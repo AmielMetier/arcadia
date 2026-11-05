@@ -127,7 +127,7 @@ export function createBackroomsScene(container, floors) {
   const holesOf = (m) => [
     ...(m.pits || []).map((p) => ({ x: p.x, z: p.z, hx: PIT_HALF, hz: PIT_HALF })),
     // la trémie de l'escalier : une seule ouverture sur ses deux cases (pas de poutre au milieu)
-    ...(m.stairs || []).map((st) => ({ x: st.x, z: st.z, hx: (st.dx ? st.len : CELL_SIZE) / 2 - 0.02, hz: (st.dz ? st.len : CELL_SIZE) / 2 - 0.02 })),
+    ...(m.stairs || []).map((st) => ({ x: st.cx, z: st.cz, hx: (st.dx ? 1.5 : 1) * CELL_SIZE - 0.02, hz: (st.dz ? 1.5 : 1) * CELL_SIZE - 0.02 })),
   ];
 
   // Un étage entier : sol, plafond, murs, néons, meubles, cassettes, objets, ascenseur… dans un groupe à sa hauteur
@@ -474,7 +474,7 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
     let ds = 1234567 + fi * 7919 + (map.level || 0) * 104729 + (map.spawn ? Math.round(map.spawn.x * 13 + map.spawn.z * 7) : 0);
     const drnd = () => ((ds = (ds * 1103515245 + 12345) % 2147483648) / 2147483648);
     const pitCells = new Set((map.pits || []).map((p) => Math.floor(p.z / CELL_SIZE) * W + Math.floor(p.x / CELL_SIZE)));
-    const stairCells = new Set((map.stairs || []).flatMap((st) => [st.gz * W + st.gx, st.gz2 * W + st.gx2]));
+    const stairCells = new Set((map.stairs || []).flatMap((st) => st.cells.map((k) => k.gz * W + k.gx)));
     const wallSpots = { outlet: [], fire_alarm: [], power_box_01: [], wall_clock: [], drawing: [] };
     const ceilSpots = [];
     const rates = L1
@@ -684,55 +684,83 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
     };
     for (const it of map.items || []) addItemMesh(it);
 
-    // 8. Escaliers : à l'étage du bas, une volée de deux cases (20 marches de 17 cm) qui monte jusqu'à la trémie, avec
-    // ses rampes ; à l'étage du haut, un garde-corps sur les côtés et au bout de la trémie (on arrive par l'autre bout)
+    // 8. Escaliers coudés : à l'étage du bas, deux volées côte à côte (16 marches de 20 cm chacune) reliées par un
+    // palier à mi-hauteur, qui montent dans un puits de plus de 6 m jusqu'à la trémie, avec leurs rampes ; à l'étage
+    // du haut, un garde-corps tout autour de la trémie, sauf en haut de la seconde volée (c'est par là qu'on arrive)
     const stairMat = baked(new THREE.MeshLambertMaterial({ color: '#7a7058' }));
     const noseMat = baked(new THREE.MeshLambertMaterial({ color: '#3d3a32' }));
     const railStair = baked(new THREE.MeshLambertMaterial({ color: '#3a3a36' }));
-    const W2 = CELL_SIZE - 0.08; // largeur de la volée
+    const C = CELL_SIZE;
+    const HALF = FLOOR_DY / 2;
+    const zAxis = new THREE.Vector3(0, 0, 1);
     for (const st of map.stairs || []) {
-      const along = (o, lat, y, sx, sy, sz, mat) => {
-        // une boîte posée le long de la volée : o depuis le bas, lat sur le côté
-        const m = new THREE.Mesh(new THREE.BoxGeometry(st.dx ? sx : sz, sy, st.dx ? sz : sx), mat);
-        m.position.set(st.bx + st.dx * o + st.dz * lat, y, st.bz + st.dz * o - st.dx * lat);
+      // repère de la cage : u le long des volées, v en travers ; y depuis le sol de cet étage
+      const wx = (u, v) => st.ox + st.dx * u + st.px * v;
+      const wz = (u, v) => st.oz + st.dz * u + st.pz * v;
+      const box = (u, v, y, su, sy, sv, mat) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(st.dx ? su : sv, sy, st.dx ? sv : su), mat);
+        m.position.set(wx(u, v), y, wz(u, v));
         group.add(m);
         return m;
       };
+      // une barre entre deux points (u, v, y)
+      const bar = (a, b, th, mat) => {
+        const A = new THREE.Vector3(wx(a[0], a[1]), a[2], wz(a[0], a[1]));
+        const B = new THREE.Vector3(wx(b[0], b[1]), b[2], wz(b[0], b[1]));
+        const d = B.clone().sub(A);
+        const m = new THREE.Mesh(new THREE.BoxGeometry(th, th, d.length()), mat);
+        m.position.copy(A).add(B).multiplyScalar(0.5);
+        m.quaternion.setFromUnitVectors(zAxis, d.normalize());
+        group.add(m);
+      };
+      // une rampe : main courante et lisse de a à b (hauteurs des marches), poteaux tous les ~80 cm
+      const rail = (a, b) => {
+        bar([a[0], a[1], a[2] + 1.0], [b[0], b[1], b[2] + 1.0], 0.05, railStair);
+        bar([a[0], a[1], a[2] + 0.5], [b[0], b[1], b[2] + 0.5], 0.03, railStair);
+        const n = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.8));
+        for (let k = 0; k <= n; k++) {
+          const f = k / n;
+          const y = a[2] + (b[2] - a[2]) * f;
+          box(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, y + 0.5, 0.04, 1.0, 0.04, railStair);
+        }
+      };
       if (fi > 0 || floors.length === 1) {
-        const n = 20;
-        const run = st.len / n;
+        const n = 16;
+        const run = (2 * C) / n;
+        const WL = C - 0.06; // largeur d'une volée
         for (let i = 0; i < n; i++) {
-          const h = ((i + 1) * FLOOR_DY) / n;
-          along((i + 0.5) * run, 0, h / 2, run, h, W2, stairMat);
-          // le nez de marche, plus sombre
-          along((i + 0.06) * run, 0, h - 0.012, run * 0.12, 0.024, W2, noseMat);
+          // première volée : on monte en s'éloignant de l'entrée
+          const hA = ((i + 1) * HALF) / n;
+          box((i + 0.5) * run, C / 2, hA / 2, run, hA, WL, stairMat);
+          box((i + 0.06) * run, C / 2, hA - 0.012, run * 0.12, 0.024, WL, noseMat);
+          // seconde volée : on remonte en revenant vers l'entrée
+          const hB = HALF + hA;
+          box(2 * C - (i + 0.5) * run, 1.5 * C, hB / 2, run, hB, WL, stairMat);
+          box(2 * C - (i + 0.06) * run, 1.5 * C, hB - 0.012, run * 0.12, 0.024, WL, noseMat);
         }
-        // rampes des deux côtés : une main courante qui suit la pente, sur des poteaux
-        const slope = Math.atan2(FLOOR_DY, st.len);
-        for (const s of [-1, 1]) {
-          const lat = s * (W2 / 2 - 0.04);
-          const hand = along(st.len / 2, lat, FLOOR_DY / 2 + 0.95, Math.hypot(st.len, FLOOR_DY), 0.05, 0.05, railStair);
-          // incliner la main courante dans le sens de la montée
-          if (st.dx) hand.rotation.z = st.dx * slope;
-          else hand.rotation.x = -st.dz * slope;
-          for (let k = 1; k < 5; k++) {
-            const o = (k / 5) * st.len;
-            const y0 = (o / st.len) * FLOOR_DY;
-            along(o, lat, y0 + 0.5, 0.04, 1.0, 0.04, railStair);
-          }
-        }
+        // le palier, à mi-hauteur
+        box(2.5 * C, C, HALF / 2, C, HALF, 2 * C - 0.04, stairMat);
+        // rampes : côté extérieur des deux volées, et le long de la seconde côté vide (on surplombe la première)
+        const e = 0.05;
+        rail([0, e, 0], [2 * C, e, HALF]);
+        rail([2 * C, 2 * C - e, HALF], [0, 2 * C - e, FLOOR_DY]);
+        rail([2 * C, C + e, HALF], [0, C + e, FLOOR_DY]);
+        // autour du palier
+        rail([2 * C, e, HALF], [3 * C - e, e, HALF]);
+        rail([3 * C - e, e, HALF], [3 * C - e, 2 * C - e, HALF]);
+        rail([3 * C - e, 2 * C - e, HALF], [2 * C, 2 * C - e, HALF]);
+        // une ampoule nue au-dessus du palier, presque morte
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshBasicMaterial({ color: '#7a6a3a' }));
+        bulb.position.set(wx(2.5 * C, C), HALF + 2.6, wz(2.5 * C, C));
+        group.add(bulb);
+        bar([2.5 * C, C, HALF + 2.66], [2.5 * C, C, FLOOR_DY - 0.4], 0.012, railStair);
       } else {
-        // une rambarde : main courante, lisse à mi-hauteur et poteaux, sur les côtés et au bout d'en bas de la trémie
-        // (le haut des marches reste ouvert : c'est par là qu'on arrive)
-        for (const s of [-1, 1]) {
-          const lat = s * (CELL_SIZE / 2 - 0.03);
-          along(st.len / 2, lat, 1.0, st.len, 0.05, 0.05, railStair);
-          along(st.len / 2, lat, 0.5, st.len, 0.03, 0.03, railStair);
-          for (let k = 0; k <= 6; k++) along((k / 6) * st.len, lat, 0.5, 0.04, 1.0, 0.04, railStair);
-        }
-        along(0.03, 0, 1.0, 0.05, 0.05, CELL_SIZE, railStair);
-        along(0.03, 0, 0.5, 0.03, 0.03, CELL_SIZE, railStair);
-        for (let k = 1; k < 4; k++) along(0.03, (k / 4 - 0.5) * CELL_SIZE, 0.5, 0.04, 1.0, 0.04, railStair);
+        // garde-corps autour de la trémie, ouvert en haut de la seconde volée
+        const e = 0.03;
+        rail([e, e, 0], [e, C, 0]);
+        rail([e, e, 0], [3 * C - e, e, 0]);
+        rail([3 * C - e, e, 0], [3 * C - e, 2 * C - e, 0]);
+        rail([3 * C - e, 2 * C - e, 0], [e, 2 * C - e, 0]);
       }
     }
 
@@ -1195,6 +1223,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   let lastTime = 0;
   let bob = 0;
   let eyeY = 1.6; // hauteur des yeux : elle suit les chutes, les escaliers et l'échelle
+  let fallV = 0; // vitesse de chute de la caméra
+  let landShake = 0; // le choc à l'arrivée d'une chute (1 : tout juste tombé)
   let exposure = 1.2; // exposition du caméscope : elle rattrape la lumière en une seconde environ
   let lightNow = 0.5; // lumière des néons là où l'on est (pour le grésillement)
 
@@ -1227,13 +1257,25 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       // 1. Caméra : balancement lent de la marche, plus marqué en courant ; une chute la fait plonger d'un étage
       if (P.moving) bob += dt * (P.running ? 9 : 5.5);
       const want = 1.6 + feetY(sim.stairs, P.x, P.z, P.floor) + (P.onLadder ? 1.0 : 0);
-      const fall = want < eyeY - 0.5;
-      eyeY += (want - eyeY) * Math.min(1, dt * (fall ? 9 : 10));
+      // une chute : on tombe vraiment (gravité), puis le choc secoue la caméra
+      if (want < eyeY - 0.5 || fallV > 0) {
+        fallV += 9.8 * dt;
+        eyeY -= fallV * dt;
+        if (eyeY <= want) {
+          eyeY = want;
+          landShake = Math.min(1, fallV / 10);
+          fallV = 0;
+        }
+      } else eyeY += (want - eyeY) * Math.min(1, dt * 10);
+      landShake = Math.max(0, landShake - dt * 0.9);
+      const shake = landShake * landShake;
       camera.position.set(P.x, eyeY + (P.moving ? Math.sin(bob * 2) * (P.running ? 0.05 : 0.025) : 0), P.z);
       camera.rotation.order = 'YXZ';
       camera.rotation.y = P.yaw;
       camera.rotation.x = P.pitch;
-      camera.rotation.z = (P.moving ? Math.sin(bob) * 0.006 : 0) - (P.tilt || 0) * 0.5; // on tangue sur l'arête
+      camera.rotation.z = (P.moving ? Math.sin(bob) * 0.006 : 0) - (P.tilt || 0) * 0.5 + shake * 0.35; // on tangue sur l'arête ; sonné après une chute
+      camera.rotation.x += shake * (Math.sin(time * 31) * 0.05 - 0.35);
+      camera.position.y -= shake * 0.9;
       // caméra tenue à la main : elle ne reste jamais tout à fait immobile, et tremble davantage en courant
       const hand = (P.moving ? (P.running ? 2.4 : 1.4) : 1) * 0.0035;
       camera.rotation.x += (Math.sin(time * 0.83) * 0.6 + Math.sin(time * 2.17 + 1.3) * 0.3 + Math.sin(time * 5.3) * 0.1) * hand;

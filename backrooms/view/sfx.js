@@ -697,35 +697,57 @@ export class BackroomsSfx {
     });
   }
 
-  // Chute dans un trou : un frottement puis un choc sourd (plus fort pour celui qui tombe)
+  // Chute dans un trou : un long sifflement d'air qui descend pendant plus d'une seconde, puis un choc sourd et lourd
+  // (plus fort pour celui qui tombe)
   fall(mine = true) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
     const t = c.currentTime;
     const k = mine ? 1 : 0.4;
+    const T = 1.1; // durée de la chute
     const osc = c.createOscillator();
     const g = c.createGain();
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(220, t);
-    osc.frequency.exponentialRampToValueAtTime(40, t + 0.45);
-    g.gain.setValueAtTime(0.25 * k, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    osc.frequency.setValueAtTime(260, t);
+    osc.frequency.exponentialRampToValueAtTime(35, t + T);
+    g.gain.setValueAtTime(0.05 * k, t);
+    g.gain.linearRampToValueAtTime(0.22 * k, t + T * 0.9);
+    g.gain.exponentialRampToValueAtTime(0.001, t + T + 0.05);
     osc.connect(g);
     g.connect(this.out);
     osc.start(t);
-    osc.stop(t + 0.55);
+    osc.stop(t + T + 0.1);
+    // l'air qui siffle (bruit filtré)
+    const len = Math.floor(c.sampleRate * T);
+    const buf = c.createBuffer(1, len, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const air = c.createBufferSource();
+    air.buffer = buf;
+    const bp = c.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(400, t);
+    bp.frequency.linearRampToValueAtTime(1600, t + T);
+    const ag = c.createGain();
+    ag.gain.setValueAtTime(0.0001, t);
+    ag.gain.exponentialRampToValueAtTime(0.35 * k, t + T);
+    air.connect(bp);
+    bp.connect(ag);
+    ag.connect(this.out);
+    air.start(t);
+    // le choc
     const thud = c.createOscillator();
     const tg = c.createGain();
     thud.type = 'sine';
-    thud.frequency.setValueAtTime(70, t + 0.45);
-    thud.frequency.exponentialRampToValueAtTime(30, t + 0.7);
+    thud.frequency.setValueAtTime(80, t + T);
+    thud.frequency.exponentialRampToValueAtTime(25, t + T + 0.4);
     tg.gain.setValueAtTime(0.0001, t);
-    tg.gain.setValueAtTime(0.6 * k, t + 0.45);
-    tg.gain.exponentialRampToValueAtTime(0.001, t + 0.75);
+    tg.gain.setValueAtTime(0.9 * k, t + T);
+    tg.gain.exponentialRampToValueAtTime(0.001, t + T + 0.6);
     thud.connect(tg);
     tg.connect(this.out);
     thud.start(t);
-    thud.stop(t + 0.8);
+    thud.stop(t + T + 0.65);
   }
 
   // Victoire

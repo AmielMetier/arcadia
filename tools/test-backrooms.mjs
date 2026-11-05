@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, DT, DEPART_T, FUSES, WHISTLE_CD, stairAt, feetY } from '../backrooms/engine/sim.js';
+import { BackroomsSim, DT, DEPART_T, FUSES, WHISTLE_CD, stairAt, stairLocal, feetY } from '../backrooms/engine/sim.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
 
 // distance en marche (en cases) entre deux cases
@@ -750,40 +750,77 @@ test("chute : par un trou, on atterrit à l'étage du dessous, juste en dessous 
   const x0 = P.x;
   sim.step({ my: 1 });
   assert.equal(P.x, x0);
-  // l'escalier : de l'étage du bas on remonte en marchant, marche après marche, sans être téléporté
+  // l'escalier coudé : de l'étage du bas on remonte en marchant, marche après marche, demi-tour sur le palier,
+  // sans être téléporté
   const st = sim.stairs[0];
-  run(sim, 1);
+  const C = CELL_SIZE;
+  const W = (u, v) => ({ x: st.ox + st.dx * u + st.px * v, z: st.oz + st.dz * u + st.pz * v });
+  const walk = (pts, check) => {
+    for (const w of pts) {
+      for (let i = 0; i < 400 && Math.hypot(P.x - w.x, P.z - w.z) > 0.25; i++) {
+        P.yaw = Math.atan2(-(w.x - P.x), -(w.z - P.z));
+        const before = { x: P.x, z: P.z, y: feetY(sim.stairs, P.x, P.z, P.floor) };
+        sim.step({ my: 1, yaw: P.yaw });
+        check(before);
+      }
+      assert.ok(Math.hypot(P.x - w.x, P.z - w.z) <= 0.25, `atteint ${w.x.toFixed(1)}, ${w.z.toFixed(1)}`);
+    }
+  };
+  run(sim, 2.5);
   P.x = st.down.x;
   P.z = st.down.z;
-  P.yaw = Math.atan2(-st.dx, -st.dz);
-  let last = { x: P.x, z: P.z, y: feetY(sim.stairs, P.x, P.z, P.floor) };
   let climbed = false;
-  for (let i = 0; i < 600 && Math.hypot(P.x - st.up.x, P.z - st.up.z) > 0.3; i++) {
-    sim.step({ my: 1, yaw: P.yaw });
+  let top = -Infinity;
+  walk([W(0.3, C / 2), W(2.5 * C, C / 2), W(2.5 * C, 1.5 * C), W(0.3, 1.5 * C), st.up], (b) => {
     const y = feetY(sim.stairs, P.x, P.z, P.floor);
-    assert.ok(Math.hypot(P.x - last.x, P.z - last.z) < 0.2, 'pas de téléportation');
-    assert.ok(y >= last.y - 1e-9 && y - last.y < 0.2, 'les pieds montent peu à peu');
-    if (y > -FLOOR_DY + 0.5 && y < -0.5) climbed = true;
-    last = { x: P.x, z: P.z, y };
-  }
-  assert.ok(climbed, 'on est passé par le milieu des marches');
+    assert.ok(Math.hypot(P.x - b.x, P.z - b.z) < 0.2, 'pas de téléportation');
+    assert.ok(y >= b.y - 1e-9 && y - b.y < 0.2, 'les pieds montent peu à peu');
+    if (Math.abs(y + FLOOR_DY / 2) < 0.01) climbed = true;
+    top = Math.max(top, y);
+  });
+  assert.ok(climbed, 'on est passé par le palier, à mi-hauteur');
   assert.equal(P.floor, 0, "remonté par l'escalier");
-  assert.ok(Math.hypot(P.x - st.up.x, P.z - st.up.z) <= 0.3, 'arrivé en haut, devant les marches');
-  // et on redescend par la même volée
-  P.yaw = Math.atan2(st.dx, st.dz);
-  for (let i = 0; i < 600 && Math.hypot(P.x - st.down.x, P.z - st.down.z) > 0.3; i++) sim.step({ my: 1, yaw: P.yaw });
+  assert.ok(FLOOR_DY > 6, 'les étages sont loin l\'un de l\'autre');
+  // et on redescend par le même chemin
+  walk([W(0.3, 1.5 * C), W(2.5 * C, 1.5 * C), W(2.5 * C, C / 2), W(0.3, C / 2), st.down], () => {});
   assert.equal(P.floor, 1, 'redescendu');
+  // pas de raccourci d'une volée à l'autre par-dessus la rampe du milieu
+  P.x = W(1.0 * C, C / 2).x;
+  P.z = W(1.0 * C, C / 2).z;
+  P.floor = 1;
+  const goal = W(1.0 * C, 1.5 * C);
+  for (let i = 0; i < 120; i++) sim.step({ my: 1, yaw: Math.atan2(-(goal.x - P.x), -(goal.z - P.z)) });
+  assert.equal(stairAt(sim.stairs, P.x, P.z).lane, 'A', 'resté sur la première volée');
   // on ne monte pas sur les marches par le côté, et on ne tombe pas dans la trémie depuis l'étage du haut
-  const side = { x: st.x + st.dz * CELL_SIZE, z: st.z - st.dx * CELL_SIZE };
-  for (const floor of [0, 1]) {
-    if (sim.isColliding(side.x, side.z, 0.38, floor)) continue;
-    P.floor = floor;
-    P.x = side.x;
-    P.z = side.z;
-    P.yaw = Math.atan2(st.dz, -st.dx); // tourné vers la volée
-    for (let i = 0; i < 180; i++) sim.step({ my: 1, yaw: P.yaw });
-    assert.ok(!stairAt(sim.stairs, P.x, P.z), `étage ${floor} : bloqué au bord de l'escalier`);
-    assert.equal(P.floor, floor);
+  for (const side of [W(1.5 * C, -0.5 * C), W(1.5 * C, 2.5 * C), W(3.5 * C, C), W(-0.5 * C, 1.5 * C), W(-0.5 * C, 0.5 * C)]) {
+    for (const floor of [0, 1]) {
+      if (sim.isColliding(side.x, side.z, 0.38, floor)) continue;
+      P.floor = floor;
+      P.x = side.x;
+      P.z = side.z;
+      // les deux entrées permises : en bas de la première volée (étage du bas), en haut de la seconde (étage du haut)
+      const lA = stairLocal(st, side.x, side.z);
+      if ((lA.u < 0 && lA.v < C && floor === 1) || (lA.u < 0 && lA.v > C && floor === 0)) continue;
+      for (let i = 0; i < 180; i++) sim.step({ my: 1, yaw: Math.atan2(-(st.cx - P.x), -(st.cz - P.z)) });
+      assert.ok(!stairAt(sim.stairs, P.x, P.z), `étage ${floor} : bloqué au bord de l'escalier`);
+      assert.equal(P.floor, floor);
+    }
+  }
+});
+
+test("Level 0 : la cage d'escalier ne coupe aucun étage, et le couloir piégé a son point de départ", () => {
+  for (const sd of [1, 7, 19, 33, 64, 101]) {
+    const L = createLevel0(sd);
+    const [up, down] = L.floors;
+    for (const st of L.stairs) assert.equal(st.cells.length, 6, 'deux volées et un palier');
+    for (const [m, entry] of [[up, 'up'], [down, 'down']]) {
+      const blocked = new Set(L.stairs.flatMap((st) => st.cells.map((c) => c.gz * m.W + c.gx)));
+      const g = m.grid.map((v, i) => (blocked.has(i) ? 2 : v));
+      const st = L.stairs[0];
+      const d = bfs(g, m.W, m.H, Math.floor(st[entry].x / CELL_SIZE), Math.floor(st[entry].z / CELL_SIZE));
+      for (let i = 0; i < g.length; i++) if (m.dist[i] >= 0 && !blocked.has(i)) assert.ok(d[i] >= 0, `graine ${sd} : tout l'étage reste accessible`);
+    }
+    if (up.trap) assert.ok(!up.isWall(Math.floor(up.trap.x / CELL_SIZE), Math.floor(up.trap.z / CELL_SIZE)), 'départ du parcours sur le sol');
   }
 });
 

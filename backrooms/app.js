@@ -216,6 +216,15 @@ function initGame(settings = lastSettings) {
   const players = NET.role === 'host' ? H.players.map((p) => ({ id: p.id, name: p.name || 'Player' })) : [{ id: 0, name: 'Player' }];
   NET.run = Date.now();
   startRun({ seed, difficulty, players, run: NET.run, level: 0 });
+  // ?parkour (seul) : on commence devant le couloir piégé, tourné vers les trous
+  const trap = sim.map.trap;
+  if (NET.role === 'solo' && trap && /[?&]parkour(&|=|$)/.test(location.search)) {
+    const P = sim.player;
+    P.x = trap.x;
+    P.z = trap.z;
+    P.yaw = trap.yaw;
+    P.pitch = -0.3;
+  }
   if (NET.role === 'host') send('all', goMessage());
 }
 

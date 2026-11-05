@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 4.14 — 5 novembre 2026
+- **The Backrooms** — au Level 0, les deux étages sont bien plus loin l'un de l'autre : les trous du couloir piégé sont maintenant de vrais puits de plus de 6 mètres.
+  - Rater une arête, c'est une vraie chute : on tombe pendant plus d'une seconde, l'air siffle, le choc est lourd, l'image tremble et on reste sonné plus longtemps, à bout de souffle.
+  - Depuis l'étage du bas, on voit le puits au-dessus de sa tête.
+- **The Backrooms** — les escaliers entre les deux étages sont coudés : une première volée, un palier à mi-hauteur sous une ampoule presque morte, demi-tour, puis une seconde volée qui surplombe la première, au fond d'une grande cage obscure.
+- **The Backrooms** — l'entité prend l'escalier par le bas ou par le haut, comme les joueurs.
+
 ## 4.13 — 4 novembre 2026
 - **The Backrooms** — le dédale aux murs jaunes est bien plus encombré, comme si d'autres étaient passés avant toi.
   - Des chantiers abandonnés : rubalise jaune et noire arrachée qui traîne par terre en travers des couloirs (elle ne bloque jamais le passage), cônes orange et projecteurs éteints sur leur trépied.
