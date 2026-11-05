@@ -400,15 +400,10 @@ export function pokedexRegisterScene(game, mon) {
       }
     }, typeSpeed);
 
-    let closed = false;
+    const finish = closer(game.ui, s, () => pop, resolve, 'select', () => { if (textTimer) clearInterval(textTimer); });
     const close = () => {
-      if (closed) return;
       if (!typingDone) { finishTyping(); return; }
-      closed = true;
-      sound.sfx('select');
-      pop();
-      s.remove();
-      resolve();
+      finish();
     };
 
     nextBtn.addEventListener('click', (e) => { e.stopPropagation(); close(); });

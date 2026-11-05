@@ -4,7 +4,7 @@ import { SPECIES } from '../../data/species.js';
 import { MOVES } from '../../data/moves.js';
 import { getAbility } from '../../data/abilities.js';
 import { ASSETS } from '../../assets.js';
-import { TYPE_FR, TYPE_COL, screen } from './common.js';
+import { TYPE_FR, TYPE_COL, screen, closer } from './common.js';
 
 /* ================= HALL DE LA RENOMMÉE / PANTHÉON B2W2 ================= */
 
@@ -139,12 +139,7 @@ export function hofScreen(game, entry) {
       });
     };
 
-    const close = () => {
-      pop();
-      s.remove();
-      ui.sound?.sfx('cancel');
-      resolve();
-    };
+    const close = closer(ui, s, () => pop, resolve);
 
     const pop = ui.input.push((k) => {
       if (k === 'a' || k === 'right' || k === 'down') {
@@ -284,12 +279,7 @@ export function pantheonScreen(game) {
       });
     };
 
-    const close = () => {
-      pop();
-      s.remove();
-      ui.sound?.sfx('cancel');
-      resolve();
-    };
+    const close = closer(ui, s, () => pop, resolve);
 
     const pop = ui.input.push((k) => {
       if (k === 'b') {

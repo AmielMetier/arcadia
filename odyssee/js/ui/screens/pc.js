@@ -119,7 +119,7 @@ export async function pcScreen(game) {
       return st.party[slot];
     };
 
-    const closePC = () => {
+    const closePC = closer(ui, s, () => pop, resolve, 'pc', () => {
       if (inHand) {
         // Reposer le Pokémon en main à son emplacement d'origine
         if (inHand.from === 'grid') {
@@ -130,8 +130,8 @@ export async function pcScreen(game) {
         }
         inHand = null;
       }
-      pop(); s.remove(); ui.sound.sfx('pc'); game.save(true); resolve();
-    };
+      game.save(true);
+    });
 
     const doDropOrSwap = (targetArea, targetSlot) => {
       if (!inHand) return;

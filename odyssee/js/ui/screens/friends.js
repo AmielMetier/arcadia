@@ -3,7 +3,7 @@ import { esc } from '../ui.js';
 import { BADGES } from '../../world/region.js';
 import { ASSETS } from '../../assets.js';
 import { getFriendsManager, formatFid } from '../../net/friends.js';
-import { screen } from './common.js';
+import { screen, closer } from './common.js';
 import { cardScreen } from './card.js';
 
 /* ================= REGISTRE AMI & CONNEXIONS C-GEAR 5G ================= */
@@ -462,14 +462,10 @@ export function friendsScreen(game) {
       });
     };
 
-    const close = () => {
+    const close = closer(ui, s, () => pop, resolve, 'cancel', () => {
       clearInterval(heartbeatTimer);
       mgr.off('change', onMgrChange);
-      pop();
-      s.remove();
-      ui.sound?.sfx('cancel');
-      resolve();
-    };
+    });
 
     const onMgrChange = () => render();
     mgr.on('change', onMgrChange);

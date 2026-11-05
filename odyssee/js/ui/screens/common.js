@@ -19,13 +19,15 @@ export function screen(ui, cls, title) {
   return s;
 }
 
-/** fermeture commune d'un écran : rend la main au clavier, retire l'écran, joue le son et tient la promesse.
- *  Ne s'exécute qu'une fois (Échap + clic sur « Fermer » le même instant ne referment pas deux fois). */
-export function closer(ui, s, getPop, resolve, sound = 'cancel') {
+/** fermeture commune d'un écran : nettoie (minuteurs, abonnements…), rend la main au clavier, retire l'écran,
+ *  joue le son et tient la promesse. Ne s'exécute qu'une fois (Échap + clic sur « Fermer » au même instant).
+ *  cleanup(value) est appelé en premier, écran encore en place. */
+export function closer(ui, s, getPop, resolve, sound = 'cancel', cleanup = null) {
   let done = false;
   return (value) => {
     if (done) return;
     done = true;
+    cleanup?.(value);
     getPop()?.();
     s.remove();
     if (sound) ui.sound?.sfx(sound);

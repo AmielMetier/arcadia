@@ -2,7 +2,7 @@
 import { esc } from '../ui.js';
 import { SPECIES } from '../../data/species.js';
 import { ASSETS } from '../../assets.js';
-import { TYPE_FR, TYPE_COL, hpCol, screen } from './common.js';
+import { TYPE_FR, TYPE_COL, hpCol, screen, closer } from './common.js';
 import { pantheonScreen } from './hof.js';
 
 /* ================= CARTE DE DRESSEUR FAÇON 5G (NOIR 2 / BLANC 2) ================= */
@@ -437,12 +437,7 @@ export function cardScreen(game, BADGES, other) {
       });
     };
 
-    const close = () => {
-      pop();
-      s.remove();
-      ui.sound?.sfx('cancel');
-      resolve();
-    };
+    const close = closer(ui, s, () => pop, resolve);
 
     const pop = ui.input.push((k) => {
       if (k === 'b') {
