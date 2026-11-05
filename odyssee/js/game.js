@@ -33,6 +33,7 @@ import { preparerDomaine, frigo, architecte, recolter, allerDomaine, resident, a
 import { composer } from './render/tenue.js';
 import { buildRivalParty, getRivalItems } from './world/rival.js';
 import { Vie, parlerFaune, rentreLeSoir } from './vie.js';
+import { VieMonde, colporteur, marche, cueillir, fouiller, revanchePossible, revanche, noteCombat, ragot } from './vie-monde.js';
 
 /** météos qui comptent en combat (brume et cendres ne sont que du décor, comme dans les jeux 5G) */
 const BATTLE_WEATHERS = ['rain', 'sun', 'sandstorm', 'hail'];
@@ -119,6 +120,8 @@ export class Game {
     this.busy = false; this.player = null; this.npcs = []; this.items = [];
     this.bv = new BattleView(this);
     this.vie = new Vie(this);
+    this.vieMonde = new VieMonde(this);
+    this.jour = () => new Date();
     this.autoRun = false;
     try { this.autoRun = localStorage.getItem('odyssee-autorun') === '1'; } catch (e) {}
     this.runSpeed = 1; // 0: Normale (1×), 1: Rapide (1.7×), 2: Turbo (2.5×)
@@ -255,6 +258,7 @@ export class Game {
     this.view.eclipse = this.eclipseOn();
     this.view.setMap(m);
     this.vie?.onMap(m);
+    this.vieMonde?.onMap(m);
     const st = this.state;
     this.npcs = m.npcs.filter((n) => this.npcVisible(n)).map((n) => this.npcState(n));
     // le rival attend au labo tant que le premier combat n'a pas eu lieu
@@ -516,6 +520,7 @@ export class Game {
     // PNJ et autres joueurs
     for (const n of this.npcs) this.npcTick(n, dt);
     this.vie?.tick(dt);
+    this.vieMonde?.tick(dt);
     this.peersTick?.(dt);
     // la carte n'est pas redessinée sous un combat ou un écran plein cadre
     if (this.bv.alive || this.ui.root.querySelector('.screen')) { this.drawTags?.(false); return; }
@@ -857,6 +862,8 @@ export class Game {
         const L = (this.legends || []).find((q) => (q.x === fx && q.y === fy) || (q.x === fx + dx && q.y === fy + dy && walkable(t)));
         if (L) await this.legendBattle(L);
         else if (it) await this.pickItem(it);
+        else if (o?.type === 'baies') await cueillir(this, o);
+        else if (o?.type === 'fouille') await fouiller(this, o);
         else if (o?.use) await o.use(this.api(), o, fx, fy);
         else if (o?.type === 'pc') await pcScreen(this);
         else if (o?.type === 'naturepc') await naturePcScreen(this);
@@ -880,6 +887,7 @@ export class Game {
     try {
       if (d.trainer) {
         if (!st.flags['T:' + n.id]) await this.trainerBattle(n, false);
+        else if (revanchePossible(this, n)) await revanche(this, n);
         else {
           await this.ui.say(d.trainer.after || 'Quel combat !', {
             speaker: d.trainer.cls ? `${d.trainer.cls} ${d.trainer.name}` : d.trainer.name,
@@ -893,7 +901,7 @@ export class Game {
       else if (d.role === 'relearner') await moveRelearnerScreen(this);
       else if (d.talk) await d.talk(this.api(), n);
       else if (d.script) await this.script(d.script, n);
-      else if (d.text) await this.ui.say(d.text, {
+      else if (d.text) await this.ui.say(/:h\d+$/.test(n.id) && Math.random() < 0.4 ? ragot(this) : d.text, {
         speaker: d.name || n.name || (d.who ? d.who : null),
         face: d.sprite || n.sprite
       });
@@ -1549,6 +1557,7 @@ export class Game {
     this.musicLock = false;
     if (res === 'win') {
       st.flags['T:' + n.id] = true;
+      noteCombat(this, n);
       if (d.leader != null) await this.badgeScene(d.leader, tr.name);
       if (typeof d.onWin === 'function') await d.onWin(this.api(), n); else if (d.onWin) await this.script(d.onWin, n);
       if (d.beatenPos) { await this.npcWalk(n, 'right', d.beatenPos[0] - n.x); n.dir = 'down'; n.home = [n.x, n.y]; }
@@ -2013,6 +2022,8 @@ export class Game {
     if (name === 'architecte') return architecte(this);
     if (name === 'resident') return resident(this, n);
     if (name === 'faune') return parlerFaune(this, n);
+    if (name === 'colporteur') return colporteur(this, n);
+    if (name === 'marche') return marche(this, n);
     if (name === 'mom') {
       if (!st.flags.starter) { await ui.say([`Ah, ${st.name}, tu es enfin réveillé${st.gender === 'f' ? 'e' : ''} !`, 'Le Professeur Saule est passé ce matin. Il t\'attend à son laboratoire, juste au sud-est.', 'Théo y est déjà, bien sûr... Allez, file !'], { speaker: 'Maman' }); return; }
       await ui.say(`${st.name} ! Tu as l'air épuisé${st.gender === 'f' ? 'e' : ''}. Repose-toi un peu.`, { keep: true, speaker: 'Maman' });

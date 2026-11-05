@@ -1,5 +1,17 @@
 # Journal des versions — Arcadia
 
+## 4.39 — 5 novembre 2026
+- **Odyssée** — Encore plus de vie sur les routes et dans les villes.
+  - Des colporteurs sur certaines routes vendent de quoi tenir le voyage, et une pierre d'évolution.
+  - Le samedi et le dimanche, une marchande s'installe au centre des villes à arène, avec des objets rares (Super Bonbon, pierres d'évolution…).
+  - Des voyageurs se promènent sur les routes : peintre, randonneur, ornithologue…
+  - Des arbres à baies poussent en bordure des routes : on peut les cueillir une fois par jour.
+  - Dans les grottes, certaines parois scintillent : en les grattant, on trouve des pierres, des objets et parfois une Méga-Gemme (une fois par jour).
+  - Les dresseurs des routes déjà battus redemandent une revanche le lendemain, avec une équipe plus forte, et une récompense à la clé.
+  - Les habitants parlent de tes badges, de la Team Éclipse, de l'heure qu'il est ou du marché du week-end.
+  - Sons d'ambiance : oiseaux le jour, grillons le soir, vagues au bord de l'eau, vent dans la neige, mouettes.
+  - Des papillons volent près des fleurs, des lucioles s'allument le soir et des mouettes survolent la mer.
+
 ## 4.38 — 5 novembre 2026
 - **Odyssée** — Le monde est plus vivant.
   - Des Pokémon en liberté se promènent dans chaque ville, selon le décor : Roucool et Pikachu en ville, Psykokwak au port, Goupix près des volcans, Évoli dans la neige… On peut leur parler.
