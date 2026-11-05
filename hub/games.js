@@ -303,7 +303,7 @@ window.HUB_GAMES = [
     settings: [
       { key: 'difficulty', label: 'Difficulté de l\'entité', options: [['normal', 'Normale'], ['hard', 'Rapide & Agressive'], ['peaceful', 'Exploration (Sans monstre)']], def: 'normal' },
     ],
-    cover: 'backrooms/img/affiche.jpg',
+    cover: 'backrooms/img/affiche.jpg?v=2', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau caméscope
   },
 ];
 

@@ -14,6 +14,7 @@ let sfx = null;
 let hud = null;
 let stepDist = 0;
 let monsterStepT = 0;
+const otherStepT = new Map(); // prochain pas de chaque autre joueur
 
 // Réseau : l'hôte fait tourner la partie et envoie un instantané ~20 fois par seconde ; un invité se déplace chez lui
 // (pour que ça réponde tout de suite), envoie ses commandes et reçoit tout le reste de l'hôte.
@@ -108,7 +109,7 @@ window.addEventListener('blur', () => {
 const touch = { move: null, look: null, run: false };
 const touchBtns = document.createElement('div');
 touchBtns.className = 'touch-btns';
-touchBtns.innerHTML = '<button data-t="run">🏃<small>Courir</small></button><button data-t="pick">✋<small>Prendre</small></button><button data-t="use">⚙<small>Utiliser</small></button><button data-t="whistle">📣<small>Siffler</small></button>';
+touchBtns.innerHTML = '<button data-t="run">🏃<small>Run</small></button><button data-t="pick">✋<small>Pick up</small></button><button data-t="use">⚙<small>Use</small></button><button data-t="whistle">📣<small>Whistle</small></button>';
 document.body.appendChild(touchBtns);
 const stick = document.createElement('div');
 stick.className = 'touch-stick';
@@ -212,7 +213,7 @@ function initGame(settings = lastSettings) {
   if (NET.role === 'guest') return; // l'invité attend le « go » de l'hôte
   const seed = Math.floor(Math.random() * 100000);
   const difficulty = settings.difficulty || 'normal';
-  const players = NET.role === 'host' ? H.players.map((p) => ({ id: p.id, name: p.name || 'Joueur' })) : [{ id: 0, name: 'Joueur' }];
+  const players = NET.role === 'host' ? H.players.map((p) => ({ id: p.id, name: p.name || 'Player' })) : [{ id: 0, name: 'Player' }];
   NET.run = Date.now();
   startRun({ seed, difficulty, players, run: NET.run, level: 0 });
   if (NET.role === 'host') send('all', goMessage());
@@ -225,7 +226,7 @@ function startRun({ seed, difficulty, players, run, level }) {
   NET.inputs = {};
   NET.actions = {};
   NET.events = [];
-  if (!players.some((p) => p.id === NET.myId)) players = [...players, { id: NET.myId, name: 'Joueur' }];
+  if (!players.some((p) => p.id === NET.myId)) players = [...players, { id: NET.myId, name: 'Player' }];
   sim = new BackroomsSim({ difficulty, seed, players, localId: NET.myId, level }); // les étages sortent de la graine
   if (level && sim.level !== level) sim.loadLevel(level);
   // un invité qui arrive en cours de partie regarde les autres jusqu'au prochain étage (l'hôte le dira)
@@ -273,7 +274,7 @@ function onMsg(from, m) {
     if (m.t === 'hi' && sim) {
       // arrivée en cours de partie : spectateur jusqu'au prochain étage
       const p = H.players.find((q) => q.id === from);
-      sim.addPlayer(from, (p && p.name) || 'Joueur');
+      sim.addPlayer(from, (p && p.name) || 'Player');
       send(from, goMessage());
     } else if (m.t === 'i' && m.run === NET.run) {
       NET.inputs[from] = { mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) } };
@@ -308,39 +309,30 @@ function onRoster() {
     NET.role = 'host';
     NET.inputs = {};
     NET.actions = {};
-    if (hud) hud.toast("Tu deviens l'hôte : la partie continue");
+    if (hud) hud.toast("You're the host now: the game goes on");
   }
   if (NET.role !== 'host') return;
   const ids = new Set(H.players.map((p) => p.id));
   for (const P of [...sim.players]) if (!ids.has(P.id)) sim.removePlayer(P.id);
 }
 
-const ITEM_NAME = { bottle: "Eau d'amande", battery: 'Piles', ladder: 'Échelle' };
-
-// position gauche / droite d'un son par rapport au regard de la caméra (-1 à 1)
-function panTo(x, z) {
-  const V = sim.viewPlayer(sim.spectate || 0);
-  let d = Math.atan2(x - V.x, z - V.z) - (V.yaw - Math.PI);
-  while (d > Math.PI) d -= 2 * Math.PI;
-  while (d < -Math.PI) d += 2 * Math.PI;
-  return Math.max(-0.9, Math.min(0.9, Math.sin(d)));
-}
+const ITEM_NAME = { bottle: 'Almond water', battery: 'Batteries', ladder: 'Ladder' };
 
 // Événements de la partie : sons, messages, changement d'étage, fin
 function handleEvent(ev, me) {
   const mine = ev.by !== undefined ? ev.by === me : ev.id === undefined || ev.id === me;
-  const who = (id) => (sim.players.find((p) => p.id === id) || {}).name || 'Quelqu\'un';
+  const who = (id) => (sim.players.find((p) => p.id === id) || {}).name || 'Someone';
   switch (ev.type) {
     case 'cassette':
       if (sfx) sfx.cassette();
-      if (hud && ev.by !== me) hud.toast(`${who(ev.by)} a trouvé une cassette (${ev.count}/${ev.total})`);
+      if (hud && ev.by !== me) hud.toast(`${who(ev.by)} found a tape (${ev.count}/${ev.total})`);
       break;
     case 'fuse':
       if (sfx) sfx.cassette();
-      if (hud) hud.toast(ev.by === me ? `Fusible ${ev.count}/${ev.total}` : `${who(ev.by)} a trouvé un fusible (${ev.count}/${ev.total})`);
+      if (hud) hud.toast(ev.by === me ? `Fuse ${ev.count}/${ev.total}` : `${who(ev.by)} found a fuse (${ev.count}/${ev.total})`);
       break;
     case 'powered':
-      if (hud) hud.toast('Fusibles en place : le monte-charge redémarre');
+      if (hud) hud.toast('Fuses in place: the freight elevator is starting up');
       break;
     case 'exitUnlocked':
       if (sfx) { sfx.exitUnlocked(); setTimeout(() => sfx && sfx.ding(), 900); }
@@ -348,71 +340,61 @@ function handleEvent(ev, me) {
     case 'pickup':
       if (!mine) break;
       if (sfx) sfx.battery();
-      if (hud) hud.toast(`${ITEM_NAME[ev.kind]} dans l'inventaire${ev.dropped ? ` · ${ITEM_NAME[ev.dropped].toLowerCase()} posée par terre` : ''}`);
+      if (hud) hud.toast(`${ITEM_NAME[ev.kind]} in your inventory${ev.dropped ? ` · ${ITEM_NAME[ev.dropped].toLowerCase()} dropped on the floor` : ''}`);
       break;
     case 'nothing':
-      if (mine && hud) hud.toast('Rien à ramasser ici');
+      if (mine && hud) hud.toast('Nothing to pick up here');
       break;
     case 'emptySlot':
-      if (mine && hud) hud.toast('Case vide : choisis un objet avec 2 ou 3');
+      if (mine && hud) hud.toast('Empty slot: pick an item with 2 or 3');
       break;
     case 'ladderFar':
-      if (mine && hud) hud.toast("Pose l'échelle juste sous le renfoncement de la cassette");
+      if (mine && hud) hud.toast('Place the ladder right under the alcove with the tape');
       break;
     case 'ladderPlaced':
       if (sfx) sfx.battery();
-      if (hud) hud.toast(mine ? "Échelle posée : approche-toi pour grimper" : "L'échelle est posée sous la cassette");
+      if (hud) hud.toast(mine ? 'Ladder placed: get closer to climb' : 'The ladder is under the tape');
       break;
     case 'fall':
       if (sfx) sfx.fall(ev.id === me);
-      if (hud) hud.toast(ev.id === me ? "Tu es tombé à l'étage du dessous ! Trouve un escalier pour remonter" : `${ev.name} est tombé à l'étage du dessous`);
+      if (hud) hud.toast(ev.id === me ? 'You fell to the floor below! Find a staircase to get back up' : `${ev.name} fell to the floor below`);
       break;
     case 'stairs':
       if (ev.id !== me) break;
       if (sfx) sfx.step(sim.level === 1);
-      if (hud) hud.toast(ev.up ? "Tu remontes à l'étage du haut" : "Tu descends à l'étage du bas");
       break;
     case 'whistle':
       {
-        // de loin, plus faible ; d'un autre étage, étouffé à travers le plancher
+        // placé là où siffle le joueur ; d'un autre étage, étouffé à travers le plancher
         const V = sim.viewPlayer(sim.spectate || 0);
-        const vol = ev.id === me ? 1 : Math.max(0.15, 1 - Math.hypot(ev.x - V.x, ev.z - V.z) / 60) * ((ev.floor || 0) === (V.floor || 0) ? 1 : 0.35);
-        if (sfx) sfx.whistle(vol, ev.id === me ? 0 : panTo(ev.x, ev.z));
+        if (sfx) sfx.whistle(ev.id === me ? null : { x: ev.x, z: ev.z, muffled: (ev.floor || 0) !== (V.floor || 0) });
       }
-      if (hud && ev.id !== me) hud.toast(`${ev.name} siffle`);
+      if (hud && ev.id !== me) hud.toast(`${ev.name} whistles`);
       break;
     case 'heard':
-      if (mine && hud) hud.toast("Chut… l'entité a entendu le sifflet");
+      if (mine && hud) hud.toast('Shh… the entity heard the whistle');
       break;
     case 'useless':
-      if (mine && hud) hud.toast(ev.kind === 'bottle' ? 'Tu as déjà tout ton souffle' : 'La lampe est déjà chargée');
+      if (mine && hud) hud.toast(ev.kind === 'bottle' ? 'Your stamina is already full' : 'The flashlight is already charged');
       break;
     case 'bottle':
       if (!mine) break;
       if (sfx) sfx.bottle();
-      if (hud) hud.toast("Eau d'amande : endurance au maximum");
+      if (hud) hud.toast('Almond water: stamina fully restored');
       break;
     case 'battery':
       if (!mine) break;
       if (sfx) sfx.battery();
-      if (hud) hud.toast('Pile changée : lampe rechargée');
-      break;
-    case 'lamp':
-      if (ev.id !== me) break;
-      if (sfx) sfx.battery();
-      if (hud) hud.toast('Lampe torche en main (case 1) · [1] pour l\'allumer ou l\'éteindre');
-      break;
-    case 'noLamp':
-      if (ev.id === me && hud) hud.toast('Pas de lampe : prends-en une sur la table du départ');
+      if (hud) hud.toast('Battery replaced: flashlight recharged');
       break;
     case 'batteryEmpty':
       if (!mine) break;
       if (sfx) sfx.battery(true);
-      if (hud) hud.toast('Plus de pile… trouve-en dans le noir');
+      if (hud) hud.toast('Out of battery… find some in the dark');
       break;
     case 'blackout':
       if (sfx) sfx.blackout();
-      if (hud) hud.toast('Coupure de courant…');
+      if (hud) hud.toast('Power outage…');
       break;
     case 'power':
       if (sfx) sfx.power();
@@ -422,11 +404,11 @@ function handleEvent(ev, me) {
       break;
     case 'board':
       if (sfx) sfx.ding();
-      if (hud && ev.id !== me) hud.toast(`${ev.name} est dans l'ascenseur`);
+      if (hud && ev.id !== me) hud.toast(`${ev.name} is in the elevator`);
       break;
     case 'depart':
       if (sfx) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
-      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? "L'ASCENSEUR DESCEND…" : 'LE MONTE-CHARGE REMONTE…', '', 0, true), 700);
+      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : 'THE FREIGHT ELEVATOR IS GOING UP…', '', 0, true), 700);
       break;
     case 'level':
       // nouvel étage : nouvelle scène
@@ -436,7 +418,7 @@ function handleEvent(ev, me) {
       scene = createBackroomsScene(stageEl, sim.floors);
       sim.spectate = 0;
       stepDist = 0;
-      if (hud) hud.fade(`LEVEL ${ev.level}`, ev.level === 1 ? 'Le sous-sol industriel' : '', 2.2);
+      if (hud) hud.fade(`LEVEL ${ev.level}`, ev.level === 1 ? 'The industrial basement' : '', 2.2);
       break;
     case 'jumpscare':
       if (ev.id !== me) break;
@@ -444,7 +426,7 @@ function handleEvent(ev, me) {
       if (hud) hud.showJumpscare(sim.level);
       break;
     case 'dead':
-      if (ev.id !== me && hud) hud.toast(`${ev.name} s'est fait attraper…`);
+      if (ev.id !== me && hud) hud.toast(`${ev.name} got caught…`);
       break;
     case 'gameover':
     case 'win':
@@ -583,12 +565,12 @@ function loop(currentTime) {
 
   // Mise à jour du son continu de l'entité, et ses pas lourds quand elle te traque
   if (sfx && sim.hasMonster && sim.state === 'playing') {
-    sfx.updateMonsterSound(sim.monster.danger, sim.monster.pan, sim.level === 1);
+    sfx.updateMonsterSound(sim.monster.danger, sim.monster, sim.level === 1);
     if (!paused && sim.monster.mode === 'chase' && sim.monster.danger > 0.05) {
       monsterStepT -= delta;
       if (monsterStepT <= 0) {
         monsterStepT = 0.42;
-        sfx.monsterStep(sim.monster.danger, sim.monster.pan);
+        sfx.monsterStep(sim.monster.danger, sim.monster);
       }
     }
   } else if (sfx) sfx.updateMonsterSound(0, 0); // partie finie : l'entité se tait
@@ -597,6 +579,22 @@ function loop(currentTime) {
   if (scene) {
     scene.render(sim, currentTime / 1000);
     if (sfx) sfx.setHum(scene.lightHere); // le grésillement des néons autour de soi
+    if (sfx) {
+      // l'oreille suit la caméra (le joueur, ou celui qu'on regarde) ; l'écho change avec le niveau
+      const V = sim.viewPlayer(sim.spectate || 0);
+      sfx.setListener(V.x, V.z, V.yaw);
+      sfx.setRoom(sim.level);
+      // les pas des autres joueurs, là où ils marchent (plus rapprochés quand ils courent)
+      for (const O of sim.players) {
+        if (O === V || O.status !== 'alive' || !O.moving || paused) {
+          otherStepT.delete(O.id);
+          continue;
+        }
+        const left = (otherStepT.get(O.id) ?? Math.random() * 0.3) - delta;
+        if (left <= 0) sfx.step(sim.level === 1, { x: O.x, z: O.z, muffled: (O.floor || 0) !== (V.floor || 0) }, O.running ? 1 : 0.7);
+        otherStepT.set(O.id, left <= 0 ? (O.running ? 0.32 : 0.5) : left);
+      }
+    }
     if (sfx) {
       // le souffle : sprint, puis halètement le temps de récupérer, et la peur quand l'entité est là
       const P = sim.player;
@@ -614,7 +612,7 @@ function loop(currentTime) {
 
 // ?debug : accès à la partie depuis la console (tests)
 if (/[?&]debug(&|=|$)/.test(location.search)) {
-  window.__br = { get sim() { return sim; }, get scene() { return scene; }, keys, frame: (t) => loop(t) };
+  window.__br = { get sim() { return sim; }, get scene() { return scene; }, get sfx() { return sfx; }, keys, frame: (t) => loop(t) };
 }
 
 // Réglages (bouton ⚙ commun aux jeux) : son, et choix Souris / Sans souris

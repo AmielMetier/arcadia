@@ -1,5 +1,24 @@
 # Journal des versions — Arcadia
 
+## 4.13 — 4 novembre 2026
+- **The Backrooms** — le dédale aux murs jaunes est bien plus encombré, comme si d'autres étaient passés avant toi.
+  - Des chantiers abandonnés : rubalise jaune et noire arrachée qui traîne par terre en travers des couloirs (elle ne bloque jamais le passage), cônes orange et projecteurs éteints sur leur trépied.
+  - Nouveaux meubles laissés là : vieux canapés, fauteuils, pupitres d'école, tableaux noirs, étagères en métal, chariots à outils, écrans de projection et escabeaux.
+  - Des dessins sur les murs : sourires à la craie, bonshommes bâtons, « EXIT ? » et sa flèche, jours comptés en bâtons, « DON'T RUN » à la peinture qui coule, maisons d'enfant, mains sales.
+- **The Backrooms** — tout le jeu passe en anglais : objectifs, messages, inventaire, écrans de pause et de fin, inscriptions sur les murs, étiquettes des cassettes et des bouteilles. Les réglages restent en français.
+- **The Backrooms** — à plusieurs, chacun commence dans son coin du dédale, à quelques couloirs des autres : assez loin pour ne pas se voir, assez près pour s'entendre siffler.
+- **The Backrooms** — le son est en 3D : on entend d'où viennent le sifflet, les pas des autres joueurs et l'entité (devant, derrière, à gauche, à droite), étouffés quand ils sont à l'autre étage.
+- **The Backrooms** — les couloirs résonnent : chaque bruit a son écho, plus long dans l'entrepôt en béton du Level 1.
+- **The Backrooms** — la bouteille d'eau d'amande a une vraie étiquette et un bouchon blanc, à tous les niveaux (au Level 1, elle restait parfois sans étiquette).
+- **The Backrooms** — la lampe torche est toujours dans la case 1 dès le départ : il n'y a plus aucune table à lampes.
+- **The Backrooms** — de vrais escaliers entre les deux étages du Level 0 : on les monte et on les descend en marchant, marche après marche, au lieu d'être téléporté. Rampes le long des marches, garde-corps autour de la cage d'escalier en haut.
+- **The Backrooms** — un éclairage bien plus angoissant : chaque néon ne fait plus qu'une petite flaque de lumière nette, le noir complet reprend juste à côté, un néon sur quatre est grillé, et le caméscope ne rattrape plus l'obscurité.
+- **The Backrooms** — une image plus propre, comme dans les vidéos des Backrooms : plus nette, des jaunes plus francs, des noirs plus profonds ; le grain, les lignes de balayage et la bavure des couleurs sont bien plus discrets, et l'image ne glitche plus en permanence : les parasites de la cassette ne reviennent que quand l'entité est tout près, et moins fort.
+- **The Backrooms** — on voit ce qu'on tient : la lampe torche dans la main droite, et dans la main gauche l'eau d'amande ou les piles quand leur case est choisie. Ils bougent avec le pas et prennent la lumière d'où l'on est.
+- **The Backrooms** — des zones plus claires : par endroits tous les néons marchent et éclairent plus fort et plus loin, entre des couloirs sombres ; moins de néons grillés au hasard, et le caméscope rattrape un peu plus l'obscurité.
+- **The Backrooms** — à bout de souffle après avoir trop couru, on ne peut plus courir pendant une seconde.
+- **The Backrooms** — nouvelle affiche dans le salon : une vraie image du jeu, une salle du Level 0 sous les néons.
+
 ## 4.11 — 4 novembre 2026
 - **Arcadia** — Un cinquième compte reçoit le grade VIP.
 
