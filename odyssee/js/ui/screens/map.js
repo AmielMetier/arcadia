@@ -56,20 +56,85 @@ function regionTerrain(game) {
     return d;
   };
   const toLand = dist((k) => k !== 0), toFoot = dist((k) => k !== 3), toOpen = dist((k) => k === 1 || k === 4 || k === 0);
+  // rendu « peint » : chaque case prend la couleur de son sol et de son biome, ombrée par un relief
+  // (pentes éclairées du nord-ouest), plages autour des côtes, mer qui fonce en s'éloignant du rivage
+  const N = w * h, H = new Float32Array(N), toSea = new Int16Array(N).fill(99), q = [];
+  const isW = (t) => t === T.WATER || t === T.WHIRL;
+  const tile = new Uint8Array(N);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const t = W.get(x, y), i = y * w + x; tile[i] = t; if (isW(t)) { toSea[i] = 0; q.push(i); } }
+  const toLandT = new Int16Array(N).fill(99), q2 = [];
+  for (let i = 0; i < N; i++) if (!isW(tile[i])) { toLandT[i] = 0; q2.push(i); }
+  for (const [d, qq] of [[toSea, q], [toLandT, q2]]) for (let k = 0; k < qq.length; k++) {
+    const i = qq[k], x = i % w; if (d[i] >= 40) continue;
+    for (const j of [x + 1 < w ? i + 1 : -1, x > 0 ? i - 1 : -1, i + w < N ? i + w : -1, i - w]) if (j >= 0 && d[j] > d[i] + 1) { d[j] = d[i] + 1; qq.push(j); }
+  }
+  // thème de la zone, échantillonné tous les 4 cases
+  const TH = new Array(Math.ceil(w / 4) * Math.ceil(h / 4)), tw = Math.ceil(w / 4);
+  for (let y = 0; y < h; y += 4) for (let x = 0; x < w; x += 4) TH[(y >> 2) * tw + (x >> 2)] = W.zoneAt(x, y)?.theme || '';
+  const theme = (x, y) => TH[(y >> 2) * tw + (x >> 2)];
+  const TOWN = new Uint8Array(TH.length);
+  for (let y = 0; y < h; y += 4) for (let x = 0; x < w; x += 4) TOWN[(y >> 2) * tw + (x >> 2)] = W.zoneAt(x, y)?.town ? 1 : 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x, t = tile[i];
+    if (isW(t)) { H[i] = -Math.min(toLandT[i], 14) * 0.25; continue; }
+    const bi = ((y / B) | 0) * bw + ((x / B) | 0);
+    let v = Math.min(toSea[i], 18) * 0.18;
+    if (kind[bi] === 3) v += 1.2 + Math.min(toFoot[bi], 8) * 0.9;
+    else if (t === T.TREE || t === T.PINE || t === T.CUT) v += 0.7;
+    else if (t === T.ROCK || t === T.CAVEWALL || t === T.CLIFF) v += 1.4;
+    H[i] = v;
+  }
+  // relief adouci (deux flous en boîte)
+  const blur = (src) => { const o = new Float32Array(N); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let s = 0, n = 0; for (let d = -2; d <= 2; d++) { const xx = x + d; if (xx >= 0 && xx < w) { s += src[y * w + xx]; n++; } } o[y * w + x] = s / n; }
+    const o2 = new Float32Array(N); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let s = 0, n = 0; for (let d = -2; d <= 2; d++) { const yy = y + d; if (yy >= 0 && yy < h) { s += o[yy * w + x]; n++; } } o2[y * w + x] = s / n; } return o2; };
+  const Hs = blur(blur(H));
+  const BIOME = {
+    snow: [[226, 236, 244], [176, 196, 210]], cime: [[226, 236, 244], [176, 196, 210]],
+    volcanic: [[112, 92, 80], [74, 60, 54]], cendre: [[120, 112, 104], [80, 74, 70]], forge: [[124, 96, 78], [82, 62, 52]],
+    desert: [[226, 196, 138], [196, 160, 100]], dunes: [[232, 204, 146], [200, 166, 108]], mirage: [[226, 196, 138], [196, 160, 100]], canyon: [[206, 142, 96], [168, 106, 70]],
+    marais: [[96, 128, 78], [64, 92, 56]], automne: [[150, 160, 78], [168, 96, 48]], ombre: [[62, 104, 78], [36, 70, 52]],
+    rose: [[118, 182, 110], [62, 128, 76]], jardin: [[112, 184, 104], [54, 130, 72]],
+  };
+  const DEF = [[104, 176, 96], [46, 122, 72]];
+  const hash = (x, y) => { let n = x * 374761393 + y * 668265263; n = (n ^ (n >> 13)) * 1274126177; return ((n ^ (n >> 16)) & 255) / 255; };
   const c0 = document.createElement('canvas'); c0.width = w; c0.height = h;
-  const ctx = c0.getContext('2d'), img = ctx.createImageData(w, h);
-  for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
-    const i = by * bw + bx, k = kind[i];
+  const ctx = c0.getContext('2d'), img = ctx.createImageData(w, h), D = img.data;
+  const mix = (a, b, f) => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x, t = tile[i], n = hash(x, y);
     let c;
-    if (k === 0) c = toLand[i] <= 1 ? HG.deep : toLand[i] <= 3 ? HG.far : (bx + by * 3) % 11 === 0 ? HG.foam : HG.open;
-    else if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => bx + dx >= 0 && by + dy >= 0 && bx + dx < bw && by + dy < bh && kind[(by + dy) * bw + bx + dx] === 0)) c = HG.cliff;
-    else if (k === 3) { const d = toFoot[i]; c = d <= 1 ? HG.low : d <= 2 ? HG.high : d <= 4 ? HG.vhigh : HG.top; }
-    else if (k === 4) c = HG.low;
-    else c = k === 2 && toOpen[i] >= 2 ? HG.shadow : HG.flat;
-    for (let dy = 0; dy < B; dy++) for (let dx = 0; dx < B; dx++) {
-      const x = bx * B + dx, y = by * B + dy; if (x >= w || y >= h) continue;
-      const o = (y * w + x) * 4; img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255;
+    if (isW(t)) {
+      const d = Math.min(toLandT[i], 22) / 22;
+      c = mix([96, 188, 210], [22, 64, 116], Math.sqrt(d));
+      if (d > 0.3 && hash(x >> 1, y) > 0.985) c = mix(c, [190, 230, 245], 0.35);   // reflets
+      if (toLandT[i] === 1) c = mix(c, [210, 240, 245], 0.35);                        // écume
+    } else {
+      const th = theme(x, y), [g, f] = BIOME[th] || DEF;
+      const bi = ((y / B) | 0) * bw + ((x / B) | 0);
+      const inTown = TOWN[(y >> 2) * tw + (x >> 2)];
+      if (inTown && (t === T.BUILD || t === T.DOOR || t === T.WALL)) c = [206, 150, 120];
+      else if (inTown && !isW(t) && t !== T.TREE && t !== T.PINE) c = mix(g, [224, 212, 182], 0.7);
+      else if (t === T.PATH || t === T.PAVE || t === T.FLOOR || t === T.MAT || t === T.STAIRS) c = [222, 206, 170];
+      else if (t === T.BRIDGE) c = [168, 120, 80];
+      else if (t === T.BUILD || t === T.DOOR || t === T.WALL) c = [196, 96, 78];
+      else if (t === T.LAVA) c = [246, 112, 40];
+      else if (t === T.SAND || (toSea[i] <= 1 && kind[bi] !== 3 && t !== T.CLIFF)) c = th === 'snow' || th === 'cime' ? [236, 240, 244] : [234, 216, 166];
+      else if (t === T.SNOW) c = [236, 242, 248];
+      else if (t === T.ASH) c = [138, 128, 120];
+      else if (kind[bi] === 3 || t === T.ROCK || t === T.CAVEWALL || t === T.CLIFF) {
+        const hi = Math.min(toFoot[bi], 6) / 6;
+        c = th === 'snow' || th === 'cime' ? mix([150, 150, 160], [246, 248, 252], hi) : th === 'volcanic' || th === 'forge' ? mix([96, 76, 66], [60, 46, 42], hi) : mix([150, 128, 104], [214, 200, 186], hi * hi);
+      } else if (t === T.TREE || t === T.PINE || t === T.CUT || t === T.BUSH) c = mix(f, [f[0] * .8, f[1] * .8, f[2] * .8], n * 0.6);
+      else if (t === T.TALL || t === T.DARKTALL) c = mix(g, f, 0.35);
+      else if (t === T.FLOWER) c = mix(g, [236, 150, 170], 0.25);
+      else c = g;
+      // ombrage du relief (lumière du nord-ouest)
+      const xl = x > 0 ? Hs[i - 1] : Hs[i], yl = y > 0 ? Hs[i - w] : Hs[i];
+      const shade = Math.max(-0.35, Math.min(0.3, (xl - Hs[i]) * -0.9 + (yl - Hs[i]) * -0.9));
+      const k2 = 1 + shade + (n - 0.5) * 0.06;
+      c = [c[0] * k2, c[1] * k2, c[2] * k2];
     }
+    const o = i * 4; D[o] = c[0]; D[o + 1] = c[1]; D[o + 2] = c[2]; D[o + 3] = 255;
   }
   ctx.putImageData(img, 0, 0);
   return (game._regionTerrain = { canvas: c0, kind, bw, bh, toOpen, toFoot, B });
@@ -126,8 +191,8 @@ function drawRegion(game, cv, v) {
   const W = game.world.maps.monde, ctx = cv.getContext('2d'), R = regionTerrain(game);
   const sx = cv.width / v.w, sy = cv.height / v.h;
   const X = (x) => (x - v.x) * sx, Y = (y) => (y - v.y) * sy;
-  ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = '#060c18'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = '#163f6e'; ctx.fillRect(0, 0, cv.width, cv.height);   // haute mer autour de la région
+  ctx.imageSmoothingEnabled = sx > 1.5; ctx.imageSmoothingQuality = 'high';
 
   // Découpage sécurisé du canvas de terrain de la région
   const sx0 = Math.max(0, Math.min(W.w, Math.floor(v.x)));
@@ -137,6 +202,7 @@ function drawRegion(game, cv, v) {
   if (sw > 0 && sh > 0) {
     ctx.drawImage(R.canvas, sx0, sy0, sw, sh, X(sx0), Y(sy0), sw * sx, sh * sy);
   }
+  ctx.imageSmoothingEnabled = false;
 
   // icônes du Pokégear : grandeur fixe à l'écran (deux pixels par pixel d'icône quand la carte est zoomée)
   const k = Math.max(1, Math.min(3, Math.round(sx / 2.2)));
@@ -148,8 +214,7 @@ function drawRegion(game, cv, v) {
     const jx = x + ((x * 7 + y * 13) % 9) - 4, jy = y + ((x * 11 + y * 5) % 9) - 4;
     if (jx < v.x - 10 || jx > v.x + v.w + 10 || jy < v.y - 10 || jy > v.y + v.h + 14) continue;
     const i = Math.floor(jy / B) * bw + Math.floor(jx / B), kk = kind[i];
-    if (kk === 2 && toOpen[i] >= 4 && ((x + y) / step | 0) % 2 === 0) icon((jx * 5 + jy) % 7 ? 'arbre_v' : 'arbre_o', jx, jy);
-    else if (kk === 3 && toFoot[i] >= 3) icon((jx * 3 + jy) % 2 ? 'montagne' : 'colline', jx, jy);
+    if (false && kk === 2 && toOpen[i] >= 4 && ((x + y) / step | 0) % 2 === 0) icon((jx * 5 + jy) % 7 ? 'arbre_v' : 'arbre_o', jx, jy);
   }
 
   // routes : un trait blanc cerclé de gris
@@ -194,7 +259,7 @@ function drawRegion(game, cv, v) {
   if (fog.width !== cv.width || fog.height !== cv.height) { fog.width = cv.width; fog.height = cv.height; }
   const fx = fog.getContext('2d');
   fx.globalCompositeOperation = 'source-over'; fx.clearRect(0, 0, fog.width, fog.height);
-  fx.fillStyle = 'rgba(6, 12, 22, 0.72)';
+  fx.fillStyle = 'rgba(14, 26, 44, 0.62)';
   fx.fillRect(0, 0, fog.width, fog.height);
   fx.globalCompositeOperation = 'destination-out';
   fx.imageSmoothingEnabled = true;
