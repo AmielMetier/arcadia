@@ -477,6 +477,9 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
     const stairCells = new Set((map.stairs || []).flatMap((st) => st.cells.map((k) => k.gz * W + k.gx)));
     const wallSpots = { outlet: [], fire_alarm: [], power_box_01: [], wall_clock: [], drawing: [] };
     const ceilSpots = [];
+    // le plafond est percé sous les trous et les trémies de l'étage du dessus : rien n'y est fixé
+    const aboveHoles = fi > 0 ? holesOf(floors[fi - 1]) : [];
+    const holeAbove = (x, z) => aboveHoles.some((h) => Math.abs((x + 0.5) * CELL_SIZE - h.x) < h.hx + 0.6 && Math.abs((z + 0.5) * CELL_SIZE - h.z) < h.hz + 0.6);
     const rates = L1
       ? { outlet: 0.02, fire_alarm: 0.01, power_box_01: 0.012, wall_clock: 0, drawing: 0 }
       : { outlet: 0.05, fire_alarm: 0.008, power_box_01: 0.003, wall_clock: 0.004, drawing: 0.016 };
@@ -500,7 +503,7 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
             break;
           }
         }
-        if (!L1 && drnd() < 0.045) ceilSpots.push({ x: (x + 0.5) * CELL_SIZE + (drnd() - 0.5) * 1.2, z: (z + 0.5) * CELL_SIZE + (drnd() - 0.5) * 1.2, rot: drnd() < 0.5 ? 0 : Math.PI / 2 });
+        if (!L1 && drnd() < 0.045 && !holeAbove(x, z)) ceilSpots.push({ x: (x + 0.5) * CELL_SIZE + (drnd() - 0.5) * 1.2, z: (z + 0.5) * CELL_SIZE + (drnd() - 0.5) * 1.2, rot: drnd() < 0.5 ? 0 : Math.PI / 2 });
       }
     }
     // prises : une petite plaque blanche jaunie à deux trous
