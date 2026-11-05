@@ -88,6 +88,18 @@ function makeCone() {
   return root;
 }
 
+// Montre ou cache un groupe sans retirer ses lumières de la scène : une lumière cachée change le nombre de lumières,
+// et three.js recompile alors tous les matériaux (le jeu se fige une à deux secondes chez tout le monde). Ici, ses
+// lumières s'éteignent (puissance 0) et le reste se cache.
+function showGroup(g, on) {
+  for (const o of g.children) {
+    if (o.isLight) {
+      if (o.userData.on === undefined) o.userData.on = o.intensity;
+      o.intensity = on ? o.userData.on : 0;
+    } else o.visible = on;
+  }
+}
+
 // floors : les étages du niveau (une carte chacun)
 export function createBackroomsScene(container, floors) {
   if (!Array.isArray(floors)) floors = [floors];
@@ -918,11 +930,12 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
 
         // Cassettes et objets
         for (const cm of cassetteMeshes) {
-          cm.group.visible = !cm.cas.collected;
-          if (cm.group.visible && cm.cas.high) {
+          const here = !cm.cas.collected;
+          showGroup(cm.group, here);
+          if (here && cm.cas.high) {
             // dans le renfoncement : elle ne tourne pas, elle regarde la pièce
             cm.group.rotation.y = Math.atan2(-N.dx, -N.dz);
-          } else if (cm.group.visible) {
+          } else if (here) {
             cm.group.rotation.y = time * 1.6;
             cm.group.position.y = 0.85 + Math.sin(time * 2.5 + cm.id) * 0.08;
           }
@@ -936,11 +949,10 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
         // Ascenseur : rouge verrouillé, vert ouvert ; le faux devient un mur
         const fake = !!(E && E.fake);
         const open = sim.open && !fake;
-        exitGroup.visible = !fake;
+        showGroup(exitGroup, !fake);
         if (fakeWall) fakeWall.visible = fake;
-        exitLight.visible = !fake;
         exitLight.color.set(open ? '#22c55e' : '#ef4444');
-        exitLight.intensity = open ? 6 : 2.5;
+        exitLight.intensity = fake ? 0 : open ? 6 : 2.5;
         signMat.color.set(open ? '#4ade80' : '#ff3030');
         // les portes s'ouvrent quand l'ascenseur est alimenté, se referment au départ
         const doorWant = open && !(sim.departT > 0) ? 1 : 0;
@@ -948,8 +960,8 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
         for (const { d, sgn } of doors) d.position.x = sgn * (0.325 + doorOpen * 0.6);
         fuseLamps.forEach((l, i) => l.material.color.set(sim.powered ? '#22c55e' : i < sim.fuses ? '#ffb020' : '#331010'));
         for (const fm of fuseMeshes) {
-          fm.g.visible = !fm.f.taken;
-          if (fm.g.visible) {
+          showGroup(fm.g, !fm.f.taken);
+          if (!fm.f.taken) {
             fm.g.rotation.y = time * 1.4;
             fm.g.position.y = 0.9 + Math.sin(time * 2.2 + fm.f.id) * 0.07;
           }
