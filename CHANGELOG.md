@@ -1,5 +1,28 @@
 # Journal des versions — Arcadia
 
+## 4.33 — 5 novembre 2026
+- **Odyssée** — La région devient immense : plus de sept fois plus grande, pour partir vraiment à l'aventure.
+  - Les villes et villages sont trois fois plus grands : rues, places, marchés, parcs, ports et phares, maisons avec jardins, et plus de mille maisons où entrer.
+  - Six nouvelles villes dans les Terres du Sud, chacune avec son caractère : Port-Lisière, Marais-Noir, Dunes d'Ocre, Forge-Acier, Rosebrume et Ombreval.
+  - Les routes sont trois à quatre fois plus longues (sauf la route 1) et serpentent entre prairies, bosquets et collines : on ne sait jamais vraiment où mène le chemin.
+  - Près de 70 lieux cachés dans la forêt entre les routes : hameaux, fermes, lacs, ruines, campements…
+  - La Ligue s'installe sur le Plateau Céleste, au cœur d'une vraie chaîne de montagnes enneigées.
+  - Au sud, les Hauts d'Ocre : des plateaux rocheux et leurs oasis.
+  - Ta partie en cours repart du Centre de soins de la dernière ville visitée.
+- **Odyssée** — La région change de visage :
+  - Maisons, centres, boutiques, laboratoire, Ligue, casino et bourse passent en fausse 3D ; leurs fenêtres s'allument la nuit.
+  - Nouvelles arènes à portique et voûte, coiffées de la statue de leur Champion.
+  - Du relief partout : talus de pelouse, falaises à longer, routes sinueuses qui montent et descendent, un désert et le Canyon d'Ocre.
+  - Deux montagnes à gravir, le Mont Lunaire et le Mont Givré, avec leurs lacets et leurs passerelles au-dessus des ravins.
+  - La Forêt des Torii rejoint la carte, plus grande : sentiers, ruisseau, jardin d'automne, et deux tours anciennes à découvrir.
+  - Le Bois Murmure devient une forêt dense et sombre, avec ses cabanes et ses mystères.
+  - La mine de Pierrefort : trois niveaux à explorer.
+  - Une usine Poké Ball monumentale à Pierrefort.
+  - L'archipel et les îles de l'Est se rejoignent en bateau, au-delà des tourbillons.
+  - Les hautes herbes bougent et s'écartent quand on y entre ; l'ancien sol ne réapparaît plus quand la carte change.
+  - Casino de Métropole : poker Texas Hold'em, tables dessinées et salle d'arcade à quatre bornes.
+  - Le professeur Orme et son Méga-Anneau t'attendent toujours à Port-Granit, à côté de l'arène.
+
 ## 4.32 — 5 novembre 2026
 - **Arcadia** — Les 18 jeux se jouent à la manette.
   - DavidSimulator, Tête de Calcul, Bastion Clash, Fil Rouge et Mini-Golf Party : un curseur se déplace au stick, A clique (maintenu pour glisser), X fait le clic droit et les gâchettes zooment.

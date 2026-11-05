@@ -3,6 +3,7 @@
 
 import { SOL16_JEUX } from '../data/sol16.js';
 import { REGLES, kitCell } from '../data/regles.js';
+import { texturesRelief, tourbillon, quart, remous, koi } from './relief-tex.js';
 
 export const CELL = 16, PITCH = 18;
 
@@ -218,7 +219,7 @@ export function buildAtlas() {
   putSol('stairs', 'stairs', (P) => { const c = PAL.rock; P.fill(c[0]); for (let y = 0; y < 16; y += 4) { P.rect(0, y, 16, 1, c[2]); P.rect(0, y + 3, 16, 1, c[3]); } });
   put('cavestairs', (P) => { const c = PAL.cave; P.fill(c[0]); for (let y = 0; y < 16; y += 4) { P.rect(0, y, 16, 1, c[2]); P.rect(0, y + 3, 16, 1, c[3]); } });
   // sols d'intérieur : la tuile du tileset qui correspond à chaque salle
-  const FLOOR32 = { base: 'floor_metal', temple: 'tatami', musee: 'floor_marble', wood: 'floor_wood', center: 'floor_pink', mart: 'floor_blue', lab: 'floor_white', league: 'carpet', gymBug: 'leaves0', gymRock: 'floor_stone', gymWater: 'floor_blue2', gymElec: 'floor_metal', gymGrass: 'tatami', gymPsy: 'floor_marble', gymFire: 'floor_dark2', gymDragon: 'floor_dark', cave: 'cave0' };
+  const FLOOR32 = { base: 'floor_metal', temple: 'tatami', musee: 'floor_marble', wood: 'floor_wood', center: 'floor_pink', mart: 'floor_blue', lab: 'floor_white', league: 'carpet', cendre: 'floor_dark', gymBug: 'leaves0', gymRock: 'floor_stone', gymWater: 'floor_blue2', gymElec: 'floor_metal', gymGrass: 'tatami', gymPsy: 'floor_marble', gymFire: 'floor_dark2', gymDragon: 'floor_dark', cave: 'cave0' };
   for (const st of ['wood', 'center', 'mart', 'lab', 'league', 'gymBug', 'gymRock', 'gymWater', 'gymElec', 'gymGrass', 'gymPsy', 'gymFire', 'gymDragon', 'base', 'temple', 'musee']) putSol('floor_' + st, FLOOR32[st], (P) => floorCell(P, st));
   put('mat', (P) => { P.fill('#c84848'); P.rect(1, 1, 14, 14, '#e06060'); P.rect(3, 3, 10, 10, '#c84848'); P.rect(0, 15, 16, 1, '#902a2a'); });
   put('matgreen', (P) => { P.fill('#3c8c54'); P.rect(1, 1, 14, 14, '#56a86c'); P.rect(3, 3, 10, 10, '#3c8c54'); });
@@ -286,7 +287,13 @@ export function buildAtlas() {
     const c = canvas(C2, C2); c.getContext('2d').drawImage(ART.relief, i * 32, j * 32, 32, 32, 0, 0, C2, C2);
     putImg(`r${k[0]}_${b}_${k.slice(1)}`, c);
   }));
+  // relief du dehors (falaises, rebords, marches, roche ocre) : render/relief-tex.js
+  texturesRelief(putImg, img);
   tameGreens(atlas);
+  // Tour Cendrée : planches noircies par le feu, suie en haut, cendre claire par endroits
+  put('wall_cendre', (P) => { P.fill('#3e3028'); for (let x = 0; x < 16; x += 4) P.rect(x, 0, 1, 16, '#271c16'); P.rect(0, 0, 16, 3, '#211814'); P.speck(10, '#2c211b', 0, 3, 16, 9); P.speck(5, '#5e5048'); P.speck(3, '#7a3a20', 0, 6, 16, 6); P.rect(0, 13, 16, 3, '#2a1f19'); P.rect(0, 13, 16, 1, '#54443a'); });
+  putSol('floor_cendre', FLOOR32.cendre, (P) => floorCell(P, 'gymDragon'));
+  putSol('floor_pierre', 'floor_stone', (P) => floorCell(P, 'gymRock'));
   return { canvas: atlas, cells, size: SIZE };
 }
 /** verts du sol adoucis : l'herbe à 16 px est très saturée (vert fluo) ; on la ramène vers le vert tendre des jeux DS.
@@ -411,6 +418,11 @@ export function buildAnimAtlas() {
   for (const [k, hk] of [[4, 'fleur_o'], [5, 'fleur_w']]) if (HG[hk]) keys.push(['flower' + k, (P, f) => flowerCell(P, f >> 1, k % 3), (f) => hgFlower(hk, f, SOL32.grass0)]);
   keys.push(['lava', (P, f) => { P.fill('#e85a20'); for (let i = 0; i < 6; i++) { const x = (i * 5 + f * 3) % 16, y = (i * 7 + f) % 16; P.rect(x, y, 3, 1, '#ffb040'); P.p(x + 1, y + 1, '#ffe080'); } P.speck(5, '#b83a10'); }, SOL32.lava0 && ((f) => up2(SOL32['lava' + ((f >> 2) & 1)] || SOL32.lava0))]);
   keys.push(['deep', (P, f) => { const w = PAL.water; P.fill(w[4]); for (let k = 0; k < 3; k++) { const y = (k * 5 + 2) % 16, x0 = (k * 6 + f * 2) % 16; for (let i = 0; i < 3; i++) P.p((x0 + i) % 16, y, w[1]); } }, SOL32.deep0 && ((f) => up2(SOL32['deep' + ((f >> 2) & 1)] || SOL32.deep0))]);
+  // tourbillons : grands (2 × 2 cases, deux sens de rotation), remous entre eux, carpes koï (render/relief-tex.js)
+  const tbCache = new Map(), tb = (v, f) => { const k = v * 8 + f; if (!tbCache.has(k)) tbCache.set(k, tourbillon(f, v)); return tbCache.get(k); };
+  for (let v = 0; v < 2; v++) for (let q = 0; q < 4; q++) keys.push([`tourbillon${v}_${q}`, null, (f) => quart(tb(v, f), q)]);
+  for (let v = 0; v < 3; v++) keys.push([`remous${v}`, null, (f) => remous(f, v)]);
+  keys.push(['koi', null, (f) => koi(f)]);   // tourbillons de la mer (render/relief-tex.js)
   for (let f = 0; f < FR; f++) {
     const c = canvas(SIZE, SIZE), ctx = c.getContext('2d');
     keys.forEach(([key, draw, drawImg], i) => {

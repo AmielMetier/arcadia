@@ -130,6 +130,11 @@ const QUESTS = [
       [atLeast('songes', 7), 'Darkrai s\'est apaisé.'],
       [fin('songes'), 'Les enfants de Floralia dorment de nouveau sur leurs deux oreilles.'],
     ] },
+  { id: 'mine', cat: 'side', name: 'Le fond de la mine', giver: 'Albin', started: atLeast('mine', 1), done: fin('mine'),
+    notes: [
+      [atLeast('mine', 1), 'Albin, le chef mineur de Pierrefort, m\'a parlé d\'un fossile resté au fond de la mine, derrière un éboulement.'],
+      [fin('mine'), 'Le Dr Silex a ranimé le fossile de la mine.'],
+    ] },
   { id: 'kagura', cat: 'side', name: 'Les talismans du Temple Kagura', giver: 'Dame Hana', started: atLeast('kagura', 1), done: fin('kagura'),
     notes: [
       [atLeast('kagura', 1), 'Dame Hana, à Mirage, m\'a parlé de trois talismans volés au Temple Kagura.'],
@@ -180,12 +185,12 @@ const QUESTS = [
   { id: 'hooh', cat: 'legend', name: 'La Plume Arc-en-ciel', giver: 'Doyenne Amaya', started: (f) => !!f.grueQuest, done: (f) => !!f['L:hooh'],
     notes: [
       [(f) => f.grueQuest, 'La doyenne de Hautegrue m\'a raconté la légende de Ho-Oh et de la Plume Arc-en-ciel.'],
-      [(f) => f.plume, 'Le Grand Sage Hoël m\'a confié la Plume Arc-en-ciel et le Sifflet Céleste au sommet de la Tour de la Grue.'],
-      [(f) => f['L:hooh'], 'Ho-Oh s\'est posé sur la Tour de la Grue.'],
+      [(f) => f.plume, 'Le Grand Sage Hoël m\'a confié la Plume Arc-en-ciel et le Sifflet Céleste au sommet de la Tour Dorée.'],
+      [(f) => f['L:hooh'], 'Ho-Oh s\'est posé sur la Tour Dorée.'],
     ] },
-  { id: 'betes', cat: 'legend', name: 'Les trois bêtes', giver: 'La Tour de la Grue', started: (f) => !!f.beasts, done: (f) => !!(f['L:raikou'] && f['L:entei'] && f['L:suicune']),
+  { id: 'betes', cat: 'legend', name: 'Les trois bêtes', giver: 'La Tour Cendrée', started: (f) => !!f.beasts, done: (f) => !!(f['L:raikou'] && f['L:entei'] && f['L:suicune']),
     notes: [
-      [(f) => f.beasts, 'À la Tour de la Grue, Raikou, Entei et Suicune se sont enfuis devant moi et se sont dispersés dans les îles.'],
+      [(f) => f.beasts, 'Dans le sous-sol de la Tour Cendrée, Raikou, Entei et Suicune se sont réveillés et se sont enfuis dans les îles.'],
       [(f) => f['L:raikou'], 'J\'ai croisé Raikou.'], [(f) => f['L:entei'], 'J\'ai croisé Entei.'], [(f) => f['L:suicune'], 'J\'ai croisé Suicune.'],
     ] },
   { id: 'ermite', cat: 'legend', name: 'Le gardien des mers', giver: 'L\'Ermite', started: (f) => !!f.ermite, done: (f) => f['L:lugia'] === 'caught' || (!!f['L:lugia'] && !!f.lugia),

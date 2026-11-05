@@ -18,14 +18,29 @@ export const TRANSPARENT = 255;
 
 // sortes de cases (calculées par le moteur à partir des codes T, voir sol.js)
 export const K = { X: 0, G: 1, F: 2, T: 3, TD: 4, P: 5, V: 6, W: 7, B: 8, C: 9, L: 10, LE: 11, LW: 12, CW: 13,
-  GF: 14, SN: 15, AS: 16, SA: 17, TS: 18, A: 19 };   // … bitume des grandes villes
+  GF: 14, SN: 15, AS: 16, SA: 17, TS: 18, A: 19,
+  // relief et lieux (world/relief.js) : feuilles mortes d'automne, gravier ratissé des jardins, mousse, sol ocre des canyons
+  FA: 20, GR: 21, MO: 22, RC: 23, TA: 24,
+  // montagnes à gravir (world/relief.js, montagne) : sol de roche (comme celui des grottes) et sol sous les gradins
+  MT: 25, MR: 26, MP: 27 };   // … hautes herbes dorées de l'automne   // … bitume des grandes villes
 /** grandes villes : rues en bitume et trottoirs, escaliers à l'entrée ; les autres sont des villages pavés */
 export const GRANDES_VILLES = new Set(['Métropole', 'Voltacité', 'Forge-Acier']);   // … hautes herbes enneigées   // herbe de forêt, neige, cendre, sable
 /** sols « d'herbe » : on y marche, le décor (arbres, rochers…) s'y pose ; la zone choisit lequel */
-const SOLS = new Set([K.G, K.GF, K.SN, K.AS, K.SA]);
+const SOLS = new Set([K.G, K.GF, K.SN, K.AS, K.SA, K.FA, K.GR, K.MO, K.RC]);
 
+/** PROTOTYPE (?relief3d, relief3d.js) : le relief est dessiné en 3D ; le sol généré n'a plus de talus, les marches
+ *  d'un talus d'herbe sont du chemin, la roche des montagnes du dehors a son sol de roche. Réglé par world3d.js. */
+let RELIEF3D = false;
+export function setRelief3dSol(v) { RELIEF3D = !!v; }
 /** sorte d'une case de la carte du jeu (K.X : le jeu garde son propre sol) */
 export function sorteCase(m, x, y) {
+  if (RELIEF3D && m.outdoor) {
+    const t = m.get(x, y), th = m.zoneAt?.(x, y)?.theme, dans = x >= 0 && y >= 0 && x < m.w && y < m.h;
+    const monts = dans && m.monts && m.monts[y * m.w + x];
+    if (t === T.STAIRS && !monts) return th === 'snow' ? K.SN : K.P;
+    if (t === T.BRIDGE && dans && m.ravins?.[y * m.w + x]) return th === 'snow' ? K.SN : K.MR;   // le fond du ravin, sous la passerelle
+    if (t === T.CAVEWALL && !monts && th !== 'snow') return th === 'canyon' || th === 'desert' ? K.RC : th === 'volcanic' ? K.AS : K.MR;
+  }
   let t = m.get(x, y);
   if (t === T.SIGN || t === T.BLOCK) t = m.underAt?.(x, y) ?? (m.outdoor ? T.GRASS : T.CAVE);
   if (!m.outdoor) {
@@ -37,35 +52,79 @@ export function sorteCase(m, x, y) {
   }
   const th = m.zoneAt?.(x, y)?.theme;
   // sol de fond de la zone : herbe, herbe sombre de forêt, neige, cendre du volcan
-  const fond = th === 'snow' ? K.SN : th === 'volcanic' ? K.AS : th === 'forest' ? K.GF : K.G;
-  const herbeux = fond === K.G || fond === K.GF;
+  const fond = th === 'snow' ? K.SN : th === 'volcanic' ? K.AS : th === 'forest' || th === 'foretsombre' ? K.GF
+    : th === 'automne' ? K.FA : th === 'desert' ? K.SA : th === 'canyon' ? K.RC : K.G;
+  const herbeux = fond === K.G || fond === K.GF || fond === K.FA;
+  const jardin = th === 'automne';
+  // montagne à gravir (hors neige) : sol de roche, le sentier en terre par-dessus ; passerelle au-dessus d'un ravin : le jeu
+  if (fond === K.G && m.monts && x >= 0 && y >= 0 && x < m.w && y < m.h && m.monts[y * m.w + x]) {
+    if (t === T.BRIDGE) return K.X;
+    return t === T.PATH ? K.MP : t === T.CAVEWALL ? K.MR : t === T.GRASS ? K.G : K.MT;   // le sommet garde son herbe
+  }
   switch (t) {
     case T.WATER: return K.W;
-    case T.BRIDGE: return K.B;
+    case T.BRIDGE: return m.ravins?.[y * m.w + x] ? K.X : K.B;   // passerelle au-dessus d'un ravin : dessinée par le jeu
     case T.PAVE: return GRANDES_VILLES.has(m.zoneAt?.(x, y)?.name) ? K.A : K.V;
     case T.PATH: case T.DOOR: return K.P;
     case T.SNOW: return K.SN;
     case T.ASH: return K.AS;
-    case T.SAND: return K.SA;
-    case T.TALL: return th === 'snow' ? K.TS : K.T;
+    case T.SAND: return jardin ? K.GR : th === 'canyon' ? K.RC : K.SA;   // jardins japonais : gravier ratissé
+    case T.TALL: return th === 'snow' ? K.TS : jardin || th === 'desert' || th === 'canyon' ? K.TA : K.T;
     case T.DARKTALL: return K.TD;
-    case T.FLOWER: return herbeux ? K.F : fond;
+    case T.FLOWER: return jardin ? K.MO : herbeux ? K.F : fond;   // jardins japonais : coussins de mousse
     case T.LEDGE: return K.L;
     case T.LEDGE_E: return K.LE;
     case T.LEDGE_W: return K.LW;
     case T.GRASS: case T.TREE: case T.PINE: case T.BUSH: case T.ROCK: case T.FENCE: case T.CUT: case T.SMASH: case T.BOULDER:
     case T.CAVEWALL:   // montagnes du dehors (plateaux de roche posés sur le sol)
+    case T.CLIFF: case T.STAIRS:   // parois et marches des falaises : dessinées par-dessus (world3d.js, reliefDehors)
       return fond;
     default: return K.X;
   }
 }
-/** sortes des cases d'un bloc et de sa marge, prêtes pour rendreBloc */
+/** relief des plateaux d'herbe (world/relief.js) : hauteur de la case (bits 0 à 2), talus (T.CLIFF), marche (T.STAIRS),
+ *  case d'un plateau d'herbe (m.pentes) ; les pentes de pelouse se dessinent dans le sol généré (talus) */
+export const REL = { H: 7, TALUS: 8, MARCHE: 16, HERBE: 32 };
+function reliefCase(m, x, y) {
+  if (x < 0 || y < 0 || x >= m.w || y >= m.h) return 0;
+  const t = m.get(x, y), h = Math.max(0, Math.min(7, m.height(x, y)));
+  return h | (t === T.CLIFF ? REL.TALUS : 0) | (t === T.STAIRS ? REL.MARCHE : 0) | (m.pentes[y * m.w + x] ? REL.HERBE : 0);
+}
+/** sortes des cases d'un bloc et de sa marge, prêtes pour rendreBloc ; rel : relief des plateaux d'herbe (null : aucun) */
 export function zoneBloc(m, ci, cj, CH = 16) {
   const x0 = ci * CH, y0 = cj * CH, bw = m.ext ? CH : Math.min(CH, m.w - x0), bh = m.ext ? CH : Math.min(CH, m.h - y0);
   const zw = bw + 2 * MARGIN, zh = bh + 2 * MARGIN, zx0 = x0 - MARGIN, zy0 = y0 - MARGIN;
   const kinds = new Uint8Array(zw * zh);
   for (let y = 0; y < zh; y++) for (let x = 0; x < zw; x++) kinds[y * zw + x] = sorteCase(m, zx0 + x, zy0 + y);
-  return { kinds, zw, zh, zx0, zy0, bw, bh };
+  let rel = null;
+  if (m.outdoor && m.pentes && !RELIEF3D) {
+    rel = new Uint8Array(zw * zh); let any = false;
+    for (let y = 0; y < zh; y++) for (let x = 0; x < zw; x++) { const v = reliefCase(m, zx0 + x, zy0 + y); rel[y * zw + x] = v; if (v & REL.HERBE) any = true; }
+    if (!any) rel = null;
+  }
+  // relief en 3D : bande de roche en plus (cases sous le bloc) pour dérouler le motif des pentes de roche (rendreRoche)
+  let roche = 0;
+  if (RELIEF3D && m.outdoor) {
+    for (let y = MARGIN - 1; y < MARGIN + bh && !roche; y++) for (let x = MARGIN; x < MARGIN + bw; x++) { const k = kinds[y * zw + x]; if (k === K.MR || k === K.MT) { roche = ROCHE_PLUS; break; } }
+  }
+  return { kinds, zw, zh, zx0, zy0, bw, bh, rel, roche };
+}
+/** cases de roche ajoutées sous le bloc dans la bande de roche (le motif déroulé d'une pente descend plus bas que la case) */
+export const ROCHE_PLUS = 4;
+/**
+ * PROTOTYPE (?relief3d) : la roche des montagnes seule, sans sentier ni herbe, sur la largeur du bloc et bh + roche cases
+ * de haut, au même endroit du monde que le bloc (mêmes bruits : le motif est celui du sol de roche, pixel pour pixel).
+ * Les pentes de roche y lisent leur motif déroulé sur la vraie longueur de la pente (relief3d.js, geoSol) : il continue
+ * la roche du replat d'au-dessus, sans jamais aller lire le sentier de la case d'à côté. Pas de flaques sur une pente.
+ */
+export function rendreRoche({ kinds: kz, zw, zx0, zy0, bw, bh, seed = 7, roche = ROCHE_PLUS }) {
+  const ch = bh + roche, kinds = new Uint8Array(bw * ch).fill(K.MT);
+  const Z = new Zone(kinds, bw, ch, zx0 + MARGIN, zy0 + MARGIN, seed);
+  // seulement là où une pente de roche peut lire son motif : sous une case de roche (au plus roche + 1 cases plus bas)
+  const estR = (cx, cy) => { const k = kz[(cy + MARGIN) * zw + cx + MARGIN]; return k === K.MR || k === K.MT; };
+  const img = new Uint8Array(Z.N), mask = Z.pxC((cx, cy) => { for (let r = Math.max(-1, cy - roche - 1); r <= Math.min(bh - 1, cy); r++) if (estR(cx, r)) return true; return false; });
+  grotte(Z, img, mask, caveRamp('montagne'), K.MR, false);
+  return img;
 }
 
 /* ------------------------------------------------------------------ palette ------------------------------------------ */
@@ -105,6 +164,13 @@ const HEX = {
   vj: '#4e4840',
   // flaques des grottes
   cw: '#3a5a7a', cW: '#5a86a8', cg: '#7ac0c8',
+  // feuilles mortes (rouge érable, orangé, doré, brun), gravier ratissé, mousse, sol ocre des canyons
+  ha0: '#3a2c12', ha1: '#5c4618', ha2: '#86682a', ha3: '#b08c3c', ha4: '#d6b85a',
+  ag0: '#2c3a18', ag1: '#3f4c1e', ag2: '#566226', ag3: '#6e7830', ag4: '#8a8c3a', ag5: '#a6a248', ag6: '#c4b85e',
+  fa0: '#7a2a16', fa1: '#b83c1c', fa2: '#e0682a', fa3: '#f0a030', fa4: '#f6cc52', fa5: '#8a5a2c',
+  y0: '#77746c', y1: '#99968c', y2: '#b4b1a6', y3: '#cbc8bc', y4: '#dfdcd0',
+  o0: '#173a1e', o1: '#245328', o2: '#336c32', o3: '#48873c', o4: '#66a248',
+  x0: '#5a2e18', x1: '#7e4424', x2: '#9c5a30', x3: '#b8743e', x4: '#cc9056', x5: '#dcaa74',
 };
 // sols de grotte selon le lieu (mêmes noms de biome que le relief des parois, caveBiome de world3d.js)
 const CAVES = {
@@ -125,10 +191,14 @@ LUT[TRANSPARENT] = 0;
 const ramp = (p, n) => Array.from({ length: n }, (_, i) => I[p + i]);
 const G = ramp('g', 7), H = ramp('h', 5), HK = ramp('k', 5), D = ramp('d', 6), P = ramp('p', 4), S = ramp('s', 3);
 const W = ramp('w', 7), B = ramp('b', 4), V = ramp('v', 5), L = ramp('l', 6);
+const FA = ramp('fa', 6), AG = ramp('ag', 7), HA = ramp('ha', 5), GRV = ramp('y', 5), MOU = ramp('o', 5), OC = ramp('x', 6);
 const AS_ = ramp('a', 5), TR = ramp('t', 5), HS = ramp('j', 5), N = ramp('n', 6), E = ramp('e', 6), Zs = ramp('z', 4), U = ramp('u', 5), Q = ramp('q', 5);
 const caveRamp = (b) => ramp(`c_${CAVES[b] ? b : 'terre'}`, 6);
+/** indices des teintes des hautes herbes (prairie, sous-bois, neige), du pied à la pointe : l'herbe qui passe devant
+ *  les personnages (herbes.js) est découpée dans le sol généré avec */
+export const HAUTES = [H, HK, HS, HA];
 const isIn = (arr) => { const s = new Uint8Array(256); for (const v of arr) s[v] = 1; return s; };
-const IS_G = isIn(G.slice(2)), IS_S = isIn(S), IS_D = isIn(D);
+const IS_GALL = isIn(G), IS_G = isIn(G.slice(2)), IS_S = isIn(S), IS_D = isIn(D);
 
 /* ------------------------------------------------------------------ hasard lié à la position ------------------------ */
 export function hash2(x, y, s) {
@@ -184,6 +254,27 @@ function edt(mask, w, h, val = 1) {
   }
   return out;
 }
+/** comme edt, en distance de chanfrein (3-4, à 5 % près de la vraie) et plafonnée à cap pixels : bien plus rapide,
+ *  assez juste pour les talus (les distances qui comptent y font quelques pixels) */
+function proche(mask, w, h, val = 1, cap = 64) {
+  const C3 = cap * 3, d = new Int16Array(w * h), out = new Float32Array(w * h);
+  for (let i = 0; i < d.length; i++) d[i] = mask[i] === val ? C3 : 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x; let v = d[i]; if (!v) continue;
+    if (x > 0) v = Math.min(v, d[i - 1] + 3);
+    if (y > 0) { v = Math.min(v, d[i - w] + 3); if (x > 0) v = Math.min(v, d[i - w - 1] + 4); if (x < w - 1) v = Math.min(v, d[i - w + 1] + 4); }
+    d[i] = Math.min(v, C3);
+  }
+  for (let y = h - 1; y >= 0; y--) for (let x = w - 1; x >= 0; x--) {
+    const i = y * w + x; let v = d[i]; if (!v) continue;
+    if (x < w - 1) v = Math.min(v, d[i + 1] + 3);
+    if (y < h - 1) { v = Math.min(v, d[i + w] + 3); if (x < w - 1) v = Math.min(v, d[i + w + 1] + 4); if (x > 0) v = Math.min(v, d[i + w - 1] + 4); }
+    d[i] = v;
+  }
+  // la vraie distance (edt) compte le pixel voisin pour 1 : même convention
+  for (let i = 0; i < d.length; i++) out[i] = d[i] / 3;
+  return out;
+}
 /** flou gaussien approché (trois flous en boîte), bords prolongés */
 function blur(src, w, h, sigma) {
   const n = 3, wIdeal = Math.sqrt((12 * sigma * sigma / n) + 1); let wl = Math.floor(wIdeal); if (wl % 2 === 0) wl--;
@@ -234,27 +325,33 @@ class Zone {
     const gx0 = Math.floor(W0 / st), gy0 = Math.floor(H0 / st);
     const gw = Math.ceil((W0 + Wd) / st) - gx0 + 2, gh = Math.ceil((H0 + Hh) / st) - gy0 + 2, g = new Float32Array(gw * gh);
     for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) g[j * gw + i] = fbm1((gx0 + i) * st, (gy0 + j) * st, scale, s, oct);
+    const IX = new Int32Array(Wd), TX = new Float64Array(Wd);   // colonnes : mêmes pour toutes les lignes
+    for (let x = 0; x < Wd; x++) { const fx = (W0 + x) / st - gx0, i = Math.floor(fx); IX[x] = i; TX[x] = fx - i; }
     for (let y = 0, k = 0; y < Hh; y++) {
-      const wy = H0 + y, fy = wy / st - gy0, j = Math.floor(fy), ty = fy - j;
+      const wy = H0 + y, fy = wy / st - gy0, j = Math.floor(fy), ty = fy - j, oj = j * gw;
       for (let x = 0; x < Wd; x++, k++) {
-        const fx = (W0 + x) / st - gx0, i = Math.floor(fx), tx = fx - i, o = j * gw + i;
+        const o = oj + IX[x], tx = TX[x];
         const a = g[o] + (g[o + 1] - g[o]) * tx, b = g[o + gw] + (g[o + gw + 1] - g[o + gw]) * tx;
         f[k] = a + (b - a) * ty;
       }
     }
     return f;
   }
-  px(pred) {
+  px(pred) { return this.pxC((cx, cy) => pred(this.k[cy * this.cw + cx])); }
+  /** cases (prédicat sur la position de la case dans la zone) → masque de pixels */
+  pxC(inC) {
     const m = new Uint8Array(this.N), c = this.c;
     for (let cy = 0; cy < this.ch; cy++) for (let cx = 0; cx < this.cw; cx++) {
-      if (!pred(this.k[cy * this.cw + cx])) continue;
+      if (!inC(cx, cy)) continue;
       for (let y = cy * c; y < cy * c + c; y++) m.fill(1, y * this.W + cx * c, y * this.W + cx * c + c);
     }
     return m;
   }
   /** cases → région au pixel près : coins arrondis, bord bruité, jamais à plus de band de la limite des cases */
-  region(pred, s, { wobble = 1, round = 0.35, band = this.band, freq = 0.4 } = {}) {
-    const mp = this.px(pred);
+  region(pred, s, o = {}) { return this.regionC((cx, cy) => pred(this.kind(cx, cy)), s, o); }
+  /** comme region, le prédicat porte sur la position de la case (cx, cy dans la zone ; hors zone : appelé quand même) */
+  regionC(inC, s, { wobble = 1, round = 0.35, band = this.band, freq = 0.4 } = {}) {
+    const mp = this.pxC(inC);
     let any = false; for (let i = 0; i < this.N; i++) if (mp[i]) { any = true; break; }
     if (!any) return mp;
     const soft = blur(mp, this.W, this.H, this.c * round), out = new Uint8Array(this.N), c = this.c, Wd = this.W;
@@ -262,7 +359,7 @@ class Zone {
     const inn = new Uint8Array(9);
     for (let cy = 0; cy < this.ch; cy++) for (let cx = 0; cx < this.cw; cx++) {
       // distance exacte à la limite des cases : seules les 8 cases voisines peuvent être à moins d'une demi-case
-      for (let dy = -1, q = 0; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++, q++) inn[q] = pred(this.kind(cx + dx, cy + dy)) ? 1 : 0;
+      for (let dy = -1, q = 0; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++, q++) inn[q] = inC(cx + dx, cy + dy) ? 1 : 0;
       const me = inn[4];
       let mixed = false; for (let q = 0; q < 9; q++) if (inn[q] !== me) { mixed = true; break; }
       for (let ly = 0; ly < c; ly++) {
@@ -314,26 +411,55 @@ function blade(img, Z, y, x, Ln, lean, base, pal, block) {
   }
 }
 
+/** cases de la zone où le masque a au moins un pixel */
+function occupees(Z, mask) {
+  const o = new Uint8Array(Z.cw * Z.ch), c = Z.c, Wd = Z.W;
+  for (let y = 0; y < Z.H; y++) {
+    const cy = (y / c) | 0, row = y * Wd;
+    for (let cx = 0; cx < Z.cw; cx++) {
+      if (o[cy * Z.cw + cx]) continue;
+      for (let x = cx * c, e = x + c; x < e; x++) if (mask[row + x]) { o[cy * Z.cw + cx] = 1; break; }
+    }
+  }
+  return o;
+}
+/** brins à dessiner : trois valeurs chacun, triés par pixel de pied (de haut en bas, de gauche à droite), l'ordre du
+ *  tirage départageant ceux d'un même pixel (comme un tri stable) ; tableaux typés, pas de petit tableau par brin */
+function brins(cap) {
+  const P = new Float64Array(cap), A = new Float64Array(cap), Bv = new Float64Array(cap), C = new Float64Array(cap), S = 2 ** 20;
+  let n = 0;
+  return {
+    add(i, a, b, c) { P[n] = i * S + n; A[n] = a; Bv[n] = b; C[n] = c; n++; },
+    trier(f) {
+      const k = P.subarray(0, n).sort();
+      for (let q = 0; q < n; q++) { const t = k[q], j = t % S; f((t - j) / S, A[j], Bv[j], C[j]); }
+    },
+  };
+}
+
 function herbe(Z, img, mask, block, foret = null) {
   const s = Z.s, c = Z.c, Wd = Z.W;
   const light = Z.field(120, s + 1), patch = Z.field(30, s + 2), colony = Z.field(70, s + 3, 2);
   const lv = new Uint8Array(Z.N);
   // forêt : l'herbe y est plus sombre d'un ton (bord tramé, voir foretMasque)
   for (let i = 0; i < Z.N; i++) { lv[i] = digitize(0.65 * light[i] + 0.35 * patch[i], [0.42, 0.58]) + 2 - (foret && foret[i] ? 1 : 0); if (mask[i]) img[i] = G[lv[i] + 1]; }
-  const blades = [], fl = [];
+  // brins : tirés case par case, puis dessinés de haut en bas (tri par pixel, l'ordre du tirage départage) ; les cases
+  // sans herbe sont sautées (rien n'y serait dessiné)
+  const fl = [], nb = Math.floor(c * c / 5.5), occ = occupees(Z, mask);
+  const B = brins(Z.cw * Z.ch * nb), LN = [3, 3, 4, 4, 5], LE = [-1, 0, 1];
   for (let cy = 0; cy < Z.ch; cy++) for (let cx = 0; cx < Z.cw; cx++) {
-    const r = cellRng(cx + Z.rx0, cy + Z.ry0, s + 10), n = Math.floor(c * c / 5.5);
-    for (let k = 0; k < n; k++) blades.push([cy * c + ri(r, 0, c), cx * c + ri(r, 0, c), pick(r, [3, 3, 4, 4, 5]), r(), pick(r, [-1, 0, 1])]);
+    if (!occ[cy * Z.cw + cx]) continue;
+    const r = cellRng(cx + Z.rx0, cy + Z.ry0, s + 10);
+    for (let k = 0; k < nb; k++) { const y = cy * c + ri(r, 0, c), x = cx * c + ri(r, 0, c); B.add(y * Wd + x, pick(r, LN), r(), pick(r, LE)); }
     const force = Z.kind(cx, cy) === K.F, nf = Math.floor(c * c / 60) * (force ? 3 : 1);
     for (let k = 0; k < nf; k++) fl.push([cy * c + ri(r, 2, c - 2), cx * c + ri(r, 2, c - 2), r(), force]);
   }
-  blades.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  for (const [y, x, Ln, v, lean] of blades) {
-    const i = y * Wd + x; if (!mask[i]) continue;
-    const base = lv[i];
+  B.trier((i, Ln, v, lean) => {
+    if (!mask[i]) return;
+    const y = (i / Wd) | 0, x = i - y * Wd, base = lv[i];
     if (v < 0.55) { blade(img, Z, y, x, Ln, -1, base, G, block); blade(img, Z, y, x + 1, Ln - 1, 1, base, G, block); }
     else blade(img, Z, y, x, Ln, lean, base, G, block);
-  }
+  });
   const kinds = [['fr', 'fR', 'fy'], ['fw', 'fW', 'fy'], ['fb', 'fB', 'fw']];
   for (const [y, x, v, force] of fl) {
     if (y < 2 || y >= Z.H - 3 || x < 2 || x >= Wd - 2) continue;
@@ -352,14 +478,15 @@ function hautesHerbes(Z, img, mask, lv, dark) {
   for (let i = 0; i < Z.N; i++) if (sh[i] && !mask[i] && img[i] !== TRANSPARENT && IS_G[img[i]]) img[i] = G[Math.max(0, lv[i] - 2)];
   const dk = Z.field(16, s + 20, 2);
   for (let i = 0; i < Z.N; i++) if (mask[i]) img[i] = dk[i] < 0.45 ? Hp[0] : Hp[1];
-  const d = edt(mask, Wd, Z.H, 1), bl = [];
+  const d = edt(mask, Wd, Z.H, 1), n = Math.floor(c * c / 4), occ = occupees(Z, mask), B = brins(Z.cw * Z.ch * n), LE = [-1, 1];
   for (let cy = 0; cy < Z.ch; cy++) for (let cx = 0; cx < Z.cw; cx++) {
-    const r = cellRng(cx + Z.rx0, cy + Z.ry0, s + 21), n = Math.floor(c * c / 4);
-    for (let k = 0; k < n; k++) bl.push([cy * c + ri(r, 0, c), cx * c + ri(r, 0, c), ri(r, 0, 4), pick(r, [-1, 1]), r()]);
+    if (!occ[cy * Z.cw + cx]) continue;
+    const r = cellRng(cx + Z.rx0, cy + Z.ry0, s + 21);
+    for (let k = 0; k < n; k++) { const y = cy * c + ri(r, 0, c), x = cx * c + ri(r, 0, c); B.add(y * Wd + x, ri(r, 0, 4), pick(r, LE), r()); }
   }
-  bl.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  for (const [y, x, e, lean, v] of bl) {
-    if (!mask[y * Wd + x]) continue;
+  B.trier((i, e, lean, v) => {
+    if (!mask[i]) return;
+    const y = (i / Wd) | 0, x = i - y * Wd;
     const Ln = Math.floor(4 + e + Math.min(2, d[y * Wd + x] / 5));
     const tufts = v < 0.6 ? [[0, lean], [1, -lean]] : [[0, lean]];
     for (const [dx, ln] of tufts) {
@@ -370,7 +497,7 @@ function hautesHerbes(Z, img, mask, lv, dark) {
         img[yy * Wd + xx] = j === top ? Hp[4] : j < Ln * 0.35 ? Hp[1] : j < Ln * 0.75 ? Hp[2] : Hp[3];
       }
     }
-  }
+  });
 }
 
 function cailloux(Z, img, mask, s, shade, density) {
@@ -540,6 +667,7 @@ function escaliers(Z, img) {
 /** sol de fond d'une zone (neige, cendre, sable), aux bords naturels ; près du bord, il se mêle à l'herbe voisine */
 function fondZone(Z, img, mask, voisin, kind) {
   const s = Z.s + kind * 13, Wd = Z.W;
+  if (kind === K.GR || kind === K.MO || kind === K.RC) return fondJardin(Z, img, mask, voisin, kind);
   const R = kind === K.SN ? N : kind === K.AS ? E : Zs, top = R.length - 1;
   const big = Z.field(60, s + 1), mid = Z.field(18, s + 2), dout = edt(mask, Wd, Z.H, 0);
   const din = edt(voisin, Wd, Z.H, 0);   // dedans : distance à l'herbe voisine (pas aux pavés ni à l'eau)
@@ -577,7 +705,54 @@ function fondZone(Z, img, mask, voisin, kind) {
   }
 }
 
-function grotte(Z, img, mask, C) {
+/** gravier ratissé (lignes du râteau qui ondulent), mousse en coussins, sol ocre craquelé des canyons */
+function fondJardin(Z, img, mask, voisin, kind) {
+  const s = Z.s + kind * 17, big = Z.field(40, s + 1), mid = Z.field(10, s + 2), din = edt(voisin, Z.W, Z.H, 0);
+  for (let i = 0; i < Z.N; i++) {
+    if (!mask[i]) continue;
+    const X = Z.X(i), Y = Z.Y(i), u = hash2(X, Y, s + 3), v = 0.6 * big[i] + 0.4 * mid[i];
+    let o;
+    if (kind === K.GR) {
+      // sillons du râteau : une ligne sombre et une claire toutes les 5 rangées, qui ondulent doucement
+      const w = Y + Math.round(Math.sin(X / 9 + big[i] * 3) * 1.6), r = ((w % 5) + 5) % 5;
+      o = r === 0 ? GRV[0] : r === 1 ? GRV[4] : r === 2 ? GRV[3] : v < 0.45 ? GRV[2] : GRV[3];
+      if (u < 0.02) o = GRV[0]; else if (u > 0.985) o = GRV[4];
+      if (din[i] < 2) o = GRV[1];                                              // bordure du lit de gravier
+    } else if (kind === K.MO) {
+      // coussins de mousse : bosses claires en haut à gauche, creux sombres
+      const b = mid[i];
+      o = b > 0.66 ? MOU[4] : b > 0.52 ? MOU[3] : b > 0.36 ? MOU[2] : MOU[1];
+      if (u < 0.04) o = MOU[0]; else if (u > 0.97) o = MOU[4];
+      if (din[i] < 2 && u < 0.5) o = MOU[1];
+    } else {
+      // sol ocre : plaques, craquelures, cailloux
+      o = OC[v < 0.34 ? 2 : v < 0.62 ? 3 : 4];
+      const cr = Math.abs(fbm1(X, Y, 11, s + 6, 2) - 0.5);
+      if (cr < 0.018) o = OC[1]; else if (cr < 0.03 && u < 0.5) o = OC[2];
+      if (u < 0.012) o = OC[0]; else if (u > 0.99) o = OC[5];
+    }
+    img[i] = o;
+  }
+}
+/** automne : l'herbe tourne à l'olive et au doré, des feuilles mortes s'y posent en petits tas (et un peu sur les chemins) */
+function feuilles(Z, img, mask) {
+  const s = Z.s + 501, amas = Z.field(22, s + 1, 2), Wd = Z.W;
+  // herbe roussie : chaque vert de l'herbe prend son équivalent olive
+  for (let i = 0; i < Z.N; i++) if (mask[i] && IS_GALL[img[i]]) img[i] = AG[G.indexOf(img[i])];
+  // feuilles : une par bloc de 3 × 3 pixels au plus, plus serrées dans les tas
+  for (let by = 0; by < Z.H; by += 3) for (let bx = 0; bx < Wd; bx += 3) {
+    const i0 = by * Wd + bx; if (!mask[i0]) continue;
+    const X = Z.X(i0), Y = Z.Y(i0), u = hash2(X, Y, s + 2), a = amas[i0];
+    if (u > 0.1 + 0.55 * a * a) continue;
+    const c = hash2(X, Y, s + 3), col = c < 0.24 ? FA[1] : c < 0.5 ? FA[2] : c < 0.7 ? FA[3] : c < 0.8 ? FA[4] : c < 0.92 ? FA[5] : FA[0];
+    const ox = bx + Math.floor(hash2(X, Y, s + 4) * 2), oy = by + Math.floor(hash2(X, Y, s + 5) * 2), vert = hash2(X, Y, s + 6) < 0.5;
+    // petite feuille en losange (3 × 2 ou 2 × 3), ombre d'un pixel sous elle
+    const pts = vert ? [[0, 0], [0, 1], [1, 1], [0, 2]] : [[0, 0], [1, 0], [1, 1], [2, 0]];
+    for (const [dx, dy] of pts) { const x = ox + dx, y = oy + dy; if (x < Wd && y < Z.H && mask[y * Wd + x]) img[y * Wd + x] = col; }
+    const sx = ox + 1, sy = oy + (vert ? 3 : 2); if (sx < Wd && sy < Z.H && mask[sy * Wd + sx] && hash2(X, Y, s + 7) < 0.6) img[sy * Wd + sx] = AG[1];
+  }
+}
+function grotte(Z, img, mask, C, roche = K.CW, flaques = true) {
   const s = Z.s, Wd = Z.W;
   const t1 = Z.field(50, s + 80), t2 = Z.field(12, s + 81, 3, mask), plate = Z.field(20, s + 82);
   const cr = Z.field(26, s + 84, 3, mask), crz = Z.field(60, s + 89, 2), pf = Z.field(22, s + 85, 2);
@@ -592,7 +767,7 @@ function grotte(Z, img, mask, C) {
     const g = hash2(X, Y, s + 83);
     if (g < 0.025) o = C[0]; else if (g > 0.98) o = C[4];
     if (Math.abs(cr[i] - 0.5) < 0.008 && crz[i] > 0.55) o = C[0];           // fissures
-    if (pf[i] > 0.9) pud[i] = 1;                                            // petites flaques
+    if (flaques && pf[i] > 0.9) pud[i] = 1;                                 // petites flaques
     img[i] = o;
   }
   if (anyOf(pud)) {
@@ -605,11 +780,11 @@ function grotte(Z, img, mask, C) {
   }
   cailloux(Z, img, andNot(mask, pud), s + 88, C[0], 1 / 420);
   // ombre de contact au pied des plateaux de roche (silhouette arrondie comme leurs coins) : la roche se pose sur le sol
-  if (Z.k.includes(K.CW)) {
-    const roc = Z.region((k) => k === K.CW, s + 90, { wobble: 0, round: 0.22 }), dr = edt(roc, Wd, Z.H, 0);
+  if (Z.k.includes(roche)) {
+    const roc = Z.region((k) => k === roche, s + 90, { wobble: 0, round: 0.22 }), dr = edt(roc, Wd, Z.H, 0);
     const pos = new Int8Array(256).fill(-1); C.forEach((v, i) => (pos[v] = i));
     for (let i = 0; i < Z.N; i++) {
-      if (roc[i] || dr[i] > 3.2 || pos[img[i]] < 0) continue;
+      if (roc[i] || !mask[i] || dr[i] > 3.2 || pos[img[i]] < 0) continue;
       img[i] = dr[i] <= 1.2 ? C[1] : C[Math.max(1, pos[img[i]] - 1)];
     }
   }
@@ -636,13 +811,15 @@ function eau(Z, img, E, frame) {
   const sp = rocky ? [rocky[1], rocky[3], rocky[4]] : S;
   const cols = [I.wt, W[4], W[3], W[2], I.wd];
   for (let i = 0; i < Z.N; i++) {
+    const berge = !mask[i] && !block[i] && sd[i] <= 5;
+    if (!mask[i] && !berge) continue;
     const lap = Math.sin(2 * Math.PI * (ph + lapPh[i] * 2));                   // la vague va et vient
     if (mask[i]) {
       img[i] = cols[lv2[i]];
       const fd = 1.6 + 1.1 * (lap + 1) / 2, X = Z.X(i), Y = Z.Y(i);
       if (dw[i] <= fd && hash2(X, Y, s + 44) < 0.8) img[i] = W[6];               // écume
       else if (dw[i] <= fd + 1.2 && hash2(X, Y, s + 45) < 0.35) img[i] = W[5];
-    } else if (!block[i] && sd[i] <= 5) {                                       // berge
+    } else {                                                                    // berge
       if (sd[i] <= 4) img[i] = sd[i] <= 1.5 + (lap > 0.3 ? 1 : 0) ? sp[0] : sd[i] <= 3 ? sp[1] : sp[2];
       else img[i] = rocky ? rocky[0] : G[1];                                    // lisière
     }
@@ -764,23 +941,246 @@ function rebords(Z, img) {
   }
 }
 
+/* ------------------------------------------------------------------ pentes de pelouse (plateaux d'herbe) -------------- */
+// Les plateaux d'herbe (world/relief.js) n'ont pas de paroi de pierre : leur talus est un versant de pelouse, plus sombre,
+// qui descend sous une lèvre d'herbe claire, quelques touffes et un caillou de temps en temps, une ombre douce au pied.
+// Au sud, le talus occupe les cases T.CLIFF ; à l'est et à l'ouest, il mord sur la case basse voisine ; au nord (versant
+// caché), un simple liseré, en roche au bord de l'eau. Tout est calculé au pixel (bords ondulés, coins arrondis).
+const RAMPES = [G, H, HK, HS, HA, D, P, S, N, E, Zs, AG, GRV, MOU, OC, V, U, Q, AS_, TR, L, B, [I.fa0, I.fa5, I.fa1, I.fa2, I.fa3, I.fa4]];
+const RAMPE = new Int16Array(256).fill(-1), RPOS = new Uint8Array(256);
+RAMPES.forEach((r, k) => r.forEach((v, p) => { if (RAMPE[v] < 0) { RAMPE[v] = k; RPOS[v] = p; } }));
+/** même teinte, k tons plus clair (k < 0 : plus sombre), dans sa propre rampe */
+function ton(v, k) { const r = RAMPE[v]; if (r < 0) return v; const R = RAMPES[r]; return R[Math.max(0, Math.min(R.length - 1, RPOS[v] + k))]; }
+/** le ton p (0 : le plus sombre, 6 : le plus clair) de la rampe du pixel v ; rampes courtes : p ramené à leur longueur.
+ *  Les feuilles mortes se fondent dans l'herbe d'automne (sur un talus, le versant garde une seule teinte) */
+const R_FA = RAMPES.length - 1, R_AG = RAMPES.indexOf(AG);
+function abs(v, p) { let r = RAMPE[v]; if (r < 0) return v; if (r === R_FA) r = R_AG; const R = RAMPES[r]; return R[Math.max(0, Math.min(R.length - 1, Math.round(p * (R.length - 1) / 6)))]; }
+const BAY = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+
+/** couleur d'un pixel du versant d'un talus d'herbe, selon le style proposé.
+ *  t : 0 en haut du versant, 1 au pied ; dT : distance (px) au dessus du plateau ; dO : au pied ; side : versant de côté
+ *  (+1 tourné vers l'est, à l'ombre ; -1 vers l'ouest, au soleil ; 0 versant sud, de face) */
+function versant(st, X, Y, b, o, t, dT, dO, side, s) {
+  const col = hash2(X, 31, s), col2 = hash2(X >> 1, 32, s), lig = hash2(Y, 33, s);
+  if (st === 'hgss') {
+    // façon HeartGold : sous la lèvre un trait sombre, puis un rideau d'herbe en bandes verticales, cerné de noir au pied
+    if (dT <= 1.5) return side ? I.g2 : I.g1;
+    if (dO <= 1.5) return I.g0;
+    if (side) { const base = side > 0 ? 1 : 3; const v = base + (lig < 0.25 ? -1 : 0) + (b < 0.25 ? 1 : 0); return [I.g0, I.g1, I.g2, I.g3, I.g4][Math.max(0, Math.min(4, v))]; }
+    const raie = col < 0.32, long = 0.35 + col2 * 0.6;               // raies sombres qui descendent plus ou moins bas
+    if (raie && t < long) return t < 0.12 ? I.g2 : I.g1;
+    if (col > 0.86 && t < 0.25) return I.g4;                          // un brin clair accroché en haut
+    if (dO <= 3) return b < 0.5 ? I.g1 : I.g2;
+    return t < 0.4 ? I.g3 : (b < 0.55 ? I.g2 : I.g3);
+  }
+  if (st === 'terre') {
+    // la pelouse déborde en franges, puis une coupe de terre en strates avec racines et cailloux
+    const frange = 2 + Math.floor(hash2(X, 34, s) * 5);
+    if (dT <= frange && !side) return dT >= frange - 0.5 ? I.g1 : (dT <= 1.5 ? I.g4 : I.g3);
+    if (dT <= 2.5 && side) return I.g2;
+    if (dO <= 1.5) return I.l0;
+    if (dO <= 3) return b < 0.6 ? I.l1 : I.l2;
+    const onde = Math.floor((Y + 2.5 * Math.sin(X / 7 + s) + 1.5 * Math.sin(X / 3.1)) / 4);
+    let v = [2, 3, 2, 3, 4, 2][((onde % 6) + 6) % 6];
+    if (side > 0) v -= 1; else if (side < 0) v += 1;
+    if (t < 0.25) v -= 1;                                            // ombre sous le débord
+    if (hash2(X, Y >> 2, s + 35) < 0.05) v = 0;                      // une racine
+    if (hash2(X >> 1, Y >> 1, s + 36) < 0.02) return I.p2;           // un caillou
+    if (b < 0.12) v += 1;
+    return [I.l0, I.l1, I.l2, I.l3, I.l4, I.l5][Math.max(0, Math.min(5, v))];
+  }
+  if (st === 'roche') {
+    // paroi de roche en assises, la mousse coule de la lèvre
+    const coule = hash2(X, 37, s) < 0.45 ? 2 + Math.floor(hash2(X, 38, s) * 9) : 1.5;
+    if (dT <= coule) return dT <= 1.5 ? I.o4 : (hash2(X, Y, s + 39) < 0.5 ? I.o3 : I.o2);
+    if (dO <= 1.5) return I.y0;
+    const rang = Math.floor(dT / 6), lx = (X + rang * 5 + Math.floor(hash2(rang, 40, s) * 9)) % 11, ly = dT % 6;
+    if (ly < 1) return I.y0;                                         // joint horizontal
+    if (lx < 1) return I.y1;                                         // joint vertical
+    let v = side > 0 ? 1 : side < 0 ? 3 : 2;
+    if (ly < 2 || lx < 2) v += 1;                                    // arête éclairée (lumière en haut à gauche)
+    if (ly >= 5 || lx >= 10) v -= 1;
+    if (b < 0.1) v -= 1;
+    return [I.y0, I.y1, I.y2, I.y3, I.y4][Math.max(0, Math.min(4, v))];
+  }
+  // douce : pelouse en pente, dégradé tramé du clair au sombre, sans trait
+  const sh = side > 0 ? -0.8 : side < 0 ? 0.6 : 0;
+  const v = 4.2 - 3.4 * t + sh + (lig < 0.06 ? 0.8 : 0);
+  return abs(o, Math.max(0, Math.min(5, Math.floor(v + b - 0.5))));
+}
+
+function talus(Z, img, rel, water) {
+  const { cw, ch, c, W: Wd, H: Hh, N: NP } = Z, s = Z.s + 900;
+  const R = (cx, cy) => (cx < 0 || cy < 0 || cx >= cw || cy >= ch ? 0 : rel[cy * cw + cx]);
+  const hOf = (v) => v & REL.H, herbe = (v) => (v & REL.HERBE) !== 0;
+  let maxL = 0; for (let i = 0; i < rel.length; i++) if (herbe(rel[i])) maxL = Math.max(maxL, hOf(rel[i]) + 1);
+  const dW = proche(water, Wd, Hh, 0, 8);   // distance à l'eau
+  const grain = Z.field(9, s + 1, 2), largeur = Z.field(18, s + 2, 2);
+  const larg = (n) => { const t = Math.max(0, Math.min(1, (n - 0.3) / 0.4)); return 8 + 12 * t * t * (3 - 2 * t); };   // 8 à 20 px
+  for (let L = 1; L <= maxL; L++) {
+    const top = (cx, cy) => { const v = R(cx, cy); return herbe(v) && hOf(v) >= L; };
+    const face = (cx, cy) => { const v = R(cx, cy); return herbe(v) && (v & (REL.TALUS | REL.MARCHE)) !== 0 && hOf(v) === L - 1 && top(cx, cy - 1); };
+    let any = false; for (let cy = 0; cy < ch && !any; cy++) for (let cx = 0; cx < cw; cx++) if (top(cx, cy)) { any = true; break; }
+    if (!any) continue;
+    // contours au pixel : coins arrondis et bords ondulés jusqu'à presque une demi-case de la limite des cases (le talus
+    // est infranchissable de toute façon ; seules les marches et le dessus comptent pour le jeu)
+    const topM = Z.regionC(top, s + 10 * L, { wobble: 0.9, round: 0.7, band: 13, freq: 0.3 });
+    const footM = Z.regionC((cx, cy) => top(cx, cy) || face(cx, cy), s + 10 * L, { wobble: 1.0, round: 0.7, band: 14, freq: 0.28 });
+    const marcheM = Z.pxC((cx, cy) => { const v = R(cx, cy); return herbe(v) && (v & REL.MARCHE) !== 0 && hOf(v) >= L; });
+    // côtés : le talus descend sur la case basse voisine (à l'est ou à l'ouest), d'une largeur qui varie ; il ne commence
+    // qu'un peu sous le bord nord du plateau (coin arrondi) et part aussi des bouts du talus sud
+    // talus sud (cases T.CLIFF et marches du talus) et leurs voisines de côté : là seulement, le pied du plateau dépasse
+    // de son dessus (ailleurs, les deux contours diffèrent de quelques pixels, sans talus)
+    const faceM = Z.pxC((cx, cy) => face(cx, cy) || face(cx - 1, cy) || face(cx + 1, cy) || face(cx, cy - 1));
+    const src = new Uint8Array(NP);
+    for (let i = 0; i < NP; i++) src[i] = (topM[i] && !marcheM[i] && i >= 10 * Wd && topM[i - 10 * Wd]) || (footM[i] && !topM[i] && faceM[i]) ? 1 : 0;
+    const side = new Int8Array(NP);   // +1 : le plateau est à l'ouest (pente tournée vers l'est, à l'ombre) ; -1 : l'inverse
+    const marche = (cx, cy) => { const v = R(cx, cy); return herbe(v) && (v & REL.MARCHE) !== 0 && hOf(v) >= L; };
+    // case basse au pied d'un côté ; pas devant une marche (on y descend)
+    const cote = (cx, cy) => { const v = R(cx, cy); return hOf(v) < L && !(v & REL.TALUS) && !(v & REL.MARCHE) && !marche(cx - 1, cy) && !marche(cx + 1, cy); };
+    const basM = Z.pxC(cote);
+    for (let y = 0; y < Hh; y++) {
+      const o = y * Wd; let dl = 99;
+      for (let x = 0; x < Wd; x++) { const i = o + x; if (src[i]) dl = 0; else if (dl < 99) dl++; if (!src[i] && !topM[i] && !footM[i] && basM[i] && !water[i] && dl <= larg(largeur[i])) side[i] = 1; }
+      let dr = 99;
+      for (let x = Wd - 1; x >= 0; x--) { const i = o + x; if (src[i]) dr = 0; else if (dr < 99) dr++; if (!src[i] && !topM[i] && !footM[i] && basM[i] && !water[i] && dr <= larg(largeur[i]) && (!side[i] || dr < dl)) side[i] = -1; }
+    }
+    const slope = new Uint8Array(NP);
+    for (let i = 0; i < NP; i++) slope[i] = ((footM[i] && !topM[i] && faceM[i]) || side[i]) && !water[i] && img[i] !== TRANSPARENT ? 1 : 0;
+    if (!anyOf(slope) && !anyOf(topM)) continue;
+    const tOrS = or(topM, slope);
+    const dT = proche(topM, Wd, Hh, 0, 64), dO = proche(tOrS, Wd, Hh, 1, 64), dS = proche(slope, Wd, Hh, 0, 8);
+    const base = img.slice();
+    // le versant : plus sombre vers le pied, à l'ombre côté est, au soleil côté ouest ; le grain de l'herbe reste dessous
+    for (let i = 0; i < NP; i++) {
+      if (!slope[i]) continue;
+      const X = Z.X(i), Y = Z.Y(i), b = BAY[(Y & 3) * 4 + (X & 3)] / 16, o = base[i];
+      const t = dT[i] / (dT[i] + dO[i] + 0.5);
+      if (STYLE_TALUS !== 'actuel') { img[i] = versant(STYLE_TALUS, X, Y, b, o, t, dT[i], dO[i], side[i], s); continue; }
+      // sous la lèvre, des brins de l'herbe du dessus pendent par-dessus le versant, colonne par colonne
+      const brin = hash2(X, 7, s + 3), pend = 1 + Math.floor(hash2(X, 8, s + 3) * 4);
+      if (dT[i] <= pend && brin < 0.45 && !side[i]) { img[i] = abs(o, dT[i] <= 1.5 ? 5 : 4); continue; }
+      // ton du versant (dans la rampe du sol d'origine) : clair en haut, sombre au pied, à l'ombre à l'est ;
+      // stries de l'herbe couchée dans le sens de la pente
+      let v = side[i] > 0 ? 2.0 - 1.4 * t : side[i] < 0 ? 2.9 - 1.6 * t : 3.1 - 2.2 * t;
+      v += (grain[i] - 0.5) * 0.6;
+      const strie = hash2(side[i] ? Y >> 3 : X, side[i] ? X : Y >> 3, s + 4);
+      if (strie < 0.07) v += 1; else if (strie > 0.95) v -= 1;
+      if (dT[i] <= (side[i] ? 1.5 : 2.5)) v = side[i] ? 0.3 : 0.6;   // l'ombre sous la lèvre
+      else if (dO[i] <= 1.2 && hash2(X >> 1, Y >> 1, s + 5) > 0.12) v = 0;   // le pied du versant, cerné d'un trait sombre
+      img[i] = abs(o, Math.max(0, Math.min(4, Math.floor(v + b - 0.5))));
+    }
+    // touffes et cailloux sur le versant
+    if (STYLE_TALUS === 'actuel' || STYLE_TALUS === 'douce') for (let cy = 0; cy < ch; cy++) for (let cx = 0; cx < cw; cx++) {
+      const r = cellRng(cx + Z.rx0, cy + Z.ry0, s + 20 + L);
+      for (let k = 0; k < 3; k++) {
+        const x = cx * c + ri(r, 2, c - 2), y = cy * c + ri(r, 2, c - 2), i = y * Wd + x, roll = r();
+        if (!slope[i] || dT[i] < 4 || dO[i] < 3) continue;
+        if (roll < 0.08) {   // un caillou : deux tons de gris, lumière en haut à gauche, ombre portée
+          const px = [[0, 0, P[3]], [1, 0, P[2]], [2, 0, P[2]], [-1, 1, P[1]], [0, 1, P[2]], [1, 1, P[1]], [2, 1, P[1]], [3, 1, P[0]], [0, 2, P[0]], [1, 2, P[0]], [2, 2, P[0]]];
+          for (const [dx, dy, col] of px) { const j = i + dy * Wd + dx; if (slope[j]) img[j] = col; }
+          for (const dx of [0, 1, 2, 3]) { const j = i + 3 * Wd + dx; if (slope[j]) img[j] = ton(img[j], -1); }
+        } else {             // une touffe plus claire, son ombre dessous
+          const o = base[i];
+          for (const [dx, dy, k2] of [[-1, -1, 1], [1, -1, 1], [0, -2, 2], [0, -1, 1], [0, 0, 0], [-1, 0, 0], [1, 0, 0], [0, 1, -2]]) {
+            const j = i + dy * Wd + dx; if (slope[j]) img[j] = ton(o, k2);
+          }
+        }
+      }
+    }
+    // lèvre : l'herbe du dessus s'éclaircit au bord du versant ; ailleurs (bord nord, versant caché), un liseré sombre,
+    // en roche au bord de l'eau
+    for (let i = 0; i < NP; i++) {
+      if (!topM[i] || (dS[i] > 3.5 && dO[i] > 4)) continue;
+      const X = Z.X(i), Y = Z.Y(i), b = BAY[(Y & 3) * 4 + (X & 3)] / 16, o = base[i];
+      const po = RAMPE[o] >= 0 ? RPOS[o] * 6 / (RAMPES[RAMPE[o]].length - 1) : 0;
+      if (STYLE_TALUS === 'hgss' || STYLE_TALUS === 'terre' || STYLE_TALUS === 'roche') {
+        if (dS[i] <= 1.5 && !(dO[i] <= 4 && dW[i] <= 5)) { img[i] = STYLE_TALUS === 'hgss' ? I.g6 : I.g5; continue; }
+        if (dS[i] <= 3 && !(dO[i] <= 4 && dW[i] <= 5)) { img[i] = b < 0.7 ? I.g5 : I.g4; continue; }
+      }
+      if (dS[i] <= 1.5) img[i] = abs(o, Math.max(po + 2, 5));
+      else if (dS[i] <= 3.5 && b < 0.6) img[i] = abs(o, Math.max(po + 1, 4));
+      else if (dO[i] <= 4 && dW[i] <= 5) img[i] = dO[i] <= 1 ? P[0] : dO[i] <= 2.5 ? P[1] : (b < 0.5 ? P[2] : P[3]);
+      else if (dO[i] <= 1.2) img[i] = ton(o, -2);
+      else if (dO[i] <= 2.2) img[i] = ton(o, -1);
+      else if (dO[i] <= 3.4 && b < 0.5) img[i] = ton(o, 1);
+    }
+    // bord nord : le sol bas juste au nord du plateau fonce un peu (le versant caché)
+    for (let i = 0; i < NP; i++) {
+      if (tOrS[i] || water[i] || dT[i] > 3 || img[i] === TRANSPARENT) continue;
+      let nord = false; for (let d = 1; d <= 3 && !nord; d++) if (i + d * Wd < NP && topM[i + d * Wd]) nord = true;
+      if (nord && (dT[i] <= 1.5 || BAY[(Z.Y(i) & 3) * 4 + (Z.X(i) & 3)] < 8)) img[i] = ton(base[i], -1);
+    }
+    // ombre au pied du versant (en dessous, et à droite des pentes tournées vers l'est), tramée
+    for (let i = 0; i < NP; i++) {
+      if (tOrS[i] || water[i] || dS[i] > 5 || img[i] === TRANSPARENT) continue;
+      const X = Z.X(i), Y = Z.Y(i), b = BAY[(Y & 3) * 4 + (X & 3)] / 16;
+      let dessous = false; for (let d = 1; d <= 5 && !dessous; d++) if (i - d * Wd >= 0 && slope[i - d * Wd]) dessous = true;
+      let droite = false; for (let d = 1; d <= 3 && !droite; d++) if (slope[i - d] && side[i - d] > 0) droite = true;
+      if (!dessous && !droite) continue;
+      const fort = STYLE_TALUS === 'hgss' || STYLE_TALUS === 'terre' || STYLE_TALUS === 'roche';
+      if (dS[i] <= (fort ? 2.5 : 1.5)) img[i] = ton(base[i], -2);
+      else if ((fort ? 1.25 : 1) - dS[i] / 5.5 > b) img[i] = ton(base[i], -1);
+    }
+  }
+  marchesTalus(Z, img, rel);
+}
+
+/** marches de terre tenues par des rondins, taillées dans un talus d'herbe (sens de la descente selon les hauteurs) */
+function marchesTalus(Z, img, rel) {
+  const { cw, ch, c, W: Wd } = Z, s = Z.s + 950;
+  const R = (cx, cy) => (cx < 0 || cy < 0 || cx >= cw || cy >= ch ? 0 : rel[cy * cw + cx]);
+  const hOf = (v) => v & REL.H;
+  for (let cy = 0; cy < ch; cy++) for (let cx = 0; cx < cw; cx++) {
+    const v = R(cx, cy); if (!(v & REL.HERBE) || !(v & REL.MARCHE)) continue;
+    const h = hOf(v), n = R(cx, cy - 1), e = R(cx + 1, cy), w = R(cx - 1, cy), so = R(cx, cy + 1);
+    const d = hOf(n) > h && (n & REL.HERBE) ? 's' : hOf(n) < h && !(n & REL.TALUS) ? 'n' : hOf(e) < h ? 'e' : hOf(w) < h ? 'w' : hOf(so) < h || (so & REL.MARCHE) ? 's' : null;
+    if (!d) continue;
+    for (let ly = 0; ly < c; ly++) for (let lx = 0; lx < c; lx++) {
+      const vert = d === 's' || d === 'n', u = vert ? lx : ly, along = d === 's' ? ly : d === 'n' ? c - 1 - ly : d === 'e' ? lx : c - 1 - lx;
+      const X = (cx + Z.rx0) * c + lx, Y = (cy + Z.ry0) * c + ly, i = (cy * c + ly) * Wd + cx * c + lx;
+      if (img[i] === TRANSPARENT) continue;
+      // joues (le talus d'herbe), sauf du côté d'une autre marche : l'escalier est d'un seul tenant
+      const avant = vert ? R(cx - 1, cy) : R(cx, cy - 1), apres = vert ? R(cx + 1, cy) : R(cx, cy + 1);
+      const ouvA = (avant & REL.MARCHE) && hOf(avant) === h, ouvB = (apres & REL.MARCHE) && hOf(apres) === h;
+      const bord = 4 + (hash2(Math.floor(along / 3), cx * 7 + cy, s + (u < 16 ? 1 : 2)) < 0.5 ? 0 : 1);
+      if ((!ouvA && u < bord - 1) || (!ouvB && u > c - bord)) continue;
+      if ((!ouvA && u === bord - 1) || (!ouvB && u === c - bord)) { img[i] = ton(img[i], -2); continue; }
+      const wob = hash2(Math.floor(u / 5), Math.floor(along / 8), s + 3) < 0.3 ? 1 : 0, lv = (along + wob) % 8;
+      let col;
+      const marcheN = Math.floor((along + wob) / 8);   // 0 : la marche du haut
+      if (lv <= 4) {   // giron : terre tassée, grains ; de côté, les marches du bas sont dans l'ombre
+        const g = hash2(X, Y, s + 4), sombre = vert ? 0 : Math.max(0, marcheN - 1);
+        col = lv === 0 ? D[1] : g < 0.12 ? D[2] : g > 0.9 ? D[Math.max(2, 4 - sombre)] : D[Math.max(1, 3 - (sombre > 1 ? 1 : 0))];
+      } else {         // rondin : dessus clair, rond, ombre dessous ; anneaux du bois aux bouts
+        const bout = (!ouvA && u <= bord + 1) || (!ouvB && u >= c - bord - 2);
+        col = bout ? (lv === 6 ? B[3] : B[1]) : lv === 5 ? B[3] : lv === 6 ? (hash2(X, Y, s + 5) < 0.2 ? B[1] : B[2]) : B[0];
+      }
+      img[i] = col;
+    }
+  }
+}
+
 /* ------------------------------------------------------------------ un bloc de carte ---------------------------------- */
 /**
  * kinds : sortes des cases de la zone (bloc + MARGIN cases tout autour), zw × zh ; (zx0, zy0) : première case de la zone.
  * Rend le bloc central (bw × bh cases, à MARGIN cases du bord de la zone) : tableau d'images (Uint8Array d'indices de
  * palette, TRANSPARENT là où le jeu garde son propre sol), une seule s'il n'y a pas d'eau, NFRAMES sinon.
  */
-export function rendreBloc({ kinds, zw, zh, zx0, zy0, bw, bh, seed = 7, cave = null }) {
+/** style des talus d'herbe (propositions) : actuel, hgss, terre, roche, douce */
+let STYLE_TALUS = 'actuel';
+export function rendreBloc({ kinds, zw, zh, zx0, zy0, bw, bh, seed = 7, cave = null, rel = null, talus: styleTalus = null }) {
+  STYLE_TALUS = styleTalus || globalThis.TALUS_STYLE || 'actuel';
   const Z = new Zone(kinds, zw, zh, zx0, zy0, seed), c = CELL;
   const img = new Uint8Array(Z.N).fill(TRANSPARENT);
   const has = (k) => kinds.includes(k);
   const isW = (k) => k === K.W || k === K.B;
   const water = has(K.W) || has(K.B) ? Z.region(isW, seed + 100, { wobble: 0.7, round: 0.45 }) : new Uint8Array(Z.N);
-  let path = has(K.P) ? Z.region((k) => k === K.P, seed + 101, { wobble: 0.9, round: 0.55, band: c >> 1 }) : new Uint8Array(Z.N);
+  let path = has(K.P) || has(K.MP) ? Z.region((k) => k === K.P || k === K.MP, seed + 101, { wobble: 0.9, round: 0.55, band: c >> 1 }) : new Uint8Array(Z.N);
   const asph = has(K.A) ? Z.region((k) => k === K.A, seed + 104, { wobble: 0, round: 0.05, band: c >> 3 }) : new Uint8Array(Z.N);
   const pave = has(K.V) ? Z.region((k) => k === K.V, seed + 103, { wobble: 0.35, round: 0.1, band: c >> 2 }) : new Uint8Array(Z.N);
   // sols de fond des zones (neige, cendre, sable) : bords naturels sur une demi-case, c'est du décor
-  const fonds = [K.SN, K.AS, K.SA].filter(has).map((k) => [k, Z.region((q) => q === k, seed + 110 + k, { wobble: 1.1, round: 0.5, band: c >> 1, freq: 0.3 })]);
+  const fonds = [K.SN, K.AS, K.SA, K.GR, K.MO, K.RC].filter(has).map((k) => [k, Z.region((q) => q === k, seed + 110 + k, { wobble: 1.1, round: 0.5, band: c >> 1, freq: 0.3 })]);
   // forêt : herbe plus sombre, bord tramé
   let foret = null;
   if (has(K.GF)) {
@@ -790,31 +1190,45 @@ export function rendreBloc({ kinds, zw, zh, zx0, zy0, bw, bh, seed = 7, cave = n
     const bay = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
     for (let i = 0; i < Z.N; i++) foret[i] = fr[i] && Math.min(1, din[i] / 10) * 16 > bay[(Z.Y(i) & 3) * 4 + (Z.X(i) & 3)] ? 1 : 0;
   }
-  let tall = has(K.T) || has(K.TD) || has(K.TS) ? Z.region((k) => k === K.T || k === K.TD || k === K.TS, seed + 106, { wobble: 1.6, round: 0.3, freq: 0.25 }) : new Uint8Array(Z.N);
+  let tall = has(K.T) || has(K.TD) || has(K.TS) || has(K.TA) ? Z.region((k) => k === K.T || k === K.TD || k === K.TS || k === K.TA, seed + 106, { wobble: 1.6, round: 0.3, freq: 0.25 }) : new Uint8Array(Z.N);
   let caveM = new Uint8Array(Z.N);
   if (cave) caveM = andNot(Z.px((k) => k !== K.X), water);
+  // montagnes à gravir : sol de roche (bords naturels vers l'herbe d'à côté)
+  const estMont = (k) => k === K.MT || k === K.MR || k === K.MP;
+  const mont = has(K.MT) || has(K.MR) || has(K.MP) ? andNot(or(Z.region(estMont, seed + 140, { wobble: 0.8, round: 0.5, band: c >> 1, freq: 0.3 }), Z.px(estMont)), water) : null;
   const hard = or(water, pave, caveM, asph);
   path = andNot(path, hard); tall = andNot(tall, or(hard, path));
   const C = cave ? caveRamp(cave) : null;
   let lv = null;
   if (!cave) {
-    const grass = new Uint8Array(Z.N); for (let i = 0; i < Z.N; i++) grass[i] = hard[i] | path[i] ? 0 : 1;
+    const grass = new Uint8Array(Z.N); for (let i = 0; i < Z.N; i++) grass[i] = hard[i] | path[i] | (mont ? mont[i] : 0) ? 0 : 1;
     lv = herbe(Z, img, grass, water, foret);
+    if (mont) grotte(Z, img, andNot(mont, or(path, hard)), caveRamp('montagne'), K.MR);
     let fondAll = new Uint8Array(Z.N);
     for (const [k, mk] of fonds) {
       const m2 = andNot(andNot(mk, hard), path); fondZone(Z, img, m2, andNot(grass, or(mk, fondAll)), k); fondAll = or(fondAll, m2);
     }
     if (anyOf(tall)) {
       // les hautes herbes sombres (sous-bois) ont leur propre vert
-      const tdM = Z.px((k) => k === K.TD), tsM = Z.px((k) => k === K.TS);
-      const tlM = andNot(andNot(tall, tdM), tsM), tdR = and(tall, tdM), tsR = and(tall, tsM);
+      const tdM = Z.px((k) => k === K.TD), tsM = Z.px((k) => k === K.TS), taM = Z.px((k) => k === K.TA);
+      const tlM = andNot(andNot(andNot(tall, tdM), tsM), taM), tdR = and(tall, tdM), tsR = and(tall, tsM), taR = and(tall, taM);
       if (anyOf(tlM)) hautesHerbes(Z, img, tlM, lv);
       if (anyOf(tdR)) hautesHerbes(Z, img, tdR, lv, HK);
       if (anyOf(tsR)) hautesHerbes(Z, img, tsR, lv, HS);
+      if (anyOf(taR)) hautesHerbes(Z, img, taR, lv, HA);
     }
-    if (anyOf(path)) chemin(Z, img, path, or(water, hard));
+    if (anyOf(path)) chemin(Z, img, path, mont ? or(water, hard, mont) : or(water, hard));
+    // automne : feuilles mortes sur l'herbe et les chemins de la zone
+    if (has(K.FA)) {
+      const fa = Z.region((q) => q === K.FA || q === K.P, seed + 130, { wobble: 1.2, round: 0.5, band: c >> 1, freq: 0.3 });
+      const zoneFA = Z.region((q) => q === K.FA, seed + 131, { wobble: 1.4, round: 0.6, band: c, freq: 0.25 });
+      const dz = edt(zoneFA, Z.W, Z.H, 0), m = new Uint8Array(Z.N);   // distance à la zone d'automne (0 dedans)
+      for (let i = 0; i < Z.N; i++) m[i] = fa[i] && !hard[i] && dz[i] < 24 ? 1 : 0;
+      feuilles(Z, img, m);
+    }
     if (anyOf(pave)) paves(Z, img, pave, andNot(andNot(grass, path), water), path);
     if (anyOf(asph)) { bitume(Z, img, asph); escaliers(Z, img); }
+    if (rel) talus(Z, img, rel, water);
   } else grotte(Z, img, caveM, C);
   // transparence : cases que le jeu dessine lui-même (sable, neige, maisons, parois de grotte…)
   const keep = Z.px((k) => k !== K.X);
