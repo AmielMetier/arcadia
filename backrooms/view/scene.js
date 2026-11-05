@@ -1139,8 +1139,9 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
   const anim = L1 ? ENTITY_ANIM : null;
   face.visible = false;
   monsterGroup.add(face);
-  // mode normal : l'entité en 3D, animée (view/beast.js) ; mode VIP : les images d'origine
-  const beast = ENTITY_VIP ? null : createBeast();
+  // l'entité en 3D, animée (view/beast.js) ; au Level 1 en mode VIP : la vidéo d'origine
+  // mode VIP au Level 0 : le même corps, avec le visage de la photo de l'entité d'origine
+  const beast = !ENTITY_VIP ? createBeast() : !L1 ? createBeast({ photo: { url: VIP_IMG, crop: [490, 20, 300, 375] } }) : null;
   if (beast) {
     monsterGroup.add(beast.group);
     shadow.visible = false;

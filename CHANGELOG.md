@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 4.32 — 5 novembre 2026
+- **The Backrooms** — avec les monstres VIP, l'entité du Level 0 prend aussi le grand corps en 3D, avec le visage de sa photo d'origine.
+- **The Backrooms** — l'entité garde sa vraie posture : sa tête ne se replie plus peu à peu sur son corps.
+
 ## 4.31 — 5 novembre 2026
 - **The Backrooms** — au Level 0, les piliers ne se ressemblent plus : colonnes rondes, piliers carrés fins ou épais, piliers pleins, et de gros blocs dans les grandes salles. On passe à côté des plus fins.
 - **The Backrooms** — beaucoup moins de culs-de-sac : la plupart des impasses débouchent maintenant sur un autre couloir (il en reste quelques-unes).

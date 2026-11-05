@@ -127,6 +127,33 @@ function faceTexture(open) {
   return t;
 }
 
+// mode VIP : le visage de la photo de l'entité d'origine (crop : x, y, largeur, hauteur dans l'image), en ovale aux bords
+// fondus, plaqué sur la tête
+function photoFace(url, crop, tex) {
+  const W = 256;
+  const H = 320;
+  const [c, g] = canvas(W, H);
+  const img = new Image();
+  img.onload = () => {
+    const [x, y, w, h] = crop;
+    g.drawImage(img, x, y, w, h, 0, 0, W, H);
+    g.globalCompositeOperation = 'destination-in';
+    const r = g.createRadialGradient(W / 2, H / 2, W * 0.3, W / 2, H / 2, W * 0.5);
+    r.addColorStop(0, 'rgba(0,0,0,1)');
+    r.addColorStop(1, 'rgba(0,0,0,0)');
+    g.save();
+    g.scale(1, H / W);
+    g.fillStyle = r;
+    g.fillRect(0, 0, W, W);
+    g.restore();
+    tex.needsUpdate = true;
+  };
+  img.src = url;
+  tex.image = c;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 // copie d'un objet animé avec son propre squelette (comme SkeletonUtils.clone)
 function cloneSkinned(src) {
   const clone = src.clone(true);
@@ -175,11 +202,13 @@ const loading = new GLTFLoader().loadAsync(MODEL).then((g) => {
   source = g;
 }, () => {});
 
-export function createBeast() {
+// opts.photo : { url, crop } pour porter le visage d'une photo (mode VIP) au lieu de celui de l'entité classique
+export function createBeast(opts = {}) {
   const group = new THREE.Group();
   const skinMat = new THREE.MeshLambertMaterial({ map: skinTexture(), emissive: '#1a1716', emissiveIntensity: 0 });
-  const faces = [faceTexture(0.25), faceTexture(1)];
-  const faceMat = new THREE.MeshBasicMaterial({ map: faces[0], transparent: true, alphaTest: 0.3, color: '#cfcac4' });
+  const photo = opts.photo ? photoFace(opts.photo.url, opts.photo.crop, new THREE.Texture()) : null;
+  const faces = photo ? [photo, photo] : [faceTexture(0.25), faceTexture(1)];
+  const faceMat = new THREE.MeshBasicMaterial({ map: faces[0], transparent: true, alphaTest: photo ? 0.05 : 0.3, color: photo ? '#d8cfc2' : '#cfcac4' });
   const st = { ready: false, w: { Idle: 1, Walk: 0, Run: 0 }, last: null, speed: 0, twitch: 0, twitchT: 1 };
 
   const build = () => {
@@ -250,6 +279,12 @@ export function createBeast() {
     }
     st.torso = torso;
     st.neck = bones.Neck;
+    // la pose de repos de chaque os : on y revient avant chaque image, sinon les retouches (dos voûté, tête
+    // penchée) s'ajoutent d'une image à l'autre sur les os que l'animation ne touche pas
+    st.rest = [];
+    root.traverse((o) => {
+      if (o.isBone) st.rest.push({ o, q: o.quaternion.clone() });
+    });
     st.mixer = new THREE.AnimationMixer(root);
     st.acts = {};
     for (const n of ['Idle', 'Walk', 'Run']) {
@@ -303,6 +338,7 @@ export function createBeast() {
       // ses grandes jambes : l'animation se joue au rythme de sa vitesse
       if (st.acts.Walk) st.acts.Walk.timeScale = THREE.MathUtils.clamp(st.speed / 1.6, 0.6, 1.6);
       if (st.acts.Run) st.acts.Run.timeScale = THREE.MathUtils.clamp(st.speed / 4, 0.7, 1.4);
+      for (const r of st.rest) r.o.quaternion.copy(r.q);
       st.mixer.update(dt);
       // ce que l'animation ne fait pas : membres rallongés, dos voûté, tête penchée qui tressaute
       for (const s of st.stretch) s.B.position.copy(s.rest).multiplyScalar(s.k);
