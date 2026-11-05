@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 4.24 — 5 novembre 2026
+- **Odyssée** — 24 Méga-Évolutions inédites, imaginées par des fans : Méga-Ronflex, Méga-Libégon, Méga-Milobellus, Méga-Typhlosion, Méga-Grolem, Méga-Papilusion, Méga-Chartor, Méga-Élekable et bien d'autres.
+  - Leurs Méga-Gemmes se vendent chez le professeur Orme, à Port-Granit.
+  - Méganium, Aligatueur, Minotaupe, Némélios et Darkrai ont désormais deux Méga au choix : l'officielle et une version Δ, chacune avec sa gemme.
+
 ## 4.23 — 5 novembre 2026
 - **Odyssée** — La Méga-Évolution arrive ! 81 Méga-Évolutions, dont les toutes nouvelles de Légendes Z-A (Méga-Dracolosse, Méga-Méganium, Méga-Aligatueur, Méga-Amphinobi, Méga-Raichu X et Y, Méga-Lucario Z…).
   - À Port-Granit, le professeur Orme te remet le Méga-Anneau dès ton cinquième badge, avec la gemme de ton partenaire de départ quand sa lignée en a une.

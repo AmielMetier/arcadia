@@ -7,7 +7,10 @@ import { SPECIES } from '../data/species.js';
 import { TALENTS_ESPECES } from '../data/talents.js';
 import { ABILITIES } from '../data/abilities.js';
 import { ITEMS } from './items.js';
-import { MEGA_FORMS, MEGA_ABILITIES } from '../data/megas.js';
+import { MEGA_FORMS as OFFICIELLES, MEGA_ABILITIES } from '../data/megas.js';
+import { MEGA_FANS } from '../data/megasFans.js';
+/** toutes les formes Méga : officielles (PokeAPI) et imaginées par des fans (n° 20001 et plus) */
+export const MEGA_FORMS = { ...OFFICIELLES, ...MEGA_FANS };
 import { calcStats } from './mon.js';
 
 export const MEGA_RING = 'mega-ring';
@@ -35,7 +38,7 @@ for (const [pidS, f] of Object.entries(MEGA_FORMS)) {
   (MEGAS_OF[f.base] ||= []).push(pid);
   // la Méga-Gemme : un objet à tenir, rangé avec les objets
   if (!ITEMS[f.stone]) {
-    ITEMS[f.stone] = { pocket: 'objets', price: LEGEND.has(f.base) ? 50000 : pid >= 10278 ? 25000 : 20000, hold: 'mega', mega: pid, name: f.stoneName, icon: f.stoneIcon ? f.stone : 'gift',
+    ITEMS[f.stone] = { pocket: 'objets', price: LEGEND.has(f.base) ? 50000 : pid >= 10278 ? 25000 : 20000, hold: 'mega', mega: pid, name: f.stoneName, icon: f.fan ? 'altarianite' : f.stoneIcon ? f.stone : 'gift',
       desc: `Méga-Gemme. Tenue par ${base.n}, elle lui permet de méga-évoluer en combat si son dresseur porte un Méga-Anneau.` };
   }
 }

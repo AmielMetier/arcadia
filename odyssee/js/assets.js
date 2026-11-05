@@ -27,15 +27,15 @@ const OBSCURS = new Set([249]);
 
 export const ASSETS = {
   // version obscure (Lugia Obscur) : son propre dessin s'il existe (img/crea/<espèce>-shadow-f / -b / -i.png)
-  front: (id, shiny, shadow) => (mega(id) ? `${BASE}/pokemon${shiny ? '/shiny' : ''}/${id}.png` : shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-f.png` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-f${shiny ? 's' : ''}.png` : `${gen(id)}${shiny ? '/shiny' : ''}/${id}.png`),
-  back: (id, shiny, shadow) => (mega(id) ? `${BASE}/pokemon/back${shiny ? '/shiny' : ''}/${id}.png` : shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-b.png` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-b${shiny ? 's' : ''}.png` : `${gen(id)}/back${shiny ? '/shiny' : ''}/${id}.png`),
-  icon: (id, shadow) => (mega(id) ? `${BASE}/pokemon/versions/generation-vii/icons/${id}.png` : shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-i.png` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-i.png` : `${BASE}/pokemon/versions/generation-vii/icons/${id}.png`),
+  front: (id, shiny, shadow) => (id >= 20000 ? `${IMG}megas/${id}-f.png` : mega(id) ? `${BASE}/pokemon${shiny ? '/shiny' : ''}/${id}.png` : shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-f.png` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-f${shiny ? 's' : ''}.png` : `${gen(id)}${shiny ? '/shiny' : ''}/${id}.png`),
+  back: (id, shiny, shadow) => (id >= 20000 ? `${IMG}megas/${id}-b.png` : mega(id) ? `${BASE}/pokemon/back${shiny ? '/shiny' : ''}/${id}.png` : shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-b.png` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-b${shiny ? 's' : ''}.png` : `${gen(id)}/back${shiny ? '/shiny' : ''}/${id}.png`),
+  icon: (id, shadow) => (id >= 20000 ? ASSETS.icon(SPECIES[id]?.mega || 0) : mega(id) ? `${BASE}/pokemon/versions/generation-vii/icons/${id}.png` : shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-i.png` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-i.png` : `${BASE}/pokemon/versions/generation-vii/icons/${id}.png`),
   shadowFront: (id) => `${IMG}crea/${SPECIES[id].k}-shadow-f.png`,
   shadowBack: (id) => `${IMG}crea/${SPECIES[id].k}-shadow-b.png`,
   shadowIcon: (id) => `${IMG}crea/${SPECIES[id].k}-shadow-i.png`,
   item: (k) => { const ic = ITEM_DEFS[k]?.icon || k; return ITEMS.has(ic) ? `${IMG}items/${ic}.png` : `${BASE}/items/${ic}.png`; },
   // cri : enregistrement PokeAPI pour un Pokémon, cri synthétisé (« synth:id ») pour une créature originale
-  cry: (id) => (orig(id) ? 'synth:' + id : params.has('sprites') ? null : `${CRIES}/${id}.ogg`),
+  cry: (id) => (id >= 20000 ? ASSETS.cry(SPECIES[id]?.mega) : orig(id) ? 'synth:' + id : params.has('sprites') ? null : `${CRIES}/${id}.ogg`),
   // dresseur en combat : dessins HeartGold / SoulSilver (provisoires), sinon nos portraits, sinon ceux de Poké Duel
   trainer: (k) => (!DRESSEURS.has(k) && !PORTRAITS.has(k) && SOSIES[k] ? ASSETS.trainer(SOSIES[k]) : DRESSEURS.has(k) ? `${IMG}dresseurs/${k}.png` : PORTRAITS.has(k) ? `${IMG}portraits/${k}.png` : `../pokemon/assets/trainers/${k}.png`),
   portrait: (k) => {

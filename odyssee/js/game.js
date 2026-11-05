@@ -2,7 +2,7 @@
 // Surf, Éclate-Roc, Vol), menus, histoire (les quinze arènes et l'archipel des trois frères), sauvegarde
 import { T, walkable, isGrassEnc, DIRS, OPP } from './world/tiles.js';
 import { MEGAS_OF, MEGA_RING, LEGEND, STONE_FORM, revertMegas } from './core/mega.js';
-import { MEGA_FORMS } from './data/megas.js';
+import { MEGA_FORMS } from './core/mega.js';
 import { createMon, monName, healFull, levelEvolution, itemEvolution, evolve, setUidBase, levelCap, ensureNature } from './core/mon.js';
 import { Battle } from './core/battle.js';
 import { ITEMS, itemName, applyItem, canUseOn, useCandy, formatFindItem, formatObtainItem, itemPocketName } from './core/items.js';

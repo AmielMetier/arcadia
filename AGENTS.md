@@ -119,6 +119,8 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   (espèces invisibles des listes, n° 10033 et plus), les Méga-Gemmes et le Méga-Anneau ; le moteur (`battle.js`) : `canMega`, `doMega`,
   une par dresseur et par combat, retour à la forme de base dans `end()`. Méga-Anneau remis par le Pr Orme à Port-Granit (5 badges),
   qui vend aussi les gemmes ; 12 gemmes cachées sur les routes de la fin. Dresseurs : `trainer.megaSp` (n° d'espèce ou 'ace').
+  Méga imaginées par des fans (24, n° 20001 et plus) : `odyssee/js/data/megasFans.js` et `odyssee/img/megas/` (origine dans `LISEZMOI.txt`) ;
+  quand l'espèce a déjà une Méga officielle, la version des fans porte le signe Δ et sa propre gemme. Toutes les gemmes se vendent chez le Pr Orme.
   Interface : un écran plein cadre par fichier dans `odyssee/js/ui/screens/` (`map.js`, `card.js`, `pc.js`, `friends.js`…),
   outils communs et fermeture d'écran (`closer`) dans `screens/common.js` ; `ui/screens.js` ne fait que tout réexporter (importer depuis lui).
   Styles découpés de même dans `odyssee/css/NN-ecran.css`, chargés dans l'ordre par `index.html` (l'ordre compte : un fichier
