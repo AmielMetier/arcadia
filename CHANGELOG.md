@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.16 — 5 novembre 2026
+- **The Backrooms** — L'entité du mode normal ne ressemble plus à un dessin : peau sombre marbrée de veines, contours déchiquetés qui s'effilochent comme de la fumée, matière qui grouille quand elle bouge.
+
 ## 4.15 — 5 novembre 2026
 - **The Backrooms** — L'entité du mode normal est bien plus flippante : silhouette voûtée qui fume, bras inégaux aux doigts interminables, tête penchée à un angle impossible, bouche béante pleine de dents et gestes saccadés.
 
