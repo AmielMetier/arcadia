@@ -1666,9 +1666,24 @@ export class Game {
     const bg = !m.outdoor ? (m.floor === 'cave' ? 'cave' : m.battleBg === 'gym' ? gymKind : m.battleBg) : this.player.surf ? 'water' : z?.theme === 'volcanic' ? 'volcanic' : z?.theme === 'snow' ? 'snow' : isVillage ? 'village' : isCity ? 'city' : 'grass';
     const weather = o.weather || this.getMapWeather();
     // Méga-Évolution : le joueur avec son Méga-Anneau ; un dresseur marqué megaSp tend sa gemme à ce Pokémon (« ace » : le dernier)
+    // À partir de la 6e arène (5 badges), les Champions et au moins un dresseur sur trois méga-évoluent
+    if (o.trainer && !o.trainer.megaSp && !o.trainer.friendly && o.party?.length && this.badgeCount() >= 5) {
+      const key = String(o.id || o.trainer.name || ''); let h = 0; for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      if (o.leader != null || o.champion || h % 3 === 0) o.trainer = { ...o.trainer, megaSp: 'auto', megaSeed: h };
+    }
     if (o.trainer?.megaSp && o.party?.length) {
-      const target = o.trainer.megaSp === 'ace' ? o.party[o.party.length - 1] : o.party.find((q) => q.sp === o.trainer.megaSp);
-      const pid = target && MEGAS_OF[target.sp]?.[0];
+      let target = o.trainer.megaSp === 'ace' ? o.party[o.party.length - 1]
+        : o.trainer.megaSp === 'auto' ? [...o.party].sort((a, b) => b.lvl - a.lvl).find((q) => MEGAS_OF[q.sp])
+          : o.party.find((q) => q.sp === o.trainer.megaSp);
+      // personne dans l'équipe n'a de Méga : son dernier Pokémon laisse la place à un Pokémon qui en a une (toujours le même pour ce dresseur)
+      if (!target && o.trainer.megaSp === 'auto') {
+        const last = o.party[o.party.length - 1], pool = Object.keys(MEGAS_OF).map(Number).filter((sp) => !LEGEND.has(sp));
+        const sp = pool[(o.trainer.megaSeed || 0) % pool.length];
+        target = createMon(sp, last.lvl, { iv: last.iv, shiny: false });
+        o.party = [...o.party.slice(0, -1), target];
+      }
+      const forms = target && MEGAS_OF[target.sp];
+      const pid = forms && forms[(o.trainer.megaSeed || 0) % forms.length];
       if (pid) { target.item = MEGA_FORMS[pid].stone; o.trainer = { ...o.trainer, mega: true }; }
     }
     const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag, mega: (st.bag[MEGA_RING] || 0) > 0 }, foe: o.wild ? { name: 'sauvage', party: [o.wild] } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap(), weather: BATTLE_WEATHERS.includes(weather) ? weather : undefined });

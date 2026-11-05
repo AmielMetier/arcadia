@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 4.25 — 5 novembre 2026
+- **Odyssée** — Les 24 Méga-Gemmes imaginées par des fans sont cachées sur les routes de la fin de l'aventure.
+- **Odyssée** — Tous les Pokémon qui ont une Méga-Évolution peuvent être capturés : les partenaires de départ des six régions, Riolu, Kabuto, Amonita, Barpau, Goinfrex, Sepiatop et d'autres apparaissent (rarement) dans les zones de la fin du jeu.
+  - Latias et Latios t'attendent quelque part avec sept badges, Diancie avec huit.
+- **Odyssée** — À partir de la sixième arène, les Champions méga-évoluent, et au moins un dresseur sur trois aussi. Prépare-toi !
+
 ## 4.24 — 5 novembre 2026
 - **Odyssée** — 24 Méga-Évolutions inédites, imaginées par des fans : Méga-Ronflex, Méga-Libégon, Méga-Milobellus, Méga-Typhlosion, Méga-Grolem, Méga-Papilusion, Méga-Chartor, Méga-Élekable et bien d'autres.
   - Leurs Méga-Gemmes se vendent chez le professeur Orme, à Port-Granit.
