@@ -37,10 +37,10 @@ const GRUNT = {
 export const ELITE = [
   { id: 'c4:1', name: 'Frimas', ow: 'frimas', bs: 'frimas', team: [[87, 73], [91, 73], [221, 74], [124, 74], [131, 75]], room: 'Salle de Glace', floor: 'gymWater', deco: 'statue',
     intro: 'Bienvenue au Conseil 4. Je suis Frimas. Mon cœur s\'est figé il y a bien longtemps... Le tien tiendra-t-il face au froid ?', lose: 'Ta flamme a fait fondre ma glace. Passe, la salle suivante t\'attend.' },
-  { id: 'c4:2', name: 'Spectrel', ow: 'spectrel', bs: 'spectrel', team: [[93, 74], [200, 74], [1023, 75], [94, 76]], room: 'Salle des Ombres', floor: 'gymPsy', deco: 'gymstatue',
-    intro: 'Chut... Les esprits me murmurent ton nom depuis que tu es entré. Ils ont hâte de jouer avec toi.', lose: 'Les esprits se taisent... Tu les as impressionnés.' },
-  { id: 'c4:3', name: 'Brutus', ow: 'brutus', bs: 'brutus', team: [[237, 75], [106, 75], [107, 75], [1033, 76], [68, 77]], room: 'Salle du Poing', floor: 'gymRock', deco: 'statue',
+  { id: 'c4:2', name: 'Brutus', ow: 'brutus', bs: 'brutus', team: [[237, 75], [106, 75], [107, 75], [1033, 76], [68, 77]], room: 'Salle du Poing', floor: 'gymRock', deco: 'statue',
     intro: 'Je suis Brutus ! J\'ai entraîné mes muscles et ceux de mes Pokémon chaque jour de ma vie. Hoo ! Hah !', lose: 'Ma force n\'a pas suffi... Va. Tu le mérites.' },
+  { id: 'c4:3', name: 'Spectrel', ow: 'spectrel', bs: 'spectrel', team: [[93, 75], [200, 75], [1023, 76], [94, 77]], room: 'Salle des Ombres', floor: 'gymPsy', deco: 'gymstatue',
+    intro: 'Chut... Les esprits me murmurent ton nom depuis que tu es entré. Ils ont hâte de jouer avec toi.', lose: 'Les esprits se taisent... Tu les as impressionnés.' },
   { id: 'c4:4', name: 'Ombrelle', ow: 'ombrelle', bs: 'ombrelle', team: [[197, 76], [198, 76], [215, 77], [229, 77], [248, 78]], room: 'Salle de la Nuit', floor: 'gymDragon', deco: 'gymstatue',
     intro: 'Je suis Ombrelle, la dernière du Conseil 4. Les gentils Pokémon, les méchants Pokémon... Seuls les dresseurs comptent. Montre-moi ce que tu vaux.', lose: 'Tu es fort, et tu aimes tes Pokémon. C\'est ce qui fait un vrai dresseur. Célestine t\'attend.' },
 ];

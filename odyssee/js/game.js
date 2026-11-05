@@ -1,5 +1,5 @@
 // odyssee/js/game.js — le jeu : déplacements sur la grille, PNJ, dresseurs, rencontres, capacités de terrain (Coupe,
-// Surf, Éclate-Roc, Vol), menus, histoire (les huit arènes et l'archipel des trois frères), sauvegarde
+// Surf, Éclate-Roc, Vol), menus, histoire (les quinze arènes et l'archipel des trois frères), sauvegarde
 import { T, walkable, isGrassEnc, DIRS, OPP } from './world/tiles.js';
 import { createMon, monName, healFull, levelEvolution, itemEvolution, evolve, setUidBase, levelCap, ensureNature } from './core/mon.js';
 import { Battle } from './core/battle.js';
@@ -547,7 +547,7 @@ export class Game {
     if (m.get(p.x, p.y) === T.MAT && d === 'down') {
       const w = m.warpAt(p.x, p.y);
       // arène : on n'en ressort pas avant d'avoir affronté le Champion (une défaite ramène au Centre de soins)
-      if (w && !this.libre && m.gymLock != null && !this.state.badges[m.gymLock] && this.state.flags['IN:' + m.id]) { this.gymLocked(); return; }
+      if (w && !this.libre && m.gymLock != null && !this.state.badges[m.gymLock] && this.state.flags['IN:' + m.id]) { this.gymLocked(w); return; }
       if (w) { this.warp(w, 'exit'); return; }
     }
     const isShift = this.input.isDown('run');
@@ -673,10 +673,10 @@ export class Game {
     const g = this.npcs.find((n) => n.def.script === 'gymguide');
     if (g) { const dx = this.player.x - g.x, dy = this.player.y - g.y; g.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down'); }
     await ui.say([`Yo, futur Maître ! Bienvenue dans l'Arène de ${L.name} !`, `${L.name} utilise des créatures de type ${TYPE_FR[L.type]}. Mise sur ${GYM_HINTS[L.type]} !`,
-      'Mais attention : une fois le défi lancé, les portes se ferment derrière toi.', 'Tu ne pourras ressortir qu\'après avoir battu le Champion… ou avoir perdu.'], { speaker: 'Guide' });
+      'Mais attention : une fois le défi lancé, tu affrontes l\'arène d\'une traite.', 'Si tu ressors avant d\'avoir battu le Champion, il faudra tout recommencer depuis le début.'], { speaker: 'Guide' });
     if (await ui.yesNo('Es-tu prêt à relever le défi ?')) {
       st.flags['IN:' + m.id] = true; this.sound.sfx('door');
-      await ui.say(['Voilà l\'esprit ! Les portes se referment derrière toi.', 'Bonne chance !'], { speaker: 'Guide' });
+      await ui.say(['Voilà l\'esprit ! Le défi commence.', 'Bonne chance !'], { speaker: 'Guide' });
       return;
     }
     await ui.say(['Pas de souci. Soigne ton équipe, remplis ton sac…', 'Et reviens quand tu seras prêt !'], { speaker: 'Guide' });
@@ -684,10 +684,17 @@ export class Game {
     if (w) await this.warp(w, 'exit');
   }
   /** l'arène est fermée derrière nous : le guide le rappelle */
-  async gymLocked() {
+  /** sortir d'une arène en plein défi : permis, mais tous les dresseurs de l'arène sont à rebattre */
+  async gymLocked(w) {
     this.busy = true;
-    await this.ui.say(['Le guide : « Les portes de l\'arène restent closes tant que tu n\'as pas affronté le Champion ! »', 'Gagne ton badge… ou retourne au Centre de soins après une défaite.']);
+    const m = this.mapObj, st = this.state;
+    const ok = await this.ui.yesNo('Le guide : « Si tu sors maintenant, ton défi s\'arrête là : il faudra recommencer l\'arène depuis le début. Tu veux sortir ? »');
+    if (!ok) { this.busy = false; return; }
+    // les dresseurs de l'arène (pas le Champion) reprennent leur place et redeviennent à battre
+    for (const k of Object.keys(st.flags)) if (k.startsWith('T:' + m.id + ':') && !k.endsWith(':leader')) delete st.flags[k];
+    st.flags['IN:' + m.id] = false;
     this.busy = false;
+    await this.warp(w, 'exit');
   }
 
   /* ================= PNJ ================= */
@@ -2101,7 +2108,8 @@ export class Game {
       this.updateZone();
       this.busy = false; return true;
     };
-    if (name === 'rival2') return rivalFight('rival2', (R) => [[1010, 11], [1013, 11], [R[0], 13]], 'Grr... Tu as eu de la chance !', [`${st.name} ! Tu as déjà ton premier badge ?`, 'Moi aussi, évidemment. Voyons qui a le plus progressé !'], ['Je vais m\'entraîner dans le Bois Murmure.', 'La prochaine fois, je ne perdrai pas !']);
+    // Théo t'attend sur la Route 2 une fois ton premier badge en poche (sa réplique et son équipe vont avec)
+    if (name === 'rival2' && st.badges[0]) return rivalFight('rival2', (R) => [[1010, 11], [1013, 11], [R[0], 13]], 'Grr... Tu as eu de la chance !', [`${st.name} ! Tu as déjà ton premier badge ?`, 'Moi aussi, évidemment. Voyons qui a le plus progressé !'], ['Je vais m\'entraîner dans le Bois Murmure.', 'La prochaine fois, je ne perdrai pas !']);
     if (name === 'rival3') return rivalFight('rival3', (R) => [[1011, 27], [1034, 26], [1021, 26], [R[1], 29]], 'Encore ?! Tes créatures sont devenues sacrément fortes...', ['Tiens, tiens... Le grand voyageur !', 'Floralia, c\'est ma ville porte-bonheur. Prépare-toi !'], ['Flora t\'attend à l\'Arène. Moi, je file vers l\'est.', 'On se retrouvera tout en haut, à la Ligue !']);
     if (name === 'rival4') return rivalFight('rival4', (R) => [[1012, 36], [1035, 35], [1022, 36], [1019, 36], [R[2], 39]], 'Toi et tes créatures, vous êtes vraiment synchronisés...', [`${st.name} ! Tu vas sur les îles, toi aussi ?`, 'On dit que Drakos a battu tous ceux qui ont osé le défier, sauf Célestine.', 'Avant que tu y ailles, montre-moi si tu es prêt !'], ['Bon. Tu es prêt. Fonce !', 'Moi, je vais m\'entraîner sur la route 10. On se revoit avant la Ligue.']);
     // second rival : l'autre enfant, petit-fils / petite-fille du professeur, recrue des Gardes d'Écaille

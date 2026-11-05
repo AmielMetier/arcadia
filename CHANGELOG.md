@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 4.20 — 5 novembre 2026
+- **Odyssée** — Arènes : tu peux maintenant ressortir en plein défi. Le guide te prévient : si tu sors avant d'avoir battu le Champion, tous les dresseurs de l'arène sont à rebattre.
+- **Odyssée** — Théo ne t'attend plus sur la Route 2 avant ton premier badge (il te le demande, après tout).
+- **Odyssée** — Le Conseil 4 monte en puissance d'une salle à l'autre : Brutus passe avant Spectrel.
+- **Odyssée** — Gaspard, Ferdinand, Corbin et Célestine perdent un niveau : ils restent redoutables, mais la difficulté monte plus régulièrement.
+- **Odyssée** — Le Cocoreille des dresseurs Insecte sait enfin attaquer : fini les combats sans fin à coups d'Armure.
+- **Odyssée** — Le nombre d'arènes est le même partout : quinze, huit au Nord et sept dans les Terres du Sud.
+
 ## 4.19 — 5 novembre 2026
 - **Odyssée** — Un début d'aventure plus accueillant (la suite garde sa difficulté) :
   - Le premier combat contre Théo au labo se joue à armes égales : même niveau que toi, et il ne joue pas encore les malins.
