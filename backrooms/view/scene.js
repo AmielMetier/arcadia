@@ -752,11 +752,6 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
         rail([2 * C, e, HALF], [3 * C - e, e, HALF]);
         rail([3 * C - e, e, HALF], [3 * C - e, 2 * C - e, HALF]);
         rail([3 * C - e, 2 * C - e, HALF], [2 * C, 2 * C - e, HALF]);
-        // une ampoule nue au-dessus du palier, presque morte
-        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshBasicMaterial({ color: '#7a6a3a' }));
-        bulb.position.set(wx(2.5 * C, C), HALF + 2.6, wz(2.5 * C, C));
-        group.add(bulb);
-        bar([2.5 * C, C, HALF + 2.66], [2.5 * C, C, FLOOR_DY - 0.4], 0.012, railStair);
       } else {
         // garde-corps autour de la trémie, ouvert en haut de la seconde volée
         const e = 0.03;

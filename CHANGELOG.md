@@ -5,7 +5,7 @@
   - Rater une arête, c'est une vraie chute : on tombe pendant plus d'une seconde, l'air siffle, le choc est lourd, l'image tremble et on reste sonné plus longtemps, à bout de souffle.
   - Depuis l'étage du bas, on voit le puits au-dessus de sa tête.
   - Plus aucun néon ne flotte au milieu des puits.
-- **The Backrooms** — les escaliers entre les deux étages sont coudés : une première volée, un palier à mi-hauteur sous une ampoule presque morte, demi-tour, puis une seconde volée qui surplombe la première, au fond d'une grande cage obscure.
+- **The Backrooms** — les escaliers entre les deux étages sont coudés : une première volée, un palier à mi-hauteur, demi-tour, puis une seconde volée qui surplombe la première, au fond d'une grande cage obscure.
 - **The Backrooms** — l'entité prend l'escalier par le bas ou par le haut, comme les joueurs.
 
 ## 4.13 — 4 novembre 2026
