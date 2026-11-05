@@ -385,12 +385,13 @@ function drawPoolWall(ctx, S, photo) {
   ctx.fillStyle = '#e9efee';
   ctx.fillRect(0, 0, S, S);
   if (photo) {
-    const tw = S / 1.4;
-    const th = S / 2.95;
+    // mosaïque fine : des carreaux d'environ 7 cm
+    const tw = S / 3;
+    const th = S / 6.3;
     for (let y = 0; y < S; y += th) for (let x = 0; x < S; x += tw) ctx.drawImage(photo, x, y, tw + 1, th + 1);
   } else noise(ctx, S, S, 10);
   // frise bleu pastel de deux rangs, à 1,1 m au-dessus de l'eau (le mur va de -1,3 m à 4 m)
-  const row = S / 2.95 / 12;
+  const row = S / 6.3 / 12;
   const yf = S * (1 - (1.1 + 1.3) / 5.3);
   ctx.globalCompositeOperation = 'multiply';
   ctx.fillStyle = '#9fd3e3';
@@ -410,22 +411,20 @@ function drawPoolWall(ctx, S, photo) {
 function drawPoolFloor(ctx, S, photo) {
   ctx.fillStyle = '#f1f4f3';
   ctx.fillRect(0, 0, S, S);
-  if (photo) ctx.drawImage(photo, 0, 0, S, S);
+  if (photo) for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) ctx.drawImage(photo, (x * S) / 2, (y * S) / 2, S / 2 + 1, S / 2 + 1);
   else noise(ctx, S, S, 8);
 }
 
-// plafond : enduit blanc lisse, à peine taché par l'humidité
-function drawPoolCeiling(ctx, S) {
+// plafond, voûtes : la même mosaïque fine, 3 × 3 photos par case de 2,5 m (carreaux d'environ 7 cm)
+function drawPoolCeiling(ctx, S, photo) {
   ctx.fillStyle = '#e8eeee';
   ctx.fillRect(0, 0, S, S);
-  noise(ctx, S, S, 6);
-  ctx.fillStyle = 'rgba(120, 150, 150, 0.12)';
-  ctx.fillRect(0, 0, S, 2);
-  ctx.fillRect(0, 0, 2, S);
+  if (photo) for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) ctx.drawImage(photo, (x * S) / 3, (y * S) / 3, S / 3 + 1, S / 3 + 1);
+  else noise(ctx, S, S, 6);
 }
 
 export function createBackroomsTextures(level = 0) {
-  const S = 512;
+  const S = level === 2 ? 1024 : 512; // la mosaïque des Poolrooms demande plus de détail
   const L1 = level === 1;
   const L2 = level === 2; // Level 37, les Poolrooms
   const [wallCanvas, wctx] = canvas(S);
@@ -443,7 +442,7 @@ export function createBackroomsTextures(level = 0) {
   const ceiling = tex(ceilCanvas);
 
   // les photos arrivent un peu plus tard : on redessine par-dessus
-  const files = L2 ? ['l37_mur.jpg', 'l37_sol.jpg', 'none'] : L1 ? ['l1_mur.jpg', 'l1_sol.jpg', 'l1_plafond.jpg'] : ['papier.jpg', 'moquette.jpg', 'plafond.jpg'];
+  const files = L2 ? ['l37_mur.jpg', 'l37_sol.jpg', 'l37_mur.jpg'] : L1 ? ['l1_mur.jpg', 'l1_sol.jpg', 'l1_plafond.jpg'] : ['papier.jpg', 'moquette.jpg', 'plafond.jpg'];
   // Level 37 : le carrelage des bassins (cyan) et des fosses (bleu profond), ambientCG Tiles132A et Tiles135A
   const [poolCanvas, pctx2] = canvas(S);
   const [deepCanvas, dctx2] = canvas(S);
@@ -453,12 +452,16 @@ export function createBackroomsTextures(level = 0) {
   dctx2.fillRect(0, 0, S, S);
   const pool = tex(poolCanvas);
   const deep = tex(deepCanvas);
+  // la mosaïque des voûtes : le même dessin que le plafond (2,5 m par répétition)
+  const mosaic = tex(ceilCanvas);
   const ready = Promise.all([...files.map(loadImage), ...(L2 ? ['l37_bassin.jpg', 'l37_fosse.jpg'].map(loadImage) : [])]).then(([pap, moq, pla, bas, fos]) => {
     if (pap) { drawW(wctx, S, pap); wall.needsUpdate = true; }
     if (moq) { drawF(cctx, S, moq); carpet.needsUpdate = true; }
     if (pla) { drawC(clctx, S, pla); ceiling.needsUpdate = true; }
-    if (bas) { pctx2.drawImage(bas, 0, 0, S, S); pool.needsUpdate = true; }
-    if (fos) { dctx2.drawImage(fos, 0, 0, S, S); deep.needsUpdate = true; }
+    // carreaux des bassins deux fois plus petits (10 cm)
+    if (bas) { for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) pctx2.drawImage(bas, (x * S) / 2, (y * S) / 2, S / 2 + 1, S / 2 + 1); pool.needsUpdate = true; }
+    if (fos) { for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) dctx2.drawImage(fos, (x * S) / 2, (y * S) / 2, S / 2 + 1, S / 2 + 1); deep.needsUpdate = true; }
+    if (pla) mosaic.needsUpdate = true;
   });
 
   // Portes d'ascenseur en inox brossé
@@ -669,5 +672,5 @@ export function createBackroomsTextures(level = 0) {
   const drawings = tex(drawCanvas);
   drawings.wrapS = drawings.wrapT = THREE.ClampToEdgeWrapping;
 
-  return { wall, carpet, ceiling, pool, deep, vhs, exit, sign, label, steel, crate, fog, lamp, outlet, vent, tape, drawings, ready };
+  return { wall, carpet, ceiling, pool, deep, mosaic, vhs, exit, sign, label, steel, crate, fog, lamp, outlet, vent, tape, drawings, ready };
 }

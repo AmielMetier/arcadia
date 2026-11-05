@@ -10,6 +10,11 @@ export const POOL_SIZE = 56;
 export const POOL_CEIL = 4.0;
 // profondeurs (m) : pataugeoire, couloir inondé, bassin, centre du grand bassin
 export const DEPTH = { WADE: 0.2, HALL: 0.4, POOL: 0.6, DEEP: 1.1 };
+// voûtes : couloirs en berceau (demi-cercle de 2,5 m de rayon sur 2 cases, naissance à 1,5 m) et grandes salles
+// en voûtes d'arêtes entre de grosses colonnes (naissance à 1,8 m, flèche de 2,2 m) : le sommet touche le plafond.
+// ceilKind (par case) : 0 plafond plat, 1 et 2 berceau dans l'axe x (moitié côté z-, moitié côté z+), 3 et 4 dans l'axe z
+export const BARREL = { spring: 1.5, r: 2.5 };
+export const GROIN = { spring: 1.8, rise: 2.2 };
 
 // objets abandonnés au bord des bassins (Poly Haven, CC0) ; float : posé sur l'eau
 export const L37_PROPS = [
@@ -71,7 +76,18 @@ export function createPoolMap(seed = 37) {
     if (r.kind) continue;
     const big = r.w >= 7 && r.h >= 7;
     const v = rnd();
-    r.kind = big && v < 0.5 ? 'pool' : v < 0.75 ? 'wade' : 'hall';
+    // les plus grandes salles : des voûtes d'arêtes sur colonnes, inondées
+    if (r.w >= 9 && r.h >= 9 && v < 0.55) {
+      r.kind = 'vault';
+      r.deep = rnd() < 0.5;
+    } else r.kind = big && v < 0.6 ? 'pool' : v < 0.8 ? 'wade' : 'hall';
+  }
+  // ambiances : des halles sous verrière, éblouissantes, et des salles sombres, bleutées, presque sans lumière
+  for (const r of rooms) {
+    if (r === start || r.kind === 'tech') continue;
+    const v = rnd();
+    if ((r.kind === 'pool' || r.kind === 'wade') && v < 0.3) r.sky = true;
+    else if (v > 0.78) r.dark = true;
   }
 
   // 3. On creuse les salles
@@ -80,7 +96,10 @@ export function createPoolMap(seed = 37) {
       for (let x = r.x; x < r.x + r.w; x++) {
         let d = 0;
         if (r.kind === 'wade') d = DEPTH.WADE;
-        else if (r.kind === 'pool') {
+        else if (r.kind === 'vault') {
+          const edge = Math.min(x - r.x, r.x + r.w - 1 - x, z - r.z, r.z + r.h - 1 - z);
+          d = r.deep ? (edge === 0 ? 0 : DEPTH.POOL) : DEPTH.WADE;
+        } else if (r.kind === 'pool') {
           // une plage sèche d'une case tout autour, le bassin, et le centre plus profond
           const edge = Math.min(x - r.x, r.x + r.w - 1 - x, z - r.z, r.z + r.h - 1 - z);
           d = edge === 0 ? 0 : edge >= 2 && r.w >= 8 && r.h >= 8 ? DEPTH.DEEP : DEPTH.POOL;
@@ -90,28 +109,39 @@ export function createPoolMap(seed = 37) {
     }
   }
 
+  // 3b. Une passerelle sèche traverse certains grands bassins
+  for (const r of rooms) {
+    if (r.kind !== 'pool' || (r.w < 8 && r.h < 8) || rnd() < 0.4) continue;
+    const alongX = r.w >= r.h;
+    const mid = alongX ? r.z + (r.h >> 1) : r.x + (r.w >> 1);
+    for (let k = alongX ? r.x : r.z; k < (alongX ? r.x + r.w : r.z + r.h); k++) depth[(alongX ? mid : k) * W + (alongX ? k : mid)] = 0;
+  }
+
   // 4. Couloirs inondés (2 cases de large) entre les salles : un arbre couvrant, plus quelques boucles
+  const ceilKind = new Uint8Array(W * H);
   const corridor = (a, b) => {
     const horizFirst = rnd() < 0.5;
-    const carve = (x, z) => {
+    // axis : 'x' ou 'z', le sens du couloir (pour sa voûte en berceau) ; null au coude
+    const carve = (x, z, axis) => {
       for (const [ox, oz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
         const k = (z + oz) * W + x + ox;
         if (!inside(x + ox, z + oz)) continue;
         if (grid[k] === T.FLOOR) continue; // on garde la profondeur des salles traversées
         set(x + ox, z + oz, T.FLOOR, DEPTH.HALL);
+        ceilKind[k] = axis === 'x' ? 1 + oz : axis === 'z' ? 3 + ox : 0;
       }
     };
     let x = a.cx;
     let z = a.cz;
     const stepX = () => {
       while (x !== b.cx) {
-        carve(x, z);
+        carve(x, z, 'x');
         x += Math.sign(b.cx - x);
       }
     };
     const stepZ = () => {
       while (z !== b.cz) {
-        carve(x, z);
+        carve(x, z, 'z');
         z += Math.sign(b.cz - z);
       }
     };
@@ -122,7 +152,7 @@ export function createPoolMap(seed = 37) {
       stepZ();
       stepX();
     }
-    carve(x, z);
+    carve(x, z, null);
   };
   const linked = [start];
   const left = rooms.filter((r) => r !== start);
@@ -147,6 +177,25 @@ export function createPoolMap(seed = 37) {
 
   // 5. Piliers ronds : en quinconce dans les pataugeoires et les halles, jamais contre un mur ni devant un passage
   const pillars = {};
+  const bays = [];
+  for (const r of rooms) {
+    if (r.kind !== 'vault') continue;
+    // grosses colonnes toutes les 3 cases ; entre elles (et les murs), une voûte d'arêtes par travée
+    const px = [];
+    const pz = [];
+    for (let x = r.x + 2; x <= r.x + r.w - 3; x += 3) px.push(x);
+    for (let z = r.z + 2; z <= r.z + r.h - 3; z += 3) pz.push(z);
+    for (const x of px) {
+      for (const z of pz) {
+        const k = z * W + x;
+        grid[k] = T.PILLAR;
+        pillars[k] = { x: (x + 0.5) * CELL_SIZE, z: (z + 0.5) * CELL_SIZE, h: 0.5, round: true };
+      }
+    }
+    const xs = [r.x * CELL_SIZE, ...px.map((x) => (x + 0.5) * CELL_SIZE), (r.x + r.w) * CELL_SIZE];
+    const zs = [r.z * CELL_SIZE, ...pz.map((z) => (z + 0.5) * CELL_SIZE), (r.z + r.h) * CELL_SIZE];
+    for (let i = 0; i + 1 < xs.length; i++) for (let j = 0; j + 1 < zs.length; j++) bays.push({ x0: xs[i], x1: xs[i + 1], z0: zs[j], z1: zs[j + 1] });
+  }
   for (const r of rooms) {
     if (r.kind !== 'wade' && r.kind !== 'hall') continue;
     if (r.w < 5 || r.h < 5) continue;
@@ -156,7 +205,7 @@ export function createPoolMap(seed = 37) {
         const k = z * W + x;
         if (DIRS.some(([dx, dz]) => get(x + dx, z + dz) !== T.FLOOR)) continue;
         grid[k] = T.PILLAR;
-        pillars[k] = { x: (x + 0.5) * CELL_SIZE, z: (z + 0.5) * CELL_SIZE, h: r.kind === 'hall' ? 0.5 : [0.28, 0.38][Math.floor(rnd() * 2)], round: true };
+        pillars[k] = { x: (x + 0.5) * CELL_SIZE, z: (z + 0.5) * CELL_SIZE, h: r.kind === 'hall' ? 0.6 : [0.32, 0.45][Math.floor(rnd() * 2)], round: true };
       }
     }
   }
@@ -171,6 +220,7 @@ export function createPoolMap(seed = 37) {
       grid[i] = T.WALL;
       depth[i] = 0;
     }
+    if (grid[i] !== T.FLOOR) ceilKind[i] = 0;
   }
   const walkable = [];
   for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) if (grid[z * W + x] === T.FLOOR) walkable.push({ x, z });
@@ -213,12 +263,40 @@ export function createPoolMap(seed = 37) {
   // les locaux techniques n'ont qu'une ampoule qui grésille
   const lights = [];
   const inTech = (x, z) => techs.some((r) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.h);
+  const roomAt = (x, z) => rooms.find((r) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.h);
+  const bayCells = new Set(bays.map((b) => Math.floor((b.z0 + b.z1) / 2 / CELL_SIZE) * W + Math.floor((b.x0 + b.x1) / 2 / CELL_SIZE)));
   for (let z = 1; z < H - 1; z++) {
     for (let x = 1; x < W - 1; x++) {
       if (grid[z * W + x] !== T.FLOOR) continue;
       const tech = inTech(x, z);
-      if (tech ? !techs.some((r) => r.cx === x && r.cz === z) : x % 2 || z % 2) continue;
-      lights.push({ x: (x + 0.5) * CELL_SIZE, y: POOL_CEIL - 0.02, z: (z + 0.5) * CELL_SIZE, gx: x, gz: z, state: tech ? 'flicker' : 'on', flicker: tech, bright: !tech, tech });
+      const r = roomAt(x, z);
+      const k = z * W + x;
+      let ok;
+      if (tech) ok = techs.some((t) => t.cx === x && t.cz === z);
+      else if (r && r.kind === 'vault') ok = bayCells.has(k); // une lampe au sommet de chaque voûte
+      else if (r && r.sky) ok = true; // la verrière : tout le plafond est lumineux
+      else ok = !(x % 2) && !(z % 2);
+      if (!ok) continue;
+      let state = tech ? 'flicker' : 'on';
+      if (r && r.dark) state = rnd() < 0.2 ? 'flicker' : 'off';
+      // dans un couloir voûté, la lampe est cachée dans la voûte : on ne voit que sa lumière
+      lights.push({ x: (x + 0.5) * CELL_SIZE, y: POOL_CEIL - 0.02, z: (z + 0.5) * CELL_SIZE, gx: x, gz: z, state, flicker: state === 'flicker', bright: !tech && !(r && r.dark), tech, sky: !!(r && r.sky), hidden: ceilKind[k] > 0 });
+    }
+  }
+
+  // échelles chromées : une ou deux par bassin, du bord sec vers l'eau
+  const ladders = [];
+  for (const r of rooms) {
+    if (r.kind !== 'pool' && !(r.kind === 'vault' && r.deep)) continue;
+    let n = 0;
+    for (let i = 0; i < 60 && n < 2; i++) {
+      const x = r.x + Math.floor(rnd() * r.w);
+      const z = r.z + Math.floor(rnd() * r.h);
+      if (grid[z * W + x] !== T.FLOOR || depth[z * W + x] !== 0) continue;
+      const d = DIRS.find(([dx, dz]) => grid[(z + dz) * W + x + dx] === T.FLOOR && depth[(z + dz) * W + x + dx] >= DEPTH.POOL);
+      if (!d || ladders.some((l) => Math.hypot(l.gx - x, l.gz - z) < 3)) continue;
+      ladders.push({ gx: x, gz: z, dx: d[0], dz: d[1], x: (x + 0.5) * CELL_SIZE + d[0] * (CELL_SIZE / 2), z: (z + 0.5) * CELL_SIZE + d[1] * (CELL_SIZE / 2) });
+      n++;
     }
   }
 
@@ -289,6 +367,9 @@ export function createPoolMap(seed = 37) {
     pitAt: () => -1,
     rooms,
     pillars,
+    ceilKind,
+    bays,
+    ladders,
     dist,
     monsterSpawn,
     isWall(gx, gz) {

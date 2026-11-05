@@ -124,7 +124,7 @@ export function createBackroomsScene(container, floors) {
   vhs.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
 
   const textures = createBackroomsTextures(map0.level || 0);
-  const AMB = L2 ? 0.08 : 0.012;
+  const AMB = L2 ? 0.045 : 0.012;
   const ambient = new THREE.AmbientLight(L2 ? '#eaf7f6' : L1 ? '#c9d8ff' : '#fff3c4', AMB);
   scene.add(ambient);
   const dummy = new THREE.Object3D();
@@ -266,7 +266,7 @@ export function createBackroomsScene(container, floors) {
       live.set(base);
       for (const f of flickers) if (f.k > 0) addPrint(live, f.fp, f.k);
       for (let i = 0; i < BW * BH; i++) {
-        const v = Math.min(1, (L2 ? 0.075 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
+        const v = Math.min(1, (L2 ? 0.03 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
         bakeData[i * 4] = Math.round(v * 255);
       }
       bakeTex.needsUpdate = true;
@@ -460,15 +460,18 @@ float bkCaust(vec2 uv, float t) {
 
     // 4. Néons au plafond (les morts sont gris, ceux qui grésillent clignotent)
     const ON = new THREE.Color(L2 ? '#f2fbff' : L1 ? '#eef6ff' : '#fffbe2').multiplyScalar(L2 ? 2.2 : 3.2); // plus fort que le blanc : le caméscope sature et ils bavent
-    const OFF = new THREE.Color('#4a473c');
+    const OFF = new THREE.Color(L2 ? '#7d8b8d' : '#4a473c'); // aux Poolrooms, un diffuseur éteint reste gris-bleu
     const fixtures = new THREE.InstancedMesh(L2 ? new THREE.BoxGeometry(1.3, 0.03, 1.3) : L1 ? new THREE.BoxGeometry(1.55, 0.05, 0.12) : new THREE.BoxGeometry(1.22, 0.04, 0.62), new THREE.MeshBasicMaterial({ color: '#ffffff', map: L1 || L2 ? null : textures.lamp }), map.lights.length);
     map.lights.forEach((l, i) => {
       dummy.position.set(l.x, CEIL - (L1 ? 0.45 : 0.025), l.z); // au Level 1, les tubes pendent sous le plafond
+      // Poolrooms : la lampe d'un couloir voûté est cachée dans la voûte ; sous une verrière, tout le plafond éclaire
+      dummy.scale.setScalar(l.hidden ? 0.0001 : l.sky ? 1.82 : 1);
       dummy.updateMatrix();
       fixtures.setMatrixAt(i, dummy.matrix);
       fixtures.setColorAt(i, l.state === 'off' ? OFF : ON);
       l.index = i;
     });
+    dummy.scale.set(1, 1, 1);
     fixtures.instanceMatrix.needsUpdate = true;
     group.add(fixtures);
 

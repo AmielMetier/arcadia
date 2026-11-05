@@ -4,6 +4,7 @@
 // centimètres quand on ne la regarde pas, et une ombre longue qui glisse au fond d'un bassin.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL_SIZE, T } from '../engine/map.js';
+import { BARREL, GROIN } from '../engine/poolrooms.js';
 
 const C = CELL_SIZE;
 const SPLASHES = 8;
@@ -87,6 +88,123 @@ export function buildWater({ map, group, baked, textures, bake, fog }) {
     group.add(inst);
   }
 
+  // --- voûtes : couloirs en berceau (avec un arc doubleau une case sur deux) et voûtes d'arêtes des grandes salles,
+  // carrelées de mosaïque comme le reste ---
+  const mosaic = baked(new THREE.MeshLambertMaterial({ map: textures.mosaic, side: THREE.DoubleSide }));
+  const ribMat = baked(new THREE.MeshLambertMaterial({ map: textures.mosaic, color: '#d8e4e3', side: THREE.DoubleSide }));
+  // un quart de berceau : l'axe le long de x (une case), de la naissance (z = -R) au sommet (z = 0)
+  const quarter = (R, len, seg = 12) => {
+    const g = new THREE.BufferGeometry();
+    const p = [];
+    const uv = [];
+    const idx = [];
+    for (let i = 0; i <= seg; i++) {
+      const t = (i / seg) * (Math.PI / 2);
+      for (const a of [-len / 2, len / 2]) {
+        p.push(a, BARREL.spring + R * Math.sin(t), -R * Math.cos(t));
+        uv.push((a + len / 2) / C, (R * t) / C);
+      }
+    }
+    for (let i = 0; i < seg; i++) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
+    g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    return g;
+  };
+  const vaults = [];
+  const ribs = [];
+  if (map.ceilKind) {
+    for (let z = 0; z < H; z++) {
+      for (let x = 0; x < W; x++) {
+        const k = map.ceilKind[z * W + x];
+        if (!k) continue;
+        const cx = (x + 0.5) * C;
+        const cz = (z + 0.5) * C;
+        // la ligne de faîte du couloir est au bord commun des deux cases de sa largeur
+        const at = [null, [cx, cz + C / 2, 0], [cx, cz - C / 2, Math.PI], [cx + C / 2, cz, Math.PI / 2], [cx - C / 2, cz, -Math.PI / 2]][k];
+        vaults.push(at);
+        if ((k <= 2 ? x : z) % 2 === 0) ribs.push(at);
+      }
+    }
+  }
+  const place = (geo, mat, list) => {
+    if (!list.length) return;
+    const inst = new THREE.InstancedMesh(geo, mat, list.length);
+    list.forEach(([x, z, r], i) => {
+      dummy.position.set(x, 0, z);
+      dummy.rotation.set(0, r, 0);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      inst.setMatrixAt(i, dummy.matrix);
+    });
+    inst.instanceMatrix.needsUpdate = true;
+    inst.frustumCulled = false;
+    group.add(inst);
+  };
+  place(quarter(BARREL.r, C), mosaic, vaults);
+  place(quarter(BARREL.r - 0.12, 0.35), ribMat, ribs);
+  // voûtes d'arêtes : sur chaque travée, la plus haute des deux voûtes en berceau qui se croisent
+  if (map.bays && map.bays.length) {
+    const N = 18;
+    const p = [];
+    const uv = [];
+    const idx = [];
+    for (const b of map.bays) {
+      const base = p.length / 3;
+      for (let j = 0; j <= N; j++) {
+        for (let i = 0; i <= N; i++) {
+          const u = (i / N) * 2 - 1;
+          const v = (j / N) * 2 - 1;
+          const x = b.x0 + ((u + 1) / 2) * (b.x1 - b.x0);
+          const z = b.z0 + ((v + 1) / 2) * (b.z1 - b.z0);
+          const y = GROIN.spring + GROIN.rise * Math.max(Math.sqrt(Math.max(0, 1 - u * u)), Math.sqrt(Math.max(0, 1 - v * v)));
+          p.push(x, y, z);
+          uv.push((x + (y - GROIN.spring) * 0.6) / C, (z + (y - GROIN.spring) * 0.6) / C);
+        }
+      }
+      for (let j = 0; j < N; j++) {
+        for (let i = 0; i < N; i++) {
+          const a = base + j * (N + 1) + i;
+          idx.push(a, a + N + 1, a + 1, a + 1, a + N + 1, a + N + 2);
+        }
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    const m = new THREE.Mesh(g, mosaic);
+    m.frustumCulled = false;
+    group.add(m);
+  }
+
+  // --- échelles chromées : deux montants recourbés au-dessus de la margelle, trois marches sous l'eau ---
+  const chrome = baked(new THREE.MeshLambertMaterial({ color: '#dfe5e8', emissive: '#596066', emissiveIntensity: 0.4 }));
+  for (const l of map.ladders || []) {
+    const g = new THREE.Group();
+    for (const side of [-0.26, 0.26]) {
+      const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(side, 0, -0.45),
+        new THREE.Vector3(side, 0.7, -0.4),
+        new THREE.Vector3(side, 0.95, -0.15),
+        new THREE.Vector3(side, 0.8, 0.12),
+        new THREE.Vector3(side, 0.1, 0.18),
+        new THREE.Vector3(side, -0.9, 0.18),
+      ]);
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 0.025, 8, false), chrome));
+    }
+    for (const y of [-0.22, -0.48, -0.74]) {
+      const step = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.03, 0.09), chrome);
+      step.position.set(0, y, 0.2);
+      g.add(step);
+    }
+    g.position.set(l.x, 0, l.z);
+    g.rotation.y = Math.atan2(l.dx, l.dz); // +z local = vers l'eau
+    group.add(g);
+  }
+
   // --- la surface de l'eau : un carré par case mouillée, avec sa profondeur ---
   const pos = [];
   const dep = [];
@@ -156,7 +274,7 @@ void main() {
   float light = texture2D(uBake, p * uBakeScale).r * 2.0;
   float k = clamp(vDepth / 1.1, 0.0, 1.0);
   // turquoise peu profond, cyan, bleu profond : l'absorption de l'eau
-  vec3 body = mix(vec3(0.62, 0.92, 0.92), vec3(0.07, 0.42, 0.56), k);
+  vec3 body = mix(vec3(0.6, 0.9, 0.84), vec3(0.04, 0.36, 0.42), k); // vert d'eau, puis bleu-vert sombre
   vec3 sky = vec3(0.92, 0.97, 0.97) * (0.55 + light * 0.5);
   // reflets des dalles lumineuses : des taches claires qui bougent avec la ride
   float glint = pow(max(dot(reflect(-v, n), vec3(0.0, 1.0, 0.0)), 0.0), 60.0) * 0.35;
