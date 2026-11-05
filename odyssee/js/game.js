@@ -28,6 +28,9 @@ import { preparerDomaine, frigo, architecte, recolter, allerDomaine, resident, a
 import { composer } from './render/tenue.js';
 import { buildRivalParty, getRivalItems } from './world/rival.js';
 
+/** météos qui comptent en combat (brume et cendres ne sont que du décor, comme dans les jeux 5G) */
+const BATTLE_WEATHERS = ['rain', 'sun', 'sandstorm', 'hail'];
+
 // v2 : nouvelle région (arènes dans un autre ordre, archipel, créatures originales) — les sauvegardes v1 ne sont pas reprises
 const SAVE_KEY = 'odyssee-save-v2';
 const SUIVEUR = 0.75;   // taille du Pokémon qui suit (1 = celle de son dessin)
@@ -1594,24 +1597,31 @@ export class Game {
     return false;
   }
 
+  /** tirage stable sur un créneau de 10 minutes : le même temps pour tous les joueurs au même endroit */
+  weatherSlot(key) {
+    let x = Math.floor(Date.now() / 600000);
+    for (const ch of String(key)) x = (x * 31 + ch.charCodeAt(0)) >>> 0;
+    return Math.imul(x ^ (x >>> 15), 0x2c1b3c6d) >>> 0;
+  }
+
   getMapWeather() {
     const m = this.mapObj, z = this.zone;
     if (!m) return 'none';
     if (m.weather) return m.weather;
     if (z?.weather) return z.weather;
     if (z?.theme === 'snow' || m.id?.includes('snow') || m.id?.includes('glace')) return 'hail';
-    if (z?.theme === 'volcanic' || m.id?.includes('cendre') || m.id?.includes('desert')) return 'sandstorm';
+    // zones volcaniques : pluie de cendres (sans effet en combat) qui alterne avec la tempête de sable
+    if (z?.theme === 'volcanic' || m.id?.includes('cendre')) return this.weatherSlot('volcan') % 2 ? 'ash' : 'sandstorm';
+    if (m.id?.includes('desert')) return 'sandstorm';
     if (z?.town === 'azur' || z?.name?.includes('Pluie') || m.id?.includes('marais')) return 'rain';
     if (m.outdoor) {
       const h = this.hour();
       if ((z?.surfEnc || m.surfEnc) && (Math.sin(h * 0.7) > 0.65)) return 'rain';
       // routes : un temps qui tourne toutes les 10 minutes, le même pour tous les joueurs (graine = route + créneau)
       if (z?.route) {
-        const slot = Math.floor(Date.now() / 600000);
-        let x = slot;
-        for (const ch of String(z.route)) x = (x * 31 + ch.charCodeAt(0)) >>> 0;
-        x = Math.imul(x ^ (x >>> 15), 0x2c1b3c6d) >>> 0;
-        const r = x % 10;
+        const r = this.weatherSlot(z.route) % 10;
+        // brume du matin dans les forêts, entre 5 h et 10 h
+        if (z.theme === 'forest' && h >= 5 && h < 10 && r < 5) return 'fog';
         if (r < 2) return 'rain';
         if (r < 4 && h >= 9 && h < 18 && z.theme !== 'forest') return 'sun';
       }
@@ -1641,10 +1651,10 @@ export class Game {
     const gymKind = (m.arene === 'rock' || m.arene === 'ground' || m.arene === 'fire' || m.arene === 'fighting') ? 'gym_rock' : 'gym';
     const bg = !m.outdoor ? (m.floor === 'cave' ? 'cave' : m.battleBg === 'gym' ? gymKind : m.battleBg) : this.player.surf ? 'water' : z?.theme === 'volcanic' ? 'volcanic' : z?.theme === 'snow' ? 'snow' : isVillage ? 'village' : isCity ? 'city' : 'grass';
     const weather = o.weather || this.getMapWeather();
-    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag }, foe: o.wild ? { name: 'sauvage', party: [o.wild] } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap(), weather: weather !== 'none' ? weather : undefined });
+    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag }, foe: o.wild ? { name: 'sauvage', party: [o.wild] } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap(), weather: BATTLE_WEATHERS.includes(weather) ? weather : undefined });
     const foeMons = o.wild ? [o.wild] : o.party;
     const h = this.hour();
-    const result = await this.bv.run(battle, { bg, night: m.outdoor && (h >= 20 || h < 5.5), weather, curtain });
+    const result = await this.bv.run(battle, { bg, night: m.outdoor && (h >= 20 || h < 5.5), weather: BATTLE_WEATHERS.includes(weather) ? weather : 'none', curtain });
     // argent
     if (result === 'win' && battle.prizeMoney) st.money += battle.prizeMoney;
     if (result === 'caught') {

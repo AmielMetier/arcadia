@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 4.18 — 5 novembre 2026
+- **Odyssée** — Nouvelles météos dans la région :
+  - Brume du matin dans les forêts, entre 5 h et 10 h : un voile blanc qui dérive sur le paysage.
+  - Pluie de cendres sur les terres volcaniques, en alternance avec la tempête de sable.
+  - Comme dans les jeux de la 5e génération, la brume et les cendres ne changent rien en combat.
+
 ## 4.17 — 5 novembre 2026
 - **Odyssée** — Carte de la région plus fiable :
   - « ⌖ Ma position » et Espace / Entrée recentrent vraiment la carte sur vous.

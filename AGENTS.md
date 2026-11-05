@@ -116,6 +116,9 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   outils communs et fermeture d'écran (`closer`) dans `screens/common.js` ; `ui/screens.js` ne fait que tout réexporter (importer depuis lui).
   Styles découpés de même dans `odyssee/css/NN-ecran.css`, chargés dans l'ordre par `index.html` (l'ordre compte : un fichier
   plus loin peut surcharger un plus tôt) ; `odyssee.css` les réunit par `@import` pour les pages d'aperçu.
+  `node tools/test-odyssee-ecrans.mjs` ouvre le jeu dans un vrai Chrome (Playwright, sauté s'il manque) : chaque écran au clavier
+  (Espace ne ferme pas, Échap ferme et rend la main), carte, Carte de Dresseur, saisie du code ami, météo (brume, cendres) — à lancer quand on touche à l'interface.
+  Météo du monde : `getMapWeather()` dans `game.js` ; seules pluie, soleil, sable et grêle comptent en combat (`BATTLE_WEATHERS`), brume et cendres sont du décor (`render/weather3d.js`, `css/22-meteo.css`).
   Touches reçues par les écrans : celles de `odyssee/js/input.js` uniquement (`a`, `b`, flèches, `map`, `menu`…), jamais `space` ni `enter`.
   Rendu : les sprites sont dessinés à l'écran pixel pour pixel, ancrés à leurs pieds
   (shader `screenSprite` de `odyssee/js/render/world3d.js`), les bâtiments prennent la profondeur de leur façade.
