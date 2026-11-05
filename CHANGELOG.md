@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.36 — 5 novembre 2026
+- **Odyssée** — Carte de la région : les villes ne sont plus des rectangles, ce sont des taches arrondies qui se fondent dans le paysage.
+
 ## 4.35 — 5 novembre 2026
 - **Odyssée** — Nouvelle carte de la région, plus belle : relief ombré, plages, mer qui fonce au large, couleurs propres à chaque coin (neige, volcans, désert, marais, automne).
   - Les villes ressortent en places claires, et la mer entoure la région au lieu de bandes noires.

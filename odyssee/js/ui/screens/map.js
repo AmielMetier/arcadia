@@ -72,8 +72,18 @@ function regionTerrain(game) {
   const TH = new Array(Math.ceil(w / 4) * Math.ceil(h / 4)), tw = Math.ceil(w / 4);
   for (let y = 0; y < h; y += 4) for (let x = 0; x < w; x += 4) TH[(y >> 2) * tw + (x >> 2)] = W.zoneAt(x, y)?.theme || '';
   const theme = (x, y) => TH[(y >> 2) * tw + (x >> 2)];
-  const TOWN = new Uint8Array(TH.length);
-  for (let y = 0; y < h; y += 4) for (let x = 0; x < w; x += 4) TOWN[(y >> 2) * tw + (x >> 2)] = W.zoneAt(x, y)?.town ? 1 : 0;
+  // villes : une tache arrondie aux bords irréguliers (ellipse bruitée), qui se fond dans le terrain
+  const TOWNF = new Float32Array(N), TOWNZ = new Uint8Array(TH.length);
+  for (let y = 0; y < h; y += 4) for (let x = 0; x < w; x += 4) TOWNZ[(y >> 2) * tw + (x >> 2)] = W.zoneAt(x, y)?.town ? 1 : 0;
+  for (const t of W.zones.filter((z) => z.town)) {
+    const cx = (t.x0 + t.x1) / 2, cy = (t.y0 + t.y1) / 2, rx = (t.x1 - t.x0) * 0.4, ry = (t.y1 - t.y0) * 0.4;
+    for (let y = Math.max(0, Math.floor(cy - ry - 4)); y < Math.min(h, cy + ry + 4); y++) for (let x = Math.max(0, Math.floor(cx - rx - 4)); x < Math.min(w, cx + rx + 4); x++) {
+      const a = Math.atan2(y - cy, x - cx), wob = 1 + 0.12 * Math.sin(a * 3 + t.x0) + 0.08 * Math.sin(a * 7 + t.y0);
+      const d = Math.hypot((x - cx) / rx, (y - cy) / ry) / wob;
+      const f = Math.max(0, Math.min(1, (1 - d) * 4));
+      const i = y * w + x; if (f > TOWNF[i]) TOWNF[i] = f;
+    }
+  }
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const i = y * w + x, t = tile[i];
     if (isW(t)) { H[i] = -Math.min(toLandT[i], 14) * 0.25; continue; }
@@ -111,9 +121,10 @@ function regionTerrain(game) {
     } else {
       const th = theme(x, y), [g, f] = BIOME[th] || DEF;
       const bi = ((y / B) | 0) * bw + ((x / B) | 0);
-      const inTown = TOWN[(y >> 2) * tw + (x >> 2)];
-      if (inTown && (t === T.BUILD || t === T.DOOR || t === T.WALL)) c = [206, 150, 120];
-      else if (inTown && !isW(t) && t !== T.TREE && t !== T.PINE) c = mix(g, [224, 212, 182], 0.7);
+      const tf = TOWNF[i];
+      if (tf > 0.05 && (t === T.BUILD || t === T.DOOR || t === T.WALL)) c = mix(g, [200, 120, 96], tf * 0.8);
+      else if (tf > 0.05 && t !== T.TREE && t !== T.PINE) c = mix(g, [226, 214, 184], tf * 0.65);
+      else if (TOWNZ[(y >> 2) * tw + (x >> 2)] && t !== T.TREE && t !== T.PINE) c = mix(g, f, 0.75 + n * 0.25);   // rues hors de la tache : prairie boisée
       else if (t === T.PATH || t === T.PAVE || t === T.FLOOR || t === T.MAT || t === T.STAIRS) c = [222, 206, 170];
       else if (t === T.BRIDGE) c = [168, 120, 80];
       else if (t === T.BUILD || t === T.DOOR || t === T.WALL) c = [196, 96, 78];
