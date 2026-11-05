@@ -11,6 +11,7 @@
 // si l'équipe le termine, tout le monde repart à l'étage suivant, lampe en main.
 import { CELL_SIZE, T, createLevel0, PIT_HALF, FLOOR_DY } from './map.js';
 import { createWarehouseMap } from './level1.js';
+import { createPoolMap } from './poolrooms.js';
 import { findPath, hasLineOfSight } from './nav.js';
 
 export const DT = 1 / 60;
@@ -40,7 +41,7 @@ export const WHISTLE_CD = 1.2;
 export const WHISTLE_HEAT = 2.5; // chaque coup compte 1 et s'oublie en 20 s : au 3e coup rapproché, l'entité vient à coup sûr
 export const CASSETTES = 5;
 export const FUSES = 3;
-export const LAST_LEVEL = 1;
+export const LAST_LEVEL = 2; // 0 : Level 0, 1 : Level 1 (entrepôt), 2 : Level 37 (les Poolrooms)
 export const DEPART_T = 3; // secondes entre la fermeture des portes et l'arrivée
 // coupures de courant du Level 1 : toutes les 35 à 60 s, pendant 15 à 20 s
 export const BLACKOUT_EVERY = [35, 60];
@@ -51,6 +52,7 @@ const cellOf = (v) => Math.floor(v / CELL_SIZE);
 
 // les étages d'un niveau : même graine de partie, des cartes différentes par niveau
 export function makeLevelMap(level, seed) {
+  if (level === 2) return [createPoolMap(seed * 11 + 37)];
   return level === 1 ? [createWarehouseMap(seed * 7 + 13)] : createLevel0(seed).floors;
 }
 
@@ -236,6 +238,13 @@ export class BackroomsSim {
       stalkT: 4, // délai avant d'aller se cacher pour observer
       watch: null, // case sombre d'où elle observe
     };
+  }
+
+  // dans l'eau (Poolrooms) on avance moins vite : 90 % dans 20 cm d'eau, 70 % dans 60 cm, 40 % au plus profond
+  wade(P) {
+    const m = this.fm(P.floor);
+    const d = m.depthAt ? m.depthAt(P.x, P.z) : 0;
+    return d > 0 ? Math.max(0.4, 1 - d * 0.55) : 1;
   }
 
   // la carte d'un étage
@@ -584,7 +593,8 @@ export class BackroomsSim {
     }
     if (this.state !== 'playing') return;
 
-    if (this.hasMonster) this.updateMonster();
+    // aux Poolrooms, l'entité ne sort pas de l'eau : elle ne chasse personne (son ombre passe sous la surface)
+    if (this.hasMonster && this.level !== 2) this.updateMonster();
     this.checkElevator();
   }
 
@@ -634,7 +644,7 @@ export class BackroomsSim {
     }
 
     // 3. Déplacement (un invité se déplace chez lui et annonce sa position : l'hôte la prend si elle est plausible)
-    const speed = P.running ? SPRINT_SPEED : WALK_SPEED;
+    const speed = (P.running ? SPRINT_SPEED : WALK_SPEED) * this.wade(P);
     P.moving = mx !== 0 || my !== 0;
     const pos = input.pos;
     // un invité a perdu l'équilibre chez lui : il bascule dans le trou de ce côté
@@ -706,7 +716,7 @@ export class BackroomsSim {
       this.emit({ type: 'fuse', id: f.id, by: P.id, count: this.fuses, total: FUSES });
     }
     // les 3 fusibles rapportés au panneau du monte-charge : le courant revient, les portes s'ouvrent
-    if (this.level === 1 && !this.powered && this.fuses >= FUSES && Math.hypot(map.exit.x - P.x, map.exit.z - P.z) < 2.6) {
+    if (this.level >= 1 && !this.powered && this.fuses >= FUSES && Math.hypot(map.exit.x - P.x, map.exit.z - P.z) < 2.6) {
       this.powered = true;
       this.emit({ type: 'powered', by: P.id });
       this.emit({ type: 'exitUnlocked' });
@@ -740,7 +750,7 @@ export class BackroomsSim {
         best = near(this.stairs);
         P.sigTo = 'stairs';
       }
-    } else if (this.level === 1 && this.fuses < FUSES) {
+    } else if (this.level >= 1 && this.fuses < FUSES) {
       best = near((map.fuses || []).filter((f) => !f.taken));
     } else {
       best = Math.hypot(map.exit.x - P.x, map.exit.z - P.z);
@@ -787,7 +797,7 @@ export class BackroomsSim {
       if (P.stamina <= 0) P.winded = WINDED_T;
     } else P.stamina = Math.min(100, P.stamina + DT * STAMINA_REGEN);
     if (!P.moving) return 0;
-    const speed = P.running ? SPRINT_SPEED : WALK_SPEED;
+    const speed = (P.running ? SPRINT_SPEED : WALK_SPEED) * this.wade(P);
     const len = Math.hypot(mx, my) || 1;
     const fx = -Math.sin(P.yaw);
     const fz = -Math.cos(P.yaw);

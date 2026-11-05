@@ -21,6 +21,7 @@ const putOn = (sim, P, cas) => {
   }
 };
 import { createWarehouseMap } from '../backrooms/engine/level1.js';
+import { createPoolMap } from '../backrooms/engine/poolrooms.js';
 
 // avance la partie de n secondes
 const run = (sim, sec, input = {}, others = null) => {
@@ -382,7 +383,7 @@ test("Level 1 : l'entrepôt, ses étagères, ses 3 fusibles et le monte-charge",
   }
 });
 
-test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, puis la victoire', () => {
+test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui descend aux Poolrooms (Level 37)', () => {
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 4, level: 1 });
   assert.equal(sim.open, false);
   for (const f of sim.map.fuses) {
@@ -402,7 +403,25 @@ test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, puis
   sim.player.z = E.z;
   sim.step();
   run(sim, DEPART_T + 0.2);
-  assert.equal(sim.state, 'won', 'le monte-charge remonte : partie gagnée');
+  assert.equal(sim.state, 'playing');
+  assert.equal(sim.level, 2, 'on arrive aux Poolrooms');
+  assert.ok(sim.drainEvents().some((e) => e.type === 'level' && e.level === 2));
+  // les 3 volants de vanne, puis l'ascenseur de sortie : la partie est gagnée
+  for (const f of sim.map.fuses) {
+    sim.player.x = f.x;
+    sim.player.z = f.z;
+    sim.step();
+  }
+  assert.equal(sim.fuses, FUSES, 'les 3 vannes');
+  sim.player.x = sim.map.exit.x;
+  sim.player.z = sim.map.exit.z;
+  sim.step();
+  assert.equal(sim.powered, true);
+  sim.player.x = sim.map.elevator.x;
+  sim.player.z = sim.map.elevator.z;
+  sim.step();
+  run(sim, DEPART_T + 0.2);
+  assert.equal(sim.state, 'won', "l'ascenseur remonte des Poolrooms : partie gagnée");
 });
 
 test('Level 1 : coupures de courant de 15 à 20 s', () => {
@@ -1076,6 +1095,46 @@ test("l'entité se tapit dans le noir pour observer, fuit la lampe au début, et
   const s5 = speedAt(5);
   assert.ok(s0 < s3 && s3 < s5, `la charge s'accélère : ${s0.toFixed(2)} < ${s3.toFixed(2)} < ${s5.toFixed(2)}`);
   assert.equal(sim.aggro, 1);
+});
+
+test("Level 37 (Poolrooms) : salles et bassins reliés, 3 vannes et l'ascenseur accessibles, l'eau ralentit", () => {
+  for (const sd of [1, 2, 3, 37, 99, 123, 500, 777]) {
+    const m = createPoolMap(sd);
+    assert.equal(m.level, 2);
+    assert.ok(m.elevator, `graine ${sd} : un ascenseur`);
+    assert.equal(m.fuses.length, 3, `graine ${sd} : 3 vannes`);
+    for (const f of m.fuses) assert.ok(m.dist[f.gz * m.W + f.gx] > 0, `graine ${sd} : vanne accessible`);
+    assert.ok(m.dist[m.exit.gz * m.W + m.exit.gx] > 20, `graine ${sd} : sortie loin du départ`);
+    assert.equal(m.depthAt(m.exit.x, m.exit.z), 0, "on attend l'ascenseur au sec");
+    assert.ok(m.walkable.some((c) => m.depth[c.z * m.W + c.x] >= 0.5), `graine ${sd} : des bassins`);
+    for (const it of m.items) assert.equal(m.depthAt(it.x, it.z), 0, 'les objets sont au sec');
+  }
+  // dans l'eau, on avance moins vite
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 5, level: 2 });
+  const P = sim.player;
+  const dry = sim.map.walkable.find((c) => sim.map.depth[c.z * sim.map.W + c.x] === 0);
+  const deep = sim.map.walkable.find((c) => sim.map.depth[c.z * sim.map.W + c.x] >= 0.5);
+  const walk = (c) => {
+    P.x = (c.x + 0.5) * CELL_SIZE;
+    P.z = (c.z + 0.5) * CELL_SIZE;
+    const x0 = P.x;
+    const z0 = P.z;
+    for (const yaw of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+      P.x = x0;
+      P.z = z0;
+      sim.step({ my: 1, yaw });
+      const d = Math.hypot(P.x - x0, P.z - z0);
+      if (d > 0.001) return d;
+    }
+    return 0;
+  };
+  const a = walk(dry);
+  const b = walk(deep);
+  assert.ok(b < a * 0.8, `plus lent dans l'eau (${b.toFixed(4)} contre ${a.toFixed(4)})`);
+  // l'entité ne sort pas de l'eau : personne n'est poursuivi aux Poolrooms
+  run(sim, 5);
+  assert.equal(P.status, 'alive');
+  assert.equal(sim.monster.mode, 'patrol');
 });
 
 console.log(`\n${count} tests réussis pour The Backrooms !`);

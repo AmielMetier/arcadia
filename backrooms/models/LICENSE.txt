@@ -39,6 +39,9 @@ Version glTF 1k compactée en .glb : géométrie d'origine, seule la texture de 
   portable_generator.glb  https://polyhaven.com/a/portable_generator
   metal_tool_chest.glb  https://polyhaven.com/a/metal_tool_chest
   utility_box_01.glb  https://polyhaven.com/a/utility_box_01
+  lifebuoy.glb  https://polyhaven.com/a/lifebuoy
+  rubber_duck_toy.glb  https://polyhaven.com/a/rubber_duck_toy
+  painted_wooden_bench.glb  https://polyhaven.com/a/painted_wooden_bench
 
 Projecteurs de chantier, cônes, rubalise et dessins muraux : dessinés dans le code (backrooms/view/).
 Level 1 : rayonnages, palettes, cartons, fûts, sacs, bacs, tuyaux, gaines, panneaux et marquages au sol dessinés dans

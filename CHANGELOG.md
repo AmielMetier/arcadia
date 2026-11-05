@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 4.34 — 5 novembre 2026
+- **The Backrooms** — un troisième niveau : le Level 37, les Poolrooms. Le monte-charge de l'entrepôt ne remonte plus : il descend dans un complexe de bassins carrelés blancs et cyan, immense, lumineux et désespérément vide.
+  - Des pataugeoires où l'on marche avec de l'eau aux chevilles, de grands bassins avec leur plage et leurs margelles, des couloirs inondés, des halles à colonnes rondes.
+  - L'eau ralentit : plus elle est profonde, plus on avance lentement, et on s'y enfonce.
+  - Une eau limpide qui fonce avec la profondeur, des reflets qui dansent au fond, des ronds dans l'eau à chaque pas, une brume légère au ras de la surface.
+  - Le son de l'endroit : des échos interminables, le ronronnement des pompes, des gouttes au loin, les pas qui pataugent.
+  - Pour sortir : retrouver les 3 volants de vanne dans les locaux techniques, puis les rapporter à l'ascenseur. Quand les vannes sont fermées, les pompes s'arrêtent d'un coup.
+  - L'entité ne sort pas de l'eau ici… mais il arrive qu'une ombre passe au fond d'un bassin, et que le niveau de l'eau ne soit plus tout à fait le même.
+
 ## 4.33 — 5 novembre 2026
 - **The Backrooms** — quand l'entité approche, plus de grésillement électrique ni de lumière rouge : on l'entend venir à ses cris et à ses pas.
 

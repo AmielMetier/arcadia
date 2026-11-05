@@ -24,6 +24,7 @@ function tex(c, repeat = 1) {
 
 function loadImage(name) {
   return new Promise((resolve) => {
+    if (name === 'none') return resolve(null); // pas de photo pour cette surface
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
@@ -377,15 +378,62 @@ function drawConcreteCeiling(ctx, S, photo) {
   ctx.fillRect(0, S / 2 - 2, S, 4);
 }
 
+// Level 37 (Poolrooms) : petits carreaux blancs (ambientCG Tiles133A), à leur vraie taille (environ 15 cm) sur un mur de
+// 2,5 m de large et 5,3 m de haut (il descend sous l'eau), avec une frise de carreaux bleu pastel à hauteur de main
+function drawPoolWall(ctx, S, photo) {
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#e9efee';
+  ctx.fillRect(0, 0, S, S);
+  if (photo) {
+    const tw = S / 1.4;
+    const th = S / 2.95;
+    for (let y = 0; y < S; y += th) for (let x = 0; x < S; x += tw) ctx.drawImage(photo, x, y, tw + 1, th + 1);
+  } else noise(ctx, S, S, 10);
+  // frise bleu pastel de deux rangs, à 1,1 m au-dessus de l'eau (le mur va de -1,3 m à 4 m)
+  const row = S / 2.95 / 12;
+  const yf = S * (1 - (1.1 + 1.3) / 5.3);
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = '#9fd3e3';
+  ctx.fillRect(0, yf - row * 2, S, row * 2);
+  // la ligne d'eau : un léger dépôt de calcaire, plus mat, juste au-dessus de la surface
+  ctx.fillStyle = '#f2efe6';
+  ctx.globalCompositeOperation = 'source-over';
+  const yw = S * (1 - 1.3 / 5.3);
+  const g = ctx.createLinearGradient(0, yw - row * 1.5, 0, yw);
+  g.addColorStop(0, 'rgba(235, 230, 214, 0)');
+  g.addColorStop(1, 'rgba(225, 220, 200, 0.45)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, yw - row * 1.5, S, row * 1.5);
+}
+
+// sols et plages : grands carreaux blancs brillants (ambientCG Tiles107)
+function drawPoolFloor(ctx, S, photo) {
+  ctx.fillStyle = '#f1f4f3';
+  ctx.fillRect(0, 0, S, S);
+  if (photo) ctx.drawImage(photo, 0, 0, S, S);
+  else noise(ctx, S, S, 8);
+}
+
+// plafond : enduit blanc lisse, à peine taché par l'humidité
+function drawPoolCeiling(ctx, S) {
+  ctx.fillStyle = '#e8eeee';
+  ctx.fillRect(0, 0, S, S);
+  noise(ctx, S, S, 6);
+  ctx.fillStyle = 'rgba(120, 150, 150, 0.12)';
+  ctx.fillRect(0, 0, S, 2);
+  ctx.fillRect(0, 0, 2, S);
+}
+
 export function createBackroomsTextures(level = 0) {
   const S = 512;
   const L1 = level === 1;
+  const L2 = level === 2; // Level 37, les Poolrooms
   const [wallCanvas, wctx] = canvas(S);
   const [carpetCanvas, cctx] = canvas(S);
   const [ceilCanvas, clctx] = canvas(S);
-  const drawW = L1 ? drawConcreteWall : drawWallpaper;
-  const drawF = L1 ? drawConcreteFloor : drawCarpet;
-  const drawC = L1 ? drawConcreteCeiling : drawCeiling;
+  const drawW = L2 ? drawPoolWall : L1 ? drawConcreteWall : drawWallpaper;
+  const drawF = L2 ? drawPoolFloor : L1 ? drawConcreteFloor : drawCarpet;
+  const drawC = L2 ? drawPoolCeiling : L1 ? drawConcreteCeiling : drawCeiling;
   drawW(wctx, S, null);
   drawF(cctx, S, null);
   drawC(clctx, S, null);
@@ -395,11 +443,22 @@ export function createBackroomsTextures(level = 0) {
   const ceiling = tex(ceilCanvas);
 
   // les photos arrivent un peu plus tard : on redessine par-dessus
-  const files = L1 ? ['l1_mur.jpg', 'l1_sol.jpg', 'l1_plafond.jpg'] : ['papier.jpg', 'moquette.jpg', 'plafond.jpg'];
-  const ready = Promise.all(files.map(loadImage)).then(([pap, moq, pla]) => {
+  const files = L2 ? ['l37_mur.jpg', 'l37_sol.jpg', 'none'] : L1 ? ['l1_mur.jpg', 'l1_sol.jpg', 'l1_plafond.jpg'] : ['papier.jpg', 'moquette.jpg', 'plafond.jpg'];
+  // Level 37 : le carrelage des bassins (cyan) et des fosses (bleu profond), ambientCG Tiles132A et Tiles135A
+  const [poolCanvas, pctx2] = canvas(S);
+  const [deepCanvas, dctx2] = canvas(S);
+  pctx2.fillStyle = '#3fb8d4';
+  pctx2.fillRect(0, 0, S, S);
+  dctx2.fillStyle = '#16446a';
+  dctx2.fillRect(0, 0, S, S);
+  const pool = tex(poolCanvas);
+  const deep = tex(deepCanvas);
+  const ready = Promise.all([...files.map(loadImage), ...(L2 ? ['l37_bassin.jpg', 'l37_fosse.jpg'].map(loadImage) : [])]).then(([pap, moq, pla, bas, fos]) => {
     if (pap) { drawW(wctx, S, pap); wall.needsUpdate = true; }
     if (moq) { drawF(cctx, S, moq); carpet.needsUpdate = true; }
     if (pla) { drawC(clctx, S, pla); ceiling.needsUpdate = true; }
+    if (bas) { pctx2.drawImage(bas, 0, 0, S, S); pool.needsUpdate = true; }
+    if (fos) { dctx2.drawImage(fos, 0, 0, S, S); deep.needsUpdate = true; }
   });
 
   // Portes d'ascenseur en inox brossé
@@ -610,5 +669,5 @@ export function createBackroomsTextures(level = 0) {
   const drawings = tex(drawCanvas);
   drawings.wrapS = drawings.wrapT = THREE.ClampToEdgeWrapping;
 
-  return { wall, carpet, ceiling, vhs, exit, sign, label, steel, crate, fog, lamp, outlet, vent, tape, drawings, ready };
+  return { wall, carpet, ceiling, pool, deep, vhs, exit, sign, label, steel, crate, fog, lamp, outlet, vent, tape, drawings, ready };
 }

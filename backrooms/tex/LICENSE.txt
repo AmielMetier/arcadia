@@ -13,3 +13,9 @@ backrooms/view/textures.js :
 
 Les objets abandonnés et ceux fixés aux murs viennent de Poly Haven (CC0) : voir backrooms/models/LICENSE.txt.
 Le souffle du joueur : voir backrooms/sfx/LICENSE.txt.
+
+Level 37 (les Poolrooms) : ambientCG (https://ambientcg.com), domaine public (CC0 1.0), réduites en 512 px :
+  l37_mur.jpg     Tiles133A  https://ambientcg.com/view?id=Tiles133A  (petits carreaux blancs des murs)
+  l37_sol.jpg     Tiles107   https://ambientcg.com/view?id=Tiles107   (grands carreaux blancs des sols)
+  l37_bassin.jpg  Tiles132A  https://ambientcg.com/view?id=Tiles132A  (carreaux cyan des bassins)
+  l37_fosse.jpg   Tiles135A  https://ambientcg.com/view?id=Tiles135A  (carreaux bleu profond)
