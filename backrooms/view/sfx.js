@@ -1,6 +1,7 @@
 // The Backrooms - Synthétiseur audio WebAudio spatialisé
 // Bourdonnement strident et glitché qui s'amplifie à l'approche de l'entité
 
+import { growlBuffer } from './entity.js';
 const VOICE = new URL('../monster/david.mp3', import.meta.url).href;
 // souffle haletant (« breathing tired » de mikeask, OpenGameArt, CC0)
 const BREATH = new URL('../sfx/souffle.mp3', import.meta.url).href;
@@ -302,11 +303,26 @@ export class BackroomsSfx {
     this.voiceGain = c.createGain();
     this.voiceGain.gain.setValueAtTime(0.0001, c.currentTime);
     this.voiceGain.connect(this.monsterPanner || this.out);
-    fetch(VOICE)
-      .then((r) => r.arrayBuffer())
-      .then((b) => c.decodeAudioData(b))
+    this.loadVoice();
+  }
+
+  // mode VIP : la voix d'origine ; sinon un grognement grave synthétisé
+  setVoiceMode(vip) {
+    if (this.voiceVip === !!vip) return;
+    this.voiceVip = !!vip;
+    if (this.voiceGain) this.loadVoice();
+  }
+
+  loadVoice() {
+    const c = this.ctx;
+    try { this.voiceSrc?.stop(); } catch {}
+    this.voiceSrc = null;
+    const want = !!this.voiceVip;
+    (want ? fetch(VOICE).then((r) => r.arrayBuffer()).then((b) => c.decodeAudioData(b)) : Promise.resolve(growlBuffer(c)))
       .then((buf) => {
+        if (want !== !!this.voiceVip) return;
         const src = c.createBufferSource();
+        this.voiceSrc = src;
         src.buffer = buf;
         src.loop = true;
         src.connect(this.voiceGain);

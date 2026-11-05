@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 4.14 — 5 novembre 2026
+- **The Backrooms** — Le jeu est de retour pour tout le monde ! En mode normal, une nouvelle entité vous traque : une longue silhouette noire aux yeux blancs, qui grogne dans le noir.
+  - Les comptes VIP peuvent choisir « ⭐ VIP mode » dans les réglages pour jouer avec les monstres d'origine (tous les joueurs de la partie les voient alors).
+
 ## 4.13 — 4 novembre 2026
 - **The Backrooms** — le dédale aux murs jaunes est bien plus encombré, comme si d'autres étaient passés avant toi.
   - Des chantiers abandonnés : rubalise jaune et noire arrachée qui traîne par terre en travers des couloirs (elle ne bloque jamais le passage), cônes orange et projecteurs éteints sur leur trépied.
