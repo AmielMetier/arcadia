@@ -15,7 +15,8 @@
   // navigation des menus à la manette (même dossier que ce fichier)
   try {
     const me = document.currentScript && document.currentScript.src;
-    if (me && !window.ArcadiaPad) { const sc = document.createElement('script'); sc.src = me.replace(/bridge\.js(\?.*)?$/, 'padnav.js$1'); sc.async = true; (document.head || document.documentElement).appendChild(sc); }
+    if (me && !window.ArcadiaPad) { const sc = document.createElement('script'); sc.src = me.replace(/bridge\.js(\?.*)?$/, 'padnav.js$1'); sc.async = true; (document.head || document.documentElement).appendChild(sc);
+      const sp = document.createElement('script'); sp.src = me.replace(/bridge\.js(\?.*)?$/, 'padplay.js$1'); sp.async = true; (document.head || document.documentElement).appendChild(sp); }
   } catch (e) {}
   const qs = new URLSearchParams(location.search);
   const embedded = qs.get('hub') === '1' && window.parent !== window;

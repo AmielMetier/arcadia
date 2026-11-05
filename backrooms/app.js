@@ -470,6 +470,36 @@ function handleEvent(ev, me) {
 let lastTime = performance.now();
 let accumulator = 0;
 
+// Manette (disposition standard) : A ramasser, X utiliser l'objet, Y lampe, RB changer d'objet, B siffler,
+// LB / LT / stick gauche enfoncé courir, Menu pause ; A relance la partie en pause
+let padPrev = [];
+function readPad() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  const p = [...pads].find((x) => x && x.connected);
+  if (!p) { padPrev = []; return null; }
+  const b = (i) => !!(p.buttons[i] && (p.buttons[i].pressed || p.buttons[i].value > 0.5));
+  const edge = (i) => b(i) && !padPrev[i];
+  let hubMenu = false;
+  try { hubMenu = window.parent !== window && !!window.parent.document.querySelector('.amenu, .gload.on'); } catch (e) {}
+  const endShown = hud && !hud.$('#endScreen').hidden;
+  if (!hubMenu && !endShown) {
+    if (paused) {
+      if (edge(0) || edge(9)) { if (sfx) sfx.unlock(); setPaused(false); }
+    } else {
+      if (sim && sim.player.status !== 'alive' && (edge(0) || edge(15))) sim.spectate = (sim.spectate || 0) + 1;
+      else if (edge(0)) act.pick = true;
+      if (edge(2)) act.use = true;
+      if (edge(3)) useSlot(0);
+      if (edge(5)) useSlot(sim && sim.player.sel === 1 ? 2 : 1);
+      if (edge(1)) act.whistle = true;
+      if (edge(9)) setPaused(true);
+    }
+  }
+  padPrev = p.buttons.map((_, i) => b(i));
+  if (hubMenu || paused) return null;
+  return { lx: p.axes[0] || 0, ly: p.axes[1] || 0, rx: p.axes[2] || 0, ry: p.axes[3] || 0, run: b(4) || b(6) || b(10) };
+}
+
 function loop(currentTime) {
   requestAnimationFrame(loop);
 
@@ -501,7 +531,12 @@ function loop(currentTime) {
       my = (-dy / d) * k;
     }
   }
-  const run = !!keys['ShiftLeft'] || !!keys['ShiftRight'] || touch.run;
+  // manette : stick gauche pour marcher, stick droit pour regarder
+  const gp = readPad();
+  if (gp) {
+    if (Math.hypot(gp.lx, gp.ly) > 0.15) { mx = gp.lx; my = -gp.ly; }
+  }
+  const run = !!keys['ShiftLeft'] || !!keys['ShiftRight'] || touch.run || !!(gp && gp.run);
 
   // Sensibilité de rotation de la souris
   const sens = 0.0022;
@@ -510,6 +545,11 @@ function loop(currentTime) {
   if (kbMode && !paused) {
     newYaw -= ((keys['ArrowRight'] ? 1 : 0) - (keys['ArrowLeft'] ? 1 : 0)) * TURN * delta;
     newPitch = Math.max(-1.3, Math.min(1.3, newPitch + ((keys['ArrowUp'] ? 1 : 0) - (keys['ArrowDown'] ? 1 : 0)) * TILT * delta));
+  }
+  if (gp && !paused) {
+    const k = (v) => (Math.abs(v) < 0.12 ? 0 : Math.sign(v) * v * v);
+    newYaw -= k(gp.rx) * TURN * 1.3 * delta;
+    newPitch = Math.max(-1.3, Math.min(1.3, newPitch - k(gp.ry) * TILT * delta));
   }
   mouseDx = 0;
   mouseDy = 0;

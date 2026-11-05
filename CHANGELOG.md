@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 4.32 — 5 novembre 2026
+- **Arcadia** — Les 18 jeux se jouent à la manette.
+  - DavidSimulator, Tête de Calcul, Bastion Clash, Fil Rouge et Mini-Golf Party : un curseur se déplace au stick, A clique (maintenu pour glisser), X fait le clic droit et les gâchettes zooment.
+  - Birdie Party, Poké Duel et Odyssée : la croix et le stick remplacent les flèches, A valide, B annule.
+  - La fiche de chaque jeu indique ses commandes à la manette.
+- **The Backrooms** — Manette : stick gauche pour avancer, stick droit pour regarder, A ramasse, X utilise, Y allume la lampe, RB change d'objet, B siffle, LB court.
+- **Poké Duel** — Nouvelle description et nouvelles commandes dans la fiche : des centaines de Pokémon, le double façon VGC et le 2 contre 2.
+- **Accueil** — La présentation du site parle bien des 18 jeux.
+
 ## 4.31 — 5 novembre 2026
 - **The Backrooms** — au Level 0, les piliers ne se ressemblent plus : colonnes rondes, piliers carrés fins ou épais, piliers pleins, et de gros blocs dans les grandes salles. On passe à côté des plus fins.
 - **The Backrooms** — beaucoup moins de culs-de-sac : la plupart des impasses débouchent maintenant sur un autre couloir (il en reste quelques-unes).
