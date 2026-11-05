@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 4.37 — 5 novembre 2026
+- **Odyssée** — La carte de la région est maintenant illustrée comme dans les vrais jeux.
+  - Les îles ont des côtes découpées, avec des plages et de l'écume.
+  - Les montagnes sont dessinées, enneigées au sommet ou fumantes dans les volcans.
+  - Les forêts sont en bosquets d'arbres (sapins dans le froid, feuillage roux en automne).
+  - Chaque ville est une petite place avec ses maisons, au milieu d'une clairière ronde : toits dorés pour les arènes, violets pour la Ligue, gris tant qu'on n'y est pas allé.
+
 ## 4.36 — 5 novembre 2026
 - **Odyssée** — Carte de la région : les villes ne sont plus des rectangles, ce sont des taches arrondies qui se fondent dans le paysage.
 
