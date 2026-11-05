@@ -11,7 +11,7 @@ import { sorteCase, K as SORTE } from './solgen.js';
 import { WeatherSystem } from './weather3d.js';
 import { choisirModele, geometriesModele, couleurBase, EMPRISES } from './bati-jeu.js';
 import { dessinHerbe, imageHerbe, NIMAGES, MARGE as HERBE_M, HAUTEUR as HERBE_H } from './herbes.js';
-import { Relief3D, relief3dActif, matParoi, matFacettes, facettesActives, LV as R3LV } from './relief3d.js';
+import { Relief3D, relief3dActif, matParoi, matFacettes, facettesActives, matPente, matsPente, LV as R3LV } from './relief3d.js';
 import { setRelief3dSol } from './solgen.js';
 
 export const EL = 55 * Math.PI / 180, FOV = 13;
@@ -447,7 +447,7 @@ export class WorldView {
     this.focus = new THREE.Vector3(); this.shake = 0;
     this.actors = new Map();
     this.root = null;
-    try { this.weather = new WeatherSystem(this.scene); } catch (e) { this.weather = null; }
+    try { this.weather = new WeatherSystem(this.scene, this.renderer.domElement); } catch (e) { this.weather = null; }
   }
 
   resize(w, h) {
@@ -809,6 +809,11 @@ export class WorldView {
     const p = G.p, an = G.an, r = this.r3d;
     if (an.length) for (let v = 0; v < G.n; v++) { const h = r.Hpose(an[v * 3], an[v * 3 + 2]); p[v * 3 + 1] += h; an[v * 3 + 1] += h; }
     else for (let v = 0; v < G.n; v++) p[v * 3 + 1] += r.H(p[v * 3], p[v * 3 + 2]) + dy;
+    // l'ancien sol d'une case du fond d'un ravin : caché (sinon, posé sur les bords du ravin, il le couvrirait en biais)
+    if (!an.length && dy < 0) for (let v = 0; v + 3 < G.n; v += 4) {
+      const cx = (p[v * 3] + p[v * 3 + 6]) / 2, cz = (p[v * 3 + 2] + p[v * 3 + 8]) / 2;
+      if (r.fondRavin(cx, cz)) for (let k = 0; k < 4; k++) p[(v + k) * 3 + 1] = -1e3;
+    }
   }
   tierAt(x, y) { const m = this.map; if (x < 0 || y < 0 || x >= m.w || y >= m.h) return 3; return this.tiers[y * m.w + x] || 0; }
 
@@ -961,8 +966,14 @@ export class WorldView {
       // parois de la couche du dessus (texture vue de la caméra), dessinées juste après le sol généré
       const bw = m.ext ? CH : Math.min(CH, m.w - x0), bh = m.ext ? CH : Math.min(CH, m.h - y0), pg = bw > 0 && bh > 0 ? r3d.geoParois(ci, cj, bw, bh) : null;
       if (pg) { const me = new THREE.Mesh(pg, matParoi()); me.renderOrder = -1; me.frustumCulled = false; grp.add(me); }
+      const gp = bw > 0 && bh > 0 && /[?&]r3tuiles/.test(location.search) ? r3d.geoPentes(ci, cj, bw, bh) : null;   // essai : tuiles simples
+      for (const [k, g] of Object.entries(gp || {})) { const me = new THREE.Mesh(g, matPente(k)); me.renderOrder = -1; me.frustumCulled = false; grp.add(me); if (!this.tinted.includes(me.material)) this.tinted.push(me.material); }
       const fg = pg && facettesActives() ? r3d.geoFacettes(ci, cj, bw, bh) : null;
       if (fg) { const me = new THREE.Mesh(fg, matFacettes()); me.frustumCulled = false; grp.add(me); }
+      // ravins : parois verticales jusqu'au fond noir
+      const rv = bw > 0 && bh > 0 ? r3d.geoRavin(ci, cj, bw, bh) : null;
+      if (rv?.paroi) { const me = new THREE.Mesh(rv.paroi, matParoi()); me.renderOrder = -1; me.frustumCulled = false; grp.add(me); }
+      if (rv?.facettes) { const me = new THREE.Mesh(rv.facettes, matFacettes()); me.frustumCulled = false; grp.add(me); }
     }
     for (const [gx, gz, gy] of glows) {
       const me = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), this.matGlow); me.position.set(gx, gy + this.hAt(gx, gz), gz + 0.05); me.rotation.x = -0.3; me.userData.lampGlow = true; this.glows.add(me);
