@@ -18,8 +18,8 @@ export const PLAYER_RADIUS = 0.38;
 // On avance lentement dans les Backrooms : la carte est immense et chaque pas compte
 export const WALK_SPEED = 2.1;
 export const SPRINT_SPEED = 3.7;
-export const MONSTER_PATROL_SPEED = 1.5;
-export const MONSTER_CHASE_SPEED = 2.75;
+export const MONSTER_PATROL_SPEED = 1.8;
+export const MONSTER_CHASE_SPEED = 3.3; // plus vite qu'en marchant, un peu moins qu'en sprintant
 export const STAMINA_DRAIN = 15; // par seconde de course
 export const STAMINA_REGEN = 9;
 export const WINDED_T = 1; // à bout de souffle : une seconde sans pouvoir courir

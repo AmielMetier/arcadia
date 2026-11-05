@@ -5,6 +5,10 @@ import { growlBuffer } from './entity.js';
 const VOICE = new URL('../monster/david.mp3', import.meta.url).href;
 // souffle haletant (« breathing tired » de mikeask, OpenGameArt, CC0)
 const BREATH = new URL('../sfx/souffle.mp3', import.meta.url).href;
+// sons du jeu (backrooms/sfx/) : cris de poursuite, ambiances jouées au hasard, le son de la mort toute proche
+const SFX = (name) => new URL(`../sfx/${name}.mp3`, import.meta.url).href;
+const CHASE = ['chase_1', 'chase_2', 'chase_3'];
+const AMBIENT = ['ambiant_1', 'ambiant_2', 'ambiant_3', 'ambiant_4', 'ambiant_5', 'ambiant_6', 'ambiant_7', 'ambiant_8', 'ambiant_9'];
 
 export class BackroomsSfx {
   constructor() {
@@ -590,21 +594,149 @@ export class BackroomsSfx {
   }
 
   // Pas lourds de l'entité, spatialisés, plus forts quand elle est près
+  // Pas lourds de l'entité, placés là où elle est, par-dessus ses cris : de plus en plus forts à mesure qu'elle approche
   monsterStep(danger, pos) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
     const t = c.currentTime;
+    const v = 0.35 + Math.min(1, danger) * 1.15;
+    const dest = c.createGain();
+    dest.gain.value = v;
+    dest.connect(pos && typeof pos === 'object' ? this.at({ ...pos, rolloff: 0 }) : this.out);
+    // le poids : une basse qui tombe
     const osc = c.createOscillator();
     const g = c.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(75, t);
-    osc.frequency.exponentialRampToValueAtTime(30, t + 0.18);
-    g.gain.setValueAtTime(0.5 * danger, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-    osc.connect(g);
-    g.connect(pos && typeof pos === 'object' ? this.at({ ...pos, rolloff: 0 }) : this.out);
+    osc.frequency.setValueAtTime(68, t);
+    osc.frequency.exponentialRampToValueAtTime(26, t + 0.3);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.9, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.34);
+    osc.connect(g).connect(dest);
     osc.start(t);
-    osc.stop(t + 0.22);
+    osc.stop(t + 0.36);
+    // le choc sur le sol, et un craquement de la dalle
+    const n = Math.floor(c.sampleRate * 0.22);
+    const buf = c.createBuffer(1, n, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 5);
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 520 + Math.random() * 160;
+    const ng = c.createGain();
+    ng.gain.value = 0.75;
+    src.connect(lp).connect(ng).connect(dest);
+    src.start(t);
+  }
+
+  // Un son du dossier sfx/, chargé une fois puis gardé
+  sample(name) {
+    this.samples = this.samples || new Map();
+    if (!this.samples.has(name)) {
+      const c = this.ctx;
+      this.samples.set(
+        name,
+        fetch(SFX(name))
+          .then((r) => r.arrayBuffer())
+          .then((b) => c.decodeAudioData(b))
+          .catch(() => null),
+      );
+    }
+    return this.samples.get(name);
+  }
+
+  // Les cris de la poursuite : tant que l'entité traque, les trois enregistrements s'enchaînent au hasard, placés
+  // là où elle est ; ils montent avec le danger et s'éteignent en une seconde et demie quand elle lâche prise
+  updateChase(on, danger, pos) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    if (!this.chaseGain) {
+      this.chaseGain = c.createGain();
+      this.chaseGain.gain.value = 0;
+      this.chasePanner = this.panner(0);
+      this.chaseGain.connect(this.chasePanner);
+      for (const n of CHASE) this.sample(n);
+    }
+    if (pos && typeof pos === 'object') this.moveTo(this.chasePanner, pos.x, pos.z, 0.05);
+    const want = on ? 0.35 + Math.min(1, danger) * 0.75 : 0;
+    this.chaseGain.gain.setTargetAtTime(want, t, on ? 0.25 : 0.5);
+    if (on && !this.chasePlaying) this.nextChase();
+  }
+
+  nextChase() {
+    this.chasePlaying = true;
+    let name = CHASE[Math.floor(Math.random() * CHASE.length)];
+    if (name === this.lastChase) name = CHASE[(CHASE.indexOf(name) + 1) % CHASE.length];
+    this.lastChase = name;
+    this.sample(name).then((buf) => {
+      if (!buf) return (this.chasePlaying = false);
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(this.chaseGain);
+      src.start();
+      src.onended = () => {
+        // on enchaîne tant que la poursuite dure (le volume dit si elle dure encore)
+        if (this.chaseGain.gain.value > 0.02) this.nextChase();
+        else this.chasePlaying = false;
+      };
+    });
+  }
+
+  // Les ambiances : de temps en temps (toutes les 20 à 50 s), un des neuf enregistrements, assez bas, avec l'écho
+  // des couloirs ; pas pendant une poursuite
+  ambience(dt, active) {
+    if (!this.unlocked || !this.ctx) return;
+    if (this.ambT === undefined) this.ambT = 6 + Math.random() * 10;
+    if (!active) return;
+    this.ambT -= dt;
+    if (this.ambT > 0) return;
+    this.ambT = 20 + Math.random() * 30;
+    let name = AMBIENT[Math.floor(Math.random() * AMBIENT.length)];
+    if (name === this.lastAmb) name = AMBIENT[(AMBIENT.indexOf(name) + 1) % AMBIENT.length];
+    this.lastAmb = name;
+    this.sample(name).then((buf) => {
+      if (!buf) return;
+      const c = this.ctx;
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      const g = c.createGain();
+      g.gain.value = 0.55;
+      src.connect(g).connect(this.out);
+      src.start();
+    });
+  }
+
+  // La mort toute proche : l'entité est sur toi
+  death() {
+    if (!this.unlocked || !this.ctx) return;
+    this.sample('death').then((buf) => {
+      if (!buf) return;
+      const c = this.ctx;
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      const g = c.createGain();
+      g.gain.value = 1.1;
+      src.connect(g).connect(this.master);
+      src.start();
+      this.deathSrc = { src, g };
+    });
+  }
+
+  // on s'en est sorti (ou une nouvelle partie commence) : le son de la mort s'éteint en une demi-seconde
+  stopDeath() {
+    if (!this.deathSrc || !this.ctx) return;
+    const { src, g } = this.deathSrc;
+    const t = this.ctx.currentTime;
+    g.gain.setTargetAtTime(0.0001, t, 0.15);
+    try {
+      src.stop(t + 0.8);
+    } catch (e) {
+      /* déjà fini */
+    }
+    this.deathSrc = null;
   }
 
   // Coupure de courant : gros claquement du disjoncteur, le bourdonnement des néons se tait

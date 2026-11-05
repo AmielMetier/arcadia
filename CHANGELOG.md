@@ -7,6 +7,8 @@
   - Plus aucun néon ne flotte au milieu des puits.
 - **The Backrooms** — les escaliers entre les deux étages sont coudés : une première volée, un palier à mi-hauteur, demi-tour, puis une seconde volée qui surplombe la première, au fond d'une grande cage obscure.
 - **The Backrooms** — l'entité prend l'escalier par le bas ou par le haut, comme les joueurs.
+- **The Backrooms** — de nouveaux sons : quand l'entité te poursuit, on entend ses cris, et par-dessus ses pas lourds, de plus en plus forts et rapprochés à mesure qu'elle approche ; quand elle est sur toi, un son de mort ; et le reste du temps, des ambiances angoissantes au hasard.
+- **The Backrooms** — l'entité va plus vite : elle te rattrape en marchant, il faut sprinter pour lui échapper.
 
 ## 4.25 — 5 novembre 2026
 - **Odyssée** — Les 24 Méga-Gemmes imaginées par des fans sont cachées sur les routes de la fin de l'aventure.
