@@ -17,7 +17,7 @@ export function dexScreen(game) {
     const num = (id) => (SPECIES[id].no ? String(SPECIES[id].no).padStart(3, '0') : '#' + String(id).padStart(3, '0'));
     let i = 0;
     const seen = new Set(st.dex.seen), caught = new Set(st.dex.caught);
-    s.innerHTML = `<div class="dex-left box"><img class="dex-spr" alt=""><div class="dex-info"></div></div><div class="dex-right box"><div class="dex-count">Vus : ${seen.size} · Capturés : ${caught.size}</div><div class="list-items dex-list"></div></div>`;
+    s.innerHTML = `<div class="dex-left box"><img class="dex-spr" alt=""><div class="dex-info"></div></div><div class="dex-right box"><div class="dex-count"><span>POKÉDEX</span><span>Vus <b>${seen.size}</b> · Capturés <b>${caught.size}</b> / ${ids.length}</span></div><div class="dex-prog"><u style="width:${(100 * caught.size / Math.max(1, ids.length)).toFixed(1)}%"></u><i style="width:${(100 * seen.size / Math.max(1, ids.length)).toFixed(1)}%"></i></div><div class="list-items dex-list"></div></div>`;
     const list = s.querySelector('.dex-list'), spr = s.querySelector('.dex-spr'), info = s.querySelector('.dex-info');
     list.innerHTML = ids.map((id) => `<div class="list-row" data-i="${id}"><span class="cur">▶</span><span class="dexn">${num(id)}</span><span class="lbl">${seen.has(id) ? esc(SPECIES[id].n) : '-----'}</span>${caught.has(id) ? '<span class="ball-mini"></span>' : ''}</div>`).join('');
     const rows = [...list.children];
@@ -26,7 +26,7 @@ export function dexScreen(game) {
       const id = ids[i], S = SPECIES[id];
       if (seen.has(id)) { spr.src = ASSETS.front(id); spr.style.visibility = ''; spr.classList.toggle('shadowed', !caught.has(id)); }
       else spr.style.visibility = 'hidden';
-      info.innerHTML = caught.has(id) ? `<div class="dex-name">${num(id)} ${esc(S.n)}</div><div>${esc(S.genus || '')}</div><div>${S.t.map(typeTag).join(' ')}</div><div>Taille ${(S.h / 10).toLocaleString('fr-FR')} m · Poids ${(S.w / 10).toLocaleString('fr-FR')} kg</div><p>${esc(S.dex)}</p>` : seen.has(id) ? `<div class="dex-name">${num(id)} ${esc(S.n)}</div><p>Capture cette créature pour en savoir plus.</p>` : '<p>Créature inconnue.</p>';
+      info.innerHTML = caught.has(id) ? `<div class="dex-name">${num(id)} ${esc(S.n)}</div><div>${esc(S.genus || '')}</div><div>${S.t.map(typeTag).join(' ')}</div><div>Taille ${(S.h / 10).toLocaleString('fr-FR')} m · Poids ${(S.w / 10).toLocaleString('fr-FR')} kg</div><p>${esc(S.dex)}</p>` : seen.has(id) ? `<div class="dex-name">${num(id)} ${esc(S.n)}</div><p>Capture cette créature pour en savoir plus.</p>` : `<div class="dex-unknown"><div class="dex-q">?</div><div class="dex-name">${num(id)} ?????</div><p>Pas encore rencontrée. Les hautes herbes, les grottes et l'eau cachent encore bien des créatures.</p></div>`;
     };
     draw();
     const pop = ui.input.push((k) => {

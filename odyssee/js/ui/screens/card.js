@@ -191,8 +191,6 @@ export function cardScreen(game, BADGES, other) {
           <div class="tc-header">
             <div class="tc-hdr-left">
               <span class="tc-hdr-title">${other ? 'CARTE DE ' + esc(String(c.name).toUpperCase()) : 'CARTE DE DRESSEUR'}</span>
-              <div class="tc-stars-wrap">${starsHtml}</div>
-              <span class="tc-hdr-grade">${rank.grade}</span>
             </div>
             <div class="tc-hdr-right">
               <span class="tc-id-pill">N° ${idStr}</span>
@@ -276,6 +274,10 @@ export function cardScreen(game, BADGES, other) {
                         <span class="tc-lbl"><i class="tc-ico">⚔</i> DUELS MULTI</span>
                         <span class="tc-val tc-pvp-val"><b>${c.pvpWins || 0}</b>V — <b>${c.pvpLosses || 0}</b>D</span>
                       </div>` : ''}
+                    </div>
+                    <!-- les 15 badges en vitrine : remplit l'espace et se lit d'un coup d'œil -->
+                    <div class="tc-badge-strip" data-act="flip" title="Voir le coffret des badges">
+                      ${BADGE_SPECS.map((b, bi) => `<img class="tc-bs-ico${c.badges?.[bi] ? ' got' : ''}" src="${c.badges?.[bi] ? ASSETS.badge(b.id) : ASSETS.badge(b.id, true)}" alt="" title="${esc(b.name || '')}">`).join('')}
                     </div>
                   </div>
                 </div>

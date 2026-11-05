@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 4.22 — 5 novembre 2026
+- **Odyssée** — Carte de Dresseur : tes 15 badges s'affichent en vitrine au centre (ceux qui manquent en silhouette), et l'en-tête est plus sobre.
+- **Odyssée** — Carte de la région : le nom des villes visitées s'affiche sous leur repère.
+- **Odyssée** — Pokédex : une barre de progression en haut, et un emplacement mystère pour les créatures que tu n'as pas encore croisées.
+
 ## 4.21 — 5 novembre 2026
 - **Odyssée** — Nouvelle musique : les mêmes airs, joués par de vrais instruments (mélodie douce, piano, basse, batterie et réverbération). Les bruitages suivent. L'ancien son 8 bits reste disponible dans les Options (« Style musical »).
 - **Odyssée** — Les starters d'Odyssée sont de retour au labo : chaque capsule propose trois partenaires (Odyssée, Kanto et Johto).

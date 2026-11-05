@@ -42,3 +42,34 @@
 .scr-close-btn, .scr-bar-title { white-space: nowrap; }
 /* emplacements vides de l'équipe : une case discrète, sans texte */
 .pslot-empty-lbl:empty { display: none; }
+
+/* Carte de Dresseur : vitrine des 15 badges sous les statistiques (comble l'espace vide au centre) */
+.tc-data-col, .tc-data-box { display: flex; flex-direction: column; }
+.tc-data-box { flex: 1; }
+.tc-badge-strip {
+  margin-top: auto; display: grid; grid-template-columns: repeat(15, 1fr); gap: calc(var(--px) * 1.5);
+  padding: calc(var(--px) * 3) calc(var(--px) * 3); cursor: pointer;
+  background: rgba(6, 12, 22, .55); border: calc(var(--px) * .8) solid rgba(120, 160, 220, .25);
+}
+.tc-bs-ico { width: 100%; aspect-ratio: 1; object-fit: contain; image-rendering: pixelated; opacity: .75; }
+.tc-bs-ico.got { opacity: 1; filter: drop-shadow(0 0 calc(var(--px) * 2) rgba(255, 220, 120, .55)); }
+.tc-badge-strip:hover .tc-bs-ico:not(.got) { opacity: 1; }
+
+/* Pokédex : en-tête avec progression, emplacement mystère pour les créatures jamais vues */
+.dex-count { display: flex; justify-content: space-between; align-items: baseline; }
+.dex-count > span:first-child { color: #ffe060; font-size: 1.15em; letter-spacing: .06em; }
+.dex-count b { color: #fff; }
+.dex-prog { position: relative; height: calc(var(--px) * 3); background: #0a1220; border: calc(var(--px) * .6) solid #000; margin-bottom: calc(var(--px) * 4); }
+.dex-prog i { position: absolute; left: 0; top: 0; bottom: 0; background: #3a5f8c; }
+.dex-prog u { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #3ad0ff, #7cf0a8); z-index: 1; }
+.dex-unknown { display: flex; flex-direction: column; align-items: center; text-align: center; gap: calc(var(--px) * 3); margin-top: calc(var(--px) * -40); }
+.dex-q { width: calc(var(--px) * 56); height: calc(var(--px) * 56); display: grid; place-items: center; font-size: calc(var(--px) * 32); font-weight: 900; color: #4a6890;
+  border: calc(var(--px) * 1.5) dashed #3a5478; border-radius: 50%; background: radial-gradient(circle, rgba(58, 208, 255, .08), transparent 70%); }
+.dex-unknown p { color: #8fa6c6; max-width: 80%; }
+
+/* carte de la région : nom des villes visitées sous leur repère */
+.map-pin-name {
+  position: absolute; transform: translate(-50%, calc(var(--px) * 6)); z-index: 5;
+  white-space: nowrap; pointer-events: none; font-size: calc(var(--px) * 4.6); font-weight: 800; letter-spacing: .02em;
+  color: #f2f8ff; text-shadow: calc(var(--px) * .6) calc(var(--px) * .6) 0 #000, calc(var(--px) * -.6) calc(var(--px) * .6) 0 #000, 0 calc(var(--px) * -.6) 0 #000;
+}

@@ -386,6 +386,9 @@ export function mapScreen(game) {
       pinsAt.push([pin, sp.x, sp.y]); place(pin, sp.x, sp.y);
       pin.title = sp.name;
       pin.innerHTML = sp.tagCls?.includes('gym') ? '★' : sp.tagCls?.includes('badge-ok') ? '✓' : sp.tagCls?.includes('league') ? '👑' : '●';
+      // le nom de la ville à côté du repère : on s'y retrouve sans cliquer partout
+      // (à côté du repère, pas dedans : le repère découpe tout ce qui dépasse de sa forme)
+      const nm = el('span', 'map-pin-name'); nm.textContent = sp.name; lab.appendChild(nm); pinsAt.push([nm, sp.x, sp.y]); place(nm, sp.x, sp.y);
       pin.addEventListener('click', (e) => {
         e.stopPropagation();
         k = idx;
