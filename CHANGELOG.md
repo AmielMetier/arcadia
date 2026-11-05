@@ -1,5 +1,26 @@
 # Journal des versions — Arcadia
 
+## 4.31 — 5 novembre 2026
+- **The Backrooms** — au Level 0, les piliers ne se ressemblent plus : colonnes rondes, piliers carrés fins ou épais, piliers pleins, et de gros blocs dans les grandes salles. On passe à côté des plus fins.
+- **The Backrooms** — beaucoup moins de culs-de-sac : la plupart des impasses débouchent maintenant sur un autre couloir (il en reste quelques-unes).
+- **The Backrooms** — l'entité encore calme qui t'aperçoit va se tapir dans le noir pour t'observer au lieu de charger ; tout près, même tapie, on l'entend.
+
+## 4.30 — 5 novembre 2026
+- **The Backrooms** — ramasser une cassette (ou un fusible au Level 1) ne fige plus le jeu une à deux secondes chez tout le monde, pas plus que l'ascenseur qui se referme une fois toutes les cassettes trouvées.
+
+## 4.29 — 5 novembre 2026
+- **The Backrooms** — l'entité prend corps en 3D : une grande silhouette décharnée et voûtée, aux bras qui pendent jusqu'aux genoux, aux doigts interminables et au cou trop long, avec le même visage aux yeux blancs et à la bouche béante. Elle marche, court et s'arrête vraiment.
+- **The Backrooms** — au début de la partie, l'entité se tapit dans les coins sombres pour observer les explorateurs de loin, sans attaquer ; braquer sa lampe sur elle la fait fuir dans le noir.
+  - À chaque cassette trouvée, elle devient plus agressive : elle voit et entend plus loin, charge plus vite, lâche moins facilement, et observe de moins en moins avant d'attaquer.
+- **The Backrooms** — les bruits d'ambiance sont joués très bas, à peine audibles.
+
+## 4.28 — 5 novembre 2026
+- **The Backrooms** — à plusieurs, tes coéquipiers sont de vrais explorateurs en combinaison jaune, casque à visière et gants noirs, qui marchent, courent et attendent.
+- **The Backrooms** — la lampe des autres joueurs éclaire vraiment les murs devant eux, sans le gros cône dessiné dans l'air ; ta propre lampe a un faisceau plus doux, avec un halo autour.
+- **The Backrooms** — l'entité ne sait plus où tu es quand elle te perd de vue : elle court là où elle t'a vu pour la dernière fois, fouille les environs, puis reprend sa ronde. On peut enfin la semer en se cachant.
+- **The Backrooms** — l'eau d'amande remplit bien la barre d'endurance quand on n'est pas l'hôte de la partie.
+- **The Backrooms** — à plusieurs, monter ou descendre l'escalier ne te ramène plus en arrière, et les autres te voient au bon endroit.
+
 ## 4.27 — 5 novembre 2026
 - **The Backrooms** — le Level 1 fait enfin peau neuve : un vrai entrepôt souterrain, bien plus réaliste.
   - Des rayonnages à palettes : échelles bleues percées, lisses orange, croisillons, planchers et fonds grillagés, protections jaunes et noires en bout de rangée.

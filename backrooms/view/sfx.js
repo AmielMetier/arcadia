@@ -703,7 +703,7 @@ export class BackroomsSfx {
       const src = c.createBufferSource();
       src.buffer = buf;
       const g = c.createGain();
-      g.gain.value = 0.55;
+      g.gain.value = 0.12; // très bas : un fond qu'on devine plus qu'on n'entend
       src.connect(g).connect(this.out);
       src.start();
     });
