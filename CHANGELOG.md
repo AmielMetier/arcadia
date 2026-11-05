@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.33 — 5 novembre 2026
+- **The Backrooms** — quand l'entité approche, plus de grésillement électrique ni de lumière rouge : on l'entend venir à ses cris et à ses pas.
+
 ## 4.32 — 5 novembre 2026
 - **The Backrooms** — avec les monstres VIP, l'entité du Level 0 prend aussi le grand corps en 3D, avec le visage de sa photo d'origine.
 - **The Backrooms** — l'entité garde sa vraie posture : sa tête ne se replie plus peu à peu sur son corps.

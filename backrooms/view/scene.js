@@ -1188,9 +1188,6 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     shadow.visible = false;
   });
 
-  const monsterAura = new THREE.PointLight('#ff1a1a', 2.5, 6, 1.6);
-  monsterAura.position.set(0, 1.6, 0.6);
-  monsterGroup.add(monsterAura);
   monsterGroup.position.set(map0.monsterSpawn.x, 0, map0.monsterSpawn.z);
   scene.add(monsterGroup);
 
@@ -1320,12 +1317,10 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
           monsterGroup.rotation.y = M.yaw || 0;
           const mv = floorViews[M.floor || 0];
           beast.update(M, chase, mv ? mv.lightAt(M.x, M.z) : 0.3, dt, time);
-          monsterAura.intensity = (chase ? 2.2 : 0.8) + Math.random() * 0.8;
         } else {
           monsterGroup.position.set(M.x + (Math.random() - 0.5) * j, my + (chase ? Math.abs(Math.sin(time * 9)) * 0.08 : Math.sin(time * 2) * 0.03), M.z + (Math.random() - 0.5) * j);
           monsterGroup.rotation.y = Math.atan2(P.x - M.x, P.z - M.z);
           face.scale.set(1 + (Math.random() - 0.5) * 0.08 * faceGlitch.value, 1 + Math.sin(time * 18) * 0.04 * faceGlitch.value, 1);
-          monsterAura.intensity = (chase ? 3 : 1.5) + Math.random() * 1.2;
         }
       } else {
         monsterGroup.visible = false;

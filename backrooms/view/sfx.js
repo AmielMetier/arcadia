@@ -346,8 +346,8 @@ export class BackroomsSfx {
     // toujours un murmure au loin, de plus en plus fort à mesure qu'elle approche
     if (this.voiceGain && !(t < this.scareUntil)) this.voiceGain.gain.setTargetAtTime(voice ? 0.04 + Math.pow(danger, 0.8) * 1.3 : 0.0001, t, 0.1);
 
-    // Danger va de 0.0 (silencieux) à 1.0 (très proche, assourdissant)
-    const targetVol = voice ? 0.0001 : Math.max(0.0001, danger * 0.45);
+    // le grésillement électrique de l'entité est coupé : on l'entend venir par ses cris et ses pas
+    const targetVol = 0.0001;
     this.monsterGain.gain.setTargetAtTime(targetVol, t, 0.08);
 
     if (pos && typeof pos === 'object') this.moveTo(this.monsterPanner, pos.x, pos.z, 0.05);
