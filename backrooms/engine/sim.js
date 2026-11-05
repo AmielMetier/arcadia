@@ -322,6 +322,15 @@ export class BackroomsSim {
     for (let gz = minGz; gz <= maxGz; gz++) {
       for (let gx = minGx; gx <= maxGx; gx++) {
         if (!this.blocked(gx, gz, floor)) continue;
+        // un pilier fin : sa vraie forme (carré ou rond), pas toute la case
+        const fm = this.fm(floor);
+        const pl = fm.pillarAt && fm.pillarAt(gx, gz);
+        if (pl) {
+          const ex = Math.max(0, Math.abs(x - pl.x) - pl.h);
+          const ez = Math.max(0, Math.abs(z - pl.z) - pl.h);
+          if (pl.round ? Math.hypot(x - pl.x, z - pl.z) < pl.h + radius : ex * ex + ez * ez < radius * radius) return true;
+          continue;
+        }
         const closestX = Math.max(gx * CELL_SIZE, Math.min(x, (gx + 1) * CELL_SIZE));
         const closestZ = Math.max(gz * CELL_SIZE, Math.min(z, (gz + 1) * CELL_SIZE));
         if ((x - closestX) ** 2 + (z - closestZ) ** 2 < radius * radius) return true;
@@ -956,7 +965,7 @@ export class BackroomsSim {
       P.mDist = same ? dist : dist + 40;
       // bourdonnement : de 0 à 35 m, il monte vite quand elle est à portée ; elle se tait en embuscade
       const ratio = 1 - Math.min(1, Math.max(0, (dist - 1.2) / 32));
-      P.danger = dist > 35 ? 0 : Math.pow(ratio, 1.6) * (M.silent ? 0.35 : 1) * (same ? 1 : 0.25);
+      P.danger = dist > 35 ? 0 : Math.pow(ratio, 1.6) * (M.silent && dist > 4 ? 0.35 : 1) * (same ? 1 : 0.25); // tout près, même tapie, on l'entend
       let diff = Math.atan2(M.x - P.x, M.z - P.z) - (P.yaw - Math.PI);
       while (diff > Math.PI) diff -= 2 * Math.PI;
       while (diff < -Math.PI) diff += 2 * Math.PI;
@@ -1003,7 +1012,7 @@ export class BackroomsSim {
     const hiding = M.mode === 'stalk' || M.mode === 'watch' || M.mode === 'flee';
     if (hiding) {
       // la lampe braquée sur elle : au début elle s'enfuit dans le noir, plus tard elle charge
-      const lit = P.flashlight && M.hasLineOfSight && dist < 14 && this.facing(P, M.x, M.z) < 0.3;
+      const lit = P.flashlight && M.hasLineOfSight && dist < 22 && this.facing(P, M.x, M.z) < 0.3;
       isNearby = dist < 3.5 + A * 4;
       canSee = (A >= 0.5 && canSee && dist < sight * 0.6) || (lit && A >= 0.4);
       canHear = A >= 0.6 && canHear;
@@ -1015,6 +1024,16 @@ export class BackroomsSim {
           M.repathT = 0;
           this.emit({ type: 'monsterFlee' });
         }
+      }
+    } else if (M.mode === 'patrol' && A < 0.5 && canSee && !isNearby && !(canHear && dist < 8)) {
+      // encore calme, elle aperçoit quelqu'un : au lieu de charger, elle va se tapir dans le noir pour l'observer
+      const spot = this.darkSpot(map, P, M, 8, 20, true);
+      if (spot) {
+        M.mode = 'stalk';
+        M.watch = spot;
+        M.silent = true;
+        M.repathT = 0;
+        canSee = false;
       }
     }
 
@@ -1082,7 +1101,7 @@ export class BackroomsSim {
       if (M.stalkT <= 0) {
         M.stalkT = rand(6, 12);
         if (Math.random() < 0.9 - A * 0.7) {
-          const spot = this.darkSpot(map, P, M, 8, 16, true);
+          const spot = this.darkSpot(map, P, M, 8, 20, true);
           if (spot) {
             M.mode = 'stalk';
             M.watch = spot;

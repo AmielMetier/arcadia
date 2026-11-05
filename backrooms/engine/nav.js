@@ -1,12 +1,25 @@
 // The Backrooms - Pathfinding A* / BFS pour l'entité et champ de vision
-import { CELL_SIZE } from './map.js';
+import { CELL_SIZE, outsidePillar } from './map.js';
 
 export function findPath(map, startX, startZ, targetX, targetZ) {
   const sgx = Math.floor(startX / CELL_SIZE);
   const sgz = Math.floor(startZ / CELL_SIZE);
-  const tgx = Math.floor(targetX / CELL_SIZE);
-  const tgz = Math.floor(targetZ / CELL_SIZE);
+  let tgx = Math.floor(targetX / CELL_SIZE);
+  let tgz = Math.floor(targetZ / CELL_SIZE);
 
+  // le joueur est à côté d'un pilier fin, dans sa case : on vise la case libre voisine la plus proche de lui
+  if (map.pillarAt && map.pillarAt(tgx, tgz)) {
+    let best = null;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (map.isWall(tgx + dx, tgz + dz)) continue;
+      const d = Math.hypot((tgx + dx + 0.5) * CELL_SIZE - targetX, (tgz + dz + 0.5) * CELL_SIZE - targetZ);
+      if (!best || d < best.d) best = { x: tgx + dx, z: tgz + dz, d };
+    }
+    if (best) {
+      tgx = best.x;
+      tgz = best.z;
+    }
+  }
   if (sgx === tgx && sgz === tgz) return [];
   if (map.isWall(tgx, tgz)) return null;
 
@@ -90,7 +103,11 @@ export function hasLineOfSight(map, x1, z1, x2, z2) {
     const pz = z1 + dz * t;
     const gx = Math.floor(px / CELL_SIZE);
     const gz = Math.floor(pz / CELL_SIZE);
-    if (map.isWall(gx, gz)) return false;
+    if (map.isWall(gx, gz)) {
+      // un pilier fin ne cache que ce qui est derrière lui, pas toute sa case
+      const p = map.pillarAt && map.pillarAt(gx, gz);
+      if (!p || !outsidePillar(p, px, pz)) return false;
+    }
   }
   return true;
 }

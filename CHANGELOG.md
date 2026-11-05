@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 4.31 — 5 novembre 2026
+- **The Backrooms** — au Level 0, les piliers ne se ressemblent plus : colonnes rondes, piliers carrés fins ou épais, piliers pleins, et de gros blocs dans les grandes salles. On passe à côté des plus fins.
+- **The Backrooms** — beaucoup moins de culs-de-sac : la plupart des impasses débouchent maintenant sur un autre couloir (il en reste quelques-unes).
+- **The Backrooms** — l'entité encore calme qui t'aperçoit va se tapir dans le noir pour t'observer au lieu de charger ; tout près, même tapie, on l'entend.
+
 ## 4.30 — 5 novembre 2026
 - **The Backrooms** — ramasser une cassette (ou un fusible au Level 1) ne fige plus le jeu une à deux secondes chez tout le monde, pas plus que l'ascenseur qui se referme une fois toutes les cassettes trouvées.
 

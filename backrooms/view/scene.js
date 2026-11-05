@@ -394,6 +394,35 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
     wallsMesh.instanceMatrix.needsUpdate = true;
     group.add(wallsMesh);
 
+    // 3b. Piliers plus fins que la case : carrés ou ronds, de tailles variées, au même papier peint (motif à l'échelle)
+    if (map.pillarAt) {
+      const kinds = new Map();
+      for (let z = 0; z < H; z++) {
+        for (let x = 0; x < W; x++) {
+          const p = map.pillarAt(x, z);
+          if (!p) continue;
+          const key = (p.round ? 'r' : 's') + p.h;
+          if (!kinds.has(key)) kinds.set(key, { p, list: [] });
+          kinds.get(key).list.push(p);
+        }
+      }
+      for (const { p, list } of kinds.values()) {
+        const geo = p.round ? new THREE.CylinderGeometry(p.h, p.h, CEIL, 20, 1, true) : new THREE.BoxGeometry(p.h * 2, CEIL, p.h * 2);
+        // le papier peint garde la largeur de ses lés : la texture couvre 2,5 m de large sur un mur
+        const span = p.round ? 2 * Math.PI * p.h : p.h * 2;
+        const uv = geo.attributes.uv;
+        for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * (span / CELL_SIZE));
+        const inst = new THREE.InstancedMesh(geo, wallMat, list.length);
+        list.forEach((q, i) => {
+          dummy.position.set(q.x, CEIL / 2, q.z);
+          dummy.updateMatrix();
+          inst.setMatrixAt(i, dummy.matrix);
+        });
+        inst.instanceMatrix.needsUpdate = true;
+        group.add(inst);
+      }
+    }
+
     // 4. Néons au plafond (les morts sont gris, ceux qui grésillent clignotent)
     const ON = new THREE.Color(L1 ? '#eef6ff' : '#fffbe2').multiplyScalar(3.2); // plus fort que le blanc : le caméscope sature et ils bavent
     const OFF = new THREE.Color('#4a473c');
