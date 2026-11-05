@@ -43,3 +43,6 @@ Version glTF 1k compactée en .glb : géométrie d'origine, seule la texture de 
 Projecteurs de chantier, cônes, rubalise et dessins muraux : dessinés dans le code (backrooms/view/).
 Level 1 : rayonnages, palettes, cartons, fûts, sacs, bacs, tuyaux, gaines, panneaux et marquages au sol dessinés dans
 le code (backrooms/view/warehouse.js) ; bois des palettes : kart/tex/planks.jpg (Poly Haven, CC0).
+
+Explorateurs (les autres joueurs) : hazmat.glb, Quaternius « Character Hazmat » (CC0), https://poly.pizza/m/z3TSQYx1Kn ,
+sans les armes du modèle d'origine.

@@ -341,6 +341,7 @@ export class BackroomsSim {
     if (kind === 'bottle') {
       if (P.stamina >= 100) return this.emit({ type: 'useless', kind, id: P.id });
       P.stamina = 100;
+      P.winded = 0;
       P.bottles++;
     } else {
       if (P.battery >= 100) return this.emit({ type: 'useless', kind, id: P.id });
@@ -574,6 +575,8 @@ export class BackroomsSim {
     if (input.yaw !== undefined) P.yaw = input.yaw;
     if (input.pitch !== undefined) P.pitch = input.pitch;
     if (input.sel === 1 || input.sel === 2) P.sel = input.sel;
+    // l'invité tient son endurance chez lui : l'hôte prend la sienne (pour savoir si l'eau d'amande sert à quelque chose)
+    if (input.remote && Number.isFinite(input.stamina)) P.stamina = input.stamina;
     P.whistleCd = Math.max(0, P.whistleCd - DT);
     P.heat = Math.max(0, P.heat - DT / 20);
     if (input.whistle) this.whistle(P);
@@ -811,7 +814,7 @@ export class BackroomsSim {
       dp: r2(this.departT),
       // le vrai ascenseur ne se dévoile qu'une fois les cassettes trouvées
       rf: this.open ? this.realFloor : -1,
-      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.floor, P.sigTo, P.onLadder ? 1 : 0, r2(P.lockT), r2(P.tilt), P.onBeam ? 1 : 0]),
+      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.floor, P.sigTo, P.onLadder ? 1 : 0, r2(P.lockT), r2(P.tilt), P.onBeam ? 1 : 0, P.bottles]),
       m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0, M.floor],
       k: [bits(this.allCassettes, 'collected'), bits(this.map.fuses, 'taken'), this.floors.map((f) => bits(f.items, 'taken')).join('|'), ''],
       // objets posés par des joueurs (échanges) : [étage, objet, x, z] ; échelle posée
@@ -836,7 +839,7 @@ export class BackroomsSim {
     }
     const seen = new Set();
     for (const row of snap.p) {
-      const [id, x, z, yaw, pitch, status, fl, bat, stam, inv, signal, running, moving, found, name, lamp, sel, floor, sigTo, onLadder, lockT, tilt, onBeam] = row;
+      const [id, x, z, yaw, pitch, status, fl, bat, stam, inv, signal, running, moving, found, name, lamp, sel, floor, sigTo, onLadder, lockT, tilt, onBeam, bottles] = row;
       seen.add(id);
       let P = this.players.find((q) => q.id === id);
       if (!P) {
@@ -846,8 +849,11 @@ export class BackroomsSim {
       }
       const mine = id === this.localId;
       const far = Math.hypot(P.x - x, P.z - z) > 2.5;
-      // l'hôte décide des chutes et des escaliers : la position suit
-      if (!mine || far || status !== 'alive' || P.status !== 'alive' || P.floor !== floor) {
+      // dans l'escalier, l'invité change d'étage chez lui (l'hôte suit sa position avec un temps de retard) : il ne
+      // doit pas être ramené en arrière à chaque instantané qui a encore l'ancien étage
+      const ownStairs = mine && !far && status === 'alive' && P.status === 'alive' && (stairAt(this.stairs, P.x, P.z) || stairAt(this.stairs, x, z));
+      // l'hôte décide des chutes : la position suit
+      if (!ownStairs && (!mine || far || status !== 'alive' || P.status !== 'alive' || P.floor !== floor)) {
         P.x = x;
         P.z = z;
       }
@@ -857,8 +863,8 @@ export class BackroomsSim {
         P.running = !!running;
         P.moving = !!moving;
         P.stamina = stam;
-      } else if (P.floor !== floor) P.yaw = yaw;
-      P.floor = floor || 0;
+      } else if (P.floor !== floor && !ownStairs) P.yaw = yaw;
+      if (!ownStairs) P.floor = floor || 0;
       P.status = status;
       P.flashlight = !!fl;
       P.hasLamp = !!lamp;
@@ -870,6 +876,12 @@ export class BackroomsSim {
         P.tilt = tilt || 0;
         P.onBeam = !!onBeam;
       }
+      // l'endurance de l'invité se calcule chez lui : une eau d'amande bue (chez l'hôte) la remplit ici aussi
+      if (mine && (bottles || 0) > (P.bottles || 0)) {
+        P.stamina = 100;
+        P.winded = 0;
+      }
+      P.bottles = bottles || 0;
       P.battery = bat;
       P.inv = (inv || ',').split(',').map((k) => k || null);
       P.signal = signal;
@@ -1005,18 +1017,27 @@ export class BackroomsSim {
       if (M.mode !== 'chase') this.emit({ type: 'spotted' });
       M.mode = 'chase';
       M.silent = false;
+      if (M.unseenT > 0) M.repathT = 0; // elle le revoit : droit sur lui
       M.unseenT = 0;
       M.lastSeenX = P.x;
       M.lastSeenZ = P.z;
+      M.lastYaw = P.yaw;
     } else if (M.mode === 'chase') {
-      // hors de vue : au bout de quelques secondes, le joueur l'a semée
+      // hors de vue : elle ne sait plus où il est. Elle court jusqu'à l'endroit où elle l'a vu pour la dernière fois,
+      // puis fouille les environs ; au bout de quelques secondes sans le voir, le joueur l'a semée
+      if (M.unseenT === 0) M.repathT = 0;
       M.unseenT += DT;
-      if (M.unseenT > LOSE_TRACK_T + rage * 4 || !same) M.mode = 'search';
+      const atLast = Math.hypot(M.x - M.lastSeenX, M.z - M.lastSeenZ) < 1.5;
+      if (atLast || M.unseenT > LOSE_TRACK_T + rage * 4 || !same) {
+        M.mode = 'search';
+        M.repathT = 0;
+      }
     }
 
     // Vitesse selon le mode, la colère et le noir
     const k = 1 + rage * 0.35 + (dark ? 0.1 : 0);
     M.burstT = Math.max(0, M.burstT - DT);
+    if (M.mode === 'search' && M.probe) M.searchT = Math.max(0, (M.searchT || 0) - DT);
     if (M.mode === 'chase') M.speed = this.monsterChaseSpeed * k * (M.burstT > 0 ? 1.15 : 1);
     else if (M.mode === 'search') M.speed = MONSTER_PATROL_SPEED * 1.3 * k;
     else if (M.mode === 'ambush') M.speed = MONSTER_PATROL_SPEED * 1.5;
@@ -1042,8 +1063,9 @@ export class BackroomsSim {
     M.repathT -= DT;
     if (M.repathT <= 0) {
       M.repathT = M.mode === 'chase' ? 0.35 : 1.2;
-      let tx = P.x;
-      let tz = P.z;
+      // en chasse, elle ne va droit sur le joueur que si elle le voit ou l'entend ; sinon, là où il était
+      let tx = M.mode === 'chase' && M.unseenT > 0 ? M.lastSeenX : P.x;
+      let tz = M.mode === 'chase' && M.unseenT > 0 ? M.lastSeenZ : P.z;
       if (!same && this.stairs.length && M.mode !== 'patrol') {
         // elle va au pied de l'escalier (étage du bas) ou à son arrivée (étage du haut)
         const foot = (s) => (M.floor > 0 ? s.down : s.up);
@@ -1068,9 +1090,24 @@ export class BackroomsSim {
           tz = M.targetWander.z;
         }
       } else if (M.mode === 'search') {
-        tx = M.lastSeenX;
-        tz = M.lastSeenZ;
-        if (Math.hypot(M.x - tx, M.z - tz) < 2) M.mode = 'patrol';
+        // d'abord là où elle a vu (ou entendu) sa proie pour la dernière fois, puis elle fouille autour quelques secondes,
+        // en commençant dans la direction où elle allait, avant de reprendre sa ronde
+        if (M.probeFrom && (M.probeFrom.x !== M.lastSeenX || M.probeFrom.z !== M.lastSeenZ)) M.probe = null;
+        const goal = M.probe || { x: M.lastSeenX, z: M.lastSeenZ };
+        if (Math.hypot(M.x - goal.x, M.z - goal.z) < 2) {
+          if (!M.probe) {
+            M.searchT = 7 + rage * 5;
+            M.probeFrom = { x: M.lastSeenX, z: M.lastSeenZ };
+          }
+          M.probe = this.searchProbe(map, M, !M.probe);
+        }
+        if (M.searchT <= 0 && M.probe) {
+          M.mode = 'patrol';
+          M.probe = null;
+          M.probeFrom = null;
+        }
+        tx = M.probe ? M.probe.x : M.lastSeenX;
+        tz = M.probe ? M.probe.z : M.lastSeenZ;
       } else if (M.mode === 'ambush') {
         tx = M.ambush.x;
         tz = M.ambush.z;
@@ -1096,7 +1133,7 @@ export class BackroomsSim {
         M.z += (wdz / wdist) * stepLen;
         M.yaw = Math.atan2(wdx, wdz);
       }
-    } else if (M.mode === 'chase' && same && dist > 0.1) {
+    } else if (M.mode === 'chase' && same && dist > 0.1 && M.unseenT === 0) {
       const stepLen = Math.min(dist, M.speed * DT);
       M.x += (dx / dist) * stepLen;
       M.z += (dz / dist) * stepLen;
@@ -1145,6 +1182,20 @@ export class BackroomsSim {
       M.path = [];
       M.ambushT = 6;
     }
+  }
+
+  // Fouille : une case libre près du dernier endroit où elle a vu sa proie (la première dans la direction où elle filait)
+  searchProbe(map, M, first) {
+    const ox = M.lastSeenX + (first && M.lastYaw !== undefined ? -Math.sin(M.lastYaw) * 6 : 0);
+    const oz = M.lastSeenZ + (first && M.lastYaw !== undefined ? -Math.cos(M.lastYaw) * 6 : 0);
+    const R = first ? 4 : 9;
+    const near = map.walkable.filter((c) => {
+      const d = Math.hypot((c.x + 0.5) * CELL_SIZE - ox, (c.z + 0.5) * CELL_SIZE - oz);
+      return d < R && Math.hypot((c.x + 0.5) * CELL_SIZE - M.x, (c.z + 0.5) * CELL_SIZE - M.z) > 2.5;
+    });
+    if (!near.length) return { x: M.lastSeenX, z: M.lastSeenZ };
+    const c = near[Math.floor(Math.random() * near.length)];
+    return { x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE };
   }
 
   // Une case au bout ou le long d'une rangée d'étagères, sur la route probable du joueur et hors de sa vue

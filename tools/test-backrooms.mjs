@@ -931,4 +931,90 @@ test("réseau : l'étage, la chute et le faux ascenseur arrivent chez l'invité"
   assert.equal(guest.fm(1).items[1].taken, host.fm(1).items[1].taken);
 });
 
+test("l'entité qui perd sa proie de vue va là où elle l'a vue, fouille autour, puis reprend sa ronde", () => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 5 });
+  const P = sim.player;
+  const M = sim.monster;
+  const cells = sim.map.walkable;
+  const at = (c) => ({ x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE });
+  // le joueur loin, hors de vue et à l'arrêt ; l'entité en chasse vient de le perdre
+  const far = cells.reduce((b, c) => (Math.hypot(at(c).x - M.x, at(c).z - M.z) > Math.hypot(at(b).x - M.x, at(b).z - M.z) ? c : b));
+  P.x = at(far).x;
+  P.z = at(far).z;
+  const last = cells.find((c) => {
+    const d = Math.hypot(at(c).x - M.x, at(c).z - M.z);
+    return d > 6 && d < 10;
+  });
+  M.mode = 'chase';
+  M.unseenT = 0.1;
+  M.lastSeenX = at(last).x;
+  M.lastSeenZ = at(last).z;
+  M.repathT = 0;
+  sim.step();
+  assert.ok(Math.hypot(M.goal.x - M.lastSeenX, M.goal.z - M.lastSeenZ) < 0.01, 'elle vise le dernier endroit vu, pas le joueur');
+  const modes = new Set();
+  for (let i = 0; i < 60 * 40 && M.mode !== 'patrol'; i++) {
+    sim.step();
+    modes.add(M.mode);
+  }
+  assert.ok(modes.has('search'), 'elle fouille');
+  assert.equal(M.mode, 'patrol', 'puis reprend sa ronde');
+});
+
+test("réseau : l'eau d'amande bue par un invité lui rend son souffle, et l'escalier ne le ramène pas en arrière", () => {
+  const players = [{ id: 1, name: 'Hôte' }, { id: 2, name: 'Invité' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 7, players, localId: 1 });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 7, players, localId: 2 });
+  const G = guest.player;
+  const HG = host.players[1];
+  HG.inv = ['bottle', null];
+  HG.stamina = 100; // l'hôte croit l'invité reposé
+  G.stamina = 12; // chez lui, il est à bout de souffle
+  host.step({}, { 2: { remote: true, stamina: 12, useSel: true, sel: 1 } });
+  assert.deepEqual(HG.inv, [null, null], 'la bouteille est bue');
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  assert.equal(G.stamina, 100, "l'endurance de l'invité est pleine");
+  // l'invité monte l'escalier chez lui ; l'hôte a un quart de seconde de retard dans chaque sens
+  const st = host.stairs[0];
+  const C = CELL_SIZE;
+  const Wp = (u, v) => ({ x: st.ox + st.dx * u + st.px * v, z: st.oz + st.dz * u + st.pz * v });
+  for (const P of [G, HG]) {
+    P.x = st.down.x;
+    P.z = st.down.z;
+    P.floor = 1;
+  }
+  const path = [Wp(0.3, C / 2), Wp(2.5 * C, C / 2), Wp(2.5 * C, 1.5 * C), Wp(0.3, 1.5 * C), st.up];
+  const toHost = [];
+  const toGuest = [];
+  let wi = 0;
+  let last = null;
+  for (let t = 0; t < 60 * 40 && wi < path.length; t++) {
+    const w = path[wi];
+    if (Math.hypot(G.x - w.x, G.z - w.z) < 0.25) {
+      wi++;
+      continue;
+    }
+    G.yaw = Math.atan2(-(w.x - G.x), -(w.z - G.z));
+    guest.predict({ my: 1, yaw: G.yaw });
+    toHost.push({ at: t + 15, i: { my: 1, yaw: G.yaw, pos: { x: G.x, z: G.z } } });
+    let inp = null;
+    while (toHost.length && toHost[0].at <= t) inp = toHost.shift().i;
+    if (inp) last = inp;
+    host.step({}, { 2: { remote: true, ...(last || {}), pos: inp ? inp.pos : null } });
+    if (t % 3 === 0) toGuest.push({ at: t + 15, s: JSON.parse(JSON.stringify(host.snapshot())) });
+    while (toGuest.length && toGuest[0].at <= t) {
+      const bx = G.x;
+      const bz = G.z;
+      guest.applySnapshot(toGuest.shift().s);
+      assert.ok(Math.hypot(G.x - bx, G.z - bz) < 0.05, 'pas ramené en arrière');
+    }
+  }
+  assert.equal(wi, path.length, "l'invité arrive en haut");
+  for (let t = 0; t < 40; t++) host.step({}, { 2: { remote: true, pos: { x: G.x, z: G.z } } });
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  assert.equal(G.floor, 0);
+  assert.equal(HG.floor, 0, "l'hôte le voit en haut lui aussi");
+  assert.ok(Math.hypot(HG.x - G.x, HG.z - G.z) < 0.3, 'au même endroit');
+});
+
 console.log(`\n${count} tests réussis pour The Backrooms !`);

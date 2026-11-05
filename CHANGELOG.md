@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 4.28 — 5 novembre 2026
+- **The Backrooms** — à plusieurs, tes coéquipiers sont de vrais explorateurs en combinaison jaune, casque à visière et gants noirs, qui marchent, courent et attendent.
+- **The Backrooms** — la lampe des autres joueurs éclaire vraiment les murs devant eux, sans le gros cône dessiné dans l'air ; ta propre lampe a un faisceau plus doux, avec un halo autour.
+- **The Backrooms** — l'entité ne sait plus où tu es quand elle te perd de vue : elle court là où elle t'a vu pour la dernière fois, fouille les environs, puis reprend sa ronde. On peut enfin la semer en se cachant.
+- **The Backrooms** — l'eau d'amande remplit bien la barre d'endurance quand on n'est pas l'hôte de la partie.
+- **The Backrooms** — à plusieurs, monter ou descendre l'escalier ne te ramène plus en arrière, et les autres te voient au bon endroit.
+
 ## 4.27 — 5 novembre 2026
 - **The Backrooms** — le Level 1 fait enfin peau neuve : un vrai entrepôt souterrain, bien plus réaliste.
   - Des rayonnages à palettes : échelles bleues percées, lisses orange, croisillons, planchers et fonds grillagés, protections jaunes et noires en bout de rangée.
