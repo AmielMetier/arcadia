@@ -225,7 +225,7 @@ export function mapScreen(game) {
       x: p.x,
       y: p.y,
       sub: 'Position actuelle du dresseur',
-      tag: 'VOUS ÊTES ICI',
+      tag: '',
       tagCls: 'here',
     }].concat(
       allTowns.filter((t) => visited.has(t.id)).map((t) => {
@@ -241,11 +241,11 @@ export function mapScreen(game) {
           x: t.x + t.w / 2,
           y: t.y + t.h / 2,
           sub: hasGym
-            ? `Arène #${gIdx + 1} : ${leader.name} (${TYPE_FR[leader.type] || leader.type}) · ${gotBadge ? badge.name + ' obtenu ✓' : `Limite av. Arène : N.${capLvl}`}`
+            ? `Champion : ${leader.name}, type ${TYPE_FR[leader.type] || leader.type}${gotBadge ? ' · ' + badge.name + ' obtenu' : ` · niveau max avant l'arène : ${capLvl}`}`
             : t.id === 'plateau'
-              ? 'Siège du Conseil des 4 et du Maître de la Ligue'
-              : 'Ville visitée · Centre Pokémon disponible',
-          tag: hasGym ? (gotBadge ? 'BADGE OBTENU ✓' : `ARÈNE #${gIdx + 1} (CAP N.${capLvl})`) : t.id === 'plateau' ? 'LIGUE POKÉMON' : 'VILLE VISITÉE',
+              ? 'Le Conseil 4 et la Maître de la Ligue'
+              : 'Centre de soins',
+          tag: hasGym ? (gotBadge ? 'Badge obtenu ✓' : `Arène ${gIdx + 1}`) : t.id === 'plateau' ? 'Ligue' : '',
           tagCls: hasGym ? (gotBadge ? 'badge-ok' : 'gym') : t.id === 'plateau' ? 'league' : 'town',
         };
       })
@@ -262,11 +262,11 @@ export function mapScreen(game) {
           <div class="map-cgear-icon"></div>
           <div class="map-hdr-titles">
             <span class="map-hdr-main">CARTE DE LA RÉGION D'ODYSSÉE</span>
-            <span class="map-hdr-sub">${visited.size} / ${allTowns.length} VILLES DÉCOUVERTES · SYSTÈME C-GEAR 5G</span>
+            <span class="map-hdr-sub">${visited.size} / ${allTowns.length} villes découvertes</span>
           </div>
         </div>
         <div class="map-hdr-right">
-          <span class="map-cap-pill">CAP NIVEAU : <b>N.${game.levelCap ? game.levelCap() : levelCap(st.badges)}</b></span>
+          <span class="map-cap-pill">Niveau max : <b>N.${game.levelCap ? game.levelCap() : levelCap(st.badges)}</b></span>
           <button type="button" class="map-close-btn" data-act="close" title="Fermer (Échap)">FERMER ✕</button>
         </div>
       </div>
@@ -275,13 +275,12 @@ export function mapScreen(game) {
       <div class="map-gps-bar">
         <div class="map-gps-left">
           <span class="map-gps-dot"></span>
-          <span class="map-gps-title">GPS EN DIRECT :</span>
-          <span class="map-gps-loc">${esc(here.toUpperCase())}</span>
-          <span class="map-gps-coords">[LOC: ${Math.round(p.x)}, ${Math.round(p.y)}]</span>
+          <span class="map-gps-title">Tu es ici :</span>
+          <span class="map-gps-loc">${esc(here)}</span>
         </div>
         <div class="map-gps-right">
-          <button type="button" class="map-ctrl-btn" data-act="me" title="Centrer la carte sur ma position (Espace / Entrée)">⌖ MA POSITION</button>
-          <button type="button" class="map-ctrl-btn" data-act="toggle-view" title="Basculer entre vue zoomée et vue de la région">🗺️ VUE RÉGION</button>
+          <button type="button" class="map-ctrl-btn" data-act="me" title="Centrer la carte sur ma position (Espace / Entrée)">⌖ Ma position</button>
+          <button type="button" class="map-ctrl-btn" data-act="toggle-view" title="Basculer entre vue zoomée et vue de la région">🗺️ Toute la région</button>
         </div>
       </div>
 
@@ -292,17 +291,13 @@ export function mapScreen(game) {
           <div class="map-labels"></div>
           <div class="map-corner tl"></div><div class="map-corner tr"></div>
           <div class="map-corner bl"></div><div class="map-corner br"></div>
-          <div class="map-hud-overlay">
-            <span class="map-coord-tag">GPS: [${Math.round(p.x)}, ${Math.round(p.y)}]</span>
-            <span class="map-radar-tag">RADAR 5G ACTIF</span>
-          </div>
         </div>
       </div>
 
       <!-- Panneau Inférieur Tactile B2W2 -->
       <div class="map-footer">
         <button type="button" class="map-nav-btn prev" data-act="prev" title="Lieu précédent (◀ ou Flèche Gauche)">
-          <span class="map-btn-arr">◀</span> LIEU PRÉC.
+          <span class="map-btn-arr">◀</span> Précédent
         </button>
         <div class="map-info">
           <div class="map-info-top">
@@ -312,7 +307,7 @@ export function mapScreen(game) {
           <div class="map-sub"></div>
         </div>
         <button type="button" class="map-nav-btn next" data-act="next" title="Lieu suivant (▶ ou Flèche Droite)">
-          LIEU SUIV. <span class="map-btn-arr">▶</span>
+          Suivant <span class="map-btn-arr">▶</span>
         </button>
         <div class="map-legend">
           <span><i class="lg-dot me"></i> Vous</span>
@@ -371,7 +366,7 @@ export function mapScreen(game) {
       <div class="map-me-radar-outer"></div>
       <div class="map-me-radar"></div>
       <div class="map-me-core"></div>
-      <div class="map-me-tag">VOUS ÊTES ICI</div>
+      <div class="map-me-tag">Toi</div>
     `;
     me.title = `Votre position : ${here} [${Math.round(p.x)}, ${Math.round(p.y)}]`;
     me.addEventListener('click', (e) => {
@@ -421,7 +416,7 @@ export function mapScreen(game) {
       tagEl.className = 'map-tag ' + (q.tagCls || '');
       
       if (k === 0) {
-        subEl.textContent = `Position actuelle du dresseur · Coordonnées [${Math.round(p.x)}, ${Math.round(p.y)}]`;
+        subEl.textContent = 'Tu es ici.';
       } else {
         subEl.innerHTML = `${esc(q.sub || '')} <span class="map-sub-dist">· ${distLabel(q.x - p.x, q.y - p.y)}</span>`;
       }
@@ -450,8 +445,8 @@ export function mapScreen(game) {
       } else {
         ui.sound.sfx('select');
         curAt[1] = worldX; curAt[2] = worldY; place(cur, worldX, worldY);
-        whereEl.textContent = `Point GPS [${worldX}, ${worldY}]`;
-        tagEl.textContent = 'POINT REPÈRE';
+        whereEl.textContent = 'Repère';
+        tagEl.textContent = '';
         tagEl.className = 'map-tag waypoint';
         subEl.innerHTML = `Repère temporaire posé sur la carte <span class="map-sub-dist">· ${distLabel(worldX - p.x, worldY - p.y)}</span>`;
       }
@@ -472,7 +467,7 @@ export function mapScreen(game) {
       isFullRegion = !isFullRegion;
       animateTo(isFullRegion ? fullRegionView(game, aspectNow()) : exploredView(game, aspectNow()), 450);
       const zoomBtn = s.querySelector('[data-act="toggle-view"]');
-      if (zoomBtn) zoomBtn.textContent = isFullRegion ? '🔍 VUE ZOOMÉE' : '🗺️ VUE RÉGION';
+      if (zoomBtn) zoomBtn.textContent = isFullRegion ? '🔍 Autour de moi' : '🗺️ Toute la région';
       ui.sound.sfx('blip');
     };
 
@@ -482,7 +477,7 @@ export function mapScreen(game) {
       show();
       isFullRegion = false;
       const zoomBtn = s.querySelector('[data-act="toggle-view"]');
-      if (zoomBtn) zoomBtn.textContent = '🗺️ VUE RÉGION';
+      if (zoomBtn) zoomBtn.textContent = '🗺️ Toute la région';
       animateTo(playerView(game, aspectNow()), 350);
     };
 

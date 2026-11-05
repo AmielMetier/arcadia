@@ -123,7 +123,7 @@ export function cardScreen(game, BADGES, other) {
           return `
             <div class="tc-team-slot empty" title="Emplacement libre">
               <div class="tc-ts-socket"></div>
-              <span class="tc-ts-empty-label">— Libre —</span>
+              
             </div>
           `;
         }
@@ -195,10 +195,7 @@ export function cardScreen(game, BADGES, other) {
               <span class="tc-hdr-grade">${rank.grade}</span>
             </div>
             <div class="tc-hdr-right">
-              <span class="tc-id-pill">IDNo. ${idStr}</span>
-              <button type="button" class="tc-btn-flip" data-act="flip" title="Basculer Recto / Verso (Espace ou ◄ / ►)">
-                ${face === 'profile' ? 'Voir les 15 Badges ▶' : '◀ Profil Dresseur'}
-              </button>
+              <span class="tc-id-pill">N° ${idStr}</span>
               <button type="button" class="tc-btn-close" data-act="close" title="Fermer (Échap)">✕</button>
             </div>
           </div>
@@ -233,7 +230,7 @@ export function cardScreen(game, BADGES, other) {
                         <span class="tc-val tc-name-val">${esc(c.name)}${c.champion ? ' <span class="tc-champ-badge">★ CHAMPION</span>' : ''}</span>
                       </div>
                       <div class="tc-hero-cell tc-hero-title-cell">
-                        <span class="tc-lbl-mini">TITRE OFFICIEL</span>
+                        <span class="tc-lbl-mini">TITRE</span>
                         <span class="tc-val tc-rank-title">${esc(rank.title)}</span>
                       </div>
                     </div>
@@ -264,7 +261,7 @@ export function cardScreen(game, BADGES, other) {
                         </div>
                       </div>
                       <div class="tc-stat-card">
-                        <span class="tc-lbl"><i class="tc-ico">🏅</i> MÉDAILLES B2W2</span>
+                        <span class="tc-lbl"><i class="tc-ico">🏅</i> MÉDAILLES</span>
                         <span class="tc-val tc-trophies-val"><b>${c.trophies || 0}</b> / 32 🏅</span>
                       </div>
                       ${c.champion || (c.hof && c.hof.length) ? `
@@ -288,7 +285,7 @@ export function cardScreen(game, BADGES, other) {
               <div class="tc-team-tray">
                 <div class="tc-tray-head">
                   <span class="tc-tray-title">ÉQUIPE EN VOYAGE</span>
-                  <span class="tc-tray-sub">${team.length} / 6 POKÉMON ACTIFS</span>
+                  <span class="tc-tray-sub">${team.length} / 6</span>
                 </div>
                 <div class="tc-team-grid">${teamHtml}</div>
               </div>
@@ -353,7 +350,7 @@ export function cardScreen(game, BADGES, other) {
               <span><kbd>ÉCHAP</kbd> Quitter</span>
             </div>
             <button type="button" class="tc-foot-btn" data-act="flip">
-              ${face === 'profile' ? 'COFFRET DES 15 BADGES ➔' : '➔ RETOUR AU PROFIL'}
+              ${face === 'profile' ? 'Voir les badges ▶' : '◀ Retour au profil'}
             </button>
           </div>
         </div>

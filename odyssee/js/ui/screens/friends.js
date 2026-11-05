@@ -65,8 +65,8 @@ export function friendsScreen(game) {
           <div class="fr-hdr-left">
             <div class="fr-cgear-icon"></div>
             <div class="fr-hdr-titles">
-              <span class="fr-hdr-main">REGISTRE AMI & CONNEXIONS C-GEAR 5G</span>
-              <span class="fr-hdr-sub">SYSTÈME SANS FIL D\'ODYSSÉE · RADAR MULTIJOUEUR EN DIRECT</span>
+              <span class="fr-hdr-main">AMIS</span>
+              <span class="fr-hdr-sub">Joue avec les dresseurs connectés et retrouve tes amis</span>
             </div>
           </div>
           <div class="fr-hdr-right">
@@ -142,7 +142,6 @@ export function friendsScreen(game) {
                 </div>
                 <div class="fr-card-meta">
                   <span class="fr-card-loc">📍 <b>${esc(p.locName || 'Odyssée')}</b></span>
-                  <span class="fr-card-coords">[LOC: ${p.x}, ${p.y}]</span>
                 </div>
               </div>
               <div class="fr-card-actions">

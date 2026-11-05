@@ -141,14 +141,14 @@ export function partyScreen(game, o = {}) {
           c.innerHTML = `
             <div class="pslot-lead-top">
               <div class="pslot-lead-badge-row">
-                <span class="pslot-star-tag">★ 1 LEADER</span>
+                <span class="pslot-star-tag">En tête</span>
                 <div class="pslot-socket">
                   <img class="pslot-ball-ico" src="img/battle/${ballKey}_32.png" onerror="this.src='img/battle/poke_ball_32.png'" alt="">
                 </div>
               </div>
               <div class="pslot-lead-lvl-row">
                 ${statusTag(m)}
-                <span class="pl${isCapped ? ' capped' : ''}">Lv. ${m.lvl}${isCapped ? ' <i>MAX</i>' : ''}</span>
+                <span class="pl${isCapped ? ' capped' : ''}">N.${m.lvl}${isCapped ? ' <i>MAX</i>' : ''}</span>
               </div>
             </div>
             <div class="pslot-lead-pedestal">
@@ -201,7 +201,7 @@ export function partyScreen(game, o = {}) {
                 <div class="pslot-types">${typesHtml}</div>
                 <div class="pslot-sub-tags">
                   ${statusTag(m)}
-                  <span class="pl${isCapped ? ' capped' : ''}">Lv. ${m.lvl}</span>
+                  <span class="pl${isCapped ? ' capped' : ''}">N.${m.lvl}</span>
                 </div>
               </div>
               ${why ? `<div class="pwhy">${esc(why)}</div>` : ''}
@@ -232,7 +232,7 @@ export function partyScreen(game, o = {}) {
             <div class="pslot-socket empty"></div>
             <span class="pslot-sub-num">#${k + 1}</span>
           </div>
-          <div class="pslot-empty-lbl">EMPLACEMENT DISPONIBLE #${k + 1}</div>`;
+          <div class="pslot-empty-lbl"></div>`;
         colSubs.appendChild(emp);
       }
 

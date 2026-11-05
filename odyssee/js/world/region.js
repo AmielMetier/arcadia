@@ -26,8 +26,8 @@ export const STARTER_TABLE = [
   { type: 'fire', lines: [[NEW_STARTERS[1], NEW_STARTERS[1] + 1, NEW_STARTERS[1] + 2], [4, 5, 6], [155, 156, 157]] },
   { type: 'water', lines: [[NEW_STARTERS[2], NEW_STARTERS[2] + 1, NEW_STARTERS[2] + 2], [7, 8, 9], [158, 159, 160]] },
 ].map((c) => ({ ...c, lines: c.lines.map((l) => l.map(R)) }));
-// au labo, trois capsules, une par type ; dans chacune, deux partenaires au choix : celui de Rouge / Bleu et celui d'Or / Argent
-export const STARTER_CHOICES = STARTER_TABLE.map((c) => ({ ...c, lines: c.lines.slice(1) }));
+// au labo, trois capsules, une par type ; dans chacune, trois partenaires au choix : celui d'Odyssée, celui de Rouge / Bleu et celui d'Or / Argent
+export const STARTER_CHOICES = STARTER_TABLE.map((c) => ({ ...c }));
 /** les trois capsules (repérées par le premier partenaire de chacune) */
 export const STARTERS = STARTER_CHOICES.map((c) => c.lines[0][0]);
 /** toutes les lignées de partenaires de départ (pour le Pokémon qui suit le dresseur) */

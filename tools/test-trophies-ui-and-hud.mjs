@@ -83,10 +83,8 @@ assert(
   hudJs.includes('data-act="trophies"') && hudJs.includes('TROPHÉES'),
   'hud.js must render TROPHÉES button with data-act="trophies"'
 );
-assert(
-  hudJs.includes('hud-trophy-pill') && hudJs.includes('trUnlocked'),
-  'hud.js must render clickable trophy pill in Pokégear header'
-);
-console.log('✔ hud.js button and header pill validated');
+// le compteur de médailles a quitté la capsule du HUD (allègement) : le bouton TROPHÉES reste le seul accès
+assert(!hudJs.includes('hud-trophy-pill'), 'hud.js no longer duplicates the trophy counter in the header');
+console.log('✔ hud.js trophies button validated');
 
 console.log('\n🎉 ALL HUD & TROPHIES TESTS PASSED SUCCESSFULLY!');

@@ -812,7 +812,7 @@ export class BattleView {
                 if (eff === 0) effBadge = '<span class="bm-eff eff-nul">SANS EFFET</span>';
                 else if (eff >= 2) effBadge = `<span class="bm-eff eff-super">SUPER EFF.${eff > 2 ? ' ×4' : ''}</span>`;
                 else if (eff < 1) effBadge = `<span class="bm-eff eff-weak">PEU EFF.${eff < 0.5 ? ' ×¼' : ''}</span>`;
-                else effBadge = '<span class="bm-eff eff-norm">EFFICACE</span>';
+                // efficacité normale : rien à signaler (l'étiquette ne sert que quand elle change quelque chose)
               } else {
                 const count = this.game.seenCount(foeMon.sp);
                 effBadge = `<span class="bm-eff eff-unk" title="Efficacité inconnue (vu ${count}/3)">???</span>`;

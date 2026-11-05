@@ -296,3 +296,9 @@ img { image-rendering: pixelated; }
   transition: opacity 280ms ease;
   opacity: 0;
 }
+
+/* menu Échap : icônes devant les entrées, texte en casse normale et un peu plus compact */
+.list.startmenu { font-size: 0.86em; min-width: calc(var(--px) * 112); }
+.list.startmenu .lbl { display: inline-flex; align-items: center; gap: calc(var(--px) * 4); }
+.list.startmenu .sm-ico { display: inline-flex; align-items: center; justify-content: center; width: calc(var(--px) * 12); height: calc(var(--px) * 12); flex: none; }
+.list.startmenu .sm-ico img { max-width: 100%; max-height: 100%; image-rendering: pixelated; filter: drop-shadow(var(--px) var(--px) 0 #000); }

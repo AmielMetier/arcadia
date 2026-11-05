@@ -1184,21 +1184,24 @@ export class Game {
     this.busy = true;
     const st = this.state;
     const opts = [];
-    if (st.flags.dex) opts.push(['POKéDEX', 'dex']);
-    if (st.party.length) opts.push(['ÉQUIPE', 'party']);
-    if (st.party.length) opts.push(['BOÎTES PC', 'pc']);
-    opts.push(['SAC', 'bag']);
-    if (this.canField('vol')) opts.push(['VOL', 'fly']);
-    opts.push(['QUÊTES', 'quests']);
-    opts.push(['TROPHÉES', 'trophies']);
-    if (st.domaine) opts.push([this.mapObj.id === 'domaine' ? 'REVENIR' : 'DOMAINE', 'domaine']);
+    if (st.flags.dex) opts.push(['Pokédex', 'dex']);
+    if (st.party.length) opts.push(['Équipe', 'party']);
+    if (st.party.length) opts.push(['Boîtes PC', 'pc']);
+    opts.push(['Sac', 'bag']);
+    if (this.canField('vol')) opts.push(['Vol', 'fly']);
+    opts.push(['Quêtes', 'quests']);
+    opts.push(['Trophées', 'trophies']);
+    if (st.domaine) opts.push([this.mapObj.id === 'domaine' ? 'Revenir' : 'Domaine', 'domaine']);
     const friendsMgr = getFriendsManager(this);
-    const onlineCount = friendsMgr.getOnlineCount();
-    opts.push([`AMIS & EN LIGNE (${onlineCount} 🟢)`, 'friends']);
-    opts.push([st.name.toUpperCase(), 'card'], ['CARTE', 'map'], ['CODE', 'code'], ['OPTIONS', 'opt'], ['FERMER', 'close']);
+    const others = Math.max(0, friendsMgr.getOnlineCount() - 1);
+    opts.push([others ? `Amis (${others} en ligne)` : 'Amis', 'friends']);
+    opts.push(['Carte de Dresseur', 'card'], ['Carte', 'map'], ['Code de sauvegarde', 'code'], ['Options', 'opt'], ['Fermer', 'close']);
+    // une petite icône devant chaque entrée (celles du HUD et du sac)
+    const ICO = { dex: ASSETS.item('dex'), party: 'img/hud/team.png', pc: 'img/hud/save.png', bag: 'img/hud/bag.png', quests: 'img/hud/quest.png', trophies: 'img/hud/trophy.png', friends: 'img/hud/friends.png', card: ASSETS.item('wallet'), map: 'img/hud/map.png', code: ASSETS.item('notebook'), domaine: ASSETS.item('gift'), fly: ASSETS.item('sifflet-celeste') };
+    const itemHtml = ([l, k]) => `<i class="sm-ico">${ICO[k] ? `<img src="${ICO[k]}" alt="">` : ''}</i>${esc(l)}`;
     let idx = Math.min(this._menuIdx || 0, opts.length - 1);
     for (;;) {
-      const r = await this.ui.list({ items: opts.map(([l]) => ({ label: l })), cls: 'startmenu', cancel: -1, start: idx, onMove: (i) => { this._menuIdx = i; } });
+      const r = await this.ui.list({ items: opts.map((x) => ({ label: x[0], html: itemHtml(x) })), cls: 'startmenu', cancel: -1, start: idx, onMove: (i) => { this._menuIdx = i; } });
       if (r < 0 || opts[r][1] === 'close') break;
       idx = r;
       const k = opts[r][1];
@@ -1923,7 +1926,7 @@ export class Game {
     } else if (name === 'prof') {
       if (!st.flags.metProf) {
         st.flags.metProf = true;
-        await ui.say([`Ah, ${st.name} ! Te voilà enfin.`, 'J\'étudie les créatures d\'Odyssée depuis trente ans. Et aujourd\'hui, j\'ai besoin de jeunes dresseurs pour m\'aider.', 'Sur la table, il y a trois capsules : Plante, Feu et Eau.', 'Dans chacune, deux créatures venues de régions lointaines, Kanto et Johto, attendent un partenaire.', 'Approche-toi de la table et choisis celle qui te plaît !'], { speaker: 'Prof. Saule' });
+        await ui.say([`Ah, ${st.name} ! Te voilà enfin.`, 'J\'étudie les créatures d\'Odyssée depuis trente ans. Et aujourd\'hui, j\'ai besoin de jeunes dresseurs pour m\'aider.', 'Sur la table, il y a trois capsules : Plante, Feu et Eau.', 'Dans chacune, trois créatures attendent un partenaire : une d\'ici, d\'Odyssée, et deux venues de régions lointaines, Kanto et Johto.', 'Approche-toi de la table et choisis celle qui te plaît !'], { speaker: 'Prof. Saule' });
         const rival = this.npcs.find((q) => q.id === 'rival-lab');
         if (rival) { rival.dir = 'up'; await ui.say('Hé ! T\'en as mis du temps ! Allez, choisis vite, je prendrai après toi.', { speaker: RIVAL_NAME }); rival.dir = 'left'; }
         return;
@@ -2020,12 +2023,12 @@ export class Game {
     if (!st.flags.metProf) { await ui.say('Il y a une créature dans cette capsule... Mieux vaut d\'abord parler au Professeur Saule.'); return; }
     // la capsule d'un type : deux partenaires au choix
     const C = STARTER_CHOICES[cap ?? Math.max(0, STARTERS.indexOf(sp))], picks = C.lines.map((l) => l[0]);
-    const ORIG = ['Kanto', 'Johto'];
+    const ORIG = picks.length === 3 ? ['Odyssée', 'Kanto', 'Johto'] : ['Kanto', 'Johto'];
     const pic = el('div', 'box starter-pic starter-trio', picks.map((p, k) => `<figure data-k="${k}"><img src="${ASSETS.front(p)}" alt=""><figcaption>${esc(SPECIES[p].n)}<small>${ORIG[k]}</small></figcaption></figure>`).join(''));
     ui.root.appendChild(pic);
     const mark = (k) => pic.querySelectorAll('figure').forEach((f, j) => f.classList.toggle('on', j === k));
     mark(0);
-    await ui.say(`Une capsule de type ${TYPE_FR[C.type]}. Deux créatures te regardent...`, { keep: true, speaker: 'Prof. Saule' });
+    await ui.say(`Une capsule de type ${TYPE_FR[C.type]}. ${picks.length === 3 ? 'Trois' : 'Deux'} créatures te regardent...`, { keep: true, speaker: 'Prof. Saule' });
     const k = await ui.list({ title: `Capsule ${TYPE_FR[C.type]}`, items: picks.map((p, j) => ({ label: SPECIES[p].n, right: ORIG[j] })).concat([{ label: 'Refermer' }]), cls: 'shop', cancel: picks.length, onMove: (j) => { if (j < picks.length) { mark(j); this.sound.cry(ASSETS.cry(picks[j])); } } });
     if (k < 0 || k >= picks.length) { pic.remove(); ui.closeDialog(); return; }
     sp = picks[k]; mark(k);

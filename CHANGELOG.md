@@ -1,5 +1,16 @@
 # Journal des versions — Arcadia
 
+## 4.21 — 5 novembre 2026
+- **Odyssée** — Nouvelle musique : les mêmes airs, joués par de vrais instruments (mélodie douce, piano, basse, batterie et réverbération). Les bruitages suivent. L'ancien son 8 bits reste disponible dans les Options (« Style musical »).
+- **Odyssée** — Les starters d'Odyssée sont de retour au labo : chaque capsule propose trois partenaires (Odyssée, Kanto et Johto).
+- **Odyssée** — Interfaces plus claires :
+  - Fini le jargon technique (« 5G », « GPS », coordonnées…) sur la carte, la Carte de Dresseur et l'écran des amis.
+  - Le menu Échap a des icônes et des noms clairs (« Carte de Dresseur » au lieu de ton prénom).
+  - Le Pokédex et les Options prennent le même style que les autres écrans.
+  - Le HUD est plus discret : capsules d'équipe plus petites, compteur de joueurs seulement quand d'autres sont connectés.
+  - En combat, la fiche d'une attaque ne cache plus tes PV, et l'efficacité n'est indiquée que lorsqu'elle compte.
+  - Les boîtes PC tiennent enfin dans l'écran, et les emplacements vides sont plus discrets.
+
 ## 4.20 — 5 novembre 2026
 - **Odyssée** — Arènes : tu peux maintenant ressortir en plein défi. Le guide te prévient : si tu sors avant d'avoir battu le Champion, tous les dresseurs de l'arène sont à rebattre.
 - **Odyssée** — Théo ne t'attend plus sur la Route 2 avant ton premier badge (il te le demande, après tout).
