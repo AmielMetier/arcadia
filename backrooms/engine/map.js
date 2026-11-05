@@ -32,17 +32,27 @@ export const T = {
   WALL: 2,
   EXIT: 3, // cabine de l'ascenseur : un mur tant qu'il est fermé
   SHELF: 4, // étagère métallique (Level 1) : bloque le passage et la vue comme un mur
+  PILLAR: 5, // pilier plus petit que la case (Level 0) : l'entité le contourne, les joueurs passent à côté
 };
 
-// cases qui bloquent le passage (et la vue) : murs, étagères et cabine d'ascenseur
-export const blocks = (v) => v === T.WALL || v === T.SHELF || v === T.EXIT;
+// cases qui bloquent le passage (et la vue) : murs, étagères, cabine d'ascenseur ; un pilier fin seulement pour les
+// chemins de l'entité (les collisions et la vue suivent sa vraie forme, voir outsidePillar)
+export const blocks = (v) => v === T.WALL || v === T.SHELF || v === T.EXIT || v === T.PILLAR;
+
+// le point (x, z) est-il hors du pilier ? (p : { x, z, h, round }, h : demi-côté ou rayon)
+export function outsidePillar(p, x, z, margin = 0) {
+  if (p.round) return Math.hypot(x - p.x, z - p.z) > p.h + margin;
+  return Math.abs(x - p.x) > p.h + margin || Math.abs(z - p.z) > p.h + margin;
+}
 
 // Creuse la cabine de l'ascenseur dans un mur voisin de la case d'entrée : la cabine est fermée sur trois côtés,
 // on y entre par l'entrée. Renvoie { gx, gz, x, z, dx, dz } (dx, dz : de l'entrée vers la cabine) ou null.
 export function carveElevator(grid, W, H, entrance, spawn, rnd, avoid = null) {
   const at = (x, z) => (x < 0 || x >= W || z < 0 || z >= H ? T.WALL : grid[z * W + x]);
+  let lastD = null;
   const reach = () => {
     const d = bfs(grid, W, H, spawn.x, spawn.z);
+    lastD = d;
     let n = 0;
     for (let i = 0; i < W * H; i++) if (d[i] >= 0) n++;
     return n;
@@ -53,7 +63,7 @@ export function carveElevator(grid, W, H, entrance, spawn, rnd, avoid = null) {
     const cx = entrance.x + dx;
     const cz = entrance.z + dz;
     if (cx < 1 || cx > W - 2 || cz < 1 || cz > H - 2) continue;
-    if (at(cx, cz) === T.FLOOR) continue; // la cabine se creuse dans un mur
+    if (at(cx, cz) === T.FLOOR || at(cx, cz) === T.PILLAR) continue; // la cabine se creuse dans un mur (pas dans un pilier fin)
     const around = [[cx + dx, cz + dz], [cx + dz, cz + dx], [cx - dz, cz - dx]];
     if (avoid && [[cx, cz], ...around].some(([x, z]) => avoid.has(z * W + x))) continue;
     const saved = around.map(([x, z]) => at(x, z));
@@ -62,8 +72,8 @@ export function carveElevator(grid, W, H, entrance, spawn, rnd, avoid = null) {
       if (x > 0 && x < W - 1 && z > 0 && z < H - 1) grid[z * W + x] = T.WALL;
     });
     grid[cz * W + cx] = T.EXIT;
-    // fermer la cabine ne doit couper aucun passage
-    if (reach() >= before - 3) {
+    // fermer la cabine ne doit couper aucun passage, ni isoler sa propre entrée
+    if (reach() >= before - 3 && lastD[entrance.z * W + entrance.x] >= 0) {
       return { gx: cx, gz: cz, x: (cx + 0.5) * CELL_SIZE, z: (cz + 0.5) * CELL_SIZE, dx, dz };
     }
     grid[cz * W + cx] = orig;
@@ -195,6 +205,43 @@ export function createBackroomsMap(seed = 42, opts = {}) {
     if (!onLine(x, z) && !inHall(x, z)) set(x, z, T.WALL);
   }
 
+  // 4b. Dans les grandes salles, de gros piliers carrés (2 × 2 cases) çà et là
+  for (const r of halls) {
+    for (let z = r.z + 2; z + 1 < r.z + r.h - 2; z += 4 + Math.floor(rnd() * 2)) {
+      for (let x = r.x + 2; x + 1 < r.x + r.w - 2; x += 4 + Math.floor(rnd() * 2)) {
+        if (rnd() < 0.45) continue;
+        for (const [dx, dz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) set(x + dx, z + dz, T.WALL);
+      }
+    }
+  }
+
+  // 4c. Moins de culs-de-sac : au fond d'une impasse, on perce le mur s'il y a du sol derrière (on en garde environ un sur trois)
+  const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const isF = (x, z) => get(x, z) === T.FLOOR;
+  for (let pass = 0; pass < 2; pass++) {
+    for (let z = 1; z < H - 1; z++) {
+      for (let x = 1; x < W - 1; x++) {
+        if (!isF(x, z)) continue;
+        const open = DIRS.filter(([dx, dz]) => isF(x + dx, z + dz));
+        if (open.length !== 1 || rnd() < 0.35) continue;
+        const [ox, oz] = open[0];
+        // en face d'abord, sinon sur les côtés ; un mur d'une case, ou de deux
+        for (const [dx, dz] of [[-ox, -oz], ...(rnd() < 0.5 ? [[oz, ox], [-oz, -ox]] : [[-oz, -ox], [oz, ox]])]) {
+          if (!inside(x + dx, z + dz) || get(x + dx, z + dz) !== T.WALL) continue;
+          if (isF(x + 2 * dx, z + 2 * dz)) {
+            set(x + dx, z + dz, T.FLOOR);
+            break;
+          }
+          if (inside(x + 2 * dx, z + 2 * dz) && isF(x + 3 * dx, z + 3 * dz)) {
+            set(x + dx, z + dz, T.FLOOR);
+            set(x + 2 * dx, z + 2 * dz, T.FLOOR);
+            break;
+          }
+        }
+      }
+    }
+  }
+
   // 5. Point de départ près du centre, sur une case libre reliée à la plus grande partie du dédale
   let floorCount = 0;
   for (let i = 0; i < W * H; i++) if (grid[i] === T.FLOOR) floorCount++;
@@ -261,6 +308,27 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   }
   const D = (c) => dist[c.z * W + c.x];
   const cellPos = (c) => ({ x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE, gx: c.x, gz: c.z });
+
+  // 6b. Piliers de toutes les tailles : un mur isolé (du sol tout autour) devient souvent un pilier plus petit que la
+  // case, carré (60 cm à 1,5 m) ou rond (colonne de 60 cm à 1,1 m), un peu décentré ; les autres restent pleins
+  const pillars = {};
+  for (let z = 2; z < H - 2; z++) {
+    for (let x = 2; x < W - 2; x++) {
+      const k = z * W + x;
+      if (grid[k] !== T.WALL || DIRS.some(([dx, dz]) => get(x + dx, z + dz) !== T.FLOOR)) continue;
+      if (rnd() < 0.3) continue;
+      const round = rnd() < 0.4;
+      const h = round ? [0.3, 0.42, 0.55][Math.floor(rnd() * 3)] : [0.3, 0.48, 0.75][Math.floor(rnd() * 3)];
+      const slack = CELL_SIZE / 2 - h - 0.05;
+      grid[k] = T.PILLAR;
+      pillars[k] = {
+        x: (x + 0.5) * CELL_SIZE + (rnd() - 0.5) * slack * 0.6,
+        z: (z + 0.5) * CELL_SIZE + (rnd() - 0.5) * slack * 0.6,
+        h,
+        round,
+      };
+    }
+  }
 
   const spawn = cellPos({ x: sx, z: sz });
 
@@ -616,13 +684,22 @@ export function createBackroomsMap(seed = 42, opts = {}) {
       return pitGrid[gz * W + gx];
     },
     monsterSpawn: cellPos(monsterCell),
+    pillars,
     isWall(gx, gz) {
       if (gx < 0 || gx >= W || gz < 0 || gz >= H) return true;
       return blocks(grid[gz * W + gx]);
     },
+    // le pilier de la case (gx, gz), s'il y en a un (et que la case n'a pas été reprise depuis)
+    pillarAt(gx, gz) {
+      if (gx < 0 || gx >= W || gz < 0 || gz >= H) return null;
+      const k = gz * W + gx;
+      return grid[k] === T.PILLAR ? pillars[k] || null : null;
+    },
     isWalkableWorld(wx, wz) {
       const gx = Math.floor(wx / CELL_SIZE);
       const gz = Math.floor(wz / CELL_SIZE);
+      const p = this.pillarAt(gx, gz);
+      if (p) return outsidePillar(p, wx, wz);
       return !this.isWall(gx, gz);
     },
   };

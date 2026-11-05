@@ -1,6 +1,14 @@
 # Journal des versions — Arcadia
 
-## 4.28 — 5 novembre 2026
+## 4.33 — 5 novembre 2026
+- **Odyssée** — La région devient immense : plus de sept fois plus grande, pour partir vraiment à l'aventure.
+  - Les villes et villages sont trois fois plus grands : rues, places, marchés, parcs, ports et phares, maisons avec jardins, et plus de mille maisons où entrer.
+  - Six nouvelles villes dans les Terres du Sud, chacune avec son caractère : Port-Lisière, Marais-Noir, Dunes d'Ocre, Forge-Acier, Rosebrume et Ombreval.
+  - Les routes sont trois à quatre fois plus longues (sauf la route 1) et serpentent entre prairies, bosquets et collines : on ne sait jamais vraiment où mène le chemin.
+  - Près de 70 lieux cachés dans la forêt entre les routes : hameaux, fermes, lacs, ruines, campements…
+  - La Ligue s'installe sur le Plateau Céleste, au cœur d'une vraie chaîne de montagnes enneigées.
+  - Au sud, les Hauts d'Ocre : des plateaux rocheux et leurs oasis.
+  - Ta partie en cours repart du Centre de soins de la dernière ville visitée.
 - **Odyssée** — La région change de visage :
   - Maisons, centres, boutiques, laboratoire, Ligue, casino et bourse passent en fausse 3D ; leurs fenêtres s'allument la nuit.
   - Nouvelles arènes à portique et voûte, coiffées de la statue de leur Champion.
@@ -9,11 +17,41 @@
   - La Forêt des Torii rejoint la carte, plus grande : sentiers, ruisseau, jardin d'automne, et deux tours anciennes à découvrir.
   - Le Bois Murmure devient une forêt dense et sombre, avec ses cabanes et ses mystères.
   - La mine de Pierrefort : trois niveaux à explorer.
-  - Villes et villages agrandis, et une usine Poké Ball monumentale à Pierrefort.
+  - Une usine Poké Ball monumentale à Pierrefort.
   - L'archipel et les îles de l'Est se rejoignent en bateau, au-delà des tourbillons.
   - Les hautes herbes bougent et s'écartent quand on y entre ; l'ancien sol ne réapparaît plus quand la carte change.
   - Casino de Métropole : poker Texas Hold'em, tables dessinées et salle d'arcade à quatre bornes.
   - Le professeur Orme et son Méga-Anneau t'attendent toujours à Port-Granit, à côté de l'arène.
+
+## 4.32 — 5 novembre 2026
+- **Arcadia** — Les 18 jeux se jouent à la manette.
+  - DavidSimulator, Tête de Calcul, Bastion Clash, Fil Rouge et Mini-Golf Party : un curseur se déplace au stick, A clique (maintenu pour glisser), X fait le clic droit et les gâchettes zooment.
+  - Birdie Party, Poké Duel et Odyssée : la croix et le stick remplacent les flèches, A valide, B annule.
+  - La fiche de chaque jeu indique ses commandes à la manette.
+- **The Backrooms** — Manette : stick gauche pour avancer, stick droit pour regarder, A ramasse, X utilise, Y allume la lampe, RB change d'objet, B siffle, LB court.
+- **Poké Duel** — Nouvelle description et nouvelles commandes dans la fiche : des centaines de Pokémon, le double façon VGC et le 2 contre 2.
+- **Accueil** — La présentation du site parle bien des 18 jeux.
+
+## 4.31 — 5 novembre 2026
+- **The Backrooms** — au Level 0, les piliers ne se ressemblent plus : colonnes rondes, piliers carrés fins ou épais, piliers pleins, et de gros blocs dans les grandes salles. On passe à côté des plus fins.
+- **The Backrooms** — beaucoup moins de culs-de-sac : la plupart des impasses débouchent maintenant sur un autre couloir (il en reste quelques-unes).
+- **The Backrooms** — l'entité encore calme qui t'aperçoit va se tapir dans le noir pour t'observer au lieu de charger ; tout près, même tapie, on l'entend.
+
+## 4.30 — 5 novembre 2026
+- **The Backrooms** — ramasser une cassette (ou un fusible au Level 1) ne fige plus le jeu une à deux secondes chez tout le monde, pas plus que l'ascenseur qui se referme une fois toutes les cassettes trouvées.
+
+## 4.29 — 5 novembre 2026
+- **The Backrooms** — l'entité prend corps en 3D : une grande silhouette décharnée et voûtée, aux bras qui pendent jusqu'aux genoux, aux doigts interminables et au cou trop long, avec le même visage aux yeux blancs et à la bouche béante. Elle marche, court et s'arrête vraiment.
+- **The Backrooms** — au début de la partie, l'entité se tapit dans les coins sombres pour observer les explorateurs de loin, sans attaquer ; braquer sa lampe sur elle la fait fuir dans le noir.
+  - À chaque cassette trouvée, elle devient plus agressive : elle voit et entend plus loin, charge plus vite, lâche moins facilement, et observe de moins en moins avant d'attaquer.
+- **The Backrooms** — les bruits d'ambiance sont joués très bas, à peine audibles.
+
+## 4.28 — 5 novembre 2026
+- **The Backrooms** — à plusieurs, tes coéquipiers sont de vrais explorateurs en combinaison jaune, casque à visière et gants noirs, qui marchent, courent et attendent.
+- **The Backrooms** — la lampe des autres joueurs éclaire vraiment les murs devant eux, sans le gros cône dessiné dans l'air ; ta propre lampe a un faisceau plus doux, avec un halo autour.
+- **The Backrooms** — l'entité ne sait plus où tu es quand elle te perd de vue : elle court là où elle t'a vu pour la dernière fois, fouille les environs, puis reprend sa ronde. On peut enfin la semer en se cachant.
+- **The Backrooms** — l'eau d'amande remplit bien la barre d'endurance quand on n'est pas l'hôte de la partie.
+- **The Backrooms** — à plusieurs, monter ou descendre l'escalier ne te ramène plus en arrière, et les autres te voient au bon endroit.
 
 ## 4.27 — 5 novembre 2026
 - **The Backrooms** — le Level 1 fait enfin peau neuve : un vrai entrepôt souterrain, bien plus réaliste.

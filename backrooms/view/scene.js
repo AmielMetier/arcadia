@@ -11,6 +11,8 @@ import { FUSES, feetY } from '../engine/sim.js';
 import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
 import { buildWarehouse } from './warehouse.js';
+import { createPlayerAvatars } from './players.js';
+import { createBeast } from './beast.js';
 
 const MODELS = new URL('../models/', import.meta.url).href; // modèles Poly Haven (CC0), voir models/LICENSE.txt
 const VIP_IMG = new URL('../img/entite.png?v=2', import.meta.url).href; // ?v : image plus nette, ne pas garder l'ancienne en cache
@@ -84,6 +86,18 @@ function makeCone() {
   band.position.y = 0.3;
   root.add(band);
   return root;
+}
+
+// Montre ou cache un groupe sans retirer ses lumières de la scène : une lumière cachée change le nombre de lumières,
+// et three.js recompile alors tous les matériaux (le jeu se fige une à deux secondes chez tout le monde). Ici, ses
+// lumières s'éteignent (puissance 0) et le reste se cache.
+function showGroup(g, on) {
+  for (const o of g.children) {
+    if (o.isLight) {
+      if (o.userData.on === undefined) o.userData.on = o.intensity;
+      o.intensity = on ? o.userData.on : 0;
+    } else o.visible = on;
+  }
 }
 
 // floors : les étages du niveau (une carte chacun)
@@ -379,6 +393,35 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
     }
     wallsMesh.instanceMatrix.needsUpdate = true;
     group.add(wallsMesh);
+
+    // 3b. Piliers plus fins que la case : carrés ou ronds, de tailles variées, au même papier peint (motif à l'échelle)
+    if (map.pillarAt) {
+      const kinds = new Map();
+      for (let z = 0; z < H; z++) {
+        for (let x = 0; x < W; x++) {
+          const p = map.pillarAt(x, z);
+          if (!p) continue;
+          const key = (p.round ? 'r' : 's') + p.h;
+          if (!kinds.has(key)) kinds.set(key, { p, list: [] });
+          kinds.get(key).list.push(p);
+        }
+      }
+      for (const { p, list } of kinds.values()) {
+        const geo = p.round ? new THREE.CylinderGeometry(p.h, p.h, CEIL, 20, 1, true) : new THREE.BoxGeometry(p.h * 2, CEIL, p.h * 2);
+        // le papier peint garde la largeur de ses lés : la texture couvre 2,5 m de large sur un mur
+        const span = p.round ? 2 * Math.PI * p.h : p.h * 2;
+        const uv = geo.attributes.uv;
+        for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * (span / CELL_SIZE));
+        const inst = new THREE.InstancedMesh(geo, wallMat, list.length);
+        list.forEach((q, i) => {
+          dummy.position.set(q.x, CEIL / 2, q.z);
+          dummy.updateMatrix();
+          inst.setMatrixAt(i, dummy.matrix);
+        });
+        inst.instanceMatrix.needsUpdate = true;
+        group.add(inst);
+      }
+    }
 
     // 4. Néons au plafond (les morts sont gris, ceux qui grésillent clignotent)
     const ON = new THREE.Color(L1 ? '#eef6ff' : '#fffbe2').multiplyScalar(3.2); // plus fort que le blanc : le caméscope sature et ils bavent
@@ -916,11 +959,12 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
 
         // Cassettes et objets
         for (const cm of cassetteMeshes) {
-          cm.group.visible = !cm.cas.collected;
-          if (cm.group.visible && cm.cas.high) {
+          const here = !cm.cas.collected;
+          showGroup(cm.group, here);
+          if (here && cm.cas.high) {
             // dans le renfoncement : elle ne tourne pas, elle regarde la pièce
             cm.group.rotation.y = Math.atan2(-N.dx, -N.dz);
-          } else if (cm.group.visible) {
+          } else if (here) {
             cm.group.rotation.y = time * 1.6;
             cm.group.position.y = 0.85 + Math.sin(time * 2.5 + cm.id) * 0.08;
           }
@@ -934,11 +978,10 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
         // Ascenseur : rouge verrouillé, vert ouvert ; le faux devient un mur
         const fake = !!(E && E.fake);
         const open = sim.open && !fake;
-        exitGroup.visible = !fake;
+        showGroup(exitGroup, !fake);
         if (fakeWall) fakeWall.visible = fake;
-        exitLight.visible = !fake;
         exitLight.color.set(open ? '#22c55e' : '#ef4444');
-        exitLight.intensity = open ? 6 : 2.5;
+        exitLight.intensity = fake ? 0 : open ? 6 : 2.5;
         signMat.color.set(open ? '#4ade80' : '#ff3030');
         // les portes s'ouvrent quand l'ascenseur est alimenté, se referment au départ
         const doorWant = open && !(sim.departT > 0) ? 1 : 0;
@@ -946,8 +989,8 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
         for (const { d, sgn } of doors) d.position.x = sgn * (0.325 + doorOpen * 0.6);
         fuseLamps.forEach((l, i) => l.material.color.set(sim.powered ? '#22c55e' : i < sim.fuses ? '#ffb020' : '#331010'));
         for (const fm of fuseMeshes) {
-          fm.g.visible = !fm.f.taken;
-          if (fm.g.visible) {
+          showGroup(fm.g, !fm.f.taken);
+          if (!fm.f.taken) {
             fm.g.rotation.y = time * 1.4;
             fm.g.position.y = 0.9 + Math.sin(time * 2.2 + fm.f.id) * 0.07;
           }
@@ -986,13 +1029,18 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
   const floorViews = floors.map((m, fi) => buildFloor(m, fi));
 
   // Lampe torche du joueur (attachée à la caméra)
-  const flashLight = new THREE.SpotLight('#fff1d0', 20, 24, Math.PI / 6.5, 0.45, 1.5);
+  // un faisceau serré au bord très doux, et un halo large et faible autour (comme une vraie torche) : pas de disque net
+  const flashLight = new THREE.SpotLight('#fff1d0', 17, 24, Math.PI / 8, 0.85, 1.5);
   flashLight.position.set(0.15, -0.12, 0);
   camera.add(flashLight);
+  const flashSpill = new THREE.SpotLight('#ffe9c4', 4, 14, Math.PI / 4.2, 1, 1.8);
+  flashSpill.position.set(0.15, -0.12, 0);
+  camera.add(flashSpill);
   const flashTarget = new THREE.Object3D();
   flashTarget.position.set(0, -0.2, -5);
   camera.add(flashTarget);
   flashLight.target = flashTarget;
+  flashSpill.target = flashTarget;
   scene.add(camera);
 
   // Ce que l'on tient devant soi : la lampe torche dans la main droite, et dans la main gauche l'objet de la case
@@ -1063,30 +1111,8 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
   heldBattery.rotation.set(0.5, 0.35, 0.1);
   held.add(heldBattery);
 
-  // Les autres joueurs : une silhouette au caméscope, et le faisceau de leur lampe
-  const avatars = new Map();
-  const avatarMat = new THREE.MeshLambertMaterial({ color: '#2b2f36' });
-  const beamMat = new THREE.MeshBasicMaterial({ color: '#fff1c9', transparent: true, opacity: 0.07, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-  const avatarOf = (P) => {
-    let a = avatars.get(P.id);
-    if (!a) {
-      const g = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 0.9, 4, 10), avatarMat);
-      body.position.y = 0.85;
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), new THREE.MeshLambertMaterial({ color: '#c9a989' }));
-      head.position.y = 1.6;
-      const cam = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.22), new THREE.MeshLambertMaterial({ color: '#111' }));
-      cam.position.set(0.18, 1.45, -0.18);
-      const beam = new THREE.Mesh(new THREE.ConeGeometry(1.6, 7, 16, 1, true), beamMat);
-      beam.rotation.x = Math.PI / 2;
-      beam.position.set(0.18, 1.45, -3.6);
-      g.add(body, head, cam, beam);
-      scene.add(g);
-      a = { g, beam };
-      avatars.set(P.id, a);
-    }
-    return a;
-  };
+  // Les autres joueurs : des explorateurs en combinaison jaune (view/players.js)
+  const avatars = createPlayerAvatars(scene);
 
   // L'entité : une image plate qui fait toujours face au joueur. Tant qu'elle n'est pas chargée (ou s'il n'y a
   // pas d'image), une silhouette noire aux yeux rouges la remplace.
@@ -1113,7 +1139,13 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
   const anim = L1 ? ENTITY_ANIM : null;
   face.visible = false;
   monsterGroup.add(face);
-  new THREE.TextureLoader().load(anim ? anim.url : ENTITY_IMG, (t) => {
+  // mode normal : l'entité en 3D, animée (view/beast.js) ; mode VIP : les images d'origine
+  const beast = ENTITY_VIP ? null : createBeast();
+  if (beast) {
+    monsterGroup.add(beast.group);
+    shadow.visible = false;
+  }
+  if (!beast) new THREE.TextureLoader().load(anim ? anim.url : ENTITY_IMG, (t) => {
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = renderer.capabilities.getMaxAnisotropy();
     const h = anim ? 2.8 : 2.15; // au Level 1, il est immense (le plafond de l'entrepôt est à 4,2 m)
@@ -1242,10 +1274,12 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         camera.position.y += (Math.random() - 0.5) * shake;
       }
 
-      flashLight.visible = P.flashlight && P.status === 'alive';
+      // allumer ou éteindre la lampe ne change pas le nombre de lumières (sinon tous les matériaux se recompilent)
+      const lampOn = P.flashlight && P.status === 'alive';
       // pile faible : la lampe faiblit et clignote
       const bat = P.battery ?? 100;
-      flashLight.intensity = 20 * (bat < 15 ? 0.45 + (Math.random() < 0.12 ? -0.4 : 0.15) : bat < 35 ? 0.75 : 1);
+      flashLight.intensity = !lampOn ? 0 : 17 * (bat < 15 ? 0.45 + (Math.random() < 0.12 ? -0.4 : 0.15) : bat < 35 ? 0.75 : 1);
+      flashSpill.intensity = flashLight.intensity * 0.24;
 
       // les objets en main : la lampe dès qu'on l'a, l'objet de la case choisie s'il y en a un (pas l'échelle)
       const alive = P.status === 'alive' && !P.onLadder;
@@ -1254,9 +1288,9 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       heldBottle.visible = inHand === 'bottle';
       heldBattery.visible = inHand === 'battery';
       // éclairés par la lumière d'où l'on est, un peu plus quand la lampe est allumée
-      const k = THREE.MathUtils.clamp(0.07 + lightNow * 1.1 + (flashLight.visible ? 0.4 : 0), 0.06, 1.05);
+      const k = THREE.MathUtils.clamp(0.07 + lightNow * 1.1 + (lampOn ? 0.4 : 0), 0.06, 1.05);
       for (const m of heldMats) m.color.copy(m.userData.base).multiplyScalar(k);
-      lensMat.color.set(flashLight.visible ? '#fff6d8' : '#2c2b26');
+      lensMat.color.set(lampOn ? '#fff6d8' : '#2c2b26');
       // ils suivent le pas, un peu en retard sur la tête
       const sway = P.moving ? (P.running ? 1.6 : 1) : 0.25;
       held.position.set(Math.cos(bob) * 0.007 * sway, Math.sin(bob * 2) * 0.006 * sway - (P.running ? 0.02 : 0), 0);
@@ -1279,10 +1313,19 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         }
         const j = (chase ? 0.12 : 0.04) * faceGlitch.value;
         const my = -(M.floor || 0) * FLOOR_DY;
-        monsterGroup.position.set(M.x + (Math.random() - 0.5) * j, my + (chase ? Math.abs(Math.sin(time * 9)) * 0.08 : Math.sin(time * 2) * 0.03), M.z + (Math.random() - 0.5) * j);
-        monsterGroup.rotation.y = Math.atan2(P.x - M.x, P.z - M.z);
-        face.scale.set(1 + (Math.random() - 0.5) * 0.08 * faceGlitch.value, 1 + Math.sin(time * 18) * 0.04 * faceGlitch.value, 1);
-        monsterAura.intensity = (chase ? 3 : 1.5) + Math.random() * 1.2;
+        if (beast) {
+          // en 3D : elle regarde où elle va (ou le joueur qu'elle observe), et marche vraiment
+          monsterGroup.position.set(M.x + (Math.random() - 0.5) * j * 0.3, my, M.z + (Math.random() - 0.5) * j * 0.3);
+          monsterGroup.rotation.y = M.yaw || 0;
+          const mv = floorViews[M.floor || 0];
+          beast.update(M, chase, mv ? mv.lightAt(M.x, M.z) : 0.3, dt, time);
+          monsterAura.intensity = (chase ? 2.2 : 0.8) + Math.random() * 0.8;
+        } else {
+          monsterGroup.position.set(M.x + (Math.random() - 0.5) * j, my + (chase ? Math.abs(Math.sin(time * 9)) * 0.08 : Math.sin(time * 2) * 0.03), M.z + (Math.random() - 0.5) * j);
+          monsterGroup.rotation.y = Math.atan2(P.x - M.x, P.z - M.z);
+          face.scale.set(1 + (Math.random() - 0.5) * 0.08 * faceGlitch.value, 1 + Math.sin(time * 18) * 0.04 * faceGlitch.value, 1);
+          monsterAura.intensity = (chase ? 3 : 1.5) + Math.random() * 1.2;
+        }
       } else {
         monsterGroup.visible = false;
       }
@@ -1291,20 +1334,16 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       for (const Q of sim.players) {
         const show = Q !== P && Q.status === 'alive';
         if (!show && !avatars.has(Q.id)) continue;
-        const a = avatarOf(Q);
-        a.g.visible = show;
-        if (!show) continue;
-        a.g.position.set(Q.x, feetY(sim.stairs, Q.x, Q.z, Q.floor) + (Q.onLadder ? 1.0 : Q.moving ? Math.abs(Math.sin(time * 8)) * 0.04 : 0), Q.z);
-        a.g.rotation.set(0, Q.yaw, 0);
-        a.g.rotateZ(-(Q.tilt || 0) * 0.6);
-        a.beam.visible = Q.flashlight;
+        const qv = floorViews[Q.floor || 0];
+        const y = feetY(sim.stairs, Q.x, Q.z, Q.floor) + (Q.onLadder ? 1.0 : 0);
+        avatars.update(Q, show, y, qv ? qv.lightAt(Q.x, Q.z) : 0.3, dt, time);
       }
 
       // exposition automatique : le caméscope s'ouvre dans le noir (image plus claire et plus granuleuse) et se
       // referme sous les néons, avec un temps de retard
       const fv = floorViews[P.floor || 0];
       lightNow = fv ? fv.lightAt(P.x, P.z) : 0.5;
-      const lightHere = lightNow + (flashLight.visible ? 0.3 : 0);
+      const lightHere = lightNow + (lampOn ? 0.3 : 0);
       const wantExp = THREE.MathUtils.clamp(0.45 / (0.15 + lightHere), 0.9, 1.4);
       exposure += (wantExp - exposure) * Math.min(1, dt * 1.1);
       vhs.render(scene, camera, time, danger * calm, exposure);
