@@ -33,7 +33,7 @@ import { preparerDomaine, frigo, architecte, recolter, allerDomaine, resident, a
 import { composer } from './render/tenue.js';
 import { buildRivalParty, getRivalItems } from './world/rival.js';
 import { Vie, parlerFaune, rentreLeSoir } from './vie.js';
-import { VieMonde, colporteur, marche, cueillir, fouiller, revanchePossible, revanche, noteCombat, ragot } from './vie-monde.js';
+import { VieMonde, colporteur, marche, cueillir, fouiller, revanchePossible, revanche, noteCombat, ragot, echange, relais, concours, loterie, musicien } from './vie-monde.js';
 
 /** météos qui comptent en combat (brume et cendres ne sont que du décor, comme dans les jeux 5G) */
 const BATTLE_WEATHERS = ['rain', 'sun', 'sandstorm', 'hail'];
@@ -122,6 +122,7 @@ export class Game {
     this.vie = new Vie(this);
     this.vieMonde = new VieMonde(this);
     this.jour = () => new Date();
+    this.followerOk = (sp) => CHAR_ROWS['poke:' + sp] != null;
     this.autoRun = false;
     try { this.autoRun = localStorage.getItem('odyssee-autorun') === '1'; } catch (e) {}
     this.runSpeed = 1; // 0: Normale (1×), 1: Rapide (1.7×), 2: Turbo (2.5×)
@@ -671,7 +672,11 @@ export class Game {
     if (vu) { this.vie.remove(vu); await this.wildBattle([vu.e]); return; }
     if (enc && (isGrassEnc(t) || (!m.outdoor && t === T.CAVE))) {
       const rate = isGrassEnc(t) ? (t === T.DARKTALL ? 0.12 : 0.1) : 0.065;
-      if (Math.random() < rate) await this.wildBattle(enc);
+      if (Math.random() < rate) {
+        // dans les grottes, il arrive qu'un Pokémon tombe du plafond
+        if (!m.outdoor && t === T.CAVE && Math.random() < 0.3) await this.vie?.embuscade();
+        await this.wildBattle(enc);
+      }
     }
   }
 
@@ -2024,6 +2029,11 @@ export class Game {
     if (name === 'faune') return parlerFaune(this, n);
     if (name === 'colporteur') return colporteur(this, n);
     if (name === 'marche') return marche(this, n);
+    if (name === 'echange') return echange(this, n);
+    if (name === 'relais') return relais(this, n);
+    if (name === 'concours') return concours(this, n);
+    if (name === 'loterie') return loterie(this, n);
+    if (name === 'musicien') return musicien(this, n);
     if (name === 'mom') {
       if (!st.flags.starter) { await ui.say([`Ah, ${st.name}, tu es enfin réveillé${st.gender === 'f' ? 'e' : ''} !`, 'Le Professeur Saule est passé ce matin. Il t\'attend à son laboratoire, juste au sud-est.', 'Théo y est déjà, bien sûr... Allez, file !'], { speaker: 'Maman' }); return; }
       await ui.say(`${st.name} ! Tu as l'air épuisé${st.gender === 'f' ? 'e' : ''}. Repose-toi un peu.`, { keep: true, speaker: 'Maman' });

@@ -4,7 +4,7 @@
 //  · Pokémon visibles dans les hautes herbes : ils pointent le bout du nez près du joueur ; marcher dessus lance le combat ;
 //  · grottes : gouttes qui tombent, poussière dans la lumière, cristaux qui scintillent, chauves-souris dérangées.
 import { T } from './world/tiles.js';
-import { PHRASES } from './world/faune.js';
+import { PHRASES, enFete } from './world/faune.js';
 export { addFauneVilles } from './world/faune.js';
 import { SPECIES } from './data/species.js';
 import { ASSETS } from './assets.js';
@@ -50,6 +50,9 @@ export class Vie {
     // la nuit tombe (ou le jour se lève) : les habitants rentrent ou ressortent
     const n = nuit(g.hour());
     if (this.nuit !== n) { const avant = this.nuit; this.nuit = n; if (avant != null && m.outdoor) g.refreshNpcs?.(); }
+    // la fête commence (ou se termine) : musicien, loterie et danseurs arrivent ou s'en vont
+    const fe = enFete(g);
+    if (this.fete !== fe) { const avant = this.fete; this.fete = fe; if (avant != null && m.outdoor) g.refreshNpcs?.(); }
     if (m.outdoor && !g.busy && !g.noEnc) this.herbeTick(dt);
     if (this.grotte) this.grotte.tick(dt);
   }
@@ -107,6 +110,18 @@ export class Vie {
     img.src = ASSETS.icon(sp);
   }
 
+  /** un Pokémon tombe du plafond : une ombre grossit au-dessus du joueur, puis le combat */
+  async embuscade() {
+    const g = this.game; g.busy = true;
+    try {
+      g.sound.sfx('chauves'); g.view.shake = 0.15;
+      this.grotte?.ombre(700);
+      await new Promise((r) => setTimeout(r, 700));
+      g.sound.sfx('hit'); g.view.shake = 0.3;
+      await g.ui.say('Un Pokémon sauvage tombe du plafond !', { auto: 900 });
+    } finally { g.busy = false; }
+  }
+
   /* ---------- grottes ---------- */
   grotteAmbiance(on) {
     if (on && !this.grotte) this.grotte = new AmbianceGrotte(this.game);
@@ -122,11 +137,12 @@ class AmbianceGrotte {
     const c = this.c = document.createElement('canvas'); c.className = 'ow-grotte';
     if (host?.parentNode) host.insertAdjacentElement('afterend', c); else document.body.appendChild(c);
     this.gouttes = []; this.poussiere = []; this.cristaux = []; this.chauves = [];
-    this.tGoutte = 1; this.tChauve = 6 + Math.random() * 8; this.dernier = null;
+    this.tGoutte = 1; this.tChauve = 6 + Math.random() * 8; this.dernier = null; this.tGronde = 25 + Math.random() * 30; this.cailloux = []; this.ombreFin = 0;
     for (let i = 0; i < 40; i++) this.poussiere.push({ x: Math.random(), y: Math.random(), v: 0.004 + Math.random() * 0.01, ph: Math.random() * 6 });
     for (let i = 0; i < 14; i++) this.cristaux.push({ x: Math.random(), y: Math.random() * 0.9, ph: Math.random() * 6, col: ['#9be7ff', '#c4a8ff', '#a8ffd8'][i % 3] });
   }
   stop() { this.c.remove(); }
+  ombre(ms) { this.ombreT0 = performance.now(); this.ombreFin = this.ombreT0 + ms; }
   tick(dt) {
     const g = this.game, c = this.c, W = c.clientWidth || innerWidth, H = c.clientHeight || innerHeight;
     if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
@@ -178,6 +194,21 @@ class AmbianceGrotte {
     }
     x.shadowBlur = 0;
     this.chauves = this.chauves.filter((b) => b.x > -400 && b.x < W + 400);
+    // la roche gronde : l'écran tremble et des cailloux tombent du plafond
+    this.tGronde -= dt;
+    if (this.tGronde <= 0 && !g.busy) {
+      this.tGronde = 35 + Math.random() * 40;
+      g.view.shake = 0.35; g.sound.sfx('hitstrong');
+      for (let i = 0; i < 18; i++) this.cailloux.push({ x: Math.random() * W, y: -10 - Math.random() * 120, v: 100 + Math.random() * 200, s: 2 + Math.random() * 4 });
+    }
+    x.fillStyle = '#6b6370';
+    for (const k of this.cailloux) { k.v += 800 * dt; k.y += k.v * dt; x.globalAlpha = 0.9; x.fillRect(k.x, k.y, k.s, k.s); }
+    this.cailloux = this.cailloux.filter((k) => k.y < H + 20);
+    // l'ombre d'un Pokémon qui va tomber du plafond, sur le joueur
+    if (performance.now() < this.ombreFin) {
+      const u = (performance.now() - this.ombreT0) / (this.ombreFin - this.ombreT0), q = g.view.screenPos(g.player.x, g.player.y, 0);
+      if (q) { const r = c.getBoundingClientRect(); x.globalAlpha = 0.25 + u * 0.4; x.fillStyle = '#000'; x.beginPath(); x.ellipse(q.left - r.left, q.top - r.top, 6 + u * 22, 3 + u * 9, 0, 0, 7); x.fill(); }
+    }
     x.globalAlpha = 1;
   }
 }

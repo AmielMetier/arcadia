@@ -1,5 +1,18 @@
 # Journal des versions — Arcadia
 
+## 4.40 — 5 novembre 2026
+- **Odyssée** — La fin des nouveautés pour faire vivre le monde.
+  - Fossiles : on en trouve en grattant les parois scintillantes des grottes (Nautile, Racine, Griffe, Crâne, Armure, Couvercle, Plume, Mâchoire, Nageoire). Le Dr Silex, à la mine de Pierrefort, les ranime tous.
+  - Concours Pokémon à Floralia, une fois par jour : Beauté, Force, Grâce ou Sagesse selon le jour, avec un classement et des prix.
+  - Fête de village le vendredi et le samedi soir à Bourg-Aube et dans les petits villages : guirlandes de lanternes, musicien, danseurs et un stand de loterie.
+  - Deux nouvelles petites quêtes : le colis du facteur de Voltacité, et le Psykokwak perdu de Papi Octave, à Floralia.
+  - Échanges en jeu : quatre habitants (Sylvebourg, Voltacité, Port-Granit, Cendrelune) échangent un Pokémon courant contre un compagnon rare, avec son surnom.
+  - Sur les routes : des bancs, des panneaux qui racontent l'histoire du coin, des cyclistes, et des relais où une gardienne offre un thé qui requinque l'équipe (une fois par jour).
+  - Les dresseurs des routes s'entraînent : leur Pokémon sautille à côté d'eux.
+  - En ville, la fumée sort des cheminées, des drapeaux flottent sur les arènes et les Centres Pokémon, les fontaines jaillissent.
+  - Rosée du matin sur l'herbe, ronds dans les flaques quand il pleut.
+  - Dans les grottes, des mineurs et des explorateurs, la roche qui gronde et fait tomber des cailloux, et des Pokémon qui tombent du plafond.
+
 ## 4.39 — 5 novembre 2026
 - **Odyssée** — Encore plus de vie sur les routes et dans les villes.
   - Des colporteurs sur certaines routes vendent de quoi tenir le voyage, et une pierre d'évolution.

@@ -27,7 +27,7 @@ import { grandeVille, bruit } from './quartiers.js';
 import { grandeRoute, boucherLocal } from './chemins.js';
 import { atelier } from './atelier.js';
 import { lieux } from './lieux.js';
-import { addFauneVilles, addVieRoutes, addMarches, addFouilles } from './faune.js';
+import { addFauneVilles, addVieRoutes, addMarches, addFouilles, addVoisinage, addFetes } from './faune.js';
 import { ANCIENS_OBJETS } from './anciens-objets.js';
 
 /** version de la carte du monde : une sauvegarde d'une version plus ancienne reprend au Centre de la dernière ville
@@ -1205,7 +1205,7 @@ export function buildWorld() {
   // des Pokémon en liberté dans les villes
   addFauneVilles(W);
   // routes : colporteurs, voyageurs et arbres à baies ; marché du week-end ; parois à fouiller dans les grottes
-  addVieRoutes(W, routes); addMarches(W, towns); addFouilles(maps);
+  addVieRoutes(W, routes); addMarches(W, towns); addFouilles(maps); addVoisinage(W, maps, routes, towns); addFetes(W, towns);
   // quêtes du vélo (Voltacité) et du permis bateau (Port-Azur)
   addVehicules({ W, maps, towns });
   // la mine de Pierrefort (trois niveaux, un fossile au fond)

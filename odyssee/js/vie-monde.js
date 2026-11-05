@@ -5,9 +5,14 @@ import { T } from './world/tiles.js';
 import { ITEMS } from './core/items.js';
 import { MEGA_FORMS, LEGEND } from './core/mega.js';
 import { levelCap } from './core/mon.js';
-import { shopScreen } from './ui/screens.js';
+import { shopScreen, partyScreen } from './ui/screens.js';
+import { createMon, monName } from './core/mon.js';
+import { SPECIES } from './data/species.js';
+import { ASSETS } from './assets.js';
+import { FOSSILES, enFete } from './world/faune.js';
 
 const jourDe = (d = new Date()) => d.toDateString();
+const h32 = (a, b, s) => { let h = (Math.imul(a | 0, 374761393) + Math.imul(b | 0, 668265263) + Math.imul(s | 0, 1442695041)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
 const etat = (st) => (st.vie ||= { baies: {}, fouilles: {}, revanche: {} });
 const nomObjet = (k) => ITEMS[k]?.name || k;
 
@@ -31,7 +36,7 @@ export async function cueillir(game, o) {
   game.vieMonde?.majObjet(o);
   await ui.say(`${st.name} cueille ${n} ${nomObjet(o.baie)}${n > 1 ? ' (×' + n + ')' : ''} !`);
 }
-const TRESORS = [['hard-stone', 22], ['ether', 18], ['revive', 12], ['prism-shard', 14], ['fire-stone', 4], ['water-stone', 4], ['thunder-stone', 4], ['leaf-stone', 4], ['moon-stone', 4], ['dusk-stone', 3], ['dawn-stone', 3], ['shiny-stone', 3], ['ice-stone', 3], ['rare-candy', 4], ['gemme', 3]];
+const TRESORS = [['hard-stone', 22], ['ether', 18], ['revive', 12], ['prism-shard', 14], ['fire-stone', 4], ['water-stone', 4], ['thunder-stone', 4], ['leaf-stone', 4], ['moon-stone', 4], ['dusk-stone', 3], ['dawn-stone', 3], ['shiny-stone', 3], ['ice-stone', 3], ['rare-candy', 4], ['gemme', 3], ['fossile', 9]];
 export async function fouiller(game, o) {
   const st = game.state, E = etat(st), ui = game.ui;
   if (E.fouilles[o.id] === jourDe()) { await ui.say('Cette paroi a déjà été fouillée aujourd\'hui.'); return; }
@@ -44,6 +49,7 @@ export async function fouiller(game, o) {
     const g = Object.values(MEGA_FORMS).filter((f) => !f.fan && !LEGEND.has(f.base)).map((f) => f.stone).filter((s) => ITEMS[s]);
     k = g[Math.floor(Math.random() * g.length)];
   }
+  if (k === 'fossile') { const L = Object.keys(FOSSILES); k = L[Math.floor(Math.random() * L.length)]; }
   if (!ITEMS[k]) k = 'hard-stone';
   game.give(k, 1); game.sound.sfx('item');
   await ui.say([`Quelque chose se détache de la roche…`, `${st.name} trouve : ${nomObjet(k)} !`]);
@@ -111,11 +117,14 @@ function dessinEclat() {
 const COULEUR_BAIE = { 'oran-berry': '#3f7fe0', 'sitrus-berry': '#f2c13a', 'lum-berry': '#7fd14a' };
 
 export class VieMonde {
+  cri(sp) { this.game.sound.cry?.(ASSETS.cry(sp)); }
   constructor(game) { this.game = game; this.actors = []; this.betes = []; this.tSon = 3; this.overlay = null; }
 
   onMap(m) {
     const v = this.game.view;
     for (const a of this.actors) v.removeActor(a.id);
+    for (const id of this.entr?.keys() || []) v.removeActor(id);
+    this.entr = new Map(); this.tDecor = 0; this.fumees = [];
     this.actors = []; this.betes = [];
     for (const [k, o] of m.objects) {
       if (o.type !== 'baies' && o.type !== 'fouille') continue;
@@ -149,6 +158,7 @@ export class VieMonde {
     for (const e of this.actors) if (e.a && e.o.type === 'fouille') e.a.mesh.visible = Math.sin(t * 3 + e.x) > -0.3;
     if (g.bv?.alive || g.ui.root.querySelector('.screen')) { if (this.overlay) this.overlay.getContext('2d').clearRect(0, 0, this.overlay.width, this.overlay.height); return; }
     this.sons(dt);
+    this.entrTick();
     if (this.overlay) this.petitesBetes(dt);
   }
 
@@ -182,6 +192,7 @@ export class VieMonde {
     if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
     const x = c.getContext('2d'); x.clearRect(0, 0, W, H);
     const h = g.hour(), soir = h >= 20 || h < 6, now = performance.now() / 1000;
+    this.decor(x, c, now, dt, h);
     this.tBete = (this.tBete ?? 0) - dt;
     if (this.tBete <= 0) {
       this.tBete = 0.6;
@@ -221,4 +232,185 @@ export class VieMonde {
     x.globalAlpha = 1;
     this.betes = this.betes.filter((b) => b.vie > 0 && Math.abs(b.x - p.x) < 18 && Math.abs(b.y - p.y) < 13);
   }
+}
+
+/* ================= décor animé : fumée, drapeaux, fontaines, rosée, flaques, guirlandes de fête, dresseurs à l'entraînement ================= */
+VieMonde.prototype.decor = function (x, c, now, dt, h) {
+  const g = this.game, m = g.mapObj, v = g.view, p = g.player, r = c.getBoundingClientRect();
+  const S = (wx, wy, hp) => { const q = v.screenPos(wx, wy, hp); return q && { x: q.left - r.left, y: q.top - r.top }; };
+  // ce qui est autour du joueur, recalculé chaque seconde
+  this.tDecor = (this.tDecor ?? 0) - dt;
+  if (this.tDecor <= 0) {
+    this.tDecor = 1;
+    const pres = (o, d = 22) => Math.abs(o.x - p.x) < d && Math.abs(o.y - p.y) < d * 0.75;
+    this.maisons = (m.buildings || []).filter((b) => pres(b) && ['house', 'house2', 'bighouse'].includes(b.kind) && h32(b.x, b.y, 5) < 0.55);
+    this.mats = (m.buildings || []).filter((b) => pres(b) && ['gym', 'center', 'league'].includes(b.kind));
+    this.fontaines = (m.deco || []).filter((d) => d.k === 'fontaine' && pres(d));
+    const z = m.zoneAt?.(p.x, p.y);
+    this.fete = enFete(g) && z?.town && ['aube', 'cime', 'orage', 'grue', 'givre'].some((id) => (z.id || z.name || '').toLowerCase().includes(id) || Object.values(g.world.towns).some((t) => t.id === id && p.x >= t.x - 6 && p.x <= t.x + t.w + 6 && p.y >= t.y - 6 && p.y <= t.y + t.h + 6));
+    this.villeFete = this.fete ? Object.values(g.world.towns).find((t) => p.x >= t.x - 6 && p.x <= t.x + t.w + 6 && p.y >= t.y - 6 && p.y <= t.y + t.h + 6) : null;
+    this.dresseurs(m);
+  }
+  const froid = ['snow', 'cime'].includes(m.zoneAt?.(p.x, p.y)?.theme);
+  // fumée des cheminées : des volutes grises qui montent et s'étirent (plus le soir et dans le froid)
+  this.fumees ||= [];
+  for (const b of this.maisons || []) {
+    b._t = (b._t ?? h32(b.x, b.y, 2) * 2) - dt * (froid || h >= 18 || h < 9 ? 1.6 : 1);
+    if (b._t <= 0) { b._t = 0.7 + Math.random() * 0.6; this.fumees.push({ wx: b.x + b.w * 0.65, wy: b.y + 0.4, hp: (b.h || 2) * 32 + 4, age: 0, dx: 0 }); }
+  }
+  for (const f of this.fumees) {
+    f.age += dt; f.dx += dt * 7; const q = S(f.wx, f.wy, f.hp); if (!q) continue;
+    const a = Math.max(0, 0.7 - f.age * 0.19), rr = 5 + f.age * 6;
+    x.globalAlpha = a; x.fillStyle = '#b9b9c3'; x.beginPath(); x.arc(q.x + f.dx + Math.sin(f.age * 2) * 3, q.y - f.age * 22, rr, 0, 7); x.fill();
+  }
+  this.fumees = this.fumees.filter((f) => f.age < 3.6);
+  // drapeaux sur les arènes, les Centres et la Ligue
+  for (const b of this.mats || []) {
+    const q = S(b.x + b.w - 0.6, b.y + 0.3, (b.h || 3) * 32 + 8); if (!q) continue;
+    x.globalAlpha = 1; x.fillStyle = '#4a4a52'; x.fillRect(q.x - 1, q.y - 34, 2, 36);
+    const col = b.kind === 'center' ? '#e8504a' : b.kind === 'league' ? '#9b5de5' : '#f2b631';
+    x.fillStyle = col; x.beginPath(); x.moveTo(q.x + 1, q.y - 34);
+    for (let k = 0; k <= 6; k++) x.lineTo(q.x + 1 + k * 3.4, q.y - 34 + 4 + Math.sin(now * 5 - k * 0.8) * 2.2);
+    for (let k = 6; k >= 0; k--) x.lineTo(q.x + 1 + k * 3.4, q.y - 34 + 13 + Math.sin(now * 5 - k * 0.8) * 2.2);
+    x.closePath(); x.fill();
+    if (b.kind === 'center') { x.fillStyle = '#fff'; x.fillRect(q.x + 9, q.y - 27, 6, 2); x.fillRect(q.x + 11, q.y - 29, 2, 6); }
+  }
+  // fontaines : un jet d'eau qui retombe en gouttelettes
+  for (const d of this.fontaines || []) {
+    const q = S(d.x, d.y, 30); if (!q) continue;
+    for (let k = 0; k < 14; k++) {
+      const t = ((now * 0.9 + k / 14) % 1), ang = (k / 14) * Math.PI * 2, rx = Math.cos(ang) * 14 * t, hy = -38 * t + 50 * t * t;
+      x.globalAlpha = 0.85 * (1 - t); x.fillStyle = k % 3 ? '#bfe6ff' : '#ffffff'; x.fillRect(q.x + rx - 1, q.y + hy - 6, 2, 3);
+    }
+  }
+  // rosée du matin : de petites étincelles sur l'herbe
+  if (h >= 5 && h < 9 && !this.villeFete) {
+    for (let k = 0; k < 26; k++) {
+      const gx = p.x - 10 + Math.floor(h32(k, Math.floor(now / 3), 4) * 20), gy = p.y - 7 + Math.floor(h32(k, Math.floor(now / 3), 6) * 14);
+      const t = m.get(gx, gy); if (t !== T.GRASS && t !== T.TALL && t !== T.FLOWER) continue;
+      const a = Math.max(0, Math.sin(now * 3 + k)) ** 4; if (a < 0.1) continue;
+      const q = S(gx + h32(k, 1, 1) - 0.5, gy + h32(k, 2, 1) - 0.5, 2); if (!q) continue;
+      x.globalAlpha = a; x.fillStyle = '#ffffff'; x.fillRect(q.x - 2, q.y, 5, 1); x.fillRect(q.x, q.y - 2, 1, 5);
+    }
+  }
+  // flaques sous la pluie : des ronds qui s'élargissent sur le sol
+  if (g.view.weather?.current === 'rain') {
+    this.ronds ||= [];
+    if (Math.random() < dt * 14) this.ronds.push({ wx: p.x + (Math.random() * 2 - 1) * 10, wy: p.y + (Math.random() * 2 - 1) * 7, age: 0 });
+    x.strokeStyle = '#d8ecff'; x.lineWidth = 1;
+    for (const o of this.ronds) {
+      o.age += dt; const q = S(o.wx, o.wy, 0); if (!q) continue;
+      x.globalAlpha = Math.max(0, 0.6 - o.age); x.beginPath(); x.ellipse(q.x, q.y, 3 + o.age * 16, 1 + o.age * 6, 0, 0, 7); x.stroke();
+    }
+    this.ronds = this.ronds.filter((o) => o.age < 0.6);
+  }
+  // fête de village : une guirlande de lanternes autour de la place
+  if (this.villeFete) {
+    const t = this.villeFete, cx = t.x + t.w / 2, cy = t.y + t.h / 2, R = Math.min(t.w, t.h) * 0.32, cols = ['#ff5a5a', '#ffd23f', '#5ad1ff', '#9dff7a', '#ff8ad8'];
+    let prev = null;
+    for (let k = 0; k <= 24; k++) {
+      const a = (k / 24) * Math.PI * 2, q = S(cx + Math.cos(a) * R, cy + Math.sin(a) * R * 0.75, 70 + Math.sin(k * 1.3) * 6); if (!q) { prev = null; continue; }
+      if (prev) { x.globalAlpha = 0.7; x.strokeStyle = '#3a2a1a'; x.lineWidth = 1; x.beginPath(); x.moveTo(prev.x, prev.y); x.quadraticCurveTo((prev.x + q.x) / 2, (prev.y + q.y) / 2 + 8, q.x, q.y); x.stroke(); }
+      const on = 0.6 + 0.4 * Math.sin(now * 3 + k);
+      x.globalAlpha = 0.35 * on; x.fillStyle = cols[k % 5]; x.beginPath(); x.arc(q.x, q.y + 6, 16, 0, 7); x.fill();
+      x.globalAlpha = 1; x.fillStyle = '#2a1d12'; x.fillRect(q.x - 1, q.y - 2, 2, 3); x.fillStyle = cols[k % 5]; x.beginPath(); x.ellipse(q.x, q.y + 6, 5, 7, 0, 0, 7); x.fill();
+      x.fillStyle = 'rgba(255,255,255,.7)'; x.fillRect(q.x - 2, q.y + 2, 2, 4);
+      prev = q;
+    }
+  }
+  x.globalAlpha = 1;
+};
+
+/** les dresseurs des routes s'entraînent : leur premier Pokémon sautille à côté d'eux (s'il a un sprite de marche) */
+VieMonde.prototype.dresseurs = function (m) {
+  const g = this.game, v = g.view, p = g.player;
+  this.entr ||= new Map();
+  const vus = new Set();
+  if (m.outdoor) for (const n of g.npcs) {
+    const tr = n.def.trainer; if (!tr || n.def.leader != null || Math.abs(n.x - p.x) > 16 || Math.abs(n.y - p.y) > 12) continue;
+    const e0 = tr.team?.[0], sp = Array.isArray(e0) ? e0[0] : e0?.sp; if (!sp || !g.followerOk?.(sp)) continue;
+    const side = [[1, 0], [-1, 0], [0, 1]].find(([dx, dy]) => { const t = m.get(n.x + dx, n.y + dy); return t === T.GRASS || t === T.PATH || t === T.SAND || t === T.FLOWER; });
+    if (!side) continue;
+    const id = 'entr:' + n.id; vus.add(id);
+    if (!this.entr.has(id)) this.entr.set(id, { a: v.actor(id, {}), sp, n, side, ph: Math.random() * 6 });
+  }
+  for (const [id, e] of this.entr) if (!vus.has(id)) { v.removeActor(id); this.entr.delete(id); }
+};
+VieMonde.prototype.entrTick = function () {
+  const v = this.game.view, now = performance.now() / 1000;
+  for (const e of this.entr?.values() || []) {
+    const n = e.n, hop = Math.max(0, Math.sin(now * 4 + e.ph)) * 0.18;
+    const dir = e.side[0] > 0 ? 'left' : e.side[0] < 0 ? 'right' : 'up';
+    v.setFrame(e.a, 'poke:' + e.sp, dir, Math.floor(now * 4 + e.ph) % 2 ? 1 : 0);
+    v.place(e.a, n.x + e.side[0], n.y + e.side[1], hop);
+  }
+};
+
+/* ================= échanges, relais, concours, fête ================= */
+
+export async function echange(game, n) {
+  const st = game.state, ui = game.ui, E = n.def.trade, who = { speaker: E.who }, f = st.flags, k = 'X:' + E.town;
+  const [gsp, glvl, gnick] = E.give, veut = E.want.map((s) => SPECIES[s]?.n).filter(Boolean);
+  if (f[k]) { await ui.say(`Comment va ${gnick} ? Moi, je m'entends à merveille avec mon nouveau compagnon !`, who); return; }
+  await ui.say([`J'aimerais tellement un ${veut.join(' ou un ')}…`, `En échange, je te donnerais mon ${SPECIES[gsp].n}, ${gnick}. Il est adorable, tu verras.`], who);
+  if (!st.party.some((m) => E.want.includes(m.sp)) || st.party.length < 2) { await ui.say('Reviens me voir quand tu en auras un dans ton équipe !', who); return; }
+  const i = await partyScreen(game, { mode: 'pick', prompt: 'Quel Pokémon échanger ?', filter: (m) => (E.want.includes(m.sp) ? null : 'Pas celui-là') });
+  if (i == null || i < 0) { await ui.say('Dommage… Reviens si tu changes d\'avis !', who); return; }
+  const m = st.party[i];
+  if (!(await ui.yesNo(`Échanger ${monName(m)} contre ${gnick} (${SPECIES[gsp].n}, N.${glvl}) ?`))) return;
+  st.party.splice(i, 1);
+  const neuf = createMon(gsp, glvl, { ot: E.who, met: 'Échange à ' + (game.locationName?.() || 'la ville') });
+  neuf.nick = gnick; neuf.ot = E.who;
+  game.markCaught?.(gsp); st.party.push(neuf); f[k] = true;
+  game.sound.sfx('caught');
+  await ui.say([`${st.name} envoie ${monName(m)}…`, `… et reçoit ${gnick} !`, `Prends bien soin de ${gnick}. Et moi, je chouchouterai ${monName(m)} !`], who);
+}
+
+export async function relais(game, n) {
+  const st = game.state, E = etat(st), ui = game.ui, who = { speaker: 'Gardienne du relais' };
+  if ((E.relais ||= {})[n.id] === jourDe()) { await ui.say('Repose-toi sur le banc autant que tu veux. Le thé, ce sera demain !', who); return; }
+  await ui.say(['Bienvenue au relais des voyageurs ! Une tasse de thé chaud ?', 'Tes Pokémon peuvent souffler un peu, eux aussi.'], who);
+  E.relais[n.id] = jourDe();
+  for (const m of st.party) if (m.hp > 0) m.hp = Math.max(m.hp, Math.ceil(m.stats[0] * 0.5));
+  game.sound.sfx('heal');
+  await ui.say('Tes Pokémon encore debout ont repris des forces (au moins la moitié de leurs PV).');
+}
+
+const CATEGORIES = [['Beauté', 3, 'élégance'], ['Force', 1, 'puissance'], ['Grâce', 5, 'agilité'], ['Sagesse', 4, 'sang-froid']];
+export async function concours(game, n) {
+  const st = game.state, E = etat(st), ui = game.ui, who = { speaker: 'Présentatrice' };
+  if (E.concours === jourDe()) { await ui.say('Le concours du jour est terminé ! Reviens demain pour une nouvelle catégorie.', who); return; }
+  const cat = CATEGORIES[new Date().getDay() % CATEGORIES.length];
+  await ui.say([`Bienvenue au Concours Pokémon de Floralia ! Aujourd'hui : catégorie ${cat[0]} !`, `Le jury regarde la ${cat[2]} de ton Pokémon, son niveau… et la complicité entre vous.`], who);
+  if (!(await ui.yesNo('Participer au concours ?', who))) return;
+  const i = await partyScreen(game, { mode: 'pick', prompt: 'Quel Pokémon présenter ?', filter: (m) => (m.hp > 0 ? null : 'Il est K.O.') });
+  if (i == null || i < 0) return;
+  const m = st.party[i], L = levelCap(st.badges) - 5;
+  const note = (lvl, stat, amitie, shiny) => lvl * 0.5 + stat / 3 + amitie / 10 + (shiny ? 20 : 0) + Math.random() * 18;
+  const toi = note(m.lvl, m.stats[cat[1]], m.happy ?? m.friend ?? 70, m.shiny);
+  const rivaux = ['Juliette et son Joliflor', 'Arthur et son Galopa', 'Inès et sa Mélodelfe'].map((nom) => [nom, note(L + Math.floor(Math.random() * 6), L * 1.5 + 20 + Math.random() * 25, 90, false)]);
+  const tab = [[`${st.name} et ${monName(m)}`, toi], ...rivaux].sort((a, b) => b[1] - a[1]);
+  const rang = tab.findIndex((t) => t[1] === toi) + 1;
+  game.sound.cry?.(ASSETS.cry(m.sp));
+  await ui.say([`${monName(m)} entre en scène et montre toute sa ${cat[2]} !`, 'Le jury délibère…', ...tab.map((t, k) => `${k + 1}. ${t[0]} — ${Math.round(t[1])} points`)], who);
+  E.concours = jourDe();
+  const prix = [[['rare-candy', 1], ['prism-shard', 1]], [['ultra-ball', 3]], [['super-potion', 2]], []][rang - 1];
+  if (rang === 1) { game.sound.sfx('medal'); await ui.say(`Et la gagnante est… l'équipe de ${st.name} ! Bravo !`, who); }
+  else await ui.say(rang === 4 ? 'Pas de prix cette fois… Reviens demain, la catégorie change chaque jour !' : `${rang}e place ! Joli passage.`, who);
+  for (const [it, q] of prix) if (ITEMS[it]) await game.api().give(it, q);
+}
+
+export async function loterie(game) {
+  const st = game.state, E = etat(st), ui = game.ui, who = { speaker: 'Stand de loterie' };
+  if (E.loterie === jourDe()) { await ui.say('Un ticket par personne et par fête ! Reviens la semaine prochaine.', who); return; }
+  await ui.say(['C\'est la fête ! Un ticket gratuit pour chaque visiteur.', 'Tire un numéro…'], who);
+  E.loterie = jourDe();
+  const r = Math.random(), lot = r < 0.03 ? 'rare-candy' : r < 0.12 ? 'ultra-ball' : r < 0.35 ? 'sitrus-berry' : r < 0.65 ? 'great-ball' : 'oran-berry';
+  game.sound.sfx('select');
+  await ui.say(`Numéro ${String(Math.floor(Math.random() * 1000)).padStart(3, '0')} !`, who);
+  await game.api().give(lot, 1);
+}
+export async function musicien(game) {
+  game.sound.sfx('evolve');
+  await game.ui.say(['♪ La la la… ♫', 'Le musicien joue un air de fête. Les enfants dansent autour de lui !'], { speaker: 'Musicien' });
 }

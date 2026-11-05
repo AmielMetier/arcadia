@@ -1,6 +1,17 @@
 // odyssee/js/world/faune.js — Pokémon en liberté dans les villes (posés à la création du monde ; leur comportement : vie.js)
 import { T, walkable } from './tiles.js';
 import { along, nearestWalkable } from './mapgen.js';
+import { ITEMS } from '../core/items.js';
+
+/* ================= fossiles (trouvés en fouillant les grottes, ranimés par le Dr Silex à Pierrefort) ================= */
+export const FOSSILES = {
+  'fossile-nautile': [138, 'helix-fossil', 'Fossile Nautile', 'un coquillage en spirale'], 'fossile-racine': [345, 'root-fossil', 'Fossile Racine', 'des racines pétrifiées'],
+  'fossile-griffe': [347, 'claw-fossil', 'Fossile Griffe', 'une griffe acérée'], 'fossile-crane': [408, 'skull-fossil', 'Fossile Crâne', 'un crâne très dur'],
+  'fossile-armure': [410, 'armor-fossil', 'Fossile Armure', 'une plaque de cuirasse'], 'fossile-couvercle': [564, 'cover-fossil', 'Fossile Couvercle', 'une carapace bombée'],
+  'fossile-plume': [566, 'plume-fossil', 'Fossile Plume', 'une plume figée dans la pierre'], 'fossile-machoire': [696, 'jaw-fossil', 'Fossile Mâchoire', 'une mâchoire de prédateur'],
+  'fossile-nageoire': [698, 'sail-fossil', 'Fossile Nageoire', 'une nageoire en éventail'],
+};
+for (const [k, [sp, icon, name, quoi]] of Object.entries(FOSSILES)) ITEMS[k] ||= { pocket: 'objets', price: 3000, icon, name, desc: `Un fossile : ${quoi}. Le Dr Silex, à la mine de Pierrefort, sait ranimer le Pokémon qui y dort.` };
 
 /* ================= Pokémon des villes (création du monde) ================= */
 // espèces qui ont un sprite de marche (planche des suiveurs), réparties par décor de ville
@@ -122,5 +133,89 @@ export function addFouilles(maps) {
       if (m.objectAt(x, y)) continue;
       m.object(x, y, { type: 'fouille', id: `fouille:${m.id}:${k}` });
     }
+  }
+}
+
+/* ================= voisinage : Psykokwak perdu, échanges, bancs, panneaux, relais, cyclistes, mineurs ================= */
+export const ECHANGES = [
+  { town: 'sylve', who: 'Gaspard', want: [16, 19, 10, 13], give: [133, 15, 'Plume'] },
+  { town: 'volta', who: 'Ingrid', want: [81, 100, 172, 25], give: [147, 25, 'Tonnerre'] },
+  { town: 'granit', who: 'Matelot Yann', want: [129, 118, 72], give: [131, 30, 'Bleuet'] },
+  { town: 'cendre', who: 'Forgeronne Alma', want: [58, 37, 4, 218], give: [246, 30, 'Braise'] },
+];
+const HISTOIRES = [
+  (r) => [`${r} — Autrefois, les marchands de sel passaient ici avec leurs Tauros.`, 'On voit encore les ornières de leurs charrettes dans la terre.'],
+  (r) => [`${r} — Ici, en l'an 812, deux dresseurs se sont affrontés trois jours durant.`, 'Personne ne se souvient de qui a gagné.'],
+  (r) => [`${r} — Un vieil arbre de ce bord de route aurait été planté par un Celebi.`, 'Les anciens disent qu\'il fleurit hors saison quand le temps se trouble.'],
+  (r) => [`${r} — Point de vue. Par temps clair, on aperçoit les îles du large.`, 'Les Roucool du coin viennent y regarder le coucher du soleil.'],
+];
+
+/** Psykokwak perdu (mission mPsyko), quatre échangeurs, et le mobilier des routes */
+export function addVoisinage(W, maps, routes, towns) {
+  const pris = new Set(W.npcs.map((n) => n.x + ',' + n.y));
+  const tout = (x, y, r) => { for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const t = W.get(x + dx, y + dy); if (!walkable(t) || [T.DOOR, T.MAT, T.TALL, T.DARKTALL, T.BRIDGE].includes(t) || pris.has((x + dx) + ',' + (y + dy)) || W.objectAt(x + dx, y + dy)) return false; } return true; };
+  const pres = (pts, t, side, off, r = 1) => {
+    for (let k = 0; k < 16; k++) {
+      const q = along(pts, Math.min(0.97, Math.max(0.03, t + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.02)));
+      const x = Math.round(q.x + q.nx * side * off), y = Math.round(q.y + q.ny * side * off);
+      if (tout(x, y, r) && !W.zoneAt(x, y)?.town) { pris.add(x + ',' + y); return [x, y]; }
+    }
+    return null;
+  };
+  const R = (id) => routes.find((r) => r.id === id);
+  // le Psykokwak de Papi Octave, sur la route 5, tant qu'on ne l'a pas retrouvé
+  const r5 = R('r5'); const pp = r5 && pres(r5.pts, 0.6, 1, 3);
+  if (pp) W.npc({ id: 'psyko-perdu', x: pp[0], y: pp[1], sprite: 'poke:54', dir: 'down', move: 'turn', sp: 54,
+    when: (f) => !!f['A:mPsyko'] && !f.psykoRetrouve,
+    talk: async (A) => { A.game.vieMonde?.cri(54); await A.say(['Psy… ? Psykokwak se tient la tête et te regarde.', 'Il a l\'air soulagé de voir quelqu\'un ! Psykokwak décide de rentrer à Floralia tout seul.']); A.flag('psykoRetrouve'); } });
+  // échanges en jeu
+  for (const E of ECHANGES) {
+    const t = Object.values(towns).find((q) => q.id === E.town); if (!t) continue;
+    const [x, y] = nearestWalkable(W, t.x + Math.round(t.w * 0.3), t.y + Math.round(t.h * 0.7), pris); if (x == null) continue;
+    pris.add(x + ',' + y);
+    W.npc({ id: 'echange:' + E.town, x, y, sprite: 'habitant', dir: 'down', move: 'turn', name: E.who, script: 'echange', trade: E });
+  }
+  // routes : un banc avec vue, un panneau d'histoire, un relais toutes les quatre routes, un cycliste sur les longues
+  routes.forEach((r, i) => {
+    if (!r.pts || r.pts.length < 10) return;
+    const nom = r.name || 'Route';
+    const b = pres(r.pts, 0.22 + (i % 3) * 0.05, i % 2 ? -1 : 1, 3); if (b) W.prop('banc', b[0], b[1]);
+    const s = pres(r.pts, 0.7, i % 2 ? 1 : -1, 2); if (s) W.sign(s[0], s[1], HISTOIRES[i % HISTOIRES.length](nom));
+    if (i % 4 === 2) { const p = pres(r.pts, 0.55, i % 2 ? -1 : 1, 3); if (p) W.npc({ id: 'relais:' + r.id, x: p[0], y: p[1], sprite: 'habitante', dir: 'down', move: 'turn', name: 'Gardienne du relais', script: 'relais' }); }
+    if (r.pts.length > 40 && i % 3 === 0) { const p = pres(r.pts, 0.35, i % 2 ? 1 : -1, 2); if (p) W.npc({ id: 'cycliste:' + r.id, x: p[0], y: p[1], sprite: i % 2 ? 'topdresseuse' : 'topdresseur', dir: 'down', move: 'wander', roam: 6, name: 'Cycliste',
+      text: ['Je fais toute la région à vélo ! Rien de tel pour sentir le vent.', `La ${nom}, c'est ma préférée : ça descend dans un sens… et ça monte dans l'autre.`] }); }
+  });
+  // grottes : un mineur ou une exploratrice
+  for (const m of Object.values(maps)) {
+    if (m.floor !== 'cave') continue;
+    const ok = (x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (m.get(x + dx, y + dy) !== T.CAVE || m.objectAt(x + dx, y + dy) || m.npcs.some((n) => Math.abs(n.x - x - dx) + Math.abs(n.y - y - dy) === 0) || m.warpAt?.(x + dx, y + dy)) return false; return true; };
+    for (let k = 0; k < 300; k++) {
+      const x = 2 + Math.floor(h32(m.w, k, 21) * (m.w - 4)), y = 2 + Math.floor(h32(m.h, k, 22) * (m.h - 4));
+      if (!ok(x, y)) continue;
+      const mineur = h32(x, y, 3) < 0.5;
+      m.npc({ id: m.id + ':explo', x, y, sprite: mineur ? 'montagnard' : 'randonneuse', dir: 'down', move: 'wander', name: mineur ? 'Mineur' : 'Exploratrice',
+        text: mineur ? ['Tu vois les parois qui scintillent ? Gratte-les : on y trouve des pierres, et parfois un fossile !', 'Le Dr Silex, à Pierrefort, sait ranimer les fossiles.']
+          : ['Je cartographie les grottes de la région. Celle-ci n\'est pas la plus profonde…', 'Écoute bien : quand la roche gronde, éloigne-toi des parois !'] });
+      break;
+    }
+  }
+}
+
+/* ================= concours Pokémon (Floralia) et fête de village ================= */
+/** la fête : le vendredi et le samedi, de 18 h à minuit, dans les villages sans arène */
+export const enFete = (g) => { const d = (g?.jour?.() ?? new Date()).getDay(), h = g?.hour?.() ?? new Date().getHours(); return (d === 5 || d === 6) && h >= 18; };
+export function addFetes(W, towns) {
+  const pris = new Set(W.npcs.map((n) => n.x + ',' + n.y));
+  const T0 = Object.values(towns);
+  const flora = T0.find((t) => t.id === 'flora');
+  if (flora) { const [x, y] = nearestWalkable(W, flora.x + Math.round(flora.w * 0.6), flora.y + Math.round(flora.h * 0.4), pris); if (x != null) { pris.add(x + ',' + y); W.npc({ id: 'concours:flora', x, y, sprite: 'dame', dir: 'down', move: 'turn', name: 'Présentatrice', script: 'concours' }); } }
+  for (const t of T0.filter((q) => q.gym == null && ['aube', 'cime', 'orage', 'grue', 'givre'].includes(q.id))) {
+    const cx = t.x + Math.round(t.w / 2), cy = t.y + Math.round(t.h / 2);
+    const place = (dx, dy) => { const [x, y] = nearestWalkable(W, cx + dx, cy + dy, pris); if (x == null) return null; pris.add(x + ',' + y); return [x, y]; };
+    const when = (f, g) => enFete(g);
+    let p = place(-2, 1); if (p) W.npc({ id: 'fete:' + t.id + ':musicien', x: p[0], y: p[1], sprite: 'kimono', dir: 'down', move: 'turn', name: 'Musicien', when, script: 'musicien' });
+    p = place(3, 1); if (p) W.npc({ id: 'fete:' + t.id + ':loterie', x: p[0], y: p[1], sprite: 'croupier', dir: 'down', move: 'static', name: 'Stand de loterie', when, script: 'loterie' });
+    p = place(0, 3); if (p) W.npc({ id: 'fete:' + t.id + ':danse1', x: p[0], y: p[1], sprite: 'fillette', dir: 'down', move: 'wander', when, text: ['C\'est la fête du village ! On danse jusqu\'à minuit !'] });
+    p = place(2, 4); if (p) W.npc({ id: 'fete:' + t.id + ':danse2', x: p[0], y: p[1], sprite: 'gamin', dir: 'down', move: 'wander', when, text: ['J\'ai gagné un ballon à la loterie ! Enfin… presque.'] });
   }
 }
