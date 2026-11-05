@@ -231,6 +231,8 @@ export class Battle {
       this.turn--;
       return [{ t: 'msg', text: 'Impossible de fuir un combat de Dresseur !' }];
     }
+    // attaque sans numéro ni identifiant : la première utilisable, ou Lutte s'il n'y a plus de PP
+    if (a.type === 'move' && a.idx == null && a.id == null) { const u = this.usableMoves(0); a = u.length ? { type: 'move', idx: u[0] } : { type: 'move', id: 165 }; }
     if (a.type === 'move' && a.idx != null) {
       const mv = this.me.moves[a.idx];
       if (!this.usableMoves(0).length) a = { type: 'move', id: 165 };
