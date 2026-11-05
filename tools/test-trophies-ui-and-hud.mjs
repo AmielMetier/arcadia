@@ -8,7 +8,9 @@ const ROOT = fs.existsSync(path.resolve('odyssee')) ? path.resolve('.') : path.r
 console.log('Testing Odyssée Trophies Screen & HUD Integrations...');
 
 // 1. Check odyssee.css rules
-const css = fs.readFileSync(path.join(ROOT, 'odyssee/odyssee.css'), 'utf8');
+// la feuille est découpée par écran dans odyssee/css/ (chargée dans l'ordre)
+const cssDir = path.join(ROOT, 'odyssee/css');
+const css = fs.readdirSync(cssDir).filter((f) => f.endsWith('.css')).sort().map((f) => fs.readFileSync(path.join(cssDir, f), 'utf8')).join('\n');
 
 assert(
   css.includes('.screen { position: absolute; inset: 0; z-index: 22;') && css.includes('pointer-events: auto;'),
