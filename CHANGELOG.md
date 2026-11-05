@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 4.17 — 5 novembre 2026
+- **Odyssée** — Carte de la région plus fiable :
+  - « ⌖ Ma position » et Espace / Entrée recentrent vraiment la carte sur vous.
+  - La carte n'est plus étirée sur les écrans qui ne sont pas en 16/10.
+  - Cliquer sur une ville marche aussi bien en vue zoomée qu'en vue de la région, et la carte reste fluide pendant les zooms.
+- **Odyssée** — Le temps change sur les routes : averses ou grand soleil toutes les dix minutes, le même pour tous les joueurs, et repris en combat.
+- **Odyssée** — Liste d'amis : le code ami qu'on tape ne s'efface plus et le curseur ne saute plus pendant la mise à jour des joueurs connectés.
+
 ## 4.16 — 5 novembre 2026
 - **The Backrooms** — L'entité du mode normal ne ressemble plus à un dessin : peau sombre marbrée de veines, contours déchiquetés qui s'effilochent comme de la fumée, matière qui grouille quand elle bouge.
 

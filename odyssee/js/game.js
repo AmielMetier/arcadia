@@ -205,6 +205,9 @@ export class Game {
     preparerDomaine(this);   // le terrain acheté grâce au frigo, avec tout ce qui y a été bâti
     this.setMap(state.map);
     this.view.setTimeOfDay(this.hour());
+    // la météo change avec le temps, pas seulement en changeant de zone
+    clearInterval(this._wxTimer);
+    this._wxTimer = setInterval(() => { try { this.view?.setWeather(this.getMapWeather()); } catch (e) {} }, 30000);
     this.hud?.update(true);
     this.link?.hello();
     await this.ui.fade(false, 400);
@@ -1602,6 +1605,16 @@ export class Game {
     if (m.outdoor) {
       const h = this.hour();
       if ((z?.surfEnc || m.surfEnc) && (Math.sin(h * 0.7) > 0.65)) return 'rain';
+      // routes : un temps qui tourne toutes les 10 minutes, le même pour tous les joueurs (graine = route + créneau)
+      if (z?.route) {
+        const slot = Math.floor(Date.now() / 600000);
+        let x = slot;
+        for (const ch of String(z.route)) x = (x * 31 + ch.charCodeAt(0)) >>> 0;
+        x = Math.imul(x ^ (x >>> 15), 0x2c1b3c6d) >>> 0;
+        const r = x % 10;
+        if (r < 2) return 'rain';
+        if (r < 4 && h >= 9 && h < 18 && z.theme !== 'forest') return 'sun';
+      }
     }
     return 'none';
   }

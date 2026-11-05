@@ -60,7 +60,8 @@ export class WeatherSystem {
     w = w || 'none';
     if (this.current === w) return;
     this.current = w;
-    this.points.visible = (w !== 'none');
+    // soleil : pas de particules (l'effet est porté par le combat et la lumière)
+    this.points.visible = (w === 'rain' || w === 'hail' || w === 'sandstorm');
 
     if (w === 'rain') {
       this.material.color.setHex(0x70b4ff);
