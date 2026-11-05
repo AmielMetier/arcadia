@@ -1,6 +1,6 @@
 // The Backrooms - Textures du Level 0 (moquette, papier peint) et du Level 1 (béton de l'entrepôt)
 // Motifs dessinés au canvas, salis par des photos CC0 de Poly Haven dès qu'elles sont chargées :
-// backrooms/tex/ pour le Level 0, les bétons de kart/tex/ (déjà sur le site) pour le Level 1.
+// backrooms/tex/ pour les deux niveaux (l1_* : parpaings peints, béton usé et dalle brute de l'entrepôt).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 
 const TEX = new URL('../tex/', import.meta.url).href;
@@ -277,94 +277,104 @@ function drawCeiling(ctx, S, grime) {
 
 // Level 1 : béton brut humide, coulures sombres au pied, bande jaune et noire de sécurité
 function drawConcreteWall(ctx, S, photo) {
+  // parpaings peints (Poly Haven, concrete_wall_004) : la photo est répétée 3 × 5 fois pour que les blocs fassent
+  // leur vraie taille (40 × 20 cm) sur un mur de 2,5 m de large et 4,2 m de haut
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = '#77776f';
+  ctx.fillStyle = '#80837c';
   ctx.fillRect(0, 0, S, S);
   if (photo) {
-    ctx.globalCompositeOperation = 'luminosity';
-    ctx.drawImage(photo, 0, 0, S, S);
+    for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) ctx.drawImage(photo, (i * S) / 3, (j * S) / 5, S / 3 + 1, S / 5 + 1);
     ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = '#9da3a6';
+    ctx.fillStyle = '#b9bdb8';
     ctx.fillRect(0, 0, S, S);
     ctx.globalCompositeOperation = 'source-over';
   } else noise(ctx, S, S, 40);
-  // joints des banches
-  ctx.fillStyle = 'rgba(30, 32, 34, 0.35)';
-  ctx.fillRect(0, S * 0.33, S, 3);
-  ctx.fillRect(0, S * 0.66, S, 3);
-  // humidité qui remonte
-  const g = ctx.createLinearGradient(0, S * 0.55, 0, S);
-  g.addColorStop(0, 'rgba(20, 24, 26, 0)');
-  g.addColorStop(1, 'rgba(20, 24, 26, 0.55)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, S, S);
-  for (let i = 0; i < 9; i++) {
+  // soubassement peint en gris foncé jusqu'à 1,2 m, souligné d'un filet jaune
+  const yb = S * (1 - 1.2 / 4.2);
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = '#8a9295';
+  ctx.fillRect(0, yb, S, S - yb);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = 'rgba(214, 170, 40, 0.85)';
+  ctx.fillRect(0, yb - 5, S, 5);
+  // coulures sombres depuis le plafond, et l'humidité qui remonte
+  for (let i = 0; i < 12; i++) {
     const x = Math.random() * S;
-    const w = 4 + Math.random() * 10;
-    const gg = ctx.createLinearGradient(0, 0, 0, S * (0.4 + Math.random() * 0.4));
-    gg.addColorStop(0, 'rgba(25, 28, 30, 0.35)');
-    gg.addColorStop(1, 'rgba(25, 28, 30, 0)');
+    const w = 3 + Math.random() * 12;
+    const gg = ctx.createLinearGradient(0, 0, 0, S * (0.3 + Math.random() * 0.5));
+    gg.addColorStop(0, 'rgba(38, 34, 26, 0.45)');
+    gg.addColorStop(1, 'rgba(38, 34, 26, 0)');
     ctx.fillStyle = gg;
     ctx.fillRect(x, 0, w, S);
   }
-  // bande de sécurité au pied
-  const y0 = S * 0.93;
+  const g = ctx.createLinearGradient(0, S * 0.8, 0, S);
+  g.addColorStop(0, 'rgba(20, 22, 18, 0)');
+  g.addColorStop(1, 'rgba(20, 22, 18, 0.35)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+  // plinthe de sécurité jaune et noire
+  const y0 = S * 0.965;
   ctx.fillStyle = '#c9a227';
   ctx.fillRect(0, y0, S, S - y0);
   ctx.fillStyle = '#16181a';
-  for (let x = -S; x < S * 2; x += 40) {
+  for (let x = -S; x < S * 2; x += 32) {
     ctx.beginPath();
     ctx.moveTo(x, S);
-    ctx.lineTo(x + 20, S);
-    ctx.lineTo(x + 20 + (S - y0), y0);
+    ctx.lineTo(x + 16, S);
+    ctx.lineTo(x + 16 + (S - y0), y0);
     ctx.lineTo(x + (S - y0), y0);
     ctx.fill();
   }
 }
 
-// Dalle de béton lissé, taches d'huile et flaques ; une ligne jaune délavée au bord de chaque case
+// Dalle de béton usé (Poly Haven, concrete_floor_worn_001), taches d'huile et traces de pneus de chariot
 function drawConcreteFloor(ctx, S, photo) {
   ctx.globalCompositeOperation = 'source-over';
   ctx.fillStyle = '#5b5d5c';
   ctx.fillRect(0, 0, S, S);
   if (photo) {
-    ctx.globalCompositeOperation = 'luminosity';
     ctx.drawImage(photo, 0, 0, S, S);
     ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = '#7d8486';
+    ctx.fillStyle = '#a7aaa6';
     ctx.fillRect(0, 0, S, S);
     ctx.globalCompositeOperation = 'source-over';
   } else noise(ctx, S, S, 30);
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     const x = Math.random() * S;
     const y = Math.random() * S;
-    const r = 20 + Math.random() * 70;
+    const r = 15 + Math.random() * 60;
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, 'rgba(12, 14, 16, 0.4)');
-    g.addColorStop(1, 'rgba(12, 14, 16, 0)');
+    g.addColorStop(0, 'rgba(14, 12, 10, 0.45)');
+    g.addColorStop(0.6, 'rgba(14, 12, 10, 0.2)');
+    g.addColorStop(1, 'rgba(14, 12, 10, 0)');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, S, S);
   }
-  ctx.fillStyle = 'rgba(201, 162, 39, 0.28)';
-  ctx.fillRect(0, 0, S, 7);
+  // traces de roues : deux bandes sombres qui traversent la case
+  ctx.fillStyle = 'rgba(10, 10, 10, 0.12)';
+  const tx = S * (0.25 + Math.random() * 0.2);
+  ctx.fillRect(tx, 0, 18, S);
+  ctx.fillRect(tx + 120, 0, 18, S);
+  // joint de dalle sciée
+  ctx.fillStyle = 'rgba(15, 16, 16, 0.6)';
+  ctx.fillRect(0, 0, S, 3);
+  ctx.fillRect(0, 0, 3, S);
 }
 
-// Plafond de béton sombre avec un chemin de câbles
+// Dalle de béton brut au plafond (Poly Haven, concrete_wall_006), avec les marques des coffrages
 function drawConcreteCeiling(ctx, S, photo) {
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = '#3c3f40';
+  ctx.fillStyle = '#4a4c4a';
   ctx.fillRect(0, 0, S, S);
   if (photo) {
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.globalAlpha = 0.6;
     ctx.drawImage(photo, 0, 0, S, S);
-    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = '#8a8c88';
+    ctx.fillRect(0, 0, S, S);
     ctx.globalCompositeOperation = 'source-over';
   }
-  ctx.fillStyle = '#26292b';
-  ctx.fillRect(S * 0.45, 0, S * 0.1, S);
-  ctx.fillStyle = '#4b5052';
-  for (let y = 0; y < S; y += 32) ctx.fillRect(S * 0.45, y, S * 0.1, 4);
+  ctx.fillStyle = 'rgba(20, 22, 22, 0.5)';
+  ctx.fillRect(0, S / 2 - 2, S, 4);
 }
 
 export function createBackroomsTextures(level = 0) {
@@ -385,7 +395,7 @@ export function createBackroomsTextures(level = 0) {
   const ceiling = tex(ceilCanvas);
 
   // les photos arrivent un peu plus tard : on redessine par-dessus
-  const files = L1 ? ['kart:cwall.jpg', 'kart:concrete.jpg', 'kart:concrete.jpg'] : ['papier.jpg', 'moquette.jpg', 'plafond.jpg'];
+  const files = L1 ? ['l1_mur.jpg', 'l1_sol.jpg', 'l1_plafond.jpg'] : ['papier.jpg', 'moquette.jpg', 'plafond.jpg'];
   const ready = Promise.all(files.map(loadImage)).then(([pap, moq, pla]) => {
     if (pap) { drawW(wctx, S, pap); wall.needsUpdate = true; }
     if (moq) { drawF(cctx, S, moq); carpet.needsUpdate = true; }

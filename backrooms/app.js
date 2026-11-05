@@ -14,6 +14,7 @@ let sfx = null;
 let hud = null;
 let stepDist = 0;
 let monsterStepT = 0;
+let deathNear = false; // le son de la mort a été joué (il revient quand l'entité s'est éloignée)
 const otherStepT = new Map(); // prochain pas de chaque autre joueur
 
 // Réseau : l'hôte fait tourner la partie et envoie un instantané ~20 fois par seconde ; un invité se déplace chez lui
@@ -215,7 +216,18 @@ function initGame(settings = lastSettings) {
   const difficulty = settings.difficulty || 'normal';
   const players = NET.role === 'host' ? H.players.map((p) => ({ id: p.id, name: p.name || 'Player' })) : [{ id: 0, name: 'Player' }];
   NET.run = Date.now();
-  startRun({ seed, difficulty, players, run: NET.run, level: 0, vip: settings.monsters === 'vip' });
+  // ?level1 (seul) : on commence directement au Level 1
+  const lv = NET.role === 'solo' && /[?&]level1(&|=|$)/.test(location.search) ? 1 : 0;
+  startRun({ seed, difficulty, players, run: NET.run, level: lv, vip: settings.monsters === 'vip' });
+  // ?parkour (seul) : on commence devant le couloir piégé, tourné vers les trous
+  const trap = sim.map.trap;
+  if (NET.role === 'solo' && trap && /[?&]parkour(&|=|$)/.test(location.search)) {
+    const P = sim.player;
+    P.x = trap.x;
+    P.z = trap.z;
+    P.yaw = trap.yaw;
+    P.pitch = -0.3;
+  }
   if (NET.role === 'host') send('all', goMessage());
 }
 
@@ -248,6 +260,8 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   if (!sfx) {
     sfx = new BackroomsSfx();
   }
+  sfx.stopDeath();
+  deathNear = false;
   if (!hud) {
     hud = new BackroomsHUD(hudEl, { play, setKbMode, use: (i) => useSlot(i, true) });
   }
@@ -569,17 +583,31 @@ function loop(currentTime) {
     accumulator -= DT;
   }
 
-  // Mise à jour du son continu de l'entité, et ses pas lourds quand elle te traque
+  // Mise à jour du son continu de l'entité ; quand elle te traque : ses cris et, par-dessus, ses pas lourds, de plus en
+  // plus forts et rapprochés ; tout près : le son de la mort ; le reste du temps, des ambiances au hasard
   if (sfx && sim.hasMonster && sim.state === 'playing') {
-    sfx.updateMonsterSound(sim.monster.danger, sim.monster, sim.level === 1);
-    if (!paused && sim.monster.mode === 'chase' && sim.monster.danger > 0.05) {
+    const M = sim.monster;
+    const chasing = !paused && M.mode === 'chase' && M.danger > 0.05;
+    sfx.updateMonsterSound(M.danger, M, sim.level === 1);
+    sfx.updateChase(chasing, M.danger, M);
+    if (chasing) {
       monsterStepT -= delta;
       if (monsterStepT <= 0) {
-        monsterStepT = 0.42;
-        sfx.monsterStep(sim.monster.danger, sim.monster);
+        monsterStepT = 0.5 - Math.min(1, M.danger) * 0.18;
+        sfx.monsterStep(M.danger, M);
       }
     }
-  } else if (sfx) sfx.updateMonsterSound(0, 0); // partie finie : l'entité se tait
+    if (M.danger > 0.85 && !deathNear) {
+      deathNear = true;
+      sfx.death();
+    } else if (M.danger < 0.5) deathNear = false;
+    if (M.danger < 0.25 && sim.player.status === 'alive') sfx.stopDeath(); // échappé : la mort s'éloigne
+    sfx.ambience(delta, !paused && !chasing && M.danger < 0.4);
+  } else if (sfx) {
+    sfx.updateMonsterSound(0, 0); // partie finie : l'entité se tait
+    sfx.updateChase(false, 0, null);
+    sfx.ambience(delta, !paused && sim.state === 'playing');
+  }
 
   // Rendu graphique et HUD
   if (scene) {

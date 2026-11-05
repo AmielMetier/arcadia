@@ -18,8 +18,8 @@ export const PLAYER_RADIUS = 0.38;
 // On avance lentement dans les Backrooms : la carte est immense et chaque pas compte
 export const WALK_SPEED = 2.1;
 export const SPRINT_SPEED = 3.7;
-export const MONSTER_PATROL_SPEED = 1.5;
-export const MONSTER_CHASE_SPEED = 2.75;
+export const MONSTER_PATROL_SPEED = 1.8;
+export const MONSTER_CHASE_SPEED = 3.3; // plus vite qu'en marchant, un peu moins qu'en sprintant
 export const STAMINA_DRAIN = 15; // par seconde de course
 export const STAMINA_REGEN = 9;
 export const WINDED_T = 1; // à bout de souffle : une seconde sans pouvoir courir
@@ -35,7 +35,7 @@ export const BEAM_UNSTABLE = 4; // plus on penche, plus on penche
 export const BEAM_NOISE = [10, 16]; // à-coups au hasard (immobile, en marchant)
 export const BEAM_FIX = 4.5; // force de Q / D
 export const BEAM_DAMP = 2.5;
-export const FALL_LOCK = 0.9; // secondes à terre après une chute d'un étage
+export const FALL_LOCK = 2.2; // secondes à terre après une chute d'un étage (plus d'une seconde de chute, puis sonné)
 export const WHISTLE_CD = 1.2;
 export const WHISTLE_HEAT = 2.5; // chaque coup compte 1 et s'oublie en 20 s : au 3e coup rapproché, l'entité vient à coup sûr
 export const CASSETTES = 5;
@@ -82,13 +82,27 @@ export function spreadSpawns(map, n) {
   return spots;
 }
 
-// Où en est-on dans un escalier ? t : 0 en bas de la volée, 1 en haut ; lat : écart au milieu de la volée
-// (null : pas dans un escalier)
+// Où en est-on dans un escalier coudé ? u : le long des volées (0 à 3 cases), v : en travers (0 à 2 cases) ;
+// lane : 'A' (première volée, v < 1 case), 'B' (seconde volée) ou 'L' (palier, u > 2 cases) ;
+// h : la hauteur, de 0 (en bas) à 1 (en haut) ; t : comme h. null : pas dans un escalier
+export function stairLocal(st, x, z) {
+  const ex = x - st.ox;
+  const ez = z - st.oz;
+  return { u: ex * st.dx + ez * st.dz, v: ex * st.px + ez * st.pz };
+}
+export function stairHeight(u, v) {
+  const C = CELL_SIZE;
+  if (u >= 2 * C) return 0.5;
+  const f = Math.max(0, u) / (2 * C);
+  return v < C ? f * 0.5 : 1 - f * 0.5;
+}
 export function stairAt(stairs, x, z) {
+  const C = CELL_SIZE;
   for (const st of stairs || []) {
-    const t = ((x - st.bx) * st.dx + (z - st.bz) * st.dz) / st.len;
-    const lat = (x - st.x) * st.dz - (z - st.z) * st.dx;
-    if (t >= 0 && t <= 1 && Math.abs(lat) < CELL_SIZE / 2) return { st, t, lat };
+    const { u, v } = stairLocal(st, x, z);
+    if (u < 0 || u > 3 * C || v < 0 || v > 2 * C) continue;
+    const h = stairHeight(u, v);
+    return { st, u, v, h, t: h, lane: u >= 2 * C ? 'L' : v < C ? 'A' : 'B' };
   }
   return null;
 }
@@ -96,7 +110,7 @@ export function stairAt(stairs, x, z) {
 // Hauteur des pieds (0 : sol de l'étage du haut, -FLOOR_DY : sol du bas) ; dans l'escalier, elle suit les marches
 export function feetY(stairs, x, z, floor) {
   const s = stairAt(stairs, x, z);
-  return s ? -FLOOR_DY + s.t * FLOOR_DY : -(floor || 0) * FLOOR_DY;
+  return s ? -FLOOR_DY + s.h * FLOOR_DY : -(floor || 0) * FLOOR_DY;
 }
 
 function newPlayer(id, name, map, i) {
@@ -430,7 +444,7 @@ export class BackroomsSim {
     P.onBeam = false;
     P.tilt = 0;
     P.tiltV = 0;
-    P.stamina = Math.max(0, P.stamina - 30);
+    P.stamina = Math.max(0, P.stamina - 60);
     this.emit({ type: 'fall', id: P.id, name: P.name, balance });
   }
 
@@ -446,44 +460,53 @@ export class BackroomsSim {
     }
   }
 
-  // L'escalier se monte et se descend en marchant : on n'y entre que par le bas (depuis l'étage du bas) ou par le
-  // haut (depuis l'étage du haut), on ne passe pas par-dessus les rampes, et on change d'étage à mi-volée.
+  // L'escalier coudé se monte et se descend en marchant : on n'y entre que par le bas de la première volée (depuis
+  // l'étage du bas) ou par le haut de la seconde (depuis l'étage du haut), on ne passe ni par-dessus les rampes ni
+  // d'une volée à l'autre (il faut faire demi-tour sur le palier), et on change d'étage à mi-hauteur.
   // Renvoie la position permise pour un pas de (P.x, P.z) vers (nx, nz) ; met à jour P.floor.
   stairStep(P, nx, nz) {
     if (!this.stairs.length) return { x: nx, z: nz };
+    const C = CELL_SIZE;
     const from = stairAt(this.stairs, P.x, P.z);
-    let to = stairAt(this.stairs, nx, nz);
-    const r = CELL_SIZE / 2 - PLAYER_RADIUS;
-    if (!from && to) {
-      // on entre : par le bas depuis l'étage du bas, par le haut depuis l'étage du haut ; pas par les côtés
-      const st = to.st;
-      const t0 = ((P.x - st.bx) * st.dx + (P.z - st.bz) * st.dz) / st.len;
-      const lat0 = (P.x - st.x) * st.dz - (P.z - st.z) * st.dx;
-      const okBottom = t0 < 0 && P.floor === 1;
-      const okTop = t0 > 1 && P.floor === 0;
-      if (!(okBottom || okTop) || Math.abs(lat0) > CELL_SIZE / 2) return { x: P.x, z: P.z };
+    const to = stairAt(this.stairs, nx, nz);
+    if (!from && !to) return { x: nx, z: nz };
+    const st = (from || to).st;
+    const r = 0.3; // demi-largeur du joueur entre les rampes
+    let lane;
+    if (from) lane = from.lane;
+    else {
+      // on entre : par le bas de la première volée depuis l'étage du bas, par le haut de la seconde depuis celui du haut
+      const p0 = stairLocal(st, P.x, P.z);
+      const okA = p0.u < 0 && p0.v > 0 && p0.v < C && P.floor === 1;
+      const okB = p0.u < 0 && p0.v > C && p0.v < 2 * C && P.floor === 0;
+      if (!okA && !okB) return { x: P.x, z: P.z };
+      lane = okA ? 'A' : 'B';
     }
-    if (from) {
-      const st = from.st;
-      let t = ((nx - st.bx) * st.dx + (nz - st.bz) * st.dz) / st.len;
-      let lat = (nx - st.x) * st.dz - (nz - st.z) * st.dx;
-      // les rampes : on reste entre les deux
-      lat = Math.max(-r, Math.min(r, lat));
-      // on ne sort par le bas qu'en bas, par le haut qu'en haut (l'autre bout est sous la dalle ou au bord du vide)
-      if (t < 0 && P.floor !== 1) t = 0;
-      if (t > 1 && P.floor !== 0) t = 1;
-      nx = st.bx + st.dx * t * st.len + st.dz * lat;
-      nz = st.bz + st.dz * t * st.len - st.dx * lat;
-      to = stairAt(this.stairs, nx, nz);
+    let { u, v } = stairLocal(st, nx, nz);
+    v = Math.max(r, Math.min(2 * C - r, v));
+    u = Math.min(3 * C - r, u);
+    if (lane === 'L') {
+      // du palier, on ne s'engage dans une volée qu'en face d'elle (pas à cheval sur la rampe du milieu)
+      if (u < 2 * C && Math.abs(v - C) < r) u = 2 * C;
+    } else if (u < 2 * C) {
+      v = lane === 'A' ? Math.min(v, C - r) : Math.max(v, C + r);
     }
-    if (to) {
-      const floor = to.t >= 0.5 ? 0 : 1;
+    if (u < 0) {
+      const lv = u < 2 * C && lane !== 'L' ? lane : v < C ? 'A' : 'B';
+      // on ne sort par le bas qu'en bas, par le haut qu'en haut (l'autre bout donne sur le vide ou sous la dalle)
+      if ((lv === 'A' && P.floor !== 1) || (lv === 'B' && P.floor !== 0)) u = 0;
+    }
+    const x = st.ox + st.dx * u + st.px * v;
+    const z = st.oz + st.dz * u + st.pz * v;
+    const now = stairAt(this.stairs, x, z);
+    if (now) {
+      const floor = now.h > 0.5 ? 0 : 1;
       if (floor !== P.floor) {
         P.floor = floor;
         this.emit({ type: 'stairs', id: P.id, up: floor === 0 });
       }
     }
-    return { x: nx, z: nz };
+    return { x, z };
   }
 
   // T : siffler. Les autres l'entendent ; trop de coups de sifflet rapprochés attirent l'entité
@@ -1022,9 +1045,11 @@ export class BackroomsSim {
       let tx = P.x;
       let tz = P.z;
       if (!same && this.stairs.length && M.mode !== 'patrol') {
-        const st = this.stairs.reduce((b, s) => (Math.hypot(s.x - M.x, s.z - M.z) < Math.hypot(b.x - M.x, b.z - M.z) ? s : b));
-        tx = st.x;
-        tz = st.z;
+        // elle va au pied de l'escalier (étage du bas) ou à son arrivée (étage du haut)
+        const foot = (s) => (M.floor > 0 ? s.down : s.up);
+        const st = this.stairs.reduce((b, s) => (Math.hypot(foot(s).x - M.x, foot(s).z - M.z) < Math.hypot(foot(b).x - M.x, foot(b).z - M.z) ? s : b));
+        tx = foot(st).x;
+        tz = foot(st).z;
       } else if (M.mode === 'patrol') {
         if (!M.targetWander || Math.hypot(M.x - M.targetWander.x, M.z - M.targetWander.z) < 1.5) {
           // l'entité rôde : souvent non loin d'un joueur de son étage (de plus en plus quand elle s'énerve) ;
@@ -1091,8 +1116,9 @@ export class BackroomsSim {
     M.stairT = Math.max(0, M.stairT - DT);
     if (!same && M.stairT <= 0) {
       for (const st of this.stairs) {
-        if (Math.hypot(st.x - M.x, st.z - M.z) > 0.6) continue;
         const up = M.floor > 0;
+        const foot = up ? st.down : st.up;
+        if (Math.hypot(foot.x - M.x, foot.z - M.z) > 0.6) continue;
         M.floor += up ? -1 : 1;
         const to = up ? st.up : st.down;
         M.x = to.x;
