@@ -144,13 +144,8 @@ export function createPoolMap(seed = 37) {
     } else if (type === 'sky') [mw, mh] = sd.dx ? [2, 1] : [1, 2];
     else [mw, mh] = SIZES[type];
     // la nouvelle salle touche le module (i, j) du côté (dx, dz) ; on la décale le long du bord au hasard
-    let mx = sd.dx > 0 ? sd.i + 1 : sd.dx < 0 ? sd.i - mw : sd.i - Math.floor(rnd() * mw);
-    let mz = sd.dz > 0 ? sd.j + 1 : sd.dz < 0 ? sd.j - mh : sd.j - Math.floor(rnd() * mh);
-    if (extra.axis) {
-      // un couloir s'aligne sur le module de départ
-      if (sd.dx) mz = sd.j;
-      else mx = sd.i;
-    }
+    const mx = sd.dx > 0 ? sd.i + 1 : sd.dx < 0 ? sd.i - mw : sd.i - Math.floor(rnd() * mw);
+    const mz = sd.dz > 0 ? sd.j + 1 : sd.dz < 0 ? sd.j - mh : sd.j - Math.floor(rnd() * mh);
     if (!free(mx, mz, mw, mh)) continue;
     const r = place(type, mx, mz, mw, mh, extra);
     edgeDoor(R, r, sd);
