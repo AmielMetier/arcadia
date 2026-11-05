@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 4.34 — 5 novembre 2026
+- **Odyssée** — Carte de la région : la vue « Toute la région » est de nouveau centrée dans le cadre.
+  - Le nom d'une ville au bord de la carte n'est plus coupé.
+
 ## 4.33 — 5 novembre 2026
 - **Odyssée** — La région devient immense : plus de sept fois plus grande, pour partir vraiment à l'aventure.
   - Les villes et villages sont trois fois plus grands : rues, places, marchés, parcs, ports et phares, maisons avec jardins, et plus de mille maisons où entrer.

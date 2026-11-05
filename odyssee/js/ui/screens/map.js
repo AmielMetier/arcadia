@@ -117,7 +117,7 @@ export function fullRegionView(game, targetAspect) {
   const ar = targetAspect || (16 / 10);
   let w = W.w, h = W.h;
   if (w / h > ar) h = w / ar; else w = h * ar;
-  const x = Math.max(0, (W.w - w) / 2), y = Math.max(0, (W.h - h) / 2);
+  const x = (W.w - w) / 2, y = (W.h - h) / 2;   // centrée, quitte à déborder (fond sombre autour)
   return { x, y, w, h };
 }
 
@@ -339,6 +339,11 @@ export function mapScreen(game) {
     const place = (node, x, y) => {
       node.style.left = ((x - view.x) / view.w * 100) + '%';
       node.style.top = ((y - view.y) / view.h * 100) + '%';
+      // nom de ville près d'un bord : ancré de ce côté pour ne pas être coupé
+      if (node.classList?.contains?.('map-pin-name') && node.style.setProperty) {
+        const px = (x - view.x) / view.w;
+        node.style.setProperty('--ax', px < 0.1 ? '-8%' : px > 0.9 ? '-92%' : '-50%');
+      }
     };
     const pinsAt = [];
     const draw = () => {
