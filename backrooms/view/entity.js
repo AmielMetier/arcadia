@@ -6,58 +6,92 @@
 const FW = 246, FH = 400;                 // une image de la planche (même proportion que celle du mode VIP)
 const COLS = 8, ROWS = 4, FRAMES = 32;    // 32 images, 12 par seconde : un peu moins de 3 s de boucle
 
-/** dessine l'entité dans un rectangle w × h ; t de 0 à 1 : la phase de son ondulation */
+// petit hasard reproductible : la même image à chaque chargement
+function rnd(n) { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
+
+/** dessine l'entité dans un rectangle w × h ; t de 0 à 1 : la phase de sa boucle */
 function drawEntity(g, w, h, t) {
-  const s = Math.sin(t * Math.PI * 2), c = Math.cos(t * Math.PI * 2);
-  const cx = w / 2 + s * w * 0.03;
+  const fr = Math.floor(t * 32);
+  // mouvements saccadés : elle tient la pose, puis se tord d'un coup
+  const jerk = rnd(fr) < 0.18 ? (rnd(fr + 50) - 0.5) * 2 : 0;
+  const s = Math.sin(t * Math.PI * 2), c = Math.cos(t * Math.PI * 4);
+  const cx = w * 0.5 + jerk * w * 0.03;
+  const P = (x, y) => [x * w, y * h];
   g.save();
   g.lineCap = 'round'; g.lineJoin = 'round';
-  g.fillStyle = '#050505'; g.strokeStyle = '#050505';
-  // fumée noire autour du corps : la silhouette n'a pas de bord net
-  g.shadowColor = 'rgba(0,0,0,0.95)'; g.shadowBlur = w * 0.05;
-  // jambes, trop longues, légèrement fléchies
-  const hip = { x: cx, y: h * 0.55 };
-  g.lineWidth = w * 0.055;
-  for (const k of [-1, 1]) {
-    g.beginPath(); g.moveTo(hip.x + k * w * 0.04, hip.y);
-    g.quadraticCurveTo(hip.x + k * w * (0.1 + 0.02 * s * k), h * 0.78, hip.x + k * w * 0.07, h * 0.985);
-    g.stroke();
+  // fumée noire qui s'effiloche vers le haut, autour de tout le corps
+  for (let i = 0; i < 70; i++) {
+    const y0 = 0.08 + rnd(i) * 0.88, side = rnd(i + 9) < 0.5 ? -1 : 1;
+    const rise = ((t + rnd(i + 3)) % 1);
+    const x0 = cx + side * w * (0.04 + rnd(i + 5) * 0.16) + Math.sin(rise * 6 + i) * w * 0.03;
+    g.globalAlpha = 0.35 * (1 - rise);
+    g.fillStyle = '#000';
+    g.beginPath(); g.ellipse(x0, (y0 - rise * 0.12) * h, w * (0.012 + rnd(i + 7) * 0.03), h * (0.01 + rnd(i + 8) * 0.025), 0, 0, Math.PI * 2); g.fill();
   }
-  // corps : un tronc étiré qui se courbe en avant
+  g.globalAlpha = 1;
+  g.fillStyle = '#030303'; g.strokeStyle = '#030303';
+  g.shadowColor = 'rgba(0,0,0,1)'; g.shadowBlur = w * 0.06;
+  // colonne voûtée, penchée vers l'avant et sur le côté
+  const neck = [cx + w * 0.05 + jerk * w * 0.04, h * 0.16], hip = [cx - w * 0.02, h * 0.56];
+  // jambes trop longues, genoux qui plient à l'envers
+  g.lineWidth = w * 0.045;
+  for (const k of [-1, 1]) {
+    const knee = [hip[0] + k * w * 0.11, h * (0.74 + (k > 0 ? 0.02 : -0.01))];
+    g.beginPath(); g.moveTo(hip[0] + k * w * 0.03, hip[1]); g.lineTo(knee[0], knee[1]); g.lineTo(hip[0] + k * w * 0.05, h * 0.99); g.stroke();
+  }
+  // torse décharné : côtes creuses et ventre aspiré
   g.beginPath();
-  g.moveTo(cx - w * 0.07, hip.y);
-  g.bezierCurveTo(cx - w * 0.1, h * 0.38, cx - w * 0.06 + s * 3, h * 0.24, cx - w * 0.035, h * 0.17);
-  g.lineTo(cx + w * 0.035, h * 0.17);
-  g.bezierCurveTo(cx + w * 0.06 + s * 3, h * 0.24, cx + w * 0.1, h * 0.38, cx + w * 0.07, hip.y);
+  g.moveTo(hip[0] - w * 0.06, hip[1]);
+  g.bezierCurveTo(hip[0] - w * 0.11, h * 0.42, neck[0] - w * 0.1, h * 0.26, neck[0] - w * 0.045, neck[1] + h * 0.02);
+  g.lineTo(neck[0] + w * 0.05, neck[1] + h * 0.03);
+  g.bezierCurveTo(neck[0] + w * 0.07, h * 0.3, hip[0] + w * 0.02, h * 0.45, hip[0] + w * 0.06, hip[1]);
   g.closePath(); g.fill();
-  // bras interminables qui pendent jusqu'aux genoux, doigts en griffes
-  g.lineWidth = w * 0.04;
-  for (const k of [-1, 1]) {
-    const sw = (k > 0 ? s : -c) * w * 0.05;
-    const sh = { x: cx + k * w * 0.075, y: h * 0.2 };
-    const el = { x: cx + k * w * 0.2 + sw * 0.5, y: h * 0.42 };
-    const ha = { x: cx + k * w * 0.23 + sw, y: h * 0.7 };
-    g.beginPath(); g.moveTo(sh.x, sh.y); g.quadraticCurveTo(el.x, el.y, ha.x, ha.y); g.stroke();
-    g.lineWidth = w * 0.014;
-    for (let f = -1; f <= 1; f++) {
-      g.beginPath(); g.moveTo(ha.x, ha.y);
-      g.quadraticCurveTo(ha.x + k * w * 0.02 + f * w * 0.015, ha.y + h * 0.04, ha.x + f * w * 0.03, ha.y + h * 0.075);
-      g.stroke();
+  // bras inégaux : le gauche traîne presque au sol, le droit se tend en avant, doigts interminables
+  const arms = [
+    { k: -1, el: [-0.2, 0.4], ha: [-0.24, 0.86], sw: s },
+    { k: 1, el: [0.24, 0.32], ha: [0.3, 0.62], sw: -s + jerk * 1.5 },
+  ];
+  for (const A of arms) {
+    const sh = [neck[0] + A.k * w * 0.06, neck[1] + h * 0.04];
+    const el = [cx + A.el[0] * w + A.sw * w * 0.02, A.el[1] * h];
+    const ha = [cx + A.ha[0] * w + A.sw * w * 0.04, A.ha[1] * h];
+    g.lineWidth = w * 0.032;
+    g.beginPath(); g.moveTo(sh[0], sh[1]); g.lineTo(el[0], el[1]); g.lineTo(ha[0], ha[1]); g.stroke();
+    g.lineWidth = w * 0.011;
+    for (let f = 0; f < 4; f++) {
+      const ang = Math.PI / 2 + (f - 1.5) * 0.35 + A.k * 0.2 + (rnd(fr * 4 + f) - 0.5) * 0.25;
+      const L = h * (0.07 + rnd(f + 20) * 0.04);
+      const m = [ha[0] + Math.cos(ang) * L * 0.55, ha[1] + Math.sin(ang) * L * 0.55];
+      g.beginPath(); g.moveTo(ha[0], ha[1]); g.lineTo(m[0], m[1]);
+      g.lineTo(m[0] + Math.cos(ang + A.k * 0.6) * L * 0.5, m[1] + Math.sin(ang + A.k * 0.6) * L * 0.5); g.stroke();
     }
-    g.lineWidth = w * 0.04;
   }
-  // cou fin et tête allongée, penchée
-  g.lineWidth = w * 0.03;
-  g.beginPath(); g.moveTo(cx, h * 0.18); g.lineTo(cx + s * w * 0.01, h * 0.12); g.stroke();
-  const hx = cx + s * w * 0.015, hy = h * 0.08;
-  g.save(); g.translate(hx, hy); g.rotate(s * 0.08);
-  g.beginPath(); g.ellipse(0, 0, w * 0.075, h * 0.06, 0, 0, Math.PI * 2); g.fill();
-  // deux yeux blancs qui brillent, sans pupille
-  g.shadowColor = 'rgba(255,255,255,0.9)'; g.shadowBlur = w * 0.03;
-  g.fillStyle = '#f4f4f0';
-  for (const k of [-1, 1]) { g.beginPath(); g.ellipse(k * w * 0.028, -h * 0.004, w * 0.016, h * 0.008 * (0.8 + 0.2 * c), 0, 0, Math.PI * 2); g.fill(); }
+  // tête allongée, penchée à un angle impossible
+  g.lineWidth = w * 0.025;
+  const hx = neck[0] + w * 0.03, hy = h * 0.085;
+  g.beginPath(); g.moveTo(neck[0], neck[1] + h * 0.02); g.lineTo(hx, hy + h * 0.03); g.stroke();
+  g.save(); g.translate(hx, hy); g.rotate(0.45 + jerk * 0.5 + s * 0.05);
+  g.beginPath(); g.ellipse(0, 0, w * 0.06, h * 0.07, 0, 0, Math.PI * 2); g.fill();
+  g.shadowBlur = 0;
+  // bouche béante, trop grande, qui s'ouvre et se referme
+  const open = 0.5 + 0.5 * Math.max(0, Math.sin(t * Math.PI * 2 - 1));
+  g.fillStyle = '#2a0000';
+  g.beginPath(); g.ellipse(w * 0.003, h * 0.03, w * 0.03, h * (0.012 + 0.03 * open), 0, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = 'rgba(230,225,210,0.85)'; g.lineWidth = w * 0.004;
+  for (let i = -3; i <= 3; i++) {
+    const tx = w * (0.003 + i * 0.008);
+    g.beginPath(); g.moveTo(tx, h * (0.03 - 0.012 - 0.026 * open)); g.lineTo(tx + w * 0.002, h * (0.03 - 0.004 - 0.018 * open)); g.stroke();
+    g.beginPath(); g.moveTo(tx, h * (0.03 + 0.012 + 0.026 * open)); g.lineTo(tx - w * 0.002, h * (0.03 + 0.004 + 0.018 * open)); g.stroke();
+  }
+  // yeux blancs, vides, de tailles différentes
+  g.shadowColor = 'rgba(255,255,255,1)'; g.shadowBlur = w * 0.04;
+  g.fillStyle = '#ffffff';
+  const blink = rnd(fr + 99) < 0.06 ? 0.15 : 1;
+  g.beginPath(); g.ellipse(-w * 0.024, -h * 0.018, w * 0.014, h * 0.011 * blink, -0.2, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.ellipse(w * 0.026, -h * 0.022, w * 0.01, h * 0.007 * blink, 0.3, 0, Math.PI * 2); g.fill();
   g.restore();
   g.restore();
+  void c; void P;
 }
 
 function canvas(w, h) {
@@ -71,7 +105,7 @@ export function classicEntity() {
   if (cached) return cached;
   if (typeof document === 'undefined') return (cached = { img: '', anim: { url: '', frames: 1, cols: 1, rows: 1, fps: 12, aspect: FW / FH, tint: '#ffffff' } });
   const one = canvas(FW * 2, FH * 2);
-  drawEntity(one.getContext('2d'), one.width, one.height, 0.1);
+  drawEntity(one.getContext('2d'), one.width, one.height, 0.3);
   const sheet = canvas(FW * COLS, FH * ROWS), g = sheet.getContext('2d');
   for (let f = 0; f < FRAMES; f++) {
     g.save(); g.translate((f % COLS) * FW, Math.floor(f / COLS) * FH);

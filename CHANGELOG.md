@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.15 — 5 novembre 2026
+- **The Backrooms** — L'entité du mode normal est bien plus flippante : silhouette voûtée qui fume, bras inégaux aux doigts interminables, tête penchée à un angle impossible, bouche béante pleine de dents et gestes saccadés.
+
 ## 4.14 — 5 novembre 2026
 - **The Backrooms** — Le jeu est de retour pour tout le monde ! En mode normal, une nouvelle entité vous traque : une longue silhouette noire aux yeux blancs, qui grogne dans le noir.
   - Les comptes VIP peuvent choisir « ⭐ VIP mode » dans les réglages pour jouer avec les monstres d'origine (tous les joueurs de la partie les voient alors).
