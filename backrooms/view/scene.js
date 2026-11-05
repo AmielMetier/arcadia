@@ -10,6 +10,7 @@ import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, FLOOR_DY } from '../engin
 import { FUSES, feetY } from '../engine/sim.js';
 import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
+import { buildWarehouse } from './warehouse.js';
 
 const MODELS = new URL('../models/', import.meta.url).href; // modèles Poly Haven (CC0), voir models/LICENSE.txt
 const VIP_IMG = new URL('../img/entite.png?v=2', import.meta.url).href; // ?v : image plus nette, ne pas garder l'ancienne en cache
@@ -382,7 +383,7 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
     // 4. Néons au plafond (les morts sont gris, ceux qui grésillent clignotent)
     const ON = new THREE.Color(L1 ? '#eef6ff' : '#fffbe2').multiplyScalar(3.2); // plus fort que le blanc : le caméscope sature et ils bavent
     const OFF = new THREE.Color('#4a473c');
-    const fixtures = new THREE.InstancedMesh(L1 ? new THREE.BoxGeometry(1.6, 0.06, 0.18) : new THREE.BoxGeometry(1.22, 0.04, 0.62), new THREE.MeshBasicMaterial({ color: '#ffffff', map: L1 ? null : textures.lamp }), map.lights.length);
+    const fixtures = new THREE.InstancedMesh(L1 ? new THREE.BoxGeometry(1.55, 0.05, 0.12) : new THREE.BoxGeometry(1.22, 0.04, 0.62), new THREE.MeshBasicMaterial({ color: '#ffffff', map: L1 ? null : textures.lamp }), map.lights.length);
     map.lights.forEach((l, i) => {
       dummy.position.set(l.x, CEIL - (L1 ? 0.45 : 0.025), l.z); // au Level 1, les tubes pendent sous le plafond
       dummy.updateMatrix();
@@ -772,66 +773,8 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
       }
     }
 
-    // 9. Level 1 : rayonnages métalliques (montants bleus, lisses orange, plateaux), panneau de fond et marchandises
-    if (map.shelves && map.shelves.length) {
-      const n = map.shelves.length;
-      const SH = Math.min(CEIL - 0.5, 3.4); // hauteur d'un rack
-      const DECKS = [0.12, 1.15, 2.2, SH - 0.05];
-      const upright = new THREE.InstancedMesh(new THREE.BoxGeometry(0.09, SH, 0.09), baked(new THREE.MeshLambertMaterial({ color: '#2d5b8c' })), n * 4);
-      const beam = new THREE.InstancedMesh(new THREE.BoxGeometry(CELL_SIZE, 0.11, 0.06), baked(new THREE.MeshLambertMaterial({ color: '#d4661a' })), n * DECKS.length * 2);
-      const deck = new THREE.InstancedMesh(new THREE.BoxGeometry(CELL_SIZE, 0.04, CELL_SIZE - 0.2), baked(new THREE.MeshLambertMaterial({ color: '#5d6266' })), n * DECKS.length);
-      const back = new THREE.InstancedMesh(new THREE.BoxGeometry(CELL_SIZE, SH, 0.05), baked(new THREE.MeshLambertMaterial({ color: '#33373b' })), n);
-      let goodsCount = 0;
-      for (const sh of map.shelves) goodsCount += sh.goods.length * 2;
-      const crates = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), baked(new THREE.MeshLambertMaterial({ map: textures.crate })), goodsCount);
-      const cartons = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), baked(new THREE.MeshLambertMaterial({ color: '#8c6e48' })), goodsCount);
-      const barrels = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.5, 0.5, 1, 12), baked(new THREE.MeshLambertMaterial({ color: '#1f4f7a' })), goodsCount);
-      const goodsMesh = [crates, cartons, barrels];
-      const goodsIdx = [0, 0, 0];
-      let ui = 0;
-      let bi = 0;
-      let di = 0;
-      const half = CELL_SIZE / 2 - 0.08;
-      map.shelves.forEach((sh, i) => {
-        const cx = (sh.gx + 0.5) * CELL_SIZE;
-        const cz = (sh.gz + 0.5) * CELL_SIZE;
-        const rot = sh.alongX ? 0 : Math.PI / 2; // la rangée court le long de x (sinon de z)
-        const put = (mesh, k, lx, y, lz, sx = 1, sy = 1, sz = 1) => {
-          dummy.position.set(cx + Math.cos(rot) * lx + Math.sin(rot) * lz, y, cz - Math.sin(rot) * lx + Math.cos(rot) * lz);
-          dummy.rotation.set(0, rot, 0);
-          dummy.scale.set(sx, sy, sz);
-          dummy.updateMatrix();
-          mesh.setMatrixAt(k, dummy.matrix);
-        };
-        for (const [ux, uz] of [[-half, -half], [half, -half], [-half, half], [half, half]]) put(upright, ui++, ux, SH / 2, uz);
-        for (const y of DECKS) {
-          put(deck, di++, 0, y, 0);
-          put(beam, bi++, 0, y + 0.03, -half);
-          put(beam, bi++, 0, y + 0.03, half);
-        }
-        put(back, i, 0, SH / 2, 0);
-        // marchandises des deux côtés du panneau de fond
-        sh.goods.forEach((g, j) => {
-          const y0 = DECKS[g.lvl] + 0.03;
-          for (const side of [-1, 1]) {
-            const kind = (g.kind + (side > 0 ? j : 0)) % 3;
-            const m = goodsMesh[kind];
-            const w = g.w;
-            const h = Math.min(g.h, DECKS[g.lvl + 1] - DECKS[g.lvl] - 0.12);
-            put(m, goodsIdx[kind]++, g.off * side, y0 + h / 2, side * 0.62, kind === 2 ? 0.7 : w, h, kind === 2 ? 0.7 : 0.9);
-          }
-        });
-      });
-      dummy.rotation.set(0, 0, 0);
-      dummy.scale.set(1, 1, 1);
-      goodsMesh.forEach((m, k) => {
-        m.count = goodsIdx[k];
-      });
-      for (const m of [upright, beam, deck, back, ...goodsMesh]) {
-        m.instanceMatrix.needsUpdate = true;
-        group.add(m);
-      }
-    }
+    // 9. Level 1 : l'habillage de l'entrepôt (rayonnages à palettes, marchandises, tuyaux, lignes au sol, piliers, panneaux)
+    if (L1) buildWarehouse({ map, group, baked, CEIL });
 
     // 10. Fusibles (Level 1) : un gros fusible céramique aux bouts de cuivre, lueur ambrée
     const fuseMeshes = [];

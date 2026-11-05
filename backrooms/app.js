@@ -216,7 +216,9 @@ function initGame(settings = lastSettings) {
   const difficulty = settings.difficulty || 'normal';
   const players = NET.role === 'host' ? H.players.map((p) => ({ id: p.id, name: p.name || 'Player' })) : [{ id: 0, name: 'Player' }];
   NET.run = Date.now();
-  startRun({ seed, difficulty, players, run: NET.run, level: 0, vip: settings.monsters === 'vip' });
+  // ?level1 (seul) : on commence directement au Level 1
+  const lv = NET.role === 'solo' && /[?&]level1(&|=|$)/.test(location.search) ? 1 : 0;
+  startRun({ seed, difficulty, players, run: NET.run, level: lv, vip: settings.monsters === 'vip' });
   // ?parkour (seul) : on commence devant le couloir piégé, tourné vers les trous
   const trap = sim.map.trap;
   if (NET.role === 'solo' && trap && /[?&]parkour(&|=|$)/.test(location.search)) {

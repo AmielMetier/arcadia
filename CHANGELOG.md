@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 4.27 — 5 novembre 2026
+- **The Backrooms** — le Level 1 fait enfin peau neuve : un vrai entrepôt souterrain, bien plus réaliste.
+  - Des rayonnages à palettes : échelles bleues percées, lisses orange, croisillons, planchers et fonds grillagés, protections jaunes et noires en bout de rangée.
+  - Les étagères sont pleines de marchandises posées sur des palettes en bois : piles de cartons, palettes filmées, fûts, sacs de ciment, bacs en plastique.
+  - Des murs en parpaings peints, un sol en béton usé, taché d'huile et de flaques, des lignes jaunes au pied des rayonnages.
+  - Au plafond, des gaines d'aération, des tuyaux et des réglettes suspendues à des chaînettes.
+  - Les piliers sont balisés et numérotés, et un panneau marque l'entrée de chaque allée.
+  - On trouve aussi plus de matériel abandonné dans les allées : groupe électrogène, armoires électriques, coffres à outils, pneus, jerricans, bouteilles de gaz.
+
 ## 4.26 — 5 novembre 2026
 - **The Backrooms** — au Level 0, les deux étages sont bien plus loin l'un de l'autre : les trous du couloir piégé sont maintenant de vrais puits de plus de 6 mètres.
   - Rater une arête, c'est une vraie chute : on tombe pendant plus d'une seconde, l'air siffle, le choc est lourd, l'image tremble et on reste sonné plus longtemps, à bout de souffle.
