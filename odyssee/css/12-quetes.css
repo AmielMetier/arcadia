@@ -338,7 +338,8 @@
 .nat-fx { color: #8aa0be; }
 
 /* labo : trois partenaires dans la capsule d'un type */
-.starter-trio { display: flex; gap: calc(var(--px) * 6); top: 12%; }
+/* sur le côté gauche : la table, le Prof. et Théo restent visibles pendant le choix */
+.starter-trio { display: flex; gap: calc(var(--px) * 6); top: 12%; left: 3%; transform: none; }
 .starter-trio figure { margin: 0; text-align: center; opacity: 0.55; transition: opacity 0.15s, transform 0.15s; }
 .starter-trio figure.on { opacity: 1; transform: translateY(calc(var(--px) * -3)); }
 .starter-trio img { width: calc(var(--px) * 64); height: calc(var(--px) * 64); image-rendering: pixelated; }

@@ -214,7 +214,7 @@ export class Game {
     this.hud?.update(true);
     this.link?.hello();
     await this.ui.fade(false, 400);
-    if (!state.flags.intro) { state.flags.intro = true; this.busy = true; await this.ui.say(['Une douce lumière filtre à travers les rideaux...', `Aujourd'hui, ${state.name}, ton aventure commence !`, 'Appuie sur H à tout moment pour revoir les touches.']); this.busy = false; }
+    if (!state.flags.intro) { state.flags.intro = true; this.busy = true; await this.ui.say(['Une douce lumière filtre à travers les rideaux...', `Aujourd'hui, ${state.name}, ton aventure commence !`, 'Le Prof. Saule t\'attend à son laboratoire, au sud-est du village.', 'Appuie sur H à tout moment pour revoir les touches.']); this.busy = false; }
   }
   hour() { if (this.eclipseOn()) return 0.5; if (this.hourOverride != null) return this.hourOverride; const d = new Date(); return d.getHours() + d.getMinutes() / 60; }
   /** la nuit violette, entre la victoire contre Nocturne au repaire et le réveil de Lugia */
@@ -1463,7 +1463,8 @@ export class Game {
       speaker: tr.cls ? `${tr.cls} ${tr.name}` : tr.name,
       face: tr.bs || tr.ow || n.sprite
     });
-    const isBoss = d.leader != null || d.champion;
+    // le premier champion reste une marche d'apprentissage : IV ordinaires et pas d'objet tenu
+    const isBoss = (d.leader != null && d.leader !== 0) || d.champion;
     const leaderDefaultItem = (sp, lvl) => {
       const S = SPECIES[sp]; if (!S) return 'sitrus-berry';
       const type = S.t[0] || 'normal';
@@ -1683,7 +1684,9 @@ export class Game {
 
   async whiteout() {
     const st = this.state;
-    const lost = Math.min(st.money, Math.floor(st.money / 2));
+    // comme dans les jeux : la perte dépend des badges et du meilleur niveau, sans jamais dépasser la moitié de la bourse
+    const nb = (st.badges || []).filter(Boolean).length, top = Math.max(1, ...st.party.map((m) => m.lvl || 1));
+    const lost = Math.min(Math.floor(st.money / 2), [8, 16, 24, 36, 48, 64, 80, 100, 120][Math.min(8, nb)] * top);
     st.money -= lost;
     await this.ui.fade(true, 400);
     for (const m of st.party) healFull(m);
@@ -1913,9 +1916,9 @@ export class Game {
     } else if (name === 'prof') {
       if (!st.flags.metProf) {
         st.flags.metProf = true;
-        await ui.say([`Ah, ${st.name} ! Te voilà enfin.`, 'J\'étudie les créatures d\'Odyssée depuis trente ans. Et aujourd\'hui, j\'ai besoin de jeunes dresseurs pour m\'aider.', 'Sur la table, il y a trois capsules : Plante, Feu et Eau.', 'Dans chacune, trois créatures attendent un partenaire : une d\'ici, d\'Odyssée, et deux venues de régions lointaines, Kanto et Johto.', 'Approche-toi de la table et choisis celle qui te plaît !'], { speaker: 'Prof. Saule' });
+        await ui.say([`Ah, ${st.name} ! Te voilà enfin.`, 'J\'étudie les créatures d\'Odyssée depuis trente ans. Et aujourd\'hui, j\'ai besoin de jeunes dresseurs pour m\'aider.', 'Sur la table, il y a trois capsules : Plante, Feu et Eau.', 'Dans chacune, deux créatures venues de régions lointaines, Kanto et Johto, attendent un partenaire.', 'Approche-toi de la table et choisis celle qui te plaît !'], { speaker: 'Prof. Saule' });
         const rival = this.npcs.find((q) => q.id === 'rival-lab');
-        if (rival) { rival.dir = 'up'; await ui.say('Hé ! J\'attends depuis ce matin, moi ! Allez, choisis vite, je prendrai après toi.', { speaker: RIVAL_NAME }); rival.dir = 'left'; }
+        if (rival) { rival.dir = 'up'; await ui.say('Hé ! T\'en as mis du temps ! Allez, choisis vite, je prendrai après toi.', { speaker: RIVAL_NAME }); rival.dir = 'left'; }
         return;
       }
       if (!st.flags.starter) { await ui.say('Les trois capsules sont sur la table. Approche-toi et choisis !', { speaker: 'Prof. Saule' }); return; }
@@ -2033,17 +2036,17 @@ export class Game {
     st.flags.rivalSp = sp;
     const rival = this.npcs.find((q) => q.id === 'rival-lab');
     if (rival) rival.dir = 'up';
-    await ui.say(['Alors je prends celle-là !', `${SPECIES[rs].n} ! Elle a une tête de gagnante, comme moi.`], { speaker: RIVAL_NAME });
+    await ui.say(['Alors je prends celle-là !', `${SPECIES[rs].n} ! Il a une tête de gagnant, comme moi.`], { speaker: RIVAL_NAME });
     if (rival) rival.dir = 'left';
     await ui.say(['Hé, ' + st.name + ' ! On a nos créatures, alors...', 'On se fait un petit combat ? Allez !'], { speaker: RIVAL_NAME });
-    const res = await this.runBattle({ trainer: { cls: 'Rival', name: RIVAL_NAME, prize: 30, bs: 'theo', ai: 'smart', friendly: true, lose: 'Quoi ?! J\'aurais dû choisir l\'autre !' }, party: buildRivalParty(this, [[rs, 5]]), music: 'rival', rival: true, noWhiteout: true });
+    const res = await this.runBattle({ trainer: { cls: 'Rival', name: RIVAL_NAME, prize: 30, bs: 'theo', ai: 'normal', friendly: true, lose: 'Quoi ?! J\'aurais dû choisir l\'autre !' }, party: [createMon(rs, 5, { ot: RIVAL_NAME })], music: 'rival', rival: true, noWhiteout: true });   // premier combat : à armes égales (même niveau, IA simple)
     for (const m of st.party) healFull(m);
     st.flags.rival1 = true;
     await ui.say(res === 'win' ? 'Pfff... Bon, c\'était juste un échauffement !' : 'Ha ha ! Je suis trop fort ! Mais t\'inquiète, tu t\'améliores déjà.', { speaker: RIVAL_NAME });
-    await ui.say(['Bien joué, tous les deux ! Vos créatures ont déjà l\'air de vous adorer.', `${st.name}, prends aussi ceci.`], { speaker: 'Prof. Saule' });
+    await ui.say([res === 'win' ? 'Quel combat ! Vos créatures ont déjà l\'air de vous adorer.' : 'Ne te décourage pas, ' + st.name + '. Ce n\'était que votre tout premier combat !', `${st.name}, prends aussi ceci.`], { speaker: 'Prof. Saule' });
     this.sound.sfx('item');
     st.flags.dex = true; st.bag['poke-ball'] = (st.bag['poke-ball'] || 0) + 5; st.bag.potion = (st.bag.potion || 0) + 2; this.give('town-map');
-    await ui.say([`${st.name} reçoit le Pokédex, la Carte, 5 capsules et 2 Potions !`, 'Le Pokédex enregistre chaque créature que tu vois ou captures.', 'Quand tes créatures sont fatiguées, reviens voir ta mère ou passe au Centre de soins.', 'La première Arène se trouve à Sylvebourg, au nord. Bonne route !'], { speaker: 'Prof. Saule' });
+    await ui.say([`${st.name} reçoit le Pokédex, la Carte, 5 Poké Balls et 2 Potions !`, 'Le Pokédex enregistre chaque créature que tu vois ou captures.', 'Quand tes créatures sont fatiguées, reviens voir ta mère ou passe au Centre de soins.', 'La première Arène se trouve à Sylvebourg, au nord. Bonne route !'], { speaker: 'Prof. Saule' });
     await ui.say('Je file ! À plus, ' + st.name + ' !', { speaker: RIVAL_NAME });
     if (rival) { await this.npcWalk(rival, 'down', 2); this.npcs = this.npcs.filter((q) => q !== rival); this.view.removeActor('npc:rival-lab'); }
     this.save(true);
@@ -2087,7 +2090,7 @@ export class Game {
       rival.dir = OPP[dir];
       await ui.say(lines, { speaker: W.name });
       const party = buildRivalParty(this, team(R));
-      const res = await this.runBattle({ trainer: { cls: W.cls || 'Rival', name: W.name, prize: 40, bs: W.bs, ai: 'smart', items: getRivalItems(this), lose: lvlText }, party, music: 'rival', rival: true });
+      const res = await this.runBattle({ trainer: { cls: W.cls || 'Rival', name: W.name, prize: 40, bs: W.bs, ai: st.badges.some(Boolean) ? 'smart' : 'normal', items: getRivalItems(this), lose: lvlText }, party, music: 'rival', rival: true });
       this.musicLock = false;
       if (res !== 'lose') {
         await ui.say(after, { speaker: W.name });

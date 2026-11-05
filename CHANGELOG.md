@@ -1,5 +1,19 @@
 # Journal des versions — Arcadia
 
+## 4.19 — 5 novembre 2026
+- **Odyssée** — Un début d'aventure plus accueillant (la suite garde sa difficulté) :
+  - Le premier combat contre Théo au labo se joue à armes égales : même niveau que toi, et il ne joue pas encore les malins.
+  - Tant que tu n'as aucun badge, Théo reste à ton niveau quand il te défie sur la route.
+  - Les dresseurs de la Route 1 n'ont plus qu'un ou deux Pokémon, de niveau débutant.
+  - Hector, le premier Champion, est un peu moins coriace (niveaux un cran plus bas, pas d'objet tenu, moins de Potions).
+  - Perdre un combat coûte désormais une somme qui dépend de tes badges, comme dans les jeux, et jamais plus de la moitié de ta bourse.
+- **Odyssée** — Finitions du début de partie :
+  - L'écran d'apparence se valide avec Entrée depuis n'importe quelle ligne, et ne redemande plus Garçon / Fille.
+  - Au réveil, on sait où aller : le Prof. Saule t'attend à son labo.
+  - Le combat contre Théo a enfin un décor de labo, et la fenêtre de choix du starter ne cache plus le Prof. ni Théo.
+  - Le nom du lieu s'affiche en bas de l'écran et ne passe plus sous le HUD.
+  - Dialogues corrigés au labo (nombre de créatures par capsule, Théo, réaction du Prof. après une défaite, Poké Balls).
+
 ## 4.18 — 5 novembre 2026
 - **Odyssée** — Nouvelles météos dans la région :
   - Brume du matin dans les forêts, entre 5 h et 10 h : un voile blanc qui dérive sur le paysage.

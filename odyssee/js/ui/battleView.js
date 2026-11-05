@@ -45,7 +45,21 @@ export class BattleView {
     const W = this.W, c = document.createElement('canvas'); c.width = W; c.height = BH; const x = c.getContext('2d');
     const grad = (y0, y1, a, b) => { const g = x.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, a); g.addColorStop(1, b); x.fillStyle = g; x.fillRect(0, y0, W, y1 - y0); };
     const stripes = (y0, y1, col, gap = 6) => { x.fillStyle = col; for (let y = y0; y < y1; y += gap) x.fillRect(0, y, W, 1); };
-    if (kind === 'cave') {
+    if (kind === 'lab') {
+      // labo du professeur : mur clair, bibliothèques, fenêtre bleue et carrelage blanc
+      grad(0, 84, '#cfe0ee', '#eef4fa');
+      x.fillStyle = '#7fb4e0'; x.fillRect(W * 0.36, 10, W * 0.28, 34); x.fillStyle = '#b8daf4'; x.fillRect(W * 0.36 + 3, 13, W * 0.28 - 6, 28);
+      x.fillStyle = '#ffffff'; x.fillRect(W * 0.5 - 1, 13, 2, 28); x.fillRect(W * 0.36 + 3, 26, W * 0.28 - 6, 2);
+      const books = ['#c04848', '#4870c0', '#48a060', '#d0a040', '#8058b0', '#e07848'];
+      for (const bx0 of [8, W * 0.68]) {
+        const bw = W * 0.26;
+        x.fillStyle = '#6a4a30'; x.fillRect(bx0, 20, bw, 64); x.fillStyle = '#8a6440'; x.fillRect(bx0 + 2, 22, bw - 4, 60);
+        for (const sy of [24, 44, 64]) { x.fillStyle = '#5a3c26'; x.fillRect(bx0 + 2, sy + 17, bw - 4, 2); for (let k = 0, bx = bx0 + 4; bx < bx0 + bw - 6; k++) { const w = 3 + ((k * 7 + sy) % 3); x.fillStyle = books[(k + sy) % books.length]; x.fillRect(bx, sy + 2 + ((k * 5) % 4), w, 15 - ((k * 5) % 4)); bx += w + 1; } }
+      }
+      x.fillStyle = '#b8c4d0'; x.fillRect(0, 84, W, 2);
+      grad(86, BH, '#e6ecf2', '#fbfcfe');
+      x.fillStyle = 'rgba(120,140,170,0.18)'; for (let i = 0; i < W; i += 16) x.fillRect(i, 86, 1, BH - 86); for (let y = 92; y < BH; y += 12) x.fillRect(0, y, W, 1);
+    } else if (kind === 'cave') {
       grad(0, BH, '#3a2e26', '#6a5440');
       x.fillStyle = '#2a201a'; for (let i = 0; i < 9; i++) { const bx = (i * 53) % W, bw = 40 + (i * 17) % 30; x.beginPath(); x.moveTo(bx, 0); x.lineTo(bx + bw / 2, 30 + (i * 13) % 25); x.lineTo(bx + bw, 0); x.fill(); }
       stripes(110, BH, 'rgba(0,0,0,0.12)', 5);
@@ -95,6 +109,8 @@ export class BattleView {
       snow: night ? 'bg_snow_night' : 'bg_snow',
       volcanic: 'bg_volcanic',
     };
+    // décors dessinés dans le code (pas d'image) : le labo du professeur
+    const drawn = kind === 'lab';
     const bgKey = bgMap[kind] || (night ? 'bg_grass_night' : 'bg_grass');
     const platMap = {
       cave: 'cave',
@@ -102,6 +118,7 @@ export class BattleView {
       gym_rock: 'cave',
       league: 'stone',
       indoor: 'stone',
+      lab: 'stone',
       city: 'stone',
       village: 'grass',
       water: 'water',
@@ -111,7 +128,7 @@ export class BattleView {
     const platKey = platMap[kind] || (this.battle?.wild ? 'tallgrass' : 'grass');
     const ballPromises = Object.entries(BALL_SPRITE_PATHS).map(async ([k, p]) => [k, await loadImg(p)]);
     const [bgImg, platE, platP, ...ballEntries] = await Promise.all([
-      loadImg(`img/battle/${bgKey}.png`),
+      drawn ? Promise.resolve(null) : loadImg(`img/battle/${bgKey}.png`),
       loadImg(`img/battle/plat_${platKey}_e.png`),
       loadImg(`img/battle/plat_${platKey}_p.png`),
       ...ballPromises,

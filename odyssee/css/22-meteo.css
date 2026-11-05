@@ -13,3 +13,4 @@
 .ow-fog i + i { opacity: 0.7; animation-duration: 95s; animation-direction: reverse; transform: scaleX(-1); }
 @keyframes ow-fog-drift { from { translate: -12% 0; } to { translate: 12% 0; } }
 @media (prefers-reduced-motion: reduce) { .ow-fog i { animation: none; } }
+
