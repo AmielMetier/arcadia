@@ -73,3 +73,20 @@
   white-space: nowrap; pointer-events: none; font-size: calc(var(--px) * 4.6); font-weight: 800; letter-spacing: .02em;
   color: #f2f8ff; text-shadow: calc(var(--px) * .6) calc(var(--px) * .6) 0 #000, calc(var(--px) * -.6) calc(var(--px) * .6) 0 #000, 0 calc(var(--px) * -.6) 0 #000;
 }
+
+/* combat : bouton Méga-Évolution, à côté de Retour ; allumé quand la Méga est armée */
+.mv-mega-btn {
+  width: calc(var(--bp) * 22); height: 100%; box-sizing: border-box; flex-shrink: 0; padding: 0; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--bp) * 1);
+  background: linear-gradient(180deg, #3a2a58 0%, #1a1428 100%);
+  border: calc(var(--bp) * 1.2) solid #9a7ad8; outline: calc(var(--bp) * 1.1) solid #080a10;
+  box-shadow: inset 0 calc(var(--bp) * 1) 0 rgba(255, 255, 255, .3), calc(var(--bp) * 1.6) calc(var(--bp) * 1.6) 0 rgba(0, 0, 0, .65);
+  color: #e8dcff; font-weight: 900; font-size: calc(var(--bp) * 6); letter-spacing: .06em; text-shadow: calc(var(--bp) * .8) calc(var(--bp) * .8) 0 #080a10;
+}
+.mv-mega-btn img { width: calc(var(--bp) * 12); height: calc(var(--bp) * 12); image-rendering: pixelated; }
+.mv-mega-btn.on {
+  border-color: #ffe060; color: #fff;
+  background: conic-gradient(from 0deg, #ff5ad0, #ffd84a, #5ad8ff, #8affa0, #ff5ad0);
+  animation: mega-pulse .9s ease-in-out infinite alternate;
+}
+@keyframes mega-pulse { from { filter: brightness(1); } to { filter: brightness(1.35); } }

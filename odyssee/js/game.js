@@ -1,6 +1,8 @@
 // odyssee/js/game.js — le jeu : déplacements sur la grille, PNJ, dresseurs, rencontres, capacités de terrain (Coupe,
 // Surf, Éclate-Roc, Vol), menus, histoire (les quinze arènes et l'archipel des trois frères), sauvegarde
 import { T, walkable, isGrassEnc, DIRS, OPP } from './world/tiles.js';
+import { MEGAS_OF, MEGA_RING, LEGEND, STONE_FORM, revertMegas } from './core/mega.js';
+import { MEGA_FORMS } from './data/megas.js';
 import { createMon, monName, healFull, levelEvolution, itemEvolution, evolve, setUidBase, levelCap, ensureNature } from './core/mon.js';
 import { Battle } from './core/battle.js';
 import { ITEMS, itemName, applyItem, canUseOn, useCandy, formatFindItem, formatObtainItem, itemPocketName } from './core/items.js';
@@ -202,6 +204,7 @@ export class Game {
 
   async start(state) {
     this.state = state; this._seen = null;
+    revertMegas(state.party); revertMegas(state.box);
     this.stepLock = false; this.stepGap = false;
     this.player = { x: state.x, y: state.y, dir: state.dir || 'down', move: null, step: 0, turnLock: 0, bumpT: 0, surf: !!state.surf };
     this.appliquerTenue();
@@ -1662,7 +1665,13 @@ export class Game {
     const gymKind = (m.arene === 'rock' || m.arene === 'ground' || m.arene === 'fire' || m.arene === 'fighting') ? 'gym_rock' : 'gym';
     const bg = !m.outdoor ? (m.floor === 'cave' ? 'cave' : m.battleBg === 'gym' ? gymKind : m.battleBg) : this.player.surf ? 'water' : z?.theme === 'volcanic' ? 'volcanic' : z?.theme === 'snow' ? 'snow' : isVillage ? 'village' : isCity ? 'city' : 'grass';
     const weather = o.weather || this.getMapWeather();
-    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag }, foe: o.wild ? { name: 'sauvage', party: [o.wild] } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap(), weather: BATTLE_WEATHERS.includes(weather) ? weather : undefined });
+    // Méga-Évolution : le joueur avec son Méga-Anneau ; un dresseur marqué megaSp tend sa gemme à ce Pokémon (« ace » : le dernier)
+    if (o.trainer?.megaSp && o.party?.length) {
+      const target = o.trainer.megaSp === 'ace' ? o.party[o.party.length - 1] : o.party.find((q) => q.sp === o.trainer.megaSp);
+      const pid = target && MEGAS_OF[target.sp]?.[0];
+      if (pid) { target.item = MEGA_FORMS[pid].stone; o.trainer = { ...o.trainer, mega: true }; }
+    }
+    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag, mega: (st.bag[MEGA_RING] || 0) > 0 }, foe: o.wild ? { name: 'sauvage', party: [o.wild] } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap(), weather: BATTLE_WEATHERS.includes(weather) ? weather : undefined });
     const foeMons = o.wild ? [o.wild] : o.party;
     const h = this.hour();
     const result = await this.bv.run(battle, { bg, night: m.outdoor && (h >= 20 || h < 5.5), weather: BATTLE_WEATHERS.includes(weather) ? weather : 'none', curtain });
@@ -1904,10 +1913,32 @@ export class Game {
   }
 
   /* ================= histoire ================= */
+  /** Port-Granit : le professeur Orme remet le Méga-Anneau (5 badges) et la gemme du starter, puis vend les Méga-Gemmes */
+  async megaRing() {
+    const st = this.state, ui = this.ui, sp = { speaker: 'Pr Orme' };
+    if (!st.bag[MEGA_RING]) {
+      if (this.badgeCount() < 5) { await ui.say(['Je suis le professeur Orme. J\'étudie un phénomène fascinant : la Méga-Évolution.', 'Certains Pokémon dépassent leur forme finale grâce à une Méga-Gemme... et au lien qui les unit à leur dresseur.', 'Reviens quand tu auras cinq badges : je verrai alors si ce lien est assez fort.'], sp); return; }
+      await ui.say(['Cinq badges... Je le sens : toi et tes Pokémon, vous êtes prêts.', 'Voici la clé de la Méga-Évolution !'], sp);
+      st.bag[MEGA_RING] = 1; this.sound.sfx('badge');
+      await ui.say(`${st.name} reçoit le Méga-Anneau !`);
+      // la gemme du partenaire de départ, si sa lignée a une Méga
+      const line = STARTER_TABLE.flatMap((c) => c.lines).find((l) => l.includes(st.flags.starter)) || [];
+      const gem = line.map((x) => MEGAS_OF[x]?.[0]).filter(Boolean).map((pid) => MEGA_FORMS[pid].stone)[0];
+      if (gem) { st.bag[gem] = (st.bag[gem] || 0) + 1; this.sound.sfx('item'); await ui.say(`Et ceci pour ton partenaire de toujours : ${st.name} reçoit ${itemName(gem)} !`); }
+      await ui.say(['Fais tenir la Méga-Gemme de son espèce à un Pokémon.', 'En combat, appuie sur MÉGA (ou sur M) avant de choisir une attaque : il méga-évoluera, une fois par combat.', 'D\'autres gemmes dorment sur les routes du sud et des îles... et je t\'en vendrai, si tu reviens me voir.'], sp);
+      this.save(true); return;
+    }
+    // la boutique des Méga-Gemmes (les gemmes des légendaires seulement pour le Maître de la Ligue)
+    const stock = Object.values(MEGA_FORMS).map((f) => f.stone).filter((g, i, a) => a.indexOf(g) === i && (!LEGEND.has(MEGA_FORMS[STONE_FORM[g]].base) || st.flags.champion))
+      .sort((a, b) => itemName(a).localeCompare(itemName(b), 'fr'));
+    await ui.say(['Tu viens pour une Méga-Gemme ?', st.flags.champion ? 'Pour le Maître de la Ligue, j\'ai même celles des Pokémon légendaires.' : 'Celles des Pokémon légendaires, je ne les confie qu\'au Maître de la Ligue.'], sp);
+    await shopScreen(this, stock);
+  }
   async script(name, n) {
     const st = this.state, ui = this.ui;
     if (await storyTalk(this, name, n)) return;   // histoire principale et quêtes annexes (story.js)
     if (name === 'savoir') return this.savoir(n);
+    if (name === 'megaRing') return this.megaRing();
     // Métropole : le comptoir du Casino, Pierre à la Bourse, la styliste de la boutique de mode
     if (name === 'casino') return casinoScreen(this);
     if (name === 'pierre') return entretienPierre(this);
@@ -2100,7 +2131,7 @@ export class Game {
       rival.dir = OPP[dir];
       await ui.say(lines, { speaker: W.name });
       const party = buildRivalParty(this, team(R));
-      const res = await this.runBattle({ trainer: { cls: W.cls || 'Rival', name: W.name, prize: 40, bs: W.bs, ai: st.badges.some(Boolean) ? 'smart' : 'normal', items: getRivalItems(this), lose: lvlText }, party, music: 'rival', rival: true });
+      const res = await this.runBattle({ trainer: { cls: W.cls || 'Rival', name: W.name, prize: 40, bs: W.bs, ai: st.badges.some(Boolean) ? 'smart' : 'normal', items: getRivalItems(this), lose: lvlText, megaSp: st.badges.filter(Boolean).length >= 8 ? 'ace' : undefined }, party, music: 'rival', rival: true });
       this.musicLock = false;
       if (res !== 'lose') {
         await ui.say(after, { speaker: W.name });

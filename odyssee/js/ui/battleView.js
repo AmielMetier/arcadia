@@ -708,7 +708,7 @@ export class BattleView {
     for (;;) {
       this.ui.typePage(this.textBox, `Que doit faire ${monName(me)} ?`, { last: true });
       const c = await this.commandMenu();
-      if (c === 0) { const mv = await this.moveMenu(); if (mv < 0) continue; return { type: 'move', idx: mv }; }
+      if (c === 0) { this.megaArmed = false; const mv = await this.moveMenu(); if (mv < 0) continue; const mega = !!this.megaArmed && b.canMega?.(0); this.megaArmed = false; return mega ? { type: 'move', idx: mv, mega: true } : { type: 'move', idx: mv }; }
       if (c === 1 && b.pvp) { await this.msg('Pas d\'objets dans un combat entre dresseurs !', { wait: true }); continue; }
       if (c === 3 && b.pvp) { if (await this.ui.yesNo('Abandonner le combat ?')) return { type: 'forfeit' }; continue; }
       if (c === 1) {
@@ -835,6 +835,7 @@ export class BattleView {
               </div>
             </div>`;
           }).join('')}</div>
+          ${this.battle.canMega?.(0) ? `<button type="button" class="mv-mega-btn" title="Méga-Évolution (touche M ou Tab)"><img src="${ASSETS.item('mega-ring')}" alt=""><span>MÉGA</span></button>` : ''}
           <button type="button" class="mv-back-btn" title="Retour (Échap / B)">
             <span class="mv-back-ico">✕</span>
             <span class="mv-back-lbl">RETOUR</span>
@@ -931,6 +932,10 @@ export class BattleView {
         b.addEventListener('pointerenter', () => { if (i !== idx) { i = idx; this.sound.sfx('blip'); show(); } });
         b.addEventListener('click', (e) => { e.stopPropagation(); i = idx; show(); confirmMove(idx); });
       });
+      // Méga-Évolution : on l'arme, puis on choisit l'attaque (le Pokémon méga-évolue avant d'attaquer)
+      const megaBtn = this.cmd.querySelector('.mv-mega-btn');
+      const toggleMega = () => { if (!megaBtn) return; this.megaArmed = !this.megaArmed; megaBtn.classList.toggle('on', this.megaArmed); this.sound.sfx(this.megaArmed ? 'select' : 'cancel'); };
+      megaBtn?.addEventListener('click', (e) => { e.stopPropagation(); toggleMega(); });
       backBtn?.addEventListener('pointerenter', () => { if (i !== 4) { i = 4; this.sound.sfx('blip'); show(); } });
       backBtn?.addEventListener('click', (e) => { e.stopPropagation(); closeMenu(-1); });
 
@@ -955,7 +960,8 @@ export class BattleView {
         } else if (k === 'b') {
           closeMenu(-1);
           return;
-        } else return;
+        } else if (k === 'menu') { toggleMega(); return; }
+        else return;
 
         if (j === 4 || m.moves[j]) { i = j; this.sound.sfx('blip'); show(); }
       });
@@ -975,6 +981,7 @@ export class BattleView {
         case 'msg': await this.msg(e.text, { wait: this.battle.state === 'over' && /remportez|battu|K\.O\.|perdez|attrapé|panique/.test(e.text) }); break;
         case 'send': if (this.boosts) this.boosts[e.side] = [0, 0, 0, 0, 0, 0, 0, 0]; this.showBoosts(e.side); await this.animSend(e.side); break;
         case 'recall': await this.animRecall(e.side); break;
+        case 'mega': await this.animMega(e.side); break;
         case 'move': await this.animMove(e.side, e.move, e.type); break;
         case 'hit': await this.animHit(e.side, e.eff, e.crit); break;
         case 'hp': await this.animHp(e.side, e.from, e.hp, e.status); break;
@@ -1023,6 +1030,20 @@ export class BattleView {
     this.sound.cry(ASSETS.cry(m.sp));
     await this.tween(220, (u) => { o.white = 1 - u; });
     o.white = 0;
+  }
+  /** Méga-Évolution : le Pokémon s'illumine dans une gerbe arc-en-ciel, puis apparaît sous sa forme Méga */
+  async animMega(side) {
+    const m = this.battle.act(side), o = side === 1 ? this.st.foe : this.st.me, c = this.sprCenter(side);
+    this.sound.sfx('mega');
+    for (let k = 0; k < 3; k++) { this.burst(c.x, c.y, ['#ff5ad0', '#ffd84a', '#5ad8ff', '#8affa0', '#ffffff'], 16, { speed: 1.6 + k * 0.6 }); await wait(160); }
+    await this.tween(380, (u) => { o.white = u; o.scale = 1 + 0.12 * Math.sin(u * Math.PI); });
+    await this.loadSide(side);
+    this.setHud(side, m);
+    this.burst(c.x, c.y, ['#ffffff', '#ffe060', '#ff7ae0', '#7ae8ff'], 30, { speed: 3 });
+    await this.tween(420, (u) => { o.white = 1 - u; });
+    o.white = 0; o.scale = 1;
+    this.sound.cry(ASSETS.cry(m.sp));
+    await wait(250);
   }
   async animRecall(side) {
     const o = side === 1 ? this.st.foe : this.st.me;

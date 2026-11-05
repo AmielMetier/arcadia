@@ -9,7 +9,8 @@ const params = new URLSearchParams(location.search);
 // sprites des Pokémon (face, dos, chromatiques, icônes) copiés de PokeAPI dans le dépôt : le jeu n'en dépend plus en ligne
 // (?sprites=<adresse> permet toujours d'en essayer d'autres)
 const BASE = params.get('sprites') || new URL('../img/pokeapi', import.meta.url).href;
-const CRIES = 'https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest';
+// cris des Pokémon copiés de PokeAPI dans le dépôt (tools/odyssee-megas.mjs)
+const CRIES = new URL('../snd/cris', import.meta.url).href;
 const HG = BASE + '/pokemon/versions/generation-iv/heartgold-soulsilver';
 // après le n° 493 (pas de dessin HeartGold / SoulSilver) : dessins Noir / Blanc, même style pixel
 const BW = BASE + '/pokemon/versions/generation-v/black-white';
@@ -18,15 +19,17 @@ const IMG = new URL('../img/', import.meta.url).href;
 const ITEMS = new Set(SPRITES.items || []), PORTRAITS = new Set(SPRITES.portraits || []), DRESSEURS = new Set(SPRITES.dresseurs || []);
 // champions dont le portrait de combat n'est pas encore dessiné : un dresseur qui leur ressemble
 const SOSIES = { pierre: 'topdresseur', croupier: 'garde' };
-const orig = (id) => id >= 1000 && SPECIES[id];
+const orig = (id) => id >= 1000 && id < 10000 && SPECIES[id];
+// formes Méga (n° PokeAPI 10033 et suivants) : leurs sprites copiés de PokeAPI
+const mega = (id) => id >= 10000;
 // espèces dont la version obscure a son dessin
 const OBSCURS = new Set([249]);
 
 export const ASSETS = {
   // version obscure (Lugia Obscur) : son propre dessin s'il existe (img/crea/<espèce>-shadow-f / -b / -i.png)
-  front: (id, shiny, shadow) => (shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-f.png` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-f${shiny ? 's' : ''}.png` : `${gen(id)}${shiny ? '/shiny' : ''}/${id}.png`),
-  back: (id, shiny, shadow) => (shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-b.png` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-b${shiny ? 's' : ''}.png` : `${gen(id)}/back${shiny ? '/shiny' : ''}/${id}.png`),
-  icon: (id, shadow) => (shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-i.png` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-i.png` : `${BASE}/pokemon/versions/generation-vii/icons/${id}.png`),
+  front: (id, shiny, shadow) => (mega(id) ? `${BASE}/pokemon${shiny ? '/shiny' : ''}/${id}.png` : shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-f.png` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-f${shiny ? 's' : ''}.png` : `${gen(id)}${shiny ? '/shiny' : ''}/${id}.png`),
+  back: (id, shiny, shadow) => (mega(id) ? `${BASE}/pokemon/back${shiny ? '/shiny' : ''}/${id}.png` : shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-b.png` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-b${shiny ? 's' : ''}.png` : `${gen(id)}/back${shiny ? '/shiny' : ''}/${id}.png`),
+  icon: (id, shadow) => (mega(id) ? `${BASE}/pokemon/versions/generation-vii/icons/${id}.png` : shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-i.png` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-i.png` : `${BASE}/pokemon/versions/generation-vii/icons/${id}.png`),
   shadowFront: (id) => `${IMG}crea/${SPECIES[id].k}-shadow-f.png`,
   shadowBack: (id) => `${IMG}crea/${SPECIES[id].k}-shadow-b.png`,
   shadowIcon: (id) => `${IMG}crea/${SPECIES[id].k}-shadow-i.png`,

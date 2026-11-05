@@ -126,7 +126,7 @@ export function trainerNpc(map, x, y, dir, cls, name, team, o = {}) {
   const [ow, prize, bs] = CLS[cls] || ['gamin', 20];
   return map.npc({
     id: o.id || `${map.id}:t${tCount++}`, x, y, dir, sprite: o.ow || ow, move: 'static', onWin: o.onWin,
-    trainer: { cls, name, team, prize: o.prize || prize, sight: o.sight ?? 4, bs: o.bs || bs || ow, ai: o.ai || 'normal', items: o.items, intro: o.intro || 'Nos regards se sont croisés : c\'est l\'heure du combat !', lose: o.lose || 'J\'ai perdu...', after: o.after || 'Tu es vraiment fort !' },
+    trainer: { cls, name, team, prize: o.prize || prize, sight: o.sight ?? 4, bs: o.bs || bs || ow, ai: o.ai || 'normal', items: o.items, megaSp: o.megaSp, intro: o.intro || 'Nos regards se sont croisés : c\'est l\'heure du combat !', lose: o.lose || 'J\'ai perdu...', after: o.after || 'Tu es vraiment fort !' },
   });
 }
 /** dresseur posé le long d'une route : t sur la ligne, côté ±1, distance au sentier */
@@ -409,6 +409,8 @@ export function buildWorld() {
     ],
     npcs: [
       { id: 'garde-quai', x: 13, y: 2, sprite: 'garde', dir: 'down', script: 'granitDock', text: ['Port-Granit. Ici, c\'est Drakos qui fait la loi, pas la Ligue.'] },
+      // le professeur Orme, chercheur des Méga-Évolutions : remet le Méga-Anneau aux dresseurs qui ont 5 badges, puis vend les Méga-Gemmes
+      { id: 'mega-chercheuse', x: 17, y: 8, sprite: 'savant', dir: 'down', script: 'megaRing' },
       { id: 'marin', x: 7, y: 8, sprite: 'marin', move: 'wander', text: ['Avec Surf, tu peux rejoindre Cendrelune, au sud-ouest.', 'Mais les gardes de Pyros ne laissent entrer que ceux qui ont battu Basalte.'] },
     ],
   };
@@ -786,6 +788,10 @@ export function buildWorld() {
   legend({ id: 'articuno', sp: 144, lvl: 45, x: 423, y: 6, intro: ['Un vent glacial se lève...', 'Artikodin, l\'oiseau des glaces, plane au-dessus de la cime !'] });
   // à l'est du village : la Grotte des Tourbillons (Lugia), ouverte par l'Ermite
   const gt = R('givre2', 'Rivage Gelé', [[377.5, 44.5], [392, 46], [404, 47.5]], { w: 9, grass: 0.6, trees: 0.05, treeT: T.PINE, theme: 'snow' }, 'givre', 'snow');
+  // Méga-Gemmes cachées sur les routes de la fin de l'aventure (après Port-Granit, où l'on reçoit le Méga-Anneau)
+  for (const [route, t, side, gem] of [[r9, 0.6, 1, 'lucarionite'], [r10, 0.3, -1, 'gyaradosite'], [r10, 0.8, 1, 'aerodactylite'], [r11, 0.5, 1, 'absolite'],
+    [r12, 0.4, -1, 'scizorite'], [r12, 0.85, 1, 'heracronite'], [so, 0.5, -1, 'ampharosite'], [cr, 0.6, 1, 'gengarite'], [mb, 0.5, -1, 'houndoominite'],
+    [pg, 0.6, 1, 'abomasite'], [gt, 0.5, -1, 'glalitite'], [r7, 0.5, 1, 'tyranitarite']]) routeItem(W, route, t, side, 4, gem);
   routeTrainer(W, gt, 0.5, 1, 3, 'Skieuse', 'Flocon', [[1045, 40], [1046, 42]]);
   const tb = W.building('cave', 406, 43);
   W.rect(402, 46, 413, 48, T.GRASS); W.rect(402, 47, 413, 47, T.PATH); W.rect(tb.doorX, tb.doorY + 1, tb.doorX, 48, T.PATH);
@@ -892,7 +898,7 @@ export function buildWorld() {
   }
   // Ligue : la Maître
   const league = maps['plateau:ligue'];
-  league.npc({ id: 'champion', x: 7, y: 3, dir: 'down', sprite: CHAMPION.ow, champion: true, trainer: { cls: 'Maître', name: CHAMPION.name, team: CHAMPION.team, prize: 200, bs: CHAMPION.ow, ai: 'smart', items: { 'full-restore': 3 }, intro: CHAMPION.intro, lose: CHAMPION.lose, sight: 0 } });
+  league.npc({ id: 'champion', x: 7, y: 3, dir: 'down', sprite: CHAMPION.ow, champion: true, trainer: { cls: 'Maître', name: CHAMPION.name, team: CHAMPION.team, prize: 200, bs: CHAMPION.ow, ai: 'smart', megaSp: 149, items: { 'full-restore': 3 }, intro: CHAMPION.intro, lose: CHAMPION.lose, sight: 0 } });
   league.npc({ id: 'ligue-garde', x: 5, y: 15, sprite: 'garde', dir: 'right', text: ['Bienvenue à la Ligue Céleste.', 'La Maître t\'attend au bout du tapis. Bonne chance !'] });
 
   // Labo : professeur, assistant

@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 4.23 — 5 novembre 2026
+- **Odyssée** — La Méga-Évolution arrive ! 81 Méga-Évolutions, dont les toutes nouvelles de Légendes Z-A (Méga-Dracolosse, Méga-Méganium, Méga-Aligatueur, Méga-Amphinobi, Méga-Raichu X et Y, Méga-Lucario Z…).
+  - À Port-Granit, le professeur Orme te remet le Méga-Anneau dès ton cinquième badge, avec la gemme de ton partenaire de départ quand sa lignée en a une.
+  - Fais tenir sa Méga-Gemme à un Pokémon, puis appuie sur MÉGA (ou M) avant de choisir une attaque : il méga-évolue, une fois par combat.
+  - Douze gemmes sont cachées sur les routes de la fin de l'aventure, et le professeur Orme vend les autres (celles des légendaires, seulement au Maître de la Ligue).
+  - Attention : Théo, Ombrelle et Célestine savent aussi méga-évoluer…
+  - Méga-Évolution possible aussi dans les duels entre amis.
+- **Odyssée** — Les cris des Pokémon sont désormais inclus dans le jeu : plus besoin de connexion pour les entendre.
+
 ## 4.22 — 5 novembre 2026
 - **Odyssée** — Carte de Dresseur : tes 15 badges s'affichent en vitrine au centre (ceux qui manquent en silhouette), et l'en-tête est plus sobre.
 - **Odyssée** — Carte de la région : le nom des villes visitées s'affiche sous leur repère.

@@ -1236,6 +1236,7 @@ export class Sound {
       case 'exp': P(n('C6'), 0, 0.04, 0.03, 'pulse50'); break;
       case 'run': this.tone('noise', 1500, t, 0.3, 0.08, B, { filter: 'bandpass' }); break;
       case 'learn': [['C5', 0], ['G5', 0.1], ['C6', 0.2]].forEach(([m, d]) => P(n(m), d, 0.09, 0.08)); break;
+      case 'mega': this.duck(2200); for (let i = 0; i < 10; i++) P(n('C5') * Math.pow(2, i / 7), i * 0.07, 0.12, 0.07, 'pulse50'); [['C6', 0.75], ['G6', 0.75], ['E6', 0.75]].forEach(([m, d]) => P(n(m), d, 1.1, 0.07, 'sine')); this.tone('noise', 6000, t + 0.7, 0.9, 0.06, B, { release: 0.8 }); break;
       case 'evolve': for (let i = 0; i < 12; i++) P(n('C5') * Math.pow(2, (i % 6) / 6), i * 0.12, 0.1, 0.06, 'pulse50'); break;
       case 'buy': P(n('B5'), 0, 0.06, 0.08); P(n('E6'), 0.07, 0.12, 0.08); break;
       case 'pc': [['C6', 0], ['E6', 0.06], ['G6', 0.12]].forEach(([m, d]) => P(n(m), d, 0.05, 0.05, 'pulse12')); break;
