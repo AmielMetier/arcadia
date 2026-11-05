@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 4.36 — 5 novembre 2026
+- **The Backrooms** — les Poolrooms (Level 37) sont reconstruites salle par salle : fini le damier, chaque salle est dessinée avec sa propre forme et reliée aux autres par des portes en plein cintre.
+  - Des lagons aux bassins courbes, avec leur margelle arrondie, un îlot au milieu de l'eau et d'énormes colonnes.
+  - Des salles en voûtes d'arêtes au-dessus d'un grand bassin, avec leurs échelles chromées.
+  - Des tunnels inondés et sombres rythmés d'arcs, et des galeries voûtées claires.
+  - Des halles sous une longue verrière à deux pans, avec des hublots ronds sur les murs.
+  - Des pataugeoires à colonnes et des locaux techniques bas de plafond, où attendent les volants de vanne.
+  - Chaque partie assemble ces salles autrement.
+
 ## 4.35 — 5 novembre 2026
 - **The Backrooms** — les Poolrooms (Level 37) bien plus variées, inspirées des vraies photos du lieu.
   - Des couloirs inondés en tunnels voûtés, rythmés d'arcs, qui s'enfoncent à perte de vue.

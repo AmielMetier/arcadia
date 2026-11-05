@@ -1108,6 +1108,11 @@ test("Level 37 (Poolrooms) : salles et bassins reliés, 3 vannes et l'ascenseur 
     assert.equal(m.depthAt(m.exit.x, m.exit.z), 0, "on attend l'ascenseur au sec");
     assert.ok(m.walkable.some((c) => m.depth[c.z * m.W + c.x] >= 0.5), `graine ${sd} : des bassins`);
     for (const it of m.items) assert.equal(m.depthAt(it.x, it.z), 0, 'les objets sont au sec');
+    // des salles préfabriquées : lagon, voûtes, couloirs… séparées par des cloisons percées de portes
+    assert.ok(m.rooms.length >= 12, `graine ${sd} : ${m.rooms.length} salles`);
+    assert.equal(m.rooms.filter((r) => r.type === 'tech').length >= 3, true, `graine ${sd} : 3 locaux techniques`);
+    for (const sg of m.segs) assert.ok(m.collide((sg.x0 + sg.x1) / 2, (sg.z0 + sg.z1) / 2, 0.38), 'une cloison arrête le joueur');
+    for (const d of m.doors) assert.ok(!m.collide(d.px, d.pz, 0.38), 'on passe par une porte');
   }
   // dans l'eau, on avance moins vite
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 5, level: 2 });
@@ -1135,6 +1140,32 @@ test("Level 37 (Poolrooms) : salles et bassins reliés, 3 vannes et l'ascenseur 
   run(sim, 5);
   assert.equal(P.status, 'alive');
   assert.equal(sim.monster.mode, 'patrol');
+});
+
+test('Level 37 : on traverse chaque porte en marchant, les cloisons arrêtent le joueur', () => {
+  let crossed = 0;
+  for (const sd of [1, 2, 3, 4, 5, 6]) {
+    const sim = new BackroomsSim({ difficulty: 'peaceful', seed: sd, level: 2 });
+    for (const d of sim.map.doors) {
+      const nx = d.along === 'z' ? 1 : 0;
+      const nz = d.along === 'x' ? 1 : 0;
+      let x = d.px - nx * 1.2;
+      let z = d.pz - nz * 1.2;
+      if (sim.isColliding(x, z, 0.38, 0)) {
+        x = d.px + nx * 1.2;
+        z = d.pz + nz * 1.2;
+      }
+      const dir = Math.sign(d.px - x + (d.pz - z));
+      for (let i = 0; i < 80; i++) {
+        const p = sim.moveWithCollisions(x, z, nx * dir * 0.05, nz * dir * 0.05, 0.38, 0);
+        x = p.x;
+        z = p.z;
+      }
+      assert.ok((x - d.px) * nx * dir + (z - d.pz) * nz * dir > 1, `graine ${sd} : porte franchie`);
+      crossed++;
+    }
+  }
+  assert.ok(crossed > 60);
 });
 
 console.log(`\n${count} tests réussis pour The Backrooms !`);

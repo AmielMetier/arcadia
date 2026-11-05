@@ -209,7 +209,8 @@ export function createBackroomsScene(container, floors) {
         if (!own || cx !== gx || cz !== gz) return false;
         inOwn += d / n;
       }
-      return inOwn < 0.7;
+      // Poolrooms : la lumière ne traverse pas les cloisons minces entre deux salles
+      return inOwn < 0.7 && !(map.lightBlocked && map.lightBlocked(lx, lz, px, pz));
     };
     // les néons des zones claires éclairent plus fort et plus loin
     const footprint = (l) => {
@@ -409,7 +410,7 @@ float bkCaust(vec2 uv, float t) {
     const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(W * CELL_SIZE, H * CELL_SIZE), ceilMat);
     ceiling.rotation.x = Math.PI / 2;
     ceiling.position.set((W * CELL_SIZE) / 2, CEIL, (H * CELL_SIZE) / 2);
-    group.add(ceiling);
+    if (!L2) group.add(ceiling); // Poolrooms : chaque salle a son propre plafond (voir water.js)
 
     // 3. Murs au papier peint jaune
     let wallCount = 0;
@@ -463,9 +464,9 @@ float bkCaust(vec2 uv, float t) {
     const OFF = new THREE.Color(L2 ? '#7d8b8d' : '#4a473c'); // aux Poolrooms, un diffuseur éteint reste gris-bleu
     const fixtures = new THREE.InstancedMesh(L2 ? new THREE.BoxGeometry(1.3, 0.03, 1.3) : L1 ? new THREE.BoxGeometry(1.55, 0.05, 0.12) : new THREE.BoxGeometry(1.22, 0.04, 0.62), new THREE.MeshBasicMaterial({ color: '#ffffff', map: L1 || L2 ? null : textures.lamp }), map.lights.length);
     map.lights.forEach((l, i) => {
-      dummy.position.set(l.x, CEIL - (L1 ? 0.45 : 0.025), l.z); // au Level 1, les tubes pendent sous le plafond
+      dummy.position.set(l.x, l.fy !== undefined ? l.fy : CEIL - (L1 ? 0.45 : 0.025), l.z); // au Level 1, les tubes pendent sous le plafond
       // Poolrooms : la lampe d'un couloir voûté est cachée dans la voûte ; sous une verrière, tout le plafond éclaire
-      dummy.scale.setScalar(l.hidden ? 0.0001 : l.sky ? 1.82 : 1);
+      dummy.scale.setScalar(l.hidden ? 0.0001 : l.fs || 1);
       dummy.updateMatrix();
       fixtures.setMatrixAt(i, dummy.matrix);
       fixtures.setColorAt(i, l.state === 'off' ? OFF : ON);
@@ -573,7 +574,7 @@ float bkCaust(vec2 uv, float t) {
     const aboveHoles = fi > 0 ? holesOf(floors[fi - 1]) : [];
     const holeAbove = (x, z) => aboveHoles.some((h) => Math.abs((x + 0.5) * CELL_SIZE - h.x) < h.hx + 0.6 && Math.abs((z + 0.5) * CELL_SIZE - h.z) < h.hz + 0.6);
     const rates = L2
-      ? { outlet: 0, fire_alarm: 0.003, power_box_01: 0, wall_clock: 0.003, drawing: 0 }
+      ? { outlet: 0, fire_alarm: 0, power_box_01: 0, wall_clock: 0, drawing: 0 }
       : L1
       ? { outlet: 0.02, fire_alarm: 0.01, power_box_01: 0.012, wall_clock: 0, drawing: 0 }
       : { outlet: 0.05, fire_alarm: 0.008, power_box_01: 0.003, wall_clock: 0.004, drawing: 0.016 };

@@ -324,6 +324,9 @@ export class BackroomsSim {
   }
 
   isColliding(x, z, radius, floor = 0) {
+    // Poolrooms : cloisons minces entre les salles et colonnes
+    const cm = this.fm(floor);
+    if (cm.collide && cm.collide(x, z, radius)) return true;
     const minGx = cellOf(x - radius);
     const maxGx = cellOf(x + radius);
     const minGz = cellOf(z - radius);

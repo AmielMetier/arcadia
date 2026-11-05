@@ -1,224 +1,391 @@
-// The Backrooms (Level 37, les Poolrooms) - Le sol qui suit la profondeur de chaque case, les parois carrelées des
-// bassins, les margelles, la surface de l'eau (limpide, cyan, de plus en plus sombre avec la profondeur, avec les ronds
-// des pas des joueurs), et deux choses qu'on n'est jamais sûr d'avoir vues : l'eau qui monte ou descend de quelques
-// centimètres quand on ne la regarde pas, et une ombre longue qui glisse au fond d'un bassin.
+// The Backrooms (Level 37, les Poolrooms) - Le rendu des salles préfabriquées : sols en relief qui suivent la forme
+// des bassins (bords courbes, îlots, margelles), cloisons percées de portes en plein cintre, plafonds (plats, voûtes
+// d'arêtes, berceaux à arcs, verrière), colonnes, échelles chromées, hublots, et l'eau : limpide, vert d'eau, plus
+// sombre avec la profondeur, avec les ronds des pas. Et deux choses qu'on n'est jamais sûr d'avoir vues : l'eau qui
+// monte ou descend de quelques centimètres quand on ne la regarde pas, et une ombre longue au fond d'un bassin.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
-import { CELL_SIZE, T } from '../engine/map.js';
-import { BARREL, GROIN } from '../engine/poolrooms.js';
+import { CELL_SIZE } from '../engine/map.js';
+import { POOL_CEIL, WALL_T, roomDepth, poolSdf, islandSdf } from '../engine/poolrooms.js';
 
 const C = CELL_SIZE;
 const SPLASHES = 8;
+const BOTTOM = -1.3; // les murs descendent jusque-là, sous les bassins
+const GROIN = { spring: POOL_CEIL - 2.2, rise: 2.2 };
+const BARREL = { spring: POOL_CEIL - 2.5, r: 2.5 };
+const RIDGE = 7.5; // faîtage de la verrière
+
+// géométrie à partir de listes : positions, uv (et une valeur par sommet, en option)
+function geometry(pos, uv, extra) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  if (uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  if (extra) g.setAttribute(extra.name, new THREE.Float32BufferAttribute(extra.data, 1));
+  g.computeVertexNormals();
+  return g;
+}
 
 export function buildWater({ map, group, baked, textures, bake, fog }) {
-  const W = map.W;
-  const H = map.H;
-  const depth = map.depth;
-  const floorLike = (x, z) => x >= 0 && z >= 0 && x < W && z < H && (map.grid[z * W + x] === T.FLOOR || map.grid[z * W + x] === T.PILLAR);
-  const dAt = (x, z) => depth[z * W + x];
-  const dummy = new THREE.Object3D();
-
-  // --- sols : une dalle par case, à la hauteur du fond (carrelage blanc au sec et dans les pataugeoires, cyan dans les
-  // bassins, bleu profond au centre des grands bassins) ---
-  const mats = {
-    white: baked(new THREE.MeshLambertMaterial({ map: textures.carpet })),
-    pool: baked(new THREE.MeshLambertMaterial({ map: textures.pool })),
-    deep: baked(new THREE.MeshLambertMaterial({ map: textures.deep })),
-  };
-  const kindOf = (d) => (d >= 1 ? 'deep' : d >= 0.5 ? 'pool' : 'white');
-  const floors = { white: [], pool: [], deep: [] };
-  const sides = { white: [], pool: [], deep: [] };
-  const coping = [];
-  const waterCells = [];
-  for (let z = 0; z < H; z++) {
-    for (let x = 0; x < W; x++) {
-      if (!floorLike(x, z)) continue;
-      const d = dAt(x, z);
-      floors[kindOf(d)].push({ x, z, d });
-      if (d > 0) waterCells.push({ x, z, d });
-      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        if (!floorLike(x + dx, z + dz)) continue;
-        const n = dAt(x + dx, z + dz);
-        // paroi entre une case profonde et sa voisine moins profonde, tournée vers la profonde
-        if (d > n + 0.01) sides[kindOf(d)].push({ x, z, dx, dz, top: -n, bottom: -d });
-        // margelle : le bord sec d'un bassin
-        if (d === 0 && n >= 0.5) coping.push({ x, z, dx, dz });
-      }
-    }
-  }
-  const flat = new THREE.PlaneGeometry(C, C).rotateX(-Math.PI / 2);
-  for (const k of ['white', 'pool', 'deep']) {
-    const list = floors[k];
-    if (!list.length) continue;
-    const inst = new THREE.InstancedMesh(flat, mats[k], list.length);
-    list.forEach((c, i) => {
-      dummy.position.set((c.x + 0.5) * C, -c.d, (c.z + 0.5) * C);
-      dummy.rotation.set(0, 0, 0);
-      dummy.scale.set(1, 1, 1);
-      dummy.updateMatrix();
-      inst.setMatrixAt(i, dummy.matrix);
-    });
-    inst.instanceMatrix.needsUpdate = true;
-    group.add(inst);
-  }
-  const wallQuad = new THREE.PlaneGeometry(1, 1);
-  for (const k of ['white', 'pool', 'deep']) {
-    const list = sides[k];
-    if (!list.length) continue;
-    const inst = new THREE.InstancedMesh(wallQuad, mats[k], list.length);
-    list.forEach((s, i) => {
-      dummy.position.set((s.x + 0.5) * C + s.dx * (C / 2), (s.top + s.bottom) / 2, (s.z + 0.5) * C + s.dz * (C / 2));
-      dummy.rotation.set(0, Math.atan2(-s.dx, -s.dz), 0); // la paroi regarde la case profonde
-      dummy.scale.set(C, s.top - s.bottom, 1);
-      dummy.updateMatrix();
-      inst.setMatrixAt(i, dummy.matrix);
-    });
-    inst.instanceMatrix.needsUpdate = true;
-    group.add(inst);
-  }
-  if (coping.length) {
-    const inst = new THREE.InstancedMesh(new THREE.BoxGeometry(C, 0.06, 0.3), baked(new THREE.MeshLambertMaterial({ color: '#f3f5f1' })), coping.length);
-    coping.forEach((c, i) => {
-      dummy.position.set((c.x + 0.5) * C + c.dx * (C / 2 - 0.15), 0.02, (c.z + 0.5) * C + c.dz * (C / 2 - 0.15));
-      dummy.rotation.set(0, c.dx ? Math.PI / 2 : 0, 0);
-      dummy.scale.set(1, 1, 1);
-      dummy.updateMatrix();
-      inst.setMatrixAt(i, dummy.matrix);
-    });
-    inst.instanceMatrix.needsUpdate = true;
-    group.add(inst);
-  }
-
-  // --- voûtes : couloirs en berceau (avec un arc doubleau une case sur deux) et voûtes d'arêtes des grandes salles,
-  // carrelées de mosaïque comme le reste ---
   const mosaic = baked(new THREE.MeshLambertMaterial({ map: textures.mosaic, side: THREE.DoubleSide }));
-  const ribMat = baked(new THREE.MeshLambertMaterial({ map: textures.mosaic, color: '#d8e4e3', side: THREE.DoubleSide }));
-  // un quart de berceau : l'axe le long de x (une case), de la naissance (z = -R) au sommet (z = 0)
-  const quarter = (R, len, seg = 12) => {
-    const g = new THREE.BufferGeometry();
-    const p = [];
-    const uv = [];
-    const idx = [];
-    for (let i = 0; i <= seg; i++) {
-      const t = (i / seg) * (Math.PI / 2);
-      for (const a of [-len / 2, len / 2]) {
-        p.push(a, BARREL.spring + R * Math.sin(t), -R * Math.cos(t));
-        uv.push((a + len / 2) / C, (R * t) / C);
+  const wallMat = baked(new THREE.MeshLambertMaterial({ map: textures.mosaic }));
+  const mats = {
+    dry: baked(new THREE.MeshLambertMaterial({ map: textures.carpet })),
+    pool: baked(new THREE.MeshLambertMaterial({ map: textures.pool, side: THREE.DoubleSide })),
+    coping: baked(new THREE.MeshLambertMaterial({ color: '#f1f3ef' })),
+  };
+  const add = (geo, mat) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.frustumCulled = false;
+    group.add(m);
+    return m;
+  };
+
+  // --- 1. Sols en relief et surface de l'eau, salle par salle ---
+  const fl = { dry: [[], []], pool: [[], []], coping: [[], []] };
+  const wPos = [];
+  const wDep = [];
+  const deepSpots = [];
+  const waterSpots = [];
+  for (const r of map.rooms) {
+    let x0 = r.x0;
+    let x1 = r.x1;
+    let z0 = r.z0;
+    let z1 = r.z1;
+    // un couloir n'occupe que le milieu de son module (5 m)
+    if (r.axis === 'x') {
+      z0 += C;
+      z1 -= C;
+    } else if (r.axis === 'z') {
+      x0 += C;
+      x1 -= C;
+    }
+    const step = r.flat !== undefined ? 1.25 : 0.25;
+    const nx = Math.round((x1 - x0) / step);
+    const nz = Math.round((z1 - z0) / step);
+    // les points proches d'un bord (le bassin, la margelle, un îlot) sont recalés dessus : des bords bien ronds
+    const COP = 0.32;
+    const snap = (x, z, f, off) => {
+      const v = f(x, z) - off;
+      if (!(Math.abs(v) < step * 0.75)) return null;
+      const e = 0.02;
+      const gx = (f(x + e, z) - f(x - e, z)) / (2 * e);
+      const gz = (f(x, z + e) - f(x, z - e)) / (2 * e);
+      const g2 = gx * gx + gz * gz || 1;
+      return [x - (v * gx) / g2, z - (v * gz) / g2];
+    };
+    const ps = (x, z) => poolSdf(r, x, z);
+    const is = (x, z) => islandSdf(r, x, z);
+    const P = [];
+    for (let j = 0; j <= nz; j++) {
+      for (let i = 0; i <= nx; i++) {
+        let x = x0 + i * step;
+        let z = z0 + j * step;
+        // pas les points du bord de la salle (ils touchent les murs)
+        if (r.flat === undefined && i > 0 && j > 0 && i < nx && j < nz) {
+          const q = ((r.islands || []).length ? snap(x, z, is, 0) : null) || snap(x, z, ps, 0) || snap(x, z, ps, COP);
+          if (q) [x, z] = q;
+        }
+        const d = roomDepth(r, x, z);
+        P.push({ x, z, d });
+        if (d >= 1) deepSpots.push({ x, z, d });
+        if (d > 0 && (i + j) % 4 === 0) waterSpots.push({ x, z });
       }
     }
-    for (let i = 0; i < seg; i++) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
-    g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    g.setIndex(idx);
-    g.computeVertexNormals();
-    return g;
-  };
-  const vaults = [];
-  const ribs = [];
-  if (map.ceilKind) {
-    for (let z = 0; z < H; z++) {
-      for (let x = 0; x < W; x++) {
-        const k = map.ceilKind[z * W + x];
-        if (!k) continue;
-        const cx = (x + 0.5) * C;
-        const cz = (z + 0.5) * C;
-        // la ligne de faîte du couloir est au bord commun des deux cases de sa largeur
-        const at = [null, [cx, cz + C / 2, 0], [cx, cz - C / 2, Math.PI], [cx + C / 2, cz, Math.PI / 2], [cx - C / 2, cz, -Math.PI / 2]][k];
-        vaults.push(at);
-        if ((k <= 2 ? x : z) % 2 === 0) ribs.push(at);
+    const at = (i, j) => P[j * (nx + 1) + i];
+    const tri = (a, b, c) => {
+      // le genre du triangle se lit en son centre
+      const mx = (a.x + b.x + c.x) / 3;
+      const mz = (a.z + b.z + c.z) / 3;
+      const md = roomDepth(r, mx, mz);
+      const sd = r.flat === undefined ? poolSdf(r, mx, mz) : null;
+      const wet = md > 0.01 || (sd !== null && sd < 0 && is(mx, mz) > 0);
+      const cop = !wet && sd !== null && sd >= 0 && sd < COP;
+      const k = r.flat !== undefined ? 'dry' : wet ? 'pool' : cop ? 'coping' : 'dry';
+      const [pos, uv] = fl[k];
+      for (const v of [a, b, c]) {
+        pos.push(v.x, cop ? 0.045 : -v.d, v.z);
+        uv.push(v.x / C, v.z / C);
+      }
+      if (wet || r.flat) for (const v of [a, b, c]) wPos.push(v.x, 0, v.z), wDep.push(v.d);
+    };
+    for (let j = 0; j < nz; j++) {
+      for (let i = 0; i < nx; i++) {
+        tri(at(i, j), at(i, j + 1), at(i + 1, j + 1));
+        tri(at(i, j), at(i + 1, j + 1), at(i + 1, j));
       }
     }
   }
-  const place = (geo, mat, list) => {
-    if (!list.length) return;
-    const inst = new THREE.InstancedMesh(geo, mat, list.length);
-    list.forEach(([x, z, r], i) => {
-      dummy.position.set(x, 0, z);
-      dummy.rotation.set(0, r, 0);
-      dummy.scale.set(1, 1, 1);
-      dummy.updateMatrix();
-      inst.setMatrixAt(i, dummy.matrix);
-    });
-    inst.instanceMatrix.needsUpdate = true;
-    inst.frustumCulled = false;
-    group.add(inst);
+  for (const k of ['dry', 'pool', 'coping']) if (fl[k][0].length) add(geometry(fl[k][0], fl[k][1]), mats[k]);
+
+  // --- 2. Cloisons entre les salles : un pan par bord commun, percé de ses portes en plein cintre ---
+  const runs = new Map();
+  for (const e of map.edges) {
+    const line = e.along === 'x' ? e.z0 : e.x0;
+    const key = `${e.along}:${line.toFixed(2)}`;
+    if (!runs.has(key)) runs.set(key, []);
+    runs.get(key).push(e.along === 'x' ? [e.x0, e.x1] : [e.z0, e.z1]);
+  }
+  const DW = map.doors.length ? map.doors[0].w / 2 : 1.5;
+  const SPRING = 1.7; // naissance de l'arc des portes (clé à 3,20 m)
+  const thresholds = [];
+  for (const [key, list] of runs) {
+    const [along, ls] = key.split(':');
+    const line = +ls;
+    list.sort((a, b) => a[0] - b[0]);
+    // bords contigus regroupés en pans
+    const spans = [];
+    for (const [a, b] of list) {
+      const last = spans[spans.length - 1];
+      if (last && Math.abs(last[1] - a) < 0.01) last[1] = b;
+      else spans.push([a, b]);
+    }
+    for (const [u0, u1] of spans) {
+      const ds = map.doors.filter((d) => d.along === along && Math.abs((along === 'x' ? d.pz : d.px) - line) < 0.01).map((d) => (along === 'x' ? d.px : d.pz)).filter((c) => c > u0 && c < u1).sort((a, b) => a - b);
+      const sh = new THREE.Shape();
+      sh.moveTo(u0, BOTTOM);
+      for (const c of ds) {
+        sh.lineTo(c - DW, BOTTOM);
+        sh.lineTo(c - DW, SPRING);
+        for (let k = 1; k <= 16; k++) {
+          const a = Math.PI - (k / 16) * Math.PI;
+          sh.lineTo(c + DW * Math.cos(a), SPRING + DW * Math.sin(a));
+        }
+        sh.lineTo(c + DW, BOTTOM);
+        // le seuil de la porte : le sol entre les deux salles, à la hauteur de la plus profonde
+        const px = along === 'x' ? c : line;
+        const pz = along === 'x' ? line : c;
+        const off = 0.6;
+        const da = map.depthAt(along === 'x' ? px : px - off, along === 'x' ? pz - off : pz);
+        const db = map.depthAt(along === 'x' ? px : px + off, along === 'x' ? pz + off : pz);
+        thresholds.push({ px, pz, along, d: Math.max(da, db) });
+      }
+      sh.lineTo(u1, BOTTOM);
+      sh.lineTo(u1, POOL_CEIL);
+      sh.lineTo(u0, POOL_CEIL);
+      sh.lineTo(u0, BOTTOM);
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: WALL_T, bevelEnabled: false, curveSegments: 4 });
+      // la mosaïque : 2,5 m par répétition
+      const uv = geo.attributes.uv;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / C, uv.getY(i) / C);
+      geo.translate(0, 0, -WALL_T / 2);
+      const m = add(geo, wallMat);
+      if (along === 'x') m.position.set(0, 0, line);
+      else {
+        m.rotation.y = -Math.PI / 2;
+        m.position.set(line, 0, 0);
+      }
+    }
+  }
+  for (const t of thresholds) {
+    const g = new THREE.BoxGeometry(t.along === 'x' ? DW * 2 : WALL_T + 0.02, -t.d - BOTTOM, t.along === 'x' ? WALL_T + 0.02 : DW * 2);
+    const m = add(g, mats.dry);
+    m.position.set(t.px, (BOTTOM - t.d) / 2, t.pz);
+    if (t.d > 0) {
+      // l'eau passe sous la porte
+      const hw = t.along === 'x' ? DW : WALL_T / 2 + 0.05;
+      const hd = t.along === 'x' ? WALL_T / 2 + 0.05 : DW;
+      wPos.push(t.px - hw, 0, t.pz - hd, t.px - hw, 0, t.pz + hd, t.px + hw, 0, t.pz + hd, t.px - hw, 0, t.pz - hd, t.px + hw, 0, t.pz + hd, t.px + hw, 0, t.pz - hd);
+      for (let i = 0; i < 6; i++) wDep.push(t.d);
+    }
+  }
+
+  // --- 3. Plafonds : plats, bas (locaux techniques), voûtes d'arêtes, berceaux à arcs, verrière ---
+  const flatCeil = [[], []];
+  const quad = (out, ax, az, bx, bz, y) => {
+    const [pos, uv] = out;
+    for (const [x, z] of [[ax, az], [ax, bz], [bx, bz], [ax, az], [bx, bz], [bx, az]]) {
+      pos.push(x, y, z);
+      uv.push(x / C, z / C);
+    }
   };
-  place(quarter(BARREL.r, C), mosaic, vaults);
-  place(quarter(BARREL.r - 0.12, 0.35), ribMat, ribs);
-  // voûtes d'arêtes : sur chaque travée, la plus haute des deux voûtes en berceau qui se croisent
-  if (map.bays && map.bays.length) {
-    const N = 18;
-    const p = [];
-    const uv = [];
-    const idx = [];
-    for (const b of map.bays) {
-      const base = p.length / 3;
-      for (let j = 0; j <= N; j++) {
-        for (let i = 0; i <= N; i++) {
+  const groin = [[], []];
+  const barrel = [[], []];
+  const ribs = [[], []];
+  const glass = [];
+  const beams = [];
+  const gables = [[], []];
+  for (const r of map.rooms) {
+    if (r.ceil === 'flat') quad(flatCeil, r.x0, r.z0, r.x1, r.z1, POOL_CEIL);
+    else if (r.ceil === 'low') {
+      quad(flatCeil, r.x0, r.z0, r.x1, r.z1, 3.2);
+      // sous le plafond bas d'un local technique, un caisson ferme le haut des murs
+      for (const [ax, az, bx, bz] of [[r.x0, r.z0, r.x1, r.z0], [r.x1, r.z0, r.x1, r.z1], [r.x1, r.z1, r.x0, r.z1], [r.x0, r.z1, r.x0, r.z0]]) {
+        const [pos, uv] = gables;
+        const L = Math.hypot(bx - ax, bz - az);
+        for (const [x, z, y, u] of [[ax, az, 3.2, 0], [bx, bz, 3.2, L], [bx, bz, POOL_CEIL, L], [ax, az, 3.2, 0], [bx, bz, POOL_CEIL, L], [ax, az, POOL_CEIL, 0]]) {
+          pos.push(x, y, z);
+          uv.push(u / C, y / C);
+        }
+      }
+    } else if (r.ceil === 'groin') {
+      const N = 16;
+      for (const b of r.bays) {
+        const pt = (i, j) => {
           const u = (i / N) * 2 - 1;
           const v = (j / N) * 2 - 1;
           const x = b.x0 + ((u + 1) / 2) * (b.x1 - b.x0);
           const z = b.z0 + ((v + 1) / 2) * (b.z1 - b.z0);
           const y = GROIN.spring + GROIN.rise * Math.max(Math.sqrt(Math.max(0, 1 - u * u)), Math.sqrt(Math.max(0, 1 - v * v)));
-          p.push(x, y, z);
-          uv.push((x + (y - GROIN.spring) * 0.6) / C, (z + (y - GROIN.spring) * 0.6) / C);
+          return [x, y, z];
+        };
+        for (let j = 0; j < N; j++) {
+          for (let i = 0; i < N; i++) {
+            for (const [a, c] of [[0, 0], [0, 1], [1, 1], [0, 0], [1, 1], [1, 0]]) {
+              const [x, y, z] = pt(i + a, j + c);
+              groin[0].push(x, y, z);
+              groin[1].push((x + (y - GROIN.spring) * 0.6) / C, (z + (y - GROIN.spring) * 0.6) / C);
+            }
+          }
         }
       }
-      for (let j = 0; j < N; j++) {
-        for (let i = 0; i < N; i++) {
-          const a = base + j * (N + 1) + i;
-          idx.push(a, a + N + 1, a + 1, a + 1, a + N + 1, a + N + 2);
+    } else if (r.ceil === 'barrel') {
+      // berceau sur 5 m de large, le long du couloir, et un arc doubleau tous les 2,5 m
+      const ax = r.axis === 'x';
+      const len = ax ? r.w : r.h;
+      const a0 = ax ? r.x0 : r.z0;
+      const mid = ax ? (r.z0 + r.z1) / 2 : (r.x0 + r.x1) / 2;
+      const SEG = 20;
+      const p = (u, t, R) => {
+        const lat = -R * Math.cos(t);
+        const y = BARREL.spring + R * Math.sin(t);
+        return ax ? [a0 + u, y, mid + lat] : [mid + lat, y, a0 + u];
+      };
+      for (let k = 0; k < SEG; k++) {
+        const t0 = (k / SEG) * Math.PI;
+        const t1 = ((k + 1) / SEG) * Math.PI;
+        for (const [u, t] of [[0, t0], [len, t0], [len, t1], [0, t0], [len, t1], [0, t1]]) {
+          barrel[0].push(...p(u, t, BARREL.r));
+          barrel[1].push(u / C, (t * BARREL.r) / C);
+        }
+        for (let u = C / 2; u < len; u += C) {
+          for (const [du, t] of [[-0.18, t0], [0.18, t0], [0.18, t1], [-0.18, t0], [0.18, t1], [-0.18, t1]]) {
+            ribs[0].push(...p(u + du, t, BARREL.r - 0.14));
+            ribs[1].push((u + du) / C, (t * BARREL.r) / C);
+          }
+        }
+      }
+    } else if (r.ceil === 'sky') {
+      // verrière à deux pans : de l'égout (4,5 m) au faîtage (7,5 m), le long de la grande longueur
+      const ax = r.long === 'x';
+      const L = ax ? r.w : r.h;
+      const S = ax ? r.h : r.w;
+      const a0 = ax ? r.x0 : r.z0;
+      const s0 = ax ? r.z0 : r.x0;
+      const P = (u, v, y) => (ax ? [a0 + u, y, s0 + v] : [s0 + v, y, a0 + u]);
+      for (const [v0, v1] of [[0, S / 2], [S, S / 2]]) {
+        glass.push(...P(0, v0, POOL_CEIL), ...P(L, v0, POOL_CEIL), ...P(L, v1, RIDGE), ...P(0, v0, POOL_CEIL), ...P(L, v1, RIDGE), ...P(0, v1, RIDGE));
+      }
+      for (let u = 0; u <= L + 0.01; u += C) beams.push({ P, u, S, ax });
+      // les pignons (triangles carrelés aux deux bouts)
+      for (const u of [0, L]) {
+        const tri = [P(u, 0, POOL_CEIL), P(u, S, POOL_CEIL), P(u, S / 2, RIDGE)];
+        for (const [x, y, z] of tri) {
+          gables[0].push(x, y, z);
+          gables[1].push((ax ? z : x) / C, y / C);
         }
       }
     }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    g.setIndex(idx);
-    g.computeVertexNormals();
-    const m = new THREE.Mesh(g, mosaic);
-    m.frustumCulled = false;
-    group.add(m);
+  }
+  if (flatCeil[0].length) add(geometry(flatCeil[0], flatCeil[1]), mosaic);
+  if (groin[0].length) add(geometry(groin[0], groin[1]), mosaic);
+  if (barrel[0].length) add(geometry(barrel[0], barrel[1]), mosaic);
+  if (ribs[0].length) add(geometry(ribs[0], ribs[1]), baked(new THREE.MeshLambertMaterial({ map: textures.mosaic, color: '#cddcda', side: THREE.DoubleSide })));
+  if (gables[0].length) add(geometry(gables[0], gables[1]), mosaic);
+  if (glass.length) {
+    // le verre laiteux : il éclaire (il ne prend pas la lumière, il la donne)
+    add(geometry(glass), new THREE.MeshBasicMaterial({ color: '#d9e8e6', side: THREE.DoubleSide, fog: false }));
+    const beamMat = new THREE.MeshLambertMaterial({ color: '#4a5658', emissive: '#4a5658', emissiveIntensity: 0.5 });
+    for (const b of beams) {
+      // une poutre de chaque côté, de l'égout au faîtage
+      for (const [v0, v1] of [[0, b.S / 2], [b.S, b.S / 2]]) {
+        const a = new THREE.Vector3(...b.P(b.u, v0, POOL_CEIL));
+        const c = new THREE.Vector3(...b.P(b.u, v1, RIDGE));
+        const len = a.distanceTo(c);
+        const m = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, len), beamMat);
+        m.position.copy(a).add(c).multiplyScalar(0.5);
+        m.lookAt(c);
+        m.position.y -= 0.12;
+        group.add(m);
+      }
+    }
   }
 
-  // --- échelles chromées : deux montants recourbés au-dessus de la margelle, trois marches sous l'eau ---
+  // --- 4. Colonnes, carrelées de mosaïque, du fond des bassins au plafond ---
+  const colKinds = new Map();
+  for (const c of map.cols) {
+    const key = c.r.toFixed(2);
+    if (!colKinds.has(key)) colKinds.set(key, []);
+    colKinds.get(key).push(c);
+  }
+  const dummy = new THREE.Object3D();
+  for (const [key, list] of colKinds) {
+    const r = +key;
+    const h = POOL_CEIL - BOTTOM;
+    const geo = new THREE.CylinderGeometry(r, r, h, 28, 1, true);
+    const uv = geo.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, (uv.getX(i) * 2 * Math.PI * r) / C, (uv.getY(i) * h) / C);
+    const inst = new THREE.InstancedMesh(geo, mosaic, list.length);
+    list.forEach((c, i) => {
+      dummy.position.set(c.x, (POOL_CEIL + BOTTOM) / 2, c.z);
+      dummy.updateMatrix();
+      inst.setMatrixAt(i, dummy.matrix);
+    });
+    inst.frustumCulled = false;
+    group.add(inst);
+  }
+
+  // --- 5. Hublots ronds sur les longs murs des halles sous verrière ---
+  const portMat = new THREE.MeshBasicMaterial({ color: '#8fb7b8' }); // le verre des hublots, un peu sombre
   const chrome = baked(new THREE.MeshLambertMaterial({ color: '#dfe5e8', emissive: '#596066', emissiveIntensity: 0.4 }));
+  const portGeo = new THREE.CircleGeometry(0.34, 24);
+  const ringGeo = new THREE.TorusGeometry(0.36, 0.04, 6, 24);
+  for (const r of map.rooms) {
+    if (r.ceil !== 'sky') continue;
+    const ax = r.long === 'x';
+    const L = ax ? r.w : r.h;
+    for (let u = C / 2; u < L; u += C) {
+      for (const [side, n] of [[0, 1], [1, -1]]) {
+        const x = ax ? r.x0 + u : side ? r.x1 - 0.02 : r.x0 + 0.02;
+        const z = ax ? (side ? r.z1 - 0.02 : r.z0 + 0.02) : r.z0 + u;
+        if (map.doors.some((d) => Math.hypot(d.px - x, d.pz - z) < 2.2)) continue;
+        if (map.collide(x + (ax ? 0 : n * 0.3), z + (ax ? n * 0.3 : 0), 0.05)) continue;
+        for (const [geo, mat, dz] of [[portGeo, portMat, 0.005], [ringGeo, chrome, 0.01]]) {
+          const m = new THREE.Mesh(geo, mat);
+          m.position.set(x + (ax ? 0 : n * dz), 2.3, z + (ax ? n * dz : 0));
+          m.rotation.y = ax ? (n > 0 ? 0 : Math.PI) : n > 0 ? Math.PI / 2 : -Math.PI / 2;
+          group.add(m);
+        }
+      }
+    }
+  }
+
+  // --- 6. Échelles chromées : deux montants recourbés au-dessus de la margelle, trois marches sous l'eau ---
   for (const l of map.ladders || []) {
     const g = new THREE.Group();
     for (const side of [-0.26, 0.26]) {
       const curve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(side, 0, -0.45),
-        new THREE.Vector3(side, 0.7, -0.4),
-        new THREE.Vector3(side, 0.95, -0.15),
-        new THREE.Vector3(side, 0.8, 0.12),
-        new THREE.Vector3(side, 0.1, 0.18),
-        new THREE.Vector3(side, -0.9, 0.18),
+        new THREE.Vector3(side, 0, -0.5),
+        new THREE.Vector3(side, 0.7, -0.45),
+        new THREE.Vector3(side, 0.95, -0.2),
+        new THREE.Vector3(side, 0.8, 0.07),
+        new THREE.Vector3(side, 0.1, 0.13),
+        new THREE.Vector3(side, -0.9, 0.13),
       ]);
       g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 0.025, 8, false), chrome));
     }
     for (const y of [-0.22, -0.48, -0.74]) {
-      const step = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.03, 0.09), chrome);
-      step.position.set(0, y, 0.2);
-      g.add(step);
+      const st = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.03, 0.09), chrome);
+      st.position.set(0, y, 0.15);
+      g.add(st);
     }
     g.position.set(l.x, 0, l.z);
     g.rotation.y = Math.atan2(l.dx, l.dz); // +z local = vers l'eau
     group.add(g);
   }
 
-  // --- la surface de l'eau : un carré par case mouillée, avec sa profondeur ---
-  const pos = [];
-  const dep = [];
-  for (const c of waterCells) {
-    const x0 = c.x * C;
-    const z0 = c.z * C;
-    const x1 = x0 + C;
-    const z1 = z0 + C;
-    pos.push(x0, 0, z0, x0, 0, z1, x1, 0, z1, x0, 0, z0, x1, 0, z1, x1, 0, z0);
-    for (let i = 0; i < 6; i++) dep.push(c.d);
-  }
+  // --- 7. La surface de l'eau ---
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute('aDepth', new THREE.Float32BufferAttribute(dep, 1));
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(wPos, 3));
+  geo.setAttribute('aDepth', new THREE.Float32BufferAttribute(wDep, 1));
   const splash = Array.from({ length: SPLASHES }, () => new THREE.Vector4(0, 0, -100, 0));
   const uniforms = {
     uTime: { value: 0 },
@@ -272,11 +439,10 @@ void main() {
   vec3 v = normalize(cameraPosition - vWorld);
   float fres = 0.03 + 0.97 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
   float light = texture2D(uBake, p * uBakeScale).r * 2.0;
-  float k = clamp(vDepth / 1.1, 0.0, 1.0);
-  // turquoise peu profond, cyan, bleu profond : l'absorption de l'eau
-  vec3 body = mix(vec3(0.6, 0.9, 0.84), vec3(0.04, 0.36, 0.42), k); // vert d'eau, puis bleu-vert sombre
+  float k = clamp(vDepth / 1.2, 0.0, 1.0);
+  // vert d'eau peu profond, puis bleu-vert sombre : l'absorption de l'eau
+  vec3 body = mix(vec3(0.6, 0.9, 0.84), vec3(0.04, 0.36, 0.42), k);
   vec3 sky = vec3(0.92, 0.97, 0.97) * (0.55 + light * 0.5);
-  // reflets des dalles lumineuses : des taches claires qui bougent avec la ride
   float glint = pow(max(dot(reflect(-v, n), vec3(0.0, 1.0, 0.0)), 0.0), 60.0) * 0.35;
   vec3 col = mix(body * (0.45 + light * 0.55), sky, fres) + glint;
   float alpha = clamp(mix(0.22, 0.72, k) + fres * 0.5, 0.0, 0.95);
@@ -292,13 +458,11 @@ void main() {
   surface.frustumCulled = false;
   group.add(surface);
 
-  // --- l'ombre au fond des bassins profonds ---
-  const [sc, sg] = (() => {
-    const c = document.createElement('canvas');
-    c.width = 256;
-    c.height = 64;
-    return [c, c.getContext('2d')];
-  })();
+  // --- 8. L'ombre au fond des bassins profonds ---
+  const sc = document.createElement('canvas');
+  sc.width = 256;
+  sc.height = 64;
+  const sg = sc.getContext('2d');
   sg.filter = 'blur(6px)';
   sg.fillStyle = '#000';
   sg.beginPath();
@@ -313,17 +477,16 @@ void main() {
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 0.9).rotateX(-Math.PI / 2), shadowMat);
   shadow.renderOrder = 2;
   group.add(shadow);
-  const deepCells = waterCells.filter((c) => c.d >= 1).length ? waterCells.filter((c) => c.d >= 1) : waterCells.filter((c) => c.d >= 0.5);
+  const ghostSpots = deepSpots.filter((_, i) => i % 7 === 0);
   let ghost = null;
   let nextGhost = 25 + Math.random() * 20;
 
-  // --- l'eau qui change de niveau quand on ne la regarde pas ---
+  // --- 9. L'eau qui change de niveau quand on ne la regarde pas ---
   let level = BASE;
   let levelWant = BASE;
   let nextShift = 30 + Math.random() * 30;
   const fwd = new THREE.Vector3();
-
-  const steps = new Map(); // dernier rond de chaque joueur
+  const steps = new Map();
   let si = 0;
 
   return {
@@ -334,27 +497,25 @@ void main() {
       uniforms.uTime.value = time;
       // un rond dans l'eau à chaque pas de chaque joueur qui marche dans l'eau
       for (const Q of sim.players) {
-        if (Q.status !== 'alive' || !Q.moving || !map.depthAt || map.depthAt(Q.x, Q.z) <= 0) continue;
+        if (Q.status !== 'alive' || !Q.moving || map.depthAt(Q.x, Q.z) <= 0) continue;
         const last = steps.get(Q.id) || 0;
         if (time - last < (Q.running ? 0.3 : 0.45)) continue;
         steps.set(Q.id, time);
         splash[si].set(Q.x, Q.z, time, Q.running ? 1.4 : 1);
         si = (si + 1) % SPLASHES;
       }
-      // le niveau de l'eau bouge de quelques centimètres, seulement quand le joueur regarde ailleurs (en l'air, ou
-      // loin de l'eau la plus proche)
+      // le niveau de l'eau bouge de quelques centimètres, seulement quand le joueur regarde ailleurs
       nextShift -= dt;
       camera.getWorldDirection(fwd);
-      if (nextShift <= 0) {
+      if (nextShift <= 0 && waterSpots.length) {
         let near = null;
-        for (const c of waterCells) {
-          const d = Math.hypot((c.x + 0.5) * C - P.x, (c.z + 0.5) * C - P.z);
-          if (!near || d < near.d) near = { c, d };
+        for (const w of waterSpots) {
+          const d = Math.hypot(w.x - P.x, w.z - P.z);
+          if (!near || d < near.d) near = { w, d };
         }
-        const away = !near || fwd.y > 0.25 || (fwd.x * ((near.c.x + 0.5) * C - P.x) + fwd.z * ((near.c.z + 0.5) * C - P.z)) / Math.max(0.1, near.d) < 0;
+        const away = fwd.y > 0.25 || (fwd.x * (near.w.x - P.x) + fwd.z * (near.w.z - P.z)) / Math.max(0.1, near.d) < 0;
         if (away) {
-          levelWant = BASE + (Math.random() < 0.5 ? -1 : 1) * (0.03 + Math.random() * 0.04);
-          if (Math.random() < 0.3) levelWant = BASE;
+          levelWant = Math.random() < 0.3 ? BASE : BASE + (Math.random() < 0.5 ? -1 : 1) * (0.03 + Math.random() * 0.04);
           nextShift = 25 + Math.random() * 35;
         }
       }
@@ -362,15 +523,14 @@ void main() {
       surface.position.y = level;
       // l'ombre : de temps en temps, elle traverse le fond d'un bassin profond pas trop loin, puis disparaît
       nextGhost -= dt;
-      if (!ghost && nextGhost <= 0 && deepCells.length) {
-        const near = deepCells.filter((c) => {
-          const d = Math.hypot((c.x + 0.5) * C - P.x, (c.z + 0.5) * C - P.z);
+      if (!ghost && nextGhost <= 0 && ghostSpots.length) {
+        const near = ghostSpots.filter((c) => {
+          const d = Math.hypot(c.x - P.x, c.z - P.z);
           return d > 5 && d < 20;
         });
         if (near.length) {
           const c = near[Math.floor(Math.random() * near.length)];
-          const a = Math.random() * Math.PI * 2;
-          ghost = { x: (c.x + 0.5) * C, z: (c.z + 0.5) * C, y: -c.d + 0.06, a, t: 0, len: 4 + Math.random() * 2 };
+          ghost = { x: c.x, z: c.z, y: -c.d + 0.06, a: Math.random() * Math.PI * 2, t: 0, len: 4 + Math.random() * 2 };
         }
         nextGhost = 30 + Math.random() * 40;
       }

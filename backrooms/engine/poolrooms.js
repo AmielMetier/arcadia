@@ -1,22 +1,28 @@
-// The Backrooms (Level 37) - Les Poolrooms : un complexe de bassins carrelés blancs et cyan, infini, propre et vide.
-// Des salles de tailles variées reliées par des couloirs inondés : pataugeoires à piliers ronds (20 cm d'eau), grands
-// bassins (plage sèche autour, 60 cm puis 1,10 m au centre), halles sèches à colonnes, et quelques locaux techniques où
-// attendent les 3 volants de vanne qui rouvrent l'ascenseur de sortie. Même grille de cases que les autres niveaux ;
-// depth donne la hauteur d'eau de chaque case (0 : sec), qui ralentit la marche.
+// The Backrooms (Level 37) - Les Poolrooms, assemblées à partir de salles préfabriquées.
+// Le niveau n'est plus un damier de cases : c'est une suite de salles dessinées, chacune avec sa propre forme, posées
+// sur une grille grossière de modules de 10 m (4 cases) et reliées par des portes en arc percées dans les cloisons.
+//   lagoon  2 × 2 modules : un bassin en haricot aux bords courbes, des îlots secs, de grosses colonnes (photo 1)
+//   groin   2 × 2 : un bassin aux angles arrondis sous des voûtes d'arêtes portées par des colonnes (photo 4)
+//   tunnel  1 × n : un couloir inondé, voûté, rythmé d'arcs, sombre, éclairé à ses bouts (photo 2)
+//   gallery 1 × n : une galerie voûtée claire, à l'eau aux chevilles (photo 3)
+//   sky     2 × 1 : une halle sous verrière, un long bassin, des échelles, des hublots (photo 5)
+//   wade    1 × 1 : une pataugeoire à quatre colonnes ; tech 1 × 1 : un local technique au sec (un volant de vanne)
+// Le moteur garde sa grille de cases de 2,5 m (les cases hors des salles, et les flancs pleins des couloirs, sont des
+// murs) ; en plus : les cloisons minces entre deux salles (segments, avec leurs portes), les colonnes (cercles), et la
+// profondeur d'eau donnée en tout point par la forme du bassin de chaque salle.
 // Bible de conception : « Bible de conception — Les Poolrooms (Level 37) ».
-import { CELL_SIZE, T, bfs, carveElevator, itemList } from './map.js';
+import { CELL_SIZE, T, itemList } from './map.js';
 
-export const POOL_SIZE = 56;
-export const POOL_CEIL = 4.0;
-// profondeurs (m) : pataugeoire, couloir inondé, bassin, centre du grand bassin
-export const DEPTH = { WADE: 0.2, HALL: 0.4, POOL: 0.6, DEEP: 1.1 };
-// voûtes : couloirs en berceau (demi-cercle de 2,5 m de rayon sur 2 cases, naissance à 1,5 m) et grandes salles
-// en voûtes d'arêtes entre de grosses colonnes (naissance à 1,8 m, flèche de 2,2 m) : le sommet touche le plafond.
-// ceilKind (par case) : 0 plafond plat, 1 et 2 berceau dans l'axe x (moitié côté z-, moitié côté z+), 3 et 4 dans l'axe z
-export const BARREL = { spring: 1.5, r: 2.5 };
-export const GROIN = { spring: 1.8, rise: 2.2 };
+const C = CELL_SIZE;
+export const MOD = 4; // un module = 4 cases = 10 m
+export const MODS = 12; // 12 × 12 modules
+export const POOL_SIZE = MODS * MOD + 2;
+export const POOL_CEIL = 4.5;
+export const WALL_T = 0.3; // épaisseur d'une cloison
+export const DOOR = { w: 3, h: 3.2 }; // une porte en plein cintre : 3 m de large, 3,20 m sous la clé
+export const DEPTH = { WADE: 0.2, GALLERY: 0.25, TUNNEL: 0.6 };
 
-// objets abandonnés au bord des bassins (Poly Haven, CC0) ; float : posé sur l'eau
+// objets abandonnés au bord des bassins (Poly Haven, CC0) ; face : dos au mur
 export const L37_PROPS = [
   { m: 'plastic_monobloc_chair_01', h: 0.8, r: 0.3, chair: true },
   { m: 'WetFloorSign_01', h: 0.62, r: 0.22 },
@@ -24,12 +30,44 @@ export const L37_PROPS = [
   { m: 'lifebuoy', h: 0.12, r: 0.36 },
 ];
 
+// --- formes (distance signée : négative à l'intérieur) ---
+const smin = (a, b, k) => {
+  const h = Math.max(k - Math.abs(a - b), 0) / k;
+  return Math.min(a, b) - h * h * k * 0.25;
+};
+export const sdCircle = (x, z, c) => Math.hypot(x - c.x, z - c.z) - c.r;
+export const sdRoundRect = (x, z, b) => {
+  const qx = Math.abs(x - b.cx) - b.hx + b.rad;
+  const qz = Math.abs(z - b.cz) - b.hz + b.rad;
+  return Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0) - b.rad;
+};
+// le bord du bassin d'une salle (null : pas de bassin), et ses îlots
+export function poolSdf(room, x, z) {
+  if (room.blobs) {
+    let d = Infinity;
+    for (const b of room.blobs) d = d === Infinity ? sdCircle(x, z, b) : smin(d, sdCircle(x, z, b), 2.2);
+    return d;
+  }
+  if (room.basin) return sdRoundRect(x, z, room.basin);
+  return null;
+}
+export function islandSdf(room, x, z) {
+  let d = Infinity;
+  for (const b of room.islands || []) d = Math.min(d, sdCircle(x, z, b));
+  return d;
+}
+// hauteur d'eau d'une salle en un point : un bassin a un bord franc de 45 cm puis descend doucement
+export function roomDepth(room, x, z) {
+  if (room.flat !== undefined) return room.flat;
+  const s = poolSdf(room, x, z);
+  if (s === null || s >= 0) return 0;
+  if (islandSdf(room, x, z) < 0) return 0;
+  return Math.min(room.maxDepth, 0.45 + -s * 0.45);
+}
+
 export function createPoolMap(seed = 37) {
   const W = POOL_SIZE;
   const H = POOL_SIZE;
-  const grid = new Uint8Array(W * H).fill(T.WALL);
-  const depth = new Float32Array(W * H);
-
   let s = (seed >>> 0) || 1;
   const rnd = () => {
     s = (s + 0x6d2b79f5) >>> 0;
@@ -39,309 +77,445 @@ export function createPoolMap(seed = 37) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
   const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
-  const inside = (x, z) => x > 0 && x < W - 1 && z > 0 && z < H - 1;
-  const get = (x, z) => (x < 0 || x >= W || z < 0 || z >= H ? T.WALL : grid[z * W + x]);
-  const set = (x, z, v, d = 0) => {
-    if (!inside(x, z)) return;
-    grid[z * W + x] = v;
-    depth[z * W + x] = d;
-  };
-  const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
-  // 1. Les salles : rectangles qui ne se touchent pas (au moins un mur entre deux)
+  // 1. Les salles sur la grille des modules : on part d'un lagon au centre et on greffe des salles sur les côtés
+  const mod = new Int16Array(MODS * MODS).fill(-1);
   const rooms = [];
-  for (let i = 0; i < 400 && rooms.length < 24; i++) {
-    const w = 4 + Math.floor(rnd() * 10);
-    const h = 4 + Math.floor(rnd() * 10);
-    const x = 2 + Math.floor(rnd() * (W - w - 4));
-    const z = 2 + Math.floor(rnd() * (H - h - 4));
-    if (rooms.some((r) => x < r.x + r.w + 2 && x + w + 2 > r.x && z < r.z + r.h + 2 && z + h + 2 > r.z)) continue;
-    rooms.push({ x, z, w, h, cx: x + (w >> 1), cz: z + (h >> 1) });
-  }
-
-  // 2. Rôle de chaque salle. Le départ : la salle la plus centrale. Les locaux techniques : 3 petites salles loin du
-  // départ. Les autres : pataugeoire, grand bassin ou halle sèche à colonnes.
-  const start = rooms.reduce((b, r) => (Math.hypot(r.cx - W / 2, r.cz - H / 2) < Math.hypot(b.cx - W / 2, b.cz - H / 2) ? r : b));
-  start.kind = 'wade';
-  const small = rooms.filter((r) => r !== start && r.w * r.h <= 42).sort((a, b) => Math.hypot(b.cx - start.cx, b.cz - start.cz) - Math.hypot(a.cx - start.cx, a.cz - start.cz));
-  const techs = [];
-  for (const r of small) {
-    if (techs.length === 3) break;
-    if (techs.every((t) => Math.hypot(t.cx - r.cx, t.cz - r.cz) > 12)) {
-      r.kind = 'tech';
-      techs.push(r);
-    }
-  }
-  for (const r of rooms) {
-    if (r.kind) continue;
-    const big = r.w >= 7 && r.h >= 7;
-    const v = rnd();
-    // les plus grandes salles : des voûtes d'arêtes sur colonnes, inondées
-    if (r.w >= 9 && r.h >= 9 && v < 0.55) {
-      r.kind = 'vault';
-      r.deep = rnd() < 0.5;
-    } else r.kind = big && v < 0.6 ? 'pool' : v < 0.8 ? 'wade' : 'hall';
-  }
-  // ambiances : des halles sous verrière, éblouissantes, et des salles sombres, bleutées, presque sans lumière
-  for (const r of rooms) {
-    if (r === start || r.kind === 'tech') continue;
-    const v = rnd();
-    if ((r.kind === 'pool' || r.kind === 'wade') && v < 0.3) r.sky = true;
-    else if (v > 0.78) r.dark = true;
-  }
-
-  // 3. On creuse les salles
-  for (const r of rooms) {
-    for (let z = r.z; z < r.z + r.h; z++) {
-      for (let x = r.x; x < r.x + r.w; x++) {
-        let d = 0;
-        if (r.kind === 'wade') d = DEPTH.WADE;
-        else if (r.kind === 'vault') {
-          const edge = Math.min(x - r.x, r.x + r.w - 1 - x, z - r.z, r.z + r.h - 1 - z);
-          d = r.deep ? (edge === 0 ? 0 : DEPTH.POOL) : DEPTH.WADE;
-        } else if (r.kind === 'pool') {
-          // une plage sèche d'une case tout autour, le bassin, et le centre plus profond
-          const edge = Math.min(x - r.x, r.x + r.w - 1 - x, z - r.z, r.z + r.h - 1 - z);
-          d = edge === 0 ? 0 : edge >= 2 && r.w >= 8 && r.h >= 8 ? DEPTH.DEEP : DEPTH.POOL;
-        }
-        set(x, z, T.FLOOR, d);
-      }
-    }
-  }
-
-  // 3b. Une passerelle sèche traverse certains grands bassins
-  for (const r of rooms) {
-    if (r.kind !== 'pool' || (r.w < 8 && r.h < 8) || rnd() < 0.4) continue;
-    const alongX = r.w >= r.h;
-    const mid = alongX ? r.z + (r.h >> 1) : r.x + (r.w >> 1);
-    for (let k = alongX ? r.x : r.z; k < (alongX ? r.x + r.w : r.z + r.h); k++) depth[(alongX ? mid : k) * W + (alongX ? k : mid)] = 0;
-  }
-
-  // 4. Couloirs inondés (2 cases de large) entre les salles : un arbre couvrant, plus quelques boucles
-  const ceilKind = new Uint8Array(W * H);
-  const corridor = (a, b) => {
-    const horizFirst = rnd() < 0.5;
-    // axis : 'x' ou 'z', le sens du couloir (pour sa voûte en berceau) ; null au coude
-    const carve = (x, z, axis) => {
-      for (const [ox, oz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
-        const k = (z + oz) * W + x + ox;
-        if (!inside(x + ox, z + oz)) continue;
-        if (grid[k] === T.FLOOR) continue; // on garde la profondeur des salles traversées
-        set(x + ox, z + oz, T.FLOOR, DEPTH.HALL);
-        ceilKind[k] = axis === 'x' ? 1 + oz : axis === 'z' ? 3 + ox : 0;
-      }
-    };
-    let x = a.cx;
-    let z = a.cz;
-    const stepX = () => {
-      while (x !== b.cx) {
-        carve(x, z, 'x');
-        x += Math.sign(b.cx - x);
-      }
-    };
-    const stepZ = () => {
-      while (z !== b.cz) {
-        carve(x, z, 'z');
-        z += Math.sign(b.cz - z);
-      }
-    };
-    if (horizFirst) {
-      stepX();
-      stepZ();
-    } else {
-      stepZ();
-      stepX();
-    }
-    carve(x, z, null);
+  const doors = [];
+  const free = (mx, mz, mw, mh) => {
+    if (mx < 0 || mz < 0 || mx + mw > MODS || mz + mh > MODS) return false;
+    for (let j = mz; j < mz + mh; j++) for (let i = mx; i < mx + mw; i++) if (mod[j * MODS + i] >= 0) return false;
+    return true;
   };
-  const linked = [start];
-  const left = rooms.filter((r) => r !== start);
-  while (left.length) {
-    let best = null;
-    for (const a of linked) {
-      for (const b of left) {
-        const d = Math.abs(a.cx - b.cx) + Math.abs(a.cz - b.cz);
-        if (!best || d < best.d) best = { a, b, d };
-      }
-    }
-    corridor(best.a, best.b);
-    linked.push(best.b);
-    left.splice(left.indexOf(best.b), 1);
-  }
-  for (let i = 0; i < 4; i++) corridor(pick(rooms), pick(rooms));
-  // un local technique reste au sec, et le grand bassin garde sa plage : un couloir qui les traverse s'assèche
-  for (const r of rooms) {
-    if (r.kind !== 'tech') continue;
-    for (let z = r.z; z < r.z + r.h; z++) for (let x = r.x; x < r.x + r.w; x++) depth[z * W + x] = 0;
-  }
-
-  // 5. Piliers ronds : en quinconce dans les pataugeoires et les halles, jamais contre un mur ni devant un passage
-  const pillars = {};
-  const bays = [];
-  for (const r of rooms) {
-    if (r.kind !== 'vault') continue;
-    // grosses colonnes toutes les 3 cases ; entre elles (et les murs), une voûte d'arêtes par travée
-    const px = [];
-    const pz = [];
-    for (let x = r.x + 2; x <= r.x + r.w - 3; x += 3) px.push(x);
-    for (let z = r.z + 2; z <= r.z + r.h - 3; z += 3) pz.push(z);
-    for (const x of px) {
-      for (const z of pz) {
-        const k = z * W + x;
-        grid[k] = T.PILLAR;
-        pillars[k] = { x: (x + 0.5) * CELL_SIZE, z: (z + 0.5) * CELL_SIZE, h: 0.5, round: true };
-      }
-    }
-    const xs = [r.x * CELL_SIZE, ...px.map((x) => (x + 0.5) * CELL_SIZE), (r.x + r.w) * CELL_SIZE];
-    const zs = [r.z * CELL_SIZE, ...pz.map((z) => (z + 0.5) * CELL_SIZE), (r.z + r.h) * CELL_SIZE];
-    for (let i = 0; i + 1 < xs.length; i++) for (let j = 0; j + 1 < zs.length; j++) bays.push({ x0: xs[i], x1: xs[i + 1], z0: zs[j], z1: zs[j + 1] });
-  }
-  for (const r of rooms) {
-    if (r.kind !== 'wade' && r.kind !== 'hall') continue;
-    if (r.w < 5 || r.h < 5) continue;
-    for (let z = r.z + 2; z < r.z + r.h - 2; z += 3) {
-      for (let x = r.x + 2; x < r.x + r.w - 2; x += 3) {
-        if (r === start && Math.abs(x - r.cx) <= 1 && Math.abs(z - r.cz) <= 1) continue;
-        const k = z * W + x;
-        if (DIRS.some(([dx, dz]) => get(x + dx, z + dz) !== T.FLOOR)) continue;
-        grid[k] = T.PILLAR;
-        pillars[k] = { x: (x + 0.5) * CELL_SIZE, z: (z + 0.5) * CELL_SIZE, h: r.kind === 'hall' ? 0.6 : [0.32, 0.45][Math.floor(rnd() * 2)], round: true };
-      }
-    }
-  }
-
-  // 6. Tout ce qui n'est pas relié au départ redevient mur
-  const sx = start.cx;
-  const sz = start.cz;
-  set(sx, sz, T.FLOOR, depth[sz * W + sx]);
-  let dist = bfs(grid, W, H, sx, sz);
-  for (let i = 0; i < W * H; i++) {
-    if (grid[i] === T.FLOOR && dist[i] < 0) {
-      grid[i] = T.WALL;
-      depth[i] = 0;
-    }
-    if (grid[i] !== T.FLOOR) ceilKind[i] = 0;
-  }
-  const walkable = [];
-  for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) if (grid[z * W + x] === T.FLOOR) walkable.push({ x, z });
-  const D = (c) => dist[c.z * W + c.x];
-  const cellPos = (c) => ({ x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE, gx: c.x, gz: c.z });
-  const spawn = cellPos({ x: sx, z: sz });
-  const dry = (c) => depth[c.z * W + c.x] === 0;
-
-  // 7. L'ascenseur de sortie : creusé dans un mur, au bord sec d'une salle loin du départ
-  const far = walkable.filter((c) => D(c) > 0 && dry(c)).sort((a, b) => D(b) - D(a));
-  let exitCell = null;
-  let elevator = null;
-  for (let i = 0; i < 80 && !elevator; i++) {
-    exitCell = far[Math.floor(rnd() * Math.min(15 + i * 5, far.length))];
-    elevator = carveElevator(grid, W, H, exitCell, { x: sx, z: sz }, rnd);
-  }
-  for (let i = walkable.length - 1; i >= 0; i--) if (grid[walkable[i].z * W + walkable[i].x] !== T.FLOOR) walkable.splice(i, 1);
-  dist = bfs(grid, W, H, sx, sz);
-  const exit = cellPos(exitCell);
-  const maxD = Math.max(...walkable.map((c) => D(c)));
-
-  // 8. Les 3 volants de vanne : au milieu des locaux techniques (sinon dans un coin sec et lointain)
-  const fuses = [];
-  const taken = [exitCell];
-  for (const r of techs) {
-    const c = walkable.find((q) => q.x === r.cx && q.z === r.cz) || walkable.find((q) => q.x >= r.x && q.x < r.x + r.w && q.z >= r.z && q.z < r.z + r.h);
-    if (c && D(c) > 0) {
-      taken.push(c);
-      fuses.push({ id: fuses.length, ...cellPos(c), taken: false });
-    }
-  }
-  while (fuses.length < 3) {
-    const cand = walkable.filter((c) => dry(c) && D(c) > maxD * 0.4 && taken.every((t) => Math.hypot(t.x - c.x, t.z - c.z) > 8));
-    const c = cand.length ? pick(cand) : pick(walkable.filter((q) => D(q) > 4));
-    taken.push(c);
-    fuses.push({ id: fuses.length, ...cellPos(c), taken: false });
-  }
-
-  // 9. Éclairage : des dalles lumineuses au plafond, une case sur deux, toutes allumées (le niveau est clair) ;
-  // les locaux techniques n'ont qu'une ampoule qui grésille
-  const lights = [];
-  const inTech = (x, z) => techs.some((r) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.h);
-  const roomAt = (x, z) => rooms.find((r) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.h);
-  const bayCells = new Set(bays.map((b) => Math.floor((b.z0 + b.z1) / 2 / CELL_SIZE) * W + Math.floor((b.x0 + b.x1) / 2 / CELL_SIZE)));
-  for (let z = 1; z < H - 1; z++) {
-    for (let x = 1; x < W - 1; x++) {
-      if (grid[z * W + x] !== T.FLOOR) continue;
-      const tech = inTech(x, z);
-      const r = roomAt(x, z);
-      const k = z * W + x;
-      let ok;
-      if (tech) ok = techs.some((t) => t.cx === x && t.cz === z);
-      else if (r && r.kind === 'vault') ok = bayCells.has(k); // une lampe au sommet de chaque voûte
-      else if (r && r.sky) ok = true; // la verrière : tout le plafond est lumineux
-      else ok = !(x % 2) && !(z % 2);
-      if (!ok) continue;
-      let state = tech ? 'flicker' : 'on';
-      if (r && r.dark) state = rnd() < 0.2 ? 'flicker' : 'off';
-      // dans un couloir voûté, la lampe est cachée dans la voûte : on ne voit que sa lumière
-      lights.push({ x: (x + 0.5) * CELL_SIZE, y: POOL_CEIL - 0.02, z: (z + 0.5) * CELL_SIZE, gx: x, gz: z, state, flicker: state === 'flicker', bright: !tech && !(r && r.dark), tech, sky: !!(r && r.sky), hidden: ceilKind[k] > 0 });
-    }
-  }
-
-  // échelles chromées : une ou deux par bassin, du bord sec vers l'eau
-  const ladders = [];
-  for (const r of rooms) {
-    if (r.kind !== 'pool' && !(r.kind === 'vault' && r.deep)) continue;
-    let n = 0;
-    for (let i = 0; i < 60 && n < 2; i++) {
-      const x = r.x + Math.floor(rnd() * r.w);
-      const z = r.z + Math.floor(rnd() * r.h);
-      if (grid[z * W + x] !== T.FLOOR || depth[z * W + x] !== 0) continue;
-      const d = DIRS.find(([dx, dz]) => grid[(z + dz) * W + x + dx] === T.FLOOR && depth[(z + dz) * W + x + dx] >= DEPTH.POOL);
-      if (!d || ladders.some((l) => Math.hypot(l.gx - x, l.gz - z) < 3)) continue;
-      ladders.push({ gx: x, gz: z, dx: d[0], dz: d[1], x: (x + 0.5) * CELL_SIZE + d[0] * (CELL_SIZE / 2), z: (z + 0.5) * CELL_SIZE + d[1] * (CELL_SIZE / 2) });
-      n++;
-    }
-  }
-
-  // 10. Objets abandonnés au bord des bassins (au sec, contre un mur), un canard qui flotte, eau d'amande et piles
-  const busy = new Set([sz * W + sx, exitCell.z * W + exitCell.x, ...fuses.map((f) => f.gz * W + f.gx)]);
-  const props = [];
-  const nearWall = (c) => DIRS.find(([dx, dz]) => get(c.x + dx, c.z + dz) === T.WALL);
-  for (let i = 0; i < 90; i++) {
-    const c = pick(walkable);
-    const k = c.z * W + c.x;
-    const wall = nearWall(c);
-    if (busy.has(k) || !wall || !dry(c) || Math.hypot(c.x - sx, c.z - sz) < 3) continue;
-    busy.add(k);
-    const kind = pick(L37_PROPS);
-    const off = CELL_SIZE / 2 - kind.r - 0.12;
-    props.push({
-      m: kind.m, h: kind.h, r: kind.r,
-      x: (c.x + 0.5) * CELL_SIZE + wall[0] * off,
-      z: (c.z + 0.5) * CELL_SIZE + wall[1] * off,
-      rot: kind.face ? Math.atan2(-wall[0], -wall[1]) : (rnd() - 0.5) * 2,
-      tipped: !!kind.chair && rnd() < 0.2,
-    });
-  }
-  for (let i = 0; i < 40 && props.filter((p) => p.m === 'rubber_duck_toy').length < 3; i++) {
-    const c = pick(walkable);
-    if (depth[c.z * W + c.x] < DEPTH.POOL || busy.has(c.z * W + c.x)) continue;
-    busy.add(c.z * W + c.x);
-    props.push({ m: 'rubber_duck_toy', h: 0.12, r: 0.01, x: (c.x + 0.3 + rnd() * 0.4) * CELL_SIZE, z: (c.z + 0.3 + rnd() * 0.4) * CELL_SIZE, rot: rnd() * 6, tipped: false, float: true });
-  }
-  const scatter = (n, minD) => {
+  const place = (type, mx, mz, mw, mh, extra = {}) => {
+    const r = { id: rooms.length, type, mx, mz, mw, mh, x0: (1 + mx * MOD) * C, z0: (1 + mz * MOD) * C, w: mw * MOD * C, h: mh * MOD * C, ...extra };
+    r.x1 = r.x0 + r.w;
+    r.z1 = r.z0 + r.h;
+    for (let j = mz; j < mz + mh; j++) for (let i = mx; i < mx + mw; i++) mod[j * MODS + i] = r.id;
+    rooms.push(r);
+    return r;
+  };
+  // une porte au milieu d'un bord de module commun à deux salles : (px, pz) sur la cloison ; along : 'x' si la cloison
+  // court selon x
+  const addDoor = (a, b, px, pz, along) => {
+    if (doors.some((d) => Math.hypot(d.px - px, d.pz - pz) < 1)) return;
+    doors.push({ a: a.id, b: b.id, px, pz, along, w: DOOR.w, h: DOOR.h, arch: true });
+  };
+  const edgeDoor = (a, b, sd) => addDoor(a, b, (1 + (sd.i + 0.5 + sd.dx * 0.5) * MOD) * C, (1 + (sd.j + 0.5 + sd.dz * 0.5) * MOD) * C, sd.dx ? 'z' : 'x');
+  const SIZES = { lagoon: [2, 2], groin: [2, 2], wade: [1, 1], tech: [1, 1] };
+  const start = place('lagoon', 5, 5, 2, 2);
+  const WEIGHTS = [['tunnel', 4], ['gallery', 3], ['lagoon', 2], ['groin', 2], ['sky', 2], ['wade', 3], ['tech', 1.5]];
+  const total = WEIGHTS.reduce((a, [, w]) => a + w, 0);
+  const pickType = () => {
+    let v = rnd() * total;
+    for (const [t, w] of WEIGHTS) if ((v -= w) < 0) return t;
+    return 'wade';
+  };
+  // les côtés d'où l'on peut greffer : (module de la salle, direction) ; un couloir ne se greffe que par ses bouts
+  const sides = (r) => {
     const out = [];
-    for (let i = 0; i < 400 && out.length < n; i++) {
-      const c = pick(walkable);
-      const k = c.z * W + c.x;
-      if (busy.has(k) || !dry(c) || D(c) < minD) continue;
-      busy.add(k);
-      out.push({ id: out.length, ...cellPos(c), taken: false });
+    for (let j = r.mz; j < r.mz + r.mh; j++) {
+      for (let i = r.mx; i < r.mx + r.mw; i++) {
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = i + dx;
+          const nz = j + dz;
+          if (nx >= r.mx && nx < r.mx + r.mw && nz >= r.mz && nz < r.mz + r.mh) continue;
+          if (r.axis && (r.axis === 'x' ? dz !== 0 : dx !== 0)) continue;
+          out.push({ i, j, dx, dz });
+        }
+      }
     }
     return out;
   };
-  const bottles = scatter(6, 6);
-  const batteries = scatter(6, 5);
+  for (let tries = 0; tries < 900 && rooms.length < 20; tries++) {
+    const R = pick(rooms);
+    const sd = pick(sides(R));
+    if (!sd) continue;
+    let type = pickType();
+    if (R.axis && (type === 'tunnel' || type === 'gallery') && rnd() < 0.6) type = 'wade'; // pas trois couloirs d'affilée
+    let mw;
+    let mh;
+    let extra = {};
+    if (type === 'tunnel' || type === 'gallery') {
+      const L = 1 + Math.floor(rnd() * 3);
+      const axis = sd.dx ? 'x' : 'z';
+      [mw, mh] = axis === 'x' ? [L, 1] : [1, L];
+      extra = { axis };
+    } else if (type === 'sky') [mw, mh] = sd.dx ? [2, 1] : [1, 2];
+    else [mw, mh] = SIZES[type];
+    // la nouvelle salle touche le module (i, j) du côté (dx, dz) ; on la décale le long du bord au hasard
+    let mx = sd.dx > 0 ? sd.i + 1 : sd.dx < 0 ? sd.i - mw : sd.i - Math.floor(rnd() * mw);
+    let mz = sd.dz > 0 ? sd.j + 1 : sd.dz < 0 ? sd.j - mh : sd.j - Math.floor(rnd() * mh);
+    if (extra.axis) {
+      // un couloir s'aligne sur le module de départ
+      if (sd.dx) mz = sd.j;
+      else mx = sd.i;
+    }
+    if (!free(mx, mz, mw, mh)) continue;
+    const r = place(type, mx, mz, mw, mh, extra);
+    edgeDoor(R, r, sd);
+  }
+  // il faut 3 locaux techniques : on en ajoute au besoin, au bout de ce qui existe
+  for (let tries = 0; tries < 400 && rooms.filter((r) => r.type === 'tech').length < 3; tries++) {
+    const R = pick(rooms);
+    const sd = pick(sides(R));
+    if (!sd) continue;
+    if (!free(sd.i + sd.dx, sd.j + sd.dz, 1, 1)) continue;
+    edgeDoor(R, place('tech', sd.i + sd.dx, sd.j + sd.dz, 1, 1), sd);
+  }
+  // quelques portes de plus entre salles voisines (des boucles), jamais sur le flanc d'un couloir
+  for (const a of rooms) {
+    for (const sd of sides(a)) {
+      const nx = sd.i + sd.dx;
+      const nz = sd.j + sd.dz;
+      if (nx < 0 || nz < 0 || nx >= MODS || nz >= MODS) continue;
+      const bi = mod[nz * MODS + nx];
+      if (bi < 0 || bi === a.id) continue;
+      const b = rooms[bi];
+      if (b.axis && (b.axis === 'x' ? sd.dz !== 0 : sd.dx !== 0)) continue;
+      if (doors.some((d) => (d.a === a.id && d.b === b.id) || (d.a === b.id && d.b === a.id))) continue;
+      if (rnd() < 0.35) edgeDoor(a, b, sd);
+    }
+  }
 
-  // 11. L'entité ne sort pas de l'eau ici : elle reste à l'écart (voir la scène pour son ombre sous la surface)
-  const monsterSpawn = { x: -1000, z: -1000, gx: -1, gz: -1 };
+  // 2. Le contenu de chaque salle : bassin, îlots, colonnes, voûtes, profondeur
+  const cols = [];
+  for (const r of rooms) {
+    const cx = (r.x0 + r.x1) / 2;
+    const cz = (r.z0 + r.z1) / 2;
+    if (r.type === 'lagoon') {
+      // un haricot : trois cercles fondus, à 3 m au moins des murs
+      r.blobs = [];
+      for (let k = 0; k < 3; k++) {
+        const rr = 3 + rnd() * 2;
+        r.blobs.push({ x: r.x0 + 3 + rr + rnd() * (r.w - 6 - 2 * rr), z: r.z0 + 3 + rr + rnd() * (r.h - 6 - 2 * rr), r: rr });
+      }
+      r.maxDepth = 1.2;
+      r.islands = rnd() < 0.7 ? [{ x: r.blobs[0].x + (rnd() - 0.5) * 2, z: r.blobs[0].z + (rnd() - 0.5) * 2, r: 1.2 + rnd() * 0.8 }] : [];
+      // de grosses colonnes, sur la plage ou dans l'eau, pas sur l'îlot
+      let n = 0;
+      for (let k = 0; k < 60 && n < 5; k++) {
+        const c = { x: r.x0 + 2.5 + rnd() * (r.w - 5), z: r.z0 + 2.5 + rnd() * (r.h - 5), r: 0.7 };
+        if (cols.some((o) => Math.hypot(o.x - c.x, o.z - c.z) < 4.5)) continue;
+        if (islandSdf(r, c.x, c.z) < 0.8) continue;
+        cols.push({ ...c, room: r.id });
+        n++;
+      }
+      r.ceil = 'flat';
+    } else if (r.type === 'groin') {
+      r.basin = { cx, cz, hx: r.w / 2 - 2, hz: r.h / 2 - 2, rad: 2 };
+      r.maxDepth = 0.95;
+      // colonnes tous les 5 m, voûtes d'arêtes entre elles
+      const xs = [r.x0];
+      const zs = [r.z0];
+      for (let x = r.x0 + 5; x < r.x1 - 1; x += 5) xs.push(x);
+      for (let z = r.z0 + 5; z < r.z1 - 1; z += 5) zs.push(z);
+      xs.push(r.x1);
+      zs.push(r.z1);
+      for (const x of xs.slice(1, -1)) for (const z of zs.slice(1, -1)) cols.push({ x, z, r: 0.55, room: r.id });
+      r.bays = [];
+      for (let i = 0; i + 1 < xs.length; i++) for (let j = 0; j + 1 < zs.length; j++) r.bays.push({ x0: xs[i], x1: xs[i + 1], z0: zs[j], z1: zs[j + 1] });
+      r.ceil = 'groin';
+    } else if (r.type === 'sky') {
+      const long = r.w > r.h;
+      r.basin = { cx, cz, hx: long ? r.w / 2 - 3 : r.w / 2 - 2.2, hz: long ? r.h / 2 - 2.2 : r.h / 2 - 3, rad: 1 };
+      r.maxDepth = 1.3;
+      r.ceil = 'sky';
+      r.long = long ? 'x' : 'z';
+    } else if (r.type === 'tunnel' || r.type === 'gallery') {
+      r.flat = r.type === 'tunnel' ? DEPTH.TUNNEL : DEPTH.GALLERY;
+      r.ceil = 'barrel';
+      r.dark = r.type === 'tunnel';
+    } else if (r.type === 'wade') {
+      r.flat = DEPTH.WADE;
+      for (const [ox, oz] of [[-2.5, -2.5], [2.5, -2.5], [-2.5, 2.5], [2.5, 2.5]]) cols.push({ x: cx + ox, z: cz + oz, r: 0.45, room: r.id });
+      r.ceil = 'flat';
+      r.dark = rnd() < 0.3;
+    } else if (r.type === 'tech') {
+      r.flat = 0;
+      r.ceil = 'low';
+    }
+  }
+
+  // 3. La grille : les cases des salles sont du sol ; les flancs pleins des couloirs et le dehors, des murs
+  const grid = new Uint8Array(W * H).fill(T.WALL);
+  const roomOf = new Int16Array(W * H).fill(-1);
+  for (const r of rooms) {
+    for (let gz = 1 + r.mz * MOD; gz < 1 + (r.mz + r.mh) * MOD; gz++) {
+      for (let gx = 1 + r.mx * MOD; gx < 1 + (r.mx + r.mw) * MOD; gx++) {
+        if (r.axis) {
+          // couloir : 2 cases de large au milieu du module (5 m)
+          const lat = r.axis === 'x' ? (gz - 1) % MOD : (gx - 1) % MOD;
+          if (lat === 0 || lat === 3) continue;
+        }
+        grid[gz * W + gx] = T.FLOOR;
+        roomOf[gz * W + gx] = r.id;
+      }
+    }
+  }
+  const roomAt = (x, z) => {
+    const gx = Math.floor(x / C);
+    const gz = Math.floor(z / C);
+    if (gx < 0 || gz < 0 || gx >= W || gz >= H) return null;
+    const id = roomOf[gz * W + gx];
+    return id >= 0 ? rooms[id] : null;
+  };
+  const depthAt = (x, z) => {
+    const r = roomAt(x, z);
+    return r ? roomDepth(r, x, z) : 0;
+  };
+
+  // 4. Les cloisons minces : partout où deux cases de sol voisines sont à deux salles différentes, moins les portes
+  const doorOn = (along, line, u) => doors.find((d) => d.along === along && Math.abs((along === 'x' ? d.pz : d.px) - line) < 0.01 && Math.abs((along === 'x' ? d.px : d.pz) - u) < d.w / 2);
+  const edges = []; // bords de case à cloison
+  for (let gz = 0; gz < H; gz++) {
+    for (let gx = 0; gx < W; gx++) {
+      const a = roomOf[gz * W + gx];
+      if (a < 0) continue;
+      if (gx + 1 < W && roomOf[gz * W + gx + 1] >= 0 && roomOf[gz * W + gx + 1] !== a) {
+        const x = (gx + 1) * C;
+        edges.push({ x0: x, z0: gz * C, x1: x, z1: (gz + 1) * C, along: 'z', a, b: roomOf[gz * W + gx + 1] });
+      }
+      if (gz + 1 < H && roomOf[(gz + 1) * W + gx] >= 0 && roomOf[(gz + 1) * W + gx] !== a) {
+        const z = (gz + 1) * C;
+        edges.push({ x0: gx * C, z0: z, x1: (gx + 1) * C, z1: z, along: 'x', a, b: roomOf[(gz + 1) * W + gx] });
+      }
+    }
+  }
+  // pour les collisions et la lumière : les cloisons en segments, la porte en moins (3 m, à cheval sur deux bords de case)
+  const segs = [];
+  for (const e of edges) {
+    const line = e.along === 'x' ? e.z0 : e.x0;
+    const lo = e.along === 'x' ? e.x0 : e.z0;
+    const hi = e.along === 'x' ? e.x1 : e.z1;
+    // on retire de ce bord l'ouverture de chaque porte de la même ligne
+    let parts = [[lo, hi]];
+    for (const d of doors) {
+      if (d.along !== e.along || Math.abs((e.along === 'x' ? d.pz : d.px) - line) > 0.01) continue;
+      const c0 = (e.along === 'x' ? d.px : d.pz) - d.w / 2;
+      const c1 = c0 + d.w;
+      parts = parts.flatMap(([a, b]) => [[a, Math.min(b, c0)], [Math.max(a, c1), b]]).filter(([a, b]) => b - a > 0.01);
+    }
+    for (const [u0, u1] of parts) {
+      if (u1 - u0 < 0.01) continue;
+      segs.push(e.along === 'x' ? { x0: u0, z0: line, x1: u1, z1: line, along: 'x' } : { x0: line, z0: u0, x1: line, z1: u1, along: 'z' });
+    }
+  }
+  const segDist = (sg, x, z) => {
+    const dx = sg.x1 - sg.x0;
+    const dz = sg.z1 - sg.z0;
+    const t = Math.max(0, Math.min(1, ((x - sg.x0) * dx + (z - sg.z0) * dz) / (dx * dx + dz * dz)));
+    return Math.hypot(x - (sg.x0 + dx * t), z - (sg.z0 + dz * t));
+  };
+  const cross = (ax, az, bx, bz, sg) => {
+    const d1x = bx - ax;
+    const d1z = bz - az;
+    const d2x = sg.x1 - sg.x0;
+    const d2z = sg.z1 - sg.z0;
+    const den = d1x * d2z - d1z * d2x;
+    if (Math.abs(den) < 1e-9) return false;
+    const t = ((sg.x0 - ax) * d2z - (sg.z0 - az) * d2x) / den;
+    const u = ((sg.x0 - ax) * d1z - (sg.z0 - az) * d1x) / den;
+    return t > 0 && t < 1 && u >= 0 && u <= 1;
+  };
+  // collisions : murs de la grille (par le moteur), cloisons et colonnes ici
+  const collide = (x, z, rad) => {
+    for (const c of cols) if (Math.abs(c.x - x) < c.r + rad && Math.hypot(c.x - x, c.z - z) < c.r + rad) return true;
+    for (const sg of segs) {
+      if (x < Math.min(sg.x0, sg.x1) - rad - 0.2 || x > Math.max(sg.x0, sg.x1) + rad + 0.2) continue;
+      if (z < Math.min(sg.z0, sg.z1) - rad - 0.2 || z > Math.max(sg.z0, sg.z1) + rad + 0.2) continue;
+      if (segDist(sg, x, z) < WALL_T / 2 + rad) return true;
+    }
+    return false;
+  };
+
+  // 5. Accessibilité : parcours en largeur de case en case, en ne passant d'une salle à l'autre que par une porte
+  const startCell = (() => {
+    // le départ : un point sec du lagon central, loin du bassin et des colonnes
+    for (let k = 0; k < 600; k++) {
+      const x = start.x0 + 2 + rnd() * (start.w - 4);
+      const z = start.z0 + 2 + rnd() * (start.h - 4);
+      if (poolSdf(start, x, z) > 1.5 && !collide(x, z, 1)) return { x, z };
+    }
+    return { x: start.x0 + 1.25, z: start.z0 + 1.25 };
+  })();
+  const crossOk = (gx, gz, nx, nz) => {
+    if (roomOf[gz * W + gx] === roomOf[nz * W + nx]) return true;
+    if (nx !== gx) return !!doorOn('z', Math.max(gx, nx) * C, (gz + 0.5) * C);
+    return !!doorOn('x', Math.max(gz, nz) * C, (gx + 0.5) * C);
+  };
+  const bfsFrom = (sx, sz) => {
+    const dist = new Int32Array(W * H).fill(-1);
+    const q = [sz * W + sx];
+    dist[q[0]] = 0;
+    for (let h = 0; h < q.length; h++) {
+      const k = q[h];
+      const x = k % W;
+      const z = (k - x) / W;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx;
+        const nz = z + dz;
+        const nk = nz * W + nx;
+        if (nx < 0 || nz < 0 || nx >= W || nz >= H || dist[nk] >= 0 || grid[nk] !== T.FLOOR || !crossOk(x, z, nx, nz)) continue;
+        dist[nk] = dist[k] + 1;
+        q.push(nk);
+      }
+    }
+    return dist;
+  };
+  const sgx = Math.floor(startCell.x / C);
+  const sgz = Math.floor(startCell.z / C);
+  const dist = bfsFrom(sgx, sgz);
+  const walkable = [];
+  for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) if (grid[z * W + x] === T.FLOOR && dist[z * W + x] >= 0) walkable.push({ x, z });
+  const D = (gx, gz) => dist[gz * W + gx];
+  const freeSpot = (x, z, rad) => {
+    const gx = Math.floor(x / C);
+    const gz = Math.floor(z / C);
+    if (gx < 1 || gz < 1 || gx >= W - 1 || gz >= H - 1 || grid[gz * W + gx] !== T.FLOOR || dist[gz * W + gx] < 0) return false;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const ngx = Math.floor((x + dx * rad) / C);
+      const ngz = Math.floor((z + dz * rad) / C);
+      if (grid[ngz * W + ngx] !== T.FLOOR) return false;
+    }
+    return !collide(x, z, rad);
+  };
+
+  // 6. La sortie : un ascenseur dans le mur extérieur d'une salle sèche, loin du départ
+  const exitRooms = rooms.filter((r) => ['lagoon', 'groin', 'sky', 'tech'].includes(r.type) && r !== start).sort((a, b) => Math.hypot(b.x0 - start.x0, b.z0 - start.z0) - Math.hypot(a.x0 - start.x0, a.z0 - start.z0));
+  let elevator = null;
+  let exitCell = null;
+  for (const r of [...exitRooms, start]) {
+    const cand = [];
+    for (let gz = 1 + r.mz * MOD; gz < 1 + (r.mz + r.mh) * MOD; gz++) {
+      for (let gx = 1 + r.mx * MOD; gx < 1 + (r.mx + r.mw) * MOD; gx++) {
+        if (roomOf[gz * W + gx] !== r.id || D(gx, gz) < 0) continue;
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = gx + dx;
+          const nz = gz + dz;
+          if (nx < 1 || nz < 1 || nx >= W - 1 || nz >= H - 1 || grid[nz * W + nx] !== T.WALL || roomOf[nz * W + nx] >= 0) continue;
+          // la cabine : fermée sur trois côtés par d'autres murs
+          const shut = [[nx + dz, nz + dx], [nx - dz, nz - dx], [nx + dx, nz + dz]].every(([x, z]) => grid[z * W + x] === T.WALL);
+          if (!shut || roomDepth(r, (gx + 0.5) * C, (gz + 0.5) * C) > 0 || collide((gx + 0.5) * C, (gz + 0.5) * C, 0.8)) continue;
+          cand.push({ gx, gz, nx, nz, dx, dz });
+        }
+      }
+    }
+    if (cand.length) {
+      const c = pick(cand);
+      grid[c.nz * W + c.nx] = T.EXIT;
+      elevator = { gx: c.nx, gz: c.nz, x: (c.nx + 0.5) * C, z: (c.nz + 0.5) * C, dx: c.dx, dz: c.dz };
+      exitCell = { x: c.gx, z: c.gz };
+      r.exit = true;
+      break;
+    }
+  }
+  const cellPos = (c) => ({ x: (c.x + 0.5) * C, z: (c.z + 0.5) * C, gx: c.x, gz: c.z });
+  const exit = cellPos(exitCell);
+
+  // 7. Les 3 volants de vanne : au milieu des locaux techniques
+  const fuses = [];
+  for (const r of rooms.filter((q) => q.type === 'tech')) {
+    if (fuses.length === 3) break;
+    const x = (r.x0 + r.x1) / 2;
+    const z = (r.z0 + r.z1) / 2;
+    const gx = Math.floor(x / C);
+    const gz = Math.floor(z / C);
+    if (D(gx, gz) < 0) continue;
+    fuses.push({ id: fuses.length, x, z, gx, gz, taken: false });
+  }
+
+  // 8. Les lampes de chaque salle : position, hauteur du luminaire (fy), sa taille (fs), cachée ou non
+  const lights = [];
+  const addLight = (x, z, o = {}) => {
+    lights.push({ x, y: POOL_CEIL - 0.02, z, gx: Math.floor(x / C), gz: Math.floor(z / C), state: 'on', flicker: false, bright: true, fy: POOL_CEIL - 0.02, fs: 1, ...o });
+  };
+  for (const r of rooms) {
+    if (r.type === 'lagoon' || r.type === 'wade') {
+      for (let x = r.x0 + 2.5; x < r.x1; x += 5) {
+        for (let z = r.z0 + 2.5; z < r.z1; z += 5) {
+          if (r.dark) {
+            const st = rnd() < 0.25 ? 'flicker' : 'off';
+            addLight(x, z, { state: st, flicker: st === 'flicker', bright: false });
+          } else addLight(x, z);
+        }
+      }
+    } else if (r.type === 'groin') {
+      for (const b of r.bays) addLight((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, { fs: 0.7 });
+    } else if (r.type === 'sky') {
+      // la verrière : le jour tombe partout, sans luminaire visible
+      for (let x = r.x0 + 2.5; x < r.x1; x += 5) for (let z = r.z0 + 2.5; z < r.z1; z += 5) addLight(x, z, { hidden: true });
+    } else if (r.axis) {
+      // couloirs : des lampes dans la voûte ; le tunnel est sombre, éclairé seulement à ses bouts
+      const n = (r.axis === 'x' ? r.mw : r.mh) * 2;
+      for (let k = 0; k < n; k++) {
+        const t = (k + 0.5) / n;
+        const x = r.axis === 'x' ? r.x0 + t * r.w : (r.x0 + r.x1) / 2;
+        const z = r.axis === 'z' ? r.z0 + t * r.h : (r.z0 + r.z1) / 2;
+        if (r.type === 'tunnel' && k !== 0 && k !== n - 1) continue;
+        addLight(x, z, { hidden: r.type === 'tunnel', fs: 0.55, bright: r.type === 'gallery', fy: POOL_CEIL - 0.06 });
+      }
+    } else if (r.type === 'tech') {
+      addLight((r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2 + 1.5, { state: 'flicker', flicker: true, bright: false, fy: 3.18, fs: 0.6, tech: true });
+    }
+  }
+
+  // 9. Objets : au bord des bassins (au sec, contre un mur), canards sur l'eau, eau d'amande et piles
+  // rien devant une porte ni devant l'ascenseur
+  const busy = [startCell, exit, ...fuses, ...doors.map((d) => ({ x: d.px, z: d.pz }))];
+  const near = (x, z, d) => busy.some((b) => Math.hypot(b.x - x, b.z - z) < d);
+  const props = [];
+  const deckRooms = rooms.filter((q) => q.type === 'lagoon' || q.type === 'sky' || q.type === 'groin' || q.type === 'wade');
+  for (let i = 0; i < 500 && props.length < 26; i++) {
+    const r = pick(deckRooms);
+    const side = Math.floor(rnd() * 4);
+    const kind = pick(L37_PROPS);
+    const off = kind.r + 0.3;
+    const t = 1.5 + rnd() * ((side % 2 ? r.h : r.w) - 3);
+    const x = side === 0 ? r.x0 + t : side === 1 ? r.x1 - off : side === 2 ? r.x1 - t : r.x0 + off;
+    const z = side === 0 ? r.z0 + off : side === 1 ? r.z0 + t : side === 2 ? r.z1 - off : r.z1 - t;
+    if (roomDepth(r, x, z) > 0 || !freeSpot(x, z, kind.r + 0.05) || near(x, z, 2.5)) continue;
+    const dir = [[0, -1], [1, 0], [0, 1], [-1, 0]][side]; // vers le mur
+    busy.push({ x, z });
+    props.push({ m: kind.m, h: kind.h, r: kind.r, x, z, rot: kind.face ? Math.atan2(-dir[0], -dir[1]) : (rnd() - 0.5) * 2, tipped: !!kind.chair && rnd() < 0.2 });
+  }
+  const basins = rooms.filter((q) => q.blobs || q.basin);
+  for (let i = 0; i < 300 && basins.length && props.filter((p) => p.m === 'rubber_duck_toy').length < 3; i++) {
+    const r = pick(basins);
+    const x = r.x0 + rnd() * r.w;
+    const z = r.z0 + rnd() * r.h;
+    if (roomDepth(r, x, z) < 0.7 || collide(x, z, 0.3)) continue;
+    props.push({ m: 'rubber_duck_toy', h: 0.12, r: 0.01, x, z, rot: rnd() * 6, tipped: false, float: true });
+  }
+  const scatter = (n) => {
+    const out = [];
+    for (let i = 0; i < 3000 && out.length < n; i++) {
+      const c = pick(walkable);
+      const x = (c.x + 0.2 + rnd() * 0.6) * C;
+      const z = (c.z + 0.2 + rnd() * 0.6) * C;
+      if (depthAt(x, z) > 0 || !freeSpot(x, z, 0.5) || near(x, z, 3) || D(c.x, c.z) < 4) continue;
+      busy.push({ x, z });
+      out.push({ id: out.length, x, z, gx: c.x, gz: c.z, taken: false });
+    }
+    return out;
+  };
+  const bottles = scatter(6);
+  const batteries = scatter(6);
+
+  // échelles : deux par bassin rectangulaire (verrière, voûtes), du bord sec vers l'eau
+  const ladders = [];
+  for (const r of rooms) {
+    if (!r.basin) continue;
+    const b = r.basin;
+    const opts = r.long === 'x' || (!r.long && r.w >= r.h)
+      ? [[b.cx - b.hx + 2, b.cz - b.hz, 0, 1], [b.cx + b.hx - 2, b.cz + b.hz, 0, -1]]
+      : [[b.cx - b.hx, b.cz - b.hz + 2, 1, 0], [b.cx + b.hx, b.cz + b.hz - 2, -1, 0]];
+    for (const [x, z, dx, dz] of opts) if (!collide(x - dx * 0.4, z - dz * 0.4, 0.3)) ladders.push({ x, z, dx, dz });
+  }
+
+  // profondeur par case (au centre)
+  const depth = new Float32Array(W * H);
+  for (const c of walkable) depth[c.z * W + c.x] = depthAt((c.x + 0.5) * C, (c.z + 0.5) * C);
 
   return {
     level: 2,
@@ -352,7 +526,7 @@ export function createPoolMap(seed = 37) {
     grid,
     depth,
     walkable,
-    spawn,
+    spawn: { x: startCell.x, z: startCell.z, gx: sgx, gz: sgz },
     exit,
     elevator,
     cassettes: [],
@@ -366,35 +540,33 @@ export function createPoolMap(seed = 37) {
     niche: null,
     pitAt: () => -1,
     rooms,
-    pillars,
-    ceilKind,
-    bays,
+    doors,
+    edges,
+    segs,
+    cols,
     ladders,
     dist,
-    monsterSpawn,
+    roomOf,
+    monsterSpawn: { x: -1000, z: -1000, gx: -1, gz: -1 },
     isWall(gx, gz) {
       if (gx < 0 || gx >= W || gz < 0 || gz >= H) return true;
       const v = grid[gz * W + gx];
-      return v === T.WALL || v === T.EXIT || v === T.PILLAR;
+      return v === T.WALL || v === T.EXIT;
     },
-    pillarAt(gx, gz) {
-      if (gx < 0 || gx >= W || gz < 0 || gz >= H) return null;
-      const k = gz * W + gx;
-      return grid[k] === T.PILLAR ? pillars[k] || null : null;
-    },
-    // hauteur d'eau (m) sous un point
-    depthAt(wx, wz) {
-      const gx = Math.floor(wx / CELL_SIZE);
-      const gz = Math.floor(wz / CELL_SIZE);
-      if (gx < 0 || gx >= W || gz < 0 || gz >= H) return 0;
-      return depth[gz * W + gx];
+    pillarAt: () => null,
+    roomAt,
+    depthAt,
+    // cloisons minces et colonnes (les murs de la grille, le moteur les connaît déjà)
+    collide,
+    // la lumière d'une lampe en (lx, lz) atteint-elle (px, pz) sans traverser de cloison ?
+    lightBlocked(lx, lz, px, pz) {
+      for (const sg of segs) if (cross(lx, lz, px, pz, sg)) return true;
+      return false;
     },
     isWalkableWorld(wx, wz) {
-      const gx = Math.floor(wx / CELL_SIZE);
-      const gz = Math.floor(wz / CELL_SIZE);
-      const p = this.pillarAt(gx, gz);
-      if (p) return Math.hypot(wx - p.x, wz - p.z) > p.h;
-      return !this.isWall(gx, gz);
+      const gx = Math.floor(wx / C);
+      const gz = Math.floor(wz / C);
+      return !this.isWall(gx, gz) && !collide(wx, wz, 0.05);
     },
   };
 }
