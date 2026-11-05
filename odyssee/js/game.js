@@ -32,6 +32,7 @@ import { apparenceScreen } from './ui/apparence.js';
 import { preparerDomaine, frigo, architecte, recolter, allerDomaine, resident, arrivees } from './ui/domaine.js';
 import { composer } from './render/tenue.js';
 import { buildRivalParty, getRivalItems } from './world/rival.js';
+import { Vie, parlerFaune, rentreLeSoir } from './vie.js';
 
 /** météos qui comptent en combat (brume et cendres ne sont que du décor, comme dans les jeux 5G) */
 const BATTLE_WEATHERS = ['rain', 'sun', 'sandstorm', 'hail'];
@@ -117,6 +118,7 @@ export class Game {
     Object.assign(this, { view, ui, input, sound, world });
     this.busy = false; this.player = null; this.npcs = []; this.items = [];
     this.bv = new BattleView(this);
+    this.vie = new Vie(this);
     this.autoRun = false;
     try { this.autoRun = localStorage.getItem('odyssee-autorun') === '1'; } catch (e) {}
     this.runSpeed = 1; // 0: Normale (1×), 1: Rapide (1.7×), 2: Turbo (2.5×)
@@ -252,6 +254,7 @@ export class Game {
     if (this.strengthOn !== m.id) this.strengthOn = null;
     this.view.eclipse = this.eclipseOn();
     this.view.setMap(m);
+    this.vie?.onMap(m);
     const st = this.state;
     this.npcs = m.npcs.filter((n) => this.npcVisible(n)).map((n) => this.npcState(n));
     // le rival attend au labo tant que le premier combat n'a pas eu lieu
@@ -337,6 +340,7 @@ export class Game {
   npcVisible(n) {
     const f = this.state.flags;
     if (n.when && !n.when(f, this)) return false;   // PNJ de quête : présent selon l'avancée
+    if (rentreLeSoir(n, this)) return false;          // le soir, les enfants et une partie des passants sont rentrés
     if (n.gate) return this.gateClosed(n.gate);
     if (n.vanish && f['T:' + n.id]) return false;    // sbire de la Team Éclipse battu : il s'en va
     if (n.showIf && !f[n.showIf]) return false;
@@ -511,6 +515,7 @@ export class Game {
     }
     // PNJ et autres joueurs
     for (const n of this.npcs) this.npcTick(n, dt);
+    this.vie?.tick(dt);
     this.peersTick?.(dt);
     // la carte n'est pas redessinée sous un combat ou un écran plein cadre
     if (this.bv.alive || this.ui.root.querySelector('.screen')) { this.drawTags?.(false); return; }
@@ -656,6 +661,9 @@ export class Game {
     // rencontres sauvages : hautes herbes, grottes, et la mer de l'archipel quand on surfe
     const enc = this.noEnc ? null : m.outdoor ? z?.enc : m.encounter;   // noEnc : version test, rencontres coupées
     if (p.surf && t === T.WATER && !this.noEnc) { const sea = m.zoneAt(p.x, p.y), enc = sea?.surfEnc || sea?.enc || m.surfEnc; if (enc && Math.random() < 0.05) await this.wildBattle(enc); return; }
+    // un Pokémon visible dans l'herbe : on lui marche dessus, c'est lui qu'on affronte
+    const vu = m.outdoor && !this.noEnc ? this.vie?.at(p.x, p.y) : null;
+    if (vu) { this.vie.remove(vu); await this.wildBattle([vu.e]); return; }
     if (enc && (isGrassEnc(t) || (!m.outdoor && t === T.CAVE))) {
       const rate = isGrassEnc(t) ? (t === T.DARKTALL ? 0.12 : 0.1) : 0.065;
       if (Math.random() < rate) await this.wildBattle(enc);
@@ -752,7 +760,8 @@ export class Game {
     n.dir = d;
     if (n.def.move === 'wander' && Math.random() < 0.6) {
       const [dx, dy] = DIRS[d], tx = n.x + dx, ty = n.y + dy;
-      if (Math.abs(tx - n.home[0]) <= 2 && Math.abs(ty - n.home[1]) <= 2 && walkable(this.mapObj.get(tx, ty)) && this.mapObj.canStep(n.x, n.y, tx, ty) && !this.occupied(tx, ty, n) && this.mapObj.get(tx, ty) !== T.DOOR && this.mapObj.get(tx, ty) !== T.MAT) {
+      const R = n.def.roam || (/:h\d+$/.test(n.id) ? 4 : 2);
+      if (Math.abs(tx - n.home[0]) <= R && Math.abs(ty - n.home[1]) <= R && walkable(this.mapObj.get(tx, ty)) && this.mapObj.canStep(n.x, n.y, tx, ty) && !this.occupied(tx, ty, n) && this.mapObj.get(tx, ty) !== T.DOOR && this.mapObj.get(tx, ty) !== T.MAT) {
         n.move = { fx: n.x, fy: n.y, t: 0, dur: 0.32 }; n.x = tx; n.y = ty;
       }
     }
@@ -2003,6 +2012,7 @@ export class Game {
     if (name === 'apparence') return this.apparence();
     if (name === 'architecte') return architecte(this);
     if (name === 'resident') return resident(this, n);
+    if (name === 'faune') return parlerFaune(this, n);
     if (name === 'mom') {
       if (!st.flags.starter) { await ui.say([`Ah, ${st.name}, tu es enfin réveillé${st.gender === 'f' ? 'e' : ''} !`, 'Le Professeur Saule est passé ce matin. Il t\'attend à son laboratoire, juste au sud-est.', 'Théo y est déjà, bien sûr... Allez, file !'], { speaker: 'Maman' }); return; }
       await ui.say(`${st.name} ! Tu as l'air épuisé${st.gender === 'f' ? 'e' : ''}. Repose-toi un peu.`, { keep: true, speaker: 'Maman' });

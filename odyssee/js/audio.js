@@ -1208,6 +1208,8 @@ export class Sound {
     const P = (f, dt, d, v = 0.12, ty = 'pulse25', o) => (this.style === 'retro' ? this.tone(ty, f, t + dt, d, v, B, o) : this.voice(SFXV[ty] || ty, f, t + dt, Math.max(d, 0.06), v * 1.1, B, o));
     const n = (m) => freq(midiOf(m));
     switch (k) {
+      case 'goutte': P(n('E7'), 0, 0.05, 0.025, 'sine', { slide: n('A6') }); break;
+      case 'chauves': for (let i = 0; i < 7; i++) this.tone('noise', 2400 + i * 200, t + i * 0.05, 0.035, 0.03, B, { filter: 'bandpass' }); break;
       case 'blip': P(n('A5'), 0, 0.045, 0.07, 'pulse50'); break;
       case 'select': P(n('E5'), 0, 0.05, 0.08); P(n('A5'), 0.05, 0.07, 0.08); break;
       case 'cancel': P(n('A4'), 0, 0.05, 0.07); P(n('E4'), 0.05, 0.06, 0.07); break;

@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 4.38 — 5 novembre 2026
+- **Odyssée** — Le monde est plus vivant.
+  - Des Pokémon en liberté se promènent dans chaque ville, selon le décor : Roucool et Pikachu en ville, Psykokwak au port, Goupix près des volcans, Évoli dans la neige… On peut leur parler.
+  - Sur les routes, on voit des Pokémon sauvages dans les hautes herbes ; ils sautillent d'une touffe à l'autre. Marcher dessus lance le combat contre celui-là.
+  - Les habitants vont plus loin dans leur quartier, et le soir les enfants et une partie des passants rentrent chez eux.
+  - Dans les grottes, des gouttes tombent du plafond, la poussière flotte, des cristaux scintillent et des chauves-souris s'envolent sur ton passage.
+
 ## 4.37 — 5 novembre 2026
 - **Odyssée** — La carte de la région est maintenant illustrée comme dans les vrais jeux.
   - Les îles ont des côtes découpées, avec des plages et de l'écume.
