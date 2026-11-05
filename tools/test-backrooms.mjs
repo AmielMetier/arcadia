@@ -1017,4 +1017,63 @@ test("réseau : l'eau d'amande bue par un invité lui rend son souffle, et l'esc
   assert.ok(Math.hypot(HG.x - G.x, HG.z - G.z) < 0.3, 'au même endroit');
 });
 
+test("l'entité se tapit dans le noir pour observer, fuit la lampe au début, et s'énerve à chaque cassette", () => {
+  let watched = 0;
+  let fled = 0;
+  for (const sd of [2, 6, 11, 19]) {
+    withSeed(sd, () => {
+      const sim = new BackroomsSim({ difficulty: 'normal', seed: sd });
+      const P = sim.player;
+      const M = sim.monster;
+      P.flashlight = false;
+      // l'entité à une vingtaine de mètres, hors de vue
+      const c = sim.map.walkable.find((q) => {
+        const d = Math.hypot((q.x + 0.5) * CELL_SIZE - P.x, (q.z + 0.5) * CELL_SIZE - P.z);
+        return d > 18 && d < 24 && !hasLineOfSight(sim.map, (q.x + 0.5) * CELL_SIZE, (q.z + 0.5) * CELL_SIZE, P.x, P.z);
+      });
+      M.x = (c.x + 0.5) * CELL_SIZE;
+      M.z = (c.z + 0.5) * CELL_SIZE;
+      M.stalkT = 0;
+      for (let i = 0; i < 60 * 40 && M.mode !== 'watch'; i++) {
+        sim.step();
+        if (M.mode === 'chase') return;
+      }
+      if (M.mode !== 'watch') return;
+      watched++;
+      const darkAt = (x, z) => sim.map.darkCells[Math.floor(z / CELL_SIZE) * sim.map.W + Math.floor(x / CELL_SIZE)];
+      assert.ok(darkAt(M.x, M.z) <= darkAt(P.x, P.z), 'dans un coin plus sombre que le joueur');
+      const d = Math.hypot(M.x - P.x, M.z - P.z);
+      assert.ok(d > 6 && d < 18, `à distance (${d.toFixed(1)} m)`);
+      // elle reste là à regarder sans charger
+      for (let i = 0; i < 60; i++) sim.step();
+      assert.notEqual(M.mode, 'chase', "elle observe sans charger");
+      // la lampe braquée sur elle : elle s'enfuit
+      P.flashlight = true;
+      P.yaw = Math.atan2(-(M.x - P.x), -(M.z - P.z));
+      if (M.mode === 'watch' && hasLineOfSight(sim.map, P.x, P.z, M.x, M.z)) {
+        sim.step({ yaw: P.yaw });
+        if (M.mode === 'flee') fled++;
+      }
+    });
+  }
+  assert.ok(watched >= 2, `${watched} fois tapie sur 4`);
+  assert.ok(fled >= 1, 'elle fuit la lampe');
+  // plus agressive à chaque cassette : vitesse de charge
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 4 });
+  const speedAt = (n) => {
+    sim.cassettes = n;
+    sim.monster.mode = 'chase';
+    sim.monster.x = sim.player.x + 5;
+    sim.monster.z = sim.player.z;
+    sim.updateMonster();
+    return sim.monster.speed;
+  };
+  assert.equal(sim.aggro, 0);
+  const s0 = speedAt(0);
+  const s3 = speedAt(3);
+  const s5 = speedAt(5);
+  assert.ok(s0 < s3 && s3 < s5, `la charge s'accélère : ${s0.toFixed(2)} < ${s3.toFixed(2)} < ${s5.toFixed(2)}`);
+  assert.equal(sim.aggro, 1);
+});
+
 console.log(`\n${count} tests réussis pour The Backrooms !`);

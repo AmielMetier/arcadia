@@ -46,3 +46,5 @@ le code (backrooms/view/warehouse.js) ; bois des palettes : kart/tex/planks.jpg 
 
 Explorateurs (les autres joueurs) : hazmat.glb, Quaternius « Character Hazmat » (CC0), https://poly.pizza/m/z3TSQYx1Kn ,
 sans les armes du modèle d'origine.
+Le squelette et les animations de hazmat.glb servent aussi à l'entité en 3D (mode normal), dont le corps et le visage
+sont dessinés dans le code (backrooms/view/beast.js).

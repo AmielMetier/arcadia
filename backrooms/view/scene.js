@@ -12,6 +12,7 @@ import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
 import { buildWarehouse } from './warehouse.js';
 import { createPlayerAvatars } from './players.js';
+import { createBeast } from './beast.js';
 
 const MODELS = new URL('../models/', import.meta.url).href; // modèles Poly Haven (CC0), voir models/LICENSE.txt
 const VIP_IMG = new URL('../img/entite.png?v=2', import.meta.url).href; // ?v : image plus nette, ne pas garder l'ancienne en cache
@@ -1097,7 +1098,13 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
   const anim = L1 ? ENTITY_ANIM : null;
   face.visible = false;
   monsterGroup.add(face);
-  new THREE.TextureLoader().load(anim ? anim.url : ENTITY_IMG, (t) => {
+  // mode normal : l'entité en 3D, animée (view/beast.js) ; mode VIP : les images d'origine
+  const beast = ENTITY_VIP ? null : createBeast();
+  if (beast) {
+    monsterGroup.add(beast.group);
+    shadow.visible = false;
+  }
+  if (!beast) new THREE.TextureLoader().load(anim ? anim.url : ENTITY_IMG, (t) => {
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = renderer.capabilities.getMaxAnisotropy();
     const h = anim ? 2.8 : 2.15; // au Level 1, il est immense (le plafond de l'entrepôt est à 4,2 m)
@@ -1265,10 +1272,19 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         }
         const j = (chase ? 0.12 : 0.04) * faceGlitch.value;
         const my = -(M.floor || 0) * FLOOR_DY;
-        monsterGroup.position.set(M.x + (Math.random() - 0.5) * j, my + (chase ? Math.abs(Math.sin(time * 9)) * 0.08 : Math.sin(time * 2) * 0.03), M.z + (Math.random() - 0.5) * j);
-        monsterGroup.rotation.y = Math.atan2(P.x - M.x, P.z - M.z);
-        face.scale.set(1 + (Math.random() - 0.5) * 0.08 * faceGlitch.value, 1 + Math.sin(time * 18) * 0.04 * faceGlitch.value, 1);
-        monsterAura.intensity = (chase ? 3 : 1.5) + Math.random() * 1.2;
+        if (beast) {
+          // en 3D : elle regarde où elle va (ou le joueur qu'elle observe), et marche vraiment
+          monsterGroup.position.set(M.x + (Math.random() - 0.5) * j * 0.3, my, M.z + (Math.random() - 0.5) * j * 0.3);
+          monsterGroup.rotation.y = M.yaw || 0;
+          const mv = floorViews[M.floor || 0];
+          beast.update(M, chase, mv ? mv.lightAt(M.x, M.z) : 0.3, dt, time);
+          monsterAura.intensity = (chase ? 2.2 : 0.8) + Math.random() * 0.8;
+        } else {
+          monsterGroup.position.set(M.x + (Math.random() - 0.5) * j, my + (chase ? Math.abs(Math.sin(time * 9)) * 0.08 : Math.sin(time * 2) * 0.03), M.z + (Math.random() - 0.5) * j);
+          monsterGroup.rotation.y = Math.atan2(P.x - M.x, P.z - M.z);
+          face.scale.set(1 + (Math.random() - 0.5) * 0.08 * faceGlitch.value, 1 + Math.sin(time * 18) * 0.04 * faceGlitch.value, 1);
+          monsterAura.intensity = (chase ? 3 : 1.5) + Math.random() * 1.2;
+        }
       } else {
         monsterGroup.visible = false;
       }

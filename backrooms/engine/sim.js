@@ -233,6 +233,8 @@ export class BackroomsSim {
       burstT: 0, // élan de la charge après une embuscade
       silent: false, // l'entité se tait quand elle attend en embuscade
       stairT: 0, // dans l'escalier
+      stalkT: 4, // délai avant d'aller se cacher pour observer
+      watch: null, // case sombre d'où elle observe
     };
   }
 
@@ -262,6 +264,13 @@ export class BackroomsSim {
 
   get open() {
     return this.level === 0 ? this.cassettes >= CASSETTES : this.powered;
+  }
+
+  // agressivité de l'entité (0 à 1) : elle monte à chaque cassette trouvée (Level 0), à chaque fusible (Level 1, où elle
+  // part déjà plus haut)
+  get aggro() {
+    if (this.level === 0) return Math.min(1, this.cassettes / CASSETTES);
+    return Math.min(1, 0.25 + (0.75 * (this.fuses + (this.powered ? FUSES : 0))) / FUSES);
   }
 
   // part de l'équipe déjà à l'abri dans l'ascenseur (0 à 1) : l'entité devient plus agressive
@@ -983,11 +992,31 @@ export class BackroomsSim {
 
     // Détection : vue directe (moins loin lampe éteinte ; dans le noir, une lampe allumée se voit de loin),
     // bruit de course, présence rapprochée. La colère allonge tout.
-    const sight = (dark ? (P.flashlight ? 28 : 7) : P.flashlight ? 24 : 15) + rage * 10;
-    const hear = (dark ? 15 : 12) + rage * 8;
-    const canSee = M.hasLineOfSight && dist < sight;
-    const canHear = P.running && dist < hear;
-    const isNearby = dist < 4 + rage * 2;
+    const A = this.aggro;
+    // au début elle voit et entend moins loin ; chaque cassette l'aiguise
+    const sight = (dark ? (P.flashlight ? 28 : 7) : P.flashlight ? 24 : 15) * (0.8 + A * 0.3) + rage * 10;
+    const hear = (dark ? 15 : 12) * (0.85 + A * 0.3) + rage * 8;
+    let canSee = M.hasLineOfSight && dist < sight;
+    let canHear = P.running && dist < hear;
+    let isNearby = dist < 4 + rage * 2 + A * 2;
+    // tapie dans le noir, elle observe : elle ne charge que si on s'approche trop (ou, déjà énervée, si on la voit)
+    const hiding = M.mode === 'stalk' || M.mode === 'watch' || M.mode === 'flee';
+    if (hiding) {
+      // la lampe braquée sur elle : au début elle s'enfuit dans le noir, plus tard elle charge
+      const lit = P.flashlight && M.hasLineOfSight && dist < 14 && this.facing(P, M.x, M.z) < 0.3;
+      isNearby = dist < 3.5 + A * 4;
+      canSee = (A >= 0.5 && canSee && dist < sight * 0.6) || (lit && A >= 0.4);
+      canHear = A >= 0.6 && canHear;
+      if (lit && A < 0.4 && M.mode !== 'flee' && !isNearby) {
+        const spot = this.darkSpot(map, P, M, 18, 30, false);
+        if (spot) {
+          M.mode = 'flee';
+          M.watch = spot;
+          M.repathT = 0;
+          this.emit({ type: 'monsterFlee' });
+        }
+      }
+    }
 
     if (M.mode === 'ambush') {
       // en embuscade, elle attend que sa proie passe tout près
@@ -1028,20 +1057,60 @@ export class BackroomsSim {
       if (M.unseenT === 0) M.repathT = 0;
       M.unseenT += DT;
       const atLast = Math.hypot(M.x - M.lastSeenX, M.z - M.lastSeenZ) < 1.5;
-      if (atLast || M.unseenT > LOSE_TRACK_T + rage * 4 || !same) {
+      if (atLast || M.unseenT > LOSE_TRACK_T + rage * 4 + A * 3 || !same) {
         M.mode = 'search';
         M.repathT = 0;
       }
     }
 
     // Vitesse selon le mode, la colère et le noir
-    const k = 1 + rage * 0.35 + (dark ? 0.1 : 0);
+    const k = (1 + rage * 0.35 + (dark ? 0.1 : 0)) * (0.9 + A * 0.22);
     M.burstT = Math.max(0, M.burstT - DT);
     if (M.mode === 'search' && M.probe) M.searchT = Math.max(0, (M.searchT || 0) - DT);
     if (M.mode === 'chase') M.speed = this.monsterChaseSpeed * k * (M.burstT > 0 ? 1.15 : 1);
     else if (M.mode === 'search') M.speed = MONSTER_PATROL_SPEED * 1.3 * k;
     else if (M.mode === 'ambush') M.speed = MONSTER_PATROL_SPEED * 1.5;
+    else if (M.mode === 'flee') M.speed = this.monsterChaseSpeed * 1.05;
+    else if (M.mode === 'stalk') M.speed = MONSTER_PATROL_SPEED * 1.15;
+    else if (M.mode === 'watch') M.speed = 0;
     else M.speed = MONSTER_PATROL_SPEED * (1 + rage * 0.5);
+
+    // En ronde, elle va souvent se tapir dans un coin sombre pour observer les joueurs de loin (de moins en moins à
+    // mesure qu'elle s'énerve)
+    if (M.mode === 'patrol' && same) {
+      M.stalkT -= DT;
+      if (M.stalkT <= 0) {
+        M.stalkT = rand(6, 12);
+        if (Math.random() < 0.9 - A * 0.7) {
+          const spot = this.darkSpot(map, P, M, 8, 16, true);
+          if (spot) {
+            M.mode = 'stalk';
+            M.watch = spot;
+            M.silent = true;
+            M.repathT = 0;
+          }
+        }
+      }
+    }
+    if (M.mode === 'stalk' || M.mode === 'flee') {
+      if (!same) M.mode = 'patrol';
+      else if (Math.hypot(M.x - M.watch.x, M.z - M.watch.z) < 0.6) {
+        // arrivée dans le noir : elle se fige et regarde (après une fuite, elle se calme un peu plus longtemps)
+        M.waitT = M.mode === 'flee' ? rand(4, 8) : rand(6, 12) * (1 - A * 0.5);
+        M.mode = 'watch';
+        M.path = [];
+      }
+    } else if (M.mode === 'watch') {
+      M.path = [];
+      M.yaw = Math.atan2(P.x - M.x, P.z - M.z);
+      M.waitT -= DT;
+      if (M.waitT <= 0 || !same) {
+        M.mode = 'patrol';
+        M.silent = false;
+        M.watch = null;
+        M.stalkT = rand(3, 8);
+      }
+    }
 
     // Level 1 : en patrouille, elle contourne par les rangées d'étagères pour attendre le joueur plus loin
     if (M.mode === 'patrol' && map.isShelfSide && same) {
@@ -1111,6 +1180,12 @@ export class BackroomsSim {
       } else if (M.mode === 'ambush') {
         tx = M.ambush.x;
         tz = M.ambush.z;
+      } else if ((M.mode === 'stalk' || M.mode === 'flee') && M.watch) {
+        tx = M.watch.x;
+        tz = M.watch.z;
+      } else if (M.mode === 'watch') {
+        tx = M.x;
+        tz = M.z;
       }
       M.goal = { x: tx, z: tz };
       const path = findPath(map, M.x, M.z, tx, tz);
@@ -1182,6 +1257,57 @@ export class BackroomsSim {
       M.path = [];
       M.ambushT = 6;
     }
+  }
+
+  // angle entre là où regarde le joueur et un point (0 : droit devant)
+  facing(P, x, z) {
+    let d = Math.atan2(-(x - P.x), -(z - P.z)) - P.yaw;
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    return Math.abs(d);
+  }
+
+  // la case la plus sombre possible (aucun néon allumé tout autour, sinon le moins possible), entre rMin et rMax du
+  // joueur ; seen : d'où on le voit. map.darkCells : 0 pour le noir complet, plus pour chaque néon allumé à côté
+  darkSpot(map, P, M, rMin, rMax, seen) {
+    if (!map.darkCells) {
+      map.darkCells = new Uint8Array(map.W * map.H);
+      for (const l of map.lights || []) {
+        if (l.state !== 'on') continue;
+        for (let dz = -2; dz <= 2; dz++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            const x = l.gx + dx;
+            const z = l.gz + dz;
+            if (x < 0 || z < 0 || x >= map.W || z >= map.H) continue;
+            const k = z * map.W + x;
+            map.darkCells[k] = Math.min(255, map.darkCells[k] + (Math.max(Math.abs(dx), Math.abs(dz)) <= 1 ? 3 : 1));
+          }
+        }
+      }
+    }
+    const R = Math.ceil(rMax / CELL_SIZE);
+    const cx = Math.floor(P.x / CELL_SIZE);
+    const cz = Math.floor(P.z / CELL_SIZE);
+    let best = null;
+    let bestS = Infinity;
+    for (let gz = cz - R; gz <= cz + R; gz++) {
+      for (let gx = cx - R; gx <= cx + R; gx++) {
+        if (map.isWall(gx, gz) || (map.pitAt && map.pitAt(gx, gz) >= 0)) continue;
+        const x = (gx + 0.5) * CELL_SIZE;
+        const z = (gz + 0.5) * CELL_SIZE;
+        const d = Math.hypot(x - P.x, z - P.z);
+        if (d < rMin || d > rMax) continue;
+        const dark = map.darkCells[gz * map.W + gx];
+        if (seen && !hasLineOfSight(map, x, z, P.x, P.z)) continue;
+        // le plus sombre, puis le plus près d'elle, et pas en plein dans le regard du joueur
+        const sc = dark * 40 + Math.hypot(x - M.x, z - M.z) + (this.facing(P, x, z) < 0.4 ? 15 : 0);
+        if (sc < bestS) {
+          bestS = sc;
+          best = { x, z };
+        }
+      }
+    }
+    return best;
   }
 
   // Fouille : une case libre près du dernier endroit où elle a vu sa proie (la première dans la direction où elle filait)

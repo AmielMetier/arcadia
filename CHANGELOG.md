@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 4.29 — 5 novembre 2026
+- **The Backrooms** — l'entité prend corps en 3D : une grande silhouette décharnée et voûtée, aux bras qui pendent jusqu'aux genoux, aux doigts interminables et au cou trop long, avec le même visage aux yeux blancs et à la bouche béante. Elle marche, court et s'arrête vraiment.
+- **The Backrooms** — au début de la partie, l'entité se tapit dans les coins sombres pour observer les explorateurs de loin, sans attaquer ; braquer sa lampe sur elle la fait fuir dans le noir.
+  - À chaque cassette trouvée, elle devient plus agressive : elle voit et entend plus loin, charge plus vite, lâche moins facilement, et observe de moins en moins avant d'attaquer.
+- **The Backrooms** — les bruits d'ambiance sont joués très bas, à peine audibles.
+
 ## 4.28 — 5 novembre 2026
 - **The Backrooms** — à plusieurs, tes coéquipiers sont de vrais explorateurs en combinaison jaune, casque à visière et gants noirs, qui marchent, courent et attendent.
 - **The Backrooms** — la lampe des autres joueurs éclaire vraiment les murs devant eux, sans le gros cône dessiné dans l'air ; ta propre lampe a un faisceau plus doux, avec un halo autour.
