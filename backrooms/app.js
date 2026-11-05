@@ -1,6 +1,6 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
 import { BackroomsSim, DT, DEPART_T } from './engine/sim.js';
-import { createBackroomsScene } from './view/scene.js';
+import { createBackroomsScene, setMonsterMode } from './view/scene.js';
 import { BackroomsSfx } from './view/sfx.js';
 import { BackroomsHUD } from './view/hud.js';
 
@@ -215,7 +215,7 @@ function initGame(settings = lastSettings) {
   const difficulty = settings.difficulty || 'normal';
   const players = NET.role === 'host' ? H.players.map((p) => ({ id: p.id, name: p.name || 'Player' })) : [{ id: 0, name: 'Player' }];
   NET.run = Date.now();
-  startRun({ seed, difficulty, players, run: NET.run, level: 0 });
+  startRun({ seed, difficulty, players, run: NET.run, level: 0, vip: settings.monsters === 'vip' });
   // ?parkour (seul) : on commence devant le couloir piégé, tourné vers les trous
   const trap = sim.map.trap;
   if (NET.role === 'solo' && trap && /[?&]parkour(&|=|$)/.test(location.search)) {
@@ -228,10 +228,15 @@ function initGame(settings = lastSettings) {
   if (NET.role === 'host') send('all', goMessage());
 }
 
-const goMessage = () => ({ t: 'go', run: NET.run, seed: sim.seed, diff: sim.difficulty, players: sim.roster, lv: sim.level });
+const goMessage = () => ({ t: 'go', run: NET.run, seed: sim.seed, diff: sim.difficulty, players: sim.roster, lv: sim.level, vip: monstersVip });
 
-function startRun({ seed, difficulty, players, run, level }) {
+let monstersVip = false;
+function startRun({ seed, difficulty, players, run, level, vip = false }) {
   NET.run = run;
+  monstersVip = !!vip;
+  setMonsterMode(monstersVip); // les monstres VIP pour toute la partie si l'hôte les a choisis
+  if (hud) hud.applyMonsters();
+  if (sfx) sfx.setVoiceMode(monstersVip);
   NET.inputs = {};
   NET.actions = {};
   NET.events = [];
@@ -255,6 +260,7 @@ function startRun({ seed, difficulty, players, run, level }) {
   if (!hud) {
     hud = new BackroomsHUD(hudEl, { play, setKbMode, use: (i) => useSlot(i, true) });
   }
+  sfx.setVoiceMode(monstersVip);
 
   stepDist = 0;
   setPaused(kbMode ? paused : !isPointerLocked);
@@ -296,7 +302,7 @@ function onMsg(from, m) {
   if (NET.role !== 'guest' || from !== H.info.hostId) return; // invité : seul l'hôte fait foi
   NET.lastHost = performance.now();
   if (m.t === 'go') {
-    if (m.run !== NET.run || !sim) startRun({ seed: m.seed, difficulty: m.diff, players: m.players || [], run: m.run, level: m.lv || 0 });
+    if (m.run !== NET.run || !sim) startRun({ seed: m.seed, difficulty: m.diff, players: m.players || [], run: m.run, level: m.lv || 0, vip: !!m.vip });
   } else if (m.t === 's' && sim && m.run === NET.run) {
     const lv = sim.level;
     sim.applySnapshot(m.s);

@@ -85,15 +85,7 @@ export class BackroomsHUD {
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Enter' && !this.$('#endScreen').hidden) this.$('#btnRestart').click();
     });
-    const img = this.$('#scareImg');
-    img.onerror = () => img.remove();
-    img.src = ENTITY_IMG;
-    // celle du Level 1 : sa vidéo, qui continue de gesticuler en plein écran
-    const A = ENTITY_ANIM;
-    const anim = this.$('#scareAnim');
-    anim.style.backgroundImage = `url("${A.url}")`;
-    anim.style.backgroundSize = `${A.cols * 100}% ${A.rows * 100}%`;
-    anim.style.aspectRatio = String(A.aspect);
+    this.applyMonsters();
 
     // date du caméscope, figée en 1996 comme une vieille cassette retrouvée
     const d = new Date();
@@ -251,6 +243,18 @@ export class BackroomsHUD {
     t.textContent = text;
     t.hidden = false;
     this.toastT = 2.5;
+  }
+
+  // images du screamer selon le mode (normal / VIP) : à rappeler quand l'hôte lance une partie
+  applyMonsters() {
+    const img = this.$('#scareImg');
+    if (img) { img.onerror = () => (img.hidden = true); img.hidden = false; img.src = ENTITY_IMG; }
+    // celle du Level 1 : sa vidéo, qui continue de gesticuler en plein écran
+    const A = ENTITY_ANIM;
+    const anim = this.$('#scareAnim');
+    anim.style.backgroundImage = `url("${A.url}")`;
+    anim.style.backgroundSize = `${A.cols * 100}% ${A.rows * 100}%`;
+    anim.style.aspectRatio = String(A.aspect);
   }
 
   // level : le screamer est celui de l'entité du level en cours

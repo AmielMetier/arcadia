@@ -4,6 +4,7 @@
 // les ascenseurs sont de vraies lumières. Les étages sont empilés (le second FLOOR_DY plus bas) : on voit l'étage du
 // dessous par les trous et les cages d'escalier. L'image finale passe par le filtre de vieille caméra (vhs.js).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
+import { classicEntity } from './entity.js';
 import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
 import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, FLOOR_DY } from '../engine/map.js';
 import { FUSES, feetY } from '../engine/sim.js';
@@ -11,9 +12,18 @@ import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
 
 const MODELS = new URL('../models/', import.meta.url).href; // modèles Poly Haven (CC0), voir models/LICENSE.txt
-export const ENTITY_IMG = new URL('../img/entite.png?v=2', import.meta.url).href; // ?v : image plus nette, ne pas garder l'ancienne en cache
+const VIP_IMG = new URL('../img/entite.png?v=2', import.meta.url).href; // ?v : image plus nette, ne pas garder l'ancienne en cache
 // L'entité du Level 1 : une vidéo détourée, découpée en planche d'images (12 par seconde, 16 par rangée) jouée en boucle
-export const ENTITY_ANIM = { url: new URL('../monster/david.webp?v=2', import.meta.url).href, frames: 119, cols: 16, rows: 8, fps: 12, aspect: 246 / 400 };
+const VIP_ANIM = { url: new URL('../monster/david.webp?v=2', import.meta.url).href, frames: 119, cols: 16, rows: 8, fps: 12, aspect: 246 / 400, tint: '#463e37', vip: true };
+// mode normal : l'entité classique dessinée dans le code ; mode VIP : les monstres d'origine (réservés, choisis par l'hôte)
+export let ENTITY_IMG = classicEntity().img;
+export let ENTITY_ANIM = classicEntity().anim;
+export let ENTITY_VIP = false;
+export function setMonsterMode(vip) {
+  ENTITY_VIP = !!vip;
+  ENTITY_IMG = vip ? VIP_IMG : classicEntity().img;
+  ENTITY_ANIM = vip ? VIP_ANIM : classicEntity().anim;
+}
 
 const LIGHT_R = 1.55; // portée d'un néon, en cases : une flaque de lumière nette, le noir juste à côté
 const AMBIENT = 0.003; // lumière minimale dans les zones mortes (presque le noir complet)
@@ -1166,7 +1176,7 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
     const h = anim ? 2.8 : 2.15; // au Level 1, il est immense (le plafond de l'entrepôt est à 4,2 m)
     const w = anim ? h * anim.aspect : Math.min(2.3, (h * t.image.width) / t.image.height);
     if (anim) faceFrame.value.set(0, 0, 1 / anim.cols, 1 / anim.rows);
-    const mat = new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide, color: anim ? '#463e37' : '#e6dccb' }); // au Level 1, une silhouette sombre
+    const mat = new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide, color: anim ? anim.tint : (ENTITY_VIP ? '#e6dccb' : '#ffffff') }); // au Level 1, une silhouette sombre
     // brouillage de l'image : bandes décalées, couleurs qui bavent, neige et lignes manquantes (uGlitch de 0 à 1)
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.uGlitch = faceGlitch;
@@ -1195,7 +1205,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     };
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
     plane.position.y = h / 2 + 0.25; // elle flotte au-dessus de la moquette
-    plane.position.x = anim ? 0 : (0.5 - 0.6) * w; // la tête (à 60 % de la largeur de la photo) dans l'axe de l'entité
+    plane.position.x = anim || !ENTITY_VIP ? 0 : (0.5 - 0.6) * w; // la tête (à 60 % de la largeur de la photo) dans l'axe de l'entité
     if (anim) plane.position.y = h / 2 + 0.02; // lui marche par terre
     face.add(plane);
     face.visible = true;
