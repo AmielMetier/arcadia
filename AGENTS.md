@@ -112,6 +112,8 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   `assets/graphics/hgss/carte_guide.png` → `odyssee/img/carte/`).
   Les outils de dessin (atelier graphique, vitrine, sources PixelLab, scripts de découpe des sols, kits, personnages
   et créatures à 16 px) vivent sur la branche `atelier` du fork ; `main` ne garde que le jeu.
+  Sprites des Pokémon (face, dos, chromatiques, icônes, générations 1 à 6) : copiés de PokeAPI dans `odyssee/img/pokeapi/`
+  par `node tools/odyssee-sprites-pokeapi.mjs` (le jeu ne les charge plus en ligne ; les cris restent en ligne).
   Interface : un écran plein cadre par fichier dans `odyssee/js/ui/screens/` (`map.js`, `card.js`, `pc.js`, `friends.js`…),
   outils communs et fermeture d'écran (`closer`) dans `screens/common.js` ; `ui/screens.js` ne fait que tout réexporter (importer depuis lui).
   Styles découpés de même dans `odyssee/css/NN-ecran.css`, chargés dans l'ordre par `index.html` (l'ordre compte : un fichier

@@ -6,7 +6,9 @@ import { SPRITES } from './data/sprites.js';
 import { ITEMS as ITEM_DEFS } from './core/items.js';
 
 const params = new URLSearchParams(location.search);
-const BASE = params.get('sprites') || 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites';
+// sprites des Pokémon (face, dos, chromatiques, icônes) copiés de PokeAPI dans le dépôt : le jeu n'en dépend plus en ligne
+// (?sprites=<adresse> permet toujours d'en essayer d'autres)
+const BASE = params.get('sprites') || new URL('../img/pokeapi', import.meta.url).href;
 const CRIES = 'https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest';
 const HG = BASE + '/pokemon/versions/generation-iv/heartgold-soulsilver';
 // après le n° 493 (pas de dessin HeartGold / SoulSilver) : dessins Noir / Blanc, même style pixel
