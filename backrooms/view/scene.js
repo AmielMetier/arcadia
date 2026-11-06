@@ -1044,7 +1044,7 @@ float bkCaust(vec2 uv, float t) {
         showGroup(exitGroup, !fake);
         if (fakeWall) fakeWall.visible = fake;
         exitLight.color.set(open ? '#22c55e' : '#ef4444');
-        exitLight.intensity = fake ? 0 : open ? 6 : 2.5;
+        exitLight.intensity = fake || !E ? 0 : open ? 6 : 2.5; // aux Poolrooms, pas d'ascenseur : les toboggans
         signMat.color.set(open ? '#4ade80' : '#ff3030');
         // les portes s'ouvrent quand l'ascenseur est alimenté, se referment au départ
         const doorWant = open && !(sim.departT > 0) ? 1 : 0;

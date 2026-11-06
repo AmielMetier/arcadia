@@ -364,7 +364,7 @@ function handleEvent(ev, me) {
       break;
     }
     case 'powered':
-      if (hud) hud.toast(sim.level === 2 ? 'Valves closed: the pumps stop, the elevator opens' : 'Fuses in place: the freight elevator is starting up');
+      if (hud) hud.toast(sim.level === 2 ? 'Valves closed: the pumps stop, the three slides open' : 'Fuses in place: the freight elevator is starting up');
       if (sfx && sim.level === 2) sfx.setPool(false); // le silence d'un coup : les pompes s'arrêtent
       break;
     case 'exitUnlocked':
@@ -435,13 +435,16 @@ function handleEvent(ev, me) {
     case 'spotted':
       if (sfx) sfx.spotted();
       break;
-    case 'board':
-      if (sfx) sfx.ding();
-      if (hud && ev.id !== me) hud.toast(`${ev.name} is in the elevator`);
+    case 'board': {
+      const sl = ev.slide !== undefined && sim.map.slides ? sim.map.slides[ev.slide] : null;
+      if (sfx) sl ? sfx.splashDown() : sfx.ding();
+      if (hud && ev.id !== me) hud.toast(sl ? `${ev.name} slid into the ${sl.name.toLowerCase()} slide` : `${ev.name} is in the elevator`);
       break;
+    }
     case 'depart':
-      if (sfx) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
-      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : 'THE ELEVATOR IS GOING UP…', '', 0, true), 700);
+      if (sfx && ev.level === 2) sfx.splashDown();
+      else if (sfx) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
+      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
       break;
     case 'level':
       // nouvel étage : nouvelle scène

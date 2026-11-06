@@ -11,7 +11,7 @@
 // murs) ; en plus : les cloisons minces entre deux salles (segments, avec leurs portes), les colonnes (cercles), et la
 // profondeur d'eau donnée en tout point par la forme du bassin de chaque salle.
 // Bible de conception : « Bible de conception — Les Poolrooms (Level 37) ».
-import { CELL_SIZE, T, itemList } from './map.js';
+import { CELL_SIZE, T, itemList, spreadOut } from './map.js';
 
 const C = CELL_SIZE;
 export const MOD = 4; // un module = 4 cases = 10 m
@@ -21,6 +21,15 @@ export const POOL_CEIL = 4.5;
 export const WALL_T = 0.3; // épaisseur d'une cloison
 export const DOOR = { w: 3, h: 3.2 }; // une porte en plein cintre : 3 m de large, 3,20 m sous la clé
 export const DEPTH = { WADE: 0.2, GALLERY: 0.25, TUNNEL: 0.6 };
+// La sortie : trois toboggans colorés sortent des murs ; une fois les 3 volants de vanne trouvés, on se glisse dans
+// l'un d'eux. Chaque couleur mène ailleurs (to : le niveau d'arrivée ; null tant qu'il n'existe pas : on sort des
+// Backrooms). MOUTH : le tube, au ras du sol (rayon et hauteur du centre), et la distance où l'on s'y glisse.
+export const SLIDES = [
+  { color: 'red', name: 'RED', hex: '#e2402f', to: null },
+  { color: 'yellow', name: 'YELLOW', hex: '#f2bf1d', to: null },
+  { color: 'blue', name: 'BLUE', hex: '#2c7fe0', to: null },
+];
+export const MOUTH = { r: 0.62, y: 0.72, enter: 1.15 };
 
 // objets abandonnés au bord des bassins (Poly Haven, CC0) ; face : dos au mur
 export const L37_PROPS = [
@@ -104,7 +113,7 @@ export function createPoolMap(seed = 37) {
   const edgeDoor = (a, b, sd) => addDoor(a, b, (1 + (sd.i + 0.5 + sd.dx * 0.5) * MOD) * C, (1 + (sd.j + 0.5 + sd.dz * 0.5) * MOD) * C, sd.dx ? 'z' : 'x');
   const SIZES = { lagoon: [2, 2], groin: [2, 2], wade: [1, 1], tech: [1, 1] };
   const start = place('lagoon', 5, 5, 2, 2);
-  const WEIGHTS = [['tunnel', 4], ['gallery', 3], ['lagoon', 2], ['groin', 2], ['sky', 2], ['wade', 3], ['tech', 1.5]];
+  const WEIGHTS = [['tunnel', 4], ['gallery', 3], ['lagoon', 2], ['groin', 2], ['sky', 2], ['wade', 3]];
   const total = WEIGHTS.reduce((a, [, w]) => a + w, 0);
   const pickType = () => {
     let v = rnd() * total;
@@ -150,7 +159,15 @@ export function createPoolMap(seed = 37) {
     const r = place(type, mx, mz, mw, mh, extra);
     edgeDoor(R, r, sd);
   }
-  // il faut 3 locaux techniques : on en ajoute au besoin, au bout de ce qui existe
+  // les 3 locaux techniques (un volant de vanne chacun) : greffés le plus loin possible du lagon de départ et les uns
+  // des autres (à vol d'oiseau, en modules)
+  const slots = [];
+  for (const R of rooms) for (const sd of sides(R)) if (free(sd.i + sd.dx, sd.j + sd.dz, 1, 1)) slots.push({ x: sd.i + sd.dx, z: sd.j + sd.dz, R, sd });
+  const modDist = (p) => (c) => Math.hypot(c.x - p.x, c.z - p.z);
+  for (const t of spreadOut(slots, [{ x: start.mx + 0.5, z: start.mz + 0.5 }], 3, modDist, rnd)) {
+    if (!free(t.x, t.z, 1, 1)) continue;
+    edgeDoor(t.R, place('tech', t.x, t.z, 1, 1), t.sd);
+  }
   for (let tries = 0; tries < 400 && rooms.filter((r) => r.type === 'tech').length < 3; tries++) {
     const R = pick(rooms);
     const sd = pick(sides(R));
@@ -376,39 +393,9 @@ export function createPoolMap(seed = 37) {
     return !collide(x, z, rad);
   };
 
-  // 6. La sortie : un ascenseur dans le mur extérieur d'une salle sèche, loin du départ
-  const exitRooms = rooms.filter((r) => ['lagoon', 'groin', 'sky', 'tech'].includes(r.type) && r !== start).sort((a, b) => Math.hypot(b.x0 - start.x0, b.z0 - start.z0) - Math.hypot(a.x0 - start.x0, a.z0 - start.z0));
-  let elevator = null;
-  let exitCell = null;
-  for (const r of [...exitRooms, start]) {
-    const cand = [];
-    for (let gz = 1 + r.mz * MOD; gz < 1 + (r.mz + r.mh) * MOD; gz++) {
-      for (let gx = 1 + r.mx * MOD; gx < 1 + (r.mx + r.mw) * MOD; gx++) {
-        if (roomOf[gz * W + gx] !== r.id || D(gx, gz) < 0) continue;
-        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          const nx = gx + dx;
-          const nz = gz + dz;
-          if (nx < 1 || nz < 1 || nx >= W - 1 || nz >= H - 1 || grid[nz * W + nx] !== T.WALL || roomOf[nz * W + nx] >= 0) continue;
-          // la cabine : fermée sur trois côtés par d'autres murs
-          const shut = [[nx + dz, nz + dx], [nx - dz, nz - dx], [nx + dx, nz + dz]].every(([x, z]) => grid[z * W + x] === T.WALL);
-          if (!shut || roomDepth(r, (gx + 0.5) * C, (gz + 0.5) * C) > 0 || collide((gx + 0.5) * C, (gz + 0.5) * C, 0.8)) continue;
-          cand.push({ gx, gz, nx, nz, dx, dz });
-        }
-      }
-    }
-    if (cand.length) {
-      const c = pick(cand);
-      grid[c.nz * W + c.nx] = T.EXIT;
-      elevator = { gx: c.nx, gz: c.nz, x: (c.nx + 0.5) * C, z: (c.nz + 0.5) * C, dx: c.dx, dz: c.dz };
-      exitCell = { x: c.gx, z: c.gz };
-      r.exit = true;
-      break;
-    }
-  }
   const cellPos = (c) => ({ x: (c.x + 0.5) * C, z: (c.z + 0.5) * C, gx: c.x, gz: c.z });
-  const exit = cellPos(exitCell);
 
-  // 7. Les 3 volants de vanne : au milieu des locaux techniques
+  // 6. Les 3 volants de vanne : au milieu des locaux techniques
   const fuses = [];
   for (const r of rooms.filter((q) => q.type === 'tech')) {
     if (fuses.length === 3) break;
@@ -419,6 +406,50 @@ export function createPoolMap(seed = 37) {
     if (D(gx, gz) < 0) continue;
     fuses.push({ id: fuses.length, x, z, gx, gz, taken: false });
   }
+
+  // 7. Les 3 toboggans : dans un mur plein (une case de mur fermée sur les côtés et derrière, pour que le tube y
+  // court), devant une case au sec ou presque d'un lagon, d'une pataugeoire ou d'une verrière (plafond haut), loin des
+  // portes ; le plus loin possible (en marche) du départ, des volants et les uns des autres
+  const slideRoom = (r) => r && ['lagoon', 'wade', 'sky'].includes(r.type);
+  const mouths = [];
+  for (const c of walkable) {
+    const r = rooms[roomOf[c.z * W + c.x]];
+    if (!slideRoom(r) || roomDepth(r, (c.x + 0.5) * C, (c.z + 0.5) * C) > DEPTH.WADE + 0.01 || collide((c.x + 0.5) * C, (c.z + 0.5) * C, 0.8)) continue;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = c.x + dx;
+      const nz = c.z + dz;
+      if (nx < 1 || nz < 1 || nx >= W - 1 || nz >= H - 1 || grid[nz * W + nx] !== T.WALL || roomOf[nz * W + nx] >= 0) continue;
+      const shut = [[nx + dz, nz + dx], [nx - dz, nz - dx], [nx + dx, nz + dz]].every(([x, z]) => grid[z * W + x] === T.WALL);
+      // les cases voisines le long du mur : de la même salle (le tube court au-dessus d'elles)
+      const along = [[c.x + dz, c.z + dx], [c.x - dz, c.z - dx]].every(([x, z]) => roomOf[z * W + x] === r.id);
+      const mx = (c.x + 0.5 + dx * 0.5) * C;
+      const mz = (c.z + 0.5 + dz * 0.5) * C;
+      if (!shut || !along || doors.some((d) => Math.hypot(d.px - mx, d.pz - mz) < 4)) continue;
+      mouths.push({ x: c.x, z: c.z, nx, nz, dx, dz, mx, mz });
+    }
+  }
+  const walkDist = (p) => {
+    const d = bfsFrom(p.x, p.z);
+    return (c) => d[c.z * W + c.x];
+  };
+  const fixed = [{ x: sgx, z: sgz }, ...fuses.map((f) => ({ x: f.gx, z: f.gz }))];
+  // pas dans le lagon de départ, ni juste à côté (sauf s'il n'y a pas d'autre place)
+  const farMouths = mouths.filter((m) => roomOf[m.z * W + m.x] !== start.id && D(m.x, m.z) >= 14);
+  const slides = spreadOut(farMouths.length >= SLIDES.length * 3 ? farMouths : mouths, fixed, SLIDES.length, walkDist, rnd).map((m, i) => ({
+    id: i,
+    ...SLIDES[i],
+    gx: m.x,
+    gz: m.z,
+    nx: m.nx,
+    nz: m.nz,
+    dx: m.dx,
+    dz: m.dz,
+    x: m.mx,
+    z: m.mz,
+  }));
+  for (const sl of slides) rooms[roomOf[sl.gz * W + sl.gx]].exit = true;
+  // le repère de sortie (signal, lumière) : devant le premier toboggan
+  const exit = slides.length ? cellPos({ x: slides[0].gx, z: slides[0].gz }) : cellPos({ x: sgx, z: sgz });
 
   // 8. Les lampes de chaque salle : position, hauteur du luminaire (fy), sa taille (fs), cachée ou non
   const lights = [];
@@ -457,7 +488,7 @@ export function createPoolMap(seed = 37) {
 
   // 9. Objets : au bord des bassins (au sec, contre un mur), canards sur l'eau, eau d'amande et piles
   // rien devant une porte ni devant l'ascenseur
-  const busy = [startCell, exit, ...fuses, ...doors.map((d) => ({ x: d.px, z: d.pz }))];
+  const busy = [startCell, ...slides, ...slides.map((sl) => ({ x: sl.x - sl.dx * C, z: sl.z - sl.dz * C })), ...fuses, ...doors.map((d) => ({ x: d.px, z: d.pz }))];
   const near = (x, z, d) => busy.some((b) => Math.hypot(b.x - x, b.z - z) < d);
   const props = [];
   const deckRooms = rooms.filter((q) => q.type === 'lagoon' || q.type === 'sky' || q.type === 'groin' || q.type === 'wade');
@@ -523,7 +554,8 @@ export function createPoolMap(seed = 37) {
     walkable,
     spawn: { x: startCell.x, z: startCell.z, gx: sgx, gz: sgz },
     exit,
-    elevator,
+    elevator: null,
+    slides,
     cassettes: [],
     fuses,
     lights,

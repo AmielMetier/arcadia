@@ -5,7 +5,7 @@
 // monte ou descend de quelques centimètres quand on ne la regarde pas, et une ombre longue au fond d'un bassin.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL_SIZE } from '../engine/map.js';
-import { POOL_CEIL, WALL_T, roomDepth, poolSdf, islandSdf } from '../engine/poolrooms.js';
+import { POOL_CEIL, WALL_T, MOUTH, roomDepth, poolSdf, islandSdf } from '../engine/poolrooms.js';
 
 const C = CELL_SIZE;
 const SPLASHES = 8;
@@ -382,6 +382,73 @@ export function buildWater({ map, group, baked, textures, bake, fog }) {
     group.add(g);
   }
 
+  // --- 6b. Les toboggans : un gros tube coloré qui sort du mur au ras du sol, et son tuyau qui monte le long du mur
+  // puis replonge dedans sous le plafond ; une grille le ferme tant que les volants ne sont pas tous trouvés (et
+  // quand un autre toboggan a été pris) ---
+  const slideMeshes = [];
+  const metal = baked(new THREE.MeshLambertMaterial({ color: '#8e979c' }));
+  const R = MOUTH.r;
+  for (const sl of map.slides || []) {
+    const g = new THREE.Group();
+    g.position.set(sl.x, 0, sl.z);
+    g.rotation.y = Math.atan2(-sl.dx, -sl.dz); // +z local = vers la salle
+    const plastic = baked(new THREE.MeshLambertMaterial({ color: sl.hex, emissive: sl.hex, emissiveIntensity: 0.12, side: THREE.DoubleSide }));
+    // la bouche : un court tronçon de tube et son bourrelet
+    const mouth = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 0.55, 32, 1, true).rotateX(Math.PI / 2), plastic);
+    mouth.position.set(0, MOUTH.y, 0.275);
+    const lip = new THREE.Mesh(new THREE.TorusGeometry(R, 0.07, 10, 32), plastic);
+    lip.position.set(0, MOUTH.y, 0.55);
+    // le fond : le noir du tube qui s'enfonce dans le mur
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 64;
+    const cg = cv.getContext('2d');
+    const grad = cg.createRadialGradient(32, 30, 2, 32, 32, 32);
+    grad.addColorStop(0, '#000000');
+    grad.addColorStop(0.55, '#020304');
+    grad.addColorStop(1, new THREE.Color(sl.hex).multiplyScalar(0.35).getStyle());
+    cg.fillStyle = grad;
+    cg.fillRect(0, 0, 64, 64);
+    const hole = new THREE.Mesh(new THREE.CircleGeometry(R - 0.005, 32), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv) }));
+    hole.position.set(0, MOUTH.y, 0.02);
+    // le tuyau : il monte au-dessus de la bouche, longe le mur sous le plafond et y rentre
+    const side = sl.id % 2 ? 1 : -1;
+    const top = MOUTH.y + R;
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, top - 0.25, 0.3),
+      new THREE.Vector3(0, top + 0.5, 0.33),
+      new THREE.Vector3(0, 2.8, 0.33),
+      new THREE.Vector3(side * 0.7, 3.55, 0.33),
+      new THREE.Vector3(side * 1.9, 3.75, 0.33),
+      new THREE.Vector3(side * 2.9, 3.8, 0.22),
+      new THREE.Vector3(side * 3.3, 3.8, -0.35),
+    ]);
+    const pipe = new THREE.Mesh(new THREE.TubeGeometry(curve, 48, 0.3, 16, false), plastic);
+    // deux colliers de métal sur la montée
+    const rings = [2.0, 2.7].map((y) => {
+      const m = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.035, 8, 20).rotateX(Math.PI / 2), metal);
+      m.position.set(0, y, 0.33);
+      return m;
+    });
+    // la grille : barreaux devant la bouche
+    const grate = new THREE.Group();
+    for (let k = -2; k <= 2; k++) {
+      const x = k * 0.22;
+      const h = 2 * Math.sqrt(Math.max(0, R * R - x * x));
+      const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, h, 6), metal);
+      bar.position.set(x, MOUTH.y, 0.5);
+      grate.add(bar);
+    }
+    for (const y of [-0.25, 0.25]) {
+      const w = 2 * Math.sqrt(R * R - y * y);
+      const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, w, 6).rotateZ(Math.PI / 2), metal);
+      bar.position.set(0, MOUTH.y + y, 0.5);
+      grate.add(bar);
+    }
+    g.add(mouth, lip, hole, pipe, ...rings, grate);
+    group.add(g);
+    slideMeshes.push({ sl, grate });
+  }
+
   // --- 7. La surface de l'eau ---
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(wPos, 3));
@@ -495,6 +562,8 @@ void main() {
     },
     update(sim, P, time, dt, camera) {
       uniforms.uTime.value = time;
+      // les grilles des toboggans : levées quand les volants sont trouvés, sauf sur les toboggans qu'on n'a pas pris
+      for (const { sl, grate } of slideMeshes) grate.visible = !sim.open || (sim.slide >= 0 && sim.slide !== sl.id);
       // un rond dans l'eau à chaque pas de chaque joueur qui marche dans l'eau
       for (const Q of sim.players) {
         if (Q.status !== 'alive' || !Q.moving || map.depthAt(Q.x, Q.z) <= 0) continue;

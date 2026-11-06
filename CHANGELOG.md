@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 4.38 — 6 novembre 2026
+- **The Backrooms** — aux Poolrooms (Level 37), on ne sort plus par un ascenseur mais par un toboggan.
+  - Trois gros toboggans, rouge, jaune et bleu, sortent des murs, avec leur tuyau qui grimpe jusqu'au plafond.
+  - Une grille les ferme tant que les 3 volants de vanne n'ont pas été trouvés.
+  - Chaque couleur mène à un endroit différent. Le premier qui se glisse dans un toboggan choisit pour toute l'équipe : les deux autres se referment.
+- **The Backrooms** — à tous les niveaux, les objectifs (cassettes, fusibles, volants de vanne, toboggans) sont placés le plus loin possible les uns des autres : il faut vraiment explorer toute la carte.
+
 ## 4.37 — 6 novembre 2026
 - **The Backrooms** — chaque niveau a désormais ses propres sons.
   - Dans l'entrepôt (Level 1), la poursuite a sa propre musique ; les cris, les ambiances et le son de la mort du Level 0 restent au Level 0.

@@ -13,6 +13,40 @@ export const PIT_DEPTH = FLOOR_DY; // on tombe d'un étage, de très haut
 export const NICHE_Y = 2.25; // hauteur de la cassette dans son renfoncement
 
 // tous les objets qu'on ramasse avec F : 'bottle', 'battery', 'ladder' (id unique, position, pris ou non)
+// Les objectifs d'un niveau, le plus loin possible les uns des autres : à chaque tour, la case candidate dont le
+// point déjà posé le plus proche (fixed, puis les choisis) est le plus loin ; on tire au hasard parmi celles qui
+// font au moins 90 % du meilleur score. distFrom(p) renvoie la distance (de marche) de p à une case c : (c) => nombre.
+export function spreadOut(cands, fixed, n, distFrom, rnd) {
+  const pool = [...cands];
+  const near = pool.map(() => Infinity);
+  const add = (p) => {
+    const d = distFrom(p);
+    pool.forEach((c, i) => {
+      const v = d(c);
+      near[i] = Math.min(near[i], v < 0 ? Infinity : v);
+    });
+  };
+  fixed.forEach(add);
+  const out = [];
+  for (let k = 0; k < n && pool.length; k++) {
+    let best = -1;
+    for (const v of near) if (v > best) best = v;
+    const top = pool.map((c, i) => i).filter((i) => near[i] >= best * 0.9);
+    const i = top[Math.floor(rnd() * top.length)];
+    const c = pool[i];
+    pool.splice(i, 1);
+    near.splice(i, 1);
+    out.push(c);
+    add(c);
+  }
+  return out;
+}
+// distance de marche sur une grille (parcours en largeur depuis p)
+export const gridDist = (grid, W, H) => (p) => {
+  const d = bfs(grid, W, H, p.x, p.z);
+  return (c) => d[c.z * W + c.x];
+};
+
 export function itemList(...lists) {
   const items = [];
   for (const [kind, list] of lists) for (const o of list) items.push(Object.assign(o, { kind, iid: items.length }));
@@ -349,25 +383,15 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   const pits = [];
   let trap = null;
 
-  // 8. Les 5 cassettes : une par secteur autour du départ, loin du départ, de la sortie et entre elles
-  const cassettes = [];
-  const taken = [exitCell];
   const maxD = D(far[0]) || 1;
-  for (let i = 0; i < 5; i++) {
-    const a0 = (i / 5) * Math.PI * 2;
-    const a1 = ((i + 1) / 5) * Math.PI * 2;
-    const ok = (c, minD) => {
-      let a = Math.atan2(c.z - sz, c.x - sx);
-      if (a < 0) a += Math.PI * 2;
-      return a >= a0 && a < a1 && D(c) > maxD * minD && taken.every((t) => Math.hypot(t.x - c.x, t.z - c.z) > 10);
-    };
-    let candidates = walkable.filter((c) => ok(c, 0.35));
-    if (!candidates.length) candidates = walkable.filter((c) => ok(c, 0.1));
-    if (!candidates.length) candidates = walkable.filter((c) => D(c) > 6 && taken.every((t) => t !== c));
-    const chosen = pick(candidates);
-    taken.push(chosen);
-    cassettes.push({ id: i, ...cellPos(chosen), name: `Cassette VHS #${i + 1}`, collected: false });
-  }
+  // 8. Les 5 cassettes : le plus loin possible (en marche) du départ, de la sortie et les unes des autres
+  const reach = bfs(grid, W, H, sx, sz); // la cabine a pu couper un recoin ; pas collée au bord (place pour le couloir piégé)
+  const cassettes = spreadOut(walkable.filter((c) => D(c) > 6 && reach[c.z * W + c.x] >= 0 && c.x > 3 && c.z > 3 && c.x < W - 4 && c.z < H - 4), [{ x: sx, z: sz }, exitCell], 5, gridDist(grid, W, H), rnd).map((c, i) => ({
+    id: i,
+    ...cellPos(c),
+    name: `Cassette VHS #${i + 1}`,
+    collected: false,
+  }));
 
   // 8a. Le couloir piégé : autour d'une cassette, une pièce de 3 × 3 cases fermée de murs, et un seul accès, un
   // couloir de trous qui tourne. Il avance par blocs de 2 × 2 trous : on le traverse sur les arêtes (entre deux
@@ -833,12 +857,16 @@ export function createLevel0(seed = 42) {
   // les cassettes : 3 en haut (dont celle du couloir piégé et celle du renfoncement), 2 en bas
   const special = up.cassettes.filter((c) => c.vault || c.high);
   const others = up.cassettes.filter((c) => !c.vault && !c.high);
-  const keepUp = [...special, ...others.slice(0, Math.max(0, 3 - special.length))];
+  // en haut, les autres le plus loin des deux spéciales ; en bas, le plus loin des escaliers et l'une de l'autre
+  const cellOf = (c) => ({ x: c.gx, z: c.gz, c });
+  const upDist = gridDist(up.grid, W, up.H);
+  const fixedUp = [...special, up.spawn, up.exit].map(cellOf);
+  const keepUp = [...special, ...spreadOut(others.map(cellOf), fixedUp, Math.max(0, 3 - special.length), upDist, rnd).map((o) => o.c)];
   const freeIds = up.cassettes.filter((c) => !keepUp.includes(c)).map((c) => c.id);
   up.cassettes = keepUp;
-  // en bas : les plus éloignées des escaliers
-  const dStair = (c) => Math.min(...stairs.map((st) => Math.abs(st.gx - c.gx) + Math.abs(st.gz - c.gz)), 999);
-  down.cassettes = [...down.cassettes].sort((a, b) => dStair(b) - dStair(a)).slice(0, freeIds.length);
+  const downDist = gridDist(down.grid, W, down.H);
+  const fixedDown = [...stairs.map((st) => ({ x: st.gx, z: st.gz })), cellOf(down.spawn)];
+  down.cassettes = spreadOut(down.cassettes.map(cellOf), fixedDown, freeIds.length, downDist, rnd).map((o) => o.c);
   down.cassettes.forEach((c, i) => {
     c.id = freeIds[i];
   });

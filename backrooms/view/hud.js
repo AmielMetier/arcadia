@@ -4,6 +4,8 @@ import { DEPART_T } from '../engine/sim.js';
 
 // nom affiché d'un niveau : le troisième, ce sont les Poolrooms (Level 37)
 export const levelName = (lv) => (lv === 2 ? 37 : lv);
+// Poolrooms : le toboggan pris par l'équipe (ou null)
+const slideOf = (sim) => (sim.map.slides && sim.slide >= 0 ? sim.map.slides[sim.slide] : null);
 export const levelSub = (lv) => (lv === 2 ? 'The Poolrooms' : lv === 1 ? 'The industrial basement' : '');
 
 export class BackroomsHUD {
@@ -119,7 +121,7 @@ export class BackroomsHUD {
     const L37 = sim.level === 2;
     const got = L1 ? sim.fuses : sim.cassettes;
     const total = L1 ? 3 : 5;
-    const objKey = `${sim.level}:${got}:${sim.open}`;
+    const objKey = `${sim.level}:${got}:${sim.open}:${sim.slide}`;
     if (objKey !== this.lastCount) {
       this.lastCount = objKey;
       this.$('#levelTag').textContent = `LEVEL ${levelName(sim.level)}`;
@@ -129,8 +131,8 @@ export class BackroomsHUD {
       this.bannerT = 6;
       const banner = this.$('#objBanner');
       banner.classList.toggle('unlocked', sim.open);
-      if (sim.open) banner.textContent = L37 ? 'THE WATER PUMPS STOPPED · THE ELEVATOR IS OPEN: EVERYONE GET IN' : L1 ? 'THE FREIGHT ELEVATOR HAS POWER: EVERYONE GET IN' : 'ONLY ONE OF THE TWO ELEVATORS OPENED… THE OTHER ONE IS JUST A WALL NOW';
-      else if (L37 && got >= total) banner.textContent = 'BRING THE VALVE WHEELS TO THE ELEVATOR · FOLLOW THE SIGNAL';
+      if (sim.open && L37) banner.textContent = slideOf(sim) ? `EVERYONE INTO THE ${slideOf(sim).name} SLIDE · THE OTHERS ARE SHUT` : 'THE PUMPS STOPPED · THE SLIDES ARE OPEN: RED, YELLOW OR BLUE, EACH ONE LEADS SOMEWHERE ELSE';
+      else if (sim.open) banner.textContent = L1 ? 'THE FREIGHT ELEVATOR HAS POWER: EVERYONE GET IN' : 'ONLY ONE OF THE TWO ELEVATORS OPENED… THE OTHER ONE IS JUST A WALL NOW';
       else if (L37) banner.textContent = got === 0 ? 'LEVEL 37 · FIND THE 3 VALVE WHEELS IN THE PUMP ROOMS' : `VALVE WHEEL ${got}/3 RECOVERED`;
       else if (L1 && got >= total) banner.textContent = 'BRING THE FUSES TO THE FREIGHT ELEVATOR PANEL · FOLLOW THE SIGNAL';
       else if (L1) banner.textContent = got === 0 ? 'LEVEL 1 · FIND THE 3 FUSES IN THE AISLES' : `FUSE ${got}/3 RECOVERED`;
@@ -157,7 +159,8 @@ export class BackroomsHUD {
     if (spec) {
       const view = sim.viewPlayer(sim.spectate || 0);
       const inside = sim.players.filter((p) => p.status === 'elevator').length;
-      this.$('#specTitle').textContent = sim.departT > 0 ? 'THE DOORS ARE CLOSING…' : P.status === 'elevator' ? "YOU'RE IN THE ELEVATOR" : 'THE ENTITY GOT YOU';
+      const sl = slideOf(sim);
+      this.$('#specTitle').textContent = sim.departT > 0 ? (sl ? 'DOWN THE SLIDE…' : 'THE DOORS ARE CLOSING…') : P.status === 'elevator' ? (sl ? `YOU'RE IN THE ${sl.name} SLIDE` : "YOU'RE IN THE ELEVATOR") : 'THE ENTITY GOT YOU';
       this.$('#specSub').textContent = sim.departT > 0 ? '' : `${inside}/${sim.players.length} safe · watching ${view.name}${view !== P ? ' · click or Space: switch' : ''}`;
     }
 
@@ -165,7 +168,7 @@ export class BackroomsHUD {
     const bars = Math.round(P.signal * 5);
     const flick = P.signal > 0 && Math.random() < 0.08 ? Math.max(0, bars - 1) : bars;
     this.$('#signalBars').innerHTML = Array.from({ length: 5 }, (_, i) => `<i class="${i < flick ? 'on' : ''}" style="height:${6 + i * 3}px"></i>`).join('');
-    this.$('#signalLabel').textContent = P.sigTo === 'stairs' ? 'STAIRS' : sim.open || (L1 && got >= total) ? (L1 && !L37 ? 'FREIGHT ELEVATOR' : 'ELEVATOR') : 'SIGNAL';
+    this.$('#signalLabel').textContent = P.sigTo === 'stairs' ? 'STAIRS' : L37 && sim.open ? 'SLIDE' : sim.open || (L1 && got >= total) ? (L1 && !L37 ? 'FREIGHT ELEVATOR' : 'ELEVATOR') : 'SIGNAL';
     // l'étage où l'on est (Level 0, sur deux étages)
     if (sim.floors.length > 1 && this.floorShown !== P.floor) {
       this.floorShown = P.floor;
@@ -307,7 +310,8 @@ export class BackroomsHUD {
     if (sim.state === 'won') {
       title.textContent = solo ? 'YOU ESCAPED!' : 'YOU ALL ESCAPED!';
       title.style.color = '#22c55e';
-      sub.textContent = 'The elevator rose out of the Poolrooms, dripping. The Backrooms let you go… this time.';
+      const sl = slideOf(sim);
+      sub.textContent = sl ? `The ${sl.name.toLowerCase()} slide spat you out somewhere else, soaked. The Backrooms let you go… this time.` : 'The elevator rose out of the Poolrooms, dripping. The Backrooms let you go… this time.';
       stats.textContent = `Escape time: ${formatTime(sim.time)} · Level 0, Level 1 and Level 37 cleared`;
     } else {
       title.textContent = solo ? 'YOU DIED' : 'NOBODY MADE IT OUT';

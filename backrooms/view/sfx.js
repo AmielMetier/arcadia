@@ -918,6 +918,32 @@ export class BackroomsSfx {
     });
   }
 
+  // On se glisse dans un toboggan : un frottement d'eau qui file et s'éloigne, puis quelques gouttes
+  splashDown() {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    const len = 2.2;
+    const buf = c.createBuffer(1, Math.floor(c.sampleRate * len), c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    const bp = c.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 1.4;
+    bp.frequency.setValueAtTime(900, t);
+    bp.frequency.exponentialRampToValueAtTime(2600, t + 0.35);
+    bp.frequency.exponentialRampToValueAtTime(300, t + len);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.5, t + 0.12);
+    g.gain.exponentialRampToValueAtTime(0.001, t + len);
+    src.connect(bp).connect(g).connect(this.out);
+    src.start(t);
+    for (let k = 0; k < 4; k++) this.plop(t + 0.1 + Math.random() * 0.6, 0.12, this.out);
+  }
+
   // L'ascenseur descend : grondement grave qui tremble
   elevator(sec = 3) {
     if (!this.unlocked || !this.ctx) return;
