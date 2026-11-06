@@ -227,6 +227,13 @@ html, body {
 .jumpscare-overlay.flash { animation: scareFlash 1.4s forwards; }
 .jumpscare-overlay.flash .scare-anim,
 .jumpscare-overlay.flash img { animation: scareShake 0.06s infinite, scareZoom 1.4s ease-out forwards; }
+.jumpscare-overlay.goat { background: transparent; }
+.jumpscare-overlay.goat.flash { animation: goatFlash 1.4s forwards; }
+@keyframes goatFlash {
+  0% { background: rgba(255, 0, 21, 0.75); }
+  10% { background: rgba(0, 0, 0, 0); }
+  100% { background: rgba(0, 0, 0, 0); }
+}
 @keyframes scareFlash {
   0% { background: #ff0015; }
   8% { background: #000; }
@@ -242,6 +249,58 @@ html, body {
   from { scale: 0.55; }
   to { scale: 1.1; }
 }
+
+/* Level 2 : l'image du bouc qui monte lentement du noir après la mort, fixe et sombre */
+.goat-death {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  z-index: 45;
+  overflow: hidden;
+  pointer-events: none;
+  transition: opacity 1.5s ease-in;
+}
+.goat-death.out { opacity: 0; }
+.goat-death .gd-pic {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  height: 100%;
+  aspect-ratio: 2000 / 1493;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+}
+/* l'image, saturée et salie, avec ses fantômes rouge et bleu décalés (fixes) et un grain de bande */
+.goat-death .gd-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  filter: brightness(0.58) contrast(1.3) saturate(2) sepia(0.2) hue-rotate(-10deg);
+}
+.goat-death .gd-red,
+.goat-death .gd-cyan { mix-blend-mode: screen; opacity: 0.4; }
+.goat-death .gd-red { transform: translate(5px, 1px); filter: brightness(0.5) contrast(1.5) sepia(1) saturate(9) hue-rotate(-45deg); }
+.goat-death .gd-cyan { transform: translate(-4px, -1px); filter: brightness(0.32) contrast(1.4) sepia(1) saturate(6) hue-rotate(150deg); }
+.goat-death .gd-grain {
+  position: absolute;
+  inset: 0;
+  background-size: 256px 256px;
+  mix-blend-mode: overlay;
+  opacity: 0.32;
+  image-rendering: pixelated;
+}
+.goat-death .gd-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.28) 0 2px, rgba(0, 0, 0, 0) 2px 4px),
+    radial-gradient(ellipse at 50% 42%, rgba(40, 0, 0, 0) 28%, rgba(10, 0, 0, 0.9) 80%);
+}
+/* la carte de fin, posée sur l'image du bouc */
+.end-screen.over-goat { background: rgba(0, 0, 0, 0.45); }
+.end-screen.over-goat .end-card { background: rgba(0, 0, 0, 0.72); }
 
 /* Prompt pour cliquer */
 .click-prompt {
@@ -374,8 +433,9 @@ html, body {
 /* Bouton Réglages (panneau commun aux jeux) */
 .icon-btn {
   position: fixed;
-  top: 112px;
-  right: 22px;
+  top: 30px;
+  right: 150px;
+  opacity: 0.55;
   z-index: 45;
   width: 40px;
   height: 40px;
@@ -388,7 +448,7 @@ html, body {
   justify-content: center;
   cursor: pointer;
 }
-.icon-btn:hover { background: rgba(242, 240, 230, 0.2); }
+.icon-btn:hover { background: rgba(242, 240, 230, 0.2); opacity: 1; }
 .icon-btn svg { width: 20px; height: 20px; fill: currentColor; }
 
 /* Commandes tactiles */
@@ -447,6 +507,80 @@ body.touch .click-prompt .ctrl-choice { display: none; }
   .inv { bottom: 92px; }
   .prompt { bottom: 152px; font-size: 16px; white-space: normal; width: 86vw; }
   .inv .slot { width: 60px; height: 50px; }
+  .icon-btn { top: 16px; right: 50%; transform: translateX(50%); }
   .stamina-track { width: 90px; }
   .objective-banner { font-size: 20px; }
 }
+
+/* --- HUD minimal : ce qui ne sert pas s'efface --- */
+.stamina { transition: opacity 0.8s; }
+.stamina.idle { opacity: 0; }
+.inv { transition: opacity 0.8s; }
+.inv.idle { opacity: 0.25; }
+.inv.idle:hover { opacity: 1; }
+.signal.none { color: #ff6b5b; opacity: 0.75; }
+.tapes i.half { background: rgba(255, 176, 32, 0.35); border-color: #ffb020; opacity: 1; }
+.crouch-tag, .carry { font-size: 20px; opacity: 0.85; margin-top: 4px; }
+.carry { color: #ffb020; }
+
+/* Dans un casier : les fentes de la porte */
+.locker { position: absolute; inset: 0; z-index: 8; background: radial-gradient(ellipse 26% 20% at 50% 42%, rgba(5, 4, 4, 0) 0 55%, #050404 100%); }
+/* on regarde dehors entre les lames de la porte */
+.locker-slits { position: absolute; left: 26vw; right: 26vw; top: 24vh; bottom: 38vh; background: repeating-linear-gradient(to bottom, #050404 0 4.6vh, rgba(5, 4, 4, 0) 4.6vh 6.2vh); }
+.locker-ui { position: absolute; left: 50%; bottom: 14%; transform: translateX(-50%); text-align: center; font-size: 22px; white-space: nowrap; }
+.locker .breath { width: 220px; height: 10px; margin: 8px auto 0; border: 2px solid currentColor; padding: 1px; }
+.locker .breath i { display: block; height: 100%; width: 100%; background: #bfe3ff; }
+.locker.holding .breath i { background: #ff6b5b; }
+
+/* Agrippé */
+.grab { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); text-align: center; z-index: 14; }
+.grab b { display: block; font-weight: normal; font-size: 48px; color: #ff3b3b; letter-spacing: 6px; animation: grabShake 0.09s infinite; }
+.grab span { font-size: 24px; }
+.grab-bar { width: 300px; height: 14px; margin: 10px auto 0; border: 2px solid #ff3b3b; padding: 2px; }
+.grab-bar i { display: block; height: 100%; width: 0; background: #ff3b3b; }
+@keyframes grabShake { 0% { translate: -3px 1px; } 50% { translate: 3px -2px; } 100% { translate: -1px 2px; } }
+
+/* Renversé par une chèvre : le bord de l'image rougit */
+.hurt { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1.2s; background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 55%, rgba(120, 0, 0, 0.55) 100%); }
+.hurt.on { opacity: 1; }
+
+/* Sous-titres et cassettes */
+.captions { position: absolute; left: 50%; bottom: 168px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 13; }
+.captions div { font-size: 22px; color: #f2f0e6; background: rgba(0, 0, 0, 0.6); padding: 1px 10px; white-space: nowrap; }
+.lore { position: absolute; left: 50%; top: 70%; transform: translateX(-50%); width: min(720px, 86vw); text-align: center; z-index: 13; background: rgba(0, 0, 0, 0.55); padding: 8px 16px; }
+.lore small { display: block; font-size: 18px; color: #ffcf3a; }
+.lore p { margin: 4px 0 0; font: 21px/1.35 'Special Elite', 'VT323', monospace; letter-spacing: 0.5px; text-shadow: none; }
+
+/* Écran titre : l'étiquette d'une vieille cassette */
+.click-prompt.title { padding: 22px 30px; max-width: min(640px, 92vw); }
+.title-card { margin-bottom: 10px; }
+.tc-label { background: #efe6cf; color: #1d1a14; text-shadow: none; padding: 10px 16px 8px; transform: rotate(-1.2deg); border-left: 14px solid #c0392b; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6); }
+.tc-label b { display: block; font: 44px/1 'Special Elite', 'VT323', monospace; letter-spacing: 3px; font-weight: normal; }
+.tc-label span { font-size: 18px; letter-spacing: 2px; opacity: 0.7; }
+.tc-continue { margin: 16px auto 0; display: block; font-family: inherit; font-size: 24px; letter-spacing: 2px; color: #ffcf3a; background: transparent; border: 2px solid #ffcf3a; padding: 3px 16px; cursor: pointer; }
+.tc-continue:hover { background: #ffcf3a; color: #000; }
+.tc-warn { font-size: 17px; letter-spacing: 1px; opacity: 0.7; margin: 14px 0 0; line-height: 1.2; }
+
+/* Écran de fin : l'étiquette de la cassette */
+.end-label { background: #efe6cf; color: #1d1a14; text-shadow: none; padding: 10px 18px 6px; margin: -6px -10px 18px; transform: rotate(-0.8deg); border-left: 14px solid #c0392b; }
+.end-label small { display: block; font-size: 17px; letter-spacing: 2px; opacity: 0.7; text-align: left; }
+.end-label h1 { font-family: 'Special Elite', 'VT323', monospace; font-size: 48px; margin: 0; }
+.end-lore { font-size: 20px; opacity: 0.7; margin: -12px 0 20px; }
+
+/* jumpscare en 3D : seulement l'éclair rouge par-dessus la scène */
+.jumpscare-overlay.three { background: transparent; }
+.jumpscare-overlay.three.flash { animation: goatFlash 0.9s forwards; }
+.jumpscare-overlay.soft.flash { animation: none; background: transparent; }
+
+@media (max-width: 700px) {
+  .locker-ui { white-space: normal; width: 86vw; font-size: 18px; }
+  .captions { bottom: 200px; }
+  .tc-label b { font-size: 32px; }
+  .grab b { font-size: 34px; }
+  .grab-bar { width: 220px; }
+}
+
+/* calibrage de la luminosité (réglages) */
+.calib { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 60; background: #000; padding: 18px 22px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: center; width: 320px; }
+.calib i { width: 70px; height: 70px; display: block; }
+.calib span { width: 100%; text-align: center; font-size: 18px; }

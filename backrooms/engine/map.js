@@ -67,11 +67,13 @@ export const T = {
   EXIT: 3, // cabine de l'ascenseur : un mur tant qu'il est fermé
   SHELF: 4, // étagère métallique (Level 1) : bloque le passage et la vue comme un mur
   PILLAR: 5, // pilier plus petit que la case (Level 0) : l'entité le contourne, les joueurs passent à côté
+  GATE: 6, // grille à barreaux fermée (Level 2) : bloque le passage, pas la vue (voir seeThrough)
+  MACHINE: 7, // chaudière (Level 2) : bloque le passage et la vue, mais ce n'est pas un mur
 };
 
 // cases qui bloquent le passage (et la vue) : murs, étagères, cabine d'ascenseur ; un pilier fin seulement pour les
-// chemins de l'entité (les collisions et la vue suivent sa vraie forme, voir outsidePillar)
-export const blocks = (v) => v === T.WALL || v === T.SHELF || v === T.EXIT || v === T.PILLAR;
+// chemins de l'entité (les collisions et la vue suivent sa vraie forme, voir outsidePillar) ; une grille, le passage seul
+export const blocks = (v) => v === T.WALL || v === T.SHELF || v === T.EXIT || v === T.PILLAR || v === T.GATE || v === T.MACHINE;
 
 // le point (x, z) est-il hors du pilier ? (p : { x, z, h, round }, h : demi-côté ou rayon)
 export function outsidePillar(p, x, z, margin = 0) {

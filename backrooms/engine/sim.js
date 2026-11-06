@@ -5,6 +5,14 @@
 //             cassettes sont trouvées, le faux se referme en mur et le vrai s'ouvre.
 //   Level 1 : l'entrepôt ; 3 fusibles à rapporter au panneau du monte-charge, des coupures de courant, et l'entité
 //             qui se cache au bout des rangées d'étagères pour tendre des embuscades.
+//   Level 37 (numéro interne 2) : les Poolrooms (engine/poolrooms.js) ; 3 volants de vanne, puis trois toboggans.
+//   Level 2 (numéro interne 3, derrière le toboggan jaune des Poolrooms) : les galeries de service ; 4 vannes à
+//             tourner (rester devant) pour couper la vapeur qui bloque l'ascenseur de service, des jets de vapeur
+//             brûlante en travers des couloirs (ils repoussent). Pas d'entité ici : un troupeau de chèvres noires qui
+//             fonce sur les joueurs, mais craint la lumière (engine/goats.js).
+// Le rythme est réglé par le directeur de tension (engine/director.js) : montée, pic, relâche, fausses alertes.
+// L'entité voit dans un cône et entend le bruit qu'on fait (marcher, courir, tomber, ramasser) ; accroupi, on ne fait
+// presque aucun bruit. Sa première prise n'est pas mortelle : on se débat, ou un coéquipier l'aveugle à la lampe.
 // Qui entre dans l'ascenseur ouvert devient spectateur ; il part quand plus personne n'est dehors. Plus il y a de
 // monde dans la cabine, plus l'entité s'énerve contre ceux qui restent.
 // Chacun part avec sa lampe torche dans la case 1. Un joueur attrapé regarde les autres jusqu'à la fin de l'étage ;
@@ -12,7 +20,11 @@
 import { CELL_SIZE, T, createLevel0, PIT_HALF, FLOOR_DY } from './map.js';
 import { createWarehouseMap } from './level1.js';
 import { createPoolMap, MOUTH } from './poolrooms.js';
+import { createPipesMap, VALVES, PIPES_LEVEL, jetState, inJet, JET_HALF } from './level2.js';
 import { findPath, hasLineOfSight } from './nav.js';
+import { createGoats, updateGoats, senseGoats, alertGoats, goatSnapshot, applyGoatSnapshot, goatCount } from './goats.js';
+import { createDirector, updateDirector, blackoutAllowed, entityRelaxed, updateLightsOut } from './director.js';
+import { placeHides, HIDE_R, LOCKER_R, BREATH_HOLD, BREATH_BACK, hideInside, hideFront } from './hides.js';
 
 export const DT = 1 / 60;
 export const PLAYER_RADIUS = 0.38;
@@ -21,6 +33,7 @@ export const WALK_SPEED = 2.1;
 export const SPRINT_SPEED = 3.7;
 export const MONSTER_PATROL_SPEED = 1.8;
 export const MONSTER_CHASE_SPEED = 3.3; // plus vite qu'en marchant, un peu moins qu'en sprintant
+export const CROUCH_SPEED = 0.5; // accroupi : moitié moins vite, presque sans bruit
 export const STAMINA_DRAIN = 15; // par seconde de course
 export const STAMINA_REGEN = 9;
 export const WINDED_T = 1; // à bout de souffle : une seconde sans pouvoir courir
@@ -29,6 +42,20 @@ export const BATTERY_DRAIN = 0.42; // % par seconde de lampe allumée (environ 4
 export const BATTERY_PACK = 60; // % rendus par une pile utilisée
 export const INV_SIZE = 2; // cases d'objets (piles, eau d'amande, échelle) : la case 1 de l'inventaire est réservée à la lampe
 export const PICK_R = 1.4; // portée de F pour ramasser
+export const ALMOND_STAMINA = 50; // l'eau d'amande rend la moitié du souffle (plus un bouton « fin de poursuite »)
+export const BLACKOUT_DRAIN = 1.5; // dans le noir d'une coupure, la lampe tire plus fort sur la pile
+export const SIGNAL_RANGE = 25; // m : au-delà, le caméscope ne capte plus rien
+// La prise : la première fois par niveau, l'entité agrippe au lieu de tuer. On se débat (GRAB_STRUGGLES appuis) ou un
+// coéquipier lui braque sa lampe dans les yeux ; sinon, au bout de GRAB_T, c'est fini. Lâchée, elle reste sonnée.
+export const GRAB_T = 2.6;
+export const GRAB_STRUGGLES = 8;
+export const MONSTER_STUN_T = 3;
+// le bruit qu'on fait (0 à 1+) : il porte jusqu'à NOISE_RANGE × bruit mètres (moins à travers les murs)
+export const NOISE = { walk: 0.32, run: 1, crouch: 0, pick: 0.45, winded: 0.4, fall: 1.6, breath: 0.12, panic: 0.3, gasp: 1.2 };
+export const NOISE_RANGE = 13;
+export const VISION_CONE = 0.96; // demi-angle du regard de l'entité (55°) ; tout près, elle sent qu'on est là
+export const DORMANT_T = 60; // au tout début, l'entité reste au loin une minute (on apprend à se déplacer)
+export const PANEL_T = 4; // Level 1 : secondes devant le panneau du monte-charge pour le relancer (bruyant)
 // Barre d'équilibre : sur une arête entre deux trous, on n'avance que tout droit et le corps tangue ; Q et D
 // corrigent. tilt va de -1 (penché à gauche) à 1 (à droite) : au bout, on tombe dans le trou de ce côté.
 export const BEAM_SPEED = 0.65; // vitesse de marche sur une arête (part de la marche normale)
@@ -41,18 +68,38 @@ export const WHISTLE_CD = 1.2;
 export const WHISTLE_HEAT = 2.5; // chaque coup compte 1 et s'oublie en 20 s : au 3e coup rapproché, l'entité vient à coup sûr
 export const CASSETTES = 5;
 export const FUSES = 3;
-export const LAST_LEVEL = 2; // 0 : Level 0, 1 : Level 1 (entrepôt), 2 : Level 37 (les Poolrooms)
+export { VALVES, PIPES_LEVEL };
+export const LAST_LEVEL = PIPES_LEVEL; // 0 : Level 0, 1 : Level 1 (entrepôt), 2 : Level 37 (Poolrooms), 3 : Level 2 (Tuyauteries, par le toboggan jaune)
+export const VALVE_T = 6.5; // secondes devant une vanne pour la fermer (elle revient doucement si on la lâche) : on s'expose
+export const VALVE_R = 1.5; // portée : il faut se tenir devant
+export const BREAKER_T = 4.5; // secondes devant un disjoncteur pour le réarmer
+export const BREAKER_R = 1.4;
+export const BLOW_DELAY = 2.2; // la vanne fermée, les néons de son secteur grésillent puis sautent
+export const BURN_LOCK = 0.9; // brûlé par un jet de vapeur : repoussé, sonné un instant
+export const BURN_STAMINA = 45;
 export const DEPART_T = 3; // secondes entre la fermeture des portes et l'arrivée
-// coupures de courant du Level 1 : toutes les 35 à 60 s, pendant 15 à 20 s
-export const BLACKOUT_EVERY = [35, 60];
+// coupures de courant du Level 1 : toutes les 45 à 80 s (et seulement après un moment de calme), pendant 15 à 20 s
+export const BLACKOUT_EVERY = [45, 80];
 export const BLACKOUT_LEN = [15, 20];
+// Level 2 : de temps en temps, tout le courant saute ; plus rien ne protège, le troupeau passe à l'attaque
+export const PIPES_BLACKOUT_EVERY = [85, 130];
+export const PIPES_BLACKOUT_LEN = [11, 15];
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const cellOf = (v) => Math.floor(v / CELL_SIZE);
+// un tirage qui ne dépend que de la graine (hôte et invités tirent pareil)
+const hashRnd = (...k) => {
+  let h = 2166136261;
+  for (const v of k) h = Math.imul(h ^ (v | 0), 16777619) ^ (h >>> 13);
+  return ((h >>> 0) % 100000) / 100000;
+};
+// part des piles et de l'eau d'amande gardée selon le nombre de joueurs (le reste n'est jamais là)
+const KEEP_ITEMS = [0.6, 0.6, 0.72, 0.82, 0.9];
 
 // les étages d'un niveau : même graine de partie, des cartes différentes par niveau
 export function makeLevelMap(level, seed) {
   if (level === 2) return [createPoolMap(seed * 11 + 37)];
+  if (level === PIPES_LEVEL) return [createPipesMap(seed * 11 + 29)];
   return level === 1 ? [createWarehouseMap(seed * 7 + 13)] : createLevel0(seed).floors;
 }
 
@@ -141,6 +188,7 @@ function newPlayer(id, name, map, i) {
     tiltV: 0,
     onLadder: false, // en haut de l'échelle (la caméra monte)
     whistleCd: 0,
+    burnT: 0, // brûlé il y a peu (Level 2) : le jet ne repousse pas deux fois de suite
     heat: 0, // coups de sifflet récents : trop, et l'entité vient
     signal: 0, // 0 à 1 : force du signal de l'objectif le plus proche (affiché par la caméra)
     sigTo: 'goal', // ce que suit le signal : 'goal', 'stairs' ou 'exit'
@@ -149,6 +197,16 @@ function newPlayer(id, name, map, i) {
     danger: 0, // 0 à 1 : proximité de l'entité, pour ce joueur (son, image)
     pan: 0,
     found: 0, // objets d'objectif trouvés (cassettes, fusibles)
+    crouch: false, // accroupi (C / Ctrl) : lent et silencieux
+    noise: 0, // bruit fait à l'instant (0 à 1+) : ce que l'entité peut entendre
+    grabT: 0, // agrippé par l'entité : secondes avant la fin
+    grabs: 0, // prises déjà subies à ce niveau (la deuxième est mortelle)
+    struggle: 0, // appuis pour se débattre
+    hurt: 0, // coups de chèvre encaissés à ce niveau (le deuxième est mortel)
+    hidden: -1, // casier où l'on est caché (-1 : dehors)
+    breath: 100, // souffle retenu dans un casier (0 à 100)
+    holding: false, // souffle retenu en ce moment
+    carry: [], // Level 1 : fusibles en poche (leurs numéros), à rapporter au panneau
   };
 }
 
@@ -165,6 +223,7 @@ export class BackroomsSim {
     this.hasMonster = difficulty !== 'peaceful';
     this.monsterChaseSpeed = MONSTER_CHASE_SPEED * (difficulty === 'hard' ? 1.2 : 1);
     this.events = [];
+    this.chases = 0; // poursuites de toute la partie : la toute première est plus clémente
     this.loadLevel(level, map ? [map] : null);
   }
 
@@ -172,8 +231,18 @@ export class BackroomsSim {
   loadLevel(level, floors = null) {
     const prev = this.players || [];
     this.level = level;
+    const generated = !floors;
     this.floors = floors || makeLevelMap(level, this.seed);
     this.map = this.floors[0];
+    // moins de piles et d'eau d'amande quand on est peu nombreux (toujours les mêmes, chez tout le monde)
+    if (generated) {
+      const keep = KEEP_ITEMS[Math.min(KEEP_ITEMS.length - 1, this.roster.length)];
+      this.floors.forEach((f, fi) => {
+        for (const it of f.items || []) if ((it.kind === 'battery' || it.kind === 'bottle') && hashRnd(this.seed, level, fi, it.id, 3) > keep) it.taken = true;
+      });
+    }
+    // des casiers où se cacher (entrepôt, galeries de service)
+    if ((level === 1 || level === PIPES_LEVEL) && !this.map.hides) this.map.hides = placeHides(this.map, level === 1 ? 5 : 6, this.seed * 31 + level);
     this.stairs = this.map.stairs || [];
     // au début de la partie, chacun part de son côté ; aux étages suivants, tout le monde sort ensemble de l'ascenseur
     const spots = level === 0 && !prev.length ? spreadSpawns(this.map, this.roster.length) : [];
@@ -199,16 +268,22 @@ export class BackroomsSim {
       return P;
     });
     this.cassettes = 0; // cassettes trouvées par l'équipe (Level 0)
-    this.fuses = 0; // fusibles en poche (Level 1)
+    this.fuses = 0; // fusibles ramassés (Level 1 ; aux Poolrooms, les volants)
+    this.delivered = 0; // Level 1 : fusibles rapportés au panneau
+    this.valves = 0; // vannes fermées (Level 2)
     this.items0 = this.floors.map((f) => (f.items || []).length); // objets d'origine (les suivants ont été posés par des joueurs)
     // un seul vrai ascenseur : on ne sait pas lequel tant que les cassettes ne sont pas toutes trouvées
-    this.realFloor = this.floors.length > 1 ? (Math.random() < 0.5 ? 0 : 1) : 0;
+    this.realFloor = this.floors.length > 1 ? (hashRnd(this.seed, level, 7) < 0.5 ? 0 : 1) : 0;
     this.unlocked = false;
     this.powered = false; // panneau du monte-charge réalimenté (aux Poolrooms : les 3 volants trouvés)
     this.slide = -1; // Poolrooms : le toboggan pris par le premier qui s'y est glissé (les autres le suivent)
     this.departT = 0; // compte à rebours du départ de l'ascenseur
+    this.panel = 0; // Level 1 : avancée du redémarrage du monte-charge (0 à 1)
+    this.panelNoiseT = 0;
+    this.director = createDirector(level);
+    this.lightsOut = null;
     this.blackout = 0; // secondes de noir restantes
-    this.nextBlackout = level === 1 ? rand(...BLACKOUT_EVERY) * 0.6 : Infinity;
+    this.nextBlackout = level === 1 ? rand(...BLACKOUT_EVERY) * 0.6 : level === PIPES_LEVEL && this.hasMonster ? rand(...PIPES_BLACKOUT_EVERY) * 0.75 : Infinity;
 
     const ms = this.map.monsterSpawn;
     this.monster = {
@@ -238,7 +313,17 @@ export class BackroomsSim {
       stairT: 0, // dans l'escalier
       stalkT: 4, // délai avant d'aller se cacher pour observer
       watch: null, // case sombre d'où elle observe
+      // au tout début de la partie, elle reste au loin une minute : on apprend à se déplacer
+      dormantT: level === 0 && !this.time ? DORMANT_T * (this.difficulty === 'hard' ? 0.75 : 1) : 0,
+      flees: 0, // fuites devant la lampe : à la troisième, elle ne fuit plus
+      escapes: [], // là où on l'a semée : elle s'en souvient pour ses embuscades
+      stunT: 0, // sonnée (aveuglée, ou après avoir lâché sa prise)
+      grabbing: null, // le joueur qu'elle agrippe
+      sawHide: -1, // le casier où elle a vu quelqu'un entrer
     };
+    // Level 2 : le troupeau remplace l'entité (elle reste là pour relayer le son et l'image de la chèvre la plus proche)
+    this.goats = level === PIPES_LEVEL && this.hasMonster ? createGoats(this.map, goatCount(this.roster.length, this.difficulty)) : null;
+    this.herd = null;
   }
 
   // dans l'eau (Poolrooms) on avance moins vite : 90 % dans 20 cm d'eau, 70 % dans 60 cm, 40 % au plus profond
@@ -273,20 +358,140 @@ export class BackroomsSim {
   }
 
   get open() {
+    if (this.level === PIPES_LEVEL) return this.valves >= VALVES;
     return this.level === 0 ? this.cassettes >= CASSETTES : this.powered;
+  }
+
+  // Level 2 : un jet de vapeur au repos (0), qui siffle (1) ou qui crache (2) ; sa vanne fermée, il se tait
+  jetOn(j) {
+    const v = (this.map.valves || [])[j.sector];
+    if (v && v.closed) return 0;
+    return jetState(j, this.time);
+  }
+
+  // le jet qui crache au point (x, z), ou null
+  steamAt(x, z) {
+    const j = this.map.jetAt ? this.map.jetAt(cellOf(x), cellOf(z)) : null;
+    return j && this.jetOn(j) === 2 && inJet(j, x, z) ? j : null;
+  }
+
+  // Brûlé : on est rejeté du côté d'où l'on venait, sonné et le souffle coupé
+  burn(P, j) {
+    const C = CELL_SIZE;
+    const pos = j.axis === 'x' ? P.x : P.z;
+    const mid = j.axis === 'x' ? j.x : j.z;
+    let dir = Math.sign(pos - mid);
+    if (!dir) dir = j.axis === 'x' ? -Math.sign(-Math.sin(P.yaw)) || 1 : -Math.sign(-Math.cos(P.yaw)) || 1;
+    const to = Math.max((j.axis === 'x' ? j.gx : j.gz) * C - C * 0.4, Math.min((j.axis === 'x' ? j.gx + 1 : j.gz + 1) * C + C * 0.4, mid + dir * (JET_HALF + 0.5)));
+    const p = this.moveWithCollisions(P.x, P.z, j.axis === 'x' ? to - P.x : 0, j.axis === 'x' ? 0 : to - P.z, PLAYER_RADIUS, P.floor);
+    P.x = p.x;
+    P.z = p.z;
+    P.lockT = BURN_LOCK;
+    P.burnT = 1.6;
+    P.running = false;
+    P.stamina = Math.max(0, P.stamina - BURN_STAMINA);
+  }
+
+  // un grand bruit (cri, vanne qui claque) : l'entité vient voir, si elle est assez près et pas déjà en chasse
+  alertMonster(x, z, range, floor = 0) {
+    if (this.goats) {
+      alertGoats(this, x, z, range);
+      return true;
+    }
+    const M = this.monster;
+    if (!this.hasMonster || M.mode === 'chase' || M.floor !== floor) return false;
+    if (Math.hypot(M.x - x, M.z - z) > range) return false;
+    M.mode = 'search';
+    M.silent = false;
+    M.ambush = null;
+    M.watch = null;
+    M.lastSeenX = x;
+    M.lastSeenZ = z;
+    M.probe = null;
+    M.repathT = 0;
+    return true;
+  }
+
+  // Les vannes : on les ferme en restant devant (à plusieurs, plus vite) ; lâchées, elles se rouvrent doucement.
+  // Une vanne qui claque résonne dans tous les tuyaux : l'entité vient voir.
+  updateValves() {
+    for (const v of this.map.valves || []) {
+      if (v.closed) continue;
+      const near = this.players.filter((P) => P.status === 'alive' && P.hidden < 0 && Math.hypot(v.sx - P.x, v.sz - P.z) < VALVE_R);
+      if (near.length) {
+        if (v.turn === 0) this.emit({ type: 'valveStart', id: v.id, by: near[0].id });
+        for (const P of near) this.makeNoise(P, 0.55, 0.3);
+        v.turn = Math.min(1, v.turn + (DT / VALVE_T) * (near.length > 1 ? 1.5 : 1));
+      } else v.turn = Math.max(0, v.turn - DT * 0.18);
+      if (v.turn < 1) continue;
+      v.closed = true;
+      this.valves++;
+      v.blowT = BLOW_DELAY;
+      this.setSector(v.id, 1);
+      near[0].found++;
+      this.emit({ type: 'valve', id: v.id, by: near[0].id, count: this.valves, total: VALVES, x: v.x, z: v.z });
+      this.alertMonster(v.sx, v.sz, 60);
+      if (this.valves >= VALVES) this.emit({ type: 'exitUnlocked' });
+    }
+  }
+
+  // Le courant d'un secteur du Level 2 (power : 0 normal, 1 les néons grésillent, 2 ils ont sauté, 3 réarmé). Les
+  // lampes gardent leur état d'origine (base) ; les chèvres et l'image relisent l'éclairage (map.lightGen)
+  setSector(i, power) {
+    const map = this.map;
+    const v = (map.valves || [])[i];
+    if (!v || v.power === power) return;
+    v.power = power;
+    for (const l of map.lights) {
+      if (l.sector !== i || l.base === 'off') continue;
+      l.state = power === 1 ? 'flicker' : power === 2 ? 'off' : l.base;
+      l.flicker = l.state === 'flicker';
+    }
+    map.goatLit = null;
+    map.darkCells = null;
+    map.lightGen = (map.lightGen || 0) + 1;
+  }
+
+  // Les néons qui sautent après une vanne, et les disjoncteurs : on reste devant pour réarmer (à plusieurs, plus vite).
+  // Le claquement s'entend loin : le troupeau vient voir.
+  updateBreakers() {
+    const map = this.map;
+    for (const v of map.valves || []) {
+      if (!(v.blowT > 0)) continue;
+      v.blowT -= DT;
+      if (v.blowT > 0) continue;
+      this.setSector(v.id, 2);
+      this.emit({ type: 'blowout', sector: v.id, x: v.x, z: v.z });
+    }
+    for (const b of map.breakers || []) {
+      const v = map.valves[b.sector];
+      if (b.done || !v || v.power !== 2) continue;
+      const near = this.players.filter((P) => P.status === 'alive' && P.hidden < 0 && Math.hypot(b.sx - P.x, b.sz - P.z) < BREAKER_R);
+      if (near.length) {
+        if (b.turn === 0) this.emit({ type: 'breakerStart', id: b.id, by: near[0].id });
+        b.turn = Math.min(1, b.turn + (DT / BREAKER_T) * (near.length > 1 ? 1.5 : 1));
+      } else b.turn = Math.max(0, b.turn - DT * 0.25);
+      if (b.turn < 1) continue;
+      b.done = true;
+      this.setSector(b.sector, 3);
+      this.emit({ type: 'breaker', id: b.id, sector: b.sector, by: near[0].id, x: b.x, z: b.z });
+      this.alertMonster(b.x, b.z, 24);
+    }
   }
 
   // agressivité de l'entité (0 à 1) : elle monte à chaque cassette trouvée (Level 0), à chaque fusible (Level 1, où elle
   // part déjà plus haut)
   get aggro() {
     if (this.level === 0) return Math.min(1, this.cassettes / CASSETTES);
+    if (this.level === PIPES_LEVEL) return Math.min(1, 0.3 + (0.7 * this.valves) / VALVES);
     return Math.min(1, 0.25 + (0.75 * (this.fuses + (this.powered ? FUSES : 0))) / FUSES);
   }
 
   // part de l'équipe déjà à l'abri dans l'ascenseur (0 à 1) : l'entité devient plus agressive
   get rage() {
+    // tous les autres sont dans la cabine : 1
     const n = this.players.length;
-    return n > 1 ? this.players.filter((p) => p.status === 'elevator').length / n : 0;
+    return n > 1 ? Math.min(1, this.players.filter((p) => p.status === 'elevator').length / (n - 1)) : 0;
   }
 
   emit(ev) {
@@ -351,10 +556,114 @@ export class BackroomsSim {
     }
     // caisses et meubles abandonnés (cercles)
     for (const pr of this.fm(floor).props || []) {
+      if (pr.walk) continue; // papiers, canettes : on marche dessus
       const rr = radius + pr.r;
       if (Math.abs(pr.x - x) < rr && Math.abs(pr.z - z) < rr && (pr.x - x) ** 2 + (pr.z - z) ** 2 < rr * rr) return true;
     }
+    // les casiers
+    for (const h of this.fm(floor).hides || []) if (Math.hypot(h.x - x, h.z - z) < radius + LOCKER_R) return true;
     return false;
+  }
+
+  // un bruit bref (ramasser, tomber, siffler, suffoquer) : il s'ajoute au bruit de la marche pendant t secondes
+  makeNoise(P, v, t = 1) {
+    if (v >= (P.bumpV || 0) || !(P.bumpT > 0)) {
+      P.bumpV = v;
+      P.bumpT = t;
+    }
+  }
+
+  // le joueur meurt : ce qu'il portait tombe là où il est (Level 1 : les fusibles), il sort de son casier
+  killPlayer(P, extra = {}) {
+    if (P.status !== 'alive') return;
+    P.status = 'dead';
+    P.moving = false;
+    P.grabT = 0;
+    if (P.hidden >= 0) {
+      const h = (this.fm(P.floor).hides || [])[P.hidden];
+      if (h) h.by = -1;
+      P.hidden = -1;
+    }
+    this.dropCarry(P);
+    this.emit({ type: 'jumpscare', x: extra.x ?? P.x, z: extra.z ?? P.z, id: P.id, goat: !!extra.goat });
+    this.emit({ type: 'dead', id: P.id, name: P.name, time: this.time });
+  }
+
+  // Level 1 : les fusibles en poche tombent par terre (on peut aller les rechercher)
+  dropCarry(P) {
+    if (!P.carry || !P.carry.length) return;
+    const map = this.fm(P.floor);
+    P.carry.forEach((id, i) => {
+      const f = map.fuses[id];
+      if (!f) return;
+      const a = (i / Math.max(1, P.carry.length)) * Math.PI * 2;
+      let x = P.x + Math.cos(a) * 0.5;
+      let z = P.z + Math.sin(a) * 0.5;
+      if (this.isColliding(x, z, 0.2, P.floor)) {
+        x = P.x;
+        z = P.z;
+      }
+      f.x = x;
+      f.z = z;
+      f.gx = cellOf(x);
+      f.gz = cellOf(z);
+      f.taken = false;
+    });
+    this.fuses = Math.max(0, this.fuses - P.carry.length);
+    this.emit({ type: 'fuseDrop', id: P.id, name: P.name, n: P.carry.length, x: P.x, z: P.z });
+    P.carry = [];
+  }
+
+  // le casier le plus proche à portée de F (et libre), ou null
+  nearHide(P) {
+    let best = null;
+    let bd = HIDE_R;
+    for (const h of this.fm(P.floor).hides || []) {
+      const f = hideFront(h);
+      const d = Math.hypot(f.x - P.x, f.z - P.z);
+      if (d < bd && (h.by < 0 || h.by === P.id)) {
+        bd = d;
+        best = h;
+      }
+    }
+    return best;
+  }
+
+  // s'enfermer dans un casier : l'entité qui t'a vu entrer saura où chercher
+  enterHide(P, h) {
+    h.by = P.id;
+    P.hidden = h.id;
+    const p = hideInside(h);
+    P.x = p.x;
+    P.z = p.z;
+    P.yaw = p.yaw;
+    P.pitch = 0;
+    P.flashlight = false;
+    P.crouch = false;
+    P.running = false;
+    P.moving = false;
+    P.breath = 100;
+    P.holding = false;
+    const M = this.monster;
+    if (this.hasMonster && !this.goats && M.floor === (P.floor || 0) && Math.hypot(M.x - P.x, M.z - P.z) < 22 && this.inCone(M, P.x, P.z) && hasLineOfSight(this.fm(M.floor), M.x, M.z, h.x + h.dx, h.z + h.dz)) M.sawHide = h.id;
+    this.emit({ type: 'hide', id: P.id, on: true, x: h.x, z: h.z });
+  }
+
+  leaveHide(P) {
+    const h = (this.fm(P.floor).hides || [])[P.hidden];
+    P.hidden = -1;
+    P.holding = false;
+    if (!h) return;
+    h.by = -1;
+    const f = hideFront(h);
+    P.x = f.x;
+    P.z = f.z;
+    this.emit({ type: 'hide', id: P.id, on: false, x: h.x, z: h.z });
+  }
+
+  // le point (x, z) est-il dans le champ de vision de l'entité ?
+  inCone(M, x, z) {
+    return Math.abs(this.angleTo(M, x, z)) < VISION_CONE;
   }
 
   // Boire l'eau d'amande (souffle au maximum), changer la pile de la lampe, poser l'échelle
@@ -371,7 +680,7 @@ export class BackroomsSim {
     }
     if (kind === 'bottle') {
       if (P.stamina >= 100) return this.emit({ type: 'useless', kind, id: P.id });
-      P.stamina = 100;
+      P.stamina = Math.min(100, P.stamina + ALMOND_STAMINA);
       P.winded = 0;
       P.bottles++;
     } else {
@@ -384,8 +693,13 @@ export class BackroomsSim {
 
   // F : ramasser l'objet le plus proche (dans une case vide, sinon échangé avec la case choisie)
   pickUp(P) {
+    // dans un casier : F en ressort ; devant un casier (sans objet plus près) : on s'y enferme
+    if (P.hidden >= 0) return this.leaveHide(P);
     const it = this.nearItem(P);
+    const h = this.nearHide(P);
+    if (h && (!it || Math.hypot(hideFront(h).x - P.x, hideFront(h).z - P.z) < Math.hypot(it.x - P.x, it.z - P.z))) return this.enterHide(P, h);
     if (!it) return this.emit({ type: 'nothing', id: P.id });
+    this.makeNoise(P, NOISE.pick, 0.8);
     it.taken = true;
     let slot = P.inv.indexOf(null);
     let dropped = null;
@@ -477,7 +791,10 @@ export class BackroomsSim {
     P.tilt = 0;
     P.tiltV = 0;
     P.stamina = Math.max(0, P.stamina - 60);
-    this.emit({ type: 'fall', id: P.id, name: P.name, balance });
+    // la chute s'entend de loin
+    this.makeNoise(P, NOISE.fall, 1.5);
+    this.emit({ type: 'fall', id: P.id, name: P.name, balance, x: P.x, z: P.z, floor: P.floor });
+    this.alertMonster(P.x, P.z, 30, P.floor);
   }
 
   // Perdre l'équilibre : on bascule dans le trou du côté où l'on penche
@@ -546,19 +863,20 @@ export class BackroomsSim {
     if (P.whistleCd > 0) return;
     P.whistleCd = WHISTLE_CD;
     P.heat += 1;
+    this.makeNoise(P, 0.9, 1);
     this.emit({ type: 'whistle', id: P.id, name: P.name, x: P.x, z: P.z, floor: P.floor });
+    if (this.goats) {
+      if (P.heat >= WHISTLE_HEAT) {
+        alertGoats(this, P.x, P.z, 45);
+        this.emit({ type: 'heard', id: P.id });
+      }
+      return;
+    }
     const M = this.monster;
     if (!this.hasMonster || M.mode === 'chase' || M.floor !== P.floor) return;
     if (Math.hypot(M.x - P.x, M.z - P.z) > 45) return;
-    if (P.heat >= WHISTLE_HEAT || Math.random() < 0.15) {
-      M.mode = 'search';
-      M.silent = false;
-      M.ambush = null;
-      M.lastSeenX = P.x;
-      M.lastSeenZ = P.z;
-      M.repathT = 0;
-      this.emit({ type: 'heard', id: P.id });
-    }
+    // trop de coups rapprochés : elle vient à coup sûr (de près, elle l'entend de toute façon : c'est du bruit)
+    if (P.heat >= WHISTLE_HEAT && this.alertMonster(P.x, P.z, 45, P.floor)) this.emit({ type: 'heard', id: P.id });
   }
 
   // Un pas de simulation. input : les commandes du joueur de cet écran ; others : { id: commandes } des autres
@@ -573,20 +891,25 @@ export class BackroomsSim {
       return;
     }
 
-    // coupures de courant du Level 1
-    if (this.level === 1) {
+    // coupures de courant du Level 1 ; au Level 2, le noir total et le troupeau qui attaque
+    if (this.level === 1 || this.level === PIPES_LEVEL) {
+      const L2 = this.level === PIPES_LEVEL;
       if (this.blackout > 0) {
         this.blackout -= DT;
         if (this.blackout <= 0) {
           this.blackout = 0;
-          this.nextBlackout = rand(...BLACKOUT_EVERY);
+          this.nextBlackout = rand(...(L2 ? PIPES_BLACKOUT_EVERY : BLACKOUT_EVERY));
+          this.map.dark = false;
           this.emit({ type: 'power' });
         }
       } else {
         this.nextBlackout -= DT;
-        if (this.nextBlackout <= 0) {
-          this.blackout = rand(...BLACKOUT_LEN);
-          this.emit({ type: 'blackout', len: this.blackout });
+        // la coupure attend un vrai moment de calme (jamais en pleine poursuite)
+        if (this.nextBlackout <= 0 && !blackoutAllowed(this)) this.nextBlackout = 2;
+        else if (this.nextBlackout <= 0) {
+          this.blackout = rand(...(L2 ? PIPES_BLACKOUT_LEN : BLACKOUT_LEN));
+          this.map.dark = L2;
+          this.emit({ type: 'blackout', len: this.blackout, level: this.level });
         }
       }
     }
@@ -596,9 +919,19 @@ export class BackroomsSim {
       if (P.status === 'alive') this.stepPlayer(P, inp);
     }
     if (this.state !== 'playing') return;
+    if (this.level === 1) this.updatePanel();
+    updateDirector(this);
+    updateLightsOut(this);
+    if (this.level === PIPES_LEVEL) {
+      this.updateValves();
+      this.updateBreakers();
+    }
 
     // aux Poolrooms, l'entité ne sort pas de l'eau : elle ne chasse personne (son ombre passe sous la surface)
-    if (this.hasMonster && this.level !== 2) this.updateMonster();
+    if (this.goats) {
+      updateGoats(this);
+      senseGoats(this);
+    } else if (this.hasMonster && this.level !== 2) this.updateMonster();
     this.checkElevator();
   }
 
@@ -611,8 +944,21 @@ export class BackroomsSim {
     if (input.remote && Number.isFinite(input.stamina)) P.stamina = input.stamina;
     P.whistleCd = Math.max(0, P.whistleCd - DT);
     P.heat = Math.max(0, P.heat - DT / 20);
+    P.bumpT = Math.max(0, (P.bumpT || 0) - DT);
+    P.hurtT = Math.max(0, (P.hurtT || 0) - DT);
+    // agrippé : on ne fait plus que se débattre (n'importe quelle touche)
+    if (P.grabT > 0) {
+      if (input.struggle) P.struggle += Math.min(4, +input.struggle || 1);
+      P.moving = false;
+      P.running = false;
+      P.noise = NOISE.panic;
+      return;
+    }
+    // caché dans un casier : immobile, lampe éteinte ; Maj retient le souffle (trop longtemps, on suffoque)
+    if (P.hidden >= 0) return this.stepHidden(P, input);
     if (input.whistle) this.whistle(P);
     if (input.pick) this.pickUp(P);
+    if (P.hidden >= 0) return;
     if (input.toggleFlashlight) {
       if (!P.hasLamp) this.emit({ type: 'noLamp', id: P.id });
       else if (!P.flashlight && P.battery <= 0) this.emit({ type: 'batteryEmpty', id: P.id });
@@ -626,7 +972,7 @@ export class BackroomsSim {
 
     // la lampe vide la pile ; à plat, elle s'éteint
     if (P.flashlight) {
-      P.battery = Math.max(0, P.battery - BATTERY_DRAIN * DT);
+      P.battery = Math.max(0, P.battery - BATTERY_DRAIN * (this.blackout > 0 ? BLACKOUT_DRAIN : 1) * DT);
       if (P.battery <= 0) {
         P.flashlight = false;
         this.emit({ type: 'batteryEmpty', id: P.id });
@@ -636,7 +982,8 @@ export class BackroomsSim {
     // 2. Endurance et course
     const mx = input.mx || 0;
     const my = input.my || 0;
-    const wantRun = !!input.run && (mx !== 0 || my !== 0) && !P.onBeam;
+    P.crouch = !!input.crouch && !P.onBeam;
+    const wantRun = !!input.run && (mx !== 0 || my !== 0) && !P.onBeam && !P.crouch;
     P.winded = Math.max(0, (P.winded || 0) - DT);
     if (wantRun && P.stamina > 0 && !(P.winded > 0)) {
       P.running = true;
@@ -648,7 +995,7 @@ export class BackroomsSim {
     }
 
     // 3. Déplacement (un invité se déplace chez lui et annonce sa position : l'hôte la prend si elle est plausible)
-    const speed = (P.running ? SPRINT_SPEED : WALK_SPEED) * this.wade(P);
+    const speed = (P.running ? SPRINT_SPEED : P.crouch ? WALK_SPEED * CROUCH_SPEED : WALK_SPEED) * this.wade(P);
     P.moving = mx !== 0 || my !== 0;
     const pos = input.pos;
     // un invité a perdu l'équilibre chez lui : il bascule dans le trou de ce côté
@@ -688,11 +1035,28 @@ export class BackroomsSim {
       P.z = p3.z;
     }
 
+    // le bruit qu'on fait : ce que l'entité peut entendre (la course s'entend loin, accroupi presque rien)
+    let noise = !P.moving ? 0 : P.running ? NOISE.run : P.crouch ? NOISE.crouch : NOISE.walk;
+    if (P.winded > 0) noise = Math.max(noise, NOISE.winded);
+    if (P.bumpT > 0) noise = Math.max(noise, P.bumpV || 0);
+    P.noise = noise;
+
     // 3b. Un pas de trop au-dessus d'un trou : on tombe à l'étage du dessous
     const pitId = this.pitUnder(P.x, P.z, P.floor);
     if (pitId >= 0) {
       const pit = this.fm(P.floor).pits[pitId];
       if (Math.abs(P.x - pit.x) < PIT_HALF && Math.abs(P.z - pit.z) < PIT_HALF) this.fallThrough(P, pitId);
+    }
+    // 3c. Level 2 : un jet de vapeur brûlant repousse (l'invité le vit chez lui et le dit à l'hôte) ; le cri attire
+    // l'entité
+    P.burnT = Math.max(0, (P.burnT || 0) - DT);
+    if (this.level === PIPES_LEVEL) {
+      const j = !input.remote && !(P.burnT > 0) && P.lockT <= 0 ? this.steamAt(P.x, P.z) : null;
+      if (j) this.burn(P, j);
+      if (j || input.burn) {
+        this.emit({ type: 'burn', id: P.id, name: P.name, x: P.x, z: P.z });
+        this.alertMonster(P.x, P.z, 40, P.floor);
+      }
     }
     // 3d. Au pied de l'échelle posée : on grimpe jusqu'au renfoncement
     const map = this.fm(P.floor);
@@ -717,11 +1081,19 @@ export class BackroomsSim {
       f.taken = true;
       this.fuses++;
       P.found++;
-      this.emit({ type: 'fuse', id: f.id, by: P.id, count: this.fuses, total: FUSES });
+      // Level 1 : le fusible reste en poche jusqu'au panneau (s'il tombe, il le lâche)
+      if (this.level === 1) P.carry.push(f.id);
+      this.makeNoise(P, NOISE.pick, 0.8);
+      this.emit({ type: 'fuse', id: f.id, by: P.id, count: this.fuses, total: FUSES, x: f.x, z: f.z });
     }
-    // les 3 fusibles rapportés au panneau du monte-charge : le courant revient, les portes s'ouvrent ; aux Poolrooms,
-    // les 3 volants trouvés suffisent : les toboggans s'ouvrent
-    if (this.level >= 1 && !this.powered && this.fuses >= FUSES && (this.level === 2 || Math.hypot(map.exit.x - P.x, map.exit.z - P.z) < 2.6)) {
+    // Level 1 : les fusibles rapportés au panneau du monte-charge (il faudra ensuite le relancer, voir updatePanel)
+    if (this.level === 1 && P.carry.length && Math.hypot(map.exit.x - P.x, map.exit.z - P.z) < 2.6) {
+      this.delivered = (this.delivered || 0) + P.carry.length;
+      this.emit({ type: 'fuseIn', id: P.id, n: P.carry.length, count: this.delivered, total: FUSES });
+      P.carry = [];
+    }
+    // aux Poolrooms, les 3 volants trouvés suffisent : les toboggans s'ouvrent
+    if (this.level === 2 && !this.powered && this.fuses >= FUSES) {
       this.powered = true;
       this.emit({ type: 'powered', by: P.id });
       this.emit({ type: 'exitUnlocked' });
@@ -766,16 +1138,68 @@ export class BackroomsSim {
         best = near(this.stairs);
         P.sigTo = 'stairs';
       }
-    } else if (this.level >= 1 && this.fuses < FUSES) {
+    } else if ((this.level === 1 || this.level === 2) && (map.fuses || []).some((f) => !f.taken)) {
       best = near((map.fuses || []).filter((f) => !f.taken));
     } else if (map.slides && map.slides.length) {
       best = near(this.slide >= 0 ? [map.slides[this.slide]] : map.slides);
       P.sigTo = 'exit';
+    } else if (this.level === PIPES_LEVEL && !this.open) {
+      best = (map.valves || []).filter((v) => !v.closed).reduce((b, v) => Math.min(b, Math.hypot(v.sx - P.x, v.sz - P.z)), Infinity);
     } else {
       best = Math.hypot(map.exit.x - P.x, map.exit.z - P.z);
       P.sigTo = 'exit';
     }
-    P.signal = best === Infinity ? 0 : Math.max(0, 1 - best / 45);
+    P.signal = best === Infinity ? 0 : Math.max(0, 1 - best / SIGNAL_RANGE);
+    // dans le noir d'une coupure, le caméscope ne capte plus rien
+    if (this.blackout > 0) P.signal = 0;
+  }
+
+  // Caché dans un casier : on ne bouge pas, on retient son souffle (Maj) ; à bout de souffle, on suffoque bruyamment
+  stepHidden(P, input) {
+    if (input.pick) return this.leaveHide(P);
+    P.moving = false;
+    P.running = false;
+    P.flashlight = false;
+    P.stamina = Math.min(100, P.stamina + DT * STAMINA_REGEN);
+    const want = !!input.run && P.breath > 0 && !(P.gaspT > 0);
+    if (want !== P.holding) this.emit({ type: 'breath', id: P.id, on: want });
+    P.holding = want;
+    P.gaspT = Math.max(0, (P.gaspT || 0) - DT);
+    if (P.holding) {
+      P.breath = Math.max(0, P.breath - (100 / BREATH_HOLD) * DT);
+      if (P.breath <= 0) {
+        P.holding = false;
+        P.gaspT = 2.5;
+        this.makeNoise(P, NOISE.gasp, 1.2);
+        this.emit({ type: 'gasp', id: P.id, x: P.x, z: P.z, floor: P.floor });
+      }
+    } else P.breath = Math.min(100, P.breath + BREATH_BACK * DT);
+    P.bumpT = Math.max(0, (P.bumpT || 0) - DT);
+    P.noise = P.holding ? 0 : Math.max(NOISE.breath, P.bumpT > 0 ? P.bumpV : 0);
+    this.updateSignal(P);
+  }
+
+  // Level 1 : les 3 fusibles au panneau, il faut encore relancer le monte-charge en restant devant (bruyant : le moteur
+  // tousse, l'entité l'entend de loin). À plusieurs, plus vite ; lâché, il redescend doucement.
+  updatePanel() {
+    if (this.powered || (this.delivered || 0) < FUSES) return;
+    const E = this.map.exit;
+    const near = this.players.filter((P) => P.status === 'alive' && P.hidden < 0 && Math.hypot(E.x - P.x, E.z - P.z) < 2.6);
+    if (near.length) {
+      if (this.panel === 0) this.emit({ type: 'panelStart', by: near[0].id, x: E.x, z: E.z });
+      this.panel = Math.min(1, this.panel + (DT / PANEL_T) * (near.length > 1 ? 1.5 : 1));
+      this.panelNoiseT -= DT;
+      if (this.panelNoiseT <= 0) {
+        this.panelNoiseT = 1.5;
+        this.alertMonster(E.x, E.z, 30, 0);
+        this.emit({ type: 'panelNoise', x: E.x, z: E.z, p: this.panel });
+      }
+      for (const P of near) this.makeNoise(P, 0.6, 0.3);
+    } else this.panel = Math.max(0, this.panel - DT * 0.1);
+    if (this.panel < 1) return;
+    this.powered = true;
+    this.emit({ type: 'powered', by: near[0].id });
+    this.emit({ type: 'exitUnlocked' });
   }
 
   // Invité : il déplace seulement son joueur, sans rien ramasser ni décider (l'hôte le fera). Renvoie le côté d'une
@@ -792,6 +1216,13 @@ export class BackroomsSim {
     if (Mo && Mo.tx !== undefined) { Mo.x += (Mo.tx - Mo.x) * k; Mo.z += (Mo.tz - Mo.z) * k; }
     if (tr.length > 270) tr.splice(0, tr.length - 270);
     if (this.state !== 'playing' || P.status !== 'alive' || this.departT > 0) return 0;
+    // agrippé ou dans un casier : l'hôte décide de tout (on ne bouge pas, le regard suit l'instantané)
+    if (P.grabT > 0 || P.hidden >= 0) {
+      P.moving = false;
+      P.running = false;
+      if (P.hidden >= 0 && input.yaw !== undefined) P.yaw = input.yaw;
+      return 0;
+    }
     if (input.yaw !== undefined) P.yaw = input.yaw;
     if (input.pitch !== undefined) P.pitch = input.pitch;
     if (P.lockT > 0) {
@@ -801,6 +1232,7 @@ export class BackroomsSim {
     const mx = input.mx || 0;
     const my = input.my || 0;
     P.moving = mx !== 0 || my !== 0;
+    P.crouch = !!input.crouch;
     const side = this.balance(P, mx);
     if (side) {
       P.tilt = 0;
@@ -819,13 +1251,13 @@ export class BackroomsSim {
       return 0;
     }
     P.winded = Math.max(0, (P.winded || 0) - DT);
-    P.running = !!input.run && P.moving && P.stamina > 0 && !(P.winded > 0);
+    P.running = !!input.run && P.moving && P.stamina > 0 && !(P.winded > 0) && !P.crouch;
     if (P.running) {
       P.stamina = Math.max(0, P.stamina - DT * STAMINA_DRAIN);
       if (P.stamina <= 0) P.winded = WINDED_T;
     } else P.stamina = Math.min(100, P.stamina + DT * STAMINA_REGEN);
     if (!P.moving) return 0;
-    const speed = (P.running ? SPRINT_SPEED : WALK_SPEED) * this.wade(P);
+    const speed = (P.running ? SPRINT_SPEED : P.crouch ? WALK_SPEED * CROUCH_SPEED : WALK_SPEED) * this.wade(P);
     const len = Math.hypot(mx, my) || 1;
     const fx = -Math.sin(P.yaw);
     const fz = -Math.cos(P.yaw);
@@ -835,7 +1267,18 @@ export class BackroomsSim {
     const ps = this.stairStep(P, pos.x, pos.z);
     P.x = ps.x;
     P.z = ps.z;
+    this.predictBurn(P);
     return 0;
+  }
+
+  // l'invité se brûle chez lui : repoussé tout de suite ; burned dit à l'application de prévenir l'hôte
+  predictBurn(P) {
+    P.burnT = Math.max(0, (P.burnT || 0) - DT);
+    if (this.level !== PIPES_LEVEL || P.burnT > 0) return;
+    const j = this.steamAt(P.x, P.z);
+    if (!j) return;
+    this.burn(P, j);
+    this.burned = true;
   }
 
   // Un joueur arrive en cours de partie : spectateur jusqu'au prochain étage
@@ -871,12 +1314,24 @@ export class BackroomsSim {
       sl: this.slide,
       // le vrai ascenseur ne se dévoile qu'une fois les cassettes trouvées
       rf: this.open ? this.realFloor : -1,
-      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.floor, P.sigTo, P.onLadder ? 1 : 0, r2(P.lockT), r2(P.tilt), P.onBeam ? 1 : 0, P.bottles]),
-      m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0, M.floor],
+      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.floor, P.sigTo, P.onLadder ? 1 : 0, r2(P.lockT), r2(P.tilt), P.onBeam ? 1 : 0, P.bottles, r2(P.grabT), P.hidden, P.crouch ? 1 : 0, P.carry.length, P.hurt || 0, Math.round(P.breath), P.holding ? 1 : 0, P.grabs || 0, r2(P.struggle || 0)]),
+      m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0, M.floor, M.grabbing ?? -1],
+      // Level 1 : fusibles (ils peuvent être tombés ailleurs), fusibles au panneau, redémarrage du monte-charge
+      fp: this.level === 1 ? (this.map.fuses || []).map((f) => [r2(f.x), r2(f.z)]) : null,
+      dl: this.delivered || 0,
+      pn: r2(this.panel || 0),
+      hd: (this.map.hides || []).map((h) => h.by),
       k: [bits(this.allCassettes, 'collected'), bits(this.map.fuses, 'taken'), this.floors.map((f) => bits(f.items, 'taken')).join('|'), ''],
       // objets posés par des joueurs (échanges) : [étage, objet, x, z] ; échelle posée
       ix: this.floors.flatMap((f, fi) => (f.items || []).slice(this.items0[fi]).map((o) => [fi, o.kind, r2(o.x), r2(o.z)])),
       nl: this.floors.some((f) => f.niche && f.niche.ladder) ? 1 : 0,
+      // vannes du Level 2 : -1 fermée, sinon combien elle est tournée
+      v: (this.map.valves || []).map((v) => (v.closed ? -1 : r2(v.turn))),
+      // courant des secteurs (0 à 3) et disjoncteurs (-1 réarmé, sinon l'avancée)
+      sp: (this.map.valves || []).map((v) => v.power || 0),
+      br: (this.map.breakers || []).map((b) => (b.done ? -1 : r2(b.turn))),
+      // le troupeau du Level 2 : [x, z, cap, état] par chèvre
+      gt: this.goats ? goatSnapshot(this.goats) : null,
     };
   }
 
@@ -889,6 +1344,7 @@ export class BackroomsSim {
     this.fuses = snap.f;
     this.powered = !!snap.pw;
     this.blackout = snap.bo;
+    this.map.dark = this.level === PIPES_LEVEL && this.blackout > 0;
     this.departT = snap.dp;
     this.slide = snap.sl ?? -1;
     if (snap.rf >= 0 && !this.unlocked) {
@@ -897,7 +1353,7 @@ export class BackroomsSim {
     }
     const seen = new Set();
     for (const row of snap.p) {
-      const [id, x, z, yaw, pitch, status, fl, bat, stam, inv, signal, running, moving, found, name, lamp, sel, floor, sigTo, onLadder, lockT, tilt, onBeam, bottles] = row;
+      const [id, x, z, yaw, pitch, status, fl, bat, stam, inv, signal, running, moving, found, name, lamp, sel, floor, sigTo, onLadder, lockT, tilt, onBeam, bottles, grabT, hidden, crouch, carryN, hurt, breath, holding, grabs, struggle] = row;
       seen.add(id);
       let P = this.players.find((q) => q.id === id);
       if (!P) {
@@ -955,6 +1411,22 @@ export class BackroomsSim {
       }
       P.bottles = bottles || 0;
       P.battery = bat;
+      P.grabT = grabT || 0;
+      P.grabs = grabs || 0;
+      // la poussée du joueur de cet écran se compte chez lui ; l'hôte confirme
+      if (!mine || !(P.grabT > 0)) P.struggle = struggle || 0;
+      const wasHidden = P.hidden;
+      P.hidden = hidden ?? -1;
+      // il vient de sortir du casier : sa position est celle de l'hôte (devant la porte)
+      if (mine && wasHidden >= 0 && P.hidden < 0) {
+        P.x = x;
+        P.z = z;
+      }
+      if (!mine) P.crouch = !!crouch;
+      P.carryN = carryN || 0;
+      P.hurt = hurt || 0;
+      P.breath = breath ?? 100;
+      P.holding = !!holding;
       P.inv = (inv || ',').split(',').map((k) => k || null);
       P.signal = signal;
       P.found = found;
@@ -967,6 +1439,21 @@ export class BackroomsSim {
     [, , M.yaw, M.mode] = snap.m;
     M.silent = !!snap.m[4];
     M.floor = snap.m[5] || 0;
+    M.grabbing = snap.m[6] >= 0 ? snap.m[6] : null;
+    if (snap.fp) (this.map.fuses || []).forEach((f, i) => {
+      const q = snap.fp[i];
+      if (!q) return;
+      f.x = q[0];
+      f.z = q[1];
+      f.gx = cellOf(q[0]);
+      f.gz = cellOf(q[1]);
+    });
+    this.delivered = snap.dl || 0;
+    this.panel = snap.pn || 0;
+    (snap.hd || []).forEach((by, i) => {
+      const h = (this.map.hides || [])[i];
+      if (h) h.by = by;
+    });
     const set = (list, k, b) => (list || []).forEach((o, i) => {
       o[k] = (b || '')[i] === '1';
     });
@@ -980,7 +1467,23 @@ export class BackroomsSim {
     const takenBits = (snap.k[2] || '').split('|');
     this.floors.forEach((f, fi) => set(f.items, 'taken', takenBits[fi]));
     for (const f of this.floors) if (f.niche) f.niche.ladder = !!snap.nl;
-    if (this.hasMonster) this.senseMonster();
+    (this.map.valves || []).forEach((v, i) => {
+      const t = (snap.v || [])[i];
+      if (t === undefined) return;
+      v.closed = t < 0;
+      v.turn = t < 0 ? 1 : t;
+    });
+    this.valves = (this.map.valves || []).filter((v) => v.closed).length;
+    (snap.sp || []).forEach((p, i) => this.setSector(i, p));
+    (this.map.breakers || []).forEach((b, i) => {
+      const t = (snap.br || [])[i];
+      if (t === undefined) return;
+      b.done = t < 0;
+      b.turn = t < 0 ? 1 : t;
+    });
+    if (snap.gt) applyGoatSnapshot(this, snap.gt);
+    if (this.goats) senseGoats(this);
+    else if (this.hasMonster) this.senseMonster();
   }
 
   // L'ascenseur part quand plus personne n'est dehors (et qu'au moins un joueur est dedans)
@@ -1006,7 +1509,8 @@ export class BackroomsSim {
       this.emit({ type: 'level', level: this.level });
       return;
     }
-    if (this.level >= LAST_LEVEL) {
+    // les autres toboggans sortent des Backrooms ; les Tuyauteries sont le dernier niveau
+    if (this.map.slides || this.level >= LAST_LEVEL) {
       this.state = 'won';
       this.emit({ type: 'win', time: this.time });
       return;
@@ -1036,7 +1540,12 @@ export class BackroomsSim {
       P.pan = Math.max(-0.9, Math.min(0.9, Math.sin(diff)));
       if (P.status !== 'alive') continue;
       P.seen = same && hasLineOfSight(this.fm(M.floor), M.x, M.z, P.x, P.z);
-      const score = P.mDist - (P.seen ? 12 : 0) - (P.id === M.target ? 6 : 0);
+      const concealed = P.hidden >= 0 && M.sawHide !== P.hidden;
+      // elle préfère celui qui s'est éloigné des autres
+      let mate = Infinity;
+      for (const Q of this.players) if (Q !== P && Q.status === 'alive' && Q.floor === P.floor) mate = Math.min(mate, Math.hypot(Q.x - P.x, Q.z - P.z));
+      const alone = mate !== Infinity && mate > 15 ? 8 : 0;
+      const score = P.mDist - (P.seen && !concealed ? 12 : 0) - (P.id === M.target ? 6 : 0) - alone + (concealed ? 30 : 0);
       if (score < bestScore) {
         bestScore = score;
         target = P;
@@ -1050,9 +1559,29 @@ export class BackroomsSim {
 
   updateMonster() {
     const M = this.monster;
-    const P = this.senseMonster();
+    const P0 = this.senseMonster();
+    // elle tient quelqu'un : elle ne fait rien d'autre
+    if (M.mode === 'grab') return this.updateGrab(M);
+    // sonnée (on s'est dégagé, ou un coéquipier l'a aveuglée) : elle recule, puis s'enfuit dans le noir
+    if (M.stunT > 0) {
+      M.stunT -= DT;
+      M.speed = 0;
+      M.path = [];
+      if (M.stunT <= 0) {
+        M.stunT = 0;
+        const spot = P0 ? this.darkSpot(this.fm(M.floor), P0, M, 18, 32, false) : null;
+        M.mode = spot ? 'flee' : 'patrol';
+        M.watch = spot;
+        M.repathT = 0;
+      }
+      return;
+    }
+    const P = P0;
     if (!P) return;
     M.target = P.id;
+    M.dormantT = Math.max(0, (M.dormantT || 0) - DT);
+    // au tout début de la partie, ou pendant le répit qui suit une poursuite, elle reste au loin et se tait
+    const calm = M.dormantT > 0 || (entityRelaxed(this) && M.mode !== 'chase');
     const map = this.fm(M.floor);
     const rage = this.rage; // 0 seul ou personne à l'abri, jusqu'à 1 quand il ne reste qu'un joueur dehors
     const dark = this.blackout > 0;
@@ -1066,12 +1595,28 @@ export class BackroomsSim {
     // Détection : vue directe (moins loin lampe éteinte ; dans le noir, une lampe allumée se voit de loin),
     // bruit de course, présence rapprochée. La colère allonge tout.
     const A = this.aggro;
-    // au début elle voit et entend moins loin ; chaque cassette l'aiguise
-    const sight = (dark ? (P.flashlight ? 28 : 7) : P.flashlight ? 24 : 15) * (0.8 + A * 0.3) + rage * 10;
-    const hear = (dark ? 15 : 12) * (0.85 + A * 0.3) + rage * 8;
-    let canSee = M.hasLineOfSight && dist < sight;
-    let canHear = P.running && dist < hear;
-    let isNearby = dist < 4 + rage * 2 + A * 2;
+    // Vue : seulement devant elle (une lampe allumée se remarque bien plus sur le côté) ; accroupi lampe éteinte, on
+    // passe mieux inaperçu. Au début elle voit et entend moins loin ; chaque objectif l'aiguise
+    const sight = ((dark ? (P.flashlight ? 28 : 7) : P.flashlight ? 24 : 15) * (0.8 + A * 0.3) + rage * 10) * (P.crouch && !P.flashlight ? 0.7 : 1) * (calm ? 0.5 : 1);
+    const ang = Math.abs(this.angleTo(M, P.x, P.z));
+    const inView = ang < VISION_CONE || (P.flashlight && ang < VISION_CONE * 1.7) || dist < 2.5;
+    // Ouïe : le bruit du joueur (course, chute, ramassage, panneau…) porte moins à travers les murs
+    const heardR = NOISE_RANGE * (P.noise || 0) * (M.hasLineOfSight ? 1 : 0.65) * (dark ? 1.15 : 1) * (0.85 + A * 0.3) * (calm ? 0.5 : 1) + (P.noise > 0.2 ? rage * 6 : 0);
+    let canSee = M.hasLineOfSight && dist < sight && inView;
+    let canHear = (P.noise || 0) > 0 && dist < heardR;
+    // tout près, elle sent sa présence… si elle le voit ou l'entend respirer ; accroupi derrière un mur, on passe
+    let isNearby = dist < 1.6 || (dist < 4 + rage * 2 + A * 2 && (M.hasLineOfSight || (P.noise || 0) > 0.1) && !(calm && dist > 2.5));
+    // caché dans un casier qu'elle ne l'a pas vu prendre : invisible ; seule sa respiration le trahit, de tout près
+    if (P.hidden >= 0 && M.sawHide !== P.hidden) {
+      canSee = false;
+      isNearby = false;
+      canHear = (P.noise || 0) > 0 && dist < 3.2 + P.noise * 8;
+      if (canHear) M.sawHide = P.hidden;
+    }
+    if (M.dormantT > 0 && !isNearby && !(canHear && P.running && dist < 7)) {
+      canSee = false;
+      canHear = false;
+    }
     // tapie dans le noir, elle observe : elle ne charge que si on s'approche trop (ou, déjà énervée, si on la voit)
     const hiding = M.mode === 'stalk' || M.mode === 'watch' || M.mode === 'flee';
     if (hiding) {
@@ -1081,12 +1626,17 @@ export class BackroomsSim {
       canSee = (A >= 0.5 && canSee && dist < sight * 0.6) || (lit && A >= 0.4);
       canHear = A >= 0.6 && canHear;
       if (lit && A < 0.4 && M.mode !== 'flee' && !isNearby) {
-        const spot = this.darkSpot(map, P, M, 18, 30, false);
-        if (spot) {
-          M.mode = 'flee';
-          M.watch = spot;
-          M.repathT = 0;
-          this.emit({ type: 'monsterFlee' });
+        // elle apprend : après deux fuites devant la lampe, elle ne se laisse plus faire
+        if (M.flees >= 2) canSee = true;
+        else {
+          const spot = this.darkSpot(map, P, M, 18, 30, false);
+          if (spot) {
+            M.flees++;
+            M.mode = 'flee';
+            M.watch = spot;
+            M.repathT = 0;
+            this.emit({ type: 'monsterFlee' });
+          }
         }
       }
     } else if (M.mode === 'patrol' && A < 0.5 && canSee && !isNearby && !(canHear && dist < 8)) {
@@ -1126,8 +1676,12 @@ export class BackroomsSim {
         M.path = [];
       }
     } else if (canSee || canHear || isNearby) {
-      if (M.mode !== 'chase') this.emit({ type: 'spotted' });
+      if (M.mode !== 'chase') {
+        this.chases++;
+        this.emit({ type: 'spotted', heard: !canSee && canHear, id: P.id });
+      }
       M.mode = 'chase';
+      M.watch = null;
       M.silent = false;
       if (M.unseenT > 0) M.repathT = 0; // elle le revoit : droit sur lui
       M.unseenT = 0;
@@ -1143,6 +1697,12 @@ export class BackroomsSim {
       if (atLast || M.unseenT > LOSE_TRACK_T + rage * 4 + A * 3 || !same) {
         M.mode = 'search';
         M.repathT = 0;
+        // elle retient l'endroit où on l'a semée : elle y reviendra se poster
+        if (same) {
+          M.escapes.push({ x: M.lastSeenX, z: M.lastSeenZ });
+          if (M.escapes.length > 4) M.escapes.shift();
+        }
+        this.emit({ type: 'lost', id: P.id });
       }
     }
 
@@ -1150,13 +1710,15 @@ export class BackroomsSim {
     const k = (1 + rage * 0.35 + (dark ? 0.1 : 0)) * (0.9 + A * 0.22);
     M.burstT = Math.max(0, M.burstT - DT);
     if (M.mode === 'search' && M.probe) M.searchT = Math.max(0, (M.searchT || 0) - DT);
-    if (M.mode === 'chase') M.speed = this.monsterChaseSpeed * k * (M.burstT > 0 ? 1.15 : 1);
+    if (M.mode === 'chase') M.speed = this.monsterChaseSpeed * k * (M.burstT > 0 ? 1.15 : 1) * (this.chases <= 1 ? 0.86 : 1);
     else if (M.mode === 'search') M.speed = MONSTER_PATROL_SPEED * 1.3 * k;
     else if (M.mode === 'ambush') M.speed = MONSTER_PATROL_SPEED * 1.5;
     else if (M.mode === 'flee') M.speed = this.monsterChaseSpeed * 1.05;
     else if (M.mode === 'stalk') M.speed = MONSTER_PATROL_SPEED * 1.15;
     else if (M.mode === 'watch') M.speed = 0;
-    else M.speed = MONSTER_PATROL_SPEED * (1 + rage * 0.5);
+    else M.speed = MONSTER_PATROL_SPEED * (1 + rage * 0.5) * (calm ? 0.8 : 1);
+    if (calm && M.mode === 'patrol') M.silent = true;
+    else if (M.mode === 'patrol' && !calm) M.silent = false;
 
     // En ronde, elle va souvent se tapir dans un coin sombre pour observer les joueurs de loin (de moins en moins à
     // mesure qu'elle s'énerve)
@@ -1164,7 +1726,7 @@ export class BackroomsSim {
       M.stalkT -= DT;
       if (M.stalkT <= 0) {
         M.stalkT = rand(6, 12);
-        if (Math.random() < 0.9 - A * 0.7) {
+        if (!calm && dist < 40 && Math.random() < 0.6 - A * 0.45) {
           const spot = this.darkSpot(map, P, M, 8, 20, true);
           if (spot) {
             M.mode = 'stalk';
@@ -1195,11 +1757,12 @@ export class BackroomsSim {
       }
     }
 
-    // Level 1 : en patrouille, elle contourne par les rangées d'étagères pour attendre le joueur plus loin
-    if (M.mode === 'patrol' && map.isShelfSide && same) {
+    // Level 1 : en patrouille, elle contourne par les rangées d'étagères pour attendre le joueur plus loin ; Level 2 :
+    // elle l'attend juste après un croisement
+    if (M.mode === 'patrol' && (map.isAmbush || map.isShelfSide || M.escapes.length) && same && !calm) {
       M.ambushT -= DT;
       if (M.ambushT <= 0 && dist < 45) {
-        const spot = this.findAmbush(P);
+        const spot = (M.escapes.length && Math.random() < 0.5 ? this.escapeAmbush(P) : null) || (map.isAmbush || map.isShelfSide ? this.findAmbush(P) : null);
         M.ambushT = 4;
         if (spot) {
           M.mode = 'ambush';
@@ -1231,7 +1794,9 @@ export class BackroomsSim {
           if (!same && this.stairs.length && Math.random() < 0.35 + rage * 0.4) {
             M.mode = 'search';
           } else {
-            const near = same && Math.random() < 0.5 + rage * 0.4 ? map.walkable.filter((c) => Math.hypot((c.x + 0.5) * CELL_SIZE - P.x, (c.z + 0.5) * CELL_SIZE - P.z) < 28 - rage * 12) : [];
+            const near = calm
+              ? map.walkable.filter((c) => Math.hypot((c.x + 0.5) * CELL_SIZE - P.x, (c.z + 0.5) * CELL_SIZE - P.z) > 30)
+              : same && Math.random() < 0.5 + rage * 0.4 ? map.walkable.filter((c) => Math.hypot((c.x + 0.5) * CELL_SIZE - P.x, (c.z + 0.5) * CELL_SIZE - P.z) < 28 - rage * 12) : [];
             const pool = near.length ? near : map.walkable;
             const c = pool[Math.floor(Math.random() * pool.length)];
             M.targetWander = { x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE };
@@ -1278,7 +1843,37 @@ export class BackroomsSim {
       }
     }
 
-    // Avancement le long du chemin
+    // Avancement le long du chemin. Level 2 : elle n'entre pas dans un jet de vapeur qui crache, elle attend devant
+    const go = (nx, nz) => {
+      if (this.level === PIPES_LEVEL && this.steamAt(nx, nz) && !this.steamAt(M.x, M.z)) {
+        M.steamWait = true;
+        return;
+      }
+      M.steamWait = false;
+      // elle contourne caisses, meubles et casiers au lieu de passer au travers
+      for (const pr of map.props || []) {
+        if (pr.walk) continue;
+        const rr = pr.r + 0.32;
+        const ex = nx - pr.x;
+        const ez = nz - pr.z;
+        const d = Math.hypot(ex, ez);
+        if (d < rr && d > 1e-4) {
+          nx = pr.x + (ex / d) * rr;
+          nz = pr.z + (ez / d) * rr;
+        }
+      }
+      for (const h of map.hides || []) {
+        const rr = LOCKER_R + 0.3;
+        const d = Math.hypot(nx - h.x, nz - h.z);
+        if (d < rr && d > 1e-4) {
+          nx = h.x + ((nx - h.x) / d) * rr;
+          nz = h.z + ((nz - h.z) / d) * rr;
+        }
+      }
+      if (this.blocked(cellOf(nx), cellOf(nz), M.floor)) return;
+      M.x = nx;
+      M.z = nz;
+    };
     if (M.path && M.path.length > M.pathIndex) {
       const wp = M.path[M.pathIndex];
       const wdx = wp.x - M.x;
@@ -1287,14 +1882,12 @@ export class BackroomsSim {
       if (wdist < 0.3) M.pathIndex++;
       else {
         const stepLen = Math.min(wdist, M.speed * DT);
-        M.x += (wdx / wdist) * stepLen;
-        M.z += (wdz / wdist) * stepLen;
+        go(M.x + (wdx / wdist) * stepLen, M.z + (wdz / wdist) * stepLen);
         M.yaw = Math.atan2(wdx, wdz);
       }
     } else if (M.mode === 'chase' && same && dist > 0.1 && M.unseenT === 0) {
       const stepLen = Math.min(dist, M.speed * DT);
-      M.x += (dx / dist) * stepLen;
-      M.z += (dz / dist) * stepLen;
+      go(M.x + (dx / dist) * stepLen, M.z + (dz / dist) * stepLen);
       M.yaw = Math.atan2(dx, dz);
     } else if (M.goal && cellOf(M.goal.x) === cellOf(M.x) && cellOf(M.goal.z) === cellOf(M.z) && Math.hypot(M.goal.x - M.x, M.goal.z - M.z) > 0.1) {
       // le but est dans sa case (pas de chemin à suivre) : tout droit
@@ -1302,8 +1895,7 @@ export class BackroomsSim {
       const gz = M.goal.z - M.z;
       const gd = Math.hypot(gx, gz);
       const stepLen = Math.min(gd, M.speed * DT);
-      M.x += (gx / gd) * stepLen;
-      M.z += (gz / gd) * stepLen;
+      go(M.x + (gx / gd) * stepLen, M.z + (gz / gd) * stepLen);
       M.yaw = Math.atan2(gx, gz);
     }
 
@@ -1322,24 +1914,110 @@ export class BackroomsSim {
         M.repathT = 0;
         M.stairT = 3;
         M.mode = 'search';
-        M.lastSeenX = P.x;
-        M.lastSeenZ = P.z;
+        M.lastSeenX = P.x + rand(-5, 5);
+        M.lastSeenZ = P.z + rand(-5, 5);
         this.emit({ type: 'monsterStairs', floor: M.floor });
         break;
       }
     }
 
-    // L'entité attrape le joueur
-    if (same && dist < 1.15) {
-      P.status = 'dead';
-      P.moving = false;
-      this.emit({ type: 'jumpscare', x: M.x, z: M.z, id: P.id });
-      this.emit({ type: 'dead', id: P.id, name: P.name, time: this.time });
-      M.mode = 'patrol';
-      M.target = null;
+    // L'entité attrape le joueur : la première fois, elle l'agrippe (on peut se dégager) ; la seconde est mortelle
+    const reach = P.hidden >= 0 ? 1.4 : 1.15;
+    if (same && dist < reach && (P.hidden < 0 || M.sawHide === P.hidden)) {
+      if (P.hidden >= 0) this.leaveHide(P);
+      if (P.grabs >= 1 || this.difficulty === 'hard' && this.rage >= 1) {
+        this.killPlayer(P, { x: M.x, z: M.z });
+        this.afterCatch(M);
+        return;
+      }
+      P.grabs++;
+      P.grabT = GRAB_T * (this.difficulty === 'hard' ? 0.8 : 1);
+      P.struggle = 0;
+      P.running = false;
+      P.crouch = false;
+      M.mode = 'grab';
+      M.grabbing = P.id;
       M.path = [];
-      M.ambushT = 6;
+      M.yaw = Math.atan2(P.x - M.x, P.z - M.z);
+      this.emit({ type: 'grab', id: P.id, name: P.name, x: M.x, z: M.z, floor: M.floor });
     }
+  }
+
+  // La prise : on se débat (n'importe quelle touche), ou un coéquipier l'aveugle avec sa lampe ; sinon c'est la fin
+  updateGrab(M) {
+    const G = this.players.find((Q) => Q.id === M.grabbing);
+    if (!G || G.status !== 'alive') {
+      this.afterCatch(M);
+      return;
+    }
+    M.speed = 0;
+    M.silent = false;
+    // elle le tient face à elle
+    const a = Math.atan2(G.x - M.x, G.z - M.z);
+    M.yaw = a;
+    G.yaw = a + Math.PI;
+    G.pitch = 0.05;
+    G.grabT -= DT;
+    const need = GRAB_STRUGGLES + (this.difficulty === 'hard' ? 3 : 0);
+    const blinded = this.players.some((Q) => Q !== G && Q.status === 'alive' && Q.flashlight && Q.floor === M.floor && Math.hypot(Q.x - M.x, Q.z - M.z) < 12 && this.facing(Q, M.x, M.z) < 0.35 && hasLineOfSight(this.fm(M.floor), Q.x, Q.z, M.x, M.z));
+    if (G.struggle >= need || blinded) {
+      G.grabT = 0;
+      G.struggle = 0;
+      G.lockT = 0.3;
+      G.stamina = Math.min(100, G.stamina + 35);
+      G.winded = 0;
+      M.mode = 'stun';
+      M.stunT = MONSTER_STUN_T;
+      M.grabbing = null;
+      M.unseenT = 0;
+      // elle recule d'un pas
+      const back = this.moveWithCollisions(M.x, M.z, -Math.sin(a) * 0.9, -Math.cos(a) * 0.9, 0.3, M.floor);
+      M.x = back.x;
+      M.z = back.z;
+      this.emit({ type: 'release', id: G.id, escaped: true, blinded, x: M.x, z: M.z, floor: M.floor });
+      return;
+    }
+    if (G.grabT <= 0) {
+      G.grabT = 0;
+      this.killPlayer(G, { x: M.x, z: M.z });
+      this.afterCatch(M);
+    }
+  }
+
+  // après une victime : elle repart en ronde, loin de la cabine
+  afterCatch(M) {
+    M.mode = 'patrol';
+    M.grabbing = null;
+    M.target = null;
+    M.path = [];
+    M.ambushT = 6;
+    M.sawHide = -1;
+  }
+
+  // angle entre le regard de l'entité et un point (0 : droit devant elle)
+  angleTo(M, x, z) {
+    let d = Math.atan2(x - M.x, z - M.z) - M.yaw;
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    return d;
+  }
+
+  // une embuscade là où on l'a déjà semée, si le joueur s'en approche (hors de sa vue)
+  escapeAmbush(P) {
+    const map = this.fm(P.floor);
+    let best = null;
+    let bd = Infinity;
+    for (const e of this.monster.escapes) {
+      const d = Math.hypot(e.x - P.x, e.z - P.z);
+      if (d < 8 || d > 30 || d >= bd) continue;
+      if (hasLineOfSight(map, P.x, P.z, e.x, e.z)) continue;
+      const gx = cellOf(e.x);
+      const gz = cellOf(e.z);
+      if (map.isWall(gx, gz)) continue;
+      best = { x: (gx + 0.5) * CELL_SIZE, z: (gz + 0.5) * CELL_SIZE, gx, gz };
+      bd = d;
+    }
+    return best;
   }
 
   // angle entre là où regarde le joueur et un point (0 : droit devant)
@@ -1422,7 +2100,7 @@ export class BackroomsSim {
       const dp = Math.hypot(x - px, z - pz);
       if (dp > 8 || dp >= bestD) continue;
       if (Math.hypot(x - P.x, z - P.z) < 7) continue;
-      if (!map.isShelfSide(c.x, c.z)) continue;
+      if (!(map.isAmbush ? map.isAmbush(c.x, c.z) : map.isShelfSide(c.x, c.z))) continue;
       if (hasLineOfSight(map, P.x, P.z, x, z)) continue;
       best = { x, z, gx: c.x, gz: c.z };
       bestD = dp;
