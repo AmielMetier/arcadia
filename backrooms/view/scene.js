@@ -14,6 +14,7 @@ import { buildWarehouse } from './warehouse.js';
 import { createPlayerAvatars } from './players.js';
 import { createBeast } from './beast.js';
 import { buildWater } from './water.js';
+import { buildHotel } from './hotel.js';
 
 const MODELS = new URL('../models/', import.meta.url).href; // modèles Poly Haven (CC0), voir models/LICENSE.txt
 const VIP_IMG = new URL('../img/entite.png?v=2', import.meta.url).href; // ?v : image plus nette, ne pas garder l'ancienne en cache
@@ -107,11 +108,12 @@ export function createBackroomsScene(container, floors) {
   const map0 = floors[0];
   const L1 = map0.level === 1;
   const L2 = map0.level === 2; // Level 37, les Poolrooms : clair, laiteux, carrelé, inondé
+  const L3 = map0.level === 3; // Level 5, le Terror Hotel : pénombre chaude, boiseries, moquette rouge
   const CEIL = map0.ceil || WALL_HEIGHT;
   const scene = new THREE.Scene();
   // Level 1 : un froid bleuté, un brouillard plus épais
-  scene.background = new THREE.Color(L2 ? '#d3e4e2' : L1 ? '#06080a' : '#0d0b06');
-  scene.fog = new THREE.FogExp2(L2 ? '#d3e4e2' : L1 ? '#050608' : '#080604', L2 ? 0.022 : L1 ? 0.058 : 0.05);
+  scene.background = new THREE.Color(L3 ? '#070403' : L2 ? '#d3e4e2' : L1 ? '#06080a' : '#0d0b06');
+  scene.fog = new THREE.FogExp2(L3 ? '#060302' : L2 ? '#d3e4e2' : L1 ? '#050608' : '#080604', L3 ? 0.07 : L2 ? 0.022 : L1 ? 0.058 : 0.05);
 
   const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.08, 90);
   camera.position.set(map0.spawn.x, 1.6, map0.spawn.z);
@@ -125,7 +127,7 @@ export function createBackroomsScene(container, floors) {
 
   const textures = createBackroomsTextures(map0.level || 0);
   const AMB = L2 ? 0.045 : 0.012;
-  const ambient = new THREE.AmbientLight(L2 ? '#eaf7f6' : L1 ? '#c9d8ff' : '#fff3c4', AMB);
+  const ambient = new THREE.AmbientLight(L3 ? '#ffcf96' : L2 ? '#eaf7f6' : L1 ? '#c9d8ff' : '#fff3c4', AMB);
   scene.add(ambient);
   const dummy = new THREE.Object3D();
   const loader = new GLTFLoader();
@@ -182,10 +184,10 @@ export function createBackroomsScene(container, floors) {
     const bakeUniforms = {
       uBake: { value: bakeTex },
       uBakeScale: { value: new THREE.Vector2(1 / (W * CELL_SIZE), 1 / (H * CELL_SIZE)) },
-      uBakeTint: { value: L2 ? new THREE.Color(1.0, 1.05, 1.07) : L1 ? new THREE.Color(0.86, 0.98, 1.12) : new THREE.Color(1.12, 1.04, 0.8) },
+      uBakeTint: { value: L3 ? new THREE.Color(1.2, 0.92, 0.62) : L2 ? new THREE.Color(1.0, 1.05, 1.07) : L1 ? new THREE.Color(0.86, 0.98, 1.12) : new THREE.Color(1.12, 1.04, 0.8) },
       uBakeY: { value: -fi * FLOOR_DY },
       uCeil: { value: CEIL },
-      uDamp: { value: L2 ? 0 : L1 ? 0.6 : 1 },
+      uDamp: { value: L3 ? 0.35 : L2 ? 0 : L1 ? 0.6 : 1 },
       // Poolrooms : sous la surface, le carrelage prend la teinte de l'eau et les caustiques dansent dessus
       uPool: { value: L2 ? 1 : 0 },
       uTime: { value: 0 },
@@ -573,7 +575,7 @@ float bkCaust(vec2 uv, float t) {
     // le plafond est percé sous les trous et les trémies de l'étage du dessus : rien n'y est fixé
     const aboveHoles = fi > 0 ? holesOf(floors[fi - 1]) : [];
     const holeAbove = (x, z) => aboveHoles.some((h) => Math.abs((x + 0.5) * CELL_SIZE - h.x) < h.hx + 0.6 && Math.abs((z + 0.5) * CELL_SIZE - h.z) < h.hz + 0.6);
-    const rates = L2
+    const rates = L2 || L3
       ? { outlet: 0, fire_alarm: 0, power_box_01: 0, wall_clock: 0, drawing: 0 }
       : L1
       ? { outlet: 0.02, fire_alarm: 0.01, power_box_01: 0.012, wall_clock: 0, drawing: 0 }
@@ -598,7 +600,7 @@ float bkCaust(vec2 uv, float t) {
             break;
           }
         }
-        if (!L1 && !L2 && drnd() < 0.045 && !holeAbove(x, z)) ceilSpots.push({ x: (x + 0.5) * CELL_SIZE + (drnd() - 0.5) * 1.2, z: (z + 0.5) * CELL_SIZE + (drnd() - 0.5) * 1.2, rot: drnd() < 0.5 ? 0 : Math.PI / 2 });
+        if (!L1 && !L2 && !L3 && drnd() < 0.045 && !holeAbove(x, z)) ceilSpots.push({ x: (x + 0.5) * CELL_SIZE + (drnd() - 0.5) * 1.2, z: (z + 0.5) * CELL_SIZE + (drnd() - 0.5) * 1.2, rot: drnd() < 0.5 ? 0 : Math.PI / 2 });
       }
     }
     // prises : une petite plaque blanche jaunie à deux trous
@@ -859,6 +861,7 @@ float bkCaust(vec2 uv, float t) {
 
     // 9. Level 1 : l'habillage de l'entrepôt (rayonnages à palettes, marchandises, tuyaux, lignes au sol, piliers, panneaux)
     if (L1) buildWarehouse({ map, group, baked, CEIL });
+    const hotel = L3 ? buildHotel({ map, group, baked, CEIL }) : null;
 
     // 10. Fusibles (Level 1) : un gros fusible céramique aux bouts de cuivre, lueur ambrée
     const fuseMeshes = [];
@@ -920,8 +923,8 @@ float bkCaust(vec2 uv, float t) {
     const signMat = new THREE.MeshBasicMaterial({ color: '#ff3030' });
     const fuseLamps = [];
     let fakeWall = null;
-    if (E) {
-      // repère local : -z regarde l'entrée, la cabine est vers +z
+    if (E && !E.fire) {
+      // repère local : -z regarde l'entrée, la cabine est vers +z (Level 5 : la porte de secours, dans view/hotel.js)
       const at = new THREE.Group();
       at.position.set(E.x - E.dx * (CELL_SIZE / 2), 0, E.z - E.dz * (CELL_SIZE / 2));
       at.rotation.y = Math.atan2(E.dx, E.dz);
@@ -1007,6 +1010,7 @@ float bkCaust(vec2 uv, float t) {
           water.update(sim, P, time, dt, camera);
           bakeUniforms.uWaterY.value = water.level;
         }
+        if (hotel) hotel.update(sim, P, time, dt);
 
         // Coupure de courant : les néons meurent d'un coup, puis reviennent en grésillant
         const want = !(sim.blackout > 0);
@@ -1301,9 +1305,13 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       // 1. Caméra : balancement lent de la marche, plus marqué en courant ; une chute la fait plonger d'un étage
       if (P.moving) bob += dt * (P.running ? 9 : 5.5);
       const pm = sim.fm(P.floor || 0);
-      const want = 1.6 + feetY(sim.stairs, P.x, P.z, P.floor) + (P.onLadder ? 1.0 : 0) - (pm.depthAt ? pm.depthAt(P.x, P.z) : 0);
+      let want = 1.6 + feetY(sim.stairs, P.x, P.z, P.floor) + (P.onLadder ? 1.0 : 0) - (pm.depthAt ? pm.depthAt(P.x, P.z) : 0);
+      // Level 5 : sous le lit, au ras du sol ; dans l'armoire, debout ; accroupi, plus bas
+      const low = (P.hidden >= 0 && pm.spots) || P.crouch;
+      if (P.hidden >= 0 && pm.spots) want = pm.spots[P.hidden].kind === 'bed' ? 0.28 : 1.5;
+      else if (P.crouch) want -= 0.62;
       // une chute : on tombe vraiment (gravité), puis le choc secoue la caméra
-      if (want < eyeY - 0.5 || fallV > 0) {
+      if ((want < eyeY - 0.5 && !low) || fallV > 0) {
         fallV += 9.8 * dt;
         eyeY -= fallV * dt;
         if (eyeY <= want) {
@@ -1392,7 +1400,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 
       // 3. Les autres joueurs encore dehors
       for (const Q of sim.players) {
-        const show = Q !== P && Q.status === 'alive';
+        const show = Q !== P && Q.status === 'alive' && !(Q.hidden >= 0); // caché : on ne le voit pas
         if (!show && !avatars.has(Q.id)) continue;
         const qv = floorViews[Q.floor || 0];
         const qm = sim.fm(Q.floor || 0);

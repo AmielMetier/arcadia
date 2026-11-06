@@ -1,5 +1,16 @@
 # Journal des versions — Arcadia
 
+## 4.51 — 6 novembre 2026
+- **The Backrooms** — nouveau niveau : le Level 5, le Terror Hotel. On y arrive en prenant le toboggan rouge des Poolrooms.
+  - Un hôtel des années 1930 : papier peint damassé, lambris sombres, moquette rouge, appliques Art déco qui grésillent, et un couloir qui fait le tour sans fin de 21 chambres numérotées, de 201 à 221.
+  - Six lettres sur papier sont cachées dans les chambres, sur un lit, sur un bureau ou par terre. Chacune se poste dans la boîte aux lettres de sa chambre, dans le hall. Ensemble, elles forment un mot.
+  - Les six lettres postées, un code à quatre chiffres s'allume au plafond du hall. On le tape sur le clavier de la porte de l'escalier de secours, qui s'ouvre : c'est la sortie.
+  - On ne se bat pas : on court, on s'accroupit (C) et on se cache sous un lit ou dans une armoire (E).
+  - L'entité rôde dans le couloir et entre parfois dans les chambres. Elle entend la course de loin et la marche de près ; accroupi, on passe en silence. Un œil se remplit quand elle te voit : plein, elle te traque. Si tu te caches loin d'elle, elle perd ta trace ; si elle t'a vu te glisser dans ta cachette, elle t'en sort.
+  - Un joueur attrapé avec des lettres en poche : elles retournent là où il les avait trouvées.
+  - Parquet qui craque et boîte à musique désaccordée au loin.
+- **The Backrooms** — les toboggans jaune et bleu des Poolrooms mènent toujours à l'écran de fin, en attendant leurs niveaux.
+
 ## 4.50 — 6 novembre 2026
 - **Arcadia** — « Tester ma connexion » affiche ton ping avec le serveur, en millisecondes, et dit si ta connexion va faire laguer les jeux (ping élevé, connexion instable).
 

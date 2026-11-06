@@ -13,6 +13,7 @@ const LEVEL_SFX = {
   0: { chase: range('level0', 'chase', 3), ambient: range('level0', 'ambiant', 9), death: 'level0/death' },
   1: { chase: range('level1', 'chase', 1), ambient: [], death: null },
   2: { chase: [], ambient: [], death: null }, // Poolrooms : pas encore de sons
+  3: { chase: [], ambient: [], death: null }, // Terror Hotel : pas encore de sons (des craquements synthétisés)
 };
 // joué en boucle par-dessus les cris de poursuite, à tous les niveaux
 const CHASE_ALL = 'chase_all';
@@ -822,6 +823,13 @@ export class BackroomsSfx {
     if (this.ambT > 0) return;
     this.ambT = 20 + Math.random() * 30;
     const AMBIENT = levelSfx(this.roomLevel).ambient;
+    if (this.roomLevel === 3) {
+      // l'hôtel : un parquet qui craque quelque part, plus rarement une boîte à musique désaccordée au loin
+      this.ambT = 9 + Math.random() * 18;
+      if (Math.random() < 0.25) this.musicBox();
+      else this.creak();
+      return;
+    }
     if (!AMBIENT.length) return;
     let name = AMBIENT[Math.floor(Math.random() * AMBIENT.length)];
     if (name === this.lastAmb) name = AMBIENT[(AMBIENT.indexOf(name) + 1) % AMBIENT.length];
@@ -898,6 +906,26 @@ export class BackroomsSfx {
     this.battery();
   }
 
+  // Level 5 : une touche du clavier à code, et le refus d'un mauvais code
+  beep(f = 1250, len = 0.07, vol = 0.08, type = 'square') {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    const o = c.createOscillator();
+    const g = c.createGain();
+    o.type = type;
+    o.frequency.value = f;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    o.connect(g).connect(this.out);
+    o.start(t);
+    o.stop(t + len + 0.02);
+  }
+
+  buzz() {
+    this.beep(160, 0.45, 0.12, 'sawtooth');
+  }
+
   // Ding de l'ascenseur (deux notes de cloche)
   ding() {
     if (!this.unlocked || !this.ctx) return;
@@ -915,6 +943,59 @@ export class BackroomsSfx {
       g.connect(this.out);
       osc.start(t + d);
       osc.stop(t + d + 1.3);
+    });
+  }
+
+  // Level 5 : une latte de parquet qui craque, quelque part dans l'hôtel
+  creak() {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    const o = c.createOscillator();
+    o.type = 'sawtooth';
+    const f = 70 + Math.random() * 60;
+    o.frequency.setValueAtTime(f, t);
+    o.frequency.linearRampToValueAtTime(f * (1.3 + Math.random() * 0.6), t + 0.5 + Math.random() * 0.5);
+    // un grincement saccadé : le volume tremble vite
+    const am = c.createOscillator();
+    am.frequency.value = 18 + Math.random() * 20;
+    const amg = c.createGain();
+    amg.gain.value = 0.5;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.05, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
+    am.connect(amg).connect(g.gain);
+    const bp = c.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 600 + Math.random() * 500;
+    bp.Q.value = 4;
+    o.connect(bp).connect(g).connect(this.out);
+    o.start(t);
+    am.start(t);
+    o.stop(t + 1.2);
+    am.stop(t + 1.2);
+  }
+
+  // Level 5 : quelques notes de boîte à musique, lentes et désaccordées, très bas
+  musicBox() {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t0 = c.currentTime;
+    const notes = [659, 587, 523, 494, 523, 392, 440, 330];
+    const start = Math.floor(Math.random() * 3);
+    notes.slice(start, start + 5).forEach((f, i) => {
+      const t = t0 + i * 0.55;
+      const o = c.createOscillator();
+      const g = c.createGain();
+      o.type = 'triangle';
+      o.frequency.value = f * (0.985 + Math.random() * 0.02);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.025, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+      o.connect(g).connect(this.out);
+      o.start(t);
+      o.stop(t + 1.5);
     });
   }
 

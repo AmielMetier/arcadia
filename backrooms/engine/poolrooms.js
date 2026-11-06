@@ -25,7 +25,7 @@ export const DEPTH = { WADE: 0.2, GALLERY: 0.25, TUNNEL: 0.6 };
 // l'un d'eux. Chaque couleur mène ailleurs (to : le niveau d'arrivée ; null tant qu'il n'existe pas : on sort des
 // Backrooms). MOUTH : le tube, au ras du sol (rayon et hauteur du centre), et la distance où l'on s'y glisse.
 export const SLIDES = [
-  { color: 'red', name: 'RED', hex: '#e2402f', to: null },
+  { color: 'red', name: 'RED', hex: '#e2402f', to: 3 }, // vers le Level 5, le Terror Hotel
   { color: 'yellow', name: 'YELLOW', hex: '#f2bf1d', to: null },
   { color: 'blue', name: 'BLUE', hex: '#2c7fe0', to: null },
 ];

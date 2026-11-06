@@ -3,6 +3,19 @@ import { BackroomsSim, DT, DEPART_T } from './engine/sim.js';
 import { createBackroomsScene, setMonsterMode } from './view/scene.js';
 import { BackroomsSfx } from './view/sfx.js';
 import { BackroomsHUD, levelName, levelSub } from './view/hud.js';
+import { parseWords } from './engine/hotel.js';
+
+// Level 5, version VIP : les mots du fichier backrooms/password_level5/mots.txt (6 lettres, un par ligne) ; sans
+// fichier (ou sans mot valide), la liste standard
+let vipWords = null;
+fetch('password_level5/mots.txt', { cache: 'no-cache' })
+  .then((r) => (r.ok ? r.text() : ''))
+  .then((t) => {
+    const w = parseWords(t);
+    vipWords = w.length ? w : null;
+    if (sim && monstersVip && vipWords) sim.words = vipWords;
+  })
+  .catch(() => {});
 
 const H = window.HubBridge;
 const stageEl = document.getElementById('stage');
@@ -44,6 +57,7 @@ let toggleFlashlightRequested = false; // touche 1 : la lampe
 let useRequested = null; // (tests) une case d'objet précise à utiliser
 // actions du prochain pas : E utilise la case choisie, F ramasse, T siffle
 const act = { use: false, pick: false, whistle: false };
+let codeRequested = null; // Level 5 : le code tapé sur le clavier de la porte de secours
 let selRequested = 0; // touches 2 et 3 : choisir la case d'objet (1 ou 2)
 let kbMode = false;
 let paused = true; // la partie attend qu'on prenne le contrôle
@@ -84,6 +98,11 @@ window.addEventListener('keydown', (e) => {
   }
   if (paused) {
     if (kbMode && (e.code === 'Enter' || e.code === 'Space')) play();
+    return;
+  }
+  if (hud && hud.keypadOpen) {
+    e.preventDefault();
+    hud.keypadKey(e);
     return;
   }
   keys[e.code] = true;
@@ -227,7 +246,7 @@ function initGame(settings = lastSettings) {
   const players = NET.role === 'host' ? H.players.map((p) => ({ id: p.id, name: p.name || 'Player' })) : [{ id: 0, name: 'Player' }];
   NET.run = Date.now();
   // ?level1 ou ?level37 (seul) : on commence directement au Level 1 ou aux Poolrooms
-  const lv = NET.role !== 'solo' ? 0 : /[?&]level37(&|=|$)/.test(location.search) ? 2 : /[?&]level1(&|=|$)/.test(location.search) ? 1 : 0;
+  const lv = NET.role !== 'solo' ? 0 : /[?&]level5(&|=|$)/.test(location.search) ? 3 : /[?&]level37(&|=|$)/.test(location.search) ? 2 : /[?&]level1(&|=|$)/.test(location.search) ? 1 : 0;
   startRun({ seed, difficulty, players, run: NET.run, level: lv, vip: settings.monsters === 'vip' });
   // ?parkour (seul) : on commence devant le couloir piégé, tourné vers les trous
   const trap = sim.map.trap;
@@ -254,7 +273,7 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   NET.actions = {};
   NET.events = [];
   if (!players.some((p) => p.id === NET.myId)) players = [...players, { id: NET.myId, name: 'Player' }];
-  sim = new BackroomsSim({ difficulty, seed, players, localId: NET.myId, level }); // les étages sortent de la graine
+  sim = new BackroomsSim({ difficulty, seed, players, localId: NET.myId, level, words: monstersVip ? vipWords : null }); // les étages sortent de la graine
   if (level && sim.level !== level) sim.loadLevel(level);
   // un invité qui arrive en cours de partie regarde les autres jusqu'au prochain étage (l'hôte le dira)
   if (scene) {
@@ -289,7 +308,7 @@ function guestInputs() {
     const q = NET.actions[id] || (NET.actions[id] = []);
     // une action par pas, dans l'ordre où l'invité les a faites (avec la case qu'il avait choisie)
     const a = q.shift() || {};
-    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, stamina: i.st, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', beamFall: a.k === 'b' ? a.side : 0 };
+    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.crouch, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, stamina: i.st, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', beamFall: a.k === 'b' ? a.side : 0, code: a.k === 'c' ? a.v : undefined };
     i.pos = null; // une position annoncée ne sert qu'une fois
   }
   return out;
@@ -307,10 +326,10 @@ function onMsg(from, m) {
       sim.addPlayer(from, (p && p.name) || 'Player');
       send(from, goMessage());
     } else if (m.t === 'i' && m.run === NET.run) {
-      NET.inputs[from] = { mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 100), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) } };
-    } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'p', 't', 'b'].includes(m.k)) {
+      NET.inputs[from] = { mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, crouch: !!m.c, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 100), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) } };
+    } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'p', 't', 'b', 'c'].includes(m.k)) {
       const q = NET.actions[from] || (NET.actions[from] = []);
-      if (q.length < 8) q.push({ k: m.k, sel: m.s === 2 ? 2 : 1, side: m.side > 0 ? 1 : -1 });
+      if (q.length < 8) q.push({ k: m.k, sel: m.s === 2 ? 2 : 1, side: m.side > 0 ? 1 : -1, v: String(m.v || '').replace(/\D/g, '').slice(0, 4) });
     }
     return;
   }
@@ -363,8 +382,45 @@ function handleEvent(ev, me) {
       if (hud) hud.toast(ev.by === me ? `${what === 'fuse' ? 'Fuse' : 'Valve wheel'} ${ev.count}/${ev.total}` : `${who(ev.by)} found a ${what} (${ev.count}/${ev.total})`);
       break;
     }
+    case 'letter':
+      if (sfx) sfx.cassette();
+      if (hud) hud.toast(ev.by === me ? `Letter « ${ev.char} » from room ${ev.num} · post it in the lobby mailboxes` : `${who(ev.by)} found a letter (room ${ev.num})`);
+      break;
+    case 'posted':
+      if (hud) hud.toast(`Mailbox ${ev.num}: « ${ev.char} » (${ev.count}/${ev.total})`);
+      break;
+    case 'mailEmpty':
+      if (mine && hud) hud.toast('No letter to post: they are hidden in the rooms');
+      break;
+    case 'codeShown':
+      if (sfx) sfx.exitUnlocked();
+      if (hud) hud.toast('All six letters are in… a code glows on the lobby ceiling');
+      break;
+    case 'keypad':
+      if (ev.id === me && hud) {
+        for (const k in keys) keys[k] = false;
+        hud.openKeypad(
+          (code) => {
+            codeRequested = code;
+          },
+          () => sfx && sfx.beep(),
+        );
+      }
+      break;
+    case 'codeWrong':
+      if (ev.id === me && hud) {
+        hud.keypadWrong();
+        if (sfx) sfx.buzz();
+      }
+      break;
+    case 'hide':
+      if (ev.id === me && hud) hud.toast(ev.kind === 'bed' ? 'Under the bed · E to come out' : 'In the wardrobe · E to come out');
+      break;
+    case 'lost':
+      if (hud && sim.player.status === 'alive') hud.toast('It lost your trail…');
+      break;
     case 'powered':
-      if (hud) hud.toast(sim.level === 2 ? 'Valves closed: the pumps stop, the three slides open' : 'Fuses in place: the freight elevator is starting up');
+      if (hud) hud.toast(sim.level === 3 ? 'The keypad beeps: the fire escape door is unlocked' : sim.level === 2 ? 'Valves closed: the pumps stop, the three slides open' : 'Fuses in place: the freight elevator is starting up');
       if (sfx && sim.level === 2) sfx.setPool(false); // le silence d'un coup : les pompes s'arrêtent
       break;
     case 'exitUnlocked':
@@ -438,15 +494,16 @@ function handleEvent(ev, me) {
     case 'board': {
       const sl = ev.slide !== undefined && sim.map.slides ? sim.map.slides[ev.slide] : null;
       if (sfx) sl ? sfx.splashDown() : sfx.ding();
-      if (hud && ev.id !== me) hud.toast(sl ? `${ev.name} slid into the ${sl.name.toLowerCase()} slide` : `${ev.name} is in the elevator`);
+      if (hud && ev.id !== me) hud.toast(sl ? `${ev.name} slid into the ${sl.name.toLowerCase()} slide` : sim.level === 3 ? `${ev.name} reached the fire escape` : `${ev.name} is in the elevator`);
       break;
     }
     case 'depart':
       if (sfx && ev.level === 2) sfx.splashDown();
-      else if (sfx) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
-      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
+      else if (sfx && ev.level !== 3) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
+      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : ev.level === 3 ? 'YOU RUN DOWN THE FIRE ESCAPE, FLOOR AFTER FLOOR…' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
       break;
     case 'level':
+      if (hud) hud.closeKeypad();
       // nouvel étage : nouvelle scène
       if (scene && scene.level === ev.level && scene.map === sim.map) break;
       if (scene) scene.dispose();
@@ -553,6 +610,7 @@ function loop(currentTime) {
     if (Math.hypot(gp.lx, gp.ly) > 0.15) { mx = gp.lx; my = -gp.ly; }
   }
   const run = !!keys['ShiftLeft'] || !!keys['ShiftRight'] || touch.run || !!(gp && gp.run);
+  const crouch = !!keys['KeyC'] || !!(gp && gp.crouch); // C (maintenu) : accroupi
 
   // Sensibilité de rotation de la souris
   const sens = 0.0022;
@@ -582,6 +640,8 @@ function loop(currentTime) {
       yaw: newYaw,
       pitch: newPitch,
       run: live && run,
+      crouch: live && crouch,
+      code: codeRequested || undefined,
       toggleFlashlight: toggleFlashlightRequested,
       use: useRequested,
       sel: selRequested || undefined,
@@ -596,10 +656,11 @@ function loop(currentTime) {
       if (fell) send('host', { t: 'a', k: 'b', side: fell, run: NET.run });
       const sel = sim.player.sel;
       if (toggleFlashlightRequested) send('host', { t: 'a', k: 'f', s: sel, run: NET.run });
+      if (codeRequested) send('host', { t: 'a', k: 'c', v: codeRequested, s: sel, run: NET.run });
       for (const [k, on] of [['e', act.use], ['p', act.pick], ['t', act.whistle]]) if (on) send('host', { t: 'a', k, s: sel, run: NET.run });
       if (NET.tick % 3 === 0) {
         const P = sim.player;
-        send('host', { t: 'i', run: NET.run, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2), st: Math.round(P.stamina) }, true);
+        send('host', { t: 'i', run: NET.run, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, c: input.crouch ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2), st: Math.round(P.stamina) }, true);
       }
     } else {
       sim.step(input, NET.role === 'host' ? guestInputs() : null);
@@ -609,6 +670,7 @@ function loop(currentTime) {
     useRequested = null;
     selRequested = 0;
     act.use = act.pick = act.whistle = false;
+    codeRequested = null;
 
     // Détection de pas pour le son de marche sur moquette
     if (sim.state === 'playing') {
@@ -740,6 +802,7 @@ if (window.DDVolume && btnSet) {
         ['Courir · lampe', '<kbd>Maj</kbd> · <kbd>1</kbd>'],
         ['Choisir · utiliser · ramasser', '<kbd>2</kbd> <kbd>3</kbd> · <kbd>E</kbd> · <kbd>F</kbd>'],
         ['Siffler', '<kbd>T</kbd>'],
+        ["S'accroupir (Level 5)", '<kbd>C</kbd> maintenu'],
         ['Jouer · pause', '<kbd>Entrée</kbd> · <kbd>Échap</kbd> ou <kbd>P</kbd>'],
       ] }] },
     ],
