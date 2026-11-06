@@ -228,14 +228,16 @@ export function createHotelMap(seed = 5) {
   corridorCells.forEach((c, i) => {
     if ((c.x + c.z) % 2) return;
     const v = rnd();
-    const st = v < 0.2 ? 'off' : v < 0.42 ? 'flicker' : 'on';
+    const st = v < 0.08 ? 'off' : v < 0.22 ? 'flicker' : 'on';
     // contre le mur le plus proche (le mur extérieur du couloir)
     const wall = [[0, -1], [0, 1], [-1, 0], [1, 0]].find(([dx, dz]) => grid[(c.z + dz) * W + c.x + dx] === T.WALL) || [0, -1];
-    addLight((c.x + 0.5 + wall[0] * 0.42) * C, (c.z + 0.5 + wall[1] * 0.42) * C, { state: st, flicker: st === 'flicker', sconce: { dx: wall[0], dz: wall[1] } });
+    addLight((c.x + 0.5 + wall[0] * 0.42) * C, (c.z + 0.5 + wall[1] * 0.42) * C, { state: st, flicker: st === 'flicker', bright: st === 'on', sconce: { dx: wall[0], dz: wall[1] } });
   });
   for (const r of rooms) {
-    const st = rnd() < 0.45 ? 'on' : rnd() < 0.5 ? 'flicker' : 'off';
+    const st = rnd() < 0.75 ? 'on' : rnd() < 0.6 ? 'flicker' : 'off';
     addLight(r.desk.x, r.desk.z, { state: st, flicker: st === 'flicker', bright: st === 'on', y: 1.2, fy: 1.2, lamp: true });
+    // un plafonnier caché au milieu de la chambre, plus doux
+    addLight(((r.x0 + r.x1 + 1) / 2) * C, ((r.z0 + r.z1 + 1) / 2) * C, { state: rnd() < 0.7 ? 'on' : 'off', y: HOTEL_CEIL - 0.1, fy: HOTEL_CEIL - 0.1 });
   }
   // une applique au-dessus des boîtes aux lettres
   addLight(mailbox.x + 0.2, mbMid, { state: 'on', y: 2.5, fy: 2.5, bright: true, sconce: { dx: -1, dz: 0 } });

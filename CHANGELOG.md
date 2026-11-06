@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.52 — 6 novembre 2026
+- **The Backrooms** — le Terror Hotel (Level 5) est moins sombre : les appliques du couloir éclairent plus, presque toutes marchent, et chaque chambre a un plafonnier en plus de sa lampe de chevet.
+
 ## 4.51 — 6 novembre 2026
 - **The Backrooms** — nouveau niveau : le Level 5, le Terror Hotel. On y arrive en prenant le toboggan rouge des Poolrooms.
   - Un hôtel des années 1930 : papier peint damassé, lambris sombres, moquette rouge, appliques Art déco qui grésillent, et un couloir qui fait le tour sans fin de 21 chambres numérotées, de 201 à 221.
