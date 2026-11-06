@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.50 — 6 novembre 2026
+- **Arcadia** — « Tester ma connexion » affiche ton ping avec le serveur, en millisecondes, et dit si ta connexion va faire laguer les jeux (ping élevé, connexion instable).
+
 ## 4.49 — 6 novembre 2026
 - **Arcadia** — Les commandes à la manette s'affichent dans le menu Arcadia et sur l'écran de chargement de chaque jeu, bouton par bouton. Elles passent en premier quand une manette est branchée.
   - Le bouton Vue (⧉) de la manette ouvre et ferme le menu Arcadia en pleine partie, B le referme.

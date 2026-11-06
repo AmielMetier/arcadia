@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '4.49';
+  const VERSION = '4.50';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -229,10 +229,13 @@
       const R = await DDNetTest.run((key, label, v) => {
         let li = list.querySelector(`[data-k="${key}"]`);
         if (!li) { li = document.createElement('li'); li.dataset.k = key; list.appendChild(li); }
-        li.className = v === null ? 'wait' : v ? 'ok' : 'ko';
-        li.innerHTML = `<i></i><span></span><b>${v === null ? 'test…' : v ? 'OK' : 'bloqué'}</b>`;
+        const ms = v && typeof v === 'object' ? v : null;   // le ping : un résultat chiffré
+        const txt = v === null ? 'test…' : ms ? `${ms.med} ms` : v ? 'OK' : 'bloqué';
+        li.className = v === null ? 'wait' : ms ? (ms.med < 120 ? 'ok' : ms.med < 200 ? 'wait' : 'ko') : v ? 'ok' : 'ko';
+        li.innerHTML = `<i></i><span></span><b>${txt}</b>`;
         li.querySelector('span').textContent = label;
-        if (v !== null) lines.push(`${label} : ${v ? 'OK' : 'bloqué'}`);
+        if (ms) { const sm = document.createElement('small'); sm.style.cssText = 'display:block;opacity:.7;font-size:12px'; sm.textContent = `de ${ms.min} à ${ms.max} ms · variation ${ms.jit} ms`; li.querySelector('span').appendChild(sm); }
+        if (v !== null) lines.push(`${label} : ${ms ? `${ms.med} ms (de ${ms.min} à ${ms.max}, variation ${ms.jit})` : v ? 'OK' : 'bloqué'}`);
       });
       const vd = DDNetTest.verdict(R), box = ov.querySelector('.ntverdict');
       box.hidden = false; box.className = 'ntverdict ' + (vd.ok ? 'ok' : 'ko'); box.textContent = vd.text;
