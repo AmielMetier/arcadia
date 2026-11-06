@@ -1,5 +1,15 @@
 # Journal des versions — Arcadia
 
+## 4.56 — 6 novembre 2026
+- **Fief Maudit** — La crypte et le Roi-Squelette : l'expédition a enfin une fin.
+  - À l'aube du onzième jour, la porte du donjon s'ouvre. En bas, deux leviers à tenir en même temps lèvent la herse, puis un couloir de brume où les morts se relèvent mène à la salle du trône.
+  - Le Roi-Squelette se bat en trois temps : il appelle ses morts, les appelle plus vite, puis souffle les torches du trône et devient furieux. On rallume les torches avec E ; près d'elles, on reprend des forces.
+  - Si toute l'équipe tombe, on retente la crypte directement. Le Roi vaincu, l'écran de fin montre qui a abattu le plus de squelettes, et la partie compte dans le classement du salon.
+  - Chaque métier a sa capacité sur F : Grand coup du bûcheron, Rempart du chevalier, fusée éclairante de la chasseuse, Prière du prêtre, barricade de la forgeronne. Les équipiers IA s'en servent aussi.
+  - De la musique : un luth le jour, des cloches la nuit, des voix sombres dans la crypte, des tambours contre le Roi.
+  - Nouveau panneau Réglages (⚙) : volume de la musique et des effets, qualité de l'image (ombres, forêt lointaine, brume), sensibilité de la souris, rappel des commandes.
+  - Nouvel écran d'accueil, bouton F sur écran tactile et Y à la manette.
+
 ## 4.55 — 6 novembre 2026
 - **Fief Maudit** — L'expédition complète : relever le village et tenir dix nuits.
   - Les ruines se relèvent. E devant une ruine ouvre le chantier avec le bois et les poutres de l'entrepôt, puis on le bâtit à coups de marteau (clic). La forgeronne bâtit deux fois plus vite.

@@ -116,5 +116,5 @@ export function createNight({ scene, renderer, sky, sun, hemi, map, noise, peaks
     });
     coal.emissiveIntensity = 0.2 + 1.3 * d;
   }
-  return { update, braziers, sunDir };
+  return { update, braziers, sunDir, force() { lastD = -1; }, layers(n) { group.children.forEach((m, i) => { m.visible = i >= 3 - n; }); } };
 }

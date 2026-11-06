@@ -32,6 +32,7 @@
   <div class="vitals">
     <div class="hpbar" id="hpBar"><i></i><span id="hpTxt">100</span></div>
     <div class="foodbar" id="foodBar" title="Faim : mange à l'entrepôt (E)"><i class="ico food"></i><b><i></i></b></div>
+    <div class="abil" id="abil" title="Capacité du métier (F)"><kbd>F</kbd><b id="abName"></b><i id="abCd"></i></div>
     <div class="wallbar" id="wallBar" hidden><small>Entrepôt</small><i><b></b></i></div>
   </div>
   <div class="banner" id="banner" hidden></div>
@@ -42,11 +43,12 @@
   <div class="carry" id="carry" hidden><i class="ico wood"></i><span>Tu portes une bûche</span></div>
   <div class="toast" id="toast"></div>
   <div class="lockhint" id="lockHint" hidden>Clique pour reprendre la main</div>
-  <div class="tr"><button class="icon" id="btnMute" title="Son (M)" aria-label="Son">♪</button><button class="icon" id="btnMenu" title="Menu (Échap)" aria-label="Menu">☰</button></div>
+  <div class="tr"><button class="icon" id="btnSet" title="Réglages : son, graphismes, souris" aria-label="Réglages">⚙</button><button class="icon" id="btnMenu" title="Menu (Échap)" aria-label="Menu">☰</button></div>
   <div class="stick" id="stick" hidden><i></i></div>
   <div class="tbtns">
     <button data-a="jump" aria-label="Sauter">Saut</button>
     <button data-a="use" aria-label="Utiliser">E</button>
+    <button data-a="ability" id="tAbility" aria-label="Capacité du métier">F</button>
     <button data-a="fire" class="big" aria-label="Frapper">Hache</button>
   </div>
 </div>

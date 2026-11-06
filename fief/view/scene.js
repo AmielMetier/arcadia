@@ -12,6 +12,7 @@ import { WATER, R_PLAY } from '../engine/map.js';
 import { loadKit, buildVillage } from './village.js';
 import { createActors } from './actors.js';
 import { createNight } from './night.js';
+import { createCrypt3D, createAbilityFx, CEIL } from './crypt.js';
 
 const MOBILE = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 560;
 const SUN_DIR = new THREE.Vector3(-0.5, 0.62, 0.6).normalize();
@@ -53,6 +54,21 @@ export function createScene(stage, { onLost } = {}) {
   let night = null, peaksMesh = null, kitRef = null, villageGroup = null, villageKey = '', berryMesh = null, berryKey = '';
   let map = null, treeKit = null, trees = null, actors = null, logsGroup = null, fire = null, falling = [], stumps = null;
   const logMeshes = new Map(), beamMeshes = new Map();
+  let crypt3d = null, fx = null, villageLights = [], wasInside = false, farForest = null;
+  // qualité : finesse de l'image, ombres, forêt lointaine, nappes de brume
+  let quality = 'moyen';
+  try { quality = localStorage.getItem('fief_q') || (MOBILE ? 'bas' : 'moyen'); } catch (e) {}
+  function setQuality(q) {
+    if (!['bas', 'moyen', 'haut'].includes(q)) q = 'moyen';
+    quality = q; try { localStorage.setItem('fief_q', q); } catch (e) {}
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, { bas: 1, moyen: MOBILE ? 1.25 : 1.5, haut: 2 }[q]));
+    const size = q === 'haut' ? 4096 : MOBILE ? 1024 : 2048;
+    if (sun.shadow.mapSize.x !== size) { sun.shadow.mapSize.set(size, size); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } }
+    sun.castShadow = q !== 'bas' && !wasInside;
+    if (farForest) farForest.visible = q !== 'bas';
+    if (night) night.layers(q === 'bas' ? 1 : q === 'moyen' ? 2 : 3);
+    resize();
+  }
   let viewT = 0;
   const SEE = { uSeeThru: { value: 0 }, uSeeAt: { value: new THREE.Vector3() } };
   const scr = new THREE.Vector3(), dbuf = new THREE.Vector2();
@@ -183,7 +199,7 @@ export function createScene(stage, { onLost } = {}) {
   async function load(M, { onProgress } = {}) {
     map = M;
     // hauteur des bâtiments pour la caméra (toit compris)
-    for (const b of M.boxes) { const B = [...M.buildings, ...M.castle].find((o) => o.id === b.id); b.top = M.heightAt((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2) + (B && B.state === 'debout' ? 8.5 : 3.4 * (B && B.tall || 1)); }
+    for (const b of M.boxes) { const B = [...M.buildings, ...M.castle].find((o) => o.id === b.id); b.top = b.id === 'crypte' || b.id === 'herse' ? 99 : M.heightAt((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2) + (B && B.state === 'debout' ? 8.5 : 3.4 * (B && B.tall || 1)); }
     const step = (k) => onProgress && onProgress(k);
     scene.add(buildTerrain(M)); step(0.1);
     const river = buildRiver(M); scene.add(river); fire = { river };
@@ -219,7 +235,7 @@ export function createScene(stage, { onLost } = {}) {
       if (Math.abs(z - M.riverZ(x)) < 12) continue;
       far.push({ x, z, y: M.heightAt(x, z), kind: rr(i + 0.11) < 0.7 ? 'pine' : 'round', s: 0.9 + rr(i + 0.5) * 0.6, rot: rr(i) * 6.28, v: Math.floor(rr(i + 0.9) * 8) });
     }
-    scene.add(plantTrees(treeKit, far, { lo: true, shadows: false, dark: true }).group); step(0.35);
+    farForest = plantTrees(treeKit, far, { lo: true, shadows: false, dark: true }).group; scene.add(farForest); step(0.35);
     // village et château
     kitRef = await loadKit('models/village.glb'); step(0.6);
     villageGroup = buildVillage(kitRef, M); scene.add(villageGroup);
@@ -255,6 +271,11 @@ export function createScene(stage, { onLost } = {}) {
     logsGroup = new THREE.Group(); scene.add(logsGroup);
     night = createNight({ scene, renderer, sky, sun, hemi, map: M, noise, peaks: peaksMesh });
     actors = await createActors(scene, { makeLog }); step(0.95);
+    // la crypte et les effets des capacités ; les lumières du village s'éteignent quand on est sous terre (et inversement)
+    scene.traverse((o) => { if (o.isPointLight) villageLights.push(o); });
+    crypt3d = createCrypt3D({ scene, kit: kitRef, map: M, noise });
+    fx = createAbilityFx(scene, M);
+    setQuality(quality);
     const s = M.spawn; cam.yaw = s.yaw + Math.PI; cam.tx = s.x; cam.tz = s.z; cam.ty = M.heightAt(s.x, s.z) + 1.6;
   }
 
@@ -278,6 +299,19 @@ export function createScene(stage, { onLost } = {}) {
     SWAY.uT.value = t;
     if (fire) { fire.river.userData.U.uT.value = t; fire.update && fire.update(t, sim.darkness); }
     if (night) night.update(sim, t);
+    // sous terre : ni ciel ni soleil, une lumière d'ambiance froide, un brouillard noir
+    const inside = !!(map && map.crypt.inside(cam.tx, cam.tz));
+    if (inside !== wasInside) {
+      wasInside = inside; for (const l of villageLights) l.visible = !inside; sky.visible = !inside; sun.castShadow = !inside && quality !== 'bas';
+      if (!inside && night) night.force();
+    }
+    if (inside) {
+      sun.intensity = 0; hemi.color.setHex(0x7a6c96); hemi.groundColor.setHex(0x2a1e16); hemi.intensity = 0.55;
+      scene.fog.color.setHex(0x07080c); scene.fog.near = 5; scene.fog.far = 36; renderer.toneMappingExposure = 1.15; scene.environmentIntensity = 0.04;
+      if (peaksMesh) peaksMesh.visible = false;
+    }
+    if (crypt3d) crypt3d.update(sim, t, camera, inside);
+    if (fx) fx.update(sim, dt, t);
     // arbres qui tombent : bascule accélérée, petit rebond, puis s'enfoncent et disparaissent
     viewT = t;
     const now = t;
@@ -343,12 +377,13 @@ export function createScene(stage, { onLost } = {}) {
       let f = 1;
       for (let i = 1; i <= 24; i++) {
         const u = i / 24, x = ox + (cx - ox) * u, z = oz + (cz - oz) * u, y = oy + (cy - oy) * u;
-        if (y < map.heightAt(x, z) + 0.35 || map.boxes.some((b) => x > b.x0 - 0.3 && x < b.x1 + 0.3 && z > b.z0 - 0.3 && z < b.z1 + 0.3 && y < b.top)) { f = Math.max(0.12, (i - 1) / 24); break; }
+        if (y < map.heightAt(x, z) + 0.35 || map.boxes.some((b) => !b.open && x > b.x0 - 0.3 && x < b.x1 + 0.3 && z > b.z0 - 0.3 && z < b.z1 + 0.3 && y < b.top)) { f = Math.max(0.12, (i - 1) / 24); break; }
       }
       cam.pull = Math.min(f, (cam.pull ?? 1) + dt * 1.5);
       cx = ox + (cx - ox) * cam.pull; cz = oz + (cz - oz) * cam.pull; cy = oy + (cy - oy) * cam.pull;
     }
     cy = Math.max(cy, map.heightAt(cx, cz) + 0.6);
+    if (inside) cy = Math.min(cy, map.crypt.y + CEIL - 0.35);
     camera.position.set(cx, cy, cz);
     camera.updateMatrixWorld();
     SEE.uSeeThru.value = Math.max(0, Math.hypot(cx - cam.tx, cy - cam.ty, cz - cam.tz) - 1.1);
@@ -371,5 +406,5 @@ export function createScene(stage, { onLost } = {}) {
   }
   addEventListener('resize', resize); resize();
 
-  return { get falling() { return falling; }, cam, renderer, scene, camera, load, update, treeFell, syncTrees, actorsEvent: (e) => actors && actors.event(e), get actors() { return actors; } };
+  return { get quality() { return quality; }, setQuality, get falling() { return falling; }, cam, renderer, scene, camera, load, update, treeFell, syncTrees, actorsEvent: (e) => actors && actors.event && actors.event(e), fxEvent: (e, sim) => fx && fx.event(e, sim), get actors() { return actors; } };
 }

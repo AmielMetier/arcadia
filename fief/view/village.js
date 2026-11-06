@@ -31,7 +31,7 @@ export async function loadKit(url) {
 }
 
 // file d'attente de pièces à poser : nom → liste de matrices
-class Batch {
+export class Batch {
   constructor(kit) { this.kit = kit; this.list = new Map(); this.m = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.e = new THREE.Euler(); }
   add(name, x, y, z, ry = 0, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) {
     if (!this.kit.has(name)) { console.warn('pièce absente', name); return; }

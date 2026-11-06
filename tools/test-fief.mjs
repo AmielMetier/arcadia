@@ -1,7 +1,7 @@
 // Fief Maudit : tests du moteur (sans navigateur). node tools/test-fief.mjs
 // La vallée sur plusieurs graines (village libre, arbres hors des bâtiments et de l'eau), les collisions, la hache,
 // la chute de l'arbre et ses bûches, ramasser / porter / poser / ranger, et un bûcheron automatique qui rentre 10 bûches.
-import { Sim, DT, emptyInput, SPEED, REACH, CYCLE, FUEL, FOES, HP, RISE, JOBS, BEAM, WAREHOUSE_HP, BUILDS, FOOD, nightLen } from '../fief/engine/sim.js';
+import { Sim, DT, emptyInput, SPEED, REACH, CYCLE, FUEL, FOES, HP, RISE, JOBS, BEAM, WAREHOUSE_HP, BUILDS, FOOD, nightLen, LEVER_T } from '../fief/engine/sim.js';
 import { doorPoint } from '../fief/engine/map.js';
 import { createValley, rectOf, R_PLAY, WATER } from '../fief/engine/map.js';
 import { encodeState, encodeWorld, applyState, applyWorld, smooth, predict, reconcile, cleanInput } from '../fief/engine/net.js';
@@ -482,7 +482,7 @@ section('sièges, dix nuits, sauvegarde');
   s2.village.hp = 1e9; s2.players[0].hp = 1e9;
   s2.clock = { day: 10, phase: 'nuit', t: nightLen(10) - 0.01 };
   s2.step();
-  ok(s2.over && s2.over.reason === 'victoire' && s2.won, 'à l\'aube du onzième jour, l\'expédition est réussie');
+  ok(!s2.over && s2.crypt.open && s2.takeEvents().some((e) => e.t === 'crypt'), 'à l\'aube du onzième jour, la crypte s\'ouvre');
   const s3 = new Sim({ seed: 18, players: [{ id: 0, name: 'A' }], mode: 'sansfin' });
   s3.clock = { day: 10, phase: 'nuit', t: nightLen(10) - 0.01 }; s3.village.hp = 1e9; s3.players[0].hp = 1e9; s3.step();
   ok(!s3.over && s3.clock.day === 11, 'en mode sans fin, on continue');
@@ -497,6 +497,76 @@ section('sièges, dix nuits, sauvegarde');
   // le moulin donne des vivres à l'aube
   const n0 = s5.stock.nourriture; s5.clock = { day: 4, phase: 'nuit', t: nightLen(4) - 0.01 }; s5.village.hp = 1e9; s5.players[0].hp = 1e9; s5.step();
   ok(s5.stock.nourriture === n0 + 4, 'le moulin donne des vivres à chaque aube');
+}
+
+// ---------------------------------------------------------------- la crypte et le Roi-Squelette
+{
+  const run = (sim, sec, f) => { for (let i = 0; i < sec / DT; i++) { if (f) f(); sim.step(); } };
+  const sim = new Sim({ seed: 21, players: [{ id: 0, name: 'A' }, { id: 1, name: 'B', job: 'chevalier' }] });
+  const [A, B] = sim.players; const K = sim.map.crypt;
+  sim.openCrypt();
+  const t0 = sim.clock.t; run(sim, 2);
+  ok(sim.clock.t === t0, 'le temps s\'arrête tant que la crypte est ouverte');
+  sim.teleport(A, sim.map.cryptDoor.x, sim.map.cryptDoor.z + 1, 0);
+  ok(sim.prompt(A.id).text.includes('crypte'), 'devant le donjon : « Descendre dans la crypte »');
+  let c = 0; sim.setInput(A.id, { ...emptyInput(), uc: ++c }); sim.step();
+  ok(K.inside(A.x, A.z) && Math.abs(A.y - K.y) < 0.01, 'E devant la porte fait descendre dans la crypte');
+  { const gx = (K.gate.x0 + K.gate.x1) / 2, gz = (K.gate.z0 + K.gate.z1) / 2; const [, z] = sim.map.collide(gx, gz, 0.4); ok(Math.abs(z - gz) > 0.3, 'la herse est fermée'); }
+  // un seul levier ne suffit pas à deux
+  const [L0, L1] = K.levers;
+  sim.teleport(A, L0.x, L0.z, 0);
+  run(sim, 2, () => sim.setInput(A.id, { ...emptyInput(), hold: true, uc: c }));
+  ok(!sim.crypt.gate, 'un seul levier tenu : la herse reste fermée');
+  sim.teleport(B, L1.x, L1.z, 0);
+  run(sim, LEVER_T + 0.3, () => { sim.setInput(A.id, { ...emptyInput(), hold: true, uc: c }); sim.setInput(B.id, { ...emptyInput(), hold: true }); });
+  ok(sim.crypt.gate && K.gate.open, 'les deux leviers tenus ensemble ouvrent la herse');
+  ok(sim.takeEvents().some((e) => e.t === 'gate'), 'la herse annonce son ouverture');
+  // le couloir de brume
+  const bz = K.halls.brume; sim.teleport(A, (bz.x0 + bz.x1) / 2, (bz.z0 + bz.z1) / 2, 0); sim.step();
+  ok(sim.crypt.brume && sim.foes.filter((f) => f.state !== 'dead').length >= 3, 'le couloir de brume réveille des squelettes');
+  ok(sim.chooseTarget(sim.foes[0]).type === 'p', 'dans la crypte, ils visent les joueurs');
+  for (const f of sim.foes) sim.killFoe(f, A);
+  // la salle du trône
+  const tz = K.halls.trone; sim.teleport(A, K.king.x, tz.z0 + 1, 0); sim.step();
+  const king = sim.foe(sim.crypt.king);
+  ok(king && king.kind === 'king' && king.maxHp > FOES.knight.hp * 2, 'le Roi-Squelette se lève dans la salle du trône');
+  run(sim, 10); ok(sim.takeEvents().some((e) => e.t === 'summon'), 'il appelle des squelettes');
+  king.hp = king.maxHp * 0.5; sim.step(); ok(sim.crypt.phase === 2, 'sous 60 % : deuxième phase');
+  king.hp = king.maxHp * 0.25; sim.step();
+  ok(sim.crypt.phase === 3 && king.enrage && K.torches.filter((t) => t.throne).every((t) => !sim.torchLit(t.id)), 'sous 30 % : il souffle les torches du trône et devient furieux');
+  const T = K.torches.find((t) => t.throne); sim.teleport(B, T.x, T.z + 1.2, 0);
+  ok((sim.prompt(B.id) || {text:""}).text.includes('torche') || sim.foeNear(B.x, B.z, 3), 'on peut rallumer une torche');
+  // instantané : la herse reste ouverte chez une copie
+  const copy = new Sim({ seed: 21, players: [] }); copy.restore(JSON.parse(JSON.stringify(sim.snapshot())));
+  ok(copy.crypt.phase === 3 && copy.map.crypt.gate.open, 'l\'instantané garde la crypte (phase, herse)');
+  { const g = new Sim({ seed: 21, players: [] }); applyWorld(g, JSON.parse(JSON.stringify(encodeWorld(sim)))); applyState(g, JSON.parse(JSON.stringify(encodeState(sim))), -1);
+    const gk = g.foe(sim.crypt.king);
+    ok(g.crypt.open && g.crypt.gate && g.map.crypt.gate.open && g.crypt.phase === 3 && gk && gk.kind === 'king' && gk.maxHp === king.maxHp && gk.enrage, 'l\'invité reçoit la crypte : herse, phase, Roi furieux');
+    ok(!g.torchLit(K.torches.find((t) => t.throne).id), 'et les torches éteintes'); }
+  king.hp = 1; sim.teleport(A, king.x, king.z - 1.5, 0); A.yaw = 0; king.stun = 5;
+  sim.killFoe(king, A);
+  ok(sim.over && sim.over.reason === 'victoire' && sim.won, 'le Roi tombe : la malédiction est brisée');
+}
+{
+  const sim = new Sim({ seed: 31, players: [], bots: 2 }); sim.openCrypt();
+  for (let i = 0; i < 40 / DT && !sim.crypt.gate; i++) sim.step();
+  ok(sim.crypt.gate, 'deux bots descendent et tiennent chacun un levier');
+}
+// ---------------------------------------------------------------- les capacités (F)
+{
+  const sim = new Sim({ seed: 22, players: [{ id: 0, name: 'A', job: 'bucheron' }, { id: 1, name: 'B', job: 'pretre' }, { id: 2, name: 'C', job: 'forgeronne' }, { id: 3, name: 'D', job: 'chasseuse' }, { id: 4, name: 'E', job: 'chevalier' }] });
+  const [A, B, Cc, D, E] = sim.players;
+  const fire = (p) => { const c = (sim.lastC.get(p.id) || { ac: 0 }).ac || 0; sim.setInput(p.id, { ...emptyInput(), ac: c + 1 }); for (let i = 0; i < 1 / DT; i++) sim.step(); sim.setInput(p.id, { ...emptyInput(), ac: c + 1 }); };
+  const f = sim.spawnFoeAt('warrior', A.x, A.z + 2); f.state = 'walk'; A.yaw = 0;
+  const h = f.hp; fire(A);
+  ok(f.hp < h && A.cd > 0, 'Grand coup du bûcheron : dégâts et temps de recharge');
+  const cd = A.cd; fire(A); ok(A.cd < cd, 'pas de second Grand coup pendant la recharge');
+  A.hp = 30; B.x = A.x + 2; B.z = A.z; fire(B); ok(A.hp >= 60, 'la Prière du prêtre soigne autour de lui');
+  const nb = sim.bars.length; fire(Cc); ok(sim.bars.length === nb + 1, 'la Forgeronne dresse une barricade');
+  sim.clock.phase = 'nuit'; D.yaw = 0; fire(D); const fl = sim.flares[0];
+  ok(fl && sim.lit(fl.x, fl.z), 'la fusée de la chasseuse éclaire');
+  const g = sim.spawnFoeAt('minion', E.x + 3, E.z); g.state = 'walk'; fire(E);
+  ok(E.guardT > 0 && sim.chooseTarget(g).id === E.id, 'le Rempart du chevalier attire les squelettes');
 }
 
 console.log(fails ? `\n${fails} échec(s) sur ${n}` : `\n${n} vérifications, tout est bon`);

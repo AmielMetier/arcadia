@@ -1,5 +1,5 @@
 // Fief Maudit : clavier (touches lues par position : ZQSD en AZERTY = WASD en QWERTY), souris capturée pour la caméra,
-// molette pour le zoom, manette et tactile. Les appuis sont comptés (fc : frapper, uc : utiliser) pour qu'un appui bref
+// molette pour le zoom, manette et tactile. Les appuis sont comptés (fc : frapper, uc : utiliser, ac : capacité du métier) pour qu'un appui bref
 // ne soit jamais perdu. sample() rend la direction voulue dans le repère de la caméra ; app.js la tourne dans le monde.
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 export const PITCH = [-0.25, 1.15];
@@ -8,7 +8,7 @@ export class Input {
   constructor(surface, hooks = {}) {
     this.surface = surface; this.h = hooks;
     this.keys = new Set(); this.off = [];
-    this.c = { fc: 0, uc: 0 };
+    this.c = { fc: 0, uc: 0, ac: 0 };
     this.yaw = 0; this.pitch = 0.32; this.zoom = 6.2; this.sens = 1;
     this.locked = false; this.free = false; this.touch = { move: null, look: null }; this.padPrev = []; this.btn = { jump: false, walk: false, use: false };
     const listen = (t, type, fn, o) => { t.addEventListener(type, fn, o); this.off.push(() => t.removeEventListener(type, fn, o)); };
@@ -24,7 +24,7 @@ export class Input {
       if (e.repeat) return;
       this.keys.add(k);
       if (k === 'KeyE') this.c.uc++;
-      else if (k === 'KeyF') this.c.fc++;
+      else if (k === 'KeyF') this.c.ac++;
       else if (k === 'Escape' || k === 'KeyP') hooks.menu && hooks.menu();
       else if (k === 'KeyM') hooks.mute && hooks.mute();
     });
@@ -66,7 +66,7 @@ export class Input {
       const a = b.dataset.a;
       this.listen(b, 'pointerdown', (e) => {
         e.preventDefault(); e.stopPropagation(); document.body.classList.add('touch'); this.free = true;
-        if (a === 'fire') this.c.fc++; else if (a === 'use') { this.c.uc++; this.btn.use = true; } else if (a === 'jump') this.btn.jump = true;
+        if (a === 'fire') this.c.fc++; else if (a === 'ability') this.c.ac++; else if (a === 'use') { this.c.uc++; this.btn.use = true; } else if (a === 'jump') this.btn.jump = true;
         b.classList.add('on');
       });
       const up = () => { if (a === 'jump') this.btn.jump = false; if (a === 'use') this.btn.use = false; b.classList.remove('on'); };
@@ -80,8 +80,9 @@ export class Input {
     const dz = (v) => (Math.abs(v) < 0.18 ? 0 : v);
     const lx = dz(gp.axes[0] || 0), ly = dz(gp.axes[1] || 0), rx = dz(gp.axes[2] || 0), ry = dz(gp.axes[3] || 0);
     this.yaw -= rx * dt * 2.6 * this.sens; this.pitch = clamp(this.pitch + ry * dt * 1.6 * this.sens, PITCH[0], PITCH[1]);
-    // RT : frapper · A : sauter · X : utiliser · LB : marcher · Start : menu
+    // RT : frapper · Y : capacité · A : sauter · X : utiliser · LB : marcher · Start : menu
     if (edge(7)) this.c.fc++;
+    if (edge(3)) this.c.ac++;
     if (edge(2)) this.c.uc++;
     if (edge(9) && this.h.menu) this.h.menu();
     const out = { lx, ly, jump: b(0), walk: b(4), use: b(2) };

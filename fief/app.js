@@ -16,7 +16,7 @@ const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const fmt = (s) => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 const PALETTE = ['#e0a040', '#6aa0e0', '#e06a8a', '#7ac46a', '#b48ae0', '#e0d06a', '#6ad6d0', '#e08a5a'];
 
-const S = { mode: 'expedition', diff: 'normale', role: 'solo', me: 0, name: 'Toi', job: 'bucheron', paused: true, started: false, acc: 0, last: 0, t: 0, goal: -1, stepDist: 0, bots: 1, ended: false, wallHitT: 0,
+const S = { runId: Date.now().toString(36), mode: 'expedition', diff: 'normale', role: 'solo', me: 0, name: 'Toi', job: 'bucheron', paused: true, started: false, acc: 0, last: 0, t: 0, goal: -1, stepDist: 0, bots: 1, ended: false, wallHitT: 0,
   tick: 0, netEv: [], worldDirty: true, lastWorld: -99, lastFull: -99, full: null, hostId: null, gotState: false, shownFell: new Set() };
 const sfx = new Sfx();
 const scene = createScene($('stage'), { onLost: () => location.reload() });
@@ -30,9 +30,24 @@ const input = new Input(canvas, {
 });
 input.bindTouch(document.querySelector('.tbtns'));
 $('btnMenu').onclick = () => openMenu();
-$('btnMute').onclick = () => toggleMute();
-const toggleMute = () => { const m = sfx.toggleMute(); $('btnMute').classList.toggle('off', m); };
-$('btnMute').classList.toggle('off', sfx.muted);
+// le son, les graphismes et la souris : le panneau Réglages commun d'Arcadia ; M coupe ou remet le son
+const toggleMute = () => { sfx.start(); sfx.toggleMute(); };
+const QUALITY = [['bas', 'Basse'], ['moyen', 'Moyenne'], ['haut', 'Haute']];
+const SETTINGS = {
+  accent: '#e07a2e', hint: 'Touche <kbd>M</kbd> : couper ou remettre le son.',
+  test: () => { sfx.start(); sfx.play('hache', { vol: 0.8 }); },
+  sections: [
+    { title: 'Graphismes', items: [{ label: 'Qualité', options: QUALITY, get: () => scene.quality, set: (v) => scene.setQuality(v) }],
+      hint: 'Basse : moins d\'arbres au loin, pas d\'ombres, une seule nappe de brume.' },
+    { title: 'Caméra', items: [{ label: 'Sensibilité de la souris', range: [0.3, 3, 0.1], format: (v) => v.toFixed(1), get: () => input.sens, set: (v) => input.setSens(v) }] },
+    { title: 'Commandes', items: [{ keys: [
+      ['Se déplacer', '<kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd>', 'stick gauche'], ['Frapper', '<kbd>Clic</kbd>', 'RT'],
+      ['Ramasser, ranger, porter · tenir pour relever', '<kbd>E</kbd>', 'X'], ['Capacité du métier', '<kbd>F</kbd>', 'Y'],
+      ['Sauter · marcher', '<kbd>Espace</kbd> · <kbd>Ctrl</kbd>', 'A · LB'], ['Menu', '<kbd>Échap</kbd>', 'Start'],
+    ] }] },
+  ],
+};
+if (window.DDVolume) window.DDVolume.panel($('btnSet'), SETTINGS);
 
 const seed = +(QS.get('seed') || 0) || 1;
 let sim = null, startSnap = null;
@@ -83,7 +98,7 @@ function colorOf(id) { const i = (H.players || []).findIndex((p) => p.id === id)
 
 // le choix du métier (écran d'accueil et menu)
 function jobPicker() {
-  return `<div class="jobs">${Object.entries(JOBS).map(([k, j]) => `<button class="job${k === S.job ? ' on' : ''}" data-job="${k}"><i class="jico ${k}"></i><b>${j.name}</b><span>${j.perk}</span></button>`).join('')}</div>`;
+  return `<div class="jobs">${Object.entries(JOBS).map(([k, j]) => `<button class="job${k === S.job ? ' on' : ''}" data-job="${k}"><i class="jico ${k}"></i><b>${j.name}</b><span>${j.perk}</span><em><kbd>F</kbd> ${j.abName} : ${j.abText}</em></button>`).join('')}</div>`;
 }
 function bindJobs(after) {
   for (const b of document.querySelectorAll('.job')) b.onclick = () => {
@@ -103,7 +118,8 @@ function intro() {
   const guest = S.role === 'guest';
   const others = (H.players || []).filter((p) => p.id !== S.me).map((p) => esc(p.name));
   const mates = S.bots ? ` ${S.bots > 1 ? 'Deux chevaliers' : 'Un chevalier'} IA ${S.bots > 1 ? 'se battent' : 'se bat'} à vos côtés.` : '';
-  showScreen(`<div class="sheet wide">
+  showScreen(`<div class="titre"><div class="crest"><svg viewBox="0 0 64 72" aria-hidden="true"><path d="M32 3 58 12v22c0 17-11 28-26 35C17 62 6 51 6 34V12Z" fill="#3a2614" stroke="#d9b36a" stroke-width="3"/><path d="M20 46 32 20l12 26M24 38h16" fill="none" stroke="#e8c27a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><h1>Fief Maudit</h1><p>Dix nuits pour briser la malédiction</p></div>
+  <div class="sheet wide">
     <h2>${guest ? 'Rejoindre le village' : 'Jour 1 — Le bois'}</h2>
     <p class="sub">${others.length ? `Avec ${others.join(', ')}.` : 'La malédiction a vidé la vallée. Il ne reste que vous, un feu de camp et un village en ruine.'}${guest ? '' : mates}</p>
     <p>Le jour, abattez les arbres et rentrez le bois à l'entrepôt ; les chênes donnent des poutres qui se portent à deux. Avant la nuit, chargez les braseros : quand la brume monte, les morts sortent du sol, et seuls ceux qui tombent dans la lumière restent à terre.</p>
@@ -112,12 +128,14 @@ function intro() {
     <div class="keys">
       <span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> · <kbd>Clic</kbd></span><span>Se déplacer · frapper (arbre ou squelette)</span>
       <span><kbd>E</kbd></span><span>Ramasser, ranger, charger un brasero, prendre un bout de poutre · <b>tenir</b> pour relever un équipier</span>
+      <span><kbd>F</kbd></span><span>La capacité de ton métier (elle se recharge)</span>
       <span><kbd>Espace</kbd> · <kbd>Ctrl</kbd> · <kbd>Échap</kbd></span><span>Sauter · marcher · menu</span>
     </div>
     ${!guest && save ? `<p class="save">Une partie est en cours : <b>jour ${save.day}</b>, ${Object.values(save.build).filter((b) => b.state === 'debout').length} bâtiment(s) relevé(s), ${save.stock.bois} bûches et ${save.stock.poutre} poutres à l'entrepôt.</p>` : ''}
-    <p class="note">${sim.mode === 'expedition' ? 'Expédition : tenez dix nuits. Les nuits 5 et 10 sont des sièges.' : 'Sans fin : les nuits durcissent sans limite.'} · Difficulté ${S.diff === 'peste' ? 'Peste noire' : S.diff === 'paisible' ? 'Paisible' : 'Normale'} · La crypte arrive à l'étape suivante.</p>
+    <p class="note">${sim.mode === 'expedition' ? 'Expédition : tenez dix nuits (les nuits 5 et 10 sont des sièges), puis descendez affronter le Roi-Squelette.' : 'Sans fin : les nuits durcissent sans limite.'} · Difficulté ${S.diff === 'peste' ? 'Peste noire' : S.diff === 'paisible' ? 'Paisible' : 'Normale'}.</p>
     <div class="row">${!guest && save ? '<button class="btn" id="fresh">Nouvelle partie</button><button class="btn go" id="cont">Continuer</button>' : `<button class="btn go" id="go">${guest ? 'Rejoindre' : 'Prendre la hache'}</button>`}</div>
   </div>`);
+  $('screen').classList.add('title');
   bindJobs();
   if ($('go')) $('go').onclick = () => { startPlaying(); resume(); };
   if ($('cont')) $('cont').onclick = () => { sim.loadSave(save); startSnap = sim.snapshot(); S.worldDirty = true; setGoal(sim.goal); startPlaying(); resume(); };
@@ -153,7 +171,7 @@ function openMenu() {
   if ($('skip')) $('skip').onclick = () => { sim.skipToDusk(); resume(); };
   if ($('quit')) $('quit').onclick = () => H.exit();
 }
-function showScreen(html) { const s = $('screen'); s.innerHTML = html; s.hidden = false; }
+function showScreen(html) { const s = $('screen'); s.innerHTML = html; s.hidden = false; s.classList.remove('title'); }
 function resume() {
   $('screen').hidden = true; S.paused = false; $('lockHint').hidden = true;
   sfx.start();
@@ -167,15 +185,17 @@ function gameOver(reason) {
   S.ended = true; S.paused = true; input.unlock();
   if (reason === 'victoire') { victory(); return; }
   sfx.play('sol', { vol: 1, rate: 0.5 });
-  const why = reason === 'entrepot' ? 'Les morts ont enfoncé l\'entrepôt : le bois du village est perdu.' : 'Toute l\'équipe est à terre. Personne pour rallumer les braseros.';
+  const crypt = sim.crypt.open;
+  const why = reason === 'entrepot' ? 'Les morts ont enfoncé l\'entrepôt : le bois du village est perdu.' : crypt ? 'Toute l\'équipe est à terre dans la crypte. Le Roi-Squelette garde son trône.' : 'Toute l\'équipe est à terre. Personne pour rallumer les braseros.';
+  report(false);
   const host = S.role !== 'guest';
   showScreen(`<div class="sheet">
-    <h2>Le village est tombé</h2>
-    <p class="sub">Nuit ${sim.clock.day} · ${sim.stats.kills} squelette${sim.stats.kills > 1 ? 's' : ''} abattu${sim.stats.kills > 1 ? 's' : ''}</p>
+    <h2>${crypt ? 'La crypte vous a gardés' : 'Le village est tombé'}</h2>
+    <p class="sub">${crypt ? 'Sous le château' : 'Nuit ' + sim.clock.day} · ${sim.stats.kills} squelette${sim.stats.kills > 1 ? 's' : ''} abattu${sim.stats.kills > 1 ? 's' : ''}</p>
     <p>${why}</p>
     ${host ? `<div class="row">
       <button class="btn" id="restart">Recommencer du début</button>
-      ${sim.duskSnap ? '<button class="btn go" id="retry">Rejouer la nuit</button>' : ''}
+      ${crypt && sim.cryptSnap ? '<button class="btn go" id="retry">Retenter la crypte</button>' : sim.duskSnap ? '<button class="btn go" id="retry">Rejouer la nuit</button>' : ''}
     </div>` : '<p class="note">L\'hôte choisit : rejouer la nuit ou recommencer du début.</p>'}
   </div>`);
   if (!host) return;
@@ -187,10 +207,10 @@ function gameOver(reason) {
     sim.players = sim.players.filter((p) => now.some((q) => q.id === p.id));
     for (const q of now) if (!sim.player(q.id)) sim.addPlayer(q);
     scene.actors.reset();
-    S.ended = false; S.goal = -1; setGoal(sim.goal); lastHud = ''; S.worldDirty = true; S.lastFull = -99;
+    S.ended = false; S.reported = false; S.goal = -1; setGoal(sim.goal); lastHud = ''; S.worldDirty = true; S.lastFull = -99;
     resume();
   };
-  if ($('retry')) $('retry').onclick = () => back(sim.duskSnap);
+  if ($('retry')) $('retry').onclick = () => { const cs = crypt && sim.cryptSnap; back(cs || sim.duskSnap); if (cs) sim.cryptSnap = cs; };
   $('restart').onclick = () => { clearSave(); back(startSnap); };
 }
 
@@ -198,15 +218,32 @@ function victory() {
   if (S.role !== 'guest') clearSave();
   sfx.play('aube', { vol: 1 }); sfx.play('cloche', { vol: 0.9, delay: 0.4 });
   const built = Object.entries(sim.build).filter(([, b]) => b.state === 'debout').length;
+  report(true);
+  const best = sim.players.slice().sort((a, b) => b.kills - a.kills);
+  const rows = best.map((p) => `<li><i style="background:${p.color}"></i>${esc(p.name)}${p.bot ? ' (IA)' : ''} · ${JOBS[p.job].name}<b>${p.kills} squelette${p.kills > 1 ? 's' : ''}</b></li>`).join('');
   showScreen(`<div class="sheet win">
-    <h2>Dix nuits tenues</h2>
-    <p class="sub">Le village tient debout. La brume recule jusqu'au château.</p>
-    <p>${sim.stats.kills} squelettes abattus · ${built} bâtiment${built > 1 ? 's' : ''} relevé${built > 1 ? 's' : ''} · ${sim.stock.bois} bûches et ${sim.stock.nourriture} vivres de reste.</p>
-    <p>Sous le château, la porte de la crypte vient de s'ouvrir. Le Roi-Squelette attendra la prochaine version.</p>
+    <h2>Le Roi-Squelette est tombé</h2>
+    <p class="sub">La malédiction est brisée. Au-dessus de la vallée, la brume se déchire.</p>
+    <p>${sim.clock.day - 1} nuits tenues · ${sim.stats.kills} squelettes abattus · ${built} bâtiment${built > 1 ? 's' : ''} relevé${built > 1 ? 's' : ''}.</p>
+    <ul class="team score">${rows}</ul>
     <div class="row">${H.embedded ? '<button class="btn" id="quit">Retour au salon</button>' : ''}${S.role !== 'guest' ? '<button class="btn go" id="again">Nouvelle expédition</button>' : ''}</div>
   </div>`);
   if ($('quit')) $('quit').onclick = () => H.exit();
   if ($('again')) $('again').onclick = () => location.reload();
+}
+
+// le classement entre potes du salon : une ligne par partie, envoyée par l'hôte
+function report(won) {
+  if (S.reported || !H.embedded || S.role === 'guest') return;
+  S.reported = true;
+  const nights = Math.max(0, sim.clock.day - 1);
+  const diff = S.diff === 'peste' ? 'Peste noire' : S.diff === 'paisible' ? 'Paisible' : 'Normale';
+  const mode = sim.mode === 'sansfin' ? `Sans fin · ${nights} nuit${nights > 1 ? 's' : ''}` : won ? 'Roi-Squelette vaincu' : sim.crypt.open ? 'Expédition · tombés dans la crypte' : `Expédition · nuit ${sim.clock.day}`;
+  const ranked = sim.players.slice().sort((a, b) => b.kills - a.kills);
+  H.report({
+    id: `fief-${seed}-${S.runId}-${sim.clock.day}`, mode: `${mode} (${diff})`,
+    players: ranked.map((p, k) => ({ id: p.bot ? null : p.id, name: p.name, color: p.color, bot: !!p.bot, rank: k + 1, score: nights * 10 + p.kills + (won ? 100 : 0) })),
+  });
 }
 
 // ------------------------------------------------------------------ réseau
@@ -274,9 +311,9 @@ function hostNet() {
 function view() { return { sim, me: S.me, camYaw: input.yaw, camPitch: input.pitch, zoom: input.zoom }; }
 function localInput() {
   const k = input.sample(DT);
-  if (S.paused) return { ...emptyInput(), fc: k.fc, uc: k.uc };
+  if (S.paused) return { ...emptyInput(), fc: k.fc, uc: k.uc, ac: k.ac };
   const Y = input.yaw, fx = -Math.sin(Y), fz = -Math.cos(Y), rx = Math.cos(Y), rz = -Math.sin(Y);
-  return { ...emptyInput(), wx: fx * k.my + rx * k.mx, wz: fz * k.my + rz * k.mx, walk: k.walk, jump: k.jump, hold: k.hold, fc: k.fc, uc: k.uc };
+  return { ...emptyInput(), wx: fx * k.my + rx * k.mx, wz: fz * k.my + rz * k.mx, walk: k.walk, jump: k.jump, hold: k.hold, fc: k.fc, uc: k.uc, ac: k.ac };
 }
 function stepOnce() {
   if (S.role === 'guest') {
@@ -309,6 +346,14 @@ function frame(now) {
   S.t += dt;
   scene.update(view(), S.paused && !multi() ? 0 : dt, S.t);
   hud(dt);
+  if (sim) music();
+}
+// la musique suit la partie : le jour, la nuit, la crypte, le Roi
+function music() {
+  const p = sim.player(S.me), under = !!(p && sim.inCrypt(p.x, p.z));
+  const king = sim.crypt.king !== null && sim.foe(sim.crypt.king);
+  sfx.under(under);
+  sfx.setMood(S.ended ? null : under ? (king && king.state !== 'dead' ? 'boss' : 'crypt') : sim.night || sim.foes.some((f) => f.kind === 'knight' && f.state !== 'dead') ? 'night' : 'day');
 }
 
 // ------------------------------------------------------------------ événements : sons, arbres, interface
@@ -320,6 +365,8 @@ function fellTree(id, dir, quiet) {
 }
 function banner(html, cls = '') { const el = $('banner'); el.innerHTML = html; el.className = 'banner ' + cls; el.hidden = false; clearTimeout(banner.t); banner.t = setTimeout(() => { el.hidden = true; }, 3300); }
 function onEvent(e) {
+  scene.fxEvent(e, sim);
+  if (e.t === 'summon' && e.foe !== undefined && scene.actors) scene.actors.cast(e.foe);
   const p = e.pid !== undefined && e.pid !== null ? sim.player(e.pid) : null;
   const d = p ? distTo(p.x, p.z) : 0;
   const fd = e.x !== undefined ? distTo(e.x, e.z) : d;
@@ -371,6 +418,18 @@ function onEvent(e) {
     case 'dead': if (mine) banner('Tu es tombé<small>Tu reviendras au feu de camp à l\'aube</small>', 'night'); break;
     case 'brazierHit': sfx.play('bouclier', { vol: 0.5, dist: distTo(sim.map.braziers[e.brazier].x, sim.map.braziers[e.brazier].z), rate: 0.7 }); break;
     case 'wallHit': S.wallHitT = 0.4; sfx.play('hache', { vol: 0.5, dist: distTo(sim.map.warehouse.x, sim.map.warehouse.z), rate: 0.6 }); break;
+    case 'crypt': banner('Dix nuits tenues !<small>Sous le château, la porte de la crypte s\'est ouverte</small>'); sfx.play('cloche', { vol: 1, rate: 0.6 }); sfx.night(false); break;
+    case 'descend': if (mine) { sfx.play('sol', { vol: 0.6, rate: 0.6 }); banner('La crypte<small>Deux leviers ouvrent la herse : il faut les tenir ensemble</small>', 'night'); } break;
+    case 'gate': sfx.play('craque', { vol: 1, rate: 0.5 }); sfx.play('bouclier', { vol: 0.8, rate: 0.5, delay: 0.3 }); banner('La herse se lève<small>Au-delà, le couloir de brume</small>', 'night'); break;
+    case 'brumeCrypt': banner('Le couloir de brume<small>Les morts s\'y relèvent : passez vite, vers la lumière</small>', 'night'); break;
+    case 'king': sfx.play('cloche', { vol: 1, rate: 0.5 }); banner('Le Roi-Squelette<small>Il se lève de son trône</small>', 'night'); break;
+    case 'kingPhase': sfx.play('cloche', { vol: 0.8, rate: 0.45 }); banner(e.phase === 3 ? 'Le Roi est furieux<small>Il a soufflé les torches : rallumez-les (E)</small>' : 'Le Roi appelle ses morts<small>Ils viennent plus vite</small>', 'night'); break;
+    case 'summon': sfx.play('terre', { vol: 1, dist: fd, rate: 0.6 }); break;
+    case 'relight': sfx.play('feu', { vol: 0.9, dist: d }); if (mine) toast('La torche reprend'); break;
+    case 'ability': if (mine) S.abFlash = 0.4; sfx.play(e.ab === 'rempart' ? 'bouclier' : e.ab === 'barricade' ? 'tronc' : e.ab === 'priere' ? 'cloche' : e.ab === 'fusee' ? 'feu' : 'souffle', { vol: e.ab === 'priere' ? 0.5 : 0.9, dist: d, rate: e.ab === 'priere' ? 1.6 : 1 }); break;
+    case 'abilityHit': if (e.ab === 'grandcoup') sfx.play('sol', { vol: 0.8, dist: fd, rate: 1.2 }); else if (e.ab === 'priere' && mine) toast('Prière : l\'équipe autour reprend des forces'); break;
+    case 'barHit': sfx.play('hache', { vol: 0.5, dist: fd, rate: 0.7 }); break;
+    case 'kingDown': sfx.play('os', { vol: 1, rate: 0.5 }); sfx.play('craque', { vol: 1, rate: 0.4, delay: 0.2 }); break;
     case 'over': gameOver(e.reason); break;
   }
 }
@@ -397,21 +456,26 @@ function hud(dt) {
   S.wallHitT = Math.max(0, S.wallHitT - dt);
   const c = sim.clock, night = c.phase === 'nuit';
   const pr = p ? sim.prompt(S.me) : null;
-  const key = [sim.stock.bois, sim.stock.poutre, p && p.carry, pr && pr.text, pr && Math.round((pr.hp || 0) * 50), sim.goal, c.day, night, Math.ceil(sim.timeLeft), Math.round(p ? p.hp : 0), p && p.maxHp, p && p.down, p && Math.round(p.revive * 10), p && Math.round(p.downT), p && p.dead, Math.round(sim.village.hp), S.wallHitT > 0, sim.stock.nourriture, p && Math.round(p.food), p && p.cold, sim.foes.map((f) => (f.kind === 'knight' ? Math.round(f.hp) : '')).join('')].join('|');
+  const key = [sim.stock.bois, sim.stock.poutre, p && p.carry, pr && pr.text, pr && Math.round((pr.hp || 0) * 50), sim.goal, c.day, night, Math.ceil(sim.timeLeft), Math.round(p ? p.hp : 0), p && p.maxHp, p && p.down, p && Math.round(p.revive * 10), p && Math.round(p.downT), p && p.dead, Math.round(sim.village.hp), S.wallHitT > 0, sim.stock.nourriture, p && Math.round(p.food), p && p.cold, sim.foes.map((f) => (f.kind === 'knight' || f.kind === 'king' ? Math.round(f.hp) : '')).join(''), p && Math.ceil(p.cd), p && p.job, sim.crypt.open, sim.crypt.phase].join('|');
   if (key === lastHud) return;
   lastHud = key;
-  $('day').textContent = `${night ? 'Nuit' : 'Jour'} ${c.day}${MODES[sim.mode] ? '/' + MODES[sim.mode] : ''}`;
-  $('clock').textContent = night ? `aube dans ${fmt(sim.timeLeft)}` : `nuit dans ${fmt(sim.timeLeft)}`;
-  $('dayChip').classList.toggle('night', night);
-  $('dayIco').className = 'ico ' + (night ? 'moon' : 'sun');
+  const C = sim.crypt.open;
+  $('day').textContent = C ? 'La crypte' : `${night ? 'Nuit' : 'Jour'} ${c.day}${MODES[sim.mode] ? '/' + MODES[sim.mode] : ''}`;
+  $('clock').textContent = C ? 'le temps s\'est arrêté' : night ? `aube dans ${fmt(sim.timeLeft)}` : `nuit dans ${fmt(sim.timeLeft)}`;
+  $('dayChip').classList.toggle('night', night || C);
+  $('dayIco').className = 'ico ' + (night || C ? 'moon' : 'sun');
   $('sBois').querySelector('b').textContent = sim.stock.bois;
   $('sPoutre').querySelector('b').textContent = sim.stock.poutre;
   $('sPoutre').classList.toggle('off', !sim.stock.poutre);
   $('sVivres').querySelector('b').textContent = sim.stock.nourriture;
   $('sVivres').classList.toggle('off', !sim.stock.nourriture);
-  const boss = sim.foes.find((f) => f.kind === 'knight' && f.state !== 'dead');
+  const boss = sim.foes.find((f) => f.kind === 'king' && f.state !== 'dead') || sim.foes.find((f) => f.kind === 'knight' && f.state !== 'dead');
   $('bossBar').hidden = !boss;
-  if (boss) $('bossBar').querySelector('b').style.width = (boss.hp / FOES.knight.hp * 100) + '%';
+  if (boss) {
+    $('bossBar').querySelector('small').textContent = boss.kind === 'king' ? `Roi-Squelette${sim.crypt.phase > 1 ? ' · phase ' + sim.crypt.phase : ''}` : 'Chevalier noir';
+    $('bossBar').classList.toggle('king', boss.kind === 'king');
+    $('bossBar').querySelector('b').style.width = Math.max(0, boss.hp / (boss.maxHp || FOES[boss.kind].hp) * 100) + '%';
+  }
   if (GOALS[S.goal] && GOALS[S.goal].id === 'ten') $('goalTxt').textContent = `${GOALS[S.goal].text} (${Math.min(10, sim.stock.bois)}/10)`;
   if (p) {
     $('hpBar').firstElementChild.style.width = (p.hp / p.maxHp * 100) + '%';
@@ -436,6 +500,13 @@ function hud(dt) {
     $('pKey').textContent = pr.key; $('pKey').hidden = !pr.key; $('pTxt').textContent = pr.text;
     $('pHp').hidden = pr.hp === undefined;
     if (pr.hp !== undefined) $('pHp').firstElementChild.style.width = Math.round(Math.min(1, pr.hp) * 100) + '%';
+  }
+  if (p) {
+    const J = JOBS[p.job], ready = p.cd <= 0;
+    $('abName').textContent = J.abName; $('abil').classList.toggle('ready', ready);
+    $('abCd').textContent = ready ? '' : Math.ceil(p.cd);
+    $('abil').style.setProperty('--cd', ready ? 0 : p.cd / J.cd);
+    $('tAbility').classList.toggle('cool', !ready);
   }
   $('carry').hidden = !(p && p.carry);
   if (p && p.carry) $('carry').lastChild.textContent = p.carry === 'poutre' ? 'Tu portes une poutre' : p.carry === 'vivres' ? 'Tu portes un panier de baies' : 'Tu portes une bûche';

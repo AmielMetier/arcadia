@@ -7,6 +7,7 @@
 // Le pas est fixe (DT). Entrée d'un joueur : { wx, wz } (direction voulue dans le monde, longueur ≤ 1), walk, jump,
 // hold (E tenu) et des compteurs d'appuis fc (frapper) et uc (utiliser) : un appui bref n'est jamais perdu.
 import { createValley, TREE_HP, LIGHT_R, FIRE_LIGHT_R, rectOf, doorPoint } from './map.js';
+import { TORCH_R, inZone } from './crypt.js';
 import { createNav } from './nav.js';
 import { makeRng } from './rng.js';
 import { botInput } from './bots.js';
@@ -25,6 +26,8 @@ export const ACT = {
   build: { dur: 0.9, hit: 0.45 },     // coup de marteau sur un chantier
   gather: { dur: 0.9, at: 0.55 },     // cueillir des baies
   eat: { dur: 1.0, at: 0.6 },         // manger à l'entrepôt
+  relight: { dur: 1.1, at: 0.8 },     // rallumer une torche de la crypte
+  ability: { dur: 0.8, hit: 0.4 },    // la capacité du métier (F)
 };
 export const REACH = { chop: 1.6, pick: 1.9, store: 3.2, feed: 2.3, strike: 2.4, revive: 1.9, build: 2.4, gather: 1.9, site: 3.2 };
 export const P_R = 0.42;
@@ -36,6 +39,8 @@ export const FOES = {
   warrior: { hp: 100, speed: 2.2, dmg: 13, reach: 1.45, dur: 1.25, hit: 0.6, block: true },
   // le chevalier noir des nuits de siège : il enfonce l'entrepôt
   knight: { hp: 420, speed: 2.0, dmg: 24, reach: 2.0, dur: 1.5, hit: 0.75, wall: 3, boss: true },
+  // le Roi-Squelette, au fond de la crypte (sa vie suit la taille de l'équipe)
+  king: { hp: 1400, speed: 2.3, dmg: 22, reach: 2.3, dur: 1.35, hit: 0.65, boss: true, king: true },
 };
 export const RISE = { delay: 6, dur: 2.3, max: 2, awaken: 2.4, crumble: 9 };
 export const WAREHOUSE_HP = 600;
@@ -59,11 +64,11 @@ export const siegeNight = (n) => n % 5 === 0;
 export const nightLen = (n) => (siegeNight(n) ? 200 : CYCLE.night);
 // les métiers : chacun son modèle (vue), sa vie, ses coups et un talent
 export const JOBS = {
-  bucheron: { name: 'Bûcheron', hp: 100, dmg: 30, chop: 1.34, build: 1.2, beamAlone: true, perk: 'Abat un arbre en 3 coups, porte une poutre seul' },
-  chevalier: { name: 'Chevalier', hp: 130, dmg: 34, armor: 0.75, perk: '+30 % de vie, encaisse un quart des coups en moins' },
-  chasseuse: { name: 'Chasseuse', hp: 90, dmg: 26, speed: 1.12, reach: 0.5, perk: 'Court plus vite, frappe de plus loin' },
-  pretre: { name: 'Prêtre', hp: 95, dmg: 22, aura: 2.5, revive: 2, perk: 'Soigne les équipiers autour de lui, relève deux fois plus vite' },
-  forgeronne: { name: 'Forgeronne', hp: 105, dmg: 28, feed: 1.5, repair: 60, build: 2, perk: 'Construit deux fois plus vite, répare l\'entrepôt, ses bûches brûlent plus longtemps' },
+  bucheron: { name: 'Bûcheron', hp: 100, dmg: 30, chop: 1.34, build: 1.2, beamAlone: true, ab: 'grandcoup', abName: 'Grand coup', cd: 18, abText: 'un coup circulaire qui repousse et sonne', perk: 'Abat un arbre en 3 coups, porte une poutre seul' },
+  chevalier: { name: 'Chevalier', hp: 130, dmg: 34, armor: 0.75, ab: 'rempart', abName: 'Rempart', cd: 25, abText: 'attire les morts sur lui et encaisse moitié moins', perk: '+30 % de vie, encaisse un quart des coups en moins' },
+  chasseuse: { name: 'Chasseuse', hp: 90, dmg: 26, speed: 1.12, reach: 0.5, ab: 'fusee', abName: 'Fusée', cd: 22, abText: 'une fusée qui éclaire au loin : les morts y restent à terre', perk: 'Court plus vite, frappe de plus loin' },
+  pretre: { name: 'Prêtre', hp: 95, dmg: 22, aura: 2.5, revive: 2, ab: 'priere', abName: 'Prière', cd: 28, abText: 'soigne tout le monde autour, aide à relever', perk: 'Soigne les équipiers autour de lui, relève deux fois plus vite' },
+  forgeronne: { name: 'Forgeronne', hp: 105, dmg: 28, feed: 1.5, repair: 60, build: 2, ab: 'barricade', abName: 'Barricade', cd: 25, abText: 'une barricade que les morts doivent casser', perk: 'Construit deux fois plus vite, répare l\'entrepôt, ses bûches brûlent plus longtemps' },
 };
 export const jobOf = (p) => JOBS[p.job] || JOBS.bucheron;
 export const BEAM = { len: 3.4, speed: 2.3, alone: 1.9, grab: 1.5, store: 4.4 };
@@ -80,10 +85,14 @@ export const GOALS = [
   { id: 'night', text: 'Tiens jusqu\'à l\'aube', hint: 'Garde les braseros allumés : dans leur lumière, les morts ne se relèvent pas' },
   { id: 'build', text: 'Relève un bâtiment du village', hint: 'E devant une ruine : du bois et des poutres de l\'entrepôt, puis des coups de marteau (clic)' },
   { id: 'free', text: 'Tenez dix nuits', hint: 'Nuits 5 et 10 : siège du chevalier noir. Pensez aux vivres : E devant l\'entrepôt pour manger' },
+  { id: 'crypt', text: 'Descendez dans la crypte', hint: 'Au nord, sous le château : E devant la porte du donjon. Le Roi-Squelette vous attend' },
+  { id: 'king', text: 'Abattez le Roi-Squelette', hint: 'Deux leviers ensemble lèvent la herse. Près des torches, on reprend des forces' },
 ];
 
 const doorOf = (M, id) => doorPoint(M.buildings.find((b) => b.id === id), 1.8);
-export const emptyInput = () => ({ wx: 0, wz: 0, walk: false, jump: false, hold: false, fc: 0, uc: 0 });
+export const emptyInput = () => ({ wx: 0, wz: 0, walk: false, jump: false, hold: false, fc: 0, uc: 0, ac: 0 });
+export const ABILITY = { grandcoup: { r: 3.2, dmg: 45, stun: 0.9 }, rempart: { dur: 6, r: 10, armor: 0.5 }, fusee: { dur: 14, r: 7.5, dist: 9 }, priere: { r: 9, heal: 35, revive: 1.8 }, barricade: { hp: 150, dur: 45, r: 0.8 } };
+export const LEVER_T = 1.2;
 const wrap = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
@@ -93,6 +102,8 @@ export class Sim {
     this.mode = MODES[mode] ? mode : 'sansfin'; this.diff = DIFF[diff] ? diff : 'normale';
     this.build = Object.fromEntries(Object.keys(BUILDS).map((id) => [id, { state: 'ruine', prog: 0 }]));
     this.berries = []; this.won = false;
+    this.crypt = { open: false, gate: false, leverT: 0, held: [false, false], brume: false, throne: false, king: null, phase: 0, summonAt: 0, torches: null };
+    this.flares = []; this.bars = []; this.nextBar = 1;
     this.map = createValley(seed);
     this.nav = createNav(this.map);
     this.rng = makeRng(seed * 31 + 5);
@@ -122,7 +133,7 @@ export class Sim {
     const job = JOBS[p.job] ? p.job : 'bucheron';
     return { id: p.id, name: p.name, job, color: p.color || '#e0a040', bot: !!p.bot, x, z, y: this.map.heightAt(x, z), vy: 0, ground: true,
       yaw: s.yaw, speed: 0, moving: 0, carry: null, beam: null, end: 0, act: null, actT: 0, target: null,
-      hp: JOBS[job].hp + this.hpBonus(), maxHp: JOBS[job].hp + this.hpBonus(), food: FOOD.max, cold: false, deadT: 0, down: false, downT: 0, dead: false, revive: 0, reviving: null, hurtT: 0, stored: 0, felled: 0, kills: 0, ai: null };
+      hp: JOBS[job].hp + this.hpBonus(), maxHp: JOBS[job].hp + this.hpBonus(), food: FOOD.max, cd: 0, guardT: 0, lever: -1, cold: false, deadT: 0, down: false, downT: 0, dead: false, revive: 0, reviving: null, hurtT: 0, stored: 0, felled: 0, kills: 0, ai: null };
   }
   // un joueur arrive en cours de partie (près du feu de camp)
   addPlayer(p) {
@@ -185,7 +196,11 @@ export class Sim {
     return false;
   }
   // un point est-il dans la lumière (feu de camp ou brasero allumé) ?
+  inCrypt(x, z) { return this.map.crypt.inside(x, z); }
+  torchLit(i) { return !this.crypt.torches || this.crypt.torches[i] !== false; }
   lit(x, z) {
+    for (const f of this.flares) if (Math.hypot(x - f.x, z - f.z) < ABILITY.fusee.r) return true;
+    if (this.inCrypt(x, z)) { for (const t of this.map.crypt.torches) if (this.torchLit(t.id) && Math.hypot(x - t.x, z - t.z) < TORCH_R) return true; return false; }
     const c = this.map.campfire;
     if (Math.hypot(x - c.x, z - c.z) < FIRE_LIGHT_R) return true;
     for (const b of this.map.braziers) if (this.braziers[b.id].fuel > 0 && Math.hypot(x - b.x, z - b.z) < LIGHT_R) return true;
@@ -203,6 +218,9 @@ export class Sim {
     for (const p of this.players) if (p.bot) this.inputs.set(p.id, botInput(this, p));
     for (const p of this.players) this.stepPlayer(p, this.inputs.get(p.id) || emptyInput());
     this.stepRevives();
+    this.stepCrypt();
+    this.flares = this.flares.filter((f) => f.until > this.t);
+    this.bars = this.bars.filter((b) => b.hp > 0 && b.until > this.t);
     this.stepFoes();
     for (const l of this.logs) if (!l.ready && this.t >= l.at) l.ready = true;
     for (const b of this.beams) if (!b.ready && this.t >= b.at) b.ready = true;
@@ -215,6 +233,7 @@ export class Sim {
 
   stepClock() {
     const c = this.clock;
+    if (this.crypt.open) return;   // le temps s'arrête : tout se joue dans la crypte
     c.t += DT;
     if (c.phase === 'jour') {
       if (c.t >= CYCLE.day - CYCLE.dusk && !c.duskSaid) { c.duskSaid = true; this.events.push({ t: 'dusk' }); this.duskSnap = this.snapshot(); }
@@ -259,7 +278,7 @@ export class Sim {
     this.events.push({ t: 'dawn', n });
     if (this.goal === 5) this.setGoal(6);
     // l'expédition : dix nuits tenues
-    if (MODES[this.mode] && n >= MODES[this.mode]) { this.won = true; this.over = { reason: 'victoire' }; this.events.push({ t: 'over', reason: 'victoire' }); }
+    if (MODES[this.mode] && n >= MODES[this.mode]) this.openCrypt();
     this.saveNow = true;
   }
   checkOver() {
@@ -273,8 +292,9 @@ export class Sim {
   // ------------------------------------------------------------------ joueurs
   stepPlayer(p, inp) {
     const last = this.lastC.get(p.id) || { fc: 0, uc: 0 };
-    const wantHit = inp.fc > last.fc, wantUse = inp.uc > last.uc;
-    this.lastC.set(p.id, { fc: inp.fc, uc: inp.uc });
+    const wantHit = inp.fc > last.fc, wantUse = inp.uc > last.uc, wantAb = (inp.ac || 0) > (last.ac || 0);
+    this.lastC.set(p.id, { fc: inp.fc, uc: inp.uc, ac: inp.ac || 0 });
+    p.cd = Math.max(0, p.cd - DT); p.guardT = Math.max(0, p.guardT - DT); p.lever = -1;
     const M = this.map;
     p.hurtT = Math.max(0, p.hurtT - DT);
     if (p.dead) {
@@ -293,6 +313,8 @@ export class Sim {
     if (inp.hold && !p.carry && !p.act) {
       const m = this.players.find((o) => o !== p && o.down && Math.hypot(o.x - p.x, o.z - p.z) < REACH.revive);
       if (m) { p.reviving = m.id; p.yaw = Math.atan2(m.x - p.x, m.z - p.z); }
+      // tenir un levier de la crypte
+      else if (this.crypt.open && !this.crypt.gate) for (const l of this.map.crypt.levers) if (Math.hypot(l.x - p.x, l.z - p.z) < 1.6) { p.lever = l.id; p.yaw = l.wall < 0 ? -Math.PI / 2 : Math.PI / 2; }
     }
 
     if (p.act) {
@@ -301,8 +323,12 @@ export class Sim {
       const at = A.hit ?? A.at;
       if (before < at && p.actT >= at) this.resolve(p);
       if (p.actT >= A.dur) { p.act = null; p.target = null; }
-    } else if (p.reviving !== null) {
-      // immobile pendant qu'on relève
+    } else if (p.reviving !== null || p.lever >= 0) {
+      // immobile pendant qu'on relève ou qu'on tient un levier
+    } else if (wantAb && p.ground && !p.carry && p.cd <= 0) {
+      p.act = 'ability'; p.actT = 0; p.cd = jobOf(p).cd;
+      const f = this.foeNear(p.x, p.z, 4); if (f) p.yaw = Math.atan2(f.x - p.x, f.z - p.z);
+      this.events.push({ t: 'ability', pid: p.id, ab: jobOf(p).ab });
     } else if (wantHit && !p.carry && p.ground) {
       // un squelette à portée passe avant les arbres
       const f = this.foeNear(p.x, p.z, REACH.strike + 0.4 + (jobOf(p).reach || 0));
@@ -319,7 +345,7 @@ export class Sim {
     let wx = inp.wx || 0, wz = inp.wz || 0;
     const len = Math.hypot(wx, wz);
     if (len > 1) { wx /= len; wz /= len; }
-    const busy = !!p.act || p.reviving !== null;
+    const busy = !!p.act || p.reviving !== null || p.lever >= 0;
     const J = jobOf(p);
     let sp = busy ? 0 : p.carry === 'poutre' ? this.beamSpeed(p) : p.carry ? SPEED.carry : inp.walk ? SPEED.walk : SPEED.run * (J.speed || 1);
     if (inp.walk && sp > SPEED.walk) sp = SPEED.walk;
@@ -328,6 +354,7 @@ export class Sim {
     if (!busy && k > 0.05) p.yaw += wrap(Math.atan2(wx, wz) - p.yaw) * Math.min(1, DT * 12);
     if (M.isWater(nx, nz)) { nx = p.x; nz = p.z; }
     [nx, nz] = M.collide(nx, nz, P_R, this.fallen);
+    [nx, nz] = this.pushBars(nx, nz, P_R);
     p.speed = Math.hypot(nx - p.x, nz - p.z) / DT;
     p.x = nx; p.z = nz; p.moving = busy ? 0 : k;
     const g = M.heightAt(p.x, p.z);
@@ -340,10 +367,12 @@ export class Sim {
     const home = this.sheltered(p.x, p.z);
     if (home && (!this.night || Math.hypot(p.x - M.campfire.x, p.z - M.campfire.z) > 6)) p.hp = Math.min(p.maxHp, p.hp + 4 * DT);
     // la faim
-    p.food = Math.max(0, p.food - FOOD.drain * this.D.food * (this.built('moulin') ? 0.5 : 1) * DT);
-    if (p.food <= 0) this.hurtBy(p, FOOD.starve * DT, 'faim');
+    // dans la crypte, près d'une torche et loin des morts, on reprend son souffle
+    if (this.crypt.open && !p.down && this.inCrypt(p.x, p.z) && p.hp < p.maxHp && this.lit(p.x, p.z) && !this.foeNear(p.x, p.z, 6)) p.hp = Math.min(p.maxHp, p.hp + 4 * DT);
+    if (!this.crypt.open) p.food = Math.max(0, p.food - FOOD.drain * this.D.food * (this.built('moulin') ? 0.5 : 1) * DT);
+    if (p.food <= 0 && !this.crypt.open) this.hurtBy(p, FOOD.starve * DT, 'faim');
     // le froid : la nuit, loin de toute lumière
-    const dark = this.night && !this.lit(p.x, p.z) && !home;
+    const dark = this.night && !this.inCrypt(p.x, p.z) && !this.lit(p.x, p.z) && !home;
     p.coldT = dark ? (p.coldT || 0) + DT : 0;
     p.cold = p.coldT > COLD_AFTER;
     if (p.cold) this.hurtBy(p, COLD * DT, 'froid');
@@ -367,7 +396,7 @@ export class Sim {
   }
   hurt(p, dmg, from) {
     if (p.down || p.dead) return;
-    dmg *= jobOf(p).armor || 1;
+    dmg *= (jobOf(p).armor || 1) * (p.guardT > 0 ? ABILITY.rempart.armor : 1);
     p.hp -= dmg; p.hurtT = 0.4;
     this.events.push({ t: 'hurt', pid: p.id, dmg });
     if (p.hp <= 0) {
@@ -396,6 +425,11 @@ export class Sim {
       p.act = 'drop'; p.actT = 0; return;
     }
     if (this.players.some((o) => o !== p && o.down && Math.hypot(o.x - p.x, o.z - p.z) < REACH.revive)) return; // E se tient pour relever
+    // la crypte : y descendre, en remonter, rallumer une torche
+    if (this.crypt.open && Math.hypot(p.x - M.cryptDoor.x, p.z - M.cryptDoor.z) < 3) { this.teleport(p, M.crypt.spawn.x, M.crypt.spawn.z + 1.5, Math.PI); this.events.push({ t: 'descend', pid: p.id }); return; }
+    if (this.inCrypt(p.x, p.z) && Math.hypot(p.x - M.crypt.spawn.x, p.z - M.crypt.spawn.z) < 1.4) { this.teleport(p, M.cryptDoor.x, M.cryptDoor.z + 1.5, 0); return; }
+    const torch = this.torchNear(p.x, p.z);
+    if (torch) { p.act = 'relight'; p.actT = 0; p.target = torch.id; return; }
     // ordre : ce qui traîne par terre, puis l'entrepôt (manger, reprendre du bois), les baies, les ruines
     const l = this.logNear(p.x, p.z, REACH.pick);
     const e = this.beamEndNear(p.x, p.z);
@@ -504,7 +538,11 @@ export class Sim {
       if (this.stock.nourriture <= 0) return;
       this.stock.nourriture--; p.food = Math.min(FOOD.max, p.food + FOOD.eat);
       this.events.push({ t: 'eat', pid: p.id });
-    } else if (p.act === 'repair') {
+    } else if (p.act === 'relight') {
+      if (this.crypt.torches) this.crypt.torches[p.target] = true;
+      this.events.push({ t: 'relight', pid: p.id, torch: p.target });
+    } else if (p.act === 'ability') this.ability(p);
+    else if (p.act === 'repair') {
       if (!p.carry) return;
       p.carry = null; this.village.hp = Math.min(WAREHOUSE_HP, this.village.hp + jobOf(p).repair);
       this.events.push({ t: 'repair', pid: p.id, hp: this.village.hp });
@@ -543,9 +581,24 @@ export class Sim {
     f.state = 'dead'; f.t = 0; f.stun = 0;
     if (by) { by.kills++; this.stats.kills++; }
     this.events.push({ t: 'kill', foe: f.id, pid: by ? by.id : null, lit: this.lit(f.x, f.z) });
+    // le Roi tombe : la malédiction est brisée
+    if (f.kind === 'king') {
+      for (const o of this.foes) if (o !== f) { o.state = 'dead'; o.t = 0; o.sun = true; }
+      this.won = true; this.over = { reason: 'victoire' };
+      this.events.push({ t: 'kingDown', pid: by ? by.id : null }, { t: 'over', reason: 'victoire' });
+    }
   }
   // la cible d'un squelette : un joueur proche, sinon un brasero allumé, sinon l'entrepôt
   chooseTarget(f) {
+    // le Rempart du chevalier attire tout ce qui est proche
+    const guard = this.players.find((p) => p.guardT > 0 && !p.down && Math.hypot(p.x - f.x, p.z - f.z) < ABILITY.rempart.r);
+    if (guard) return { type: 'p', id: guard.id };
+    // dans la crypte : le joueur le plus proche, où qu'il soit
+    if (this.inCrypt(f.x, f.z)) {
+      let b2 = null, d2 = 1e9;
+      for (const p of this.players) { if (p.down || p.dead || !this.inCrypt(p.x, p.z)) continue; const d = Math.hypot(p.x - f.x, p.z - f.z); if (d < d2) { d2 = d; b2 = { type: 'p', id: p.id }; } }
+      return b2 || { type: 'none' };
+    }
     let best = null, bd = 9;
     for (const p of this.players) { if (p.down || p.dead) continue; const d = Math.hypot(p.x - f.x, p.z - f.z); if (d < bd) { bd = d; best = { type: 'p', id: p.id }; } }
     if (best) return best;
@@ -555,6 +608,8 @@ export class Sim {
   }
   // point visé et distance à laquelle on frappe
   targetPoint(f, tg) {
+    if (tg.type === 'none') return null;
+    if (tg.type === 'bar') { const b = this.bars.find((o) => o.id === tg.id); return b ? { x: b.x, z: b.z, reach: ABILITY.barricade.r + 0.9 } : null; }
     if (tg.type === 'p') { const p = this.player(tg.id); return p && !p.down && !p.dead ? { x: p.x, z: p.z, reach: FOES[f.kind].reach } : null; }
     if (tg.type === 'b') { const b = this.map.braziers[tg.id]; return this.braziers[tg.id].fuel > 0 ? { x: b.x, z: b.z, reach: 1.25 } : null; }
     const box = this.map.boxes.find((o) => o.id === 'entrepot');
@@ -569,13 +624,16 @@ export class Sim {
       if (f.state === 'awaken') { if (f.t >= RISE.awaken) { f.state = 'walk'; f.t = 0; } continue; }
       if (f.state === 'dead') {
         // dans la brume, il se relève (deux fois au plus) ; dans la lumière, il reste à terre
-        if (!f.sun && f.kind !== 'knight' && f.t >= RISE.delay && f.rises < RISE.max && this.canRise(f.x, f.z) && this.night) { f.state = 'rise'; f.t = 0; f.rises++; this.events.push({ t: 'rise', foe: f.id }); }
+        if (!f.sun && !FOES[f.kind].boss && f.t >= RISE.delay && f.rises < RISE.max && this.canRise(f.x, f.z) && (this.night || this.inCrypt(f.x, f.z))) { f.state = 'rise'; f.t = 0; f.rises++; this.events.push({ t: 'rise', foe: f.id }); }
         continue;
       }
       if (f.state === 'rise') { if (f.t >= RISE.dur) { f.state = 'walk'; f.t = 0; f.hp = F.hp * 0.6; } continue; }
       if (f.stun > 0) continue;
+      // une barricade sur le chemin : on la casse d'abord
+      const bar = this.bars.find((b) => Math.hypot(b.x - f.x, b.z - f.z) < ABILITY.barricade.r + 0.7);
+      if (bar && f.state !== 'attack') f.tgt = { type: 'bar', id: bar.id };
       // cible revue deux fois par seconde
-      if (!f.tgt || this.tick % 15 === f.id % 15) f.tgt = this.chooseTarget(f);
+      if (!f.tgt || (this.tick % 15 === f.id % 15 && f.tgt.type !== 'bar')) f.tgt = this.chooseTarget(f);
       let tp = this.targetPoint(f, f.tgt);
       if (!tp) { f.tgt = this.chooseTarget(f); tp = this.targetPoint(f, f.tgt); if (!tp) continue; }
       const dx = tp.x - f.x, dz = tp.z - f.z, d = Math.hypot(dx, dz);
@@ -598,6 +656,7 @@ export class Sim {
       const sp = F.speed * (this.lit(f.x, f.z) ? 0.85 : 1);
       let nx = f.x + wx / wd * sp * DT, nz = f.z + wz / wd * sp * DT;
       [nx, nz] = M.collide(nx, nz, 0.4, this.fallen);
+      [nx, nz] = this.pushBars(nx, nz, 0.4);
       const moved = Math.hypot(nx - f.x, nz - f.z);
       f.stuck = moved < sp * DT * 0.3 ? f.stuck + DT : 0;
       if (f.stuck > 0.8) { f.path = null; f.stuck = 0; }
@@ -612,14 +671,15 @@ export class Sim {
     }
     // les squelettes tombés à la lumière, ou au soleil, finissent en poussière
     this.foes = this.foes.filter((f) => {
-      if (f.state === 'dead' && (f.sun ? f.t > 3 : (f.t > RISE.crumble && (this.lit(f.x, f.z) || f.rises >= RISE.max || !this.night)))) { this.events.push({ t: 'crumble', foe: f.id }); return false; }
+      if (f.state === 'dead' && (f.sun ? f.t > 3 : (f.t > RISE.crumble && (this.lit(f.x, f.z) || f.rises >= RISE.max || FOES[f.kind].boss || (!this.night && !this.inCrypt(f.x, f.z)))))) { this.events.push({ t: 'crumble', foe: f.id }); return false; }
       return true;
     });
   }
   foeHits(f, tg) {
     const F = FOES[f.kind];
     const dm = this.D.dmg;
-    if (tg.type === 'p') { const p = this.player(tg.id); if (p) this.hurt(p, F.dmg * dm, f); }
+    if (tg.type === 'p') { const p = this.player(tg.id); if (p) this.hurt(p, F.dmg * dm * (f.enrage ? 1.3 : 1) * (F.king && this.alive().length <= 2 ? 0.8 : 1), f); }
+    else if (tg.type === 'bar') { const b = this.bars.find((o) => o.id === tg.id); if (b) { b.hp -= F.dmg * 1.5; this.events.push({ t: 'barHit', x: b.x, z: b.z }); } }
     else if (tg.type === 'b') { const B = this.braziers[tg.id]; B.fuel = Math.max(0, B.fuel - FUEL.hit); this.events.push({ t: 'brazierHit', brazier: tg.id, fuel: B.fuel }); }
     else { this.village.hp = Math.max(0, this.village.hp - F.dmg * 0.7 * dm * (F.wall || 1)); this.events.push({ t: 'wallHit', hp: this.village.hp, big: !!F.wall }); }
   }
@@ -661,7 +721,7 @@ export class Sim {
   // ce qui reste d'une partie d'un soir à l'autre (sauvegardé à chaque aube par l'hôte)
   saveData() {
     return { v: 1, seed: this.seed, mode: this.mode, diff: this.diff, day: this.clock.day, stock: this.stock, build: this.build, village: this.village,
-      braziers: this.braziers.map((b) => b.fuel), trees: this.trees.filter((t) => t.down).map((t) => [t.id, t.dir]), stats: this.stats, goal: this.goal };
+      braziers: this.braziers.map((b) => b.fuel), trees: this.trees.filter((t) => t.down).map((t) => [t.id, t.dir]), stats: this.stats, goal: this.goal, crypt: this.crypt.open };
   }
   loadSave(s) {
     if (!s || s.v !== 1 || s.seed !== this.seed) return false;
@@ -672,7 +732,117 @@ export class Sim {
     for (const [id, dir] of s.trees) if (this.trees[id]) { this.trees[id].down = true; this.trees[id].dir = dir; this.trees[id].hp = 0; }
     Object.assign(this.stats, s.stats); this.goal = Math.max(this.goal, s.goal);
     for (const p of this.players) { p.maxHp = JOBS[p.job].hp + this.hpBonus(); p.hp = p.maxHp; }
+    if (s.crypt) this.openCrypt();
     return true;
+  }
+
+  // ------------------------------------------------------------------ la crypte
+  alive() { return this.players.filter((p) => !p.dead); }
+  teleport(p, x, z, yaw) { p.x = x; p.z = z; p.y = this.map.heightAt(x, z); p.yaw = yaw; p.vy = 0; p.ground = true; }
+  torchNear(x, z) {
+    if (!this.crypt.torches) return null;
+    for (const t of this.map.crypt.torches) if (!this.torchLit(t.id) && Math.hypot(t.x - x, t.z - z) < 2.4) return t;
+    return null;
+  }
+  openCrypt() {
+    const C = this.crypt;
+    if (C.open) return;
+    C.open = true; C.torches = this.map.crypt.torches.map(() => true);
+    this.cryptSnap = null;
+    this.events.push({ t: 'crypt' });
+    this.setGoal(GOALS.findIndex((g) => g.id === 'crypt'));
+    this.saveNow = true;
+  }
+  // la herse, la brume du couloir, le trône et le Roi
+  stepCrypt() {
+    const C = this.crypt, K = this.map.crypt;
+    if (!C.open) return;
+    // le premier qui descend : on garde de quoi rejouer la crypte
+    if (!this.cryptSnap && this.players.some((p) => this.inCrypt(p.x, p.z))) { this.cryptSnap = this.snapshot(); this.setGoal(GOALS.findIndex((g) => g.id === 'king')); }
+    if (!C.gate) {
+      const held = K.levers.map((l) => this.players.some((p) => p.lever === l.id));
+      C.held = held;
+      const ok = held.every(Boolean) || (this.alive().length < 2 && held.some(Boolean));
+      C.leverT = ok ? C.leverT + DT : Math.max(0, C.leverT - DT * 2);
+      if (C.leverT >= LEVER_T) { C.gate = true; K.gate.open = true; this.events.push({ t: 'gate' }); }
+    }
+    const inside = (z) => this.players.some((p) => !p.dead && inZone(z, p.x, p.z));
+    if (C.gate && !C.brume && inside(K.halls.brume)) {
+      C.brume = true; this.events.push({ t: 'brumeCrypt' });
+      // autant de morts que l'équipe peut en tenir, répartis le long du couloir
+      const n = Math.round((1 + 2 * this.alive().length) * this.D.count), cells = K.brumeCells;
+      for (let i = 0; i < n; i++) { const c = cells[Math.floor((i + 0.5) / n * cells.length)]; const f = this.spawnFoeAt(i % 4 === 3 ? 'warrior' : 'minion', c.x + this.rng.range(-0.5, 0.5), c.z); if (f) f.yaw = 0; }
+    }
+    if (C.gate && !C.throne && inside(K.halls.trone)) {
+      C.throne = true;
+      const k = this.spawnFoeAt('king', K.king.x, K.king.z);
+      const team = Math.min(1.8, 0.45 + 0.25 * this.alive().length);
+      k.hp = k.maxHp = Math.round(FOES.king.hp * team * this.D.count); k.yaw = Math.PI;
+      C.king = k.id; C.phase = 1; C.summonAt = this.t + 8;
+      this.events.push({ t: 'king' });
+    }
+    const king = C.king !== null && this.foe(C.king);
+    if (king && king.state !== 'dead') {
+      const r = king.hp / king.maxHp;
+      const phase = r < 0.3 ? 3 : r < 0.6 ? 2 : 1;
+      if (phase > C.phase) {
+        C.phase = phase; this.events.push({ t: 'kingPhase', phase });
+        // troisième phase : il souffle les torches du trône et devient furieux
+        if (phase === 3) { K.torches.forEach((t) => { if (t.throne) C.torches[t.id] = false; }); king.enrage = true; }
+      }
+      if (this.t >= C.summonAt && king.state !== 'awaken') {
+        const n = (phase === 1 ? 1 : 2) + (this.alive().length > 2 ? 1 : 0);
+        for (let i = 0; i < n; i++) { const a = this.rng.range(0, Math.PI * 2); this.spawnFoeAt(i === 2 ? 'warrior' : 'minion', king.x + Math.sin(a) * 3.5, king.z + Math.cos(a) * 3.5); }
+        C.summonAt = this.t + (phase === 1 ? 14 : phase === 2 ? 11 : 9);
+        this.events.push({ t: 'summon', foe: king.id, x: king.x, z: king.z });
+      }
+    }
+  }
+  spawnFoeAt(kind, x, z) {
+    [x, z] = this.map.collide(x, z, 0.4, this.fallen);
+    const F = FOES[kind];
+    const f = { id: this.nextFoe++, kind, x, z, y: this.map.heightAt(x, z), yaw: 0, hp: F.hp, maxHp: F.hp, state: 'awaken', t: 0, rises: 0, stun: 0, tgt: null, path: null, pathAt: -9, pathTo: null, atkT: 0, stuck: 0 };
+    this.foes.push(f);
+    this.events.push({ t: 'spawn', foe: f.id, kind, x, z });
+    return f;
+  }
+
+  // ------------------------------------------------------------------ capacités des métiers (F)
+  ability(p) {
+    const J = jobOf(p), A = ABILITY[J.ab];
+    if (J.ab === 'grandcoup') {
+      // un coup circulaire devant soi : tout ce qui est près recule, sonné
+      for (const f of this.foes) {
+        if (f.state === 'dead' || f.state === 'rise') continue;
+        const dx = f.x - p.x, dz = f.z - p.z, d = Math.hypot(dx, dz);
+        if (d > A.r || Math.abs(wrap(Math.atan2(dx, dz) - p.yaw)) > 1.0) continue;
+        f.hp -= A.dmg * this.dmgMul(); f.stun = A.stun;
+        [f.x, f.z] = this.map.collide(f.x + dx / (d || 1) * 1.6, f.z + dz / (d || 1) * 1.6, 0.4, this.fallen);
+        this.events.push({ t: 'strike', pid: p.id, foe: f.id, x: f.x, z: f.z });
+        if (f.hp <= 0) this.killFoe(f, p);
+      }
+    } else if (J.ab === 'rempart') {
+      p.guardT = A.dur;
+      for (const f of this.foes) if (f.state !== 'dead' && Math.hypot(f.x - p.x, f.z - p.z) < A.r) f.tgt = { type: 'p', id: p.id };
+    } else if (J.ab === 'fusee') {
+      const x = p.x + Math.sin(p.yaw) * A.dist, z = p.z + Math.cos(p.yaw) * A.dist;
+      this.flares.push({ x, z, until: this.t + A.dur });
+    } else if (J.ab === 'priere') {
+      for (const o of this.players) {
+        if (o.dead || Math.hypot(o.x - p.x, o.z - p.z) > A.r) continue;
+        if (o.down) o.revive += A.revive; else o.hp = Math.min(o.maxHp, o.hp + A.heal);
+      }
+    } else if (J.ab === 'barricade') {
+      let x = p.x + Math.sin(p.yaw) * 1.7, z = p.z + Math.cos(p.yaw) * 1.7;
+      [x, z] = this.map.collide(x, z, A.r, this.fallen);
+      this.bars.push({ id: this.nextBar++, x, z, rot: p.yaw, hp: A.hp, until: this.t + A.dur });
+    }
+    this.events.push({ t: 'abilityHit', pid: p.id, ab: J.ab, x: p.x, z: p.z });
+  }
+  // les barricades bloquent le passage
+  pushBars(x, z, r) {
+    for (const b of this.bars) { const R = ABILITY.barricade.r + r, dx = x - b.x, dz = z - b.z, d = Math.hypot(dx, dz); if (d < R && d > 1e-6) { x = b.x + dx / d * R; z = b.z + dz / d * R; } }
+    return [x, z];
   }
 
   // ------------------------------------------------------------------ poutres
@@ -768,6 +938,14 @@ export class Sim {
       return p.carry === 'vivres' ? { key: '', text: 'Rapporte les baies à l\'entrepôt' } : { key: 'E', text: 'Poser la bûche' };
     }
     if (this.foeNear(p.x, p.z, REACH.strike + 0.4)) return { key: 'Clic', text: 'Frapper' };
+    if (this.crypt.open && Math.hypot(p.x - M.cryptDoor.x, p.z - M.cryptDoor.z) < 3) return { key: 'E', text: 'Descendre dans la crypte' };
+    if (this.inCrypt(p.x, p.z) && Math.hypot(p.x - M.crypt.spawn.x, p.z - M.crypt.spawn.z) < 1.4) return { key: 'E', text: 'Remonter au château' };
+    if (this.crypt.open && !this.crypt.gate) for (const l of M.crypt.levers) if (Math.hypot(l.x - p.x, l.z - p.z) < 1.6) {
+      const other = this.players.find((o) => o !== p && o.lever >= 0 && o.lever !== l.id);
+      return { key: 'E', hold: true, text: this.alive().length < 2 ? 'Tenir le levier (E)' : other ? `Tenir le levier : ${other.name} tient l'autre !` : 'Tenir le levier (E) : il faut quelqu\'un à l\'autre', hp: this.crypt.leverT / LEVER_T };
+    }
+    const torch = this.torchNear(p.x, p.z);
+    if (torch) return { key: 'E', text: 'Rallumer la torche' };
     const be = this.beamEndNear(p.x, p.z);
     if (be) { const other = be.beam.h[1 - be.end]; return { key: 'E', text: other !== null ? `Soulever la poutre avec ${this.player(other)?.name || 'ton équipier'}` : jobOf(p).beamAlone ? 'Prendre la poutre (seul, lentement)' : 'Prendre un bout de la poutre (il faut être deux)' }; }
     if (this.logNear(p.x, p.z, REACH.pick)) return { key: 'E', text: 'Ramasser la bûche' };
@@ -798,12 +976,14 @@ export class Sim {
   snapshot() {
     return structuredClone({ t: this.t, tick: this.tick, clock: this.clock, stock: this.stock, trees: this.trees, logs: this.logs, nextLog: this.nextLog,
       braziers: this.braziers, village: this.village, beams: this.beams, nextBeam: this.nextBeam, foes: this.foes.map((f) => ({ ...f, path: null })), nextFoe: this.nextFoe, spawnQ: this.spawnQ, goal: this.goal, stats: this.stats,
-      build: this.build, berries: this.berries, mode: this.mode, diff: this.diff, won: this.won,
+      build: this.build, berries: this.berries, mode: this.mode, diff: this.diff, won: this.won, crypt: this.crypt, flares: this.flares, bars: this.bars, nextBar: this.nextBar,
       players: this.players.map((p) => ({ ...p, ai: null })) });
   }
   restore(s) {
     const c = structuredClone(s);
     Object.assign(this, c);
     this.over = null; this.events = []; this.inputs = new Map();   // lastC est gardé : les compteurs d'appuis continuent
+    if (!this.crypt) this.crypt = { open: false, gate: false, leverT: 0, held: [false, false], brume: false, throne: false, king: null, phase: 0, summonAt: 0, torches: null };
+    this.map.crypt.gate.open = !!this.crypt.gate;
   }
 }
