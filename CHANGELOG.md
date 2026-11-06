@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 4.58 — 6 novembre 2026
+- **The Backrooms** — au Terror Hotel (Level 5) :
+  - Caché sous un lit ou dans une armoire, une fois que l'entité a perdu ta trace, elle quitte la chambre et reprend sa ronde au loin, au lieu de fouiller autour de toi.
+  - Elle entend les pas de tous les joueurs : si un autre court ou marche près d'elle, elle part voir.
+  - L'hôtel est nettement plus éclairé : toutes les chambres ont leur plafonnier allumé, et presque toutes les appliques marchent.
+
 ## 4.57 — 6 novembre 2026
 - **The Backrooms** — le hall du Terror Hotel (Level 5), où l'on arrive, est un vrai hall d'hôtel des années 1930, plus petit et meublé de partout.
   - Une réception au comptoir de marbre et de bois mouluré, avec sa caisse enregistreuse, sa pendule, sa lampe à pétrole, sa sonnette et son registre ouvert ; derrière, la vitrine et les tableaux à clés.

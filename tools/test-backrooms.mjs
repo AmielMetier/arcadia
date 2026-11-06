@@ -1431,4 +1431,38 @@ test("Level 5 : on entre dans chaque chambre par sa porte en marchant, les meubl
   for (const f of m.furniture) assert.ok(sim.isColliding(f.x, f.z, 0.38), `${f.kind} : on ne le traverse pas`);
 });
 
+
+test("Level 5 : caché, l'entité quitte la pièce et reprend sa ronde ; un autre joueur qui court l'attire", () => {
+  const players = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }];
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 7, level: 3, players, localId: 'a' });
+  const [A, B] = sim.players;
+  const M = sim.monster;
+  const m = sim.map;
+  const sp = m.spots.find((s) => s.kind === 'bed');
+  A.x = sp.out.x;
+  A.z = sp.out.z;
+  sim.step({ useSel: true });
+  assert.equal(A.hidden, sp.id);
+  // B attend sans bruit au bout du couloir
+  const far = m.corridorCells.reduce((b, c) => (Math.hypot((c.x + 0.5) * CELL_SIZE - A.x, (c.z + 0.5) * CELL_SIZE - A.z) > Math.hypot((b.x + 0.5) * CELL_SIZE - A.x, (b.z + 0.5) * CELL_SIZE - A.z) ? c : b));
+  B.x = (far.x + 0.5) * CELL_SIZE;
+  B.z = (far.z + 0.5) * CELL_SIZE;
+  // l'entité traquait A, qui s'est caché hors de sa vue
+  Object.assign(M, { x: sp.out.x, z: sp.out.z, mode: 'chase', unseenT: 0.6, path: [], lastSeenX: sp.out.x, lastSeenZ: sp.out.z, target: 'a' });
+  M.x += (sp.out.x - sp.x) * 0.8;
+  M.z += (sp.out.z - sp.z) * 0.8;
+  run(sim, 0.1);
+  assert.equal(M.mode, 'patrol', 'elle renonce');
+  run(sim, 6);
+  assert.equal(A.status, 'alive');
+  assert.ok(Math.hypot(M.x - A.x, M.z - A.z) > 5, "elle s'éloigne de la cachette");
+  // B se met à courir près d'elle : elle va voir
+  B.x = M.x + 6;
+  B.z = M.z;
+  if (sim.isColliding(B.x, B.z, 0.38, 0)) { B.x = M.x; B.z = M.z + 6; }
+  sim.step({}, { b: { my: 1, run: true, yaw: 0 } });
+  assert.equal(M.mode, 'search', "le bruit de B l'attire");
+  assert.ok(Math.hypot(M.lastSeenX - B.x, M.lastSeenZ - B.z) < 1.5);
+});
+
 console.log(`\n${count} tests réussis pour The Backrooms !`);

@@ -852,6 +852,19 @@ export class BackroomsSim {
     P.letters = [];
   }
 
+  // Level 5 : l'entité renonce et reprend sa ronde, vers un bout du couloir loin de sa proie cachée
+  leaveRoom(M, P) {
+    const map = this.fm(M.floor);
+    const far = (map.corridorCells || map.walkable).filter((c) => Math.hypot((c.x + 0.5) * CELL_SIZE - P.x, (c.z + 0.5) * CELL_SIZE - P.z) > 14);
+    const c = far.length ? far[Math.floor(Math.random() * far.length)] : null;
+    M.mode = 'patrol';
+    M.probe = null;
+    M.probeFrom = null;
+    M.searchT = 0;
+    M.targetWander = c ? { x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE } : null;
+    M.repathT = 0;
+  }
+
   // Level 5 : un code tapé sur le clavier de la porte de secours
   enterCode(P, code) {
     const map = this.fm(P.floor);
@@ -1226,18 +1239,26 @@ export class BackroomsSim {
       const seeK = !hid && M.hasLineOfSight && dist < sight ? (1.3 - dist / sight) * (P.flashlight ? 1.5 : 1) * (P.crouch ? 0.45 : 1) * (M.mode === 'chase' ? 4 : 1) : 0;
       P.detect = seeK > 0 ? Math.min(1, P.detect + seeK * DT * 1.1) : Math.max(0, P.detect - DT * (hid ? 0.45 : 0.15));
       canSee = P.detect >= 1;
-      // le bruit : la course s'entend de loin, la marche de près, accroupi rien ; elle va voir (sans charger)
-      const noise = hid || !P.moving || P.crouch ? 0 : P.running ? hear : 5;
+      // le bruit, de n'importe quel joueur : la course s'entend de loin, la marche de près, accroupi rien ; elle va
+      // voir le plus proche (sans charger)
       canHear = false;
-      if (dist < noise && M.mode !== 'chase' && !canSee) {
-        const fresh = M.mode !== 'search' || Math.hypot(M.lastSeenX - P.x, M.lastSeenZ - P.z) > 3;
+      let loud = null;
+      for (const Q of this.players) {
+        if (Q.status !== 'alive' || Q.hidden >= 0 || !Q.moving || Q.crouch || Q.floor !== M.floor) continue;
+        const d = Math.hypot(Q.x - M.x, Q.z - M.z);
+        if (d < (Q.running ? hear : 5) && (!loud || d < loud.d)) loud = { Q, d };
+      }
+      if (loud && M.mode !== 'chase' && !canSee) {
+        const Q = loud.Q;
+        const fresh = M.mode !== 'search' || Math.hypot(M.lastSeenX - Q.x, M.lastSeenZ - Q.z) > 3;
         M.mode = 'search';
-        M.lastSeenX = P.x;
-        M.lastSeenZ = P.z;
+        M.target = Q.id;
+        M.lastSeenX = Q.x;
+        M.lastSeenZ = Q.z;
         M.probe = null;
         if (fresh) {
           M.repathT = 0;
-          this.emit({ type: 'heard', id: P.id });
+          this.emit({ type: 'heard', id: Q.id });
         }
       }
       // tout près, elle le sent ; caché, seulement si elle l'a vu s'y glisser sous son nez
@@ -1311,7 +1332,11 @@ export class BackroomsSim {
       if (M.unseenT === 0) M.repathT = 0;
       M.unseenT += DT;
       const atLast = Math.hypot(M.x - M.lastSeenX, M.z - M.lastSeenZ) < 1.5;
-      if (atLast || M.unseenT > LOSE_TRACK_T + rage * 4 + A * 3 || !same || (this.level === 3 && P.hidden >= 0 && M.unseenT > 0.5)) {
+      if (this.level === 3 && P.hidden >= 0 && M.unseenT > 0.5) {
+        // Level 5 : sa proie s'est cachée loin de ses yeux : elle a perdu sa trace, elle quitte la pièce
+        this.leaveRoom(M, P);
+        this.emit({ type: 'lost' });
+      } else if (atLast || M.unseenT > LOSE_TRACK_T + rage * 4 + A * 3 || !same) {
         M.mode = 'search';
         M.repathT = 0;
         if (this.level === 3) this.emit({ type: 'lost' }); // Level 5 : elle a perdu sa proie
@@ -1421,7 +1446,9 @@ export class BackroomsSim {
         // en commençant dans la direction où elle allait, avant de reprendre sa ronde
         if (M.probeFrom && (M.probeFrom.x !== M.lastSeenX || M.probeFrom.z !== M.lastSeenZ)) M.probe = null;
         const goal = M.probe || { x: M.lastSeenX, z: M.lastSeenZ };
-        if (Math.hypot(M.x - goal.x, M.z - goal.z) < 2) {
+        // Level 5 : arrivée là où elle l'avait entendu, et il s'est caché : rien à voir, elle s'en va
+        if (this.level === 3 && P.hidden >= 0 && Math.hypot(M.x - goal.x, M.z - goal.z) < 2) this.leaveRoom(M, P);
+        else if (Math.hypot(M.x - goal.x, M.z - goal.z) < 2) {
           if (!M.probe) {
             M.searchT = 7 + rage * 5;
             M.probeFrom = { x: M.lastSeenX, z: M.lastSeenZ };

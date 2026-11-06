@@ -114,7 +114,7 @@ export function createBackroomsScene(container, floors) {
   const scene = new THREE.Scene();
   // Level 1 : un froid bleuté, un brouillard plus épais
   scene.background = new THREE.Color(L3 ? '#070403' : L2 ? '#d3e4e2' : L1 ? '#06080a' : '#0d0b06');
-  scene.fog = new THREE.FogExp2(L3 ? '#120a06' : L2 ? '#d3e4e2' : L1 ? '#050608' : '#080604', L3 ? 0.04 : L2 ? 0.022 : L1 ? 0.058 : 0.05);
+  scene.fog = new THREE.FogExp2(L3 ? '#120a06' : L2 ? '#d3e4e2' : L1 ? '#050608' : '#080604', L3 ? 0.022 : L2 ? 0.022 : L1 ? 0.058 : 0.05);
 
   const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.08, 90);
   camera.position.set(map0.spawn.x, 1.6, map0.spawn.z);
@@ -127,7 +127,7 @@ export function createBackroomsScene(container, floors) {
   vhs.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
 
   const textures = createBackroomsTextures(map0.level || 0);
-  const AMB = L2 ? 0.045 : L3 ? 0.05 : 0.012; // l'hôtel : une pénombre chaude, mais on y voit
+  const AMB = L2 ? 0.045 : L3 ? 0.1 : 0.012; // l'hôtel : une pénombre chaude, mais on y voit
   const ambient = new THREE.AmbientLight(L3 ? '#ffcf96' : L2 ? '#eaf7f6' : L1 ? '#c9d8ff' : '#fff3c4', AMB);
   scene.add(ambient);
   const dummy = new THREE.Object3D();
@@ -270,7 +270,7 @@ export function createBackroomsScene(container, floors) {
       live.set(base);
       for (const f of flickers) if (f.k > 0) addPrint(live, f.fp, f.k);
       for (let i = 0; i < BW * BH; i++) {
-        const v = Math.min(1, (L2 ? 0.03 : L3 ? 0.045 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
+        const v = Math.min(1, (L2 ? 0.03 : L3 ? 0.09 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
         bakeData[i * 4] = Math.round(v * 255);
       }
       bakeTex.needsUpdate = true;
