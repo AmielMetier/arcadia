@@ -169,6 +169,20 @@ window.HUB_GAMES = [
     cover: 'convoy/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
+    id: 'fief',
+    title: 'Fief Maudit',
+    tag: 'Survie médiévale en coop · en construction',
+    desc: 'Les derniers habitants d\'un village en ruine. Le jour, abats les arbres et rentre le bois ; la nuit, garde les braseros allumés pendant que les morts sortent de la brume. Avant-première : chacun dans sa vallée, avec un chevalier IA.',
+    url: 'fief/',
+    minPlayers: 1, maxPlayers: 6,
+    accent: '#e08a3a',
+    icon: '🪓', score: 'Bûches rentrées',
+    settings: [
+      { key: 'bots', label: 'Équipiers IA', options: [[0, 'Aucun'], [1, '1 chevalier'], [2, '2 chevaliers']], def: 1 },
+    ],
+    cover: 'fief/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
+  },
+  {
     id: 'golf',
     title: 'Birdie Party',
     tag: 'Golf 3D entre potes',
@@ -295,7 +309,7 @@ window.HUB_GAMES = [
     id: 'backrooms',
     title: 'The Backrooms',
     tag: 'Survie & Horreur',
-    desc: "Seul ou à plusieurs, échappe-toi des Backrooms : 5 cassettes VHS sur les deux étages du Level 0 pour ouvrir le bon ascenseur, puis 3 fusibles pour relancer le monte-charge de l'entrepôt du Level 1, avant que l'entité ne vous rattrape.",
+    desc: "Seul ou à plusieurs, échappe-toi des Backrooms : 5 cassettes VHS sur les deux étages du Level 0 pour ouvrir le bon ascenseur, puis 3 fusibles pour relancer le monte-charge de l'entrepôt du Level 1, et enfin 4 vannes de vapeur dans les tuyauteries du Level 2, où un troupeau de chèvres charge dans le noir.",
     url: 'backrooms/',
     minPlayers: 1, maxPlayers: 6, maxWithBots: 6,
     accent: '#eab308',
@@ -313,7 +327,7 @@ window.HUB_GAMES = [
 window.HUB_GAME_INFO = {
   backrooms: { genre: 'action', time: '10–20 min',
     keys: [['ZQSD / Flèches', 'Se déplacer'], ['Souris', 'Regarder autour de soi'], ['Maj (Shift)', 'Courir (Endurance limitée)'], ['1', 'Allumer / Éteindre la lampe torche'], ['2 3 puis E', 'Choisir une case, utiliser son objet'], ['F', 'Ramasser (échange si l\'inventaire est plein)'], ['T', 'Siffler (trop, et l\'entité arrive)'], ['C (maintenu)', "S'accroupir : plus lent, mais silencieux"], ['E (Level 5)', 'Se cacher sous un lit ou dans une armoire, poster ses lettres, taper le code'], ['Échap', 'Pause'], ['⚙ Réglages', 'Mode Sans souris : les flèches tournent la vue'], ['🎮 Manette', 'Stick gauche : bouger · stick droit : regarder · A : ramasser · X : utiliser · Y : lampe · RB : objet · B : siffler · LB : courir · Menu : pause']],
-    tips: ['Écoute attentivement : le bourdonnement strident de l\'entité devient de plus en plus fort quand elle s\'approche.', "Casse sa ligne de vue : derrière quelques murs, l'entité finit par te perdre.", 'Suis les barres de SIGNAL du caméscope pour trouver les cassettes (Level 0) ou les fusibles (Level 1), puis l\'ascenseur.', "L'ascenseur part quand tout le monde est dedans : plus vous êtes à l'abri, plus l'entité s'acharne sur ceux qui restent.", "Le Level 0 a deux étages : un faux pas dans un trou t'envoie en bas, les escaliers font remonter.", "Il y a un ascenseur par étage, mais un seul est le vrai : l'autre se change en mur quand les cassettes sont trouvées.", 'Au Level 1, garde des piles : les coupures de courant te laissent seul avec ta lampe.', "Au bout d'une rangée d'étagères, l'entité peut t'attendre en silence.", "L'eau d'amande rend tout ton souffle : garde-la dans ton inventaire pour une poursuite.", 'Ta lampe vide sa pile : éteins-la dans les zones éclairées et ramasse les piles dans le noir.', 'Aux Poolrooms, le toboggan rouge mène au Level 5, le Terror Hotel.', "Au Level 5, l'entité entend tes pas : accroupis-toi (C) près d'elle, et cache-toi avant que l'œil ne se remplisse.", 'Chaque lettre va dans la boîte aux lettres de sa chambre : une fois les six postées, lève les yeux au plafond du hall.'] },
+    tips: ['Écoute attentivement : le bourdonnement strident de l\'entité devient de plus en plus fort quand elle s\'approche.', "Casse sa ligne de vue : derrière quelques murs, l'entité finit par te perdre.", 'Suis les barres de SIGNAL du caméscope pour trouver les cassettes (Level 0) ou les fusibles (Level 1), puis l\'ascenseur.', "L'ascenseur part quand tout le monde est dedans : plus vous êtes à l'abri, plus l'entité s'acharne sur ceux qui restent.", "Le Level 0 a deux étages : un faux pas dans un trou t'envoie en bas, les escaliers font remonter.", "Il y a un ascenseur par étage, mais un seul est le vrai : l'autre se change en mur quand les cassettes sont trouvées.", 'Au Level 1, garde des piles : les coupures de courant te laissent seul avec ta lampe.', "Au bout d'une rangée d'étagères, l'entité peut t'attendre en silence.", "L'eau d'amande rend tout ton souffle : garde-la dans ton inventaire pour une poursuite.", 'Ta lampe vide sa pile : éteins-la dans les zones éclairées et ramasse les piles dans le noir.', "Au Level 2, les chèvres craignent la lumière : reste sous les néons, et braque ta lampe sur celle qui charge pour la faire fuir.", "Une chèvre qui charge ne tourne presque pas : un pas de côté au dernier moment, et elle s'écrase contre le mur.", 'Les jets de vapeur brûlent : attends qu\'ils se coupent pour passer.', "Chaque vanne fermée fait sauter les néons autour d'elle : cherche l'armoire ELECTRICAL au voyant rouge et réarme le disjoncteur.", "Quand la cloche sonne, le bouc ne craint plus la lumière : attire sa charge dans un jet de vapeur qui crache.", "Au Level 2, tout le courant saute parfois : le troupeau sait où tu es. Garde de la pile pour braquer ta lampe sur elles.", 'Aux Poolrooms, le toboggan rouge mène au Level 5, le Terror Hotel.', "Au Level 5, l'entité entend tes pas : accroupis-toi (C) près d'elle, et cache-toi avant qu'elle ne te voie.", 'Chaque lettre va dans la boîte aux lettres de sa chambre : une fois les six postées, lève les yeux au plafond du hall.'] },
   dogfight: { genre: 'action', time: '5–10 min',
     keys: [['Souris', 'Viser, l\'avion suit'], ['ZQSD / flèches', 'Piloter soi-même'], ['Espace / clic', 'Canon'], ['E / clic droit', 'Missile'], ['F', 'Leurres'], ['Maj', 'Postcombustion'], ['C', 'Aérofrein'], ['🎮 Manette', 'Sticks pour piloter, gâchettes pour tirer']],
     tips: ['Place le réticule blanc sur le cercle vert : c\'est là que les balles rencontrent la cible.', 'Monter et serrer les virages coûte de la vitesse : garde de l\'énergie.', 'Un nuage te cache des missiles et des bots.', 'En Domination, vole bas : au-dessus du plafond de la zone, tu ne captures rien.', 'En Escorte, le transport est fragile face à plusieurs attaquants : reste près de lui.'] },
@@ -338,6 +352,9 @@ window.HUB_GAME_INFO = {
   kart: { genre: 'course', time: '10–20 min',
     keys: [['Flèches / ZQSD', 'Conduire'], ['Maj en tournant', 'Drift (mini-turbo)'], ['E', 'Utiliser l\'objet'], ['↓ + E', 'Lancer vers l\'arrière'], ['🎮 Manette', 'Stick pour conduire, gâchettes pour accélérer et freiner']],
     tips: ['Alterne Q et D pendant un drift : le mini-turbo charge deux fois plus vite.', 'Colle-toi derrière un kart pour profiter de l\'aspiration.', 'Une figure en sautant donne un petit turbo à l\'atterrissage.'] },
+  fief: { genre: 'action', time: '10–20 min',
+    keys: [['ZQSD + souris', 'Se déplacer, tourner la caméra'], ['Clic', 'Coup de hache'], ['E', 'Ramasser, ranger, charger un brasero · tenir pour relever'], ['Espace · Ctrl', 'Sauter · marcher'], ['Molette', 'Zoom'], ['Échap', 'Pause'], ['🎮 Manette', 'Stick gauche : bouger · stick droit : caméra · RT : hache · X : utiliser · A : sauter']],
+    tips: ['Un bûcheron abat un arbre en trois coups de hache.', 'Chaque arbre donne deux bûches : on n\'en porte qu\'une à la fois.', 'Charge les braseros avant la nuit : un squelette tombé dans leur lumière ne se relève pas.', 'Le guerrier pare de face avec son bouclier : prends-le de côté ou de dos.', 'E devant l\'entrepôt reprend une bûche du stock pour un brasero.', 'Tiens E près d\'un équipier à terre pour le relever.'] },
   convoy: { genre: 'action', time: '15–30 min',
     keys: [['ZQSD', 'Se déplacer'], ['E', 'Interagir'], ['Souris', 'Viser · tirer'], ['🎮 Manette', 'Stick : se déplacer · X / RT : interagir, tirer']],
     tips: ['Le convoi ralentit en gare : profitez-en pour réparer.', 'Surveillez la pression de la chaudière.'] },

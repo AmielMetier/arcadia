@@ -149,10 +149,11 @@ export function createHotelMap(seed = 5) {
     const bed = put('bed', mid);
     // caché, on regarde vers la porte ; on se glisse sous le lit par son pied, on entre dans l'armoire par devant
     const yaw = Math.atan2(-dx, -dz);
-    spots.push({ id: spots.length, kind: 'bed', room: r.id, x: bed.x, z: bed.z, yaw, out: { x: bed.x + dx * (FURNITURE.bed.hd + 0.7), z: bed.z + dz * (FURNITURE.bed.hd + 0.7) } });
+    // (les cachettes servent aussi de « casiers » au moteur : dx, dz vers la sortie, by : qui s'y cache)
+    spots.push({ id: spots.length, kind: 'bed', room: r.id, x: bed.x, z: bed.z, dx, dz, gx: mid.x, gz: mid.z, ry: rot, by: -1, yaw, out: { x: bed.x + dx * (FURNITURE.bed.hd + 0.7), z: bed.z + dz * (FURNITURE.bed.hd + 0.7) } });
     if (rnd() < 0.7) {
       const w = put('wardrobe', corners[0]);
-      spots.push({ id: spots.length, kind: 'wardrobe', room: r.id, x: w.x, z: w.z, yaw, out: { x: w.x + dx * 0.95, z: w.z + dz * 0.95 } });
+      spots.push({ id: spots.length, kind: 'wardrobe', room: r.id, x: w.x, z: w.z, dx, dz, gx: corners[0].x, gz: corners[0].z, ry: rot, by: -1, yaw, out: { x: w.x + dx * 0.95, z: w.z + dz * 0.95 } });
     }
     r.desk = put('desk', corners[1]);
   }
@@ -328,7 +329,7 @@ export function createHotelMap(seed = 5) {
     return v === T.WALL || v === T.EXIT;
   };
   const map = {
-    level: 3,
+    level: 4, // HOTEL_LEVEL (le 3 est le Level 2, les Tuyauteries)
     name: 5,
     ceil: HOTEL_CEIL,
     W,
@@ -358,6 +359,7 @@ export function createHotelMap(seed = 5) {
     solids,
     doorW: DOOR_W,
     spots,
+    hides: spots, // les lits et armoires : les cachettes du moteur (comme les casiers des autres niveaux)
     letters,
     mailbox,
     keypad,

@@ -1,37 +1,37 @@
 # Journal des versions — Arcadia
 
-## 4.58 — 6 novembre 2026
+## 4.61 — 6 novembre 2026
 - **The Backrooms** — au Terror Hotel (Level 5) :
   - Caché sous un lit ou dans une armoire, une fois que l'entité a perdu ta trace, elle quitte la chambre et reprend sa ronde au loin, au lieu de fouiller autour de toi.
   - Elle entend les pas de tous les joueurs : si un autre court ou marche près d'elle, elle part voir.
   - L'hôtel est nettement plus éclairé : toutes les chambres ont leur plafonnier allumé, et presque toutes les appliques marchent.
 
-## 4.57 — 6 novembre 2026
+## 4.60 — 6 novembre 2026
 - **The Backrooms** — le hall du Terror Hotel (Level 5), où l'on arrive, est un vrai hall d'hôtel des années 1930, plus petit et meublé de partout.
   - Une réception au comptoir de marbre et de bois mouluré, avec sa caisse enregistreuse, sa pendule, sa lampe à pétrole, sa sonnette et son registre ouvert ; derrière, la vitrine et les tableaux à clés.
   - Un salon : canapé capitonné, deux fauteuils, table basse, pouf et tapis vert bordé d'or, sous un tableau.
   - Au milieu, une banquette ronde de velours vert surmontée d'une plante ; deux colonnes de marbre encadrent l'entrée.
   - Un chariot à bagages en laiton chargé de vieilles valises, une horloge comtoise, une commode et son miroir, un buste de marbre, des plantes et cinq lustres.
 
-## 4.56 — 6 novembre 2026
+## 4.59 — 6 novembre 2026
 - **The Backrooms** — aux Poolrooms (Level 37), l'entité ne se cache plus derrière les cloisons pour t'observer : elle rôde et te traque à découvert, tu la vois venir.
   - Derrière une cloison, son bourdonnement est étouffé : on ne croit plus l'entendre à travers les murs.
 
-## 4.55 — 6 novembre 2026
+## 4.58 — 6 novembre 2026
 - **The Backrooms** — l'entité du Level 1 te suit aux Poolrooms (Level 37) : même apparence, mêmes sons, même screamer.
   - Elle passe d'une salle à l'autre par les portes, jamais à travers les cloisons, et les cloisons te cachent d'elle.
   - Elle marche au fond des bassins ; l'eau la freine, un peu moins que toi.
 
-## 4.54 — 6 novembre 2026
+## 4.57 — 6 novembre 2026
 - **The Backrooms** — au Terror Hotel (Level 5), se faire attraper donne un vrai screamer : l'entité de l'hôtel se jette sur toi en un quart de seconde, bras tendus vers ton visage, la tête qui tremble, l'image qui saute et se déchire, un éclair rouge et un hurlement déchiré, puis le noir.
 
-## 4.53 — 6 novembre 2026
+## 4.56 — 6 novembre 2026
 - **The Backrooms** — le Terror Hotel (Level 5) a sa propre entité : un homme en chemise sombre et jean, plus grand que toi, qui marche raide dans les couloirs, se penche en avant pour courir quand il te traque, et dont la tête penchée tressaute sans arrêt.
 
-## 4.52 — 6 novembre 2026
+## 4.55 — 6 novembre 2026
 - **The Backrooms** — le Terror Hotel (Level 5) est moins sombre : les appliques du couloir éclairent plus, presque toutes marchent, et chaque chambre a un plafonnier en plus de sa lampe de chevet.
 
-## 4.51 — 6 novembre 2026
+## 4.54 — 6 novembre 2026
 - **The Backrooms** — nouveau niveau : le Level 5, le Terror Hotel. On y arrive en prenant le toboggan rouge des Poolrooms.
   - Un hôtel des années 1930 : papier peint damassé, lambris sombres, moquette rouge, appliques Art déco qui grésillent, et un couloir qui fait le tour sans fin de 21 chambres numérotées, de 201 à 221.
   - Six lettres sur papier sont cachées dans les chambres, sur un lit, sur un bureau ou par terre. Chacune se poste dans la boîte aux lettres de sa chambre, dans le hall. Ensemble, elles forment un mot.
@@ -41,6 +41,56 @@
   - Un joueur attrapé avec des lettres en poche : elles retournent là où il les avait trouvées.
   - Parquet qui craque et boîte à musique désaccordée au loin.
 - **The Backrooms** — les toboggans jaune et bleu des Poolrooms mènent toujours à l'écran de fin, en attendant leurs niveaux.
+
+## 4.53 — 6 novembre 2026
+- **The Backrooms** — Un nouveau niveau : le Level 2, les Tuyauteries.
+  - Aux Poolrooms, le toboggan jaune ne sort plus des Backrooms : il descend dans les galeries de service. Le rouge et le bleu font toujours sortir.
+  - De longues galeries carrelées sous les tuyaux, des réserves en brique, des chaufferies et plusieurs grandes salles à piliers, dont certaines au cœur du réseau. Chaque partie a son plan.
+  - Il faut fermer les 4 vannes de vapeur, une dans chaque chaufferie, puis rejoindre l'ascenseur de service.
+  - Les jets de vapeur brûlent : attends qu'ils se coupent pour passer.
+  - Un troupeau de chèvres rôde dans le noir. Elles craignent la lumière : reste sous les lampes, et braque ta lampe torche sur celle qui charge pour la faire fuir. Une chèvre qui charge tourne mal : un pas de côté au dernier moment, et elle s'écrase contre le mur.
+  - Chaque vanne fermée fait sauter les lampes autour d'elle. Une armoire ELECTRICAL à voyant rouge permet de réarmer le disjoncteur et de rallumer le secteur.
+  - Le bouc alpha porte une cloche. En fin de partie, quand la cloche sonne, il ne craint plus la lumière : attire sa charge dans un jet de vapeur pour le faire fuir.
+  - De temps en temps, tout le courant saute : le troupeau sait où tu es et passe à l'attaque.
+  - Un écran de mort qui fait peur, avec son bruit à lui.
+  - Si le jeu ne peut pas capturer la souris, on regarde autour de soi en glissant avec le clic gauche.
+- **The Backrooms** — Tout le jeu fait plus peur, et il est plus juste.
+  - L'entité ne voit que devant elle, et elle entend : la course s'entend de loin, la marche de près. Accroupi (C), on avance lentement et presque sans bruit.
+  - Elle ne tue plus au premier contact : elle t'agrippe. Tape sur n'importe quelle touche pour te dégager, ou un coéquipier l'aveugle avec sa lampe. La deuxième prise est mortelle. Au Level 2, le premier coup de chèvre te renverse, le deuxième tue.
+  - Des casiers au Level 1 et au Level 2 : F pour s'y enfermer. Elle ne te trouve pas, sauf si elle t'a vu entrer. Quand elle passe tout près, retiens ton souffle (Maj)… pas trop longtemps.
+  - Le jeu dose la peur : après une poursuite, un vrai moment de calme. Puis de fausses alertes : des pas, une porte qui claque, un néon qui saute, un coéquipier qui siffle alors qu'il est loin. Et parfois, une fois par niveau, quelque chose de rare.
+  - Elle apprend : après deux fuites devant ta lampe, elle ne fuit plus, et elle se poste là où tu l'as semée.
+  - Au début de la partie, elle te laisse une minute pour apprendre à te déplacer, et la première poursuite est un peu plus lente.
+  - Moins de piles et d'eau d'amande quand on joue à peu nombreux ; l'eau d'amande rend la moitié du souffle. La lampe se vide plus vite pendant les coupures.
+  - Level 1 : les fusibles se portent jusqu'au panneau (si tu meurs, ils tombent par terre), puis il faut relancer le monte-charge en restant devant… et le moteur fait beaucoup de bruit.
+  - Le signal ne capte plus qu'à 25 m, il tremble, et il se coupe pendant les coupures de courant.
+  - Les vannes et les disjoncteurs demandent un peu plus de temps.
+  - Les cassettes racontent une histoire : chacune contient un enregistrement, et ceux que tu as déjà entendus restent dans ta collection.
+  - Deux fins : le toboggan rouge ou bleu te ramène… au Level 0. Seul le jaune, par les Tuyauteries, fait vraiment sortir, et rapporte beaucoup plus de points.
+  - Seul, on peut reprendre au dernier niveau atteint depuis l'écran titre.
+  - Le son a été refait : musique de tension, cœur qui bat, sons étouffés derrière les murs, une ambiance propre à chaque niveau, des bruits réels au lieu des bips. Les Tuyauteries ont enfin leurs propres sons et leur écho métallique.
+  - L'image fait plus vieux caméscope : bande qui saute, mise au point qui cherche, image qui se perd à la mort. L'entité surgit devant l'objectif au lieu d'une image plaquée.
+  - Interface plus discrète (la jauge de souffle et l'inventaire s'effacent quand ils ne servent pas), écran titre et écran de fin façon étiquette de cassette ; on peut passer l'écran de mort au bout de 3 s.
+  - Nouveaux réglages : sensibilité, axe vertical inversé, champ de vision, luminosité, caméra stable, qualité, flashs réduits, sous-titres avec la direction des sons, touches ZQSD ou WASD.
+  - Corrigé : l'écran noir après plusieurs changements de niveau, le petit gel au premier regard, l'entité qui traversait les caisses, une chèvre qui pouvait renverser plusieurs joueurs d'un coup, le score qui donnait plus en mourant aux Tuyauteries qu'en sortant.
+
+## 4.52 — 6 novembre 2026
+- **Fief Maudit** — La nuit tombe sur la vallée.
+  - Le jour dure quatre minutes et demie. Au crépuscule, la cloche sonne, puis la brume monte et les morts sortent du sol, du côté du château.
+  - Six braseros entourent la place. Une bûche dedans, c'est un peu moins d'une minute et demie de feu. On peut reprendre le bois rangé à l'entrepôt pour les charger.
+  - Un squelette abattu dans la brume se relève quelques secondes plus tard. Abattu dans la lumière d'un brasero ou du feu de camp, il reste à terre.
+  - Deux sortes de squelettes : les soldats à la lame, rapides, et les guerriers à la hache, qui parent de face avec leur bouclier (contourne-les).
+  - Ils s'en prennent à qui passe près d'eux, sinon aux braseros allumés, sinon à l'entrepôt.
+  - À 0 PV, on tombe à terre : un équipier a 40 secondes pour te relever en tenant E près de toi.
+  - Un chevalier IA joue avec toi (ou deux, ou aucun, dans les réglages du salon) : il coupe du bois, charge les braseros, se bat et te relève.
+  - À l'aube, les morts retournent à la poussière et tout le monde est soigné. Si l'entrepôt tombe ou si toute l'équipe est à terre, on peut rejouer la nuit.
+  - Dans le menu, « Avancer jusqu'au soir » saute la journée.
+
+## 4.51 — 6 novembre 2026
+- **Fief Maudit** — Nouveau jeu en avant-première : une survie médiévale en coopération, en 3D. Les derniers habitants d'un village en ruine doivent le relever avant que les morts ne sortent de la crypte du château.
+  - Cette première version permet de découvrir la vallée : le village en ruine, l'entrepôt, le feu de camp, la rivière et le château sur sa colline.
+  - On joue le bûcheron : trois coups de hache pour abattre un arbre, qui tombe dans le sens du coup et donne deux bûches. On les ramasse et on les rapporte à l'entrepôt, une par une (on marche moins vite en portant).
+  - Pour l'instant, chacun joue dans sa propre vallée. La nuit, les squelettes et le jeu à plusieurs arrivent dans les prochaines versions.
 
 ## 4.50 — 6 novembre 2026
 - **Arcadia** — « Tester ma connexion » affiche ton ping avec le serveur, en millisecondes, et dit si ta connexion va faire laguer les jeux (ping élevé, connexion instable).

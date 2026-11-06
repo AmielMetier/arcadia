@@ -1,7 +1,7 @@
 # Consignes pour les assistants de code (Claude, Codex, Copilot, Cursor, Gemini…) et les contributeurs
 
 Ce dépôt est **Arcadia** (anciennement « Game Hub »), le salon de jeux d'Amiel : un site statique (GitHub Pages, sans étape de build) qui réunit plusieurs
-jeux multijoueurs dans le navigateur — Duo Drift, DavidSimulator, Tête de Calcul, Bastion Clash, Outbreak, Fil Rouge, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party, Island Rush, Odyssée, Mollo !, Site Noir, Mystère Mystère, Dogfight 3D et The Backrooms.
+jeux multijoueurs dans le navigateur — Duo Drift, DavidSimulator, Tête de Calcul, Bastion Clash, Outbreak, Fil Rouge, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party, Island Rush, Odyssée, Mollo !, Site Noir, Mystère Mystère, Dogfight 3D, The Backrooms et Fief Maudit (en construction).
 
 ## À chaque modification poussée sur `main` : journal + version
 
@@ -30,12 +30,12 @@ Filet de sécurité : si un push sur `main` ne touche pas `CHANGELOG.md`, l'acti
 (`tools/changelog-auto.mjs`) et monte la version. Elle est moins bien écrite qu'une entrée faite à la main :
 préférer l'écrire soi-même. Pour qu'elle soit lisible, écrire des messages de commit clairs, par exemple
 `feat(calcul): mode Éclair` ou `fix(david): la caméra qui suit ne se désactive plus`
-(portées reconnues : `drift`, `david`, `calcul`, `bastion`, `outbreak`, `filrouge`, `kart`, `convoy`, `golf`, `minigolf`, `royale`, `odyssee`, `mollo`, `sitenoir`, `mystery`, `hub`, `server`).
+(portées reconnues : `drift`, `david`, `calcul`, `bastion`, `outbreak`, `filrouge`, `kart`, `convoy`, `golf`, `minigolf`, `royale`, `odyssee`, `mollo`, `sitenoir`, `mystery`, `fief`, `hub`, `server`).
 Ajouter `[skip changelog]` dans le message d'un commit purement technique pour qu'il n'apparaisse pas.
 
 ## Repères
 
-- Chaque jeu vit dans son dossier (`drift/`, `david/`, `calcul/`, `bastion/`, `outbreak/`, `filrouge/`, `kart/`, `convoy/`, `golf/`, `minigolf/`, `royale/`, `odyssee/`, `mollo/`, `sitenoir/`, `mystery/`, `backrooms/`) et tourne dans une iframe du Hub ;
+- Chaque jeu vit dans son dossier (`drift/`, `david/`, `calcul/`, `bastion/`, `outbreak/`, `filrouge/`, `kart/`, `convoy/`, `golf/`, `minigolf/`, `royale/`, `odyssee/`, `mollo/`, `sitenoir/`, `mystery/`, `backrooms/`, `fief/`) et tourne dans une iframe du Hub ;
   le Hub (`index.html`, `hub/`) gère le salon, le classement entre potes et le pont `shared/bridge.js`.
 - Multijoueur : relais WebSocket (`shared/net.js`, serveur dans `server/`). `?local` dans l'adresse simule le réseau
   entre onglets du même navigateur pour tester à plusieurs.
@@ -76,7 +76,7 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   étagères, 3 fusibles, coupures de courant, embuscades), reliés par un ascenseur qui part quand tous les joueurs encore en vie sont dedans.
   À plusieurs, l'hôte fait autorité (`snapshot` / `applySnapshot`), l'invité se déplace chez lui (`predict`). `node --experimental-detect-module tools/test-backrooms.mjs`.
   Puis Level 37, les Poolrooms (`poolrooms.js`), après l'ascenseur du Level 1 : des salles préfabriquées (lagon, voûtes d'arêtes, tunnel, galerie, verrière, pataugeoire, local technique) posées sur des modules de 10 m et reliées par des portes ; le moteur garde sa grille (murs hors des salles) plus `segs` (cloisons minces, portes ôtées), `cols` (colonnes), `collide`, `lightBlocked` et `depthAt` (forme des bassins en distance signée, l'eau ralentit) ; 3 volants de vanne = les `fuses` ; une fois trouvés, on sort par l'un des 3 toboggans colorés (`slides`, table `SLIDES` : chaque couleur a son niveau d'arrivée `to`, `null` = sortie des Backrooms ; le premier joueur qui s'y glisse choisit, `sim.slide`) ; l'entité du Level 1 y chasse aussi (même modèle, mêmes sons : `sfx/level1/`, et le dossier `models/level1/` attend sa nouvelle entité), ses chemins ne passent que par les portes (`canStep`), les cloisons cachent (`lightBlocked` dans `hasLineOfSight`). Les objectifs de chaque niveau sont placés le plus loin possible les uns des autres (`spreadOut` dans `map.js`). Rendu des salles, de l'eau et de l'ombre : `view/water.js`.
-  Puis Level 5, le Terror Hotel (`hotel.js`, rendu `view/hotel.js`), par le toboggan rouge des Poolrooms (`SLIDES[0].to = 3`) : un couloir en boucle autour de 21 chambres (201 à 221), 6 lettres (`letters`, ramassées en passant, gardées par chaque joueur dans `P.letters`) à poster dans les boîtes du hall (`mailbox`, E), puis le code à 4 chiffres (`map.code`, affiché au plafond quand `sim.codeShown`) à taper sur le clavier (`enterCode`, action réseau `c`) : la porte de secours s'ouvre (`powered`). Cachettes (`spots`, lit ou armoire, `P.hidden`), accroupi (`P.crouch`, touche C), jauge de détection (`P.detect`) ; l'entité y rôde (ronde, enquête au bruit, traque, perte de trace, `map.nav` lui fait contourner les meubles). Le mot vient de `WORDS` (standard) ou, en mode VIP, de `backrooms/password_level5/mots.txt` (un mot de 6 lettres par ligne, `parseWords`).
+  Puis Level 5, le Terror Hotel (`hotel.js`, rendu `view/hotel.js`), par le toboggan rouge des Poolrooms (`SLIDES[0].to = 4`, `HOTEL_LEVEL` ; le 3 est le Level 2, les Tuyauteries, par le jaune) : un couloir en boucle autour de 21 chambres (201 à 221), 6 lettres (`letters`, ramassées en passant, gardées par chaque joueur dans `P.letters`) à poster dans les boîtes du hall (`mailbox`, E), puis le code à 4 chiffres (`map.code`, affiché au plafond quand `sim.codeShown`) à taper sur le clavier (`enterCode`, action réseau `c`) : la porte de secours s'ouvre (`powered`). Cachettes (`spots`, lit ou armoire, `P.hidden` ; ce sont aussi les `hides` du moteur, comme les casiers : `enterHide`, `leaveHide`, souffle retenu), accroupi (`P.crouch`, touche C), jauge de détection (`P.detect`) ; l'entité y rôde (ronde, enquête au bruit, traque, perte de trace, `map.nav` lui fait contourner les meubles). Le mot vient de `WORDS` (standard) ou, en mode VIP, de `backrooms/password_level5/mots.txt` (un mot de 6 lettres par ligne, `parseWords`).
   `backrooms/?parkour` (seul) fait commencer devant le couloir piégé, `backrooms/?level1` (seul) directement au Level 1, `backrooms/?level37` aux Poolrooms, `backrooms/?level5` à l'hôtel.
   Habillage du Level 1 (rayonnages, marchandises, tuyaux, marquages, piliers, panneaux) : `backrooms/view/warehouse.js`.
 - Sauvegardes en ligne (`server/saves.js`, client `odyssee/js/net/cloud.js`) : le relais range les parties dans le dépôt GitHub,
@@ -149,4 +149,11 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
 - Bastion Clash : le moteur (`bastion/engine/`, sans DOM) est testé par `node tools/test-bastion.mjs` ;
   `node tools/bench-bastion.mjs [minutes] [graine] [mode] [carte]` fait jouer 4 bots hors navigateur et mesure
   le coût d'un pas de simulation (doit rester sous 33 ms), les éliminations, les cibles des bots et les unités bloquées.
+- Fief Maudit (`fief/`, moteur sans DOM dans `fief/engine/`) : survie médiévale en coop, en construction par étapes (conception et étapes dans `docs/FIEF-MAUDIT.md`).
+  Vallée, village, braseros, arbres et collisions dans `map.js` ; chemins A* sur une grille de 1 m dans `nav.js` ; joueurs, hache, bûches, entrepôt, cycle jour / nuit (`CYCLE`),
+  braseros (`FUEL`), squelettes (`FOES`, réveil, cibles, résurrection dans la brume `RISE`), à terre / relevé (`HP`), défaite, `snapshot` / `restore` dans `sim.js` ;
+  coéquipiers IA dans `bots.js` (mêmes entrées qu'un joueur). Vue : `view/night.js` (lumière, ciel, brume, braseros), `view/actors.js` (héros et squelettes).
+  `node tools/test-fief.mjs` (à lancer quand on touche au moteur : vallée, chemins, hache et bûches, nuit, braseros, squelettes, bouclier, relève, défaite, instantané, une nuit jouée par deux bots).
+  Modèles (Quaternius Medieval Village MegaKit, KayKit Adventurers et Skeletons, CC0) préparés par `node tools/fief-assets.mjs <clones>` dans `fief/models/` (crédits : `fief/models/LICENSE.txt`) ;
+  arbres, ciel et textures repris de Birdie Party, rochers de Kenney et sons d'Island Rush et Birdie Party. `?debug` expose `__fief` (`ff(sec)`, `tp(x, z, cap)`, `cam(cap, inclinaison, distance)`, `press('fc'|'uc')`), `?manual` ne dessine qu'à la demande (`__fief.frames(n)`), `?seed`, `?bots=0..2`, `?autostart`.
 - Commits : auteur et messages en français, un message qui décrit ce que le joueur gagne.

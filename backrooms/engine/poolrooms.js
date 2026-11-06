@@ -12,6 +12,7 @@
 // profondeur d'eau donnée en tout point par la forme du bassin de chaque salle.
 // Bible de conception : « Bible de conception — Les Poolrooms (Level 37) ».
 import { CELL_SIZE, T, itemList, spreadOut } from './map.js';
+import { PIPES_LEVEL } from './level2.js';
 
 const C = CELL_SIZE;
 export const MOD = 4; // un module = 4 cases = 10 m
@@ -25,8 +26,8 @@ export const DEPTH = { WADE: 0.2, GALLERY: 0.25, TUNNEL: 0.6 };
 // l'un d'eux. Chaque couleur mène ailleurs (to : le niveau d'arrivée ; null tant qu'il n'existe pas : on sort des
 // Backrooms). MOUTH : le tube, au ras du sol (rayon et hauteur du centre), et la distance où l'on s'y glisse.
 export const SLIDES = [
-  { color: 'red', name: 'RED', hex: '#e2402f', to: 3 }, // vers le Level 5, le Terror Hotel
-  { color: 'yellow', name: 'YELLOW', hex: '#f2bf1d', to: null },
+  { color: 'red', name: 'RED', hex: '#e2402f', to: 4 }, // vers le Level 5, le Terror Hotel (HOTEL_LEVEL)
+  { color: 'yellow', name: 'YELLOW', hex: '#f2bf1d', to: PIPES_LEVEL }, // les galeries de service (Level 2)
   { color: 'blue', name: 'BLUE', hex: '#2c7fe0', to: null },
 ];
 export const MOUTH = { r: 0.62, y: 0.72, enter: 1.15 };

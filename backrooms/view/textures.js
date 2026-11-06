@@ -580,7 +580,7 @@ export function createBackroomsTextures(level = 0) {
   const S = level === 2 ? 1024 : 512; // la mosaïque des Poolrooms demande plus de détail
   const L1 = level === 1;
   const L2 = level === 2; // Level 37, les Poolrooms
-  const L3 = level === 3; // Level 5, le Terror Hotel
+  const L3 = level === 4; // Level 5, le Terror Hotel (HOTEL_LEVEL)
   const [wallCanvas, wctx] = canvas(S);
   const [carpetCanvas, cctx] = canvas(S);
   const [ceilCanvas, clctx] = canvas(S);
