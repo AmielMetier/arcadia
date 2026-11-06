@@ -1,18 +1,18 @@
 # Journal des versions — Arcadia
 
-## 4.38 — 6 novembre 2026
+## 4.47 — 6 novembre 2026
 - **The Backrooms** — aux Poolrooms (Level 37), on ne sort plus par un ascenseur mais par un toboggan.
   - Trois gros toboggans, rouge, jaune et bleu, sortent des murs, avec leur tuyau qui grimpe jusqu'au plafond.
   - Une grille les ferme tant que les 3 volants de vanne n'ont pas été trouvés.
   - Chaque couleur mène à un endroit différent. Le premier qui se glisse dans un toboggan choisit pour toute l'équipe : les deux autres se referment.
 - **The Backrooms** — à tous les niveaux, les objectifs (cassettes, fusibles, volants de vanne, toboggans) sont placés le plus loin possible les uns des autres : il faut vraiment explorer toute la carte.
 
-## 4.37 — 6 novembre 2026
+## 4.46 — 6 novembre 2026
 - **The Backrooms** — chaque niveau a désormais ses propres sons.
   - Dans l'entrepôt (Level 1), la poursuite a sa propre musique ; les cris, les ambiances et le son de la mort du Level 0 restent au Level 0.
   - Une nouvelle nappe angoissante s'ajoute par-dessus toutes les poursuites, quel que soit le niveau.
 
-## 4.36 — 5 novembre 2026
+## 4.45 — 5 novembre 2026
 - **The Backrooms** — les Poolrooms (Level 37) sont reconstruites salle par salle : fini le damier, chaque salle est dessinée avec sa propre forme et reliée aux autres par des portes en plein cintre.
   - Des lagons aux bassins courbes, avec leur margelle arrondie, un îlot au milieu de l'eau et d'énormes colonnes.
   - Des salles en voûtes d'arêtes au-dessus d'un grand bassin, avec leurs échelles chromées.
@@ -21,7 +21,7 @@
   - Des pataugeoires à colonnes et des locaux techniques bas de plafond, où attendent les volants de vanne.
   - Chaque partie assemble ces salles autrement.
 
-## 4.35 — 5 novembre 2026
+## 4.44 — 5 novembre 2026
 - **The Backrooms** — les Poolrooms (Level 37) bien plus variées, inspirées des vraies photos du lieu.
   - Des couloirs inondés en tunnels voûtés, rythmés d'arcs, qui s'enfoncent à perte de vue.
   - De grandes salles en voûtes d'arêtes portées par d'énormes colonnes rondes, les pieds dans l'eau.
@@ -30,7 +30,7 @@
   - Des passerelles qui traversent les grands bassins, des échelles chromées pour descendre dans l'eau.
   - Une eau plus vert d'eau, comme une vraie piscine.
 
-## 4.34 — 5 novembre 2026
+## 4.43 — 5 novembre 2026
 - **The Backrooms** — un troisième niveau : le Level 37, les Poolrooms. Le monte-charge de l'entrepôt ne remonte plus : il descend dans un complexe de bassins carrelés blancs et cyan, immense, lumineux et désespérément vide.
   - Des pataugeoires où l'on marche avec de l'eau aux chevilles, de grands bassins avec leur plage et leurs margelles, des couloirs inondés, des halles à colonnes rondes.
   - L'eau ralentit : plus elle est profonde, plus on avance lentement, et on s'y enfonce.
@@ -39,12 +39,94 @@
   - Pour sortir : retrouver les 3 volants de vanne dans les locaux techniques, puis les rapporter à l'ascenseur. Quand les vannes sont fermées, les pompes s'arrêtent d'un coup.
   - L'entité ne sort pas de l'eau ici… mais il arrive qu'une ombre passe au fond d'un bassin, et que le niveau de l'eau ne soit plus tout à fait le même.
 
-## 4.33 — 5 novembre 2026
+## 4.42 — 5 novembre 2026
 - **The Backrooms** — quand l'entité approche, plus de grésillement électrique ni de lumière rouge : on l'entend venir à ses cris et à ses pas.
 
-## 4.32 — 5 novembre 2026
+## 4.41 — 5 novembre 2026
 - **The Backrooms** — avec les monstres VIP, l'entité du Level 0 prend aussi le grand corps en 3D, avec le visage de sa photo d'origine.
 - **The Backrooms** — l'entité garde sa vraie posture : sa tête ne se replie plus peu à peu sur son corps.
+
+## 4.40 — 5 novembre 2026
+- **Odyssée** — La fin des nouveautés pour faire vivre le monde.
+  - Fossiles : on en trouve en grattant les parois scintillantes des grottes (Nautile, Racine, Griffe, Crâne, Armure, Couvercle, Plume, Mâchoire, Nageoire). Le Dr Silex, à la mine de Pierrefort, les ranime tous.
+  - Concours Pokémon à Floralia, une fois par jour : Beauté, Force, Grâce ou Sagesse selon le jour, avec un classement et des prix.
+  - Fête de village le vendredi et le samedi soir à Bourg-Aube et dans les petits villages : guirlandes de lanternes, musicien, danseurs et un stand de loterie.
+  - Deux nouvelles petites quêtes : le colis du facteur de Voltacité, et le Psykokwak perdu de Papi Octave, à Floralia.
+  - Échanges en jeu : quatre habitants (Sylvebourg, Voltacité, Port-Granit, Cendrelune) échangent un Pokémon courant contre un compagnon rare, avec son surnom.
+  - Sur les routes : des bancs, des panneaux qui racontent l'histoire du coin, des cyclistes, et des relais où une gardienne offre un thé qui requinque l'équipe (une fois par jour).
+  - Les dresseurs des routes s'entraînent : leur Pokémon sautille à côté d'eux.
+  - En ville, la fumée sort des cheminées, des drapeaux flottent sur les arènes et les Centres Pokémon, les fontaines jaillissent.
+  - Rosée du matin sur l'herbe, ronds dans les flaques quand il pleut.
+  - Dans les grottes, des mineurs et des explorateurs, la roche qui gronde et fait tomber des cailloux, et des Pokémon qui tombent du plafond.
+
+## 4.39 — 5 novembre 2026
+- **Odyssée** — Encore plus de vie sur les routes et dans les villes.
+  - Des colporteurs sur certaines routes vendent de quoi tenir le voyage, et une pierre d'évolution.
+  - Le samedi et le dimanche, une marchande s'installe au centre des villes à arène, avec des objets rares (Super Bonbon, pierres d'évolution…).
+  - Des voyageurs se promènent sur les routes : peintre, randonneur, ornithologue…
+  - Des arbres à baies poussent en bordure des routes : on peut les cueillir une fois par jour.
+  - Dans les grottes, certaines parois scintillent : en les grattant, on trouve des pierres, des objets et parfois une Méga-Gemme (une fois par jour).
+  - Les dresseurs des routes déjà battus redemandent une revanche le lendemain, avec une équipe plus forte, et une récompense à la clé.
+  - Les habitants parlent de tes badges, de la Team Éclipse, de l'heure qu'il est ou du marché du week-end.
+  - Sons d'ambiance : oiseaux le jour, grillons le soir, vagues au bord de l'eau, vent dans la neige, mouettes.
+  - Des papillons volent près des fleurs, des lucioles s'allument le soir et des mouettes survolent la mer.
+
+## 4.38 — 5 novembre 2026
+- **Odyssée** — Le monde est plus vivant.
+  - Des Pokémon en liberté se promènent dans chaque ville, selon le décor : Roucool et Pikachu en ville, Psykokwak au port, Goupix près des volcans, Évoli dans la neige… On peut leur parler.
+  - Sur les routes, on voit des Pokémon sauvages dans les hautes herbes ; ils sautillent d'une touffe à l'autre. Marcher dessus lance le combat contre celui-là.
+  - Les habitants vont plus loin dans leur quartier, et le soir les enfants et une partie des passants rentrent chez eux.
+  - Dans les grottes, des gouttes tombent du plafond, la poussière flotte, des cristaux scintillent et des chauves-souris s'envolent sur ton passage.
+
+## 4.37 — 5 novembre 2026
+- **Odyssée** — La carte de la région est maintenant illustrée comme dans les vrais jeux.
+  - Les îles ont des côtes découpées, avec des plages et de l'écume.
+  - Les montagnes sont dessinées, enneigées au sommet ou fumantes dans les volcans.
+  - Les forêts sont en bosquets d'arbres (sapins dans le froid, feuillage roux en automne).
+  - Chaque ville est une petite place avec ses maisons, au milieu d'une clairière ronde : toits dorés pour les arènes, violets pour la Ligue, gris tant qu'on n'y est pas allé.
+
+## 4.36 — 5 novembre 2026
+- **Odyssée** — Carte de la région : les villes ne sont plus des rectangles, ce sont des taches arrondies qui se fondent dans le paysage.
+
+## 4.35 — 5 novembre 2026
+- **Odyssée** — Nouvelle carte de la région, plus belle : relief ombré, plages, mer qui fonce au large, couleurs propres à chaque coin (neige, volcans, désert, marais, automne).
+  - Les villes ressortent en places claires, et la mer entoure la région au lieu de bandes noires.
+
+## 4.34 — 5 novembre 2026
+- **Odyssée** — Carte de la région : la vue « Toute la région » est de nouveau centrée dans le cadre.
+  - Le nom d'une ville au bord de la carte n'est plus coupé.
+
+## 4.33 — 5 novembre 2026
+- **Odyssée** — La région devient immense : plus de sept fois plus grande, pour partir vraiment à l'aventure.
+  - Les villes et villages sont trois fois plus grands : rues, places, marchés, parcs, ports et phares, maisons avec jardins, et plus de mille maisons où entrer.
+  - Six nouvelles villes dans les Terres du Sud, chacune avec son caractère : Port-Lisière, Marais-Noir, Dunes d'Ocre, Forge-Acier, Rosebrume et Ombreval.
+  - Les routes sont trois à quatre fois plus longues (sauf la route 1) et serpentent entre prairies, bosquets et collines : on ne sait jamais vraiment où mène le chemin.
+  - Près de 70 lieux cachés dans la forêt entre les routes : hameaux, fermes, lacs, ruines, campements…
+  - La Ligue s'installe sur le Plateau Céleste, au cœur d'une vraie chaîne de montagnes enneigées.
+  - Au sud, les Hauts d'Ocre : des plateaux rocheux et leurs oasis.
+  - Ta partie en cours repart du Centre de soins de la dernière ville visitée.
+- **Odyssée** — La région change de visage :
+  - Maisons, centres, boutiques, laboratoire, Ligue, casino et bourse passent en fausse 3D ; leurs fenêtres s'allument la nuit.
+  - Nouvelles arènes à portique et voûte, coiffées de la statue de leur Champion.
+  - Du relief partout : talus de pelouse, falaises à longer, routes sinueuses qui montent et descendent, un désert et le Canyon d'Ocre.
+  - Deux montagnes à gravir, le Mont Lunaire et le Mont Givré, avec leurs lacets et leurs passerelles au-dessus des ravins.
+  - La Forêt des Torii rejoint la carte, plus grande : sentiers, ruisseau, jardin d'automne, et deux tours anciennes à découvrir.
+  - Le Bois Murmure devient une forêt dense et sombre, avec ses cabanes et ses mystères.
+  - La mine de Pierrefort : trois niveaux à explorer.
+  - Une usine Poké Ball monumentale à Pierrefort.
+  - L'archipel et les îles de l'Est se rejoignent en bateau, au-delà des tourbillons.
+  - Les hautes herbes bougent et s'écartent quand on y entre ; l'ancien sol ne réapparaît plus quand la carte change.
+  - Casino de Métropole : poker Texas Hold'em, tables dessinées et salle d'arcade à quatre bornes.
+  - Le professeur Orme et son Méga-Anneau t'attendent toujours à Port-Granit, à côté de l'arène.
+
+## 4.32 — 5 novembre 2026
+- **Arcadia** — Les 18 jeux se jouent à la manette.
+  - DavidSimulator, Tête de Calcul, Bastion Clash, Fil Rouge et Mini-Golf Party : un curseur se déplace au stick, A clique (maintenu pour glisser), X fait le clic droit et les gâchettes zooment.
+  - Birdie Party, Poké Duel et Odyssée : la croix et le stick remplacent les flèches, A valide, B annule.
+  - La fiche de chaque jeu indique ses commandes à la manette.
+- **The Backrooms** — Manette : stick gauche pour avancer, stick droit pour regarder, A ramasse, X utilise, Y allume la lampe, RB change d'objet, B siffle, LB court.
+- **Poké Duel** — Nouvelle description et nouvelles commandes dans la fiche : des centaines de Pokémon, le double façon VGC et le 2 contre 2.
+- **Accueil** — La présentation du site parle bien des 18 jeux.
 
 ## 4.31 — 5 novembre 2026
 - **The Backrooms** — au Level 0, les piliers ne se ressemblent plus : colonnes rondes, piliers carrés fins ou épais, piliers pleins, et de gros blocs dans les grandes salles. On passe à côté des plus fins.

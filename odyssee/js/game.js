@@ -1,6 +1,7 @@
 // odyssee/js/game.js — le jeu : déplacements sur la grille, PNJ, dresseurs, rencontres, capacités de terrain (Coupe,
 // Surf, Éclate-Roc, Vol), menus, histoire (les quinze arènes et l'archipel des trois frères), sauvegarde
 import { T, walkable, isGrassEnc, DIRS, OPP } from './world/tiles.js';
+import { nearestWalkable } from './world/mapgen.js';
 import { MEGAS_OF, MEGA_RING, LEGEND, STONE_FORM, revertMegas } from './core/mega.js';
 import { MEGA_FORMS } from './core/mega.js';
 import { createMon, monName, healFull, levelEvolution, itemEvolution, evolve, setUidBase, levelCap, ensureNature } from './core/mon.js';
@@ -9,7 +10,8 @@ import { ITEMS, itemName, applyItem, canUseOn, useCandy, formatFindItem, formatO
 import { SPECIES } from './data/species.js';
 import { MOVES } from './data/moves.js';
 import { SAUVAGE, R } from './data/remplacants.js';
-import { STARTERS, STARTER_CHOICES, STARTER_TABLE, starterSlot, RIVAL_NAME, BADGES, LEADERS, FIELD } from './world/region.js';
+import { STARTERS, STARTER_CHOICES, STARTER_TABLE, starterSlot, RIVAL_NAME, BADGES, LEADERS, FIELD, CARTE_VERSION } from './world/region.js';
+import { migrerCarte } from './world/migration.js';
 import { BattleView } from './ui/battleView.js';
 import { Hud } from './ui/hud.js';
 import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, naturePcScreen, moveRelearnerScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, questsScreen, trophiesScreen, showTrophyToast, hofScreen, pantheonScreen, friendsScreen } from './ui/screens.js';
@@ -25,10 +27,13 @@ import { storyTalk, storyTrigger, storyWin, lugiaBattle, placeLugia, purify, ove
 import { syncJournal } from './core/questsData.js';
 import { QUIZ } from './world/arenes.js';
 import { casinoScreen, bourseScreen, entretienPierre } from './ui/metropole.js';
+import { arcadeScreen } from './ui/arcade.js';
 import { apparenceScreen } from './ui/apparence.js';
 import { preparerDomaine, frigo, architecte, recolter, allerDomaine, resident, arrivees } from './ui/domaine.js';
 import { composer } from './render/tenue.js';
 import { buildRivalParty, getRivalItems } from './world/rival.js';
+import { Vie, parlerFaune, rentreLeSoir } from './vie.js';
+import { VieMonde, colporteur, marche, cueillir, fouiller, revanchePossible, revanche, noteCombat, ragot, echange, relais, concours, loterie, musicien } from './vie-monde.js';
 
 /** météos qui comptent en combat (brume et cendres ne sont que du décor, comme dans les jeux 5G) */
 const BATTLE_WEATHERS = ['rain', 'sun', 'sandstorm', 'hail'];
@@ -114,6 +119,10 @@ export class Game {
     Object.assign(this, { view, ui, input, sound, world });
     this.busy = false; this.player = null; this.npcs = []; this.items = [];
     this.bv = new BattleView(this);
+    this.vie = new Vie(this);
+    this.vieMonde = new VieMonde(this);
+    this.jour = () => new Date();
+    this.followerOk = (sp) => CHAR_ROWS['poke:' + sp] != null;
     this.autoRun = false;
     try { this.autoRun = localStorage.getItem('odyssee-autorun') === '1'; } catch (e) {}
     this.runSpeed = 1; // 0: Normale (1×), 1: Rapide (1.7×), 2: Turbo (2.5×)
@@ -177,7 +186,7 @@ export class Game {
       party: [], box: [], bag: { potion: 1 }, dex: { seen: [], caught: [], seenCount: {} }, time: 0, visited: ['aube'], repel: 0,
       cleared: {}, surf: false, explored: [], journal: {},
       pvp: { totalWins: 0, totalLosses: 0, totalDraws: 0, currentStreak: 0, bestStreak: 0, players: {}, trophies: {} },
-      lastCenter: { map: 'aube:maison', x: 4, y: 5, dir: 'up' }, ...this.world.start,
+      lastCenter: { map: 'aube:maison', x: 4, y: 5, dir: 'up' }, ...this.world.start, carte: CARTE_VERSION,
     };
   }
   save(silent = false) {
@@ -203,6 +212,14 @@ export class Game {
   }
 
   async start(state) {
+    // partie d'avant le remaniement de la carte du monde : elle reprend au Centre de la dernière ville visitée
+    // (world/migration.js) ; badges, équipe, objets, quêtes et dresseurs battus ne bougent pas
+    const repriseVille = migrerCarte(state, this.world);
+    // ancienne partie arrêtée sur une carte qui n'existe plus (lieu déplacé sur la carte du monde) ou dans un décor
+    // qui a changé (falaise, arbre) : on la reprend sur la case libre la plus proche
+    const mv = this.world.moved?.[state.map];
+    if (mv) Object.assign(state, { map: mv.map, x: mv.x, y: mv.y, dir: mv.dir || state.dir, surf: false });
+    if (state.map === 'monde' && !state.surf && !walkable(this.world.maps.monde.get(state.x, state.y))) [state.x, state.y] = nearestWalkable(this.world.maps.monde, state.x, state.y);
     this.state = state; this._seen = null;
     revertMegas(state.party); revertMegas(state.box);
     this.stepLock = false; this.stepGap = false;
@@ -216,8 +233,14 @@ export class Game {
     this._wxTimer = setInterval(() => { try { this.view?.setWeather(this.getMapWeather()); } catch (e) {} }, 30000);
     this.hud?.update(true);
     this.link?.hello();
+    this.view.update(0, this.player.x, this.player.y); await this.view.solPret?.();   // le sol généré est prêt avant d'ouvrir l'écran
     await this.ui.fade(false, 400);
-    if (!state.flags.intro) { state.flags.intro = true; this.busy = true; await this.ui.say(['Une douce lumière filtre à travers les rideaux...', `Aujourd'hui, ${state.name}, ton aventure commence !`, 'Le Prof. Saule t\'attend à son laboratoire, au sud-est du village.', 'Appuie sur H à tout moment pour revoir les touches.']); this.busy = false; }
+    if (!state.flags.intro) { state.flags.intro = true; this.busy = true; await this.ui.say(['Une douce lumière filtre à travers les rideaux...', `Aujourd'hui, ${state.name}, ton aventure commence !`, 'Le Prof. Saule t\'attend à son laboratoire, le grand bâtiment blanc au cœur du village.', 'Appuie sur H à tout moment pour revoir les touches.']); this.busy = false; }
+    else if (repriseVille) {
+      this.busy = true;
+      await this.ui.say(['La région d\'Odyssée s\'est agrandie pendant ton absence : les villes ont poussé, les routes serpentent plus loin.', `Tu reprends ton voyage au ${repriseVille.centerId ? 'Centre de soins de ' + repriseVille.name : 'calme de ta maison'}.`]);
+      this.busy = false; this.save(true);
+    }
   }
   hour() { if (this.eclipseOn()) return 0.5; if (this.hourOverride != null) return this.hourOverride; const d = new Date(); return d.getHours() + d.getMinutes() / 60; }
   /** la nuit violette, entre la victoire contre Nocturne au repaire et le réveil de Lugia */
@@ -235,6 +258,8 @@ export class Game {
     if (this.strengthOn !== m.id) this.strengthOn = null;
     this.view.eclipse = this.eclipseOn();
     this.view.setMap(m);
+    this.vie?.onMap(m);
+    this.vieMonde?.onMap(m);
     const st = this.state;
     this.npcs = m.npcs.filter((n) => this.npcVisible(n)).map((n) => this.npcState(n));
     // le rival attend au labo tant que le premier combat n'a pas eu lieu
@@ -320,6 +345,7 @@ export class Game {
   npcVisible(n) {
     const f = this.state.flags;
     if (n.when && !n.when(f, this)) return false;   // PNJ de quête : présent selon l'avancée
+    if (rentreLeSoir(n, this)) return false;          // le soir, les enfants et une partie des passants sont rentrés
     if (n.gate) return this.gateClosed(n.gate);
     if (n.vanish && f['T:' + n.id]) return false;    // sbire de la Team Éclipse battu : il s'en va
     if (n.showIf && !f[n.showIf]) return false;
@@ -385,6 +411,7 @@ export class Game {
     if ((m.outdoor || m.floor === 'cave') && name !== this.zoneName) { this.zoneName = name; this.ui.banner(name); }
     if (z?.town && !this.state.visited.includes(z.town)) this.state.visited.push(z.town);
     this.zone = z; this.explore();
+    this.view.ombreCible = (m.outdoor && z?.ombre) || 1;   // sous-bois : l'image s'assombrit doucement
     if (!this.musicLock) this.sound.play(p.surf && m.outdoor ? 'route2' : (z && z.music) || m.music);
     this.zone = z;
     try { this.view?.setWeather(this.getMapWeather()); } catch (e) {}
@@ -400,6 +427,7 @@ export class Game {
     this.setMap(to.map);
     this.view.update(0, this.player.x, this.player.y);
     this.save(true);
+    await this.view.solPret?.();   // l'écran se rouvre sur le sol généré, jamais sur l'ancien
     await this.ui.doorTransition(false, 240);
     if (this.mapObj.dark && this.mapObj.dark !== 'arene' && this.canField('flash') && this.lead()) await this.ui.say(`${monName(this.lead())} utilise Flash !\nLa grotte s'éclaire.`, { auto: 900 });
     await this.onEnterMap(from);
@@ -418,19 +446,38 @@ export class Game {
     if (this.mapObj.id === 'domaine' && st.domaine) await arrivees(this);   // des Pokémon dont l'habitat est prêt viennent s'installer
     { const h = this.hour(); if (h >= 20 || h < 5) st.flags['VN:' + this.mapObj.id] = true; }
     // au labo, le professeur accueille le joueur avant qu'il ne touche aux capsules
-    // Tour de la Grue : trois bêtes s'enfuient à l'arrivée du joueur
-    if (this.mapObj.id === 'grue:tour' && !st.flags.beasts) {
-      st.flags.beasts = true;
-      this.sound.sfx('bang'); this.view.shake = 0.25;
-      await this.ui.say(['Un grondement fait trembler le plancher de la tour...', 'Trois créatures bondissent devant toi et s\'enfuient par la porte !', 'Un éclair jaune... une flamme... un souffle cristallin...', 'Raikou, Entei et Suicune se sont dispersés dans les îles.']);
-      await this.ui.flash(2, '#ffffff', 80);
-    }
+    // sous-sol de la Tour Cendrée : trois bêtes se réveillent à l'arrivée du joueur et s'enfuient (m.betes : [espèce, x, y])
+    if (this.mapObj.betes && !st.flags.beasts) await this.reveilBetes();
     if (this.mapObj.id === 'aube:labo' && !st.flags.metProf) {
       const prof = this.npcs.find((n) => n.id === 'prof');
       await this.playerWalk('up', 2);
       if (prof) prof.dir = 'down';
       await this.script('prof', prof);
     }
+  }
+
+  /** les trois bêtes du sous-sol de la Tour Cendrée : elles dorment, se réveillent, bondissent vers l'échelle et
+   *  disparaissent ; on les croise ensuite dans les îles (légendaires `cond: 'beasts'`) */
+  async reveilBetes() {
+    const st = this.state, m = this.mapObj, v = this.view, ids = m.betes.map(([sp]) => 'betes:' + sp);
+    st.flags.beasts = true;
+    const imgs = await Promise.all(m.betes.map(([sp]) => loadImg(ASSETS.front(sp)).catch(() => null)));
+    if (this.mapObj !== m) return;
+    const acteurs = m.betes.map(([sp, x, y], i) => { if (!imgs[i]) return null; const a = v.imageActor(ids[i], imgs[i], 0.5); v.place(a, x, y - 0.1); return a; });
+    await this.ui.say(['Au fond du sous-sol, trois grandes créatures se tiennent immobiles dans la cendre, les yeux clos...', 'Elles respirent lentement, comme si elles dormaient depuis très longtemps.']);
+    this.sound.sfx('bang'); v.shake = 0.3;
+    this.sound.cry(ASSETS.cry(m.betes[1]?.[0] ?? m.betes[0][0]));
+    await this.ui.say('Les trois créatures ouvrent les yeux et se dressent d\'un bond !');
+    // chacune file à son tour vers l'échelle, en sautant, puis s'évanouit
+    const [ex, ey] = m.betesSortie || [2, 3];
+    for (let i = 0; i < m.betes.length; i++) {
+      const a = acteurs[i]; if (!a) continue;
+      const [, x0, y0] = m.betes[i], t0 = performance.now(), dur = 520;
+      for (let t = 0; t < 1; t = (performance.now() - t0) / dur) { v.place(a, x0 + (ex - x0) * t, y0 - 0.1 + (ey - y0) * t, Math.sin(t * Math.PI) * 0.8); await wait(16); }
+      v.removeActor(ids[i]);
+    }
+    await this.ui.flash(2, '#ffffff', 80);
+    await this.ui.say(['Un éclair jaune... une flamme... un souffle cristallin...', 'Raikou, Entei et Suicune se sont enfuis de la tour et dispersés dans les îles.']);
   }
 
   /* ================= boucle ================= */
@@ -473,6 +520,8 @@ export class Game {
     }
     // PNJ et autres joueurs
     for (const n of this.npcs) this.npcTick(n, dt);
+    this.vie?.tick(dt);
+    this.vieMonde?.tick(dt);
     this.peersTick?.(dt);
     // la carte n'est pas redessinée sous un combat ou un écran plein cadre
     if (this.bv.alive || this.ui.root.querySelector('.screen')) { this.drawTags?.(false); return; }
@@ -497,7 +546,7 @@ export class Game {
     if (bike) {
       const b = v.actor('velo', { kind: 'item' }), k = 'velo_' + { down: 's', up: 'n', left: 'w', right: 'e' }[p.dir], r = v.S.rects[k];
       if (r && b.veloKey !== k) { v.setSpriteRect(b, r, r.w, r.h); b.veloKey = k; b.shadow.visible = false; }
-      b.mesh.position.set(px + 0.5, hop - 6 * HPX, py + (p.dir === 'up' ? 0.62 : 0.6));
+      b.mesh.position.set(px + 0.5, hop - 6 * HPX + v.hAt(px + 0.5, py + 0.55), py + (p.dir === 'up' ? 0.62 : 0.6));
     } else if (v.actors.has('velo')) v.removeActor('velo');
     const t = this.mapObj.get(Math.round(px), Math.round(py));
     // sur l'eau : le joueur flotte sur le dos d'une créature, entouré d'un sillage
@@ -508,11 +557,11 @@ export class Game {
     this.drawPeers?.(); this.drawTags?.(true);
     if (p.surf) {
       const w = v.actor('wake', { kind: 'flat' }); if (!w.wakeSet) { const r = v.S.rects.wake; v.setSpriteRect(w, r, r.w, r.h); w.wakeSet = true; w.shadow.visible = false; }
-      w.mesh.position.set(px + 0.5, 0.01 + bob * 0.3, py + 0.62); w.mesh.rotation.x = -1.1;
+      w.mesh.position.set(px + 0.5, 0.01 + bob * 0.3 + v.hAt(px + 0.5, py + 0.62), py + 0.62); w.mesh.rotation.x = -1.1;
     } else if (v.actors.has('wake')) v.removeActor('wake');
     if (p.bang) {
       const b = v.actor('bang:player', { kind: 'bang' });
-      b.mesh.position.set(px + 0.5, 34 * HPX, py + 0.56);
+      b.mesh.position.set(px + 0.5, 34 * HPX + v.hAt(px + 0.5, py + 0.55), py + 0.56);
     } else if (v.actors.has('bang:player')) {
       v.removeActor('bang:player');
     }
@@ -522,7 +571,7 @@ export class Game {
       const na = v.actor('npc:' + n.id, {});
       v.setFrame(na, n.sprite, n.dir, sf); v.place(na, nx, ny, 0, isGrassEnc(this.mapObj.get(n.x, n.y)) && !n.move);
       { const gx = Math.round(nx), gy = Math.round(ny); v.cover(na, ...(isGrassEnc(this.mapObj.get(gx, gy)) ? [gx, gy] : [null])); }
-      if (n.bang) { const b = v.actor('bang:' + n.id, { kind: 'bang' }); b.mesh.position.set(nx + 0.5, 34 * HPX, ny + 0.56); }
+      if (n.bang) { const b = v.actor('bang:' + n.id, { kind: 'bang' }); b.mesh.position.set(nx + 0.5, 34 * HPX + v.hAt(nx + 0.5, ny + 0.55), ny + 0.56); }
       else if (v.actors.has('bang:' + n.id)) v.removeActor('bang:' + n.id);
     }
     v.update(dt, px, py);
@@ -559,7 +608,7 @@ export class Game {
     // en surf : on glisse sur l'eau, et on descend sur la berge
     if (p.surf) {
       if (m.in(tx, ty) && t === T.WATER && !this.occupied(tx, ty)) { p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur: SURF }; p.walking = true; return; }
-      if (m.in(tx, ty) && walkable(t) && t !== T.DOOR && t !== T.BRIDGE && !this.occupied(tx, ty)) { p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur: 0.25, jump: true, land: true }; p.walking = true; this.sound.sfx('ledge'); return; }
+      if (m.in(tx, ty) && walkable(t) && t !== T.DOOR && t !== T.BRIDGE && !this.occupied(tx, ty) && m.height(tx, ty) === m.height(p.x, p.y)) { p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur: 0.25, jump: true, land: true }; p.walking = true; this.sound.sfx('ledge'); return; }
       p.walking = false; if (p.bumpT <= 0) { this.sound.sfx('bump'); p.bumpT = 0.3; } return;
     }
     // Force : pousser un rocher
@@ -576,7 +625,7 @@ export class Game {
       const lx = tx + dx, ly = ty + dy;
       if (walkable(m.get(lx, ly)) && !this.occupied(lx, ly)) { p.move = { fx: p.x, fy: p.y, tx: lx, ty: ly, t: 0, dur: 0.42, jump: true }; p.walking = true; this.sound.sfx('ledge'); return; }
     }
-    if (m.in(tx, ty) && walkable(t) && !this.occupied(tx, ty) && m.height(tx, ty) === m.height(p.x, p.y)) {
+    if (m.in(tx, ty) && walkable(t) && !this.occupied(tx, ty) && m.canStep(p.x, p.y, tx, ty)) {
       const dur = this.onBike() ? VELO : isRunning ? this.runDur(isTurbo) : WALK;
       p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur }; p.walking = true;
       return;
@@ -618,9 +667,16 @@ export class Game {
     // rencontres sauvages : hautes herbes, grottes, et la mer de l'archipel quand on surfe
     const enc = this.noEnc ? null : m.outdoor ? z?.enc : m.encounter;   // noEnc : version test, rencontres coupées
     if (p.surf && t === T.WATER && !this.noEnc) { const sea = m.zoneAt(p.x, p.y), enc = sea?.surfEnc || sea?.enc || m.surfEnc; if (enc && Math.random() < 0.05) await this.wildBattle(enc); return; }
+    // un Pokémon visible dans l'herbe : on lui marche dessus, c'est lui qu'on affronte
+    const vu = m.outdoor && !this.noEnc ? this.vie?.at(p.x, p.y) : null;
+    if (vu) { this.vie.remove(vu); await this.wildBattle([vu.e]); return; }
     if (enc && (isGrassEnc(t) || (!m.outdoor && t === T.CAVE))) {
       const rate = isGrassEnc(t) ? (t === T.DARKTALL ? 0.12 : 0.1) : 0.065;
-      if (Math.random() < rate) await this.wildBattle(enc);
+      if (Math.random() < rate) {
+        // dans les grottes, il arrive qu'un Pokémon tombe du plafond
+        if (!m.outdoor && t === T.CAVE && Math.random() < 0.3) await this.vie?.embuscade();
+        await this.wildBattle(enc);
+      }
     }
   }
 
@@ -651,6 +707,7 @@ export class Game {
     await this.ui.fade(true, 140);
     p.x = o.to[0]; p.y = o.to[1]; p.dir = o.dir || p.dir; p.move = null;
     this.view.update(0, p.x, p.y); this.resetFollower?.();
+    await this.view.solPret?.();
     await this.ui.fade(false, 140);
   }
   /** gardien du savoir (arène Feu) : une bonne réponse et il s'écarte ; une mauvaise, et il faut le battre */
@@ -668,6 +725,8 @@ export class Game {
   }
   /** tables du Casino et terminaux de la Bourse (objets des intérieurs de Métropole) */
   casino(quoi) { return casinoScreen(this, quoi); }
+  /** bornes de la salle d'arcade du Casino */
+  arcade(jeu) { return arcadeScreen(this, jeu); }
   bourse() { return bourseScreen(this); }
   /** accueil d'une arène : le guide présente le Champion et demande si l'on est prêt ; oui = enfermé jusqu'à la victoire ou
    *  la défaite, non = on ressort pour se préparer */
@@ -711,7 +770,8 @@ export class Game {
     n.dir = d;
     if (n.def.move === 'wander' && Math.random() < 0.6) {
       const [dx, dy] = DIRS[d], tx = n.x + dx, ty = n.y + dy;
-      if (Math.abs(tx - n.home[0]) <= 2 && Math.abs(ty - n.home[1]) <= 2 && walkable(this.mapObj.get(tx, ty)) && !this.occupied(tx, ty, n) && this.mapObj.get(tx, ty) !== T.DOOR && this.mapObj.get(tx, ty) !== T.MAT) {
+      const R = n.def.roam || (/:h\d+$/.test(n.id) ? 4 : 2);
+      if (Math.abs(tx - n.home[0]) <= R && Math.abs(ty - n.home[1]) <= R && walkable(this.mapObj.get(tx, ty)) && this.mapObj.canStep(n.x, n.y, tx, ty) && !this.occupied(tx, ty, n) && this.mapObj.get(tx, ty) !== T.DOOR && this.mapObj.get(tx, ty) !== T.MAT) {
         n.move = { fx: n.x, fy: n.y, t: 0, dur: 0.32 }; n.x = tx; n.y = ty;
       }
     }
@@ -807,6 +867,8 @@ export class Game {
         const L = (this.legends || []).find((q) => (q.x === fx && q.y === fy) || (q.x === fx + dx && q.y === fy + dy && walkable(t)));
         if (L) await this.legendBattle(L);
         else if (it) await this.pickItem(it);
+        else if (o?.type === 'baies') await cueillir(this, o);
+        else if (o?.type === 'fouille') await fouiller(this, o);
         else if (o?.use) await o.use(this.api(), o, fx, fy);
         else if (o?.type === 'pc') await pcScreen(this);
         else if (o?.type === 'naturepc') await naturePcScreen(this);
@@ -830,6 +892,7 @@ export class Game {
     try {
       if (d.trainer) {
         if (!st.flags['T:' + n.id]) await this.trainerBattle(n, false);
+        else if (revanchePossible(this, n)) await revanche(this, n);
         else {
           await this.ui.say(d.trainer.after || 'Quel combat !', {
             speaker: d.trainer.cls ? `${d.trainer.cls} ${d.trainer.name}` : d.trainer.name,
@@ -843,7 +906,7 @@ export class Game {
       else if (d.role === 'relearner') await moveRelearnerScreen(this);
       else if (d.talk) await d.talk(this.api(), n);
       else if (d.script) await this.script(d.script, n);
-      else if (d.text) await this.ui.say(d.text, {
+      else if (d.text) await this.ui.say(/:h\d+$/.test(n.id) && Math.random() < 0.4 ? ragot(this) : d.text, {
         speaker: d.name || n.name || (d.who ? d.who : null),
         face: d.sprite || n.sprite
       });
@@ -941,13 +1004,13 @@ export class Game {
     const st = this.state, ui = this.ui, docks = this.world.docks, here = n.def.dock, sp = 'Capitaine';
     // sans permis bateau, on ne monte pas à bord : l'examen se passe à la Capitainerie de Port-Azur
     if (!st.bag['permis-bateau']) {
-      await ui.say(['Ahoy, moussaillon ! Tu veux voir les îles de l\'Est ?', 'Pas sans ton permis bateau ! La Capitainerie de Port-Azur fait passer l\'examen.', 'Reviens avec, et je te fais embarquer.'], { speaker: sp });
+      await ui.say(['Ahoy, moussaillon ! Tu veux prendre la mer ?', 'Pas sans ton permis bateau ! La Capitainerie de Port-Azur fait passer l\'examen.', 'Reviens avec, et je te fais embarquer.'], { speaker: sp });
       if (!st.flags['Q:permis']) { st.flags['Q:permis'] = 1; this.refreshNpcs(); }
       return;
     }
     if (!st.flags.passe) {
       st.flags.passe = true; this.give('ferry-ticket'); this.sound.sfx('item');
-      await ui.say(['Ahoy, moussaillon ! Mon bateau fait le tour des îles de l\'Est.', 'L\'Île Orageuse pour ceux qui ont 2 badges, l\'Île de la Grue avec 3, et l\'Île Givrée, tout au nord, avec 5.', `Tiens, voici ton Passe Marin.`], { speaker: sp });
+      await ui.say(['Ahoy, moussaillon ! Mon bateau fait le tour des îles de l\'Est.', 'L\'Île Orageuse pour ceux qui ont 2 badges, l\'Île de la Grue avec 3, et l\'Île Givrée, tout au nord, avec 5.', 'Pour l\'archipel des trois frères, au-delà des tourbillons, il faut 5 badges : Drakos n\'aime pas les débutants.', `Tiens, voici ton Passe Marin.`], { speaker: sp });
     }
     const opts = Object.entries(docks).filter(([k, d]) => k !== here && (!d.show || d.show(st.flags))), b = this.badgeCount();
     await ui.say('Où veux-tu aller ?', { keep: true, speaker: sp });
@@ -1499,6 +1562,7 @@ export class Game {
     this.musicLock = false;
     if (res === 'win') {
       st.flags['T:' + n.id] = true;
+      noteCombat(this, n);
       if (d.leader != null) await this.badgeScene(d.leader, tr.name);
       if (typeof d.onWin === 'function') await d.onWin(this.api(), n); else if (d.onWin) await this.script(d.onWin, n);
       if (d.beatenPos) { await this.npcWalk(n, 'right', d.beatenPos[0] - n.x); n.dir = 'down'; n.home = [n.x, n.y]; }
@@ -1544,8 +1608,8 @@ export class Game {
       ],
       5: ['Tiens, la CS03 : Éclate-Roc. Elle brise les rochers fissurés.', 'Tu en auras besoin sur la Grande Île.', 'Drakos est notre frère aîné. Il a perdu la finale de la Ligue contre Célestine, il y a dix ans.', 'Depuis, il a juré qu\'aucun Maître ne dicterait sa loi aux îles. Pyros et moi... nous l\'avons suivi.'],
       6: this.hasField('vol')
-        ? ['Drakos t\'attend à Fort-Écaille, sur la Grande Île, à l\'ouest.', 'Je vois que tu portes déjà le Sifflet Céleste des Sages de Hautegrue ! Les vents te porteront sans peine jusqu\'à lui.', 'Mon frère a besoin qu\'on le batte. Peut-être qu\'il ouvrira enfin les yeux.']
-        : ['Drakos t\'attend à Fort-Écaille, sur la Grande Île, à l\'ouest.', 'Tiens, prends ce Sifflet Céleste qu\'un pèlerin de la Tour de la Grue m\'a confié. Il appellera un oiseau pour te transporter d\'une ville à l\'autre en un instant !', 'Mon frère a besoin qu\'on le batte. Peut-être qu\'il ouvrira enfin les yeux.'],
+        ? ['Drakos t\'attend à Fort-Écaille, sur la Grande Île, à l\'ouest.', 'Je vois que tu portes déjà le Sifflet Céleste des Sages de la Tour Dorée ! Les vents te porteront sans peine jusqu\'à lui.', 'Mon frère a besoin qu\'on le batte. Peut-être qu\'il ouvrira enfin les yeux.']
+        : ['Drakos t\'attend à Fort-Écaille, sur la Grande Île, à l\'ouest.', 'Tiens, prends ce Sifflet Céleste qu\'un pèlerin de la Tour Dorée m\'a confié. Il appellera un oiseau pour te transporter d\'une ville à l\'autre en un instant !', 'Mon frère a besoin qu\'on le batte. Peut-être qu\'il ouvrira enfin les yeux.'],
       7: ['...Tu te bats comme Célestine. Avec tes créatures, pas contre elles.', 'Les îles resteront libres. Mais j\'arrête de prélever les pêches et de fermer les ports.', 'Va à la Ligue. Et dis à Célestine que le vieux Drakos attend sa revanche.', 'Ah, et le Cap des Étoiles, au nord de la ville, t\'est ouvert. Odyssor y passe parfois...'],
     }[g];
     if (lines) await ui.say(lines, { speaker: name });
@@ -1578,7 +1642,7 @@ export class Game {
     const st = this.state, B = this.rivalB(), sp = 'Prof. Saule';
     const calls = {
       1: ['Allô, ' + st.name + ' ? Deux badges, déjà ! Bravo.', 'Écoute : le capitaine de l\'Embarcadère de l\'Aube, à l\'est de la route 1, emmène les dresseurs aguerris vers les îles de l\'Est.', 'On dit qu\'Électhor, l\'oiseau de foudre, dérègle les orages de l\'Île Orageuse. Ça mérite un coup d\'œil !'],
-      2: ['Trois badges ! Le capitaine peut maintenant t\'emmener à l\'Île de la Grue.', 'Là-bas se dresse la Tour de la Grue. La légende dit que Ho-Oh, l\'oiseau arc-en-ciel, s\'y posait autrefois.', 'La doyenne de Hautegrue connaît cette histoire mieux que personne.'],
+      2: ['Trois badges ! Le capitaine peut maintenant t\'emmener à l\'Île de la Grue.', 'Là-bas vit une doyenne qui connaît la légende de Ho-Oh, l\'oiseau arc-en-ciel, mieux que personne.', 'Il paraît qu\'il se posait autrefois sur une tour dorée...'],
       3: ['Quatre badges... Tu vas bientôt passer à Mirage.', 'Au fait, ' + st.name + ', je ne t\'en ai jamais parlé : j\'ai un' + (B.e ? 'e ' : ' ') + B.fils + ', ' + B.name + '.', B.name + ' a grandi à Port-Granit, sur les îles. Le lendemain de ton départ, ' + B.il + ' est passé' + B.e + ' au labo et a pris la troisième capsule.', 'Depuis, ' + B.il + ' ne répond plus à mes appels. On dit qu\'' + B.il + ' s\'est engagé' + B.e + ' chez les Gardes d\'Écaille de Drakos...', 'Si tu ' + B.le + ' croises, dis-lui que son grand-père pense à ' + (B.e ? 'elle' : 'lui') + '.'],
       4: this.eclipseOn() ? ['Cinq badges ! Et Surf, en plus. Écoute bien, ' + st.name + '.', 'Cette nuit violette ne finira pas toute seule. Si la Team Éclipse a vraiment fermé le cœur de Lugia...', 'La voyante de Mirage connaît les légendes de la mer. Elle saura où dort Lugia. Va la voir avant de partir pour l\'archipel !'] : ['Cinq badges ! Avec Surf, tu peux rejoindre l\'archipel des trois frères, au sud du Cap Mirage.', 'Et le capitaine t\'emmènera aussi à l\'Île Givrée, tout au nord. Artikodin y vivrait... et plus profond encore, Lugia.'],
       7: ['Tu as battu Drakos ?! Toute la région en parle.', st.flags.rivalB3 ? B.name + ' m\'a appelé. Pour la première fois depuis des mois. ' + (B.e ? 'Elle' : 'Il') + ' a quitté les Gardes d\'Écaille.' : 'J\'espère que mon' + (B.e ? 'e ' : ' ') + B.fils + ' va bien, là-bas...', 'Il ne te reste plus que la Ligue. Mais avant, va donc voir le Cap des Étoiles, au nord de Fort-Écaille.'],
@@ -1604,6 +1668,7 @@ export class Game {
       const [dx, dy] = DIRS[n.dir];
       for (let k = 1; k <= tr.sight; k++) {
         const x = n.x + dx * k, y = n.y + dy * k;
+        if (!m.canStep(x - dx, y - dy, x, y)) break;   // pas de regard par-dessus une falaise
         if (x === p.x && y === p.y) { await this.trainerBattle(n, true); return true; }
         if (!walkable(m.get(x, y)) || this.npcs.some((q) => q !== n && q.x === x && q.y === y)) break;
       }
@@ -1728,6 +1793,7 @@ export class Game {
     this.player.x = c.x; this.player.y = c.y; this.player.dir = c.dir || 'up'; this.player.surf = false;
     this.setMap(c.map);
     this.view.update(0, this.player.x, this.player.y); this.view.render();
+    await this.view.solPret?.();
     await this.ui.fade(false, 400);
     await this.ui.say([`${st.name} a perdu ${lost.toLocaleString('fr-FR')} ₽ dans la panique...`, '... ... ...', `${st.name} reprend ses esprits. Ses créatures ont été soignées.`]);
   }
@@ -1960,6 +2026,14 @@ export class Game {
     if (name === 'apparence') return this.apparence();
     if (name === 'architecte') return architecte(this);
     if (name === 'resident') return resident(this, n);
+    if (name === 'faune') return parlerFaune(this, n);
+    if (name === 'colporteur') return colporteur(this, n);
+    if (name === 'marche') return marche(this, n);
+    if (name === 'echange') return echange(this, n);
+    if (name === 'relais') return relais(this, n);
+    if (name === 'concours') return concours(this, n);
+    if (name === 'loterie') return loterie(this, n);
+    if (name === 'musicien') return musicien(this, n);
     if (name === 'mom') {
       if (!st.flags.starter) { await ui.say([`Ah, ${st.name}, tu es enfin réveillé${st.gender === 'f' ? 'e' : ''} !`, 'Le Professeur Saule est passé ce matin. Il t\'attend à son laboratoire, juste au sud-est.', 'Théo y est déjà, bien sûr... Allez, file !'], { speaker: 'Maman' }); return; }
       await ui.say(`${st.name} ! Tu as l'air épuisé${st.gender === 'f' ? 'e' : ''}. Repose-toi un peu.`, { keep: true, speaker: 'Maman' });
@@ -2018,13 +2092,13 @@ export class Game {
     } else if (name === 'doyenne') {
       const sp = 'Doyenne Amaya', f = st.flags;
       if (f['L:hooh'] === 'caught') { await ui.say(['Ho-Oh t\'a choisi... Après tant d\'années.', 'Les trois bêtes errent toujours dans les îles. Raikou sur l\'Île Orageuse, Entei sur le Chemin du Brasier, Suicune près de Givrebourg.', 'Elles ne se laisseront approcher que par un dresseur aguerri (5 badges).'], { speaker: sp }); return; }
-      if (f.plume) { await ui.say(['La Plume Arc-en-ciel et le Sifflet Céleste ! Le Grand Sage t\'a jugé digne de la lignée des gardiens du ciel.', 'Monte sur le toit de la tour. Si Ho-Oh le veut, il descendra vers toi. Et le chant de ton sifflet appellera les oiseaux du ciel où que tu sois.'], { speaker: sp }); return; }
+      if (f.plume) { await ui.say(['La Plume Arc-en-ciel et le Sifflet Céleste ! Le Grand Sage t\'a jugé digne de la lignée des gardiens du ciel.', 'Monte sur le toit de la Tour Dorée. Si Ho-Oh le veut, il descendra vers toi. Et le chant de ton sifflet appellera les oiseaux du ciel où que tu sois.'], { speaker: sp }); return; }
       if (!f.grueQuest) {
         f.grueQuest = true;
-        await ui.say(['Tu viens du continent ? Assieds-toi, que je te raconte.', 'Autrefois, deux tours se dressaient ici. L\'une a brûlé, et trois créatures ont péri dans les flammes.', 'Ho-Oh, l\'oiseau arc-en-ciel, les a ramenées à la vie : ce sont Raikou, Entei et Suicune.', 'Depuis, Ho-Oh ne se pose plus que sur la Tour de la Grue... et seulement devant celui qui porte la Plume Arc-en-ciel.', 'La plume est gardée par le Grand Sage, au sommet de la tour. Gagne le respect des Sages, et peut-être te la confiera-t-il.'], { speaker: sp });
+        await ui.say(['Tu viens du continent ? Assieds-toi, que je te raconte.', 'Là-bas, dans la Forêt des Torii, au sud-ouest de Mirage, deux tours se dressent côte à côte.', 'L\'une a brûlé, et trois créatures ont péri dans les flammes. Ho-Oh, l\'oiseau arc-en-ciel, les a ramenées à la vie : ce sont Raikou, Entei et Suicune.', 'Depuis, Ho-Oh ne se pose plus que sur l\'autre, la Tour Dorée... Nos anciens l\'appelaient la Tour de la Grue, comme notre village.', 'Il ne se pose que devant celui qui porte la Plume Arc-en-ciel. Le Grand Sage la garde, au sommet de la tour. Gagne le respect des Sages, et peut-être te la confiera-t-il.'], { speaker: sp });
         return;
       }
-      await ui.say(['Les Sages t\'attendent dans la tour, au nord du village.', 'Le Grand Sage Hoël garde la Plume Arc-en-ciel au dernier étage.'], { speaker: sp });
+      await ui.say(['Les Sages t\'attendent dans la Tour Dorée, sur le continent : dans la Forêt des Torii, au sud-ouest de Mirage.', 'Le Grand Sage Hoël garde la Plume Arc-en-ciel au dernier étage.'], { speaker: sp });
     } else if (name === 'grandSage') {
       if (st.flags.plume) return;
       st.flags.plume = true; this.give('plume-arc'); this.give('great-ball', 5); this.sound.sfx('item');

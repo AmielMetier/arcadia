@@ -2,12 +2,17 @@
 // arbres / herbes / personnages en sprites verticaux, caméra inclinée en perspective étroite, rendu basse résolution.
 import * as THREE from 'three';
 import { T } from '../world/tiles.js';
+import { pente, ravin, mont } from '../world/relief.js';
 import { buildAtlas, buildAnimAtlas, buildSprites, applySpriteImages, facade, sideWall, roofTex, roofColors, kitColor, PAL, SOL16 } from './textures.js';
 import { SPRITES } from '../data/sprites.js';
 import { Sol } from './sol.js';
 import { archeGrotte, jourGrotte } from './grottes.js';
 import { sorteCase, K as SORTE } from './solgen.js';
 import { WeatherSystem } from './weather3d.js';
+import { choisirModele, geometriesModele, couleurBase, EMPRISES } from './bati-jeu.js';
+import { dessinHerbe, imageHerbe, NIMAGES, MARGE as HERBE_M, HAUTEUR as HERBE_H } from './herbes.js';
+import { Relief3D, relief3dActif, matParoi, matFacettes, facettesActives, matPente, matsPente, LV as R3LV } from './relief3d.js';
+import { setRelief3dSol } from './solgen.js';
 
 export const EL = 55 * Math.PI / 180, FOV = 13;
 
@@ -71,6 +76,25 @@ function screenSprite(mat) {
         gl_Position = vec4( ( sPx / uRes * 2.0 - 1.0 ) * sPC.w, sPC.z + sBias * sPC.w, sPC.w );`);
   };
   mat.customProgramCacheKey = () => 'screenSprite';
+  return mat;
+}
+/**
+ * Herbe de devant (herbes.js) : couchée sur le sol et projetée comme lui, mais sa profondeur est celle du panneau
+ * vertical dressé au bord sud de sa case (z de sa position), là où le rayon de la caméra le traverse : elle passe
+ * devant qui se tient dans la case, derrière ce qui est plus au sud.
+ */
+function herbeDebout(mat) {
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>', `
+        vec4 hW = modelMatrix * vec4( transformed, 1.0 );
+        vec4 mvPosition = viewMatrix * hW;
+        gl_Position = projectionMatrix * mvPosition;
+        float hZ = modelMatrix[3][2];
+        vec3 hQ = cameraPosition + ( hW.xyz - cameraPosition ) * ( ( hZ - cameraPosition.z ) / ( hW.z - cameraPosition.z ) );
+        vec4 hQC = projectionMatrix * viewMatrix * vec4( hQ, 1.0 );
+        gl_Position.z = hQC.z / hQC.w * gl_Position.w;`);
+  };
+  mat.customProgramCacheKey = () => 'herbeDebout';
   return mat;
 }
 const CH = 16;
@@ -162,7 +186,11 @@ function reliefKey(A, b, kind, v) {
 }
 
 /** biome des plateaux de roche dehors (montagnes des entrées de grottes et du bord du monde) */
-function bioDehors(theme) { return theme === 'snow' ? 'glace' : theme === 'volcanic' ? 'magma' : theme === 'beach' || theme === 'sea' ? 'mer' : 'montagne'; }
+function bioDehors(theme) { return theme === 'snow' ? 'glace' : theme === 'volcanic' ? 'magma' : theme === 'beach' || theme === 'sea' ? 'mer' : theme === 'canyon' || theme === 'desert' ? 'ocre' : 'montagne'; }
+/** roche des falaises du dehors (parois, rebords, marches) : celle des montagnes, ocre au désert, brune en forêt */
+function bioFalaise(zone) { const th = zone?.theme; return zone?.roche || (th === 'snow' ? 'glace' : th === 'volcanic' ? 'magma' : th === 'canyon' || th === 'desert' ? 'ocre' : th === 'forest' || th === 'automne' ? 'terre' : 'montagne'); }
+/** herbe (ou neige, sable…) qui déborde en haut d'une falaise */
+function levreFalaise(th) { return th === 'snow' ? 'neige' : th === 'volcanic' ? 'cendre' : th === 'desert' || th === 'canyon' ? 'sable' : th === 'forest' || th === 'foretsombre' ? 'foret' : 'herbe'; }
 /** bruit lisse (valeurs aléatoires sur une grille de `s` cases, interpolées) */
 function lisse(x, y, s) {
   const fx = x / s, fy = y / s, ix = Math.floor(fx), iy = Math.floor(fy); let tx = fx - ix, ty = fy - iy;
@@ -176,7 +204,7 @@ function lisse(x, y, s) {
  *  roche continue. Autour des entrées de grottes, les arbres qui bordent l'entrée deviennent la montagne de la grotte. */
 export function vueCarte(map) {
   if (!map.outdoor && map.floor !== 'cave') return map;
-  const v = Object.create(map); v.ext = true;
+  const v = Object.create(map); v.ext = true; v.base = map;
   const roc = new Set();
   if (map.outdoor) for (const b of map.buildings || []) {
     if (b.kind !== 'cave') continue;
@@ -201,7 +229,7 @@ export function vueCarte(map) {
   const W = map.w, H = map.h, cl = (a, n) => Math.max(0, Math.min(n - 1, a));
   v.get = (x, y) => {
     if (couloir.size && couloir.has(x + ',' + y)) return T.CAVE;
-    if (map.in(x, y)) return roc.size && roc.has(x + ',' + y) ? T.CAVEWALL : map.get(x, y);
+    if (map.in(x, y)) { if (roc.size && roc.has(x + ',' + y)) return T.CAVEWALL; const q = map.get(x, y); return q === T.WHIRL ? T.WATER : q; }   // tourbillon : de l'eau, avec sa spirale par-dessus
     if (!map.outdoor) return T.CAVEWALL;
     const cx = cl(x, W), cy = cl(y, H), d = Math.max(Math.abs(x - cx), Math.abs(y - cy)), b = map.get(cx, cy);
     if (b === T.WATER || b === T.BRIDGE) return T.WATER;
@@ -401,13 +429,21 @@ export class WorldView {
       walls: mk(this.texA),
       // pièces de transition des sols (terrain du bas transparent)
       overlay: mk(this.texA, { alphaTest: 0.5 }),
+      // décor animé posé sur l'eau (tourbillons)
+      animOver: mk(this.texN, { alphaTest: 0.5 }),
     };
     this.tinted = Object.values(this.mat);
     this.glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 32; const x = c.getContext('2d'); const g = x.createRadialGradient(16, 16, 1, 16, 16, 16); g.addColorStop(0, 'rgba(255,240,180,0.9)'); g.addColorStop(0.4, 'rgba(255,210,120,0.35)'); g.addColorStop(1, 'rgba(255,200,100,0)'); x.fillStyle = g; x.fillRect(0, 0, 32, 32); return tex(c); })();
     this.matGlow = new THREE.MeshBasicMaterial({ map: this.glowTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
     this.tint = new THREE.Color(1, 1, 1); this.night = 0;
+    // ombre des sous-bois (zones avec `ombre`, comme le Bois Murmure) : 1 en plein jour, plus bas sous les frondaisons
+    this.ombre = 1; this.ombreCible = 1; this.tintBase = [1, 1, 1];
     this.animFrame = 0; this.animT = 0;
     this.sol = new Sol(this);   // sol en pixel art généré, posé sur chaque bloc (sol.js)
+    // PROTOTYPE (?relief3d) : le sol du dehors en vrai relief (relief3d.js) ; sans le paramètre, rien ne change
+    this.r3dOn = relief3dActif() && this.sol.on; this.r3d = null;
+    this.r3dOrtho = this.r3dOn && !/[?&]r3persp\b/.test(globalThis.location?.search || '');
+    if (this.r3dOn) setRelief3dSol(true);
     this.focus = new THREE.Vector3(); this.shake = 0;
     this.actors = new Map();
     this.root = null;
@@ -429,11 +465,17 @@ export class WorldView {
     for (const a of this.actors.values()) a.dispose?.();
     this.actors.clear();
     map = vueCarte(map);   // hors des bords : la région continue (rendu seulement)
+    this.ombre = this.ombreCible = 1;
     this.map = map; this.root = new THREE.Group(); this.scene.add(this.root);
     this.chunks = new Map(); this.glows = new THREE.Group(); this.root.add(this.glows);
     this.sol.setMap(map);
+    this.r3d = this.r3dOn && map.outdoor && this.sol.couvre(map) ? new Relief3D(map) : null;
+    if (this.r3d && !this.tinted.includes(matParoi())) this.tinted.push(matParoi(), matFacettes());
+    for (const e of this.herbes?.values() || []) e.tex?.dispose(); this.herbes = new Map();   // herbes de devant (herbes.js)
     this.decoAt = new Map(); for (const d of map.deco) this.decoAt.set(d.x + ',' + d.y, d);
     this.tiers = map.outdoor ? null : caveTiers(map); this.biome = caveBiome(map);
+    // relief du dehors : plateaux plus hauts, parois de falaise, marches (world/relief.js)
+    this.relief = !this.r3d && !!map.outdoor && (map.hg?.some((h) => h !== 0) || map.t?.includes(T.CLIFF));
     this.rh = this.tiers && !this.A?.cells?.[`rp_${this.biome}_00`] ? caveHeights(map, this.tiers) : null;
     this.scene.background = new THREE.Color(map.outdoor ? '#1d4f2a' : '#0c0a10');
     if (map.id === 'monde') this.scene.background = new THREE.Color('#1d4f2a');
@@ -460,6 +502,15 @@ export class WorldView {
     if (deco?.k === 'sable') return { c: A.gl_sable };
     if (deco?.k === 'eau') return { anim: this.N.cells.water15 };
     if (t === T.LAVA) return { anim: this.N.cells.lava };
+    // passerelle de bois au-dessus d'un ravin (montagne) : le vide dessous, planches et cordes dans le sens de la traversée
+    if (t === T.BRIDGE && ravin(m, x, y)) {
+      // sens de la traversée : vers les sentiers que la passerelle relie (ou le long de la passerelle)
+      const pont = (a, b) => m.get(a, b) === T.BRIDGE && ravin(m, a, b), terre = (a, b) => m.get(a, b) !== T.CAVEWALL && !pont(a, b);
+      const ew = pont(x - 1, y) || pont(x + 1, y) || terre(x - 1, y) || terre(x + 1, y);
+      const a = ew ? !pont(x, y - 1) : !pont(x - 1, y), b = ew ? !pont(x, y + 1) : !pont(x + 1, y);
+      const d = ew ? !pont(x - 1, y) : !pont(x, y - 1), f = ew ? !pont(x + 1, y) : !pont(x, y + 1);
+      return { c: A[`ravin_${hash(x, y) < 0.5 ? 0 : 1}`], passerelle: A[`passerelle_${ew ? 'ew' : 'ns'}_${(a ? 1 : 0) | (b ? 2 : 0) | (d ? 4 : 0) | (f ? 8 : 0)}`] };
+    }
     if (t === T.BARRIER_R || t === T.BARRIER_B) return { c: A['floor_' + m.floor] || A.floor_wood };
     const isPathish = (q) => [T.PATH, T.PAVE, T.SAND, T.BUILD, T.DOOR, T.BRIDGE, T.SIGN, T.BLOCK, T.MAT].includes(q);
     if (SOL16 && m.outdoor) {
@@ -521,7 +572,7 @@ export class WorldView {
    *  aux quatre cases qui se touchent là (grille décalée d'une demi-case, comme les jeux de tuiles Wang) */
   wangChunk(O, x0, y0) {
     const m = this.map, A = this.A.cells;
-    const water = (x, y) => { const q = m.get(Math.max(0, Math.min(m.w - 1, x)), Math.max(0, Math.min(m.h - 1, y))); return q === T.WATER || q === T.BRIDGE; };
+    const water = (x, y) => { const a = Math.max(0, Math.min(m.w - 1, x)), b = Math.max(0, Math.min(m.h - 1, y)), q = m.get(a, b); return q === T.WATER || (q === T.BRIDGE && !ravin(m, a, b)); };
     const ORDER = ['herbes_neige', 'herbes_bois', 'sable', 'pave', 'neige', 'cendre', 'chemin'];
     const xe = x0 + CH >= m.w && !m.ext ? m.w + 1 : x0 + CH, ye = y0 + CH >= m.h && !m.ext ? m.h + 1 : y0 + CH;
     const couvert = this.sol.couvre() ? (a, b) => sorteCase(m, a, b) !== SORTE.X : null;
@@ -551,7 +602,37 @@ export class WorldView {
     const m = this.map, A = this.A.cells, b = bio || this.biome;
     // au-dessus du sol généré (sol.js) : ses coins arrondis laissent voir le sol fin, pas l'ancien sol de la case
     const yh = this.sol.couvre() ? 0.0049 : 0.004;
-    const rock = (dx, dy) => { const a = x + dx, c = y + dy; return a < 0 || c < 0 || a >= m.w || c >= m.h || m.get(a, c) === T.CAVEWALL; };
+    // dehors, les montagnes ont des gradins (massif, montagne de relief.js) : chaque gradin est un plateau de roche posé
+    // sur le précédent, ses bords en pente comme ceux des grottes ; la roche plus basse est « dehors »
+    // dans une montagne à gravir (relief.js, montagne), le sentier fait partie du gradin quand il est à sa hauteur (ou
+    // plus haut) : la roche sous le bord d'un sentier n'a pas de rebord de ce côté, elle descend en pente vers le bas
+    const h0 = m.outdoor ? m.height(x, y) : 0;
+    const rock = (dx, dy) => {
+      const a = x + dx, c = y + dy; if (a < 0 || c < 0 || a >= m.w || c >= m.h) return true;
+      if (ravin(m, a, c)) return false;
+      const q = m.get(a, c);
+      if (q === T.CAVEWALL) return !m.outdoor || m.height(a, c) >= h0;
+      return m.outdoor && mont(m, a, c) && q !== T.STAIRS && m.height(a, c) >= h0;
+    };
+    if (m.outdoor) {
+      // sous les coins arrondis : le gradin du dessous (ou le vide d'un ravin), pas l'herbe
+      let bas = false;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const a = x + dx, c = y + dy; if (!m.in(a, c) || m.get(a, c) !== T.CAVEWALL) continue;
+        if (!ravin(m, a, c) && m.height(a, c) < h0) bas = true;
+      }
+      // à côté d'un sentier (case praticable), le pied de la paroi laisse voir le sentier : pas de roche dessous
+      const sol = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => m.in(x + dx, y + dy) && m.get(x + dx, y + dy) !== T.CAVEWALL);
+      if (bas && !sol) flat(G, x, y, x + 1, y + 1, yh - 0.0002, A[`rp_${b}_11`], 0.9);
+      // le vide d'un ravin, seulement sous les quarts de case tournés vers lui (pas de noir qui déborde sur la roche)
+      const vide = (a, c) => ravin(m, a, c) && m.get(a, c) === T.CAVEWALL;   // le gouffre (pas une passerelle)
+      for (let qy = 0; qy < 2; qy++) for (let qx = 0; qx < 2; qx++) {
+        const dx = qx ? 1 : -1, dy = qy ? 1 : -1;
+        if (!(vide(x, y + dy) || vide(x + dx, y) && vide(x + dx, y + dy))) continue;
+        const u = A.ravin_0, hu = (u[2] - u[0]) / 2, hv = (u[3] - u[1]) / 2;
+        flat(G, x + qx / 2, y + qy / 2, x + (qx + 1) / 2, y + (qy + 1) / 2, yh - 0.0001, [u[0] + qx * hu, u[1] + qy * hv, u[0] + (qx + 1) * hu, u[1] + (qy + 1) * hv]);
+      }
+    }
     const W = !rock(-1, 0), E = !rock(1, 0), N = !rock(0, -1), S = !rock(0, 1);
     const cols = W && E ? [0, 5] : W ? [0, 1] : E ? [4, 5] : [2, 3];
     const rows = N && S ? [0, 5] : N ? [0, 1] : S ? [4, 5] : [2, 3];
@@ -561,6 +642,11 @@ export class WorldView {
     // une case entière de rechange (falaise, bord ou dessus décoré) pour que la roche ne se répète pas
     const v = hash(x * 13 + 5, y * 7 + 3), pick = (k, n, p) => A[`r${k}_${b}_${Math.floor(v * n)}`] && v < p ? A[`r${k}_${b}_${Math.floor(v * n / p) % n}`] : null;
     const open = (W ? 1 : 0) + (E ? 1 : 0) + (N ? 1 : 0) + (S ? 1 : 0);
+    // falaise de montagne sur plusieurs gradins : sous une roche plus haute, la pente continue (pas de dessus de gradin)
+    if (m.outdoor && S && !W && !E && !N && m.get(x, y - 1) === T.CAVEWALL && !ravin(m, x, y - 1) && m.height(x, y - 1) > h0 && mont(m, x, y)) {
+      const k = A[`rv_${b}_${Math.floor(v * 4)}`] || A[`rv_${b}_0`];
+      if (k) { flat(G, x, y, x + 1, y + 1, yh, k); return; }
+    }
     if (!inner[0] && !inner[1] && open <= 1) {
       const alt = S ? pick('f', 4, 0.8) : N ? pick('n', 4, 0.8) : W ? pick('l', 3, 0.75) : E ? pick('e', 3, 0.75) : pick('q', 6, 0.4);
       if (alt) { flat(G, x, y, x + 1, y + 1, yh, alt); return; }
@@ -627,11 +713,115 @@ export class WorldView {
     const L = th === 'forest' ? ['touffe', 'feuilles', 'champignons', 'brindilles', 'touffe3', 'trefle'] : ['touffe', 'touffe2', 'trefle', 'cailloux', 'paquerettes', 'boutons', 'touffe3', 'touffe', 'trefle', 'brindilles'];
     return L[Math.floor(hash(x + 503, y + 211) * L.length)];
   }
+  /** tourbillons : un grand tourbillon (2 × 2 cases) aux places d'une grille décalée quand les quatre cases en sont,
+   *  des remous d'écume sur les autres cases ; sens de rotation et remous tirés par case (pas de motif répété) */
+  tourbillonCell(G, b, x, y) {
+    const N = this.N.cells, W2 = (a, c) => b.get(a, c) === T.WHIRL;
+    const ancre = (a, c) => ((a + ((c >> 1) & 1) * 2) & 3) === 0 && (c & 1) === 0 && W2(a, c) && W2(a + 1, c) && W2(a, c + 1) && W2(a + 1, c + 1);
+    for (const [dx, dy, q] of [[0, 0, 0], [1, 0, 1], [0, 1, 2], [1, 1, 3]]) {
+      const ax = x - dx, ay = y - dy;
+      if (ancre(ax, ay)) { const v = hash(ax * 5 + 1, ay * 3 + 7) < 0.5 ? 0 : 1, k = N[`tourbillon${v}_${q}`]; if (k) flat(G, x, y, x + 1, y + 1, 0.006, k); return; }
+    }
+    const v = hash(x * 11 + 3, y * 7 + 1); if (v < 0.85) { const k = N['remous' + Math.floor(v / 0.85 * 3)]; if (k) flat(G, x, y, x + 1, y + 1, 0.006, k); }
+  }
+  /** relief du dehors, dessiné à plat comme dans HeartGold / SoulSilver : paroi de roche sous le bord sud d'un plateau
+   *  (lèvre d'herbe en haut, ombre au pied), rebords de roche à l'est, à l'ouest et au nord, marches taillées */
+  reliefDehors(G, x, y, t, zone) {
+    const m = this.map, A = this.A.cells, h = m.height(x, y), th = zone?.theme, bio = bioFalaise(zone);
+    const Y = 0.0049, v = hash(x * 3 + 1, y * 7 + 5);
+    // plateaux d'herbe (world/relief.js, pente) : talus de pelouse, dessiné au pixel par le sol généré (solgen.js, talus) ;
+    // sans lui (?sol=0), des pièces de pelouse toutes faites (relief-tex.js)
+    const gen = this.sol.couvre(), herbe = (a, b) => pente(m, a, b), lv = levreFalaise(th);
+    if ((t === T.CLIFF || t === T.STAIRS) && herbe(x, y)) {
+      if (gen) return;
+      if (t === T.CLIFF) {
+        let r = 0; while (r < 6 && m.get(x, y - r - 1) === T.CLIFF) r++;
+        const k = A[`pente_${lv}_${r === 0 ? 's' : 'm'}_${v < 0.5 ? 0 : 1}`]; if (k) flat(G, x, y, x + 1, y + 1, Y, k);
+        return;
+      }
+      const d = m.height(x, y - 1) > h ? 's' : m.height(x, y - 1) < h ? 'n' : m.height(x + 1, y) < h ? 'e' : m.height(x - 1, y) < h ? 'w' : 's';
+      if (A[`rondins_${d}`]) flat(G, x, y, x + 1, y + 1, Y + 0.0001, A[`rondins_${d}`]);
+      return;
+    }
+    if (t === T.CLIFF) {
+      let r = 0; while (r < 6 && m.get(x, y - r - 1) === T.CLIFF) r++;
+      const rw = A[`rw_${bio}_${Math.floor(v * 3)}`] || A.rw_montagne_0;
+      if (rw) flat(G, x, y, x + 1, y + 1, Y, rw, r === 0 ? 1 : Math.max(0.72, 0.94 - 0.08 * r));
+      if (r === 0) { const L = A[`fal_levre_${levreFalaise(th)}_${v < 0.5 ? 0 : 1}`]; if (L) flat(G, x, y, x + 1, y + 1, Y + 0.0002, L); }
+      const fin = (q) => q !== T.CLIFF && q !== T.STAIRS;
+      if (fin(m.get(x - 1, y)) && A[`fal_bout_w_${bio}`]) flat(G, x, y, x + 1, y + 1, Y + 0.0001, A[`fal_bout_w_${bio}`]);
+      if (fin(m.get(x + 1, y)) && A[`fal_bout_e_${bio}`]) flat(G, x, y, x + 1, y + 1, Y + 0.0001, A[`fal_bout_e_${bio}`]);
+      return;
+    }
+    if (t === T.CAVEWALL) {
+      const bm = bioDehors(th);
+      if (A[`rp_${bm}_00`]) return;   // gradins dessinés en plateaux de roche aux bords en pente (paroiCell)
+      // montagne en gradins : une paroi là où la roche du dessus est plus haute, un rebord sur les côtés
+      if (m.get(x, y - 1) === T.CAVEWALL && m.height(x, y - 1) > h) {
+        const rw = A[`rw_${bm}_${Math.floor(v * 3)}`] || A.rw_montagne_0;
+        if (rw) flat(G, x, y, x + 1, y + 1, Y + 0.0004, rw, 0.86);
+      } else if (m.get(x, y - 1) === T.CAVEWALL && m.get(x, y - 2) === T.CAVEWALL && m.height(x, y - 2) > m.height(x, y - 1) && A.fal_pied) flat(G, x, y, x + 1, y + 1, Y + 0.0004, A.fal_pied);
+      const cote = (dx) => m.get(x + dx, y) === T.CAVEWALL && m.height(x + dx, y) < h && !(m.get(x, y - 1) === T.CAVEWALL && m.height(x, y - 1) > h);
+      if (cote(1)) flat(G, x, y, x + 1, y + 1, Y + 0.0005, A[`fal_bord_e_${bm}`]);
+      if (cote(-1)) flat(G, x, y, x + 1, y + 1, Y + 0.0005, A[`fal_bord_w_${bm}`]);
+      return;
+    }
+    if (t === T.STAIRS && mont(m, x, y)) {
+      // marches taillées dans la montagne : on monte vers le sentier (ou la marche) plus haut
+      const haut = (dx, dy) => { const q = m.get(x + dx, y + dy); return q !== T.CAVEWALL && m.height(x + dx, y + dy) > h || q === T.STAIRS && m.get(x + 2 * dx, y + 2 * dy) !== T.CAVEWALL && m.height(x + 2 * dx, y + 2 * dy) > h; };
+      const d = haut(0, -1) ? 's' : haut(0, 1) ? 'n' : haut(-1, 0) ? 'e' : haut(1, 0) ? 'w' : 's';
+      const k = A[`marches_${d}_${bio}`] || A[`marches_${d}_montagne`];
+      if (k) flat(G, x, y, x + 1, y + 1, Y + 0.0001, k);
+      return;
+    }
+    if (t === T.STAIRS) {
+      const d = m.height(x, y - 1) > h ? 's' : m.height(x, y - 1) < h && m.get(x, y - 1) !== T.CLIFF ? 'n' : m.height(x + 1, y) < h ? 'e' : m.height(x - 1, y) < h ? 'w' : m.height(x, y + 1) < h || m.get(x, y + 1) === T.STAIRS ? 's' : null;
+      const k = d && (A[`marches_${d}_${bio}`] || A[`marches_${d}_montagne`]);
+      if (k) { flat(G, x, y, x + 1, y + 1, Y + 0.0001, k); return; }
+    }
+    if (m.get(x, y - 1) === T.CLIFF && !(gen && herbe(x, y - 1)) && A.fal_pied) flat(G, x, y, x + 1, y + 1, Y, herbe(x, y - 1) ? A.pente_pied || A.fal_pied : A.fal_pied);
+    // flancs d'un plateau voisin plus haut, à l'ouest ou à l'est (sauf contre une marche ou une montagne)
+    const flanc = (dx) => { const q = m.get(x + dx, y); return m.height(x + dx, y) > h && q !== T.CLIFF && q !== T.STAIRS && q !== T.CAVEWALL && t !== T.STAIRS && !(gen && herbe(x + dx, y)); };
+    const fl = (c, dx) => (herbe(x + dx, y) ? A[`pente_flanc_${c}_${lv}`] : A[`fal_flanc_${c}_${bio}`]);
+    if (flanc(-1) && fl('w', -1)) flat(G, x, y, x + 1, y + 1, Y + 0.0001, fl('w', -1));
+    if (flanc(1) && fl('e', 1)) flat(G, x, y, x + 1, y + 1, Y + 0.0001, fl('e', 1));
+    if (h > 0 && !(gen && herbe(x, y))) {
+      const bas = (dx, dy) => { const q = m.get(x + dx, y + dy); return m.height(x + dx, y + dy) < h && q !== T.CLIFF && q !== T.STAIRS && q !== T.CAVEWALL; };
+      const bd = (c) => (herbe(x, y) ? A[`pente_bord_${c}_${lv}`] : A[`fal_bord_${c}_${bio}`]);
+      if (bas(1, 0) && bd('e')) flat(G, x, y, x + 1, y + 1, Y + 0.0002, bd('e'));
+      if (bas(-1, 0) && bd('w')) flat(G, x, y, x + 1, y + 1, Y + 0.0002, bd('w'));
+      if (bas(0, -1) && bd('n')) flat(G, x, y, x + 1, y + 1, Y + 0.0003, bd('n'));
+    }
+  }
+  /** hauteur du sol à l'endroit (x, z) du monde : 0 sans le relief en 3D (?relief3d) */
+  hAt(x, z) { return this.r3d ? this.r3d.Hmarche(x, z) : 0; }
+  r3dLV() { return this.r3d ? R3LV : 0; }
+  r3dMats() {
+    if (!this._r3dMats) {
+      const c = (m) => { const k = m.clone(); k.depthWrite = false; this.tinted.push(k); return k; };
+      this._r3dMats = { ground: c(this.mat.ground), anim: c(this.mat.anim), overlay: c(this.mat.overlay) };
+    }
+    return this._r3dMats;
+  }
+  /** pose une géométrie sur le relief : les sprites (ancrés à leurs pieds) montent avec leur point d'ancrage, le reste
+   *  sommet par sommet */
+  r3dLift(G, dy) {
+    const p = G.p, an = G.an, r = this.r3d;
+    if (an.length) for (let v = 0; v < G.n; v++) { const h = r.Hpose(an[v * 3], an[v * 3 + 2]); p[v * 3 + 1] += h; an[v * 3 + 1] += h; }
+    else for (let v = 0; v < G.n; v++) p[v * 3 + 1] += r.H(p[v * 3], p[v * 3 + 2]) + dy;
+    // l'ancien sol d'une case du fond d'un ravin : caché (sinon, posé sur les bords du ravin, il le couvrirait en biais)
+    if (!an.length && dy < 0) for (let v = 0; v + 3 < G.n; v += 4) {
+      const cx = (p[v * 3] + p[v * 3 + 6]) / 2, cz = (p[v * 3 + 2] + p[v * 3 + 8]) / 2;
+      if (r.fondRavin(cx, cz)) for (let k = 0; k < 4; k++) p[(v + k) * 3 + 1] = -1e3;
+    }
+  }
   tierAt(x, y) { const m = this.map; if (x < 0 || y < 0 || x >= m.w || y >= m.h) return 3; return this.tiers[y * m.w + x] || 0; }
 
   buildChunk(ci, cj) {
     const m = this.map, A = this.A.cells, S = this.S.rects;
-    const G = new Geo(), N = new Geo(), P = new Geo(), Wl = new Geo(), Sh = new Geo(), O0 = new Geo();
+    const G = new Geo(), N = new Geo(), P = new Geo(), Wl = new Geo(), Sh = new Geo(), O0 = new Geo(), NO = new Geo(), PB = new Geo();
+    const r3d = this.r3d;
+    const base = m.base || m;
     const glows = [];
     const x0 = ci * CH, y0 = cj * CH;
     const wallH = 2 * Math.tan(EL), caveH = 1.25 * Math.tan(EL);
@@ -641,12 +831,17 @@ export class WorldView {
       if (g.c) flat(G, x, y, x + 1, y + 1, 0, g.c, g.shade);
       if (g.anim) flat(N, x, y, x + 1, y + 1, 0, g.anim);
       if (g.bridge && !this.sol.couvre()) flat(G, x - 0.02, y, x + 1.02, y + 1, 0.012, g.bridge);   // le sol généré dessine ses pontons
+      if (g.passerelle) flat(r3d ? PB : G, x, y, x + 1, y + 1, 0.012 + (r3d ? r3d.Hmarche(x + 0.5, y + 0.5) : 0), g.passerelle);
       // détails de l'herbe (touffes, trèfles, cailloux, fleurettes…) : une case d'herbe sur six environ, jamais deux
       // fois le même détail côte à côte ; des feuilles mortes et des champignons en forêt
       if (m.outdoor && !this.sol.couvre() && (t === T.GRASS || t === T.FENCE) && this.detailAt(x, y)) {
         const k = this.detailAt(x, y); if (A['dec_' + k]) flat(O0, x, y, x + 1, y + 1, 0.004, A['dec_' + k]);
       }
       const zone = m.outdoor ? m.zoneAt(x, y) : null, theme = zone?.theme;
+      if (this.relief) this.reliefDehors(O0, x, y, t, zone);
+      if (m.outdoor && base.get(x, y) === T.WHIRL) this.tourbillonCell(NO, base, x, y);
+      if (m.outdoor && t === T.BRIDGE && theme === 'automne' && A.pont_rouge) flat(O0, x - 0.02, y, x + 1.02, y + 1, 0.0051, A.pont_rouge);
+      if (this.decoAt.get(x + ',' + y)?.k === 'koi') flat(NO, x, y, x + 1, y + 1, 0.0055, this.N.cells.koi);
       // décor en volume
       if (t === T.TREE || t === T.PINE) {
         // forêts rangées comme sur DS : un arbre par bloc de 2 × 2 cases, les rangées se chevauchent un peu ;
@@ -661,6 +856,7 @@ export class WorldView {
           let key = t === T.PINE ? 'pine' : vb < 0.6 ? 'tree' : S.tree3 && vb < 0.68 ? 'tree3' : 'tree2';
           if (theme === 'volcanic') key = 'deadtree';
           else if (theme === 'snow') key = 'snowpine';
+          else if (theme === 'automne' && t === T.TREE && S.automne0) { const a = 'automne' + Math.floor(hash(x * 7 + 3, y * 3 + 9) * 6); if (S[a]) key = a; }
           const r = S[key], cx = x + 0.5 + (v - 0.5) * 0.2, cz = y + 0.7;
           billboard(P, cx, cz, SW(r), SH(r), r, 0, vb > 0.5, 1);
           flat(Sh, cx - 0.75, cz - 0.3, cx + 0.75, cz + 0.3, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]);
@@ -681,12 +877,19 @@ export class WorldView {
         else flat(Wl, x, y, x + 1, y + 1, 0.01, A.walltop);
       } else if (t === T.CAVEWALL) {
         // dehors (montagnes des entrées de grottes, bord du monde) : mêmes plateaux de roche que dans les grottes
-        const bioC = m.outdoor ? bioDehors(theme) : this.biome;
-        if ((this.tiers || m.outdoor) && A['rp_' + bioC + '_00']) {
-          this.paroiCell(O0, x, y, bioC);
+        const bioC = m.outdoor ? (m.neige?.[y * m.w + x] ? 'glace' : zone?.roche || bioDehors(theme)) : this.biome;
+        if (m.outdoor && ravin(m, x, y)) {
+          // le vide d'un ravin : sous la paroi du fond, la roche qui plonge ; plus bas, le noir
+          // bords : la paroi du fond sous tout ce qui n'est pas le ravin au nord ; une lèvre là où un sentier le borde
+          const bord = (dx, dy) => !ravin(m, x + dx, y + dy), sentier = (dx, dy) => bord(dx, dy) && m.get(x + dx, y + dy) !== T.CAVEWALL;
+          const f = (bord(0, -1) ? 1 : 0) | (sentier(-1, 0) ? 2 : 0) | (sentier(1, 0) ? 4 : 0);
+          const k = f ? A[`ravin_${bioC}_${f}`] || A[`ravin_montagne_${f}`] : A[`ravin_${hash(x, y) < 0.5 ? 0 : 1}`];
+          if (k && !r3d) flat(O0, x, y, x + 1, y + 1, this.sol.couvre() ? 0.0049 : 0.004, k);
+        } else if ((this.tiers || m.outdoor) && A['rp_' + bioC + '_00']) {
+          if (!r3d) this.paroiCell(O0, x, y, bioC);
           // de temps en temps un rocher pointu au milieu d'un plateau
           const b = bioC, v2 = hash(x * 5 + 3, y * 7 + 11), m2 = this.map;
-          const inner = [[1, 0], [-1, 0], [0, 1], [0, -1], [0, 2]].every(([dx, dy]) => m2.get(x + dx, y + dy) === T.CAVEWALL || m2.get(x + dx, y + dy) == null);
+          const inner = [[1, 0], [-1, 0], [0, 1], [0, -1], [0, 2]].every(([dx, dy]) => (m2.get(x + dx, y + dy) === T.CAVEWALL && m2.height(x + dx, y + dy) === m2.height(x, y) && !ravin(m2, x + dx, y + dy)) || m2.get(x + dx, y + dy) == null);
           if (inner && v2 < 0.1) {
             const r = v2 < 0.04 ? S[`pic_${b}_${Math.floor(hash(x + 41, y + 43) * 3)}`] : S[`cone_${b}_${Math.floor(hash(x + 41, y + 43) * 3)}`];
             if (r) billboard(P, x + 0.5 + (v - 0.5) * 0.25, y + 0.62, SW(r), SH(r), r, 0, v > 0.5);
@@ -714,6 +917,14 @@ export class WorldView {
       // décor posé (lampadaires, panneaux, meubles…)
       const d = this.decoAt.get(x + ',' + y);
       // décalques des arènes au sol : flèches, souffles, courants, dalles, téléporteurs, socles des barrières
+      // mine : rails (orientés selon les rails voisins) et échelles entre les niveaux
+      if (m.rails?.has(x + ',' + y)) {
+        const R = (dx, dy) => m.rails.has((x + dx) + ',' + (y + dy));
+        const n = R(0, -1), e = R(1, 0), so = R(0, 1), w = R(-1, 0);
+        const k = (n || so) && !(e || w) ? 'ns' : (e || w) && !(n || so) ? 'ew' : n && e ? 'ne' : e && so ? 'es' : so && w ? 'sw' : n && w ? 'nw' : 'ew';
+        if (A['rail_' + k]) flat(O0, x, y, x + 1, y + 1, 0.0052, A['rail_' + k]);
+      }
+      if ((d?.k === 'echelle' || d?.k === 'echelle_jour' || d?.k === 'trou') && A[d.k]) flat(O0, x, y, x + 1, y + 1, 0.0053, A[d.k]);
       if (d && DECALS.has(d.k)) { const k = 'dec_' + d.k + (d.dir ? '_' + d.dir : d.g ? '_' + d.g : ''); if (A[k]) flat(O0, x, y, x + 1, y + 1, 0.005, A[k]); }
       if (d) {
         if (d.k === 'counter') {
@@ -728,19 +939,44 @@ export class WorldView {
           // meubles de deux cases (le second est bloqué par l'intérieur) : centrés entre les deux ; les autres sur leur case
           billboard(P, x + (d.w ? d.w / 2 : WIDE_DECO.has(d.k) ? 1 : 0.5), y + (d.dz ?? 0.6), SW(r), SH(r), r);
           if (d.k === 'lamp') glows.push([x + 0.5, y + 0.62, SH(r) * 0.82]);
-          if (['statue', 'gymstatue', 'plant', 'lamp', 'mailbox', 'sign', 'pot', 'caverock', 'stalag', 'fridge', 'clock', 'books', 'pc', 'labmachine', 'vase', 'trash'].includes(d.k)) flat(Sh, x + 0.1, y + 0.4, x + 0.9, y + 0.85, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]);
+          if (['statue', 'gymstatue', 'plant', 'lamp', 'mailbox', 'sign', 'pot', 'caverock', 'stalag', 'fridge', 'clock', 'books', 'pc', 'labmachine', 'vase', 'trash', 'machine_sous'].includes(d.k) || d.k.startsWith('borne_')) flat(Sh, x + 0.1, y + 0.4, x + 0.9, y + 0.85, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]);
         }
       }
     }
     const O = new Geo();
     if (SOL16 && m.outdoor) this.wangChunk(O, x0, y0);
+    // relief en 3D : tout ce qui est posé suit le sol (l'ancien sol passe juste dessous du sol généré)
+    if (r3d) {
+      for (const q of [G, N, O]) this.r3dLift(q, -0.03); for (const q of [O0, NO, P, Wl]) this.r3dLift(q, 0);
+      // ombres au sol : posées à plat sous l'arbre (au haut de sa case), et pas d'ombre sur une paroi
+      for (let v = 0; v < Sh.n; v += 4) {
+        const cx = (Sh.p[v * 3] + Sh.p[v * 3 + 6]) / 2, cz = (Sh.p[v * 3 + 2] + Sh.p[v * 3 + 8]) / 2;
+        const h = r3d.surParoi(cx, cz) ? -1e3 : r3d.Hpose(cx, cz);
+        for (let k = 0; k < 4; k++) Sh.p[(v + k) * 3 + 1] += h;
+      }
+    }
     const grp = new THREE.Group();
     const add = (geo, mat, order = 0) => { const g = geo.build(); if (g) { const me = new THREE.Mesh(g, mat); me.renderOrder = order; me.frustumCulled = false; grp.add(me); } };
     // sous le sol généré (sol.js, ordre -2, sans profondeur : pas de scintillement entre couches presque à la même hauteur)
     const sous = this.sol.couvre() ? -3 : 0;
-    add(G, this.mat.ground, sous); add(N, this.mat.anim, sous); add(O, this.mat.overlay, sous); add(O0, this.mat.overlay); add(Sh, this.mat.shadow, 1); add(P, this.mat.sprite); add(Wl, this.mat.walls);
+    // relief en 3D : l'ancien sol (sous le sol généré) n'écrit pas la profondeur, le sol généré le recouvre toujours
+    const M3 = r3d ? this.r3dMats() : this.mat;
+    add(G, M3.ground, sous); add(N, M3.anim, sous); add(O, M3.overlay, sous); add(O0, this.mat.overlay); add(Sh, this.mat.shadow, 1); add(P, this.mat.sprite); add(Wl, this.mat.walls); add(NO, this.mat.animOver); add(PB, this.mat.overlay, 1);
+    if (r3d) {
+      // parois de la couche du dessus (texture vue de la caméra), dessinées juste après le sol généré
+      const bw = m.ext ? CH : Math.min(CH, m.w - x0), bh = m.ext ? CH : Math.min(CH, m.h - y0), pg = bw > 0 && bh > 0 ? r3d.geoParois(ci, cj, bw, bh) : null;
+      if (pg) { const me = new THREE.Mesh(pg, matParoi()); me.renderOrder = -1; me.frustumCulled = false; grp.add(me); }
+      const gp = bw > 0 && bh > 0 && /[?&]r3tuiles/.test(location.search) ? r3d.geoPentes(ci, cj, bw, bh) : null;   // essai : tuiles simples
+      for (const [k, g] of Object.entries(gp || {})) { const me = new THREE.Mesh(g, matPente(k)); me.renderOrder = -1; me.frustumCulled = false; grp.add(me); if (!this.tinted.includes(me.material)) this.tinted.push(me.material); }
+      const fg = pg && facettesActives() ? r3d.geoFacettes(ci, cj, bw, bh) : null;
+      if (fg) { const me = new THREE.Mesh(fg, matFacettes()); me.frustumCulled = false; grp.add(me); }
+      // ravins : parois verticales jusqu'au fond noir
+      const rv = bw > 0 && bh > 0 ? r3d.geoRavin(ci, cj, bw, bh) : null;
+      if (rv?.paroi) { const me = new THREE.Mesh(rv.paroi, matParoi()); me.renderOrder = -1; me.frustumCulled = false; grp.add(me); }
+      if (rv?.facettes) { const me = new THREE.Mesh(rv.facettes, matFacettes()); me.frustumCulled = false; grp.add(me); }
+    }
     for (const [gx, gz, gy] of glows) {
-      const me = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), this.matGlow); me.position.set(gx, gy, gz + 0.05); me.rotation.x = -0.3; me.userData.lampGlow = true; this.glows.add(me);
+      const me = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), this.matGlow); me.position.set(gx, gy + this.hAt(gx, gz), gz + 0.05); me.rotation.x = -0.3; me.userData.lampGlow = true; this.glows.add(me);
     }
     this.root.add(grp);
     this.sol.demande(ci, cj, grp);
@@ -754,6 +990,21 @@ export class WorldView {
     this.sol.invalider(x, y);
     this.lastChunk = null;
   }
+  /** promesse tenue quand le sol généré couvre tout l'écran (appeler après update) : derrière une transition, on attend
+   *  les blocs plutôt que de laisser voir l'ancien sol (au plus ms millisecondes) */
+  solPret(ms) {
+    if (!this.sol.couvre()) return Promise.resolve(true);
+    this.camera.updateMatrixWorld();
+    const cam = this.camera.position, v = new THREE.Vector3();
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [nx, ny] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      v.set(nx, ny, 0.5).unproject(this.camera).sub(cam);
+      const t = v.y < -1e-6 ? (this.focus.y - cam.y) / v.y : 400, x = cam.x + v.x * t, z = cam.z + v.z * t;
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, z); y1 = Math.max(y1, z);
+    }
+    // les arbres et les toits du bas de l'écran ont leurs pieds une case plus bas
+    return this.sol.pret(Math.floor(x0), Math.floor(y0), Math.ceil(x1), Math.ceil(y1) + 1, ms);
+  }
   ensureChunks(px, py) {
     const ci = Math.floor(px / CH), cj = Math.floor(py / CH), k = ci + ',' + cj;
     if (k === this.lastChunk) return; this.lastChunk = k;
@@ -762,9 +1013,15 @@ export class WorldView {
       const ex = this.map.ext ? 2 : 0;
       if (i < -ex || j < -ex || (i - ex) * CH >= this.map.w || (j - ex) * CH >= this.map.h) continue;
       const kk = i + ',' + j; if (!this.chunks.has(kk)) this.chunks.set(kk, this.buildChunk(i, j));
+      this.poserBatimentsBloc(i, j);
     }
-    // les morceaux éloignés sont masqués
-    for (const [kk, g] of this.chunks) { const [i, j] = kk.split(',').map(Number); g.visible = Math.abs(i - ci) <= 2 && Math.abs(j - cj) <= 2; }
+    // les morceaux éloignés sont masqués ; ceux qui sont loin derrière nous sont défaits (la grande carte en compte des
+    // milliers : la mémoire ne grossit pas à mesure qu'on voyage)
+    for (const [kk, g] of this.chunks) {
+      const [i, j] = kk.split(',').map(Number), d = Math.max(Math.abs(i - ci), Math.abs(j - cj));
+      g.visible = d <= 2;
+      if (d > 6) { this.root.remove(g); g.traverse((o) => o.geometry?.dispose()); this.chunks.delete(kk); }
+    }
   }
 
   /** sorties des grottes vues de dedans : le couloir creusé dans la paroi s'éclaire du jour qui entre du dehors */
@@ -794,102 +1051,149 @@ export class WorldView {
   }
 
   /* ---------------- bâtiments ---------------- */
+  /** les bâtiments de la carte : sur la grande carte, chacun n'est construit qu'au moment où le morceau de 16 cases qui
+   *  le porte entre en vue (ensureChunks) ; les petites cartes (intérieurs, grottes) sont construites d'un coup */
   buildBuildings() {
     this.buildingMeshes = [];
-    const cache = new Map();
+    this._texBat = new Map(); this._fenetres = new Map();
+    this.nightGroup = new THREE.Group(); this.root.add(this.nightGroup); this.nightGroup.visible = false;
+    this.batAttente = new Map();
+    for (const b of this.map.buildings) { const k = Math.floor(b.x / CH) + ',' + Math.floor(b.y / CH); if (!this.batAttente.has(k)) this.batAttente.set(k, []); this.batAttente.get(k).push(b); }
+    if (this.map.buildings.length < 200) { for (const L of this.batAttente.values()) for (const b of L) this.poserBat(b); this.batAttente.clear(); }
+  }
+  /** construit les bâtiments en attente d'un morceau (i, j) */
+  poserBatimentsBloc(i, j) { const k = i + ',' + j, L = this.batAttente?.get(k); if (!L) return; this.batAttente.delete(k); for (const b of L) this.poserBat(b); }
+  poserBat(b) {
+    const cache = this._texBat;
     const T3 = (key, mk) => { if (!cache.has(key)) cache.set(key, tex(mk())); return cache.get(key); };
-    for (const b of this.map.buildings) {
-      const g = new THREE.Group();
-      const wallH = b.h * Math.tan(EL), o = 0.18;
-      const zf = b.y + b.d + 0.02;
-      const own = (t) => { const m = frontDepth(new THREE.MeshBasicMaterial({ map: t, vertexColors: true }), zf); this.tinted.push(m); m.userData.ownTint = true; return m; };
-      if (b.kind === 'cave') {
-        // la montagne est dessinée par les plateaux de roche (vueCarte : l'entrée et les arbres qui la bordent) ;
-        // ici seulement la bouche sombre, peinte dans la falaise au-dessus de la porte
-        const bio = bioDehors(this.map.zoneAt?.(b.x, b.y)?.theme), holeW = 1.5, holeD = 1.25;   // arche de 48 × 40 px
-        const geo = new THREE.PlaneGeometry(holeW, holeD); geo.rotateX(-Math.PI / 2);
-        const mat = new THREE.MeshBasicMaterial({ map: T3('arche_' + bio, () => archeGrotte(bio, false, this.paletteRoche(bio))), transparent: true, alphaTest: 0.5 });
-        mat.map.flipY = true; mat.map.needsUpdate = true;   // ligne 0 de l'image = nord (le haut de l'arche)
-        this.tinted.push(mat); mat.color.copy(this.tint);
-        const hole = new THREE.Mesh(geo, mat); hole.position.set(b.doorX + 0.5, 0.0056, b.doorY + 1 - holeD / 2); hole.renderOrder = 1;
-        g.add(hole); this.root.add(g); continue;
+    const g = new THREE.Group();
+    // relief en 3D : le bâtiment est posé au niveau de sa porte (le sol est aplani dessous)
+    const hb = this.r3d && b.kind !== 'cave' ? this.r3d.niveauBatiment(b) : 0;
+    g.userData.hb = hb;
+    const wallH = b.h * Math.tan(EL), o = 0.18;
+    const zf = b.y + b.d + 0.02;
+    const own = (t) => { const m = frontDepth(new THREE.MeshBasicMaterial({ map: t, vertexColors: true }), zf); this.tinted.push(m); m.userData.ownTint = true; return m; };
+    if (b.kind === 'cave') {
+      // la montagne est dessinée par les plateaux de roche (vueCarte : l'entrée et les arbres qui la bordent) ;
+      // ici seulement la bouche sombre, peinte dans la falaise au-dessus de la porte
+      const bio = bioDehors(this.map.zoneAt?.(b.x, b.y)?.theme), holeW = 1.5, holeD = 1.25;   // arche de 48 × 40 px
+      const geo = new THREE.PlaneGeometry(holeW, holeD); geo.rotateX(-Math.PI / 2);
+      const mat = new THREE.MeshBasicMaterial({ map: T3('arche_' + bio, () => archeGrotte(bio, false, this.paletteRoche(bio))), transparent: true, alphaTest: 0.5 });
+      mat.map.flipY = true; mat.map.needsUpdate = true;   // ligne 0 de l'image = nord (le haut de l'arche)
+      this.tinted.push(mat); mat.color.copy(this.tint);
+      const hole = new THREE.Mesh(geo, mat); hole.position.set(b.doorX + 0.5, 0.0056, b.doorY + 1 - holeD / 2); hole.renderOrder = 1;
+      if (this.r3d) {
+        // relief en 3D : la bouche est plaquée sur la paroi au-dessus de la porte (la géométrie suit le sol)
+        const gg = new THREE.PlaneGeometry(holeW, holeD, 6, 5); gg.rotateX(-Math.PI / 2); gg.translate(b.doorX + 0.5, 0, b.doorY + 1 - holeD / 2);
+        const ps = gg.attributes.position; for (let i = 0; i < ps.count; i++) ps.setY(i, this.r3d.H(ps.getX(i), ps.getZ(i)) + 0.02);
+        hole.geometry.dispose(); hole.geometry = gg; hole.position.set(0, 0, 0); mat.polygonOffset = true; mat.polygonOffsetFactor = -2; mat.polygonOffsetUnits = -4;
       }
-      const ks = kitStyle(b, this.map); b.kitStyle = ks;
-      const fkey = `${ks}:${b.w}:${b.h}:${b.door}`;
-      const fr = T3('f' + fkey, () => facade(ks, b.w, b.h, b.door, false, b.x * 7 + b.y));
-      const sd = T3(`s${ks}:${b.d}:${b.h}`, () => sideWall(ks, b.d, b.h));
-      // toit à deux pans, assez pentu pour qu'on voie surtout le pan avant (comme sur DS) ; toit plat pour les
-      // centres, boutiques, arènes et la Ligue
-      const flatRoof = b.flat || b.style === 'center' || b.style === 'mart' || b.style === 'gym' || b.style === 'league';
-      const rh = flatRoof ? 0.35 : Math.min(2.2, 0.55 * b.d);
-      // rangées de cellules d'un pan : sa hauteur à l'écran, en cases
-      const rows = Math.max(1, Math.round(b.d / 2 + o + rh * 0.7));
-      const rf = T3(`r${ks}:${b.roof}:${b.w}:${rows}`, () => roofTex(b.roof, b.w, b.d + 1, 3, ks, rows));
-      const mFront = own(fr), mSide = own(sd), mRoof = own(rf);
-      const x0 = b.x, x1 = b.x + b.w, z0 = b.y, z1 = b.y + b.d;
-      // façade
-      const geoF = new Geo(); geoF.quad([x0, 0, z1], [x1, 0, z1], [x1, wallH, z1], [x0, wallH, z1], 0, 0, 1, 1, 1);
-      g.add(new THREE.Mesh(geoF.build(), mFront));
-      // le toit déborde de o devant la façade : il est posé assez haut pour que son bord tombe pile sur le haut de la
-      // façade à l'écran (sinon il cache le haut des fenêtres de l'étage)
-      const eY = wallH + o * Math.tan(EL);
-      const geoS = new Geo();
-      geoS.quad([x1, 0, z1], [x1, 0, z0], [x1, eY, z0], [x1, eY, z1], 0, 0, 1, 1, 0.8);
-      geoS.quad([x0, 0, z0], [x0, 0, z1], [x0, eY, z1], [x0, eY, z0], 0, 0, 1, 1, 0.8);
-      g.add(new THREE.Mesh(geoS.build(), mSide));
-      const zm = (z0 + z1) / 2, ytop = eY + rh;
-      const geoR = new Geo();
-      geoR.quad([x0 - o, eY, z1 + o], [x1 + o, eY, z1 + o], [x1 + o, ytop, zm], [x0 - o, ytop, zm], 0, 0.5, 1, 1, 1);
-      geoR.quad([x1 + o, eY, z0 - o], [x0 - o, eY, z0 - o], [x0 - o, ytop, zm], [x1 + o, ytop, zm], 0, 0, 1, 0.5, 0.7);
-      g.add(new THREE.Mesh(geoR.build(), mRoof));
-      // pignons et liseré : couleur du mur et du rebord du kit (la couleur du toit pour les maisons recolorées)
-      const rc = roofColors[b.roof] || roofColors.red;
-      const kitted = !!kitColor(ks);
-      const gableCol = (kitted && kitColor(ks, 'mur', -0.12)) || rc[1];
-      const eaveCol = ks === 'house' || ks === 'house2' || ks === 'bighouse' || ks === 'tower' || ks === 'gate' || !kitted ? rc[1] : kitColor(ks, 'rebord', -0.35) || rc[1];
-      const mkCol = (col) => { const m = frontDepth(new THREE.MeshBasicMaterial({ color: new THREE.Color(col) }), zf); this.tinted.push(m); m.userData.ownTint = true; m.userData.base = new THREE.Color(col); return m; };
-      const gableMat = mkCol(gableCol), eaveMat = mkCol(eaveCol);
-      const gg = new THREE.BufferGeometry();
-      gg.setAttribute('position', new THREE.Float32BufferAttribute([x1 + o, eY, z1 + o, x1 + o, eY, z0 - o, x1 + o, ytop, zm, x0 - o, eY, z0 - o, x0 - o, eY, z1 + o, x0 - o, ytop, zm], 3));
-      g.add(new THREE.Mesh(gg, gableMat));
-      // bande de mur sous le débord du toit (cachée par le rebord, sauf de très près)
-      const band = new THREE.BufferGeometry();
-      band.setAttribute('position', new THREE.Float32BufferAttribute([x0, wallH, z1, x1, wallH, z1, x1, eY, z1, x0, wallH, z1, x1, eY, z1, x0, eY, z1], 3));
-      g.add(new THREE.Mesh(band, gableMat));
-      // liseré sous le toit
-      const eave = new THREE.Mesh(new THREE.BoxGeometry(b.w + 2 * o, 0.1, 0.1), eaveMat); eave.position.set((x0 + x1) / 2, eY - 0.05, z1 + o); g.add(eave);
-      // ombre portée au sol devant le bâtiment
-      const sh = new Geo(); const S = this.S.rects.shadow;
-      flat(sh, x0 - 0.1, z1 - 0.2, x1 + 0.1, z1 + 0.45, 0.012, [S.u0, S.v0 + (S.v1 - S.v0) * 0.4, S.u1, S.v1]);
-      g.add(new THREE.Mesh(sh.build(), this.mat.shadow));
-      g.userData.b = b; g.userData.front = mFront; g.userData.fkey = fkey;
-      this.root.add(g); this.buildingMeshes.push(g);
+      g.add(hole); this.root.add(g); return;
     }
-  }
-  buildWindowsGroup() {
-    // à la nuit tombée, fenêtres et portes s'allument (façades de nuit non teintées)
-    this.nightGroup = new THREE.Group(); this.root.add(this.nightGroup);
-    const cache = new Map();
-    for (const g of this.buildingMeshes) {
-      const b = g.userData.b; if (!b) continue;
-      const key = g.userData.fkey;
-      if (!cache.has(key)) {
-        const ks = b.kitStyle || b.style;
-        const day = facade(ks, b.w, b.h, b.door, false, b.x * 7 + b.y), night = facade(ks, b.w, b.h, b.door, true, b.x * 7 + b.y);
-        // ne garder que les pixels qui changent (fenêtres)
-        const c = document.createElement('canvas'); c.width = day.width; c.height = day.height;
-        const x = c.getContext('2d'); const dd = day.getContext('2d').getImageData(0, 0, c.width, c.height), nd = night.getContext('2d').getImageData(0, 0, c.width, c.height);
-        const out = x.createImageData(c.width, c.height);
-        for (let i = 0; i < dd.data.length; i += 4) { if (dd.data[i] !== nd.data[i] || dd.data[i + 1] !== nd.data[i + 1] || dd.data[i + 2] !== nd.data[i + 2]) { out.data[i] = nd.data[i]; out.data[i + 1] = nd.data[i + 1]; out.data[i + 2] = nd.data[i + 2]; out.data[i + 3] = 255; } }
-        x.putImageData(out, 0, 0);
-        cache.set(key, new THREE.MeshBasicMaterial({ map: tex(c), transparent: true, alphaTest: 0.5 }));
-      }
-      const wallH = b.h * Math.tan(EL);
-      const geo = new Geo(); geo.quad([b.x, 0, b.y + b.d + 0.01], [b.x + b.w, 0, b.y + b.d + 0.01], [b.x + b.w, wallH, b.y + b.d + 0.01], [b.x, wallH, b.y + b.d + 0.01], 0, 0, 1, 1, 1);
-      const wm = new THREE.Mesh(geo.build(), cache.get(key).clone()); g.userData.win = wm; this.nightGroup.add(wm);
+    // bâtiment en fausse 3D (modèle de batiments3d.js) quand un modèle a la bonne emprise ; sinon l'ancienne façade
+    if (!/[?&]bati=0/.test(globalThis.location?.search || '')) {
+      const z = this.map.zoneAt?.(b.x, b.y);
+      const mod = choisirModele(b, { theme: z?.theme, ville: z?.town, typeArene: b.typeArene });
+      if (mod) { const gm = this.batimentModele(b, mod); gm.position.y = hb; gm.userData.hb = hb; this.root.add(gm); this.buildingMeshes.push(gm); return; }
     }
-    this.nightGroup.visible = false;
+    const ks = kitStyle(b, this.map); b.kitStyle = ks;
+    const fkey = `${ks}:${b.w}:${b.h}:${b.door}`;
+    const fr = T3('f' + fkey, () => facade(ks, b.w, b.h, b.door, false, b.x * 7 + b.y));
+    const sd = T3(`s${ks}:${b.d}:${b.h}`, () => sideWall(ks, b.d, b.h));
+    // toit à deux pans, assez pentu pour qu'on voie surtout le pan avant (comme sur DS) ; toit plat pour les
+    // centres, boutiques, arènes et la Ligue
+    const flatRoof = b.flat || b.style === 'center' || b.style === 'mart' || b.style === 'gym' || b.style === 'league';
+    const rh = flatRoof ? 0.35 : Math.min(2.2, 0.55 * b.d);
+    // rangées de cellules d'un pan : sa hauteur à l'écran, en cases
+    const rows = Math.max(1, Math.round(b.d / 2 + o + rh * 0.7));
+    const rf = T3(`r${ks}:${b.roof}:${b.w}:${rows}`, () => roofTex(b.roof, b.w, b.d + 1, 3, ks, rows));
+    const mFront = own(fr), mSide = own(sd), mRoof = own(rf);
+    const x0 = b.x, x1 = b.x + b.w, z0 = b.y, z1 = b.y + b.d;
+    // façade
+    const geoF = new Geo(); geoF.quad([x0, 0, z1], [x1, 0, z1], [x1, wallH, z1], [x0, wallH, z1], 0, 0, 1, 1, 1);
+    g.add(new THREE.Mesh(geoF.build(), mFront));
+    // le toit déborde de o devant la façade : il est posé assez haut pour que son bord tombe pile sur le haut de la
+    // façade à l'écran (sinon il cache le haut des fenêtres de l'étage)
+    const eY = wallH + o * Math.tan(EL);
+    const geoS = new Geo();
+    geoS.quad([x1, 0, z1], [x1, 0, z0], [x1, eY, z0], [x1, eY, z1], 0, 0, 1, 1, 0.8);
+    geoS.quad([x0, 0, z0], [x0, 0, z1], [x0, eY, z1], [x0, eY, z0], 0, 0, 1, 1, 0.8);
+    g.add(new THREE.Mesh(geoS.build(), mSide));
+    const zm = (z0 + z1) / 2, ytop = eY + rh;
+    const geoR = new Geo();
+    geoR.quad([x0 - o, eY, z1 + o], [x1 + o, eY, z1 + o], [x1 + o, ytop, zm], [x0 - o, ytop, zm], 0, 0.5, 1, 1, 1);
+    geoR.quad([x1 + o, eY, z0 - o], [x0 - o, eY, z0 - o], [x0 - o, ytop, zm], [x1 + o, ytop, zm], 0, 0, 1, 0.5, 0.7);
+    g.add(new THREE.Mesh(geoR.build(), mRoof));
+    // pignons et liseré : couleur du mur et du rebord du kit (la couleur du toit pour les maisons recolorées)
+    const rc = roofColors[b.roof] || roofColors.red;
+    const kitted = !!kitColor(ks);
+    const gableCol = (kitted && kitColor(ks, 'mur', -0.12)) || rc[1];
+    const eaveCol = ks === 'house' || ks === 'house2' || ks === 'bighouse' || ks === 'tower' || ks === 'gate' || !kitted ? rc[1] : kitColor(ks, 'rebord', -0.35) || rc[1];
+    const mkCol = (col) => { const m = frontDepth(new THREE.MeshBasicMaterial({ color: new THREE.Color(col) }), zf); this.tinted.push(m); m.userData.ownTint = true; m.userData.base = new THREE.Color(col); return m; };
+    const gableMat = mkCol(gableCol), eaveMat = mkCol(eaveCol);
+    const gg = new THREE.BufferGeometry();
+    gg.setAttribute('position', new THREE.Float32BufferAttribute([x1 + o, eY, z1 + o, x1 + o, eY, z0 - o, x1 + o, ytop, zm, x0 - o, eY, z0 - o, x0 - o, eY, z1 + o, x0 - o, ytop, zm], 3));
+    g.add(new THREE.Mesh(gg, gableMat));
+    // bande de mur sous le débord du toit (cachée par le rebord, sauf de très près)
+    const band = new THREE.BufferGeometry();
+    band.setAttribute('position', new THREE.Float32BufferAttribute([x0, wallH, z1, x1, wallH, z1, x1, eY, z1, x0, wallH, z1, x1, eY, z1, x0, eY, z1], 3));
+    g.add(new THREE.Mesh(band, gableMat));
+    // liseré sous le toit
+    const eave = new THREE.Mesh(new THREE.BoxGeometry(b.w + 2 * o, 0.1, 0.1), eaveMat); eave.position.set((x0 + x1) / 2, eY - 0.05, z1 + o); g.add(eave);
+    // ombre portée au sol devant le bâtiment
+    const sh = new Geo(); const S = this.S.rects.shadow;
+    flat(sh, x0 - 0.1, z1 - 0.2, x1 + 0.1, z1 + 0.45, 0.012, [S.u0, S.v0 + (S.v1 - S.v0) * 0.4, S.u1, S.v1]);
+    g.add(new THREE.Mesh(sh.build(), this.mat.shadow));
+    g.userData.b = b; g.userData.front = mFront; g.userData.fkey = fkey;
+    g.position.y = hb;
+    this.root.add(g); this.buildingMeshes.push(g);
+    this.fenetresBat(g);
   }
+  /** pose un bâtiment en fausse 3D : géométries fusionnées du modèle, matériaux sans lumière (éclairage cuit),
+   *  profondeur de façade, teinte de l'heure */
+  batimentModele(b, mod) {
+    const parts = geometriesModele(mod.nom, mod.o);
+    const [ew, ed] = EMPRISES[mod.nom] || [b.w, b.d];
+    const sx = mod.libre ? 1 : b.w / ew, sz = mod.libre ? 1 : b.d / ed;
+    const g = new THREE.Group(); g.position.set(b.x, 0, b.y); g.scale.set(sx, 1, sz);
+    const zf = b.y + b.d + 0.02;
+    for (const p of parts) {
+      const m0 = p.mat0;
+      const mat = frontDepth(new THREE.MeshBasicMaterial({ map: m0.map || null, vertexColors: true, transparent: !!m0.transparent, opacity: m0.opacity ?? 1, side: m0.side, alphaTest: m0.alphaTest || 0 }), zf);
+      mat.userData.base = couleurBase(m0); mat.userData.ownTint = true; mat.userData.op0 = m0.transparent ? (m0.opacity ?? 1) : 1;
+      const cle = m0.map?.userData?.cle || '';
+      if (/^(verre|vr|vt|r#|rs|ev|ed)/.test(cle)) mat.userData.vitre = true;   // vitres : allumées la nuit
+      mat.color.copy(mat.userData.base).multiply(this.tint);
+      this.tinted.push(mat);
+      g.add(new THREE.Mesh(p.geo, mat));
+    }
+    const sh = new Geo(); const S = this.S.rects.shadow;
+    flat(sh, 0 - 0.1, b.d - 0.2, b.w + 0.1, b.d + 0.45, 0.012, [S.u0, S.v0 + (S.v1 - S.v0) * 0.4, S.u1, S.v1]);
+    const ombre = new THREE.Mesh(sh.build(), this.mat.shadow); ombre.scale.set(1 / sx, 1, 1 / sz); g.add(ombre);
+    g.userData.b = b; g.userData.modele = mod.nom;
+    return g;
+  }
+  buildWindowsGroup() { /* les fenêtres de nuit sont posées avec chaque bâtiment (fenetresBat) */ }
+  /** à la nuit tombée, fenêtres et portes s'allument (façades de nuit non teintées) */
+  fenetresBat(g) {
+    const b = g.userData.b; if (!b || g.userData.modele) return;
+    const cache = this._fenetres, key = g.userData.fkey;
+    if (!cache.has(key)) {
+      const ks = b.kitStyle || b.style;
+      const day = facade(ks, b.w, b.h, b.door, false, b.x * 7 + b.y), night = facade(ks, b.w, b.h, b.door, true, b.x * 7 + b.y);
+      // ne garder que les pixels qui changent (fenêtres)
+      const c = document.createElement('canvas'); c.width = day.width; c.height = day.height;
+      const x = c.getContext('2d'); const dd = day.getContext('2d').getImageData(0, 0, c.width, c.height), nd = night.getContext('2d').getImageData(0, 0, c.width, c.height);
+      const out = x.createImageData(c.width, c.height);
+      for (let i = 0; i < dd.data.length; i += 4) { if (dd.data[i] !== nd.data[i] || dd.data[i + 1] !== nd.data[i + 1] || dd.data[i + 2] !== nd.data[i + 2]) { out.data[i] = nd.data[i]; out.data[i + 1] = nd.data[i + 1]; out.data[i + 2] = nd.data[i + 2]; out.data[i + 3] = 255; } }
+      x.putImageData(out, 0, 0);
+      cache.set(key, new THREE.MeshBasicMaterial({ map: tex(c), transparent: true, alphaTest: 0.5 }));
+    }
+    const wallH = b.h * Math.tan(EL);
+    const geo = new Geo(); geo.quad([b.x, 0, b.y + b.d + 0.01], [b.x + b.w, 0, b.y + b.d + 0.01], [b.x + b.w, wallH, b.y + b.d + 0.01], [b.x, wallH, b.y + b.d + 0.01], 0, 0, 1, 1, 1);
+    const wm = new THREE.Mesh(geo.build(), cache.get(key).clone()); wm.position.y = g.userData.hb || 0; g.userData.win = wm; this.nightGroup.add(wm);
+  }
+
 
   /* ---------------- personnages, objets ---------------- */
   actor(id, o) {
@@ -929,8 +1233,9 @@ export class WorldView {
     const uv = a.mesh.geometry.attributes.uv; uv.setXY(0, u0, v0); uv.setXY(1, u1, v0); uv.setXY(2, u0, v1); uv.setXY(3, u1, v1); uv.needsUpdate = true;
   }
   place(a, x, y, hop = 0, inGrass = false) {
-    a.mesh.position.set(x + 0.5, hop, y + 0.55);
-    a.shadow.position.set(x + 0.5, 0.02, y + 0.6);
+    const h = this.r3d ? this.r3d.Hmarche(x + 0.5, y + 0.55) : 0;
+    a.mesh.position.set(x + 0.5, hop + h, y + 0.55);
+    a.shadow.position.set(x + 0.5, 0.02 + h, y + 0.6);
     a.shadow.visible = !inGrass;
   }
   /** les herbes hautes s'agitent quand on y entre (les brins de devant se couchent et se relèvent) */
@@ -938,7 +1243,10 @@ export class WorldView {
   /** hautes herbes devant un personnage : la rangée du bas du tapis, redessinée devant lui, cache ses jambes ;
    *  gx, gy : la case d'herbe où il se tient (null : il n'est pas dans l'herbe) */
   cover(a, gx, gy) {
-    if (gx == null) { if (a.cover) a.cover.visible = false; return; }
+    if (gx == null) { if (a.cover) a.cover.visible = false; if (a.herbe) a.herbe.visible = false; a.herbeCase = null; return; }
+    // sol généré : l'herbe de devant est découpée dans le sol de la case, et s'écarte quand on y entre (herbes.js)
+    if (this.herbeDevant(a, gx, gy)) { if (a.cover) a.cover.visible = false; return; }
+    if (a.herbe) a.herbe.visible = false;
     const t = this.map.get(gx, gy), theme = this.map.outdoor ? this.map.zoneAt(gx, gy)?.theme : null;
     const base = t === T.DARKTALL ? 'darkfront' : theme === 'snow' ? 'snowfront' : 'grassfront';
     const rs = this.rustleAt, shake = rs && rs.k === gx + ',' + gy && performance.now() - rs.t0 < 360;
@@ -950,7 +1258,54 @@ export class WorldView {
       const d = a.dispose; a.dispose = () => { d(); this.root?.remove(a.cover); geo.dispose(); };
     }
     if (a.coverKey !== key) { this.setSpriteRect({ mesh: a.cover }, r, r.w, r.h); a.coverKey = key; }
-    a.cover.visible = true; a.cover.position.set(gx + 0.5, 0, gy + 0.99);
+    a.cover.visible = true; a.cover.position.set(gx + 0.5, this.hAt(gx + 0.5, gy + 0.99), gy + 0.99);
+  }
+  /** herbe de devant découpée dans le sol généré (texture des images de herbes.js, gardée par case) ; null si pas prête */
+  herbeTex(gx, gy) {
+    const c = this.sol.solCase(gx, gy); if (!c) return undefined;
+    const C = this.herbes, k = gx + ',' + gy;
+    let e = C.get(k);
+    if (e && e.d !== c.d) { e.tex?.dispose(); C.delete(k); e = null; }
+    if (!e) {
+      const r = dessinHerbe(this.sol.pixelsCase(gx, gy).px);
+      let tex = null;
+      if (r) {
+        tex = new THREE.DataTexture(r.data, r.w, r.h, THREE.RGBAFormat);
+        tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.generateMipmaps = false;
+        tex.colorSpace = THREE.SRGBColorSpace; tex.needsUpdate = true;
+      }
+      e = { d: c.d, tex }; C.set(k, e);
+      if (C.size > 64) { const [k0, e0] = C.entries().next().value; e0.tex?.dispose(); C.delete(k0); }
+    }
+    return e.tex;
+  }
+  herbeDevant(a, gx, gy) {
+    const tex = this.herbeTex(gx, gy);
+    if (tex === undefined) return false;                                   // sol généré pas encore là : l'ancienne herbe
+    if (!tex) { if (a.herbe) a.herbe.visible = false; return true; }       // pas d'herbe haute dessinée dans cette case
+    if (!a.herbe) {
+      // couchée sur le sol, projetée exactement comme lui (chaque pixel retombe sur le pixel qu'il recopie, partout à
+      // l'écran), mais à la profondeur d'un panneau dressé au bord sud de la case : devant les jambes de qui s'y tient
+      const x0 = -0.5 - HERBE_M / 32, x1 = 0.5 + HERBE_M / 32, z0 = -HERBE_H / 32;
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute([x0, 0, z0, x1, 0, z0, x0, 0, 0, x1, 0, 0], 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1, 1, 1], 2));
+      geo.setIndex([0, 2, 1, 1, 2, 3]);
+      const mat = herbeDebout(new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.5, side: THREE.DoubleSide }));
+      mat.color.copy(this.tint); this.tinted.push(mat);
+      const me = a.herbe = new THREE.Mesh(geo, mat); me.frustumCulled = false; a.herbeF = -1; this.root.add(me);
+      const d = a.dispose; a.dispose = () => { d(); this.root?.remove(me); geo.dispose(); mat.dispose(); this.tinted = this.tinted.filter((m) => m !== mat); };
+    }
+    const me = a.herbe, now = performance.now(), k = gx + ',' + gy;
+    if (me.material.map !== tex) me.material.map = tex;
+    if (a.herbeCase !== k) { a.herbeCase = k; a.herbeT0 = now; }   // on vient d'entrer dans la case : les brins s'écartent
+    const f = imageHerbe(now - a.herbeT0);
+    if (a.herbeF !== f) {
+      const uv = me.geometry.attributes.uv, u0 = f / NIMAGES, u1 = (f + 1) / NIMAGES;
+      uv.setXY(0, u0, 0); uv.setXY(1, u1, 0); uv.setXY(2, u0, 1); uv.setXY(3, u1, 1); uv.needsUpdate = true; a.herbeF = f;
+    }
+    me.visible = true; me.position.set(gx + 0.5, this.hAt(gx + 0.5, gy + 0.75), gy + 1);
+    return true;
   }
   /** grande créature posée sur la carte (légendaire) : son image de face, debout sur la case */
   imageActor(id, img, scale = 1) {
@@ -1007,7 +1362,7 @@ export class WorldView {
   removeActor(id) { const a = this.actors.get(id); if (a) { a.dispose(); this.actors.delete(id); } }
   /** position à l'écran (pixels de la page) d'un point de la carte, à h pixels au-dessus du sol (noms des autres joueurs) */
   screenPos(x, y, h = 34) {
-    const v = new THREE.Vector3(x + 0.5, h * HPX, y + 0.55).project(this.camera);
+    const v = new THREE.Vector3(x + 0.5, h * HPX + this.hAt(x + 0.5, y + 0.55), y + 0.55).project(this.camera);
     if (v.z > 1 || v.x < -1.2 || v.x > 1.2 || v.y < -1.2 || v.y > 1.2) return null;
     const r = this.renderer.domElement.getBoundingClientRect();
     return { left: r.left + (v.x + 1) / 2 * r.width, top: r.top + (1 - v.y) / 2 * r.height };
@@ -1020,13 +1375,16 @@ export class WorldView {
     let c = keys[0][1];
     for (let i = 1; i < keys.length; i++) if (h <= keys[i][0]) { const [a, ca] = keys[i - 1], [b, cb] = keys[i]; const u = (h - a) / (b - a); c = ca.map((v, k) => v + (cb[k] - v) * u); break; }
     this.night = h >= 20 || h < 5.5 ? 1 : h >= 18.5 ? (h - 18.5) / 1.5 : h < 6.5 ? 1 - (h - 5.5) : 0;
+    this.tintBase = c;
     this.applyTint(c);
   }
   applyTint(c) {
     const indoorOrCave = !this.map?.outdoor;
-    const k = indoorOrCave ? (this.map?.floor === 'cave' ? [0.82, 0.8, 0.86] : [1, 1, 1]) : this.eclipse ? [0.3, 0.17, 0.44] : c;
+    let k = indoorOrCave ? (this.map?.floor === 'cave' ? [0.82, 0.8, 0.86] : [1, 1, 1]) : this.eclipse ? [0.3, 0.17, 0.44] : c;
+    // sous les frondaisons : plus sombre, un peu plus vert
+    if (!indoorOrCave && this.ombre < 0.999) { const o = this.ombre; k = [k[0] * o * 0.94, k[1] * Math.min(1, o * 1.06), k[2] * o * 0.92]; }
     this.tint.setRGB(k[0], k[1], k[2]);
-    for (const m of this.tinted) { const base = m.userData.base; if (base) m.color.copy(base).multiply(this.tint); else m.color.copy(this.tint); }
+    for (const m of this.tinted) { const base = m.userData.base; if (m.userData.vitre && !indoorOrCave && this.night > 0.5) m.color.setRGB(1.25, 1.0, 0.62); else if (base) m.color.copy(base).multiply(this.tint); else m.color.copy(this.tint); }
     if (this.nightGroup) this.nightGroup.visible = !indoorOrCave && this.night > 0.5;
     if (this.glows) this.glows.visible = !indoorOrCave && this.night > 0.5;
   }
@@ -1045,25 +1403,40 @@ export class WorldView {
       const mats = [];
       g.traverse((m) => { if (m.material && m.material !== this.mat.shadow) mats.push(m.material); });
       if (g.userData.win) mats.push(g.userData.win.material);
-      for (const m of mats) { m.transparent = n < 1; m.opacity = n; m.depthWrite = n >= 1; m.needsUpdate = true; }
+      for (const m of mats) { const o0 = m.userData.op0 ?? 1; m.transparent = n < 1 || o0 < 1; m.opacity = n * o0; m.depthWrite = n >= 1 && o0 >= 1; m.needsUpdate = true; }
     }
   }
 
   /* ---------------- image ---------------- */
   update(dt, fx, fy) {
     this.ensureChunks(fx, fy);
-    this.sol.update(dt, Math.floor(fx / CH), Math.floor(fy / CH));
+    if (Math.abs(this.ombre - this.ombreCible) > 0.002) { this.ombre += (this.ombreCible - this.ombre) * Math.min(1, dt * 2.5); this.applyTint(this.tintBase); }
+    this.sol.update(dt, Math.floor(fx / CH), Math.floor(fy / CH), fx + 0.5, fy + 0.5);
     this.animT += dt;
     if (this.animT > 0.2) {
       this.animT = 0; this.animFrame = (this.animFrame + 1) % this.N.frames.length;
       const ctx = this.N.canvas.getContext('2d'); ctx.clearRect(0, 0, this.N.canvas.width, this.N.canvas.height); ctx.drawImage(this.N.frames[this.animFrame], 0, 0); this.texN.needsUpdate = true;
     }
     this.focus.set(fx + 0.5, 0, fy + 0.5);
+    if (this.r3d) {
+      // relief en 3D : la caméra suit la hauteur du sol, calée sur la grille des pixels (rien ne « nage » en marchant)
+      const fh = this.r3d.Hmarche(fx + 0.5, fy + 0.55), tan = Math.tan(EL);
+      const s = Math.round((fy + 0.5 - fh / tan) * TILE_PX) / TILE_PX;
+      this.focus.set(Math.round((fx + 0.5) * TILE_PX) / TILE_PX, fh, s + fh / tan);
+    }
     this.fadeBuildings(fx, fy, dt);
-    const d = this.dist;
-    this.camera.position.set(this.focus.x, d * Math.sin(EL), this.focus.z + d * Math.cos(EL));
+    const d = this.r3d && this.r3dOrtho ? 400 : this.dist;
+    if (this.r3d && this.r3dOrtho) {
+      // relief en 3D : projection orthographique (32 px par case, comme la perspective au centre de l'écran) ; un pas
+      // de la caméra décale toute l'image d'un nombre entier de pixels, le sol ne « nage » pas en marchant
+      const u = SPRITE_UNIFORMS.uRes.value, l = -u.x / 64, t = u.y * Math.sin(EL) / 64, n = 1, f = 2000;
+      this.camera.projectionMatrix.set(2 / (2 * -l), 0, 0, 0, 0, 2 / (2 * t), 0, 0, 0, 0, -2 / (f - n), -(f + n) / (f - n), 0, 0, 0, 1);
+      this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
+      this._ortho = true;
+    } else if (this._ortho) { this._ortho = false; this.resize(SPRITE_UNIFORMS.uRes.value.x, SPRITE_UNIFORMS.uRes.value.y); }
+    this.camera.position.set(this.focus.x, this.focus.y + d * Math.sin(EL), this.focus.z + d * Math.cos(EL));
     if (this.shake > 0) { this.camera.position.x += (Math.random() - 0.5) * this.shake; this.camera.position.y += (Math.random() - 0.5) * this.shake; this.shake *= 0.85; if (this.shake < 0.01) this.shake = 0; }
-    this.camera.lookAt(this.focus.x, 0, this.focus.z);
+    this.camera.lookAt(this.focus.x, this.focus.y, this.focus.z);
     this.weather?.update(dt, this.focus.x, this.focus.z);
   }
   setWeather(w) { this.weather?.setWeather(w); }

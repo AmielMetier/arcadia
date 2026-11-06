@@ -64,12 +64,16 @@ try {
   await talk('jardin', 'q:ariane1'); ok(S('songes') === 5, 'songes : Ariane fuit au temple');
   // Les talismans du Temple Kagura
   await talk('monde', 'q:sakura'); ok(S('kagura') === 1, 'kagura : lancée');
-  await beat('torii', 'q:tor1'); await beat('torii', 'q:tor2');
-  const [stele] = deco('torii', 'stele'); await use('torii', stele.x, stele.y);
+  // la Forêt des Torii est sur la carte du monde (à l'ouest de la route 7)
+  ok(!maps.torii, 'la Forêt des Torii n\'est plus une carte à part');
+  await beat('monde', 'q:tor1'); await beat('monde', 'q:tor2');
+  const { TORII } = await import('../odyssee/js/world/plan.js'), [tdx, tdy] = maps.monde.w > 440 ? [TORII.dx, TORII.dy] : [0, 0];
+  const torii = (d) => d.x >= 204 + tdx && d.x <= 281 + tdx && d.y >= 152 + tdy && d.y <= 197 + tdy;
+  const [stele] = deco('monde', 'stele').filter(torii); await use('monde', stele.x, stele.y);
   ok(S('kagura') === 2 && bag.talisman === 3, 'kagura : trois talismans');
   const temple = Object.keys(maps).find((k) => k.startsWith('kagura:tower'));
   await talk(temple, 'pretre'); await talk(temple, 'pretre'); ok(S('kagura') === 3, 'kagura : talismans rendus');
-  const [cl] = deco('torii', 'cloche'); await use('torii', cl.x, cl.y); ok(S('kagura') === 'fin', 'kagura : terminée');
+  const [cl] = deco('monde', 'cloche').filter(torii); await use('monde', cl.x, cl.y); ok(S('kagura') === 'fin', 'kagura : terminée');
   await leg('uxie');
   await talk('kagura:sanctuaire', 'q:ariane2'); ok(S('songes') === 6, 'songes : sanctuaire');
   await leg('darkrai'); ok(S('songes') === 7, 'songes : Darkrai');
@@ -93,6 +97,14 @@ try {
   await talk('magma:caverne', 'q:nox2'); ok(S('magma') === 3, 'magma : Groudon');
   await leg('groudon'); await talk(anc.id, 'ancien'); ok(S('magma') === 'fin' && bag['master-ball'], 'magma : terminée');
   ok(W.legends.find((q) => q.id === 'heatran').cond(F, game), 'Heatran après la quête');
+  // Le fond de la mine (Pierrefort) : trois niveaux reliés par des échelles, le fossile tout au fond
+  await talk('monde', 'mine:albin'); ok(S('mine') === 1, 'mine : lancée');
+  { const ech = (m) => [...maps[m].warps.values()].filter((w) => w.step).map((w) => w.map);
+    ok(ech('mine1').includes('mine2') && ech('mine2').includes('mine3') && ech('mine3').includes('mine2'), 'mine : échelles entre les niveaux');
+    const f = maps.mine3.items.find((i) => i.item === 'fossile-dome'); ok(!!f, 'mine : le fossile est au fond');
+    const r = maps.mine2.reach(5, 5, true, false, new Set()), sansForce = [...maps.mine2.warps.keys()].some((k) => { const [x, y] = k.split(',').map(Number); return maps.mine2.warps.get(k).map === 'mine3' && r[y * maps.mine2.w + x]; });
+    ok(!sansForce, 'mine : l\'éboulement demande Force'); }
+  bag['fossile-dome'] = 1; await talk('monde', 'mine:silex'); ok(S('mine') === 'fin' && !bag['fossile-dome'] && party.some((m) => m.sp === 140), 'mine : fossile ranimé');
 } catch (e) { fails++; console.log('ÉCHEC :', e.message); }
 
 for (const [id, q] of Object.entries(W.quests)) ok(F['Q:' + id] === 'fin', `quête ${id} (${q.name}) terminée`);
