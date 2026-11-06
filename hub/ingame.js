@@ -8,7 +8,19 @@
   const GENRES = Object.fromEntries(window.HUB_GENRES || []);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const sfx = (n, v) => { try { window.DDSfx && window.DDSfx.play(n, v); } catch (e) {} };
-  const keysHTML = (keys) => (keys || []).map(([k, a]) => `<div class="kr"><span class="kk">${k.split(' / ').map((x) => `<kbd>${esc(x)}</kbd>`).join('<i>ou</i>')}</span><span>${esc(a)}</span></div>`).join('');
+  const keyRows = (keys) => (keys || []).map(([k, a]) => `<div class="kr"><span class="kk">${k.split(' / ').map((x) => `<kbd>${esc(x)}</kbd>`).join('<i>ou</i>')}</span><span>${esc(a)}</span></div>`).join('');
+  // les commandes à la manette (ligne « 🎮 Manette » de la fiche, « Bouton : action · … ») ont leur propre bloc,
+  // affiché en premier quand une manette est branchée
+  const padOn = () => { try { return [...(navigator.getGamepads ? navigator.getGamepads() : [])].some((p) => p && p.connected); } catch (e) { return false; } };
+  const keysHTML = (keys, H = 'gl-h') => {
+    const kb = (keys || []).filter(([k]) => !k.startsWith('🎮'));
+    const padLine = (keys || []).find(([k]) => k.startsWith('🎮'));
+    const pad = padLine ? padLine[1].split(' · ').map((x) => { const i = x.indexOf(' : '); const up = (t) => t.charAt(0).toUpperCase() + t.slice(1); return i > 0 ? [up(x.slice(0, i)), up(x.slice(i + 3))] : ['', up(x)]; }) : [];
+    pad.push(['Vue (⧉)', 'Ouvrir ce menu']);
+    const padHTML = `<div class="${H}">🎮 Manette</div><div class="gl-keys">${pad.map(([k, a]) => `<div class="kr"><span class="kk">${k ? `<kbd>${esc(k)}</kbd>` : ''}</span><span>${esc(a)}</span></div>`).join('')}</div>`;
+    const kbHTML = kb.length ? `<div class="${H}">⌨️ Clavier et souris</div><div class="gl-keys">${keyRows(kb)}</div>` : '';
+    return padOn() ? padHTML + kbHTML : kbHTML + padHTML;
+  };
 
   let L = null, M = null, cur = null;
 
@@ -27,7 +39,7 @@
           <div class="gl-meta"><span>${esc(GENRES[info.genre] || def.tag || '')}</span><span>⏱ ${esc(info.time || '')}</span><span>👥 ${def.minPlayers}–${def.maxPlayers}</span></div>
           <h2 class="gl-title">${esc(def.title)}</h2>
           <p class="gl-desc">${esc(def.desc || '')}</p>
-          ${info.keys ? `<div class="gl-h">Commandes</div><div class="gl-keys">${keysHTML(info.keys)}</div>` : ''}
+          ${info.keys ? keysHTML(info.keys, 'gl-h') : ''}
           ${tips.length ? `<p class="gl-tip"><b>Astuce</b> ${esc(tips[(Math.random() * tips.length) | 0])}</p>` : ''}
           <div class="gl-foot"><div class="gl-bar"><i></i></div><span class="gl-st">Chargement du jeu…</span>
             <button class="btn gl-go" type="button" disabled>Patiente…</button></div>
@@ -124,7 +136,7 @@
         <div class="am-head"><img src="${esc(def.cover)}" alt=""><div><small>Arcadia</small><b>${esc(def.title)}</b></div>
           <button class="am-x" type="button" aria-label="Fermer">✕</button></div>
         <button class="btn block am-resume" type="button">▶ Reprendre</button>
-        ${info.keys ? `<div class="am-h">Commandes</div><div class="gl-keys">${keysHTML(info.keys)}</div>` : ''}
+        ${info.keys ? keysHTML(info.keys, 'am-h') : ''}
         <div class="am-h">Son</div>${vol('music', 'Musique')}${vol('fx', 'Effets')}
         <div class="am-row">
           <button class="btn ghost small am-fs" type="button">⛶ Plein écran</button>
@@ -147,6 +159,18 @@
     el.querySelector('.am-resume').focus();
   }
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && M) { e.preventDefault(); menu(false); } });
+
+  // manette : le bouton Vue (⧉, celui de gauche au centre) ouvre et ferme ce menu pendant une partie, B le ferme
+  let padPrev = {};
+  (function poll() {
+    requestAnimationFrame(poll);
+    let gp = null; try { gp = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find((p) => p && p.connected); } catch (e) {}
+    if (!gp) { padPrev = {}; return; }
+    const b = (i) => !!(gp.buttons[i] && gp.buttons[i].pressed);
+    if (b(8) && !padPrev[8] && cur && !document.querySelector('.gload.on')) menu(!M);
+    else if (b(1) && !padPrev[1] && M) menu(false);
+    padPrev = { 8: b(8), 1: b(1) };
+  })();
 
   window.HubInGame = { open, shown, close, menu, refresh };
 })();

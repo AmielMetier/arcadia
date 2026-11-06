@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 4.49 — 6 novembre 2026
+- **Arcadia** — Les commandes à la manette s'affichent dans le menu Arcadia et sur l'écran de chargement de chaque jeu, bouton par bouton. Elles passent en premier quand une manette est branchée.
+  - Le bouton Vue (⧉) de la manette ouvre et ferme le menu Arcadia en pleine partie, B le referme.
+
 ## 4.48 — 6 novembre 2026
 - **The Backrooms** — Beaucoup moins de lag à plusieurs.
   - On n'est plus ramené en arrière quand on court avec une connexion lente.
