@@ -656,7 +656,7 @@ export class BackroomsSim {
     if (P.lockT > 0) {
       P.lockT = Math.max(0, P.lockT - DT);
       P.moving = false;
-    } else if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.z) && Math.hypot(pos.x - P.x, pos.z - P.z) < 3 && !this.isColliding(pos.x, pos.z, PLAYER_RADIUS * 0.8, P.floor)) {
+    } else if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.z) && Math.hypot(pos.x - P.x, pos.z - P.z) < 4.5 && !this.isColliding(pos.x, pos.z, PLAYER_RADIUS * 0.8, P.floor)) {
       // un invité se déplace chez lui (et tient son équilibre chez lui) : l'hôte prend sa position et son inclinaison
       const ps = this.stairStep(P, pos.x, pos.z);
       P.x = ps.x;
@@ -782,6 +782,15 @@ export class BackroomsSim {
   // chute de la barre d'équilibre (l'hôte fera tomber), sinon 0.
   predict(input = {}) {
     const P = this.player;
+    // trace de ses positions de la dernière seconde et demie : l'instantané de l'hôte, en retard, est comparé à elle
+    const tr = this.trail || (this.trail = []);
+    tr.push(P.x, P.z, P.floor);
+    // lissage des autres joueurs et de l'entité vers leur dernière position connue
+    const k = 1 - Math.exp(-DT * 14);
+    for (const Q of this.players) if (Q !== P && Q.tx !== undefined) { Q.x += (Q.tx - Q.x) * k; Q.z += (Q.tz - Q.z) * k; }
+    const Mo = this.monster;
+    if (Mo && Mo.tx !== undefined) { Mo.x += (Mo.tx - Mo.x) * k; Mo.z += (Mo.tz - Mo.z) * k; }
+    if (tr.length > 270) tr.splice(0, tr.length - 270);
     if (this.state !== 'playing' || P.status !== 'alive' || this.departT > 0) return 0;
     if (input.yaw !== undefined) P.yaw = input.yaw;
     if (input.pitch !== undefined) P.pitch = input.pitch;
@@ -897,14 +906,26 @@ export class BackroomsSim {
         this.players.push(P);
       }
       const mine = id === this.localId;
-      const far = Math.hypot(P.x - x, P.z - z) > 2.5;
+      // l'hôte voit l'invité avec un temps de retard : on ne le ramène que si sa position ne figure nulle part
+      // dans sa trace récente (sinon, à la course, chaque instantané le tirerait en arrière)
+      let far = Math.hypot(P.x - x, P.z - z) > 2.5;
+      if (far && mine && this.trail && status === 'alive' && P.status === 'alive') {
+        const tr = this.trail;
+        for (let i = 0; i < tr.length; i += 3) if (tr[i + 2] === floor && Math.hypot(tr[i] - x, tr[i + 1] - z) < 1.2) { far = false; break; }
+      }
+      if (far && mine) this.trail = [];
       // dans l'escalier, l'invité change d'étage chez lui (l'hôte suit sa position avec un temps de retard) : il ne
       // doit pas être ramené en arrière à chaque instantané qui a encore l'ancien étage
       const ownStairs = mine && !far && status === 'alive' && P.status === 'alive' && (stairAt(this.stairs, P.x, P.z) || stairAt(this.stairs, x, z));
       // l'hôte décide des chutes : la position suit
-      if (!ownStairs && (!mine || far || status !== 'alive' || P.status !== 'alive' || P.floor !== floor)) {
+      if (!mine && status === 'alive' && P.status === 'alive' && P.floor === floor && Math.hypot(P.x - x, P.z - z) < 3) {
+        // les autres glissent vers leur position reçue (lissé à chaque pas) au lieu de sauter 20 fois par seconde
+        P.tx = x;
+        P.tz = z;
+      } else if (!ownStairs && (!mine || far || status !== 'alive' || P.status !== 'alive' || P.floor !== floor)) {
         P.x = x;
         P.z = z;
+        P.tx = P.tz = undefined;
       }
       if (!mine) {
         P.yaw = yaw;
@@ -920,7 +941,9 @@ export class BackroomsSim {
       if (!mine && sel) P.sel = sel;
       P.sigTo = sigTo || 'goal';
       P.onLadder = !!onLadder;
-      if (lockT > 0 && !(P.lockT > 0)) P.lockT = lockT;
+      // un blocage (coup, chute) ne s'applique qu'à son début : un instantané en retard ne le relance pas une fois fini
+      if (lockT > 0 && !(P.lockSeen > 0) && !(P.lockT > 0)) P.lockT = lockT;
+      P.lockSeen = lockT;
       if (!mine) {
         P.tilt = tilt || 0;
         P.onBeam = !!onBeam;
@@ -938,7 +961,10 @@ export class BackroomsSim {
     }
     this.players = this.players.filter((q) => seen.has(q.id));
     const M = this.monster;
-    [M.x, M.z, M.yaw, M.mode] = snap.m;
+    const [mx, mz] = snap.m;
+    if ((snap.m[5] || 0) === M.floor && Math.hypot(M.x - mx, M.z - mz) < 4) { M.tx = mx; M.tz = mz; }
+    else { M.x = mx; M.z = mz; M.tx = M.tz = undefined; }
+    [, , M.yaw, M.mode] = snap.m;
     M.silent = !!snap.m[4];
     M.floor = snap.m[5] || 0;
     const set = (list, k, b) => (list || []).forEach((o, i) => {

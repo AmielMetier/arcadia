@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 4.48 — 6 novembre 2026
+- **The Backrooms** — Beaucoup moins de lag à plusieurs.
+  - On n'est plus ramené en arrière quand on court avec une connexion lente.
+  - Un coup ou une chute ne bloque plus deux fois de suite.
+  - Les autres joueurs et l'entité glissent d'un point à l'autre au lieu de sauter.
+
 ## 4.47 — 6 novembre 2026
 - **The Backrooms** — aux Poolrooms (Level 37), on ne sort plus par un ascenseur mais par un toboggan.
   - Trois gros toboggans, rouge, jaune et bleu, sortent des murs, avec leur tuyau qui grimpe jusqu'au plafond.
