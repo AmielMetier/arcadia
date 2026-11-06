@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 4.56 — 6 novembre 2026
+- **The Backrooms** — aux Poolrooms (Level 37), l'entité ne se cache plus derrière les cloisons pour t'observer : elle rôde et te traque à découvert, tu la vois venir.
+  - Derrière une cloison, son bourdonnement est étouffé : on ne croit plus l'entendre à travers les murs.
+
 ## 4.55 — 6 novembre 2026
 - **The Backrooms** — l'entité du Level 1 te suit aux Poolrooms (Level 37) : même apparence, mêmes sons, même screamer.
   - Elle passe d'une salle à l'autre par les portes, jamais à travers les cloisons, et les cloisons te cachent d'elle.

@@ -1173,7 +1173,9 @@ export class BackroomsSim {
       P.mDist = same ? dist : dist + 40;
       // bourdonnement : de 0 à 35 m, il monte vite quand elle est à portée ; elle se tait en embuscade
       const ratio = 1 - Math.min(1, Math.max(0, (dist - 1.2) / 32));
-      P.danger = dist > 35 ? 0 : Math.pow(ratio, 1.6) * (M.silent && dist > 4 ? 0.35 : 1) * (same ? 1 : 0.25); // tout près, même tapie, on l'entend
+      // Poolrooms : derrière une cloison, on l'entend étouffée
+      const wall = same && dist > 3 && this.fm(P.floor).lightBlocked && this.fm(P.floor).lightBlocked(M.x, M.z, P.x, P.z) ? 0.45 : 1;
+      P.danger = dist > 35 ? 0 : Math.pow(ratio, 1.6) * (M.silent && dist > 4 ? 0.35 : 1) * (same ? 1 : 0.25) * wall; // tout près, même tapie, on l'entend
       let diff = Math.atan2(M.x - P.x, M.z - P.z) - (P.yaw - Math.PI);
       while (diff > Math.PI) diff -= 2 * Math.PI;
       while (diff < -Math.PI) diff += 2 * Math.PI;
@@ -1257,7 +1259,7 @@ export class BackroomsSim {
           this.emit({ type: 'monsterFlee' });
         }
       }
-    } else if (this.level !== 3 && M.mode === 'patrol' && A < 0.5 && canSee && !isNearby && !(canHear && dist < 8)) {
+    } else if (this.level < 2 && M.mode === 'patrol' && A < 0.5 && canSee && !isNearby && !(canHear && dist < 8)) {
       // encore calme, elle aperçoit quelqu'un : au lieu de charger, elle va se tapir dans le noir pour l'observer
       const spot = this.darkSpot(map, P, M, 8, 20, true);
       if (spot) {
@@ -1331,7 +1333,7 @@ export class BackroomsSim {
 
     // En ronde, elle va souvent se tapir dans un coin sombre pour observer les joueurs de loin (de moins en moins à
     // mesure qu'elle s'énerve)
-    if (M.mode === 'patrol' && same && this.level !== 3) {
+    if (M.mode === 'patrol' && same && this.level < 2) { // l'affût dans le noir : Level 0 et Level 1 seulement
       M.stalkT -= DT;
       if (M.stalkT <= 0) {
         M.stalkT = rand(6, 12);
