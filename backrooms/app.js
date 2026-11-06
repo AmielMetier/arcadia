@@ -2,7 +2,7 @@
 import { BackroomsSim, DT, DEPART_T } from './engine/sim.js';
 import { createBackroomsScene, setMonsterMode } from './view/scene.js';
 import { BackroomsSfx } from './view/sfx.js';
-import { BackroomsHUD } from './view/hud.js';
+import { BackroomsHUD, levelName, levelSub } from './view/hud.js';
 
 const H = window.HubBridge;
 const stageEl = document.getElementById('stage');
@@ -207,6 +207,16 @@ function useSlot(i, tap = false) {
   if (sim) sim.player.sel = i; // tout de suite à l'écran, l'hôte suit
 }
 
+// le bruit d'un pas selon le sol : béton et carrelage (Level 1, Level 37 au sec), eau (Level 37), moquette (Level 0)
+function stepKind(P) {
+  if (!sim || !P) return false;
+  if (sim.level === 2) {
+    const m = sim.fm(P.floor || 0);
+    return m.depthAt && m.depthAt(P.x, P.z) > 0 ? 'water' : true;
+  }
+  return sim.level === 1;
+}
+
 let lastSettings = {};
 // Nouvelle partie (solo ou hôte) : l'hôte l'annonce aux invités, qui construisent la même carte avec la même graine
 function initGame(settings = lastSettings) {
@@ -216,8 +226,8 @@ function initGame(settings = lastSettings) {
   const difficulty = settings.difficulty || 'normal';
   const players = NET.role === 'host' ? H.players.map((p) => ({ id: p.id, name: p.name || 'Player' })) : [{ id: 0, name: 'Player' }];
   NET.run = Date.now();
-  // ?level1 (seul) : on commence directement au Level 1
-  const lv = NET.role === 'solo' && /[?&]level1(&|=|$)/.test(location.search) ? 1 : 0;
+  // ?level1 ou ?level37 (seul) : on commence directement au Level 1 ou aux Poolrooms
+  const lv = NET.role !== 'solo' ? 0 : /[?&]level37(&|=|$)/.test(location.search) ? 2 : /[?&]level1(&|=|$)/.test(location.search) ? 1 : 0;
   startRun({ seed, difficulty, players, run: NET.run, level: lv, vip: settings.monsters === 'vip' });
   // ?parkour (seul) : on commence devant le couloir piégé, tourné vers les trous
   const trap = sim.map.trap;
@@ -347,12 +357,15 @@ function handleEvent(ev, me) {
       if (sfx) sfx.cassette();
       if (hud && ev.by !== me) hud.toast(`${who(ev.by)} found a tape (${ev.count}/${ev.total})`);
       break;
-    case 'fuse':
+    case 'fuse': {
       if (sfx) sfx.cassette();
-      if (hud) hud.toast(ev.by === me ? `Fuse ${ev.count}/${ev.total}` : `${who(ev.by)} found a fuse (${ev.count}/${ev.total})`);
+      const what = sim.level === 2 ? 'valve wheel' : 'fuse';
+      if (hud) hud.toast(ev.by === me ? `${what === 'fuse' ? 'Fuse' : 'Valve wheel'} ${ev.count}/${ev.total}` : `${who(ev.by)} found a ${what} (${ev.count}/${ev.total})`);
       break;
+    }
     case 'powered':
-      if (hud) hud.toast('Fuses in place: the freight elevator is starting up');
+      if (hud) hud.toast(sim.level === 2 ? 'Valves closed: the pumps stop, the three slides open' : 'Fuses in place: the freight elevator is starting up');
+      if (sfx && sim.level === 2) sfx.setPool(false); // le silence d'un coup : les pompes s'arrêtent
       break;
     case 'exitUnlocked':
       if (sfx) { sfx.exitUnlocked(); setTimeout(() => sfx && sfx.ding(), 900); }
@@ -381,7 +394,7 @@ function handleEvent(ev, me) {
       break;
     case 'stairs':
       if (ev.id !== me) break;
-      if (sfx) sfx.step(sim.level === 1);
+      if (sfx) sfx.step(stepKind(sim.player));
       break;
     case 'whistle':
       {
@@ -422,13 +435,16 @@ function handleEvent(ev, me) {
     case 'spotted':
       if (sfx) sfx.spotted();
       break;
-    case 'board':
-      if (sfx) sfx.ding();
-      if (hud && ev.id !== me) hud.toast(`${ev.name} is in the elevator`);
+    case 'board': {
+      const sl = ev.slide !== undefined && sim.map.slides ? sim.map.slides[ev.slide] : null;
+      if (sfx) sl ? sfx.splashDown() : sfx.ding();
+      if (hud && ev.id !== me) hud.toast(sl ? `${ev.name} slid into the ${sl.name.toLowerCase()} slide` : `${ev.name} is in the elevator`);
       break;
+    }
     case 'depart':
-      if (sfx) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
-      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : 'THE FREIGHT ELEVATOR IS GOING UP…', '', 0, true), 700);
+      if (sfx && ev.level === 2) sfx.splashDown();
+      else if (sfx) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
+      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
       break;
     case 'level':
       // nouvel étage : nouvelle scène
@@ -438,7 +454,7 @@ function handleEvent(ev, me) {
       scene = createBackroomsScene(stageEl, sim.floors);
       sim.spectate = 0;
       stepDist = 0;
-      if (hud) hud.fade(`LEVEL ${ev.level}`, ev.level === 1 ? 'The industrial basement' : '', 2.2);
+      if (hud) hud.fade(`LEVEL ${levelName(ev.level)}`, levelSub(ev.level), 2.2);
       break;
     case 'jumpscare':
       if (ev.id !== me) break;
@@ -601,7 +617,7 @@ function loop(currentTime) {
       const stepInterval = sim.player.running ? 1.25 : 0.85;
       if (stepDist >= stepInterval) {
         stepDist = 0;
-        if (sfx) sfx.step(sim.level === 1);
+        if (sfx) sfx.step(stepKind(sim.player));
       }
     }
 
@@ -643,6 +659,7 @@ function loop(currentTime) {
     } else if (M.danger < 0.5) deathNear = false;
     if (M.danger < 0.25 && sim.player.status === 'alive') sfx.stopDeath(); // échappé : la mort s'éloigne
     sfx.ambience(delta, !paused && !chasing && M.danger < 0.4);
+    sfx.drips(paused ? 0 : delta);
   } else if (sfx) {
     sfx.updateMonsterSound(0, 0); // partie finie : l'entité se tait
     sfx.updateChase(false, 0, null);
@@ -665,7 +682,7 @@ function loop(currentTime) {
           continue;
         }
         const left = (otherStepT.get(O.id) ?? Math.random() * 0.3) - delta;
-        if (left <= 0) sfx.step(sim.level === 1, { x: O.x, z: O.z, muffled: (O.floor || 0) !== (V.floor || 0) }, O.running ? 1 : 0.7);
+        if (left <= 0) sfx.step(stepKind(O), { x: O.x, z: O.z, muffled: (O.floor || 0) !== (V.floor || 0) }, O.running ? 1 : 0.7);
         otherStepT.set(O.id, left <= 0 ? (O.running ? 0.32 : 0.5) : left);
       }
     }

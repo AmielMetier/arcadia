@@ -21,6 +21,7 @@ const putOn = (sim, P, cas) => {
   }
 };
 import { createWarehouseMap } from '../backrooms/engine/level1.js';
+import { createPoolMap } from '../backrooms/engine/poolrooms.js';
 
 // avance la partie de n secondes
 const run = (sim, sec, input = {}, others = null) => {
@@ -382,7 +383,7 @@ test("Level 1 : l'entrepôt, ses étagères, ses 3 fusibles et le monte-charge",
   }
 });
 
-test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, puis la victoire', () => {
+test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui descend aux Poolrooms (Level 37)', () => {
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 4, level: 1 });
   assert.equal(sim.open, false);
   for (const f of sim.map.fuses) {
@@ -402,7 +403,29 @@ test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, puis
   sim.player.z = E.z;
   sim.step();
   run(sim, DEPART_T + 0.2);
-  assert.equal(sim.state, 'won', 'le monte-charge remonte : partie gagnée');
+  assert.equal(sim.state, 'playing');
+  assert.equal(sim.level, 2, 'on arrive aux Poolrooms');
+  assert.ok(sim.drainEvents().some((e) => e.type === 'level' && e.level === 2));
+  // les 3 volants de vanne ouvrent les toboggans ; on se glisse dans l'un d'eux : la partie est gagnée
+  const sl = sim.map.slides[1];
+  sim.player.x = sl.x - sl.dx * 0.6;
+  sim.player.z = sl.z - sl.dz * 0.6;
+  sim.step();
+  assert.equal(sim.player.status, 'alive', 'toboggan fermé tant que les vannes manquent');
+  for (const f of sim.map.fuses) {
+    sim.player.x = f.x;
+    sim.player.z = f.z;
+    sim.step();
+  }
+  assert.equal(sim.fuses, FUSES, 'les 3 vannes');
+  assert.equal(sim.open, true, "les toboggans s'ouvrent dès la troisième vanne");
+  sim.player.x = sl.x - sl.dx * 0.6;
+  sim.player.z = sl.z - sl.dz * 0.6;
+  sim.step();
+  assert.equal(sim.player.status, 'elevator');
+  assert.equal(sim.slide, 1, 'le toboggan jaune est pris');
+  run(sim, DEPART_T + 0.2);
+  assert.equal(sim.state, 'won', 'le toboggan sort des Poolrooms : partie gagnée');
 });
 
 test('Level 1 : coupures de courant de 15 à 20 s', () => {
@@ -1076,6 +1099,133 @@ test("l'entité se tapit dans le noir pour observer, fuit la lampe au début, et
   const s5 = speedAt(5);
   assert.ok(s0 < s3 && s3 < s5, `la charge s'accélère : ${s0.toFixed(2)} < ${s3.toFixed(2)} < ${s5.toFixed(2)}`);
   assert.equal(sim.aggro, 1);
+});
+
+test("Level 37 (Poolrooms) : salles et bassins reliés, 3 vannes et 3 toboggans accessibles, l'eau ralentit", () => {
+  for (const sd of [1, 2, 3, 37, 99, 123, 500, 777]) {
+    const m = createPoolMap(sd);
+    assert.equal(m.level, 2);
+    assert.equal(m.fuses.length, 3, `graine ${sd} : 3 vannes`);
+    for (const f of m.fuses) assert.ok(m.dist[f.gz * m.W + f.gx] > 0, `graine ${sd} : vanne accessible`);
+    // 3 toboggans de couleurs différentes, dans un mur, devant une case accessible, au sec ou presque
+    assert.deepEqual(m.slides.map((x) => x.color), ['red', 'yellow', 'blue'], `graine ${sd} : 3 toboggans`);
+    for (const x of m.slides) {
+      assert.ok(m.dist[x.gz * m.W + x.gx] > 10, `graine ${sd} : toboggan accessible, loin du départ`);
+      assert.ok(m.isWall(x.nx, x.nz), "le toboggan sort d'un mur");
+      assert.ok(m.depthAt(x.x - x.dx * 0.6, x.z - x.dz * 0.6) <= 0.21, 'on y entre au sec ou presque');
+      assert.ok(!m.collide(x.x - x.dx * 0.6, x.z - x.dz * 0.6, 0.38), 'rien devant la bouche');
+    }
+    // objectifs et toboggans bien écartés les uns des autres
+    const pts = [...m.fuses, ...m.slides];
+    for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) assert.ok(Math.hypot(pts[i].x - pts[j].x, pts[i].z - pts[j].z) > 7, `graine ${sd} : deux objectifs trop proches`);
+    assert.ok(m.walkable.some((c) => m.depth[c.z * m.W + c.x] >= 0.5), `graine ${sd} : des bassins`);
+    for (const it of m.items) assert.equal(m.depthAt(it.x, it.z), 0, 'les objets sont au sec');
+    // des salles préfabriquées : lagon, voûtes, couloirs… séparées par des cloisons percées de portes
+    assert.ok(m.rooms.length >= 12, `graine ${sd} : ${m.rooms.length} salles`);
+    assert.equal(m.rooms.filter((r) => r.type === 'tech').length >= 3, true, `graine ${sd} : 3 locaux techniques`);
+    for (const sg of m.segs) assert.ok(m.collide((sg.x0 + sg.x1) / 2, (sg.z0 + sg.z1) / 2, 0.38), 'une cloison arrête le joueur');
+    for (const d of m.doors) assert.ok(!m.collide(d.px, d.pz, 0.38), 'on passe par une porte');
+  }
+  // dans l'eau, on avance moins vite
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 5, level: 2 });
+  const P = sim.player;
+  const dry = sim.map.walkable.find((c) => sim.map.depth[c.z * sim.map.W + c.x] === 0);
+  const deep = sim.map.walkable.find((c) => sim.map.depth[c.z * sim.map.W + c.x] >= 0.5);
+  const walk = (c) => {
+    P.x = (c.x + 0.5) * CELL_SIZE;
+    P.z = (c.z + 0.5) * CELL_SIZE;
+    const x0 = P.x;
+    const z0 = P.z;
+    for (const yaw of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+      P.x = x0;
+      P.z = z0;
+      sim.step({ my: 1, yaw });
+      const d = Math.hypot(P.x - x0, P.z - z0);
+      if (d > 0.001) return d;
+    }
+    return 0;
+  };
+  const a = walk(dry);
+  const b = walk(deep);
+  assert.ok(b < a * 0.8, `plus lent dans l'eau (${b.toFixed(4)} contre ${a.toFixed(4)})`);
+  // l'entité ne sort pas de l'eau : personne n'est poursuivi aux Poolrooms
+  run(sim, 5);
+  assert.equal(P.status, 'alive');
+  assert.equal(sim.monster.mode, 'patrol');
+});
+
+test('Level 37 : le premier qui prend un toboggan choisit la couleur, les autres se referment', () => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 12, level: 2, players: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], localId: 'a' });
+  for (const f of sim.map.fuses) {
+    sim.players[0].x = f.x;
+    sim.players[0].z = f.z;
+    sim.step();
+  }
+  assert.equal(sim.open, true);
+  const [red, , blue] = sim.map.slides;
+  const [A, B] = sim.players;
+  A.x = red.x - red.dx * 0.6;
+  A.z = red.z - red.dz * 0.6;
+  sim.step();
+  assert.equal(A.status, 'elevator');
+  assert.equal(sim.slide, 0);
+  B.x = blue.x - blue.dx * 0.6;
+  B.z = blue.z - blue.dz * 0.6;
+  sim.step();
+  assert.equal(B.status, 'alive', 'le toboggan bleu est fermé');
+  // l'invité reçoit le toboggan choisi
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 12, level: 2, players: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], localId: 'b' });
+  guest.applySnapshot(sim.snapshot());
+  assert.equal(guest.slide, 0);
+  B.x = red.x - red.dx * 0.6;
+  B.z = red.z - red.dz * 0.6;
+  sim.step();
+  assert.equal(B.status, 'elevator');
+  run(sim, DEPART_T + 0.2);
+  assert.equal(sim.state, 'won');
+});
+
+test('objectifs écartés : cassettes et fusibles loin les uns des autres (en marche)', () => {
+  const minPath = (m, pts) => {
+    let mn = Infinity;
+    for (const a of pts) {
+      const d = bfs(m.grid, m.W, m.H, a.gx, a.gz);
+      for (const b of pts) if (b !== a && d[b.gz * m.W + b.gx] >= 0) mn = Math.min(mn, d[b.gz * m.W + b.gx]);
+    }
+    return mn;
+  };
+  for (const sd of [1, 5, 9, 42, 77]) {
+    const up = createLevel0(sd).floors[0];
+    assert.ok(minPath(up, up.cassettes) >= 12, `graine ${sd} : cassettes trop proches (${minPath(up, up.cassettes)} cases)`);
+    const w = createWarehouseMap(sd * 7 + 13);
+    assert.ok(minPath(w, w.fuses) >= 12, `graine ${sd} : fusibles trop proches (${minPath(w, w.fuses)} cases)`);
+  }
+});
+
+test('Level 37 : on traverse chaque porte en marchant, les cloisons arrêtent le joueur', () => {
+  let crossed = 0;
+  for (const sd of [1, 2, 3, 4, 5, 6]) {
+    const sim = new BackroomsSim({ difficulty: 'peaceful', seed: sd, level: 2 });
+    for (const d of sim.map.doors) {
+      const nx = d.along === 'z' ? 1 : 0;
+      const nz = d.along === 'x' ? 1 : 0;
+      let x = d.px - nx * 1.2;
+      let z = d.pz - nz * 1.2;
+      if (sim.isColliding(x, z, 0.38, 0)) {
+        x = d.px + nx * 1.2;
+        z = d.pz + nz * 1.2;
+      }
+      const dir = Math.sign(d.px - x + (d.pz - z));
+      for (let i = 0; i < 80; i++) {
+        const p = sim.moveWithCollisions(x, z, nx * dir * 0.05, nz * dir * 0.05, 0.38, 0);
+        x = p.x;
+        z = p.z;
+      }
+      assert.ok((x - d.px) * nx * dir + (z - d.pz) * nz * dir > 1, `graine ${sd} : porte franchie`);
+      crossed++;
+    }
+  }
+  assert.ok(crossed > 60);
 });
 
 console.log(`\n${count} tests réussis pour The Backrooms !`);

@@ -13,6 +13,7 @@ import { createVhsFilter } from './vhs.js';
 import { buildWarehouse } from './warehouse.js';
 import { createPlayerAvatars } from './players.js';
 import { createBeast } from './beast.js';
+import { buildWater } from './water.js';
 
 const MODELS = new URL('../models/', import.meta.url).href; // modèles Poly Haven (CC0), voir models/LICENSE.txt
 const VIP_IMG = new URL('../img/entite.png?v=2', import.meta.url).href; // ?v : image plus nette, ne pas garder l'ancienne en cache
@@ -105,11 +106,12 @@ export function createBackroomsScene(container, floors) {
   if (!Array.isArray(floors)) floors = [floors];
   const map0 = floors[0];
   const L1 = map0.level === 1;
+  const L2 = map0.level === 2; // Level 37, les Poolrooms : clair, laiteux, carrelé, inondé
   const CEIL = map0.ceil || WALL_HEIGHT;
   const scene = new THREE.Scene();
   // Level 1 : un froid bleuté, un brouillard plus épais
-  scene.background = new THREE.Color(L1 ? '#06080a' : '#0d0b06');
-  scene.fog = new THREE.FogExp2(L1 ? '#050608' : '#080604', L1 ? 0.058 : 0.05);
+  scene.background = new THREE.Color(L2 ? '#d3e4e2' : L1 ? '#06080a' : '#0d0b06');
+  scene.fog = new THREE.FogExp2(L2 ? '#d3e4e2' : L1 ? '#050608' : '#080604', L2 ? 0.022 : L1 ? 0.058 : 0.05);
 
   const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.08, 90);
   camera.position.set(map0.spawn.x, 1.6, map0.spawn.z);
@@ -122,7 +124,8 @@ export function createBackroomsScene(container, floors) {
   vhs.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
 
   const textures = createBackroomsTextures(map0.level || 0);
-  const ambient = new THREE.AmbientLight(L1 ? '#c9d8ff' : '#fff3c4', 0.012);
+  const AMB = L2 ? 0.045 : 0.012;
+  const ambient = new THREE.AmbientLight(L2 ? '#eaf7f6' : L1 ? '#c9d8ff' : '#fff3c4', AMB);
   scene.add(ambient);
   const dummy = new THREE.Object3D();
   const loader = new GLTFLoader();
@@ -179,10 +182,14 @@ export function createBackroomsScene(container, floors) {
     const bakeUniforms = {
       uBake: { value: bakeTex },
       uBakeScale: { value: new THREE.Vector2(1 / (W * CELL_SIZE), 1 / (H * CELL_SIZE)) },
-      uBakeTint: { value: L1 ? new THREE.Color(0.86, 0.98, 1.12) : new THREE.Color(1.12, 1.04, 0.8) },
+      uBakeTint: { value: L2 ? new THREE.Color(1.0, 1.05, 1.07) : L1 ? new THREE.Color(0.86, 0.98, 1.12) : new THREE.Color(1.12, 1.04, 0.8) },
       uBakeY: { value: -fi * FLOOR_DY },
       uCeil: { value: CEIL },
-      uDamp: { value: L1 ? 0.6 : 1 },
+      uDamp: { value: L2 ? 0 : L1 ? 0.6 : 1 },
+      // Poolrooms : sous la surface, le carrelage prend la teinte de l'eau et les caustiques dansent dessus
+      uPool: { value: L2 ? 1 : 0 },
+      uTime: { value: 0 },
+      uWaterY: { value: -0.03 },
     };
     // un texel est-il éclairé par ce néon ? Le rayon ne doit traverser aucun mur, sauf, pour un texel de mur,
     // les 70 premiers centimètres de son propre mur (la face tournée vers le néon)
@@ -202,7 +209,8 @@ export function createBackroomsScene(container, floors) {
         if (!own || cx !== gx || cz !== gz) return false;
         inOwn += d / n;
       }
-      return inOwn < 0.7;
+      // Poolrooms : la lumière ne traverse pas les cloisons minces entre deux salles
+      return inOwn < 0.7 && !(map.lightBlocked && map.lightBlocked(lx, lz, px, pz));
     };
     // les néons des zones claires éclairent plus fort et plus loin
     const footprint = (l) => {
@@ -259,7 +267,7 @@ export function createBackroomsScene(container, floors) {
       live.set(base);
       for (const f of flickers) if (f.k > 0) addPrint(live, f.fp, f.k);
       for (let i = 0; i < BW * BH; i++) {
-        const v = Math.min(1, AMBIENT * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
+        const v = Math.min(1, (L2 ? 0.03 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
         bakeData[i * 4] = Math.round(v * 255);
       }
       bakeTex.needsUpdate = true;
@@ -292,6 +300,9 @@ uniform vec3 uBakeTint;
 uniform float uBakeY;
 uniform float uCeil;
 uniform float uDamp;
+uniform float uPool;
+uniform float uTime;
+uniform float uWaterY;
 varying vec3 vBakeP;
 varying vec3 vBakeN;
 float bkHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -302,6 +313,20 @@ float bkNoise(vec2 p) {
   return mix(mix(bkHash(i), bkHash(i + vec2(1.0, 0.0)), f.x), mix(bkHash(i + vec2(0.0, 1.0)), bkHash(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 + bkNoise(p * 4.7 + 3.3) * 0.15; }
+// caustiques : le réseau lumineux que l'eau projette sur le fond
+float bkCaust(vec2 uv, float t) {
+  vec2 p = mod(uv * 6.2831, 6.2831) - 250.0;
+  vec2 i = p;
+  float c = 1.0;
+  for (int n = 0; n < 4; n++) {
+    float tt = t * (1.0 - 3.5 / float(n + 1));
+    i = p + vec2(cos(tt - i.x) + sin(tt + i.y), sin(tt - i.y) + cos(tt + i.x));
+    c += 1.0 / length(vec2(p.x / (sin(i.x + tt) / 0.005), p.y / (cos(i.y + tt) / 0.005)));
+  }
+  c /= 4.0;
+  c = 1.17 - pow(c, 1.4);
+  return pow(abs(c), 8.0);
+}
 ` +
           sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
           // les néons sont au plafond : un mur s'assombrit vers le bas, et plus encore au ras du sol et sous le plafond ;
@@ -321,7 +346,11 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
           float stain = ny < -0.5 ? ring : (abs(ny) < 0.5 ? ring * 0.6 : 0.0);
           diffuseColor.rgb *= mix(1.0, 0.62, ny > 0.5 ? wet : (abs(ny) < 0.5 ? rise : 0.0));
           diffuseColor.rgb *= mix(vec3(1.0), vec3(0.78, 0.66, 0.45), stain * uDamp);
-          totalEmissiveRadiance += diffuseColor.rgb * uBakeTint * bk.r * 2.0 * shape;`);
+          // sous l'eau (Poolrooms) : teinte cyan qui fonce avec la profondeur, et les caustiques
+          float sub = uPool * smoothstep(0.0, 0.06, uWaterY - by);
+          diffuseColor.rgb *= mix(vec3(1.0), vec3(0.62, 0.9, 0.96) * mix(1.0, 0.6, clamp((uWaterY - by) / 1.2, 0.0, 1.0)), sub);
+          totalEmissiveRadiance += diffuseColor.rgb * uBakeTint * bk.r * 2.0 * shape;
+          totalEmissiveRadiance += vec3(0.8, 1.0, 1.0) * bkCaust(vBakeP.xz * 0.32, uTime * 0.45) * 0.55 * sub * (0.35 + bk.r * 1.6);`);
       };
       return mat;
     };
@@ -354,10 +383,16 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
       dummy.scale.set(1, 1, 1);
       group.add(edges);
     }
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * CELL_SIZE, H * CELL_SIZE), floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.set((W * CELL_SIZE) / 2, 0, (H * CELL_SIZE) / 2);
-    group.add(floor);
+    let water = null;
+    if (L2) {
+      // Poolrooms : sols, bassins, parois des bassins, margelles et la surface de l'eau (view/water.js)
+      water = buildWater({ map, group, baked, textures, bake: bakeUniforms, fog: scene.fog });
+    } else {
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * CELL_SIZE, H * CELL_SIZE), floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.set((W * CELL_SIZE) / 2, 0, (H * CELL_SIZE) / 2);
+      group.add(floor);
+    }
 
     // 2. Faux plafond à dalles (percé là où l'étage du dessus a ses trous et ses escaliers)
     const ceilTex = textures.ceiling.clone();
@@ -375,18 +410,19 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
     const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(W * CELL_SIZE, H * CELL_SIZE), ceilMat);
     ceiling.rotation.x = Math.PI / 2;
     ceiling.position.set((W * CELL_SIZE) / 2, CEIL, (H * CELL_SIZE) / 2);
-    group.add(ceiling);
+    if (!L2) group.add(ceiling); // Poolrooms : chaque salle a son propre plafond (voir water.js)
 
     // 3. Murs au papier peint jaune
     let wallCount = 0;
     for (let i = 0; i < W * H; i++) if (map.grid[i] === T.WALL) wallCount++;
     const wallMat = baked(new THREE.MeshLambertMaterial({ map: textures.wall }));
-    const wallsMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(CELL_SIZE, CEIL, CELL_SIZE), wallMat, wallCount);
+    const SUNK = L2 ? 1.3 : 0; // les murs des Poolrooms descendent sous l'eau
+    const wallsMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(CELL_SIZE, CEIL + SUNK, CELL_SIZE), wallMat, wallCount);
     let idx = 0;
     for (let z = 0; z < H; z++) {
       for (let x = 0; x < W; x++) {
         if (map.grid[z * W + x] !== T.WALL) continue;
-        dummy.position.set((x + 0.5) * CELL_SIZE, CEIL / 2, (z + 0.5) * CELL_SIZE);
+        dummy.position.set((x + 0.5) * CELL_SIZE, (CEIL - SUNK) / 2, (z + 0.5) * CELL_SIZE);
         dummy.updateMatrix();
         wallsMesh.setMatrixAt(idx++, dummy.matrix);
       }
@@ -407,14 +443,14 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
         }
       }
       for (const { p, list } of kinds.values()) {
-        const geo = p.round ? new THREE.CylinderGeometry(p.h, p.h, CEIL, 20, 1, true) : new THREE.BoxGeometry(p.h * 2, CEIL, p.h * 2);
+        const geo = p.round ? new THREE.CylinderGeometry(p.h, p.h, CEIL + SUNK, 20, 1, true) : new THREE.BoxGeometry(p.h * 2, CEIL + SUNK, p.h * 2);
         // le papier peint garde la largeur de ses lés : la texture couvre 2,5 m de large sur un mur
         const span = p.round ? 2 * Math.PI * p.h : p.h * 2;
         const uv = geo.attributes.uv;
         for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * (span / CELL_SIZE));
         const inst = new THREE.InstancedMesh(geo, wallMat, list.length);
         list.forEach((q, i) => {
-          dummy.position.set(q.x, CEIL / 2, q.z);
+          dummy.position.set(q.x, (CEIL - SUNK) / 2, q.z);
           dummy.updateMatrix();
           inst.setMatrixAt(i, dummy.matrix);
         });
@@ -424,16 +460,19 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
     }
 
     // 4. Néons au plafond (les morts sont gris, ceux qui grésillent clignotent)
-    const ON = new THREE.Color(L1 ? '#eef6ff' : '#fffbe2').multiplyScalar(3.2); // plus fort que le blanc : le caméscope sature et ils bavent
-    const OFF = new THREE.Color('#4a473c');
-    const fixtures = new THREE.InstancedMesh(L1 ? new THREE.BoxGeometry(1.55, 0.05, 0.12) : new THREE.BoxGeometry(1.22, 0.04, 0.62), new THREE.MeshBasicMaterial({ color: '#ffffff', map: L1 ? null : textures.lamp }), map.lights.length);
+    const ON = new THREE.Color(L2 ? '#f2fbff' : L1 ? '#eef6ff' : '#fffbe2').multiplyScalar(L2 ? 2.2 : 3.2); // plus fort que le blanc : le caméscope sature et ils bavent
+    const OFF = new THREE.Color(L2 ? '#7d8b8d' : '#4a473c'); // aux Poolrooms, un diffuseur éteint reste gris-bleu
+    const fixtures = new THREE.InstancedMesh(L2 ? new THREE.BoxGeometry(1.3, 0.03, 1.3) : L1 ? new THREE.BoxGeometry(1.55, 0.05, 0.12) : new THREE.BoxGeometry(1.22, 0.04, 0.62), new THREE.MeshBasicMaterial({ color: '#ffffff', map: L1 || L2 ? null : textures.lamp }), map.lights.length);
     map.lights.forEach((l, i) => {
-      dummy.position.set(l.x, CEIL - (L1 ? 0.45 : 0.025), l.z); // au Level 1, les tubes pendent sous le plafond
+      dummy.position.set(l.x, l.fy !== undefined ? l.fy : CEIL - (L1 ? 0.45 : 0.025), l.z); // au Level 1, les tubes pendent sous le plafond
+      // Poolrooms : la lampe d'un couloir voûté est cachée dans la voûte ; sous une verrière, tout le plafond éclaire
+      dummy.scale.setScalar(l.hidden ? 0.0001 : l.fs || 1);
       dummy.updateMatrix();
       fixtures.setMatrixAt(i, dummy.matrix);
       fixtures.setColorAt(i, l.state === 'off' ? OFF : ON);
       l.index = i;
     });
+    dummy.scale.set(1, 1, 1);
     fixtures.instanceMatrix.needsUpdate = true;
     group.add(fixtures);
 
@@ -534,7 +573,9 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
     // le plafond est percé sous les trous et les trémies de l'étage du dessus : rien n'y est fixé
     const aboveHoles = fi > 0 ? holesOf(floors[fi - 1]) : [];
     const holeAbove = (x, z) => aboveHoles.some((h) => Math.abs((x + 0.5) * CELL_SIZE - h.x) < h.hx + 0.6 && Math.abs((z + 0.5) * CELL_SIZE - h.z) < h.hz + 0.6);
-    const rates = L1
+    const rates = L2
+      ? { outlet: 0, fire_alarm: 0, power_box_01: 0, wall_clock: 0, drawing: 0 }
+      : L1
       ? { outlet: 0.02, fire_alarm: 0.01, power_box_01: 0.012, wall_clock: 0, drawing: 0 }
       : { outlet: 0.05, fire_alarm: 0.008, power_box_01: 0.003, wall_clock: 0.004, drawing: 0.016 };
     const heights = { outlet: 0.32, fire_alarm: 2.15, power_box_01: 1.35, wall_clock: 2.25, drawing: 1.3 };
@@ -557,7 +598,7 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
             break;
           }
         }
-        if (!L1 && drnd() < 0.045 && !holeAbove(x, z)) ceilSpots.push({ x: (x + 0.5) * CELL_SIZE + (drnd() - 0.5) * 1.2, z: (z + 0.5) * CELL_SIZE + (drnd() - 0.5) * 1.2, rot: drnd() < 0.5 ? 0 : Math.PI / 2 });
+        if (!L1 && !L2 && drnd() < 0.045 && !holeAbove(x, z)) ceilSpots.push({ x: (x + 0.5) * CELL_SIZE + (drnd() - 0.5) * 1.2, z: (z + 0.5) * CELL_SIZE + (drnd() - 0.5) * 1.2, rot: drnd() < 0.5 ? 0 : Math.PI / 2 });
       }
     }
     // prises : une petite plaque blanche jaunie à deux trous
@@ -823,7 +864,24 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
     const fuseMeshes = [];
     const fuseBody = new THREE.MeshLambertMaterial({ color: '#efe9dc', emissive: '#4a3a20', emissiveIntensity: 0.5 });
     const fuseCap = new THREE.MeshLambertMaterial({ color: '#c98a2b', emissive: '#7a4a10', emissiveIntensity: 0.7 });
+    const valveMat = new THREE.MeshLambertMaterial({ color: '#c0261d', emissive: '#4a0c08', emissiveIntensity: 0.6 });
     for (const f of map.fuses || []) {
+      if (L2) {
+        // un volant de vanne rouge : la jante, quatre rayons, le moyeu
+        const g = new THREE.Group();
+        g.add(new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.022, 8, 24), valveMat));
+        for (let k = 0; k < 2; k++) {
+          const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.025, 0.025), valveMat);
+          spoke.rotation.z = (k * Math.PI) / 2;
+          g.add(spoke);
+        }
+        g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.06, 12).rotateX(Math.PI / 2), valveMat));
+        g.add(new THREE.PointLight('#ff5a3c', 1.6, 4, 1.6));
+        g.position.set(f.x, 0.9, f.z);
+        group.add(g);
+        fuseMeshes.push({ f, g });
+        continue;
+      }
       const g = new THREE.Group();
       const body = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.26, 12), fuseBody);
       body.rotation.z = Math.PI / 2;
@@ -840,12 +898,12 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
 
     // 11. Brouillard froid au ras du sol (Level 1) : deux nappes qui glissent lentement et suivent la caméra
     const fogLayers = [];
-    if (L1) {
-      for (const [y, o, rep, sp] of [[0.15, 0.55, 9, 0.012], [0.5, 0.3, 6, -0.008]]) {
+    if (L1 || L2) {
+      for (const [y, o, rep, sp] of L2 ? [[0.06, 0.32, 8, 0.01], [0.32, 0.16, 5, -0.006]] : [[0.15, 0.55, 9, 0.012], [0.5, 0.3, 6, -0.008]]) {
         const t = textures.fog.clone();
         t.needsUpdate = true;
         t.repeat.set(rep, rep);
-        const m = new THREE.Mesh(new THREE.PlaneGeometry(70, 70), new THREE.MeshBasicMaterial({ map: t, color: '#3e4850', transparent: true, opacity: o, depthWrite: false }));
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(70, 70), new THREE.MeshBasicMaterial({ map: t, color: L2 ? '#f3fbfa' : '#3e4850', transparent: true, opacity: o, depthWrite: false }));
         m.rotation.x = -Math.PI / 2;
         m.position.y = y;
         m.renderOrder = 2;
@@ -909,7 +967,7 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
       const panel = new THREE.Mesh(new THREE.BoxGeometry(0.34, L1 ? 0.6 : 0.4, 0.08), baked(new THREE.MeshLambertMaterial({ color: L1 ? '#3b4a2f' : '#55595e' })));
       panel.position.set(DW / 2 + 0.35, 1.3, -0.04);
       exitGroup.add(sign, panel);
-      if (L1) {
+      if (L1 || L2) {
         for (let i = 0; i < FUSES; i++) {
           const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.03), new THREE.MeshBasicMaterial({ color: '#331010' }));
           lamp.position.set(DW / 2 + 0.35, 1.45 - i * 0.15, -0.09);
@@ -934,7 +992,7 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
     const setPower = (v) => {
       if (v === power) return;
       power = v;
-      ambient.intensity = v ? 0.012 : 0;
+      ambient.intensity = v ? AMB : 0;
       for (const l of map.lights) fixtures.setColorAt(l.index, power && l.state !== 'off' ? ON : OFF);
       fixtures.instanceColor.needsUpdate = true;
       writeBake();
@@ -944,6 +1002,11 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
       lightAt,
       // une image : objets, cassettes, ascenseur, néons de cet étage
       update(sim, P, time, dt) {
+        bakeUniforms.uTime.value = time;
+        if (water) {
+          water.update(sim, P, time, dt, camera);
+          bakeUniforms.uWaterY.value = water.level;
+        }
 
         // Coupure de courant : les néons meurent d'un coup, puis reviennent en grésillant
         const want = !(sim.blackout > 0);
@@ -981,7 +1044,7 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
         showGroup(exitGroup, !fake);
         if (fakeWall) fakeWall.visible = fake;
         exitLight.color.set(open ? '#22c55e' : '#ef4444');
-        exitLight.intensity = fake ? 0 : open ? 6 : 2.5;
+        exitLight.intensity = fake || !E ? 0 : open ? 6 : 2.5; // aux Poolrooms, pas d'ascenseur : les toboggans
         signMat.color.set(open ? '#4ade80' : '#ff3030');
         // les portes s'ouvrent quand l'ascenseur est alimenté, se referment au départ
         const doorWant = open && !(sim.departT > 0) ? 1 : 0;
@@ -1139,8 +1202,9 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
   const anim = L1 ? ENTITY_ANIM : null;
   face.visible = false;
   monsterGroup.add(face);
-  // mode normal : l'entité en 3D, animée (view/beast.js) ; mode VIP : les images d'origine
-  const beast = ENTITY_VIP ? null : createBeast();
+  // l'entité en 3D, animée (view/beast.js) ; au Level 1 en mode VIP : la vidéo d'origine
+  // mode VIP au Level 0 : le même corps, avec le visage de la photo de l'entité d'origine
+  const beast = !ENTITY_VIP ? createBeast() : !L1 ? createBeast({ photo: { url: VIP_IMG, crop: [490, 20, 300, 375] } }) : null;
   if (beast) {
     monsterGroup.add(beast.group);
     shadow.visible = false;
@@ -1187,9 +1251,6 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     shadow.visible = false;
   });
 
-  const monsterAura = new THREE.PointLight('#ff1a1a', 2.5, 6, 1.6);
-  monsterAura.position.set(0, 1.6, 0.6);
-  monsterGroup.add(monsterAura);
   monsterGroup.position.set(map0.monsterSpawn.x, 0, map0.monsterSpawn.z);
   scene.add(monsterGroup);
 
@@ -1239,7 +1300,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 
       // 1. Caméra : balancement lent de la marche, plus marqué en courant ; une chute la fait plonger d'un étage
       if (P.moving) bob += dt * (P.running ? 9 : 5.5);
-      const want = 1.6 + feetY(sim.stairs, P.x, P.z, P.floor) + (P.onLadder ? 1.0 : 0);
+      const pm = sim.fm(P.floor || 0);
+      const want = 1.6 + feetY(sim.stairs, P.x, P.z, P.floor) + (P.onLadder ? 1.0 : 0) - (pm.depthAt ? pm.depthAt(P.x, P.z) : 0);
       // une chute : on tombe vraiment (gravité), puis le choc secoue la caméra
       if (want < eyeY - 0.5 || fallV > 0) {
         fallV += 9.8 * dt;
@@ -1319,12 +1381,10 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
           monsterGroup.rotation.y = M.yaw || 0;
           const mv = floorViews[M.floor || 0];
           beast.update(M, chase, mv ? mv.lightAt(M.x, M.z) : 0.3, dt, time);
-          monsterAura.intensity = (chase ? 2.2 : 0.8) + Math.random() * 0.8;
         } else {
           monsterGroup.position.set(M.x + (Math.random() - 0.5) * j, my + (chase ? Math.abs(Math.sin(time * 9)) * 0.08 : Math.sin(time * 2) * 0.03), M.z + (Math.random() - 0.5) * j);
           monsterGroup.rotation.y = Math.atan2(P.x - M.x, P.z - M.z);
           face.scale.set(1 + (Math.random() - 0.5) * 0.08 * faceGlitch.value, 1 + Math.sin(time * 18) * 0.04 * faceGlitch.value, 1);
-          monsterAura.intensity = (chase ? 3 : 1.5) + Math.random() * 1.2;
         }
       } else {
         monsterGroup.visible = false;
@@ -1335,7 +1395,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         const show = Q !== P && Q.status === 'alive';
         if (!show && !avatars.has(Q.id)) continue;
         const qv = floorViews[Q.floor || 0];
-        const y = feetY(sim.stairs, Q.x, Q.z, Q.floor) + (Q.onLadder ? 1.0 : 0);
+        const qm = sim.fm(Q.floor || 0);
+        const y = feetY(sim.stairs, Q.x, Q.z, Q.floor) + (Q.onLadder ? 1.0 : 0) - (qm.depthAt ? qm.depthAt(Q.x, Q.z) : 0);
         avatars.update(Q, show, y, qv ? qv.lightAt(Q.x, Q.z) : 0.3, dt, time);
       }
 

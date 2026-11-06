@@ -2,7 +2,7 @@
 // Des travées d'étagères métalliques séparées par de grandes allées, des piliers de béton, un parking vide çà et là,
 // des caisses dans les allées, 3 fusibles à retrouver et le monte-charge qui ramène à la surface.
 // Mêmes cases et même forme de carte que le Level 0 (map.js) : le moteur et la scène lisent les deux.
-import { CELL_SIZE, T, blocks, bfs, carveElevator, itemList } from './map.js';
+import { CELL_SIZE, T, blocks, bfs, carveElevator, itemList, spreadOut, gridDist } from './map.js';
 
 export const LEVEL1_SIZE = 56;
 export const LEVEL1_CEIL = 4.2; // plafond plus haut qu'au Level 0
@@ -148,23 +148,10 @@ export function createWarehouseMap(seed = 7) {
 
   // 6. Les 3 fusibles : dans les allées des étagères, un par tiers de l'entrepôt autour du départ
   const shelfSide = (c) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => get(c.x + dx, c.z + dz) === T.SHELF);
-  const fuses = [];
-  const taken = [exitCell];
-  for (let i = 0; i < 3; i++) {
-    const a0 = (i / 3) * Math.PI * 2;
-    const a1 = ((i + 1) / 3) * Math.PI * 2;
-    const ok = (c, minD, aisle) => {
-      let a = Math.atan2(c.z - sz, c.x - sx);
-      if (a < 0) a += Math.PI * 2;
-      return a >= a0 && a < a1 && D(c) > maxD * minD && (!aisle || shelfSide(c)) && taken.every((t) => Math.hypot(t.x - c.x, t.z - c.z) > 10);
-    };
-    let cand = walkable.filter((c) => ok(c, 0.4, true));
-    if (!cand.length) cand = walkable.filter((c) => ok(c, 0.2, false));
-    if (!cand.length) cand = walkable.filter((c) => D(c) > 8 && !taken.includes(c));
-    const c = pick(cand);
-    taken.push(c);
-    fuses.push({ id: i, ...cellPos(c), taken: false });
-  }
+  // le plus loin possible (en marche) du départ, du monte-charge et les uns des autres
+  let cand = walkable.filter((c) => D(c) > 8 && shelfSide(c));
+  if (cand.length < 3) cand = walkable.filter((c) => D(c) > 8);
+  const fuses = spreadOut(cand, [{ x: sx, z: sz }, exitCell], 3, gridDist(grid, W, H), rnd).map((c, i) => ({ id: i, ...cellPos(c), taken: false }));
 
   // 7. Néons en rangées au-dessus des allées ; quelques-uns grésillent ou sont morts
   const lights = [];

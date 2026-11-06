@@ -11,6 +11,7 @@
 // si l'équipe le termine, tout le monde repart à l'étage suivant, lampe en main.
 import { CELL_SIZE, T, createLevel0, PIT_HALF, FLOOR_DY } from './map.js';
 import { createWarehouseMap } from './level1.js';
+import { createPoolMap, MOUTH } from './poolrooms.js';
 import { findPath, hasLineOfSight } from './nav.js';
 
 export const DT = 1 / 60;
@@ -40,7 +41,7 @@ export const WHISTLE_CD = 1.2;
 export const WHISTLE_HEAT = 2.5; // chaque coup compte 1 et s'oublie en 20 s : au 3e coup rapproché, l'entité vient à coup sûr
 export const CASSETTES = 5;
 export const FUSES = 3;
-export const LAST_LEVEL = 1;
+export const LAST_LEVEL = 2; // 0 : Level 0, 1 : Level 1 (entrepôt), 2 : Level 37 (les Poolrooms)
 export const DEPART_T = 3; // secondes entre la fermeture des portes et l'arrivée
 // coupures de courant du Level 1 : toutes les 35 à 60 s, pendant 15 à 20 s
 export const BLACKOUT_EVERY = [35, 60];
@@ -51,6 +52,7 @@ const cellOf = (v) => Math.floor(v / CELL_SIZE);
 
 // les étages d'un niveau : même graine de partie, des cartes différentes par niveau
 export function makeLevelMap(level, seed) {
+  if (level === 2) return [createPoolMap(seed * 11 + 37)];
   return level === 1 ? [createWarehouseMap(seed * 7 + 13)] : createLevel0(seed).floors;
 }
 
@@ -202,7 +204,8 @@ export class BackroomsSim {
     // un seul vrai ascenseur : on ne sait pas lequel tant que les cassettes ne sont pas toutes trouvées
     this.realFloor = this.floors.length > 1 ? (Math.random() < 0.5 ? 0 : 1) : 0;
     this.unlocked = false;
-    this.powered = false; // panneau du monte-charge réalimenté
+    this.powered = false; // panneau du monte-charge réalimenté (aux Poolrooms : les 3 volants trouvés)
+    this.slide = -1; // Poolrooms : le toboggan pris par le premier qui s'y est glissé (les autres le suivent)
     this.departT = 0; // compte à rebours du départ de l'ascenseur
     this.blackout = 0; // secondes de noir restantes
     this.nextBlackout = level === 1 ? rand(...BLACKOUT_EVERY) * 0.6 : Infinity;
@@ -236,6 +239,13 @@ export class BackroomsSim {
       stalkT: 4, // délai avant d'aller se cacher pour observer
       watch: null, // case sombre d'où elle observe
     };
+  }
+
+  // dans l'eau (Poolrooms) on avance moins vite : 90 % dans 20 cm d'eau, 70 % dans 60 cm, 40 % au plus profond
+  wade(P) {
+    const m = this.fm(P.floor);
+    const d = m.depthAt ? m.depthAt(P.x, P.z) : 0;
+    return d > 0 ? Math.max(0.4, 1 - d * 0.55) : 1;
   }
 
   // la carte d'un étage
@@ -315,6 +325,9 @@ export class BackroomsSim {
   }
 
   isColliding(x, z, radius, floor = 0) {
+    // Poolrooms : cloisons minces entre les salles et colonnes
+    const cm = this.fm(floor);
+    if (cm.collide && cm.collide(x, z, radius)) return true;
     const minGx = cellOf(x - radius);
     const maxGx = cellOf(x + radius);
     const minGz = cellOf(z - radius);
@@ -584,7 +597,8 @@ export class BackroomsSim {
     }
     if (this.state !== 'playing') return;
 
-    if (this.hasMonster) this.updateMonster();
+    // aux Poolrooms, l'entité ne sort pas de l'eau : elle ne chasse personne (son ombre passe sous la surface)
+    if (this.hasMonster && this.level !== 2) this.updateMonster();
     this.checkElevator();
   }
 
@@ -634,7 +648,7 @@ export class BackroomsSim {
     }
 
     // 3. Déplacement (un invité se déplace chez lui et annonce sa position : l'hôte la prend si elle est plausible)
-    const speed = P.running ? SPRINT_SPEED : WALK_SPEED;
+    const speed = (P.running ? SPRINT_SPEED : WALK_SPEED) * this.wade(P);
     P.moving = mx !== 0 || my !== 0;
     const pos = input.pos;
     // un invité a perdu l'équilibre chez lui : il bascule dans le trou de ce côté
@@ -705,8 +719,9 @@ export class BackroomsSim {
       P.found++;
       this.emit({ type: 'fuse', id: f.id, by: P.id, count: this.fuses, total: FUSES });
     }
-    // les 3 fusibles rapportés au panneau du monte-charge : le courant revient, les portes s'ouvrent
-    if (this.level === 1 && !this.powered && this.fuses >= FUSES && Math.hypot(map.exit.x - P.x, map.exit.z - P.z) < 2.6) {
+    // les 3 fusibles rapportés au panneau du monte-charge : le courant revient, les portes s'ouvrent ; aux Poolrooms,
+    // les 3 volants trouvés suffisent : les toboggans s'ouvrent
+    if (this.level >= 1 && !this.powered && this.fuses >= FUSES && (this.level === 2 || Math.hypot(map.exit.x - P.x, map.exit.z - P.z) < 2.6)) {
       this.powered = true;
       this.emit({ type: 'powered', by: P.id });
       this.emit({ type: 'exitUnlocked' });
@@ -716,8 +731,19 @@ export class BackroomsSim {
     // l'autre étage, l'escalier ; une fois tout trouvé, l'ascenseur de cet étage (le vrai… ou le faux)
     this.updateSignal(P);
 
-    // 5. Entrer dans le vrai ascenseur ouvert : à l'abri, spectateur jusqu'au départ
-    if (this.open && P.floor === this.realFloor) {
+    // 5. Entrer dans le vrai ascenseur ouvert : à l'abri, spectateur jusqu'au départ. Aux Poolrooms : se glisser
+    // dans un toboggan ; le premier choisit la couleur, les autres toboggans se referment
+    if (this.open && map.slides) {
+      for (const sl of map.slides) {
+        if ((this.slide >= 0 && sl.id !== this.slide) || Math.hypot(sl.x - P.x, sl.z - P.z) > MOUTH.enter) continue;
+        if (this.slide < 0) this.slide = sl.id;
+        P.status = 'elevator';
+        P.moving = false;
+        P.running = false;
+        this.emit({ type: 'board', id: P.id, name: P.name, slide: sl.id });
+        break;
+      }
+    } else if (this.open && P.floor === this.realFloor) {
       const E = map.elevator;
       const inside = E ? cellOf(P.x) === E.gx && cellOf(P.z) === E.gz : Math.hypot(map.exit.x - P.x, map.exit.z - P.z) < 1.8;
       if (inside) {
@@ -740,8 +766,11 @@ export class BackroomsSim {
         best = near(this.stairs);
         P.sigTo = 'stairs';
       }
-    } else if (this.level === 1 && this.fuses < FUSES) {
+    } else if (this.level >= 1 && this.fuses < FUSES) {
       best = near((map.fuses || []).filter((f) => !f.taken));
+    } else if (map.slides && map.slides.length) {
+      best = near(this.slide >= 0 ? [map.slides[this.slide]] : map.slides);
+      P.sigTo = 'exit';
     } else {
       best = Math.hypot(map.exit.x - P.x, map.exit.z - P.z);
       P.sigTo = 'exit';
@@ -787,7 +816,7 @@ export class BackroomsSim {
       if (P.stamina <= 0) P.winded = WINDED_T;
     } else P.stamina = Math.min(100, P.stamina + DT * STAMINA_REGEN);
     if (!P.moving) return 0;
-    const speed = P.running ? SPRINT_SPEED : WALK_SPEED;
+    const speed = (P.running ? SPRINT_SPEED : WALK_SPEED) * this.wade(P);
     const len = Math.hypot(mx, my) || 1;
     const fx = -Math.sin(P.yaw);
     const fz = -Math.cos(P.yaw);
@@ -830,6 +859,7 @@ export class BackroomsSim {
       pw: this.powered ? 1 : 0,
       bo: r2(this.blackout),
       dp: r2(this.departT),
+      sl: this.slide,
       // le vrai ascenseur ne se dévoile qu'une fois les cassettes trouvées
       rf: this.open ? this.realFloor : -1,
       p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.floor, P.sigTo, P.onLadder ? 1 : 0, r2(P.lockT), r2(P.tilt), P.onBeam ? 1 : 0, P.bottles]),
@@ -851,6 +881,7 @@ export class BackroomsSim {
     this.powered = !!snap.pw;
     this.blackout = snap.bo;
     this.departT = snap.dp;
+    this.slide = snap.sl ?? -1;
     if (snap.rf >= 0 && !this.unlocked) {
       this.realFloor = snap.rf;
       if (this.level === 0) this.unlockLevel0();
@@ -942,6 +973,13 @@ export class BackroomsSim {
   }
 
   arrive() {
+    // Poolrooms : le toboggan pris décide du niveau suivant (sans niveau d'arrivée : on sort des Backrooms)
+    const sl = this.map.slides && this.slide >= 0 ? this.map.slides[this.slide] : null;
+    if (sl && sl.to != null) {
+      this.loadLevel(sl.to);
+      this.emit({ type: 'level', level: this.level });
+      return;
+    }
     if (this.level >= LAST_LEVEL) {
       this.state = 'won';
       this.emit({ type: 'win', time: this.time });

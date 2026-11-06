@@ -1,5 +1,51 @@
 # Journal des versions — Arcadia
 
+## 4.47 — 6 novembre 2026
+- **The Backrooms** — aux Poolrooms (Level 37), on ne sort plus par un ascenseur mais par un toboggan.
+  - Trois gros toboggans, rouge, jaune et bleu, sortent des murs, avec leur tuyau qui grimpe jusqu'au plafond.
+  - Une grille les ferme tant que les 3 volants de vanne n'ont pas été trouvés.
+  - Chaque couleur mène à un endroit différent. Le premier qui se glisse dans un toboggan choisit pour toute l'équipe : les deux autres se referment.
+- **The Backrooms** — à tous les niveaux, les objectifs (cassettes, fusibles, volants de vanne, toboggans) sont placés le plus loin possible les uns des autres : il faut vraiment explorer toute la carte.
+
+## 4.46 — 6 novembre 2026
+- **The Backrooms** — chaque niveau a désormais ses propres sons.
+  - Dans l'entrepôt (Level 1), la poursuite a sa propre musique ; les cris, les ambiances et le son de la mort du Level 0 restent au Level 0.
+  - Une nouvelle nappe angoissante s'ajoute par-dessus toutes les poursuites, quel que soit le niveau.
+
+## 4.45 — 5 novembre 2026
+- **The Backrooms** — les Poolrooms (Level 37) sont reconstruites salle par salle : fini le damier, chaque salle est dessinée avec sa propre forme et reliée aux autres par des portes en plein cintre.
+  - Des lagons aux bassins courbes, avec leur margelle arrondie, un îlot au milieu de l'eau et d'énormes colonnes.
+  - Des salles en voûtes d'arêtes au-dessus d'un grand bassin, avec leurs échelles chromées.
+  - Des tunnels inondés et sombres rythmés d'arcs, et des galeries voûtées claires.
+  - Des halles sous une longue verrière à deux pans, avec des hublots ronds sur les murs.
+  - Des pataugeoires à colonnes et des locaux techniques bas de plafond, où attendent les volants de vanne.
+  - Chaque partie assemble ces salles autrement.
+
+## 4.44 — 5 novembre 2026
+- **The Backrooms** — les Poolrooms (Level 37) bien plus variées, inspirées des vraies photos du lieu.
+  - Des couloirs inondés en tunnels voûtés, rythmés d'arcs, qui s'enfoncent à perte de vue.
+  - De grandes salles en voûtes d'arêtes portées par d'énormes colonnes rondes, les pieds dans l'eau.
+  - Une mosaïque de tout petits carreaux partout, jusqu'au plafond et dans les voûtes.
+  - Des halles sous verrière éblouissantes, et des salles plongées dans le noir où seule la lumière du couloir passe.
+  - Des passerelles qui traversent les grands bassins, des échelles chromées pour descendre dans l'eau.
+  - Une eau plus vert d'eau, comme une vraie piscine.
+
+## 4.43 — 5 novembre 2026
+- **The Backrooms** — un troisième niveau : le Level 37, les Poolrooms. Le monte-charge de l'entrepôt ne remonte plus : il descend dans un complexe de bassins carrelés blancs et cyan, immense, lumineux et désespérément vide.
+  - Des pataugeoires où l'on marche avec de l'eau aux chevilles, de grands bassins avec leur plage et leurs margelles, des couloirs inondés, des halles à colonnes rondes.
+  - L'eau ralentit : plus elle est profonde, plus on avance lentement, et on s'y enfonce.
+  - Une eau limpide qui fonce avec la profondeur, des reflets qui dansent au fond, des ronds dans l'eau à chaque pas, une brume légère au ras de la surface.
+  - Le son de l'endroit : des échos interminables, le ronronnement des pompes, des gouttes au loin, les pas qui pataugent.
+  - Pour sortir : retrouver les 3 volants de vanne dans les locaux techniques, puis les rapporter à l'ascenseur. Quand les vannes sont fermées, les pompes s'arrêtent d'un coup.
+  - L'entité ne sort pas de l'eau ici… mais il arrive qu'une ombre passe au fond d'un bassin, et que le niveau de l'eau ne soit plus tout à fait le même.
+
+## 4.42 — 5 novembre 2026
+- **The Backrooms** — quand l'entité approche, plus de grésillement électrique ni de lumière rouge : on l'entend venir à ses cris et à ses pas.
+
+## 4.41 — 5 novembre 2026
+- **The Backrooms** — avec les monstres VIP, l'entité du Level 0 prend aussi le grand corps en 3D, avec le visage de sa photo d'origine.
+- **The Backrooms** — l'entité garde sa vraie posture : sa tête ne se replie plus peu à peu sur son corps.
+
 ## 4.40 — 5 novembre 2026
 - **Odyssée** — La fin des nouveautés pour faire vivre le monde.
   - Fossiles : on en trouve en grattant les parois scintillantes des grottes (Nautile, Racine, Griffe, Crâne, Armure, Couvercle, Plume, Mâchoire, Nageoire). Le Dr Silex, à la mine de Pierrefort, les ranime tous.
