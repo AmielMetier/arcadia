@@ -172,12 +172,14 @@ window.HUB_GAMES = [
     id: 'fief',
     title: 'Fief Maudit',
     tag: 'Survie médiévale en coop · en construction',
-    desc: 'Les derniers habitants d\'un village en ruine. Le jour, abats les arbres et rentre le bois pour relever les maisons ; bientôt, la nuit, les morts sortiront de la crypte du château. Avant-première : la récolte du bois, chacun dans sa vallée.',
+    desc: 'Les derniers habitants d\'un village en ruine. Le jour, abats les arbres et rentre le bois ; la nuit, garde les braseros allumés pendant que les morts sortent de la brume. Avant-première : chacun dans sa vallée, avec un chevalier IA.',
     url: 'fief/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#e08a3a',
     icon: '🪓', score: 'Bûches rentrées',
-    settings: [],
+    settings: [
+      { key: 'bots', label: 'Équipiers IA', options: [[0, 'Aucun'], [1, '1 chevalier'], [2, '2 chevaliers']], def: 1 },
+    ],
     cover: 'fief/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
@@ -351,8 +353,8 @@ window.HUB_GAME_INFO = {
     keys: [['Flèches / ZQSD', 'Conduire'], ['Maj en tournant', 'Drift (mini-turbo)'], ['E', 'Utiliser l\'objet'], ['↓ + E', 'Lancer vers l\'arrière'], ['🎮 Manette', 'Stick pour conduire, gâchettes pour accélérer et freiner']],
     tips: ['Alterne Q et D pendant un drift : le mini-turbo charge deux fois plus vite.', 'Colle-toi derrière un kart pour profiter de l\'aspiration.', 'Une figure en sautant donne un petit turbo à l\'atterrissage.'] },
   fief: { genre: 'action', time: '10–20 min',
-    keys: [['ZQSD + souris', 'Se déplacer, tourner la caméra'], ['Clic', 'Coup de hache'], ['E', 'Ramasser, poser, ranger une bûche'], ['Espace · Ctrl', 'Sauter · marcher'], ['Molette', 'Zoom'], ['Échap', 'Pause'], ['🎮 Manette', 'Stick gauche : bouger · stick droit : caméra · RT : hache · X : utiliser · A : sauter']],
-    tips: ['Un bûcheron abat un arbre en trois coups de hache.', 'Chaque arbre donne deux bûches : on n\'en porte qu\'une à la fois.', 'L\'entrepôt est la grande maison au toit de tuiles, à l\'est du feu de camp.', 'Porter une bûche ralentit : coupe les arbres les plus proches du village.'] },
+    keys: [['ZQSD + souris', 'Se déplacer, tourner la caméra'], ['Clic', 'Coup de hache'], ['E', 'Ramasser, ranger, charger un brasero · tenir pour relever'], ['Espace · Ctrl', 'Sauter · marcher'], ['Molette', 'Zoom'], ['Échap', 'Pause'], ['🎮 Manette', 'Stick gauche : bouger · stick droit : caméra · RT : hache · X : utiliser · A : sauter']],
+    tips: ['Un bûcheron abat un arbre en trois coups de hache.', 'Chaque arbre donne deux bûches : on n\'en porte qu\'une à la fois.', 'Charge les braseros avant la nuit : un squelette tombé dans leur lumière ne se relève pas.', 'Le guerrier pare de face avec son bouclier : prends-le de côté ou de dos.', 'E devant l\'entrepôt reprend une bûche du stock pour un brasero.', 'Tiens E près d\'un équipier à terre pour le relever.'] },
   convoy: { genre: 'action', time: '15–30 min',
     keys: [['ZQSD', 'Se déplacer'], ['E', 'Interagir'], ['Souris', 'Viser · tirer'], ['🎮 Manette', 'Stick : se déplacer · X / RT : interagir, tirer']],
     tips: ['Le convoi ralentit en gare : profitez-en pour réparer.', 'Surveillez la pression de la chaudière.'] },

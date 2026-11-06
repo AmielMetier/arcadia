@@ -34,6 +34,9 @@ export const BUILDINGS = [
   { id: 'chapelle', name: 'Chapelle', x: -1, z: 17, w: 6, d: 8, style: 'brick', state: 'ruine', door: 'n' },
 ];
 export const CAMPFIRE = { x: 0, z: 1, r: 0.9 };
+// braseros autour de la place : la nuit, leur lumière (et celle du feu de camp) tient la brume à distance
+export const BRAZIERS = [[5.5, -9.5], [-1, -9], [-7.5, -1.5], [-6.5, 12], [6.5, 10], [17.5, -3]].map(([x, z], id) => ({ id, x, z }));
+export const LIGHT_R = 8.5, FIRE_LIGHT_R = 9.5;
 // le château en ruine, sur la colline au nord
 export const CASTLE = { x: -6, z: -80 };
 export const CASTLE_PARTS = [
@@ -102,11 +105,13 @@ export function createValley(seed = 1) {
   const boxes = [], circles = [];
   for (const b of [...BUILDINGS, ...CASTLE_PARTS]) boxes.push({ ...rectOf(b, 0.25), id: b.id });
   circles.push({ x: CAMPFIRE.x, z: CAMPFIRE.z, r: CAMPFIRE.r });
+  for (const b of BRAZIERS) circles.push({ x: b.x, z: b.z, r: 0.45 });
 
   // ------------------------------------------------ objets du décor
   const props = [];
   const blockedForDecor = (x, z, m = 3) => {
     if (Math.hypot(x - CAMPFIRE.x, z - CAMPFIRE.z) < 7) return true;
+    if (BRAZIERS.some((b) => Math.hypot(x - b.x, z - b.z) < 2.5)) return true;
     for (const b of [...BUILDINGS, ...CASTLE_PARTS]) { const R = rectOf(b, m); if (x > R.x0 && x < R.x1 && z > R.z0 && z < R.z1) return true; }
     for (const b of BUILDINGS) { const p = doorPoint(b, 2.5); if (Math.hypot(x - p.x, z - p.z) < 3) return true; }
     if (pathDist(x, z) < 2.6) return true;
@@ -213,7 +218,7 @@ export function createValley(seed = 1) {
 
   return {
     seed, heightAt, isWater, collide, treeNear, near,
-    buildings: BUILDINGS, castle: CASTLE_PARTS, campfire: CAMPFIRE, trees, props, rubble, boxes, circles, paths: PATHS,
+    buildings: BUILDINGS, castle: CASTLE_PARTS, campfire: CAMPFIRE, braziers: BRAZIERS, trees, props, rubble, boxes, circles, paths: PATHS,
     warehouse, depot, spawn, riverZ, pathDist,
   };
 }

@@ -176,8 +176,9 @@ Bagarre de pantins mous au-dessus du vide (`mollo/`). Le dernier debout gagne la
 Survie médiévale en coopération, en 3D (`fief/`). Les derniers habitants d'un village en ruine le relèvent le jour et le défendent la nuit
 contre les morts sortis de la crypte du château. Le jeu se construit par étapes, décrites dans [docs/FIEF-MAUDIT.md](docs/FIEF-MAUDIT.md).
 
-- **Déjà jouable** : la vallée (village en ruine, entrepôt, feu de camp, rivière, château sur sa colline, forêt), le bûcheron et sa hache, les arbres qui tombent, les bûches à ramasser, porter et ranger à l'entrepôt, et un petit tutoriel
-- **À venir** : la nuit et les squelettes, le jeu à plusieurs et les métiers, la construction des bâtiments, la crypte
+- **Déjà jouable** : la vallée (village en ruine, entrepôt, feu de camp, rivière, château sur sa colline, forêt), le bûcheron et sa hache, les arbres qui tombent, les bûches à ramasser, porter et ranger à l'entrepôt, un petit tutoriel
+- **La nuit** : cycle jour / crépuscule / nuit / aube, brume qui épouse le sol et s'ouvre autour des six braseros et du feu de camp, squelettes (soldats et guerriers à bouclier) qui sortent du sol côté château et se relèvent s'ils tombent dans la brume, joueur à terre qu'on relève en tenant E, coéquipiers IA (chevaliers), défaite et nuit à rejouer
+- **À venir** : le jeu à plusieurs et les métiers, la construction des bâtiments, les sièges, la crypte
 - Modèles : Medieval Village MegaKit de Quaternius, personnages et squelettes de KayKit (CC0), dans `fief/models/` ; arbres et ciel de Birdie Party
 
 ## Mystère Mystère, The Backrooms

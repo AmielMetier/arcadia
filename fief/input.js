@@ -10,7 +10,7 @@ export class Input {
     this.keys = new Set(); this.off = [];
     this.c = { fc: 0, uc: 0 };
     this.yaw = 0; this.pitch = 0.32; this.zoom = 6.2; this.sens = 1;
-    this.locked = false; this.free = false; this.touch = { move: null, look: null }; this.padPrev = []; this.btn = { jump: false, walk: false };
+    this.locked = false; this.free = false; this.touch = { move: null, look: null }; this.padPrev = []; this.btn = { jump: false, walk: false, use: false };
     const listen = (t, type, fn, o) => { t.addEventListener(type, fn, o); this.off.push(() => t.removeEventListener(type, fn, o)); };
     this.listen = listen;
     try { this.sens = clamp(+(localStorage.getItem('fief_sens') || 1), 0.3, 3); } catch (e) {}
@@ -60,16 +60,16 @@ export class Input {
     if (r && r.catch) r.catch(() => { try { const r2 = this.surface.requestPointerLock(); if (r2 && r2.catch) r2.catch(() => { this.free = true; }); } catch (e) { this.free = true; } });
   }
   unlock() { if (document.pointerLockElement) document.exitPointerLock(); }
-  release() { this.keys.clear(); this.btn.jump = this.btn.walk = false; this.touch.move = null; this.touch.look = null; }
+  release() { this.keys.clear(); this.btn.jump = this.btn.walk = this.btn.use = false; this.touch.move = null; this.touch.look = null; }
   bindTouch(box) {
     for (const b of box.querySelectorAll('button[data-a]')) {
       const a = b.dataset.a;
       this.listen(b, 'pointerdown', (e) => {
         e.preventDefault(); e.stopPropagation(); document.body.classList.add('touch'); this.free = true;
-        if (a === 'fire') this.c.fc++; else if (a === 'use') this.c.uc++; else if (a === 'jump') this.btn.jump = true;
+        if (a === 'fire') this.c.fc++; else if (a === 'use') { this.c.uc++; this.btn.use = true; } else if (a === 'jump') this.btn.jump = true;
         b.classList.add('on');
       });
-      const up = () => { if (a === 'jump') this.btn.jump = false; b.classList.remove('on'); };
+      const up = () => { if (a === 'jump') this.btn.jump = false; if (a === 'use') this.btn.use = false; b.classList.remove('on'); };
       this.listen(b, 'pointerup', up); this.listen(b, 'pointerleave', up); this.listen(b, 'pointercancel', up);
     }
   }
@@ -84,7 +84,7 @@ export class Input {
     if (edge(7)) this.c.fc++;
     if (edge(2)) this.c.uc++;
     if (edge(9) && this.h.menu) this.h.menu();
-    const out = { lx, ly, jump: b(0), walk: b(4) };
+    const out = { lx, ly, jump: b(0), walk: b(4), use: b(2) };
     this.padPrev = gp.buttons.map((x, i) => b(i));
     return out;
   }
@@ -97,7 +97,7 @@ export class Input {
     if (pad && (pad.lx || pad.ly)) { mx = pad.lx; my = -pad.ly; }
     const m = this.touch.move;
     if (m) { const dx = m.x - m.ox, dy = m.y - m.oy, d = Math.hypot(dx, dy); if (d > 8) { const k = Math.min(1, d / 60); mx = dx / d * k; my = -dy / d * k; } }
-    return { mx, my, walk: K.has('ControlLeft') || K.has('AltLeft') || this.btn.walk || !!pad?.walk, jump: K.has('Space') || this.btn.jump || !!pad?.jump, ...this.c };
+    return { mx, my, walk: K.has('ControlLeft') || K.has('AltLeft') || this.btn.walk || !!pad?.walk, jump: K.has('Space') || this.btn.jump || !!pad?.jump, hold: K.has('KeyE') || this.btn.use || !!pad?.use, ...this.c };
   }
   stick() { const m = this.touch.move; return m ? { ox: m.ox, oy: m.oy, x: m.x, y: m.y } : null; }
   dispose() { for (const f of this.off) f(); this.off = []; this.keys.clear(); this.unlock(); }

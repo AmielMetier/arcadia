@@ -12,6 +12,7 @@
 //   persos/<nom>.glb     les personnages KayKit sans leurs animations (texture en WebP 512 px)
 //   anims.glb            le squelette d'animation et les clips communs (tirés du Chevalier)
 //   anims-squelettes.glb les clips propres aux squelettes (réveil, mort, résurrection), tirés du Squelette
+//   armes-squelettes.glb les armes des squelettes (un nœud par arme), à accrocher aux mains
 import { NodeIO, Document } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, prune, weld, quantize, textureCompress, mergeDocuments, unpartition } from '@gltf-transform/functions';
@@ -116,6 +117,25 @@ async function anims(file, keep, out) {
   await io.write(out, doc);
 }
 
+// armes des squelettes : un seul fichier, un nœud par arme
+const ARMES = ['Skeleton_Blade', 'Skeleton_Axe', 'Skeleton_Shield_Large_A', 'Skeleton_Shield_Small_A', 'Skeleton_Staff', 'Skeleton_Crossbow'];
+async function armes() {
+  const doc = new Document();
+  const dir = path.join(SRC, 'KayKit-Character-Pack-Skeletons-1.0', 'addons', 'kaykit_character_pack_skeletons', 'Assets', 'gltf');
+  for (const name of ARMES) {
+    const part = await io.read(path.join(dir, name + '.gltf'));
+    const scene = part.getRoot().listScenes()[0], kids = scene.listChildren();
+    if (kids.length === 1) kids[0].setName(name);
+    else { const g = part.createNode(name); for (const k of kids) { scene.removeChild(k); g.addChild(k); } scene.addChild(g); }
+    mergeDocuments(doc, part);
+  }
+  const root = doc.getRoot(), [first, ...rest] = root.listScenes();
+  for (const s of rest) { for (const k of s.listChildren()) { s.removeChild(k); first.addChild(k); } s.dispose(); }
+  await doc.transform(dedup(), prune(), unpartition(), textureCompress({ encoder: sharp, targetFormat: 'webp', quality: 88, resize: [512, 512] }), quantize());
+  await io.write(path.join(OUT, 'armes-squelettes.glb'), doc);
+}
+
+await armes();
 await village();
 for (const n of HEROS) await perso(path.join(ADV, n + '.glb'), path.join(OUT, 'persos', n.toLowerCase() + '.glb'));
 for (const n of SQUELETTES) await perso(path.join(SKL, n + '.glb'), path.join(OUT, 'persos', n.toLowerCase() + '.glb'));

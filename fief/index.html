@@ -22,13 +22,19 @@
 <div id="hud" hidden>
   <div class="vig"></div>
   <div class="tl">
-    <div class="day"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.6" fill="#ffd27a"/><g stroke="#ffd27a" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></g></svg><span id="day">Jour 1</span></div>
+    <div class="day" id="dayChip"><i class="ico sun" id="dayIco"></i><span id="day">Jour 1</span><small id="clock"></small></div>
     <ul class="stock">
       <li id="sBois" title="Bois"><i class="ico wood"></i><b>0</b></li>
       <li id="sPierre" class="off" title="Pierre (bientôt)"><i class="ico stone"></i><b>0</b></li>
       <li id="sVivres" class="off" title="Vivres (bientôt)"><i class="ico food"></i><b>0</b></li>
     </ul>
   </div>
+  <div class="vitals">
+    <div class="hpbar" id="hpBar"><i></i><span id="hpTxt">100</span></div>
+    <div class="wallbar" id="wallBar" hidden><small>Entrepôt</small><i><b></b></i></div>
+  </div>
+  <div class="banner" id="banner" hidden></div>
+  <div class="downbox" id="downBox" hidden><b>À terre</b><span id="downTxt"></span><i class="ring"><i id="downRing"></i></i></div>
   <div class="goal" id="goal"><small>Objectif</small><b id="goalTxt"></b><span id="goalHint"></span></div>
   <div class="prompt" id="prompt" hidden><kbd id="pKey">E</kbd><span id="pTxt"></span><i class="hp" id="pHp" hidden><i></i></i></div>
   <div class="carry" id="carry" hidden><i class="ico wood"></i>Tu portes une bûche</div>

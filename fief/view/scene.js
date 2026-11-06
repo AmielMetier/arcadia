@@ -11,6 +11,7 @@ import { grassTexture } from '../../golf/view/textures.js';
 import { WATER, R_PLAY } from '../engine/map.js';
 import { loadKit, buildVillage } from './village.js';
 import { createActors } from './actors.js';
+import { createNight } from './night.js';
 
 const MOBILE = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 560;
 const SUN_DIR = new THREE.Vector3(-0.5, 0.62, 0.6).normalize();
@@ -49,6 +50,7 @@ export function createScene(stage, { onLost } = {}) {
     scene.environmentIntensity = 0.45;
   }
 
+  let night = null, peaksMesh = null;
   let map = null, treeKit = null, trees = null, actors = null, logsGroup = null, fire = null, falling = [], stumps = null;
   const logMeshes = new Map();
   let viewT = 0;
@@ -171,7 +173,7 @@ export function createScene(stage, { onLost } = {}) {
     const fmat = new THREE.SpriteMaterial({ map: flameTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
     const flames = [];
     for (let i = 0; i < 5; i++) { const s = new THREE.Sprite(fmat); s.position.set((i - 2) * 0.12, 0.55, ((i * 7) % 3 - 1) * 0.1); s.scale.set(0.55, 1.1, 1); g.add(s); flames.push(s); }
-    return { group: g, update(t) { light.intensity = 8 + Math.sin(t * 13) * 1.2 + Math.sin(t * 7.3) * 1.4; flames.forEach((f, i) => { const k = 0.85 + 0.25 * Math.sin(t * (9 + i) + i * 2); f.scale.set(0.5 * k, 1.15 * k, 1); f.position.y = 0.5 + 0.08 * k; }); } };
+    return { group: g, update(t, dark = 0) { light.intensity = (8 + Math.sin(t * 13) * 1.2 + Math.sin(t * 7.3) * 1.4) * (1 + dark * 0.8); light.distance = 14 + dark * 6; flames.forEach((f, i) => { const k = 0.85 + 0.25 * Math.sin(t * (9 + i) + i * 2); f.scale.set(0.5 * k, 1.15 * k, 1); f.position.y = 0.5 + 0.08 * k; }); } };
   }
 
   // ------------------------------------------------------------------ chargement
@@ -182,7 +184,7 @@ export function createScene(stage, { onLost } = {}) {
     const step = (k) => onProgress && onProgress(k);
     scene.add(buildTerrain(M)); step(0.1);
     const river = buildRiver(M); scene.add(river); fire = { river };
-    const peaks = buildPeaks(look, 3, { x: 0, z: 0 }, noise); if (peaks) scene.add(peaks);
+    const peaks = buildPeaks(look, 3, { x: 0, z: 0 }, noise); if (peaks) scene.add(peaks); peaksMesh = peaks;
     treeKit = createTreeKit();
     // le feuillage entre la caméra et le joueur devient ajouré (tramé), pour ne jamais perdre son personnage dans un sapin
     for (const k of ['leaf', 'leaf2', 'pine', 'bark']) {
@@ -239,6 +241,7 @@ export function createScene(stage, { onLost } = {}) {
     stumps = { model: models.stump, list: [] };
     const f = buildFire(M, models.campfire); scene.add(f.group); fire.update = f.update;
     logsGroup = new THREE.Group(); scene.add(logsGroup);
+    night = createNight({ scene, renderer, sky, sun, hemi, map: M, noise, peaks: peaksMesh });
     actors = await createActors(scene, { makeLog }); step(0.95);
     const s = M.spawn; cam.yaw = s.yaw + Math.PI; cam.tx = s.x; cam.tz = s.z; cam.ty = M.heightAt(s.x, s.z) + 1.6;
   }
@@ -259,7 +262,8 @@ export function createScene(stage, { onLost } = {}) {
   function update(view, dt, t) {
     const { sim, me, camYaw, camPitch, zoom } = view;
     SWAY.uT.value = t;
-    if (fire) { fire.river.userData.U.uT.value = t; fire.update && fire.update(t); }
+    if (fire) { fire.river.userData.U.uT.value = t; fire.update && fire.update(t, sim.darkness); }
+    if (night) night.update(sim, t);
     // arbres qui tombent : bascule accélérée, petit rebond, puis s'enfoncent et disparaissent
     viewT = t;
     const now = t;
@@ -283,7 +287,7 @@ export function createScene(stage, { onLost } = {}) {
       const k = Math.min(1, (now - m.userData.born) / 0.25); m.scale.setScalar(0.6 + 0.4 * k);
     }
     for (const [id, m] of logMeshes) if (!seen.has(id)) { logsGroup.remove(m); logMeshes.delete(id); }
-    actors.update(sim, dt, me);
+    actors.update(sim, dt, me, t);
 
     // caméra à l'épaule : derrière le joueur, orientée par la souris
     const p = sim.player(me);
@@ -318,7 +322,7 @@ export function createScene(stage, { onLost } = {}) {
     camera.lookAt(cam.tx + rx * side, cam.ty, cam.tz + rz * side);
     // l'ombre suit le joueur
     tmpV.set(cam.tx, cam.ty, cam.tz);
-    sun.position.copy(tmpV).addScaledVector(SUN_DIR, 120); sun.target.position.copy(tmpV);
+    sun.position.copy(tmpV).addScaledVector(night ? night.sunDir : SUN_DIR, 120); sun.target.position.copy(tmpV);
     sky.position.copy(camera.position);
     if (sky.userData.update) sky.userData.update(t, null);
     renderer.render(scene, camera);

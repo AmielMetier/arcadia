@@ -2,7 +2,7 @@
 
 Survie en coopération en 3D (Three.js), vue à la troisième personne, de 1 à 6 joueurs, avec des bots pour compléter.
 Dossier : `fief/`. Ce document décrit le jeu visé, les assets retenus et l'ordre de développement.
-Où on en est : **étape 2 faite** (voir la section 8).
+Où on en est : **étape 3 faite** (voir la section 8).
 
 ## 1. L'idée
 
@@ -205,7 +205,12 @@ Chaque étape se termine par une version jouable, poussée, et validée avant de
      dans un cercle autour du personnage : sinon, en forêt, on ne voit plus rien.
    - Pour porter, les jambes jouent `Walking_A` et les bras `2H_Melee_Idle` (pistes séparées par os).
    - Lancé depuis un salon, chacun joue dans sa propre vallée jusqu'à l'étape 4.
-3. **Une nuit** : brume, braseros, squelettes qui se réveillent et attaquent, combat, à terre / relevé. Toujours seul, avec un bot.
+3. **Une nuit** : brume, braseros, squelettes qui se réveillent et attaquent, combat, à terre / relevé. Toujours seul, avec un bot. ✔ (version 4.52)
+   - Réglages actuels : jour 270 s dont 25 s de crépuscule, nuit 150 s ; 6 squelettes la première nuit (+3 par nuit, un tiers
+     de guerriers) ; braseros : 70 s au départ, +50 s par bûche, 150 s au plus, 0,6 s brûlée par seconde ; entrepôt 600 PV.
+   - Le bois rangé peut ressortir de l'entrepôt (E devant la porte) : c'est lui qui nourrit les braseros.
+   - Seuls les soldats (Skeleton_Minion) et les guerriers (Skeleton_Warrior) sont là ; archers, mages et chevalier noir viendront avec les sièges.
+   - Défaite : on rejoue depuis le crépuscule (instantané pris à la cloche) ou depuis le début.
 4. **À plusieurs** : branchement au Hub, hôte qui fait autorité, prédiction, poutres à deux, métiers.
 5. **La boucle complète** : construction des bâtiments, faim, froid, nourriture, 10 jours, sauvegarde, sièges des jours 5 et 10.
 6. **La crypte** et le Roi-Squelette, écran de fin, `H.report`.

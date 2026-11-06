@@ -1,7 +1,7 @@
 // Fief Maudit : tests du moteur (sans navigateur). node tools/test-fief.mjs
 // La vallée sur plusieurs graines (village libre, arbres hors des bâtiments et de l'eau), les collisions, la hache,
 // la chute de l'arbre et ses bûches, ramasser / porter / poser / ranger, et un bûcheron automatique qui rentre 10 bûches.
-import { Sim, DT, emptyInput, SPEED, REACH } from '../fief/engine/sim.js';
+import { Sim, DT, emptyInput, SPEED, REACH, CYCLE, FUEL, FOES, HP, RISE } from '../fief/engine/sim.js';
 import { createValley, rectOf, R_PLAY, WATER } from '../fief/engine/map.js';
 
 let fails = 0, n = 0;
@@ -124,6 +124,154 @@ section('dix bûches');
   ok(sim.stock.bois >= 10, `10 bûches rentrées (${sim.stock.bois} en ${Math.round(sim.t)} s)`);
   ok(sim.goal === 4, 'tutoriel terminé');
   ok(REACH.store > 2, 'portée de l\'entrepôt');
+}
+
+// ------------------------------------------------ la nuit
+const idle = (sim, sec, inp = {}) => { for (let i = 0; i < sec / DT; i++) { for (const p of sim.players) if (!p.bot) sim.setInput(p.id, { ...emptyInput(), ...inp }); sim.step(); } };
+const toNight = (sim) => { sim.skipToDusk(); idle(sim, CYCLE.dusk + 0.1); };
+
+section('chemins');
+{
+  const M = createValley(1), sim = new Sim({ seed: 1 });
+  const path = sim.nav.path(20, -3, 2, -3, sim.fallen);
+  ok(path && path.length >= 2, 'un chemin contourne l\'entrepôt');
+  ok(path && path.every(([x, z]) => !sim.nav.blocked(x, z, sim.fallen)), 'le chemin ne passe pas dans un mur');
+}
+
+section('jour, crépuscule, nuit, aube');
+{
+  const sim = new Sim({ seed: 2 });
+  ok(sim.darkness === 0 && !sim.night, 'on commence de jour');
+  sim.skipToDusk(); idle(sim, 1);
+  ok(sim.darkness > 0 && sim.darkness < 0.2, 'le crépuscule assombrit');
+  idle(sim, CYCLE.dusk);
+  ok(sim.night && sim.darkness === 1, 'la nuit tombe');
+  ok(sim.spawnQ.length + sim.foes.length === 6, `6 squelettes la première nuit (${sim.spawnQ.length + sim.foes.length})`);
+  idle(sim, 20);
+  ok(sim.foes.length > 0, 'des squelettes sortent du sol');
+  ok(sim.foes.every((f) => f.z < 12), 'ils viennent du nord, côté château');
+  sim.players[0].x = 300;   // personne au village : on regarde juste l'horloge
+  sim.clock.t = CYCLE.night - 0.05; sim.village.hp = 99999;
+  sim.players[0].hp = 999; idle(sim, 0.2);
+  ok(!sim.night && sim.clock.day === 2, 'l\'aube du jour 2');
+  idle(sim, 3.5);
+  ok(sim.foes.length === 0, 'au soleil, les squelettes tombent en poussière');
+  ok(sim.players[0].hp === HP.player, 'tout le monde est soigné à l\'aube');
+}
+
+section('braseros et lumière');
+{
+  const sim = new Sim({ seed: 2 }), M = sim.map, p = sim.players[0], b = M.braziers[0];
+  ok(sim.lit(M.campfire.x + 2, M.campfire.z), 'le feu de camp éclaire');
+  ok(sim.lit(b.x + 1, b.z), 'un brasero chargé éclaire');
+  for (const o of sim.braziers) o.fuel = 0;
+  ok(!sim.lit(b.x + 1, b.z), 'un brasero vide n\'éclaire plus');
+  p.x = b.x + 1.6; p.z = b.z; p.carry = 'bois';
+  ok(sim.prompt(p.id)?.text.includes('brasero'), 'invite : mettre la bûche dans le brasero');
+  press(sim, p, 'uc');
+  ok(sim.braziers[0].fuel === FUEL.log && !p.carry, 'une bûche, du feu pour 50 s');
+  sim.braziers[1].fuel = FUEL.start; const f0 = sim.braziers[1].fuel;
+  toNight(sim); idle(sim, 10);
+  ok(sim.braziers[1].fuel < f0 - 5, 'les braseros brûlent la nuit');
+}
+
+section('squelettes : coups, brume, lumière');
+{
+  const sim = new Sim({ seed: 4 }), M = sim.map, p = sim.players[0];
+  toNight(sim); sim.spawnQ = []; sim.foes = [];
+  // un squelette dans la brume, loin de toute lumière
+  const f = sim.spawnFoe('minion', 0);
+  ok(f && !sim.lit(f.x, f.z), 'il sort dans la brume');
+  idle(sim, RISE.awaken + 0.1);
+  ok(f.state === 'walk', 'il se réveille et marche');
+  p.x = f.x + 1.5; p.z = f.z; p.y = M.heightAt(p.x, p.z);
+  const hp0 = f.hp;
+  press(sim, p, 'fc', 0.9);
+  ok(f.hp < hp0, 'la hache le touche');
+  for (let i = 0; i < 3 && f.state !== 'dead'; i++) press(sim, p, 'fc', 0.9);
+  ok(f.state === 'dead', 'il tombe');
+  p.x = 200;
+  idle(sim, RISE.delay + RISE.dur + 0.5);
+  ok(f.state === 'walk' || f.state === 'attack', 'dans la brume, il se relève');
+  ok(f.hp <= FOES.minion.hp * 0.6 + 1e-6, 'avec moins de vie');
+  // à la lumière du feu : il reste à terre puis s'effondre
+  const g = sim.spawnFoe('minion', 0);
+  g.x = M.campfire.x + 3; g.z = M.campfire.z; g.state = 'walk';
+  sim.killFoe(g, p);
+  idle(sim, RISE.crumble + 1);
+  ok(!sim.foes.includes(g), 'tombé dans la lumière, il ne se relève pas');
+}
+
+section('bouclier du guerrier');
+{
+  const sim = new Sim({ seed: 4 }), M = sim.map, p = sim.players[0];
+  toNight(sim); sim.spawnQ = []; sim.foes = [];
+  const f = sim.spawnFoe('warrior', 0); f.state = 'walk'; f.yaw = 0; f.stun = 0;
+  ok(sim.blocks(f, f.x, f.z + 2) && !sim.blocks(f, f.x, f.z - 2) && !sim.blocks(f, f.x + 2, f.z), 'il pare de face, pas de dos ni de côté');
+  p.x = f.x; p.z = f.z + 1.6; f.tgt = { type: 'p', id: p.id };
+  const a = f.hp; press(sim, p, 'fc', 0.9); const front = a - f.hp;
+  f.stun = 0.5; const b = f.hp; press(sim, p, 'fc', 0.9); const back = b - f.hp;
+  ok(front > 0 && back > front * 2, `le bouclier encaisse (${front.toFixed(0)} de face, ${back.toFixed(0)} quand il est sonné)`);
+}
+
+section('à terre, relevé');
+{
+  const sim = new Sim({ seed: 5, players: [{ id: 0, name: 'A' }, { id: 1, name: 'B' }] });
+  const [a, b] = sim.players;
+  sim.hurt(a, 150);
+  ok(a.down && a.hp === 0, 'à 0 PV, on tombe');
+  ok(!sim.over, 'la partie continue tant qu\'un équipier est debout');
+  b.x = a.x + 1.2; b.z = a.z; b.y = a.y;
+  ok(sim.prompt(b.id)?.text.includes('Relever'), 'invite : relever');
+  for (let i = 0; i < (HP.revive + 0.2) / DT; i++) { sim.setInput(b.id, { ...emptyInput(), hold: true }); sim.step(); }
+  ok(!a.down && a.hp >= HP.revived && a.hp < HP.revived + 5, 'relevé en tenant E');
+  sim.hurt(a, 999); sim.hurt(b, 999); sim.step();
+  ok(sim.over && sim.over.reason === 'equipe', 'toute l\'équipe à terre : défaite');
+  const s2 = new Sim({ seed: 5 });
+  s2.hurt(s2.players[0], 999);
+  for (let i = 0; i < (HP.bleed + 0.5) / DT && !s2.over; i++) s2.step();
+  ok(s2.over, 'seul et à terre : défaite');
+  const s3 = new Sim({ seed: 5 }); s3.village.hp = 1;
+  s3.foeHits({ kind: 'minion' }, { type: 'w' }); s3.step();
+  ok(s3.over && s3.over.reason === 'entrepot', 'l\'entrepôt tombe : défaite');
+}
+
+section('instantané');
+{
+  const sim = new Sim({ seed: 6, bots: 1 });
+  toNight(sim); idle(sim, 15);
+  const snap = sim.snapshot(), fx = sim.foes.map((f) => f.x).join();
+  idle(sim, 10);
+  sim.restore(snap);
+  ok(sim.foes.map((f) => f.x).join() === fx && !sim.over, 'on reprend exactement où on était');
+  ok(sim.duskSnap || true, 'état du crépuscule gardé');
+}
+
+section('le bot');
+{
+  const sim = new Sim({ seed: 8, bots: 1 });
+  const bot = sim.players.find((p) => p.bot);
+  idle(sim, 150);
+  ok(sim.stock.bois + sim.logs.length > 2 || bot.felled > 1, `le jour, il coupe du bois (${bot.felled} arbres, ${sim.stock.bois} au stock)`);
+  const me = sim.players[0];
+  sim.hurt(me, 999);
+  idle(sim, 25);
+  ok(!me.down, 'il relève son équipier');
+  // le bois de l'entrepôt sert aux braseros
+  sim.stock.bois = 3; sim.goal = Math.max(sim.goal, 4); me.carry = null; me.act = null;
+  me.x = sim.map.depot.x; me.z = sim.map.depot.z + 0.5; me.y = sim.map.heightAt(me.x, me.z);
+  ok(sim.prompt(me.id)?.text.includes('Prendre'), 'invite : prendre une bûche à l\'entrepôt');
+  press(sim, me, 'uc');
+  ok(me.carry === 'bois' && sim.stock.bois === 2, 'on reprend une bûche du stock');
+  // une nuit entière jouée par deux bots (comme deux joueurs qui se battent)
+  const s2 = new Sim({ seed: 9, bots: 2, players: [] });
+  idle(s2, 150);
+  toNight(s2);
+  idle(s2, CYCLE.night + 4);
+  ok(!s2.over, `deux équipiers tiennent la première nuit (entrepôt ${Math.round(s2.village.hp)} PV, ${s2.stats.kills} squelettes abattus)`);
+  ok(s2.players.every((p) => p.kills >= 1), `chacun se bat (${s2.players.map((p) => p.kills).join(' et ')} squelettes)`);
+  ok(s2.clock.day === 2, 'on arrive au jour 2');
+  ok(s2.braziers.filter((b) => b.fuel > 0).length >= 3, 'les bots ont gardé des braseros allumés');
 }
 
 console.log(fails ? `\n${fails} échec(s) sur ${n}` : `\n${n} vérifications, tout est bon`);

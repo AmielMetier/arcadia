@@ -149,7 +149,10 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   `node tools/bench-bastion.mjs [minutes] [graine] [mode] [carte]` fait jouer 4 bots hors navigateur et mesure
   le coût d'un pas de simulation (doit rester sous 33 ms), les éliminations, les cibles des bots et les unités bloquées.
 - Fief Maudit (`fief/`, moteur sans DOM dans `fief/engine/`) : survie médiévale en coop, en construction par étapes (conception et étapes dans `docs/FIEF-MAUDIT.md`).
-  Vallée, village, arbres et collisions dans `map.js` ; joueurs, hache, bûches et entrepôt dans `sim.js` ; `node tools/test-fief.mjs` (à lancer quand on touche au moteur).
+  Vallée, village, braseros, arbres et collisions dans `map.js` ; chemins A* sur une grille de 1 m dans `nav.js` ; joueurs, hache, bûches, entrepôt, cycle jour / nuit (`CYCLE`),
+  braseros (`FUEL`), squelettes (`FOES`, réveil, cibles, résurrection dans la brume `RISE`), à terre / relevé (`HP`), défaite, `snapshot` / `restore` dans `sim.js` ;
+  coéquipiers IA dans `bots.js` (mêmes entrées qu'un joueur). Vue : `view/night.js` (lumière, ciel, brume, braseros), `view/actors.js` (héros et squelettes).
+  `node tools/test-fief.mjs` (à lancer quand on touche au moteur : vallée, chemins, hache et bûches, nuit, braseros, squelettes, bouclier, relève, défaite, instantané, une nuit jouée par deux bots).
   Modèles (Quaternius Medieval Village MegaKit, KayKit Adventurers et Skeletons, CC0) préparés par `node tools/fief-assets.mjs <clones>` dans `fief/models/` (crédits : `fief/models/LICENSE.txt`) ;
-  arbres, ciel et textures repris de Birdie Party, rochers de Kenney et sons d'Island Rush et Birdie Party. `?debug` expose `__fief` (`ff(sec)`, `tp(x, z, cap)`, `cam(cap, inclinaison, distance)`, `press('fc'|'uc')`), `?manual` ne dessine qu'à la demande (`__fief.frames(n)`), `?seed`, `?autostart`.
+  arbres, ciel et textures repris de Birdie Party, rochers de Kenney et sons d'Island Rush et Birdie Party. `?debug` expose `__fief` (`ff(sec)`, `tp(x, z, cap)`, `cam(cap, inclinaison, distance)`, `press('fc'|'uc')`), `?manual` ne dessine qu'à la demande (`__fief.frames(n)`), `?seed`, `?bots=0..2`, `?autostart`.
 - Commits : auteur et messages en français, un message qui décrit ce que le joueur gagne.

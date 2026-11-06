@@ -1,5 +1,17 @@
 # Journal des versions — Arcadia
 
+## 4.52 — 6 novembre 2026
+- **Fief Maudit** — La nuit tombe sur la vallée.
+  - Le jour dure quatre minutes et demie. Au crépuscule, la cloche sonne, puis la brume monte et les morts sortent du sol, du côté du château.
+  - Six braseros entourent la place. Une bûche dedans, c'est un peu moins d'une minute et demie de feu. On peut reprendre le bois rangé à l'entrepôt pour les charger.
+  - Un squelette abattu dans la brume se relève quelques secondes plus tard. Abattu dans la lumière d'un brasero ou du feu de camp, il reste à terre.
+  - Deux sortes de squelettes : les soldats à la lame, rapides, et les guerriers à la hache, qui parent de face avec leur bouclier (contourne-les).
+  - Ils s'en prennent à qui passe près d'eux, sinon aux braseros allumés, sinon à l'entrepôt.
+  - À 0 PV, on tombe à terre : un équipier a 40 secondes pour te relever en tenant E près de toi.
+  - Un chevalier IA joue avec toi (ou deux, ou aucun, dans les réglages du salon) : il coupe du bois, charge les braseros, se bat et te relève.
+  - À l'aube, les morts retournent à la poussière et tout le monde est soigné. Si l'entrepôt tombe ou si toute l'équipe est à terre, on peut rejouer la nuit.
+  - Dans le menu, « Avancer jusqu'au soir » saute la journée.
+
 ## 4.51 — 6 novembre 2026
 - **Fief Maudit** — Nouveau jeu en avant-première : une survie médiévale en coopération, en 3D. Les derniers habitants d'un village en ruine doivent le relever avant que les morts ne sortent de la crypte du château.
   - Cette première version permet de découvrir la vallée : le village en ruine, l'entrepôt, le feu de camp, la rivière et le château sur sa colline.
