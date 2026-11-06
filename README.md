@@ -179,7 +179,8 @@ contre les morts sortis de la crypte du château. Le jeu se construit par étape
 - **Déjà jouable** : la vallée (village en ruine, entrepôt, feu de camp, rivière, château sur sa colline, forêt), le bûcheron et sa hache, les arbres qui tombent, les bûches à ramasser, porter et ranger à l'entrepôt, un petit tutoriel
 - **La nuit** : cycle jour / crépuscule / nuit / aube, brume qui épouse le sol et s'ouvre autour des six braseros et du feu de camp, squelettes (soldats et guerriers à bouclier) qui sortent du sol côté château et se relèvent s'ils tombent dans la brume, joueur à terre qu'on relève en tenant E, coéquipiers IA (chevaliers), défaite et nuit à rejouer
 - **À plusieurs** : une seule vallée pour tout le salon (l'hôte fait foi, les invités prédisent leur déplacement, relais d'hôte), cinq métiers, poutres portées à deux ; banc d'essai sans relais : `tools/fief-duo.html`
-- **À venir** : la construction des bâtiments, la faim et le froid, les sièges, la crypte
+- **La boucle complète** : chantiers (maisons, forge, moulin, chapelle) payés avec le bois et les poutres de l'entrepôt, faim et baies, froid la nuit, expédition de dix nuits avec sièges du chevalier noir (nuits 5 et 10), mode sans fin, trois difficultés, sauvegarde à chaque aube
+- **À venir** : la crypte et le Roi-Squelette, les capacités des métiers
 - Modèles : Medieval Village MegaKit de Quaternius, personnages et squelettes de KayKit (CC0), dans `fief/models/` ; arbres et ciel de Birdie Party
 
 ## Mystère Mystère, The Backrooms

@@ -172,12 +172,14 @@ window.HUB_GAMES = [
     id: 'fief',
     title: 'Fief Maudit',
     tag: 'Survie médiévale en coop, jusqu\'à 6 · en construction',
-    desc: 'Les derniers habitants d\'un village en ruine. Le jour, abats les arbres et rentre le bois ; la nuit, garde les braseros allumés pendant que les morts sortent de la brume. Choisissez vos métiers et portez les poutres à deux. Avant-première : la construction des bâtiments arrive bientôt.',
+    desc: 'Les derniers habitants d\'un village en ruine. Le jour, abats les arbres et rentre le bois ; la nuit, garde les braseros allumés pendant que les morts sortent de la brume. Relevez les maisons, la forge, le moulin et la chapelle, gardez des vivres, et tenez dix nuits, dont deux sièges du chevalier noir.',
     url: 'fief/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#e08a3a',
     icon: '🪓', score: 'Bûches rentrées',
     settings: [
+      { key: 'mode', label: 'Mode', options: [['expedition', 'Expédition (10 nuits)'], ['sansfin', 'Sans fin']], def: 'expedition' },
+      { key: 'diff', label: 'Difficulté', options: [['paisible', 'Paisible'], ['normale', 'Normale'], ['peste', 'Peste noire']], def: 'normale' },
       { key: 'bots', label: 'Équipiers IA', options: [[0, 'Aucun'], [1, '1 chevalier'], [2, '2 chevaliers']], def: 1 },
     ],
     cover: 'fief/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau

@@ -128,3 +128,16 @@ body.touch .tbtns button.on { transform: scale(0.92); }
 .team li { display: flex; align-items: center; gap: 6px; }
 .team i { width: 10px; height: 10px; border-radius: 50%; }
 @media (max-width: 640px) { .jobs { grid-template-columns: repeat(2, 1fr); } }
+
+.foodbar { display: flex; align-items: center; gap: 6px; }
+.foodbar .ico { width: 20px; height: 20px; }
+.foodbar b { flex: 1; height: 9px; border-radius: 4px; background: rgba(20, 10, 6, 0.75); border: 1px solid var(--line); overflow: hidden; }
+.foodbar b i { display: block; height: 100%; background: linear-gradient(90deg, #c98a3e, #ecc070); transition: width 0.4s; }
+.foodbar.low b i { background: #d0402a; animation: lowhp 0.8s infinite alternate; }
+.bossbar { position: absolute; left: 50%; top: 96px; transform: translateX(-50%); width: min(460px, 70vw); text-align: center; }
+.bossbar small { font: 800 15px/1 'Cinzel', serif; letter-spacing: 0.12em; color: #ff8a70; text-shadow: 0 2px 0 #000; }
+.bossbar i { display: block; height: 12px; margin-top: 4px; border-radius: 4px; background: rgba(20, 6, 6, 0.8); border: 1px solid rgba(255, 120, 100, 0.5); overflow: hidden; }
+.bossbar b { display: block; height: 100%; background: linear-gradient(90deg, #8a1a10, #e0503a); transition: width 0.25s; }
+body.cold .vig { background: radial-gradient(ellipse at center, transparent 45%, rgba(120, 170, 255, 0.35) 100%); }
+.sheet .save { padding: 8px 12px; border-radius: 6px; background: rgba(120, 80, 30, 0.12); margin: 10px 0; font-size: 15px; }
+.sheet.win h2 { color: #7a5a10; }

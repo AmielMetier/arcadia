@@ -18,6 +18,7 @@ export const JOBS = {
 const SKEL = {
   minion: { model: 'skeleton_minion', right: 'Skeleton_Blade', left: null, walk: 'Running_C', attack: '1H_Melee_Attack_Chop' },
   warrior: { model: 'skeleton_warrior', right: 'Skeleton_Axe', left: 'Skeleton_Shield_Large_A', walk: 'Walking_C', attack: '1H_Melee_Attack_Slice_Diagonal' },
+  knight: { model: 'skeleton_warrior', right: 'Skeleton_Axe', left: 'Skeleton_Axe', walk: 'Walking_C', attack: '1H_Melee_Attack_Chop', scale: 1.55, eyes: 0xff3a2a },
 };
 const HELD = /(_Axe|Shield|Sword|Mug|Staff|Wand|Crossbow|Knife|Dagger|Spellbook|Throwable|Quiver)/i;
 const SCALE = 0.8;
@@ -123,10 +124,15 @@ export async function createActors(scene, { makeLog }) {
     });
     const holder = new THREE.Group(); holder.add(root); scene.add(holder);
     const log = makeLog(); log.scale.set(0.8, 0.9, 0.9); log.position.set(0, 1.12, 0.42); log.visible = false; holder.add(log);
+    // panier de baies
+    const basket = new THREE.Group();
+    basket.add(new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.18, 0.22, 10, 1, true), new THREE.MeshStandardMaterial({ color: 0x9a6a38, roughness: 0.9, side: THREE.DoubleSide })));
+    for (let i = 0; i < 7; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 5), new THREE.MeshStandardMaterial({ color: 0xc8243a, roughness: 0.4 })); b.position.set(Math.cos(i * 0.9) * 0.12, 0.1, Math.sin(i * 0.9) * 0.12); basket.add(b); }
+    basket.position.set(0, 1.0, 0.38); basket.visible = false; holder.add(basket);
     const shadow = new THREE.Mesh(shadowGeo, shadowMat); shadow.renderOrder = 1; scene.add(shadow);
     const nameTag = p.id !== me ? label(p.name, { color: p.bot ? '#bcd4ff' : '#ffe2a8' }) : null; if (nameTag) { nameTag.position.y = 2.25; holder.add(nameTag); }
     const cross = crossSprite(); cross.visible = false; cross.position.y = 1.0; holder.add(cross);
-    const a = { p, jobKey: p.job, root, holder, log, shadow, nameTag, cross, mats, job, tools: job.show.map((n) => root.getObjectByName(n)).filter(Boolean), yaw: p.yaw, wasDown: false, upT: 0, ...rig(root) };
+    const a = { p, jobKey: p.job, root, holder, log, basket, shadow, nameTag, cross, mats, job, tools: job.show.map((n) => root.getObjectByName(n)).filter(Boolean), yaw: p.yaw, wasDown: false, upT: 0, ...rig(root) };
     heroes.set(p.id, a);
   }
   function updateHero(a, p, dt, sim, t) {
@@ -135,8 +141,9 @@ export async function createActors(scene, { makeLog }) {
     a.yaw += d * (1 - Math.exp(-dt * 16)); a.holder.rotation.y = a.yaw;
     a.shadow.position.set(p.x, sim.map.heightAt(p.x, p.z) + 0.04, p.z); a.shadow.visible = !p.down;
     a.holder.visible = !p.dead;
-    a.log.visible = p.carry === 'poutre' ? false : p.carry === 'bois' && !(p.act === 'pick' && p.actT < ACT.pick.at) && !(p.act === 'take' && p.actT < ACT.take.at) || (p.act === 'store' && p.actT < ACT.store.at) || (p.act === 'feed' && p.actT < ACT.feed.at) || (p.act === 'drop' && p.actT < ACT.drop.at);
-    for (const o of a.tools) o.visible = !p.carry && !['pick', 'store', 'feed', 'take'].includes(p.act);
+    a.basket.visible = p.carry === 'vivres';
+    a.log.visible = p.carry === 'poutre' || p.carry === 'vivres' ? false : p.carry === 'bois' && !(p.act === 'pick' && p.actT < ACT.pick.at) && !(p.act === 'take' && p.actT < ACT.take.at) || (p.act === 'store' && p.actT < ACT.store.at) || (p.act === 'feed' && p.actT < ACT.feed.at) || (p.act === 'drop' && p.actT < ACT.drop.at);
+    for (const o of a.tools) o.visible = !p.carry && !['pick', 'store', 'feed', 'take', 'gather', 'eat'].includes(p.act);
     a.cross.visible = p.down; if (p.down) { a.cross.material.opacity = 0.6 + 0.4 * Math.sin(t * 6); }
     if (a.nameTag) a.nameTag.visible = !p.down;
     // un éclat rouge quand on est touché
@@ -144,7 +151,7 @@ export async function createActors(scene, { makeLog }) {
     if (a.wasDown && !p.down) a.upT = 1.2;
     a.wasDown = p.down;
     a.upT = Math.max(0, a.upT - dt);
-    const ONCE = { chop: '1H_Melee_Attack_Chop', strike: a.job.strike, pick: 'PickUp', store: 'Interact', drop: 'PickUp', feed: 'Interact', take: 'Interact' };
+    const ONCE = { chop: '1H_Melee_Attack_Chop', strike: a.job.strike, pick: 'PickUp', store: 'Interact', drop: 'PickUp', feed: 'Interact', take: 'Interact', build: '1H_Melee_Attack_Chop', gather: 'PickUp', eat: 'Use_Item', repair: 'Interact' };
     if (p.down) play(a, ['Lie_Down'], { once: true, dur: 0.9 });
     else if (a.upT > 0) { a.tag = 'up'; play(a, ['Lie_StandUp'], { once: true, dur: 1.2 }); }
     else if (p.act) {
@@ -173,14 +180,16 @@ export async function createActors(scene, { makeLog }) {
   async function addFoe(f) {
     const S = SKEL[f.kind];
     const g = await getModel(S.model);
-    const root = cloneSkinned(g.scene); root.scale.setScalar(SCALE * (f.kind === 'warrior' ? 1.06 : 1));
-    root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; if (/glow/i.test(o.material.name || '')) o.material = glow; } });
+    const root = cloneSkinned(g.scene); root.scale.setScalar(SCALE * (S.scale || (f.kind === 'warrior' ? 1.06 : 1)));
+    const eyes = S.eyes ? new THREE.MeshStandardMaterial({ color: S.eyes, emissive: S.eyes, emissiveIntensity: 3 }) : glow;
+    // le chevalier noir : os noircis
+    root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; if (/glow/i.test(o.material.name || '')) o.material = eyes; else if (S.eyes) { o.material = o.material.clone(); o.material.color.multiplyScalar(0.32); } } });
     for (const [slot, name] of [['handslotr', S.right], ['handslotl', S.left]]) {
       if (!name) continue; const bone = root.getObjectByName(slot), w = weapon(name);
       if (bone && w) { w.traverse((o) => { if (o.isMesh) o.castShadow = true; }); bone.add(w); }
     }
     const holder = new THREE.Group(); holder.add(root); scene.add(holder);
-    const bar = hpBar(); bar.position.y = 2.15; bar.visible = false; holder.add(bar);
+    const bar = hpBar(); bar.position.y = 2.15 * (S.scale || 1); bar.visible = false; holder.add(bar);
     const a = { f, root, holder, bar, S, yaw: f.yaw, gone: 0, hitAt: -9, lastHp: f.hp, ...rig(root) };
     foes.set(f.id, a);
   }

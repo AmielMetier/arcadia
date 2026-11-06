@@ -1,5 +1,15 @@
 # Journal des versions — Arcadia
 
+## 4.55 — 6 novembre 2026
+- **Fief Maudit** — L'expédition complète : relever le village et tenir dix nuits.
+  - Les ruines se relèvent. E devant une ruine ouvre le chantier avec le bois et les poutres de l'entrepôt, puis on le bâtit à coups de marteau (clic). La forgeronne bâtit deux fois plus vite.
+  - Chaque bâtiment aide : une maison donne +15 PV à toute l'équipe et un abri pour récupérer la nuit, la forge +30 % de dégâts, le moulin du pain et des vivres à chaque aube. Autour de la chapelle, les morts ne se relèvent plus, et les tombés reviennent à ses pieds.
+  - La faim : des buissons de baies poussent dans la vallée. On cueille un panier, on le range à l'entrepôt, et on y mange avec E. Ventre vide, on perd des PV.
+  - Le froid : la nuit, quelques secondes loin de toute lumière et on gèle doucement.
+  - Expédition : tenez dix nuits. Les nuits 5 et 10 sont des sièges, plus longues, avec le chevalier noir, un géant qui enfonce l'entrepôt (deux à la dixième nuit). Mode « Sans fin » dans les réglages.
+  - Trois difficultés : Paisible (les morts ne se relèvent pas), Normale et Peste noire. Les squelettes sont plus nombreux quand l'équipe est grande.
+  - La partie se sauvegarde à chaque aube et à chaque bâtiment relevé. On la reprend au matin depuis l'écran d'accueil.
+
 ## 4.54 — 6 novembre 2026
 - **Fief Maudit** — On défend le village ensemble.
   - Tout le salon joue dans la même vallée, jusqu'à six joueurs, avec ou sans chevaliers IA. Un joueur peut arriver en cours de partie, il apparaît près du feu de camp.

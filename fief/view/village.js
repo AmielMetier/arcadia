@@ -69,7 +69,7 @@ function sides(b) {
 // pose un bâtiment ; ground(x, z) : hauteur du sol
 function placeBuilding(B, b, ground, { rubble } = {}) {
   const H0 = ground(b.x, b.z);
-  const ruin = b.state === 'ruine', tall = b.tall || 1;
+  const ruin = b.state !== 'debout', tall = b.tall || 1;
   const brick = b.style === 'brick';
   const W = brick ? 'Wall_UnevenBrick_' : 'Wall_Plaster_';
   const seed = strHash(b.id);
@@ -141,22 +141,30 @@ function placeBuilding(B, b, ground, { rubble } = {}) {
   } else {
     // sol intérieur en pavés disjoints, une poutre du toit tombée en travers
     for (let x = -hw + 1; x < hw; x += 2) for (let z = -hd + 1; z < hd; z += 2) if (hash(seed + x * 17 + z * 131) > 0.3) B.add('Floor_UnevenBrick', b.x + x, H0 + 0.02, b.z + z, 0);
-    // poutres tombées en travers
     const along = b.d >= b.w;
-    B.add('Prop_Support', b.x - 0.4, H0 + 0.1, b.z, along ? 0.3 : 1.9, 1, 1, 1, 0, 1.25);
-    if (rubble) for (const r of rubble) if (Math.abs(r.x - b.x) < b.w && Math.abs(r.z - b.z) < b.d) B.add('Prop_Brick' + r.v, r.x, r.y + 0.08, r.z, r.rot, 1.6, 1.6, 1.6, r.tilt, 0);
+    if (b.state === 'chantier') {
+      // échafaudage : des poteaux aux angles et des poutres neuves au pied des murs
+      for (const [cx, cz] of [[b.x + hw - 0.5, b.z + hd - 0.5], [b.x - hw + 0.5, b.z + hd - 0.5], [b.x - hw + 0.5, b.z - hd + 0.5], [b.x + hw - 0.5, b.z - hd + 0.5]]) B.add('Prop_Support', cx, H0, cz, 0, 1, 1.6, 1);
+      B.add('Prop_Crate', b.x + hw + 0.9, H0, b.z + hd * 0.4, 0.3, 0.8, 0.8, 0.8);
+      B.add('Roof_Log', b.x + (along ? hw + 1.2 : 0), H0 - 3.95 + 0.25, b.z + (along ? 0 : hd + 1.2), along ? 0 : Math.PI / 2, 0.6, 0.6, 0.35);
+    } else {
+      // poutres tombées en travers
+      B.add('Prop_Support', b.x - 0.4, H0 + 0.1, b.z, along ? 0.3 : 1.9, 1, 1, 1, 0, 1.25);
+    }
+    if (rubble && b.state === 'ruine') for (const r of rubble) if (Math.abs(r.x - b.x) < b.w && Math.abs(r.z - b.z) < b.d) B.add('Prop_Brick' + r.v, r.x, r.y + 0.08, r.z, r.rot, 1.6, 1.6, 1.6, r.tilt, 0);
   }
 }
 
 // tout le village et le château
-export function buildVillage(kit, map) {
+export function buildVillage(kit, map, states = null) {
   const B = new Batch(kit);
   const ground = (x, z) => {
     // on cale le bâtiment sur le point le plus bas de son emprise : les murs s'enfoncent un peu plutôt que de flotter
     let m = Infinity; for (const [dx, dz] of [[0, 0], [-2, -2], [2, -2], [-2, 2], [2, 2]]) m = Math.min(m, map.heightAt(x + dx, z + dz));
     return m - 0.06;
   };
-  for (const b of map.buildings) placeBuilding(B, b, ground, { rubble: map.rubble });
+  // l'état de chaque bâtiment vient du moteur (ruine, chantier, debout) quand on le connaît
+  for (const b of map.buildings) placeBuilding(B, { ...b, state: (states && states[b.id] && states[b.id].state) || b.state }, ground, { rubble: map.rubble });
   for (const b of map.castle) placeBuilding(B, b, ground, { rubble: map.rubble });
   // bordure de pierre autour de la place du feu
   for (const p of map.props) {

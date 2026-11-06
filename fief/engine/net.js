@@ -2,22 +2,25 @@
 // compact (horloge, stock, braseros, joueurs, squelettes, bûches, poutres) et, plus rarement, le « monde » (qui joue
 // quel métier, arbres abattus). L'invité garde une copie de la vallée (même graine) et y recopie ces états ; seul son
 // propre déplacement est prédit chez lui (predict) puis recalé sur l'hôte. Moteur PUR.
-import { DT, SPEED, BEAM, P_R, jobOf } from './sim.js';
+import { DT, SPEED, BEAM, P_R, jobOf, BUILDS } from './sim.js';
 
-const ACTS = [null, 'chop', 'strike', 'pick', 'store', 'feed', 'take', 'drop', 'repair'];
+const ACTS = [null, 'chop', 'strike', 'pick', 'store', 'feed', 'take', 'drop', 'repair', 'build', 'gather', 'eat'];
+const SITES = Object.keys(BUILDS), BST = ['ruine', 'chantier', 'debout'];
 const STATES = ['awaken', 'walk', 'attack', 'dead', 'rise'];
-const KINDS = ['minion', 'warrior'];
+const KINDS = ['minion', 'warrior', 'knight'];
 const r2 = (v) => Math.round(v * 100), r3 = (v) => Math.round(v * 1000);
 
 // ------------------------------------------------------------------ hôte → invités
 export function encodeState(sim) {
   return {
     c: [sim.clock.day, sim.clock.phase === 'nuit' ? 1 : 0, Math.round(sim.clock.t * 10), sim.clock.duskSaid ? 1 : 0],
-    k: [sim.stock.bois, sim.stock.poutre], v: Math.round(sim.village.hp), g: sim.goal, o: sim.over ? sim.over.reason : 0, ts: Math.round(sim.t * 1000),
+    k: [sim.stock.bois, sim.stock.poutre, sim.stock.nourriture], w: sim.won ? 1 : 0,
+    bd: SITES.map((id) => [BST.indexOf(sim.build[id].state), sim.build[id].prog]),
+    br: sim.berries.map((b) => (b.ready ? 1 : 0)).join(''), v: Math.round(sim.village.hp), g: sim.goal, o: sim.over ? sim.over.reason : 0, ts: Math.round(sim.t * 1000),
     bz: sim.braziers.map((b) => Math.round(b.fuel * 10)),
     p: sim.players.map((p) => [p.id, r2(p.x), r2(p.y), r2(p.z), r3(p.yaw), Math.round(p.hp), p.maxHp,
-      (p.ground ? 1 : 0) | (p.down ? 2 : 0) | (p.dead ? 4 : 0) | (p.carry === 'bois' ? 8 : 0) | (p.carry === 'poutre' ? 16 : 0) | (p.hurtT > 0 ? 32 : 0),
-      ACTS.indexOf(p.act), r2(p.actT), r2(p.speed), p.beam ?? -1, p.end, Math.round(p.downT * 10), r2(p.revive), p.reviving ?? -1, p.kills]),
+      (p.ground ? 1 : 0) | (p.down ? 2 : 0) | (p.dead ? 4 : 0) | (p.carry === 'bois' ? 8 : 0) | (p.carry === 'poutre' ? 16 : 0) | (p.hurtT > 0 ? 32 : 0) | (p.cold ? 64 : 0) | (p.carry === 'vivres' ? 128 : 0),
+      ACTS.indexOf(p.act), r2(p.actT), r2(p.speed), p.beam ?? -1, p.end, Math.round(p.downT * 10), r2(p.revive), p.reviving ?? -1, p.kills, Math.round(p.food)]),
     f: sim.foes.map((f) => [f.id, KINDS.indexOf(f.kind), r2(f.x), r2(f.y), r2(f.z), r3(f.yaw), STATES.indexOf(f.state), r2(f.t), Math.round(f.hp), f.stun > 0 ? 1 : 0, r2(f.atkT), f.rises]),
     l: sim.logs.map((l) => [l.id, r2(l.x), r2(l.y), r2(l.z), r3(l.rot), l.ready ? 1 : 0]),
     b: sim.beams.map((b) => [b.id, r2(b.x), r2(b.y), r2(b.z), r3(b.rot), b.h[0] ?? -1, b.h[1] ?? -1, (b.lifted ? 1 : 0) | (b.ready ? 2 : 0)]),
@@ -26,7 +29,7 @@ export function encodeState(sim) {
 // le monde : rarement (qui est qui, arbres abattus)
 export function encodeWorld(sim) {
   return {
-    seed: sim.seed,
+    seed: sim.seed, mode: sim.mode, diff: sim.diff,
     pl: sim.players.map((p) => ({ id: p.id, name: p.name, job: p.job, color: p.color, bot: p.bot, stored: p.stored, felled: p.felled })),
     tr: sim.trees.filter((t) => t.down).map((t) => [t.id, r3(t.dir)]),
     st: { kills: sim.stats.kills, nights: sim.stats.nights },
@@ -45,6 +48,7 @@ export function applyWorld(sim, w) {
   const fell = [];
   for (const [id, dir] of w.tr) { const T = sim.trees[id]; if (T && !T.down) { T.down = true; T.dir = dir / 1000; fell.push(id); } }
   if (w.st) Object.assign(sim.stats, w.st);
+  if (w.mode) sim.mode = w.mode; if (w.diff) sim.diff = w.diff;
   sim.events = sim.events.filter((e) => e.t !== 'join');
   return fell;   // arbres à faire tomber à l'écran (on vient d'arriver)
 }
@@ -52,7 +56,9 @@ export function applyWorld(sim, w) {
 export function applyState(sim, s, me) {
   const [day, night, t, dusk] = s.c;
   Object.assign(sim.clock, { day, phase: night ? 'nuit' : 'jour', t: t / 10, duskSaid: !!dusk });
-  sim.stock.bois = s.k[0]; sim.stock.poutre = s.k[1]; sim.village.hp = s.v; sim.goal = s.g;
+  sim.stock.bois = s.k[0]; sim.stock.poutre = s.k[1]; sim.stock.nourriture = s.k[2] || 0; sim.village.hp = s.v; sim.goal = s.g; sim.won = !!s.w;
+  if (s.bd) SITES.forEach((id, i) => { const b = s.bd[i]; if (b) sim.build[id] = { state: BST[b[0]], prog: b[1] }; });
+  if (s.br) [...s.br].forEach((c, i) => { if (sim.berries[i]) sim.berries[i].ready = c === '1'; });
   sim.over = s.o ? { reason: s.o } : null;
   s.bz.forEach((f, i) => { if (sim.braziers[i]) sim.braziers[i].fuel = f / 10; });
   let mine = null;
@@ -63,7 +69,7 @@ export function applyState(sim, s, me) {
     if (!p) p = sim.addPlayer({ id, name: '…', job: 'bucheron' });
     const st = { x: r[1] / 100, y: r[2] / 100, z: r[3] / 100, yaw: r[4] / 1000 };
     const fl = r[7];
-    Object.assign(p, { hp: r[5], maxHp: r[6], ground: !!(fl & 1), down: !!(fl & 2), dead: !!(fl & 4), carry: fl & 8 ? 'bois' : fl & 16 ? 'poutre' : null, hurtT: fl & 32 ? 0.35 : 0,
+    Object.assign(p, { hp: r[5], maxHp: r[6], ground: !!(fl & 1), down: !!(fl & 2), dead: !!(fl & 4), carry: fl & 8 ? 'bois' : fl & 16 ? 'poutre' : fl & 128 ? 'vivres' : null, hurtT: fl & 32 ? 0.35 : 0, cold: !!(fl & 64), food: r[17] ?? 100,
       act: ACTS[r[8]] || null, actT: r[9] / 100, speed: r[10] / 100, beam: r[11] < 0 ? null : r[11], end: r[12], downT: r[13] / 10, revive: r[14] / 100, reviving: r[15] < 0 ? null : r[15], kills: r[16] });
     if (id === me) { mine = st; p._srv = st; continue; }
     // les autres : on vise la position reçue, l'affichage s'en approche en douceur (smooth)

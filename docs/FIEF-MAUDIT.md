@@ -2,7 +2,7 @@
 
 Survie en coopération en 3D (Three.js), vue à la troisième personne, de 1 à 6 joueurs, avec des bots pour compléter.
 Dossier : `fief/`. Ce document décrit le jeu visé, les assets retenus et l'ordre de développement.
-Où on en est : **étape 4 faite** (voir la section 8).
+Où on en est : **étape 5 faite** (voir la section 8).
 
 ## 1. L'idée
 
@@ -218,6 +218,16 @@ Chaque étape se termine par une version jouable, poussée, et validée avant de
    - Poutres : un chêne donne une bûche et une poutre (3,4 m). Seul, on ne peut que tenir son bout ; le bûcheron la porte seul, plus lentement.
      Elles s'empilent à l'entrepôt (stock « poutre ») pour la construction de l'étape 5.
    - Banc d'essai : `tools/fief-duo.html` (deux ou trois jeux dans une page, messages relayés comme par le salon).
-5. **La boucle complète** : construction des bâtiments, faim, froid, nourriture, 10 jours, sauvegarde, sièges des jours 5 et 10.
+5. **La boucle complète** : construction des bâtiments, faim, froid, nourriture, 10 jours, sauvegarde, sièges des jours 5 et 10. ✔ (version 4.55)
+   - Chantiers : E devant une ruine (le stock de l'entrepôt paie), puis des coups de marteau (clic). Maisons 8 bois + 1 poutre, forge et moulin
+     10 + 2, chapelle 14 + 3. Pas encore de pierre : la carrière et la pioche viendront avec d'autres bâtiments (puits, remparts, tours).
+   - Effets : maison +15 PV et abri (soin la nuit), forge +30 % de dégâts, moulin faim ×0,5 et +4 vivres à l'aube, chapelle : pas de résurrection
+     à moins de 24 m, et les tombés y reviennent au bout de 20 s.
+   - Faim : 100 → 0 en ~520 s ; baies (2 vivres le panier, repoussent en 300 s) ; manger rend 55. Froid : 0,5 PV/s après 3 s dans le noir.
+   - Sièges : nuits 5 et 10 de 200 s, +30 % de squelettes, chevalier noir (420 PV, frappe l'entrepôt ×3), deux à la dixième nuit.
+   - Le nombre de squelettes suit la taille de l'équipe (×0,75 seul, ×1,6 à six). Sans bâtiment, trois bots tiennent 5 à 10 nuits en Normale
+     et gagnent en Paisible : avec la forge, les maisons et la chapelle, l'équipe a de quoi faire mieux.
+   - Sauvegarde : `localStorage` de l'hôte (jour, stock, bâtiments, arbres abattus, braseros) à chaque aube et à chaque bâtiment relevé ;
+     les joueurs repartent du feu de camp, vie pleine. Pas encore de sauvegarde en ligne (`server/saves.js`).
 6. **La crypte** et le Roi-Squelette, écran de fin, `H.report`.
 7. **Finitions** : sons, musique, écran d'accueil, réglages graphiques, mode Sans fin, manette et tactile.

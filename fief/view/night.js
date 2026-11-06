@@ -114,6 +114,7 @@ export function createNight({ scene, renderer, sky, sun, hemi, map, noise, peaks
       B.light.intensity = lit ? (6 + Math.sin(t * 11 + i) * 0.9 + Math.sin(t * 6.7 + i * 3) * 1.1) * (0.6 + 0.4 * k) * Math.min(1, (d - 0.3) * 2) : 0;
       B.coals.material = on ? coal : iron;
     });
+    coal.emissiveIntensity = 0.2 + 1.3 * d;
   }
   return { update, braziers, sunDir };
 }

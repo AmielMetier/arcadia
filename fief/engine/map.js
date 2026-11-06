@@ -166,6 +166,19 @@ export function createValley(seed = 1) {
     if (!trees.some((t) => Math.hypot(t.x - x, t.z - z) < 3) && heightAt(x, z) > WATER + 0.6) trees.push({ id: trees.length, x, z, y: heightAt(x, z), kind: 'round', s: 1, rot: x * z, v: 3 });
   }
 
+  // ------------------------------------------------ buissons de baies (les vivres), en lisière des clairières
+  const bushes = [];
+  tries = 0;
+  while (bushes.length < 26 && tries++ < 4000) {
+    const a = rng.range(0, Math.PI * 2), d = rng.range(20, 85), x = Math.sin(a) * d, z = Math.cos(a) * d;
+    if (blockedForDecor(x, z, 3.5) || heightAt(x, z) < WATER + 0.6) continue;
+    if (trees.some((t) => Math.hypot(t.x - x, t.z - z) < 2.6) || props.some((p) => Math.hypot(p.x - x, p.z - z) < 2.4) || bushes.some((o) => Math.hypot(o.x - x, o.z - z) < 7)) continue;
+    bushes.push({ id: bushes.length, x, z, y: heightAt(x, z), rot: rng.range(0, 6.28), s: rng.range(0.9, 1.2) });
+    circles.push({ x, z, r: 0.55 });
+  }
+  // deux buissons tout près du feu, pour qu'on les remarque
+  for (const [x, z] of [[-9, 18], [12, -16]]) if (!bushes.some((o) => Math.hypot(o.x - x, o.z - z) < 4) && !trees.some((t) => Math.hypot(t.x - x, t.z - z) < 2.6)) { bushes.push({ id: bushes.length, x, z, y: heightAt(x, z), rot: x, s: 1 }); circles.push({ x, z, r: 0.55 }); }
+
   // ------------------------------------------------ grille de recherche (cases de 8 m) pour les cercles et les arbres
   const CELL = 8, grid = new Map();
   const key = (cx, cz) => cx * 4096 + cz;
@@ -218,7 +231,7 @@ export function createValley(seed = 1) {
 
   return {
     seed, heightAt, isWater, collide, treeNear, near,
-    buildings: BUILDINGS, castle: CASTLE_PARTS, campfire: CAMPFIRE, braziers: BRAZIERS, trees, props, rubble, boxes, circles, paths: PATHS,
+    buildings: BUILDINGS, castle: CASTLE_PARTS, campfire: CAMPFIRE, braziers: BRAZIERS, bushes, trees, props, rubble, boxes, circles, paths: PATHS,
     warehouse, depot, spawn, riverZ, pathDist,
   };
 }

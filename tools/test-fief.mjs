@@ -1,7 +1,8 @@
 // Fief Maudit : tests du moteur (sans navigateur). node tools/test-fief.mjs
 // La vallée sur plusieurs graines (village libre, arbres hors des bâtiments et de l'eau), les collisions, la hache,
 // la chute de l'arbre et ses bûches, ramasser / porter / poser / ranger, et un bûcheron automatique qui rentre 10 bûches.
-import { Sim, DT, emptyInput, SPEED, REACH, CYCLE, FUEL, FOES, HP, RISE, JOBS, BEAM, WAREHOUSE_HP } from '../fief/engine/sim.js';
+import { Sim, DT, emptyInput, SPEED, REACH, CYCLE, FUEL, FOES, HP, RISE, JOBS, BEAM, WAREHOUSE_HP, BUILDS, FOOD, nightLen } from '../fief/engine/sim.js';
+import { doorPoint } from '../fief/engine/map.js';
 import { createValley, rectOf, R_PLAY, WATER } from '../fief/engine/map.js';
 import { encodeState, encodeWorld, applyState, applyWorld, smooth, predict, reconcile, cleanInput } from '../fief/engine/net.js';
 
@@ -147,7 +148,11 @@ section('jour, crépuscule, nuit, aube');
   ok(sim.darkness > 0 && sim.darkness < 0.2, 'le crépuscule assombrit');
   idle(sim, CYCLE.dusk);
   ok(sim.night && sim.darkness === 1, 'la nuit tombe');
-  ok(sim.spawnQ.length + sim.foes.length === 6, `6 squelettes la première nuit (${sim.spawnQ.length + sim.foes.length})`);
+  const n1 = sim.spawnQ.length + sim.foes.length;
+  ok(n1 >= 4 && n1 <= 6, `une poignée de squelettes la première nuit, seul (${n1})`);
+  const big = new Sim({ seed: 2, players: [0, 1, 2, 3, 4, 5].map((id) => ({ id, name: 'p' + id })) });
+  big.skipToDusk(); idle(big, CYCLE.dusk + 0.1);
+  ok(big.spawnQ.length + big.foes.length > n1 + 2, `plus nombreux contre six joueurs (${big.spawnQ.length + big.foes.length})`);
   idle(sim, 20);
   ok(sim.foes.length > 0, 'des squelettes sortent du sol');
   ok(sim.foes.every((f) => f.z < 12), 'ils viennent du nord, côté château');
@@ -395,6 +400,103 @@ section('réseau');
   ok(heir.players.length === 2 && heir.night && heir.foes.length >= n0 - 2, 'un invité reprend la partie quand l\'hôte s\'en va');
   const bad = cleanInput({ wx: 9, wz: 'x', fc: 3.7, hold: 1 });
   ok(bad.wx === 1 && bad.wz === 0 && bad.fc === 3 && bad.hold === true, 'les entrées des invités sont nettoyées');
+}
+
+// ------------------------------------------------ étape 5 : la boucle complète
+section('construction');
+{
+  const sim = new Sim({ seed: 15, players: [{ id: 0, name: 'B', job: 'bucheron' }] });
+  const p = sim.players[0], M = sim.map, ruin = M.buildings.find((b) => b.id === 'maison1'), C = BUILDS.maison1;
+  const d = doorPoint(ruin, 1.4); p.x = d.x; p.z = d.z; p.y = M.heightAt(d.x, d.z);
+  ok(sim.prompt(0)?.text.includes('il manque'), 'invite : il manque du bois et des poutres');
+  sim.stock.bois = C.bois + 2; sim.stock.poutre = C.poutre;
+  ok(sim.prompt(0)?.text.startsWith('Relever'), 'invite : relever la maison');
+  const hp0 = p.maxHp;
+  press(sim, p, 'uc', 0.2);
+  ok(sim.build.maison1.state === 'chantier' && sim.stock.bois === 2 && sim.stock.poutre === 0, 'le chantier ouvre et prend son bois au stock');
+  let hits = 0; while (sim.build.maison1.state === 'chantier' && hits < 30) { press(sim, p, 'fc', 1); hits++; }
+  ok(sim.build.maison1.state === 'debout', `la maison est relevée (${hits} coups de marteau)`);
+  ok(p.maxHp === hp0 + 15, 'une maison : +15 PV pour l\'équipe');
+  ok(sim.goal === 7, 'tutoriel : tenir dix nuits');
+  // la forge renforce les coups, la chapelle empêche les morts de se relever
+  sim.build.forge = { state: 'debout', prog: 14 };
+  ok(sim.dmgMul() > 1.2, 'la forge : +30 % de dégâts');
+  sim.skipToDusk(); idle(sim, CYCLE.dusk + 1);
+  const ch = M.buildings.find((b) => b.id === 'chapelle');
+  const far = [ch.x - 14, ch.z + 10];
+  for (const o of sim.braziers) o.fuel = 0;
+  const risesBefore = sim.canRise(far[0], far[1]);
+  sim.build.chapelle = { state: 'debout', prog: 18 };
+  ok(risesBefore && !sim.canRise(far[0], far[1]), 'près de la chapelle, les morts ne se relèvent plus');
+  // un bot vient aider sur un chantier
+  const s2 = new Sim({ seed: 16, players: [{ id: 0, name: 'A' }], bots: 1 });
+  s2.goal = 6; s2.build.forge = { state: 'chantier', prog: 0 };
+  idle(s2, 40);
+  ok(s2.build.forge.prog > 3, `un chevalier IA vient bâtir (${s2.build.forge.prog} coups)`);
+}
+
+section('faim, baies, froid');
+{
+  const sim = new Sim({ seed: 17, players: [{ id: 0, name: 'A', job: 'chasseuse' }] });
+  const p = sim.players[0], M = sim.map;
+  idle(sim, 60);
+  ok(p.food < FOOD.max - 5, `la faim se creuse (${p.food.toFixed(0)})`);
+  p.food = 0; const h = p.hp; p.x = 40; p.z = -40; idle(sim, 3);
+  ok(p.hp < h - 2, 'le ventre vide fait perdre des PV');
+  // cueillir, ranger, manger
+  const bush = M.bushes[0]; p.x = bush.x + 1.2; p.z = bush.z; p.y = M.heightAt(p.x, p.z);
+  ok(sim.prompt(0)?.text.includes('baies'), 'invite : cueillir des baies');
+  press(sim, p, 'uc', 1.1);
+  ok(p.carry === 'vivres' && !sim.berries[0].ready, 'un panier de baies, le buisson est vide');
+  p.x = M.depot.x; p.z = M.depot.z; press(sim, p, 'uc', 0.8);
+  ok(sim.stock.nourriture === FOOD.berries && !p.carry, 'les baies vont à l\'entrepôt');
+  p.food = 20; ok(sim.prompt(0)?.text.startsWith('Manger'), 'invite : manger');
+  press(sim, p, 'uc', 1.2);
+  ok(p.food > 70 && sim.stock.nourriture === FOOD.berries - 1, 'on mange un vivre');
+  sim.village.hp = 1e9; p.maxHp = p.hp = 1e9; sim.clock.t = 0;
+  idle(sim, FOOD.regrow + 1);
+  ok(sim.berries[0].ready, 'le buisson repousse');
+  sim.foes = []; sim.spawnQ = []; p.maxHp = p.hp = JOBS.chasseuse.hp; sim.clock = { day: 2, phase: 'jour', t: 0 };
+  // le froid, la nuit, loin des lumières
+  sim.skipToDusk(); idle(sim, CYCLE.dusk + 1); sim.spawnQ = []; sim.foes = [];
+  p.x = 30; p.z = 50 - 70; p.food = 100; p.hp = p.maxHp; const hc = p.hp;
+  idle(sim, 1.5);
+  ok(!p.cold, 'on ne gèle pas à la première seconde dans le noir');
+  idle(sim, 6);
+  ok(p.cold && p.hp < hc - 2, `la nuit, loin des braseros, on a froid (${hc} → ${p.hp.toFixed(1)}, ${sim.night}, ${p.cold})`);
+  p.x = M.campfire.x + 2; p.z = M.campfire.z; p.hp = 50; idle(sim, 2);
+  ok(!p.cold && p.hp >= 50, 'près du feu, on se réchauffe');
+}
+
+section('sièges, dix nuits, sauvegarde');
+{
+  const sim = new Sim({ seed: 18, players: [{ id: 0, name: 'A' }] });
+  sim.clock.day = 5; sim.skipToDusk(); idle(sim, CYCLE.dusk + 1);
+  ok(nightLen(5) > CYCLE.night && sim.timeLeft > CYCLE.night, 'la cinquième nuit est plus longue');
+  ok(sim.spawnQ.some((s) => s.kind === 'knight'), 'le chevalier noir vient à la cinquième nuit');
+  const k = sim.spawnFoe('knight', 0); const v = sim.village.hp;
+  sim.foeHits(k, { type: 'w' });
+  ok(v - sim.village.hp > FOES.minion.dmg * 2, 'il enfonce l\'entrepôt bien plus fort');
+  // dix nuits : la victoire
+  const s2 = new Sim({ seed: 18, players: [{ id: 0, name: 'A' }] });
+  s2.village.hp = 1e9; s2.players[0].hp = 1e9;
+  s2.clock = { day: 10, phase: 'nuit', t: nightLen(10) - 0.01 };
+  s2.step();
+  ok(s2.over && s2.over.reason === 'victoire' && s2.won, 'à l\'aube du onzième jour, l\'expédition est réussie');
+  const s3 = new Sim({ seed: 18, players: [{ id: 0, name: 'A' }], mode: 'sansfin' });
+  s3.clock = { day: 10, phase: 'nuit', t: nightLen(10) - 0.01 }; s3.village.hp = 1e9; s3.players[0].hp = 1e9; s3.step();
+  ok(!s3.over && s3.clock.day === 11, 'en mode sans fin, on continue');
+  // sauvegarde : ce qui compte d'un soir à l'autre
+  const s4 = new Sim({ seed: 19, players: [{ id: 0, name: 'A' }] });
+  s4.clock.day = 4; s4.stock.bois = 12; s4.stock.poutre = 3; s4.build.moulin = { state: 'debout', prog: 14 }; s4.trees[5].down = true; s4.trees[5].dir = 1;
+  const save = JSON.parse(JSON.stringify(s4.saveData()));
+  const s5 = new Sim({ seed: 19, players: [{ id: 3, name: 'Autre', job: 'pretre' }] });
+  ok(s5.loadSave(save), 'la sauvegarde se charge');
+  ok(s5.clock.day === 4 && s5.stock.bois === 12 && s5.built('moulin') && s5.trees[5].down, 'jour, stock, bâtiments et arbres abattus reviennent');
+  ok(!new Sim({ seed: 20, players: [] }).loadSave(save), 'une sauvegarde d\'une autre vallée est refusée');
+  // le moulin donne des vivres à l'aube
+  const n0 = s5.stock.nourriture; s5.clock = { day: 4, phase: 'nuit', t: nightLen(4) - 0.01 }; s5.village.hp = 1e9; s5.players[0].hp = 1e9; s5.step();
+  ok(s5.stock.nourriture === n0 + 4, 'le moulin donne des vivres à chaque aube');
 }
 
 console.log(fails ? `\n${fails} échec(s) sur ${n}` : `\n${n} vérifications, tout est bon`);

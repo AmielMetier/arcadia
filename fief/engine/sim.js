@@ -6,7 +6,7 @@
 // À l'aube, les squelettes encore debout tombent en poussière. Défaite si toute l'équipe est à terre ou si l'entrepôt tombe.
 // Le pas est fixe (DT). Entrée d'un joueur : { wx, wz } (direction voulue dans le monde, longueur ≤ 1), walk, jump,
 // hold (E tenu) et des compteurs d'appuis fc (frapper) et uc (utiliser) : un appui bref n'est jamais perdu.
-import { createValley, TREE_HP, LIGHT_R, FIRE_LIGHT_R } from './map.js';
+import { createValley, TREE_HP, LIGHT_R, FIRE_LIGHT_R, rectOf, doorPoint } from './map.js';
 import { createNav } from './nav.js';
 import { makeRng } from './rng.js';
 import { botInput } from './bots.js';
@@ -22,8 +22,11 @@ export const ACT = {
   take: { dur: 0.6, at: 0.35 },       // reprendre une bûche à l'entrepôt
   drop: { dur: 0.45, at: 0.2 },       // poser la bûche par terre
   repair: { dur: 1.1, at: 0.7 },      // réparer l'entrepôt avec une bûche (forgeronne)
+  build: { dur: 0.9, hit: 0.45 },     // coup de marteau sur un chantier
+  gather: { dur: 0.9, at: 0.55 },     // cueillir des baies
+  eat: { dur: 1.0, at: 0.6 },         // manger à l'entrepôt
 };
-export const REACH = { chop: 1.6, pick: 1.9, store: 3.2, feed: 2.3, strike: 2.4, revive: 1.9 };
+export const REACH = { chop: 1.6, pick: 1.9, store: 3.2, feed: 2.3, strike: 2.4, revive: 1.9, build: 2.4, gather: 1.9, site: 3.2 };
 export const P_R = 0.42;
 export const CYCLE = { day: 270, dusk: 25, night: 150, dawn: 10 };
 export const HP = { player: 100, revived: 45, bleed: 40, revive: 3 };
@@ -31,16 +34,36 @@ export const FUEL = { start: 70, log: 50, max: 150, hit: 20, burn: 0.6 };
 export const FOES = {
   minion: { hp: 55, speed: 2.7, dmg: 8, reach: 1.35, dur: 1.1, hit: 0.5 },
   warrior: { hp: 100, speed: 2.2, dmg: 13, reach: 1.45, dur: 1.25, hit: 0.6, block: true },
+  // le chevalier noir des nuits de siège : il enfonce l'entrepôt
+  knight: { hp: 420, speed: 2.0, dmg: 24, reach: 2.0, dur: 1.5, hit: 0.75, wall: 3, boss: true },
 };
 export const RISE = { delay: 6, dur: 2.3, max: 2, awaken: 2.4, crumble: 9 };
 export const WAREHOUSE_HP = 600;
+// les bâtiments à relever : coût (pris au stock de l'entrepôt), travail (coups de marteau) et effet
+export const BUILDS = {
+  maison1: { bois: 8, poutre: 1, work: 10, text: '+15 PV pour toute l\'équipe ; on y récupère la nuit' },
+  maison2: { bois: 8, poutre: 1, work: 10, text: '+15 PV pour toute l\'équipe ; on y récupère la nuit' },
+  forge: { bois: 10, poutre: 2, work: 14, text: 'Des armes forgées : +30 % de dégâts pour tous' },
+  moulin: { bois: 10, poutre: 2, work: 14, text: 'Du pain : la faim baisse deux fois moins vite, +4 vivres à chaque aube' },
+  chapelle: { bois: 14, poutre: 3, work: 18, text: 'Autour d\'elle, les morts ne se relèvent plus ; les tombés reviennent à ses pieds' },
+};
+export const FOOD = { max: 100, drain: 100 / 520, starve: 1, eat: 55, berries: 2, regrow: 300 };
+export const COLD = 0.5, COLD_AFTER = 3;   // PV perdus par seconde, la nuit, après quelques secondes hors de toute lumière
+export const MODES = { expedition: 10 };
+export const DIFF = {
+  paisible: { count: 0.7, dmg: 0.7, rise: false, food: 0.7 },
+  normale: { count: 1, dmg: 1, rise: true, food: 1 },
+  peste: { count: 1.35, dmg: 1.2, rise: true, food: 1.5 },
+};
+export const siegeNight = (n) => n % 5 === 0;
+export const nightLen = (n) => (siegeNight(n) ? 200 : CYCLE.night);
 // les métiers : chacun son modèle (vue), sa vie, ses coups et un talent
 export const JOBS = {
-  bucheron: { name: 'Bûcheron', hp: 100, dmg: 30, chop: 1.34, beamAlone: true, perk: 'Abat un arbre en 3 coups, porte une poutre seul' },
+  bucheron: { name: 'Bûcheron', hp: 100, dmg: 30, chop: 1.34, build: 1.2, beamAlone: true, perk: 'Abat un arbre en 3 coups, porte une poutre seul' },
   chevalier: { name: 'Chevalier', hp: 130, dmg: 34, armor: 0.75, perk: '+30 % de vie, encaisse un quart des coups en moins' },
   chasseuse: { name: 'Chasseuse', hp: 90, dmg: 26, speed: 1.12, reach: 0.5, perk: 'Court plus vite, frappe de plus loin' },
   pretre: { name: 'Prêtre', hp: 95, dmg: 22, aura: 2.5, revive: 2, perk: 'Soigne les équipiers autour de lui, relève deux fois plus vite' },
-  forgeronne: { name: 'Forgeronne', hp: 105, dmg: 28, feed: 1.5, repair: 60, perk: 'Ses bûches brûlent plus longtemps, répare l\'entrepôt' },
+  forgeronne: { name: 'Forgeronne', hp: 105, dmg: 28, feed: 1.5, repair: 60, build: 2, perk: 'Construit deux fois plus vite, répare l\'entrepôt, ses bûches brûlent plus longtemps' },
 };
 export const jobOf = (p) => JOBS[p.job] || JOBS.bucheron;
 export const BEAM = { len: 3.4, speed: 2.3, alone: 1.9, grab: 1.5, store: 4.4 };
@@ -55,16 +78,21 @@ export const GOALS = [
   { id: 'ten', text: 'Rentre 10 bûches', hint: 'Chaque arbre donne deux bûches' },
   { id: 'feed', text: 'Charge les braseros avant la nuit', hint: 'Porte une bûche à un brasero et appuie sur E' },
   { id: 'night', text: 'Tiens jusqu\'à l\'aube', hint: 'Garde les braseros allumés : dans leur lumière, les morts ne se relèvent pas' },
-  { id: 'free', text: 'Prépare la prochaine nuit', hint: 'Du bois pour les braseros, et l\'entrepôt à défendre' },
+  { id: 'build', text: 'Relève un bâtiment du village', hint: 'E devant une ruine : du bois et des poutres de l\'entrepôt, puis des coups de marteau (clic)' },
+  { id: 'free', text: 'Tenez dix nuits', hint: 'Nuits 5 et 10 : siège du chevalier noir. Pensez aux vivres : E devant l\'entrepôt pour manger' },
 ];
 
+const doorOf = (M, id) => doorPoint(M.buildings.find((b) => b.id === id), 1.8);
 export const emptyInput = () => ({ wx: 0, wz: 0, walk: false, jump: false, hold: false, fc: 0, uc: 0 });
 const wrap = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 export class Sim {
-  constructor({ seed = 1, players = [{ id: 0, name: 'Toi', job: 'bucheron', color: '#e0a040' }], bots = 0 } = {}) {
+  constructor({ seed = 1, players = [{ id: 0, name: 'Toi', job: 'bucheron', color: '#e0a040' }], bots = 0, mode = 'expedition', diff = 'normale' } = {}) {
     this.seed = seed;
+    this.mode = MODES[mode] ? mode : 'sansfin'; this.diff = DIFF[diff] ? diff : 'normale';
+    this.build = Object.fromEntries(Object.keys(BUILDS).map((id) => [id, { state: 'ruine', prog: 0 }]));
+    this.berries = []; this.won = false;
     this.map = createValley(seed);
     this.nav = createNav(this.map);
     this.rng = makeRng(seed * 31 + 5);
@@ -82,6 +110,7 @@ export class Sim {
     const list = [...players];
     const BOT_NAMES = ['Bertrand', 'Aliénor', 'Gauvain', 'Mahaut', 'Tristan'];
     for (let i = 0; i < bots; i++) list.push({ id: 100 + i, name: BOT_NAMES[i % BOT_NAMES.length], job: 'chevalier', color: '#6aa0e0', bot: true });
+    this.berries = this.map.bushes.map((b) => ({ id: b.id, ready: true, at: 0 }));
     this.players = list.map((p, i) => this.makePlayer(p, i));
     this.inputs = new Map();
     this.lastC = new Map();
@@ -93,7 +122,7 @@ export class Sim {
     const job = JOBS[p.job] ? p.job : 'bucheron';
     return { id: p.id, name: p.name, job, color: p.color || '#e0a040', bot: !!p.bot, x, z, y: this.map.heightAt(x, z), vy: 0, ground: true,
       yaw: s.yaw, speed: 0, moving: 0, carry: null, beam: null, end: 0, act: null, actT: 0, target: null,
-      hp: JOBS[job].hp, maxHp: JOBS[job].hp, down: false, downT: 0, dead: false, revive: 0, reviving: null, hurtT: 0, stored: 0, felled: 0, kills: 0, ai: null };
+      hp: JOBS[job].hp + this.hpBonus(), maxHp: JOBS[job].hp + this.hpBonus(), food: FOOD.max, cold: false, deadT: 0, down: false, downT: 0, dead: false, revive: 0, reviving: null, hurtT: 0, stored: 0, felled: 0, kills: 0, ai: null };
   }
   // un joueur arrive en cours de partie (près du feu de camp)
   addPlayer(p) {
@@ -113,11 +142,12 @@ export class Sim {
   }
   setJob(id, job) {
     const p = this.player(id); if (!p || !JOBS[job] || p.job === job) return;
-    const k = p.hp / p.maxHp; p.job = job; p.maxHp = JOBS[job].hp; p.hp = Math.max(1, Math.round(p.maxHp * k));
+    const k = p.hp / p.maxHp; p.job = job; p.maxHp = JOBS[job].hp + this.hpBonus(); p.hp = Math.max(1, Math.round(p.maxHp * k));
     this.events.push({ t: 'job', pid: id, job });
   }
   // lâcher ce qu'on porte (à terre, en partant)
   release(p) {
+    if (p.carry === 'vivres') this.stock.nourriture += 1;   // le panier n'est pas perdu
     if (p.carry === 'bois') { const x = p.x + 0.6, z = p.z; this.logs.push({ id: this.nextLog++, x, z, y: this.map.heightAt(x, z), rot: p.yaw, at: this.t, ready: true }); }
     if (p.carry === 'poutre') this.letGo(p);
     p.carry = null; p.beam = null;
@@ -136,7 +166,24 @@ export class Sim {
     return 0;
   }
   // temps avant le prochain changement (pour l'horloge à l'écran)
-  get timeLeft() { const c = this.clock; return c.phase === 'nuit' ? CYCLE.night - c.t : CYCLE.day - c.t; }
+  get timeLeft() { const c = this.clock; return c.phase === 'nuit' ? nightLen(c.day) - c.t : CYCLE.day - c.t; }
+  get D() { return DIFF[this.diff]; }
+  built(id) { return this.build[id] && this.build[id].state === 'debout'; }
+  hpBonus() { return this.build ? 15 * ((this.built('maison1') ? 1 : 0) + (this.built('maison2') ? 1 : 0)) : 0; }
+  dmgMul() { return this.built('forge') ? 1.3 : 1; }
+  // un squelette tombé ici se relèvera-t-il ?
+  canRise(x, z) {
+    if (!this.D.rise || this.lit(x, z)) return false;
+    if (this.built('chapelle')) { const c = this.map.buildings.find((b) => b.id === 'chapelle'); if (Math.hypot(x - c.x, z - c.z) < 24) return false; }
+    return true;
+  }
+  // abri : feu de camp, ou une maison relevée
+  sheltered(x, z) {
+    const c = this.map.campfire;
+    if (Math.hypot(x - c.x, z - c.z) < 6) return true;
+    for (const id of ['maison1', 'maison2']) if (this.built(id)) { const b = this.map.buildings.find((o) => o.id === id); if (Math.hypot(x - b.x, z - b.z) < 6.5) return true; }
+    return false;
+  }
   // un point est-il dans la lumière (feu de camp ou brasero allumé) ?
   lit(x, z) {
     const c = this.map.campfire;
@@ -160,6 +207,7 @@ export class Sim {
     for (const l of this.logs) if (!l.ready && this.t >= l.at) l.ready = true;
     for (const b of this.beams) if (!b.ready && this.t >= b.at) b.ready = true;
     this.stepBeams();
+    for (const b of this.berries) if (!b.ready && this.t >= b.at) b.ready = true;
     if (this.goal === 3 && this.stock.bois >= 10) this.setGoal(4);
     this.checkOver();
   }
@@ -171,7 +219,7 @@ export class Sim {
     if (c.phase === 'jour') {
       if (c.t >= CYCLE.day - CYCLE.dusk && !c.duskSaid) { c.duskSaid = true; this.events.push({ t: 'dusk' }); this.duskSnap = this.snapshot(); }
       if (c.t >= CYCLE.day) { c.phase = 'nuit'; c.t = 0; this.startNight(); }
-    } else if (c.t >= CYCLE.night) {
+    } else if (c.t >= nightLen(c.day)) {
       c.phase = 'jour'; c.t = 0; c.day++; c.duskSaid = false;
       this.dawn();
     }
@@ -181,7 +229,10 @@ export class Sim {
     this.events.push({ t: 'night', n });
     if (this.goal < 5) this.setGoal(5);
     // les squelettes arrivent par petits groupes pendant les deux premiers tiers de la nuit
-    const total = 6 + 3 * (n - 1), warriors = Math.max(1, Math.floor(total * (n === 1 ? 0.2 : 0.33)));
+    const siege = siegeNight(n), len = nightLen(n);
+    // plus on est nombreux, plus ils sont nombreux
+    const team = Math.min(1.6, Math.max(0.75, 0.55 + 0.2 * this.players.length));
+    const total = Math.round((6 + 2 * (n - 1)) * team * this.D.count * (siege ? 1.3 : 1)), warriors = Math.max(1, Math.floor(total * (n === 1 ? 0.2 : 0.33)));
     const kinds = []; for (let i = 0; i < total; i++) kinds.push(i < warriors ? 'warrior' : 'minion');
     this.rng.shuffle(kinds);
     this.spawnQ = [];
@@ -189,8 +240,10 @@ export class Sim {
     for (let i = 0; i < total;) {
       const g = Math.min(total - i, this.rng.int(2, 3)), side = this.rng.range(-1.4, 1.4);
       for (let k = 0; k < g; k++, i++) this.spawnQ.push({ at: at + k * 0.8, kind: kinds[i], side: side + this.rng.range(-0.25, 0.25) });
-      at += (CYCLE.night * 0.62) / Math.ceil(total / 2.5);
+      at += (len * 0.62) / Math.ceil(total / 2.5);
     }
+    // nuit de siège : le chevalier noir (deux à la dixième nuit)
+    if (siege) { for (let k = 0; k < (n >= 10 ? 2 : 1); k++) this.spawnQ.push({ at: 35 + k * 25, kind: 'knight', side: k ? 0.5 : -0.3 }); this.spawnQ.sort((a, b) => a.at - b.at); this.events.push({ t: 'siege', n }); }
   }
   dawn() {
     this.stats.nights++;
@@ -201,10 +254,16 @@ export class Sim {
       if (p.dead || p.down) { p.dead = false; p.down = false; p.revive = 0; const c = this.map.campfire; p.x = c.x + 1.6; p.z = c.z + 1.6; p.y = this.map.heightAt(p.x, p.z); }
       p.hp = p.maxHp;
     }
-    this.events.push({ t: 'dawn', n: this.clock.day - 1 });
+    if (this.built('moulin')) this.stock.nourriture += 4;
+    const n = this.clock.day - 1;
+    this.events.push({ t: 'dawn', n });
     if (this.goal === 5) this.setGoal(6);
+    // l'expédition : dix nuits tenues
+    if (MODES[this.mode] && n >= MODES[this.mode]) { this.won = true; this.over = { reason: 'victoire' }; this.events.push({ t: 'over', reason: 'victoire' }); }
+    this.saveNow = true;
   }
   checkOver() {
+    if (this.over) return;
     const alive = this.players.filter((p) => !p.dead);
     if (this.village.hp <= 0) this.over = { reason: 'entrepot' };
     else if (!alive.length || alive.every((p) => p.down)) this.over = { reason: 'equipe' };
@@ -218,10 +277,15 @@ export class Sim {
     this.lastC.set(p.id, { fc: inp.fc, uc: inp.uc });
     const M = this.map;
     p.hurtT = Math.max(0, p.hurtT - DT);
-    if (p.dead) return;
+    if (p.dead) {
+      // la chapelle relevée ramène les tombés à ses pieds
+      p.deadT += DT;
+      if (this.built('chapelle') && p.deadT > 20) { const c = doorOf(this.map, 'chapelle'); p.dead = false; p.down = false; p.x = c.x; p.z = c.z; p.y = this.map.heightAt(c.x, c.z); p.hp = Math.round(p.maxHp * 0.5); this.events.push({ t: 'back', pid: p.id }); }
+      return;
+    }
     if (p.down) {
       p.downT += DT;
-      if (p.downT >= HP.bleed) { p.dead = true; p.down = false; this.events.push({ t: 'dead', pid: p.id }); }
+      if (p.downT >= HP.bleed) { p.dead = true; p.down = false; p.deadT = 0; this.events.push({ t: 'dead', pid: p.id }); }
       return;
     }
     // relever un équipier : E tenu tout près de lui
@@ -242,7 +306,9 @@ export class Sim {
     } else if (wantHit && !p.carry && p.ground) {
       // un squelette à portée passe avant les arbres
       const f = this.foeNear(p.x, p.z, REACH.strike + 0.4 + (jobOf(p).reach || 0));
+      const site = !f && this.siteNear(p.x, p.z, REACH.build);
       if (f) { p.yaw = Math.atan2(f.x - p.x, f.z - p.z); p.act = 'strike'; p.actT = 0; p.target = f.id; }
+      else if (site && this.build[site.id].state === 'chantier') { p.yaw = Math.atan2(site.x - p.x, site.z - p.z); p.act = 'build'; p.actT = 0; p.target = site.id; }
       else {
         const t = M.treeNear(p.x, p.z, REACH.chop + 0.6, this.fallen);
         if (t) p.yaw = Math.atan2(t.x - p.x, t.z - p.z);
@@ -270,8 +336,17 @@ export class Sim {
       p.vy -= GRAV * DT; p.y += p.vy * DT;
       if (p.y <= g) { p.y = g; p.vy = 0; p.ground = true; this.events.push({ t: 'land', pid: p.id }); }
     } else p.y = g;
-    // le jour, près du feu de camp, on récupère
-    if (!this.night && Math.hypot(p.x - M.campfire.x, p.z - M.campfire.z) < 6) p.hp = Math.min(p.maxHp, p.hp + 4 * DT);
+    // près du feu de camp (le jour) ou d'une maison relevée, on récupère
+    const home = this.sheltered(p.x, p.z);
+    if (home && (!this.night || Math.hypot(p.x - M.campfire.x, p.z - M.campfire.z) > 6)) p.hp = Math.min(p.maxHp, p.hp + 4 * DT);
+    // la faim
+    p.food = Math.max(0, p.food - FOOD.drain * this.D.food * (this.built('moulin') ? 0.5 : 1) * DT);
+    if (p.food <= 0) this.hurtBy(p, FOOD.starve * DT, 'faim');
+    // le froid : la nuit, loin de toute lumière
+    const dark = this.night && !this.lit(p.x, p.z) && !home;
+    p.coldT = dark ? (p.coldT || 0) + DT : 0;
+    p.cold = p.coldT > COLD_AFTER;
+    if (p.cold) this.hurtBy(p, COLD * DT, 'froid');
     // le prêtre soigne autour de lui
     if (J.aura) for (const o of this.players) if (!o.down && !o.dead && Math.hypot(o.x - p.x, o.z - p.z) < 7) o.hp = Math.min(o.maxHp, o.hp + J.aura * DT);
   }
@@ -283,6 +358,12 @@ export class Sim {
       else m.revive = Math.max(0, m.revive - DT * 2);
       if (m.revive >= HP.revive) { m.down = false; m.revive = 0; m.downT = 0; m.hp = HP.revived; this.events.push({ t: 'up', pid: m.id }); }
     }
+  }
+  // une perte lente (faim, froid) : pas de cri à chaque pas
+  hurtBy(p, dmg) {
+    if (p.down || p.dead) return;
+    p.hp -= dmg;
+    if (p.hp <= 0) this.hurt(p, 1);
   }
   hurt(p, dmg, from) {
     if (p.down || p.dead) return;
@@ -307,18 +388,25 @@ export class Sim {
       return;
     }
     if (p.carry) {
-      if (jobOf(p).repair && this.village.hp < WAREHOUSE_HP - 20 && Math.hypot(p.x - M.depot.x, p.z - M.depot.z) < REACH.store) { p.act = 'repair'; p.actT = 0; p.yaw = Math.atan2(M.warehouse.x - p.x, M.warehouse.z - p.z); return; }
+      if (p.carry === 'bois' && jobOf(p).repair && this.village.hp < WAREHOUSE_HP - 20 && Math.hypot(p.x - M.depot.x, p.z - M.depot.z) < REACH.store) { p.act = 'repair'; p.actT = 0; p.yaw = Math.atan2(M.warehouse.x - p.x, M.warehouse.z - p.z); return; }
       const b = this.brazierNear(p.x, p.z, REACH.feed);
-      if (b && this.braziers[b.id].fuel < FUEL.max - 5) { p.act = 'feed'; p.actT = 0; p.target = b.id; p.yaw = Math.atan2(b.x - p.x, b.z - p.z); return; }
+      if (b && p.carry === 'bois' && this.braziers[b.id].fuel < FUEL.max - 5) { p.act = 'feed'; p.actT = 0; p.target = b.id; p.yaw = Math.atan2(b.x - p.x, b.z - p.z); return; }
       if (Math.hypot(p.x - M.depot.x, p.z - M.depot.z) < REACH.store) { p.act = 'store'; p.actT = 0; p.yaw = Math.atan2(M.warehouse.x - p.x, M.warehouse.z - p.z); return; }
+      if (p.carry === 'vivres') return;   // un panier ne se pose pas : on le range
       p.act = 'drop'; p.actT = 0; return;
     }
     if (this.players.some((o) => o !== p && o.down && Math.hypot(o.x - p.x, o.z - p.z) < REACH.revive)) return; // E se tient pour relever
+    // ordre : ce qui traîne par terre, puis l'entrepôt (manger, reprendre du bois), les baies, les ruines
     const l = this.logNear(p.x, p.z, REACH.pick);
     const e = this.beamEndNear(p.x, p.z);
     if (e && (!l || e.d < Math.hypot(l.x - p.x, l.z - p.z))) { this.grab(p, e.beam, e.end); return; }
     if (l) { p.act = 'pick'; p.actT = 0; p.target = l.id; p.yaw = Math.atan2(l.x - p.x, l.z - p.z); return; }
-    if (this.canTake(p)) { p.act = 'take'; p.actT = 0; p.yaw = Math.atan2(M.warehouse.x - p.x, M.warehouse.z - p.z); }
+    if (this.canEat(p)) { p.act = 'eat'; p.actT = 0; p.yaw = Math.atan2(M.warehouse.x - p.x, M.warehouse.z - p.z); return; }
+    if (this.canTake(p)) { p.act = 'take'; p.actT = 0; p.yaw = Math.atan2(M.warehouse.x - p.x, M.warehouse.z - p.z); return; }
+    const bush = this.bushNear(p.x, p.z);
+    if (bush) { p.act = 'gather'; p.actT = 0; p.target = bush.id; p.yaw = Math.atan2(bush.x - p.x, bush.z - p.z); return; }
+    const site = this.siteNear(p.x, p.z);
+    if (site && this.build[site.id].state === 'ruine') this.startBuild(site.id, p);
   }
   // reprendre une bûche à l'entrepôt (pour les braseros), une fois le tutoriel des bûches passé
   canTake(p) { return this.stock.bois > 0 && this.goal >= 4 && Math.hypot(p.x - this.map.depot.x, p.z - this.map.depot.z) < REACH.store; }
@@ -373,7 +461,7 @@ export class Sim {
     } else if (p.act === 'strike') {
       const f = this.foe(p.target);
       if (!f || f.state === 'dead' || f.state === 'rise' || Math.hypot(f.x - p.x, f.z - p.z) > REACH.strike + 0.6 + (jobOf(p).reach || 0)) { this.events.push({ t: 'swing', pid: p.id }); return; }
-      let dmg = jobOf(p).dmg;
+      let dmg = jobOf(p).dmg * this.dmgMul();
       // le guerrier pare de face avec son bouclier
       const blocked = this.blocks(f, p.x, p.z);
       if (blocked) dmg *= 0.3;
@@ -391,6 +479,7 @@ export class Sim {
       if (this.goal === 1) this.setGoal(2);
     } else if (p.act === 'store') {
       if (!p.carry) return;
+      if (p.carry === 'vivres') { this.stock.nourriture += FOOD.berries; p.carry = null; this.events.push({ t: 'storeFood', pid: p.id, n: this.stock.nourriture }); return; }
       this.stock.bois++; p.stored++; p.carry = null;
       this.events.push({ t: 'store', pid: p.id, n: this.stock.bois });
       if (this.goal === 2) this.setGoal(3);
@@ -400,6 +489,21 @@ export class Sim {
       B.fuel = Math.min(FUEL.max, B.fuel + FUEL.log * (jobOf(p).feed || 1)); p.carry = null;
       this.events.push({ t: 'feed', pid: p.id, brazier: p.target, fuel: B.fuel });
       if (this.goal === 4) this.setGoal(5);
+    } else if (p.act === 'build') {
+      const B = this.build[p.target], C = BUILDS[p.target];
+      if (!B || B.state !== 'chantier') return;
+      B.prog = Math.min(C.work, B.prog + (jobOf(p).build || 1));
+      this.events.push({ t: 'hammer', pid: p.id, site: p.target, prog: B.prog / C.work });
+      if (B.prog >= C.work) this.finishBuild(p.target, p);
+    } else if (p.act === 'gather') {
+      const b = this.berries[p.target];
+      if (!b || !b.ready || p.carry) return;
+      b.ready = false; b.at = this.t + FOOD.regrow; p.carry = 'vivres';
+      this.events.push({ t: 'gather', pid: p.id, bush: b.id });
+    } else if (p.act === 'eat') {
+      if (this.stock.nourriture <= 0) return;
+      this.stock.nourriture--; p.food = Math.min(FOOD.max, p.food + FOOD.eat);
+      this.events.push({ t: 'eat', pid: p.id });
     } else if (p.act === 'repair') {
       if (!p.carry) return;
       p.carry = null; this.village.hp = Math.min(WAREHOUSE_HP, this.village.hp + jobOf(p).repair);
@@ -465,7 +569,7 @@ export class Sim {
       if (f.state === 'awaken') { if (f.t >= RISE.awaken) { f.state = 'walk'; f.t = 0; } continue; }
       if (f.state === 'dead') {
         // dans la brume, il se relève (deux fois au plus) ; dans la lumière, il reste à terre
-        if (!f.sun && f.t >= RISE.delay && f.rises < RISE.max && !this.lit(f.x, f.z) && this.night) { f.state = 'rise'; f.t = 0; f.rises++; this.events.push({ t: 'rise', foe: f.id }); }
+        if (!f.sun && f.kind !== 'knight' && f.t >= RISE.delay && f.rises < RISE.max && this.canRise(f.x, f.z) && this.night) { f.state = 'rise'; f.t = 0; f.rises++; this.events.push({ t: 'rise', foe: f.id }); }
         continue;
       }
       if (f.state === 'rise') { if (f.t >= RISE.dur) { f.state = 'walk'; f.t = 0; f.hp = F.hp * 0.6; } continue; }
@@ -514,9 +618,61 @@ export class Sim {
   }
   foeHits(f, tg) {
     const F = FOES[f.kind];
-    if (tg.type === 'p') { const p = this.player(tg.id); if (p) this.hurt(p, F.dmg, f); }
+    const dm = this.D.dmg;
+    if (tg.type === 'p') { const p = this.player(tg.id); if (p) this.hurt(p, F.dmg * dm, f); }
     else if (tg.type === 'b') { const B = this.braziers[tg.id]; B.fuel = Math.max(0, B.fuel - FUEL.hit); this.events.push({ t: 'brazierHit', brazier: tg.id, fuel: B.fuel }); }
-    else { this.village.hp = Math.max(0, this.village.hp - F.dmg * 0.7); this.events.push({ t: 'wallHit', hp: this.village.hp }); }
+    else { this.village.hp = Math.max(0, this.village.hp - F.dmg * 0.7 * dm * (F.wall || 1)); this.events.push({ t: 'wallHit', hp: this.village.hp, big: !!F.wall }); }
+  }
+
+  // ------------------------------------------------------------------ village : chantiers, baies, repas
+  // la ruine dont on est devant la porte (ou contre le mur, pour bâtir)
+  siteNear(x, z, r = REACH.site) {
+    let best = null, bd = r;
+    for (const b of this.map.buildings) {
+      if (!this.build[b.id] || this.build[b.id].state === 'debout') continue;
+      const R = rectOf(b), cx = clamp(x, R.x0, R.x1), cz = clamp(z, R.z0, R.z1), d = Math.hypot(x - cx, z - cz);
+      if (d < bd) { bd = d; best = b; }
+    }
+    return best;
+  }
+  startBuild(id, p) {
+    const C = BUILDS[id];
+    if (this.stock.bois < C.bois || this.stock.poutre < C.poutre) { this.events.push({ t: 'poor', pid: p.id, site: id }); return false; }
+    this.stock.bois -= C.bois; this.stock.poutre -= C.poutre;
+    this.build[id] = { state: 'chantier', prog: 0 };
+    this.events.push({ t: 'site', pid: p.id, site: id });
+    return true;
+  }
+  finishBuild(id, by) {
+    this.build[id] = { state: 'debout', prog: BUILDS[id].work };
+    // les nouveaux PV des maisons, pour tout le monde
+    for (const q of this.players) { const m = JOBS[q.job].hp + this.hpBonus(); q.hp += m - q.maxHp; q.maxHp = m; }
+    this.events.push({ t: 'built', pid: by ? by.id : null, site: id });
+    if (this.goal <= 6) { this.setGoal(6); this.setGoal(7); }
+    this.saveNow = true;
+  }
+  bushNear(x, z) {
+    let best = null, bd = REACH.gather;
+    for (const b of this.map.bushes) { if (!this.berries[b.id].ready) continue; const d = Math.hypot(b.x - x, b.z - z) - 0.5; if (d < bd) { bd = d; best = b; } }
+    return best;
+  }
+  canEat(p) { return !p.carry && p.food < FOOD.max - FOOD.eat * 0.6 && this.stock.nourriture > 0 && Math.hypot(p.x - this.map.depot.x, p.z - this.map.depot.z) < REACH.store; }
+
+  // ce qui reste d'une partie d'un soir à l'autre (sauvegardé à chaque aube par l'hôte)
+  saveData() {
+    return { v: 1, seed: this.seed, mode: this.mode, diff: this.diff, day: this.clock.day, stock: this.stock, build: this.build, village: this.village,
+      braziers: this.braziers.map((b) => b.fuel), trees: this.trees.filter((t) => t.down).map((t) => [t.id, t.dir]), stats: this.stats, goal: this.goal };
+  }
+  loadSave(s) {
+    if (!s || s.v !== 1 || s.seed !== this.seed) return false;
+    this.mode = s.mode; this.diff = s.diff;
+    this.clock = { day: s.day, phase: 'jour', t: 0, duskSaid: false };
+    Object.assign(this.stock, s.stock); this.build = structuredClone(s.build); this.village = { ...s.village };
+    s.braziers.forEach((f, i) => { if (this.braziers[i]) this.braziers[i].fuel = f; });
+    for (const [id, dir] of s.trees) if (this.trees[id]) { this.trees[id].down = true; this.trees[id].dir = dir; this.trees[id].hp = 0; }
+    Object.assign(this.stats, s.stats); this.goal = Math.max(this.goal, s.goal);
+    for (const p of this.players) { p.maxHp = JOBS[p.job].hp + this.hpBonus(); p.hp = p.maxHp; }
+    return true;
   }
 
   // ------------------------------------------------------------------ poutres
@@ -605,19 +761,33 @@ export class Sim {
       return { key: 'E', text: 'Poser la poutre' };
     }
     if (p.carry) {
-      if (jobOf(p).repair && this.village.hp < WAREHOUSE_HP - 20 && Math.hypot(p.x - M.depot.x, p.z - M.depot.z) < REACH.store) return { key: 'E', text: 'Réparer l\'entrepôt avec la bûche', hp: this.village.hp / WAREHOUSE_HP };
+      if (p.carry === 'bois' && jobOf(p).repair && this.village.hp < WAREHOUSE_HP - 20 && Math.hypot(p.x - M.depot.x, p.z - M.depot.z) < REACH.store) return { key: 'E', text: 'Réparer l\'entrepôt avec la bûche', hp: this.village.hp / WAREHOUSE_HP };
       const b = this.brazierNear(p.x, p.z, REACH.feed);
-      if (b && this.braziers[b.id].fuel < FUEL.max - 5) return { key: 'E', text: 'Mettre la bûche dans le brasero', hp: this.braziers[b.id].fuel / FUEL.max };
-      if (Math.hypot(p.x - M.depot.x, p.z - M.depot.z) < REACH.store) return { key: 'E', text: 'Ranger la bûche dans l\'entrepôt' };
-      return { key: 'E', text: 'Poser la bûche' };
+      if (b && p.carry === 'bois' && this.braziers[b.id].fuel < FUEL.max - 5) return { key: 'E', text: 'Mettre la bûche dans le brasero', hp: this.braziers[b.id].fuel / FUEL.max };
+      if (Math.hypot(p.x - M.depot.x, p.z - M.depot.z) < REACH.store) return { key: 'E', text: p.carry === 'vivres' ? 'Ranger les baies dans l\'entrepôt' : 'Ranger la bûche dans l\'entrepôt' };
+      return p.carry === 'vivres' ? { key: '', text: 'Rapporte les baies à l\'entrepôt' } : { key: 'E', text: 'Poser la bûche' };
     }
     if (this.foeNear(p.x, p.z, REACH.strike + 0.4)) return { key: 'Clic', text: 'Frapper' };
     const be = this.beamEndNear(p.x, p.z);
     if (be) { const other = be.beam.h[1 - be.end]; return { key: 'E', text: other !== null ? `Soulever la poutre avec ${this.player(other)?.name || 'ton équipier'}` : jobOf(p).beamAlone ? 'Prendre la poutre (seul, lentement)' : 'Prendre un bout de la poutre (il faut être deux)' }; }
     if (this.logNear(p.x, p.z, REACH.pick)) return { key: 'E', text: 'Ramasser la bûche' };
+    if (this.canEat(p)) return { key: 'E', text: `Manger (${this.stock.nourriture} vivre${this.stock.nourriture > 1 ? 's' : ''} à l'entrepôt)`, hp: p.food / FOOD.max };
     if (this.canTake(p)) return { key: 'E', text: `Prendre une bûche à l'entrepôt (${this.stock.bois})` };
+    const bush = this.bushNear(p.x, p.z);
+    if (bush) return { key: 'E', text: 'Cueillir des baies' };
+    const site = this.siteNear(p.x, p.z);
+    let info = null;
+    if (site) {
+      const B = this.build[site.id], C = BUILDS[site.id];
+      if (B.state === 'chantier') return { key: 'Clic', text: `${site.name} en chantier : frappe pour bâtir`, hp: B.prog / C.work };
+      const cost = `${C.bois} bois, ${C.poutre} poutre${C.poutre > 1 ? 's' : ''}`;
+      const miss = [this.stock.bois < C.bois ? `${C.bois - this.stock.bois} bois` : '', this.stock.poutre < C.poutre ? `${C.poutre - this.stock.poutre} poutre${C.poutre - this.stock.poutre > 1 ? 's' : ''}` : ''].filter(Boolean);
+      if (!miss.length) return { key: 'E', text: `Relever : ${site.name} (${cost})` };
+      info = { key: '', text: `${site.name} (${cost}) : il manque ${miss.join(' et ')}` };
+    }
     const t = M.treeNear(p.x, p.z, REACH.chop + 0.6, this.fallen);
     if (t) return { key: 'Clic', text: 'Couper l\'arbre', hp: this.trees[t.id].hp / TREE_HP };
+    if (info) return info;
     const b = this.brazierNear(p.x, p.z, REACH.feed);
     if (b) return { key: '', text: `Brasero : ${Math.round(this.braziers[b.id].fuel)} s de feu (apporte une bûche)`, hp: this.braziers[b.id].fuel / FUEL.max };
     return null;
@@ -628,6 +798,7 @@ export class Sim {
   snapshot() {
     return structuredClone({ t: this.t, tick: this.tick, clock: this.clock, stock: this.stock, trees: this.trees, logs: this.logs, nextLog: this.nextLog,
       braziers: this.braziers, village: this.village, beams: this.beams, nextBeam: this.nextBeam, foes: this.foes.map((f) => ({ ...f, path: null })), nextFoe: this.nextFoe, spawnQ: this.spawnQ, goal: this.goal, stats: this.stats,
+      build: this.build, berries: this.berries, mode: this.mode, diff: this.diff, won: this.won,
       players: this.players.map((p) => ({ ...p, ai: null })) });
   }
   restore(s) {

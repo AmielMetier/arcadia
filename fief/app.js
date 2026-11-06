@@ -3,7 +3,7 @@
 // invité garde une copie de la vallée, y recopie l'état reçu et prédit son propre déplacement. Si l'hôte s'en va, le
 // nouvel hôte reprend depuis le dernier instantané complet. Seul (ou sans invité), c'est la même boucle, sans envoi.
 // Adresse : ?seed=… (vallée), ?bots=0..2, ?job=…, ?debug (expose window.__fief), ?autostart, ?manual (images à la demande).
-import { Sim, DT, GOALS, emptyInput, WAREHOUSE_HP, CYCLE, JOBS, HP } from './engine/sim.js';
+import { Sim, DT, GOALS, emptyInput, WAREHOUSE_HP, CYCLE, JOBS, HP, BUILDS, FOOD, FOES, MODES } from './engine/sim.js';
 import { encodeState, encodeWorld, applyState, applyWorld, smooth, predict, reconcile, cleanInput } from './engine/net.js';
 import { createScene } from './view/scene.js';
 import { Input } from './input.js';
@@ -16,7 +16,7 @@ const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const fmt = (s) => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 const PALETTE = ['#e0a040', '#6aa0e0', '#e06a8a', '#7ac46a', '#b48ae0', '#e0d06a', '#6ad6d0', '#e08a5a'];
 
-const S = { role: 'solo', me: 0, name: 'Toi', job: 'bucheron', paused: true, started: false, acc: 0, last: 0, t: 0, goal: -1, stepDist: 0, bots: 1, ended: false, wallHitT: 0,
+const S = { mode: 'expedition', diff: 'normale', role: 'solo', me: 0, name: 'Toi', job: 'bucheron', paused: true, started: false, acc: 0, last: 0, t: 0, goal: -1, stepDist: 0, bots: 1, ended: false, wallHitT: 0,
   tick: 0, netEv: [], worldDirty: true, lastWorld: -99, lastFull: -99, full: null, hostId: null, gotState: false, shownFell: new Set() };
 const sfx = new Sfx();
 const scene = createScene($('stage'), { onLost: () => location.reload() });
@@ -50,16 +50,18 @@ async function boot() {
     S.hostId = H.info.hostId;
     const me = (H.players || []).find((p) => p.id === S.me);
     if (me && me.name) S.name = me.name;
-    const b = H.info.settings && H.info.settings.bots;
-    if (b !== undefined && b !== null) S.bots = +b;
+    const st = H.info.settings || {};
+    if (st.bots !== undefined && st.bots !== null) S.bots = +st.bots;
+    if (st.mode) S.mode = st.mode; if (st.diff) S.diff = st.diff;
     H.on('msg', onMsg);
     H.on('roster', onRoster);
     H.signalReady();
   }
   if (QS.has('bots')) S.bots = +QS.get('bots');
+  if (QS.get('mode')) S.mode = QS.get('mode'); if (QS.get('diff')) S.diff = QS.get('diff');
   sim = S.role === 'guest'
     ? new Sim({ seed, players: [] })
-    : new Sim({ seed, players: [{ id: S.me, name: S.name, job: S.job, color: colorOf(S.me) }], bots: S.bots });
+    : new Sim({ seed, players: [{ id: S.me, name: S.name, job: S.job, color: colorOf(S.me) }], bots: S.bots, mode: S.mode, diff: S.diff });
   startSnap = sim.snapshot();
   try {
     await scene.load(sim.map, { onProgress: (k) => { $('loadBar').style.width = Math.round(k * 100) + '%'; } });
@@ -91,8 +93,13 @@ function bindJobs(after) {
     if (after) after();
   };
 }
+const SAVE_KEY = `fief_save_${seed}`;
+function readSave() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); return s && s.seed === seed && s.mode === sim.mode ? s : null; } catch (e) { return null; } }
+function writeSave() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(sim.saveData())); } catch (e) {} }
+function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
 function intro() {
   S.paused = true;
+  const save = S.role !== 'guest' ? readSave() : null;
   const guest = S.role === 'guest';
   const others = (H.players || []).filter((p) => p.id !== S.me).map((p) => esc(p.name));
   const mates = S.bots ? ` ${S.bots > 1 ? 'Deux chevaliers' : 'Un chevalier'} IA ${S.bots > 1 ? 'se battent' : 'se bat'} à vos côtés.` : '';
@@ -107,11 +114,14 @@ function intro() {
       <span><kbd>E</kbd></span><span>Ramasser, ranger, charger un brasero, prendre un bout de poutre · <b>tenir</b> pour relever un équipier</span>
       <span><kbd>Espace</kbd> · <kbd>Ctrl</kbd> · <kbd>Échap</kbd></span><span>Sauter · marcher · menu</span>
     </div>
-    <p class="note">Version en construction : la construction des bâtiments, les sièges et la crypte arrivent dans les prochaines étapes.</p>
-    <div class="row"><button class="btn go" id="go">${guest ? 'Rejoindre' : 'Prendre la hache'}</button></div>
+    ${!guest && save ? `<p class="save">Une partie est en cours : <b>jour ${save.day}</b>, ${Object.values(save.build).filter((b) => b.state === 'debout').length} bâtiment(s) relevé(s), ${save.stock.bois} bûches et ${save.stock.poutre} poutres à l'entrepôt.</p>` : ''}
+    <p class="note">${sim.mode === 'expedition' ? 'Expédition : tenez dix nuits. Les nuits 5 et 10 sont des sièges.' : 'Sans fin : les nuits durcissent sans limite.'} · Difficulté ${S.diff === 'peste' ? 'Peste noire' : S.diff === 'paisible' ? 'Paisible' : 'Normale'} · La crypte arrive à l'étape suivante.</p>
+    <div class="row">${!guest && save ? '<button class="btn" id="fresh">Nouvelle partie</button><button class="btn go" id="cont">Continuer</button>' : `<button class="btn go" id="go">${guest ? 'Rejoindre' : 'Prendre la hache'}</button>`}</div>
   </div>`);
   bindJobs();
-  $('go').onclick = () => { startPlaying(); resume(); };
+  if ($('go')) $('go').onclick = () => { startPlaying(); resume(); };
+  if ($('cont')) $('cont').onclick = () => { sim.loadSave(save); startSnap = sim.snapshot(); S.worldDirty = true; setGoal(sim.goal); startPlaying(); resume(); };
+  if ($('fresh')) $('fresh').onclick = () => { clearSave(); startPlaying(); resume(); };
 }
 function startPlaying() {
   S.started = true; S.paused = false;
@@ -155,6 +165,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && S.s
 function gameOver(reason) {
   if (S.ended) return;
   S.ended = true; S.paused = true; input.unlock();
+  if (reason === 'victoire') { victory(); return; }
   sfx.play('sol', { vol: 1, rate: 0.5 });
   const why = reason === 'entrepot' ? 'Les morts ont enfoncé l\'entrepôt : le bois du village est perdu.' : 'Toute l\'équipe est à terre. Personne pour rallumer les braseros.';
   const host = S.role !== 'guest';
@@ -180,7 +191,22 @@ function gameOver(reason) {
     resume();
   };
   if ($('retry')) $('retry').onclick = () => back(sim.duskSnap);
-  $('restart').onclick = () => back(startSnap);
+  $('restart').onclick = () => { clearSave(); back(startSnap); };
+}
+
+function victory() {
+  if (S.role !== 'guest') clearSave();
+  sfx.play('aube', { vol: 1 }); sfx.play('cloche', { vol: 0.9, delay: 0.4 });
+  const built = Object.entries(sim.build).filter(([, b]) => b.state === 'debout').length;
+  showScreen(`<div class="sheet win">
+    <h2>Dix nuits tenues</h2>
+    <p class="sub">Le village tient debout. La brume recule jusqu'au château.</p>
+    <p>${sim.stats.kills} squelettes abattus · ${built} bâtiment${built > 1 ? 's' : ''} relevé${built > 1 ? 's' : ''} · ${sim.stock.bois} bûches et ${sim.stock.nourriture} vivres de reste.</p>
+    <p>Sous le château, la porte de la crypte vient de s'ouvrir. Le Roi-Squelette attendra la prochaine version.</p>
+    <div class="row">${H.embedded ? '<button class="btn" id="quit">Retour au salon</button>' : ''}${S.role !== 'guest' ? '<button class="btn go" id="again">Nouvelle expédition</button>' : ''}</div>
+  </div>`);
+  if ($('quit')) $('quit').onclick = () => H.exit();
+  if ($('again')) $('again').onclick = () => location.reload();
 }
 
 // ------------------------------------------------------------------ réseau
@@ -263,6 +289,7 @@ function stepOnce() {
   }
   sim.setInput(S.me, localInput());
   sim.step();
+  if (sim.saveNow) { sim.saveNow = false; if (!sim.over) writeSave(); }
   for (const e of sim.takeEvents()) { onEvent(e); S.netEv.push(e); }
   hostNet();
 }
@@ -317,6 +344,15 @@ function onEvent(e) {
     case 'drop': case 'beamDrop': sfx.play('sol', { vol: 0.7, dist: d }); break;
     case 'store': sfx.play('tronc', { vol: 0.9, dist: d }); if (mine) { sfx.play('ui', { vol: 0.35, delay: 0.1 }); toast('+1 bûche'); } bump('sBois'); break;
     case 'storeBeam': sfx.play('tronc', { vol: 1, dist: d, rate: 0.8 }); sfx.play('ui', { vol: 0.4, delay: 0.1 }); toast('+1 poutre'); bump('sPoutre'); break;
+    case 'site': sfx.play('tronc', { vol: 0.9, dist: d }); banner(`Chantier ouvert<small>${esc(siteName(e.site))} : frappez-le (clic) pour le relever</small>`); bump('sBois'); break;
+    case 'poor': if (mine) toast('Pas assez de bois ou de poutres à l\'entrepôt'); break;
+    case 'hammer': sfx.play('hache', { vol: 0.8, dist: d, rate: 1.35 }); break;
+    case 'built': sfx.play('aube', { vol: 0.7 }); banner(`${esc(siteName(e.site))} relevé${e.site === 'moulin' ? '' : 'e'} !<small>${esc(BUILDS[e.site].text)}</small>`); break;
+    case 'gather': sfx.play('herbe', { vol: 0.8, dist: d, rate: 1.3 }); break;
+    case 'storeFood': sfx.play('tronc', { vol: 0.6, dist: d, rate: 1.3 }); if (mine) toast(`+${FOOD.berries} vivres`); bump('sVivres'); break;
+    case 'eat': if (mine) { sfx.play('ui', { vol: 0.4 }); toast('Miam'); } break;
+    case 'siege': banner(`Nuit de siège<small>Le chevalier noir sort de la crypte</small>`, 'night'); break;
+    case 'back': if (mine) toast('La chapelle t\'a ramené'); break;
     case 'repair': sfx.play('hache', { vol: 0.8, dist: d, rate: 1.2 }); if (mine) toast('Entrepôt réparé'); break;
     case 'feed': sfx.play('feu', { vol: 0.9, dist: d }); if (mine) toast('Le brasero flambe'); break;
     case 'land': sfx.play('herbe', { vol: 0.8, dist: d }); break;
@@ -338,6 +374,7 @@ function onEvent(e) {
     case 'over': gameOver(e.reason); break;
   }
 }
+const siteName = (id) => (sim.map.buildings.find((b) => b.id === id) || {}).name || id;
 function toast(t) { const el = $('toast'); el.textContent = t; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); }
 function bump(id) { const el = $(id); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
 function setGoal(g) {
@@ -360,22 +397,30 @@ function hud(dt) {
   S.wallHitT = Math.max(0, S.wallHitT - dt);
   const c = sim.clock, night = c.phase === 'nuit';
   const pr = p ? sim.prompt(S.me) : null;
-  const key = [sim.stock.bois, sim.stock.poutre, p && p.carry, pr && pr.text, pr && Math.round((pr.hp || 0) * 50), sim.goal, c.day, night, Math.ceil(sim.timeLeft), Math.round(p ? p.hp : 0), p && p.maxHp, p && p.down, p && Math.round(p.revive * 10), p && Math.round(p.downT), p && p.dead, Math.round(sim.village.hp), S.wallHitT > 0].join('|');
+  const key = [sim.stock.bois, sim.stock.poutre, p && p.carry, pr && pr.text, pr && Math.round((pr.hp || 0) * 50), sim.goal, c.day, night, Math.ceil(sim.timeLeft), Math.round(p ? p.hp : 0), p && p.maxHp, p && p.down, p && Math.round(p.revive * 10), p && Math.round(p.downT), p && p.dead, Math.round(sim.village.hp), S.wallHitT > 0, sim.stock.nourriture, p && Math.round(p.food), p && p.cold, sim.foes.map((f) => (f.kind === 'knight' ? Math.round(f.hp) : '')).join('')].join('|');
   if (key === lastHud) return;
   lastHud = key;
-  $('day').textContent = `${night ? 'Nuit' : 'Jour'} ${c.day}`;
+  $('day').textContent = `${night ? 'Nuit' : 'Jour'} ${c.day}${MODES[sim.mode] ? '/' + MODES[sim.mode] : ''}`;
   $('clock').textContent = night ? `aube dans ${fmt(sim.timeLeft)}` : `nuit dans ${fmt(sim.timeLeft)}`;
   $('dayChip').classList.toggle('night', night);
   $('dayIco').className = 'ico ' + (night ? 'moon' : 'sun');
   $('sBois').querySelector('b').textContent = sim.stock.bois;
   $('sPoutre').querySelector('b').textContent = sim.stock.poutre;
   $('sPoutre').classList.toggle('off', !sim.stock.poutre);
+  $('sVivres').querySelector('b').textContent = sim.stock.nourriture;
+  $('sVivres').classList.toggle('off', !sim.stock.nourriture);
+  const boss = sim.foes.find((f) => f.kind === 'knight' && f.state !== 'dead');
+  $('bossBar').hidden = !boss;
+  if (boss) $('bossBar').querySelector('b').style.width = (boss.hp / FOES.knight.hp * 100) + '%';
   if (GOALS[S.goal] && GOALS[S.goal].id === 'ten') $('goalTxt').textContent = `${GOALS[S.goal].text} (${Math.min(10, sim.stock.bois)}/10)`;
   if (p) {
     $('hpBar').firstElementChild.style.width = (p.hp / p.maxHp * 100) + '%';
     $('hpTxt').textContent = Math.ceil(p.hp);
     $('hpBar').classList.toggle('low', p.hp < 30 && !p.down);
     document.body.classList.toggle('down', !!(p.down || p.dead));
+    document.body.classList.toggle('cold', !!p.cold && !p.down);
+    $('foodBar').querySelector('b i').style.width = (p.food / FOOD.max * 100) + '%';
+    $('foodBar').classList.toggle('low', p.food < 20);
     $('downBox').hidden = !p.down;
     if (p.down) {
       const mate = sim.players.find((o) => o.reviving === p.id);
@@ -393,7 +438,7 @@ function hud(dt) {
     if (pr.hp !== undefined) $('pHp').firstElementChild.style.width = Math.round(Math.min(1, pr.hp) * 100) + '%';
   }
   $('carry').hidden = !(p && p.carry);
-  if (p && p.carry) $('carry').lastChild.textContent = p.carry === 'poutre' ? 'Tu portes une poutre' : 'Tu portes une bûche';
+  if (p && p.carry) $('carry').lastChild.textContent = p.carry === 'poutre' ? 'Tu portes une poutre' : p.carry === 'vivres' ? 'Tu portes un panier de baies' : 'Tu portes une bûche';
 }
 
 // ------------------------------------------------------------------ outils de test

@@ -50,7 +50,7 @@ export function createScene(stage, { onLost } = {}) {
     scene.environmentIntensity = 0.45;
   }
 
-  let night = null, peaksMesh = null;
+  let night = null, peaksMesh = null, kitRef = null, villageGroup = null, villageKey = '', berryMesh = null, berryKey = '';
   let map = null, treeKit = null, trees = null, actors = null, logsGroup = null, fire = null, falling = [], stumps = null;
   const logMeshes = new Map(), beamMeshes = new Map();
   let viewT = 0;
@@ -221,8 +221,8 @@ export function createScene(stage, { onLost } = {}) {
     }
     scene.add(plantTrees(treeKit, far, { lo: true, shadows: false, dark: true }).group); step(0.35);
     // village et château
-    const kit = await loadKit('models/village.glb'); step(0.6);
-    scene.add(buildVillage(kit, M));
+    kitRef = await loadKit('models/village.glb'); step(0.6);
+    villageGroup = buildVillage(kitRef, M); scene.add(villageGroup);
     // décor de Kenney : rochers, souches, tas de bûches, feu de camp, buissons
     const names = { rockA: 'rock_largeA', rockC: 'rock_largeC', rockE: 'rock_largeE', rockS: 'rock_smallA', rockS2: 'rock_smallC', stump: 'stump_round', logstack: 'log_stackLarge' };
     const models = {};
@@ -239,6 +239,15 @@ export function createScene(stage, { onLost } = {}) {
       const a = rr(i + 9.1) * Math.PI * 2, d = 24 + rr(i + 3.3) * 85, x = Math.sin(a) * d, z = Math.cos(a) * d;
       if (M.pathDist(x, z) < 3 || Math.abs(z - M.riverZ(x)) < 8 || M.trees.some((t) => Math.hypot(t.x - x, t.z - z) < 1.6)) continue;
       prop(rr(i) < 0.6 ? 'bush' : 'bushL', x, M.heightAt(x, z) - 0.05, z, rr(i + 1) * 6.28, 1.4 + rr(i + 2) * 1.2);
+    }
+    // buissons de baies : un buisson de Kenney et des grappes rouges (cachées une fois cueillies)
+    for (const b of M.bushes) prop('bush', b.x, b.y - 0.05, b.z, b.rot, 1.7 * b.s);
+    {
+      const geo = new THREE.SphereGeometry(0.07, 6, 5), mat = new THREE.MeshStandardMaterial({ color: 0xc8243a, roughness: 0.35, emissive: 0x3a0008 });
+      const per = 9; berryMesh = new THREE.InstancedMesh(geo, mat, M.bushes.length * per); berryMesh.userData = { per, pos: [] };
+      const m4 = new THREE.Matrix4(), rr2 = (k) => { const v = Math.sin(k * 91.7) * 43758.5; return v - Math.floor(v); };
+      M.bushes.forEach((b, i) => { for (let k = 0; k < per; k++) { const a = rr2(i * 13 + k) * 6.28, r = 0.35 + rr2(i * 7 + k * 3) * 0.3, y = 0.35 + rr2(i + k * 11) * 0.45; const p = [b.x + Math.cos(a) * r * b.s, b.y + y * b.s, b.z + Math.sin(a) * r * b.s]; berryMesh.userData.pos.push(p); m4.makeTranslation(...p); berryMesh.setMatrixAt(i * per + k, m4); } });
+      scene.add(berryMesh);
     }
     // souches qui remplacent les arbres abattus
     stumps = { model: models.stump, list: [] };
@@ -306,6 +315,16 @@ export function createScene(stage, { onLost } = {}) {
     }
     for (const [id, m] of beamMeshes) if (!bseen.has(id)) { logsGroup.remove(m); beamMeshes.delete(id); }
     actors.update(sim, dt, me, t);
+    // le village change quand un chantier s'ouvre ou qu'un bâtiment est relevé
+    const vk = Object.entries(sim.build || {}).map(([k, v]) => k + v.state).join();
+    if (vk !== villageKey && kitRef) { villageKey = vk; if (villageGroup) scene.remove(villageGroup); villageGroup = buildVillage(kitRef, map, sim.build); scene.add(villageGroup); }
+    // les baies cueillies disparaissent du buisson
+    const bk = (sim.berries || []).map((b) => (b.ready ? 1 : 0)).join('');
+    if (bk !== berryKey && berryMesh) {
+      berryKey = bk; const m4 = new THREE.Matrix4(), per = berryMesh.userData.per;
+      sim.berries.forEach((b, i) => { for (let k = 0; k < per; k++) { const p = berryMesh.userData.pos[i * per + k]; if (b.ready) m4.makeTranslation(...p); else m4.makeScale(0, 0, 0); berryMesh.setMatrixAt(i * per + k, m4); } });
+      berryMesh.instanceMatrix.needsUpdate = true;
+    }
 
     // caméra à l'épaule : derrière le joueur, orientée par la souris
     const p = sim.player(me);
