@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.53 — 6 novembre 2026
+- **The Backrooms** — le Terror Hotel (Level 5) a sa propre entité : un homme en chemise sombre et jean, plus grand que toi, qui marche raide dans les couloirs, se penche en avant pour courir quand il te traque, et dont la tête penchée tressaute sans arrêt.
+
 ## 4.52 — 6 novembre 2026
 - **The Backrooms** — le Terror Hotel (Level 5) est moins sombre : les appliques du couloir éclairent plus, presque toutes marchent, et chaque chambre a un plafonnier en plus de sa lampe de chevet.
 

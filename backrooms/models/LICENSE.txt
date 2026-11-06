@@ -51,3 +51,9 @@ Explorateurs (les autres joueurs) : hazmat.glb, Quaternius « Character Hazmat �
 sans les armes du modèle d'origine.
 Le squelette et les animations de hazmat.glb servent aussi à l'entité en 3D (mode normal), dont le corps et le visage
 sont dessinés dans le code (backrooms/view/beast.js).
+
+Level 5 (le Terror Hotel), l'entité de l'hôtel :
+  jeffrey_epstein_web.glb  « Jeffrey Epstein » de SigmaGrindsetMog, Sketchfab
+  (https://sketchfab.com/3d-models/jeffrey-epstein-bd6c6bf543184c8da1f457fc7bf0c494),
+  licence CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/) : citation de l'auteur obligatoire.
+  Textures réencodées en WebP (tools/glb-webp.py) ; animé dans le jeu (view/hotelEntity.js), le modèle est en T-pose.
