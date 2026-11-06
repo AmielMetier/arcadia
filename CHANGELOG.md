@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.54 — 6 novembre 2026
+- **The Backrooms** — au Terror Hotel (Level 5), se faire attraper donne un vrai screamer : l'entité de l'hôtel se jette sur toi en un quart de seconde, bras tendus vers ton visage, la tête qui tremble, l'image qui saute et se déchire, un éclair rouge et un hurlement déchiré, puis le noir.
+
 ## 4.53 — 6 novembre 2026
 - **The Backrooms** — le Terror Hotel (Level 5) a sa propre entité : un homme en chemise sombre et jean, plus grand que toi, qui marche raide dans les couloirs, se penche en avant pour courir quand il te traque, et dont la tête penchée tressaute sans arrêt.
 

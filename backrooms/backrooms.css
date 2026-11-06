@@ -475,3 +475,18 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 .tapes i.letter { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 18px; margin: 0 1px; border: 1px solid rgba(232, 220, 192, 0.5); font-style: normal; font-size: 13px; line-height: 1; color: #e8dcc0; background: transparent; vertical-align: middle; }
 .tapes i.letter.on { background: #e8dcc0; color: #2b2116; }
 .tapes i.letter.carry { border-color: #ffd36a; color: #ffd36a; }
+
+/* Level 5 : le screamer est dans la scène 3D ; par-dessus, un éclair rouge, de la neige, puis le noir */
+.jumpscare-overlay.l5 { background: transparent; }
+.jumpscare-overlay.l5::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.07) 0 2px, transparent 2px 4px); mix-blend-mode: screen; animation: scareSnow 0.08s steps(2) infinite; }
+.jumpscare-overlay.l5.flash { animation: scareFlash5 1.5s forwards; }
+@keyframes scareFlash5 {
+  0% { background: rgba(255, 0, 20, 0.75); }
+  5% { background: transparent; }
+  9% { background: rgba(255, 255, 255, 0.3); }
+  13% { background: transparent; }
+  40% { background: rgba(120, 0, 0, 0.18); }
+  80% { background: rgba(0, 0, 0, 0.2); }
+  100% { background: #000; }
+}
+@keyframes scareSnow { to { background-position: 0 3px; } }

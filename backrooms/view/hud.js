@@ -390,7 +390,9 @@ export class BackroomsHUD {
     const anim = this.$('#scareAnim');
     const img = this.$('#scareImg');
     anim.hidden = level !== 1;
-    if (img) img.hidden = level === 1;
+    if (img) img.hidden = level === 1 || level === 3;
+    // Level 5 : le screamer est en 3D (la scène) ; l'écran ne fait qu'un éclair rouge et de la neige par-dessus
+    j.classList.toggle('l5', level === 3);
     clearInterval(this.scareTimer);
     if (level === 1) {
       let f = 0;

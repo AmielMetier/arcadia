@@ -90,8 +90,10 @@ export function createHotelEntity() {
 
   return {
     group,
-    // M : l'entité ; chase : elle poursuit ; light : lumière là où elle est ; dt : durée de l'image
-    update(M, chase, light, dt, time) {
+    // M : l'entité ; chase : elle poursuit ; light : lumière là où elle est ; dt : durée de l'image ;
+    // scare : le screamer (elle se jette sur la caméra, bras tendus, tête secouée)
+    update(M, chase, light, dt, time, scare = 0) {
+      if (scare) return this.scarePose(light, time);
       if (st.last && dt > 0) {
         const v = Math.hypot(M.x - st.last.x, M.z - st.last.z) / dt;
         st.speed += (Math.min(6, v) - st.speed) * Math.min(1, dt * 6);
@@ -144,6 +146,28 @@ export function createHotelEntity() {
       // un petit rebond à chaque pas
       st.root.position.y += 0;
       group.position.y = moving ? Math.abs(Math.sin(ph)) * 0.04 * (1 + st.run) : 0;
+    },
+
+    // le screamer : penchée sur toi, les deux bras tendus vers ton visage, la tête qui tremble dans tous les sens
+    scarePose(light, time) {
+      if (!st.ready) return;
+      const B = st.b;
+      for (const m of st.mats) m.emissiveIntensity = 0.5 + Math.random() * 0.25;
+      for (const r of st.rest) r.o.quaternion.copy(r.q);
+      st.root.updateMatrixWorld(true);
+      group.getWorldQuaternion(qRoot);
+      group.position.y = 0;
+      turn(B.spine_1, X, 0.18);
+      turn(B.spine_2, X, 0.22);
+      for (const [s, side] of [['R', -1], ['L', 1]]) {
+        aim(B[`upper_arm_${s}`], B[`lower_arm_${s}`], new THREE.Vector3(side * 0.35, 0.3 + Math.sin(time * 40 + side) * 0.05, 1));
+        aim(B[`lower_arm_${s}`], B[`hand_${s}`], new THREE.Vector3(-side * 0.15, 0.25, 1));
+        aim(B[`hand_${s}`], B[`hand_${s}`] && B[`hand_${s}`].children[0], new THREE.Vector3(-side * 0.3, 0.6, 1));
+      }
+      const j = 0.35;
+      turn(B.neck, X, -0.15 + (Math.random() - 0.5) * j);
+      turn(B.head, Z, (Math.random() - 0.5) * j * 2);
+      turn(B.head, X, -0.1 + (Math.random() - 0.5) * j);
     },
   };
 }

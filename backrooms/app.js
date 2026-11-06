@@ -517,6 +517,7 @@ function handleEvent(ev, me) {
       if (ev.id !== me) break;
       if (sfx) sfx.jumpscare(sim.level);
       if (hud) hud.showJumpscare(sim.level);
+      if (scene && sim.level === 3) scene.scare();
       break;
     case 'dead':
       if (ev.id !== me && hud) hud.toast(`${ev.name} got caught…`);

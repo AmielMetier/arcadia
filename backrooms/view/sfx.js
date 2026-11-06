@@ -579,6 +579,55 @@ export class BackroomsSfx {
       return;
     }
 
+    // Level 5 : un hurlement humain déchiré (deux voix désaccordées qui montent puis s'effondrent), un coup sourd
+    if (level === 3) {
+      if (this.monsterGain) this.monsterGain.gain.setValueAtTime(0.0001, t);
+      const shaper = c.createWaveShaper();
+      const curve = new Float32Array(1024);
+      for (let i = 0; i < 1024; i++) {
+        const x = (i / 1023) * 2 - 1;
+        curve[i] = Math.tanh(x * 6);
+      }
+      shaper.curve = curve;
+      const out = c.createGain();
+      out.gain.setValueAtTime(0.0001, t);
+      out.gain.exponentialRampToValueAtTime(0.55, t + 0.03);
+      out.gain.setValueAtTime(0.55, t + 0.9);
+      out.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+      shaper.connect(out).connect(this.master || this.out);
+      for (const [f0, det] of [[420, 0], [445, 12], [210, -7]]) {
+        const o = c.createOscillator();
+        o.type = 'sawtooth';
+        o.detune.value = det;
+        o.frequency.setValueAtTime(f0 * 0.7, t);
+        o.frequency.exponentialRampToValueAtTime(f0 * 1.9, t + 0.25);
+        o.frequency.exponentialRampToValueAtTime(f0 * 0.45, t + 1.4);
+        // la voix tremble
+        const lfo = c.createOscillator();
+        lfo.frequency.value = 9 + Math.random() * 5;
+        const lg = c.createGain();
+        lg.gain.value = f0 * 0.08;
+        lfo.connect(lg).connect(o.frequency);
+        const g = c.createGain();
+        g.gain.value = 0.3;
+        o.connect(g).connect(shaper);
+        o.start(t);
+        lfo.start(t);
+        o.stop(t + 1.5);
+        lfo.stop(t + 1.5);
+      }
+      const thud = c.createOscillator();
+      const tg = c.createGain();
+      thud.frequency.setValueAtTime(90, t);
+      thud.frequency.exponentialRampToValueAtTime(35, t + 0.4);
+      tg.gain.setValueAtTime(0.9, t);
+      tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      thud.connect(tg).connect(this.master || this.out);
+      thud.start(t);
+      thud.stop(t + 0.55);
+      return;
+    }
+
     // Coupe le son de traque continu
     if (this.monsterGain) {
       this.monsterGain.gain.setValueAtTime(0.0001, t);

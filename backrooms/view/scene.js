@@ -1115,6 +1115,7 @@ float bkCaust(vec2 uv, float t) {
   // choisie (eau d'amande ou piles ; l'échelle, trop grande, reste dans le sac). Ils suivent la caméra et prennent
   // la lumière d'où l'on est (néons autour, lampe allumée).
   const held = new THREE.Group();
+  let scareFx = null; // Level 5 : le screamer en cours
   camera.add(held);
   const heldMats = [];
   const hmat = (opts) => {
@@ -1291,6 +1292,12 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       return lightNow;
     },
 
+    // Level 5 : le screamer de la mort (l'entité 3D se jette sur la caméra)
+    scare() {
+      if (!L3 || !beast || !beast.scarePose) return;
+      scareFx = { t0: null, x: camera.position.x, y: camera.position.y, z: camera.position.z, yaw: camera.rotation.y };
+    },
+
     dispose() {
       window.removeEventListener('resize', onResize);
       renderer.dispose();
@@ -1417,7 +1424,35 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       const lightHere = lightNow + (lampOn ? 0.3 : 0);
       const wantExp = THREE.MathUtils.clamp(0.45 / (0.15 + lightHere), 0.9, 1.4);
       exposure += (wantExp - exposure) * Math.min(1, dt * 1.1);
-      vhs.render(scene, camera, time, danger * calm, exposure);
+      // Level 5 : le screamer. La caméra reste où l'on est mort ; l'entité surgit à 2,40 m et se jette à 55 cm du
+      // visage en un quart de seconde, puis reste là, tremblante, pendant que l'image saute
+      let glitch = danger * calm;
+      if (scareFx) {
+        if (scareFx.t0 === null) scareFx.t0 = time;
+        const k = time - scareFx.t0;
+        if (k > 1.5) {
+          scareFx = null;
+          held.visible = true;
+        } else {
+          const c = scareFx;
+          const fx = -Math.sin(c.yaw);
+          const fz = -Math.cos(c.yaw);
+          const d = THREE.MathUtils.lerp(2.4, 0.55, Math.pow(Math.min(1, k / 0.24), 0.55));
+          const sh = k < 0.24 ? 0.015 : 0.05 * (1 - k / 1.6);
+          const r = () => (Math.random() - 0.5) * sh;
+          camera.position.set(c.x + r(), c.y + r(), c.z + r());
+          camera.rotation.order = 'YXZ';
+          camera.rotation.set(0.05 + r() * 0.8, c.yaw + r() * 0.8, r() * 1.6);
+          held.visible = false;
+          monsterGroup.visible = true;
+          monsterGroup.position.set(c.x + fx * d, c.y - 1.8, c.z + fz * d);
+          monsterGroup.rotation.y = Math.atan2(c.x - monsterGroup.position.x, c.z - monsterGroup.position.z);
+          beast.update(sim.monster, true, 1, dt, time, 1);
+          glitch = 1;
+          exposure = 1.25;
+        }
+      }
+      vhs.render(scene, camera, time, glitch, exposure);
     },
   };
 }
