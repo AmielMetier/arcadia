@@ -5,10 +5,18 @@ import { growlBuffer } from './entity.js';
 const VOICE = new URL('../monster/david.mp3', import.meta.url).href;
 // souffle haletant (« breathing tired » de mikeask, OpenGameArt, CC0)
 const BREATH = new URL('../sfx/souffle.mp3', import.meta.url).href;
-// sons du jeu (backrooms/sfx/) : cris de poursuite, ambiances jouées au hasard, le son de la mort toute proche
+// sons du jeu (backrooms/sfx/) : un dossier par niveau (cris de poursuite, ambiances jouées au hasard, le son de la
+// mort toute proche) ; ce qui est à la racine du dossier sert partout
 const SFX = (name) => new URL(`../sfx/${name}.mp3`, import.meta.url).href;
-const CHASE = ['chase_1', 'chase_2', 'chase_3'];
-const AMBIENT = ['ambiant_1', 'ambiant_2', 'ambiant_3', 'ambiant_4', 'ambiant_5', 'ambiant_6', 'ambiant_7', 'ambiant_8', 'ambiant_9'];
+const range = (dir, base, n) => Array.from({ length: n }, (_, i) => `${dir}/${base}_${i + 1}`);
+const LEVEL_SFX = {
+  0: { chase: range('level0', 'chase', 3), ambient: range('level0', 'ambiant', 9), death: 'level0/death' },
+  1: { chase: range('level1', 'chase', 1), ambient: [], death: null },
+  2: { chase: [], ambient: [], death: null }, // Poolrooms : pas encore de sons
+};
+// joué en boucle par-dessus les cris de poursuite, à tous les niveaux
+const CHASE_ALL = 'chase_all';
+const levelSfx = (level) => LEVEL_SFX[level] || LEVEL_SFX[0];
 
 export class BackroomsSfx {
   constructor() {
@@ -747,18 +755,48 @@ export class BackroomsSfx {
       this.chaseGain.gain.value = 0;
       this.chasePanner = this.panner(0);
       this.chaseGain.connect(this.chasePanner);
-      for (const n of CHASE) this.sample(n);
+      this.sample(CHASE_ALL);
+    }
+    const list = levelSfx(this.roomLevel).chase;
+    if (this.chaseList !== list) {
+      this.chaseList = list;
+      for (const n of list) this.sample(n);
     }
     if (pos && typeof pos === 'object') this.moveTo(this.chasePanner, pos.x, pos.z, 0.05);
     const want = on ? 0.35 + Math.min(1, danger) * 0.75 : 0;
     this.chaseGain.gain.setTargetAtTime(want, t, on ? 0.25 : 0.5);
     if (on && !this.chasePlaying) this.nextChase();
+    if (on && !this.chaseAll) this.startChaseAll();
+    else if (!on && this.chaseAll && this.chaseGain.gain.value < 0.02) {
+      try {
+        this.chaseAll.stop();
+      } catch (e) {
+        /* déjà fini */
+      }
+      this.chaseAll = null;
+    }
+  }
+
+  // la couche commune à toutes les poursuites, en boucle tant que dure la traque
+  startChaseAll() {
+    this.chaseAll = true; // réservé pendant le chargement
+    this.sample(CHASE_ALL).then((buf) => {
+      if (!buf || this.chaseAll !== true) return (this.chaseAll = null);
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      src.connect(this.chaseGain);
+      src.start();
+      this.chaseAll = src;
+    });
   }
 
   nextChase() {
+    const CHASE = levelSfx(this.roomLevel).chase;
+    if (!CHASE.length) return (this.chasePlaying = false);
     this.chasePlaying = true;
     let name = CHASE[Math.floor(Math.random() * CHASE.length)];
-    if (name === this.lastChase) name = CHASE[(CHASE.indexOf(name) + 1) % CHASE.length];
+    if (name === this.lastChase && CHASE.length > 1) name = CHASE[(CHASE.indexOf(name) + 1) % CHASE.length];
     this.lastChase = name;
     this.sample(name).then((buf) => {
       if (!buf) return (this.chasePlaying = false);
@@ -774,7 +812,7 @@ export class BackroomsSfx {
     });
   }
 
-  // Les ambiances : de temps en temps (toutes les 20 à 50 s), un des neuf enregistrements, assez bas, avec l'écho
+  // Les ambiances : de temps en temps (toutes les 20 à 50 s), un des enregistrements du niveau, assez bas, avec l'écho
   // des couloirs ; pas pendant une poursuite
   ambience(dt, active) {
     if (!this.unlocked || !this.ctx) return;
@@ -783,6 +821,8 @@ export class BackroomsSfx {
     this.ambT -= dt;
     if (this.ambT > 0) return;
     this.ambT = 20 + Math.random() * 30;
+    const AMBIENT = levelSfx(this.roomLevel).ambient;
+    if (!AMBIENT.length) return;
     let name = AMBIENT[Math.floor(Math.random() * AMBIENT.length)];
     if (name === this.lastAmb) name = AMBIENT[(AMBIENT.indexOf(name) + 1) % AMBIENT.length];
     this.lastAmb = name;
@@ -800,8 +840,9 @@ export class BackroomsSfx {
 
   // La mort toute proche : l'entité est sur toi
   death() {
-    if (!this.unlocked || !this.ctx) return;
-    this.sample('death').then((buf) => {
+    const name = levelSfx(this.roomLevel).death;
+    if (!this.unlocked || !this.ctx || !name) return;
+    this.sample(name).then((buf) => {
       if (!buf) return;
       const c = this.ctx;
       const src = c.createBufferSource();

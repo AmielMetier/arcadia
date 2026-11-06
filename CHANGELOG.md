@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 4.37 — 6 novembre 2026
+- **The Backrooms** — chaque niveau a désormais ses propres sons.
+  - Dans l'entrepôt (Level 1), la poursuite a sa propre musique ; les cris, les ambiances et le son de la mort du Level 0 restent au Level 0.
+  - Une nouvelle nappe angoissante s'ajoute par-dessus toutes les poursuites, quel que soit le niveau.
+
 ## 4.36 — 5 novembre 2026
 - **The Backrooms** — les Poolrooms (Level 37) sont reconstruites salle par salle : fini le damier, chaque salle est dessinée avec sa propre forme et reliée aux autres par des portes en plein cintre.
   - Des lagons aux bassins courbes, avec leur margelle arrondie, un îlot au milieu de l'eau et d'énormes colonnes.
