@@ -12,6 +12,25 @@
   - De temps en temps, tout le courant saute : le troupeau sait où tu es et passe à l'attaque.
   - Un écran de mort qui fait peur, avec son bruit à lui.
   - Si le jeu ne peut pas capturer la souris, on regarde autour de soi en glissant avec le clic gauche.
+- **The Backrooms** — Tout le jeu fait plus peur, et il est plus juste.
+  - L'entité ne voit que devant elle, et elle entend : la course s'entend de loin, la marche de près. Accroupi (C), on avance lentement et presque sans bruit.
+  - Elle ne tue plus au premier contact : elle t'agrippe. Tape sur n'importe quelle touche pour te dégager, ou un coéquipier l'aveugle avec sa lampe. La deuxième prise est mortelle. Au Level 2, le premier coup de chèvre te renverse, le deuxième tue.
+  - Des casiers au Level 1 et au Level 2 : F pour s'y enfermer. Elle ne te trouve pas, sauf si elle t'a vu entrer. Quand elle passe tout près, retiens ton souffle (Maj)… pas trop longtemps.
+  - Le jeu dose la peur : après une poursuite, un vrai moment de calme. Puis de fausses alertes : des pas, une porte qui claque, un néon qui saute, un coéquipier qui siffle alors qu'il est loin. Et parfois, une fois par niveau, quelque chose de rare.
+  - Elle apprend : après deux fuites devant ta lampe, elle ne fuit plus, et elle se poste là où tu l'as semée.
+  - Au début de la partie, elle te laisse une minute pour apprendre à te déplacer, et la première poursuite est un peu plus lente.
+  - Moins de piles et d'eau d'amande quand on joue à peu nombreux ; l'eau d'amande rend la moitié du souffle. La lampe se vide plus vite pendant les coupures.
+  - Level 1 : les fusibles se portent jusqu'au panneau (si tu meurs, ils tombent par terre), puis il faut relancer le monte-charge en restant devant… et le moteur fait beaucoup de bruit.
+  - Le signal ne capte plus qu'à 25 m, il tremble, et il se coupe pendant les coupures de courant.
+  - Les vannes et les disjoncteurs demandent un peu plus de temps.
+  - Les cassettes racontent une histoire : chacune contient un enregistrement, et ceux que tu as déjà entendus restent dans ta collection.
+  - Deux fins : le toboggan rouge ou bleu te ramène… au Level 0. Seul le jaune, par les Tuyauteries, fait vraiment sortir, et rapporte beaucoup plus de points.
+  - Seul, on peut reprendre au dernier niveau atteint depuis l'écran titre.
+  - Le son a été refait : musique de tension, cœur qui bat, sons étouffés derrière les murs, une ambiance propre à chaque niveau, des bruits réels au lieu des bips. Les Tuyauteries ont enfin leurs propres sons et leur écho métallique.
+  - L'image fait plus vieux caméscope : bande qui saute, mise au point qui cherche, image qui se perd à la mort. L'entité surgit devant l'objectif au lieu d'une image plaquée.
+  - Interface plus discrète (la jauge de souffle et l'inventaire s'effacent quand ils ne servent pas), écran titre et écran de fin façon étiquette de cassette ; on peut passer l'écran de mort au bout de 3 s.
+  - Nouveaux réglages : sensibilité, axe vertical inversé, champ de vision, luminosité, caméra stable, qualité, flashs réduits, sous-titres avec la direction des sons, touches ZQSD ou WASD.
+  - Corrigé : l'écran noir après plusieurs changements de niveau, le petit gel au premier regard, l'entité qui traversait les caisses, une chèvre qui pouvait renverser plusieurs joueurs d'un coup, le score qui donnait plus en mourant aux Tuyauteries qu'en sortant.
 
 ## 4.52 — 6 novembre 2026
 - **Fief Maudit** — La nuit tombe sur la vallée.

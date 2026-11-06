@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, DT, DEPART_T, FUSES, WHISTLE_CD, stairAt, stairLocal, feetY } from '../backrooms/engine/sim.js';
+import { BackroomsSim, DT, DEPART_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY } from '../backrooms/engine/sim.js';
+import { hideFront } from '../backrooms/engine/hides.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
 
 // distance en marche (en cases) entre deux cases
@@ -161,14 +162,107 @@ test('l\'entité : calcul du danger sonore selon la distance et course-poursuite
   sim.step();
   assert.ok(sim.monster.danger > 0.7, 'le son devient assourdissant à 2 m');
 
-  // Contact immédiat : jumpscare et mort
+  // Contact : elle l'agrippe d'abord ; sans se débattre, c'est la fin
   sim.monster.x = sim.player.x + 0.5;
   sim.monster.z = sim.player.z + 0.5;
   sim.step();
-  assert.equal(sim.state, 'dead', 'le joueur meurt attrapé par le monstre');
+  assert.ok(sim.player.grabT > 0, 'le contact est une prise, pas une mort immédiate');
+  assert.equal(sim.monster.mode, 'grab');
+  assert.ok(sim.drainEvents().some((e) => e.type === 'grab'));
+  run(sim, GRAB_T + 0.2);
+  assert.equal(sim.state, 'dead', 'le joueur meurt s\'il ne se débat pas');
   assert.equal(sim.player.status, 'dead');
   const events = sim.drainEvents();
   assert.ok(events.some((e) => e.type === 'jumpscare'), 'jumpscare déclenché à la mort');
+});
+
+test('la prise : se débattre libère, la seconde prise est mortelle', () => {
+  const sim = new BackroomsSim({ map, difficulty: 'normal' });
+  const P = sim.player;
+  sim.monster.x = P.x + 0.5;
+  sim.monster.z = P.z;
+  sim.step();
+  assert.ok(P.grabT > 0);
+  for (let i = 0; i < 12 && P.grabT > 0; i++) sim.step({ struggle: 1 });
+  assert.equal(P.grabT, 0, 'on se dégage en se débattant');
+  assert.equal(P.status, 'alive');
+  assert.equal(sim.monster.mode, 'stun', 'elle est sonnée');
+  assert.ok(sim.drainEvents().some((e) => e.type === 'release' && e.escaped));
+  run(sim, MONSTER_STUN_T + 0.5);
+  assert.notEqual(sim.monster.mode, 'stun');
+  sim.monster.mode = 'chase';
+  sim.monster.x = P.x + 0.5;
+  sim.monster.z = P.z;
+  sim.step();
+  assert.equal(P.status, 'dead', 'la seconde prise ne pardonne pas');
+});
+
+test('perception : accroupi derrière elle, on passe ; en courant, elle entend', () => {
+  const sim = new BackroomsSim({ map, difficulty: 'normal' });
+  const P = sim.player;
+  const M = sim.monster;
+  M.dormantT = 0;
+  // elle regarde ailleurs (dos au joueur), à 6 m
+  M.x = P.x + 6;
+  M.z = P.z;
+  M.yaw = Math.PI / 2; // regarde vers +x : le joueur est derrière elle
+  M.mode = 'patrol';
+  M.stalkT = 99;
+  M.ambushT = 99;
+  P.flashlight = false;
+  for (let i = 0; i < 20; i++) {
+    sim.step({ crouch: true });
+    M.x = P.x + 6;
+    M.z = P.z;
+    M.yaw = Math.PI / 2;
+  }
+  assert.notEqual(M.mode, 'chase', 'accroupi, immobile, dans son dos : rien');
+  P.noise = 0;
+  P.running = true;
+  P.bumpV = NOISE.run;
+  P.bumpT = 1;
+  sim.step();
+  assert.equal(M.mode, 'chase', 'un bruit de course tout près : elle se retourne');
+});
+
+test('casier : caché, l\'entité ne le voit pas ; vu en entrant, elle vient le chercher', () => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 5, level: 1 });
+  const hides = sim.map.hides;
+  assert.ok(hides && hides.length >= 3, 'des casiers à l\'entrepôt');
+  const P = sim.player;
+  const h = hides[0];
+  const f = hideFront(h);
+  P.x = f.x;
+  P.z = f.z;
+  // l'entité loin, dos tourné
+  sim.monster.x = P.x + 40;
+  sim.monster.z = P.z;
+  sim.step({ pick: true });
+  assert.equal(P.hidden, h.id, 'F devant le casier : on s\'y enferme');
+  assert.equal(P.flashlight, false);
+  // elle arrive tout près sans l'avoir vu : elle ne le trouve pas tant qu'il retient son souffle
+  sim.monster.x = h.x + h.dx * 2.5;
+  sim.monster.z = h.z + h.dz * 2.5;
+  sim.monster.mode = 'search';
+  for (let i = 0; i < 60; i++) sim.step({ run: true });
+  assert.equal(P.status, 'alive');
+  assert.ok(!(P.grabT > 0), 'souffle retenu : elle passe');
+  sim.step({ pick: true });
+  assert.equal(P.hidden, -1, 'F pour ressortir');
+});
+
+test('Level 1 : les fusibles se portent jusqu\'au panneau et tombent avec celui qui meurt', () => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 3, level: 1 });
+  const P = sim.player;
+  const f0 = sim.map.fuses[0];
+  P.x = f0.x;
+  P.z = f0.z;
+  sim.step();
+  assert.equal(P.carry.length, 1, 'le fusible est en poche');
+  sim.killPlayer(P);
+  assert.equal(P.carry.length, 0);
+  assert.equal(f0.taken, false, 'il est tombé par terre');
+  assert.equal(sim.fuses, 0);
 });
 
 test('grande carte : générée sans erreur pour 200 graines, sortie loin du départ', () => {
@@ -181,7 +275,7 @@ test('grande carte : générée sans erreur pour 200 graines, sortie loin du dé
   }
 });
 
-test("eau d'amande : remplit l'endurance", () => {
+test("eau d'amande : rend la moitié de l'endurance", () => {
   const m = createBackroomsMap(7);
   const sim = new BackroomsSim({ map: m, difficulty: 'peaceful' });
   sim.player.stamina = 10;
@@ -194,8 +288,9 @@ test("eau d'amande : remplit l'endurance", () => {
   assert.equal(b.taken, true);
   assert.deepEqual(sim.player.inv, ['bottle', null], "F : la bouteille va dans l'inventaire");
   assert.ok(sim.player.stamina < 100, "elle ne se boit pas toute seule");
+  const before = sim.player.stamina;
   sim.step({ useSel: true });
-  assert.equal(sim.player.stamina, 100, 'E : on boit la case choisie');
+  assert.ok(Math.abs(sim.player.stamina - Math.min(100, before + 50)) < 0.5, 'E : on boit la case choisie (+50)');
   assert.deepEqual(sim.player.inv, [null, null]);
   assert.ok(sim.drainEvents().some((e) => e.type === 'bottle'));
 });
@@ -396,6 +491,9 @@ test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui 
   sim.player.x = sim.map.exit.x;
   sim.player.z = sim.map.exit.z;
   sim.step();
+  assert.equal(sim.delivered, FUSES, 'les fusibles sont au panneau');
+  assert.equal(sim.powered, false, 'il faut encore relancer le monte-charge');
+  run(sim, PANEL_T + 0.2);
   assert.equal(sim.powered, true);
   assert.ok(sim.drainEvents().some((e) => e.type === 'powered'));
   const E = sim.map.elevator;
@@ -482,10 +580,10 @@ test("à plusieurs : qui entre dans l'ascenseur devient spectateur, il part quan
   assert.equal(a.status, 'elevator');
   assert.equal(sim.departT, 0, "il attend les autres");
   assert.notEqual(sim.viewPlayer(0).id, a.id, 'le spectateur suit un joueur encore dehors');
-  assert.ok(Math.abs(sim.rage - 1 / 3) < 1e-9, "l'entité s'énerve");
+  assert.ok(Math.abs(sim.rage - 1 / 2) < 1e-9, "l'entité s'énerve");
   b.x = E.x; b.z = E.z;
   sim.step();
-  assert.ok(Math.abs(sim.rage - 2 / 3) < 1e-9);
+  assert.ok(Math.abs(sim.rage - 1) < 1e-9, 'le dernier dehors : colère au maximum');
   assert.equal(sim.departT, 0);
   c.x = E.x; c.z = E.z;
   sim.step();
@@ -518,6 +616,7 @@ test("à plusieurs : un joueur attrapé devient spectateur, la partie continue ;
   sim.monster.x = a.x + 0.4;
   sim.monster.z = a.z;
   b.x = a.x + 30; // loin
+  a.grabs = 1; // déjà agrippé une fois : cette prise-ci est mortelle
   sim.step();
   assert.equal(a.status, 'dead');
   assert.equal(sim.state, 'playing', 'B joue encore');
@@ -1058,6 +1157,7 @@ test("l'entité se tapit dans le noir pour observer, fuit la lampe au début, et
       M.x = (c.x + 0.5) * CELL_SIZE;
       M.z = (c.z + 0.5) * CELL_SIZE;
       M.stalkT = 0;
+      M.dormantT = 0; // passé la première minute de calme
       for (let i = 0; i < 60 * 40 && M.mode !== 'watch'; i++) {
         sim.step();
         if (M.mode === 'chase') return;
@@ -1316,13 +1416,31 @@ test('Level 2 : une chèvre repère un joueur dans le noir, gratte le sol, fonce
   g.z = cellC(r.z);
   g.cool = 0;
   const acts = [];
-  for (let i = 0; i < 60 * 5 && P.status === 'alive'; i++) {
+  for (let i = 0; i < 60 * 5 && P.status === 'alive' && !(P.hurt > 0); i++) {
     sim.step();
-    for (const e of sim.drainEvents()) if (e.type === 'goat' || e.type === 'jumpscare') acts.push(e.act || e.type);
+    for (const e of sim.drainEvents()) if (e.type === 'goat' || e.type === 'jumpscare' || e.type === 'hurt') acts.push(e.act || e.type);
   }
   assert.ok(acts.includes('windup') && acts.includes('charge'), `elle prévient avant de charger (${acts.join(', ')})`);
   assert.ok(acts.indexOf('windup') < acts.indexOf('charge'));
-  assert.equal(P.status, 'dead', 'la charge tue');
+  assert.equal(P.status, 'alive', 'la première charge renverse');
+  assert.equal(P.hurt, 1);
+  assert.ok(acts.includes('hurt'));
+  // la seconde tue
+  P.hurtT = 0;
+  P.lockT = 0;
+  P.x = cellC(r.x0);
+  P.z = cellC(r.z);
+  g.x = cellC(r.x0 + 4);
+  g.z = cellC(r.z);
+  g.mode = 'roam';
+  g.cool = 0;
+  for (let i = 0; i < 60 * 8 && P.status === 'alive'; i++) {
+    sim.step();
+    for (const e of sim.drainEvents()) if (e.type === 'jumpscare') acts.push(e.type);
+    P.x = cellC(r.x0);
+    P.z = cellC(r.z);
+  }
+  assert.equal(P.status, 'dead', 'la seconde charge tue');
   assert.ok(acts.includes('jumpscare'));
 });
 
@@ -1476,6 +1594,7 @@ test('Level 2 : le bouc alpha ignore la lumière en fin de partie ; ébouillant�
   sim.map.goatLit[r.z * W + r.x0] = 1;
   sim.map.goatLit[r.z * W + r.x0 + 1] = 1;
   sim.valves = ALPHA_RAGE;
+  P.hurt = 1; // déjà renversé une fois : ce coup-ci est mortel
   g.x = cellC(r.x0 + 6);
   g.z = cellC(r.z);
   g.cool = 0;
@@ -1528,6 +1647,7 @@ test('Level 2 : tout le courant saute de temps en temps ; plus rien ne protège,
   g.z = sim.map.goatSpawn[0].z;
   run(sim, 1);
   assert.ok(isLitL2(sim.map, P.x, P.z), 'sous la lampe');
+  sim.director.calmT = 99; // un vrai moment de calme : la coupure peut tomber
   sim.nextBlackout = 0;
   sim.step();
   assert.ok(sim.blackout > 0 && sim.map.dark, 'le noir total');

@@ -106,6 +106,25 @@ function showGroup(g, on) {
   }
 }
 
+// Un seul moteur de rendu (un seul contexte WebGL) pour toute la session : chaque nouvel étage le réutilise. Avant,
+// chaque étage en créait un, et le navigateur finissait par perdre les plus anciens (écran noir au 4e niveau).
+let sharedRenderer = null;
+function getRenderer() {
+  if (!sharedRenderer) {
+    sharedRenderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+    sharedRenderer.setPixelRatio(1);
+  }
+  return sharedRenderer;
+}
+
+// Réglages d'image du joueur (view/../app.js) : champ de vision, mouvements de caméra, luminosité, flashs, qualité
+const OPTS = { fov: 72, motion: 1, brightness: 1, reduceFlashes: false, quality: 'auto' };
+let liveScene = null;
+export function setSceneOptions(o = {}) {
+  Object.assign(OPTS, o);
+  if (liveScene) liveScene.applyOptions();
+}
+
 // floors : les étages du niveau (une carte chacun)
 export function createBackroomsScene(container, floors) {
   if (!Array.isArray(floors)) floors = [floors];
@@ -119,11 +138,10 @@ export function createBackroomsScene(container, floors) {
   scene.background = new THREE.Color(L2 ? '#d3e4e2' : L1 ? '#06080a' : PIPES ? '#080604' : '#0d0b06');
   scene.fog = new THREE.FogExp2(L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#0a0705' : '#080604', L2 ? 0.022 : L1 ? 0.058 : PIPES ? 0.033 : 0.05);
 
-  const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.08, 90);
+  const camera = new THREE.PerspectiveCamera(OPTS.fov, window.innerWidth / window.innerHeight, 0.08, 90);
   camera.position.set(map0.spawn.x, 1.6, map0.spawn.z);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(1);
+  const renderer = getRenderer();
   renderer.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
   container.appendChild(renderer.domElement);
   const vhs = createVhsFilter(renderer);
@@ -263,7 +281,7 @@ export function createBackroomsScene(container, floors) {
       base.fill(0);
       baseB.fill(0);
       for (const l of map.lights) if (l.state === 'on') addPrint(chan(l) ? baseB : base, fpOf(l), 1);
-      flickers = map.lights.filter((l) => l.state === 'flicker').map((l) => ({ l, k: 1, fp: fpOf(l), ch: chan(l) }));
+      flickers = map.lights.filter((l) => l.state === 'flicker').map((l) => ({ l, k: 1, fp: fpOf(l), ch: chan(l), calm: Math.random() * 4, burst: 0 }));
     };
     sumLights();
     let lightGen = map.lightGen || 0;
@@ -930,15 +948,42 @@ float bkCaust(vec2 uv, float t) {
 
     // 6. Les cassettes VHS de cet étage
     const cassetteGeo = new THREE.BoxGeometry(0.38, 0.22, 0.06);
-    const cassetteMat = new THREE.MeshLambertMaterial({ map: textures.vhs, emissive: '#d97706', emissiveIntensity: 0.35 });
+    const cassetteMat = new THREE.MeshLambertMaterial({ map: textures.vhs, emissive: '#d97706', emissiveIntensity: 0.16 });
     const cassetteMeshes = [];
     for (const cas of map.cassettes || []) {
       const cg = new THREE.Group();
       cg.add(new THREE.Mesh(cassetteGeo, cassetteMat));
-      cg.add(new THREE.PointLight('#f5a524', 2.2, 5, 1.6));
+      cg.add(new THREE.PointLight('#f5a524', 1.1, 3.5, 1.8));
       cg.position.set(cas.x, cas.high ? NICHE_Y : 0.85, cas.z);
       group.add(cg);
       cassetteMeshes.push({ id: cas.id, cas, group: cg });
+    }
+
+    // 6a. Les casiers métalliques où l'on peut se cacher (Level 1, Tuyauteries)
+    if ((map.hides || []).length) {
+      const lockMat = baked(new THREE.MeshLambertMaterial({ color: PIPES ? '#6b6253' : '#55615a' }));
+      const slitMat = new THREE.MeshBasicMaterial({ color: '#070707' });
+      const body = new THREE.BoxGeometry(0.78, 1.95, 0.56);
+      const slit = new THREE.BoxGeometry(0.42, 0.025, 0.01);
+      const seam = new THREE.BoxGeometry(0.012, 1.85, 0.01);
+      for (const h of map.hides) {
+        const lg = new THREE.Group();
+        const b = new THREE.Mesh(body, lockMat);
+        b.position.y = 0.975;
+        lg.add(b);
+        // les fentes d'aération de la porte (on regarde dehors par là) et la jointure de la porte
+        for (let i = 0; i < 5; i++) {
+          const sl = new THREE.Mesh(slit, slitMat);
+          sl.position.set(0, 1.42 + i * 0.065, 0.285);
+          lg.add(sl);
+        }
+        const sm = new THREE.Mesh(seam, slitMat);
+        sm.position.set(0.36, 0.975, 0.285);
+        lg.add(sm);
+        lg.position.set(h.x, 0, h.z);
+        lg.rotation.y = h.ry;
+        group.add(lg);
+      }
     }
 
     // 6b. Le renfoncement dans le mur, la cassette posée dedans, et l'échelle une fois posée
@@ -998,7 +1043,7 @@ float bkCaust(vec2 uv, float t) {
       return g;
     };
     const cellMat = baked(new THREE.MeshLambertMaterial({ color: '#1d1d1d' }));
-    const capCopper = baked(new THREE.MeshLambertMaterial({ color: '#c98a2b', emissive: '#5a3a08', emissiveIntensity: 0.6 }));
+    const capCopper = baked(new THREE.MeshLambertMaterial({ color: '#c98a2b', emissive: '#5a3a08', emissiveIntensity: 0.3 }));
     const makeBattery = () => {
       const g = new THREE.Group();
       for (let i = 0; i < 2; i++) {
@@ -1113,9 +1158,9 @@ float bkCaust(vec2 uv, float t) {
 
     // 10. Fusibles (Level 1) : un gros fusible céramique aux bouts de cuivre, lueur ambrée
     const fuseMeshes = [];
-    const fuseBody = new THREE.MeshLambertMaterial({ color: '#efe9dc', emissive: '#4a3a20', emissiveIntensity: 0.5 });
-    const fuseCap = new THREE.MeshLambertMaterial({ color: '#c98a2b', emissive: '#7a4a10', emissiveIntensity: 0.7 });
-    const valveMat = new THREE.MeshLambertMaterial({ color: '#c0261d', emissive: '#4a0c08', emissiveIntensity: 0.6 });
+    const fuseBody = new THREE.MeshLambertMaterial({ color: '#efe9dc', emissive: '#4a3a20', emissiveIntensity: 0.22 });
+    const fuseCap = new THREE.MeshLambertMaterial({ color: '#c98a2b', emissive: '#7a4a10', emissiveIntensity: 0.32 });
+    const valveMat = new THREE.MeshLambertMaterial({ color: '#c0261d', emissive: '#4a0c08', emissiveIntensity: 0.3 });
     for (const f of map.fuses || []) {
       if (L2) {
         // un volant de vanne rouge : la jante, quatre rayons, le moyeu
@@ -1127,7 +1172,7 @@ float bkCaust(vec2 uv, float t) {
           g.add(spoke);
         }
         g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.06, 12).rotateX(Math.PI / 2), valveMat));
-        g.add(new THREE.PointLight('#ff5a3c', 1.6, 4, 1.6));
+        g.add(new THREE.PointLight('#ff5a3c', 0.9, 3, 1.8));
         g.position.set(f.x, 0.9, f.z);
         group.add(g);
         fuseMeshes.push({ f, g });
@@ -1141,7 +1186,7 @@ float bkCaust(vec2 uv, float t) {
       c1.position.x = 0.15;
       const c2 = c1.clone();
       c2.position.x = -0.15;
-      g.add(body, c1, c2, new THREE.PointLight('#ffb347', 2, 4.5, 1.6));
+      g.add(body, c1, c2, new THREE.PointLight('#ffb347', 1.1, 3.2, 1.8));
       g.position.set(f.x, 0.9, f.z);
       group.add(g);
       fuseMeshes.push({ f, g });
@@ -1361,14 +1406,24 @@ float bkCaust(vec2 uv, float t) {
           flickT = 1 / 15;
           let changed = false;
           for (const f of flickers) {
-            if (Math.random() < 0.12) {
-              const k = Math.random() < 0.45 ? 0 : 0.6 + Math.random() * 0.4;
-              if (k !== f.k) {
-                f.k = k;
-                f.l.k = k;
-                fixColor(f.l, k > 0);
-                changed = true;
+            // un tube fatigué : allumé longtemps, puis une rafale de claquements (0,2 à 0,9 s), parfois éteint un moment
+            let k = f.k;
+            if (f.burst > 0) {
+              f.burst -= 1 / 15;
+              k = Math.random() < 0.5 ? 0 : 0.55 + Math.random() * 0.45;
+              if (f.burst <= 0) {
+                f.calm = 1.2 + Math.random() * 5;
+                k = Math.random() < 0.18 ? 0 : 1; // parfois il reste éteint jusqu'à la prochaine rafale
               }
+            } else {
+              f.calm -= 1 / 15;
+              if (f.calm <= 0) f.burst = 0.2 + Math.random() * 0.7;
+            }
+            if (k !== f.k) {
+              f.k = k;
+              f.l.k = k;
+              fixColor(f.l, k > 0);
+              changed = true;
             }
           }
           if (changed) {
@@ -1543,6 +1598,17 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 
   monsterGroup.position.set(map0.monsterSpawn.x, 0, map0.monsterSpawn.z);
   scene.add(monsterGroup);
+  // l'événement rare : une silhouette immobile au bout du couloir, qui n'est plus là quand on s'approche
+  const figure = new THREE.Group();
+  const figMat = new THREE.MeshBasicMaterial({ color: '#030303', fog: true });
+  const fb = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 1.75, 10), figMat);
+  fb.position.y = 0.95;
+  const fh = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 10), figMat);
+  fh.position.y = 1.95;
+  figure.add(fb, fh);
+  figure.visible = false;
+  scene.add(figure);
+  let figT = 0;
   // Level 2 : pas d'entité, le troupeau de chèvres (view/goats.js)
   const goatHerd = PIPES ? createGoatHerd(scene) : null;
 
@@ -1558,13 +1624,22 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 
   let lastTime = 0;
   let bob = 0;
+  let crouchY = 0;
+  let grabYaw = 0;
   let eyeY = 1.6; // hauteur des yeux : elle suit les chutes, les escaliers et l'échelle
   let fallV = 0; // vitesse de chute de la caméra
   let landShake = 0; // le choc à l'arrivée d'une chute (1 : tout juste tombé)
   let exposure = 1.2; // exposition du caméscope : elle rattrape la lumière en une seconde environ
   let lightNow = 0.5; // lumière des néons là où l'on est (pour le grésillement)
 
-  return {
+  // effets de bande en cours (secondes restantes), jumpscare, résolution dynamique, mise au point
+  const fx = { splice: 0, loss: 0, bars: 0, grab: 0 };
+  let scareT = 0;
+  let frameAvg = 16;
+  let lines = 720;
+  let focusT = 0;
+  let lastExp = 1.2;
+  const api = {
     level: map0.level || 0,
     map: map0,
     floors,
@@ -1583,7 +1658,56 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 
     dispose() {
       window.removeEventListener('resize', onResize);
-      renderer.dispose();
+      if (liveScene === api) liveScene = null;
+      const seen = new Set();
+      scene.traverse((o) => {
+        if (o.geometry && !seen.has(o.geometry)) {
+          seen.add(o.geometry);
+          o.geometry.dispose();
+        }
+        for (const m of [].concat(o.material || [])) {
+          if (seen.has(m)) continue;
+          seen.add(m);
+          for (const k in m) if (m[k] && m[k].isTexture && !seen.has(m[k])) {
+            seen.add(m[k]);
+            m[k].dispose();
+          }
+          m.dispose();
+        }
+      });
+      vhs.dispose?.();
+      renderer.renderLists.dispose();
+      if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
+    },
+
+    // les réglages d'image du joueur
+    applyOptions() {
+      camera.fov = OPTS.fov;
+      camera.updateProjectionMatrix();
+      vhs.setFx?.({ brightness: OPTS.brightness, reduceFlashes: OPTS.reduceFlashes });
+      if (OPTS.quality !== 'auto') vhs.setQuality?.(OPTS.quality);
+    },
+
+    // un effet de bande passager : 'splice' (raccord), 'loss' (perte du signal), 'bars' (mire), 'grab' (la prise)
+    tape(kind, len = 1) {
+      fx[kind] = Math.max(fx[kind] || 0, len);
+    },
+
+    // L'entité surgit devant l'objectif (en 3D, dans la scène) pendant un instant
+    jumpscare() {
+      scareT = 1.1;
+    },
+
+    // la silhouette au bout du couloir (quelques secondes, ou jusqu'à ce qu'on s'en approche)
+    figure(x, z) {
+      figure.position.set(x, 0, z);
+      figure.visible = true;
+      figT = 7;
+    },
+
+    // pause : l'image se fige (sur la dernière trame)
+    freeze(on) {
+      vhs.setFx?.({ freeze: !!on });
     },
 
     // Rendu d'une frame
@@ -1609,27 +1733,45 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         }
       } else eyeY += (want - eyeY) * Math.min(1, dt * 10);
       landShake = Math.max(0, landShake - dt * 0.9);
-      const shake = landShake * landShake;
-      camera.position.set(P.x, eyeY + (P.moving ? Math.sin(bob * 2) * (P.running ? 0.05 : 0.025) : 0), P.z);
+      const mo = OPTS.motion; // 0 : caméra stable (réglage), 1 : caméra à l'épaule
+      const shake = landShake * landShake * Math.max(0.3, mo);
+      // accroupi, la caméra descend ; dans un casier, elle est fixe
+      crouchY += ((P.crouch ? -0.55 : 0) - crouchY) * Math.min(1, dt * 8);
+      const still = P.hidden >= 0;
+      camera.position.set(P.x, eyeY + crouchY + (P.moving && !still ? Math.sin(bob * 2) * (P.running ? 0.05 : 0.025) * mo : 0), P.z);
       camera.rotation.order = 'YXZ';
-      camera.rotation.y = P.yaw;
-      camera.rotation.x = P.pitch;
-      camera.rotation.z = (P.moving ? Math.sin(bob) * 0.006 : 0) - (P.tilt || 0) * 0.5 + shake * 0.35; // on tangue sur l'arête ; sonné après une chute
+      // agrippé : le regard est tiré vers l'entité
+      let yaw = P.yaw;
+      let pitch = P.pitch;
+      if (P.grabT > 0 && sim.monster) {
+        const M = sim.monster;
+        const a = Math.atan2(-(M.x - P.x), -(M.z - P.z));
+        let d = a - yaw;
+        while (d > Math.PI) d -= 2 * Math.PI;
+        while (d < -Math.PI) d += 2 * Math.PI;
+        grabYaw += (d - grabYaw) * Math.min(1, dt * 10);
+        yaw += grabYaw;
+        pitch = 0.12;
+      } else grabYaw *= Math.max(0, 1 - dt * 6);
+      camera.rotation.y = yaw;
+      camera.rotation.x = pitch;
+      camera.rotation.z = (P.moving ? Math.sin(bob) * 0.006 * mo : 0) - (P.tilt || 0) * 0.5 + shake * 0.35; // on tangue sur l'arête ; sonné après une chute
       camera.rotation.x += shake * (Math.sin(time * 31) * 0.05 - 0.35);
       camera.position.y -= shake * 0.9;
       // caméra tenue à la main : elle ne reste jamais tout à fait immobile, et tremble davantage en courant
-      const hand = (P.moving ? (P.running ? 2.4 : 1.4) : 1) * 0.0035;
+      const hand = (P.moving ? (P.running ? 2.4 : 1.4) : 1) * 0.0035 * mo * (P.grabT > 0 ? 4 : 1);
       camera.rotation.x += (Math.sin(time * 0.83) * 0.6 + Math.sin(time * 2.17 + 1.3) * 0.3 + Math.sin(time * 5.3) * 0.1) * hand;
       camera.rotation.y += (Math.sin(time * 0.61 + 2.1) * 0.6 + Math.sin(time * 1.73) * 0.3 + Math.sin(time * 4.7 + 0.4) * 0.1) * hand;
       camera.rotation.z += Math.sin(time * 0.47 + 0.7) * hand * 0.8;
 
       // tremblement quand l'entité est tout près
       const danger = sim.hasMonster ? sim.monster.danger : 0;
-      const calm = 1 - THREE.MathUtils.smoothstep(danger, 0.72, 0.92);
+      // tout près, le tremblement se calme un peu (on ne voit plus rien sinon) ; le filtre, lui, continue de monter
+      const calm = 1 - THREE.MathUtils.smoothstep(danger, 0.72, 0.92) * 0.6;
       if (danger > 0.3) {
-        const shake = (danger - 0.3) * 0.035 * calm;
-        camera.rotation.z += (Math.random() - 0.5) * shake;
-        camera.position.y += (Math.random() - 0.5) * shake;
+        const sh = (danger - 0.3) * 0.035 * calm * mo;
+        camera.rotation.z += (Math.random() - 0.5) * sh;
+        camera.position.y += (Math.random() - 0.5) * sh;
       }
 
       // allumer ou éteindre la lampe ne change pas le nombre de lumières (sinon tous les matériaux se recompilent)
@@ -1640,7 +1782,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       flashSpill.intensity = flashLight.intensity * 0.24;
 
       // les objets en main : la lampe dès qu'on l'a, l'objet de la case choisie s'il y en a un (pas l'échelle)
-      const alive = P.status === 'alive' && !P.onLadder;
+      const alive = P.status === 'alive' && !P.onLadder && !(P.hidden >= 0);
       const inHand = alive ? P.inv && P.inv[(P.sel || 1) - 1] : null;
       heldLamp.visible = alive && !!P.hasLamp;
       heldBottle.visible = inHand === 'bottle';
@@ -1689,10 +1831,32 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       } else {
         monsterGroup.visible = false;
       }
+      if (figT > 0) {
+        figT -= dt;
+        const d = Math.hypot(figure.position.x - P.x, figure.position.z - P.z);
+        // elle disparaît quand on s'approche… ou dès que la lampe la touche
+        const lit = lampOn && d < 22 && Math.abs(Math.atan2(-(figure.position.x - P.x), -(figure.position.z - P.z)) - P.yaw) % (2 * Math.PI) < 0.12;
+        if (figT <= 0 || d < 9 || lit) {
+          figT = 0;
+          figure.visible = false;
+        }
+      }
+      // le jumpscare : elle est là, devant l'objectif, qui tremble
+      if (scareT > 0 && !goatHerd) {
+        scareT -= dt;
+        const fx0 = -Math.sin(camera.rotation.y);
+        const fz0 = -Math.cos(camera.rotation.y);
+        const near = 0.55 + Math.max(0, scareT - 0.7) * 1.2;
+        monsterGroup.visible = true;
+        monsterGroup.position.set(camera.position.x + fx0 * near, camera.position.y - 2.05, camera.position.z + fz0 * near);
+        monsterGroup.rotation.y = Math.atan2(-fx0, -fz0);
+        camera.rotation.z += (Math.random() - 0.5) * 0.08 * Math.max(0.3, mo);
+        camera.rotation.x += (Math.random() - 0.5) * 0.05 * Math.max(0.3, mo);
+      }
 
       // 3. Les autres joueurs encore dehors
       for (const Q of sim.players) {
-        const show = Q !== P && Q.status === 'alive';
+        const show = Q !== P && Q.status === 'alive' && !(Q.hidden >= 0); // un coéquipier caché dans un casier ne se voit pas
         if (!show && !avatars.has(Q.id)) continue;
         const qv = floorViews[Q.floor || 0];
         const qm = sim.fm(Q.floor || 0);
@@ -1706,8 +1870,45 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       lightNow = fv ? fv.lightAt(P.x, P.z) : 0.5;
       const lightHere = lightNow + (lampOn ? 0.3 : 0);
       const wantExp = THREE.MathUtils.clamp(0.45 / (0.15 + lightHere), 0.9, 1.4);
-      exposure += (wantExp - exposure) * Math.min(1, dt * 1.1);
-      vhs.render(scene, camera, time, danger * calm, exposure);
+      // il s'ouvre lentement dans le noir, se referme vite sous la lumière (comme un vrai caméscope)
+      exposure += (wantExp - exposure) * Math.min(1, dt * (wantExp > exposure ? 0.65 : 2.4));
+      // la mise au point cherche un peu quand la lumière change d'un coup
+      if (Math.abs(exposure - lastExp) > dt * 0.25) focusT = Math.min(0.6, focusT + dt * 1.5);
+      lastExp = exposure;
+      focusT = Math.max(0, focusT - dt * 0.8);
+      // balance des blancs automatique : un peu bleue dans le noir, chaude sous les néons
+      const wb = THREE.MathUtils.clamp(lightHere, 0, 1);
+      const white = L2 ? [1, 1, 1] : [0.96 + wb * 0.06, 1, 1.07 - wb * 0.1];
+
+      // les effets de bande du moment : raccord, perte de signal (mort), mire, la prise de l'entité
+      for (const k in fx) fx[k] = Math.max(0, fx[k] - dt);
+      const grabbed = P.grabT > 0 && P.status === 'alive';
+      const dark = sim.blackout > 0;
+      vhs.setFx?.({
+        tracking: Math.min(1, (dark ? 0.25 : 0) + (grabbed ? 0.75 : 0) + Math.min(1, fx.grab) * 0.6 + (scareT > 0 ? 0.6 : 0)),
+        splice: Math.min(1, fx.splice * 1.5),
+        signalLoss: Math.min(1, fx.loss * 0.8),
+        bars: Math.min(1, fx.bars),
+        chroma: grabbed ? 0.6 : 0,
+        focus: Math.min(1, focusT + (grabbed ? 0.35 : 0)),
+        white,
+      });
+
+      // résolution dynamique : moins de lignes quand l'image peine, plus quand elle est à l'aise
+      frameAvg += (dt * 1000 - frameAvg) * 0.05;
+      if (OPTS.quality === 'auto' && vhs.setLines) {
+        if (frameAvg > 24 && lines > 360) lines -= 8;
+        else if (frameAvg < 15 && lines < 720) lines += 4;
+        vhs.setLines(lines);
+      }
+      vhs.render(scene, camera, time, danger, exposure);
     },
   };
+  liveScene = api;
+  api.applyOptions();
+  // les matériaux se compilent en arrière-plan avant la première image (sinon le jeu se fige au premier regard)
+  try {
+    renderer.compileAsync?.(scene, camera)?.catch?.(() => {});
+  } catch (e) {}
+  return api;
 }

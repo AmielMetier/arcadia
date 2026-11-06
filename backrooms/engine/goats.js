@@ -344,7 +344,8 @@ export function updateGoats(sim) {
   const lit = litCells(map);
   const A = sim.aggro;
   const rage = sim.rage;
-  const alive = sim.players.filter((P) => P.status === 'alive');
+  // les joueurs cachés dans un casier n'existent pas pour le troupeau
+  const alive = sim.players.filter((P) => P.status === 'alive' && !(P.hidden >= 0));
   const herd = sim.herd || (sim.herd = { goal: null, t: 0 });
 
   // le troupeau va paître d'un coin sombre à l'autre, de plus en plus souvent près des joueurs
@@ -533,16 +534,28 @@ export function updateGoats(sim) {
         }
       }
       // elle percute un joueur
+      // elle percute un joueur (un seul par charge) : le premier coup le renverse, le second est mortel (le bouc tue
+      // d'un coup en difficile)
       for (const P of alive) {
-        if (P.status !== 'alive' || (P.floor || 0) !== 0) continue;
+        if (P.status !== 'alive' || (P.floor || 0) !== 0 || P.hurtT > 0) continue;
         if (Math.hypot(P.x - g.x, P.z - g.z) > HIT_R * (g.alpha ? 1.15 : 1)) continue;
-        P.status = 'dead';
-        P.moving = false;
-        sim.emit({ type: 'jumpscare', x: g.x, z: g.z, id: P.id, goat: true });
-        sim.emit({ type: 'dead', id: P.id, name: P.name, time: sim.time });
+        if ((P.hurt || 0) >= 1 || (g.alpha && sim.difficulty === 'hard')) sim.killPlayer(P, { x: g.x, z: g.z, goat: true });
+        else {
+          P.hurt = (P.hurt || 0) + 1;
+          P.hurtT = 3;
+          P.lockT = 1.4;
+          P.running = false;
+          P.stamina = Math.max(0, P.stamina - 50);
+          // projeté dans le sens de la charge
+          const p = sim.moveWithCollisions(P.x, P.z, g.dirX * 1.2, g.dirZ * 1.2, 0.38, 0);
+          P.x = p.x;
+          P.z = p.z;
+          sim.emit({ type: 'hurt', id: P.id, name: P.name, x: g.x, z: g.z, goat: true });
+        }
         setMode(g, 'stalk');
         g.target = null;
         g.cool = 4;
+        break;
       }
     } else if (g.mode === 'stun') {
       if (g.t <= 0) {
