@@ -617,6 +617,476 @@ export class BackroomsSfx {
     osc.stop(t + 0.75);
   }
 
+  // --- Level 2 : le troupeau ---
+
+  // un bruit blanc d'une seconde, partagé
+  noise() {
+    if (!this.noiseBuf) {
+      const c = this.ctx;
+      this.noiseBuf = c.createBuffer(1, c.sampleRate, c.sampleRate);
+      const d = this.noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const n = this.ctx.createBufferSource();
+    n.buffer = this.noiseBuf;
+    n.loop = true;
+    return n;
+  }
+
+  // une rafale de bruit filtré (souffle, raclement, choc) : début t, durée, filtre, volume
+  burst(out, t, dur, type, freq, q, vol) {
+    const c = this.ctx;
+    const n = this.noise();
+    const f = c.createBiquadFilter();
+    f.type = type;
+    f.frequency.value = freq;
+    f.Q.value = q;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.02, dur * 0.2));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    n.connect(f).connect(g).connect(out);
+    n.start(t, Math.random() * 0.5);
+    n.stop(t + dur + 0.02);
+  }
+
+  // Bêlement : une voix nasale (dents de scie passées par les formants d'un « è ») qui chevrote, un peu rauque.
+  // kind : 'bleat' (au loin), 'spot' (elle t'a vu : plus fort, qui monte), 'flee' (cri aigu), 'hurt' (sonnée),
+  // 'scream' (collée à toi)
+  goatBleat(pos, kind = 'bleat') {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.01;
+    // bellow : le bouc alpha, grave et long, qui porte dans toutes les galeries
+    const dur = kind === 'bellow' ? 1.7 : kind === 'flee' ? 0.5 : kind === 'spot' ? 1.15 : kind === 'scream' ? 1.0 : kind === 'hurt' ? 0.45 : 0.75 + Math.random() * 0.45;
+    const f0 = (kind === 'bellow' ? 118 : kind === 'flee' ? 560 : kind === 'scream' ? 430 : kind === 'spot' ? 290 : kind === 'hurt' ? 360 : 250) * (0.88 + Math.random() * 0.24);
+    const vol = { bleat: 0.6, spot: 1.0, flee: 0.8, hurt: 0.7, scream: 2.0, bellow: 2.6 }[kind];
+    if (kind === 'bellow') pos = { ...pos, rolloff: 0.5, ref: 6 };
+    const out = this.at(pos, vol);
+    const osc = c.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(f0 * 0.9, t);
+    osc.frequency.linearRampToValueAtTime(f0 * (kind === 'spot' || kind === 'scream' ? 1.18 : 1.03), t + dur * 0.35);
+    osc.frequency.linearRampToValueAtTime(f0 * (kind === 'scream' ? 0.55 : 0.82), t + dur);
+    // le chevrotement : la voix tremble, en hauteur et en volume (15 à 22 fois par seconde)
+    const lfo = c.createOscillator();
+    lfo.frequency.value = 15 + Math.random() * 7;
+    const lf = c.createGain();
+    lf.gain.value = f0 * 0.07;
+    lfo.connect(lf).connect(osc.frequency);
+    const trem = c.createGain();
+    trem.gain.value = 0.55;
+    const la = c.createGain();
+    la.gain.value = 0.45;
+    lfo.connect(la).connect(trem.gain);
+    const mix = c.createGain();
+    for (const [f, q, g] of [[640, 5, 1], [1750, 7, 0.55], [2700, 9, 0.3]]) {
+      const bp = c.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = f * (kind === 'flee' ? 1.25 : kind === 'bellow' ? 0.62 : 1);
+      bp.Q.value = q;
+      const bg = c.createGain();
+      bg.gain.value = g * 2.2;
+      osc.connect(bp).connect(bg).connect(mix);
+    }
+    if (!this.rasp) {
+      this.rasp = new Float32Array(1024);
+      for (let i = 0; i < 1024; i++) this.rasp[i] = Math.tanh(((i / 1023) * 2 - 1) * 3.2);
+    }
+    const sh = c.createWaveShaper();
+    sh.curve = this.rasp;
+    const env = c.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(0.5, t + 0.05);
+    env.gain.setValueAtTime(0.5, t + dur * 0.7);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    mix.connect(sh).connect(trem).connect(env).connect(out);
+    osc.start(t);
+    lfo.start(t);
+    osc.stop(t + dur + 0.05);
+    lfo.stop(t + dur + 0.05);
+  }
+
+  // Avant la charge : elle souffle par les naseaux et racle le sol du sabot
+  goatSnort(pos) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = this.at(pos, 1);
+    this.burst(out, t, 0.22, 'bandpass', 900, 1.2, 0.5);
+    this.burst(out, t + 0.28, 0.18, 'bandpass', 1100, 1.2, 0.4);
+    for (const k of [0.15, 0.4, 0.62]) this.burst(out, t + k, 0.09, 'highpass', 2600, 0.8, 0.35);
+  }
+
+  // un sabot sur le carrelage : un claquement sec et un coup sourd
+  goatHoof(pos, vol = 1) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.005;
+    const out = this.at(pos, vol);
+    this.burst(out, t, 0.035, 'bandpass', 2100 + Math.random() * 600, 2.5, 0.6);
+    const o = c.createOscillator();
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(60, t + 0.06);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.35, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+    o.connect(g).connect(out);
+    o.start(t);
+    o.stop(t + 0.08);
+  }
+
+  // dans les gaines : des coups métalliques irréguliers et un raclement, étouffés par la tôle
+  goatVent(pos) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t0 = c.currentTime + 0.01;
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1500;
+    lp.connect(this.at(pos, 0.8));
+    this.burst(lp, t0, 1.4, 'bandpass', 1300, 2, 0.12);
+    let t = t0;
+    for (let i = 0; i < 6 + Math.floor(Math.random() * 5); i++) {
+      t += 0.08 + Math.random() * 0.2;
+      for (const [f, a] of [[290, 0.3], [830, 0.2], [1610, 0.12]]) {
+        const o = c.createOscillator();
+        o.frequency.value = f * (0.9 + Math.random() * 0.2);
+        const g = c.createGain();
+        g.gain.setValueAtTime(a, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+        o.connect(g).connect(lp);
+        o.start(t);
+        o.stop(t + 0.2);
+      }
+    }
+  }
+
+  // la charge finit dans le mur : un choc sourd, puis elle bêle, sonnée
+  goatCrash(pos) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.01;
+    const out = this.at(pos, 1.3);
+    const o = c.createOscillator();
+    o.frequency.setValueAtTime(110, t);
+    o.frequency.exponentialRampToValueAtTime(38, t + 0.3);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.9, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    o.connect(g).connect(out);
+    o.start(t);
+    o.stop(t + 0.4);
+    this.burst(out, t, 0.25, 'lowpass', 700, 0.7, 0.7);
+    setTimeout(() => this.goatBleat(pos, 'hurt'), 350);
+  }
+
+  // la cloche du bouc : un bronze fêlé (partiels inharmoniques), qui s'entend de loin
+  goatBell(pos, vol = 1) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.005;
+    const out = this.at({ ...pos, rolloff: 0.55, ref: 5 }, 0.55 * vol);
+    const f = 560 * (0.97 + Math.random() * 0.06);
+    for (const [m, g, d] of [[1, 1, 0.9], [2.32, 0.55, 0.6], [3.76, 0.35, 0.4], [5.4, 0.2, 0.25], [1.5, 0.25, 0.5]]) {
+      const o = c.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = f * m;
+      const e = c.createGain();
+      e.gain.setValueAtTime(0.0001, t);
+      e.gain.exponentialRampToValueAtTime(0.3 * g, t + 0.004);
+      e.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(e).connect(out);
+      o.start(t);
+      o.stop(t + d + 0.05);
+    }
+    this.burst(out, t, 0.04, 'bandpass', 3200, 2, 0.4); // le battant
+  }
+
+  // un secteur qui saute : des claquements électriques, puis le bourdonnement qui retombe
+  blowout(pos) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.01;
+    const out = this.at({ ...pos, rolloff: 0.6, ref: 6 }, 1.2);
+    for (let i = 0; i < 5; i++) this.burst(out, t + i * 0.09 + Math.random() * 0.05, 0.05, 'highpass', 2500, 0.8, 0.6);
+    this.burst(out, t + 0.45, 0.5, 'lowpass', 220, 0.8, 1.2);
+    const o = c.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(120, t);
+    o.frequency.exponentialRampToValueAtTime(30, t + 1.2);
+    const e = c.createGain();
+    e.gain.setValueAtTime(0.12, t);
+    e.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 600;
+    o.connect(lp).connect(e).connect(out);
+    o.start(t);
+    o.stop(t + 1.3);
+  }
+
+  // le levier du disjoncteur qui claque, puis les ballasts qui se rallument
+  breakerClunk(pos) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.01;
+    const out = this.at({ ...pos, rolloff: 0.7, ref: 4 }, 1.4);
+    this.burst(out, t, 0.12, 'lowpass', 400, 1, 1.4);
+    this.burst(out, t, 0.05, 'bandpass', 2400, 3, 0.6);
+    for (let i = 0; i < 4; i++) this.burst(out, t + 0.35 + i * 0.12, 0.04, 'bandpass', 4000, 4, 0.25);
+    const o = c.createOscillator();
+    o.type = 'square';
+    o.frequency.value = 100;
+    const e = c.createGain();
+    e.gain.setValueAtTime(0.0001, t + 0.3);
+    e.gain.exponentialRampToValueAtTime(0.05, t + 0.6);
+    e.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 500;
+    o.connect(lp).connect(e).connect(out);
+    o.start(t + 0.3);
+    o.stop(t + 1.9);
+  }
+
+  // brûlé par un jet de vapeur : le sifflement qui gicle et le cri étouffé
+  steamBurn(pos) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = this.at(pos, 1);
+    this.burst(out, t, 0.9, 'highpass', 2800, 0.7, 0.6);
+    this.burst(out, t, 0.35, 'bandpass', 600, 1.5, 0.5);
+  }
+
+  // L'écran de mort du Level 2, calé sur l'image qui monte (8 s) : un grondement sous les pieds, un chœur de chèvres qui
+  // hurlent au ralenti en accords faux (voix modulées en anneau, inhumaines), une plainte de métal qui grince, des
+  // chuchotements qui tournent autour de la tête, un cœur lourd. Tout enfle… et se tait d'un coup quand le texte
+  // apparaît. Dans le silence, tout près, un rire de bouc ralenti, qui s'éteint.
+  goatDeath() {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.03;
+    const CUT = 8.6;
+    // tout passe par un compresseur, coupé net à CUT
+    const comp = c.createDynamicsCompressor();
+    comp.threshold.value = -20;
+    comp.ratio.value = 6;
+    comp.attack.value = 0.01;
+    comp.release.value = 0.3;
+    const bus = c.createGain();
+    bus.gain.setValueAtTime(0.62, t);
+    bus.gain.setValueAtTime(0.62, t + CUT - 0.015);
+    bus.gain.linearRampToValueAtTime(0, t + CUT);
+    comp.connect(bus).connect(this.master);
+    const stop = (n, a = 0) => {
+      n.start(t + a);
+      n.stop(t + CUT + 0.1);
+      return n;
+    };
+    const osc = (type, f) => {
+      const o = c.createOscillator();
+      o.type = type;
+      o.frequency.value = f;
+      return o;
+    };
+    const gain = (v = 0) => {
+      const g = c.createGain();
+      g.gain.value = v;
+      return g;
+    };
+    const filt = (type, f, q = 1) => {
+      const b = c.createBiquadFilter();
+      b.type = type;
+      b.frequency.value = f;
+      b.Q.value = q;
+      return b;
+    };
+    const swell = (g, a, b, v, curve = 2) => {
+      // montée lente, de plus en plus raide
+      const pts = 24;
+      g.gain.setValueAtTime(0.0001, t + a);
+      for (let i = 1; i <= pts; i++) g.gain.linearRampToValueAtTime(v * Math.pow(i / pts, curve), t + a + ((b - a) * i) / pts);
+    };
+    if (!this.rasp) {
+      this.rasp = new Float32Array(1024);
+      for (let i = 0; i < 1024; i++) this.rasp[i] = Math.tanh(((i / 1023) * 2 - 1) * 3.2);
+    }
+    const shaper = () => {
+      const w = c.createWaveShaper();
+      w.curve = this.rasp;
+      return w;
+    };
+
+    // 1. le grondement : trois sons très graves qui battent entre eux, comme un moteur sous le sol
+    const rg = gain();
+    swell(rg, 0, CUT, 0.55, 1.4);
+    const rl = filt('lowpass', 110, 0.7);
+    rl.connect(rg).connect(comp);
+    for (const f of [29, 30.7, 43.6]) stop(osc('sawtooth', f)).connect(rl);
+
+    // 2. le chœur : six chèvres qui hurlent au ralenti, en grappe d'accords faux, chacune à sa place autour de toi.
+    // Leur bouche se referme lentement (« aa » vers « ou »), leur voix tremble et se modulent en anneau.
+    const cluster = [[185, -0.8], [196, 0.6], [262, -0.3], [277, 0.25], [370, 0.85], [392, -0.6]];
+    cluster.forEach(([f0, pan], i) => {
+      const o = stop(osc('sawtooth', f0));
+      o.frequency.setValueAtTime(f0, t);
+      o.frequency.linearRampToValueAtTime(f0 * (0.86 + Math.random() * 0.05), t + CUT);
+      const wob = stop(osc('sine', 4.5 + Math.random() * 2.5));
+      const wg = gain(f0 * 0.035);
+      wob.connect(wg).connect(o.frequency);
+      const drift = stop(osc('sine', 0.15 + Math.random() * 0.2));
+      const dg = gain(f0 * 0.04);
+      drift.connect(dg).connect(o.frequency);
+      const mouth = gain(1);
+      for (const [fa, fb, q, g] of [[820, 330, 6, 1], [1200, 870, 7, 0.6], [2800, 2300, 9, 0.3]]) {
+        const bp = filt('bandpass', fa, q);
+        bp.frequency.setValueAtTime(fa, t);
+        bp.frequency.linearRampToValueAtTime(fb, t + CUT);
+        const bg = gain(g * 3);
+        o.connect(bp).connect(bg).connect(mouth);
+      }
+      // modulation en anneau : la voix multipliée par un son grave, elle n'a plus rien d'animal
+      const ring = gain(0);
+      stop(osc('sine', 31 + i * 7.3)).connect(ring.gain);
+      const dry = gain(0.45);
+      const vg = gain();
+      swell(vg, 0.6 + i * 0.45, CUT, 0.085, 2.2);
+      const p = c.createStereoPanner();
+      p.pan.value = pan;
+      const sh = shaper();
+      mouth.connect(ring).connect(sh);
+      mouth.connect(dry).connect(sh);
+      sh.connect(vg).connect(p).connect(comp);
+    });
+
+    // 3. le métal qui grince : un souffle dans un filtre très étroit qui glisse, renvoyé par un écho très court
+    const n = stop(this.noise(), 0);
+    const bp = filt('bandpass', 1900, 38);
+    bp.frequency.setValueAtTime(1900, t + 2);
+    bp.frequency.linearRampToValueAtTime(3400, t + CUT);
+    const sweep = stop(osc('sine', 0.37));
+    const sweepG = gain(260);
+    sweep.connect(sweepG).connect(bp.frequency);
+    const comb = c.createDelay(0.05);
+    comb.delayTime.value = 0.0029;
+    const fb = gain(0.82);
+    const mg = gain();
+    swell(mg, 2.2, CUT, 0.5, 2.6);
+    n.connect(bp).connect(comb).connect(fb).connect(comb);
+    comb.connect(mg).connect(comp);
+
+    // 4. des chuchotements : des syllabes de souffle (formants qui sautent d'une voyelle à l'autre) qui passent d'une
+    // oreille à l'autre
+    const wn = stop(this.noise(), 0);
+    const wm = gain(1);
+    const vowels = [[300, 870, 2240], [730, 1090, 2440], [270, 2290, 3010], [570, 840, 2410], [440, 1020, 2240]];
+    const forms = [0, 1, 2].map((k) => {
+      const b = filt('bandpass', vowels[0][k], 9);
+      const g = gain([1, 0.7, 0.4][k] * 4);
+      wn.connect(b).connect(g).connect(wm);
+      return b;
+    });
+    const gate = gain(0);
+    const wp = c.createStereoPanner();
+    const ww = gain();
+    swell(ww, 1.5, CUT, 0.9, 1.2);
+    wm.connect(gate).connect(wp).connect(ww).connect(comp);
+    for (let k = 1.5; k < CUT - 0.1; ) {
+      const len = 0.08 + Math.random() * 0.22;
+      const v = vowels[Math.floor(Math.random() * vowels.length)];
+      forms.forEach((b, j) => b.frequency.setTargetAtTime(v[j] * (0.9 + Math.random() * 0.2), t + k, 0.02));
+      gate.gain.setTargetAtTime(0.7 + Math.random() * 0.3, t + k, 0.015);
+      gate.gain.setTargetAtTime(0, t + k + len, 0.03);
+      wp.pan.setTargetAtTime(Math.sin(k * 1.7) * 0.95, t + k, 0.2);
+      k += len + (Math.random() < 0.3 ? 0.35 + Math.random() * 0.5 : 0.04 + Math.random() * 0.1);
+    }
+
+    // 5. le cœur : lourd, et qui ralentit au lieu d'accélérer
+    let bt = 0.3;
+    let gap = 0.95;
+    while (bt < CUT - 0.3) {
+      for (const [dt, v] of [[0, 1], [0.2, 0.7]]) {
+        const o = osc('sine', 58);
+        o.frequency.setValueAtTime(58, t + bt + dt);
+        o.frequency.exponentialRampToValueAtTime(34, t + bt + dt + 0.18);
+        const g = gain();
+        g.gain.setValueAtTime(0.0001, t + bt + dt);
+        g.gain.exponentialRampToValueAtTime(v * 0.5, t + bt + dt + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + bt + dt + 0.22);
+        o.connect(g).connect(comp);
+        o.start(t + bt + dt);
+        o.stop(t + bt + dt + 0.25);
+      }
+      bt += gap;
+      gap *= 1.07;
+    }
+
+    // 6. dans le silence, tout près et sans écho : un rire de bouc ralenti (une voix hachée « ha… ha… ha »), qui
+    // descend et s'éteint
+    const T2 = t + CUT + 0.9;
+    const L = 3.6;
+    const late = gain(1);
+    late.connect(this.master);
+    const vo = osc('sawtooth', 120);
+    vo.frequency.setValueAtTime(120, T2);
+    vo.frequency.exponentialRampToValueAtTime(58, T2 + L);
+    const vib = osc('sine', 6);
+    const vibG = gain(5);
+    vib.connect(vibG).connect(vo.frequency);
+    const lm = gain(1);
+    for (const [f, q, g] of [[700, 6, 1], [1150, 7, 0.55], [2500, 9, 0.25]]) {
+      const b = filt('bandpass', f, q);
+      b.frequency.setValueAtTime(f, T2);
+      b.frequency.exponentialRampToValueAtTime(f * 0.7, T2 + L);
+      const bg = gain(g * 3);
+      vo.connect(b).connect(bg).connect(lm);
+    }
+    // le hachage du rire : de 4,5 à 1,6 coups par seconde
+    const chop = gain(0);
+    const lfo = osc('sine', 4.5);
+    lfo.frequency.setValueAtTime(4.5, T2);
+    lfo.frequency.exponentialRampToValueAtTime(1.6, T2 + L);
+    const lfoSq = c.createWaveShaper();
+    const sq = new Float32Array(256);
+    for (let i = 0; i < 256; i++) sq[i] = Math.max(0, Math.tanh(((i / 255) * 2 - 1) * 6));
+    lfoSq.curve = sq;
+    lfo.connect(lfoSq).connect(chop.gain);
+    const lg = gain();
+    lg.gain.setValueAtTime(0.0001, T2);
+    lg.gain.exponentialRampToValueAtTime(0.6, T2 + 0.08);
+    lg.gain.setValueAtTime(0.6, T2 + L * 0.6);
+    lg.gain.exponentialRampToValueAtTime(0.0001, T2 + L);
+    const lsh = shaper();
+    lm.connect(chop).connect(lsh).connect(lg).connect(late);
+    for (const o of [vo, vib, lfo]) {
+      o.start(T2);
+      o.stop(T2 + L + 0.1);
+    }
+    // et, très bas, le souffle de la bande qui continue
+    const hiss = this.noise();
+    const hf = filt('highpass', 2500);
+    const hg = gain();
+    hg.gain.setValueAtTime(0.0001, t + CUT + 0.3);
+    hg.gain.linearRampToValueAtTime(0.025, t + CUT + 1.5);
+    hg.gain.linearRampToValueAtTime(0.0001, T2 + L + 2);
+    hiss.connect(hf).connect(hg).connect(late);
+    hiss.start(t + CUT + 0.3);
+    hiss.stop(T2 + L + 2.1);
+    if (this.monsterGain) this.monsterGain.gain.setValueAtTime(0.0001, t);
+  }
+
+  // percuté : le cri de la chèvre collé à toi et le choc
+  goatJumpscare() {
+    if (!this.unlocked || !this.ctx) return;
+    const e = this.ear || { x: 0, z: 0, yaw: 0 };
+    const pos = { x: e.x - Math.sin(e.yaw) * 0.5, z: e.z - Math.cos(e.yaw) * 0.5 };
+    this.goatBleat(pos, 'scream');
+    const t = this.ctx.currentTime + 0.01;
+    this.burst(this.out, t, 0.45, 'lowpass', 900, 0.7, 1.2);
+    this.burst(this.out, t, 0.3, 'highpass', 1500, 0.7, 0.5);
+    if (this.monsterGain) this.monsterGain.gain.setValueAtTime(0.0001, t);
+  }
+
   // Gorgée d'eau d'amande
   bottle() {
     if (!this.unlocked || !this.ctx) return;

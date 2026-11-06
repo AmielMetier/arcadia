@@ -407,7 +407,7 @@ test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui 
   assert.equal(sim.level, 2, 'on arrive aux Poolrooms');
   assert.ok(sim.drainEvents().some((e) => e.type === 'level' && e.level === 2));
   // les 3 volants de vanne ouvrent les toboggans ; on se glisse dans l'un d'eux : la partie est gagnée
-  const sl = sim.map.slides[1];
+  const sl = sim.map.slides[0];
   sim.player.x = sl.x - sl.dx * 0.6;
   sim.player.z = sl.z - sl.dz * 0.6;
   sim.step();
@@ -423,9 +423,9 @@ test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui 
   sim.player.z = sl.z - sl.dz * 0.6;
   sim.step();
   assert.equal(sim.player.status, 'elevator');
-  assert.equal(sim.slide, 1, 'le toboggan jaune est pris');
+  assert.equal(sim.slide, 0, 'le toboggan rouge est pris');
   run(sim, DEPART_T + 0.2);
-  assert.equal(sim.state, 'won', 'le toboggan sort des Poolrooms : partie gagnée');
+  assert.equal(sim.state, 'won', 'le toboggan rouge sort des Poolrooms : partie gagnée');
 });
 
 test('Level 1 : coupures de courant de 15 à 20 s', () => {
@@ -1185,6 +1185,28 @@ test('Level 37 : le premier qui prend un toboggan choisit la couleur, les autres
   assert.equal(sim.state, 'won');
 });
 
+test('Level 37 : le toboggan jaune descend aux Tuyauteries (Level 2), le dernier niveau', () => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 12, level: 2 });
+  for (const f of sim.map.fuses) {
+    sim.player.x = f.x;
+    sim.player.z = f.z;
+    sim.step();
+  }
+  const yellow = sim.map.slides.find((x) => x.color === 'yellow');
+  assert.equal(yellow.to, PIPES_LEVEL);
+  sim.player.x = yellow.x - yellow.dx * 0.6;
+  sim.player.z = yellow.z - yellow.dz * 0.6;
+  sim.step();
+  assert.equal(sim.player.status, 'elevator');
+  sim.drainEvents();
+  run(sim, DEPART_T + 0.2);
+  assert.equal(sim.state, 'playing', 'pas encore gagné : il reste les Tuyauteries');
+  assert.equal(sim.level, PIPES_LEVEL);
+  assert.ok(sim.drainEvents().some((e) => e.type === 'level' && e.level === PIPES_LEVEL));
+  assert.equal(sim.map.valves.length, 4, 'les 4 vannes des galeries');
+  assert.equal(sim.slide, -1, "plus de toboggan : l'ascenseur de service est la sortie");
+});
+
 test('objectifs écartés : cassettes et fusibles loin les uns des autres (en marche)', () => {
   const minPath = (m, pts) => {
     let mn = Infinity;
@@ -1226,6 +1248,318 @@ test('Level 37 : on traverse chaque porte en marchant, les cloisons arrêtent le
     }
   }
   assert.ok(crossed > 60);
+});
+
+// --- Level 2 : les galeries, les halles et le troupeau ---
+import { createPipesMap, Z as Z2, PIPES_LEVEL } from '../backrooms/engine/level2.js';
+import { GOAT_MODES, ALPHA_RAGE, ALPHA_TAME, isLit as isLitL2 } from '../backrooms/engine/goats.js';
+import { BREAKER_T, BLOW_DELAY, VALVE_T } from '../backrooms/engine/sim.js';
+
+// un bout de galerie droite de n cases, sans grille, jet, renfoncement ni objet : { x0, z } (le long de x) ou null
+const straightRun = (m, n) => {
+  const free = (x, z) => m.grid[z * m.W + x] === T.FLOOR && m.zone[z * m.W + x] !== Z2.HALL && !(m.jetAt && m.jetAt(x, z)) && !m.props.some((p) => !p.walk && Math.hypot(p.x - (x + 0.5) * CELL_SIZE, p.z - (z + 0.5) * CELL_SIZE) < 1.6);
+  for (let z = 2; z < m.H - 2; z++) {
+    for (let x = 2; x + n < m.W - 2; x++) {
+      let ok = true;
+      for (let k = 0; k < n && ok; k++) ok = free(x + k, z) && m.isWall(x + k, z - 1) && m.isWall(x + k, z + 1);
+      if (ok && m.isWall(x - 1, z) === false) return { x0: x, z };
+    }
+  }
+  return null;
+};
+const level2 = (opts = {}) => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 31, level: PIPES_LEVEL, ...opts });
+  sim.map.goatLit = new Uint8Array(sim.map.W * sim.map.H); // tout dans le noir (les tests allument ce qu'il faut)
+  return sim;
+};
+const cellC = (v) => (v + 0.5) * CELL_SIZE;
+
+test('Level 2 : grandes halles à piliers, cuves, bergerie, renfoncements ; tout est relié', () => {
+  for (const seed of [13603, 106, 491, 5, 77, 1000, 31337, 2024]) {
+    const m = createPipesMap(seed);
+    assert.ok(m.halls.length >= 1, 'au moins une grande halle');
+    const big = m.halls.reduce((b, h) => ((h.x1 - h.x0 + 1) * (h.z1 - h.z0 + 1) > (b.x1 - b.x0 + 1) * (b.z1 - b.z0 + 1) ? h : b));
+    assert.ok((big.x1 - big.x0 + 1) * (big.z1 - big.z0 + 1) >= 60, `une halle d'au moins 60 cases (${seed})`);
+    assert.ok(m.den, 'une bergerie');
+    let pillars = 0;
+    for (let z = 0; z < m.H; z++) for (let x = 0; x < m.W; x++) if (m.pillarAt(x, z)) pillars++;
+    assert.ok(pillars >= 4, 'des piliers de béton');
+    for (const t of m.tanks) assert.equal(m.grid[t.gz * m.W + t.gx], T.MACHINE, 'une cuve occupe ses cases');
+    assert.ok(m.niches.length >= 8, 'des renfoncements le long des galeries');
+    for (const n of m.niches) assert.equal([[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => !m.isWall(n.gx + dx, n.gz + dz)).length, 1, 'un renfoncement est un cul-de-sac');
+    const d = bfs(m.grid, m.W, m.H, m.spawn.gx, m.spawn.gz);
+    for (const c of m.walkable) assert.ok(d[c.z * m.W + c.x] >= 0, `case (${c.x}, ${c.z}) isolée (${seed})`);
+    for (const v of m.valves) assert.ok(d[v.gz * m.W + v.gx] >= 0, 'vanne atteignable');
+    assert.ok(m.goatSpawn.every((g) => g.gx >= m.den.x0 && g.gx <= m.den.x1 && g.gz >= m.den.z0 && g.gz <= m.den.z1), 'le troupeau part de la bergerie');
+  }
+});
+
+test('Level 2 : le troupeau remplace l\'entité (pas de chèvres en mode paisible)', () => {
+  const sim = level2({ players: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }] });
+  assert.equal(sim.goats.length, 4, '2 de plus que de joueurs');
+  assert.equal(new BackroomsSim({ difficulty: 'hard', seed: 31, level: PIPES_LEVEL }).goats.length, 4, 'au moins 3, une de plus en difficile');
+  assert.equal(new BackroomsSim({ difficulty: 'peaceful', seed: 31, level: PIPES_LEVEL }).goats, null);
+  assert.equal(new BackroomsSim({ difficulty: 'normal', seed: 31, level: 1 }).goats, null, "l'entrepôt garde son entité");
+});
+
+test('Level 2 : une chèvre repère un joueur dans le noir, gratte le sol, fonce et le percute', () => {
+  const sim = level2();
+  const r = straightRun(sim.map, 9);
+  assert.ok(r, 'une galerie droite');
+  const P = sim.player;
+  P.x = cellC(r.x0);
+  P.z = cellC(r.z);
+  P.flashlight = false;
+  const g = sim.goats[0];
+  sim.goats = [g];
+  g.x = cellC(r.x0 + 4);
+  g.z = cellC(r.z);
+  g.cool = 0;
+  const acts = [];
+  for (let i = 0; i < 60 * 5 && P.status === 'alive'; i++) {
+    sim.step();
+    for (const e of sim.drainEvents()) if (e.type === 'goat' || e.type === 'jumpscare') acts.push(e.act || e.type);
+  }
+  assert.ok(acts.includes('windup') && acts.includes('charge'), `elle prévient avant de charger (${acts.join(', ')})`);
+  assert.ok(acts.indexOf('windup') < acts.indexOf('charge'));
+  assert.equal(P.status, 'dead', 'la charge tue');
+  assert.ok(acts.includes('jumpscare'));
+});
+
+test('Level 2 : la lampe braquée sur une chèvre la fait détaler, même en pleine charge', () => {
+  for (const charging of [false, true]) {
+    const sim = level2();
+    const r = straightRun(sim.map, 9);
+    const P = sim.player;
+    P.x = cellC(r.x0);
+    P.z = cellC(r.z);
+    const g = sim.goats[0];
+    sim.goats = [g];
+    g.x = cellC(r.x0 + 5);
+    g.z = cellC(r.z);
+    P.yaw = Math.atan2(-(g.x - P.x), -(g.z - P.z)); // on la regarde
+    P.flashlight = true;
+    if (charging) {
+      g.mode = 'charge';
+      g.dirX = -1;
+      g.dirZ = 0;
+      g.speed = 6;
+      g.maxRun = 20;
+    }
+    const d0 = Math.hypot(g.x - P.x, g.z - P.z);
+    let fled = false;
+    for (let i = 0; i < 60 * 2; i++) {
+      sim.step();
+      if (sim.drainEvents().some((e) => e.type === 'goat' && e.act === 'flee')) fled = true;
+    }
+    assert.ok(fled, 'elle fuit la lumière');
+    assert.equal(P.status, 'alive');
+    assert.ok(Math.hypot(g.x - P.x, g.z - P.z) > d0, 'elle s\'éloigne');
+  }
+});
+
+test("Level 2 : sous une lampe allumée, on est à l'abri ; une charge manquée finit contre un mur", () => {
+  const sim = level2();
+  const r = straightRun(sim.map, 9);
+  const P = sim.player;
+  P.flashlight = false;
+  P.x = cellC(r.x0);
+  P.z = cellC(r.z);
+  // la case du joueur est éclairée : la chèvre s'arrête au bord de l'ombre et attend
+  const W = sim.map.W;
+  sim.map.goatLit[r.z * W + r.x0] = 1;
+  sim.map.goatLit[r.z * W + r.x0 + 1] = 1;
+  const g = sim.goats[0];
+  sim.goats = [g];
+  g.x = cellC(r.x0 + 6);
+  g.z = cellC(r.z);
+  g.cool = 0;
+  run(sim, 6);
+  assert.equal(P.status, 'alive', 'à l\'abri sous la lampe');
+  assert.ok(g.x > (r.x0 + 2) * CELL_SIZE - 0.01, 'elle n\'entre pas dans la lumière');
+  assert.ok(['lurk', 'stalk'].includes(g.mode), `elle attend au bord de l'ombre (${g.mode})`);
+  // lancée droit sur un mur : elle s'assomme
+  sim.map.goatLit.fill(0);
+  P.x = P.z = -50;
+  g.mode = 'charge';
+  g.x = cellC(r.x0 + 4);
+  g.dirX = 0;
+  g.dirZ = 1; // en travers de la galerie : le mur est à un mètre
+  g.speed = 6;
+  g.maxRun = 30;
+  g.target = null;
+  let crash = false;
+  for (let i = 0; i < 60 && !crash; i++) {
+    sim.step();
+    crash = sim.drainEvents().some((e) => e.type === 'goat' && e.act === 'crash');
+  }
+  assert.ok(crash, 'contre le mur');
+  assert.equal(g.mode, 'stun');
+});
+
+test('Level 2 : un disjoncteur par secteur, atteignable ; le départ et l\'ascenseur sur leur propre circuit', () => {
+  for (const seed of [13603, 106, 491, 5, 77, 1000, 31337, 2024]) {
+    const m = createPipesMap(seed);
+    assert.equal(m.breakers.length, 4, `4 disjoncteurs (${seed})`);
+    assert.deepEqual(m.breakers.map((b) => b.sector).sort(), [0, 1, 2, 3], 'un par secteur');
+    const d = bfs(m.grid, m.W, m.H, m.spawn.gx, m.spawn.gz);
+    for (const b of m.breakers) {
+      assert.ok(d[b.gz * m.W + b.gx] >= 0, 'disjoncteur atteignable');
+      assert.ok(m.isWall(b.gx + b.dx, b.gz + b.dz), 'fixé à un mur');
+    }
+    for (const l of m.lights) {
+      assert.ok(l.sector >= -1 && l.sector < 4);
+      if (Math.abs(l.gx - m.spawn.gx) + Math.abs(l.gz - m.spawn.gz) <= 2) assert.equal(l.sector, -1, 'le départ ne s\'éteint jamais');
+    }
+    for (let i = 0; i < 4; i++) assert.ok(m.lights.some((l) => l.sector === i && l.state === 'on'), `des néons allumés dans le secteur ${i}`);
+  }
+});
+
+test('Level 2 : une vanne fermée fait sauter les néons de son secteur ; le disjoncteur les rallume', () => {
+  const players = [{ id: 1, name: 'Hôte' }, { id: 2, name: 'Invité' }];
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 31, players, localId: 1, level: PIPES_LEVEL });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 31, players, localId: 2, level: PIPES_LEVEL });
+  const P = sim.player;
+  const v = sim.map.valves[1];
+  const mine = sim.map.lights.filter((l) => l.sector === 1 && l.base === 'on');
+  const others = sim.map.lights.filter((l) => l.sector !== 1);
+  const before = others.map((l) => l.state);
+  assert.ok(mine.length > 2);
+  P.x = v.sx;
+  P.z = v.sz;
+  const ev = [];
+  const go = (sec) => {
+    for (let i = 0; i < sec * 60; i++) {
+      sim.step();
+      ev.push(...sim.drainEvents().map((e) => e.type));
+    }
+  };
+  go(VALVE_T + 0.2);
+  assert.ok(v.closed && sim.valves === 1, 'vanne fermée');
+  assert.ok(mine.every((l) => l.state === 'flicker'), 'les néons grésillent');
+  const gen = sim.map.lightGen;
+  go(BLOW_DELAY + 0.1);
+  assert.ok(ev.includes('blowout'));
+  assert.ok(mine.every((l) => l.state === 'off'), 'puis sautent');
+  assert.ok(sim.map.lightGen > gen, "l'image relit l'éclairage");
+  assert.deepEqual(others.map((l) => l.state), before, 'les autres secteurs ne bougent pas');
+  guest.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
+  assert.ok(guest.map.lights.filter((l) => l.sector === 1 && l.base === 'on').every((l) => l.state === 'off'), "chez l'invité aussi");
+  // le disjoncteur d'un autre secteur ne sert à rien
+  const b0 = sim.map.breakers.find((b) => b.sector === 0);
+  P.x = b0.sx;
+  P.z = b0.sz;
+  go(BREAKER_T + 0.5);
+  assert.ok(!b0.done, 'rien à réarmer');
+  const b = sim.map.breakers.find((q) => q.sector === 1);
+  P.x = b.sx;
+  P.z = b.sz;
+  go(BREAKER_T + 0.2);
+  assert.ok(b.done && ev.includes('breaker'), 'réarmé');
+  assert.ok(mine.every((l) => l.state === 'on'), 'le secteur se rallume');
+  guest.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
+  assert.ok(guest.map.lights.filter((l) => l.sector === 1 && l.base === 'on').every((l) => l.state === 'on'));
+  assert.ok(guest.map.breakers.find((q) => q.sector === 1).done);
+});
+
+test('Level 2 : le bouc alpha ignore la lumière en fin de partie ; ébouillanté, il file à la bergerie', () => {
+  const sim = level2();
+  const r = straightRun(sim.map, 9);
+  const P = sim.player;
+  const g = sim.goats[0];
+  assert.ok(g.alpha && !sim.goats[1].alpha, 'un seul bouc');
+  sim.goats = [g];
+  P.flashlight = false;
+  P.x = cellC(r.x0);
+  P.z = cellC(r.z);
+  const W = sim.map.W;
+  sim.map.goatLit[r.z * W + r.x0] = 1;
+  sim.map.goatLit[r.z * W + r.x0 + 1] = 1;
+  sim.valves = ALPHA_RAGE;
+  g.x = cellC(r.x0 + 6);
+  g.z = cellC(r.z);
+  g.cool = 0;
+  const acts = [];
+  for (let i = 0; i < 60 * 6 && P.status === 'alive'; i++) {
+    sim.step();
+    for (const e of sim.drainEvents()) if (e.type === 'goat') acts.push(e.act);
+  }
+  assert.ok(acts.includes('rage'), 'il se fâche');
+  assert.equal(P.status, 'dead', 'la lumière ne le retient plus');
+  // ébouillanté par un jet qui crache, en pleine charge (le joueur revient, loin)
+  P.status = 'alive';
+  sim.state = 'playing';
+  P.x = P.z = -50;
+  const j = sim.map.jets[0];
+  sim.jetOn = (q) => (q === j ? 2 : 0);
+  const [ax, az] = j.axis === 'x' ? [1, 0] : [0, 1];
+  g.mode = 'charge';
+  g.x = j.x - ax * 2.2;
+  g.z = j.z - az * 2.2;
+  g.dirX = ax;
+  g.dirZ = az;
+  g.speed = 6;
+  g.maxRun = 30;
+  g.target = null;
+  let scald = false;
+  for (let i = 0; i < 60 && !scald; i++) {
+    sim.step();
+    scald = sim.drainEvents().some((e) => e.type === 'goat' && e.act === 'scald');
+  }
+  assert.ok(scald, 'ébouillanté');
+  assert.equal(g.mode, 'flee');
+  assert.ok(g.tameT > ALPHA_TAME - 1 && !g.rage, 'il craint de nouveau la lumière');
+  const den = sim.map.goatSpawn[0];
+  assert.ok(Math.hypot(g.goal.x - den.x, g.goal.z - den.z) < 0.1, 'il file à la bergerie');
+});
+
+test('Level 2 : tout le courant saute de temps en temps ; plus rien ne protège, le troupeau attaque', () => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 31, level: PIPES_LEVEL });
+  assert.ok(sim.nextBlackout > 40 && sim.nextBlackout < 200, 'une coupure viendra');
+  assert.equal(new BackroomsSim({ difficulty: 'peaceful', seed: 31, level: PIPES_LEVEL }).nextBlackout, Infinity, 'pas en mode paisible');
+  const P = sim.player;
+  const lamp = sim.map.lights.find((l) => l.state === 'on' && l.sector === -1);
+  P.x = (lamp.gx + 0.5) * CELL_SIZE;
+  P.z = (lamp.gz + 0.5) * CELL_SIZE;
+  P.flashlight = false;
+  const g = sim.goats[1];
+  sim.goats = [g];
+  g.x = sim.map.goatSpawn[0].x;
+  g.z = sim.map.goatSpawn[0].z;
+  run(sim, 1);
+  assert.ok(isLitL2(sim.map, P.x, P.z), 'sous la lampe');
+  sim.nextBlackout = 0;
+  sim.step();
+  assert.ok(sim.blackout > 0 && sim.map.dark, 'le noir total');
+  assert.ok(!isLitL2(sim.map, P.x, P.z), 'plus aucune lampe ne protège');
+  run(sim, 0.5);
+  assert.equal(g.mode, 'stalk');
+  assert.equal(g.target, P.id, 'elle vient droit sur le joueur, même sans le voir');
+  const guest = new BackroomsSim({ difficulty: 'normal', seed: 31, level: PIPES_LEVEL, players: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }], localId: 2 });
+  guest.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
+  assert.ok(guest.blackout > 0 && guest.map.dark, "chez l'invité aussi");
+  sim.blackout = DT / 2;
+  sim.step();
+  assert.ok(!sim.map.dark && isLitL2(sim.map, P.x, P.z), 'le courant revient');
+});
+
+test("réseau : l'invité voit le troupeau et l'entend approcher", () => {
+  const players = [{ id: 1, name: 'Hôte' }, { id: 2, name: 'Invité' }];
+  const host = new BackroomsSim({ difficulty: 'normal', seed: 31, players, localId: 1, level: PIPES_LEVEL });
+  const guest = new BackroomsSim({ difficulty: 'normal', seed: 31, players, localId: 2, level: PIPES_LEVEL });
+  run(host, 2);
+  const g = host.goats[1];
+  const me = host.players.find((p) => p.id === 2);
+  g.x = me.x + 3;
+  g.z = me.z;
+  g.mode = 'windup';
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  assert.equal(guest.goats.length, host.goats.length);
+  assert.deepEqual(guest.goats.map((q) => [q.x, q.z]), host.goats.map((q) => [Math.round(q.x * 100) / 100, Math.round(q.z * 100) / 100]));
+  assert.equal(guest.goats[1].mode, 'windup');
+  assert.ok(GOAT_MODES.includes(guest.goats[0].mode));
+  assert.ok(guest.monster.danger > 0.5, "l'invité l'entend tout près");
+  assert.equal(guest.monster.mode, 'chase', 'la musique de poursuite');
 });
 
 console.log(`\n${count} tests réussis pour The Backrooms !`);

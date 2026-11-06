@@ -1,5 +1,5 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
-import { BackroomsSim, DT, DEPART_T } from './engine/sim.js';
+import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL } from './engine/sim.js';
 import { createBackroomsScene, setMonsterMode } from './view/scene.js';
 import { BackroomsSfx } from './view/sfx.js';
 import { BackroomsHUD, levelName, levelSub } from './view/hud.js';
@@ -14,6 +14,10 @@ let sfx = null;
 let hud = null;
 let stepDist = 0;
 let monsterStepT = 0;
+const goatHoofT = []; // Level 2 : le prochain coup de sabot de chaque chèvre
+let goatBellT = 0; // la cloche du bouc alpha
+let goatHint = false; // le conseil « elles craignent la lumière », une fois par partie
+const goatHoofN = [];
 let deathNear = false; // le son de la mort a été joué (il revient quand l'entité s'est éloignée)
 const otherStepT = new Map(); // prochain pas de chaque autre joueur
 
@@ -40,6 +44,9 @@ const keys = {};
 let mouseDx = 0;
 let mouseDy = 0;
 let isPointerLocked = false;
+// la page n'a pas droit au verrouillage de la souris (aperçu intégré, iframe sans permission) : on regarde autour de soi
+// en glissant, bouton enfoncé
+let noLock = false;
 let toggleFlashlightRequested = false; // touche 1 : la lampe
 let useRequested = null; // (tests) une case d'objet précise à utiliser
 // actions du prochain pas : E utilise la case choisie, F ramasse, T siffle
@@ -61,9 +68,24 @@ function play() {
   if (sfx) sfx.unlock();
   const tactile = document.body.classList.contains('touch') || matchMedia('(pointer: coarse)').matches;
   if (tactile) document.body.classList.add('touch');
-  if (kbMode || tactile) setPaused(false);
-  else stageEl.requestPointerLock?.();
+  if (kbMode || tactile || noLock) setPaused(false);
+  else {
+    try {
+      const p = stageEl.requestPointerLock?.();
+      if (p && p.catch) p.catch(lockRefused);
+    } catch (e) {
+      lockRefused();
+    }
+  }
 }
+
+function lockRefused() {
+  if (noLock) return;
+  noLock = true;
+  setPaused(false);
+  if (hud) hud.toast('Mouse look: hold the click and drag · Esc to pause');
+}
+document.addEventListener('pointerlockerror', lockRefused);
 
 function setKbMode(on) {
   kbMode = on;
@@ -96,7 +118,7 @@ window.addEventListener('keydown', (e) => {
     else if (e.code === 'KeyF') act.pick = true;
     else if (e.code === 'KeyT') act.whistle = true;
   }
-  if (kbMode && (e.code === 'Escape' || e.code === 'KeyP')) setPaused(true);
+  if ((kbMode || noLock) && (e.code === 'Escape' || e.code === 'KeyP')) setPaused(true);
 });
 
 window.addEventListener('keyup', (e) => {
@@ -184,11 +206,11 @@ stageEl.addEventListener('click', () => {
 
 document.addEventListener('pointerlockchange', () => {
   isPointerLocked = document.pointerLockElement === stageEl;
-  if (!kbMode) setPaused(!isPointerLocked);
+  if (!kbMode && !noLock) setPaused(!isPointerLocked);
 });
 
 document.addEventListener('mousemove', (e) => {
-  if (isPointerLocked && !kbMode && !touch.look) {
+  if ((isPointerLocked || (noLock && !paused && e.buttons & 1)) && !kbMode && !touch.look) {
     mouseDx += e.movementX || 0;
     mouseDy += e.movementY || 0;
   }
@@ -222,12 +244,15 @@ let lastSettings = {};
 function initGame(settings = lastSettings) {
   lastSettings = settings;
   if (NET.role === 'guest') return; // l'invité attend le « go » de l'hôte
-  const seed = Math.floor(Math.random() * 100000);
+  // ?seed=1234 (seul) : toujours la même carte, pour comparer deux réglages
+  const sm = NET.role === 'solo' && location.search.match(/[?&]seed=(\d+)/);
+  const seed = sm ? +sm[1] : Math.floor(Math.random() * 100000);
   const difficulty = settings.difficulty || 'normal';
   const players = NET.role === 'host' ? H.players.map((p) => ({ id: p.id, name: p.name || 'Player' })) : [{ id: 0, name: 'Player' }];
   NET.run = Date.now();
-  // ?level1 ou ?level37 (seul) : on commence directement au Level 1 ou aux Poolrooms
-  const lv = NET.role !== 'solo' ? 0 : /[?&]level37(&|=|$)/.test(location.search) ? 2 : /[?&]level1(&|=|$)/.test(location.search) ? 1 : 0;
+  // ?level1, ?level37 ou ?level2 (seul) : on commence directement au Level 1, aux Poolrooms ou aux Tuyauteries
+  const lvm = NET.role === 'solo' && location.search.match(/[?&]level(1|2|37)(&|=|$)/);
+  const lv = lvm ? { 1: 1, 37: 2, 2: PIPES_LEVEL }[lvm[1]] : 0;
   startRun({ seed, difficulty, players, run: NET.run, level: lv, vip: settings.monsters === 'vip' });
   // ?parkour (seul) : on commence devant le couloir piégé, tourné vers les trous
   const trap = sim.map.trap;
@@ -289,7 +314,7 @@ function guestInputs() {
     const q = NET.actions[id] || (NET.actions[id] = []);
     // une action par pas, dans l'ordre où l'invité les a faites (avec la case qu'il avait choisie)
     const a = q.shift() || {};
-    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, stamina: i.st, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', beamFall: a.k === 'b' ? a.side : 0 };
+    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, stamina: i.st, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h' };
     i.pos = null; // une position annoncée ne sert qu'une fois
   }
   return out;
@@ -308,7 +333,7 @@ function onMsg(from, m) {
       send(from, goMessage());
     } else if (m.t === 'i' && m.run === NET.run) {
       NET.inputs[from] = { mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 100), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) } };
-    } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'p', 't', 'b'].includes(m.k)) {
+    } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'p', 't', 'b', 'h'].includes(m.k)) {
       const q = NET.actions[from] || (NET.actions[from] = []);
       if (q.length < 8) q.push({ k: m.k, sel: m.s === 2 ? 2 : 1, side: m.side > 0 ? 1 : -1 });
     }
@@ -427,7 +452,13 @@ function handleEvent(ev, me) {
       break;
     case 'blackout':
       if (sfx) sfx.blackout();
-      if (hud) hud.toast('Power outage…');
+      if (ev.level === PIPES_LEVEL) {
+        // le noir total : un silence, puis tout le troupeau répond, de partout à la fois
+        if (hud) hud.toast("Everything went dark… they're coming. Keep your flashlight on them");
+        if (sfx && sim.goats) {
+          sim.goats.forEach((g, i) => setTimeout(() => sfx.goatBleat({ x: g.x, z: g.z }, g.alpha ? 'bellow' : 'spot'), 1400 + i * 260 + Math.random() * 300));
+        }
+      } else if (hud) hud.toast('Power outage…');
       break;
     case 'power':
       if (sfx) sfx.power();
@@ -458,9 +489,67 @@ function handleEvent(ev, me) {
       break;
     case 'jumpscare':
       if (ev.id !== me) break;
+      if (ev.goat) {
+        // Level 2 : une chèvre t'a percuté
+        if (sfx) sfx.goatJumpscare();
+        if (hud) hud.showJumpscare(sim.level, true);
+        if (scene && scene.goatScare) scene.goatScare();
+        // puis l'image du bouc qui monte du noir, et le son qui va avec
+        if (hud) hud.showGoatDeath(0.85);
+        if (sfx) setTimeout(() => sfx.goatDeath(), 850);
+        break;
+      }
       if (sfx) sfx.jumpscare(sim.level);
       if (hud) hud.showJumpscare(sim.level);
       break;
+    case 'valve':
+      if (sfx) sfx.cassette();
+      if (hud) hud.toast(ev.by === me ? `Valve closed · ${ev.count}/${ev.total}` : `A valve slammed shut somewhere · ${ev.count}/${ev.total}`);
+      break;
+    case 'valveStart':
+      if (ev.by === me && hud) hud.toast('Turning the valve… stay in front of it');
+      break;
+    case 'blowout':
+      // la vanne fermée a fait sauter les néons de son secteur
+      if (sfx) sfx.blowout({ x: ev.x, z: ev.z });
+      if (hud) hud.toast('The lights blew out around that valve… a breaker panel can bring them back');
+      break;
+    case 'breakerStart':
+      if (ev.by === me && hud) hud.toast('Resetting the breaker… stay in front of it');
+      break;
+    case 'breaker':
+      if (sfx) sfx.breakerClunk({ x: ev.x, z: ev.z });
+      if (hud) hud.toast(ev.by === me ? 'Breaker reset: the lights are back on' : `${who(ev.by)} reset a breaker: lights back on`);
+      break;
+    case 'burn':
+      if (sfx) sfx.steamBurn({ x: ev.x, z: ev.z });
+      if (ev.id === me && hud) hud.toast('Burned by the steam!');
+      break;
+    case 'goat': {
+      // le troupeau : chaque bruit vient de la chèvre qui l'a fait ; la première fois, un conseil
+      if (ev.act === 'spot' && !goatHint && hud) {
+        goatHint = true;
+        hud.toast('Something bleats in the dark… they fear the light');
+      }
+      if (ev.act === 'rage' && hud) hud.toast('A bell rings in the pipes… the billy goat no longer fears the light. Lure it into the steam');
+      if (ev.act === 'scald' && hud) hud.toast('The billy goat got scalded! It runs back to its pen');
+      if (!sfx) break;
+      const pos = { x: ev.x, z: ev.z };
+      if (ev.act === 'bleat') sfx.goatBleat(pos, 'bleat');
+      else if (ev.act === 'spot') sfx.goatBleat(pos, 'spot');
+      else if (ev.act === 'windup') sfx.goatSnort(pos);
+      else if (ev.act === 'flee') sfx.goatBleat(pos, 'flee');
+      else if (ev.act === 'crash') sfx.goatCrash(pos);
+      else if (ev.act === 'vent') sfx.goatVent(pos);
+      else if (ev.act === 'rage') {
+        sfx.goatBleat(pos, 'bellow');
+        sfx.goatBell(pos, 2);
+      } else if (ev.act === 'scald') {
+        sfx.goatBleat(pos, 'scream');
+        sfx.steamBurn(pos);
+      }
+      break;
+    }
     case 'dead':
       if (ev.id !== me && hud) hud.toast(`${ev.name} got caught…`);
       break;
@@ -594,6 +683,11 @@ function loop(currentTime) {
       // l'invité tient son équilibre chez lui ; s'il le perd, l'hôte le fait tomber
       const fell = sim.predict(input);
       if (fell) send('host', { t: 'a', k: 'b', side: fell, run: NET.run });
+      // brûlé par un jet de vapeur chez lui : l'hôte fait crier (et prévient l'entité)
+      if (sim.burned) {
+        sim.burned = false;
+        send('host', { t: 'a', k: 'h', run: NET.run });
+      }
       const sel = sim.player.sel;
       if (toggleFlashlightRequested) send('host', { t: 'a', k: 'f', s: sel, run: NET.run });
       for (const [k, on] of [['e', act.use], ['p', act.pick], ['t', act.whistle]]) if (on) send('host', { t: 'a', k, s: sel, run: NET.run });
@@ -644,9 +738,33 @@ function loop(currentTime) {
   if (sfx && sim.hasMonster && sim.state === 'playing') {
     const M = sim.monster;
     const chasing = !paused && M.mode === 'chase' && M.danger > 0.05;
-    sfx.updateMonsterSound(M.danger, M, sim.level === 1);
+    // Level 2 : pas de bourdonnement d'entité, les sabots du troupeau
+    sfx.updateMonsterSound(sim.goats ? 0 : M.danger, M, sim.level === 1);
     sfx.updateChase(chasing, M.danger, M);
-    if (chasing) {
+    if (sim.goats) {
+      const L = sim.viewPlayer(sim.spectate || 0);
+      sim.goats.forEach((g, i) => {
+        const every = { charge: 0.12, flee: 0.17, stalk: 0.3 }[g.mode];
+        const d = Math.hypot(g.x - L.x, g.z - L.z);
+        if (!every || d > 28 || paused) return;
+        goatHoofT[i] = (goatHoofT[i] || 0) - delta;
+        if (goatHoofT[i] > 0) return;
+        // le galop : trois coups rapprochés, puis un temps
+        goatHoofN[i] = ((goatHoofN[i] || 0) + 1) % 4;
+        goatHoofT[i] = g.mode === 'charge' && goatHoofN[i] === 0 ? every * 2 : every;
+        if (g.mode !== 'charge' || goatHoofN[i] !== 0) sfx.goatHoof({ x: g.x, z: g.z }, g.mode === 'charge' ? 1 : 0.5);
+      });
+      // la cloche du bouc : on l'entend de loin, plus vite quand il trotte ou charge
+      const A = sim.goats.find((g) => g.alpha);
+      if (A && !paused) {
+        goatBellT -= delta;
+        if (goatBellT <= 0 && Math.hypot(A.x - L.x, A.z - L.z) < 48) {
+          const gap = { charge: 0.18, flee: 0.28, stalk: 0.55, roam: 1.1, stun: 0.12 }[A.mode] || 2.4;
+          goatBellT = gap * (0.8 + Math.random() * 0.5);
+          sfx.goatBell({ x: A.x, z: A.z }, A.mode === 'charge' ? 1.3 : 1);
+        }
+      }
+    } else if (chasing) {
       monsterStepT -= delta;
       if (monsterStepT <= 0) {
         monsterStepT = 0.5 - Math.min(1, M.danger) * 0.18;

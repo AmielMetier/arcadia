@@ -5,6 +5,9 @@
 //             cassettes sont trouvées, le faux se referme en mur et le vrai s'ouvre.
 //   Level 1 : l'entrepôt ; 3 fusibles à rapporter au panneau du monte-charge, des coupures de courant, et l'entité
 //             qui se cache au bout des rangées d'étagères pour tendre des embuscades.
+//   Level 2 (numéro interne 3, derrière le toboggan rouge des Poolrooms) : les galeries de service ; 4 vannes à tourner (rester devant) pour couper la vapeur qui bloque l'ascenseur
+//             de service, des jets de vapeur brûlante en travers des couloirs (ils repoussent). Pas d'entité ici : un
+//             troupeau de chèvres noires qui fonce sur les joueurs, mais craint la lumière (engine/goats.js).
 // Qui entre dans l'ascenseur ouvert devient spectateur ; il part quand plus personne n'est dehors. Plus il y a de
 // monde dans la cabine, plus l'entité s'énerve contre ceux qui restent.
 // Chacun part avec sa lampe torche dans la case 1. Un joueur attrapé regarde les autres jusqu'à la fin de l'étage ;
@@ -12,7 +15,9 @@
 import { CELL_SIZE, T, createLevel0, PIT_HALF, FLOOR_DY } from './map.js';
 import { createWarehouseMap } from './level1.js';
 import { createPoolMap, MOUTH } from './poolrooms.js';
+import { createPipesMap, VALVES, PIPES_LEVEL, jetState, inJet, JET_HALF } from './level2.js';
 import { findPath, hasLineOfSight } from './nav.js';
+import { createGoats, updateGoats, senseGoats, alertGoats, goatSnapshot, applyGoatSnapshot, goatCount } from './goats.js';
 
 export const DT = 1 / 60;
 export const PLAYER_RADIUS = 0.38;
@@ -41,11 +46,22 @@ export const WHISTLE_CD = 1.2;
 export const WHISTLE_HEAT = 2.5; // chaque coup compte 1 et s'oublie en 20 s : au 3e coup rapproché, l'entité vient à coup sûr
 export const CASSETTES = 5;
 export const FUSES = 3;
-export const LAST_LEVEL = 2; // 0 : Level 0, 1 : Level 1 (entrepôt), 2 : Level 37 (les Poolrooms)
+export { VALVES, PIPES_LEVEL };
+export const LAST_LEVEL = PIPES_LEVEL; // 0 : Level 0, 1 : Level 1 (entrepôt), 2 : Level 37 (Poolrooms), 3 : Level 2 (Tuyauteries, par le toboggan jaune)
+export const VALVE_T = 2.6; // secondes devant une vanne pour la fermer (elle revient doucement si on la lâche)
+export const VALVE_R = 1.5; // portée : il faut se tenir devant
+export const BREAKER_T = 3; // secondes devant un disjoncteur pour le réarmer
+export const BREAKER_R = 1.4;
+export const BLOW_DELAY = 2.2; // la vanne fermée, les néons de son secteur grésillent puis sautent
+export const BURN_LOCK = 0.9; // brûlé par un jet de vapeur : repoussé, sonné un instant
+export const BURN_STAMINA = 45;
 export const DEPART_T = 3; // secondes entre la fermeture des portes et l'arrivée
 // coupures de courant du Level 1 : toutes les 35 à 60 s, pendant 15 à 20 s
 export const BLACKOUT_EVERY = [35, 60];
 export const BLACKOUT_LEN = [15, 20];
+// Level 2 : de temps en temps, tout le courant saute ; plus rien ne protège, le troupeau passe à l'attaque
+export const PIPES_BLACKOUT_EVERY = [85, 130];
+export const PIPES_BLACKOUT_LEN = [11, 15];
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const cellOf = (v) => Math.floor(v / CELL_SIZE);
@@ -53,6 +69,7 @@ const cellOf = (v) => Math.floor(v / CELL_SIZE);
 // les étages d'un niveau : même graine de partie, des cartes différentes par niveau
 export function makeLevelMap(level, seed) {
   if (level === 2) return [createPoolMap(seed * 11 + 37)];
+  if (level === PIPES_LEVEL) return [createPipesMap(seed * 11 + 29)];
   return level === 1 ? [createWarehouseMap(seed * 7 + 13)] : createLevel0(seed).floors;
 }
 
@@ -141,6 +158,7 @@ function newPlayer(id, name, map, i) {
     tiltV: 0,
     onLadder: false, // en haut de l'échelle (la caméra monte)
     whistleCd: 0,
+    burnT: 0, // brûlé il y a peu (Level 2) : le jet ne repousse pas deux fois de suite
     heat: 0, // coups de sifflet récents : trop, et l'entité vient
     signal: 0, // 0 à 1 : force du signal de l'objectif le plus proche (affiché par la caméra)
     sigTo: 'goal', // ce que suit le signal : 'goal', 'stairs' ou 'exit'
@@ -200,6 +218,7 @@ export class BackroomsSim {
     });
     this.cassettes = 0; // cassettes trouvées par l'équipe (Level 0)
     this.fuses = 0; // fusibles en poche (Level 1)
+    this.valves = 0; // vannes fermées (Level 2)
     this.items0 = this.floors.map((f) => (f.items || []).length); // objets d'origine (les suivants ont été posés par des joueurs)
     // un seul vrai ascenseur : on ne sait pas lequel tant que les cassettes ne sont pas toutes trouvées
     this.realFloor = this.floors.length > 1 ? (Math.random() < 0.5 ? 0 : 1) : 0;
@@ -208,7 +227,7 @@ export class BackroomsSim {
     this.slide = -1; // Poolrooms : le toboggan pris par le premier qui s'y est glissé (les autres le suivent)
     this.departT = 0; // compte à rebours du départ de l'ascenseur
     this.blackout = 0; // secondes de noir restantes
-    this.nextBlackout = level === 1 ? rand(...BLACKOUT_EVERY) * 0.6 : Infinity;
+    this.nextBlackout = level === 1 ? rand(...BLACKOUT_EVERY) * 0.6 : level === PIPES_LEVEL && this.hasMonster ? rand(...PIPES_BLACKOUT_EVERY) * 0.75 : Infinity;
 
     const ms = this.map.monsterSpawn;
     this.monster = {
@@ -239,6 +258,9 @@ export class BackroomsSim {
       stalkT: 4, // délai avant d'aller se cacher pour observer
       watch: null, // case sombre d'où elle observe
     };
+    // Level 2 : le troupeau remplace l'entité (elle reste là pour relayer le son et l'image de la chèvre la plus proche)
+    this.goats = level === PIPES_LEVEL && this.hasMonster ? createGoats(this.map, goatCount(this.roster.length, this.difficulty)) : null;
+    this.herd = null;
   }
 
   // dans l'eau (Poolrooms) on avance moins vite : 90 % dans 20 cm d'eau, 70 % dans 60 cm, 40 % au plus profond
@@ -273,13 +295,131 @@ export class BackroomsSim {
   }
 
   get open() {
+    if (this.level === PIPES_LEVEL) return this.valves >= VALVES;
     return this.level === 0 ? this.cassettes >= CASSETTES : this.powered;
+  }
+
+  // Level 2 : un jet de vapeur au repos (0), qui siffle (1) ou qui crache (2) ; sa vanne fermée, il se tait
+  jetOn(j) {
+    const v = (this.map.valves || [])[j.sector];
+    if (v && v.closed) return 0;
+    return jetState(j, this.time);
+  }
+
+  // le jet qui crache au point (x, z), ou null
+  steamAt(x, z) {
+    const j = this.map.jetAt ? this.map.jetAt(cellOf(x), cellOf(z)) : null;
+    return j && this.jetOn(j) === 2 && inJet(j, x, z) ? j : null;
+  }
+
+  // Brûlé : on est rejeté du côté d'où l'on venait, sonné et le souffle coupé
+  burn(P, j) {
+    const C = CELL_SIZE;
+    const pos = j.axis === 'x' ? P.x : P.z;
+    const mid = j.axis === 'x' ? j.x : j.z;
+    let dir = Math.sign(pos - mid);
+    if (!dir) dir = j.axis === 'x' ? -Math.sign(-Math.sin(P.yaw)) || 1 : -Math.sign(-Math.cos(P.yaw)) || 1;
+    const to = Math.max((j.axis === 'x' ? j.gx : j.gz) * C - C * 0.4, Math.min((j.axis === 'x' ? j.gx + 1 : j.gz + 1) * C + C * 0.4, mid + dir * (JET_HALF + 0.5)));
+    const p = this.moveWithCollisions(P.x, P.z, j.axis === 'x' ? to - P.x : 0, j.axis === 'x' ? 0 : to - P.z, PLAYER_RADIUS, P.floor);
+    P.x = p.x;
+    P.z = p.z;
+    P.lockT = BURN_LOCK;
+    P.burnT = 1.6;
+    P.running = false;
+    P.stamina = Math.max(0, P.stamina - BURN_STAMINA);
+  }
+
+  // un grand bruit (cri, vanne qui claque) : l'entité vient voir, si elle est assez près et pas déjà en chasse
+  alertMonster(x, z, range, floor = 0) {
+    if (this.goats) {
+      alertGoats(this, x, z, range);
+      return true;
+    }
+    const M = this.monster;
+    if (!this.hasMonster || M.mode === 'chase' || M.floor !== floor) return false;
+    if (Math.hypot(M.x - x, M.z - z) > range) return false;
+    M.mode = 'search';
+    M.silent = false;
+    M.ambush = null;
+    M.watch = null;
+    M.lastSeenX = x;
+    M.lastSeenZ = z;
+    M.probe = null;
+    M.repathT = 0;
+    return true;
+  }
+
+  // Les vannes : on les ferme en restant devant (à plusieurs, plus vite) ; lâchées, elles se rouvrent doucement.
+  // Une vanne qui claque résonne dans tous les tuyaux : l'entité vient voir.
+  updateValves() {
+    for (const v of this.map.valves || []) {
+      if (v.closed) continue;
+      const near = this.players.filter((P) => P.status === 'alive' && Math.hypot(v.sx - P.x, v.sz - P.z) < VALVE_R);
+      if (near.length) {
+        if (v.turn === 0) this.emit({ type: 'valveStart', id: v.id, by: near[0].id });
+        v.turn = Math.min(1, v.turn + (DT / VALVE_T) * (near.length > 1 ? 1.5 : 1));
+      } else v.turn = Math.max(0, v.turn - DT * 0.18);
+      if (v.turn < 1) continue;
+      v.closed = true;
+      this.valves++;
+      v.blowT = BLOW_DELAY;
+      this.setSector(v.id, 1);
+      near[0].found++;
+      this.emit({ type: 'valve', id: v.id, by: near[0].id, count: this.valves, total: VALVES, x: v.x, z: v.z });
+      this.alertMonster(v.sx, v.sz, 60);
+      if (this.valves >= VALVES) this.emit({ type: 'exitUnlocked' });
+    }
+  }
+
+  // Le courant d'un secteur du Level 2 (power : 0 normal, 1 les néons grésillent, 2 ils ont sauté, 3 réarmé). Les
+  // lampes gardent leur état d'origine (base) ; les chèvres et l'image relisent l'éclairage (map.lightGen)
+  setSector(i, power) {
+    const map = this.map;
+    const v = (map.valves || [])[i];
+    if (!v || v.power === power) return;
+    v.power = power;
+    for (const l of map.lights) {
+      if (l.sector !== i || l.base === 'off') continue;
+      l.state = power === 1 ? 'flicker' : power === 2 ? 'off' : l.base;
+      l.flicker = l.state === 'flicker';
+    }
+    map.goatLit = null;
+    map.darkCells = null;
+    map.lightGen = (map.lightGen || 0) + 1;
+  }
+
+  // Les néons qui sautent après une vanne, et les disjoncteurs : on reste devant pour réarmer (à plusieurs, plus vite).
+  // Le claquement s'entend loin : le troupeau vient voir.
+  updateBreakers() {
+    const map = this.map;
+    for (const v of map.valves || []) {
+      if (!(v.blowT > 0)) continue;
+      v.blowT -= DT;
+      if (v.blowT > 0) continue;
+      this.setSector(v.id, 2);
+      this.emit({ type: 'blowout', sector: v.id, x: v.x, z: v.z });
+    }
+    for (const b of map.breakers || []) {
+      const v = map.valves[b.sector];
+      if (b.done || !v || v.power !== 2) continue;
+      const near = this.players.filter((P) => P.status === 'alive' && Math.hypot(b.sx - P.x, b.sz - P.z) < BREAKER_R);
+      if (near.length) {
+        if (b.turn === 0) this.emit({ type: 'breakerStart', id: b.id, by: near[0].id });
+        b.turn = Math.min(1, b.turn + (DT / BREAKER_T) * (near.length > 1 ? 1.5 : 1));
+      } else b.turn = Math.max(0, b.turn - DT * 0.25);
+      if (b.turn < 1) continue;
+      b.done = true;
+      this.setSector(b.sector, 3);
+      this.emit({ type: 'breaker', id: b.id, sector: b.sector, by: near[0].id, x: b.x, z: b.z });
+      this.alertMonster(b.x, b.z, 24);
+    }
   }
 
   // agressivité de l'entité (0 à 1) : elle monte à chaque cassette trouvée (Level 0), à chaque fusible (Level 1, où elle
   // part déjà plus haut)
   get aggro() {
     if (this.level === 0) return Math.min(1, this.cassettes / CASSETTES);
+    if (this.level === PIPES_LEVEL) return Math.min(1, 0.3 + (0.7 * this.valves) / VALVES);
     return Math.min(1, 0.25 + (0.75 * (this.fuses + (this.powered ? FUSES : 0))) / FUSES);
   }
 
@@ -351,6 +491,7 @@ export class BackroomsSim {
     }
     // caisses et meubles abandonnés (cercles)
     for (const pr of this.fm(floor).props || []) {
+      if (pr.walk) continue; // papiers, canettes : on marche dessus
       const rr = radius + pr.r;
       if (Math.abs(pr.x - x) < rr && Math.abs(pr.z - z) < rr && (pr.x - x) ** 2 + (pr.z - z) ** 2 < rr * rr) return true;
     }
@@ -547,6 +688,13 @@ export class BackroomsSim {
     P.whistleCd = WHISTLE_CD;
     P.heat += 1;
     this.emit({ type: 'whistle', id: P.id, name: P.name, x: P.x, z: P.z, floor: P.floor });
+    if (this.goats) {
+      if (P.heat >= WHISTLE_HEAT || Math.random() < 0.15) {
+        alertGoats(this, P.x, P.z, 45);
+        this.emit({ type: 'heard', id: P.id });
+      }
+      return;
+    }
     const M = this.monster;
     if (!this.hasMonster || M.mode === 'chase' || M.floor !== P.floor) return;
     if (Math.hypot(M.x - P.x, M.z - P.z) > 45) return;
@@ -573,20 +721,23 @@ export class BackroomsSim {
       return;
     }
 
-    // coupures de courant du Level 1
-    if (this.level === 1) {
+    // coupures de courant du Level 1 ; au Level 2, le noir total et le troupeau qui attaque
+    if (this.level === 1 || this.level === PIPES_LEVEL) {
+      const L2 = this.level === PIPES_LEVEL;
       if (this.blackout > 0) {
         this.blackout -= DT;
         if (this.blackout <= 0) {
           this.blackout = 0;
-          this.nextBlackout = rand(...BLACKOUT_EVERY);
+          this.nextBlackout = rand(...(L2 ? PIPES_BLACKOUT_EVERY : BLACKOUT_EVERY));
+          this.map.dark = false;
           this.emit({ type: 'power' });
         }
       } else {
         this.nextBlackout -= DT;
         if (this.nextBlackout <= 0) {
-          this.blackout = rand(...BLACKOUT_LEN);
-          this.emit({ type: 'blackout', len: this.blackout });
+          this.blackout = rand(...(L2 ? PIPES_BLACKOUT_LEN : BLACKOUT_LEN));
+          this.map.dark = L2;
+          this.emit({ type: 'blackout', len: this.blackout, level: this.level });
         }
       }
     }
@@ -596,9 +747,16 @@ export class BackroomsSim {
       if (P.status === 'alive') this.stepPlayer(P, inp);
     }
     if (this.state !== 'playing') return;
+    if (this.level === PIPES_LEVEL) {
+      this.updateValves();
+      this.updateBreakers();
+    }
 
     // aux Poolrooms, l'entité ne sort pas de l'eau : elle ne chasse personne (son ombre passe sous la surface)
-    if (this.hasMonster && this.level !== 2) this.updateMonster();
+    if (this.goats) {
+      updateGoats(this);
+      senseGoats(this);
+    } else if (this.hasMonster && this.level !== 2) this.updateMonster();
     this.checkElevator();
   }
 
@@ -694,6 +852,17 @@ export class BackroomsSim {
       const pit = this.fm(P.floor).pits[pitId];
       if (Math.abs(P.x - pit.x) < PIT_HALF && Math.abs(P.z - pit.z) < PIT_HALF) this.fallThrough(P, pitId);
     }
+    // 3c. Level 2 : un jet de vapeur brûlant repousse (l'invité le vit chez lui et le dit à l'hôte) ; le cri attire
+    // l'entité
+    P.burnT = Math.max(0, (P.burnT || 0) - DT);
+    if (this.level === PIPES_LEVEL) {
+      const j = !input.remote && !(P.burnT > 0) && P.lockT <= 0 ? this.steamAt(P.x, P.z) : null;
+      if (j) this.burn(P, j);
+      if (j || input.burn) {
+        this.emit({ type: 'burn', id: P.id, name: P.name, x: P.x, z: P.z });
+        this.alertMonster(P.x, P.z, 40, P.floor);
+      }
+    }
     // 3d. Au pied de l'échelle posée : on grimpe jusqu'au renfoncement
     const map = this.fm(P.floor);
     const N = map.niche;
@@ -721,7 +890,7 @@ export class BackroomsSim {
     }
     // les 3 fusibles rapportés au panneau du monte-charge : le courant revient, les portes s'ouvrent ; aux Poolrooms,
     // les 3 volants trouvés suffisent : les toboggans s'ouvrent
-    if (this.level >= 1 && !this.powered && this.fuses >= FUSES && (this.level === 2 || Math.hypot(map.exit.x - P.x, map.exit.z - P.z) < 2.6)) {
+    if ((this.level === 1 || this.level === 2) && !this.powered && this.fuses >= FUSES && (this.level === 2 || Math.hypot(map.exit.x - P.x, map.exit.z - P.z) < 2.6)) {
       this.powered = true;
       this.emit({ type: 'powered', by: P.id });
       this.emit({ type: 'exitUnlocked' });
@@ -766,11 +935,13 @@ export class BackroomsSim {
         best = near(this.stairs);
         P.sigTo = 'stairs';
       }
-    } else if (this.level >= 1 && this.fuses < FUSES) {
+    } else if ((this.level === 1 || this.level === 2) && this.fuses < FUSES) {
       best = near((map.fuses || []).filter((f) => !f.taken));
     } else if (map.slides && map.slides.length) {
       best = near(this.slide >= 0 ? [map.slides[this.slide]] : map.slides);
       P.sigTo = 'exit';
+    } else if (this.level === PIPES_LEVEL && !this.open) {
+      best = (map.valves || []).filter((v) => !v.closed).reduce((b, v) => Math.min(b, Math.hypot(v.sx - P.x, v.sz - P.z)), Infinity);
     } else {
       best = Math.hypot(map.exit.x - P.x, map.exit.z - P.z);
       P.sigTo = 'exit';
@@ -835,7 +1006,18 @@ export class BackroomsSim {
     const ps = this.stairStep(P, pos.x, pos.z);
     P.x = ps.x;
     P.z = ps.z;
+    this.predictBurn(P);
     return 0;
+  }
+
+  // l'invité se brûle chez lui : repoussé tout de suite ; burned dit à l'application de prévenir l'hôte
+  predictBurn(P) {
+    P.burnT = Math.max(0, (P.burnT || 0) - DT);
+    if (this.level !== PIPES_LEVEL || P.burnT > 0) return;
+    const j = this.steamAt(P.x, P.z);
+    if (!j) return;
+    this.burn(P, j);
+    this.burned = true;
   }
 
   // Un joueur arrive en cours de partie : spectateur jusqu'au prochain étage
@@ -877,6 +1059,13 @@ export class BackroomsSim {
       // objets posés par des joueurs (échanges) : [étage, objet, x, z] ; échelle posée
       ix: this.floors.flatMap((f, fi) => (f.items || []).slice(this.items0[fi]).map((o) => [fi, o.kind, r2(o.x), r2(o.z)])),
       nl: this.floors.some((f) => f.niche && f.niche.ladder) ? 1 : 0,
+      // vannes du Level 2 : -1 fermée, sinon combien elle est tournée
+      v: (this.map.valves || []).map((v) => (v.closed ? -1 : r2(v.turn))),
+      // courant des secteurs (0 à 3) et disjoncteurs (-1 réarmé, sinon l'avancée)
+      sp: (this.map.valves || []).map((v) => v.power || 0),
+      br: (this.map.breakers || []).map((b) => (b.done ? -1 : r2(b.turn))),
+      // le troupeau du Level 2 : [x, z, cap, état] par chèvre
+      gt: this.goats ? goatSnapshot(this.goats) : null,
     };
   }
 
@@ -889,6 +1078,7 @@ export class BackroomsSim {
     this.fuses = snap.f;
     this.powered = !!snap.pw;
     this.blackout = snap.bo;
+    this.map.dark = this.level === PIPES_LEVEL && this.blackout > 0;
     this.departT = snap.dp;
     this.slide = snap.sl ?? -1;
     if (snap.rf >= 0 && !this.unlocked) {
@@ -980,7 +1170,23 @@ export class BackroomsSim {
     const takenBits = (snap.k[2] || '').split('|');
     this.floors.forEach((f, fi) => set(f.items, 'taken', takenBits[fi]));
     for (const f of this.floors) if (f.niche) f.niche.ladder = !!snap.nl;
-    if (this.hasMonster) this.senseMonster();
+    (this.map.valves || []).forEach((v, i) => {
+      const t = (snap.v || [])[i];
+      if (t === undefined) return;
+      v.closed = t < 0;
+      v.turn = t < 0 ? 1 : t;
+    });
+    this.valves = (this.map.valves || []).filter((v) => v.closed).length;
+    (snap.sp || []).forEach((p, i) => this.setSector(i, p));
+    (this.map.breakers || []).forEach((b, i) => {
+      const t = (snap.br || [])[i];
+      if (t === undefined) return;
+      b.done = t < 0;
+      b.turn = t < 0 ? 1 : t;
+    });
+    if (snap.gt) applyGoatSnapshot(this, snap.gt);
+    if (this.goats) senseGoats(this);
+    else if (this.hasMonster) this.senseMonster();
   }
 
   // L'ascenseur part quand plus personne n'est dehors (et qu'au moins un joueur est dedans)
@@ -1006,7 +1212,8 @@ export class BackroomsSim {
       this.emit({ type: 'level', level: this.level });
       return;
     }
-    if (this.level >= LAST_LEVEL) {
+    // les autres toboggans sortent des Backrooms ; les Tuyauteries sont le dernier niveau
+    if (this.map.slides || this.level >= LAST_LEVEL) {
       this.state = 'won';
       this.emit({ type: 'win', time: this.time });
       return;
@@ -1195,8 +1402,9 @@ export class BackroomsSim {
       }
     }
 
-    // Level 1 : en patrouille, elle contourne par les rangées d'étagères pour attendre le joueur plus loin
-    if (M.mode === 'patrol' && map.isShelfSide && same) {
+    // Level 1 : en patrouille, elle contourne par les rangées d'étagères pour attendre le joueur plus loin ; Level 2 :
+    // elle l'attend juste après un croisement
+    if (M.mode === 'patrol' && (map.isAmbush || map.isShelfSide) && same) {
       M.ambushT -= DT;
       if (M.ambushT <= 0 && dist < 45) {
         const spot = this.findAmbush(P);
@@ -1278,7 +1486,16 @@ export class BackroomsSim {
       }
     }
 
-    // Avancement le long du chemin
+    // Avancement le long du chemin. Level 2 : elle n'entre pas dans un jet de vapeur qui crache, elle attend devant
+    const go = (nx, nz) => {
+      if (this.level === PIPES_LEVEL && this.steamAt(nx, nz) && !this.steamAt(M.x, M.z)) {
+        M.steamWait = true;
+        return;
+      }
+      M.steamWait = false;
+      M.x = nx;
+      M.z = nz;
+    };
     if (M.path && M.path.length > M.pathIndex) {
       const wp = M.path[M.pathIndex];
       const wdx = wp.x - M.x;
@@ -1287,14 +1504,12 @@ export class BackroomsSim {
       if (wdist < 0.3) M.pathIndex++;
       else {
         const stepLen = Math.min(wdist, M.speed * DT);
-        M.x += (wdx / wdist) * stepLen;
-        M.z += (wdz / wdist) * stepLen;
+        go(M.x + (wdx / wdist) * stepLen, M.z + (wdz / wdist) * stepLen);
         M.yaw = Math.atan2(wdx, wdz);
       }
     } else if (M.mode === 'chase' && same && dist > 0.1 && M.unseenT === 0) {
       const stepLen = Math.min(dist, M.speed * DT);
-      M.x += (dx / dist) * stepLen;
-      M.z += (dz / dist) * stepLen;
+      go(M.x + (dx / dist) * stepLen, M.z + (dz / dist) * stepLen);
       M.yaw = Math.atan2(dx, dz);
     } else if (M.goal && cellOf(M.goal.x) === cellOf(M.x) && cellOf(M.goal.z) === cellOf(M.z) && Math.hypot(M.goal.x - M.x, M.goal.z - M.z) > 0.1) {
       // le but est dans sa case (pas de chemin à suivre) : tout droit
@@ -1302,8 +1517,7 @@ export class BackroomsSim {
       const gz = M.goal.z - M.z;
       const gd = Math.hypot(gx, gz);
       const stepLen = Math.min(gd, M.speed * DT);
-      M.x += (gx / gd) * stepLen;
-      M.z += (gz / gd) * stepLen;
+      go(M.x + (gx / gd) * stepLen, M.z + (gz / gd) * stepLen);
       M.yaw = Math.atan2(gx, gz);
     }
 
@@ -1422,7 +1636,7 @@ export class BackroomsSim {
       const dp = Math.hypot(x - px, z - pz);
       if (dp > 8 || dp >= bestD) continue;
       if (Math.hypot(x - P.x, z - P.z) < 7) continue;
-      if (!map.isShelfSide(c.x, c.z)) continue;
+      if (!(map.isAmbush ? map.isAmbush(c.x, c.z) : map.isShelfSide(c.x, c.z))) continue;
       if (hasLineOfSight(map, P.x, P.z, x, z)) continue;
       best = { x, z, gx: c.x, gz: c.z };
       bestD = dp;

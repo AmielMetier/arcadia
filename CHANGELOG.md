@@ -1,5 +1,18 @@
 # Journal des versions — Arcadia
 
+## 4.53 — 6 novembre 2026
+- **The Backrooms** — Un nouveau niveau : le Level 2, les Tuyauteries.
+  - Aux Poolrooms, le toboggan jaune ne sort plus des Backrooms : il descend dans les galeries de service. Le rouge et le bleu font toujours sortir.
+  - De longues galeries carrelées sous les tuyaux, des réserves en brique, des chaufferies et plusieurs grandes salles à piliers, dont certaines au cœur du réseau. Chaque partie a son plan.
+  - Il faut fermer les 4 vannes de vapeur, une dans chaque chaufferie, puis rejoindre l'ascenseur de service.
+  - Les jets de vapeur brûlent : attends qu'ils se coupent pour passer.
+  - Un troupeau de chèvres rôde dans le noir. Elles craignent la lumière : reste sous les lampes, et braque ta lampe torche sur celle qui charge pour la faire fuir. Une chèvre qui charge tourne mal : un pas de côté au dernier moment, et elle s'écrase contre le mur.
+  - Chaque vanne fermée fait sauter les lampes autour d'elle. Une armoire ELECTRICAL à voyant rouge permet de réarmer le disjoncteur et de rallumer le secteur.
+  - Le bouc alpha porte une cloche. En fin de partie, quand la cloche sonne, il ne craint plus la lumière : attire sa charge dans un jet de vapeur pour le faire fuir.
+  - De temps en temps, tout le courant saute : le troupeau sait où tu es et passe à l'attaque.
+  - Un écran de mort qui fait peur, avec son bruit à lui.
+  - Si le jeu ne peut pas capturer la souris, on regarde autour de soi en glissant avec le clic gauche.
+
 ## 4.52 — 6 novembre 2026
 - **Fief Maudit** — La nuit tombe sur la vallée.
   - Le jour dure quatre minutes et demie. Au crépuscule, la cloche sonne, puis la brume monte et les morts sortent du sol, du côté du château.

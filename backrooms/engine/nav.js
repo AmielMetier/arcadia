@@ -104,6 +104,8 @@ export function hasLineOfSight(map, x1, z1, x2, z2) {
     const gx = Math.floor(px / CELL_SIZE);
     const gz = Math.floor(pz / CELL_SIZE);
     if (map.isWall(gx, gz)) {
+      // une grille à barreaux ne cache rien
+      if (map.seeThrough && map.seeThrough(gx, gz)) continue;
       // un pilier fin ne cache que ce qui est derrière lui, pas toute sa case
       const p = map.pillarAt && map.pillarAt(gx, gz);
       if (!p || !outsidePillar(p, px, pz)) return false;
