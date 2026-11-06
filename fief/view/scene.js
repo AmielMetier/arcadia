@@ -52,7 +52,7 @@ export function createScene(stage, { onLost } = {}) {
 
   let night = null, peaksMesh = null;
   let map = null, treeKit = null, trees = null, actors = null, logsGroup = null, fire = null, falling = [], stumps = null;
-  const logMeshes = new Map();
+  const logMeshes = new Map(), beamMeshes = new Map();
   let viewT = 0;
   const SEE = { uSeeThru: { value: 0 }, uSeeAt: { value: new THREE.Vector3() } };
   const scr = new THREE.Vector3(), dbuf = new THREE.Vector2();
@@ -157,6 +157,9 @@ export function createScene(stage, { onLost } = {}) {
   const barkTex = (() => { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 128; const g = cv.getContext('2d'); g.fillStyle = '#5a4030'; g.fillRect(0, 0, 64, 128); for (let i = 0; i < 90; i++) { g.fillStyle = `rgba(${30 + Math.random() * 40},${20 + Math.random() * 25},${12 + Math.random() * 15},0.7)`; g.fillRect(Math.random() * 64, Math.random() * 128, 2 + Math.random() * 3, 10 + Math.random() * 30); } const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; })();
   const logGeo = new THREE.CylinderGeometry(0.17, 0.19, 1.7, 12, 1).rotateZ(Math.PI / 2);
   const logMats = [new THREE.MeshStandardMaterial({ map: barkTex, roughness: 0.95 }), new THREE.MeshStandardMaterial({ color: 0xc89f6a, roughness: 0.8 }), new THREE.MeshStandardMaterial({ color: 0xc89f6a, roughness: 0.8 })];
+  // poutre équarrie : 3,4 m de long, faces sciées claires aux bouts
+  const beamGeo = new THREE.BoxGeometry(0.3, 0.3, 3.4);
+  const beamMats = [logMats[0], logMats[0], logMats[0], logMats[0], logMats[1], logMats[1]];
   function makeLog() { const m = new THREE.Mesh(logGeo, logMats); m.castShadow = true; m.receiveShadow = true; return m; }
 
   // ------------------------------------------------------------------ feu de camp
@@ -248,14 +251,16 @@ export function createScene(stage, { onLost } = {}) {
 
   // ------------------------------------------------------------------ chaque image
   const tmpV = new THREE.Vector3();
-  function treeFell(sim, id, dir) {
+  function treeFell(sim, id, dir, quiet = false) {
     trees.hide(id);
     const t = map.trees[id];
+    if (quiet) { addStump(t); return; }
     const piv = treeMesh(treeKit, { ...t, y: t.y });
     piv.userData = { ...piv.userData, t0: viewT, dir, axis: new THREE.Vector3(Math.cos(dir), 0, -Math.sin(dir)) };
     scene.add(piv); falling.push(piv);
-    if (stumps.model) { const o = stumps.model.scene.clone(); o.position.set(t.x, t.y - 0.1, t.z); o.scale.setScalar(2.3 * t.s); o.rotation.y = t.rot; o.traverse((m) => { if (m.isMesh) m.castShadow = true; }); scene.add(o); }
+    addStump(t);
   }
+  function addStump(t) { if (stumps.model) { const o = stumps.model.scene.clone(); o.position.set(t.x, t.y - 0.1, t.z); o.scale.setScalar(2.3 * t.s); o.rotation.y = t.rot; o.traverse((m) => { if (m.isMesh) m.castShadow = true; }); scene.add(o); } }
   // un arbre déjà abattu au chargement (partie reprise) : juste la souche
   function syncTrees(sim) { sim.trees.forEach((T, i) => { if (T.down && !T.shown) { T.shown = true; treeFell(sim, i, T.dir); } }); }
 
@@ -287,6 +292,19 @@ export function createScene(stage, { onLost } = {}) {
       const k = Math.min(1, (now - m.userData.born) / 0.25); m.scale.setScalar(0.6 + 0.4 * k);
     }
     for (const [id, m] of logMeshes) if (!seen.has(id)) { logsGroup.remove(m); logMeshes.delete(id); }
+    // poutres : au sol, ou portées à hauteur d'épaule entre leurs porteurs
+    const bseen = new Set();
+    for (const b of sim.beams || []) {
+      if (!b.ready) continue;
+      bseen.add(b.id);
+      let m = beamMeshes.get(b.id);
+      if (!m) { m = new THREE.Mesh(beamGeo, beamMats); m.castShadow = true; m.receiveShadow = true; logsGroup.add(m); beamMeshes.set(b.id, m); m.position.set(b.x, b.y + 0.16, b.z); }
+      const ty = b.lifted ? b.y : map.heightAt(b.x, b.z) + 0.16, k = 1 - Math.exp(-dt * 18);
+      m.position.x += (b.x - m.position.x) * k; m.position.z += (b.z - m.position.z) * k; m.position.y += (ty - m.position.y) * k;
+      let dr = b.rot - m.rotation.y; while (dr > Math.PI) dr -= 2 * Math.PI; while (dr < -Math.PI) dr += 2 * Math.PI;
+      m.rotation.y += dr * k;
+    }
+    for (const [id, m] of beamMeshes) if (!bseen.has(id)) { logsGroup.remove(m); beamMeshes.delete(id); }
     actors.update(sim, dt, me, t);
 
     // caméra à l'épaule : derrière le joueur, orientée par la souris

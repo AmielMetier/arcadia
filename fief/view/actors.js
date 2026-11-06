@@ -12,8 +12,8 @@ export const JOBS = {
   bucheron: { model: 'barbarian', name: 'Bûcheron', show: ['1H_Axe'], strike: '1H_Melee_Attack_Chop' },
   chevalier: { model: 'knight', name: 'Chevalier', show: ['1H_Sword', 'Round_Shield'], strike: '1H_Melee_Attack_Slice_Diagonal' },
   chasseuse: { model: 'rogue', name: 'Chasseuse', show: ['Knife'], strike: '1H_Melee_Attack_Stab' },
-  pretre: { model: 'mage', name: 'Prêtre', show: ['Staff'], strike: '1H_Melee_Attack_Chop' },
-  forgeronne: { model: 'rogue_hooded', name: 'Forgeronne', show: ['1H_Crossbow'], strike: '1H_Melee_Attack_Chop' },
+  pretre: { model: 'mage', name: 'Prêtre', show: ['2H_Staff'], strike: '2H_Melee_Attack_Chop' },
+  forgeronne: { model: 'rogue_hooded', name: 'Forgeronne', show: ['Knife'], strike: '1H_Melee_Attack_Stab' },
 };
 const SKEL = {
   minion: { model: 'skeleton_minion', right: 'Skeleton_Blade', left: null, walk: 'Running_C', attack: '1H_Melee_Attack_Chop' },
@@ -126,7 +126,7 @@ export async function createActors(scene, { makeLog }) {
     const shadow = new THREE.Mesh(shadowGeo, shadowMat); shadow.renderOrder = 1; scene.add(shadow);
     const nameTag = p.id !== me ? label(p.name, { color: p.bot ? '#bcd4ff' : '#ffe2a8' }) : null; if (nameTag) { nameTag.position.y = 2.25; holder.add(nameTag); }
     const cross = crossSprite(); cross.visible = false; cross.position.y = 1.0; holder.add(cross);
-    const a = { p, root, holder, log, shadow, nameTag, cross, mats, job, tools: job.show.map((n) => root.getObjectByName(n)).filter(Boolean), yaw: p.yaw, wasDown: false, upT: 0, ...rig(root) };
+    const a = { p, jobKey: p.job, root, holder, log, shadow, nameTag, cross, mats, job, tools: job.show.map((n) => root.getObjectByName(n)).filter(Boolean), yaw: p.yaw, wasDown: false, upT: 0, ...rig(root) };
     heroes.set(p.id, a);
   }
   function updateHero(a, p, dt, sim, t) {
@@ -135,7 +135,7 @@ export async function createActors(scene, { makeLog }) {
     a.yaw += d * (1 - Math.exp(-dt * 16)); a.holder.rotation.y = a.yaw;
     a.shadow.position.set(p.x, sim.map.heightAt(p.x, p.z) + 0.04, p.z); a.shadow.visible = !p.down;
     a.holder.visible = !p.dead;
-    a.log.visible = p.carry === 'bois' && !(p.act === 'pick' && p.actT < ACT.pick.at) && !(p.act === 'take' && p.actT < ACT.take.at) || (p.act === 'store' && p.actT < ACT.store.at) || (p.act === 'feed' && p.actT < ACT.feed.at) || (p.act === 'drop' && p.actT < ACT.drop.at);
+    a.log.visible = p.carry === 'poutre' ? false : p.carry === 'bois' && !(p.act === 'pick' && p.actT < ACT.pick.at) && !(p.act === 'take' && p.actT < ACT.take.at) || (p.act === 'store' && p.actT < ACT.store.at) || (p.act === 'feed' && p.actT < ACT.feed.at) || (p.act === 'drop' && p.actT < ACT.drop.at);
     for (const o of a.tools) o.visible = !p.carry && !['pick', 'store', 'feed', 'take'].includes(p.act);
     a.cross.visible = p.down; if (p.down) { a.cross.material.opacity = 0.6 + 0.4 * Math.sin(t * 6); }
     if (a.nameTag) a.nameTag.visible = !p.down;
@@ -209,6 +209,8 @@ export async function createActors(scene, { makeLog }) {
     for (const [id, a] of heroes) {
       const p = sim.player(id);
       if (!p) { scene.remove(a.holder, a.shadow); heroes.delete(id); continue; }
+      // changement de métier : on refait le personnage
+      if (a.jobKey !== p.job) { scene.remove(a.holder, a.shadow); heroes.delete(id); continue; }
       a.p = p; updateHero(a, p, dt, sim, t);
     }
     const alive = new Set();

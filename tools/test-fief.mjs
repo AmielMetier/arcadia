@@ -1,8 +1,9 @@
 // Fief Maudit : tests du moteur (sans navigateur). node tools/test-fief.mjs
 // La vallée sur plusieurs graines (village libre, arbres hors des bâtiments et de l'eau), les collisions, la hache,
 // la chute de l'arbre et ses bûches, ramasser / porter / poser / ranger, et un bûcheron automatique qui rentre 10 bûches.
-import { Sim, DT, emptyInput, SPEED, REACH, CYCLE, FUEL, FOES, HP, RISE } from '../fief/engine/sim.js';
+import { Sim, DT, emptyInput, SPEED, REACH, CYCLE, FUEL, FOES, HP, RISE, JOBS, BEAM, WAREHOUSE_HP } from '../fief/engine/sim.js';
 import { createValley, rectOf, R_PLAY, WATER } from '../fief/engine/map.js';
+import { encodeState, encodeWorld, applyState, applyWorld, smooth, predict, reconcile, cleanInput } from '../fief/engine/net.js';
 
 let fails = 0, n = 0;
 const ok = (c, m) => { n++; if (!c) { fails++; console.log('  ✗ ' + m); } };
@@ -272,6 +273,128 @@ section('le bot');
   ok(s2.players.every((p) => p.kills >= 1), `chacun se bat (${s2.players.map((p) => p.kills).join(' et ')} squelettes)`);
   ok(s2.clock.day === 2, 'on arrive au jour 2');
   ok(s2.braziers.filter((b) => b.fuel > 0).length >= 3, 'les bots ont gardé des braseros allumés');
+}
+
+// ------------------------------------------------ métiers, poutres, arrivées et départs
+section('métiers');
+{
+  const sim = new Sim({ seed: 12, players: Object.keys(JOBS).map((job, i) => ({ id: i, name: job, job })) });
+  const P = Object.fromEntries(sim.players.map((p) => [p.job, p]));
+  ok(P.chevalier.maxHp > P.bucheron.maxHp, 'le chevalier a plus de vie');
+  sim.hurt(P.chevalier, 20); sim.hurt(P.bucheron, 20);
+  ok(P.chevalier.maxHp - P.chevalier.hp < P.bucheron.maxHp - P.bucheron.hp, 'le chevalier encaisse moins');
+  // la chasseuse court plus vite
+  const run = (p) => { const x0 = p.x; for (let i = 0; i < 15; i++) { sim.setInput(p.id, { ...emptyInput(), wx: 1 }); sim.step(); } return p.x - x0; };
+  for (const p of sim.players) { p.x = -40 + p.id * 5; p.z = 40 - p.id * 3; }
+  ok(run(P.chasseuse) > run(P.bucheron) * 1.05, 'la chasseuse court plus vite');
+  // le prêtre soigne autour de lui (la nuit, loin du feu)
+  const s2 = new Sim({ seed: 12, players: [{ id: 0, name: 'p', job: 'pretre' }, { id: 1, name: 'b', job: 'bucheron' }] });
+  s2.skipToDusk(); idle(s2, CYCLE.dusk + 1); s2.spawnQ = []; s2.foes = [];
+  for (const p of s2.players) { p.x = 40; p.z = -30 + p.id; }
+  s2.players[1].hp = 40; idle(s2, 4);
+  ok(s2.players[1].hp > 45, 'le prêtre soigne ses voisins');
+  // la forgeronne répare l'entrepôt avec une bûche
+  const s3 = new Sim({ seed: 12, players: [{ id: 0, name: 'f', job: 'forgeronne' }] });
+  const f = s3.players[0]; s3.village.hp = 300; f.carry = 'bois'; f.x = s3.map.depot.x; f.z = s3.map.depot.z;
+  ok(s3.prompt(0)?.text.includes('Réparer'), 'invite : réparer l\'entrepôt');
+  press(s3, f, 'uc', 1.3);
+  ok(s3.village.hp === 300 + JOBS.forgeronne.repair && !f.carry, 'la forgeronne répare l\'entrepôt');
+  s3.setJob(0, 'chevalier');
+  ok(f.job === 'chevalier' && f.maxHp === JOBS.chevalier.hp, 'on change de métier');
+}
+
+section('poutres');
+{
+  const sim = new Sim({ seed: 13, players: [{ id: 0, name: 'A', job: 'chevalier' }, { id: 1, name: 'B', job: 'chasseuse' }] });
+  const [a, b] = sim.players, M = sim.map;
+  const oak = M.trees.find((t) => t.kind === 'oak' && Math.hypot(t.x, t.z) < 60);
+  ok(!!oak, 'il y a des chênes près du village');
+  a.x = oak.x - 1.4; a.z = oak.z; a.y = M.heightAt(a.x, a.z);
+  for (let i = 0; i < 6 && !sim.trees[oak.id].down; i++) press(sim, a, 'fc');
+  press(sim, a, 'fc', 1.6);
+  ok(sim.beams.length === 1 && sim.logs.length === 1, 'un chêne donne une poutre et une bûche');
+  const beam = sim.beams[0], [e0, e1] = sim.beamEnds(beam);
+  a.x = e0[0]; a.z = e0[1]; press(sim, a, 'uc', 0.3);
+  ok(a.carry === 'poutre' && !beam.lifted, 'un bout en main, la poutre reste au sol');
+  for (let i = 0; i < 30; i++) { sim.setInput(a.id, { ...emptyInput(), wx: -1, fc: a._fc, uc: a._uc }); sim.setInput(b.id, emptyInput()); sim.step(); }
+  ok(Math.hypot(a.x - e0[0], a.z - e0[1]) < 1, 'seul, on ne l\'emporte pas');
+  b.x = e1[0]; b.z = e1[1]; press(sim, b, 'uc', 0.3);
+  ok(beam.lifted, 'à deux, elle se soulève');
+  // on la porte : elle suit ses porteurs (vers le nord, où le terrain est libre)
+  const walk = (wx, wz, sec) => { for (let i = 0; i < sec / DT; i++) { const w = { ...emptyInput(), wx, wz }; sim.setInput(a.id, { ...w, fc: a._fc || 0, uc: a._uc || 0 }); sim.setInput(b.id, { ...w, fc: b._fc || 0, uc: b._uc || 0 }); sim.step(); } };
+  const x0 = beam.x, z0 = beam.z;
+  walk(0, -1, 2);
+  ok(Math.hypot(beam.x - x0, beam.z - z0) > BEAM.speed * 2 * 0.7, `elle avance avec ses porteurs (${Math.hypot(beam.x - x0, beam.z - z0).toFixed(1)} m en 2 s)`);
+  ok(Math.abs(Math.hypot(a.x - b.x, a.z - b.z) - BEAM.len) < 0.6, 'les porteurs restent à la longueur de la poutre');
+  // posée près de l'entrepôt et rangée
+  const D = M.depot; a.x = D.x - 2; a.z = D.z - 1.7; b.x = D.x - 2; b.z = D.z + 1.7; walk(0, 0, 0.1);
+  press(sim, a, 'uc', 0.3);
+  ok(sim.stock.poutre === 1 && !a.carry && !b.carry && !sim.beams.length, 'la poutre est rangée à l\'entrepôt');
+  // le bûcheron la porte seul
+  const s2 = new Sim({ seed: 13, players: [{ id: 0, name: 'B', job: 'bucheron' }] });
+  s2.beams.push({ id: 9, x: 10, z: 20, y: s2.map.heightAt(10, 20), rot: 0, h: [null, null], lifted: false, ready: true, at: 0 });
+  const p = s2.players[0], [q] = s2.beamEnds(s2.beams[0]); p.x = q[0]; p.z = q[1]; press(s2, p, 'uc', 0.3);
+  ok(s2.beams[0].lifted, 'le bûcheron soulève une poutre seul');
+  // un bot vient tenir l'autre bout
+  const s3 = new Sim({ seed: 13, players: [{ id: 0, name: 'A', job: 'chasseuse' }], bots: 1 });
+  s3.goal = 6;
+  s3.beams.push({ id: 9, x: 4, z: 18, y: s3.map.heightAt(4, 18), rot: Math.PI / 2, h: [null, null], lifted: false, ready: true, at: 0 });
+  const h = s3.players[0], [r] = s3.beamEnds(s3.beams[0]); h.x = r[0]; h.z = r[1]; press(s3, h, 'uc', 0.3);
+  idle(s3, 15);
+  ok(s3.beams[0].lifted, 'un chevalier IA vient prendre l\'autre bout');
+}
+
+section('arrivées et départs');
+{
+  const sim = new Sim({ seed: 14, bots: 1 });
+  idle(sim, 2);
+  const q = sim.addPlayer({ id: 7, name: 'Nouveau', job: 'pretre' });
+  ok(sim.players.length === 3 && q.job === 'pretre', 'un joueur rejoint la partie en cours');
+  q.carry = 'bois'; const n = sim.logs.length;
+  sim.removePlayer(7);
+  ok(sim.players.length === 2 && sim.logs.length === n + 1, 'il part : sa bûche reste par terre');
+}
+
+section('réseau');
+{
+  // un hôte, un invité ; l'invité garde une copie de la vallée et y recopie ce que l'hôte envoie
+  const host = new Sim({ seed: 1, players: [{ id: 1, name: 'Hôte', job: 'bucheron' }], bots: 1 });
+  host.addPlayer({ id: 2, name: 'Invité', job: 'chasseuse' });
+  const mirror = new Sim({ seed: 1, players: [] });
+  const wire = (o) => JSON.parse(JSON.stringify(o));
+  applyWorld(mirror, wire(encodeWorld(host)));
+  ok(mirror.players.length === 3 && mirror.player(2).job === 'chasseuse', 'l\'invité connaît l\'équipe et les métiers');
+  const sizes = [];
+  host.skipToDusk();
+  const gi = { ...emptyInput() };
+  let me = mirror.player(2);
+  for (let i = 0; i < (CYCLE.dusk + 20) / DT; i++) {
+    // l'invité avance chez lui et envoie son entrée
+    gi.wx = 1; gi.wz = 0.3;
+    predict(mirror, me, gi);
+    host.setInput(2, cleanInput(wire(gi))); host.setInput(1, emptyInput());
+    host.step();
+    if (i % 2 === 0) {
+      const msg = wire(encodeState(host)); sizes.push(JSON.stringify(msg).length);
+      const srv = applyState(mirror, msg, 2);
+      reconcile(me, srv, !!me.act || me.carry === 'poutre');
+      smooth(mirror, DT * 2, 2);
+    }
+  }
+  const hp = host.player(2);
+  ok(Math.hypot(me.x - hp.x, me.z - hp.z) < 1.5, `la position prédite colle à celle de l'hôte (écart ${Math.hypot(me.x - hp.x, me.z - hp.z).toFixed(2)} m)`);
+  ok(mirror.night && mirror.foes.length === host.foes.length && mirror.foes.length > 0, `la nuit et les squelettes arrivent chez l'invité (${mirror.foes.length})`);
+  ok(mirror.braziers.every((b, i) => Math.abs(b.fuel - host.braziers[i].fuel) < 0.2), 'les braseros aussi');
+  const avg = sizes.reduce((a, b) => a + b, 0) / sizes.length;
+  ok(avg < 3000, `un état pèse ${Math.round(avg)} octets en moyenne`);
+  // l'hôte part : l'invité reprend la partie depuis le dernier instantané complet
+  const full = wire(host.snapshot());
+  const heir = new Sim({ seed: 1, players: [] });
+  heir.restore(full); heir.removePlayer(1);
+  const n0 = heir.foes.length; idle(heir, 5);
+  ok(heir.players.length === 2 && heir.night && heir.foes.length >= n0 - 2, 'un invité reprend la partie quand l\'hôte s\'en va');
+  const bad = cleanInput({ wx: 9, wz: 'x', fc: 3.7, hold: 1 });
+  ok(bad.wx === 1 && bad.wz === 0 && bad.fc === 3 && bad.hold === true, 'les entrées des invités sont nettoyées');
 }
 
 console.log(fails ? `\n${fails} échec(s) sur ${n}` : `\n${n} vérifications, tout est bon`);

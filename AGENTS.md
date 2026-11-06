@@ -151,8 +151,12 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
 - Fief Maudit (`fief/`, moteur sans DOM dans `fief/engine/`) : survie médiévale en coop, en construction par étapes (conception et étapes dans `docs/FIEF-MAUDIT.md`).
   Vallée, village, braseros, arbres et collisions dans `map.js` ; chemins A* sur une grille de 1 m dans `nav.js` ; joueurs, hache, bûches, entrepôt, cycle jour / nuit (`CYCLE`),
   braseros (`FUEL`), squelettes (`FOES`, réveil, cibles, résurrection dans la brume `RISE`), à terre / relevé (`HP`), défaite, `snapshot` / `restore` dans `sim.js` ;
-  coéquipiers IA dans `bots.js` (mêmes entrées qu'un joueur). Vue : `view/night.js` (lumière, ciel, brume, braseros), `view/actors.js` (héros et squelettes).
-  `node tools/test-fief.mjs` (à lancer quand on touche au moteur : vallée, chemins, hache et bûches, nuit, braseros, squelettes, bouclier, relève, défaite, instantané, une nuit jouée par deux bots).
+  métiers (`JOBS`), poutres à deux (`BEAM`, `stepBeams`), arrivées et départs (`addPlayer`, `removePlayer`, `setJob`) dans `sim.js` ;
+  coéquipiers IA dans `bots.js` (mêmes entrées qu'un joueur). Réseau dans `net.js` : l'hôte envoie `encodeState` (~15 fois par seconde), `encodeWorld` et
+  un `snapshot` complet toutes les 4 s ; l'invité garde une copie de la vallée (`applyState`, `smooth`) et prédit son déplacement (`predict`, `reconcile`) ;
+  le nouvel hôte repart du dernier instantané. `tools/fief-duo.html?q=debug%26manual` charge deux ou trois jeux dans une page et fait passer leurs messages
+  comme le salon (`duo.dropHost()` fait partir l'hôte). Vue : `view/night.js` (lumière, ciel, brume, braseros), `view/actors.js` (héros et squelettes).
+  `node tools/test-fief.mjs` (à lancer quand on touche au moteur : vallée, chemins, hache et bûches, nuit, braseros, squelettes, bouclier, relève, défaite, instantané, une nuit jouée par deux bots, métiers, poutres, arrivées et départs, réseau).
   Modèles (Quaternius Medieval Village MegaKit, KayKit Adventurers et Skeletons, CC0) préparés par `node tools/fief-assets.mjs <clones>` dans `fief/models/` (crédits : `fief/models/LICENSE.txt`) ;
-  arbres, ciel et textures repris de Birdie Party, rochers de Kenney et sons d'Island Rush et Birdie Party. `?debug` expose `__fief` (`ff(sec)`, `tp(x, z, cap)`, `cam(cap, inclinaison, distance)`, `press('fc'|'uc')`), `?manual` ne dessine qu'à la demande (`__fief.frames(n)`), `?seed`, `?bots=0..2`, `?autostart`.
+  arbres, ciel et textures repris de Birdie Party, rochers de Kenney et sons d'Island Rush et Birdie Party. `?debug` expose `__fief` (`ff(sec)`, `tp(x, z, cap)`, `cam(cap, inclinaison, distance)`, `press('fc'|'uc')`), `?manual` ne dessine qu'à la demande (`__fief.frames(n)`), `?seed`, `?bots=0..2`, `?job=…`, `?autostart`.
 - Commits : auteur et messages en français, un message qui décrit ce que le joueur gagne.

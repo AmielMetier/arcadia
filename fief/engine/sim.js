@@ -21,6 +21,7 @@ export const ACT = {
   feed: { dur: 0.7, at: 0.4 },        // bûche dans un brasero
   take: { dur: 0.6, at: 0.35 },       // reprendre une bûche à l'entrepôt
   drop: { dur: 0.45, at: 0.2 },       // poser la bûche par terre
+  repair: { dur: 1.1, at: 0.7 },      // réparer l'entrepôt avec une bûche (forgeronne)
 };
 export const REACH = { chop: 1.6, pick: 1.9, store: 3.2, feed: 2.3, strike: 2.4, revive: 1.9 };
 export const P_R = 0.42;
@@ -33,7 +34,16 @@ export const FOES = {
 };
 export const RISE = { delay: 6, dur: 2.3, max: 2, awaken: 2.4, crumble: 9 };
 export const WAREHOUSE_HP = 600;
-const DMG = { bucheron: 30, chevalier: 34 };
+// les métiers : chacun son modèle (vue), sa vie, ses coups et un talent
+export const JOBS = {
+  bucheron: { name: 'Bûcheron', hp: 100, dmg: 30, chop: 1.34, beamAlone: true, perk: 'Abat un arbre en 3 coups, porte une poutre seul' },
+  chevalier: { name: 'Chevalier', hp: 130, dmg: 34, armor: 0.75, perk: '+30 % de vie, encaisse un quart des coups en moins' },
+  chasseuse: { name: 'Chasseuse', hp: 90, dmg: 26, speed: 1.12, reach: 0.5, perk: 'Court plus vite, frappe de plus loin' },
+  pretre: { name: 'Prêtre', hp: 95, dmg: 22, aura: 2.5, revive: 2, perk: 'Soigne les équipiers autour de lui, relève deux fois plus vite' },
+  forgeronne: { name: 'Forgeronne', hp: 105, dmg: 28, feed: 1.5, repair: 60, perk: 'Ses bûches brûlent plus longtemps, répare l\'entrepôt' },
+};
+export const jobOf = (p) => JOBS[p.job] || JOBS.bucheron;
+export const BEAM = { len: 3.4, speed: 2.3, alone: 1.9, grab: 1.5, store: 4.4 };
 const GRAV = 22, JUMP_V = 7.2;
 const LOGS_PER_TREE = 2, LOG_DELAY = 1.3;
 
@@ -60,7 +70,8 @@ export class Sim {
     this.rng = makeRng(seed * 31 + 5);
     this.t = 0; this.tick = 0;
     this.clock = { day: 1, phase: 'jour', t: 0 };
-    this.stock = { bois: 0, pierre: 0, nourriture: 0 };
+    this.stock = { bois: 0, poutre: 0, pierre: 0, nourriture: 0 };
+    this.beams = []; this.nextBeam = 1;
     this.trees = this.map.trees.map((t) => ({ id: t.id, hp: TREE_HP, down: false, fallAt: 0, dir: 0 }));
     this.logs = []; this.nextLog = 1;
     this.braziers = this.map.braziers.map((b) => ({ id: b.id, fuel: FUEL.start }));
@@ -77,10 +88,39 @@ export class Sim {
   }
   makePlayer(p, i) {
     const s = this.map.spawn, a = i * 2.1;
-    const x = s.x + Math.sin(a) * i * 1.4, z = s.z + Math.cos(a) * i * 1.4;
-    return { id: p.id, name: p.name, job: p.job || 'bucheron', color: p.color || '#e0a040', bot: !!p.bot, x, z, y: this.map.heightAt(x, z), vy: 0, ground: true,
-      yaw: s.yaw, speed: 0, moving: 0, carry: null, act: null, actT: 0, target: null,
-      hp: HP.player, down: false, downT: 0, dead: false, revive: 0, reviving: null, hurtT: 0, stored: 0, felled: 0, kills: 0, ai: null };
+    let x = s.x + Math.sin(a) * i * 1.4, z = s.z + Math.cos(a) * i * 1.4;
+    [x, z] = this.map.collide(x, z, P_R, this.fallen);
+    const job = JOBS[p.job] ? p.job : 'bucheron';
+    return { id: p.id, name: p.name, job, color: p.color || '#e0a040', bot: !!p.bot, x, z, y: this.map.heightAt(x, z), vy: 0, ground: true,
+      yaw: s.yaw, speed: 0, moving: 0, carry: null, beam: null, end: 0, act: null, actT: 0, target: null,
+      hp: JOBS[job].hp, maxHp: JOBS[job].hp, down: false, downT: 0, dead: false, revive: 0, reviving: null, hurtT: 0, stored: 0, felled: 0, kills: 0, ai: null };
+  }
+  // un joueur arrive en cours de partie (près du feu de camp)
+  addPlayer(p) {
+    if (this.player(p.id)) return this.player(p.id);
+    const q = this.makePlayer(p, this.players.length);
+    this.players.push(q); this.events.push({ t: 'join', pid: q.id });
+    return q;
+  }
+  // un joueur s'en va : ce qu'il portait reste par terre
+  removePlayer(id) {
+    const p = this.player(id); if (!p) return;
+    this.release(p);
+    this.players = this.players.filter((o) => o !== p);
+    for (const o of this.players) if (o.reviving === id) o.reviving = null;
+    this.inputs.delete(id); this.lastC.delete(id);
+    this.events.push({ t: 'leave', pid: id, name: p.name });
+  }
+  setJob(id, job) {
+    const p = this.player(id); if (!p || !JOBS[job] || p.job === job) return;
+    const k = p.hp / p.maxHp; p.job = job; p.maxHp = JOBS[job].hp; p.hp = Math.max(1, Math.round(p.maxHp * k));
+    this.events.push({ t: 'job', pid: id, job });
+  }
+  // lâcher ce qu'on porte (à terre, en partant)
+  release(p) {
+    if (p.carry === 'bois') { const x = p.x + 0.6, z = p.z; this.logs.push({ id: this.nextLog++, x, z, y: this.map.heightAt(x, z), rot: p.yaw, at: this.t, ready: true }); }
+    if (p.carry === 'poutre') this.letGo(p);
+    p.carry = null; p.beam = null;
   }
   fallen = (id) => this.trees[id].down;
   player(id) { return this.players.find((p) => p.id === id); }
@@ -118,6 +158,8 @@ export class Sim {
     this.stepRevives();
     this.stepFoes();
     for (const l of this.logs) if (!l.ready && this.t >= l.at) l.ready = true;
+    for (const b of this.beams) if (!b.ready && this.t >= b.at) b.ready = true;
+    this.stepBeams();
     if (this.goal === 3 && this.stock.bois >= 10) this.setGoal(4);
     this.checkOver();
   }
@@ -157,7 +199,7 @@ export class Sim {
     for (const f of this.foes) f.sun = true;
     for (const p of this.players) {
       if (p.dead || p.down) { p.dead = false; p.down = false; p.revive = 0; const c = this.map.campfire; p.x = c.x + 1.6; p.z = c.z + 1.6; p.y = this.map.heightAt(p.x, p.z); }
-      p.hp = HP.player;
+      p.hp = p.maxHp;
     }
     this.events.push({ t: 'dawn', n: this.clock.day - 1 });
     if (this.goal === 5) this.setGoal(6);
@@ -199,7 +241,7 @@ export class Sim {
       // immobile pendant qu'on relève
     } else if (wantHit && !p.carry && p.ground) {
       // un squelette à portée passe avant les arbres
-      const f = this.foeNear(p.x, p.z, REACH.strike + 0.4);
+      const f = this.foeNear(p.x, p.z, REACH.strike + 0.4 + (jobOf(p).reach || 0));
       if (f) { p.yaw = Math.atan2(f.x - p.x, f.z - p.z); p.act = 'strike'; p.actT = 0; p.target = f.id; }
       else {
         const t = M.treeNear(p.x, p.z, REACH.chop + 0.6, this.fallen);
@@ -212,7 +254,9 @@ export class Sim {
     const len = Math.hypot(wx, wz);
     if (len > 1) { wx /= len; wz /= len; }
     const busy = !!p.act || p.reviving !== null;
-    const sp = busy ? 0 : p.carry ? SPEED.carry : inp.walk ? SPEED.walk : SPEED.run;
+    const J = jobOf(p);
+    let sp = busy ? 0 : p.carry === 'poutre' ? this.beamSpeed(p) : p.carry ? SPEED.carry : inp.walk ? SPEED.walk : SPEED.run * (J.speed || 1);
+    if (inp.walk && sp > SPEED.walk) sp = SPEED.walk;
     const k = Math.min(1, len);
     let nx = p.x + wx * sp * DT, nz = p.z + wz * sp * DT;
     if (!busy && k > 0.05) p.yaw += wrap(Math.atan2(wx, wz) - p.yaw) * Math.min(1, DT * 12);
@@ -227,25 +271,28 @@ export class Sim {
       if (p.y <= g) { p.y = g; p.vy = 0; p.ground = true; this.events.push({ t: 'land', pid: p.id }); }
     } else p.y = g;
     // le jour, près du feu de camp, on récupère
-    if (!this.night && Math.hypot(p.x - M.campfire.x, p.z - M.campfire.z) < 6) p.hp = Math.min(HP.player, p.hp + 4 * DT);
+    if (!this.night && Math.hypot(p.x - M.campfire.x, p.z - M.campfire.z) < 6) p.hp = Math.min(p.maxHp, p.hp + 4 * DT);
+    // le prêtre soigne autour de lui
+    if (J.aura) for (const o of this.players) if (!o.down && !o.dead && Math.hypot(o.x - p.x, o.z - p.z) < 7) o.hp = Math.min(o.maxHp, o.hp + J.aura * DT);
   }
   stepRevives() {
     for (const m of this.players) {
       if (!m.down) continue;
-      const helpers = this.players.filter((p) => p.reviving === m.id).length;
-      if (helpers) m.revive += DT * (1 + 0.5 * (helpers - 1));
+      const helpers = this.players.filter((p) => p.reviving === m.id);
+      if (helpers.length) m.revive += DT * Math.max(...helpers.map((p) => jobOf(p).revive || 1)) * (1 + 0.5 * (helpers.length - 1));
       else m.revive = Math.max(0, m.revive - DT * 2);
       if (m.revive >= HP.revive) { m.down = false; m.revive = 0; m.downT = 0; m.hp = HP.revived; this.events.push({ t: 'up', pid: m.id }); }
     }
   }
   hurt(p, dmg, from) {
     if (p.down || p.dead) return;
+    dmg *= jobOf(p).armor || 1;
     p.hp -= dmg; p.hurtT = 0.4;
     this.events.push({ t: 'hurt', pid: p.id, dmg });
     if (p.hp <= 0) {
       p.hp = 0; p.down = true; p.downT = 0; p.revive = 0; p.act = null;
-      // la bûche tombe avec lui
-      if (p.carry) { this.logs.push({ id: this.nextLog++, x: p.x + 0.6, z: p.z, y: this.map.heightAt(p.x + 0.6, p.z), rot: p.yaw, at: this.t, ready: true }); p.carry = null; }
+      // ce qu'il portait tombe avec lui
+      this.release(p);
       this.events.push({ t: 'down', pid: p.id });
     }
   }
@@ -253,7 +300,14 @@ export class Sim {
   // E : poser dans un brasero, ranger, poser par terre, ramasser
   use(p) {
     const M = this.map;
+    if (p.carry === 'poutre') {
+      const b = this.beams.find((o) => o.id === p.beam);
+      if (b && b.lifted && Math.hypot(b.x - M.depot.x, b.z - M.depot.z) < BEAM.store) this.storeBeam(b, p);
+      else this.letGo(p);
+      return;
+    }
     if (p.carry) {
+      if (jobOf(p).repair && this.village.hp < WAREHOUSE_HP - 20 && Math.hypot(p.x - M.depot.x, p.z - M.depot.z) < REACH.store) { p.act = 'repair'; p.actT = 0; p.yaw = Math.atan2(M.warehouse.x - p.x, M.warehouse.z - p.z); return; }
       const b = this.brazierNear(p.x, p.z, REACH.feed);
       if (b && this.braziers[b.id].fuel < FUEL.max - 5) { p.act = 'feed'; p.actT = 0; p.target = b.id; p.yaw = Math.atan2(b.x - p.x, b.z - p.z); return; }
       if (Math.hypot(p.x - M.depot.x, p.z - M.depot.z) < REACH.store) { p.act = 'store'; p.actT = 0; p.yaw = Math.atan2(M.warehouse.x - p.x, M.warehouse.z - p.z); return; }
@@ -261,6 +315,8 @@ export class Sim {
     }
     if (this.players.some((o) => o !== p && o.down && Math.hypot(o.x - p.x, o.z - p.z) < REACH.revive)) return; // E se tient pour relever
     const l = this.logNear(p.x, p.z, REACH.pick);
+    const e = this.beamEndNear(p.x, p.z);
+    if (e && (!l || e.d < Math.hypot(l.x - p.x, l.z - p.z))) { this.grab(p, e.beam, e.end); return; }
     if (l) { p.act = 'pick'; p.actT = 0; p.target = l.id; p.yaw = Math.atan2(l.x - p.x, l.z - p.z); return; }
     if (this.canTake(p)) { p.act = 'take'; p.actT = 0; p.yaw = Math.atan2(M.warehouse.x - p.x, M.warehouse.z - p.z); }
   }
@@ -291,14 +347,21 @@ export class Sim {
       if (id === null || this.trees[id].down) { this.events.push({ t: 'swing', pid: p.id }); return; }
       const T = this.trees[id], src = M.trees[id];
       if (Math.hypot(src.x - p.x, src.z - p.z) - 0.55 * src.s > REACH.chop + 0.7) { this.events.push({ t: 'swing', pid: p.id }); return; }
-      T.hp -= p.job === 'bucheron' ? 1.34 : 1;
+      T.hp -= jobOf(p).chop || 1;
       this.events.push({ t: 'hit', pid: p.id, tree: id, hp: Math.max(0, T.hp) });
       if (T.hp <= 0.01) {
         T.down = true; T.fallAt = this.t;
         T.dir = Math.atan2(src.x - p.x, src.z - p.z);
         p.felled++;
         this.events.push({ t: 'fall', pid: p.id, tree: id, dir: T.dir });
-        for (let i = 0; i < LOGS_PER_TREE; i++) {
+        // un chêne donne une poutre (à porter à deux) en plus d'une bûche
+        if (src.kind === 'oak') {
+          let x = src.x + Math.sin(T.dir) * 3.4 * src.s, z = src.z + Math.cos(T.dir) * 3.4 * src.s;
+          if (M.isWater(x, z)) { x = src.x + Math.sin(T.dir) * 1.8; z = src.z + Math.cos(T.dir) * 1.8; }
+          [x, z] = M.collide(x, z, 0.5, this.fallen);
+          this.beams.push({ id: this.nextBeam++, x, z, y: M.heightAt(x, z), rot: T.dir, h: [null, null], lifted: false, at: this.t + LOG_DELAY, ready: false });
+        }
+        for (let i = 0; i < (src.kind === 'oak' ? 1 : LOGS_PER_TREE); i++) {
           const d = 2.2 + i * 2.1 * src.s;
           let x = src.x + Math.sin(T.dir) * d, z = src.z + Math.cos(T.dir) * d;
           if (M.isWater(x, z)) { x = src.x + Math.sin(T.dir) * 1.2; z = src.z + Math.cos(T.dir) * 1.2; }
@@ -309,8 +372,8 @@ export class Sim {
       }
     } else if (p.act === 'strike') {
       const f = this.foe(p.target);
-      if (!f || f.state === 'dead' || f.state === 'rise' || Math.hypot(f.x - p.x, f.z - p.z) > REACH.strike + 0.6) { this.events.push({ t: 'swing', pid: p.id }); return; }
-      let dmg = DMG[p.job] || 30;
+      if (!f || f.state === 'dead' || f.state === 'rise' || Math.hypot(f.x - p.x, f.z - p.z) > REACH.strike + 0.6 + (jobOf(p).reach || 0)) { this.events.push({ t: 'swing', pid: p.id }); return; }
+      let dmg = jobOf(p).dmg;
       // le guerrier pare de face avec son bouclier
       const blocked = this.blocks(f, p.x, p.z);
       if (blocked) dmg *= 0.3;
@@ -334,9 +397,13 @@ export class Sim {
     } else if (p.act === 'feed') {
       if (!p.carry) return;
       const B = this.braziers[p.target];
-      B.fuel = Math.min(FUEL.max, B.fuel + FUEL.log); p.carry = null;
+      B.fuel = Math.min(FUEL.max, B.fuel + FUEL.log * (jobOf(p).feed || 1)); p.carry = null;
       this.events.push({ t: 'feed', pid: p.id, brazier: p.target, fuel: B.fuel });
       if (this.goal === 4) this.setGoal(5);
+    } else if (p.act === 'repair') {
+      if (!p.carry) return;
+      p.carry = null; this.village.hp = Math.min(WAREHOUSE_HP, this.village.hp + jobOf(p).repair);
+      this.events.push({ t: 'repair', pid: p.id, hp: this.village.hp });
     } else if (p.act === 'take') {
       if (p.carry || this.stock.bois <= 0) return;
       this.stock.bois--; p.carry = 'bois';
@@ -452,6 +519,77 @@ export class Sim {
     else { this.village.hp = Math.max(0, this.village.hp - F.dmg * 0.7); this.events.push({ t: 'wallHit', hp: this.village.hp }); }
   }
 
+  // ------------------------------------------------------------------ poutres
+  // les deux bouts d'une poutre
+  beamEnds(b) { const h = BEAM.len / 2, sx = Math.sin(b.rot) * h, sz = Math.cos(b.rot) * h; return [[b.x - sx, b.z - sz], [b.x + sx, b.z + sz]]; }
+  beamEndNear(x, z) {
+    let best = null;
+    for (const b of this.beams) {
+      if (!b.ready || b.lifted) continue;
+      this.beamEnds(b).forEach(([ex, ez], k) => { if (b.h[k] !== null) return; const d = Math.hypot(ex - x, ez - z); if (d < BEAM.grab && (!best || d < best.d)) best = { beam: b, end: k, d }; });
+    }
+    return best;
+  }
+  grab(p, b, end) {
+    b.h[end] = p.id; p.carry = 'poutre'; p.beam = b.id; p.end = end;
+    const [ex, ez] = this.beamEnds(b)[end]; p.yaw = Math.atan2(b.x - ex, b.z - ez);
+    this.events.push({ t: 'grab', pid: p.id, beam: b.id });
+    this.liftCheck(b);
+  }
+  liftCheck(b) {
+    const hs = b.h.filter((id) => id !== null).map((id) => this.player(id));
+    const was = b.lifted;
+    b.lifted = hs.length === 2 || (hs.length === 1 && !!jobOf(hs[0]).beamAlone);
+    if (b.lifted && !was) this.events.push({ t: 'lift', beam: b.id });
+  }
+  letGo(p) {
+    const b = this.beams.find((o) => o.id === p.beam);
+    p.carry = null; p.beam = null;
+    if (!b) return;
+    b.h = b.h.map((id) => (id === p.id ? null : id));
+    const wasUp = b.lifted;
+    this.liftCheck(b);
+    if (wasUp && !b.lifted) {
+      // la poutre retombe : l'autre garde son bout en main
+      [b.x, b.z] = this.map.collide(b.x, b.z, 0.5, this.fallen); b.y = this.map.heightAt(b.x, b.z);
+      this.events.push({ t: 'beamDrop', beam: b.id });
+    }
+  }
+  storeBeam(b, by) {
+    for (const id of b.h) { const o = this.player(id); if (o) { o.carry = null; o.beam = null; } }
+    this.beams = this.beams.filter((o) => o !== b);
+    this.stock.poutre++;
+    this.events.push({ t: 'storeBeam', pid: by.id, n: this.stock.poutre });
+  }
+  beamSpeed(p) {
+    const b = this.beams.find((o) => o.id === p.beam);
+    if (!b || !b.lifted) return 0.9;   // on ne peut que tirer un peu sur son bout
+    return b.h.filter((id) => id !== null).length === 2 ? BEAM.speed : BEAM.alone;
+  }
+  // après le déplacement des joueurs : la poutre suit ses porteurs, qui restent à bonne distance l'un de l'autre
+  stepBeams() {
+    for (const b of this.beams) {
+      const hs = b.h.map((id) => (id === null ? null : this.player(id)));
+      for (let k = 0; k < 2; k++) if (b.h[k] !== null && (!hs[k] || hs[k].carry !== 'poutre' || hs[k].beam !== b.id)) { b.h[k] = null; this.liftCheck(b); }
+      const H = b.h.map((id) => (id === null ? null : this.player(id)));
+      if (!b.lifted) {
+        // un seul porteur qui ne peut pas la soulever : il reste à son bout
+        for (let k = 0; k < 2; k++) { const p = H[k]; if (!p) continue; const [ex, ez] = this.beamEnds(b)[k], d = Math.hypot(p.x - ex, p.z - ez); if (d > 0.9) { p.x = ex + (p.x - ex) / d * 0.9; p.z = ez + (p.z - ez) / d * 0.9; } }
+        continue;
+      }
+      if (H[0] && H[1]) {
+        const a = H[0], c = H[1], dx = c.x - a.x, dz = c.z - a.z, d = Math.hypot(dx, dz) || 1e-3, k = (d - BEAM.len) / 2 / d;
+        a.x += dx * k; a.z += dz * k; c.x -= dx * k; c.z -= dz * k;
+        [a.x, a.z] = this.map.collide(a.x, a.z, P_R, this.fallen); [c.x, c.z] = this.map.collide(c.x, c.z, P_R, this.fallen);
+        b.x = (a.x + c.x) / 2; b.z = (a.z + c.z) / 2; b.rot = Math.atan2(c.x - a.x, c.z - a.z);
+        b.y = (a.y + c.y) / 2 + 1.15;
+      } else {
+        const p = H[0] || H[1];
+        b.x = p.x; b.z = p.z; b.rot = p.yaw; b.y = p.y + 1.35;
+      }
+    }
+  }
+
   // ------------------------------------------------------------------ pour l'écran
   // ce que E (ou le clic) ferait maintenant
   prompt(id) {
@@ -459,13 +597,23 @@ export class Sim {
     if (!p || p.act || p.down || p.dead) return null;
     const mate = this.players.find((o) => o !== p && o.down && Math.hypot(o.x - p.x, o.z - p.z) < REACH.revive + 0.4);
     if (mate && !p.carry) return { key: 'E', hold: true, text: `Relever ${mate.name} (tenir E)`, hp: mate.revive / HP.revive };
+    if (p.carry === 'poutre') {
+      const b = this.beams.find((o) => o.id === p.beam);
+      if (!b) return null;
+      if (!b.lifted) return { key: 'E', text: 'Il faut quelqu\'un à l\'autre bout (E pour lâcher)' };
+      if (Math.hypot(b.x - M.depot.x, b.z - M.depot.z) < BEAM.store) return { key: 'E', text: 'Ranger la poutre dans l\'entrepôt' };
+      return { key: 'E', text: 'Poser la poutre' };
+    }
     if (p.carry) {
+      if (jobOf(p).repair && this.village.hp < WAREHOUSE_HP - 20 && Math.hypot(p.x - M.depot.x, p.z - M.depot.z) < REACH.store) return { key: 'E', text: 'Réparer l\'entrepôt avec la bûche', hp: this.village.hp / WAREHOUSE_HP };
       const b = this.brazierNear(p.x, p.z, REACH.feed);
       if (b && this.braziers[b.id].fuel < FUEL.max - 5) return { key: 'E', text: 'Mettre la bûche dans le brasero', hp: this.braziers[b.id].fuel / FUEL.max };
       if (Math.hypot(p.x - M.depot.x, p.z - M.depot.z) < REACH.store) return { key: 'E', text: 'Ranger la bûche dans l\'entrepôt' };
       return { key: 'E', text: 'Poser la bûche' };
     }
     if (this.foeNear(p.x, p.z, REACH.strike + 0.4)) return { key: 'Clic', text: 'Frapper' };
+    const be = this.beamEndNear(p.x, p.z);
+    if (be) { const other = be.beam.h[1 - be.end]; return { key: 'E', text: other !== null ? `Soulever la poutre avec ${this.player(other)?.name || 'ton équipier'}` : jobOf(p).beamAlone ? 'Prendre la poutre (seul, lentement)' : 'Prendre un bout de la poutre (il faut être deux)' }; }
     if (this.logNear(p.x, p.z, REACH.pick)) return { key: 'E', text: 'Ramasser la bûche' };
     if (this.canTake(p)) return { key: 'E', text: `Prendre une bûche à l'entrepôt (${this.stock.bois})` };
     const t = M.treeNear(p.x, p.z, REACH.chop + 0.6, this.fallen);
@@ -479,7 +627,7 @@ export class Sim {
   // état complet (sans la carte), pour rejouer une nuit ; plus tard pour le réseau
   snapshot() {
     return structuredClone({ t: this.t, tick: this.tick, clock: this.clock, stock: this.stock, trees: this.trees, logs: this.logs, nextLog: this.nextLog,
-      braziers: this.braziers, village: this.village, foes: this.foes, nextFoe: this.nextFoe, spawnQ: this.spawnQ, goal: this.goal, stats: this.stats,
+      braziers: this.braziers, village: this.village, beams: this.beams, nextBeam: this.nextBeam, foes: this.foes.map((f) => ({ ...f, path: null })), nextFoe: this.nextFoe, spawnQ: this.spawnQ, goal: this.goal, stats: this.stats,
       players: this.players.map((p) => ({ ...p, ai: null })) });
   }
   restore(s) {

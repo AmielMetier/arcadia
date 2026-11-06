@@ -2,7 +2,7 @@
 
 Survie en coopération en 3D (Three.js), vue à la troisième personne, de 1 à 6 joueurs, avec des bots pour compléter.
 Dossier : `fief/`. Ce document décrit le jeu visé, les assets retenus et l'ordre de développement.
-Où on en est : **étape 3 faite** (voir la section 8).
+Où on en est : **étape 4 faite** (voir la section 8).
 
 ## 1. L'idée
 
@@ -211,7 +211,13 @@ Chaque étape se termine par une version jouable, poussée, et validée avant de
    - Le bois rangé peut ressortir de l'entrepôt (E devant la porte) : c'est lui qui nourrit les braseros.
    - Seuls les soldats (Skeleton_Minion) et les guerriers (Skeleton_Warrior) sont là ; archers, mages et chevalier noir viendront avec les sièges.
    - Défaite : on rejoue depuis le crépuscule (instantané pris à la cloche) ou depuis le début.
-4. **À plusieurs** : branchement au Hub, hôte qui fait autorité, prédiction, poutres à deux, métiers.
+4. **À plusieurs** : branchement au Hub, hôte qui fait autorité, prédiction, poutres à deux, métiers. ✔ (version 4.54)
+   - Réseau : état compact (~400 octets) 15 fois par seconde, monde à chaque changement et toutes les 2 s, instantané complet toutes les 4 s
+     (il sert au relais d'hôte). L'invité prédit seulement son déplacement ; ses gestes (hache, E) passent par l'hôte.
+   - Métiers : bonus passifs pour l'instant (vie, dégâts, vitesse, portée, soin, relève, bûches, réparation). Les capacités sur F viendront plus tard.
+   - Poutres : un chêne donne une bûche et une poutre (3,4 m). Seul, on ne peut que tenir son bout ; le bûcheron la porte seul, plus lentement.
+     Elles s'empilent à l'entrepôt (stock « poutre ») pour la construction de l'étape 5.
+   - Banc d'essai : `tools/fief-duo.html` (deux ou trois jeux dans une page, messages relayés comme par le salon).
 5. **La boucle complète** : construction des bâtiments, faim, froid, nourriture, 10 jours, sauvegarde, sièges des jours 5 et 10.
 6. **La crypte** et le Roi-Squelette, écran de fin, `H.report`.
 7. **Finitions** : sons, musique, écran d'accueil, réglages graphiques, mode Sans fin, manette et tactile.

@@ -2,7 +2,7 @@
 // il relève un équipier à terre, se bat contre les squelettes qui approchent, charge les braseros au crépuscule
 // et la nuit, et le jour coupe du bois près du village et le rentre à l'entrepôt. Il se déplace par les chemins
 // de la grille (nav.js). Moteur PUR.
-import { FUEL, REACH, CYCLE } from './sim.js';
+import { FUEL, REACH, CYCLE, BEAM, emptyInput } from './sim.js';
 import { TREE_R } from './map.js';
 
 const THINK = 0.3;   // secondes entre deux décisions
@@ -12,14 +12,25 @@ export function botInput(sim, p) {
   const out = { wx: 0, wz: 0, walk: false, jump: false, hold: false, fc: ai.fc, uc: ai.uc };
   if (p.down || p.dead) return out;
   ai.think -= 1 / 30; ai.cool -= 1 / 30;
+  // une poutre en main : on suit son équipier (mêmes gestes que lui), ou on lâche s'il ne vient pas
+  if (p.carry === 'poutre') {
+    const b = sim.beams.find((o) => o.id === p.beam);
+    const mate = b && b.h.map((id) => (id === null || id === p.id ? null : sim.player(id))).find(Boolean);
+    if (!b || !mate) { ai.wait = (ai.wait || 0) + 1 / 30; if (ai.wait > 3 && ai.cool <= 0) { out.uc = ++ai.uc; ai.cool = 1; ai.wait = 0; } return out; }
+    ai.wait = 0;
+    const mi = sim.inputs.get(mate.id) || emptyInput();
+    // il tire dans le même sens que son équipier, et se recale à bonne distance
+    out.wx = mi.wx || 0; out.wz = mi.wz || 0;
+    return out;
+  }
   if (ai.think <= 0 || !ai.goal) { ai.think = THINK; ai.goal = decide(sim, p, ai); }
   const G = ai.goal;
   if (!G) return out;
   const d = Math.hypot(G.x - p.x, G.z - p.z);
   if (d > G.near) {
     // en route
-    if (!ai.path || sim.t - ai.pathAt > 2.5 || Math.hypot(ai.pathTo[0] - G.x, ai.pathTo[1] - G.z) > 1.5) {
-      ai.path = sim.nav.path(p.x, p.z, G.x, G.z, sim.fallen) || [[G.x, G.z]]; ai.pathAt = sim.t; ai.pathTo = [G.x, G.z];
+    if (!ai.path || !ai.path.length || sim.t - ai.pathAt > 2.5 || Math.hypot(ai.pathTo[0] - G.x, ai.pathTo[1] - G.z) > 1.5) {
+      ai.path = sim.nav.path(p.x, p.z, G.x, G.z, sim.fallen); if (!ai.path || !ai.path.length) ai.path = [[G.x, G.z]]; ai.pathAt = sim.t; ai.pathTo = [G.x, G.z];
     }
     while (ai.path.length > 1 && Math.hypot(ai.path[0][0] - p.x, ai.path[0][1] - p.z) < 0.7) ai.path.shift();
     const w = ai.path[0], wx = w[0] - p.x, wz = w[1] - p.z, wd = Math.hypot(wx, wz) || 1;
@@ -31,7 +42,7 @@ export function botInput(sim, p) {
   if (p.act) return out;
   if (G.kind === 'revive') out.hold = true;
   else if ((G.kind === 'fight' || G.kind === 'chop') && ai.cool <= 0) { out.fc = ++ai.fc; ai.cool = 0.25; }
-  else if ((G.kind === 'pick' || G.kind === 'store' || G.kind === 'feed' || G.kind === 'take') && ai.cool <= 0) { out.uc = ++ai.uc; ai.cool = 0.8; }
+  else if ((G.kind === 'pick' || G.kind === 'store' || G.kind === 'feed' || G.kind === 'take' || G.kind === 'beam') && ai.cool <= 0) { out.uc = ++ai.uc; ai.cool = 0.8; }
   return out;
 }
 
@@ -48,6 +59,13 @@ function decide(sim, p, ai) {
     .filter((f) => dist(f) < 14 || Math.hypot(f.x - camp.x, f.z - camp.z) < 24 || sim.players.some((o) => !o.bot && !o.down && Math.hypot(o.x - f.x, o.z - f.z) < 8))
     .sort((a, b) => dist(a) - dist(b))[0];
   if (threat && !p.carry) return { kind: 'fight', x: threat.x, z: threat.z, near: REACH.strike - 0.6 };
+  // 2b. un équipier attend à un bout de poutre : prendre l'autre bout
+  if (!p.carry) for (const b of sim.beams) {
+    const k = b.h.findIndex((id) => id !== null && !sim.player(id)?.bot);
+    if (k < 0 || b.lifted || b.h[1 - k] !== null) continue;
+    const [ex, ez] = sim.beamEnds(b)[1 - k];
+    if (Math.hypot(ex - p.x, ez - p.z) < 60) return { kind: 'beam', x: ex, z: ez, near: BEAM.grab - 0.7 };
+  }
   const dark = sim.darkness > 0 || sim.clock.t > CYCLE.day - CYCLE.dusk - 40;
   // 3. une bûche en main : le brasero le plus vide, ou l'entrepôt
   if (p.carry) {

@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 4.54 — 6 novembre 2026
+- **Fief Maudit** — On défend le village ensemble.
+  - Tout le salon joue dans la même vallée, jusqu'à six joueurs, avec ou sans chevaliers IA. Un joueur peut arriver en cours de partie, il apparaît près du feu de camp.
+  - Si celui qui a lancé la partie s'en va, un autre joueur la reprend là où elle en était.
+  - Cinq métiers à choisir en arrivant ou dans le menu : bûcheron (trois coups par arbre, porte une poutre seul), chevalier (plus de vie, encaisse mieux), chasseuse (plus rapide, frappe de plus loin), prêtre (soigne autour de lui, relève deux fois plus vite) et forgeronne (ses bûches brûlent plus longtemps, elle répare l'entrepôt).
+  - Les chênes donnent une poutre en plus d'une bûche. Une poutre se porte à deux : chacun prend un bout avec E. Un chevalier IA vient tenir l'autre bout si personne n'est là.
+  - À plusieurs, le menu ne met plus la partie en pause : la vallée continue pour les autres.
+
 ## 4.53 — 6 novembre 2026
 - **The Backrooms** — Un nouveau niveau : le Level 2, les Tuyauteries.
   - Aux Poolrooms, le toboggan jaune ne sort plus des Backrooms : il descend dans les galeries de service. Le rouge et le bleu font toujours sortir.

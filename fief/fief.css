@@ -108,3 +108,23 @@ body.touch .tbtns button.on { transform: scale(0.92); }
 .btn:hover { filter: brightness(1.06); }
 .sheet label { display: flex; align-items: center; gap: 12px; margin: 10px 0; font-weight: 700; }
 .sheet input[type=range] { flex: 1; accent-color: #c4601d; }
+
+.ico.beam { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M2 15l16-9 4 3-16 9z' fill='%23a87a4a' stroke='%235e3f22' stroke-width='1.2'/%3E%3Cpath d='M18 6l4 3v2l-4-3z' fill='%23d9b07a'/%3E%3Cpath d='M6 14l9-5M5 16.5l9-5' stroke='%237a5232' stroke-width='0.9'/%3E%3C/svg%3E"); }
+.sheet.wide { width: min(760px, 94vw); max-height: 92vh; overflow: auto; }
+.sheet h3 { margin: 14px 0 8px; font: 800 15px/1 'Cinzel', serif; letter-spacing: 0.08em; color: #7a4a1a; text-transform: uppercase; }
+.jobs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.job { display: grid; justify-items: center; gap: 4px; padding: 10px 6px 9px; border-radius: 6px; border: 1px solid rgba(90, 60, 20, 0.35); background: rgba(255, 248, 230, 0.55); color: var(--ink); text-align: center; }
+.job b { font: 800 15px/1.1 'Alegreya Sans', sans-serif; }
+.job span { font-size: 12px; line-height: 1.25; color: #6b4a28; }
+.job.on { background: #fff4d8; border-color: #c4601d; box-shadow: 0 0 0 2px #e8893a; }
+.job:hover { background: #fff8e8; }
+.jico { width: 34px; height: 34px; border-radius: 50%; background: #3a2614 center / 22px no-repeat; box-shadow: inset 0 0 0 2px #d9b36a; }
+.jico.bucheron { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 21L17 6' stroke='%23c89a5a' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath d='M14 3c4 0 7 3 7 7l-4 1-4-4z' fill='%23d8dce2'/%3E%3C/svg%3E"); }
+.jico.chevalier { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2l8 3v6c0 6-4 9-8 11-4-2-8-5-8-11V5z' fill='%236aa0e0' stroke='%23e8eef8' stroke-width='1.4'/%3E%3Cpath d='M12 6v12M8 10h8' stroke='%23e8eef8' stroke-width='1.6'/%3E%3C/svg%3E"); }
+.jico.chasseuse { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 3c8 3 8 15 0 18' fill='none' stroke='%23c89a5a' stroke-width='2'/%3E%3Cpath d='M6 3v18' stroke='%23e8e2d0' stroke-width='1'/%3E%3Cpath d='M4 12h16l-3-2m3 2l-3 2' fill='none' stroke='%23d8dce2' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E"); }
+.jico.pretre { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2v20M6 8h12' stroke='%23ffe2a0' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E"); }
+.jico.forgeronne { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='4' y='4' width='12' height='6' rx='1' fill='%23d8dce2'/%3E%3Cpath d='M10 10v11' stroke='%23c89a5a' stroke-width='2.6' stroke-linecap='round'/%3E%3Cpath d='M16 5l4 2-4 2' fill='%23b8bcc4'/%3E%3C/svg%3E"); }
+.team { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; }
+.team li { display: flex; align-items: center; gap: 6px; }
+.team i { width: 10px; height: 10px; border-radius: 50%; }
+@media (max-width: 640px) { .jobs { grid-template-columns: repeat(2, 1fr); } }
