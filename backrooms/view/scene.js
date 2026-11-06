@@ -504,7 +504,7 @@ float bkCaust(vec2 uv, float t) {
         const k = kind.h / (size.y || 1);
         const fix = new THREE.Matrix4().makeScale(k, k, k).multiply(new THREE.Matrix4().makeTranslation(-c.x, -box.min.y, -c.z));
         const place = list.map((p) => {
-          const m = new THREE.Matrix4().makeTranslation(p.x, p.tipped ? (size.x * k) / 2 : 0, p.z).multiply(new THREE.Matrix4().makeRotationY(p.rot));
+          const m = new THREE.Matrix4().makeTranslation(p.x, (p.y || 0) + (p.tipped ? (size.x * k) / 2 : 0), p.z).multiply(new THREE.Matrix4().makeRotationY(p.rot));
           if (p.tipped) m.multiply(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
           return m.multiply(fix);
         });

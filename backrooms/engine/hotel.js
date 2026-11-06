@@ -92,10 +92,10 @@ export function createHotelMap(seed = 5) {
   });
 
   // 3. Le hall d'entrée au sud, ouvert sur le couloir ; la porte de l'escalier de secours dans son mur du fond
-  const LOBBY = { x0: 13, z0: 21, x1: 22, z1: 27 };
+  const LOBBY = { x0: 14, z0: 21, x1: 21, z1: 25 }; // 20 × 12,5 m : assez petit pour être meublé de partout
   carve(LOBBY.x0, LOBBY.z0, LOBBY.x1, LOBBY.z1);
   carve(16, 20, 19, 20);
-  const EX = { x: 18, z: 28 };
+  const EX = { x: 18, z: LOBBY.z1 + 1 };
   grid[EX.z * W + EX.x] = T.EXIT;
   const elevator = { gx: EX.x, gz: EX.z, x: (EX.x + 0.5) * C, z: (EX.z + 0.5) * C, dx: 0, dz: 1, fire: true };
   const exit = cellPos(EX.x, EX.z - 1);
@@ -112,7 +112,7 @@ export function createHotelMap(seed = 5) {
     return { num: r.num, room: r.id, z: mailbox.z1 - u * (mailbox.z1 - mailbox.z0), y: mailbox.y1 - 0.25 - row * 0.4, letter: -1 };
   });
   const lobbyCenter = { x: ((LOBBY.x0 + LOBBY.x1 + 1) / 2) * C, z: ((LOBBY.z0 + LOBBY.z1 + 1) / 2) * C };
-  const spawnCell = { x: 17, z: 25 };
+  const spawnCell = { x: 17, z: 24 };
 
   // 4. Les meubles de chaque chambre : le lit contre le mur du fond (en face de la porte), l'armoire dans un coin du
   // fond, un bureau dans l'autre (parfois pas d'armoire : alors on n'a que le lit pour se cacher)
@@ -171,8 +171,64 @@ export function createHotelMap(seed = 5) {
     if (r.dir[0] === 0) for (const sx of [-1, 1]) solids.push({ x: (x + 0.5) * C + sx * (DOOR_W / 2 + jamb), z: (z + 0.5) * C, hx: jamb, hz: C / 2 });
     else for (const sz of [-1, 1]) solids.push({ x: (x + 0.5) * C, z: (z + 0.5) * C + sz * (DOOR_W / 2 + jamb), hx: C / 2, hz: jamb });
   }
-  const desk = { x: (LOBBY.x1 + 0.55) * C, z: (LOBBY.z0 + 3.5) * C, hx: 0.45, hz: 2.4, reception: true };
+  // le hall : X0..X1, Z0..Z1 (mètres) ; l'entrée (vers le couloir) au nord, la porte de secours au sud
+  const X0 = LOBBY.x0 * C;
+  const X1 = (LOBBY.x1 + 1) * C;
+  const Z0 = LOBBY.z0 * C;
+  const Z1 = (LOBBY.z1 + 1) * C;
+  // le comptoir de la réception, à l'est, à 1,60 m du mur (le personnel passe derrière)
+  const desk = { x: X1 - 1.6, z: ((LOBBY.z0 + LOBBY.z1 + 1) / 2) * C, hx: 0.45, hz: 2.4, reception: true };
   solids.push(desk);
+  // le mobilier du hall (modèles Poly Haven, CC0) : m, hauteur h, rayon de collision r (0 : posé sur un meuble), y au-dessus
+  // du sol, rot (l'avant du modèle, +z, tourné vers…) : N = vers le nord (-z), S, E, W
+  const N = Math.PI;
+  const S = 0;
+  const E = Math.PI / 2;
+  const Wd = -Math.PI / 2;
+  const lobbyProps = [
+    // la réception : derrière, la vitrine des clés ; dessus, la caisse, la pendule, la lampe à pétrole
+    { m: 'vintage_cabinet_01', h: 2.0, r: 0.6, x: X1 - 0.32, z: desk.z, rot: Wd },
+    { m: 'CashRegister_01', h: 0.42, r: 0, x: desk.x, z: desk.z - 1.3, y: 1.13, rot: Wd },
+    { m: 'mantel_clock_01', h: 0.32, r: 0, x: desk.x + 0.05, z: desk.z + 0.4, y: 1.13, rot: Wd },
+    { m: 'vintage_oil_lamp', h: 0.55, r: 0, x: desk.x, z: desk.z + 1.7, y: 1.13, rot: 0 },
+    // le salon au sud-ouest : un canapé contre le mur, deux fauteuils, la table basse, un pouf
+    { m: 'sofa_03', h: 1.0, r: 0.9, x: X0 + 5, z: Z1 - 0.65, rot: N },
+    { m: 'fancy_picture_frame_01', h: 0.9, r: 0, x: X0 + 5, z: Z1 - 0.04, y: 1.45, rot: N },
+    { m: 'gothic_coffee_table', h: 0.5, r: 0.55, x: X0 + 5, z: Z1 - 2.4, rot: 0 },
+    { m: 'ArmChair_01', h: 1.0, r: 0.5, x: X0 + 2.9, z: Z1 - 2.5, rot: E },
+    { m: 'ArmChair_01', h: 1.0, r: 0.5, x: X0 + 7.1, z: Z1 - 2.5, rot: Wd },
+    { m: 'Ottoman_01', h: 0.45, r: 0.4, x: X0 + 5, z: Z1 - 4.0, rot: 0.3 },
+    { m: 'potted_plant_02', h: 0.95, r: 0.4, x: X0 + 0.7, z: Z1 - 0.7, rot: 0 },
+    // près de l'entrée : un canapé contre le mur ouest, un fauteuil vert, la commode et son miroir, une plante
+    { m: 'sofa_02', h: 0.95, r: 0.8, x: X0 + 0.6, z: Z0 + 2.6, rot: E },
+    { m: 'GreenChair_01', h: 1.05, r: 0.5, x: X0 + 2.3, z: Z0 + 2.4, rot: E - 0.5 },
+    { m: 'GothicCommode_01', h: 0.95, r: 0.45, x: X0 + 2.8, z: Z0 + 0.35, rot: S },
+    { m: 'antique_ceramic_vase_01', h: 0.4, r: 0, x: X0 + 2.8, z: Z0 + 0.35, y: 0.95, rot: 0 },
+    { m: 'ornate_mirror_01', h: 1.1, r: 0, x: X0 + 2.8, z: Z0 + 0.04, y: 1.3, rot: S },
+    { m: 'potted_plant_02', h: 0.95, r: 0.4, x: X0 + 0.7, z: Z0 + 0.7, rot: 1 },
+    // au nord-est, l'horloge comtoise et une plante ; au sud-est, la console et son buste
+    { m: 'vintage_grandfather_clock_01', h: 2.1, r: 0.35, x: X1 - 2.2, z: Z0 + 0.3, rot: S },
+    { m: 'potted_plant_02', h: 0.95, r: 0.4, x: X1 - 0.7, z: Z0 + 0.7, rot: 2 },
+    { m: 'ClassicConsole_01', h: 0.85, r: 0.45, x: X1 - 3.2, z: Z1 - 0.35, rot: N },
+    { m: 'marble_bust_01', h: 0.55, r: 0, x: X1 - 3.2, z: Z1 - 0.35, y: 0.85, rot: N },
+    { m: 'potted_plant_02', h: 0.95, r: 0.4, x: X1 - 0.7, z: Z1 - 0.7, rot: 0.5 },
+    // les valises : sur le chariot à bagages devant la réception, et une qui traîne par terre
+    { m: 'vintage_suitcase', h: 0.55, r: 0, x: desk.x - 3.0, z: desk.z - 3.6, y: 0.32, rot: 0.2 },
+    { m: 'vintage_suitcase', h: 0.55, r: 0.4, x: desk.x - 1.6, z: desk.z + 3.4, rot: 1.9 },
+    // la plante au sommet de la banquette ronde du milieu
+    { m: 'potted_plant_02', h: 0.95, r: 0, x: lobbyCenter.x, z: lobbyCenter.z, y: 0.92, rot: 0 },
+    // les lustres : les trois du milieu, un au-dessus du salon, un devant la réception
+    ...[[-1, -0.8], [1, -0.8], [0, 1.2]].map(([ox, oz]) => ({ m: 'Chandelier_01', h: 1.0, r: 0, x: lobbyCenter.x + ox * C * 1.5, z: lobbyCenter.z + oz * C, y: HOTEL_CEIL - 1.0, rot: 0 })),
+    { m: 'Chandelier_01', h: 1.0, r: 0, x: X0 + 5, z: Z1 - 2.6, y: HOTEL_CEIL - 1.0, rot: 0.4 },
+    { m: 'Chandelier_01', h: 1.0, r: 0, x: desk.x - 2.2, z: desk.z, y: HOTEL_CEIL - 1.0, rot: 0.4 },
+  ];
+  // la banquette ronde de velours au milieu du hall, et deux colonnes de marbre de part et d'autre de l'entrée
+  solids.push({ x: lobbyCenter.x, z: lobbyCenter.z, hx: 1.15, hz: 1.15, banquette: true });
+  for (const x of [16 * C + 0.6, 20 * C - 0.6]) solids.push({ x, z: Z0 + 1.0, hx: 0.34, hz: 0.34, column: true });
+  // le chariot à bagages (dessiné à la main, view/hotel.js) : une collision
+  const cart = { x: desk.x - 3.0, z: desk.z - 3.6, hx: 0.45, hz: 0.75, cart: true };
+  solids.push(cart);
+  for (const p of lobbyProps) if (p.r > 0.5) blockCells.add(Math.floor(p.z / C) * W + Math.floor(p.x / C));
   const collide = (x, z, rad) => {
     for (const f of furniture) if (Math.abs(f.x - x) < f.hx + rad && Math.abs(f.z - z) < f.hz + rad) return true;
     for (const f of solids) if (Math.abs(f.x - x) < f.hx + rad && Math.abs(f.z - z) < f.hz + rad) return true;
@@ -241,10 +297,12 @@ export function createHotelMap(seed = 5) {
   }
   // une applique au-dessus des boîtes aux lettres
   addLight(mailbox.x + 0.2, mbMid, { state: 'on', y: 2.5, fy: 2.5, bright: true, sconce: { dx: -1, dz: 0 } });
+  addLight(X0 + 5, Z1 - 2.6, { state: 'on', bright: true, y: HOTEL_CEIL - 0.5, fy: HOTEL_CEIL - 0.5, chandelier: true });
+  addLight(desk.x - 2.2, desk.z, { state: 'on', bright: true, y: HOTEL_CEIL - 0.5, fy: HOTEL_CEIL - 0.5, chandelier: true });
   for (const [ox, oz] of [[-1, -0.8], [1, -0.8], [0, 1.2]]) addLight(lobbyCenter.x + ox * C * 1.5, lobbyCenter.z + oz * C, { state: 'on', bright: true, y: HOTEL_CEIL - 0.5, fy: HOTEL_CEIL - 0.5, chandelier: true });
 
   // 9. Quelques piles et eaux d'amande, dans les chambres sans lettre et le couloir
-  const busy = [cellPos(spawnCell.x, spawnCell.z), ...letters, ...furniture];
+  const busy = [cellPos(spawnCell.x, spawnCell.z), ...letters, ...furniture, ...lobbyProps, ...solids];
   const scatter = (n) => {
     const out = [];
     for (let i = 0; i < 2000 && out.length < n; i++) {
@@ -284,7 +342,7 @@ export function createHotelMap(seed = 5) {
     cassettes: [],
     fuses: [],
     lights,
-    props: [],
+    props: lobbyProps,
     bottles,
     batteries,
     items: itemList(['bottle', bottles], ['battery', batteries]),

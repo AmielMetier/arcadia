@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 4.57 — 6 novembre 2026
+- **The Backrooms** — le hall du Terror Hotel (Level 5), où l'on arrive, est un vrai hall d'hôtel des années 1930, plus petit et meublé de partout.
+  - Une réception au comptoir de marbre et de bois mouluré, avec sa caisse enregistreuse, sa pendule, sa lampe à pétrole, sa sonnette et son registre ouvert ; derrière, la vitrine et les tableaux à clés.
+  - Un salon : canapé capitonné, deux fauteuils, table basse, pouf et tapis vert bordé d'or, sous un tableau.
+  - Au milieu, une banquette ronde de velours vert surmontée d'une plante ; deux colonnes de marbre encadrent l'entrée.
+  - Un chariot à bagages en laiton chargé de vieilles valises, une horloge comtoise, une commode et son miroir, un buste de marbre, des plantes et cinq lustres.
+
 ## 4.56 — 6 novembre 2026
 - **The Backrooms** — aux Poolrooms (Level 37), l'entité ne se cache plus derrière les cloisons pour t'observer : elle rôde et te traque à découvert, tu la vois venir.
   - Derrière une cloison, son bourdonnement est étouffé : on ne croit plus l'entendre à travers les murs.

@@ -365,6 +365,7 @@ export class BackroomsSim {
     }
     // caisses et meubles abandonnés (cercles)
     for (const pr of this.fm(floor).props || []) {
+      if (!(pr.r > 0)) continue; // posé sur un meuble, ou suspendu : rien à heurter
       const rr = radius + pr.r;
       if (Math.abs(pr.x - x) < rr && Math.abs(pr.z - z) < rr && (pr.x - x) ** 2 + (pr.z - z) ** 2 < rr * rr) return true;
     }

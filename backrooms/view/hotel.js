@@ -143,24 +143,8 @@ export function buildHotel({ map, group, baked, CEIL }) {
       mat.side = THREE.DoubleSide;
       g.add(glass);
       lampShades.push({ l, mat, k: 1.6 });
-    } else if (l.chandelier) {
-      const g = new THREE.Group();
-      g.position.set(l.x, CEIL, l.z);
-      group.add(g);
-      box(0.02, 0.5, 0.02, M.brass, 0, -0.25, 0, g);
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.025, 6, 24), M.brass);
-      ring.rotation.x = Math.PI / 2;
-      ring.position.y = -0.55;
-      g.add(ring);
-      const mat = new THREE.MeshLambertMaterial({ color: '#fff0c8', emissive: '#ffd890', emissiveIntensity: 0 });
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2;
-        const b = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), mat);
-        b.position.set(Math.cos(a) * 0.42, -0.5, Math.sin(a) * 0.42);
-        g.add(b);
-      }
-      lampShades.push({ l, mat, k: 2 });
     }
+    // les lustres du hall sont des modèles (Chandelier_01, dans map.props)
   }
 
   // --- 4. Cadres aux murs du couloir : des portraits sombres et des paysages délavés ---
@@ -196,12 +180,119 @@ export function buildHotel({ map, group, baked, CEIL }) {
   }
 
   // --- 5. Le hall : comptoir de la réception, boîtes aux lettres, clavier, porte de l'escalier de secours ---
+  const marble = lam({ color: '#d9d2c4' });
   for (const s of map.solids) {
-    if (!s.reception) continue;
-    box(s.hx * 2, 1.1, s.hz * 2, M.wood, s.x, 0.55, s.z);
-    box(s.hx * 2 + 0.1, 0.06, s.hz * 2 + 0.1, M.darkWood, s.x, 1.13, s.z);
-    // la sonnette
-    box(0.1, 0.05, 0.1, M.brass, s.x - 0.1, 1.19, s.z - 0.8);
+    if (s.reception) {
+      // le comptoir : façade à panneaux moulurés côté hall, plateau de marbre, plinthe, sonnette et registre
+      box(s.hx * 2, 1.05, s.hz * 2, M.wood, s.x, 0.525, s.z);
+      box(s.hx * 2 + 0.12, 0.06, s.hz * 2 + 0.12, marble, s.x, 1.08, s.z);
+      box(s.hx * 2 + 0.04, 0.12, s.hz * 2 + 0.04, M.darkWood, s.x, 0.06, s.z);
+      const n = 4;
+      for (let i = 0; i < n; i++) {
+        const z = s.z - s.hz + ((i + 0.5) * s.hz * 2) / n;
+        box(0.03, 0.62, (s.hz * 2) / n - 0.22, M.darkWood, s.x - s.hx - 0.015, 0.55, z);
+        box(0.035, 0.5, (s.hz * 2) / n - 0.34, M.door, s.x - s.hx - 0.02, 0.55, z);
+      }
+      box(0.04, 0.1, s.hz * 2 + 0.04, M.brass, s.x - s.hx - 0.02, 0.95, s.z); // la frise de laiton
+      const bell = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.brass);
+      bell.position.set(s.x - 0.2, 1.11, s.z - 0.4);
+      group.add(bell);
+      box(0.12, 0.012, 0.012, M.brass, s.x - 0.2, 1.18, s.z - 0.4);
+      // le registre ouvert
+      for (const sz of [-1, 1]) {
+        const page = box(0.26, 0.02, 0.18, M.sheet, s.x - 0.15, 1.12, s.z + 0.95 + sz * 0.1);
+        page.rotation.x = sz * 0.06;
+      }
+      box(0.28, 0.015, 0.4, M.blanket, s.x - 0.15, 1.105, s.z + 0.95);
+      // le tableau des clés, au mur de part et d'autre de la vitrine : des casiers, une clé de laiton pendue sous chacun
+      for (const side of [-1, 1]) {
+        const kz = s.z + side * 1.65;
+        const kx = s.x + s.hx + 1.15 - 0.03; // contre le mur est
+        box(0.05, 0.9, 0.9, M.darkWood, kx, 1.75, kz);
+        for (let r = 0; r < 4; r++) {
+          for (let c = 0; c < 4; c++) {
+            const y = 2.1 - r * 0.22;
+            const z = kz - 0.33 + c * 0.22;
+            box(0.02, 0.17, 0.17, M.black, kx - 0.03, y, z);
+            if ((r * 4 + c + side) % 3) box(0.01, 0.07, 0.02, M.brass, kx - 0.05, y - 0.11, z);
+          }
+        }
+      }
+    } else if (s.banquette) {
+      // banquette ronde de velours vert, dossier central, socle de bois et frise de laiton
+      const velvet = lam({ color: '#23432f' });
+      const seat = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.25, 0.42, 32), velvet);
+      seat.position.set(s.x, 0.26, s.z);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(1.26, 1.26, 0.06, 32), M.darkWood);
+      base.position.set(s.x, 0.03, s.z);
+      const back = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, 0.5, 24), velvet);
+      back.position.set(s.x, 0.72, s.z);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(1.3, 0.025, 6, 40), M.brass);
+      rim.rotation.x = Math.PI / 2;
+      rim.position.set(s.x, 0.47, s.z);
+      const tuft = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.06, 24), M.darkWood);
+      tuft.position.set(s.x, 0.97, s.z);
+      group.add(seat, base, back, rim, tuft);
+    } else if (s.column) {
+      // colonne de marbre, base et chapiteau de laiton
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.3, CEIL, 20), marble);
+      shaft.position.set(s.x, CEIL / 2, s.z);
+      group.add(shaft);
+      box(0.72, 0.18, 0.72, M.darkWood, s.x, 0.09, s.z);
+      box(0.66, 0.14, 0.66, M.brass, s.x, CEIL - 0.07, s.z);
+      box(0.58, 0.05, 0.58, M.brass, s.x, 0.2, s.z);
+    } else if (s.cart) {
+      // le chariot à bagages : plateau de moquette rouge, deux arceaux de laiton, quatre roues
+      box(s.hx * 2, 0.06, s.hz * 2, M.blanket, s.x, 0.29, s.z);
+      box(s.hx * 2 + 0.04, 0.04, s.hz * 2 + 0.04, M.brass, s.x, 0.25, s.z);
+      for (const sz of [-1, 1]) {
+        const arch = new THREE.Mesh(new THREE.TorusGeometry(s.hx, 0.022, 6, 24, Math.PI), M.brass);
+        arch.position.set(s.x, 0.3, s.z + sz * (s.hz - 0.03));
+        arch.scale.set(1, 3.4, 1);
+        group.add(arch);
+      }
+      box(0.03, 0.03, s.hz * 2, M.brass, s.x, 0.3 + s.hx * 3.4, s.z);
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const w = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.05, 12), M.black);
+          w.rotation.z = Math.PI / 2;
+          w.position.set(s.x + sx * (s.hx - 0.08), 0.09, s.z + sz * (s.hz - 0.1));
+          group.add(w);
+        }
+      }
+    }
+  }
+  // les tapis : vert bouteille bordé d'or, sous le salon et devant la réception
+  const rugTex = label(256, 256, (c, w, h) => {
+    c.fillStyle = '#1f3a2c';
+    c.fillRect(0, 0, w, h);
+    c.strokeStyle = '#b08a3c';
+    c.lineWidth = 10;
+    c.strokeRect(14, 14, w - 28, h - 28);
+    c.lineWidth = 3;
+    c.strokeRect(34, 34, w - 68, h - 68);
+    c.strokeStyle = 'rgba(176, 138, 60, 0.6)';
+    c.beginPath();
+    c.moveTo(w / 2, 50);
+    c.lineTo(w - 50, h / 2);
+    c.lineTo(w / 2, h - 50);
+    c.lineTo(50, h / 2);
+    c.closePath();
+    c.stroke();
+    for (let i = 0; i < 4000; i++) {
+      c.fillStyle = `rgba(0,0,0,${Math.random() * 0.12})`;
+      c.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+    }
+  });
+  const L = map.lobby;
+  for (const [x, z, w, d] of [
+    [(L.x0 * C) + 5, (L.z1 + 1) * C - 2.6, 5.4, 3.8],
+    [(L.x1 + 1) * C - 3.6, (L.z0 + 3.5) * C, 2.4, 5.4],
+  ]) {
+    const rug = new THREE.Mesh(new THREE.PlaneGeometry(w, d), baked(new THREE.MeshLambertMaterial({ map: rugTex, polygonOffset: true, polygonOffsetFactor: -2 })));
+    rug.rotation.x = -Math.PI / 2;
+    rug.position.set(x, 0.008, z);
+    group.add(rug);
   }
   const mb = map.mailbox;
   const mg = frame(mb.x, 0, Math.PI / 2); // +z local : vers l'est (le hall), x local : vers -z monde

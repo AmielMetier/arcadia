@@ -52,6 +52,28 @@ sans les armes du modèle d'origine.
 Le squelette et les animations de hazmat.glb servent aussi à l'entité en 3D (mode normal), dont le corps et le visage
 sont dessinés dans le code (backrooms/view/beast.js).
 
+Le hall du Terror Hotel (Level 5), Poly Haven, CC0 (glTF 1k compacté en .glb, seule la texture de couleur, JPEG 512 px) :
+  Chandelier_01.glb  https://polyhaven.com/a/Chandelier_01
+  sofa_02.glb  https://polyhaven.com/a/sofa_02
+  sofa_03.glb  https://polyhaven.com/a/sofa_03
+  ArmChair_01.glb  https://polyhaven.com/a/ArmChair_01
+  GreenChair_01.glb  https://polyhaven.com/a/GreenChair_01
+  Ottoman_01.glb  https://polyhaven.com/a/Ottoman_01
+  gothic_coffee_table.glb  https://polyhaven.com/a/gothic_coffee_table
+  ClassicConsole_01.glb  https://polyhaven.com/a/ClassicConsole_01
+  GothicCommode_01.glb  https://polyhaven.com/a/GothicCommode_01
+  vintage_cabinet_01.glb  https://polyhaven.com/a/vintage_cabinet_01
+  vintage_grandfather_clock_01.glb  https://polyhaven.com/a/vintage_grandfather_clock_01
+  CashRegister_01.glb  https://polyhaven.com/a/CashRegister_01
+  mantel_clock_01.glb  https://polyhaven.com/a/mantel_clock_01
+  vintage_oil_lamp.glb  https://polyhaven.com/a/vintage_oil_lamp
+  vintage_suitcase.glb  https://polyhaven.com/a/vintage_suitcase
+  potted_plant_02.glb  https://polyhaven.com/a/potted_plant_02
+  antique_ceramic_vase_01.glb  https://polyhaven.com/a/antique_ceramic_vase_01
+  marble_bust_01.glb  https://polyhaven.com/a/marble_bust_01
+  ornate_mirror_01.glb  https://polyhaven.com/a/ornate_mirror_01
+  fancy_picture_frame_01.glb  https://polyhaven.com/a/fancy_picture_frame_01
+
 Level 5 (le Terror Hotel), l'entité de l'hôtel :
   jeffrey_epstein_web.glb  « Jeffrey Epstein » de SigmaGrindsetMog, Sketchfab
   (https://sketchfab.com/3d-models/jeffrey-epstein-bd6c6bf543184c8da1f457fc7bf0c494),
