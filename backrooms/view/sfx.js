@@ -12,12 +12,12 @@ const range = (dir, base, n) => Array.from({ length: n }, (_, i) => `${dir}/${ba
 const LEVEL_SFX = {
   0: { chase: range('level0', 'chase', 3), ambient: range('level0', 'ambiant', 9), death: 'level0/death' },
   1: { chase: range('level1', 'chase', 1), ambient: [], death: null },
-  2: { chase: [], ambient: [], death: null }, // Poolrooms : pas encore de sons
+  2: null, // Poolrooms : la même entité qu'au Level 1, les mêmes sons (voir levelSfx)
   3: { chase: [], ambient: [], death: null }, // Terror Hotel : pas encore de sons (des craquements synthétisés)
 };
 // joué en boucle par-dessus les cris de poursuite, à tous les niveaux
 const CHASE_ALL = 'chase_all';
-const levelSfx = (level) => LEVEL_SFX[level] || LEVEL_SFX[0];
+const levelSfx = (level) => LEVEL_SFX[level === 2 ? 1 : level] || LEVEL_SFX[0];
 
 export class BackroomsSfx {
   constructor() {

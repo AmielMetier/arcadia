@@ -1149,10 +1149,34 @@ test("Level 37 (Poolrooms) : salles et bassins reliés, 3 vannes et 3 toboggans 
   const a = walk(dry);
   const b = walk(deep);
   assert.ok(b < a * 0.8, `plus lent dans l'eau (${b.toFixed(4)} contre ${a.toFixed(4)})`);
-  // l'entité ne sort pas de l'eau : personne n'est poursuivi aux Poolrooms
-  run(sim, 5);
-  assert.equal(P.status, 'alive');
-  assert.equal(sim.monster.mode, 'patrol');
+  // l'entité du Level 1 y chasse aussi : elle part loin, au sec, et ses chemins ne passent que par les portes
+  const m = sim.map;
+  const ms = m.monsterSpawn;
+  assert.ok(m.dist[ms.gz * m.W + ms.gx] > 15, "l'entité part loin du départ");
+  assert.equal(m.depthAt(ms.x, ms.z), 0, "l'entité part au sec");
+  for (const sd of [3, 37, 99]) {
+    const pm = createPoolMap(sd);
+    const a = pm.monsterSpawn;
+    for (const r of pm.rooms.filter((q) => q.type === 'tech')) {
+      const path = findPath(pm, a.x, a.z, (r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2);
+      assert.ok(path && path.length, `graine ${sd} : l'entité trouve un chemin`);
+      let prev = a;
+      for (const w of path) {
+        const crossed = pm.segs.some((sg) => {
+          const d1x = w.x - prev.x, d1z = w.z - prev.z, d2x = sg.x1 - sg.x0, d2z = sg.z1 - sg.z0;
+          const den = d1x * d2z - d1z * d2x;
+          if (Math.abs(den) < 1e-9) return false;
+          const t = ((sg.x0 - prev.x) * d2z - (sg.z0 - prev.z) * d2x) / den;
+          const u = ((sg.x0 - prev.x) * d1z - (sg.z0 - prev.z) * d1x) / den;
+          return t > 0 && t < 1 && u >= 0 && u <= 1;
+        });
+        assert.ok(!crossed, `graine ${sd} : l'entité traverse une cloison`);
+        prev = w;
+      }
+    }
+  }
+  run(sim, 3);
+  assert.ok(sim.monster.x !== ms.x || sim.monster.z !== ms.z, "l'entité bouge aux Poolrooms");
 });
 
 test('Level 37 : le premier qui prend un toboggan choisit la couleur, les autres se referment', () => {

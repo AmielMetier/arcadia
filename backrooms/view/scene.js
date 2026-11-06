@@ -1205,13 +1205,13 @@ float bkCaust(vec2 uv, float t) {
   const faceTime = { value: 0 };
   // au Level 1, l'image de la planche affichée : décalage et taille dans la texture (xy, zw)
   const faceFrame = { value: new THREE.Vector4(0, 0, 1, 1) };
-  const anim = L1 ? ENTITY_ANIM : null;
+  const anim = L1 || L2 ? ENTITY_ANIM : null; // aux Poolrooms, la même entité qu'au Level 1
   face.visible = false;
   monsterGroup.add(face);
   // l'entité en 3D, animée (view/beast.js) ; au Level 1 en mode VIP : la vidéo d'origine
   // mode VIP au Level 0 : le même corps, avec le visage de la photo de l'entité d'origine
   // Level 5 : l'entité de l'hôtel, un modèle humain animé os par os (view/hotelEntity.js)
-  const beast = L3 ? createHotelEntity() : !ENTITY_VIP ? createBeast() : !L1 ? createBeast({ photo: { url: VIP_IMG, crop: [490, 20, 300, 375] } }) : null;
+  const beast = L3 ? createHotelEntity() : !ENTITY_VIP ? createBeast() : !(L1 || L2) ? createBeast({ photo: { url: VIP_IMG, crop: [490, 20, 300, 375] } }) : null;
   if (beast) {
     monsterGroup.add(beast.group);
     shadow.visible = false;
@@ -1391,7 +1391,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
           faceFrame.value.y = 1 - (Math.floor(f / anim.cols) + 1) / anim.rows;
         }
         const j = (chase ? 0.12 : 0.04) * faceGlitch.value;
-        const my = -(M.floor || 0) * FLOOR_DY;
+        const mm = sim.fm(M.floor || 0);
+        const my = -(M.floor || 0) * FLOOR_DY - (mm.depthAt ? mm.depthAt(M.x, M.z) : 0); // aux Poolrooms, elle marche au fond de l'eau
         if (beast) {
           // en 3D : elle regarde où elle va (ou le joueur qu'elle observe), et marche vraiment
           monsterGroup.position.set(M.x + (Math.random() - 0.5) * j * 0.3, my, M.z + (Math.random() - 0.5) * j * 0.3);

@@ -611,8 +611,7 @@ export class BackroomsSim {
     }
     if (this.state !== 'playing') return;
 
-    // aux Poolrooms, l'entité ne sort pas de l'eau : elle ne chasse personne (son ombre passe sous la surface)
-    if (this.hasMonster && this.level !== 2) this.updateMonster();
+    if (this.hasMonster) this.updateMonster();
     this.checkElevator();
   }
 
@@ -1327,6 +1326,8 @@ export class BackroomsSim {
     else if (M.mode === 'stalk') M.speed = MONSTER_PATROL_SPEED * 1.15;
     else if (M.mode === 'watch') M.speed = 0;
     else M.speed = MONSTER_PATROL_SPEED * (1 + rage * 0.5);
+    // Poolrooms : l'eau la freine aussi (un peu moins que les joueurs)
+    if (map.depthAt) M.speed *= Math.max(0.55, 1 - map.depthAt(M.x, M.z) * 0.4);
 
     // En ronde, elle va souvent se tapir dans un coin sombre pour observer les joueurs de loin (de moins en moins à
     // mesure qu'elle s'énerve)

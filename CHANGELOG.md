@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 4.55 — 6 novembre 2026
+- **The Backrooms** — l'entité du Level 1 te suit aux Poolrooms (Level 37) : même apparence, mêmes sons, même screamer.
+  - Elle passe d'une salle à l'autre par les portes, jamais à travers les cloisons, et les cloisons te cachent d'elle.
+  - Elle marche au fond des bassins ; l'eau la freine, un peu moins que toi.
+
 ## 4.54 — 6 novembre 2026
 - **The Backrooms** — au Terror Hotel (Level 5), se faire attraper donne un vrai screamer : l'entité de l'hôtel se jette sur toi en un quart de seconde, bras tendus vers ton visage, la tête qui tremble, l'image qui saute et se déchire, un éclair rouge et un hurlement déchiré, puis le noir.
 

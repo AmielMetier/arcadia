@@ -515,8 +515,9 @@ function handleEvent(ev, me) {
       break;
     case 'jumpscare':
       if (ev.id !== me) break;
-      if (sfx) sfx.jumpscare(sim.level);
-      if (hud) hud.showJumpscare(sim.level);
+      // aux Poolrooms, le même screamer qu'au Level 1 (la même entité)
+      if (sfx) sfx.jumpscare(sim.level === 2 ? 1 : sim.level);
+      if (hud) hud.showJumpscare(sim.level === 2 ? 1 : sim.level);
       if (scene && sim.level === 3) scene.scare();
       break;
     case 'dead':
@@ -707,7 +708,7 @@ function loop(currentTime) {
   if (sfx && sim.hasMonster && sim.state === 'playing') {
     const M = sim.monster;
     const chasing = !paused && M.mode === 'chase' && M.danger > 0.05;
-    sfx.updateMonsterSound(M.danger, M, sim.level === 1);
+    sfx.updateMonsterSound(M.danger, M, sim.level === 1 || sim.level === 2); // Poolrooms : la voix de l'entité du Level 1
     sfx.updateChase(chasing, M.danger, M);
     if (chasing) {
       monsterStepT -= delta;
