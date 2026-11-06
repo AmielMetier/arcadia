@@ -1,7 +1,7 @@
 # Consignes pour les assistants de code (Claude, Codex, Copilot, Cursor, Gemini…) et les contributeurs
 
 Ce dépôt est **Arcadia** (anciennement « Game Hub »), le salon de jeux d'Amiel : un site statique (GitHub Pages, sans étape de build) qui réunit plusieurs
-jeux multijoueurs dans le navigateur — Duo Drift, DavidSimulator, Tête de Calcul, Bastion Clash, Outbreak, Fil Rouge, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party, Island Rush, Odyssée, Mollo !, Site Noir, Mystère Mystère, Dogfight 3D et The Backrooms.
+jeux multijoueurs dans le navigateur — Duo Drift, DavidSimulator, Tête de Calcul, Bastion Clash, Outbreak, Fil Rouge, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party, Island Rush, Odyssée, Mollo !, Site Noir, Mystère Mystère, Dogfight 3D, The Backrooms et Fief Maudit (en construction).
 
 ## À chaque modification poussée sur `main` : journal + version
 
@@ -30,12 +30,12 @@ Filet de sécurité : si un push sur `main` ne touche pas `CHANGELOG.md`, l'acti
 (`tools/changelog-auto.mjs`) et monte la version. Elle est moins bien écrite qu'une entrée faite à la main :
 préférer l'écrire soi-même. Pour qu'elle soit lisible, écrire des messages de commit clairs, par exemple
 `feat(calcul): mode Éclair` ou `fix(david): la caméra qui suit ne se désactive plus`
-(portées reconnues : `drift`, `david`, `calcul`, `bastion`, `outbreak`, `filrouge`, `kart`, `convoy`, `golf`, `minigolf`, `royale`, `odyssee`, `mollo`, `sitenoir`, `mystery`, `hub`, `server`).
+(portées reconnues : `drift`, `david`, `calcul`, `bastion`, `outbreak`, `filrouge`, `kart`, `convoy`, `golf`, `minigolf`, `royale`, `odyssee`, `mollo`, `sitenoir`, `mystery`, `fief`, `hub`, `server`).
 Ajouter `[skip changelog]` dans le message d'un commit purement technique pour qu'il n'apparaisse pas.
 
 ## Repères
 
-- Chaque jeu vit dans son dossier (`drift/`, `david/`, `calcul/`, `bastion/`, `outbreak/`, `filrouge/`, `kart/`, `convoy/`, `golf/`, `minigolf/`, `royale/`, `odyssee/`, `mollo/`, `sitenoir/`, `mystery/`, `backrooms/`) et tourne dans une iframe du Hub ;
+- Chaque jeu vit dans son dossier (`drift/`, `david/`, `calcul/`, `bastion/`, `outbreak/`, `filrouge/`, `kart/`, `convoy/`, `golf/`, `minigolf/`, `royale/`, `odyssee/`, `mollo/`, `sitenoir/`, `mystery/`, `backrooms/`, `fief/`) et tourne dans une iframe du Hub ;
   le Hub (`index.html`, `hub/`) gère le salon, le classement entre potes et le pont `shared/bridge.js`.
 - Multijoueur : relais WebSocket (`shared/net.js`, serveur dans `server/`). `?local` dans l'adresse simule le réseau
   entre onglets du même navigateur pour tester à plusieurs.
@@ -148,4 +148,8 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
 - Bastion Clash : le moteur (`bastion/engine/`, sans DOM) est testé par `node tools/test-bastion.mjs` ;
   `node tools/bench-bastion.mjs [minutes] [graine] [mode] [carte]` fait jouer 4 bots hors navigateur et mesure
   le coût d'un pas de simulation (doit rester sous 33 ms), les éliminations, les cibles des bots et les unités bloquées.
+- Fief Maudit (`fief/`, moteur sans DOM dans `fief/engine/`) : survie médiévale en coop, en construction par étapes (conception et étapes dans `docs/FIEF-MAUDIT.md`).
+  Vallée, village, arbres et collisions dans `map.js` ; joueurs, hache, bûches et entrepôt dans `sim.js` ; `node tools/test-fief.mjs` (à lancer quand on touche au moteur).
+  Modèles (Quaternius Medieval Village MegaKit, KayKit Adventurers et Skeletons, CC0) préparés par `node tools/fief-assets.mjs <clones>` dans `fief/models/` (crédits : `fief/models/LICENSE.txt`) ;
+  arbres, ciel et textures repris de Birdie Party, rochers de Kenney et sons d'Island Rush et Birdie Party. `?debug` expose `__fief` (`ff(sec)`, `tp(x, z, cap)`, `cam(cap, inclinaison, distance)`, `press('fc'|'uc')`), `?manual` ne dessine qu'à la demande (`__fief.frames(n)`), `?seed`, `?autostart`.
 - Commits : auteur et messages en français, un message qui décrit ce que le joueur gagne.

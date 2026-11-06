@@ -1,8 +1,8 @@
 # Fief Maudit — conception
 
 Survie en coopération en 3D (Three.js), vue à la troisième personne, de 1 à 6 joueurs, avec des bots pour compléter.
-Dossier prévu : `fief/`. Ce document décrit le jeu visé, les assets retenus et l'ordre de développement.
-Rien n'est encore codé.
+Dossier : `fief/`. Ce document décrit le jeu visé, les assets retenus et l'ordre de développement.
+Où on en est : **étape 2 faite** (voir la section 8).
 
 ## 1. L'idée
 
@@ -196,9 +196,15 @@ fief/
 
 Chaque étape se termine par une version jouable, poussée, et validée avant de passer à la suivante.
 
-1. **Conception** (ce document).
+1. **Conception** (ce document). ✔
 2. **Le village vide** : récupérer et compresser les assets, la vallée, le village en ruine assemblé avec le MegaKit,
-   un personnage animé qui court, coupe un arbre et porte une bûche à l'entrepôt. Seul, sans réseau.
+   un personnage animé qui court, coupe un arbre et porte une bûche à l'entrepôt. Seul, sans réseau. ✔ (version 4.51)
+   - Assets : 5,6 Mo en tout (`tools/fief-assets.mjs`). La porte en planches est `Door_8_Round` ; les ruines n'ont pas de
+     pièces cassées dans le kit, on pose des pans entiers, des pans rabaissés et des trous, avec lierre et briques tombées.
+   - La caméra s'arrête avant les murs et les toits, et le feuillage entre elle et le joueur devient ajouré (tramé)
+     dans un cercle autour du personnage : sinon, en forêt, on ne voit plus rien.
+   - Pour porter, les jambes jouent `Walking_A` et les bras `2H_Melee_Idle` (pistes séparées par os).
+   - Lancé depuis un salon, chacun joue dans sa propre vallée jusqu'à l'étape 4.
 3. **Une nuit** : brume, braseros, squelettes qui se réveillent et attaquent, combat, à terre / relevé. Toujours seul, avec un bot.
 4. **À plusieurs** : branchement au Hub, hôte qui fait autorité, prédiction, poutres à deux, métiers.
 5. **La boucle complète** : construction des bâtiments, faim, froid, nourriture, 10 jours, sauvegarde, sièges des jours 5 et 10.

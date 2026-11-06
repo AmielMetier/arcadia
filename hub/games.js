@@ -169,6 +169,18 @@ window.HUB_GAMES = [
     cover: 'convoy/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
+    id: 'fief',
+    title: 'Fief Maudit',
+    tag: 'Survie médiévale en coop · en construction',
+    desc: 'Les derniers habitants d\'un village en ruine. Le jour, abats les arbres et rentre le bois pour relever les maisons ; bientôt, la nuit, les morts sortiront de la crypte du château. Avant-première : la récolte du bois, chacun dans sa vallée.',
+    url: 'fief/',
+    minPlayers: 1, maxPlayers: 6,
+    accent: '#e08a3a',
+    icon: '🪓', score: 'Bûches rentrées',
+    settings: [],
+    cover: 'fief/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
+  },
+  {
     id: 'golf',
     title: 'Birdie Party',
     tag: 'Golf 3D entre potes',
@@ -338,6 +350,9 @@ window.HUB_GAME_INFO = {
   kart: { genre: 'course', time: '10–20 min',
     keys: [['Flèches / ZQSD', 'Conduire'], ['Maj en tournant', 'Drift (mini-turbo)'], ['E', 'Utiliser l\'objet'], ['↓ + E', 'Lancer vers l\'arrière'], ['🎮 Manette', 'Stick pour conduire, gâchettes pour accélérer et freiner']],
     tips: ['Alterne Q et D pendant un drift : le mini-turbo charge deux fois plus vite.', 'Colle-toi derrière un kart pour profiter de l\'aspiration.', 'Une figure en sautant donne un petit turbo à l\'atterrissage.'] },
+  fief: { genre: 'action', time: '10–20 min',
+    keys: [['ZQSD + souris', 'Se déplacer, tourner la caméra'], ['Clic', 'Coup de hache'], ['E', 'Ramasser, poser, ranger une bûche'], ['Espace · Ctrl', 'Sauter · marcher'], ['Molette', 'Zoom'], ['Échap', 'Pause'], ['🎮 Manette', 'Stick gauche : bouger · stick droit : caméra · RT : hache · X : utiliser · A : sauter']],
+    tips: ['Un bûcheron abat un arbre en trois coups de hache.', 'Chaque arbre donne deux bûches : on n\'en porte qu\'une à la fois.', 'L\'entrepôt est la grande maison au toit de tuiles, à l\'est du feu de camp.', 'Porter une bûche ralentit : coupe les arbres les plus proches du village.'] },
   convoy: { genre: 'action', time: '15–30 min',
     keys: [['ZQSD', 'Se déplacer'], ['E', 'Interagir'], ['Souris', 'Viser · tirer'], ['🎮 Manette', 'Stick : se déplacer · X / RT : interagir, tirer']],
     tips: ['Le convoi ralentit en gare : profitez-en pour réparer.', 'Surveillez la pression de la chaudière.'] },

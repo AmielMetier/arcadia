@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 4.51 — 6 novembre 2026
+- **Fief Maudit** — Nouveau jeu en avant-première : une survie médiévale en coopération, en 3D. Les derniers habitants d'un village en ruine doivent le relever avant que les morts ne sortent de la crypte du château.
+  - Cette première version permet de découvrir la vallée : le village en ruine, l'entrepôt, le feu de camp, la rivière et le château sur sa colline.
+  - On joue le bûcheron : trois coups de hache pour abattre un arbre, qui tombe dans le sens du coup et donne deux bûches. On les ramasse et on les rapporte à l'entrepôt, une par une (on marche moins vite en portant).
+  - Pour l'instant, chacun joue dans sa propre vallée. La nuit, les squelettes et le jeu à plusieurs arrivent dans les prochaines versions.
+
 ## 4.50 — 6 novembre 2026
 - **Arcadia** — « Tester ma connexion » affiche ton ping avec le serveur, en millisecondes, et dit si ta connexion va faire laguer les jeux (ping élevé, connexion instable).
 

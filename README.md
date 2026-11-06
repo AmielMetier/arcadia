@@ -1,4 +1,4 @@
-# Arcadia — Dogfight 3D, Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party, Island Rush, Mollo !, Site Noir, Mystère Mystère et The Backrooms
+# Arcadia — Dogfight 3D, Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party, Island Rush, Mollo !, Site Noir, Mystère Mystère, The Backrooms et Fief Maudit
 
 Des jeux en ligne entre potes, directement dans le navigateur, sans rien installer. On crée un salon,
 on partage le code, et l'hôte choisit le jeu. Le salon reste ouvert d'un jeu à l'autre.
@@ -171,6 +171,14 @@ Bagarre de pantins mous au-dessus du vide (`mollo/`). Le dernier debout gagne la
 - Réseau (`mollo/app.js`) : l'hôte simule et envoie 20 instantanés par seconde ; l'invité envoie ses commandes et affiche tous les corps ~100 ms en retard, sans prédiction.
   `?debug` expose `__mollo.run(2)`, qui fait avancer le jeu de 2 s image par image ; `?autostart`, `?seed`, `?arene=four`, `?hazards=0`, `?items=0`.
 - Graphismes : personnages et décors dessinés dans le code (`mollo/view/pantin.js`, `scene.js`), textures au canvas. Musique et sons synthétisés (WebAudio).
+
+## Fief Maudit (en construction)
+Survie médiévale en coopération, en 3D (`fief/`). Les derniers habitants d'un village en ruine le relèvent le jour et le défendent la nuit
+contre les morts sortis de la crypte du château. Le jeu se construit par étapes, décrites dans [docs/FIEF-MAUDIT.md](docs/FIEF-MAUDIT.md).
+
+- **Déjà jouable** : la vallée (village en ruine, entrepôt, feu de camp, rivière, château sur sa colline, forêt), le bûcheron et sa hache, les arbres qui tombent, les bûches à ramasser, porter et ranger à l'entrepôt, et un petit tutoriel
+- **À venir** : la nuit et les squelettes, le jeu à plusieurs et les métiers, la construction des bâtiments, la crypte
+- Modèles : Medieval Village MegaKit de Quaternius, personnages et squelettes de KayKit (CC0), dans `fief/models/` ; arbres et ciel de Birdie Party
 
 ## Mystère Mystère, The Backrooms
 
