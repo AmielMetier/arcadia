@@ -202,6 +202,8 @@ test('perception : accroupi derrière elle, on passe ; en courant, elle entend',
   const P = sim.player;
   const M = sim.monster;
   M.dormantT = 0;
+  sim.map.brightCells = new Uint8Array(sim.map.W * sim.map.H); // hors de la lumière franche du départ
+  M.warpT = 999;
   // elle regarde ailleurs (dos au joueur), à 6 m
   M.x = P.x + 6;
   M.z = P.z;
@@ -223,12 +225,15 @@ test('perception : accroupi derrière elle, on passe ; en courant, elle entend',
   P.bumpT = 1;
   sim.step();
   assert.equal(M.mode, 'chase', 'un bruit de course tout près : elle se retourne');
+  sim.map.brightCells = null;
 });
 
 test('nez à nez : découverte en face, de près, elle hurle et fonce (même au repos)', () => {
   const sim = new BackroomsSim({ map, difficulty: 'normal' });
   const P = sim.player;
   const M = sim.monster;
+  sim.map.brightCells = new Uint8Array(sim.map.W * sim.map.H); // hors de la lumière franche du départ
+  M.warpT = 999;
   // une direction dégagée sur 5 m depuis le départ
   const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   const [dx, dz] = dirs.find(([x, z]) => hasLineOfSight(sim.map, P.x, P.z, P.x + x * 4.5, P.z + z * 4.5));
@@ -262,6 +267,99 @@ test('nez à nez : découverte en face, de près, elle hurle et fonce (même au 
   assert.ok(M.rushT > 0, 'en hurlant (charge rapide)');
   assert.ok(sim.events.some((e) => e.type === 'rush'), 'le cri est annoncé');
   assert.ok(M.speed > sim.monsterChaseSpeed, 'plus vite qu\'une poursuite ordinaire');
+  sim.map.brightCells = null;
+});
+
+test('zone très éclairée : à l\'abri, elle ne s\'y lance pas et s\'arrête au bord de l\'ombre', () => {
+  const sim = new BackroomsSim({ map, difficulty: 'normal' });
+  const P = sim.player;
+  const M = sim.monster;
+  sim.map.brightCells = null; // (un autre test l'a éteinte)
+  assert.ok(sim.brightCell(sim.map, P.x, P.z), 'le départ est dans une zone claire');
+  M.dormantT = 0;
+  M.warpT = 999;
+  const [dx, dz] = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([x, z]) => hasLineOfSight(sim.map, P.x, P.z, P.x + x * 6, P.z + z * 6));
+  const put = () => {
+    M.x = P.x + dx * 6;
+    M.z = P.z + dz * 6;
+  };
+  put();
+  M.mode = 'patrol';
+  M.stalkT = 99;
+  M.ambushT = 99;
+  P.flashlight = false;
+  P.yaw = Math.atan2(dx, dz); // il regarde ailleurs
+  P.running = true;
+  P.bumpV = NOISE.run;
+  P.bumpT = 1;
+  sim.step({ yaw: P.yaw });
+  assert.notEqual(M.mode, 'chase', 'dans la lumière, un bruit de course à 6 m ne la lance pas');
+  // déjà lancée : elle renonce au bord de la lumière et l'observe
+  M.mode = 'chase';
+  M.unseenT = 0;
+  for (let i = 0; i < 60 * 3 && M.mode === 'chase'; i++) {
+    sim.step({ yaw: P.yaw });
+    put();
+  }
+  assert.equal(M.mode, 'watch', 'elle s\'arrête et regarde');
+  // pendant une coupure, plus d'abri
+  sim.blackout = 10;
+  assert.ok(!(sim.level === 0 && !(sim.blackout > 0) && sim.brightCell(sim.map, P.x, P.z)), 'la coupure retire l\'abri');
+});
+
+test('triche : invisible de tous, elle réapparaît juste derrière un angle devant sa proie, ou disparaît', () => {
+  let corner = 0;
+  let behind = 0;
+  for (let seed = 1; seed <= 12; seed++) {
+    const sim = new BackroomsSim({ map: createBackroomsMap(seed), difficulty: 'normal' });
+    const P = sim.player;
+    const M = sim.monster;
+    M.dormantT = 0;
+    if (sim.director) sim.director.phase = 'build';
+    // elle est loin, hors de vue ; le joueur, hors de la lumière franche, regarde le long d'un couloir
+    sim.map.brightCells = new Uint8Array(sim.map.W * sim.map.H);
+    const far = sim.map.walkable.find((c) => Math.hypot((c.x + 0.5) * CELL_SIZE - P.x, (c.z + 0.5) * CELL_SIZE - P.z) > 50);
+    M.x = (far.x + 0.5) * CELL_SIZE;
+    M.z = (far.z + 0.5) * CELL_SIZE;
+    M.floor = 0;
+    M.mode = 'patrol';
+    M.warpT = 0;
+    M.stalkT = 99;
+    M.ambushT = 99;
+    M.unseenAllT = 5;
+    const evs = [];
+    for (let i = 0; i < 3; i++) {
+      sim.events.length = 0;
+      sim.step({ yaw: P.yaw });
+      evs.push(...sim.events.filter((e) => e.type === 'warp'));
+    }
+    const w = evs[0];
+    if (!w) continue;
+    assert.ok(!sim.inSomeView(0, M.x, M.z), 'elle n\'apparaît jamais sous les yeux d\'un joueur');
+    assert.ok(Math.hypot(M.x - P.x, M.z - P.z) > 5, 'pas collée au joueur');
+    if (w.kind === 'corner') {
+      corner++;
+      assert.equal(M.mode, 'watch', 'postée, elle attend');
+    } else behind++;
+  }
+  assert.ok(corner + behind >= 8, `elle trouve où apparaître (${corner} devant, ${behind} derrière sur 12)`);
+  // la disparition : elle finit d'observer, personne ne la regarde, elle est partie loin
+  const sim = new BackroomsSim({ map, difficulty: 'normal' });
+  const P = sim.player;
+  const M = sim.monster;
+  M.dormantT = 0;
+  sim.map.brightCells = new Uint8Array(sim.map.W * sim.map.H);
+  const spot = sim.warpSpot(P, 'behind') || sim.warpSpot(P, 'corner');
+  M.x = spot.x;
+  M.z = spot.z;
+  M.mode = 'watch';
+  M.waitT = 0.01;
+  M.warpT = 999;
+  M.unseenAllT = 5;
+  P.yaw = Math.atan2(M.x - P.x, M.z - P.z); // il lui tourne le dos
+  for (let i = 0; i < 5; i++) sim.step({ yaw: P.yaw });
+  assert.ok(sim.players.every((Q) => Math.hypot(Q.x - M.x, Q.z - M.z) >= 30), 'on se retourne : elle a disparu');
+  sim.map.brightCells = null;
 });
 
 test('casier : caché, l\'entité ne le voit pas ; vu en entrant, elle vient le chercher', () => {

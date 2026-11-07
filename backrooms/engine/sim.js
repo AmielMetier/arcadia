@@ -17,7 +17,7 @@
 // monde dans la cabine, plus l'entité s'énerve contre ceux qui restent.
 // Chacun part avec sa lampe torche dans la case 1. Un joueur attrapé regarde les autres jusqu'à la fin de l'étage ;
 // si l'équipe le termine, tout le monde repart à l'étage suivant, lampe en main.
-import { CELL_SIZE, T, createLevel0, PIT_HALF, FLOOR_DY } from './map.js';
+import { CELL_SIZE, T, createLevel0, PIT_HALF, FLOOR_DY, bfs } from './map.js';
 import { createWarehouseMap } from './level1.js';
 import { createPoolMap, MOUTH } from './poolrooms.js';
 import { createPipesMap, VALVES, PIPES_LEVEL, jetState, inJet, JET_HALF } from './level2.js';
@@ -331,6 +331,11 @@ export class BackroomsSim {
       grabbing: null, // le joueur qu'elle agrippe
       faceT: 0, // depuis combien de temps un joueur la regarde en face, de près
       rushT: 0, // découverte nez à nez : elle hurle et fonce (secondes de charge)
+      warpT: 25, // Level 0 : délai avant sa prochaine apparition « trichée » (quand personne ne la voit)
+      unseenAllT: 0, // depuis combien de temps aucun joueur ne l'a dans son champ de vision
+      edgeT: 0, // sa proie s'est réfugiée dans la lumière : elle hésite au bord
+      lurk: false, // postée là où on va tomber sur elle (après une apparition)
+      vanish: false, // elle a fini d'observer : dès que personne ne la regarde, elle disparaît
       sawHide: -1, // le casier où elle a vu quelqu'un entrer
     };
     // Level 2 : le troupeau remplace l'entité (elle reste là pour relayer le son et l'image de la chèvre la plus proche)
@@ -1632,7 +1637,9 @@ export class BackroomsSim {
     }
     // Nez à nez : le joueur la regarde en face, de près, et la voit vraiment (sous un néon, dans sa lampe, ou à deux
     // pas). Elle ne reste pas plantée là : au bout d'une demi-seconde, elle hurle et fonce sur lui, même au repos
-    const exposed = same && M.hasLineOfSight && !(P.hidden >= 0) && dist < 7 && this.facing(P, M.x, M.z) < 0.4 &&
+    // Level 0 : dans la lumière franche d'une zone claire, on est presque à l'abri (sauf pendant une coupure)
+    const safe = this.level === 0 && !dark && this.brightCell(this.fm(P.floor), P.x, P.z);
+    const exposed = same && M.hasLineOfSight && !(P.hidden >= 0) && dist < 7 && (!safe || dist < 4) && this.facing(P, M.x, M.z) < 0.4 &&
       ((P.flashlight && dist < 7) || dist < 3.2 || (!dark && this.litCell(map, M.x, M.z)));
     if (exposed && M.mode !== 'chase' && M.mode !== 'flee' && M.mode !== 'ambush') M.faceT += DT;
     else M.faceT = Math.max(0, M.faceT - DT * 2);
@@ -1687,6 +1694,27 @@ export class BackroomsSim {
         canSee = false;
       }
     }
+
+    // à l'abri dans la lumière : elle ne s'y lance qu'à bout portant ; si elle le poursuivait, elle s'arrête au bord
+    // de l'ombre et l'observe
+    if (safe) {
+      canSee = canSee && dist < 3.5;
+      canHear = canHear && dist < 2.5;
+      isNearby = dist < 1.8;
+      if ((M.mode === 'chase' || M.mode === 'search') && dist > 2.2 && !(M.rushT > 0)) {
+        M.edgeT += DT;
+        if (M.edgeT > 1.0 + rage * 1.5) {
+          M.edgeT = 0;
+          M.mode = 'watch';
+          M.waitT = rand(4, 8);
+          M.watch = null;
+          M.path = [];
+          M.silent = true;
+          M.lurk = false;
+          this.emit({ type: 'lost', id: P.id });
+        }
+      } else M.edgeT = 0;
+    } else M.edgeT = 0;
 
     if (M.mode === 'ambush') {
       // en embuscade, elle attend que sa proie passe tout près
@@ -1743,6 +1771,11 @@ export class BackroomsSim {
       }
     }
 
+    // Level 0 : elle triche. Quand aucun joueur ne l'a dans son champ de vision, elle se téléporte : juste derrière
+    // un angle devant sa proie (on tombe nez à nez avec elle), dans son dos (elle approche sans un bruit), ou très
+    // loin (on se retourne, elle a disparu)
+    if (this.level === 0) this.monsterWarp(M, P, calm, A, rage);
+
     // Vitesse selon le mode, la colère et le noir
     const k = (1 + rage * 0.35 + (dark ? 0.1 : 0)) * (0.9 + A * 0.22);
     M.burstT = Math.max(0, M.burstT - DT);
@@ -1791,6 +1824,9 @@ export class BackroomsSim {
         M.silent = false;
         M.watch = null;
         M.stalkT = rand(3, 8);
+        // Level 0 : on se retourne… elle n'est plus là
+        if (this.level === 0) M.vanish = true;
+        M.lurk = false;
       }
     }
 
@@ -1834,7 +1870,9 @@ export class BackroomsSim {
             const near = calm
               ? map.walkable.filter((c) => Math.hypot((c.x + 0.5) * CELL_SIZE - P.x, (c.z + 0.5) * CELL_SIZE - P.z) > 30)
               : same && Math.random() < 0.5 + rage * 0.4 ? map.walkable.filter((c) => Math.hypot((c.x + 0.5) * CELL_SIZE - P.x, (c.z + 0.5) * CELL_SIZE - P.z) < 28 - rage * 12) : [];
-            const pool = near.length ? near : map.walkable;
+            // Level 0 : elle rôde dans l'ombre, pas dans la lumière franche des zones claires
+            const shade = this.level === 0 && !dark ? near.filter((c) => !this.brightCell(map, (c.x + 0.5) * CELL_SIZE, (c.z + 0.5) * CELL_SIZE)) : near;
+            const pool = shade.length ? shade : near.length ? near : map.walkable;
             const c = pool[Math.floor(Math.random() * pool.length)];
             M.targetWander = { x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE };
           }
@@ -2067,6 +2105,143 @@ export class BackroomsSim {
 
   // la case la plus sombre possible (aucun néon allumé tout autour, sinon le moins possible), entre rMin et rMax du
   // joueur ; seen : d'où on le voit. map.darkCells : 0 pour le noir complet, plus pour chaque néon allumé à côté
+  // Level 0 : une case dans la lumière franche d'une zone claire (sous ou à côté d'un néon d'une zone où tous marchent)
+  brightCell(map, x, z) {
+    if (!map.brightCells) {
+      map.brightCells = new Uint8Array(map.W * map.H);
+      for (const l of map.lights || []) {
+        if (!l.bright || l.state !== 'on') continue;
+        for (let dz = -1; dz <= 1; dz++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const gx = l.gx + dx;
+            const gz = l.gz + dz;
+            if (gx >= 0 && gz >= 0 && gx < map.W && gz < map.H) map.brightCells[gz * map.W + gx] = 1;
+          }
+        }
+      }
+    }
+    const gx = cellOf(x);
+    const gz = cellOf(z);
+    return gx >= 0 && gz >= 0 && gx < map.W && gz < map.H && map.brightCells[gz * map.W + gx] === 1;
+  }
+
+  // ce point est-il dans le champ de vision d'un joueur ? (dans le cadre de sa caméra, rien entre eux ; tout près,
+  // on la sentirait même dans son dos)
+  inSomeView(floor, x, z, margin = 0) {
+    const map = this.fm(floor);
+    for (const Q of this.players) {
+      if (Q.status !== 'alive' || (Q.floor || 0) !== floor) continue;
+      const d = Math.hypot(Q.x - x, Q.z - z);
+      if (d < 3.5) return true;
+      if (d > 60 || this.facing(Q, x, z) > 1.05 + margin) continue;
+      if (hasLineOfSight(map, Q.x, Q.z, x, z)) return true;
+    }
+    return false;
+  }
+
+  // Où réapparaître sans être vue. kind : 'corner' (devant sa proie, à quelques pas de marche, caché juste derrière un
+  // angle qu'elle va passer), 'behind' (dans son dos, dans l'ombre), 'far' (loin de tout le monde)
+  warpSpot(P, kind) {
+    const floor = P.floor || 0;
+    const map = this.fm(floor);
+    const W = map.W;
+    const pd = bfs(map.grid, W, map.H, cellOf(P.x), cellOf(P.z));
+    const stairCell = new Set((this.stairs || []).flatMap((st) => st.cells.map((k) => k.gz * W + k.gx)));
+    const dark = this.blackout > 0;
+    let best = null;
+    let bestS = Infinity;
+    for (const c of map.walkable || []) {
+      const i = c.z * W + c.x;
+      const d = pd[i];
+      if (d < 0 || stairCell.has(i)) continue;
+      if (kind === 'corner' && (d < 3 || d > 8)) continue;
+      if (kind === 'behind' && (d < 2 || d > 6)) continue;
+      const x = (c.x + 0.5) * CELL_SIZE;
+      const z = (c.z + 0.5) * CELL_SIZE;
+      const e = Math.hypot(x - P.x, z - P.z);
+      if (kind === 'far' ? this.players.some((Q) => Q.status === 'alive' && (Q.floor || 0) === floor && Math.hypot(Q.x - x, Q.z - z) < 30) : e < 5.5) continue;
+      if (map.pitAt && map.pitAt(c.x, c.z) >= 0) continue;
+      if (!dark && this.brightCell(map, x, z)) continue;
+      if ((map.props || []).some((pr) => Math.hypot(pr.x - x, pr.z - z) < pr.r + 0.6)) continue;
+      const ang = this.facing(P, x, z);
+      if (kind === 'corner' && ang > 1.1) continue;
+      if (kind === 'behind' && ang < 2.0) continue;
+      if (this.inSomeView(floor, x, z, 0.2)) continue;
+      let s = Math.random() * 2;
+      if (kind === 'corner') {
+        // juste derrière un angle : une case voisine est déjà en vue du joueur
+        const edge = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => {
+          const nx = c.x + dx;
+          const nz = c.z + dz;
+          return pd[nz * W + nx] >= 0 && hasLineOfSight(map, P.x, P.z, (nx + 0.5) * CELL_SIZE, (nz + 0.5) * CELL_SIZE);
+        });
+        if (!edge) continue;
+        s += ang * 3 + Math.abs(d - 5);
+      } else if (kind === 'behind') s += Math.abs(d - 3) + (Math.PI - ang) * 2;
+      else s += Math.random() * 4;
+      if (s < bestS) {
+        bestS = s;
+        best = { x, z, floor };
+      }
+    }
+    return best;
+  }
+
+  // la téléportation elle-même : elle n'arrive ni ne disparaît jamais sous les yeux d'un joueur
+  monsterWarp(M, P, calm, A, rage) {
+    const unseen = !this.inSomeView(M.floor || 0, M.x, M.z, 0.15);
+    M.unseenAllT = unseen ? M.unseenAllT + DT : 0;
+    M.warpT -= DT;
+    if (!unseen || M.unseenAllT < 1.2 || P.status !== 'alive') return;
+    const place = (spot) => {
+      M.x = spot.x;
+      M.z = spot.z;
+      M.floor = spot.floor;
+      M.path = [];
+      M.pathIndex = 0;
+      M.repathT = 0;
+      M.targetWander = null;
+      M.unseenAllT = 0;
+    };
+    // elle a fini d'observer : dès qu'on ne la regarde plus, elle n'est plus là
+    if (M.vanish) {
+      M.vanish = false;
+      if (M.mode === 'patrol' || M.mode === 'stalk') {
+        const spot = this.warpSpot(P, 'far');
+        if (spot) {
+          place(spot);
+          M.mode = 'patrol';
+          this.emit({ type: 'warp', kind: 'far' });
+        }
+      }
+      return;
+    }
+    if (M.warpT > 0 || calm || (M.mode !== 'patrol' && M.mode !== 'search') || P.hidden >= 0) return;
+    M.warpT = rand(20, 38) * (1 - A * 0.35) * (1 - rage * 0.3);
+    const kind = Math.random() < 0.65 ? 'corner' : 'behind';
+    const spot = this.warpSpot(P, kind) || (kind === 'behind' ? this.warpSpot(P, 'corner') : null);
+    if (!spot) return;
+    place(spot);
+    M.yaw = Math.atan2(P.x - M.x, P.z - M.z);
+    if (kind === 'corner') {
+      // postée, immobile et muette, face à l'endroit d'où il va surgir
+      M.mode = 'watch';
+      M.lurk = true;
+      M.waitT = rand(10, 16);
+      M.watch = null;
+      M.silent = true;
+    } else {
+      // elle s'approche par derrière, sans un bruit
+      M.mode = 'search';
+      M.silent = true;
+      M.probe = null;
+      M.probeFrom = null;
+      M.lastSeenX = P.x;
+      M.lastSeenZ = P.z;
+    }
+    this.emit({ type: 'warp', kind });
+  }
+
   // une case éclairée par un néon allumé (le sien ou un voisin direct)
   litCell(map, x, z) {
     this.darkCellsOf(map);

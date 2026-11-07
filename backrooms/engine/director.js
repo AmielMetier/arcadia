@@ -114,6 +114,7 @@ export function entityRelaxed(sim) {
 export function lightsChanged(map) {
   map.goatLit = null;
   map.darkCells = null;
+  map.brightCells = null;
   map.lightGen = (map.lightGen || 0) + 1;
 }
 

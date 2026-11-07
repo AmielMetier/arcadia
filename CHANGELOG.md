@@ -9,6 +9,8 @@
   - Si tu tombes nez à nez avec l'entité et que tu la vois en face, elle ne reste plus plantée là : elle hurle et fonce sur toi.
   - L'entité est plus grande (elle frôle le plafond) et bouge autrement : coudes et genoux qui plient dans le mauvais sens, mouvements saccadés image par image, tête qui se tord d'un coup, bras interminables qui ballottent, démarche boiteuse et course désarticulée. Quand elle charge, sa bouche s'ouvre en grand et elle tend les bras vers toi.
   - En arrivant au Level 1, on sort du même ascenseur que celui pris au Level 0 : ses portes se referment derrière toi une fois que tu as fait quelques pas.
+  - Sous les néons les plus forts, on est presque à l'abri : l'entité ne t'y prend en chasse que si tu la frôles. Elle reste à la lisière de l'ombre, immobile, et attend que tu en sortes.
+  - Quand plus personne ne la regarde, elle ne joue plus franc jeu : elle peut réapparaître juste derrière un angle devant toi, immobile et muette, ou se glisser dans ton dos sans un bruit. Et après t'avoir observé, il suffit de te retourner pour qu'elle ait disparu.
 
 ## 4.56 — 6 novembre 2026
 - **Fief Maudit** — La crypte et le Roi-Squelette : l'expédition a enfin une fin.
