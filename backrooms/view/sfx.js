@@ -975,6 +975,47 @@ export class BackroomsSfx {
 
   // Déverrouillage de la sortie : un relais qui claque, puis au loin le moteur d'un ascenseur (ou d'un monte-charge)
   // qui démarre et tourne quelques secondes ; pos : { x, z } de l'ascenseur (null : non placé)
+  // La porte cadenassée de l'escalier : la barre anti-panique qui cogne, la porte qui bute sur la chaîne, le cadenas
+  // qui ballotte contre le métal
+  lockedDoor(pos = null) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = pos ? this.at({ ...pos, rolloff: 0.8, ref: 3 }, 1) : this.gainNode(0.8);
+    if (!pos) out.connect(this.out);
+    this.burst(out, t, 0.09, 'lowpass', 380, 0.9, 0.55);
+    this.ring(out, t, 141, [[1, 1, 0.5], [2.7, 0.5, 0.3], [5.4, 0.25, 0.18]], 0.12);
+    this.burst(out, t + 0.07, 0.05, 'bandpass', 1500, 1.5, 0.22);
+    // la chaîne : une pluie de petits maillons
+    for (let k = 0; k < 9; k++) this.burst(out, t + 0.1 + k * rnd(0.018, 0.04), 0.012, 'bandpass', rnd(3200, 5600), 6, rnd(0.05, 0.12) * (1 - k / 10));
+    // le cadenas qui retombe
+    this.ring(out, t + 0.32, 1240, [[1, 1, 0.12], [2.4, 0.5, 0.08]], 0.07);
+    this.caption('[chain rattles]', pos);
+  }
+
+  // La clé ramassée : un trousseau qui tinte (pas de son à l'endroit : c'est dans ta main)
+  keyJingle() {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = this.gainNode(0.6);
+    out.connect(this.ui);
+    for (let k = 0; k < 5; k++) {
+      const f = rnd(2400, 4200);
+      this.ring(out, t + k * rnd(0.03, 0.07), f, [[1, 1, 0.25], [2.76, 0.4, 0.12], [5.4, 0.2, 0.07]], 0.06);
+    }
+    this.burst(out, t, 0.04, 'highpass', 5000, 0.7, 0.05);
+  }
+
+  // Loin, la porte de l'escalier qu'on déverrouille : un cadenas qui saute, une chaîne qui tombe
+  unlockFar(pos = null) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = pos ? this.at({ ...pos, rolloff: 0.5, ref: 5 }, 0.9) : this.gainNode(0.5);
+    if (!pos) out.connect(this.out);
+    this.burst(out, t, 0.03, 'bandpass', 2600, 3, 0.25);
+    for (let k = 0; k < 12; k++) this.burst(out, t + 0.12 + k * rnd(0.015, 0.035), 0.012, 'bandpass', rnd(2800, 5200), 5, rnd(0.04, 0.1));
+    this.burst(out, t + 0.55, 0.1, 'lowpass', 320, 0.9, 0.3);
+  }
+
   exitUnlocked(pos = null) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;

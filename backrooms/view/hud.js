@@ -110,6 +110,7 @@ export class BackroomsHUD {
       <!-- Spectateur : à l'abri dans l'ascenseur, ou attrapé -->
       <div class="spectate" id="spectate" hidden><b id="specTitle"></b><span id="specSub"></span><small id="specHaunt"></small></div>
       <!-- Le rejeu de la mort, vu de sa tête -->
+      <div class="voice-tag" id="voiceTag" hidden><span id="voiceOut"></span><i id="voiceBar"><b></b></i><span id="voiceIn"></span></div>
       <div class="replay-tag" id="replayTag" hidden><b>▶ PLAY</b> CAM 02 · <span>00:00:0<i id="replayClock">0</i></span></div>
       <!-- Fondu : l'ascenseur descend, carte de l'étage -->
       <div class="fade" id="fade"><div><b id="fadeTitle"></b><span id="fadeSub"></span><div class="fade-bar" id="fadeBarBox" hidden><i id="fadeBar"></i></div></div></div>
@@ -306,7 +307,7 @@ export class BackroomsHUD {
       }
     }
     const noSig = !(P.signal > 0);
-    this.text('signalLabel', noSig ? (sim.blackout > 0 ? 'NO SIGNAL' : 'NO SIGNAL') : P.sigTo === 'stairs' ? 'STAIRS' : L37 && sim.open ? 'SLIDE' : sim.open || (sim.level === 1 && delivered >= total) || (sim.level === 1 && !(sim.map.fuses || []).some((f) => !f.taken)) ? (sim.level === 1 ? 'FREIGHT ELEVATOR' : 'ELEVATOR') : 'SIGNAL');
+    this.text('signalLabel', noSig ? (sim.blackout > 0 ? 'NO SIGNAL' : 'NO SIGNAL') : P.sigTo === 'stairs' ? 'STAIRS' : P.sigTo === 'key' ? 'KEY' : L37 && sim.open ? 'SLIDE' : sim.open || (sim.level === 1 && delivered >= total) || (sim.level === 1 && !(sim.map.fuses || []).some((f) => !f.taken)) ? (sim.level === 1 ? 'FREIGHT ELEVATOR' : 'ELEVATOR') : 'SIGNAL');
     this.flag('signal', 'none', noSig);
     if (sim.floors.length > 1 && this.floorShown !== P.floor) {
       this.floorShown = P.floor;
@@ -415,6 +416,36 @@ export class BackroomsHUD {
   }
 
   // le bandeau du rejeu (on = false : caché)
+  // la voix : ce qu'on émet (VOICE à côté de soi, RADIO dans le talkie) et qui parle dans le talkie
+  voice(v, sim, multi, dead = false) {
+    const el = this.$('#voiceTag');
+    if (!el) return;
+    const mode = v.mode;
+    if (dead) {
+      // coupure : on appuie sur le talkie, il ne se passe rien
+      el.hidden = false;
+      el.classList.add('radio');
+      this.$('#voiceOut').textContent = 'RADIO · NO SIGNAL';
+      this.$('#voiceBar').hidden = true;
+      this.$('#voiceIn').textContent = '';
+      return;
+    }
+    const names = v.talking().map((id) => {
+      const Q = sim.players.find((q) => q.id === id);
+      return Q ? Q.name : null;
+    }).filter(Boolean);
+    const show = mode > 0 || names.length > 0;
+    el.hidden = !show;
+    if (!show) return;
+    el.classList.toggle('radio', mode === 2);
+    this.$('#voiceOut').textContent = mode === 2 ? '● RADIO' : mode === 1 ? '● VOICE' : '';
+    const bar = this.$('#voiceBar');
+    bar.hidden = mode === 0;
+    bar.firstChild.style.width = `${Math.round(Math.min(1, v.level) * 100)}%`;
+    bar.classList.toggle('loud', v.level > 0.75);
+    this.$('#voiceIn').textContent = names.length ? `RADIO · ${names.join(', ').toUpperCase()}` : '';
+  }
+
   replayTag(on) {
     this.$('#replayTag').hidden = !on;
     clearInterval(this.replayI);
@@ -472,6 +503,8 @@ export class BackroomsHUD {
         } else if (N && !N.ladder && sel === 'ladder' && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.2) text = 'PRESS E · PLACE THE LADDER UNDER THE TAPE';
         else if (it) text = P.inv.includes(null) ? `PRESS F · PICK UP ${NAME[it.kind]}` : `PRESS F · SWAP ${NAME[sel || 'bottle']} (SLOT ${P.sel + 1}) FOR ${NAME[it.kind]}`;
         else if (h) text = 'PRESS F · HIDE IN THE LOCKER';
+        else if (sim.nearKey && sim.nearKey(P)) text = 'PRESS F · TAKE THE STAIRWELL KEY';
+        else if (sim.lockedDoorNear && sim.lockedDoorNear(P)) text = 'LOCKED · FIND THE STAIRWELL KEY';
         else if (atPanel) text = `RESTARTING THE FREIGHT ELEVATOR… ${Math.round((sim.panel || 0) * 100)}% · STAY HERE`;
         else if (N && !N.ladder && nicheCas && !nicheCas.collected && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.6) text = 'THE TAPE IS TOO HIGH: YOU NEED A LADDER';
         // ce qu'on tient servirait maintenant : à bout de souffle avec de l'eau d'amande, la lampe presque vide avec des piles

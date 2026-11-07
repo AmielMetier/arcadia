@@ -1097,6 +1097,41 @@ float bkCaust(vec2 uv, float t) {
       itemMeshes.push({ it, g });
     };
     for (const it of map.items || []) addItemMesh(it);
+    // la clé de l'escalier : un trousseau sur un carton, au fond du noir ; un reflet de laiton quand la lampe passe dessus
+    let keyGroup = null;
+    let keyGlint = null;
+    if (map.key) {
+      keyGroup = new THREE.Group();
+      const card = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.34, 0.36), baked(new THREE.MeshLambertMaterial({ color: '#8a6a3e' })));
+      card.position.y = 0.17;
+      const kb = new THREE.MeshLambertMaterial({ color: '#c9a03a', emissive: '#4a3508', emissiveIntensity: 0.5 });
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.008, 6, 16), kb);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.set(-0.05, 0.345, 0);
+      const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.008, 0.014), kb);
+      shaft.position.set(0.035, 0.345, 0);
+      const bit = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.008, 0.03), kb);
+      bit.position.set(0.08, 0.345, 0.012);
+      const tag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.004, 0.035), new THREE.MeshLambertMaterial({ color: '#b3261e', emissive: '#300', emissiveIntensity: 0.4 }));
+      tag.position.set(-0.11, 0.343, 0.02);
+      tag.rotation.y = 0.4;
+      const gcv = document.createElement('canvas');
+      gcv.width = gcv.height = 32;
+      const gg = gcv.getContext('2d');
+      const ggr = gg.createRadialGradient(16, 16, 0, 16, 16, 16);
+      ggr.addColorStop(0, 'rgba(255,255,255,1)');
+      ggr.addColorStop(0.25, 'rgba(255,230,160,0.5)');
+      ggr.addColorStop(1, 'rgba(255,200,100,0)');
+      gg.fillStyle = ggr;
+      gg.fillRect(0, 0, 32, 32);
+      keyGlint = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(gcv), color: '#ffe7a0', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+      keyGlint.scale.setScalar(0.22);
+      keyGlint.position.set(0.02, 0.37, 0);
+      keyGroup.add(card, ring, shaft, bit, tag, keyGlint);
+      keyGroup.position.set(map.key.x, 0, map.key.z);
+      keyGroup.rotation.y = (map.key.gx * 7 + map.key.gz) % 6;
+      group.add(keyGroup);
+    }
 
     // 8. Cages d'escalier : un puits fermé de murs, du sol de l'étage du bas au plafond de celui du haut, ouvert par une
     // baie en bas de la première volée (étage du bas) et une en haut de la seconde (étage du haut). Dehors, le papier
@@ -1111,6 +1146,7 @@ float bkCaust(vec2 uv, float t) {
     const zAxis = new THREE.Vector3(0, 0, 1);
     const lowerHere = fi > 0 || floors.length === 1;
     let innerMat = null;
+    const stairDoors = [];
     for (const st of map.stairs || []) {
       // repère de la cage : u le long des volées, v en travers ; y depuis le sol de cet étage
       const wx = (u, v) => st.ox + st.dx * u + st.px * v;
@@ -1177,6 +1213,51 @@ float bkCaust(vec2 uv, float t) {
         box(0.05, d0 - 0.005, DOOR_H / 2, 0.1, DOOR_H, 0.01, casing);
         box(0.05, d1 + 0.005, DOOR_H / 2, 0.1, DOOR_H, 0.01, casing);
         box(0.05, (d0 + d1) / 2, DOOR_H + 0.005, 0.1, 0.01, d1 - d0, casing);
+      }
+      // Level 0, étage du haut : une porte coupe-feu dans la baie, fermée par une chaîne et un cadenas tant que
+      // personne n'a trouvé la clé ; ensuite elle reste grande ouverte, rabattue contre le mur du couloir
+      if (!lowerHere && map.key) {
+        const [d0, d1] = doorUp;
+        const w = d1 - d0;
+        const pivot = new THREE.Group();
+        pivot.position.set(wx(-0.02, d1), 0, wz(-0.02, d1));
+        const base = Math.atan2(st.pz, -st.px); // le long de la porte : de la charnière (v = d1) vers v = d0
+        const zs = st.pz * -st.dx + -st.px * -st.dz > 0 ? 1 : -1; // le côté du couloir, dans le repère de la porte
+        const sgn = -zs; // elle s'ouvre vers le couloir
+        pivot.rotation.y = base;
+        const steel = baked(new THREE.MeshLambertMaterial({ color: '#6e7366' }));
+        const dark = baked(new THREE.MeshLambertMaterial({ color: '#2b2c28' }));
+        const brass = new THREE.MeshLambertMaterial({ color: '#b8902e', emissive: '#3a2a08', emissiveIntensity: 0.4 });
+        const leaf = new THREE.Mesh(new THREE.BoxGeometry(w, DOOR_H - 0.02, 0.05), steel);
+        leaf.position.set(w / 2, DOOR_H / 2, 0);
+        // un hublot de verre armé, la barre anti-panique côté cage, une poignée côté couloir
+        const glass = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.42), new THREE.MeshBasicMaterial({ color: '#2a2d26' }));
+        glass.position.set(w * 0.62, 1.55, -0.027);
+        glass.rotation.y = Math.PI;
+        const glass2 = glass.clone();
+        glass2.position.z = 0.027;
+        glass2.rotation.y = 0;
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7, 0.06, 0.06), dark);
+        bar.position.set(w * 0.55, 1.0, -zs * 0.06);
+        const handle = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.03, 0.05), dark);
+        handle.position.set(w - 0.12, 1.0, zs * 0.05);
+        // la chaîne en X sur la poignée et le chambranle, et le cadenas qui pend
+        const lock = new THREE.Group();
+        const chainMat = new THREE.MeshLambertMaterial({ color: '#8d8a80', emissive: '#1a1a18' });
+        for (const a of [0.5, -0.5]) {
+          const ch = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.025, 0.025), chainMat);
+          ch.position.set(w - 0.02, 1.0, zs * 0.075);
+          ch.rotation.z = a;
+          lock.add(ch);
+        }
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.09, 0.03), brass);
+        body.position.set(w - 0.02, 0.86, zs * 0.085);
+        const shackle = new THREE.Mesh(new THREE.TorusGeometry(0.028, 0.007, 6, 12, Math.PI), chainMat);
+        shackle.position.set(w - 0.02, 0.905, zs * 0.085);
+        lock.add(body, shackle);
+        pivot.add(leaf, glass, glass2, bar, handle, lock);
+        group.add(pivot);
+        stairDoors.push({ pivot, lock, base, sgn, open: 0, map });
       }
       if (!lowerHere) continue;
 
@@ -1735,6 +1816,25 @@ float bkCaust(vec2 uv, float t) {
         const items = map.items || [];
         for (let i = itemMeshes.length; i < items.length; i++) addItemMesh(items[i]);
         for (const im of itemMeshes) im.g.visible = !im.it.taken;
+        // la clé, puis la porte de l'escalier qui s'ouvre (vite, d'un coup de pied) une fois la clé trouvée
+        if (keyGroup) {
+          keyGroup.visible = !map.key.taken;
+          if (keyGlint && keyGroup.visible) {
+            const dx = map.key.x - P.x;
+            const dz = map.key.z - P.z;
+            const d = Math.hypot(dx, dz);
+            let off = Math.atan2(-dx, -dz) - P.yaw;
+            off = Math.atan2(Math.sin(off), Math.cos(off));
+            const inBeam = P.flashlight && (P.floor || 0) === fi && d < 16 && Math.abs(off) < 0.3;
+            keyGlint.material.opacity = inBeam ? 0.55 + 0.35 * Math.sin(time * 9) * Math.sin(time * 3.7) : 0.06;
+          }
+        }
+        for (const D of stairDoors) {
+          const want = D.map.key && !D.map.key.taken ? 0 : 1;
+          D.open += Math.sign(want - D.open) * Math.min(Math.abs(want - D.open), dt / 0.7);
+          D.lock.visible = D.open < 0.05;
+          D.pivot.rotation.y = D.base + D.sgn * (1 - Math.pow(1 - D.open, 3)) * 1.75;
+        }
         if (placedLadder) placedLadder.visible = !!(N && N.ladder);
 
         // Ascenseur : rouge verrouillé, vert ouvert ; le faux devient un mur

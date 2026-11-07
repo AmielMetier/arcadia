@@ -1306,7 +1306,8 @@ test("chute : par un trou, on atterrit à l'étage du dessous, juste en dessous 
   assert.ok(climbed, 'on est passé par le palier, à mi-hauteur');
   assert.equal(P.floor, 0, "remonté par l'escalier");
   assert.ok(FLOOR_DY > 6, 'les étages sont loin l\'un de l\'autre');
-  // et on redescend par le même chemin
+  // et on redescend par le même chemin (la porte du haut s'ouvre avec la clé)
+  sim.floors[0].key.taken = true;
   walk([W(0.3, 1.5 * C), W(2.5 * C, 1.5 * C), W(2.5 * C, C / 2), W(0.3, C / 2), st.down], () => {});
   assert.equal(P.floor, 1, 'redescendu');
   // pas de raccourci d'une volée à l'autre par-dessus la rampe du milieu
@@ -1382,10 +1383,115 @@ test("ascenseurs : un en haut, un en bas ; les 5 cassettes trouvées, le faux de
   }
 });
 
+test("clé : la porte du haut de l'escalier est cadenassée ; la clé, au fond d'une zone morte, l'ouvre pour tous", () => {
+  for (let seed = 1; seed <= 12; seed++) {
+    const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
+    const sim = new BackroomsSim({ difficulty: 'peaceful', seed, players, localId: 1 });
+    const K = sim.floors[0].key;
+    assert.ok(K, `graine ${seed} : une clé`);
+    const top = sim.floors[0];
+    assert.ok(!top.isWall(K.gx, K.gz) && !(top.pitAt && top.pitAt(K.gx, K.gz) >= 0), 'posée par terre, pas dans un trou');
+    assert.ok(Math.hypot(K.x - top.spawn.x, K.z - top.spawn.z) >= 30, 'loin du départ');
+    assert.ok(sim.stairs.every((st) => Math.hypot(st.x - K.x, st.z - K.z) >= 18), "loin de l'escalier");
+    assert.ok(!sim.litCell(top, K.x, K.z), 'dans le noir');
+    // les invités la posent au même endroit
+    const g = new BackroomsSim({ difficulty: 'peaceful', seed, players, localId: 2 });
+    assert.deepEqual([g.floors[0].key.x, g.floors[0].key.z], [K.x, K.z]);
+    // fermée : on bute contre la porte, en entendant le cadenas
+    const P = sim.player;
+    const st = sim.stairs[0];
+    const C = CELL_SIZE;
+    const W = (u, v) => ({ x: st.ox + st.dx * u + st.px * v, z: st.oz + st.dz * u + st.pz * v });
+    const go = () => {
+      const a = W(-0.6, 1.5 * C);
+      P.x = a.x;
+      P.z = a.z;
+      P.floor = 0;
+      const b = W(1.0, 1.5 * C);
+      const evs = [];
+      for (let i = 0; i < 90; i++) {
+        sim.step({ my: 1, yaw: Math.atan2(-(b.x - P.x), -(b.z - P.z)) });
+        evs.push(...sim.drainEvents());
+      }
+      return evs;
+    };
+    assert.ok(sim.stairsLocked);
+    assert.ok(sim.lockedDoorNear(P, 99), 'la porte est repérée');
+    const evs = go();
+    assert.ok(!stairAt(sim.stairs, P.x, P.z), 'la porte ne cède pas');
+    assert.ok(evs.some((e) => e.type === 'locked' && e.id === P.id), 'le cadenas claque');
+    // F à côté de la clé : elle est à nous, la porte s'ouvre pour tout le monde
+    P.x = K.x + 0.5;
+    P.z = K.z;
+    sim.step({ pick: true });
+    const got = sim.drainEvents().find((e) => e.type === 'key');
+    assert.ok(got && got.by === P.id && K.taken, 'la clé ramassée');
+    assert.ok(!sim.stairsLocked);
+    g.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
+    assert.ok(g.floors[0].key.taken && !g.stairsLocked, "l'invité le sait aussi");
+    go();
+    assert.ok(stairAt(sim.stairs, P.x, P.z), "on entre dans l'escalier");
+  }
+});
+
+test("voix : parler fait du bruit, le talkie grésille chez les autres, et le vacarme la rend agressive", () => {
+  const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }, { id: 3, name: 'C' }];
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 5, players, localId: 1 });
+  const [A, B, C] = sim.players;
+  // un murmure de rien ne compte pas ; une voix normale fait plus de bruit que marcher ; un cri, plus que courir
+  sim.step({ voice: 0.08 });
+  assert.ok(!(A.noise > NOISE.walk), 'le souffle du micro ne compte pas');
+  sim.step({ voice: 0.6 });
+  assert.ok(A.noise > NOISE.walk && A.noise < NOISE.run, `une voix normale (${A.noise.toFixed(2)})`);
+  sim.step({ voice: 1 });
+  assert.ok(A.noise > NOISE.run, 'un cri');
+  for (let i = 0; i < 40; i++) sim.step({});
+  // au talkie : chez les autres aussi (leur haut-parleur), même loin
+  sim.step({ voice: 0.6, radio: true });
+  assert.ok(A.radio);
+  assert.ok(B.noise > NOISE.walk && C.noise > NOISE.walk, 'le talkie grésille chez chacun');
+  // coupure (les néons qui meurent) : le talkie ne passe plus, ni chez les autres, ni chez l'invité (instantané)
+  for (let i = 0; i < 40; i++) sim.step({});
+  sim.lightsOut = { list: [], t: 0, n: 0, id: 1, floor: 0 };
+  assert.ok(sim.radioDead);
+  sim.step({ voice: 0.6, radio: true });
+  assert.ok(!A.radio && !(B.noise > NOISE.walk), 'en coupure, le talkie est mort');
+  const g = new BackroomsSim({ difficulty: 'peaceful', seed: 5, players, localId: 2 });
+  sim.lightsOut = { list: [], t: 0, n: 0, id: 1, floor: 0 }; // (la séquence vide s'est déjà terminée au pas précédent)
+  g.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
+  assert.ok(g.radioDead, "l'invité le sait");
+  sim.lightsOut = null;
+  g.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
+  assert.ok(!sim.radioDead && !g.radioDead, 'le courant revient, le talkie aussi');
+  // un invité : son niveau arrive avec ses commandes
+  for (let i = 0; i < 40; i++) sim.step({});
+  sim.step({}, { 2: { remote: true, voice: 0.7 } });
+  assert.ok(B.noise > NOISE.walk && !(C.noise > NOISE.walk), "la voix de l'invité, de vive voix : chez lui seulement");
+  // les morts ne font plus de bruit
+  C.status = 'dead';
+  sim.step({}, { 3: { remote: true, voice: 1 } });
+  assert.equal(C.voice, 0);
+  // le vacarme : à force de parler, elle devient plus agressive, et on est prévenu ; puis il retombe
+  const a0 = sim.aggro;
+  const evs = [];
+  for (let i = 0; i < 60 * 40; i++) {
+    sim.step({ voice: 0.7 });
+    evs.push(...sim.drainEvents().filter((e) => e.type === 'din'));
+  }
+  assert.ok(sim.din > 0.8, `le vacarme monte (${sim.din.toFixed(2)})`);
+  assert.ok(sim.aggro > a0 + 0.3, 'elle est plus agressive');
+  assert.deepEqual(evs.map((e) => e.level), [1, 2], 'deux paliers, chacun une fois');
+  for (let i = 0; i < 60 * 100; i++) sim.step({});
+  assert.ok(sim.din < 0.5, `il retombe dans le silence (${sim.din.toFixed(2)})`);
+});
+
 test("signal : sans cassette à son étage, le caméscope guide vers l'escalier", () => {
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 19 });
   const P = sim.player;
   for (const c of sim.map.cassettes) c.collected = true;
+  sim.step();
+  assert.equal(P.sigTo, 'key', "d'abord la clé de la porte du haut");
+  sim.floors[0].key.taken = true;
   sim.step();
   assert.equal(P.sigTo, 'stairs');
   P.floor = 1;

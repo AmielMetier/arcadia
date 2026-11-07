@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '4.58';
+  const VERSION = '4.59';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -653,7 +653,7 @@ renderPlayers(); renderNet(); pubState(); renderFriends(); renderPings();
     for (const k of ['debug', 'ws', 'mute']) if (pass.has(k)) q.set(k, pass.get(k));
     let src = def.url + '?' + q.toString() + (DDNet.LOCAL_TEST ? '&local' : '');
     const el = document.createElement('iframe');
-    el.title = def.title; el.src = src; el.allow = 'autoplay; fullscreen; gamepad';
+    el.title = def.title; el.src = src; el.allow = 'autoplay; fullscreen; gamepad; microphone'; // micro : la voix de proximité des Backrooms
     $('#play').innerHTML = ''; $('#play').appendChild(el);
 const watchdog = setTimeout(() => {
       if (frame && frame.el === el && !frame.loaded && window.DDLogger) {
