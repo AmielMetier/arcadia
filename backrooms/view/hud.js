@@ -114,7 +114,7 @@ export class BackroomsHUD {
       <!-- Spectateur : à l'abri dans l'ascenseur, ou attrapé -->
       <div class="spectate" id="spectate" hidden><b id="specTitle"></b><span id="specSub"></span><small id="specHaunt"></small></div>
       <!-- Le rejeu de la mort, vu de sa tête -->
-      <div class="voice-tag" id="voiceTag" hidden><span id="voiceOut"></span><i id="voiceBar"><b></b></i><span id="voiceIn"></span></div>
+      <div class="voice-tag" id="voiceTag" hidden><span id="voiceOut"></span><i id="voiceBar"><b></b></i><span id="voiceIn"></span><span id="voiceLore"></span></div>
       <div class="replay-tag" id="replayTag" hidden><b>▶ PLAY</b> CAM 02 · <span>00:00:0<i id="replayClock">0</i></span></div>
       <!-- Fondu : l'ascenseur descend, carte de l'étage -->
       <div class="fade" id="fade"><div><b id="fadeTitle"></b><span id="fadeSub"></span><div class="fade-bar" id="fadeBarBox" hidden><i id="fadeBar"></i></div></div></div>
@@ -434,13 +434,21 @@ export class BackroomsHUD {
       this.$('#voiceOut').textContent = 'RADIO · NO SIGNAL';
       this.$('#voiceBar').hidden = true;
       this.$('#voiceIn').textContent = '';
+      this.$('#voiceLore').textContent = this.loreTxt = '';
       return;
     }
     const names = v.talking().map((id) => {
       const Q = sim.players.find((q) => q.id === id);
       return Q ? Q.name : null;
     }).filter(Boolean);
-    const show = mode === 2 || names.length > 0;
+    // une voix perdue sur le canal : sa transcription s'écrit au rythme de la voix
+    const lore = v.loreLine ? v.loreLine() : null;
+    const loreTxt = lore ? `RADIO ▸ ${lore.text.slice(0, lore.shown)}${lore.shown < lore.text.length ? '▌' : ''}` : '';
+    if (loreTxt !== this.loreTxt) {
+      this.loreTxt = loreTxt;
+      this.$('#voiceLore').textContent = loreTxt;
+    }
+    const show = mode === 2 || names.length > 0 || !!lore;
     el.hidden = !show;
     if (!show) return;
     el.classList.toggle('radio', mode === 2);
@@ -578,11 +586,11 @@ export class BackroomsHUD {
     }
   }
 
-  toast(text) {
+  toast(text, secs = 2.5) {
     const t = this.$('#toast');
     t.textContent = text;
     t.hidden = false;
-    this.toastT = 2.5;
+    this.toastT = secs;
   }
 
   // images du screamer selon le mode (normal / VIP) : à rappeler quand l'hôte lance une partie

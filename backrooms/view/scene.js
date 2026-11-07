@@ -2355,7 +2355,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         goatHerd.update(sim, P, camera, gv ? gv.lightAt : () => 0.3, lampOn, dt, time);
       } else if (sim.hasMonster) {
         const M = sim.monster;
-        monsterGroup.visible = true;
+        monsterGroup.visible = !M.away; // le prélude (avant la première cassette) : elle n'est pas là
         const chase = M.mode === 'chase';
         // plus elle est proche, moins elle est brouillée : nette à moins de 2,5 m
         const g = THREE.MathUtils.clamp((Math.hypot(P.x - M.x, P.z - M.z) - 2.5) / 14, 0, 1);

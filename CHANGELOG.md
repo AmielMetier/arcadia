@@ -6,6 +6,11 @@
   - Sous le trait, tu chuchotes : personne ne t'entend, l'entité non plus. Au-dessus, la jauge passe au jaune et affiche « HEARD » : les joueurs proches t'entendent, et elle aussi.
   - Tout en haut, elle vire au rouge et clignote « TOO LOUD » : tu fais plus de bruit qu'en courant.
   - Si le navigateur bloque le micro, la jauge affiche « BLOCKED ».
+- **The Backrooms** — Un début de partie plus lent, et des voix perdues dans le talkie.
+  - Avant la première cassette, l'entité n'est tout simplement pas là : seule sa toute première apparition, au bout d'un couloir, vient troubler l'exploration. Pas de traque, pas de fausses alertes, pas de néons qui meurent, pas de parasites dans le talkie. Elle n'arrive qu'une vingtaine de secondes après la première cassette, et de loin.
+  - De temps en temps (c'est rare), une voix passe sur le canal du talkie : quelqu'un d'autre, perdu ici. Ses mots s'écrivent à l'écran pendant qu'il parle.
+  - Voix de proximité : tout près, la voix est sèche, avec juste un soupçon d'écho ; en s'éloignant, la voix s'efface et l'écho des couloirs prend le dessus.
+  - Si un joueur n'a pas la même carte que l'hôte (une vieille version du jeu restée en mémoire), il est prévenu qu'il doit recharger la page, et l'hôte aussi.
 
 ## 4.60 — 7 novembre 2026
 - **The Backrooms** — Voix de proximité sans touche, et quelques retouches au caméscope.

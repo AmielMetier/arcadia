@@ -7,6 +7,8 @@ import { hideFront } from '../backrooms/engine/hides.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
 
 // distance en marche (en cases) entre deux cases
+// les tests du comportement de l'entité la veulent présente dès le départ : le prélude a son propre test
+BackroomsSim.PRELUDE = false;
 const bfsDist = (m, ax, az, bx, bz) => bfs(m.grid, m.W, m.H, ax, az)[bz * m.W + bx];
 
 // amène un joueur sur une cassette, à son étage (celle du renfoncement : échelle posée, au pied de l'échelle)
@@ -460,6 +462,46 @@ test('première rencontre : au bout du couloir, elle est là ; regardée, le né
     assert.equal(sim.glimpseAt, Infinity, 'une seule fois par partie');
   }
   assert.ok(shown >= 7, `elle se montre (${shown}/10)`);
+});
+
+test('prélude : avant la première cassette, rien que la première apparition ; l\'entité n\'est pas là', () => {
+  BackroomsSim.PRELUDE = true;
+  try {
+    for (let seed = 1; seed <= 4; seed++) {
+      const sim = new BackroomsSim({ seed, difficulty: 'hard', players: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], localId: 'a' });
+      const M = sim.monster;
+      assert.ok(sim.prelude, 'Level 0, aucune cassette : le prélude');
+      const types = new Set();
+      let glimpses = 0;
+      // trois minutes à parler fort et à courir partout
+      for (let i = 0; i < 60 * 180; i++) {
+        sim.events.length = 0;
+        const t = i / 60;
+        sim.step({ my: 1, mx: Math.sin(t * 0.7), run: true, voice: 0.9, radio: (i % 600) < 200 }, { b: { my: 1, mx: Math.cos(t * 0.5), voice: 0.9 } });
+        for (const e of sim.events) types.add(e.type);
+        if (sim.events.some((e) => e.type === 'glimpse' && e.phase === 'show')) glimpses++;
+        if (!M.glimpse) assert.ok(M.away, 'hors de l\'apparition, elle n\'est pas là');
+        assert.ok(M.mode !== 'chase' && M.mode !== 'grab', 'jamais de poursuite');
+        assert.ok(sim.players.every((P) => !(P.danger > 0) || M.glimpse), 'pas de bourdonnement');
+      }
+      assert.ok(glimpses <= 1, 'une seule apparition');
+      for (const t of ['spotted', 'phantom', 'din', 'tell', 'warp', 'blackout']) assert.ok(!types.has(t), `rien d'autre : ${t}`);
+      assert.ok(!sim.lightsOut, 'pas de néons qui meurent');
+      assert.ok(sim.players.every((P) => P.status === 'alive'), 'personne ne meurt');
+      // la première cassette : elle arrive, une vingtaine de secondes plus tard, et de loin
+      sim.cassettes = 1;
+      run(sim, 1);
+      assert.ok(!sim.prelude);
+      let back = 0;
+      for (let i = 0; i < 60 * 30 && !back; i++) {
+        sim.step({});
+        if (!M.away) back = i / 60;
+      }
+      assert.ok(back > 0, 'elle est revenue');
+    }
+  } finally {
+    BackroomsSim.PRELUDE = false;
+  }
 });
 
 test('traque annoncée : les néons meurent un à un jusqu\'au joueur, puis elle est lâchée du fond', () => {
