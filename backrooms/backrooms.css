@@ -569,6 +569,7 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 
 /* jumpscare en 3D : seulement l'éclair rouge par-dessus la scène */
 .jumpscare-overlay.three { background: transparent; }
+.jumpscare-overlay.three.pre { background: #000; }
 .jumpscare-overlay.three.flash { animation: goatFlash 0.9s forwards; }
 .jumpscare-overlay.soft.flash { animation: none; background: transparent; }
 
@@ -588,6 +589,16 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 /* Spectateur : aider (ou piéger) les vivants */
 .spectate small { display: block; font-size: 17px; margin-top: 6px; opacity: 0.75; letter-spacing: 1px; }
 /* Le rejeu de la mort, vu de sa tête */
+/* La voix : ce qu'on émet, le niveau du micro (rouge quand on crie : elle entend), qui parle au talkie */
+.voice-tag { position: absolute; left: 32px; bottom: 120px; z-index: 13; display: flex; flex-direction: column; gap: 4px; font-size: 18px; letter-spacing: 2px; color: #f2f0e6; text-shadow: 0 0 5px rgba(0,0,0,0.9); pointer-events: none; }
+.voice-tag span:empty { display: none; }
+.voice-tag #voiceOut { color: #9be37a; }
+.voice-tag.radio #voiceOut { color: #ffcf3a; }
+.voice-tag #voiceIn { color: #ffcf3a; animation: replayBlink 1.2s steps(2) infinite; }
+.voice-tag i { display: block; width: 120px; height: 6px; border: 1px solid rgba(242,240,230,0.7); }
+.voice-tag i[hidden] { display: none; }
+.voice-tag i b { display: block; height: 100%; width: 0; background: #9be37a; }
+.voice-tag i.loud b { background: #ff3b3b; }
 .replay-tag { position: fixed; top: 22px; left: 50%; transform: translateX(-50%); white-space: nowrap; z-index: 45; font-size: 26px; color: #f2f2f2; letter-spacing: 2px; text-shadow: 0 0 6px rgba(0,0,0,0.9); pointer-events: none; }
 .replay-tag b { color: #ef4444; font-weight: normal; animation: replayBlink 1s steps(2) infinite; }
 .replay-tag i { font-style: normal; }

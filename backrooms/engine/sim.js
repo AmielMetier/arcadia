@@ -44,7 +44,7 @@ export const INV_SIZE = 2; // cases d'objets (piles, eau d'amande, échelle) : l
 export const PICK_R = 1.4; // portée de F pour ramasser
 export const ALMOND_STAMINA = 50; // l'eau d'amande rend la moitié du souffle (plus un bouton « fin de poursuite »)
 export const BLACKOUT_DRAIN = 1.5; // dans le noir d'une coupure, la lampe tire plus fort sur la pile
-export const SIGNAL_RANGE = 25; // m : au-delà, le caméscope ne capte plus rien
+export const SIGNAL_RANGE = 34; // m : au-delà, le caméscope ne capte plus rien
 // La prise : la première fois par niveau, l'entité agrippe au lieu de tuer. On se débat (GRAB_STRUGGLES appuis) ou un
 // coéquipier lui braque sa lampe dans les yeux ; sinon, au bout de GRAB_T, c'est fini. Lâchée, elle reste sonnée.
 export const GRAB_T = 2.6;
@@ -53,6 +53,9 @@ export const MONSTER_STUN_T = 3;
 // le bruit qu'on fait (0 à 1+) : il porte jusqu'à NOISE_RANGE × bruit mètres (moins à travers les murs)
 export const NOISE = { walk: 0.32, run: 1, crouch: 0, pick: 0.45, winded: 0.4, fall: 1.6, breath: 0.12, panic: 0.3, gasp: 1.2 };
 export const NOISE_RANGE = 13;
+export const VOICE_MIN = 0.15; // niveau du micro en dessous duquel on ne compte pas (le souffle, la pièce)
+export const DIN_RATE = 0.04; // le vacarme : parler une cinquantaine de secondes d'affilée le fait monter au maximum
+export const DIN_DECAY = 0.006; // et il retombe en un peu moins de trois minutes de silence
 export const VISION_CONE = 0.96; // demi-angle du regard de l'entité (55°) ; tout près, elle sent qu'on est là
 export const DORMANT_T = 60; // au tout début, l'entité reste au loin une minute (on apprend à se déplacer)
 export const PANEL_T = 4; // Level 1 : secondes devant le panneau du monte-charge pour le relancer (bruyant)
@@ -128,6 +131,37 @@ export function findCalmNooks(map, seed, spawn) {
   }
   return out;
 }
+// Level 0 : la clé de la cage d'escalier. La porte du haut est fermée au cadenas ; la clé traîne au fond d'une zone
+// morte de l'étage du haut, loin du départ et des escaliers (de préférence dans un cul-de-sac). Le tirage ne dépend que
+// de la carte et de la graine : l'hôte et les invités la posent au même endroit. dark(x, z) : la case est dans le noir.
+export function findStairKey(map, seed, dark) {
+  const W = map.W;
+  const free = new Set((map.walkable || []).map((c) => c.z * W + c.x));
+  const stairs = map.stairs || [];
+  const busy = new Set(stairs.flatMap((st) => st.cells.map((k) => k.gz * W + k.gx)));
+  for (const n of map.calm || []) for (const c of n.cells) busy.add(c.z * W + c.x);
+  let best = null;
+  for (const c of map.walkable || []) {
+    const i = c.z * W + c.x;
+    if (busy.has(i) || (map.pitAt && map.pitAt(c.x, c.z) >= 0)) continue;
+    const x = (c.x + 0.5) * CELL_SIZE;
+    const z = (c.z + 0.5) * CELL_SIZE;
+    const ds = map.spawn ? Math.hypot(x - map.spawn.x, z - map.spawn.z) : 99;
+    if (ds < 30 || ds > 80) continue;
+    if (stairs.some((st) => Math.hypot(st.x - x, st.z - z) < 18)) continue;
+    if (map.exit && Math.hypot(x - map.exit.x, z - map.exit.z) < 10) continue;
+    if ((map.items || []).some((it) => Math.hypot(it.x - x, it.z - z) < 2)) continue;
+    if (dark && !dark(x, z)) continue;
+    const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => free.has((c.z + dz) * W + c.x + dx)).length;
+    let h = (i * 2654435761 + seed * 40503) >>> 0;
+    h ^= h >>> 15;
+    h = Math.imul(h, 2246822519) >>> 0;
+    const score = (h ^ (h >>> 13)) / 4294967296 + (nb === 1 ? 1 : 0);
+    if (!best || score > best.score) best = { x, z, gx: c.x, gz: c.z, score };
+  }
+  return best ? { x: best.x, z: best.z, gx: best.gx, gz: best.gz, taken: false } : null;
+}
+
 // un tirage qui ne dépend que de la graine (hôte et invités tirent pareil)
 const hashRnd = (...k) => {
   let h = 2166136261;
@@ -185,6 +219,12 @@ export function stairHeight(u, v) {
   if (u >= 2 * C) return 0.5;
   const f = Math.max(0, u) / (2 * C);
   return v < C ? f * 0.5 : 1 - f * 0.5;
+}
+// le seuil de la porte du haut d'une cage (côté couloir, étage du haut)
+export function stairDoor(st) {
+  const u = -0.5;
+  const v = 1.5 * CELL_SIZE;
+  return { x: st.ox + st.dx * u + st.px * v, z: st.oz + st.dz * u + st.pz * v, st };
 }
 export function stairAt(stairs, x, z) {
   const C = CELL_SIZE;
@@ -336,6 +376,9 @@ export class BackroomsSim {
     this.director = createDirector(level);
     // Level 0 : un ou deux recoins calmes par étage, où rien ne se passe… un moment ; la première rencontre, mise en scène
     if (level === 0) this.floors.forEach((f, fi) => (f.calm = f.calm || findCalmNooks(f, this.seed * 13 + fi, fi === 0 ? f.spawn : null)));
+    // Level 0 : la porte du haut des cages d'escalier est cadenassée ; la clé est quelque part à l'étage du haut
+    const top = this.floors[0];
+    if (level === 0 && this.floors.length > 1 && (top.stairs || []).length && top.key === undefined) top.key = findStairKey(top, this.seed * 17 + 5, (x, z) => !this.litCell(top, x, z));
     // l'état d'origine des néons (les instantanés n'envoient que ceux qui ont changé)
     for (const f of this.floors) for (const l of f.lights || []) if (l.s0 === undefined) l.s0 = l.state;
 
@@ -549,12 +592,68 @@ export class BackroomsSim {
     }
   }
 
+  // La voix (niveau du micro de 0 à 1, mesuré chez chaque joueur) : parler fait du bruit là où l'on est ; au talkie, on
+  // parle plus bas, mais le haut-parleur de chaque vivant grésille aussi, là où il est. Et le vacarme s'accumule :
+  // plus l'équipe parle, plus l'entité devient agressive.
+  voice(P, input) {
+    const v = P.status === 'alive' ? Math.max(0, Math.min(1, +input.voice || 0)) : 0;
+    P.voice = v;
+    P.radio = v > 0 && !!input.radio && !this.radioDead; // coupure de courant : le talkie ne passe plus
+    if (v < VOICE_MIN) return;
+    const loud = 0.1 + v * 1.1; // un murmure ~ marcher, une voix normale entre marcher et courir, un cri plus que courir
+    this.makeNoise(P, P.radio ? loud * 0.7 : loud, 0.35);
+    if (P.radio) for (const Q of this.players) if (Q !== P && Q.status === 'alive') this.makeNoise(Q, 0.25 + v * 0.75, 0.35);
+    this.din = Math.min(1, (this.din || 0) + v * DT * DIN_RATE * (P.radio ? 1.5 : 1));
+  }
+
+  // les talkies ne marchent plus pendant une coupure de courant (Level 1, Tuyauteries) ou quand les néons du Level 0
+  // meurent un à un (chez l'invité, l'hôte le dit dans l'instantané)
+  get radioDead() {
+    return this.blackout > 0 || !!this.lightsOut || !!this.rdSnap;
+  }
+
+  // le vacarme retombe peu à peu ; il prévient quand il franchit un palier
+  updateDin() {
+    this.din = Math.max(0, (this.din || 0) - DIN_DECAY * DT);
+    const lv = this.din >= 0.7 ? 2 : this.din >= 0.35 ? 1 : 0;
+    const was = this.dinLv || 0;
+    if (lv > was) {
+      this.dinLv = lv;
+      this.emit({ type: 'din', level: lv });
+    } else if (was > 0 && this.din < (was === 1 ? 0.25 : 0.6)) this.dinLv = was - 1; // un peu d'écart avant de redescendre
+  }
+
+  // la porte du haut des cages d'escalier est-elle encore cadenassée ?
+  get stairsLocked() {
+    const K = this.floors[0] && this.floors[0].key;
+    return !!K && !K.taken;
+  }
+
+  // la porte cadenassée devant laquelle se tient ce joueur (à l'étage du haut), sinon null
+  lockedDoorNear(P, r = 1.8) {
+    if (!this.stairsLocked || (P.floor || 0) !== 0) return null;
+    for (const st of this.stairs) {
+      const d = stairDoor(st);
+      if (Math.hypot(d.x - P.x, d.z - P.z) < r) return d;
+    }
+    return null;
+  }
+
+  // la clé à portée de F
+  nearKey(P) {
+    const K = this.floors[0] && this.floors[0].key;
+    if (!K || K.taken || (P.floor || 0) !== 0) return null;
+    return Math.hypot(K.x - P.x, K.z - P.z) < PICK_R + 0.2 ? K : null;
+  }
+
   // agressivité de l'entité (0 à 1) : elle monte à chaque cassette trouvée (Level 0), à chaque fusible (Level 1, où elle
   // part déjà plus haut)
+  // ; le vacarme des voix l'y pousse aussi
   get aggro() {
-    if (this.level === 0) return Math.min(1, this.cassettes / CASSETTES);
-    if (this.level === PIPES_LEVEL) return Math.min(1, 0.3 + (0.7 * this.valves) / VALVES);
-    return Math.min(1, 0.25 + (0.75 * (this.fuses + (this.powered ? FUSES : 0))) / FUSES);
+    const loud = (this.din || 0) * 0.45;
+    if (this.level === 0) return Math.min(1, this.cassettes / CASSETTES + loud);
+    if (this.level === PIPES_LEVEL) return Math.min(1, 0.3 + (0.7 * this.valves) / VALVES + loud);
+    return Math.min(1, 0.25 + (0.75 * (this.fuses + (this.powered ? FUSES : 0))) / FUSES + loud);
   }
 
   // part de l'équipe déjà à l'abri dans l'ascenseur (0 à 1) : l'entité devient plus agressive
@@ -765,6 +864,12 @@ export class BackroomsSim {
   pickUp(P) {
     // dans un casier : F en ressort ; devant un casier (sans objet plus près) : on s'y enferme
     if (P.hidden >= 0) return this.leaveHide(P);
+    const K = this.nearKey(P);
+    if (K) {
+      K.taken = true;
+      this.makeNoise(P, NOISE.pick, 0.8);
+      return this.emit({ type: 'key', by: P.id, name: P.name, x: K.x, z: K.z });
+    }
     const it = this.nearItem(P);
     const h = this.nearHide(P);
     if (h && (!it || Math.hypot(hideFront(h).x - P.x, hideFront(h).z - P.z) < Math.hypot(it.x - P.x, it.z - P.z))) return this.enterHide(P, h);
@@ -899,6 +1004,15 @@ export class BackroomsSim {
       const okA = p0.u < 0 && p0.v > 0 && p0.v < C && P.floor === 1;
       const okB = p0.u < 0 && p0.v > C && p0.v < 2 * C && P.floor === 0;
       if (!okA && !okB) return { x: P.x, z: P.z };
+      // la porte du haut est cadenassée tant que personne n'a trouvé la clé (d'en bas, la barre anti-panique s'ouvre)
+      if (okB && this.stairsLocked) {
+        if (!(P.lockedT > 0)) {
+          P.lockedT = 1.6;
+          this.makeNoise(P, NOISE.pick, 0.6);
+          this.emit({ type: 'locked', id: P.id, x: P.x, z: P.z, floor: P.floor });
+        }
+        return { x: P.x, z: P.z };
+      }
       lane = okA ? 'A' : 'B';
     }
     let { u, v } = stairLocal(st, nx, nz);
@@ -953,6 +1067,7 @@ export class BackroomsSim {
   step(input = {}, others = null) {
     if (this.state !== 'playing') return;
     this.time += DT;
+    this.updateDin();
 
     // l'ascenseur part : les portes sont fermées, on attend l'arrivée
     if (this.departT > 0) {
@@ -1018,7 +1133,9 @@ export class BackroomsSim {
     P.whistleCd = Math.max(0, P.whistleCd - DT);
     P.heat = Math.max(0, P.heat - DT / 20);
     P.bumpT = Math.max(0, (P.bumpT || 0) - DT);
+    P.lockedT = Math.max(0, (P.lockedT || 0) - DT);
     P.hurtT = Math.max(0, (P.hurtT || 0) - DT);
+    this.voice(P, input);
     // agrippé : on ne fait plus que se débattre (n'importe quelle touche)
     if (P.grabT > 0) {
       if (input.struggle) P.struggle += Math.min(4, +input.struggle || 1);
@@ -1208,8 +1325,14 @@ export class BackroomsSim {
     if (this.level === 0 && !this.open) {
       best = near((map.cassettes || []).filter((c) => !c.collected));
       if (best === Infinity && this.stairs.length) {
-        best = near(this.stairs);
-        P.sigTo = 'stairs';
+        const K = this.floors[0].key;
+        if (P.floor === 0 && K && !K.taken) {
+          best = Math.hypot(K.x - P.x, K.z - P.z);
+          P.sigTo = 'key';
+        } else {
+          best = near(this.stairs);
+          P.sigTo = 'stairs';
+        }
       }
     } else if ((this.level === 1 || this.level === 2) && (map.fuses || []).some((f) => !f.taken)) {
       best = near((map.fuses || []).filter((f) => !f.taken));
@@ -1279,6 +1402,7 @@ export class BackroomsSim {
   // chute de la barre d'équilibre (l'hôte fera tomber), sinon 0.
   predict(input = {}) {
     const P = this.player;
+    P.lockedT = Math.max(0, (P.lockedT || 0) - DT);
     // trace de ses positions de la dernière seconde et demie : l'instantané de l'hôte, en retard, est comparé à elle
     const tr = this.trail || (this.trail = []);
     tr.push(P.x, P.z, P.floor);
@@ -1392,6 +1516,8 @@ export class BackroomsSim {
       // néons : 1 allumé, 0 éteint, 2 qui grésille (les coupures du directeur, les néons qui meurent un à un)
       ls: this.level === 0 ? this.floors.map((f) => (f.lights || []).flatMap((l, i) => (l.state !== l.s0 ? [i * 3 + (l.state === 'off' ? 0 : l.state === 'flicker' ? 2 : 1)] : []))) : null,
       cw: this.level === 0 ? this.floors.map((f) => (f.calm || []).map((n) => r2(n.wear || 0))) : null,
+      rd: this.lightsOut ? 1 : undefined, // les néons meurent : plus de talkie
+      kk: this.floors[0] && this.floors[0].key ? (this.floors[0].key.taken ? 1 : 0) : undefined, // la clé de l'escalier
       // Level 1 : fusibles (ils peuvent être tombés ailleurs), fusibles au panneau, redémarrage du monte-charge
       fp: this.level === 1 ? (this.map.fuses || []).map((f) => [r2(f.x), r2(f.z)]) : null,
       dl: this.delivered || 0,
@@ -1439,6 +1565,8 @@ export class BackroomsSim {
       });
     }
     if (snap.cw) snap.cw.forEach((row, fi) => (this.floors[fi] && this.floors[fi].calm || []).forEach((n, i) => (n.wear = row[i] || 0)));
+    this.rdSnap = !!snap.rd;
+    if (snap.kk !== undefined && this.floors[0] && this.floors[0].key) this.floors[0].key.taken = !!snap.kk;
     this.map.dark = this.level === PIPES_LEVEL && this.blackout > 0;
     this.departT = snap.dp;
     this.slide = snap.sl ?? -1;

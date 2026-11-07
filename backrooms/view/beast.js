@@ -65,7 +65,9 @@ function skinTexture() {
 }
 
 // le visage de l'entité classique : yeux blancs vides de tailles différentes, bouche trop grande avec ses dents
-function faceTexture(open) {
+// scare : le visage du jumpscare, vu à bout portant : peau blême veinée de noir, orbites creuses avec deux points de
+// lumière, la bouche ouverte jusqu'aux yeux (le contraste se lit même à travers la bande qui saute)
+function faceTexture(open, scare = false) {
   const W = 256;
   const H = 320;
   const [c, g] = canvas(W, H);
@@ -81,7 +83,7 @@ function faceTexture(open) {
       const n = noise2(x / 18, y / 18, 9) * 0.6 + noise2(x / 6, y / 6, 2) * 0.4;
       const vein = Math.pow(1 - Math.abs(noise2(x / 12, y / 30, 5) - 0.5) * 2, 10);
       const edge = Math.hypot((x - W / 2) / (W * 0.47), (y - H / 2) / (H * 0.47));
-      const v = (10 + n * 18 + vein * 30) * (1 - edge * 0.6);
+      const v = scare ? Math.max(8, (105 + n * 70 - vein * 85) * (1 - edge * 0.5)) : (10 + n * 18 + vein * 30) * (1 - edge * 0.6);
       const i = (y * W + x) * 4;
       img.data[i] = v * 1.06;
       img.data[i + 1] = v * 0.96;
@@ -94,7 +96,7 @@ function faceTexture(open) {
   // bouche béante
   const mx = W * 0.5;
   const my = H * 0.7;
-  const rx = W * 0.24;
+  const rx = W * (scare ? 0.16 : 0.24); // le jumpscare : une mâchoire décrochée, plus étroite et bien plus haute
   const ry = H * (0.05 + 0.1 * open);
   g.fillStyle = '#2a0000';
   g.beginPath();
@@ -109,14 +111,49 @@ function faceTexture(open) {
   for (let i = -5; i <= 5; i++) {
     const tx = mx + i * rx * 0.17;
     const lift = Math.sqrt(Math.max(0, 1 - (i / 6) ** 2));
+    // des dents inégales (au jumpscare : longues, de travers, il en manque)
+    const ln = scare ? [0.5, 0.2, 0.62, 0, 0.35, 0.55, 0.28, 0.6, 0, 0.42, 0.3][i + 5] : 0.45;
+    const lb = scare ? [0.25, 0.4, 0, 0.52, 0.3, 0.2, 0.48, 0, 0.36, 0.22, 0.4][i + 5] : 0.45;
     g.beginPath();
     g.moveTo(tx, my - ry * lift);
-    g.lineTo(tx + 2, my - ry * lift + ry * 0.45);
+    g.lineTo(tx + (scare ? (i % 3) * 3 - 3 : 2), my - ry * lift + ry * ln);
     g.stroke();
     g.beginPath();
     g.moveTo(tx, my + ry * lift);
-    g.lineTo(tx - 2, my + ry * lift - ry * 0.45);
+    g.lineTo(tx - 2, my + ry * lift - ry * lb);
     g.stroke();
+  }
+  if (scare) {
+    // des coulures noires sous les yeux, jusqu'à la bouche
+    g.strokeStyle = 'rgba(8,4,3,0.85)';
+    for (const [x0, y0, w] of [[0.28, 0.42, 5], [0.35, 0.43, 3], [0.66, 0.4, 4], [0.72, 0.39, 2.5]]) {
+      g.lineWidth = w;
+      g.beginPath();
+      g.moveTo(W * x0, H * y0);
+      g.bezierCurveTo(W * (x0 + 0.01), H * (y0 + 0.08), W * (x0 - 0.015), H * (y0 + 0.14), W * (x0 + 0.005), H * (y0 + 0.22));
+      g.stroke();
+    }
+    // des orbites noires, profondes, et tout au fond un point blanc qui te fixe
+    for (const [ex, ey, er] of [[0.32, 0.38, 1], [0.69, 0.36, 0.8]]) {
+      const gr = g.createRadialGradient(W * ex, H * ey, 0, W * ex, H * ey, W * 0.15 * er);
+      gr.addColorStop(0, '#000');
+      gr.addColorStop(0.7, 'rgba(0,0,0,0.92)');
+      gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr;
+      g.beginPath();
+      g.ellipse(W * ex, H * ey, W * 0.15 * er, H * 0.11 * er, 0, 0, Math.PI * 2);
+      g.fill();
+      g.shadowColor = 'rgba(255,240,220,1)';
+      g.shadowBlur = 10;
+      g.fillStyle = '#fff';
+      g.beginPath();
+      g.arc(W * ex + 2, H * ey + 3, W * 0.022 * er, 0, Math.PI * 2);
+      g.fill();
+      g.shadowBlur = 0;
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
   }
   // yeux blancs, vides, l'un plus grand que l'autre, qui luisent
   g.shadowColor = 'rgba(255,255,255,1)';
@@ -213,7 +250,7 @@ export function createBeast(opts = {}) {
   const group = new THREE.Group();
   const skinMat = new THREE.MeshLambertMaterial({ map: skinTexture(), emissive: '#1a1716', emissiveIntensity: 0 });
   const photo = opts.photo ? photoFace(opts.photo.url, opts.photo.crop, new THREE.Texture()) : null;
-  const faces = photo ? [photo, photo, photo] : [faceTexture(0.25), faceTexture(1), faceTexture(1.7)];
+  const faces = photo ? [photo, photo, photo, photo] : [faceTexture(0.25), faceTexture(1), faceTexture(1.7), faceTexture(2.1, true)];
   const faceMat = new THREE.MeshBasicMaterial({ map: faces[0], transparent: true, alphaTest: photo ? 0.05 : 0.3, color: photo ? '#d8cfc2' : '#cfcac4' });
   const st = {
     ready: false,
@@ -444,6 +481,14 @@ export function createBeast(opts = {}) {
 
   return {
     group,
+    // le jumpscare : son visage le plus déformé, le corps recollé à son groupe ; rend le visage (pour le placer
+    // juste devant l'objectif)
+    scareFace() {
+      faceMat.map = faces[3];
+      group.position.set(0, 0, 0);
+      group.rotation.set(0, 0, 0);
+      return st.face || st.head || null;
+    },
     // M : l'entité ; chase : elle poursuit ; light : lumière des néons là où elle est ; dt : durée de l'image
     update(M, chase, light, dt, time) {
       // sa vitesse, d'après son déplacement (pareil chez l'hôte et chez les invités)

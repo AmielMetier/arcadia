@@ -597,7 +597,7 @@ export class BackroomsSfx {
     }
     if (this.breathHeld) level = 0;
     const t = c.currentTime;
-    this.breathGain.gain.setTargetAtTime(Math.max(0, Math.min(1, level)) * 0.55, t, level > 0.05 ? 0.35 : this.breathHeld ? 0.06 : 0.8);
+    this.breathGain.gain.setTargetAtTime(Math.max(0, Math.min(1, level)) * 0.4, t, level > 0.05 ? 0.35 : this.breathHeld ? 0.06 : 0.6);
     // plus essoufflé, plus rapide
     if (this.breathSrc) this.breathSrc.playbackRate.setTargetAtTime(0.9 + Math.min(1, level) * 0.25, t, 0.5);
   }
@@ -975,6 +975,47 @@ export class BackroomsSfx {
 
   // Déverrouillage de la sortie : un relais qui claque, puis au loin le moteur d'un ascenseur (ou d'un monte-charge)
   // qui démarre et tourne quelques secondes ; pos : { x, z } de l'ascenseur (null : non placé)
+  // La porte cadenassée de l'escalier : la barre anti-panique qui cogne, la porte qui bute sur la chaîne, le cadenas
+  // qui ballotte contre le métal
+  lockedDoor(pos = null) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = pos ? this.at({ ...pos, rolloff: 0.8, ref: 3 }, 1) : this.gainNode(0.8);
+    if (!pos) out.connect(this.out);
+    this.burst(out, t, 0.09, 'lowpass', 380, 0.9, 0.55);
+    this.ring(out, t, 141, [[1, 1, 0.5], [2.7, 0.5, 0.3], [5.4, 0.25, 0.18]], 0.12);
+    this.burst(out, t + 0.07, 0.05, 'bandpass', 1500, 1.5, 0.22);
+    // la chaîne : une pluie de petits maillons
+    for (let k = 0; k < 9; k++) this.burst(out, t + 0.1 + k * rnd(0.018, 0.04), 0.012, 'bandpass', rnd(3200, 5600), 6, rnd(0.05, 0.12) * (1 - k / 10));
+    // le cadenas qui retombe
+    this.ring(out, t + 0.32, 1240, [[1, 1, 0.12], [2.4, 0.5, 0.08]], 0.07);
+    this.caption('[chain rattles]', pos);
+  }
+
+  // La clé ramassée : un trousseau qui tinte (pas de son à l'endroit : c'est dans ta main)
+  keyJingle() {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = this.gainNode(0.6);
+    out.connect(this.ui);
+    for (let k = 0; k < 5; k++) {
+      const f = rnd(2400, 4200);
+      this.ring(out, t + k * rnd(0.03, 0.07), f, [[1, 1, 0.25], [2.76, 0.4, 0.12], [5.4, 0.2, 0.07]], 0.06);
+    }
+    this.burst(out, t, 0.04, 'highpass', 5000, 0.7, 0.05);
+  }
+
+  // Loin, la porte de l'escalier qu'on déverrouille : un cadenas qui saute, une chaîne qui tombe
+  unlockFar(pos = null) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = pos ? this.at({ ...pos, rolloff: 0.5, ref: 5 }, 0.9) : this.gainNode(0.5);
+    if (!pos) out.connect(this.out);
+    this.burst(out, t, 0.03, 'bandpass', 2600, 3, 0.25);
+    for (let k = 0; k < 12; k++) this.burst(out, t + 0.12 + k * rnd(0.015, 0.035), 0.012, 'bandpass', rnd(2800, 5200), 5, rnd(0.04, 0.1));
+    this.burst(out, t + 0.55, 0.1, 'lowpass', 320, 0.9, 0.3);
+  }
+
   exitUnlocked(pos = null) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
@@ -1055,9 +1096,41 @@ export class BackroomsSfx {
       return;
     }
     if (this.voiceGain) this.voiceGain.gain.setValueAtTime(0.0001, t);
-    this.scareHit(t0, 1);
-    this.scareScream(t0, 1);
-    this.tapeCrumple(t0 + 1.05);
+    this.scareHit(t0, 1.35);
+    this.scareScream(t0, 1.4);
+    this.scareScreech(t0);
+    this.tapeCrumple(t0 + 1.25);
+  }
+
+  // le crissement par-dessus le cri : une grappe de cordes désaccordées, très aiguës, qui grincent et tombent
+  scareScreech(t) {
+    const c = this.ctx;
+    const D = 1.1;
+    const bp = this.filt('bandpass', 2600, 1.2);
+    const sat = this.shaper(4);
+    const env = c.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(0.16, t + 0.008);
+    env.gain.setValueAtTime(0.16, t + 0.35);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + D);
+    // le trémolo module un étage à part (0,2 à 1), l'enveloppe garde le dernier mot
+    const am = this.gainNode(0.6);
+    bp.connect(sat).connect(am).connect(env).connect(this.master);
+    const trem = this.osc('sine', 17);
+    const tremG = this.gainNode(0.4);
+    trem.connect(tremG).connect(am.gain);
+    const os = [trem];
+    for (const f of [1870, 1975, 2210, 2490, 2630]) {
+      const o = this.osc('sawtooth', f);
+      o.frequency.setValueAtTime(f, t);
+      o.frequency.exponentialRampToValueAtTime(f * 0.62, t + D);
+      o.connect(this.gainNode(0.2)).connect(bp);
+      os.push(o);
+    }
+    for (const o of os) {
+      o.start(t);
+      o.stop(t + D + 0.05);
+    }
   }
 
   // le coup : un impact très grave, un choc sourd et un craquement, saturés ; un peu d'écho
@@ -1075,7 +1148,7 @@ export class BackroomsSfx {
   // le cri : une voix (dent de scie et souffle) qui tremble, passe d'un « aa » à un « ii », très saturée
   scareScream(t, k = 1) {
     const c = this.ctx;
-    const D = 1.05;
+    const D = 1.3;
     const vo = this.osc('sawtooth', 520);
     vo.frequency.setValueAtTime(480, t);
     vo.frequency.linearRampToValueAtTime(660, t + 0.15);

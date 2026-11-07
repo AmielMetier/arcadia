@@ -3,6 +3,7 @@ import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL } from './engine/sim.js';
 import { hasLineOfSight } from './engine/nav.js';
 import { createBackroomsScene, setMonsterMode, setSceneOptions } from './view/scene.js';
 import { BackroomsSfx } from './view/sfx.js';
+import { createVoice } from './view/voice.js';
 import { BackroomsHUD, levelName, levelSub, LORE, loreOf, hearTape, tapesHeard, store } from './view/hud.js';
 
 const H = window.HubBridge;
@@ -77,7 +78,7 @@ let started = false; // la première prise en main (avant : l'écran titre)
 let padCrouch = false; // accroupi à la manette (stick droit enfoncé : bascule)
 
 // Réglages du joueur (sur cet appareil) : souris, image, accessibilité
-const OPT_DEFAULT = { sens: 1, invertY: false, fov: 72, motion: 1, bright: 1, reduceFlashes: false, subs: false, layout: 'auto', quality: 'auto' };
+const OPT_DEFAULT = { sens: 1, invertY: false, fov: 72, motion: 1, bright: 1, reduceFlashes: false, subs: false, layout: 'auto', quality: 'auto', mic: 'ptt', voiceVol: 1 };
 const OPTS = { ...OPT_DEFAULT, ...store.get('backrooms_opts', {}) };
 let detectedQwerty = false;
 const qwerty = () => OPTS.layout === 'qwerty' || (OPTS.layout === 'auto' && detectedQwerty);
@@ -90,6 +91,32 @@ function applyOpts() {
     if (paused) hud.showPause(true, kbMode, !started, resumeLevel());
   }
   if (sfx) sfx.onCaption = OPTS.subs ? (text, dir) => hud && hud.caption(text, dir) : null;
+  if (voice) voice.setVolume(OPTS.voiceVol);
+}
+
+// Voix de proximité (V) et talkie-walkie (R) : WebRTC entre joueurs, signalisation par le salon (view/voice.js)
+let voice = null;
+let micWarned = false;
+const sfxRef = { get ctx() { return sfx && sfx.ctx; }, get verb() { return sfx && sfx.verb; }, moveTo: (...a) => sfx && sfx.moveTo(...a), caption: (...a) => sfx && sfx.caption(...a) };
+function ensureVoice() {
+  if (!voice) {
+    voice = createVoice({ send: (to, m) => send(to, m), myId: NET.myId, sfx: sfxRef });
+    voice.setVolume(OPTS.voiceVol);
+  }
+  return voice;
+}
+// le micro : demandé au lancement à plusieurs (ou seul en micro ouvert : elle t'entend), sinon à la première touche
+function askMic(force = false) {
+  if (OPTS.mic === 'off') return;
+  if (!force && !multi() && OPTS.mic !== 'open') return;
+  const v = ensureVoice();
+  if (v.micState === 'on' || v.micState === 'asking') return;
+  v.enableMic().then((ok) => {
+    if (!ok && !micWarned && hud) {
+      micWarned = true;
+      hud.toast('Microphone blocked · no voice chat, no radio');
+    }
+  });
 }
 function setOpt(k, v) {
   OPTS[k] = v;
@@ -122,6 +149,7 @@ function setPaused(on) {
 
 function play() {
   if (sfx) sfx.unlock();
+  askMic();
   const tactile = document.body.classList.contains('touch') || matchMedia('(pointer: coarse)').matches;
   if (tactile) document.body.classList.add('touch');
   if (kbMode || tactile || noLock) setPaused(false);
@@ -178,6 +206,10 @@ window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyE') act.use = true;
     else if (e.code === 'KeyF') act.pick = true;
     else if (e.code === 'KeyT') act.whistle = true;
+    else if (e.code === 'KeyV' || e.code === 'KeyR') {
+      askMic(true);
+      if (e.code === 'KeyR' && !multi() && hud) hud.toast('The radio only hisses · no one else is out there');
+    }
   }
   if ((kbMode || noLock) && (e.code === 'Escape' || e.code === 'KeyP')) setPaused(true);
 });
@@ -348,6 +380,7 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   // la difficulté adaptative ne compte que chez l'hôte (c'est lui qui fait tourner l'entité)
   const skill = NET.role === 'guest' ? 0.5 : +store.get(SKILL_KEY, 0.5);
   sim = new BackroomsSim({ difficulty, seed, players, localId: NET.myId, level, skill }); // les étages sortent de la graine
+  if (NET.role !== 'solo') ensureVoice().sync(players.map((p) => p.id));
   runStats = { seen: 0, rushes: 0, escapes: 0, closest: Infinity, haunts: 0 };
   tapeFrames = [];
   replayed = false;
@@ -399,7 +432,7 @@ function guestInputs() {
     const q = NET.actions[id] || (NET.actions[id] = []);
     // une action par pas, dans l'ordre où l'invité les a faites (avec la case qu'il avait choisie)
     const a = q.shift() || {};
-    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, stamina: i.st, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v };
+    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, stamina: i.st, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v, voice: i.vo, radio: i.ra };
     i.pos = null; // une position annoncée ne sert qu'une fois
   }
   return out;
@@ -410,6 +443,11 @@ const num = (v, a, b) => (Number.isFinite(+v) ? Math.max(a, Math.min(b, +v)) : 0
 // Messages du réseau (from : l'identifiant donné par le salon, la seule identité fiable)
 function onMsg(from, m) {
   if (!m || typeof m !== 'object') return;
+  // la voix : d'un joueur à l'autre, sans passer par l'hôte
+  if (m.t === 'rtc' || m.t === 'vx') {
+    ensureVoice().onMessage(from, m);
+    return;
+  }
   if (NET.role === 'host') {
     if (m.t === 'hi' && sim) {
       // arrivée en cours de partie : spectateur jusqu'au prochain étage
@@ -417,7 +455,7 @@ function onMsg(from, m) {
       sim.addPlayer(from, (p && p.name) || 'Player');
       send(from, goMessage());
     } else if (m.t === 'i' && m.run === NET.run) {
-      NET.inputs[from] = { mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 100), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) }, v: m.v };
+      NET.inputs[from] = { vo: num(m.vo, 0, 1), ra: !!m.ra, mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 100), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) }, v: m.v };
     } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'p', 't', 'b', 'h', 'g'].includes(m.k)) {
       const q = NET.actions[from] || (NET.actions[from] = []);
       if (q.length < 8) q.push({ k: m.k, sel: m.s === 2 ? 2 : 1, side: m.side > 0 ? 1 : -1, n: Math.max(1, Math.min(4, m.n | 0)) });
@@ -454,6 +492,7 @@ function onRoster() {
     NET.actions = {};
     if (hud) hud.toast("You're the host now: the game goes on");
   }
+  if (voice && NET.role !== 'solo') voice.sync(H.players.map((p) => p.id));
   if (NET.role !== 'host') return;
   const ids = new Set(H.players.map((p) => p.id));
   for (const P of [...sim.players]) if (!ids.has(P.id)) sim.removePlayer(P.id);
@@ -573,6 +612,25 @@ function handleEvent(ev, me) {
       break;
     case 'nothing':
       if (mine && hud) hud.toast('Nothing to pick up here');
+      break;
+    case 'din':
+      // le vacarme des voix : elle a entendu
+      if (hud) hud.toast(ev.level >= 2 ? 'Too loud. It knows exactly where you are' : 'Something in the walls is listening to your voices…');
+      if (sfx && sfx.ear) sfx.tell('corner', { x: sfx.ear.x + Math.sin(sfx.ear.yaw) * 9, z: sfx.ear.z + Math.cos(sfx.ear.yaw) * 9 }); // un grattement, quelque part derrière
+      break;
+    case 'locked':
+      // la porte du haut de l'escalier, cadenassée
+      if (sfx) sfx.lockedDoor(mine ? null : { x: ev.x, z: ev.z, muffled: (ev.floor || 0) !== (sim.viewPlayer(sim.spectate || 0).floor || 0) });
+      if (mine && hud) hud.toast("Locked. A chain and a padlock hold the door shut · find the stairwell key");
+      break;
+    case 'key':
+      if (ev.by === me) {
+        if (sfx) sfx.keyJingle();
+        if (hud) hud.toast('Stairwell key · the doors to the floor below are open');
+      } else {
+        if (sfx) sfx.unlockFar();
+        if (hud) hud.toast(`${ev.name} found the stairwell key · the doors to the floor below are open`);
+      }
       break;
     case 'emptySlot':
       if (mine && hud) hud.toast('Empty slot: pick an item with 2 or 3');
@@ -743,8 +801,8 @@ function handleEvent(ev, me) {
             scene.replay(frames);
             if (hud) hud.replayTag(true);
             setTimeout(lose, span * 1000 + 350);
-          }, 1450);
-        } else setTimeout(lose, 1100);
+          }, 1700);
+        } else setTimeout(lose, 1400);
       }
       break;
     case 'valve':
@@ -947,6 +1005,8 @@ function loop(currentTime) {
       pick: act.pick,
       whistle: act.whistle,
       view: sim.player.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined,
+      voice: voice ? voice.level : 0,
+      radio: !!voice && voice.mode === 2,
     };
     // spectateur : un signe aux vivants (E ou T), puis il faut attendre
     if (sim.player.status !== 'alive' && (act.use || act.whistle)) {
@@ -975,7 +1035,7 @@ function loop(currentTime) {
       if (act.struggle) send('host', { t: 'a', k: 'g', n: act.struggle, run: NET.run });
       if (NET.tick % 3 === 0) {
         const P = sim.player;
-        send('host', { t: 'i', run: NET.run, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, c: input.crouch ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2), st: Math.round(P.stamina), v: P.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined }, true);
+        send('host', { t: 'i', run: NET.run, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, c: input.crouch ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2), st: Math.round(P.stamina), v: P.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined, vo: input.voice ? +input.voice.toFixed(2) : undefined, ra: input.radio ? 1 : undefined }, true);
       }
     } else {
       sim.step(input, NET.role === 'host' ? guestInputs() : null);
@@ -1164,12 +1224,22 @@ function loop(currentTime) {
       // le souffle : sprint, puis halètement le temps de récupérer, et la peur quand l'entité est là
       const P = sim.player;
       const tired = 1 - P.stamina / 100;
-      const run = P.running && P.moving ? 0.45 + tired * 0.55 : 0;
-      const pant = tired > 0.2 ? ((tired - 0.2) / 0.8) * 0.85 : 0;
-      const fear = sim.hasMonster ? sim.monster.danger * 0.35 : 0;
+      // discret : on l'entend surtout en courant ; à l'arrêt, juste un reste de halètement quand on est vraiment à bout
+      const run = P.running && P.moving ? 0.3 + tired * 0.4 : 0;
+      const pant = tired > 0.55 ? ((tired - 0.55) / 0.45) * 0.3 : 0;
+      const fear = sim.hasMonster && sim.monster.danger > 0.6 ? (sim.monster.danger - 0.6) * 0.3 : 0;
       const grab = P.grabT > 0 ? 1 : 0;
       sfx.setBreath(P.status === 'alive' && sim.state === 'playing' && !paused && !P.holding ? Math.max(run, pant, fear, grab) : 0);
     }
+  }
+  if (voice) {
+    // V : parler autour de soi ; R : dans le talkie (à plusieurs) ; micro ouvert : la voix passe sans touche
+    const me = sim.player;
+    const want = OPTS.mic === 'off' ? 0 : keys['KeyR'] && multi() ? 2 : keys['KeyV'] ? 1 : 0;
+    // le talkie grésille tout seul de temps en temps (plus souvent quand elle rôde) ; en coupure, il est mort
+    const radioOk = !sim.radioDead;
+    voice.update(sim, sim.viewPlayer(sim.spectate || 0), delta, want, OPTS.mic === 'open' && !paused, me.status === 'alive', { ok: radioOk, danger: me.danger || 0, live: !paused && sim.state === 'playing' });
+    if (hud) hud.voice(voice, sim, multi(), !!keys['KeyR'] && !radioOk && multi());
   }
   if (hud) {
     hud.update(sim, sim.time, delta);
@@ -1178,7 +1248,7 @@ function loop(currentTime) {
 
 // ?debug : accès à la partie depuis la console (tests)
 if (/[?&]debug(&|=|$)/.test(location.search)) {
-  window.__br = { get sim() { return sim; }, get scene() { return scene; }, get sfx() { return sfx; }, get hud() { return hud; }, keys, act, OPTS, frame: (t) => loop(t) };
+  window.__br = { get voice() { return voice; }, get sim() { return sim; }, get scene() { return scene; }, get sfx() { return sfx; }, get hud() { return hud; }, keys, act, OPTS, frame: (t) => loop(t) };
 }
 
 // Réglages (bouton ⚙ commun aux jeux) : son, et choix Souris / Sans souris
@@ -1207,6 +1277,10 @@ if (window.DDVolume && btnSet) {
         { label: 'Caméra à l\'épaule', get: () => OPTS.motion, set: (v) => setOpt('motion', +v), range: [0, 1, 0.1], format: (v) => (+v === 0 ? 'stable' : `${Math.round(v * 100)} %`) },
         { label: 'Qualité', get: () => OPTS.quality, set: (v) => setOpt('quality', v), options: [['auto', 'Auto'], ['low', 'Basse'], ['medium', 'Moyenne'], ['high', 'Haute']] },
       ], hint: 'Luminosité : réglez-la pour que le carré de gauche soit à peine visible.' },
+      { title: 'Voix', items: [
+        { label: 'Micro', get: () => OPTS.mic, set: (v) => { setOpt('mic', v); if (v !== 'off' && started) askMic(true); }, options: [['ptt', 'Appuyer pour parler'], ['open', 'Micro ouvert'], ['off', 'Coupé']] },
+        { label: 'Volume des voix', get: () => OPTS.voiceVol, set: (v) => setOpt('voiceVol', +v), range: [0, 2, 0.1], format: (v) => `${Math.round(v * 100)} %` },
+      ], hint: "V : parler aux joueurs proches (on vous entend à travers les murs, mal). R : parler dans le talkie, à toute l'équipe. Attention : l'entité entend aussi, et plus vous parlez, plus elle devient agressive. Le talkie grésille aussi chez ceux qui le reçoivent." },
       { title: 'Accessibilité', items: [
         { label: 'Réduire les flashs', get: () => OPTS.reduceFlashes, set: (v) => setOpt('reduceFlashes', v), options: [[false, 'Non'], [true, 'Oui']] },
         { label: 'Sous-titres', get: () => OPTS.subs, set: (v) => setOpt('subs', v), options: [[false, 'Non'], [true, 'Oui']] },
@@ -1223,6 +1297,7 @@ if (window.DDVolume && btnSet) {
         ['Choisir une case · utiliser', '<kbd>2</kbd> <kbd>3</kbd> · <kbd>E</kbd>'],
         ['Ramasser (échange si plein)', '<kbd>F</kbd>'],
         ['Siffler (attention à l\'entité)', '<kbd>T</kbd>'],
+        ['Parler (proximité) · talkie', '<kbd>V</kbd> · <kbd>R</kbd> (maintenir)'],
         ['Pause', '<kbd>Échap</kbd>'],
       ] }] },
       { title: 'Sans souris', items: [{ keys: [
@@ -1250,6 +1325,7 @@ function boot(info) {
     H.on('roster', onRoster);
     H.signalReady(); // après on('msg') : sinon les premiers messages de l'hôte se perdent
   }
+  ensureVoice(); // le talkie grésille même seul ; la voix, elle, attend le micro
   initGame(info.settings || {});
   if (NET.role === 'guest') {
     // demander la partie en cours à l'hôte (et la redemander tant qu'elle n'arrive pas)
