@@ -493,6 +493,8 @@ export function createVoice({ send, myId, sfx }) {
     get micState() { return micState; },
     get mode() { return mode; },
     get level() { return mode ? level : 0; },
+    // le niveau du micro, même quand rien ne part (la jauge du HUD : on sait si on est bruyant avant de l'être)
+    get raw() { return micState === 'on' ? level : 0; },
     enableMic,
     setVolume(v) {
       volume = v;

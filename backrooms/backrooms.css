@@ -592,6 +592,24 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 /* La voix : ce qu'on émet, le niveau du micro (rouge quand on crie : elle entend), qui parle au talkie */
 .voice-tag { position: absolute; left: 32px; bottom: 120px; z-index: 13; display: flex; flex-direction: column; gap: 4px; font-size: 18px; letter-spacing: 2px; color: #f2f0e6; text-shadow: 0 0 5px rgba(0,0,0,0.9); pointer-events: none; }
 .voice-tag span:empty { display: none; }
+/* la jauge du micro : un vumètre de caméscope ; le trait après la 4e case, c'est là que l'entité commence à t'entendre */
+.mic-meter { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 16px; letter-spacing: 2px; opacity: 0.7; transition: opacity 0.3s; }
+.mic-meter[hidden] { display: none; }
+.mic-meter.heard, .mic-meter.loud { opacity: 1; }
+.mic-meter i { display: flex; gap: 2px; }
+.mic-meter b { display: block; width: 7px; height: 11px; border: 1px solid rgba(242, 240, 230, 0.35); }
+.mic-meter b.h { border-color: rgba(255, 207, 58, 0.45); }
+.mic-meter b.l { border-color: rgba(255, 59, 59, 0.55); }
+.mic-meter b:nth-child(5) { margin-left: 5px; box-shadow: -4px 0 0 -2px rgba(242, 240, 230, 0.7); }
+.mic-meter b.q.on { background: #f2f0e6; }
+.mic-meter b.h.on { background: #ffcf3a; }
+.mic-meter b.l.on { background: #ff3b3b; }
+.mic-meter b.pk { background: rgba(242, 240, 230, 0.4); }
+.mic-meter em { font-style: normal; min-width: 5em; }
+.mic-meter.heard em { color: #ffcf3a; }
+.mic-meter.loud em { color: #ff3b3b; animation: recBlink 0.5s steps(1) infinite; }
+.mic-meter.off { opacity: 0.5; }
+.mic-meter.off em { color: #ff6b5b; }
 /* le rappel des touches : une ligne pâle de l'écran du caméscope, sous l'endurance */
 .keys-tag { display: flex; gap: 14px; margin-top: 8px; font-size: 16px; letter-spacing: 2px; opacity: 0.55; }
 .keys-tag[hidden] { display: none; }

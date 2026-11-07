@@ -84,6 +84,8 @@ export class BackroomsHUD {
         <div class="stamina" id="stamina"><span>STAMINA</span><div class="stamina-track"><div class="stamina-bar" id="staminaBar"></div></div></div>
         <div class="crouch-tag" id="crouchTag" hidden>▼ CROUCHED</div>
         <!-- les touches utiles, en petit, comme une ligne de plus de l'écran du caméscope -->
+        <!-- la jauge du micro, comme le vumètre d'un caméscope : au-delà du trait, l'entité t'entend -->
+        <div class="mic-meter" id="micMeter" hidden><span>MIC</span><i id="micCells">${'<b></b>'.repeat(12)}</i><em id="micTxt"></em></div>
         <div class="keys-tag" id="keysTag"></div>
       </div>
       <div class="cam cam-br">
@@ -421,6 +423,7 @@ export class BackroomsHUD {
   // la voix : ce qu'on émet (VOICE à côté de soi, RADIO dans le talkie) et qui parle dans le talkie
   voice(v, sim, multi, dead = false) {
     this.keysLine(sim, multi);
+    this.micMeter(v, sim, multi);
     const el = this.$('#voiceTag');
     if (!el) return;
     const mode = v.mode;
@@ -437,15 +440,12 @@ export class BackroomsHUD {
       const Q = sim.players.find((q) => q.id === id);
       return Q ? Q.name : null;
     }).filter(Boolean);
-    const show = mode > 0 || names.length > 0;
+    const show = mode === 2 || names.length > 0;
     el.hidden = !show;
     if (!show) return;
     el.classList.toggle('radio', mode === 2);
-    this.$('#voiceOut').textContent = mode === 2 ? '● RADIO' : mode === 1 ? '● VOICE' : '';
-    const bar = this.$('#voiceBar');
-    bar.hidden = mode === 0;
-    bar.firstChild.style.width = `${Math.round(Math.min(1, v.level) * 100)}%`;
-    bar.classList.toggle('loud', v.level > 0.75);
+    this.$('#voiceOut').textContent = mode === 2 ? '● RADIO' : '';
+    this.$('#voiceBar').hidden = true; // le niveau est sur la jauge MIC
     this.$('#voiceIn').textContent = names.length ? `RADIO · ${names.join(', ').toUpperCase()}` : '';
   }
 
@@ -463,6 +463,42 @@ export class BackroomsHUD {
     const keys = [['F', 'INTERACT'], ['E', 'USE']];
     if (multi) keys.push(['R', 'RADIO']);
     el.innerHTML = keys.map(([key, what]) => `<span><kbd>${key}</kbd>${what}</span>`).join('');
+  }
+
+  // la jauge du micro : 12 cases. Sous le trait (≈ un murmure), rien ne part ; au-dessus, on t'entend (et elle aussi) ;
+  // tout en haut, tu fais plus de bruit qu'en courant. Visible dès que le micro est ouvert, seul ou à plusieurs.
+  micMeter(v, sim, multi) {
+    const el = this.$('#micMeter');
+    if (!el) return;
+    const P = sim.player;
+    const st = v ? v.micState : 'off';
+    const on = !!P && P.status === 'alive' && !document.body.classList.contains('touch') && (st === 'on' || (multi && st === 'denied'));
+    el.hidden = !on;
+    if (!on) { this.micK = ''; return; }
+    if (st === 'denied') {
+      if (this.micK !== 'denied') {
+        this.micK = 'denied';
+        el.className = 'mic-meter off';
+        this.$('#micTxt').textContent = 'BLOCKED';
+        for (const b of this.$('#micCells').children) b.className = '';
+      }
+      return;
+    }
+    const lv = Math.max(0, Math.min(1, v.raw || 0));
+    // le pic retombe doucement, pour qu'on ait le temps de le lire
+    this.micPeak = Math.max(lv, (this.micPeak || 0) - 0.012);
+    const n = Math.round(lv * 12);
+    const pk = Math.min(11, Math.round(this.micPeak * 12) - 1);
+    const state = v.mode === 0 ? 'quiet' : lv >= 0.8 ? 'loud' : 'heard';
+    const k = `${n}|${pk}|${state}`;
+    if (k === this.micK) return;
+    this.micK = k;
+    el.className = `mic-meter ${state}`;
+    this.$('#micTxt').textContent = state === 'loud' ? 'TOO LOUD' : state === 'heard' ? 'HEARD' : '';
+    [...this.$('#micCells').children].forEach((b, i) => {
+      const zone = i < 4 ? 'q' : i < 10 ? 'h' : 'l';
+      b.className = `${zone}${i < n ? ' on' : i === pk ? ' pk' : ''}`;
+    });
   }
 
   replayTag(on) {

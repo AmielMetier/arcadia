@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 4.61 — 7 novembre 2026
+- **The Backrooms** — Une jauge du micro pour savoir si tu fais du bruit.
+  - En bas à gauche, une petite jauge « MIC » suit ta voix en direct, comme le vumètre d'un caméscope.
+  - Sous le trait, tu chuchotes : personne ne t'entend, l'entité non plus. Au-dessus, la jauge passe au jaune et affiche « HEARD » : les joueurs proches t'entendent, et elle aussi.
+  - Tout en haut, elle vire au rouge et clignote « TOO LOUD » : tu fais plus de bruit qu'en courant.
+  - Si le navigateur bloque le micro, la jauge affiche « BLOCKED ».
+
 ## 4.60 — 7 novembre 2026
 - **The Backrooms** — Voix de proximité sans touche, et quelques retouches au caméscope.
   - Plus besoin d'appuyer pour parler aux joueurs proches : le micro est ouvert, il suffit de parler. Seul le talkie se tient sur R.
