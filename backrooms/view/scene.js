@@ -10,6 +10,7 @@ import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, FLOOR_DY } from '../engin
 import { FUSES, feetY, stairAt, PIPES_LEVEL } from '../engine/sim.js';
 import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
+import { createInset } from './inset.js';
 import { buildWarehouse } from './warehouse.js';
 import { createPlayerAvatars } from './players.js';
 import { createBeast } from './beast.js';
@@ -17,7 +18,7 @@ import { buildWater } from './water.js';
 import { createGoatHerd } from './goats.js';
 import { createPipesTextures } from './textures2.js';
 import { buildPipes, L2_PROC } from './pipes.js';
-import { hasLineOfSight } from '../engine/nav.js';
+import { hasLineOfSight, findPath } from '../engine/nav.js';
 import { Z } from '../engine/level2.js';
 
 const MODELS = new URL('../models/', import.meta.url).href; // modèles Poly Haven (CC0), voir models/LICENSE.txt
@@ -146,6 +147,7 @@ export function createBackroomsScene(container, floors) {
   renderer.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
   container.appendChild(renderer.domElement);
   const vhs = createVhsFilter(renderer);
+  const inset = createInset(renderer, container);
   vhs.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
 
   const textures = createBackroomsTextures(PIPES ? 0 : map0.level || 0);
@@ -155,6 +157,25 @@ export function createBackroomsScene(container, floors) {
   scene.add(ambient);
   const dummy = new THREE.Object3D();
   const loader = new GLTFLoader();
+  // le cadenas de la porte de la cage d'escalier (Quaternius, CC0) : laiton patiné, anse d'acier, 10 cm de haut
+  const padlockModel = new Promise((resolve) => {
+    loader.load(MODELS + 'padlock.glb', (g) => {
+      const root = g.scene;
+      const box = new THREE.Box3().setFromObject(root);
+      const k = 0.1 / Math.max(0.001, box.max.y - box.min.y);
+      const brassM = new THREE.MeshPhongMaterial({ color: '#a8833a', specular: '#6b5a33', shininess: 60, emissive: '#2e2208', emissiveIntensity: 0.5 });
+      const steelM = new THREE.MeshPhongMaterial({ color: '#8d9094', specular: '#777', shininess: 80, emissive: '#1c1d1e', emissiveIntensity: 0.5 });
+      root.traverse((o) => {
+        if (o.isMesh) o.material = /grey/i.test(o.material.name || '') ? brassM : steelM;
+      });
+      const holder = new THREE.Group();
+      root.scale.multiplyScalar(k);
+      const b2 = new THREE.Box3().setFromObject(root);
+      root.position.set(-(b2.min.x + b2.max.x) / 2, -b2.min.y, -(b2.min.z + b2.max.z) / 2);
+      holder.add(root);
+      resolve(holder);
+    }, undefined, () => resolve(null));
+  });
 
   // masque de transparence d'un plan couché (sol ou plafond) : des trous rectangulaires (demi-côtés hx, hz). 16 texels par case (16 cm : de quoi
   // garder les arêtes de 50 cm entre les trous). flip : la ligne 0 du masque est au bord z max (sol) ou z 0 (plafond)
@@ -428,9 +449,23 @@ float bkCaust(vec2 uv, float t) {
           sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
           // les néons sont au plafond : un mur s'assombrit vers le bas, et plus encore au ras du sol et sous le plafond ;
           // le sol et le plafond s'assombrissent au pied des murs
-          vec4 bk = texture2D(uBake, vBakeP.xz * uBakeScale);
+          vec2 bkUv = vBakeP.xz * uBakeScale;
+          vec4 bk = texture2D(uBake, bkUv);
           float by = vBakeP.y - uBakeY;
           float ny = vBakeN.y;
+          // le plafond n'est éclairé que par ricochet (les néons y sont encastrés) : sa lumière est très adoucie, sans les
+          // ombres nettes en escalier de la grille d'éclairage (elles faisaient des plaques noires crénelées)
+          if (ny < -0.5) {
+            vec2 o1 = uBakeScale * 0.9;
+            vec2 o2 = uBakeScale * 1.8;
+            vec2 bkAcc = bk.rb * 3.0;
+            bkAcc += texture2D(uBake, bkUv + vec2(o1.x, 0.0)).rb + texture2D(uBake, bkUv - vec2(o1.x, 0.0)).rb;
+            bkAcc += texture2D(uBake, bkUv + vec2(0.0, o1.y)).rb + texture2D(uBake, bkUv - vec2(0.0, o1.y)).rb;
+            bkAcc += texture2D(uBake, bkUv + o1 * 0.7).rb + texture2D(uBake, bkUv - o1 * 0.7).rb;
+            bkAcc += texture2D(uBake, bkUv + vec2(o1.x, -o1.y) * 0.7).rb + texture2D(uBake, bkUv + vec2(-o1.x, o1.y) * 0.7).rb;
+            bkAcc += (texture2D(uBake, bkUv + vec2(o2.x, 0.0)).rb + texture2D(uBake, bkUv - vec2(o2.x, 0.0)).rb + texture2D(uBake, bkUv + vec2(0.0, o2.y)).rb + texture2D(uBake, bkUv - vec2(0.0, o2.y)).rb) * 0.5;
+            bk.rb = bkAcc / 13.0;
+          }
           float side = mix(uSideLo, 1.12, smoothstep(0.0, uCeil, by)) * mix(uSideLo * 0.85, 1.0, smoothstep(0.0, 0.4, by)) * mix(0.72, 1.0, smoothstep(0.0, 0.3, uCeil - by));
           float flat2 = ny > 0.0 ? bk.g : mix(0.7, 1.0, bk.g) * 0.85;
           float shape = mix(side, flat2, smoothstep(0.5, 0.8, abs(ny)));
@@ -969,6 +1004,129 @@ float bkCaust(vec2 uv, float t) {
       }, undefined, () => {});
     }
 
+    // 6a. La moquette détrempée (Level 0) : des traces de pas mouillées qui mènent à une cassette (quelqu'un est passé
+    // par là avant vous), et des fuites au plafond qui gouttent dans une flaque. Tirées de la carte : tout le monde les
+    // voit au même endroit.
+    const drips = [];
+    if (L0 && map.walkable && map.walkable.length) {
+      let rs = (map.W * 7919 + (map.cassettes || []).reduce((a, c) => a + c.gx * 31 + c.gz * 17, 0) + fi * 101) >>> 0 || 1;
+      const rr = () => {
+        rs = (rs + 0x6d2b79f5) >>> 0;
+        let t = rs;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+      const free = (x, z) => !map.isWall(x, z) && !(map.pitAt && map.pitAt(x, z) >= 0) && !stairSet.has(z * W + x);
+      // l'empreinte d'une semelle (pointe vers le haut de la toile), sur fond transparent
+      const fc = document.createElement('canvas');
+      fc.width = 64;
+      fc.height = 128;
+      const fg = fc.getContext('2d');
+      fg.fillStyle = '#fff';
+      fg.beginPath();
+      fg.ellipse(32, 44, 21, 36, 0, 0, Math.PI * 2);
+      fg.fill();
+      fg.beginPath();
+      fg.ellipse(32, 104, 15, 19, 0, 0, Math.PI * 2);
+      fg.fill();
+      fg.globalCompositeOperation = 'destination-out';
+      for (let y = 14; y < 120; y += 9) fg.fillRect(0, y, 64, 3); // les crans de la semelle
+      const footTex = new THREE.CanvasTexture(fc);
+      const prints = [];
+      for (const c of (map.cassettes || []).filter((q) => !q.high && !q.vault).slice(0, 2)) {
+        let start = null;
+        for (let i = 0; i < 60 && !start; i++) {
+          const w = map.walkable[(rr() * map.walkable.length) | 0];
+          const d = Math.abs(w.x - c.gx) + Math.abs(w.z - c.gz);
+          if (d >= 7 && d <= 15 && free(w.x, w.z)) start = w;
+        }
+        if (!start) continue;
+        const sx = (start.x + 0.5) * CELL_SIZE;
+        const sz = (start.z + 0.5) * CELL_SIZE;
+        const path = findPath(map, sx, sz, c.x, c.z);
+        if (!path || path.length < 2) continue;
+        const pts = [{ x: sx, z: sz }, ...path, { x: c.x, z: c.z }];
+        let side = 1;
+        let carry = 0;
+        const list = [];
+        for (let i = 1; i < pts.length; i++) {
+          const a = pts[i - 1];
+          const b = pts[i];
+          const L = Math.hypot(b.x - a.x, b.z - a.z);
+          if (L < 0.01) continue;
+          const ux = (b.x - a.x) / L;
+          const uz = (b.z - a.z) / L;
+          let d = carry;
+          for (; d < L; d += 0.4) {
+            const px = a.x + ux * d - uz * 0.12 * side;
+            const pz = a.z + uz * d + ux * 0.12 * side;
+            if (Math.hypot(px - c.x, pz - c.z) < 1.1) break;
+            list.push({ x: px, z: pz, ry: Math.atan2(-ux, -uz) + (rr() - 0.5) * 0.25, side });
+            side = -side;
+          }
+          carry = d - L;
+        }
+        // les plus anciennes (au début de la piste) ont presque séché
+        list.forEach((q, i) => prints.push({ ...q, k: 0.25 + 0.75 * (i / Math.max(1, list.length - 1)) }));
+      }
+      if (prints.length) {
+        const pm = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.13, 0.28), new THREE.MeshBasicMaterial({ map: footTex, color: '#ffffff', transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }), prints.length);
+        const wetC = new THREE.Color('#1e1708');
+        const dryC = new THREE.Color('#6d5d2c');
+        const m4 = new THREE.Matrix4();
+        prints.forEach((q, i) => {
+          m4.makeRotationY(q.ry).multiply(new THREE.Matrix4().makeRotationX(-Math.PI / 2)).multiply(new THREE.Matrix4().makeScale(q.side, 1, 1));
+          m4.setPosition(q.x, 0.006, q.z);
+          pm.setMatrixAt(i, m4);
+          pm.setColorAt(i, dryC.clone().lerp(wetC, q.k));
+        });
+        pm.instanceMatrix.needsUpdate = true;
+        pm.instanceColor.needsUpdate = true;
+        pm.frustumCulled = false;
+        group.add(pm);
+      }
+      // les fuites : une auréole au plafond, une flaque dessous, une goutte qui tombe et fait des ronds
+      const rc = document.createElement('canvas');
+      rc.width = rc.height = 128;
+      const rg = rc.getContext('2d');
+      const grd = rg.createRadialGradient(64, 64, 4, 64, 64, 62);
+      grd.addColorStop(0, 'rgba(255,255,255,0.95)');
+      grd.addColorStop(0.65, 'rgba(255,255,255,0.75)');
+      grd.addColorStop(0.85, 'rgba(255,255,255,1)');
+      grd.addColorStop(1, 'rgba(255,255,255,0)');
+      rg.fillStyle = grd;
+      rg.fillRect(0, 0, 128, 128);
+      const blotTex = new THREE.CanvasTexture(rc);
+      const puddleMat = new THREE.MeshBasicMaterial({ map: blotTex, color: '#1a1406', transparent: true, opacity: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
+      const stainMat = new THREE.MeshBasicMaterial({ map: blotTex, color: '#5a4720', transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide });
+      const dropMat = new THREE.MeshBasicMaterial({ color: '#d8d2b8', transparent: true, opacity: 0.8 });
+      const ringMat = new THREE.MeshBasicMaterial({ color: '#c9c0a0', transparent: true, opacity: 0.0, depthWrite: false });
+      const dropGeo = new THREE.SphereGeometry(0.012, 6, 5);
+      const ringGeo = new THREE.RingGeometry(0.85, 1, 24);
+      for (let i = 0, tries = 0; i < 5 && tries < 200; tries++) {
+        const w = map.walkable[(rr() * map.walkable.length) | 0];
+        if (!free(w.x, w.z) || drips.some((d) => Math.abs(d.gx - w.x) + Math.abs(d.gz - w.z) < 6)) continue;
+        const x = (w.x + 0.2 + rr() * 0.6) * CELL_SIZE;
+        const z = (w.z + 0.2 + rr() * 0.6) * CELL_SIZE;
+        const r = 0.35 + rr() * 0.35;
+        const pud = new THREE.Mesh(new THREE.PlaneGeometry(r * 2, r * 2), puddleMat);
+        pud.rotation.x = -Math.PI / 2;
+        pud.position.set(x, 0.007, z);
+        const st = new THREE.Mesh(new THREE.PlaneGeometry(r * 2.4, r * 2.4), stainMat);
+        st.rotation.x = Math.PI / 2;
+        st.position.set(x, CEIL - 0.012, z);
+        const drop = new THREE.Mesh(dropGeo, dropMat);
+        drop.scale.set(1, 1.8, 1);
+        const ring = new THREE.Mesh(ringGeo, ringMat.clone());
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(x, 0.01, z);
+        group.add(pud, st, drop, ring);
+        drips.push({ gx: w.x, gz: w.z, x, z, drop, ring, period: 1.4 + rr() * 1.8, phase: rr() * 3, last: -1 });
+        i++;
+      }
+    }
+
     // 6. Les cassettes VHS de cet étage
     const cassetteGeo = new THREE.BoxGeometry(0.38, 0.22, 0.06);
     const cassetteMat = new THREE.MeshLambertMaterial({ map: textures.vhs, emissive: '#d97706', emissiveIntensity: 0.16 });
@@ -1225,18 +1383,79 @@ float bkCaust(vec2 uv, float t) {
         const zs = st.pz * -st.dx + -st.px * -st.dz > 0 ? 1 : -1; // le côté du couloir, dans le repère de la porte
         const sgn = -zs; // elle s'ouvre vers le couloir
         pivot.rotation.y = base;
-        const steel = baked(new THREE.MeshLambertMaterial({ color: '#6e7366' }));
+        // l'acier peint de la porte (photo Poly Haven) ; ses chants restent unis
+        const fireTex = textures.fireDoor.clone();
+        fireTex.needsUpdate = true;
+        textures.metalReady.then(() => (fireTex.needsUpdate = true));
+        const steel = baked(new THREE.MeshLambertMaterial({ map: fireTex }));
         const dark = baked(new THREE.MeshLambertMaterial({ color: '#2b2c28' }));
         const brass = new THREE.MeshLambertMaterial({ color: '#b8902e', emissive: '#3a2a08', emissiveIntensity: 0.4 });
-        const leaf = new THREE.Mesh(new THREE.BoxGeometry(w, DOOR_H - 0.02, 0.05), steel);
+        // le battant, percé d'un hublot (au milieu, pour que les deux faces tombent au même endroit) : ses deux grandes
+        // faces sont découpées par un masque, ses chants restent pleins
+        const GW = 0.3; // largeur et hauteur du hublot
+        const GH = 0.56;
+        const GY = 1.5; // hauteur du centre du hublot
+        const LH = DOOR_H - 0.02;
+        const holeCv = document.createElement('canvas');
+        holeCv.width = 128;
+        holeCv.height = 256;
+        {
+          const g = holeCv.getContext('2d');
+          g.fillStyle = '#fff';
+          g.fillRect(0, 0, 128, 256);
+          g.fillStyle = '#000';
+          g.fillRect(((0.5 - GW / 2 / w) * 128) | 0, ((1 - (GY + GH / 2) / LH) * 256) | 0, Math.round((GW / w) * 128), Math.round((GH / LH) * 256));
+        }
+        const holeTex = new THREE.CanvasTexture(holeCv);
+        holeTex.magFilter = THREE.NearestFilter;
+        holeTex.minFilter = THREE.NearestFilter;
+        holeTex.generateMipmaps = false;
+        const steelHoled = baked(new THREE.MeshLambertMaterial({ map: fireTex, alphaMap: holeTex, alphaTest: 0.5 }));
+        const leaf = new THREE.Mesh(new THREE.BoxGeometry(w, LH, 0.05), [steel, steel, steel, steel, steelHoled, steelHoled]);
         leaf.position.set(w / 2, DOOR_H / 2, 0);
-        // un hublot de verre armé, la barre anti-panique côté cage, une poignée côté couloir
-        const glass = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.42), new THREE.MeshBasicMaterial({ color: '#2a2d26' }));
-        glass.position.set(w * 0.62, 1.55, -0.027);
-        glass.rotation.y = Math.PI;
-        const glass2 = glass.clone();
-        glass2.position.z = 0.027;
-        glass2.rotation.y = 0;
+        // le cadre du hublot (une parclose d'acier un peu en relief) et le verre armé : teinté, assez opaque, on
+        // devine la cage derrière à travers son grillage
+        const frameMat = baked(new THREE.MeshLambertMaterial({ color: '#4a4d45' }));
+        const fr = new THREE.Group();
+        fr.position.set(w / 2, GY, 0);
+        for (const [fx, fy, fw, fh] of [[0, GH / 2 + 0.015, GW + 0.06, 0.03], [0, -GH / 2 - 0.015, GW + 0.06, 0.03], [GW / 2 + 0.015, 0, 0.03, GH], [-GW / 2 - 0.015, 0, 0.03, GH]]) {
+          const b = new THREE.Mesh(new THREE.BoxGeometry(fw, fh, 0.066), frameMat);
+          b.position.set(fx, fy, 0);
+          fr.add(b);
+        }
+        const wireCv = document.createElement('canvas');
+        wireCv.width = wireCv.height = 128;
+        {
+          const g = wireCv.getContext('2d');
+          g.fillStyle = '#a7b2a8';
+          g.fillRect(0, 0, 128, 128);
+          // poussière et traces de doigts
+          for (let i = 0; i < 260; i++) {
+            g.fillStyle = `rgba(90,85,70,${Math.random() * 0.12})`;
+            g.fillRect(Math.random() * 128, Math.random() * 128, 2 + Math.random() * 10, 2 + Math.random() * 6);
+          }
+          // le grillage : un maillage carré de fil d'acier noyé dans le verre
+          g.strokeStyle = 'rgba(40,40,36,0.85)';
+          g.lineWidth = 1.4;
+          for (let k = 0; k <= 128; k += 16) {
+            g.beginPath();
+            g.moveTo(k, 0);
+            g.lineTo(k, 128);
+            g.moveTo(0, k);
+            g.lineTo(128, k);
+            g.stroke();
+          }
+        }
+        const wireTex = new THREE.CanvasTexture(wireCv);
+        wireTex.wrapS = wireTex.wrapT = THREE.RepeatWrapping;
+        wireTex.repeat.set(GW / 0.12, GH / 0.12);
+        wireTex.anisotropy = 4;
+        // éclairé comme le reste (sombre dans le noir, il ne luit pas) : on y voit surtout la lumière de la cage derrière
+        const glassMat = baked(new THREE.MeshLambertMaterial({ map: wireTex, color: '#7a8a80', transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide }));
+        const glass = new THREE.Mesh(new THREE.PlaneGeometry(GW, GH), glassMat);
+        glass.renderOrder = 2;
+        fr.add(glass);
+        // la barre anti-panique côté cage, une poignée côté couloir
         const bar = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7, 0.06, 0.06), dark);
         bar.position.set(w * 0.55, 1.0, -zs * 0.06);
         const handle = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.03, 0.05), dark);
@@ -1255,7 +1474,17 @@ float bkCaust(vec2 uv, float t) {
         const shackle = new THREE.Mesh(new THREE.TorusGeometry(0.028, 0.007, 6, 12, Math.PI), chainMat);
         shackle.position.set(w - 0.02, 0.905, zs * 0.085);
         lock.add(body, shackle);
-        pivot.add(leaf, glass, glass2, bar, handle, lock);
+        // le vrai cadenas (Quaternius, « Padlock », CC0) remplace la boîte dessinée dès qu'il est chargé
+        padlockModel.then((src) => {
+          if (!src) return;
+          const pl = src.clone();
+          pl.position.set(w - 0.02, 0.855, zs * 0.088);
+          pl.rotation.y = zs > 0 ? 0 : Math.PI;
+          body.visible = false;
+          shackle.visible = false;
+          lock.add(pl);
+        });
+        pivot.add(leaf, fr, bar, handle, lock);
         group.add(pivot);
         stairDoors.push({ pivot, lock, base, sgn, open: 0, map });
       }
@@ -1552,7 +1781,12 @@ float bkCaust(vec2 uv, float t) {
       cabPane(CD, 2.6, CW / 2, 1.3, CZ, -Math.PI / 2, cabMat);
       // le mur au-dessus de la baie, vu de la cabine
       cabPane(CW, 2.6 - DH, 0, DH + (2.6 - DH) / 2, ZD + 0.04, 0, cabMat);
-      const cabFloor = new THREE.Mesh(new THREE.PlaneGeometry(CW, CD), new THREE.MeshLambertMaterial({ color: '#2b2a28' }));
+      // le plancher de tôle larmée (photo Poly Haven), éclairé par le plafonnier
+      const tread = textures.treadPlate.clone();
+      tread.needsUpdate = true;
+      tread.repeat.set(2, 2);
+      textures.metalReady.then(() => (tread.needsUpdate = true));
+      const cabFloor = new THREE.Mesh(new THREE.PlaneGeometry(CW, CD), new THREE.MeshLambertMaterial({ map: tread, color: '#9a9d9f', emissive: '#1d1e1f', emissiveIntensity: 0.5 }));
       cabFloor.rotation.x = -Math.PI / 2;
       cabFloor.position.set(0, 0.004, CZ);
       const cabCeil = new THREE.Mesh(new THREE.PlaneGeometry(CW, CD), new THREE.MeshLambertMaterial({ color: '#6c6e70' }));
@@ -1564,6 +1798,19 @@ float bkCaust(vec2 uv, float t) {
       const handrail = new THREE.Mesh(new THREE.BoxGeometry(CW - 0.3, 0.04, 0.04), inox);
       handrail.position.set(0, 0.92, CZ + CD / 2 - 0.06);
       exitGroup.add(cabFloor, cabCeil, cabLamp, handrail);
+      // une caméra de surveillance dans le coin du fond (Poly Haven, security_camera_01, CC0), braquée sur la porte
+      loader.load(MODELS + 'security_camera_01.glb', (g) => {
+        const cam = g.scene;
+        cam.traverse((o) => {
+          if (o.isMesh) o.material = new THREE.MeshLambertMaterial({ map: o.material.map || null, color: o.material.map ? '#ffffff' : '#9a9a9a', emissive: '#3a3a3a', emissiveIntensity: 0.5 });
+        });
+        const box = new THREE.Box3().setFromObject(cam);
+        const k = 0.32 / Math.max(0.01, box.max.x - box.min.x, box.max.z - box.min.z);
+        cam.scale.multiplyScalar(k);
+        cam.position.set(CW / 2 - 0.16, 2.6 - (box.max.y - box.min.y) * k - 0.02, CZ + CD / 2 - 0.16);
+        cam.rotation.y = Math.PI * 0.75;
+        exitGroup.add(cam);
+      }, undefined, () => {});
       if (!arrival) {
         const cabinLight = new THREE.PointLight('#f4f1e0', 2.5, 4, 1.5);
         cabinLight.position.set(0, 2.4, CZ);
@@ -1770,6 +2017,22 @@ float bkCaust(vec2 uv, float t) {
       nooks,
       update(sim, P, time, dt) {
         bakeUniforms.uTime.value = time;
+        // les gouttes : elles tombent du plafond (un peu plus d'une demi-seconde), puis des ronds dans la flaque
+        for (const d of drips) {
+          const u = (time + d.phase) / d.period;
+          const n = Math.floor(u);
+          const f = u - n;
+          const fall = 0.62 / d.period;
+          d.drop.visible = f < fall;
+          if (f < fall) d.drop.position.set(d.x, CEIL - 0.03 - (CEIL - 0.03) * (f / fall) * (f / fall), d.z);
+          const rf = (f - fall) / (1 - fall);
+          d.ring.material.opacity = f >= fall ? 0.45 * (1 - rf) : 0;
+          d.ring.scale.setScalar(0.03 + rf * 0.35);
+          if (f >= fall && d.last !== n) {
+            d.last = n;
+            if (api.onDrip && (P.floor || 0) === fi && Math.hypot(P.x - d.x, P.z - d.z) < 14) api.onDrip({ x: d.x, z: d.z });
+          }
+        }
         if (nooks.length) updateNooks(time);
         if (water) {
           water.update(sim, P, time, dt, camera);
@@ -1983,6 +2246,20 @@ float bkCaust(vec2 uv, float t) {
   heldLamp.rotation.set(0.08, 0.18, 0);
   heldLamp.scale.setScalar(0.85);
   held.add(heldLamp);
+  // la vraie lampe : la torche en plastique jaune usée de Poly Haven (small_plastic_torch, CC0) ; la lampe dessinée
+  // ci-dessus ne sert qu'en attendant qu'elle arrive. Son verre s'allume avec elle.
+  loader.load(MODELS + 'small_plastic_torch.glb', (g) => {
+    const m = g.scene;
+    m.traverse((o) => {
+      if (!o.isMesh) return;
+      o.frustumCulled = false;
+      o.material = /glass/.test(o.material.name || '') ? lensMat : hmat({ map: o.material.map });
+    });
+    m.rotation.set(0, Math.PI, -Math.PI / 2); // le verre vers l'avant (-z), l'interrupteur sur le dessus
+    m.scale.setScalar(1.05);
+    for (const c of heldLamp.children) c.visible = false;
+    heldLamp.add(m);
+  }, undefined, () => {});
   // l'eau d'amande : la même bouteille qu'au sol, avec son étiquette
   const heldBottle = new THREE.Group();
   const hGlass = hmat({ color: '#e6eef2', transparent: true, opacity: 0.7 });
@@ -2129,6 +2406,10 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   let landShake = 0; // le choc à l'arrivée d'une chute (1 : tout juste tombé)
   let exposure = 1.2; // exposition du caméscope : elle rattrape la lumière en une seconde environ
   let lightNow = 0.5; // lumière des néons là où l'on est (pour le grésillement)
+  let camT = 0; // caméscope sorti (0 à 1, la transition vers le 4:3)
+  let camZoomWant = 1.5; // zoom de l'objectif (molette), de 1,5 à 4
+  let camZoomNow = 1.5;
+  let nightT = 0; // son mode nuit (0 à 1)
 
   // effets de bande en cours (secondes restantes), jumpscare, résolution dynamique, mise au point
   const fx = { splice: 0, loss: 0, bars: 0, grab: 0 };
@@ -2145,6 +2426,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   const replayP = { x: 0, z: 0, yaw: 0, pitch: 0, floor: 0, status: 'dead', moving: false, crouch: false, hidden: -1, grabT: 0, tilt: 0 };
   let frameAvg = 16;
   let lines = 720;
+  const avatarPos = new Map(); // position affichée de chaque coéquipier (sa piste interpolée)
   let focusT = 0;
   let focusPulse = 0; // temps restant de la « chasse » de mise au point en cours
   let focusWait = 3 + Math.random() * 4; // secondes de course avant la prochaine
@@ -2160,6 +2442,15 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     vhs,
     get lightHere() {
       return lightNow;
+    },
+    onDrip: null, // une goutte tombe dans une flaque près du joueur ({ x, z }) : l'application la fait entendre
+    // le zoom de l'objectif du caméscope (molette), de 1,5 à 4
+    setCamZoom(z) {
+      camZoomWant = z;
+    },
+    // le caméscope : où il en est (0 à 1), son mode nuit, et la largeur des bandes noires (px)
+    get cam() {
+      return { t: camT, night: nightT, bars: vhs.bars || 0 };
     },
     // Level 2 : percuté par une chèvre
     goatScare() {
@@ -2186,6 +2477,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         }
       });
       vhs.dispose?.();
+      inset.dispose();
       renderer.renderLists.dispose();
       if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
     },
@@ -2234,6 +2526,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     render(sim, time) {
       const dt = Math.min(0.1, Math.max(0, time - lastTime));
       lastTime = time;
+      const nowS = performance.now() / 1000; // l'horloge des pistes d'affichage des coéquipiers (sim.netSample)
       // la caméra suit le joueur de cet écran, ou celui qu'il regarde quand il est spectateur ; pendant le rejeu, elle
       // est dans la tête de l'entité
       let RF = null;
@@ -2282,7 +2575,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       // accroupi, la caméra descend ; dans un casier, elle est fixe
       crouchY += ((P.crouch ? -0.55 : 0) - crouchY) * Math.min(1, dt * 8);
       const still = P.hidden >= 0;
-      camera.position.set(P.x, eyeY + crouchY + (P.moving && !still ? Math.sin(bob * 2) * (P.running ? 0.05 : 0.025) * mo : 0), P.z);
+      camera.position.set(P.x, eyeY + crouchY + (P.jy || 0) + (P.moving && !(P.jy > 0) && !still ? Math.sin(bob * 2) * (P.running ? 0.05 : 0.025) * mo : 0), P.z);
       camera.rotation.order = 'YXZ';
       // agrippé : le regard est tiré vers l'entité
       let yaw = P.yaw;
@@ -2331,6 +2624,21 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       const bat = P.battery ?? 100;
       flashLight.intensity = !lampOn ? 0 : 17 * (bat < 15 ? 0.45 + (Math.random() < 0.12 ? -0.4 : 0.15) : bat < 35 ? 0.75 : 1);
       flashSpill.intensity = flashLight.intensity * 0.24;
+      // le caméscope (V) : il sort en un tiers de seconde ; dans le noir, s'il reste de la pile, il passe en mode nuit
+      // et sa lampe infrarouge éclaire devant (pour l'image seulement : l'entité ne la voit pas)
+      const camWant = !RF && P.cam && P.status === 'alive' ? 1 : 0;
+      camT += (camWant - camT) * Math.min(1, dt * 9);
+      if (camT < 0.002) camT = 0;
+      const nightWant = camWant && bat > 0 ? THREE.MathUtils.clamp((0.34 - lightNow - (lampOn ? 0.3 : 0)) / 0.22, 0, 1) : 0;
+      nightT += (nightWant - nightT) * Math.min(1, dt * 3);
+      flashSpill.intensity += nightT * 3.2;
+      // le caméscope zoome (×1,3) : son objectif est plus serré que l'œil
+      camZoomNow += (camZoomWant - camZoomNow) * Math.min(1, dt * 7); // l'objectif glisse, il ne saute pas
+      const camFov = (2 * Math.atan(Math.tan((OPTS.fov * Math.PI) / 360) / (1 + (camZoomNow - 1) * camT)) * 180) / Math.PI;
+      if (Math.abs(camera.fov - camFov) > 0.01) {
+        camera.fov = camFov;
+        camera.updateProjectionMatrix();
+      }
 
       // les objets en main : la lampe dès qu'on l'a, l'objet de la case choisie s'il y en a un (pas l'échelle)
       const alive = P.status === 'alive' && !P.onLadder && !(P.hidden >= 0);
@@ -2448,10 +2756,21 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       for (const Q of sim.players) {
         const show = Q !== P && Q.status === 'alive' && !(Q.hidden >= 0); // un coéquipier caché dans un casier ne se voit pas
         if (!show && !avatars.has(Q.id)) continue;
+        // à l'écran, chacun suit sa piste : les positions reçues (20 par seconde), interpolées un peu dans le passé,
+        // donc un mouvement régulier ; un vrai saut (chute, étage, rattrapage) reste net
+        let S = avatarPos.get(Q.id);
+        if (!S) avatarPos.set(Q.id, (S = { x: 0, z: 0, yaw: 0, f: 0 }));
+        if (!sim.netSample(Q.id, nowS, S, Q)) {
+          S.x = Q.x;
+          S.z = Q.z;
+          S.yaw = Q.yaw;
+        }
+        S.f = Q.floor || 0;
+        const D = { ...Q, x: S.x, z: S.z, yaw: S.yaw };
         const qv = floorViews[Q.floor || 0];
         const qm = sim.fm(Q.floor || 0);
-        const y = feetY(sim.stairs, Q.x, Q.z, Q.floor) + (Q.onLadder ? 1.0 : 0) - (qm.depthAt ? qm.depthAt(Q.x, Q.z) : 0);
-        avatars.update(Q, show, y, qv ? qv.lightAt(Q.x, Q.z) : 0.3, dt, time);
+        const y = feetY(sim.stairs, D.x, D.z, D.floor) + (D.onLadder ? 1.0 : 0) + (D.jy || 0) - (qm.depthAt ? qm.depthAt(D.x, D.z) : 0);
+        avatars.update(D, show, y, qv ? qv.lightAt(D.x, D.z) : 0.3, dt, time);
       }
 
       // exposition automatique : le caméscope s'ouvre dans le noir (image plus claire et plus granuleuse) et se
@@ -2490,6 +2809,10 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         chroma: scareT > 0 ? 0.7 : grabbed ? 0.6 : RF ? 0.45 : 0,
         focus: Math.min(1, focusT + (grabbed ? 0.35 : 0)),
         white,
+        cam: camT,
+        night: nightT,
+        // la brume de chaleur du Level 0 (coupée en mode nuit : le vert l'écraserait)
+        haze: L0 && !OPTS.lowFx ? 1 - nightT * camT : 0,
       });
 
       // résolution dynamique : moins de lignes quand l'image peine, plus quand elle est à l'aise
@@ -2499,7 +2822,30 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         else if (frameAvg < 15 && lines < 720) lines += 4;
         vhs.setLines(lines);
       }
-      vhs.render(scene, camera, time, danger, exposure);
+      vhs.render(scene, camera, time, danger, exposure * (1 + nightT * 1.6));
+
+      // le caméscope d'un coéquipier qui filme, en médaillon (vivant, au même étage, pas soi-même)
+      const camQ = !RF && P === sim.player && P.status === 'alive' ? sim.players.find((q) => q !== P && q.cam && q.status === 'alive' && (q.floor || 0) === (P.floor || 0) && !(q.hidden >= 0)) : null;
+      if (camQ) {
+        const S = avatarPos.get(camQ.id) || camQ;
+        const qm = sim.fm(camQ.floor || 0);
+        const ey = feetY(sim.stairs, S.x, S.z, camQ.floor || 0) + (camQ.crouch ? 1.05 : 1.6) + (camQ.jy || 0) - (qm.depthAt ? qm.depthAt(S.x, S.z) : 0);
+        const fov = (2 * Math.atan(Math.tan((OPTS.fov * Math.PI) / 360) / 1.5) * 180) / Math.PI;
+        const pm = sim.fm(P.floor || 0);
+        let heldWas = true;
+        const py = feetY(sim.stairs, P.x, P.z, P.floor || 0) + (P.onLadder ? 1.0 : 0) + (P.jy || 0) - (pm.depthAt ? pm.depthAt(P.x, P.z) : 0);
+        inset.render(camQ, { x: S.x, y: ey, z: S.z }, fov, scene, avatars, time, dt, {
+          show() {
+            heldWas = held.visible;
+            held.visible = false;
+            avatars.update(P, true, py, lightNow, 0, time);
+          },
+          hide() {
+            held.visible = heldWas;
+            avatars.setShown(P.id, false);
+          },
+        });
+      } else inset.render(null);
     },
   };
   liveScene = api;

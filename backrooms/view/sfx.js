@@ -710,6 +710,59 @@ export class BackroomsSfx {
     if (pos) this.caption('[lights flicker]', pos);
   }
 
+  // Toute une rangée de néons qui saute dans ton dos : le gros claquement d'un disjoncteur, le bourdonnement qui s'éteint
+  // en descendant, et les tubes qui tintent en refroidissant
+  neonRow(pos, n = 4) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.01;
+    const out = this.at({ ...pos, rolloff: 0.6, ref: 4 }, 1.2);
+    this.burst(out, t, 0.03, 'lowpass', 220, 0.9, 0.5);
+    this.burst(out, t, 0.015, 'bandpass', 2600, 2, 0.3);
+    this.tone(out, t, 'sine', 70, 38, 0.25, 0.3, 0.002);
+    const o = this.osc('sawtooth', 120);
+    o.frequency.setValueAtTime(120, t);
+    o.frequency.exponentialRampToValueAtTime(40, t + 0.9);
+    const bp = this.filt('bandpass', 700, 1.4);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.09, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    o.connect(bp).connect(g).connect(out);
+    o.start(t);
+    o.stop(t + 1);
+    for (let i = 0; i < Math.min(6, n); i++) this.tone(out, t + 0.4 + i * rnd(0.12, 0.3), 'sine', rnd(2800, 4200), 0, 0.08, 0.012, 0.001);
+    this.caption('[the lights behind you go out]', pos);
+  }
+
+  // Un néon qui s'emballe : un bourdonnement fort et sale qui hoquette quelques secondes
+  neonSurge(pos, sec = 4.5) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.01;
+    const out = this.at({ ...pos, rolloff: 0.9, ref: 2.5 }, 1);
+    const o = this.osc('sawtooth', 120);
+    const o2 = this.osc('square', 60);
+    const bp = this.filt('bandpass', 1100, 0.9);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    let k = t;
+    while (k < t + sec) {
+      const on = rnd(0.08, 0.5);
+      g.gain.setTargetAtTime(rnd(0.05, 0.11), k, 0.01);
+      g.gain.setTargetAtTime(rnd(0.0, 0.02), k + on, 0.01);
+      k += on + rnd(0.02, 0.15);
+    }
+    g.gain.setTargetAtTime(0.0001, t + sec, 0.05);
+    o.connect(bp);
+    o2.connect(bp);
+    bp.connect(g).connect(out);
+    o.start(t);
+    o2.start(t);
+    o.stop(t + sec + 0.4);
+    o2.stop(t + sec + 0.4);
+    this.caption('[a light buzzes loudly]', pos);
+  }
+
   // La voix de l'entité du Level 1 : la bande-son de sa vidéo, jouée en boucle sans fin. Chargée une seule fois,
   // au premier besoin ; elle passe par le même panoramique (et la même occlusion) que le bourdonnement.
   initVoice() {
@@ -858,6 +911,24 @@ export class BackroomsSfx {
   }
 
   // une goutte qui tombe dans l'eau : un « plop » qui monte vite
+  // le clic de l'interrupteur de la lampe : un « clac » sec en plastique (plus grave à l'extinction) ; pos : la lampe
+  // d'un coéquipier, sinon la sienne
+  lampClick(on = true, pos = null) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.005;
+    const out = pos ? this.at({ ...pos, rolloff: 1.4, ref: 1.5 }, 0.9) : this.gainNode(0.9);
+    if (!pos) out.connect(this.out);
+    this.burst(out, t, 0.006, 'bandpass', on ? 3400 : 2600, 3, 0.35);
+    this.burst(out, t + 0.004, 0.02, 'bandpass', on ? 1500 : 1100, 5, 0.18);
+    this.tone(out, t, 'triangle', on ? 900 : 650, 0, 0.025, 0.03, 0.001);
+  }
+
+  // une goutte du plafond qui tombe dans une flaque, quelque part près de soi
+  drip(pos) {
+    if (!this.unlocked || !this.ctx) return;
+    this.plop(this.ctx.currentTime + 0.01, 0.07, this.at({ ...pos, rolloff: 1.3, ref: 1.2 }, 1));
+  }
+
   plop(t, vol, dest) {
     const c = this.ctx;
     const o = c.createOscillator();
@@ -1780,6 +1851,42 @@ export class BackroomsSfx {
 
   // Les piles : la trappe qui se déclipse, les piles qui glissent, le ressort, la trappe qui reclaque.
   // empty : la lampe à plat, un clic mou et le filament qui grésille et meurt
+  // le caméscope (V) : le clic de l'écran qu'on déplie, le moteur de la bande, et le bip de l'enregistrement
+  // le moteur du zoom du caméscope : un petit servo qui siffle en montant (zoom avant) ou en descendant ; une
+  // seule plainte à la fois quand la molette tourne vite
+  camZoom(dir = 1) {
+    if (!this.unlocked || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    if (this.zoomUntil && now < this.zoomUntil - 0.04) return;
+    const t = now + 0.005;
+    const out = this.gainNode(0.55);
+    out.connect(this.out);
+    const f0 = dir > 0 ? 470 : 640;
+    const f1 = dir > 0 ? 640 : 470;
+    this.tone(out, t, 'sawtooth', f0, f1, 0.16, 0.009, 0.02);
+    this.tone(out, t, 'square', f0 * 2.02, f1 * 2.02, 0.16, 0.0035, 0.02);
+    this.burst(out, t, 0.16, 'bandpass', dir > 0 ? 2400 : 1900, 5, 0.035);
+    this.burst(out, t + 0.15, 0.012, 'bandpass', 3000, 3, 0.05); // la butée de l'engrenage
+    this.zoomUntil = t + 0.16;
+  }
+
+  camcorder(on) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.01;
+    const out = this.gainNode(0.7);
+    out.connect(this.out);
+    this.burst(out, t, 0.02, 'bandpass', 2600, 3, 0.22);
+    this.burst(out, t + 0.05, 0.015, 'bandpass', 1500, 4, 0.14);
+    // le moteur : un ronron qui monte (ou retombe) en un tiers de seconde
+    this.burst(out, t + 0.06, 0.32, 'bandpass', on ? 420 : 300, 6, 0.05);
+    this.tone(out, t + 0.06, 'sawtooth', on ? 90 : 160, on ? 160 : 70, 0.3, 0.012, 0.03);
+    if (on) {
+      this.tone(out, t + 0.42, 'square', 1950, 1950, 0.07, 0.02, 0.002);
+      this.tone(out, t + 0.52, 'square', 1950, 1950, 0.07, 0.02, 0.002);
+    }
+  }
+
   battery(empty = false) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
@@ -1943,32 +2050,48 @@ export class BackroomsSfx {
     });
   }
 
-  // Les ambiances : de temps en temps (toutes les 20 à 50 s), un des enregistrements du niveau, assez bas, avec l'écho
-  // des couloirs ; pas pendant une poursuite. Par-dessus, les bruits synthétisés propres à chaque niveau.
-  ambience(dt, active) {
-    if (!this.unlocked || !this.ctx) return;
-    if (this.ambT === undefined) this.ambT = 6 + Math.random() * 10;
-    if (!active) return;
+  // Les ambiances : c'est l'hôte qui les tire (engine/sim.js, updateAmbience), pour que tout le monde les entende en
+  // même temps et au même endroit. Ici, on ne fait plus que les jouer (ambCue).
+  ambience() {}
+
+  // Un bruit d'ambiance tiré par l'hôte : slot 'rec' (un des enregistrements du niveau, bas, avec l'écho des couloirs)
+  // ou 'a', 'b', 'c' (les bruits synthétisés du niveau), placé à partir d'un joueur (anchor) ; a, u, v, w : ses tirages
+  ambCue(slot, anchor, a = 0, u = 0.5, v = 0.5, w = 0.5) {
+    if (!this.unlocked || !this.ctx || !anchor) return;
     if (this.ctx.currentTime < this.silenceUntil) return;
-    this.synthAmbience(dt);
-    this.ambT -= dt;
-    if (this.ambT > 0) return;
-    this.ambT = 20 + Math.random() * 30;
-    const AMBIENT = levelSfx(this.roomLevel).ambient;
-    if (!AMBIENT.length) return;
-    let name = AMBIENT[Math.floor(Math.random() * AMBIENT.length)];
-    if (name === this.lastAmb) name = AMBIENT[(AMBIENT.indexOf(name) + 1) % AMBIENT.length];
-    this.lastAmb = name;
-    this.sample(name).then((buf) => {
-      if (!buf) return;
-      const c = this.ctx;
-      const src = c.createBufferSource();
-      src.buffer = buf;
-      const g = c.createGain();
-      g.gain.value = 0.12; // très bas : un fond qu'on devine plus qu'on n'entend
-      src.connect(g).connect(this.bedWet);
-      src.start();
-    });
+    const pos = (r1, r2) => {
+      const r = r1 + (r2 - r1) * u;
+      return { x: anchor.x + Math.cos(a) * r, z: anchor.z + Math.sin(a) * r };
+    };
+    const vol = (v0, v1) => v0 + (v1 - v0) * v;
+    const lv = this.roomLevel;
+    if (slot === 'rec') {
+      const AMBIENT = levelSfx(lv).ambient;
+      if (!AMBIENT.length) return;
+      const name = AMBIENT[Math.min(AMBIENT.length - 1, Math.floor(w * AMBIENT.length))];
+      this.sample(name).then((buf) => {
+        if (!buf) return;
+        const c = this.ctx;
+        const src = c.createBufferSource();
+        src.buffer = buf;
+        const g = c.createGain();
+        g.gain.value = 0.12; // très bas : un fond qu'on devine plus qu'on n'entend
+        src.connect(g).connect(this.bedWet);
+        src.start();
+      });
+    } else if (lv === 1) {
+      // la tôle et les étagères qui craquent ; parfois des coups dans les gaines
+      if (slot === 'a') this.creak(pos(8, 25), vol(0.5, 1));
+      else if (slot === 'b') this.distant(w < 0.6 ? 'groan' : 'knock', pos(18, 32), 0.5, this.bedWet);
+    } else if (lv === 2) {
+      // l'eau qui clapote contre le carrelage
+      if (slot === 'a') this.slosh(pos(5, 16), vol(0.5, 1));
+    } else if (lv === PIPES_LEVEL) {
+      // coups de bélier, vapeur qui siffle au loin, tuyaux qui gémissent
+      if (slot === 'a') this.steamFar(pos(14, 30), vol(0.5, 0.9));
+      else if (slot === 'b') this.distant('hammer', pos(15, 35), vol(0.5, 0.8), this.bedWet);
+      else if (slot === 'c') this.distant('groan', pos(12, 30), vol(0.4, 0.7), this.bedWet);
+    }
   }
 
   // les fonds continus de chaque niveau, sous tout le reste (bus bedWet) : Level 1 la ventilation, Poolrooms l'eau
@@ -2025,47 +2148,6 @@ export class BackroomsSfx {
     for (const s of srcs) s.start(t, s.buffer ? Math.random() * 4 : 0);
     g.gain.setTargetAtTime(vol, t, 2);
     this.bed = { g, srcs };
-  }
-
-  // les bruits ponctuels synthétisés de chaque niveau (appelé par ambience, hors poursuite et hors silence)
-  synthAmbience(dt) {
-    const A = this.amb;
-    if (!A) return;
-    A.a -= dt;
-    A.b -= dt;
-    A.c -= dt;
-    const lv = this.roomLevel;
-    if (lv === 1) {
-      // la tôle et les étagères qui craquent ; parfois des coups dans les gaines
-      if (A.a <= 0) {
-        A.a = rnd(7, 20);
-        this.creak(this.around(8, 25), rnd(0.5, 1));
-      }
-      if (A.b <= 0) {
-        A.b = rnd(25, 50);
-        this.distant(Math.random() < 0.6 ? 'groan' : 'knock', this.around(18, 32), 0.5, this.bedWet);
-      }
-    } else if (lv === 2) {
-      // l'eau qui clapote contre le carrelage
-      if (A.a <= 0) {
-        A.a = rnd(4, 10);
-        this.slosh(this.around(5, 16), rnd(0.5, 1));
-      }
-    } else if (lv === PIPES_LEVEL) {
-      // coups de bélier, vapeur qui siffle au loin, tuyaux qui gémissent
-      if (A.a <= 0) {
-        A.a = rnd(9, 22);
-        this.steamFar(this.around(14, 30), rnd(0.5, 0.9));
-      }
-      if (A.b <= 0) {
-        A.b = rnd(18, 40);
-        this.distant('hammer', this.around(15, 35), rnd(0.5, 0.8), this.bedWet);
-      }
-      if (A.c <= 0) {
-        A.c = rnd(14, 32);
-        this.distant('groan', this.around(12, 30), rnd(0.4, 0.7), this.bedWet);
-      }
-    }
   }
 
   // un craquement de tôle ou d'étagère : quelques grains métalliques très résonants

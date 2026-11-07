@@ -1,5 +1,58 @@
 # Journal des versions — Arcadia
 
+## 4.62 — 7 novembre 2026
+- **The Backrooms** — Une image nette, et un vrai caméscope à sortir (touche V).
+  - Sans caméscope, l'écran n'a plus d'effet de cassette : image propre, sans lignes, ni bande déformée, ni compteur REC.
+  - Avec V, on sort le caméscope : l'image passe au format carré, entre deux bandes noires, avec un effet de cassette bien plus fort qu'avant (REC, compteur, coins du viseur, lignes, couleurs qui bavent).
+  - La jauge de signal des cassettes reste toujours affichée en bas à droite ; au caméscope, elle s'affiche en plus grand et plus précise dans la bande de gauche.
+  - Le caméscope est un peu parasité : une légère neige, une barre de bruit qui remonte l'image, quelques lignes qui sautent.
+  - Il zoome ×1,5 dès qu'on le sort, et la molette zoome davantage (jusqu'à ×4), avec le petit bruit du moteur de l'objectif.
+  - Quand un coéquipier filme, on voit son image en direct dans un petit écran en bas à droite, avec son nom.
+  - La bande de droite montre les parasites : quand l'entité approche, la jauge monte et l'image se déchire.
+  - Dans le noir, le caméscope passe tout seul en mode nuit (image verte) : on y voit sans lampe, donc sans se faire repérer.
+  - Il tire un peu sur la même pile que la lampe. Les coéquipiers qui filment ont un petit voyant rouge.
+- **The Backrooms** — À plusieurs, tout bouge en douceur.
+  - Les coéquipiers et l'entité avancent et tournent la tête d'un mouvement régulier, au lieu de petits sauts 20 fois par seconde (chez l'hôte comme chez les invités) ; une vraie téléportation ou une chute reste nette.
+  - Sur un écran à plus de 60 images par seconde, la souris ne perd plus de mouvement (avant, plus de la moitié pouvait sauter à 144 Hz), et ta propre marche est fluide à chaque image.
+- **The Backrooms** — Tous les niveaux au même niveau de détail que le Level 0.
+  - Level 2 (Tuyauteries) : les réserves sont en vraie brique, avec son relief, et les chaufferies en brique peinte écaillée ; le carrelage et l'enduit sont salis comme le papier peint du Level 0.
+  - Level 37 (Poolrooms) : carrelages deux fois plus fins, nets même collé au mur.
+  - Level 1 : cartons, fûts, étiquettes, pochoirs et panneaux d'allée deux fois plus fins, et plus nets au loin.
+- **The Backrooms** — Le Level 0 plus vivant, et plus inquiétant.
+  - Les néons vivent : certains grésillent fort et clignotent d'un coup, et parfois toute une rangée s'éteint derrière toi, dans un claquement de disjoncteur.
+  - La moquette raconte quelque chose : des taches d'humidité, des traces de pas mouillées qui mènent quelque part, et des gouttes qui tombent du plafond dans des flaques (on les entend).
+  - Tout au fond des couloirs, l'air tremble à peine et jaunit un peu, comme s'il faisait trop chaud.
+  - Le plafond est un peu plus haut (20 cm).
+  - Fini les grandes plaques d'ombre crénelées au plafond : la lumière y est douce, comme renvoyée par le sol.
+  - Les bords des murs, des piliers et des néons sont lisses : fini les marches d'escalier sur les contours.
+  - Collé contre la cage d'escalier (sa porte cadenassée comme tous ses murs), on ne voit plus à travers : on bute juste devant, et la chaîne de la porte cogne.
+  - La porte de l'escalier a un vrai hublot en verre armé : trouble et grillagé, il laisse deviner la cage éclairée derrière.
+- **The Backrooms** — Des matières bien plus détaillées : moquette, papier peint, plafond, entrepôt du Level 1, porte coupe-feu en acier peint, sol de l'ascenseur en tôle, parois en inox.
+  - La lampe torche et le cadenas de la porte de l'escalier sont de vrais objets en 3D ; une caméra de surveillance observe la cabine de l'ascenseur.
+  - La lampe fait un petit clic quand on l'allume ou l'éteint (et on entend celle des coéquipiers proches).
+- **The Backrooms** — On part ensemble, ou pas du tout.
+  - Dès que quelqu'un entre dans l'ascenseur, les autres ont 45 secondes pour le rejoindre. Un compte à rebours s'affiche, et l'entité entend la cabine : elle arrive.
+  - À zéro, les portes se ferment : ceux qui sont encore dehors sont perdus, et l'ascenseur part avec les autres.
+- **The Backrooms** — L'endurance compte davantage.
+  - Chaque eau d'amande bue agrandit la jauge pour de bon (jusqu'à presque deux fois sa taille), en plus de rendre du souffle : elle n'est donc jamais inutile.
+- **The Backrooms** — Une entité qui ne lâche plus.
+  - En chasse, elle va toujours plus vite qu'un joueur qui marche : pour la semer, il faut courir.
+  - Elle fonce droit sur toi sans hésiter, au lieu de tourner sur elle-même juste devant toi quand elle essaie de t'attraper.
+- **The Backrooms** — 7 cassettes à trouver au lieu de 5 (4 à l'étage du haut, 3 en bas), sur une carte de la même taille.
+- **The Backrooms** — On court plus vite, et on peut sauter.
+  - Espace pour sauter : un petit bond qui coûte un peu de souffle et s'entend à la réception. Il ne permet pas de franchir un trou.
+  - C pour s'accroupir se fait maintenant d'un appui (plus besoin de garder la touche) ; Espace ou la course relèvent.
+- **The Backrooms** — Tout le monde a enfin la même carte : escaliers, cassettes et objets au même endroit pour chaque joueur.
+  - Le jeu se charge toujours en entier à la version du Hub : un navigateur ne peut plus mélanger des fichiers d'une ancienne version (gardés en mémoire) avec ceux de la nouvelle, ce qui donnait une autre carte que celle des coéquipiers.
+  - Si les cartes diffèrent malgré tout (quelqu'un a encore une vieille version ouverte), un message dit qui doit recharger la page, chez l'hôte comme chez l'invité, et revient tant que ce n'est pas réglé.
+- **The Backrooms** — Un multijoueur plus solide, et des voix plus claires.
+  - Fini les téléportations : quand le jeu de l'hôte se fige un instant (une saccade, ou un passage sur un autre onglet), les autres ne sont plus ramenés en arrière.
+  - Les coéquipiers se déplacent de façon fluide à l'écran, au lieu d'avancer par petits sauts.
+  - Les bruits d'ambiance (enregistrements lointains, tôle qui craque, coups dans les conduites…) arrivent en même temps chez tout le monde, au même endroit du niveau : fort pour celui qui est à côté, étouffé pour celui qui est loin.
+  - Les voix des joueurs sont plus fortes et toutes au même niveau, qu'on chuchote ou qu'on parle fort ; les grésillements du talkie ne sont pas remontés avec elles.
+  - L'écho des voix est plus discret : court, juste après la voix, sans graves qui noient ; on l'entend surtout quand la personne est loin.
+  - La jauge du micro est devenue un simple trait fin, avec un petit repère : au-delà, on t'entend.
+
 ## 4.61 — 7 novembre 2026
 - **The Backrooms** — Une jauge du micro pour savoir si tu fais du bruit.
   - En bas à gauche, une petite jauge « MIC » suit ta voix en direct, comme le vumètre d'un caméscope.

@@ -42,8 +42,32 @@ const loading = new GLTFLoader().loadAsync(MODEL).then((g) => {
   source = g;
 }, () => {});
 
+// leur lampe : la torche jaune de Poly Haven (small_plastic_torch, CC0), la même que la nôtre
+let torchSrc = null;
+const torchLoading = new GLTFLoader().loadAsync(new URL('../models/small_plastic_torch.glb', import.meta.url).href).then((g) => {
+  const body = new THREE.MeshLambertMaterial({ color: '#ffffff', emissive: '#4a3a10', emissiveIntensity: 0.6 });
+  g.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    if (/glass/.test(o.material.name || '')) o.userData.glass = true;
+    else {
+      body.map = o.material.map;
+      o.material = body;
+    }
+  });
+  torchSrc = g.scene;
+}, () => {});
+
 function makeTorch(mat) {
   const g = new THREE.Group();
+  if (torchSrc) {
+    const m = torchSrc.clone(true);
+    m.traverse((o) => {
+      if (o.isMesh && o.userData.glass) o.material = mat.lens;
+    });
+    m.rotation.z = -Math.PI / 2;
+    g.add(m);
+    return g;
+  }
   const body = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.2, 10), mat.dark);
   body.rotation.x = Math.PI / 2;
   const head = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.024, 0.05, 12), mat.dark);
@@ -101,6 +125,11 @@ export function createPlayerAvatars(scene) {
     }
     a.torch = makeTorch(mat);
     a.g.add(a.torch);
+    // le voyant rouge du caméscope, à hauteur du visage, quand il filme (V)
+    a.rec = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), new THREE.MeshBasicMaterial({ color: '#ff2a1a' }));
+    a.rec.position.set(-0.12, 1.62, -0.3);
+    a.rec.visible = false;
+    a.g.add(a.rec);
     if (!a.light) {
       // la lampe : un vrai projecteur à bord doux. Il reste dans la scène même caché (sa puissance tombe à 0) :
       // le nombre de lumières ne change pas, les matériaux ne se recompilent pas
@@ -118,6 +147,13 @@ export function createPlayerAvatars(scene) {
       scene.add(a.g);
       build(a);
       avatars.set(P.id, a);
+      if (!torchSrc) torchLoading.then(() => {
+        // la torche vient d'arriver : on la met dans sa main
+        if (!torchSrc || !a.torch) return;
+        a.g.remove(a.torch);
+        a.torch = makeTorch(a.mat);
+        a.g.add(a.torch);
+      });
       if (!source) loading.then(() => {
         // le modèle vient d'arriver : on refait l'explorateur
         if (!source || a.root) return;
@@ -130,6 +166,14 @@ export function createPlayerAvatars(scene) {
 
   return {
     has: (id) => avatars.has(id),
+    // cache (ou remontre) le corps d'un joueur le temps d'une prise de vue depuis sa tête ; renvoie l'état d'avant
+    setShown(id, v) {
+      const a = avatars.get(id);
+      if (!a) return false;
+      const was = a.g.visible;
+      a.g.visible = v;
+      return was;
+    },
     // Q : le joueur ; y : hauteur des pieds ; light : lumière des néons là où il est ; dt : durée de l'image
     update(Q, show, y, light, dt) {
       if (!show && !avatars.has(Q.id)) return;
@@ -171,6 +215,7 @@ export function createPlayerAvatars(scene) {
       a.lightTarget.position.copy(a.g.localToWorld(tmp));
       a.lightTarget.updateMatrixWorld();
       a.light.intensity = Q.flashlight ? 14 : 0;
+      if (a.rec) a.rec.visible = !!Q.cam && (performance.now() % 1200) < 700;
       a.mat.lens.color.set(Q.flashlight ? '#fff6dc' : '#2a2620');
     },
   };

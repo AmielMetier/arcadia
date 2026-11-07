@@ -1,4 +1,4 @@
-// The Backrooms (Level 2) - Textures des galeries de service, dessinées au canvas : carrelage émaillé ocre ou brun
+// The Backrooms (Level 2) - Textures des galeries de service : carrelage émaillé ocre ou brun dessiné au canvas
 // (avec son relief : joints creux, chanfreins), brique rouge des réserves, brique peinte des chaufferies, béton ciré
 // du sol, dalle peinte qui s'écaille au plafond. Le sol et le plafond sont salis par les photos CC0 de Poly Haven
 // déjà utilisées au Level 1 (backrooms/tex/l1_*). Chaque mur fait une face de case : 2,5 m de large, 3,3 m de haut.
@@ -220,6 +220,50 @@ function tileWall(pal) {
 function brickWall(painted = false) {
   const [cv, ctx] = canvas(FW, FH);
   const [bv, btx] = canvas(FW, FH);
+  drawBricks(ctx, btx, painted, null, null);
+  const map = tex(cv);
+  const bump = tex(bv, false);
+  // les photos arrivent : la vraie brique (et sa profondeur) remplace le dessin, salie de la même façon
+  const redraw = (photo, relief) => {
+    if (!photo) return;
+    drawBricks(ctx, btx, painted, photo, relief);
+    map.needsUpdate = true;
+    bump.needsUpdate = true;
+  };
+  return { map, bump, redraw };
+}
+
+// une photo répétée sur toute la face, w × h pixels par répétition (calée sur le pied du mur)
+function tilePhoto(ctx, img, w, h) {
+  for (let y = FH; y > -h; y -= h) for (let x = 0; x < FW; x += w) ctx.drawImage(img, x, y - h, w + 0.5, h + 0.5);
+}
+
+// photo : Poly Haven red_brick_03 ou painted_worn_brick (déjà peinte en crème) ; relief : sa
+// carte de profondeur, qui sert de relief (joints creux, briques bombées, écailles)
+function drawBricks(ctx, btx, painted, photo, relief) {
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+  btx.globalCompositeOperation = 'source-over';
+  btx.globalAlpha = 1;
+  if (photo) {
+    // un nombre entier de répétitions sur la largeur d'une face (2,5 m) : pas de raccord d'une case à l'autre
+    // (0,83 m pour la brique rouge, 1,25 m pour la peinte, un peu plus petites que nature)
+    const w = FW / (painted ? 2 : 3);
+    const h = (w * PY) / PX;
+    tilePhoto(ctx, photo, w, h);
+    btx.fillStyle = '#808080';
+    btx.fillRect(0, 0, FW, FH);
+    if (relief) tilePhoto(btx, relief, w, h);
+    // la photo est propre et claire : l'âge des réserves (tons plus sombres, moins saturés)
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = painted ? 'rgb(214, 208, 190)' : 'rgb(178, 160, 150)';
+    ctx.fillRect(0, 0, FW, FH);
+    ctx.globalCompositeOperation = 'source-over';
+    bricksGrime(ctx, painted, true);
+    grain(ctx, FW, FH, 6);
+    grain(btx, FW, FH, 6);
+    return;
+  }
   const course = 0.075 * PY;
   const len = 0.225 * PX;
   const mortar = 3;
@@ -250,7 +294,13 @@ function brickWall(painted = false) {
       btx.fillRect(x + mortar / 2 + 1, y - course + mortar / 2 + 1, len - mortar - 2, course - mortar - 2);
     }
   }
-  // suie en haut, humidité et salpêtre blanc au pied
+  bricksGrime(ctx, painted, false);
+  grain(ctx, FW, FH, 12);
+  grain(btx, FW, FH, 20);
+}
+
+// suie en haut, humidité et salpêtre blanc au pied ; painted : soubassement vert sombre sous le crème, écaillé
+function bricksGrime(ctx, painted, photo) {
   const soot = ctx.createLinearGradient(0, 0, 0, FH * 0.35);
   soot.addColorStop(0, 'rgba(12, 10, 8, 0.45)');
   soot.addColorStop(1, 'rgba(12, 10, 8, 0)');
@@ -263,7 +313,19 @@ function brickWall(painted = false) {
   ctx.fillRect(0, yAt(0.9), FW, FH - yAt(0.9));
   blotches(ctx, FW, FH, 14, 'rgba(225, 222, 205, 0.22)', 20, 70, yAt(0.6), FH);
   drips(ctx, 10, 'rgba(20, 16, 12, 0.3)', FH * 0.6);
-  if (painted) {
+  if (painted && photo) {
+    // la photo est déjà peinte en crème, écaillée : le soubassement vert sombre se peint par-dessus (le relief de la
+    // brique et les écailles restent visibles au travers)
+    const band = yAt(1.3);
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = hsl(140, 22, 36);
+    ctx.fillRect(0, band, FW, FH - band);
+    ctx.restore();
+    ctx.fillStyle = hsl(40, 30, 30, 0.9);
+    ctx.fillRect(0, band - 4, FW, 5);
+    drips(ctx, 16, 'rgba(100, 60, 25, 0.3)', FH * 0.7);
+  } else if (painted) {
     // brique peinte : crème en haut, vert sombre brillant en bas, écaillée par endroits
     const band = yAt(1.3);
     ctx.save();
@@ -283,9 +345,6 @@ function brickWall(painted = false) {
     blotches(ctx, FW, band, 18, 'rgba(60, 50, 30, 0.2)', 30, 120);
     drips(ctx, 16, 'rgba(100, 60, 25, 0.3)', FH * 0.7);
   }
-  grain(ctx, FW, FH, 12);
-  grain(btx, FW, FH, 20);
-  return { map: tex(cv), bump: tex(bv, false) };
 }
 
 // Béton ciré du sol (une case : 2,5 m) : la photo de dalle usée, adoucie et éclaircie, granulats, traces de
@@ -577,6 +636,23 @@ function hallWall() {
   return { map: tex(cv), bump: tex(bv, false) };
 }
 
+// La photo de béton brut (celle du plafond du Level 1) salit le carrelage et l'enduit comme le papier peint du
+// Level 0 : marbrures, coulées, petits trous, en lumière douce par-dessus le dessin
+function grime(t, photo) {
+  const c = t.map.image;
+  const ctx = c.getContext('2d');
+  ctx.save();
+  ctx.globalCompositeOperation = 'soft-light';
+  ctx.globalAlpha = 0.7;
+  ctx.drawImage(photo, 0, 0, FW, FW);
+  ctx.drawImage(photo, 0, FW, FW, FW);
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.globalAlpha = 0.22;
+  ctx.drawImage(photo, -FW * 0.3, -FH * 0.2, FW * 1.6, FH * 1.6);
+  ctx.restore();
+  t.map.needsUpdate = true;
+}
+
 export function createPipesTextures() {
   const tileA = tileWall({ h: 44, s: 52, l: 55, var: 5, grout: '#b9ae90', cove: [24, 30, 11], rowH: 0.078, cols: 16 });
   const tileB = tileWall({ h: 27, s: 44, l: 31, var: 8, grout: '#57493a', cove: [22, 40, 13], rowH: 0.156, cols: 16 });
@@ -589,7 +665,11 @@ export function createPipesTextures() {
   drawCeiling(cctx, S, null);
   const floor = tex(fc);
   const ceiling = tex(cc);
-  const ready = Promise.all([loadImage('l1_sol.jpg'), loadImage('l1_plafond.jpg')]).then(([sol, pla]) => {
+  const hall = hallWall();
+  const ready = Promise.all(['l1_sol.jpg', 'l1_plafond.jpg', 'l2_brique.jpg', 'l2_brique_relief.jpg', 'l2_brique_peinte.jpg', 'l2_brique_peinte_relief.jpg'].map(loadImage)).then(([sol, pla, br, brR, bp, bpR]) => {
+    brick.redraw(br, brR);
+    boiler.redraw(bp, bpR);
+    if (pla) for (const t of [tileA, tileB, hall]) grime(t, pla);
     if (sol) {
       drawFloor(fctx, S, sol);
       floor.needsUpdate = true;
@@ -599,5 +679,5 @@ export function createPipesTextures() {
       ceiling.needsUpdate = true;
     }
   });
-  return { tileA, tileB, brick, boiler, hall: hallWall(), floor, ceiling, signs: drawSigns(), gauge: drawGauge(), pipe: drawPipes(), ready };
+  return { tileA, tileB, brick, boiler, hall, floor, ceiling, signs: drawSigns(), gauge: drawGauge(), pipe: drawPipes(), ready };
 }

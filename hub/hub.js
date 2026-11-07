@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '4.61';
+  const VERSION = '4.62';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -649,6 +649,7 @@ renderPlayers(); renderNet(); pubState(); renderFriends(); renderPings();
     const role = room.mode === 'solo' ? 'solo' : room.isHost ? 'host' : 'guest';
     const q = new URLSearchParams({ hub: '1', role, game: g.id });
     if (room.code) q.set('code', room.code);
+    q.set('v', VERSION); // les fichiers du jeu sont chargés à cette version : tout le salon a les mêmes
     const pass = new URLSearchParams(location.search);
     for (const k of ['debug', 'ws', 'mute']) if (pass.has(k)) q.set(k, pass.get(k));
     let src = def.url + '?' + q.toString() + (DDNet.LOCAL_TEST ? '&local' : '');

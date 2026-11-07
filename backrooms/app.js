@@ -1,5 +1,5 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
-import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL } from './engine/sim.js';
+import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, staminaMax } from './engine/sim.js';
 import { hasLineOfSight } from './engine/nav.js';
 import { createBackroomsScene, setMonsterMode, setSceneOptions } from './view/scene.js';
 import { BackroomsSfx } from './view/sfx.js';
@@ -70,7 +70,10 @@ let noLock = false;
 let toggleFlashlightRequested = false; // touche 1 : la lampe
 let useRequested = null; // (tests) une case d'objet précise à utiliser
 // actions du prochain pas : E utilise la case choisie, F ramasse, T siffle
-const act = { use: false, pick: false, whistle: false, struggle: 0 };
+const act = { use: false, pick: false, whistle: false, jump: false, struggle: 0 };
+let crouchOn = false; // C : s'accroupir / se relever (bascule)
+let camOn = false; // V : sortir / ranger le caméscope
+let airborne = false; // en plein saut (pour le bruit de la réception)
 let selRequested = 0; // touches 2 et 3 : choisir la case d'objet (1 ou 2)
 let kbMode = false;
 let paused = true; // la partie attend qu'on prenne le contrôle
@@ -99,7 +102,7 @@ function applyOpts() {
 // Voix de proximité (toujours ouverte, sans touche) et talkie-walkie (R maintenu) : WebRTC entre joueurs, signalisation par le salon (view/voice.js)
 let voice = null;
 let micWarned = false;
-const sfxRef = { get ctx() { return sfx && sfx.ctx; }, get verb() { return sfx && sfx.verb; }, moveTo: (...a) => sfx && sfx.moveTo(...a), caption: (...a) => sfx && sfx.caption(...a) };
+const sfxRef = { get ctx() { return sfx && sfx.ctx; }, get verb() { return sfx && sfx.verb; }, get level() { return sfx ? sfx.roomLevel || 0 : 0; }, moveTo: (...a) => sfx && sfx.moveTo(...a), caption: (...a) => sfx && sfx.caption(...a) };
 function ensureVoice() {
   if (!voice) {
     voice = createVoice({ send: (to, m) => send(to, m), myId: NET.myId, sfx: sfxRef });
@@ -198,6 +201,35 @@ function setKbMode(on) {
   if (hud) hud.showPause(paused, kbMode);
 }
 
+// V : sortir ou ranger le caméscope (image 4:3, signal des objectifs, mode nuit)
+function toggleCam() {
+  if (!sim || sim.player.status !== 'alive') return;
+  camOn = !camOn;
+  if (sfx) sfx.camcorder(camOn);
+  // on ressort le caméscope au zoom de base
+  camZoom = CAM_ZOOM_MIN;
+  if (scene && scene.setCamZoom) scene.setCamZoom(camZoom);
+}
+
+// molette, caméscope sorti : le zoom de l'objectif (de ×1,5 à ×4), avec son petit moteur
+const CAM_ZOOM_MIN = 1.5;
+const CAM_ZOOM_MAX = 4;
+let camZoom = CAM_ZOOM_MIN;
+window.addEventListener(
+  'wheel',
+  (e) => {
+    if (!camOn || paused || !sim || sim.player.status !== 'alive') return;
+    e.preventDefault();
+    const dir = e.deltaY < 0 ? 1 : -1;
+    const z = Math.min(CAM_ZOOM_MAX, Math.max(CAM_ZOOM_MIN, camZoom * (dir > 0 ? 1.12 : 1 / 1.12)));
+    if (Math.abs(z - camZoom) < 1e-3) return;
+    camZoom = z;
+    if (scene && scene.setCamZoom) scene.setCamZoom(camZoom);
+    if (sfx) sfx.camZoom(dir);
+  },
+  { passive: false }
+);
+
 window.addEventListener('keydown', (e) => {
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
   if (sfx) sfx.unlock();
@@ -216,13 +248,19 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   // 1 : allumer / éteindre la lampe ; 2, 3 : choisir une case d'objet ; E : l'utiliser ; F : ramasser, ou se cacher
-  // dans un casier ; T : siffler ; C : s'accroupir
+  // dans un casier ; T : siffler ; C : s'accroupir (bascule) ; Espace : sauter (accroupi : se relever)
   const slot = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
   if (slot >= 0 && !e.repeat) useSlot(slot % 3);
   if (!e.repeat) {
     if (e.code === 'KeyE') act.use = true;
     else if (e.code === 'KeyF') act.pick = true;
     else if (e.code === 'KeyT') act.whistle = true;
+    else if (e.code === 'KeyC' && sim && sim.player.status === 'alive') crouchOn = !crouchOn;
+    else if (e.code === 'KeyV') toggleCam();
+    else if (e.code === 'Space' && sim && sim.player.status === 'alive') {
+      if (crouchOn) crouchOn = false;
+      else act.jump = true;
+    }
     else if (e.code === 'KeyR') {
       askMic(true);
       if (!multi() && hud) hud.toast('The radio only hisses · no one else is out there');
@@ -242,7 +280,7 @@ window.addEventListener('blur', () => {
 const touch = { move: null, look: null, run: false, crouch: false };
 const touchBtns = document.createElement('div');
 touchBtns.className = 'touch-btns';
-touchBtns.innerHTML = '<button data-t="run">🏃<small>Run</small></button><button data-t="crouch">⤓<small>Crouch</small></button><button data-t="pick">✋<small>Pick up</small></button><button data-t="use">⚙<small>Use</small></button><button data-t="whistle">📣<small>Whistle</small></button>';
+touchBtns.innerHTML = '<button data-t="run">🏃<small>Run</small></button><button data-t="crouch">⤓<small>Crouch</small></button><button data-t="pick">✋<small>Pick up</small></button><button data-t="use">⚙<small>Use</small></button><button data-t="whistle">📣<small>Whistle</small></button><button data-t="jump">⤒<small>Jump</small></button><button data-t="cam">📹<small>Camera</small></button>';
 document.body.appendChild(touchBtns);
 const stick = document.createElement('div');
 stick.className = 'touch-stick';
@@ -256,6 +294,7 @@ for (const b of touchBtns.querySelectorAll('button')) {
     if (sim && sim.player.grabT > 0) act.struggle++;
     else if (b.dataset.t === 'run') touch.run = true;
     else if (b.dataset.t === 'crouch') touch.crouch = !touch.crouch;
+    else if (b.dataset.t === 'cam') toggleCam();
     else act[b.dataset.t] = true;
     b.classList.add('on');
   });
@@ -340,6 +379,8 @@ document.addEventListener('mousemove', (e) => {
 function useSlot(i, tap = false) {
   if (i === 0) {
     toggleFlashlightRequested = true;
+    // le clic de l'interrupteur, tout de suite (même sans pile : on l'entend cliquer dans le vide)
+    if (sfx && sim && sim.player.status === 'alive' && sim.player.hasLamp) sfx.lampClick(!sim.player.flashlight);
     return;
   }
   if (tap && sim && sim.player.sel === i) act.use = true;
@@ -388,21 +429,33 @@ function initGame(settings = lastSettings, forceLevel = null) {
 
 // Invité : la carte de l'hôte a-t-elle la même empreinte que la nôtre ? Sinon (une version plus ancienne en cache),
 // les murs, les escaliers et les objets ne sont pas aux mêmes endroits chez nous : on prévient, une fois par étage.
-let printWarned = '';
+// Le message revient toutes les 40 s tant que les cartes diffèrent : la partie n'est pas jouable ainsi.
+const GAME_V = new URLSearchParams(location.search).get('v') || ''; // la version du Hub qui a lancé le jeu
+let hostV = '';
+let printWarnT = -Infinity;
+const verLabel = (v) => (v ? `V${v}` : 'AN OLD VERSION');
 function checkPrint(fp) {
   if (typeof fp !== 'string' || !sim || fp === sim.fp) return;
-  const k = `${NET.run}:${sim.level}`;
-  if (printWarned === k) return;
-  printWarned = k;
-  if (hud) hud.toast('YOUR GAME IS OUT OF DATE · RELOAD THE PAGE (CTRL+SHIFT+R)', 12);
-  send(H.info.hostId, { t: 'fp' });
+  const now = performance.now();
+  if (now - printWarnT < 40000) return;
+  printWarnT = now;
+  const older = hostV && GAME_V && hostV !== GAME_V ? (+hostV > +GAME_V ? 'you' : 'host') : '';
+  const msg = older === 'host'
+    ? `MAPS DON'T MATCH · THE HOST HAS ${verLabel(hostV)}, YOU HAVE ${verLabel(GAME_V)} · THE HOST MUST RELOAD (CTRL+SHIFT+R)`
+    : older === 'you'
+      ? `MAPS DON'T MATCH · YOU HAVE ${verLabel(GAME_V)}, THE HOST HAS ${verLabel(hostV)} · RELOAD THE PAGE (CTRL+SHIFT+R)`
+      : "MAPS DON'T MATCH · SOMEONE HAS AN OLD VERSION · EVERYONE RELOAD (CTRL+SHIFT+R)";
+  if (hud) hud.toast(msg, 14);
+  send(H.info.hostId, { t: 'fp', v: GAME_V });
 }
 
-const goMessage = () => ({ t: 'go', run: NET.run, seed: sim.seed, diff: sim.difficulty, players: sim.roster, lv: sim.level, vip: monstersVip, dy: dailyLabel });
+const goMessage = () => ({ t: 'go', v: GAME_V, run: NET.run, seed: sim.seed, diff: sim.difficulty, players: sim.roster, lv: sim.level, vip: monstersVip, dy: dailyLabel });
 
 let monstersVip = false;
 function startRun({ seed, difficulty, players, run, level, vip = false }) {
   NET.run = run;
+  camPrev.ok = false;
+  trackSeq.clear();
   monstersVip = !!vip;
   setMonsterMode(monstersVip); // les monstres VIP pour toute la partie si l'hôte les a choisis
   if (hud) hud.applyMonsters();
@@ -414,7 +467,9 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   // la difficulté adaptative ne compte que chez l'hôte (c'est lui qui fait tourner l'entité)
   const skill = NET.role === 'guest' ? 0.5 : +store.get(SKILL_KEY, 0.5);
   sim = new BackroomsSim({ difficulty, seed, players, localId: NET.myId, level, skill }); // les étages sortent de la graine
-  if (NET.role !== 'solo') ensureVoice().sync(players.map((p) => p.id));
+  if (NET.role !== 'solo') {
+    ensureVoice().sync(players.map((p) => p.id));
+  }
   runStats = { seen: 0, rushes: 0, escapes: 0, closest: Infinity, haunts: 0 };
   tapeFrames = [];
   replayed = false;
@@ -427,6 +482,7 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
     stageEl.innerHTML = '';
   }
   scene = createBackroomsScene(stageEl, sim.floors);
+  scene.onDrip = (pos) => sfx && sfx.drip(pos);
   if (hud) {
     hud.$('#endScreen').hidden = true;
     hud.lastCount = -1;
@@ -466,7 +522,7 @@ function guestInputs() {
     const q = NET.actions[id] || (NET.actions[id] = []);
     // une action par pas, dans l'ordre où l'invité les a faites (avec la case qu'il avait choisie)
     const a = q.shift() || {};
-    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, stamina: i.st, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v, voice: i.vo, radio: i.ra };
+    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, cam: !!i.cm, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, stamina: i.st, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', jump: a.k === 'j', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v, voice: i.vo, radio: i.ra, seq: i.seq };
     i.pos = null; // une position annoncée ne sert qu'une fois
   }
   return out;
@@ -489,11 +545,16 @@ function onMsg(from, m) {
       sim.addPlayer(from, (p && p.name) || 'Player');
       send(from, goMessage());
     } else if (m.t === 'i' && m.run === NET.run) {
-      NET.inputs[from] = { vo: num(m.vo, 0, 1), ra: !!m.ra, mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 100), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) }, v: m.v };
+      NET.inputs[from] = { seq: Number.isFinite(+m.n) ? +m.n : undefined, vo: num(m.vo, 0, 1), ra: !!m.ra, mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 200), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) }, v: m.v };
     } else if (m.t === 'fp' && hud) {
-      // un invité n'a pas la même carte que nous : il tourne sur une autre version du jeu
+      // un invité n'a pas la même carte que nous : l'un des deux tourne sur une autre version du jeu
       const p = H.players.find((q) => q.id === from);
-      hud.toast(`${((p && p.name) || 'A player').toUpperCase()} HAS ANOTHER VERSION OF THE GAME · THEY MUST RELOAD`);
+      const who = ((p && p.name) || 'A player').toUpperCase();
+      const gv = typeof m.v === 'string' ? m.v.slice(0, 8) : '';
+      const meOlder = gv && GAME_V && +gv > +GAME_V;
+      hud.toast(meOlder
+        ? `MAPS DON'T MATCH · ${who} HAS ${verLabel(gv)}, YOU HAVE ${verLabel(GAME_V)} · RELOAD THE PAGE (CTRL+SHIFT+R)`
+        : `MAPS DON'T MATCH · ${who} HAS ${verLabel(gv)} · THEY MUST RELOAD (CTRL+SHIFT+R)`, 14);
     } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'p', 't', 'b', 'h', 'g'].includes(m.k)) {
       const q = NET.actions[from] || (NET.actions[from] = []);
       if (q.length < 8) q.push({ k: m.k, sel: m.s === 2 ? 2 : 1, side: m.side > 0 ? 1 : -1, n: Math.max(1, Math.min(4, m.n | 0)) });
@@ -503,13 +564,14 @@ function onMsg(from, m) {
   if (NET.role !== 'guest' || from !== H.info.hostId) return; // invité : seul l'hôte fait foi
   NET.lastHost = performance.now();
   if (m.t === 'go') {
+    hostV = typeof m.v === 'string' ? m.v.slice(0, 8) : '';
     if (m.run !== NET.run || !sim) {
       dailyLabel = typeof m.dy === 'string' ? m.dy.slice(0, 12) : null;
       startRun({ seed: m.seed, difficulty: m.diff, players: m.players || [], run: m.run, level: m.lv || 0, vip: !!m.vip });
     }
   } else if (m.t === 's' && sim && m.run === NET.run) {
     const lv = sim.level;
-    sim.applySnapshot(m.s);
+    sim.applySnapshot(m.s, performance.now() / 1000);
     if (sim.level !== lv) handleEvent({ type: 'level', level: sim.level, rebuild: true }, NET.myId);
     checkPrint(m.s.mp);
   } else if (m.t === 'e' && sim && m.run === NET.run) {
@@ -612,10 +674,22 @@ function handleEvent(ev, me) {
       }
       if (ev.id === me && hud) hud.toast("You couldn't hold it…");
       break;
+    case 'flashlight': {
+      // le clic de la lampe d'un coéquipier, entendu de près (le sien sonne déjà à l'appui)
+      if (mine || !sfx) break;
+      const Q = sim.players.find((p) => p.id === ev.id);
+      if (Q && (Q.floor || 0) === (sim.player.floor || 0) && Math.hypot(Q.x - sim.player.x, Q.z - sim.player.z) < 14) sfx.lampClick(ev.on, { x: Q.x, z: Q.z });
+      break;
+    }
     case 'phantom':
       // une fausse alerte : un son sans rien derrière (ou un néon qui claque vraiment)
       if (!sfx) break;
       if (ev.kind === 'neon') sfx.neonClick({ x: ev.x, z: ev.z }, ev.quiet ? 0.7 : 1);
+      else if (ev.kind === 'row') {
+        if ((ev.floor || 0) === (sim.player.floor || 0)) sfx.neonRow({ x: ev.x, z: ev.z }, ev.n);
+      } else if (ev.kind === 'surge') {
+        if ((ev.floor || 0) === (sim.player.floor || 0)) sfx.neonSurge({ x: ev.x, z: ev.z });
+      }
       else if (ev.kind === 'whistle') {
         // l'entité imite le sifflet d'un coéquipier… qui est ailleurs ; seul celui qui est visé l'entend
         if (ev.id !== me) break;
@@ -706,7 +780,7 @@ function handleEvent(ev, me) {
     case 'bottle':
       if (!mine) break;
       if (sfx) sfx.bottle();
-      if (hud) hud.toast('Almond water: you catch your breath');
+      if (hud) hud.toast('Almond water: you catch your breath, and your stamina grows for good');
       break;
     case 'battery':
       if (!mine) break;
@@ -739,6 +813,14 @@ function handleEvent(ev, me) {
       // le signe avant qu'elle surgisse : seulement à cet étage
       const V = sim.viewPlayer(sim.spectate || 0);
       if (sfx && (ev.floor || 0) === (V.floor || 0)) sfx.tell(ev.kind, { x: ev.x, z: ev.z });
+      break;
+    }
+    case 'amb': {
+      // un bruit d'ambiance tiré par l'hôte : tout le monde l'entend en même temps, au même endroit
+      if (!sfx || paused || !sim) break;
+      const V = sim.viewPlayer(sim.spectate || 0);
+      if (ev.s !== 'rec' && (ev.floor || 0) !== (V.floor || 0)) break; // à un autre étage : la dalle l'étouffe
+      sfx.ambCue(ev.s, { x: ev.x, z: ev.z }, ev.a, ev.u, ev.v, ev.w);
       break;
     }
     case 'glimpse':
@@ -780,6 +862,14 @@ function handleEvent(ev, me) {
       if (hud && ev.id !== me) hud.toast(sl ? `${ev.name} slid into the ${sl.name.toLowerCase()} slide` : `${ev.name} is in the elevator`);
       break;
     }
+    case 'boardCount':
+      // les portes vont se fermer : la cabine sonne, et à 10 s un second coup plus pressant
+      if (sfx && ev.t <= 10) sfx.ding();
+      if (hud && ev.start && sim.player.status === 'alive') hud.toast(`The doors close in ${ev.t}s… get in, it's coming`);
+      break;
+    case 'leftBehind':
+      if (hud) hud.toast(ev.id === me ? 'The doors closed without you' : `${ev.name} was left behind`);
+      break;
     case 'depart':
       if (sfx && ev.level === 2) sfx.splashDown();
       else if (sfx) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
@@ -793,6 +883,7 @@ function handleEvent(ev, me) {
       if (scene) scene.dispose();
       stageEl.innerHTML = '';
       scene = createBackroomsScene(stageEl, sim.floors);
+      scene.onDrip = (pos) => sfx && sfx.drip(pos);
       sim.spectate = 0;
       stepDist = 0;
       scene.tape('bars', 0.8);
@@ -932,6 +1023,9 @@ function handleEvent(ev, me) {
 // Boucle principale d'animation et de simulation
 let lastTime = performance.now();
 let accumulator = 0;
+const trackSeq = new Map(); // hôte : dernière position d'invité entrée dans sa piste d'affichage
+const camPrev = { x: 0, z: 0, f: 0, ok: false }; // sa position avant le dernier pas (la caméra interpole jusqu'à la suivante)
+const lookIn = { yaw: NaN, pitch: NaN }; // le dernier regard donné à la simulation
 
 // Manette (disposition standard) : A ramasser, X utiliser l'objet, Y lampe, RB changer d'objet, B siffler,
 // LB / LT / stick gauche enfoncé courir, Menu pause ; A relance la partie en pause
@@ -953,6 +1047,8 @@ function readPad() {
       for (let i = 0; i < p.buttons.length; i++) if (i !== 9 && edge(i)) act.struggle++;
     } else {
       if (edge(11)) padCrouch = !padCrouch;
+      if (edge(10)) toggleCam();
+      if (edge(12)) act.jump = true;
       if (sim && sim.player.status !== 'alive' && (edge(0) || edge(15))) sim.spectate = (sim.spectate || 0) + 1;
       else if (edge(0)) act.pick = true;
       if (edge(2)) act.use = true;
@@ -967,10 +1063,15 @@ function readPad() {
   return { lx: p.axes[0] || 0, ly: p.axes[1] || 0, rx: p.axes[2] || 0, ry: p.axes[3] || 0, run: b(4) || b(6) || b(10) };
 }
 
+// (onglet en arrière-plan : shared/bridge.js fait passer requestAnimationFrame par une minuterie, la partie continue)
 function loop(currentTime) {
   requestAnimationFrame(loop);
+  frame(currentTime);
+}
 
-  const delta = Math.min(0.1, (currentTime - lastTime) / 1000);
+function frame(currentTime) {
+
+  const delta = Math.max(0, Math.min(0.1, (currentTime - lastTime) / 1000));
   lastTime = currentTime;
   accumulator += delta;
 
@@ -1004,7 +1105,10 @@ function loop(currentTime) {
     if (Math.hypot(gp.lx, gp.ly) > 0.15) { mx = gp.lx; my = -gp.ly; }
   }
   const run = !!keys['ShiftLeft'] || !!keys['ShiftRight'] || touch.run || !!(gp && gp.run);
-  const crouch = !!keys['KeyC'] || touch.crouch || padCrouch;
+  // courir relève (on ne court pas accroupi)
+  if (crouchOn && run && (mx || my)) crouchOn = false;
+  if (camOn && sim.player.status !== 'alive') camOn = false;
+  const crouch = crouchOn || touch.crouch || padCrouch;
 
   // Sensibilité de rotation de la souris (réglage), axe vertical inversé au choix
   const sens = 0.0022 * OPTS.sens;
@@ -1027,6 +1131,10 @@ function loop(currentTime) {
   while (accumulator >= DT) {
     const oldX = sim.player.x;
     const oldZ = sim.player.z;
+    camPrev.x = oldX;
+    camPrev.z = oldZ;
+    camPrev.f = sim.player.floor || 0;
+    camPrev.ok = true;
 
     const live = !paused;
     const input = {
@@ -1036,6 +1144,8 @@ function loop(currentTime) {
       pitch: newPitch,
       run: live && run,
       crouch: live && crouch,
+      jump: live && act.jump,
+      cam: camOn && sim.player.status === 'alive',
       struggle: act.struggle,
       toggleFlashlight: toggleFlashlightRequested,
       use: useRequested,
@@ -1070,27 +1180,47 @@ function loop(currentTime) {
       }
       const sel = sim.player.sel;
       if (toggleFlashlightRequested) send('host', { t: 'a', k: 'f', s: sel, run: NET.run });
-      for (const [k, on] of [['e', act.use], ['p', act.pick], ['t', act.whistle]]) if (on) send('host', { t: 'a', k, s: sel, run: NET.run });
+      for (const [k, on] of [['e', act.use], ['p', act.pick], ['t', act.whistle], ['j', input.jump]]) if (on) send('host', { t: 'a', k, s: sel, run: NET.run });
       if (act.struggle) send('host', { t: 'a', k: 'g', n: act.struggle, run: NET.run });
       if (NET.tick % 3 === 0) {
         const P = sim.player;
-        send('host', { t: 'i', run: NET.run, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, c: input.crouch ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2), st: Math.round(P.stamina), v: P.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined, vo: input.voice ? +input.voice.toFixed(2) : undefined, ra: input.radio ? 1 : undefined }, true);
+        send('host', { t: 'i', run: NET.run, n: NET.tick, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, c: input.crouch ? 1 : 0, cm: input.cam ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2), st: Math.round(P.stamina), v: P.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined, vo: input.voice ? +input.voice.toFixed(2) : undefined, ra: input.radio ? 1 : undefined }, true);
       }
     } else {
       sim.step(input, NET.role === 'host' ? guestInputs() : null);
+      // hôte : chaque position annoncée par un invité (et acceptée) entre dans sa piste d'affichage, à l'heure de
+      // l'invité : son avatar est interpolé à l'écran au lieu d'avancer par sauts de 50 ms
+      if (NET.role === 'host') {
+        const now = performance.now() / 1000;
+        for (const Q of sim.players) {
+          if (Q === sim.player || !Number.isFinite(Q.posSeq) || trackSeq.get(Q.id) === Q.posSeq) continue;
+          trackSeq.set(Q.id, Q.posSeq);
+          sim.netPush(Q.id, Q.posSeq * DT, now, Q.x, Q.z, Q.yaw, Q.floor || 0, Q.status === 'alive');
+        }
+      }
     }
     NET.tick++;
+    lookIn.yaw = newYaw;
+    lookIn.pitch = newPitch;
     toggleFlashlightRequested = false;
     useRequested = null;
     selRequested = 0;
     if (act.struggle && sfx) sfx.struggle();
-    act.use = act.pick = act.whistle = false;
+    act.use = act.pick = act.whistle = act.jump = false;
     act.struggle = 0;
 
     // Détection de pas pour le son de marche sur moquette
     if (sim.state === 'playing') {
       const moved = Math.hypot(sim.player.x - oldX, sim.player.z - oldZ);
-      stepDist += moved;
+      // un saut : pas de pas en l'air, un choc sourd à la réception
+      const up = (sim.player.jy || 0) > 0;
+      if (airborne && !up && sfx) {
+        sfx.step(stepKind(sim.player));
+        setTimeout(() => sfx && sfx.step(stepKind(sim.player)), 45);
+        stepDist = 0;
+      }
+      airborne = up;
+      if (!up) stepDist += moved;
       const stepInterval = sim.player.running ? 1.25 : 0.85;
       if (stepDist >= stepInterval) {
         stepDist = 0;
@@ -1121,6 +1251,15 @@ function loop(currentTime) {
     }
 
     accumulator -= DT;
+  }
+  // invité : les autres joueurs et l'entité à leur position interpolée, pour cette image
+  if (NET.role === 'guest') sim.interpolate(performance.now() / 1000);
+  // une image sans pas de simulation (écran à plus de 60 images par seconde) : le regard suit quand même la souris
+  // (avant, ce mouvement-là était perdu), sauf si le jeu tient le regard (prise, casier)
+  const Pl = sim.player;
+  if (Pl.yaw === lookIn.yaw && Pl.pitch === lookIn.pitch) {
+    Pl.yaw = lookIn.yaw = newYaw;
+    Pl.pitch = lookIn.pitch = newPitch;
   }
 
   // Mise à jour du son continu de l'entité ; quand elle te traque : ses cris et, par-dessus, ses pas lourds, de plus en
@@ -1241,7 +1380,27 @@ function loop(currentTime) {
 
   // Rendu graphique et HUD
   if (scene) {
-    scene.render(sim, currentTime / 1000);
+    if (!document.hidden) {
+      // entre deux pas de simulation (60 par seconde), la caméra prend la position intermédiaire : le déplacement est
+      // fluide quelle que soit la fréquence de l'écran (un vrai saut, lui, reste net)
+      const a = Math.min(1, accumulator / DT);
+      const Pl = sim.player;
+      const cx = Pl.x;
+      const cz = Pl.z;
+      const lerp = camPrev.ok && Pl.status === 'alive' && (Pl.floor || 0) === camPrev.f && Math.hypot(cx - camPrev.x, cz - camPrev.z) < 1;
+      if (lerp) {
+        Pl.x = camPrev.x + (cx - camPrev.x) * a;
+        Pl.z = camPrev.z + (cz - camPrev.z) * a;
+      }
+      try {
+        scene.render(sim, currentTime / 1000); // en arrière-plan : la partie tourne, sans image
+      } finally {
+        if (lerp) {
+          Pl.x = cx;
+          Pl.z = cz;
+        }
+      }
+    }
     if (sfx) sfx.setHum(scene.lightHere); // le grésillement des néons autour de soi
     if (sfx) {
       // l'oreille suit la caméra (le joueur, ou celui qu'on regarde) ; l'écho change avec le niveau
@@ -1262,7 +1421,7 @@ function loop(currentTime) {
     if (sfx) {
       // le souffle : sprint, puis halètement le temps de récupérer, et la peur quand l'entité est là
       const P = sim.player;
-      const tired = 1 - P.stamina / 100;
+      const tired = 1 - P.stamina / staminaMax(P);
       // discret : on l'entend surtout en courant ; à l'arrêt, juste un reste de halètement quand on est vraiment à bout
       const run = P.running && P.moving ? 0.3 + tired * 0.4 : 0;
       const pant = tired > 0.55 ? ((tired - 0.55) / 0.45) * 0.3 : 0;
@@ -1283,12 +1442,13 @@ function loop(currentTime) {
   }
   if (hud) {
     hud.update(sim, sim.time, delta);
+    if (scene && scene.cam) hud.camera(scene.cam, sim, delta);
   }
 }
 
 // ?debug : accès à la partie depuis la console (tests)
 if (/[?&]debug(&|=|$)/.test(location.search)) {
-  window.__br = { get voice() { return voice; }, get sim() { return sim; }, get scene() { return scene; }, get sfx() { return sfx; }, get hud() { return hud; }, keys, act, OPTS, frame: (t) => loop(t) };
+  window.__br = { get voice() { return voice; }, get sim() { return sim; }, get scene() { return scene; }, get sfx() { return sfx; }, get hud() { return hud; }, keys, act, OPTS, frame: (t) => frame(t) };
 }
 
 // Réglages (bouton ⚙ commun aux jeux) : son, et choix Souris / Sans souris

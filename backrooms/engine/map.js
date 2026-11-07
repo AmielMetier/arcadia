@@ -1,6 +1,6 @@
 // The Backrooms (Level 0) - Génération de la carte du dédale
 // Grande grille de cases (64 × 64, soit 160 m de côté) : un quadrillage de cloisons percées de passages, des piliers,
-// quelques grandes salles vides, des zones aux néons morts, 5 cassettes VHS, de l'eau d'amande et 1 ascenseur.
+// quelques grandes salles vides, des zones aux néons morts, 7 cassettes VHS, de l'eau d'amande et 1 ascenseur.
 // Le Level 1 (entrepôt) est dans level1.js et partage les types de cases, l'ascenseur et le parcours en largeur.
 // Pièges du Level 0, posés une fois le dédale construit :
 //  - une cassette enfermée dans une petite pièce, qu'on n'atteint que par un couloir étroit au sol creusé de trous
@@ -10,6 +10,7 @@
 export const PIT_HALF = 1.0; // un trou fait 2 m de côté dans une case de 2,5 m : il reste des arêtes de 50 cm
 export const FLOOR_DY = 6.4; // l'étage du bas est 6,40 m plus bas (3 m sous plafond et 3,40 m de dalle : les trous sont des puits)
 export const PIT_DEPTH = FLOOR_DY; // on tombe d'un étage, de très haut
+export const CASSETTES = 7; // cassettes VHS à trouver au Level 0 (4 en haut, 3 en bas)
 export const NICHE_Y = 2.25; // hauteur de la cassette dans son renfoncement
 
 // tous les objets qu'on ramasse avec F : 'bottle', 'battery', 'ladder' (id unique, position, pris ou non)
@@ -57,7 +58,7 @@ export function itemList(...lists) {
 }
 
 export const CELL_SIZE = 2.5; // chaque case fait 2.5m x 2.5m
-export const WALL_HEIGHT = 3.0; // hauteur sous plafond
+export const WALL_HEIGHT = 3.2; // hauteur sous plafond (3,20 m : un peu plus haut que l'ordinaire, on s'y sent petit)
 export const MAP_SIZE = 64;
 
 export const T = {
@@ -386,9 +387,9 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   let trap = null;
 
   const maxD = D(far[0]) || 1;
-  // 8. Les 5 cassettes : le plus loin possible (en marche) du départ, de la sortie et les unes des autres
+  // 8. Les cassettes : le plus loin possible (en marche) du départ, de la sortie et les unes des autres
   const reach = bfs(grid, W, H, sx, sz); // la cabine a pu couper un recoin ; pas collée au bord (place pour le couloir piégé)
-  const cassettes = spreadOut(walkable.filter((c) => D(c) > 6 && reach[c.z * W + c.x] >= 0 && c.x > 3 && c.z > 3 && c.x < W - 4 && c.z < H - 4), [{ x: sx, z: sz }, exitCell], 5, gridDist(grid, W, H), rnd).map((c, i) => ({
+  const cassettes = spreadOut(walkable.filter((c) => D(c) > 6 && reach[c.z * W + c.x] >= 0 && c.x > 3 && c.z > 3 && c.x < W - 4 && c.z < H - 4), [{ x: sx, z: sz }, exitCell], CASSETTES, gridDist(grid, W, H), rnd).map((c, i) => ({
     id: i,
     ...cellPos(c),
     name: `Cassette VHS #${i + 1}`,
@@ -757,7 +758,7 @@ export function bfs(grid, W, H, sx, sz) {
 }
 
 // Le Level 0 sur deux étages : on tombe par les trous du haut, on remonte par les escaliers (2, loin des trous).
-// Les 5 cassettes sont réparties entre les étages (celle du couloir piégé et celle du renfoncement en haut).
+// Les cassettes sont réparties entre les étages (celle du couloir piégé et celle du renfoncement en haut).
 // Chaque étage a son ascenseur ; le moteur décide lequel est le vrai.
 export function createLevel0(seed = 42) {
   const up = createBackroomsMap(seed);
@@ -858,14 +859,14 @@ export function createLevel0(seed = 42) {
     m.tapes = m.tapes.filter((t) => !nearWell((t.x1 + t.x2) / 2, (t.z1 + t.z2) / 2, 2.6));
   }
 
-  // les cassettes : 3 en haut (dont celle du couloir piégé et celle du renfoncement), 2 en bas
+  // les cassettes : 4 en haut (dont celle du couloir piégé et celle du renfoncement), 3 en bas
   const special = up.cassettes.filter((c) => c.vault || c.high);
   const others = up.cassettes.filter((c) => !c.vault && !c.high);
   // en haut, les autres le plus loin des deux spéciales ; en bas, le plus loin des escaliers et l'une de l'autre
   const cellOf = (c) => ({ x: c.gx, z: c.gz, c });
   const upDist = gridDist(up.grid, W, up.H);
   const fixedUp = [...special, up.spawn, up.exit].map(cellOf);
-  const keepUp = [...special, ...spreadOut(others.map(cellOf), fixedUp, Math.max(0, 3 - special.length), upDist, rnd).map((o) => o.c)];
+  const keepUp = [...special, ...spreadOut(others.map(cellOf), fixedUp, Math.max(0, CASSETTES - 3 - special.length), upDist, rnd).map((o) => o.c)];
   const freeIds = up.cassettes.filter((c) => !keepUp.includes(c)).map((c) => c.id);
   up.cassettes = keepUp;
   const downDist = gridDist(down.grid, W, down.H);

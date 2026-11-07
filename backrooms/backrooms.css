@@ -80,8 +80,8 @@ html, body {
 }
 
 .tape-date { font-size: 26px; margin-bottom: 6px; }
-.stamina { display: flex; align-items: center; gap: 10px; font-size: 22px; }
-.stamina-track { width: 160px; height: 12px; border: 2px solid currentColor; padding: 1px; }
+.stamina { display: flex; align-items: center; gap: 8px; font-size: 18px; }
+.stamina-track { width: calc(140px * var(--smax, 1)); max-width: max(90px, calc(50vw - 270px - var(--bx, 0px))); height: 9px; border: 1px solid currentColor; padding: 1px; transition: width 0.6s ease; }
 .stamina-bar { height: 100%; width: 100%; background: currentColor; }
 .stamina-bar.low { background: #ff3b3b; animation: recBlink 0.5s steps(1) infinite; }
 
@@ -141,6 +141,20 @@ html, body {
   transition: opacity 1s ease;
 }
 .objective-banner.hide { opacity: 0; }
+.board-timer {
+  position: absolute;
+  top: calc(18% + 46px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  font-size: 26px;
+  text-align: center;
+  color: #ffd84a;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 3px 14px;
+}
+.board-timer.urgent { color: #ff5a4a; animation: recBlink 0.6s steps(1) infinite; }
 .objective-banner.unlocked { color: #7dffa0; }
 .vhs-level { font-size: 22px; opacity: 0.8; margin-top: 2px; }
 .blackout-tag { font-size: 22px; color: #ff6b5b; margin-top: 6px; animation: recBlink 0.9s steps(1) infinite; }
@@ -508,7 +522,7 @@ body.touch .click-prompt .ctrl-choice { display: none; }
   .prompt { bottom: 152px; font-size: 16px; white-space: normal; width: 86vw; }
   .inv .slot { width: 60px; height: 50px; }
   .icon-btn { top: 16px; right: 50%; transform: translateX(50%); }
-  .stamina-track { width: 90px; }
+  .stamina-track { width: calc(90px * var(--smax, 1)); height: 8px; }
   .objective-banner { font-size: 20px; }
 }
 
@@ -592,24 +606,15 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 /* La voix : ce qu'on émet, le niveau du micro (rouge quand on crie : elle entend), qui parle au talkie */
 .voice-tag { position: absolute; left: 32px; bottom: 178px; z-index: 13; display: flex; flex-direction: column; gap: 4px; font-size: 18px; letter-spacing: 2px; color: #f2f0e6; text-shadow: 0 0 5px rgba(0,0,0,0.9); pointer-events: none; }
 .voice-tag span:empty { display: none; }
-/* la jauge du micro : un vumètre de caméscope ; le trait après la 4e case, c'est là que l'entité commence à t'entendre */
-.mic-meter { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 16px; letter-spacing: 2px; opacity: 0.7; transition: opacity 0.3s; }
+/* la jauge du micro : un trait fin, blanc, comme le reste de l'écran ; le petit repère, c'est là qu'on t'entend */
+.mic-meter { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 16px; letter-spacing: 2px; opacity: 0.45; transition: opacity 0.25s; }
 .mic-meter[hidden] { display: none; }
-.mic-meter.heard, .mic-meter.loud { opacity: 1; }
-.mic-meter i { display: flex; gap: 2px; }
-.mic-meter b { display: block; width: 7px; height: 11px; border: 1px solid rgba(242, 240, 230, 0.35); }
-.mic-meter b.h { border-color: rgba(255, 207, 58, 0.45); }
-.mic-meter b.l { border-color: rgba(255, 59, 59, 0.55); }
-.mic-meter b:nth-child(5) { margin-left: 5px; box-shadow: -4px 0 0 -2px rgba(242, 240, 230, 0.7); }
-.mic-meter b.q.on { background: #f2f0e6; }
-.mic-meter b.h.on { background: #ffcf3a; }
-.mic-meter b.l.on { background: #ff3b3b; }
-.mic-meter b.pk { background: rgba(242, 240, 230, 0.4); }
-.mic-meter em { font-style: normal; min-width: 5em; }
-.mic-meter.heard em { color: #ffcf3a; }
-.mic-meter.loud em { color: #ff3b3b; animation: recBlink 0.5s steps(1) infinite; }
-.mic-meter.off { opacity: 0.5; }
-.mic-meter.off em { color: #ff6b5b; }
+.mic-meter.heard, .mic-meter.loud { opacity: 0.9; }
+.mic-meter i { position: relative; display: block; width: 78px; height: 3px; background: rgba(242, 240, 230, 0.22); }
+.mic-meter i::after { content: ''; position: absolute; left: 30%; top: -3px; width: 1px; height: 9px; background: rgba(242, 240, 230, 0.6); }
+.mic-meter b { display: block; height: 100%; width: 0; background: #f2f0e6; transition: width 0.06s linear; }
+.mic-meter.loud b { background: #ff5b4b; }
+.mic-meter.off { opacity: 0.4; }
 /* le rappel des touches : une ligne pâle de l'écran du caméscope, sous l'endurance */
 .keys-tag { display: flex; gap: 14px; margin-top: 8px; font-size: 16px; letter-spacing: 2px; opacity: 0.55; }
 .keys-tag[hidden] { display: none; }
@@ -634,3 +639,58 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 .tc-calib { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; margin: 12px auto 0; padding: 10px 12px; background: #000; width: 300px; }
 .tc-calib i { width: 46px; height: 46px; display: block; background: #050505; }
 .tc-calib span { width: 100%; font-size: 15px; opacity: 0.8; text-align: center; }
+
+/* À l'œil nu : pas d'incrustations de caméscope (REC, compteur, coins du viseur), un texte net ; la jauge de signal
+   des objectifs reste toujours là */
+#hud:not(.camcorder) { text-shadow: 0 0 6px rgba(0, 0, 0, 0.7), 0 1px 2px rgba(0, 0, 0, 0.6); }
+#hud:not(.camcorder) .vhs-rec,
+#hud:not(.camcorder) .vhs-play,
+#hud:not(.camcorder) #vhsTimer,
+#hud:not(.camcorder) .tape-date,
+#hud:not(.camcorder) .corner,
+#hud:not(.camcorder) .cam-bar { display: none; }
+
+/* Au caméscope (V) : les incrustations se calent dans l'image 4:3, entre les bandes noires */
+#hud.camcorder .cam-tl, #hud.camcorder .cam-bl { left: calc(48px + var(--bx, 0px)); }
+#hud.camcorder .cam-tr, #hud.camcorder .cam-br { right: calc(48px + var(--bx, 0px)); }
+#hud.camcorder .c1, #hud.camcorder .c3 { left: calc(22px + var(--bx, 0px)); }
+#hud.camcorder .c2, #hud.camcorder .c4 { right: calc(22px + var(--bx, 0px)); }
+#hud.camcorder.cam-wide #signal,
+#hud.camcorder #keysTag { display: none; }
+#hud.camcorder:not(.cam-wide) .cam-bar { display: none; }
+
+/* Les bandes noires : deux écrans de contrôle, à gauche le signal, à droite les parasites */
+.cam-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--bx, 0px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 20px;
+  color: rgba(242, 240, 230, 0.78);
+  text-shadow: none;
+  letter-spacing: 3px;
+}
+.cam-bar-l { left: 0; }
+.cam-bar-r { right: 0; }
+.cam-bar small { font-size: 18px; opacity: 0.8; text-align: center; max-width: 92%; }
+.cam-gauge {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 5px;
+  height: min(46vh, 340px);
+  width: 26px;
+}
+.cam-gauge i {
+  flex: 1;
+  border: 1px solid rgba(242, 240, 230, 0.35);
+  background: transparent;
+}
+.cam-gauge i.on { background: #e9e4c8; border-color: #e9e4c8; box-shadow: 0 0 8px rgba(233, 228, 200, 0.35); }
+.cam-gauge.interf i.on { background: #ff4b3b; border-color: #ff4b3b; box-shadow: 0 0 10px rgba(255, 75, 59, 0.45); }
+.cam-night { padding: 1px 6px; border: 1px solid rgba(242, 240, 230, 0.35); }
+.cam-night.on { color: #7dff8a; border-color: #7dff8a; }
