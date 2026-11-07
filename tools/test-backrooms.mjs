@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
 
@@ -765,7 +765,7 @@ test('grande carte : générée sans erreur pour 200 graines, sortie loin du dé
   }
 });
 
-test("eau d'amande : rend la moitié de l'endurance", () => {
+test("eau d'amande : rend la moitié de l'endurance et agrandit la jauge pour de bon", () => {
   const m = createBackroomsMap(7);
   const sim = new BackroomsSim({ map: m, difficulty: 'peaceful' });
   sim.player.stamina = 10;
@@ -780,9 +780,17 @@ test("eau d'amande : rend la moitié de l'endurance", () => {
   assert.ok(sim.player.stamina < 100, "elle ne se boit pas toute seule");
   const before = sim.player.stamina;
   sim.step({ useSel: true });
-  assert.ok(Math.abs(sim.player.stamina - Math.min(100, before + 50)) < 0.5, 'E : on boit la case choisie (+50)');
+  assert.ok(Math.abs(sim.player.stamina - (before + 50 + ALMOND_GROW)) < 0.5, 'E : on boit la case choisie (+50, plus la jauge agrandie)');
   assert.deepEqual(sim.player.inv, [null, null]);
   assert.ok(sim.drainEvents().some((e) => e.type === 'bottle'));
+  assert.equal(staminaMax(sim.player), 100 + ALMOND_GROW, 'la jauge a grandi');
+  // au repos, on remplit la nouvelle jauge, au-delà de 100
+  run(sim, 30);
+  assert.ok(sim.player.stamina > 100 + ALMOND_GROW - 1, `souffle ${sim.player.stamina.toFixed(0)}`);
+  // elle reste agrandie à l'étage suivant
+  sim.loadLevel(1);
+  assert.equal(staminaMax(sim.player), 100 + ALMOND_GROW);
+  assert.ok(sim.player.stamina > 100, 'on y arrive avec tout son souffle');
 });
 
 test("inventaire : deux cases d'objets ; plein, F échange l'objet de la case choisie contre celui du sol", () => {
@@ -820,10 +828,11 @@ test("inventaire : deux cases d'objets ; plein, F échange l'objet de la case ch
   sim.step({ pick: true });
   assert.deepEqual(P.inv, ['ladder', 'bottle']);
   assert.equal(m.items.length, before, 'rien de posé : il restait une case');
-  // E sur une eau d'amande inutile (souffle plein) : on la garde
+  // E sur une eau d'amande, souffle plein : elle sert quand même (la jauge grandit)
   P.stamina = 100;
   sim.step({ useSel: true });
-  assert.deepEqual(P.inv, ['ladder', 'bottle']);
+  assert.deepEqual(P.inv, ['ladder', null]);
+  assert.equal(staminaMax(P), 100 + ALMOND_GROW);
 });
 
 test("renfoncement : la cassette en hauteur s'attrape seulement depuis l'échelle, qu'il faut aller chercher", () => {
@@ -1693,7 +1702,7 @@ test("réseau : l'eau d'amande bue par un invité lui rend son souffle, et l'esc
   host.step({}, { 2: { remote: true, stamina: 12, useSel: true, sel: 1 } });
   assert.deepEqual(HG.inv, [null, null], 'la bouteille est bue');
   guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
-  assert.equal(G.stamina, 100, "l'endurance de l'invité est pleine");
+  assert.equal(G.stamina, 100 + ALMOND_GROW, "l'endurance de l'invité est pleine (jauge agrandie)");
   // l'invité monte l'escalier chez lui ; l'hôte a un quart de seconde de retard dans chaque sens
   const st = host.stairs[0];
   const C = CELL_SIZE;
@@ -1953,7 +1962,7 @@ test('Level 37 : on traverse chaque porte en marchant, les cloisons arrêtent le
 // --- Level 2 : les galeries, les halles et le troupeau ---
 import { createPipesMap, Z as Z2, PIPES_LEVEL } from '../backrooms/engine/level2.js';
 import { GOAT_MODES, ALPHA_RAGE, ALPHA_TAME, isLit as isLitL2 } from '../backrooms/engine/goats.js';
-import { BREAKER_T, BLOW_DELAY, VALVE_T } from '../backrooms/engine/sim.js';
+import { BREAKER_T, BLOW_DELAY, VALVE_T, ALMOND_GROW, staminaMax, WALK_SPEED, CHASE_MIN } from '../backrooms/engine/sim.js';
 
 // un bout de galerie droite de n cases, sans grille, jet, renfoncement ni objet : { x0, z } (le long de x) ou null
 const straightRun = (m, n) => {
@@ -2327,6 +2336,79 @@ test("réseau : le caméscope (V) tire sur la pile, et l'on voit qui filme et qu
   assert.ok(guest.player.cam, "l'invité sort son caméscope sans attendre l'hôte");
   guest.applySnapshot(JSON.parse(JSON.stringify({ ...host.snapshot() })));
   assert.ok(guest.player.cam, "l'instantané ne le lui range pas");
+});
+
+
+test("fin d'équipe : l'ascenseur attend les autres BOARD_T secondes, puis se ferme sur les retardataires", () => {
+  const players = [{ id: 1, name: 'Hôte' }, { id: 2, name: 'Invité' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 11, players, localId: 1 });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 11, players, localId: 2 });
+  host.players[0].status = 'elevator';
+  host.step({}, { 2: { remote: true } });
+  assert.ok(host.boardT > BOARD_T - 0.1, 'le compte à rebours démarre');
+  assert.ok(host.drainEvents().some((e) => e.type === 'boardCount' && e.start), 'il est annoncé');
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  assert.ok(Math.abs(guest.boardT - host.boardT) < 0.05, "l'invité voit le même compte à rebours");
+  // le retardataire arrive à temps : le compte à rebours s'arrête et l'ascenseur part
+  const h2 = new BackroomsSim({ difficulty: 'peaceful', seed: 11, players, localId: 1 });
+  h2.players[0].status = 'elevator';
+  run(h2, 10, {}, { 2: { remote: true } });
+  h2.players[1].status = 'elevator';
+  h2.step({}, { 2: { remote: true } });
+  assert.equal(h2.boardT, 0);
+  assert.ok(h2.departT > 0, "tout le monde est dedans : l'ascenseur part");
+  // personne ne vient : les portes se ferment, l'autre est perdu, l'ascenseur part quand même
+  host.monster.x = host.monster.z = -999;
+  for (let i = 0; i < Math.ceil((BOARD_T + 0.5) / DT) && host.departT <= 0; i++) host.step({}, { 2: { remote: true } });
+  assert.equal(host.players[1].status, 'dead', 'le retardataire est resté dehors');
+  const ev = host.drainEvents();
+  assert.ok(ev.some((e) => e.type === 'leftBehind' && e.id === 2), 'on le sait');
+  assert.ok(ev.some((e) => e.type === 'depart'), "l'ascenseur part avec ceux qui sont dedans");
+});
+
+
+test("poursuite : plus rapide qu'un joueur qui marche, droit sur lui, sans tourner sur place", () => {
+  const map = createBackroomsMap(3);
+  const sim = new BackroomsSim({ map, difficulty: 'normal' });
+  const P = sim.player;
+  const M = sim.monster;
+  // un couloir droit et sombre de 12 cases
+  const start = map.walkable.find((c) => {
+    for (let i = 0; i < 12; i++) if (sim.blocked(c.x + i, c.z, 0) || sim.brightCell(map, (c.x + i + 0.5) * CELL_SIZE, (c.z + 0.5) * CELL_SIZE)) return false;
+    return true;
+  });
+  assert.ok(start, 'un couloir droit');
+  M.dormantT = 0;
+  M.floor = 0;
+  if (sim.director) sim.director.phase = 'build';
+  M.x = (start.x + 0.5) * CELL_SIZE;
+  M.z = (start.z + 0.5) * CELL_SIZE + 0.3; // pas pile au milieu de la case
+  P.x = M.x + 7;
+  P.z = (start.z + 0.5) * CELL_SIZE;
+  P.yaw = -Math.PI / 2;
+  P.flashlight = false;
+  M.mode = 'chase';
+  M.unseenT = 0;
+  M.path = [];
+  M.repathT = 0;
+  M.yaw = Math.PI / 2;
+  let reversals = 0;
+  let last = 0;
+  const d0 = Math.hypot(P.x - M.x, P.z - M.z);
+  for (let i = 0; i < 60 * 5; i++) {
+    const y0 = M.yaw;
+    sim.step({ my: 1, yaw: P.yaw });
+    const d = Math.atan2(Math.sin(M.yaw - y0), Math.cos(M.yaw - y0));
+    if (Math.abs(d) > 0.01) {
+      if (last && Math.sign(d) !== Math.sign(last)) reversals++;
+      last = d;
+    }
+  }
+  const d1 = Math.hypot(P.x - M.x, P.z - M.z);
+  assert.equal(M.mode, 'chase');
+  assert.ok(M.speed >= WALK_SPEED * CHASE_MIN - 1e-6, `vitesse ${M.speed.toFixed(2)} m/s`);
+  assert.ok(d0 - d1 > 3.5, `elle gagne du terrain sur un joueur qui marche (${d0.toFixed(1)} → ${d1.toFixed(1)} m)`);
+  assert.ok(reversals <= 1, `elle ne zigzague pas (${reversals} changements de sens)`);
 });
 
 console.log(`\n${count} tests réussis pour The Backrooms !`);

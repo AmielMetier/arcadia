@@ -4,10 +4,29 @@
 - **The Backrooms** — Une image nette, et un vrai caméscope à sortir (touche V).
   - Sans caméscope, l'écran n'a plus d'effet de cassette : image propre, sans lignes, ni bande déformée, ni compteur REC.
   - Avec V, on sort le caméscope : l'image passe au format carré, entre deux bandes noires, avec un effet de cassette bien plus fort qu'avant (REC, compteur, coins du viseur, lignes, couleurs qui bavent).
-  - Le signal des cassettes ne se voit plus qu'au caméscope : il s'affiche en grand dans la bande de gauche. Pour trouver une cassette, il faut filmer.
+  - La jauge de signal des cassettes reste toujours affichée en bas à droite ; au caméscope, elle s'affiche en plus grand et plus précise dans la bande de gauche.
+  - Le caméscope est plus parasité : de la neige, une barre de bruit qui remonte l'image, des lignes qui sautent. Il zoome aussi un peu (×1,3).
+  - Quand un coéquipier filme, on voit son image en direct dans un petit écran en bas à droite, avec son nom.
   - La bande de droite montre les parasites : quand l'entité approche, la jauge monte et l'image se déchire.
   - Dans le noir, le caméscope passe tout seul en mode nuit (image verte) : on y voit sans lampe, donc sans se faire repérer.
   - Il tire un peu sur la même pile que la lampe. Les coéquipiers qui filment ont un petit voyant rouge.
+- **The Backrooms** — Le Level 0 plus vivant, et plus inquiétant.
+  - Les néons vivent : certains grésillent fort et clignotent d'un coup, et parfois toute une rangée s'éteint derrière toi, dans un claquement de disjoncteur.
+  - La moquette raconte quelque chose : des taches d'humidité, des traces de pas mouillées qui mènent quelque part, et des gouttes qui tombent du plafond dans des flaques (on les entend).
+  - Au loin, l'air tremble et jaunit, comme s'il faisait trop chaud.
+  - Le plafond est un peu plus haut (20 cm).
+- **The Backrooms** — Des matières bien plus détaillées : moquette, papier peint, plafond, entrepôt du Level 1, porte coupe-feu en acier peint, sol de l'ascenseur en tôle, parois en inox.
+  - La lampe torche et le cadenas de la porte de l'escalier sont de vrais objets en 3D ; une caméra de surveillance observe la cabine de l'ascenseur.
+  - La lampe fait un petit clic quand on l'allume ou l'éteint (et on entend celle des coéquipiers proches).
+- **The Backrooms** — On part ensemble, ou pas du tout.
+  - Dès que quelqu'un entre dans l'ascenseur, les autres ont 45 secondes pour le rejoindre. Un compte à rebours s'affiche, et l'entité entend la cabine : elle arrive.
+  - À zéro, les portes se ferment : ceux qui sont encore dehors sont perdus, et l'ascenseur part avec les autres.
+- **The Backrooms** — L'endurance compte davantage.
+  - La jauge de souffle est plus grande et plus lisible.
+  - Chaque eau d'amande bue agrandit la jauge pour de bon (jusqu'à presque deux fois sa taille), en plus de rendre du souffle : elle n'est donc jamais inutile.
+- **The Backrooms** — Une entité qui ne lâche plus.
+  - En chasse, elle va toujours plus vite qu'un joueur qui marche : pour la semer, il faut courir.
+  - Elle fonce droit sur toi sans hésiter, au lieu de tourner sur elle-même juste devant toi quand elle essaie de t'attraper.
 - **The Backrooms** — 7 cassettes à trouver au lieu de 5 (4 à l'étage du haut, 3 en bas), sur une carte de la même taille.
 - **The Backrooms** — On court plus vite, et on peut sauter.
   - Espace pour sauter : un petit bond qui coûte un peu de souffle et s'entend à la réception. Il ne permet pas de franchir un trou.

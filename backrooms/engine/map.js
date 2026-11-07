@@ -58,7 +58,7 @@ export function itemList(...lists) {
 }
 
 export const CELL_SIZE = 2.5; // chaque case fait 2.5m x 2.5m
-export const WALL_HEIGHT = 3.0; // hauteur sous plafond
+export const WALL_HEIGHT = 3.2; // hauteur sous plafond (3,20 m : un peu plus haut que l'ordinaire, on s'y sent petit)
 export const MAP_SIZE = 64;
 
 export const T = {

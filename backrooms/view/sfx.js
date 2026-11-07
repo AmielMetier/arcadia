@@ -710,6 +710,59 @@ export class BackroomsSfx {
     if (pos) this.caption('[lights flicker]', pos);
   }
 
+  // Toute une rangée de néons qui saute dans ton dos : le gros claquement d'un disjoncteur, le bourdonnement qui s'éteint
+  // en descendant, et les tubes qui tintent en refroidissant
+  neonRow(pos, n = 4) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.01;
+    const out = this.at({ ...pos, rolloff: 0.6, ref: 4 }, 1.2);
+    this.burst(out, t, 0.03, 'lowpass', 220, 0.9, 0.5);
+    this.burst(out, t, 0.015, 'bandpass', 2600, 2, 0.3);
+    this.tone(out, t, 'sine', 70, 38, 0.25, 0.3, 0.002);
+    const o = this.osc('sawtooth', 120);
+    o.frequency.setValueAtTime(120, t);
+    o.frequency.exponentialRampToValueAtTime(40, t + 0.9);
+    const bp = this.filt('bandpass', 700, 1.4);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.09, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    o.connect(bp).connect(g).connect(out);
+    o.start(t);
+    o.stop(t + 1);
+    for (let i = 0; i < Math.min(6, n); i++) this.tone(out, t + 0.4 + i * rnd(0.12, 0.3), 'sine', rnd(2800, 4200), 0, 0.08, 0.012, 0.001);
+    this.caption('[the lights behind you go out]', pos);
+  }
+
+  // Un néon qui s'emballe : un bourdonnement fort et sale qui hoquette quelques secondes
+  neonSurge(pos, sec = 4.5) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.01;
+    const out = this.at({ ...pos, rolloff: 0.9, ref: 2.5 }, 1);
+    const o = this.osc('sawtooth', 120);
+    const o2 = this.osc('square', 60);
+    const bp = this.filt('bandpass', 1100, 0.9);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    let k = t;
+    while (k < t + sec) {
+      const on = rnd(0.08, 0.5);
+      g.gain.setTargetAtTime(rnd(0.05, 0.11), k, 0.01);
+      g.gain.setTargetAtTime(rnd(0.0, 0.02), k + on, 0.01);
+      k += on + rnd(0.02, 0.15);
+    }
+    g.gain.setTargetAtTime(0.0001, t + sec, 0.05);
+    o.connect(bp);
+    o2.connect(bp);
+    bp.connect(g).connect(out);
+    o.start(t);
+    o2.start(t);
+    o.stop(t + sec + 0.4);
+    o2.stop(t + sec + 0.4);
+    this.caption('[a light buzzes loudly]', pos);
+  }
+
   // La voix de l'entité du Level 1 : la bande-son de sa vidéo, jouée en boucle sans fin. Chargée une seule fois,
   // au premier besoin ; elle passe par le même panoramique (et la même occlusion) que le bourdonnement.
   initVoice() {
@@ -858,6 +911,24 @@ export class BackroomsSfx {
   }
 
   // une goutte qui tombe dans l'eau : un « plop » qui monte vite
+  // le clic de l'interrupteur de la lampe : un « clac » sec en plastique (plus grave à l'extinction) ; pos : la lampe
+  // d'un coéquipier, sinon la sienne
+  lampClick(on = true, pos = null) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.005;
+    const out = pos ? this.at({ ...pos, rolloff: 1.4, ref: 1.5 }, 0.9) : this.gainNode(0.9);
+    if (!pos) out.connect(this.out);
+    this.burst(out, t, 0.006, 'bandpass', on ? 3400 : 2600, 3, 0.35);
+    this.burst(out, t + 0.004, 0.02, 'bandpass', on ? 1500 : 1100, 5, 0.18);
+    this.tone(out, t, 'triangle', on ? 900 : 650, 0, 0.025, 0.03, 0.001);
+  }
+
+  // une goutte du plafond qui tombe dans une flaque, quelque part près de soi
+  drip(pos) {
+    if (!this.unlocked || !this.ctx) return;
+    this.plop(this.ctx.currentTime + 0.01, 0.07, this.at({ ...pos, rolloff: 1.3, ref: 1.2 }, 1));
+  }
+
   plop(t, vol, dest) {
     const c = this.ctx;
     const o = c.createOscillator();

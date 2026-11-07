@@ -2,7 +2,7 @@ Textures de The Backrooms. Toutes sont dans le domaine public (CC0 1.0,
 https://creativecommons.org/publicdomain/zero/1.0/) : utilisation libre, même commerciale, sans obligation de citer.
 On les cite quand même, avec plaisir.
 
-Poly Haven (https://polyhaven.com), réduites en 512 px puis recolorées et mélangées aux motifs dessinés dans
+Poly Haven (https://polyhaven.com), réduites en 1024 px (depuis la 2K) puis recolorées et mélangées aux motifs dessinés dans
 backrooms/view/textures.js :
   moquette.jpg  Dirty Carpet        https://polyhaven.com/a/dirty_carpet
   papier.jpg    Decrepit Wallpaper  https://polyhaven.com/a/decrepit_wallpaper
@@ -10,6 +10,8 @@ backrooms/view/textures.js :
   l1_mur.jpg    Concrete Wall 004   https://polyhaven.com/a/concrete_wall_004  (Level 1 : parpaings peints)
   l1_sol.jpg    Concrete Floor Worn 001  https://polyhaven.com/a/concrete_floor_worn_001  (Level 1 : dalle usée)
   l1_plafond.jpg  Concrete Wall 006  https://polyhaven.com/a/concrete_wall_006  (Level 1 : dalle brute)
+  porte_metal.jpg  Blue Metal Plate  https://polyhaven.com/a/blue_metal_plate  (porte coupe-feu, repeinte)
+  tole_larmee.jpg  Metal Plate       https://polyhaven.com/a/metal_plate  (tôle larmée du sol de l'ascenseur)
 
 Les objets abandonnés et ceux fixés aux murs viennent de Poly Haven (CC0) : voir backrooms/models/LICENSE.txt.
 Le souffle du joueur : voir backrooms/sfx/LICENSE.txt.

@@ -157,7 +157,7 @@ function fakeAlarm(sim, P) {
   const pipes = !!sim.goats || (sim.map.valves || []).length > 0;
   // Level 0 : aussi l'écho (des pas qui s'arrêtent quand on s'arrête), une silhouette qui s'efface, l'ascenseur qui
   // sonne tout seul
-  const kinds = pipes ? ['hammer', 'groan', 'knock', 'steps', 'neon', 'neon'] : lv === 1 ? ['buzz', 'steps', 'door', 'knock', 'groan', 'neon'] : lv === 2 ? ['steps', 'knock', 'drag'] : ['buzz', 'steps', 'door', 'drag', 'neon', 'echo', 'echo', 'figure', 'ding'];
+  const kinds = pipes ? ['hammer', 'groan', 'knock', 'steps', 'neon', 'neon'] : lv === 1 ? ['buzz', 'steps', 'door', 'knock', 'groan', 'neon'] : lv === 2 ? ['steps', 'knock', 'drag'] : ['buzz', 'steps', 'door', 'drag', 'neon', 'echo', 'echo', 'figure', 'ding', 'row', 'row', 'surge', 'surge'];
   // à plusieurs, l'entité imite parfois le sifflet d'un coéquipier… qui est ailleurs
   const mates = sim.players.filter((Q) => Q !== P && Q.status === 'alive');
   if (mates.length && sim.hasMonster && !sim.goats && Math.random() < 0.25) {
@@ -172,6 +172,9 @@ function fakeAlarm(sim, P) {
   if (kind === 'neon') {
     if (neonDrop(sim, P)) return;
   }
+  // des néons vivants : toute une rangée s'éteint d'un coup dans ton dos, ou un tube s'emballe et bourdonne fort
+  if (kind === 'row' && rowBehind(sim, P)) return;
+  if (kind === 'surge' && neonSurge(sim, P)) return;
   if (kind === 'echo') {
     // seul celui qui est visé l'entend : quelqu'un marche derrière lui, à son rythme, et s'arrête quand il s'arrête
     sim.emit({ type: 'phantom', kind: 'echo', id: P.id, len: rand(7, 11) });
@@ -202,6 +205,52 @@ function neonDrop(sim, P) {
   l.flicker = false;
   lightsChanged(map);
   sim.emit({ type: 'phantom', kind: 'neon', x: l.x, z: l.z, floor: P.floor || 0 });
+  return true;
+}
+
+// Une rangée de néons s'éteint d'un seul coup dans le dos du joueur (le claquement le fait se retourner) et ne revient
+// qu'au bout de 8 à 14 s : le couloir d'où il vient est devenu noir
+function rowBehind(sim, P) {
+  const map = sim.fm(P.floor);
+  const D = sim.director;
+  const fx = -Math.sin(P.yaw);
+  const fz = -Math.cos(P.yaw);
+  const behind = (map.lights || []).filter((l) => {
+    if (l.state !== 'on' || D.drops.some((d) => d.l === l)) return false;
+    const dx = l.x - P.x;
+    const dz = l.z - P.z;
+    const d = Math.hypot(dx, dz);
+    return d > 3 && d < 22 && (dx * fx + dz * fz) / d < -0.45;
+  });
+  if (behind.length < 2) return false;
+  // la rangée : les néons alignés avec le plus proche (même ligne ou même colonne de cases)
+  behind.sort((a, b) => Math.hypot(a.x - P.x, a.z - P.z) - Math.hypot(b.x - P.x, b.z - P.z));
+  const a = behind[0];
+  const row = behind.filter((l) => l.gx === a.gx || l.gz === a.gz).slice(0, 6);
+  const list = row.length >= 2 ? row : behind.slice(0, 4);
+  const t = rand(8, 14);
+  for (const l of list) {
+    D.drops.push({ l, t, back: l.state, map });
+    l.state = 'off';
+    l.flicker = false;
+  }
+  lightsChanged(map);
+  sim.emit({ type: 'phantom', kind: 'row', x: a.x, z: a.z, floor: P.floor || 0, n: list.length });
+  return true;
+}
+
+// Un néon proche s'emballe : il grésille, clignote et bourdonne beaucoup plus fort quelques secondes
+function neonSurge(sim, P) {
+  const map = sim.fm(P.floor);
+  const D = sim.director;
+  const lit = (map.lights || []).filter((l) => l.state === 'on' && !D.drops.some((d) => d.l === l) && Math.hypot(l.x - P.x, l.z - P.z) < 9);
+  if (!lit.length) return false;
+  const l = pick(lit);
+  D.drops.push({ l, t: rand(4, 7), back: l.state, map });
+  l.state = 'flicker';
+  l.flicker = true;
+  lightsChanged(map);
+  sim.emit({ type: 'phantom', kind: 'surge', x: l.x, z: l.z, floor: P.floor || 0 });
   return true;
 }
 

@@ -33,6 +33,7 @@ export const WALK_SPEED = 2.1;
 export const SPRINT_SPEED = 4.4; // la course : nettement plus vite que la marche (l'entité en chasse reste en dessous)
 export const MONSTER_PATROL_SPEED = 1.8;
 export const MONSTER_CHASE_SPEED = 3.3; // plus vite qu'en marchant, un peu moins qu'en sprintant
+export const CHASE_MIN = 1.45; // en chasse, au moins 1,45 fois la marche (3 m/s), toujours sous le sprint
 export const CROUCH_SPEED = 0.5; // accroupi : moitié moins vite, presque sans bruit
 export const STAMINA_DRAIN = 15; // par seconde de course
 // le saut : un petit bond (0,35 m, 0,4 s en l'air) ; même en courant on ne franchit pas un trou (2 m)
@@ -48,6 +49,10 @@ export const BATTERY_PACK = 60; // % rendus par une pile utilisée
 export const INV_SIZE = 2; // cases d'objets (piles, eau d'amande, échelle) : la case 1 de l'inventaire est réservée à la lampe
 export const PICK_R = 1.4; // portée de F pour ramasser
 export const ALMOND_STAMINA = 50; // l'eau d'amande rend la moitié du souffle (plus un bouton « fin de poursuite »)
+export const ALMOND_GROW = 15; // … et agrandit pour de bon la jauge de souffle (+15 par bouteille bue)
+export const STAMINA_CAP = 190; // jauge de souffle la plus grande possible
+// la taille de la jauge de souffle d'un joueur : 100, plus ce que les bouteilles bues lui ont donné
+export const staminaMax = (P) => Math.min(STAMINA_CAP, 100 + (P.bottles || 0) * ALMOND_GROW);
 export const BLACKOUT_DRAIN = 1.5; // dans le noir d'une coupure, la lampe tire plus fort sur la pile
 export const SIGNAL_RANGE = 34; // m : au-delà, le caméscope ne capte plus rien
 // La prise : la première fois par niveau, l'entité agrippe au lieu de tuer. On se débat (GRAB_STRUGGLES appuis) ou un
@@ -86,6 +91,7 @@ export const BLOW_DELAY = 2.2; // la vanne fermée, les néons de son secteur gr
 export const BURN_LOCK = 0.9; // brûlé par un jet de vapeur : repoussé, sonné un instant
 export const BURN_STAMINA = 45;
 export const DEPART_T = 3; // secondes entre la fermeture des portes et l'arrivée
+export const BOARD_T = 45; // dès qu'un joueur est dans l'ascenseur, les autres ont ce temps pour le rejoindre
 // coupures de courant du Level 1 : toutes les 45 à 80 s (et seulement après un moment de calme), pendant 15 à 20 s
 export const BLACKOUT_EVERY = [45, 80];
 export const BLACKOUT_LEN = [15, 20];
@@ -387,6 +393,7 @@ export class BackroomsSim {
         P.sel = old.sel;
         P.battery = old.battery;
         P.bottles = old.bottles;
+        P.stamina = staminaMax(P); // nouvel étage : on repart avec tout son souffle (la jauge agrandie comprise)
         P.found = old.found;
         P.yaw = old.yaw;
       }
@@ -416,6 +423,7 @@ export class BackroomsSim {
     this.powered = false; // panneau du monte-charge réalimenté (aux Poolrooms : les 3 volants trouvés)
     this.slide = -1; // Poolrooms : le toboggan pris par le premier qui s'y est glissé (les autres le suivent)
     this.departT = 0; // compte à rebours du départ de l'ascenseur
+    this.boardT = 0; // compte à rebours de l'équipe : les portes se ferment sur ceux qui ne sont pas dedans
     this.panel = 0; // Level 1 : avancée du redémarrage du monte-charge (0 à 1)
     this.panelNoiseT = 0;
     this.director = createDirector(level);
@@ -941,10 +949,10 @@ export class BackroomsSim {
       return this.emit({ type: 'ladderPlaced', id: P.id });
     }
     if (kind === 'bottle') {
-      if (P.stamina >= 100) return this.emit({ type: 'useless', kind, id: P.id });
-      P.stamina = Math.min(100, P.stamina + ALMOND_STAMINA);
-      P.winded = 0;
+      if (P.stamina >= staminaMax(P) && staminaMax(P) >= STAMINA_CAP) return this.emit({ type: 'useless', kind, id: P.id });
       P.bottles++;
+      P.stamina = Math.min(staminaMax(P), P.stamina + ALMOND_STAMINA + ALMOND_GROW);
+      P.winded = 0;
     } else {
       if (P.battery >= 100) return this.emit({ type: 'useless', kind, id: P.id });
       P.battery = Math.min(100, P.battery + BATTERY_PACK);
@@ -1169,6 +1177,7 @@ export class BackroomsSim {
       if (this.departT <= 0) this.arrive();
       return;
     }
+    this.updateBoarding();
 
     // coupures de courant du Level 1 ; au Level 2, le noir total et le troupeau qui attaque
     if (this.level === 1 || this.level === PIPES_LEVEL) {
@@ -1279,7 +1288,7 @@ export class BackroomsSim {
       if (P.stamina <= 0) P.winded = WINDED_T; // à bout de souffle
     } else {
       P.running = false;
-      P.stamina = Math.min(100, P.stamina + DT * STAMINA_REGEN);
+      P.stamina = Math.min(staminaMax(P), P.stamina + DT * STAMINA_REGEN);
     }
 
     // 3. Déplacement (un invité se déplace chez lui et annonce sa position : l'hôte la prend si elle est plausible)
@@ -1458,7 +1467,7 @@ export class BackroomsSim {
     P.moving = false;
     P.running = false;
     P.flashlight = false;
-    P.stamina = Math.min(100, P.stamina + DT * STAMINA_REGEN);
+    P.stamina = Math.min(staminaMax(P), P.stamina + DT * STAMINA_REGEN);
     const want = !!input.run && P.breath > 0 && !(P.gaspT > 0);
     if (want !== P.holding) this.emit({ type: 'breath', id: P.id, on: want });
     P.holding = want;
@@ -1561,7 +1570,7 @@ export class BackroomsSim {
     }
     if (P.onBeam) {
       P.running = false;
-      P.stamina = Math.min(100, P.stamina + DT * STAMINA_REGEN);
+      P.stamina = Math.min(staminaMax(P), P.stamina + DT * STAMINA_REGEN);
       P.moving = my !== 0;
       if (my !== 0) {
         const b = this.beamStep(P, my);
@@ -1575,7 +1584,7 @@ export class BackroomsSim {
     if (P.running) {
       P.stamina = Math.max(0, P.stamina - DT * STAMINA_DRAIN);
       if (P.stamina <= 0) P.winded = WINDED_T;
-    } else P.stamina = Math.min(100, P.stamina + DT * STAMINA_REGEN);
+    } else P.stamina = Math.min(staminaMax(P), P.stamina + DT * STAMINA_REGEN);
     if (!P.moving) return 0;
     const speed = (P.running ? SPRINT_SPEED : P.crouch ? WALK_SPEED * CROUCH_SPEED : WALK_SPEED) * this.wade(P);
     const len = Math.hypot(mx, my) || 1;
@@ -1632,6 +1641,7 @@ export class BackroomsSim {
       pw: this.powered ? 1 : 0,
       bo: r2(this.blackout),
       dp: r2(this.departT),
+      bt: r2(this.boardT),
       sl: this.slide,
       // le vrai ascenseur ne se dévoile qu'une fois les cassettes trouvées
       rf: this.open ? this.realFloor : -1,
@@ -1694,6 +1704,7 @@ export class BackroomsSim {
     if (snap.kk !== undefined && this.floors[0] && this.floors[0].key) this.floors[0].key.taken = !!snap.kk;
     this.map.dark = this.level === PIPES_LEVEL && this.blackout > 0;
     this.departT = snap.dp;
+    this.boardT = snap.bt || 0;
     this.slide = snap.sl ?? -1;
     if (snap.rf >= 0 && !this.unlocked) {
       this.realFloor = snap.rf;
@@ -1753,11 +1764,12 @@ export class BackroomsSim {
         P.onBeam = !!onBeam;
       }
       // l'endurance de l'invité se calcule chez lui : une eau d'amande bue (chez l'hôte) la remplit ici aussi
-      if (mine && (bottles || 0) > (P.bottles || 0)) {
-        P.stamina = 100;
+      const drank = mine && (bottles || 0) > (P.bottles || 0);
+      P.bottles = bottles || 0;
+      if (drank) {
+        P.stamina = staminaMax(P);
         P.winded = 0;
       }
-      P.bottles = bottles || 0;
       P.battery = bat;
       P.grabT = grabT || 0;
       P.grabs = grabs || 0;
@@ -1838,12 +1850,48 @@ export class BackroomsSim {
     else if (this.hasMonster) this.senseMonster();
   }
 
+  // Fin d'équipe : le premier dans l'ascenseur lance le compte à rebours. L'entité est attirée vers la cabine, puis
+  // vers les retardataires ; à zéro, les portes se ferment et ceux qui sont restés dehors sont perdus
+  updateBoarding() {
+    if (this.boardT <= 0) return;
+    const was = this.boardT;
+    this.boardT = Math.max(0, this.boardT - DT);
+    const out = this.players.filter((p) => p.status === 'alive');
+    if (!out.length) {
+      this.boardT = 0;
+      return;
+    }
+    if (was > 20 && this.boardT <= 20) {
+      // elle sent ceux qui traînent
+      const P = out[Math.floor(this.time * 7) % out.length];
+      this.alertMonster(P.x, P.z, 80, P.floor);
+      this.emit({ type: 'boardCount', t: 20 });
+    }
+    if (was > 10 && this.boardT <= 10) this.emit({ type: 'boardCount', t: 10 });
+    if (this.boardT > 0) return;
+    for (const P of out) {
+      this.emit({ type: 'leftBehind', id: P.id, name: P.name });
+      this.killPlayer(P);
+    }
+  }
+
   // L'ascenseur part quand plus personne n'est dehors (et qu'au moins un joueur est dedans)
   checkElevator() {
     if (this.departT > 0 || this.state !== 'playing') return;
     const alive = this.players.filter((p) => p.status === 'alive').length;
     const inside = this.players.filter((p) => p.status === 'elevator').length;
-    if (alive > 0) return;
+    if (alive > 0) {
+      if (inside > 0 && this.boardT <= 0) {
+        this.boardT = BOARD_T;
+        this.emit({ type: 'boardCount', t: BOARD_T, start: true });
+        // l'entité entend la cabine : elle arrive
+        const E = this.fm(this.realFloor);
+        const ex = E && E.exit ? E.exit : null;
+        if (ex) this.alertMonster(ex.x, ex.z, 999, this.realFloor);
+      }
+      return;
+    }
+    this.boardT = 0;
     if (inside > 0) {
       this.departT = DEPART_T;
       this.emit({ type: 'depart', level: this.level });
@@ -2163,8 +2211,9 @@ export class BackroomsSim {
     const k = (1 + rage * 0.35 + (dark ? 0.1 : 0)) * (0.9 + A * 0.22);
     M.burstT = Math.max(0, M.burstT - DT);
     if (M.mode === 'search' && M.probe) M.searchT = Math.max(0, (M.searchT || 0) - DT);
-    if (M.mode === 'chase') M.speed = this.monsterChaseSpeed * k * (M.rushT > 0 ? 1.25 : M.burstT > 0 ? 1.15 : 1) * (this.chases <= (this.skill < 0.3 ? 2 : 1) && !(M.rushT > 0) ? 0.86 : 1);
-    else if (M.mode === 'search') M.speed = MONSTER_PATROL_SPEED * 1.3 * k;
+    // en chasse, jamais moins de CHASE_MIN fois la marche : à pied, on ne la sème pas ; il faut courir
+    if (M.mode === 'chase') M.speed = Math.max(WALK_SPEED * CHASE_MIN * (1 + A * 0.15), this.monsterChaseSpeed * k * (M.rushT > 0 ? 1.25 : M.burstT > 0 ? 1.15 : 1) * (this.chases <= (this.skill < 0.3 ? 2 : 1) && !(M.rushT > 0) ? 0.86 : 1));
+    else if (M.mode === 'search') M.speed = Math.max(MONSTER_PATROL_SPEED * 1.3, WALK_SPEED * 1.15) * k; // elle cherche plus vite qu'on ne marche
     else if (M.mode === 'ambush') M.speed = MONSTER_PATROL_SPEED * 1.5;
     else if (M.mode === 'flee') M.speed = this.monsterChaseSpeed * 1.05;
     else if (M.mode === 'stalk') M.speed = MONSTER_PATROL_SPEED * 1.15;
@@ -2328,11 +2377,53 @@ export class BackroomsSim {
           nz = h.z + ((nz - h.z) / d) * rr;
         }
       }
-      if (this.blocked(cellOf(nx), cellOf(nz), M.floor)) return;
+      if (this.blocked(cellOf(nx), cellOf(nz), M.floor)) return false;
       M.x = nx;
       M.z = nz;
+      return true;
     };
-    if (M.path && M.path.length > M.pathIndex) {
+    // une ligne droite assez large pour son corps (le centre et les deux épaules ne touchent aucun mur)
+    const clearRun = (bx, bz) => {
+      const ex = bx - M.x;
+      const ez = bz - M.z;
+      const d = Math.hypot(ex, ez);
+      if (d < 0.05) return true;
+      const ox = (-ez / d) * 0.35;
+      const oz = (ex / d) * 0.35;
+      return hasLineOfSight(map, M.x, M.z, bx, bz) && hasLineOfSight(map, M.x + ox, M.z + oz, bx + ox, bz + oz) && hasLineOfSight(map, M.x - ox, M.z - oz, bx - ox, bz - oz);
+    };
+    // elle se tourne vite mais sans à-coups vers où elle va (fini les quarts de tour sur place)
+    const face = (vx, vz) => {
+      const want = Math.atan2(vx, vz);
+      let dy = want - M.yaw;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      const max = (M.mode === 'chase' ? 11 : 6) * DT;
+      M.yaw += Math.max(-max, Math.min(max, dy));
+    };
+    // en chasse, quand elle voit sa proie et que la voie est libre : droit sur elle, sans repasser par le milieu des
+    // cases du chemin (c'est ce qui la faisait hésiter et tourner sur place juste devant le joueur)
+    let moved = false;
+    const cdx = P.x - M.x;
+    const cdz = P.z - M.z;
+    const cd = Math.hypot(cdx, cdz);
+    if (M.mode === 'chase' && same && cd > 0.1 && M.unseenT === 0 && !M.steamWait && clearRun(P.x, P.z)) {
+      const stepLen = Math.min(cd, M.speed * DT);
+      moved = go(M.x + (cdx / cd) * stepLen, M.z + (cdz / cd) * stepLen);
+      if (moved) {
+        face(cdx, cdz);
+        M.pathIndex = M.path ? M.path.length : 0;
+        M.repathT = Math.min(M.repathT, 0.1);
+      }
+    }
+    if (moved) {
+      // déjà avancé
+    } else if (M.path && M.path.length > M.pathIndex) {
+      // raccourci : elle vise le point le plus lointain du chemin qu'elle peut déjà atteindre en ligne droite
+      for (let k = 0; k < 3 && M.pathIndex + 1 < M.path.length; k++) {
+        const nx = M.path[M.pathIndex + 1];
+        if (!clearRun(nx.x, nx.z)) break;
+        M.pathIndex++;
+      }
       const wp = M.path[M.pathIndex];
       const wdx = wp.x - M.x;
       const wdz = wp.z - M.z;
@@ -2341,12 +2432,12 @@ export class BackroomsSim {
       else {
         const stepLen = Math.min(wdist, M.speed * DT);
         go(M.x + (wdx / wdist) * stepLen, M.z + (wdz / wdist) * stepLen);
-        M.yaw = Math.atan2(wdx, wdz);
+        face(wdx, wdz);
       }
     } else if (M.mode === 'chase' && same && dist > 0.1 && M.unseenT === 0) {
       const stepLen = Math.min(dist, M.speed * DT);
       go(M.x + (dx / dist) * stepLen, M.z + (dz / dist) * stepLen);
-      M.yaw = Math.atan2(dx, dz);
+      face(dx, dz);
     } else if (M.goal && cellOf(M.goal.x) === cellOf(M.x) && cellOf(M.goal.z) === cellOf(M.z) && Math.hypot(M.goal.x - M.x, M.goal.z - M.z) > 0.1) {
       // le but est dans sa case (pas de chemin à suivre) : tout droit
       const gx = M.goal.x - M.x;
@@ -2354,7 +2445,7 @@ export class BackroomsSim {
       const gd = Math.hypot(gx, gz);
       const stepLen = Math.min(gd, M.speed * DT);
       go(M.x + (gx / gd) * stepLen, M.z + (gz / gd) * stepLen);
-      M.yaw = Math.atan2(gx, gz);
+      face(gx, gz);
     }
 
     // l'entité prend l'escalier quand sa proie est à l'autre étage
@@ -2423,7 +2514,7 @@ export class BackroomsSim {
       G.grabT = 0;
       G.struggle = 0;
       G.lockT = 0.3;
-      G.stamina = Math.min(100, G.stamina + 35);
+      G.stamina = Math.min(staminaMax(G), G.stamina + 35);
       G.winded = 0;
       M.mode = 'stun';
       M.stunT = MONSTER_STUN_T;

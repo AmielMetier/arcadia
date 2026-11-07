@@ -13,12 +13,19 @@ function canvas(w, h = w) {
   return [c, c.getContext('2d')];
 }
 
+// une toile deux fois plus fine que son dessin (les petites textures : étiquettes, panneaux, cassettes…)
+function hd(w, h = w) {
+  const [c, ctx] = canvas(w * 2, h * 2);
+  ctx.setTransform(2, 0, 0, 2, 0, 0);
+  return [c, ctx];
+}
+
 function tex(c, repeat = 1) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(repeat, repeat);
-  t.anisotropy = 4;
+  t.anisotropy = 8; // le sol et le plafond restent nets jusqu'au fond des couloirs
   return t;
 }
 
@@ -33,6 +40,9 @@ function loadImage(name) {
 }
 
 function noise(ctx, w, h, amount) {
+  // sur toute la toile (elle peut être dessinée à l'échelle 2 : plus de pixels que d'unités de dessin)
+  w = ctx.canvas.width;
+  h = ctx.canvas.height;
   const d = ctx.getImageData(0, 0, w, h);
   for (let i = 0; i < d.data.length; i += 4) {
     const n = (Math.random() - 0.5) * amount;
@@ -424,12 +434,16 @@ function drawPoolCeiling(ctx, S, photo) {
 }
 
 export function createBackroomsTextures(level = 0) {
-  const S = level === 2 ? 1024 : 512; // la mosaïque des Poolrooms demande plus de détail
+  // Toutes les surfaces en 1024 px (photos Poly Haven en 1024 px) : les motifs du Level 0 et du Level 1 sont dessinés
+  // en 512 unités, à l'échelle 2 (même dessin qu'avant, deux fois plus fin) ; la mosaïque des Poolrooms en 1024
+  const S = level === 2 ? 1024 : 512;
+  const PX = 1024;
   const L1 = level === 1;
   const L2 = level === 2; // Level 37, les Poolrooms
-  const [wallCanvas, wctx] = canvas(S);
-  const [carpetCanvas, cctx] = canvas(S);
-  const [ceilCanvas, clctx] = canvas(S);
+  const [wallCanvas, wctx] = canvas(PX);
+  const [carpetCanvas, cctx] = canvas(PX);
+  const [ceilCanvas, clctx] = canvas(PX);
+  for (const c of [wctx, cctx, clctx]) c.setTransform(PX / S, 0, 0, PX / S, 0, 0);
   const drawW = L2 ? drawPoolWall : L1 ? drawConcreteWall : drawWallpaper;
   const drawF = L2 ? drawPoolFloor : L1 ? drawConcreteFloor : drawCarpet;
   const drawC = L2 ? drawPoolCeiling : L1 ? drawConcreteCeiling : drawCeiling;
@@ -464,22 +478,107 @@ export function createBackroomsTextures(level = 0) {
     if (pla) mosaic.needsUpdate = true;
   });
 
-  // Portes d'ascenseur en inox brossé
-  const [doorCanvas, dctx] = canvas(128, 256);
-  dctx.fillStyle = '#8e9398';
-  dctx.fillRect(0, 0, 128, 256);
-  for (let x = 0; x < 128; x++) {
-    dctx.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '0,0,0'}, ${Math.random() * 0.08})`;
-    dctx.fillRect(x, 0, 1, 256);
+  // Portes d'ascenseur en inox brossé (512 × 1024) : brossage vertical, reflets en bandes, joint central, rayures,
+  // traces de doigts à hauteur de main et salissure au pied
+  const [doorCanvas, dctx] = canvas(512, 1024);
+  {
+    const g = dctx.createLinearGradient(0, 0, 512, 0);
+    g.addColorStop(0, '#7f858b');
+    g.addColorStop(0.35, '#a4aab0');
+    g.addColorStop(0.55, '#8b9197');
+    g.addColorStop(0.8, '#a0a6ab');
+    g.addColorStop(1, '#7a8086');
+    dctx.fillStyle = g;
+    dctx.fillRect(0, 0, 512, 1024);
+    for (let x = 0; x < 512; x++) {
+      dctx.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '0,0,0'}, ${Math.random() * 0.07})`;
+      dctx.fillRect(x, 0, 1, 1024);
+    }
+    for (let i = 0; i < 900; i++) {
+      dctx.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '20,20,20'}, ${0.04 + Math.random() * 0.06})`;
+      dctx.fillRect(Math.random() * 512, Math.random() * 1024, 1, 8 + Math.random() * 60);
+    }
+    // rayures fines en biais
+    dctx.lineWidth = 1;
+    for (let i = 0; i < 70; i++) {
+      const x = Math.random() * 512;
+      const y = 200 + Math.random() * 800;
+      const a = (Math.random() - 0.5) * 1.2;
+      const l = 10 + Math.random() * 70;
+      dctx.strokeStyle = `rgba(${Math.random() < 0.6 ? '230,232,235' : '40,40,40'}, ${0.12 + Math.random() * 0.2})`;
+      dctx.beginPath();
+      dctx.moveTo(x, y);
+      dctx.lineTo(x + Math.sin(a) * l, y + Math.cos(a) * l);
+      dctx.stroke();
+    }
+    // traces de doigts à hauteur de main (vers le milieu, là où on pousse)
+    for (let i = 0; i < 22; i++) {
+      const x = 330 + Math.random() * 160;
+      const y = 470 + Math.random() * 180;
+      const r = 8 + Math.random() * 10;
+      const fg = dctx.createRadialGradient(x, y, 0, x, y, r);
+      fg.addColorStop(0, 'rgba(60, 55, 45, 0.16)');
+      fg.addColorStop(1, 'rgba(60, 55, 45, 0)');
+      dctx.fillStyle = fg;
+      dctx.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+    // la crasse au pied, et les bords des vantaux
+    const dg = dctx.createLinearGradient(0, 860, 0, 1024);
+    dg.addColorStop(0, 'rgba(50, 42, 25, 0)');
+    dg.addColorStop(1, 'rgba(50, 42, 25, 0.45)');
+    dctx.fillStyle = dg;
+    dctx.fillRect(0, 860, 512, 164);
+    dctx.fillStyle = 'rgba(0,0,0,0.35)';
+    dctx.fillRect(0, 0, 8, 1024);
+    dctx.fillRect(504, 0, 8, 1024);
+    dctx.fillStyle = 'rgba(255,255,255,0.18)';
+    dctx.fillRect(8, 0, 2, 1024);
   }
-  dctx.fillStyle = 'rgba(0,0,0,0.25)';
-  dctx.fillRect(0, 0, 3, 256);
-  dctx.fillRect(125, 0, 3, 256);
   const steel = tex(doorCanvas);
   steel.wrapS = steel.wrapT = THREE.ClampToEdgeWrapping;
 
+  // Porte coupe-feu en acier peint (photo Poly Haven blue_metal_plate, repeinte en gris-vert d'usine) et tôle larmée
+  // du plancher de la cabine (Poly Haven metal_plate) : dessinées quand les photos arrivent
+  const [fireCanvas, fdctx] = canvas(512, 1024);
+  fdctx.fillStyle = '#6e7366';
+  fdctx.fillRect(0, 0, 512, 1024);
+  const fireDoor = tex(fireCanvas);
+  fireDoor.wrapS = fireDoor.wrapT = THREE.ClampToEdgeWrapping;
+  const [plateCanvas, plctx] = canvas(512);
+  plctx.fillStyle = '#55585a';
+  plctx.fillRect(0, 0, 512, 512);
+  const treadPlate = tex(plateCanvas);
+  const metalReady = Promise.all(['porte_metal.jpg', 'tole_larmee.jpg'].map(loadImage)).then(([pm, tl]) => {
+    if (pm) {
+      fdctx.drawImage(pm, 0, 0, 512, 512);
+      fdctx.drawImage(pm, 0, 512, 512, 512);
+      fdctx.globalCompositeOperation = 'color';
+      fdctx.fillStyle = '#7d8570';
+      fdctx.fillRect(0, 0, 512, 1024);
+      fdctx.globalCompositeOperation = 'soft-light';
+      fdctx.fillStyle = '#b8baa8';
+      fdctx.fillRect(0, 0, 512, 1024);
+      fdctx.globalCompositeOperation = 'source-over';
+      // la crasse au pied et autour de la poignée
+      const g2 = fdctx.createLinearGradient(0, 880, 0, 1024);
+      g2.addColorStop(0, 'rgba(40, 34, 20, 0)');
+      g2.addColorStop(1, 'rgba(40, 34, 20, 0.5)');
+      fdctx.fillStyle = g2;
+      fdctx.fillRect(0, 880, 512, 144);
+      fireDoor.needsUpdate = true;
+    }
+    if (tl) {
+      plctx.drawImage(tl, 0, 0, 512, 512);
+      plctx.globalCompositeOperation = 'color';
+      plctx.fillStyle = '#6b6f72';
+      plctx.fillRect(0, 0, 512, 512);
+      plctx.globalCompositeOperation = 'source-over';
+      treadPlate.needsUpdate = true;
+    }
+  });
+
   // Caisse en bois des étagères
-  const [crateCanvas, kctx] = canvas(128);
+  const [crateCanvas, kctx] = hd(128);
   kctx.fillStyle = '#8a6a3f';
   kctx.fillRect(0, 0, 128, 128);
   noise(kctx, 128, 128, 30);
@@ -513,7 +612,7 @@ export function createBackroomsTextures(level = 0) {
   fog.wrapS = fog.wrapT = THREE.RepeatWrapping;
 
   // Cassette VHS
-  const [vhsCanvas, vctx] = canvas(256, 160);
+  const [vhsCanvas, vctx] = hd(256, 160);
   vctx.fillStyle = '#1c1b18';
   vctx.fillRect(0, 0, 256, 160);
   vctx.fillStyle = '#e5dfcc';
@@ -535,7 +634,7 @@ export function createBackroomsTextures(level = 0) {
   vhs.wrapS = vhs.wrapT = THREE.ClampToEdgeWrapping;
 
   // Porte de sortie métallique (sans le panneau, posé à part)
-  const [exitCanvas, ectx] = canvas(256, 512);
+  const [exitCanvas, ectx] = hd(256, 512);
   ectx.fillStyle = '#3b3f45';
   ectx.fillRect(0, 0, 256, 512);
   ectx.strokeStyle = '#25282c';
@@ -560,7 +659,7 @@ export function createBackroomsTextures(level = 0) {
   exit.wrapS = exit.wrapT = THREE.ClampToEdgeWrapping;
 
   // Panneau EXIT lumineux
-  const [signCanvas, sctx] = canvas(256, 96);
+  const [signCanvas, sctx] = hd(256, 96);
   sctx.fillStyle = '#0b0b0b';
   sctx.fillRect(0, 0, 256, 96);
   sctx.fillStyle = '#fff';
@@ -574,7 +673,7 @@ export function createBackroomsTextures(level = 0) {
   // Étiquette de l'eau d'amande : la vraie (photo de la bouteille), deux fois autour (devant et derrière). Le canvas a
   // d'emblée la taille de la photo : une texture déjà envoyée à la carte graphique ne change plus de taille (sinon,
   // à un niveau où la bouteille s'affiche avant la fin du chargement, elle restait sans étiquette).
-  const [labelCanvas, lctx] = canvas(256, 176);
+  const [labelCanvas, lctx] = hd(256, 176);
   lctx.fillStyle = '#f1e7c9';
   lctx.fillRect(0, 0, 256, 176);
   lctx.fillStyle = '#c0306a';
@@ -592,7 +691,7 @@ export function createBackroomsTextures(level = 0) {
   });
 
   // Pavé lumineux encastré (diffuseur prismatique dans son cadre) ; au Level 1, un tube nu sous sa réglette
-  const [lampCanvas, pctx] = canvas(128, 64);
+  const [lampCanvas, pctx] = hd(128, 64);
   pctx.fillStyle = '#3a3a36';
   pctx.fillRect(0, 0, 128, 64);
   pctx.fillStyle = '#ffffff';
@@ -606,7 +705,7 @@ export function createBackroomsTextures(level = 0) {
   lamp.wrapS = lamp.wrapT = THREE.ClampToEdgeWrapping;
 
   // Prise électrique : plaque jaunie, deux trous ronds
-  const [outCanvas, octx] = canvas(64, 96);
+  const [outCanvas, octx] = hd(64, 96);
   octx.fillStyle = '#e4dcc4';
   octx.fillRect(0, 0, 64, 96);
   octx.strokeStyle = 'rgba(80, 70, 50, 0.5)';
@@ -630,7 +729,7 @@ export function createBackroomsTextures(level = 0) {
   outlet.wrapS = outlet.wrapT = THREE.ClampToEdgeWrapping;
 
   // Grille d'aération du faux plafond : lames grises et poussière noire entre elles
-  const [ventCanvas, vtctx] = canvas(128);
+  const [ventCanvas, vtctx] = hd(128);
   vtctx.fillStyle = '#c9c4b2';
   vtctx.fillRect(0, 0, 128, 128);
   vtctx.fillStyle = '#9b9584';
@@ -646,7 +745,7 @@ export function createBackroomsTextures(level = 0) {
   vent.wrapS = vent.wrapT = THREE.ClampToEdgeWrapping;
 
   // Rubalise de chantier : bandes jaunes et noires en biais, plastique un peu froissé
-  const [tapeCanvas, tpctx] = canvas(256, 32);
+  const [tapeCanvas, tpctx] = hd(256, 32);
   tpctx.fillStyle = '#e8c21a';
   tpctx.fillRect(0, 0, 256, 32);
   tpctx.fillStyle = '#16140f';
@@ -672,5 +771,5 @@ export function createBackroomsTextures(level = 0) {
   const drawings = tex(drawCanvas);
   drawings.wrapS = drawings.wrapT = THREE.ClampToEdgeWrapping;
 
-  return { wall, carpet, ceiling, pool, deep, mosaic, vhs, exit, sign, label, steel, crate, fog, lamp, outlet, vent, tape, drawings, ready };
+  return { wall, carpet, ceiling, pool, deep, mosaic, vhs, exit, sign, label, steel, fireDoor, treadPlate, crate, fog, lamp, outlet, vent, tape, drawings, ready, metalReady };
 }

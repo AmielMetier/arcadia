@@ -1,6 +1,6 @@
 // The Backrooms - Interface façon caméscope (REC, signal, bande), jumpscare et écran de fin
 import { ENTITY_IMG, ENTITY_ANIM } from './scene.js';
-import { DEPART_T, PIPES_LEVEL, CASSETTES } from '../engine/sim.js';
+import { DEPART_T, PIPES_LEVEL, CASSETTES, staminaMax } from '../engine/sim.js';
 
 const GOAT_DEATH_IMG = new URL('../img/bouc.jpg', import.meta.url).href;
 const GOAT_DEATH_FADE = 8; // secondes de montée de l'image
@@ -116,6 +116,8 @@ export class BackroomsHUD {
       <div class="crosshair"></div>
 
       <div class="objective-banner" id="objBanner"></div>
+      <!-- Fin d'équipe : l'ascenseur attend les autres, pas longtemps -->
+      <div class="board-timer" id="boardTimer" hidden></div>
       <!-- Spectateur : à l'abri dans l'ascenseur, ou attrapé -->
       <div class="spectate" id="spectate" hidden><b id="specTitle"></b><span id="specSub"></span><small id="specHaunt"></small></div>
       <!-- Le rejeu de la mort, vu de sa tête -->
@@ -162,7 +164,7 @@ export class BackroomsHUD {
     this.$ = (s) => this.el.querySelector(s);
     // les éléments mis à jour à chaque image (on ne les recherche pas à chaque fois)
     this.E = {};
-    for (const id of ['vhsTimer', 'battery', 'levelTag', 'cassetteIcons', 'cassetteText', 'objBanner', 'blackoutTag', 'fadeBar', 'spectate', 'specTitle', 'specSub', 'signal', 'signalBars', 'signalLabel', 'stamina', 'staminaBar', 'crouchTag', 'carryTag', 'inv', 'toast', 'locker', 'lockerText', 'breathBar', 'grab', 'grabBar', 'grabText', 'hurt', 'captions', 'lore', 'loreText', 'loreTag', 'prompt', 'promptText', 'beamBar', 'camSigLbl', 'camNight']) this.E[id] = this.$('#' + id);
+    for (const id of ['vhsTimer', 'battery', 'levelTag', 'cassetteIcons', 'cassetteText', 'objBanner', 'blackoutTag', 'fadeBar', 'spectate', 'specTitle', 'specSub', 'signal', 'signalBars', 'signalLabel', 'stamina', 'staminaBar', 'crouchTag', 'carryTag', 'inv', 'toast', 'locker', 'lockerText', 'breathBar', 'grab', 'grabBar', 'grabText', 'hurt', 'captions', 'lore', 'loreText', 'loreTag', 'prompt', 'promptText', 'beamBar', 'camSigLbl', 'camNight', 'boardTimer']) this.E[id] = this.$('#' + id);
     this.barEls = [...this.E.signalBars.children];
     this.camSigEls = [...this.$('#camSig').children];
     this.camIntEls = [...this.$('#camInt').children];
@@ -277,6 +279,17 @@ export class BackroomsHUD {
     this.bannerT -= dt;
     this.flag('objBanner', 'hide', this.bannerT <= 0);
     this.show('blackoutTag', sim.blackout > 0);
+    // compte à rebours de l'équipe : dehors, il faut courir ; dedans, on regarde les autres arriver
+    const bt = sim.departT > 0 ? 0 : sim.boardT || 0;
+    this.show('boardTimer', bt > 0 && sim.state === 'playing');
+    if (bt > 0) {
+      const sec = Math.ceil(bt);
+      const out = sim.players.filter((p) => p.status === 'alive').length;
+      const sl = slideOf(sim);
+      const what = sl ? 'THE SLIDE' : 'THE ELEVATOR';
+      E.boardTimer.textContent = P.status === 'alive' ? `GET TO ${what} · DOORS CLOSE IN ${sec}s` : `WAITING FOR ${out} · DOORS CLOSE IN ${sec}s`;
+      E.boardTimer.classList.toggle('urgent', bt <= 10);
+    }
 
     // 2a. Trajet en ascenseur : barre de chargement ; à l'arrivée, la carte de l'étage (même si l'annonce s'est perdue)
     if (this.fadeRide) {
@@ -333,13 +346,17 @@ export class BackroomsHUD {
     }
 
     // 4. Souffle : la jauge n'apparaît que quand elle sert (HUD minimal)
+    // la jauge s'allonge avec chaque eau d'amande bue (100 au départ)
+    const smax = staminaMax(P);
     const st = Math.round(P.stamina);
-    if (this.cache.st !== st) {
+    if (this.cache.st !== st || this.cache.smax !== smax) {
       this.cache.st = st;
-      E.staminaBar.style.width = `${st}%`;
+      this.cache.smax = smax;
+      E.staminaBar.style.width = `${Math.min(100, (st / smax) * 100)}%`;
+      E.stamina.style.setProperty('--smax', smax / 100);
     }
     this.flag('staminaBar', 'low', st < 25);
-    this.flag('stamina', 'idle', st >= 99 && !P.running);
+    this.flag('stamina', 'idle', st >= smax - 1 && !P.running);
     this.show('crouchTag', !!P.crouch && P.status === 'alive');
     // Level 1 : les fusibles en poche
     const carry = P.carry ? P.carry.length : P.carryN || 0;

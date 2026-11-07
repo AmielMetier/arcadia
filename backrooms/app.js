@@ -1,5 +1,5 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
-import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL } from './engine/sim.js';
+import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, staminaMax } from './engine/sim.js';
 import { hasLineOfSight } from './engine/nav.js';
 import { createBackroomsScene, setMonsterMode, setSceneOptions } from './view/scene.js';
 import { BackroomsSfx } from './view/sfx.js';
@@ -357,6 +357,8 @@ document.addEventListener('mousemove', (e) => {
 function useSlot(i, tap = false) {
   if (i === 0) {
     toggleFlashlightRequested = true;
+    // le clic de l'interrupteur, tout de suite (même sans pile : on l'entend cliquer dans le vide)
+    if (sfx && sim && sim.player.status === 'alive' && sim.player.hasLamp) sfx.lampClick(!sim.player.flashlight);
     return;
   }
   if (tap && sim && sim.player.sel === i) act.use = true;
@@ -456,6 +458,7 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
     stageEl.innerHTML = '';
   }
   scene = createBackroomsScene(stageEl, sim.floors);
+  scene.onDrip = (pos) => sfx && sfx.drip(pos);
   if (hud) {
     hud.$('#endScreen').hidden = true;
     hud.lastCount = -1;
@@ -647,10 +650,22 @@ function handleEvent(ev, me) {
       }
       if (ev.id === me && hud) hud.toast("You couldn't hold it…");
       break;
+    case 'flashlight': {
+      // le clic de la lampe d'un coéquipier, entendu de près (le sien sonne déjà à l'appui)
+      if (mine || !sfx) break;
+      const Q = sim.players.find((p) => p.id === ev.id);
+      if (Q && (Q.floor || 0) === (sim.player.floor || 0) && Math.hypot(Q.x - sim.player.x, Q.z - sim.player.z) < 14) sfx.lampClick(ev.on, { x: Q.x, z: Q.z });
+      break;
+    }
     case 'phantom':
       // une fausse alerte : un son sans rien derrière (ou un néon qui claque vraiment)
       if (!sfx) break;
       if (ev.kind === 'neon') sfx.neonClick({ x: ev.x, z: ev.z }, ev.quiet ? 0.7 : 1);
+      else if (ev.kind === 'row') {
+        if ((ev.floor || 0) === (sim.player.floor || 0)) sfx.neonRow({ x: ev.x, z: ev.z }, ev.n);
+      } else if (ev.kind === 'surge') {
+        if ((ev.floor || 0) === (sim.player.floor || 0)) sfx.neonSurge({ x: ev.x, z: ev.z });
+      }
       else if (ev.kind === 'whistle') {
         // l'entité imite le sifflet d'un coéquipier… qui est ailleurs ; seul celui qui est visé l'entend
         if (ev.id !== me) break;
@@ -741,7 +756,7 @@ function handleEvent(ev, me) {
     case 'bottle':
       if (!mine) break;
       if (sfx) sfx.bottle();
-      if (hud) hud.toast('Almond water: you catch your breath');
+      if (hud) hud.toast('Almond water: you catch your breath, and your stamina grows for good');
       break;
     case 'battery':
       if (!mine) break;
@@ -823,6 +838,14 @@ function handleEvent(ev, me) {
       if (hud && ev.id !== me) hud.toast(sl ? `${ev.name} slid into the ${sl.name.toLowerCase()} slide` : `${ev.name} is in the elevator`);
       break;
     }
+    case 'boardCount':
+      // les portes vont se fermer : la cabine sonne, et à 10 s un second coup plus pressant
+      if (sfx && ev.t <= 10) sfx.ding();
+      if (hud && ev.start && sim.player.status === 'alive') hud.toast(`The doors close in ${ev.t}s… get in, it's coming`);
+      break;
+    case 'leftBehind':
+      if (hud) hud.toast(ev.id === me ? 'The doors closed without you' : `${ev.name} was left behind`);
+      break;
     case 'depart':
       if (sfx && ev.level === 2) sfx.splashDown();
       else if (sfx) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
@@ -836,6 +859,7 @@ function handleEvent(ev, me) {
       if (scene) scene.dispose();
       stageEl.innerHTML = '';
       scene = createBackroomsScene(stageEl, sim.floors);
+      scene.onDrip = (pos) => sfx && sfx.drip(pos);
       sim.spectate = 0;
       stepDist = 0;
       scene.tape('bars', 0.8);
@@ -1325,7 +1349,7 @@ function frame(currentTime) {
     if (sfx) {
       // le souffle : sprint, puis halètement le temps de récupérer, et la peur quand l'entité est là
       const P = sim.player;
-      const tired = 1 - P.stamina / 100;
+      const tired = 1 - P.stamina / staminaMax(P);
       // discret : on l'entend surtout en courant ; à l'arrêt, juste un reste de halètement quand on est vraiment à bout
       const run = P.running && P.moving ? 0.3 + tired * 0.4 : 0;
       const pant = tired > 0.55 ? ((tired - 0.55) / 0.45) * 0.3 : 0;

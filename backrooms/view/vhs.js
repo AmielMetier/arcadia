@@ -35,6 +35,7 @@ const FX_DEFAULTS = {
   danger: 0, // danger plancher : l'image n'est jamais moins brouillée que ça, quoi que passe render()
   cam: 0, // 0 : à l'œil nu, 1 : au caméscope (la transition est faite par l'appelant)
   night: 0, // mode nuit du caméscope (0 à 1)
+  haze: 0, // brume de chaleur au loin : l'air tremble et jaunit (0 à 1)
 };
 // les effets plein écran que l'option « flashs adoucis » ralentit
 const SLEW_KEYS = ['tracking', 'signalLoss', 'bars', 'splice'];
@@ -71,7 +72,12 @@ uniform float uBright;
 uniform float uCam;     // 0 : à l'œil nu, 1 : au caméscope
 uniform float uBox;     // largeur visible de l'image (4:3 au caméscope, 1 sinon)
 uniform float uNight;   // mode nuit du caméscope (0 à 1)
+uniform sampler2D tDepth; // profondeur de la scène (brume de chaleur)
+uniform float uHaze;
+uniform float uNear;
+uniform float uFar;
 varying vec2 vUv;
+vec2 gHz = vec2(0.0); // décalage de la brume de chaleur, ajouté à chaque lecture de la scène
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 // bruit lissé en largeur : les taches de couleur de la bande s'étirent à l'horizontale
@@ -85,7 +91,7 @@ float vnoise(float x, float y) {
 vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
 
 // de l'image 4:3 du caméscope à la scène rendue (on en garde le centre)
-vec2 S(vec2 uv) { return vec2((uv.x - 0.5) * uBox + 0.5, uv.y); }
+vec2 S(vec2 uv) { return vec2((uv.x - 0.5) * uBox + 0.5, uv.y) + gHz; }
 vec3 grab(vec2 uv) { return texture2D(tDiffuse, S(uv)).rgb; }
 
 // mire de barres SMPTE simplifiée : blanc, jaune, cyan, vert, magenta, rouge, bleu à 75 %
@@ -176,6 +182,15 @@ void main() {
   // objectif bombé (au caméscope)
   vec2 c = uv - 0.5;
   uv = 0.5 + c * mix(1.0, 0.975 + 0.09 * dot(c, c), cm);
+  // brume de chaleur : au-delà d'une dizaine de mètres, l'air tremble en vagues lentes et prend une teinte jaune
+  float hzA = 0.0;
+  if (uHaze > 0.001) {
+    float zd = texture2D(tDepth, S(uv)).r;
+    float zl = 2.0 * uNear * uFar / (uFar + uNear - (2.0 * zd - 1.0) * (uFar - uNear));
+    hzA = smoothstep(8.0, 24.0, zl) * uHaze;
+    float wv = sin(uv.y * 150.0 + uTime * 5.3 + sin(uv.x * 37.0 + uTime * 1.7) * 2.2);
+    gHz = vec2(wv * 0.0021, sin(uv.x * 110.0 - uTime * 4.1) * 0.0009) * hzA;
+  }
 
   // 2. L'IMAGE DU CAMÉSCOPE
   // bavure des couleurs (rouge et bleu décalés) et flou horizontal de la bande magnétique
@@ -192,6 +207,8 @@ void main() {
   if (uBloomOn > 0.5) col += texture2D(tBloom, S(uv)).rgb * (1.1 + cm * 0.5);
   // balance des blancs du caméscope
   col *= uWhite;
+  // le lointain jaunit, comme un air chaud et sale
+  col = mix(col, col * vec3(1.16, 1.03, 0.58) + vec3(0.016, 0.012, 0.001), hzA * 0.8);
 
   col = aces(col * uExposure);
   col = pow(col, vec3(1.0 / 2.2));
@@ -251,6 +268,19 @@ void main() {
     vec3 snc = vec3(sn) + (vec3(hash(vec2(sy, vUv.x * 9.1)), hash(vec2(vUv.x * 7.3, sy)), hash(vec2(sy * 1.7, vUv.x))) - 0.5) * 0.08;
     if (soft > 0.5) snc = mix(vec3(0.4), snc, 0.6);
     col = mix(col, snc, snowAmt);
+  }
+  // au caméscope : la neige de fond d'un signal faible (permanente, plus forte par bouffées), une barre de bruit qui
+  // roule lentement de haut en bas, et des lignes qui décrochent
+  if (cm > 0.001) {
+    float sy2 = floor(vUv.y * uLines) + sfr * 7.13 + 3.0;
+    float sn2 = hash(vec2(floor(vUv.x * uRes.x * 0.5), sy2));
+    float gust = step(0.82, hash(vec2(floor(uTime * 3.0), 4.2)));
+    float st = cm * (0.1 + 0.07 * gust) * (soft > 0.5 ? 0.6 : 1.0);
+    col = mix(col, vec3(sn2 * sn2 * 1.2), st);
+    float rb = 1.0 - smoothstep(0.0, 0.045, abs(fract(vUv.y + uTime * 0.07) - 0.5));
+    col = mix(col, vec3(sn2) * 0.9, rb * cm * 0.22);
+    float drop = step(0.985, hash(vec2(floor(vUv.y * uLines * 0.5), fr)));
+    col = mix(col, vec3(0.9), drop * cm * 0.35);
   }
   // flash du raccord
   col += uSplice * uSplice * uSplice * 0.3 * (soft > 0.5 ? 0.25 : 1.0);
@@ -325,6 +355,8 @@ export function createVhsFilter(renderer) {
     magFilter: THREE.LinearFilter,
     depthBuffer: true,
   });
+  // la profondeur, lue par la brume de chaleur
+  target.depthTexture = new THREE.DepthTexture(4, 4);
   const half = () => new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false });
   const bloomA = half();
   const bloomB = half();
@@ -359,6 +391,10 @@ export function createVhsFilter(renderer) {
       uCam: { value: 0 },
       uBox: { value: 1 },
       uNight: { value: 0 },
+      tDepth: { value: target.depthTexture },
+      uHaze: { value: 0 },
+      uNear: { value: 0.1 },
+      uFar: { value: 100 },
     },
     vertexShader,
     fragmentShader,
@@ -498,6 +534,9 @@ export function createVhsFilter(renderer) {
       // au caméscope : l'image 4:3 au centre, deux bandes noires sur les côtés (rien si l'écran est déjà étroit)
       U.uCam.value = fx.cam;
       U.uNight.value = fx.night * fx.cam;
+      U.uHaze.value = fx.haze;
+      U.uNear.value = camera.near;
+      U.uFar.value = camera.far;
       U.uBox.value = 1 + (Math.min(1, (ch * 4) / 3 / cw) - 1) * fx.cam;
       // mise au point qui cherche : le flou respire un peu autour de la valeur demandée
       const focus = fx.focus > 0.001 ? clamp(fx.focus * (0.88 + 0.12 * Math.sin(time * 4.1) * Math.sin(time * 1.3 + 1)), 0, 1) : 0;

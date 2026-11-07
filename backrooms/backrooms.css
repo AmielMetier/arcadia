@@ -81,7 +81,7 @@ html, body {
 
 .tape-date { font-size: 26px; margin-bottom: 6px; }
 .stamina { display: flex; align-items: center; gap: 10px; font-size: 22px; }
-.stamina-track { width: 160px; height: 12px; border: 2px solid currentColor; padding: 1px; }
+.stamina-track { width: calc(210px * var(--smax, 1)); max-width: max(110px, calc(50vw - 290px - var(--bx, 0px))); height: 18px; border: 2px solid currentColor; padding: 2px; transition: width 0.6s ease; }
 .stamina-bar { height: 100%; width: 100%; background: currentColor; }
 .stamina-bar.low { background: #ff3b3b; animation: recBlink 0.5s steps(1) infinite; }
 
@@ -141,6 +141,20 @@ html, body {
   transition: opacity 1s ease;
 }
 .objective-banner.hide { opacity: 0; }
+.board-timer {
+  position: absolute;
+  top: calc(18% + 46px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  font-size: 26px;
+  text-align: center;
+  color: #ffd84a;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 3px 14px;
+}
+.board-timer.urgent { color: #ff5a4a; animation: recBlink 0.6s steps(1) infinite; }
 .objective-banner.unlocked { color: #7dffa0; }
 .vhs-level { font-size: 22px; opacity: 0.8; margin-top: 2px; }
 .blackout-tag { font-size: 22px; color: #ff6b5b; margin-top: 6px; animation: recBlink 0.9s steps(1) infinite; }
@@ -508,7 +522,7 @@ body.touch .click-prompt .ctrl-choice { display: none; }
   .prompt { bottom: 152px; font-size: 16px; white-space: normal; width: 86vw; }
   .inv .slot { width: 60px; height: 50px; }
   .icon-btn { top: 16px; right: 50%; transform: translateX(50%); }
-  .stamina-track { width: 90px; }
+  .stamina-track { width: calc(130px * var(--smax, 1)); height: 14px; }
   .objective-banner { font-size: 20px; }
 }
 
@@ -626,14 +640,14 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 .tc-calib i { width: 46px; height: 46px; display: block; background: #050505; }
 .tc-calib span { width: 100%; font-size: 15px; opacity: 0.8; text-align: center; }
 
-/* À l'œil nu : pas d'incrustations de caméscope (REC, compteur, coins du viseur, signal), un texte net */
+/* À l'œil nu : pas d'incrustations de caméscope (REC, compteur, coins du viseur), un texte net ; la jauge de signal
+   des objectifs reste toujours là */
 #hud:not(.camcorder) { text-shadow: 0 0 6px rgba(0, 0, 0, 0.7), 0 1px 2px rgba(0, 0, 0, 0.6); }
 #hud:not(.camcorder) .vhs-rec,
 #hud:not(.camcorder) .vhs-play,
 #hud:not(.camcorder) #vhsTimer,
 #hud:not(.camcorder) .tape-date,
 #hud:not(.camcorder) .corner,
-#hud:not(.camcorder) #signal,
 #hud:not(.camcorder) .cam-bar { display: none; }
 
 /* Au caméscope (V) : les incrustations se calent dans l'image 4:3, entre les bandes noires */
