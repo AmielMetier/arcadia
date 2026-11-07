@@ -234,7 +234,7 @@ export function stairDoor(st) {
   const v = 1.5 * CELL_SIZE;
   return { x: st.ox + st.dx * u + st.px * v, z: st.oz + st.dz * u + st.pz * v, st };
 }
-// L'empreinte d'une carte : les murs et les cages d'escalier de chaque étage. Tout le monde construit la même à partir
+// L'empreinte d'une carte : les murs, les cages d'escalier, les cassettes, les objets, la clé et l'ascenseur de chaque étage. Tout le monde construit la même à partir
 // de la graine ; si l'empreinte de l'hôte diffère, c'est que ce navigateur fait tourner une autre version du jeu.
 export function mapPrint(floors) {
   let h = 2166136261;
@@ -248,6 +248,16 @@ export function mapPrint(floors) {
     const g = f.grid || [];
     for (let i = 0; i < g.length; i++) mix(g[i] + i * 7);
     for (const st of f.stairs || []) for (const k of st.cells || []) mix(k.gx * 131 + k.gz);
+    // et tout ce qu'on cherche : cassettes, objets, clé, ascenseur, néons
+    const at = (o) => {
+      mix(Math.round((o.x || 0) * 10));
+      mix(Math.round((o.z || 0) * 10));
+    };
+    for (const c of f.cassettes || []) { mix(c.id); at(c); }
+    for (const it of f.items || []) { mix((it.kind || '').length); at(it); }
+    if (f.key) at(f.key);
+    if (f.elevator) at(f.elevator);
+    mix((f.lights || []).length);
   }
   return (h >>> 0).toString(36);
 }

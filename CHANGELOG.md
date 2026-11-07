@@ -1,9 +1,11 @@
 # Journal des versions — Arcadia
 
 ## 4.62 — 7 novembre 2026
+- **The Backrooms** — Tout le monde a enfin la même carte : escaliers, cassettes et objets au même endroit pour chaque joueur.
+  - Le jeu se charge toujours en entier à la version du Hub : un navigateur ne peut plus mélanger des fichiers d'une ancienne version (gardés en mémoire) avec ceux de la nouvelle, ce qui donnait une autre carte que celle des coéquipiers.
+  - Si les cartes diffèrent malgré tout (quelqu'un a encore une vieille version ouverte), un message dit qui doit recharger la page, chez l'hôte comme chez l'invité, et revient tant que ce n'est pas réglé.
 - **The Backrooms** — Un multijoueur plus solide, et des voix plus claires.
   - Fini les téléportations : quand le jeu de l'hôte se fige un instant (une saccade, ou un passage sur un autre onglet), les autres ne sont plus ramenés en arrière.
-  - À plusieurs, la partie continue même si quelqu'un passe sur une autre fenêtre : l'entité et les autres joueurs ne se figent plus chez tout le monde.
   - Les coéquipiers se déplacent de façon fluide à l'écran, au lieu d'avancer par petits sauts.
   - Les bruits d'ambiance (enregistrements lointains, tôle qui craque, coups dans les conduites…) arrivent en même temps chez tout le monde, au même endroit du niveau : fort pour celui qui est à côté, étouffé pour celui qui est loin.
   - Les voix des joueurs sont plus fortes et toutes au même niveau, qu'on chuchote ou qu'on parle fort ; les grésillements du talkie ne sont pas remontés avec elles.

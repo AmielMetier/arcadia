@@ -1,8 +1,9 @@
 // Tests unitaires du moteur des Backrooms : node tools/test-backrooms.mjs
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
 
@@ -489,6 +490,23 @@ test("à plusieurs : après un gel de l'hôte, la position de l'invité est repr
   }
   assert.ok(amb.length >= 1, `des ambiances (${amb.length})`);
   for (const e of amb) assert.ok(Number.isFinite(e.x) && Number.isFinite(e.a) && e.u >= 0 && e.u <= 1 && ['rec', 'a', 'b', 'c'].includes(e.s));
+});
+
+test("même version, même carte : tous les fichiers du jeu sont versionnés, et l'empreinte voit une cassette déplacée", () => {
+  const html = fs.readFileSync(new URL('../backrooms/index.html', import.meta.url), 'utf8');
+  const listed = new Set([...html.matchAll(/'((?:engine|view)\/[\w-]+\.js|app\.js)'/g)].map((m) => m[1]));
+  for (const dir of ['', 'engine/', 'view/']) {
+    for (const f of fs.readdirSync(new URL('../backrooms/' + dir, import.meta.url))) {
+      if (f.endsWith('.js')) assert.ok(listed.has(dir + f), `backrooms/index.html doit charger ${dir + f} à la version du Hub`);
+    }
+  }
+  const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }];
+  const a = new BackroomsSim({ seed: 77, players, localId: 1 });
+  const b = new BackroomsSim({ seed: 77, players, localId: 2 });
+  assert.equal(a.fp, b.fp, 'même graine, même empreinte');
+  const cas = b.floors[1].cassettes[0];
+  cas.x += 5;
+  assert.notEqual(mapPrint(b.floors), a.fp, 'une cassette ailleurs : empreinte différente');
 });
 
 test('prélude : avant la première cassette, rien que la première apparition ; l\'entité n\'est pas là', () => {

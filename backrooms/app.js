@@ -388,17 +388,27 @@ function initGame(settings = lastSettings, forceLevel = null) {
 
 // Invité : la carte de l'hôte a-t-elle la même empreinte que la nôtre ? Sinon (une version plus ancienne en cache),
 // les murs, les escaliers et les objets ne sont pas aux mêmes endroits chez nous : on prévient, une fois par étage.
-let printWarned = '';
+// Le message revient toutes les 40 s tant que les cartes diffèrent : la partie n'est pas jouable ainsi.
+const GAME_V = new URLSearchParams(location.search).get('v') || ''; // la version du Hub qui a lancé le jeu
+let hostV = '';
+let printWarnT = -Infinity;
+const verLabel = (v) => (v ? `V${v}` : 'AN OLD VERSION');
 function checkPrint(fp) {
   if (typeof fp !== 'string' || !sim || fp === sim.fp) return;
-  const k = `${NET.run}:${sim.level}`;
-  if (printWarned === k) return;
-  printWarned = k;
-  if (hud) hud.toast('YOUR GAME IS OUT OF DATE · RELOAD THE PAGE (CTRL+SHIFT+R)', 12);
-  send(H.info.hostId, { t: 'fp' });
+  const now = performance.now();
+  if (now - printWarnT < 40000) return;
+  printWarnT = now;
+  const older = hostV && GAME_V && hostV !== GAME_V ? (+hostV > +GAME_V ? 'you' : 'host') : '';
+  const msg = older === 'host'
+    ? `MAPS DON'T MATCH · THE HOST HAS ${verLabel(hostV)}, YOU HAVE ${verLabel(GAME_V)} · THE HOST MUST RELOAD (CTRL+SHIFT+R)`
+    : older === 'you'
+      ? `MAPS DON'T MATCH · YOU HAVE ${verLabel(GAME_V)}, THE HOST HAS ${verLabel(hostV)} · RELOAD THE PAGE (CTRL+SHIFT+R)`
+      : "MAPS DON'T MATCH · SOMEONE HAS AN OLD VERSION · EVERYONE RELOAD (CTRL+SHIFT+R)";
+  if (hud) hud.toast(msg, 14);
+  send(H.info.hostId, { t: 'fp', v: GAME_V });
 }
 
-const goMessage = () => ({ t: 'go', run: NET.run, seed: sim.seed, diff: sim.difficulty, players: sim.roster, lv: sim.level, vip: monstersVip, dy: dailyLabel });
+const goMessage = () => ({ t: 'go', v: GAME_V, run: NET.run, seed: sim.seed, diff: sim.difficulty, players: sim.roster, lv: sim.level, vip: monstersVip, dy: dailyLabel });
 
 let monstersVip = false;
 function startRun({ seed, difficulty, players, run, level, vip = false }) {
@@ -416,7 +426,6 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   sim = new BackroomsSim({ difficulty, seed, players, localId: NET.myId, level, skill }); // les étages sortent de la graine
   if (NET.role !== 'solo') {
     ensureVoice().sync(players.map((p) => p.id));
-    startBackgroundTicker();
   }
   runStats = { seen: 0, rushes: 0, escapes: 0, closest: Infinity, haunts: 0 };
   tapeFrames = [];
@@ -494,9 +503,14 @@ function onMsg(from, m) {
     } else if (m.t === 'i' && m.run === NET.run) {
       NET.inputs[from] = { seq: Number.isFinite(+m.n) ? +m.n : undefined, vo: num(m.vo, 0, 1), ra: !!m.ra, mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 100), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) }, v: m.v };
     } else if (m.t === 'fp' && hud) {
-      // un invité n'a pas la même carte que nous : il tourne sur une autre version du jeu
+      // un invité n'a pas la même carte que nous : l'un des deux tourne sur une autre version du jeu
       const p = H.players.find((q) => q.id === from);
-      hud.toast(`${((p && p.name) || 'A player').toUpperCase()} HAS ANOTHER VERSION OF THE GAME · THEY MUST RELOAD`);
+      const who = ((p && p.name) || 'A player').toUpperCase();
+      const gv = typeof m.v === 'string' ? m.v.slice(0, 8) : '';
+      const meOlder = gv && GAME_V && +gv > +GAME_V;
+      hud.toast(meOlder
+        ? `MAPS DON'T MATCH · ${who} HAS ${verLabel(gv)}, YOU HAVE ${verLabel(GAME_V)} · RELOAD THE PAGE (CTRL+SHIFT+R)`
+        : `MAPS DON'T MATCH · ${who} HAS ${verLabel(gv)} · THEY MUST RELOAD (CTRL+SHIFT+R)`, 14);
     } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'p', 't', 'b', 'h', 'g'].includes(m.k)) {
       const q = NET.actions[from] || (NET.actions[from] = []);
       if (q.length < 8) q.push({ k: m.k, sel: m.s === 2 ? 2 : 1, side: m.side > 0 ? 1 : -1, n: Math.max(1, Math.min(4, m.n | 0)) });
@@ -506,6 +520,7 @@ function onMsg(from, m) {
   if (NET.role !== 'guest' || from !== H.info.hostId) return; // invité : seul l'hôte fait foi
   NET.lastHost = performance.now();
   if (m.t === 'go') {
+    hostV = typeof m.v === 'string' ? m.v.slice(0, 8) : '';
     if (m.run !== NET.run || !sim) {
       dailyLabel = typeof m.dy === 'string' ? m.dy.slice(0, 12) : null;
       startRun({ seed: m.seed, difficulty: m.diff, players: m.players || [], run: m.run, level: m.lv || 0, vip: !!m.vip });
@@ -978,31 +993,10 @@ function readPad() {
   return { lx: p.axes[0] || 0, ly: p.axes[1] || 0, rx: p.axes[2] || 0, ry: p.axes[3] || 0, run: b(4) || b(6) || b(10) };
 }
 
-let lastRaf = 0;
+// (onglet en arrière-plan : shared/bridge.js fait passer requestAnimationFrame par une minuterie, la partie continue)
 function loop(currentTime) {
   requestAnimationFrame(loop);
-  lastRaf = performance.now();
   frame(currentTime);
-}
-
-// Onglet en arrière-plan : le navigateur suspend requestAnimationFrame. Seul, ça fige la partie (c'est voulu) ; à
-// plusieurs, l'hôte figé figeait tout le monde (l'entité, les instantanés), et un invité caché revenait en se
-// « téléportant ». Une petite horloge dans un worker (que le navigateur ne ralentit pas) prend alors le relais :
-// la partie continue sans image, au rythme de 20 pas par seconde.
-let bgTicker = null;
-function startBackgroundTicker() {
-  if (bgTicker || typeof Worker === 'undefined') return;
-  try {
-    const src = 'setInterval(() => postMessage(0), 50);';
-    bgTicker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
-    bgTicker.onmessage = () => {
-      if (!sim || !multi()) return;
-      if (performance.now() - lastRaf < 250) return; // les images tournent : rien à faire
-      frame(performance.now());
-    };
-  } catch (e) {
-    bgTicker = null;
-  }
 }
 
 function frame(currentTime) {

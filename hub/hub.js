@@ -649,6 +649,7 @@ renderPlayers(); renderNet(); pubState(); renderFriends(); renderPings();
     const role = room.mode === 'solo' ? 'solo' : room.isHost ? 'host' : 'guest';
     const q = new URLSearchParams({ hub: '1', role, game: g.id });
     if (room.code) q.set('code', room.code);
+    q.set('v', VERSION); // les fichiers du jeu sont chargés à cette version : tout le salon a les mêmes
     const pass = new URLSearchParams(location.search);
     for (const k of ['debug', 'ws', 'mute']) if (pass.has(k)) q.set(k, pass.get(k));
     let src = def.url + '?' + q.toString() + (DDNet.LOCAL_TEST ? '&local' : '');
