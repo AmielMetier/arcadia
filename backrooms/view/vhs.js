@@ -354,6 +354,8 @@ export function createVhsFilter(renderer) {
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
     depthBuffer: true,
+    // anticrénelage : 4 échantillons par pixel (bords des murs, des néons et des piliers sans marches d'escalier)
+    samples: renderer.capabilities && renderer.capabilities.isWebGL2 === false ? 0 : 4,
   });
   // la profondeur, lue par la brume de chaleur
   target.depthTexture = new THREE.DepthTexture(4, 4);

@@ -1962,7 +1962,7 @@ test('Level 37 : on traverse chaque porte en marchant, les cloisons arrêtent le
 // --- Level 2 : les galeries, les halles et le troupeau ---
 import { createPipesMap, Z as Z2, PIPES_LEVEL } from '../backrooms/engine/level2.js';
 import { GOAT_MODES, ALPHA_RAGE, ALPHA_TAME, isLit as isLitL2 } from '../backrooms/engine/goats.js';
-import { BREAKER_T, BLOW_DELAY, VALVE_T, ALMOND_GROW, staminaMax, WALK_SPEED, CHASE_MIN } from '../backrooms/engine/sim.js';
+import { BREAKER_T, BLOW_DELAY, VALVE_T, ALMOND_GROW, staminaMax, WALK_SPEED, CHASE_MIN, DOOR_GAP } from '../backrooms/engine/sim.js';
 
 // un bout de galerie droite de n cases, sans grille, jet, renfoncement ni objet : { x0, z } (le long de x) ou null
 const straightRun = (m, n) => {
@@ -2409,6 +2409,27 @@ test("poursuite : plus rapide qu'un joueur qui marche, droit sur lui, sans tourn
   assert.ok(M.speed >= WALK_SPEED * CHASE_MIN - 1e-6, `vitesse ${M.speed.toFixed(2)} m/s`);
   assert.ok(d0 - d1 > 3.5, `elle gagne du terrain sur un joueur qui marche (${d0.toFixed(1)} → ${d1.toFixed(1)} m)`);
   assert.ok(reversals <= 1, `elle ne zigzague pas (${reversals} changements de sens)`);
+});
+
+
+test("porte cadenassée de l'escalier : on bute à DOOR_GAP du battant (plus de vue à travers), et elle cogne", () => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 5 });
+  const P = sim.player;
+  assert.ok(sim.stairsLocked, 'la porte est cadenassée');
+  const st = sim.stairs[0];
+  const C = CELL_SIZE;
+  const W = (u, v) => ({ x: st.ox + st.dx * u + st.px * v, z: st.oz + st.dz * u + st.pz * v });
+  const p = W(-1.5, 1.5 * C);
+  P.x = p.x;
+  P.z = p.z;
+  P.floor = 0;
+  sim.drainEvents();
+  const door = W(0, 1.5 * C);
+  P.yaw = Math.atan2(-(door.x - P.x), -(door.z - P.z));
+  run(sim, 2, { my: 1, yaw: P.yaw });
+  const u = stairLocal(st, P.x, P.z).u;
+  assert.ok(u <= -DOOR_GAP + 1e-6, `arrêté à ${(-u).toFixed(2)} m du battant`);
+  assert.ok(sim.drainEvents().some((e) => e.type === 'locked'), 'la chaîne cogne');
 });
 
 console.log(`\n${count} tests réussis pour The Backrooms !`);

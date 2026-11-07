@@ -91,6 +91,7 @@ export const BLOW_DELAY = 2.2; // la vanne fermée, les néons de son secteur gr
 export const BURN_LOCK = 0.9; // brûlé par un jet de vapeur : repoussé, sonné un instant
 export const BURN_STAMINA = 45;
 export const DEPART_T = 3; // secondes entre la fermeture des portes et l'arrivée
+export const DOOR_GAP = 0.32; // distance minimale entre le joueur et la porte cadenassée de l'escalier
 export const BOARD_T = 45; // dès qu'un joueur est dans l'ascenseur, les autres ont ce temps pour le rejoindre
 // coupures de courant du Level 1 : toutes les 45 à 80 s (et seulement après un moment de calme), pendant 15 à 20 s
 export const BLACKOUT_EVERY = [45, 80];
@@ -1094,6 +1095,23 @@ export class BackroomsSim {
     const C = CELL_SIZE;
     const from = stairAt(this.stairs, P.x, P.z);
     const to = stairAt(this.stairs, nx, nz);
+    // la porte cadenassée : on s'arrête à DOOR_GAP du battant (collé contre, on voyait à travers) ; pousser dessus la
+    // fait cogner contre sa chaîne
+    if (!from && (P.floor || 0) === 0 && this.stairsLocked) {
+      for (const st of this.stairs) {
+        const q = stairLocal(st, nx, nz);
+        if (q.u <= -DOOR_GAP || q.u > 0.6 || q.v < C - 0.1 || q.v > 2 * C + 0.1) continue;
+        const p0 = stairLocal(st, P.x, P.z);
+        if (q.u <= p0.u + 1e-4) continue; // on s'en éloigne (en sortant de la cage, par exemple) : libre
+        if (!(P.lockedT > 0)) {
+          P.lockedT = 1.6;
+          this.makeNoise(P, NOISE.pick, 0.6);
+          this.emit({ type: 'locked', id: P.id, x: P.x, z: P.z, floor: P.floor });
+        }
+        const u = Math.min(q.u, Math.max(p0.u, -DOOR_GAP));
+        return { x: st.ox + st.dx * u + st.px * q.v, z: st.oz + st.dz * u + st.pz * q.v };
+      }
+    }
     if (!from && !to) return { x: nx, z: nz };
     const st = (from || to).st;
     const r = 0.3; // demi-largeur du joueur entre les rampes
