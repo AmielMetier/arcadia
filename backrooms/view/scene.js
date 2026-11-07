@@ -2426,7 +2426,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   const replayP = { x: 0, z: 0, yaw: 0, pitch: 0, floor: 0, status: 'dead', moving: false, crouch: false, hidden: -1, grabT: 0, tilt: 0 };
   let frameAvg = 16;
   let lines = 720;
-  const avatarPos = new Map(); // position lissée de chaque coéquipier à l'écran
+  const avatarPos = new Map(); // position affichée de chaque coéquipier (sa piste interpolée)
   let focusT = 0;
   let focusPulse = 0; // temps restant de la « chasse » de mise au point en cours
   let focusWait = 3 + Math.random() * 4; // secondes de course avant la prochaine
@@ -2526,6 +2526,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     render(sim, time) {
       const dt = Math.min(0.1, Math.max(0, time - lastTime));
       lastTime = time;
+      const nowS = performance.now() / 1000; // l'horloge des pistes d'affichage des coéquipiers (sim.netSample)
       // la caméra suit le joueur de cet écran, ou celui qu'il regarde quand il est spectateur ; pendant le rejeu, elle
       // est dans la tête de l'entité
       let RF = null;
@@ -2755,17 +2756,17 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       for (const Q of sim.players) {
         const show = Q !== P && Q.status === 'alive' && !(Q.hidden >= 0); // un coéquipier caché dans un casier ne se voit pas
         if (!show && !avatars.has(Q.id)) continue;
-        // à l'écran, chacun glisse vers sa dernière position connue : chez l'hôte, les invités n'arrivent que 20 fois
-        // par seconde (ils avançaient par petits sauts) ; un vrai saut (chute, étage, rattrapage) reste net
+        // à l'écran, chacun suit sa piste : les positions reçues (20 par seconde), interpolées un peu dans le passé,
+        // donc un mouvement régulier ; un vrai saut (chute, étage, rattrapage) reste net
         let S = avatarPos.get(Q.id);
-        if (!S || S.f !== (Q.floor || 0) || Math.hypot(Q.x - S.x, Q.z - S.z) > 3) S = { x: Q.x, z: Q.z, f: Q.floor || 0 };
-        else {
-          const k = 1 - Math.exp(-dt * 18);
-          S.x += (Q.x - S.x) * k;
-          S.z += (Q.z - S.z) * k;
+        if (!S) avatarPos.set(Q.id, (S = { x: 0, z: 0, yaw: 0, f: 0 }));
+        if (!sim.netSample(Q.id, nowS, S, Q)) {
+          S.x = Q.x;
+          S.z = Q.z;
+          S.yaw = Q.yaw;
         }
-        avatarPos.set(Q.id, S);
-        const D = { ...Q, x: S.x, z: S.z };
+        S.f = Q.floor || 0;
+        const D = { ...Q, x: S.x, z: S.z, yaw: S.yaw };
         const qv = floorViews[Q.floor || 0];
         const qm = sim.fm(Q.floor || 0);
         const y = feetY(sim.stairs, D.x, D.z, D.floor) + (D.onLadder ? 1.0 : 0) + (D.jy || 0) - (qm.depthAt ? qm.depthAt(D.x, D.z) : 0);

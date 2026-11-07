@@ -22,6 +22,7 @@ import { createWarehouseMap } from './level1.js';
 import { createPoolMap, MOUTH } from './poolrooms.js';
 import { createPipesMap, VALVES, PIPES_LEVEL, jetState, inJet, JET_HALF } from './level2.js';
 import { findPath, hasLineOfSight } from './nav.js';
+import { Track } from './interp.js';
 import { createGoats, updateGoats, senseGoats, alertGoats, goatSnapshot, applyGoatSnapshot, goatCount } from './goats.js';
 import { createDirector, updateDirector, blackoutAllowed, entityRelaxed, updateLightsOut, lightsChanged } from './director.js';
 import { placeHides, HIDE_R, LOCKER_R, BREATH_HOLD, BREATH_BACK, hideInside, hideFront } from './hides.js';
@@ -1264,7 +1265,7 @@ export class BackroomsSim {
     if (input.pitch !== undefined) P.pitch = input.pitch;
     if (input.sel === 1 || input.sel === 2) P.sel = input.sel;
     // l'invité tient son endurance chez lui : l'hôte prend la sienne (pour savoir si l'eau d'amande sert à quelque chose)
-    if (input.remote && Number.isFinite(input.stamina)) P.stamina = input.stamina;
+    if (input.remote && Number.isFinite(input.stamina)) P.stamina = Math.min(staminaMax(P), input.stamina);
     P.whistleCd = Math.max(0, P.whistleCd - DT);
     P.heat = Math.max(0, P.heat - DT / 20);
     P.bumpT = Math.max(0, (P.bumpT || 0) - DT);
@@ -1568,11 +1569,6 @@ export class BackroomsSim {
     // trace de ses positions de la dernière seconde et demie : l'instantané de l'hôte, en retard, est comparé à elle
     const tr = this.trail || (this.trail = []);
     tr.push(P.x, P.z, P.floor);
-    // lissage des autres joueurs et de l'entité vers leur dernière position connue
-    const k = 1 - Math.exp(-DT * 14);
-    for (const Q of this.players) if (Q !== P && Q.tx !== undefined) { Q.x += (Q.tx - Q.x) * k; Q.z += (Q.tz - Q.z) * k; }
-    const Mo = this.monster;
-    if (Mo && Mo.tx !== undefined) { Mo.x += (Mo.tx - Mo.x) * k; Mo.z += (Mo.tz - Mo.z) * k; }
     if (tr.length > 270) tr.splice(0, tr.length - 270);
     if (input.cam !== undefined) P.cam = !!input.cam && P.status === 'alive';
     if (this.state !== 'playing' || P.status !== 'alive' || this.departT > 0) return 0;
@@ -1652,6 +1648,39 @@ export class BackroomsSim {
     this.players.push(P);
   }
 
+  // Pistes d'affichage des autres (interp.js) : chez l'invité, les instantanés de l'hôte (l'entité est la piste 'M') ;
+  // chez l'hôte, les positions annoncées par les invités. Elles ne servent qu'à l'image : ni la logique du jeu ni les
+  // instantanés ne les lisent
+  netPush(id, t, now, x, z, yaw, f, live = true) {
+    const tracks = this.tracks || (this.tracks = new Map());
+    let tr = tracks.get(id);
+    if (!tr) tracks.set(id, (tr = new Track()));
+    if (live) tr.push(t, now, x, z, yaw, f);
+    else tr.reset();
+  }
+
+  // la position à afficher de id, dans out { x, z, yaw, f } : false sans piste ou loin de E (un saut que la piste
+  // n'a pas encore reçu : chute, téléportation, retour au point de départ)
+  netSample(id, now, out, E = null) {
+    const tr = this.tracks && this.tracks.get(id);
+    if (!tr || !tr.sample(now, out)) return false;
+    return !E || (out.f === (E.floor || 0) && Math.hypot(out.x - E.x, out.z - E.z) < 4);
+  }
+
+  // Invité : avant chaque image, les autres joueurs et l'entité prennent leur position interpolée (un mouvement
+  // régulier, au lieu d'un pas toutes les 50 ms) ; l'instantané suivant remet les positions reçues, ce pas-ci repasse
+  interpolate(now) {
+    const o = this.interpOut || (this.interpOut = { x: 0, z: 0, yaw: 0, f: 0 });
+    const put = (E, id) => {
+      if (!this.netSample(id, now, o, E)) return;
+      E.x = o.x;
+      E.z = o.z;
+      E.yaw = o.yaw;
+    };
+    for (const Q of this.players) if (Q !== this.player && Q.status === 'alive') put(Q, Q.id);
+    if (this.monster) put(this.monster, 'M');
+  }
+
   // Un joueur s'en va : il disparaît de la partie ; s'il était le dernier dehors, l'ascenseur part
   removePlayer(id) {
     this.roster = this.roster.filter((r) => r.id !== id);
@@ -1705,7 +1734,8 @@ export class BackroomsSim {
   }
 
   // Invité : applique l'instantané de l'hôte. Son propre joueur garde sa position prédite, sauf grand écart
-  applySnapshot(snap) {
+  // now : l'heure locale de réception (en secondes), pour interpoler l'affichage des autres (interpolate)
+  applySnapshot(snap, now) {
     if (snap.lv !== this.level) this.loadLevel(snap.lv);
     this.state = snap.st;
     this.time = snap.tm;
@@ -1765,17 +1795,17 @@ export class BackroomsSim {
       // doit pas être ramené en arrière à chaque instantané qui a encore l'ancien étage
       const ownStairs = mine && !far && status === 'alive' && P.status === 'alive' && (stairAt(this.stairs, P.x, P.z) || stairAt(this.stairs, x, z));
       // l'hôte décide des chutes : la position suit
-      if (!mine && status === 'alive' && P.status === 'alive' && P.floor === floor && Math.hypot(P.x - x, P.z - z) < 3) {
-        // les autres glissent vers leur position reçue (lissé à chaque pas) au lieu de sauter 20 fois par seconde
-        P.tx = x;
-        P.tz = z;
-      } else if (!ownStairs && (!mine || far || status !== 'alive' || P.status !== 'alive' || P.floor !== floor)) {
+      if (!mine) {
+        // les autres : leurs positions reçues vont dans leur piste, et l'affichage les interpole (interpolate)
+        if (now !== undefined) this.netPush(id, snap.tm, now, x, z, yaw, floor || 0, status === 'alive');
         P.x = x;
         P.z = z;
-        P.tx = P.tz = undefined;
+        P.yaw = yaw;
+      } else if (!ownStairs && (far || status !== 'alive' || P.status !== 'alive' || P.floor !== floor)) {
+        P.x = x;
+        P.z = z;
       }
       if (!mine) {
-        P.yaw = yaw;
         P.pitch = pitch;
         P.running = !!running;
         P.moving = !!moving;
@@ -1828,9 +1858,10 @@ export class BackroomsSim {
     this.players = this.players.filter((q) => seen.has(q.id));
     const M = this.monster;
     const [mx, mz] = snap.m;
-    if ((snap.m[5] || 0) === M.floor && Math.hypot(M.x - mx, M.z - mz) < 4) { M.tx = mx; M.tz = mz; }
-    else { M.x = mx; M.z = mz; M.tx = M.tz = undefined; }
+    M.x = mx;
+    M.z = mz;
     [, , M.yaw, M.mode] = snap.m;
+    if (now !== undefined) this.netPush('M', snap.tm, now, mx, mz, M.yaw, snap.m[5] || 0, !snap.m[8]);
     M.silent = !!snap.m[4];
     M.floor = snap.m[5] || 0;
     M.grabbing = snap.m[6] >= 0 ? snap.m[6] : null;

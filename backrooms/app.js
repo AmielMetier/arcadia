@@ -454,6 +454,8 @@ const goMessage = () => ({ t: 'go', v: GAME_V, run: NET.run, seed: sim.seed, dif
 let monstersVip = false;
 function startRun({ seed, difficulty, players, run, level, vip = false }) {
   NET.run = run;
+  camPrev.ok = false;
+  trackSeq.clear();
   monstersVip = !!vip;
   setMonsterMode(monstersVip); // les monstres VIP pour toute la partie si l'hôte les a choisis
   if (hud) hud.applyMonsters();
@@ -543,7 +545,7 @@ function onMsg(from, m) {
       sim.addPlayer(from, (p && p.name) || 'Player');
       send(from, goMessage());
     } else if (m.t === 'i' && m.run === NET.run) {
-      NET.inputs[from] = { seq: Number.isFinite(+m.n) ? +m.n : undefined, vo: num(m.vo, 0, 1), ra: !!m.ra, mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 100), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) }, v: m.v };
+      NET.inputs[from] = { seq: Number.isFinite(+m.n) ? +m.n : undefined, vo: num(m.vo, 0, 1), ra: !!m.ra, mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 200), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) }, v: m.v };
     } else if (m.t === 'fp' && hud) {
       // un invité n'a pas la même carte que nous : l'un des deux tourne sur une autre version du jeu
       const p = H.players.find((q) => q.id === from);
@@ -569,7 +571,7 @@ function onMsg(from, m) {
     }
   } else if (m.t === 's' && sim && m.run === NET.run) {
     const lv = sim.level;
-    sim.applySnapshot(m.s);
+    sim.applySnapshot(m.s, performance.now() / 1000);
     if (sim.level !== lv) handleEvent({ type: 'level', level: sim.level, rebuild: true }, NET.myId);
     checkPrint(m.s.mp);
   } else if (m.t === 'e' && sim && m.run === NET.run) {
@@ -1021,6 +1023,9 @@ function handleEvent(ev, me) {
 // Boucle principale d'animation et de simulation
 let lastTime = performance.now();
 let accumulator = 0;
+const trackSeq = new Map(); // hôte : dernière position d'invité entrée dans sa piste d'affichage
+const camPrev = { x: 0, z: 0, f: 0, ok: false }; // sa position avant le dernier pas (la caméra interpole jusqu'à la suivante)
+const lookIn = { yaw: NaN, pitch: NaN }; // le dernier regard donné à la simulation
 
 // Manette (disposition standard) : A ramasser, X utiliser l'objet, Y lampe, RB changer d'objet, B siffler,
 // LB / LT / stick gauche enfoncé courir, Menu pause ; A relance la partie en pause
@@ -1126,6 +1131,10 @@ function frame(currentTime) {
   while (accumulator >= DT) {
     const oldX = sim.player.x;
     const oldZ = sim.player.z;
+    camPrev.x = oldX;
+    camPrev.z = oldZ;
+    camPrev.f = sim.player.floor || 0;
+    camPrev.ok = true;
 
     const live = !paused;
     const input = {
@@ -1179,8 +1188,20 @@ function frame(currentTime) {
       }
     } else {
       sim.step(input, NET.role === 'host' ? guestInputs() : null);
+      // hôte : chaque position annoncée par un invité (et acceptée) entre dans sa piste d'affichage, à l'heure de
+      // l'invité : son avatar est interpolé à l'écran au lieu d'avancer par sauts de 50 ms
+      if (NET.role === 'host') {
+        const now = performance.now() / 1000;
+        for (const Q of sim.players) {
+          if (Q === sim.player || !Number.isFinite(Q.posSeq) || trackSeq.get(Q.id) === Q.posSeq) continue;
+          trackSeq.set(Q.id, Q.posSeq);
+          sim.netPush(Q.id, Q.posSeq * DT, now, Q.x, Q.z, Q.yaw, Q.floor || 0, Q.status === 'alive');
+        }
+      }
     }
     NET.tick++;
+    lookIn.yaw = newYaw;
+    lookIn.pitch = newPitch;
     toggleFlashlightRequested = false;
     useRequested = null;
     selRequested = 0;
@@ -1230,6 +1251,15 @@ function frame(currentTime) {
     }
 
     accumulator -= DT;
+  }
+  // invité : les autres joueurs et l'entité à leur position interpolée, pour cette image
+  if (NET.role === 'guest') sim.interpolate(performance.now() / 1000);
+  // une image sans pas de simulation (écran à plus de 60 images par seconde) : le regard suit quand même la souris
+  // (avant, ce mouvement-là était perdu), sauf si le jeu tient le regard (prise, casier)
+  const Pl = sim.player;
+  if (Pl.yaw === lookIn.yaw && Pl.pitch === lookIn.pitch) {
+    Pl.yaw = lookIn.yaw = newYaw;
+    Pl.pitch = lookIn.pitch = newPitch;
   }
 
   // Mise à jour du son continu de l'entité ; quand elle te traque : ses cris et, par-dessus, ses pas lourds, de plus en
@@ -1350,7 +1380,27 @@ function frame(currentTime) {
 
   // Rendu graphique et HUD
   if (scene) {
-    if (!document.hidden) scene.render(sim, currentTime / 1000); // en arrière-plan : la partie tourne, sans image
+    if (!document.hidden) {
+      // entre deux pas de simulation (60 par seconde), la caméra prend la position intermédiaire : le déplacement est
+      // fluide quelle que soit la fréquence de l'écran (un vrai saut, lui, reste net)
+      const a = Math.min(1, accumulator / DT);
+      const Pl = sim.player;
+      const cx = Pl.x;
+      const cz = Pl.z;
+      const lerp = camPrev.ok && Pl.status === 'alive' && (Pl.floor || 0) === camPrev.f && Math.hypot(cx - camPrev.x, cz - camPrev.z) < 1;
+      if (lerp) {
+        Pl.x = camPrev.x + (cx - camPrev.x) * a;
+        Pl.z = camPrev.z + (cz - camPrev.z) * a;
+      }
+      try {
+        scene.render(sim, currentTime / 1000); // en arrière-plan : la partie tourne, sans image
+      } finally {
+        if (lerp) {
+          Pl.x = cx;
+          Pl.z = cz;
+        }
+      }
+    }
     if (sfx) sfx.setHum(scene.lightHere); // le grésillement des néons autour de soi
     if (sfx) {
       // l'oreille suit la caméra (le joueur, ou celui qu'on regarde) ; l'écho change avec le niveau

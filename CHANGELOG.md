@@ -11,6 +11,9 @@
   - La bande de droite montre les parasites : quand l'entité approche, la jauge monte et l'image se déchire.
   - Dans le noir, le caméscope passe tout seul en mode nuit (image verte) : on y voit sans lampe, donc sans se faire repérer.
   - Il tire un peu sur la même pile que la lampe. Les coéquipiers qui filment ont un petit voyant rouge.
+- **The Backrooms** — À plusieurs, tout bouge en douceur.
+  - Les coéquipiers et l'entité avancent et tournent la tête d'un mouvement régulier, au lieu de petits sauts 20 fois par seconde (chez l'hôte comme chez les invités) ; une vraie téléportation ou une chute reste nette.
+  - Sur un écran à plus de 60 images par seconde, la souris ne perd plus de mouvement (avant, plus de la moitié pouvait sauter à 144 Hz), et ta propre marche est fluide à chaque image.
 - **The Backrooms** — Le Level 0 plus vivant, et plus inquiétant.
   - Les néons vivent : certains grésillent fort et clignotent d'un coup, et parfois toute une rangée s'éteint derrière toi, dans un claquement de disjoncteur.
   - La moquette raconte quelque chose : des taches d'humidité, des traces de pas mouillées qui mènent quelque part, et des gouttes qui tombent du plafond dans des flaques (on les entend).

@@ -2453,4 +2453,56 @@ test("cage d'escalier : on bute à DOOR_GAP de la porte cadenassée et de ses mu
   assert.ok(tried > 0, 'au moins un mur de cage essayé');
 });
 
+test("réseau : chez l'invité, les autres et l'entité avancent à vitesse régulière malgré des paquets irréguliers ; un saut reste net", () => {
+  const players = [{ id: 1, name: 'Hôte' }, { id: 2, name: 'Invité' }];
+  const host = new BackroomsSim({ difficulty: 'normal', seed: 5, players, localId: 1 });
+  const guest = new BackroomsSim({ difficulty: 'normal', seed: 5, players, localId: 2 });
+  const H = host.player;
+  const M = host.monster;
+  M.away = false;
+  let rnd = 12345;
+  const rand = () => ((rnd = (rnd * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const x0 = H.x;
+  const mx0 = M.x;
+  const inbox = [];
+  let tick = 0;
+  let frames = [];
+  const V = 4; // m/s
+  for (let f = 0; f < 144 * 4; f++) {
+    const now = f / 144;
+    // l'hôte : 60 pas par seconde, un instantané tous les 3 pas, qui met de 40 à 90 ms à arriver
+    while (tick * DT <= now) {
+      host.time = tick * DT;
+      H.x = x0 + V * tick * DT;
+      H.yaw = 3 * tick * DT; // il tourne la tête de 3 radians par seconde
+      M.x = mx0 + V * 1.5 * tick * DT;
+      if (tick % 3 === 0) inbox.push({ at: tick * DT + 0.04 + rand() * 0.05, s: JSON.parse(JSON.stringify(host.snapshot())) });
+      tick++;
+    }
+    inbox.sort((a, b) => a.at - b.at);
+    while (inbox.length && inbox[0].at <= now) guest.applySnapshot(inbox.shift().s, now);
+    guest.interpolate(now);
+    const Q = guest.players.find((q) => q.id === 1);
+    frames.push({ x: Q.x, yaw: Q.yaw, mx: guest.monster.x });
+  }
+  frames = frames.slice(144); // une seconde pour s'installer
+  for (let i = 1; i < frames.length; i++) {
+    const v = (frames[i].x - frames[i - 1].x) * 144;
+    const mv = (frames[i].mx - frames[i - 1].mx) * 144;
+    const w = (frames[i].yaw - frames[i - 1].yaw) * 144;
+    assert.ok(Math.abs(v - V) < V * 0.15, `vitesse affichée régulière (${v.toFixed(2)} m/s au lieu de ${V})`);
+    assert.ok(Math.abs(mv - V * 1.5) < V * 1.5 * 0.15, `l'entité aussi (${mv.toFixed(2)} m/s)`);
+    assert.ok(Math.abs(w - 3) < 0.45, `le regard tourne sans à-coups (${w.toFixed(2)} rad/s)`);
+  }
+  // affiché un peu dans le passé, pas trop : moins de 0,2 s de retard sur la position réelle
+  const lag = (x0 + V * (tick - 1) * DT - frames[frames.length - 1].x) / V;
+  assert.ok(lag > 0 && lag < 0.2, `retard d'affichage ${lag.toFixed(3)} s`);
+  // un saut (chute, téléportation) : affiché tel quel dès son instantané, sans glisser
+  H.x += 20;
+  host.time = tick * DT;
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())), 4.1);
+  guest.interpolate(4.1);
+  assert.ok(Math.abs(guest.players.find((q) => q.id === 1).x - H.x) < 0.006, 'le saut est net');
+});
+
 console.log(`\n${count} tests réussis pour The Backrooms !`);
