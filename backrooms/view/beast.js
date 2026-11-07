@@ -3,11 +3,17 @@
 // visage de l'entité classique (view/entity.js) : tête noire allongée, yeux blancs inégaux, bouche béante et dents.
 // Le squelette et ses animations (attente, marche, course) viennent de models/hazmat.glb (Quaternius, CC0) ; le corps
 // est fait de pièces dessinées dans le code, fixées aux os et rallongées.
+// Par-dessus ces animations humaines, tout ce qui la rend fausse : une image tenue deux à quatre images puis qui
+// saute (image par image, comme une pellicule abîmée), des genoux et des coudes qui plient à l'envers, des épaules
+// de travers, des bras trop longs qui ballottent en retard, des doigts qui tressaillent, une tête cassée sur le côté
+// qui change d'angle d'un coup, un cou qui s'étire vers toi quand elle regarde, une démarche boiteuse, une course
+// penchée, trop rapide, bras en avant qui battent l'air ; et la ruée (M.rushT) : bouche béante, bras tendus, tout le
+// corps qui tremble.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
 
 const MODEL = new URL('../models/hazmat.glb', import.meta.url).href;
-const SCALE = 1.22; // l'explorateur fait 1,78 m : elle, 2,6 m une fois le cou et les jambes allongés
+const SCALE = 1.5; // l'explorateur fait 1,78 m : elle, plus de 3 m une fois le cou et les jambes allongés (voûtée sous le plafond)
 const LEG = 1.25; // jambes trop longues : tout le corps est soulevé d'autant
 
 function canvas(w, h) {
@@ -207,9 +213,33 @@ export function createBeast(opts = {}) {
   const group = new THREE.Group();
   const skinMat = new THREE.MeshLambertMaterial({ map: skinTexture(), emissive: '#1a1716', emissiveIntensity: 0 });
   const photo = opts.photo ? photoFace(opts.photo.url, opts.photo.crop, new THREE.Texture()) : null;
-  const faces = photo ? [photo, photo] : [faceTexture(0.25), faceTexture(1)];
+  const faces = photo ? [photo, photo, photo] : [faceTexture(0.25), faceTexture(1), faceTexture(1.7)];
   const faceMat = new THREE.MeshBasicMaterial({ map: faces[0], transparent: true, alphaTest: photo ? 0.05 : 0.3, color: photo ? '#d8cfc2' : '#cfcac4' });
-  const st = { ready: false, w: { Idle: 1, Walk: 0, Run: 0 }, last: null, speed: 0, twitch: 0, twitchT: 1 };
+  const st = {
+    ready: false,
+    w: { Idle: 1, Walk: 0, Run: 0 },
+    last: { x: 0, z: 0, yaw: 0, ok: false },
+    speed: 0,
+    accel: 0,
+    turn: 0,
+    // image par image : la pose est tenue holdT secondes, le temps écoulé (acc) est rattrapé d'un coup
+    holdT: 0,
+    acc: 0,
+    held: { x: 0, z: 0, yaw: 0, ok: false },
+    // poids des états (0 à 1, lissés)
+    k: { still: 0, run: 0, rush: 0, grab: 0, stun: 0 },
+    // tête cassée sur le côté, qui change d'angle d'un coup ; petits tics quand elle observe
+    tilt: 0.9,
+    tiltT: 1,
+    tickY: 0,
+    tickX: 0,
+    tickT: 0.5,
+    // sursauts : des ressorts (position, vitesse) qu'une secousse lance
+    jerkT: 2,
+    sp: { head: [0, 0], shL: [0, 0], shR: [0, 0], torso: [0, 0], armL: [0, 0], armR: [0, 0], swayL: [0, 0], swayR: [0, 0] },
+    fingers: [],
+    fl: 0, // phase des bras qui battent l'air
+  };
 
   const build = () => {
     const root = cloneSkinned(source.scene);
@@ -276,14 +306,31 @@ export function createBeast(opts = {}) {
       face.lookAt(face.position.clone().add(fwd)); // dans le repère de l'os : le plan regarde vers l'avant
       head.add(face);
       st.head = head;
+      st.face = face;
+      st.faceS = s;
+      st.faceY = face.position.clone();
+      st.faceDown = up.clone().multiplyScalar(-0.035 * s);
     }
     st.torso = torso;
     st.neck = bones.Neck;
+    st.b = bones;
+    for (const s of L) {
+      for (const f of ['Index', 'Middle', 'Pinky', 'Thumb']) {
+        for (let i = 1; i <= 3; i++) {
+          const o = bones[`${f}${i}${s}`];
+          if (o) st.fingers.push({ o, c: 0.3, want: 0.3, t: Math.random(), thumb: f === 'Thumb' });
+        }
+      }
+    }
     // la pose de repos de chaque os : on y revient avant chaque image, sinon les retouches (dos voûté, tête
     // penchée) s'ajoutent d'une image à l'autre sur les os que l'animation ne touche pas
     st.rest = [];
+    st.R = {};
     root.traverse((o) => {
-      if (o.isBone) st.rest.push({ o, q: o.quaternion.clone() });
+      if (o.isBone) {
+        st.rest.push({ o, q: o.quaternion.clone() });
+        st.R[o.name] = st.rest[st.rest.length - 1].q;
+      }
     });
     st.mixer = new THREE.AnimationMixer(root);
     st.acts = {};
@@ -317,42 +364,299 @@ export function createBeast(opts = {}) {
   if (source) build();
   else loading.then(() => source && build());
 
+  // --- outils sans allocation ---
+  const _q = new THREE.Quaternion();
+  const _pq = new THREE.Quaternion();
+  const _gq = new THREE.Quaternion();
+  const _d = new THREE.Quaternion();
+  const _ax = new THREE.Vector3();
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  // tourne un os autour d'un axe du repère du corps (+x : sa gauche, +y : le haut, +z : devant elle), autour de son
+  // articulation ; les os enfants suivent
+  const rot = (bone, x, y, z, a) => {
+    if (!bone || !a) return;
+    _ax.set(x, y, z).applyQuaternion(_gq);
+    bone.parent.getWorldQuaternion(_pq);
+    _ax.applyQuaternion(_pq.invert());
+    _q.setFromAxisAngle(_ax, a);
+    bone.quaternion.premultiply(_q);
+  };
+  // exagère le mouvement que l'animation donne à un os (k > 1 : des enjambées et des gestes plus amples)
+  const amp = (bone, k) => {
+    if (!bone || k === 1) return;
+    const rq = st.R[bone.name];
+    _d.copy(rq).invert().multiply(bone.quaternion);
+    if (_d.w < 0) _d.set(-_d.x, -_d.y, -_d.z, -_d.w);
+    const w = Math.min(1, _d.w);
+    const sn = Math.sqrt(1 - w * w);
+    if (sn < 1e-4) return;
+    _ax.set(_d.x / sn, _d.y / sn, _d.z / sn);
+    _d.setFromAxisAngle(_ax, 2 * Math.acos(w) * k);
+    bone.quaternion.copy(rq).multiply(_d);
+  };
+  // pointe un os (de son articulation vers celle de son os enfant) dans une direction du repère du corps : les bras
+  // pendent selon la pesanteur, quel que soit l'angle du dos
+  const _a = new THREE.Vector3();
+  const _b = new THREE.Vector3();
+  const aim = (bone, child, dir) => {
+    if (!bone || !child) return;
+    bone.getWorldPosition(_a);
+    child.getWorldPosition(_b);
+    _b.sub(_a);
+    if (_b.lengthSq() < 1e-8) return;
+    _b.normalize();
+    _a.copy(dir).normalize().applyQuaternion(_gq);
+    _q.setFromUnitVectors(_b, _a);
+    bone.parent.getWorldQuaternion(_pq);
+    // q (monde) ramené dans le repère du parent : P⁻¹ q P
+    _d.copy(_pq).invert().multiply(_q).multiply(_pq);
+    bone.quaternion.premultiply(_d);
+  };
+  // la direction d'un bras : a (autour de l'axe gauche-droite : > 0 vers l'arrière, < 0 vers l'avant), c (écarté du
+  // corps, du côté side)
+  const armDir = (a, c, side, out) => out.set(side * Math.cos(a) * Math.sin(c), -Math.cos(a) * Math.cos(c), -Math.sin(a));
+  const _dir = new THREE.Vector3();
+  // un ressort (sp = [position, vitesse]) : raide et peu amorti, il dépasse et revient d'un coup sec
+  const spring = (sp, k, c, drive, dt) => {
+    sp[1] += (-k * sp[0] - c * sp[1] + drive) * dt;
+    sp[0] += sp[1] * dt;
+  };
+  const ease = (v, want, rate, dt) => v + (want - v) * Math.min(1, dt * rate);
+  // entre deux poses, le corps reste là où il était (sauf un saut de plus de 2 m : changement d'étage, téléportation)
+  const keepAt = (M) => {
+    const H = st.held;
+    const parent = group.parent;
+    const dx = H.x - M.x;
+    const dz = H.z - M.z;
+    if (!H.ok || dx * dx + dz * dz > 4 || !parent) {
+      group.position.set(0, 0, 0);
+      group.rotation.set(0, 0, 0);
+      return;
+    }
+    const py = parent.rotation.y;
+    const c = Math.cos(py);
+    const sn = Math.sin(py);
+    group.position.set(dx * c - dz * sn, 0, dx * sn + dz * c);
+    let ry = H.yaw - py;
+    ry = Math.atan2(Math.sin(ry), Math.cos(ry));
+    group.rotation.set(0, ry, 0);
+  };
+
   return {
     group,
     // M : l'entité ; chase : elle poursuit ; light : lumière des néons là où elle est ; dt : durée de l'image
     update(M, chase, light, dt, time) {
       // sa vitesse, d'après son déplacement (pareil chez l'hôte et chez les invités)
-      if (st.last && dt > 0) {
-        const v = Math.hypot(M.x - st.last.x, M.z - st.last.z) / dt;
-        st.speed += (Math.min(6, v) - st.speed) * Math.min(1, dt * 6);
+      const L0 = st.last;
+      const yaw = M.yaw || 0;
+      if (L0.ok && dt > 0) {
+        const jump = Math.hypot(M.x - L0.x, M.z - L0.z);
+        const v = jump > 3 ? st.speed : jump / dt; // téléportée (changement d'étage) : on ne compte pas le saut
+        const old = st.speed;
+        st.speed += (Math.min(9, v) - st.speed) * Math.min(1, dt * 6);
+        st.accel = ease(st.accel, (st.speed - old) / dt, 8, dt);
+        let dy = yaw - L0.yaw;
+        dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        st.turn = ease(st.turn, dy / dt, 8, dt);
       }
-      st.last = { x: M.x, z: M.z };
+      L0.x = M.x;
+      L0.z = M.z;
+      L0.yaw = yaw;
+      L0.ok = true;
+      const rush = (M.rushT || M.rush || 0) > 0;
       skinMat.emissiveIntensity = Math.min(0.6, light * 0.25);
-      faceMat.map = chase ? faces[1] : faces[0];
+      faceMat.map = rush ? faces[2] : chase || M.mode === 'grab' ? faces[1] : faces[0];
+
+      // image par image : entre deux poses, le corps ne bouge pas et reste là où il était (sauf un saut de plus de
+      // 2 m : un changement d'étage, une téléportation)
+      const H = st.held;
+      const parent = group.parent;
+      st.acc += dt;
+      st.holdT -= dt;
+      if (st.holdT > 0 && st.ready) {
+        keepAt(M);
+        // la ruée : tout le corps tremble, même entre deux poses
+        if (st.k.rush > 0.05) {
+          group.position.x += (Math.random() - 0.5) * 0.05 * st.k.rush;
+          group.position.z += (Math.random() - 0.5) * 0.05 * st.k.rush;
+          group.rotation.z = (Math.random() - 0.5) * 0.08 * st.k.rush;
+        }
+        return;
+      }
+      let step = st.acc;
+      st.acc = 0;
+      // la cadence : figée quand elle observe, saccadée en marchant, frénétique en courant
+      const K = st.k;
+      st.holdT = rush ? rnd(0.016, 0.034) : K.still > 0.5 ? rnd(0.06, 0.1) : K.run > 0.5 ? rnd(0.03, 0.05) : rnd(0.033, 0.07);
+      // parfois une image manque : elle a bougé plus que le temps écoulé
+      if (st.speed > 0.4 && Math.random() < (rush ? 0.08 : 0.035)) step += rnd(0.12, 0.3);
+      H.x = M.x;
+      H.z = M.z;
+      H.yaw = parent ? parent.rotation.y : yaw;
+      H.ok = true;
+      group.position.set(0, 0, 0);
+      group.rotation.set(0, 0, 0);
       if (!st.ready) return;
-      const want = st.speed < 0.25 ? 'Idle' : st.speed > 2.6 ? 'Run' : 'Walk';
+      const sdt = Math.min(step, 0.4);
+
+      // --- les états ---
+      const mode = M.mode;
+      const sp = st.speed;
+      const grab = mode === 'grab';
+      const stun = mode === 'stun';
+      const stillWant = !rush && !grab && !stun && sp < 0.3 && mode !== 'chase' && mode !== 'flee' ? 1 : 0;
+      K.still = ease(K.still, stillWant, 5, sdt);
+      K.rush = ease(K.rush, rush ? 1 : 0, 10, sdt);
+      K.grab = ease(K.grab, grab ? 1 : 0, 9, sdt);
+      K.stun = ease(K.stun, stun ? 1 : 0, 9, sdt);
+
+      const want = rush || sp > 2.4 ? 'Run' : sp < 0.25 ? 'Idle' : 'Walk';
       for (const n in st.acts) {
-        st.w[n] += ((n === want ? 1 : 0) - st.w[n]) * Math.min(1, dt * 6);
+        st.w[n] = ease(st.w[n], n === want ? 1 : 0, 7, sdt);
         st.acts[n].weight = st.w[n];
       }
-      // ses grandes jambes : l'animation se joue au rythme de sa vitesse
-      if (st.acts.Walk) st.acts.Walk.timeScale = THREE.MathUtils.clamp(st.speed / 1.6, 0.6, 1.6);
-      if (st.acts.Run) st.acts.Run.timeScale = THREE.MathUtils.clamp(st.speed / 4, 0.7, 1.4);
+      K.run = ease(K.run, want === 'Run' ? 1 : 0, 7, sdt);
+      // la marche boite : un pas rapide, un pas traîné
+      const walk = st.acts.Walk;
+      if (walk) {
+        const ph = (walk.time / walk.getClip().duration) * Math.PI * 4;
+        walk.timeScale = THREE.MathUtils.clamp(sp / 1.6, 0.55, 1.6) * (0.5 + 0.9 * (0.5 + 0.5 * Math.sin(ph)));
+      }
+      // la course : une cadence trop rapide pour sa taille
+      if (st.acts.Run) st.acts.Run.timeScale = rush ? 2.3 : THREE.MathUtils.clamp(sp / 3, 0.9, 2.0);
+      // immobile, elle ne respire pas
+      if (st.acts.Idle) st.acts.Idle.timeScale = 1 - K.still * 0.97;
+
       for (const r of st.rest) r.o.quaternion.copy(r.q);
-      st.mixer.update(dt);
-      // ce que l'animation ne fait pas : membres rallongés, dos voûté, tête penchée qui tressaute
+      st.mixer.update(step);
       for (const s of st.stretch) s.B.position.copy(s.rest).multiplyScalar(s.k);
-      if (st.torso) st.torso.rotation.x += 0.38;
-      if (st.neck) st.neck.rotation.x -= 0.15;
-      st.twitchT -= dt;
-      if (st.twitchT <= 0) {
-        st.twitch = (Math.random() - 0.5) * (chase ? 1.4 : 0.8);
-        st.twitchT = 0.15 + Math.random() * (chase ? 0.6 : 2.2);
+      group.getWorldQuaternion(_gq);
+      const B = st.b;
+
+      // --- sursauts : une secousse de temps en temps (plus souvent quand elle chasse) ---
+      st.jerkT -= sdt;
+      if (st.jerkT <= 0) {
+        st.jerkT = K.still > 0.5 ? rnd(1.2, 4.5) : chase || rush ? rnd(0.3, 1.2) : rnd(0.8, 3);
+        const r = Math.random();
+        const kick = rnd(14, 30) * (Math.random() < 0.5 ? -1 : 1);
+        if (r < 0.3) st.sp.head[1] += kick;
+        else if (r < 0.5) st.sp.shL[1] += kick;
+        else if (r < 0.7) st.sp.shR[1] += kick;
+        else if (r < 0.85) st.sp.torso[1] += kick * 0.6;
+        else {
+          st.sp.armL[1] += kick;
+          st.sp.armR[1] -= kick * 0.7;
+        }
+        // et la tête casse d'un coup vers un autre angle impossible
+        if (Math.random() < 0.45) st.tiltT = 0;
       }
-      if (st.head) {
-        st.head.rotation.z += 0.45 + st.twitch * 0.5;
-        st.head.rotation.x += -0.25 + Math.sin(time * 1.3) * 0.05;
+      for (let t = sdt; t > 1e-4; t -= 1 / 60) {
+        const h = Math.min(t, 1 / 60);
+        spring(st.sp.head, 320, 9, 0, h);
+        spring(st.sp.shL, 260, 8, 0, h);
+        spring(st.sp.shR, 260, 8, 0, h);
+        spring(st.sp.torso, 200, 10, 0, h);
+        // les bras pendent et ballottent en retard : un pendule mou, poussé par les accélérations et les virages
+        spring(st.sp.armL, 16, 1.4, -st.accel * 2.2, h);
+        spring(st.sp.armR, 21, 1.7, -st.accel * 2.2, h);
+        spring(st.sp.swayL, 14, 1.2, st.turn * sp * 1.4, h);
+        spring(st.sp.swayR, 18, 1.5, st.turn * sp * 1.4, h);
       }
+      const clampS = (v, m) => Math.max(-m, Math.min(m, v));
+
+      // --- la tête : cassée sur le côté, elle change d'angle d'un coup ---
+      st.tiltT -= sdt;
+      if (st.tiltT <= 0) {
+        st.tiltT = chase ? rnd(0.4, 1.4) : rnd(0.9, 4);
+        const side = Math.random() < 0.7 ? Math.sign(st.tilt || 1) : -Math.sign(st.tilt || 1);
+        st.tilt = side * rnd(0.55, 1.2);
+      }
+      st.tickT -= sdt;
+      if (st.tickT <= 0) {
+        st.tickT = rnd(0.25, 1.4);
+        st.tickY = rnd(-0.14, 0.14);
+        st.tickX = rnd(-0.08, 0.08);
+      }
+
+      const run = K.run;
+      const rk = K.rush;
+      const still = K.still;
+      const gk = K.grab;
+      const sk = K.stun;
+      st.fl += sdt * (rush ? 17 : 11) * run;
+
+      // --- le tronc : voûté, de travers, penché en avant pour courir ---
+      const lean = 0.22 + 0.3 * run + 0.35 * rk + 0.12 * still + 0.25 * gk - 0.55 * sk;
+      rot(B.Abdomen, 1, 0, 0, lean + clampS(st.sp.torso[0], 0.5) * 0.4);
+      rot(B.Torso, 1, 0, 0, 0.22 + 0.1 * run);
+      rot(B.Torso, 0, 0, 1, 0.13 + (st.w.Walk || 0) * 0.12 * Math.sin(st.acts.Walk ? (st.acts.Walk.time / st.acts.Walk.getClip().duration) * Math.PI * 2 : 0));
+      rot(B.Torso, 0, 1, 0, run * 0.28 * Math.sin(st.fl) + (rush ? rnd(-0.12, 0.12) : 0));
+
+      // --- les épaules : l'une remontée, l'autre tombante ---
+      rot(B.ShoulderL, 0, 0, 1, 0.3 + clampS(st.sp.shL[0], 0.6) * 0.6 + 0.12 * still);
+      rot(B.ShoulderR, 0, 0, 1, 0.2 + clampS(st.sp.shR[0], 0.6) * 0.6);
+      rot(B.ShoulderL, 1, 0, 0, 0.15 + 0.2 * rk);
+      rot(B.ShoulderR, 1, 0, 0, 0.15 + 0.2 * rk);
+
+      // --- les bras : pendants et ballants ; en course, tendus devant et battant l'air ; dans la ruée, raides devant ---
+      for (const s of L) {
+        const left = s === 'L';
+        const ua = B[`UpperArm${s}`];
+        const la = B[`LowerArm${s}`];
+        const pend = clampS((left ? st.sp.armL : st.sp.armR)[0], 0.9);
+        const sway = clampS((left ? st.sp.swayL : st.sp.swayR)[0], 0.6);
+        const flail = run * (0.85 * Math.sin(st.fl + (left ? 0 : 2.3)) + 0.4 * Math.sin(st.fl * 2.7 + (left ? 1 : 0)));
+        const reach = -0.45 * run - 1.3 * rk - 1.25 * gk - 2.3 * sk;
+        const shake = rush || grab ? rnd(-0.16, 0.16) : 0;
+        const side = left ? 1 : -1;
+        // le bras : il pend (et ballotte), il bat l'air en courant, il se tend devant pour saisir
+        const a = pend + flail * (1 - rk * 0.75) + reach + shake;
+        const c = 0.1 + sway * 0.5 * side + 0.3 * run + 0.12 * rk - 0.22 * gk + 0.5 * sk + (rush ? rnd(-0.1, 0.1) : 0) + 0.08 * still * side;
+        aim(ua, la, armDir(a, c, side, _dir));
+        // l'avant-bras : le coude plie à l'envers (la main part vers l'arrière) ; il se casse quand elle bat l'air
+        const bend = (0.42 + 0.35 * run * (0.5 + 0.5 * Math.sin(st.fl * 1.7 + (left ? 0 : 1.1)))) * (1 - 0.85 * Math.max(rk, gk)) - 1.4 * sk;
+        aim(la, B[`Middle1${s}`], armDir(a + bend, c + 0.1 * still, side, _dir));
+      }
+
+      // --- les doigts : ils tressaillent chacun de leur côté ; écartés et tremblants dans la ruée, serrés pour saisir ---
+      for (const f of st.fingers) {
+        f.t -= sdt;
+        if (f.t <= 0) {
+          f.t = rnd(0.08, chase ? 0.5 : 1.6);
+          f.want = Math.random() < 0.25 ? rnd(-0.35, 1.0) : rnd(0.1, 0.45);
+        }
+        f.c = f.want;
+        let c = f.c * (1 - rk - gk) + rk * (-0.12 + rnd(-0.2, 0.2)) + gk * 1.1;
+        if (f.thumb) c *= 0.5;
+        f.o.rotateX(c);
+      }
+
+      // --- le cou s'étire vers toi quand elle regarde ; la tête reste droite, verrouillée sur sa cible en courant ---
+      const crane = 0.18 + 0.75 * still + 0.25 * run + 0.4 * rk + 0.45 * gk - 0.4 * sk;
+      rot(B.Neck, 1, 0, 0, crane);
+      const level = -(lean + 0.22 + crane) * (0.55 + 0.4 * Math.max(run, rk, still));
+      rot(B.Head, 1, 0, 0, level + st.tickX * still + clampS(st.sp.head[0], 0.7) * 0.3 - 0.25 * sk + (rush ? rnd(-0.08, 0.08) : 0));
+      const tilt = st.tilt * (1 - 0.45 * run) * (1 - 0.5 * rk) + clampS(st.sp.head[0], 0.8) * 0.7;
+      rot(B.Head, 0, 0, 1, tilt + (rush ? rnd(-0.25, 0.25) : 0));
+      rot(B.Head, 0, 1, 0, st.tickY * still + 0.9 * sk);
+
+      // --- les jambes : genoux qui plient à l'envers, une jambe raide qui traîne, des enjambées trop longues ---
+      for (const s of L) {
+        const left = s === 'L';
+        amp(B[`UpperLeg${s}`], 1 + 0.45 * run + 0.25 * rk);
+        amp(B[`LowerLeg${s}`], 1 + 0.3 * run);
+        const limp = !left ? (st.w.Walk || 0) * (1 - run) : 0;
+        rot(B[`LowerLeg${s}`], 1, 0, 0, -0.2 - 0.35 * limp - 0.1 * still);
+        rot(B[`UpperLeg${s}`], 0, 0, 1, (left ? 1 : -1) * (0.05 + 0.1 * limp + 0.06 * still));
+      }
+
+      // --- la bouche s'ouvre en grand dans la ruée ---
+      if (st.face) {
+        const g = 1 + 0.4 * rk;
+        st.face.scale.set(st.faceS * (1 + 0.06 * rk), st.faceS * g, st.faceS);
+        st.face.position.copy(st.faceY).addScaledVector(st.faceDown, rk);
+      }
+      keepAt(M);
     },
   };
 }

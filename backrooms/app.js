@@ -20,6 +20,21 @@ let goatBellT = 0; // la cloche du bouc alpha
 let goatHint = false; // le conseil « elles craignent la lumière », une fois par partie
 const goatHoofN = [];
 let deathNear = false; // le son de la mort a été joué (il revient quand l'entité s'est éloignée)
+// le bilan de la bande (ce qu'elle a vu de toi), tenu sur cet écran ; les dernières secondes pour le rejeu de la mort
+let runStats = { seen: 0, rushes: 0, escapes: 0, closest: Infinity, haunts: 0 };
+let tapeFrames = [];
+let replayed = false;
+let echoT = 0; // fausse alerte : quelqu'un marche derrière toi, à ton rythme
+let hauntAt = 0; // spectateur : quand on pourra de nouveau faire un signe (sur cet écran)
+// Carte du jour : la même graine pour tout le monde, ce jour-là
+const dailyOf = (d = new Date()) => {
+  const k = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  return { seed: (Math.imul(k, 2654435761) >>> 0) % 100000, key: String(k), label: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) };
+};
+let dailyLabel = null;
+// difficulté adaptative (hôte ou seul) : 0 à 1, 0,5 au départ
+const SKILL_KEY = 'backrooms_skill';
+const nudgeSkill = (d) => store.set(SKILL_KEY, Math.max(0, Math.min(1, (+store.get(SKILL_KEY, 0.5) || 0.5) + d)));
 const otherStepT = new Map(); // prochain pas de chaque autre joueur
 let heartShown = 0; // battements par minute du cœur (0 : on ne l'entend pas)
 let valveSound = false; // une vanne grince sous nos mains
@@ -71,6 +86,7 @@ function applyOpts() {
   if (hud) {
     hud.qwerty = qwerty();
     hud.reduceFlashes = OPTS.reduceFlashes;
+    hud.calibrate(OPTS.bright, true);
     if (paused) hud.showPause(true, kbMode, !started, resumeLevel());
   }
   if (sfx) sfx.onCaption = OPTS.subs ? (text, dir) => hud && hud.caption(text, dir) : null;
@@ -294,7 +310,9 @@ function initGame(settings = lastSettings, forceLevel = null) {
   if (NET.role === 'guest') return; // l'invité attend le « go » de l'hôte
   // ?seed=1234 (seul) : toujours la même carte, pour comparer deux réglages
   const sm = NET.role === 'solo' && location.search.match(/[?&]seed=(\d+)/);
-  const seed = sm ? +sm[1] : Math.floor(Math.random() * 100000);
+  const daily = settings.map === 'daily' && !sm ? dailyOf() : null;
+  dailyLabel = daily ? daily.label : null;
+  const seed = sm ? +sm[1] : daily ? daily.seed : Math.floor(Math.random() * 100000);
   const difficulty = settings.difficulty || 'normal';
   const players = NET.role === 'host' ? H.players.map((p) => ({ id: p.id, name: p.name || 'Player' })) : [{ id: 0, name: 'Player' }];
   NET.run = Date.now();
@@ -314,7 +332,7 @@ function initGame(settings = lastSettings, forceLevel = null) {
   if (NET.role === 'host') send('all', goMessage());
 }
 
-const goMessage = () => ({ t: 'go', run: NET.run, seed: sim.seed, diff: sim.difficulty, players: sim.roster, lv: sim.level, vip: monstersVip });
+const goMessage = () => ({ t: 'go', run: NET.run, seed: sim.seed, diff: sim.difficulty, players: sim.roster, lv: sim.level, vip: monstersVip, dy: dailyLabel });
 
 let monstersVip = false;
 function startRun({ seed, difficulty, players, run, level, vip = false }) {
@@ -327,7 +345,14 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   NET.actions = {};
   NET.events = [];
   if (!players.some((p) => p.id === NET.myId)) players = [...players, { id: NET.myId, name: 'Player' }];
-  sim = new BackroomsSim({ difficulty, seed, players, localId: NET.myId, level }); // les étages sortent de la graine
+  // la difficulté adaptative ne compte que chez l'hôte (c'est lui qui fait tourner l'entité)
+  const skill = NET.role === 'guest' ? 0.5 : +store.get(SKILL_KEY, 0.5);
+  sim = new BackroomsSim({ difficulty, seed, players, localId: NET.myId, level, skill }); // les étages sortent de la graine
+  runStats = { seen: 0, rushes: 0, escapes: 0, closest: Infinity, haunts: 0 };
+  tapeFrames = [];
+  replayed = false;
+  echoT = 0;
+  hauntAt = 0;
   if (level && sim.level !== level) sim.loadLevel(level);
   // un invité qui arrive en cours de partie regarde les autres jusqu'au prochain étage (l'hôte le dira)
   if (scene) {
@@ -339,6 +364,7 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
     hud.$('#endScreen').hidden = true;
     hud.lastCount = -1;
     hud.endPending = null;
+    hud.replayTag(false);
   }
 
   if (!sfx) {
@@ -373,7 +399,7 @@ function guestInputs() {
     const q = NET.actions[id] || (NET.actions[id] = []);
     // une action par pas, dans l'ordre où l'invité les a faites (avec la case qu'il avait choisie)
     const a = q.shift() || {};
-    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, stamina: i.st, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0 };
+    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, stamina: i.st, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v };
     i.pos = null; // une position annoncée ne sert qu'une fois
   }
   return out;
@@ -391,7 +417,7 @@ function onMsg(from, m) {
       sim.addPlayer(from, (p && p.name) || 'Player');
       send(from, goMessage());
     } else if (m.t === 'i' && m.run === NET.run) {
-      NET.inputs[from] = { mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 100), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) } };
+      NET.inputs[from] = { mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 100), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) }, v: m.v };
     } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'p', 't', 'b', 'h', 'g'].includes(m.k)) {
       const q = NET.actions[from] || (NET.actions[from] = []);
       if (q.length < 8) q.push({ k: m.k, sel: m.s === 2 ? 2 : 1, side: m.side > 0 ? 1 : -1, n: Math.max(1, Math.min(4, m.n | 0)) });
@@ -401,7 +427,10 @@ function onMsg(from, m) {
   if (NET.role !== 'guest' || from !== H.info.hostId) return; // invité : seul l'hôte fait foi
   NET.lastHost = performance.now();
   if (m.t === 'go') {
-    if (m.run !== NET.run || !sim) startRun({ seed: m.seed, difficulty: m.diff, players: m.players || [], run: m.run, level: m.lv || 0, vip: !!m.vip });
+    if (m.run !== NET.run || !sim) {
+      dailyLabel = typeof m.dy === 'string' ? m.dy.slice(0, 12) : null;
+      startRun({ seed: m.seed, difficulty: m.diff, players: m.players || [], run: m.run, level: m.lv || 0, vip: !!m.vip });
+    }
   } else if (m.t === 's' && sim && m.run === NET.run) {
     const lv = sim.level;
     sim.applySnapshot(m.s);
@@ -514,6 +543,9 @@ function handleEvent(ev, me) {
         if (ev.id !== me) break;
         sfx.whistle({ x: ev.x, z: ev.z, muffled: true });
         if (hud) hud.toast(`${ev.name} whistles`);
+      } else if (ev.kind === 'echo') {
+        // des pas derrière toi, qui suivent les tiens
+        if (ev.id === me) echoT = ev.len || 8;
       } else sfx.distant(ev.kind, { x: ev.x, z: ev.z }, 0.9);
       break;
     case 'rare':
@@ -604,9 +636,46 @@ function handleEvent(ev, me) {
       break;
     case 'spotted':
       if (sfx) sfx.spotted();
+      if (ev.id === me) runStats.seen++;
+      break;
+    case 'tell': {
+      // le signe avant qu'elle surgisse : seulement à cet étage
+      const V = sim.viewPlayer(sim.spectate || 0);
+      if (sfx && (ev.floor || 0) === (V.floor || 0)) sfx.tell(ev.kind, { x: ev.x, z: ev.z });
+      break;
+    }
+    case 'glimpse':
+      // la première rencontre : rien… puis le néon au-dessus d'elle qui claque
+      if (ev.phase === 'show' && sfx && ev.id === me) sfx.silence(2.5);
+      if (ev.phase === 'gone' && sfx) sfx.neonClick({ x: ev.x, z: ev.z }, 1.2);
+      if (ev.phase === 'gone' && ev.seen && ev.id === me) runStats.seen++;
+      break;
+    case 'hunt':
+      // les néons sont revenus… elle est lâchée, là-bas au fond
+      if (sfx && (ev.floor || 0) === (sim.viewPlayer(sim.spectate || 0).floor || 0)) sfx.distant('drag', { x: ev.x, z: ev.z }, 1.1);
+      break;
+    case 'haunt':
+      if (sfx) {
+        if (ev.kind === 'flicker') sfx.neonClick({ x: ev.x, z: ev.z }, 0.9);
+        else sfx.distant('knock', { x: ev.x, z: ev.z }, 1.1);
+      }
+      if (hud && ev.by === me) hud.toast(ev.kind === 'flicker' ? `The light above ${who(ev.id)} flickers` : `Something knocks ahead of ${who(ev.id)}… it heard`);
+      break;
+    case 'calmWorn':
+      if (sfx) sfx.neonClick({ x: ev.x, z: ev.z }, 0.8);
+      break;
+    case 'rush':
+      // découverte nez à nez : elle hurle et fonce
+      if (sfx && (ev.floor === undefined || ev.floor === (sim.player.floor || 0))) sfx.rush({ x: ev.x, z: ev.z });
+      if (scene && ev.id === me) scene.tape('grab', 0.5);
+      if (ev.id === me) {
+        runStats.rushes++;
+        runStats.seen++;
+      }
       break;
     case 'lost':
       if (sfx) sfx.heartbeat(0);
+      if (ev.id === me) runStats.escapes++;
       break;
     case 'board': {
       const sl = ev.slide !== undefined && sim.map.slides ? sim.map.slides[ev.slide] : null;
@@ -620,6 +689,8 @@ function handleEvent(ev, me) {
       if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
       break;
     case 'level':
+      // un étage de plus : elle s'enhardit un peu pour la prochaine partie
+      if (NET.role !== 'guest' && ev.level && !ev.rebuild) nudgeSkill(0.05);
       // nouvel étage : nouvelle scène
       if (scene && scene.level === ev.level && scene.map === sim.map) break;
       if (scene) scene.dispose();
@@ -646,15 +717,35 @@ function handleEvent(ev, me) {
         if (sfx) setTimeout(() => sfx.goatDeath(), 850);
         break;
       }
-      // elle surgit devant l'objectif (dans la scène), puis l'image se perd
+      // elle surgit devant l'objectif (dans la scène), puis la bande saute… et rejoue tes dernières secondes, vues de sa
+      // tête (sur une autre caméra) ; puis l'image se perd
       if (sfx) sfx.jumpscare(sim.level);
       if (scene) scene.jumpscare();
       if (hud) hud.showJumpscare(sim.level);
-      setTimeout(() => {
-        if (scene) scene.tape('loss', 2.6);
-        if (sfx) sfx.noSignal(true);
-        setTimeout(() => sfx && sfx.noSignal(false), 2400);
-      }, 1100);
+      {
+        const now = performance.now() / 1000;
+        const frames = tapeFrames.filter((f) => f.t > now - 3.6);
+        const span = frames.length ? frames[frames.length - 1].t - frames[0].t : 0;
+        const sc = scene;
+        replayed = span > 1.5 && !sim.goats;
+        const lose = () => {
+          if (scene !== sc) return;
+          if (hud) hud.replayTag(false);
+          if (scene) scene.tape('loss', 2.6);
+          if (sfx) sfx.noSignal(true);
+          setTimeout(() => sfx && sfx.noSignal(false), 2400);
+        };
+        if (replayed) {
+          setTimeout(() => {
+            if (scene !== sc) return;
+            scene.tape('splice', 0.7);
+            if (sfx) sfx.tapeSplice();
+            scene.replay(frames);
+            if (hud) hud.replayTag(true);
+            setTimeout(lose, span * 1000 + 350);
+          }, 1450);
+        } else setTimeout(lose, 1100);
+      }
       break;
     case 'valve':
       if (sfx) sfx.cassette('valve');
@@ -715,7 +806,17 @@ function handleEvent(ev, me) {
       if (ev.type === 'gameover' && sfx) sfx.tapeStop();
       // une sortie (vraie ou fausse) efface la reprise : on recommence au Level 0
       if (ev.type === 'win' && NET.role === 'solo') store.set('backrooms_resume', 0);
-      if (hud) hud.showEnd(sim, NET.role === 'guest' ? null : () => initGame());
+      // difficulté adaptative : mort vite au Level 0, elle triche moins la prochaine fois ; une sortie l'enhardit
+      if (NET.role !== 'guest') nudgeSkill(ev.type === 'win' ? 0.12 : sim.level === 0 ? (sim.time < 180 ? -0.15 : -0.05) : -0.03);
+      // Carte du jour : ton meilleur temps de survie, ce jour-là
+      let best = null;
+      if (dailyLabel) {
+        const key = dailyOf().key;
+        const rec = store.get('backrooms_daily', {});
+        best = Math.max(rec.key === key ? rec.best || 0 : 0, sim.time);
+        store.set('backrooms_daily', { key, best });
+      }
+      if (hud) hud.showEnd(sim, NET.role === 'guest' ? null : () => initGame(), { stats: runStats, daily: dailyLabel, best, replay: replayed && ev.type === 'gameover' });
       if (H && H.embedded && NET.role !== 'guest') {
         const won = ev.type === 'win';
         // la vraie fin vaut bien plus qu'une fausse sortie, qui vaut plus que de mourir loin (Level 2 compris)
@@ -723,7 +824,7 @@ function handleEvent(ev, me) {
         const depth = { 0: 0, 1: 1, 2: 2, [PIPES_LEVEL]: 3 }[sim.level] || 0;
         H.report({
           id: `backrooms-${Date.now()}`,
-          mode: 'Survie',
+          mode: dailyLabel ? 'Carte du jour' : 'Survie',
           players: sim.players.map((p) => ({ id: p.id, name: p.name, score: p.found + (won ? (trueEnd ? 40 : 20) : depth * 4), rank: won ? 1 : 2 })),
         });
       }
@@ -845,7 +946,19 @@ function loop(currentTime) {
       useSel: act.use,
       pick: act.pick,
       whistle: act.whistle,
+      view: sim.player.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined,
     };
+    // spectateur : un signe aux vivants (E ou T), puis il faut attendre
+    if (sim.player.status !== 'alive' && (act.use || act.whistle)) {
+      if (performance.now() < hauntAt) {
+        input.useSel = false;
+        input.whistle = false;
+        act.use = act.whistle = false;
+      } else if (sim.state === 'playing' && sim.hasMonster && !sim.goats && sim.players.some((p) => p.status === 'alive')) {
+        hauntAt = performance.now() + 12000;
+        runStats.haunts++;
+      }
+    }
     if (NET.role === 'guest') {
       // l'invité se déplace chez lui ; lampe et objets partent tout de suite à l'hôte
       // l'invité tient son équilibre chez lui ; s'il le perd, l'hôte le fait tomber
@@ -862,7 +975,7 @@ function loop(currentTime) {
       if (act.struggle) send('host', { t: 'a', k: 'g', n: act.struggle, run: NET.run });
       if (NET.tick % 3 === 0) {
         const P = sim.player;
-        send('host', { t: 'i', run: NET.run, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, c: input.crouch ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2), st: Math.round(P.stamina) }, true);
+        send('host', { t: 'i', run: NET.run, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, c: input.crouch ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2), st: Math.round(P.stamina), v: P.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined }, true);
       }
     } else {
       sim.step(input, NET.role === 'host' ? guestInputs() : null);
@@ -883,6 +996,13 @@ function loop(currentTime) {
       if (stepDist >= stepInterval) {
         stepDist = 0;
         if (sfx) sfx.step(stepKind(sim.player));
+        // l'écho : un pas derrière toi, une fraction de seconde après le tien (il s'arrête quand tu t'arrêtes)
+        if (sfx && echoT > 0) {
+          const P = sim.player;
+          const d = 9 + Math.random() * 3;
+          const pos = { x: P.x + Math.sin(P.yaw) * d, z: P.z + Math.cos(P.yaw) * d };
+          setTimeout(() => sfx && sfx.step(stepKind(P), pos, 0.55), 180 + Math.random() * 60);
+        }
       }
     }
 
@@ -992,6 +1112,33 @@ function loop(currentTime) {
       sfx.crouch(crouchShown);
     }
   }
+
+  // la bande : les dernières secondes (pour le rejeu de la mort), l'appel le plus serré, l'air des recoins calmes
+  if (sim.hasMonster && !sim.goats && sim.state === 'playing') {
+    const P = sim.player;
+    const M = sim.monster;
+    if (P.status === 'alive' && !(P.grabT > 0)) {
+      const t = performance.now() / 1000;
+      tapeFrames.push({ t, mx: M.x, mz: M.z, myaw: M.yaw || 0, mf: M.floor || 0, px: P.x, pz: P.z, pyaw: P.yaw, pf: P.floor || 0, mv: P.moving ? 1 : 0, rn: P.running ? 1 : 0, fl: P.flashlight ? 1 : 0 });
+      while (tapeFrames.length && tapeFrames[0].t < t - 4) tapeFrames.shift();
+      if (M.mode === 'chase' && (M.floor || 0) === (P.floor || 0)) runStats.closest = Math.min(runStats.closest, Math.hypot(M.x - P.x, M.z - P.z));
+    }
+  }
+  echoT = Math.max(0, echoT - delta);
+  if (hud) hud.hauntWait = Math.max(0, (hauntAt - performance.now()) / 1000);
+  if (sfx && sim.level === 0) {
+    const V = sim.viewPlayer(sim.spectate || 0);
+    let calm = 0;
+    let wear = 0;
+    for (const n of sim.fm(V.floor || 0).calm || []) {
+      const v = Math.max(0, 1 - Math.hypot(n.x - V.x, n.z - V.z) / 11) * (n.wear >= 1 ? 0.15 : 1);
+      if (v > calm) {
+        calm = v;
+        wear = n.wear || 0;
+      }
+    }
+    sfx.setCalm(paused || sim.state !== 'playing' ? 0 : calm, wear);
+  } else if (sfx && sfx.calmBus) sfx.setCalm(0);
 
   // Rendu graphique et HUD
   if (scene) {

@@ -1,5 +1,32 @@
 # Journal des versions — Arcadia
 
+## 4.57 — 7 novembre 2026
+- **The Backrooms** — Le Level 0 ressemble enfin aux vidéos.
+  - Les zones éclairées baignent vraiment dans la lumière jaune des néons, du sol au plafond ; les zones mortes restent noires.
+  - Plinthes au pied des murs, taches du plafond plus discrètes.
+  - L'escalier est maintenant une vraie cage fermée : une porte en bas, une en haut, des marches avec nez de marche, des mains courantes au mur, et des appliques qui l'éclairent (elles s'éteignent pendant les coupures).
+  - L'ascenseur a été refait : cadre en inox, portes brossées, seuil, voyant à flèches, bouton d'appel et vraie cabine éclairée. Plus de texture qui clignote, et sa lueur rouge ne repeint plus tout le couloir.
+  - Si tu tombes nez à nez avec l'entité et que tu la vois en face, elle ne reste plus plantée là : elle hurle et fonce sur toi.
+  - L'entité est plus grande (elle frôle le plafond) et bouge autrement : coudes et genoux qui plient dans le mauvais sens, mouvements saccadés image par image, tête qui se tord d'un coup, bras interminables qui ballottent, démarche boiteuse et course désarticulée. Quand elle charge, sa bouche s'ouvre en grand et elle tend les bras vers toi.
+  - En arrivant au Level 1, on sort du même ascenseur que celui pris au Level 0 : ses portes se referment derrière toi une fois que tu as fait quelques pas.
+  - Sous les néons les plus forts, on est presque à l'abri : l'entité ne t'y prend en chasse que si tu la frôles. Elle reste à la lisière de l'ombre, immobile, et attend que tu en sortes.
+  - Quand plus personne ne la regarde, elle ne joue plus franc jeu : elle peut réapparaître juste derrière un angle devant toi, immobile et muette, ou se glisser dans ton dos sans un bruit. Et après t'avoir observé, il suffit de te retourner pour qu'elle ait disparu.
+  - Avant chacune de ces apparitions, un signe : un grattement derrière le mur, ou une respiration lente dans ton dos. On la sent venir sans savoir exactement où.
+  - La toute première rencontre : pendant la première minute, au bout d'un couloir, elle est là, immobile. Regarde-la trop longtemps, ou approche, et le néon au-dessus d'elle claque : il n'y a plus personne.
+  - De temps en temps, les néons s'éteignent un à un jusqu'à toi… et quand ils se rallument, elle a été lâchée au fond du couloir.
+  - Nouvelles fausses alertes : des pas qui suivent les tiens et s'arrêtent quand tu t'arrêtes, une silhouette qui s'efface, l'ascenseur qui sonne tout seul.
+  - Des recoins calmes : un fauteuil, une lampe de salon, une vieille radio. Elle n'y entre pas… pendant 45 secondes. Ensuite la lampe grésille et plus rien n'y protège, jusqu'à ce qu'on l'ait laissé reposer.
+  - Elle s'adapte : si tu es mort vite la dernière fois, elle triche moins ; si tu t'en sors, elle s'enhardit.
+  - À plusieurs, elle traque surtout celui qui s'éloigne du groupe.
+  - Mort, tu peux encore aider (ou piéger) les vivants : E fait grésiller le néon au-dessus de celui que tu regardes, T frappe un peu plus loin devant lui et l'y attire.
+  - À ta mort, la bande rejoue tes dernières secondes, vues de sa tête.
+  - En fin de partie, le bilan : combien de fois elle t'a vu, les poursuites semées, ton passage le plus serré.
+  - Nouveau réglage « Carte du jour » : la même carte pour tout le monde ce jour-là, avec ton meilleur temps.
+  - L'écran titre conseille de jouer au casque, lumière éteinte, et montre le réglage de luminosité.
+  - Les zones éclairées sont un peu moins éblouissantes (environ 10 % de lumière en moins).
+  - Ne la fixe pas : si tu la regardes plus d'une seconde à moins de quinze mètres, lampe allumée ou non, elle hurle et fonce sur toi. Et si tu t'approches à moins de six mètres, aussi.
+  - La lampe ne la fait plus fuir : tout au plus sursaute-t-elle une fois, de très loin, au début. Seule la première rencontre se termine par une disparition.
+
 ## 4.56 — 6 novembre 2026
 - **Fief Maudit** — La crypte et le Roi-Squelette : l'expédition a enfin une fin.
   - À l'aube du onzième jour, la porte du donjon s'ouvre. En bas, deux leviers à tenir en même temps lèvent la herse, puis un couloir de brume où les morts se relèvent mène à la salle du trône.

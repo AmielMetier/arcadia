@@ -17,13 +17,13 @@
 // monde dans la cabine, plus l'entité s'énerve contre ceux qui restent.
 // Chacun part avec sa lampe torche dans la case 1. Un joueur attrapé regarde les autres jusqu'à la fin de l'étage ;
 // si l'équipe le termine, tout le monde repart à l'étage suivant, lampe en main.
-import { CELL_SIZE, T, createLevel0, PIT_HALF, FLOOR_DY } from './map.js';
+import { CELL_SIZE, T, createLevel0, PIT_HALF, FLOOR_DY, bfs } from './map.js';
 import { createWarehouseMap } from './level1.js';
 import { createPoolMap, MOUTH } from './poolrooms.js';
 import { createPipesMap, VALVES, PIPES_LEVEL, jetState, inJet, JET_HALF } from './level2.js';
 import { findPath, hasLineOfSight } from './nav.js';
 import { createGoats, updateGoats, senseGoats, alertGoats, goatSnapshot, applyGoatSnapshot, goatCount } from './goats.js';
-import { createDirector, updateDirector, blackoutAllowed, entityRelaxed, updateLightsOut } from './director.js';
+import { createDirector, updateDirector, blackoutAllowed, entityRelaxed, updateLightsOut, lightsChanged } from './director.js';
 import { placeHides, HIDE_R, LOCKER_R, BREATH_HOLD, BREATH_BACK, hideInside, hideFront } from './hides.js';
 
 export const DT = 1 / 60;
@@ -87,6 +87,47 @@ export const PIPES_BLACKOUT_LEN = [11, 15];
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const cellOf = (v) => Math.floor(v / CELL_SIZE);
+export const STARE_R = 15; // la fixer à moins de 15 m (en la voyant vraiment) la provoque
+export const STARE_T = 1.0; // … au bout d'une seconde (une demi-seconde à moins de 7 m)
+export const NEAR_CHARGE = 6; // s'approcher à moins de 6 m d'elle quand elle observe : elle charge
+export const CALM_HOLD = 45; // secondes de répit dans un recoin calme, avant que sa lampe grésille
+export const HAUNT_COOLDOWN = 12; // un spectateur ne hante qu'une fois toutes les 12 s
+
+// Les recoins calmes d'un étage du Level 0 : des culs-de-sac (une seule case voisine libre), loin du départ et les uns
+// des autres. Une lampe chaude y brille, un air doux y joue : rien ne s'y passe… pendant un moment
+export function findCalmNooks(map, seed, spawn) {
+  const W = map.W;
+  const free = new Set((map.walkable || []).map((c) => c.z * W + c.x));
+  const stairs = new Set((map.stairs || []).flatMap((st) => st.cells.map((k) => k.gz * W + k.gx)));
+  const hash = (i) => {
+    let h = (i * 2654435761 + seed * 40503) >>> 0;
+    h ^= h >>> 15;
+    h = Math.imul(h, 2246822519) >>> 0;
+    return (h ^ (h >>> 13)) / 4294967296;
+  };
+  const cands = [];
+  for (const c of map.walkable || []) {
+    const i = c.z * W + c.x;
+    if (stairs.has(i) || (map.pitAt && map.pitAt(c.x, c.z) >= 0)) continue;
+    const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => free.has((c.z + dz) * W + c.x + dx));
+    if (nb.length !== 1) continue;
+    const [dx, dz] = nb[0];
+    if (stairs.has((c.z + dz) * W + c.x + dx)) continue;
+    const x = (c.x + 0.5) * CELL_SIZE;
+    const z = (c.z + 0.5) * CELL_SIZE;
+    if (spawn && Math.hypot(x - spawn.x, z - spawn.z) < 18) continue;
+    if (map.exit && Math.hypot(x - map.exit.x, z - map.exit.z) < 8) continue;
+    cands.push({ x, z, gx: c.x, gz: c.z, dx: -dx || 0, dz: -dz || 0, cells: [{ x: c.x, z: c.z }, { x: c.x + dx, z: c.z + dz }], r: hash(i) });
+  }
+  cands.sort((a, b) => a.r - b.r);
+  const out = [];
+  for (const n of cands) {
+    if (out.some((o) => Math.hypot(o.x - n.x, o.z - n.z) < 30)) continue;
+    out.push({ x: n.x, z: n.z, gx: n.gx, gz: n.gz, dx: n.dx, dz: n.dz, cells: n.cells, wear: 0 });
+    if (out.length >= 2) break;
+  }
+  return out;
+}
 // un tirage qui ne dépend que de la graine (hôte et invités tirent pareil)
 const hashRnd = (...k) => {
   let h = 2166136261;
@@ -213,8 +254,10 @@ function newPlayer(id, name, map, i) {
 export class BackroomsSim {
   // players : [{ id, name }] (le premier est l'hôte) ; localId : le joueur de cet écran
   // map : une carte d'un seul étage (tests) ; sinon le niveau est généré à partir de la graine
-  constructor({ map = null, difficulty = 'normal', seed = 42, players = null, localId = 0, level = 0 } = {}) {
+  constructor({ map = null, difficulty = 'normal', seed = 42, players = null, localId = 0, level = 0, skill = 0.5 } = {}) {
     this.difficulty = difficulty;
+    // difficulté adaptative (0 à 1) : on est mort vite la dernière fois, elle triche moins ; on s'en sort, elle s'enhardit
+    this.skill = Math.max(0, Math.min(1, Number.isFinite(+skill) ? +skill : 0.5));
     this.seed = seed;
     this.time = 0;
     this.state = 'playing'; // 'playing' | 'won' | 'dead'
@@ -265,6 +308,16 @@ export class BackroomsSim {
       // tout le monde part avec sa lampe torche, allumée, dans la case 1 (ceux qui étaient tombés en reçoivent une)
       P.hasLamp = true;
       P.flashlight = !old || old.flashlight || old.status !== 'alive';
+      // Level 1 : tout le monde sort ensemble de l'ascenseur d'arrivée, dos à ses portes
+      const A = this.map.arrival;
+      if (A) {
+        const side = [0, 0.65, -0.65, 0.33, -0.33, 0][i % 6];
+        const back = [0.5, 0.5, 0.5, -0.2, -0.2, -0.45][i % 6];
+        P.x = this.map.spawn.x + A.dx * back - A.dz * side;
+        P.z = this.map.spawn.z + A.dz * back + A.dx * side;
+        P.yaw = Math.atan2(A.dx, A.dz);
+        P.pitch = 0;
+      }
       return P;
     });
     this.cassettes = 0; // cassettes trouvées par l'équipe (Level 0)
@@ -281,6 +334,11 @@ export class BackroomsSim {
     this.panel = 0; // Level 1 : avancée du redémarrage du monte-charge (0 à 1)
     this.panelNoiseT = 0;
     this.director = createDirector(level);
+    // Level 0 : un ou deux recoins calmes par étage, où rien ne se passe… un moment ; la première rencontre, mise en scène
+    if (level === 0) this.floors.forEach((f, fi) => (f.calm = f.calm || findCalmNooks(f, this.seed * 13 + fi, fi === 0 ? f.spawn : null)));
+    // l'état d'origine des néons (les instantanés n'envoient que ceux qui ont changé)
+    for (const f of this.floors) for (const l of f.lights || []) if (l.s0 === undefined) l.s0 = l.state;
+
     this.lightsOut = null;
     this.blackout = 0; // secondes de noir restantes
     this.nextBlackout = level === 1 ? rand(...BLACKOUT_EVERY) * 0.6 : level === PIPES_LEVEL && this.hasMonster ? rand(...PIPES_BLACKOUT_EVERY) * 0.75 : Infinity;
@@ -314,13 +372,25 @@ export class BackroomsSim {
       stalkT: 4, // délai avant d'aller se cacher pour observer
       watch: null, // case sombre d'où elle observe
       // au tout début de la partie, elle reste au loin une minute : on apprend à se déplacer
-      dormantT: level === 0 && !this.time ? DORMANT_T * (this.difficulty === 'hard' ? 0.75 : 1) : 0,
+      dormantT: level === 0 && !this.time ? DORMANT_T * (this.difficulty === 'hard' ? 0.75 : 1) * (1.3 - 0.6 * this.skill) : 0,
       flees: 0, // fuites devant la lampe : à la troisième, elle ne fuit plus
       escapes: [], // là où on l'a semée : elle s'en souvient pour ses embuscades
       stunT: 0, // sonnée (aveuglée, ou après avoir lâché sa prise)
       grabbing: null, // le joueur qu'elle agrippe
+      faceT: 0, // depuis combien de temps un joueur la regarde en face, de près
+      rushT: 0, // découverte nez à nez : elle hurle et fonce (secondes de charge)
+      warpT: 25, // Level 0 : délai avant sa prochaine apparition « trichée » (quand personne ne la voit)
+      unseenAllT: 0, // depuis combien de temps aucun joueur ne l'a dans son champ de vision
+      edgeT: 0, // sa proie s'est réfugiée dans la lumière : elle hésite au bord
+      lurk: false, // postée là où on va tomber sur elle (après une apparition)
+      vanish: false, // elle a fini d'observer : dès que personne ne la regarde, elle disparaît
+      pending: null, // apparition annoncée : { spot, kind, t } (le signe a été donné, elle arrive)
+      glimpse: null, // Level 0 : la toute première rencontre, mise en scène ({ t, looked })
       sawHide: -1, // le casier où elle a vu quelqu'un entrer
     };
+    // la première rencontre arrive pendant la minute de calme du début (elle n'est encore qu'une silhouette)
+    this.glimpseAt = level === 0 && !prev.length && this.hasMonster && this.monster.dormantT > 0 ? this.monster.dormantT * rand(0.4, 0.7) : Infinity;
+    this.glimpseTries = 0;
     // Level 2 : le troupeau remplace l'entité (elle reste là pour relayer le son et l'image de la chèvre la plus proche)
     this.goats = level === PIPES_LEVEL && this.hasMonster ? createGoats(this.map, goatCount(this.roster.length, this.difficulty)) : null;
     this.herd = null;
@@ -917,7 +987,10 @@ export class BackroomsSim {
     for (const P of this.players) {
       const inp = P.id === this.localId ? input : (others && others[P.id]) || {};
       if (P.status === 'alive') this.stepPlayer(P, inp);
+      // spectateur : il peut encore aider (ou piéger) les vivants
+      else if (inp.haunt || inp.useSel || inp.whistle) this.haunt(P, inp.haunt || (inp.useSel ? 'flicker' : 'knock'), inp.view);
     }
+    if (this.level === 0) this.updateCalm();
     if (this.state !== 'playing') return;
     if (this.level === 1) this.updatePanel();
     updateDirector(this);
@@ -1315,7 +1388,10 @@ export class BackroomsSim {
       // le vrai ascenseur ne se dévoile qu'une fois les cassettes trouvées
       rf: this.open ? this.realFloor : -1,
       p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.floor, P.sigTo, P.onLadder ? 1 : 0, r2(P.lockT), r2(P.tilt), P.onBeam ? 1 : 0, P.bottles, r2(P.grabT), P.hidden, P.crouch ? 1 : 0, P.carry.length, P.hurt || 0, Math.round(P.breath), P.holding ? 1 : 0, P.grabs || 0, r2(P.struggle || 0)]),
-      m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0, M.floor, M.grabbing ?? -1],
+      m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0, M.floor, M.grabbing ?? -1, r2(M.rushT || 0)],
+      // néons : 1 allumé, 0 éteint, 2 qui grésille (les coupures du directeur, les néons qui meurent un à un)
+      ls: this.level === 0 ? this.floors.map((f) => (f.lights || []).flatMap((l, i) => (l.state !== l.s0 ? [i * 3 + (l.state === 'off' ? 0 : l.state === 'flicker' ? 2 : 1)] : []))) : null,
+      cw: this.level === 0 ? this.floors.map((f) => (f.calm || []).map((n) => r2(n.wear || 0))) : null,
       // Level 1 : fusibles (ils peuvent être tombés ailleurs), fusibles au panneau, redémarrage du monte-charge
       fp: this.level === 1 ? (this.map.fuses || []).map((f) => [r2(f.x), r2(f.z)]) : null,
       dl: this.delivered || 0,
@@ -1344,6 +1420,25 @@ export class BackroomsSim {
     this.fuses = snap.f;
     this.powered = !!snap.pw;
     this.blackout = snap.bo;
+    if (Array.isArray(snap.ls) && this.level === 0) {
+      snap.ls.forEach((row, fi) => {
+        const f = this.floors[fi];
+        if (!f || !f.lights || !Array.isArray(row)) return;
+        const want = new Map();
+        for (const v of row) want.set(Math.floor(v / 3), ['off', 'on', 'flicker'][v % 3]);
+        let changed = false;
+        f.lights.forEach((l, i) => {
+          const st = want.get(i) || l.s0 || l.state;
+          if (l.state !== st) {
+            l.state = st;
+            l.flicker = st === 'flicker';
+            changed = true;
+          }
+        });
+        if (changed) lightsChanged(f);
+      });
+    }
+    if (snap.cw) snap.cw.forEach((row, fi) => (this.floors[fi] && this.floors[fi].calm || []).forEach((n, i) => (n.wear = row[i] || 0)));
     this.map.dark = this.level === PIPES_LEVEL && this.blackout > 0;
     this.departT = snap.dp;
     this.slide = snap.sl ?? -1;
@@ -1440,6 +1535,7 @@ export class BackroomsSim {
     M.silent = !!snap.m[4];
     M.floor = snap.m[5] || 0;
     M.grabbing = snap.m[6] >= 0 ? snap.m[6] : null;
+    M.rushT = snap.m[7] || 0;
     if (snap.fp) (this.map.fuses || []).forEach((f, i) => {
       const q = snap.fp[i];
       if (!q) return;
@@ -1544,8 +1640,10 @@ export class BackroomsSim {
       // elle préfère celui qui s'est éloigné des autres
       let mate = Infinity;
       for (const Q of this.players) if (Q !== P && Q.status === 'alive' && Q.floor === P.floor) mate = Math.min(mate, Math.hypot(Q.x - P.x, Q.z - P.z));
-      const alone = mate !== Infinity && mate > 15 ? 8 : 0;
-      const score = P.mDist - (P.seen && !concealed ? 12 : 0) - (P.id === M.target ? 6 : 0) - alone + (concealed ? 30 : 0);
+      // plus il est loin des autres, plus elle le préfère (jusqu'à 22 m d'avance sur un joueur bien entouré)
+      const alone = mate !== Infinity && mate > 12 ? Math.min(22, 6 + (mate - 12) * 0.6) : 0;
+      const resting = this.calmAt(P);
+      const score = P.mDist - (P.seen && !concealed ? 12 : 0) - (P.id === M.target ? 6 : 0) - alone + (concealed ? 30 : 0) + (resting ? 40 : 0);
       if (score < bestScore) {
         bestScore = score;
         target = P;
@@ -1582,6 +1680,7 @@ export class BackroomsSim {
     M.dormantT = Math.max(0, (M.dormantT || 0) - DT);
     // au tout début de la partie, ou pendant le répit qui suit une poursuite, elle reste au loin et se tait
     const calm = M.dormantT > 0 || (entityRelaxed(this) && M.mode !== 'chase');
+    if (this.level === 0 && this.firstGlimpse(M, P)) return;
     const map = this.fm(M.floor);
     const rage = this.rage; // 0 seul ou personne à l'abri, jusqu'à 1 quand il ne reste qu'un joueur dehors
     const dark = this.blackout > 0;
@@ -1617,26 +1716,53 @@ export class BackroomsSim {
       canSee = false;
       canHear = false;
     }
+    // Nez à nez : le joueur la regarde en face, de près, et la voit vraiment (sous un néon, dans sa lampe, ou à deux
+    // pas). Elle ne reste pas plantée là : au bout d'une demi-seconde, elle hurle et fonce sur lui, même au repos
+    // Level 0 : dans la lumière franche d'une zone claire, on est presque à l'abri (sauf pendant une coupure)
+    const safe = this.level === 0 && !dark && this.brightCell(this.fm(P.floor), P.x, P.z);
+    // Plus loin (jusqu'à STARE_R), la fixer la provoque aussi : il faut la regarder bien en face un peu plus longtemps
+    const near = dist < 7;
+    const exposed = same && M.hasLineOfSight && !(P.hidden >= 0) && !this.calmAt(P) && dist < STARE_R && (!safe || dist < 4) && this.facing(P, M.x, M.z) < (near ? 0.4 : 0.3) &&
+      ((P.flashlight && dist < 20) || dist < 3.2 || (!dark && this.litCell(map, M.x, M.z)));
+    if (exposed && M.mode !== 'chase' && M.mode !== 'flee' && M.mode !== 'ambush') M.faceT += DT;
+    else M.faceT = Math.max(0, M.faceT - DT * 2);
+    if (M.faceT > (near ? 0.5 : STARE_T)) {
+      M.faceT = 0;
+      M.dormantT = 0;
+      M.mode = 'chase';
+      M.watch = null;
+      M.silent = false;
+      M.rushT = 2.4;
+      M.burstT = 2.4;
+      M.unseenT = 0;
+      M.repathT = 0;
+      M.lastSeenX = P.x;
+      M.lastSeenZ = P.z;
+      M.yaw = Math.atan2(P.x - M.x, P.z - M.z);
+      this.chases++;
+      canSee = true;
+      this.emit({ type: 'rush', id: P.id, x: M.x, z: M.z, floor: M.floor });
+    }
+    M.rushT = Math.max(0, M.rushT - DT);
     // tapie dans le noir, elle observe : elle ne charge que si on s'approche trop (ou, déjà énervée, si on la voit)
     const hiding = M.mode === 'stalk' || M.mode === 'watch' || M.mode === 'flee';
     if (hiding) {
       // la lampe braquée sur elle : au début elle s'enfuit dans le noir, plus tard elle charge
       const lit = P.flashlight && M.hasLineOfSight && dist < 22 && this.facing(P, M.x, M.z) < 0.3;
-      isNearby = dist < 3.5 + A * 4;
+      // on s'approche trop près d'elle : elle charge
+      isNearby = dist < 3.5 + A * 4 || (dist < NEAR_CHARGE + A * 2 && M.hasLineOfSight && !(P.hidden >= 0));
       canSee = (A >= 0.5 && canSee && dist < sight * 0.6) || (lit && A >= 0.4);
       canHear = A >= 0.6 && canHear;
-      if (lit && A < 0.4 && M.mode !== 'flee' && !isNearby) {
-        // elle apprend : après deux fuites devant la lampe, elle ne se laisse plus faire
-        if (M.flees >= 2) canSee = true;
-        else {
-          const spot = this.darkSpot(map, P, M, 18, 30, false);
-          if (spot) {
-            M.flees++;
-            M.mode = 'flee';
-            M.watch = spot;
-            M.repathT = 0;
-            this.emit({ type: 'monsterFlee' });
-          }
+      // un seul sursaut devant la lampe, tout au début et de loin : ensuite, la lumière ne la fait plus reculer (de près,
+      // la fixer la fait charger)
+      if (lit && A < 0.2 && M.flees < 1 && dist > STARE_R && M.mode !== 'flee' && !isNearby && !exposed) {
+        const spot = this.darkSpot(map, P, M, 18, 30, false);
+        if (spot) {
+          M.flees++;
+          M.mode = 'flee';
+          M.watch = spot;
+          M.repathT = 0;
+          this.emit({ type: 'monsterFlee' });
         }
       }
     } else if (M.mode === 'patrol' && A < 0.5 && canSee && !isNearby && !(canHear && dist < 8)) {
@@ -1650,6 +1776,43 @@ export class BackroomsSim {
         canSee = false;
       }
     }
+
+    // dans un recoin calme (tant qu'il tient) : elle ne le voit pas, ne l'entend pas, et ne franchit pas le seuil
+    if (this.calmAt(P)) {
+      canSee = false;
+      canHear = false;
+      isNearby = false;
+      if (M.mode === 'chase' || M.mode === 'search') {
+        M.mode = 'watch';
+        M.waitT = rand(5, 9);
+        M.watch = null;
+        M.path = [];
+        M.silent = true;
+        M.lurk = false;
+        M.vanish = this.level === 0;
+        this.emit({ type: 'lost', id: P.id });
+      }
+    }
+    // à l'abri dans la lumière : elle ne s'y lance qu'à bout portant ; si elle le poursuivait, elle s'arrête au bord
+    // de l'ombre et l'observe
+    if (safe) {
+      canSee = canSee && dist < 3.5;
+      canHear = canHear && dist < 2.5;
+      isNearby = dist < 1.8;
+      if ((M.mode === 'chase' || M.mode === 'search') && dist > 2.2 && !(M.rushT > 0)) {
+        M.edgeT += DT;
+        if (M.edgeT > 1.0 + rage * 1.5) {
+          M.edgeT = 0;
+          M.mode = 'watch';
+          M.waitT = rand(4, 8);
+          M.watch = null;
+          M.path = [];
+          M.silent = true;
+          M.lurk = false;
+          this.emit({ type: 'lost', id: P.id });
+        }
+      } else M.edgeT = 0;
+    } else M.edgeT = 0;
 
     if (M.mode === 'ambush') {
       // en embuscade, elle attend que sa proie passe tout près
@@ -1706,11 +1869,16 @@ export class BackroomsSim {
       }
     }
 
+    // Level 0 : elle triche. Quand aucun joueur ne l'a dans son champ de vision, elle se téléporte : juste derrière
+    // un angle devant sa proie (on tombe nez à nez avec elle), dans son dos (elle approche sans un bruit), ou très
+    // loin (on se retourne, elle a disparu)
+    if (this.level === 0) this.monsterWarp(M, P, calm, A, rage);
+
     // Vitesse selon le mode, la colère et le noir
     const k = (1 + rage * 0.35 + (dark ? 0.1 : 0)) * (0.9 + A * 0.22);
     M.burstT = Math.max(0, M.burstT - DT);
     if (M.mode === 'search' && M.probe) M.searchT = Math.max(0, (M.searchT || 0) - DT);
-    if (M.mode === 'chase') M.speed = this.monsterChaseSpeed * k * (M.burstT > 0 ? 1.15 : 1) * (this.chases <= 1 ? 0.86 : 1);
+    if (M.mode === 'chase') M.speed = this.monsterChaseSpeed * k * (M.rushT > 0 ? 1.25 : M.burstT > 0 ? 1.15 : 1) * (this.chases <= (this.skill < 0.3 ? 2 : 1) && !(M.rushT > 0) ? 0.86 : 1);
     else if (M.mode === 'search') M.speed = MONSTER_PATROL_SPEED * 1.3 * k;
     else if (M.mode === 'ambush') M.speed = MONSTER_PATROL_SPEED * 1.5;
     else if (M.mode === 'flee') M.speed = this.monsterChaseSpeed * 1.05;
@@ -1754,6 +1922,9 @@ export class BackroomsSim {
         M.silent = false;
         M.watch = null;
         M.stalkT = rand(3, 8);
+        // Level 0 : on se retourne… elle n'est plus là
+        if (this.level === 0) M.vanish = true;
+        M.lurk = false;
       }
     }
 
@@ -1797,7 +1968,9 @@ export class BackroomsSim {
             const near = calm
               ? map.walkable.filter((c) => Math.hypot((c.x + 0.5) * CELL_SIZE - P.x, (c.z + 0.5) * CELL_SIZE - P.z) > 30)
               : same && Math.random() < 0.5 + rage * 0.4 ? map.walkable.filter((c) => Math.hypot((c.x + 0.5) * CELL_SIZE - P.x, (c.z + 0.5) * CELL_SIZE - P.z) < 28 - rage * 12) : [];
-            const pool = near.length ? near : map.walkable;
+            // Level 0 : elle rôde dans l'ombre, pas dans la lumière franche des zones claires
+            const shade = this.level === 0 && !dark ? near.filter((c) => !this.brightCell(map, (c.x + 0.5) * CELL_SIZE, (c.z + 0.5) * CELL_SIZE)) : near;
+            const pool = shade.length ? shade : near.length ? near : map.walkable;
             const c = pool[Math.floor(Math.random() * pool.length)];
             M.targetWander = { x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE };
           }
@@ -1923,7 +2096,7 @@ export class BackroomsSim {
 
     // L'entité attrape le joueur : la première fois, elle l'agrippe (on peut se dégager) ; la seconde est mortelle
     const reach = P.hidden >= 0 ? 1.4 : 1.15;
-    if (same && dist < reach && (P.hidden < 0 || M.sawHide === P.hidden)) {
+    if (same && dist < reach && (P.hidden < 0 || M.sawHide === P.hidden) && !this.calmAt(P)) {
       if (P.hidden >= 0) this.leaveHide(P);
       if (P.grabs >= 1 || this.difficulty === 'hard' && this.rage >= 1) {
         this.killPlayer(P, { x: M.x, z: M.z });
@@ -2030,7 +2203,368 @@ export class BackroomsSim {
 
   // la case la plus sombre possible (aucun néon allumé tout autour, sinon le moins possible), entre rMin et rMax du
   // joueur ; seen : d'où on le voit. map.darkCells : 0 pour le noir complet, plus pour chaque néon allumé à côté
-  darkSpot(map, P, M, rMin, rMax, seen) {
+  // Level 0 : une case dans la lumière franche d'une zone claire (sous ou à côté d'un néon d'une zone où tous marchent)
+  brightCell(map, x, z) {
+    if (!map.brightCells) {
+      map.brightCells = new Uint8Array(map.W * map.H);
+      for (const l of map.lights || []) {
+        if (!l.bright || l.state !== 'on') continue;
+        for (let dz = -1; dz <= 1; dz++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const gx = l.gx + dx;
+            const gz = l.gz + dz;
+            if (gx >= 0 && gz >= 0 && gx < map.W && gz < map.H) map.brightCells[gz * map.W + gx] = 1;
+          }
+        }
+      }
+    }
+    const gx = cellOf(x);
+    const gz = cellOf(z);
+    return gx >= 0 && gz >= 0 && gx < map.W && gz < map.H && map.brightCells[gz * map.W + gx] === 1;
+  }
+
+  // ce point est-il dans le champ de vision d'un joueur ? (dans le cadre de sa caméra, rien entre eux ; tout près,
+  // on la sentirait même dans son dos)
+  inSomeView(floor, x, z, margin = 0) {
+    const map = this.fm(floor);
+    for (const Q of this.players) {
+      if (Q.status !== 'alive' || (Q.floor || 0) !== floor) continue;
+      const d = Math.hypot(Q.x - x, Q.z - z);
+      if (d < 3.5) return true;
+      if (d > 60 || this.facing(Q, x, z) > 1.05 + margin) continue;
+      if (hasLineOfSight(map, Q.x, Q.z, x, z)) return true;
+    }
+    return false;
+  }
+
+  // Où réapparaître sans être vue. kind : 'corner' (devant sa proie, à quelques pas de marche, caché juste derrière un
+  // angle qu'elle va passer), 'behind' (dans son dos, dans l'ombre), 'far' (loin de tout le monde)
+  warpSpot(P, kind) {
+    const floor = P.floor || 0;
+    const map = this.fm(floor);
+    const W = map.W;
+    const pd = bfs(map.grid, W, map.H, cellOf(P.x), cellOf(P.z));
+    const stairCell = new Set((this.stairs || []).flatMap((st) => st.cells.map((k) => k.gz * W + k.gx)));
+    const dark = this.blackout > 0;
+    let best = null;
+    let bestS = Infinity;
+    for (const c of map.walkable || []) {
+      const i = c.z * W + c.x;
+      const d = pd[i];
+      if (d < 0 || stairCell.has(i)) continue;
+      if (kind === 'corner' && (d < 3 || d > 8)) continue;
+      if (kind === 'behind' && (d < 2 || d > 6)) continue;
+      const x = (c.x + 0.5) * CELL_SIZE;
+      const z = (c.z + 0.5) * CELL_SIZE;
+      const e = Math.hypot(x - P.x, z - P.z);
+      if (kind === 'far' ? this.players.some((Q) => Q.status === 'alive' && (Q.floor || 0) === floor && Math.hypot(Q.x - x, Q.z - z) < 30) : e < NEAR_CHARGE + 0.5) continue; // postée hors de portée de charge : c'est au joueur de s'approcher
+      if (map.pitAt && map.pitAt(c.x, c.z) >= 0) continue;
+      if (!dark && this.brightCell(map, x, z)) continue;
+      if ((map.props || []).some((pr) => Math.hypot(pr.x - x, pr.z - z) < pr.r + 0.6)) continue;
+      if ((map.calm || []).some((n) => n.cells.some((k) => k.x === c.x && k.z === c.z))) continue;
+      const ang = this.facing(P, x, z);
+      if (kind === 'corner' && ang > 1.1) continue;
+      if (kind === 'behind' && ang < 2.0) continue;
+      if (this.inSomeView(floor, x, z, 0.2)) continue;
+      let s = Math.random() * 2;
+      if (kind === 'corner') {
+        // juste derrière un angle : une case voisine est déjà en vue du joueur
+        const edge = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => {
+          const nx = c.x + dx;
+          const nz = c.z + dz;
+          return pd[nz * W + nx] >= 0 && hasLineOfSight(map, P.x, P.z, (nx + 0.5) * CELL_SIZE, (nz + 0.5) * CELL_SIZE);
+        });
+        if (!edge) continue;
+        s += ang * 3 + Math.abs(d - 5);
+      } else if (kind === 'behind') s += Math.abs(d - 3) + (Math.PI - ang) * 2;
+      else s += Math.random() * 4;
+      if (s < bestS) {
+        bestS = s;
+        best = { x, z, floor };
+      }
+    }
+    return best;
+  }
+
+  // dans un recoin calme, et il tient encore (on s'y repose 45 s ; ensuite sa lampe grésille et plus rien n'y protège)
+  calmAt(P) {
+    if (this.level !== 0 || !P || P.status !== 'alive') return false;
+    const n = this.nookOf(P);
+    return !!n && (n.wear || 0) < 1;
+  }
+
+  nookOf(P) {
+    const f = this.fm(P.floor || 0);
+    if (!f.calm || !f.calm.length) return null;
+    const gx = cellOf(P.x);
+    const gz = cellOf(P.z);
+    return f.calm.find((n) => n.cells.some((c) => c.x === gx && c.z === gz)) || null;
+  }
+
+  // l'usure des recoins : elle monte quand quelqu'un s'y abrite, redescend lentement quand il est vide
+  updateCalm() {
+    for (const f of this.floors) {
+      for (const n of f.calm || []) {
+        const inside = this.players.some((P) => P.status === 'alive' && this.nookOf(P) === n);
+        const was = n.wear || 0;
+        n.wear = inside ? Math.min(1.2, was + DT / CALM_HOLD) : Math.max(0, was - DT / (CALM_HOLD * 2.5));
+        if (was < 1 && n.wear >= 1) this.emit({ type: 'calmWorn', x: n.x, z: n.z, floor: this.floors.indexOf(f) });
+      }
+    }
+  }
+
+  // un spectateur hante : 'flicker' (le néon au-dessus de celui qu'il regarde grésille : attention) ou 'knock'
+  // (des coups un peu plus loin, qui attirent l'entité : pour l'éloigner… ou la lui amener)
+  haunt(P, kind, viewId) {
+    if ((P.hauntAt || 0) > this.time || this.state !== 'playing') return;
+    const alive = this.players.filter((Q) => Q.status === 'alive');
+    const V = alive.find((Q) => Q.id === viewId) || alive[0];
+    if (!V) return;
+    const map = this.fm(V.floor || 0);
+    P.hauntAt = this.time + HAUNT_COOLDOWN;
+    if (kind === 'flicker') {
+      const near = (map.lights || []).filter((l) => l.state === 'on').sort((a, b) => Math.hypot(a.x - V.x, a.z - V.z) - Math.hypot(b.x - V.x, b.z - V.z))[0];
+      if (!near || Math.hypot(near.x - V.x, near.z - V.z) > 14) {
+        P.hauntAt = this.time + 1;
+        return;
+      }
+      if (this.director) this.director.drops.push({ l: near, t: 1.4, back: near.state, map });
+      near.state = 'flicker';
+      near.flicker = true;
+      lightsChanged(map);
+      this.emit({ type: 'haunt', kind, x: near.x, z: near.z, floor: V.floor || 0, by: P.id, name: P.name, id: V.id });
+      return;
+    }
+    // des coups à 8-16 m de lui, dans la direction où il regarde (le spectateur choisit en tournant avec lui)
+    const fx = -Math.sin(V.yaw);
+    const fz = -Math.cos(V.yaw);
+    let spot = null;
+    for (let d = 16; d >= 8 && !spot; d -= 2) {
+      const x = V.x + fx * d;
+      const z = V.z + fz * d;
+      if (!map.isWall(cellOf(x), cellOf(z))) spot = { x: (cellOf(x) + 0.5) * CELL_SIZE, z: (cellOf(z) + 0.5) * CELL_SIZE };
+    }
+    if (!spot) spot = { x: V.x + fx * 6, z: V.z + fz * 6 };
+    if (this.hasMonster && !this.goats) this.alertMonster(spot.x, spot.z, 34, V.floor || 0);
+    this.emit({ type: 'haunt', kind: 'knock', x: spot.x, z: spot.z, floor: V.floor || 0, by: P.id, name: P.name, id: V.id });
+  }
+
+  // La toute première rencontre (Level 0, une fois) : au bout d'un couloir, droit devant, elle est là, immobile. Dès
+  // qu'on la regarde vraiment (ou qu'on approche), le néon au-dessus d'elle claque… et il n'y a plus personne. On
+  // apprend sans un mot qu'elle existe, que le noir est à elle, et qu'il ne faut pas la fixer
+  firstGlimpse(M, P) {
+    if (!M.glimpse) {
+      if (this.time < this.glimpseAt || !(M.dormantT > 0) || M.mode !== 'patrol' || P.status !== 'alive' || P.hidden >= 0 || this.blackout > 0) return false;
+      this.glimpseAt = this.time + 1;
+      if (++this.glimpseTries > 40) {
+        this.glimpseAt = Infinity;
+        return false;
+      }
+      const map = this.fm(P.floor || 0);
+      const fx = -Math.sin(P.yaw);
+      const fz = -Math.cos(P.yaw);
+      let spot = null;
+      // d'abord sous un néon (pas une zone très éclairée) : on doit la distinguer ; sinon, où l'on peut
+      for (let pass = 0; pass < 2 && !spot; pass++)
+      for (let d = 20; d >= 12; d -= 1.5) {
+        if (spot) break;
+        for (const side of [0, 0.12, -0.12]) {
+          const ax = fx * Math.cos(side) - fz * Math.sin(side);
+          const az = fz * Math.cos(side) + fx * Math.sin(side);
+          const gx = cellOf(P.x + ax * d);
+          const gz = cellOf(P.z + az * d);
+          if (map.isWall(gx, gz) || (map.pitAt && map.pitAt(gx, gz) >= 0)) continue;
+          const x = (gx + 0.5) * CELL_SIZE;
+          const z = (gz + 0.5) * CELL_SIZE;
+          if (this.brightCell(map, x, z) || !hasLineOfSight(map, P.x, P.z, x, z)) continue;
+          if (pass === 0 && !this.litCell(map, x, z)) continue;
+          // un autre joueur ne doit pas tomber dessus de près
+          if (this.players.some((Q) => Q !== P && Q.status === 'alive' && Math.hypot(Q.x - x, Q.z - z) < 10)) continue;
+          spot = { x, z };
+          break;
+        }
+      }
+      if (!spot) return false;
+      this.glimpseAt = Infinity;
+      M.x = spot.x;
+      M.z = spot.z;
+      M.floor = P.floor || 0;
+      M.path = [];
+      M.mode = 'watch';
+      M.watch = null;
+      M.waitT = 30;
+      M.silent = true;
+      M.yaw = Math.atan2(P.x - M.x, P.z - M.z);
+      M.glimpse = { t: 0, looked: 0, id: P.id };
+      this.emit({ type: 'glimpse', phase: 'show', x: M.x, z: M.z, floor: M.floor, id: P.id });
+    }
+    const G = M.glimpse;
+    const V = this.players.find((Q) => Q.id === G.id && Q.status === 'alive') || P;
+    G.t += DT;
+    M.speed = 0;
+    M.path = [];
+    M.silent = true;
+    M.yaw = Math.atan2(V.x - M.x, V.z - M.z);
+    const d = Math.hypot(V.x - M.x, V.z - M.z);
+    const los = (V.floor || 0) === (M.floor || 0) && hasLineOfSight(this.fm(M.floor || 0), V.x, V.z, M.x, M.z);
+    if (los && this.facing(V, M.x, M.z) < 0.3) G.looked += DT;
+    const unseen = !this.inSomeView(M.floor || 0, M.x, M.z, 0.15);
+    // regardée assez longtemps, ou trop approchée : le néon claque ; ignorée, elle s'en va quand personne ne regarde
+    if (G.looked > 0.8 || d < 9 || (G.t > 10 && unseen) || G.t > 25) {
+      const map = this.fm(M.floor || 0);
+      const lit = (map.lights || []).filter((l) => l.state === 'on' && Math.hypot(l.x - M.x, l.z - M.z) < 8);
+      for (const l of lit) {
+        if (this.director) this.director.drops.push({ l, t: 0.7, back: 'on', map });
+        l.state = 'off';
+        l.flicker = false;
+      }
+      if (lit.length) lightsChanged(map);
+      this.emit({ type: 'glimpse', phase: 'gone', x: M.x, z: M.z, floor: M.floor || 0, id: V.id, seen: G.looked > 0.8 });
+      const far = this.warpSpot(V, 'far');
+      if (far) {
+        M.x = far.x;
+        M.z = far.z;
+        M.floor = far.floor;
+      }
+      M.glimpse = null;
+      M.mode = 'patrol';
+      M.targetWander = null;
+      M.repathT = 0;
+      M.unseenAllT = 0;
+      M.warpT = Math.max(M.warpT, 30);
+    }
+    return true;
+  }
+
+  // la traque annoncée : le dernier néon vient de mourir. Elle est lâchée là où le premier s'est éteint (le plus loin),
+  // hors de vue, et vient droit sur celui qu'on a plongé dans le noir
+  huntFrom(S) {
+    const M = this.monster;
+    const P = this.players.find((Q) => Q.id === S.id && Q.status === 'alive');
+    if (!P || !this.hasMonster || this.goats || M.mode === 'chase' || M.mode === 'grab' || M.glimpse) return;
+    const floor = S.floor || 0;
+    const map = this.fm(floor);
+    let spot = null;
+    for (const l of S.list) {
+      const gx = cellOf(l.x);
+      const gz = cellOf(l.z);
+      if (map.isWall(gx, gz)) continue;
+      const x = (gx + 0.5) * CELL_SIZE;
+      const z = (gz + 0.5) * CELL_SIZE;
+      if (Math.hypot(x - P.x, z - P.z) < 10 || this.inSomeView(floor, x, z, 0.1)) continue;
+      spot = { x, z, floor };
+      break;
+    }
+    if (!spot) spot = this.warpSpot(P, 'corner') || this.warpSpot(P, 'behind');
+    if (!spot) return;
+    M.x = spot.x;
+    M.z = spot.z;
+    M.floor = spot.floor;
+    M.path = [];
+    M.pathIndex = 0;
+    M.repathT = 0;
+    M.pending = null;
+    M.mode = 'search';
+    M.silent = false;
+    M.probe = null;
+    M.probeFrom = null;
+    M.lastSeenX = P.x;
+    M.lastSeenZ = P.z;
+    M.yaw = Math.atan2(P.x - M.x, P.z - M.z);
+    M.unseenAllT = 0;
+    M.warpT = Math.max(M.warpT, 20);
+    this.emit({ type: 'hunt', x: M.x, z: M.z, floor: M.floor, id: P.id });
+  }
+
+  // la téléportation elle-même : elle n'arrive ni ne disparaît jamais sous les yeux d'un joueur
+  monsterWarp(M, P, calm, A, rage) {
+    const unseen = !this.inSomeView(M.floor || 0, M.x, M.z, 0.15);
+    M.unseenAllT = unseen ? M.unseenAllT + DT : 0;
+    M.warpT -= DT;
+    const place = (spot) => {
+      M.x = spot.x;
+      M.z = spot.z;
+      M.floor = spot.floor;
+      M.path = [];
+      M.pathIndex = 0;
+      M.repathT = 0;
+      M.targetWander = null;
+      M.unseenAllT = 0;
+    };
+    // une apparition annoncée : le signe a été donné (un craquement, un souffle), elle arrive… si personne ne regarde
+    // encore l'endroit et si elle n'a pas trouvé mieux à faire entre-temps
+    if (M.pending) {
+      const W = M.pending;
+      W.t -= DT;
+      if ((M.mode !== 'patrol' && M.mode !== 'search') || P.status !== 'alive' || P.hidden >= 0) M.pending = null;
+      else if (W.t <= 0) {
+        M.pending = null;
+        if (!unseen || this.inSomeView(W.spot.floor, W.spot.x, W.spot.z, 0.1)) {
+          M.warpT = rand(3, 6); // on regardait par là : elle réessaiera un peu plus tard
+          return;
+        }
+        place(W.spot);
+        M.yaw = Math.atan2(P.x - M.x, P.z - M.z);
+        if (W.kind === 'corner') {
+          // postée, immobile et muette, face à l'endroit d'où il va surgir
+          M.mode = 'watch';
+          M.lurk = true;
+          M.waitT = rand(10, 16);
+          M.watch = null;
+          M.silent = true;
+        } else {
+          // elle s'approche par derrière, sans un bruit
+          M.mode = 'search';
+          M.silent = true;
+          M.probe = null;
+          M.probeFrom = null;
+          M.lastSeenX = P.x;
+          M.lastSeenZ = P.z;
+        }
+        this.emit({ type: 'warp', kind: W.kind });
+      }
+      return;
+    }
+    if (!unseen || M.unseenAllT < 1.2 || P.status !== 'alive') return;
+    // elle a fini d'observer : dès qu'on ne la regarde plus, elle n'est plus là
+    if (M.vanish) {
+      M.vanish = false;
+      if (M.mode === 'patrol' || M.mode === 'stalk') {
+        const spot = this.warpSpot(P, 'far');
+        if (spot) {
+          place(spot);
+          M.mode = 'patrol';
+          this.emit({ type: 'warp', kind: 'far' });
+        }
+      }
+      return;
+    }
+    if (M.warpT > 0 || calm || (M.mode !== 'patrol' && M.mode !== 'search') || P.hidden >= 0 || this.calmAt(P)) return;
+    // plus on joue bien (difficulté adaptative), plus elle triche souvent
+    M.warpT = rand(20, 38) * (1 - A * 0.35) * (1 - rage * 0.3) * (1.25 - this.skill * 0.5);
+    const kind = Math.random() < 0.65 ? 'corner' : 'behind';
+    let k2 = kind;
+    let spot = this.warpSpot(P, kind);
+    if (!spot && kind === 'behind') {
+      spot = this.warpSpot(P, 'corner');
+      k2 = 'corner';
+    }
+    if (!spot) return;
+    // le signe, une seconde et demie avant : de là où elle va surgir, un craquement ou un souffle (jamais rien sans
+    // rien : la triche reste juste, on la sent venir sans savoir exactement où)
+    M.pending = { spot, kind: k2, t: rand(1.3, 1.9) };
+    this.emit({ type: 'tell', kind: k2, x: spot.x, z: spot.z, floor: spot.floor, id: P.id });
+  }
+
+  // une case éclairée par un néon allumé (le sien ou un voisin direct)
+  litCell(map, x, z) {
+    this.darkCellsOf(map);
+    const gx = Math.floor(x / CELL_SIZE);
+    const gz = Math.floor(z / CELL_SIZE);
+    return gx >= 0 && gz >= 0 && gx < map.W && gz < map.H && map.darkCells[gz * map.W + gx] >= 3;
+  }
+
+  darkCellsOf(map) {
     if (!map.darkCells) {
       map.darkCells = new Uint8Array(map.W * map.H);
       for (const l of map.lights || []) {
@@ -2046,6 +2580,11 @@ export class BackroomsSim {
         }
       }
     }
+    return map.darkCells;
+  }
+
+  darkSpot(map, P, M, rMin, rMax, seen) {
+    this.darkCellsOf(map);
     const R = Math.ceil(rMax / CELL_SIZE);
     const cx = Math.floor(P.x / CELL_SIZE);
     const cz = Math.floor(P.z / CELL_SIZE);

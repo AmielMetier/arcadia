@@ -108,7 +108,9 @@ export class BackroomsHUD {
 
       <div class="objective-banner" id="objBanner"></div>
       <!-- Spectateur : à l'abri dans l'ascenseur, ou attrapé -->
-      <div class="spectate" id="spectate" hidden><b id="specTitle"></b><span id="specSub"></span></div>
+      <div class="spectate" id="spectate" hidden><b id="specTitle"></b><span id="specSub"></span><small id="specHaunt"></small></div>
+      <!-- Le rejeu de la mort, vu de sa tête -->
+      <div class="replay-tag" id="replayTag" hidden><b>▶ PLAY</b> CAM 02 · <span>00:00:0<i id="replayClock">0</i></span></div>
       <!-- Fondu : l'ascenseur descend, carte de l'étage -->
       <div class="fade" id="fade"><div><b id="fadeTitle"></b><span id="fadeSub"></span><div class="fade-bar" id="fadeBarBox" hidden><i id="fadeBar"></i></div></div></div>
       <div class="toast" id="toast" hidden></div>
@@ -120,6 +122,8 @@ export class BackroomsHUD {
         <div class="title-card" id="titleCard" hidden>
           <div class="tc-label"><b>THE BACKROOMS</b><span>FOUND FOOTAGE · TAPE 1 OF ?</span></div>
           <button class="tc-continue" id="btnContinue" hidden></button>
+          <p class="tc-phones">🎧 BEST WITH HEADPHONES, LIGHTS OFF</p>
+          <div class="tc-calib" id="tcCalib"><i></i><i></i><i></i><span>Brightness ⚙: the left square should be barely visible</span></div>
           <p class="tc-warn" id="tcWarn">This tape contains flashing lights, loud sounds and screen distortion. Settings ⚙ can reduce flashes and camera motion.</p>
         </div>
         <div class="pause-title" id="pauseTitle">II PAUSE</div>
@@ -138,6 +142,7 @@ export class BackroomsHUD {
           <div class="end-label"><small id="endTape">TAPE 1996 · DO NOT ERASE</small><h1 id="endTitle">YOU DIED</h1></div>
           <p id="endSubtitle">The entity caught you...</p>
           <div class="end-stats" id="endStats"></div>
+          <div class="end-run" id="endRun"></div>
           <div class="end-lore" id="endLore"></div>
           <button class="btn-restart" id="btnRestart">PLAY AGAIN</button>
         </div>
@@ -281,6 +286,10 @@ export class BackroomsHUD {
       const sl = slideOf(sim);
       this.text('specTitle', sim.departT > 0 ? (sl ? 'DOWN THE SLIDE…' : 'THE DOORS ARE CLOSING…') : P.status === 'elevator' ? (sl ? `YOU'RE IN THE ${sl.name} SLIDE` : "YOU'RE IN THE ELEVATOR") : sim.goats ? 'THE HERD GOT YOU' : 'THE ENTITY GOT YOU');
       this.text('specSub', sim.departT > 0 ? '' : `${inside}/${sim.players.length} safe · watching ${view.name}${view !== P ? ' · click or Space: switch' : ''}`);
+      // on peut encore aider (ou piéger) ceux qui sont dehors
+      const canHaunt = view !== P && sim.departT <= 0 && sim.hasMonster && !sim.goats;
+      const wait = Math.ceil(this.hauntWait || 0);
+      this.text('specHaunt', !canHaunt ? '' : wait > 0 ? `The other side needs ${wait}s…` : `E: make their light flicker · T: knock further on (it will come)`);
     }
 
     // 3. Signal de l'objectif le plus proche (25 m) : il tremble quatre fois par seconde, pas à chaque image ; rien
@@ -405,14 +414,29 @@ export class BackroomsHUD {
     this.loreT = 3 + text.length / 16;
   }
 
+  // le bandeau du rejeu (on = false : caché)
+  replayTag(on) {
+    this.$('#replayTag').hidden = !on;
+    clearInterval(this.replayI);
+    if (!on) return;
+    let k = 0;
+    this.replayI = setInterval(() => {
+      k = (k + 1) % 4;
+      this.$('#replayClock').textContent = String(k);
+    }, 1000);
+  }
+
   // calibrage de la luminosité : trois carrés presque noirs, éclaircis comme l'image du jeu
-  calibrate(v) {
+  calibrate(v, quiet = false) {
     const el = this.$('#calib');
     const lv = [4, 12, 26];
-    el.querySelectorAll('i').forEach((sq, i) => {
-      const c = Math.round(255 * Math.pow(lv[i] / 255, 1 / v));
-      sq.style.background = `rgb(${c},${c},${c})`;
-    });
+    for (const box of [el, this.$('#tcCalib')]) {
+      box.querySelectorAll('i').forEach((sq, i) => {
+        const c = Math.round(255 * Math.pow(lv[i] / 255, 1 / v));
+        sq.style.background = `rgb(${c},${c},${c})`;
+      });
+    }
+    if (quiet) return;
     el.hidden = false;
     clearTimeout(this.calibT);
     this.calibT = setTimeout(() => (el.hidden = true), 2500);
@@ -579,7 +603,8 @@ export class BackroomsHUD {
     if (el) el.hidden = true;
   }
 
-  showEnd(sim, onRestart) {
+  // extra : { stats: { seen, rushes, escapes, closest, haunts }, daily: 'Nov 7' | null, best: secondes | null, replay: bool }
+  showEnd(sim, onRestart, extra = {}) {
     const end = this.$('#endScreen');
     const title = this.$('#endTitle');
     const sub = this.$('#endSubtitle');
@@ -599,7 +624,18 @@ export class BackroomsHUD {
     };
     this.endAt = performance.now();
     this.endPending = reveal;
-    this.endT = setTimeout(reveal, goat ? 12500 : sim.state === 'dead' ? 1300 : 300);
+    this.endT = setTimeout(reveal, goat ? 12500 : sim.state === 'dead' ? (extra.replay ? 5600 : 1300) : 300);
+    // le bilan de la bande : ce qu'elle a vu de toi
+    const S = extra.stats;
+    const lines = [];
+    if (S && sim.hasMonster && !sim.goats) {
+      const times = (n, one) => (n === 1 ? one : `${n} times`);
+      const seen = S.seen ? `IT SAW YOU ${times(S.seen, 'ONCE')}` : sim.state === 'dead' ? 'YOU NEVER SAW IT COMING' : 'IT NEVER SAW YOU';
+      lines.push(`${seen} · CHASES ESCAPED ${S.escapes}${S.closest < 50 ? ` · CLOSEST CALL ${S.closest.toFixed(1)} M` : ''}`.toUpperCase());
+      if (S.haunts) lines.push(`FROM THE OTHER SIDE: ${S.haunts} SIGN${S.haunts > 1 ? 'S' : ''} TO THE LIVING`);
+    }
+    if (extra.daily) lines.push(`DAILY MAP · ${extra.daily.toUpperCase()}${extra.best ? ` · YOUR BEST ${formatTime(extra.best)}` : ''}`);
+    this.$('#endRun').textContent = lines.join('\n');
 
     const solo = sim.players.length === 1;
     const heard = tapesHeard().length;

@@ -36,7 +36,9 @@ const clamp01 = (v) => Math.max(0, Math.min(1, +v || 0));
 const rnd = (a, b) => a + Math.random() * (b - a);
 // l'occlusion (un mur entre la source et toi) : true, ou de 0 à 1 ; passe-bas jusqu'à 700 Hz et -4 dB
 const occOf = (o) => (o === true ? 1 : clamp01(o));
-const occFreq = (k) => 20000 * Math.pow(700 / 20000, k);
+// la fréquence la plus haute que la carte son accepte (la moitié de sa fréquence d'échantillonnage)
+let NYQ = 20000;
+const occFreq = (k) => Math.min(NYQ, 20000 * Math.pow(700 / 20000, k));
 const occGain = (k) => Math.pow(10, (-4 * k) / 20);
 // des voyelles (trois formants) pour les voix inintelligibles
 const VOWELS = [[300, 870, 2240], [730, 1090, 2440], [270, 2290, 3010], [570, 840, 2410], [440, 1020, 2240], [660, 1700, 2400]];
@@ -95,6 +97,7 @@ export class BackroomsSfx {
     if (!AudioCtx) return;
 
     const c = (this.ctx = new AudioCtx());
+    NYQ = Math.min(20000, c.sampleRate / 2 - 50);
     if (c.state === 'suspended') c.resume();
     // sortie commune, réglée par le curseur « Effets » du panneau Réglages ; puis la coupure des jumpscares et un
     // limiteur (seuil -6 dB, attaque rapide) qui rattrape les crêtes
@@ -359,7 +362,7 @@ export class BackroomsSfx {
     if (pos.muffled || occ > 0) {
       const lp = c.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = Math.min(pos.muffled ? 420 : 20000, occ > 0 ? occFreq(occ) : 20000);
+      lp.frequency.value = Math.min(pos.muffled ? 420 : NYQ, occ > 0 ? occFreq(occ) : NYQ);
       lp.connect(head);
       head = lp;
     }
@@ -419,7 +422,7 @@ export class BackroomsSfx {
   filt(type, f, q = 1) {
     const b = this.ctx.createBiquadFilter();
     b.type = type;
-    b.frequency.value = f;
+    b.frequency.value = Math.min(f, NYQ);
     b.Q.value = q;
     return b;
   }
@@ -617,6 +620,63 @@ export class BackroomsSfx {
         k += rnd(0.04, 0.15);
       }
     }
+  }
+
+  // Le signe avant une apparition de l'entité, de là où elle va surgir : 'corner' (un ongle qui gratte le papier peint,
+  // un souffle derrière le mur), 'behind' (une expiration lente, toute proche, dans ton dos)
+  tell(kind, pos) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.02;
+    if (kind === 'behind') {
+      const out = this.at({ ...pos, rolloff: 0.7, ref: 3 }, 0.9, 0, this.bedWet);
+      this.breathNoise(out, t, 1.6, 380, 220, 0.16);
+      this.breathNoise(out, t + 1.7, 1.1, 520, 300, 0.07);
+      this.caption('[slow breathing behind you]', pos);
+      return;
+    }
+    const out = this.at({ ...pos, rolloff: 0.6, ref: 3, occluded: 0.6 }, 1, 0.6, this.bedWet);
+    // le grattement : des petites rafales de bruit aigu, filtrées comme à travers une cloison
+    let k = t;
+    for (let i = 0; i < 5 + Math.floor(Math.random() * 4); i++) {
+      this.burst(out, k, rnd(0.04, 0.09), 'bandpass', rnd(1800, 2600), 3, 0.09);
+      k += rnd(0.07, 0.16);
+    }
+    this.breathNoise(out, k + 0.15, 1.2, 300, 180, 0.1);
+    this.caption('[scratching behind the wall]', pos);
+  }
+
+  // Les recoins calmes : un vieil air doux, comme une radio oubliée dans une pièce voisine (level : 0 à 1 ; wear : la
+  // protection s'use, l'air se désaccorde et grésille)
+  setCalm(level, wear = 0) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    if (!this.calmBus) {
+      if (level < 0.01) return;
+      this.calmBus = c.createGain();
+      this.calmBus.gain.value = 0;
+      const lp = this.filt('lowpass', 1400, 0.6);
+      this.calmBus.connect(lp).connect(this.out);
+      lp.connect(this.gainNode(0.4)).connect(this.verb);
+      this.calmDetune = [];
+      // un accord majeur doux, avec un trémolo lent (une boîte à musique fatiguée)
+      [261.6, 329.6, 392, 523.3].forEach((f, i) => {
+        const o = this.osc(i === 3 ? 'triangle' : 'sine', f);
+        const g = c.createGain();
+        g.gain.value = [0.05, 0.035, 0.03, 0.012][i];
+        const lfo = this.osc('sine', 0.18 + i * 0.07);
+        const lg = c.createGain();
+        lg.gain.value = g.gain.value * 0.6;
+        lfo.connect(lg).connect(g.gain);
+        o.connect(g).connect(this.calmBus);
+        o.start();
+        lfo.start();
+        this.calmDetune.push(o);
+      });
+    }
+    this.calmBus.gain.setTargetAtTime(Math.max(0, Math.min(1, level)) * 0.9, t, 0.6);
+    const w = Math.max(0, Math.min(1, wear));
+    this.calmDetune.forEach((o, i) => o.detune.setTargetAtTime(w * w * (i % 2 ? -60 : 45) + (w > 0.8 ? (Math.random() - 0.5) * 80 : 0), t, 0.3));
   }
 
   // Un tube qui s'amorce ou claque : le tic du starter, le verre qui tinte, puis deux ou trois bégaiements du ballast
@@ -984,7 +1044,7 @@ export class BackroomsSfx {
     if (level === 1 && this.voiceGain) {
       // juste devant toi
       if (this.monsterPanner && this.ear) this.moveTo(this.monsterPanner, this.ear.x - Math.sin(this.ear.yaw) * 0.6, this.ear.z - Math.cos(this.ear.yaw) * 0.6);
-      this.monsterOcc.frequency.setValueAtTime(20000, t);
+      this.monsterOcc.frequency.setValueAtTime(NYQ, t);
       this.monsterOccG.gain.setValueAtTime(1, t);
       this.voiceGain.gain.cancelScheduledValues(t);
       this.voiceGain.gain.setValueAtTime(0.0001, t);
@@ -1377,7 +1437,7 @@ export class BackroomsSfx {
     const filt = (type, f, q = 1) => {
       const b = c.createBiquadFilter();
       b.type = type;
-      b.frequency.value = f;
+      b.frequency.value = Math.min(f, NYQ);
       b.Q.value = q;
       return b;
     };
@@ -1595,6 +1655,16 @@ export class BackroomsSfx {
       this.tone(out, k + 0.02, 'sine', 150, 95, 0.09, 0.07, 0.008);
     }
     this.breathNoise(out, t0 + 1.1, 0.4, 900, 500, 0.04);
+  }
+
+  // Découverte nez à nez : elle hurle avant de foncer (un cri saturé, un choc grave, l'ambiance qui se tait)
+  rush(pos = null) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.02;
+    this.duck(0.2, 3);
+    this.scareHit(t, 0.45);
+    this.scareScream(t + 0.05, 0.9);
+    this.caption('[the entity screams]', pos);
   }
 
   // L'entité vient de repérer le joueur : un coup très grave et deux cordes qui frottent à un demi-ton d'écart
