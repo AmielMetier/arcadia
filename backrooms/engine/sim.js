@@ -265,6 +265,16 @@ export class BackroomsSim {
       // tout le monde part avec sa lampe torche, allumée, dans la case 1 (ceux qui étaient tombés en reçoivent une)
       P.hasLamp = true;
       P.flashlight = !old || old.flashlight || old.status !== 'alive';
+      // Level 1 : tout le monde sort ensemble de l'ascenseur d'arrivée, dos à ses portes
+      const A = this.map.arrival;
+      if (A) {
+        const side = [0, 0.65, -0.65, 0.33, -0.33, 0][i % 6];
+        const back = [0.5, 0.5, 0.5, -0.2, -0.2, -0.45][i % 6];
+        P.x = this.map.spawn.x + A.dx * back - A.dz * side;
+        P.z = this.map.spawn.z + A.dz * back + A.dx * side;
+        P.yaw = Math.atan2(A.dx, A.dz);
+        P.pitch = 0;
+      }
       return P;
     });
     this.cassettes = 0; // cassettes trouvées par l'équipe (Level 0)
@@ -319,6 +329,8 @@ export class BackroomsSim {
       escapes: [], // là où on l'a semée : elle s'en souvient pour ses embuscades
       stunT: 0, // sonnée (aveuglée, ou après avoir lâché sa prise)
       grabbing: null, // le joueur qu'elle agrippe
+      faceT: 0, // depuis combien de temps un joueur la regarde en face, de près
+      rushT: 0, // découverte nez à nez : elle hurle et fonce (secondes de charge)
       sawHide: -1, // le casier où elle a vu quelqu'un entrer
     };
     // Level 2 : le troupeau remplace l'entité (elle reste là pour relayer le son et l'image de la chèvre la plus proche)
@@ -1315,7 +1327,7 @@ export class BackroomsSim {
       // le vrai ascenseur ne se dévoile qu'une fois les cassettes trouvées
       rf: this.open ? this.realFloor : -1,
       p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.floor, P.sigTo, P.onLadder ? 1 : 0, r2(P.lockT), r2(P.tilt), P.onBeam ? 1 : 0, P.bottles, r2(P.grabT), P.hidden, P.crouch ? 1 : 0, P.carry.length, P.hurt || 0, Math.round(P.breath), P.holding ? 1 : 0, P.grabs || 0, r2(P.struggle || 0)]),
-      m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0, M.floor, M.grabbing ?? -1],
+      m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0, M.floor, M.grabbing ?? -1, r2(M.rushT || 0)],
       // Level 1 : fusibles (ils peuvent être tombés ailleurs), fusibles au panneau, redémarrage du monte-charge
       fp: this.level === 1 ? (this.map.fuses || []).map((f) => [r2(f.x), r2(f.z)]) : null,
       dl: this.delivered || 0,
@@ -1440,6 +1452,7 @@ export class BackroomsSim {
     M.silent = !!snap.m[4];
     M.floor = snap.m[5] || 0;
     M.grabbing = snap.m[6] >= 0 ? snap.m[6] : null;
+    M.rushT = snap.m[7] || 0;
     if (snap.fp) (this.map.fuses || []).forEach((f, i) => {
       const q = snap.fp[i];
       if (!q) return;
@@ -1617,6 +1630,30 @@ export class BackroomsSim {
       canSee = false;
       canHear = false;
     }
+    // Nez à nez : le joueur la regarde en face, de près, et la voit vraiment (sous un néon, dans sa lampe, ou à deux
+    // pas). Elle ne reste pas plantée là : au bout d'une demi-seconde, elle hurle et fonce sur lui, même au repos
+    const exposed = same && M.hasLineOfSight && !(P.hidden >= 0) && dist < 7 && this.facing(P, M.x, M.z) < 0.4 &&
+      ((P.flashlight && dist < 7) || dist < 3.2 || (!dark && this.litCell(map, M.x, M.z)));
+    if (exposed && M.mode !== 'chase' && M.mode !== 'flee' && M.mode !== 'ambush') M.faceT += DT;
+    else M.faceT = Math.max(0, M.faceT - DT * 2);
+    if (M.faceT > 0.5) {
+      M.faceT = 0;
+      M.dormantT = 0;
+      M.mode = 'chase';
+      M.watch = null;
+      M.silent = false;
+      M.rushT = 2.4;
+      M.burstT = 2.4;
+      M.unseenT = 0;
+      M.repathT = 0;
+      M.lastSeenX = P.x;
+      M.lastSeenZ = P.z;
+      M.yaw = Math.atan2(P.x - M.x, P.z - M.z);
+      this.chases++;
+      canSee = true;
+      this.emit({ type: 'rush', id: P.id, x: M.x, z: M.z, floor: M.floor });
+    }
+    M.rushT = Math.max(0, M.rushT - DT);
     // tapie dans le noir, elle observe : elle ne charge que si on s'approche trop (ou, déjà énervée, si on la voit)
     const hiding = M.mode === 'stalk' || M.mode === 'watch' || M.mode === 'flee';
     if (hiding) {
@@ -1625,7 +1662,7 @@ export class BackroomsSim {
       isNearby = dist < 3.5 + A * 4;
       canSee = (A >= 0.5 && canSee && dist < sight * 0.6) || (lit && A >= 0.4);
       canHear = A >= 0.6 && canHear;
-      if (lit && A < 0.4 && M.mode !== 'flee' && !isNearby) {
+      if (lit && A < 0.4 && M.mode !== 'flee' && !isNearby && !exposed) {
         // elle apprend : après deux fuites devant la lampe, elle ne se laisse plus faire
         if (M.flees >= 2) canSee = true;
         else {
@@ -1710,7 +1747,7 @@ export class BackroomsSim {
     const k = (1 + rage * 0.35 + (dark ? 0.1 : 0)) * (0.9 + A * 0.22);
     M.burstT = Math.max(0, M.burstT - DT);
     if (M.mode === 'search' && M.probe) M.searchT = Math.max(0, (M.searchT || 0) - DT);
-    if (M.mode === 'chase') M.speed = this.monsterChaseSpeed * k * (M.burstT > 0 ? 1.15 : 1) * (this.chases <= 1 ? 0.86 : 1);
+    if (M.mode === 'chase') M.speed = this.monsterChaseSpeed * k * (M.rushT > 0 ? 1.25 : M.burstT > 0 ? 1.15 : 1) * (this.chases <= 1 && !(M.rushT > 0) ? 0.86 : 1);
     else if (M.mode === 'search') M.speed = MONSTER_PATROL_SPEED * 1.3 * k;
     else if (M.mode === 'ambush') M.speed = MONSTER_PATROL_SPEED * 1.5;
     else if (M.mode === 'flee') M.speed = this.monsterChaseSpeed * 1.05;
@@ -2030,7 +2067,15 @@ export class BackroomsSim {
 
   // la case la plus sombre possible (aucun néon allumé tout autour, sinon le moins possible), entre rMin et rMax du
   // joueur ; seen : d'où on le voit. map.darkCells : 0 pour le noir complet, plus pour chaque néon allumé à côté
-  darkSpot(map, P, M, rMin, rMax, seen) {
+  // une case éclairée par un néon allumé (le sien ou un voisin direct)
+  litCell(map, x, z) {
+    this.darkCellsOf(map);
+    const gx = Math.floor(x / CELL_SIZE);
+    const gz = Math.floor(z / CELL_SIZE);
+    return gx >= 0 && gz >= 0 && gx < map.W && gz < map.H && map.darkCells[gz * map.W + gx] >= 3;
+  }
+
+  darkCellsOf(map) {
     if (!map.darkCells) {
       map.darkCells = new Uint8Array(map.W * map.H);
       for (const l of map.lights || []) {
@@ -2046,6 +2091,11 @@ export class BackroomsSim {
         }
       }
     }
+    return map.darkCells;
+  }
+
+  darkSpot(map, P, M, rMin, rMax, seen) {
+    this.darkCellsOf(map);
     const R = Math.ceil(rMax / CELL_SIZE);
     const cx = Math.floor(P.x / CELL_SIZE);
     const cz = Math.floor(P.z / CELL_SIZE);

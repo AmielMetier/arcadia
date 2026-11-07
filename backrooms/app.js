@@ -605,6 +605,11 @@ function handleEvent(ev, me) {
     case 'spotted':
       if (sfx) sfx.spotted();
       break;
+    case 'rush':
+      // découverte nez à nez : elle hurle et fonce
+      if (sfx && (ev.floor === undefined || ev.floor === (sim.player.floor || 0))) sfx.rush({ x: ev.x, z: ev.z });
+      if (scene && ev.id === me) scene.tape('grab', 0.5);
+      break;
     case 'lost':
       if (sfx) sfx.heartbeat(0);
       break;

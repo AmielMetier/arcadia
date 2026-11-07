@@ -1,5 +1,15 @@
 # Journal des versions — Arcadia
 
+## 4.57 — 7 novembre 2026
+- **The Backrooms** — Le Level 0 ressemble enfin aux vidéos.
+  - Les zones éclairées baignent vraiment dans la lumière jaune des néons, du sol au plafond ; les zones mortes restent noires.
+  - Plinthes au pied des murs, taches du plafond plus discrètes.
+  - L'escalier est maintenant une vraie cage fermée : une porte en bas, une en haut, des marches avec nez de marche, des mains courantes au mur, et des appliques qui l'éclairent (elles s'éteignent pendant les coupures).
+  - L'ascenseur a été refait : cadre en inox, portes brossées, seuil, voyant à flèches, bouton d'appel et vraie cabine éclairée. Plus de texture qui clignote, et sa lueur rouge ne repeint plus tout le couloir.
+  - Si tu tombes nez à nez avec l'entité et que tu la vois en face, elle ne reste plus plantée là : elle hurle et fonce sur toi.
+  - L'entité est plus grande (elle frôle le plafond) et bouge autrement : coudes et genoux qui plient dans le mauvais sens, mouvements saccadés image par image, tête qui se tord d'un coup, bras interminables qui ballottent, démarche boiteuse et course désarticulée. Quand elle charge, sa bouche s'ouvre en grand et elle tend les bras vers toi.
+  - En arrivant au Level 1, on sort du même ascenseur que celui pris au Level 0 : ses portes se referment derrière toi une fois que tu as fait quelques pas.
+
 ## 4.56 — 6 novembre 2026
 - **Fief Maudit** — La crypte et le Roi-Squelette : l'expédition a enfin une fin.
   - À l'aube du onzième jour, la porte du donjon s'ouvre. En bas, deux leviers à tenir en même temps lèvent la herse, puis un couloir de brume où les morts se relèvent mène à la salle du trône.

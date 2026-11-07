@@ -849,6 +849,8 @@ export function createLevel0(seed = 42) {
   // ni sous les trous de l'étage du haut (le néon flotterait au milieu du puits)
   const inWell = (l) => stairs.some((st) => st.cells.some((k) => k.gx === l.gx && k.gz === l.gz)) || up.pits.some((p) => p.gx === l.gx && p.gz === l.gz);
   down.lights = down.lights.filter((l) => !inWell(l));
+  // la cage est fermée jusqu'au plafond du haut : pas de néon au-dessus d'elle non plus (ses appliques l'éclairent)
+  up.lights = up.lights.filter((l) => !stairs.some((st) => st.cells.some((k) => k.gx === l.gx && k.gz === l.gz)));
   // pas d'objet ni de meuble sur les marches ni autour de la cage
   const nearWell = (x, z, d) => stairs.some((st) => st.cells.some((k) => Math.hypot(x - (k.gx + 0.5) * C, z - (k.gz + 0.5) * C) < d));
   for (const m of [up, down]) {

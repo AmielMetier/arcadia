@@ -225,6 +225,45 @@ test('perception : accroupi derrière elle, on passe ; en courant, elle entend',
   assert.equal(M.mode, 'chase', 'un bruit de course tout près : elle se retourne');
 });
 
+test('nez à nez : découverte en face, de près, elle hurle et fonce (même au repos)', () => {
+  const sim = new BackroomsSim({ map, difficulty: 'normal' });
+  const P = sim.player;
+  const M = sim.monster;
+  // une direction dégagée sur 5 m depuis le départ
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const [dx, dz] = dirs.find(([x, z]) => hasLineOfSight(sim.map, P.x, P.z, P.x + x * 4.5, P.z + z * 4.5));
+  const place = () => {
+    M.x = P.x + dx * 4.5;
+    M.z = P.z + dz * 4.5;
+  };
+  place();
+  M.mode = 'watch';
+  M.waitT = 99;
+  M.dormantT = 99;
+  M.yaw = Math.atan2(-dx, -dz);
+  P.flashlight = true;
+  // le joueur regarde ailleurs : elle reste plantée là
+  P.yaw = Math.atan2(dx, dz);
+  for (let i = 0; i < 60; i++) {
+    sim.step({ yaw: P.yaw, pitch: 0 });
+    place();
+  }
+  assert.equal(M.mode, 'watch', 'pas vue : elle observe');
+  // il se retourne et la voit en plein dans sa lampe
+  const yaw = Math.atan2(-dx, -dz);
+  sim.events.length = 0;
+  for (let i = 0; i < 20; i++) {
+    sim.step({ yaw, pitch: 0 });
+    place();
+  }
+  assert.notEqual(M.mode, 'chase', 'un regard fugace ne suffit pas');
+  for (let i = 0; i < 25; i++) sim.step({ yaw, pitch: 0 });
+  assert.equal(M.mode, 'chase', 'découverte : elle charge');
+  assert.ok(M.rushT > 0, 'en hurlant (charge rapide)');
+  assert.ok(sim.events.some((e) => e.type === 'rush'), 'le cri est annoncé');
+  assert.ok(M.speed > sim.monsterChaseSpeed, 'plus vite qu\'une poursuite ordinaire');
+});
+
 test('casier : caché, l\'entité ne le voit pas ; vu en entrant, elle vient le chercher', () => {
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 5, level: 1 });
   const hides = sim.map.hides;
