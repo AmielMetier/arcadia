@@ -2412,7 +2412,7 @@ test("poursuite : plus rapide qu'un joueur qui marche, droit sur lui, sans tourn
 });
 
 
-test("porte cadenassée de l'escalier : on bute à DOOR_GAP du battant (plus de vue à travers), et elle cogne", () => {
+test("cage d'escalier : on bute à DOOR_GAP de la porte cadenassée et de ses murs (plus de vue à travers)", () => {
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 5 });
   const P = sim.player;
   assert.ok(sim.stairsLocked, 'la porte est cadenassée');
@@ -2430,6 +2430,27 @@ test("porte cadenassée de l'escalier : on bute à DOOR_GAP du battant (plus de 
   const u = stairLocal(st, P.x, P.z).u;
   assert.ok(u <= -DOOR_GAP + 1e-6, `arrêté à ${(-u).toFixed(2)} m du battant`);
   assert.ok(sim.drainEvents().some((e) => e.type === 'locked'), 'la chaîne cogne');
+  // pareil pour les autres murs de la cage, à chaque étage, en arrivant de biais : on glisse le long, sans s'y coller
+  const box = (q) => Math.hypot(q.u - Math.max(0, Math.min(3 * C, q.u)), q.v - Math.max(0, Math.min(2 * C, q.v)));
+  let tried = 0;
+  for (const [fl, u0, v0, tu, tv] of [[0, 1.5 * C, -1.2, 2 * C, 0], [1, 1.5 * C, -1.2, 2 * C, 0], [0, 1.5 * C, 2 * C + 1.2, C, 2 * C], [1, 3 * C + 1.2, C, 3 * C, 0.5 * C]]) {
+    const a = W(u0, v0);
+    if (sim.isColliding(a.x, a.z, 0.3, fl)) continue;
+    tried++;
+    P.x = a.x;
+    P.z = a.z;
+    P.floor = fl;
+    const t = W(tu, tv);
+    let closest = Infinity;
+    for (let i = 0; i < 120; i++) {
+      P.yaw = Math.atan2(-(t.x - P.x), -(t.z - P.z));
+      sim.step({ my: 1, yaw: P.yaw });
+      if (!stairAt(sim.stairs, P.x, P.z)) closest = Math.min(closest, box(stairLocal(st, P.x, P.z)));
+    }
+    assert.equal(stairAt(sim.stairs, P.x, P.z), null, `étage ${fl} : on n'est pas entré par le mur`);
+    assert.ok(closest >= DOOR_GAP - 1e-6, `étage ${fl} : au plus près ${closest.toFixed(2)} m du mur`);
+  }
+  assert.ok(tried > 0, 'au moins un mur de cage essayé');
 });
 
 console.log(`\n${count} tests réussis pour The Backrooms !`);

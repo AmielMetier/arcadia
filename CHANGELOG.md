@@ -18,7 +18,8 @@
   - Le plafond est un peu plus haut (20 cm).
   - Fini les grandes plaques d'ombre crénelées au plafond : la lumière y est douce, comme renvoyée par le sol.
   - Les bords des murs, des piliers et des néons sont lisses : fini les marches d'escalier sur les contours.
-  - Collé contre la porte cadenassée de l'escalier, on ne voit plus à travers : on bute juste devant, et la chaîne cogne.
+  - Collé contre la cage d'escalier (sa porte cadenassée comme tous ses murs), on ne voit plus à travers : on bute juste devant, et la chaîne de la porte cogne.
+  - La porte de l'escalier a un vrai hublot en verre armé : trouble et grillagé, il laisse deviner la cage éclairée derrière.
 - **The Backrooms** — Des matières bien plus détaillées : moquette, papier peint, plafond, entrepôt du Level 1, porte coupe-feu en acier peint, sol de l'ascenseur en tôle, parois en inox.
   - La lampe torche et le cadenas de la porte de l'escalier sont de vrais objets en 3D ; une caméra de surveillance observe la cabine de l'ascenseur.
   - La lampe fait un petit clic quand on l'allume ou l'éteint (et on entend celle des coéquipiers proches).

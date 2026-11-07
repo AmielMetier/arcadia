@@ -91,7 +91,7 @@ export const BLOW_DELAY = 2.2; // la vanne fermée, les néons de son secteur gr
 export const BURN_LOCK = 0.9; // brûlé par un jet de vapeur : repoussé, sonné un instant
 export const BURN_STAMINA = 45;
 export const DEPART_T = 3; // secondes entre la fermeture des portes et l'arrivée
-export const DOOR_GAP = 0.32; // distance minimale entre le joueur et la porte cadenassée de l'escalier
+export const DOOR_GAP = 0.32; // distance minimale entre le joueur et les murs (et la porte) de la cage d'escalier, vus du dehors
 export const BOARD_T = 45; // dès qu'un joueur est dans l'ascenseur, les autres ont ce temps pour le rejoindre
 // coupures de courant du Level 1 : toutes les 45 à 80 s (et seulement après un moment de calme), pendant 15 à 20 s
 export const BLACKOUT_EVERY = [45, 80];
@@ -1095,21 +1095,35 @@ export class BackroomsSim {
     const C = CELL_SIZE;
     const from = stairAt(this.stairs, P.x, P.z);
     const to = stairAt(this.stairs, nx, nz);
-    // la porte cadenassée : on s'arrête à DOOR_GAP du battant (collé contre, on voyait à travers) ; pousser dessus la
-    // fait cogner contre sa chaîne
-    if (!from && (P.floor || 0) === 0 && this.stairsLocked) {
+    // La cage vue du dehors : ses murs sont minces, on s'arrête à DOOR_GAP de chacun (collé contre, la caméra passait
+    // au travers). Seule son entrée de l'étage laisse passer : le bas de la première volée en bas, la porte en haut
+    // (si elle n'est plus cadenassée ; sinon, pousser dessus fait cogner sa chaîne). On n'est jamais tiré vers la cage
+    // ni repoussé en sortant : seul le pas qui s'en approche trop est raccourci
+    if (!from) {
+      const fl = P.floor || 0;
       for (const st of this.stairs) {
         const q = stairLocal(st, nx, nz);
-        if (q.u <= -DOOR_GAP || q.u > 0.6 || q.v < C - 0.1 || q.v > 2 * C + 0.1) continue;
+        const cu = Math.max(0, Math.min(3 * C, q.u));
+        const cv = Math.max(0, Math.min(2 * C, q.v));
+        const eu = q.u - cu;
+        const ev = q.v - cv;
+        const d = Math.hypot(eu, ev);
+        if (d >= DOOR_GAP || d < 1e-6) continue;
+        const front = eu < 0 && ev === 0; // devant la face des entrées (u = 0)
+        const doorSpan = q.v > C + 0.05 && q.v < 2 * C - 0.05;
+        if (front && (fl === 1 ? q.v > 0.05 && q.v < C - 0.05 : doorSpan && !this.stairsLocked)) continue;
         const p0 = stairLocal(st, P.x, P.z);
-        if (q.u <= p0.u + 1e-4) continue; // on s'en éloigne (en sortant de la cage, par exemple) : libre
-        if (!(P.lockedT > 0)) {
+        const d0 = Math.hypot(p0.u - Math.max(0, Math.min(3 * C, p0.u)), p0.v - Math.max(0, Math.min(2 * C, p0.v)));
+        if (d >= d0 - 1e-6) continue; // on s'en éloigne
+        if (front && fl === 0 && doorSpan && this.stairsLocked && !(P.lockedT > 0)) {
           P.lockedT = 1.6;
           this.makeNoise(P, NOISE.pick, 0.6);
           this.emit({ type: 'locked', id: P.id, x: P.x, z: P.z, floor: P.floor });
         }
-        const u = Math.min(q.u, Math.max(p0.u, -DOOR_GAP));
-        return { x: st.ox + st.dx * u + st.px * q.v, z: st.oz + st.dz * u + st.pz * q.v };
+        const k = Math.min(DOOR_GAP, d0) / d;
+        const u = cu + eu * k;
+        const v = cv + ev * k;
+        return { x: st.ox + st.dx * u + st.px * v, z: st.oz + st.dz * u + st.pz * v };
       }
     }
     if (!from && !to) return { x: nx, z: nz };

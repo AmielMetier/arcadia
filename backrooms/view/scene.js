@@ -1390,15 +1390,72 @@ float bkCaust(vec2 uv, float t) {
         const steel = baked(new THREE.MeshLambertMaterial({ map: fireTex }));
         const dark = baked(new THREE.MeshLambertMaterial({ color: '#2b2c28' }));
         const brass = new THREE.MeshLambertMaterial({ color: '#b8902e', emissive: '#3a2a08', emissiveIntensity: 0.4 });
-        const leaf = new THREE.Mesh(new THREE.BoxGeometry(w, DOOR_H - 0.02, 0.05), steel);
+        // le battant, percé d'un hublot (au milieu, pour que les deux faces tombent au même endroit) : ses deux grandes
+        // faces sont découpées par un masque, ses chants restent pleins
+        const GW = 0.3; // largeur et hauteur du hublot
+        const GH = 0.56;
+        const GY = 1.5; // hauteur du centre du hublot
+        const LH = DOOR_H - 0.02;
+        const holeCv = document.createElement('canvas');
+        holeCv.width = 128;
+        holeCv.height = 256;
+        {
+          const g = holeCv.getContext('2d');
+          g.fillStyle = '#fff';
+          g.fillRect(0, 0, 128, 256);
+          g.fillStyle = '#000';
+          g.fillRect(((0.5 - GW / 2 / w) * 128) | 0, ((1 - (GY + GH / 2) / LH) * 256) | 0, Math.round((GW / w) * 128), Math.round((GH / LH) * 256));
+        }
+        const holeTex = new THREE.CanvasTexture(holeCv);
+        holeTex.magFilter = THREE.NearestFilter;
+        holeTex.minFilter = THREE.NearestFilter;
+        holeTex.generateMipmaps = false;
+        const steelHoled = baked(new THREE.MeshLambertMaterial({ map: fireTex, alphaMap: holeTex, alphaTest: 0.5 }));
+        const leaf = new THREE.Mesh(new THREE.BoxGeometry(w, LH, 0.05), [steel, steel, steel, steel, steelHoled, steelHoled]);
         leaf.position.set(w / 2, DOOR_H / 2, 0);
-        // un hublot de verre armé, la barre anti-panique côté cage, une poignée côté couloir
-        const glass = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.42), new THREE.MeshBasicMaterial({ color: '#2a2d26' }));
-        glass.position.set(w * 0.62, 1.55, -0.027);
-        glass.rotation.y = Math.PI;
-        const glass2 = glass.clone();
-        glass2.position.z = 0.027;
-        glass2.rotation.y = 0;
+        // le cadre du hublot (une parclose d'acier un peu en relief) et le verre armé : teinté, assez opaque, on
+        // devine la cage derrière à travers son grillage
+        const frameMat = baked(new THREE.MeshLambertMaterial({ color: '#4a4d45' }));
+        const fr = new THREE.Group();
+        fr.position.set(w / 2, GY, 0);
+        for (const [fx, fy, fw, fh] of [[0, GH / 2 + 0.015, GW + 0.06, 0.03], [0, -GH / 2 - 0.015, GW + 0.06, 0.03], [GW / 2 + 0.015, 0, 0.03, GH], [-GW / 2 - 0.015, 0, 0.03, GH]]) {
+          const b = new THREE.Mesh(new THREE.BoxGeometry(fw, fh, 0.066), frameMat);
+          b.position.set(fx, fy, 0);
+          fr.add(b);
+        }
+        const wireCv = document.createElement('canvas');
+        wireCv.width = wireCv.height = 128;
+        {
+          const g = wireCv.getContext('2d');
+          g.fillStyle = '#a7b2a8';
+          g.fillRect(0, 0, 128, 128);
+          // poussière et traces de doigts
+          for (let i = 0; i < 260; i++) {
+            g.fillStyle = `rgba(90,85,70,${Math.random() * 0.12})`;
+            g.fillRect(Math.random() * 128, Math.random() * 128, 2 + Math.random() * 10, 2 + Math.random() * 6);
+          }
+          // le grillage : un maillage carré de fil d'acier noyé dans le verre
+          g.strokeStyle = 'rgba(40,40,36,0.85)';
+          g.lineWidth = 1.4;
+          for (let k = 0; k <= 128; k += 16) {
+            g.beginPath();
+            g.moveTo(k, 0);
+            g.lineTo(k, 128);
+            g.moveTo(0, k);
+            g.lineTo(128, k);
+            g.stroke();
+          }
+        }
+        const wireTex = new THREE.CanvasTexture(wireCv);
+        wireTex.wrapS = wireTex.wrapT = THREE.RepeatWrapping;
+        wireTex.repeat.set(GW / 0.12, GH / 0.12);
+        wireTex.anisotropy = 4;
+        // éclairé comme le reste (sombre dans le noir, il ne luit pas) : on y voit surtout la lumière de la cage derrière
+        const glassMat = baked(new THREE.MeshLambertMaterial({ map: wireTex, color: '#7a8a80', transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide }));
+        const glass = new THREE.Mesh(new THREE.PlaneGeometry(GW, GH), glassMat);
+        glass.renderOrder = 2;
+        fr.add(glass);
+        // la barre anti-panique côté cage, une poignée côté couloir
         const bar = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7, 0.06, 0.06), dark);
         bar.position.set(w * 0.55, 1.0, -zs * 0.06);
         const handle = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.03, 0.05), dark);
@@ -1427,7 +1484,7 @@ float bkCaust(vec2 uv, float t) {
           shackle.visible = false;
           lock.add(pl);
         });
-        pivot.add(leaf, glass, glass2, bar, handle, lock);
+        pivot.add(leaf, fr, bar, handle, lock);
         group.add(pivot);
         stairDoors.push({ pivot, lock, base, sgn, open: 0, map });
       }
