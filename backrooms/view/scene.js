@@ -2129,6 +2129,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   let landShake = 0; // le choc à l'arrivée d'une chute (1 : tout juste tombé)
   let exposure = 1.2; // exposition du caméscope : elle rattrape la lumière en une seconde environ
   let lightNow = 0.5; // lumière des néons là où l'on est (pour le grésillement)
+  let camT = 0; // caméscope sorti (0 à 1, la transition vers le 4:3)
+  let nightT = 0; // son mode nuit (0 à 1)
 
   // effets de bande en cours (secondes restantes), jumpscare, résolution dynamique, mise au point
   const fx = { splice: 0, loss: 0, bars: 0, grab: 0 };
@@ -2161,6 +2163,10 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     vhs,
     get lightHere() {
       return lightNow;
+    },
+    // le caméscope : où il en est (0 à 1), son mode nuit, et la largeur des bandes noires (px)
+    get cam() {
+      return { t: camT, night: nightT, bars: vhs.bars || 0 };
     },
     // Level 2 : percuté par une chèvre
     goatScare() {
@@ -2283,7 +2289,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       // accroupi, la caméra descend ; dans un casier, elle est fixe
       crouchY += ((P.crouch ? -0.55 : 0) - crouchY) * Math.min(1, dt * 8);
       const still = P.hidden >= 0;
-      camera.position.set(P.x, eyeY + crouchY + (P.moving && !still ? Math.sin(bob * 2) * (P.running ? 0.05 : 0.025) * mo : 0), P.z);
+      camera.position.set(P.x, eyeY + crouchY + (P.jy || 0) + (P.moving && !(P.jy > 0) && !still ? Math.sin(bob * 2) * (P.running ? 0.05 : 0.025) * mo : 0), P.z);
       camera.rotation.order = 'YXZ';
       // agrippé : le regard est tiré vers l'entité
       let yaw = P.yaw;
@@ -2332,6 +2338,14 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       const bat = P.battery ?? 100;
       flashLight.intensity = !lampOn ? 0 : 17 * (bat < 15 ? 0.45 + (Math.random() < 0.12 ? -0.4 : 0.15) : bat < 35 ? 0.75 : 1);
       flashSpill.intensity = flashLight.intensity * 0.24;
+      // le caméscope (V) : il sort en un tiers de seconde ; dans le noir, s'il reste de la pile, il passe en mode nuit
+      // et sa lampe infrarouge éclaire devant (pour l'image seulement : l'entité ne la voit pas)
+      const camWant = !RF && P.cam && P.status === 'alive' ? 1 : 0;
+      camT += (camWant - camT) * Math.min(1, dt * 9);
+      if (camT < 0.002) camT = 0;
+      const nightWant = camWant && bat > 0 ? THREE.MathUtils.clamp((0.34 - lightNow - (lampOn ? 0.3 : 0)) / 0.22, 0, 1) : 0;
+      nightT += (nightWant - nightT) * Math.min(1, dt * 3);
+      flashSpill.intensity += nightT * 3.2;
 
       // les objets en main : la lampe dès qu'on l'a, l'objet de la case choisie s'il y en a un (pas l'échelle)
       const alive = P.status === 'alive' && !P.onLadder && !(P.hidden >= 0);
@@ -2462,7 +2476,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         const D = { ...Q, x: S.x, z: S.z };
         const qv = floorViews[Q.floor || 0];
         const qm = sim.fm(Q.floor || 0);
-        const y = feetY(sim.stairs, D.x, D.z, D.floor) + (D.onLadder ? 1.0 : 0) - (qm.depthAt ? qm.depthAt(D.x, D.z) : 0);
+        const y = feetY(sim.stairs, D.x, D.z, D.floor) + (D.onLadder ? 1.0 : 0) + (D.jy || 0) - (qm.depthAt ? qm.depthAt(D.x, D.z) : 0);
         avatars.update(D, show, y, qv ? qv.lightAt(D.x, D.z) : 0.3, dt, time);
       }
 
@@ -2502,6 +2516,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         chroma: scareT > 0 ? 0.7 : grabbed ? 0.6 : RF ? 0.45 : 0,
         focus: Math.min(1, focusT + (grabbed ? 0.35 : 0)),
         white,
+        cam: camT,
+        night: nightT,
       });
 
       // résolution dynamique : moins de lignes quand l'image peine, plus quand elle est à l'aise
@@ -2511,7 +2527,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         else if (frameAvg < 15 && lines < 720) lines += 4;
         vhs.setLines(lines);
       }
-      vhs.render(scene, camera, time, danger, exposure);
+      vhs.render(scene, camera, time, danger, exposure * (1 + nightT * 1.6));
     },
   };
   liveScene = api;

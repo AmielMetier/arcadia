@@ -101,6 +101,11 @@ export function createPlayerAvatars(scene) {
     }
     a.torch = makeTorch(mat);
     a.g.add(a.torch);
+    // le voyant rouge du caméscope, à hauteur du visage, quand il filme (V)
+    a.rec = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), new THREE.MeshBasicMaterial({ color: '#ff2a1a' }));
+    a.rec.position.set(-0.12, 1.62, -0.3);
+    a.rec.visible = false;
+    a.g.add(a.rec);
     if (!a.light) {
       // la lampe : un vrai projecteur à bord doux. Il reste dans la scène même caché (sa puissance tombe à 0) :
       // le nombre de lumières ne change pas, les matériaux ne se recompilent pas
@@ -171,6 +176,7 @@ export function createPlayerAvatars(scene) {
       a.lightTarget.position.copy(a.g.localToWorld(tmp));
       a.lightTarget.updateMatrixWorld();
       a.light.intensity = Q.flashlight ? 14 : 0;
+      if (a.rec) a.rec.visible = !!Q.cam && (performance.now() % 1200) < 700;
       a.mat.lens.color.set(Q.flashlight ? '#fff6dc' : '#2a2620');
     },
   };

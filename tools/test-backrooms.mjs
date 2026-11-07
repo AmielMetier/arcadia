@@ -54,8 +54,8 @@ test('génération de la carte : dimensions, sols, murs et pièces', () => {
   assert.equal(map.isWall(map.exit.gx, map.exit.gz), false, 'la sortie est sur du sol');
 });
 
-test('cassettes VHS : 5 cassettes placées et atteignables', () => {
-  assert.equal(map.cassettes.length, 5, 'exactement 5 cassettes');
+test('cassettes VHS : 7 cassettes placées et atteignables', () => {
+  assert.equal(map.cassettes.length, 7, 'exactement 7 cassettes');
   for (const cas of map.cassettes) {
     assert.equal(map.isWall(cas.gx, cas.gz), false, `la cassette ${cas.id} n'est pas dans un mur`);
     const path = findPath(map, map.spawn.x, map.spawn.z, cas.x, cas.z);
@@ -107,7 +107,7 @@ test('endurance : courir consomme la stamina, l\'arrêt la recharge', () => {
   assert.ok(sim.player.stamina > staminaAfterRun, 'la stamina s\'est régénérée au repos');
 });
 
-test("ramassage des 5 cassettes, l'ascenseur s'ouvre et descend au Level 1", () => {
+test("ramassage des 7 cassettes, l'ascenseur s'ouvre et descend au Level 1", () => {
   const map = createBackroomsMap(42);
   const sim = new BackroomsSim({ map, difficulty: 'peaceful' });
   assert.equal(sim.cassettes, 0);
@@ -123,7 +123,7 @@ test("ramassage des 5 cassettes, l'ascenseur s'ouvre et descend au Level 1", () 
     assert.ok(cas.collected, `la cassette ${cas.id} a été ramassée`);
   }
 
-  assert.equal(sim.cassettes, 5);
+  assert.equal(sim.cassettes, 7);
   const events = sim.drainEvents();
   assert.ok(events.some((e) => e.type === 'exitUnlocked'), 'événement exitUnlocked émis');
   assert.ok(!sim.isColliding(map.elevator.x, map.elevator.z, 0.3), "ouvert : on peut entrer dans la cabine");
@@ -1060,7 +1060,7 @@ test("à plusieurs : qui entre dans l'ascenseur devient spectateur, il part quan
     putOn(sim, sim.player, c);
     sim.step();
   }
-  assert.equal(sim.cassettes, 5, "les cassettes comptent pour toute l'équipe");
+  assert.equal(sim.cassettes, 7, "les cassettes comptent pour toute l'équipe");
   const E = sim.fm(sim.realFloor).elevator;
   for (const P of sim.players) P.floor = sim.realFloor;
   const [a, b, c] = sim.players;
@@ -1087,7 +1087,7 @@ test("à plusieurs : plus il y a de monde à l'abri, plus l'entité est rapide e
   const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }, { id: 3, name: 'C' }];
   const speed = (inside) => {
     const sim = new BackroomsSim({ difficulty: 'normal', seed: 5, players, localId: 1 });
-    sim.cassettes = 5;
+    sim.cassettes = 7;
     for (let i = 0; i < inside; i++) sim.players[i].status = 'elevator';
     const P = sim.players[2];
     sim.monster.mode = 'chase';
@@ -1111,7 +1111,7 @@ test("à plusieurs : un joueur attrapé devient spectateur, la partie continue ;
   assert.equal(a.status, 'dead');
   assert.equal(sim.state, 'playing', 'B joue encore');
   assert.equal(sim.viewPlayer(0).id, b.id, 'A regarde B');
-  sim.cassettes = 5;
+  sim.cassettes = 7;
   sim.realFloor = 0;
   b.x = sim.map.elevator.x;
   b.z = sim.map.elevator.z;
@@ -1148,7 +1148,7 @@ test("réseau : l'invité reçoit l'état de l'hôte, se déplace chez lui et su
   assert.equal(guest.cassettes, 1);
   assert.equal(guest.allCassettes.find((q) => q.id === c.id).collected, true);
   // tout le monde dans l'ascenseur : l'invité passe au Level 1 avec la même carte
-  host.cassettes = 5;
+  host.cassettes = 7;
   host.realFloor = 0;
   for (const P of host.players) {
     P.x = host.map.elevator.x;
@@ -1233,7 +1233,7 @@ test("un joueur tombé au Level 0 repart au Level 1 avec une lampe", () => {
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players, localId: 1 });
   const [a, b] = sim.players;
   a.status = 'dead'; // attrapé avant d'avoir pris sa lampe
-  sim.cassettes = 5;
+  sim.cassettes = 7;
   sim.realFloor = 0;
   b.x = sim.map.elevator.x;
   b.z = sim.map.elevator.z;
@@ -1343,7 +1343,9 @@ test("Level 0 sur deux étages : les trous mènent en bas, deux escaliers loin d
     }
     for (const p of up.pits) assert.ok(down.dist[p.gz * down.W + p.gx] >= 0, 'on atterrit sur du sol accessible');
     assert.ok(down.cassettes.length >= 1 && up.cassettes.length >= 1, 'des cassettes aux deux étages');
-    assert.deepEqual([...up.cassettes, ...down.cassettes].map((c) => c.id).sort(), [0, 1, 2, 3, 4]);
+    assert.deepEqual([...up.cassettes, ...down.cassettes].map((c) => c.id).sort(), [0, 1, 2, 3, 4, 5, 6]);
+    assert.equal(up.cassettes.length, 4, "4 cassettes en haut");
+    assert.equal(down.cassettes.length, 3, "3 cassettes en bas");
     assert.ok(up.elevator && down.elevator, 'un ascenseur à chaque étage');
   }
 });
@@ -1437,7 +1439,7 @@ test("Level 0 : la cage d'escalier ne coupe aucun étage, et le couloir piégé 
   }
 });
 
-test("ascenseurs : un en haut, un en bas ; les 5 cassettes trouvées, le faux devient un mur et seul le vrai emmène", () => {
+test("ascenseurs : un en haut, un en bas ; les 7 cassettes trouvées, le faux devient un mur et seul le vrai emmène", () => {
   for (const real of [0, 1]) {
     const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 11 });
     sim.realFloor = real;
@@ -1448,7 +1450,7 @@ test("ascenseurs : un en haut, un en bas ; les 5 cassettes trouvées, le faux de
       putOn(sim, sim.player, c);
       sim.step();
     }
-    assert.equal(sim.cassettes, 5);
+    assert.equal(sim.cassettes, 7);
     assert.ok(sim.fm(fake).elevator.fake, 'le faux est démasqué');
     assert.ok(!sim.fm(real).elevator.fake);
     assert.ok(sim.isColliding(sim.fm(fake).elevator.x, sim.fm(fake).elevator.z, 0.3, fake), "le faux n'est plus qu'un mur");
@@ -1794,7 +1796,7 @@ test("l'entité se tapit dans le noir pour observer, sursaute une fois devant la
   assert.equal(sim.aggro, 0);
   const s0 = speedAt(0);
   const s3 = speedAt(3);
-  const s5 = speedAt(5);
+  const s5 = speedAt(7);
   assert.ok(s0 < s3 && s3 < s5, `la charge s'accélère : ${s0.toFixed(2)} < ${s3.toFixed(2)} < ${s5.toFixed(2)}`);
   assert.equal(sim.aggro, 1);
 });
@@ -2278,6 +2280,53 @@ test("réseau : l'invité voit le troupeau et l'entend approcher", () => {
   assert.ok(GOAT_MODES.includes(guest.goats[0].mode));
   assert.ok(guest.monster.danger > 0.5, "l'invité l'entend tout près");
   assert.equal(guest.monster.mode, 'chase', 'la musique de poursuite');
+});
+
+test("saut : un petit bond qui coûte du souffle, s'entend à la réception et ne franchit pas un trou", () => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players: [{ id: 1, name: 'A' }], localId: 1 });
+  const P = sim.player;
+  const st = P.stamina;
+  sim.step({ jump: true });
+  assert.ok(P.jy > 0, 'en l\'air');
+  assert.ok(P.stamina < st - 5, 'le saut coûte du souffle');
+  let air = 0;
+  let top = 0;
+  let landNoise = 0;
+  for (let i = 0; i < 120; i++) {
+    sim.step({});
+    if (P.jy > 0) air++;
+    top = Math.max(top, P.jy);
+    landNoise = Math.max(landNoise, P.noise);
+    sim.monster.x = sim.monster.z = -999;
+  }
+  assert.equal(P.jy, 0, 'retombé');
+  assert.ok(top > 0.25 && top < 0.5, `hauteur ${top.toFixed(2)} m`);
+  assert.ok(landNoise >= NOISE.land, 'la réception fait du bruit');
+  // au mieux, en courant : moins de 2 m parcourus en l'air (un trou en fait 2)
+  assert.ok(((air + 1) / 60) * 4.4 < 2 * PIT_HALF, `${(((air + 1) / 60) * 4.4).toFixed(2)} m en l'air`);
+  // accroupi au sol, on ne saute pas sur une arête
+  P.onBeam = true;
+  sim.step({ jump: true });
+  assert.equal(P.jy, 0, 'pas de saut sur une arête');
+});
+
+test("réseau : le caméscope (V) tire sur la pile, et l'on voit qui filme et qui saute", () => {
+  const players = [{ id: 1, name: 'Hôte' }, { id: 2, name: 'Invité' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players, localId: 1 });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players, localId: 2 });
+  const b0 = host.players[1].battery;
+  for (let i = 0; i < 60; i++) host.step({ jump: i === 0 }, { 2: { remote: true, cam: true } });
+  assert.ok(host.players[1].cam, "l'hôte sait que l'invité filme");
+  assert.ok(host.players[1].battery < b0, 'le caméscope tire sur la pile');
+  host.step({ jump: true }, { 2: { remote: true, cam: true } });
+  host.step({}, { 2: { remote: true, cam: true } });
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  assert.ok(guest.players[0].jy > 0, "l'invité voit l'hôte sauter");
+  guest.player.cam = false;
+  guest.predict({ cam: true });
+  assert.ok(guest.player.cam, "l'invité sort son caméscope sans attendre l'hôte");
+  guest.applySnapshot(JSON.parse(JSON.stringify({ ...host.snapshot() })));
+  assert.ok(guest.player.cam, "l'instantané ne le lui range pas");
 });
 
 console.log(`\n${count} tests réussis pour The Backrooms !`);

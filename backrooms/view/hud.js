@@ -1,6 +1,6 @@
 // The Backrooms - Interface façon caméscope (REC, signal, bande), jumpscare et écran de fin
 import { ENTITY_IMG, ENTITY_ANIM } from './scene.js';
-import { DEPART_T, PIPES_LEVEL } from '../engine/sim.js';
+import { DEPART_T, PIPES_LEVEL, CASSETTES } from '../engine/sim.js';
 
 const GOAT_DEATH_IMG = new URL('../img/bouc.jpg', import.meta.url).href;
 const GOAT_DEATH_FADE = 8; // secondes de montée de l'image
@@ -89,10 +89,15 @@ export class BackroomsHUD {
         <div class="keys-tag" id="keysTag"></div>
       </div>
       <div class="cam cam-br">
-        <div class="tapes"><span id="cassetteIcons"></span> <b id="cassetteText">0/5</b></div>
+        <div class="tapes"><span id="cassetteIcons"></span> <b id="cassetteText">0/${CASSETTES}</b></div>
         <div class="carry" id="carryTag" hidden></div>
         <div class="signal" id="signal"><span id="signalLabel">SIGNAL</span> <span id="signalBars">${'<i></i>'.repeat(5)}</span></div>
       </div>
+
+      <!-- Au caméscope (V) : l'image passe en 4:3, et les bandes noires servent d'écrans : à gauche le signal des
+           objectifs (plus fin qu'au petit indicateur), à droite les parasites (l'entité brouille la bande) et le mode nuit -->
+      <div class="cam-bar cam-bar-l"><small id="camSigLbl">SIGNAL</small><div class="cam-gauge" id="camSig">${'<i></i>'.repeat(10)}</div><small>TAPE</small></div>
+      <div class="cam-bar cam-bar-r"><small class="cam-night" id="camNight">AUTO</small><div class="cam-gauge interf" id="camInt">${'<i></i>'.repeat(10)}</div><small>INTERF.</small></div>
 
       <!-- Dans un casier : les fentes de la porte, et le souffle retenu -->
       <div class="locker" id="locker" hidden><div class="locker-slits"></div><div class="locker-ui"><span id="lockerText">HOLD SHIFT TO HOLD YOUR BREATH · PRESS F TO GET OUT</span><div class="breath"><i id="breathBar"></i></div></div></div>
@@ -157,8 +162,10 @@ export class BackroomsHUD {
     this.$ = (s) => this.el.querySelector(s);
     // les éléments mis à jour à chaque image (on ne les recherche pas à chaque fois)
     this.E = {};
-    for (const id of ['vhsTimer', 'battery', 'levelTag', 'cassetteIcons', 'cassetteText', 'objBanner', 'blackoutTag', 'fadeBar', 'spectate', 'specTitle', 'specSub', 'signal', 'signalBars', 'signalLabel', 'stamina', 'staminaBar', 'crouchTag', 'carryTag', 'inv', 'toast', 'locker', 'lockerText', 'breathBar', 'grab', 'grabBar', 'grabText', 'hurt', 'captions', 'lore', 'loreText', 'loreTag', 'prompt', 'promptText', 'beamBar']) this.E[id] = this.$('#' + id);
+    for (const id of ['vhsTimer', 'battery', 'levelTag', 'cassetteIcons', 'cassetteText', 'objBanner', 'blackoutTag', 'fadeBar', 'spectate', 'specTitle', 'specSub', 'signal', 'signalBars', 'signalLabel', 'stamina', 'staminaBar', 'crouchTag', 'carryTag', 'inv', 'toast', 'locker', 'lockerText', 'breathBar', 'grab', 'grabBar', 'grabText', 'hurt', 'captions', 'lore', 'loreText', 'loreTag', 'prompt', 'promptText', 'beamBar', 'camSigLbl', 'camNight']) this.E[id] = this.$('#' + id);
     this.barEls = [...this.E.signalBars.children];
+    this.camSigEls = [...this.$('#camSig').children];
+    this.camIntEls = [...this.$('#camInt').children];
     this.barEls.forEach((b, i) => (b.style.height = `${6 + i * 3}px`));
     this.sigShown = -1;
     this.sigT = 0;
@@ -242,7 +249,7 @@ export class BackroomsHUD {
     const L37 = sim.level === 2;
     const PIPES = sim.level === PIPES_LEVEL;
     const got = PIPES ? sim.valves : L1 ? sim.fuses : sim.cassettes;
-    const total = PIPES ? 4 : L1 ? 3 : 5;
+    const total = PIPES ? 4 : L1 ? 3 : CASSETTES;
     const delivered = sim.delivered || 0;
     const objKey = `${sim.level}:${got}:${delivered}:${sim.open}:${sim.slide}`;
     if (objKey !== this.lastCount) {
@@ -264,7 +271,7 @@ export class BackroomsHUD {
       } else if (L1 && delivered >= total) b = 'ALL FUSES IN · STAY AT THE PANEL TO RESTART THE FREIGHT ELEVATOR · IT WILL BE LOUD';
       else if (L1 && got > delivered) b = `FUSE IN YOUR POCKET · BRING IT TO THE FREIGHT ELEVATOR PANEL (${delivered}/3 IN)`;
       else if (L1) b = got === 0 ? 'LEVEL 1 · FIND THE 3 FUSES IN THE AISLES' : `FUSE ${got}/3 RECOVERED`;
-      else b = got === 0 ? 'FIND THE 5 VHS TAPES · THE SIGNAL GETS STRONGER AS YOU GET CLOSER' : `TAPE ${got}/5 RECOVERED`;
+      else b = got === 0 ? `FIND THE ${CASSETTES} VHS TAPES · THE SIGNAL GETS STRONGER AS YOU GET CLOSER` : `TAPE ${got}/${CASSETTES} RECOVERED`;
       banner.textContent = b;
     }
     this.bannerT -= dt;
@@ -309,10 +316,17 @@ export class BackroomsHUD {
         this.sigShown = n;
         this.barEls.forEach((b, i) => b.classList.toggle('on', i < n));
       }
+      // la jauge du caméscope : dix crans, plus fine
+      if (this.camOn) {
+        const s10 = Math.round((P.signal || 0) * 10);
+        const m = Math.min(10, s10 > 0 && Math.random() < 0.3 ? s10 + (Math.random() < 0.5 ? -1 : 1) : s10);
+        this.camSigEls.forEach((b, i) => b.classList.toggle('on', i < m));
+      }
     }
     const noSig = !(P.signal > 0);
     this.text('signalLabel', noSig ? (sim.blackout > 0 ? 'NO SIGNAL' : 'NO SIGNAL') : P.sigTo === 'stairs' ? 'STAIRS' : P.sigTo === 'key' ? 'KEY' : L37 && sim.open ? 'SLIDE' : sim.open || (sim.level === 1 && delivered >= total) || (sim.level === 1 && !(sim.map.fuses || []).some((f) => !f.taken)) ? (sim.level === 1 ? 'FREIGHT ELEVATOR' : 'ELEVATOR') : 'SIGNAL');
     this.flag('signal', 'none', noSig);
+    if (this.camOn) this.text('camSigLbl', this.E.signalLabel.textContent.replace('FREIGHT ', ''));
     if (sim.floors.length > 1 && this.floorShown !== P.floor) {
       this.floorShown = P.floor;
       this.text('levelTag', `LEVEL ${levelName(sim.level)} · ${P.floor ? 'LOWER' : 'UPPER'} FLOOR`);
@@ -458,6 +472,39 @@ export class BackroomsHUD {
   }
 
   // le rappel des touches : interagir, utiliser, et le talkie à plusieurs (la voix de proximité n'a pas de touche)
+  // Le caméscope (V) : les incrustations (REC, compteur, coins du viseur, signal) n'apparaissent qu'avec lui, calées
+  // dans l'image 4:3 ; ses bandes noires affichent le signal et les parasites. c : { t, night, bars } de la scène
+  camera(c, sim, dt = 1 / 60) {
+    const on = c.t > 0.5;
+    if (on !== this.camOn) {
+      this.camOn = on;
+      this.el.classList.toggle('camcorder', on);
+      this.sigShown = -1;
+    }
+    const bx = Math.round(c.bars);
+    if (bx !== this.camBx) {
+      this.camBx = bx;
+      this.el.style.setProperty('--bx', `${bx}px`);
+      this.el.classList.toggle('cam-wide', bx >= 64);
+    }
+    if (!on) return;
+    this.intT = (this.intT || 0) - dt;
+    if (this.intT > 0) return;
+    this.intT = 0.12;
+    // les parasites : l'entité brouille la bande quand elle approche (rien au prélude, rien chez les chèvres)
+    const M = sim.monster;
+    const d = sim.hasMonster && !sim.goats && M && !M.away ? M.danger || 0 : 0;
+    const n = Math.min(10, Math.round(d * 10 + (d > 0.05 ? (Math.random() - 0.3) * 2.2 : Math.random() < 0.05 ? 1 : 0)));
+    if (n !== this.intShown) {
+      this.intShown = n;
+      this.camIntEls.forEach((b, i) => b.classList.toggle('on', i < n));
+    }
+    const P = sim.player;
+    const night = (P.battery ?? 100) <= 0 ? 'NO IR' : c.night > 0.5 ? 'NIGHT' : 'AUTO';
+    this.text('camNight', night);
+    this.flag('camNight', 'on', night === 'NIGHT');
+  }
+
   keysLine(sim, multi) {
     const el = this.$('#keysTag');
     if (!el) return;
@@ -468,7 +515,7 @@ export class BackroomsHUD {
     this.keysK = k;
     el.hidden = !on;
     if (!on) return;
-    const keys = [['F', 'INTERACT'], ['E', 'USE']];
+    const keys = [['F', 'INTERACT'], ['E', 'USE'], ['SPACE', 'JUMP'], ['C', 'CROUCH'], ['V', 'CAMCORDER']];
     if (multi) keys.push(['R', 'RADIO']);
     el.innerHTML = keys.map(([key, what]) => `<span><kbd>${key}</kbd>${what}</span>`).join('');
   }
@@ -762,7 +809,7 @@ export class BackroomsHUD {
       title.style.color = '#ef4444';
       const PIPES = sim.level === PIPES_LEVEL;
       sub.textContent = PIPES ? 'The herd found you in the dark…' : sim.level === 1 ? 'The entity was waiting at the end of the shelves…' : 'The entity caught you in the endless hallways…';
-      stats.textContent = `Level ${levelName(sim.level)} · ${PIPES ? `valves ${sim.valves}/4` : sim.level === 2 ? `valves ${sim.fuses}/3` : sim.level === 1 ? `fuses ${sim.delivered || 0}/3` : `tapes ${sim.cassettes}/5`} · Survived for ${formatTime(sim.time)}`;
+      stats.textContent = `Level ${levelName(sim.level)} · ${PIPES ? `valves ${sim.valves}/4` : sim.level === 2 ? `valves ${sim.fuses}/3` : sim.level === 1 ? `fuses ${sim.delivered || 0}/3` : `tapes ${sim.cassettes}/${CASSETTES}`} · Survived for ${formatTime(sim.time)}`;
       this.$('#endTape').textContent = `${d} · RECORDING STOPPED`;
     }
 
@@ -808,8 +855,8 @@ export class BackroomsHUD {
     this.$('#pauseGo').textContent = tactile ? 'TAP THE SCREEN TO PLAY' : kb ? 'PRESS ENTER TO PLAY' : title ? 'CLICK TO PRESS PLAY' : 'CLICK TO TAKE CONTROL';
     const mv = this.qwerty ? 'WASD' : 'ZQSD';
     this.$('#pauseKeys').textContent = kb
-      ? `${mv} move · Arrows look · Shift run · C crouch · 1 flashlight · 2 3 select · E use · F pick up / hide · T whistle · Esc pause`
-      : `${mv} move · Mouse look · Shift run · C crouch · 1 flashlight · 2 3 select · E use · F pick up / hide · T whistle · Esc pause`;
+      ? `${mv} move · Arrows look · Shift run · Space jump · C crouch · V camcorder · 1 flashlight · 2 3 select · E use · F pick up / hide · T whistle · Esc pause`
+      : `${mv} move · Mouse look · Shift run · Space jump · C crouch · V camcorder · 1 flashlight · 2 3 select · E use · F pick up / hide · T whistle · Esc pause`;
     for (const b of this.el.querySelectorAll('button[data-kb]')) b.classList.toggle('on', (b.dataset.kb === '1') === kb);
   }
 }

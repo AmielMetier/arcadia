@@ -1780,6 +1780,24 @@ export class BackroomsSfx {
 
   // Les piles : la trappe qui se déclipse, les piles qui glissent, le ressort, la trappe qui reclaque.
   // empty : la lampe à plat, un clic mou et le filament qui grésille et meurt
+  // le caméscope (V) : le clic de l'écran qu'on déplie, le moteur de la bande, et le bip de l'enregistrement
+  camcorder(on) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.01;
+    const out = this.gainNode(0.7);
+    out.connect(this.out);
+    this.burst(out, t, 0.02, 'bandpass', 2600, 3, 0.22);
+    this.burst(out, t + 0.05, 0.015, 'bandpass', 1500, 4, 0.14);
+    // le moteur : un ronron qui monte (ou retombe) en un tiers de seconde
+    this.burst(out, t + 0.06, 0.32, 'bandpass', on ? 420 : 300, 6, 0.05);
+    this.tone(out, t + 0.06, 'sawtooth', on ? 90 : 160, on ? 160 : 70, 0.3, 0.012, 0.03);
+    if (on) {
+      this.tone(out, t + 0.42, 'square', 1950, 1950, 0.07, 0.02, 0.002);
+      this.tone(out, t + 0.52, 'square', 1950, 1950, 0.07, 0.02, 0.002);
+    }
+  }
+
   battery(empty = false) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;

@@ -625,3 +625,58 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 .tc-calib { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; margin: 12px auto 0; padding: 10px 12px; background: #000; width: 300px; }
 .tc-calib i { width: 46px; height: 46px; display: block; background: #050505; }
 .tc-calib span { width: 100%; font-size: 15px; opacity: 0.8; text-align: center; }
+
+/* À l'œil nu : pas d'incrustations de caméscope (REC, compteur, coins du viseur, signal), un texte net */
+#hud:not(.camcorder) { text-shadow: 0 0 6px rgba(0, 0, 0, 0.7), 0 1px 2px rgba(0, 0, 0, 0.6); }
+#hud:not(.camcorder) .vhs-rec,
+#hud:not(.camcorder) .vhs-play,
+#hud:not(.camcorder) #vhsTimer,
+#hud:not(.camcorder) .tape-date,
+#hud:not(.camcorder) .corner,
+#hud:not(.camcorder) #signal,
+#hud:not(.camcorder) .cam-bar { display: none; }
+
+/* Au caméscope (V) : les incrustations se calent dans l'image 4:3, entre les bandes noires */
+#hud.camcorder .cam-tl, #hud.camcorder .cam-bl { left: calc(48px + var(--bx, 0px)); }
+#hud.camcorder .cam-tr, #hud.camcorder .cam-br { right: calc(48px + var(--bx, 0px)); }
+#hud.camcorder .c1, #hud.camcorder .c3 { left: calc(22px + var(--bx, 0px)); }
+#hud.camcorder .c2, #hud.camcorder .c4 { right: calc(22px + var(--bx, 0px)); }
+#hud.camcorder.cam-wide #signal,
+#hud.camcorder #keysTag { display: none; }
+#hud.camcorder:not(.cam-wide) .cam-bar { display: none; }
+
+/* Les bandes noires : deux écrans de contrôle, à gauche le signal, à droite les parasites */
+.cam-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--bx, 0px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 20px;
+  color: rgba(242, 240, 230, 0.78);
+  text-shadow: none;
+  letter-spacing: 3px;
+}
+.cam-bar-l { left: 0; }
+.cam-bar-r { right: 0; }
+.cam-bar small { font-size: 18px; opacity: 0.8; text-align: center; max-width: 92%; }
+.cam-gauge {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 5px;
+  height: min(46vh, 340px);
+  width: 26px;
+}
+.cam-gauge i {
+  flex: 1;
+  border: 1px solid rgba(242, 240, 230, 0.35);
+  background: transparent;
+}
+.cam-gauge i.on { background: #e9e4c8; border-color: #e9e4c8; box-shadow: 0 0 8px rgba(233, 228, 200, 0.35); }
+.cam-gauge.interf i.on { background: #ff4b3b; border-color: #ff4b3b; box-shadow: 0 0 10px rgba(255, 75, 59, 0.45); }
+.cam-night { padding: 1px 6px; border: 1px solid rgba(242, 240, 230, 0.35); }
+.cam-night.on { color: #7dff8a; border-color: #7dff8a; }

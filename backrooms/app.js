@@ -70,7 +70,10 @@ let noLock = false;
 let toggleFlashlightRequested = false; // touche 1 : la lampe
 let useRequested = null; // (tests) une case d'objet précise à utiliser
 // actions du prochain pas : E utilise la case choisie, F ramasse, T siffle
-const act = { use: false, pick: false, whistle: false, struggle: 0 };
+const act = { use: false, pick: false, whistle: false, jump: false, struggle: 0 };
+let crouchOn = false; // C : s'accroupir / se relever (bascule)
+let camOn = false; // V : sortir / ranger le caméscope
+let airborne = false; // en plein saut (pour le bruit de la réception)
 let selRequested = 0; // touches 2 et 3 : choisir la case d'objet (1 ou 2)
 let kbMode = false;
 let paused = true; // la partie attend qu'on prenne le contrôle
@@ -198,6 +201,13 @@ function setKbMode(on) {
   if (hud) hud.showPause(paused, kbMode);
 }
 
+// V : sortir ou ranger le caméscope (image 4:3, signal des objectifs, mode nuit)
+function toggleCam() {
+  if (!sim || sim.player.status !== 'alive') return;
+  camOn = !camOn;
+  if (sfx) sfx.camcorder(camOn);
+}
+
 window.addEventListener('keydown', (e) => {
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
   if (sfx) sfx.unlock();
@@ -216,13 +226,19 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   // 1 : allumer / éteindre la lampe ; 2, 3 : choisir une case d'objet ; E : l'utiliser ; F : ramasser, ou se cacher
-  // dans un casier ; T : siffler ; C : s'accroupir
+  // dans un casier ; T : siffler ; C : s'accroupir (bascule) ; Espace : sauter (accroupi : se relever)
   const slot = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
   if (slot >= 0 && !e.repeat) useSlot(slot % 3);
   if (!e.repeat) {
     if (e.code === 'KeyE') act.use = true;
     else if (e.code === 'KeyF') act.pick = true;
     else if (e.code === 'KeyT') act.whistle = true;
+    else if (e.code === 'KeyC' && sim && sim.player.status === 'alive') crouchOn = !crouchOn;
+    else if (e.code === 'KeyV') toggleCam();
+    else if (e.code === 'Space' && sim && sim.player.status === 'alive') {
+      if (crouchOn) crouchOn = false;
+      else act.jump = true;
+    }
     else if (e.code === 'KeyR') {
       askMic(true);
       if (!multi() && hud) hud.toast('The radio only hisses · no one else is out there');
@@ -242,7 +258,7 @@ window.addEventListener('blur', () => {
 const touch = { move: null, look: null, run: false, crouch: false };
 const touchBtns = document.createElement('div');
 touchBtns.className = 'touch-btns';
-touchBtns.innerHTML = '<button data-t="run">🏃<small>Run</small></button><button data-t="crouch">⤓<small>Crouch</small></button><button data-t="pick">✋<small>Pick up</small></button><button data-t="use">⚙<small>Use</small></button><button data-t="whistle">📣<small>Whistle</small></button>';
+touchBtns.innerHTML = '<button data-t="run">🏃<small>Run</small></button><button data-t="crouch">⤓<small>Crouch</small></button><button data-t="pick">✋<small>Pick up</small></button><button data-t="use">⚙<small>Use</small></button><button data-t="whistle">📣<small>Whistle</small></button><button data-t="jump">⤒<small>Jump</small></button><button data-t="cam">📹<small>Camera</small></button>';
 document.body.appendChild(touchBtns);
 const stick = document.createElement('div');
 stick.className = 'touch-stick';
@@ -256,6 +272,7 @@ for (const b of touchBtns.querySelectorAll('button')) {
     if (sim && sim.player.grabT > 0) act.struggle++;
     else if (b.dataset.t === 'run') touch.run = true;
     else if (b.dataset.t === 'crouch') touch.crouch = !touch.crouch;
+    else if (b.dataset.t === 'cam') toggleCam();
     else act[b.dataset.t] = true;
     b.classList.add('on');
   });
@@ -478,7 +495,7 @@ function guestInputs() {
     const q = NET.actions[id] || (NET.actions[id] = []);
     // une action par pas, dans l'ordre où l'invité les a faites (avec la case qu'il avait choisie)
     const a = q.shift() || {};
-    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, stamina: i.st, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v, voice: i.vo, radio: i.ra, seq: i.seq };
+    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, cam: !!i.cm, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, stamina: i.st, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', jump: a.k === 'j', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v, voice: i.vo, radio: i.ra, seq: i.seq };
     i.pos = null; // une position annoncée ne sert qu'une fois
   }
   return out;
@@ -979,6 +996,8 @@ function readPad() {
       for (let i = 0; i < p.buttons.length; i++) if (i !== 9 && edge(i)) act.struggle++;
     } else {
       if (edge(11)) padCrouch = !padCrouch;
+      if (edge(10)) toggleCam();
+      if (edge(12)) act.jump = true;
       if (sim && sim.player.status !== 'alive' && (edge(0) || edge(15))) sim.spectate = (sim.spectate || 0) + 1;
       else if (edge(0)) act.pick = true;
       if (edge(2)) act.use = true;
@@ -1035,7 +1054,10 @@ function frame(currentTime) {
     if (Math.hypot(gp.lx, gp.ly) > 0.15) { mx = gp.lx; my = -gp.ly; }
   }
   const run = !!keys['ShiftLeft'] || !!keys['ShiftRight'] || touch.run || !!(gp && gp.run);
-  const crouch = !!keys['KeyC'] || touch.crouch || padCrouch;
+  // courir relève (on ne court pas accroupi)
+  if (crouchOn && run && (mx || my)) crouchOn = false;
+  if (camOn && sim.player.status !== 'alive') camOn = false;
+  const crouch = crouchOn || touch.crouch || padCrouch;
 
   // Sensibilité de rotation de la souris (réglage), axe vertical inversé au choix
   const sens = 0.0022 * OPTS.sens;
@@ -1067,6 +1089,8 @@ function frame(currentTime) {
       pitch: newPitch,
       run: live && run,
       crouch: live && crouch,
+      jump: live && act.jump,
+      cam: camOn && sim.player.status === 'alive',
       struggle: act.struggle,
       toggleFlashlight: toggleFlashlightRequested,
       use: useRequested,
@@ -1101,11 +1125,11 @@ function frame(currentTime) {
       }
       const sel = sim.player.sel;
       if (toggleFlashlightRequested) send('host', { t: 'a', k: 'f', s: sel, run: NET.run });
-      for (const [k, on] of [['e', act.use], ['p', act.pick], ['t', act.whistle]]) if (on) send('host', { t: 'a', k, s: sel, run: NET.run });
+      for (const [k, on] of [['e', act.use], ['p', act.pick], ['t', act.whistle], ['j', input.jump]]) if (on) send('host', { t: 'a', k, s: sel, run: NET.run });
       if (act.struggle) send('host', { t: 'a', k: 'g', n: act.struggle, run: NET.run });
       if (NET.tick % 3 === 0) {
         const P = sim.player;
-        send('host', { t: 'i', run: NET.run, n: NET.tick, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, c: input.crouch ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2), st: Math.round(P.stamina), v: P.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined, vo: input.voice ? +input.voice.toFixed(2) : undefined, ra: input.radio ? 1 : undefined }, true);
+        send('host', { t: 'i', run: NET.run, n: NET.tick, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, c: input.crouch ? 1 : 0, cm: input.cam ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2), st: Math.round(P.stamina), v: P.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined, vo: input.voice ? +input.voice.toFixed(2) : undefined, ra: input.radio ? 1 : undefined }, true);
       }
     } else {
       sim.step(input, NET.role === 'host' ? guestInputs() : null);
@@ -1115,13 +1139,21 @@ function frame(currentTime) {
     useRequested = null;
     selRequested = 0;
     if (act.struggle && sfx) sfx.struggle();
-    act.use = act.pick = act.whistle = false;
+    act.use = act.pick = act.whistle = act.jump = false;
     act.struggle = 0;
 
     // Détection de pas pour le son de marche sur moquette
     if (sim.state === 'playing') {
       const moved = Math.hypot(sim.player.x - oldX, sim.player.z - oldZ);
-      stepDist += moved;
+      // un saut : pas de pas en l'air, un choc sourd à la réception
+      const up = (sim.player.jy || 0) > 0;
+      if (airborne && !up && sfx) {
+        sfx.step(stepKind(sim.player));
+        setTimeout(() => sfx && sfx.step(stepKind(sim.player)), 45);
+        stepDist = 0;
+      }
+      airborne = up;
+      if (!up) stepDist += moved;
       const stepInterval = sim.player.running ? 1.25 : 0.85;
       if (stepDist >= stepInterval) {
         stepDist = 0;
@@ -1314,6 +1346,7 @@ function frame(currentTime) {
   }
   if (hud) {
     hud.update(sim, sim.time, delta);
+    if (scene && scene.cam) hud.camera(scene.cam, sim, delta);
   }
 }
 

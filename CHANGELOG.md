@@ -1,6 +1,17 @@
 # Journal des versions — Arcadia
 
 ## 4.62 — 7 novembre 2026
+- **The Backrooms** — Une image nette, et un vrai caméscope à sortir (touche V).
+  - Sans caméscope, l'écran n'a plus d'effet de cassette : image propre, sans lignes, ni bande déformée, ni compteur REC.
+  - Avec V, on sort le caméscope : l'image passe au format carré, entre deux bandes noires, avec un effet de cassette bien plus fort qu'avant (REC, compteur, coins du viseur, lignes, couleurs qui bavent).
+  - Le signal des cassettes ne se voit plus qu'au caméscope : il s'affiche en grand dans la bande de gauche. Pour trouver une cassette, il faut filmer.
+  - La bande de droite montre les parasites : quand l'entité approche, la jauge monte et l'image se déchire.
+  - Dans le noir, le caméscope passe tout seul en mode nuit (image verte) : on y voit sans lampe, donc sans se faire repérer.
+  - Il tire un peu sur la même pile que la lampe. Les coéquipiers qui filment ont un petit voyant rouge.
+- **The Backrooms** — 7 cassettes à trouver au lieu de 5 (4 à l'étage du haut, 3 en bas), sur une carte de la même taille.
+- **The Backrooms** — On court plus vite, et on peut sauter.
+  - Espace pour sauter : un petit bond qui coûte un peu de souffle et s'entend à la réception. Il ne permet pas de franchir un trou.
+  - C pour s'accroupir se fait maintenant d'un appui (plus besoin de garder la touche) ; Espace ou la course relèvent.
 - **The Backrooms** — Tout le monde a enfin la même carte : escaliers, cassettes et objets au même endroit pour chaque joueur.
   - Le jeu se charge toujours en entier à la version du Hub : un navigateur ne peut plus mélanger des fichiers d'une ancienne version (gardés en mémoire) avec ceux de la nouvelle, ce qui donnait une autre carte que celle des coéquipiers.
   - Si les cartes diffèrent malgré tout (quelqu'un a encore une vieille version ouverte), un message dit qui doit recharger la page, chez l'hôte comme chez l'invité, et revient tant que ce n'est pas réglé.

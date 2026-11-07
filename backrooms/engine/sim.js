@@ -1,6 +1,6 @@
 // The Backrooms - Moteur de simulation (60 Hz), sans DOM
 // Plusieurs joueurs possibles (l'hôte fait autorité). Deux niveaux :
-//   Level 0 : deux étages superposés (on tombe par les trous du haut, on remonte par les escaliers). 5 cassettes
+//   Level 0 : deux étages superposés (on tombe par les trous du haut, on remonte par les escaliers). 7 cassettes
 //             VHS réparties entre les étages ; un ascenseur à chaque étage, mais un seul est le vrai : quand les 5
 //             cassettes sont trouvées, le faux se referme en mur et le vrai s'ouvre.
 //   Level 1 : l'entrepôt ; 3 fusibles à rapporter au panneau du monte-charge, des coupures de courant, et l'entité
@@ -17,7 +17,7 @@
 // monde dans la cabine, plus l'entité s'énerve contre ceux qui restent.
 // Chacun part avec sa lampe torche dans la case 1. Un joueur attrapé regarde les autres jusqu'à la fin de l'étage ;
 // si l'équipe le termine, tout le monde repart à l'étage suivant, lampe en main.
-import { CELL_SIZE, T, createLevel0, PIT_HALF, FLOOR_DY, bfs } from './map.js';
+import { CELL_SIZE, T, CASSETTES, createLevel0, PIT_HALF, FLOOR_DY, bfs } from './map.js';
 import { createWarehouseMap } from './level1.js';
 import { createPoolMap, MOUTH } from './poolrooms.js';
 import { createPipesMap, VALVES, PIPES_LEVEL, jetState, inJet, JET_HALF } from './level2.js';
@@ -30,15 +30,20 @@ export const DT = 1 / 60;
 export const PLAYER_RADIUS = 0.38;
 // On avance lentement dans les Backrooms : la carte est immense et chaque pas compte
 export const WALK_SPEED = 2.1;
-export const SPRINT_SPEED = 3.7;
+export const SPRINT_SPEED = 4.4; // la course : nettement plus vite que la marche (l'entité en chasse reste en dessous)
 export const MONSTER_PATROL_SPEED = 1.8;
 export const MONSTER_CHASE_SPEED = 3.3; // plus vite qu'en marchant, un peu moins qu'en sprintant
 export const CROUCH_SPEED = 0.5; // accroupi : moitié moins vite, presque sans bruit
 export const STAMINA_DRAIN = 15; // par seconde de course
+// le saut : un petit bond (0,35 m, 0,4 s en l'air) ; même en courant on ne franchit pas un trou (2 m)
+export const JUMP_V = 3.4;
+export const JUMP_G = 17;
+export const JUMP_STAMINA = 6;
 export const STAMINA_REGEN = 9;
 export const WINDED_T = 1; // à bout de souffle : une seconde sans pouvoir courir
 export const LOSE_TRACK_T = 4; // secondes sans voir le joueur avant que l'entité ne le perde
 export const BATTERY_DRAIN = 0.42; // % par seconde de lampe allumée (environ 4 minutes pour une pile pleine)
+export const CAM_DRAIN = 0.15; // % par seconde de caméscope sorti (V) : il tire sur la même pile que la lampe
 export const BATTERY_PACK = 60; // % rendus par une pile utilisée
 export const INV_SIZE = 2; // cases d'objets (piles, eau d'amande, échelle) : la case 1 de l'inventaire est réservée à la lampe
 export const PICK_R = 1.4; // portée de F pour ramasser
@@ -51,7 +56,7 @@ export const GRAB_T = 2.6;
 export const GRAB_STRUGGLES = 8;
 export const MONSTER_STUN_T = 3;
 // le bruit qu'on fait (0 à 1+) : il porte jusqu'à NOISE_RANGE × bruit mètres (moins à travers les murs)
-export const NOISE = { walk: 0.32, run: 1, crouch: 0, pick: 0.45, winded: 0.4, fall: 1.6, breath: 0.12, panic: 0.3, gasp: 1.2 };
+export const NOISE = { walk: 0.32, run: 1, crouch: 0, land: 0.55, pick: 0.45, winded: 0.4, fall: 1.6, breath: 0.12, panic: 0.3, gasp: 1.2 };
 export const NOISE_RANGE = 13;
 export const VOICE_MIN = 0.15; // niveau du micro en dessous duquel on ne compte pas (le souffle, la pièce)
 export const DIN_RATE = 0.04; // le vacarme : parler une cinquantaine de secondes d'affilée le fait monter au maximum
@@ -69,7 +74,7 @@ export const BEAM_DAMP = 2.5;
 export const FALL_LOCK = 2.2; // secondes à terre après une chute d'un étage (plus d'une seconde de chute, puis sonné)
 export const WHISTLE_CD = 1.2;
 export const WHISTLE_HEAT = 2.5; // chaque coup compte 1 et s'oublie en 20 s : au 3e coup rapproché, l'entité vient à coup sûr
-export const CASSETTES = 5;
+export { CASSETTES };
 export const FUSES = 3;
 export { VALVES, PIPES_LEVEL };
 export const LAST_LEVEL = PIPES_LEVEL; // 0 : Level 0, 1 : Level 1 (entrepôt), 2 : Level 37 (Poolrooms), 3 : Level 2 (Tuyauteries, par le toboggan jaune)
@@ -319,6 +324,9 @@ function newPlayer(id, name, map, i) {
     grabT: 0, // agrippé par l'entité : secondes avant la fin
     grabs: 0, // prises déjà subies à ce niveau (la deuxième est mortelle)
     struggle: 0, // appuis pour se débattre
+    cam: false, // caméscope sorti (V) : image 4:3, signal des objectifs, mode nuit
+    jy: 0, // hauteur du saut (m) et sa vitesse verticale
+    jvy: 0,
     hurt: 0, // coups de chèvre encaissés à ce niveau (le deuxième est mortel)
     hidden: -1, // casier où l'on est caché (-1 : dehors)
     breath: 100, // souffle retenu dans un casier (0 à 100)
@@ -829,6 +837,7 @@ export class BackroomsSim {
   killPlayer(P, extra = {}) {
     if (P.status !== 'alive') return;
     P.status = 'dead';
+    P.cam = false;
     P.moving = false;
     P.grabT = 0;
     if (P.hidden >= 0) {
@@ -892,6 +901,7 @@ export class BackroomsSim {
     P.pitch = 0;
     P.flashlight = false;
     P.crouch = false;
+    P.jy = P.jvy = 0;
     P.running = false;
     P.moving = false;
     P.breath = 100;
@@ -1244,6 +1254,9 @@ export class BackroomsSim {
     if (input.use !== undefined && input.use !== null) this.useItem(P, input.use);
     if (input.useSel) this.useItem(P, P.sel - 1);
 
+    // le caméscope (V) : il tire un peu sur la pile (à plat, il filme encore, mais sans mode nuit)
+    if (input.cam !== undefined) P.cam = !!input.cam;
+    if (P.cam) P.battery = Math.max(0, P.battery - CAM_DRAIN * DT);
     // la lampe vide la pile ; à plat, elle s'éteint
     if (P.flashlight) {
       P.battery = Math.max(0, P.battery - BATTERY_DRAIN * (this.blackout > 0 ? BLACKOUT_DRAIN : 1) * DT);
@@ -1257,6 +1270,7 @@ export class BackroomsSim {
     const mx = input.mx || 0;
     const my = input.my || 0;
     P.crouch = !!input.crouch && !P.onBeam;
+    const landed = this.jumpStep(P, input.jump);
     const wantRun = !!input.run && (mx !== 0 || my !== 0) && !P.onBeam && !P.crouch;
     P.winded = Math.max(0, (P.winded || 0) - DT);
     if (wantRun && P.stamina > 0 && !(P.winded > 0)) {
@@ -1314,10 +1328,13 @@ export class BackroomsSim {
     let noise = !P.moving ? 0 : P.running ? NOISE.run : P.crouch ? NOISE.crouch : NOISE.walk;
     if (P.winded > 0) noise = Math.max(noise, NOISE.winded);
     if (P.bumpT > 0) noise = Math.max(noise, P.bumpV || 0);
+    if (landed) P.landT = 0.25;
+    P.landT = Math.max(0, (P.landT || 0) - DT);
+    if (P.landT > 0) noise = Math.max(noise, NOISE.land);
     P.noise = noise;
 
     // 3b. Un pas de trop au-dessus d'un trou : on tombe à l'étage du dessous
-    const pitId = this.pitUnder(P.x, P.z, P.floor);
+    const pitId = P.jy > 0 ? -1 : this.pitUnder(P.x, P.z, P.floor); // en l'air, on passe au-dessus (on retombe dedans)
     if (pitId >= 0) {
       const pit = this.fm(P.floor).pits[pitId];
       if (Math.abs(P.x - pit.x) < PIT_HALF && Math.abs(P.z - pit.z) < PIT_HALF) this.fallThrough(P, pitId);
@@ -1485,6 +1502,25 @@ export class BackroomsSim {
 
   // Invité : il déplace seulement son joueur, sans rien ramasser ni décider (l'hôte le fera). Renvoie le côté d'une
   // chute de la barre d'équilibre (l'hôte fera tomber), sinon 0.
+  // Le saut (Espace) : un petit bond qui coûte un peu de souffle et s'entend à la réception. Pas sur une arête, une
+  // échelle, ni à bout de souffle ; accroupi, on se relève d'abord. Rend true au pas où l'on retombe.
+  jumpStep(P, want) {
+    if (want && !(P.jy > 0) && !P.onBeam && !P.onLadder && !(P.lockT > 0) && !(P.winded > 0) && P.stamina >= JUMP_STAMINA) {
+      P.jy = 0.001;
+      P.jvy = JUMP_V;
+      P.stamina -= JUMP_STAMINA;
+      P.crouch = false;
+    }
+    if (!(P.jy > 0)) return false;
+    P.crouch = false;
+    P.jy += P.jvy * DT;
+    P.jvy -= JUMP_G * DT;
+    if (P.jy > 0) return false;
+    P.jy = 0;
+    P.jvy = 0;
+    return true;
+  }
+
   predict(input = {}) {
     const P = this.player;
     P.lockedT = Math.max(0, (P.lockedT || 0) - DT);
@@ -1497,6 +1533,7 @@ export class BackroomsSim {
     const Mo = this.monster;
     if (Mo && Mo.tx !== undefined) { Mo.x += (Mo.tx - Mo.x) * k; Mo.z += (Mo.tz - Mo.z) * k; }
     if (tr.length > 270) tr.splice(0, tr.length - 270);
+    if (input.cam !== undefined) P.cam = !!input.cam && P.status === 'alive';
     if (this.state !== 'playing' || P.status !== 'alive' || this.departT > 0) return 0;
     // agrippé ou dans un casier : l'hôte décide de tout (on ne bouge pas, le regard suit l'instantané)
     if (P.grabT > 0 || P.hidden >= 0) {
@@ -1515,6 +1552,7 @@ export class BackroomsSim {
     const my = input.my || 0;
     P.moving = mx !== 0 || my !== 0;
     P.crouch = !!input.crouch;
+    this.jumpStep(P, input.jump);
     const side = this.balance(P, mx);
     if (side) {
       P.tilt = 0;
@@ -1569,6 +1607,7 @@ export class BackroomsSim {
     this.roster.push({ id, name });
     const P = newPlayer(id, name, this.map, this.players.length);
     P.status = 'dead';
+    P.cam = false;
     this.players.push(P);
   }
 
@@ -1596,7 +1635,7 @@ export class BackroomsSim {
       sl: this.slide,
       // le vrai ascenseur ne se dévoile qu'une fois les cassettes trouvées
       rf: this.open ? this.realFloor : -1,
-      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.floor, P.sigTo, P.onLadder ? 1 : 0, r2(P.lockT), r2(P.tilt), P.onBeam ? 1 : 0, P.bottles, r2(P.grabT), P.hidden, P.crouch ? 1 : 0, P.carry.length, P.hurt || 0, Math.round(P.breath), P.holding ? 1 : 0, P.grabs || 0, r2(P.struggle || 0)]),
+      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.floor, P.sigTo, P.onLadder ? 1 : 0, r2(P.lockT), r2(P.tilt), P.onBeam ? 1 : 0, P.bottles, r2(P.grabT), P.hidden, P.crouch ? 1 : 0, P.carry.length, P.hurt || 0, Math.round(P.breath), P.holding ? 1 : 0, P.grabs || 0, r2(P.struggle || 0), r2(P.jy || 0), P.cam ? 1 : 0]),
       m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0, M.floor, M.grabbing ?? -1, r2(M.rushT || 0), M.away ? 1 : 0],
       // néons : 1 allumé, 0 éteint, 2 qui grésille (les coupures du directeur, les néons qui meurent un à un)
       ls: this.level === 0 ? this.floors.map((f) => (f.lights || []).flatMap((l, i) => (l.state !== l.s0 ? [i * 3 + (l.state === 'off' ? 0 : l.state === 'flicker' ? 2 : 1)] : []))) : null,
@@ -1662,7 +1701,7 @@ export class BackroomsSim {
     }
     const seen = new Set();
     for (const row of snap.p) {
-      const [id, x, z, yaw, pitch, status, fl, bat, stam, inv, signal, running, moving, found, name, lamp, sel, floor, sigTo, onLadder, lockT, tilt, onBeam, bottles, grabT, hidden, crouch, carryN, hurt, breath, holding, grabs, struggle] = row;
+      const [id, x, z, yaw, pitch, status, fl, bat, stam, inv, signal, running, moving, found, name, lamp, sel, floor, sigTo, onLadder, lockT, tilt, onBeam, bottles, grabT, hidden, crouch, carryN, hurt, breath, holding, grabs, struggle, jy, cam] = row;
       seen.add(id);
       let P = this.players.find((q) => q.id === id);
       if (!P) {
@@ -1732,6 +1771,8 @@ export class BackroomsSim {
         P.z = z;
       }
       if (!mine) P.crouch = !!crouch;
+      if (!mine) P.jy = +jy || 0;
+      if (!mine) P.cam = !!cam;
       P.carryN = carryN || 0;
       P.hurt = hurt || 0;
       P.breath = breath ?? 100;
@@ -2352,6 +2393,7 @@ export class BackroomsSim {
       P.struggle = 0;
       P.running = false;
       P.crouch = false;
+      P.jy = P.jvy = 0;
       M.mode = 'grab';
       M.grabbing = P.id;
       M.path = [];
