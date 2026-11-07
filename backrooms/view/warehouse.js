@@ -10,22 +10,29 @@ import { CELL_SIZE, T } from '../engine/map.js';
 const KART_TEX = new URL('../../kart/tex/', import.meta.url).href;
 const C = CELL_SIZE;
 
+// toiles deux fois plus fines que leur dessin (comme les petites textures du Level 0) : cartons, étiquettes, fûts,
+// pochoirs et panneaux restent nets de près
 function canvas(w, h = w) {
   const c = document.createElement('canvas');
-  c.width = w;
-  c.height = h;
-  return [c, c.getContext('2d')];
+  c.width = w * 2;
+  c.height = h * 2;
+  const ctx = c.getContext('2d');
+  ctx.setTransform(2, 0, 0, 2, 0, 0);
+  return [c, ctx];
 }
 
 function tex(c) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.anisotropy = 4;
+  t.anisotropy = 8;
   return t;
 }
 
 function grain(ctx, w, h, amount, rnd) {
+  // sur toute la toile (dessinée à l'échelle 2)
+  w = ctx.canvas.width;
+  h = ctx.canvas.height;
   const d = ctx.getImageData(0, 0, w, h);
   for (let i = 0; i < d.data.length; i += 4) {
     const n = (rnd() - 0.5) * amount;

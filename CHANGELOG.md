@@ -14,6 +14,10 @@
 - **The Backrooms** — À plusieurs, tout bouge en douceur.
   - Les coéquipiers et l'entité avancent et tournent la tête d'un mouvement régulier, au lieu de petits sauts 20 fois par seconde (chez l'hôte comme chez les invités) ; une vraie téléportation ou une chute reste nette.
   - Sur un écran à plus de 60 images par seconde, la souris ne perd plus de mouvement (avant, plus de la moitié pouvait sauter à 144 Hz), et ta propre marche est fluide à chaque image.
+- **The Backrooms** — Tous les niveaux au même niveau de détail que le Level 0.
+  - Level 2 (Tuyauteries) : les réserves sont en vraie brique, avec son relief, et les chaufferies en brique peinte écaillée ; le carrelage et l'enduit sont salis comme le papier peint du Level 0.
+  - Level 37 (Poolrooms) : carrelages deux fois plus fins, nets même collé au mur.
+  - Level 1 : cartons, fûts, étiquettes, pochoirs et panneaux d'allée deux fois plus fins, et plus nets au loin.
 - **The Backrooms** — Le Level 0 plus vivant, et plus inquiétant.
   - Les néons vivent : certains grésillent fort et clignotent d'un coup, et parfois toute une rangée s'éteint derrière toi, dans un claquement de disjoncteur.
   - La moquette raconte quelque chose : des taches d'humidité, des traces de pas mouillées qui mènent quelque part, et des gouttes qui tombent du plafond dans des flaques (on les entend).
