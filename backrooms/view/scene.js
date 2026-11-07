@@ -263,7 +263,7 @@ export function createBackroomsScene(container, floors) {
       // Level 0 : les zones claires baignent dans la lumière des néons (comme dans les vidéos), sans flaque ni trou noir
       const LB = L0 && l.bright;
       const LR = LB ? LIGHT_R * CELL_SIZE * 2.3 : l.bright ? LIGHT_R * CELL_SIZE * 1.55 : l.kind === 'bulb' ? 2.2 * CELL_SIZE : l.kind === 'tube' ? 2.3 * CELL_SIZE : LIGHT_R * CELL_SIZE * (L0 ? 1.15 : 1);
-      const gain = LB ? 1.9 : l.bright ? 1.3 : l.kind === 'bulb' ? 1.05 : l.kind === 'tube' ? 1.45 : L0 ? 1.2 : 1;
+      const gain = LB ? 1.42 : l.bright ? 1.3 : l.kind === 'bulb' ? 1.05 : l.kind === 'tube' ? 1.45 : L0 ? 0.97 : 1; // Level 0 : l'image environ 10 % moins lumineuse qu'au réglage du 7 novembre (la courbe du caméscope compresse : il faut baisser plus les néons)
       const fall = LB ? 1.5 : 2.4;
       const r = Math.ceil(LR / TX);
       const tx0 = Math.floor(l.x / TX);

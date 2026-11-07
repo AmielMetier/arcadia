@@ -234,12 +234,12 @@ test('nez à nez : découverte en face, de près, elle hurle et fonce (même au 
   const M = sim.monster;
   sim.map.brightCells = new Uint8Array(sim.map.W * sim.map.H); // hors de la lumière franche du départ
   M.warpT = 999;
-  // une direction dégagée sur 5 m depuis le départ
+  // une direction dégagée sur 6,5 m depuis le départ (plus près, elle chargerait d'elle-même)
   const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  const [dx, dz] = dirs.find(([x, z]) => hasLineOfSight(sim.map, P.x, P.z, P.x + x * 4.5, P.z + z * 4.5));
+  const [dx, dz] = dirs.find(([x, z]) => hasLineOfSight(sim.map, P.x, P.z, P.x + x * 6.5, P.z + z * 6.5));
   const place = () => {
-    M.x = P.x + dx * 4.5;
-    M.z = P.z + dz * 4.5;
+    M.x = P.x + dx * 6.5;
+    M.z = P.z + dz * 6.5;
   };
   place();
   M.mode = 'watch';
@@ -268,6 +268,59 @@ test('nez à nez : découverte en face, de près, elle hurle et fonce (même au 
   assert.ok(sim.events.some((e) => e.type === 'rush'), 'le cri est annoncé');
   assert.ok(M.speed > sim.monsterChaseSpeed, 'plus vite qu\'une poursuite ordinaire');
   sim.map.brightCells = null;
+});
+
+test('la fixer de loin la provoque ; s\'en approcher aussi ; la lampe ne la fait plus fuir', () => {
+  let stared = 0;
+  let approached = 0;
+  for (let seed = 1; seed <= 8; seed++) {
+    const make = () => {
+      const sim = new BackroomsSim({ seed, difficulty: 'normal' });
+      sim.map.brightCells = new Uint8Array(sim.map.W * sim.map.H);
+      sim.glimpseAt = Infinity;
+      sim.director.huntT = 1e9;
+      sim.director.fakeT = 1e9;
+      return sim;
+    };
+    const sim = make();
+    const P = sim.player;
+    const M = sim.monster;
+    const dir = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([x, z]) => hasLineOfSight(sim.map, P.x, P.z, P.x + x * 12, P.z + z * 12));
+    if (!dir) continue;
+    const [dx, dz] = dir;
+    const put = (d) => {
+      M.x = P.x + dx * d;
+      M.z = P.z + dz * d;
+    };
+    // elle observe à 12 m ; il la fixe, lampe allumée
+    put(12);
+    Object.assign(M, { mode: 'watch', waitT: 99, dormantT: 0, warpT: 1e9, flees: 0 });
+    P.flashlight = true;
+    const yaw = Math.atan2(-dx, -dz);
+    sim.events.length = 0;
+    for (let i = 0; i < 30; i++) {
+      sim.step({ yaw, pitch: 0 });
+      put(12);
+    }
+    assert.notEqual(M.mode, 'flee', 'la lampe ne la fait plus fuir');
+    assert.notEqual(M.mode, 'chase', 'une demi-seconde de loin ne suffit pas');
+    for (let i = 0; i < 60 && M.mode !== 'chase'; i++) sim.step({ yaw, pitch: 0 });
+    assert.equal(M.mode, 'chase', 'fixée une seconde à 12 m : elle charge');
+    assert.ok(M.rushT > 0 && sim.events.some((e) => e.type === 'rush'), 'en hurlant');
+    stared++;
+    // une autre : elle observe à 5 m, il regarde ailleurs mais elle le voit
+    const s2 = make();
+    const Q = s2.player;
+    const N = s2.monster;
+    N.x = Q.x + dx * 5;
+    N.z = Q.z + dz * 5;
+    Object.assign(N, { mode: 'watch', waitT: 99, dormantT: 0, warpT: 1e9 });
+    Q.flashlight = false;
+    for (let i = 0; i < 10; i++) s2.step({ yaw: Math.atan2(dx, dz), pitch: 0 });
+    assert.equal(N.mode, 'chase', 'trop près d\'elle : elle charge');
+    approached++;
+  }
+  assert.ok(stared >= 4 && approached >= 4, `cas testés (${stared}, ${approached})`);
 });
 
 test('zone très éclairée : à l\'abri, elle ne s\'y lance pas et s\'arrête au bord de l\'ombre', () => {
@@ -347,7 +400,7 @@ test('triche : invisible de tous, elle réapparaît juste derrière un angle dev
     assert.ok(tell, 'un signe avant chaque apparition');
     assert.ok(tellStep >= 0 && Math.hypot(tell.x - M.x, tell.z - M.z) < 0.3, 'elle surgit là où on l\'a entendue');
     assert.ok(!sim.inSomeView(0, M.x, M.z), 'elle n\'apparaît jamais sous les yeux d\'un joueur');
-    assert.ok(Math.hypot(M.x - P.x, M.z - P.z) > 5, 'pas collée au joueur');
+    assert.ok(Math.hypot(M.x - P.x, M.z - P.z) > 6, 'pas collée au joueur, hors de portée de charge');
     if (w.kind === 'corner') {
       corner++;
       assert.equal(M.mode, 'watch', 'postée, elle attend');
@@ -1489,7 +1542,7 @@ test("réseau : l'eau d'amande bue par un invité lui rend son souffle, et l'esc
   assert.ok(Math.hypot(HG.x - G.x, HG.z - G.z) < 0.3, 'au même endroit');
 });
 
-test("l'entité se tapit dans le noir pour observer, fuit la lampe au début, et s'énerve à chaque cassette", () => {
+test("l'entité se tapit dans le noir pour observer, sursaute une fois devant la lampe (de loin), et s'énerve à chaque cassette", () => {
   let watched = 0;
   let fled = 0;
   let darker = 0;
@@ -1523,7 +1576,7 @@ test("l'entité se tapit dans le noir pour observer, fuit la lampe au début, et
       // elle reste là à regarder sans charger
       for (let i = 0; i < 60; i++) sim.step();
       assert.notEqual(M.mode, 'chase', "elle observe sans charger");
-      // la lampe braquée sur elle : elle s'enfuit
+      // la lampe braquée sur elle, de loin et tout au début : un seul sursaut, elle s'enfuit (de près, elle chargerait)
       P.flashlight = true;
       P.yaw = Math.atan2(-(M.x - P.x), -(M.z - P.z));
       if (M.mode === 'watch' && hasLineOfSight(sim.map, P.x, P.z, M.x, M.z)) {
@@ -1533,7 +1586,7 @@ test("l'entité se tapit dans le noir pour observer, fuit la lampe au début, et
     });
   }
   assert.ok(watched >= 2, `${watched} fois tapie sur 4`);
-  assert.ok(fled >= 1, 'elle fuit la lampe');
+  assert.ok(fled >= 1, 'elle sursaute devant la lampe');
   assert.ok(darker >= 2, `${darker} fois dans un coin plus sombre que le joueur`);
   // plus agressive à chaque cassette : vitesse de charge
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 4 });

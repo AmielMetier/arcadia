@@ -23,6 +23,9 @@
   - En fin de partie, le bilan : combien de fois elle t'a vu, les poursuites semées, ton passage le plus serré.
   - Nouveau réglage « Carte du jour » : la même carte pour tout le monde ce jour-là, avec ton meilleur temps.
   - L'écran titre conseille de jouer au casque, lumière éteinte, et montre le réglage de luminosité.
+  - Les zones éclairées sont un peu moins éblouissantes (environ 10 % de lumière en moins).
+  - Ne la fixe pas : si tu la regardes plus d'une seconde à moins de quinze mètres, lampe allumée ou non, elle hurle et fonce sur toi. Et si tu t'approches à moins de six mètres, aussi.
+  - La lampe ne la fait plus fuir : tout au plus sursaute-t-elle une fois, de très loin, au début. Seule la première rencontre se termine par une disparition.
 
 ## 4.56 — 6 novembre 2026
 - **Fief Maudit** — La crypte et le Roi-Squelette : l'expédition a enfin une fin.

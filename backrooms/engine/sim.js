@@ -87,6 +87,9 @@ export const PIPES_BLACKOUT_LEN = [11, 15];
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const cellOf = (v) => Math.floor(v / CELL_SIZE);
+export const STARE_R = 15; // la fixer à moins de 15 m (en la voyant vraiment) la provoque
+export const STARE_T = 1.0; // … au bout d'une seconde (une demi-seconde à moins de 7 m)
+export const NEAR_CHARGE = 6; // s'approcher à moins de 6 m d'elle quand elle observe : elle charge
 export const CALM_HOLD = 45; // secondes de répit dans un recoin calme, avant que sa lampe grésille
 export const HAUNT_COOLDOWN = 12; // un spectateur ne hante qu'une fois toutes les 12 s
 
@@ -1717,11 +1720,13 @@ export class BackroomsSim {
     // pas). Elle ne reste pas plantée là : au bout d'une demi-seconde, elle hurle et fonce sur lui, même au repos
     // Level 0 : dans la lumière franche d'une zone claire, on est presque à l'abri (sauf pendant une coupure)
     const safe = this.level === 0 && !dark && this.brightCell(this.fm(P.floor), P.x, P.z);
-    const exposed = same && M.hasLineOfSight && !(P.hidden >= 0) && !this.calmAt(P) && dist < 7 && (!safe || dist < 4) && this.facing(P, M.x, M.z) < 0.4 &&
-      ((P.flashlight && dist < 7) || dist < 3.2 || (!dark && this.litCell(map, M.x, M.z)));
+    // Plus loin (jusqu'à STARE_R), la fixer la provoque aussi : il faut la regarder bien en face un peu plus longtemps
+    const near = dist < 7;
+    const exposed = same && M.hasLineOfSight && !(P.hidden >= 0) && !this.calmAt(P) && dist < STARE_R && (!safe || dist < 4) && this.facing(P, M.x, M.z) < (near ? 0.4 : 0.3) &&
+      ((P.flashlight && dist < 20) || dist < 3.2 || (!dark && this.litCell(map, M.x, M.z)));
     if (exposed && M.mode !== 'chase' && M.mode !== 'flee' && M.mode !== 'ambush') M.faceT += DT;
     else M.faceT = Math.max(0, M.faceT - DT * 2);
-    if (M.faceT > 0.5) {
+    if (M.faceT > (near ? 0.5 : STARE_T)) {
       M.faceT = 0;
       M.dormantT = 0;
       M.mode = 'chase';
@@ -1744,21 +1749,20 @@ export class BackroomsSim {
     if (hiding) {
       // la lampe braquée sur elle : au début elle s'enfuit dans le noir, plus tard elle charge
       const lit = P.flashlight && M.hasLineOfSight && dist < 22 && this.facing(P, M.x, M.z) < 0.3;
-      isNearby = dist < 3.5 + A * 4;
+      // on s'approche trop près d'elle : elle charge
+      isNearby = dist < 3.5 + A * 4 || (dist < NEAR_CHARGE + A * 2 && M.hasLineOfSight && !(P.hidden >= 0));
       canSee = (A >= 0.5 && canSee && dist < sight * 0.6) || (lit && A >= 0.4);
       canHear = A >= 0.6 && canHear;
-      if (lit && A < 0.4 && M.mode !== 'flee' && !isNearby && !exposed) {
-        // elle apprend : après deux fuites devant la lampe, elle ne se laisse plus faire
-        if (M.flees >= 2) canSee = true;
-        else {
-          const spot = this.darkSpot(map, P, M, 18, 30, false);
-          if (spot) {
-            M.flees++;
-            M.mode = 'flee';
-            M.watch = spot;
-            M.repathT = 0;
-            this.emit({ type: 'monsterFlee' });
-          }
+      // un seul sursaut devant la lampe, tout au début et de loin : ensuite, la lumière ne la fait plus reculer (de près,
+      // la fixer la fait charger)
+      if (lit && A < 0.2 && M.flees < 1 && dist > STARE_R && M.mode !== 'flee' && !isNearby && !exposed) {
+        const spot = this.darkSpot(map, P, M, 18, 30, false);
+        if (spot) {
+          M.flees++;
+          M.mode = 'flee';
+          M.watch = spot;
+          M.repathT = 0;
+          this.emit({ type: 'monsterFlee' });
         }
       }
     } else if (M.mode === 'patrol' && A < 0.5 && canSee && !isNearby && !(canHear && dist < 8)) {
@@ -2253,7 +2257,7 @@ export class BackroomsSim {
       const x = (c.x + 0.5) * CELL_SIZE;
       const z = (c.z + 0.5) * CELL_SIZE;
       const e = Math.hypot(x - P.x, z - P.z);
-      if (kind === 'far' ? this.players.some((Q) => Q.status === 'alive' && (Q.floor || 0) === floor && Math.hypot(Q.x - x, Q.z - z) < 30) : e < 5.5) continue;
+      if (kind === 'far' ? this.players.some((Q) => Q.status === 'alive' && (Q.floor || 0) === floor && Math.hypot(Q.x - x, Q.z - z) < 30) : e < NEAR_CHARGE + 0.5) continue; // postée hors de portée de charge : c'est au joueur de s'approcher
       if (map.pitAt && map.pitAt(c.x, c.z) >= 0) continue;
       if (!dark && this.brightCell(map, x, z)) continue;
       if ((map.props || []).some((pr) => Math.hypot(pr.x - x, pr.z - z) < pr.r + 0.6)) continue;
