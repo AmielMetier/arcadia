@@ -54,7 +54,7 @@ export function createVoice({ send, myId, sfx }) {
       verbOut.type = 'lowpass';
       verbOut.frequency.value = 3800;
       const wet = c.createGain();
-      wet.gain.value = 0.4; // comme l'écho des bruits du Level 0
+      wet.gain.value = 0.5; // comme l'écho des bruits du Level 0, un peu plus présent au loin
       verbOut.connect(wet).connect(bus);
     }
     // la salle change avec le niveau : un nouveau convoluteur quand la réponse de sfx change
@@ -201,10 +201,12 @@ export function createVoice({ send, myId, sfx }) {
     pan.distanceModel = 'linear';
     pan.rolloffFactor = 0; // la distance, on la règle nous-mêmes (murs, étages)
     src.connect(lp).connect(pg).connect(pan).connect(o);
-    // la réverbération : une part de la voix part dans l'écho des couloirs, d'autant plus qu'elle vient de loin
+    // la réverbération : une piste à part, prise avant le volume de la voix sèche. Tout près, la voix est sèche (un
+    // soupçon d'écho) ; en s'éloignant, la voix directe s'efface plus vite que l'écho des couloirs, qui finit par
+    // rester presque seul
     const vs = c.createGain();
     vs.gain.value = 0;
-    pg.connect(vs).connect(verbIn);
+    lp.connect(vs).connect(verbIn);
     // le talkie : bande étroite (pas de graves, pas d'aigus), un médium nasillard poussé, saturé et un peu
     // « en escalier » (le petit convertisseur), qui flotte (la modulation de la porteuse) ; le grésillement et les
     // coupures, eux, dépendent de la distance (dans update)
@@ -352,11 +354,11 @@ export function createVoice({ send, myId, sfx }) {
   }
 
   // une voix grave et hachée, des syllabes qui ne veulent rien dire, et qui ralentit à la fin
-  function garbled(t) {
+  function garbled(t, len = 0) {
     const c = ctxOf();
     const i = fxIn();
     if (!i) return 0;
-    const D = rnd(1.8, 2.8);
+    const D = len || rnd(1.8, 2.8);
     const vo = c.createOscillator();
     vo.type = 'sawtooth';
     vo.frequency.setValueAtTime(rnd(82, 104), t);
@@ -442,6 +444,55 @@ export function createVoice({ send, myId, sfx }) {
     if (sfx.caption) sfx.caption(cap, null);
   }
 
+  // De loin en loin, une voix passe sur le canal : quelqu'un d'autre, perdu ici avant vous (ou pas encore). On ne
+  // comprend que les mots qui s'affichent, comme une transcription de la bande. Rare, jamais deux fois la même.
+  const LORE = [
+    "…if you can hear this, stop walking. The carpet remembers where you've been.",
+    'Do not trust the exit signs. Repeat: do not trust the exit signs.',
+    'Day forty. The lights all hum the same note. I\'ve started humming back.',
+    "Whoever has the tapes… don't watch the last one. Please.",
+    'The rooms moved again while I slept. The water cooler is gone.',
+    'I counted nine hundred doors. They all open onto the same room.',
+    'Base, this is Halloway. The walls are wet. The walls were never wet.',
+    "Don't answer it when it uses my voice. I'm not on this channel anymore.",
+    'If the lights die one by one, run toward the last one still on.',
+    "Found another camera. The footage shows me. I don't remember filming it.",
+    'Stay in the yellow. It hates the yellow.',
+    'Someone carved a map into the wallpaper. It shows where I am standing.',
+    'There is no ceiling above the ceiling. I checked.',
+    "It doesn't chase you. It waits for you to get tired.",
+    'The hum stops right before it comes. Listen for the silence.',
+    'Channel nine has always been clear. Who changed the channel?',
+    'I followed the signal for six hours. The signal was following me.',
+    "If you find my tapes, they're out of order on purpose.",
+    'We came in through a door in a parking garage. There is no door back.',
+    "Don't stand under a dead light. Don't ask me why.",
+    'The almond water tastes like copper today.',
+    "Is anyone there? I can hear your footsteps. I'm not moving.",
+    'Third floor smells like rain. There is no third floor.',
+    "My radio still answers. It just isn't me answering.",
+    '…this is a recorded message. Keep your lamp off when it is close.',
+    'I left a key under the boxes for whoever comes next. Sorry about the stairs.',
+  ];
+  let loreBag = [];
+  let loreT = rnd(120, 220);
+  let loreNow = null; // { text, t (s depuis le début), len (durée de la voix) }
+  function lore() {
+    const c = ctxOf();
+    if (!c || !fxIn()) return false;
+    if (!loreBag.length) loreBag = LORE.map((_, i) => i).sort(() => Math.random() - 0.5);
+    const text = LORE[loreBag.pop()];
+    const t = c.currentTime + 0.05;
+    const len = Math.min(6.5, 1.4 + text.length / 16);
+    crackle(t, 0.25, 0.25);
+    garbled(t + 0.35, len);
+    squelch(true, 0.055);
+    parBusy = len + 0.9;
+    setTimeout(() => squelch(false, 0.055), (len + 0.6) * 1000);
+    loreNow = { text, t: 0, len };
+    return true;
+  }
+
   // la coupure : un dernier râle de la porteuse, puis plus rien
   function radioDies() {
     const c = ctxOf();
@@ -493,6 +544,8 @@ export function createVoice({ send, myId, sfx }) {
     get micState() { return micState; },
     get mode() { return mode; },
     get level() { return mode ? level : 0; },
+    // le niveau du micro, même quand rien ne part (la jauge du HUD : on sait si on est bruyant avant de l'être)
+    get raw() { return micState === 'on' ? level : 0; },
     enableMic,
     setVolume(v) {
       volume = v;
@@ -563,6 +616,20 @@ export function createVoice({ send, myId, sfx }) {
       }
       // les parasites : de temps en temps, plus souvent quand elle rôde ; jamais en coupure, jamais mort
       parBusy = Math.max(0, parBusy - dt);
+      // la transcription : elle reste lisible un moment après la voix ; une coupure l'interrompt
+      if (loreNow) {
+        loreNow.t += dt;
+        if (!radioOk || !alive || loreNow.t > loreNow.len + 2.5 + loreNow.text.length / 30) loreNow = null;
+      }
+      // une voix sur le canal : rare, quand c'est calme (pas tout près d'elle) et que personne de l'équipe ne parle
+      if (alive && radioOk && radio.live && parBusy <= 0 && (radio.danger || 0) < 0.3) {
+        loreT -= dt;
+        if (loreT <= 0) {
+          const busy = mode === 2 || [...peers.values()].some((p) => p.mode === 2);
+          if (busy) loreT = rnd(8, 20);
+          else if (lore()) loreT = rnd(160, 320);
+        }
+      }
       if (alive && radioOk && radio.live && parBusy <= 0) {
         parT -= dt * (1 + (radio.danger || 0) * 2.5);
         if (parT <= 0) {
@@ -578,6 +645,7 @@ export function createVoice({ send, myId, sfx }) {
         const Q = sim && sim.players.find((q) => q.id === p.id);
         const t = c.currentTime;
         let near = 0;
+        let rev = 0;
         let rad = 0;
         if (Q && V) {
           const ghost = Q.status === 'dead' && alive; // les morts ne parlent plus aux vivants
@@ -603,6 +671,9 @@ export function createVoice({ send, myId, sfx }) {
                 p.los = los;
               }
               if (!floors && !p.los) near *= 0.65;
+              // l'écho : il porte un peu plus loin que la voix, et sa part grandit avec la distance
+              const far = Math.min(1, d / VOICE_R);
+              rev = Math.pow(Math.max(0, 1 - d / (VOICE_R * 1.35)), 0.8) * (0.05 + 0.95 * Math.pow(far, 1.2)) * (floors ? 0.3 : !p.los ? 0.8 : 1);
               sfx.moveTo(p.chain.pan, Q.x, Q.z, 0.05);
             }
           }
@@ -613,11 +684,7 @@ export function createVoice({ send, myId, sfx }) {
         }
         if (rad) rx = Math.max(rx, 0.2 + (p.bad || 0));
         p.chain.pg.gain.setTargetAtTime(near * 1.4, t, 0.05);
-        // plus elle vient de loin, plus on entend l'écho autour d'elle (au loin, presque que lui)
-        if (Q && V) {
-          const d = Math.hypot(Q.x - V.x, Q.z - V.z);
-          p.chain.vs.gain.setTargetAtTime(near > 0 ? 0.35 + Math.min(1, d / VOICE_R) * 0.65 : 0, t, 0.1);
-        }
+        p.chain.vs.gain.setTargetAtTime(rev * 1.6, t, 0.1);
         p.chain.rg.gain.setTargetAtTime(rad, t, 0.03);
       }
       // tout près d'elle, le talkie capte des interférences, même quand personne ne parle
@@ -629,6 +696,18 @@ export function createVoice({ send, myId, sfx }) {
     // (tests) l'état des liaisons
     links() {
       return [...peers.values()].map((p) => ({ id: p.id, state: p.pc ? p.pc.connectionState : 'none', audio: !!p.chain, mode: p.mode }));
+    },
+
+    // la voix perdue sur le canal, en train de passer : { text, shown (caractères déjà « entendus ») } ou null
+    loreLine() {
+      if (!loreNow) return null;
+      const k = Math.max(0, Math.min(1, (loreNow.t - 0.35) / loreNow.len));
+      return { text: loreNow.text, shown: Math.ceil(loreNow.text.length * k) };
+    },
+
+    // (tests) une voix sur le canal tout de suite
+    lore() {
+      return lore();
     },
 
     // (tests) un parasite tout de suite

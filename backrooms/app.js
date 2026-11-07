@@ -386,6 +386,18 @@ function initGame(settings = lastSettings, forceLevel = null) {
   if (NET.role === 'host') send('all', goMessage());
 }
 
+// Invité : la carte de l'hôte a-t-elle la même empreinte que la nôtre ? Sinon (une version plus ancienne en cache),
+// les murs, les escaliers et les objets ne sont pas aux mêmes endroits chez nous : on prévient, une fois par étage.
+let printWarned = '';
+function checkPrint(fp) {
+  if (typeof fp !== 'string' || !sim || fp === sim.fp) return;
+  const k = `${NET.run}:${sim.level}`;
+  if (printWarned === k) return;
+  printWarned = k;
+  if (hud) hud.toast('YOUR GAME IS OUT OF DATE · RELOAD THE PAGE (CTRL+SHIFT+R)', 12);
+  send(H.info.hostId, { t: 'fp' });
+}
+
 const goMessage = () => ({ t: 'go', run: NET.run, seed: sim.seed, diff: sim.difficulty, players: sim.roster, lv: sim.level, vip: monstersVip, dy: dailyLabel });
 
 let monstersVip = false;
@@ -478,6 +490,10 @@ function onMsg(from, m) {
       send(from, goMessage());
     } else if (m.t === 'i' && m.run === NET.run) {
       NET.inputs[from] = { vo: num(m.vo, 0, 1), ra: !!m.ra, mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 100), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) }, v: m.v };
+    } else if (m.t === 'fp' && hud) {
+      // un invité n'a pas la même carte que nous : il tourne sur une autre version du jeu
+      const p = H.players.find((q) => q.id === from);
+      hud.toast(`${((p && p.name) || 'A player').toUpperCase()} HAS ANOTHER VERSION OF THE GAME · THEY MUST RELOAD`);
     } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'p', 't', 'b', 'h', 'g'].includes(m.k)) {
       const q = NET.actions[from] || (NET.actions[from] = []);
       if (q.length < 8) q.push({ k: m.k, sel: m.s === 2 ? 2 : 1, side: m.side > 0 ? 1 : -1, n: Math.max(1, Math.min(4, m.n | 0)) });
@@ -495,6 +511,7 @@ function onMsg(from, m) {
     const lv = sim.level;
     sim.applySnapshot(m.s);
     if (sim.level !== lv) handleEvent({ type: 'level', level: sim.level, rebuild: true }, NET.myId);
+    checkPrint(m.s.mp);
   } else if (m.t === 'e' && sim && m.run === NET.run) {
     for (const ev of m.e) {
       // l'étage a déjà été chargé par l'instantané : on refait seulement la scène si besoin
@@ -1115,7 +1132,7 @@ function loop(currentTime) {
     // un mur (ou un plancher) entre elle et nous : on l'entend étouffée
     const occl = (M.floor || 0) !== (V0.floor || 0) || !hasLineOfSight(sim.fm(M.floor || 0), V0.x, V0.z, M.x, M.z);
     // Level 2 : pas de bourdonnement d'entité, les sabots du troupeau
-    sfx.updateMonsterSound(sim.goats ? 0 : M.danger, M, sim.level === 1, occl);
+    sfx.updateMonsterSound(sim.goats || M.away ? 0 : M.danger, M, sim.level === 1, occl);
     sfx.updateChase(chasing, M.danger, M, occl);
     // la musique de tension suit le directeur (la peur de l'équipe) et ce que fait l'entité
     const D = sim.director;
@@ -1261,7 +1278,7 @@ function loop(currentTime) {
     const want = OPTS.mic !== 'off' && keys['KeyR'] && multi() ? 2 : 0;
     // le talkie grésille tout seul de temps en temps (plus souvent quand elle rôde) ; en coupure, il est mort
     const radioOk = !sim.radioDead;
-    voice.update(sim, sim.viewPlayer(sim.spectate || 0), delta, want, OPTS.mic !== 'off' && !paused, me.status === 'alive', { ok: radioOk, danger: me.danger || 0, live: !paused && sim.state === 'playing' });
+    voice.update(sim, sim.viewPlayer(sim.spectate || 0), delta, want, OPTS.mic !== 'off' && !paused, me.status === 'alive', { ok: radioOk, danger: me.danger || 0, live: !paused && sim.state === 'playing' && !sim.prelude });
     if (hud) hud.voice(voice, sim, multi(), !!keys['KeyR'] && !radioOk && multi());
   }
   if (hud) {

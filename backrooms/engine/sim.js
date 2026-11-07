@@ -226,6 +226,24 @@ export function stairDoor(st) {
   const v = 1.5 * CELL_SIZE;
   return { x: st.ox + st.dx * u + st.px * v, z: st.oz + st.dz * u + st.pz * v, st };
 }
+// L'empreinte d'une carte : les murs et les cages d'escalier de chaque étage. Tout le monde construit la même à partir
+// de la graine ; si l'empreinte de l'hôte diffère, c'est que ce navigateur fait tourner une autre version du jeu.
+export function mapPrint(floors) {
+  let h = 2166136261;
+  const mix = (v) => {
+    h ^= v & 0xffff;
+    h = Math.imul(h, 16777619);
+  };
+  for (const f of floors || []) {
+    mix(f.W || 0);
+    mix(f.H || 0);
+    const g = f.grid || [];
+    for (let i = 0; i < g.length; i++) mix(g[i] + i * 7);
+    for (const st of f.stairs || []) for (const k of st.cells || []) mix(k.gx * 131 + k.gz);
+  }
+  return (h >>> 0).toString(36);
+}
+
 export function stairAt(stairs, x, z) {
   const C = CELL_SIZE;
   for (const st of stairs || []) {
@@ -317,6 +335,7 @@ export class BackroomsSim {
     const generated = !floors;
     this.floors = floors || makeLevelMap(level, this.seed);
     this.map = this.floors[0];
+    this.fp = mapPrint(this.floors);
     // moins de piles et d'eau d'amande quand on est peu nombreux (toujours les mêmes, chez tout le monde)
     if (generated) {
       const keep = KEEP_ITEMS[Math.min(KEEP_ITEMS.length - 1, this.roster.length)];
@@ -613,7 +632,15 @@ export class BackroomsSim {
   }
 
   // le vacarme retombe peu à peu ; il prévient quand il franchit un palier
+  // Le prélude : au Level 0, tant que l'équipe n'a pas trouvé sa première cassette, il ne se passe rien… sauf la
+  // première apparition, mise en scène. Ni traque, ni fausse alerte, ni néons qui meurent, ni triche de l'entité,
+  // ni parasites du talkie : on découvre les lieux, on se sent seul. La peur commence avec la première cassette.
+  get prelude() {
+    return BackroomsSim.PRELUDE !== false && this.level === 0 && this.hasMonster && !this.goats && (this.cassettes || 0) === 0;
+  }
+
   updateDin() {
+    if (this.prelude) this.din = 0; // parler ne l'énerve pas encore
     this.din = Math.max(0, (this.din || 0) - DIN_DECAY * DT);
     const lv = this.din >= 0.7 ? 2 : this.din >= 0.35 ? 1 : 0;
     const was = this.dinLv || 0;
@@ -1512,11 +1539,12 @@ export class BackroomsSim {
       // le vrai ascenseur ne se dévoile qu'une fois les cassettes trouvées
       rf: this.open ? this.realFloor : -1,
       p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.floor, P.sigTo, P.onLadder ? 1 : 0, r2(P.lockT), r2(P.tilt), P.onBeam ? 1 : 0, P.bottles, r2(P.grabT), P.hidden, P.crouch ? 1 : 0, P.carry.length, P.hurt || 0, Math.round(P.breath), P.holding ? 1 : 0, P.grabs || 0, r2(P.struggle || 0)]),
-      m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0, M.floor, M.grabbing ?? -1, r2(M.rushT || 0)],
+      m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0, M.floor, M.grabbing ?? -1, r2(M.rushT || 0), M.away ? 1 : 0],
       // néons : 1 allumé, 0 éteint, 2 qui grésille (les coupures du directeur, les néons qui meurent un à un)
       ls: this.level === 0 ? this.floors.map((f) => (f.lights || []).flatMap((l, i) => (l.state !== l.s0 ? [i * 3 + (l.state === 'off' ? 0 : l.state === 'flicker' ? 2 : 1)] : []))) : null,
       cw: this.level === 0 ? this.floors.map((f) => (f.calm || []).map((n) => r2(n.wear || 0))) : null,
       rd: this.lightsOut ? 1 : undefined, // les néons meurent : plus de talkie
+      mp: this.fp, // l’empreinte de la carte : un invité qui n'a pas la même (vieille version en cache) est prévenu
       kk: this.floors[0] && this.floors[0].key ? (this.floors[0].key.taken ? 1 : 0) : undefined, // la clé de l'escalier
       // Level 1 : fusibles (ils peuvent être tombés ailleurs), fusibles au panneau, redémarrage du monte-charge
       fp: this.level === 1 ? (this.map.fuses || []).map((f) => [r2(f.x), r2(f.z)]) : null,
@@ -1664,6 +1692,7 @@ export class BackroomsSim {
     M.floor = snap.m[5] || 0;
     M.grabbing = snap.m[6] >= 0 ? snap.m[6] : null;
     M.rushT = snap.m[7] || 0;
+    M.away = !!snap.m[8]; // le prélude : elle n'est pas là
     if (snap.fp) (this.map.fuses || []).forEach((f, i) => {
       const q = snap.fp[i];
       if (!q) return;
@@ -1757,7 +1786,7 @@ export class BackroomsSim {
       P.mDist = same ? dist : dist + 40;
       // bourdonnement : de 0 à 35 m, il monte vite quand elle est à portée ; elle se tait en embuscade
       const ratio = 1 - Math.min(1, Math.max(0, (dist - 1.2) / 32));
-      P.danger = dist > 35 ? 0 : Math.pow(ratio, 1.6) * (M.silent && dist > 4 ? 0.35 : 1) * (same ? 1 : 0.25); // tout près, même tapie, on l'entend
+      P.danger = M.away || dist > 35 ? 0 : Math.pow(ratio, 1.6) * (M.silent && dist > 4 ? 0.35 : 1) * (same ? 1 : 0.25); // tout près, même tapie, on l'entend
       let diff = Math.atan2(M.x - P.x, M.z - P.z) - (P.yaw - Math.PI);
       while (diff > Math.PI) diff -= 2 * Math.PI;
       while (diff < -Math.PI) diff += 2 * Math.PI;
@@ -1806,9 +1835,38 @@ export class BackroomsSim {
     if (!P) return;
     M.target = P.id;
     M.dormantT = Math.max(0, (M.dormantT || 0) - DT);
+    // le prélude : elle n'est pas là (elle n'arrive que 20 s après la première cassette, et de loin)
+    const prelude = this.prelude;
+    if (prelude) M.dormantT = Math.max(M.dormantT, 20);
     // au tout début de la partie, ou pendant le répit qui suit une poursuite, elle reste au loin et se tait
     const calm = M.dormantT > 0 || (entityRelaxed(this) && M.mode !== 'chase');
-    if (this.level === 0 && this.firstGlimpse(M, P)) return;
+    if (this.level === 0 && this.firstGlimpse(M, P)) {
+      M.away = prelude && !M.glimpse; // l'apparition finie, elle repart déjà loin : de nouveau absente
+      if (M.away) for (const Q of this.players) Q.danger = 0;
+      return;
+    }
+    // le prélude, hors de l'apparition : elle n'existe tout simplement pas (ni vue, ni son, ni bourdonnement)
+    if (prelude) {
+      if (!M.away) {
+        // elle s'en va loin des joueurs, là où elle reviendra
+        const far = this.warpSpot && this.warpSpot(P, 'far');
+        if (far) {
+          M.x = far.x;
+          M.z = far.z;
+          M.floor = far.floor;
+        }
+      }
+      M.away = true;
+      M.mode = 'patrol';
+      M.speed = 0;
+      M.path = [];
+      M.silent = true;
+      M.faceT = 0;
+      M.danger = 0;
+      for (const Q of this.players) Q.danger = 0;
+      return;
+    }
+    M.away = false;
     const map = this.fm(M.floor);
     const rage = this.rage; // 0 seul ou personne à l'abri, jusqu'à 1 quand il ne reste qu'un joueur dehors
     const dark = this.blackout > 0;

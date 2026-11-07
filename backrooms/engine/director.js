@@ -80,7 +80,8 @@ export function updateDirector(sim) {
     lightsChanged(d.map || sim.map);
   }
 
-  if (!alive.length || sim.state !== 'playing' || sim.departT > 0) return;
+  // le prélude (Level 0, avant la première cassette) : rien que l'apparition mise en scène
+  if (!alive.length || sim.state !== 'playing' || sim.departT > 0 || sim.prelude) return;
 
   // fausses alertes : seulement pendant la montée, quand on respire
   if (D.phase === 'build' && D.stress < 0.4) {
