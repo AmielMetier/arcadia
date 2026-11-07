@@ -3,7 +3,7 @@
 // invité garde une copie de la vallée, y recopie l'état reçu et prédit son propre déplacement. Si l'hôte s'en va, le
 // nouvel hôte reprend depuis le dernier instantané complet. Seul (ou sans invité), c'est la même boucle, sans envoi.
 // Adresse : ?seed=… (vallée), ?bots=0..2, ?job=…, ?debug (expose window.__fief), ?autostart, ?manual (images à la demande).
-import { Sim, DT, GOALS, emptyInput, WAREHOUSE_HP, CYCLE, JOBS, HP, BUILDS, FOOD, FOES, MODES } from './engine/sim.js';
+import { Sim, DT, GOALS, emptyInput, WAREHOUSE_HP, CYCLE, JOBS, HP, BUILDS, FOOD, FOES, MODES, LOOT } from './engine/sim.js';
 import { encodeState, encodeWorld, applyState, applyWorld, smooth, predict, reconcile, cleanInput } from './engine/net.js';
 import { createScene } from './view/scene.js';
 import { Input } from './input.js';
@@ -122,7 +122,7 @@ function intro() {
   <div class="sheet wide">
     <h2>${guest ? 'Rejoindre le village' : 'Jour 1 — Le bois'}</h2>
     <p class="sub">${others.length ? `Avec ${others.join(', ')}.` : 'La malédiction a vidé la vallée. Il ne reste que vous, un feu de camp et un village en ruine.'}${guest ? '' : mates}</p>
-    <p>Le jour, abattez les arbres et rentrez le bois à l'entrepôt ; les chênes donnent des poutres qui se portent à deux. Avant la nuit, chargez les braseros : quand la brume monte, les morts sortent du sol, et seuls ceux qui tombent dans la lumière restent à terre.</p>
+    <p>Le jour, abattez les arbres et rentrez le bois à l'entrepôt (trois bûches à la fois) ; les chênes donnent des poutres qui se portent à deux. Les lueurs dorées dans les bois sont des coffres gardés par des morts endormis : bois, vivres, huile ou élixir. Avant la nuit, chargez les braseros : quand la brume monte, les morts sortent du sol, et seuls ceux qui tombent dans la lumière restent à terre.</p>
     <h3>Ton métier</h3>
     ${jobPicker()}
     <div class="keys">
@@ -150,7 +150,7 @@ function openMenu() {
   if (!S.started || S.ended) return;
   S.paused = true; input.unlock();
   const host = S.role !== 'guest';
-  const canSkip = host && sim.clock.phase === 'jour' && sim.clock.t < CYCLE.day - CYCLE.dusk;
+  const canSkip = host && sim.clock.phase === 'jour' && sim.clock.t < sim.dayLen - CYCLE.dusk;
   const team = sim.players.map((p) => `<li><i style="background:${p.color}"></i>${esc(p.name)}${p.bot ? ' (IA)' : ''} · ${JOBS[p.job].name}${p.down ? ' · à terre' : ''}</li>`).join('');
   showScreen(`<div class="sheet wide">
     <h2>Pause</h2>
@@ -389,7 +389,7 @@ function onEvent(e) {
     case 'pick': case 'take': case 'grab': sfx.play('tronc', { vol: 0.6, dist: d }); break;
     case 'lift': sfx.play('tronc', { vol: 0.8 }); break;
     case 'drop': case 'beamDrop': sfx.play('sol', { vol: 0.7, dist: d }); break;
-    case 'store': sfx.play('tronc', { vol: 0.9, dist: d }); if (mine) { sfx.play('ui', { vol: 0.35, delay: 0.1 }); toast('+1 bûche'); } bump('sBois'); break;
+    case 'store': sfx.play('tronc', { vol: 0.9, dist: d }); if (mine) { sfx.play('ui', { vol: 0.35, delay: 0.1 }); toast(e.k > 1 ? `+${e.k} bûches` : '+1 bûche'); } bump('sBois'); break;
     case 'storeBeam': sfx.play('tronc', { vol: 1, dist: d, rate: 0.8 }); sfx.play('ui', { vol: 0.4, delay: 0.1 }); toast('+1 poutre'); bump('sPoutre'); break;
     case 'site': sfx.play('tronc', { vol: 0.9, dist: d }); banner(`Chantier ouvert<small>${esc(siteName(e.site))} : frappez-le (clic) pour le relever</small>`); bump('sBois'); break;
     case 'poor': if (mine) toast('Pas assez de bois ou de poutres à l\'entrepôt'); break;
@@ -408,8 +408,11 @@ function onEvent(e) {
     case 'leave': if (e.pid !== S.me) toast(`${e.name || 'Un joueur'} est parti`); break;
     case 'dusk': banner('Le soleil se couche<small>Chargez les braseros : la nuit arrive</small>'); sfx.play('cloche', { vol: 0.8 }); break;
     case 'night': banner(`Nuit ${e.n}<small>La brume monte. Les morts se lèvent.</small>`, 'night'); sfx.play('cloche', { vol: 1, rate: 0.8 }); sfx.night(true); break;
-    case 'dawn': banner(`L'aube !<small>Nuit ${e.n} tenue · les morts retournent à la poussière</small>`); sfx.play('aube', { vol: 0.8 }); sfx.night(false); break;
+    case 'dawn': banner(`L'aube !<small>Nuit ${e.n} tenue · les morts retournent à la poussière</small>`); sfx.play('aube', { vol: 0.8 }); sfx.night(false); if (!sim.crypt.open) setTimeout(() => toast('De nouveaux coffres luisent dans les bois'), 4500); break;
     case 'spawn': sfx.play('terre', { vol: 0.9, dist: fd, rate: 0.8 }); break;
+    case 'guardWake': sfx.play('terre', { vol: 0.9, dist: fd, rate: 1.1 }); sfx.play('os', { vol: 0.7, dist: fd, delay: 0.2 }); break;
+    case 'chest': sfx.play('craque', { vol: 0.8, dist: d, rate: 1.3 }); sfx.play('cloche', { vol: 0.4, dist: d, rate: 2.2, delay: 0.15 }); if (mine || d < 20) banner(`Un coffre !<small>${LOOT[e.loot].text}</small>`); bump('sBois'); break;
+    case 'bell': sfx.play('cloche', { vol: 1 }); toast(`${mine ? 'Tu sonnes' : (p ? esc(p.name) : 'On') + ' sonne'} la cloche : la nuit tombe`); break;
     case 'rise': { const f = sim.foe(e.foe); sfx.play('craque', { vol: 0.7, dist: f ? distTo(f.x, f.z) : 30, rate: 1.3 }); break; }
     case 'kill': { const f = sim.foe(e.foe); sfx.play('os', { vol: 0.8, dist: f ? distTo(f.x, f.z) : 20, rate: 0.7 }); if (mine && !e.lit) toast('Il se relèvera dans la brume…'); break; }
     case 'hurt': sfx.play('coup', { vol: mine ? 1 : 0.6, dist: d }); if (mine) { document.body.classList.add('hurt'); clearTimeout(onEvent.h); onEvent.h = setTimeout(() => document.body.classList.remove('hurt'), 250); } break;
@@ -456,7 +459,7 @@ function hud(dt) {
   S.wallHitT = Math.max(0, S.wallHitT - dt);
   const c = sim.clock, night = c.phase === 'nuit';
   const pr = p ? sim.prompt(S.me) : null;
-  const key = [sim.stock.bois, sim.stock.poutre, p && p.carry, pr && pr.text, pr && Math.round((pr.hp || 0) * 50), sim.goal, c.day, night, Math.ceil(sim.timeLeft), Math.round(p ? p.hp : 0), p && p.maxHp, p && p.down, p && Math.round(p.revive * 10), p && Math.round(p.downT), p && p.dead, Math.round(sim.village.hp), S.wallHitT > 0, sim.stock.nourriture, p && Math.round(p.food), p && p.cold, sim.foes.map((f) => (f.kind === 'knight' || f.kind === 'king' ? Math.round(f.hp) : '')).join(''), p && Math.ceil(p.cd), p && p.job, sim.crypt.open, sim.crypt.phase].join('|');
+  const key = [sim.stock.bois, sim.stock.poutre, p && p.carry, p && p.load, pr && pr.text, pr && Math.round((pr.hp || 0) * 50), sim.goal, c.day, night, Math.ceil(sim.timeLeft), Math.round(p ? p.hp : 0), p && p.maxHp, p && p.down, p && Math.round(p.revive * 10), p && Math.round(p.downT), p && p.dead, Math.round(sim.village.hp), S.wallHitT > 0, sim.stock.nourriture, p && Math.round(p.food), p && p.cold, sim.foes.map((f) => (f.kind === 'knight' || f.kind === 'king' ? Math.round(f.hp) : '')).join(''), p && Math.ceil(p.cd), p && p.job, sim.crypt.open, sim.crypt.phase].join('|');
   if (key === lastHud) return;
   lastHud = key;
   const C = sim.crypt.open;
@@ -509,7 +512,7 @@ function hud(dt) {
     $('tAbility').classList.toggle('cool', !ready);
   }
   $('carry').hidden = !(p && p.carry);
-  if (p && p.carry) $('carry').lastChild.textContent = p.carry === 'poutre' ? 'Tu portes une poutre' : p.carry === 'vivres' ? 'Tu portes un panier de baies' : 'Tu portes une bûche';
+  if (p && p.carry) $('carry').lastChild.textContent = p.carry === 'poutre' ? 'Tu portes une poutre' : p.carry === 'vivres' ? 'Tu portes un panier de baies' : p.load > 1 ? `Tu portes ${p.load} bûches` : 'Tu portes une bûche (E près d\'une autre pour empiler)';
 }
 
 // ------------------------------------------------------------------ outils de test

@@ -17,6 +17,14 @@
   - Pendant les coupures de courant, les talkies sont morts.
   - Nouveau dans ⚙️ Réglages : « Voix » (appuyer pour parler, micro ouvert ou coupé, volume des voix).
 
+## 4.58 — 7 novembre 2026
+- **Fief Maudit** — Un début de partie plus vif.
+  - Le premier jour dure deux minutes et demie au lieu de quatre et demie ; les suivants, un peu moins de quatre.
+  - On porte jusqu'à trois bûches à la fois : E près d'une autre bûche pour l'empiler, et les trois se rangent d'un coup.
+  - Des coffres luisent dans les bois, gardés par des squelettes endormis qui se réveillent quand on approche, même en plein jour. Dedans : du bois, des vivres, des poutres, de l'huile pour les braseros ou un élixir qui soigne toute l'équipe. Le premier est tout près du village, avec un seul garde ; de nouveaux coffres apparaissent à chaque aube.
+  - Une cloche près du feu de camp : la sonner (E) fait tomber la nuit tout de suite quand on est prêts.
+  - On peut relever un équipier même avec du bois dans les bras.
+
 ## 4.57 — 7 novembre 2026
 - **The Backrooms** — Le Level 0 ressemble enfin aux vidéos.
   - Les zones éclairées baignent vraiment dans la lumière jaune des néons, du sol au plafond ; les zones mortes restent noires.

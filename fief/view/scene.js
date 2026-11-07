@@ -13,6 +13,7 @@ import { loadKit, buildVillage } from './village.js';
 import { createActors } from './actors.js';
 import { createNight } from './night.js';
 import { createCrypt3D, createAbilityFx, CEIL } from './crypt.js';
+import { createChests } from './chests.js';
 
 const MOBILE = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 560;
 const SUN_DIR = new THREE.Vector3(-0.5, 0.62, 0.6).normalize();
@@ -54,7 +55,7 @@ export function createScene(stage, { onLost } = {}) {
   let night = null, peaksMesh = null, kitRef = null, villageGroup = null, villageKey = '', berryMesh = null, berryKey = '';
   let map = null, treeKit = null, trees = null, actors = null, logsGroup = null, fire = null, falling = [], stumps = null;
   const logMeshes = new Map(), beamMeshes = new Map();
-  let crypt3d = null, fx = null, villageLights = [], wasInside = false, farForest = null;
+  let crypt3d = null, fx = null, chests3d = null, villageLights = [], wasInside = false, farForest = null;
   // qualité : finesse de l'image, ombres, forêt lointaine, nappes de brume
   let quality = 'moyen';
   try { quality = localStorage.getItem('fief_q') || (MOBILE ? 'bas' : 'moyen'); } catch (e) {}
@@ -275,6 +276,7 @@ export function createScene(stage, { onLost } = {}) {
     scene.traverse((o) => { if (o.isPointLight) villageLights.push(o); });
     crypt3d = createCrypt3D({ scene, kit: kitRef, map: M, noise });
     fx = createAbilityFx(scene, M);
+    chests3d = createChests(scene, M);
     setQuality(quality);
     const s = M.spawn; cam.yaw = s.yaw + Math.PI; cam.tx = s.x; cam.tz = s.z; cam.ty = M.heightAt(s.x, s.z) + 1.6;
   }
@@ -312,6 +314,7 @@ export function createScene(stage, { onLost } = {}) {
     }
     if (crypt3d) crypt3d.update(sim, t, camera, inside);
     if (fx) fx.update(sim, dt, t);
+    if (chests3d) chests3d.update(sim, dt, t);
     // arbres qui tombent : bascule accélérée, petit rebond, puis s'enfoncent et disparaissent
     viewT = t;
     const now = t;
@@ -406,5 +409,5 @@ export function createScene(stage, { onLost } = {}) {
   }
   addEventListener('resize', resize); resize();
 
-  return { get quality() { return quality; }, setQuality, get falling() { return falling; }, cam, renderer, scene, camera, load, update, treeFell, syncTrees, actorsEvent: (e) => actors && actors.event && actors.event(e), fxEvent: (e, sim) => fx && fx.event(e, sim), get actors() { return actors; } };
+  return { get quality() { return quality; }, setQuality, get falling() { return falling; }, cam, renderer, scene, camera, load, update, treeFell, syncTrees, actorsEvent: (e) => actors && actors.event && actors.event(e), fxEvent: (e, sim) => { if (fx) fx.event(e, sim); if (chests3d) chests3d.event(e); }, get actors() { return actors; } };
 }

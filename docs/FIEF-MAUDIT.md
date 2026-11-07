@@ -2,7 +2,7 @@
 
 Survie en coopération en 3D (Three.js), vue à la troisième personne, de 1 à 6 joueurs, avec des bots pour compléter.
 Dossier : `fief/`. Ce document décrit le jeu visé, les assets retenus et l'ordre de développement.
-Où on en est : **étapes 6 et 7 faites**, le jeu est complet (voir la section 8).
+Où on en est : **étapes 6 et 7 faites**, le jeu est complet ; étape 8 : un début plus vif (voir la section 8).
 
 ## 1. L'idée
 
@@ -247,3 +247,10 @@ Chaque étape se termine par une version jouable, poussée, et validée avant de
    - Musique synthétisée (`view/music.js`) : jour, nuit, crypte, Roi, en fondu. Le son passe par le panneau Réglages commun (`shared/volume.js`).
    - Qualité basse / moyenne / haute : finesse de l'image, ombres, forêt lointaine, nappes de brume (`scene.setQuality`).
    - Le mode Sans fin et la manette existaient déjà ; l'écran d'accueil prend la vallée en fond.
+8. **Un début plus vif** (retour de partie : « on s'ennuie au début »). ✔ (version 4.58)
+   - Premier jour de 150 s (`CYCLE.first`, `dayLen`), les suivants 220 s.
+   - Jusqu'à trois bûches portées (`LOAD_MAX`, `p.load`) : on fait trois fois moins d'allers-retours.
+   - Coffres gardés (`placeChests`, `LOOT`, `CHEST`) : 2 + un par paire de joueurs, dans des clairières à 28-95 m du feu ; gardes endormis
+     (`state: 'sleep'`, `guard`) réveillés à 11 m, qui ne s'éloignent pas à plus de 22 m et retournent dormir. Le premier coffre est le plus proche,
+     un seul garde, 5 bûches : on se bat dès la première minute. De nouveaux coffres à chaque aube.
+   - Cloche au feu de camp (`canRing`, `ring`) : passer directement au crépuscule.
