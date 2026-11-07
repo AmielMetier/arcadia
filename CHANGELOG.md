@@ -1,7 +1,8 @@
 # Journal des versions — Arcadia
 
-## 4.63 — 7 novembre 2026
+## 4.63 — 8 novembre 2026
 - **The Backrooms** — Plus jamais de parties où chacun a sa propre carte.
+  - La vraie cause est trouvée : un joueur sur Chrome et un autre sur Firefox ou Safari avaient toujours deux cartes différentes (le tirage de la carte dépendait du navigateur). Maintenant, tout le monde a exactement la même carte, quel que soit son navigateur. Toutes les cartes changent avec cette version, la Carte du jour aussi.
   - Si ta carte n'est pas celle de l'hôte (une ancienne version gardée par le navigateur), ton jeu se met à jour tout seul et te ramène dans la même partie, sur la même carte.
   - Si c'est l'hôte qui a l'ancienne version, c'est lui qui se met à jour : la partie continue pour les autres pendant ce temps, et il revient dedans.
   - Un joueur qui a raté le début d'une nouvelle partie la rattrape tout seul, au lieu de rester sur l'ancienne carte.
@@ -13,6 +14,44 @@
   - Les voix résonnent de nouveau dans les couloirs : un peu d'écho de près, beaucoup quand le coéquipier est loin ou derrière un mur.
   - Tout le monde voit le caméscope des coéquipiers (avant, seul celui de l'hôte s'affichait), et l'image de leur petit écran tourne avec leur regard, sans à-coups.
   - Fini les cassettes qu'on voit briller au fond d'un trou sans pouvoir les prendre (elles étaient à l'étage du dessous, et le signal ne les comptait pas) : celles d'en bas ne sont plus jamais sous un trou.
+- **The Backrooms** — L'entité ne fait plus aucun mouvement bizarre.
+  - Elle se déplace comme un vrai corps : elle se tourne avant d'avancer (plus de pas de côté ni de marche arrière), accélère, freine, et ne traverse plus jamais un mur, un meuble, un casier ou une cage d'escalier.
+  - Elle monte et descend vraiment les marches, et peut sauter dans un trou pour te suivre à l'étage du dessous.
+  - Plus d'arrêts d'une fraction de seconde au milieu d'un couloir : en ronde, elle s'arrête pour écouter, puis repart.
+  - Elle n'apparaît et ne disparaît jamais sous tes yeux, ni devant la lumière d'une zone claire.
+- **The Backrooms** — L'entité, encore plus terrifiante.
+  - Quand elle t'observe ou te traque, sa tête se tourne vers toi et te suit.
+  - Elle arrive dans le noir : les néons autour claquent, ta lampe hoquette et meurt un instant… et quand la lumière revient, elle est là.
+  - Au bord de la lumière, elle arpente l'ombre sans te quitter des yeux ; si tu te retournes, elle est plus près qu'avant, immobile.
+  - En poursuite, les néons qu'elle frôle grésillent : on l'entend venir, de néon en néon.
+  - Elle passe la porte du haut de l'escalier d'un coup d'épaule ; au bord d'un trou, ses griffes raclent le rebord, puis on entend le choc à l'étage du dessous.
+  - Repoussée, elle titube en arrière avant de s'enfuir dans le noir.
+  - Les zones très éclairées restent un abri sûr : leurs néons ne s'éteignent jamais.
+- **The Backrooms** — À plusieurs, plus de joueur perdu ni de partie bloquée.
+  - Quand l'hôte s'en va, la partie continue vraiment pour tous : avant, les autres restaient coincés, la caméra sur un coéquipier, sans pouvoir bouger.
+  - Le nouvel hôte reprend l'entité où elle en était (pas de nouvelle minute de calme), et les fusibles que chacun a en poche au Level 1 ne disparaissent plus (la partie devenait impossible à gagner).
+  - Si l'hôte part pendant le chargement, un autre joueur lance la partie au lieu de laisser tout le monde attendre.
+  - Un joueur qui perd la connexion ne continue plus de courir et de parler tout seul jusqu'à la fin (il attirait l'entité sur tout le monde) ; absent 20 secondes, il quitte la partie.
+  - Un joueur revenu au salon n'est plus remis dans la partie suivante quand on clique sur Rejouer.
+  - Ce qu'un joueur portait ne se perd plus quand il meurt ou s'en va : l'échelle, les piles, l'eau d'amande et les fusibles tombent là où il était.
+  - Dans l'ascenseur, si celui qui attendait dans la cabine s'en va, le compte à rebours s'arrête (avant, ceux restés dehors mouraient pour rien).
+  - Sur tous les niveaux, les néons qui clignotent ou s'éteignent sont les mêmes pour tout le monde (avant, seulement au Level 0) ; dans les Tuyauteries, les lampes qui tiennent les chèvres à distance aussi.
+  - Échanger un objet contre un autre, encore et encore, ne ralentit plus la partie.
+  - Plus de coéquipier fantôme à l'étage suivant après le départ d'un joueur.
+  - Pour les invités, le recul d'un coup de chèvre et l'arrivée après une chute se font au même endroit que chez l'hôte, et la vapeur brûle aussi quand on reste immobile dedans.
+- **The Backrooms** — Autres corrections.
+  - On ne commence plus jamais dans une cage d'escalier, et une chute dans un trou ne finit plus coincé dans un meuble (il n'y a plus de meuble sous les trous).
+  - L'échelle n'est plus jamais posée dans la salle au bout du couloir piégé, qu'on ne pouvait atteindre qu'en franchissant les trous.
+  - Level 37 (Poolrooms) : on n'apparaît plus collé à un mur ni dans un recoin d'où l'on ne peut pas sortir.
+  - Level 2 (Tuyauteries) : chaque vanne a de nouveau son disjoncteur (sur certaines cartes, il en manquait un et l'on ne pouvait pas finir).
+  - En relançant une partie, plus de son bloqué (l'entité qui agrippe, la vanne), d'écran de fin ou d'image de mort qui reste affiché, ni de souffle retenu.
+  - Ton souffle retenu ne se relâche plus quand c'est un coéquipier qui reprend sa respiration.
+  - Un coéquipier parti ne reste plus figé sur place, lampe allumée, et l'arrivée d'un coéquipier (ou le rejeu de ta mort) ne fige plus l'image une seconde.
+  - Plus de musique de poursuite en double, ni de son de mort qui démarre après coup ; la brume de chaleur s'arrête bien en qualité basse, et repasser de « basse » à « auto » remet la bonne qualité.
+  - Ta lampe ne t'éclaire plus deux fois quand un coéquipier te filme.
+  - La silhouette aperçue au loin disparaît bien dès que ta lampe la touche (avant, ça ratait après quelques tours sur toi-même).
+  - La vérification de carte entre joueurs compare aussi la clé, les casiers et les recoins calmes : une différence là aussi se répare toute seule.
+- **Hub** — Un ami qui a une version pas encore en ligne ne fait plus recharger tout le salon toutes les deux minutes.
 
 ## 4.62 — 7 novembre 2026
 - **The Backrooms** — Une image nette, et un vrai caméscope à sortir (touche V).

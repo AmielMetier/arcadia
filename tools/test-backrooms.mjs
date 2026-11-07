@@ -805,15 +805,21 @@ test("inventaire : deux cases d'objets ; plein, F échange l'objet de la case ch
   }
   assert.deepEqual(P.inv, ['bottle', 'battery']);
   // plein : la case choisie (2, l'eau d'amande) part au sol à la place de l'échelle
+  const at = { x: ladder.x, z: ladder.z };
+  const n0 = m.items.length;
   P.x = ladder.x;
   P.z = ladder.z;
   sim.step({ pick: true, sel: 1 });
   assert.deepEqual(P.inv, ['ladder', 'battery']);
-  assert.equal(ladder.taken, true);
-  const dropped = m.items[m.items.length - 1];
-  assert.equal(dropped.kind, 'bottle');
-  assert.equal(dropped.taken, false);
-  assert.ok(Math.hypot(dropped.x - ladder.x, dropped.z - ladder.z) < 0.01, "l'eau d'amande est posée là où était l'échelle");
+  const dropped = m.items.find((o) => !o.taken && o.kind === 'bottle' && Math.hypot(o.x - at.x, o.z - at.z) < 0.01);
+  assert.ok(dropped, "l'eau d'amande est posée là où était l'échelle");
+  assert.ok(!m.items.some((o) => !o.taken && o.kind === 'ladder'), "l'échelle n'est plus au sol");
+  assert.equal(m.items.length, n0, "l'échange n'ajoute pas d'objet (avant, chaque échange en ajoutait un, sans fin)");
+  // échanger encore et encore au même endroit : toujours le même nombre d'objets
+  for (let i = 0; i < 6; i++) sim.step({ pick: true, sel: 1 });
+  assert.equal(m.items.length, n0, 'des échanges répétés ne font pas grossir la partie');
+  if (P.inv[0] !== 'ladder') sim.step({ pick: true, sel: 1 });
+  assert.deepEqual(P.inv, ['ladder', 'battery']);
   // une case vide : F y range l'objet sans rien poser
   P.x = m.spawn.x;
   P.z = m.spawn.z;
@@ -2510,6 +2516,115 @@ test("réseau : chez l'invité, les autres et l'entité avancent à vitesse rég
   guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())), 4.1);
   guest.interpolate(4.1);
   assert.ok(Math.abs(guest.players.find((q) => q.id === 1).x - H.x) < 0.006, 'le saut est net');
+});
+
+test("l'échelle ne se perd jamais : mort ou départ, elle tombe là où était son porteur (et l'invité la voit)", () => {
+  const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }, { id: 3, name: 'B' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 42, players, localId: 1 });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 42, players, localId: 2 });
+  const wire = () => guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  const items = host.fm(0).items;
+  const ladder = items.find((o) => o.kind === 'ladder');
+  assert.ok(ladder, 'une échelle');
+  const B = host.players.find((q) => q.id === 2);
+  B.floor = 0;
+  B.x = ladder.x;
+  B.z = ladder.z;
+  host.pickUp(B);
+  assert.ok(B.inv.includes('ladder') && ladder.taken, 'B porte l’échelle');
+  // B meurt plus loin : l'échelle tombe à ses pieds
+  B.x += 1;
+  host.killPlayer(B);
+  const back = items.find((o) => o.kind === 'ladder' && !o.taken);
+  assert.ok(back && Math.hypot(back.x - B.x, back.z - B.z) < 0.6, "l'échelle est par terre, là où il est mort");
+  assert.ok(!B.inv.includes('ladder'));
+  wire();
+  const g = guest.fm(0).items.find((o) => o.kind === 'ladder' && !o.taken);
+  assert.ok(g && Math.hypot(g.x - back.x, g.z - back.z) < 0.02, "l'invité la voit au même endroit");
+  // C la ramasse… et quitte la partie : elle reste
+  const C = host.players.find((q) => q.id === 3);
+  C.floor = 0;
+  C.x = back.x;
+  C.z = back.z;
+  host.pickUp(C);
+  assert.ok(C.inv.includes('ladder'));
+  host.removePlayer(3);
+  assert.ok(items.some((o) => o.kind === 'ladder' && !o.taken), "partie du joueur : l'échelle reste au sol");
+});
+
+test("Level 1 : les fusibles en poche survivent au changement d'hôte et au départ du porteur", () => {
+  const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players, localId: 1 });
+  host.loadLevel(1);
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players, localId: 2 });
+  guest.loadLevel(1);
+  const G = host.players.find((q) => q.id === 2);
+  G.carry = [0, 1];
+  for (const id of G.carry) host.map.fuses[id].taken = true;
+  host.fuses = 2;
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  const g = guest.players.find((q) => q.id === 2);
+  assert.deepEqual(g.carry, [0, 1], "l'invité sait quels fusibles il porte (s'il devient l'hôte, ils ne se perdent pas)");
+  // le porteur s'en va : ses fusibles tombent par terre, on peut aller les rechercher
+  host.removePlayer(2);
+  assert.ok(host.map.fuses[0].taken === false && host.map.fuses[1].taken === false, 'les fusibles sont au sol');
+});
+
+test("l'ascenseur : celui qui attendait dedans s'en va, le compte à rebours s'arrête (personne ne meurt pour lui)", () => {
+  const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }];
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 3, players, localId: 1 });
+  sim.loadLevel(1);
+  const G = sim.players.find((q) => q.id === 2);
+  G.status = 'elevator';
+  sim.checkElevator();
+  assert.ok(sim.boardT > 0, 'le compte à rebours part');
+  sim.removePlayer(2);
+  assert.equal(sim.boardT, 0, 'il est annulé');
+  run(sim, 2);
+  assert.equal(sim.player.status, 'alive');
+});
+
+test("à plusieurs : les néons de tous les niveaux, et ceux qu'on a éteints un instant, sont les mêmes chez l'invité", () => {
+  const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 21, players, localId: 1 });
+  host.loadLevel(1);
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 21, players, localId: 2 });
+  guest.loadLevel(1);
+  const l = host.map.lights.find((q) => q.state === 'on');
+  host.director.drops.push({ l, t: 3, back: 'on', map: host.map });
+  l.state = 'off';
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  const i = host.map.lights.indexOf(l);
+  assert.equal(guest.map.lights[i].state, 'off', 'éteint aussi chez l’invité (Level 1)');
+  assert.equal(guest.director.drops.length, 1, "l'invité sait qu'il doit revenir (s'il devient l'hôte)");
+  // l'invité devient l'hôte : 3 s plus tard, le néon est revenu
+  run(guest, 3.2);
+  assert.equal(guest.map.lights[i].state, 'on', 'le néon revient');
+});
+
+test("à plusieurs : ceux qui sont partis quittent aussi la liste de l'invité (pas de fantôme à l'étage suivant)", () => {
+  const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }, { id: 3, name: 'L' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 4, players, localId: 1 });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 4, players, localId: 2 });
+  host.removePlayer(3);
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  assert.deepEqual(guest.roster.map((r) => r.id).sort(), [1, 2]);
+  guest.loadLevel(1);
+  assert.ok(!guest.players.some((q) => q.id === 3), 'pas de fantôme au Level 1');
+});
+
+test('Level 0 : on ne part jamais dans une cage d’escalier, et une chute ne finit jamais dans un meuble', () => {
+  for (let seed = 1; seed <= 40; seed++) {
+    const sim = new BackroomsSim({ difficulty: 'peaceful', seed, players: [1, 2, 3, 4, 5, 6].map((id) => ({ id, name: 'p' + id })), localId: 1 });
+    for (const P of sim.players) assert.ok(!stairAt(sim.stairs, P.x, P.z) && !(sim.stairs || []).some((st) => st.cells.some((k) => Math.abs(k.gx - Math.floor(P.x / CELL_SIZE)) <= 1 && Math.abs(k.gz - Math.floor(P.z / CELL_SIZE)) <= 1)), `graine ${seed} : départ hors des cages`);
+    if (sim.floors.length < 2) continue;
+    const P = sim.player;
+    for (let id = 0; id < (sim.fm(0).pits || []).length; id++) {
+      P.floor = 0;
+      sim.fallThrough(P, id);
+      assert.ok(!sim.isColliding(P.x, P.z, 0.37, 1), `graine ${seed}, trou ${id} : on retombe sur ses pieds, pas dans un meuble`);
+    }
+  }
 });
 
 console.log(`\n${count} tests réussis pour The Backrooms !`);

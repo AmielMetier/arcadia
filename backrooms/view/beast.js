@@ -271,6 +271,10 @@ export function createBeast(opts = {}) {
     tickY: 0,
     tickX: 0,
     tickT: 0.5,
+    // elle te suit des yeux (quand elle t'observe) : poids, et l'angle de la tête par rapport au corps
+    look: 0,
+    lookY: 0,
+    lookX: 0,
     // sursauts : des ressorts (position, vitesse) qu'une secousse lance
     jerkT: 2,
     sp: { head: [0, 0], shL: [0, 0], shR: [0, 0], torso: [0, 0], armL: [0, 0], armR: [0, 0], swayL: [0, 0], swayR: [0, 0] },
@@ -489,8 +493,9 @@ export function createBeast(opts = {}) {
       group.rotation.set(0, 0, 0);
       return st.face || st.head || null;
     },
-    // M : l'entité ; chase : elle poursuit ; light : lumière des néons là où elle est ; dt : durée de l'image
-    update(M, chase, light, dt, time) {
+    // M : l'entité ; chase : elle poursuit ; light : lumière des néons là où elle est ; dt : durée de l'image ;
+    // eye : la caméra de cet écran (elle la suit des yeux quand elle observe)
+    update(M, chase, light, dt, time, eye = null) {
       // sa vitesse, d'après son déplacement (pareil chez l'hôte et chez les invités)
       const L0 = st.last;
       const yaw = M.yaw || 0;
@@ -677,13 +682,35 @@ export function createBeast(opts = {}) {
       }
 
       // --- le cou s'étire vers toi quand elle regarde ; la tête reste droite, verrouillée sur sa cible en courant ---
+      // --- elle te suit des yeux quand elle t'observe (à l'affût, en rôdant au bord de la lumière, en approchant
+      // dans l'ombre) : le cou puis la tête pivotent vers toi, d'une pose à l'autre, bien plus loin qu'un cou ne
+      // devrait tourner. Le corps, lui, continue d'aller où il va ---
+      const watching = eye && !rush && !grab && !stun && (mode === 'watch' || mode === 'stalk' || mode === 'ambush');
+      let wantY = 0;
+      let wantX = 0;
+      if (eye) {
+        const ex = eye.x - M.x;
+        const ez = eye.z - M.z;
+        const by = parent ? parent.rotation.y : yaw;
+        let rel = Math.atan2(ex, ez) - by;
+        rel = Math.atan2(Math.sin(rel), Math.cos(rel));
+        wantY = clampS(rel, 2.1);
+        // vers le bas, si tu es plus bas que sa tête (et tout près)
+        wantX = clampS(Math.atan2((parent ? parent.position.y : 0) + 2.45 - eye.y, Math.max(0.6, Math.hypot(ex, ez))), 0.7);
+      }
+      st.look = ease(st.look, watching ? 1 : 0, watching ? 7 : 4, sdt);
+      st.lookY = ease(st.lookY, wantY, 12, sdt);
+      st.lookX = ease(st.lookX, wantX, 8, sdt);
+      const lk = st.look;
+
       const crane = 0.18 + 0.75 * still + 0.25 * run + 0.4 * rk + 0.45 * gk - 0.4 * sk;
       rot(B.Neck, 1, 0, 0, crane);
+      rot(B.Neck, 0, 1, 0, 0.4 * lk * st.lookY);
       const level = -(lean + 0.22 + crane) * (0.55 + 0.4 * Math.max(run, rk, still));
-      rot(B.Head, 1, 0, 0, level + st.tickX * still + clampS(st.sp.head[0], 0.7) * 0.3 - 0.25 * sk + (rush ? rnd(-0.08, 0.08) : 0));
-      const tilt = st.tilt * (1 - 0.45 * run) * (1 - 0.5 * rk) + clampS(st.sp.head[0], 0.8) * 0.7;
+      rot(B.Head, 1, 0, 0, level + st.tickX * still + clampS(st.sp.head[0], 0.7) * 0.3 - 0.25 * sk + (rush ? rnd(-0.08, 0.08) : 0) + 0.6 * lk * st.lookX);
+      const tilt = st.tilt * (1 - 0.45 * run) * (1 - 0.5 * rk) * (1 - 0.35 * lk) + clampS(st.sp.head[0], 0.8) * 0.7;
       rot(B.Head, 0, 0, 1, tilt + (rush ? rnd(-0.25, 0.25) : 0));
-      rot(B.Head, 0, 1, 0, st.tickY * still + 0.9 * sk);
+      rot(B.Head, 0, 1, 0, st.tickY * still * (1 - lk) + 0.9 * sk + 0.6 * lk * st.lookY);
 
       // --- les jambes : genoux qui plient à l'envers, une jambe raide qui traîne, des enjambées trop longues ---
       for (const s of L) {

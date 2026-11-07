@@ -75,11 +75,23 @@
   // les joueurs du salon qui n'ont pas notre version (sans version : un Hub d'avant cette vérification, donc ancien)
   const otherVersion = (p) => p.id !== (room && room.myId) && (p.ver || '') !== VERSION;
   let peerWarned = '';
+  let peerCheck = { v: '', t: 0 };
   function checkPeers() {
     if (!room || room.mode === 'solo') return;
     const newer = room.players.filter((p) => p.id !== room.myId && verNum(p.ver) > verNum(VERSION)).sort((a, b) => verNum(b.ver) - verNum(a.ver))[0];
     if (!newer) return;
-    if (!frame) { updateTo(newer.ver); return; }
+    if (!frame) {
+      // seulement si cette version est vraiment en ligne : un ami sur une version de test (ou servie trop tôt) ne doit
+      // pas faire recharger tout le salon en boucle. Une vérification par minute au plus
+      if (peerCheck.v === newer.ver && Date.now() - peerCheck.t < 60000) return;
+      peerCheck = { v: newer.ver, t: Date.now() };
+      onlineVersion().then((v) => {
+        if (frame || updating) return;
+        if (verNum(v) >= verNum(newer.ver)) updateTo(newer.ver);
+        else if (peerWarned !== newer.ver) { peerWarned = newer.ver; toast(`${newer.name} a la version ${newer.ver}, qui n'est pas encore en ligne`, 6000); }
+      });
+      return;
+    }
     if (peerWarned !== newer.ver) { peerWarned = newer.ver; toast(`${newer.name} a la version ${newer.ver} : tu seras mis à jour à la fin de la partie`, 6000); }
   }
   setTimeout(checkOnline, 4000);

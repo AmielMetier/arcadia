@@ -127,7 +127,8 @@ export function setSceneOptions(o = {}) {
 }
 
 // floors : les étages du niveau (une carte chacun)
-export function createBackroomsScene(container, floors) {
+// lamps : combien de lampes d'explorateurs poser d'avance (les joueurs de la partie, et celui du rejeu de la mort)
+export function createBackroomsScene(container, floors, lamps) {
   if (!Array.isArray(floors)) floors = [floors];
   const map0 = floors[0];
   const L1 = map0.level === 1;
@@ -2100,15 +2101,16 @@ float bkCaust(vec2 uv, float t) {
         }
         if (placedLadder) placedLadder.visible = !!(N && N.ladder);
 
-        // Ascenseur : rouge verrouillé, vert ouvert ; le faux devient un mur
+        // Ascenseur : rouge verrouillé, vert ouvert ; le faux devient un mur (couleurs en nombres : à chaque image,
+        // pas de texte à relire)
         const fake = !!(E && E.fake);
         const open = sim.open && !fake;
         showGroup(exitGroup, !fake);
         if (fakeWall) fakeWall.visible = fake;
-        exitLight.color.set(open ? '#22c55e' : '#ef4444');
+        exitLight.color.setHex(open ? 0x22c55e : 0xef4444);
         exitLight.intensity = fake || !E ? 0 : open ? 3 : 1; // aux Poolrooms, pas d'ascenseur : les toboggans
-        signMat.color.set(open ? '#4ade80' : '#ff3030');
-        callMat.color.set(open ? '#f4f1e0' : '#c2701c');
+        signMat.color.setHex(open ? 0x4ade80 : 0xff3030);
+        callMat.color.setHex(open ? 0xf4f1e0 : 0xc2701c);
         // les portes s'ouvrent quand l'ascenseur est alimenté, se referment au départ
         const doorWant = open && !(sim.departT > 0) ? 1 : 0;
         doorOpen += Math.sign(doorWant - doorOpen) * Math.min(Math.abs(doorWant - doorOpen), dt / 1.2);
@@ -2122,7 +2124,7 @@ float bkCaust(vec2 uv, float t) {
           arrivalLift.open += Math.sign(want - arrivalLift.open) * Math.min(Math.abs(want - arrivalLift.open), dt / 1.4);
           for (const { d, sgn } of arrivalLift.doors) d.position.x = sgn * (0.3 + arrivalLift.open * 0.6);
         }
-        fuseLamps.forEach((l, i) => l.material.color.set(sim.powered ? '#22c55e' : i < sim.fuses ? '#ffb020' : '#331010'));
+        fuseLamps.forEach((l, i) => l.material.color.setHex(sim.powered ? 0x22c55e : i < sim.fuses ? 0xffb020 : 0x331010));
         for (const fm of fuseMeshes) {
           showGroup(fm.g, !fm.f.taken);
           if (!fm.f.taken) {
@@ -2294,8 +2296,9 @@ float bkCaust(vec2 uv, float t) {
   heldBattery.rotation.set(0.5, 0.35, 0.1);
   held.add(heldBattery);
 
-  // Les autres joueurs : des explorateurs en combinaison jaune (view/players.js)
-  const avatars = createPlayerAvatars(scene);
+  // Les autres joueurs : des explorateurs en combinaison jaune (view/players.js). Leurs lampes sont posées dès
+  // maintenant, éteintes, pour que la compilation des matériaux (à la fin) les compte déjà
+  const avatars = createPlayerAvatars(scene, lamps);
 
   // L'entité : une image plate qui fait toujours face au joueur. Tant qu'elle n'est pas chargée (ou s'il n'y a
   // pas d'image), une silhouette noire aux yeux rouges la remplace.
@@ -2410,6 +2413,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   let camZoomWant = 1.5; // zoom de l'objectif (molette), de 1,5 à 4
   let camZoomNow = 1.5;
   let nightT = 0; // son mode nuit (0 à 1)
+  let lampCutT = 0; // la lampe (et l'infrarouge du caméscope) coupée par sa présence : secondes restantes
+  let lampCutLen = 0;
 
   // effets de bande en cours (secondes restantes), jumpscare, résolution dynamique, mise au point
   const fx = { splice: 0, loss: 0, bars: 0, grab: 0 };
@@ -2426,6 +2431,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   const replayP = { x: 0, z: 0, yaw: 0, pitch: 0, floor: 0, status: 'dead', moving: false, crouch: false, hidden: -1, grabT: 0, tilt: 0 };
   let frameAvg = 16;
   let lines = 720;
+  let qualityWas = null; // la qualité déjà appliquée au filtre (il ne retaille l'image que si elle change)
+  const camState = { t: 0, night: 0, bars: 0 }; // api.cam, lu à chaque image : le même objet, remis à jour
   const avatarPos = new Map(); // position affichée de chaque coéquipier (sa piste interpolée)
   let focusT = 0;
   let focusPulse = 0; // temps restant de la « chasse » de mise au point en cours
@@ -2448,9 +2455,13 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     setCamZoom(z) {
       camZoomWant = z;
     },
-    // le caméscope : où il en est (0 à 1), son mode nuit, et la largeur des bandes noires (px)
+    // le caméscope : où il en est (0 à 1), son mode nuit, et la largeur des bandes noires (px). Toujours le même
+    // objet (lu par le HUD à chaque image) : le lire tout de suite, ne pas le garder
     get cam() {
-      return { t: camT, night: nightT, bars: vhs.bars || 0 };
+      camState.t = camT;
+      camState.night = nightT;
+      camState.bars = vhs.bars || 0;
+      return camState;
     },
     // Level 2 : percuté par une chèvre
     goatScare() {
@@ -2487,7 +2498,13 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       camera.fov = OPTS.fov;
       camera.updateProjectionMatrix();
       vhs.setFx?.({ brightness: OPTS.brightness, reduceFlashes: OPTS.reduceFlashes });
-      if (OPTS.quality !== 'auto') vhs.setQuality?.(OPTS.quality);
+      // « auto » : la bande de la qualité haute (720 lignes, halo), puis la résolution dynamique (dans render) ajuste
+      // les lignes. Avant, « auto » ne rappelait pas setQuality : revenir de « basse » à « auto » restait en basse.
+      // Seulement quand la qualité change : setQuality remet les lignes au maximum et retaille l'image
+      if (OPTS.quality !== qualityWas) {
+        qualityWas = OPTS.quality;
+        vhs.setQuality?.(OPTS.quality === 'auto' ? 'high' : OPTS.quality);
+      }
     },
 
     // un effet de bande passager : 'splice' (raccord), 'loss' (perte du signal), 'bars' (mire), 'grab' (la prise)
@@ -2502,6 +2519,14 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     },
     get replaying() {
       return !!replayFrames;
+    },
+
+    // elle apparaît ou disparaît tout près : la lampe hoquette et meurt t secondes (l'infrarouge du caméscope aussi)
+    lampCut(t) {
+      if (t > lampCutT) {
+        lampCutT = t;
+        lampCutLen = t;
+      }
     },
 
     // L'entité surgit devant l'objectif (en 3D, dans la scène) pendant un instant
@@ -2623,6 +2648,14 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       // pile faible : la lampe faiblit et clignote
       const bat = P.battery ?? 100;
       flashLight.intensity = !lampOn ? 0 : 17 * (bat < 15 ? 0.45 + (Math.random() < 0.12 ? -0.4 : 0.15) : bat < 35 ? 0.75 : 1);
+      // sa présence la coupe : deux hoquets, puis plus rien, puis elle revient en tremblant
+      let cut = 1;
+      if (lampCutT > 0) {
+        lampCutT = Math.max(0, lampCutT - dt);
+        const e = lampCutLen - lampCutT;
+        cut = e < 0.14 ? (Math.random() < 0.5 ? 0.35 : 0) : lampCutT < 0.08 ? Math.random() * 0.6 : 0;
+        flashLight.intensity *= cut;
+      }
       flashSpill.intensity = flashLight.intensity * 0.24;
       // le caméscope (V) : il sort en un tiers de seconde ; dans le noir, s'il reste de la pile, il passe en mode nuit
       // et sa lampe infrarouge éclaire devant (pour l'image seulement : l'entité ne la voit pas)
@@ -2631,7 +2664,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       if (camT < 0.002) camT = 0;
       const nightWant = camWant && bat > 0 ? THREE.MathUtils.clamp((0.34 - lightNow - (lampOn ? 0.3 : 0)) / 0.22, 0, 1) : 0;
       nightT += (nightWant - nightT) * Math.min(1, dt * 3);
-      flashSpill.intensity += nightT * 3.2;
+      flashSpill.intensity += nightT * 3.2 * cut;
       // le caméscope zoome (×1,3) : son objectif est plus serré que l'œil
       camZoomNow += (camZoomWant - camZoomNow) * Math.min(1, dt * 7); // l'objectif glisse, il ne saute pas
       const camFov = (2 * Math.atan(Math.tan((OPTS.fov * Math.PI) / 360) / (1 + (camZoomNow - 1) * camT)) * 180) / Math.PI;
@@ -2649,7 +2682,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       // éclairés par la lumière d'où l'on est, un peu plus quand la lampe est allumée
       const k = THREE.MathUtils.clamp(0.07 + lightNow * 1.1 + (lampOn ? 0.4 : 0), 0.06, 1.05);
       for (const m of heldMats) m.color.copy(m.userData.base).multiplyScalar(k);
-      lensMat.color.set(lampOn ? '#fff6d8' : '#2c2b26');
+      lensMat.color.setHex(lampOn ? 0xfff6d8 : 0x2c2b26);
       // ils suivent le pas, un peu en retard sur la tête
       const sway = P.moving ? (P.running ? 1.6 : 1) : 0.25;
       held.position.set(Math.cos(bob) * 0.007 * sway, Math.sin(bob * 2) * 0.006 * sway - (P.running ? 0.02 : 0), 0);
@@ -2676,13 +2709,14 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
           faceFrame.value.y = 1 - (Math.floor(f / anim.cols) + 1) / anim.rows;
         }
         const j = (chase ? 0.12 : 0.04) * faceGlitch.value;
-        const my = -(M.floor || 0) * FLOOR_DY;
+        // la hauteur de ses pieds : les marches de l'escalier, la chute dans un trou
+        const my = M.y ?? -(M.floor || 0) * FLOOR_DY;
         if (beast) {
           // en 3D : elle regarde où elle va (ou le joueur qu'elle observe), et marche vraiment
           monsterGroup.position.set(M.x + (Math.random() - 0.5) * j * 0.3, my, M.z + (Math.random() - 0.5) * j * 0.3);
           monsterGroup.rotation.y = M.yaw || 0;
           const mv = floorViews[M.floor || 0];
-          beast.update(M, chase, mv ? mv.lightAt(M.x, M.z) : 0.3, dt, time);
+          beast.update(M, chase, mv ? mv.lightAt(M.x, M.z) : 0.3, dt, time, RF ? null : camera.position);
         } else {
           monsterGroup.position.set(M.x + (Math.random() - 0.5) * j, my + (chase ? Math.abs(Math.sin(time * 9)) * 0.08 : Math.sin(time * 2) * 0.03), M.z + (Math.random() - 0.5) * j);
           monsterGroup.rotation.y = Math.atan2(P.x - M.x, P.z - M.z);
@@ -2694,8 +2728,10 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       if (figT > 0) {
         figT -= dt;
         const d = Math.hypot(figure.position.x - P.x, figure.position.z - P.z);
-        // elle disparaît quand on s'approche… ou dès que la lampe la touche
-        const lit = lampOn && d < 22 && Math.abs(Math.atan2(-(figure.position.x - P.x), -(figure.position.z - P.z)) - P.yaw) % (2 * Math.PI) < 0.12;
+        // elle disparaît quand on s'approche… ou dès que la lampe la touche (l'écart d'angle ramené entre -pi et pi :
+        // le regard n'est jamais ramené, il compte les tours)
+        const fa = Math.atan2(-(figure.position.x - P.x), -(figure.position.z - P.z)) - P.yaw;
+        const lit = lampOn && d < 22 && Math.abs(Math.atan2(Math.sin(fa), Math.cos(fa))) < 0.12;
         if (figT <= 0 || d < 9 || lit) {
           figT = 0;
           figure.visible = false;
@@ -2772,6 +2808,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         const y = feetY(sim.stairs, D.x, D.z, D.floor) + (D.onLadder ? 1.0 : 0) + (D.jy || 0) - (qm.depthAt ? qm.depthAt(D.x, D.z) : 0);
         avatars.update(D, show, y, qv ? qv.lightAt(D.x, D.z) : 0.3, dt, time);
       }
+      // … et ceux qui ont quitté la partie : la boucle ne les voit plus, ils resteraient figés là, lampe allumée
+      avatars.hideGone(sim.players, replayQ.id);
 
       // exposition automatique : le caméscope s'ouvre dans le noir (image plus claire et plus granuleuse) et se
       // referme sous les néons, avec un temps de retard
@@ -2811,8 +2849,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         white,
         cam: camT,
         night: nightT,
-        // la brume de chaleur du Level 0 (coupée en mode nuit : le vert l'écraserait)
-        haze: L0 && !OPTS.lowFx ? 1 - nightT * camT : 0,
+        // la brume de chaleur du Level 0 (coupée en mode nuit : le vert l'écraserait ; et en qualité basse)
+        haze: L0 && OPTS.quality !== 'low' ? 1 - nightT * camT : 0,
       });
 
       // résolution dynamique : moins de lignes quand l'image peine, plus quand elle est à l'aise
@@ -2833,17 +2871,28 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         const fov = (2 * Math.atan(Math.tan((OPTS.fov * Math.PI) / 360) / 1.5) * 180) / Math.PI;
         const pm = sim.fm(P.floor || 0);
         let heldWas = true;
+        let lampWas = 0;
+        let spillWas = 0;
         const py = feetY(sim.stairs, P.x, P.z, P.floor || 0) + (P.onLadder ? 1.0 : 0) + (P.jy || 0) - (pm.depthAt ? pm.depthAt(P.x, P.z) : 0);
         // son regard suit la même piste que son corps (sans à-coups)
         inset.render(S.yaw !== undefined ? { ...camQ, yaw: S.yaw } : camQ, { x: S.x, y: ey, z: S.z }, fov, scene, avatars, time, dt, {
           show() {
             heldWas = held.visible;
             held.visible = false;
+            // vue par lui, notre lampe est celle de notre explorateur (dans sa main) : celles de notre caméra
+            // s'éteignent le temps de sa prise de vue (sinon elle éclaire deux fois). On remet ensuite les puissances
+            // de cette image-ci, déjà calculées plus haut (pile faible, coupure par sa présence, infrarouge)
+            lampWas = flashLight.intensity;
+            spillWas = flashSpill.intensity;
+            flashLight.intensity = 0;
+            flashSpill.intensity = 0;
             avatars.update(P, true, py, lightNow, 0, time);
           },
           hide() {
             held.visible = heldWas;
-            avatars.setShown(P.id, false);
+            flashLight.intensity = lampWas;
+            flashSpill.intensity = spillWas;
+            avatars.update(P, false); // caché, et sa lampe éteinte (setShown ne cache que le corps)
           },
         });
       } else inset.render(null);
