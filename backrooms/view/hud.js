@@ -84,8 +84,8 @@ export class BackroomsHUD {
         <div class="stamina" id="stamina"><span>STAMINA</span><div class="stamina-track"><div class="stamina-bar" id="staminaBar"></div></div></div>
         <div class="crouch-tag" id="crouchTag" hidden>▼ CROUCHED</div>
         <!-- les touches utiles, en petit, comme une ligne de plus de l'écran du caméscope -->
-        <!-- la jauge du micro, comme le vumètre d'un caméscope : au-delà du trait, l'entité t'entend -->
-        <div class="mic-meter" id="micMeter" hidden><span>MIC</span><i id="micCells">${'<b></b>'.repeat(12)}</i><em id="micTxt"></em></div>
+        <!-- la jauge du micro : un trait fin ; au-delà du repère, on t'entend (et l'entité aussi) -->
+        <div class="mic-meter" id="micMeter" hidden><span id="micTxt">MIC</span><i><b id="micFill"></b></i></div>
         <div class="keys-tag" id="keysTag"></div>
       </div>
       <div class="cam cam-br">
@@ -473,8 +473,8 @@ export class BackroomsHUD {
     el.innerHTML = keys.map(([key, what]) => `<span><kbd>${key}</kbd>${what}</span>`).join('');
   }
 
-  // la jauge du micro : 12 cases. Sous le trait (≈ un murmure), rien ne part ; au-dessus, on t'entend (et elle aussi) ;
-  // tout en haut, tu fais plus de bruit qu'en courant. Visible dès que le micro est ouvert, seul ou à plusieurs.
+  // la jauge du micro : un trait fin qui suit la voix. Sous le repère (un murmure), rien ne part ; au-dessus, on
+  // t'entend (elle aussi) et le trait s'affirme ; tout en haut, il rougit. Visible dès que le micro est ouvert.
   micMeter(v, sim, multi) {
     const el = this.$('#micMeter');
     if (!el) return;
@@ -487,26 +487,20 @@ export class BackroomsHUD {
       if (this.micK !== 'denied') {
         this.micK = 'denied';
         el.className = 'mic-meter off';
-        this.$('#micTxt').textContent = 'BLOCKED';
-        for (const b of this.$('#micCells').children) b.className = '';
+        this.$('#micTxt').textContent = 'MIC OFF';
+        this.$('#micFill').style.width = '0%';
       }
       return;
     }
     const lv = Math.max(0, Math.min(1, v.raw || 0));
-    // le pic retombe doucement, pour qu'on ait le temps de le lire
-    this.micPeak = Math.max(lv, (this.micPeak || 0) - 0.012);
-    const n = Math.round(lv * 12);
-    const pk = Math.min(11, Math.round(this.micPeak * 12) - 1);
+    const w = Math.round(lv * 40) * 2.5; // par pas de 2,5 % : assez fin, sans réécrire le style à chaque image
     const state = v.mode === 0 ? 'quiet' : lv >= 0.8 ? 'loud' : 'heard';
-    const k = `${n}|${pk}|${state}`;
+    const k = `${w}|${state}`;
     if (k === this.micK) return;
     this.micK = k;
     el.className = `mic-meter ${state}`;
-    this.$('#micTxt').textContent = state === 'loud' ? 'TOO LOUD' : state === 'heard' ? 'HEARD' : '';
-    [...this.$('#micCells').children].forEach((b, i) => {
-      const zone = i < 4 ? 'q' : i < 10 ? 'h' : 'l';
-      b.className = `${zone}${i < n ? ' on' : i === pk ? ' pk' : ''}`;
-    });
+    this.$('#micTxt').textContent = 'MIC';
+    this.$('#micFill').style.width = `${w}%`;
   }
 
   replayTag(on) {

@@ -99,7 +99,7 @@ function applyOpts() {
 // Voix de proximité (toujours ouverte, sans touche) et talkie-walkie (R maintenu) : WebRTC entre joueurs, signalisation par le salon (view/voice.js)
 let voice = null;
 let micWarned = false;
-const sfxRef = { get ctx() { return sfx && sfx.ctx; }, get verb() { return sfx && sfx.verb; }, moveTo: (...a) => sfx && sfx.moveTo(...a), caption: (...a) => sfx && sfx.caption(...a) };
+const sfxRef = { get ctx() { return sfx && sfx.ctx; }, get verb() { return sfx && sfx.verb; }, get level() { return sfx ? sfx.roomLevel || 0 : 0; }, moveTo: (...a) => sfx && sfx.moveTo(...a), caption: (...a) => sfx && sfx.caption(...a) };
 function ensureVoice() {
   if (!voice) {
     voice = createVoice({ send: (to, m) => send(to, m), myId: NET.myId, sfx: sfxRef });
@@ -414,7 +414,10 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   // la difficulté adaptative ne compte que chez l'hôte (c'est lui qui fait tourner l'entité)
   const skill = NET.role === 'guest' ? 0.5 : +store.get(SKILL_KEY, 0.5);
   sim = new BackroomsSim({ difficulty, seed, players, localId: NET.myId, level, skill }); // les étages sortent de la graine
-  if (NET.role !== 'solo') ensureVoice().sync(players.map((p) => p.id));
+  if (NET.role !== 'solo') {
+    ensureVoice().sync(players.map((p) => p.id));
+    startBackgroundTicker();
+  }
   runStats = { seen: 0, rushes: 0, escapes: 0, closest: Infinity, haunts: 0 };
   tapeFrames = [];
   replayed = false;
@@ -466,7 +469,7 @@ function guestInputs() {
     const q = NET.actions[id] || (NET.actions[id] = []);
     // une action par pas, dans l'ordre où l'invité les a faites (avec la case qu'il avait choisie)
     const a = q.shift() || {};
-    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, stamina: i.st, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v, voice: i.vo, radio: i.ra };
+    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, stamina: i.st, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v, voice: i.vo, radio: i.ra, seq: i.seq };
     i.pos = null; // une position annoncée ne sert qu'une fois
   }
   return out;
@@ -489,7 +492,7 @@ function onMsg(from, m) {
       sim.addPlayer(from, (p && p.name) || 'Player');
       send(from, goMessage());
     } else if (m.t === 'i' && m.run === NET.run) {
-      NET.inputs[from] = { vo: num(m.vo, 0, 1), ra: !!m.ra, mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 100), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) }, v: m.v };
+      NET.inputs[from] = { seq: Number.isFinite(+m.n) ? +m.n : undefined, vo: num(m.vo, 0, 1), ra: !!m.ra, mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 100), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) }, v: m.v };
     } else if (m.t === 'fp' && hud) {
       // un invité n'a pas la même carte que nous : il tourne sur une autre version du jeu
       const p = H.players.find((q) => q.id === from);
@@ -741,6 +744,14 @@ function handleEvent(ev, me) {
       if (sfx && (ev.floor || 0) === (V.floor || 0)) sfx.tell(ev.kind, { x: ev.x, z: ev.z });
       break;
     }
+    case 'amb': {
+      // un bruit d'ambiance tiré par l'hôte : tout le monde l'entend en même temps, au même endroit
+      if (!sfx || paused || !sim) break;
+      const V = sim.viewPlayer(sim.spectate || 0);
+      if (ev.s !== 'rec' && (ev.floor || 0) !== (V.floor || 0)) break; // à un autre étage : la dalle l'étouffe
+      sfx.ambCue(ev.s, { x: ev.x, z: ev.z }, ev.a, ev.u, ev.v, ev.w);
+      break;
+    }
     case 'glimpse':
       // la première rencontre : rien… puis le néon au-dessus d'elle qui claque
       if (ev.phase === 'show' && sfx && ev.id === me) sfx.silence(2.5);
@@ -967,10 +978,36 @@ function readPad() {
   return { lx: p.axes[0] || 0, ly: p.axes[1] || 0, rx: p.axes[2] || 0, ry: p.axes[3] || 0, run: b(4) || b(6) || b(10) };
 }
 
+let lastRaf = 0;
 function loop(currentTime) {
   requestAnimationFrame(loop);
+  lastRaf = performance.now();
+  frame(currentTime);
+}
 
-  const delta = Math.min(0.1, (currentTime - lastTime) / 1000);
+// Onglet en arrière-plan : le navigateur suspend requestAnimationFrame. Seul, ça fige la partie (c'est voulu) ; à
+// plusieurs, l'hôte figé figeait tout le monde (l'entité, les instantanés), et un invité caché revenait en se
+// « téléportant ». Une petite horloge dans un worker (que le navigateur ne ralentit pas) prend alors le relais :
+// la partie continue sans image, au rythme de 20 pas par seconde.
+let bgTicker = null;
+function startBackgroundTicker() {
+  if (bgTicker || typeof Worker === 'undefined') return;
+  try {
+    const src = 'setInterval(() => postMessage(0), 50);';
+    bgTicker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    bgTicker.onmessage = () => {
+      if (!sim || !multi()) return;
+      if (performance.now() - lastRaf < 250) return; // les images tournent : rien à faire
+      frame(performance.now());
+    };
+  } catch (e) {
+    bgTicker = null;
+  }
+}
+
+function frame(currentTime) {
+
+  const delta = Math.max(0, Math.min(0.1, (currentTime - lastTime) / 1000));
   lastTime = currentTime;
   accumulator += delta;
 
@@ -1074,7 +1111,7 @@ function loop(currentTime) {
       if (act.struggle) send('host', { t: 'a', k: 'g', n: act.struggle, run: NET.run });
       if (NET.tick % 3 === 0) {
         const P = sim.player;
-        send('host', { t: 'i', run: NET.run, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, c: input.crouch ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2), st: Math.round(P.stamina), v: P.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined, vo: input.voice ? +input.voice.toFixed(2) : undefined, ra: input.radio ? 1 : undefined }, true);
+        send('host', { t: 'i', run: NET.run, n: NET.tick, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, c: input.crouch ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2), st: Math.round(P.stamina), v: P.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined, vo: input.voice ? +input.voice.toFixed(2) : undefined, ra: input.radio ? 1 : undefined }, true);
       }
     } else {
       sim.step(input, NET.role === 'host' ? guestInputs() : null);
@@ -1241,7 +1278,7 @@ function loop(currentTime) {
 
   // Rendu graphique et HUD
   if (scene) {
-    scene.render(sim, currentTime / 1000);
+    if (!document.hidden) scene.render(sim, currentTime / 1000); // en arrière-plan : la partie tourne, sans image
     if (sfx) sfx.setHum(scene.lightHere); // le grésillement des néons autour de soi
     if (sfx) {
       // l'oreille suit la caméra (le joueur, ou celui qu'on regarde) ; l'écho change avec le niveau
@@ -1288,7 +1325,7 @@ function loop(currentTime) {
 
 // ?debug : accès à la partie depuis la console (tests)
 if (/[?&]debug(&|=|$)/.test(location.search)) {
-  window.__br = { get voice() { return voice; }, get sim() { return sim; }, get scene() { return scene; }, get sfx() { return sfx; }, get hud() { return hud; }, keys, act, OPTS, frame: (t) => loop(t) };
+  window.__br = { get voice() { return voice; }, get sim() { return sim; }, get scene() { return scene; }, get sfx() { return sfx; }, get hud() { return hud; }, keys, act, OPTS, frame: (t) => frame(t) };
 }
 
 // Réglages (bouton ⚙ commun aux jeux) : son, et choix Souris / Sans souris

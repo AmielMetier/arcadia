@@ -38,40 +38,87 @@ export function createVoice({ send, myId, sfx }) {
     if (!c) return null;
     // le son du jeu a été recréé : tout se rebranche sur le nouveau
     if (bus && bus.context !== c) {
-      bus = null;
-      verb = verbIr = verbIn = verbOut = null;
+      bus = nbus = null;
+      verb = verbIn = verbPre = verbOut = null;
+      verbLv = -1;
       hiss = null;
       analyser = null;
       for (const p of peers.values()) if (p.chain) { p.pending = p.stream; p.chain = null; }
     }
     if (!bus) {
+      // les voix passent devant le reste : un compresseur doux les met toutes au même niveau (un chuchoteur comme
+      // un crieur), puis on les remonte
       bus = c.createGain();
       bus.gain.value = volume;
-      bus.connect(c.destination);
-      // l'écho des couloirs pour les voix de vive voix : la même réponse de salle que les bruits du niveau
+      const comp = c.createDynamicsCompressor();
+      comp.threshold.value = -30;
+      comp.knee.value = 12;
+      comp.ratio.value = 4;
+      comp.attack.value = 0.004;
+      comp.release.value = 0.25;
+      const makeup = c.createGain();
+      makeup.gain.value = 2.2;
+      bus.connect(comp).connect(makeup).connect(c.destination);
+      // le souffle, les « kshh » et les parasites du talkie restent hors du compresseur (il les remonterait)
+      nbus = c.createGain();
+      nbus.gain.value = volume;
+      nbus.connect(c.destination);
+      // l'écho des couloirs, sur sa propre piste : un léger retard (la voix d'abord, la salle ensuite), sans les
+      // graves (qui noient) ni les aigus (qui sifflent), et bien en dessous de la voix
       verbIn = c.createGain();
+      const pre = c.createDelay(0.1);
+      pre.delayTime.value = 0.028;
+      const hp = c.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 280;
+      verbIn.connect(pre).connect(hp);
+      verbPre = hp;
       verbOut = c.createBiquadFilter();
       verbOut.type = 'lowpass';
-      verbOut.frequency.value = 3800;
+      verbOut.frequency.value = 3200;
       const wet = c.createGain();
-      wet.gain.value = 0.5; // comme l'écho des bruits du Level 0, un peu plus présent au loin
+      wet.gain.value = 0.32;
       verbOut.connect(wet).connect(bus);
     }
-    // la salle change avec le niveau : un nouveau convoluteur quand la réponse de sfx change
-    const ir = sfx.verb && sfx.verb.buffer;
-    if (ir && ir !== verbIr) {
-      if (verb) { try { verbIn.disconnect(verb); verb.disconnect(); } catch (e) {} }
+    // la salle des voix change avec le niveau : moquette (courte et mate), entrepôt, piscine (longue), conduites
+    const lv = sfx.level || 0;
+    if (verbLv !== lv) {
+      if (verb) { try { verbPre.disconnect(verb); verb.disconnect(); } catch (e) {} }
       verb = c.createConvolver();
-      verb.buffer = ir;
-      verbIr = ir;
-      verbIn.connect(verb).connect(verbOut);
+      verb.buffer = voiceRoom(c, lv);
+      verbLv = lv;
+      verbPre.connect(verb).connect(verbOut);
     }
     return bus;
   }
+  let nbus = null; // les bruits du talkie (sans compresseur)
+  const fxOut = () => (out() ? nbus : null);
   let verbIn = null;
+  let verbPre = null;
   let verbOut = null;
   let verb = null;
-  let verbIr = null;
+  let verbLv = -1;
+
+  // la réponse de la salle pour les voix : quelques premières réflexions sur les murs proches, puis une queue courte
+  // qui s'éteint (plus longue dans les grands volumes) ; stéréo décorrélée pour qu'elle enveloppe sans masquer
+  function voiceRoom(c, lv) {
+    const len = lv === 2 ? 2.2 : lv === 1 ? 1.5 : lv === 3 ? 1.3 : 0.85; // s
+    const n = Math.floor(c.sampleRate * len);
+    const buf = c.createBuffer(2, n, c.sampleRate);
+    const early = lv === 2 ? [0.019, 0.033, 0.051, 0.074] : [0.011, 0.023, 0.037, 0.052];
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < n; i++) {
+        const t = i / c.sampleRate;
+        d[i] = (Math.random() * 2 - 1) * Math.exp((-6.9 * t) / len) * Math.min(1, t / 0.012) * 0.55;
+      }
+      early.forEach((e, k) => {
+        const i = Math.floor((e + ch * 0.0017 * (k + 1)) * c.sampleRate);
+        if (i < n) d[i] += (k % 2 ? -1 : 1) * (0.7 - k * 0.12);
+      });
+    }
+    return buf;
+  }
 
   async function enableMic() {
     if (stream || micState === 'asking') return micState === 'on';
@@ -249,7 +296,7 @@ export function createVoice({ send, myId, sfx }) {
   let hiss = null;
   function hissOn(on) {
     const c = ctxOf();
-    const o = out();
+    const o = fxOut();
     if (!c || !o) return;
     if (!hiss) {
       const n = c.createBufferSource();
@@ -276,7 +323,7 @@ export function createVoice({ send, myId, sfx }) {
   let fx = null;
   function fxIn() {
     const c = ctxOf();
-    const o = out();
+    const o = fxOut();
     if (!c || !o) return null;
     if (fx && fx.context === c) return fx;
     const hp = c.createBiquadFilter();
@@ -514,7 +561,7 @@ export function createVoice({ send, myId, sfx }) {
   // « kshh » : le bouton du talkie, l'ouverture (ou la fin) de la transmission
   function squelch(open, vol = 0.12) {
     const c = ctxOf();
-    const o = out();
+    const o = fxOut();
     if (!c || !o) return;
     const t = c.currentTime;
     const n = c.createBufferSource();
@@ -550,6 +597,7 @@ export function createVoice({ send, myId, sfx }) {
     setVolume(v) {
       volume = v;
       if (bus) bus.gain.value = v;
+      if (nbus) nbus.gain.value = v;
     },
 
     // les joueurs de la partie (identifiants) : on appelle ceux qui ont un identifiant plus grand
@@ -673,7 +721,7 @@ export function createVoice({ send, myId, sfx }) {
               if (!floors && !p.los) near *= 0.65;
               // l'écho : il porte un peu plus loin que la voix, et sa part grandit avec la distance
               const far = Math.min(1, d / VOICE_R);
-              rev = Math.pow(Math.max(0, 1 - d / (VOICE_R * 1.35)), 0.8) * (0.05 + 0.95 * Math.pow(far, 1.2)) * (floors ? 0.3 : !p.los ? 0.8 : 1);
+              rev = Math.pow(Math.max(0, 1 - d / (VOICE_R * 1.35)), 0.8) * (0.03 + 0.6 * Math.pow(far, 1.5)) * (floors ? 0.3 : !p.los ? 0.8 : 1);
               sfx.moveTo(p.chain.pan, Q.x, Q.z, 0.05);
             }
           }
@@ -683,8 +731,8 @@ export function createVoice({ send, myId, sfx }) {
           p.radioEdge = null;
         }
         if (rad) rx = Math.max(rx, 0.2 + (p.bad || 0));
-        p.chain.pg.gain.setTargetAtTime(near * 1.4, t, 0.05);
-        p.chain.vs.gain.setTargetAtTime(rev * 1.6, t, 0.1);
+        p.chain.pg.gain.setTargetAtTime(near * 1.6, t, 0.05);
+        p.chain.vs.gain.setTargetAtTime(rev * 1.2, t, 0.1);
         p.chain.rg.gain.setTargetAtTime(rad, t, 0.03);
       }
       // tout près d'elle, le talkie capte des interférences, même quand personne ne parle

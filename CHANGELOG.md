@@ -1,5 +1,15 @@
 # Journal des versions — Arcadia
 
+## 4.62 — 7 novembre 2026
+- **The Backrooms** — Un multijoueur plus solide, et des voix plus claires.
+  - Fini les téléportations : quand le jeu de l'hôte se fige un instant (une saccade, ou un passage sur un autre onglet), les autres ne sont plus ramenés en arrière.
+  - À plusieurs, la partie continue même si quelqu'un passe sur une autre fenêtre : l'entité et les autres joueurs ne se figent plus chez tout le monde.
+  - Les coéquipiers se déplacent de façon fluide à l'écran, au lieu d'avancer par petits sauts.
+  - Les bruits d'ambiance (enregistrements lointains, tôle qui craque, coups dans les conduites…) arrivent en même temps chez tout le monde, au même endroit du niveau : fort pour celui qui est à côté, étouffé pour celui qui est loin.
+  - Les voix des joueurs sont plus fortes et toutes au même niveau, qu'on chuchote ou qu'on parle fort ; les grésillements du talkie ne sont pas remontés avec elles.
+  - L'écho des voix est plus discret : court, juste après la voix, sans graves qui noient ; on l'entend surtout quand la personne est loin.
+  - La jauge du micro est devenue un simple trait fin, avec un petit repère : au-delà, on t'entend.
+
 ## 4.61 — 7 novembre 2026
 - **The Backrooms** — Une jauge du micro pour savoir si tu fais du bruit.
   - En bas à gauche, une petite jauge « MIC » suit ta voix en direct, comme le vumètre d'un caméscope.

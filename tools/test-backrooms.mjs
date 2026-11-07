@@ -464,6 +464,33 @@ test('première rencontre : au bout du couloir, elle est là ; regardée, le né
   assert.ok(shown >= 7, `elle se montre (${shown}/10)`);
 });
 
+test("à plusieurs : après un gel de l'hôte, la position de l'invité est reprise (pas de retour en arrière) ; les ambiances viennent de l'hôte", () => {
+  const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }];
+  const host = new BackroomsSim({ seed: 12, players, localId: 1 });
+  const G = host.players[1];
+  const at = { x: G.x, z: G.z };
+  // un point accessible à une dizaine de mètres
+  const far = host.map.walkable.map((c) => ({ x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE })).find((c) => Math.hypot(c.x - at.x, c.z - at.z) > 9 && Math.hypot(c.x - at.x, c.z - at.z) < 12);
+  assert.ok(far, 'un point à une dizaine de mètres');
+  host.step({}, { 2: { remote: true, seq: 100, pos: { x: at.x, z: at.z } } });
+  // 2 s plus tard chez l'invité (l'hôte était figé) : 120 pas, à la course, ça passe
+  host.step({}, { 2: { remote: true, seq: 220, pos: far } });
+  assert.ok(Math.hypot(G.x - far.x, G.z - far.z) < 0.5, "l'hôte reprend la position de l'invité");
+  // mais pas un bond impossible
+  const back = { x: at.x, z: at.z };
+  host.step({}, { 2: { remote: true, seq: 223, pos: back } });
+  assert.ok(Math.hypot(G.x - far.x, G.z - far.z) < 0.5, 'un bond de 10 m en 3 pas est refusé');
+  // les ambiances : tirées par l'hôte, avec un endroit et des tirages que tout le monde rejoue pareil
+  const amb = [];
+  for (let i = 0; i < 60 * 70; i++) {
+    host.events.length = 0;
+    host.step({}, {});
+    amb.push(...host.events.filter((e) => e.type === 'amb'));
+  }
+  assert.ok(amb.length >= 1, `des ambiances (${amb.length})`);
+  for (const e of amb) assert.ok(Number.isFinite(e.x) && Number.isFinite(e.a) && e.u >= 0 && e.u <= 1 && ['rec', 'a', 'b', 'c'].includes(e.s));
+});
+
 test('prélude : avant la première cassette, rien que la première apparition ; l\'entité n\'est pas là', () => {
   BackroomsSim.PRELUDE = true;
   try {

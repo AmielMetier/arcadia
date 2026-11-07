@@ -2145,6 +2145,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   const replayP = { x: 0, z: 0, yaw: 0, pitch: 0, floor: 0, status: 'dead', moving: false, crouch: false, hidden: -1, grabT: 0, tilt: 0 };
   let frameAvg = 16;
   let lines = 720;
+  const avatarPos = new Map(); // position lissée de chaque coéquipier à l'écran
   let focusT = 0;
   let focusPulse = 0; // temps restant de la « chasse » de mise au point en cours
   let focusWait = 3 + Math.random() * 4; // secondes de course avant la prochaine
@@ -2448,10 +2449,21 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       for (const Q of sim.players) {
         const show = Q !== P && Q.status === 'alive' && !(Q.hidden >= 0); // un coéquipier caché dans un casier ne se voit pas
         if (!show && !avatars.has(Q.id)) continue;
+        // à l'écran, chacun glisse vers sa dernière position connue : chez l'hôte, les invités n'arrivent que 20 fois
+        // par seconde (ils avançaient par petits sauts) ; un vrai saut (chute, étage, rattrapage) reste net
+        let S = avatarPos.get(Q.id);
+        if (!S || S.f !== (Q.floor || 0) || Math.hypot(Q.x - S.x, Q.z - S.z) > 3) S = { x: Q.x, z: Q.z, f: Q.floor || 0 };
+        else {
+          const k = 1 - Math.exp(-dt * 18);
+          S.x += (Q.x - S.x) * k;
+          S.z += (Q.z - S.z) * k;
+        }
+        avatarPos.set(Q.id, S);
+        const D = { ...Q, x: S.x, z: S.z };
         const qv = floorViews[Q.floor || 0];
         const qm = sim.fm(Q.floor || 0);
-        const y = feetY(sim.stairs, Q.x, Q.z, Q.floor) + (Q.onLadder ? 1.0 : 0) - (qm.depthAt ? qm.depthAt(Q.x, Q.z) : 0);
-        avatars.update(Q, show, y, qv ? qv.lightAt(Q.x, Q.z) : 0.3, dt, time);
+        const y = feetY(sim.stairs, D.x, D.z, D.floor) + (D.onLadder ? 1.0 : 0) - (qm.depthAt ? qm.depthAt(D.x, D.z) : 0);
+        avatars.update(D, show, y, qv ? qv.lightAt(D.x, D.z) : 0.3, dt, time);
       }
 
       // exposition automatique : le caméscope s'ouvre dans le noir (image plus claire et plus granuleuse) et se

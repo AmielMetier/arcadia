@@ -1943,32 +1943,48 @@ export class BackroomsSfx {
     });
   }
 
-  // Les ambiances : de temps en temps (toutes les 20 à 50 s), un des enregistrements du niveau, assez bas, avec l'écho
-  // des couloirs ; pas pendant une poursuite. Par-dessus, les bruits synthétisés propres à chaque niveau.
-  ambience(dt, active) {
-    if (!this.unlocked || !this.ctx) return;
-    if (this.ambT === undefined) this.ambT = 6 + Math.random() * 10;
-    if (!active) return;
+  // Les ambiances : c'est l'hôte qui les tire (engine/sim.js, updateAmbience), pour que tout le monde les entende en
+  // même temps et au même endroit. Ici, on ne fait plus que les jouer (ambCue).
+  ambience() {}
+
+  // Un bruit d'ambiance tiré par l'hôte : slot 'rec' (un des enregistrements du niveau, bas, avec l'écho des couloirs)
+  // ou 'a', 'b', 'c' (les bruits synthétisés du niveau), placé à partir d'un joueur (anchor) ; a, u, v, w : ses tirages
+  ambCue(slot, anchor, a = 0, u = 0.5, v = 0.5, w = 0.5) {
+    if (!this.unlocked || !this.ctx || !anchor) return;
     if (this.ctx.currentTime < this.silenceUntil) return;
-    this.synthAmbience(dt);
-    this.ambT -= dt;
-    if (this.ambT > 0) return;
-    this.ambT = 20 + Math.random() * 30;
-    const AMBIENT = levelSfx(this.roomLevel).ambient;
-    if (!AMBIENT.length) return;
-    let name = AMBIENT[Math.floor(Math.random() * AMBIENT.length)];
-    if (name === this.lastAmb) name = AMBIENT[(AMBIENT.indexOf(name) + 1) % AMBIENT.length];
-    this.lastAmb = name;
-    this.sample(name).then((buf) => {
-      if (!buf) return;
-      const c = this.ctx;
-      const src = c.createBufferSource();
-      src.buffer = buf;
-      const g = c.createGain();
-      g.gain.value = 0.12; // très bas : un fond qu'on devine plus qu'on n'entend
-      src.connect(g).connect(this.bedWet);
-      src.start();
-    });
+    const pos = (r1, r2) => {
+      const r = r1 + (r2 - r1) * u;
+      return { x: anchor.x + Math.cos(a) * r, z: anchor.z + Math.sin(a) * r };
+    };
+    const vol = (v0, v1) => v0 + (v1 - v0) * v;
+    const lv = this.roomLevel;
+    if (slot === 'rec') {
+      const AMBIENT = levelSfx(lv).ambient;
+      if (!AMBIENT.length) return;
+      const name = AMBIENT[Math.min(AMBIENT.length - 1, Math.floor(w * AMBIENT.length))];
+      this.sample(name).then((buf) => {
+        if (!buf) return;
+        const c = this.ctx;
+        const src = c.createBufferSource();
+        src.buffer = buf;
+        const g = c.createGain();
+        g.gain.value = 0.12; // très bas : un fond qu'on devine plus qu'on n'entend
+        src.connect(g).connect(this.bedWet);
+        src.start();
+      });
+    } else if (lv === 1) {
+      // la tôle et les étagères qui craquent ; parfois des coups dans les gaines
+      if (slot === 'a') this.creak(pos(8, 25), vol(0.5, 1));
+      else if (slot === 'b') this.distant(w < 0.6 ? 'groan' : 'knock', pos(18, 32), 0.5, this.bedWet);
+    } else if (lv === 2) {
+      // l'eau qui clapote contre le carrelage
+      if (slot === 'a') this.slosh(pos(5, 16), vol(0.5, 1));
+    } else if (lv === PIPES_LEVEL) {
+      // coups de bélier, vapeur qui siffle au loin, tuyaux qui gémissent
+      if (slot === 'a') this.steamFar(pos(14, 30), vol(0.5, 0.9));
+      else if (slot === 'b') this.distant('hammer', pos(15, 35), vol(0.5, 0.8), this.bedWet);
+      else if (slot === 'c') this.distant('groan', pos(12, 30), vol(0.4, 0.7), this.bedWet);
+    }
   }
 
   // les fonds continus de chaque niveau, sous tout le reste (bus bedWet) : Level 1 la ventilation, Poolrooms l'eau
@@ -2025,47 +2041,6 @@ export class BackroomsSfx {
     for (const s of srcs) s.start(t, s.buffer ? Math.random() * 4 : 0);
     g.gain.setTargetAtTime(vol, t, 2);
     this.bed = { g, srcs };
-  }
-
-  // les bruits ponctuels synthétisés de chaque niveau (appelé par ambience, hors poursuite et hors silence)
-  synthAmbience(dt) {
-    const A = this.amb;
-    if (!A) return;
-    A.a -= dt;
-    A.b -= dt;
-    A.c -= dt;
-    const lv = this.roomLevel;
-    if (lv === 1) {
-      // la tôle et les étagères qui craquent ; parfois des coups dans les gaines
-      if (A.a <= 0) {
-        A.a = rnd(7, 20);
-        this.creak(this.around(8, 25), rnd(0.5, 1));
-      }
-      if (A.b <= 0) {
-        A.b = rnd(25, 50);
-        this.distant(Math.random() < 0.6 ? 'groan' : 'knock', this.around(18, 32), 0.5, this.bedWet);
-      }
-    } else if (lv === 2) {
-      // l'eau qui clapote contre le carrelage
-      if (A.a <= 0) {
-        A.a = rnd(4, 10);
-        this.slosh(this.around(5, 16), rnd(0.5, 1));
-      }
-    } else if (lv === PIPES_LEVEL) {
-      // coups de bélier, vapeur qui siffle au loin, tuyaux qui gémissent
-      if (A.a <= 0) {
-        A.a = rnd(9, 22);
-        this.steamFar(this.around(14, 30), rnd(0.5, 0.9));
-      }
-      if (A.b <= 0) {
-        A.b = rnd(18, 40);
-        this.distant('hammer', this.around(15, 35), rnd(0.5, 0.8), this.bedWet);
-      }
-      if (A.c <= 0) {
-        A.c = rnd(14, 32);
-        this.distant('groan', this.around(12, 30), rnd(0.4, 0.7), this.bedWet);
-      }
-    }
   }
 
   // un craquement de tôle ou d'étagère : quelques grains métalliques très résonants

@@ -162,6 +162,14 @@ export function findStairKey(map, seed, dark) {
   return best ? { x: best.x, z: best.z, gx: best.gx, gz: best.gz, taken: false } : null;
 }
 
+// les bruits d'ambiance de chaque niveau : tous les combien (s) ; ce qu'ils sont, c'est view/sfx.js (ambCue) qui le sait
+const AMB_CUES = {
+  0: { rec: [20, 50] },
+  1: { rec: [20, 50], a: [7, 20], b: [25, 50] },
+  2: { rec: [20, 50], a: [4, 10] },
+  [PIPES_LEVEL]: { rec: [20, 50], a: [9, 22], b: [18, 40], c: [14, 32] },
+};
+
 // un tirage qui ne dépend que de la graine (hôte et invités tirent pareil)
 const hashRnd = (...k) => {
   let h = 2166136261;
@@ -393,6 +401,7 @@ export class BackroomsSim {
     this.panel = 0; // Level 1 : avancée du redémarrage du monte-charge (0 à 1)
     this.panelNoiseT = 0;
     this.director = createDirector(level);
+    this.ambT = null; // les bruits d'ambiance repartent avec le niveau
     // Level 0 : un ou deux recoins calmes par étage, où rien ne se passe… un moment ; la première rencontre, mise en scène
     if (level === 0) this.floors.forEach((f, fi) => (f.calm = f.calm || findCalmNooks(f, this.seed * 13 + fi, fi === 0 ? f.spawn : null)));
     // Level 0 : la porte du haut des cages d'escalier est cadenassée ; la clé est quelque part à l'étage du haut
@@ -632,6 +641,43 @@ export class BackroomsSim {
   }
 
   // le vacarme retombe peu à peu ; il prévient quand il franchit un palier
+  // Les bruits d'ambiance (un enregistrement au loin, la tôle qui craque, un coup dans les conduites…) : c'est l'hôte
+  // qui les tire, à un endroit du niveau, et tout le monde les entend en même temps, au même endroit (fort pour celui
+  // qui est à côté, étouffé pour celui qui est loin). Avant, chacun avait les siens.
+  updateAmbience() {
+    if (this.state !== 'playing' || this.departT > 0) return;
+    const cues = AMB_CUES[this.level] || AMB_CUES[0];
+    const T = this.ambT || (this.ambT = { rec: rand(6, 16), a: rand(6, 14), b: rand(10, 20), c: rand(14, 26) });
+    const M = this.monster;
+    const busy = this.hasMonster && M && (M.mode === 'chase' || M.mode === 'grab');
+    for (const slot of Object.keys(cues)) {
+      T[slot] -= DT;
+      if (T[slot] > 0) continue;
+      T[slot] = rand(...cues[slot]);
+      if (busy) continue; // pas pendant une poursuite
+      const alive = this.players.filter((P) => P.status === 'alive');
+      if (!alive.length) continue;
+      const P = alive[Math.floor(Math.random() * alive.length)];
+      const r2 = (v) => Math.round(v * 1000) / 1000;
+      this.emit({ type: 'amb', s: slot, id: P.id, x: r2(P.x), z: r2(P.z), floor: P.floor || 0, a: r2(Math.random() * Math.PI * 2), u: r2(Math.random()), v: r2(Math.random()), w: r2(Math.random()) });
+    }
+  }
+
+  // Une position annoncée par un invité est-elle atteignable ? Il a pu courir pendant tout le temps écoulé chez lui
+  // (seq : ses pas de simulation) : après une saccade ou un onglet en arrière-plan chez l'hôte, l'écart est grand
+  // mais légitime ; le refuser renvoyait l'invité en arrière (une « téléportation »).
+  posReach(P, pos, seq) {
+    const d = Math.hypot(pos.x - P.x, pos.z - P.z);
+    if (d < 4.5) return true;
+    if (!Number.isFinite(seq)) return false;
+    if (!Number.isFinite(P.posSeq)) {
+      P.posSeq = seq; // première annonce de loin : on part de là
+      return false;
+    }
+    if (seq <= P.posSeq) return false;
+    return d < Math.min(60, (seq - P.posSeq) * DT * SPRINT_SPEED * 1.35 + 2);
+  }
+
   // Le prélude : au Level 0, tant que l'équipe n'a pas trouvé sa première cassette, il ne se passe rien… sauf la
   // première apparition, mise en scène. Ni traque, ni fausse alerte, ni néons qui meurent, ni triche de l'entité,
   // ni parasites du talkie : on découvre les lieux, on se sent seul. La peur commence avec la première cassette.
@@ -1095,6 +1141,7 @@ export class BackroomsSim {
     if (this.state !== 'playing') return;
     this.time += DT;
     this.updateDin();
+    this.updateAmbience();
 
     // l'ascenseur part : les portes sont fermées, on attend l'arrivée
     if (this.departT > 0) {
@@ -1220,8 +1267,9 @@ export class BackroomsSim {
     if (P.lockT > 0) {
       P.lockT = Math.max(0, P.lockT - DT);
       P.moving = false;
-    } else if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.z) && Math.hypot(pos.x - P.x, pos.z - P.z) < 4.5 && !this.isColliding(pos.x, pos.z, PLAYER_RADIUS * 0.8, P.floor)) {
+    } else if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.z) && this.posReach(P, pos, input.seq) && !this.isColliding(pos.x, pos.z, PLAYER_RADIUS * 0.8, P.floor)) {
       // un invité se déplace chez lui (et tient son équilibre chez lui) : l'hôte prend sa position et son inclinaison
+      if (Number.isFinite(input.seq)) P.posSeq = input.seq;
       const ps = this.stairStep(P, pos.x, pos.z);
       P.x = ps.x;
       P.z = ps.z;
