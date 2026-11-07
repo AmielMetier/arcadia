@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 4.60 — 7 novembre 2026
+- **The Backrooms** — Voix de proximité sans touche, et quelques retouches au caméscope.
+  - Plus besoin d'appuyer pour parler aux joueurs proches : le micro est ouvert, il suffit de parler. Seul le talkie se tient sur R.
+  - Dans ⚙️ Réglages, « Voix » propose simplement micro activé ou coupé.
+  - L'image ne floute plus tout le temps quand tu cours : seulement de temps en temps, le temps que l'autofocus raccroche.
+  - Un petit rappel des touches (F interagir, E utiliser, R talkie à plusieurs) s'affiche en bas à gauche, discret, avec le reste de l'écran du caméscope.
+  - Les parasites du talkie sont moins forts et ne couvrent plus les voix.
+  - Corrigé : il arrivait de devoir garder le clic gauche enfoncé pour tourner la caméra. Si la souris n'a pas pu être capturée (par exemple en recliquant juste après Échap), un nouveau clic suffit maintenant.
+
 ## 4.59 — 7 novembre 2026
 - **The Backrooms** — Un screamer qui fait vraiment sursauter, une clé pour l'escalier, et un caméscope plus lisible.
   - Le screamer a été refait : un instant de noir et de silence total, puis son visage blême, orbites vides et mâchoire décrochée, se jette contre l'objectif et tressaute, avec un cri plus violent.
