@@ -142,6 +142,8 @@ export async function createActors(scene, { makeLog }) {
     });
     const holder = new THREE.Group(); holder.add(root); scene.add(holder);
     const log = makeLog(); log.scale.set(0.8, 0.9, 0.9); log.position.set(0, 1.12, 0.42); log.visible = false; holder.add(log);
+    // les bûches empilées au-dessus de la première (jusqu'à trois)
+    const more = [1, 2].map((i) => { const m = makeLog(); m.scale.set(0.8, 0.9, 0.9); m.position.set((i === 1 ? -0.08 : 0.08), 1.12 + i * 0.2, 0.42 - i * 0.02); m.rotation.y = i === 1 ? 0.08 : -0.06; m.visible = false; holder.add(m); return m; });
     // panier de baies
     const basket = new THREE.Group();
     basket.add(new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.18, 0.22, 10, 1, true), new THREE.MeshStandardMaterial({ color: 0x9a6a38, roughness: 0.9, side: THREE.DoubleSide })));
@@ -150,7 +152,7 @@ export async function createActors(scene, { makeLog }) {
     const shadow = new THREE.Mesh(shadowGeo, shadowMat); shadow.renderOrder = 1; scene.add(shadow);
     const nameTag = p.id !== me ? label(p.name, { color: p.bot ? '#bcd4ff' : '#ffe2a8' }) : null; if (nameTag) { nameTag.position.y = 2.25; holder.add(nameTag); }
     const cross = crossSprite(); cross.visible = false; cross.position.y = 1.0; holder.add(cross);
-    const a = { p, jobKey: p.job, root, holder, log, basket, shadow, nameTag, cross, mats, job, tools: job.show.map((n) => root.getObjectByName(n)).filter(Boolean), yaw: p.yaw, wasDown: false, upT: 0, ...rig(root) };
+    const a = { p, jobKey: p.job, root, holder, log, more, basket, shadow, nameTag, cross, mats, job, tools: job.show.map((n) => root.getObjectByName(n)).filter(Boolean), yaw: p.yaw, wasDown: false, upT: 0, ...rig(root) };
     heroes.set(p.id, a);
   }
   function updateHero(a, p, dt, sim, t) {
@@ -160,6 +162,7 @@ export async function createActors(scene, { makeLog }) {
     a.shadow.position.set(p.x, sim.map.heightAt(p.x, p.z) + 0.04, p.z); a.shadow.visible = !p.down;
     a.holder.visible = !p.dead;
     a.basket.visible = p.carry === 'vivres';
+    a.more.forEach((m, i) => { m.visible = p.carry === 'bois' && (p.load || 1) > i + 1 && p.act !== 'store'; });
     a.log.visible = p.carry === 'poutre' || p.carry === 'vivres' ? false : p.carry === 'bois' && !(p.act === 'pick' && p.actT < ACT.pick.at) && !(p.act === 'take' && p.actT < ACT.take.at) || (p.act === 'store' && p.actT < ACT.store.at) || (p.act === 'feed' && p.actT < ACT.feed.at) || (p.act === 'drop' && p.actT < ACT.drop.at);
     for (const o of a.tools) o.visible = !p.carry && !['pick', 'store', 'feed', 'take', 'gather', 'eat'].includes(p.act);
     a.cross.visible = p.down; if (p.down) { a.cross.material.opacity = 0.6 + 0.4 * Math.sin(t * 6); }
@@ -230,7 +233,8 @@ export async function createActors(scene, { makeLog }) {
     a.bar.userData.set(f.hp / max);
     a.castAt += dt;
     if (a.state !== f.state) { a.state = f.state; a.tag = f.state + ':' + sim.t; }
-    if (f.state === 'awaken') play(a, ['Skeletons_Awaken_Floor'], { once: true, dur: RISE.awaken, fade: 0.01 });
+    if (f.state === 'sleep') { a.tag = 'z'; play(a, ['Skeletons_Awaken_Floor'], { once: true, dur: 1e6, fade: 0.01 }); }
+    else if (f.state === 'awaken') { if (a.tag === 'z') a.tag = 'w'; play(a, ['Skeletons_Awaken_Floor'], { once: true, dur: RISE.awaken, fade: 0.01 }); }
     else if (f.state === 'dead') play(a, ['Death_C_Skeletons'], { once: true, dur: 1.4, fade: 0.08 });
     else if (f.state === 'rise') play(a, ['Death_C_Skeletons_Resurrect'], { once: true, dur: RISE.dur, fade: 0.08 });
     else if (f.state === 'attack') play(a, [a.S.attack], { once: true, dur: F.dur, fade: 0.1 });

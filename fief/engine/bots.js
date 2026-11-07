@@ -2,7 +2,7 @@
 // il relève un équipier à terre, se bat contre les squelettes qui approchent, charge les braseros au crépuscule
 // et la nuit, et le jour coupe du bois près du village et le rentre à l'entrepôt. Il se déplace par les chemins
 // de la grille (nav.js). Moteur PUR.
-import { FUEL, REACH, CYCLE, BEAM, FOOD, emptyInput, jobOf } from './sim.js';
+import { FUEL, REACH, CYCLE, BEAM, FOOD, LOAD_MAX, emptyInput, jobOf } from './sim.js';
 import { inZone } from './crypt.js';
 import { TREE_R, rectOf } from './map.js';
 
@@ -45,7 +45,7 @@ export function botInput(sim, p) {
   if (p.act) return out;
   if (G.kind === 'revive' || G.kind === 'lever') out.hold = true;
   else if ((G.kind === 'fight' || G.kind === 'chop' || G.kind === 'build') && ai.cool <= 0) { out.fc = ++ai.fc; ai.cool = 0.25; }
-  else if ((G.kind === 'pick' || G.kind === 'store' || G.kind === 'feed' || G.kind === 'take' || G.kind === 'beam' || G.kind === 'eat' || G.kind === 'gather' || G.kind === 'descend' || G.kind === 'relight') && ai.cool <= 0) { out.uc = ++ai.uc; ai.cool = 0.8; }
+  else if ((G.kind === 'pick' || G.kind === 'store' || G.kind === 'feed' || G.kind === 'take' || G.kind === 'beam' || G.kind === 'eat' || G.kind === 'gather' || G.kind === 'descend' || G.kind === 'relight' || G.kind === 'open') && ai.cool <= 0) { out.uc = ++ai.uc; ai.cool = 0.8; }
   return out;
 }
 
@@ -76,13 +76,15 @@ function decide(sim, p, ai) {
     const [ex, ez] = sim.beamEnds(b)[1 - k];
     if (Math.hypot(ex - p.x, ez - p.z) < 60) return { kind: 'beam', x: ex, z: ez, near: BEAM.grab - 0.7 };
   }
-  const dark = sim.darkness > 0 || sim.clock.t > CYCLE.day - CYCLE.dusk - 40;
+  const dark = sim.darkness > 0 || sim.clock.t > sim.dayLen - CYCLE.dusk - 40;
   // 3. une bûche en main : le brasero le plus vide, ou l'entrepôt
   if (p.carry) {
     if (dark && p.carry === 'bois') {
       const b = M.braziers.filter((o) => sim.braziers[o.id].fuel < FUEL.max - FUEL.log).sort((a, b2) => sim.braziers[a.id].fuel - sim.braziers[b2.id].fuel)[0];
       if (b) return { kind: 'feed', x: b.x, z: b.z, near: REACH.feed - 0.6 };
     }
+    // encore de la place dans les bras : la bûche d'à côté
+    if (p.carry === 'bois' && p.load < LOAD_MAX) { const l = sim.logs.filter((o) => o.ready && dist(o) < 8).sort((a, b) => dist(a) - dist(b))[0]; if (l) return { kind: 'pick', x: l.x, z: l.z, near: REACH.pick - 0.7 }; }
     return { kind: 'store', x: M.depot.x, z: M.depot.z, near: REACH.store - 1.2 };
   }
   // 3b. les mains vides au crépuscule ou la nuit : reprendre du bois à l'entrepôt pour un brasero qui faiblit
@@ -101,6 +103,11 @@ function decide(sim, p, ai) {
   if (!dark && sim.stock.nourriture < 2 + sim.players.length) {
     const bush = M.bushes.filter((o) => sim.berries[o.id].ready && !sim.players.some((q) => q !== p && q.ai && q.ai.goal && q.ai.goal.kind === 'gather' && q.ai.goal.id === o.id)).sort((a, c) => dist(a) - dist(c))[0];
     if (bush && dist(bush) < 70) { const a2 = Math.atan2(p.x - bush.x, p.z - bush.z); return { kind: 'gather', id: bush.id, x: bush.x + Math.sin(a2) * 1.3, z: bush.z + Math.cos(a2) * 1.3, near: 0.6 }; }
+  }
+  // 3f. le jour : un coffre dont les gardes sont tombés
+  if (!dark) {
+    const c = sim.chests.filter((o) => !o.open && dist(o) < 60 && !sim.foes.some((f) => f.guard === o.id && f.state !== 'dead')).sort((a, b) => dist(a) - dist(b))[0];
+    if (c) { const a2 = Math.atan2(p.x - c.x, p.z - c.z); return { kind: 'open', x: c.x + Math.sin(a2) * 1.3, z: c.z + Math.cos(a2) * 1.3, near: 0.5 }; }
   }
   // 4. la nuit sans ennemi proche : rester près du feu (et ramasser les bûches qui traînent près des braseros)
   const log = sim.logs.filter((l) => l.ready && Math.hypot(l.x - camp.x, l.z - camp.z) < (dark ? 25 : 60)).sort((a, b) => dist(a) - dist(b))[0];

@@ -1,10 +1,13 @@
 // Fief Maudit : tests du moteur (sans navigateur). node tools/test-fief.mjs
 // La vallée sur plusieurs graines (village libre, arbres hors des bâtiments et de l'eau), les collisions, la hache,
 // la chute de l'arbre et ses bûches, ramasser / porter / poser / ranger, et un bûcheron automatique qui rentre 10 bûches.
-import { Sim, DT, emptyInput, SPEED, REACH, CYCLE, FUEL, FOES, HP, RISE, JOBS, BEAM, WAREHOUSE_HP, BUILDS, FOOD, nightLen, LEVER_T } from '../fief/engine/sim.js';
+import { Sim as SimBase, DT, emptyInput, LOAD_MAX, CHEST, dayLen, SPEED, REACH, CYCLE, FUEL, FOES, HP, RISE, JOBS, BEAM, WAREHOUSE_HP, BUILDS, FOOD, nightLen, LEVER_T } from '../fief/engine/sim.js';
 import { doorPoint } from '../fief/engine/map.js';
 import { createValley, rectOf, R_PLAY, WATER } from '../fief/engine/map.js';
 import { encodeState, encodeWorld, applyState, applyWorld, smooth, predict, reconcile, cleanInput } from '../fief/engine/net.js';
+
+// les coffres gardés des bois réveillent des squelettes en plein jour : la plupart des tests s'en passent
+class Sim extends SimBase { constructor(o = {}) { super(o); if (!o.chests) { this.chests = []; this.foes = []; } } }
 
 let fails = 0, n = 0;
 const ok = (c, m) => { n++; if (!c) { fails++; console.log('  ✗ ' + m); } };
@@ -43,7 +46,7 @@ section('collisions');
 function goTo(sim, p, x, z, maxT = 40) {
   const t0 = sim.t;
   let stuck = 0, side = 1, lastD = Infinity;
-  while (sim.t - t0 < maxT) {
+  while (sim.t - t0 < maxT && !sim.over) {
     const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz);
     if (d < 0.9) return true;
     let wx = dx / d, wz = dz / d;
@@ -57,7 +60,7 @@ function goTo(sim, p, x, z, maxT = 40) {
 }
 function press(sim, p, k, wait = 1.2) {
   p['_' + k] = (p['_' + k] || 0) + 1;
-  for (let i = 0; i < wait / DT; i++) { sim.setInput(p.id, { ...emptyInput(), fc: p._fc || 0, uc: p._uc || 0 }); sim.step(); }
+  for (let i = 0; i < wait / DT && !sim.over; i++) { sim.setInput(p.id, { ...emptyInput(), fc: p._fc || 0, uc: p._uc || 0 }); sim.step(); }
 }
 
 section('hache, bûches, entrepôt');
@@ -107,6 +110,7 @@ function clear(M, ax, az, bx, bz) {
 section('dix bûches');
 {
   const sim = new Sim({ seed: 11 });
+  sim.clock.t = -200;   // une longue journée : le test prend son temps
   const p = sim.players[0], M = sim.map;
   let guard = 0;
   while (sim.stock.bois < 10 && guard++ < 40) {
@@ -161,7 +165,7 @@ section('jour, crépuscule, nuit, aube');
   sim.players[0].hp = 999; idle(sim, 0.2);
   ok(!sim.night && sim.clock.day === 2, 'l\'aube du jour 2');
   idle(sim, 3.5);
-  ok(sim.foes.length === 0, 'au soleil, les squelettes tombent en poussière');
+  ok(sim.foes.every((f) => f.guard), 'au soleil, les squelettes tombent en poussière (restent les gardes des coffres)');
   ok(sim.players[0].hp === HP.player, 'tout le monde est soigné à l\'aube');
 }
 
@@ -256,6 +260,7 @@ section('instantané');
 section('le bot');
 {
   const sim = new Sim({ seed: 8, bots: 1 });
+  sim.clock.t = -150;
   const bot = sim.players.find((p) => p.bot);
   idle(sim, 150);
   ok(sim.stock.bois + sim.logs.length > 2 || bot.felled > 1, `le jour, il coupe du bois (${bot.felled} arbres, ${sim.stock.bois} au stock)`);
@@ -551,6 +556,37 @@ section('sièges, dix nuits, sauvegarde');
   const sim = new Sim({ seed: 31, players: [], bots: 2 }); sim.openCrypt();
   for (let i = 0; i < 40 / DT && !sim.crypt.gate; i++) sim.step();
   ok(sim.crypt.gate, 'deux bots descendent et tiennent chacun un levier');
+}
+// ---------------------------------------------------------------- un début plus vif : jour court, bûches empilées, cloche, coffres
+section('début de partie');
+{
+  ok(dayLen(1) < dayLen(2) && dayLen(1) <= 160, `le premier jour est court (${dayLen(1)} s, puis ${dayLen(2)} s)`);
+  const sim = new Sim({ seed: 12 }); const p = sim.players[0], M = sim.map;
+  for (let i = 0; i < 3; i++) sim.logs.push({ id: sim.nextLog++, x: p.x + 0.6 + i * 0.3, z: p.z, y: p.y, rot: 0, at: 0, ready: true });
+  for (let i = 0; i < LOAD_MAX; i++) press(sim, p, 'uc');
+  ok(p.carry === 'bois' && p.load === LOAD_MAX, `on empile jusqu'à ${LOAD_MAX} bûches`);
+  p.x = M.depot.x; p.z = M.depot.z; press(sim, p, 'uc');
+  ok(sim.stock.bois === LOAD_MAX && !p.carry, 'les trois se rangent d\'un coup');
+  sim.goal = 4; p.x = M.campfire.x + 1.5; p.z = M.campfire.z;
+  ok(/cloche/i.test(sim.prompt(p.id)?.text || ''), 'au feu de camp : sonner la cloche');
+  press(sim, p, 'uc', 0.2);
+  ok(sim.clock.t >= sim.dayLen - CYCLE.dusk - 1, 'la cloche fait tomber la nuit');
+  const g = new Sim({ seed: 12, chests: true }); const q = g.players[0];
+  ok(g.chests.length >= 2, `des coffres dans les bois (${g.chests.length})`);
+  const c0 = g.chests[0], gd = g.foes.filter((f) => f.guard === c0.id);
+  ok(gd.length === 1 && gd[0].state === 'sleep' && Math.hypot(c0.x - M.campfire.x, c0.z - M.campfire.z) < 45, 'le premier est près du village, un seul garde endormi');
+  ok(g.foes.filter((f) => f.guard !== c0.id).length >= 2, 'les autres sont mieux gardés');
+  idle(g, 3); ok(gd[0].state === 'sleep', 'le garde dort tant qu\'on est loin');
+  g.teleport(q, c0.x + 6, c0.z, 0); idle(g, 0.2);
+  ok(gd[0].state === 'awaken', 'il se réveille quand on approche, même de jour');
+  q.hp = 9999; g.teleport(q, c0.x + 1.2, c0.z, -Math.PI / 2);
+  ok(/coffre/i.test(g.prompt(q.id)?.text || ''), 'invite : ouvrir le coffre');
+  const b0 = g.stock.bois; press(g, q, 'uc', 1.5);
+  ok(c0.open && g.stock.bois === b0 + 5, 'le premier coffre donne 5 bûches');
+  g.teleport(q, 300, 0, 0); idle(g, 12);
+  ok(gd[0].state === 'sleep' || gd[0].state === 'dead' || Math.hypot(gd[0].x - c0.x, gd[0].z - c0.z) < 6, 'sans personne, le garde retourne à son coffre');
+  const w = new Sim({ seed: 12, chests: true }); applyState(w, JSON.parse(JSON.stringify(encodeState(g))), -1);
+  ok(w.chests.length === g.chests.length && w.chests[0].open, 'les coffres passent chez l\'invité');
 }
 // ---------------------------------------------------------------- les capacités (F)
 {

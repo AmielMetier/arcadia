@@ -4,9 +4,9 @@
 // propre déplacement est prédit chez lui (predict) puis recalé sur l'hôte. Moteur PUR.
 import { DT, SPEED, BEAM, P_R, jobOf, BUILDS } from './sim.js';
 
-const ACTS = [null, 'chop', 'strike', 'pick', 'store', 'feed', 'take', 'drop', 'repair', 'build', 'gather', 'eat', 'relight', 'ability'];
+const ACTS = [null, 'chop', 'strike', 'pick', 'store', 'feed', 'take', 'drop', 'repair', 'build', 'gather', 'eat', 'relight', 'ability', 'open'];
 const SITES = Object.keys(BUILDS), BST = ['ruine', 'chantier', 'debout'];
-const STATES = ['awaken', 'walk', 'attack', 'dead', 'rise'];
+const STATES = ['awaken', 'walk', 'attack', 'dead', 'rise', 'sleep'];
 const KINDS = ['minion', 'warrior', 'knight', 'king'];
 const r2 = (v) => Math.round(v * 100), r3 = (v) => Math.round(v * 1000);
 
@@ -18,12 +18,13 @@ export function encodeState(sim) {
     bd: SITES.map((id) => [BST.indexOf(sim.build[id].state), sim.build[id].prog]),
     br: sim.berries.map((b) => (b.ready ? 1 : 0)).join(''), v: Math.round(sim.village.hp), g: sim.goal, o: sim.over ? sim.over.reason : 0, ts: Math.round(sim.t * 1000),
     bz: sim.braziers.map((b) => Math.round(b.fuel * 10)),
+    ch: sim.chests.map((c) => [c.id, r2(c.x), r2(c.z), r3(c.rot), c.open ? 1 : 0]),
     cr: sim.crypt.open ? [sim.crypt.gate ? 1 : 0, r2(sim.crypt.leverT), (sim.crypt.brume ? 1 : 0) | (sim.crypt.throne ? 2 : 0), sim.crypt.king ?? -1, sim.crypt.phase, sim.crypt.torches.map((t) => (t ? 1 : 0)).join('')] : 0,
     fx: sim.flares.map((f) => [r2(f.x), r2(f.z), r2(f.until - sim.t)]),
     bs: sim.bars.map((b) => [b.id, r2(b.x), r2(b.z), r3(b.rot), Math.round(b.hp), r2(b.until - sim.t)]),
     p: sim.players.map((p) => [p.id, r2(p.x), r2(p.y), r2(p.z), r3(p.yaw), Math.round(p.hp), p.maxHp,
       (p.ground ? 1 : 0) | (p.down ? 2 : 0) | (p.dead ? 4 : 0) | (p.carry === 'bois' ? 8 : 0) | (p.carry === 'poutre' ? 16 : 0) | (p.hurtT > 0 ? 32 : 0) | (p.cold ? 64 : 0) | (p.carry === 'vivres' ? 128 : 0),
-      ACTS.indexOf(p.act), r2(p.actT), r2(p.speed), p.beam ?? -1, p.end, Math.round(p.downT * 10), r2(p.revive), p.reviving ?? -1, p.kills, Math.round(p.food), r2(p.cd), r2(p.guardT), p.lever]),
+      ACTS.indexOf(p.act), r2(p.actT), r2(p.speed), p.beam ?? -1, p.end, Math.round(p.downT * 10), r2(p.revive), p.reviving ?? -1, p.kills, Math.round(p.food), r2(p.cd), r2(p.guardT), p.lever, p.load || 0]),
     f: sim.foes.map((f) => [f.id, KINDS.indexOf(f.kind), r2(f.x), r2(f.y), r2(f.z), r3(f.yaw), STATES.indexOf(f.state), r2(f.t), Math.round(f.hp), f.stun > 0 ? 1 : 0, r2(f.atkT), f.rises, f.maxHp || 0, f.enrage ? 1 : 0]),
     l: sim.logs.map((l) => [l.id, r2(l.x), r2(l.y), r2(l.z), r3(l.rot), l.ready ? 1 : 0]),
     b: sim.beams.map((b) => [b.id, r2(b.x), r2(b.y), r2(b.z), r3(b.rot), b.h[0] ?? -1, b.h[1] ?? -1, (b.lifted ? 1 : 0) | (b.ready ? 2 : 0)]),
@@ -64,6 +65,7 @@ export function applyState(sim, s, me) {
   if (s.br) [...s.br].forEach((c, i) => { if (sim.berries[i]) sim.berries[i].ready = c === '1'; });
   sim.over = s.o ? { reason: s.o } : null;
   s.bz.forEach((f, i) => { if (sim.braziers[i]) sim.braziers[i].fuel = f / 10; });
+  if (s.ch) sim.chests = s.ch.map((r) => ({ id: r[0], x: r[1] / 100, z: r[2] / 100, rot: r[3] / 1000, open: !!r[4] }));
   const C = sim.crypt;
   if (s.cr) {
     if (!C.open) { C.open = true; C.torches = sim.map.crypt.torches.map(() => true); }
@@ -82,7 +84,7 @@ export function applyState(sim, s, me) {
     const st = { x: r[1] / 100, y: r[2] / 100, z: r[3] / 100, yaw: r[4] / 1000 };
     const fl = r[7];
     Object.assign(p, { hp: r[5], maxHp: r[6], ground: !!(fl & 1), down: !!(fl & 2), dead: !!(fl & 4), carry: fl & 8 ? 'bois' : fl & 16 ? 'poutre' : fl & 128 ? 'vivres' : null, hurtT: fl & 32 ? 0.35 : 0, cold: !!(fl & 64), food: r[17] ?? 100,
-      act: ACTS[r[8]] || null, actT: r[9] / 100, speed: r[10] / 100, beam: r[11] < 0 ? null : r[11], end: r[12], downT: r[13] / 10, revive: r[14] / 100, reviving: r[15] < 0 ? null : r[15], kills: r[16], cd: (r[18] || 0) / 100, guardT: (r[19] || 0) / 100, lever: r[20] ?? -1 });
+      act: ACTS[r[8]] || null, actT: r[9] / 100, speed: r[10] / 100, beam: r[11] < 0 ? null : r[11], end: r[12], downT: r[13] / 10, revive: r[14] / 100, reviving: r[15] < 0 ? null : r[15], kills: r[16], cd: (r[18] || 0) / 100, guardT: (r[19] || 0) / 100, lever: r[20] ?? -1, load: r[21] || 0 });
     if (id === me) { mine = st; p._srv = st; continue; }
     // les autres : on vise la position reçue, l'affichage s'en approche en douceur (smooth)
     p._to = st;
@@ -124,7 +126,7 @@ export function predict(sim, p, inp) {
   if (len > 1) { wx /= len; wz /= len; }
   let sp;
   if (p.carry === 'poutre') { const b = sim.beams.find((o) => o.id === p.beam); sp = !b || !b.lifted ? 0 : b.h.filter((id) => id !== null).length === 2 ? BEAM.speed : BEAM.alone; }
-  else sp = p.carry ? SPEED.carry : inp.walk ? SPEED.walk : SPEED.run * (jobOf(p).speed || 1);
+  else sp = p.carry ? SPEED.carry - 0.3 * Math.max(0, (p.load || 1) - 1) : inp.walk ? SPEED.walk : SPEED.run * (jobOf(p).speed || 1);
   let nx = p.x + wx * sp * DT, nz = p.z + wz * sp * DT;
   if (len > 0.05) { let d = Math.atan2(wx, wz) - p.yaw; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; p.yaw += d * Math.min(1, DT * 12); }
   if (M.isWater(nx, nz)) { nx = p.x; nz = p.z; }

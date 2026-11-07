@@ -28,10 +28,19 @@ export const ACT = {
   eat: { dur: 1.0, at: 0.6 },         // manger à l'entrepôt
   relight: { dur: 1.1, at: 0.8 },     // rallumer une torche de la crypte
   ability: { dur: 0.8, hit: 0.4 },    // la capacité du métier (F)
+  open: { dur: 1.2, at: 0.9 },        // ouvrir un coffre
 };
 export const REACH = { chop: 1.6, pick: 1.9, store: 3.2, feed: 2.3, strike: 2.4, revive: 1.9, build: 2.4, gather: 1.9, site: 3.2 };
 export const P_R = 0.42;
-export const CYCLE = { day: 270, dusk: 25, night: 150, dawn: 10 };
+export const CYCLE = { day: 220, first: 150, dusk: 25, night: 150, dawn: 10 };
+export const dayLen = (day) => (day <= 1 ? CYCLE.first : CYCLE.day);
+export const LOAD_MAX = 3;           // bûches portées à la fois
+// coffres gardés dans les bois : ce qu'on y trouve
+export const LOOT = {
+  bois: { text: '5 bûches rangées à l\'entrepôt' }, vivres: { text: '5 vivres rangés à l\'entrepôt' }, poutre: { text: '2 poutres rangées à l\'entrepôt' },
+  huile: { text: 'de l\'huile : tous les braseros sont pleins' }, elixir: { text: 'un élixir : toute l\'équipe est soignée, capacités prêtes' },
+};
+export const CHEST = { r: 1.4, wake: 11, leash: 22, open: 1.2 };
 export const HP = { player: 100, revived: 45, bleed: 40, revive: 3 };
 export const FUEL = { start: 70, log: 50, max: 150, hit: 20, burn: 0.6 };
 export const FOES = {
@@ -104,6 +113,7 @@ export class Sim {
     this.berries = []; this.won = false;
     this.crypt = { open: false, gate: false, leverT: 0, held: [false, false], brume: false, throne: false, king: null, phase: 0, summonAt: 0, torches: null };
     this.flares = []; this.bars = []; this.nextBar = 1;
+    this.chests = []; this.nextChest = 1; this.chestSites = null;
     this.map = createValley(seed);
     this.nav = createNav(this.map);
     this.rng = makeRng(seed * 31 + 5);
@@ -123,6 +133,7 @@ export class Sim {
     for (let i = 0; i < bots; i++) list.push({ id: 100 + i, name: BOT_NAMES[i % BOT_NAMES.length], job: 'chevalier', color: '#6aa0e0', bot: true });
     this.berries = this.map.bushes.map((b) => ({ id: b.id, ready: true, at: 0 }));
     this.players = list.map((p, i) => this.makePlayer(p, i));
+    if (this.players.length) this.placeChests();
     this.inputs = new Map();
     this.lastC = new Map();
   }
@@ -133,7 +144,7 @@ export class Sim {
     const job = JOBS[p.job] ? p.job : 'bucheron';
     return { id: p.id, name: p.name, job, color: p.color || '#e0a040', bot: !!p.bot, x, z, y: this.map.heightAt(x, z), vy: 0, ground: true,
       yaw: s.yaw, speed: 0, moving: 0, carry: null, beam: null, end: 0, act: null, actT: 0, target: null,
-      hp: JOBS[job].hp + this.hpBonus(), maxHp: JOBS[job].hp + this.hpBonus(), food: FOOD.max, cd: 0, guardT: 0, lever: -1, cold: false, deadT: 0, down: false, downT: 0, dead: false, revive: 0, reviving: null, hurtT: 0, stored: 0, felled: 0, kills: 0, ai: null };
+      hp: JOBS[job].hp + this.hpBonus(), maxHp: JOBS[job].hp + this.hpBonus(), food: FOOD.max, cd: 0, guardT: 0, lever: -1, load: 0, cold: false, deadT: 0, down: false, downT: 0, dead: false, revive: 0, reviving: null, hurtT: 0, stored: 0, felled: 0, kills: 0, ai: null };
   }
   // un joueur arrive en cours de partie (près du feu de camp)
   addPlayer(p) {
@@ -159,10 +170,12 @@ export class Sim {
   // lâcher ce qu'on porte (à terre, en partant)
   release(p) {
     if (p.carry === 'vivres') this.stock.nourriture += 1;   // le panier n'est pas perdu
-    if (p.carry === 'bois') { const x = p.x + 0.6, z = p.z; this.logs.push({ id: this.nextLog++, x, z, y: this.map.heightAt(x, z), rot: p.yaw, at: this.t, ready: true }); }
+    if (p.carry === 'bois') for (let i = 0; i < Math.max(1, p.load); i++) { const x = p.x + 0.6 + i * 0.35, z = p.z + i * 0.5; this.logs.push({ id: this.nextLog++, x, z, y: this.map.heightAt(x, z), rot: p.yaw, at: this.t, ready: true }); }
     if (p.carry === 'poutre') this.letGo(p);
-    p.carry = null; p.beam = null;
+    p.carry = null; p.beam = null; p.load = 0;
   }
+  // une bûche de moins dans les bras
+  dropOne(p) { p.load = Math.max(0, (p.load || 1) - 1); if (!p.load) p.carry = null; }
   fallen = (id) => this.trees[id].down;
   player(id) { return this.players.find((p) => p.id === id); }
   foe(id) { return this.foes.find((f) => f.id === id); }
@@ -172,12 +185,13 @@ export class Sim {
   get darkness() {
     const c = this.clock;
     if (c.phase === 'nuit') return 1;
-    if (c.t > CYCLE.day - CYCLE.dusk) return (c.t - (CYCLE.day - CYCLE.dusk)) / CYCLE.dusk;
+    if (c.t > this.dayLen - CYCLE.dusk) return (c.t - (this.dayLen - CYCLE.dusk)) / CYCLE.dusk;
     if (c.day > 1 && c.t < CYCLE.dawn) return 1 - c.t / CYCLE.dawn;
     return 0;
   }
   // temps avant le prochain changement (pour l'horloge à l'écran)
-  get timeLeft() { const c = this.clock; return c.phase === 'nuit' ? nightLen(c.day) - c.t : CYCLE.day - c.t; }
+  get timeLeft() { const c = this.clock; return c.phase === 'nuit' ? nightLen(c.day) - c.t : this.dayLen - c.t; }
+  get dayLen() { return dayLen(this.clock.day); }
   get D() { return DIFF[this.diff]; }
   built(id) { return this.build[id] && this.build[id].state === 'debout'; }
   hpBonus() { return this.build ? 15 * ((this.built('maison1') ? 1 : 0) + (this.built('maison2') ? 1 : 0)) : 0; }
@@ -206,7 +220,7 @@ export class Sim {
     for (const b of this.map.braziers) if (this.braziers[b.id].fuel > 0 && Math.hypot(x - b.x, z - b.z) < LIGHT_R) return true;
     return false;
   }
-  skipToDusk() { if (this.clock.phase === 'jour' && this.clock.t < CYCLE.day - CYCLE.dusk) this.clock.t = CYCLE.day - CYCLE.dusk; }
+  skipToDusk() { if (this.clock.phase === 'jour' && this.clock.t < this.dayLen - CYCLE.dusk) this.clock.t = this.dayLen - CYCLE.dusk; }
 
   // ------------------------------------------------------------------ un pas
   step() {
@@ -236,8 +250,8 @@ export class Sim {
     if (this.crypt.open) return;   // le temps s'arrête : tout se joue dans la crypte
     c.t += DT;
     if (c.phase === 'jour') {
-      if (c.t >= CYCLE.day - CYCLE.dusk && !c.duskSaid) { c.duskSaid = true; this.events.push({ t: 'dusk' }); this.duskSnap = this.snapshot(); }
-      if (c.t >= CYCLE.day) { c.phase = 'nuit'; c.t = 0; this.startNight(); }
+      if (c.t >= this.dayLen - CYCLE.dusk && !c.duskSaid) { c.duskSaid = true; this.events.push({ t: 'dusk' }); this.duskSnap = this.snapshot(); }
+      if (c.t >= this.dayLen) { c.phase = 'nuit'; c.t = 0; this.startNight(); }
     } else if (c.t >= nightLen(c.day)) {
       c.phase = 'jour'; c.t = 0; c.day++; c.duskSaid = false;
       this.dawn();
@@ -276,6 +290,7 @@ export class Sim {
     if (this.built('moulin')) this.stock.nourriture += 4;
     const n = this.clock.day - 1;
     this.events.push({ t: 'dawn', n });
+    if (!(MODES[this.mode] && n >= MODES[this.mode])) this.placeChests();
     if (this.goal === 5) this.setGoal(6);
     // l'expédition : dix nuits tenues
     if (MODES[this.mode] && n >= MODES[this.mode]) this.openCrypt();
@@ -310,7 +325,7 @@ export class Sim {
     }
     // relever un équipier : E tenu tout près de lui
     p.reviving = null;
-    if (inp.hold && !p.carry && !p.act) {
+    if (inp.hold && p.carry !== 'poutre' && !p.act) {
       const m = this.players.find((o) => o !== p && o.down && Math.hypot(o.x - p.x, o.z - p.z) < REACH.revive);
       if (m) { p.reviving = m.id; p.yaw = Math.atan2(m.x - p.x, m.z - p.z); }
       // tenir un levier de la crypte
@@ -347,7 +362,7 @@ export class Sim {
     if (len > 1) { wx /= len; wz /= len; }
     const busy = !!p.act || p.reviving !== null || p.lever >= 0;
     const J = jobOf(p);
-    let sp = busy ? 0 : p.carry === 'poutre' ? this.beamSpeed(p) : p.carry ? SPEED.carry : inp.walk ? SPEED.walk : SPEED.run * (J.speed || 1);
+    let sp = busy ? 0 : p.carry === 'poutre' ? this.beamSpeed(p) : p.carry ? SPEED.carry - 0.3 * Math.max(0, (p.load || 1) - 1) : inp.walk ? SPEED.walk : SPEED.run * (J.speed || 1);
     if (inp.walk && sp > SPEED.walk) sp = SPEED.walk;
     const k = Math.min(1, len);
     let nx = p.x + wx * sp * DT, nz = p.z + wz * sp * DT;
@@ -416,20 +431,24 @@ export class Sim {
       else this.letGo(p);
       return;
     }
+    if (this.players.some((o) => o !== p && o.down && Math.hypot(o.x - p.x, o.z - p.z) < REACH.revive)) return; // E se tient pour relever
     if (p.carry) {
       if (p.carry === 'bois' && jobOf(p).repair && this.village.hp < WAREHOUSE_HP - 20 && Math.hypot(p.x - M.depot.x, p.z - M.depot.z) < REACH.store) { p.act = 'repair'; p.actT = 0; p.yaw = Math.atan2(M.warehouse.x - p.x, M.warehouse.z - p.z); return; }
       const b = this.brazierNear(p.x, p.z, REACH.feed);
       if (b && p.carry === 'bois' && this.braziers[b.id].fuel < FUEL.max - 5) { p.act = 'feed'; p.actT = 0; p.target = b.id; p.yaw = Math.atan2(b.x - p.x, b.z - p.z); return; }
       if (Math.hypot(p.x - M.depot.x, p.z - M.depot.z) < REACH.store) { p.act = 'store'; p.actT = 0; p.yaw = Math.atan2(M.warehouse.x - p.x, M.warehouse.z - p.z); return; }
+      if (p.carry === 'bois' && p.load < LOAD_MAX) { const l = this.logNear(p.x, p.z, REACH.pick); if (l) { p.act = 'pick'; p.actT = 0; p.target = l.id; p.yaw = Math.atan2(l.x - p.x, l.z - p.z); return; } }
       if (p.carry === 'vivres') return;   // un panier ne se pose pas : on le range
       p.act = 'drop'; p.actT = 0; return;
     }
-    if (this.players.some((o) => o !== p && o.down && Math.hypot(o.x - p.x, o.z - p.z) < REACH.revive)) return; // E se tient pour relever
     // la crypte : y descendre, en remonter, rallumer une torche
     if (this.crypt.open && Math.hypot(p.x - M.cryptDoor.x, p.z - M.cryptDoor.z) < 3) { this.teleport(p, M.crypt.spawn.x, M.crypt.spawn.z + 1.5, Math.PI); this.events.push({ t: 'descend', pid: p.id }); return; }
     if (this.inCrypt(p.x, p.z) && Math.hypot(p.x - M.crypt.spawn.x, p.z - M.crypt.spawn.z) < 1.4) { this.teleport(p, M.cryptDoor.x, M.cryptDoor.z + 1.5, 0); return; }
     const torch = this.torchNear(p.x, p.z);
     if (torch) { p.act = 'relight'; p.actT = 0; p.target = torch.id; return; }
+    const ch = this.chestNear(p.x, p.z);
+    if (ch) { p.act = 'open'; p.actT = 0; p.target = ch.id; p.yaw = Math.atan2(ch.x - p.x, ch.z - p.z); return; }
+    if (this.canRing(p)) { this.ring(p); return; }
     // ordre : ce qui traîne par terre, puis l'entrepôt (manger, reprendre du bois), les baies, les ruines
     const l = this.logNear(p.x, p.z, REACH.pick);
     const e = this.beamEndNear(p.x, p.z);
@@ -508,19 +527,19 @@ export class Sim {
       const l = this.logs.find((o) => o.id === p.target);
       if (!l) return;
       this.logs = this.logs.filter((o) => o !== l);
-      p.carry = 'bois';
+      if (p.carry === 'bois') p.load = Math.min(LOAD_MAX, p.load + 1); else { p.carry = 'bois'; p.load = 1; }
       this.events.push({ t: 'pick', pid: p.id });
       if (this.goal === 1) this.setGoal(2);
     } else if (p.act === 'store') {
       if (!p.carry) return;
       if (p.carry === 'vivres') { this.stock.nourriture += FOOD.berries; p.carry = null; this.events.push({ t: 'storeFood', pid: p.id, n: this.stock.nourriture }); return; }
-      this.stock.bois++; p.stored++; p.carry = null;
-      this.events.push({ t: 'store', pid: p.id, n: this.stock.bois });
+      const k = Math.max(1, p.load); this.stock.bois += k; p.stored += k; p.carry = null; p.load = 0;
+      this.events.push({ t: 'store', pid: p.id, n: this.stock.bois, k });
       if (this.goal === 2) this.setGoal(3);
     } else if (p.act === 'feed') {
       if (!p.carry) return;
       const B = this.braziers[p.target];
-      B.fuel = Math.min(FUEL.max, B.fuel + FUEL.log * (jobOf(p).feed || 1)); p.carry = null;
+      B.fuel = Math.min(FUEL.max, B.fuel + FUEL.log * (jobOf(p).feed || 1)); this.dropOne(p);
       this.events.push({ t: 'feed', pid: p.id, brazier: p.target, fuel: B.fuel });
       if (this.goal === 4) this.setGoal(5);
     } else if (p.act === 'build') {
@@ -542,20 +561,21 @@ export class Sim {
       if (this.crypt.torches) this.crypt.torches[p.target] = true;
       this.events.push({ t: 'relight', pid: p.id, torch: p.target });
     } else if (p.act === 'ability') this.ability(p);
+    else if (p.act === 'open') this.openChest(p, p.target);
     else if (p.act === 'repair') {
       if (!p.carry) return;
-      p.carry = null; this.village.hp = Math.min(WAREHOUSE_HP, this.village.hp + jobOf(p).repair);
+      this.dropOne(p); this.village.hp = Math.min(WAREHOUSE_HP, this.village.hp + jobOf(p).repair);
       this.events.push({ t: 'repair', pid: p.id, hp: this.village.hp });
     } else if (p.act === 'take') {
       if (p.carry || this.stock.bois <= 0) return;
-      this.stock.bois--; p.carry = 'bois';
+      this.stock.bois--; p.carry = 'bois'; p.load = 1;
       this.events.push({ t: 'take', pid: p.id, n: this.stock.bois });
     } else if (p.act === 'drop') {
       if (!p.carry) return;
       let x = p.x + Math.sin(p.yaw) * 0.9, z = p.z + Math.cos(p.yaw) * 0.9;
       [x, z] = M.collide(x, z, 0.3, this.fallen);
       this.logs.push({ id: this.nextLog++, x, z, y: M.heightAt(x, z), rot: p.yaw + Math.PI / 2, at: this.t, ready: true });
-      p.carry = null;
+      this.dropOne(p);
       this.events.push({ t: 'drop', pid: p.id });
     }
   }
@@ -590,6 +610,7 @@ export class Sim {
   }
   // la cible d'un squelette : un joueur proche, sinon un brasero allumé, sinon l'entrepôt
   chooseTarget(f) {
+    if (f.guard) return this.guardTarget(f);
     // le Rempart du chevalier attire tout ce qui est proche
     const guard = this.players.find((p) => p.guardT > 0 && !p.down && Math.hypot(p.x - f.x, p.z - f.z) < ABILITY.rempart.r);
     if (guard) return { type: 'p', id: guard.id };
@@ -609,6 +630,7 @@ export class Sim {
   // point visé et distance à laquelle on frappe
   targetPoint(f, tg) {
     if (tg.type === 'none') return null;
+    if (tg.type === 'home') return { x: tg.x, z: tg.z, reach: 0.8 };
     if (tg.type === 'bar') { const b = this.bars.find((o) => o.id === tg.id); return b ? { x: b.x, z: b.z, reach: ABILITY.barricade.r + 0.9 } : null; }
     if (tg.type === 'p') { const p = this.player(tg.id); return p && !p.down && !p.dead ? { x: p.x, z: p.z, reach: FOES[f.kind].reach } : null; }
     if (tg.type === 'b') { const b = this.map.braziers[tg.id]; return this.braziers[tg.id].fuel > 0 ? { x: b.x, z: b.z, reach: 1.25 } : null; }
@@ -621,6 +643,7 @@ export class Sim {
     for (const f of this.foes) {
       const F = FOES[f.kind];
       f.t += DT; f.stun = Math.max(0, f.stun - DT);
+      if (f.state === 'sleep') { if (this.guardWakes(f)) { f.state = 'awaken'; f.t = 0; this.events.push({ t: 'guardWake', foe: f.id, x: f.x, z: f.z }); } continue; }
       if (f.state === 'awaken') { if (f.t >= RISE.awaken) { f.state = 'walk'; f.t = 0; } continue; }
       if (f.state === 'dead') {
         // dans la brume, il se relève (deux fois au plus) ; dans la lumière, il reste à terre
@@ -644,6 +667,7 @@ export class Sim {
         if (f.atkT >= F.dur) { f.state = 'walk'; f.atkT = 0; }
         continue;
       }
+      if (d < tp.reach && f.tgt.type === 'home') { f.state = 'sleep'; f.t = 0; f.hp = Math.min(f.maxHp || FOES[f.kind].hp, f.hp + 20); continue; }
       if (d < tp.reach) { f.state = 'attack'; f.atkT = 0; this.events.push({ t: 'swingFoe', foe: f.id }); continue; }
       // chemin : recalculé quand la cible a bougé, ou de temps en temps
       if (!f.path || this.t - f.pathAt > 2 || (f.pathTo && Math.hypot(f.pathTo[0] - tp.x, f.pathTo[1] - tp.z) > 2.5)) {
@@ -736,6 +760,81 @@ export class Sim {
     return true;
   }
 
+  // ------------------------------------------------------------------ coffres gardés et cloche
+  // des clairières dans les bois, entre 28 et 95 m du feu de camp, loin des bâtiments
+  sites() {
+    if (this.chestSites) return this.chestSites;
+    const M = this.map, r = makeRng(this.seed * 7 + 3), out = [];
+    for (let k = 0; k < 4000 && out.length < 14; k++) {
+      const a = r.range(0, Math.PI * 2), d = r.range(28, 95), x = Math.sin(a) * d, z = M.campfire.z + Math.cos(a) * d;
+      if (M.isWater(x, z) || Math.abs(M.riverZ(x) - z) < 6) continue;
+      const [cx, cz] = M.collide(x, z, 1.3);
+      if (Math.hypot(cx - x, cz - z) > 0.01) continue;
+      if (M.buildings.some((b) => Math.hypot(b.x - x, b.z - z) < 12) || Math.hypot(x - M.cryptDoor.x, z - M.cryptDoor.z) < 24) continue;
+      if (out.some((o) => Math.hypot(o.x - x, o.z - z) < 22)) continue;
+      out.push({ x, z, d });
+    }
+    out.sort((a, b) => a.d - b.d);
+    return (this.chestSites = out);
+  }
+  // à chaque aube (et au premier matin) : de nouveaux coffres, chacun gardé par des squelettes endormis
+  placeChests() {
+    const S = this.sites(), day = this.clock.day;
+    this.chests = this.chests.filter((c) => !c.open);
+    const want = Math.min(S.length, 2 + Math.ceil(this.players.length / 2));
+    const kinds = Object.keys(LOOT);
+    let tries = 0;
+    while (this.chests.length < want && tries++ < 50) {
+      // le tout premier coffre est près du village, avec un seul garde : de quoi apprendre à se battre
+      const first = day === 1 && this.chests.length === 0;
+      const site = first ? S[0] : S[this.rng.int(1, S.length - 1)];
+      if (!site || this.chests.some((c) => c.site === S.indexOf(site))) continue;
+      const loot = first ? 'bois' : kinds[this.rng.int(0, kinds.length - 1)];
+      const c = { id: this.nextChest++, site: S.indexOf(site), x: site.x, z: site.z, rot: this.rng.range(0, Math.PI * 2), loot, open: false };
+      this.chests.push(c);
+      const n = first ? 1 : Math.min(4, 1 + Math.ceil(day / 3) + (this.players.length > 2 ? 1 : 0));
+      for (let i = 0; i < n; i++) {
+        const a = c.rot + i * (Math.PI * 2 / n) + 0.4, kind = !first && (i === 1 || day >= 6 && i === 2) ? 'warrior' : 'minion';
+        const f = this.spawnFoeAt(kind, c.x + Math.sin(a) * 2.6, c.z + Math.cos(a) * 2.6, true);
+        f.state = 'sleep'; f.guard = c.id; f.home = [f.x, f.z]; f.yaw = a;
+      }
+    }
+  }
+  chestNear(x, z) { for (const c of this.chests) if (!c.open && Math.hypot(c.x - x, c.z - z) < CHEST.r + 0.6) return c; return null; }
+  guardWakes(f) {
+    const c = this.chests.find((o) => o.id === f.guard);
+    if (!c || c.open) return true;
+    return this.players.some((p) => !p.down && !p.dead && Math.hypot(p.x - c.x, p.z - c.z) < CHEST.wake);
+  }
+  // un garde défend son coffre et n'en va pas trop loin
+  guardTarget(f) {
+    const c = this.chests.find((o) => o.id === f.guard);
+    const cx = c ? c.x : f.home[0], cz = c ? c.z : f.home[1];
+    let best = null, bd = CHEST.leash;
+    for (const p of this.players) { if (p.down || p.dead) continue; const d = Math.hypot(p.x - cx, p.z - cz); if (d < bd) { bd = d; best = { type: 'p', id: p.id }; } }
+    return best || { type: 'home', x: f.home[0], z: f.home[1] };
+  }
+  openChest(p, id) {
+    const c = this.chests.find((o) => o.id === id);
+    if (!c || c.open) return;
+    c.open = true; const S = this.stock;
+    if (c.loot === 'bois') S.bois += 5;
+    else if (c.loot === 'vivres') S.nourriture += 5;
+    else if (c.loot === 'poutre') S.poutre += 2;
+    else if (c.loot === 'huile') for (const b of this.braziers) b.fuel = FUEL.max;
+    else if (c.loot === 'elixir') for (const o of this.players) { if (o.dead) continue; if (o.down) { o.down = false; o.revive = 0; } o.hp = o.maxHp; o.cd = 0; }
+    this.stats.chests = (this.stats.chests || 0) + 1;
+    this.events.push({ t: 'chest', pid: p.id, chest: c.id, loot: c.loot, x: c.x, z: c.z });
+    // les gardes encore couchés se lèvent
+    for (const f of this.foes) if (f.guard === c.id && f.state === 'sleep') { f.state = 'awaken'; f.t = 0; }
+  }
+  // la cloche du feu de camp : on appelle la nuit tout de suite
+  canRing(p) {
+    const c = this.map.campfire;
+    return this.clock.phase === 'jour' && this.goal >= 4 && !this.crypt.open && this.clock.t < this.dayLen - CYCLE.dusk && Math.hypot(p.x - c.x, p.z - c.z) < 2.6;
+  }
+  ring(p) { this.skipToDusk(); this.events.push({ t: 'bell', pid: p.id }); }
+
   // ------------------------------------------------------------------ la crypte
   alive() { return this.players.filter((p) => !p.dead); }
   teleport(p, x, z, yaw) { p.x = x; p.z = z; p.y = this.map.heightAt(x, z); p.yaw = yaw; p.vy = 0; p.ground = true; }
@@ -798,12 +897,12 @@ export class Sim {
       }
     }
   }
-  spawnFoeAt(kind, x, z) {
+  spawnFoeAt(kind, x, z, quiet) {
     [x, z] = this.map.collide(x, z, 0.4, this.fallen);
     const F = FOES[kind];
     const f = { id: this.nextFoe++, kind, x, z, y: this.map.heightAt(x, z), yaw: 0, hp: F.hp, maxHp: F.hp, state: 'awaken', t: 0, rises: 0, stun: 0, tgt: null, path: null, pathAt: -9, pathTo: null, atkT: 0, stuck: 0 };
     this.foes.push(f);
-    this.events.push({ t: 'spawn', foe: f.id, kind, x, z });
+    if (!quiet) this.events.push({ t: 'spawn', foe: f.id, kind, x, z });
     return f;
   }
 
@@ -922,7 +1021,7 @@ export class Sim {
     const p = this.player(id), M = this.map;
     if (!p || p.act || p.down || p.dead) return null;
     const mate = this.players.find((o) => o !== p && o.down && Math.hypot(o.x - p.x, o.z - p.z) < REACH.revive + 0.4);
-    if (mate && !p.carry) return { key: 'E', hold: true, text: `Relever ${mate.name} (tenir E)`, hp: mate.revive / HP.revive };
+    if (mate && p.carry !== 'poutre') return { key: 'E', hold: true, text: `Relever ${mate.name} (tenir E)`, hp: mate.revive / HP.revive };
     if (p.carry === 'poutre') {
       const b = this.beams.find((o) => o.id === p.beam);
       if (!b) return null;
@@ -934,8 +1033,10 @@ export class Sim {
       if (p.carry === 'bois' && jobOf(p).repair && this.village.hp < WAREHOUSE_HP - 20 && Math.hypot(p.x - M.depot.x, p.z - M.depot.z) < REACH.store) return { key: 'E', text: 'Réparer l\'entrepôt avec la bûche', hp: this.village.hp / WAREHOUSE_HP };
       const b = this.brazierNear(p.x, p.z, REACH.feed);
       if (b && p.carry === 'bois' && this.braziers[b.id].fuel < FUEL.max - 5) return { key: 'E', text: 'Mettre la bûche dans le brasero', hp: this.braziers[b.id].fuel / FUEL.max };
-      if (Math.hypot(p.x - M.depot.x, p.z - M.depot.z) < REACH.store) return { key: 'E', text: p.carry === 'vivres' ? 'Ranger les baies dans l\'entrepôt' : 'Ranger la bûche dans l\'entrepôt' };
-      return p.carry === 'vivres' ? { key: '', text: 'Rapporte les baies à l\'entrepôt' } : { key: 'E', text: 'Poser la bûche' };
+      const k = p.load || 1;
+      if (Math.hypot(p.x - M.depot.x, p.z - M.depot.z) < REACH.store) return { key: 'E', text: p.carry === 'vivres' ? 'Ranger les baies dans l\'entrepôt' : k > 1 ? `Ranger les ${k} bûches dans l\'entrepôt` : 'Ranger la bûche dans l\'entrepôt' };
+      if (p.carry === 'bois' && k < LOAD_MAX && this.logNear(p.x, p.z, REACH.pick)) return { key: 'E', text: `Ramasser une autre bûche (${k + 1}/${LOAD_MAX})` };
+      return p.carry === 'vivres' ? { key: '', text: 'Rapporte les baies à l\'entrepôt' } : { key: 'E', text: k > 1 ? `Poser une bûche (${k} portées)` : 'Poser la bûche' };
     }
     if (this.foeNear(p.x, p.z, REACH.strike + 0.4)) return { key: 'Clic', text: 'Frapper' };
     if (this.crypt.open && Math.hypot(p.x - M.cryptDoor.x, p.z - M.cryptDoor.z) < 3) return { key: 'E', text: 'Descendre dans la crypte' };
@@ -946,6 +1047,9 @@ export class Sim {
     }
     const torch = this.torchNear(p.x, p.z);
     if (torch) return { key: 'E', text: 'Rallumer la torche' };
+    const ch = this.chestNear(p.x, p.z);
+    if (ch) return { key: 'E', text: 'Ouvrir le coffre' };
+    if (this.canRing(p)) return { key: 'E', text: 'Sonner la cloche : la nuit tombe tout de suite' };
     const be = this.beamEndNear(p.x, p.z);
     if (be) { const other = be.beam.h[1 - be.end]; return { key: 'E', text: other !== null ? `Soulever la poutre avec ${this.player(other)?.name || 'ton équipier'}` : jobOf(p).beamAlone ? 'Prendre la poutre (seul, lentement)' : 'Prendre un bout de la poutre (il faut être deux)' }; }
     if (this.logNear(p.x, p.z, REACH.pick)) return { key: 'E', text: 'Ramasser la bûche' };
@@ -976,13 +1080,14 @@ export class Sim {
   snapshot() {
     return structuredClone({ t: this.t, tick: this.tick, clock: this.clock, stock: this.stock, trees: this.trees, logs: this.logs, nextLog: this.nextLog,
       braziers: this.braziers, village: this.village, beams: this.beams, nextBeam: this.nextBeam, foes: this.foes.map((f) => ({ ...f, path: null })), nextFoe: this.nextFoe, spawnQ: this.spawnQ, goal: this.goal, stats: this.stats,
-      build: this.build, berries: this.berries, mode: this.mode, diff: this.diff, won: this.won, crypt: this.crypt, flares: this.flares, bars: this.bars, nextBar: this.nextBar,
+      build: this.build, berries: this.berries, mode: this.mode, diff: this.diff, won: this.won, crypt: this.crypt, flares: this.flares, bars: this.bars, nextBar: this.nextBar, chests: this.chests, nextChest: this.nextChest,
       players: this.players.map((p) => ({ ...p, ai: null })) });
   }
   restore(s) {
     const c = structuredClone(s);
     Object.assign(this, c);
     this.over = null; this.events = []; this.inputs = new Map();   // lastC est gardé : les compteurs d'appuis continuent
+    if (!this.chests) { this.chests = []; this.nextChest = 1; }
     if (!this.crypt) this.crypt = { open: false, gate: false, leverT: 0, held: [false, false], brume: false, throne: false, king: null, phase: 0, summonAt: 0, torches: null };
     this.map.crypt.gate.open = !!this.crypt.gate;
   }
