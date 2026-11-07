@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 4.58 — 7 novembre 2026
+- **The Backrooms** — Un screamer qui fait vraiment sursauter, et un caméscope plus lisible.
+  - Le screamer a été refait : un instant de noir et de silence total, puis son visage blême, orbites vides et mâchoire décrochée, se jette contre l'objectif et tressaute, avec un cri plus violent.
+  - Ton souffle est beaucoup plus discret : on l'entend surtout en courant, à peine quand on marche.
+  - L'image ne devient floue qu'en courant.
+  - « PRESS F » ou « PRESS E » s'affiche quand tu peux ramasser un objet, te cacher, poser l'échelle, boire l'eau d'amande ou changer les piles.
+  - Le signal du caméscope capte de plus loin.
+
 ## 4.57 — 7 novembre 2026
 - **The Backrooms** — Le Level 0 ressemble enfin aux vidéos.
   - Les zones éclairées baignent vraiment dans la lumière jaune des néons, du sol au plafond ; les zones mortes restent noires.

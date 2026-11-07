@@ -597,7 +597,7 @@ export class BackroomsSfx {
     }
     if (this.breathHeld) level = 0;
     const t = c.currentTime;
-    this.breathGain.gain.setTargetAtTime(Math.max(0, Math.min(1, level)) * 0.55, t, level > 0.05 ? 0.35 : this.breathHeld ? 0.06 : 0.8);
+    this.breathGain.gain.setTargetAtTime(Math.max(0, Math.min(1, level)) * 0.4, t, level > 0.05 ? 0.35 : this.breathHeld ? 0.06 : 0.6);
     // plus essoufflé, plus rapide
     if (this.breathSrc) this.breathSrc.playbackRate.setTargetAtTime(0.9 + Math.min(1, level) * 0.25, t, 0.5);
   }
@@ -1055,9 +1055,41 @@ export class BackroomsSfx {
       return;
     }
     if (this.voiceGain) this.voiceGain.gain.setValueAtTime(0.0001, t);
-    this.scareHit(t0, 1);
-    this.scareScream(t0, 1);
-    this.tapeCrumple(t0 + 1.05);
+    this.scareHit(t0, 1.35);
+    this.scareScream(t0, 1.4);
+    this.scareScreech(t0);
+    this.tapeCrumple(t0 + 1.25);
+  }
+
+  // le crissement par-dessus le cri : une grappe de cordes désaccordées, très aiguës, qui grincent et tombent
+  scareScreech(t) {
+    const c = this.ctx;
+    const D = 1.1;
+    const bp = this.filt('bandpass', 2600, 1.2);
+    const sat = this.shaper(4);
+    const env = c.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(0.16, t + 0.008);
+    env.gain.setValueAtTime(0.16, t + 0.35);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + D);
+    // le trémolo module un étage à part (0,2 à 1), l'enveloppe garde le dernier mot
+    const am = this.gainNode(0.6);
+    bp.connect(sat).connect(am).connect(env).connect(this.master);
+    const trem = this.osc('sine', 17);
+    const tremG = this.gainNode(0.4);
+    trem.connect(tremG).connect(am.gain);
+    const os = [trem];
+    for (const f of [1870, 1975, 2210, 2490, 2630]) {
+      const o = this.osc('sawtooth', f);
+      o.frequency.setValueAtTime(f, t);
+      o.frequency.exponentialRampToValueAtTime(f * 0.62, t + D);
+      o.connect(this.gainNode(0.2)).connect(bp);
+      os.push(o);
+    }
+    for (const o of os) {
+      o.start(t);
+      o.stop(t + D + 0.05);
+    }
   }
 
   // le coup : un impact très grave, un choc sourd et un craquement, saturés ; un peu d'écho
@@ -1075,7 +1107,7 @@ export class BackroomsSfx {
   // le cri : une voix (dent de scie et souffle) qui tremble, passe d'un « aa » à un « ii », très saturée
   scareScream(t, k = 1) {
     const c = this.ctx;
-    const D = 1.05;
+    const D = 1.3;
     const vo = this.osc('sawtooth', 520);
     vo.frequency.setValueAtTime(480, t);
     vo.frequency.linearRampToValueAtTime(660, t + 0.15);

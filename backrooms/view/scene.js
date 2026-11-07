@@ -2033,6 +2033,11 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   // effets de bande en cours (secondes restantes), jumpscare, résolution dynamique, mise au point
   const fx = { splice: 0, loss: 0, bars: 0, grab: 0 };
   let scareT = 0;
+  const SCARE_T = 1.6; // durée du jumpscare : 0,2 s de noir et de silence, puis elle
+  const SCARE_CUT = 0.2;
+  let scareJ = 0; // prochaine saccade de sa tête (image par image)
+  const scareOff = new THREE.Vector3();
+  const scareV = new THREE.Vector3();
   // le rejeu de la mort : les dernières secondes, vues de sa tête (frames : [{ t, mx, mz, myaw, mf, px, pz, pyaw, pf, mv, rn, fl }])
   let replayFrames = null;
   let replayT = 0;
@@ -2107,7 +2112,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 
     // L'entité surgit devant l'objectif (en 3D, dans la scène) pendant un instant
     jumpscare() {
-      scareT = 1.1;
+      scareT = SCARE_T;
+      scareJ = 0;
     },
 
     // la silhouette au bout du couloir (quelques secondes, ou jusqu'à ce qu'on s'en approche)
@@ -2237,7 +2243,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       // ils suivent le pas, un peu en retard sur la tête
       const sway = P.moving ? (P.running ? 1.6 : 1) : 0.25;
       held.position.set(Math.cos(bob) * 0.007 * sway, Math.sin(bob * 2) * 0.006 * sway - (P.running ? 0.02 : 0), 0);
-      held.visible = !RF;
+      held.visible = !RF && !(scareT > 0); // rien dans les mains pendant le jumpscare : elle seule à l'image
       held.rotation.set(Math.sin(bob * 2) * 0.01 * sway, Math.cos(bob) * 0.015 * sway, 0);
 
       // 2. L'entité fait face au joueur et tressaute quand elle le traque (Level 2 : le troupeau)
@@ -2285,17 +2291,41 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
           figure.visible = false;
         }
       }
-      // le jumpscare : elle est là, devant l'objectif, qui tremble
+      // le jumpscare : un noir d'un cinquième de seconde (le son coupe aussi), puis son visage fonce sur l'objectif à
+      // hauteur des yeux (elle se plie : elle est bien plus grande que toi), s'y colle et tressaute image par image
       if (scareT > 0 && !goatHerd) {
         scareT -= dt;
-        const fx0 = -Math.sin(camera.rotation.y);
-        const fz0 = -Math.cos(camera.rotation.y);
-        const near = 0.55 + Math.max(0, scareT - 0.7) * 1.2;
-        monsterGroup.visible = true;
-        monsterGroup.position.set(camera.position.x + fx0 * near, camera.position.y - 2.05, camera.position.z + fz0 * near);
-        monsterGroup.rotation.y = Math.atan2(-fx0, -fz0);
-        camera.rotation.z += (Math.random() - 0.5) * 0.08 * Math.max(0.3, mo);
-        camera.rotation.x += (Math.random() - 0.5) * 0.05 * Math.max(0.3, mo);
+        const e = SCARE_T - scareT - SCARE_CUT;
+        if (e < 0) monsterGroup.visible = false;
+        else {
+          const fx0 = -Math.sin(camera.rotation.y);
+          const fz0 = -Math.cos(camera.rotation.y);
+          const lunge = Math.min(1, e / 0.09);
+          scareJ -= dt;
+          if (scareJ <= 0) {
+            scareJ = 0.04 + Math.random() * 0.08;
+            scareOff.set((Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.08, (Math.random() - 0.5) * 0.5);
+          }
+          const near = 1.9 - 1.62 * lunge * lunge + Math.max(0, e - 1.0) * 0.5 + scareOff.y;
+          monsterGroup.visible = true;
+          monsterGroup.position.set(camera.position.x + fx0 * near, 0, camera.position.z + fz0 * near);
+          monsterGroup.rotation.set(0, Math.atan2(fx0, fz0) + Math.PI, 0);
+          const faceObj = beast && beast.scareFace();
+          if (faceObj) {
+            // le visage pile dans l'axe de l'objectif, à `near` mètres
+            monsterGroup.updateMatrixWorld(true);
+            faceObj.getWorldPosition(scareV);
+            monsterGroup.position.x += camera.position.x + fx0 * near - scareV.x + scareOff.x * fz0;
+            monsterGroup.position.y += camera.position.y - scareV.y;
+            monsterGroup.position.z += camera.position.z + fz0 * near - scareV.z - scareOff.x * fx0;
+          } else monsterGroup.position.y = camera.position.y - 2.05;
+          monsterGroup.rotation.z = scareOff.z * 0.3;
+          // le choc, puis un tremblement qui ne se calme qu'à peine
+          const amp = (lunge < 1 ? 0.03 : 0.09 * Math.max(0.25, 1 - e / 1.2)) * Math.max(0.3, mo);
+          camera.rotation.z += (Math.random() - 0.5) * amp * 1.6 + scareOff.z * 0.15;
+          camera.rotation.x += (Math.random() - 0.5) * amp;
+          camera.rotation.y += (Math.random() - 0.5) * amp * 0.6;
+        }
       }
 
       // pendant le rejeu : elle n'est pas dans l'image (on est elle) ; lui, si
@@ -2331,10 +2361,10 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       const wantExp = THREE.MathUtils.clamp(0.45 / (0.15 + lightHere), 0.9, 1.4);
       // il s'ouvre lentement dans le noir, se referme vite sous la lumière (comme un vrai caméscope)
       exposure += (wantExp - exposure) * Math.min(1, dt * (wantExp > exposure ? 0.65 : 2.4));
-      // la mise au point cherche un peu quand la lumière change d'un coup
-      if (Math.abs(exposure - lastExp) > dt * 0.25) focusT = Math.min(0.6, focusT + dt * 1.5);
+      // la mise au point ne décroche qu'en courant (la caméra secouée) ; au pas ou à l'arrêt, l'image reste nette
       lastExp = exposure;
-      focusT = Math.max(0, focusT - dt * 0.8);
+      if (P.running && P.moving && P.status === 'alive') focusT = Math.min(0.45, focusT + dt * 0.9);
+      else focusT = Math.max(0, focusT - dt * 1.6);
       // balance des blancs automatique : un peu bleue dans le noir, chaude sous les néons
       const wb = THREE.MathUtils.clamp(lightHere, 0, 1);
       const white = L2 ? [1, 1, 1] : [0.96 + wb * 0.06, 1, 1.07 - wb * 0.1];
@@ -2344,11 +2374,11 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       const grabbed = P.grabT > 0 && P.status === 'alive';
       const dark = sim.blackout > 0;
       vhs.setFx?.({
-        tracking: Math.min(1, (dark ? 0.25 : 0) + (grabbed ? 0.75 : 0) + Math.min(1, fx.grab) * 0.6 + (scareT > 0 ? 0.6 : 0) + (RF ? 0.45 : 0)),
+        tracking: Math.min(1, (dark ? 0.25 : 0) + (grabbed ? 0.75 : 0) + Math.min(1, fx.grab) * 0.6 + (scareT > 0 ? 0.45 : 0) + (RF ? 0.45 : 0)),
         splice: Math.min(1, fx.splice * 1.5),
         signalLoss: Math.min(1, fx.loss * 0.8),
         bars: Math.min(1, fx.bars),
-        chroma: grabbed ? 0.6 : RF ? 0.45 : 0,
+        chroma: scareT > 0 ? 0.7 : grabbed ? 0.6 : RF ? 0.45 : 0,
         focus: Math.min(1, focusT + (grabbed ? 0.35 : 0)),
         white,
       });

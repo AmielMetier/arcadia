@@ -44,7 +44,7 @@ export const INV_SIZE = 2; // cases d'objets (piles, eau d'amande, échelle) : l
 export const PICK_R = 1.4; // portée de F pour ramasser
 export const ALMOND_STAMINA = 50; // l'eau d'amande rend la moitié du souffle (plus un bouton « fin de poursuite »)
 export const BLACKOUT_DRAIN = 1.5; // dans le noir d'une coupure, la lampe tire plus fort sur la pile
-export const SIGNAL_RANGE = 25; // m : au-delà, le caméscope ne capte plus rien
+export const SIGNAL_RANGE = 34; // m : au-delà, le caméscope ne capte plus rien
 // La prise : la première fois par niveau, l'entité agrippe au lieu de tuer. On se débat (GRAB_STRUGGLES appuis) ou un
 // coéquipier lui braque sa lampe dans les yeux ; sinon, au bout de GRAB_T, c'est fini. Lâchée, elle reste sonnée.
 export const GRAB_T = 2.6;

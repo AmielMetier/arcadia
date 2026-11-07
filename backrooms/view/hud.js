@@ -91,7 +91,7 @@ export class BackroomsHUD {
       </div>
 
       <!-- Dans un casier : les fentes de la porte, et le souffle retenu -->
-      <div class="locker" id="locker" hidden><div class="locker-slits"></div><div class="locker-ui"><span id="lockerText">HOLD [SHIFT] TO HOLD YOUR BREATH · [F] GET OUT</span><div class="breath"><i id="breathBar"></i></div></div></div>
+      <div class="locker" id="locker" hidden><div class="locker-slits"></div><div class="locker-ui"><span id="lockerText">HOLD SHIFT TO HOLD YOUR BREATH · PRESS F TO GET OUT</span><div class="breath"><i id="breathBar"></i></div></div></div>
       <!-- Agrippé : se débattre -->
       <div class="grab" id="grab" hidden><b>BREAK FREE!</b><span id="grabText">MASH ANY KEY</span><div class="grab-bar"><i id="grabBar"></i></div></div>
       <div class="hurt" id="hurt"></div>
@@ -360,7 +360,7 @@ export class BackroomsHUD {
         E.breathBar.style.width = `${br}%`;
       }
       this.flag('locker', 'holding', !!P.holding);
-      this.text('lockerText', P.holding ? (br < 30 ? "YOU CAN'T HOLD IT MUCH LONGER…" : 'HOLDING YOUR BREATH…') : 'HOLD [SHIFT] TO HOLD YOUR BREATH · [F] GET OUT');
+      this.text('lockerText', P.holding ? (br < 30 ? "YOU CAN'T HOLD IT MUCH LONGER…" : 'HOLDING YOUR BREATH…') : 'HOLD SHIFT TO HOLD YOUR BREATH · PRESS F TO GET OUT');
     }
     const grabbed = P.grabT > 0 && P.status === 'alive';
     this.show('grab', grabbed);
@@ -469,11 +469,14 @@ export class BackroomsHUD {
           // la prise et le casier ont leur propre affichage
         } else if (beam !== null) {
           // rien d'autre sur l'arête
-        } else if (N && !N.ladder && sel === 'ladder' && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.2) text = '[E] PLACE THE LADDER UNDER THE TAPE';
-        else if (it) text = P.inv.includes(null) ? `[F] PICK UP ${NAME[it.kind]}` : `[F] SWAP ${NAME[sel || 'bottle']} (SLOT ${P.sel + 1}) FOR ${NAME[it.kind]}`;
-        else if (h) text = '[F] HIDE IN THE LOCKER';
+        } else if (N && !N.ladder && sel === 'ladder' && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.2) text = 'PRESS E · PLACE THE LADDER UNDER THE TAPE';
+        else if (it) text = P.inv.includes(null) ? `PRESS F · PICK UP ${NAME[it.kind]}` : `PRESS F · SWAP ${NAME[sel || 'bottle']} (SLOT ${P.sel + 1}) FOR ${NAME[it.kind]}`;
+        else if (h) text = 'PRESS F · HIDE IN THE LOCKER';
         else if (atPanel) text = `RESTARTING THE FREIGHT ELEVATOR… ${Math.round((sim.panel || 0) * 100)}% · STAY HERE`;
         else if (N && !N.ladder && nicheCas && !nicheCas.collected && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.6) text = 'THE TAPE IS TOO HIGH: YOU NEED A LADDER';
+        // ce qu'on tient servirait maintenant : à bout de souffle avec de l'eau d'amande, la lampe presque vide avec des piles
+        else if (sel === 'bottle' && P.stamina < 45) text = 'PRESS E · DRINK THE ALMOND WATER';
+        else if (sel === 'battery' && P.hasLamp && P.battery < 35) text = 'PRESS E · CHANGE THE BATTERIES';
       }
     }
     if (this.qwerty) text = text.replace('Z TO MOVE FORWARD, Q / D', 'W TO MOVE FORWARD, A / D');
@@ -517,12 +520,18 @@ export class BackroomsHUD {
       const img = this.$('#scareImg');
       if (img) img.hidden = true;
       this.$('#scareAnim').hidden = true;
+      // un cinquième de seconde de noir complet (le son coupe en même temps), puis l'éclair et elle
       j.hidden = false;
       j.classList.remove('flash');
-      void j.offsetWidth;
-      j.classList.add('flash');
+      j.classList.add('pre');
+      clearTimeout(this.scarePreT);
+      this.scarePreT = setTimeout(() => {
+        j.classList.remove('pre');
+        void j.offsetWidth;
+        j.classList.add('flash');
+      }, 200);
       clearTimeout(this.scareHideT);
-      this.scareHideT = setTimeout(() => (j.hidden = true), 1400);
+      this.scareHideT = setTimeout(() => (j.hidden = true), 1600);
       return;
     }
     const A = ENTITY_ANIM;
