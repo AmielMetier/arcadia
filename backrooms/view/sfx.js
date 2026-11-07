@@ -1852,6 +1852,24 @@ export class BackroomsSfx {
   // Les piles : la trappe qui se déclipse, les piles qui glissent, le ressort, la trappe qui reclaque.
   // empty : la lampe à plat, un clic mou et le filament qui grésille et meurt
   // le caméscope (V) : le clic de l'écran qu'on déplie, le moteur de la bande, et le bip de l'enregistrement
+  // le moteur du zoom du caméscope : un petit servo qui siffle en montant (zoom avant) ou en descendant ; une
+  // seule plainte à la fois quand la molette tourne vite
+  camZoom(dir = 1) {
+    if (!this.unlocked || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    if (this.zoomUntil && now < this.zoomUntil - 0.04) return;
+    const t = now + 0.005;
+    const out = this.gainNode(0.55);
+    out.connect(this.out);
+    const f0 = dir > 0 ? 470 : 640;
+    const f1 = dir > 0 ? 640 : 470;
+    this.tone(out, t, 'sawtooth', f0, f1, 0.16, 0.009, 0.02);
+    this.tone(out, t, 'square', f0 * 2.02, f1 * 2.02, 0.16, 0.0035, 0.02);
+    this.burst(out, t, 0.16, 'bandpass', dir > 0 ? 2400 : 1900, 5, 0.035);
+    this.burst(out, t + 0.15, 0.012, 'bandpass', 3000, 3, 0.05); // la butée de l'engrenage
+    this.zoomUntil = t + 0.16;
+  }
+
   camcorder(on) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;

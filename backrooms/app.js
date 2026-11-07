@@ -206,7 +206,29 @@ function toggleCam() {
   if (!sim || sim.player.status !== 'alive') return;
   camOn = !camOn;
   if (sfx) sfx.camcorder(camOn);
+  // on ressort le caméscope au zoom de base
+  camZoom = CAM_ZOOM_MIN;
+  if (scene && scene.setCamZoom) scene.setCamZoom(camZoom);
 }
+
+// molette, caméscope sorti : le zoom de l'objectif (de ×1,5 à ×4), avec son petit moteur
+const CAM_ZOOM_MIN = 1.5;
+const CAM_ZOOM_MAX = 4;
+let camZoom = CAM_ZOOM_MIN;
+window.addEventListener(
+  'wheel',
+  (e) => {
+    if (!camOn || paused || !sim || sim.player.status !== 'alive') return;
+    e.preventDefault();
+    const dir = e.deltaY < 0 ? 1 : -1;
+    const z = Math.min(CAM_ZOOM_MAX, Math.max(CAM_ZOOM_MIN, camZoom * (dir > 0 ? 1.12 : 1 / 1.12)));
+    if (Math.abs(z - camZoom) < 1e-3) return;
+    camZoom = z;
+    if (scene && scene.setCamZoom) scene.setCamZoom(camZoom);
+    if (sfx) sfx.camZoom(dir);
+  },
+  { passive: false }
+);
 
 window.addEventListener('keydown', (e) => {
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();

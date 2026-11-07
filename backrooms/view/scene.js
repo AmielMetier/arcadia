@@ -449,9 +449,23 @@ float bkCaust(vec2 uv, float t) {
           sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
           // les néons sont au plafond : un mur s'assombrit vers le bas, et plus encore au ras du sol et sous le plafond ;
           // le sol et le plafond s'assombrissent au pied des murs
-          vec4 bk = texture2D(uBake, vBakeP.xz * uBakeScale);
+          vec2 bkUv = vBakeP.xz * uBakeScale;
+          vec4 bk = texture2D(uBake, bkUv);
           float by = vBakeP.y - uBakeY;
           float ny = vBakeN.y;
+          // le plafond n'est éclairé que par ricochet (les néons y sont encastrés) : sa lumière est très adoucie, sans les
+          // ombres nettes en escalier de la grille d'éclairage (elles faisaient des plaques noires crénelées)
+          if (ny < -0.5) {
+            vec2 o1 = uBakeScale * 0.9;
+            vec2 o2 = uBakeScale * 1.8;
+            vec2 bkAcc = bk.rb * 3.0;
+            bkAcc += texture2D(uBake, bkUv + vec2(o1.x, 0.0)).rb + texture2D(uBake, bkUv - vec2(o1.x, 0.0)).rb;
+            bkAcc += texture2D(uBake, bkUv + vec2(0.0, o1.y)).rb + texture2D(uBake, bkUv - vec2(0.0, o1.y)).rb;
+            bkAcc += texture2D(uBake, bkUv + o1 * 0.7).rb + texture2D(uBake, bkUv - o1 * 0.7).rb;
+            bkAcc += texture2D(uBake, bkUv + vec2(o1.x, -o1.y) * 0.7).rb + texture2D(uBake, bkUv + vec2(-o1.x, o1.y) * 0.7).rb;
+            bkAcc += (texture2D(uBake, bkUv + vec2(o2.x, 0.0)).rb + texture2D(uBake, bkUv - vec2(o2.x, 0.0)).rb + texture2D(uBake, bkUv + vec2(0.0, o2.y)).rb + texture2D(uBake, bkUv - vec2(0.0, o2.y)).rb) * 0.5;
+            bk.rb = bkAcc / 13.0;
+          }
           float side = mix(uSideLo, 1.12, smoothstep(0.0, uCeil, by)) * mix(uSideLo * 0.85, 1.0, smoothstep(0.0, 0.4, by)) * mix(0.72, 1.0, smoothstep(0.0, 0.3, uCeil - by));
           float flat2 = ny > 0.0 ? bk.g : mix(0.7, 1.0, bk.g) * 0.85;
           float shape = mix(side, flat2, smoothstep(0.5, 0.8, abs(ny)));
@@ -2336,6 +2350,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   let exposure = 1.2; // exposition du caméscope : elle rattrape la lumière en une seconde environ
   let lightNow = 0.5; // lumière des néons là où l'on est (pour le grésillement)
   let camT = 0; // caméscope sorti (0 à 1, la transition vers le 4:3)
+  let camZoomWant = 1.5; // zoom de l'objectif (molette), de 1,5 à 4
+  let camZoomNow = 1.5;
   let nightT = 0; // son mode nuit (0 à 1)
 
   // effets de bande en cours (secondes restantes), jumpscare, résolution dynamique, mise au point
@@ -2371,6 +2387,10 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       return lightNow;
     },
     onDrip: null, // une goutte tombe dans une flaque près du joueur ({ x, z }) : l'application la fait entendre
+    // le zoom de l'objectif du caméscope (molette), de 1,5 à 4
+    setCamZoom(z) {
+      camZoomWant = z;
+    },
     // le caméscope : où il en est (0 à 1), son mode nuit, et la largeur des bandes noires (px)
     get cam() {
       return { t: camT, night: nightT, bars: vhs.bars || 0 };
@@ -2555,7 +2575,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       nightT += (nightWant - nightT) * Math.min(1, dt * 3);
       flashSpill.intensity += nightT * 3.2;
       // le caméscope zoome (×1,3) : son objectif est plus serré que l'œil
-      const camFov = (2 * Math.atan(Math.tan((OPTS.fov * Math.PI) / 360) / (1 + 0.3 * camT)) * 180) / Math.PI;
+      camZoomNow += (camZoomWant - camZoomNow) * Math.min(1, dt * 7); // l'objectif glisse, il ne saute pas
+      const camFov = (2 * Math.atan(Math.tan((OPTS.fov * Math.PI) / 360) / (1 + (camZoomNow - 1) * camT)) * 180) / Math.PI;
       if (Math.abs(camera.fov - camFov) > 0.01) {
         camera.fov = camFov;
         camera.updateProjectionMatrix();
@@ -2751,7 +2772,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         const S = avatarPos.get(camQ.id) || camQ;
         const qm = sim.fm(camQ.floor || 0);
         const ey = feetY(sim.stairs, S.x, S.z, camQ.floor || 0) + (camQ.crouch ? 1.05 : 1.6) + (camQ.jy || 0) - (qm.depthAt ? qm.depthAt(S.x, S.z) : 0);
-        const fov = (2 * Math.atan(Math.tan((OPTS.fov * Math.PI) / 360) / 1.3) * 180) / Math.PI;
+        const fov = (2 * Math.atan(Math.tan((OPTS.fov * Math.PI) / 360) / 1.5) * 180) / Math.PI;
         const pm = sim.fm(P.floor || 0);
         let heldWas = true;
         const py = feetY(sim.stairs, P.x, P.z, P.floor || 0) + (P.onLadder ? 1.0 : 0) + (P.jy || 0) - (pm.depthAt ? pm.depthAt(P.x, P.z) : 0);

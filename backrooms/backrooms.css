@@ -80,8 +80,8 @@ html, body {
 }
 
 .tape-date { font-size: 26px; margin-bottom: 6px; }
-.stamina { display: flex; align-items: center; gap: 10px; font-size: 22px; }
-.stamina-track { width: calc(210px * var(--smax, 1)); max-width: max(110px, calc(50vw - 290px - var(--bx, 0px))); height: 18px; border: 2px solid currentColor; padding: 2px; transition: width 0.6s ease; }
+.stamina { display: flex; align-items: center; gap: 8px; font-size: 18px; }
+.stamina-track { width: calc(140px * var(--smax, 1)); max-width: max(90px, calc(50vw - 270px - var(--bx, 0px))); height: 9px; border: 1px solid currentColor; padding: 1px; transition: width 0.6s ease; }
 .stamina-bar { height: 100%; width: 100%; background: currentColor; }
 .stamina-bar.low { background: #ff3b3b; animation: recBlink 0.5s steps(1) infinite; }
 
@@ -522,7 +522,7 @@ body.touch .click-prompt .ctrl-choice { display: none; }
   .prompt { bottom: 152px; font-size: 16px; white-space: normal; width: 86vw; }
   .inv .slot { width: 60px; height: 50px; }
   .icon-btn { top: 16px; right: 50%; transform: translateX(50%); }
-  .stamina-track { width: calc(130px * var(--smax, 1)); height: 14px; }
+  .stamina-track { width: calc(90px * var(--smax, 1)); height: 8px; }
   .objective-banner { font-size: 20px; }
 }
 
