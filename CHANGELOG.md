@@ -11,6 +11,18 @@
   - En arrivant au Level 1, on sort du même ascenseur que celui pris au Level 0 : ses portes se referment derrière toi une fois que tu as fait quelques pas.
   - Sous les néons les plus forts, on est presque à l'abri : l'entité ne t'y prend en chasse que si tu la frôles. Elle reste à la lisière de l'ombre, immobile, et attend que tu en sortes.
   - Quand plus personne ne la regarde, elle ne joue plus franc jeu : elle peut réapparaître juste derrière un angle devant toi, immobile et muette, ou se glisser dans ton dos sans un bruit. Et après t'avoir observé, il suffit de te retourner pour qu'elle ait disparu.
+  - Avant chacune de ces apparitions, un signe : un grattement derrière le mur, ou une respiration lente dans ton dos. On la sent venir sans savoir exactement où.
+  - La toute première rencontre : pendant la première minute, au bout d'un couloir, elle est là, immobile. Regarde-la trop longtemps, ou approche, et le néon au-dessus d'elle claque : il n'y a plus personne.
+  - De temps en temps, les néons s'éteignent un à un jusqu'à toi… et quand ils se rallument, elle a été lâchée au fond du couloir.
+  - Nouvelles fausses alertes : des pas qui suivent les tiens et s'arrêtent quand tu t'arrêtes, une silhouette qui s'efface, l'ascenseur qui sonne tout seul.
+  - Des recoins calmes : un fauteuil, une lampe de salon, une vieille radio. Elle n'y entre pas… pendant 45 secondes. Ensuite la lampe grésille et plus rien n'y protège, jusqu'à ce qu'on l'ait laissé reposer.
+  - Elle s'adapte : si tu es mort vite la dernière fois, elle triche moins ; si tu t'en sors, elle s'enhardit.
+  - À plusieurs, elle traque surtout celui qui s'éloigne du groupe.
+  - Mort, tu peux encore aider (ou piéger) les vivants : E fait grésiller le néon au-dessus de celui que tu regardes, T frappe un peu plus loin devant lui et l'y attire.
+  - À ta mort, la bande rejoue tes dernières secondes, vues de sa tête.
+  - En fin de partie, le bilan : combien de fois elle t'a vu, les poursuites semées, ton passage le plus serré.
+  - Nouveau réglage « Carte du jour » : la même carte pour tout le monde ce jour-là, avec ton meilleur temps.
+  - L'écran titre conseille de jouer au casque, lumière éteinte, et montre le réglage de luminosité.
 
 ## 4.56 — 6 novembre 2026
 - **Fief Maudit** — La crypte et le Roi-Squelette : l'expédition a enfin une fin.

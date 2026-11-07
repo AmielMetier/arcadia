@@ -30,6 +30,8 @@ export function createDirector(level) {
     rareDone: false,
     t: 0,
     drops: [], // néons éteints un instant : [{ l, t, back }]
+    // Level 0 : de temps en temps, les néons meurent un à un jusqu'à soi… et quand ils reviennent, elle arrive
+    huntT: level === 0 ? rand(85, 130) : Infinity,
   };
 }
 
@@ -75,7 +77,7 @@ export function updateDirector(sim) {
     d.l.state = d.back;
     d.l.flicker = d.back === 'flicker';
     D.drops.splice(i, 1);
-    lightsChanged(sim.map);
+    lightsChanged(d.map || sim.map);
   }
 
   if (!alive.length || sim.state !== 'playing' || sim.departT > 0) return;
@@ -86,6 +88,18 @@ export function updateDirector(sim) {
     if (D.fakeT <= 0) {
       D.fakeT = rand(...FAKE_EVERY) * (sim.difficulty === 'hard' ? 0.8 : 1);
       fakeAlarm(sim, pick(alive));
+    }
+  }
+
+  // Level 0 : la traque annoncée. Les néons s'éteignent un à un vers le joueur ; au dernier, elle est lâchée depuis
+  // le fond du couloir, là où le premier est mort
+  if (D.level === 0 && sim.hasMonster && M && D.phase === 'build' && D.stress < 0.3 && !sim.lightsOut && M.mode === 'patrol' && !M.glimpse && !(M.dormantT > 0)) {
+    D.huntT -= DT;
+    if (D.huntT <= 0) {
+      D.huntT = rand(100, 160) * (1.2 - (sim.skill ?? 0.5) * 0.4);
+      // de préférence celui qui s'est isolé
+      const lone = alive.slice().sort((a, b) => isolation(sim, b) - isolation(sim, a))[0];
+      if (!sim.calmAt || !sim.calmAt(lone)) lightsDie(sim, lone, true);
     }
   }
 
@@ -140,7 +154,9 @@ function spotAround(sim, P, rMin, rMax, hidden = true) {
 function fakeAlarm(sim, P) {
   const lv = sim.level;
   const pipes = !!sim.goats || (sim.map.valves || []).length > 0;
-  const kinds = pipes ? ['hammer', 'groan', 'knock', 'steps', 'neon', 'neon'] : lv === 1 ? ['buzz', 'steps', 'door', 'knock', 'groan', 'neon'] : lv === 2 ? ['steps', 'knock', 'drag'] : ['buzz', 'steps', 'door', 'drag', 'neon'];
+  // Level 0 : aussi l'écho (des pas qui s'arrêtent quand on s'arrête), une silhouette qui s'efface, l'ascenseur qui
+  // sonne tout seul
+  const kinds = pipes ? ['hammer', 'groan', 'knock', 'steps', 'neon', 'neon'] : lv === 1 ? ['buzz', 'steps', 'door', 'knock', 'groan', 'neon'] : lv === 2 ? ['steps', 'knock', 'drag'] : ['buzz', 'steps', 'door', 'drag', 'neon', 'echo', 'echo', 'figure', 'ding'];
   // à plusieurs, l'entité imite parfois le sifflet d'un coéquipier… qui est ailleurs
   const mates = sim.players.filter((Q) => Q !== P && Q.status === 'alive');
   if (mates.length && sim.hasMonster && !sim.goats && Math.random() < 0.25) {
@@ -155,8 +171,22 @@ function fakeAlarm(sim, P) {
   if (kind === 'neon') {
     if (neonDrop(sim, P)) return;
   }
+  if (kind === 'echo') {
+    // seul celui qui est visé l'entend : quelqu'un marche derrière lui, à son rythme, et s'arrête quand il s'arrête
+    sim.emit({ type: 'phantom', kind: 'echo', id: P.id, len: rand(7, 11) });
+    return;
+  }
+  if (kind === 'figure' && figureAhead(sim, P)) return;
+  if (kind === 'ding') {
+    const E = sim.fm(P.floor).exit;
+    if (E) {
+      sim.emit({ type: 'rare', kind: 'ding', x: E.x, z: E.z, floor: P.floor || 0 });
+      return;
+    }
+  }
   const spot = spotAround(sim, P, 16, 38);
-  if (spot) sim.emit({ type: 'phantom', kind: kind === 'neon' ? 'knock' : kind, x: spot.x, z: spot.z, floor: spot.floor });
+  const k = kind === 'neon' || kind === 'figure' || kind === 'ding' ? 'knock' : kind;
+  if (spot) sim.emit({ type: 'phantom', kind: k, x: spot.x, z: spot.z, floor: spot.floor });
 }
 
 // un néon allumé près du joueur claque et s'éteint quelques secondes (au Level 2, la protection disparaît vraiment)
@@ -166,7 +196,7 @@ function neonDrop(sim, P) {
   const lit = (map.lights || []).filter((l) => l.state === 'on' && !D.drops.some((d) => d.l === l) && Math.hypot(l.x - P.x, l.z - P.z) < 16 && Math.hypot(l.x - P.x, l.z - P.z) > 4 && !(l.sector === -1 && sim.goats));
   if (!lit.length) return false;
   const l = pick(lit);
-  D.drops.push({ l, t: rand(2.5, 5), back: l.state });
+  D.drops.push({ l, t: rand(2.5, 5), back: l.state, map });
   l.state = 'off';
   l.flicker = false;
   lightsChanged(map);
@@ -186,33 +216,50 @@ function rareEvent(sim, P) {
     return;
   }
   if (kind === 'figure') {
-    // une silhouette immobile au bout du couloir, droit devant, qui n'est plus là quand on y regarde de trop près
-    const fx = -Math.sin(P.yaw);
-    const fz = -Math.cos(P.yaw);
-    for (let d = 26; d >= 12; d -= 2) {
-      const x = P.x + fx * d;
-      const z = P.z + fz * d;
-      const gx = Math.floor(x / CELL_SIZE);
-      const gz = Math.floor(z / CELL_SIZE);
-      if (map.isWall(gx, gz) || !hasLineOfSight(map, P.x, P.z, x, z)) continue;
-      sim.emit({ type: 'rare', kind: 'figure', x: (gx + 0.5) * CELL_SIZE, z: (gz + 0.5) * CELL_SIZE, floor: P.floor || 0, id: P.id });
-      return;
-    }
+    if (figureAhead(sim, P)) return;
     sim.emit({ type: 'rare', kind: 'ding', x: (map.exit || P).x, z: (map.exit || P).z, floor: P.floor || 0 });
     return;
   }
-  // les néons s'éteignent un à un, du plus loin jusqu'au-dessus du joueur, puis se rallument d'un coup
-  const lights = (map.lights || []).filter((l) => l.state === 'on' && Math.hypot(l.x - P.x, l.z - P.z) < 22).sort((a, b) => Math.hypot(b.x - P.x, b.z - P.z) - Math.hypot(a.x - P.x, a.z - P.z));
-  if (lights.length < 3) {
-    sim.emit({ type: 'rare', kind: 'ding', x: (map.exit || P).x, z: (map.exit || P).z, floor: P.floor || 0 });
-    return;
+  if (!lightsDie(sim, P, false)) sim.emit({ type: 'rare', kind: 'ding', x: (map.exit || P).x, z: (map.exit || P).z, floor: P.floor || 0 });
+}
+
+// une silhouette immobile au bout du couloir, droit devant, qui n'est plus là quand on y regarde de trop près
+function figureAhead(sim, P) {
+  const map = sim.fm(P.floor);
+  const fx = -Math.sin(P.yaw);
+  const fz = -Math.cos(P.yaw);
+  for (let d = 26; d >= 12; d -= 2) {
+    const x = P.x + fx * d;
+    const z = P.z + fz * d;
+    const gx = Math.floor(x / CELL_SIZE);
+    const gz = Math.floor(z / CELL_SIZE);
+    if (map.isWall(gx, gz) || !hasLineOfSight(map, P.x, P.z, x, z)) continue;
+    sim.emit({ type: 'rare', kind: 'figure', x: (gx + 0.5) * CELL_SIZE, z: (gz + 0.5) * CELL_SIZE, floor: P.floor || 0, id: P.id });
+    return true;
   }
+  return false;
+}
+
+// à quelle distance du coéquipier le plus proche (Infinity seul)
+function isolation(sim, P) {
+  let m = Infinity;
+  for (const Q of sim.players) if (Q !== P && Q.status === 'alive' && (Q.floor || 0) === (P.floor || 0)) m = Math.min(m, Math.hypot(Q.x - P.x, Q.z - P.z));
+  return m === Infinity ? 0 : m;
+}
+
+// les néons s'éteignent un à un, du plus loin jusqu'au-dessus du joueur, puis se rallument d'un coup. hunt : quand le
+// dernier meurt, l'entité est lâchée depuis le fond (sim.huntFrom)
+function lightsDie(sim, P, hunt) {
+  const map = sim.fm(P.floor);
+  const lights = (map.lights || []).filter((l) => l.state === 'on' && Math.hypot(l.x - P.x, l.z - P.z) < 24).sort((a, b) => Math.hypot(b.x - P.x, b.z - P.z) - Math.hypot(a.x - P.x, a.z - P.z));
+  if (lights.length < 3) return false;
   const D = sim.director;
   const n = Math.min(8, lights.length);
   // chaque néon s'éteint à son tour (updateLightsOut) ; tous reviennent ensemble ~4 s après le dernier
-  for (let i = 0; i < n; i++) D.drops.push({ l: lights[i], t: 4.5 + n * 0.45, back: 'on' });
-  sim.lightsOut = { list: lights.slice(0, n), t: 0, n };
-  sim.emit({ type: 'rare', kind: 'lightsOut', x: P.x, z: P.z, floor: P.floor || 0 });
+  for (let i = 0; i < n; i++) D.drops.push({ l: lights[i], t: 4.5 + n * 0.45, back: 'on', map });
+  sim.lightsOut = { list: lights.slice(0, n), t: 0, n, hunt, id: P.id, floor: P.floor || 0 };
+  sim.emit({ type: 'rare', kind: 'lightsOut', x: P.x, z: P.z, floor: P.floor || 0, hunt });
+  return true;
 }
 
 // la séquence des néons qui s'éteignent un à un (appelée à chaque pas)
@@ -231,8 +278,11 @@ export function updateLightsOut(sim) {
     }
   }
   if (changed) {
-    lightsChanged(sim.map);
-    sim.emit({ type: 'phantom', kind: 'neon', x: S.list[k - 1].x, z: S.list[k - 1].z, floor: 0, quiet: true });
+    lightsChanged(sim.fm ? sim.fm(S.floor || 0) : sim.map);
+    sim.emit({ type: 'phantom', kind: 'neon', x: S.list[k - 1].x, z: S.list[k - 1].z, floor: S.floor || 0, quiet: true });
   }
-  if (k >= S.n) sim.lightsOut = null;
+  if (k >= S.n) {
+    sim.lightsOut = null;
+    if (S.hunt && sim.huntFrom) sim.huntFrom(S);
+  }
 }

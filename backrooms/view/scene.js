@@ -1577,11 +1577,119 @@ float bkCaust(vec2 uv, float t) {
       }
     };
 
+    // --- Recoins calmes (Level 0) : une lampe de salon chaude, un vieux fauteuil, une radio. Rien d'éclairé pour de vrai
+    // (pas de lumière en plus : tous les matériaux se recompileraient) ; la chaleur est dans les matériaux et un halo.
+    // Quand le recoin s'use, la lampe grésille puis s'éteint
+    const nooks = [];
+    if (L0 && map.calm && map.calm.length) {
+      const glowTex = (() => {
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = 64;
+        const g = cv.getContext('2d');
+        const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+        gr.addColorStop(0, 'rgba(255,214,150,1)');
+        gr.addColorStop(0.35, 'rgba(255,170,90,0.45)');
+        gr.addColorStop(1, 'rgba(255,140,60,0)');
+        g.fillStyle = gr;
+        g.fillRect(0, 0, 64, 64);
+        const t = new THREE.CanvasTexture(cv);
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      })();
+      const warm = new THREE.Color('#ffb36b');
+      for (const n of map.calm) {
+        const g = new THREE.Group();
+        // le fond du cul-de-sac : (dx, dz) pointe vers le mur du fond ; (sx, sz) sur le côté
+        const sx = -n.dz;
+        const sz = n.dx;
+        const mats = [];
+        const mat = (color, k = 0.3) => {
+          const m = new THREE.MeshLambertMaterial({ color, emissive: warm.clone().multiplyScalar(k) });
+          m.userData.k = k;
+          mats.push(m);
+          return m;
+        };
+        // la lampe, dans un coin du fond
+        const lx = n.x + n.dx * 0.85 + sx * 0.75;
+        const lz = n.z + n.dz * 0.85 + sz * 0.75;
+        const metal = mat('#2b2620', 0.08);
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.03, 16), metal);
+        base.position.set(lx, 0.015, lz);
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 1.45, 8), metal);
+        pole.position.set(lx, 0.74, lz);
+        const shadeMat = new THREE.MeshBasicMaterial({ color: '#ffd9a0', side: THREE.DoubleSide });
+        const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.3, 20, 1, true), shadeMat);
+        shade.position.set(lx, 1.52, lz);
+        const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#ffffff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.32 }));
+        glow.position.set(lx, 1.5, lz);
+        glow.scale.set(1.5, 1.5, 1);
+        // la flaque de lumière chaude au sol
+        const poolMat = new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.22 });
+        const pool = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4), poolMat);
+        pool.rotation.x = -Math.PI / 2;
+        pool.position.set(lx - n.dx * 0.6, 0.012, lz - n.dz * 0.6);
+        // le fauteuil, tourné vers l'entrée, à côté de la lampe
+        const cx = n.x + n.dx * 0.55 - sx * 0.45;
+        const cz = n.z + n.dz * 0.55 - sz * 0.45;
+        const chair = new THREE.Group();
+        const fabric = mat('#4a1f18', 0.14);
+        const wood = mat('#2a1a0e', 0.1);
+        const seat = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.2, 0.7), fabric);
+        seat.position.y = 0.42;
+        const back = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.7, 0.16), fabric);
+        back.position.set(0, 0.8, 0.29);
+        back.rotation.x = -0.12;
+        const armL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.24, 0.68), fabric);
+        armL.position.set(0.39, 0.6, 0.02);
+        const armR = armL.clone();
+        armR.position.x = -0.39;
+        chair.add(seat, back, armL, armR);
+        for (const [ax, az] of [[0.33, 0.28], [-0.33, 0.28], [0.33, -0.28], [-0.33, -0.28]]) {
+          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.32, 0.06), wood);
+          leg.position.set(ax, 0.16, az);
+          chair.add(leg);
+        }
+        chair.position.set(cx, 0, cz);
+        chair.rotation.y = Math.atan2(n.dx, n.dz) + 0.35; // le dos au mur du fond, un peu de biais
+        // la radio, par terre au pied de la lampe : son cadran luit
+        const radio = new THREE.Group();
+        const box = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.24, 0.16), wood);
+        box.position.y = 0.12;
+        const dialMat = new THREE.MeshBasicMaterial({ color: '#ffcc66' });
+        const dial = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.05), dialMat);
+        dial.position.set(0.08, 0.16, -0.081);
+        dial.rotation.y = Math.PI;
+        radio.add(box, dial);
+        radio.position.set(lx - sx * 0.45 - n.dx * 0.1, 0, lz - sz * 0.45 - n.dz * 0.1);
+        radio.rotation.y = Math.atan2(n.dx, n.dz);
+        g.add(base, pole, shade, glow, pool, chair, radio);
+        group.add(g);
+        nooks.push({ n, shadeMat, glow, poolMat, dialMat, mats, on: 1 });
+      }
+    }
+    const updateNooks = (time) => {
+      for (const v of nooks) {
+        const w = v.n.wear || 0;
+        // usé : la lampe grésille de plus en plus, puis s'éteint presque tout à fait
+        let on = 1;
+        if (w >= 1) on = Math.random() < 0.04 ? 0.6 : 0.05;
+        else if (w > 0.75) on = Math.random() < (w - 0.75) * 0.5 ? 0.25 : 1;
+        v.on += (on - v.on) * 0.5;
+        v.shadeMat.color.setRGB(1 * v.on + 0.12, 0.85 * v.on + 0.1, 0.63 * v.on + 0.08);
+        v.glow.material.opacity = 0.32 * v.on;
+        v.poolMat.opacity = 0.22 * v.on;
+        v.dialMat.color.setRGB(1 * Math.max(0.2, v.on), 0.8 * Math.max(0.2, v.on), 0.4 * Math.max(0.2, v.on));
+        for (const m of v.mats) m.emissive.setRGB(1, 0.7, 0.42).multiplyScalar(m.userData.k * v.on);
+      }
+    };
+
     return {
       lightAt,
       // une image : objets, cassettes, ascenseur, néons de cet étage
+      nooks,
       update(sim, P, time, dt) {
         bakeUniforms.uTime.value = time;
+        if (nooks.length) updateNooks(time);
         if (water) {
           water.update(sim, P, time, dt, camera);
           bakeUniforms.uWaterY.value = water.level;
@@ -1925,6 +2033,11 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   // effets de bande en cours (secondes restantes), jumpscare, résolution dynamique, mise au point
   const fx = { splice: 0, loss: 0, bars: 0, grab: 0 };
   let scareT = 0;
+  // le rejeu de la mort : les dernières secondes, vues de sa tête (frames : [{ t, mx, mz, myaw, mf, px, pz, pyaw, pf, mv, rn, fl }])
+  let replayFrames = null;
+  let replayT = 0;
+  const replayQ = { id: '__replay', x: 0, z: 0, yaw: 0, pitch: 0, moving: false, running: false, flashlight: false, tilt: 0, floor: 0 };
+  const replayP = { x: 0, z: 0, yaw: 0, pitch: 0, floor: 0, status: 'dead', moving: false, crouch: false, hidden: -1, grabT: 0, tilt: 0 };
   let frameAvg = 16;
   let lines = 720;
   let focusT = 0;
@@ -1983,6 +2096,15 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       fx[kind] = Math.max(fx[kind] || 0, len);
     },
 
+    // le rejeu : on revoit ses dernières secondes depuis la tête de l'entité, sur une bande abîmée
+    replay(frames) {
+      replayFrames = frames && frames.length > 4 ? frames : null;
+      replayT = 0;
+    },
+    get replaying() {
+      return !!replayFrames;
+    },
+
     // L'entité surgit devant l'objectif (en 3D, dans la scène) pendant un instant
     jumpscare() {
       scareT = 1.1;
@@ -2004,8 +2126,32 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     render(sim, time) {
       const dt = Math.min(0.1, Math.max(0, time - lastTime));
       lastTime = time;
-      // la caméra suit le joueur de cet écran, ou celui qu'il regarde quand il est spectateur
-      const P = sim.viewPlayer(sim.spectate || 0);
+      // la caméra suit le joueur de cet écran, ou celui qu'il regarde quand il est spectateur ; pendant le rejeu, elle
+      // est dans la tête de l'entité
+      let RF = null;
+      if (replayFrames) {
+        replayT += dt;
+        const t0 = replayFrames[0].t;
+        const span = replayFrames[replayFrames.length - 1].t - t0;
+        if (replayT > span + 0.35) {
+          replayFrames = null;
+          avatars.update(replayQ, false, 0, 0.3, dt, time);
+        } else {
+          const want = t0 + Math.min(span, replayT);
+          let i = 1;
+          while (i < replayFrames.length - 1 && replayFrames[i].t < want) i++;
+          const a = replayFrames[i - 1];
+          const b = replayFrames[i];
+          const u = THREE.MathUtils.clamp((want - a.t) / Math.max(1e-3, b.t - a.t), 0, 1);
+          const L = (k) => a[k] + (b[k] - a[k]) * u;
+          RF = { mx: L('mx'), mz: L('mz'), px: L('px'), pz: L('pz'), pyaw: b.pyaw, mf: b.mf, pf: b.pf, mv: b.mv, rn: b.rn, fl: b.fl };
+          replayP.x = RF.mx;
+          replayP.z = RF.mz;
+          replayP.floor = RF.mf;
+          replayP.yaw = Math.atan2(-(RF.px - RF.mx), -(RF.pz - RF.mz));
+        }
+      }
+      const P = RF ? replayP : sim.viewPlayer(sim.spectate || 0);
       for (const fv of floorViews) fv.update(sim, P, time, dt);
 
       // 1. Caméra : balancement lent de la marche, plus marqué en courant ; une chute la fait plonger d'un étage
@@ -2064,6 +2210,13 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         camera.position.y += (Math.random() - 0.5) * sh;
       }
 
+      if (RF) {
+        // sa tête : haute, penchée vers lui, avec ce léger balancement de bête qui marche
+        const d = Math.hypot(RF.px - RF.mx, RF.pz - RF.mz);
+        camera.position.set(RF.mx, 2.55 + feetY(sim.stairs, RF.mx, RF.mz, RF.mf || 0) + Math.sin(time * 7) * 0.03, RF.mz);
+        camera.rotation.set(-Math.atan2(1.4, Math.max(0.6, d)) * 0.8 + Math.sin(time * 3.1) * 0.02, replayP.yaw + Math.sin(time * 2.3) * 0.03, Math.sin(time * 1.7) * 0.04, 'YXZ');
+      }
+
       // allumer ou éteindre la lampe ne change pas le nombre de lumières (sinon tous les matériaux se recompilent)
       const lampOn = P.flashlight && P.status === 'alive';
       // pile faible : la lampe faiblit et clignote
@@ -2084,6 +2237,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       // ils suivent le pas, un peu en retard sur la tête
       const sway = P.moving ? (P.running ? 1.6 : 1) : 0.25;
       held.position.set(Math.cos(bob) * 0.007 * sway, Math.sin(bob * 2) * 0.006 * sway - (P.running ? 0.02 : 0), 0);
+      held.visible = !RF;
       held.rotation.set(Math.sin(bob * 2) * 0.01 * sway, Math.cos(bob) * 0.015 * sway, 0);
 
       // 2. L'entité fait face au joueur et tressaute quand elle le traque (Level 2 : le troupeau)
@@ -2144,6 +2298,20 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         camera.rotation.x += (Math.random() - 0.5) * 0.05 * Math.max(0.3, mo);
       }
 
+      // pendant le rejeu : elle n'est pas dans l'image (on est elle) ; lui, si
+      if (RF) {
+        monsterGroup.visible = false;
+        replayQ.x = RF.px;
+        replayQ.z = RF.pz;
+        replayQ.yaw = RF.pyaw;
+        replayQ.moving = !!RF.mv;
+        replayQ.running = !!RF.rn;
+        replayQ.flashlight = !!RF.fl;
+        replayQ.floor = RF.pf;
+        const rv = floorViews[RF.pf || 0];
+        avatars.update(replayQ, true, feetY(sim.stairs, RF.px, RF.pz, RF.pf || 0), rv ? rv.lightAt(RF.px, RF.pz) : 0.3, dt, time);
+      }
+
       // 3. Les autres joueurs encore dehors
       for (const Q of sim.players) {
         const show = Q !== P && Q.status === 'alive' && !(Q.hidden >= 0); // un coéquipier caché dans un casier ne se voit pas
@@ -2176,11 +2344,11 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       const grabbed = P.grabT > 0 && P.status === 'alive';
       const dark = sim.blackout > 0;
       vhs.setFx?.({
-        tracking: Math.min(1, (dark ? 0.25 : 0) + (grabbed ? 0.75 : 0) + Math.min(1, fx.grab) * 0.6 + (scareT > 0 ? 0.6 : 0)),
+        tracking: Math.min(1, (dark ? 0.25 : 0) + (grabbed ? 0.75 : 0) + Math.min(1, fx.grab) * 0.6 + (scareT > 0 ? 0.6 : 0) + (RF ? 0.45 : 0)),
         splice: Math.min(1, fx.splice * 1.5),
         signalLoss: Math.min(1, fx.loss * 0.8),
         bars: Math.min(1, fx.bars),
-        chroma: grabbed ? 0.6 : 0,
+        chroma: grabbed ? 0.6 : RF ? 0.45 : 0,
         focus: Math.min(1, focusT + (grabbed ? 0.35 : 0)),
         white,
       });

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, DT, DEPART_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
 
@@ -328,13 +328,24 @@ test('triche : invisible de tous, elle réapparaît juste derrière un angle dev
     M.ambushT = 99;
     M.unseenAllT = 5;
     const evs = [];
-    for (let i = 0; i < 3; i++) {
+    let tell = null;
+    let tellStep = -1;
+    for (let i = 0; i < 150 && !evs.length; i++) {
       sim.events.length = 0;
       sim.step({ yaw: P.yaw });
+      const t = sim.events.find((e) => e.type === 'tell');
+      if (t && !tell) {
+        tell = t;
+        tellStep = i;
+        assert.ok(Math.hypot(t.x - P.x, t.z - P.z) > 5, 'le signe vient de là où elle va surgir');
+      }
       evs.push(...sim.events.filter((e) => e.type === 'warp'));
     }
     const w = evs[0];
     if (!w) continue;
+    // jamais sans prévenir : un craquement ou un souffle, plus d'une seconde avant, de l'endroit même
+    assert.ok(tell, 'un signe avant chaque apparition');
+    assert.ok(tellStep >= 0 && Math.hypot(tell.x - M.x, tell.z - M.z) < 0.3, 'elle surgit là où on l\'a entendue');
     assert.ok(!sim.inSomeView(0, M.x, M.z), 'elle n\'apparaît jamais sous les yeux d\'un joueur');
     assert.ok(Math.hypot(M.x - P.x, M.z - P.z) > 5, 'pas collée au joueur');
     if (w.kind === 'corner') {
@@ -360,6 +371,208 @@ test('triche : invisible de tous, elle réapparaît juste derrière un angle dev
   for (let i = 0; i < 5; i++) sim.step({ yaw: P.yaw });
   assert.ok(sim.players.every((Q) => Math.hypot(Q.x - M.x, Q.z - M.z) >= 30), 'on se retourne : elle a disparu');
   sim.map.brightCells = null;
+});
+
+test('première rencontre : au bout du couloir, elle est là ; regardée, le néon claque et elle a disparu', () => {
+  let shown = 0;
+  for (let seed = 1; seed <= 10; seed++) {
+    const sim = new BackroomsSim({ seed, difficulty: 'normal' });
+    const P = sim.player;
+    const M = sim.monster;
+    assert.ok(M.dormantT > 0 && sim.glimpseAt < M.dormantT, 'elle se montre pendant la minute de calme du début');
+    sim.glimpseAt = 0;
+    let show = null;
+    // le joueur tourne lentement sur lui-même jusqu'à ce qu'elle se montre devant lui
+    for (let i = 0; i < 60 * 30 && !show; i++) {
+      sim.events.length = 0;
+      sim.step({ yaw: P.yaw + 0.01 });
+      show = sim.events.find((e) => e.type === 'glimpse' && e.phase === 'show');
+    }
+    if (!show) continue;
+    shown++;
+    const d = Math.hypot(M.x - P.x, M.z - P.z);
+    assert.ok(d > 10 && d < 26, `au bout du couloir (${d.toFixed(1)} m)`);
+    assert.ok(hasLineOfSight(sim.map, P.x, P.z, M.x, M.z), 'droit devant, bien en vue');
+    assert.equal(M.mode, 'watch', 'immobile, elle regarde');
+    // on la fixe : moins d'une seconde plus tard, le néon claque et elle n'est plus là
+    let gone = null;
+    for (let i = 0; i < 90 && !gone; i++) {
+      sim.events.length = 0;
+      sim.step({ yaw: Math.atan2(-(M.x - P.x), -(M.z - P.z)) });
+      gone = sim.events.find((e) => e.type === 'glimpse' && e.phase === 'gone');
+    }
+    assert.ok(gone && gone.seen, 'regardée, elle disparaît');
+    assert.ok(Math.hypot(M.x - P.x, M.z - P.z) >= 30, 'loin, très loin');
+    assert.equal(M.mode, 'patrol');
+    assert.equal(sim.glimpseAt, Infinity, 'une seule fois par partie');
+  }
+  assert.ok(shown >= 7, `elle se montre (${shown}/10)`);
+});
+
+test('traque annoncée : les néons meurent un à un jusqu\'au joueur, puis elle est lâchée du fond', () => {
+  let hunts = 0;
+  for (let seed = 1; seed <= 8; seed++) {
+    const sim = new BackroomsSim({ seed, difficulty: 'normal' });
+    const P = sim.player;
+    const M = sim.monster;
+    M.dormantT = 0;
+    M.warpT = 1e9;
+    sim.glimpseAt = Infinity;
+    // elle rôde loin
+    const far = sim.map.walkable.find((c) => Math.hypot((c.x + 0.5) * CELL_SIZE - P.x, (c.z + 0.5) * CELL_SIZE - P.z) > 60);
+    M.x = (far.x + 0.5) * CELL_SIZE;
+    M.z = (far.z + 0.5) * CELL_SIZE;
+    M.stalkT = 99;
+    M.ambushT = 99;
+    sim.director.huntT = 0.01;
+    sim.director.fakeT = 999;
+    const offAt = [];
+    let hunt = null;
+    for (let i = 0; i < 60 * 8 && !hunt; i++) {
+      sim.events.length = 0;
+      sim.step({ yaw: P.yaw });
+      for (const e of sim.events) if (e.type === 'phantom' && e.kind === 'neon') offAt.push(Math.hypot(e.x - P.x, e.z - P.z));
+      hunt = sim.events.find((e) => e.type === 'hunt');
+      if (sim.events.some((e) => e.type === 'rare' && e.kind === 'lightsOut')) assert.ok(sim.lightsOut && sim.lightsOut.hunt, 'c\'est une traque');
+    }
+    if (!hunt) continue;
+    hunts++;
+    assert.ok(offAt.length >= 3, 'plusieurs néons s\'éteignent');
+    assert.ok(offAt[offAt.length - 1] < offAt[0], 'du plus loin jusqu\'à lui');
+    assert.ok(!sim.inSomeView(0, M.x, M.z, 0.1) || Math.hypot(M.x - P.x, M.z - P.z) > 10, 'lâchée hors de vue, au fond');
+    assert.ok(Math.hypot(M.x - P.x, M.z - P.z) < 30, 'tout près maintenant');
+    assert.equal(M.mode, 'search', 'elle vient le chercher');
+    assert.ok(Math.hypot(M.lastSeenX - P.x, M.lastSeenZ - P.z) < 0.5, 'droit sur lui');
+  }
+  assert.ok(hunts >= 6, `traques lancées (${hunts}/8)`);
+});
+
+test('recoin calme : elle n\'y voit ni n\'y entre ; au bout de 45 s, sa lampe grésille et plus rien n\'y protège', () => {
+  let tested = 0;
+  for (let seed = 1; seed <= 10; seed++) {
+    const sim = new BackroomsSim({ seed, difficulty: 'normal' });
+    const nooks = sim.floors[0].calm;
+    assert.ok(nooks.length >= 1, `des recoins calmes (graine ${seed})`);
+    for (const n of nooks) {
+      assert.ok(n.cells.length === 2 && !sim.map.isWall(n.gx, n.gz), 'un cul-de-sac libre');
+      assert.ok(Math.hypot(n.x - sim.map.spawn.x, n.z - sim.map.spawn.z) >= 18, 'loin du départ');
+    }
+    const n = nooks[0];
+    const P = sim.player;
+    const M = sim.monster;
+    M.dormantT = 0;
+    M.warpT = 1e9;
+    sim.glimpseAt = Infinity;
+    sim.director.huntT = 1e9;
+    P.x = n.x;
+    P.z = n.z;
+    P.flashlight = false;
+    // elle le poursuit, juste devant l'entrée du recoin
+    const ox = (n.cells[1].x + 0.5) * CELL_SIZE - n.dx * CELL_SIZE * 1.6;
+    const oz = (n.cells[1].z + 0.5) * CELL_SIZE - n.dz * CELL_SIZE * 1.6;
+    if (sim.map.isWall(Math.floor(ox / CELL_SIZE), Math.floor(oz / CELL_SIZE))) continue;
+    tested++;
+    M.x = ox;
+    M.z = oz;
+    M.mode = 'chase';
+    M.lastSeenX = P.x;
+    M.lastSeenZ = P.z;
+    assert.ok(sim.calmAt(P), 'à l\'abri');
+    let grabbed = false;
+    for (let i = 0; i < 60 * 20; i++) {
+      sim.step({ yaw: P.yaw });
+      if (P.grabT > 0 || P.status !== 'alive') grabbed = true;
+    }
+    assert.ok(!grabbed, 'elle ne franchit pas le seuil');
+    assert.notEqual(M.mode, 'chase', 'elle a cessé la poursuite');
+    // il s'y éternise : la protection s'use
+    sim.events.length = 0;
+    for (let i = 0; i < 60 * (CALM_HOLD - 18); i++) sim.step({ yaw: P.yaw });
+    assert.ok(!sim.calmAt(P), 'usé : plus d\'abri');
+    assert.ok(n.wear >= 1);
+    // dehors, il se recharge peu à peu
+    P.x = sim.map.spawn.x;
+    P.z = sim.map.spawn.z;
+    for (let i = 0; i < 60 * CALM_HOLD * 3; i++) sim.updateCalm();
+    assert.ok(n.wear < 0.05, 'reposé, il protège à nouveau');
+  }
+  assert.ok(tested >= 5, `recoins testés (${tested})`);
+});
+
+test('spectateurs : un mort fait grésiller le néon près d\'un vivant, ou frappe plus loin pour attirer l\'entité', () => {
+  const sim = new BackroomsSim({ seed: 4, difficulty: 'normal', players: [{ id: 0, name: 'A' }, { id: 1, name: 'B' }] });
+  const [A, B] = sim.players;
+  A.status = 'dead';
+  sim.glimpseAt = Infinity;
+  sim.monster.dormantT = 0;
+  // E : le néon le plus proche de B grésille
+  const lit = sim.map.lights.filter((l) => l.state === 'on').sort((a, b) => Math.hypot(a.x - B.x, a.z - B.z) - Math.hypot(b.x - B.x, b.z - B.z))[0];
+  B.x = lit.x + 1;
+  B.z = lit.z;
+  sim.events.length = 0;
+  sim.step({ useSel: true, view: 1 }, { 1: {} });
+  const f = sim.events.find((e) => e.type === 'haunt');
+  assert.ok(f && f.kind === 'flicker' && f.id === 1, 'le néon de B grésille');
+  assert.equal(lit.state, 'flicker');
+  // pas deux de suite
+  sim.events.length = 0;
+  sim.step({ whistle: true, view: 1 }, { 1: {} });
+  assert.ok(!sim.events.some((e) => e.type === 'haunt'), 'il faut attendre');
+  // après le délai : des coups devant B, qui attirent l'entité
+  A.hauntAt = 0;
+  sim.events.length = 0;
+  sim.step({ whistle: true, view: 1 }, { 1: {} });
+  const k = sim.events.find((e) => e.type === 'haunt');
+  assert.ok(k && k.kind === 'knock', 'des coups');
+  const dk = Math.hypot(k.x - B.x, k.z - B.z);
+  assert.ok(dk > 4 && dk < 18, `un peu plus loin (${dk.toFixed(1)} m)`);
+  assert.ok(A.hauntAt - sim.time > HAUNT_COOLDOWN - 1);
+  // un vivant ne hante pas
+  const before = sim.events.length;
+  sim.step({ useSel: true }, { 1: { whistle: true } });
+  assert.ok(!sim.events.slice(before).some((e) => e.type === 'haunt'));
+});
+
+test('elle préfère celui qui s\'isole ; plus on joue bien, plus elle triche (et inversement)', () => {
+  const sim = new BackroomsSim({ seed: 9, difficulty: 'normal', players: [{ id: 0, name: 'A' }, { id: 1, name: 'B' }, { id: 2, name: 'C' }] });
+  const [A, B, C] = sim.players;
+  const M = sim.monster;
+  const cells = sim.map.walkable.map((c) => ({ x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE }));
+  // A et B ensemble, C seul à 40 m d'eux ; l'entité un peu plus près du groupe
+  const g = cells.find((c) => Math.hypot(c.x - M.x, c.z - M.z) > 25 && Math.hypot(c.x - M.x, c.z - M.z) < 30);
+  const lone = cells.find((c) => Math.hypot(c.x - M.x, c.z - M.z) > 31 && Math.hypot(c.x - M.x, c.z - M.z) < 36 && Math.hypot(c.x - g.x, c.z - g.z) > 40);
+  A.x = B.x = g.x;
+  A.z = g.z;
+  B.z = g.z + 0.5;
+  C.x = lone.x;
+  C.z = lone.z;
+  for (const P of sim.players) P.seen = false;
+  assert.equal(sim.senseMonster().id, 2, 'le joueur seul');
+  const easy = new BackroomsSim({ seed: 9, skill: 0 });
+  const pro = new BackroomsSim({ seed: 9, skill: 1 });
+  assert.ok(easy.monster.dormantT > pro.monster.dormantT + 20, 'plus de répit au début pour qui débute');
+  assert.equal(new BackroomsSim({ seed: 9, skill: 'x' }).skill, 0.5);
+});
+
+test('invités : ils voient les néons mourir et les recoins s\'user (seuls les néons changés voyagent)', () => {
+  const host = new BackroomsSim({ seed: 3 });
+  const guest = new BackroomsSim({ seed: 3 });
+  const a = host.map.lights.find((l) => l.state === 'on');
+  const b = host.floors[1].lights.find((l) => l.state === 'on');
+  a.state = 'off';
+  b.state = 'flicker';
+  host.floors[0].calm[0].wear = 0.6;
+  const snap = JSON.parse(JSON.stringify(host.snapshot()));
+  assert.ok(JSON.stringify(snap).length < 900, 'un instantané léger');
+  guest.applySnapshot(snap);
+  assert.equal(guest.map.lights[host.map.lights.indexOf(a)].state, 'off');
+  assert.equal(guest.floors[1].lights[host.floors[1].lights.indexOf(b)].state, 'flicker');
+  assert.equal(guest.floors[0].calm[0].wear, 0.6);
+  a.state = 'on';
+  b.state = 'on';
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  assert.equal(guest.map.lights[host.map.lights.indexOf(a)].state, 'on', 'rallumé chez l\'invité aussi');
+  assert.equal(guest.floors[1].lights[host.floors[1].lights.indexOf(b)].state, 'on');
 });
 
 test('casier : caché, l\'entité ne le voit pas ; vu en entrant, elle vient le chercher', () => {
@@ -1295,12 +1508,14 @@ test("l'entité se tapit dans le noir pour observer, fuit la lampe au début, et
       M.z = (c.z + 0.5) * CELL_SIZE;
       M.stalkT = 0;
       M.dormantT = 0; // passé la première minute de calme
+      M.warpT = 1e9; // ici, elle ne triche pas : on regarde comment elle se tapit
       for (let i = 0; i < 60 * 40 && M.mode !== 'watch'; i++) {
         sim.step();
         if (M.mode === 'chase') return;
       }
       if (M.mode !== 'watch') return;
       watched++;
+      sim.darkCellsOf(sim.map);
       const darkAt = (x, z) => sim.map.darkCells[Math.floor(z / CELL_SIZE) * sim.map.W + Math.floor(x / CELL_SIZE)];
       if (darkAt(M.x, M.z) < darkAt(P.x, P.z)) darker++;
       const d = Math.hypot(M.x - P.x, M.z - P.z);
