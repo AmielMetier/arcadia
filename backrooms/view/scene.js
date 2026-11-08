@@ -784,7 +784,7 @@ float bkCaust(vec2 uv, float t) {
         group.add(inst);
       }
     } else {
-      // l'étage du bas du Level 0 : le papier peint délavé, mangé par l'humidité
+      // l'étage du bas du Level 0 : le même papier peint, délavé vers le gris
       wallMat = baked(new THREE.MeshLambertMaterial({ map: L0 && fi === 1 ? textures.wallLow : textures.wall }), L0 ? { base: true } : null);
       const wallsMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(CELL_SIZE, CEIL + SUNK, CELL_SIZE), wallMat, wallCount);
       // le mur percé du trou de la cassette perchée se construit à part (6b)
