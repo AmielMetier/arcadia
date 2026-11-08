@@ -439,15 +439,17 @@ export function createBackroomsScene(container, floors, lamps) {
     }
     // power : 1 néons allumés, 0 coupure de courant (seule reste une lueur à peine visible)
     let power = 1;
-    // Level 0, toutes les cassettes trouvées : la phase rouge. Plus aucune lumière blanche : les néons s'éteignent, sauf
-    // un sur cinq environ (share), qui devient un feu de secours rouge à bout de souffle. Chacun vit à son rythme,
+    // Level 0, toutes les cassettes trouvées : la phase rouge. Plus aucune lumière blanche : les néons s'éteignent. Dans
+    // chaque zone de 8,75 m de côté (zone) qui a un plafonnier, un seul devient un feu de secours rouge, même un néon
+    // grillé (le feu de secours a sa batterie) : aucune région ne reste dans le noir pour de bon. Chaque feu éclaire
+    // comme un néon ordinaire, même dans les zones claires, et il est à bout de souffle. Chacun vit à son rythme,
     // sans régularité : éteint un moment, il tente de se rallumer en claquant (allumé, éteint, sans entre-deux), tient
     // parfois une seconde, puis lâche de nouveau ; il lui arrive de rester à demi allumé. Le noir domine. Sa lumière
     // tombe vers le sol et éclaire peu le plafond (ceil). De temps en temps tout se coupe d'un coup, puis se rallume en
     // hoquetant. La lumière rouge passe par le second canal de la lumière cuite (liveB, teinte tint).
     // alarm : un par feu rouge
     let alarm = null;
-    const RED = { share: 0.22, level: [0.65, 1], tint: [0.66, 0.038, 0.024], ceil: 0.22 };
+    const RED = { zone: 8.75, level: [0.65, 1], tint: [0.66, 0.038, 0.024], ceil: 0.22 };
     const alarmOf = new Map();
     const writeBake = () => {
       if (alarm) {
@@ -2567,13 +2569,18 @@ float bkCaust(vec2 uv, float t) {
         if (L0 && !alarm && sim.level === 0 && sim.open) {
           // les feux rouges, tirés d'après leur place (les mêmes chez tous les joueurs)
           const pick = (l, s) => (((Math.sin(l.x * 12.9898 + l.z * 78.233 + s) * 43758.5453) % 1) + 1) % 1;
-          alarm = map.lights
-            .filter((l) => l.state !== 'off' && pick(l, 0) < RED.share)
-            .map((l) => {
-              const base = RED.level[0] + (RED.level[1] - RED.level[0]) * pick(l, 3.3);
-              // chacun commence à un moment différent de sa vie
-              return { l, fp: fpOf(l), base, k: 0, v: 0, mode: 'off', t: Math.random() * 2.5, n: 0 };
-            });
+          const zones = new Map(); // un feu par zone : le néon que le tirage met en tête
+          for (const l of map.lights) {
+            const key = Math.floor(l.x / RED.zone) + ',' + Math.floor(l.z / RED.zone);
+            const cur = zones.get(key);
+            if (!cur || pick(l, 1.7) < pick(cur, 1.7)) zones.set(key, l);
+          }
+          alarm = [...zones.values()].map((l) => {
+            const base = RED.level[0] + (RED.level[1] - RED.level[0]) * pick(l, 3.3);
+            const fp = footprint({ ...l, bright: false }); // la portée d'un néon ordinaire, même en zone claire
+            // chacun commence à un moment différent de sa vie
+            return { l, fp, base, k: 0, v: 0, mode: 'off', t: Math.random() * 2.5, n: 0 };
+          });
           for (const a of alarm) alarmOf.set(a.l, a);
           bakeUniforms.uBakeTint.value.setRGB(0.8, 0.08, 0.05); // le peu de lumière qui reste dans le noir : rouge aussi
           bakeUniforms.uBakeTint2.value.setRGB(...RED.tint);

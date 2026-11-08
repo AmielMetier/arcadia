@@ -10,7 +10,7 @@
 - **The Backrooms** — Les trous de l'étage du haut sont plus larges, avec des passerelles plus fines et des parois éclairées.
 - **The Backrooms** — L'intérieur des trous et des puits a la même teinte que les murs de l'étage, au lieu d'un gris-vert.
 - **The Backrooms** — Nouvelles couleurs à l'étage du haut du Level 0 : un jaune moins vert, murs jaune pâle, moquette beige à peine plus foncée que les murs, plafond blanc cassé à la grille discrète et néons d'un blanc à peine chaud.
-- **The Backrooms** — La fin du Level 0 plonge dans le noir : quand toutes les cassettes sont trouvées, les néons s'éteignent et seuls quelques feux de secours rouges restent allumés.
+- **The Backrooms** — La fin du Level 0 plonge dans le noir : quand toutes les cassettes sont trouvées, les néons s'éteignent et seuls des feux de secours rouges restent allumés, un par zone : aucune région ne reste dans le noir pour de bon.
   - Des feux à bout de souffle, chacun à son rythme : ils claquent en tentant de se rallumer, tiennent parfois une seconde, puis lâchent de nouveau. Le noir domine.
   - Leur lumière tombe vers le sol et laisse le plafond et le fond des couloirs dans le noir.
   - Parfois tout se coupe d'un coup avant de se rallumer en hoquetant.
