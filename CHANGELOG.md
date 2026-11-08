@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 4.63 — 8 novembre 2026
+- **Odyssée** — La première arène, celle d'Hector à Sylvebourg, est entièrement nouvelle : une grande serre lumineuse en trois salles.
+  - À l'accueil, le panneau des règles t'attend au milieu de la pièce, et deux portes mènent à la Grande Serre.
+  - Dans chaque moitié de la serre, des blocs de pollen trop collants pour être poussés à la main : marche sur la dalle derrière une soufflerie, et le bloc glisse tout droit jusqu'au premier obstacle.
+  - Fais tomber un bloc dans la stèle de chaque côté pour ouvrir le dôme d'Hector. Un pupitre près de chaque porte remet les blocs en place.
+  - Deux dresseurs guettent les allées du bord, avec des baies et des potions à gagner : résous l'énigme du premier coup et tu peux les éviter.
+- **Odyssée** — Hector a une nouvelle équipe de trois Pokémon qui jouent ensemble : Mimigal ralentit, Couverdure encaisse et endort, et son Bourdonnet puise dans ses Sacoches de Pollen quand il faiblit.
+- **Odyssée** — Les CT arrivent : en battant Hector, tu reçois la CT01 Pollen Collant, une attaque Insecte inédite qui baisse la Vitesse. Une CT ne s'use pas, on l'apprend depuis le Sac.
+
 ## 4.62 — 7 novembre 2026
 - **The Backrooms** — Une image nette, et un vrai caméscope à sortir (touche V).
   - Sans caméscope, l'écran n'a plus d'effet de cassette : image propre, sans lignes, ni bande déformée, ni compteur REC.
