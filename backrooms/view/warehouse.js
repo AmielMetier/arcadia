@@ -6,6 +6,7 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
 import { CELL_SIZE, T } from '../engine/map.js';
+import { loadKit } from './kit.js';
 
 const KART_TEX = new URL('../../kart/tex/', import.meta.url).href;
 const C = CELL_SIZE;
@@ -398,7 +399,115 @@ function makeTextures(rnd) {
     };
     img.src = KART_TEX + 'planks.jpg';
   }
+
+  // Repères de zone peints au pochoir sur les murs (« ZONE » et une lettre-chiffre, de A1 à D4) : 16 sur une planche
+  // 4 × 4, peinture blanche un peu passée, écaillée
+  {
+    const [cv, ctx] = canvas(1024, 512);
+    ctx.clearRect(0, 0, 1024, 512);
+    for (let k = 0; k < 16; k++) {
+      const ox = (k % 4) * 256;
+      const oy = Math.floor(k / 4) * 128;
+      stencil(ctx, 'ZONE', ox + 128, oy + 26, 24, 'rgba(232,230,220,0.82)', rnd);
+      stencil(ctx, `${'ABCD'[k >> 2]}${(k & 3) + 1}`, ox + 128, oy + 80, 76, 'rgba(232,230,220,0.88)', rnd);
+    }
+    out.zones = tex(cv);
+  }
+
+  // Poste d'extincteur : le panneau rouge carré au pictogramme blanc (planche de gauche) et le fond peint en rouge
+  // derrière l'appareil, cerné de blanc (planche de droite)
+  {
+    const [cv, ctx] = canvas(256, 128);
+    ctx.fillStyle = '#b3201a';
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(6, 6, 116, 116);
+    ctx.fillStyle = '#f4f1ea';
+    // l'extincteur : le corps, l'épaule, la tête, le tuyau
+    ctx.beginPath();
+    ctx.roundRect(46, 42, 30, 62, 8);
+    ctx.fill();
+    ctx.fillRect(54, 30, 14, 14);
+    ctx.fillRect(48, 26, 30, 6);
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = '#f4f1ea';
+    ctx.beginPath();
+    ctx.moveTo(76, 30);
+    ctx.quadraticCurveTo(96, 34, 92, 70);
+    ctx.stroke();
+    // la flamme, à droite
+    ctx.beginPath();
+    ctx.moveTo(98, 104);
+    ctx.quadraticCurveTo(84, 92, 96, 76);
+    ctx.quadraticCurveTo(98, 88, 104, 84);
+    ctx.quadraticCurveTo(116, 96, 98, 104);
+    ctx.fill();
+    // le fond rouge du poste : un aplat cerné d'un filet blanc, la peinture un peu usée
+    ctx.fillStyle = '#a61d17';
+    ctx.fillRect(128, 0, 128, 128);
+    ctx.strokeStyle = 'rgba(240,236,228,0.85)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(131, 2, 122, 124);
+    for (let i = 0; i < 90; i++) {
+      ctx.fillStyle = `rgba(${rnd() < 0.5 ? '40,10,8' : '220,120,110'},${rnd() * 0.18})`;
+      ctx.fillRect(128 + rnd() * 128, rnd() * 128, 1 + rnd() * 6, 1 + rnd() * 3);
+    }
+    out.fire = tex(cv);
+  }
+
+  // Siphon de sol : une grille de fonte carrée dans son cadre, un peu de rouille au fond des fentes
+  {
+    const [cv, ctx] = canvas(128);
+    ctx.fillStyle = '#3c3e3f';
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.fillStyle = '#56595b';
+    ctx.fillRect(8, 8, 112, 112);
+    for (let i = 0; i < 9; i++) {
+      ctx.fillStyle = '#0d0e0e';
+      ctx.fillRect(18 + i * 11, 18, 5, 92);
+      ctx.fillStyle = 'rgba(110,62,30,0.35)';
+      ctx.fillRect(18 + i * 11, 96, 5, 14);
+    }
+    grain(ctx, 128, 128, 24, rnd);
+    out.drain = tex(cv);
+  }
+
+  // Numéros d'allée peints au sol, à l'entrée de chaque allée (les mêmes que les panneaux suspendus) : 16, en jaune
+  {
+    const [cv, ctx] = canvas(512);
+    ctx.clearRect(0, 0, 512, 512);
+    for (let k = 0; k < 16; k++) {
+      const x = (k % 4) * 128 + 64;
+      const y = Math.floor(k / 4) * 128 + 64;
+      stencil(ctx, String(k + 1).padStart(2, '0'), x, y + 4, 78, 'rgba(222,178,40,0.85)', rnd);
+    }
+    out.floorNum = tex(cv);
+  }
+
+  // Tôle laquée blanche des capots de réglettes, salie de poussière
+  {
+    const [cv, ctx] = canvas(64);
+    ctx.fillStyle = '#d9dcd8';
+    ctx.fillRect(0, 0, 64, 64);
+    grain(ctx, 64, 64, 14, rnd);
+    out.lacquer = tex(cv);
+  }
   return out;
+}
+
+// les UV d'une boîte calées sur le monde : unit mètres par répétition de la texture, sur chaque face
+function boxUV(geo, unit) {
+  const p = geo.attributes.position;
+  const n = geo.attributes.normal;
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < p.count; i++) {
+    const ax = Math.abs(n.getX(i));
+    const ay = Math.abs(n.getY(i));
+    const [u, v] = ax > 0.5 ? [p.getZ(i), p.getY(i)] : ay > 0.5 ? [p.getX(i), p.getZ(i)] : [p.getX(i), p.getY(i)];
+    uv.setXY(i, u / unit, v / unit);
+  }
+  return geo;
 }
 
 // Palette Europe (1,2 m × 1 m × 14 cm) : 3 semelles, 9 dés, planches du dessus et du dessous, en un seul maillage
@@ -418,11 +527,12 @@ function palletGeometry() {
   return mergeGeometries(parts);
 }
 
-export function buildWarehouse({ map, group, baked, CEIL }) {
+export function buildWarehouse({ map, group, baked, CEIL, textures }) {
   const W = map.W;
   const H = map.H;
   const grid = map.grid;
   const at = (x, z) => (x < 0 || z < 0 || x >= W || z >= H ? T.WALL : grid[z * W + x]);
+  const solid = (x, z) => at(x, z) === T.WALL || at(x, z) === T.EXIT;
   let s = 918273 + Math.round(map.spawn.x * 31 + map.spawn.z * 17);
   const rnd = () => {
     s = (s + 0x6d2b79f5) >>> 0;
@@ -433,6 +543,7 @@ export function buildWarehouse({ map, group, baked, CEIL }) {
   };
   const tx = makeTextures(rnd);
   const lambert = (o) => baked(new THREE.MeshLambertMaterial(o));
+  const CH = 4 * C; // un morceau d'entrepôt (10 m de côté) : l'unité du tri des objets à dessiner
 
   // Instances regroupées par maillage : on empile les matrices (et les teintes), on crée les InstancedMesh à la fin
   const bins = new Map();
@@ -440,7 +551,6 @@ export function buildWarehouse({ map, group, baked, CEIL }) {
     if (!bins.has(key)) bins.set(key, { geo, mat, m: [], c: [] });
     return bins.get(key);
   };
-  const tint = new THREE.Color();
   const push = (b, m, shade = 1) => {
     b.m.push(m);
     b.c.push(shade);
@@ -639,6 +749,10 @@ export function buildWarehouse({ map, group, baked, CEIL }) {
   const signB = [];
   for (let k = 0; k < 16; k++) signB.push(bin('sign' + k, atlasGeo(new THREE.BoxGeometry(1, 1, 1), (k % 2) / 2, 1 - (Math.floor(k / 2) + 1) / 8, 0.5, 0.125), signMat));
   const rodB = bin('rod', new THREE.BoxGeometry(0.015, 1, 0.015), lambert({ color: '#2a2c2e' }));
+  const decal = (o) => lambert({ transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, ...o });
+  const numMat = decal({ map: tx.floorNum });
+  const numB = [];
+  for (let k = 0; k < 16; k++) numB.push(bin('num' + k, atlasGeo(new THREE.PlaneGeometry(1, 1), (k % 4) / 4, 0.75 - Math.floor(k / 4) / 4, 0.25, 0.25), numMat));
   let aisleN = 0;
   for (let z = 1; z < H - 1; z++) {
     for (let x = 1; x < W - 1; x++) {
@@ -653,6 +767,12 @@ export function buildWarehouse({ map, group, baked, CEIL }) {
         const px = (x + 0.5) * C + ax * (C / 2);
         const pz = (z + 0.5) * C + az * (C / 2);
         const face = ax ? 0 : Math.PI / 2; // la pancarte barre l'entrée de l'allée
+        // son numéro, peint au sol à l'entrée, lisible en y entrant
+        dummy.position.set(px, 0.005, pz);
+        dummy.rotation.set(-Math.PI / 2, ax ? Math.PI : -Math.PI / 2, 0);
+        dummy.scale.set(0.95, 0.95, 1);
+        dummy.updateMatrix();
+        push(numB[aisleN % 16], dummy.matrix.clone());
         const sb = signB[aisleN++ % 16];
         for (const flip of [0, Math.PI]) {
           dummy.position.set(px - az * (C / 2 - 0.3), CEIL - 1.05, pz - ax * (C / 2 - 0.3));
@@ -672,22 +792,153 @@ export function buildWarehouse({ map, group, baked, CEIL }) {
     }
   }
 
-  // --- Réglettes suspendues : carter de tôle et deux chaînettes au-dessus de chaque tube ---
-  const housingB = bin('housing', new THREE.BoxGeometry(1.7, 0.07, 0.24), lambert({ color: '#595e60' }));
-  const chainB = bin('chain', new THREE.BoxGeometry(0.012, 1, 0.012), lambert({ color: '#3a3c3e' }));
+  // --- Les murs : une gaine électrique grise court tout du long à 3 m (colliers, boîtes de dérivation), des repères de
+  // zone peints au pochoir, des postes d'extincteur (fond rouge, panneau, l'appareil au pied). Sur les murs seulement,
+  // pas sur les piliers isolés ; jamais sur la façade d'un ascenseur
+  const lifts = new Set([map.exit && map.exit.gz * W + map.exit.gx, map.arrival && map.arrival.gz * W + map.arrival.gx]);
+  const greyMetal = lambert({ color: '#7d8284' });
+  const conduitB = bin('conduit', new THREE.CylinderGeometry(0.016, 0.016, 1, 8, 1, true), greyMetal);
+  const clipB = bin('clip', new THREE.BoxGeometry(0.05, 0.045, 0.03), greyMetal);
+  const jboxB = bin('jbox', new THREE.BoxGeometry(0.15, 0.15, 0.07), lambert({ color: '#8d9294' }));
+  const zoneMat = decal({ map: tx.zones });
+  const zoneB = [];
+  for (let k = 0; k < 16; k++) zoneB.push(bin('zone' + k, atlasGeo(new THREE.PlaneGeometry(1, 1), (k % 4) / 4, 0.75 - Math.floor(k / 4) / 4, 0.25, 0.25), zoneMat));
+  const fireMat = decal({ map: tx.fire });
+  const fireSignB = bin('fireSign', atlasGeo(new THREE.BoxGeometry(1, 1, 1), 0, 0, 0.5, 1), lambert({ map: tx.fire }));
+  const firePanelB = bin('firePanel', atlasGeo(new THREE.PlaneGeometry(1, 1), 0.5, 0, 0.5, 1), fireMat);
+  const extPlaces = []; // les extincteurs (modèle Poly Haven, chargé plus bas)
+  const stations = [];
+  const CY = 3.05; // hauteur de la gaine
+  // posé contre le mur en (x, y, z), tourné de ry, à l'échelle (sx, sy, sz)
+  const wallAt = (x, y, z, ry, sx, sy, sz) => {
+    dummy.position.set(x, y, z);
+    dummy.rotation.set(0, ry, 0);
+    dummy.scale.set(sx, sy, sz);
+    dummy.updateMatrix();
+    return dummy.matrix.clone();
+  };
+  for (let z = 1; z < H - 1; z++) {
+    for (let x = 1; x < W - 1; x++) {
+      if (at(x, z) !== T.FLOOR) continue;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const wx = x + dx;
+        const wz = z + dz;
+        if (at(wx, wz) !== T.WALL || lifts.has(wz * W + wx)) continue;
+        // un mur, pas un pilier : il se prolonge d'un côté ou de l'autre
+        if (!solid(wx + dz, wz + dx) && !solid(wx - dz, wz - dx)) continue;
+        const fx = (x + 0.5) * C + dx * (C / 2); // le milieu de la face
+        const fz = (z + 0.5) * C + dz * (C / 2);
+        const ry = Math.atan2(-dx, -dz); // ce qui est posé dessus regarde la pièce
+        const tx0 = dz; // le long du mur
+        const tz0 = dx;
+        // la gaine, à 4 cm du mur, ses colliers tous les 1,25 m
+        dummy.position.set(fx - dx * 0.045, CY, fz - dz * 0.045);
+        dummy.rotation.set(dz ? 0 : Math.PI / 2, 0, dz ? Math.PI / 2 : 0);
+        dummy.scale.set(1, C, 1);
+        dummy.updateMatrix();
+        push(conduitB, dummy.matrix.clone());
+        for (const o of [-0.625, 0.625]) push(clipB, wallAt(fx - dx * 0.03 + tx0 * o, CY, fz - dz * 0.03 + tz0 * o, ry, 1, 1, 1));
+        if (rnd() < 0.16) {
+          const o = (rnd() - 0.5) * 1.2;
+          push(jboxB, wallAt(fx - dx * 0.036 + tx0 * o, CY, fz - dz * 0.036 + tz0 * o, ry, 1, 1, 1));
+        }
+        const r = rnd();
+        if (r < 0.07 && stations.every((p) => Math.hypot(p[0] - fx, p[1] - fz) > 14)) {
+          // poste d'extincteur : le fond rouge peint, le panneau au-dessus, l'appareil posé au pied
+          stations.push([fx, fz]);
+          push(firePanelB, wallAt(fx - dx * 0.004, 0.82, fz - dz * 0.004, ry, 0.62, 1.26, 1));
+          push(fireSignB, wallAt(fx - dx * 0.008, 1.78, fz - dz * 0.008, ry, 0.32, 0.32, 0.012));
+          extPlaces.push(new THREE.Matrix4().makeTranslation(fx - dx * 0.17, 0, fz - dz * 0.17).multiply(new THREE.Matrix4().makeRotationY(ry)));
+        } else if (r > 0.86) {
+          // repère de zone : le quart de l'entrepôt (A à D) et son quart à lui (1 à 4)
+          const qx = x < W / 2 ? 0 : 1;
+          const qz = z < H / 2 ? 0 : 1;
+          const sx = (x % (W / 2)) < W / 4 ? 0 : 1;
+          const sz = (z % (H / 2)) < H / 4 ? 0 : 1;
+          push(zoneB[(qx + qz * 2) * 4 + sx + sz * 2], wallAt(fx - dx * 0.006, 2.45, fz - dz * 0.006, ry, 1.15, 0.58, 1));
+        }
+      }
+    }
+  }
+
+  // --- Siphons de sol dans les grandes allées (une grille de fonte, à plat) ---
+  const drainB = bin('drain', new THREE.PlaneGeometry(0.42, 0.42), decal({ map: tx.drain, transparent: false }));
+  for (let z = 2; z < H - 2; z++) {
+    for (let x = 2; x < W - 2; x++) {
+      if (at(x, z) !== T.FLOOR) continue;
+      let open = true;
+      for (let dz = -1; dz <= 1 && open; dz++) for (let dx = -1; dx <= 1; dx++) if (at(x + dx, z + dz) !== T.FLOOR) open = false;
+      if (!open || rnd() > 0.025) continue;
+      dummy.position.set((x + 0.5) * C, 0.004, (z + 0.5) * C);
+      dummy.rotation.set(-Math.PI / 2, Math.floor(rnd() * 4) * (Math.PI / 2), 0);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      push(drainB, dummy.matrix.clone());
+    }
+  }
+
+  // --- Réglettes suspendues : un capot de tôle laquée blanche en auge au-dessus des deux tubes (dessus, deux flancs
+  // évasés, deux embouts, les douilles), pendu à deux chaînettes. Les tubes eux-mêmes sont dans scene.js (ils
+  // s'allument, grésillent, meurent)
+  const TY = CEIL - 0.45; // l'axe des tubes
+  const capGeo = (() => {
+    const parts = [];
+    const box = (sx, sy, sz, x, y, z, rx = 0) => {
+      const g = new THREE.BoxGeometry(sx, sy, sz);
+      if (rx) g.rotateX(rx);
+      g.translate(x, y, z);
+      parts.push(g);
+    };
+    box(1.62, 0.012, 0.15, 0, 0.05, 0);
+    for (const sz of [-1, 1]) box(1.62, 0.075, 0.006, 0, 0.012, sz * 0.09, -sz * 0.5);
+    for (const sx of [-1, 1]) {
+      box(0.012, 0.07, 0.17, sx * 0.81, 0.016, 0);
+      for (const z of [-0.045, 0.045]) box(0.03, 0.03, 0.036, sx * 0.765, 0.002, z); // douilles
+    }
+    return mergeGeometries(parts);
+  })();
+  const housingB = bin('housing', capGeo, lambert({ map: tx.lacquer }));
+  const chainB = bin('chain', new THREE.BoxGeometry(0.01, 1, 0.01), lambert({ color: '#3a3c3e' }));
+  const chainLen = CEIL - (TY + 0.056);
   for (const l of map.lights) {
     dummy.rotation.set(0, 0, 0);
-    dummy.position.set(l.x, CEIL - 0.39, l.z);
+    dummy.position.set(l.x, TY, l.z);
     dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
     push(housingB, dummy.matrix.clone());
-    for (const o of [-0.65, 0.65]) {
-      dummy.position.set(l.x + o, CEIL - 0.18, l.z);
-      dummy.scale.set(1, 0.36, 1);
+    for (const o of [-0.6, 0.6]) {
+      dummy.position.set(l.x + o, CEIL - chainLen / 2, l.z);
+      dummy.scale.set(1, chainLen, 1);
       dummy.updateMatrix();
       push(chainB, dummy.matrix.clone());
     }
   }
+
+  // --- Plafond à caissons : la dalle porte sur des poutres de béton coulées avec elle. Les principales (40 cm de
+  // retombée) courent le long de z toutes les 3 cases, les secondaires (30 cm) le long de x toutes les 2 cases : les
+  // réglettes pendent au milieu des caissons, les gaines passent dessous, les tuyaux les traversent dans leurs fourreaux
+  const concrete = textures ? textures.ceiling.clone() : null;
+  if (concrete) {
+    concrete.needsUpdate = true;
+    concrete.repeat.set(1, 1);
+    textures.ready.then(() => {
+      concrete.needsUpdate = true;
+    });
+  }
+  const beamMat = lambert({ map: concrete, color: '#f2f2ee' });
+  const BD1 = 0.4;
+  const BD2 = 0.3;
+  const beamZ = bin('beamZ', boxUV(new THREE.BoxGeometry(0.42, BD1, C), C), beamMat);
+  const beamX = bin('beamX', boxUV(new THREE.BoxGeometry(C, BD2, 0.32), C), beamMat);
+  const put = (b, x, y, z) => {
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.set(1, 1, 1);
+    dummy.position.set(x, y, z);
+    dummy.updateMatrix();
+    push(b, dummy.matrix.clone());
+  };
+  for (let gx = 3; gx < W - 1; gx += 3) for (let gz = 1; gz < H - 1; gz++) if (!(solid(gx - 1, gz) && solid(gx, gz))) put(beamZ, gx * C, CEIL - BD1 / 2, (gz + 0.5) * C);
+  for (let gz = 2; gz < H - 1; gz += 2) for (let gx = 1; gx < W - 1; gx++) if (!(solid(gx, gz - 1) && solid(gx, gz))) put(beamX, (gx + 0.5) * C, CEIL - BD2 / 2, gz * C);
 
   // --- Réseaux au plafond : tuyaux le long de x (eau grise, sprinklers rouges, gaz vert), gaines le long de z ---
   const len = W * C;
@@ -701,11 +952,15 @@ export function buildWarehouse({ map, group, baked, CEIL }) {
     const z0 = gz * C + 0.4;
     for (const p of pipeDefs) {
       const b = bin('pipe' + p.col, new THREE.CylinderGeometry(p.r, p.r, 1, 10), lambert({ color: p.col }));
-      dummy.position.set(len / 2, CEIL - p.dy, z0 + p.dz);
-      dummy.rotation.set(0, 0, Math.PI / 2);
-      dummy.scale.set(1, len, 1);
-      dummy.updateMatrix();
-      push(b, dummy.matrix.clone());
+      // un tronçon par morceau d'entrepôt (CH m) : bout à bout, ils font le tuyau ; chacun n'est dessiné que s'il se voit
+      for (let x0 = 0; x0 < len; x0 += CH) {
+        const l = Math.min(CH, len - x0);
+        dummy.position.set(x0 + l / 2, CEIL - p.dy, z0 + p.dz);
+        dummy.rotation.set(0, 0, Math.PI / 2);
+        dummy.scale.set(1, l, 1);
+        dummy.updateMatrix();
+        push(b, dummy.matrix.clone());
+      }
     }
     // colliers : une tige et une barre sous les tuyaux, tous les 2,5 m
     for (let x = C / 2; x < len; x += C) {
@@ -734,22 +989,130 @@ export function buildWarehouse({ map, group, baked, CEIL }) {
     }
   }
 
-  // --- Création des maillages ---
-  for (const b of bins.values()) {
-    if (!b.m.length) continue;
-    const inst = new THREE.InstancedMesh(b.geo, b.mat, b.m.length);
-    b.m.forEach((m, i) => {
-      inst.setMatrixAt(i, m);
-      if (b.c[i] !== 1) inst.setColorAt(i, tint.setScalar(b.c[i]));
-      else if (inst.instanceColor) inst.setColorAt(i, tint.setScalar(1));
-    });
-    if (b.c.some((v) => v !== 1)) {
-      // les premières teintes à 1 ont été sautées avant que instanceColor n'existe
-      b.m.forEach((_, i) => inst.setColorAt(i, tint.setScalar(b.c[i])));
-      inst.instanceColor.needsUpdate = true;
+  // --- Création des maillages, triés par morceau d'entrepôt (CH × CH m) ---
+  // Des dizaines de milliers d'objets (près de 7 000 palettes de 250 triangles) : à chaque image, on ne dessine que les
+  // morceaux que la caméra peut voir (ou le caméscope d'un coéquipier en médaillon), en deçà de son plan lointain. Chaque
+  // morceau tient dans la sphère de la boîte qui contient tous ses objets : ceux qu'on saute ne changeraient pas un pixel
+  const NX = Math.ceil((W * C) / CH);
+  const NZ = Math.ceil((H * C) / CH);
+  const NCH = NX * NZ;
+  const lo = new Float32Array(NCH * 3).fill(Infinity);
+  const hi = new Float32Array(NCH * 3).fill(-Infinity);
+  const sc = new Float32Array(NCH * 4).fill(-1); // la sphère de chaque morceau (rayon négatif : morceau vide)
+  const bb = new THREE.Box3();
+  const sets = [];
+  let nVis = -1;
+  // un ensemble d'objets du même maillage (list : leurs matrices ; shades : leurs teintes, ou null), rangés par morceau
+  const addSet = (geo, mat, list, shades) => {
+    const n = list.length;
+    if (!n) return;
+    if (!geo.boundingBox) geo.computeBoundingBox();
+    const key = new Int32Array(n);
+    for (let i = 0; i < n; i++) {
+      const e = list[i].elements;
+      const k = Math.min(NX - 1, Math.max(0, Math.floor(e[12] / CH))) + NX * Math.min(NZ - 1, Math.max(0, Math.floor(e[14] / CH)));
+      key[i] = k;
+      bb.copy(geo.boundingBox).applyMatrix4(list[i]);
+      lo[k * 3] = Math.min(lo[k * 3], bb.min.x);
+      lo[k * 3 + 1] = Math.min(lo[k * 3 + 1], bb.min.y);
+      lo[k * 3 + 2] = Math.min(lo[k * 3 + 2], bb.min.z);
+      hi[k * 3] = Math.max(hi[k * 3], bb.max.x);
+      hi[k * 3 + 1] = Math.max(hi[k * 3 + 1], bb.max.y);
+      hi[k * 3 + 2] = Math.max(hi[k * 3 + 2], bb.max.z);
+      for (let a = 0; a < 3; a++) sc[k * 4 + a] = (lo[k * 3 + a] + hi[k * 3 + a]) / 2;
+      sc[k * 4 + 3] = 0.5 * Math.hypot(hi[k * 3] - lo[k * 3], hi[k * 3 + 1] - lo[k * 3 + 1], hi[k * 3 + 2] - lo[k * 3 + 2]) + 0.05;
     }
+    const order = Array.from({ length: n }, (_, i) => i).sort((a, c) => key[a] - key[c] || a - c);
+    const mats = new Float32Array(n * 16);
+    const cols = shades && shades.some((v) => v !== 1) ? new Float32Array(n * 3) : null;
+    const start = new Int32Array(NCH + 1); // les objets du morceau k : de start[k] à start[k + 1]
+    order.forEach((i, j) => {
+      list[i].toArray(mats, j * 16);
+      if (cols) cols.fill(shades[i], j * 3, j * 3 + 3);
+      start[key[i] + 1]++;
+    });
+    for (let k = 0; k < NCH; k++) start[k + 1] += start[k];
+    const inst = new THREE.InstancedMesh(geo, mat, n);
+    inst.instanceMatrix.array.set(mats);
     inst.instanceMatrix.needsUpdate = true;
+    if (cols) inst.instanceColor = new THREE.InstancedBufferAttribute(cols.slice(), 3);
     inst.frustumCulled = false;
     group.add(inst);
-  }
+    sets.push({ inst, mats, cols, start });
+    nVis = -1; // (un ensemble arrivé après coup : la prochaine image refait le tri)
+  };
+  for (const b of bins.values()) addSet(b.geo, b.mat, b.m, b.c);
+  // les extincteurs des postes (Poly Haven, korean_fire_extinguisher_01, CC0), une fois le modèle chargé
+  if (extPlaces.length)
+    loadKit('korean_fire_extinguisher_01').then((pieces) => {
+      for (const parts of pieces.values()) {
+        for (const part of parts) {
+          const src = part.mat;
+          const mat = baked(new THREE.MeshLambertMaterial({ map: src.map || null, color: src.color ? src.color.clone().multiplyScalar(0.85) : '#888888' }));
+          addSet(part.geo, mat, extPlaces.map((m) => m.clone().multiply(part.m)), null);
+        }
+      }
+    });
+  const vis = new Int32Array(NCH);
+  const sph = new THREE.Sphere();
+  // n morceaux visibles (vis) : on recopie leurs objets au début des tampons, et on n'envoie que cette partie
+  const fill = (n) => {
+    for (const S of sets) {
+      const am = S.inst.instanceMatrix.array;
+      const ac = S.cols && S.inst.instanceColor.array;
+      let o = 0;
+      for (let j = 0; j < n; j++) {
+        const a = S.start[vis[j]];
+        const b = S.start[vis[j] + 1];
+        if (b === a) continue;
+        am.set(S.mats.subarray(a * 16, b * 16), o * 16);
+        if (ac) ac.set(S.cols.subarray(a * 3, b * 3), o * 3);
+        o += b - a;
+      }
+      S.inst.count = o;
+      S.inst.instanceMatrix.clearUpdateRanges();
+      S.inst.instanceMatrix.addUpdateRange(0, o * 16);
+      S.inst.instanceMatrix.needsUpdate = true;
+      if (ac) {
+        S.inst.instanceColor.clearUpdateRanges();
+        S.inst.instanceColor.addUpdateRange(0, o * 3);
+        S.inst.instanceColor.needsUpdate = true;
+      }
+    }
+  };
+  const api = {
+    off: false, // (?debug : tout dessiner, pour comparer l'image avec et sans le tri)
+    // V : le point de vue (voir cullFor dans scene.js) ; here : la caméra est à cet étage ; insetHere : celle du médaillon
+    cull(V, here = true, insetHere = false) {
+      const gy = group.position.y;
+      let n = 0;
+      let ch = false;
+      for (let k = 0; k < NCH; k++) {
+        const r = sc[k * 4 + 3];
+        if (r < 0) continue;
+        const x = sc[k * 4];
+        const y = gy + sc[k * 4 + 1];
+        const z = sc[k * 4 + 2];
+        let ok = api.off;
+        if (!ok && here && (x - V.cam.x) * V.fwd.x + (y - V.cam.y) * V.fwd.y + (z - V.cam.z) * V.fwd.z - r <= V.R) {
+          sph.center.set(x, y, z);
+          sph.radius = r;
+          ok = V.fr.intersectsSphere(sph);
+        }
+        if (!ok && V.inset && insetHere) {
+          sph.center.set(x, y, z);
+          sph.radius = r;
+          ok = V.ifr.intersectsSphere(sph);
+        }
+        if (!ok) continue;
+        if (vis[n] !== k) ch = true;
+        vis[n++] = k;
+      }
+      if (n !== nVis) ch = true;
+      if (!ch) return;
+      nVis = n;
+      fill(n);
+    },
+  };
+  return api;
 }

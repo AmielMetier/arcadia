@@ -403,10 +403,11 @@ test('la fixer de loin la provoque ; s\'en approcher aussi ; la lampe ne la fait
 });
 
 test('zone très éclairée : à l\'abri, elle ne s\'y lance pas ; elle renonce au bord de l\'ombre et s\'y fond, hors de vue', () => {
-  const sim = new BackroomsSim({ map, difficulty: 'normal' });
+  // une carte neuve : les parties d'avant laissent parfois un néon de la zone claire éteint ou grésillant (leurs
+  // fantômes n'ont pas eu le temps de le rallumer), et le départ ne serait plus à l'abri
+  const sim = new BackroomsSim({ map: createBackroomsMap(42), difficulty: 'normal' });
   const P = sim.player;
   const M = sim.monster;
-  sim.map.brightCells = null; // (un autre test l'a éteinte)
   assert.ok(sim.brightCell(sim.map, P.x, P.z), 'le départ est dans une zone claire');
   M.dormantT = 0;
   M.warpT = 999;
