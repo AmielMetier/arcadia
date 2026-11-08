@@ -1,5 +1,26 @@
 # Journal des versions — Arcadia
 
+## 4.75 — 8 novembre 2026
+- **The Backrooms** — Des puits sans fond à l'étage du bas du Level 0.
+  - Dans certaines grandes salles, le sol laisse place à une grille de trous carrés séparés par d'étroites passerelles.
+  - Ils sont si profonds qu'on n'en voit jamais le fond : leurs parois s'enfoncent dans le noir.
+  - Y tomber est mortel : on bascule, on tombe longtemps en voyant la lumière rapetisser au-dessus… et personne ne vous entend atterrir.
+  - On peut les traverser par les passerelles en gardant l'équilibre ; le perdre, c'est tomber.
+  - Les escaliers, les cassettes et la sortie restent toujours accessibles sans passer au-dessus d'un puits.
+- **The Backrooms** — Les trous de l'étage du haut sont plus larges, avec des passerelles plus fines et des parois éclairées.
+- **The Backrooms** — L'intérieur des trous et des puits a la même teinte que les murs de l'étage, au lieu d'un gris-vert.
+- **The Backrooms** — Nouvelles couleurs à l'étage du haut du Level 0 : un jaune moins vert, murs jaune pâle, moquette beige à peine plus foncée que les murs, plafond blanc cassé à la grille discrète et néons d'un blanc à peine chaud.
+- **The Backrooms** — La fin du Level 0 plonge dans le noir : quand toutes les cassettes sont trouvées, les néons s'éteignent et seuls des feux de secours rouges restent allumés, un par zone : aucune région ne reste dans le noir pour de bon.
+  - Des feux à bout de souffle, chacun à son rythme : ils claquent en tentant de se rallumer, tiennent parfois une seconde, puis lâchent de nouveau. Le noir domine.
+  - Leur lumière, diffuse et sans bord net, porte un peu plus loin qu'un néon ; elle tombe vers le sol et laisse le plafond dans l'ombre. Chaque feu allumé jette une lueur sur les dalles autour de lui et un cône de lumière poussiéreuse vers le bas.
+  - Parfois tout se coupe d'un coup avant de se rallumer en hoquetant.
+  - La lampe torche aussi est à bout : elle claque, faiblit ou lâche par moments (elle reste blanche).
+- **The Backrooms** — Les piles sont de vraies piles AA, au sol comme dans la main.
+- **The Backrooms** — L'eau au Level 0 : flaques et plaques d'humidité plus rares, aux bords irréguliers (plus aucun rond parfait), auréoles du plafond plus discrètes qui ne passent plus d'une pièce à l'autre à travers les murs.
+- **The Backrooms** — Une vraie moquette rase au Level 0, la même aux deux étages : des poils fins qu'on distingue à hauteur d'homme, avec leurs ombres, et plus aucun motif qui se répète sur le sol.
+- **The Backrooms** — Les murs de l'étage du haut sont propres : plus de coulures, presque plus d'auréoles ni de traces d'humidité.
+- **The Backrooms** — L'étage du bas du Level 0 garde son ambiance d'avant : papier peint doré juste plus gris (plus aucune tache, fissure ni moisissure) et lumière plus chaude.
+
 ## 4.74 — 8 novembre 2026
 - Correction : sortie de la Caverne du Magma bien encadree de roche et chambre sud-est reliee au nord (Amiel)
 

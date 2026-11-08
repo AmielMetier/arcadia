@@ -790,7 +790,8 @@ export class BackroomsHUD {
     if (el) el.hidden = true;
   }
 
-  // extra : { stats: { seen, rushes, escapes, closest, haunts }, daily: 'Nov 7' | null, best: secondes | null, replay: bool }
+  // extra : { stats: { seen, rushes, escapes, closest, haunts }, daily: 'Nov 7' | null, best: secondes | null, replay: bool,
+  // abyss: bool (le dernier mort est tombé dans un puits sans fond : on le laisse tomber jusqu'au noir) }
   showEnd(sim, onRestart, extra = {}) {
     const end = this.$('#endScreen');
     const title = this.$('#endTitle');
@@ -811,7 +812,7 @@ export class BackroomsHUD {
     };
     this.endAt = performance.now();
     this.endPending = reveal;
-    this.endT = setTimeout(reveal, goat ? 12500 : sim.state === 'dead' ? (extra.replay ? 5600 : 1300) : 300);
+    this.endT = setTimeout(reveal, goat ? 12500 : sim.state === 'dead' ? (extra.replay ? 5600 : extra.abyss ? 5200 : 1300) : 300);
     // le bilan de la bande : ce qu'elle a vu de toi
     const S = extra.stats;
     const lines = [];
@@ -849,7 +850,7 @@ export class BackroomsHUD {
       title.textContent = solo ? 'YOU DIED' : 'NOBODY MADE IT OUT';
       title.style.color = '#ef4444';
       const PIPES = sim.level === PIPES_LEVEL;
-      sub.textContent = PIPES ? 'The herd found you in the dark…' : sim.level === 1 ? 'The entity was waiting at the end of the shelves…' : 'The entity caught you in the endless hallways…';
+      sub.textContent = PIPES ? 'The herd found you in the dark…' : sim.level === 1 ? 'The entity was waiting at the end of the shelves…' : extra.abyss ? 'You fell, and you are still falling. Nobody heard you land…' : 'The entity caught you in the endless hallways…';
       stats.textContent = `Level ${levelName(sim.level)} · ${PIPES ? `valves ${sim.valves}/4` : sim.level === 2 ? `valves ${sim.fuses}/3` : sim.level === 1 ? `fuses ${sim.delivered || 0}/3` : `tapes ${sim.cassettes}/${CASSETTES}`} · Survived for ${formatTime(sim.time)}`;
       this.$('#endTape').textContent = `${d} · RECORDING STOPPED`;
     }

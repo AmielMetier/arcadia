@@ -907,8 +907,9 @@ export class BackroomsSim {
     }
     this.dropCarry(P);
     this.dropInv(P);
-    this.emit({ type: 'jumpscare', x: extra.x ?? P.x, z: extra.z ?? P.z, id: P.id, goat: !!extra.goat });
-    this.emit({ type: 'dead', id: P.id, name: P.name, time: this.time });
+    // (tombé dans un puits sans fond : pas d'entité qui surgit, la chute suffit)
+    if (!extra.abyss) this.emit({ type: 'jumpscare', x: extra.x ?? P.x, z: extra.z ?? P.z, id: P.id, goat: !!extra.goat });
+    this.emit({ type: 'dead', id: P.id, name: P.name, time: this.time, abyss: !!extra.abyss });
   }
 
   // Level 1 : les fusibles en poche tombent par terre (on peut aller les rechercher)
@@ -1093,11 +1094,13 @@ export class BackroomsSim {
     return best;
   }
 
-  // le trou sous un point de l'étage du haut (-1 : pas de trou)
+  // le trou sous un point (-1 : pas de trou) : ceux du haut mènent à l'étage du dessous, les puits sans fond nulle part
   pitUnder(x, z, floor) {
     const m = this.fm(floor);
-    if (!this.floors[floor + 1]) return -1; // pas d'étage en dessous : pas de trou
-    return m.pitAt ? m.pitAt(cellOf(x), cellOf(z)) : -1;
+    const id = m.pitAt ? m.pitAt(cellOf(x), cellOf(z)) : -1;
+    if (id < 0) return -1;
+    if (!m.pits[id].deep && !this.floors[floor + 1]) return -1; // pas d'étage en dessous : pas de trou
+    return id;
   }
 
   // l'hôte (ou le joueur seul) tient son équilibre ; s'il le perd, il tombe
@@ -1146,6 +1149,7 @@ export class BackroomsSim {
   // Tomber par un trou : on atterrit à l'étage du dessous, juste en dessous, sonné un instant
   fallThrough(P, pitId, balance = false) {
     const pit = this.fm(P.floor).pits[pitId];
+    if (pit.deep) return this.fallDeep(P, pit, balance);
     P.floor += 1;
     P.x = pit.x;
     P.z = pit.z;
@@ -1174,6 +1178,39 @@ export class BackroomsSim {
     this.makeNoise(P, NOISE.fall, 1.5);
     this.emit({ type: 'fall', id: P.id, name: P.name, balance, x: P.x, z: P.z, floor: P.floor });
     this.alertMonster(P.x, P.z, 30, P.floor);
+  }
+
+  // Un puits sans fond (étage du bas du Level 0) : on y tombe pour de bon. Ce qu'on portait reste au bord, sur le sol
+  // le plus proche (sinon l'échelle, perdue au fond, rendrait la partie impossible) ; le cri s'entend de loin
+  fallDeep(P, pit, balance = false) {
+    if (P.status !== 'alive') return;
+    const m = this.fm(P.floor);
+    let best = null;
+    for (let r = 1; r <= 6 && !best; r++) {
+      for (let dz = -r; dz <= r; dz++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+          const gx = pit.gx + dx;
+          const gz = pit.gz + dz;
+          if (m.isWall(gx, gz) || m.pitAt(gx, gz) >= 0 || (m.pillarAt && m.pillarAt(gx, gz))) continue;
+          const x = (gx + 0.5) * CELL_SIZE;
+          const z = (gz + 0.5) * CELL_SIZE;
+          const d = (x - P.x) * (x - P.x) + (z - P.z) * (z - P.z);
+          if (!best || d < best.d) best = { x, z, d };
+        }
+      }
+    }
+    if (best) {
+      P.x = best.x;
+      P.z = best.z;
+    }
+    P.onBeam = false;
+    P.tilt = 0;
+    P.tiltV = 0;
+    P.running = false;
+    this.makeNoise(P, NOISE.fall, 1.5);
+    this.emit({ type: 'abyss', id: P.id, name: P.name, balance, x: pit.x, z: pit.z, floor: P.floor, yaw: P.yaw });
+    this.killPlayer(P, { abyss: true });
   }
 
   // Perdre l'équilibre : on bascule dans le trou du côté où l'on penche
