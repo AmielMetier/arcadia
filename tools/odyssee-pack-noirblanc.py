@@ -78,7 +78,7 @@ def sans_ombre(im):   # l'ombre (pixels à moitié transparents) sous le bâtime
     return im.crop((0, 0, im.width, rows.max() + 1))
 
 
-deco.update({'b_' + k: sans_ombre(v) for k, v in bats.items()})
+# (bats ne sert plus qu'à découper les kits ci-dessous)
 # kits de façade (4 × 4 cellules de 16 px, rôles de odyssee/js/data/regles.js) découpés dans les bâtiments Noir & Blanc 2 :
 # le jeu assemble avec eux des bâtiments de n'importe quelle taille, à l'échelle de tout le reste
 GRILLE = [['mur', 'fenetre', 'fenetre_nuit', 'socle'], ['porte', 'porte_nuit', 'linteau', 'cote'],
@@ -127,6 +127,26 @@ deco['kit_orange'] = kit(ville.crop((245, 397, 363, 555)), {'mur': (12, 120), 'f
 route = L('route.png')
 deco['tree'] = trim(route, (219, 11, 254, 68)); deco['tree2'] = trim(route, (219, 75, 254, 132))
 deco['pine'] = trim(route, (169, 10, 207, 68))
-for n, im in {**files, **{('' if k.startswith('kit_') else 'd_') + k: v for k, v in deco.items() if not k.startswith('b_')}}.items():
+# bâtiments entiers du kit « Pokémon Essentials BW » (KleinStudio), planche PkmnBlackWhiteSet.png : tuiles de 32 px,
+# soit pile la taille d'une case à l'écran ; posés tels quels (pixel pour pixel) par le jeu
+BW = L('kit_bw_set.png')
+BATS = {   # nom : (x0, y0, x1, y1) dans la planche
+    'centre': None, 'boutique': None,
+}
+import json as _json
+COMPS = _json.load(open(os.path.join(SRC, 'kit_bw_batiments.json')))
+for nom, (x0, y0, x1, y1, porte) in COMPS.items():
+    deco['b_' + nom] = BW.crop((x0, y0, x1, y1))
+# mer du kit (autotiles animés de 8 images de 96 px ; la tuile pleine est au centre, 32 px)
+mer, merp = L('mer.png'), L('mer_profonde.png')
+for f in range(4):
+    files[f'water{f}'] = mer.crop((f * 192 + 32, 64, f * 192 + 64, 96)); files[f'deep{f}'] = merp.crop((f * 192 + 32, 64, f * 192 + 64, 96))
+# hautes herbes du kit (32 px, pixel pour pixel à l'écran) posées sur l'herbe agrandie
+big = lambda t: t.resize((32, 32), Image.NEAREST)
+th = BW.crop((128, 352, 160, 384)); thd = BW.crop((160, 352, 192, 384))
+files['tall0'] = over(big(grass[0]), verdir(th)); files['tall1'] = over(big(grass[1]), verdir(th).transpose(Image.FLIP_LEFT_RIGHT))
+files['darktall0'] = over(big(files['forest0']), tone(verdir(th), 0.8)); files['darktall1'] = over(big(files['forest1']), tone(verdir(th), 0.78).transpose(Image.FLIP_LEFT_RIGHT))
+files['snowtall0'] = over(big(files['snow0']), thd); files['snowtall1'] = over(big(files['snow1']), thd.transpose(Image.FLIP_LEFT_RIGHT))
+for n, im in {**files, **{('' if k.startswith(('kit_', 'b_')) else 'd_') + k: v for k, v in deco.items()}}.items():
     im.save(os.path.join(OUT, n + '.png'))
 print(len(files), 'tuiles et', len(deco), 'décors dans', os.path.normpath(OUT))

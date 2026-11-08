@@ -31,8 +31,13 @@ export const PACKS = {
       'tall0', 'tall1', 'water0', 'water1', 'water2', 'water3'],
     // décor remplacé (fichier d_<nom>.png, dessiné pixel pour pixel)
     decor: ['tree', 'tree2', 'pine', 'snowpine', 'palm', 'bush', 'rock', 'deadtree'],
-    // kits de façade (kit_<nom>.png, 4 × 4 cellules) qui remplacent ceux du jeu : les bâtiments gardent leur taille
-    kits: { maison: 'kit_maison', chalet: 'kit_turquoise', pecheur: 'kit_bleue', 'st:house2': 'kit_bleue', 'st:house3': 'kit_turquoise', 'st:bighouse': 'kit_turquoise' },
+    // bâtiments entiers du kit Pokémon Essentials BW (b_<nom>.png, 32 px par case : posés pixel pour pixel) :
+    // [image, largeur en px, colonne du milieu de la porte]. Le jeu prend l'image dont la largeur colle à l'emprise
+    // (à une case et demie près) ; sinon le bâtiment de base reste.
+    batiments: {
+      center: [['centre', 200, 99]], mart: [['boutique', 148, 91], ['boutique_b', 150, 75]], gym: [['arene', 222, 143]], lab: [['labo', 188, 88]], tower: [['tour', 116, null]],
+      house: [['maison_bleue', 154, 48], ['maison_a', 148, 73], ['maison_c', 176, 71], ['maison_d', 150, 75], ['maison_brique', 192, 94], ['maison_b', 200, 99], ['maison_e', 200, 74], ['maison_orange', 246, 134]], house2: [['maison_bleue', 154, 48], ['maison_a', 148, 73], ['maison_c', 176, 71], ['maison_d', 150, 75], ['maison_brique', 192, 94], ['maison_b', 200, 99], ['maison_e', 200, 74], ['maison_orange', 246, 134]], house3: [['maison_bleue', 154, 48], ['maison_a', 148, 73], ['maison_c', 176, 71], ['maison_d', 150, 75], ['maison_brique', 192, 94], ['maison_b', 200, 99], ['maison_e', 200, 74], ['maison_orange', 246, 134]], bighouse: [['maison_bleue', 154, 48], ['maison_a', 148, 73], ['maison_c', 176, 71], ['maison_d', 150, 75], ['maison_brique', 192, 94], ['maison_b', 200, 99], ['maison_e', 200, 74], ['maison_orange', 246, 134]],
+    },
   },
 };
 
@@ -52,7 +57,7 @@ export function choisirSprites(id) { if (SPRITES_CHOIX.some((s) => s.id === id))
 /** crédits affichés dans Options → Crédits graphismes */
 export const CREDITS = [
   ['Sol « Pokémon Lumineux »', 'Tuiles de Flurmimon (planche « Bright »), adaptées par Bivurnum — Team Aqua\'s Asset Repo.'],
-  ['Graphismes « Pokémon Noir & Blanc »', 'BW Spring Tileset de thefloofypanthar, B/W Water Tiles d\'UltimoSpriter, Alternate Volcano Tiles, maisons BW2 et Taragonia Mix Special Trees de Phyromatical, et planches de villes et de routes Noir & Blanc partagées sur DeviantArt (artistes cités dans assets/graphics/noirblanc).'],
+  ['Graphismes « Noir & Blanc »', 'Bâtiments, mer et hautes herbes du kit « Pokémon Essentials BW » de KleinStudio ; sol de thefloofypanthar ; lave et rochers de Phyromatical ; arbres des planches Noir & Blanc partagées sur DeviantArt. Graphismes de Pokémon Noir & Blanc © Nintendo / Game Freak.'],
   ['Sprites Noir & Blanc', 'Sprites des jeux Pokémon © Nintendo / Game Freak / Creatures, récupérés par PokeAPI (projet PokeAPI/sprites).'],
   ['Sprites HeartGold / SoulSilver', 'Même source : PokeAPI/sprites.'],
   ['Utilisation', 'Projet de fans sans but lucratif. Les artistes restent propriétaires de leurs créations.'],

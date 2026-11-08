@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 4.82 — 8 novembre 2026
+- **Odyssée** — Graphismes « Noir & Blanc » refaits avec les vrais décors du jeu Noir & Blanc.
+  - Centres Pokémon, Boutiques, arènes, labo, tours et une dizaine de maisons différentes, dessinés comme dans Noir & Blanc, à la bonne taille et la porte en face de l'entrée.
+  - La mer et les hautes herbes de Noir & Blanc.
+  - Un bâtiment qui n'a pas d'équivalent à sa taille garde son dessin de base.
+
 ## 4.81 — 8 novembre 2026
 - **Odyssée** — Options → Graphismes plus simple : deux choix seulement, « Odyssée (de base) » ou « Noir & Blanc ».
   - En Noir & Blanc, les Centres Pokémon, Boutiques, arènes et grands bâtiments gardent leur beau modèle en relief ; seules les maisons changent.
