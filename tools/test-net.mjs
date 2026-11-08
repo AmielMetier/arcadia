@@ -239,8 +239,105 @@ const [X, Y] = NH === A ? [A, B] : [B, A]; // X est l'hôte actuel
 X.R.leave();
 ok(await until(() => H.R.isHost || Y.R.isHost, 8000), 'l\'hôte part : un invité reprend le salon');
 ok(await until(() => H.R.players.length === 2 && Y.R.players.length === 2, 8000), 'migration : les deux restants se retrouvent');
-
 for (const p of [H, Y]) p.R.leave();
+
+// un salon neuf de n joueurs (chacun derrière son mandataire), tous entrés
+async function newRoom(names, port) {
+  const px = names.map((_, k) => proxy(port + k));
+  const ps = names.map((n, k) => player(port + k, n, ('uid' + n.toLowerCase() + 'xxxxxxx').slice(0, 10)));
+  ps[0].R.host(ps[0].me);
+  await until(() => ps[0].R.code);
+  for (const p of ps.slice(1)) { p.R.join(ps[0].R.code, p.me); await until(() => p.R.myId > 0); }
+  await until(() => ps.every((p) => p.R.players.length === ps.length));
+  return { px, ps, close: () => { for (const p of ps) p.R.leave(); for (const x of px) x.server.close(); } };
+}
+
+/* ---------- 9. partie en cours : l'hôte absent plus longtemps que sa place gardée rejoint le nouvel hôte ---------- */
+// (avant, il gardait sa place d'hôte pendant une partie : il rouvrait l'ancien code et restait seul, avec une
+// seconde partie, pendant que les autres jouaient chez le nouvel hôte)
+{
+  const S = await newRoom(['Hote', 'Ines', 'Jules'], 8211), [H9, A9, B9] = S.ps;
+  H9.R.setGame('backrooms', {});
+  await until(() => A9.R.game && B9.R.game);
+  S.px[0].block(true);
+  ok(await until(() => A9.R.isHost || B9.R.isHost, 12000), 'partie en cours, hôte injoignable : un invité reprend le salon');
+  await sleep(1000);
+  S.px[0].block(false);
+  const N9 = A9.R.isHost ? A9 : B9;
+  ok(await until(() => H9.R.mode === 'guest' && H9.R.code === N9.R.code && N9.R.players.length === 3, 20000),
+    'partie en cours : l\'ancien hôte rejoint le nouveau salon, pas de second salon ' + JSON.stringify([H9.R.mode, H9.R.code, N9.R.code, N9.R.players.length]));
+  ok(H9.R.myId === 0 && H9.R.game && H9.R.game.id === 'backrooms', 'partie en cours : l\'ancien hôte garde son numéro et retrouve la partie');
+  S.close();
+}
+
+/* ---------- 9b. même coupure, mais plus personne de présent : l'hôte garde son salon ---------- */
+// (Léa a fermé son onglet en pleine partie : personne n'a repris le salon, l'hôte ne doit pas partir l'attendre ailleurs)
+{
+  const S = await newRoom(['Hote', 'Lea'], 8216), [H9b, L9b] = S.ps, code = H9b.R.code;
+  H9b.R.setGame('backrooms', {});
+  await until(() => L9b.R.game);
+  L9b.R.leave();
+  await until(() => H9b.R.players.find((p) => p.id === 1)?.away, 5000);
+  S.px[0].block(true);
+  await sleep(4000); // plus que la place gardée par le relais de test (2,5 s)
+  S.px[0].block(false);
+  ok(await until(() => H9b.log.ev.includes('net:up'), 10000) && H9b.R.isHost && H9b.R.code === code && !H9b.log.ev.some((e) => /^(migrating|closed)/.test(e)),
+    'seul en partie : l\'hôte revenu d\'une longue coupure garde son salon ' + JSON.stringify([H9b.R.mode, H9b.log.ev]));
+  L9b.R.join(code, L9b.me);
+  ok(await until(() => L9b.R.myId === 1 && H9b.R.players.some((p) => p.id === 1 && p.cid && !p.away), 8000), 'seul en partie : le salon est bien rouvert, Léa y retrouve sa place');
+  S.close();
+}
+
+/* ---------- 10. élection du successeur : ni un joueur en coupure, ni un joueur resté au salon ---------- */
+// Ines (plus petit numéro) a fermé son onglet en pleine partie, Jules est resté au salon, Kim joue : c'est Kim qui
+// reprend (avant : tout le monde attendait Ines, puis « Impossible de joindre le nouvel hôte » ; ou Jules reprenait
+// sans avoir la partie, et ceux qui jouaient restaient sans hôte)
+{
+  const S = await newRoom(['Hote', 'Ines', 'Jules', 'Kim'], 8221), [H10, I10, J10, K10] = S.ps;
+  H10.R.setGame('backrooms', {});
+  await until(() => S.ps.every((p) => p.R.game));
+  I10.R.setReady('backrooms'); K10.R.setReady('backrooms');
+  await until(() => S.ps.every((p) => p.R.ready[I10.R.myId] === 'backrooms' && p.R.ready[K10.R.myId] === 'backrooms'));
+  I10.R.leave();
+  ok(await until(() => [H10, J10, K10].every((p) => p.R.players.find((q) => q.id === I10.R.myId)?.away), 5000), 'élection : le joueur parti est vu en reconnexion par tous');
+  const code = H10.R.successorCode(), t0 = Date.now();
+  H10.R.leave();
+  ok(await until(() => K10.R.isHost && J10.R.mode === 'guest' && J10.R.code === K10.R.code && K10.R.players.length === 2, 8000),
+    'élection : le joueur en partie reprend le salon, celui resté au salon le rejoint ' + JSON.stringify([K10.R.mode, J10.R.mode, J10.R.code, K10.R.code]));
+  ok(Date.now() - t0 < 5000 && !J10.log.ev.some((e) => e.startsWith('closed')), 'élection : migration en quelques secondes, personne n\'est renvoyé ' + (Date.now() - t0) + ' ms');
+  ok(code === K10.R.code, 'élection : successorCode() de l\'hôte donne le code du salon migré ' + JSON.stringify([code, K10.R.code]));
+  S.close();
+}
+
+/* ---------- 11. usurpation : un invité ne peut pas se faire passer pour l'hôte ---------- */
+{
+  const S = await newRoom(['Hote', 'Mallory', 'Bob'], 8231), [H11, M11, B11] = S.ps;
+  H11.R.setGame('backrooms', {});
+  await until(() => B11.R.game);
+  const evil = M11.nets[M11.nets.length - 1], bob = B11.nets[B11.nets.length - 1];
+  const bobCid = H11.R.players.find((p) => p.id === B11.R.myId).cid;
+  const got0 = B11.log.got.length;
+  // par le relais : à tout le salon et directement à Bob (faux message de jeu, faux départ, faux renvoi)
+  for (const to of ['all', bobCid]) {
+    evil._relay(to, { t: 'g', from: 0, m: { tag: 'faux' } });
+    evil._relay(to, { t: 'kicked', by: 'Hote', reason: 'faux' });
+    evil._relay(to, { t: 'bye' });
+    evil._relay(to, { _ctrl: 'bye' });
+  }
+  await sleep(1500);
+  ok(B11.log.got.length === got0 && B11.R.mode === 'guest' && B11.R.code === H11.R.code && !B11.log.ev.some((e) => /^(migrating|closed)/.test(e)),
+    'usurpation : rien n\'arrive à Bob, qui reste chez le vrai hôte ' + JSON.stringify([B11.log.got.length - got0, B11.R.mode, B11.log.ev]));
+  // une page à jour ignore aussi ce qu'un relais plus ancien laisserait passer : seul ce qui vient de 'host' compte
+  bob._onMsg(JSON.stringify({ type: 'relay', from: 'cdeadbeef', data: { t: 'bye' } }));
+  bob._onMsg(JSON.stringify({ type: 'relay', from: 'cdeadbeef', data: { t: 'g', from: 0, m: { tag: 'faux' } } }));
+  await sleep(600);
+  ok(B11.log.got.length === got0 && B11.R.mode === 'guest' && !B11.log.ev.some((e) => /^(migrating|closed)/.test(e)), 'usurpation : la page de l\'invité écarte les messages d\'un autre joueur');
+  H11.R.sendGame(B11.R.myId, { tag: 'vrai' });
+  M11.R.sendGame('all', { tag: 'via-hote' }); // un invité passe par l'hôte, qui fait suivre
+  ok(await until(() => B11.log.got.some((m) => m.tag === 'vrai') && B11.log.got.some((m) => m.tag === 'via-hote')), 'usurpation : les vrais messages, de l\'hôte et relayés par lui, passent toujours');
+  S.close();
+}
+
 srv.kill();
 for (const p of [pH, p1, p2]) p.server.close();
 console.log(fails ? `\n${fails} échec(s), ${passes} réussis` : `Connexion : ${passes} vérifications réussies`);
