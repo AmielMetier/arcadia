@@ -1,8 +1,8 @@
 // The Backrooms - Moteur de simulation (60 Hz), sans DOM
 // Plusieurs joueurs possibles (l'hôte fait autorité). Deux niveaux :
-//   Level 0 : deux étages superposés (on tombe par les trous du haut, on remonte par les escaliers). 7 cassettes
-//             VHS réparties entre les étages ; un ascenseur à chaque étage, mais un seul est le vrai : quand les 5
-//             cassettes sont trouvées, le faux se referme en mur et le vrai s'ouvre.
+//   Level 0 : deux étages superposés (on tombe par les trous du haut, on remonte par les escaliers ; celui du bas est
+//             plus petit). 6 cassettes VHS réparties entre les étages ; un ascenseur à chaque étage, mais un seul est le
+//             vrai : quand les 6 cassettes sont trouvées, le faux se referme en mur et le vrai s'ouvre.
 //   Level 1 : l'entrepôt ; 3 fusibles à rapporter au panneau du monte-charge, des coupures de courant, et l'entité
 //             qui se cache au bout des rangées d'étagères pour tendre des embuscades.
 //   Level 37 (numéro interne 2) : les Poolrooms (engine/poolrooms.js) ; 3 volants de vanne, puis trois toboggans.
@@ -943,11 +943,16 @@ export class BackroomsSim {
         x = P.x;
         z = P.z;
       }
-      const it = items.find((o) => o.taken && o.kind === kind);
+      let it = items.find((o) => o.taken && o.kind === kind);
       if (it) {
         placeItem(it, kind, x, z);
         it.taken = false;
-      } else items.push({ id: items.length, kind, x, z, gx: cellOf(x), gz: cellOf(z), taken: false });
+      } else items.push((it = { id: items.length, kind, x, z, gx: cellOf(x), gz: cellOf(z), taken: false }));
+      // l'échelle tombée : toute l'équipe l'apprend, et le caméscope y mène tant que personne ne l'a reprise
+      if (kind === 'ladder') {
+        it.lost = true;
+        this.emit({ type: 'ladderDrop', id: P.id, name: P.name, x, z, floor: P.floor || 0 });
+      }
     });
     P.inv = P.inv.map(() => null);
   }
@@ -1046,6 +1051,7 @@ export class BackroomsSim {
     if (!it) return this.emit({ type: 'nothing', id: P.id });
     this.makeNoise(P, NOISE.pick, 0.8);
     it.taken = true;
+    it.lost = false;
     let slot = P.inv.indexOf(null);
     let dropped = null;
     if (slot < 0) {
@@ -1548,14 +1554,41 @@ export class BackroomsSim {
     }
   }
 
+  // Level 0 : la cassette perchée ne se prend qu'avec l'échelle. Tant que personne ne l'a en main ni ne l'a posée sous
+  // le renfoncement, le caméscope mène à l'échelle s'il ne reste à cet étage que la cassette perchée (ou plus rien),
+  // ou si l'échelle est tombée des mains d'un joueur mort (ou parti). Elle est à un autre étage : il mène à l'escalier.
+  // left : les cassettes à prendre à l'étage du joueur. Rend { sig: 'ladder', x, z }, { sig: 'stairs' } ou null
+  ladderGoal(P, left) {
+    const N = this.floors[0] && this.floors[0].niche;
+    const high = N && this.allCassettes.find((c) => c.high);
+    if (!high || high.collected || N.ladder) return null;
+    if (this.players.some((Q) => Q.status === 'alive' && Q.inv && Q.inv.includes('ladder'))) return null;
+    const lying = this.floors.flatMap((f, fi) => (f.items || []).filter((o) => o.kind === 'ladder' && !o.taken).map((o) => ({ o, fi })));
+    if (!lying.length) return null;
+    const lost = lying.some(({ o }) => o.lost);
+    if (!lost && left.some((c) => !c.high)) return null;
+    const here = lying.filter(({ fi }) => fi === (P.floor || 0));
+    if (here.length) {
+      const o = here.reduce((b, l) => (Math.hypot(l.o.x - P.x, l.o.z - P.z) < Math.hypot(b.o.x - P.x, b.o.z - P.z) ? l : b)).o;
+      return { sig: 'ladder', x: o.x, z: o.z };
+    }
+    // l'échelle est à l'autre étage : à l'escalier, si l'on est à l'étage de la cassette perchée ou si l'échelle est perdue
+    return this.stairs.length && (left.some((c) => c.high) || lost) ? { sig: 'stairs' } : null;
+  }
+
   updateSignal(P) {
     const map = this.fm(P.floor);
     const near = (list) => list.reduce((b, g) => Math.min(b, Math.hypot(g.x - P.x, g.z - P.z)), Infinity);
     let best = Infinity;
     P.sigTo = 'goal';
     if (this.level === 0 && !this.open) {
-      best = near((map.cassettes || []).filter((c) => !c.collected));
-      if (best === Infinity && this.stairs.length) {
+      const left = (map.cassettes || []).filter((c) => !c.collected);
+      best = near(left);
+      const lad = this.ladderGoal(P, left);
+      if (lad) {
+        best = lad.sig === 'ladder' ? Math.hypot(lad.x - P.x, lad.z - P.z) : near(this.stairs);
+        P.sigTo = lad.sig;
+      } else if (best === Infinity && this.stairs.length) {
         const K = this.floors[0].key;
         if (P.floor === 0 && K && !K.taken) {
           best = Math.hypot(K.x - P.x, K.z - P.z);
@@ -1846,6 +1879,8 @@ export class BackroomsSim {
       // objets d'origine qui ont changé de place ou de genre (échangés, lâchés par un joueur mort) : [numéro, genre, x, z]
       im: this.floors.map((f) => (f.items || []).flatMap((o, i) => (o.o && (o.kind !== o.o[0] || o.x !== o.o[1] || o.z !== o.o[2]) ? [[i, o.kind, r2(o.x), r2(o.z)]] : []))),
       nl: this.floors.some((f) => f.niche && f.niche.ladder) ? 1 : 0,
+      // échelles tombées des mains d'un mort, que le caméscope montre : [étage, numéro de l'objet]
+      ll: this.floors.flatMap((f, fi) => (f.items || []).flatMap((o, i) => (o.lost && !o.taken ? [[fi, i]] : []))),
       // vannes du Level 2 : -1 fermée, sinon combien elle est tournée
       v: (this.map.valves || []).map((v) => (v.closed ? -1 : r2(v.turn))),
       // courant des secteurs (0 à 3) et disjoncteurs (-1 réarmé, sinon l'avancée)
@@ -2043,6 +2078,8 @@ export class BackroomsSim {
     const takenBits = (snap.k[2] || '').split('|');
     this.floors.forEach((f, fi) => set(f.items, 'taken', takenBits[fi]));
     for (const f of this.floors) if (f.niche) f.niche.ladder = !!snap.nl;
+    const lost = new Set((snap.ll || []).map(([fi, i]) => `${fi}:${i}`));
+    this.floors.forEach((f, fi) => (f.items || []).forEach((o, i) => (o.lost = lost.has(`${fi}:${i}`))));
     (this.map.valves || []).forEach((v, i) => {
       const t = (snap.v || [])[i];
       if (t === undefined) return;

@@ -940,6 +940,9 @@ function handleEvent(ev, me) {
     case 'ladderFar':
       if (mine && hud) hud.toast('Place the ladder right under the alcove with the tape');
       break;
+    case 'ladderDrop':
+      if (hud && ev.id !== me) hud.toast(`${ev.name} lost the ladder · follow the signal to find it`);
+      break;
     case 'ladderPlaced':
       if (sfx) sfx.battery();
       if (hud) hud.toast(mine ? 'Ladder placed: get closer to climb' : 'The ladder is under the tape');

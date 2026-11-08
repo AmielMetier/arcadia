@@ -54,8 +54,8 @@ test('génération de la carte : dimensions, sols, murs et pièces', () => {
   assert.equal(map.isWall(map.exit.gx, map.exit.gz), false, 'la sortie est sur du sol');
 });
 
-test('cassettes VHS : 7 cassettes placées et atteignables', () => {
-  assert.equal(map.cassettes.length, 7, 'exactement 7 cassettes');
+test('cassettes VHS : 6 cassettes placées et atteignables', () => {
+  assert.equal(map.cassettes.length, 6, 'exactement 6 cassettes');
   for (const cas of map.cassettes) {
     assert.equal(map.isWall(cas.gx, cas.gz), false, `la cassette ${cas.id} n'est pas dans un mur`);
     // celle du trou dans le mur se prend depuis le pied de l'échelle, dans la case devant le mur
@@ -109,7 +109,7 @@ test('endurance : courir consomme la stamina, l\'arrêt la recharge', () => {
   assert.ok(sim.player.stamina > staminaAfterRun, 'la stamina s\'est régénérée au repos');
 });
 
-test("ramassage des 7 cassettes, l'ascenseur s'ouvre et descend au Level 1", () => {
+test("ramassage des 6 cassettes, l'ascenseur s'ouvre et descend au Level 1", () => {
   const map = createBackroomsMap(42);
   const sim = new BackroomsSim({ map, difficulty: 'peaceful' });
   assert.equal(sim.cassettes, 0);
@@ -125,7 +125,7 @@ test("ramassage des 7 cassettes, l'ascenseur s'ouvre et descend au Level 1", () 
     assert.ok(cas.collected, `la cassette ${cas.id} a été ramassée`);
   }
 
-  assert.equal(sim.cassettes, 7);
+  assert.equal(sim.cassettes, 6);
   const events = sim.drainEvents();
   assert.ok(events.some((e) => e.type === 'exitUnlocked'), 'événement exitUnlocked émis');
   assert.ok(!sim.isColliding(map.elevator.x, map.elevator.z, 0.3), "ouvert : on peut entrer dans la cabine");
@@ -581,8 +581,9 @@ test('triche : invisible de tous, elle réapparaît juste derrière un angle dev
 });
 
 test('première rencontre : au bout du couloir, elle est là ; regardée, le néon claque et elle a disparu', () => {
+  // (le joueur tourne sur place au départ : sur certaines cartes, aucun couloir assez long ne s'y prête)
   let shown = 0;
-  for (let seed = 1; seed <= 10; seed++) {
+  for (let seed = 1; seed <= 20; seed++) {
     const sim = new BackroomsSim({ seed, difficulty: 'normal' });
     const P = sim.player;
     const M = sim.monster;
@@ -613,7 +614,7 @@ test('première rencontre : au bout du couloir, elle est là ; regardée, le né
     assert.equal(M.mode, 'patrol');
     assert.equal(sim.glimpseAt, Infinity, 'une seule fois par partie');
   }
-  assert.ok(shown >= 7, `elle se montre (${shown}/10)`);
+  assert.ok(shown >= 12, `elle se montre (${shown}/20)`);
 });
 
 test("à plusieurs : après un gel de l'hôte, la position de l'invité est reprise (pas de retour en arrière) ; les ambiances viennent de l'hôte", () => {
@@ -1003,7 +1004,7 @@ test("renfoncement : la cassette en hauteur s'attrape seulement depuis l'échell
     const ladder = m.items.find((i) => i.kind === 'ladder');
     assert.ok(ladder, "une échelle sur la carte");
     const d = bfsDist(m, N.gx, N.gz, ladder.gx, ladder.gz);
-    assert.ok(d >= 12 && d <= 70, `graine ${sd} : échelle à ${d} cases du renfoncement`);
+    assert.ok(d >= 6 && d <= 40, `graine ${sd} : échelle à ${d} cases du renfoncement (dans les parages)`);
     const P = sim.player;
     // sans échelle, même juste dessous : trop haut
     P.x = N.baseX;
@@ -1029,6 +1030,78 @@ test("renfoncement : la cassette en hauteur s'attrape seulement depuis l'échell
     sim.step();
     assert.ok(P.onLadder, "en haut de l'échelle");
     assert.ok(cas.collected, 'cassette récupérée');
+  }
+});
+
+test("échelle : le caméscope y mène s'il ne reste que la cassette perchée, ou si elle tombe des mains d'un mort (l'équipe est prévenue, l'invité le sait)", () => {
+  const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
+  for (const sd of [2, 9, 31]) {
+    const host = new BackroomsSim({ difficulty: 'peaceful', seed: sd, players, localId: 1 });
+    const guest = new BackroomsSim({ difficulty: 'peaceful', seed: sd, players, localId: 2 });
+    const wire = () => guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+    const [A, B] = host.players;
+    const m = host.map;
+    const N = m.niche;
+    const ladder = m.items.find((i) => i.kind === 'ladder');
+    const others = m.cassettes.filter((c) => !c.high);
+    // A loin de tout, au départ ; B au pied de l'échelle
+    const sigOf = (inB = {}) => {
+      host.step({}, { 2: inB });
+      return A.sigTo;
+    };
+    assert.equal(sigOf(), 'goal', `graine ${sd} : des cassettes à trouver, le signal les suit`);
+    // il ne reste à l'étage que la cassette perchée : le signal mène à l'échelle
+    for (const c of others.slice(1)) c.collected = true;
+    others[0].collected = true;
+    assert.equal(sigOf(), 'ladder', "il ne reste que la cassette perchée : à l'échelle");
+    A.x = ladder.x + 0.6;
+    A.z = ladder.z;
+    host.step();
+    assert.ok(A.signal > 0.9, "tout près de l'échelle, le signal est au plus fort");
+    // B la ramasse : le signal de A repart vers la cassette (le renfoncement)
+    B.x = ladder.x;
+    B.z = ladder.z;
+    A.x = host.map.spawn.x;
+    A.z = host.map.spawn.z;
+    sigOf({ pick: true });
+    assert.ok(B.inv.includes('ladder'), "B a l'échelle");
+    assert.equal(sigOf(), 'goal', "quelqu'un a l'échelle : vers la cassette");
+    // une autre cassette reste à trouver ; B meurt l'échelle en main, loin du renfoncement
+    others[0].collected = false;
+    host.drainEvents();
+    host.killPlayer(B);
+    const ev = host.drainEvents().find((e) => e.type === 'ladderDrop');
+    assert.ok(ev && ev.name === 'B', "l'équipe apprend que B a lâché l'échelle");
+    const lying = m.items.find((i) => i.kind === 'ladder' && !i.taken);
+    assert.ok(lying && lying.lost && Math.hypot(lying.x - B.x, lying.z - B.z) < 1, 'elle est par terre, là où il est tombé');
+    assert.equal(sigOf(), 'ladder', "l'échelle perdue d'abord, même s'il reste une autre cassette");
+    wire();
+    assert.equal(guest.player.status, 'dead');
+    const gl = guest.map.items.find((i) => i.kind === 'ladder' && !i.taken);
+    assert.ok(gl && gl.lost && Math.abs(gl.x - lying.x) < 0.02, "l'invité la voit au même endroit, perdue");
+    // A la ramasse puis la pose : plus de guidage vers l'échelle
+    A.x = lying.x;
+    A.z = lying.z;
+    host.step({ pick: true });
+    assert.ok(A.inv.includes('ladder') && !lying.lost);
+    wire();
+    assert.ok(!guest.map.items.some((i) => i.lost), "chez l'invité aussi, elle n'est plus perdue");
+    // posée à côté du pied du renfoncement (sans grimper dans la foulée)
+    let placed = false;
+    for (const [ox, oz] of [[1.5, 0], [-1.5, 0], [0, 1.5], [0, -1.5]]) {
+      if (placed || host.isColliding(N.baseX + ox, N.baseZ + oz, 0.3)) continue;
+      A.x = N.baseX + ox;
+      A.z = N.baseZ + oz;
+      A.sel = A.inv.indexOf('ladder') + 1;
+      host.step({ useSel: true });
+      placed = N.ladder;
+    }
+    assert.ok(N.ladder, 'échelle posée');
+    assert.equal(m.cassettes.find((c) => c.high).collected, false);
+    others[0].collected = true;
+    A.x = host.map.spawn.x;
+    A.z = host.map.spawn.z;
+    assert.equal(sigOf(), 'goal', 'échelle posée : vers la cassette perchée');
   }
 });
 
@@ -1226,7 +1299,7 @@ test("à plusieurs : qui entre dans l'ascenseur devient spectateur, il part quan
     putOn(sim, sim.player, c);
     sim.step();
   }
-  assert.equal(sim.cassettes, 7, "les cassettes comptent pour toute l'équipe");
+  assert.equal(sim.cassettes, 6, "les cassettes comptent pour toute l'équipe");
   const E = sim.fm(sim.realFloor).elevator;
   for (const P of sim.players) P.floor = sim.realFloor;
   const [a, b, c] = sim.players;
@@ -1253,7 +1326,7 @@ test("à plusieurs : plus il y a de monde à l'abri, plus l'entité est rapide e
   const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }, { id: 3, name: 'C' }];
   const speed = (inside) => {
     const sim = new BackroomsSim({ difficulty: 'normal', seed: 5, players, localId: 1 });
-    sim.cassettes = 7;
+    sim.cassettes = 6;
     for (let i = 0; i < inside; i++) sim.players[i].status = 'elevator';
     const P = sim.players[2];
     sim.monster.mode = 'chase';
@@ -1277,7 +1350,7 @@ test("à plusieurs : un joueur attrapé devient spectateur, la partie continue ;
   assert.equal(a.status, 'dead');
   assert.equal(sim.state, 'playing', 'B joue encore');
   assert.equal(sim.viewPlayer(0).id, b.id, 'A regarde B');
-  sim.cassettes = 7;
+  sim.cassettes = 6;
   sim.realFloor = 0;
   b.x = sim.map.elevator.x;
   b.z = sim.map.elevator.z;
@@ -1314,7 +1387,7 @@ test("réseau : l'invité reçoit l'état de l'hôte, se déplace chez lui et su
   assert.equal(guest.cassettes, 1);
   assert.equal(guest.allCassettes.find((q) => q.id === c.id).collected, true);
   // tout le monde dans l'ascenseur : l'invité passe au Level 1 avec la même carte
-  host.cassettes = 7;
+  host.cassettes = 6;
   host.realFloor = 0;
   for (const P of host.players) {
     P.x = host.map.elevator.x;
@@ -1399,7 +1472,7 @@ test("un joueur tombé au Level 0 repart au Level 1 avec une lampe (éteinte, co
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players, localId: 1 });
   const [a, b] = sim.players;
   a.status = 'dead'; // attrapé avant d'avoir pris sa lampe
-  sim.cassettes = 7;
+  sim.cassettes = 6;
   sim.realFloor = 0;
   b.x = sim.map.elevator.x;
   b.z = sim.map.elevator.z;
@@ -1516,9 +1589,9 @@ test("Level 0 sur deux étages : les trous mènent en bas, deux escaliers loin d
     }
     for (const p of up.pits) assert.ok(down.dist[p.gz * down.W + p.gx] >= 0, 'on atterrit sur du sol accessible');
     assert.ok(down.cassettes.length >= 1 && up.cassettes.length >= 1, 'des cassettes aux deux étages');
-    assert.deepEqual([...up.cassettes, ...down.cassettes].map((c) => c.id).sort(), [0, 1, 2, 3, 4, 5, 6]);
+    assert.deepEqual([...up.cassettes, ...down.cassettes].map((c) => c.id).sort(), [0, 1, 2, 3, 4, 5]);
     assert.equal(up.cassettes.length, 4, "4 cassettes en haut");
-    assert.equal(down.cassettes.length, 3, "3 cassettes en bas");
+    assert.equal(down.cassettes.length, 2, "2 cassettes en bas");
     assert.ok(up.elevator && down.elevator, 'un ascenseur à chaque étage');
   }
 });
@@ -1612,7 +1685,7 @@ test("Level 0 : la cage d'escalier ne coupe aucun étage, et le couloir piégé 
   }
 });
 
-test("ascenseurs : un en haut, un en bas ; les 7 cassettes trouvées, le faux devient un mur et seul le vrai emmène", () => {
+test("ascenseurs : un en haut, un en bas ; les 6 cassettes trouvées, le faux devient un mur et seul le vrai emmène", () => {
   for (const real of [0, 1]) {
     const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 11 });
     sim.realFloor = real;
@@ -1623,7 +1696,7 @@ test("ascenseurs : un en haut, un en bas ; les 7 cassettes trouvées, le faux de
       putOn(sim, sim.player, c);
       sim.step();
     }
-    assert.equal(sim.cassettes, 7);
+    assert.equal(sim.cassettes, 6);
     assert.ok(sim.fm(fake).elevator.fake, 'le faux est démasqué');
     assert.ok(!sim.fm(real).elevator.fake);
     assert.ok(sim.isColliding(sim.fm(fake).elevator.x, sim.fm(fake).elevator.z, 0.3, fake), "le faux n'est plus qu'un mur");
