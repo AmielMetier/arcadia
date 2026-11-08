@@ -385,6 +385,47 @@ async function newRoom(names, port) {
   S.close();
 }
 
+/* ---------- 13. file d'envoi de l'hôte débordée pendant une coupure : il suit le successeur ---------- */
+// Coupé, l'hôte garde ses messages pour les renvoyer à la reprise ; au-delà de 3000, il renonce à reprendre sa place.
+// Avant, il relançait join_room tant que le relais la gardait encore ('unavailable-id'), puis rouvrait seul l'ancien
+// code dès qu'elle avait expiré, alors que les invités étaient déjà partis chez le successeur : deux parties.
+{
+  const S = await newRoom(['Hote', 'Nina', 'Omar'], 8251), [H13, A13, B13] = S.ps, code = H13.R.code;
+  H13.R.setGame('backrooms', {});
+  await until(() => A13.R.game && B13.R.game);
+  S.px[0].block(true);
+  for (let k = 1; k <= 3001; k++) H13.R.sendGame('all', { tag: 'c13', k }); // plus que la file d'envoi n'en garde
+  ok(!H13.nets[0].sid, 'file débordée : l\'hôte renonce à reprendre sa place');
+  await sleep(800); // il revient avant que le relais de test (2,5 s) n'ait libéré son ancienne place
+  S.px[0].block(false);
+  const N13 = () => [A13, B13].find((p) => p.R.isHost);
+  ok(await until(() => N13() && H13.R.mode === 'guest' && H13.R.code === N13().R.code && N13().R.players.length === 3, 20000),
+    'file débordée : l\'ancien hôte rejoint le successeur au lieu de rouvrir seul son code ' + JSON.stringify([H13.R.mode, H13.R.code === code, A13.R.mode, B13.R.mode, N13() && N13().R.players.length]));
+  ok(H13.R.myId === 0 && H13.R.code === A13.R.code && A13.R.code === B13.R.code && N13()?.R.players.some((p) => p.id === 0 && p.cid) && H13.R.game?.id === 'backrooms',
+    'file débordée : l\'ancien hôte garde son numéro et retrouve la partie');
+  S.close();
+}
+
+/* ---------- 13b. même débordement, mais personne d'autre de présent : l'hôte garde son salon ---------- */
+// (Paul est lui aussi coupé : personne ne reprendra le salon, l'hôte rouvre son code et Paul y revient, comme en 9b)
+{
+  const S = await newRoom(['Hote', 'Paul'], 8256), [H13b, P13b] = S.ps, code = H13b.R.code;
+  H13b.R.setGame('backrooms', {});
+  await until(() => P13b.R.game);
+  S.px[1].block(true);
+  await until(() => H13b.R.players.find((p) => p.id === 1)?.away, 5000);
+  S.px[0].block(true);
+  for (let k = 1; k <= 3001; k++) H13b.R.sendGame('all', { tag: 'c13b', k });
+  ok(!H13b.nets[0].sid, 'file débordée, seul en partie : l\'hôte renonce à reprendre sa place');
+  await sleep(800);
+  S.px[0].block(false);
+  ok(await until(() => H13b.log.ev.includes('net:up'), 10000) && H13b.R.isHost && H13b.R.code === code && !H13b.log.ev.some((e) => /^(migrating|closed)/.test(e)),
+    'file débordée, seul en partie : l\'hôte garde son salon ' + JSON.stringify([H13b.R.mode, H13b.log.ev]));
+  S.px[1].block(false);
+  ok(await until(() => P13b.R.myId === 1 && P13b.R.code === code && H13b.R.players.some((p) => p.id === 1 && p.cid && !p.away), 10000), 'file débordée, seul en partie : Paul retrouve sa place dans le salon rouvert');
+  S.close();
+}
+
 srv.kill();
 for (const p of [pH, p1, p2]) p.server.close();
 console.log(fails ? `\n${fails} échec(s), ${passes} réussis` : `Connexion : ${passes} vérifications réussies`);
