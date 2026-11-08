@@ -1123,6 +1123,7 @@ export function buildWorld() {
     const tourb = caveMap('tourbillons', 44, 30, 5151, [{ x: 4, y: 25 }], { name: 'Grotte des Tourbillons', via: [{ x: 16, y: 10 }, { x: 30, y: 20 }, { x: 38, y: 6 }], dark: false });
     tourb.encounter = ENC.tourbillons; maps.tourbillons = tourb;
     tourb.set(4, 26, T.CAVEDOOR); tourb.set(4, 25, T.CAVE); tourb.set(4, 27, T.CAVEWALL);
+  for (let x = 2; x <= 6; x++) for (let y = 26; y < tourb.h; y++) if (x !== 4 || y !== 26) tourb.set(x, y, T.CAVEWALL);   // sortie au bout de la salle
     tourb.warp(4, 26, { map: 'monde', x: tb.doorX, y: tb.doorY + 1, dir: 'down' });
     W.warp(tb.doorX, tb.doorY, { map: 'tourbillons', x: 4, y: 25, dir: 'up' });
     tourb.deco.push({ k: 'exitlight', x: 4, y: 26 });
@@ -1167,6 +1168,8 @@ export function buildWorld() {
   grotte.encounter = ENC.grotte; maps.grotte = grotte;
   for (const [cx, cy, out] of [[4, 26, g1in], [41, 26, g1out]]) {
     grotte.set(cx, cy + 1, T.CAVEDOOR); grotte.set(cx, cy, T.CAVE); grotte.set(cx, cy + 2, T.CAVEWALL);
+    // la sortie au bout de la salle : roche de chaque côté de la porte et en dessous (plus de case libre à côté)
+    for (let x = cx - 2; x <= cx + 2; x++) for (let y = cy + 1; y < grotte.h; y++) if (x !== cx || y !== cy + 1) grotte.set(x, y, T.CAVEWALL);
     grotte.warp(cx, cy + 1, { map: 'monde', x: out.doorX, y: out.doorY + 1, dir: 'down' });
     W.warp(out.doorX, out.doorY, { map: 'grotte', x: cx, y: cy, dir: 'up' });
     grotte.deco.push({ k: 'exitlight', x: cx, y: cy + 1 });
@@ -1179,6 +1182,7 @@ export function buildWorld() {
   victoire.encounter = ENC.victoire; maps.victoire = victoire;
   for (const [cx, cy, out] of [[50, 34, v1in], [6, 34, v1out]]) {
     victoire.set(cx, cy + 1, T.CAVEDOOR); victoire.set(cx, cy, T.CAVE); victoire.set(cx, cy + 2, T.CAVEWALL);
+    for (let x = cx - 2; x <= cx + 2; x++) for (let y = cy + 1; y < victoire.h; y++) if (x !== cx || y !== cy + 1) victoire.set(x, y, T.CAVEWALL);   // sortie au bout de la salle
     victoire.warp(cx, cy + 1, { map: 'monde', x: out.doorX, y: out.doorY + 1, dir: 'down' });
     W.warp(out.doorX, out.doorY, { map: 'victoire', x: cx, y: cy, dir: 'up' });
     victoire.deco.push({ k: 'exitlight', x: cx, y: cy + 1 });

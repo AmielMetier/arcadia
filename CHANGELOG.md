@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 4.73 — 8 novembre 2026
+## 4.74 — 8 novembre 2026
 - **The Backrooms** — Des puits sans fond à l'étage du bas du Level 0.
   - Dans certaines grandes salles, le sol laisse place à une grille de trous carrés séparés par d'étroites passerelles.
   - Ils sont si profonds qu'on n'en voit jamais le fond : leurs parois s'enfoncent dans le noir.
@@ -10,6 +10,9 @@
 - **The Backrooms** — Les trous de l'étage du haut sont plus larges, avec des passerelles plus fines et des parois éclairées.
 - **The Backrooms** — Nouvelles couleurs au Level 0 : murs jaune olive plus pâles, moquette kaki clair, néons plus blancs.
 - **The Backrooms** — L'étage du bas du Level 0 garde le même papier peint qu'en haut, juste plus gris : plus aucune tache, fissure ni moisissure.
+
+## 4.73 — 8 novembre 2026
+- Correction : sorties des grottes au bout de la salle (Grotte Lunaire, Tourbillons, Victoire), plus de case libre a cote de la porte (Amiel)
 
 ## 4.72 — 8 novembre 2026
 - Nouveau : barre Habitat DexNav retirable completement (bouton x + option) (Amiel)
