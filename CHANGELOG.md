@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 4.74 — 8 novembre 2026
+## 4.75 — 8 novembre 2026
 - **Odyssée** — Les quinze arènes ont été entièrement redessinées, chacune avec sa propre énigme en plusieurs salles et un panneau qui en donne les règles à l'entrée.
   - Sylvebourg devient la Ruche : des ruchers font fondre ou rebâtir des murs de cire de cinq couleurs.
   - Port-Azur : deux bassins à trois niveaux d'eau, des pontons et des radeaux. Voltacité : des barrières qui s'inversent et trois fusibles à rapporter.
@@ -13,6 +13,9 @@
 - **Odyssée** — Les intérieurs ont de vrais murs : papier peint et lambris au fond, fenêtres, murs sur les côtés, ombres au sol et un tapis dans les maisons.
   - Quatre papiers peints différents pour les maisons.
   - Dans la maison de Maman, l'armoire se range au fond, à côté de l'évier.
+
+## 4.74 — 8 novembre 2026
+- Correction : sortie de la Caverne du Magma bien encadree de roche et chambre sud-est reliee au nord (Amiel)
 
 ## 4.73 — 8 novembre 2026
 - Correction : sorties des grottes au bout de la salle (Grotte Lunaire, Tourbillons, Victoire), plus de case libre a cote de la porte (Amiel)
