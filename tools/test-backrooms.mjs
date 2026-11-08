@@ -1701,20 +1701,92 @@ test("ascenseurs : un en haut, un en bas ; les 6 cassettes trouvées, le faux de
     assert.ok(!sim.fm(real).elevator.fake);
     assert.ok(sim.isColliding(sim.fm(fake).elevator.x, sim.fm(fake).elevator.z, 0.3, fake), "le faux n'est plus qu'un mur");
     assert.ok(!sim.isColliding(sim.fm(real).elevator.x, sim.fm(real).elevator.z, 0.3, real), 'le vrai est ouvert');
-    // le signal de chaque étage pointe vers son propre ascenseur (le doute reste)
+    // le caméscope mène au vrai ascenseur, de partout : à l'étage du faux, vers l'escalier (ou d'abord la clé de la
+    // porte du haut) ; jamais sans signal
     const P = sim.player;
     P.floor = fake;
     P.x = sim.fm(fake).exit.x;
     P.z = sim.fm(fake).exit.z;
     sim.step();
-    assert.equal(P.sigTo, 'exit');
-    assert.ok(P.signal > 0.9);
+    assert.ok(P.sigTo === 'stairs' || (P.sigTo === 'key' && fake === 0), `à l'étage du faux : ${P.sigTo}`);
+    assert.ok(P.signal >= 0.2, 'jamais sans signal');
     assert.equal(P.status, 'alive', 'devant le faux, rien ne se passe');
+    if (fake === 0) {
+      sim.floors[0].key.taken = true;
+      sim.step();
+      assert.equal(P.sigTo, 'stairs', 'la porte ouverte : vers l\'escalier');
+    }
+    P.floor = real;
+    P.x = sim.fm(real).exit.x;
+    P.z = sim.fm(real).exit.z;
+    sim.step();
+    assert.equal(P.sigTo, 'exit', 'à son étage : droit sur le vrai');
+    assert.ok(P.signal > 0.9);
     P.floor = real;
     P.x = sim.fm(real).elevator.x;
     P.z = sim.fm(real).elevator.z;
     sim.step();
     assert.equal(P.status, 'elevator', 'le vrai emmène');
+  }
+});
+
+test("Level 0 : une seule panne de courant, au milieu de la partie (25 à 35 s de noir, ni signal ni refuge), que l'invité voit aussi", () => {
+  const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }];
+  for (const seed of [3, 8]) {
+    const host = new BackroomsSim({ difficulty: 'normal', seed, players, localId: 1 });
+    const guest = new BackroomsSim({ difficulty: 'normal', seed, players, localId: 2 });
+    const M = host.monster;
+    const P = host.player;
+    const hold = () => {
+      // l'entité reste loin (on ne teste que la panne) ; le joueur, sous un néon fort s'il y en a
+      M.dormantT = 999;
+      M.away = true;
+      M.mode = 'patrol';
+    };
+    hold();
+    const lit = host.map.lights.find((l) => l.bright && l.state === 'on');
+    if (lit) {
+      P.x = lit.x;
+      P.z = lit.z;
+    }
+    // avant la moitié des cassettes : jamais de panne
+    let evs = [];
+    for (let i = 0; i < 60 * 90; i++) {
+      hold();
+      host.step();
+      evs.push(...host.drainEvents());
+    }
+    assert.ok(!evs.some((e) => e.type === 'blackout'), `graine ${seed} : pas de panne avant la moitié des cassettes`);
+    // la moitié des cassettes : elle tombe dans les 80 s
+    const half = host.allCassettes.slice(0, 3);
+    for (const c of half) c.collected = true;
+    host.cassettes = 3;
+    let t = 0;
+    evs = [];
+    while (!(host.blackout > 0) && t < 80) {
+      hold();
+      host.step();
+      evs.push(...host.drainEvents());
+      t += DT;
+    }
+    const ev = evs.find((e) => e.type === 'blackout');
+    assert.ok(ev && ev.level === 0, `graine ${seed} : la panne tombe (${t.toFixed(0)} s)`);
+    assert.ok(ev.len >= 25 && ev.len <= 35, 'quelques dizaines de secondes');
+    host.step();
+    assert.equal(P.signal, 0, 'plus de signal');
+    assert.ok(!host.shelteredAt(P), 'plus de refuge sous les néons');
+    guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+    assert.ok(guest.blackout > 0 && guest.midBlackout, "l'invité est dans le noir lui aussi");
+    // la lumière revient, et c'est la seule panne de la partie
+    evs = [];
+    for (let i = 0; i < 60 * 150; i++) {
+      hold();
+      host.step();
+      evs.push(...host.drainEvents());
+    }
+    assert.ok(evs.some((e) => e.type === 'power'), 'le courant revient');
+    assert.equal(host.blackout, 0);
+    assert.ok(!evs.some((e) => e.type === 'blackout'), 'une seule panne');
   }
 });
 

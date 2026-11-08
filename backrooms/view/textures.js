@@ -242,6 +242,140 @@ function drawWallpaper(ctx, S, grime) {
   noise(ctx, S, S, 10);
 }
 
+// Le même papier peint, à l'étage du bas du Level 0 : délavé vers le gris, mangé par l'humidité. Des auréoles d'eau
+// au liseré sombre, des coulures du plafond, des lés arrachés jusqu'au plâtre, des fissures et de la moisissure au
+// pied du mur. On le passe par-dessus drawWallpaper (même toile, même échelle S)
+function decayWall(ctx, S) {
+  const R = Math.random;
+  ctx.save();
+  // 1. délavé : la couleur s'en va aux deux tiers, et tout tire vers un gris sale
+  ctx.globalCompositeOperation = 'saturation';
+  ctx.fillStyle = 'rgba(128, 128, 128, 0.68)';
+  ctx.fillRect(0, 0, S, S);
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = '#b3b0a6';
+  ctx.fillRect(0, 0, S, S);
+  ctx.globalCompositeOperation = 'source-over';
+  // 2. auréoles d'humidité : un cœur à peine teinté, un liseré brun plus sombre
+  for (let i = 0; i < 5; i++) {
+    const x = R() * S;
+    const y = S * (0.1 + R() * 0.75);
+    const r = S * (0.07 + R() * 0.16);
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(78, 70, 54, 0.14)');
+    g.addColorStop(0.78, 'rgba(78, 70, 54, 0.2)');
+    g.addColorStop(0.9, 'rgba(64, 54, 38, 0.38)');
+    g.addColorStop(1, 'rgba(64, 54, 38, 0)');
+    ctx.fillStyle = g;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1, 0.7 + R() * 0.6);
+    ctx.translate(-x, -y);
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  // 3. coulures depuis le plafond, plus longues et plus sombres qu'en haut
+  for (let i = 0; i < 9; i++) {
+    const x = R() * S;
+    const len = S * (0.2 + R() * 0.6);
+    const w = 2 + R() * 9;
+    const g = ctx.createLinearGradient(0, 0, 0, len);
+    g.addColorStop(0, 'rgba(58, 50, 38, 0.42)');
+    g.addColorStop(0.7, 'rgba(58, 50, 38, 0.18)');
+    g.addColorStop(1, 'rgba(58, 50, 38, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, 0, w, len);
+  }
+  // 4. lés arrachés : le plâtre gris dessous, un bord déchiré, le papier qui rebique (clair) et son ombre
+  for (let i = 0; i < 3; i++) {
+    const cx = R() * S;
+    const cy = S * (0.15 + R() * 0.6);
+    const rw = S * (0.04 + R() * 0.08);
+    const rh = S * (0.06 + R() * 0.14);
+    const pts = [];
+    for (let k = 0; k < 14; k++) {
+      const a = (k / 14) * Math.PI * 2;
+      const j = 0.65 + R() * 0.5;
+      pts.push([cx + Math.cos(a) * rw * j, cy + Math.sin(a) * rh * j]);
+    }
+    const path = () => {
+      ctx.beginPath();
+      pts.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.closePath();
+    };
+    ctx.save();
+    ctx.translate(2.5, 2.5);
+    path();
+    ctx.fillStyle = 'rgba(30, 28, 22, 0.35)'; // l'ombre du papier décollé
+    ctx.fill();
+    ctx.restore();
+    path();
+    ctx.fillStyle = '#8f8c84';
+    ctx.fill();
+    ctx.save();
+    path();
+    ctx.clip();
+    for (let k = 0; k < 160; k++) {
+      ctx.fillStyle = `rgba(${R() < 0.5 ? '60,58,52' : '170,168,160'}, ${0.15 + R() * 0.2})`;
+      ctx.fillRect(cx - rw + R() * rw * 2, cy - rh + R() * rh * 2, 1 + R() * 2, 1 + R() * 2);
+    }
+    ctx.restore();
+    path();
+    ctx.strokeStyle = 'rgba(215, 208, 190, 0.55)';
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+  }
+  // 5. fissures dans le plâtre : des traits sombres qui zigzaguent et se ramifient
+  ctx.strokeStyle = 'rgba(32, 30, 26, 0.55)';
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 4; i++) {
+    let x = R() * S;
+    let y = R() * S * 0.5;
+    let a = Math.PI / 2 + (R() - 0.5) * 1.2;
+    ctx.lineWidth = 0.8 + R() * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    for (let k = 0; k < 10 + R() * 14; k++) {
+      a += (R() - 0.5) * 0.9;
+      x += Math.cos(a) * (5 + R() * 9);
+      y += Math.sin(a) * (5 + R() * 9);
+      ctx.lineTo(x, y);
+      if (R() < 0.15) {
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + (R() - 0.5) * 24, y + R() * 16);
+        ctx.moveTo(x, y);
+      }
+    }
+    ctx.stroke();
+  }
+  // 6. moisissure : des grappes de points sombres, surtout au pied du mur et dans les coins
+  for (let i = 0; i < 7; i++) {
+    const foot = R() < 0.7;
+    const cx = R() < 0.3 ? (R() < 0.5 ? R() * S * 0.08 : S - R() * S * 0.08) : R() * S;
+    const cy = foot ? S * (0.78 + R() * 0.16) : R() * S * 0.3;
+    const n = 60 + R() * 140;
+    const rad = S * (0.03 + R() * 0.06);
+    for (let k = 0; k < n; k++) {
+      const a = R() * Math.PI * 2;
+      const d = Math.pow(R(), 0.6) * rad;
+      ctx.fillStyle = `rgba(${34 + R() * 14}, ${38 + R() * 14}, ${30 + R() * 8}, ${0.25 + R() * 0.4})`;
+      ctx.beginPath();
+      ctx.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d * 0.7, 0.5 + R() * 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  // 7. le pied du mur, noirci par l'eau qui stagne sur la moquette
+  const foot = ctx.createLinearGradient(0, S * 0.72, 0, S * 0.955);
+  foot.addColorStop(0, 'rgba(40, 36, 28, 0)');
+  foot.addColorStop(1, 'rgba(40, 36, 28, 0.45)');
+  ctx.fillStyle = foot;
+  ctx.fillRect(0, S * 0.72, S, S * 0.235);
+  ctx.restore();
+  noise(ctx, S, S, 14);
+}
+
 // Moquette humide jaunâtre : la photo est recolorée, sinon une trame de bruit
 function drawCarpet(ctx, S, photo) {
   ctx.globalCompositeOperation = 'source-over';
@@ -450,8 +584,18 @@ export function createBackroomsTextures(level = 0) {
   drawW(wctx, S, null);
   drawF(cctx, S, null);
   drawC(clctx, S, null);
+  // Level 0, étage du bas : le même papier peint, délavé et délabré
+  const [lowCanvas, lowCtx] = level === 0 ? canvas(PX) : [null, null];
+  const drawLow = (pap) => {
+    if (!lowCtx) return;
+    lowCtx.setTransform(PX / S, 0, 0, PX / S, 0, 0);
+    drawW(lowCtx, S, pap);
+    decayWall(lowCtx, S);
+  };
+  drawLow(null);
 
   const wall = tex(wallCanvas);
+  const wallLow = lowCanvas ? tex(lowCanvas) : wall;
   const carpet = tex(carpetCanvas);
   const ceiling = tex(ceilCanvas);
 
@@ -470,6 +614,7 @@ export function createBackroomsTextures(level = 0) {
   const mosaic = tex(ceilCanvas);
   const ready = Promise.all([...files.map(loadImage), ...(L2 ? ['l37_bassin.jpg', 'l37_fosse.jpg'].map(loadImage) : [])]).then(([pap, moq, pla, bas, fos]) => {
     if (pap) { drawW(wctx, S, pap); wall.needsUpdate = true; }
+    if (pap && lowCtx) { drawLow(pap); wallLow.needsUpdate = true; }
     if (moq) { drawF(cctx, S, moq); carpet.needsUpdate = true; }
     if (pla) { drawC(clctx, S, pla); ceiling.needsUpdate = true; }
     // carreaux des bassins deux fois plus petits (10 cm)
@@ -771,5 +916,5 @@ export function createBackroomsTextures(level = 0) {
   const drawings = tex(drawCanvas);
   drawings.wrapS = drawings.wrapT = THREE.ClampToEdgeWrapping;
 
-  return { wall, carpet, ceiling, pool, deep, mosaic, vhs, exit, sign, label, steel, fireDoor, treadPlate, crate, fog, lamp, outlet, vent, tape, drawings, ready, metalReady };
+  return { wall, wallLow, carpet, ceiling, pool, deep, mosaic, vhs, exit, sign, label, steel, fireDoor, treadPlate, crate, fog, lamp, outlet, vent, tape, drawings, ready, metalReady };
 }

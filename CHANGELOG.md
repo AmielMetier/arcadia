@@ -1,5 +1,16 @@
 # Journal des versions — Arcadia
 
+## 4.71 — 8 novembre 2026
+- **The Backrooms** — Au Level 0, une panne de courant en pleine partie.
+  - Une fois la moitié des cassettes trouvée, tout s'éteint d'un coup, une seule fois, pendant 25 à 35 secondes.
+  - Dans le noir, les néons ne protègent plus, le caméscope perd le signal et l'entité vient vers vous.
+- **The Backrooms** — Un final sous alarme quand toutes les cassettes sont trouvées.
+  - Toutes les lumières allumées passent au rouge et clignotent chacune à son rythme.
+  - Une sirène lointaine et un grondement grave s'ajoutent à l'ambiance jusqu'au départ.
+  - Une flèche rouge à côté du signal (et sur le caméscope) indique où est l'ascenseur. Depuis l'autre étage, elle mène d'abord à l'escalier, ou à la clé tant qu'elle n'est pas prise.
+- **The Backrooms** — L'étage du bas du Level 0 a l'air abandonné : papier peint grisé, taché, fissuré, arraché par endroits et moisi au pied des murs.
+- **The Backrooms** — Le bourdonnement des néons est un peu moins fort.
+
 ## 4.70 — 8 novembre 2026
 - **The Backrooms** — Un Level 0 plus court, pour aller au bout.
   - 6 cassettes à trouver au lieu de 7 : 4 à l'étage du haut, 2 en bas.

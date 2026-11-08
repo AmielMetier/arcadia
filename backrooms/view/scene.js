@@ -411,10 +411,19 @@ export function createBackroomsScene(container, floors, lamps) {
     }
     // power : 1 néons allumés, 0 coupure de courant (seule reste une lueur à peine visible)
     let power = 1;
+    // Level 0, toutes les cassettes trouvées : l'alarme. Chaque néon qui marchait passe au rouge et clignote à son
+    // propre rythme, sans aucun ensemble ; la lumière qu'ils jettent sur les murs suit (alarm : un par néon)
+    let alarm = null;
     const writeBake = () => {
-      live.set(base);
-      liveB.set(baseB);
-      for (const f of flickers) if (f.k > 0) addPrint(f.ch ? liveB : live, f.fp, f.k);
+      if (alarm) {
+        live.fill(0);
+        liveB.fill(0);
+        for (const a of alarm) if (a.k > 0 && a.l.state !== 'off') addPrint(live, a.fp, a.k);
+      } else {
+        live.set(base);
+        liveB.set(baseB);
+        for (const f of flickers) if (f.k > 0) addPrint(f.ch ? liveB : live, f.fp, f.k);
+      }
       for (let i = 0; i < BW * BH; i++) {
         const v = Math.min(1, (L2 || PIPES ? 0.03 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
         bakeData[i * 4] = Math.round(v * 255);
@@ -775,7 +784,8 @@ float bkCaust(vec2 uv, float t) {
         group.add(inst);
       }
     } else {
-      wallMat = baked(new THREE.MeshLambertMaterial({ map: textures.wall }), L0 ? { base: true } : null);
+      // l'étage du bas du Level 0 : le papier peint délavé, mangé par l'humidité
+      wallMat = baked(new THREE.MeshLambertMaterial({ map: L0 && fi === 1 ? textures.wallLow : textures.wall }), L0 ? { base: true } : null);
       const wallsMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(CELL_SIZE, CEIL + SUNK, CELL_SIZE), wallMat, wallCount);
       // le mur percé du trou de la cassette perchée se construit à part (6b)
       const nicheWall = map.niche ? (map.niche.gz + map.niche.dz) * W + map.niche.gx + map.niche.dx : -1;
@@ -913,7 +923,8 @@ float bkCaust(vec2 uv, float t) {
       group.add(mesh);
       fixSets.push(mesh);
     };
-    const onCol = (l) => (l.kind === 'bulb' ? ON_BULB : l.kind === 'tube' ? ON_TUBE : ON);
+    const ALARM = new THREE.Color('#ff2414').multiplyScalar(3.2);
+    const onCol = (l) => (alarm ? ALARM : l.kind === 'bulb' ? ON_BULB : l.kind === 'tube' ? ON_TUBE : ON);
     const offCol = (l) => (l.kind === 'bulb' ? OFF_BULB : OFF);
     const fixColor = (l, on) => l.fix && l.fix.mesh.setColorAt(l.fix.i, on ? onCol(l) : offCol(l));
     const fixDirty = () => {
@@ -2101,6 +2112,7 @@ float bkCaust(vec2 uv, float t) {
     let lit = true;
     let powerFlick = 0;
     let flickT = 0;
+    let alarmT = 0;
     const setPower = (v) => {
       if (v === power) return;
       power = v;
@@ -2374,9 +2386,39 @@ float bkCaust(vec2 uv, float t) {
         }
         if (pipesView) pipesView.update(sim, P, time, dt, lightAt, P.flashlight && P.status === 'alive');
 
+        // L'alarme de la fin du Level 0 : une fois lancée, elle tient jusqu'au départ
+        if (L0 && !alarm && sim.level === 0 && sim.open) {
+          alarm = map.lights.filter((l) => l.state !== 'off').map((l) => ({ l, fp: fpOf(l), k: 1, t: Math.random() * 1.2 }));
+          bakeUniforms.uBakeTint.value.setRGB(1.55, 0.16, 0.1);
+          for (const a of alarm) fixColor(a.l, power > 0);
+          fixDirty();
+          writeBake();
+        }
+        if (alarm) {
+          alarmT -= dt;
+          if (alarmT <= 0 && power && powerFlick <= 0) {
+            alarmT = 1 / 20;
+            let changed = false;
+            for (const a of alarm) {
+              a.t -= 1 / 20;
+              if (a.t > 0) continue;
+              // allumé 0,15 à 1,2 s, éteint 0,06 à 0,7 s ; parfois une rafale de claquements
+              const on = a.k <= 0;
+              a.k = on ? 0.55 + Math.random() * 0.45 : Math.random() < 0.2 ? 0.12 : 0;
+              a.t = on ? (Math.random() < 0.25 ? 0.05 + Math.random() * 0.08 : 0.15 + Math.random() * 1.05) : 0.06 + Math.random() * 0.64;
+              fixColor(a.l, a.k > 0.3 && a.l.state !== 'off');
+              changed = true;
+            }
+            if (changed) {
+              fixDirty();
+              writeBake();
+            }
+          }
+        }
+
         // Néons qui grésillent (une quinzaine de fois par seconde)
         flickT -= dt;
-        if (flickT <= 0 && flickers.length && power && powerFlick <= 0) {
+        if (!alarm && flickT <= 0 && flickers.length && power && powerFlick <= 0) {
           flickT = 1 / 15;
           let changed = false;
           for (const f of flickers) {

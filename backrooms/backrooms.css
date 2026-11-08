@@ -96,6 +96,11 @@ html, body {
 .tapes i.on { background: #ffcf3a; border-color: #ffcf3a; opacity: 1; }
 .tapes b { font-weight: normal; margin-left: 6px; }
 .signal { font-size: 24px; }
+/* Level 0, tout trouvé : la flèche vers le vrai ascenseur */
+.sig-arrow { display: inline-block; margin-right: 8px; color: #ff4b3b; text-shadow: 0 0 10px rgba(255, 60, 40, 0.7); animation: sigArrow 0.9s ease-in-out infinite; }
+.sig-arrow[hidden] { display: none; }
+.cam-arrow { margin: 0 0 6px; font-size: 34px; }
+@keyframes sigArrow { 50% { opacity: 0.45; } }
 #signalBars { display: inline-flex; align-items: flex-end; gap: 3px; height: 20px; }
 #signalBars i { width: 7px; background: currentColor; opacity: 0.25; }
 #signalBars i.on { opacity: 1; }

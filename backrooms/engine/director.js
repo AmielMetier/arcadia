@@ -94,7 +94,7 @@ export function updateDirector(sim) {
 
   // Level 0 : la traque annoncée. Les néons s'éteignent un à un vers le joueur ; au dernier, elle est lâchée depuis
   // le fond du couloir, là où le premier est mort
-  if (D.level === 0 && sim.hasMonster && M && D.phase === 'build' && D.stress < 0.3 && !sim.lightsOut && M.mode === 'patrol' && !M.glimpse && !(M.dormantT > 0)) {
+  if (D.level === 0 && sim.hasMonster && M && D.phase === 'build' && D.stress < 0.3 && !sim.lightsOut && !(sim.blackout > 0) && M.mode === 'patrol' && !M.glimpse && !(M.dormantT > 0)) {
     D.huntT -= DT;
     if (D.huntT <= 0) {
       D.huntT = rand(100, 160) * (1.2 - (sim.skill ?? 0.5) * 0.4);
@@ -168,7 +168,9 @@ function fakeAlarm(sim, P) {
       return;
     }
   }
-  const kind = pick(kinds);
+  let kind = pick(kinds);
+  // pendant la panne, ou l'alarme rouge de la fin du Level 0, les néons ne sont plus les siens
+  if ((sim.blackout > 0 || (lv === 0 && sim.open)) && (kind === 'neon' || kind === 'row' || kind === 'surge')) kind = 'steps';
   if (kind === 'neon') {
     if (neonDrop(sim, P)) return;
   }
