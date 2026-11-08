@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 4.79 — 8 novembre 2026
+- **Odyssée** — Graphismes « Pokémon Noir & Blanc » : les maisons sont refaites.
+  - Elles gardent leur vraie taille et leur place : plus de dessin qui déborde sur la route ni de porte décalée.
+  - Toit de tuiles orange, corniche claire et murs beiges dans le style Noir 2 & Blanc 2, à la même échelle que le reste.
+  - Les Centres Pokémon, Boutiques et arènes reprennent leur dessin de base en attendant une vraie version Noir & Blanc.
+
 ## 4.78 — 8 novembre 2026
 - **Odyssée** — Graphismes « Pokémon Noir & Blanc » : les bâtiments changent aussi.
   - Centres Pokémon, arènes et maisons prennent les dessins des jeux Noir 2 & Blanc 2 (maisons de Phyromatical).

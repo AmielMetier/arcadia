@@ -73,7 +73,47 @@ deco = {
 mais = L('maisons_bw2.png')
 bats = {'center': trim(mais, (16, 15, 160, 159)), 'house': trim(mais, (175, 36, 268, 159)),
         'house2': trim(mais, (188, 186, 283, 287)), 'gym': trim(mais, (22, 178, 170, 383))}
-deco.update({'b_' + k: v for k, v in bats.items()})
-for n, im in {**files, **{('' if k.startswith('b_') else 'd_') + k: v for k, v in deco.items()}}.items():
+def sans_ombre(im):   # l'ombre (pixels à moitié transparents) sous le bâtiment : coupée, le pied de l'image = le bas du mur
+    a = np.array(im); rows = np.where((a[..., 3] > 128).any(1))[0]
+    return im.crop((0, 0, im.width, rows.max() + 1))
+
+
+deco.update({'b_' + k: sans_ombre(v) for k, v in bats.items()})
+# kits de façade (4 × 4 cellules de 16 px, rôles de odyssee/js/data/regles.js) découpés dans les bâtiments Noir & Blanc 2 :
+# le jeu assemble avec eux des bâtiments de n'importe quelle taille, à l'échelle de tout le reste
+GRILLE = [['mur', 'fenetre', 'fenetre_nuit', 'socle'], ['porte', 'porte_nuit', 'linteau', 'cote'],
+          ['toit', 'rebord', 'faite', 'cheminee'], ['enseigne_g', 'enseigne_d', 'fleurs', 'lampe']]
+ODY = os.path.join(ROOT, 'odyssee', 'img', 'facades')
+
+
+def nuit(t):
+    a = np.array(t).astype(float); vitre = (a[..., 2] > a[..., 0] + 45) & (a[..., 2] > a[..., 1]) & (a[..., 3] > 0)
+    a[vitre, 0] = 255; a[vitre, 1] = 225; a[vitre, 2] = 140
+    return Image.fromarray(a.clip(0, 255).astype('uint8'), 'RGBA')
+
+
+def kit(src, cases, base):
+    old = Image.open(os.path.join(ODY, base + '.png')).convert('RGBA')
+    k = Image.new('RGBA', (64, 64))
+    for j, row in enumerate(GRILLE):
+        for i, role in enumerate(row):
+            if role in cases:
+                x, y = cases[role]; c = src.crop((x, y, x + 16, y + 16))
+            elif role == 'fenetre_nuit':
+                x, y = cases['fenetre']; c = nuit(src.crop((x, y, x + 16, y + 16)))
+            elif role == 'porte_nuit':
+                x, y = cases['porte']; c = src.crop((x, y, x + 16, y + 16))
+            else:
+                c = old.crop((i * 16, j * 16, i * 16 + 16, j * 16 + 16))   # enseignes, fleurs, lampe : ceux du jeu
+            k.paste(c, (i * 16, j * 16))
+    return k
+
+
+h, c = bats['house'], bats['center']
+deco['kit_maison'] = kit(h, {'mur': (4, 80), 'fenetre': (32, 64), 'socle': (4, 92), 'porte': (32, 90), 'linteau': (32, 76),
+                             'cote': (60, 82), 'toit': (12, 30), 'rebord': (4, 64), 'faite': (12, 30), 'cheminee': (52, 12)}, 'maison')
+deco['kit_centre'] = kit(c, {'mur': (24, 104), 'fenetre': (100, 66), 'socle': (24, 116), 'porte': (62, 114), 'linteau': (62, 98),
+                             'cote': (8, 104), 'toit': (30, 40), 'rebord': (30, 84), 'faite': (30, 40), 'cheminee': (30, 40)}, 'centre')
+for n, im in {**files, **{('' if k.startswith('kit_') else 'd_') + k: v for k, v in deco.items() if not k.startswith('b_')}}.items():
     im.save(os.path.join(OUT, n + '.png'))
 print(len(files), 'tuiles et', len(deco), 'décors dans', os.path.normpath(OUT))

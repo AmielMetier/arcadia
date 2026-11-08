@@ -33,8 +33,8 @@ export const PACKS = {
       'tall0', 'tall1', 'water0', 'water1', 'water2', 'water3'],
     // décor remplacé (fichier d_<nom>.png, dessiné pixel pour pixel)
     decor: ['tree', 'tree2', 'pine', 'snowpine', 'palm', 'bush', 'rock', 'deadtree'],
-    // bâtiments dessinés d'un seul tenant (fichier b_<image>.png), par style de bâtiment du jeu
-    batiments: { center: 'center', gym: 'gym', house: 'house', house2: 'house2', house3: 'house', bighouse: 'house2', chalet: 'house', pecheur: 'house2' },
+    // kits de façade (kit_<nom>.png, 4 × 4 cellules) qui remplacent ceux du jeu : les bâtiments gardent leur taille
+    kits: { maison: 'kit_maison', chalet: 'kit_maison', pecheur: 'kit_maison' },
   },
 };
 
