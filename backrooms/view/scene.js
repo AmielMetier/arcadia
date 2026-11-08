@@ -220,6 +220,7 @@ export function createBackroomsScene(container, floors, lamps) {
 
   // Un étage entier : sol, plafond, murs, néons, meubles, cassettes, objets, ascenseur… dans un groupe à sa hauteur
   function buildFloor(map, fi) {
+    const LOW0 = L0 && fi === 1; // l'étage du bas du Level 0
     const group = new THREE.Group();
     group.position.y = -fi * FLOOR_DY;
     scene.add(group);
@@ -270,6 +271,8 @@ export function createBackroomsScene(container, floors, lamps) {
       // Level 0 : les néons éclairent le mur presque jusqu'au sol, et les auréoles du plafond restent discrètes
       uSideLo: { value: L0 ? 0.8 : 0.5 },
       uStain: { value: L0 ? 0.5 : 1 },
+      // Level 0, étage du haut : des murs propres (presque pas d'auréoles ni d'humidité au pied) ; le bas reste défraîchi
+      uWallDecay: { value: L0 && !LOW0 ? 0.15 : 1 },
     };
     // reflets des lampes (Level 2) : les plus proches que la caméra voit, choisies à chaque image
     const NLAMP = 12;
@@ -510,6 +513,7 @@ uniform float uWaterY;
 uniform float uHaze;
 uniform float uSideLo;
 uniform float uStain;
+uniform float uWallDecay;
 #ifdef BK_TILE
 uniform float uTileRow;
 #endif
@@ -586,11 +590,11 @@ float bkCaust(vec2 uv, float t) {
           #endif
           // humidité : la moquette détrempée par plaques, l'eau qui remonte au pied des murs
           float wet = smoothstep(0.52, 0.72, bkFbm(vBakeP.xz * 0.17 + 11.0)) * uDamp;
-          float rise = (1.0 - smoothstep(0.05, 0.45 + bkFbm(vBakeP.xz * 0.9 + vBakeP.y) * 0.5, by)) * smoothstep(0.3, 0.7, bkFbm(vBakeP.xz * 0.3 + 5.0)) * uDamp;
+          float rise = (1.0 - smoothstep(0.05, 0.45 + bkFbm(vBakeP.xz * 0.9 + vBakeP.y) * 0.5, by)) * smoothstep(0.3, 0.7, bkFbm(vBakeP.xz * 0.3 + 5.0)) * uDamp * uWallDecay;
           // auréoles d'eau, au plafond (des dalles entières) et sur les murs : un cerne plus foncé autour d'une tache pâle
           float n2 = bkFbm(vec2(vBakeP.x + vBakeP.z * 0.37, vBakeP.y * (abs(ny) < 0.5 ? 1.0 : 0.0) + vBakeP.z) * 0.45 + 31.0);
           float ring = smoothstep(0.6, 0.66, n2) * (1.0 - smoothstep(0.68, 0.75, n2)) * 0.8 + smoothstep(0.66, 0.75, n2) * 0.3;
-          float stain = ny < -0.5 ? ring : (abs(ny) < 0.5 ? ring * 0.6 : 0.0);
+          float stain = ny < -0.5 ? ring : (abs(ny) < 0.5 ? ring * 0.6 * uWallDecay : 0.0);
           diffuseColor.rgb *= mix(1.0, 0.62, ny > 0.5 ? wet : (abs(ny) < 0.5 ? rise : 0.0));
           diffuseColor.rgb *= mix(vec3(1.0), vec3(0.78, 0.66, 0.45), stain * uDamp * uStain);
           #ifdef BK_BASE
@@ -724,9 +728,9 @@ float bkCaust(vec2 uv, float t) {
       const deepSet = new Set((map.pits || []).filter((p) => p.deep).map((p) => p.id));
       const deep = (map.pits || []).filter((p) => deepSet.has(p.id)).map((p) => ({ x: p.x, z: p.z, hx: PIT_HALF, hz: PIT_HALF }));
       const shallow = holes.filter((h) => !deep.some((d) => d.x === h.x && d.z === h.z));
-      shaftWalls(shallow, SLAB, L0 ? [[0, '#d2cca2'], [0.55, '#9a9470'], [1, '#5f5a42']] : [[0, '#5e5434'], [1, '#5e5434']]);
+      shaftWalls(shallow, SLAB, L0 ? [[0, '#aca785'], [0.55, '#7e795c'], [1, '#4e4a36']] : [[0, '#5e5434'], [1, '#5e5434']]);
       // le noir arrive dès le premier mètre : debout au bord, on ne voit que le haut de la paroi, et il plonge déjà dans l'ombre
-      shaftWalls(deep, DEEP_DEPTH, [[0, '#c9c5a4'], [0.004, '#aca78a'], [0.012, '#625e4a'], [0.024, '#22211a'], [0.04, '#080806'], [0.08, '#000000'], [1, '#000000']]);
+      shaftWalls(deep, DEEP_DEPTH, [[0, '#a5a186'], [0.004, '#8d8971'], [0.012, '#55523f'], [0.024, '#22211a'], [0.04, '#080806'], [0.08, '#000000'], [1, '#000000']]);
       if (deep.length) {
         // le fond, si loin qu'on ne le voit jamais : du noir
         const bottom = new THREE.InstancedMesh(new THREE.PlaneGeometry(PIT_HALF * 2, PIT_HALF * 2), new THREE.MeshBasicMaterial({ color: '#000000' }), deep.length);

@@ -183,7 +183,7 @@ function drawWallArt(ctx) {
 
 // Papier peint jaune pâle des films : fines rayures verticales et motif en chevrons à peine visible, un peu jauni,
 // cloqué par l'humidité, avec sa plinthe (une face de mur = 2,5 m × 3 m)
-function drawWallpaper(ctx, S, grime) {
+function drawWallpaper(ctx, S, grime, worn = false) {
   ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1;
   ctx.fillStyle = '#d6cb98'; // jaune pâle tirant sur l'olive
@@ -211,13 +211,13 @@ function drawWallpaper(ctx, S, grime) {
   // le papier jauni, plus clair au milieu des lés
   if (grime) {
     ctx.globalCompositeOperation = 'soft-light';
-    ctx.globalAlpha = 0.55;
+    ctx.globalAlpha = worn ? 0.55 : 0.3;
     ctx.drawImage(grime, 0, 0, S, S);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
-  // coulures depuis le plafond
-  for (let i = 0; i < 3; i++) {
+  // coulures depuis le plafond (seulement à l'étage du bas : en haut, les murs restent propres)
+  for (let i = 0; i < (worn ? 3 : 0); i++) {
     const x = Math.random() * S;
     const len = S * (0.1 + Math.random() * 0.3);
     const g = ctx.createLinearGradient(0, 0, 0, len);
@@ -229,7 +229,7 @@ function drawWallpaper(ctx, S, grime) {
   // salissures au ras de la plinthe
   const dirt = ctx.createLinearGradient(0, S * 0.82, 0, S * 0.955);
   dirt.addColorStop(0, 'rgba(90, 70, 30, 0)');
-  dirt.addColorStop(1, 'rgba(90, 70, 30, 0.3)');
+  dirt.addColorStop(1, `rgba(90, 70, 30, ${worn ? 0.3 : 0.12})`);
   ctx.fillStyle = dirt;
   ctx.fillRect(0, S * 0.82, S, S * 0.14);
   // plinthe en vinyle brun, éraflée
@@ -265,11 +265,11 @@ function drawCarpet(ctx, S, photo) {
     ctx.fillStyle = '#9f9b70';
     ctx.fillRect(0, 0, S, S);
     ctx.globalCompositeOperation = 'screen';
-    ctx.fillStyle = '#aaa484';
+    ctx.fillStyle = '#625d4c';
     ctx.fillRect(0, 0, S, S);
     ctx.globalCompositeOperation = 'source-over';
   } else {
-    ctx.fillStyle = '#b5ad84';
+    ctx.fillStyle = '#948d6c';
     ctx.fillRect(0, 0, S, S);
     noise(ctx, S, S, 36);
   }
@@ -469,7 +469,7 @@ export function createBackroomsTextures(level = 0) {
   const drawLow = (pap) => {
     if (!lowCtx) return;
     lowCtx.setTransform(PX / S, 0, 0, PX / S, 0, 0);
-    drawW(lowCtx, S, pap);
+    drawW(lowCtx, S, pap, true);
     greyWall(lowCtx, S);
   };
   drawLow(null);
