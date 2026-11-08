@@ -1,6 +1,6 @@
 // The Backrooms (Level 0) - Génération de la carte du dédale
 // Grande grille de cases (64 × 64, soit 160 m de côté) : un quadrillage de cloisons percées de passages, des piliers,
-// quelques grandes salles vides, des zones aux néons morts, 7 cassettes VHS, de l'eau d'amande et 1 ascenseur.
+// quelques grandes salles vides, des zones aux néons morts, 6 cassettes VHS, de l'eau d'amande et 1 ascenseur.
 // Le Level 1 (entrepôt) est dans level1.js et partage les types de cases, l'ascenseur et le parcours en largeur.
 // Pièges du Level 0, posés une fois le dédale construit :
 //  - une cassette enfermée dans une petite pièce, qu'on n'atteint que par un couloir étroit au sol creusé de trous
@@ -13,7 +13,8 @@
 export const PIT_HALF = 1.0; // un trou fait 2 m de côté dans une case de 2,5 m : il reste des arêtes de 50 cm
 export const FLOOR_DY = 6.4; // l'étage du bas est 6,40 m plus bas (3 m sous plafond et 3,40 m de dalle : les trous sont des puits)
 export const PIT_DEPTH = FLOOR_DY; // on tombe d'un étage, de très haut
-export const CASSETTES = 7; // cassettes VHS à trouver au Level 0 (4 en haut, 3 en bas)
+export const CASSETTES = 6; // cassettes VHS à trouver au Level 0 (4 en haut, 2 en bas)
+export const LOWER_CASSETTES = 2; // … dont celles de l'étage du bas
 // le trou carré du mur où attend la cassette perchée : son bas (à 2,40 m, hors de portée sans l'échelle), son côté et
 // sa profondeur ; la cassette y tient debout, la jaquette tournée vers la pièce (NICHE_Y : son centre)
 export const NICHE_LO = 2.4;
@@ -84,6 +85,9 @@ export function itemList(...lists) {
 export const CELL_SIZE = 2.5; // chaque case fait 2.5m x 2.5m
 export const WALL_HEIGHT = 3.2; // hauteur sous plafond (3,20 m : un peu plus haut que l'ordinaire, on s'y sent petit)
 export const MAP_SIZE = 64;
+// l'étage du bas n'occupe qu'un carré de 40 cases (100 m de côté, contre 160 m en haut), sous le couloir piégé et les
+// escaliers : le reste de sa grille est du mur plein
+export const LOWER_SIZE = 40;
 
 export const T = {
   EMPTY: 0,
@@ -271,11 +275,18 @@ export const WORKLIGHT = { m: 'worklight', h: 1.75, r: 0.32, proc: true };
 export const CONE = { m: 'cone', h: 0.5, r: 0.18, proc: true };
 
 // opts.lower : étage du bas (pas de couloir piégé, de renfoncement ni d'échelle) ; opts.forced : cases qui doivent
-// rester du sol accessible (sous les trous de l'étage du dessus)
+// rester du sol accessible (sous les trous de l'étage du dessus) ; opts.box : { x0, z0, size }, le carré de la grille
+// où l'étage existe (son mur d'enceinte compris), le reste est du mur plein (même repère que l'étage du dessus)
 export function createBackroomsMap(seed = 42, opts = {}) {
   const lower = !!opts.lower;
   const W = MAP_SIZE;
   const H = MAP_SIZE;
+  const BX = opts.box ? opts.box.x0 : 0;
+  const BZ = opts.box ? opts.box.z0 : 0;
+  const BW = opts.box ? opts.box.size : W;
+  const BH = opts.box ? opts.box.size : H;
+  const AREA = (BW * BH) / (W * H); // part de la grille occupée : les tirages « par étage » en tiennent compte
+  const per = (n) => (AREA === 1 ? n : Math.max(1, Math.round(n * AREA)));
   const grid = new Uint8Array(W * H);
 
   // Générateur pseudo-aléatoire (mulberry32) pour une carte reproductible à partir de la graine
@@ -289,7 +300,7 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   };
   const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
 
-  const inside = (x, z) => x > 0 && x < W - 1 && z > 0 && z < H - 1;
+  const inside = (x, z) => x > BX && x < BX + BW - 1 && z > BZ && z < BZ + BH - 1;
   const get = (x, z) => (x < 0 || x >= W || z < 0 || z >= H ? T.WALL : grid[z * W + x]);
   const set = (x, z, val) => {
     if (inside(x, z)) grid[z * W + x] = val;
@@ -304,10 +315,10 @@ export function createBackroomsMap(seed = 42, opts = {}) {
 
   // 2. Grandes salles vides : on n'y pose aucune cloison (les « halls » du Level 0)
   const halls = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < per(4); i++) {
     const w = 6 + Math.floor(rnd() * 7);
     const h = 6 + Math.floor(rnd() * 7);
-    halls.push({ x: 2 + Math.floor(rnd() * (W - w - 4)), z: 2 + Math.floor(rnd() * (H - h - 4)), w, h });
+    halls.push({ x: BX + 2 + Math.floor(rnd() * (BW - w - 4)), z: BZ + 2 + Math.floor(rnd() * (BH - h - 4)), w, h });
   }
   const inHall = (x, z) => halls.some((r) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.h);
 
@@ -346,9 +357,9 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   const onLine = (x, z) => xs.includes(x) || zs.includes(z);
 
   // 4. Cloisons libres en L, hors du quadrillage, et piliers isolés pour casser les lignes de vue
-  for (let i = 0; i < 26; i++) {
-    let x = 2 + Math.floor(rnd() * (W - 4));
-    let z = 2 + Math.floor(rnd() * (H - 4));
+  for (let i = 0; i < per(26); i++) {
+    let x = BX + 2 + Math.floor(rnd() * (BW - 4));
+    let z = BZ + 2 + Math.floor(rnd() * (BH - 4));
     let [dx, dz] = pick([[1, 0], [-1, 0], [0, 1], [0, -1]]);
     const len = 2 + Math.floor(rnd() * 4);
     for (let k = 0; k < len * 2; k++) {
@@ -362,9 +373,9 @@ export function createBackroomsMap(seed = 42, opts = {}) {
       z += dz;
     }
   }
-  for (let i = 0; i < 90; i++) {
-    const x = 2 + Math.floor(rnd() * (W - 4));
-    const z = 2 + Math.floor(rnd() * (H - 4));
+  for (let i = 0; i < per(90); i++) {
+    const x = BX + 2 + Math.floor(rnd() * (BW - 4));
+    const z = BZ + 2 + Math.floor(rnd() * (BH - 4));
     if (!onLine(x, z) && !inHall(x, z)) set(x, z, T.WALL);
   }
 
@@ -457,9 +468,9 @@ export function createBackroomsMap(seed = 42, opts = {}) {
       return n;
     };
     let placed = 0;
-    for (let a = 0; a < PARTITIONS * 14 && placed < PARTITIONS; a++) {
-      const x0 = 2 + Math.floor(prnd() * (W - 4));
-      const z0 = 2 + Math.floor(prnd() * (H - 4));
+    for (let a = 0; a < per(PARTITIONS) * 14 && placed < per(PARTITIONS); a++) {
+      const x0 = BX + 2 + Math.floor(prnd() * (BW - 4));
+      const z0 = BZ + 2 + Math.floor(prnd() * (BH - 4));
       if (!roomy(x0, z0)) continue;
       const [ax, az] = prnd() < 0.5 ? [1, 0] : [0, 1];
       const [px, pz] = [az, ax];
@@ -506,8 +517,10 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   // 5. Point de départ près du centre, sur une case libre reliée à la plus grande partie du dédale
   let floorCount = 0;
   for (let i = 0; i < W * H; i++) if (grid[i] === T.FLOOR) floorCount++;
-  let sx = W >> 1;
-  let sz = H >> 1;
+  const cx0 = BX + (BW >> 1);
+  const cz0 = BZ + (BH >> 1);
+  let sx = cx0;
+  let sz = cz0;
   let dist = null;
   for (let r = 0; r < 400; r++) {
     if (get(sx, sz) === T.FLOOR) {
@@ -517,8 +530,8 @@ export function createBackroomsMap(seed = 42, opts = {}) {
       if (reach > floorCount * 0.5) break;
     }
     const spread = 4 + (r >> 4);
-    sx = Math.min(W - 2, Math.max(1, (W >> 1) + Math.floor(rnd() * (spread * 2 + 1)) - spread));
-    sz = Math.min(H - 2, Math.max(1, (H >> 1) + Math.floor(rnd() * (spread * 2 + 1)) - spread));
+    sx = Math.min(BX + BW - 2, Math.max(BX + 1, cx0 + Math.floor(rnd() * (spread * 2 + 1)) - spread));
+    sz = Math.min(BZ + BH - 2, Math.max(BZ + 1, cz0 + Math.floor(rnd() * (spread * 2 + 1)) - spread));
   }
 
   // 5b. Cases imposées (sous les trous du dessus) : du sol, relié au reste par un passage creusé s'il le faut
@@ -974,14 +987,15 @@ export function createBackroomsMap(seed = 42, opts = {}) {
     batteries.push({ id: batteries.length, ...cellPos(c), taken: false });
   }
 
-  // 10b. L'échelle : loin du renfoncement, mais pas trop (25 à 45 cases de marche), et jamais derrière les trous du
-  // couloir piégé (dans la pièce de sa cassette, il faudrait traverser les trous pour aller la chercher)
+  // 10b. L'échelle : pas sous le renfoncement, mais dans les parages (10 à 22 cases de marche, 25 à 55 m), et jamais
+  // derrière les trous du couloir piégé (dans la pièce de sa cassette, il faudrait traverser les trous pour aller la
+  // chercher)
   const ladders = [];
   if (niche) {
     const dn = bfs(grid, W, H, niche.gx, niche.gz);
     const dry = reachAll(true);
     const ok = (lo, hi) => walkable.filter((c) => !busy.has(c.z * W + c.x) && dry[c.z * W + c.x] >= 0 && dn[c.z * W + c.x] >= lo && dn[c.z * W + c.x] <= hi);
-    const cand = ok(25, 45).length ? ok(25, 45) : ok(12, 70);
+    const cand = ok(10, 22).length ? ok(10, 22) : ok(6, 40);
     const c = cand.length ? pick(cand) : null;
     if (c) {
       busy.add(c.z * W + c.x);
@@ -1081,11 +1095,28 @@ export function bfs(grid, W, H, sx, sz) {
 // Le Level 0 sur deux étages : on tombe par les trous du haut, on remonte par les escaliers (2, loin des trous).
 // Les cassettes sont réparties entre les étages (celle du couloir piégé et celle du renfoncement en haut).
 // Chaque étage a son ascenseur ; le moteur décide lequel est le vrai.
+// Le carré de l'étage du bas (LOWER_SIZE cases, mur d'enceinte compris) : le plus au centre possible, mais avec les
+// cases sous les trous du dessus à au moins 3 cases de ses bords. Trop étalés (jamais vu), l'étage garde toute la grille
+export function lowerBox(forced, W = MAP_SIZE, size = LOWER_SIZE) {
+  let x0 = (W - size) >> 1;
+  let z0 = x0;
+  if (forced.length) {
+    const xs = forced.map(([x]) => x);
+    const zs = forced.map(([, z]) => z);
+    // une case c est dans l'étage si x0 < c < x0 + size - 1 ; on vise 3 cases de marge de chaque côté
+    const fit = (lo, hi, c) => Math.max(0, Math.min(W - size, Math.max(hi + 3 - size + 2, Math.min(lo - 4, c))));
+    x0 = fit(Math.min(...xs), Math.max(...xs), x0);
+    z0 = fit(Math.min(...zs), Math.max(...zs), z0);
+    if (!forced.every(([x, z]) => x > x0 && x < x0 + size - 1 && z > z0 && z < z0 + size - 1)) return null;
+  }
+  return { x0, z0, size };
+}
+
 export function createLevel0(seed = 42) {
   const up = createBackroomsMap(seed);
   const W = up.W;
   const forced = up.pits.map((p) => [p.gx, p.gz]);
-  const down = createBackroomsMap(seed + 7919, { lower: true, forced });
+  const down = createBackroomsMap(seed + 7919, { lower: true, forced, box: lowerBox(forced, W) });
 
   // les escaliers coudés : deux volées côte à côte reliées par un palier (6 cases libres aux deux étages, loin des
   // trous). On entre en bas par la case d'avant la première volée (étage du bas), on monte, on fait demi-tour sur le
@@ -1175,22 +1206,24 @@ export function createLevel0(seed = 42) {
   up.lights = up.lights.filter((l) => !stairs.some((st) => st.cells.some((k) => k.gx === l.gx && k.gz === l.gz)));
   // pas d'objet ni de meuble sur les marches ni autour de la cage
   const nearWell = (x, z, d) => stairs.some((st) => st.cells.some((k) => Math.hypot(x - (k.gx + 0.5) * C, z - (k.gz + 0.5) * C) < d));
+  // (ni sur la case d'où l'on entre dans la cage, en bas, et où l'on en sort, en haut : on s'y cognait)
+  const atDoor = (x, z, d) => stairs.some((st) => Math.hypot(x - st.down.x, z - st.down.z) < d || Math.hypot(x - st.up.x, z - st.up.z) < d);
   for (const m of [up, down]) {
-    m.props = m.props.filter((p) => !nearWell(p.x, p.z, 2.2 + (p.r || 0)));
+    m.props = m.props.filter((p) => !nearWell(p.x, p.z, 2.2 + (p.r || 0)) && !atDoor(p.x, p.z, 1.6 + (p.r || 0)));
     m.tapes = m.tapes.filter((t) => !nearWell((t.x1 + t.x2) / 2, (t.z1 + t.z2) / 2, 2.6));
   }
   // qui tombe par un trou atterrit en bas au milieu de sa case : aucun meuble qui arrête le pas à moins de son rayon,
   // du rayon d'un joueur et de 30 cm de ce point (sinon on atterrissait dedans, coincé pour de bon)
   down.props = down.props.filter((p) => p.walk || up.pits.every((q) => Math.hypot(p.x - q.x, p.z - q.z) >= p.r + PLAYER_R + 0.3));
 
-  // les cassettes : 4 en haut (dont celle du couloir piégé et celle du renfoncement), 3 en bas
+  // les cassettes : 4 en haut (dont celle du couloir piégé et celle du renfoncement), 2 en bas
   const special = up.cassettes.filter((c) => c.vault || c.high);
   const others = up.cassettes.filter((c) => !c.vault && !c.high);
   // en haut, les autres le plus loin des deux spéciales ; en bas, le plus loin des escaliers et l'une de l'autre
   const cellOf = (c) => ({ x: c.gx, z: c.gz, c });
   const upDist = gridDist(up.grid, W, up.H);
   const fixedUp = [...special, up.spawn, up.exit].map(cellOf);
-  const keepUp = [...special, ...spreadOut(others.map(cellOf), fixedUp, Math.max(0, CASSETTES - 3 - special.length), upDist, rnd).map((o) => o.c)];
+  const keepUp = [...special, ...spreadOut(others.map(cellOf), fixedUp, Math.max(0, CASSETTES - LOWER_CASSETTES - special.length), upDist, rnd).map((o) => o.c)];
   const freeIds = up.cassettes.filter((c) => !keepUp.includes(c)).map((c) => c.id);
   up.cassettes = keepUp;
   const downDist = gridDist(down.grid, W, down.H);

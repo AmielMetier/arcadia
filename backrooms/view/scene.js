@@ -779,10 +779,19 @@ float bkCaust(vec2 uv, float t) {
       const wallsMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(CELL_SIZE, CEIL + SUNK, CELL_SIZE), wallMat, wallCount);
       // le mur percé du trou de la cassette perchée se construit à part (6b)
       const nicheWall = map.niche ? (map.niche.gz + map.niche.dz) * W + map.niche.gx + map.niche.dx : -1;
+      // un bloc entouré de murs ne se voit de nulle part (le plein autour de l'étage du bas, plus petit) : on le saute
+      const buried = (x, z) => {
+        for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const nz = z + dz;
+          if (nx >= 0 && nz >= 0 && nx < W && nz < H && map.grid[nz * W + nx] !== T.WALL) return false;
+        }
+        return true;
+      };
       let idx = 0;
       for (let z = 0; z < H; z++) {
         for (let x = 0; x < W; x++) {
-          if (map.grid[z * W + x] !== T.WALL || z * W + x === nicheWall) continue;
+          if (map.grid[z * W + x] !== T.WALL || z * W + x === nicheWall || buried(x, z)) continue;
           if (map.arrival && map.arrival.gx === x && map.arrival.gz === z) continue; // la gaine de l'ascenseur d'arrivée
           dummy.position.set((x + 0.5) * CELL_SIZE, (CEIL - SUNK) / 2, (z + 0.5) * CELL_SIZE);
           dummy.updateMatrix();

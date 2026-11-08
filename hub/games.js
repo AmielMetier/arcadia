@@ -311,7 +311,7 @@ window.HUB_GAMES = [
     id: 'backrooms',
     title: 'The Backrooms',
     tag: 'Survie & Horreur',
-    desc: "Seul ou à plusieurs, échappe-toi des Backrooms : 5 cassettes VHS sur les deux étages du Level 0 pour ouvrir le bon ascenseur, puis 3 fusibles pour relancer le monte-charge de l'entrepôt du Level 1, et enfin 4 vannes de vapeur dans les tuyauteries du Level 2, où un troupeau de chèvres charge dans le noir.",
+    desc: "Seul ou à plusieurs, échappe-toi des Backrooms : 6 cassettes VHS sur les deux étages du Level 0 pour ouvrir le bon ascenseur, puis 3 fusibles pour relancer le monte-charge de l'entrepôt du Level 1, et enfin 4 vannes de vapeur dans les tuyauteries du Level 2, où un troupeau de chèvres charge dans le noir.",
     url: 'backrooms/',
     minPlayers: 1, maxPlayers: 6, maxWithBots: 6,
     accent: '#eab308',

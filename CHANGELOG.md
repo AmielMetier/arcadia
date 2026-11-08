@@ -1,5 +1,16 @@
 # Journal des versions — Arcadia
 
+## 4.70 — 8 novembre 2026
+- **The Backrooms** — Un Level 0 plus court, pour aller au bout.
+  - 6 cassettes à trouver au lieu de 7 : 4 à l'étage du haut, 2 en bas.
+  - L'étage du bas est bien plus petit : un carré de 100 m de côté au lieu de 160, sous le couloir piégé. Il y a moins de terrain à fouiller, et les escaliers y mènent toujours.
+  - Toutes les cartes changent avec cette version, la Carte du jour aussi.
+- **The Backrooms** — L'échelle ne se perd plus.
+  - Elle est posée bien plus près de la cassette perchée (40 m en moyenne au lieu de 90).
+  - Quand il ne reste à ton étage que la cassette perchée et que personne n'a l'échelle, le caméscope te mène à l'échelle (LADDER sur la jauge de signal).
+  - Si un coéquipier meurt l'échelle en main, toute l'équipe est prévenue : elle tombe là où il est tombé, et le caméscope y mène jusqu'à ce que quelqu'un la reprenne.
+  - Plus aucun meuble devant l'entrée d'un escalier.
+
 ## 4.69 — 8 novembre 2026
 - Correction : imports hud, affichage habitat dexnav en ville et routes, report chat menu et lock inputs (Amiel)
 

@@ -339,7 +339,7 @@ export class BackroomsHUD {
       }
     }
     const noSig = !(P.signal > 0);
-    this.text('signalLabel', noSig ? (sim.blackout > 0 ? 'NO SIGNAL' : 'NO SIGNAL') : P.sigTo === 'stairs' ? 'STAIRS' : P.sigTo === 'key' ? 'KEY' : L37 && sim.open ? 'SLIDE' : sim.open || (sim.level === 1 && delivered >= total) || (sim.level === 1 && !(sim.map.fuses || []).some((f) => !f.taken)) ? (sim.level === 1 ? 'FREIGHT ELEVATOR' : 'ELEVATOR') : 'SIGNAL');
+    this.text('signalLabel', noSig ? (sim.blackout > 0 ? 'NO SIGNAL' : 'NO SIGNAL') : P.sigTo === 'stairs' ? 'STAIRS' : P.sigTo === 'key' ? 'KEY' : P.sigTo === 'ladder' ? 'LADDER' : L37 && sim.open ? 'SLIDE' : sim.open || (sim.level === 1 && delivered >= total) || (sim.level === 1 && !(sim.map.fuses || []).some((f) => !f.taken)) ? (sim.level === 1 ? 'FREIGHT ELEVATOR' : 'ELEVATOR') : 'SIGNAL');
     this.flag('signal', 'none', noSig);
     if (this.camOn) this.text('camSigLbl', this.E.signalLabel.textContent.replace('FREIGHT ', ''));
     if (sim.floors.length > 1 && this.floorShown !== P.floor) {
