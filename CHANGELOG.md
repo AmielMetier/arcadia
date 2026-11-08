@@ -1,7 +1,10 @@
 # Journal des versions — Arcadia
 
-## 4.72 — 8 novembre 2026
+## 4.73 — 8 novembre 2026
 - **The Backrooms** — L'étage du bas du Level 0 garde le même papier peint qu'en haut, juste plus gris : plus aucune tache, fissure ni moisissure.
+
+## 4.72 — 8 novembre 2026
+- Nouveau : barre Habitat DexNav retirable completement (bouton x + option) (Amiel)
 
 ## 4.71 — 8 novembre 2026
 - **The Backrooms** — Au Level 0, une panne de courant en pleine partie.

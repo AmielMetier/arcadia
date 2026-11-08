@@ -23,6 +23,8 @@ export class Hud {
     this.dexnavCollapsed = false;
     try { this.collapsed = localStorage.getItem('odyssee-hud-collapsed') === '1'; } catch (e) {}
     try { this.dexnavCollapsed = localStorage.getItem('odyssee-dexnav-collapsed') === '1'; } catch (e) {}
+    this.dexnavHidden = false;
+    try { this.dexnavHidden = localStorage.getItem('odyssee-dexnav-hidden') === '1'; } catch (e) {}
     this._sig = '';
 
     this.root = el('div', 'hud' + (this.collapsed ? ' collapsed' : ''));
@@ -32,6 +34,13 @@ export class Hud {
     game.ui.root.appendChild(this.root);
 
     this.bindEvents();
+  }
+
+  /** retire complètement (ou réaffiche) la barre Habitat DexNav ; réglable aussi dans Options */
+  setDexnavHidden(v) {
+    this.dexnavHidden = !!v;
+    try { localStorage.setItem('odyssee-dexnav-hidden', this.dexnavHidden ? '1' : '0'); } catch (e) {}
+    this.update(true);
   }
 
   toggle() {
@@ -155,6 +164,10 @@ export class Hud {
         g.useRegisteredItem();
       } else if (act === 'chat') {
         g.openChat();
+      } else if (act === 'hide-dexnav') {
+        this.game.sound.sfx('cancel');
+        this.setDexnavHidden(true);
+        this.game.ui.toast?.('Barre Habitat retirée (réactivable dans Options)');
       } else if (act === 'toggle-dexnav') {
         this.dexnavCollapsed = !this.dexnavCollapsed;
         try { localStorage.setItem('odyssee-dexnav-collapsed', this.dexnavCollapsed ? '1' : '0'); } catch (e) {}
@@ -268,12 +281,13 @@ export class Hud {
           </div>`;
         })()}
         ${(() => {
-          if (!zoneCatch) return '';
+          if (!zoneCatch || this.dexnavHidden) return '';
           if (zoneCatch.isTown) {
             return `<div class="hud-dexnav town">
               <div class="hud-dexnav-head" title="Zone urbaine ou abritée : aucun Pokémon sauvage à proximité">
                 <span class="hdn-title">🐾 HABITAT</span>
                 <span class="hdn-cnt town">Zone urbaine (0 sauvage)</span>
+                <button type="button" class="hdn-close" data-act="hide-dexnav" title="Retirer la barre Habitat (réactivable dans Options)" tabindex="-1">✕</button>
               </div>
             </div>`;
           }
@@ -282,6 +296,7 @@ export class Hud {
             <div class="hud-dexnav-head" data-act="toggle-dexnav" title="Habitat DexNav : cliquer pour replier/déplier">
               <span class="hdn-title">🐾 HABITAT ${zoneCatch.complete ? '👑' : ''}</span>
               <span class="hdn-cnt${zoneCatch.complete ? ' done' : ''}">${zoneCatch.caught}/${zoneCatch.total}</span>
+              <button type="button" class="hdn-close" data-act="hide-dexnav" title="Retirer la barre Habitat (réactivable dans Options)" tabindex="-1">✕</button>
             </div>
             ${!this.dexnavCollapsed ? `
             <div class="hud-dexnav-row">
