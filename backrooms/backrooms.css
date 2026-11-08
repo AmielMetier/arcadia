@@ -97,7 +97,9 @@ html, body {
 .tapes b { font-weight: normal; margin-left: 6px; }
 .signal { font-size: 24px; }
 /* Level 0, tout trouvé : la flèche vers le vrai ascenseur */
-.sig-arrow { display: inline-block; margin-right: 8px; color: #ff4b3b; text-shadow: 0 0 10px rgba(255, 60, 40, 0.7); animation: sigArrow 0.9s ease-in-out infinite; }
+/* une vraie flèche (pointe et tige) : on voit tout de suite dans quel sens elle pointe */
+.sig-arrow { display: inline-block; vertical-align: middle; margin-right: 8px; color: #ff4b3b; animation: sigArrow 0.9s ease-in-out infinite; }
+.sig-arrow svg { display: block; width: 0.75em; height: 1.1em; fill: currentColor; filter: drop-shadow(0 0 5px rgba(255, 60, 40, 0.75)); }
 .sig-arrow[hidden] { display: none; }
 .cam-arrow { margin: 0 0 6px; font-size: 34px; }
 @keyframes sigArrow { 50% { opacity: 0.45; } }

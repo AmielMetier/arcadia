@@ -1397,6 +1397,12 @@ export class BackroomsSim {
     this.checkElevator();
   }
 
+  // l'endurance s'use deux fois moins vite pendant la phase rouge de la fin du Level 0 (toutes les cassettes trouvées) :
+  // on peut courir deux fois plus longtemps pour rejoindre l'ascenseur
+  drainRate() {
+    return this.level === 0 && this.open ? STAMINA_DRAIN / 2 : STAMINA_DRAIN;
+  }
+
   stepPlayer(P, input) {
     // 1. Orientation, lampe et inventaire
     if (input.yaw !== undefined) P.yaw = input.yaw;
@@ -1455,7 +1461,7 @@ export class BackroomsSim {
     P.winded = Math.max(0, (P.winded || 0) - DT);
     if (wantRun && P.stamina > 0 && !(P.winded > 0)) {
       P.running = true;
-      P.stamina = Math.max(0, P.stamina - DT * STAMINA_DRAIN);
+      P.stamina = Math.max(0, P.stamina - DT * this.drainRate());
       if (P.stamina <= 0) P.winded = WINDED_T; // à bout de souffle
     } else {
       P.running = false;
@@ -1829,7 +1835,7 @@ export class BackroomsSim {
     P.winded = Math.max(0, (P.winded || 0) - DT);
     P.running = !!input.run && P.moving && P.stamina > 0 && !(P.winded > 0) && !P.crouch;
     if (P.running) {
-      P.stamina = Math.max(0, P.stamina - DT * STAMINA_DRAIN);
+      P.stamina = Math.max(0, P.stamina - DT * this.drainRate());
       if (P.stamina <= 0) P.winded = WINDED_T;
     } else P.stamina = Math.min(staminaMax(P), P.stamina + DT * STAMINA_REGEN);
     if (!P.moving) {

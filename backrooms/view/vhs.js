@@ -15,7 +15,7 @@ import * as THREE from '../../shared/vendor/three/three.module.min.js';
 const LINES = 720; // hauteur de rendu de la scène, en pixels (qualité « high »)
 const QUALITY = { low: 480, medium: 600, high: 720 }; // lignes de la bande selon la qualité
 const MIN_LINES = 240;
-const MAX_LINES = 1080;
+const MAX_LINES = 2880; // la pleine définition d'un grand écran (à l'œil nu)
 const RESIZE_EVERY = 0.5; // résolution dynamique : au plus un changement de taille toutes les 0,5 s
 const SOFT_RATE = 1.6; // flashs adoucis : un effet plein écran met au moins 0,6 s à passer de 0 à 1 (bien sous 3 Hz)
 
@@ -392,6 +392,11 @@ export function createVhsFilter(renderer) {
   let quality = 'high';
   let tapeLines = LINES; // lignes de la bande pour la qualité choisie : elles calent le balayage
   let wantLines = LINES; // lignes de rendu voulues (résolution dynamique)
+  // à l'œil nu (sans caméscope), en qualité haute ou automatique : l'image est calculée en pleine définition (les
+  // pixels de l'écran) au lieu des lignes de la bande ; la résolution dynamique ne la baisse que si le jeu rame
+  let fullOk = true;
+  const fullH = () => Math.max(1, Math.round(ch * renderer.getPixelRatio()));
+  const wantH = () => Math.max(1, fx.cam < 0.5 && fullOk ? Math.min(wantLines, fullH()) : Math.min(wantLines, tapeLines, ch));
   let bloomOn = true;
   let cw = 1; // taille du canvas
   let ch = 1;
@@ -402,7 +407,7 @@ export function createVhsFilter(renderer) {
 
   // retaille les cibles seulement si la taille change vraiment (pas de réallocation sinon)
   function applySize() {
-    const lines = Math.max(1, Math.min(wantLines, ch));
+    const lines = wantH();
     const tw = Math.max(1, Math.round((lines * cw) / ch));
     lastResize = now();
     U.uLines.value = Math.max(1, Math.min(tapeLines, ch));
@@ -438,17 +443,23 @@ export function createVhsFilter(renderer) {
     get lines() {
       return target.height;
     },
+    // le plus de lignes que l'image peut prendre en ce moment (pleine définition à l'œil nu, la bande au caméscope)
+    get maxLines() {
+      return fx.cam < 0.5 && fullOk ? fullH() : Math.min(tapeLines, ch);
+    },
     setSize(w, h) {
       cw = Math.max(1, w | 0);
       ch = Math.max(1, h | 0);
       U.uRes.value.set(cw, ch);
       applySize();
     },
-    // qualité : 'low' (480 lignes, sans halo), 'medium' (600), 'high' (720, par défaut)
+    // qualité : 'low' (480 lignes, sans halo), 'medium' (600), 'high' (720 au caméscope, pleine définition à l'œil
+    // nu, par défaut)
     setQuality(q) {
       quality = QUALITY[q] ? q : 'high';
       tapeLines = QUALITY[quality];
-      wantLines = tapeLines;
+      fullOk = quality === 'high';
+      wantLines = fullOk ? MAX_LINES : tapeLines;
       bloomOn = quality !== 'low';
       U.uBloomOn.value = bloomOn ? 1 : 0;
       applySize();
@@ -485,7 +496,7 @@ export function createVhsFilter(renderer) {
       const t = now();
       const dt = lastNow == null ? 0 : clamp(t - lastNow, 0, 0.1);
       lastNow = t;
-      if (target.height !== Math.max(1, Math.min(wantLines, ch)) && t - lastResize >= RESIZE_EVERY) applySize();
+      if (target.height !== wantH() && t - lastResize >= RESIZE_EVERY) applySize();
 
       // flashs adoucis : les effets plein écran glissent au lieu de sauter
       const soft = fx.reduceFlashes;

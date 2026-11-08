@@ -181,32 +181,77 @@ function drawWallArt(ctx) {
   });
 }
 
-// Papier peint jaune pâle des films : fines rayures verticales et motif en chevrons à peine visible, un peu jauni,
-// cloqué par l'humidité, avec sa plinthe (une face de mur = 2,5 m × 3 m)
+// Papier peint jaune pâle des photos du Level 0 : des rayures de deux teintes, chaînes de perles et chevrons
+// emboîtés, le tout discret, un peu jauni, avec sa plinthe (une face de mur = 2,5 m × 3 m)
 // worn : l'étage du bas du Level 0, qui garde l'ancien jaune doré (grisé ensuite par greyWall) et son usure
 function drawWallpaper(ctx, S, grime, worn = false) {
   ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1;
   ctx.fillStyle = worn ? '#d4c37a' : '#d6cb98'; // en haut, jaune pâle tirant sur l'olive
   ctx.fillRect(0, 0, S, S);
-  const band = S / 16; // 16 lés de rayures par face
-  for (let i = 0; i < 16; i++) {
-    const x = i * band;
-    ctx.fillStyle = worn ? 'rgba(150, 128, 52, 0.16)' : 'rgba(140, 134, 66, 0.16)';
-    ctx.fillRect(x, 0, band * 0.5, S);
-    ctx.fillStyle = worn ? 'rgba(110, 92, 36, 0.22)' : 'rgba(100, 96, 44, 0.22)';
-    ctx.fillRect(x, 0, 1.2, S);
-    ctx.fillRect(x + band * 0.5, 0, 1, S);
-    // chevrons pointés vers le haut, au milieu de la rayure claire
-    ctx.strokeStyle = worn ? 'rgba(140, 118, 46, 0.32)' : 'rgba(128, 122, 56, 0.32)';
-    ctx.lineWidth = 1.4;
-    const cx = x + band * 0.75;
-    for (let y = (i % 2) * 9; y < S; y += 18) {
-      ctx.beginPath();
-      ctx.moveTo(cx - 6, y + 5);
-      ctx.lineTo(cx, y);
-      ctx.lineTo(cx + 6, y + 5);
-      ctx.stroke();
+  // le motif des photos du Level 0, discret, sur les rayures d'origine : 16 lés par face, chacun en deux bandes de
+  // 7,8 cm, l'une un peu plus foncée que l'autre. Sur chaque lisière, une chaîne fine (deux filets pâles, et entre
+  // eux des perles allongées qui alternent avec des points clairs) ; au milieu de chaque bande, des groupes de trois
+  // chevrons emboîtés pointés vers le haut, qui pâlissent du premier au dernier et reviennent tous les 11 cm ; d'une
+  // bande à l'autre, ils sont décalés d'une demi-période. La toile fait 2,5 m de large pour 3 m de haut : les
+  // hauteurs sont tassées d'autant
+  const N = 32; // bandes par face
+  const P = S / N;
+  const KY = 2.5 / 3; // une longueur verticale, en unités de toile, pour la même longueur horizontale
+  const ROWS = 26; // groupes de chevrons par hauteur de face
+  const BEADS = 120; // perles par hauteur de face (2,5 cm)
+  const tint = worn ? [150, 128, 52] : [140, 134, 66]; // la bande foncée
+  const dark = worn ? [110, 92, 36] : [100, 96, 44]; // les perles
+  const olive = worn ? [140, 118, 46] : [128, 122, 56]; // les chevrons
+  const pale = worn ? [250, 238, 182] : [246, 242, 206];
+  const rgba = (c, a) => `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
+  const bead = (x, y, rx, ry) => {
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  ctx.lineCap = 'butt';
+  ctx.lineJoin = 'miter';
+  const dy = S / BEADS;
+  const rowH = S / ROWS;
+  const hw = P * 0.3; // demi-largeur d'un chevron
+  const hh = hw * 0.62 * KY; // sa hauteur
+  const gap = P * 0.17 * KY; // l'écart entre deux chevrons emboîtés
+  const vee = (cx, y0) => {
+    ctx.beginPath();
+    ctx.moveTo(cx - hw, y0 + hh);
+    ctx.lineTo(cx, y0);
+    ctx.lineTo(cx + hw, y0 + hh);
+    ctx.stroke();
+  };
+  ctx.lineWidth = P * 0.07;
+  for (let i = 0; i < N; i++) {
+    const x = i * P;
+    if (i % 2 === 0) {
+      ctx.fillStyle = rgba(tint, 0.16);
+      ctx.fillRect(x, 0, P, S);
+    }
+    // la chaîne, sur la lisière de la bande
+    ctx.fillStyle = rgba(pale, 0.3);
+    ctx.fillRect(x - P * 0.1, 0, 0.5, S);
+    ctx.fillRect(x + P * 0.1 - 0.5, 0, 0.5, S);
+    for (let k = 0; k < BEADS; k++) {
+      const y = (k + 0.25) * dy;
+      ctx.fillStyle = rgba(dark, 0.26);
+      bead(x, y, P * 0.045, dy * 0.27);
+      ctx.fillStyle = rgba(pale, 0.42);
+      bead(x, y + dy * 0.5, P * 0.035, P * 0.035 * KY);
+    }
+    // les chevrons, au milieu de la bande
+    const cx = x + P * 0.5;
+    for (let r = 0; r < ROWS; r++) {
+      const y0 = (r + (i % 2) * 0.5 + 0.2) * rowH;
+      ctx.strokeStyle = rgba(olive, 0.28);
+      vee(cx, y0);
+      ctx.strokeStyle = rgba(olive, 0.2);
+      vee(cx, y0 + gap);
+      ctx.strokeStyle = rgba(olive, 0.12);
+      vee(cx, y0 + gap * 2);
     }
   }
   // le papier jauni, plus clair au milieu des lés
