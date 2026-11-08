@@ -220,7 +220,7 @@ export function createBackroomsScene(container, floors, lamps) {
 
   // Un étage entier : sol, plafond, murs, néons, meubles, cassettes, objets, ascenseur… dans un groupe à sa hauteur
   function buildFloor(map, fi) {
-    const LOW0 = L0 && fi === 1; // l'étage du bas du Level 0
+    const LOW0 = L0 && fi === 1; // l'étage du bas du Level 0 : ambiance d'avant, moquette brun doré, lumière chaude
     const group = new THREE.Group();
     group.position.y = -fi * FLOOR_DY;
     scene.add(group);
@@ -257,7 +257,7 @@ export function createBackroomsScene(container, floors, lamps) {
       uBake: { value: bakeTex },
       uBakeScale: { value: new THREE.Vector2(1 / (W * CELL_SIZE), 1 / (H * CELL_SIZE)) },
       uBakeTX: { value: TX },
-      uBakeTint: { value: L2 ? new THREE.Color(1.0, 1.05, 1.07) : L1 ? new THREE.Color(0.86, 0.98, 1.12) : PIPES ? new THREE.Color(1.25, 0.98, 0.7) : new THREE.Color(1.0, 1.04, 0.9) }, // Level 0 : une lumière blanche un peu verte, sans orange
+      uBakeTint: { value: L2 ? new THREE.Color(1.0, 1.05, 1.07) : L1 ? new THREE.Color(0.86, 0.98, 1.12) : PIPES ? new THREE.Color(1.25, 0.98, 0.7) : LOW0 ? new THREE.Color(1.12, 1.04, 0.8) : new THREE.Color(1.0, 1.04, 0.9) }, // Level 0 : en haut une lumière blanche un peu verte ; en bas, la lumière chaude d'avant
       uBakeTint2: { value: PIPES ? new THREE.Color(0.78, 0.95, 1.08) : new THREE.Color(0, 0, 0) },
       uBakeY: { value: -fi * FLOOR_DY },
       uCeil: { value: CEIL },
@@ -689,7 +689,7 @@ float bkCaust(vec2 uv, float t) {
 
     // 1. Sol en moquette humide (une répétition de texture par case), percé des trous et des cages d'escalier
     // (Level 2 : béton ciré, luisant d'humidité, qui reflète les lampes)
-    const carpet = (PIPES ? tx2.floor : textures.carpet).clone();
+    const carpet = (PIPES ? tx2.floor : LOW0 ? textures.carpetLow : textures.carpet).clone();
     carpet.needsUpdate = true;
     carpet.repeat.set(W, H);
     (PIPES ? tx2.ready : textures.ready).then(() => {
@@ -728,9 +728,9 @@ float bkCaust(vec2 uv, float t) {
       const deepSet = new Set((map.pits || []).filter((p) => p.deep).map((p) => p.id));
       const deep = (map.pits || []).filter((p) => deepSet.has(p.id)).map((p) => ({ x: p.x, z: p.z, hx: PIT_HALF, hz: PIT_HALF }));
       const shallow = holes.filter((h) => !deep.some((d) => d.x === h.x && d.z === h.z));
-      shaftWalls(shallow, SLAB, L0 ? [[0, '#aca785'], [0.55, '#7e795c'], [1, '#4e4a36']] : [[0, '#5e5434'], [1, '#5e5434']]);
+      shaftWalls(shallow, SLAB, L0 && !LOW0 ? [[0, '#aca785'], [0.55, '#7e795c'], [1, '#4e4a36']] : [[0, '#5e5434'], [1, '#5e5434']]);
       // le noir arrive dès le premier mètre : debout au bord, on ne voit que le haut de la paroi, et il plonge déjà dans l'ombre
-      shaftWalls(deep, DEEP_DEPTH, [[0, '#a5a186'], [0.004, '#8d8971'], [0.012, '#55523f'], [0.024, '#22211a'], [0.04, '#080806'], [0.08, '#000000'], [1, '#000000']]);
+      shaftWalls(deep, DEEP_DEPTH, [[0, '#968a5c'], [0.004, '#7e7452'], [0.012, '#4c4532'], [0.024, '#1e1b14'], [0.04, '#080806'], [0.08, '#000000'], [1, '#000000']]);
       if (deep.length) {
         // le fond, si loin qu'on ne le voit jamais : du noir
         const bottom = new THREE.InstancedMesh(new THREE.PlaneGeometry(PIT_HALF * 2, PIT_HALF * 2), new THREE.MeshBasicMaterial({ color: '#000000' }), deep.length);
@@ -757,7 +757,7 @@ float bkCaust(vec2 uv, float t) {
     }
 
     // 2. Faux plafond à dalles (percé là où l'étage du dessus a ses trous et ses escaliers)
-    const ceilTex = (PIPES ? tx2.ceiling : textures.ceiling).clone();
+    const ceilTex = (PIPES ? tx2.ceiling : LOW0 ? textures.ceilingLow : textures.ceiling).clone();
     ceilTex.needsUpdate = true;
     ceilTex.repeat.set(W, H);
     (PIPES ? tx2.ready : textures.ready).then(() => {
@@ -943,7 +943,7 @@ float bkCaust(vec2 uv, float t) {
     }
 
     // 4. Néons au plafond (les morts sont gris, ceux qui grésillent clignotent)
-    const ON = new THREE.Color(L2 ? '#f2fbff' : L1 ? '#eef6ff' : '#f6fff0').multiplyScalar(L2 ? 2.2 : 3.2); // plus fort que le blanc : le caméscope sature et ils bavent
+    const ON = new THREE.Color(L2 ? '#f2fbff' : L1 ? '#eef6ff' : LOW0 ? '#fffbe2' : '#f6fff0').multiplyScalar(L2 ? 2.2 : 3.2); // plus fort que le blanc : le caméscope sature et ils bavent
     const OFF = new THREE.Color(L2 ? '#7d8b8d' : '#4a473c'); // aux Poolrooms, un diffuseur éteint reste gris-bleu
     // Level 2 : des globes de verre dépoli au mur (ampoules chaudes) et des tubes nus dans les réserves
     const ON_BULB = new THREE.Color('#ffc27a').multiplyScalar(3.4);

@@ -183,21 +183,22 @@ function drawWallArt(ctx) {
 
 // Papier peint jaune pâle des films : fines rayures verticales et motif en chevrons à peine visible, un peu jauni,
 // cloqué par l'humidité, avec sa plinthe (une face de mur = 2,5 m × 3 m)
+// worn : l'étage du bas du Level 0, qui garde l'ancien jaune doré (grisé ensuite par greyWall) et son usure
 function drawWallpaper(ctx, S, grime, worn = false) {
   ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1;
-  ctx.fillStyle = '#d6cb98'; // jaune pâle tirant sur l'olive
+  ctx.fillStyle = worn ? '#d4c37a' : '#d6cb98'; // en haut, jaune pâle tirant sur l'olive
   ctx.fillRect(0, 0, S, S);
   const band = S / 16; // 16 lés de rayures par face
   for (let i = 0; i < 16; i++) {
     const x = i * band;
-    ctx.fillStyle = 'rgba(140, 134, 66, 0.16)';
+    ctx.fillStyle = worn ? 'rgba(150, 128, 52, 0.16)' : 'rgba(140, 134, 66, 0.16)';
     ctx.fillRect(x, 0, band * 0.5, S);
-    ctx.fillStyle = 'rgba(100, 96, 44, 0.22)';
+    ctx.fillStyle = worn ? 'rgba(110, 92, 36, 0.22)' : 'rgba(100, 96, 44, 0.22)';
     ctx.fillRect(x, 0, 1.2, S);
     ctx.fillRect(x + band * 0.5, 0, 1, S);
     // chevrons pointés vers le haut, au milieu de la rayure claire
-    ctx.strokeStyle = 'rgba(128, 122, 56, 0.32)';
+    ctx.strokeStyle = worn ? 'rgba(140, 118, 46, 0.32)' : 'rgba(128, 122, 56, 0.32)';
     ctx.lineWidth = 1.4;
     const cx = x + band * 0.75;
     for (let y = (i % 2) * 9; y < S; y += 18) {
@@ -256,29 +257,30 @@ function greyWall(ctx, S) {
   ctx.restore();
 }
 
-// Moquette humide beige kaki, claire : la photo est recolorée, sinon une trame de bruit
-function drawCarpet(ctx, S, photo) {
+// Moquette humide : beige kaki à peine plus foncé que les murs en haut, brun doré en bas (low). La photo est
+// recolorée, sinon une trame de bruit
+function drawCarpet(ctx, S, photo, low = false) {
   ctx.globalCompositeOperation = 'source-over';
   if (photo) {
     ctx.drawImage(photo, 0, 0, S, S);
     ctx.globalCompositeOperation = 'color';
-    ctx.fillStyle = '#9f9b70';
+    ctx.fillStyle = low ? '#9c8a3c' : '#9f9b70';
     ctx.fillRect(0, 0, S, S);
     ctx.globalCompositeOperation = 'screen';
-    ctx.fillStyle = '#625d4c';
+    ctx.fillStyle = low ? '#5f5226' : '#625d4c';
     ctx.fillRect(0, 0, S, S);
     ctx.globalCompositeOperation = 'source-over';
   } else {
-    ctx.fillStyle = '#948d6c';
+    ctx.fillStyle = low ? '#8f7d45' : '#948d6c';
     ctx.fillRect(0, 0, S, S);
     noise(ctx, S, S, 36);
   }
 }
 
 // Dalles de faux plafond (4 × 4 par case), salies par la photo
-function drawCeiling(ctx, S, grime) {
+function drawCeiling(ctx, S, grime, low = false) {
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = '#bdb593';
+  ctx.fillStyle = low ? '#ddd6bd' : '#bdb593';
   ctx.fillRect(0, 0, S, S);
   if (grime) {
     ctx.globalCompositeOperation = 'multiply';
@@ -464,20 +466,28 @@ export function createBackroomsTextures(level = 0) {
   drawW(wctx, S, null);
   drawF(cctx, S, null);
   drawC(clctx, S, null);
-  // Level 0, étage du bas : le même papier peint, délavé et délabré
+  // Level 0, étage du bas : l'ancien papier peint doré, délavé vers le gris, sa moquette brun doré, son plafond clair
   const [lowCanvas, lowCtx] = level === 0 ? canvas(PX) : [null, null];
-  const drawLow = (pap) => {
+  const [carpetLowCanvas, cLowCtx] = level === 0 ? canvas(PX) : [null, null];
+  const [ceilLowCanvas, clLowCtx] = level === 0 ? canvas(PX) : [null, null];
+  const drawLow = (pap, moq, pla) => {
     if (!lowCtx) return;
-    lowCtx.setTransform(PX / S, 0, 0, PX / S, 0, 0);
-    drawW(lowCtx, S, pap, true);
-    greyWall(lowCtx, S);
+    for (const c of [lowCtx, cLowCtx, clLowCtx]) c.setTransform(PX / S, 0, 0, PX / S, 0, 0);
+    if (pap !== undefined) {
+      drawW(lowCtx, S, pap, true);
+      greyWall(lowCtx, S);
+    }
+    if (moq !== undefined) drawCarpet(cLowCtx, S, moq, true);
+    if (pla !== undefined) drawCeiling(clLowCtx, S, pla, true);
   };
-  drawLow(null);
+  drawLow(null, null, null);
 
   const wall = tex(wallCanvas);
   const wallLow = lowCanvas ? tex(lowCanvas) : wall;
   const carpet = tex(carpetCanvas);
   const ceiling = tex(ceilCanvas);
+  const carpetLow = carpetLowCanvas ? tex(carpetLowCanvas) : carpet;
+  const ceilingLow = ceilLowCanvas ? tex(ceilLowCanvas) : ceiling;
 
   // les photos arrivent un peu plus tard : on redessine par-dessus
   const files = L2 ? ['l37_mur.jpg', 'l37_sol.jpg', 'l37_mur.jpg'] : L1 ? ['l1_mur.jpg', 'l1_sol.jpg', 'l1_plafond.jpg'] : ['papier.jpg', 'moquette.jpg', 'plafond.jpg'];
@@ -494,7 +504,9 @@ export function createBackroomsTextures(level = 0) {
   const mosaic = tex(ceilCanvas);
   const ready = Promise.all([...files.map(loadImage), ...(L2 ? ['l37_bassin.jpg', 'l37_fosse.jpg'].map(loadImage) : [])]).then(([pap, moq, pla, bas, fos]) => {
     if (pap) { drawW(wctx, S, pap); wall.needsUpdate = true; }
-    if (pap && lowCtx) { drawLow(pap); wallLow.needsUpdate = true; }
+    if (pap && lowCtx) { drawLow(pap, undefined, undefined); wallLow.needsUpdate = true; }
+    if (moq && lowCtx) { drawLow(undefined, moq, undefined); carpetLow.needsUpdate = true; }
+    if (pla && lowCtx) { drawLow(undefined, undefined, pla); ceilingLow.needsUpdate = true; }
     if (moq) { drawF(cctx, S, moq); carpet.needsUpdate = true; }
     if (pla) { drawC(clctx, S, pla); ceiling.needsUpdate = true; }
     // carreaux des bassins deux fois plus petits (10 cm)
@@ -796,5 +808,5 @@ export function createBackroomsTextures(level = 0) {
   const drawings = tex(drawCanvas);
   drawings.wrapS = drawings.wrapT = THREE.ClampToEdgeWrapping;
 
-  return { wall, wallLow, carpet, ceiling, pool, deep, mosaic, vhs, exit, sign, label, steel, fireDoor, treadPlate, crate, fog, lamp, outlet, vent, tape, drawings, ready, metalReady };
+  return { wall, wallLow, carpet, carpetLow, ceiling, ceilingLow, pool, deep, mosaic, vhs, exit, sign, label, steel, fireDoor, treadPlate, crate, fog, lamp, outlet, vent, tape, drawings, ready, metalReady };
 }

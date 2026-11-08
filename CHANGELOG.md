@@ -8,9 +8,9 @@
   - On peut les traverser par les passerelles en gardant l'équilibre ; le perdre, c'est tomber.
   - Les escaliers, les cassettes et la sortie restent toujours accessibles sans passer au-dessus d'un puits.
 - **The Backrooms** — Les trous de l'étage du haut sont plus larges, avec des passerelles plus fines et des parois éclairées.
-- **The Backrooms** — Nouvelles couleurs au Level 0 : murs jaune olive plus pâles, moquette kaki à peine plus foncée que les murs, néons plus blancs.
+- **The Backrooms** — Nouvelles couleurs à l'étage du haut du Level 0 : murs jaune olive plus pâles, moquette kaki à peine plus foncée que les murs, néons plus blancs.
 - **The Backrooms** — Les murs de l'étage du haut sont propres : plus de coulures, presque plus d'auréoles ni de traces d'humidité.
-- **The Backrooms** — L'étage du bas du Level 0 garde le même papier peint qu'en haut, juste plus gris : plus aucune tache, fissure ni moisissure.
+- **The Backrooms** — L'étage du bas du Level 0 garde son ambiance d'avant : papier peint doré juste plus gris (plus aucune tache, fissure ni moisissure), moquette brun doré et lumière plus chaude.
 
 ## 4.73 — 8 novembre 2026
 - Correction : sorties des grottes au bout de la salle (Grotte Lunaire, Tourbillons, Victoire), plus de case libre a cote de la porte (Amiel)
