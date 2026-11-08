@@ -1,7 +1,20 @@
 // odyssee/js/ui/screens/map.js — carte de la région (C-Gear)
 import { el, esc } from '../ui.js';
 import { levelCap, GYM_CAPS } from '../../core/mon.js';
-import { BADGES, LEADERS } from '../../world/region.js';
+import { BADGES, LEADERS, SPAWNS } from '../../world/region.js';
+import { getZoneCatchStats } from '../../core/trophies.js';
+
+function findZoneSpawnKey(z) {
+  if (!z) return null;
+  if (z.spawns && SPAWNS[z.spawns]) return z.spawns;
+  if (z.route && SPAWNS[z.route]) return z.route;
+  if (z.enc) {
+    for (const [k, v] of Object.entries(SPAWNS)) {
+      if (v?.land === z.enc) return k;
+    }
+  }
+  return null;
+}
 import { ASSETS } from '../../assets.js';
 import { SPRITES } from '../../data/sprites.js';
 import { T, walkable } from '../../world/tiles.js';
@@ -506,10 +519,17 @@ export function mapScreen(game) {
       tagEl.textContent = q.tag || '';
       tagEl.className = 'map-tag ' + (q.tagCls || '');
       
+      const zAt = (W || game.world?.maps?.monde)?.zoneAt?.(Math.round(q.x), Math.round(q.y));
+      const zKey = findZoneSpawnKey(zAt);
+      const zCatch = zKey ? getZoneCatchStats(st, zKey) : null;
+      const catchBadge = zCatch
+        ? ` <span class="map-route-catch-badge${zCatch.complete ? ' complete' : ''}">· 🐾 Pokédex Zone : <b>${zCatch.caught} / ${zCatch.total}</b> capturés${zCatch.complete ? ' ★' : ''}</span>`
+        : '';
+
       if (k === 0) {
-        subEl.textContent = 'Tu es ici.';
+        subEl.innerHTML = `Tu es ici.${catchBadge}`;
       } else {
-        subEl.innerHTML = `${esc(q.sub || '')} <span class="map-sub-dist">· ${distLabel(q.x - p.x, q.y - p.y)}</span>`;
+        subEl.innerHTML = `${esc(q.sub || '')} <span class="map-sub-dist">· ${distLabel(q.x - p.x, q.y - p.y)}</span>${catchBadge}`;
       }
     };
     show();
@@ -536,10 +556,16 @@ export function mapScreen(game) {
       } else {
         ui.sound.sfx('select');
         curAt[1] = worldX; curAt[2] = worldY; place(cur, worldX, worldY);
-        whereEl.textContent = 'Repère';
+        const clickZone = world.zoneAt?.(worldX, worldY);
+        const clickKey = findZoneSpawnKey(clickZone);
+        const clickCatch = clickKey ? getZoneCatchStats(st, clickKey) : null;
+        const clickCatchHtml = clickCatch
+          ? ` <span class="map-route-catch-badge${clickCatch.complete ? ' complete' : ''}">· 🐾 Pokédex Zone : <b>${clickCatch.caught} / ${clickCatch.total}</b> capturés${clickCatch.complete ? ' ★' : ''}</span>`
+          : '';
+        whereEl.textContent = clickZone?.name || 'Repère';
         tagEl.textContent = '';
         tagEl.className = 'map-tag waypoint';
-        subEl.innerHTML = `Repère temporaire posé sur la carte <span class="map-sub-dist">· ${distLabel(worldX - p.x, worldY - p.y)}</span>`;
+        subEl.innerHTML = `Repère temporaire posé sur la carte <span class="map-sub-dist">· ${distLabel(worldX - p.x, worldY - p.y)}</span>${clickCatchHtml}`;
       }
     });
 

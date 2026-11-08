@@ -6,6 +6,13 @@ import { SPECIES } from '../data/species.js';
 
 // poche : 'soin' | 'balls' | 'objets'
 export const ITEMS = {
+  'running-shoes': {
+    pocket: 'cles',
+    price: 0,
+    key: true,
+    name: 'Chaussures de Course',
+    desc: 'Des baskets ultra-légères offertes par Maman. Maintiens Maj ou appuie sur R (ou sur le bouton du Pokégear) pour courir à vive allure.'
+  },
   'poke-ball': { pocket: 'balls', price: 200, ball: 1, desc: 'Un objet semblable à une capsule, qui capture les Pokémon sauvages.' },
   'great-ball': { pocket: 'balls', price: 600, ball: 1.5, desc: 'Une Ball de bonne qualité, plus efficace que la Poké Ball.' },
   'ultra-ball': { pocket: 'balls', price: 1200, ball: 2, desc: 'Une Ball très performante, plus efficace que la Super Ball.' },
@@ -47,6 +54,8 @@ export const ITEMS = {
   'cs-force': { pocket: 'ct', price: 0, key: true, field: 'force', icon: 'notebook', name: 'CS06 Force', desc: 'Pousse les gros rochers. Place-toi face au rocher, appuie sur F, puis marche contre lui. Badge Volt requis.' },
   medaillon: { pocket: 'cles', price: 0, key: true, icon: 'soothe-bell', name: 'Médaillon', desc: 'Un médaillon gravé d\'une petite fleur. Quelqu\'un de Sylvebourg doit le chercher partout.' },
   'prism-shard': { pocket: 'cles', price: 0, key: true, icon: 'shoal-shell', name: 'Éclat de Prisme', desc: 'Un fragment noir du Prisme de la Team Éclipse. Il est glacé au toucher.' },
+  // CT01 : donnée par Hector avec le Badge Élytre ; ne s'use pas
+  'ct-01': { pocket: 'ct', price: 0, key: true, ct: 10002, types: ['bug'], icon: 'notebook', name: 'CT01 Pollen Collant', desc: 'Insecte · Spéciale · Puissance 55 · Précision 95. Un nuage de pollen gluant englue la cible et baisse sa Vitesse. Pour les Pokémon Insecte et ceux qui connaissent des attaques Insecte. La CT ne s\'use pas.' },
   'cs-vol': { pocket: 'ct', price: 0, key: true, field: 'vol', icon: 'notebook', name: 'CS04 Vol', desc: 'Ramène en un instant dans une ville déjà visitée (depuis le menu, ou en utilisant cet objet). Badge Braise requis.' },
   // objets de quête des légendaires
   'gs-ball': { pocket: 'cles', price: 0, key: true, icon: 'gift', name: 'Balle GS', desc: 'Une capsule dorée gravée des lettres G et S. Elle semble attirée par l\'autel du Bois Murmure.' },
@@ -93,6 +102,7 @@ export const ITEMS = {
   'chambre-air': { pocket: 'cles', price: 0, key: true, name: 'Chambre à Air', desc: 'Une chambre à air robuste pour assembler le vélo.' },
   derailleur: { pocket: 'cles', price: 0, key: true, name: 'Dérailleur', desc: 'Un dérailleur forgé avec soin pour assembler le vélo.' },
   'permis-bateau': { pocket: 'cles', price: 0, key: true, name: 'Permis Bateau', desc: 'Un permis officiel autorisant la navigation vers les îles.' },
+  canne: { pocket: 'cles', price: 0, key: true, name: 'Canne à Pêche', desc: 'Une canne à pêche solide et maniable. Permet de ferrer des Pokémon aquatiques depuis la rive.' },
   'secateur-sylvestre': { pocket: 'cles', price: 0, key: true, field: 'coupe', icon: 'secateur-sylvestre', name: 'Sécateur Sylvestre', desc: 'Des cisailles horticoles ouvragées en acier ciselé et or. Elles tranchent net les arbustes épineux. Place-toi face au buisson et appuie sur F.' },
   'harnais-flottant': { pocket: 'cles', price: 0, key: true, field: 'surf', icon: 'harnais-flottant', name: 'Harnais Flottant', desc: 'Une selle nautique étanche avec flotteurs profilés. Permet de glisser sur l\'eau et la mer. Place-toi face à l\'eau et appuie sur F.' },
   'sifflet-celeste': { pocket: 'cles', price: 0, key: true, field: 'vol', icon: 'sifflet-celeste', name: 'Sifflet Céleste', desc: 'Un sifflet ouvragé en argent et ruban saphir. Il appelle un grand oiseau pour voyager en un instant vers une ville déjà visitée (depuis le menu ou le sac).' },

@@ -98,13 +98,28 @@ export function ragot(game) {
 
 /* ================= affichage : baies, paroi qui brille, petites bêtes, sons ================= */
 function dessinBaies(couleur) {
-  const c = document.createElement('canvas'); c.width = 30; c.height = 24; const g = c.getContext('2d');
+  const c = document.createElement('canvas'); c.width = 32; c.height = 26; const g = c.getContext('2d');
   g.imageSmoothingEnabled = false;
-  for (const [x, y] of [[7, 8], [16, 5], [24, 10], [11, 16], [21, 18]]) {
-    g.fillStyle = '#23461f'; g.fillRect(x, y - 5, 2, 3);
-    g.fillStyle = '#141414'; g.beginPath(); g.arc(x + 0.5, y + 0.5, 3.6, 0, 7); g.fill();
-    g.fillStyle = couleur; g.beginPath(); g.arc(x + 0.5, y + 0.5, 2.6, 0, 7); g.fill();
-    g.fillStyle = 'rgba(255,255,255,.9)'; g.fillRect(x - 1, y - 1, 2, 1);
+  // Déterminer les nuances d'ombre et de lumière selon la couleur
+  const isBlue = couleur.includes('3f7') || couleur.includes('blue');
+  const isYellow = couleur.includes('f2c') || couleur.includes('yellow');
+  const darkCol = isBlue ? '#1e408a' : isYellow ? '#a16207' : '#15803d';
+  const lightCol = isBlue ? '#93c5fd' : isYellow ? '#fde047' : '#bef264';
+  const berries = [[7, 7, 3.8], [16, 5, 4.2], [24, 9, 3.8], [11, 16, 4.4], [21, 17, 4.0]];
+  for (const [x, y, r] of berries) {
+    // Pédoncule vert
+    g.fillStyle = '#1e3a18'; g.fillRect(x, y - 6, 2, 3);
+    g.fillStyle = '#3f7a28'; g.fillRect(x - 1, y - 5, 2, 2);
+    // Ombre portée / contour
+    g.fillStyle = '#0f172a'; g.beginPath(); g.arc(x + 0.5, y + 0.5, r + 0.8, 0, Math.PI * 2); g.fill();
+    // Base de la baie
+    g.fillStyle = darkCol; g.beginPath(); g.arc(x + 0.5, y + 0.5, r, 0, Math.PI * 2); g.fill();
+    // Cœur coloré vibrant
+    g.fillStyle = couleur; g.beginPath(); g.arc(x + 0.2, y + 0.2, r - 0.7, 0, Math.PI * 2); g.fill();
+    // Éclat supérieur doux
+    g.fillStyle = lightCol; g.beginPath(); g.arc(x - 1, y - 1, r * 0.45, 0, Math.PI * 2); g.fill();
+    // Reflet blanc spéculaire net
+    g.fillStyle = '#ffffff'; g.fillRect(x - 1, y - 2, 2, 1); g.fillRect(x - 2, y - 1, 1, 1);
   }
   return c;
 }

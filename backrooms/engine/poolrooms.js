@@ -344,11 +344,13 @@ export function createPoolMap(seed = 37) {
 
   // 5. Accessibilité : parcours en largeur de case en case, en ne passant d'une salle à l'autre que par une porte
   const startCell = (() => {
-    // le départ : un point sec du lagon central, loin du bassin et des colonnes
+    // le départ : un point sec du lagon central, loin du bassin et des colonnes. Les joueurs arrivent côte à côte
+    // autour de lui, jusqu'à 0,99 m (newPlayer, sim.js), et ont 0,38 m de rayon : à 6, avec moins de 1,4 m de place,
+    // l'un d'eux pouvait apparaître dans une colonne, coincé
     for (let k = 0; k < 600; k++) {
       const x = start.x0 + 2 + rnd() * (start.w - 4);
       const z = start.z0 + 2 + rnd() * (start.h - 4);
-      if (poolSdf(start, x, z) > 1.5 && !collide(x, z, 1)) return { x, z };
+      if (poolSdf(start, x, z) > 1.5 && !collide(x, z, 1.4)) return { x, z };
     }
     return { x: start.x0 + 1.25, z: start.z0 + 1.25 };
   })();

@@ -2007,7 +2007,7 @@ export class BackroomsSfx {
     if (on && !this.chaseAll) this.startChaseAll();
     else if (!on && this.chaseAll && this.chaseGain.gain.value < 0.02) {
       try {
-        if (this.chaseAll !== true) this.chaseAll.stop();
+        if (this.chaseAll.stop) this.chaseAll.stop(); // encore en chargement : un simple jeton, rien ne joue
       } catch (e) {
         /* déjà fini */
       }
@@ -2015,11 +2015,14 @@ export class BackroomsSfx {
     }
   }
 
-  // la couche commune à toutes les poursuites, en boucle tant que dure la traque
+  // la couche commune à toutes les poursuites, en boucle tant que dure la traque. Pendant le chargement, chaseAll tient
+  // le jeton de cette demande : si la poursuite s'arrête puis reprend avant la fin, l'ancienne demande ne lance rien
+  // (sinon une boucle partait que plus rien n'arrêtait, et la couche doublait à chaque poursuite suivante)
   startChaseAll() {
-    this.chaseAll = true; // réservé pendant le chargement
+    const tok = (this.chaseAll = {}); // réservé pendant le chargement
     this.sample(CHASE_ALL).then((buf) => {
-      if (!buf || this.chaseAll !== true) return (this.chaseAll = null);
+      if (this.chaseAll !== tok) return; // arrêtée entre-temps, ou une demande plus récente a pris la place
+      if (!buf) return; // pas de fichier : le jeton reste jusqu'à la fin de cette poursuite (pas un essai par image)
       const src = this.ctx.createBufferSource();
       src.buffer = buf;
       src.loop = true;
@@ -2409,12 +2412,15 @@ export class BackroomsSfx {
     }
   }
 
-  // La mort toute proche : l'entité est sur toi
+  // La mort toute proche : l'entité est sur toi. Celle d'avant s'éteint d'abord (sinon elle continuait sous la
+  // nouvelle, et plus rien ne l'arrêtait)
   death() {
     const name = levelSfx(this.roomLevel).death;
     if (!this.unlocked || !this.ctx || !name) return;
+    this.stopDeath();
+    const tok = (this.deathTok = {}); // le jeton de cette mort : stopDeath pendant son chargement l'annule
     this.sample(name).then((buf) => {
-      if (!buf) return;
+      if (!buf || this.deathTok !== tok) return;
       const c = this.ctx;
       const src = c.createBufferSource();
       src.buffer = buf;
@@ -2428,6 +2434,7 @@ export class BackroomsSfx {
 
   // on s'en est sorti (ou une nouvelle partie commence) : le son de la mort s'éteint en une demi-seconde
   stopDeath() {
+    this.deathTok = null; // une mort encore en chargement ne partira pas
     if (!this.deathSrc || !this.ctx) return;
     const { src, g } = this.deathSrc;
     const t = this.ctx.currentTime;
@@ -2617,6 +2624,21 @@ export class BackroomsSfx {
       osc.stop(t + d + len + 0.02);
     });
     if (pos) this.caption('[whistle]', pos);
+  }
+
+  // Elle retombe à l'étage du dessous, de tout son poids : un choc sourd qui fait trembler la dalle, un craquement,
+  // des gravats ; de l'étage du dessus (muffled), seulement le coup, grave, à travers le plancher
+  heavyThud(pos) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = this.at({ ...pos, rolloff: 0.5, ref: 4 }, 1.2);
+    this.tone(out, t, 'sine', 70, 26, 0.9, 1, 0.004);
+    this.tone(out, t, 'triangle', 120, 40, 0.25, 0.35, 0.002);
+    this.burst(out, t, 0.35, 'lowpass', 300, 0.8, 0.9);
+    if (!pos.muffled) {
+      this.burst(out, t + 0.02, 0.05, 'bandpass', 1600, 3, 0.3);
+      for (let i = 0; i < 5; i++) this.burst(out, t + rnd(0.12, 0.6), rnd(0.01, 0.03), 'bandpass', rnd(2200, 4200), 3, rnd(0.05, 0.12));
+    }
   }
 
   // Chute dans un trou : un long sifflement d'air qui descend pendant plus d'une seconde, puis un choc sourd et lourd

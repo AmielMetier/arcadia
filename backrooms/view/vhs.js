@@ -481,25 +481,27 @@ export function createVhsFilter(renderer) {
     setLines(n) {
       wantLines = clamp(Math.round(num(n, tapeLines) / 8) * 8, MIN_LINES, MAX_LINES);
     },
-    // fusionne des réglages (voir FX_DEFAULTS) ; renvoie les réglages courants
+    // fusionne des réglages (voir FX_DEFAULTS) ; getFx les relit. Appelé à chaque image : ne renvoie rien et ne crée
+    // rien (avant, une copie de tous les réglages à jeter, à chaque appel)
     setFx(partial = {}) {
-      for (const k of Object.keys(partial)) {
+      for (const k in partial) {
         if (!(k in FX_DEFAULTS)) continue;
         const v = partial[k];
         if (k === 'white') {
-          if (Array.isArray(v) && v.length >= 3) fx.white = [num(v[0], 1), num(v[1], 1), num(v[2], 1)].map((x) => clamp(x, 0, 3));
+          if (Array.isArray(v) && v.length >= 3) for (let i = 0; i < 3; i++) fx.white[i] = clamp(num(v[i], 1), 0, 3);
         } else if (k === 'freeze' || k === 'reduceFlashes') fx[k] = !!v;
         else if (k === 'brightness') fx.brightness = clamp(num(v, 1), 0.5, 1.8);
         else if (k === 'headSwitch') fx.headSwitch = clamp(num(v, 1), 0, 3);
         else fx[k] = clamp(num(v, 0), 0, 1);
       }
-      return api.getFx();
     },
     getFx() {
       return { ...fx, white: [...fx.white] };
     },
+    // revient aux réglages par défaut ; renvoie les réglages courants
     resetFx() {
-      return api.setFx(FX_DEFAULTS);
+      api.setFx(FX_DEFAULTS);
+      return api.getFx();
     },
     // exposure : l'exposition voulue par la caméra (1 en pleine lumière, plus haut dans le noir)
     render(scene, camera, time, danger, exposure = 1.2) {

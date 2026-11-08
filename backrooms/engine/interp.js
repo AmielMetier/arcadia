@@ -13,7 +13,9 @@ const SLEW = 0.05; // on le rattrape en accélérant ou ralentissant l'affichage
 const angle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 export class Track {
-  constructor() {
+  // floorCut : un changement d'étage coupe la piste (un joueur qui tombe) ; l'entité, elle, change d'étage en marchant
+  constructor({ floorCut = true } = {}) {
+    this.floorCut = floorCut;
     this.buf = [];
     this.off = undefined; // horloge locale - horloge de l'envoyeur, telle qu'affichée
     this.want = undefined; // celle qu'on vise : le plus petit écart de la dernière seconde (le paquet le plus rapide)
@@ -26,8 +28,8 @@ export class Track {
   }
 
   // t : l'heure de l'envoyeur ; now : l'heure locale à la réception ; f : l'étage (un changement d'étage, ou un saut
-  // de plus de 3 m, n'est pas interpolé : on y va d'un coup)
-  push(t, now, x, z, yaw, f = 0) {
+  // de plus de 3 m, n'est pas interpolé : on y va d'un coup) ; h : une hauteur, interpolée elle aussi
+  push(t, now, x, z, yaw, f = 0, h = 0) {
     const b = this.buf;
     const last = b[b.length - 1];
     if (last) {
@@ -37,9 +39,9 @@ export class Track {
         this.off = undefined;
         this.os.length = 0;
       } else if (t <= last.t) return;
-      else if (f !== last.f || Math.hypot(x - last.x, z - last.z) > 3) b.length = 0;
+      else if ((this.floorCut && f !== last.f) || Math.hypot(x - last.x, z - last.z) > 3) b.length = 0;
     }
-    b.push({ t, x, z, yaw, f });
+    b.push({ t, x, z, yaw, f, h });
     if (b.length > KEEP) b.shift();
     const os = this.os;
     os.push(now - t);
@@ -72,6 +74,7 @@ export class Track {
       out.z = l.z + ((l.z - p.z) / span) * dt;
       out.yaw = l.yaw + (angle(l.yaw - p.yaw) / span) * dt;
       out.f = l.f;
+      out.h = l.h;
       return true;
     }
     const a = b[i - 1];
@@ -81,6 +84,7 @@ export class Track {
     out.z = a.z + (c.z - a.z) * k;
     out.yaw = a.yaw + angle(c.yaw - a.yaw) * k;
     out.f = c.f;
+    out.h = a.h + (c.h - a.h) * k;
     return true;
   }
 }
@@ -90,5 +94,6 @@ function copy(out, s) {
   out.z = s.z;
   out.yaw = s.yaw;
   out.f = s.f;
+  out.h = s.h;
   return true;
 }
