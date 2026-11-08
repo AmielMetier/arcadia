@@ -12,7 +12,7 @@
   - Un pupitre remet une arène à zéro si l'on s'est bloqué ; chaque arène a ses dresseurs et parfois un objet caché.
 - **Odyssée** — Les intérieurs ont de vrais murs : papier peint et lambris au fond, fenêtres, murs sur les côtés, ombres au sol et un tapis dans les maisons.
   - Quatre papiers peints différents pour les maisons.
-  - Dans la maison de Maman, l'armoire est rangée contre le mur de gauche.
+  - Dans la maison de Maman, l'armoire se range au fond, entre la télévision et le frigo.
 
 ## 4.73 — 8 novembre 2026
 - Correction : sorties des grottes au bout de la salle (Grotte Lunaire, Tourbillons, Victoire), plus de case libre a cote de la porte (Amiel)
