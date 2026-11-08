@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.69 — 8 novembre 2026
+- Correction : imports hud, affichage habitat dexnav en ville et routes, report chat menu et lock inputs (Amiel)
+
 ## 4.68 — 8 novembre 2026
 - Correction : affichage et detection universelle de l'habitat DexNav dans le HUD (Amiel)
 
