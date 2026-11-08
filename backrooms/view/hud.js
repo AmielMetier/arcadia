@@ -96,6 +96,8 @@ export class BackroomsHUD {
 
       <!-- Au caméscope (V) : l'image passe en 4:3, et les bandes noires servent d'écrans : à gauche le signal des
            objectifs (plus fin qu'au petit indicateur), à droite les parasites (l'entité brouille la bande) et le mode nuit -->
+      <!-- le zoom de l'objectif (molette) : la barre W ─── T, le temps de zoomer -->
+      <div class="cam-zoom" id="camZoom"><span>W</span><i><b id="camZoomBar"></b></i><span>T</span><em id="camZoomX">×1.5</em></div>
       <div class="cam-bar cam-bar-l"><small id="camSigLbl">SIGNAL</small><div class="cam-gauge" id="camSig">${'<i></i>'.repeat(10)}</div><small>TAPE</small></div>
       <div class="cam-bar cam-bar-r"><small class="cam-night" id="camNight">AUTO</small><div class="cam-gauge interf" id="camInt">${'<i></i>'.repeat(10)}</div><small>INTERF.</small></div>
 
@@ -164,7 +166,7 @@ export class BackroomsHUD {
     this.$ = (s) => this.el.querySelector(s);
     // les éléments mis à jour à chaque image (on ne les recherche pas à chaque fois)
     this.E = {};
-    for (const id of ['vhsTimer', 'battery', 'levelTag', 'cassetteIcons', 'cassetteText', 'objBanner', 'blackoutTag', 'fadeBar', 'spectate', 'specTitle', 'specSub', 'signal', 'signalBars', 'signalLabel', 'stamina', 'staminaBar', 'crouchTag', 'carryTag', 'inv', 'toast', 'locker', 'lockerText', 'breathBar', 'grab', 'grabBar', 'grabText', 'hurt', 'captions', 'lore', 'loreText', 'loreTag', 'prompt', 'promptText', 'beamBar', 'camSigLbl', 'camNight', 'boardTimer']) this.E[id] = this.$('#' + id);
+    for (const id of ['vhsTimer', 'battery', 'levelTag', 'cassetteIcons', 'cassetteText', 'objBanner', 'blackoutTag', 'fadeBar', 'spectate', 'specTitle', 'specSub', 'signal', 'signalBars', 'signalLabel', 'stamina', 'staminaBar', 'crouchTag', 'carryTag', 'inv', 'toast', 'locker', 'lockerText', 'breathBar', 'grab', 'grabBar', 'grabText', 'hurt', 'captions', 'lore', 'loreText', 'loreTag', 'prompt', 'promptText', 'beamBar', 'camSigLbl', 'camNight', 'boardTimer', 'camZoom', 'camZoomBar', 'camZoomX']) this.E[id] = this.$('#' + id);
     this.barEls = [...this.E.signalBars.children];
     this.camSigEls = [...this.$('#camSig').children];
     this.camIntEls = [...this.$('#camInt').children];
@@ -522,6 +524,16 @@ export class BackroomsHUD {
     this.flag('camNight', 'on', night === 'NIGHT');
   }
 
+  // le zoom de l'objectif (molette) : la barre W ─── T et le grossissement, affichés le temps de zoomer
+  camZoom(z, lo, hi) {
+    const k = Math.max(0, Math.min(1, Math.log(z / lo) / Math.log(hi / lo)));
+    this.E.camZoomBar.style.width = `${Math.round(k * 100)}%`;
+    this.text('camZoomX', `×${z < 9.95 ? z.toFixed(1) : Math.round(z)}`);
+    this.E.camZoom.classList.add('on');
+    clearTimeout(this.zoomT);
+    this.zoomT = setTimeout(() => this.E.camZoom.classList.remove('on'), 1600);
+  }
+
   keysLine(sim, multi) {
     const el = this.$('#keysTag');
     if (!el) return;
@@ -532,7 +544,8 @@ export class BackroomsHUD {
     this.keysK = k;
     el.hidden = !on;
     if (!on) return;
-    const keys = [['F', 'INTERACT'], ['E', 'USE'], ['SPACE', 'JUMP'], ['C', 'CROUCH'], ['V', 'CAMCORDER']];
+    // la lampe part éteinte : sa touche vient en premier
+    const keys = [['1', 'LAMP'], ['F', 'INTERACT'], ['E', 'USE'], ['SPACE', 'JUMP'], ['C', 'CROUCH'], ['V', 'CAMCORDER']];
     if (multi) keys.push(['R', 'RADIO']);
     el.innerHTML = keys.map(([key, what]) => `<span><kbd>${key}</kbd>${what}</span>`).join('');
   }

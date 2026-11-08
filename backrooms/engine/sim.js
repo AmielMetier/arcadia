@@ -17,12 +17,12 @@
 // monde dans la cabine, plus l'entité s'énerve contre ceux qui restent.
 // Chacun part avec sa lampe torche dans la case 1. Un joueur attrapé regarde les autres jusqu'à la fin de l'étage ;
 // si l'équipe le termine, tout le monde repart à l'étage suivant, lampe en main.
-import { CELL_SIZE, T, CASSETTES, createLevel0, PIT_HALF, FLOOR_DY, bfs } from './map.js';
+import { CELL_SIZE, T, CASSETTES, createLevel0, PIT_HALF, FLOOR_DY, bfs, pillarDist } from './map.js';
 import { createWarehouseMap } from './level1.js';
 import { createPoolMap, MOUTH } from './poolrooms.js';
 import { createPipesMap, VALVES, PIPES_LEVEL, jetState, inJet, JET_HALF } from './level2.js';
 import { hasLineOfSight } from './nav.js';
-import { planTo, move as gaitMove, faceTo, shove, stagger, feetOf, paceSpot, cageAt } from './gait.js';
+import { planTo, move as gaitMove, faceTo, shove, stagger, feetOf, cageAt } from './gait.js';
 import { Track } from './interp.js';
 import { createGoats, updateGoats, senseGoats, alertGoats, goatSnapshot, applyGoatSnapshot, goatCount } from './goats.js';
 import { createDirector, updateDirector, blackoutAllowed, entityRelaxed, updateLightsOut, lightsChanged } from './director.js';
@@ -108,6 +108,10 @@ const cellOf = (v) => Math.floor(v / CELL_SIZE);
 export const STARE_R = 15; // la fixer à moins de 15 m (en la voyant vraiment) la provoque
 export const STARE_T = 1.0; // … au bout d'une seconde (une demi-seconde à moins de 7 m)
 export const NEAR_CHARGE = 6; // s'approcher à moins de 6 m d'elle quand elle observe : elle charge
+// jamais plantée sous les yeux de quelqu'un : immobile, dans le cadre d'un joueur à moins de SEEN_R m, elle agit au
+// bout de PLANTED_T secondes (elle charge, ou se glisse hors de vue)
+export const PLANTED_T = 1.0;
+export const SEEN_R = 26;
 export const CALM_HOLD = 45; // secondes de répit dans un recoin calme, avant que sa lampe grésille
 export const HAUNT_COOLDOWN = 12; // un spectateur ne hante qu'une fois toutes les 12 s
 
@@ -417,9 +421,10 @@ export class BackroomsSim {
         P.found = old.found;
         P.yaw = old.yaw;
       }
-      // tout le monde part avec sa lampe torche, allumée, dans la case 1 (ceux qui étaient tombés en reçoivent une)
+      // tout le monde part avec sa lampe torche dans la case 1 (ceux qui étaient tombés en reçoivent une), éteinte : on
+      // l'allume soi-même. D'un étage à l'autre, elle reste comme on l'avait laissée.
       P.hasLamp = true;
-      P.flashlight = !old || old.flashlight || old.status !== 'alive';
+      P.flashlight = !!old && old.status === 'alive' && !!old.flashlight;
       // Level 1 : tout le monde sort ensemble de l'ascenseur d'arrivée, dos à ses portes
       const A = this.map.arrival;
       if (A) {
@@ -516,7 +521,7 @@ export class BackroomsSim {
       route: null,
       arrived: false,
       lastSeenF: 0, // l'étage où elle a vu (ou entendu) sa proie pour la dernière fois
-      prowl: false, // elle arpente (au bord de la lumière, devant une proie hors d'atteinte)
+      plantT: 0, // depuis combien de temps elle se tient immobile sous les yeux d'un joueur (voir PLANTED_T)
       pace: null,
       paceSide: 1,
       modeT: 0, // depuis combien de temps elle est dans ce mode
@@ -849,13 +854,11 @@ export class BackroomsSim {
     for (let gz = minGz; gz <= maxGz; gz++) {
       for (let gx = minGx; gx <= maxGx; gx++) {
         if (!this.blocked(gx, gz, floor)) continue;
-        // un pilier fin : sa vraie forme (carré ou rond), pas toute la case
+        // un pilier fin ou une cloison : sa vraie forme (carré, rond, rectangles de 12 cm), pas toute la case
         const fm = this.fm(floor);
         const pl = fm.pillarAt && fm.pillarAt(gx, gz);
         if (pl) {
-          const ex = Math.max(0, Math.abs(x - pl.x) - pl.h);
-          const ez = Math.max(0, Math.abs(z - pl.z) - pl.h);
-          if (pl.round ? Math.hypot(x - pl.x, z - pl.z) < pl.h + radius : ex * ex + ez * ez < radius * radius) return true;
+          if (pillarDist(pl, x, z) < radius) return true;
           continue;
         }
         const closestX = Math.max(gx * CELL_SIZE, Math.min(x, (gx + 1) * CELL_SIZE));
@@ -2161,7 +2164,8 @@ export class BackroomsSim {
       // plus il est loin des autres, plus elle le préfère (jusqu'à 22 m d'avance sur un joueur bien entouré)
       const alone = mate !== Infinity && mate > 12 ? Math.min(22, 6 + (mate - 12) * 0.6) : 0;
       const resting = this.calmAt(P);
-      const score = P.mDist - (P.seen && !concealed ? 12 : 0) - (P.id === M.target ? 6 : 0) - alone + (concealed ? 30 : 0) + (resting ? 40 : 0);
+      // (pendant sa charge, elle ne lâche pas celui sur qui elle fonce)
+      const score = P.mDist - (P.seen && !concealed ? 12 : 0) - (P.id === M.target ? (M.rushT > 0 ? 60 : 6) : 0) - alone + (concealed ? 30 : 0) + (resting ? 40 : 0);
       if (score < bestScore) {
         bestScore = score;
         target = P;
@@ -2180,7 +2184,6 @@ export class BackroomsSim {
       M.lastMode = M.mode;
       M.modeT = 0;
     } else M.modeT += DT;
-    if (M.mode !== 'watch' && M.mode !== 'chase') M.prowl = false;
     // elle tient quelqu'un : elle ne fait rien d'autre
     if (M.mode === 'grab') return this.updateGrab(M);
     // sonnée (on s'est dégagé, ou un coéquipier l'a aveuglée) : elle titube en arrière, puis s'enfuit dans le noir
@@ -2297,26 +2300,14 @@ export class BackroomsSim {
     const safe = this.level === 0 && !dark && this.brightCell(this.fm(P.floor), P.x, P.z);
     // Plus loin (jusqu'à STARE_R), la fixer la provoque aussi : il faut la regarder bien en face un peu plus longtemps
     const near = dist < 7;
+    // (on la voit : sous un néon, dans sa lampe, dans l'infrarouge du caméscope, ou à deux pas)
     const exposed = same && M.hasLineOfSight && !(P.hidden >= 0) && !this.calmAt(P) && dist < STARE_R && (!safe || dist < 4) && this.facing(P, M.x, M.z) < (near ? 0.4 : 0.3) &&
-      ((P.flashlight && dist < 20) || dist < 3.2 || (!dark && this.litCell(map, M.x, M.z)));
+      ((P.flashlight && dist < 20) || (P.cam && (P.battery ?? 100) > 0 && dist < 14) || dist < 3.2 || (!dark && this.litCell(map, M.x, M.z)));
     if (exposed && M.mode !== 'chase' && M.mode !== 'flee' && M.mode !== 'ambush') M.faceT += DT;
     else M.faceT = Math.max(0, M.faceT - DT * 2);
     if (M.faceT > (near ? 0.5 : STARE_T)) {
-      M.faceT = 0;
-      M.dormantT = 0;
-      M.mode = 'chase';
-      M.watch = null;
-      M.silent = false;
-      M.rushT = 2.4;
-      M.burstT = 2.4;
-      M.unseenT = 0;
-      M.repathT = 0;
-      M.lastSeenX = P.x;
-      M.lastSeenZ = P.z;
-      M.lastSeenF = P.floor || 0;
-      this.chases++;
+      this.rushAt(M, P);
       canSee = true;
-      this.emit({ type: 'rush', id: P.id, x: M.x, z: M.z, floor: M.floor });
     }
     M.rushT = Math.max(0, M.rushT - DT);
     // tapie dans le noir, elle observe : elle ne charge que si on s'approche trop (ou, déjà énervée, si on la voit)
@@ -2352,24 +2343,19 @@ export class BackroomsSim {
       }
     }
 
-    // dans un recoin calme (tant qu'il tient) : elle ne le voit pas, ne l'entend pas, et ne franchit pas le seuil
+    // dans un recoin calme (tant qu'il tient) : elle ne le voit pas, ne l'entend pas, et ne franchit pas le seuil ; elle
+    // ne reste pas non plus plantée devant : elle se fond dans le noir, derrière un angle, et on la perd
     if (this.calmAt(P)) {
       canSee = false;
       canHear = false;
       isNearby = false;
       if (M.mode === 'chase' || M.mode === 'search') {
-        M.mode = 'watch';
-        M.waitT = rand(5, 9);
-        M.watch = null;
-        M.path = [];
-        M.silent = true;
-        M.lurk = false;
-        M.vanish = this.level === 0;
+        this.slipAway(M, P, true);
         this.emit({ type: 'lost', id: P.id });
       }
     }
-    // à l'abri dans la lumière : elle ne s'y lance qu'à bout portant ; si elle le poursuivait, elle s'arrête au bord
-    // de l'ombre et l'observe
+    // à l'abri dans la lumière : elle ne s'y lance qu'à bout portant ; si elle le poursuivait, elle renonce au bord de
+    // l'ombre et s'y fond, hors de sa vue (elle l'attendra ailleurs)
     if (safe) {
       canSee = canSee && dist < 3.5;
       canHear = canHear && dist < 2.5;
@@ -2378,18 +2364,34 @@ export class BackroomsSim {
         M.edgeT += DT;
         if (M.edgeT > 1.0 + rage * 1.5) {
           M.edgeT = 0;
-          M.mode = 'watch';
-          M.waitT = rand(4, 8);
-          M.watch = null;
-          M.path = [];
-          M.silent = true;
-          M.lurk = false;
-          M.prowl = true; // elle arpente le bord de l'ombre sans le quitter des yeux
-          M.pace = null;
+          this.slipAway(M, P, true);
           this.emit({ type: 'lost', id: P.id });
         }
       } else M.edgeT = 0;
     } else M.edgeT = 0;
+
+    // Jamais plantée sous les yeux de quelqu'un : hors poursuite, presque immobile dans le cadre d'un joueur, elle agit
+    // au bout d'une seconde (d'une demi, postée au coin d'un couloir). Fixée par quelqu'un à découvert (sa proie ou un
+    // autre : c'est alors lui qu'elle charge), découverte de près ou à son poste : elle hurle et charge. Vue de côté,
+    // de loin, ou par quelqu'un à l'abri (lumière franche, recoin calme), ou pendant son répit : elle se glisse
+    // derrière un angle, hors de vue. Arrêtée pour écouter, en ronde ou en fouille : elle repart
+    if (M.mode !== 'chase') {
+      const V = (M.v || 0) < 0.45 && !M.trav ? this.viewerOf(M, SEEN_R) : null;
+      M.plantT = V ? (M.plantT || 0) + DT : Math.max(0, (M.plantT || 0) - DT * 2);
+      if (V && M.plantT > (M.lurk ? 0.5 : PLANTED_T)) {
+        M.plantT = 0;
+        const Q = V.Q;
+        const shelter = this.shelteredAt(Q);
+        if ((M.mode === 'patrol' || M.mode === 'search') && M.arrived) {
+          M.repathT = 0;
+          if (M.mode === 'patrol') M.targetWander = null;
+        } else if (!shelter && !calm && V.d < STARE_R + 5 && (V.f < 0.45 || M.lurk || M.mode === 'ambush' || V.d < NEAR_CHARGE + 2)) {
+          this.rushAt(M, Q);
+          if (Q === P) canSee = true;
+          else M.target = Q.id; // elle change de proie : celui qui l'a fixée (voir senseMonster)
+        } else this.slipAway(M, Q, shelter || calm);
+      }
+    } else M.plantT = 0;
 
     if (M.mode === 'ambush') {
       // en embuscade, elle attend que sa proie passe tout près
@@ -2508,20 +2510,9 @@ export class BackroomsSim {
       if (M.pace && M.arrived) {
         // au bout de son pas : un temps d'arrêt, les yeux sur sa proie
         M.pace = null;
-        M.paceT = M.prowl ? rand(0.5, 1.4) : rand(0.3, 0.8);
+        M.paceT = rand(0.3, 0.8);
       }
-      if (M.prowl && same) {
-        // au bord de la lumière : elle arpente l'ombre, de long en large, sans quitter sa proie des yeux
-        if (!M.pace) {
-          M.paceT = (M.paceT || 0) - DT;
-          if (M.paceT <= 0) {
-            M.paceSide = -(M.paceSide || 1);
-            M.pace = paceSpot(this, M, P.x, P.z, M.paceSide, (x, z) => !this.brightCell(map, x, z) && Math.hypot(x - P.x, z - P.z) > 2.4);
-            M.paceT = 0.6;
-            M.repathT = 0;
-          }
-        }
-      } else if (!M.lurk && same && M.modeT > 3.5 && M.unseenWT > 1.2 && dist > NEAR_CHARGE + 3 && dist < 26 && !(P.hidden >= 0)) {
+      if (!M.lurk && same && M.modeT > 3.5 && M.unseenWT > 1.2 && dist > NEAR_CHARGE + 3 && dist < 26 && !(P.hidden >= 0) && !((M.hideUntil || 0) > this.time)) {
         // elle a observé un moment ; personne ne la regarde : elle se rapproche sans un bruit, d'une ombre à l'autre
         // (on se retourne : elle est plus près qu'avant, immobile)
         if (!M.pace) {
@@ -2532,8 +2523,8 @@ export class BackroomsSim {
             M.repathT = 0;
           }
         }
-      } else if (M.pace && !M.prowl) {
-        // on la regarde : elle se fige
+      } else if (M.pace) {
+        // on la regarde : elle se fige (une seconde au plus : ensuite elle charge, ou se glisse hors de vue)
         M.pace = null;
         M.repathT = 0;
       }
@@ -2543,7 +2534,6 @@ export class BackroomsSim {
         M.silent = false;
         M.watch = null;
         M.pace = null;
-        M.prowl = false;
         M.stalkT = rand(3, 8);
         // Level 0 : on se retourne… elle n'est plus là
         if (this.level === 0) M.vanish = true;
@@ -2647,7 +2637,7 @@ export class BackroomsSim {
     // un jet de vapeur qui crache, elle attend devant
     const chasing = M.mode === 'chase';
     const rushing = M.rushT > 0;
-    const speed = M.mode === 'watch' ? (M.pace ? (M.prowl ? 0.85 : 0.7) : 0) : M.speed;
+    const speed = M.mode === 'watch' ? (M.pace ? 0.7 : 0) : M.speed;
     gaitMove(this, M, {
       speed,
       turn: rushing ? 12 : chasing ? 7.5 : M.mode === 'flee' ? 6.5 : M.mode === 'search' ? 5 : M.mode === 'watch' ? 3.2 : 3.6,
@@ -2795,20 +2785,32 @@ export class BackroomsSim {
   brightCell(map, x, z) {
     if (!map.brightCells) {
       map.brightCells = new Uint8Array(map.W * map.H);
+      map.brightThin = null;
       for (const l of map.lights || []) {
         if (!l.bright || l.state !== 'on') continue;
         for (let dz = -1; dz <= 1; dz++) {
           for (let dx = -1; dx <= 1; dx++) {
             const gx = l.gx + dx;
             const gz = l.gz + dz;
-            if (gx >= 0 && gz >= 0 && gx < map.W && gz < map.H) map.brightCells[gz * map.W + gx] = 1;
+            if (gx < 0 || gz < 0 || gx >= map.W || gz >= map.H) continue;
+            const k = gz * map.W + gx;
+            map.brightCells[k] = 1;
+            // la case d'une cloison fine : seul le côté tourné vers le néon est dans sa lumière
+            const p = map.lightBlocked && map.pillarAt && map.pillarAt(gx, gz);
+            if (p && p.rects) {
+              if (!map.brightThin) map.brightThin = new Map();
+              if (!map.brightThin.has(k)) map.brightThin.set(k, []);
+              map.brightThin.get(k).push(l);
+            }
           }
         }
       }
     }
     const gx = cellOf(x);
     const gz = cellOf(z);
-    return gx >= 0 && gz >= 0 && gx < map.W && gz < map.H && map.brightCells[gz * map.W + gx] === 1;
+    if (gx < 0 || gz < 0 || gx >= map.W || gz >= map.H || map.brightCells[gz * map.W + gx] !== 1) return false;
+    const by = map.brightThin && map.brightThin.get(gz * map.W + gx);
+    return !by || by.some((l) => !map.lightBlocked(l.x, l.z, x, z));
   }
 
   // ce point est-il dans le champ de vision d'un joueur ? (dans le cadre de sa caméra, rien entre eux ; tout près,
@@ -2829,6 +2831,139 @@ export class BackroomsSim {
       if (hasLineOfSight(map, Q.x, Q.z, x, z) || hasLineOfSight(map, Q.x, Q.z, x + nx, z + nz) || hasLineOfSight(map, Q.x, Q.z, x - nx, z - nz)) return true;
     }
     return false;
+  }
+
+  // le joueur (hors casier) qui l'a dans le cadre de sa caméra, son centre ou une épaule sans rien entre eux, à moins
+  // de r m ; le plus proche : { Q, d, f } (f : l'angle entre son regard et elle), ou null
+  viewerOf(M, r) {
+    const floor = M.floor || 0;
+    const map = this.fm(floor);
+    let best = null;
+    for (const Q of this.players) {
+      if (Q.status !== 'alive' || Q.hidden >= 0 || (Q.floor || 0) !== floor) continue;
+      const d = Math.hypot(Q.x - M.x, Q.z - M.z);
+      if (d > r || (best && d >= best.d)) continue;
+      const f = this.facing(Q, M.x, M.z);
+      if (f > 1.25 + Math.atan2(0.5, Math.max(0.5, d))) continue;
+      const nx = (-(M.z - Q.z) / Math.max(0.01, d)) * 0.45;
+      const nz = ((M.x - Q.x) / Math.max(0.01, d)) * 0.45;
+      if (!hasLineOfSight(map, Q.x, Q.z, M.x, M.z) && !hasLineOfSight(map, Q.x, Q.z, M.x + nx, M.z + nz) && !hasLineOfSight(map, Q.x, Q.z, M.x - nx, M.z - nz)) continue;
+      best = { Q, d, f };
+    }
+    return best;
+  }
+
+  // à l'abri d'elle : dans un casier, dans un recoin calme qui tient encore, ou (Level 0, hors coupure) dans la lumière
+  // franche d'une zone claire
+  shelteredAt(Q) {
+    if (Q.hidden >= 0 || this.calmAt(Q)) return true;
+    return this.level === 0 && !(this.blackout > 0) && this.brightCell(this.fm(Q.floor || 0), Q.x, Q.z);
+  }
+
+  // découverte, fixée : elle hurle et fonce sur sa proie (même au repos)
+  rushAt(M, P) {
+    M.faceT = 0;
+    M.plantT = 0;
+    M.dormantT = 0;
+    M.mode = 'chase';
+    M.watch = null;
+    M.pace = null;
+    M.lurk = false;
+    M.ambush = null;
+    M.silent = false;
+    M.rushT = 2.4;
+    M.burstT = 2.4;
+    M.unseenT = 0;
+    M.repathT = 0;
+    M.lastSeenX = P.x;
+    M.lastSeenZ = P.z;
+    M.lastSeenF = P.floor || 0;
+    this.chases++;
+    this.emit({ type: 'rush', id: P.id, x: M.x, z: M.z, floor: M.floor });
+  }
+
+  // vue sans pouvoir (ou devoir) charger : elle se glisse derrière un angle, à quelques pas, hors de la vue de tous ;
+  // giveUp (sa proie est à l'abri, ou c'est son répit) : elle renonce, et disparaîtra dès que personne ne la regarde
+  slipAway(M, Q, giveUp) {
+    const map = this.fm(M.floor || 0);
+    const spot = this.hideSpot(map, M, Q);
+    M.plantT = 0;
+    M.pace = null;
+    M.lurk = false;
+    M.ambush = null;
+    M.ambushT = Math.max(M.ambushT || 0, 6);
+    M.silent = true;
+    M.repathT = 0;
+    M.vanish = !!giveUp && this.level === 0;
+    M.hideUntil = this.time + rand(8, 14); // repérée : elle ne revient pas tout de suite se montrer
+    if (spot) {
+      M.mode = 'stalk';
+      M.watch = spot;
+      M.stalkT = rand(6, 12);
+    } else {
+      // nulle part où se cacher tout près : elle s'éloigne de lui, dans l'ombre
+      M.mode = 'patrol';
+      M.watch = null;
+      M.targetWander = this.awaySpot(map, M, Q);
+      M.stalkT = rand(6, 12);
+    }
+  }
+
+  // une case à quelques pas d'elle (en marche), derrière un angle pour Q (rien en ligne droite entre eux) et hors de la
+  // vue de tous, dans l'ombre, pas collée à lui ; la plus proche d'elle
+  hideSpot(map, M, Q) {
+    const W = map.W;
+    const H = map.H;
+    const gx = cellOf(M.x);
+    const gz = cellOf(M.z);
+    if (gx < 0 || gz < 0 || gx >= W || gz >= H) return null;
+    const pd = bfs(map.grid, W, H, gx, gz);
+    const dark = this.blackout > 0;
+    const stairCell = this.stairs && this.stairs.length ? new Set(this.stairs.flatMap((st) => st.cells.map((k) => k.gz * W + k.gx))) : null;
+    const floor = M.floor || 0;
+    let best = null;
+    let bestS = Infinity;
+    const R = 9;
+    for (let z = Math.max(1, gz - R); z <= Math.min(H - 2, gz + R); z++) {
+      for (let x = Math.max(1, gx - R); x <= Math.min(W - 2, gx + R); x++) {
+        const steps = pd[z * W + x];
+        if (steps < 1 || steps > 12 || map.isWall(x, z)) continue;
+        if ((map.pillarAt && map.pillarAt(x, z)) || (stairCell && stairCell.has(z * W + x)) || (map.pitAt && map.pitAt(x, z) >= 0)) continue;
+        const cx = (x + 0.5) * CELL_SIZE;
+        const cz = (z + 0.5) * CELL_SIZE;
+        const dq = Math.hypot(cx - Q.x, cz - Q.z);
+        if (dq < 5) continue;
+        const s = steps + (dq < 8 ? 4 : 0) + Math.random() * 0.5;
+        if (s >= bestS) continue;
+        if (!dark && this.level === 0 && this.brightCell(map, cx, cz)) continue;
+        if ((map.calm || []).some((n) => n.cells.some((c) => c.x === x && c.z === z))) continue;
+        if (hasLineOfSight(map, Q.x, Q.z, cx, cz) || this.inSomeView(floor, cx, cz, 0.2)) continue;
+        bestS = s;
+        best = { x: cx, z: cz };
+      }
+    }
+    return best;
+  }
+
+  // une case loin de Q (14 à 40 m), dans l'ombre, plutôt vers elle
+  awaySpot(map, M, Q) {
+    const dark = this.blackout > 0;
+    let best = null;
+    let bs = -Infinity;
+    for (let i = 0; i < 60 && map.walkable && map.walkable.length; i++) {
+      const c = map.walkable[Math.floor(Math.random() * map.walkable.length)];
+      const x = (c.x + 0.5) * CELL_SIZE;
+      const z = (c.z + 0.5) * CELL_SIZE;
+      const dq = Math.hypot(x - Q.x, z - Q.z);
+      if (dq < 14 || dq > 40) continue;
+      if (!dark && this.level === 0 && this.brightCell(map, x, z)) continue;
+      const s = dq - Math.hypot(x - M.x, z - M.z) * 0.5;
+      if (s > bs) {
+        bs = s;
+        best = { x, z };
+      }
+    }
+    return best;
   }
 
   // en poursuite, les néons au-dessus d'elle grésillent un instant à son passage (jamais ceux des zones très
@@ -3068,10 +3203,19 @@ export class BackroomsSim {
     M.path = [];
     M.silent = true;
     faceTo(M, V.x, V.z, 4);
-    const d = Math.hypot(V.x - M.x, V.z - M.z);
-    const los = (V.floor || 0) === (M.floor || 0) && hasLineOfSight(this.fm(M.floor || 0), V.x, V.z, M.x, M.z);
-    // on ne compte le regard qu'une fois la lumière revenue
-    if (los && !(G.darkT > 0) && this.facing(V, M.x, M.z) < 0.3) G.looked += DT;
+    // on ne compte les regards (le sien ou celui d'un autre) qu'une fois la lumière revenue : en face, elle part au bout
+    // de 0,8 s ; vue de côté (dans le cadre), un peu plus tard. Jamais elle ne reste plantée sous nos yeux
+    let d = Infinity;
+    let look = 0;
+    for (const Q of this.players) {
+      if (Q.status !== 'alive' || (Q.floor || 0) !== (M.floor || 0)) continue;
+      const dq = Math.hypot(Q.x - M.x, Q.z - M.z);
+      d = Math.min(d, dq);
+      if (G.darkT > 0 || Q.hidden >= 0 || !hasLineOfSight(this.fm(M.floor || 0), Q.x, Q.z, M.x, M.z)) continue;
+      const f = this.facing(Q, M.x, M.z);
+      look = Math.max(look, f < 0.3 ? 1 : f < 1.25 + Math.atan2(0.5, Math.max(0.5, dq)) ? 0.85 : 0);
+    }
+    G.looked += DT * look;
     const unseen = !this.inSomeView(M.floor || 0, M.x, M.z, 0.15);
     // regardée assez longtemps, ou trop approchée : le néon claque (et les lampes vacillent) ; dans ce noir complet,
     // elle n'est plus là. Ignorée, elle s'en va quand personne ne regarde
@@ -3106,10 +3250,13 @@ export class BackroomsSim {
     const floor = S.floor || 0;
     const map = this.fm(floor);
     let spot = null;
+    const W = map.W;
+    const stairCell = new Set((this.stairs || []).flatMap((st) => st.cells.map((k) => k.gz * W + k.gx)));
     for (const l of S.list) {
       const gx = cellOf(l.x);
       const gz = cellOf(l.z);
-      if (map.isWall(gx, gz)) continue;
+      // jamais au-dessus d'un trou, dans le plâtre d'un pilier ou d'une cloison, ni dans la cage d'escalier
+      if (map.isWall(gx, gz) || (map.pitAt && map.pitAt(gx, gz) >= 0) || (map.pillarAt && map.pillarAt(gx, gz)) || stairCell.has(gz * W + gx)) continue;
       const x = (gx + 0.5) * CELL_SIZE;
       const z = (gz + 0.5) * CELL_SIZE;
       if (Math.hypot(x - P.x, z - P.z) < 10 || this.inSomeView(floor, x, z, 0.1)) continue;
@@ -3247,19 +3394,37 @@ export class BackroomsSim {
     const R = Math.ceil(rMax / CELL_SIZE);
     const cx = Math.floor(P.x / CELL_SIZE);
     const cz = Math.floor(P.z / CELL_SIZE);
+    // en marche (cases) depuis elle et depuis le joueur : pour y aller, passerait-elle sous son nez ?
+    const W = map.W;
+    const inGrid = (x, z) => x >= 0 && z >= 0 && x < W && z < map.H;
+    const mx = cellOf(M.x);
+    const mz = cellOf(M.z);
+    const md = (M.floor || 0) === (P.floor || 0) && inGrid(mx, mz) && inGrid(cx, cz) ? bfs(map.grid, W, map.H, mx, mz) : null;
+    const pd = md ? bfs(map.grid, W, map.H, cx, cz) : null;
+    // (le joueur peut se tenir dans une case de cloison, bloquante pour le parcours : on passe par ses voisines)
+    let mP = md ? md[cz * W + cx] : -1;
+    if (md && mP < 0) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (inGrid(cx + dx, cz + dz) && md[(cz + dz) * W + cx + dx] >= 0) mP = mP < 0 ? md[(cz + dz) * W + cx + dx] + 1 : Math.min(mP, md[(cz + dz) * W + cx + dx] + 1);
     let best = null;
     let bestS = Infinity;
     for (let gz = cz - R; gz <= cz + R; gz++) {
       for (let gx = cx - R; gx <= cx + R; gx++) {
-        if (map.isWall(gx, gz) || (map.pitAt && map.pitAt(gx, gz) >= 0)) continue;
+        // (le centre d'une case de pilier ou de cloison fine est dans le plâtre)
+        if (map.isWall(gx, gz) || (map.pitAt && map.pitAt(gx, gz) >= 0) || (map.pillarAt && map.pillarAt(gx, gz))) continue;
         const x = (gx + 0.5) * CELL_SIZE;
         const z = (gz + 0.5) * CELL_SIZE;
         const d = Math.hypot(x - P.x, z - P.z);
         if (d < rMin || d > rMax) continue;
         const dark = map.darkCells[gz * map.W + gx];
         if (seen && !hasLineOfSight(map, x, z, P.x, P.z)) continue;
-        // le plus sombre, puis le plus près d'elle, et pas en plein dans le regard du joueur
-        const sc = dark * 40 + Math.hypot(x - M.x, z - M.z) + (this.facing(P, x, z) < 0.4 ? 15 : 0);
+        // le plus sombre, puis le plus près d'elle, et plutôt hors du regard du joueur (vue, elle ne s'y attarderait pas)
+        const f = this.facing(P, x, z);
+        let sc = dark * 40 + Math.hypot(x - M.x, z - M.z) + (f < 0.4 ? 15 : 0) + (f < 1.3 ? 8 : 0);
+        // elle n'y va pas en passant sous son nez : si l'un de ses plus courts chemins frôle le joueur (à deux cases ou
+        // moins), passer par lui ne rallonge presque rien (md[P] + pd[S] - md[S] <= 4 cases)
+        if (md && mP >= 0) {
+          const k = gz * W + gx;
+          if (md[k] >= 0 && pd[k] >= 0 && mP + pd[k] - md[k] <= 4) sc += 200;
+        }
         if (sc < bestS) {
           bestS = sc;
           best = { x, z };

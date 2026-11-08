@@ -524,6 +524,7 @@ body.touch .click-prompt .ctrl-choice { display: none; }
   .icon-btn { top: 16px; right: 50%; transform: translateX(50%); }
   .stamina-track { width: calc(90px * var(--smax, 1)); height: 8px; }
   .objective-banner { font-size: 20px; }
+  .cam-zoom { top: 72px; font-size: 18px; }
 }
 
 /* --- HUD minimal : ce qui ne sert pas s'efface --- */
@@ -648,7 +649,8 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 #hud:not(.camcorder) #vhsTimer,
 #hud:not(.camcorder) .tape-date,
 #hud:not(.camcorder) .corner,
-#hud:not(.camcorder) .cam-bar { display: none; }
+#hud:not(.camcorder) .cam-bar,
+#hud:not(.camcorder) .cam-zoom { display: none; }
 
 /* Au caméscope (V) : les incrustations se calent dans l'image 4:3, entre les bandes noires */
 #hud.camcorder .cam-tl, #hud.camcorder .cam-bl { left: calc(48px + var(--bx, 0px)); }
@@ -658,6 +660,25 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 #hud.camcorder.cam-wide #signal,
 #hud.camcorder #keysTag { display: none; }
 #hud.camcorder:not(.cam-wide) .cam-bar { display: none; }
+
+/* Le zoom de l'objectif : W ─── T en haut de l'image, le temps de zoomer */
+.cam-zoom {
+  position: absolute;
+  top: 34px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 24px;
+  opacity: 0;
+  transition: opacity 0.35s;
+  pointer-events: none;
+}
+.cam-zoom.on { opacity: 0.9; transition: opacity 0.08s; }
+.cam-zoom i { position: relative; width: min(28vw, 240px); height: 10px; border: 1px solid rgba(242, 240, 230, 0.7); }
+.cam-zoom b { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #e9e4c8; }
+.cam-zoom em { font-style: normal; min-width: 3.2em; }
 
 /* Les bandes noires : deux écrans de contrôle, à gauche le signal, à droite les parasites */
 .cam-bar {

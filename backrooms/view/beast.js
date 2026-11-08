@@ -15,6 +15,8 @@ import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
 const MODEL = new URL('../models/hazmat.glb', import.meta.url).href;
 const SCALE = 1.5; // l'explorateur fait 1,78 m : elle, plus de 3 m une fois le cou et les jambes allongés (voûtée sous le plafond)
 const LEG = 1.25; // jambes trop longues : tout le corps est soulevé d'autant
+// les instants où un pied touche le sol, en fraction du cycle de chaque clip (mesurés sur la hauteur des pieds)
+const FOOT_AT = { Run: [[0.17, 'R'], [0.71, 'L']], Walk: [[0.09, 'R'], [0.59, 'L']] };
 
 function canvas(w, h) {
   const c = document.createElement('canvas');
@@ -494,7 +496,8 @@ export function createBeast(opts = {}) {
       return st.face || st.head || null;
     },
     // M : l'entité ; chase : elle poursuit ; light : lumière des néons là où elle est ; dt : durée de l'image ;
-    // eye : la caméra de cet écran (elle la suit des yeux quand elle observe)
+    // eye : la caméra de cet écran (elle la suit des yeux quand elle observe). Rend le pied qui vient de toucher le
+    // sol ('L' ou 'R', pour faire entendre le pas à cet instant), sinon null
     update(M, chase, light, dt, time, eye = null) {
       // sa vitesse, d'après son déplacement (pareil chez l'hôte et chez les invités)
       const L0 = st.last;
@@ -572,13 +575,23 @@ export function createBeast(opts = {}) {
         const ph = (walk.time / walk.getClip().duration) * Math.PI * 4;
         walk.timeScale = THREE.MathUtils.clamp(sp / 1.6, 0.55, 1.6) * (0.5 + 0.9 * (0.5 + 0.5 * Math.sin(ph)));
       }
-      // la course : une cadence trop rapide pour sa taille
-      if (st.acts.Run) st.acts.Run.timeScale = rush ? 2.3 : THREE.MathUtils.clamp(sp / 3, 0.9, 2.0);
+      // la course : une cadence trop rapide pour sa taille. Vers 3,3 m/s, un pas toutes les 0,27 s : celle des pas
+      // de l'enregistrement de la poursuite ; plus vite, les pas se serrent moins vite que la vitesse ne monte
+      if (st.acts.Run) st.acts.Run.timeScale = rush ? 1.9 : THREE.MathUtils.clamp(1.32 * Math.sqrt(sp / 3.3), 1.0, 2.2);
       // immobile, elle ne respire pas
       if (st.acts.Idle) st.acts.Idle.timeScale = 1 - K.still * 0.97;
 
+      // les pas : le pied qui touche le sol pendant cette pose (au plus un), d'après le clip qui domine
+      const dom = (st.w.Run || 0) > 0.35 && (st.w.Run || 0) >= (st.w.Walk || 0) ? 'Run' : (st.w.Walk || 0) > 0.35 ? 'Walk' : null;
+      const da = dom ? st.acts[dom] : null;
+      const ph0 = da ? (da.time / da.getClip().duration) % 1 : 0;
       for (const r of st.rest) r.o.quaternion.copy(r.q);
       st.mixer.update(step);
+      let foot = null;
+      if (da && sp > 0.3) {
+        const ph1 = (da.time / da.getClip().duration) % 1;
+        for (const [p, side] of FOOT_AT[dom]) if (ph1 >= ph0 ? p > ph0 && p <= ph1 : p > ph0 || p <= ph1) foot = side;
+      }
       for (const s of st.stretch) s.B.position.copy(s.rest).multiplyScalar(s.k);
       group.getWorldQuaternion(_gq);
       const B = st.b;
@@ -729,6 +742,7 @@ export function createBeast(opts = {}) {
         st.face.position.copy(st.faceY).addScaledVector(st.faceDown, rk);
       }
       keepAt(M);
+      return foot;
     },
   };
 }

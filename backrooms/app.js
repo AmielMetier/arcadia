@@ -1,6 +1,7 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
 import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, staminaMax } from './engine/sim.js';
 import { hasLineOfSight } from './engine/nav.js';
+import { bfs, CELL_SIZE, cellsOnSeg, T } from './engine/map.js';
 import { createBackroomsScene, setMonsterMode, setSceneOptions } from './view/scene.js';
 import { BackroomsSfx } from './view/sfx.js';
 import { createVoice } from './view/voice.js';
@@ -15,7 +16,57 @@ let scene = null;
 let sfx = null;
 let hud = null;
 let stepDist = 0;
-let monsterStepT = 0;
+let monsterStepT = 0; // sans entité animée (mode VIP du Level 1) : le prochain pas, à la minuterie
+// l'entité entendue comme un joueur : ce qui la sépare de l'oreille (occ, détour par les couloirs) et l'espace autour
+// des deux (space, pour l'écho), recalculés quelques fois par seconde
+const entEar = { t: 0, occ: 0, space: 0.3, spaceS: 0.3 };
+// la dernière image de traque : { danger, occl } (null hors traque) ; ses pas, eux, viennent de son animation
+let entChase = null;
+const onMonsterStep = (foot) => {
+  if (sfx && entChase && sim && sim.hasMonster) sfx.monsterStep(entChase.danger, sim.monster, entChase.occl, foot);
+};
+// l'espace autour d'un point : la longueur libre moyenne de 12 rayons (jusqu'à 18 m), de 0 (couloir étroit) à 1
+// (grande salle)
+function spaceAt(m, x, z) {
+  if (!m || !m.isWalkableWorld) return 0.3;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    const dx = Math.cos(a);
+    const dz = Math.sin(a);
+    let r = 0.6;
+    while (r < 18 && m.isWalkableWorld(x + dx * r, z + dz * r)) r += 0.6;
+    sum += r;
+  }
+  return Math.max(0, Math.min(1, (sum / 12 - 3.5) / 9));
+}
+// le détour qu'un son doit faire par les couloirs pour aller de a à b, de 0 (presque tout droit) à 1 (6 m de plus
+// qu'en ligne droite, ou pas de passage)
+function detourOf(m, ax, az, bx, bz) {
+  if (!m || !m.grid || !m.W) return 1;
+  const W = m.W;
+  const H = m.H || m.W;
+  const cl = (v, n) => Math.max(0, Math.min(n - 1, v));
+  const ax0 = cl(Math.floor(ax / CELL_SIZE), W);
+  const az0 = cl(Math.floor(az / CELL_SIZE), H);
+  const bx0 = cl(Math.floor(bx / CELL_SIZE), W);
+  const bz0 = cl(Math.floor(bz / CELL_SIZE), H);
+  const d = bfs(m.grid, W, H, ax0, az0);
+  // l'entité peut se tenir dans une case qui bloque (une cloison fine) : on passe par une case voisine
+  let best = d[bz0 * W + bx0];
+  if (best < 0) {
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const x = bx0 + dx;
+      const z = bz0 + dz;
+      if (x < 0 || z < 0 || x >= W || z >= H) continue;
+      const v = d[z * W + x];
+      if (v >= 0 && (best < 0 || v + 1 < best)) best = v + 1;
+    }
+  }
+  if (best < 0) return 1;
+  const extra = (best - (Math.abs(bx0 - ax0) + Math.abs(bz0 - az0))) * CELL_SIZE;
+  return Math.max(0, Math.min(1, extra / 6));
+}
 const goatHoofT = []; // Level 2 : le prochain coup de sabot de chaque chèvre
 let goatBellT = 0; // la cloche du bouc alpha
 let goatHint = false; // le conseil « elles craignent la lumière », une fois par partie
@@ -215,24 +266,29 @@ function toggleCam() {
   if (scene && scene.setCamZoom) scene.setCamZoom(camZoom);
 }
 
-// molette, caméscope sorti : le zoom de l'objectif (de ×1,5 à ×4), avec son petit moteur
+// molette, caméscope sorti : le zoom de l'objectif (de ×1,5 à ×12), avec son petit moteur et la barre W–T de
+// l'écran. Une molette crantée avance d'environ ×1,14 par cran, un pavé tactile en continu.
 const CAM_ZOOM_MIN = 1.5;
-const CAM_ZOOM_MAX = 4;
+const CAM_ZOOM_MAX = 12;
 let camZoom = CAM_ZOOM_MIN;
 window.addEventListener(
   'wheel',
   (e) => {
     if (!camOn || paused || !sim || sim.player.status !== 'alive') return;
     e.preventDefault();
-    const dir = e.deltaY < 0 ? 1 : -1;
-    const z = Math.min(CAM_ZOOM_MAX, Math.max(CAM_ZOOM_MIN, camZoom * (dir > 0 ? 1.12 : 1 / 1.12)));
+    const d = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+    const z = Math.min(CAM_ZOOM_MAX, Math.max(CAM_ZOOM_MIN, camZoom * Math.exp(Math.max(-0.3, Math.min(0.3, -d * 0.0013)))));
     if (Math.abs(z - camZoom) < 1e-3) return;
+    const dir = z > camZoom ? 1 : -1;
     camZoom = z;
     if (scene && scene.setCamZoom) scene.setCamZoom(camZoom);
+    if (hud && hud.camZoom) hud.camZoom(camZoom, CAM_ZOOM_MIN, CAM_ZOOM_MAX);
     if (sfx) sfx.camZoom(dir);
   },
   { passive: false }
 );
+// zoomé, la visée ralentit d'autant : au plus fort du zoom, un geste de la souris ne fait plus valser l'image
+const camAimK = () => (camOn ? Math.pow(CAM_ZOOM_MIN / camZoom, 0.9) : 1);
 
 window.addEventListener('keydown', (e) => {
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
@@ -525,6 +581,7 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   }
   scene = createBackroomsScene(stageEl, sim.floors, lampsFor());
   scene.onDrip = (pos) => sfx && sfx.drip(pos);
+  scene.onMonsterStep = onMonsterStep;
   if (hud) {
     // l'écran de fin d'une partie précédente, encore programmé, ne vient pas couvrir celle-ci ; l'image du bouc non plus
     clearTimeout(hud.endT);
@@ -1054,6 +1111,7 @@ function handleEvent(ev, me) {
       stageEl.innerHTML = '';
       scene = createBackroomsScene(stageEl, sim.floors, lampsFor());
       scene.onDrip = (pos) => sfx && sfx.drip(pos);
+      scene.onMonsterStep = onMonsterStep;
       sim.spectate = 0;
       stepDist = 0;
       scene.tape('bars', 0.8);
@@ -1283,18 +1341,20 @@ function frame(currentTime) {
   const crouch = crouchOn || touch.crouch || padCrouch;
 
   // Sensibilité de rotation de la souris (réglage), axe vertical inversé au choix
-  const sens = 0.0022 * OPTS.sens;
+  // (au caméscope zoomé, plus lente d'autant : camAimK)
+  const aimK = camAimK();
+  const sens = 0.0022 * OPTS.sens * aimK;
   const inv = OPTS.invertY ? -1 : 1;
   let newYaw = sim.player.yaw - mouseDx * sens;
   let newPitch = Math.max(-1.3, Math.min(1.3, sim.player.pitch - mouseDy * sens * inv));
   if (kbMode && !paused) {
-    newYaw -= ((keys['ArrowRight'] ? 1 : 0) - (keys['ArrowLeft'] ? 1 : 0)) * TURN * delta * OPTS.sens;
-    newPitch = Math.max(-1.3, Math.min(1.3, newPitch + ((keys['ArrowUp'] ? 1 : 0) - (keys['ArrowDown'] ? 1 : 0)) * TILT * delta * inv));
+    newYaw -= ((keys['ArrowRight'] ? 1 : 0) - (keys['ArrowLeft'] ? 1 : 0)) * TURN * delta * OPTS.sens * aimK;
+    newPitch = Math.max(-1.3, Math.min(1.3, newPitch + ((keys['ArrowUp'] ? 1 : 0) - (keys['ArrowDown'] ? 1 : 0)) * TILT * delta * inv * aimK));
   }
   if (gp && !paused) {
     const k = (v) => (Math.abs(v) < 0.12 ? 0 : Math.sign(v) * v * v);
-    newYaw -= k(gp.rx) * TURN * 1.3 * delta * OPTS.sens;
-    newPitch = Math.max(-1.3, Math.min(1.3, newPitch - k(gp.ry) * TILT * delta * inv));
+    newYaw -= k(gp.rx) * TURN * 1.3 * delta * OPTS.sens * aimK;
+    newPitch = Math.max(-1.3, Math.min(1.3, newPitch - k(gp.ry) * TILT * delta * inv * aimK));
   }
   mouseDx = 0;
   mouseDy = 0;
@@ -1442,7 +1502,28 @@ function frame(currentTime) {
     const V0 = sim.viewPlayer(sim.spectate || 0);
     const chasing = !paused && (M.mode === 'chase' || M.mode === 'grab') && M.danger > 0.05;
     // un mur (ou un plancher) entre elle et nous : on l'entend étouffée
-    const occl = (M.floor || 0) !== (V0.floor || 0) || !hasLineOfSight(sim.fm(M.floor || 0), V0.x, V0.z, M.x, M.z);
+    const floors = (M.floor || 0) !== (V0.floor || 0);
+    const occl = floors || !hasLineOfSight(sim.fm(M.floor || 0), V0.x, V0.z, M.x, M.z);
+    // entendue comme un joueur : plus elle doit contourner de murs pour arriver jusqu'à nous, plus elle est étouffée ;
+    // l'écho suit l'espace autour d'elle et de nous (quelques fois par seconde : un parcours de la carte)
+    entEar.t -= delta;
+    if (entEar.t <= 0) {
+      entEar.t = 0.25;
+      const fm = sim.fm(V0.floor || 0);
+      entEar.occ = floors ? 1 : occl ? Math.max(0.35, detourOf(fm, V0.x, V0.z, M.x, M.z)) : 0;
+      // à travers une cloison fine (12 cm de plâtre) ou des piliers, on l'entend mieux qu'à travers un mur plein
+      if (entEar.occ > 0.6 && !floors && fm && fm.grid) {
+        const thick = cellsOnSeg(V0.x, V0.z, M.x, M.z, (gx, gz) => {
+          const v = gx < 0 || gz < 0 || gx >= fm.W || gz >= fm.H ? T.WALL : fm.grid[gz * fm.W + gx];
+          return v === T.WALL || v === T.EXIT || v === T.SHELF || v === T.MACHINE;
+        });
+        if (!thick) entEar.occ = 0.6;
+      }
+      entEar.space = (spaceAt(fm, V0.x, V0.z) + spaceAt(sim.fm(M.floor || 0), M.x, M.z)) / 2;
+    }
+    entEar.spaceS += (entEar.space - entEar.spaceS) * Math.min(1, delta * 2);
+    sfx.entUpdate(M, entEar.occ, floors, entEar.spaceS);
+    entChase = chasing && !M.away && !sim.goats ? { danger: M.danger, occl } : null;
     // Level 2 : pas de bourdonnement d'entité, les sabots du troupeau
     sfx.updateMonsterSound(sim.goats || M.away ? 0 : M.danger, M, sim.level === 1, occl);
     sfx.updateChase(chasing, M.danger, M, occl);
@@ -1483,7 +1564,8 @@ function frame(currentTime) {
           sfx.goatBell({ x: A.x, z: A.z }, A.mode === 'charge' ? 1.3 : 1);
         }
       }
-    } else if (chasing) {
+    } else if (chasing && !(scene && scene.hasBeast)) {
+      // pas d'entité animée (mode VIP du Level 1) : ses pas à la minuterie
       monsterStepT -= delta;
       if (monsterStepT <= 0) {
         monsterStepT = 0.5 - Math.min(1, M.danger) * 0.18;
@@ -1500,6 +1582,7 @@ function frame(currentTime) {
   } else if (sfx) {
     sfx.updateMonsterSound(0, 0); // partie finie : l'entité se tait
     sfx.updateChase(false, 0, null);
+    entChase = null;
     sfx.setTension(0, 'calm');
     if (heartShown) {
       heartShown = 0;
