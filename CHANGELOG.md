@@ -7,6 +7,9 @@
 - **The Backrooms** — Sur les arêtes au bord du vide, l'équilibre est bien moins capricieux : on penche moins vite, les à-coups sont plus doux et Q / D rattrapent mieux. Sans rien faire, on finit quand même par tomber.
 - **The Backrooms** — À l'étage du bas du Level 0, les champs de puits sont entourés de sol : chaque arête entre deux puits mène de l'autre côté, plus aucune ne finit contre un mur ou un meuble.
 - **The Backrooms** — Un saut en courant garde son élan : on file en l'air à la vitesse de la course, même en lâchant les touches. En l'air, on ne peut que l'infléchir un peu, et un mur l'arrête.
+- **The Backrooms** — Le Level 1 fait peau neuve : un vrai entrepôt de béton, aux murs de parpaings peints en gris clair, au sol lissé où les réglettes se reflètent en longues traînées, au plafond à caissons éclairé par la lueur des néons (qui grésille et s'éteint avec eux).
+  - Au plafond, des gaines de ventilation sur leurs étriers, leurs branches rondes et leurs grilles ; aux murs, des postes d'incendie avec leur alarme, des coffrets électriques, des caméras, des horloges arrêtées et des quais de chargement condamnés.
+  - Sur les palettes, des caisses clouées, des grands bacs, des sacs de terreau et de ciment, et enfin des fûts.
 
 ## 4.83 — 8 novembre 2026
 - **The Backrooms** — Les cassettes sont posées par terre, comme les piles et les bouteilles : on les ramasse avec F, sans coupure d'image.

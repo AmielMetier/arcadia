@@ -402,8 +402,13 @@ function drawConcreteWall(ctx, S, photo) {
   ctx.fillRect(0, 0, S, S);
   if (photo) {
     for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) ctx.drawImage(photo, (i * S) / 3, (j * S) / 5, S / 3 + 1, S / 5 + 1);
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = '#c3c6c0';
+    // la peinture des parpaings : un gris clair à peine froid (la photo, jaunie, faisait des murs vert olive sous les
+    // réglettes), un peu éclairci
+    ctx.globalCompositeOperation = 'saturation';
+    ctx.fillStyle = 'rgba(128, 128, 128, 0.7)';
+    ctx.fillRect(0, 0, S, S);
+    ctx.globalCompositeOperation = 'screen';
+    ctx.fillStyle = 'rgb(34, 36, 38)';
     ctx.fillRect(0, 0, S, S);
     ctx.globalCompositeOperation = 'source-over';
   } else noise(ctx, S, S, 40);

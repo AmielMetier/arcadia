@@ -1,8 +1,9 @@
 // The Backrooms (Level 1) - L'habillage de l'entrepôt : rayonnages à palettes (échelles bleues percées, lisses orange,
 // croisillons, planchers grillagés), marchandises sur palettes (cartons, films étirables, fûts, sacs de ciment, bacs),
-// tuyaux et gaines au plafond, réglettes suspendues, lignes peintes au sol, flaques, piliers balisés et numérotés,
-// panneaux d'allée. Tout est dessiné dans le code (textures au canvas, palettes en planches de kart/tex/, Poly Haven CC0)
-// et tiré d'une graine propre à la carte : chacun voit le même entrepôt.
+// plafond à caissons, tuyaux, gaines de ventilation et grilles, réglettes suspendues, lignes peintes au sol, flaques,
+// piliers balisés et numérotés, panneaux d'allée ; aux murs, postes d'incendie, coffrets électriques, caméras, horloges et
+// quais condamnés. Dessiné dans le code (textures au canvas, palettes en planches de kart/tex/) ou tiré des modèles
+// Poly Haven (CC0) de backrooms/models/, et tiré d'une graine propre à la carte : chacun voit le même entrepôt.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
 import { CELL_SIZE, T } from '../engine/map.js';
@@ -365,22 +366,6 @@ function makeTextures(rnd) {
     out.stain = new THREE.CanvasTexture(cv);
   }
 
-  // Tôle galvanisée des gaines, avec la bride au bout de chaque tronçon
-  {
-    const [cv, ctx] = canvas(128);
-    ctx.fillStyle = '#8b9094';
-    ctx.fillRect(0, 0, 128, 128);
-    grain(ctx, 128, 128, 22, rnd);
-    for (let i = 0; i < 20; i++) {
-      ctx.fillStyle = `rgba(255,255,255,${rnd() * 0.12})`;
-      ctx.fillRect(rnd() * 128, rnd() * 128, 30 + rnd() * 60, 2 + rnd() * 6);
-    }
-    ctx.fillStyle = 'rgba(30,32,34,0.6)';
-    ctx.fillRect(0, 0, 4, 128);
-    ctx.fillRect(124, 0, 4, 128);
-    out.duct = tex(cv);
-  }
-
   // Bois des palettes : la photo des planches de kart/tex/, éclaircie (canvas en attendant)
   {
     const [cv, ctx] = canvas(256);
@@ -555,6 +540,16 @@ export function buildWarehouse({ map, group, baked, CEIL, textures }) {
     b.m.push(m);
     b.c.push(shade);
   };
+  // les modèles Poly Haven (CC0, backrooms/models/) posés un par un : kit → morceau ('*' : tous) → matrices et teintes
+  // (l'ombre sous les rayonnages) ; ils sont chargés à la fin et rangés comme le reste par morceau d'entrepôt
+  const kits = new Map();
+  const kp = (kit, piece, m, shade = 1) => {
+    if (!kits.has(kit)) kits.set(kit, new Map());
+    const k = kits.get(kit);
+    if (!k.has(piece)) k.set(piece, { m: [], c: [] });
+    k.get(piece).m.push(m);
+    k.get(piece).c.push(shade);
+  };
   const dummy = new THREE.Object3D();
   dummy.rotation.order = 'YXZ';
   // repère d'une case de rayonnage : lx le long de la rangée, lz en travers
@@ -599,7 +594,7 @@ export function buildWarehouse({ map, group, baked, CEIL, textures }) {
     const y0 = y + 0.144;
     const r = rnd();
     if (r < 0.08 || hb < 0.3) return; // palette vide
-    const kind = r < 0.42 ? 'carton' : r < 0.58 ? 'wrap' : r < 0.72 ? 'drum' : r < 0.86 ? 'sack' : 'tote';
+    const kind = r < 0.35 ? 'carton' : r < 0.42 ? 'model' : r < 0.58 ? 'wrap' : r < 0.72 ? 'drum' : r < 0.86 ? 'sack' : 'tote';
     if (kind === 'carton' || kind === 'wrap') {
       const sizes = [[0.38, 0.3, 0.32], [0.57, 0.4, 0.48], [0.39, 0.36, 0.49], [0.58, 0.28, 0.32]];
       const [bx, by, bz] = sizes[Math.floor(rnd() * sizes.length)];
@@ -618,14 +613,46 @@ export function buildWarehouse({ map, group, baked, CEIL, textures }) {
         }
       }
       if (kind === 'wrap') push(wrapB, L(lx, y0 + (ny * by) / 2, lz, nx * bx + 0.03, ny * by + 0.02, nz * bz + 0.03), shade);
+    } else if (kind === 'model') {
+      // des modèles Poly Haven : caisses de bois clouées, grands bacs de plastique, sacs de terreau (détaillés : on en
+      // met peu, ailleurs la palette reste vide)
+      const m = rnd();
+      if (m < 0.4 && hb > 0.5) {
+        const n = hb > 0.98 && rnd() < 0.6 ? 2 : 1;
+        for (let j = 0; j < n; j++) kp('wooden_crate_02', 'wooden_crate_02_crate', L(lx, y0 + j * 0.45, lz, 1, 1, 1, Math.PI / 2 + (rnd() - 0.5) * 0.05), shade);
+        if (rnd() < 0.7) kp('wooden_crate_02', 'wooden_crate_02_lid', L(lx, y0 + n * 0.45 + 0.03, lz, 1, 1, 1, Math.PI / 2 + (rnd() - 0.5) * 0.08), shade);
+      } else if (m < 0.7 && hb > 0.45) {
+        const n = hb > 0.9 && rnd() < 0.5 ? 2 : 1;
+        for (let j = 0; j < n; j++) kp('plastic_container', 'plastic_container', L(lx, y0 + j * 0.43, lz, 1, 1, 1, (rnd() - 0.5) * 0.06), shade);
+      } else if (m < 0.85) {
+        const n = rnd() < 0.5 ? 2 : 1;
+        for (let j = 0; j < n; j++) kp('compost_bags', 'compost_bags_floorstacked', L(lx + (rnd() - 0.5) * 0.06, y0 + j * 0.175, lz, 1, 1, 1, (rnd() - 0.5) * 0.12 + (j % 2) * Math.PI), shade);
+      }
     } else if (kind === 'drum') {
-      if (hb < 0.9) return load(lx, y, lz, 0, shade);
+      // des fûts : 76 à 88 cm de place sous la lisse, ils sont un peu plus petits qu'un fût de 200 l
+      if (hb < 0.6) return load(lx, y, lz, 0, shade);
+      if (rnd() < 0.1) {
+        // des fûts d'acier (Poly Haven, barrel_03)
+        const k = Math.min(0.8, (hb - 0.02) / 0.93);
+        for (const [dx, dz] of [[-0.3, -0.25], [0.3, -0.25], [-0.3, 0.25], [0.3, 0.25]]) if (rnd() > 0.15) kp('barrel_03', 'barrel_03', L(lx + dx, y0, lz + dz, 0.8, k, 0.8, rnd() * 6), shade);
+        return;
+      }
       const v = drumB[Math.floor(rnd() * 4)];
+      const dh = Math.min(0.88, hb - 0.02);
       for (const [dx, dz] of [[-0.3, -0.25], [0.3, -0.25], [-0.3, 0.25], [0.3, 0.25]]) {
         if (rnd() < 0.15) continue;
-        push(v, L(lx + dx, y0 + 0.44, lz + dz, 0.56, 0.88, 0.56, rnd() * 6), shade * (0.8 + rnd() * 0.25));
+        push(v, L(lx + dx, y0 + dh / 2, lz + dz, 0.56, dh, 0.56, rnd() * 6), shade * (0.8 + rnd() * 0.25));
       }
     } else if (kind === 'sack') {
+      if (rnd() < 0.08) {
+        // des sacs de ciment (Poly Haven, cement_bag), croisés d'un lit à l'autre
+        const n = Math.min(5, Math.floor((hb * (0.5 + rnd() * 0.5)) / 0.135));
+        for (let j = 0; j < n; j++) {
+          const cross = j % 2 === 1;
+          for (const o of [-0.25, 0.25]) kp('cement_bag', 'cement_bag', L(lx + (cross ? 0 : o * 1.1), y0 + j * 0.135, lz + (cross ? o : 0), 1.05, 0.75, 1.3, (cross ? Math.PI / 2 : 0) + (rnd() - 0.5) * 0.08), shade * (0.85 + rnd() * 0.2));
+        }
+        return;
+      }
       const n = Math.min(7, Math.floor((hb * (0.5 + rnd() * 0.5)) / 0.13));
       for (let j = 0; j < n; j++) {
         const cross = j % 2 === 1;
@@ -806,8 +833,12 @@ export function buildWarehouse({ map, group, baked, CEIL, textures }) {
   const fireMat = decal({ map: tx.fire });
   const fireSignB = bin('fireSign', atlasGeo(new THREE.BoxGeometry(1, 1, 1), 0, 0, 0.5, 1), lambert({ map: tx.fire }));
   const firePanelB = bin('firePanel', atlasGeo(new THREE.PlaneGeometry(1, 1), 0.5, 0, 0.5, 1), fireMat);
-  const extPlaces = []; // les extincteurs (modèle Poly Haven, chargé plus bas)
   const stations = [];
+  const shutters = [];
+  const boxes = [];
+  const cams = [];
+  const clocks = [];
+  const far = (list, x, z, d) => list.every((p) => Math.hypot(p[0] - x, p[1] - z) > d);
   const CY = 3.05; // hauteur de la gaine
   // posé contre le mur en (x, y, z), tourné de ry, à l'échelle (sx, sy, sz)
   const wallAt = (x, y, z, ry, sx, sy, sz) => {
@@ -848,7 +879,25 @@ export function buildWarehouse({ map, group, baked, CEIL, textures }) {
           stations.push([fx, fz]);
           push(firePanelB, wallAt(fx - dx * 0.004, 0.82, fz - dz * 0.004, ry, 0.62, 1.26, 1));
           push(fireSignB, wallAt(fx - dx * 0.008, 1.78, fz - dz * 0.008, ry, 0.32, 0.32, 0.012));
-          extPlaces.push(new THREE.Matrix4().makeTranslation(fx - dx * 0.17, 0, fz - dz * 0.17).multiply(new THREE.Matrix4().makeRotationY(ry)));
+          kp('korean_fire_extinguisher_01', '*', new THREE.Matrix4().makeTranslation(fx - dx * 0.17, 0, fz - dz * 0.17).multiply(new THREE.Matrix4().makeRotationY(ry)));
+          // le déclencheur manuel d'alarme incendie, à côté, à hauteur de main
+          kp('fire_alarm', '*', wallAt(fx - dx * 0.002 + tx0 * 0.58, 1.45, fz - dz * 0.002 + tz0 * 0.58, ry, 1.25, 1.25, 1.25));
+        } else if (r < 0.105 && (wx === 0 || wz === 0 || wx === W - 1 || wz === H - 1) && far(shutters, fx, fz, 20) && far(stations, fx, fz, 4)) {
+          // un quai de chargement condamné sur le mur d'enceinte : le rideau métallique baissé, son caisson au-dessus
+          shutters.push([fx, fz]);
+          kp('rollershutter_door', rnd() < 0.3 ? 'rollershutter_door_graffiti' : 'rollershutter_door', wallAt(fx - dx * 0.006, 0, fz - dz * 0.006, ry, 2.15, 1.12, 1));
+        } else if (r < 0.125 && far(boxes, fx, fz, 16) && far(stations, fx, fz, 4) && far(shutters, fx, fz, 4)) {
+          // un coffret électrique, sa porte entrouverte
+          boxes.push([fx, fz]);
+          kp('power_box_01', '*', wallAt(fx - dx * 0.05 + tx0 * 0.3, 1.5, fz - dz * 0.05 + tz0 * 0.3, ry, 1, 1, 1));
+        } else if (r < 0.133 && cams.length < 8 && far(cams, fx, fz, 24)) {
+          // une caméra de surveillance, sous la gaine, qui plonge vers l'allée
+          cams.push([fx, fz]);
+          kp('security_camera_01', '*', wallAt(fx - dx * 0.3, 2.62, fz - dz * 0.3, ry, 1.1, 1.1, 1.1));
+        } else if (r < 0.138 && clocks.length < 3 && far(clocks, fx, fz, 30) && far(stations, fx, fz, 4)) {
+          // une horloge arrêtée
+          clocks.push([fx, fz]);
+          kp('wall_clock', '*', wallAt(fx, 2.55, fz, ry, 1.3, 1.3, 1.3));
         } else if (r > 0.86) {
           // repère de zone : le quart de l'entrepôt (A à D) et son quart à lui (1 à 4)
           const qx = x < W / 2 ? 0 : 1;
@@ -925,7 +974,8 @@ export function buildWarehouse({ map, group, baked, CEIL, textures }) {
       concrete.needsUpdate = true;
     });
   }
-  const beamMat = lambert({ map: concrete, color: '#f2f2ee' });
+  // (le dessous et les flancs des poutres reçoivent la lueur qui monte des réglettes voisines)
+  const beamMat = baked(new THREE.MeshLambertMaterial({ map: concrete, color: '#f2f2ee' }), { gloss: 1 });
   const BD1 = 0.4;
   const BD2 = 0.3;
   const beamZ = bin('beamZ', boxUV(new THREE.BoxGeometry(0.42, BD1, C), C), beamMat);
@@ -945,11 +995,13 @@ export function buildWarehouse({ map, group, baked, CEIL, textures }) {
   const pipeDefs = [
     { r: 0.075, dz: 0, dy: 0.28, col: '#6e7477' },
     { r: 0.05, dz: 0.32, dy: 0.22, col: '#8e2219' },
-    { r: 0.095, dz: 0.66, dy: 0.32, col: '#4b5e47' },
+    { r: 0.095, dz: 0.66, dy: 0.3, col: '#4b5e47' },
   ];
   const strapB = bin('strap', new THREE.BoxGeometry(1, 0.02, 0.05), lambert({ color: '#3a3c3e' }));
+  const pipeZ = []; // le milieu de chaque faisceau de tuyaux
   for (let gz = 4 + Math.floor(rnd() * 3); gz < H - 2; gz += 9 + Math.floor(rnd() * 4)) {
     const z0 = gz * C + 0.4;
+    pipeZ.push(z0 + 0.38);
     for (const p of pipeDefs) {
       const b = bin('pipe' + p.col, new THREE.CylinderGeometry(p.r, p.r, 1, 10), lambert({ color: p.col }));
       // un tronçon par morceau d'entrepôt (CH m) : bout à bout, ils font le tuyau ; chacun n'est dessiné que s'il se voit
@@ -965,7 +1017,7 @@ export function buildWarehouse({ map, group, baked, CEIL, textures }) {
     // colliers : une tige et une barre sous les tuyaux, tous les 2,5 m
     for (let x = C / 2; x < len; x += C) {
       dummy.rotation.set(0, 0, 0);
-      dummy.position.set(x, CEIL - 0.4, z0 + 0.33);
+      dummy.position.set(x, CEIL - 0.395, z0 + 0.33);
       dummy.scale.set(1, 1, 18);
       dummy.updateMatrix();
       push(strapB, dummy.matrix.clone());
@@ -977,15 +1029,90 @@ export function buildWarehouse({ map, group, baked, CEIL, textures }) {
       }
     }
   }
-  const ductB = bin('duct', new THREE.BoxGeometry(0.7, 0.45, 1.2), lambert({ map: tx.duct }));
+  // --- Ventilation (modèles Poly Haven, CC0) : des gaines principales de tôle nervurée le long de z, pendues à des
+  // étriers tous les 1,8 m, des grilles sur leurs flancs ; des branches rondes en partent le long de x (un adaptateur
+  // sur le flanc, des colliers, une bouche au bout) ; des grilles de reprise d'air dans la dalle, entre les poutres.
+  // Tout passe sous les tuyaux et les poutres, au-dessus des rayonnages (3,40 m), et jamais près des ascenseurs
+  const mat4 = (x, y, z, ry = 0, sx = 1, sy = 1, sz = 1, rx = 0) => {
+    dummy.position.set(x, y, z);
+    dummy.rotation.set(rx, ry, 0);
+    dummy.scale.set(sx, sy, sz);
+    dummy.updateMatrix();
+    return dummy.matrix.clone();
+  };
+  const RK = 'modular_airduct_rectangular_01';
+  const CK = 'modular_airduct_circular_01';
+  const DY = CEIL - 0.62; // l'axe des gaines
+  const DS = 0.78; // la gaine du modèle (51 cm) ramenée à 40 cm de haut
+  const SEG = 1.8;
+  const liftCells = [map.exit, map.arrival, map.elevator].filter(Boolean);
+  const nearLift = (x, z) => liftCells.some((c) => Math.abs(Math.floor(x / C) - c.gx) <= 1 && Math.abs(Math.floor(z / C) - c.gz) <= 1);
+  const nearBeamX = (z) => Math.abs(z - Math.round(z / (2 * C)) * 2 * C) < 0.3;
+  const nearBeamZ = (x) => Math.abs(x - Math.round(x / (3 * C)) * 3 * C) < 0.35;
+  const trunks = [];
   for (let gx = 6 + Math.floor(rnd() * 4); gx < W - 3; gx += 13 + Math.floor(rnd() * 5)) {
-    const x0 = gx * C + 1.2;
-    for (let z = 0.6; z < H * C; z += 1.2) {
-      dummy.rotation.set(0, 0, 0);
-      dummy.position.set(x0, CEIL - 0.6, z);
-      dummy.scale.set(1, 1, 1);
-      dummy.updateMatrix();
-      push(ductB, dummy.matrix.clone());
+    // (jamais dans une colonne de réglettes : la gaine passerait au travers de leur capot)
+    const x0 = (gx % 3 === 1 ? gx + 1 : gx) * C + 1.2;
+    trunks.push(x0);
+    let n = 0;
+    for (let z = C; z + SEG <= (H - 1) * C + 0.01; z += SEG, n++) {
+      if (nearLift(x0, z) || nearLift(x0, z + SEG)) continue;
+      kp(RK, RK + '_tripple_01', mat4(x0, DY, z, 0, 1, DS, 1));
+      // l'étrier sous la gaine et ses deux tiges jusqu'à la dalle (pas au droit d'une poutre)
+      if (z > C + 0.1 && !nearBeamX(z)) {
+        const yb = DY - 0.26 * DS - 0.03;
+        kp(RK, RK + '_brace_01', mat4(x0, yb, z));
+        kp(RK, RK + '_brace_wire_01', mat4(x0, (yb + CEIL) / 2, z, 0, 1, (CEIL - yb) / 1.1, 1));
+      }
+      // une grille sur un flanc, un tronçon sur trois, d'un côté puis de l'autre
+      if (n % 3 === 1) {
+        const sd = n % 6 === 1 ? 1 : -1;
+        kp(RK, RK + (rnd() < 0.5 ? '_vent_01' : '_vent_02'), mat4(x0 + sd * 0.3, DY, z + SEG / 2, sd * Math.PI / 2, 0.85, 0.85, 1));
+      }
+    }
+  }
+  // les branches rondes, le long de x, au milieu des rangées de caissons sans réglettes, loin des faisceaux de tuyaux
+  for (const x0 of trunks) {
+    for (let gz = 2; gz < H - 3; gz += 2) {
+      const z = (gz + 0.5) * C;
+      if (rnd() > 0.32 || !pipeZ.every((pz) => Math.abs(pz - z) > 1.6)) continue;
+      const sd = rnd() < 0.5 ? 1 : -1;
+      const xs = x0 + sd * (0.33 + 0.32);
+      const want = 5 + Math.floor(rnd() * 5);
+      let n = 0;
+      while (n < want) {
+        const xe = xs + sd * 1.42 * (n + 1);
+        const cx2 = Math.floor(xe / C);
+        if (solid(cx2, gz) || nearLift(xe, z) || trunks.some((t) => t !== x0 && Math.abs(t - xe) < 1.2)) break;
+        n++;
+      }
+      if (n < 2 || nearLift(x0, z)) continue;
+      kp(CK, 'modular_airduct_rectangular_converter', mat4(x0 + sd * 0.33, DY, z, sd * Math.PI / 2));
+      for (let i = 0; i < n; i++) {
+        const xa = xs + sd * 1.42 * i;
+        kp(CK, 'modular_airduct_circular_triple', mat4(xa, DY, z, sd * Math.PI / 2));
+        const xb = xa + sd * 0.71;
+        if (!nearBeamZ(xb)) {
+          kp(CK, 'modular_airduct_circular_brace', mat4(xb, DY, z, sd * Math.PI / 2));
+          kp(CK, 'modular_airduct_circular_brace_extention_wires', mat4(xb, DY + 0.49, z, sd * Math.PI / 2, 1, (CEIL - DY - 0.49) / 0.6, 1));
+        }
+      }
+      kp(CK, 'modular_airduct_circular_fan', mat4(xs + sd * 1.42 * n, DY, z, sd * Math.PI / 2, 0.75, 0.75, 1));
+    }
+  }
+  // les grilles de reprise dans la dalle : au fond des caissons, à l'écart des réglettes, des tuyaux et des gaines
+  for (let kx = 0; kx * 3 * C < W * C; kx++) {
+    for (let kz = 0; kz * 2 * C < H * C; kz++) {
+      for (const sd of [-1, 1]) {
+        if (rnd() > 0.22) continue;
+        const xg = kx * 3 * C + 1.5 * C + sd * 2.3;
+        const zg = kz * 2 * C + C - 0.9;
+        const cxg = Math.floor(xg / C);
+        const czg = Math.floor(zg / C);
+        if (at(cxg, czg) === T.WALL || at(cxg, czg) === T.EXIT || nearLift(xg, zg)) continue;
+        if (!pipeZ.every((pz) => Math.abs(pz - zg) > 0.9) || !trunks.every((t) => Math.abs(t - xg) > 0.7)) continue;
+        kp(RK, RK + (rnd() < 0.5 ? '_vent_01' : '_vent_02'), mat4(xg, CEIL - 0.004, zg, rnd() < 0.5 ? 0 : Math.PI / 2, 1.25, 1.25, 1, Math.PI / 2));
+      }
     }
   }
 
@@ -1002,8 +1129,10 @@ export function buildWarehouse({ map, group, baked, CEIL, textures }) {
   const bb = new THREE.Box3();
   const sets = [];
   let nVis = -1;
-  // un ensemble d'objets du même maillage (list : leurs matrices ; shades : leurs teintes, ou null), rangés par morceau
-  const addSet = (geo, mat, list, shades) => {
+  // un ensemble d'objets du même maillage (list : leurs matrices ; shades : leurs teintes, ou null), rangés par morceau ;
+  // near : dessinés seulement dans les morceaux à moins de NEAR m (les modèles détaillés : plus loin, le brouillard en
+  // laisse moins d'un millième, rien qu'un pixel puisse montrer)
+  const addSet = (geo, mat, list, shades, near = false) => {
     const n = list.length;
     if (!n) return;
     if (!geo.boundingBox) geo.computeBoundingBox();
@@ -1038,32 +1167,54 @@ export function buildWarehouse({ map, group, baked, CEIL, textures }) {
     if (cols) inst.instanceColor = new THREE.InstancedBufferAttribute(cols.slice(), 3);
     inst.frustumCulled = false;
     group.add(inst);
-    sets.push({ inst, mats, cols, start });
+    sets.push({ inst, mats, cols, start, near });
     nVis = -1; // (un ensemble arrivé après coup : la prochaine image refait le tri)
   };
   for (const b of bins.values()) addSet(b.geo, b.mat, b.m, b.c);
-  // les extincteurs des postes (Poly Haven, korean_fire_extinguisher_01, CC0), une fois le modèle chargé
-  if (extPlaces.length)
-    loadKit('korean_fire_extinguisher_01').then((pieces) => {
-      for (const parts of pieces.values()) {
-        for (const part of parts) {
-          const src = part.mat;
-          const mat = baked(new THREE.MeshLambertMaterial({ map: src.map || null, color: src.color ? src.color.clone().multiplyScalar(0.85) : '#888888' }));
-          addSet(part.geo, mat, extPlaces.map((m) => m.clone().multiply(part.m)), null);
+  // les modèles posés un par un (Poly Haven, CC0), une fois chargés : une matière de la scène par matière du modèle
+  const kitMats = new Map();
+  const kitMat = (src) => {
+    if (!kitMats.has(src))
+      kitMats.set(
+        src,
+        baked(
+          new THREE.MeshLambertMaterial({
+            map: src.map || null,
+            color: src.color ? src.color.clone().multiplyScalar(0.85) : '#888888',
+            alphaTest: src.alphaTest || (src.transparent || src.alphaMap ? 0.5 : 0),
+            alphaMap: src.alphaMap || null,
+            side: src.side,
+          }),
+        ),
+      );
+    return kitMats.get(src);
+  };
+  for (const [name, places] of kits)
+    loadKit(name).then((pieces) => {
+      for (const [piece, list] of places) {
+        for (const [pn, parts] of pieces) {
+          if (piece !== '*' && pn !== piece) continue;
+          for (const part of parts) addSet(part.geo, kitMat(part.mat), list.m.map((m) => m.clone().multiply(part.m)), list.c, true);
         }
       }
     });
+  const NEAR = 50; // (brouillard exp² de densité 0,058, selon la profondeur de vue : à 50 m, il reste 0,02 % de l'objet)
   const vis = new Int32Array(NCH);
+  const visN = new Int32Array(NCH); // ceux d'entre eux qui sont à moins de NEAR m
+  let nNear = -1;
   const sph = new THREE.Sphere();
-  // n morceaux visibles (vis) : on recopie leurs objets au début des tampons, et on n'envoie que cette partie
-  const fill = (n) => {
+  // n morceaux visibles (vis), dont nn proches (visN) : on recopie leurs objets au début des tampons, et on n'envoie que
+  // cette partie
+  const fill = (n, nn) => {
     for (const S of sets) {
       const am = S.inst.instanceMatrix.array;
       const ac = S.cols && S.inst.instanceColor.array;
+      const L = S.near ? visN : vis;
+      const m = S.near ? nn : n;
       let o = 0;
-      for (let j = 0; j < n; j++) {
-        const a = S.start[vis[j]];
-        const b = S.start[vis[j] + 1];
+      for (let j = 0; j < m; j++) {
+        const a = S.start[L[j]];
+        const b = S.start[L[j] + 1];
         if (b === a) continue;
         am.set(S.mats.subarray(a * 16, b * 16), o * 16);
         if (ac) ac.set(S.cols.subarray(a * 3, b * 3), o * 3);
@@ -1086,6 +1237,7 @@ export function buildWarehouse({ map, group, baked, CEIL, textures }) {
     cull(V, here = true, insetHere = false) {
       const gy = group.position.y;
       let n = 0;
+      let nn = 0;
       let ch = false;
       for (let k = 0; k < NCH; k++) {
         const r = sc[k * 4 + 3];
@@ -1107,11 +1259,19 @@ export function buildWarehouse({ map, group, baked, CEIL, textures }) {
         if (!ok) continue;
         if (vis[n] !== k) ch = true;
         vis[n++] = k;
+        // proche : la sphère du morceau entame les NEAR premiers mètres de profondeur de la caméra (c'est la profondeur,
+        // pas la distance, qui règle le brouillard), ou le médaillon la voit
+        const dc = (x - V.cam.x) * V.fwd.x + (y - V.cam.y) * V.fwd.y + (z - V.cam.z) * V.fwd.z - r;
+        if (api.off || dc <= NEAR || (V.inset && insetHere && V.ifr.intersectsSphere(sph.set(sph.center.set(x, y, z), r)))) {
+          if (visN[nn] !== k) ch = true;
+          visN[nn++] = k;
+        }
       }
-      if (n !== nVis) ch = true;
+      if (n !== nVis || nn !== nNear) ch = true;
       if (!ch) return;
       nVis = n;
-      fill(n);
+      nNear = nn;
+      fill(n, nn);
     },
   };
   return api;
