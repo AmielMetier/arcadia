@@ -4,6 +4,9 @@
 - **The Backrooms** — L'ascenseur qui se referme en mur est toujours le plus proche de l'équipe : il faut courir jusqu'à l'autre.
 - **The Backrooms** — Les portes de l'ascenseur refermées ne laissent plus voir le couloir à travers la cabine, et on ne passe plus au travers : elles poussent dans la cabine ou dans le couloir celui qui reste sur le seuil.
 - **The Backrooms** — Mort ou à l'abri dans l'ascenseur, l'écran de spectateur ne fait plus planter l'affichage.
+- **The Backrooms** — Sur les arêtes au bord du vide, l'équilibre est bien moins capricieux : on penche moins vite, les à-coups sont plus doux et Q / D rattrapent mieux. Sans rien faire, on finit quand même par tomber.
+- **The Backrooms** — À l'étage du bas du Level 0, les champs de puits sont entourés de sol : chaque arête entre deux puits mène de l'autre côté, plus aucune ne finit contre un mur ou un meuble.
+- **The Backrooms** — Un saut en courant garde son élan : on file en l'air à la vitesse de la course, même en lâchant les touches. En l'air, on ne peut que l'infléchir un peu, et un mur l'arrête.
 
 ## 4.83 — 8 novembre 2026
 - **The Backrooms** — Les cassettes sont posées par terre, comme les piles et les bouteilles : on les ramasse avec F, sans coupure d'image.

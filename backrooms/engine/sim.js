@@ -40,6 +40,8 @@ export const CROUCH_SPEED = 0.5; // accroupi : moitié moins vite, presque sans 
 // le saut : un petit bond (0,35 m, 0,4 s en l'air) ; même en courant on ne franchit pas un trou (2 m)
 export const JUMP_V = 3.4;
 export const JUMP_G = 17;
+// en l'air, on garde son élan (la vitesse prise à l'appel) ; les touches ne font que l'infléchir, de 3 m/s² au plus
+export const AIR_ACCEL = 3;
 // La soif : on court sans fin, mais on se déshydrate peu à peu (plus vite en courant). Sous THIRST_BLUR, la vue se
 // brouille de plus en plus ; à sec, on s'effondre. L'eau d'amande désaltère
 export const WATER_DRAIN = 100 / 540; // par seconde : 9 minutes d'une gourde pleine à sec, en marchant
@@ -75,10 +77,11 @@ export const PANEL_T = 4; // Level 1 : secondes devant le panneau du monte-charg
 // Barre d'équilibre : sur une arête entre deux trous, on n'avance que tout droit et le corps tangue ; Q et D
 // corrigent. tilt va de -1 (penché à gauche) à 1 (à droite) : au bout, on tombe dans le trou de ce côté.
 export const BEAM_SPEED = 0.65; // vitesse de marche sur une arête (part de la marche normale)
-export const BEAM_UNSTABLE = 4; // plus on penche, plus on penche
-export const BEAM_NOISE = [10, 16]; // à-coups au hasard (immobile, en marchant)
-export const BEAM_FIX = 4.5; // force de Q / D
-export const BEAM_DAMP = 2.5;
+// (réglé pour un joueur qui réagit en 0,4 s : il traverse ; sans rien faire, on tombe au bout de 6 s environ)
+export const BEAM_UNSTABLE = 2; // plus on penche, plus on penche
+export const BEAM_NOISE = [5, 8.5]; // à-coups au hasard (immobile, en marchant)
+export const BEAM_FIX = 5; // force de Q / D
+export const BEAM_DAMP = 3.5;
 export const FALL_LOCK = 2.2; // secondes à terre après une chute d'un étage (plus d'une seconde de chute, puis sonné)
 export const WHISTLE_CD = 1.2;
 export const WHISTLE_HEAT = 2.5; // chaque coup compte 1 et s'oublie en 20 s : au 3e coup rapproché, l'entité vient à coup sûr
@@ -1260,7 +1263,8 @@ export class BackroomsSim {
 
   // Barre d'équilibre : renvoie le côté de la chute (-1 gauche, 1 droite) ou 0
   balance(P, mx) {
-    P.onBeam = this.pitUnder(P.x, P.z, P.floor) >= 0;
+    // (en l'air, on passe au-dessus : l'élan du saut n'est pas cassé par l'arête qu'on survole)
+    P.onBeam = !(P.jy > 0) && this.pitUnder(P.x, P.z, P.floor) >= 0;
     if (!P.onBeam) {
       P.tilt *= Math.max(0, 1 - DT * 5);
       P.tiltV = 0;
@@ -1759,18 +1763,15 @@ export class BackroomsSim {
         P.x = b.x;
         P.z = b.z;
       }
-    } else if (P.moving) {
-      const len = Math.hypot(mx, my) || 1;
-      const normX = mx / len;
-      const normY = my / len;
-      const fx = -Math.sin(P.yaw);
-      const fz = -Math.cos(P.yaw);
-      const rx = Math.cos(P.yaw);
-      const rz = -Math.sin(P.yaw);
-      const p2 = this.moveWithCollisions(P.x, P.z, (fx * normY + rx * normX) * speed * DT, (fz * normY + rz * normX) * speed * DT, PLAYER_RADIUS, P.floor);
-      const p3 = this.stairStep(P, p2.x, p2.z);
-      P.x = p3.x;
-      P.z = p3.z;
+    } else if (P.moving || P.jy > 0) {
+      const v = this.stride(P, this.wishVel(P, mx, my, speed));
+      if (v.x || v.z) {
+        const p2 = this.moveWithCollisions(P.x, P.z, v.x * DT, v.z * DT, PLAYER_RADIUS, P.floor);
+        this.bumpAir(P, p2);
+        const p3 = this.stairStep(P, p2.x, p2.z);
+        P.x = p3.x;
+        P.z = p3.z;
+      }
     }
 
     // 3a. Les portes de la cabine se referment : on ne reste pas entre les vantaux
@@ -2030,6 +2031,7 @@ export class BackroomsSim {
       P.jy = 0.001;
       P.jvy = JUMP_V;
       P.crouch = false;
+      P.takeoff = true; // l'élan est pris au premier pas en l'air (stride)
     }
     if (!(P.jy > 0)) return false;
     P.crouch = false;
@@ -2038,7 +2040,54 @@ export class BackroomsSim {
     if (P.jy > 0) return false;
     P.jy = 0;
     P.jvy = 0;
+    P.takeoff = false;
     return true;
+  }
+
+  // la vitesse voulue (m/s) d'après les touches, dans le repère du regard
+  wishVel(P, mx, my, speed) {
+    if (!mx && !my) return { x: 0, z: 0 };
+    const len = Math.hypot(mx, my) || 1;
+    const fx = -Math.sin(P.yaw);
+    const fz = -Math.cos(P.yaw);
+    const rx = Math.cos(P.yaw);
+    const rz = -Math.sin(P.yaw);
+    return { x: ((fx * my + rx * mx) / len) * speed, z: ((fz * my + rz * mx) / len) * speed };
+  }
+
+  // La vitesse du pas (m/s) : au sol, celle des touches ; en l'air, on garde l'élan pris à l'appel (un saut en courant
+  // file à la vitesse de la course, même touches lâchées). Les touches ne font que l'infléchir (AIR_ACCEL) : elles
+  // n'enlèvent rien à l'élan dans leur sens, et l'on ne dépasse jamais la course
+  stride(P, w) {
+    if (!(P.jy > 0)) return w;
+    if (P.takeoff) {
+      P.takeoff = false;
+      P.avx = w.x;
+      P.avz = w.z;
+      return w;
+    }
+    const ws = Math.hypot(w.x, w.z);
+    if (ws > 0) {
+      const ux = w.x / ws;
+      const uz = w.z / ws;
+      const add = Math.min(Math.max(0, ws - ((P.avx || 0) * ux + (P.avz || 0) * uz)), AIR_ACCEL * DT);
+      P.avx = (P.avx || 0) + ux * add;
+      P.avz = (P.avz || 0) + uz * add;
+      const v = Math.hypot(P.avx, P.avz);
+      const cap = SPRINT_SPEED * this.wade(P);
+      if (v > cap) {
+        P.avx *= cap / v;
+        P.avz *= cap / v;
+      }
+    }
+    return { x: P.avx || 0, z: P.avz || 0 };
+  }
+
+  // en l'air, un mur arrête l'élan qui va vers lui (on glisse le long)
+  bumpAir(P, p) {
+    if (!(P.jy > 0)) return;
+    P.avx = (p.x - P.x) / DT;
+    P.avz = (p.z - P.z) / DT;
   }
 
   predict(input = {}) {
@@ -2085,18 +2134,15 @@ export class BackroomsSim {
       return 0;
     }
     P.running = !!input.run && P.moving && !P.crouch;
-    if (!P.moving) {
+    const speed = (P.running ? SPRINT_SPEED : P.crouch ? WALK_SPEED * CROUCH_SPEED : WALK_SPEED) * this.wade(P);
+    const v = this.stride(P, this.wishVel(P, mx, my, speed));
+    if (!v.x && !v.z) {
       // immobile dans un jet de vapeur : on se brûle aussi
       this.predictBurn(P);
       return 0;
     }
-    const speed = (P.running ? SPRINT_SPEED : P.crouch ? WALK_SPEED * CROUCH_SPEED : WALK_SPEED) * this.wade(P);
-    const len = Math.hypot(mx, my) || 1;
-    const fx = -Math.sin(P.yaw);
-    const fz = -Math.cos(P.yaw);
-    const rx = Math.cos(P.yaw);
-    const rz = -Math.sin(P.yaw);
-    const pos = this.moveWithCollisions(P.x, P.z, ((fx * my + rx * mx) / len) * speed * DT, ((fz * my + rz * mx) / len) * speed * DT, PLAYER_RADIUS, P.floor);
+    const pos = this.moveWithCollisions(P.x, P.z, v.x * DT, v.z * DT, PLAYER_RADIUS, P.floor);
+    this.bumpAir(P, pos);
     const ps = this.stairStep(P, pos.x, pos.z);
     P.x = ps.x;
     P.z = ps.z;

@@ -1649,6 +1649,27 @@ test("barre d'équilibre : sans rien faire on bascule dans le trou du côté où
     });
     assert.equal(b.P.floor, 0, `graine ${sd} : tenu 20 s en corrigeant`);
   }
+  // pas trop sensible : un joueur qui ne réagit qu'au bout de 0,4 s (et d'un coup) traverse une arête de trois cases
+  // en marchant, presque à chaque fois
+  let held = 0;
+  for (let sd = 1; sd <= 24; sd++) {
+    const b = onBeam(1 + (sd % 3) * 3);
+    const seen = [];
+    let mx = 0;
+    b.P.moving = true; // les à-coups de la marche
+    withSeed(100 + sd, () => {
+      for (let i = 0; i < 60 * 5.5 && b.P.floor === 0; i++) {
+        seen.push(b.P.tilt);
+        const t = seen[Math.max(0, seen.length - 1 - 24)];
+        if (Math.abs(t) > 0.3) mx = -Math.sign(t);
+        else if (Math.abs(t) < 0.12) mx = 0;
+        b.sim.balance(b.P, mx); // seulement l'équilibre : on reste sur l'arête (le pas en avant n'y change rien)
+        if (Math.abs(b.P.tilt) >= 1) b.P.floor = -1;
+      }
+    });
+    if (b.P.floor === 0) held++;
+  }
+  assert.ok(held >= 21, `réflexes de 0,4 s : ${held} traversées sur 24`);
 });
 
 test("barre d'équilibre : on n'y avance que tout droit et lentement, Q / D ne font pas de pas de côté", () => {
@@ -1724,6 +1745,36 @@ test("Level 0 : des puits sans fond à l'étage du bas, en grille au milieu d'un
     // rien posé dedans ; loin des cases d'atterrissage
     for (const it of down.items) assert.ok(down.pitAt(it.gx, it.gz) < 0, `graine ${sd} : objet dans un puits`);
     for (const p of deep) assert.ok(up.pits.every((q) => Math.max(Math.abs(q.gx - p.gx), Math.abs(q.gz - p.gz)) >= 4), `graine ${sd} : puits sous un trou du haut`);
+  }
+});
+
+test('puits sans fond : chaque arête entre deux puits débouche, à ses deux bouts, sur du sol libre (jamais sur un mur ni un meuble)', () => {
+  for (let sd = 1; sd <= 30; sd++) {
+    const sim = new BackroomsSim({ difficulty: 'peaceful', seed: sd });
+    const down = sim.floors[1];
+    const W = down.W;
+    const set = new Set(down.pits.filter((p) => p.deep).map((p) => p.gz * W + p.gx));
+    const has = (x, z) => set.has(z * W + x);
+    let ends = 0;
+    for (const k of set) {
+      const gx = k % W;
+      const gz = (k - gx) / W;
+      for (const lineX of [true, false]) {
+        // deux puits voisins : l'arête est la ligne qui les sépare ; on la suit jusqu'au bout, dans les deux sens
+        if (lineX ? !has(gx + 1, gz) : !has(gx, gz + 1)) continue;
+        for (const s of [-1, 1]) {
+          let n = 1;
+          while (lineX ? has(gx, gz + s * n) && has(gx + 1, gz + s * n) : has(gx + s * n, gz) && has(gx + s * n, gz + 1)) n++;
+          const x = lineX ? (gx + 1) * CELL_SIZE : (s > 0 ? gx + n : gx - n + 1) * CELL_SIZE + s * 0.6;
+          const z = lineX ? (s > 0 ? gz + n : gz - n + 1) * CELL_SIZE + s * 0.6 : (gz + 1) * CELL_SIZE;
+          if (lineX ? has(gx, gz + s * n) || has(gx + 1, gz + s * n) : has(gx + s * n, gz) || has(gx + s * n, gz + 1)) continue; // le bord du champ
+          ends++;
+          assert.ok(!sim.isColliding(x, z, PLAYER_RADIUS, 1), `graine ${sd} : l'arête finit contre un obstacle en (${(x / CELL_SIZE).toFixed(1)}, ${(z / CELL_SIZE).toFixed(1)})`);
+          assert.ok(sim.pitUnder(x, z, 1) < 0, `graine ${sd} : l'arête finit dans le vide`);
+        }
+      }
+    }
+    assert.ok(ends > 0, `graine ${sd} : des arêtes`);
   }
 });
 
@@ -2958,6 +3009,55 @@ test("saut : un petit bond qui s'entend à la réception et ne franchit pas un t
   P.onBeam = true;
   sim.step({ jump: true });
   assert.equal(P.jy, 0, 'pas de saut sur une arête');
+});
+
+test("saut : en courant, on garde son élan en l'air (touches lâchées), chez l'hôte comme chez l'invité ; un mur l'arrête", () => {
+  const players = [{ id: 1, name: 'Hôte' }, { id: 2, name: 'Invité' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players, localId: 1 });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players, localId: 2 });
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  // une direction dégagée sur 6 m, sans trou
+  const clear = (sim, P) => {
+    for (let a = 0; a < 6.28; a += 0.1) {
+      let ok = true;
+      for (let d = 0.25; d < 6 && ok; d += 0.25) ok = !sim.isColliding(P.x - Math.sin(a) * d, P.z - Math.cos(a) * d, PLAYER_RADIUS + 0.05, P.floor) && sim.pitUnder(P.x - Math.sin(a) * d, P.z - Math.cos(a) * d, P.floor) < 0;
+      if (ok) return a;
+    }
+    return null;
+  };
+  for (const [who, sim, P, step] of [
+    ['hôte', host, host.player, (i) => host.step(i)],
+    ['invité', guest, guest.player, (i) => guest.predict({ yaw: guest.player.yaw, ...i })],
+  ]) {
+    P.yaw = clear(sim, P);
+    assert.ok(P.yaw !== null, `${who} : de la place`);
+    for (let i = 0; i < 20; i++) step({ my: 1, run: true });
+    const x0 = P.x;
+    const z0 = P.z;
+    step({ my: 1, run: true, jump: true });
+    let n = 1;
+    while (P.jy > 0 && n < 60) {
+      step({});
+      n++;
+    }
+    const d = Math.hypot(P.x - x0, P.z - z0);
+    assert.ok(d > 0.9 * 4.4 * n * DT && d < 2 * PIT_HALF, `${who} : ${d.toFixed(2)} m en ${(n * DT).toFixed(2)} s, touches lâchées`);
+  }
+  // sur place, puis la marche en l'air : à peine un pas (on n'a pas d'élan)
+  const P = host.player;
+  const x0 = P.x;
+  const z0 = P.z;
+  host.step({ jump: true });
+  while (P.jy > 0) host.step({ my: 1 });
+  assert.ok(Math.hypot(P.x - x0, P.z - z0) < 0.5, "sans élan, on n'avance presque pas en l'air");
+  // élancé contre un mur : il arrête l'élan (on ne repart pas de plus belle une fois le mur dépassé)
+  P.jy = 0.2;
+  P.jvy = 0;
+  P.takeoff = false;
+  P.avx = 4;
+  P.avz = 0;
+  host.bumpAir(P, { x: P.x, z: P.z });
+  assert.equal(P.avx, 0, 'le mur arrête l\'élan');
 });
 
 test("réseau : le caméscope (V) tire sur la pile, et l'on voit qui filme et qui saute", () => {

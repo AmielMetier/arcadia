@@ -765,17 +765,13 @@ export function createBackroomsMap(seed = 42, opts = {}) {
         if (!cells.every(([x, z]) => open(x, z) && clearOf(x, z))) continue;
         // à bonne distance des autres champs
         if (fields.some((f) => Math.max(f.x0 - (c.x + w - 1), c.x - f.x1, f.z0 - (c.z + h - 1), c.z - f.z1) < 6)) continue;
-        // au milieu d'une salle : au moins la moitié du tour est du sol (sinon c'est un couloir barré de trous)
-        let ring = 0;
-        let ringFloor = 0;
-        for (let z = c.z - 1; z <= c.z + h; z++) {
-          for (let x = c.x - 1; x <= c.x + w; x++) {
-            if (x >= c.x && x < c.x + w && z >= c.z && z < c.z + h) continue;
-            ring++;
-            if (open(x, z)) ringFloor++;
-          }
-        }
-        if (ringFloor * 2 < ring) continue;
+        // au milieu d'une salle : du sol tout autour (les coins mis à part). Chaque arête entre deux puits débouche
+        // ainsi, à ses deux bouts, sur du sol : on peut traverser le champ, jamais un chemin au bord du vide qui finit
+        // contre un mur
+        let ringOk = true;
+        for (let x = c.x; x < c.x + w && ringOk; x++) ringOk = open(x, c.z - 1) && open(x, c.z + h);
+        for (let z = c.z; z < c.z + h && ringOk; z++) ringOk = open(c.x - 1, z) && open(c.x + w, z);
+        if (!ringOk) continue;
         // tout le reste de l'étage reste relié sans passer par les puits
         for (const [x, z] of cells) pitGrid[z * W + x] = 0;
         const d = bfs(grid.map((v, i) => (pitGrid[i] >= 0 ? T.WALL : v)), W, H, sx, sz);
@@ -946,11 +942,13 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   const props = [];
   const nearWall = (c) => [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dz]) => get(c.x + dx, c.z + dz) === T.WALL);
   const busy = new Set([sz * W + sx, exitCell.z * W + exitCell.x, ...cassettes.map((c) => c.gz * W + c.gx)]);
+  // (rien au bord d'un trou : un meuble y boucherait le bout d'une arête)
+  const nearPit = (c) => pits.some((p) => Math.abs(p.gx - c.x) <= 1 && Math.abs(p.gz - c.z) <= 1);
   for (let i = 0; i < 160; i++) {
     const c = pick(walkable);
     const k = c.z * W + c.x;
     const wall = nearWall(c);
-    if (busy.has(k) || !wall || Math.hypot(c.x - sx, c.z - sz) < 3) continue;
+    if (busy.has(k) || !wall || nearPit(c) || Math.hypot(c.x - sx, c.z - sz) < 3) continue;
     busy.add(k);
     const kind = pick(PROP_KINDS);
     // collé au mur, dos au mur (les modèles ont le dos vers -z)
@@ -970,7 +968,6 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   // (elle ne bloque rien), des cônes au pied des murs et un projecteur éteint sur son trépied juste avant
   const tapes = [];
   const prop = (kind, x, z, rot) => props.push({ m: kind.m, h: kind.h, r: kind.r, proc: true, x, z, rot, tipped: false });
-  const nearPit = (c) => pits.some((p) => Math.abs(p.gx - c.x) <= 1 && Math.abs(p.gz - c.z) <= 1);
   for (let i = 0; i < 400 && tapes.length < 14; i++) {
     const c = pick(walkable);
     if (busy.has(c.z * W + c.x) || nearPit(c) || Math.hypot(c.x - sx, c.z - sz) < 4) continue;
@@ -1003,7 +1000,7 @@ export function createBackroomsMap(seed = 42, opts = {}) {
     const dir = rnd() < 0.5 ? -1 : 1;
     const nx = c.x + (alongZ ? 0 : dir);
     const nz = c.z + (alongZ ? dir : 0);
-    if (rnd() < 0.8 && !busy.has(nz * W + nx) && get(nx, nz) === T.FLOOR) {
+    if (rnd() < 0.8 && !busy.has(nz * W + nx) && get(nx, nz) === T.FLOOR && !nearPit({ x: nx, z: nz })) {
       busy.add(nz * W + nx);
       const s = rnd() < 0.5 ? -1 : 1;
       const px = (nx + 0.5) * CELL_SIZE + side[0] * s * (h - 0.45);
