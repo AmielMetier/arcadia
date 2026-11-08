@@ -241,6 +241,13 @@ function drawWallpaper(ctx, S, grime, worn = false) {
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
   ctx.fillRect(0, S * 0.951, S, 2);
   noise(ctx, S, S, 10);
+  // en haut : un peu moins de vert (le jaune tirait sur l'olive)
+  if (!worn) {
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = 'rgb(255, 244, 247)';
+    ctx.fillRect(0, 0, S, S);
+    ctx.globalCompositeOperation = 'source-over';
+  }
 }
 
 // Le même papier peint, à l'étage du bas du Level 0 : simplement délavé vers le gris, sans aucune tache. On le passe
@@ -257,21 +264,31 @@ function greyWall(ctx, S) {
   ctx.restore();
 }
 
-// Moquette humide : beige kaki à peine plus foncé que les murs en haut, brun doré en bas (low). La photo est
-// recolorée, sinon une trame de bruit
+// Moquette humide, rase (photo ambientCG Carpet011, ses poils creusés par l'ombre) : on ne garde que son grain, la
+// luminance de chaque poil aux trois quarts de son contraste, posée sur la couleur moyenne voulue. Beige à peine plus
+// foncé que les murs en haut, brun doré en bas (low). Sans photo, une trame de bruit
+const CARPET_RGB = { up: [132, 119, 81], low: [133, 116, 38] };
+const CARPET_GRAIN = 0.75;
 function drawCarpet(ctx, S, photo, low = false) {
+  const [cr, cg, cb] = low ? CARPET_RGB.low : CARPET_RGB.up;
   ctx.globalCompositeOperation = 'source-over';
   if (photo) {
     ctx.drawImage(photo, 0, 0, S, S);
-    ctx.globalCompositeOperation = 'color';
-    ctx.fillStyle = low ? '#9c8a3c' : '#9f9b70';
-    ctx.fillRect(0, 0, S, S);
-    ctx.globalCompositeOperation = 'screen';
-    ctx.fillStyle = low ? '#5f5226' : '#625d4c';
-    ctx.fillRect(0, 0, S, S);
-    ctx.globalCompositeOperation = 'source-over';
+    const { width: w, height: h } = ctx.canvas;
+    const img = ctx.getImageData(0, 0, w, h);
+    const d = img.data;
+    let sum = 0;
+    for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+    const mean = sum / (d.length / 4) || 1;
+    for (let i = 0; i < d.length; i += 4) {
+      const k = 1 + CARPET_GRAIN * ((0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / mean - 1);
+      d[i] = cr * k;
+      d[i + 1] = cg * k;
+      d[i + 2] = cb * k;
+    }
+    ctx.putImageData(img, 0, 0);
   } else {
-    ctx.fillStyle = low ? '#8f7d45' : '#948d6c';
+    ctx.fillStyle = `rgb(${cr}, ${cg}, ${cb})`;
     ctx.fillRect(0, 0, S, S);
     noise(ctx, S, S, 36);
   }
@@ -280,7 +297,7 @@ function drawCarpet(ctx, S, photo, low = false) {
 // Dalles de faux plafond (4 × 4 par case), salies par la photo
 function drawCeiling(ctx, S, grime, low = false) {
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = low ? '#ddd6bd' : '#bdb593';
+  ctx.fillStyle = low ? '#ddd6bd' : '#ddccb7'; // blanc cassé, un peu plus chaud en haut
   ctx.fillRect(0, 0, S, S);
   if (grime) {
     ctx.globalCompositeOperation = 'multiply';
@@ -490,7 +507,7 @@ export function createBackroomsTextures(level = 0) {
   const ceilingLow = ceilLowCanvas ? tex(ceilLowCanvas) : ceiling;
 
   // les photos arrivent un peu plus tard : on redessine par-dessus
-  const files = L2 ? ['l37_mur.jpg', 'l37_sol.jpg', 'l37_mur.jpg'] : L1 ? ['l1_mur.jpg', 'l1_sol.jpg', 'l1_plafond.jpg'] : ['papier.jpg', 'moquette.jpg', 'plafond.jpg'];
+  const files = L2 ? ['l37_mur.jpg', 'l37_sol.jpg', 'l37_mur.jpg'] : L1 ? ['l1_mur.jpg', 'l1_sol.jpg', 'l1_plafond.jpg'] : ['papier.jpg', 'moquette_rase.jpg', 'plafond.jpg'];
   // Level 37 : le carrelage des bassins (cyan) et des fosses (bleu profond), ambientCG Tiles132A et Tiles135A
   const [poolCanvas, pctx2] = canvas(S);
   const [deepCanvas, dctx2] = canvas(S);

@@ -687,11 +687,13 @@ float bkCaust(vec2 uv, float t) {
       return mat;
     };
 
-    // 1. Sol en moquette humide (une répétition de texture par case), percé des trous et des cages d'escalier
+    // 1. Sol en moquette humide (une répétition de texture par case, une et demie au Level 0 : les poils de la moquette
+    // rase restent assez gros pour se voir à hauteur d'homme), percé des trous et des cages d'escalier
     // (Level 2 : béton ciré, luisant d'humidité, qui reflète les lampes)
     const carpet = (PIPES ? tx2.floor : LOW0 ? textures.carpetLow : textures.carpet).clone();
     carpet.needsUpdate = true;
-    carpet.repeat.set(W, H);
+    carpet.repeat.set(W * (L0 ? 1.5 : 1), H * (L0 ? 1.5 : 1));
+    if (L0) carpet.anisotropy = renderer.capabilities.getMaxAnisotropy(); // le grain reste net jusqu'au fond des couloirs
     (PIPES ? tx2.ready : textures.ready).then(() => {
       carpet.needsUpdate = true;
     });
