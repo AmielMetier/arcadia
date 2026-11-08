@@ -309,9 +309,9 @@ function drawCeiling(ctx, S, grime, low = false) {
   // trous des dalles acoustiques
   ctx.fillStyle = 'rgba(90, 80, 60, 0.18)';
   for (let i = 0; i < 1400; i++) ctx.fillRect(Math.random() * S, Math.random() * S, 1.5, 1.5);
-  // rails de la grille métallique
+  // rails de la grille métallique (en haut, gris chaud comme les dalles : le gris olive y paraissait vert)
   const n = 4;
-  ctx.fillStyle = '#9c957e';
+  ctx.fillStyle = low ? '#9c957e' : '#b6a89d';
   for (let i = 0; i <= n; i++) {
     const p = (i / n) * S;
     ctx.fillRect(p - 2, 0, 4, S);
