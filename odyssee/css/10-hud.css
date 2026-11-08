@@ -318,3 +318,41 @@
 .hud-chat-btn img {
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
 }
+
+.hud-dexnav.town {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(16, 24, 36, 0.82);
+}
+.hud-dexnav.town .hdn-title {
+  color: #a0c0e0;
+}
+.hdn-cnt.town {
+  font-size: 10px;
+  font-weight: 600;
+  color: #98b4d0;
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.hud-dexnav.min .hud-dexnav-row {
+  display: none !important;
+}
+.hud-dexnav-row {
+  max-height: 120px;
+  overflow-y: auto;
+}
+.hud-dexnav-row::-webkit-scrollbar {
+  width: 4px;
+}
+.hud-dexnav-row::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.4);
+  border-radius: 2px;
+}
+.hdn-slot {
+  cursor: pointer;
+  transition: transform 0.1s ease, border-color 0.1s ease;
+}
+.hdn-slot:hover {
+  transform: scale(1.15);
+  z-index: 2;
+  border-color: #00f0ff;
+}

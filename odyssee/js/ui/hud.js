@@ -255,17 +255,28 @@ export class Hud {
           <div class="hud-stat-item hud-cap-pill" title="Niveau max autorisé avant la prochaine Arène">
             <span>Niv. max ${g.levelCap()}</span>
           </div>
-          ${(() => {
-            const reg = st.registeredItem || (st.bag?.['canne'] ? 'canne' : null);
-            if (!reg || (st.bag?.[reg] || 0) <= 0) return '';
-            return `<div class="hud-quick-item" data-act="quick-item" title="Objet Rapide (Touche Y ou Clic) : ${esc(itemName(reg))}">
-              <span class="hqi-key">Y</span>
-              <img class="hqi-ico" src="${ASSETS.item(reg)}" alt="">
-              <span class="hqi-lbl">${esc(itemName(reg))}</span>
+        </div>
+        ${(() => {
+          const reg = st.registeredItem || (st.bag?.['running-shoes'] ? 'running-shoes' : null) || (st.bag?.['canne'] ? 'canne' : null);
+          if (!reg || (st.bag?.[reg] || 0) <= 0) return '';
+          return `<div class="hud-quick-item" data-act="quick-item" title="Objet Rapide (Touche Y ou Clic) : ${esc(itemName(reg))}">
+            <span class="hqi-key">Y</span>
+            <img class="hqi-ico" src="${ASSETS.item(reg)}" alt="">
+            <span class="hqi-lbl">${esc(itemName(reg))}</span>
+          </div>`;
+        })()}
+        ${(() => {
+          if (!zoneCatch) return '';
+          if (zoneCatch.isTown) {
+            return `<div class="hud-dexnav town">
+              <div class="hud-dexnav-head" title="Zone urbaine ou abritée : aucun Pokémon sauvage à proximité">
+                <span class="hdn-title">🐾 HABITAT</span>
+                <span class="hdn-cnt town">Zone urbaine (0 sauvage)</span>
+              </div>
             </div>`;
-          })()}
-          ${zoneCatch && zoneCatch.speciesList?.length ? `
-          <div class="hud-dexnav${this.dexnavCollapsed ? ' min' : ''}">
+          }
+          if (!zoneCatch.speciesList?.length) return '';
+          return `<div class="hud-dexnav${this.dexnavCollapsed ? ' min' : ''}">
             <div class="hud-dexnav-head" data-act="toggle-dexnav" title="Habitat DexNav : cliquer pour replier/déplier">
               <span class="hdn-title">🐾 HABITAT ${zoneCatch.complete ? '👑' : ''}</span>
               <span class="hdn-cnt${zoneCatch.complete ? ' done' : ''}">${zoneCatch.caught}/${zoneCatch.total}</span>
@@ -285,8 +296,8 @@ export class Hud {
                 }
               }).join('')}
             </div>` : ''}
-          </div>` : ''}
-        </div>
+          </div>`;
+        })()}
         <div class="hud-bdots-row" data-act="card" title="Badges d'Arène">${badgeDots}</div>
         ${tracked ? `
           <div class="hud-quest-card" data-act="quests" title="Objectif suivi : cliquer pour ouvrir le Journal (Touche Q)">

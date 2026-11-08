@@ -9,17 +9,49 @@ import { SPAWNS } from '../world/region.js';
  * (herbes, grottes, eau et pêche combinées), ainsi que le nombre déjà capturé par le joueur,
  * SANS révéler l'identité des espèces non capturées.
  */
-export function getZoneCatchStats(st, zoneKey) {
-  if (!zoneKey || !SPAWNS[zoneKey]) return null;
-  const spData = SPAWNS[zoneKey];
+export function getZoneCatchStats(st, zoneOrData) {
+  if (!zoneOrData) return null;
   const pool = new Set();
-  for (const table of [spData.land, spData.water, spData.fish]) {
+  const addFromTable = (table) => {
     if (Array.isArray(table)) {
       for (const row of table) {
-        if (Array.isArray(row) && row[0]) pool.add(Number(row[0]));
+        if (Array.isArray(row) && row[0] != null) pool.add(Number(row[0]));
+        else if (typeof row === 'number') pool.add(row);
       }
+    } else if (table && typeof table === 'object') {
+      if (Array.isArray(table.land)) addFromTable(table.land);
+      if (Array.isArray(table.water)) addFromTable(table.water);
+      if (Array.isArray(table.fish)) addFromTable(table.fish);
     }
+  };
+
+  let zoneKey = 'zone', zoneName = '', isTown = false;
+  if (typeof zoneOrData === 'string') {
+    zoneKey = zoneOrData;
+    if (SPAWNS[zoneOrData]) addFromTable(SPAWNS[zoneOrData]);
+  } else if (Array.isArray(zoneOrData)) {
+    addFromTable(zoneOrData);
+  } else if (typeof zoneOrData === 'object') {
+    zoneKey = zoneOrData.key || 'zone';
+    zoneName = zoneOrData.name || '';
+    isTown = !!zoneOrData.isTown;
+    if (zoneOrData.enc) addFromTable(zoneOrData.enc);
+    if (zoneOrData.surfEnc) addFromTable(zoneOrData.surfEnc);
+    if (zoneOrData.key && SPAWNS[zoneOrData.key]) addFromTable(SPAWNS[zoneOrData.key]);
   }
+
+  if (isTown && !pool.size) {
+    return {
+      zoneKey,
+      zoneName,
+      isTown: true,
+      caught: 0,
+      total: 0,
+      complete: true,
+      speciesList: []
+    };
+  }
+
   if (!pool.size) return null;
   const caughtSet = new Set((st?.dex?.caught || []).map(Number));
   let caughtCount = 0;
@@ -29,6 +61,8 @@ export function getZoneCatchStats(st, zoneKey) {
   const totalCount = pool.size;
   return {
     zoneKey,
+    zoneName,
+    isTown,
     caught: caughtCount,
     total: totalCount,
     complete: totalCount > 0 && caughtCount >= totalCount,

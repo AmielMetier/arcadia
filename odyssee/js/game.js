@@ -400,7 +400,17 @@ export class Game {
     if (!m || !p) return null;
     const z = m.outdoor ? m.zoneAt(p.x, p.y) : (m.zones?.length && m.zoneAt(p.x, p.y)) || null;
     const k = z?.spawns || z?.route || m.spawns || (!m.outdoor && m.id && !m.id.includes(':') ? m.id : null);
-    return k ? { key: k } : null;
+    const enc = m.outdoor ? z?.enc : (m.encounter || m.enc);
+    const surfEnc = m.outdoor ? (z?.surfEnc || m.surfEnc) : m.surfEnc;
+    const name = z?.name || m.name || 'Zone';
+    const isTown = !!(z?.town || (m.outdoor && !enc && !surfEnc && !k) || m.id?.includes(':'));
+    return {
+      key: k || null,
+      name,
+      isTown,
+      enc: enc || null,
+      surfEnc: surfEnc || null
+    };
   }
 
   /** la carte se découvre en marchant : blocs de 8 × 8 cases autour du joueur (et toute ville visitée) */
