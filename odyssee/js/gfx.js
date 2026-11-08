@@ -34,7 +34,7 @@ export const PACKS = {
     // décor remplacé (fichier d_<nom>.png, dessiné pixel pour pixel)
     decor: ['tree', 'tree2', 'pine', 'snowpine', 'palm', 'bush', 'rock', 'deadtree'],
     // kits de façade (kit_<nom>.png, 4 × 4 cellules) qui remplacent ceux du jeu : les bâtiments gardent leur taille
-    kits: { maison: 'kit_maison', chalet: 'kit_maison', pecheur: 'kit_maison' },
+    kits: { maison: 'kit_maison', chalet: 'kit_turquoise', pecheur: 'kit_bleue', 'st:house2': 'kit_bleue', 'st:house3': 'kit_turquoise', 'st:bighouse': 'kit_turquoise' },
   },
 };
 
@@ -53,7 +53,7 @@ export function choisirSprites(id) { if (SPRITES_CHOIX.some((s) => s.id === id))
 /** crédits affichés dans Options → Crédits graphismes */
 export const CREDITS = [
   ['Sol « Pokémon Lumineux »', 'Tuiles de Flurmimon (planche « Bright »), adaptées par Bivurnum — Team Aqua\'s Asset Repo.'],
-  ['Graphismes « Pokémon Noir & Blanc »', 'BW Spring Tileset de thefloofypanthar, B/W Water Tiles d\'UltimoSpriter, Alternate Volcano Tiles, maisons BW2 et Taragonia Mix Special Trees de Phyromatical (DeviantArt).'],
+  ['Graphismes « Pokémon Noir & Blanc »', 'BW Spring Tileset de thefloofypanthar, B/W Water Tiles d\'UltimoSpriter, Alternate Volcano Tiles, maisons BW2 et Taragonia Mix Special Trees de Phyromatical, et planches de villes et de routes Noir & Blanc partagées sur DeviantArt (artistes cités dans assets/graphics/noirblanc).'],
   ['Sprites Noir & Blanc', 'Sprites des jeux Pokémon © Nintendo / Game Freak / Creatures, récupérés par PokeAPI (projet PokeAPI/sprites).'],
   ['Sprites HeartGold / SoulSilver', 'Même source : PokeAPI/sprites.'],
   ['Utilisation', 'Projet de fans sans but lucratif. Les artistes restent propriétaires de leurs créations.'],

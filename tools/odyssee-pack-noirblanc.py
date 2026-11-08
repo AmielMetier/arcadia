@@ -114,6 +114,19 @@ deco['kit_maison'] = kit(h, {'mur': (4, 80), 'fenetre': (32, 64), 'socle': (4, 9
                              'cote': (60, 82), 'toit': (12, 30), 'rebord': (4, 64), 'faite': (12, 30), 'cheminee': (52, 12)}, 'maison')
 deco['kit_centre'] = kit(c, {'mur': (24, 104), 'fenetre': (100, 66), 'socle': (24, 116), 'porte': (62, 114), 'linteau': (62, 98),
                              'cote': (8, 104), 'toit': (30, 40), 'rebord': (30, 84), 'faite': (30, 40), 'cheminee': (30, 40)}, 'centre')
+# planches de villes détourées (tools/odyssee-detourer.py) : maisons_toits.png et ville.png
+toits, ville = L('maisons_toits.png'), L('ville.png')
+teal = ville.crop((147, 432, 233, 561))
+deco['kit_bleue'] = kit(toits, {'mur': (64, 94), 'fenetre': (60, 82), 'socle': (64, 100), 'porte': (36, 92), 'linteau': (36, 80),
+                                'cote': (20, 90), 'toit': (110, 12), 'rebord': (40, 54), 'faite': (110, 12), 'cheminee': (110, 30)}, 'maison')
+deco['kit_turquoise'] = kit(teal, {'mur': (56, 74), 'fenetre': (42, 74), 'socle': (2, 96), 'porte': (16, 94), 'linteau': (16, 82),
+                                   'cote': (2, 90), 'toit': (40, 50), 'rebord': (40, 62), 'faite': (40, 50), 'cheminee': (8, 4)}, 'maison')
+deco['kit_orange'] = kit(ville.crop((245, 397, 363, 555)), {'mur': (12, 120), 'fenetre': (20, 104), 'socle': (12, 136), 'porte': (52, 128), 'linteau': (52, 104),
+                                   'cote': (4, 120), 'toit': (20, 60), 'rebord': (20, 76), 'faite': (20, 60), 'cheminee': (20, 60)}, 'maison')
+# vrais arbres Noir & Blanc (route.png) : remplacent ceux de Taragonia
+route = L('route.png')
+deco['tree'] = trim(route, (219, 11, 254, 68)); deco['tree2'] = trim(route, (219, 75, 254, 132))
+deco['pine'] = trim(route, (169, 10, 207, 68))
 for n, im in {**files, **{('' if k.startswith('kit_') else 'd_') + k: v for k, v in deco.items() if not k.startswith('b_')}}.items():
     im.save(os.path.join(OUT, n + '.png'))
 print(len(files), 'tuiles et', len(deco), 'décors dans', os.path.normpath(OUT))

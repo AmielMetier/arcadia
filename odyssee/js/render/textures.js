@@ -610,7 +610,8 @@ const KIT_OF = { house: 'maison', house2: 'maison', house3: 'maison', bighouse: 
 const kitT = (kit) => Math.round(kit.width / 4);
 const HOUSE_STYLES = new Set(['house', 'house2', 'house3', 'bighouse', 'tower', 'gate', 'chalet', 'pecheur']);
 const SHOP_STYLES = new Set(['center', 'mart']);
-function kitOf(style) { const name = KIT_OF[style]; const kit = name && KITS[name]; return kit ? { kit, name, T: kitT(kit) } : null; }
+function kitOf(style) { const name = KIT_OF[style]; const kit = name && (KITS['st:' + style] || KITS[name]);   // st:<style> : kit d'un pack de graphismes pour ce seul style
+  return kit ? { kit, name, T: kitT(kit) } : null; }
 /** dessine la cellule d'un rôle ; false si le kit ne l'a pas */
 function put(ctx, K, role, x, y, flip = false) {
   const c = kitCell(K.name, role); if (!c) return false;

@@ -6,3 +6,6 @@ dans les planches de assets/graphics/noirblanc/ :
   arbres.png    — BW Taragonia Mix Special Trees, Phyromatical (DeviantArt)
 Planches reçues mais pas encore utilisées : saisons (shiney570), maisons BW2 (Phyromatical), Dreamyard, Cold Storage, Starter Kit (UltimoSpriter).
 Tuiles retournées, décalées ou recolorées par le script. Projet de fans sans but lucratif ; crédits obligatoires.
+Planches de villes et de routes reçues ensuite (fond en damier enlevé par tools/odyssee-detourer.py) :
+  maisons_toits.png, ville.png, route.png, maisons_japon.png — artistes à confirmer d'après les pages DeviantArt d'origine.
+  Utilisées : arbres et sapins (route.png), maisons au toit bleu (maisons_toits.png) et turquoise (ville.png).

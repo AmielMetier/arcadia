@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 4.80 — 8 novembre 2026
+- **Odyssée** — Graphismes « Pokémon Noir & Blanc » : plus de variété dans les villes.
+  - Trois sortes de maisons : toit de tuiles orange, toit bleu avec auvent, toit turquoise.
+  - Les arbres et les sapins sont ceux des routes de Noir & Blanc.
+
 ## 4.79 — 8 novembre 2026
 - **Odyssée** — Graphismes « Pokémon Noir & Blanc » : les maisons sont refaites.
   - Elles gardent leur vraie taille et leur place : plus de dessin qui déborde sur la route ni de porte décalée.
