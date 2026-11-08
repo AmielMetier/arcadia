@@ -309,13 +309,41 @@ function drawCeiling(ctx, S, grime, low = false) {
   // trous des dalles acoustiques
   ctx.fillStyle = 'rgba(90, 80, 60, 0.18)';
   for (let i = 0; i < 1400; i++) ctx.fillRect(Math.random() * S, Math.random() * S, 1.5, 1.5);
-  // rails de la grille métallique (en haut, gris chaud comme les dalles : le gris olive y paraissait vert)
+  // rails de la grille métallique. En bas, l'ancien gris olive ; en haut, la teinte moyenne des dalles (salissures
+  // comprises) à peine plus foncée, avec un relief minuscule : une arête claire d'un côté, une ombre de l'autre
   const n = 4;
-  ctx.fillStyle = low ? '#9c957e' : '#b6a89d';
-  for (let i = 0; i <= n; i++) {
-    const p = (i / n) * S;
-    ctx.fillRect(p - 2, 0, 4, S);
-    ctx.fillRect(0, p - 2, S, 4);
+  let rail = '#9c957e';
+  let lit = null;
+  let shade = null;
+  if (!low) {
+    const { width: w, height: h } = ctx.canvas;
+    const d = ctx.getImageData(0, 0, w, h).data;
+    let r = 0, g = 0, b = 0, k = 0;
+    for (let i = 0; i < d.length; i += 4 * 61) {
+      r += d[i];
+      g += d[i + 1];
+      b += d[i + 2];
+      k++;
+    }
+    const tone = (f) => `rgb(${Math.round((r / k) * f)}, ${Math.round((g / k) * f)}, ${Math.round((b / k) * f)})`;
+    rail = tone(0.9);
+    lit = tone(1.03);
+    shade = tone(0.74);
+  }
+  const lines = (dx, w) => {
+    for (let i = 0; i <= n; i++) {
+      const p = (i / n) * S;
+      ctx.fillRect(p + dx, 0, w, S);
+      ctx.fillRect(0, p + dx, S, w);
+    }
+  };
+  ctx.fillStyle = rail;
+  lines(-2, 4);
+  if (lit) {
+    ctx.fillStyle = lit;
+    lines(-2, 0.75);
+    ctx.fillStyle = shade;
+    lines(1.25, 0.75);
   }
 }
 
