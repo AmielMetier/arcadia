@@ -262,7 +262,9 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
             if (this.role === 'host' && msg.cid && this.cb.away) this.cb.away(msg.cid, msg.type === 'peer_away');
             return;
           case 'peer_left': if (this.role === 'host' && msg.cid) this._drop(msg.cid); return;
-          case 'relay': if (msg.data) { if (this.role === 'host') this._hostData(msg.from, msg.data); else this._guestData(msg.data); } return;
+          // un invité n'écoute que l'hôte : le relais marque ses messages from 'host', ce qu'aucun autre joueur ne peut
+          // imiter (sinon un client modifié enverrait aux autres de faux départs, de fausses parties ou de faux renvois)
+          case 'relay': if (msg.data) { if (this.role === 'host') this._hostData(msg.from, msg.data); else if (msg.from === 'host') this._guestData(msg.data); } return;
         }
       },
       _onError(msg) {

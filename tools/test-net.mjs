@@ -309,6 +309,35 @@ async function newRoom(names, port) {
   S.close();
 }
 
+/* ---------- 11. usurpation : un invité ne peut pas se faire passer pour l'hôte ---------- */
+{
+  const S = await newRoom(['Hote', 'Mallory', 'Bob'], 8231), [H11, M11, B11] = S.ps;
+  H11.R.setGame('backrooms', {});
+  await until(() => B11.R.game);
+  const evil = M11.nets[M11.nets.length - 1], bob = B11.nets[B11.nets.length - 1];
+  const bobCid = H11.R.players.find((p) => p.id === B11.R.myId).cid;
+  const got0 = B11.log.got.length;
+  // par le relais : à tout le salon et directement à Bob (faux message de jeu, faux départ, faux renvoi)
+  for (const to of ['all', bobCid]) {
+    evil._relay(to, { t: 'g', from: 0, m: { tag: 'faux' } });
+    evil._relay(to, { t: 'kicked', by: 'Hote', reason: 'faux' });
+    evil._relay(to, { t: 'bye' });
+    evil._relay(to, { _ctrl: 'bye' });
+  }
+  await sleep(1500);
+  ok(B11.log.got.length === got0 && B11.R.mode === 'guest' && B11.R.code === H11.R.code && !B11.log.ev.some((e) => /^(migrating|closed)/.test(e)),
+    'usurpation : rien n\'arrive à Bob, qui reste chez le vrai hôte ' + JSON.stringify([B11.log.got.length - got0, B11.R.mode, B11.log.ev]));
+  // une page à jour ignore aussi ce qu'un relais plus ancien laisserait passer : seul ce qui vient de 'host' compte
+  bob._onMsg(JSON.stringify({ type: 'relay', from: 'cdeadbeef', data: { t: 'bye' } }));
+  bob._onMsg(JSON.stringify({ type: 'relay', from: 'cdeadbeef', data: { t: 'g', from: 0, m: { tag: 'faux' } } }));
+  await sleep(600);
+  ok(B11.log.got.length === got0 && B11.R.mode === 'guest' && !B11.log.ev.some((e) => /^(migrating|closed)/.test(e)), 'usurpation : la page de l\'invité écarte les messages d\'un autre joueur');
+  H11.R.sendGame(B11.R.myId, { tag: 'vrai' });
+  M11.R.sendGame('all', { tag: 'via-hote' }); // un invité passe par l'hôte, qui fait suivre
+  ok(await until(() => B11.log.got.some((m) => m.tag === 'vrai') && B11.log.got.some((m) => m.tag === 'via-hote')), 'usurpation : les vrais messages, de l\'hôte et relayés par lui, passent toujours');
+  S.close();
+}
+
 srv.kill();
 for (const p of [pH, p1, p2]) p.server.close();
 console.log(fails ? `\n${fails} échec(s), ${passes} réussis` : `Connexion : ${passes} vérifications réussies`);
