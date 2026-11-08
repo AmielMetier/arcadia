@@ -84,6 +84,13 @@ html, body {
 .stamina-track { width: calc(140px * var(--smax, 1)); max-width: max(90px, calc(50vw - 270px - var(--bx, 0px))); height: 9px; border: 1px solid currentColor; padding: 1px; transition: width 0.6s ease; }
 .stamina-bar { height: 100%; width: 100%; background: currentColor; }
 .stamina-bar.low { background: #ff3b3b; animation: recBlink 0.5s steps(1) infinite; }
+/* la jauge de bruit : un vumètre de 12 cases, blanc, puis ambre, puis rouge (on t'entend de loin) */
+.noise { display: flex; align-items: center; gap: 8px; font-size: 18px; margin-top: 4px; }
+.noise[hidden] { display: none; }
+.noise-track { width: 140px; max-width: max(90px, calc(50vw - 270px - var(--bx, 0px))); height: 9px; border: 1px solid currentColor; padding: 1px; }
+.noise-bar { height: 100%; width: 100%; background: currentColor; transform: scaleX(0); transform-origin: left center; transition: background-color 0.25s; }
+.noise-bar.warm { background: #ffb020; }
+.noise-bar.hot { background: #ff3b3b; }
 
 .tapes i {
   display: inline-block;
@@ -165,6 +172,17 @@ html, body {
 .objective-banner.unlocked { color: #7dffa0; }
 .vhs-level { font-size: 22px; opacity: 0.8; margin-top: 2px; }
 .blackout-tag { font-size: 22px; color: #ff6b5b; margin-top: 6px; animation: recBlink 0.9s steps(1) infinite; }
+/* L'équipe, sous le niveau : soi en premier, plus net ; les attrapés barrés, ceux déjà partis en vert */
+.team { margin-top: 10px; display: flex; flex-direction: column; gap: 1px; font-size: 20px; line-height: 1.1; }
+.team .mate { display: flex; align-items: baseline; gap: 7px; opacity: 0.72; max-width: 260px; }
+.team .mate span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team .mate i { font-style: normal; font-size: 13px; width: 12px; text-align: center; flex: none; }
+.team .mate.me { opacity: 0.95; }
+.team .mate.dead { color: #ff6b5b; opacity: 0.5; }
+.team .mate.dead span { text-decoration: line-through; }
+.team .mate.gone { color: #7dffa0; opacity: 0.8; }
+.team .mate.talk { opacity: 1; }
+.team .mate s { text-decoration: none; color: #ffcf3a; font-size: 15px; animation: recBlink 0.5s steps(1) infinite; }
 .tapes i.fuse { border-radius: 50%; width: 14px; }
 .tapes i.fuse.on { background: #ffb020; border-color: #ffb020; }
 .spectate {
@@ -530,13 +548,16 @@ body.touch .click-prompt .ctrl-choice { display: none; }
   .inv .slot { width: 60px; height: 50px; }
   .icon-btn { top: 16px; right: 50%; transform: translateX(50%); }
   .stamina-track { width: calc(90px * var(--smax, 1)); height: 8px; }
+  .noise-track { width: 90px; height: 8px; }
   .objective-banner { font-size: 20px; }
   .cam-zoom { top: 72px; font-size: 18px; }
+  .team { font-size: 16px; margin-top: 6px; }
+  .team .mate { max-width: 160px; }
 }
 
 /* --- HUD minimal : ce qui ne sert pas s'efface --- */
 .stamina { transition: opacity 0.8s; }
-.stamina.idle { opacity: 0; }
+.stamina.idle { opacity: 0.45; }
 .inv { transition: opacity 0.8s; }
 .inv.idle { opacity: 0.25; }
 .inv.idle:hover { opacity: 1; }

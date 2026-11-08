@@ -40,6 +40,8 @@ export function createInset(renderer, container) {
   const rt = new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true });
   const cam = new THREE.PerspectiveCamera(50, W / H, 0.08, 60);
   cam.rotation.order = 'YXZ';
+  const aim = cam.clone(); // (son double, pour connaître son champ sans toucher à la vraie)
+  const aimM = new THREE.Matrix4();
   const mat = new THREE.ShaderMaterial({
     uniforms: { tScene: { value: rt.texture }, uTime: { value: 0 }, uExp: { value: 1.05 }, uIn: { value: 0 } },
     vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
@@ -70,6 +72,19 @@ export function createInset(renderer, container) {
   const size = new THREE.Vector2();
 
   return {
+    // pour le tri des objets : le médaillon se refait-il à cette image (avec ce coéquipier) ? Et le champ qu'il filmera,
+    // cadré exactement comme dans render
+    due(Q) {
+      return !!Q && (Q.id !== curId || tick % EVERY === 0);
+    },
+    frustum(Q, eye, fov, out) {
+      aim.fov = fov;
+      aim.position.set(eye.x, eye.y, eye.z);
+      aim.rotation.set(Q.pitch || 0, Q.yaw || 0, 0);
+      aim.updateProjectionMatrix();
+      aim.updateMatrixWorld(true);
+      return out.setFromProjectionMatrix(aimM.multiplyMatrices(aim.projectionMatrix, aim.matrixWorldInverse));
+    },
     // Q : le coéquipier qui filme (ou null) ; eye : { x, y, z } ; fov : son champ (zoom du caméscope compris) ;
     // draw(hide) : rend la scène vue de sa tête, en cachant son propre corps
     render(Q, eye, fov, scene, avatars, time, dt, me = null) {
