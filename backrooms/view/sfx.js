@@ -805,38 +805,110 @@ export class BackroomsSfx {
     this.caption('[scratching behind the wall]', pos);
   }
 
-  // Les recoins calmes : un vieil air doux, comme une radio oubliée dans une pièce voisine (level : 0 à 1 ; wear : la
-  // protection s'use, l'air se désaccorde et grésille)
-  setCalm(level, wear = 0) {
+  // Les recoins calmes : la radio posée par terre joue doucement une vieille valse, comme un disque des années 30 dans
+  // un petit haut-parleur (bande étroite, souffle, craquements). level : 0 à 1 (la distance au recoin) ; wear : la
+  // protection s'use, le poste décroche (l'air pleure, le souffle et les craquements montent) ; pos : la radio
+  setCalm(level, wear = 0, pos = null) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
     const t = c.currentTime;
-    if (!this.calmBus) {
-      if (level < 0.01) return;
-      this.calmBus = c.createGain();
-      this.calmBus.gain.value = 0;
-      const lp = this.filt('lowpass', 1400, 0.6);
-      this.calmBus.connect(lp).connect(this.out);
-      lp.connect(this.gainNode(0.4)).connect(this.verb);
-      this.calmDetune = [];
-      // un accord majeur doux, avec un trémolo lent (une boîte à musique fatiguée)
-      [261.6, 329.6, 392, 523.3].forEach((f, i) => {
-        const o = this.osc(i === 3 ? 'triangle' : 'sine', f);
-        const g = c.createGain();
-        g.gain.value = [0.05, 0.035, 0.03, 0.012][i];
-        const lfo = this.osc('sine', 0.18 + i * 0.07);
-        const lg = c.createGain();
-        lg.gain.value = g.gain.value * 0.6;
-        lfo.connect(lg).connect(g.gain);
-        o.connect(g).connect(this.calmBus);
-        o.start();
-        lfo.start();
-        this.calmDetune.push(o);
-      });
+    if (!this.calm) {
+      if (level < 0.01 || !pos) return;
+      const R = (this.calm = { level: 0, wear: 0, next: t + 0.2, step: 0, crackle: 0 });
+      // le poste : la musique et le souffle passent par le petit haut-parleur (bande étroite, un peu saturé)
+      R.place = this.place({ x: pos.x, z: pos.z, rolloff: 1.1, ref: 1.6 }, 1);
+      R.pos = pos;
+      R.gain = c.createGain();
+      R.gain.gain.value = 0;
+      const hp = this.filt('highpass', 380, 0.7);
+      const lp = this.filt('lowpass', 2600, 0.9);
+      const body = this.filt('peaking', 1100, 1.2);
+      body.gain.value = 5;
+      R.music = c.createGain();
+      R.music.gain.value = 1;
+      R.music.connect(hp).connect(body).connect(this.shaper(1.6)).connect(lp).connect(R.gain);
+      R.gain.connect(R.place.input);
+      // le souffle de la bande AM
+      const hiss = this.longNoise();
+      const hf = this.filt('bandpass', 2400, 0.6);
+      R.hiss = this.gainNode(0.004);
+      hiss.connect(hf).connect(R.hiss).connect(R.gain);
+      hiss.start();
     }
-    this.calmBus.gain.setTargetAtTime(Math.max(0, Math.min(1, level)) * 0.9, t, 0.6);
-    const w = Math.max(0, Math.min(1, wear));
-    this.calmDetune.forEach((o, i) => o.detune.setTargetAtTime(w * w * (i % 2 ? -60 : 45) + (w > 0.8 ? (Math.random() - 0.5) * 80 : 0), t, 0.3));
+    const R = this.calm;
+    if (pos && (pos.x !== R.pos.x || pos.z !== R.pos.z)) {
+      R.pos = pos;
+      this.moveTo(R.place.panner, pos.x, pos.z);
+    }
+    R.level = Math.max(0, Math.min(1, level));
+    R.wear = Math.max(0, Math.min(1.2, wear));
+    R.gain.gain.setTargetAtTime(R.level * 0.8, t, 0.5);
+    R.hiss.gain.setTargetAtTime(0.004 + R.wear * R.wear * 0.02, t, 0.4);
+    if (R.level < 0.01) return;
+    if (R.next < t) R.next = t + 0.05; // de retour après un silence : on reprend où on en était, sans rattraper
+    // la valse : on programme les temps une demi-seconde à l'avance
+    const BEAT = 0.6;
+    const mid = (m) => 440 * Math.pow(2, (m - 69) / 12);
+    // 16 mesures à trois temps : [accord (fondamentale, tierce, quinte en demi-tons), mélodie : [note, temps]…]
+    const SONG = [
+      [[48, 52, 55], [[76, 2], [67, 1]]],
+      [[45, 48, 52], [[72, 2], [69, 1]]],
+      [[41, 45, 48], [[69, 1], [72, 1], [77, 1]]],
+      [[43, 47, 50], [[76, 2], [74, 1]]],
+      [[48, 52, 55], [[72, 2], [76, 1]]],
+      [[45, 48, 52], [[81, 2], [79, 1]]],
+      [[41, 45, 48], [[77, 1], [76, 1], [74, 1]]],
+      [[43, 47, 50], [[74, 3]]],
+      [[48, 52, 55], [[76, 2], [67, 1]]],
+      [[45, 48, 52], [[72, 2], [69, 1]]],
+      [[41, 45, 48], [[69, 1], [72, 1], [77, 1]]],
+      [[43, 47, 50], [[76, 1], [74, 1], [71, 1]]],
+      [[41, 45, 48], [[72, 1], [74, 1], [76, 1]]],
+      [[43, 47, 50], [[74, 2], [71, 1]]],
+      [[48, 52, 55], [[72, 3]]],
+      [[48, 52, 55], []],
+    ];
+    const out = R.music;
+    const w = R.wear;
+    while (R.next < t + 0.5) {
+      const at = R.next;
+      const bar = SONG[Math.floor(R.step / 3) % SONG.length];
+      const beat = R.step % 3;
+      // le poste pleure : la hauteur ondule, de plus en plus quand le recoin s'use
+      const wow = Math.pow(2, (Math.sin(at * 0.9) * (0.08 + w * 0.6) + (w > 0.8 ? (Math.random() - 0.5) * w * 0.8 : 0)) / 12);
+      // l'accompagnement : la basse au premier temps, l'accord pincé aux deux autres
+      if (beat === 0) this.tone(out, at, 'triangle', mid(bar[0][0] - 12) * wow, 0, 0.5, 0.05, 0.01);
+      else for (const m of bar[0]) this.tone(out, at, 'square', mid(m + 12) * wow, 0, 0.18, 0.006, 0.006);
+      // la mélodie : une note douce, son vibrato
+      let b = 0;
+      for (const [m, len] of bar[1]) {
+        if (b === beat) {
+          const f = mid(m) * wow;
+          const o = c.createOscillator();
+          o.type = 'triangle';
+          o.frequency.value = f;
+          const vib = this.osc('sine', 5.2);
+          const vg = this.gainNode(f * 0.006);
+          vib.connect(vg).connect(o.frequency);
+          const g = c.createGain();
+          const d = len * BEAT;
+          g.gain.setValueAtTime(0.0001, at);
+          g.gain.exponentialRampToValueAtTime(0.045, at + 0.04);
+          g.gain.setTargetAtTime(0.028, at + 0.05, 0.25);
+          g.gain.setTargetAtTime(0.0001, at + d - 0.08, 0.05);
+          o.connect(g).connect(out);
+          o.start(at);
+          vib.start(at);
+          o.stop(at + d + 0.3);
+          vib.stop(at + d + 0.3);
+        }
+        b += len;
+      }
+      // les craquements du disque et de la réception
+      if (Math.random() < 0.35 + w * 0.6) this.burst(out, at + Math.random() * BEAT, rnd(0.003, 0.012), 'highpass', rnd(1500, 3500), 0.7, rnd(0.02, 0.06) * (0.5 + w));
+      R.next += BEAT;
+      R.step++;
+    }
   }
 
   // Un tube qui s'amorce ou claque : le tic du starter, le verre qui tinte, puis deux ou trois bégaiements du ballast
@@ -1038,7 +1110,8 @@ export class BackroomsSfx {
 
     if (hard === 'soak') {
       // la moquette noyée : le talon étouffé, l'eau chassée des fibres sous la semelle (un « splotch » qui descend),
-      // de petites bulles qui éclatent, une ou deux gouttes projetées qui retombent
+      // de petites bulles qui éclatent, une ou deux gouttes projetées qui retombent ; à peine plus fort qu'un pas sur la
+      // moquette sèche
       this.tone(dest, t, 'triangle', 70 * v, 32, 0.08, 0.035);
       const n = Math.floor(c.sampleRate * 0.24);
       const buf = c.createBuffer(1, n, c.sampleRate);
@@ -1055,15 +1128,15 @@ export class BackroomsSfx {
       f.frequency.exponentialRampToValueAtTime(380 * v, t + 0.17);
       f.Q.value = 1.7;
       const g = c.createGain();
-      g.gain.value = 0.15 * v;
+      g.gain.value = 0.06 * v;
       src.connect(f).connect(g).connect(dest);
       src.start(t + 0.01);
-      this.burst(dest, t + 0.012, 0.05, 'highpass', 3600, 0.7, 0.03 * v);
+      this.burst(dest, t + 0.012, 0.05, 'highpass', 3600, 0.7, 0.011 * v);
       for (let k = 0, m = 3 + Math.floor(Math.random() * 4); k < m; k++) {
         const f0 = rnd(1800, 4200);
-        this.tone(dest, t + rnd(0.03, 0.2), 'sine', f0, f0 * 1.5, rnd(0.008, 0.016), rnd(0.006, 0.014), 0.001);
+        this.tone(dest, t + rnd(0.03, 0.2), 'sine', f0, f0 * 1.5, rnd(0.008, 0.016), rnd(0.002, 0.005), 0.001);
       }
-      if (Math.random() < 0.7) this.plop(t + rnd(0.15, 0.3), 0.018 * v, dest);
+      if (Math.random() < 0.5) this.plop(t + rnd(0.15, 0.3), 0.007 * v, dest);
       return;
     }
 

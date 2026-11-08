@@ -1674,15 +1674,19 @@ function frame(currentTime) {
     const V = sim.viewPlayer(sim.spectate || 0);
     let calm = 0;
     let wear = 0;
+    let radio = null;
     for (const n of sim.fm(V.floor || 0).calm || []) {
-      const v = Math.max(0, 1 - Math.hypot(n.x - V.x, n.z - V.z) / 11) * (n.wear >= 1 ? 0.15 : 1);
+      const v = Math.max(0, 1 - Math.hypot(n.x - V.x, n.z - V.z) / 14) * (n.wear >= 1 ? 0.3 : 1);
       if (v > calm) {
         calm = v;
         wear = n.wear || 0;
+        // la radio, par terre au pied du lampadaire (voir la scène)
+        radio = { x: n.x + n.dx * 0.75 - n.dz * 0.3, z: n.z + n.dz * 0.75 + n.dx * 0.3 };
       }
     }
-    sfx.setCalm(paused || sim.state !== 'playing' ? 0 : calm, wear);
-  } else if (sfx && sfx.calmBus) sfx.setCalm(0);
+    // à la fin du Level 0 (le courant lâche, puis la phase rouge), la radio se tait
+    sfx.setCalm(paused || sim.state !== 'playing' || sim.open ? 0 : calm, wear, radio);
+  } else if (sfx && sfx.calm) sfx.setCalm(0);
 
   // Rendu graphique et HUD
   if (scene) {

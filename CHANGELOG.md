@@ -12,6 +12,11 @@
 - **The Backrooms** — Une fine pellicule d'eau au cœur des plus grosses taches de la moquette : elle reflète le plafond, les néons (ou les feux rouges) et la lampe torche, et vos pas y font un bruit mouillé.
 - **The Backrooms** — Un papier peint plus fidèle aux photos au Level 0, toujours discret : sur les rayures de deux teintes, de fines chaînes de perles et des chevrons emboîtés pointés vers le haut.
 - **The Backrooms** — Les grilles d'aération du plafond ne chevauchent plus les néons.
+- **The Backrooms** — Les recoins calmes du Level 0 refaits.
+  - Un vrai fauteuil, un lampadaire à abat-jour de tissu et une petite radio en bois.
+  - La lampe éclaire vraiment les murs, le sol et le plafond d'une lumière chaude, au lieu d'un disque orange.
+  - La radio joue doucement une vieille valse, avec son souffle et ses craquements, d'où elle est posée ; elle se dérègle quand le recoin s'use.
+- **The Backrooms** — Les pas dans l'eau des taches de moquette sont beaucoup plus discrets.
 - **The Backrooms** — À l'œil nu, l'image est calculée en pleine définition (les vrais pixels de l'écran) ; le caméscope garde l'image de sa bande.
 - **The Backrooms** — Ce que vous tenez en main prend la couleur de la lumière autour de vous : rouge à la fin, noir quand tout s'éteint.
 - **The Backrooms** — La flèche à côté du signal a maintenant une tige : on voit tout de suite dans quel sens elle pointe.

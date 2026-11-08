@@ -308,7 +308,7 @@ export function createBackroomsScene(container, floors, lamps) {
       uBakeScale: { value: new THREE.Vector2(1 / (W * CELL_SIZE), 1 / (H * CELL_SIZE)) },
       uBakeTX: { value: TX },
       uBakeTint: { value: L2 ? new THREE.Color(1.0, 1.05, 1.07) : L1 ? new THREE.Color(0.86, 0.98, 1.12) : PIPES ? new THREE.Color(1.25, 0.98, 0.7) : LOW0 ? new THREE.Color(1.12, 1.04, 0.8) : new THREE.Color(1.05, 1.03, 0.83) }, // Level 0 : en haut une lumière blanche à peine chaude ; en bas, la lumière chaude d'avant
-      uBakeTint2: { value: PIPES ? new THREE.Color(0.78, 0.95, 1.08) : new THREE.Color(0, 0, 0) },
+      uBakeTint2: { value: PIPES ? new THREE.Color(0.78, 0.95, 1.08) : L0 ? new THREE.Color(1.2, 0.72, 0.38) : new THREE.Color(0, 0, 0) }, // Level 0 : les lampadaires des recoins calmes
       uCeilB: { value: 1 }, // la part du second canal reçue par le plafond (la phase rouge : des feux qui éclairent vers le bas)
       uBakeY: { value: -fi * FLOOR_DY },
       uCeil: { value: CEIL },
@@ -505,6 +505,7 @@ export function createBackroomsScene(container, floors, lamps) {
     let redDust = null; // la poussière qui flotte dans les cônes (un nuage de points, MOTES par feu)
     const MOTES = 260;
     const redU = { uRedT: { value: 0 } }; // l'horloge des halos : grésillement, volutes, poussière
+    const nookLamps = []; // Level 0 : les lampadaires des recoins calmes (second canal, teinte chaude), { fp, k }
     const writeBake = () => {
       if (alarm) {
         live.fill(0);
@@ -513,15 +514,17 @@ export function createBackroomsScene(container, floors, lamps) {
       } else if (casc) {
         live.set(casc.live);
         liveB.fill(0);
+        if (!casc.dark) for (const v of nookLamps) if (v.k > 0.01) addPrint(liveB, v.fp, v.k);
       } else {
         live.set(base);
         liveB.set(baseB);
         for (const f of flickers) if (f.k > 0) addPrint(f.ch ? liveB : live, f.fp, f.k);
+        for (const v of nookLamps) if (v.k > 0.01) addPrint(liveB, v.fp, v.k);
       }
       for (let i = 0; i < BW * BH; i++) {
         const v = Math.min(1, (L2 || PIPES ? 0.03 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
         bakeData[i * 4] = Math.round(v * 255);
-        if (PIPES || alarm) bakeData[i * 4 + 2] = Math.round(Math.min(1, liveB[i] * 0.3 * power) * 255);
+        if (PIPES || alarm || nookLamps.length) bakeData[i * 4 + 2] = Math.round(Math.min(1, liveB[i] * 0.3 * power) * 255);
       }
       bakeTex.needsUpdate = true;
     };
@@ -2461,110 +2464,173 @@ float bkCaust(vec2 uv, float t) {
       }
     };
 
-    // --- Recoins calmes (Level 0) : une lampe de salon chaude, un vieux fauteuil, une radio. Rien d'éclairé pour de vrai
-    // (pas de lumière en plus : tous les matériaux se recompileraient) ; la chaleur est dans les matériaux et un halo.
-    // Quand le recoin s'use, la lampe grésille puis s'éteint
+    // --- Recoins calmes (Level 0) : un lampadaire de salon, un vieux fauteuil, une radio posée par terre. La lampe
+    // éclaire pour de vrai, par le second canal de la lumière cuite (teinte chaude, arrêtée par les murs) : pas de
+    // lumière en plus, qui ferait recompiler tous les matériaux. Quand le recoin s'use, la lampe grésille puis s'éteint
     const nooks = [];
     if (L0 && map.calm && map.calm.length) {
-      const glowTex = (() => {
+      const canvasTex = (w, h, draw) => {
         const cv = document.createElement('canvas');
-        cv.width = cv.height = 64;
-        const g = cv.getContext('2d');
-        const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-        gr.addColorStop(0, 'rgba(255,214,150,1)');
-        gr.addColorStop(0.35, 'rgba(255,170,90,0.45)');
-        gr.addColorStop(1, 'rgba(255,140,60,0)');
-        g.fillStyle = gr;
-        g.fillRect(0, 0, 64, 64);
+        cv.width = w;
+        cv.height = h;
+        draw(cv.getContext('2d'), w, h);
         const t = new THREE.CanvasTexture(cv);
         t.colorSpace = THREE.SRGBColorSpace;
+        t.anisotropy = 4;
         return t;
-      })();
-      const warm = new THREE.Color('#ffb36b');
+      };
+      // l'abat-jour : un tissu crème plissé, éclairé par transparence, plus vif vers le bas où l'ampoule est proche
+      const shadeTex = canvasTex(256, 64, (g, w, h) => {
+        const gr = g.createLinearGradient(0, 0, 0, h);
+        gr.addColorStop(0, '#c98a4c');
+        gr.addColorStop(0.55, '#f1c58a');
+        gr.addColorStop(1, '#ffe2b0');
+        g.fillStyle = gr;
+        g.fillRect(0, 0, w, h);
+        for (let x = 0; x < w; x += 4) {
+          g.fillStyle = `rgba(120, 70, 30, ${0.05 + ((x * 37) % 11) * 0.006})`;
+          g.fillRect(x, 0, 1.5, h);
+        }
+        g.fillStyle = 'rgba(110, 64, 28, 0.35)';
+        g.fillRect(0, 0, w, 3);
+        g.fillRect(0, h - 3, w, 3);
+      });
+      // la toile du haut-parleur de la radio : une trame brune et des lattes
+      const grilleTex = canvasTex(64, 64, (g, w, h) => {
+        g.fillStyle = '#6b5236';
+        g.fillRect(0, 0, w, h);
+        for (let y = 0; y < h; y += 2) {
+          g.fillStyle = 'rgba(40, 26, 14, 0.25)';
+          g.fillRect(0, y, w, 1);
+        }
+        for (let x = 0; x < w; x += 2) {
+          g.fillStyle = 'rgba(40, 26, 14, 0.18)';
+          g.fillRect(x, 0, 1, h);
+        }
+        for (let x = 6; x < w; x += 13) {
+          g.fillStyle = '#3a2614';
+          g.fillRect(x, 0, 4, h);
+        }
+      });
+      const brass = baked(new THREE.MeshLambertMaterial({ color: '#7a6644' }));
+      const darkMetal = baked(new THREE.MeshLambertMaterial({ color: '#2e2a24' }));
+      const walnut = baked(new THREE.MeshLambertMaterial({ color: '#5c3b22' }));
+      const bakelite = baked(new THREE.MeshLambertMaterial({ color: '#241a12' }));
+      const grilleMat = baked(new THREE.MeshLambertMaterial({ map: grilleTex }));
+      const shadeGeo = new THREE.CylinderGeometry(0.15, 0.25, 0.3, 40, 1, true);
+      const chairs = [];
       for (const n of map.calm) {
         const g = new THREE.Group();
         // le fond du cul-de-sac : (dx, dz) pointe vers le mur du fond ; (sx, sz) sur le côté
         const sx = -n.dz;
         const sz = n.dx;
-        const mats = [];
-        const mat = (color, k = 0.3) => {
-          const m = new THREE.MeshLambertMaterial({ color, emissive: warm.clone().multiplyScalar(k) });
-          m.userData.k = k;
-          mats.push(m);
-          return m;
-        };
-        // la lampe, dans un coin du fond
+        const face = Math.atan2(-n.dx, -n.dz); // regarder l'entrée du recoin
+        // le lampadaire, dans un coin du fond : pied lesté, tige à rotule, abat-jour de tissu, l'ampoule dessous
         const lx = n.x + n.dx * 0.85 + sx * 0.75;
         const lz = n.z + n.dz * 0.85 + sz * 0.75;
-        const metal = mat('#2b2620', 0.08);
-        const base = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.03, 16), metal);
-        base.position.set(lx, 0.015, lz);
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 1.45, 8), metal);
-        pole.position.set(lx, 0.74, lz);
-        const shadeMat = new THREE.MeshBasicMaterial({ color: '#ffd9a0', side: THREE.DoubleSide });
-        const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 0.3, 20, 1, true), shadeMat);
-        shade.position.set(lx, 1.52, lz);
-        const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#ffffff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.32 }));
-        glow.position.set(lx, 1.5, lz);
-        glow.scale.set(1.5, 1.5, 1);
-        // la flaque de lumière chaude au sol
-        const poolMat = new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.22 });
-        const pool = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4), poolMat);
-        pool.rotation.x = -Math.PI / 2;
-        pool.position.set(lx - n.dx * 0.6, 0.012, lz - n.dz * 0.6);
-        // le fauteuil, tourné vers l'entrée, à côté de la lampe
-        const cx = n.x + n.dx * 0.55 - sx * 0.45;
-        const cz = n.z + n.dz * 0.55 - sz * 0.45;
-        const chair = new THREE.Group();
-        const fabric = mat('#4a1f18', 0.14);
-        const wood = mat('#2a1a0e', 0.1);
-        const seat = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.2, 0.7), fabric);
-        seat.position.y = 0.42;
-        const back = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.7, 0.16), fabric);
-        back.position.set(0, 0.8, 0.29);
-        back.rotation.x = -0.12;
-        const armL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.24, 0.68), fabric);
-        armL.position.set(0.39, 0.6, 0.02);
-        const armR = armL.clone();
-        armR.position.x = -0.39;
-        chair.add(seat, back, armL, armR);
-        for (const [ax, az] of [[0.33, 0.28], [-0.33, 0.28], [0.33, -0.28], [-0.33, -0.28]]) {
-          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.32, 0.06), wood);
-          leg.position.set(ax, 0.16, az);
-          chair.add(leg);
-        }
-        chair.position.set(cx, 0, cz);
-        chair.rotation.y = Math.atan2(n.dx, n.dz) + 0.35; // le dos au mur du fond, un peu de biais
-        // la radio, par terre au pied de la lampe : son cadran luit
+        const lamp = new THREE.Group();
+        const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, 0.035, 32), darkMetal);
+        foot.position.y = 0.018;
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(0.13, 24, 8, 0, Math.PI * 2, 0, Math.PI / 2), darkMetal);
+        dome.scale.y = 0.18;
+        dome.position.y = 0.035;
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.013, 1.32, 10), brass);
+        pole.position.y = 0.7;
+        const joint = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 8), brass);
+        joint.position.y = 1.36;
+        const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.16, 8), brass);
+        neck.position.y = 1.44;
+        const shadeMat = new THREE.MeshBasicMaterial({ map: shadeTex, color: '#ffffff', side: THREE.FrontSide });
+        const innerMat = new THREE.MeshBasicMaterial({ color: '#fff0d0', side: THREE.BackSide });
+        const shade = new THREE.Mesh(shadeGeo, shadeMat);
+        shade.position.y = 1.55;
+        const inner = new THREE.Mesh(shadeGeo, innerMat);
+        inner.position.y = 1.55;
+        const bulbMat = new THREE.MeshBasicMaterial({ color: '#fff4dc' });
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 14, 10), bulbMat);
+        bulb.position.y = 1.5;
+        lamp.add(foot, dome, pole, joint, neck, shade, inner, bulb);
+        lamp.position.set(lx, 0, lz);
+        // la radio, par terre au pied de la lampe : caisse de noyer arrondie, toile, cadran qui luit, deux boutons
         const radio = new THREE.Group();
-        const box = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.24, 0.16), wood);
-        box.position.y = 0.12;
-        const dialMat = new THREE.MeshBasicMaterial({ color: '#ffcc66' });
-        const dial = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.05), dialMat);
-        dial.position.set(0.08, 0.16, -0.081);
-        dial.rotation.y = Math.PI;
-        radio.add(box, dial);
+        const box = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.2, 0.15), walnut);
+        box.position.y = 0.1;
+        const top = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.38, 16, 1, false, 0, Math.PI), walnut);
+        top.rotation.z = Math.PI / 2; // le demi-cylindre couché sur la caisse : un dessus arrondi
+        top.scale.x = 0.7;
+        top.position.y = 0.2;
+        const grille = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.13), grilleMat);
+        grille.position.set(-0.08, 0.11, 0.0755);
+        const dialMat = new THREE.MeshBasicMaterial({ color: '#ffcc77' });
+        const dial = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.045), dialMat);
+        dial.position.set(0.1, 0.14, 0.0755);
+        radio.add(box, top, grille, dial);
+        for (const kx of [0.06, 0.14]) {
+          const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.018, 0.02, 14), bakelite);
+          knob.rotation.x = Math.PI / 2;
+          knob.position.set(kx, 0.065, 0.085);
+          radio.add(knob);
+        }
         radio.position.set(lx - sx * 0.45 - n.dx * 0.1, 0, lz - sz * 0.45 - n.dz * 0.1);
-        radio.rotation.y = Math.atan2(n.dx, n.dz);
-        g.add(base, pole, shade, glow, pool, chair, radio);
+        radio.rotation.y = face + 0.25;
+        g.add(lamp, radio);
         group.add(g);
-        nooks.push({ n, shadeMat, glow, poolMat, dialMat, mats, on: 1 });
+        // le fauteuil, le dos au mur du fond, un peu de biais vers la lampe
+        chairs.push({ x: n.x + n.dx * 0.5 - sx * 0.4, z: n.z + n.dz * 0.5 - sz * 0.4, rot: face - 0.4 });
+        // la lumière de la lampe : chaude, assez forte tout près, éteinte vers 3,5 m ; les murs l'arrêtent
+        const fp = footprint({ x: lx, z: lz }, { r: 3.8, fall: 2.3, gain: 1.6 });
+        const v = { n, shadeMat, innerMat, bulbMat, dialMat, fp, on: 1, k: 1, baked: 1 };
+        nooks.push(v);
+        nookLamps.push(v);
       }
+      // le fauteuil : le modèle Poly Haven des objets abandonnés, avec sa photo de couleur
+      loader.load(MODELS + 'modern_arm_chair_01.glb', (gl) => {
+        const root = gl.scene;
+        root.updateMatrixWorld(true);
+        const bb = new THREE.Box3().setFromObject(root);
+        const size = new THREE.Vector3();
+        const c = new THREE.Vector3();
+        bb.getSize(size);
+        bb.getCenter(c);
+        const k = 0.86 / (size.y || 1);
+        const fix = new THREE.Matrix4().makeScale(k, k, k).multiply(new THREE.Matrix4().makeTranslation(-c.x, -bb.min.y, -c.z));
+        root.traverse((o) => {
+          if (!o.isMesh) return;
+          const src = Array.isArray(o.material) ? o.material[0] : o.material;
+          const inst = new THREE.InstancedMesh(o.geometry, propMat(src), chairs.length);
+          chairs.forEach((ch, i) => {
+            const m = new THREE.Matrix4().makeTranslation(ch.x, 0, ch.z).multiply(new THREE.Matrix4().makeRotationY(ch.rot)).multiply(fix);
+            inst.setMatrixAt(i, m.multiply(o.matrixWorld));
+          });
+          inst.instanceMatrix.needsUpdate = true;
+          inst.frustumCulled = false;
+          group.add(inst);
+        });
+      }, undefined, () => {});
+      writeBake();
     }
+    const shadeCol = new THREE.Color();
     const updateNooks = (time) => {
+      let dirty = false;
       for (const v of nooks) {
         const w = v.n.wear || 0;
         // usé : la lampe grésille de plus en plus, puis s'éteint presque tout à fait
         let on = 1;
-        if (alarm || (casc && casc.dark)) on = 0.02; // la phase rouge (et le noir qui l'annonce) : la lampe de salon s'éteint aussi
+        if (alarm || (casc && casc.dark)) on = 0; // la phase rouge (et le noir qui l'annonce) : la lampe de salon s'éteint aussi
         else if (w >= 1) on = Math.random() < 0.04 ? 0.6 : 0.05;
         else if (w > 0.75) on = Math.random() < (w - 0.75) * 0.5 ? 0.25 : 1;
         v.on += (on - v.on) * 0.5;
-        v.shadeMat.color.setRGB(1 * v.on + 0.12, 0.85 * v.on + 0.1, 0.63 * v.on + 0.08);
-        v.glow.material.opacity = 0.32 * v.on;
-        v.poolMat.opacity = 0.22 * v.on;
-        v.dialMat.color.setRGB(1 * Math.max(0.2, v.on), 0.8 * Math.max(0.2, v.on), 0.4 * Math.max(0.2, v.on));
-        for (const m of v.mats) m.emissive.setRGB(1, 0.7, 0.42).multiplyScalar(m.userData.k * v.on);
+        v.k = v.on;
+        if (Math.abs(v.k - v.baked) > 0.02) dirty = true;
+        const e = v.on;
+        v.shadeMat.color.setRGB(0.1 + 0.95 * e, 0.09 + 0.88 * e, 0.08 + 0.8 * e);
+        v.innerMat.color.copy(shadeCol.setRGB(1, 0.94, 0.82).multiplyScalar(0.12 + 1.1 * e));
+        v.bulbMat.color.setRGB(0.15 + 1.2 * e, 0.13 + 1.15 * e, 0.1 + 1.0 * e);
+        v.dialMat.color.setRGB(Math.max(0.15, e), 0.8 * Math.max(0.15, e), 0.45 * Math.max(0.15, e));
+      }
+      if (dirty && !alarm) {
+        for (const v of nooks) v.baked = v.k;
+        writeBake();
       }
     };
 
