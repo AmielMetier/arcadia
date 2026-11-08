@@ -302,6 +302,7 @@ export function buildAtlas() {
 /** verts du sol adoucis : l'herbe à 16 px est très saturée (vert fluo) ; on la ramène vers le vert tendre des jeux DS.
  *  Une table de couleurs (les tuiles en ont peu) évite de refaire le calcul pour chaque pixel. */
 export function tameGreens(cv) {
+  if (ART.pack) return;   // un pack de tuiles garde ses couleurs
   const x = cv.getContext('2d'), im = x.getImageData(0, 0, cv.width, cv.height), d = im.data, lut = new Map();
   for (let i = 0; i < d.length; i += 4) {
     if (!d[i + 3]) continue;
@@ -578,7 +579,7 @@ export function applySpriteImages(S, images, dens = {}) {
 /* ---------------- images dessinées (planches préparées par tools/odyssee-sprites.py) ---------------- */
 // kits de façade (4 × 4 tuiles de 16 px) par style, et sols d'intérieur ; chargés au démarrage, sinon dessin du code
 const KITS = {}, SOLS = {}, SOL32 = {}, HG = {}, ART = {};
-export function setArt({ kits = {}, sols = {}, sol32 = {}, hgss = {}, relief = null } = {}) { ART.relief = relief; Object.assign(KITS, kits); Object.assign(SOLS, sols); for (const [k, v] of Object.entries(sol32)) if (v) SOL32[k] = v; for (const [k, v] of Object.entries(hgss)) if (v) HG[k] = v; 
+export function setArt({ kits = {}, sols = {}, sol32 = {}, hgss = {}, relief = null, pack = null } = {}) { ART.relief = relief; ART.pack = !!pack; Object.assign(KITS, kits); Object.assign(SOLS, sols); for (const [k, v] of Object.entries(sol32)) if (v) SOL32[k] = v; for (const [k, v] of Object.entries(hgss)) if (v) HG[k] = v; 
   // sols à 16 px (PixelLab) : ils prennent la place des tuiles du tileset (agrandies ×2 comme les autres)
   const s = (k) => SOL32['s16_' + k];
   if (s('chemin_0')) {
@@ -588,7 +589,18 @@ export function setArt({ kits = {}, sols = {}, sol32 = {}, hgss = {}, relief = n
     for (const [k, v] of Object.entries(alias)) if (s(v)) SOL32[k] = s(v);
     SOL32.lava1 = null; SOL32.deep1 = null; SOL16 = true;
   }
+  // pack de tuiles Pokémon (Options → Graphismes → Sol du dehors, gfx.js) : ses tuiles de 16 px prennent la place de celles
+  // du sol classique (herbe, terre, sable, pierre, neige, eau, lave, hautes herbes), les bords sont recalculés par le jeu
+  if (pack) {
+    for (const [k, v] of Object.entries(pack)) {
+      if (!v) continue;
+      if (/^(tall|darktall|snowtall)\d$/.test(k)) SOLS[k] = v; else SOL32[k] = v;
+    }
+    for (let f = 0; f < 4; f++) delete SOL32['s16_eau' + f];
+    delete HG.mer;   // la mer animée de HeartGold passerait devant les tuiles d'eau du pack
+  }
 }
+
 /** les sols à 16 px sont-ils là (pièces de transition posées sur la grille décalée) ? */
 export let SOL16 = false;
 const KIT_OF = { house: 'maison', house2: 'maison', house3: 'maison', bighouse: 'maison', tower: 'maison', gate: 'maison', center: 'centre', mart: 'boutique', gym: 'arene', lab: 'labo', league: 'ligue', chalet: 'chalet', pecheur: 'pecheur', port: 'port', musee: 'musee', base: 'base', mirage: 'mirage', phare: 'phare', pagode: 'pagode' };

@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 4.76 — 8 novembre 2026
+## 4.77 — 8 novembre 2026
 - **The Backrooms** — La fin du Level 0 s'annonce : à la dernière cassette, les néons s'éteignent un à un, en vague qui arrive sur vous, chacun avec le claquement de son relais. Puis c'est le noir complet, et les feux rouges se rallument d'un coup dans un fracas électronique (une seule fois). Les alarmes se déclenchent à ce moment-là.
 - **The Backrooms** — Une bande son bien plus oppressante pour la phase rouge.
   - Une sirène d'évacuation au son riche, noyée dans une grande réverbération.
@@ -20,6 +20,13 @@
 - **The Backrooms** — À l'œil nu, l'image est calculée en pleine définition (les vrais pixels de l'écran) ; le caméscope garde l'image de sa bande.
 - **The Backrooms** — Ce que vous tenez en main prend la couleur de la lumière autour de vous : rouge à la fin, noir quand tout s'éteint.
 - **The Backrooms** — La flèche à côté du signal a maintenant une tige : on voit tout de suite dans quel sens elle pointe.
+
+## 4.76 — 8 novembre 2026
+- **Odyssée** — Tu choisis maintenant tes graphismes : Options → « Sol du dehors » et « Sprites des Pokémon ».
+  - Sol du dehors : « Odyssée » (le sol dessiné par le jeu, avec son relief), « Classique » (les tuiles d'origine) ou le nouveau « Pokémon Lumineux » (herbe, terre, sable, pierre, neige, eau, lave et hautes herbes dans un style Rubis / Émeraude aux couleurs vives).
+  - Le sol change au prochain lancement d'Odyssée ; depuis l'écran-titre, le jeu se relance tout seul en quittant les Options.
+  - Sprites des Pokémon : « HeartGold / SoulSilver » (comme avant) ou « Noir & Blanc » (Gen 5) pour les 493 premiers Pokémon, avec leurs versions de dos et chromatiques. Le changement est immédiat.
+- **Odyssée** — Un écran « Crédits graphismes » dans les Options remercie les artistes dont les tuiles et les sprites sont utilisés.
 
 ## 4.75 — 8 novembre 2026
 - **The Backrooms** — Des puits sans fond à l'étage du bas du Level 0.
