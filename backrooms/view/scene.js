@@ -315,13 +315,14 @@ export function createBackroomsScene(container, floors, lamps) {
       return inOwn < 0.7 && !(map.lightBlocked && map.lightBlocked(lx, lz, px, pz));
     };
     // les néons des zones claires éclairent plus fort et plus loin
-    const footprint = (l) => {
+    // o (facultatif) : { r, fall, gain } imposés (les feux de secours de la phase rouge)
+    const footprint = (l, o = null) => {
       const out = [];
       // Level 0 : les zones claires baignent dans la lumière des néons (comme dans les vidéos), sans flaque ni trou noir
       const LB = L0 && l.bright;
-      const LR = LB ? LIGHT_R * CELL_SIZE * 2.3 : l.bright ? LIGHT_R * CELL_SIZE * 1.55 : l.kind === 'bulb' ? 2.2 * CELL_SIZE : l.kind === 'tube' ? 2.3 * CELL_SIZE : LIGHT_R * CELL_SIZE * (L0 ? 1.15 : 1);
-      const gain = LB ? 1.42 : l.bright ? 1.3 : l.kind === 'bulb' ? 1.05 : l.kind === 'tube' ? 1.45 : L0 ? 0.97 : 1; // Level 0 : l'image environ 10 % moins lumineuse qu'au réglage du 7 novembre (la courbe du caméscope compresse : il faut baisser plus les néons)
-      const fall = LB ? 1.5 : 2.4;
+      const LR = o ? o.r : LB ? LIGHT_R * CELL_SIZE * 2.3 : l.bright ? LIGHT_R * CELL_SIZE * 1.55 : l.kind === 'bulb' ? 2.2 * CELL_SIZE : l.kind === 'tube' ? 2.3 * CELL_SIZE : LIGHT_R * CELL_SIZE * (L0 ? 1.15 : 1);
+      const gain = o ? o.gain : LB ? 1.42 : l.bright ? 1.3 : l.kind === 'bulb' ? 1.05 : l.kind === 'tube' ? 1.45 : L0 ? 0.97 : 1; // Level 0 : l'image environ 10 % moins lumineuse qu'au réglage du 7 novembre (la courbe du caméscope compresse : il faut baisser plus les néons)
+      const fall = o ? o.fall : LB ? 1.5 : 2.4;
       const r = Math.ceil(LR / TX);
       const tx0 = Math.floor(l.x / TX);
       const tz0 = Math.floor(l.z / TX);
@@ -449,8 +450,11 @@ export function createBackroomsScene(container, floors, lamps) {
     // hoquetant. La lumière rouge passe par le second canal de la lumière cuite (liveB, teinte tint).
     // alarm : un par feu rouge
     let alarm = null;
-    const RED = { zone: 8.75, level: [0.65, 1], tint: [0.66, 0.038, 0.024], ceil: 0.22 };
+    // reach : la lumière d'un feu porte un quart plus loin qu'un néon ordinaire et s'éteint en pente douce (fall), sans
+    // bord net ; glow : le halo rouge que la lentille du caméscope voit autour d'un feu allumé
+    const RED = { zone: 8.75, level: [0.65, 1], tint: [0.66, 0.038, 0.024], ceil: 0.22, reach: { r: LIGHT_R * CELL_SIZE * 1.15 * 1.28, fall: 1.65, gain: 0.9 }, glow: 2.4 };
     const alarmOf = new Map();
+    let redGlow = null; // les halos des feux rouges
     const writeBake = () => {
       if (alarm) {
         live.fill(0);
@@ -2577,11 +2581,30 @@ float bkCaust(vec2 uv, float t) {
           }
           alarm = [...zones.values()].map((l) => {
             const base = RED.level[0] + (RED.level[1] - RED.level[0]) * pick(l, 3.3);
-            const fp = footprint({ ...l, bright: false }); // la portée d'un néon ordinaire, même en zone claire
+            const fp = footprint(l, RED.reach); // la même portée partout, même en zone claire
             // chacun commence à un moment différent de sa vie
             return { l, fp, base, k: 0, v: 0, mode: 'off', t: Math.random() * 2.5, n: 0 };
           });
           for (const a of alarm) alarmOf.set(a.l, a);
+          // le halo de chaque feu : un point lumineux flou (un seul appel de dessin pour tous), sa couleur suit le feu
+          {
+            const cv = document.createElement('canvas');
+            cv.width = cv.height = 64;
+            const g = cv.getContext('2d');
+            const rg = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+            rg.addColorStop(0, 'rgba(255,255,255,1)');
+            rg.addColorStop(0.18, 'rgba(255,255,255,0.55)');
+            rg.addColorStop(0.5, 'rgba(255,255,255,0.12)');
+            rg.addColorStop(1, 'rgba(255,255,255,0)');
+            g.fillStyle = rg;
+            g.fillRect(0, 0, 64, 64);
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(alarm.flatMap((a) => [a.l.x, (a.l.fy !== undefined ? a.l.fy : CEIL - 0.025) - 0.08, a.l.z]), 3));
+            geo.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(alarm.length * 3), 3));
+            redGlow = new THREE.Points(geo, new THREE.PointsMaterial({ size: RED.glow, map: new THREE.CanvasTexture(cv), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+            redGlow.frustumCulled = false;
+            group.add(redGlow);
+          }
           bakeUniforms.uBakeTint.value.setRGB(0.8, 0.08, 0.05); // le peu de lumière qui reste dans le noir : rouge aussi
           bakeUniforms.uBakeTint2.value.setRGB(...RED.tint);
           bakeUniforms.uCeilB.value = RED.ceil;
@@ -2661,6 +2684,9 @@ float bkCaust(vec2 uv, float t) {
             if (changed) {
               fixDirty();
               writeBake();
+              const col = redGlow.geometry.attributes.color;
+              alarm.forEach((a, i) => col.setXYZ(i, 0.5 * a.v, 0.04 * a.v, 0.025 * a.v));
+              col.needsUpdate = true;
             }
           }
         }

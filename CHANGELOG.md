@@ -12,7 +12,7 @@
 - **The Backrooms** — Nouvelles couleurs à l'étage du haut du Level 0 : un jaune moins vert, murs jaune pâle, moquette beige à peine plus foncée que les murs, plafond blanc cassé à la grille discrète et néons d'un blanc à peine chaud.
 - **The Backrooms** — La fin du Level 0 plonge dans le noir : quand toutes les cassettes sont trouvées, les néons s'éteignent et seuls des feux de secours rouges restent allumés, un par zone : aucune région ne reste dans le noir pour de bon.
   - Des feux à bout de souffle, chacun à son rythme : ils claquent en tentant de se rallumer, tiennent parfois une seconde, puis lâchent de nouveau. Le noir domine.
-  - Leur lumière tombe vers le sol et laisse le plafond et le fond des couloirs dans le noir.
+  - Leur lumière, diffuse et sans bord net, porte un peu plus loin qu'un néon ; elle tombe vers le sol, laisse le plafond dans l'ombre, et chaque feu allumé s'entoure d'un halo rouge.
   - Parfois tout se coupe d'un coup avant de se rallumer en hoquetant.
 - **The Backrooms** — Les piles sont de vraies piles AA, au sol comme dans la main.
 - **The Backrooms** — L'eau au Level 0 : flaques et plaques d'humidité plus rares, aux bords irréguliers (plus aucun rond parfait), auréoles du plafond plus discrètes qui ne passent plus d'une pièce à l'autre à travers les murs.
