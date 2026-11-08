@@ -451,10 +451,10 @@ export function createBackroomsScene(container, floors, lamps) {
     // alarm : un par feu rouge
     let alarm = null;
     // reach : la lumière d'un feu porte un quart plus loin qu'un néon ordinaire et s'éteint en pente douce (fall), sans
-    // bord net ; glow : le halo rouge que la lentille du caméscope voit autour d'un feu allumé
-    const RED = { zone: 8.75, level: [0.65, 1], tint: [0.66, 0.038, 0.024], ceil: 0.22, reach: { r: LIGHT_R * CELL_SIZE * 1.15 * 1.28, fall: 1.65, gain: 0.9 }, glow: 2.4 };
+    // bord net
+    const RED = { zone: 8.75, level: [0.65, 1], tint: [0.66, 0.038, 0.024], ceil: 0.22, reach: { r: LIGHT_R * CELL_SIZE * 1.15 * 1.28, fall: 1.65, gain: 0.9 } };
     const alarmOf = new Map();
-    let redGlow = null; // les halos des feux rouges
+    let redGlow = null; // les halos des feux rouges : [lueur au plafond, cône de lumière]
     const writeBake = () => {
       if (alarm) {
         live.fill(0);
@@ -2586,24 +2586,89 @@ float bkCaust(vec2 uv, float t) {
             return { l, fp, base, k: 0, v: 0, mode: 'off', t: Math.random() * 2.5, n: 0 };
           });
           for (const a of alarm) alarmOf.set(a.l, a);
-          // le halo de chaque feu : un point lumineux flou (un seul appel de dessin pour tous), sa couleur suit le feu
+          // le halo de chaque feu : la lueur qu'il jette sur les dalles autour du diffuseur (un rectangle aux bords très
+          // doux, de sa forme), et le cône de lumière qui descend dans l'air poussiéreux, vif sous le diffuseur, perdu
+          // avant le sol. Leur force suit le feu (couleur d'instance) ; un appel de dessin pour chacun
           {
-            const cv = document.createElement('canvas');
-            cv.width = cv.height = 64;
-            const g = cv.getContext('2d');
-            const rg = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-            rg.addColorStop(0, 'rgba(255,255,255,1)');
-            rg.addColorStop(0.18, 'rgba(255,255,255,0.55)');
-            rg.addColorStop(0.5, 'rgba(255,255,255,0.12)');
-            rg.addColorStop(1, 'rgba(255,255,255,0)');
-            g.fillStyle = rg;
-            g.fillRect(0, 0, 64, 64);
-            const geo = new THREE.BufferGeometry();
-            geo.setAttribute('position', new THREE.Float32BufferAttribute(alarm.flatMap((a) => [a.l.x, (a.l.fy !== undefined ? a.l.fy : CEIL - 0.025) - 0.08, a.l.z]), 3));
-            geo.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(alarm.length * 3), 3));
-            redGlow = new THREE.Points(geo, new THREE.PointsMaterial({ size: RED.glow, map: new THREE.CanvasTexture(cv), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-            redGlow.frustumCulled = false;
-            group.add(redGlow);
+            const tex = (w, h, f) => {
+              const cv = document.createElement('canvas');
+              cv.width = w;
+              cv.height = h;
+              const g = cv.getContext('2d');
+              const img = g.createImageData(w, h);
+              for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                  const a = Math.max(0, Math.min(1, f((x + 0.5) / w, (y + 0.5) / h)));
+                  const o = (y * w + x) * 4;
+                  img.data[o] = img.data[o + 1] = img.data[o + 2] = Math.round(a * 255);
+                  img.data[o + 3] = 255;
+                }
+              }
+              g.putImageData(img, 0, 0);
+              const t = new THREE.CanvasTexture(cv);
+              t.colorSpace = THREE.SRGBColorSpace;
+              return t;
+            };
+            // au plafond : 3,2 × 2,4 m autour d'un diffuseur de 1,22 × 0,62 m ; la lueur décroît depuis son bord
+            const GW = 3.2;
+            const GD = 2.4;
+            const ceilTex = tex(128, 96, (u, v) => {
+              const dx = Math.max(0, Math.abs((u - 0.5) * GW) - 0.61);
+              const dz = Math.max(0, Math.abs((v - 0.5) * GD) - 0.31);
+              const d = Math.hypot(dx, dz);
+              const edge = Math.min(1, (0.5 - Math.abs(u - 0.5)) * 8, (0.5 - Math.abs(v - 0.5)) * 8);
+              return (0.75 * Math.exp(-d / 0.22) + 0.25 * Math.exp(-d / 0.7)) * Math.max(0, edge);
+            });
+            // le cône : le haut de la toile sous le diffuseur, le bas 2,3 m plus bas ; bords latéraux fondus, quelques
+            // traînées plus claires (la poussière)
+            const streak = Array.from({ length: 64 }, () => 0.75 + Math.random() * 0.25);
+            const coneTex = tex(64, 128, (u, v) => {
+              const side = Math.pow(Math.sin(Math.PI * u), 1.4);
+              return Math.pow(1 - v, 2.4) * side * streak[Math.min(63, Math.floor(u * 64))];
+            });
+            const H = 2.3;
+            const SP = 0.6; // de combien le cône s'élargit en descendant
+            const pos = [];
+            const uv = [];
+            const top = [[-0.61, -0.31], [0.61, -0.31], [0.61, 0.31], [-0.61, 0.31]];
+            const bot = top.map(([x, z]) => [x + Math.sign(x) * SP, z + Math.sign(z) * SP]);
+            for (let k = 0; k < 4; k++) {
+              const n = (k + 1) % 4;
+              const q = [[top[k][0], 0, top[k][1], 0, 1], [top[n][0], 0, top[n][1], 1, 1], [bot[n][0], -H, bot[n][1], 1, 0], [bot[k][0], -H, bot[k][1], 0, 0]];
+              for (const ix of [0, 1, 2, 0, 2, 3]) {
+                pos.push(q[ix][0], q[ix][1], q[ix][2]);
+                uv.push(q[ix][3], q[ix][4]);
+              }
+            }
+            const coneGeo = new THREE.BufferGeometry();
+            coneGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+            coneGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+            const add = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide };
+            const ceilGlow = new THREE.InstancedMesh(new THREE.PlaneGeometry(GW, GD), new THREE.MeshBasicMaterial({ map: ceilTex, opacity: 0.55, ...add }), alarm.length);
+            const cone = new THREE.InstancedMesh(coneGeo, new THREE.MeshBasicMaterial({ map: coneTex, opacity: 0.14, ...add }), alarm.length);
+            alarm.forEach((a, i) => {
+              const y = a.l.fy !== undefined ? a.l.fy : CEIL - 0.025;
+              const fs = a.l.fs || 1;
+              dummy.scale.set(fs, fs, 1);
+              dummy.position.set(a.l.x, CEIL - 0.008, a.l.z);
+              dummy.rotation.set(Math.PI / 2, 0, 0); // tournée vers le bas
+              dummy.updateMatrix();
+              ceilGlow.setMatrixAt(i, dummy.matrix);
+              dummy.scale.set(fs, 1, fs);
+              dummy.position.set(a.l.x, y - 0.02, a.l.z);
+              dummy.rotation.set(0, 0, 0);
+              dummy.updateMatrix();
+              cone.setMatrixAt(i, dummy.matrix);
+              ceilGlow.setColorAt(i, fixTmp.setRGB(0, 0, 0));
+              cone.setColorAt(i, fixTmp);
+            });
+            dummy.scale.set(1, 1, 1);
+            for (const m of [ceilGlow, cone]) {
+              m.frustumCulled = false;
+              m.instanceMatrix.needsUpdate = true;
+              group.add(m);
+            }
+            redGlow = [ceilGlow, cone];
           }
           bakeUniforms.uBakeTint.value.setRGB(0.8, 0.08, 0.05); // le peu de lumière qui reste dans le noir : rouge aussi
           bakeUniforms.uBakeTint2.value.setRGB(...RED.tint);
@@ -2684,9 +2749,11 @@ float bkCaust(vec2 uv, float t) {
             if (changed) {
               fixDirty();
               writeBake();
-              const col = redGlow.geometry.attributes.color;
-              alarm.forEach((a, i) => col.setXYZ(i, 0.5 * a.v, 0.04 * a.v, 0.025 * a.v));
-              col.needsUpdate = true;
+              alarm.forEach((a, i) => {
+                fixTmp.setRGB(1, 0.07, 0.04).multiplyScalar(a.v);
+                for (const m of redGlow) m.setColorAt(i, fixTmp);
+              });
+              for (const m of redGlow) m.instanceColor.needsUpdate = true;
             }
           }
         }
@@ -2956,6 +3023,13 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   let camZoomNow = 1.5;
   let nightT = 0; // son mode nuit (0 à 1)
   let lampCutT = 0; // la lampe (et l'infrarouge du caméscope) coupée par sa présence : secondes restantes
+  // la phase rouge (fin du Level 0) : la lampe aussi est à bout. failMode : 'ok' (elle tient, avec de petits creux),
+  // 'stutter' (elle claque), 'out' (elle lâche, puis revient en hoquetant), 'dim' (elle faiblit) ; failT : secondes
+  // avant de changer ; failStep : avant le prochain à-coup ; failK : sa force
+  let failMode = 'ok';
+  let failT = 3;
+  let failStep = 0;
+  let failK = 1;
   let lampCutLen = 0;
 
   // effets de bande en cours (secondes restantes), jumpscare, résolution dynamique, mise au point
@@ -3225,6 +3299,33 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         cut = e < 0.14 ? (Math.random() < 0.5 ? 0.35 : 0) : lampCutT < 0.08 ? Math.random() * 0.6 : 0;
         flashLight.intensity *= cut;
       }
+      // la phase rouge : la lampe claque, faiblit, lâche, sans régularité et par à-coups (jamais de fondu). Elle
+      // reste blanche
+      if (sim.level === 0 && sim.open && lampOn) {
+        failT -= dt;
+        failStep -= dt;
+        if (failT <= 0) {
+          if (failMode === 'ok') {
+            const r = Math.random();
+            failMode = r < 0.45 ? 'stutter' : r < 0.75 ? 'out' : 'dim';
+            failT = failMode === 'stutter' ? 0.3 + Math.random() * 1.1 : failMode === 'out' ? 0.6 + Math.random() * 1.8 : 1 + Math.random() * 2;
+          } else {
+            failMode = 'ok';
+            failT = 2.5 + Math.random() * 6;
+          }
+          failStep = 0;
+        }
+        if (failStep <= 0) {
+          failStep = 0.04 + Math.random() * 0.11;
+          const r = Math.random();
+          if (failMode === 'ok') failK = r < 0.04 ? 0.35 : 1;
+          else if (failMode === 'stutter') failK = r < 0.5 ? 0 : r < 0.7 ? 0.45 : 1;
+          else if (failMode === 'out') failK = failT < 0.35 ? (r < 0.5 ? 0 : 0.8) : 0;
+          else failK = r < 0.12 ? 0 : 0.28 + Math.random() * 0.12;
+        }
+        flashLight.intensity *= failK;
+        cut *= failK;
+      } else failK = 1;
       flashSpill.intensity = flashLight.intensity * 0.24;
       // le caméscope (V) : il sort en un tiers de seconde ; dans le noir, s'il reste de la pile, il passe en mode nuit
       // et sa lampe infrarouge éclaire devant (pour l'image seulement : l'entité ne la voit pas)
@@ -3251,7 +3352,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       // éclairés par la lumière d'où l'on est, un peu plus quand la lampe est allumée
       const k = THREE.MathUtils.clamp(0.07 + lightNow * 1.1 + (lampOn ? 0.4 : 0), 0.06, 1.05);
       for (const m of heldMats) m.color.copy(m.userData.base).multiplyScalar(k);
-      lensMat.color.setHex(lampOn ? 0xfff6d8 : 0x2c2b26);
+      lensMat.color.setHex(lampOn && failK > 0.2 ? 0xfff6d8 : 0x2c2b26);
       // ils suivent le pas, un peu en retard sur la tête
       const sway = P.moving ? (P.running ? 1.6 : 1) : 0.25;
       held.position.set(Math.cos(bob) * 0.007 * sway, Math.sin(bob * 2) * 0.006 * sway - (P.running ? 0.02 : 0), 0);
