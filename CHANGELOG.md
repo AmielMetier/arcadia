@@ -9,7 +9,10 @@
   - Les escaliers, les cassettes et la sortie restent toujours accessibles sans passer au-dessus d'un puits.
 - **The Backrooms** — Les trous de l'étage du haut sont plus larges, avec des passerelles plus fines et des parois éclairées.
 - **The Backrooms** — L'intérieur des trous et des puits a la même teinte que les murs de l'étage, au lieu d'un gris-vert.
-- **The Backrooms** — Nouvelles couleurs à l'étage du haut du Level 0 : un jaune moins vert, murs jaune pâle, moquette beige à peine plus foncée que les murs, plafond blanc cassé à la grille discrète et néons plus blancs.
+- **The Backrooms** — Nouvelles couleurs à l'étage du haut du Level 0 : un jaune moins vert, murs jaune pâle, moquette beige à peine plus foncée que les murs, plafond blanc cassé à la grille discrète et néons d'un blanc à peine chaud.
+- **The Backrooms** — La fin du Level 0 plonge dans le noir : quand toutes les cassettes sont trouvées, les néons s'éteignent et seuls quelques feux de secours rouges restent allumés.
+  - Une lumière rouge fixe et faible, qui tombe vers le sol et laisse le plafond et le fond des couloirs dans le noir.
+  - Certains feux claquent ou lâchent quelques secondes, et parfois tout se coupe d'un coup avant de se rallumer en hoquetant.
 - **The Backrooms** — Les piles sont de vraies piles AA, au sol comme dans la main.
 - **The Backrooms** — L'eau au Level 0 : flaques et plaques d'humidité plus rares, aux bords irréguliers (plus aucun rond parfait), auréoles du plafond plus discrètes qui ne passent plus d'une pièce à l'autre à travers les murs.
 - **The Backrooms** — Une vraie moquette rase au Level 0, la même aux deux étages : des poils fins qu'on distingue à hauteur d'homme, avec leurs ombres, et plus aucun motif qui se répète sur le sol.

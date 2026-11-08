@@ -268,8 +268,9 @@ export function createBackroomsScene(container, floors, lamps) {
       uBake: { value: bakeTex },
       uBakeScale: { value: new THREE.Vector2(1 / (W * CELL_SIZE), 1 / (H * CELL_SIZE)) },
       uBakeTX: { value: TX },
-      uBakeTint: { value: L2 ? new THREE.Color(1.0, 1.05, 1.07) : L1 ? new THREE.Color(0.86, 0.98, 1.12) : PIPES ? new THREE.Color(1.25, 0.98, 0.7) : LOW0 ? new THREE.Color(1.12, 1.04, 0.8) : new THREE.Color(1.0, 1.04, 0.9) }, // Level 0 : en haut une lumière blanche un peu verte ; en bas, la lumière chaude d'avant
+      uBakeTint: { value: L2 ? new THREE.Color(1.0, 1.05, 1.07) : L1 ? new THREE.Color(0.86, 0.98, 1.12) : PIPES ? new THREE.Color(1.25, 0.98, 0.7) : LOW0 ? new THREE.Color(1.12, 1.04, 0.8) : new THREE.Color(1.05, 1.03, 0.83) }, // Level 0 : en haut une lumière blanche à peine chaude ; en bas, la lumière chaude d'avant
       uBakeTint2: { value: PIPES ? new THREE.Color(0.78, 0.95, 1.08) : new THREE.Color(0, 0, 0) },
+      uCeilB: { value: 1 }, // la part du second canal reçue par le plafond (la phase rouge : des feux qui éclairent vers le bas)
       uBakeY: { value: -fi * FLOOR_DY },
       uCeil: { value: CEIL },
       uDamp: { value: L2 ? 0 : L1 ? 0.6 : PIPES ? 0.5 : 1 },
@@ -438,14 +439,20 @@ export function createBackroomsScene(container, floors, lamps) {
     }
     // power : 1 néons allumés, 0 coupure de courant (seule reste une lueur à peine visible)
     let power = 1;
-    // Level 0, toutes les cassettes trouvées : l'alarme. Chaque néon qui marchait passe au rouge et clignote à son
-    // propre rythme, sans aucun ensemble ; la lumière qu'ils jettent sur les murs suit (alarm : un par néon)
+    // Level 0, toutes les cassettes trouvées : la phase rouge. Plus aucune lumière blanche : les néons s'éteignent, sauf
+    // un sur cinq environ (share), qui devient un feu de secours rouge. Comme de vrais feux de secours : une lumière
+    // fixe et faible, chacun à sa force (level), qui tombe vers le sol et éclaire peu le plafond (ceil). Rien ne varie
+    // en douceur : certains feux sont défectueux (bad) et claquent par à-coups ou lâchent quelques secondes, et de
+    // temps en temps tout se coupe d'un coup, puis se rallume en hoquetant. La lumière rouge passe par le second canal
+    // de la lumière cuite (liveB, teinte tint). alarm : un par feu rouge
     let alarm = null;
+    const RED = { share: 0.22, level: [0.65, 1], bad: 0.22, tint: [0.66, 0.038, 0.024], ceil: 0.22 };
+    const alarmOf = new Map();
     const writeBake = () => {
       if (alarm) {
         live.fill(0);
         liveB.fill(0);
-        for (const a of alarm) if (a.k > 0 && a.l.state !== 'off') addPrint(live, a.fp, a.k);
+        for (const a of alarm) if (a.k > 0.01) addPrint(liveB, a.fp, a.k);
       } else {
         live.set(base);
         liveB.set(baseB);
@@ -454,7 +461,7 @@ export function createBackroomsScene(container, floors, lamps) {
       for (let i = 0; i < BW * BH; i++) {
         const v = Math.min(1, (L2 || PIPES ? 0.03 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
         bakeData[i * 4] = Math.round(v * 255);
-        if (PIPES) bakeData[i * 4 + 2] = Math.round(Math.min(1, liveB[i] * 0.3 * power) * 255);
+        if (PIPES || alarm) bakeData[i * 4 + 2] = Math.round(Math.min(1, liveB[i] * 0.3 * power) * 255);
       }
       bakeTex.needsUpdate = true;
     };
@@ -509,6 +516,7 @@ uniform vec2 uBakeScale;
 uniform float uBakeTX;
 uniform vec3 uBakeTint;
 uniform vec3 uBakeTint2;
+uniform float uCeilB;
 #ifdef BK_SPEC
 uniform vec3 uLampPos[${NLAMP}];
 uniform vec3 uLampCol[${NLAMP}];
@@ -677,7 +685,7 @@ float bkCaust(vec2 uv, float t) {
           // sous l'eau (Poolrooms) : teinte cyan qui fonce avec la profondeur, et les caustiques
           float sub = uPool * smoothstep(0.0, 0.06, uWaterY - by);
           diffuseColor.rgb *= mix(vec3(1.0), vec3(0.62, 0.9, 0.96) * mix(1.0, 0.6, clamp((uWaterY - by) / 1.2, 0.0, 1.0)), sub);
-          totalEmissiveRadiance += diffuseColor.rgb * (uBakeTint * bk.r + uBakeTint2 * bk.b) * 2.0 * shape;
+          totalEmissiveRadiance += diffuseColor.rgb * (uBakeTint * bk.r + uBakeTint2 * bk.b * (ny < -0.5 ? uCeilB : 1.0)) * 2.0 * shape;
           totalEmissiveRadiance += vec3(0.8, 1.0, 1.0) * bkCaust(vBakeP.xz * 0.32, uTime * 0.45) * 0.55 * sub * (0.35 + bk.r * 1.6);
           #ifdef BK_SPEC
           {
@@ -999,7 +1007,7 @@ float bkCaust(vec2 uv, float t) {
     }
 
     // 4. Néons au plafond (les morts sont gris, ceux qui grésillent clignotent)
-    const ON = new THREE.Color(L2 ? '#f2fbff' : L1 ? '#eef6ff' : LOW0 ? '#fffbe2' : '#f6fff0').multiplyScalar(L2 ? 2.2 : 3.2); // plus fort que le blanc : le caméscope sature et ils bavent
+    const ON = new THREE.Color(L2 ? '#f2fbff' : L1 ? '#eef6ff' : LOW0 ? '#fffbe2' : '#fffaea').multiplyScalar(L2 ? 2.2 : 3.2); // plus fort que le blanc : le caméscope sature et ils bavent
     const OFF = new THREE.Color(L2 ? '#7d8b8d' : '#4a473c'); // aux Poolrooms, un diffuseur éteint reste gris-bleu
     // Level 2 : des globes de verre dépoli au mur (ampoules chaudes) et des tubes nus dans les réserves
     const ON_BULB = new THREE.Color('#ffc27a').multiplyScalar(3.4);
@@ -1023,9 +1031,16 @@ float bkCaust(vec2 uv, float t) {
       fixSets.push(mesh);
     };
     const ALARM = new THREE.Color('#ff2414').multiplyScalar(3.2);
-    const onCol = (l) => (alarm ? ALARM : l.kind === 'bulb' ? ON_BULB : l.kind === 'tube' ? ON_TUBE : ON);
+    const onCol = (l) => (l.kind === 'bulb' ? ON_BULB : l.kind === 'tube' ? ON_TUBE : ON);
     const offCol = (l) => (l.kind === 'bulb' ? OFF_BULB : OFF);
-    const fixColor = (l, on) => l.fix && l.fix.mesh.setColorAt(l.fix.i, on ? onCol(l) : offCol(l));
+    const fixTmp = new THREE.Color();
+    const ALARM_OFF = new THREE.Color('#140807'); // dans le noir rouge, un diffuseur éteint ne se voit presque plus
+    // pendant la phase rouge, un néon est éteint, ou rouge à la force de sa pulsation
+    const fixColor = (l, on) => {
+      if (!l.fix) return;
+      const a = alarm && alarmOf.get(l);
+      l.fix.mesh.setColorAt(l.fix.i, alarm ? (a && on ? fixTmp.copy(ALARM_OFF).lerp(ALARM, Math.min(1, a.k)) : ALARM_OFF) : on ? onCol(l) : offCol(l));
+    };
     const fixDirty = () => {
       for (const m of fixSets) if (m.instanceColor) m.instanceColor.needsUpdate = true;
     };
@@ -2192,6 +2207,7 @@ float bkCaust(vec2 uv, float t) {
       }, undefined, () => {});
       if (!arrival) {
         const cabinLight = new THREE.PointLight('#f4f1e0', 2.5, 4, 1.5);
+        cabinLight.name = 'cabin';
         cabinLight.position.set(0, 2.4, CZ);
         exitGroup.add(cabinLight);
       }
@@ -2269,6 +2285,9 @@ float bkCaust(vec2 uv, float t) {
     let powerFlick = 0;
     let flickT = 0;
     let alarmT = 0;
+    let redCut = 0; // phase rouge : tout éteint encore tant de secondes
+    let redNext = 6; // avant la prochaine coupure
+    let redBack = 0; // le rallumage qui hoquette, au retour d'une coupure
     const setPower = (v) => {
       if (v === power) return;
       power = v;
@@ -2280,8 +2299,8 @@ float bkCaust(vec2 uv, float t) {
       fixDirty();
       writeBake();
       for (const sv of shaftViews) {
-        sv.u.uShaftK.value = v ? 1 : 0.04;
-        sv.glassMat.color.copy(v ? sv.glassOn : new THREE.Color('#3a3528'));
+        sv.u.uShaftK.value = v && !alarm ? 1 : 0.04;
+        sv.glassMat.color.copy(v && !alarm ? sv.glassOn : new THREE.Color(alarm ? '#4a0805' : '#3a3528'));
       }
     };
 
@@ -2380,7 +2399,8 @@ float bkCaust(vec2 uv, float t) {
         const w = v.n.wear || 0;
         // usé : la lampe grésille de plus en plus, puis s'éteint presque tout à fait
         let on = 1;
-        if (w >= 1) on = Math.random() < 0.04 ? 0.6 : 0.05;
+        if (alarm) on = 0.02; // la phase rouge : la lampe de salon s'éteint aussi
+        else if (w >= 1) on = Math.random() < 0.04 ? 0.6 : 0.05;
         else if (w > 0.75) on = Math.random() < (w - 0.75) * 0.5 ? 0.25 : 1;
         v.on += (on - v.on) * 0.5;
         v.shadeMat.color.setRGB(1 * v.on + 0.12, 0.85 * v.on + 0.1, 0.63 * v.on + 0.08);
@@ -2542,28 +2562,71 @@ float bkCaust(vec2 uv, float t) {
         }
         if (pipesView) pipesView.update(sim, P, time, dt, lightAt, P.flashlight && P.status === 'alive');
 
-        // L'alarme de la fin du Level 0 : une fois lancée, elle tient jusqu'au départ
+        // La phase rouge de la fin du Level 0 : une fois lancée, elle tient jusqu'au départ
         if (L0 && !alarm && sim.level === 0 && sim.open) {
-          alarm = map.lights.filter((l) => l.state !== 'off').map((l) => ({ l, fp: fpOf(l), k: 1, t: Math.random() * 1.2 }));
-          bakeUniforms.uBakeTint.value.setRGB(1.55, 0.16, 0.1);
-          for (const a of alarm) fixColor(a.l, power > 0);
+          // les feux rouges, tirés d'après leur place (les mêmes chez tous les joueurs)
+          const pick = (l, s) => (((Math.sin(l.x * 12.9898 + l.z * 78.233 + s) * 43758.5453) % 1) + 1) % 1;
+          alarm = map.lights
+            .filter((l) => l.state !== 'off' && pick(l, 0) < RED.share)
+            .map((l) => {
+              const base = RED.level[0] + (RED.level[1] - RED.level[0]) * pick(l, 3.3);
+              return { l, fp: fpOf(l), base, k: base, bad: pick(l, 7.1) < RED.bad, hic: 0, dead: 0 };
+            });
+          for (const a of alarm) alarmOf.set(a.l, a);
+          bakeUniforms.uBakeTint.value.setRGB(0.8, 0.08, 0.05); // le peu de lumière qui reste dans le noir : rouge aussi
+          bakeUniforms.uBakeTint2.value.setRGB(...RED.tint);
+          bakeUniforms.uCeilB.value = RED.ceil;
+          ambient.color.set('#ff1408');
+          exitLight.color.set('#ff1408');
+          const cab = exitGroup.getObjectByName('cabin');
+          if (cab) cab.color.set('#ff2a14');
+          for (const sv of shaftViews) {
+            sv.u.uShaftK.value = 0.04;
+            sv.glassMat.color.set('#4a0805');
+          }
+          for (const l of map.lights) fixColor(l, power > 0 && l.state !== 'off');
           fixDirty();
           writeBake();
         }
         if (alarm) {
           alarmT -= dt;
           if (alarmT <= 0 && power && powerFlick <= 0) {
-            alarmT = 1 / 20;
+            const st = 1 / 20;
+            alarmT = st;
+            // de temps en temps, tout se coupe d'un coup ; au retour, les feux se rallument en hoquetant
+            let all = null; // null : chacun sa vie ; 0 : tout éteint ; sinon, le hoquet du rallumage
+            if (redCut > 0) {
+              redCut -= st;
+              all = 0;
+              if (redCut <= 0) redBack = 0.2 + Math.random() * 0.35;
+            } else if (redBack > 0) {
+              redBack -= st;
+              all = Math.random() < 0.5 ? 0 : 1;
+            } else if ((redNext -= st) <= 0) {
+              redCut = 0.3 + Math.random() * 1.1;
+              redNext = 9 + Math.random() * 12;
+              all = 0;
+            }
             let changed = false;
             for (const a of alarm) {
-              a.t -= 1 / 20;
-              if (a.t > 0) continue;
-              // allumé 0,15 à 1,2 s, éteint 0,06 à 0,7 s ; parfois une rafale de claquements
-              const on = a.k <= 0;
-              a.k = on ? 0.55 + Math.random() * 0.45 : Math.random() < 0.2 ? 0.12 : 0;
-              a.t = on ? (Math.random() < 0.25 ? 0.05 + Math.random() * 0.08 : 0.15 + Math.random() * 1.05) : 0.06 + Math.random() * 0.64;
-              fixColor(a.l, a.k > 0.3 && a.l.state !== 'off');
-              changed = true;
+              let k = a.base;
+              if (a.bad) {
+                // un feu défectueux : il claque un moment (allumé, éteint, sans entre-deux), ou lâche quelques secondes
+                if (a.dead > 0) {
+                  a.dead -= st;
+                  k = 0;
+                } else if (a.hic > 0) {
+                  a.hic -= st;
+                  k = Math.random() < 0.5 ? 0 : a.base;
+                } else if (Math.random() < 0.01) a.hic = 0.15 + Math.random() * 1.3;
+                else if (Math.random() < 0.002) a.dead = 2 + Math.random() * 6;
+              }
+              if (all !== null) k = all ? a.base : 0;
+              if (k !== a.k) {
+                a.k = k;
+                fixColor(a.l, true);
+                changed = true;
+              }
             }
             if (changed) {
               fixDirty();
