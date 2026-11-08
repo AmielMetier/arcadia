@@ -95,11 +95,11 @@ function browser(port, env = {}) {
   return w;
 }
 function player(port, name, uid, env) {
-  const b = browser(port, env), log = { got: [], ev: [] }, nets = [];
+  const b = browser(port, env), log = { got: [], from: [], ev: [] }, nets = [];
   const mk = b.DDNet.create; b.DDNet.create = (o) => { const n = mk(o); nets.push(n); return n; };
   const R = b.DDRoom.create({
     joined() { log.ev.push('joined'); }, update() {}, chat() {}, results() {}, left(p) { log.ev.push('left:' + p.name); },
-    game(from, m) { log.got.push(m); },
+    game(from, m) { log.got.push(m); log.from.push(from); },
     error(m) { log.ev.push('error:' + m); }, closed(m) { log.ev.push('closed:' + m); },
     migrating() { log.ev.push('migrating'); }, migrated() { log.ev.push('migrated'); }, net(s) { log.ev.push('net:' + s); },
   });
@@ -335,6 +335,53 @@ async function newRoom(names, port) {
   H11.R.sendGame(B11.R.myId, { tag: 'vrai' });
   M11.R.sendGame('all', { tag: 'via-hote' }); // un invité passe par l'hôte, qui fait suivre
   ok(await until(() => B11.log.got.some((m) => m.tag === 'vrai') && B11.log.got.some((m) => m.tag === 'via-hote')), 'usurpation : les vrais messages, de l\'hôte et relayés par lui, passent toujours');
+  S.close();
+}
+
+/* ---------- 12. vol de place : sans hello, une connexion ne prend pas la place d'un joueur encore connecté ---------- */
+// Un invité qui a perdu sa place sur le relais revient sous une nouvelle connexion. Ses premiers messages (jeu, ping)
+// peuvent arriver avant son hello : l'hôte le retrouve par le numéro qu'ils portent (fromId). Avant, il le faisait même
+// quand le joueur était encore là : une seconde connexion d'un client modifié, annoncée sous le numéro de Bob, prenait
+// sa place, recevait ce qui n'était destiné qu'à lui (sa fiche de rôle dans Mystère Mystère…) et parlait en son nom.
+{
+  const S = await newRoom(['Hote', 'Mallory', 'Bob'], 8241), [H12, M12, B12] = S.ps;
+  H12.R.setGame('mystery', {});
+  await until(() => M12.R.game && B12.R.game);
+  const idB = B12.R.myId, cidB = H12.R.players.find((p) => p.id === idB).cid;
+  const got = [], evil = M12.b.DDNet.create({ prefix: 'ddhub-v1-', maxPeers: 5 });
+  evil.join(H12.R.code, { open() {}, msg: (m) => got.push(m), close() {}, error() {} });
+  ok(await until(() => evil.opened), 'vol de place : la seconde connexion de Mallory entre dans le salon, sans dire bonjour');
+  evil.toHost({ t: 'ping', ts: 1, fromId: idB });
+  evil.toHost({ t: 'g', fromId: idB, to: 'host', m: { tag: 'vol' } });
+  await sleep(600);
+  H12.R.sendGame(idB, { tag: 'fiche' });
+  await until(() => B12.log.got.some((m) => m.tag === 'fiche'), 3000);
+  const stolen = got.some((m) => m.t === 'g' && m.m && m.m.tag === 'fiche');
+  ok(H12.R.players.find((p) => p.id === idB).cid === cidB && B12.log.got.some((m) => m.tag === 'fiche') && !stolen && !H12.log.got.some((m) => m.tag === 'vol'),
+    'vol de place : Bob garde sa place, ce qui lui est destiné n\'arrive qu\'à lui, l\'intrus ne parle pas en son nom '
+    + JSON.stringify([H12.R.players.find((p) => p.id === idB).cid === cidB, B12.log.got.some((m) => m.tag === 'fiche'), stolen, H12.log.got.some((m) => m.tag === 'vol')]));
+  evil.close();
+  S.close();
+}
+
+/* ---------- 12b. reprise normale : un invité dont la place s'est libérée la retrouve par son numéro ---------- */
+// Zoé perd sa place sur le relais en pleine partie ; ce que son jeu envoie dès son retour, avant même que son hello
+// ne soit arrivé, parvient à l'hôte sous son nom : sa place est libre, son numéro suffit
+{
+  const S = await newRoom(['Hote', 'Zoe'], 8246), [H12b, Z12b] = S.ps, idZ = Z12b.R.myId;
+  H12b.R.setGame('mystery', {});
+  await until(() => Z12b.R.game);
+  const zoe = Z12b.nets[Z12b.nets.length - 1], onMsg = zoe._onMsg;
+  let early = false;
+  zoe._onMsg = function (raw) { onMsg.call(this, raw); if (!early && /"type":"room_joined"/.test(raw)) { early = true; Z12b.R.sendGame('host', { tag: 'tot' }); } };
+  S.px[1].block(true);
+  ok(await until(() => H12b.R.players.find((p) => p.id === idZ && !p.cid), 6000), 'reprise normale : la place de Zoé se libère quand sa coupure dure trop');
+  S.px[1].block(false);
+  ok(await until(() => { const k = H12b.log.got.findIndex((m) => m.tag === 'tot'); return k >= 0 && H12b.log.from[k] === idZ; }, 10000) && early,
+    'reprise normale : le premier message de Zoé, parti avant son hello, arrive à l\'hôte sous son nom ' + JSON.stringify([early, H12b.log.from[H12b.log.got.findIndex((m) => m.tag === 'tot')]]));
+  ok(await until(() => Z12b.R.myId === idZ && H12b.R.players.some((p) => p.id === idZ && p.cid && !p.away) && H12b.R.players.length === 2, 8000), 'reprise normale : Zoé retrouve sa place, même numéro');
+  H12b.R.sendGame(idZ, { tag: 'fiche' });
+  ok(await until(() => Z12b.log.got.some((m) => m.tag === 'fiche')), 'reprise normale : l\'hôte écrit de nouveau à Zoé');
   S.close();
 }
 
