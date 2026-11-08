@@ -265,12 +265,12 @@ function greyWall(ctx, S) {
 }
 
 // Moquette humide, rase (photo ambientCG Carpet011, ses poils creusés par l'ombre) : on ne garde que son grain, la
-// luminance de chaque poil aux trois quarts de son contraste, posée sur la couleur moyenne voulue. Beige à peine plus
-// foncé que les murs en haut, brun doré en bas (low). Sans photo, une trame de bruit
-const CARPET_RGB = { up: [132, 119, 81], low: [133, 116, 38] };
+// luminance de chaque poil aux trois quarts de son contraste, posée sur la couleur moyenne voulue : un beige à peine
+// plus foncé que les murs du haut, la même moquette aux deux étages. Sans photo, une trame de bruit
+const CARPET_RGB = [132, 119, 81];
 const CARPET_GRAIN = 0.75;
-function drawCarpet(ctx, S, photo, low = false) {
-  const [cr, cg, cb] = low ? CARPET_RGB.low : CARPET_RGB.up;
+function drawCarpet(ctx, S, photo) {
+  const [cr, cg, cb] = CARPET_RGB;
   ctx.globalCompositeOperation = 'source-over';
   if (photo) {
     ctx.drawImage(photo, 0, 0, S, S);
@@ -511,27 +511,25 @@ export function createBackroomsTextures(level = 0) {
   drawW(wctx, S, null);
   drawF(cctx, S, null);
   drawC(clctx, S, null);
-  // Level 0, étage du bas : l'ancien papier peint doré, délavé vers le gris, sa moquette brun doré, son plafond clair
+  // Level 0, étage du bas : l'ancien papier peint doré, délavé vers le gris, et son plafond clair (la moquette est
+  // celle du haut)
   const [lowCanvas, lowCtx] = level === 0 ? canvas(PX) : [null, null];
-  const [carpetLowCanvas, cLowCtx] = level === 0 ? canvas(PX) : [null, null];
   const [ceilLowCanvas, clLowCtx] = level === 0 ? canvas(PX) : [null, null];
-  const drawLow = (pap, moq, pla) => {
+  const drawLow = (pap, pla) => {
     if (!lowCtx) return;
-    for (const c of [lowCtx, cLowCtx, clLowCtx]) c.setTransform(PX / S, 0, 0, PX / S, 0, 0);
+    for (const c of [lowCtx, clLowCtx]) c.setTransform(PX / S, 0, 0, PX / S, 0, 0);
     if (pap !== undefined) {
       drawW(lowCtx, S, pap, true);
       greyWall(lowCtx, S);
     }
-    if (moq !== undefined) drawCarpet(cLowCtx, S, moq, true);
     if (pla !== undefined) drawCeiling(clLowCtx, S, pla, true);
   };
-  drawLow(null, null, null);
+  drawLow(null, null);
 
   const wall = tex(wallCanvas);
   const wallLow = lowCanvas ? tex(lowCanvas) : wall;
   const carpet = tex(carpetCanvas);
   const ceiling = tex(ceilCanvas);
-  const carpetLow = carpetLowCanvas ? tex(carpetLowCanvas) : carpet;
   const ceilingLow = ceilLowCanvas ? tex(ceilLowCanvas) : ceiling;
 
   // les photos arrivent un peu plus tard : on redessine par-dessus
@@ -549,9 +547,8 @@ export function createBackroomsTextures(level = 0) {
   const mosaic = tex(ceilCanvas);
   const ready = Promise.all([...files.map(loadImage), ...(L2 ? ['l37_bassin.jpg', 'l37_fosse.jpg'].map(loadImage) : [])]).then(([pap, moq, pla, bas, fos]) => {
     if (pap) { drawW(wctx, S, pap); wall.needsUpdate = true; }
-    if (pap && lowCtx) { drawLow(pap, undefined, undefined); wallLow.needsUpdate = true; }
-    if (moq && lowCtx) { drawLow(undefined, moq, undefined); carpetLow.needsUpdate = true; }
-    if (pla && lowCtx) { drawLow(undefined, undefined, pla); ceilingLow.needsUpdate = true; }
+    if (pap && lowCtx) { drawLow(pap, undefined); wallLow.needsUpdate = true; }
+    if (pla && lowCtx) { drawLow(undefined, pla); ceilingLow.needsUpdate = true; }
     if (moq) { drawF(cctx, S, moq); carpet.needsUpdate = true; }
     if (pla) { drawC(clctx, S, pla); ceiling.needsUpdate = true; }
     // carreaux des bassins deux fois plus petits (10 cm)
@@ -853,5 +850,5 @@ export function createBackroomsTextures(level = 0) {
   const drawings = tex(drawCanvas);
   drawings.wrapS = drawings.wrapT = THREE.ClampToEdgeWrapping;
 
-  return { wall, wallLow, carpet, carpetLow, ceiling, ceilingLow, pool, deep, mosaic, vhs, exit, sign, label, steel, fireDoor, treadPlate, crate, fog, lamp, outlet, vent, tape, drawings, ready, metalReady };
+  return { wall, wallLow, carpet, ceiling, ceilingLow, pool, deep, mosaic, vhs, exit, sign, label, steel, fireDoor, treadPlate, crate, fog, lamp, outlet, vent, tape, drawings, ready, metalReady };
 }

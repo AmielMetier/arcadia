@@ -231,7 +231,7 @@ export function createBackroomsScene(container, floors, lamps) {
 
   // Un étage entier : sol, plafond, murs, néons, meubles, cassettes, objets, ascenseur… dans un groupe à sa hauteur
   function buildFloor(map, fi) {
-    const LOW0 = L0 && fi === 1; // l'étage du bas du Level 0 : ambiance d'avant, moquette brun doré, lumière chaude
+    const LOW0 = L0 && fi === 1; // l'étage du bas du Level 0 : ambiance d'avant (papier peint doré, lumière chaude), même moquette qu'en haut
     const group = new THREE.Group();
     group.position.y = -fi * FLOOR_DY;
     scene.add(group);
@@ -602,9 +602,9 @@ float bkCaust(vec2 uv, float t) {
           if (ny < -0.5) shape *= mix(0.62, 1.15, smoothstep(0.0, 0.26, uCeil - by));
           #endif
           // humidité : la moquette détrempée par plaques, l'eau qui remonte au pied des murs
-          // (les plaques sont déformées par un second bruit : des bords déchiquetés, jamais des ronds)
+          // (des plaques éparses, environ un dixième du sol, déformées par un second bruit : des bords déchiquetés, jamais des ronds)
           vec2 wq = vBakeP.xz * 0.17 + 11.0;
-          float wet = smoothstep(0.52, 0.72, bkFbm(wq + (vec2(bkFbm(wq * 3.1 + 2.0), bkFbm(wq * 3.1 + 9.0)) - 0.5) * 1.1)) * uDamp;
+          float wet = smoothstep(0.62, 0.8, bkFbm(wq + (vec2(bkFbm(wq * 3.1 + 2.0), bkFbm(wq * 3.1 + 9.0)) - 0.5) * 1.1)) * uDamp;
           float rise = (1.0 - smoothstep(0.05, 0.45 + bkFbm(vBakeP.xz * 0.9 + vBakeP.y) * 0.5, by)) * smoothstep(0.3, 0.7, bkFbm(vBakeP.xz * 0.3 + 5.0)) * uDamp * uWallDecay;
           // auréoles d'eau sur les murs : un cerne plus foncé autour d'une tache pâle
           float n2 = bkFbm(vec2(vBakeP.x + vBakeP.z * 0.37, vBakeP.y + vBakeP.z) * 0.45 + 31.0);
@@ -721,7 +721,7 @@ float bkCaust(vec2 uv, float t) {
     // 1. Sol en moquette humide (une répétition de texture par case, une et demie au Level 0 : les poils de la moquette
     // rase restent assez gros pour se voir à hauteur d'homme), percé des trous et des cages d'escalier
     // (Level 2 : béton ciré, luisant d'humidité, qui reflète les lampes)
-    const carpet = (PIPES ? tx2.floor : LOW0 ? textures.carpetLow : textures.carpet).clone();
+    const carpet = (PIPES ? tx2.floor : textures.carpet).clone();
     carpet.needsUpdate = true;
     carpet.repeat.set(W * (L0 ? 1.5 : 1), H * (L0 ? 1.5 : 1));
     if (L0) carpet.anisotropy = renderer.capabilities.getMaxAnisotropy(); // le grain reste net jusqu'au fond des couloirs
@@ -735,13 +735,35 @@ float bkCaust(vec2 uv, float t) {
     if (holes.length) {
       floorMat.alphaMap = holeMask(W, H, holes, true);
       floorMat.alphaTest = 0.5;
-      // les parois des trous, du même béton peint que le sol, éclairées d'en haut : claires au bord, de plus en plus
-      // sombres en descendant. Les trous du haut traversent la dalle (on voit l'étage du dessous au fond) ; les puits
-      // sans fond de l'étage du bas descendent bien plus bas que ce que laisse voir l'obscurité
+      // les parois des trous, éclairées d'en haut : claires au bord, de plus en plus sombres en descendant. Les trous du
+      // haut traversent la dalle (on voit l'étage du dessous au fond) ; les puits sans fond de l'étage du bas descendent
+      // bien plus bas que ce que laisse voir l'obscurité. Au Level 0, elles prennent la teinte du papier peint de l'étage
+      // (stops : une fonction de sa couleur moyenne, recalculée quand la photo du papier arrive)
+      const wallCv = L0 ? (LOW0 ? textures.wallLow : textures.wall).image : null;
+      const wallRGB = () => {
+        const d = wallCv.getContext('2d').getImageData(0, 0, wallCv.width, wallCv.height).data;
+        const m = [0, 0, 0];
+        let n = 0;
+        for (let i = 0; i < d.length; i += 4 * 37) {
+          m[0] += d[i];
+          m[1] += d[i + 1];
+          m[2] += d[i + 2];
+          n++;
+        }
+        return m.map((v) => v / n);
+      };
+      const shade = (rgb, k) => `rgb(${rgb.map((v) => Math.min(255, Math.round(v * k))).join(', ')})`;
       const shaftWalls = (list, depth, stops) => {
         if (!list.length) return;
-        const tex = new THREE.CanvasTexture(gradCanvas(stops, depth > 10 ? 2048 : 512));
+        const h = depth > 10 ? 2048 : 512;
+        const cv = gradCanvas(typeof stops === 'function' ? stops(wallCv && wallRGB()) : stops, h);
+        const tex = new THREE.CanvasTexture(cv);
         tex.colorSpace = THREE.SRGBColorSpace;
+        if (typeof stops === 'function' && wallCv)
+          textures.ready.then(() => {
+            cv.getContext('2d').drawImage(gradCanvas(stops(wallRGB()), h), 0, 0);
+            tex.needsUpdate = true;
+          });
         const mat = baked(new THREE.MeshLambertMaterial({ map: tex }));
         const walls = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, depth), mat, list.length * 4);
         list.forEach((h, i) => {
@@ -761,9 +783,10 @@ float bkCaust(vec2 uv, float t) {
       const deepSet = new Set((map.pits || []).filter((p) => p.deep).map((p) => p.id));
       const deep = (map.pits || []).filter((p) => deepSet.has(p.id)).map((p) => ({ x: p.x, z: p.z, hx: PIT_HALF, hz: PIT_HALF }));
       const shallow = holes.filter((h) => !deep.some((d) => d.x === h.x && d.z === h.z));
-      shaftWalls(shallow, SLAB, L0 && !LOW0 ? [[0, '#aca785'], [0.55, '#7e795c'], [1, '#4e4a36']] : [[0, '#5e5434'], [1, '#5e5434']]);
+      shaftWalls(shallow, SLAB, L0 ? (c) => [[0, shade(c, 1.1)], [0.55, shade(c, 0.8)], [1, shade(c, 0.5)]] : [[0, '#5e5434'], [1, '#5e5434']]);
       // le noir arrive dès le premier mètre : debout au bord, on ne voit que le haut de la paroi, et il plonge déjà dans l'ombre
-      shaftWalls(deep, DEEP_DEPTH, [[0, '#968a5c'], [0.004, '#7e7452'], [0.012, '#4c4532'], [0.024, '#1e1b14'], [0.04, '#080806'], [0.08, '#000000'], [1, '#000000']]);
+      const DEEP_FADE = [[0, 1.1], [0.004, 0.92], [0.012, 0.56], [0.024, 0.22], [0.04, 0.06]];
+      shaftWalls(deep, DEEP_DEPTH, (c) => [...DEEP_FADE.map(([at, k]) => [at, shade(c || [137, 126, 84], k)]), [0.08, '#000000'], [1, '#000000']]);
       if (deep.length) {
         // le fond, si loin qu'on ne le voit jamais : du noir
         const bottom = new THREE.InstancedMesh(new THREE.PlaneGeometry(PIT_HALF * 2, PIT_HALF * 2), new THREE.MeshBasicMaterial({ color: '#000000' }), deep.length);
