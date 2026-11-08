@@ -8,7 +8,9 @@
   - On peut les traverser par les passerelles en gardant l'équilibre ; le perdre, c'est tomber.
   - Les escaliers, les cassettes et la sortie restent toujours accessibles sans passer au-dessus d'un puits.
 - **The Backrooms** — Les trous de l'étage du haut sont plus larges, avec des passerelles plus fines et des parois éclairées.
-- **The Backrooms** — Nouvelles couleurs à l'étage du haut du Level 0 : murs jaune pâle, moquette beige à peine plus foncée que les murs, plafond blanc cassé et néons plus blancs.
+- **The Backrooms** — Nouvelles couleurs à l'étage du haut du Level 0 : un jaune moins vert, murs jaune pâle, moquette beige à peine plus foncée que les murs, plafond blanc cassé à la grille discrète et néons plus blancs.
+- **The Backrooms** — Les piles sont de vraies piles AA, au sol comme dans la main.
+- **The Backrooms** — L'eau au Level 0 : flaques et plaques d'humidité aux bords irréguliers (plus aucun rond parfait), auréoles du plafond plus discrètes qui ne passent plus d'une pièce à l'autre à travers les murs.
 - **The Backrooms** — Une vraie moquette rase au Level 0 : des poils fins qu'on distingue à hauteur d'homme, avec leurs ombres, et plus aucun motif qui se répète sur le sol.
 - **The Backrooms** — Les murs de l'étage du haut sont propres : plus de coulures, presque plus d'auréoles ni de traces d'humidité.
 - **The Backrooms** — L'étage du bas du Level 0 garde son ambiance d'avant : papier peint doré juste plus gris (plus aucune tache, fissure ni moisissure), moquette brun doré et lumière plus chaude.

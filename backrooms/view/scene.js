@@ -177,6 +177,17 @@ export function createBackroomsScene(container, floors, lamps) {
       resolve(holder);
     }, undefined, () => resolve(null));
   });
+  // la pile AA (Poly by Google, CC-BY 3.0) : 1,4 × 5,2 cm, debout le long de y, centrée. On garde sa forme et son
+  // étiquette ; chaque usage (au sol, en main) lui donne son matériau
+  const batteryModel = new Promise((resolve) => {
+    loader.load(MODELS + 'aa_battery.glb', (g) => {
+      let src = null;
+      g.scene.traverse((o) => {
+        if (o.isMesh && !src) src = { geo: o.geometry, map: o.material.map };
+      });
+      resolve(src);
+    }, undefined, () => resolve(null));
+  });
 
   // masque de transparence d'un plan couché (sol ou plafond) : des trous rectangulaires (demi-côtés hx, hz). 16 texels par case (16 cm : de quoi
   // garder les arêtes de 50 cm entre les trous). flip : la ligne 0 du masque est au bord z max (sol) ou z 0 (plafond)
@@ -271,6 +282,7 @@ export function createBackroomsScene(container, floors, lamps) {
       // Level 0 : les néons éclairent le mur presque jusqu'au sol, et les auréoles du plafond restent discrètes
       uSideLo: { value: L0 ? 0.8 : 0.5 },
       uStain: { value: L0 ? 0.5 : 1 },
+      uCeilStain: { value: L0 ? 0.55 : 1 }, // Level 0 : les auréoles du plafond, encore plus pâles
       // Level 0, étage du haut : des murs propres (presque pas d'auréoles ni d'humidité au pied) ; le bas reste défraîchi
       uWallDecay: { value: L0 && !LOW0 ? 0.15 : 1 },
     };
@@ -513,6 +525,7 @@ uniform float uWaterY;
 uniform float uHaze;
 uniform float uSideLo;
 uniform float uStain;
+uniform float uCeilStain;
 uniform float uWallDecay;
 #ifdef BK_TILE
 uniform float uTileRow;
@@ -589,12 +602,30 @@ float bkCaust(vec2 uv, float t) {
           if (ny < -0.5) shape *= mix(0.62, 1.15, smoothstep(0.0, 0.26, uCeil - by));
           #endif
           // humidité : la moquette détrempée par plaques, l'eau qui remonte au pied des murs
-          float wet = smoothstep(0.52, 0.72, bkFbm(vBakeP.xz * 0.17 + 11.0)) * uDamp;
+          // (les plaques sont déformées par un second bruit : des bords déchiquetés, jamais des ronds)
+          vec2 wq = vBakeP.xz * 0.17 + 11.0;
+          float wet = smoothstep(0.52, 0.72, bkFbm(wq + (vec2(bkFbm(wq * 3.1 + 2.0), bkFbm(wq * 3.1 + 9.0)) - 0.5) * 1.1)) * uDamp;
           float rise = (1.0 - smoothstep(0.05, 0.45 + bkFbm(vBakeP.xz * 0.9 + vBakeP.y) * 0.5, by)) * smoothstep(0.3, 0.7, bkFbm(vBakeP.xz * 0.3 + 5.0)) * uDamp * uWallDecay;
-          // auréoles d'eau, au plafond (des dalles entières) et sur les murs : un cerne plus foncé autour d'une tache pâle
-          float n2 = bkFbm(vec2(vBakeP.x + vBakeP.z * 0.37, vBakeP.y * (abs(ny) < 0.5 ? 1.0 : 0.0) + vBakeP.z) * 0.45 + 31.0);
+          // auréoles d'eau sur les murs : un cerne plus foncé autour d'une tache pâle
+          float n2 = bkFbm(vec2(vBakeP.x + vBakeP.z * 0.37, vBakeP.y + vBakeP.z) * 0.45 + 31.0);
           float ring = smoothstep(0.6, 0.66, n2) * (1.0 - smoothstep(0.68, 0.75, n2)) * 0.8 + smoothstep(0.66, 0.75, n2) * 0.3;
-          float stain = ny < -0.5 ? ring : (abs(ny) < 0.5 ? ring * 0.6 * uWallDecay : 0.0);
+          // au plafond : une auréole par case au plus (une sur quatre), de forme irrégulière, qui ne sort jamais de sa
+          // case. Les murs et les cloisons sont au bord des cases : une tache ne passe jamais d'une pièce à l'autre
+          float cst = 0.0;
+          if (ny < -0.5) {
+            vec2 cq = vBakeP.xz / ${CELL_SIZE.toFixed(3)};
+            vec2 ci = floor(cq);
+            if (bkHash(ci + 41.3) < 0.26) {
+              vec2 cc = ci + 0.5 + (vec2(bkHash(ci + 3.1), bkHash(ci + 8.7)) - 0.5) * 0.16;
+              float ca = bkHash(ci + 2.9) * 6.2832;
+              vec2 dv = mat2(cos(ca), sin(ca), -sin(ca), cos(ca)) * (cq - cc);
+              dv /= (0.15 + 0.13 * bkHash(ci + 5.3)) * vec2(1.0, 0.7 + 0.3 * bkHash(ci + 6.1)); // 37 à 70 cm, ovale
+              float d = length(dv) + (bkFbm(cq * 3.4 + ci * 1.7) - 0.5) * 0.55;
+              float s = 1.0 - d;
+              cst = smoothstep(-0.06, 0.02, s) * (1.0 - smoothstep(0.04, 0.16, s)) * 0.8 + smoothstep(0.02, 0.2, s) * 0.3;
+            }
+          }
+          float stain = ny < -0.5 ? cst * uCeilStain : (abs(ny) < 0.5 ? ring * 0.6 * uWallDecay : 0.0);
           diffuseColor.rgb *= mix(1.0, 0.62, ny > 0.5 ? wet : (abs(ny) < 0.5 ? rise : 0.0));
           diffuseColor.rgb *= mix(vec3(1.0), vec3(0.78, 0.66, 0.45), stain * uDamp * uStain);
           #ifdef BK_BASE
@@ -1301,19 +1332,55 @@ float bkCaust(vec2 uv, float t) {
         group.add(pm);
       }
       // les fuites : une auréole au plafond, une flaque dessous, une goutte qui tombe et fait des ronds
-      const rc = document.createElement('canvas');
-      rc.width = rc.height = 128;
-      const rg = rc.getContext('2d');
-      const grd = rg.createRadialGradient(64, 64, 4, 64, 64, 62);
-      grd.addColorStop(0, 'rgba(255,255,255,0.95)');
-      grd.addColorStop(0.65, 'rgba(255,255,255,0.75)');
-      grd.addColorStop(0.85, 'rgba(255,255,255,1)');
-      grd.addColorStop(1, 'rgba(255,255,255,0)');
-      rg.fillStyle = grd;
-      rg.fillRect(0, 0, 128, 128);
-      const blotTex = new THREE.CanvasTexture(rc);
-      const puddleMat = new THREE.MeshBasicMaterial({ map: blotTex, color: '#1a1406', transparent: true, opacity: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
-      const stainMat = new THREE.MeshBasicMaterial({ map: blotTex, color: '#5a4720', transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide });
+      // des taches irrégulières, jamais rondes : un contour qui ondule (quelques harmoniques au hasard), deux ou trois
+      // coulées qui débordent, des bords flous. Trois dessins, tirés d'une graine fixe (les mêmes chez tout le monde)
+      let bs = 0x5eed;
+      const br = () => ((bs = (Math.imul(bs, 1103515245) + 12345) >>> 0) / 4294967296);
+      const blot = (ring) => {
+        const c = document.createElement('canvas');
+        c.width = c.height = 256;
+        const x = c.getContext('2d');
+        x.filter = 'blur(5px)';
+        const shape = (cx, cy, R) => {
+          const h = [1, 2, 3, 5].map((k) => [k, (0.12 / k) * (0.5 + br()), br() * 6.2832]);
+          x.beginPath();
+          for (let i = 0; i <= 64; i++) {
+            const a = (i / 64) * 6.2832;
+            const r = R * (1 + h.reduce((s, [k, amp, ph]) => s + amp * Math.sin(k * a + ph), 0));
+            if (i) x.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+            else x.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+          }
+          x.closePath();
+        };
+        const n = 2 + ((br() * 2) | 0);
+        const parts = [[128, 128, 60]];
+        for (let i = 0; i < n; i++) {
+          const a = br() * 6.2832;
+          const d = 35 + br() * 25;
+          parts.push([128 + Math.cos(a) * d, 128 + Math.sin(a) * d, 15 + br() * 18]);
+        }
+        if (ring) {
+          // l'auréole : un cerne plus foncé autour d'un cœur pâle
+          x.globalAlpha = 0.55;
+          x.fillStyle = '#fff';
+          for (const p of parts) (shape(...p), x.fill());
+          x.globalAlpha = 1;
+          x.strokeStyle = '#fff';
+          x.lineWidth = 7;
+          shape(...parts[0]);
+          x.stroke();
+        } else {
+          x.fillStyle = '#fff';
+          for (const p of parts) (shape(...p), x.fill());
+        }
+        const t = new THREE.CanvasTexture(c);
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      };
+      const pudTex = [blot(false), blot(false), blot(false)];
+      const stainTex = [blot(true), blot(true), blot(true)];
+      const puddleMats = pudTex.map((map) => new THREE.MeshBasicMaterial({ map, color: '#1a1406', transparent: true, opacity: 0.45, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 }));
+      const stainMats = stainTex.map((map) => new THREE.MeshBasicMaterial({ map, color: '#5a4720', transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide }));
       const dropMat = new THREE.MeshBasicMaterial({ color: '#d8d2b8', transparent: true, opacity: 0.8 });
       const ringMat = new THREE.MeshBasicMaterial({ color: '#c9c0a0', transparent: true, opacity: 0.0, depthWrite: false });
       const dropGeo = new THREE.SphereGeometry(0.012, 6, 5);
@@ -1324,11 +1391,16 @@ float bkCaust(vec2 uv, float t) {
         const x = (w.x + 0.2 + rr() * 0.6) * CELL_SIZE;
         const z = (w.z + 0.2 + rr() * 0.6) * CELL_SIZE;
         const r = 0.35 + rr() * 0.35;
-        const pud = new THREE.Mesh(new THREE.PlaneGeometry(r * 2, r * 2), puddleMat);
-        pud.rotation.x = -Math.PI / 2;
+        // la flaque et son auréole restent dans leur case : jamais à travers un mur ou une cloison
+        const room = Math.min(x - w.x * CELL_SIZE, (w.x + 1) * CELL_SIZE - x, z - w.z * CELL_SIZE, (w.z + 1) * CELL_SIZE - z) - 0.08;
+        const rp = Math.min(r, room);
+        const rs = Math.min(r * 1.2, room);
+        const turn = (x * 7.31 + z * 3.17) % 6.2832;
+        const pud = new THREE.Mesh(new THREE.PlaneGeometry(rp * 2, rp * 2 * (0.7 + 0.3 * ((x * 13.7) % 1))), puddleMats[i % 3]);
+        pud.rotation.set(-Math.PI / 2, 0, turn);
         pud.position.set(x, 0.007, z);
-        const st = new THREE.Mesh(new THREE.PlaneGeometry(r * 2.4, r * 2.4), stainMat);
-        st.rotation.x = Math.PI / 2;
+        const st = new THREE.Mesh(new THREE.PlaneGeometry(rs * 2, rs * 2 * (0.75 + 0.25 * ((z * 11.3) % 1))), stainMats[(i + 1) % 3]);
+        st.rotation.set(Math.PI / 2, 0, turn * 0.7 + 1);
         st.position.set(x, CEIL - 0.012, z);
         const drop = new THREE.Mesh(dropGeo, dropMat);
         drop.scale.set(1, 1.8, 1);
@@ -1493,17 +1565,33 @@ float bkCaust(vec2 uv, float t) {
     };
     const cellMat = baked(new THREE.MeshLambertMaterial({ color: '#1d1d1d' }));
     const capCopper = baked(new THREE.MeshLambertMaterial({ color: '#c98a2b', emissive: '#5a3a08', emissiveIntensity: 0.3 }));
+    // les piles au sol : deux piles AA couchées, quatre fois plus grandes que nature pour qu'on les repère sur la
+    // moquette ; deux cylindres noirs à bout cuivré en attendant le modèle
+    const BATT_K = 4;
+    let battMat = null;
     const makeBattery = () => {
       const g = new THREE.Group();
       for (let i = 0; i < 2; i++) {
-        const cell = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.2, 10), cellMat);
+        const cell = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.021, 0.12, 10), cellMat);
         cell.rotation.z = Math.PI / 2;
-        cell.position.set(0, 0.045, i * 0.1 - 0.05);
-        const top = new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.046, 0.07, 10), capCopper);
+        cell.position.set(0, 0.021, (i - 0.5) * 0.045);
+        const top = new THREE.Mesh(new THREE.CylinderGeometry(0.0212, 0.0212, 0.04, 10), capCopper);
         top.rotation.z = Math.PI / 2;
-        top.position.set(0.07, 0.045, i * 0.1 - 0.05);
+        top.position.set(0.075, 0.021, (i - 0.5) * 0.045);
         g.add(cell, top);
       }
+      batteryModel.then((src) => {
+        if (!src) return;
+        battMat = battMat || baked(new THREE.MeshLambertMaterial({ map: src.map }));
+        g.clear();
+        for (let i = 0; i < 2; i++) {
+          const m = new THREE.Mesh(src.geo, battMat);
+          m.scale.setScalar(BATT_K);
+          m.rotation.set(0, i * 0.35, Math.PI / 2); // couchées, pas tout à fait parallèles
+          m.position.set(0, 0.0071 * BATT_K, (i - 0.5) * 0.0155 * BATT_K);
+          g.add(m);
+        }
+      });
       return g;
     };
     // l'échelle au sol : couchée
@@ -2593,6 +2681,20 @@ float bkCaust(vec2 uv, float t) {
   heldBattery.position.set(-0.2, -0.22, -0.45);
   heldBattery.rotation.set(0.5, 0.35, 0.1);
   held.add(heldBattery);
+  // puis les vraies : deux piles AA (le même modèle qu'au sol), un peu plus grandes que nature à cette distance
+  batteryModel.then((src) => {
+    if (!src) return;
+    const hm = hmat({ map: src.map });
+    for (const c of heldBattery.children) c.visible = false;
+    for (let i = 0; i < 2; i++) {
+      const m = new THREE.Mesh(src.geo, hm);
+      m.frustumCulled = false;
+      m.scale.setScalar(1.4);
+      m.rotation.z = -Math.PI / 2; // couchées, le plot + vers la droite
+      m.position.set(0.01, 0, (i - 0.5) * 0.021);
+      heldBattery.add(m);
+    }
+  });
 
   // Les autres joueurs : des explorateurs en combinaison jaune (view/players.js). Leurs lampes sont posées dès
   // maintenant, éteintes, pour que la compilation des matériaux (à la fin) les compte déjà
@@ -3159,7 +3261,9 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       else focusT = Math.max(0, focusT - dt * 1.4);
       // balance des blancs automatique : un peu bleue dans le noir, chaude sous les néons
       const wb = THREE.MathUtils.clamp(lightHere, 0, 1);
-      const white = L2 ? [1, 1, 1] : [0.96 + wb * 0.06, 1, 1.07 - wb * 0.1];
+      // Level 0, étage du haut : un étalonnage moins vert, un peu plus jaune (rouge +4 %, vert et bleu −5 %)
+      const up0 = L0 && (P.floor || 0) === 0;
+      const white = L2 ? [1, 1, 1] : [(0.96 + wb * 0.06) * (up0 ? 1.04 : 1), up0 ? 0.95 : 1, (1.07 - wb * 0.1) * (up0 ? 0.95 : 1)];
 
       // les effets de bande du moment : raccord, perte de signal (mort), mire, la prise de l'entité
       for (const k in fx) fx[k] = Math.max(0, fx[k] - dt);
