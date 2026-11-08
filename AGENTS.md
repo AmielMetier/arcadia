@@ -150,6 +150,12 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   `node tools/bench-dogfight.mjs [joueurs] [niveau] [éliminations] [parties]` fait jouer des bots hors navigateur. `python3 tools/glb-webp.py modele.glb` allège un modèle. Licences des modèles : `dogfight/LICENSE.txt` (F-22 à confirmer).
 - Réseau (`shared/net.js`, `shared/room.js`, `server/`) : `node tools/test-relay.mjs` et `node tools/test-net.mjs`
   (prérequis : `cd server && npm install`). Le serveur relais doit être redéployé quand `server/server.js` change.
+  Si l'hôte part, son successeur est choisi par `successorOf` (`shared/room.js`) : un joueur présent (pas `away`), de préférence
+  dans la partie (`ready[id] === game`), puis le plus petit numéro ; un jeu qui le devine (Bastion Clash, pour sa sauvegarde
+  de reprise) suit la même règle. Un invité n'écoute que l'hôte (`from: 'host'`), et le relais ne le laisse écrire qu'à l'hôte.
+  Côté hôte, une place tenue par une connexion ne se reprend que par hello (avec le `sid` de la page) ; le numéro `fromId` d'un
+  message ne rattache une nouvelle connexion qu'à une place libre. Un hôte qui renonce à sa place (file d'envoi débordée,
+  `_overflow` dans `shared/net.js`) fait comme si elle avait expiré (`cb.lost`) : il suit le successeur, ou rouvre son code s'il est seul.
 - Bastion Clash : le moteur (`bastion/engine/`, sans DOM) est testé par `node tools/test-bastion.mjs` ;
   `node tools/bench-bastion.mjs [minutes] [graine] [mode] [carte]` fait jouer 4 bots hors navigateur et mesure
   le coût d'un pas de simulation (doit rester sous 33 ms), les éliminations, les cibles des bots et les unités bloquées.

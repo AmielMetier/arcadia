@@ -1,5 +1,19 @@
 # Journal des versions — Arcadia
 
+## 4.66 — 8 novembre 2026
+- **Tous les jeux en ligne** — Ta place dans le salon n'est qu'à toi, et un hôte coupé en pleine action ne rouvre plus une seconde partie dans son coin.
+  - Un joueur ne peut plus se faire passer pour un autre auprès de l'hôte : ce qui t'est destiné (ta fiche de rôle dans Mystère Mystère, par exemple) n'arrive qu'à toi, et personne ne joue ni ne parle à ta place.
+  - Un hôte qui perd sa connexion en pleine action, avec trop de messages en retard pour reprendre sa place, rejoint lui aussi le salon repris par un autre joueur, au lieu de rouvrir seul son ancien salon. S'il n'y a personne d'autre pour le reprendre, il le rouvre, et chacun y revient avec son numéro.
+
+## 4.65 — 8 novembre 2026
+- **Tous les jeux en ligne** — Quand l'hôte s'en va ou perd sa connexion, tout le salon repart chez un seul et même nouvel hôte.
+  - Un hôte coupé trop longtemps en pleine partie rejoint, avec son numéro, le salon qui a continué sans lui, au lieu de rouvrir seul son ancien salon : fini les deux parties en parallèle.
+  - Le nouvel hôte est toujours un joueur présent : plus personne n'attend un joueur qui avait fermé son onglet, pour finir sur « Impossible de joindre le nouvel hôte ».
+  - Le nouvel hôte est de préférence un joueur qui a la partie ouverte : ceux qui jouent ne restent plus sans personne pour faire tourner la partie quand le premier de la liste était resté au salon.
+  - Dans Bastion Clash, celui qui reprend la partie la retrouve toujours en entier, armées adverses comprises.
+  - Un joueur ne peut plus se faire passer pour l'hôte auprès des autres : faux départ de l'hôte, fausse partie ou faux renvoi du salon sont ignorés.
+- **The Backrooms** — Si l'hôte ne donne plus de nouvelles, ton jeu le relance de lui-même. Et si le nouvel hôte n'a même pas la partie ouverte, un message le dit et tu reviens au salon au bout d'une vingtaine de secondes, au lieu d'attendre seul pour toujours.
+
 ## 4.64 — 8 novembre 2026
 - Nouveau : refonte HUD & Sac B2W2, DexNav habitat, chat multijoueur et audit de stabilite (Amiel)
 

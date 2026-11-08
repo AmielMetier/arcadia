@@ -1306,6 +1306,7 @@ function frame(currentTime) {
   accumulator += delta;
 
   if (!sim) return;
+  if (NET.role === 'guest') watchHost();
   // en pause, le monde est figé (seul) ; à plusieurs, il continue sans toi. Le trajet en ascenseur, lui, va
   // toujours jusqu'au bout : sinon une pause pendant la descente laissait l'écran noir pour toujours
   if (paused && !multi() && !(sim.departT > 0)) accumulator = 0;
@@ -1772,6 +1773,39 @@ if (window.DDVolume && btnSet) {
       ] }] },
     ],
   });
+}
+
+// Invité : chien de garde de l'hôte. Plus rien de lui depuis 5 s : on lui redemande la partie, toutes les 5 s (« hi » :
+// sans effet s'il nous a déjà ; un hôte qui vient de reprendre le salon nous renvoie le « go »). Pendant une coupure de
+// l'hôte, le salon garde sa place et la partie l'attend. Mais s'il n'a même pas la partie ouverte (un nouvel hôte resté
+// au salon), elle ne reprendra jamais : après 15 s ainsi, retour au salon, avec un message, au lieu d'attendre seul.
+const HOST_ASK_MS = 5000;
+const HOST_GONE_MS = 15000;
+const hostWatch = { askT: 0, goneT: 0, leaving: false };
+function watchHost() {
+  const now = performance.now();
+  if (now - NET.lastHost < HOST_ASK_MS) {
+    hostWatch.goneT = 0;
+    return;
+  }
+  if (now - hostWatch.askT >= HOST_ASK_MS) {
+    hostWatch.askT = now;
+    send('host', { t: 'hi' });
+  }
+  const game = H.info.game;
+  if (!game || (H.readyMap || {})[H.info.hostId] === game) {
+    hostWatch.goneT = 0;
+    return;
+  }
+  if (!hostWatch.goneT) hostWatch.goneT = now;
+  if (now - hostWatch.goneT < HOST_GONE_MS || hostWatch.leaving) return;
+  hostWatch.leaving = true;
+  if (hud) hud.toast("The host doesn't have the game open · back to the lobby", 6);
+  setTimeout(() => {
+    hostWatch.leaving = false;
+    hostWatch.goneT = 0;
+    if (NET.role === 'guest' && performance.now() - NET.lastHost >= HOST_ASK_MS) H.exit();
+  }, 2500);
 }
 
 // Initialisation HubBridge ou Solo
