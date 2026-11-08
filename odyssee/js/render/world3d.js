@@ -387,6 +387,7 @@ function kitStyle(b, map) {
 export class WorldView {
   constructor(renderer, charsImg, art = {}) {
     this.renderer = renderer;
+    this.batImgs = art.batiments || null;   // pack de graphismes : bâtiments dessinés d'un seul tenant (gfx.js)
     // Pokémon qui suivent le dresseur (img/suiveurs.png) : leurs lignes s'ajoutent sous celles des personnages
     if (charsImg && art.suiveurs && SPRITES.suiveurs) {
       const c = document.createElement('canvas'); c.width = charsImg.width; c.height = charsImg.height + art.suiveurs.height;
@@ -1095,6 +1096,20 @@ export class WorldView {
         hole.geometry.dispose(); hole.geometry = gg; hole.position.set(0, 0, 0); mat.polygonOffset = true; mat.polygonOffsetFactor = -2; mat.polygonOffsetUnits = -4;
       }
       g.add(hole); this.root.add(g); return;
+    }
+    // pack de graphismes (Options → Graphismes) : le bâtiment est une image d'un seul tenant, posée sur le bord avant
+    // de son emprise et mise à sa largeur, dessinée comme un sprite (pixel pour pixel, ancrée en bas)
+    const bim = this.batImgs?.[b.style] || this.batImgs?.[kitStyle(b, this.map)];
+    if (bim) {
+      const t = T3('pack_' + b.style + ':' + bim.src, () => bim); t.flipY = true; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.needsUpdate = true;
+      const s = b.w / (bim.width * WPX), W = b.w, H = bim.height * s * HPX;
+      const geo = new THREE.PlaneGeometry(W, H); geo.translate(0, H / 2, 0);
+      const ax = b.x + b.w / 2, az = b.y + b.d;
+      geo.setAttribute('anchor', new THREE.Float32BufferAttribute(new Array(12).fill(0), 3));
+      const mat = screenSprite(new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide, transparent: true }));
+      this.tinted.push(mat); mat.color.copy(this.tint);
+      const me = new THREE.Mesh(geo, mat); me.position.set(ax, hb, az); g.add(me); g.userData.b = b;
+      this.root.add(g); this.buildingMeshes.push(g); return;
     }
     // bâtiment en fausse 3D (modèle de batiments3d.js) quand un modèle a la bonne emprise ; sinon l'ancienne façade
     if (!/[?&]bati=0/.test(globalThis.location?.search || '')) {

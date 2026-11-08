@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 4.78 — 8 novembre 2026
+- **Odyssée** — Graphismes « Pokémon Noir & Blanc » : les bâtiments changent aussi.
+  - Centres Pokémon, arènes et maisons prennent les dessins des jeux Noir 2 & Blanc 2 (maisons de Phyromatical).
+  - L'herbe est plus verte, on ne la confond plus avec l'eau.
+
 ## 4.77 — 8 novembre 2026
 - **Odyssée** — Nouveaux graphismes « Pokémon Noir & Blanc » : Options → Graphismes.
   - Herbe turquoise, chemins, sable, eau, lave, hautes herbes, arbres, palmiers, sapins enneigés, buissons, rochers et arbres morts dans le style des jeux Noir & Blanc.

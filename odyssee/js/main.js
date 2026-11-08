@@ -60,6 +60,7 @@ async function loadArt() {
   if (!pack) for (const k of SOL16_FICHIERS) sol32['s16_' + k] = ASSETS.sol16(k);
   const tuilesPack = {}; if (pack) for (const k of pack.tuiles) tuilesPack[k] = ASSETS.gfx(pack.dossier, k);
   // décor du pack (arbres, rochers…) : remplace celui du jeu, dessiné pixel pour pixel
+  const batsPack = {}; if (pack?.batiments) for (const [st, f] of Object.entries(pack.batiments)) batsPack[st] = ASSETS.gfx(pack.dossier, 'b_' + f);
   if (pack?.decor) for (const k of pack.decor) { sprites[k] = ASSETS.gfx(pack.dossier, 'd_' + k); dens[k] = 2; }
   // devant un personnage dans l'herbe : le bas de la nappe du tileset (et l'image de l'herbe qui bouge)
   for (const [th, key] of [['prairie', 'grassfront'], ['bois', 'darkfront'], ['neige', 'snowfront']]) {
@@ -70,8 +71,8 @@ async function loadArt() {
   sprites.grassfront = ASSETS.sol16('hautes_herbes_front'); sprites.grassfront2 = ASSETS.sol16('hautes_herbes_front2'); dens.grassfront = dens.grassfront2 = 1;
   // animations de terrain de HeartGold / SoulSilver (mer, rivages, fleurs)
   const hg = {}; for (const k of Object.keys(SPRITES.hgss || {})) hg[k] = ASSETS.hgss(k);
-  const [S, K, L, L32, HGI, chars, title, suiveurs, relief, PK] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(ASSETS.chars), loadImg(ASSETS.title), SPRITES.suiveurs ? loadImg(ASSETS.suiveurs) : null, loadImg(ASSETS.relief).catch(() => null), loadAll(tuilesPack)]);
-  return { sprites: S, dens, kits: K, sols: L, sol32: L32, hgss: HGI, chars, title, suiveurs, relief, pack: pack ? PK : null };
+  const [S, K, L, L32, HGI, chars, title, suiveurs, relief, PK, PB] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(ASSETS.chars), loadImg(ASSETS.title), SPRITES.suiveurs ? loadImg(ASSETS.suiveurs) : null, loadImg(ASSETS.relief).catch(() => null), loadAll(tuilesPack), loadAll(batsPack)]);
+  return { sprites: S, dens, kits: K, sols: L, sol32: L32, hgss: HGI, chars, title, suiveurs, relief, pack: pack ? PK : null, batiments: pack ? PB : null };
 }
 
 async function boot() {
@@ -81,7 +82,7 @@ async function boot() {
   const world = buildWorld();
   const art = await loadArt();
   setArt({ kits: art.kits, sols: art.sols, sol32: art.sol32, hgss: art.hgss, relief: art.relief, pack: art.pack });
-  const view = new WorldView(renderer, art.chars, { sprites: art.sprites, dens: art.dens, suiveurs: art.suiveurs });
+  const view = new WorldView(renderer, art.chars, { sprites: art.sprites, dens: art.dens, suiveurs: art.suiveurs, batiments: art.batiments });
   const game = new Game({ view, ui, input, sound, world });
   // sauvegarde en ligne (compte du Hub) : chaque sauvegarde part aussi sur le serveur, regroupée
   const cloud = game.cloud = new Cloud();

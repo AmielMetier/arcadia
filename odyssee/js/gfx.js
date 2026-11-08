@@ -33,6 +33,8 @@ export const PACKS = {
       'tall0', 'tall1', 'water0', 'water1', 'water2', 'water3'],
     // décor remplacé (fichier d_<nom>.png, dessiné pixel pour pixel)
     decor: ['tree', 'tree2', 'pine', 'snowpine', 'palm', 'bush', 'rock', 'deadtree'],
+    // bâtiments dessinés d'un seul tenant (fichier b_<image>.png), par style de bâtiment du jeu
+    batiments: { center: 'center', gym: 'gym', house: 'house', house2: 'house2', house3: 'house', bighouse: 'house2', chalet: 'house', pecheur: 'house2' },
   },
 };
 
@@ -51,7 +53,7 @@ export function choisirSprites(id) { if (SPRITES_CHOIX.some((s) => s.id === id))
 /** crédits affichés dans Options → Crédits graphismes */
 export const CREDITS = [
   ['Sol « Pokémon Lumineux »', 'Tuiles de Flurmimon (planche « Bright »), adaptées par Bivurnum — Team Aqua\'s Asset Repo.'],
-  ['Graphismes « Pokémon Noir & Blanc »', 'BW Spring Tileset de thefloofypanthar, B/W Water Tiles d\'UltimoSpriter, Alternate Volcano Tiles et Taragonia Mix Special Trees de Phyromatical (DeviantArt).'],
+  ['Graphismes « Pokémon Noir & Blanc »', 'BW Spring Tileset de thefloofypanthar, B/W Water Tiles d\'UltimoSpriter, Alternate Volcano Tiles, maisons BW2 et Taragonia Mix Special Trees de Phyromatical (DeviantArt).'],
   ['Sprites Noir & Blanc', 'Sprites des jeux Pokémon © Nintendo / Game Freak / Creatures, récupérés par PokeAPI (projet PokeAPI/sprites).'],
   ['Sprites HeartGold / SoulSilver', 'Même source : PokeAPI/sprites.'],
   ['Utilisation', 'Projet de fans sans but lucratif. Les artistes restent propriétaires de leurs créations.'],

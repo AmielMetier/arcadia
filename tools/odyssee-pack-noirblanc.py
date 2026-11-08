@@ -39,7 +39,12 @@ def trim(im, box):
     c = im.crop(box); bb = c.getbbox(); return c.crop(bb) if bb else c
 
 
-grass = [tile(spring, 0, 0), tile(spring, 1, 0), tile(spring, 2, 1)]
+def verdir(t):
+    a = np.array(t).astype(float); a[..., 0] *= 0.85; a[..., 1] *= 1.02; a[..., 2] *= 0.55
+    return Image.fromarray(a.clip(0, 255).astype('uint8'), 'RGBA')
+
+
+grass = [verdir(tile(spring, 0, 0)), verdir(tile(spring, 1, 0)), verdir(tile(spring, 2, 1))]   # herbe turquoise ramenée vers le vert
 dirt, sand = tile(spring, 1, 2), tile(spring, 2, 7)
 water = eau.crop((104, 616, 120, 632))
 rockfloor, lava = tile(volc, 0, 0), [tile(volc, 5, 4), tile(volc, 11, 4)]
@@ -64,6 +69,11 @@ deco = {
     'palm': trim(arbres, (73, 70, 119, 129)), 'bush': trim(arbres, (79, 304, 97, 326)),
     'rock': trim(volc, (256, 32, 288, 64)), 'deadtree': trim(volc, (330, 0, 368, 64)),
 }
-for n, im in {**files, **{'d_' + k: v for k, v in deco.items()}}.items():
+# bâtiments entiers (maisons_bw2.png, Phyromatical) : posés devant l'emprise du bâtiment du jeu
+mais = L('maisons_bw2.png')
+bats = {'center': trim(mais, (16, 15, 160, 159)), 'house': trim(mais, (175, 36, 268, 159)),
+        'house2': trim(mais, (188, 186, 283, 287)), 'gym': trim(mais, (22, 178, 170, 383))}
+deco.update({'b_' + k: v for k, v in bats.items()})
+for n, im in {**files, **{('' if k.startswith('b_') else 'd_') + k: v for k, v in deco.items()}}.items():
     im.save(os.path.join(OUT, n + '.png'))
 print(len(files), 'tuiles et', len(deco), 'décors dans', os.path.normpath(OUT))
