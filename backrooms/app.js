@@ -1,5 +1,5 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
-import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, staminaMax } from './engine/sim.js';
+import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T } from './engine/sim.js';
 import { hasLineOfSight } from './engine/nav.js';
 import { bfs, CELL_SIZE, cellsOnSeg, T } from './engine/map.js';
 import { createBackroomsScene, setMonsterMode, setSceneOptions } from './view/scene.js';
@@ -77,6 +77,8 @@ let runStats = { seen: 0, rushes: 0, escapes: 0, closest: Infinity, haunts: 0 };
 let tapeFrames = [];
 let replayed = false;
 let lastAbyss = false; // le dernier mort est tombé dans un puits sans fond (texte et délai de l'écran de fin)
+let lastThirst = false; // … ou s'est effondré, mort de soif
+let runT = 0; // secondes de course d'affilée (le souffle qui s'emballe)
 let neonWakeAt = 0; // le dernier grésillement de néon entendu sur son passage (pas plus d'un tous les 90 ms)
 let echoT = 0; // fausse alerte : quelqu'un marche derrière toi, à ton rythme
 let hauntAt = 0; // spectateur : quand on pourra de nouveau faire un signe (sur cet écran)
@@ -166,10 +168,9 @@ function ensureVoice() {
   }
   return voice;
 }
-// le micro : demandé au lancement à plusieurs (seul, il n'y a personne à qui parler), sinon à la première touche R
+// le micro : demandé au lancement, même seul (la voix fait du bruit : l'entité l'entend), sinon à la première touche R
 function askMic(force = false) {
   if (OPTS.mic === 'off') return;
-  if (!force && !multi()) return;
   const v = ensureVoice();
   if (v.micState === 'on' || v.micState === 'asking') return;
   v.enableMic().then((ok) => {
@@ -586,6 +587,7 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   tapeFrames = [];
   replayed = false;
   lastAbyss = false;
+  lastThirst = false;
   echoT = 0;
   hauntAt = 0;
   if (level && sim.level !== level) sim.loadLevel(level);
@@ -662,7 +664,7 @@ function guestInputs() {
     const q = NET.actions[id] || (NET.actions[id] = []);
     // une action par pas, dans l'ordre où l'invité les a faites (avec la case qu'il avait choisie)
     const a = q.shift() || {};
-    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, cam: !!i.cm, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, stamina: i.st, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', jump: a.k === 'j', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v, voice: i.vo, radio: i.ra, seq: i.seq };
+    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, cam: !!i.cm, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', jump: a.k === 'j', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v, voice: i.vo, radio: i.ra, seq: i.seq };
     i.pos = null; // une position annoncée ne sert qu'une fois
   }
   return out;
@@ -822,7 +824,6 @@ function handleEvent(ev, me) {
       hearTape(n);
       if (hud) setTimeout(() => hud && hud.showLore(n, LORE[n], isNew), 900);
       if (sfx) setTimeout(() => sfx && sfx.loreTape(4 + LORE[n].length / 16), 700);
-      if (scene) scene.tape('splice', 0.5);
       break;
     }
     case 'fuse': {
@@ -942,15 +943,15 @@ function handleEvent(ev, me) {
     case 'locked':
       // la porte du haut de l'escalier, cadenassée
       if (sfx) sfx.lockedDoor(mine ? null : { x: ev.x, z: ev.z, muffled: (ev.floor || 0) !== (sim.viewPlayer(sim.spectate || 0).floor || 0) });
-      if (mine && hud) hud.toast("Locked. A chain and a padlock hold the door shut · find the stairwell key");
+      if (mine && hud) hud.toast("Locked. A chain and a padlock hold the door shut · find the stairwell key on this floor");
       break;
     case 'key':
       if (ev.by === me) {
         if (sfx) sfx.keyJingle();
-        if (hud) hud.toast('Stairwell key · the doors to the floor below are open');
+        if (hud) hud.toast('Stairwell key · the stairwell doors are open, upstairs and downstairs');
       } else {
         if (sfx) sfx.unlockFar();
-        if (hud) hud.toast(`${ev.name} found the stairwell key · the doors to the floor below are open`);
+        if (hud) hud.toast(`${ev.name} found the stairwell key · the stairwell doors are open`);
       }
       break;
     case 'emptySlot':
@@ -986,12 +987,12 @@ function handleEvent(ev, me) {
       if (mine && hud) hud.toast('Shh… the entity heard the whistle');
       break;
     case 'useless':
-      if (mine && hud) hud.toast(ev.kind === 'bottle' ? 'Your stamina is already full' : 'The flashlight is already charged');
+      if (mine && hud) hud.toast(ev.kind === 'bottle' ? "You're not thirsty" : 'The flashlight is already charged');
       break;
     case 'bottle':
       if (!mine) break;
       if (sfx) sfx.bottle();
-      if (hud) hud.toast('Almond water: you catch your breath, and your stamina grows for good');
+      if (hud) hud.toast('Almond water: your thirst fades, your eyes clear');
       break;
     case 'battery':
       if (!mine) break;
@@ -1104,11 +1105,55 @@ function handleEvent(ev, me) {
       if (ev.id === me) runStats.escapes++;
       break;
     case 'board': {
+      // (dans un ascenseur, on monte à bord quand ses portes se ferment : le son est celui des portes)
       const sl = ev.slide !== undefined && sim.map.slides ? sim.map.slides[ev.slide] : null;
-      if (sfx) sl ? sfx.splashDown() : sfx.ding();
-      if (hud && ev.id !== me) hud.toast(sl ? `${ev.name} slid into the ${sl.name.toLowerCase()} slide` : `${ev.name} is in the elevator`);
+      if (!sl) break;
+      if (sfx) sfx.splashDown();
+      if (hud && ev.id !== me) hud.toast(`${ev.name} slid into the ${sl.name.toLowerCase()} slide`);
       break;
     }
+    case 'liftWait':
+      if (mine && hud) hud.toast(`${ev.names.join(', ')} ${ev.n > 1 ? 'are' : 'is'} still outside · press F again to leave without ${ev.n > 1 ? 'them' : 'them'}`, 4);
+      if (mine && sfx) sfx.liftButton(null, false);
+      break;
+    case 'liftClose': {
+      const E = sim.fm(sim.realFloor).elevator;
+      const pos = E ? { x: E.x, z: E.z } : null;
+      if (sfx) {
+        sfx.liftButton(ev.id === me ? null : pos, true);
+        sfx.liftDoors(pos, true);
+      }
+      if (hud && ev.id !== me && sim.player.status === 'alive') hud.toast(`${ev.name} pressed the button · the doors are closing`);
+      break;
+    }
+    case 'liftOpen': {
+      const E = sim.fm(sim.realFloor).elevator;
+      if (sfx) sfx.liftDoors(E ? { x: E.x, z: E.z } : null, false);
+      break;
+    }
+    case 'arrived': {
+      const A = sim.map.arrival;
+      const pos = A ? { x: A.x, z: A.z } : null;
+      if (sfx) {
+        sfx.ding(pos);
+        setTimeout(() => sfx && sfx.liftDoors(pos, false), 350);
+      }
+      break;
+    }
+    case 'arrivalShut': {
+      const A = sim.map.arrival;
+      if (sfx && A) sfx.liftDoors({ x: A.x, z: A.z }, true);
+      break;
+    }
+    case 'thirsty':
+      if (!mine) break;
+      if (hud) hud.toast(ev.level >= 2 ? "You're about to pass out · drink, now" : "You're dehydrated · your vision blurs · find almond water", 4);
+      break;
+    case 'finalHunt':
+      // la phase finale : elle sait où l'on est. Un cri, au loin, puis plus rien que l'alarme
+      if (sfx && (ev.floor || 0) === (sim.viewPlayer(sim.spectate || 0).floor || 0)) sfx.distant('drag', { x: ev.x, z: ev.z }, 1.2);
+      if (hud && sim.player.status === 'alive') hud.toast('It knows where you are. RUN to the elevator', 4);
+      break;
     case 'boardCount':
       // les portes vont se fermer : la cabine sonne, et à 10 s un second coup plus pressant
       if (sfx && ev.t <= 10) sfx.ding();
@@ -1144,6 +1189,8 @@ function handleEvent(ev, me) {
       scene.tape('splice', 1.2);
       if (sfx) sfx.tapeSplice();
       if (hud) hud.fade(`LEVEL ${levelName(ev.level)}`, levelSub(ev.level), 2.2);
+      // on arrive dans la cabine qui finit de descendre (portes fermées)
+      if (sfx && sim.arriveT > 0) sfx.elevator(ARRIVE_T + 0.4, true);
       // seul, on pourra reprendre à ce niveau-ci
       if (NET.role === 'solo') store.set('backrooms_resume', ev.level);
       break;
@@ -1240,8 +1287,17 @@ function handleEvent(ev, me) {
       break;
     }
     case 'dead':
-      if (ev.id !== me && hud && !ev.abyss) hud.toast(`${ev.name} got caught…`);
+      if (ev.id !== me && hud && !ev.abyss) hud.toast(ev.thirst ? `${ev.name} collapsed, dehydrated…` : `${ev.name} got caught…`);
       lastAbyss = !!ev.abyss;
+      lastThirst = !!ev.thirst;
+      // mort de soif : la vue part, la bande se perd
+      if (ev.thirst && ev.id === me && scene) {
+        scene.tape('loss', 2.6);
+        if (sfx) {
+          sfx.noSignal(true);
+          setTimeout(() => sfx && sfx.noSignal(false), 2400);
+        }
+      }
       break;
     case 'abyss':
       // un puits sans fond : sa chute s'entend de loin ; pour soi, la caméra tombe jusqu'au noir, puis la bande se perd
@@ -1279,7 +1335,7 @@ function handleEvent(ev, me) {
         best = Math.max(rec.key === key ? rec.best || 0 : 0, sim.time);
         store.set('backrooms_daily', { key, best });
       }
-      if (hud) hud.showEnd(sim, NET.role === 'guest' ? null : () => initGame(), { stats: runStats, daily: dailyLabel, best, replay: replayed && ev.type === 'gameover', abyss: lastAbyss && ev.type === 'gameover' });
+      if (hud) hud.showEnd(sim, NET.role === 'guest' ? null : () => initGame(), { stats: runStats, daily: dailyLabel, best, replay: replayed && ev.type === 'gameover', abyss: lastAbyss && ev.type === 'gameover', thirst: lastThirst && ev.type === 'gameover' });
       if (H && H.embedded && NET.role !== 'guest') {
         const won = ev.type === 'win';
         // la vraie fin vaut bien plus qu'une fausse sortie, qui vaut plus que de mourir loin (Level 2 compris)
@@ -1432,7 +1488,7 @@ function frame(currentTime) {
       pick: act.pick,
       whistle: act.whistle,
       view: sim.player.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined,
-      voice: voice ? voice.level : 0,
+      voice: voice ? voice.raw || 0 : 0, // la voix au micro compte dans le bruit qu'on fait (même seul)
       radio: !!voice && voice.mode === 2,
     };
     // spectateur : un signe aux vivants (E ou T), puis il faut attendre
@@ -1462,7 +1518,7 @@ function frame(currentTime) {
       if (act.struggle) send('host', { t: 'a', k: 'g', n: act.struggle, run: NET.run });
       if (NET.tick % 3 === 0) {
         const P = sim.player;
-        send('host', { t: 'i', run: NET.run, n: NET.tick, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, c: input.crouch ? 1 : 0, cm: input.cam ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2), st: Math.round(P.stamina), v: P.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined, vo: input.voice ? +input.voice.toFixed(2) : undefined, ra: input.radio ? 1 : undefined }, true);
+        send('host', { t: 'i', run: NET.run, n: NET.tick, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, c: input.crouch ? 1 : 0, cm: input.cam ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2), v: P.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined, vo: input.voice ? +input.voice.toFixed(2) : undefined, ra: input.radio ? 1 : undefined }, true);
       }
     } else {
       sim.step(input, NET.role === 'host' ? guestInputs() : null);
@@ -1733,10 +1789,13 @@ function frame(currentTime) {
     if (sfx) {
       // le souffle : sprint, puis halètement le temps de récupérer, et la peur quand l'entité est là
       const P = sim.player;
-      const tired = 1 - P.stamina / staminaMax(P);
-      // discret : on l'entend surtout en courant ; à l'arrêt, juste un reste de halètement quand on est vraiment à bout
+      // la course est sans fin, mais le souffle s'emballe à la longue ; à l'arrêt, on récupère peu à peu
+      runT = P.running && P.moving ? Math.min(40, runT + delta) : Math.max(0, runT - delta * 2);
+      const tired = Math.min(1, runT / 30);
+      // discret : on l'entend surtout en courant ; à l'arrêt, juste un reste de halètement après une longue course ;
+      // assoiffé, la respiration se fait sèche
       const run = P.running && P.moving ? 0.3 + tired * 0.4 : 0;
-      const pant = tired > 0.55 ? ((tired - 0.55) / 0.45) * 0.3 : 0;
+      const pant = tired > 0.4 ? ((tired - 0.4) / 0.6) * 0.3 : (P.water ?? 100) < 15 ? 0.12 : 0;
       const fear = sim.hasMonster && sim.monster.danger > 0.6 ? (sim.monster.danger - 0.6) * 0.3 : 0;
       const grab = P.grabT > 0 ? 1 : 0;
       sfx.setBreath(P.status === 'alive' && sim.state === 'playing' && !paused && !P.holding ? Math.max(run, pant, fear, grab) : 0);

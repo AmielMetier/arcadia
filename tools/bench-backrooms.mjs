@@ -316,7 +316,7 @@ class Bot {
     if (Math.hypot(w.x - P.x, w.z - P.z) < 0.5) this.wp++;
     inp.yaw = yawTo(P, w.x, w.z);
     inp.my = 1;
-    inp.run = this.task === 'flee' && P.stamina > 5;
+    inp.run = this.task === 'flee'; // la course est infinie
     // en fuyant, on se retourne parfois (on marche à reculons un instant)
     if (this.task === 'flee' && same && dM < 14) {
       this.lookBackT -= DT;

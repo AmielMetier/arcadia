@@ -1,5 +1,21 @@
 # Journal des versions — Arcadia
 
+## 4.83 — 8 novembre 2026
+- **The Backrooms** — Les cassettes sont posées par terre, comme les piles et les bouteilles : on les ramasse avec F, sans coupure d'image.
+- **The Backrooms** — La fin du Level 0 se fait attendre : après la sixième cassette, quelques secondes de silence… puis l'alarme, les feux rouges, et l'entité vous traque sans relâche jusqu'à l'ascenseur.
+- **The Backrooms** — Fini l'endurance : on court sans limite.
+  - En échange, on se déshydrate peu à peu. Quand l'eau manque, la vue se brouille de plus en plus, jusqu'à en mourir. Les bouteilles d'eau d'amande vous désaltèrent.
+- **The Backrooms** — Tout fait du bruit, et l'entité l'entend.
+  - Accroupi, on ne fait presque pas de bruit ; en courant, beaucoup. Votre voix au micro compte aussi.
+  - Une barre de bruit, toujours affichée (même en solo), montre en continu le bruit que vous faites.
+- **The Backrooms** — La liste de l'équipe en haut à gauche : qui est encore là, qui est tombé, qui est parti, et qui parle.
+- **The Backrooms** — La cage d'escalier embellie et réparée : plus aucun filet de lumière au bord des murs, plus de textures qui clignotent.
+  - Une porte coupe-feu en bas aussi. Tombé à l'étage du bas, il faut trouver une clé pour remonter : il y en a une à chaque étage, et dès que l'une est trouvée, l'autre disparaît.
+- **The Backrooms** — L'ascenseur refait : on entre, on appuie sur le bouton de la cabine, les portes se ferment et il part. Coupure… on reprend au Level 1 dans la cabine qui finit de descendre, les portes s'ouvrent, et on sort.
+  - À plusieurs, la cabine attend ceux qui sont encore dehors ; un second appui part sans eux.
+  - Le monte-charge du Level 1 se lance aussi avec son bouton.
+- **The Backrooms** — Plus fluide, sans rien perdre à l'image : les objets hors de vue ne sont plus dessinés (cinq fois moins de triangles par image, image identique au pixel près).
+
 ## 4.82 — 8 novembre 2026
 - **Odyssée** — Graphismes « Noir & Blanc » refaits avec les vrais décors du jeu Noir & Blanc.
   - Centres Pokémon, Boutiques, arènes, labo, tours et une dizaine de maisons différentes, dessinés comme dans Noir & Blanc, à la bonne taille et la porte en face de l'entrée.

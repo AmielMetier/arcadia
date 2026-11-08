@@ -1,6 +1,6 @@
 // The Backrooms - Interface façon caméscope (REC, signal, bande), jumpscare et écran de fin
 import { ENTITY_IMG, ENTITY_ANIM } from './scene.js';
-import { DEPART_T, PIPES_LEVEL, CASSETTES, staminaMax } from '../engine/sim.js';
+import { DEPART_T, PIPES_LEVEL, CASSETTES, NOISE, VOICE_MIN, THIRST_BLUR } from '../engine/sim.js';
 
 const GOAT_DEATH_IMG = new URL('../img/bouc.jpg', import.meta.url).href;
 const GOAT_DEATH_FADE = 8; // secondes de montée de l'image
@@ -74,6 +74,8 @@ export class BackroomsHUD {
         <div class="vhs-play">PLAY ▶ SP</div>
         <div class="vhs-level" id="levelTag">LEVEL 0</div>
         <div class="blackout-tag" id="blackoutTag" hidden>⚠ POWER OUTAGE</div>
+        <!-- l'équipe : soi d'abord, puis les autres (mort, déjà dans la cabine, en train de parler) -->
+        <div class="team" id="team"></div>
       </div>
       <div class="cam cam-tr">
         <div class="battery" id="battery"><i></i></div>
@@ -81,7 +83,10 @@ export class BackroomsHUD {
       </div>
       <div class="cam cam-bl">
         <div class="tape-date" id="tapeDate"></div>
-        <div class="stamina" id="stamina"><span>STAMINA</span><div class="stamina-track"><div class="stamina-bar" id="staminaBar"></div></div></div>
+        <!-- la soif : la gourde se vide peu à peu (plus vite en courant) -->
+        <div class="stamina" id="stamina"><span>WATER</span><div class="stamina-track"><div class="stamina-bar" id="staminaBar"></div></div></div>
+        <!-- le bruit qu'on fait (pas, course, voix, objets) : toujours affiché ; plus il monte, plus loin on l'entend -->
+        <div class="noise" id="noise"><span>NOISE</span><div class="noise-track"><div class="noise-bar" id="noiseBar"></div></div></div>
         <div class="crouch-tag" id="crouchTag" hidden>▼ CROUCHED</div>
         <!-- les touches utiles, en petit, comme une ligne de plus de l'écran du caméscope -->
         <!-- la jauge du micro : un trait fin ; au-delà du repère, on t'entend (et l'entité aussi) -->
@@ -166,7 +171,7 @@ export class BackroomsHUD {
     this.$ = (s) => this.el.querySelector(s);
     // les éléments mis à jour à chaque image (on ne les recherche pas à chaque fois)
     this.E = {};
-    for (const id of ['vhsTimer', 'battery', 'levelTag', 'cassetteIcons', 'cassetteText', 'objBanner', 'blackoutTag', 'fadeBar', 'spectate', 'specTitle', 'specSub', 'signal', 'signalBars', 'signalLabel', 'stamina', 'staminaBar', 'crouchTag', 'carryTag', 'inv', 'toast', 'locker', 'lockerText', 'breathBar', 'grab', 'grabBar', 'grabText', 'hurt', 'captions', 'lore', 'loreText', 'loreTag', 'prompt', 'promptText', 'beamBar', 'camSigLbl', 'signalArrow', 'camArrow', 'camNight', 'boardTimer', 'camZoom', 'camZoomBar', 'camZoomX']) this.E[id] = this.$('#' + id);
+    for (const id of ['vhsTimer', 'battery', 'levelTag', 'cassetteIcons', 'cassetteText', 'objBanner', 'blackoutTag', 'fadeBar', 'spectate', 'specTitle', 'specSub', 'signal', 'signalBars', 'signalLabel', 'stamina', 'staminaBar', 'noise', 'noiseBar', 'crouchTag', 'carryTag', 'inv', 'toast', 'locker', 'lockerText', 'breathBar', 'grab', 'grabBar', 'grabText', 'hurt', 'captions', 'lore', 'loreText', 'loreTag', 'prompt', 'promptText', 'beamBar', 'camSigLbl', 'signalArrow', 'camArrow', 'camNight', 'boardTimer', 'camZoom', 'camZoomBar', 'camZoomX', 'team']) this.E[id] = this.$('#' + id);
     this.barEls = [...this.E.signalBars.children];
     this.camSigEls = [...this.$('#camSig').children];
     this.camIntEls = [...this.$('#camInt').children];
@@ -246,6 +251,9 @@ export class BackroomsHUD {
       E.battery.style.setProperty('--b', Math.max(0.04, bat / 100).toFixed(3));
     }
     this.flag('battery', 'low', bat < 20);
+
+    // 1 bis. L'équipe, en haut à gauche : réécrite seulement quand quelque chose change
+    this.teamList(sim, P);
 
     // 2. Objectif de l'étage : 5 cassettes (Level 0), 3 fusibles à rapporter au monte-charge (Level 1), 3 volants
     // (Level 37), 4 vannes (Level 2)
@@ -358,18 +366,32 @@ export class BackroomsHUD {
       this.text('levelTag', `LEVEL ${levelName(sim.level)} · ${P.floor ? 'LOWER' : 'UPPER'} FLOOR`);
     }
 
-    // 4. Souffle : la jauge n'apparaît que quand elle sert (HUD minimal)
-    // la jauge s'allonge avec chaque eau d'amande bue (100 au départ)
-    const smax = staminaMax(P);
-    const st = Math.round(P.stamina);
-    if (this.cache.st !== st || this.cache.smax !== smax) {
-      this.cache.st = st;
-      this.cache.smax = smax;
-      E.staminaBar.style.width = `${Math.min(100, (st / smax) * 100)}%`;
-      E.stamina.style.setProperty('--smax', smax / 100);
+    // 4. La soif : la gourde, discrète tant qu'elle est pleine, bien visible quand elle baisse, rouge sous le seuil
+    // où la vue se brouille
+    const wt = Math.round(P.water ?? 100);
+    if (this.cache.st !== wt) {
+      this.cache.st = wt;
+      E.staminaBar.style.width = `${Math.max(0, Math.min(100, wt))}%`;
     }
-    this.flag('staminaBar', 'low', st < 25);
-    this.flag('stamina', 'idle', st >= smax - 1 && !P.running);
+    this.flag('staminaBar', 'low', wt < THIRST_BLUR);
+    this.flag('stamina', 'idle', wt >= 60);
+    this.show('stamina', P.status === 'alive');
+    // 4a. Le bruit qu'on fait : celui que l'entité peut entendre (l'hôte le compte ; on y ajoute tout de suite ses
+    // propres pas et sa voix, sans attendre l'hôte). Une aiguille de vumètre : elle monte vite, retombe doucement
+    const voice = this.micRaw >= VOICE_MIN ? 0.1 + this.micRaw * 1.1 : 0;
+    const step = !P.moving ? 0 : P.running ? NOISE.run : P.crouch ? NOISE.crouch : NOISE.walk;
+    const nz = P.status === 'alive' ? Math.max(P.noise || 0, step, voice) : 0;
+    const want = Math.min(1, nz / 1.2);
+    this.noiseLv = want > (this.noiseLv || 0) ? want : Math.max(want, (this.noiseLv || 0) - dt * 0.9);
+    // une barre continue (transform : rien à remettre en page), blanche, puis ambre, puis rouge quand ça s'entend loin
+    const lv = Math.round(this.noiseLv * 400) / 400;
+    if (this.cache.nz !== lv) {
+      this.cache.nz = lv;
+      E.noiseBar.style.transform = `scaleX(${lv})`;
+      const tone = lv >= 0.72 ? 'noise-bar hot' : lv >= 0.4 ? 'noise-bar warm' : 'noise-bar';
+      if (E.noiseBar.className !== tone) E.noiseBar.className = tone;
+    }
+    this.show('noise', P.status === 'alive');
     this.show('crouchTag', !!P.crouch && P.status === 'alive');
     // Level 1 : les fusibles en poche
     const carry = P.carry ? P.carry.length : P.carryN || 0;
@@ -463,9 +485,33 @@ export class BackroomsHUD {
     this.loreT = 3 + text.length / 16;
   }
 
+  // la liste de l'équipe : soi d'abord ; ✕ attrapé (il revient à l'étage suivant), ▼ déjà parti dans la cabine ou
+  // le toboggan, ))) parle dans le talkie (ou au micro, pour soi)
+  teamList(sim, P) {
+    const el = this.E.team;
+    if (!el) return;
+    const ps = [P, ...sim.players.filter((Q) => Q !== P)];
+    const talk = this.talkIds || new Set();
+    const selfTalk = (this.micRaw || 0) > VOICE_MIN;
+    const row = (Q) => {
+      const st = Q.status === 'dead' ? 'dead' : Q.status === 'elevator' ? 'gone' : 'alive';
+      return [Q.id, Q.name, st, Q === P ? selfTalk : talk.has(Q.id)];
+    };
+    const rows = ps.map(row);
+    const key = rows.map((r) => r.join(':')).join('|');
+    if (key === this.teamKey) return;
+    this.teamKey = key;
+    const esc = (t) => String(t || '?').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+    el.innerHTML = rows.map(([, name, st, talking], i) => {
+      const mark = st === 'dead' ? '✕' : st === 'gone' ? '▼' : '●';
+      return `<div class="mate ${st}${i === 0 ? ' me' : ''}${talking ? ' talk' : ''}"><i>${mark}</i><span>${esc(name).toUpperCase()}</span>${talking ? '<s>)))</s>' : ''}</div>`;
+    }).join('');
+  }
+
   // le bandeau du rejeu (on = false : caché)
   // la voix : ce qu'on émet (VOICE à côté de soi, RADIO dans le talkie) et qui parle dans le talkie
   voice(v, sim, multi, dead = false) {
+    this.micRaw = v && v.micState === 'on' ? v.raw || 0 : 0; // la voix compte dans la jauge de bruit
     this.keysLine(sim, multi);
     this.micMeter(v, sim, multi);
     const el = this.$('#voiceTag');
@@ -481,7 +527,9 @@ export class BackroomsHUD {
       this.$('#voiceLore').textContent = this.loreTxt = '';
       return;
     }
-    const names = v.talking().map((id) => {
+    const ids = v.talking();
+    this.talkIds = new Set(ids);
+    const names = ids.map((id) => {
       const Q = sim.players.find((q) => q.id === id);
       return Q ? Q.name : null;
     }).filter(Boolean);
@@ -646,14 +694,16 @@ export class BackroomsHUD {
         } else if (beam !== null) {
           // rien d'autre sur l'arête
         } else if (N && !N.ladder && sel === 'ladder' && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.2) text = 'PRESS E · PLACE THE LADDER UNDER THE TAPE';
+        else if (sim.inCabin && sim.inCabin(P) && sim.fm(P.floor).elevator) text = sim.liftT > 0 ? 'THE DOORS ARE CLOSING…' : 'PRESS F · PRESS THE BUTTON TO GO DOWN';
+        else if (sim.nearCassette && sim.nearCassette(P)) text = 'PRESS F · TAKE THE TAPE';
         else if (it) text = P.inv.includes(null) ? `PRESS F · PICK UP ${NAME[it.kind]}` : `PRESS F · SWAP ${NAME[sel || 'bottle']} (SLOT ${P.sel + 1}) FOR ${NAME[it.kind]}`;
         else if (h) text = 'PRESS F · HIDE IN THE LOCKER';
         else if (sim.nearKey && sim.nearKey(P)) text = 'PRESS F · TAKE THE STAIRWELL KEY';
-        else if (sim.lockedDoorNear && sim.lockedDoorNear(P)) text = 'LOCKED · FIND THE STAIRWELL KEY';
+        else if (sim.lockedDoorNear && sim.lockedDoorNear(P)) text = 'LOCKED · FIND THE STAIRWELL KEY ON THIS FLOOR';
         else if (atPanel) text = `RESTARTING THE FREIGHT ELEVATOR… ${Math.round((sim.panel || 0) * 100)}% · STAY HERE`;
         else if (N && !N.ladder && nicheCas && !nicheCas.collected && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.6) text = 'THE TAPE IS TOO HIGH: YOU NEED A LADDER';
-        // ce qu'on tient servirait maintenant : à bout de souffle avec de l'eau d'amande, la lampe presque vide avec des piles
-        else if (sel === 'bottle' && P.stamina < 45) text = 'PRESS E · DRINK THE ALMOND WATER';
+        // ce qu'on tient servirait maintenant : assoiffé avec de l'eau d'amande, la lampe presque vide avec des piles
+        else if (sel === 'bottle' && (P.water ?? 100) < 50) text = 'PRESS E · DRINK THE ALMOND WATER';
         else if (sel === 'battery' && P.hasLamp && P.battery < 35) text = 'PRESS E · CHANGE THE BATTERIES';
       }
     }
@@ -791,7 +841,8 @@ export class BackroomsHUD {
   }
 
   // extra : { stats: { seen, rushes, escapes, closest, haunts }, daily: 'Nov 7' | null, best: secondes | null, replay: bool,
-  // abyss: bool (le dernier mort est tombé dans un puits sans fond : on le laisse tomber jusqu'au noir) }
+  // abyss: bool (le dernier mort est tombé dans un puits sans fond : on le laisse tomber jusqu'au noir),
+  // thirst: bool (le dernier mort s'est effondré, mort de soif) }
   showEnd(sim, onRestart, extra = {}) {
     const end = this.$('#endScreen');
     const title = this.$('#endTitle');
@@ -812,7 +863,7 @@ export class BackroomsHUD {
     };
     this.endAt = performance.now();
     this.endPending = reveal;
-    this.endT = setTimeout(reveal, goat ? 12500 : sim.state === 'dead' ? (extra.replay ? 5600 : extra.abyss ? 5200 : 1300) : 300);
+    this.endT = setTimeout(reveal, goat ? 12500 : sim.state === 'dead' ? (extra.replay ? 5600 : extra.abyss ? 5200 : extra.thirst ? 3400 : 1300) : 300);
     // le bilan de la bande : ce qu'elle a vu de toi
     const S = extra.stats;
     const lines = [];
@@ -850,7 +901,7 @@ export class BackroomsHUD {
       title.textContent = solo ? 'YOU DIED' : 'NOBODY MADE IT OUT';
       title.style.color = '#ef4444';
       const PIPES = sim.level === PIPES_LEVEL;
-      sub.textContent = PIPES ? 'The herd found you in the dark…' : sim.level === 1 ? 'The entity was waiting at the end of the shelves…' : extra.abyss ? 'You fell, and you are still falling. Nobody heard you land…' : 'The entity caught you in the endless hallways…';
+      sub.textContent = PIPES ? 'The herd found you in the dark…' : sim.level === 1 ? 'The entity was waiting at the end of the shelves…' : extra.abyss ? 'You fell, and you are still falling. Nobody heard you land…' : extra.thirst ? 'Your mouth went dry, then your eyes. The hum went on without you…' : 'The entity caught you in the endless hallways…';
       stats.textContent = `Level ${levelName(sim.level)} · ${PIPES ? `valves ${sim.valves}/4` : sim.level === 2 ? `valves ${sim.fuses}/3` : sim.level === 1 ? `fuses ${sim.delivered || 0}/3` : `tapes ${sim.cassettes}/${CASSETTES}`} · Survived for ${formatTime(sim.time)}`;
       this.$('#endTape').textContent = `${d} · RECORDING STOPPED`;
     }

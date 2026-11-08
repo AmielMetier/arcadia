@@ -3322,8 +3322,54 @@ export class BackroomsSfx {
     for (let k = 0; k < 4; k++) this.plop(t + 0.1 + Math.random() * 0.6, 0.12, this.out);
   }
 
-  // L'ascenseur descend : grondement grave qui tremble
-  elevator(sec = 3) {
+  // Le bouton de la cabine : le clic du poussoir, puis (pressed) le bip du voyant qui s'allume ; sans pressed, un bip
+  // sourd (refusé : quelqu'un est encore dehors)
+  liftButton(pos = null, pressed = true) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = pos ? this.at({ ...pos, rolloff: 0.8, ref: 2 }, 1) : this.out;
+    this.burst(out, t, 0.018, 'bandpass', 3200, 3, 0.18);
+    this.burst(out, t + 0.05, 0.012, 'bandpass', 1800, 4, 0.08);
+    if (pressed) this.tone(out, t + 0.08, 'sine', 1760, 1760, 0.12, 0.045);
+    else this.tone(out, t + 0.08, 'square', 330, 330, 0.22, 0.05);
+    if (pressed) this.caption('[button click]', pos);
+  }
+
+  // Les portes de l'ascenseur : le moteur qui ronronne, le roulement des vantaux, puis le choc sourd en butée
+  liftDoors(pos = null, closing = true) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.02;
+    const len = closing ? 1.6 : 1.3;
+    const out = pos ? this.at({ ...pos, rolloff: 0.7, ref: 3 }, 1) : this.out;
+    // le moteur : une note grave, un peu de grain
+    const o = c.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(92, t);
+    o.frequency.linearRampToValueAtTime(closing ? 104 : 86, t + len);
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 420;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.05, t + 0.15);
+    g.gain.setValueAtTime(0.05, t + len - 0.2);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    o.connect(lp).connect(g).connect(out);
+    o.start(t);
+    o.stop(t + len + 0.05);
+    // le roulement des galets dans le rail
+    this.burst(out, t + 0.05, len - 0.1, 'bandpass', 1400, 0.9, 0.035);
+    // en butée : un choc sourd (fermées, les deux vantaux se rejoignent)
+    if (closing) {
+      this.burst(out, t + len, 0.09, 'lowpass', 260, 0.8, 0.5);
+      this.burst(out, t + len, 0.03, 'bandpass', 2200, 2, 0.12);
+    }
+    this.caption(closing ? '[elevator doors closing]' : '[elevator doors opening]', pos);
+  }
+
+  // L'ascenseur descend : grondement grave qui tremble (arriving : il ralentit, puis s'arrête d'un à-coup)
+  elevator(sec = 3, arriving = false) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
     const t = c.currentTime;
@@ -3341,9 +3387,18 @@ export class BackroomsSfx {
     f.type = 'lowpass';
     f.frequency.setValueAtTime(160, t);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.2, t + 0.5);
+    g.gain.exponentialRampToValueAtTime(0.2, t + (arriving ? 0.2 : 0.5));
     g.gain.setValueAtTime(0.2, t + sec - 0.6);
     g.gain.exponentialRampToValueAtTime(0.001, t + sec);
+    if (arriving) {
+      // il ralentit : le grondement descend, puis l'arrêt
+      osc.frequency.setValueAtTime(48, t + sec * 0.55);
+      osc.frequency.exponentialRampToValueAtTime(30, t + sec - 0.3);
+      lfo.frequency.setValueAtTime(7, t + sec * 0.55);
+      lfo.frequency.linearRampToValueAtTime(3, t + sec - 0.3);
+      this.burst(this.out, t + sec - 0.35, 0.12, 'lowpass', 180, 0.7, 0.55);
+      this.burst(this.out, t + sec - 0.33, 0.05, 'bandpass', 1300, 2, 0.1);
+    }
     osc.connect(f);
     f.connect(g);
     g.connect(this.out);
