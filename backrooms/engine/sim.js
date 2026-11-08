@@ -102,6 +102,12 @@ export const BLACKOUT_LEN = [15, 20];
 // Level 2 : de temps en temps, tout le courant saute ; plus rien ne protège, le troupeau passe à l'attaque
 export const PIPES_BLACKOUT_EVERY = [85, 130];
 export const PIPES_BLACKOUT_LEN = [11, 15];
+// Level 0 : une seule panne, au milieu de la partie. La moitié des cassettes trouvée, elle tombe 8 à 30 s plus tard (au
+// premier moment de calme, ou au plus tard 45 s après), et tout reste noir 25 à 35 s : plus de néons, plus de refuge
+// sous la lumière, plus de signal
+export const L0_BLACKOUT_DELAY = [8, 30];
+export const L0_BLACKOUT_LEN = [25, 35];
+export const L0_BLACKOUT_AT = Math.ceil(CASSETTES / 2);
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const cellOf = (v) => Math.floor(v / CELL_SIZE);
@@ -466,6 +472,8 @@ export class BackroomsSim {
     this.lightsOut = null;
     this.blackout = 0; // secondes de noir restantes
     this.nextBlackout = level === 1 ? rand(...BLACKOUT_EVERY) * 0.6 : level === PIPES_LEVEL && this.hasMonster ? rand(...PIPES_BLACKOUT_EVERY) * 0.75 : Infinity;
+    this.midBlackout = false; // Level 0 : la panne du milieu de partie a eu lieu
+    this.blackoutWait = 0;
 
     const ms = this.map.monsterSpawn;
     this.monster = {
@@ -1326,7 +1334,7 @@ export class BackroomsSim {
           this.emit({ type: 'blackout', len: this.blackout, level: this.level });
         }
       }
-    }
+    } else if (this.level === 0) this.updateMidBlackout();
 
     for (const P of this.players) {
       const inp = P.id === this.localId ? input : (others && others[P.id]) || {};
@@ -1576,6 +1584,51 @@ export class BackroomsSim {
     return this.stairs.length && (left.some((c) => c.high) || lost) ? { sig: 'stairs' } : null;
   }
 
+  // Level 0 : la panne du milieu de partie (une seule). L'entité en profite : elle sait à peu près où est le joueur
+  // le plus proche d'elle
+  updateMidBlackout() {
+    if (this.blackout > 0) {
+      this.blackout -= DT;
+      if (this.blackout <= 0) {
+        this.blackout = 0;
+        this.emit({ type: 'power' });
+      }
+      return;
+    }
+    if (this.midBlackout || !this.hasMonster || this.goats || this.open || this.cassettes < L0_BLACKOUT_AT) return;
+    if (this.nextBlackout === Infinity) this.nextBlackout = rand(...L0_BLACKOUT_DELAY);
+    this.nextBlackout -= DT;
+    if (this.nextBlackout > 0) return;
+    this.blackoutWait += DT;
+    const M = this.monster;
+    const busy = M && (M.mode === 'chase' || M.mode === 'grab');
+    if (busy || !(blackoutAllowed(this) || this.blackoutWait > 45)) return;
+    this.midBlackout = true;
+    this.lightsOut = null;
+    this.blackout = rand(...L0_BLACKOUT_LEN);
+    this.emit({ type: 'blackout', len: this.blackout, level: this.level });
+    const alive = this.players.filter((Q) => Q.status === 'alive' && (Q.floor || 0) === (M.floor || 0));
+    if (alive.length) {
+      const Q = alive.reduce((b, q) => (Math.hypot(q.x - M.x, q.z - M.z) < Math.hypot(b.x - M.x, b.z - M.z) ? q : b));
+      this.alertMonster(Q.x + rand(-6, 6), Q.z + rand(-6, 6), 60, Q.floor || 0);
+    }
+  }
+
+  // Level 0, tout trouvé : le vrai ascenseur. À son étage, droit dessus ; à l'autre, l'escalier (ou d'abord la clé de
+  // la porte du haut, si elle est encore cadenassée et qu'il est en bas). Rend { x, z, sig }
+  exitGoal(P) {
+    const fl = P.floor || 0;
+    if (fl === this.realFloor || !this.stairs.length) {
+      const X = this.fm(this.realFloor).exit;
+      return { x: X.x, z: X.z, sig: 'exit' };
+    }
+    const K = this.floors[0].key;
+    if (fl === 0 && K && !K.taken) return { x: K.x, z: K.z, sig: 'key' };
+    const st = this.stairs.reduce((b, q) => (Math.hypot(q.cx - P.x, q.cz - P.z) < Math.hypot(b.cx - P.x, b.cz - P.z) ? q : b));
+    const door = fl === 0 ? st.up : st.down;
+    return { x: door.x, z: door.z, sig: 'stairs' };
+  }
+
   updateSignal(P) {
     const map = this.fm(P.floor);
     const near = (list) => list.reduce((b, g) => Math.min(b, Math.hypot(g.x - P.x, g.z - P.z)), Infinity);
@@ -1605,6 +1658,15 @@ export class BackroomsSim {
       P.sigTo = 'exit';
     } else if (this.level === PIPES_LEVEL && !this.open) {
       best = (map.valves || []).filter((v) => !v.closed).reduce((b, v) => Math.min(b, Math.hypot(v.sx - P.x, v.sz - P.z)), Infinity);
+    } else if (this.level === 0 && this.floors.length > 1) {
+      // tout est trouvé : le caméscope montre le vrai ascenseur, de partout (jamais tout à fait sans signal)
+      const G = this.exitGoal(P);
+      P.sigTo = G.sig;
+      P.sigX = G.x;
+      P.sigZ = G.z;
+      P.signal = Math.max(0.2, 1 - Math.hypot(G.x - P.x, G.z - P.z) / SIGNAL_RANGE);
+      if (this.blackout > 0) P.signal = 0;
+      return;
     } else {
       best = Math.hypot(map.exit.x - P.x, map.exit.z - P.z);
       P.sigTo = 'exit';
@@ -1851,6 +1913,7 @@ export class BackroomsSim {
       f: this.fuses,
       pw: this.powered ? 1 : 0,
       bo: r2(this.blackout),
+      mb: this.midBlackout ? 1 : 0,
       dp: r2(this.departT),
       bt: r2(this.boardT),
       sl: this.slide,
@@ -1901,6 +1964,7 @@ export class BackroomsSim {
     this.fuses = snap.f;
     this.powered = !!snap.pw;
     this.blackout = snap.bo;
+    this.midBlackout = !!snap.mb;
     if (Array.isArray(snap.ls)) {
       snap.ls.forEach((row, fi) => {
         const f = this.floors[fi];

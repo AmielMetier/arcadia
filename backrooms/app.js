@@ -992,7 +992,7 @@ function handleEvent(ev, me) {
         if (sfx && sim.goats) {
           sim.goats.forEach((g, i) => setTimeout(() => sfx.goatBleat({ x: g.x, z: g.z }, g.alpha ? 'bellow' : 'spot'), 1400 + i * 260 + Math.random() * 300));
         }
-      } else if (hud) hud.toast('Power outage…');
+      } else if (hud) hud.toast(ev.level === 0 ? "Power outage… the lights won't protect you now" : 'Power outage…');
       break;
     case 'power':
       if (sfx) sfx.power();
@@ -1671,6 +1671,8 @@ function frame(currentTime) {
       const V = sim.viewPlayer(sim.spectate || 0);
       sfx.setListener(V.x, V.z, V.yaw);
       sfx.setRoom(sim.level);
+      // le final du Level 0 : toutes les cassettes trouvées, une alarme au loin jusqu'à l'ascenseur
+      sfx.finale(sim.level === 0 && !!sim.open && sim.state === 'playing');
       // les pas des autres joueurs, là où ils marchent (plus rapprochés quand ils courent)
       for (const O of sim.players) {
         if (O === V || O.status !== 'alive' || !O.moving || paused) {

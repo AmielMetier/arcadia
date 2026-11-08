@@ -65,6 +65,10 @@ const hasEntity = (level) => levelSfx(level).entity !== false;
 
 const clamp01 = (v) => Math.max(0, Math.min(1, +v || 0));
 const rnd = (a, b) => a + Math.random() * (b - a);
+// le grésillement des néons : au repos, dans le noir (en plus du repos) et sous un néon (en plus) ; -4 dB depuis la 4.71
+const HUM_REST = 0.03;
+const HUM_DARK = 0.008;
+const HUM_LIT = 0.046;
 // l'occlusion (un mur entre la source et toi) : true, ou de 0 à 1 ; passe-bas jusqu'à 700 Hz et -4 dB
 const occOf = (o) => (o === true ? 1 : clamp01(o));
 // la fréquence la plus haute que la carte son accepte (la moitié de sa fréquence d'échantillonnage)
@@ -674,7 +678,7 @@ export class BackroomsSfx {
   initAmbientAudio() {
     const c = this.ctx;
     this.ambientGain = c.createGain();
-    this.ambientGain.gain.setValueAtTime(0.045, c.currentTime); // son d'ambiance discret
+    this.ambientGain.gain.setValueAtTime(HUM_REST, c.currentTime); // son d'ambiance discret
     // les tubes qui papillotent (setHum, power) : un gain en série, à 1 le reste du temps
     this.humFlutter = c.createGain();
     this.ambientGain.connect(this.humFlutter).connect(this.bedDry);
@@ -763,7 +767,7 @@ export class BackroomsSfx {
   setHum(light) {
     if (!this.unlocked || !this.ambientGain || this.dark) return;
     const t = this.ctx.currentTime;
-    this.ambientGain.gain.setTargetAtTime(0.012 + Math.min(1, light) * 0.07, t, 0.3);
+    this.ambientGain.gain.setTargetAtTime(HUM_DARK + Math.min(1, light) * HUM_LIT, t, 0.3);
     if (this.humFlutterT === undefined) this.humFlutterT = t + rnd(8, 20);
     if (light > 0.35 && t > this.humFlutterT) {
       this.humFlutterT = t + rnd(7, 25);
@@ -2333,6 +2337,57 @@ export class BackroomsSfx {
 
   // les fonds continus de chaque niveau, sous tout le reste (bus bedWet) : Level 1 la ventilation, Poolrooms l'eau
   // qui s'écoule, Tuyauteries le grondement des conduites. Rien au Level 0 : la moquette boit tout.
+  // Le final du Level 0 (toutes les cassettes trouvées, les lumières en rouge) : une sirène lointaine, étouffée par
+  // les murs, qui monte et redescend lentement en tournant ; dessous, un grave qui bat (deux notes presque pareilles)
+  // et un triton qui grince par moments. S'ajoute à l'ambiance, s'arrête en changeant de niveau ou à la fin.
+  finale(on) {
+    if (!this.unlocked || !this.ctx || !on === !this.fin) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    if (!on) {
+      const old = this.fin;
+      this.fin = null;
+      for (const g of old.gs) {
+        g.gain.cancelScheduledValues(t);
+        g.gain.setTargetAtTime(0, t, 0.7);
+      }
+      setTimeout(() => old.srcs.forEach((s) => { try { s.stop(); } catch (e) { /* déjà arrêté */ } }), 5000);
+      return;
+    }
+    const srcs = [];
+    const src = (n) => (srcs.push(n), n);
+    // la sirène, avec l'écho des couloirs : deux dents de scie à peine désaccordées, de 270 à 530 Hz en 8 s
+    const wail = this.gainNode(0);
+    wail.connect(this.bedWet);
+    const sweep = src(this.osc('sine', 0.125));
+    const sLp = this.filt('lowpass', 850, 0.9);
+    for (const [f, d] of [[400, 130], [403, 132]]) {
+      const o = src(this.osc('sawtooth', f));
+      sweep.connect(this.gainNode(d)).connect(o.frequency);
+      o.connect(this.gainNode(0.5)).connect(sLp);
+    }
+    // le pavillon qui tourne : le son enfle et retombe deux fois plus vite que la note
+    const spin = this.gainNode(0.6);
+    const spinLfo = src(this.osc('sine', 0.45));
+    spinLfo.connect(this.gainNode(0.4)).connect(spin.gain);
+    sLp.connect(spin).connect(wail);
+    // le grave, sec, tout près : 49 et 51,5 Hz (un battement de 2,5 par seconde), le triton au-dessus qui va et vient
+    const drone = this.gainNode(0);
+    drone.connect(this.bedDry);
+    const dLp = this.filt('lowpass', 260, 0.8);
+    dLp.connect(drone);
+    for (const f of [49, 51.5]) src(this.osc('sawtooth', f)).connect(this.gainNode(0.5)).connect(dLp);
+    const tri = this.gainNode(0);
+    const triLfo = src(this.osc('sine', 0.06));
+    triLfo.connect(this.gainNode(0.22)).connect(tri.gain);
+    src(this.osc('triangle', 69.3)).connect(tri).connect(dLp);
+    for (const s of srcs) s.start(t);
+    wail.gain.setTargetAtTime(0.07, t + 0.4, 1.6);
+    drone.gain.setTargetAtTime(0.16, t, 2.5);
+    this.fin = { gs: [wail, drone], srcs };
+    this.caption('[a distant alarm wails]');
+  }
+
   levelBed(level) {
     const c = this.ctx;
     const t = c.currentTime;
@@ -2745,7 +2800,7 @@ export class BackroomsSfx {
     // les tubes qui s'amorcent, un par un, autour de toi
     for (let i = 0; i < 3 + Math.floor(Math.random() * 3); i++) this.neonClick(this.around(2, 9), 0.7, 0.25 + i * rnd(0.15, 0.35));
     // le bourdonnement qui revient en papillotant
-    if (this.ambientGain) this.ambientGain.gain.setTargetAtTime(0.045, t + 0.3, 0.4);
+    if (this.ambientGain) this.ambientGain.gain.setTargetAtTime(HUM_REST, t + 0.3, 0.4);
     if (this.humFlutter) {
       const f = this.humFlutter.gain;
       f.cancelScheduledValues(t);
