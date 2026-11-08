@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.73 — 8 novembre 2026
+- Correction : sorties des grottes au bout de la salle (Grotte Lunaire, Tourbillons, Victoire), plus de case libre a cote de la porte (Amiel)
+
 ## 4.72 — 8 novembre 2026
 - Nouveau : barre Habitat DexNav retirable completement (bouton x + option) (Amiel)
 
