@@ -27,8 +27,39 @@ const LEVEL_SFX = {
   [PIPES_LEVEL]: { chase: [], ambient: [], death: null, entity: false }, // Tuyauteries : le troupeau, pas l'entité
 };
 const NO_SFX = { chase: [], ambient: [], death: null };
-// joué en boucle par-dessus les cris de poursuite, à tous les niveaux où l'entité chasse
+// l'enregistrement commun à toutes les poursuites : un élan (ses 2,44 premières secondes, joué une fois quand la
+// traque commence), puis une course dont on découpe les pas un par un (STEP_ON : le début de chacun, en secondes),
+// joués au moment où le pied de l'entité touche le sol dans son animation
 const CHASE_ALL = 'chase_all';
+const CHASE_INTRO = 2.44;
+const STEP_ON = [2.498, 2.754, 3.03, 3.286, 3.558, 3.828, 4.106, 4.42, 4.67, 4.938, 5.198, 5.504, 5.74, 5.976, 6.18, 6.494, 6.788, 7.064, 7.336, 7.618, 7.872, 8.102, 8.384, 8.648, 8.922, 9.198, 9.432, 9.746, 9.986, 10.312, 10.58, 10.824, 11.13, 11.37, 11.606, 11.84, 12.096, 12.4, 12.7, 12.976, 13.222, 13.488, 13.738, 13.976, 14.294, 14.554, 14.82, 15.064, 15.352, 15.664, 15.894, 16.192, 16.424, 16.762, 16.99, 17.226, 17.488, 17.74, 18.04, 18.314, 18.586, 18.87, 19.124, 19.352, 19.634, 19.908, 20.174, 20.45, 20.708, 20.996, 21.266, 21.562, 21.82, 22.074, 22.386];
+// la partie forte d'un enregistrement [début, fin] en secondes : la plus longue suite de tranches de 50 ms au-dessus
+// du tiers de la plus forte (gardée par enregistrement)
+const LOUD = new WeakMap();
+function loudPart(buf) {
+  if (LOUD.has(buf)) return LOUD.get(buf);
+  const d = buf.getChannelData(0);
+  const W = Math.max(1, Math.floor(buf.sampleRate * 0.05));
+  const r = [];
+  for (let k = 0; k + W <= d.length; k += W) {
+    let q = 0;
+    for (let j = k; j < k + W; j++) q += d[j] * d[j];
+    r.push(Math.sqrt(q / W));
+  }
+  const mx = Math.max(1e-6, ...r);
+  let best = [0, Math.max(0, r.length - 1)];
+  let run = -1;
+  let len = -1;
+  r.forEach((v, i) => {
+    if (v > mx * 0.35) {
+      if (run < 0) run = i;
+      if (i - run > len) (len = i - run), (best = [run, i]);
+    } else run = -1;
+  });
+  const out = [best[0] * 0.05, Math.min(buf.duration, (best[1] + 1) * 0.05)];
+  LOUD.set(buf, out);
+  return out;
+}
 const levelSfx = (level) => LEVEL_SFX[level] || NO_SFX;
 const hasEntity = (level) => levelSfx(level).entity !== false;
 
@@ -70,7 +101,7 @@ export class BackroomsSfx {
 
     // Nœuds pour le bourdonnement de l'entité
     this.monsterGain = null;
-    this.monsterPanner = null;
+    this.ent = null; // le bus de l'entité (initEntityBus)
     this.monsterOsc1 = null;
     this.monsterOsc2 = null;
     this.monsterMod = null;
@@ -130,7 +161,8 @@ export class BackroomsSfx {
     this.music = c.createGain();
     this.music.connect(this.master);
 
-    // 1. Initialiser le bourdonnement strident et glitché de l'entité
+    // 1. Le bus de l'entité (entendue comme un joueur), puis son bourdonnement strident et glitché
+    this.initEntityBus();
     this.initMonsterAudio();
 
     // 2. Initialiser l'ambiance des néons fluorescents
@@ -278,6 +310,7 @@ export class BackroomsSfx {
     this.verbLp.frequency.value = level === 2 ? 7000 : pipes ? 6000 : level === 1 ? 5200 : 3600;
     this.setPool(level === 2);
     this.levelBed(level);
+    this.entRoom(level);
   }
 
   // l'oreille du joueur : sa position et la direction de son regard (yaw de la caméra)
@@ -458,22 +491,145 @@ export class BackroomsSfx {
 
   // --- L'entité ---
 
+  // Le bus de l'entité : tout ce qui vient d'elle y passe, entendu comme la voix d'un joueur. Placé là où elle est
+  // (HRTF), plus bas avec la distance, étouffé derrière les murs (passe-bas, d'autant plus fort que le son doit faire
+  // un long détour pour arriver) et à travers le plancher, avec l'écho du lieu : court et serré dans un couloir étroit,
+  // long dans une grande salle (entUpdate, à chaque image). Il ne passe pas par l'écho commun de la pièce (this.out).
+  // Deux entrées :
+  //   ent.near  ce qui suit la distance : cris de poursuite, pas, rugissements, cri de la ruée
+  //   ent.raw   ce qui suit déjà le danger : bourdonnement, voix du Level 1 (seulement les murs et l'écho en plus)
+  initEntityBus() {
+    const c = this.ctx;
+    const E = (this.ent = { pinUntil: 0, pos: null });
+    E.pan = c.createPanner();
+    E.pan.panningModel = 'HRTF';
+    E.pan.distanceModel = 'linear';
+    E.pan.rolloffFactor = 0; // la distance, on la règle nous-mêmes
+    E.pan.connect(this.master);
+    // l'écho : un léger retard (le son d'abord, la salle ensuite), sans les graves qui noient, puis deux salles (une
+    // petite, une grande) mélangées selon l'espace autour ; la moquette mange les aigus
+    E.verbIn = c.createGain();
+    E.pre = c.createDelay(0.2);
+    E.pre.delayTime.value = 0.02;
+    E.hp = this.filt('highpass', 120, 0.7);
+    E.cvS = c.createConvolver();
+    E.cvL = c.createConvolver();
+    E.gS = this.gainNode(0.8);
+    E.gL = this.gainNode(0.6);
+    E.wetLp = this.filt('lowpass', 3800, 0.6);
+    E.verbIn.connect(E.pre).connect(E.hp);
+    E.hp.connect(E.cvS).connect(E.gS).connect(E.wetLp);
+    E.hp.connect(E.cvL).connect(E.gL).connect(E.wetLp);
+    E.wetLp.connect(this.master);
+    // une voie par entrée : l'occlusion (passe-bas), le son direct (vers le panoramique) et l'envoi vers l'écho
+    const lane = (input) => {
+      const lp = this.filt('lowpass', NYQ, 0.5);
+      const dry = this.gainNode(0);
+      const send = this.gainNode(0);
+      input.connect(lp);
+      lp.connect(dry).connect(E.pan);
+      lp.connect(send).connect(E.verbIn);
+      return { lp, dry, send };
+    };
+    E.near = c.createGain();
+    E.raw = c.createGain();
+    E.N = lane(E.near);
+    E.R = lane(E.raw);
+  }
+
+  // les deux salles de l'entité pour ce niveau, normalisées (l'écho sort au niveau de ce qui y entre) : une petite
+  // (couloir : réflexions serrées, 0,6 s) et une grande (hall : réflexions espacées, 2,5 s). Béton du Level 1 et
+  // carrelage des Poolrooms : plus longues, plus claires
+  entRoom(level) {
+    const E = this.ent;
+    if (!E || !this.ctx) return;
+    const c = this.ctx;
+    const sr = c.sampleRate;
+    const k = level === 2 ? 1.8 : level === 1 ? 1.4 : 1;
+    const ir = (len, early) => {
+      const n = Math.floor(sr * len);
+      const b = c.createBuffer(2, n, sr);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = b.getChannelData(ch);
+        for (let i = 0; i < n; i++) {
+          const t = i / sr;
+          d[i] = (Math.random() * 2 - 1) * Math.exp((-6.9 * t) / len) * Math.min(1, t / 0.006) * 0.5;
+        }
+        for (const [ms, a] of early) {
+          const i = Math.floor((sr * (ms + (ch ? 3.1 : 0))) / 1000);
+          if (i < n) d[i] += (Math.random() < 0.5 ? -1 : 1) * a;
+        }
+        let e = 0;
+        for (let i = 0; i < n; i++) e += d[i] * d[i];
+        const g = 1 / Math.sqrt(e || 1);
+        for (let i = 0; i < n; i++) d[i] *= g;
+      }
+      return b;
+    };
+    E.cvS.buffer = ir(0.6 * k, [[4, 0.8], [9, 0.6], [15, 0.45], [22, 0.32], [31, 0.22]]);
+    E.cvL.buffer = ir(2.5 * k, [[21, 0.6], [38, 0.48], [57, 0.4], [83, 0.32], [117, 0.24], [161, 0.16], [222, 0.1]]);
+    E.wetLp.frequency.value = level === 2 ? 6500 : level === 1 ? 5000 : 3800;
+  }
+
+  // À chaque image : où est l'entité (pos), ce qui la sépare de l'oreille (occ, de 0 à vue à 1 quand le son doit
+  // faire un long détour par les couloirs ; floors : elle est à l'autre étage) et l'espace autour (space : 0 couloir
+  // étroit, 1 grande salle). Comme une voix : le son direct s'efface avant l'écho, qui finit par rester presque seul.
+  entUpdate(pos, occ = 0, floors = false, space = 0.3) {
+    const E = this.ent;
+    if (!E || !this.ctx || !pos || typeof pos !== 'object') return;
+    const t = this.ctx.currentTime;
+    E.pos = { x: pos.x, z: pos.z };
+    if (t < E.pinUntil) return; // le jumpscare la tient collée à l'oreille
+    const e = this.ear || { x: pos.x, z: pos.z };
+    const d = Math.hypot(pos.x - e.x, pos.z - e.z);
+    const R = 36; // au-delà, on ne l'entend plus
+    const o = floors ? 1 : clamp01(occ);
+    const sp = clamp01(space);
+    const room = 0.5 + 0.9 * sp;
+    const near = Math.pow(Math.max(0, 1 - d / R), 1.25) * (floors ? 0.3 : 1 - 0.45 * o);
+    const far = Math.min(1, d / R);
+    const rev = Math.pow(Math.max(0, 1 - d / (R * 1.3)), 0.8) * (0.25 + 0.75 * Math.pow(far, 1.1)) * room * (floors ? 0.3 : 1 - 0.25 * o);
+    const f = floors ? 380 : o > 0 ? Math.min(NYQ, 16000 * Math.pow(1000 / 16000, o)) : NYQ;
+    const raw = floors ? 0.5 : 1 - 0.35 * o;
+    this.moveTo(E.pan, pos.x, pos.z, 0.05);
+    for (const [L, g, s] of [[E.N, near, rev], [E.R, raw, 0.3 * room * raw]]) {
+      L.lp.frequency.setTargetAtTime(f, t, 0.12);
+      L.dry.gain.setTargetAtTime(g, t, 0.08);
+      L.send.gain.setTargetAtTime(s, t, 0.15);
+    }
+    // l'espace : la petite salle cède la place à la grande, et la salle répond un peu plus tard
+    E.gS.gain.setTargetAtTime(Math.cos((sp * Math.PI) / 2), t, 0.4);
+    E.gL.gain.setTargetAtTime(Math.sin((sp * Math.PI) / 2), t, 0.4);
+    E.pre.delayTime.setTargetAtTime(0.008 + 0.035 * sp, t, 0.4);
+  }
+
+  // le jumpscare : l'entité collée juste devant l'oreille, sans mur ni distance, jusqu'à until
+  entPin(until) {
+    const E = this.ent;
+    if (!E || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    E.pinUntil = until;
+    if (this.ear) this.moveTo(E.pan, this.ear.x - Math.sin(this.ear.yaw) * 0.6, this.ear.z - Math.cos(this.ear.yaw) * 0.6);
+    for (const L of [E.N, E.R]) {
+      for (const [p, v] of [[L.lp.frequency, NYQ], [L.dry.gain, 1]]) {
+        p.cancelScheduledValues(t);
+        p.setValueAtTime(v, t);
+      }
+    }
+  }
+
   // Le bourdonnement de l'entité : la chaîne reste en place, les oscillateurs ne tournent que quand elle est proche
-  // (startBuzz / stopBuzz). Elle passe par la fenêtre de silence (monsterHush) et par l'occlusion (monsterOcc).
+  // (startBuzz / stopBuzz). Elle passe par la fenêtre de silence (monsterHush), puis par le bus de l'entité.
   initMonsterAudio() {
     const c = this.ctx;
 
-    // Gain principal du monstre (contrôlé en continu par la distance)
+    // Gain principal du monstre (contrôlé en continu par le danger)
     this.monsterGain = c.createGain();
     this.monsterGain.gain.setValueAtTime(0.0001, c.currentTime);
     this.monsterHush = c.createGain();
-    this.monsterOcc = this.filt('lowpass', 20000, 0.5);
-    this.monsterOccG = c.createGain();
-
-    // placé en 3D là où se trouve l'entité (son volume, lui, suit le danger : pas d'atténuation en plus)
-    this.monsterPanner = this.panner(0);
-    this.monsterGain.connect(this.monsterHush).connect(this.monsterOcc);
-    this.monsterOcc.connect(this.monsterOccG).connect(this.monsterPanner);
+    // placé là où elle est, derrière ses murs, avec l'écho du lieu (son volume, lui, suit le danger : pas
+    // d'atténuation de distance en plus)
+    this.monsterGain.connect(this.monsterHush).connect(this.ent ? this.ent.raw : this.out);
 
     // Filtre passe-bande résonant pour le strident perçant, puis le bégaiement électrique (stutter)
     this.monsterFilter = this.filt('bandpass', 900, 4);
@@ -764,12 +920,12 @@ export class BackroomsSfx {
   }
 
   // La voix de l'entité du Level 1 : la bande-son de sa vidéo, jouée en boucle sans fin. Chargée une seule fois,
-  // au premier besoin ; elle passe par le même panoramique (et la même occlusion) que le bourdonnement.
+  // au premier besoin ; elle passe par le bus de l'entité, comme le bourdonnement.
   initVoice() {
     const c = this.ctx;
     this.voiceGain = c.createGain();
     this.voiceGain.gain.setValueAtTime(0.0001, c.currentTime);
-    this.voiceGain.connect(this.monsterOcc || this.monsterPanner || this.out);
+    this.voiceGain.connect(this.ent ? this.ent.raw : this.out);
     this.loadVoice();
   }
 
@@ -800,7 +956,7 @@ export class BackroomsSfx {
 
   // Mettre à jour le bourdonnement strident de l'entité à chaque frame ; voice : c'est la voix du Level 1 qu'on
   // entend à la place du bourdonnement
-  // pos : { x, z } de l'entité (null : on ne bouge pas la source) ; occluded : un mur entre elle et toi (true, 0 à 1)
+  // pos : { x, z } de l'entité (pour les sous-titres) ; où on l'entend, les murs et l'écho : entUpdate
   updateMonsterSound(danger, pos, voice = false, occluded = 0) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
@@ -812,12 +968,6 @@ export class BackroomsSfx {
     // toujours un murmure au loin, de plus en plus fort à mesure qu'elle approche
     if (this.voiceGain && !(t < this.scareUntil)) this.voiceGain.gain.setTargetAtTime(voice ? 0.04 + Math.pow(d, 0.8) * 1.3 : 0.0001, t, 0.1);
     if (voice && d > 0.25) this.caption('[garbled voice]', pos);
-
-    if (pos && typeof pos === 'object') this.moveTo(this.monsterPanner, pos.x, pos.z, 0.05);
-    // derrière un mur : étouffée
-    const occ = occOf(occluded);
-    this.monsterOcc.frequency.setTargetAtTime(occFreq(occ), t, 0.12);
-    this.monsterOccG.gain.setTargetAtTime(occGain(occ), t, 0.12);
 
     // le grésillement électrique : un fond à peine audible au loin, qui devient strident tout près ; hors danger
     // (ou quand c'est la voix qu'on entend) les oscillateurs s'arrêtent
@@ -1155,9 +1305,7 @@ export class BackroomsSfx {
     // Level 1 : sa voix à plein volume, collée à l'oreille, puis le silence
     if (level === 1 && this.voiceGain) {
       // juste devant toi
-      if (this.monsterPanner && this.ear) this.moveTo(this.monsterPanner, this.ear.x - Math.sin(this.ear.yaw) * 0.6, this.ear.z - Math.cos(this.ear.yaw) * 0.6);
-      this.monsterOcc.frequency.setValueAtTime(NYQ, t);
-      this.monsterOccG.gain.setValueAtTime(1, t);
+      this.entPin(t0 + 1.6);
       this.voiceGain.gain.cancelScheduledValues(t);
       this.voiceGain.gain.setValueAtTime(0.0001, t);
       this.voiceGain.gain.setValueAtTime(2.2, t0);
@@ -1216,8 +1364,9 @@ export class BackroomsSfx {
     this.burst(sat, t, 0.06, 'bandpass', 2200, 1, 0.6);
   }
 
-  // le cri : une voix (dent de scie et souffle) qui tremble, passe d'un « aa » à un « ii », très saturée
-  scareScream(t, k = 1) {
+  // le cri : une voix (dent de scie et souffle) qui tremble, passe d'un « aa » à un « ii », très saturée ; dest : où
+  // il part (le bus de l'entité pour la ruée : placé là où elle est, avec son écho), sinon collé à l'oreille
+  scareScream(t, k = 1, dest = null) {
     const c = this.ctx;
     const D = 1.3;
     const vo = this.osc('sawtooth', 520);
@@ -1256,9 +1405,8 @@ export class BackroomsSfx {
     env.gain.exponentialRampToValueAtTime(0.32 * k, t + 0.012);
     env.gain.setValueAtTime(0.32 * k, t + D * 0.5);
     env.gain.exponentialRampToValueAtTime(0.0001, t + D);
-    mix.connect(hp).connect(sat).connect(env).connect(this.master);
-    const wet = this.gainNode(0.3);
-    env.connect(wet).connect(this.out);
+    mix.connect(hp).connect(sat).connect(env).connect(dest || this.master);
+    if (!dest) env.connect(this.gainNode(0.3)).connect(this.out);
     for (const o of [vo, sub, j1, j2, breath]) {
       o.start(t);
       o.stop(t + D + 0.05);
@@ -1807,7 +1955,8 @@ export class BackroomsSfx {
     const t = this.ctx.currentTime + 0.02;
     this.duck(0.2, 3);
     this.scareHit(t, 0.45);
-    this.scareScream(t + 0.05, 0.9);
+    // le cri vient d'elle : placé là où elle est, avec l'écho du lieu (tout près, il est aussi fort qu'avant)
+    this.scareScream(t + 0.05, this.ent ? 1.1 : 0.9, this.ent ? this.ent.near : null);
     this.caption('[the entity screams]', pos);
   }
 
@@ -1915,42 +2064,66 @@ export class BackroomsSfx {
     this.burst(out, t + 0.24, 0.03, 'lowpass', 700, 0.8, 0.12);
   }
 
-  // Pas lourds de l'entité, placés là où elle est, par-dessus ses cris : de plus en plus forts à mesure qu'elle approche
-  // occluded : un mur entre elle et toi (true ou 0 à 1)
-  monsterStep(danger, pos, occluded = 0) {
+  // Un pas lourd de l'entité, au moment où son pied touche le sol dans son animation (foot : 'L' ou 'R', voir
+  // view/beast.js) : un des pas de l'enregistrement de la poursuite, découpé (un pied pris dans les pas pairs,
+  // l'autre dans les impairs, jamais deux fois le même de suite), avec sous lui un poids grave. Tant que
+  // l'enregistrement charge, un pas synthétisé. Tout passe par le bus de l'entité (distance, murs, écho).
+  monsterStep(danger, pos, occluded = 0, foot = null) {
     if (!this.unlocked || !this.ctx || !hasEntity(this.roomLevel)) return;
     const c = this.ctx;
-    const t = c.currentTime;
-    const v = 0.35 + Math.min(1, danger) * 1.15;
-    const dest = c.createGain();
-    dest.gain.value = v;
-    dest.connect(pos && typeof pos === 'object' ? this.at({ ...pos, rolloff: 0 }, 1, occluded) : this.out);
+    const t = c.currentTime + 0.004;
+    const out = c.createGain();
+    out.gain.value = foot ? 1 : 0.85;
+    out.connect(this.ent ? this.ent.near : this.out);
+    if (this.stepBuf === undefined) {
+      this.stepBuf = null;
+      this.sample(CHASE_ALL).then((b) => (this.stepBuf = b || null));
+    }
     // le poids : une basse qui tombe
     const osc = c.createOscillator();
     const g = c.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(68, t);
-    osc.frequency.exponentialRampToValueAtTime(26, t + 0.3);
+    osc.frequency.setValueAtTime(64, t);
+    osc.frequency.exponentialRampToValueAtTime(27, t + 0.28);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.9, t + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.34);
-    osc.connect(g).connect(dest);
+    g.gain.exponentialRampToValueAtTime(this.stepBuf ? 0.45 : 0.9, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    osc.connect(g).connect(out);
     osc.start(t);
-    osc.stop(t + 0.36);
-    // le choc sur le sol, et un craquement de la dalle
-    const n = Math.floor(c.sampleRate * 0.22);
-    const buf = c.createBuffer(1, n, c.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 5);
-    const src = c.createBufferSource();
-    src.buffer = buf;
-    const lp = c.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.value = 520 + Math.random() * 160;
-    const ng = c.createGain();
-    ng.gain.value = 0.75;
-    src.connect(lp).connect(ng).connect(dest);
-    src.start(t);
+    osc.stop(t + 0.32);
+    const buf = this.stepBuf;
+    if (buf) {
+      let i;
+      do i = Math.floor(Math.random() * STEP_ON.length);
+      while (i === this.lastStep || (foot && i % 2 !== (foot === 'L' ? 0 : 1)));
+      this.lastStep = i;
+      const a = STEP_ON[i] - 0.008;
+      const b = Math.min(STEP_ON[i] + 0.26, (STEP_ON[i + 1] ?? STEP_ON[i] + 0.3) - 0.01);
+      const rate = rnd(0.94, 1.04);
+      const dur = (b - a) / rate;
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = rate;
+      const env = c.createGain();
+      const v = 2.4 * rnd(0.85, 1.1);
+      env.gain.setValueAtTime(0, t);
+      env.gain.linearRampToValueAtTime(v, t + 0.003);
+      env.gain.setValueAtTime(v, t + Math.max(0.004, dur - 0.04));
+      env.gain.linearRampToValueAtTime(0, t + dur);
+      src.connect(env).connect(out);
+      src.start(t, a, b - a);
+    } else {
+      // le choc sur le sol, et un craquement de la dalle
+      const n = Math.floor(c.sampleRate * 0.22);
+      const nb = c.createBuffer(1, n, c.sampleRate);
+      const d = nb.getChannelData(0);
+      for (let k = 0; k < n; k++) d[k] = (Math.random() * 2 - 1) * Math.pow(1 - k / n, 5);
+      const src = c.createBufferSource();
+      src.buffer = nb;
+      const ng = this.gainNode(0.75);
+      src.connect(this.filt('lowpass', 520 + Math.random() * 160, 1)).connect(ng).connect(out);
+      src.start(t);
+    }
     this.caption('[heavy footsteps]', pos);
   }
 
@@ -1970,9 +2143,11 @@ export class BackroomsSfx {
     return this.samples.get(name);
   }
 
-  // Les cris de la poursuite : tant que l'entité traque, les trois enregistrements s'enchaînent au hasard, placés
-  // là où elle est ; ils montent avec le danger et s'éteignent en une seconde et demie quand elle lâche prise.
-  // Pendant la poursuite l'ambiance est baissée de 10 dB. Rien là où l'entité ne vit pas (Tuyauteries).
+  // Les cris de la poursuite : tant que l'entité traque, les enregistrements du niveau s'enchaînent au hasard ; ils
+  // s'éteignent en une seconde et demie quand elle lâche prise. Au départ, l'élan de l'enregistrement commun ; puis,
+  // de temps en temps, un rugissement grave et saturé (deepScream). Tout part du bus de l'entité : c'est la distance,
+  // les murs et l'écho du lieu qui font le volume. Pendant la poursuite l'ambiance est baissée de 10 dB. Rien là où
+  // l'entité ne vit pas (Tuyauteries).
   updateChase(on, danger, pos, occluded = 0) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
@@ -1988,47 +2163,51 @@ export class BackroomsSfx {
       if (!on) return;
       this.chaseGain = c.createGain();
       this.chaseGain.gain.value = 0;
-      this.chasePanner = this.panner(0);
-      this.chaseOcc = this.filt('lowpass', 20000, 0.5);
-      this.chaseGain.connect(this.chaseOcc).connect(this.chasePanner);
-      this.sample(CHASE_ALL);
+      this.chaseGain.connect(this.ent ? this.ent.near : this.out);
+      // les cris aigus, qui s'effacent le temps d'un rugissement
+      this.shriekG = this.gainNode(1);
+      this.shriekG.connect(this.chaseGain);
+      if (this.stepBuf === undefined) {
+        this.stepBuf = null;
+        this.sample(CHASE_ALL).then((b) => (this.stepBuf = b || null));
+      }
     }
     const list = levelSfx(this.roomLevel).chase;
     if (this.chaseList !== list) {
       this.chaseList = list;
       for (const n of list) this.sample(n);
     }
-    if (pos && typeof pos === 'object') this.moveTo(this.chasePanner, pos.x, pos.z, 0.05);
-    const occ = occOf(occluded);
-    this.chaseOcc.frequency.setTargetAtTime(occFreq(occ), t, 0.12);
-    const want = on ? (0.35 + Math.min(1, danger) * 0.75) * occGain(occ) : 0;
-    this.chaseGain.gain.setTargetAtTime(want, t, on ? 0.25 : 0.5);
+    this.chaseGain.gain.setTargetAtTime(on ? 1 : 0, t, on ? 0.25 : 0.5);
     if (on && !this.chasePlaying) this.nextChase();
-    if (on && !this.chaseAll) this.startChaseAll();
-    else if (!on && this.chaseAll && this.chaseGain.gain.value < 0.02) {
-      try {
-        if (this.chaseAll.stop) this.chaseAll.stop(); // encore en chargement : un simple jeton, rien ne joue
-      } catch (e) {
-        /* déjà fini */
+    if (on && !this.chaseWas) {
+      // l'élan, une fois par traque (pas plus d'une fois toutes les 6 s), puis le premier rugissement
+      if (t - (this.chaseIntroT ?? -99) > 6) {
+        this.chaseIntroT = t;
+        this.chaseIntro();
       }
-      this.chaseAll = null;
+      this.deepAt = t + rnd(1.2, 2.5);
+    } else if (on && t >= this.deepAt) {
+      this.deepScream();
+      this.deepAt = t + Math.max(3.5, rnd(5, 10) - Math.min(1, danger) * 2);
     }
+    this.chaseWas = on;
   }
 
-  // la couche commune à toutes les poursuites, en boucle tant que dure la traque. Pendant le chargement, chaseAll tient
-  // le jeton de cette demande : si la poursuite s'arrête puis reprend avant la fin, l'ancienne demande ne lance rien
-  // (sinon une boucle partait que plus rien n'arrêtait, et la couche doublait à chaque poursuite suivante)
-  startChaseAll() {
-    const tok = (this.chaseAll = {}); // réservé pendant le chargement
+  // l'élan de la poursuite : le début de l'enregistrement commun, une fois. Pendant le chargement, introTok tient le
+  // jeton de cette demande : si la traque s'arrête avant, rien ne part
+  chaseIntro() {
+    const tok = (this.introTok = {});
     this.sample(CHASE_ALL).then((buf) => {
-      if (this.chaseAll !== tok) return; // arrêtée entre-temps, ou une demande plus récente a pris la place
-      if (!buf) return; // pas de fichier : le jeton reste jusqu'à la fin de cette poursuite (pas un essai par image)
-      const src = this.ctx.createBufferSource();
+      if (!buf || this.introTok !== tok || !this.chaseAuto) return;
+      const c = this.ctx;
+      const t = c.currentTime + 0.01;
+      const g = this.gainNode(1);
+      g.gain.setValueAtTime(1, t + CHASE_INTRO - 0.25);
+      g.gain.linearRampToValueAtTime(0, t + CHASE_INTRO);
+      const src = c.createBufferSource();
       src.buffer = buf;
-      src.loop = true;
-      src.connect(this.chaseGain);
-      src.start();
-      this.chaseAll = src;
+      src.connect(g).connect(this.chaseGain);
+      src.start(t, 0, CHASE_INTRO);
     });
   }
 
@@ -2043,13 +2222,68 @@ export class BackroomsSfx {
       if (!buf) return (this.chasePlaying = false);
       const src = this.ctx.createBufferSource();
       src.buffer = buf;
-      src.connect(this.chaseGain);
+      src.connect(this.shriekG);
       src.start();
       src.onended = () => {
         // on enchaîne tant que la poursuite dure (le volume dit si elle dure encore)
         if (this.chaseGain.gain.value > 0.02) this.nextChase();
         else this.chasePlaying = false;
       };
+    });
+  }
+
+  // Un rugissement grave et saturé pendant la traque : la partie forte d'un des cris du niveau, jouée une octave
+  // plus bas, poussée dans une saturation épaisse, avec sous elle une gorge synthétique qui gronde. Les cris aigus
+  // s'effacent le temps qu'il passe. Placé là où elle est, comme le reste (bus de l'entité)
+  deepScream() {
+    const list = levelSfx(this.roomLevel).chase;
+    if (!this.ent || !list.length) return;
+    const name = list[Math.floor(Math.random() * list.length)];
+    this.sample(name).then((buf) => {
+      if (!buf || !this.chaseAuto) return;
+      const c = this.ctx;
+      const t = c.currentTime + 0.02;
+      const [a, b] = loudPart(buf);
+      const rate = rnd(0.48, 0.6);
+      const len = Math.max(0.6, Math.min((b - a) / rate, rnd(1.4, 2.6)));
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.setValueAtTime(rate, t);
+      src.playbackRate.linearRampToValueAtTime(rate * 0.88, t + len); // la voix qui retombe
+      const hp = this.filt('highpass', 45, 0.7);
+      const pre = this.gainNode(2.2);
+      const sat = this.shaper(9);
+      sat.oversample = '4x';
+      const pk = this.filt('peaking', 160, 0.9);
+      pk.gain.value = 7;
+      const lp = this.filt('lowpass', 2200, 0.7);
+      const env = c.createGain();
+      env.gain.setValueAtTime(0.0001, t);
+      env.gain.exponentialRampToValueAtTime(0.42, t + 0.06);
+      env.gain.setValueAtTime(0.42, t + Math.max(0.07, len - 0.35));
+      env.gain.exponentialRampToValueAtTime(0.0001, t + len);
+      src.connect(hp).connect(pre).connect(sat).connect(pk).connect(lp).connect(env).connect(this.ent.near);
+      // la gorge : une dent de scie très grave qui tremble, dans la même saturation
+      const throat = this.osc('sawtooth', rnd(46, 58));
+      throat.frequency.setValueAtTime(throat.frequency.value, t);
+      throat.frequency.exponentialRampToValueAtTime(throat.frequency.value * 0.8, t + len);
+      const wob = this.osc('sine', rnd(5, 8));
+      const wobG = this.gainNode(3);
+      wob.connect(wobG).connect(throat.frequency);
+      throat.connect(this.filt('lowpass', 240, 0.8)).connect(this.gainNode(0.22)).connect(pre);
+      src.start(t, a, Math.max(0.1, b - a));
+      src.stop(t + len + 0.05);
+      for (const o of [throat, wob]) {
+        o.start(t);
+        o.stop(t + len + 0.05);
+      }
+      if (this.shriekG) {
+        const g = this.shriekG.gain;
+        g.cancelScheduledValues(t);
+        g.setTargetAtTime(0.35, t, 0.08);
+        g.setTargetAtTime(1, t + len, 0.3);
+      }
+      this.caption('[deep roar]', this.ent.pos);
     });
   }
 

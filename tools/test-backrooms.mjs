@@ -58,7 +58,9 @@ test('cassettes VHS : 7 cassettes placées et atteignables', () => {
   assert.equal(map.cassettes.length, 7, 'exactement 7 cassettes');
   for (const cas of map.cassettes) {
     assert.equal(map.isWall(cas.gx, cas.gz), false, `la cassette ${cas.id} n'est pas dans un mur`);
-    const path = findPath(map, map.spawn.x, map.spawn.z, cas.x, cas.z);
+    // celle du trou dans le mur se prend depuis le pied de l'échelle, dans la case devant le mur
+    const to = cas.high ? { x: map.niche.baseX, z: map.niche.baseZ } : cas;
+    const path = findPath(map, map.spawn.x, map.spawn.z, to.x, to.z);
     assert.ok(path, `un chemin existe du spawn vers la cassette ${cas.id}`);
   }
 });
@@ -326,7 +328,7 @@ test('la fixer de loin la provoque ; s\'en approcher aussi ; la lampe ne la fait
   assert.ok(stared >= 4 && approached >= 4, `cas testés (${stared}, ${approached})`);
 });
 
-test('zone très éclairée : à l\'abri, elle ne s\'y lance pas et s\'arrête au bord de l\'ombre', () => {
+test('zone très éclairée : à l\'abri, elle ne s\'y lance pas ; elle renonce au bord de l\'ombre et s\'y fond, hors de vue', () => {
   const sim = new BackroomsSim({ map, difficulty: 'normal' });
   const P = sim.player;
   const M = sim.monster;
@@ -357,10 +359,159 @@ test('zone très éclairée : à l\'abri, elle ne s\'y lance pas et s\'arrête a
     sim.step({ yaw: P.yaw });
     put();
   }
-  assert.equal(M.mode, 'watch', 'elle s\'arrête et regarde');
+  assert.notEqual(M.mode, 'chase', 'elle renonce au bord de la lumière');
+  // il la regarde : elle ne reste pas plantée là à le fixer, elle se glisse hors de sa vue
+  let still = 0;
+  let worst = 0;
+  let px = M.x;
+  let pz = M.z;
+  const d0 = Math.hypot(M.x - P.x, M.z - P.z);
+  for (let i = 0; i < 60 * 6; i++) {
+    sim.step({ yaw: Math.atan2(-(M.x - P.x), -(M.z - P.z)) });
+    const v = Math.hypot(M.x - px, M.z - pz) / DT;
+    px = M.x;
+    pz = M.z;
+    still = v < 0.4 && sim.inSomeView(0, M.x, M.z) && Math.hypot(M.x - P.x, M.z - P.z) < 22 ? still + DT : 0;
+    worst = Math.max(worst, still);
+    assert.notEqual(M.mode, 'chase', 'à l\'abri, il ne risque rien');
+  }
+  assert.ok(worst < 1.5, `jamais plantée à le fixer (${worst.toFixed(1)} s immobile sous ses yeux)`);
+  assert.ok(!sim.inSomeView(0, M.x, M.z) || Math.hypot(M.x - P.x, M.z - P.z) > d0 + 4, 'elle a quitté sa vue (ou s\'éloigne)');
   // pendant une coupure, plus d'abri
   sim.blackout = 10;
   assert.ok(!(sim.level === 0 && !(sim.blackout > 0) && sim.brightCell(sim.map, P.x, P.z)), 'la coupure retire l\'abri');
+});
+
+test("jamais plantée sous les yeux du joueur : fixée, elle charge ; vue de côté, ou devant un joueur à l'abri, elle se glisse hors de vue", () => {
+  const C = CELL_SIZE;
+  const at = (c) => ({ x: (c.x + 0.5) * C, z: (c.z + 0.5) * C });
+  const look = (P, M, off = 0) => () => Math.atan2(-(M.x - P.x), -(M.z - P.z)) + off;
+  // le plus long moment où elle reste immobile (ni pas, ni demi-tour), hors poursuite, dans le cadre d'un joueur
+  const watchIt = (sim, sec, yaw) => {
+    const P = sim.player;
+    const M = sim.monster;
+    let px = M.x;
+    let pz = M.z;
+    let pyaw = M.yaw || 0;
+    let t = 0;
+    let worst = 0;
+    let charged = false;
+    let grabbed = false;
+    let hidden = false;
+    const d0 = Math.hypot(M.x - P.x, M.z - P.z);
+    for (let i = 0; i < Math.round(sec / DT); i++) {
+      sim.step({ yaw: yaw(), pitch: 0 });
+      if (!sim.viewerOf(M, 22) && M.mode !== 'chase') hidden = true;
+      if (M.mode === 'chase') charged = true;
+      if (M.mode === 'grab' || P.grabT > 0 || P.status !== 'alive') {
+        grabbed = true;
+        break;
+      }
+      const v = Math.hypot(M.x - px, M.z - pz) / DT;
+      const w = Math.abs(Math.atan2(Math.sin((M.yaw || 0) - pyaw), Math.cos((M.yaw || 0) - pyaw))) / DT;
+      px = M.x;
+      pz = M.z;
+      pyaw = M.yaw || 0;
+      t = sim.viewerOf(M, 22) && v < 0.4 && w < 0.6 && M.mode !== 'chase' ? t + DT : 0;
+      worst = Math.max(worst, t);
+    }
+    return { worst, charged, grabbed, hidden, away: Math.hypot(M.x - P.x, M.z - P.z) - d0 };
+  };
+  const make = (seed) => {
+    const sim = new BackroomsSim({ seed, difficulty: 'normal' });
+    sim.glimpseAt = Infinity;
+    if (sim.director) Object.assign(sim.director, { phase: 'build', huntT: 1e9, fakeT: 1e9 });
+    return sim;
+  };
+  // une case libre en vue du joueur, entre dMin et dMax
+  const inView = (sim, P, dMin, dMax, ok = () => true) => sim.map.walkable.map(at).find((p) => {
+    const d = Math.hypot(p.x - P.x, p.z - P.z);
+    return d > dMin && d < dMax && !sim.map.pillarAt(Math.floor(p.x / C), Math.floor(p.z / C)) && hasLineOfSight(sim.map, P.x, P.z, p.x, p.z) && ok(p);
+  });
+  const n = { fixee: 0, cote: 0, lumiere: 0, recoin: 0, apparition: 0 };
+  for (const seed of [42, 1, 9, 31]) {
+    // dans le noir, lampe éteinte, il la fixe : elle charge (au bout d'une seconde au plus)
+    for (const off of [0, 0.75]) {
+      const sim = make(seed);
+      const P = sim.player;
+      const M = sim.monster;
+      const free = (p) => !sim.brightCell(sim.map, p.x, p.z) && !sim.litCell(sim.map, p.x, p.z) && !sim.map.pillarAt(Math.floor(p.x / C), Math.floor(p.z / C)) && !(sim.map.calm || []).some((k) => k.cells.some((q) => q.x === Math.floor(p.x / C) && q.z === Math.floor(p.z / C)));
+      const home = sim.map.walkable.map(at).filter(free).find((p) => inView(sim, p, 9, 16, free));
+      if (!home) continue;
+      Object.assign(P, home);
+      P.flashlight = false;
+      const s = inView(sim, P, 9, 16, free);
+      Object.assign(M, { x: s.x, z: s.z, mode: 'watch', waitT: 30, dormantT: 0, warpT: 1e9, watch: null, path: [] });
+      M.yaw = Math.atan2(P.x - M.x, P.z - M.z);
+      const r = watchIt(sim, off ? 6 : 3, look(P, M, off));
+      assert.ok(r.worst < 1.5, `graine ${seed}${off ? ', vue de côté' : ''} : plantée ${r.worst.toFixed(1)} s sous ses yeux`);
+      if (!off) {
+        assert.ok(r.charged, `graine ${seed} : fixée, elle charge`);
+        n.fixee++;
+      } else {
+        assert.ok(!r.charged, `graine ${seed} : vue de côté et de loin, elle ne charge pas`);
+        assert.ok(r.hidden || r.away > 3, `graine ${seed} : vue de côté, elle se glisse hors de vue (ou s'éloigne)`);
+        n.cote++;
+      }
+    }
+    // à l'abri dans la lumière franche, ou dans un recoin calme : elle le poursuivait, elle ne reste pas plantée devant
+    {
+      const sim = make(seed);
+      const P = sim.player;
+      const M = sim.monster;
+      if (sim.brightCell(sim.map, P.x, P.z)) {
+        const s = inView(sim, P, 8, 14, (p) => !sim.brightCell(sim.map, p.x, p.z));
+        if (s) {
+          Object.assign(M, { x: s.x, z: s.z, mode: 'chase', dormantT: 0, warpT: 1e9, unseenT: 0, lastSeenX: P.x, lastSeenZ: P.z, repathT: 0 });
+          const r = watchIt(sim, 6, look(P, M));
+          assert.ok(r.worst < 1.5, `graine ${seed}, à l'abri dans la lumière : plantée ${r.worst.toFixed(1)} s`);
+          n.lumiere++;
+        }
+      }
+    }
+    {
+      const sim = make(seed);
+      const P = sim.player;
+      const M = sim.monster;
+      const nook = (sim.map.calm || [])[0];
+      if (nook) {
+        Object.assign(P, at(nook.cells[nook.cells.length - 1]));
+        const s = inView(sim, P, 5, 12);
+        if (s) {
+          Object.assign(M, { x: s.x, z: s.z, mode: 'chase', dormantT: 0, warpT: 1e9, unseenT: 0, lastSeenX: P.x, lastSeenZ: P.z, repathT: 0 });
+          const r = watchIt(sim, 6, look(P, M));
+          assert.ok(r.worst < 1.5 && !r.grabbed, `graine ${seed}, dans un recoin calme : plantée ${r.worst.toFixed(1)} s${r.grabbed ? ', attrapé' : ''}`);
+          n.recoin++;
+        }
+      }
+    }
+    // la première rencontre : vue de côté (pas en plein centre), elle disparaît vite elle aussi
+    {
+      const sim = new BackroomsSim({ seed, difficulty: 'normal' });
+      if (sim.director) Object.assign(sim.director, { huntT: 1e9, fakeT: 1e9 });
+      const P = sim.player;
+      const M = sim.monster;
+      sim.glimpseAt = 0;
+      let show = null;
+      for (let i = 0; i < 60 * 30 && !show; i++) {
+        sim.events.length = 0;
+        sim.step({ yaw: P.yaw + 0.01 });
+        show = sim.events.find((e) => e.type === 'glimpse' && e.phase === 'show');
+      }
+      if (show) {
+        let gone = null;
+        let t = 0;
+        for (; t < 3 && !gone; t += DT) {
+          sim.events.length = 0;
+          sim.step({ yaw: Math.atan2(-(M.x - P.x), -(M.z - P.z)) + 0.5 });
+          gone = sim.events.find((e) => e.type === 'glimpse' && e.phase === 'gone');
+        }
+        assert.ok(gone && t < 2, `graine ${seed} : vue de côté, la première apparition dure ${t.toFixed(1)} s`);
+        n.apparition++;
+      }
+    }
+  }
+  assert.ok(n.fixee >= 3 && n.cote >= 3 && n.lumiere + n.recoin >= 3 && n.apparition >= 3, `cas testés : ${JSON.stringify(n)}`);
 });
 
 test('triche : invisible de tous, elle réapparaît juste derrière un angle devant sa proie, ou disparaît', () => {
@@ -1188,18 +1339,18 @@ test("réseau : l'invité reçoit l'état de l'hôte, se déplace chez lui et su
   assert.equal(guest.players.length, 1);
 });
 
-test('départ : pas de table, chacun a déjà sa lampe allumée dans la case 1', () => {
+test('départ : pas de table, chacun a déjà sa lampe dans la case 1, éteinte', () => {
   const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }, { id: 3, name: 'C' }];
   for (const sd of [3, 14, 15, 92, 653]) {
     const sim = new BackroomsSim({ difficulty: 'peaceful', seed: sd, players, localId: 1 });
     assert.ok(!sim.table, `graine ${sd} : pas de table au départ`);
-    assert.ok(sim.players.every((p) => p.hasLamp && p.flashlight), 'tout le monde part équipé, lampe allumée');
-    // la touche 1 éteint et rallume sa lampe
-    sim.step({ toggleFlashlight: true });
-    assert.equal(sim.player.flashlight, false);
-    assert.ok(!sim.drainEvents().some((e) => e.type === 'noLamp'));
+    assert.ok(sim.players.every((p) => p.hasLamp && !p.flashlight), 'tout le monde part équipé, lampe éteinte');
+    // la touche 1 allume et éteint sa lampe
     sim.step({ toggleFlashlight: true });
     assert.equal(sim.player.flashlight, true);
+    assert.ok(!sim.drainEvents().some((e) => e.type === 'noLamp'));
+    sim.step({ toggleFlashlight: true });
+    assert.equal(sim.player.flashlight, false);
   }
 });
 
@@ -1243,7 +1394,7 @@ test('départ à plusieurs : chacun dans son coin, à portée de sifflet, et par
   assert.equal(solo.player.x, solo.map.spawn.x);
 });
 
-test("un joueur tombé au Level 0 repart au Level 1 avec une lampe", () => {
+test("un joueur tombé au Level 0 repart au Level 1 avec une lampe (éteinte, comme au départ)", () => {
   const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players, localId: 1 });
   const [a, b] = sim.players;
@@ -1257,7 +1408,7 @@ test("un joueur tombé au Level 0 repart au Level 1 avec une lampe", () => {
   assert.equal(sim.level, 1);
   const a1 = sim.players.find((p) => p.id === 1);
   assert.equal(a1.status, 'alive');
-  assert.ok(a1.hasLamp && a1.flashlight);
+  assert.ok(a1.hasLamp && !a1.flashlight);
   assert.ok(!sim.table, "plus de table à l'étage suivant");
 });
 
@@ -1759,28 +1910,36 @@ test("réseau : l'eau d'amande bue par un invité lui rend son souffle, et l'esc
   assert.ok(Math.hypot(HG.x - G.x, HG.z - G.z) < 0.3, 'au même endroit');
 });
 
-test("l'entité se tapit dans le noir pour observer, sursaute une fois devant la lampe (de loin), et s'énerve à chaque cassette", () => {
+test("l'entité se tapit dans le noir pour observer (sans jamais rester plantée sous ses yeux), sursaute une fois devant la lampe (de loin), et s'énerve à chaque cassette", () => {
   let watched = 0;
   let fled = 0;
   let darker = 0;
-  for (const sd of [2, 6, 11, 19]) {
+  for (const sd of [2, 6, 11, 19, 23, 31]) {
     withSeed(sd, () => {
       const sim = new BackroomsSim({ difficulty: 'normal', seed: sd });
       const P = sim.player;
       const M = sim.monster;
       P.flashlight = false;
-      // l'entité à une vingtaine de mètres, hors de vue
+      sim.glimpseAt = Infinity;
+      if (sim.director) Object.assign(sim.director, { phase: 'build', huntT: 1e9, fakeT: 1e9 });
+      // l'entité à une vingtaine de mètres, hors de vue : elle part se tapir dans un coin sombre d'où elle le voit
       const c = sim.map.walkable.find((q) => {
         const d = Math.hypot((q.x + 0.5) * CELL_SIZE - P.x, (q.z + 0.5) * CELL_SIZE - P.z);
         return d > 18 && d < 24 && !hasLineOfSight(sim.map, (q.x + 0.5) * CELL_SIZE, (q.z + 0.5) * CELL_SIZE, P.x, P.z);
       });
+      if (!c) return;
       M.x = (c.x + 0.5) * CELL_SIZE;
       M.z = (c.z + 0.5) * CELL_SIZE;
-      M.stalkT = 0;
       M.dormantT = 0; // passé la première minute de calme
       M.warpT = 1e9; // ici, elle ne triche pas : on regarde comment elle se tapit
-      for (let i = 0; i < 60 * 40 && M.mode !== 'watch'; i++) {
-        sim.step();
+      M.stalkT = 99;
+      const spot = sim.darkSpot(sim.map, P, M, 8, 20, true);
+      if (!spot) return;
+      Object.assign(M, { mode: 'stalk', watch: spot, silent: true, repathT: 0 });
+      // il regarde ailleurs (dos à l'endroit où elle va)
+      const away = Math.atan2(spot.x - P.x, spot.z - P.z);
+      for (let i = 0; i < 60 * 25 && M.mode !== 'watch'; i++) {
+        sim.step({ yaw: away });
         if (M.mode === 'chase') return;
       }
       if (M.mode !== 'watch') return;
@@ -1790,21 +1949,21 @@ test("l'entité se tapit dans le noir pour observer, sursaute une fois devant la
       if (darkAt(M.x, M.z) < darkAt(P.x, P.z)) darker++;
       const d = Math.hypot(M.x - P.x, M.z - P.z);
       assert.ok(d > 6 && d < 22, `à distance (${d.toFixed(1)} m)`);
-      // elle reste là à regarder sans charger
-      for (let i = 0; i < 60; i++) sim.step();
-      assert.notEqual(M.mode, 'chase', "elle observe sans charger");
+      // il ne la voit pas : elle reste là à l'observer, sans charger
+      for (let i = 0; i < 60; i++) sim.step({ yaw: away });
+      assert.notEqual(M.mode, 'chase', 'elle observe sans charger');
       // la lampe braquée sur elle, de loin et tout au début : un seul sursaut, elle s'enfuit (de près, elle chargerait)
       P.flashlight = true;
-      P.yaw = Math.atan2(-(M.x - P.x), -(M.z - P.z));
+      const yaw = Math.atan2(-(M.x - P.x), -(M.z - P.z));
       if (M.mode === 'watch' && hasLineOfSight(sim.map, P.x, P.z, M.x, M.z)) {
-        sim.step({ yaw: P.yaw });
+        sim.step({ yaw });
         if (M.mode === 'flee') fled++;
       }
     });
   }
-  assert.ok(watched >= 2, `${watched} fois tapie sur 4`);
+  assert.ok(watched >= 4, `${watched} fois tapie sur 6`);
   assert.ok(fled >= 1, 'elle sursaute devant la lampe');
-  assert.ok(darker >= 2, `${darker} fois dans un coin plus sombre que le joueur`);
+  assert.ok(darker >= 3, `${darker} fois dans un coin plus sombre que le joueur`);
   // plus agressive à chaque cassette : vitesse de charge
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 4 });
   const speedAt = (n) => {

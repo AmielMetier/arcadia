@@ -5,13 +5,22 @@
 // Pièges du Level 0, posés une fois le dédale construit :
 //  - une cassette enfermée dans une petite pièce, qu'on n'atteint que par un couloir étroit au sol creusé de trous
 //    carrés (on marche sur l'arête du milieu ; qui tombe attend qu'un collègue lui lance une corde) ;
-//  - une cassette posée dans un renfoncement en hauteur, qu'on n'atteint qu'avec l'échelle cachée ailleurs.
+//  - une cassette posée au fond d'un trou carré creusé haut dans un mur, qu'on n'atteint qu'avec l'échelle cachée
+//    ailleurs.
+// Des cloisons fines (12 cm de plâtre) : au milieu des grandes pièces (voir 4d) et, par endroits, à la place des pans
+// droits des murs d'une case d'épaisseur (voir 8c).
 
 export const PIT_HALF = 1.0; // un trou fait 2 m de côté dans une case de 2,5 m : il reste des arêtes de 50 cm
 export const FLOOR_DY = 6.4; // l'étage du bas est 6,40 m plus bas (3 m sous plafond et 3,40 m de dalle : les trous sont des puits)
 export const PIT_DEPTH = FLOOR_DY; // on tombe d'un étage, de très haut
 export const CASSETTES = 7; // cassettes VHS à trouver au Level 0 (4 en haut, 3 en bas)
-export const NICHE_Y = 2.25; // hauteur de la cassette dans son renfoncement
+// le trou carré du mur où attend la cassette perchée : son bas (à 2,40 m, hors de portée sans l'échelle), son côté et
+// sa profondeur ; la cassette y tient debout, la jaquette tournée vers la pièce (NICHE_Y : son centre)
+export const NICHE_LO = 2.4;
+export const NICHE_SIZE = 0.56;
+export const NICHE_DEPTH = 0.42;
+export const NICHE_IN = 0.2; // la cassette est à 20 cm dans le trou
+export const NICHE_Y = NICHE_LO + 0.115;
 // rayon d'un joueur : PLAYER_RADIUS de sim.js (sim.js importe ce fichier, on ne l'importe pas d'ici)
 const PLAYER_R = 0.38;
 
@@ -91,10 +100,112 @@ export const T = {
 // chemins de l'entité (les collisions et la vue suivent sa vraie forme, voir outsidePillar) ; une grille, le passage seul
 export const blocks = (v) => v === T.WALL || v === T.SHELF || v === T.EXIT || v === T.PILLAR || v === T.GATE || v === T.MACHINE;
 
-// le point (x, z) est-il hors du pilier ? (p : { x, z, h, round }, h : demi-côté ou rayon)
+// Les obstacles plus petits que leur case : un pilier ({ x, z, h, round }, h : demi-côté ou rayon) ou une cloison
+// fine ({ x, z, h, rects : [[x0, z0, x1, z1], …], thin: true } : un à trois rectangles en mètres, h : le demi-côté
+// de la case, pour borner)
+export const THIN_HALF = 0.06; // demi-épaisseur d'une cloison fine (12 cm)
+export const THIN_SHARE = 0.25; // part des murs d'une case d'épaisseur changés en cloisons (par régions)
+const PARTITIONS = 48; // cloisons ajoutées au milieu des espaces trop ouverts, par étage
+const PART_ROOMY = 21; // cases libres sur 5 × 5 autour du départ d'une cloison
+
+// le point (x, z) est-il hors du pilier (à margin près) ?
 export function outsidePillar(p, x, z, margin = 0) {
+  if (p.rects) {
+    for (const r of p.rects) if (x > r[0] - margin && x < r[2] + margin && z > r[1] - margin && z < r[3] + margin) return false;
+    return true;
+  }
   if (p.round) return Math.hypot(x - p.x, z - p.z) > p.h + margin;
   return Math.abs(x - p.x) > p.h + margin || Math.abs(z - p.z) > p.h + margin;
+}
+
+// la distance du point (x, z) au pilier ou à la cloison (0 dedans)
+export function pillarDist(p, x, z) {
+  if (p.round) return Math.max(0, Math.hypot(x - p.x, z - p.z) - p.h);
+  if (p.rects) {
+    let best = Infinity;
+    for (const r of p.rects) {
+      const d = Math.hypot(Math.max(r[0] - x, 0, x - r[2]), Math.max(r[1] - z, 0, z - r[3]));
+      if (d < best) best = d;
+    }
+    return best;
+  }
+  return Math.hypot(Math.max(0, Math.abs(x - p.x) - p.h), Math.max(0, Math.abs(z - p.z) - p.h));
+}
+
+// le segment (ax, az) → (ax + dx, az + dz) passe-t-il dans le rectangle r ?
+function segRect(ax, az, dx, dz, r) {
+  let t0 = 0;
+  let t1 = 1;
+  if (Math.abs(dx) < 1e-12) {
+    if (ax <= r[0] || ax >= r[2]) return false;
+  } else {
+    let u = (r[0] - ax) / dx;
+    let v = (r[2] - ax) / dx;
+    if (u > v) [u, v] = [v, u];
+    t0 = Math.max(t0, u);
+    t1 = Math.min(t1, v);
+    if (t0 >= t1) return false;
+  }
+  if (Math.abs(dz) < 1e-12) {
+    if (az <= r[1] || az >= r[3]) return false;
+  } else {
+    let u = (r[1] - az) / dz;
+    let v = (r[3] - az) / dz;
+    if (u > v) [u, v] = [v, u];
+    t0 = Math.max(t0, u);
+    t1 = Math.min(t1, v);
+    if (t0 >= t1) return false;
+  }
+  return true;
+}
+
+// le segment (ax, az) → (bx, bz) traverse-t-il le pilier ou la cloison ? (exact : pas d'échantillons qui passeraient
+// à côté d'une cloison de 12 cm)
+export function segHitsPillar(p, ax, az, bx, bz) {
+  const dx = bx - ax;
+  const dz = bz - az;
+  if (p.round) {
+    const l2 = dx * dx + dz * dz;
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - ax) * dx + (p.z - az) * dz) / l2)) : 0;
+    return Math.hypot(ax + dx * t - p.x, az + dz * t - p.z) < p.h;
+  }
+  if (p.rects) {
+    for (const r of p.rects) if (segRect(ax, az, dx, dz, r)) return true;
+    return false;
+  }
+  return segRect(ax, az, dx, dz, [p.x - p.h, p.z - p.h, p.x + p.h, p.z + p.h]);
+}
+
+// les cases traversées par le segment (ax, az) → (bx, bz), dans l'ordre : visit(gx, gz) renvoie true pour s'arrêter
+// (et cellsOnSeg renvoie alors true)
+export function cellsOnSeg(ax, az, bx, bz, visit) {
+  const C = CELL_SIZE;
+  let gx = Math.floor(ax / C);
+  let gz = Math.floor(az / C);
+  const ex = Math.floor(bx / C);
+  const ez = Math.floor(bz / C);
+  const dx = bx - ax;
+  const dz = bz - az;
+  const sx = dx > 0 ? 1 : -1;
+  const sz = dz > 0 ? 1 : -1;
+  const tdx = dx !== 0 ? C / Math.abs(dx) : Infinity;
+  const tdz = dz !== 0 ? C / Math.abs(dz) : Infinity;
+  let tx = dx !== 0 ? (sx > 0 ? (gx + 1) * C - ax : ax - gx * C) / Math.abs(dx) : Infinity;
+  let tz = dz !== 0 ? (sz > 0 ? (gz + 1) * C - az : az - gz * C) / Math.abs(dz) : Infinity;
+  for (let n = 0; n < 4096; n++) {
+    if (visit(gx, gz)) return true;
+    if (gx === ex && gz === ez) return false;
+    if (tx < tz) {
+      if (tx > 1) return false;
+      gx += sx;
+      tx += tdx;
+    } else {
+      if (tz > 1) return false;
+      gz += sz;
+      tz += tdz;
+    }
+  }
+  return false;
 }
 
 // Creuse la cabine de l'ascenseur dans un mur voisin de la case d'entrée : la cabine est fermée sur trois côtés,
@@ -294,6 +405,104 @@ export function createBackroomsMap(seed = 42, opts = {}) {
     }
   }
 
+  // 4d. Des cloisons au milieu des espaces trop ouverts (hors des grandes salles) : des pans droits de 3 à 6 cases,
+  // accrochés à un mur quand c'est possible et percés d'une porte s'ils vont d'un mur à l'autre. Ce sont des murs
+  // ici ; ils deviennent des cloisons de plâtre de 12 cm plus bas (8c). Ils ne coupent jamais le dédale en deux et
+  // ne créent pas de cul-de-sac. Tirés à part : le reste du tirage de la carte ne bouge pas.
+  const partCells = new Set();
+  if (PARTITIONS > 0) {
+    let ps = Math.imul((seed >>> 0) ^ 0x2545f491, 2654435761) >>> 0 || 1;
+    const prnd = () => {
+      ps = (ps + 0x6d2b79f5) >>> 0;
+      let t = ps;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const isF0 = (x, z) => inside(x, z) && grid[z * W + x] === T.FLOOR;
+    const avoid = new Set();
+    for (const [fx, fz] of opts.forced || []) for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) avoid.add((fz + dz) * W + fx + dx);
+    // la plus grande partie d'un seul tenant : une cloison ne doit jamais la couper
+    let ref = -1;
+    let refSize = 0;
+    const seen = new Uint8Array(W * H);
+    for (let k = 0; k < W * H; k++) {
+      if (grid[k] !== T.FLOOR || seen[k]) continue;
+      const d = bfs(grid, W, H, k % W, (k - (k % W)) / W);
+      let n = 0;
+      for (let i = 0; i < W * H; i++) if (d[i] >= 0) (seen[i] = 1), n++;
+      if (n > refSize) (refSize = n), (ref = k);
+    }
+    // on part du milieu des espaces les plus ouverts : presque tout libre sur 5 × 5 cases
+    const roomy = (x, z) => {
+      let n = 0;
+      for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if (isF0(x + dx, z + dz)) n++;
+      return n >= PART_ROOMY && isF0(x, z);
+    };
+    const fits = (x, z, px, pz) => isF0(x, z) && !avoid.has(z * W + x) && z * W + x !== ref && isF0(x + px, z + pz) && isF0(x - px, z - pz);
+    const crowded = (x, z) => {
+      for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if (partCells.has((z + dz) * W + x + dx)) return true;
+      return false;
+    };
+    // culs-de-sac (une seule case libre autour) dans un carré autour des cases posées
+    const deadEnds = (cells) => {
+      let n = 0;
+      const xs0 = cells.map((c) => c[0]);
+      const zs0 = cells.map((c) => c[1]);
+      for (let z = Math.min(...zs0) - 2; z <= Math.max(...zs0) + 2; z++) {
+        for (let x = Math.min(...xs0) - 2; x <= Math.max(...xs0) + 2; x++) {
+          if (isF0(x, z) && DIRS.filter(([dx, dz]) => isF0(x + dx, z + dz)).length === 1) n++;
+        }
+      }
+      return n;
+    };
+    let placed = 0;
+    for (let a = 0; a < PARTITIONS * 14 && placed < PARTITIONS; a++) {
+      const x0 = 2 + Math.floor(prnd() * (W - 4));
+      const z0 = 2 + Math.floor(prnd() * (H - 4));
+      if (!roomy(x0, z0)) continue;
+      const [ax, az] = prnd() < 0.5 ? [1, 0] : [0, 1];
+      const [px, pz] = [az, ax];
+      let f = 0;
+      let b = 0;
+      while (f < 8 && fits(x0 + ax * (f + 1), z0 + az * (f + 1), px, pz)) f++;
+      while (b < 8 && fits(x0 - ax * (b + 1), z0 - az * (b + 1), px, pz)) b++;
+      const runLen = b + f + 1;
+      if (runLen < 3) continue;
+      const fWall = get(x0 + ax * (f + 1), z0 + az * (f + 1)) === T.WALL;
+      const bWall = get(x0 - ax * (b + 1), z0 - az * (b + 1)) === T.WALL;
+      const L = Math.min(runLen, 3 + Math.floor(prnd() * 4));
+      let s = -b + Math.floor(prnd() * (runLen - L + 1)); // un paravent au milieu de la pièce
+      if (fWall && (!bWall || prnd() < 0.5)) s = f - L + 1; // ou accroché au mur d'en face
+      else if (bWall) s = -b;
+      const cells = [];
+      for (let i = 0; i < L; i++) cells.push([x0 + ax * (s + i), z0 + az * (s + i)]);
+      if (cells.some(([x, z]) => crowded(x, z))) continue;
+      let door = -1;
+      if (s === -b && bWall && s + L - 1 === f && fWall) {
+        if (L < 4) continue;
+        door = 1 + Math.floor(prnd() * (L - 2));
+      }
+      const put = cells.filter((_, i) => i !== door);
+      const before = deadEnds(cells);
+      for (const [x, z] of put) grid[z * W + x] = T.WALL;
+      let ok = deadEnds(cells) <= before;
+      if (ok) {
+        const d = bfs(grid, W, H, ref % W, (ref - (ref % W)) / W);
+        let n = 0;
+        for (let i = 0; i < W * H; i++) if (d[i] >= 0) n++;
+        ok = n === refSize - put.length;
+        if (ok) refSize = n;
+      }
+      if (!ok) {
+        for (const [x, z] of put) grid[z * W + x] = T.FLOOR;
+        continue;
+      }
+      for (const [x, z] of put) partCells.add(z * W + x);
+      placed++;
+    }
+  }
+
   // 5. Point de départ près du centre, sur une case libre reliée à la plus grande partie du dédale
   let floorCount = 0;
   for (let i = 0; i < W * H; i++) if (grid[i] === T.FLOOR) floorCount++;
@@ -400,6 +609,7 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   const pitGrid = new Int16Array(W * H).fill(-1);
   const pits = [];
   let trap = null;
+  let vaultCells = null; // les cases réécrites par le couloir piégé (pièce, couloir, murs autour)
 
   const maxD = D(far[0]) || 1;
   // 8. Les cassettes : le plus loin possible (en marche) du départ, de la sortie et les unes des autres
@@ -502,6 +712,7 @@ export function createBackroomsMap(seed = 42, opts = {}) {
       pits.push({ id: pits.length, gx: x, gz: z, x: (x + 0.5) * CELL_SIZE, z: (z + 0.5) * CELL_SIZE });
     }
     cas.vault = true;
+    vaultCells = new Set(writes.keys());
     // devant l'entrée du couloir piégé, tourné vers les trous (pour ?parkour)
     trap = { x: ((exits[0][0] + exits[1][0]) / 2 + 0.5 + lx * 0.2) * CELL_SIZE, z: ((exits[0][1] + exits[1][1]) / 2 + 0.5 + lz * 0.2) * CELL_SIZE, yaw: Math.atan2(lx, lz) };
     return true;
@@ -520,7 +731,7 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   walkable.length = 0;
   for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) if (grid[z * W + x] === T.FLOOR && pitGrid[z * W + x] < 0) walkable.push({ x, z });
 
-  // 8b. Une cassette dans un renfoncement en hauteur, au-dessus d'une case contre un mur
+  // 8b. Une cassette au fond d'un trou carré creusé haut dans un mur plein, au-dessus d'une case contre ce mur
   const wallSide = (c) => [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => get(c.x + dx, c.z + dz) === T.WALL);
   let niche = null;
   for (const cas of lower ? [] : shuffle(cassettes.filter((c) => !c.vault), rnd)) {
@@ -534,12 +745,95 @@ export function createBackroomsMap(seed = 42, opts = {}) {
       sides = wallSide(cell);
     }
     const [dx, dz] = pick(sides);
-    const off = CELL_SIZE / 2 - 0.2; // la cassette dépasse un peu du mur
+    const off = CELL_SIZE / 2 + NICHE_IN; // dans le trou, derrière la face du mur
     Object.assign(cas, cellPos(cell), { high: true });
     cas.x = (cell.x + 0.5) * CELL_SIZE + dx * off;
     cas.z = (cell.z + 0.5) * CELL_SIZE + dz * off;
     niche = { cas: cas.id, gx: cell.x, gz: cell.z, dx, dz, x: cas.x, z: cas.z, baseX: (cell.x + 0.5) * CELL_SIZE + dx * 0.55, baseZ: (cell.z + 0.5) * CELL_SIZE + dz * 0.55, ladder: false };
     break;
+  }
+
+  // 8c. Des cloisons fines : les pans posés en 4d, et par régions les pans droits et les bouts des murs d'une case
+  // d'épaisseur (les angles et les croisements restent épais : le dédale garde sa forme), deviennent des cloisons de
+  // plâtre de 12 cm, tirées sur l'axe de la case et prolongées jusqu'aux murs voisins. Les régions viennent d'un bruit
+  // lent tiré à part : le reste du tirage de la carte ne bouge pas. On garde épais les murs de l'ascenseur, du couloir piégé (sinon on
+  // longerait ses trous de l'autre côté d'une cloison) et du trou à cassette, les blocs de murs (2 × 2 et plus) et
+  // l'enceinte. Une cloison est un pilier à rectangles (voir outsidePillar) : les chemins de l'entité évitent sa case,
+  // mais on marche de part et d'autre (1,19 m de chaque côté).
+  let thinCount = 0;
+  {
+    const TZ = 9;
+    const hz = (i, j) => {
+      let v = (Math.imul(i + 1013, 73856093) ^ Math.imul(j + 7, 19349663) ^ Math.imul((seed >>> 0) + 40503, 83492791)) >>> 0;
+      v ^= v >>> 13;
+      v = Math.imul(v, 1274126177) >>> 0;
+      v ^= v >>> 16;
+      return (v >>> 0) / 4294967296;
+    };
+    const region = (x, z) => {
+      const fx = x / TZ;
+      const fz = z / TZ;
+      const ix = Math.floor(fx);
+      const iz = Math.floor(fz);
+      let tx = fx - ix;
+      let tz = fz - iz;
+      tx = tx * tx * (3 - 2 * tx);
+      tz = tz * tz * (3 - 2 * tz);
+      return (hz(ix, iz) * (1 - tx) + hz(ix + 1, iz) * tx) * (1 - tz) + (hz(ix, iz + 1) * (1 - tx) + hz(ix + 1, iz + 1) * tx) * tz;
+    };
+    const keep = new Set(vaultCells || []);
+    const guard = (gx, gz) => {
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) keep.add((gz + dz) * W + gx + dx);
+    };
+    if (elevator) guard(elevator.gx, elevator.gz);
+    if (niche) guard(niche.gx + niche.dx, niche.gz + niche.dz);
+    // les culs-de-sac restent fermés de vrais murs : on s'y réfugie (les recoins calmes, avec leur fauteuil)
+    const open = new Set(walkable.map((c) => c.z * W + c.x));
+    for (const c of walkable) {
+      const nb = DIRS.filter(([dx, dz]) => open.has((c.z + dz) * W + c.x + dx));
+      if (nb.length === 1) for (const [dx, dz] of DIRS) keep.add((c.z + dz) * W + c.x + dx);
+    }
+    const solid = (x, z) => {
+      const v = get(x, z);
+      return v === T.WALL || v === T.EXIT;
+    };
+    // tout se décide sur la carte d'avant (une cloison ne change pas le sort de ses voisines)
+    const list = [];
+    for (let z = 1; z < H - 1; z++) {
+      for (let x = 1; x < W - 1; x++) {
+        const k = z * W + x;
+        if (grid[k] !== T.WALL || keep.has(k)) continue;
+        const w = solid(x - 1, z);
+        const e = solid(x + 1, z);
+        const n = solid(x, z - 1);
+        const so = solid(x, z + 1);
+        if (!(w || e || n || so)) continue;
+        if ((w && n && solid(x - 1, z - 1)) || (e && n && solid(x + 1, z - 1)) || (w && so && solid(x - 1, z + 1)) || (e && so && solid(x + 1, z + 1))) continue;
+        // ailleurs que dans les pans de 4d : seulement les pans droits et les bouts de mur, dans les régions tirées
+        const straight = (w && e && !n && !so) || (n && so && !w && !e);
+        const tip = w + e + n + so === 1;
+        if (!partCells.has(k) && ((!straight && !tip) || region(x, z) > THIN_SHARE)) continue;
+        list.push({ k, x, z, w, e, n, s: so });
+      }
+    }
+    const th = THIN_HALF;
+    const hc = CELL_SIZE / 2;
+    for (const t of list) {
+      const cx = (t.x + 0.5) * CELL_SIZE;
+      const cz = (t.z + 0.5) * CELL_SIZE;
+      // une cloison le long de x (et ses retours vers le nord et le sud), ou le long de z seulement
+      const rects = [];
+      if (t.w || t.e) {
+        rects.push([t.w ? cx - hc : cx - th, cz - th, t.e ? cx + hc : cx + th, cz + th]);
+        if (t.n) rects.push([cx - th, cz - hc, cx + th, cz - th]);
+        if (t.s) rects.push([cx - th, cz + th, cx + th, cz + hc]);
+      } else {
+        rects.push([cx - th, t.n ? cz - hc : cz - th, cx + th, t.s ? cz + hc : cz + th]);
+      }
+      grid[t.k] = T.PILLAR;
+      pillars[t.k] = { x: cx, z: cz, h: hc, rects, thin: true };
+    }
+    thinCount = list.length;
   }
 
   // 9. Éclairage : un néon par case paire. Un bruit à basse fréquence découpe des zones où les néons sont morts
@@ -644,7 +938,7 @@ export function createBackroomsMap(seed = 42, opts = {}) {
     const dir = rnd() < 0.5 ? -1 : 1;
     const nx = c.x + (alongZ ? 0 : dir);
     const nz = c.z + (alongZ ? dir : 0);
-    if (rnd() < 0.8 && !busy.has(nz * W + nx) && get(nx, nz) !== T.WALL) {
+    if (rnd() < 0.8 && !busy.has(nz * W + nx) && get(nx, nz) === T.FLOOR) {
       busy.add(nz * W + nx);
       const s = rnd() < 0.5 ? -1 : 1;
       const px = (nx + 0.5) * CELL_SIZE + side[0] * s * (h - 0.45);
@@ -729,6 +1023,16 @@ export function createBackroomsMap(seed = 42, opts = {}) {
     },
     monsterSpawn: cellPos(monsterCell),
     pillars,
+    thinCount,
+    // la lumière des néons s'arrête aux cloisons fines (la cuisson de la scène arrête déjà les murs pleins)
+    lightBlocked: thinCount
+      ? (ax, az, bx, bz) =>
+          cellsOnSeg(ax, az, bx, bz, (gx, gz) => {
+            if (gx < 0 || gz < 0 || gx >= W || gz >= H || grid[gz * W + gx] !== T.PILLAR) return false;
+            const p = pillars[gz * W + gx];
+            return !!(p && p.rects && segHitsPillar(p, ax, az, bx, bz));
+          })
+      : null,
     isWall(gx, gz) {
       if (gx < 0 || gx >= W || gz < 0 || gz >= H) return true;
       return blocks(grid[gz * W + gx]);

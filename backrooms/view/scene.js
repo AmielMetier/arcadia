@@ -6,7 +6,7 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { classicEntity } from './entity.js';
 import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
-import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, FLOOR_DY } from '../engine/map.js';
+import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, NICHE_LO, NICHE_SIZE, NICHE_DEPTH, FLOOR_DY, pillarDist } from '../engine/map.js';
 import { FUSES, feetY, stairAt, PIPES_LEVEL } from '../engine/sim.js';
 import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
@@ -223,6 +223,12 @@ export function createBackroomsScene(container, floors, lamps) {
     // la cage d'escalier est fermée de murs : la lumière des néons n'y entre pas, elle éclaire ses murs du dehors
     const stairSet = new Set((map.stairs || []).flatMap((st) => st.cells.map((k) => k.gz * W + k.gx)));
     const isWall = (x, z) => x < 0 || z < 0 || x >= W || z >= H || map.grid[z * W + x] === T.WALL || stairSet.has(z * W + x);
+    // Level 0 : les cloisons fines (12 cm de plâtre sur l'axe de la case, voir la carte)
+    const thinAt = (x, z) => {
+      const p = map.pillarAt && map.pillarAt(x, z);
+      return p && p.rects ? p : null;
+    };
+    const EDGE = !!map.thinCount;
     const shaftViews = []; // les appliques des cages d'escalier (étage du bas), éteintes pendant les coupures
     // Level 2 : deux lumières de couleurs différentes, les ampoules chaudes des galeries (rouge) et les tubes froids
     // des réserves (bleu)
@@ -237,6 +243,7 @@ export function createBackroomsScene(container, floors, lamps) {
     const bakeUniforms = {
       uBake: { value: bakeTex },
       uBakeScale: { value: new THREE.Vector2(1 / (W * CELL_SIZE), 1 / (H * CELL_SIZE)) },
+      uBakeTX: { value: TX },
       uBakeTint: { value: L2 ? new THREE.Color(1.0, 1.05, 1.07) : L1 ? new THREE.Color(0.86, 0.98, 1.12) : PIPES ? new THREE.Color(1.25, 0.98, 0.7) : new THREE.Color(1.12, 1.04, 0.8) },
       uBakeTint2: { value: PIPES ? new THREE.Color(0.78, 0.95, 1.08) : new THREE.Color(0, 0, 0) },
       uBakeY: { value: -fi * FLOOR_DY },
@@ -336,9 +343,70 @@ export function createBackroomsScene(container, floors, lamps) {
               d = Math.min(d, Math.hypot(ex, ez));
             }
           }
+          // et au pied des cloisons fines
+          if (EDGE) {
+            for (let dz = -1; dz <= 1; dz++) {
+              for (let dx = -1; dx <= 1; dx++) {
+                const p = thinAt(gx + dx, gz + dz);
+                if (p) d = Math.min(d, pillarDist(p, px, pz));
+              }
+            }
+          }
         }
         const t = d / AO_R;
         bakeData[(tz * BW + tx) * 4 + 1] = Math.round((0.42 + 0.58 * t * t * (3 - 2 * t)) * 255);
+      }
+    }
+    // Les cloisons fines tombent sur des bords de texels (l'axe d'une case). Chaque texel note dans l'alpha les bords
+    // que barre une cloison (1 : -x, 2 : +x, 4 : -z, 8 : +z) et, en seizièmes, sa proximité d'une cloison (3 : contre,
+    // 2 et 1 : à un et deux texels) : le shader ne mélange pas la lumière à travers (elle passait dessous sur 30 cm) et
+    // ne flou plus le plafond par-dessus
+    if (EDGE) {
+      const flags = new Uint8Array(BW * BH);
+      const mark = (tx, tz, bit) => {
+        if (tx >= 0 && tz >= 0 && tx < BW && tz < BH) flags[tz * BW + tx] |= bit;
+      };
+      const edgeOf = (v) => Math.abs(v / CELL_SIZE - Math.round(v / CELL_SIZE)) < 1e-6; // sur une limite de cases
+      for (let gz = 0; gz < H; gz++) {
+        for (let gx = 0; gx < W; gx++) {
+          const p = thinAt(gx, gz);
+          if (!p) continue;
+          for (const r of p.rects) {
+            const alongX = r[2] - r[0] >= r[3] - r[1];
+            // a0, a1 : l'étendue le long de la cloison ; line : sa ligne (un bord de texels)
+            const a0 = alongX ? r[0] : r[1];
+            const a1 = alongX ? r[2] : r[3];
+            const line = Math.round((alongX ? r[1] + r[3] : r[0] + r[2]) / 2 / TX);
+            // un bout contre une autre case : le texel d'au-delà aussi (la face du mur voisin, à la jonction)
+            const t0 = Math.floor(a0 / TX) - (edgeOf(a0) ? 1 : 0);
+            const t1 = Math.ceil(a1 / TX) + (edgeOf(a1) ? 1 : 0);
+            for (let t = t0; t < t1; t++) {
+              const cover = Math.min(a1, (t + 1) * TX) - Math.max(a0, t * TX);
+              if (cover < TX * 0.5 && !((edgeOf(a0) && t === t0) || (edgeOf(a1) && t === t1 - 1))) continue;
+              if (alongX) {
+                mark(t, line - 1, 8);
+                mark(t, line, 4);
+              } else {
+                mark(line - 1, t, 2);
+                mark(line, t, 1);
+              }
+            }
+          }
+        }
+      }
+      for (let tz = 0; tz < BH; tz++) {
+        for (let tx = 0; tx < BW; tx++) {
+          let near = 0;
+          for (let dz = -2; dz <= 2 && near < 3; dz++) {
+            for (let dx = -2; dx <= 2; dx++) {
+              const x = tx + dx;
+              const z = tz + dz;
+              if (x < 0 || z < 0 || x >= BW || z >= BH || !(flags[z * BW + x] & 15)) continue;
+              near = Math.max(near, 3 - Math.max(Math.abs(dx), Math.abs(dz)));
+            }
+          }
+          bakeData[(tz * BW + tx) * 4 + 3] = ((flags[tz * BW + tx] & 15) + near * 16) * 4;
+        }
       }
     }
     // power : 1 néons allumés, 0 coupure de courant (seule reste une lueur à peine visible)
@@ -376,7 +444,7 @@ export function createBackroomsScene(container, floors, lamps) {
       const specU = spec ? { uSpecK: { value: opts.spec }, uGloss: { value: opts.gloss || 40 }, uSpecMask: { value: opts.mask ?? (mat.bumpMap ? 1 : 0) } } : null;
       const tileU = tile ? { uTileRow: { value: opts.tile } } : null;
       const base = opts && opts.base; // une plinthe au pied du mur
-      if (spec || PIPES || base) mat.customProgramCacheKey = () => 'bk' + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '');
+      if (spec || PIPES || base || EDGE) mat.customProgramCacheKey = () => 'bk' + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE ? '-edge' : '');
       mat.onBeforeCompile = (sh) => {
         Object.assign(sh.uniforms, bakeUniforms);
         if (spec) {
@@ -390,6 +458,7 @@ export function createBackroomsScene(container, floors, lamps) {
         }
         if (PIPES) sh.defines = { ...(sh.defines || {}), BK_PIPES: 1 };
         if (base) sh.defines = { ...(sh.defines || {}), BK_BASE: 1 };
+        if (EDGE) sh.defines = { ...(sh.defines || {}), BK_EDGE: 1 };
         sh.vertexShader = 'varying vec3 vBakeP;\nvarying vec3 vBakeN;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
           vec4 bakeWP = vec4(transformed, 1.0);
           vec3 bakeN = objectNormal;
@@ -401,6 +470,7 @@ export function createBackroomsScene(container, floors, lamps) {
           vBakeN = normalize(mat3(modelMatrix) * bakeN);`);
         sh.fragmentShader = `uniform sampler2D uBake;
 uniform vec2 uBakeScale;
+uniform float uBakeTX;
 uniform vec3 uBakeTint;
 uniform vec3 uBakeTint2;
 #ifdef BK_SPEC
@@ -451,6 +521,25 @@ float bkCaust(vec2 uv, float t) {
           // les néons sont au plafond : un mur s'assombrit vers le bas, et plus encore au ras du sol et sous le plafond ;
           // le sol et le plafond s'assombrissent au pied des murs
           vec2 bkUv = vBakeP.xz * uBakeScale;
+          float bkNear = 0.0; // près d'une cloison fine : 1 contre elle, 0 à trois texels et plus
+          #ifdef BK_EDGE
+          {
+            // une cloison fine sur un bord du texel : on ne lit pas la lumière de l'autre côté
+            vec2 bkT = vBakeP.xz / uBakeTX;
+            vec2 bkI = floor(bkT);
+            vec2 bkF = bkT - bkI;
+            float bkA = floor(texture2D(uBake, (bkI + 0.5) * uBakeTX * uBakeScale).a * 63.75 + 0.5);
+            float bkE = mod(bkA, 16.0);
+            bkNear = floor(bkA / 16.0) / 3.0;
+            if (bkE > 0.5) {
+              if (mod(bkE, 2.0) > 0.5) bkF.x = max(bkF.x, 0.5);
+              if (mod(floor(bkE * 0.5), 2.0) > 0.5) bkF.x = min(bkF.x, 0.5);
+              if (mod(floor(bkE * 0.25), 2.0) > 0.5) bkF.y = max(bkF.y, 0.5);
+              if (bkE > 7.5) bkF.y = min(bkF.y, 0.5);
+              bkUv = (bkI + bkF) * uBakeTX * uBakeScale;
+            }
+          }
+          #endif
           vec4 bk = texture2D(uBake, bkUv);
           float by = vBakeP.y - uBakeY;
           float ny = vBakeN.y;
@@ -465,7 +554,7 @@ float bkCaust(vec2 uv, float t) {
             bkAcc += texture2D(uBake, bkUv + o1 * 0.7).rb + texture2D(uBake, bkUv - o1 * 0.7).rb;
             bkAcc += texture2D(uBake, bkUv + vec2(o1.x, -o1.y) * 0.7).rb + texture2D(uBake, bkUv + vec2(-o1.x, o1.y) * 0.7).rb;
             bkAcc += (texture2D(uBake, bkUv + vec2(o2.x, 0.0)).rb + texture2D(uBake, bkUv - vec2(o2.x, 0.0)).rb + texture2D(uBake, bkUv + vec2(0.0, o2.y)).rb + texture2D(uBake, bkUv - vec2(0.0, o2.y)).rb) * 0.5;
-            bk.rb = bkAcc / 13.0;
+            bk.rb = mix(bkAcc / 13.0, bk.rb, bkNear); // pas de flou à travers une cloison fine
           }
           float side = mix(uSideLo, 1.12, smoothstep(0.0, uCeil, by)) * mix(uSideLo * 0.85, 1.0, smoothstep(0.0, 0.4, by)) * mix(0.72, 1.0, smoothstep(0.0, 0.3, uCeil - by));
           float flat2 = ny > 0.0 ? bk.g : mix(0.7, 1.0, bk.g) * 0.85;
@@ -688,10 +777,12 @@ float bkCaust(vec2 uv, float t) {
     } else {
       wallMat = baked(new THREE.MeshLambertMaterial({ map: textures.wall }), L0 ? { base: true } : null);
       const wallsMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(CELL_SIZE, CEIL + SUNK, CELL_SIZE), wallMat, wallCount);
+      // le mur percé du trou de la cassette perchée se construit à part (6b)
+      const nicheWall = map.niche ? (map.niche.gz + map.niche.dz) * W + map.niche.gx + map.niche.dx : -1;
       let idx = 0;
       for (let z = 0; z < H; z++) {
         for (let x = 0; x < W; x++) {
-          if (map.grid[z * W + x] !== T.WALL) continue;
+          if (map.grid[z * W + x] !== T.WALL || z * W + x === nicheWall) continue;
           if (map.arrival && map.arrival.gx === x && map.arrival.gz === z) continue; // la gaine de l'ascenseur d'arrivée
           dummy.position.set((x + 0.5) * CELL_SIZE, (CEIL - SUNK) / 2, (z + 0.5) * CELL_SIZE);
           dummy.updateMatrix();
@@ -709,7 +800,7 @@ float bkCaust(vec2 uv, float t) {
       for (let z = 0; z < H; z++) {
         for (let x = 0; x < W; x++) {
           const p = map.pillarAt(x, z);
-          if (!p) continue;
+          if (!p || p.rects) continue; // les cloisons fines : plus bas (3c)
           const key = (p.round ? 'r' : 's') + p.h + (p.hall ? 'h' : '');
           if (!kinds.has(key)) kinds.set(key, { p, list: [] });
           kinds.get(key).list.push(p);
@@ -730,6 +821,63 @@ float bkCaust(vec2 uv, float t) {
         inst.instanceMatrix.needsUpdate = true;
         group.add(inst);
       }
+    }
+
+    // 3c. Les cloisons fines (Level 0) : un seul maillage, le papier peint calé sur le monde (u le long du mur, une
+    // répétition par case comme sur les murs pleins) ; pas de bout de cloison collé à un mur voisin ni de face à la
+    // jonction d'un retour (cachés, ils scintilleraient)
+    if (EDGE) {
+      const pos = [];
+      const nor = [];
+      const uvs = [];
+      const idx = [];
+      const C = CELL_SIZE;
+      const solidAt = (x, z) => x < 0 || z < 0 || x >= W || z >= H || map.grid[z * W + x] === T.WALL || map.grid[z * W + x] === T.EXIT || !!thinAt(x, z);
+      // une face verticale du sol au plafond, de a à b (b à droite vu de devant), de normale (nx, nz)
+      const quad = (ax, az, bx, bz, nx, nz) => {
+        const uOf = (x, z) => (nz > 0.5 ? x : nz < -0.5 ? -x : nx > 0.5 ? -z : z) / C;
+        const i = pos.length / 3;
+        pos.push(ax, 0, az, bx, 0, bz, bx, CEIL, bz, ax, CEIL, az);
+        for (let k = 0; k < 4; k++) nor.push(nx, 0, nz);
+        const ua = uOf(ax, az);
+        const ub = uOf(bx, bz);
+        uvs.push(ua, 0, ub, 0, ub, 1, ua, 1);
+        idx.push(i, i + 1, i + 2, i, i + 2, i + 3);
+      };
+      for (let gz = 0; gz < H; gz++) {
+        for (let gx = 0; gx < W; gx++) {
+          const p = thinAt(gx, gz);
+          if (!p) continue;
+          p.rects.forEach(([x0, z0, x1, z1], ri) => {
+            const alongX = x1 - x0 >= z1 - z0;
+            // un bout : sur la limite de la case, caché si la case voisine est un mur ; au milieu, caché s'il s'agit de
+            // la jonction d'un retour (ri > 0) avec la cloison principale
+            const showEnd = (v, lo) => {
+              const edge = Math.abs(v / C - Math.round(v / C)) < 1e-6;
+              if (!edge) return ri === 0;
+              return alongX ? !solidAt(gx + (lo ? -1 : 1), gz) : !solidAt(gx, gz + (lo ? -1 : 1));
+            };
+            if (alongX) {
+              quad(x0, z1, x1, z1, 0, 1);
+              quad(x1, z0, x0, z0, 0, -1);
+              if (showEnd(x0, true)) quad(x0, z0, x0, z1, -1, 0);
+              if (showEnd(x1, false)) quad(x1, z1, x1, z0, 1, 0);
+            } else {
+              quad(x1, z1, x1, z0, 1, 0);
+              quad(x0, z0, x0, z1, -1, 0);
+              if (showEnd(z0, true)) quad(x1, z0, x0, z0, 0, -1);
+              if (showEnd(z1, false)) quad(x0, z1, x1, z1, 0, 1);
+            }
+          });
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geo.setIndex(idx);
+      geo.computeBoundingSphere();
+      group.add(new THREE.Mesh(geo, wallMat));
     }
 
     // 4. Néons au plafond (les morts sont gris, ceux qui grésillent clignotent)
@@ -907,7 +1055,7 @@ float bkCaust(vec2 uv, float t) {
     for (let z = 0; z < H; z++) {
       for (let x = 0; x < W; x++) {
         const i = z * W + x;
-        if (map.grid[i] === T.WALL || pitCells.has(i) || stairCells.has(i)) continue;
+        if (map.grid[i] === T.WALL || pitCells.has(i) || stairCells.has(i) || thinAt(x, z)) continue;
         for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
           const nx = x + dx;
           const nz = z + dz;
@@ -1130,7 +1278,8 @@ float bkCaust(vec2 uv, float t) {
 
     // 6. Les cassettes VHS de cet étage
     const cassetteGeo = new THREE.BoxGeometry(0.38, 0.22, 0.06);
-    const cassetteMat = new THREE.MeshLambertMaterial({ map: textures.vhs, emissive: '#d97706', emissiveIntensity: 0.16 });
+    // sa lueur porte la jaquette (pas une teinte unie) : dans le noir, on voit encore l'étiquette et les bobines
+    const cassetteMat = new THREE.MeshLambertMaterial({ map: textures.vhs, emissive: '#ffe2b8', emissiveMap: textures.vhs, emissiveIntensity: 0.42 });
     const cassetteMeshes = [];
     for (const cas of map.cassettes || []) {
       const cg = new THREE.Group();
@@ -1168,7 +1317,7 @@ float bkCaust(vec2 uv, float t) {
       }
     }
 
-    // 6b. Le renfoncement dans le mur, la cassette posée dedans, et l'échelle une fois posée
+    // 6b. Le trou carré dans le mur, la cassette posée dedans, et l'échelle une fois posée
     const N = map.niche;
     let placedLadder = null;
     const railMat = baked(new THREE.MeshLambertMaterial({ color: '#8a8f94' }));
@@ -1186,22 +1335,75 @@ float bkCaust(vec2 uv, float t) {
       }
       return g;
     };
+    // la case de mur du trou : ses quatre faces au papier peint (celle de la pièce percée d'un trou carré, son papier
+    // peint calé comme sur les murs voisins), et l'intérieur du trou, sombre, que seule la lueur de la cassette éclaire
+    const nicheWallMesh = (N) => {
+      const C = CELL_SIZE;
+      const cx = (N.gx + N.dx + 0.5) * C;
+      const cz = (N.gz + N.dz + 0.5) * C;
+      const out = { p: [], n: [], u: [] };
+      const inn = { p: [], n: [], u: [] };
+      // un quadrilatère o, o + e1, o + e1 + e2, o + e2 (vu de face : e1 vers la droite, e2 vers le haut)
+      const quad = (t, o, e1, e2, uv) => {
+        const nx = e1[1] * e2[2] - e1[2] * e2[1];
+        const ny = e1[2] * e2[0] - e1[0] * e2[2];
+        const nz = e1[0] * e2[1] - e1[1] * e2[0];
+        const l = Math.hypot(nx, ny, nz) || 1;
+        const v = [o, [o[0] + e1[0], o[1] + e1[1], o[2] + e1[2]], [o[0] + e1[0] + e2[0], o[1] + e1[1] + e2[1], o[2] + e1[2] + e2[2]], [o[0] + e2[0], o[1] + e2[1], o[2] + e2[2]]];
+        for (const k of [0, 1, 2, 0, 2, 3]) {
+          t.p.push(...v[k]);
+          t.n.push(nx / l, ny / l, nz / l);
+          t.u.push(...uv[k]);
+        }
+      };
+      const A0 = C / 2 - NICHE_SIZE / 2;
+      const A1 = C / 2 + NICHE_SIZE / 2;
+      const B0 = NICHE_LO;
+      const B1 = NICHE_LO + NICHE_SIZE;
+      const D = NICHE_DEPTH;
+      for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        // la face qui regarde vers (sx, sz) ; r : sa droite vue de dehors ; c0 : son coin en bas à gauche
+        const r = [sz, 0, -sx];
+        const c0 = [cx + sx * (C / 2) - r[0] * (C / 2), 0, cz + sz * (C / 2) - r[2] * (C / 2)];
+        const at = (a, b, d = 0) => [c0[0] + r[0] * a - sx * d, b, c0[2] + r[2] * a - sz * d];
+        const rect = (a0, a1, b0, b1) => quad(out, at(a0, b0), [r[0] * (a1 - a0), 0, r[2] * (a1 - a0)], [0, b1 - b0, 0], [[a0 / C, b0 / CEIL], [a1 / C, b0 / CEIL], [a1 / C, b1 / CEIL], [a0 / C, b1 / CEIL]]);
+        if (sx !== -N.dx || sz !== -N.dz) {
+          rect(0, C, 0, CEIL);
+          continue;
+        }
+        rect(0, C, 0, B0);
+        rect(0, C, B1, CEIL);
+        rect(0, A0, B0, B1);
+        rect(A1, C, B0, B1);
+        const S = NICHE_SIZE;
+        const uvS = (w, h) => [[0, 0], [w, 0], [w, h], [0, h]];
+        quad(inn, at(A0, B0), [r[0] * S, 0, r[2] * S], [-sx * D, 0, -sz * D], uvS(1, D / S)); // le fond du trou (dessous)
+        quad(inn, at(A0, B1, D), [r[0] * S, 0, r[2] * S], [sx * D, 0, sz * D], uvS(1, D / S)); // son plafond
+        quad(inn, at(A0, B0), [-sx * D, 0, -sz * D], [0, S, 0], uvS(D / S, 1)); // côté gauche
+        quad(inn, at(A1, B0, D), [sx * D, 0, sz * D], [0, S, 0], uvS(D / S, 1)); // côté droit
+        quad(inn, at(A0, B0, D), [r[0] * S, 0, r[2] * S], [0, S, 0], uvS(1, 1)); // le fond
+      }
+      const geoOf = (t) => {
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(t.p, 3));
+        g.setAttribute('normal', new THREE.Float32BufferAttribute(t.n, 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute(t.u, 2));
+        return g;
+      };
+      const g = new THREE.Group();
+      g.add(new THREE.Mesh(geoOf(out), wallMat));
+      // l'intérieur : du plâtre brut, poussiéreux (pas de lumière cuite : les néons n'y entrent pas)
+      g.add(new THREE.Mesh(geoOf(inn), new THREE.MeshLambertMaterial({ color: '#7a6f58' })));
+      return g;
+    };
     if (N) {
-      const wx = (N.gx + 0.5) * CELL_SIZE + N.dx * (CELL_SIZE / 2 - 0.012);
-      const wz = (N.gz + 0.5) * CELL_SIZE + N.dz * (CELL_SIZE / 2 - 0.012);
       const face = Math.atan2(-N.dx, -N.dz); // regarde la pièce
-      const hole = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.62), new THREE.MeshBasicMaterial({ color: '#0d0b07' }));
-      hole.position.set(wx, NICHE_Y + 0.12, wz);
-      hole.rotation.y = face;
-      const ledge = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.05, 0.28), wallMat);
-      ledge.position.set(wx - N.dx * 0.12, NICHE_Y - 0.2, wz - N.dz * 0.12);
-      ledge.rotation.y = face;
-      group.add(hole, ledge);
-      // l'échelle posée : appuyée au mur, sous le renfoncement
+      group.add(nicheWallMesh(N));
+      // l'échelle posée : appuyée au mur, le haut juste sous le trou
       placedLadder = makeLadder(2.3);
       placedLadder.position.set(N.baseX + N.dx * 0.25, 0, N.baseZ + N.dz * 0.25);
       placedLadder.rotation.set(0, face, 0);
-      placedLadder.rotateX(-0.22);
+      placedLadder.rotateX(-0.195);
       placedLadder.visible = false;
       group.add(placedLadder);
     }
@@ -2410,7 +2612,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   let exposure = 1.2; // exposition du caméscope : elle rattrape la lumière en une seconde environ
   let lightNow = 0.5; // lumière des néons là où l'on est (pour le grésillement)
   let camT = 0; // caméscope sorti (0 à 1, la transition vers le 4:3)
-  let camZoomWant = 1.5; // zoom de l'objectif (molette), de 1,5 à 4
+  let camZoomWant = 1.5; // zoom de l'objectif (molette), de 1,5 à 12
   let camZoomNow = 1.5;
   let nightT = 0; // son mode nuit (0 à 1)
   let lampCutT = 0; // la lampe (et l'infrarouge du caméscope) coupée par sa présence : secondes restantes
@@ -2451,7 +2653,10 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       return lightNow;
     },
     onDrip: null, // une goutte tombe dans une flaque près du joueur ({ x, z }) : l'application la fait entendre
-    // le zoom de l'objectif du caméscope (molette), de 1,5 à 4
+    // un pied de l'entité touche le sol ('L' ou 'R'), au moment de l'animation : l'application fait entendre le pas
+    onMonsterStep: null,
+    hasBeast: !!beast, // l'entité est animée en 3D (sinon, pas d'animation pour caler ses pas)
+    // le zoom de l'objectif du caméscope (molette), de 1,5 à 12
     setCamZoom(z) {
       camZoomWant = z;
     },
@@ -2716,7 +2921,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
           monsterGroup.position.set(M.x + (Math.random() - 0.5) * j * 0.3, my, M.z + (Math.random() - 0.5) * j * 0.3);
           monsterGroup.rotation.y = M.yaw || 0;
           const mv = floorViews[M.floor || 0];
-          beast.update(M, chase, mv ? mv.lightAt(M.x, M.z) : 0.3, dt, time, RF ? null : camera.position);
+          const foot = beast.update(M, chase, mv ? mv.lightAt(M.x, M.z) : 0.3, dt, time, RF ? null : camera.position);
+          if (foot && api.onMonsterStep) api.onMonsterStep(foot);
         } else {
           monsterGroup.position.set(M.x + (Math.random() - 0.5) * j, my + (chase ? Math.abs(Math.sin(time * 9)) * 0.08 : Math.sin(time * 2) * 0.03), M.z + (Math.random() - 0.5) * j);
           monsterGroup.rotation.y = Math.atan2(P.x - M.x, P.z - M.z);
@@ -2849,8 +3055,6 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         white,
         cam: camT,
         night: nightT,
-        // la brume de chaleur du Level 0 (coupée en mode nuit : le vert l'écraserait ; et en qualité basse)
-        haze: L0 && OPTS.quality !== 'low' ? 1 - nightT * camT : 0,
       });
 
       // résolution dynamique : moins de lignes quand l'image peine, plus quand elle est à l'aise

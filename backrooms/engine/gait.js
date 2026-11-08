@@ -4,7 +4,7 @@
 // descend vraiment les marches, et peut sauter dans un trou pour suivre quelqu'un à l'étage du dessous.
 // Ses chemins se cherchent sur une grille fine (50 cm) où chaque obstacle est grossi de la largeur de son corps, puis
 // se tendent en lignes droites aussi longues que son corps peut les suivre sans rien frôler.
-import { CELL_SIZE, FLOOR_DY, PIT_HALF } from './map.js';
+import { CELL_SIZE, FLOOR_DY, PIT_HALF, pillarDist } from './map.js';
 import { LOCKER_R } from './hides.js';
 
 const C = CELL_SIZE;
@@ -92,8 +92,7 @@ function build(sim, floor) {
           const ez = Math.max(gz * C - z, 0, z - (gz + 1) * C);
           d = Math.hypot(ex, ez);
         } else if (s === 2) {
-          const p = m.pillarAt(gx, gz);
-          d = p.round ? Math.hypot(x - p.x, z - p.z) - p.h : Math.hypot(Math.max(0, Math.abs(x - p.x) - p.h), Math.max(0, Math.abs(z - p.z) - p.h));
+          d = pillarDist(m.pillarAt(gx, gz), x, z); // pilier carré ou rond, cloison fine
         } else {
           const p = m.pits[m.pitAt(gx, gz)];
           d = Math.hypot(Math.max(0, Math.abs(x - p.x) - PIT_HALF), Math.max(0, Math.abs(z - p.z) - PIT_HALF));
@@ -796,26 +795,4 @@ export function feetOf(sim, M) {
   const s = sim.stairs && sim.stairs.length ? cageAt(sim.stairs, M.x, M.z) : null;
   if (s) return -FLOOR_DY + s.h * FLOOR_DY;
   return -(M.floor || 0) * FLOOR_DY - (M.dropY || 0);
-}
-
-// Pour arpenter (au bord de la lumière, devant une proie hors d'atteinte) : un point libre à 1,5-3 m d'elle, de
-// côté par rapport à (lx, lz), alternativement d'un côté puis de l'autre ; ok(x, z) peut écarter des endroits
-export function paceSpot(sim, M, lx, lz, side, ok = null) {
-  const N = navOf(sim, M.floor || 0);
-  const ax = lx - M.x;
-  const az = lz - M.z;
-  const d = Math.hypot(ax, az) || 1;
-  const px = (-az / d) * side;
-  const pz = (ax / d) * side;
-  for (const r of [2.6, 2, 1.5, 3.2]) {
-    for (const k of [0, 0.35, -0.35]) {
-      const x = M.x + px * r - (ax / d) * r * k;
-      const z = M.z + pz * r - (az / d) * r * k;
-      if (N.clear(x, z, BODY_R + 0.1) < BODY_R + 0.1) continue;
-      if (!clearLine(N, M.x, M.z, x, z)) continue;
-      if (ok && !ok(x, z)) continue;
-      return { x, z };
-    }
-  }
-  return null;
 }

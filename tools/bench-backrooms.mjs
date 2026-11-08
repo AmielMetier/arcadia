@@ -13,6 +13,8 @@
 //                    quand elle titube en arrière, repoussée par un joueur qui s'est dégagé)
 //   pietine       : elle devrait marcher mais n'avance plus depuis une seconde
 //   plantee        : en chasse, à moins de 9 m de sa proie qui la voit, elle ne bouge plus depuis une seconde
+//   plantee_vue    : hors poursuite, immobile (ni pas, ni demi-tour) dans le champ d'un joueur à moins de 22 m, plus de
+//                    1,5 s : elle doit charger ou se glisser hors de vue, jamais rester plantée à le fixer
 //   hesite         : trois demi-tours de marche en moins d'une seconde
 //   a_coup         : un pas manqué (immobile une image entre deux pas)
 //   etage_faux     : son étage ne correspond pas à là où elle est dans l'escalier
@@ -393,7 +395,7 @@ function whoSees(sim, M) {
   return '';
 }
 
-const KINDS = ['teleport_vue', 'survitesse', 'dans_mur', 'sur_trou', 'demi_tour_vu', 'reculons', 'pietine', 'plantee', 'hesite', 'a_coup', 'etage_faux'];
+const KINDS = ['teleport_vue', 'survitesse', 'dans_mur', 'sur_trou', 'demi_tour_vu', 'reculons', 'pietine', 'plantee', 'plantee_vue', 'hesite', 'a_coup', 'etage_faux'];
 const found = Object.fromEntries(KINDS.map((k) => [k, []]));
 const info = { teleport_noir: [] };
 const stats = { ticks: 0, seen: 0, chases: 0, grabs: 0, deaths: 0, warps: 0, warpsSeen: 0, tapes: 0, runs: 0, floorMoves: 0, modes: {} };
@@ -531,6 +533,10 @@ function runGame(seed, budget) {
       ep.planted++;
       if (ep.planted === 60) note('plantee', sim, M, `proie à ${dP.toFixed(1)} m`);
     } else ep.planted = 0;
+    // plantée sous les yeux de quelqu'un, hors poursuite (immobile : ni pas, ni demi-tour)
+    const viewer = !tele && !M.trav && !['chase', 'grab', 'stun'].includes(M.mode) && d < 0.4 * DT && dyaw < 0.6 * DT ? sim.players.find((Q) => seesMonster(sim, Q, M) && Math.hypot(Q.x - M.x, Q.z - M.z) < 22) : null;
+    ep.plantV = viewer ? (ep.plantV || 0) + DT : 0;
+    if (viewer && Math.abs(ep.plantV - 1.5) < DT / 2) note('plantee_vue', sim, M, `vue par ${viewer.name || viewer.id} à ${Math.hypot(viewer.x - M.x, viewer.z - M.z).toFixed(1)} m${M.glimpse ? ' (première rencontre)' : ''}${M.lurk ? ' (postée)' : ''}`);
     // hésitations : demi-tours de marche rapprochés
     if (!tele && d > 0.005) {
       const dir = [dx / d, dz / d];
