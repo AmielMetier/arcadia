@@ -8,7 +8,7 @@ import { classicEntity } from './entity.js';
 import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
 import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
 import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, NICHE_LO, NICHE_SIZE, NICHE_DEPTH, FLOOR_DY, DEEP_DEPTH, pillarDist } from '../engine/map.js';
-import { FUSES, feetY, stairAt, PIPES_LEVEL, THIRST_BLUR } from '../engine/sim.js';
+import { FUSES, feetY, stairAt, PIPES_LEVEL, THIRST_BLUR, LIFT_SHUT_T } from '../engine/sim.js';
 import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
 import { createInset } from './inset.js';
@@ -2534,8 +2534,10 @@ float bkCaust(vec2 uv, float t) {
       cabPane(CW, 2.6, 0, 1.3, CZ + CD / 2, Math.PI, cabMat);
       cabPane(CD, 2.6, -CW / 2, 1.3, CZ, Math.PI / 2, cabMat);
       cabPane(CD, 2.6, CW / 2, 1.3, CZ, -Math.PI / 2, cabMat);
-      // le mur au-dessus de la baie, vu de la cabine
+      // le mur au-dessus de la baie, vu de la cabine, et ses deux pans de part et d'autre : les vantaux s'y rangent quand
+      // ils s'ouvrent (sans eux, une fois les portes refermées, on voyait le couloir à travers l'envers de la façade)
       cabPane(CW, 2.6 - DH, 0, DH + (2.6 - DH) / 2, ZD + 0.04, 0, cabMat);
+      for (const sx of [-1, 1]) cabPane(CW / 2 - DW / 2, DH, sx * (CW / 2 + DW / 2) / 2, DH / 2, ZD + 0.04, 0, cabMat);
       // le plancher de tôle larmée (photo Poly Haven), éclairé par le plafonnier
       const tread = textures.treadPlate.clone();
       tread.needsUpdate = true;
@@ -3083,7 +3085,7 @@ float bkCaust(vec2 uv, float t) {
         // (en un peu moins de deux secondes) et l'ascenseur part
         const closing = sim.liftT > 0 || sim.departT > 0;
         const doorWant = open && !closing ? 1 : 0;
-        doorOpen += Math.sign(doorWant - doorOpen) * Math.min(Math.abs(doorWant - doorOpen), dt / (doorWant ? 1.2 : 1.7));
+        doorOpen += Math.sign(doorWant - doorOpen) * Math.min(Math.abs(doorWant - doorOpen), dt / (doorWant ? 1.2 : LIFT_SHUT_T));
         for (const { d, sgn } of doors) d.position.x = sgn * (0.3 + doorOpen * 0.6);
         if (lift) lift.btnMat.color.setHex(closing ? 0xffb43a : 0xd8d4c4);
         if (arrivalLift) {

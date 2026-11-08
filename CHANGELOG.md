@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 4.84 — 8 novembre 2026
+- **The Backrooms** — L'ascenseur qui se referme en mur est toujours le plus proche de l'équipe : il faut courir jusqu'à l'autre.
+- **The Backrooms** — Les portes de l'ascenseur refermées ne laissent plus voir le couloir à travers la cabine, et on ne passe plus au travers : elles poussent dans la cabine ou dans le couloir celui qui reste sur le seuil.
+- **The Backrooms** — Mort ou à l'abri dans l'ascenseur, l'écran de spectateur ne fait plus planter l'affichage.
+
 ## 4.83 — 8 novembre 2026
 - **The Backrooms** — Les cassettes sont posées par terre, comme les piles et les bouteilles : on les ramasse avec F, sans coupure d'image.
 - **The Backrooms** — La fin du Level 0 se fait attendre : après la sixième cassette, quelques secondes de silence… puis l'alarme, les feux rouges, et l'entité vous traque sans relâche jusqu'à l'ascenseur.

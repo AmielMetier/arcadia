@@ -95,6 +95,7 @@ export const BURN_LOCK = 0.9; // brûlé par un jet de vapeur : repoussé, sonn�
 export const DEPART_T = 3; // secondes entre la fermeture des portes et l'arrivée
 export const BOARD_T = 45; // Poolrooms : dès qu'un joueur est dans un toboggan, les autres ont ce temps pour le suivre
 export const LIFT_CLOSE_T = 2; // le bouton pressé dans la cabine : les portes mettent ce temps à se fermer
+export const LIFT_SHUT_T = 1.7; // … dont celui que mettent les vantaux à se rejoindre (à l'écran comme ici)
 export const ARRIVE_T = 4.2; // à l'arrivée, la cabine finit de descendre (portes fermées) avant de s'ouvrir
 export const LIFT_BAY = 0.6; // demi-largeur de la baie des portes de l'ascenseur : on n'entre dans la cabine que par là
 export const LIFT_FACE = 0.19; // épaisseur de sa façade (cadre et portes)
@@ -456,7 +457,7 @@ export class BackroomsSim {
     this.delivered = 0; // Level 1 : fusibles rapportés au panneau
     this.valves = 0; // vannes fermées (Level 2)
     this.items0 = this.floors.map((f) => (f.items || []).length); // objets d'origine (les suivants ont été posés par des joueurs)
-    // un seul vrai ascenseur : on ne sait pas lequel tant que les cassettes ne sont pas toutes trouvées
+    // un seul vrai ascenseur : décidé quand tout se met en route, le plus loin de l'équipe (pickRealFloor)
     this.realFloor = this.floors.length > 1 ? (hashRnd(this.seed, level, 7) < 0.5 ? 0 : 1) : 0;
     this.unlocked = false;
     this.powered = false; // panneau du monte-charge réalimenté (aux Poolrooms : les 3 volants trouvés)
@@ -874,6 +875,50 @@ export class BackroomsSim {
     return list;
   }
 
+  // Le vrai ascenseur, au moment où tout se met en route : le plus loin de l'équipe. Celui qui est le plus près (en
+  // marchant, par l'escalier pour l'autre étage) se referme en mur sous son nez
+  pickRealFloor() {
+    if (this.floors.length < 2) return 0;
+    const alive = this.players.filter((P) => P.status === 'alive');
+    if (!alive.length) return this.realFloor;
+    // la distance en cases d'un champ à une case (si elle est pleine, par sa voisine la plus proche)
+    const at = (m, d, x, z) => {
+      const gx = cellOf(x);
+      const gz = cellOf(z);
+      let best = Infinity;
+      for (const [ox, oz, k] of [[0, 0, 0], [1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1]]) {
+        const nx = gx + ox;
+        const nz = gz + oz;
+        if (nx < 0 || nz < 0 || nx >= m.W || nz >= m.H) continue;
+        const v = d[nz * m.W + nx];
+        if (v >= 0) best = Math.min(best, v + k);
+      }
+      return best;
+    };
+    const fromExit = this.floors.map((m) => (m.exit ? bfs(m.grid, m.W, m.H, m.exit.gx, m.exit.gz) : null));
+    const STAIR = 6; // les deux volées de la cage, en cases
+    const far = this.floors.map(() => Infinity); // pour chaque ascenseur : le coéquipier le plus proche
+    for (const P of alive) {
+      const a = P.floor || 0;
+      const m = this.fm(a);
+      const mine = bfs(m.grid, m.W, m.H, cellOf(P.x), cellOf(P.z));
+      for (let b = 0; b < this.floors.length; b++) {
+        if (!fromExit[b]) continue;
+        let d = Infinity;
+        if (b === a) d = at(m, mine, m.exit.x, m.exit.z);
+        else
+          for (const st of this.stairs) {
+            const here = a === 0 ? st.up : st.down;
+            const there = b === 0 ? st.up : st.down;
+            d = Math.min(d, at(m, mine, here.x, here.z) + STAIR + at(this.floors[b], fromExit[b], there.x, there.z));
+          }
+        far[b] = Math.min(far[b], d);
+      }
+    }
+    if (!Number.isFinite(far[0]) && !Number.isFinite(far[1])) return this.realFloor;
+    return far[0] < far[1] ? 1 : 0;
+  }
+
   // Toutes les cassettes trouvées : le faux ascenseur se referme en mur (on ne le sait qu'en arrivant devant)
   unlockLevel0() {
     this.unlocked = true;
@@ -912,11 +957,38 @@ export class BackroomsSim {
       if (lz < -radius || lz > LIFT_FACE + radius) continue;
       const ax = Math.abs((x - fx) * E.dz - (z - fz) * E.dx);
       if (ax > CELL_SIZE / 2 + radius || this.blocked(E.gx, E.gz, floor)) continue;
-      const ex = ax < LIFT_BAY ? LIFT_BAY - ax : ax > CELL_SIZE / 2 ? ax - CELL_SIZE / 2 : 0;
+      const gap = this.liftGap(E, m); // portes refermées : la baie est un mur comme la façade
+      const ex = ax < gap ? gap - ax : ax > CELL_SIZE / 2 ? ax - CELL_SIZE / 2 : 0;
       const ez = lz < 0 ? -lz : lz > LIFT_FACE ? lz - LIFT_FACE : 0;
       if (ex * ex + ez * ez < radius * radius * 0.8) return true;
     }
     return false;
+  }
+
+  // demi-largeur encore ouverte entre les portes d'une cabine (LIFT_BAY grandes ouvertes, 0 fermées) : après le
+  // bouton, elles se rejoignent en LIFT_SHUT_T, comme à l'écran
+  liftGap(E, m) {
+    if (E === m.arrival) return this.arriveT > 0 ? 0 : LIFT_BAY;
+    if (this.departT > 0) return 0;
+    if (this.liftT > 0) return LIFT_BAY * Math.max(0, Math.min(1, (this.liftT - (LIFT_CLOSE_T - LIFT_SHUT_T)) / LIFT_SHUT_T));
+    return LIFT_BAY;
+  }
+
+  // les portes qui se referment poussent celui qui se tient dans la baie : dans la cabine s'il y était entré, dehors
+  // sinon. Personne ne reste entre les vantaux (on y voyait à travers, et on y passait)
+  doorShove(P) {
+    const E = this.fm(P.floor).elevator;
+    if (!E || E.fake || (P.floor || 0) !== this.realFloor) return;
+    const fx = E.x - E.dx * (CELL_SIZE / 2);
+    const fz = E.z - E.dz * (CELL_SIZE / 2);
+    const lz = (P.x - fx) * E.dx + (P.z - fz) * E.dz;
+    const ax = Math.abs((P.x - fx) * E.dz - (P.z - fz) * E.dx);
+    const R = PLAYER_RADIUS + 0.03;
+    if (ax > LIFT_BAY + R || lz <= -R || lz >= LIFT_FACE + R) return;
+    const want = lz >= 0 ? LIFT_FACE + R : -R;
+    const step = Math.sign(want - lz) * Math.min(Math.abs(want - lz), 2.4 * DT);
+    P.x += E.dx * step;
+    P.z += E.dz * step;
   }
 
   isColliding(x, z, radius, floor = 0) {
@@ -1508,6 +1580,7 @@ export class BackroomsSim {
   // la phase finale du Level 0 : le vrai ascenseur s'ouvre, les néons s'éteignent un à un ; HUNT_DELAY plus tard, les
   // feux rouges et les alarmes, et l'entité se lance à la poursuite de l'équipe
   startFinale() {
+    this.realFloor = this.pickRealFloor();
     this.unlockLevel0();
     this.emit({ type: 'exitUnlocked' });
     this.huntT = HUNT_DELAY;
@@ -1699,6 +1772,9 @@ export class BackroomsSim {
       P.x = p3.x;
       P.z = p3.z;
     }
+
+    // 3a. Les portes de la cabine se referment : on ne reste pas entre les vantaux
+    if (this.liftT > 0) this.doorShove(P);
 
     // le bruit qu'on fait : ce que l'entité peut entendre (la course s'entend loin, accroupi presque rien)
     let noise = !P.moving ? 0 : P.running ? NOISE.run : P.crouch ? NOISE.crouch : NOISE.walk;

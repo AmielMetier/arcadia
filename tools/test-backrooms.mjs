@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
 
@@ -1455,8 +1455,9 @@ test("à plusieurs : un joueur attrapé devient spectateur, la partie continue ;
   assert.equal(sim.state, 'playing', 'B joue encore');
   assert.equal(sim.viewPlayer(0).id, b.id, 'A regarde B');
   sim.cassettes = 6;
-  sim.realFloor = 0;
   sim.startFinale();
+  sim.realFloor = 0; // (le test choisit lui-même le vrai ascenseur)
+  sim.unlockLevel0();
   b.x = sim.map.elevator.x;
   b.z = sim.map.elevator.z;
   sim.monster.x = sim.monster.z = -999;
@@ -1494,8 +1495,9 @@ test("réseau : l'invité reçoit l'état de l'hôte, se déplace chez lui et su
   assert.equal(guest.allCassettes.find((q) => q.id === c.id).collected, true);
   // tout le monde dans l'ascenseur : l'invité passe au Level 1 avec la même carte
   host.cassettes = 6;
-  host.realFloor = 0;
   host.startFinale();
+  host.realFloor = 0; // (le test choisit lui-même le vrai ascenseur)
+  host.unlockLevel0();
   for (const P of host.players) {
     P.x = host.map.elevator.x;
     P.z = host.map.elevator.z;
@@ -1577,8 +1579,9 @@ test("un joueur tombé au Level 0 repart au Level 1 avec une lampe (éteinte, co
   const [a, b] = sim.players;
   a.status = 'dead'; // attrapé avant d'avoir pris sa lampe
   sim.cassettes = 6;
-  sim.realFloor = 0;
   sim.startFinale();
+  sim.realFloor = 0; // (le test choisit lui-même le vrai ascenseur)
+  sim.unlockLevel0();
   b.x = sim.map.elevator.x;
   b.z = sim.map.elevator.z;
   sim.step({}, { 2: { pick: true } });
@@ -1900,6 +1903,56 @@ test("Level 0 : la cage d'escalier ne coupe aucun étage, et le couloir piégé 
   }
 });
 
+test("le faux ascenseur est toujours le plus proche de l'équipe (le coéquipier le plus près compte)", () => {
+  for (const seed of [11, 23, 57]) {
+    for (const near of [0, 1]) {
+      const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
+      const sim = new BackroomsSim({ difficulty: 'peaceful', seed, players, localId: 1 });
+      const [a, b] = sim.players;
+      // A attend devant l'ascenseur de l'étage « near » ; B est quelque part à l'autre étage, loin de l'ascenseur
+      const X = sim.fm(near).exit;
+      Object.assign(a, { floor: near, x: X.x, z: X.z });
+      const other = sim.fm(1 - near);
+      const spot = other.walkable.reduce((best, c) => (Math.hypot(c.x * CELL_SIZE - other.exit.x, c.z * CELL_SIZE - other.exit.z) > Math.hypot(best.x * CELL_SIZE - other.exit.x, best.z * CELL_SIZE - other.exit.z) ? c : best));
+      Object.assign(b, { floor: 1 - near, x: (spot.x + 0.5) * CELL_SIZE, z: (spot.z + 0.5) * CELL_SIZE });
+      sim.cassettes = 6;
+      sim.startFinale();
+      assert.equal(sim.realFloor, 1 - near, `graine ${seed} : celui devant lequel attend A se referme`);
+      assert.ok(sim.fm(near).elevator.fake);
+    }
+  }
+});
+
+test("portes de la cabine : elles poussent celui qui reste entre les vantaux, et refermées on ne les traverse plus", () => {
+  const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players, localId: 1 });
+  const [a, b] = sim.players;
+  sim.cassettes = 6;
+  sim.startFinale();
+  sim.realFloor = 0;
+  sim.unlockLevel0();
+  sim.monster.x = sim.monster.z = -999;
+  const E = sim.map.elevator;
+  const fx = E.x - E.dx * (CELL_SIZE / 2);
+  const fz = E.z - E.dz * (CELL_SIZE / 2);
+  const lz = (P) => (P.x - fx) * E.dx + (P.z - fz) * E.dz;
+  // A entre à peine (dans le plan des portes), B se tient sur le seuil, côté couloir
+  Object.assign(a, { x: fx + E.dx * 0.06, z: fz + E.dz * 0.06 });
+  Object.assign(b, { x: fx - E.dx * 0.1, z: fz - E.dz * 0.1 });
+  assert.ok(sim.inCabin(a) && !sim.inCabin(b));
+  sim.step({ pick: true }, {});
+  sim.step({ pick: true }, {}); // à plusieurs : second appui, on part sans B
+  assert.ok(sim.liftT > 0, 'les portes se ferment');
+  run(sim, LIFT_SHUT_T - 0.05);
+  assert.ok(lz(a) >= LIFT_FACE + PLAYER_RADIUS - 0.01, 'A a été poussé au fond de la cabine');
+  assert.ok(lz(b) <= -PLAYER_RADIUS + 0.01, 'B a été repoussé dans le couloir');
+  // portes jointes : la baie est un mur, des deux côtés
+  run(sim, (LIFT_CLOSE_T - LIFT_SHUT_T) / 2);
+  assert.ok(sim.liftT > 0);
+  assert.ok(sim.isColliding(fx + E.dx * 0.1, fz + E.dz * 0.1, 0.3, 0), 'plus de passage entre les vantaux');
+  assert.ok(sim.isColliding(fx - E.dx * 0.15, fz - E.dz * 0.15, 0.3, 0), 'ni depuis le couloir');
+});
+
 test("ascenseurs : un en haut, un en bas ; les 6 cassettes trouvées, le faux devient un mur et seul le vrai emmène", () => {
   for (const real of [0, 1]) {
     const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 11 });
@@ -1914,7 +1967,10 @@ test("ascenseurs : un en haut, un en bas ; les 6 cassettes trouvées, le faux de
     }
     assert.equal(sim.cassettes, 6);
     assert.ok(!sim.fm(fake).elevator.fake, 'pendant la pause, rien ne bouge encore');
+    // le faux est toujours celui qui est le plus près de l'équipe : on attend devant celui de l'étage « fake »
+    Object.assign(sim.player, { floor: fake, x: sim.fm(fake).exit.x, z: sim.fm(fake).exit.z });
     run(sim, FINALE_WAIT + 0.1);
+    assert.equal(sim.realFloor, real, 'le vrai est le plus loin');
     assert.ok(sim.fm(fake).elevator.fake, 'le faux est démasqué');
     assert.ok(!sim.fm(real).elevator.fake);
     assert.ok(sim.isColliding(sim.fm(fake).elevator.x, sim.fm(fake).elevator.z, 0.3, fake), "le faux n'est plus qu'un mur");
