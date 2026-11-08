@@ -450,12 +450,25 @@ function useSlot(i, tap = false) {
 }
 
 // le bruit d'un pas selon le sol : béton et carrelage (Level 1, Level 37 au sec), eau (Level 37), moquette (Level 0)
+// l'annonce de la phase rouge : le courant qui tombe, puis chaque néon qui s'éteint près de soi
+function onCascade(pos) {
+  if (sfx) pos ? sfx.lightOff(pos) : sfx.powerDown();
+}
+// les feux rouges s'allument : le fracas électronique, la première fois seulement dans la partie
+function onRedStart() {
+  if (!sfx || !sim || sim.redStung) return;
+  sim.redStung = true;
+  sfx.redStart();
+}
+
 function stepKind(P) {
   if (!sim || !P) return false;
   if (sim.level === 2) {
     const m = sim.fm(P.floor || 0);
     return m.depthAt && m.depthAt(P.x, P.z) > 0 ? 'water' : true;
   }
+  // Level 0 : dans la pellicule d'eau des grosses taches de la moquette, des pas mouillés
+  if (sim.level === 0 && scene && scene.filmAt && scene.filmAt(P.x, P.z) > 0.35) return 'soak';
   return sim.level === 1;
 }
 
@@ -583,6 +596,10 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   }
   scene = createBackroomsScene(stageEl, sim.floors, lampsFor());
   scene.onDrip = (pos) => sfx && sfx.drip(pos);
+  scene.onRedCut = (on) => sfx && sfx.finCut(on);
+  scene.onRedFlick = (pos, on) => sfx && sfx.redFlick(pos, on);
+  scene.onCascade = onCascade;
+  scene.onRedStart = onRedStart;
   scene.onMonsterStep = onMonsterStep;
   if (hud) {
     // l'écran de fin d'une partie précédente, encore programmé, ne vient pas couvrir celle-ci ; l'image du bouc non plus
@@ -1116,6 +1133,10 @@ function handleEvent(ev, me) {
       stageEl.innerHTML = '';
       scene = createBackroomsScene(stageEl, sim.floors, lampsFor());
       scene.onDrip = (pos) => sfx && sfx.drip(pos);
+      scene.onRedCut = (on) => sfx && sfx.finCut(on);
+      scene.onRedFlick = (pos, on) => sfx && sfx.redFlick(pos, on);
+      scene.onCascade = onCascade;
+      scene.onRedStart = onRedStart;
       scene.onMonsterStep = onMonsterStep;
       sim.spectate = 0;
       stepDist = 0;
@@ -1693,7 +1714,7 @@ function frame(currentTime) {
       sfx.setListener(V.x, V.z, V.yaw);
       sfx.setRoom(sim.level);
       // le final du Level 0 : toutes les cassettes trouvées, une alarme au loin jusqu'à l'ascenseur
-      sfx.finale(sim.level === 0 && !!sim.open && sim.state === 'playing');
+      sfx.finale(sim.level === 0 && !!sim.open && sim.state === 'playing' && (!scene || scene.redOn));
       // les pas des autres joueurs, là où ils marchent (plus rapprochés quand ils courent)
       for (const O of sim.players) {
         if (O === V || O.status !== 'alive' || !O.moving || paused) {

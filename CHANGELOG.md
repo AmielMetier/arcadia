@@ -1,5 +1,21 @@
 # Journal des versions — Arcadia
 
+## 4.76 — 8 novembre 2026
+- **The Backrooms** — La fin du Level 0 s'annonce : à la dernière cassette, les néons s'éteignent un à un, en vague qui arrive sur vous, chacun avec le claquement de son relais. Puis c'est le noir complet, et les feux rouges se rallument d'un coup dans un fracas électronique (une seule fois). Les alarmes se déclenchent à ce moment-là.
+- **The Backrooms** — Une bande son bien plus oppressante pour la phase rouge.
+  - Une sirène d'évacuation au son riche, noyée dans une grande réverbération.
+  - D'autres alarmes surgissent par-dessus, de toutes les directions (sonnerie d'incendie, bips, klaxon, sirènes), de plus en plus serrées au fil des minutes.
+  - Dessous, un grave qui bat, un accord dissonant et une gamme qui monte sans fin.
+  - Quand le courant se coupe, toutes les alarmes se taisent net ; les feux qui claquent près de vous grésillent.
+- **The Backrooms** — Les feux rouges vivent : leur lueur grésille et se déforme, des volutes de brume traversent leur cône, et une poussière très fine flotte dans la lumière, portée par les courants d'air.
+- **The Backrooms** — Pendant la phase rouge, la lampe torche est plus faible et ses pannes plus variées (salves, extinctions, faux contact, éclair trop fort, agonie). L'endurance s'use deux fois moins vite, pour courir jusqu'à l'ascenseur.
+- **The Backrooms** — Une fine pellicule d'eau au cœur des plus grosses taches de la moquette : elle reflète le plafond, les néons (ou les feux rouges) et la lampe torche, et vos pas y font un bruit mouillé.
+- **The Backrooms** — Un papier peint plus fidèle aux photos au Level 0, toujours discret : sur les rayures de deux teintes, de fines chaînes de perles et des chevrons emboîtés pointés vers le haut.
+- **The Backrooms** — Les grilles d'aération du plafond ne chevauchent plus les néons.
+- **The Backrooms** — À l'œil nu, l'image est calculée en pleine définition (les vrais pixels de l'écran) ; le caméscope garde l'image de sa bande.
+- **The Backrooms** — Ce que vous tenez en main prend la couleur de la lumière autour de vous : rouge à la fin, noir quand tout s'éteint.
+- **The Backrooms** — La flèche à côté du signal a maintenant une tige : on voit tout de suite dans quel sens elle pointe.
+
 ## 4.75 — 8 novembre 2026
 - **The Backrooms** — Des puits sans fond à l'étage du bas du Level 0.
   - Dans certaines grandes salles, le sol laisse place à une grille de trous carrés séparés par d'étroites passerelles.

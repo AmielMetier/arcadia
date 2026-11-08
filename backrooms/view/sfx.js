@@ -1004,7 +1004,8 @@ export class BackroomsSfx {
   // Bruit de pas feutrés sur moquette
   // Un pas : étouffé et un peu spongieux sur la moquette humide, sec et claquant sur le béton (hard)
   // pos : { x, z, muffled } pour les pas d'un autre joueur (sinon ce sont les tiens) ; vol : plus bas pour les autres
-  // hard : true sur le béton ou le carrelage, false sur la moquette, 'water' dans l'eau (Poolrooms)
+  // hard : true sur le béton ou le carrelage, false sur la moquette, 'water' dans l'eau (Poolrooms), 'soak' sur la
+  // moquette noyée (Level 0)
   step(hard = false, pos = null, vol = 1) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
@@ -1032,6 +1033,37 @@ export class BackroomsSfx {
       src.connect(f).connect(g).connect(dest);
       src.start(t);
       for (let k = 0; k < 2 + Math.floor(Math.random() * 2); k++) this.plop(t + 0.12 + Math.random() * 0.25, 0.04 * v, dest);
+      return;
+    }
+
+    if (hard === 'soak') {
+      // la moquette noyée : le talon étouffé, l'eau chassée des fibres sous la semelle (un « splotch » qui descend),
+      // de petites bulles qui éclatent, une ou deux gouttes projetées qui retombent
+      this.tone(dest, t, 'triangle', 70 * v, 32, 0.08, 0.035);
+      const n = Math.floor(c.sampleRate * 0.24);
+      const buf = c.createBuffer(1, n, c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) {
+        const k = i / n;
+        d[i] = (Math.random() * 2 - 1) * Math.min(1, k * 30) * Math.pow(1 - k, 2.4);
+      }
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      const f = c.createBiquadFilter();
+      f.type = 'bandpass';
+      f.frequency.setValueAtTime(1600 * v, t);
+      f.frequency.exponentialRampToValueAtTime(380 * v, t + 0.17);
+      f.Q.value = 1.7;
+      const g = c.createGain();
+      g.gain.value = 0.15 * v;
+      src.connect(f).connect(g).connect(dest);
+      src.start(t + 0.01);
+      this.burst(dest, t + 0.012, 0.05, 'highpass', 3600, 0.7, 0.03 * v);
+      for (let k = 0, m = 3 + Math.floor(Math.random() * 4); k < m; k++) {
+        const f0 = rnd(1800, 4200);
+        this.tone(dest, t + rnd(0.03, 0.2), 'sine', f0, f0 * 1.5, rnd(0.008, 0.016), rnd(0.006, 0.014), 0.001);
+      }
+      if (Math.random() < 0.7) this.plop(t + rnd(0.15, 0.3), 0.018 * v, dest);
       return;
     }
 
@@ -2336,10 +2368,18 @@ export class BackroomsSfx {
   }
 
   // les fonds continus de chaque niveau, sous tout le reste (bus bedWet) : Level 1 la ventilation, Poolrooms l'eau
-  // qui s'écoule, Tuyauteries le grondement des conduites. Rien au Level 0 : la moquette boit tout.
-  // Le final du Level 0 (toutes les cassettes trouvées, les lumières en rouge) : une sirène lointaine, étouffée par
-  // les murs, qui monte et redescend lentement en tournant ; dessous, un grave qui bat (deux notes presque pareilles)
-  // et un triton qui grince par moments. S'ajoute à l'ambiance, s'arrête en changeant de niveau ou à la fin.
+  // qui s'écoule, Tuyauteries le grondement des conduites. Rien au Level 0 : la moquette boit tout (levelBed, plus bas).
+
+  // Le final du Level 0, la phase rouge (toutes les cassettes trouvées) : tout est fait pour oppresser.
+  // - une sirène d'évacuation hurle au loin : une note riche (le pavillon d'un haut-parleur qui sature un peu), noyée
+  //   dans une grande réverbération à elle (5,5 s), qu'on entend partout et de nulle part ;
+  // - d'autres alarmes surgissent par-dessus, de toutes les directions, se chevauchent puis se taisent : sonnerie
+  //   d'incendie, bips électroniques, klaxon industriel, sirène affolée, whoop, une seconde sirène désaccordée ; de
+  //   plus en plus serrées au fil des minutes ;
+  // - dessous, un grave qui bat et gronde, un accord dissonant qui rampe, et une gamme de Shepard qui monte sans fin ;
+  // - une coupure de courant (finCut) coupe net toutes les alarmes (leur écho traîne) avec le bruit du courant qui
+  //   tombe, puis tout revient d'un bloc ; les feux qui claquent près de soi grésillent (redFlick).
+  // S'arrête en changeant de niveau ou à la fin de la partie.
   finale(on) {
     if (!this.unlocked || !this.ctx || !on === !this.fin) return;
     const c = this.ctx;
@@ -2347,45 +2387,397 @@ export class BackroomsSfx {
     if (!on) {
       const old = this.fin;
       this.fin = null;
-      for (const g of old.gs) {
-        g.gain.cancelScheduledValues(t);
-        g.gain.setTargetAtTime(0, t, 0.7);
-      }
-      setTimeout(() => old.srcs.forEach((s) => { try { s.stop(); } catch (e) { /* déjà arrêté */ } }), 5000);
+      clearInterval(old.timer);
+      old.bus.gain.cancelScheduledValues(t);
+      old.bus.gain.setTargetAtTime(0, t, 0.7);
+      setTimeout(() => old.srcs.forEach((n) => { try { n.stop(); } catch (e) { /* déjà arrêté */ } }), 6000);
       return;
     }
+    const F = (this.fin = { srcs: [], t0: t, cut: false, layers: 0, flickT: 0 });
+    const src = (n) => (F.srcs.push(n), n);
+    // le bus du final, dans l'ambiance sèche (baissé pendant une poursuite, coupé dans les silences d'avant un
+    // événement) ; sa grande réverbération à lui
+    const bus = (F.bus = this.gainNode(0));
+    bus.connect(this.bedDry);
+    bus.gain.setTargetAtTime(1, t, 0.4);
+    const verb = (F.verb = c.createConvolver());
+    verb.buffer = this.hallIR(5.5);
+    verb.connect(this.filt('highpass', 130, 0.7)).connect(this.filt('lowpass', 4600, 0.6)).connect(this.gainNode(1.15)).connect(bus);
+    // les alarmes passent par power (les coupures de courant) : un peu de son direct, beaucoup d'écho
+    const power = (F.power = this.gainNode(1));
+    power.connect(this.gainNode(0.3)).connect(bus);
+    power.connect(verb);
+
+    // 1. La sirène d'évacuation : la note doublée à 6 cents et à l'octave dessous, saturée, filtrée comme un
+    // haut-parleur de couloir ; le pavillon qui tourne la fait enfler et retomber
+    const wave = this.hornWave();
+    const sir = [330, 330, 165].map((f) => {
+      const o = src(this.osc('sine', f));
+      o.setPeriodicWave(wave);
+      return o;
+    });
+    sir[1].detune.value = 6;
+    const sMix = this.gainNode(1);
+    sir.forEach((o, k) => o.connect(this.gainNode([0.5, 0.45, 0.22][k])).connect(sMix));
+    const horn = this.filt('peaking', 1700, 1.1);
+    horn.gain.value = 7;
+    const spin = this.gainNode(0.75);
+    src(this.osc('sine', 0.42)).connect(this.gainNode(0.25)).connect(spin.gain);
+    sMix.connect(this.filt('highpass', 220, 0.7)).connect(this.shaper(2.2)).connect(horn).connect(this.filt('lowpass', 3600, 0.7)).connect(spin).connect(this.gainNode(0.15)).connect(power);
+    F.sir = sir;
+    F.sirAt = t + 0.05;
+
+    // 2. Le fond, que les coupures n'arrêtent pas : un grave qui bat (41 et 43,4 Hz) et gronde, un accord dissonant
+    // qui rampe (la, si bémol, ré dièse), la gamme de Shepard qui monte sans fin
+    const bed = this.gainNode(0);
+    bed.connect(bus);
+    bed.gain.setTargetAtTime(1, t, 2.5);
+    const sub = this.filt('lowpass', 150, 0.8);
+    sub.connect(this.gainNode(0.2)).connect(bed);
+    for (const f of [41, 43.4]) src(this.osc('sawtooth', f)).connect(this.gainNode(0.5)).connect(sub);
+    src(this.longNoise()).connect(this.filt('lowpass', 65, 0.7)).connect(this.gainNode(0.55)).connect(bed);
+    const cl = this.gainNode(0.03);
+    src(this.osc('sine', 0.05)).connect(this.gainNode(0.025)).connect(cl.gain);
+    const clLp = this.filt('lowpass', 700, 0.7);
+    clLp.connect(cl);
+    cl.connect(bed);
+    cl.connect(this.gainNode(0.6)).connect(verb);
+    for (const f of [110, 116.54, 155.56]) src(this.osc('triangle', f)).connect(this.gainNode(0.33)).connect(clLp);
+    const shep = (F.shepG = this.gainNode(0.03));
+    shep.connect(this.filt('lowpass', 2600, 0.7)).connect(bed);
+    shep.connect(this.gainNode(0.5)).connect(verb);
+    F.shep = Array.from({ length: 7 }, () => {
+      const o = src(this.osc('sine', 100));
+      const g = this.gainNode(0);
+      o.connect(g).connect(shep);
+      return { o, g };
+    });
+
+    for (const n of F.srcs) n.start(t);
+    // d'entrée, deux alarmes surgissent l'une après l'autre
+    F.nextSurge = t + 0.6;
+    F.timer = setInterval(() => this.finTick(), 100);
+    this.finTick();
+    this.caption('[alarms are going off everywhere]');
+  }
+
+  // le pas du final, dix fois par seconde : le cycle de la sirène, la gamme de Shepard, les alarmes qui surgissent
+  finTick() {
+    const F = this.fin;
+    if (!F || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    const e = now - F.t0;
+    if (F.cut && now > F.cutEnd) this.finCut(false);
+    // la sirène : monte en 2,6 s, tient, retombe en 3,4 s, un cycle toutes les 7,2 s (programmé un cycle d'avance)
+    while (F.sirAt < now + 1) {
+      const at = F.sirAt;
+      F.sir.forEach((o, k) => {
+        const m = k === 2 ? 0.5 : 1;
+        o.frequency.setValueAtTime(330 * m, at);
+        o.frequency.setTargetAtTime(740 * m, at, 0.85);
+        o.frequency.setTargetAtTime(330 * m, at + 3.4, 1.15);
+      });
+      F.sirAt += 7.2;
+    }
+    // la gamme de Shepard : sept octaves qui montent (une octave en 24 s), la plus grave et la plus aiguë inaudibles
+    const ph = (e / 24) % 1;
+    F.shep.forEach(({ o, g }, i) => {
+      const x = (i + ph) / 7;
+      o.frequency.setTargetAtTime(40 * Math.pow(2, x * 7), now, 0.04);
+      g.gain.setTargetAtTime(Math.exp(-((x - 0.5) ** 2) / (2 * 0.15 * 0.15)), now, 0.04);
+    });
+    F.shepG.gain.setTargetAtTime(0.03 + 0.04 * Math.min(1, e / 150), now, 0.5);
+    // les autres alarmes : de plus en plus serrées et nombreuses
+    if (now >= F.nextSurge) {
+      const most = 2 + Math.min(3, Math.floor(e / 40));
+      if (F.layers < most) this.surge();
+      const gap = 6.5 - 4.3 * Math.min(1, e / 120);
+      F.nextSurge = now + gap * rnd(0.55, 1.45);
+    }
+  }
+
+  // une alarme qui surgit quelque part autour de soi, tient quelques secondes, puis se tait
+  surge(kind = null) {
+    const F = this.fin;
+    const c = this.ctx;
+    const t = c.currentTime + 0.03;
+    const KINDS = ['bell', 'beep', 'horn', 'yelp', 'whoop', 'wail'];
+    const k = kind || KINDS[Math.floor(Math.random() * KINDS.length)];
+    const p = this.around(k === 'wail' || k === 'yelp' ? 22 : 9, k === 'beep' ? 26 : 42);
+    const pl = this.place({ ...p, rolloff: 0.55, ref: 7 }, 1, 0, F.power);
+    const env = this.gainNode(0);
+    env.connect(pl.input);
     const srcs = [];
     const src = (n) => (srcs.push(n), n);
-    // la sirène, avec l'écho des couloirs : deux dents de scie à peine désaccordées, de 270 à 530 Hz en 8 s
-    const wail = this.gainNode(0);
-    wail.connect(this.bedWet);
-    const sweep = src(this.osc('sine', 0.125));
-    const sLp = this.filt('lowpass', 850, 0.9);
-    for (const [f, d] of [[400, 130], [403, 132]]) {
-      const o = src(this.osc('sawtooth', f));
-      sweep.connect(this.gainNode(d)).connect(o.frequency);
-      o.connect(this.gainNode(0.5)).connect(sLp);
+    const dur = { bell: rnd(3.5, 9), beep: rnd(5, 12), horn: rnd(5, 11), yelp: rnd(4, 9), whoop: rnd(5, 10), wail: rnd(10, 20) }[k];
+    const vol = { bell: 0.11, beep: 0.06, horn: 0.11, yelp: 0.09, whoop: 0.09, wail: 0.12 }[k] * rnd(0.6, 1);
+    const gate = (on, off, pattern = null) => {
+      // un motif marche/arrêt : [durée allumé, durée éteint]… répété jusqu'à la fin, à-coups de 4 ms
+      const g = this.gainNode(0);
+      const steps = pattern || [[on, off]];
+      let at = t;
+      let n = 0;
+      while (at < t + dur) {
+        const [a, b] = steps[n++ % steps.length];
+        g.gain.setValueAtTime(0, at);
+        g.gain.linearRampToValueAtTime(1, at + 0.004);
+        g.gain.setValueAtTime(1, at + a);
+        g.gain.linearRampToValueAtTime(0, at + a + 0.004);
+        at += a + b;
+      }
+      return g;
+    };
+    if (k === 'bell') {
+      // la sonnerie d'incendie : le marteau frappe le timbre vingt fois par seconde
+      const f0 = [880, 1046, 1175][Math.floor(Math.random() * 3)];
+      const strike = this.gainNode(0.5);
+      src(this.osc('square', rnd(17, 22))).connect(this.gainNode(0.5)).connect(strike.gain);
+      for (const [m, a] of [[1, 1], [2.76, 0.5], [5.4, 0.28], [8.93, 0.12]]) src(this.osc('sine', f0 * m)).connect(this.gainNode(a * 0.5)).connect(strike);
+      strike.connect(env);
+    } else if (k === 'beep') {
+      // l'avertisseur électronique : trois bips, une pause (le motif « temporal 3 » des alarmes incendie)
+      const g = gate(0, 0, [[0.5, 0.5], [0.5, 0.5], [0.5, 1.5]]);
+      src(this.osc('square', rnd(2850, 3250))).connect(this.filt('bandpass', 3000, 3)).connect(this.filt('lowpass', 5200, 0.7)).connect(g).connect(env);
+    } else if (k === 'horn') {
+      // le klaxon industriel : deux notes rauques qui frottent, saturées, en coups longs
+      const g = gate(1.1, 0.7);
+      const mix = this.gainNode(0.5);
+      for (const f of [196, 233]) src(this.osc('sawtooth', f * rnd(0.97, 1.03))).connect(mix);
+      mix.connect(this.shaper(4)).connect(this.filt('bandpass', 950, 0.9)).connect(g).connect(env);
+    } else if (k === 'yelp') {
+      // la sirène affolée : elle monte et redescend trois fois par seconde, loin, étouffée
+      const o = src(this.osc('sine', 980));
+      o.setPeriodicWave(this.hornWave());
+      src(this.osc('triangle', rnd(2.8, 3.8))).connect(this.gainNode(340)).connect(o.frequency);
+      o.connect(this.filt('lowpass', 2300, 0.7)).connect(env);
+    } else if (k === 'whoop') {
+      // le whoop : une montée rapide, un silence, encore
+      const o = src(this.osc('sine', 480));
+      o.setPeriodicWave(this.hornWave());
+      const g = gate(0.85, 0.35);
+      for (let at = t; at < t + dur; at += 1.2) {
+        o.frequency.setValueAtTime(480, at);
+        o.frequency.exponentialRampToValueAtTime(1150, at + 0.85);
+      }
+      o.connect(this.filt('lowpass', 3200, 0.7)).connect(g).connect(env);
+    } else {
+      // une seconde sirène, plus grave, qui ne tombe jamais d'accord avec la première
+      const o = src(this.osc('sine', 280));
+      o.setPeriodicWave(this.hornWave());
+      for (let at = t; at < t + dur; at += 9.4) {
+        o.frequency.setValueAtTime(280, at);
+        o.frequency.setTargetAtTime(610, at, 1.1);
+        o.frequency.setTargetAtTime(280, at + 4.6, 1.4);
+      }
+      o.connect(this.shaper(1.8)).connect(this.filt('lowpass', 2400, 0.7)).connect(env);
     }
-    // le pavillon qui tourne : le son enfle et retombe deux fois plus vite que la note
-    const spin = this.gainNode(0.6);
-    const spinLfo = src(this.osc('sine', 0.45));
-    spinLfo.connect(this.gainNode(0.4)).connect(spin.gain);
-    sLp.connect(spin).connect(wail);
-    // le grave, sec, tout près : 49 et 51,5 Hz (un battement de 2,5 par seconde), le triton au-dessus qui va et vient
-    const drone = this.gainNode(0);
-    drone.connect(this.bedDry);
-    const dLp = this.filt('lowpass', 260, 0.8);
-    dLp.connect(drone);
-    for (const f of [49, 51.5]) src(this.osc('sawtooth', f)).connect(this.gainNode(0.5)).connect(dLp);
-    const tri = this.gainNode(0);
-    const triLfo = src(this.osc('sine', 0.06));
-    triLfo.connect(this.gainNode(0.22)).connect(tri.gain);
-    src(this.osc('triangle', 69.3)).connect(tri).connect(dLp);
-    for (const s of srcs) s.start(t);
-    wail.gain.setTargetAtTime(0.07, t + 0.4, 1.6);
-    drone.gain.setTargetAtTime(0.16, t, 2.5);
-    this.fin = { gs: [wail, drone], srcs };
-    this.caption('[a distant alarm wails]');
+    // elle surgit (la sonnerie d'un coup, les autres en montant), tient, puis se tait
+    const rise = k === 'bell' || k === 'beep' ? 0.03 : rnd(0.4, 1.6);
+    const fall = rnd(0.4, 1.8);
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(vol, t + rise);
+    env.gain.setValueAtTime(vol, t + dur);
+    env.gain.linearRampToValueAtTime(0, t + dur + fall);
+    for (const n of srcs) {
+      n.start(t);
+      n.stop(t + dur + fall + 0.1);
+    }
+    F.layers++;
+    setTimeout(() => { if (this.fin === F) F.layers--; }, (dur + fall) * 1000);
+  }
+
+  // L'annonce de la phase rouge. powerDown : le courant commence à tomber, un sifflement électrique qui descend
+  // longuement (un transformateur qui s'arrête) et le bourdonnement des néons qui se tait ; lightOff : chaque néon
+  // qui s'éteint près de soi, le claquement sec de son relais et un dernier grésillement ; redStart : les feux rouges
+  // s'allument d'un coup, un fracas électronique qui surprend (une seule fois par partie, décidé par l'application)
+  powerDown() {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.02;
+    const out = this.gainNode(1);
+    out.connect(this.bedDry);
+    out.connect(this.gainNode(0.5)).connect(this.out);
+    // le sifflement qui descend : deux notes et leur harmonique, de l'aigu au grave en quatre secondes
+    for (const [f, v] of [[1180, 0.05], [1187, 0.04], [590, 0.05]]) {
+      const o = this.osc('sawtooth', f);
+      const g = this.gainNode(0);
+      o.frequency.setValueAtTime(f, t);
+      o.frequency.exponentialRampToValueAtTime(f * 0.08, t + 4.2);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(v, t + 0.25);
+      g.gain.setValueAtTime(v, t + 2.6);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 4.3);
+      o.connect(this.filt('lowpass', 2400, 0.7)).connect(g).connect(out);
+      o.start(t);
+      o.stop(t + 4.4);
+    }
+    // le bourdonnement du secteur (100 Hz) qui faiblit en tremblant puis meurt
+    const hum = this.osc('sawtooth', 100);
+    const hg = this.gainNode(0);
+    hum.frequency.setValueAtTime(100, t);
+    hum.frequency.linearRampToValueAtTime(82, t + 3.4);
+    hg.gain.setValueAtTime(0.06, t);
+    hg.gain.linearRampToValueAtTime(0.03, t + 2.4);
+    hg.gain.exponentialRampToValueAtTime(0.0001, t + 3.5);
+    hum.connect(this.filt('bandpass', 300, 1.2)).connect(hg).connect(out);
+    hum.start(t);
+    hum.stop(t + 3.6);
+    this.caption('[the power is failing]');
+  }
+
+  lightOff(pos) {
+    if (!this.unlocked || !this.ctx || !pos) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    if (t < (this.offT || 0)) return;
+    this.offT = t + 0.045;
+    const out = this.at({ x: pos.x, z: pos.z, rolloff: 1, ref: 3 }, 1, 0, this.out);
+    // le relais : un coup sourd et un clic métallique
+    this.tone(out, t, 'sine', 120, 50, 0.09, 0.18, 0.002);
+    this.burst(out, t + 0.002, 0.02, 'bandpass', 2800, 2, 0.14);
+    // le tube qui grésille une dernière fois
+    const b = this.osc('sawtooth', 100);
+    const bg = this.gainNode(0);
+    b.connect(this.filt('bandpass', 700, 1.5)).connect(bg).connect(out);
+    bg.gain.setValueAtTime(0.05, t);
+    bg.gain.exponentialRampToValueAtTime(0.0001, t + rnd(0.08, 0.2));
+    b.start(t);
+    b.stop(t + 0.25);
+  }
+
+  redStart() {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.01;
+    const out = this.gainNode(1);
+    out.connect(this.bedDry);
+    out.connect(this.gainNode(0.7)).connect(this.out);
+    // les contacteurs qui collent : deux claquements énormes
+    for (const dt of [0, 0.035]) {
+      this.burst(out, t + dt, 0.04, 'bandpass', 2200, 1.2, 0.5);
+      this.tone(out, t + dt, 'sine', 90, 38, 0.25, 0.5, 0.002);
+    }
+    // le fracas électronique : un accord dissonant de carrés saturés, haché, qui glisse vers le bas en mourant
+    const mix = this.gainNode(0);
+    const chop = this.gainNode(0.5);
+    const lfo = this.osc('square', 17);
+    lfo.connect(this.gainNode(0.5)).connect(chop.gain);
+    mix.connect(this.shaper(5)).connect(this.filt('lowpass', 5200, 0.7)).connect(chop).connect(out);
+    const os = [466, 494, 523, 988, 1046].map((f) => {
+      const o = this.osc('square', f);
+      o.frequency.setValueAtTime(f, t);
+      o.frequency.setValueAtTime(f, t + 0.45);
+      o.frequency.exponentialRampToValueAtTime(f * 0.5, t + 1.3);
+      o.connect(this.gainNode(0.2)).connect(mix);
+      return o;
+    });
+    mix.gain.setValueAtTime(0, t);
+    mix.gain.linearRampToValueAtTime(0.32, t + 0.01);
+    mix.gain.setValueAtTime(0.32, t + 0.5);
+    mix.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+    for (const o of [...os, lfo]) {
+      o.start(t);
+      o.stop(t + 1.45);
+    }
+    // de la friture numérique, et le grave qui cogne dans la poitrine
+    this.burst(out, t, 0.5, 'highpass', 3500, 0.7, 0.16);
+    this.tone(out, t, 'sine', 55, 28, 1.6, 0.7, 0.004);
+    this.caption('[a loud electronic blare]');
+  }
+
+  // coupure de courant pendant la phase rouge : toutes les alarmes se taisent net (leur écho traîne), le courant tombe
+  // dans un bruit sourd et un sifflement qui descend ; au retour, un claquement de relais et tout revient d'un bloc
+  finCut(on) {
+    const F = this.fin;
+    if (!F || F.cut === !!on) return;
+    F.cut = !!on;
+    const t = this.ctx.currentTime;
+    F.cutEnd = t + 2.5; // filet : si le retour n'arrive pas (changement d'étage), le courant revient quand même
+    const g = F.power.gain;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(g.value, t);
+    g.linearRampToValueAtTime(on ? 0 : 1, t + (on ? 0.012 : 0.005));
+    const out = this.gainNode(1);
+    out.connect(F.bus);
+    out.connect(this.gainNode(0.5)).connect(F.verb);
+    if (on) {
+      this.tone(out, t, 'sine', 75, 28, 0.6, 0.5, 0.003);
+      const lp = this.filt('lowpass', 1800, 0.7);
+      lp.connect(out);
+      this.tone(lp, t, 'sawtooth', 900, 80, 1.1, 0.05, 0.01);
+      this.tone(out, t, 'square', 2400, 700, 0.03, 0.08, 0.001);
+    } else {
+      this.tone(out, t, 'sine', 140, 55, 0.18, 0.4, 0.002);
+      this.tone(out, t, 'square', 3100, 900, 0.025, 0.1, 0.001);
+    }
+  }
+
+  // un feu de secours qui claque près de soi : le clic sec du starter, et à l'allumage une bouffée de bourdonnement
+  redFlick(pos, on) {
+    const F = this.fin;
+    if (!F || !pos) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    if (t < F.flickT) return;
+    F.flickT = t + 0.035; // pas plus d'une trentaine par seconde en tout
+    const out = this.at({ x: pos.x, z: pos.z, rolloff: 1.2, ref: 2.5 }, 1, 0, this.out);
+    const n = this.noise();
+    const g = this.gainNode(0);
+    n.connect(this.filt('bandpass', on ? 3600 : 2600, 1.4)).connect(g).connect(out);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(on ? 0.16 : 0.1, t + 0.001);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.012);
+    n.start(t, Math.random() * 0.5);
+    n.stop(t + 0.03);
+    if (on) {
+      const b = this.osc('sawtooth', 100);
+      const bg = this.gainNode(0);
+      b.connect(this.filt('bandpass', 520, 2)).connect(bg).connect(out);
+      const d = rnd(0.05, 0.16);
+      bg.gain.setValueAtTime(0, t);
+      bg.gain.linearRampToValueAtTime(0.07, t + 0.004);
+      bg.gain.setValueAtTime(0.07, t + d);
+      bg.gain.linearRampToValueAtTime(0, t + d + 0.02);
+      b.start(t);
+      b.stop(t + d + 0.05);
+    }
+  }
+
+  // la note d'un pavillon de sirène : riche en harmoniques, les impaires un peu plus fortes, l'aigu adouci
+  hornWave() {
+    if (!this.hornW) {
+      const N = 24;
+      const re = new Float32Array(N);
+      const im = new Float32Array(N);
+      for (let h = 1; h < N; h++) im[h] = (h % 2 ? 1 : 0.55) / Math.pow(h, 0.95) * Math.exp(-h / 14);
+      this.hornW = this.ctx.createPeriodicWave(re, im);
+    }
+    return this.hornW;
+  }
+
+  // la réverbération d'un grand espace vide (le final) : len secondes, des premiers échos, l'aigu qui s'éteint
+  // plus vite que le grave
+  hallIR(len) {
+    const c = this.ctx;
+    const sr = c.sampleRate;
+    const n = Math.floor(sr * len);
+    const ir = c.createBuffer(2, n, sr);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = ir.getChannelData(ch);
+      const pre = Math.floor(sr * 0.03);
+      let y = 0;
+      for (let i = pre; i < n; i++) {
+        const k = (i - pre) / (n - pre);
+        const a = 0.85 - 0.75 * k; // le filtre se ferme en avançant : la queue s'assombrit
+        y += a * ((Math.random() * 2 - 1) - y);
+        d[i] = y * Math.exp(-6.9 * k) * 0.55;
+      }
+      for (const [ms, a] of [[37, 0.5], [61, 0.4], [89, 0.32], [127, 0.25], [181, 0.2], [263, 0.14]]) {
+        const i = Math.floor((sr * (ms + (ch ? 11 : 0))) / 1000);
+        if (i < n) d[i] += (Math.random() < 0.5 ? -1 : 1) * a;
+      }
+    }
+    return ir;
   }
 
   levelBed(level) {

@@ -91,14 +91,14 @@ export class BackroomsHUD {
       <div class="cam cam-br">
         <div class="tapes"><span id="cassetteIcons"></span> <b id="cassetteText">0/${CASSETTES}</b></div>
         <div class="carry" id="carryTag" hidden></div>
-        <div class="signal" id="signal"><b class="sig-arrow" id="signalArrow" hidden>▲</b><span id="signalLabel">SIGNAL</span> <span id="signalBars">${'<i></i>'.repeat(5)}</span></div>
+        <div class="signal" id="signal"><b class="sig-arrow" id="signalArrow" hidden><svg viewBox="0 0 16 24" aria-hidden="true"><path d="M8 1 15 11H10.2V23H5.8V11H1Z"/></svg></b><span id="signalLabel">SIGNAL</span> <span id="signalBars">${'<i></i>'.repeat(5)}</span></div>
       </div>
 
       <!-- Au caméscope (V) : l'image passe en 4:3, et les bandes noires servent d'écrans : à gauche le signal des
            objectifs (plus fin qu'au petit indicateur), à droite les parasites (l'entité brouille la bande) et le mode nuit -->
       <!-- le zoom de l'objectif (molette) : la barre W ─── T, le temps de zoomer -->
       <div class="cam-zoom" id="camZoom"><span>W</span><i><b id="camZoomBar"></b></i><span>T</span><em id="camZoomX">×1.5</em></div>
-      <div class="cam-bar cam-bar-l"><b class="sig-arrow cam-arrow" id="camArrow" hidden>▲</b><small id="camSigLbl">SIGNAL</small><div class="cam-gauge" id="camSig">${'<i></i>'.repeat(10)}</div><small>TAPE</small></div>
+      <div class="cam-bar cam-bar-l"><b class="sig-arrow cam-arrow" id="camArrow" hidden><svg viewBox="0 0 16 24" aria-hidden="true"><path d="M8 1 15 11H10.2V23H5.8V11H1Z"/></svg></b><small id="camSigLbl">SIGNAL</small><div class="cam-gauge" id="camSig">${'<i></i>'.repeat(10)}</div><small>TAPE</small></div>
       <div class="cam-bar cam-bar-r"><small class="cam-night" id="camNight">AUTO</small><div class="cam-gauge interf" id="camInt">${'<i></i>'.repeat(10)}</div><small>INTERF.</small></div>
 
       <!-- Dans un casier : les fentes de la porte, et le souffle retenu -->
