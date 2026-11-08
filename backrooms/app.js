@@ -25,6 +25,7 @@ let deathNear = false; // le son de la mort a été joué (il revient quand l'en
 let runStats = { seen: 0, rushes: 0, escapes: 0, closest: Infinity, haunts: 0 };
 let tapeFrames = [];
 let replayed = false;
+let neonWakeAt = 0; // le dernier grésillement de néon entendu sur son passage (pas plus d'un tous les 90 ms)
 let echoT = 0; // fausse alerte : quelqu'un marche derrière toi, à ton rythme
 let hauntAt = 0; // spectateur : quand on pourra de nouveau faire un signe (sur cet écran)
 // Carte du jour : la même graine pour tout le monde, ce jour-là
@@ -52,6 +53,9 @@ const NET = {
   actions: {}, // hôte : lampe et objets demandés par chaque invité, en attente du prochain pas
   events: [], // hôte : événements à envoyer aux invités
   lastHost: 0, // invité : dernier message de l'hôte
+  goneAt: {}, // hôte : depuis quand chaque joueur manque au salon (parti, en reconnexion, retourné au salon)
+  seenReady: new Set(), // les joueurs qu'on a vus dans le jeu
+  quit: new Set(), // ceux qui en sont ressortis (retour au salon) : pas dans la prochaine partie (« Rejouer »)
 };
 const multi = () => NET.role !== 'solo' && sim && sim.players.length > 1;
 const send = (to, m, vol) => H && H.embedded && H.send(to, m, vol ? { volatile: true } : undefined);
@@ -409,7 +413,8 @@ function initGame(settings = lastSettings, forceLevel = null) {
   dailyLabel = daily ? daily.label : null;
   const seed = sm ? +sm[1] : daily ? daily.seed : Math.floor(Math.random() * 100000);
   const difficulty = settings.difficulty || 'normal';
-  const players = NET.role === 'host' ? H.players.map((p) => ({ id: p.id, name: p.name || 'Player' })) : [{ id: 0, name: 'Player' }];
+  // tout le salon, sauf ceux revenus au salon pendant la partie d'avant (ceux qui chargent encore arrivent vivants)
+  const players = NET.role === 'host' ? H.players.filter((p) => p.id === NET.myId || !NET.quit.has(p.id)).map((p) => ({ id: p.id, name: p.name || 'Player' })) : [{ id: 0, name: 'Player' }];
   NET.run = Date.now();
   // ?level1, ?level37 ou ?level2 (seul) : on commence directement au Level 1, aux Poolrooms ou aux Tuyauteries
   const lvm = NET.role === 'solo' && location.search.match(/[?&]level(1|2|37)(&|=|$)/);
@@ -427,26 +432,63 @@ function initGame(settings = lastSettings, forceLevel = null) {
   if (NET.role === 'host') send('all', goMessage());
 }
 
-// Invité : la carte de l'hôte a-t-elle la même empreinte que la nôtre ? Sinon (une version plus ancienne en cache),
-// les murs, les escaliers et les objets ne sont pas aux mêmes endroits chez nous : on prévient, une fois par étage.
-// Le message revient toutes les 40 s tant que les cartes diffèrent : la partie n'est pas jouable ainsi.
+// Invité : la carte de l'hôte a-t-elle la même empreinte que la nôtre ? Sinon, les murs, les escaliers et les cassettes
+// ne sont pas aux mêmes endroits chez nous : la partie est injouable. Celui qui a tort se répare tout seul : le Hub
+// reprend ses fichiers (et ceux du jeu) à la version la plus récente des deux, recharge, revient dans le salon puis
+// dans la partie. Un invité plus ancien (ou à la même version, fichiers abîmés en cache) se répare chez lui ; si
+// l'hôte est le plus ancien, ou si l'invité s'est déjà réparé sans succès, c'est l'hôte (la partie continue chez les
+// autres : l'un d'eux prend le relais).
 const GAME_V = new URLSearchParams(location.search).get('v') || ''; // la version du Hub qui a lancé le jeu
 let hostV = '';
 let printWarnT = -Infinity;
+let printBad = 0;
 const verLabel = (v) => (v ? `V${v}` : 'AN OLD VERSION');
+// 4.100 vient après 4.99 (on ne compare pas des nombres à virgule)
+const verNum = (v) => {
+  const m = /^(\d+)\.(\d+)$/.exec(String(v || ''));
+  return m ? +m[1] * 10000 + +m[2] : 0;
+};
+// les fichiers du jeu, tels que chargés (à la version du Hub)
+const gameFiles = () => (window.BACKROOMS_FILES || []).concat('backrooms.css').map((f) => new URL(f, location.href).href + (GAME_V ? '?v=' + encodeURIComponent(GAME_V) : ''));
+// on vient déjà de recharger pour cette version (sans succès) ?
+function triedUpdate(v) {
+  try {
+    const last = JSON.parse(sessionStorage.getItem('hub_update') || 'null');
+    return !!(last && last.v === v && Date.now() - last.t < 120000);
+  } catch (e) {
+    return false;
+  }
+}
+function selfUpdate(v) {
+  if (!H.embedded || !H.outdated || triedUpdate(v)) return false;
+  if (hud) hud.toast(`MAPS DON'T MATCH · UPDATING YOUR GAME TO ${verLabel(v)}…`, 8);
+  H.outdated(v, gameFiles());
+  return true;
+}
 function checkPrint(fp) {
-  if (typeof fp !== 'string' || !sim || fp === sim.fp) return;
+  if (typeof fp !== 'string' || !sim) return;
+  if (fp === sim.fp) {
+    printBad = 0;
+    return;
+  }
+  // trois instantanés de suite (un changement d'étage peut croiser un instantané de l'étage d'avant)
+  if (++printBad < 3) return;
+  const hv = verNum(hostV);
+  const gv = verNum(GAME_V);
+  if (!(hv && gv && hv < gv)) {
+    if (selfUpdate(hv > gv ? hostV : GAME_V)) return;
+  }
   const now = performance.now();
   if (now - printWarnT < 40000) return;
   printWarnT = now;
-  const older = hostV && GAME_V && hostV !== GAME_V ? (+hostV > +GAME_V ? 'you' : 'host') : '';
+  const older = hv && gv && hv !== gv ? (hv > gv ? 'you' : 'host') : '';
   const msg = older === 'host'
-    ? `MAPS DON'T MATCH · THE HOST HAS ${verLabel(hostV)}, YOU HAVE ${verLabel(GAME_V)} · THE HOST MUST RELOAD (CTRL+SHIFT+R)`
+    ? `MAPS DON'T MATCH · THE HOST HAS ${verLabel(hostV)}, YOU HAVE ${verLabel(GAME_V)} · THE HOST IS UPDATING`
     : older === 'you'
       ? `MAPS DON'T MATCH · YOU HAVE ${verLabel(GAME_V)}, THE HOST HAS ${verLabel(hostV)} · RELOAD THE PAGE (CTRL+SHIFT+R)`
-      : "MAPS DON'T MATCH · SOMEONE HAS AN OLD VERSION · EVERYONE RELOAD (CTRL+SHIFT+R)";
+      : "MAPS DON'T MATCH · THE HOST IS UPDATING";
   if (hud) hud.toast(msg, 14);
-  send(H.info.hostId, { t: 'fp', v: GAME_V });
+  send(H.info.hostId, { t: 'fp', v: GAME_V, tried: triedUpdate(GAME_V) ? 1 : 0 });
 }
 
 const goMessage = () => ({ t: 'go', v: GAME_V, run: NET.run, seed: sim.seed, diff: sim.difficulty, players: sim.roster, lv: sim.level, vip: monstersVip, dy: dailyLabel });
@@ -481,19 +523,30 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
     scene.dispose();
     stageEl.innerHTML = '';
   }
-  scene = createBackroomsScene(stageEl, sim.floors);
+  scene = createBackroomsScene(stageEl, sim.floors, lampsFor());
   scene.onDrip = (pos) => sfx && sfx.drip(pos);
   if (hud) {
+    // l'écran de fin d'une partie précédente, encore programmé, ne vient pas couvrir celle-ci ; l'image du bouc non plus
+    clearTimeout(hud.endT);
     hud.$('#endScreen').hidden = true;
     hud.lastCount = -1;
     hud.endPending = null;
     hud.replayTag(false);
+    if (hud.hideGoatDeath) hud.hideGoatDeath();
   }
 
   if (!sfx) {
     sfx = new BackroomsSfx();
   }
   sfx.stopDeath();
+  // les sons restés accrochés à la partie d'avant : la lutte d'une prise mortelle, le souffle retenu, le noir d'une
+  // coupure (le bourdonnement des néons revient), la vanne
+  if (sfx.stopGrab) sfx.stopGrab();
+  if (sfx.breathHeld && sfx.holdBreath) sfx.holdBreath(false);
+  sfx.breathHeld = false;
+  sfx.dark = false;
+  if (valveSound && sfx.valveTurn) sfx.valveTurn(-1);
+  valveSound = false;
   deathNear = false;
   if (!hud) {
     hud = new BackroomsHUD(hudEl, hudActions);
@@ -517,8 +570,19 @@ const hudActions = { play, setKbMode, use: (i) => useSlot(i, true), resume: resu
 // Hôte : les commandes des invités pour ce pas (la lampe et les objets ne servent qu'une fois)
 function guestInputs() {
   const out = {};
+  const now = performance.now();
   for (const id in NET.inputs) {
     const i = NET.inputs[id];
+    // plus rien reçu de lui depuis une demi-seconde (coupure, onglet fermé, retour au salon) : son avatar s'arrête et
+    // se tait, au lieu de rejouer sans fin sa dernière commande (courir, parler… et attirer l'entité sur tout le monde)
+    if (now - (i.at || 0) > 500) {
+      i.mx = 0;
+      i.my = 0;
+      i.run = false;
+      i.vo = 0;
+      i.ra = false;
+      i.cm = false;
+    }
     const q = NET.actions[id] || (NET.actions[id] = []);
     // une action par pas, dans l'ordre où l'invité les a faites (avec la case qu'il avait choisie)
     const a = q.shift() || {};
@@ -544,17 +608,28 @@ function onMsg(from, m) {
       const p = H.players.find((q) => q.id === from);
       sim.addPlayer(from, (p && p.name) || 'Player');
       send(from, goMessage());
+    } else if ((m.t === 'i' || m.t === 'a') && m.run === NET.run && sim && !sim.players.some((P) => P.id === from)) {
+      // revenu après être sorti de la partie : spectateur jusqu'au prochain étage
+      const p = H.players.find((q) => q.id === from);
+      sim.addPlayer(from, (p && p.name) || 'Player');
+      send(from, goMessage());
     } else if (m.t === 'i' && m.run === NET.run) {
-      NET.inputs[from] = { seq: Number.isFinite(+m.n) ? +m.n : undefined, vo: num(m.vo, 0, 1), ra: !!m.ra, mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 200), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) }, v: m.v };
+      NET.inputs[from] = { at: performance.now(), seq: Number.isFinite(+m.n) ? +m.n : undefined, vo: num(m.vo, 0, 1), ra: !!m.ra, mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, cm: !!m.cm, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 200), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) }, v: m.v };
     } else if (m.t === 'fp' && hud) {
-      // un invité n'a pas la même carte que nous : l'un des deux tourne sur une autre version du jeu
+      // un invité n'a pas la même carte que nous : s'il a une version plus récente, ou la même et qu'il s'est déjà
+      // réparé sans succès, c'est nous qui avons tort (la partie continue chez les autres pendant qu'on se répare)
       const p = H.players.find((q) => q.id === from);
       const who = ((p && p.name) || 'A player').toUpperCase();
       const gv = typeof m.v === 'string' ? m.v.slice(0, 8) : '';
-      const meOlder = gv && GAME_V && +gv > +GAME_V;
-      hud.toast(meOlder
-        ? `MAPS DON'T MATCH · ${who} HAS ${verLabel(gv)}, YOU HAVE ${verLabel(GAME_V)} · RELOAD THE PAGE (CTRL+SHIFT+R)`
-        : `MAPS DON'T MATCH · ${who} HAS ${verLabel(gv)} · THEY MUST RELOAD (CTRL+SHIFT+R)`, 14);
+      const a = verNum(gv);
+      const b = verNum(GAME_V);
+      if ((a > b || (a && a === b && m.tried)) && selfUpdate(a > b ? gv : GAME_V)) return;
+      if (performance.now() - printWarnT > 20000) {
+        printWarnT = performance.now();
+        hud.toast(a > b
+          ? `MAPS DON'T MATCH · ${who} HAS ${verLabel(gv)}, YOU HAVE ${verLabel(GAME_V)} · RELOAD THE PAGE (CTRL+SHIFT+R)`
+          : `MAPS DON'T MATCH · ${who} HAS ${verLabel(gv)} · ${who} IS UPDATING`, 14);
+      }
     } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'p', 't', 'b', 'h', 'g'].includes(m.k)) {
       const q = NET.actions[from] || (NET.actions[from] = []);
       if (q.length < 8) q.push({ k: m.k, sel: m.s === 2 ? 2 : 1, side: m.side > 0 ? 1 : -1, n: Math.max(1, Math.min(4, m.n | 0)) });
@@ -568,6 +643,14 @@ function onMsg(from, m) {
     if (m.run !== NET.run || !sim) {
       dailyLabel = typeof m.dy === 'string' ? m.dy.slice(0, 12) : null;
       startRun({ seed: m.seed, difficulty: m.diff, players: m.players || [], run: m.run, level: m.lv || 0, vip: !!m.vip });
+    }
+  } else if (m.t === 's' && m.run !== NET.run) {
+    // une partie que l'on n'a pas (le « go » de l'hôte s'est perdu, une nouvelle partie a commencé sans nous) : on la
+    // redemande, au plus toutes les 1,5 s, au lieu de rester sur l'ancienne carte
+    const t = performance.now();
+    if (!(t - (NET.askT || -1e9) < 1500)) {
+      NET.askT = t;
+      send('host', { t: 'hi' });
     }
   } else if (m.t === 's' && sim && m.run === NET.run) {
     const lv = sim.level;
@@ -586,17 +669,65 @@ function onMsg(from, m) {
 
 // Le salon a changé : un joueur part (il quitte la partie), ou l'hôte est parti et c'est moi qui prends le relais
 function onRoster() {
-  if (!sim) return;
+  // qui est sorti du jeu pour revenir au salon (il était prêt pour ce jeu, il ne l'est plus)
+  const game = H.info && H.info.game;
+  if (game) {
+    const ready = H.readyMap || {};
+    for (const p of H.players) {
+      if (ready[p.id] === game) NET.seenReady.add(p.id), NET.quit.delete(p.id);
+      else if (NET.seenReady.has(p.id)) NET.quit.add(p.id);
+    }
+  }
+  // l'hôte est parti et c'est moi qui prends le relais, même si sa partie ne m'était pas encore arrivée
   if (NET.role === 'guest' && H.info.role === 'host') {
     NET.role = 'host';
     NET.inputs = {};
     NET.actions = {};
+    NET.goneAt = {};
+    if (!sim) {
+      // promu avant le « go » : on lance la partie nous-mêmes, le temps que les autres nous rejoignent
+      setTimeout(() => {
+        if (NET.role === 'host' && !sim) initGame(lastSettings);
+      }, 2500);
+      return;
+    }
     if (hud) hud.toast("You're the host now: the game goes on");
   }
+  if (!sim) return;
   if (voice && NET.role !== 'solo') voice.sync(H.players.map((p) => p.id));
-  if (NET.role !== 'host') return;
-  const ids = new Set(H.players.map((p) => p.id));
-  for (const P of [...sim.players]) if (!ids.has(P.id)) sim.removePlayer(P.id);
+  prunePlayers();
+}
+
+// Hôte : un joueur qui manque au salon (parti, en reconnexion, retourné au salon) garde sa place 20 s, le temps de
+// revenir ; après un changement d'hôte, les autres reviennent un par un dans le nouveau salon : on ne les sort pas
+// de la partie pour autant. Au-delà, il la quitte (ce qu'il portait reste par terre)
+// les lampes d'explorateurs à poser d'avance dans la scène (chacune coûte un peu à chaque image, même éteinte ; en
+// ajouter une en cours de partie fige l'image le temps de recompiler) : une par joueur du salon, plus celle du rejeu
+// de la mort, et une de réserve à plusieurs pour un retardataire
+function lampsFor() {
+  if (NET.role === 'solo') return 2;
+  const n = Math.max(sim ? sim.players.length : 1, H && H.players ? H.players.length : 1);
+  return Math.min(8, n + 2);
+}
+
+function prunePlayers() {
+  if (NET.role !== 'host' || !sim) return;
+  const game = H.info && H.info.game;
+  const ready = H.readyMap || {};
+  const here = new Set(H.players.filter((p) => !p.away && (!game || !Object.keys(ready).length || ready[p.id] === game)).map((p) => p.id));
+  const now = performance.now();
+  for (const P of [...sim.players]) {
+    if (P.id === NET.myId || here.has(P.id)) {
+      delete NET.goneAt[P.id];
+      continue;
+    }
+    const t = NET.goneAt[P.id] ?? (NET.goneAt[P.id] = now);
+    if (now - t < 20000) continue;
+    sim.removePlayer(P.id);
+    delete NET.goneAt[P.id];
+    delete NET.inputs[P.id];
+    delete NET.actions[P.id];
+  }
 }
 
 const ITEM_NAME = { bottle: 'Almond water', battery: 'Batteries', ladder: 'Ladder' };
@@ -662,6 +793,7 @@ function handleEvent(ev, me) {
       break;
     case 'hide':
       if (sfx) sfx.hide(ev.id === me ? null : { x: ev.x, z: ev.z });
+      if (sfx && ev.id === me && !ev.on && sfx.breathHeld) sfx.holdBreath(false);
       if (ev.id === me && ev.on && hud) hud.toast('Hidden · hold [Shift] to hold your breath when it comes close');
       break;
     case 'breath':
@@ -669,7 +801,7 @@ function handleEvent(ev, me) {
       break;
     case 'gasp':
       if (sfx) {
-        sfx.holdBreath(false);
+        if (ev.id === me) sfx.holdBreath(false);
         if (ev.id !== me) sfx.caption('gasping', { x: ev.x, z: ev.z });
       }
       if (ev.id === me && hud) hud.toast("You couldn't hold it…");
@@ -823,6 +955,42 @@ function handleEvent(ev, me) {
       sfx.ambCue(ev.s, { x: ev.x, z: ev.z }, ev.a, ev.u, ev.v, ev.w);
       break;
     }
+    case 'lampCut': {
+      // elle apparaît (ou disparaît) tout près : la lampe hoquette et meurt un instant
+      const V = sim.viewPlayer(sim.spectate || 0);
+      if ((V.floor || 0) !== (ev.floor || 0) || Math.hypot(V.x - ev.x, V.z - ev.z) > (ev.r || 30)) break;
+      if (scene && scene.lampCut) scene.lampCut(ev.t);
+      if (sfx && V.flashlight) sfx.neonClick(null, 0.3);
+      break;
+    }
+    case 'neonWake': {
+      // en poursuite, les néons qu'elle frôle grésillent : on l'entend venir de néon en néon
+      const V = sim.viewPlayer(sim.spectate || 0);
+      const now = performance.now();
+      if (!sfx || now - (neonWakeAt || 0) < 90 || Math.hypot(V.x - ev.x, V.z - ev.z) > 30) break;
+      neonWakeAt = now;
+      sfx.neonClick({ x: ev.x, z: ev.z, muffled: (ev.floor || 0) !== (V.floor || 0) }, 0.55);
+      break;
+    }
+    case 'monsterDoor': {
+      // la porte du haut de l'escalier : elle la passe d'un coup d'épaule
+      const V = sim.viewPlayer(sim.spectate || 0);
+      if (sfx) sfx.distant('door', { x: ev.x, z: ev.z, muffled: (V.floor || 0) !== 0, rolloff: 0.3, ref: 5 }, 1.4);
+      break;
+    }
+    case 'monsterDrop': {
+      // au bord d'un trou, ses griffes raclent le rebord… puis plus rien
+      const V = sim.viewPlayer(sim.spectate || 0);
+      if (sfx && Math.hypot(V.x - ev.x, V.z - ev.z) < 35) sfx.distant('drag', { x: ev.x, z: ev.z, muffled: (V.floor || 0) !== (ev.floor || 0), rolloff: 0.4, ref: 4 }, 0.9);
+      break;
+    }
+    case 'monsterLand': {
+      // … et le choc, à l'étage du dessous
+      const V = sim.viewPlayer(sim.spectate || 0);
+      if (sfx && Math.hypot(V.x - ev.x, V.z - ev.z) < 45) sfx.heavyThud({ x: ev.x, z: ev.z, muffled: (V.floor || 0) !== (ev.floor || 0) });
+      if (scene && (V.floor || 0) === (ev.floor || 0) && Math.hypot(V.x - ev.x, V.z - ev.z) < 14) scene.tape('grab', 0.25);
+      break;
+    }
     case 'glimpse':
       // la première rencontre : rien… puis le néon au-dessus d'elle qui claque
       if (ev.phase === 'show' && sfx && ev.id === me) sfx.silence(2.5);
@@ -876,13 +1044,15 @@ function handleEvent(ev, me) {
       if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
       break;
     case 'level':
+      // un nouvel étage s'allume : le bourdonnement des néons revient (même si on est parti pendant une coupure)
+      if (sfx) sfx.dark = false;
       // un étage de plus : elle s'enhardit un peu pour la prochaine partie
       if (NET.role !== 'guest' && ev.level && !ev.rebuild) nudgeSkill(0.05);
       // nouvel étage : nouvelle scène
       if (scene && scene.level === ev.level && scene.map === sim.map) break;
       if (scene) scene.dispose();
       stageEl.innerHTML = '';
-      scene = createBackroomsScene(stageEl, sim.floors);
+      scene = createBackroomsScene(stageEl, sim.floors, lampsFor());
       scene.onDrip = (pos) => sfx && sfx.drip(pos);
       sim.spectate = 0;
       stepDist = 0;
@@ -895,6 +1065,7 @@ function handleEvent(ev, me) {
       break;
     case 'jumpscare':
       if (ev.id !== me) break;
+      if (sfx && sfx.stopGrab) sfx.stopGrab(); // agrippé jusqu'à la mort : la lutte se tait
       if (ev.goat) {
         // Level 2 : une chèvre t'a percuté
         if (sfx) sfx.goatJumpscare();
@@ -918,6 +1089,7 @@ function handleEvent(ev, me) {
         replayed = span > 1.5 && !sim.goats;
         const lose = () => {
           if (scene !== sc) return;
+          replayed = false; // le rejeu est fini : l'écran de fin n'a plus à l'attendre
           if (hud) hud.replayTag(false);
           if (scene) scene.tape('loss', 2.6);
           if (sfx) sfx.noSignal(true);
@@ -1241,6 +1413,7 @@ function frame(currentTime) {
       if (NET.role === 'host') NET.events.push(ev);
       handleEvent(ev, me);
     }
+    if (NET.role === 'host' && NET.tick % 60 === 0) prunePlayers();
     if (NET.role === 'host' && NET.tick % 3 === 0 && H.players.length > 1) {
       // d'abord l'état, ensuite les événements : un événement ne précède jamais ce qu'il annonce
       send('all', { t: 's', run: NET.run, s: sim.snapshot() }, true);
@@ -1333,6 +1506,10 @@ function frame(currentTime) {
       sfx.heartbeat(0);
     }
     sfx.ambience(delta, !paused && sim.state === 'playing');
+  }
+  if (sfx && sim.state !== 'playing' && valveSound) {
+    sfx.valveTurn(-1);
+    valveSound = false;
   }
   if (sfx && sim.state === 'playing') {
     // la vanne qu'on tourne grince de plus en plus

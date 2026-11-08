@@ -12,6 +12,21 @@ export const FLOOR_DY = 6.4; // l'étage du bas est 6,40 m plus bas (3 m sous pl
 export const PIT_DEPTH = FLOOR_DY; // on tombe d'un étage, de très haut
 export const CASSETTES = 7; // cassettes VHS à trouver au Level 0 (4 en haut, 3 en bas)
 export const NICHE_Y = 2.25; // hauteur de la cassette dans son renfoncement
+// rayon d'un joueur : PLAYER_RADIUS de sim.js (sim.js importe ce fichier, on ne l'importe pas d'ici)
+const PLAYER_R = 0.38;
+
+// Mélange un tableau sur place (Fisher–Yates) avec le générateur de la carte, et le renvoie. Jamais de
+// sort(() => rnd() - 0.5) : l'ordre obtenu, et le nombre de tirages, dépendraient de l'algorithme de tri du
+// navigateur (Chrome, Firefox et Safari ne construiraient plus la même carte à partir de la même graine).
+export function shuffle(arr, rnd) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    const t = arr[i];
+    arr[i] = arr[j];
+    arr[j] = t;
+  }
+  return arr;
+}
 
 // tous les objets qu'on ramasse avec F : 'bottle', 'battery', 'ladder' (id unique, position, pris ou non)
 // Les objectifs d'un niveau, le plus loin possible les uns des autres : à chaque tour, la case candidate dont le
@@ -95,7 +110,7 @@ export function carveElevator(grid, W, H, entrance, spawn, rnd, avoid = null) {
     return n;
   };
   const before = reach();
-  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]].sort(() => rnd() - 0.5);
+  const dirs = shuffle([[1, 0], [-1, 0], [0, 1], [0, -1]], rnd);
   for (const [dx, dz] of dirs) {
     const cx = entrance.x + dx;
     const cz = entrance.z + dz;
@@ -493,8 +508,8 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   };
   const byFar = lower ? [] : [...cassettes].sort((a, b) => D({ x: b.gx, z: b.gz }) - D({ x: a.gx, z: a.gz }));
   vaultLoop: for (const cas of byFar) {
-    for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]].sort(() => rnd() - 0.5)) {
-      for (const shape of [...SHAPES].sort(() => rnd() - 0.5)) {
+    for (const d of shuffle([[1, 0], [-1, 0], [0, 1], [0, -1]], rnd)) {
+      for (const shape of shuffle([...SHAPES], rnd)) {
         for (const side of rnd() < 0.5 ? [1, -1] : [-1, 1]) if (vaultTry(cas, d, shape, side)) break vaultLoop;
       }
     }
@@ -508,7 +523,7 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   // 8b. Une cassette dans un renfoncement en hauteur, au-dessus d'une case contre un mur
   const wallSide = (c) => [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => get(c.x + dx, c.z + dz) === T.WALL);
   let niche = null;
-  for (const cas of lower ? [] : [...cassettes].filter((c) => !c.vault).sort(() => rnd() - 0.5)) {
+  for (const cas of lower ? [] : shuffle(cassettes.filter((c) => !c.vault), rnd)) {
     const c = { x: cas.gx, z: cas.gz };
     let sides = wallSide(c);
     let cell = c;
@@ -665,11 +680,13 @@ export function createBackroomsMap(seed = 42, opts = {}) {
     batteries.push({ id: batteries.length, ...cellPos(c), taken: false });
   }
 
-  // 10b. L'échelle : loin du renfoncement, mais pas trop (25 à 45 cases de marche)
+  // 10b. L'échelle : loin du renfoncement, mais pas trop (25 à 45 cases de marche), et jamais derrière les trous du
+  // couloir piégé (dans la pièce de sa cassette, il faudrait traverser les trous pour aller la chercher)
   const ladders = [];
   if (niche) {
     const dn = bfs(grid, W, H, niche.gx, niche.gz);
-    const ok = (lo, hi) => walkable.filter((c) => !busy.has(c.z * W + c.x) && dn[c.z * W + c.x] >= lo && dn[c.z * W + c.x] <= hi);
+    const dry = reachAll(true);
+    const ok = (lo, hi) => walkable.filter((c) => !busy.has(c.z * W + c.x) && dry[c.z * W + c.x] >= 0 && dn[c.z * W + c.x] >= lo && dn[c.z * W + c.x] <= hi);
     const cand = ok(25, 45).length ? ok(25, 45) : ok(12, 70);
     const c = cand.length ? pick(cand) : null;
     if (c) {
@@ -793,12 +810,12 @@ export function createLevel0(seed = 42) {
   const stairs = [];
   const C = CELL_SIZE;
   for (const minPit of [10, 6, 4]) {
-    const cand = up.walkable.filter((c) => farFromPits(c.x, c.z, minPit) && Math.hypot(c.x - up.spawn.gx, c.z - up.spawn.gz) > 6).sort(() => rnd() - 0.5);
+    const cand = shuffle(up.walkable.filter((c) => farFromPits(c.x, c.z, minPit) && Math.hypot(c.x - up.spawn.gx, c.z - up.spawn.gz) > 6), rnd);
     for (const c of cand) {
       if (stairs.length >= 2) break;
       if (stairs.some((st) => Math.abs(st.gx - c.x) + Math.abs(st.gz - c.z) < 24)) continue;
       // c : la case d'en bas (étage du bas) ; on monte vers (dx, dz) ; la seconde volée est du côté (px, pz)
-      const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]].sort(() => rnd() - 0.5);
+      const dirs = shuffle([[1, 0], [-1, 0], [0, 1], [0, -1]], rnd);
       let found = null;
       for (const [dx, dz] of dirs) {
         for (const side of rnd() < 0.5 ? [1, -1] : [-1, 1]) {
@@ -858,6 +875,9 @@ export function createLevel0(seed = 42) {
     m.props = m.props.filter((p) => !nearWell(p.x, p.z, 2.2 + (p.r || 0)));
     m.tapes = m.tapes.filter((t) => !nearWell((t.x1 + t.x2) / 2, (t.z1 + t.z2) / 2, 2.6));
   }
+  // qui tombe par un trou atterrit en bas au milieu de sa case : aucun meuble qui arrête le pas à moins de son rayon,
+  // du rayon d'un joueur et de 30 cm de ce point (sinon on atterrissait dedans, coincé pour de bon)
+  down.props = down.props.filter((p) => p.walk || up.pits.every((q) => Math.hypot(p.x - q.x, p.z - q.z) >= p.r + PLAYER_R + 0.3));
 
   // les cassettes : 4 en haut (dont celle du couloir piégé et celle du renfoncement), 3 en bas
   const special = up.cassettes.filter((c) => c.vault || c.high);
@@ -871,7 +891,11 @@ export function createLevel0(seed = 42) {
   up.cassettes = keepUp;
   const downDist = gridDist(down.grid, W, down.H);
   const fixedDown = [...stairs.map((st) => ({ x: st.gx, z: st.gz })), cellOf(down.spawn)];
-  down.cassettes = spreadOut(down.cassettes.map(cellOf), fixedDown, freeIds.length, downDist, rnd).map((o) => o.c);
+  // jamais sous un trou du haut (ni tout près) : vue d'en haut au fond du puits, elle brillait sans qu'on puisse la
+  // prendre, et le signal (celui de l'étage où l'on est) ne la comptait pas
+  const downCands = down.cassettes.map(cellOf);
+  const clear = downCands.filter((o) => !up.pits.some((p) => Math.hypot(p.x - o.c.x, p.z - o.c.z) < 6));
+  down.cassettes = spreadOut(clear.length >= freeIds.length ? clear : downCands, fixedDown, freeIds.length, downDist, rnd).map((o) => o.c);
   down.cassettes.forEach((c, i) => {
     c.id = freeIds[i];
   });
