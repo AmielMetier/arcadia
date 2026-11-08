@@ -440,19 +440,20 @@ export function createBackroomsScene(container, floors, lamps) {
     // power : 1 néons allumés, 0 coupure de courant (seule reste une lueur à peine visible)
     let power = 1;
     // Level 0, toutes les cassettes trouvées : la phase rouge. Plus aucune lumière blanche : les néons s'éteignent, sauf
-    // un sur cinq environ (share), qui devient un feu de secours rouge. Comme de vrais feux de secours : une lumière
-    // fixe et faible, chacun à sa force (level), qui tombe vers le sol et éclaire peu le plafond (ceil). Rien ne varie
-    // en douceur : certains feux sont défectueux (bad) et claquent par à-coups ou lâchent quelques secondes, et de
-    // temps en temps tout se coupe d'un coup, puis se rallume en hoquetant. La lumière rouge passe par le second canal
-    // de la lumière cuite (liveB, teinte tint). alarm : un par feu rouge
+    // un sur cinq environ (share), qui devient un feu de secours rouge à bout de souffle. Chacun vit à son rythme,
+    // sans régularité : éteint un moment, il tente de se rallumer en claquant (allumé, éteint, sans entre-deux), tient
+    // parfois une seconde, puis lâche de nouveau ; il lui arrive de rester à demi allumé. Le noir domine. Sa lumière
+    // tombe vers le sol et éclaire peu le plafond (ceil). De temps en temps tout se coupe d'un coup, puis se rallume en
+    // hoquetant. La lumière rouge passe par le second canal de la lumière cuite (liveB, teinte tint).
+    // alarm : un par feu rouge
     let alarm = null;
-    const RED = { share: 0.22, level: [0.65, 1], bad: 0.22, tint: [0.66, 0.038, 0.024], ceil: 0.22 };
+    const RED = { share: 0.22, level: [0.65, 1], tint: [0.66, 0.038, 0.024], ceil: 0.22 };
     const alarmOf = new Map();
     const writeBake = () => {
       if (alarm) {
         live.fill(0);
         liveB.fill(0);
-        for (const a of alarm) if (a.k > 0.01) addPrint(liveB, a.fp, a.k);
+        for (const a of alarm) if (a.v > 0.01) addPrint(liveB, a.fp, a.v);
       } else {
         live.set(base);
         liveB.set(baseB);
@@ -1039,7 +1040,7 @@ float bkCaust(vec2 uv, float t) {
     const fixColor = (l, on) => {
       if (!l.fix) return;
       const a = alarm && alarmOf.get(l);
-      l.fix.mesh.setColorAt(l.fix.i, alarm ? (a && on ? fixTmp.copy(ALARM_OFF).lerp(ALARM, Math.min(1, a.k)) : ALARM_OFF) : on ? onCol(l) : offCol(l));
+      l.fix.mesh.setColorAt(l.fix.i, alarm ? (a && on ? fixTmp.copy(ALARM_OFF).lerp(ALARM, Math.min(1, a.v)) : ALARM_OFF) : on ? onCol(l) : offCol(l));
     };
     const fixDirty = () => {
       for (const m of fixSets) if (m.instanceColor) m.instanceColor.needsUpdate = true;
@@ -2570,7 +2571,8 @@ float bkCaust(vec2 uv, float t) {
             .filter((l) => l.state !== 'off' && pick(l, 0) < RED.share)
             .map((l) => {
               const base = RED.level[0] + (RED.level[1] - RED.level[0]) * pick(l, 3.3);
-              return { l, fp: fpOf(l), base, k: base, bad: pick(l, 7.1) < RED.bad, hic: 0, dead: 0 };
+              // chacun commence à un moment différent de sa vie
+              return { l, fp: fpOf(l), base, k: 0, v: 0, mode: 'off', t: Math.random() * 2.5, n: 0 };
             });
           for (const a of alarm) alarmOf.set(a.l, a);
           bakeUniforms.uBakeTint.value.setRGB(0.8, 0.08, 0.05); // le peu de lumière qui reste dans le noir : rouge aussi
@@ -2609,23 +2611,44 @@ float bkCaust(vec2 uv, float t) {
             }
             let changed = false;
             for (const a of alarm) {
-              let k = a.base;
-              if (a.bad) {
-                // un feu défectueux : il claque un moment (allumé, éteint, sans entre-deux), ou lâche quelques secondes
-                if (a.dead > 0) {
-                  a.dead -= st;
-                  k = 0;
-                } else if (a.hic > 0) {
-                  a.hic -= st;
-                  k = Math.random() < 0.5 ? 0 : a.base;
-                } else if (Math.random() < 0.01) a.hic = 0.15 + Math.random() * 1.3;
-                else if (Math.random() < 0.002) a.dead = 2 + Math.random() * 6;
+              a.t -= st;
+              let k = a.k;
+              if (a.mode === 'off') {
+                // éteint ; parfois une lueur à peine visible, le tube qui n'amorce pas
+                if (a.t <= 0) {
+                  a.mode = 'try';
+                  a.n = 2 + Math.floor(Math.random() * 6);
+                  a.t = 0;
+                } else k = Math.random() < 0.02 ? a.base * 0.2 : k > 0 && k < a.base * 0.3 ? k : 0;
               }
-              if (all !== null) k = all ? a.base : 0;
-              if (k !== a.k) {
-                a.k = k;
-                fixColor(a.l, true);
+              if (a.mode === 'try' && a.t <= 0) {
+                // il tente de s'allumer : des claquements de longueurs inégales
+                if (a.n-- > 0) {
+                  const on = k < a.base * 0.5;
+                  k = on ? (Math.random() < 0.25 ? a.base * 0.35 : a.base) : 0;
+                  a.t = on ? 0.04 + Math.random() * 0.14 : 0.03 + Math.random() * 0.2;
+                } else if (Math.random() < 0.5) {
+                  a.mode = 'on'; // il tient… un peu
+                  k = Math.random() < 0.3 ? a.base * 0.45 : a.base;
+                  a.t = 0.25 + Math.random() * 1.2;
+                } else {
+                  a.mode = 'off';
+                  k = 0;
+                  a.t = 0.4 + Math.random() * 3.2;
+                }
+              } else if (a.mode === 'on') {
+                if (a.t <= 0) {
+                  a.mode = 'off';
+                  k = 0;
+                  a.t = 0.5 + Math.random() * 3.5;
+                } else if (Math.random() < 0.06) k = k > 0 ? 0 : a.base; // un trou d'une fraction de seconde
+              }
+              a.k = k;
+              const shown = all !== null ? (all ? k || a.base * 0.6 : 0) : k;
+              if (shown !== a.v) {
+                a.v = shown; // ce qui se voit (k, sauf pendant une coupure générale)
                 changed = true;
+                fixColor(a.l, true);
               }
             }
             if (changed) {
