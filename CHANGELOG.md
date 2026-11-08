@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 4.74 — 8 novembre 2026
+## 4.75 — 8 novembre 2026
 - **The Backrooms** — Des puits sans fond à l'étage du bas du Level 0.
   - Dans certaines grandes salles, le sol laisse place à une grille de trous carrés séparés par d'étroites passerelles.
   - Ils sont si profonds qu'on n'en voit jamais le fond : leurs parois s'enfoncent dans le noir.
@@ -12,6 +12,9 @@
 - **The Backrooms** — Une vraie moquette rase au Level 0 : des poils fins qu'on distingue à hauteur d'homme, avec leurs ombres, et plus aucun motif qui se répète sur le sol.
 - **The Backrooms** — Les murs de l'étage du haut sont propres : plus de coulures, presque plus d'auréoles ni de traces d'humidité.
 - **The Backrooms** — L'étage du bas du Level 0 garde son ambiance d'avant : papier peint doré juste plus gris (plus aucune tache, fissure ni moisissure), moquette brun doré et lumière plus chaude.
+
+## 4.74 — 8 novembre 2026
+- Correction : sortie de la Caverne du Magma bien encadree de roche et chambre sud-est reliee au nord (Amiel)
 
 ## 4.73 — 8 novembre 2026
 - Correction : sorties des grottes au bout de la salle (Grotte Lunaire, Tourbillons, Victoire), plus de case libre a cote de la porte (Amiel)
