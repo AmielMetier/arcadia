@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.64 — 8 novembre 2026
+- Nouveau : refonte HUD & Sac B2W2, DexNav habitat, chat multijoueur et audit de stabilite (Amiel)
+
 ## 4.63 — 8 novembre 2026
 - **The Backrooms** — Plus jamais de parties où chacun a sa propre carte.
   - La vraie cause est trouvée : un joueur sur Chrome et un autre sur Firefox ou Safari avaient toujours deux cartes différentes (le tirage de la carte dépendait du navigateur). Maintenant, tout le monde a exactement la même carte, quel que soit son navigateur. Toutes les cartes changent avec cette version, la Carte du jour aussi.
