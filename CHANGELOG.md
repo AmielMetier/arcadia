@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 4.76 — 8 novembre 2026
+- **Odyssée** — Tu choisis maintenant tes graphismes : Options → « Sol du dehors » et « Sprites des Pokémon ».
+  - Sol du dehors : « Odyssée » (le sol dessiné par le jeu, avec son relief), « Classique » (les tuiles d'origine) ou le nouveau « Pokémon Lumineux » (herbe, terre, sable, pierre, neige, eau, lave et hautes herbes dans un style Rubis / Émeraude aux couleurs vives).
+  - Le sol change au prochain lancement d'Odyssée ; depuis l'écran-titre, le jeu se relance tout seul en quittant les Options.
+  - Sprites des Pokémon : « HeartGold / SoulSilver » (comme avant) ou « Noir & Blanc » (Gen 5) pour les 493 premiers Pokémon, avec leurs versions de dos et chromatiques. Le changement est immédiat.
+- **Odyssée** — Un écran « Crédits graphismes » dans les Options remercie les artistes dont les tuiles et les sprites sont utilisés.
+
 ## 4.75 — 8 novembre 2026
 - **The Backrooms** — Des puits sans fond à l'étage du bas du Level 0.
   - Dans certaines grandes salles, le sol laisse place à une grille de trous carrés séparés par d'étroites passerelles.
