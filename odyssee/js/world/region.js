@@ -17,6 +17,8 @@ import { enrichirTout, equipeDeType } from './rencontres.js';
 import { addHabitants } from './habitants.js';
 import { applyRetouches } from './retouches.js';
 import { buildArena } from './arenes.js';
+import { construireArene } from './arenes-plan.js';
+import { PLANS } from './arenes-plans.js';
 import { areneSylve } from './arene-sylve.js';
 import { buildSud, BADGES_SUD, LEADERS_SUD, GYM_TRAINERS_SUD } from './sud.js';
 import { addVehicules } from './vehicules.js';
@@ -258,7 +260,9 @@ export function poserBatiment(W, maps, def, b) {
   else if (b.kind === 'mart') inside = martInterior(id, 'Boutique', STOCK[def.stock || 1]);
   else if (b.kind === 'gym') {
     // la première arène (Sylvebourg) est dessinée à la main : la Grande Serre (world/arene-sylve.js) ; les autres sont tirées d'une graine
-    const ar = def.gym === 0 ? areneSylve(id, 'Arène de ' + def.name) : buildArena(id, def.gym, LEADERS[def.gym].type, 'Arène de ' + def.name);
+    // les autres sont dessinées dans un plan (world/arenes-plans.js, mécanismes dans world/arenes-plan.js) ; repli : énigme tirée d'une graine
+    const nom = 'Arène de ' + def.name;
+    const ar = PLANS[def.gym] ? construireArene(id, def.gym, PLANS[def.gym], nom) : def.gym === 0 ? areneSylve(id, nom) : buildArena(id, def.gym, LEADERS[def.gym].type, nom);
     inside = ar.map; def.gymArena = ar;
   }
   else if (b.kind === 'lab') inside = labInterior(id);
@@ -1204,7 +1208,7 @@ export function buildWorld() {
   chaine(W, towns);
   /* ======================== ARÈNES ======================== */
   const gymTrainers = [
-    [['Insectomane', 'Lucas', [[1017, 9], [10, 10]]], ['Insectomane', 'Basile', [[1018, 10, null, [33, 81, 106]], [1020, 10]]]],
+    [['Insectomane', 'Lucas', [[13, 12], [265, 12], [1017, 13]]], ['Jardinière', 'Capucine', [[540, 13], [401, 13], [1018, 14]]]],   // la Ruche de Sylvebourg (niveaux 12 à 14)
     [['Marin', 'Yann', [[1029, 17], [116, 17]]], ['Fillette', 'Océane', [[118, 18], [1031, 18]]], ['Pêcheur', 'Paul', [[60, 19], [1033, 19]]]],
     [['Scientifique', 'Alan', [[100, 23], [1034, 23]]], ['Topdresseuse', 'Électra', [[1036, 24], [25, 24]]], ['Scientifique', 'Ohm', [[82, 25]]]],
     [['Randonneuse', 'Rose', [[69, 28], [1021, 28]]], ['Topdresseuse', 'Lila', [[44, 29], [1038, 29]]], ['Randonneuse', 'Iris', [[189, 30]]]],
@@ -1216,9 +1220,20 @@ export function buildWorld() {
   ];
   // quatrième dresseur des arènes qui n'en avaient que deux ou trois
   const GYM_EXTRA = [
-    ['Gamin', 'Théodore', [[1017, 10]]], ['Pêcheur', 'Gilles', [[1029, 18]]], ['Scientifique', 'Volt', [[1034, 24]]], ['Fillette', 'Capucine', [[1021, 29]]],
+    ['Insectomane', 'Basile', [[1018, 13, null, [33, 81, 106]], [1020, 13]]], ['Pêcheur', 'Gilles', [[1029, 18]]], ['Scientifique', 'Volt', [[1034, 24]]], ['Fillette', 'Capucine', [[1021, 29]]],
     ['Médium', 'Isaure', [[1039, 34]]], ['Montagnard', 'Roch', [[1026, 39]]], ['Karatéka', 'Kazuo', [[1041, 44]]], ['Topdresseur', 'Siegfried', [[1049, 48]]],
   ];
+  // cinquième dresseur des arènes dessinées qui ont cinq places
+  const GYM_CINQUIEME = {
+    grass: [['Jardinière', 'Pervenche'], ['Randonneuse', 'Myrtille']], psychic: [['Médium', 'Oriane'], ['Médium', 'Séraphin']], rock: [['Montagnard', 'Silex'], ['Montagnard', 'Galet']],
+    fire: [['Karatéka', 'Daigo'], ['Topdresseur', 'Ignis']], dragon: [['Garde d\'Écaille', 'Ysolde'], ['Topdresseuse', 'Draconia']], flying: [['Pilote', 'Zéphyr'], ['Pilote', 'Alizée']],
+    dark: [['Ninja', 'Nyx'], ['Voleur', 'Sombral']], normal: [['Homme d\'affaires', 'Albert'], ['Femme d\'affaires', 'Odile']], water: [['Marin', 'Loïc'], ['Pêcheur', 'Ewen']],
+    electric: [['Scientifique', 'Ampère'], ['Topdresseuse', 'Volta Jr']], poison: [['Voleur', 'Toxin'], ['Médium', 'Belladone']], ground: [['Montagnard', 'Sablon'], ['Ouvrier', 'Gravier']],
+    steel: [['Ouvrier', 'Boulon'], ['Scientifique', 'Rivet']], fairy: [['Dame Kimono', 'Rosalie'], ['Fillette', 'Mélusine']],
+    bug: [['Gamin', 'Théodore'], ['Insectomane', 'Mathis']],
+  };
+  // objets des recoins (case « o » des plans)
+  const OBJETS_ARENE = { 0: ['potion', 'paralyze-heal'], 1: ['mystic-water'], 11: ['soft-sand'] };
   for (const t of Object.values(towns)) {
     if (t.gym == null) continue;
     const g = t.gymMap, L2 = LEADERS[t.gym], ar = t.gymArena;
@@ -1233,11 +1248,19 @@ export function buildWorld() {
     // les six générations (un Pokémon différent d'une arène à l'autre, toujours le même pour une arène donnée)
     const list = ar.dresseurs ? [] : gymTrainers[t.gym].slice();
     const extra = GYM_EXTRA[t.gym]; if (!ar.dresseurs && list.length < 4 && extra) list.push(extra);
-    list.forEach(([cls, name, team], i) => {
+    // arène dessinée : autant de dresseurs que de places (un cinquième, du même niveau que le quatrième, si le plan en prévoit un)
+    // (les places des plans font partie de l'énigme : chaque place reçoit son dresseur)
+    const plus = GYM_CINQUIEME[L2.type] || [];
+    for (let k = 0; !ar.dresseurs && ar.map.planArene && spots.length > list.length && list.length && k < plus.length; k++) {
+      const t4 = list[list.length - 1][2]; list.push([plus[k][0], plus[k][1], t4.map(([sp, lv]) => [sp, lv + 1]).slice(0, 1)]);
+    }
+    list.slice(0, spots.length).forEach(([cls, name, team], i) => {
       const lvl = Math.max(...team.map((m) => m[1]));
       const more = equipeDeType(L2.type, lvl, team.length >= 3 ? 1 : 2, t.gym * 31 + i * 7 + 3).filter(([sp]) => !team.some((m) => m[0] === sp));
-      const [x, y, dir] = spots[i]; trainerNpc(g, x, y, dir, cls, name, team.concat(more).slice(0, 4), { sight: 3, intro: 'Tu veux défier notre Champion ? Passe d\'abord par moi !', after: 'Notre Champion est bien plus fort que moi.' });
+      const [x, y, dir, vue] = spots[i]; trainerNpc(g, x, y, dir, cls, name, team.concat(more).slice(0, 4), { sight: vue ?? 3, intro: 'Tu veux défier notre Champion ? Passe d\'abord par moi !', after: 'Notre Champion est bien plus fort que moi.' });
     });
+    // objets posés dans les recoins des arènes dessinées
+    (ar.objets || []).forEach(([x, y], i) => g.item(x, y, OBJETS_ARENE[t.gym]?.[i] || 'super-potion', 1, `${g.id}:objet${i}`));
     const fem = L2.fem || ['Marine', 'Volta', 'Flora', 'Sibylle'].includes(L2.name);
     g.npc({ id: g.id + ':leader', x: ar.leader[0], y: ar.leader[1], dir: 'down', sprite: L2.ow, leader: t.gym, trainer: { cls: fem ? 'Championne' : 'Champion', name: L2.name, team: L2.team, prize: 100, bs: L2.ow, ai: t.gym === 0 ? 'normal' : 'smart', items: { 'potion': t.gym === 0 ? 2 : 0, 'super-potion': (t.gym >= 1 && t.gym < 3 ? 2 : 0), 'hyper-potion': (t.gym >= 3 ? 2 : 0), 'full-restore': (t.gym >= 6 ? 2 : (t.gym >= 4 ? 1 : 0)) }, intro: L2.intro, lose: L2.lose, sight: 0 } });
   }

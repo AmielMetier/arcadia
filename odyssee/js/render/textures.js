@@ -5,6 +5,8 @@ import { SOL16_JEUX } from '../data/sol16.js';
 import { REGLES, kitCell } from '../data/regles.js';
 import { texturesRelief, tourbillon, quart, remous, koi } from './relief-tex.js';
 import { texturesSerre, spritesSerre } from './serre-tex.js';
+import { texturesArenes, spritesArenes } from './arenes-tex.js';
+import { texturesMurs } from './murs-tex.js';
 
 export const CELL = 16, PITCH = 18;
 
@@ -275,6 +277,10 @@ export function buildAtlas() {
   }
   // Arène de Sylvebourg (la Grande Serre) : sol, mur de verre, alvéoles, stèles, interrupteurs, estrade, tapis
   texturesSerre(putImg);
+  // arènes dessinées dans un plan (world/arenes-plans.js) : sols, dalles, pontons, gouffres, tapis, rayon…
+  texturesArenes(putImg);
+  // murs des intérieurs façon HeartGold / SoulSilver (haut et bas du mur du fond, chaperons, fenêtres, ombres)
+  texturesMurs(putImg);
   // chaussées de Métropole : asphalte, avec la ligne pointillée du milieu sur le bord commun des deux voies
   const asph = (P) => { P.fill('#5a5c64'); P.speck(18, '#64666e'); P.speck(10, '#4e5058'); };
   put('asph', asph);
@@ -491,7 +497,7 @@ function tuftSprite(P, pal, ox, oy, frame = 0) {
   P.rect(ox, oy + 12, 16, 2, dd);
 }
 export function buildSprites() {
-  const SIZE = 1024; const P = new Pix(SIZE, SIZE, 4242);
+  const SIZE = 2048; const P = new Pix(SIZE, SIZE, 4242);
   P.x.clearRect(0, 0, SIZE, SIZE);
   const rects = {};
   const add = (k, x, y, w, h) => { rects[k] = { x, y, w, h, u0: x / SIZE, v0: y / SIZE, u1: (x + w) / SIZE, v1: (y + h) / SIZE }; };
@@ -554,6 +560,8 @@ export function buildSprites() {
   (() => { const ox = 448, oy = 48; for (let y = 0; y < 10; y++) for (let x = 0; x < 24; x++) { const dx = (x - 11.5) / 11.5, dy = (y - 4.5) / 4.5, q = dx * dx + dy * dy; if (q > 1) continue; P.p(ox + x, oy + y, q > 0.62 ? '#ffffff' : q > 0.4 ? '#bfe4ff' : '#3a86d8'); } add('wake', ox, oy, 24, 10); })();
   // Arène de Sylvebourg : bloc de pollen, bordure du bassin, fleur géante, massif, soufflerie, lianes, pupitre (32 px par case)
   spritesSerre(P.x, (k, x, y, w, h, d) => { add(k, x, y, w, h); rects[k].d = d; });
+  // arènes dessinées : leviers, statues, vitrines, canons, miroirs, grilles… (bas de la planche, 32 px par case)
+  spritesArenes(P.x, (k, x, y, w, h, d) => { add(k, x, y, w, h); rects[k].d = d; });
   return { canvas: P.c, rects, size: SIZE };
 }
 /** pose les images dessinées (nature, mobilier) dans l'atlas des sprites, à la place des dessins du code */

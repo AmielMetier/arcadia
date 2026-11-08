@@ -107,11 +107,22 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   Histoire principale (la Team Éclipse, Lugia Obscur au Sanctuaire des Marées, l'Éclipse, le Conseil 4 avant Célestine, les CS Flash et Force
   et leurs recoins cachés, les quêtes annexes) : `odyssee/js/world/story.js` (PNJ et lieux) et `odyssee/js/story.js` (scènes) ;
   `node tools/test-odyssee-story.mjs` rejoue toute l'aventure dans l'ordre et vérifie que chaque étape est atteignable au bon moment.
-  Arène de Sylvebourg (premier badge, `odyssee/js/world/arene-sylve.js`) : dessinée à la main dans un plan ASCII, la Grande Serre
-  (accueil, deux demi-serres où des souffleries poussent des blocs de pollen jusqu'aux stèles, dôme d'Hector) ; les autres arènes
-  sont tirées d'une graine (`odyssee/js/world/arenes.js`). Le souffle est dans `souffle()` (même code pour le jeu et le test) ;
-  `node tools/test-odyssee-arene-sylve.mjs` vérifie qu'elle se résout sans impasse et sans croiser les dresseurs, le talent
-  Sacoches de Pollen et la CT01 Pollen Collant. Graphismes : `odyssee/js/render/serre-tex.js`.
+  Arènes dessinées dans un plan ASCII (les quinze, Sylvebourg comprise) : plans, légendes, registres et règles dans `odyssee/js/world/arenes-plans.js`,
+  écrit par `python3 tools/odyssee-arenes/dessiner.py` (arènes peintes dans `nord.py` et `sud.py` à côté ; `archipel()` : 3 × 4 îles reliées par
+  des passages, configurations trouvées par recherche). Mécanismes et solveur communs dans `odyssee/js/world/arenes-plan.js` (portes à condition
+  sur des registres, dalles et leviers, verrous, tapis qui tournent, glace et sable, trous, téléporteurs, canons à vent, rochers et fosses, rayon
+  et miroirs qui barrent la route, dalles d'argile, pupitre de remise) ; côté jeu `odyssee/js/arenes-jeu.js` (registres dans le drapeau `R:<carte>`,
+  `PV:<carte>` pour les sauvegardes d'avant), graphismes `odyssee/js/render/arenes-tex.js`, une case d'arène = plusieurs décors (`celluleArene`
+  de `world3d.js`). Chaque place de dresseur du plan reçoit son dresseur (`GYM_CINQUIEME` de `region.js`). `node tools/test-odyssee-arenes-plan.mjs [type]` :
+  chaque arène se résout, sans état sans retour, sans dresseur qui bloque ; `node tools/test-odyssee-arenes-jeu.mjs [n°]` (Playwright, `CHROME_PATH`
+  possible) rejoue chaque solution dans le vrai jeu et compare les registres coup par coup : à lancer quand on touche à l'un de ces fichiers.
+  Les énigmes tirées d'une graine (`odyssee/js/world/arenes.js`, `node tools/test-odyssee-arenes.mjs`) ne servent plus que de repli ; l'ancienne
+  Grande Serre de Sylvebourg (`arene-sylve.js`, `serre-tex.js`) reste vérifiée seule par `node tools/test-odyssee-arene-sylve.mjs` (avec Sacoches de
+  Pollen et la CT01 Pollen Collant).
+  Intérieurs façon HeartGold / SoulSilver (`murCell` de `world3d.js`, tuiles de `odyssee/js/render/murs-tex.js`) : mur du fond en deux (papier peint
+  et corniche, lambris et plinthe), fenêtres là où rien ne s'adosse, murs latéraux en vrais volumes coiffés d'un chaperon, muret en bas, ombre des
+  murs sur le sol, tapis sous la table des maisons ; quatre papiers peints de maison tirés de l'identifiant de la carte (`styleMur`) ; `?anciensmurs`
+  dans l'adresse remet l'ancien rendu pour comparer.
   Histoire secondaire (la Brume) et nouveaux lieux (Lac Miroir, Grotte des Marées, Jardin des Songes, Forêt des Torii et Temple Kagura,
   Île du Magma) : `odyssee/js/world/quetes.js`. Une quête = des étapes dans `flags['Q:id']`, des PNJ qui apparaissent selon l'étape
   (`when`), des scripts (`talk`, `use`, `onWin`, `after`) qui reçoivent les outils de `game.api()`. `node tools/test-odyssee-quetes.mjs`

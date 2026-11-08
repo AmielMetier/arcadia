@@ -45,7 +45,9 @@ export function houseInterior(id, name, o = {}) {
   furn(m, 'table', 4, 4); if (o.bed) furn(m, 'bed', w - 2, 4);
   // la chambre du joueur : une armoire pour changer de tenue
   if (o.bed && o.kitchen) m.object(5, 2, { use: (api) => api.game.frigo() });   // le frigo : son aimant d'agence immobilière
-  if (o.bed) { furn(m, 'armoire', w - 2, 2); m.object(w - 2, 2, { use: (api) => api.game.apparence({ armoire: true }) }); furn(m, 'pc', 2, 2); m.object(2, 2, { type: 'pc' }); }
+  // l'armoire est large : contre le mur de gauche (la cuisine occupe le fond à droite), sinon au fond à droite
+  const [ax, ay] = o.bed && o.kitchen ? [1, 4] : [w - 2, 2];
+  if (o.bed) { furn(m, 'armoire', ax, ay); m.object(ax, ay, { use: (api) => api.game.apparence({ armoire: true }) }); furn(m, 'pc', 2, 2); m.object(2, 2, { type: 'pc' }); }
   if (o.kitchen) { furn(m, 'fridge', 5, 2); furn(m, 'kitchen', 6, 2); }
   else furn(m, w > 9 ? 'clock' : 'painting', 5, 2);
   if (o.extraBooks) furn(m, 'books', 6, 2);
