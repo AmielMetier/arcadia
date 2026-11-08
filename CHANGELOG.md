@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.72 — 8 novembre 2026
+- Nouveau : barre Habitat DexNav retirable completement (bouton x + option) (Amiel)
+
 ## 4.71 — 8 novembre 2026
 - **The Backrooms** — Au Level 0, une panne de courant en pleine partie.
   - Une fois la moitié des cassettes trouvée, tout s'éteint d'un coup, une seule fois, pendant 25 à 35 secondes.
