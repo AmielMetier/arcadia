@@ -928,6 +928,10 @@ export class Game {
 
   async useRegisteredItem() {
     if (this.busy || !this.input.free || this.bv.alive || this.player?.move) return;
+    this.busy = true;
+    try { await this._useRegisteredItem(); } finally { this.busy = false; this.hud?.update(true); }
+  }
+  async _useRegisteredItem() {
     const st = this.state;
     if (!st) return;
     let reg = st.registeredItem;
@@ -966,7 +970,7 @@ export class Game {
       if (this.mapObj.floor === 'cave' && st.lastOutdoor) {
         this.take(reg);
         await this.ui.say(`${st.name} utilise la Corde Sortie !`);
-        await this.warp({ map: 'monde', x: st.lastOutdoor.x, y: st.lastOutdoor.y, dir: 'down' }, 'exit');
+        await this.warp({ map: 'monde', x: st.lastOutdoor.x, y: st.lastOutdoor.y, dir: 'down' }, 'exit'); this.busy = true;
         return;
       }
       this.sound.sfx('bump');
@@ -978,7 +982,7 @@ export class Game {
       const it = ITEMS[reg];
       this.take(reg);
       this.sound.sfx('item');
-      st.repel = Math.max(st.repel || 0, it.repel || 100);
+      st.repel = Math.max(st.repel || 0, it.repel || 100); st.lastRepel = reg;
       await this.ui.say(`${st.name} utilise un ${itemName(reg)} ! Les créatures sauvages s'éloignent.`);
       this.save(true);
       return;
@@ -1000,8 +1004,7 @@ export class Game {
     }
 
     if (reg === 'town-map') {
-      this.busy = true;
-      try { await mapScreen(this); } finally { this.busy = false; }
+      await mapScreen(this);
       return;
     }
 
@@ -1544,6 +1547,7 @@ export class Game {
   /* ================= menu principal ================= */
   async startMenu() {
     this.busy = true;
+    let openChatAfter = false;
     const st = this.state;
     const opts = [];
     if (st.flags.dex) opts.push(['Pokédex', 'dex']);
@@ -1578,7 +1582,7 @@ export class Game {
       else if (k === 'map') await mapScreen(this);
       else if (k === 'quests') await questsScreen(this);
       else if (k === 'trophies') await trophiesScreen(this);
-      else if (k === 'chat') { this.openChat(); break; }
+      else if (k === 'chat') { openChatAfter = true; break; }
       else if (k === 'domaine') { this.busy = false; if (await allerDomaine(this)) break; this.busy = true; }
       else if (k === 'opt') await optionsScreen(this);
       else if (k === 'code') {
@@ -1601,6 +1605,7 @@ export class Game {
       }
     }
     this.busy = false;
+    if (openChatAfter) this.openChat();
   }
   /** le sprite du joueur : sa tenue composée s'il en a une, sinon le dresseur ou la dresseuse de base */
   recordPvpResult(foeName, result) {

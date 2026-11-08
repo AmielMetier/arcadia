@@ -65,7 +65,7 @@ assert.ok(chatModalJs.includes('chat-emote-btn'), 'chatModal.js must provide emo
 const socialJs = fs.readFileSync(resolvePath('arcadia/odyssee/js/net/social.js'), 'utf8');
 assert.ok(socialJs.includes('game.showSpeechBubble ='), 'social.js must define showSpeechBubble');
 assert.ok(socialJs.includes('speech-bubble'), 'social.js must create .speech-bubble elements');
-assert.ok(socialJs.includes('m.t === \'chat\''), 'social.js must listen for P2P chat messages');
+assert.ok(socialJs.includes('link.onChat ='), 'social.js must listen for P2P chat messages');
 
 assert.ok(gameJs.includes('broadcastChat(text, emote)'), 'game.js must define broadcastChat');
 assert.ok(gameJs.includes('openChat()'), 'game.js must define openChat');

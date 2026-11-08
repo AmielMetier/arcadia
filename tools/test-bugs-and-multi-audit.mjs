@@ -67,7 +67,7 @@ console.log('✔ game.js: smart defaults for shoes/canne/velo, key items handled
 console.log('6. Auditing startMenu() options...');
 assert.ok(gameSrc.includes("['Émotes & Chat', 'chat']"), 'startMenu must include Émotes & Chat');
 assert.ok(gameSrc.includes("chat: 'img/hud/chat.png'"), 'startMenu must include chat icon');
-assert.ok(gameSrc.includes("else if (k === 'chat') { this.openChat(); break; }"), 'startMenu must execute openChat()');
+assert.ok(gameSrc.includes('if (openChatAfter) this.openChat();'), 'startMenu must execute openChat()');
 console.log('✔ game.js: startMenu fully synchronized with Chat option');
 
 // 7. Audit DexNav to Pokédex navigation (focusSp)

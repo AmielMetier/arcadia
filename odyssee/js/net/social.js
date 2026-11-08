@@ -57,12 +57,12 @@ export function installSocial(game) {
     };
   };
   link.onRequest = (from, m) => onRequest(game, from, m);
-  link.onChat = (from, m) => { if (m) game.showSpeechBubble(from, m.text, m.emote); };
-  link.H?.on?.('msg', (from, m) => {
-    if (m && m.t === 'chat') {
-      game.showSpeechBubble(from, m.text, m.emote);
-    }
-  });
+  link.onChat = (from, m) => {
+    if (!m) return;
+    const text = typeof m.text === 'string' ? m.text.slice(0, 40) : '';
+    const emote = typeof m.emote === 'string' ? m.emote.slice(0, 8) : '';
+    if (text || emote) game.showSpeechBubble(from, text, emote);
+  };
   // fiche demandée par un autre joueur : réponse automatique, sans interrompre la partie
   link.onCard = () => (game.state ? trainerCard(game.state) : null);
   game.talkToPeer = (peer) => talkToPeer(game, peer);

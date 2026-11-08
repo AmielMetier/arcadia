@@ -40,7 +40,7 @@ export function getZoneCatchStats(st, zoneOrData) {
     if (zoneOrData.key && SPAWNS[zoneOrData.key]) addFromTable(SPAWNS[zoneOrData.key]);
   }
 
-  if (isTown && !pool.size) {
+  if (!pool.size) {
     return {
       zoneKey,
       zoneName,
@@ -51,8 +51,6 @@ export function getZoneCatchStats(st, zoneOrData) {
       speciesList: []
     };
   }
-
-  if (!pool.size) return null;
   const caughtSet = new Set((st?.dex?.caught || []).map(Number));
   let caughtCount = 0;
   for (const sp of pool) {
@@ -62,7 +60,7 @@ export function getZoneCatchStats(st, zoneOrData) {
   return {
     zoneKey,
     zoneName,
-    isTown,
+    isTown: false,
     caught: caughtCount,
     total: totalCount,
     complete: totalCount > 0 && caughtCount >= totalCount,

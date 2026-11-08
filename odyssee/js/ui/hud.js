@@ -10,6 +10,8 @@ import { hpCol, statusTag, partyScreen, summaryScreen, mapScreen, cardScreen, qu
 import { getFriendsManager } from '../net/friends.js';
 import { getPvpSummary, getZoneCatchStats } from '../core/trophies.js';
 import { getTrackedQuest } from '../core/questsData.js';
+import { itemName } from '../core/items.js';
+import { SPECIES } from '../data/species.js';
 
 const gender = (m) => (m.gender === 'm' ? '<span class="g m">♂</span>' : m.gender === 'f' ? '<span class="g f">♀</span>' : '');
 
@@ -177,9 +179,9 @@ export class Hud {
     const trTotal = pvpSummary?.trophiesTotal ?? 32;
     const friendsMgr = getFriendsManager(g);
     const onlineCount = friendsMgr.getOnlineCount();
-    const curSpawnKey = g.currentSpawns?.()?.key || null;
-    const zoneCatch = curSpawnKey ? getZoneCatchStats(st, curSpawnKey) : null;
-    const zoneCatchKey = zoneCatch ? `${zoneCatch.zoneKey}:${zoneCatch.caught}/${zoneCatch.total}` : '';
+    const curSpawns = g.currentSpawns?.() || null;
+    const zoneCatch = curSpawns ? getZoneCatchStats(st, curSpawns) : null;
+    const zoneCatchKey = zoneCatch ? (zoneCatch.isTown ? `town:${zoneCatch.zoneName}` : `${zoneCatch.zoneKey}:${zoneCatch.caught}/${zoneCatch.total}:${st.dex?.seen?.length || 0}`) : '';
     const badgesKey = st.badges.map((b) => (b ? '1' : '0')).join('');
     const partyKey = st.party
       .map((m) => `${m.uid}:${m.sp}:${m.nick || ''}:${m.lvl}:${m.hp}:${m.stats[0]}:${m.exp}:${m.status || ''}:${m.shadow ? 1 : 0}:${m.shiny ? 1 : 0}`)
