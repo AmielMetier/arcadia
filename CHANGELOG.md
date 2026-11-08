@@ -1,5 +1,25 @@
 # Journal des versions — Arcadia
 
+## 4.67 — 8 novembre 2026
+- **The Backrooms** — Le Level 0 redevient un labyrinthe.
+  - Des cloisons fines coupent les salles trop ouvertes, souvent avec un passage au milieu : moins de grands espaces vides, plus de recoins et de détours. Certains murs droits deviennent eux aussi de simples cloisons de plâtre.
+  - Toutes les cartes changent avec cette version, la Carte du jour aussi.
+- **The Backrooms** — L'entité ne reste plus jamais plantée devant toi à te fixer.
+  - Si tu la fixes, même lampe éteinte ou en la filmant au caméscope, elle hurle et charge au bout d'une seconde. Si c'est un coéquipier qui la fixe, c'est lui qu'elle charge.
+  - Aperçue du coin de l'œil, ou quand tu es à l'abri (sous un néon fort, dans un recoin calme), elle se glisse hors de ta vue, dans le noir, au lieu de faire les cent pas au bord de la lumière.
+  - La première rencontre est brève : dès qu'on la regarde, même de côté ou par un coéquipier, elle s'efface.
+  - Elle n'apparaît plus au-dessus d'un trou ni dans un pilier, et ne te frôle plus en allant se cacher dans un coin sombre.
+- **The Backrooms** — On entend l'entité là où elle est.
+  - Ses pas tombent au moment où ses pieds touchent le sol, avec les vrais bruits de pas de la poursuite.
+  - Tous ses bruits viennent d'elle : plus faibles de loin, étouffés derrière un mur (un peu moins à travers une cloison fine), sourds à travers le plancher, avec l'écho du lieu (presque sec dans un couloir, long dans une grande salle).
+  - Pendant la traque, elle pousse des rugissements graves et saturés.
+- **The Backrooms** — Caméscope, lampe et cassettes.
+  - Le caméscope zoome maintenant jusqu'à ×12 (molette), avec la barre W–T à l'écran le temps de zoomer.
+  - Plus aucune ondulation de chaleur sur les murs.
+  - La cassette perchée est rangée dans un trou carré creusé dans le mur, plus haut qu'avant : il faut toujours l'échelle pour l'attraper.
+  - La lampe est éteinte au départ : la touche 1 l'allume.
+  - L'étiquette des cassettes reste lisible dans le noir.
+
 ## 4.66 — 8 novembre 2026
 - **Tous les jeux en ligne** — Ta place dans le salon n'est qu'à toi, et un hôte coupé en pleine action ne rouvre plus une seconde partie dans son coin.
   - Un joueur ne peut plus se faire passer pour un autre auprès de l'hôte : ce qui t'est destiné (ta fiche de rôle dans Mystère Mystère, par exemple) n'arrive qu'à toi, et personne ne joue ni ne parle à ta place.
