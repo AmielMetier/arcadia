@@ -20,6 +20,10 @@
 - **The Backrooms** — À l'œil nu, l'image est calculée en pleine définition (les vrais pixels de l'écran) ; le caméscope garde l'image de sa bande.
 - **The Backrooms** — Ce que vous tenez en main prend la couleur de la lumière autour de vous : rouge à la fin, noir quand tout s'éteint.
 - **The Backrooms** — La flèche à côté du signal a maintenant une tige : on voit tout de suite dans quel sens elle pointe.
+- **Odyssée** — Nouveaux graphismes « Pokémon Noir & Blanc » : Options → Graphismes.
+  - Herbe turquoise, chemins, sable, eau, lave, hautes herbes, arbres, palmiers, sapins enneigés, buissons, rochers et arbres morts dans le style des jeux Noir & Blanc.
+  - Les Pokémon gardent leurs sprites ; on revient aux graphismes de base en choisissant « Odyssée » sur la même ligne (le jeu se relance).
+  - Les artistes (thefloofypanthar, UltimoSpriter, Phyromatical) sont crédités dans les Options.
 
 ## 4.76 — 8 novembre 2026
 - **Odyssée** — Tu choisis maintenant tes graphismes : Options → « Sol du dehors » et « Sprites des Pokémon ».
