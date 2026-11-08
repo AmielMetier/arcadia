@@ -186,18 +186,18 @@ function drawWallArt(ctx) {
 function drawWallpaper(ctx, S, grime) {
   ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1;
-  ctx.fillStyle = '#d4c37a';
+  ctx.fillStyle = '#d6cb98'; // jaune pâle tirant sur l'olive
   ctx.fillRect(0, 0, S, S);
   const band = S / 16; // 16 lés de rayures par face
   for (let i = 0; i < 16; i++) {
     const x = i * band;
-    ctx.fillStyle = 'rgba(150, 128, 52, 0.16)';
+    ctx.fillStyle = 'rgba(140, 134, 66, 0.16)';
     ctx.fillRect(x, 0, band * 0.5, S);
-    ctx.fillStyle = 'rgba(110, 92, 36, 0.22)';
+    ctx.fillStyle = 'rgba(100, 96, 44, 0.22)';
     ctx.fillRect(x, 0, 1.2, S);
     ctx.fillRect(x + band * 0.5, 0, 1, S);
     // chevrons pointés vers le haut, au milieu de la rayure claire
-    ctx.strokeStyle = 'rgba(140, 118, 46, 0.32)';
+    ctx.strokeStyle = 'rgba(128, 122, 56, 0.32)';
     ctx.lineWidth = 1.4;
     const cx = x + band * 0.75;
     for (let y = (i % 2) * 9; y < S; y += 18) {
@@ -256,20 +256,20 @@ function greyWall(ctx, S) {
   ctx.restore();
 }
 
-// Moquette humide jaunâtre : la photo est recolorée, sinon une trame de bruit
+// Moquette humide beige kaki, claire : la photo est recolorée, sinon une trame de bruit
 function drawCarpet(ctx, S, photo) {
   ctx.globalCompositeOperation = 'source-over';
   if (photo) {
     ctx.drawImage(photo, 0, 0, S, S);
     ctx.globalCompositeOperation = 'color';
-    ctx.fillStyle = '#9c8a3c';
+    ctx.fillStyle = '#9f9b70';
     ctx.fillRect(0, 0, S, S);
     ctx.globalCompositeOperation = 'screen';
-    ctx.fillStyle = '#5f5226';
+    ctx.fillStyle = '#aaa484';
     ctx.fillRect(0, 0, S, S);
     ctx.globalCompositeOperation = 'source-over';
   } else {
-    ctx.fillStyle = '#8f7d45';
+    ctx.fillStyle = '#b5ad84';
     ctx.fillRect(0, 0, S, S);
     noise(ctx, S, S, 36);
   }
@@ -278,7 +278,7 @@ function drawCarpet(ctx, S, photo) {
 // Dalles de faux plafond (4 × 4 par case), salies par la photo
 function drawCeiling(ctx, S, grime) {
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = '#ddd6bd';
+  ctx.fillStyle = '#bdb593';
   ctx.fillRect(0, 0, S, S);
   if (grime) {
     ctx.globalCompositeOperation = 'multiply';

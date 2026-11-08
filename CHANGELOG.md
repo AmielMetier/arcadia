@@ -1,6 +1,14 @@
 # Journal des versions — Arcadia
 
 ## 4.73 — 8 novembre 2026
+- **The Backrooms** — Des puits sans fond à l'étage du bas du Level 0.
+  - Dans certaines grandes salles, le sol laisse place à une grille de trous carrés séparés par d'étroites passerelles.
+  - Ils sont si profonds qu'on n'en voit jamais le fond : leurs parois s'enfoncent dans le noir.
+  - Y tomber est mortel : on bascule, on tombe longtemps en voyant la lumière rapetisser au-dessus… et personne ne vous entend atterrir.
+  - On peut les traverser par les passerelles en gardant l'équilibre ; le perdre, c'est tomber.
+  - Les escaliers, les cassettes et la sortie restent toujours accessibles sans passer au-dessus d'un puits.
+- **The Backrooms** — Les trous de l'étage du haut sont plus larges, avec des passerelles plus fines et des parois éclairées.
+- **The Backrooms** — Nouvelles couleurs au Level 0 : murs jaune olive plus pâles, moquette kaki clair, néons plus blancs.
 - **The Backrooms** — L'étage du bas du Level 0 garde le même papier peint qu'en haut, juste plus gris : plus aucune tache, fissure ni moisissure.
 
 ## 4.72 — 8 novembre 2026

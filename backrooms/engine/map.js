@@ -10,7 +10,10 @@
 // Des cloisons fines (12 cm de plâtre) : au milieu des grandes pièces (voir 4d) et, par endroits, à la place des pans
 // droits des murs d'une case d'épaisseur (voir 8c).
 
-export const PIT_HALF = 1.0; // un trou fait 2 m de côté dans une case de 2,5 m : il reste des arêtes de 50 cm
+export const PIT_HALF = 1.08; // un trou fait 2,16 m de côté dans une case de 2,5 m : il reste des arêtes de 34 cm
+// L'étage du bas du Level 0 : des champs de puits sans fond (on y meurt), en grille comme les trous du haut
+export const DEEP_FIELDS = 3; // au plus, par étage du bas
+export const DEEP_DEPTH = 60; // profondeur dessinée d'un puits (bien au-delà de ce que laisse voir l'obscurité)
 export const FLOOR_DY = 6.4; // l'étage du bas est 6,40 m plus bas (3 m sous plafond et 3,40 m de dalle : les trous sont des puits)
 export const PIT_DEPTH = FLOOR_DY; // on tombe d'un étage, de très haut
 export const CASSETTES = 6; // cassettes VHS à trouver au Level 0 (4 en haut, 2 en bas)
@@ -744,6 +747,55 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   walkable.length = 0;
   for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) if (grid[z * W + x] === T.FLOOR && pitGrid[z * W + x] < 0) walkable.push({ x, z });
 
+  // 8a'. L'étage du bas : des champs de puits sans fond, une grille de trous carrés séparés d'arêtes de 34 cm, au
+  // milieu d'une salle (on peut en faire le tour). Jamais sur un passage obligé : sans les traverser, tout l'étage reste
+  // relié. Loin des cases où l'on atterrit en tombant du haut, du départ, de l'ascenseur et des cassettes possibles.
+  if (lower) {
+    const keepOut = [{ x: sx, z: sz, d: 5 }, { x: exitCell.x, z: exitCell.z, d: 5 }, ...(opts.forced || []).map(([x, z]) => ({ x, z, d: 4 })), ...cassettes.map((c) => ({ x: c.gx, z: c.gz, d: 2 }))];
+    if (elevator) keepOut.push({ x: elevator.gx, z: elevator.gz, d: 4 });
+    const clearOf = (x, z) => keepOut.every((k) => Math.max(Math.abs(k.x - x), Math.abs(k.z - z)) >= k.d);
+    const open = (x, z) => x > 1 && z > 1 && x < W - 2 && z < H - 2 && grid[z * W + x] === T.FLOOR && pitGrid[z * W + x] < 0;
+    const SIZES = [[4, 3], [3, 4], [3, 3], [4, 2], [2, 4], [3, 2], [2, 3]];
+    const fields = [];
+    for (const c of shuffle(walkable.slice(), rnd)) {
+      if (fields.length >= DEEP_FIELDS) break;
+      for (const [w, h] of SIZES) {
+        const cells = [];
+        for (let dz = 0; dz < h; dz++) for (let dx = 0; dx < w; dx++) cells.push([c.x + dx, c.z + dz]);
+        if (!cells.every(([x, z]) => open(x, z) && clearOf(x, z))) continue;
+        // à bonne distance des autres champs
+        if (fields.some((f) => Math.max(f.x0 - (c.x + w - 1), c.x - f.x1, f.z0 - (c.z + h - 1), c.z - f.z1) < 6)) continue;
+        // au milieu d'une salle : au moins la moitié du tour est du sol (sinon c'est un couloir barré de trous)
+        let ring = 0;
+        let ringFloor = 0;
+        for (let z = c.z - 1; z <= c.z + h; z++) {
+          for (let x = c.x - 1; x <= c.x + w; x++) {
+            if (x >= c.x && x < c.x + w && z >= c.z && z < c.z + h) continue;
+            ring++;
+            if (open(x, z)) ringFloor++;
+          }
+        }
+        if (ringFloor * 2 < ring) continue;
+        // tout le reste de l'étage reste relié sans passer par les puits
+        for (const [x, z] of cells) pitGrid[z * W + x] = 0;
+        const d = bfs(grid.map((v, i) => (pitGrid[i] >= 0 ? T.WALL : v)), W, H, sx, sz);
+        const linked = walkable.every((q) => pitGrid[q.z * W + q.x] >= 0 || d[q.z * W + q.x] >= 0);
+        for (const [x, z] of cells) pitGrid[z * W + x] = -1;
+        if (!linked) continue;
+        for (const [x, z] of cells) {
+          pitGrid[z * W + x] = pits.length;
+          pits.push({ id: pits.length, gx: x, gz: z, x: (x + 0.5) * CELL_SIZE, z: (z + 0.5) * CELL_SIZE, deep: true });
+        }
+        fields.push({ x0: c.x, z0: c.z, x1: c.x + w - 1, z1: c.z + h - 1 });
+        break;
+      }
+    }
+    if (fields.length) {
+      walkable.length = 0;
+      for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) if (grid[z * W + x] === T.FLOOR && pitGrid[z * W + x] < 0) walkable.push({ x, z });
+    }
+  }
+
   // 8b. Une cassette au fond d'un trou carré creusé haut dans un mur plein, au-dessus d'une case contre ce mur
   const wallSide = (c) => [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => get(c.x + dx, c.z + dz) === T.WALL);
   let niche = null;
@@ -1133,10 +1185,13 @@ export function createLevel0(seed = 42) {
   const busyCell = (m, x, z) =>
     m.cassettes.some((c) => c.gx === x && c.gz === z) || m.items.some((i) => i.gx === x && i.gz === z) || (m.exit.gx === x && m.exit.gz === z) || (m.spawn.gx === x && m.spawn.gz === z);
   const farFromPits = (x, z, d) => up.pits.every((p) => Math.abs(p.gx - x) + Math.abs(p.gz - z) >= d);
-  const ok = (x, z) => free(up, x, z) && free(down, x, z) && !busyCell(up, x, z) && !busyCell(down, x, z);
-  // la cage d'escalier ne doit couper aucun des deux étages en morceaux
+  // ni collée à un puits sans fond de l'étage du bas (on sortirait de la cage droit dedans)
+  const farFromDeep = (x, z) => down.pits.every((p) => Math.max(Math.abs(p.gx - x), Math.abs(p.gz - z)) >= 3);
+  const ok = (x, z) => free(up, x, z) && free(down, x, z) && !busyCell(up, x, z) && !busyCell(down, x, z) && farFromDeep(x, z);
+  // la cage d'escalier ne doit couper aucun des deux étages en morceaux (en bas, sans compter de passer par les puits)
   const stillLinked = (m, cells, enter) => {
     const blocked = new Set(cells.map(([x, z]) => z * W + x));
+    for (const p of m.pits) if (p.deep) blocked.add(p.gz * W + p.gx);
     const g = m.grid.map((v, i) => (blocked.has(i) ? T.WALL : v));
     const d = bfs(g, W, m.H, enter[0], enter[1]);
     for (let i = 0; i < W * m.H; i++) if (m.dist[i] >= 0 && !blocked.has(i) && d[i] < 0) return false;
@@ -1159,7 +1214,7 @@ export function createLevel0(seed = 42) {
           const cells = [];
           for (let k = 1; k <= 3; k++) for (const l of [0, 1]) cells.push([c.x + dx * k + px * l, c.z + dz * k + pz * l]);
           if (!cells.every(([x, z]) => ok(x, z) && farFromPits(x, z, minPit))) continue;
-          if (!free(down, c.x, c.z) || !free(up, c.x + px, c.z + pz)) continue;
+          if (!free(down, c.x, c.z) || !free(up, c.x + px, c.z + pz) || !farFromDeep(c.x, c.z)) continue;
           if (!stillLinked(down, cells, [c.x, c.z]) || !stillLinked(up, cells, [c.x + px, c.z + pz])) continue;
           found = { dx, dz, px, pz, cells };
           break;

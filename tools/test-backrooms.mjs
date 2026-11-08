@@ -1301,7 +1301,9 @@ test("à plusieurs : qui entre dans l'ascenseur devient spectateur, il part quan
   }
   assert.equal(sim.cassettes, 6, "les cassettes comptent pour toute l'équipe");
   const E = sim.fm(sim.realFloor).elevator;
-  for (const P of sim.players) P.floor = sim.realFloor;
+  // tout le monde à l'étage du vrai ascenseur, au départ de cet étage (pas au-dessus d'un puits sans fond)
+  const S0 = sim.fm(sim.realFloor).spawn;
+  for (const P of sim.players) Object.assign(P, { floor: sim.realFloor, x: S0.x, z: S0.z });
   const [a, b, c] = sim.players;
   sim.monster.x = sim.monster.z = -999; // loin de tout le monde
   a.x = E.x; a.z = E.z;
@@ -1594,6 +1596,106 @@ test("Level 0 sur deux étages : les trous mènent en bas, deux escaliers loin d
     assert.equal(down.cassettes.length, 2, "2 cassettes en bas");
     assert.ok(up.elevator && down.elevator, 'un ascenseur à chaque étage');
   }
+});
+
+test("Level 0 : des puits sans fond à l'étage du bas, en grille au milieu d'une salle, jamais sur un passage obligé", () => {
+  for (let sd = 1; sd <= 40; sd++) {
+    const L = createLevel0(sd);
+    const [up, down] = L.floors;
+    const deep = down.pits.filter((p) => p.deep);
+    assert.ok(deep.length >= 6, `graine ${sd} : des puits (${deep.length})`);
+    assert.ok(up.pits.every((p) => !p.deep), 'en haut, les trous mènent en bas');
+    const W = down.W;
+    const set = new Set(deep.map((p) => p.gz * W + p.gx));
+    // sans traverser les puits, on rejoint les escaliers, les cassettes et les cases où l'on atterrit en tombant du haut
+    const g = down.grid.map((v, i) => (set.has(i) ? T.WALL : v));
+    const st = L.stairs[0];
+    const d = bfs(g, W, down.H, Math.floor(st.down.x / CELL_SIZE), Math.floor(st.down.z / CELL_SIZE));
+    const must = [...L.stairs.map((q) => [Math.floor(q.down.x / CELL_SIZE), Math.floor(q.down.z / CELL_SIZE)]), ...down.cassettes.map((c) => [c.gx, c.gz]), ...up.pits.map((p) => [p.gx, p.gz])];
+    for (const [x, z] of must) assert.ok(d[z * W + x] >= 0, `graine ${sd} : (${x}, ${z}) joignable sans les puits`);
+    // rien posé dedans ; loin des cases d'atterrissage
+    for (const it of down.items) assert.ok(down.pitAt(it.gx, it.gz) < 0, `graine ${sd} : objet dans un puits`);
+    for (const p of deep) assert.ok(up.pits.every((q) => Math.max(Math.abs(q.gx - p.gx), Math.abs(q.gz - p.gz)) >= 4), `graine ${sd} : puits sous un trou du haut`);
+  }
+});
+
+// un joueur à l'étage du bas, sur l'arête entre deux puits voisins
+const onDeepBeam = (sd) => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: sd });
+  const down = sim.floors[1];
+  const deep = down.pits.filter((p) => p.deep);
+  const p0 = deep[0];
+  const p1 = deep.find((q) => Math.abs(q.gx - p0.gx) + Math.abs(q.gz - p0.gz) === 1);
+  const P = sim.player;
+  P.floor = 1;
+  P.x = p0.gx === p1.gx ? p0.x : (p0.x + p1.x) / 2;
+  P.z = p0.gz === p1.gz ? p0.z : (p0.z + p1.z) / 2;
+  P.yaw = p0.gx === p1.gx ? Math.PI / 2 : 0; // le long de l'arête
+  sim.monster.floor = 0;
+  return { sim, P, p0 };
+};
+
+test("puits sans fond : y entrer tue, sans entité qui surgit ; ce qu'on portait reste au bord", () => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 11 });
+  const P = sim.player;
+  const pit = sim.floors[1].pits.find((p) => p.deep);
+  P.floor = 1;
+  P.x = pit.x + 0.3;
+  P.z = pit.z;
+  P.inv[0] = 'battery';
+  sim.monster.floor = 0;
+  sim.step();
+  assert.equal(P.status, 'dead', 'mort');
+  assert.equal(P.floor, 1, "pas d'étage en dessous");
+  const ev = sim.drainEvents();
+  assert.ok(ev.some((e) => e.type === 'abyss' && e.id === P.id && e.x === pit.x && e.z === pit.z));
+  assert.ok(ev.some((e) => e.type === 'dead' && e.abyss));
+  assert.ok(!ev.some((e) => e.type === 'jumpscare'), "pas d'entité qui surgit");
+  const bat = sim.floors[1].items.find((i) => i.kind === 'battery' && !i.taken && Math.hypot(i.x - pit.x, i.z - pit.z) < 6);
+  assert.ok(bat, 'la pile est tombée au bord');
+  assert.ok(sim.floors[1].pitAt(bat.gx, bat.gz) < 0, 'pas dans le puits');
+});
+
+test("puits sans fond : l'arête tient comme en haut, mais perdre l'équilibre est mortel (chez l'invité aussi)", () => {
+  for (const sd of [3, 9]) {
+    const { sim, P } = onDeepBeam(sd);
+    sim.step();
+    assert.ok(P.onBeam, `graine ${sd} : sur l'arête`);
+    let t = 0;
+    withSeed(sd, () => {
+      while (P.status === 'alive' && t < 20) {
+        sim.step();
+        t += DT;
+      }
+    });
+    assert.equal(P.status, 'dead', `graine ${sd} : tombé au bout de ${t.toFixed(1)} s`);
+    assert.ok(sim.drainEvents().some((e) => e.type === 'abyss' && e.balance));
+    // en corrigeant : on tient
+    const b = onDeepBeam(sd);
+    withSeed(sd + 7, () => {
+      for (let i = 0; i < 60 * 10; i++) b.sim.step({ mx: Math.abs(b.P.tilt) > 0.12 ? -Math.sign(b.P.tilt) : 0 });
+    });
+    assert.equal(b.P.status, 'alive', `graine ${sd} : tenu 10 s en corrigeant`);
+  }
+  // un invité qui bascule chez lui meurt chez l'hôte, et l'invité le voit
+  const players = [{ id: 1, name: 'Hôte' }, { id: 2, name: 'Invité' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 3, players, localId: 1 });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 3, players, localId: 2 });
+  const deep = host.floors[1].pits.filter((p) => p.deep);
+  const p0 = deep[0];
+  const p1 = deep.find((q) => Math.abs(q.gx - p0.gx) + Math.abs(q.gz - p0.gz) === 1);
+  const g = host.players[1];
+  g.floor = 1;
+  g.x = p0.gx === p1.gx ? p0.x : (p0.x + p1.x) / 2;
+  g.z = p0.gz === p1.gz ? p0.z : (p0.z + p1.z) / 2;
+  host.monster.floor = 0;
+  host.step({}, { 2: { remote: true, pos: { x: g.x, z: g.z }, tilt: 0.7 } });
+  assert.ok(g.onBeam);
+  host.step({}, { 2: { remote: true, beamFall: 1 } });
+  assert.equal(g.status, 'dead', "l'invité est tombé dans le puits");
+  assert.equal(host.players[0].status, 'alive');
+  guest.applySnapshot(host.snapshot());
+  assert.equal(guest.player.status, 'dead', "l'invité se voit mort");
 });
 
 test("chute : par un trou, on atterrit à l'étage du dessous, juste en dessous ; l'escalier fait remonter", () => {

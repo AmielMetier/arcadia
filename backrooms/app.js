@@ -76,6 +76,7 @@ let deathNear = false; // le son de la mort a été joué (il revient quand l'en
 let runStats = { seen: 0, rushes: 0, escapes: 0, closest: Infinity, haunts: 0 };
 let tapeFrames = [];
 let replayed = false;
+let lastAbyss = false; // le dernier mort est tombé dans un puits sans fond (texte et délai de l'écran de fin)
 let neonWakeAt = 0; // le dernier grésillement de néon entendu sur son passage (pas plus d'un tous les 90 ms)
 let echoT = 0; // fausse alerte : quelqu'un marche derrière toi, à ton rythme
 let hauntAt = 0; // spectateur : quand on pourra de nouveau faire un signe (sur cet écran)
@@ -571,6 +572,7 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   runStats = { seen: 0, rushes: 0, escapes: 0, closest: Infinity, haunts: 0 };
   tapeFrames = [];
   replayed = false;
+  lastAbyss = false;
   echoT = 0;
   hauntAt = 0;
   if (level && sim.level !== level) sim.loadLevel(level);
@@ -1217,14 +1219,33 @@ function handleEvent(ev, me) {
       break;
     }
     case 'dead':
-      if (ev.id !== me && hud) hud.toast(`${ev.name} got caught…`);
+      if (ev.id !== me && hud && !ev.abyss) hud.toast(`${ev.name} got caught…`);
+      lastAbyss = !!ev.abyss;
+      break;
+    case 'abyss':
+      // un puits sans fond : sa chute s'entend de loin ; pour soi, la caméra tombe jusqu'au noir, puis la bande se perd
+      if (sfx) sfx.abyss(ev.id === me, { x: ev.x, z: ev.z, muffled: (ev.floor || 0) !== (sim.viewPlayer(sim.spectate || 0).floor || 0) });
+      if (ev.id === me) {
+        if (scene) scene.abyss(ev.x, ev.z, ev.floor || 0, sim.player.yaw, sim.player.pitch);
+        const sc = scene;
+        setTimeout(() => {
+          if (scene !== sc) return;
+          scene.tape('loss', 2.6);
+          if (sfx) sfx.noSignal(true);
+          setTimeout(() => sfx && sfx.noSignal(false), 2400);
+        }, 3000);
+      } else if (hud) hud.toast(`${ev.name} fell into a bottomless pit…`);
       break;
     case 'gameover':
     case 'win':
       // rendre le curseur pour le bouton Rejouer (Entrée marche aussi)
       if (document.pointerLockElement) document.exitPointerLock();
       if (ev.type === 'win' && sfx) sfx.win();
-      if (ev.type === 'gameover' && sfx) sfx.tapeStop();
+      // (tombé dans un puits : la bande ne s'arrête qu'au bout de la chute)
+      if (ev.type === 'gameover' && sfx) {
+        if (lastAbyss) setTimeout(() => sfx && sfx.tapeStop(), 3000);
+        else sfx.tapeStop();
+      }
       // une sortie (vraie ou fausse) efface la reprise : on recommence au Level 0
       if (ev.type === 'win' && NET.role === 'solo') store.set('backrooms_resume', 0);
       // difficulté adaptative : mort vite au Level 0, elle triche moins la prochaine fois ; une sortie l'enhardit
@@ -1237,7 +1258,7 @@ function handleEvent(ev, me) {
         best = Math.max(rec.key === key ? rec.best || 0 : 0, sim.time);
         store.set('backrooms_daily', { key, best });
       }
-      if (hud) hud.showEnd(sim, NET.role === 'guest' ? null : () => initGame(), { stats: runStats, daily: dailyLabel, best, replay: replayed && ev.type === 'gameover' });
+      if (hud) hud.showEnd(sim, NET.role === 'guest' ? null : () => initGame(), { stats: runStats, daily: dailyLabel, best, replay: replayed && ev.type === 'gameover', abyss: lastAbyss && ev.type === 'gameover' });
       if (H && H.embedded && NET.role !== 'guest') {
         const won = ev.type === 'win';
         // la vraie fin vaut bien plus qu'une fausse sortie, qui vaut plus que de mourir loin (Level 2 compris)

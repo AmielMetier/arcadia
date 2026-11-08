@@ -6,7 +6,7 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { classicEntity } from './entity.js';
 import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
-import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, NICHE_LO, NICHE_SIZE, NICHE_DEPTH, FLOOR_DY, pillarDist } from '../engine/map.js';
+import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, NICHE_LO, NICHE_SIZE, NICHE_DEPTH, FLOOR_DY, DEEP_DEPTH, pillarDist } from '../engine/map.js';
 import { FUSES, feetY, stairAt, PIPES_LEVEL } from '../engine/sim.js';
 import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
@@ -199,6 +199,18 @@ export function createBackroomsScene(container, floors, lamps) {
     t.needsUpdate = true;
     return t;
   };
+  // un dégradé vertical (haut de la toile = haut de la paroi) : stops [[0..1, couleur], …]
+  const gradCanvas = (stops, h = 512) => {
+    const c = document.createElement('canvas');
+    c.width = 4;
+    c.height = h;
+    const x = c.getContext('2d');
+    const g = x.createLinearGradient(0, 0, 0, h);
+    for (const [at, col] of stops) g.addColorStop(at, col);
+    x.fillStyle = g;
+    x.fillRect(0, 0, 4, h);
+    return c;
+  };
   // les trous d'un étage (ceux du sol, par où l'on tombe) et ses cages d'escalier
   const holesOf = (m) => [
     ...(m.pits || []).map((p) => ({ x: p.x, z: p.z, hx: PIT_HALF, hz: PIT_HALF })),
@@ -244,7 +256,7 @@ export function createBackroomsScene(container, floors, lamps) {
       uBake: { value: bakeTex },
       uBakeScale: { value: new THREE.Vector2(1 / (W * CELL_SIZE), 1 / (H * CELL_SIZE)) },
       uBakeTX: { value: TX },
-      uBakeTint: { value: L2 ? new THREE.Color(1.0, 1.05, 1.07) : L1 ? new THREE.Color(0.86, 0.98, 1.12) : PIPES ? new THREE.Color(1.25, 0.98, 0.7) : new THREE.Color(1.12, 1.04, 0.8) },
+      uBakeTint: { value: L2 ? new THREE.Color(1.0, 1.05, 1.07) : L1 ? new THREE.Color(0.86, 0.98, 1.12) : PIPES ? new THREE.Color(1.25, 0.98, 0.7) : new THREE.Color(1.0, 1.04, 0.9) }, // Level 0 : une lumière blanche un peu verte, sans orange
       uBakeTint2: { value: PIPES ? new THREE.Color(0.78, 0.95, 1.08) : new THREE.Color(0, 0, 0) },
       uBakeY: { value: -fi * FLOOR_DY },
       uCeil: { value: CEIL },
@@ -686,21 +698,48 @@ float bkCaust(vec2 uv, float t) {
     if (holes.length) {
       floorMat.alphaMap = holeMask(W, H, holes, true);
       floorMat.alphaTest = 0.5;
-      // les bords des trous : l'épaisseur de la dalle
-      const edgeMat = baked(new THREE.MeshLambertMaterial({ color: '#5e5434' }));
-      const edges = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, SLAB), edgeMat, holes.length * 4);
-      holes.forEach((h, i) => {
-        [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dz], k) => {
-          dummy.position.set(h.x + dx * h.hx, -SLAB / 2, h.z + dz * h.hz);
-          dummy.rotation.set(0, Math.atan2(-dx, -dz), 0); // la paroi regarde l'intérieur du trou
-          dummy.scale.set((dx ? h.hz : h.hx) * 2, 1, 1);
-          dummy.updateMatrix();
-          edges.setMatrixAt(i * 4 + k, dummy.matrix);
+      // les parois des trous, du même béton peint que le sol, éclairées d'en haut : claires au bord, de plus en plus
+      // sombres en descendant. Les trous du haut traversent la dalle (on voit l'étage du dessous au fond) ; les puits
+      // sans fond de l'étage du bas descendent bien plus bas que ce que laisse voir l'obscurité
+      const shaftWalls = (list, depth, stops) => {
+        if (!list.length) return;
+        const tex = new THREE.CanvasTexture(gradCanvas(stops, depth > 10 ? 2048 : 512));
+        tex.colorSpace = THREE.SRGBColorSpace;
+        const mat = baked(new THREE.MeshLambertMaterial({ map: tex }));
+        const walls = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, depth), mat, list.length * 4);
+        list.forEach((h, i) => {
+          [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dz], k) => {
+            dummy.position.set(h.x + dx * h.hx, -depth / 2, h.z + dz * h.hz);
+            dummy.rotation.set(0, Math.atan2(-dx, -dz), 0); // la paroi regarde l'intérieur du trou
+            dummy.scale.set((dx ? h.hz : h.hx) * 2, 1, 1);
+            dummy.updateMatrix();
+            walls.setMatrixAt(i * 4 + k, dummy.matrix);
+          });
         });
-      });
-      dummy.rotation.set(0, 0, 0);
-      dummy.scale.set(1, 1, 1);
-      group.add(edges);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, 1, 1);
+        walls.instanceMatrix.needsUpdate = true;
+        group.add(walls);
+      };
+      const deepSet = new Set((map.pits || []).filter((p) => p.deep).map((p) => p.id));
+      const deep = (map.pits || []).filter((p) => deepSet.has(p.id)).map((p) => ({ x: p.x, z: p.z, hx: PIT_HALF, hz: PIT_HALF }));
+      const shallow = holes.filter((h) => !deep.some((d) => d.x === h.x && d.z === h.z));
+      shaftWalls(shallow, SLAB, L0 ? [[0, '#d2cca2'], [0.55, '#9a9470'], [1, '#5f5a42']] : [[0, '#5e5434'], [1, '#5e5434']]);
+      // le noir arrive dès le premier mètre : debout au bord, on ne voit que le haut de la paroi, et il plonge déjà dans l'ombre
+      shaftWalls(deep, DEEP_DEPTH, [[0, '#c9c5a4'], [0.004, '#aca78a'], [0.012, '#625e4a'], [0.024, '#22211a'], [0.04, '#080806'], [0.08, '#000000'], [1, '#000000']]);
+      if (deep.length) {
+        // le fond, si loin qu'on ne le voit jamais : du noir
+        const bottom = new THREE.InstancedMesh(new THREE.PlaneGeometry(PIT_HALF * 2, PIT_HALF * 2), new THREE.MeshBasicMaterial({ color: '#000000' }), deep.length);
+        deep.forEach((h, i) => {
+          dummy.position.set(h.x, -DEEP_DEPTH, h.z);
+          dummy.rotation.set(-Math.PI / 2, 0, 0);
+          dummy.updateMatrix();
+          bottom.setMatrixAt(i, dummy.matrix);
+        });
+        dummy.rotation.set(0, 0, 0);
+        bottom.instanceMatrix.needsUpdate = true;
+        group.add(bottom);
+      }
     }
     let water = null;
     if (L2) {
@@ -900,7 +939,7 @@ float bkCaust(vec2 uv, float t) {
     }
 
     // 4. Néons au plafond (les morts sont gris, ceux qui grésillent clignotent)
-    const ON = new THREE.Color(L2 ? '#f2fbff' : L1 ? '#eef6ff' : '#fffbe2').multiplyScalar(L2 ? 2.2 : 3.2); // plus fort que le blanc : le caméscope sature et ils bavent
+    const ON = new THREE.Color(L2 ? '#f2fbff' : L1 ? '#eef6ff' : '#f6fff0').multiplyScalar(L2 ? 2.2 : 3.2); // plus fort que le blanc : le caméscope sature et ils bavent
     const OFF = new THREE.Color(L2 ? '#7d8b8d' : '#4a473c'); // aux Poolrooms, un diffuseur éteint reste gris-bleu
     // Level 2 : des globes de verre dépoli au mur (ampoules chaudes) et des tubes nus dans les réserves
     const ON_BULB = new THREE.Color('#ffc27a').multiplyScalar(3.4);
@@ -2682,6 +2721,10 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   let replayT = 0;
   const replayQ = { id: '__replay', x: 0, z: 0, yaw: 0, pitch: 0, moving: false, running: false, flashlight: false, tilt: 0, floor: 0 };
   const replayP = { x: 0, z: 0, yaw: 0, pitch: 0, floor: 0, status: 'dead', moving: false, crouch: false, hidden: -1, grabT: 0, tilt: 0 };
+  // la chute dans un puits sans fond : la caméra plonge au milieu du puits, le regard remonte vers le carré de lumière
+  // qui rapetisse, puis il n'y a plus que le noir
+  const PLUNGE_T = 3.2;
+  let plunge = null;
   let frameAvg = 16;
   let lines = 720;
   let qualityWas = null; // la qualité déjà appliquée au filtre (il ne retaille l'image que si elle change)
@@ -2776,6 +2819,13 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     get replaying() {
       return !!replayFrames;
     },
+    // tombé dans un puits sans fond (x, z : le milieu du puits)
+    abyss(x, z, floor, yaw, pitch) {
+      plunge = { t: 0, x, z, floor, yaw, pitch: pitch || 0, P: { x, z, yaw, pitch: pitch || 0, floor, status: 'dead', moving: false, crouch: false, hidden: -1, grabT: 0, tilt: 0 } };
+    },
+    get plunging() {
+      return !!plunge;
+    },
 
     // elle apparaît ou disparaît tout près : la lampe hoquette et meurt t secondes (l'infrarouge du caméscope aussi)
     lampCut(t) {
@@ -2833,7 +2883,9 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
           replayP.yaw = Math.atan2(-(RF.px - RF.mx), -(RF.pz - RF.mz));
         }
       }
-      const P = RF ? replayP : sim.viewPlayer(sim.spectate || 0);
+      // la chute dure le temps de passer la main à un coéquipier encore en vie ; seul, on reste dans le noir du puits
+      if (plunge && (plunge.t += dt) > PLUNGE_T && sim.players.some((p) => p.status === 'alive')) plunge = null;
+      const P = RF ? replayP : plunge ? plunge.P : sim.viewPlayer(sim.spectate || 0);
       for (const fv of floorViews) fv.update(sim, P, time, dt);
 
       // 1. Caméra : balancement lent de la marche, plus marqué en courant ; une chute la fait plonger d'un étage
@@ -2892,6 +2944,17 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         camera.position.y += (Math.random() - 0.5) * sh;
       }
 
+      if (plunge) {
+        // la chute : on bascule en avant, puis on tombe (gravité), en tournant lentement sur soi, les yeux vers le haut
+        const t = plunge.t;
+        const tip = Math.min(1, t / 0.35);
+        const fall = Math.min(DEEP_DEPTH - 6, 0.5 * 9.8 * Math.max(0, t - 0.15) * Math.max(0, t - 0.15));
+        camera.position.set(plunge.x + Math.sin(t * 2.1) * 0.12, feetY(sim.stairs, plunge.x, plunge.z, plunge.floor) + 1.6 - tip * 0.6 - fall, plunge.z + Math.cos(t * 1.7) * 0.12);
+        const up = 1 - Math.exp(-Math.max(0, t - 0.25) * 2.2);
+        camera.rotation.set(plunge.pitch + (-0.9 - plunge.pitch) * tip * (1 - up) + 1.35 * up, plunge.yaw + t * 0.5, Math.sin(t * 1.3) * 0.25 * up, 'YXZ');
+        eyeY = 1.6 + feetY(sim.stairs, plunge.x, plunge.z, plunge.floor);
+        fallV = 0;
+      }
       if (RF) {
         // sa tête : haute, penchée vers lui, avec ce léger balancement de bête qui marche
         const d = Math.hypot(RF.px - RF.mx, RF.pz - RF.mz);

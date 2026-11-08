@@ -2932,6 +2932,38 @@ export class BackroomsSfx {
 
   // Chute dans un trou : un long sifflement d'air qui descend pendant plus d'une seconde, puis un choc sourd et lourd
   // (plus fort pour celui qui tombe) ; pos : { x, z } d'un coéquipier qui tombe (sa chute est alors placée là)
+  // Un puits sans fond : l'air qui siffle de plus en plus fort, un grave qui plonge, le bord qui racle au départ… et
+  // jamais de choc : le son s'éloigne et s'éteint. mine : c'est toi qui tombes ; sinon placé au puits (pos, avec
+  // muffled pour un autre étage), et l'écho du puits le prolonge
+  abyss(mine = true, pos = null) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.01;
+    const placed = !mine && pos && typeof pos === 'object';
+    const k = mine ? 1 : 0.7;
+    const out = placed ? this.at({ ...pos, rolloff: 0.5, ref: 4 }, 1) : this.out;
+    const T = mine ? 3.1 : 2.6;
+    // le pied qui glisse au bord, une main qui racle la paroi
+    this.burst(out, t, 0.12, 'lowpass', 900, 0.8, 0.5 * k);
+    this.burst(out, t + 0.1, 0.4, 'bandpass', 2400, 1.5, 0.12 * k);
+    // l'air : un souffle qui monte en hauteur et en force, puis s'efface (on est trop loin pour entendre la suite)
+    const air = this.longNoise();
+    const bp = this.filt('bandpass', 300, 0.9);
+    bp.frequency.setValueAtTime(300, t);
+    bp.frequency.exponentialRampToValueAtTime(mine ? 2200 : 900, t + T * 0.8);
+    const ag = c.createGain();
+    ag.gain.setValueAtTime(0.0001, t);
+    ag.gain.exponentialRampToValueAtTime(0.4 * k, t + T * 0.7);
+    ag.gain.exponentialRampToValueAtTime(0.0001, t + T);
+    air.connect(bp).connect(ag).connect(out);
+    air.start(t, Math.random() * 3);
+    air.stop(t + T + 0.05);
+    // le grave qui plonge et s'éteint (le cœur qui lâche)
+    this.tone(out, t + 0.05, 'triangle', 190, 28, T * 0.95, 0.2 * k, 0.4);
+    this.tone(out, t + 0.05, 'sine', 95, 22, T, 0.25 * k, 0.5);
+    if (!mine) this.caption('[a long fall… then nothing]', pos);
+  }
+
   fall(mine = true, pos = null) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
