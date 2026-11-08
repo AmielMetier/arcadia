@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 4.77 — 8 novembre 2026
+- **Odyssée** — Nouveaux graphismes « Pokémon Noir & Blanc » : Options → Graphismes.
+  - Herbe turquoise, chemins, sable, eau, lave, hautes herbes, arbres, palmiers, sapins enneigés, buissons, rochers et arbres morts dans le style des jeux Noir & Blanc.
+  - Les Pokémon gardent leurs sprites ; on revient aux graphismes de base en choisissant « Odyssée » sur la même ligne (le jeu se relance).
+  - Les artistes (thefloofypanthar, UltimoSpriter, Phyromatical) sont crédités dans les Options.
+
 ## 4.76 — 8 novembre 2026
 - **Odyssée** — Tu choisis maintenant tes graphismes : Options → « Sol du dehors » et « Sprites des Pokémon ».
   - Sol du dehors : « Odyssée » (le sol dessiné par le jeu, avec son relief), « Classique » (les tuiles d'origine) ou le nouveau « Pokémon Lumineux » (herbe, terre, sable, pierre, neige, eau, lave et hautes herbes dans un style Rubis / Émeraude aux couleurs vives).

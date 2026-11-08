@@ -59,6 +59,8 @@ async function loadArt() {
   const pack = packActif();   // Options → Graphismes → Sol du dehors : un pack de tuiles remplace aussi les sols à 16 px
   if (!pack) for (const k of SOL16_FICHIERS) sol32['s16_' + k] = ASSETS.sol16(k);
   const tuilesPack = {}; if (pack) for (const k of pack.tuiles) tuilesPack[k] = ASSETS.gfx(pack.dossier, k);
+  // décor du pack (arbres, rochers…) : remplace celui du jeu, dessiné pixel pour pixel
+  if (pack?.decor) for (const k of pack.decor) { sprites[k] = ASSETS.gfx(pack.dossier, 'd_' + k); dens[k] = 2; }
   // devant un personnage dans l'herbe : le bas de la nappe du tileset (et l'image de l'herbe qui bouge)
   for (const [th, key] of [['prairie', 'grassfront'], ['bois', 'darkfront'], ['neige', 'snowfront']]) {
     if (!SPRITES.herbes?.[th]) continue;

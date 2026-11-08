@@ -20,12 +20,12 @@ export function optionsScreen(game) {
       ['Pokémon qui suit', game.followOff ? 'Non' : 'Oui'],
       ['Style musical', snd.style === 'retro' ? 'Rétro (8 bits)' : 'Moderne'],
       ['Barre Habitat (DexNav)', game.hud?.dexnavHidden ? 'Masquée' : 'Affichée'],
-      ['Sol du dehors', nom(SOLS_CHOIX, solChoix())],
+      ['Graphismes', nom(SOLS_CHOIX, solChoix())],
       ['Sprites des Pokémon', nom(SPRITES_CHOIX, spritesChoix())],
       ['Crédits graphismes', ''],
       ['Retour', ''],
     ];
-    const draw = () => { box.innerHTML = rows().map(([a, b], k) => `<div class="list-row ${k === i ? 'on' : ''}"><span class="cur">▶</span><span class="lbl">${a}</span><span class="rgt">${b ? '◀ ' + b + ' ▶' : ''}</span></div>`).join('') + '<div class="keys">' + (solChange ? '<b>Le sol change au prochain lancement d\'Odyssée.</b><br>' : '') + '<b>Commandes</b><br>Flèches ou ZQSD : se déplacer · Espace / Entrée : valider, parler<br>Échap : annuler, menu · Maj : sprint · R : basculer course rapide/turbo · C : carte</div>'; };
+    const draw = () => { box.innerHTML = rows().map(([a, b], k) => `<div class="list-row ${k === i ? 'on' : ''}"><span class="cur">▶</span><span class="lbl">${a}</span><span class="rgt">${b ? '◀ ' + b + ' ▶' : ''}</span></div>`).join('') + '<div class="keys">' + (solChange ? '<b>Les graphismes changent au prochain lancement d\'Odyssée.</b><br>' : '') + '<b>Commandes</b><br>Flèches ou ZQSD : se déplacer · Espace / Entrée : valider, parler<br>Échap : annuler, menu · Maj : sprint · R : basculer course rapide/turbo · C : carte</div>'; };
     draw();
     const pop = ui.input.push((k) => {
       const nRows = 10;

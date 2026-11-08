@@ -10,6 +10,7 @@ export const SOLS_CHOIX = [
   { id: 'odyssee', nom: 'Odyssée', info: 'sol dessiné par le jeu, relief en 3D' },
   { id: 'classique', nom: 'Classique', info: 'tuiles d\'origine du jeu' },
   { id: 'lumineux', nom: 'Pokémon Lumineux', info: 'tuiles de style Rubis / Émeraude, couleurs vives' },
+  { id: 'noirblanc', nom: 'Pokémon Noir & Blanc', info: 'sol, eau, lave, arbres et rochers de style Gen 5' },
 ];
 /** sprites de Pokémon (face, dos, chromatiques) : HeartGold / SoulSilver (Gen 4) ou Noir / Blanc (Gen 5) */
 export const SPRITES_CHOIX = [
@@ -24,6 +25,14 @@ export const PACKS = {
     tuiles: ['ash0', 'ash1', 'cave0', 'cave1', 'darktall0', 'darktall1', 'deep0', 'deep1', 'deep2', 'deep3', 'forest0', 'forest1',
       'grass0', 'grass1', 'grass2', 'lava0', 'lava1', 'path0', 'pave0', 'sand0', 'snow0', 'snow1', 'snowtall0', 'snowtall1',
       'tall0', 'tall1', 'water0', 'water1', 'water2', 'water3'],
+  },
+  noirblanc: {
+    dossier: 'gfx/noirblanc',
+    tuiles: ['ash0', 'ash1', 'cave0', 'cave1', 'darktall0', 'darktall1', 'deep0', 'deep1', 'deep2', 'deep3', 'forest0', 'forest1',
+      'grass0', 'grass1', 'grass2', 'lava0', 'lava1', 'path0', 'pave0', 'sand0', 'snow0', 'snow1', 'snowtall0', 'snowtall1',
+      'tall0', 'tall1', 'water0', 'water1', 'water2', 'water3'],
+    // décor remplacé (fichier d_<nom>.png, dessiné pixel pour pixel)
+    decor: ['tree', 'tree2', 'pine', 'snowpine', 'palm', 'bush', 'rock', 'deadtree'],
   },
 };
 
@@ -42,6 +51,7 @@ export function choisirSprites(id) { if (SPRITES_CHOIX.some((s) => s.id === id))
 /** crédits affichés dans Options → Crédits graphismes */
 export const CREDITS = [
   ['Sol « Pokémon Lumineux »', 'Tuiles de Flurmimon (planche « Bright »), adaptées par Bivurnum — Team Aqua\'s Asset Repo.'],
+  ['Graphismes « Pokémon Noir & Blanc »', 'BW Spring Tileset de thefloofypanthar, B/W Water Tiles d\'UltimoSpriter, Alternate Volcano Tiles et Taragonia Mix Special Trees de Phyromatical (DeviantArt).'],
   ['Sprites Noir & Blanc', 'Sprites des jeux Pokémon © Nintendo / Game Freak / Creatures, récupérés par PokeAPI (projet PokeAPI/sprites).'],
   ['Sprites HeartGold / SoulSilver', 'Même source : PokeAPI/sprites.'],
   ['Utilisation', 'Projet de fans sans but lucratif. Les artistes restent propriétaires de leurs créations.'],
