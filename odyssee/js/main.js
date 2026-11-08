@@ -135,7 +135,15 @@ async function boot() {
     const newer = remote && (!info || (remote.time || 0) > (info.time || 0) + 5);
     const has = !!info || !!remote;
     const opts = (has ? ['Continuer'] : []).concat(['Nouvelle partie'], cloud.on ? ['Sauvegarde en ligne'] : [], ['Charger un code', 'Options'], H && H.embedded ? ['Retour au salon'] : []);
-    const card = info ? el('div', 'box save-info', `<b>${esc(info.name)}</b><br>Badges : ${info.badges.filter(Boolean).length} · Pokédex : ${info.dex.caught.length}<br>Temps : ${Math.floor(info.time / 3600)}:${String(Math.floor(info.time / 60) % 60).padStart(2, '0')}`) : null;
+    const leadMon = info?.party?.[0];
+    const card = info ? el('div', 'box save-info', `
+      ${leadMon ? `<div class="save-lead-preview"><img class="save-lead-ico" src="${ASSETS.icon(leadMon.sp)}" alt="" onerror="this.src='${ASSETS.front(leadMon.sp)}'"><span class="save-lead-lvl">N.${leadMon.lvl || 5}</span></div>` : ''}
+      <div class="save-details">
+        <div class="save-name">${esc(info.name)}</div>
+        <div class="save-stats">Badges : <b>${info.badges?.filter(Boolean).length || 0}</b> · Pokédex : <b>${info.dex?.caught?.length || 0}</b></div>
+        <div class="save-time">Temps : ${Math.floor((info.time || 0) / 3600)}:${String(Math.floor((info.time || 0) / 60) % 60).padStart(2, '0')}</div>
+      </div>
+    `) : null;
     if (card) title.appendChild(card);
     const r = await ui.list({ items: opts.map((label) => ({ label })), cls: 'title-menu', cancel: null, parent: title });
     const pick = opts[r];

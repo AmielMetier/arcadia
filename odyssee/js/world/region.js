@@ -84,7 +84,7 @@ const STOCK = {
 };
 
 /* ---------------- rencontres sauvages : [espèce, niveau min, niveau max, poids] ---------------- */
-const ENC = {
+export const ENC = {
   r1: [[1010, 2, 4, 25], [1013, 2, 4, 25], [16, 2, 4, 15], [19, 2, 4, 15], [1017, 2, 3, 12], [161, 2, 4, 8]],
   r2: [[1010, 4, 7, 15], [1013, 4, 6, 15], [1017, 4, 6, 15], [1018, 6, 7, 5], [1034, 5, 7, 10], [1021, 5, 7, 10], [21, 5, 7, 10], [10, 4, 6, 10], [1039, 5, 6, 5], [29, 5, 6, 5]],
   bois: [[1053, 7, 9, 5], [1017, 6, 8, 15], [1018, 7, 9, 8], [1015, 6, 9, 15], [1021, 6, 9, 15], [1020, 7, 9, 8], [1013, 7, 9, 10], [165, 6, 9, 8], [167, 6, 9, 8], [1043, 7, 9, 5], [1038, 8, 9, 3], [46, 7, 9, 5]],
@@ -111,6 +111,7 @@ const ENC = {
 };
 // plus de diversité : chaque zone reçoit aussi tous les Pokémon des lieux équivalents des jeux officiels (Rouge à X / Y)
 enrichirTout(ENC);
+export const SPAWNS = ENC;
 
 /* ---------------- dresseurs ---------------- */
 // classe → apparence sur la carte et portrait en combat, prime de base
@@ -354,6 +355,7 @@ function lotir(W, def, poser) {
   for (let i = cands.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [cands[i], cands[j]] = [cands[j], cands[i]]; }
   let pose = 0, v = Math.floor(r() * VOISINS.length);
   for (const [rx, ry] of cands) {
+      if (def.id === 'aube' && rx >= 12 && rx <= 26 && ry >= 12 && ry <= 25) continue;
     if (pose >= n) break;
     const [kind, bw, bd, gk] = LOTS[(pose + seed) % LOTS.length], G = gk ? GRAND[gk] : null;
     const x0 = ox + rx, y0 = oy + ry;
@@ -414,7 +416,7 @@ export function buildWorld() {
 
   /* ---------- A · Bourg-Aube ---------- */
   const A = towns.A = {
-    id: 'aube', name: 'Bourg-Aube', x: 20, y: 238, w: 40, h: 30, exits: [['n', 14], ['e', 10]], fermer: true, lotir: { n: 5, seed: 11 },
+    id: 'aube', name: 'Bourg-Aube', x: 20, y: 238, w: 40, h: 30, exits: [['n', 14], ['e', 10]], fermer: true, lotir: false,
     roads: [[14, 2, 15, 23, T.PATH], [4, 10, 39, 11, T.PATH], [14, 19, 22, 19, T.PATH], [4, 23, 35, 23, T.PATH], [30, 11, 31, 27, T.PATH], [3, 27, 36, 27, T.PATH]],
     deco: [['flowers', 9, 3, 11, 5], ['flowers', 26, 13, 27, 17], ['water', 6, 15, 3.2, 2.2], ['fence', 2, 8, 4, 8], ['fence', 24, 8, 27, 8],
       ['sign', 12, 8, 'BOURG-AUBE\nLà où chaque aventure commence.'], ['sign', 13, 17, 'LABORATOIRE\nProf. Saule'], ['lamp', 13, 9], ['lamp', 16, 9]],
@@ -434,7 +436,7 @@ export function buildWorld() {
 
   /* ---------- B · Sylvebourg (Hector, Insecte) ---------- */
   const B = towns.B = {
-    id: 'sylve', name: 'Sylvebourg', x: 18, y: 138, w: 54, h: 44, exits: [['s', 16], ['n', 16]], gym: 0, stock: 1, fermer: true, lotir: { n: 7, seed: 21 },
+    id: 'sylve', name: 'Sylvebourg', x: 18, y: 138, w: 54, h: 44, exits: [['s', 16], ['n', 16]], gym: 0, stock: 1, fermer: true, lotir: { n: 3, seed: 21 },
     roads: [[16, 0, 17, 43, T.PATH], [4, 11, 49, 12], [4, 20, 15, 21], [4, 36, 49, 37], [46, 12, 47, 36], [18, 28, 27, 28]],
     deco: [['flowers', 11, 4, 14, 7], ['flowers', 19, 4, 21, 7], ['lamp', 14, 10], ['lamp', 19, 10], ['lamp', 14, 13], ['lamp', 19, 13], ['lamp', 14, 35], ['lamp', 19, 35],
       ['sign', 14, 9, 'SYLVEBOURG\nLa ville où murmurent les feuilles.'], ['sign', 39, 38, 'ARÈNE DE SYLVEBOURG\nChampion : Hector\nL\'observateur des insectes.'],
@@ -495,7 +497,30 @@ export function buildWorld() {
     ],
     npcs: [
       { id: 'marin', x: 17, y: 5, sprite: 'marin', move: 'turn', text: ['Ahoy ! Ce ponton était le départ des ferries.', 'Depuis que les îles ont fermé leurs ports, plus aucun bateau ne part...'] },
-      { id: 'pecheur', x: 25, y: 5, sprite: 'pecheur', move: 'wander', text: ['Les Racaillou se cachent parmi les galets, méfie-toi en marchant sur la plage.'] },
+      {
+        id: 'pecheur',
+        x: 25,
+        y: 5,
+        sprite: 'pecheur',
+        move: 'wander',
+        name: 'Pêcheur Barnabé',
+        talk: async (A) => {
+          if (!A.has('canne')) {
+            await A.say([
+              'Ahoy jeune dresseur ! La brise marine est vivifiante aujourd\'hui.',
+              'Une bonne canne, de la patience et un peu de chance... voilà tout le secret d\'un bon pêcheur !',
+              'Tiens, prends ma Canne à Pêche ! Mets-toi face à l\'eau depuis le rivage et appuie pour lancer ta ligne.'
+            ]);
+            await A.give('canne');
+            await A.say('Tu pourras ferrer de superbes créatures aquatiques dans tous les étangs et en pleine mer !');
+            return;
+          }
+          await A.say([
+            'Les Racaillou se cachent parmi les galets, méfie-toi en marchant sur la plage.',
+            'Quand la mer est calme, c\'est le moment rêvé pour sortir la Canne à Pêche !'
+          ]);
+        }
+      },
       { id: 'garde', x: 34, y: 18, sprite: 'garde', dir: 'down', gate: { badges: 2, tiles: [[35, 19], [35, 20]] }, text: ['La route 4 longe une côte escarpée.', 'Il faut deux badges pour l\'emprunter.'] },
     ],
   };
@@ -701,6 +726,21 @@ export function buildWorld() {
   const relais = (x, y, dir) => ({ x, y, dir });
 
   const r1 = G2({ id: 'r1', nom: 'Route 1', de: porte('A', 'r1'), vers: arrivee('B', 'r1'), long: 3, graine: 101, w: 13, grass: 0.8, trees: 0.04, paysages: ['rebords', 'prairie', 'fleurs'], branches: 0, dresseurs: 0, promeneurs: 1, panneaux: ['ROUTE 1\n↑ Sylvebourg   ↓ Bourg-Aube', null], voix: 'general' }, 'r1');
+  const pGuide = along(r1, 0.06);
+  const [gx, gy] = caseLibre(W, pGuide.x + 0.5 + pGuide.nx * 2, pGuide.y + 0.5 + pGuide.ny * 2);
+  W.npc({
+    id: 'r1:guide',
+    x: gx,
+    y: gy,
+    dir: 'left',
+    sprite: 'randonneuse',
+    name: 'Guide de la Route',
+    text: [
+      'Bienvenue sur la Route 1 ! Tu as des Poké Balls sur toi ?',
+      'Pour capturer facilement un Pokémon sauvage, affaiblis-le d\'abord dans les herbes.',
+      'Astuce de pro : en combat sauvage, appuie directement sur B ou Y pour lancer ta meilleure Ball sans passer par les menus !'
+    ]
+  });
   routeTrainer(W, r1, 0.35, 1, 4, 'Gamin', 'Léo', [[1013, 3]], { intro: 'Hé ! Toi aussi tu viens d\'avoir ta première créature ?' });
   routeTrainer(W, r1, 0.62, -1, 4, 'Fillette', 'Inès', [[161, 4]], { intro: 'Mon Fouinette est le plus mignon de la route !' });
   routeTrainer(W, r1, 0.82, 1, 3, 'Gamin', 'Malo', [[1010, 4], [19, 4]]);
@@ -708,7 +748,7 @@ export function buildWorld() {
   routeItem(W, r1, 0.5, -1, 5, 'potion'); routeItem(W, r1, 0.9, 1, 5, 'poke-ball', 2);
 
   const H1 = relais(143, 196, 'e');
-  const r2 = G2({ id: 'r2', nom: 'Route 2', de: porte('B', 'r2'), vers: H1, effile: [true, false], long: 14, graine: 202, w: 11, grass: 0.7, trees: 0.05, flowers: 0.03, paysages: ['prairie', 'fleurs', 'bosquet', 'plateau', 'etang', 'riviere', 'rebords'], branches: 0.45, raccourci: 'coupe', anciens: 4, panneaux: ['ROUTE 2\n↑ Bois Murmure   ↓ Sylvebourg', null], voix: 'general' }, 'r2');
+  const r2 = G2({ id: 'r2', nom: 'Route 2', de: porte('B', 'r2'), vers: H1, effile: [true, false], long: 9, graine: 202, w: 11, grass: 0.7, trees: 0.05, flowers: 0.03, paysages: ['prairie', 'fleurs', 'bosquet', 'plateau', 'etang', 'riviere', 'rebords'], branches: 0.15, raccourci: 'coupe', anciens: 4, panneaux: ['ROUTE 2\n↑ Bois Murmure   ↓ Sylvebourg', null], voix: 'general' }, 'r2');
   routeTrainer(W, r2, 0.2, -1, 3, 'Insectomane', 'Noé', [[1017, 6], [1018, 6, null, [33, 81, 106]], [10, 7]]);
   routeTrainer(W, r2, 0.45, 1, 3, 'Fillette', 'Jade', [[1039, 7], [29, 7]]);
   routeTrainer(W, r2, 0.7, -1, 4, 'Gamin', 'Sacha', [[21, 8], [1034, 7]]);
@@ -775,14 +815,14 @@ export function buildWorld() {
   routeTrainer(W, r3b, 0.6, -1, 3, 'Randonneuse', 'Maëlle', [[1034, 13], [27, 13]]);
 
   // route 4 : elle monte sur les falaises qui dominent la mer, longe le bord, puis redescend vers Voltacité
-  const r4 = G2({ id: 'r4', nom: 'Route 4', de: porte('D', 'r4'), vers: arrivee('E', 'r4'), long: 11, graine: 606, w: 12, grass: 0.6, trees: 0.03, flowers: 0.03, paysages: ['plateau', 'prairie', 'fleurs', 'etang', 'rochers', 'riviere'], branches: 0.4, raccourci: 'coupe', anciens: 4, panneaux: ['ROUTE 4\n→ Voltacité', 'ROUTE 4\n← Port-Azur'], voix: 'mer' }, 'r4', 'route2');
+  const r4 = G2({ id: 'r4', nom: 'Route 4', de: porte('D', 'r4'), vers: arrivee('E', 'r4'), long: 11, graine: 606, w: 12, grass: 0.6, trees: 0.03, flowers: 0.03, paysages: ['plateau', 'prairie', 'fleurs', 'etang', 'rochers', 'riviere'], branches: 0.2, raccourci: 'coupe', anciens: 4, panneaux: ['ROUTE 4\n→ Voltacité', 'ROUTE 4\n← Port-Azur'], voix: 'mer' }, 'r4', 'route2');
   routeTrainer(W, r4, 0.18, -1, 4, 'Pêcheur', 'Yves', [[1031, 15], [1029, 15], [60, 15]]);
   routeTrainer(W, r4, 0.4, 1, 4, 'Marin', 'Loïc', [[66, 16], [1033, 16]]);
   routeTrainer(W, r4, 0.62, -1, 4, 'Fillette', 'Romane', [[1037, 16], [179, 17]]);
   routeTrainer(W, r4, 0.85, 1, 3, 'Topdresseur', 'Kylian', [[1011, 18], [84, 17], [1026, 18]]);
   routeItem(W, r4, 0.3, 1, 5, 'great-ball', 2); routeItem(W, r4, 0.72, -1, 5, 'water-stone', 1, 'monde:265,47');   // identifiant d'avant les talus (anciennes sauvegardes)
 
-  const r5 = G2({ id: 'r5', nom: 'Route 5', de: porte('E', 'r5'), vers: arrivee('F', 'r5'), long: 17, graine: 707, w: 12, grass: 0.75, trees: 0.05, rocks: 0.01, paysages: ['prairie', 'rebords', 'rochers', 'etang', 'fleurs', 'riviere', 'bosquet'], branches: 0.4, raccourci: 'eclate', anciens: 5, panneaux: ['ROUTE 5\n↓ Floralia', 'ROUTE 5\n↑ Voltacité'], voix: 'general' }, 'r5');
+  const r5 = G2({ id: 'r5', nom: 'Route 5', de: porte('E', 'r5'), vers: arrivee('F', 'r5'), long: 17, graine: 707, w: 12, grass: 0.75, trees: 0.05, rocks: 0.01, paysages: ['prairie', 'rebords', 'rochers', 'etang', 'fleurs', 'riviere', 'bosquet'], branches: 0.2, raccourci: 'eclate', anciens: 5, panneaux: ['ROUTE 5\n↓ Floralia', 'ROUTE 5\n↑ Voltacité'], voix: 'general' }, 'r5');
   // au milieu de la route, un tertre : un escalier taillé y grimpe, sa falaise domine le sentier
   tertre(W, r5, 0.5, 'ether', 2);
   routeTrainer(W, r5, 0.12, 1, 4, 'Scientifique', 'Pierre', [[1036, 19], [100, 19], [81, 20]]);
@@ -792,7 +832,7 @@ export function buildWorld() {
   routeTrainer(W, r5, 0.78, 1, 4, 'Topdresseuse', 'Zoé', [[1037, 22], [1043, 21], [179, 21]]);
   routeItem(W, r5, 0.22, -1, 5, 'super-potion', 2); routeItem(W, r5, 0.5, 1, 5, 'thunder-stone'); routeItem(W, r5, 0.7, -1, 5, 'full-heal'); routeItem(W, r5, 0.9, 1, 5, 'rare-candy');
 
-  const r6 = G2({ id: 'r6', nom: 'Route 6', de: porte('F', 'r6'), vers: arrivee('G', 'r6'), long: 10, graine: 808, w: 12, grass: 0.8, trees: 0.06, flowers: 0.04, paysages: ['fleurs', 'prairie', 'plateau', 'etang', 'bosquet'], branches: 0.4, anciens: 4, panneaux: ['ROUTE 6\n→ Mirage', 'ROUTE 6\n← Floralia'], voix: 'general' }, 'r6', 'route2');
+  const r6 = G2({ id: 'r6', nom: 'Route 6', de: porte('F', 'r6'), vers: arrivee('G', 'r6'), long: 10, graine: 808, w: 12, grass: 0.8, trees: 0.06, flowers: 0.04, paysages: ['fleurs', 'prairie', 'plateau', 'etang', 'bosquet'], branches: 0.2, anciens: 4, panneaux: ['ROUTE 6\n→ Mirage', 'ROUTE 6\n← Floralia'], voix: 'general' }, 'r6', 'route2');
   // une falaise boisée et un petit belvédère où l'on monte par un escalier taillé
   tertre(W, r6, 0.8, 'elixir', 1);
   routeTrainer(W, r6, 0.15, 1, 4, 'Randonneuse', 'Nina', [[1038, 24], [70, 24]]);
@@ -859,7 +899,7 @@ export function buildWorld() {
   void r9; void r9b;
 
   // route 10 : elle longe la côte du détroit, franchit le chenal de l'Embarcadère, puis rejoint Cimelune
-  const r10 = G2({ id: 'r10', nom: 'Route 10', de: porte('A', 'r10'), vers: arrivee('I', 'r10'), long: 15, graine: 1313, w: 12, grass: 0.8, trees: 0.05, rocks: 0.02, paysages: ['plateau', 'prairie', 'rochers', 'fleurs', 'etang', 'rebords'], branches: 0.4, raccourci: 'surf', anciens: 4, panneaux: ['ROUTE 10\n→ Cimelune · Pont de l\'Austral', 'ROUTE 10\n← Bourg-Aube'], voix: 'mer' }, 'r10');
+  const r10 = G2({ id: 'r10', nom: 'Route 10', de: porte('A', 'r10'), vers: arrivee('I', 'r10'), long: 15, graine: 1313, w: 12, grass: 0.8, trees: 0.05, rocks: 0.02, paysages: ['plateau', 'prairie', 'rochers', 'fleurs', 'etang', 'rebords'], branches: 0.2, raccourci: 'surf', anciens: 4, panneaux: ['ROUTE 10\n→ Cimelune · Pont de l\'Austral', 'ROUTE 10\n← Bourg-Aube'], voix: 'mer' }, 'r10');
   routeTrainer(W, r10, 0.2, 1, 4, 'Topdresseur', 'Victor', [[1035, 36], [128, 36], [1014, 36]]);
   routeTrainer(W, r10, 0.45, -1, 4, 'Karatéka', 'Ryu', [[68, 37], [1033, 37]]);
   routeTrainer(W, r10, 0.7, 1, 4, 'Topdresseuse', 'Léa', [[241, 37], [1040, 37], [1037, 37]]);
