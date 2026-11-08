@@ -90,8 +90,12 @@
       if (!m || typeof m !== 'object') return;
       R.lastRecvC[cid] = performance.now();
       let p = R.players.find((q) => q.cid === cid);
+      // Un invité qui a perdu sa place sur le relais revient sous une nouvelle connexion, et ses premiers messages (jeu,
+      // ping) arrivent avant son hello : son numéro (fromId) suffit à le retrouver, mais seulement si sa place est libre.
+      // Une place encore tenue par une connexion ne se reprend que par hello, avec l'identifiant de la page (sid) : sinon
+      // un client modifié prendrait la place d'un autre joueur sans dire bonjour, et recevrait ce qui n'est destiné qu'à lui.
       if (!p && Number.isInteger(m.fromId) && m.fromId !== R.hostId) {
-        const byId = R.players.find((q) => q.id === m.fromId);
+        const byId = R.players.find((q) => q.id === m.fromId && !q.cid);
         if (byId) { byId.cid = cid; p = byId; }
       }
       switch (m.t) {
