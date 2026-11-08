@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.74 — 8 novembre 2026
+- Correction : sortie de la Caverne du Magma bien encadree de roche et chambre sud-est reliee au nord (Amiel)
+
 ## 4.73 — 8 novembre 2026
 - Correction : sorties des grottes au bout de la salle (Grotte Lunaire, Tourbillons, Victoire), plus de case libre a cote de la porte (Amiel)
 
