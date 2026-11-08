@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.68 — 8 novembre 2026
+- Correction : affichage et detection universelle de l'habitat DexNav dans le HUD (Amiel)
+
 ## 4.67 — 8 novembre 2026
 - **The Backrooms** — Le Level 0 redevient un labyrinthe.
   - Des cloisons fines coupent les salles trop ouvertes, souvent avec un passage au milieu : moins de grands espaces vides, plus de recoins et de détours. Certains murs droits deviennent eux aussi de simples cloisons de plâtre.
