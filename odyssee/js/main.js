@@ -72,7 +72,7 @@ async function loadArt() {
   // animations de terrain de HeartGold / SoulSilver (mer, rivages, fleurs)
   const hg = {}; for (const k of Object.keys(SPRITES.hgss || {})) hg[k] = ASSETS.hgss(k);
   const [S, K, L, L32, HGI, chars, title, suiveurs, relief, PK] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(ASSETS.chars), loadImg(ASSETS.title), SPRITES.suiveurs ? loadImg(ASSETS.suiveurs) : null, loadImg(ASSETS.relief).catch(() => null), loadAll(tuilesPack)]);
-  return { sprites: S, dens, kits: K, sols: L, sol32: L32, hgss: HGI, chars, title, suiveurs, relief, pack: pack ? PK : null, batiments: pack?.kits ? true : null };
+  return { sprites: S, dens, kits: K, sols: L, sol32: L32, hgss: HGI, chars, title, suiveurs, relief, pack: pack ? PK : null, batiments: pack?.kits ? new Set(Object.keys(pack.kits).flatMap((k) => (k.startsWith('st:') ? [k.slice(3)] : k === 'maison' ? ['house', 'house2', 'house3', 'bighouse', 'tower', 'gate'] : [k]))) : null };
 }
 
 async function boot() {

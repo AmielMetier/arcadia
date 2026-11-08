@@ -7,10 +7,8 @@ const ecrire = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* na
 
 /** sol du dehors : « odyssee » (sol généré, relief 3D), « classique » (tuiles d'origine) ou un pack de tuiles Pokémon */
 export const SOLS_CHOIX = [
-  { id: 'odyssee', nom: 'Odyssée', info: 'sol dessiné par le jeu, relief en 3D' },
-  { id: 'classique', nom: 'Classique', info: 'tuiles d\'origine du jeu' },
-  { id: 'lumineux', nom: 'Pokémon Lumineux', info: 'tuiles de style Rubis / Émeraude, couleurs vives' },
-  { id: 'noirblanc', nom: 'Pokémon Noir & Blanc', info: 'sol, eau, lave, arbres et rochers de style Gen 5' },
+  { id: 'odyssee', nom: 'Odyssée (de base)', info: 'les graphismes d\'origine du jeu' },
+  { id: 'noirblanc', nom: 'Noir & Blanc', info: 'sol, eau, arbres et maisons dans le style Pokémon Noir & Blanc' },
 ];
 /** sprites de Pokémon (face, dos, chromatiques) : HeartGold / SoulSilver (Gen 4) ou Noir / Blanc (Gen 5) */
 export const SPRITES_CHOIX = [
@@ -39,10 +37,11 @@ export const PACKS = {
 };
 
 export function solChoix() {
+  // ?sol=0 : ancien sol à tuiles, pour comparer
   try { if (/[?&]sol=0\b/.test(location.search)) return 'classique'; } catch (e) { /* hors navigateur */ }
   const v = lire('odyssee-gfx-sol', null);
   if (v && SOLS_CHOIX.some((s) => s.id === v)) return v;
-  return lire('odyssee-sol', '1') === '0' ? 'classique' : 'odyssee';   // ancien réglage (odyssee-sol = 0)
+  return 'odyssee';   // anciens choix (« Classique », « Lumineux ») : retour aux graphismes de base
 }
 export const spritesChoix = () => (lire('odyssee-gfx-sprites', 'hgss') === 'bw' ? 'bw' : 'hgss');
 export const packActif = () => PACKS[solChoix()] || null;

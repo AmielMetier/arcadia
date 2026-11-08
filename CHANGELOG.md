@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 4.81 — 8 novembre 2026
+- **Odyssée** — Options → Graphismes plus simple : deux choix seulement, « Odyssée (de base) » ou « Noir & Blanc ».
+  - En Noir & Blanc, les Centres Pokémon, Boutiques, arènes et grands bâtiments gardent leur beau modèle en relief ; seules les maisons changent.
+  - Toits des maisons plus propres (plus de traits répétés).
+
 ## 4.80 — 8 novembre 2026
 - **Odyssée** — Graphismes « Pokémon Noir & Blanc » : plus de variété dans les villes.
   - Trois sortes de maisons : toit de tuiles orange, toit bleu avec auvent, toit turquoise.

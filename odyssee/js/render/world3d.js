@@ -387,7 +387,7 @@ function kitStyle(b, map) {
 export class WorldView {
   constructor(renderer, charsImg, art = {}) {
     this.renderer = renderer;
-    this.packBat = !!art.batiments;   // pack de graphismes avec ses façades (gfx.js) : pas de modèles en fausse 3D
+    this.packKits = art.batiments || null;   // pack de graphismes : styles dont il fournit la façade (pas de modèle en fausse 3D pour eux)
     // Pokémon qui suivent le dresseur (img/suiveurs.png) : leurs lignes s'ajoutent sous celles des personnages
     if (charsImg && art.suiveurs && SPRITES.suiveurs) {
       const c = document.createElement('canvas'); c.width = charsImg.width; c.height = charsImg.height + art.suiveurs.height;
@@ -1098,7 +1098,7 @@ export class WorldView {
       g.add(hole); this.root.add(g); return;
     }
     // bâtiment en fausse 3D (modèle de batiments3d.js) quand un modèle a la bonne emprise ; sinon l'ancienne façade
-    if (!this.packBat && !/[?&]bati=0/.test(globalThis.location?.search || '')) {
+    if (!this.packKits?.has(kitStyle(b, this.map)) && !/[?&]bati=0/.test(globalThis.location?.search || '')) {
       const z = this.map.zoneAt?.(b.x, b.y);
       const mod = choisirModele(b, { theme: z?.theme, ville: z?.town, typeArene: b.typeArene });
       if (mod) { const gm = this.batimentModele(b, mod); gm.position.y = hb; gm.userData.hb = hb; this.root.add(gm); this.buildingMeshes.push(gm); return; }

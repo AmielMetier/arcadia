@@ -111,7 +111,7 @@ def kit(src, cases, base):
 
 h, c = bats['house'], bats['center']
 deco['kit_maison'] = kit(h, {'mur': (4, 80), 'fenetre': (32, 64), 'socle': (4, 92), 'porte': (32, 90), 'linteau': (32, 76),
-                             'cote': (60, 82), 'toit': (12, 30), 'rebord': (4, 64), 'faite': (12, 30), 'cheminee': (52, 12)}, 'maison')
+                             'cote': (60, 82), 'toit': (2, 34), 'rebord': (4, 64), 'faite': (2, 34), 'cheminee': (2, 34)}, 'maison')
 deco['kit_centre'] = kit(c, {'mur': (24, 104), 'fenetre': (100, 66), 'socle': (24, 116), 'porte': (62, 114), 'linteau': (62, 98),
                              'cote': (8, 104), 'toit': (30, 40), 'rebord': (30, 84), 'faite': (30, 40), 'cheminee': (30, 40)}, 'centre')
 # planches de villes détourées (tools/odyssee-detourer.py) : maisons_toits.png et ville.png
