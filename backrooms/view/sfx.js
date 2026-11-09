@@ -1600,6 +1600,29 @@ export class BackroomsSfx {
   // --- Level 2 : le troupeau ---
 
   // un bruit blanc d'une seconde, partagé
+  // Le talkie s'ouvre tout seul : un déclic, un grésillement qui monte, une nappe de souffle sous la voix (sec : sa
+  // durée), puis le déclic de fin. La voix (synthèse du navigateur) passe à côté ; ce bruit-là fait la radio.
+  radioIn(sec = 5) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    const out = this.master;
+    this.burst(out, t, 0.04, 'highpass', 2500, 0.8, 0.05);
+    const n = this.noise();
+    const bp = this.filt('bandpass', 1700, 0.7);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.05, t + 0.15);
+    g.gain.setTargetAtTime(0.012, t + 0.5, 0.3);
+    g.gain.setValueAtTime(0.012, t + sec);
+    g.gain.linearRampToValueAtTime(0.06, t + sec + 0.15);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + sec + 0.45);
+    n.connect(bp).connect(g).connect(out);
+    n.start(t, Math.random() * 0.5);
+    n.stop(t + sec + 0.5);
+    this.burst(out, t + sec + 0.45, 0.04, 'highpass', 2500, 0.8, 0.05);
+  }
+
   noise() {
     if (!this.noiseBuf) {
       const c = this.ctx;

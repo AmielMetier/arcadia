@@ -720,6 +720,8 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
 
   stepDist = 0;
   letterN = 0;
+  otState.level = -1;
+  otState.last = false;
   setPaused(kbMode ? paused : !isPointerLocked);
 }
 
@@ -906,6 +908,94 @@ function showNote(k, i) {
   const text = NOTES[k].list[n].replace('{name}', (sim.player && sim.player.name) || 'You');
   setTimeout(() => hud && hud.showLore(n, text, isNew, NOTES[k].tag), 1200);
   if (sfx) setTimeout(() => sfx && sfx.loreTape && sfx.loreTape(4 + text.length / 16), 1000);
+}
+
+// « The Old Timer » : une voix sur le talkie, là depuis toujours. Il parle à tout le monde en même temps (le moment
+// et la phrase se tirent de la graine et du temps de la partie, pareils chez chacun), jamais pendant une poursuite.
+const OLD_TIMER = {
+  0: [
+    "Hello? Hello… ah. You can hear me. Good. Don't look behind you yet. I'll tell you when.",
+    "Count the lights in your hallway. Now count them again. …Yeah. It does that.",
+    "The last group found every tape. I helped them. They're still here. They just don't talk anymore.",
+    "She hums when she's close. If you catch yourself humming along… stop. Stop right now.",
+  ],
+  1: [
+    "Basement. Fuses in the side rooms. Whatever you do, don't take the stairs back up. Nothing is up there anymore.",
+    "There's a woman down there. She keeps the lights off. If she whispers that it's safe… it isn't. It never is.",
+    "Someone's been clocking in at three seventeen every night. Every night. Nobody works here.",
+  ],
+  2: [
+    "Smell the chlorine? That's him. He's in the water. He's in the numbers. He's been watching you solve things.",
+    "Don't swim. Don't put your face under. You'll see the floor, and the floor isn't empty.",
+    "Three slides. I took one, a long time ago. I'll let you guess which.",
+  ],
+  pipes: [
+    "Hear the bell? That's Teo. He's not lost. He's counting you. He likes to count.",
+    "If a goat stops and stares at you… don't stare back. That's how he picks the next one.",
+    "The warm pipes breathe at night. I can hear it from here. I can hear you from here too.",
+  ],
+  hotel: [
+    "Welcome to the hotel. Don't sign the register. …Oh. You already did. Before you got here.",
+    "Room thirteen is yours. It's been yours for a long time. They kept it clean for you.",
+    "If someone knocks on your door and says room service… there is no room service.",
+  ],
+  rare: [
+    "…sorry. Wrong channel. I wasn't talking to you. …Who were you talking to?",
+    "How long have you been down there? …No. No, that's not possible. Check your watch again.",
+    "I don't remember the way out. I just remember the screaming of the people who found it.",
+    "Hello? Is anybody… oh. Oh, it's you again. You always come back.",
+    "Stop for a second. Listen. …Hear that? That's not me breathing.",
+    "Why are there five of you? You came in with four.",
+  ],
+  last: "Just you now. That's okay. It's always just one, in the end. …I'll stay on the line. Until it finds you.",
+};
+const otState = { level: -1, t0: 0, said: 0, next: 0, last: false };
+// un tirage déterministe (graine, niveau, rang) : le même chez tous les joueurs
+const otRand = (a, b, c) => {
+  let x = (a * 374761393 + b * 668265263 + c * 2147483647) | 0;
+  x = Math.imul(x ^ (x >>> 13), 1274126177);
+  return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+};
+function oldTimerSay(text) {
+  if (!text) return;
+  const sec = 1.5 + text.length / 13;
+  if (sfx && sfx.radioIn) sfx.radioIn(sec);
+  if (hud) setTimeout(() => hud && hud.showLore(null, text, false, '📻 CHANNEL 9 · ???'), 350);
+  try {
+    if (window.speechSynthesis) {
+      const u = new SpeechSynthesisUtterance(text);
+      const v = speechSynthesis.getVoices().filter((v) => /^en/i.test(v.lang));
+      u.voice = v.find((x) => /male|daniel|fred|george|david/i.test(x.name)) || v[0] || null;
+      u.lang = 'en-US';
+      u.pitch = 0.1;
+      u.rate = 0.78;
+      u.volume = 0.85;
+      setTimeout(() => speechSynthesis.speak(u), 400);
+    }
+  } catch (e) {}
+}
+function oldTimerTick() {
+  if (!sim || sim.state !== 'playing' || paused) return;
+  const key = sim.level === PIPES_LEVEL ? 'pipes' : sim.level === HOTEL_LEVEL ? 'hotel' : sim.level;
+  if (otState.level !== sim.level) {
+    Object.assign(otState, { level: sim.level, t0: sim.time, said: 0, last: otState.last });
+    otState.next = 25 + otRand(sim.seed, sim.level, 0) * 20;
+  }
+  // le dernier vivant d'une équipe : il ne parle plus qu'à lui
+  const alive = sim.players.filter((p) => p.status === 'alive');
+  if (multi() && sim.players.length > 1 && alive.length === 1 && alive[0] === sim.player && !otState.last) {
+    otState.last = true;
+    return oldTimerSay(OLD_TIMER.last);
+  }
+  const M = sim.hasMonster ? sim.monster : null;
+  if (M && (M.mode === 'chase' || M.mode === 'grab')) return;
+  const pool = OLD_TIMER[key];
+  if (!pool || otState.said >= 3 || sim.time - otState.t0 < otState.next) return;
+  const r = otRand(sim.seed, sim.level, otState.said + 1);
+  const line = r < 0.25 ? OLD_TIMER.rare[Math.floor(otRand(sim.seed, sim.level, otState.said + 50) * OLD_TIMER.rare.length)] : pool[(Math.floor(r * 1000) + otState.said) % pool.length];
+  otState.said++;
+  otState.next += 70 + otRand(sim.seed, sim.level, otState.said + 9) * 80;
+  oldTimerSay(line);
 }
 
 // Événements de la partie : sons, messages, changement d'étage, fin
@@ -1954,6 +2044,7 @@ function frame(currentTime) {
       const fear = sim.hasMonster && sim.monster.danger > 0.6 ? (sim.monster.danger - 0.6) * 0.3 : 0;
       const grab = P.grabT > 0 ? 1 : 0;
       sfx.setBreath(P.status === 'alive' && sim.state === 'playing' && !paused && !P.holding ? Math.max(run, pant, fear, grab) : 0);
+      oldTimerTick();
     }
   }
   if (voice) {
