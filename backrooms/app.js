@@ -223,7 +223,8 @@ function playIntro() {
   introRun = NET.run;
   const el = document.createElement('div');
   el.id = 'intro';
-  el.innerHTML = '<video src="video/intro.mp4" playsinline preload="auto"></video><div class="skip">SPACE · SKIP</div>';
+  // le mode VIP a la version sous-titrée ; le mode normal, l'image seule
+  el.innerHTML = `<video src="video/${monstersVip ? 'intro_vip' : 'intro'}.mp4" playsinline preload="auto"></video><div class="skip">SPACE · SKIP</div>`;
   document.body.appendChild(el);
   const video = el.querySelector('video');
   intro = { el, video, pending: false };

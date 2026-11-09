@@ -2,6 +2,7 @@
 
 ## 5.22 — 9 novembre 2026
 - **The Backrooms** — Une partie qui commence au Level 0 s'ouvre sur une vidéo filmée au caméscope : une soirée d'urbex dans une usine abandonnée, où Safia passe à travers une trappe du plancher… et le groupe saute pour la rejoindre. Espace ou Entrée pour la passer.
+  - En mode VIP, la vidéo est sous-titrée.
   - La feuille scotchée au mur de l'arrivée est signée Safia.
 
 ## 5.21 — 9 novembre 2026
