@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.94 — 9 novembre 2026
+- **The Backrooms** — au Level 0, une feuille de cahier est scotchée au mur juste à côté de l'arrivée : le mot griffonné d'un survivant passé avant vous, qui dessine l'entité, les cassettes, les trous dans le sol et le faux ascenseur.
+
 ## 4.93 — 6 novembre 2026
 - **The Backrooms** — au Terror Hotel (Level 5) :
   - Caché sous un lit ou dans une armoire, une fois que l'entité a perdu ta trace, elle quitte la chambre et reprend sa ronde au loin, au lieu de fouiller autour de toi.
@@ -41,9 +44,6 @@
   - Un joueur attrapé avec des lettres en poche : elles retournent là où il les avait trouvées.
   - Parquet qui craque et boîte à musique désaccordée au loin.
 - **The Backrooms** — les toboggans jaune et bleu des Poolrooms mènent toujours à l'écran de fin, en attendant leurs niveaux.
-## 4.94 — 9 novembre 2026
-- **The Backrooms** — au Level 0, une feuille de cahier est scotchée au mur juste à côté de l'arrivée : le mot griffonné d'un survivant passé avant vous, qui dessine l'entité, les cassettes, les trous dans le sol et le faux ascenseur.
-
 ## 4.85 — 9 novembre 2026
 - **The Backrooms** — Un vrai inventaire : quatre cases d'objets à côté de la lampe, à choisir avec les touches 2 à 5 ou la molette.
   - G pose l'objet choisi par terre, juste devant soi : une eau d'amande ou des piles à laisser à un coéquipier, l'échelle à garder pour plus tard. On l'entend tomber.
