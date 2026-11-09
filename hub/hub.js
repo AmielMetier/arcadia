@@ -102,20 +102,12 @@
   // Vignette d'un jeu, la même à l'accueil et dans le salon : l'affiche porte le titre et le sous-titre
   function gameCard(g, { el = 'div', cls = '', attrs = '', extra = '' } = {}) {
     const bots = g.bots || (g.settings || []).some((s) => s.key === 'bots');
-    const trBtn = g.trailer ? `<button type="button" class="btn-trailer" data-trailer="${esc(g.trailer)}" data-title="${esc(g.title)}" title="Regarder la bande-annonce (30s)" tabindex="0">▶ Bande-annonce</button>` : '';
     return `<${el} class="game${cls}" ${attrs}>
-      <span class="cv" style="--acc:${esc(g.accent || '#2b8cff')}"><b class="ph">${esc(g.title)}</b><img src="${esc(g.cover)}" alt="${esc(g.title)}" width="960" height="540" loading="lazy" decoding="async" onload="this.classList.add('in')" onerror="this.remove()">${trBtn}</span>
+      <span class="cv" style="--acc:${esc(g.accent || '#2b8cff')}"><b class="ph">${esc(g.title)}</b><img src="${esc(g.cover)}" alt="${esc(g.title)}" width="960" height="540" loading="lazy" decoding="async" onload="this.classList.add('in')" onerror="this.remove()"></span>
       <span class="tx"><span class="ds">${esc(g.desc)}</span>
         <span class="meta"><span class="chip">👥 ${g.minPlayers} à ${g.maxPlayers} joueurs</span>${bots ? '<span class="chip">🤖 Bots</span>' : ''}</span>${extra}</span></${el}>`;
   }
   $('#shelf').innerHTML = GAMES.map((g) => gameCard(g, { attrs: `data-g="${g.id}"` })).join('');
-  $('#shelf').addEventListener('click', (e) => {
-    const btn = e.target.closest('.btn-trailer');
-    if (!btn) return;
-    e.stopPropagation(); e.preventDefault();
-    const tr = btn.dataset.trailer, title = btn.dataset.title || 'Bande-annonce';
-    dialog(title + ' — Bande-annonce', `<div class="trailer-box" style="text-align:center;margin-top:10px;"><video src="${esc(tr)}" controls autoplay playsinline style="width:100%;max-width:800px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.7);aspect-ratio:16/9;background:#000;display:block;margin:0 auto;"></video><p style="margin-top:12px;font-size:13.5px;color:#a1a1aa">Bande-annonce officielle (30s) · The Backrooms sur le Hub Arcadia</p></div>`);
-  });
   $('#shelfCount').textContent = GAMES.length + ' jeux';
   $('#name').value = me.name;
   $('#name').addEventListener('input', (e) => { me.name = e.target.value.slice(0, 12); DDProfile.save(me); FR.setMe(profile()); renderAccount(); if (room) room.updateMe(me); });

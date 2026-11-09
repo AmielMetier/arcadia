@@ -511,38 +511,3 @@ body:not(:has(#play.on)) .atab{display:none}
 .amenu{justify-content:flex-end}
 @keyframes amslideR{from{transform:translateX(30px)}}
 .am-panel{animation-name:amslideR}
-
-/* Bouton Bande-annonce sur les vignettes de jeu */
-.btn-trailer {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 4;
-  background: rgba(15, 17, 23, .85);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  color: #ffd033;
-  border: 2px solid #ffd033;
-  border-radius: 999px;
-  padding: 5px 12px;
-  font-family: inherit;
-  font-size: 11.5px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, .6);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  transition: transform .18s ease, background .18s ease, color .18s ease, box-shadow .18s ease;
-}
-.btn-trailer:hover {
-  background: #ffd033;
-  color: #0b0d12;
-  transform: scale(1.08);
-  box-shadow: 0 6px 16px rgba(255, 208, 51, .4);
-}
-.btn-trailer:active {
-  transform: scale(.98);
-}
