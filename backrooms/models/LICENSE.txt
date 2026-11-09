@@ -81,3 +81,8 @@ Level 2 (galeries de service), même traitement :
 
 Quaternius (https://quaternius.com), domaine public (CC0 1.0), via Poly Pizza :
   padlock.glb  « Padlock »  https://poly.pizza/m/2ZSHgKVr3F  (le cadenas de la porte coupe-feu)
+
+Poly by Google, licence Creative Commons Attribution 3.0 (CC-BY 3.0, https://creativecommons.org/licenses/by/3.0/),
+via Poly Pizza : attribution obligatoire, la voici.
+  aa_battery.glb  « AA battery », Poly by Google  https://poly.pizza/m/2TKK0wpiWPw  (les piles, au sol et en main ;
+  fichier d'origine, non modifié)

@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { WorldView } from './render/world3d.js';
 import { setArt } from './render/textures.js';
+import { packActif } from './gfx.js';
 import { buildWorld } from './world/region.js';
 import { Input } from './input.js';
 import { Sound } from './audio.js';
@@ -55,7 +56,13 @@ async function loadArt() {
   const sol32 = {}; for (const k of SPRITES.sol32 || []) sol32[k] = ASSETS.sol32(k);
   for (const [th, ks] of Object.entries(SPRITES.herbes || {})) for (const k of ks) sol32[`h_${th}_${k}`] = ASSETS.herbe(`${th}_${k}`);
   // sols à 16 px (PixelLab) : ils remplacent ceux du tileset
-  for (const k of SOL16_FICHIERS) sol32['s16_' + k] = ASSETS.sol16(k);
+  const pack = packActif();   // Options → Graphismes → Sol du dehors : un pack de tuiles remplace aussi les sols à 16 px
+  if (!pack) for (const k of SOL16_FICHIERS) sol32['s16_' + k] = ASSETS.sol16(k);
+  const tuilesPack = {}; if (pack) for (const k of pack.tuiles) tuilesPack[k] = ASSETS.gfx(pack.dossier, k);
+  // décor du pack (arbres, rochers…) : remplace celui du jeu, dessiné pixel pour pixel
+  if (pack?.kits) for (const [k, f] of Object.entries(pack.kits)) kits[k] = ASSETS.gfx(pack.dossier, f);   // façades du pack
+  const batsPack = {}; if (pack?.batiments) for (const L of Object.values(pack.batiments)) for (const [n] of L) batsPack[n] = ASSETS.gfx(pack.dossier, 'b_' + n);
+  if (pack?.decor) for (const k of pack.decor) { sprites[k] = ASSETS.gfx(pack.dossier, 'd_' + k); dens[k] = 2; }
   // devant un personnage dans l'herbe : le bas de la nappe du tileset (et l'image de l'herbe qui bouge)
   for (const [th, key] of [['prairie', 'grassfront'], ['bois', 'darkfront'], ['neige', 'snowfront']]) {
     if (!SPRITES.herbes?.[th]) continue;
@@ -65,8 +72,8 @@ async function loadArt() {
   sprites.grassfront = ASSETS.sol16('hautes_herbes_front'); sprites.grassfront2 = ASSETS.sol16('hautes_herbes_front2'); dens.grassfront = dens.grassfront2 = 1;
   // animations de terrain de HeartGold / SoulSilver (mer, rivages, fleurs)
   const hg = {}; for (const k of Object.keys(SPRITES.hgss || {})) hg[k] = ASSETS.hgss(k);
-  const [S, K, L, L32, HGI, chars, title, suiveurs, relief] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(ASSETS.chars), loadImg(ASSETS.title), SPRITES.suiveurs ? loadImg(ASSETS.suiveurs) : null, loadImg(ASSETS.relief).catch(() => null)]);
-  return { sprites: S, dens, kits: K, sols: L, sol32: L32, hgss: HGI, chars, title, suiveurs, relief };
+  const [S, K, L, L32, HGI, chars, title, suiveurs, relief, PK, PB] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(ASSETS.chars), loadImg(ASSETS.title), SPRITES.suiveurs ? loadImg(ASSETS.suiveurs) : null, loadImg(ASSETS.relief).catch(() => null), loadAll(tuilesPack), loadAll(batsPack)]);
+  return { sprites: S, dens, kits: K, sols: L, sol32: L32, hgss: HGI, chars, title, suiveurs, relief, pack: pack ? PK : null, batiments: pack?.batiments ? { images: PB, styles: pack.batiments } : null };
 }
 
 async function boot() {
@@ -75,8 +82,8 @@ async function boot() {
   const input = new Input(), sound = new Sound(), ui = new UI(uiRoot, input, sound);
   const world = buildWorld();
   const art = await loadArt();
-  setArt({ kits: art.kits, sols: art.sols, sol32: art.sol32, hgss: art.hgss, relief: art.relief });
-  const view = new WorldView(renderer, art.chars, { sprites: art.sprites, dens: art.dens, suiveurs: art.suiveurs });
+  setArt({ kits: art.kits, sols: art.sols, sol32: art.sol32, hgss: art.hgss, relief: art.relief, pack: art.pack });
+  const view = new WorldView(renderer, art.chars, { sprites: art.sprites, dens: art.dens, suiveurs: art.suiveurs, batiments: art.batiments });
   const game = new Game({ view, ui, input, sound, world });
   // sauvegarde en ligne (compte du Hub) : chaque sauvegarde part aussi sur le serveur, regroupée
   const cloud = game.cloud = new Cloud();
@@ -147,7 +154,7 @@ async function boot() {
     if (card) title.appendChild(card);
     const r = await ui.list({ items: opts.map((label) => ({ label })), cls: 'title-menu', cancel: null, parent: title });
     const pick = opts[r];
-    if (pick === 'Options') { stopSea(); title.remove(); await optionsScreen(game); continue; }
+    if (pick === 'Options') { stopSea(); title.remove(); const r = await optionsScreen(game); if (r && r.reload) { location.reload(); return; } continue; }
     if (pick === 'Retour au salon') { H.exit(); stopSea(); title.remove(); continue; }
     if (pick === 'Sauvegarde en ligne') { stopSea(); title.remove(); await onlineScreen(ui, cloud, info); continue; }
     if (pick === 'Charger un code') {

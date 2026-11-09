@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
 
@@ -90,23 +90,31 @@ test('simulation : déplacement du joueur et collisions murales', () => {
   assert.notEqual(sim.player.z, startZ, 'le joueur a avancé');
 });
 
-test('endurance : courir consomme la stamina, l\'arrêt la recharge', () => {
+test("course infinie ; la soif monte peu à peu, plus vite en courant, et tue à sec", () => {
   const sim = new BackroomsSim({ map, difficulty: 'peaceful' });
-  assert.equal(sim.player.stamina, 100);
-
-  // Courir
-  for (let i = 0; i < 30; i++) {
-    sim.step({ my: 1, run: true });
+  const P = sim.player;
+  assert.equal(P.water, 100);
+  assert.equal(P.stamina, undefined, "plus d'endurance");
+  // on court une minute entière sans jamais s'essouffler
+  let ran = 0;
+  for (let i = 0; i < 60 / DT; i++) {
+    sim.step({ my: 1, run: true, yaw: (i % 600) < 300 ? 0 : Math.PI });
+    if (P.running) ran++;
   }
-  assert.ok(sim.player.stamina < 100, 'la stamina a diminué en courant');
-  assert.equal(sim.player.running, true);
-
-  // S'arrêter
-  const staminaAfterRun = sim.player.stamina;
-  for (let i = 0; i < 30; i++) {
-    sim.step({ my: 0, run: false });
-  }
-  assert.ok(sim.player.stamina > staminaAfterRun, 'la stamina s\'est régénérée au repos');
+  assert.ok(ran > 0.95 * (60 / DT), `on court tout du long (${ran})`);
+  const afterRun = 100 - P.water;
+  assert.ok(Math.abs(afterRun - 60 * WATER_DRAIN * WATER_RUN) < 0.5, `en courant : -${afterRun.toFixed(1)} en une minute`);
+  const w = P.water;
+  run(sim, 60, { my: 1, yaw: 0, crouch: true });
+  assert.ok(Math.abs(w - P.water - 60 * WATER_DRAIN) < 0.5, 'en marchant : plus lentement');
+  // la vue se brouille sous THIRST_BLUR, puis on s'effondre
+  P.water = THIRST_BLUR + 0.05;
+  run(sim, 1);
+  assert.ok(sim.drainEvents().some((e) => e.type === 'thirsty' && e.level === 1), 'premier signe de soif');
+  P.water = 0.2;
+  run(sim, 2);
+  assert.equal(P.status, 'dead', 'mort de soif');
+  assert.ok(sim.drainEvents().some((e) => e.type === 'dead' && e.thirst), "l'écran de fin sait que c'est la soif");
 });
 
 test("ramassage des 6 cassettes, l'ascenseur s'ouvre et descend au Level 1", () => {
@@ -118,31 +126,97 @@ test("ramassage des 6 cassettes, l'ascenseur s'ouvre et descend au Level 1", () 
   // fermé : la cabine est un mur
   assert.ok(sim.isColliding(map.elevator.x, map.elevator.z, 0.3));
 
-  // Téléporter sur chaque cassette pour la ramasser
+  // chaque cassette est posée au sol : marcher dessus ne suffit plus, il faut F
   for (const cas of map.cassettes) {
     putOn(sim, sim.player, cas);
     sim.step();
-    assert.ok(cas.collected, `la cassette ${cas.id} a été ramassée`);
+    assert.ok(!cas.collected, `la cassette ${cas.id} ne se ramasse pas en passant`);
+    sim.step({ pick: true });
+    assert.ok(cas.collected, `F : la cassette ${cas.id} est ramassée`);
   }
 
   assert.equal(sim.cassettes, 6);
-  const events = sim.drainEvents();
-  assert.ok(events.some((e) => e.type === 'exitUnlocked'), 'événement exitUnlocked émis');
+  // la 6e trouvée, rien ne se passe pendant quelques secondes
+  assert.ok(!sim.drainEvents().some((e) => e.type === 'exitUnlocked'), 'rien tout de suite');
+  run(sim, FINALE_WAIT - 0.3);
+  assert.ok(!sim.drainEvents().some((e) => e.type === 'exitUnlocked'), "toujours rien juste avant FINALE_WAIT");
+  assert.ok(sim.isColliding(map.elevator.x, map.elevator.z, 0.3), 'la cabine reste fermée pendant l\'attente');
+  run(sim, 0.5);
+  assert.ok(sim.drainEvents().some((e) => e.type === 'exitUnlocked'), 'puis tout se met en route');
   assert.ok(!sim.isColliding(map.elevator.x, map.elevator.z, 0.3), "ouvert : on peut entrer dans la cabine");
 
-  // de l'entrée, on marche dans la cabine
+  // de l'entrée, on marche dans la cabine : elle ne part pas toute seule
   sim.player.x = map.exit.x;
   sim.player.z = map.exit.z;
   sim.player.yaw = Math.atan2(-map.elevator.dx, -map.elevator.dz);
-  for (let i = 0; i < 120 && sim.player.status === 'alive'; i++) sim.step({ my: 1, yaw: sim.player.yaw });
-  assert.equal(sim.player.status, 'elevator', 'le joueur est dans la cabine');
-  assert.ok(sim.drainEvents().some((e) => e.type === 'depart'), "seul, l'ascenseur part tout de suite");
+  for (let i = 0; i < 120; i++) sim.step({ my: 1, yaw: sim.player.yaw });
+  assert.ok(sim.inCabin(sim.player), 'le joueur est dans la cabine');
+  assert.equal(sim.player.status, 'alive', "entrer ne suffit pas : il faut le bouton");
+  assert.ok(!sim.drainEvents().some((e) => e.type === 'depart'));
+  // F dans la cabine : le bouton, les portes se ferment, puis elle part
+  sim.step({ pick: true });
+  assert.ok(sim.drainEvents().some((e) => e.type === 'liftClose'), 'le bouton ferme les portes');
+  run(sim, LIFT_CLOSE_T + 0.1);
+  assert.equal(sim.player.status, 'elevator', 'portes fermées : la cabine emporte le joueur');
+  assert.ok(sim.drainEvents().some((e) => e.type === 'depart'), "seul, l'ascenseur part dès les portes fermées");
   run(sim, DEPART_T + 0.2);
   assert.equal(sim.state, 'playing');
   assert.equal(sim.level, 1, 'arrivée au Level 1');
   assert.equal(sim.map.level, 1);
   assert.equal(sim.player.status, 'alive');
   assert.ok(sim.drainEvents().some((e) => e.type === 'level'));
+  // on reprend dans la cabine qui finit de descendre : immobile, portes fermées, puis elles s'ouvrent
+  const A = sim.map.arrival;
+  assert.ok(A, "le Level 1 a sa cabine d'arrivée");
+  const Q = sim.player;
+  assert.equal(Math.floor(Q.x / CELL_SIZE), A.gx);
+  assert.equal(Math.floor(Q.z / CELL_SIZE), A.gz);
+  assert.ok(sim.arriveT > 0);
+  const x0 = Q.x, z0 = Q.z;
+  run(sim, 1, { my: 1, yaw: Q.yaw });
+  assert.ok(Math.hypot(Q.x - x0, Q.z - z0) < 1e-6, 'on ne bouge pas tant que la cabine descend');
+  run(sim, ARRIVE_T);
+  assert.ok(sim.drainEvents().some((e) => e.type === 'arrived'), 'les portes s\'ouvrent');
+  run(sim, 6, { my: 1, yaw: Q.yaw });
+  assert.ok(Math.hypot(Q.x - A.x, Q.z - A.z) > 3.4, 'on sort de la cabine');
+  run(sim, 0.2);
+  assert.ok(sim.liftShut, 'derrière nous, la cabine se referme');
+  assert.ok(sim.isColliding(A.x, A.z, 0.3), "et on n'y rentre plus");
+});
+
+test("phase finale : après la pause, l'alarme ; quelques secondes plus tard, l'entité poursuit l'équipe sans relâche", () => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 7 });
+  const P = sim.player;
+  const M = sim.monster;
+  sim.cassettes = 5;
+  const cas = sim.allCassettes.find((c) => !c.high);
+  for (const c of sim.allCassettes) if (c !== cas) c.collected = true;
+  putOn(sim, P, cas);
+  sim.step({ pick: true });
+  assert.equal(sim.cassettes, 6);
+  run(sim, FINALE_WAIT + 0.1);
+  assert.ok(sim.open && !sim.hunt, "l'ascenseur s'ouvre, pas encore la traque");
+  sim.drainEvents();
+  run(sim, HUNT_DELAY);
+  assert.ok(sim.hunt);
+  const ev = sim.drainEvents().find((e) => e.type === 'finalHunt');
+  assert.ok(ev, 'la traque est annoncée');
+  assert.equal(M.mode, 'chase', 'elle fonce sur nous');
+  assert.equal(M.floor, P.floor, 'à notre étage');
+  const d = Math.hypot(M.x - P.x, M.z - P.z);
+  assert.ok(d > 5 && d < 40, `assez près pour qu'on la sente venir (${d.toFixed(1)} m)`);
+  // elle ne lâche plus : ni le calme, ni l'attente, même immobile dans le noir
+  for (let i = 0; i < 4 / DT; i++) {
+    sim.step({});
+    if (P.status !== 'alive') break;
+    assert.ok(M.mode === 'chase' || M.grabbing != null, `toujours en chasse (${M.mode})`);
+  }
+  // plus rapide qu'en marchant, moins qu'en courant
+  sim.monster.mode = 'chase';
+  if (P.status === 'alive') {
+    sim.updateMonster();
+    assert.ok(M.speed > WALK_SPEED * 1.3 && M.speed < 4.4, `vitesse ${M.speed.toFixed(2)}`);
+  }
 });
 
 test('l\'entité : calcul du danger sonore selon la distance et course-poursuite', () => {
@@ -917,10 +991,10 @@ test('grande carte : générée sans erreur pour 200 graines, sortie loin du dé
   }
 });
 
-test("eau d'amande : rend la moitié de l'endurance et agrandit la jauge pour de bon", () => {
+test("eau d'amande : rend la moitié de la gourde", () => {
   const m = createBackroomsMap(7);
   const sim = new BackroomsSim({ map: m, difficulty: 'peaceful' });
-  sim.player.stamina = 10;
+  sim.player.water = 10;
   const b = m.bottles[0];
   sim.player.x = b.x;
   sim.player.z = b.z;
@@ -929,20 +1003,22 @@ test("eau d'amande : rend la moitié de l'endurance et agrandit la jauge pour de
   sim.step({ pick: true });
   assert.equal(b.taken, true);
   assert.deepEqual(sim.player.inv, ['bottle', null], "F : la bouteille va dans l'inventaire");
-  assert.ok(sim.player.stamina < 100, "elle ne se boit pas toute seule");
-  const before = sim.player.stamina;
+  assert.ok(sim.player.water < 11, "elle ne se boit pas toute seule");
+  const before = sim.player.water;
   sim.step({ useSel: true });
-  assert.ok(Math.abs(sim.player.stamina - (before + 50 + ALMOND_GROW)) < 0.5, 'E : on boit la case choisie (+50, plus la jauge agrandie)');
+  assert.ok(Math.abs(sim.player.water - (before + ALMOND_WATER)) < 0.1, 'E : on boit la case choisie (+50)');
   assert.deepEqual(sim.player.inv, [null, null]);
   assert.ok(sim.drainEvents().some((e) => e.type === 'bottle'));
-  assert.equal(staminaMax(sim.player), 100 + ALMOND_GROW, 'la jauge a grandi');
-  // au repos, on remplit la nouvelle jauge, au-delà de 100
-  run(sim, 30);
-  assert.ok(sim.player.stamina > 100 + ALMOND_GROW - 1, `souffle ${sim.player.stamina.toFixed(0)}`);
-  // elle reste agrandie à l'étage suivant
+  // gourde pleine : on la garde
+  sim.player.water = 99;
+  sim.player.inv = ['bottle', null];
+  sim.step({ useSel: true, sel: 1 });
+  assert.deepEqual(sim.player.inv, ['bottle', null], 'pas soif : la bouteille reste dans le sac');
+  assert.ok(sim.drainEvents().some((e) => e.type === 'useless'));
+  // un nouvel étage : jamais à sec en arrivant
+  sim.player.water = 5;
   sim.loadLevel(1);
-  assert.equal(staminaMax(sim.player), 100 + ALMOND_GROW);
-  assert.ok(sim.player.stamina > 100, 'on y arrive avec tout son souffle');
+  assert.equal(sim.player.water, WATER_LEVEL_MIN);
 });
 
 test("inventaire : deux cases d'objets ; plein, F échange l'objet de la case choisie contre celui du sol", () => {
@@ -986,11 +1062,11 @@ test("inventaire : deux cases d'objets ; plein, F échange l'objet de la case ch
   sim.step({ pick: true });
   assert.deepEqual(P.inv, ['ladder', 'bottle']);
   assert.equal(m.items.length, before, 'rien de posé : il restait une case');
-  // E sur une eau d'amande, souffle plein : elle sert quand même (la jauge grandit)
-  P.stamina = 100;
+  // E sur une eau d'amande quand on a soif : on la boit
+  P.water = 40;
   sim.step({ useSel: true });
   assert.deepEqual(P.inv, ['ladder', null]);
-  assert.equal(staminaMax(P), 100 + ALMOND_GROW);
+  assert.ok(P.water > 89);
 });
 
 test("renfoncement : la cassette en hauteur s'attrape seulement depuis l'échelle, qu'il faut aller chercher", () => {
@@ -1029,7 +1105,9 @@ test("renfoncement : la cassette en hauteur s'attrape seulement depuis l'échell
     P.z = N.baseZ;
     sim.step();
     assert.ok(P.onLadder, "en haut de l'échelle");
-    assert.ok(cas.collected, 'cassette récupérée');
+    assert.equal(cas.collected, false, 'il faut encore la prendre');
+    sim.step({ pick: true });
+    assert.ok(cas.collected, 'F : cassette récupérée');
   }
 });
 
@@ -1229,6 +1307,9 @@ test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui 
   sim.player.x = E.x;
   sim.player.z = E.z;
   sim.step();
+  assert.equal(sim.player.status, 'alive', 'le monte-charge aussi attend le bouton');
+  sim.step({ pick: true });
+  run(sim, LIFT_CLOSE_T + 0.1);
   run(sim, DEPART_T + 0.2);
   assert.equal(sim.state, 'playing');
   assert.equal(sim.level, 2, 'on arrive aux Poolrooms');
@@ -1292,34 +1373,57 @@ test("Level 1 : l'entité se cache au bout des étagères pour tendre une embusc
   assert.ok(ambushes >= 2, `${ambushes} embuscades sur 4`);
 });
 
-test("à plusieurs : qui entre dans l'ascenseur devient spectateur, il part quand tout le monde est dedans", () => {
+test("à plusieurs : le bouton de la cabine attend les autres, sinon on part sans eux", () => {
   const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }, { id: 3, name: 'C' }];
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 21, players, localId: 1 });
   for (const c of sim.allCassettes) {
     putOn(sim, sim.player, c);
-    sim.step();
+    sim.step(); // (en haut de l'échelle pour la cassette perchée)
+    sim.step({ pick: true });
   }
   assert.equal(sim.cassettes, 6, "les cassettes comptent pour toute l'équipe");
+  run(sim, FINALE_WAIT + 0.1);
+  assert.ok(sim.open);
   const E = sim.fm(sim.realFloor).elevator;
-  for (const P of sim.players) P.floor = sim.realFloor;
+  // tout le monde à l'étage du vrai ascenseur, au départ de cet étage (pas au-dessus d'un puits sans fond)
+  const S0 = sim.fm(sim.realFloor).spawn;
+  for (const P of sim.players) Object.assign(P, { floor: sim.realFloor, x: S0.x, z: S0.z });
   const [a, b, c] = sim.players;
   sim.monster.x = sim.monster.z = -999; // loin de tout le monde
   a.x = E.x; a.z = E.z;
   sim.step();
-  assert.equal(a.status, 'elevator');
-  assert.equal(sim.departT, 0, "il attend les autres");
-  assert.notEqual(sim.viewPlayer(0).id, a.id, 'le spectateur suit un joueur encore dehors');
+  assert.equal(a.status, 'alive', 'dans la cabine, on reste joueur');
   assert.ok(Math.abs(sim.rage - 1 / 2) < 1e-9, "l'entité s'énerve");
+  // A appuie : les autres sont dehors, il faut confirmer
+  sim.step({ pick: true });
+  assert.ok(sim.drainEvents().some((e) => e.type === 'liftWait' && e.n === 2), 'on prévient : deux joueurs dehors');
+  assert.equal(sim.liftT, 0, 'les portes restent ouvertes');
   b.x = E.x; b.z = E.z;
   sim.step();
   assert.ok(Math.abs(sim.rage - 1) < 1e-9, 'le dernier dehors : colère au maximum');
-  assert.equal(sim.departT, 0);
-  c.x = E.x; c.z = E.z;
-  sim.step();
-  assert.ok(sim.departT > 0, 'tout le monde est dedans : départ');
+  // A confirme : C reste dehors
+  sim.step({ pick: true });
+  assert.ok(sim.liftT > 0, 'deuxième appui : les portes se ferment');
+  run(sim, LIFT_CLOSE_T + 0.1);
+  assert.equal(a.status, 'elevator');
+  assert.equal(b.status, 'elevator');
+  assert.equal(c.status, 'dead', 'C est resté dehors');
+  assert.ok(sim.drainEvents().some((e) => e.type === 'leftBehind' && e.id === c.id));
+  assert.ok(sim.departT > 0, 'la cabine part');
   run(sim, DEPART_T + 0.2);
   assert.equal(sim.level, 1);
-  assert.ok(sim.players.every((p) => p.status === 'alive'));
+  assert.ok(sim.players.every((p) => p.status === 'alive'), "tout le monde au Level 1 (C revient à l'étage suivant)");
+  // tous ensemble dans la cabine : un seul appui suffit
+  const s2 = new BackroomsSim({ difficulty: 'normal', seed: 21, players, localId: 1 });
+  s2.cassettes = 6;
+  s2.startFinale();
+  const E2 = s2.fm(s2.realFloor).elevator;
+  s2.monster.x = s2.monster.z = -999;
+  for (const P of s2.players) Object.assign(P, { floor: s2.realFloor, x: E2.x, z: E2.z });
+  s2.step({}, { 2: { pick: true } });
+  assert.ok(s2.liftT > 0, "un invité peut appuyer sur le bouton");
+  run(s2, LIFT_CLOSE_T + 0.1);
+  assert.ok(s2.players.every((p) => p.status === 'elevator'));
 });
 
 test("à plusieurs : plus il y a de monde à l'abri, plus l'entité est rapide et voit loin", () => {
@@ -1352,11 +1456,13 @@ test("à plusieurs : un joueur attrapé devient spectateur, la partie continue ;
   assert.equal(sim.viewPlayer(0).id, b.id, 'A regarde B');
   sim.cassettes = 6;
   sim.realFloor = 0;
+  sim.startFinale();
   b.x = sim.map.elevator.x;
   b.z = sim.map.elevator.z;
   sim.monster.x = sim.monster.z = -999;
-  sim.step();
-  assert.ok(sim.departT > 0, "B seul dehors entre : l'ascenseur part");
+  sim.step({}, { 2: { pick: true } });
+  run(sim, LIFT_CLOSE_T + 0.1);
+  assert.ok(sim.departT > 0, "B, seul vivant, entre et appuie : l'ascenseur part");
   run(sim, DEPART_T + 0.2);
   assert.equal(sim.level, 1);
   assert.equal(sim.players[0].status, 'alive', 'A revient au Level 1');
@@ -1382,18 +1488,20 @@ test("réseau : l'invité reçoit l'état de l'hôte, se déplace chez lui et su
   const c = host.map.cassettes.find((q) => !q.high);
   host.player.x = c.x;
   host.player.z = c.z;
-  host.step();
+  host.step({ pick: true });
   wire();
   assert.equal(guest.cassettes, 1);
   assert.equal(guest.allCassettes.find((q) => q.id === c.id).collected, true);
   // tout le monde dans l'ascenseur : l'invité passe au Level 1 avec la même carte
   host.cassettes = 6;
   host.realFloor = 0;
+  host.startFinale();
   for (const P of host.players) {
     P.x = host.map.elevator.x;
     P.z = host.map.elevator.z;
   }
-  host.step();
+  host.step({ pick: true });
+  run(host, LIFT_CLOSE_T + 0.1);
   run(host, DEPART_T + 0.2);
   wire();
   assert.equal(guest.level, 1);
@@ -1427,24 +1535,20 @@ test('départ : pas de table, chacun a déjà sa lampe dans la case 1, éteinte'
   }
 });
 
-test("à bout de souffle : une seconde sans pouvoir courir, chez l'hôte comme chez l'invité", () => {
+test("course infinie, chez l'hôte comme chez l'invité ; accroupi, on ne court pas", () => {
   for (const guest of [false, true]) {
     const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 3 });
     const P = sim.player;
-    const go = () => (guest ? sim.predict({ my: 1, run: true, yaw: P.yaw }) : sim.step({ my: 1, run: true, yaw: P.yaw }));
-    let t = 0;
-    while (P.stamina > 0 && t < 20) {
-      go();
-      t += DT;
+    const go = (inp) => (guest ? sim.predict({ my: 1, yaw: P.yaw, ...inp }) : sim.step({ my: 1, yaw: P.yaw, ...inp }));
+    let ran = 0;
+    for (let i = 0; i < Math.round(20 / DT); i++) {
+      P.yaw += i % 120 === 0 ? Math.PI / 2 : 0; // tourner de temps en temps pour ne pas rester collé à un mur
+      go({ run: true });
+      if (P.running) ran++;
     }
-    assert.equal(P.stamina, 0, 'endurance épuisée');
-    let stopped = 0;
-    for (let i = 0; i < Math.round(1.5 / DT); i++) {
-      go();
-      if (P.running) break;
-      stopped += DT;
-    }
-    assert.ok(stopped > 0.9 && stopped < 1.1, `${guest ? 'invité' : 'hôte'} : environ une seconde sans courir (${stopped.toFixed(2)} s)`);
+    assert.ok(ran > 0.9 * Math.round(20 / DT), `${guest ? 'invité' : 'hôte'} : on court sans s'arrêter (${ran})`);
+    go({ run: true, crouch: true });
+    assert.equal(P.running, false);
   }
 });
 
@@ -1474,9 +1578,11 @@ test("un joueur tombé au Level 0 repart au Level 1 avec une lampe (éteinte, co
   a.status = 'dead'; // attrapé avant d'avoir pris sa lampe
   sim.cassettes = 6;
   sim.realFloor = 0;
+  sim.startFinale();
   b.x = sim.map.elevator.x;
   b.z = sim.map.elevator.z;
-  sim.step();
+  sim.step({}, { 2: { pick: true } });
+  run(sim, LIFT_CLOSE_T + 0.1);
   run(sim, DEPART_T + 0.2);
   assert.equal(sim.level, 1);
   const a1 = sim.players.find((p) => p.id === 1);
@@ -1596,6 +1702,106 @@ test("Level 0 sur deux étages : les trous mènent en bas, deux escaliers loin d
   }
 });
 
+test("Level 0 : des puits sans fond à l'étage du bas, en grille au milieu d'une salle, jamais sur un passage obligé", () => {
+  for (let sd = 1; sd <= 40; sd++) {
+    const L = createLevel0(sd);
+    const [up, down] = L.floors;
+    const deep = down.pits.filter((p) => p.deep);
+    assert.ok(deep.length >= 6, `graine ${sd} : des puits (${deep.length})`);
+    assert.ok(up.pits.every((p) => !p.deep), 'en haut, les trous mènent en bas');
+    const W = down.W;
+    const set = new Set(deep.map((p) => p.gz * W + p.gx));
+    // sans traverser les puits, on rejoint les escaliers, les cassettes et les cases où l'on atterrit en tombant du haut
+    const g = down.grid.map((v, i) => (set.has(i) ? T.WALL : v));
+    const st = L.stairs[0];
+    const d = bfs(g, W, down.H, Math.floor(st.down.x / CELL_SIZE), Math.floor(st.down.z / CELL_SIZE));
+    const must = [...L.stairs.map((q) => [Math.floor(q.down.x / CELL_SIZE), Math.floor(q.down.z / CELL_SIZE)]), ...down.cassettes.map((c) => [c.gx, c.gz]), ...up.pits.map((p) => [p.gx, p.gz])];
+    for (const [x, z] of must) assert.ok(d[z * W + x] >= 0, `graine ${sd} : (${x}, ${z}) joignable sans les puits`);
+    // rien posé dedans ; loin des cases d'atterrissage
+    for (const it of down.items) assert.ok(down.pitAt(it.gx, it.gz) < 0, `graine ${sd} : objet dans un puits`);
+    for (const p of deep) assert.ok(up.pits.every((q) => Math.max(Math.abs(q.gx - p.gx), Math.abs(q.gz - p.gz)) >= 4), `graine ${sd} : puits sous un trou du haut`);
+  }
+});
+
+// un joueur à l'étage du bas, sur l'arête entre deux puits voisins
+const onDeepBeam = (sd) => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: sd });
+  const down = sim.floors[1];
+  const deep = down.pits.filter((p) => p.deep);
+  const p0 = deep[0];
+  const p1 = deep.find((q) => Math.abs(q.gx - p0.gx) + Math.abs(q.gz - p0.gz) === 1);
+  const P = sim.player;
+  P.floor = 1;
+  P.x = p0.gx === p1.gx ? p0.x : (p0.x + p1.x) / 2;
+  P.z = p0.gz === p1.gz ? p0.z : (p0.z + p1.z) / 2;
+  P.yaw = p0.gx === p1.gx ? Math.PI / 2 : 0; // le long de l'arête
+  sim.monster.floor = 0;
+  return { sim, P, p0 };
+};
+
+test("puits sans fond : y entrer tue, sans entité qui surgit ; ce qu'on portait reste au bord", () => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 11 });
+  const P = sim.player;
+  const pit = sim.floors[1].pits.find((p) => p.deep);
+  P.floor = 1;
+  P.x = pit.x + 0.3;
+  P.z = pit.z;
+  P.inv[0] = 'battery';
+  sim.monster.floor = 0;
+  sim.step();
+  assert.equal(P.status, 'dead', 'mort');
+  assert.equal(P.floor, 1, "pas d'étage en dessous");
+  const ev = sim.drainEvents();
+  assert.ok(ev.some((e) => e.type === 'abyss' && e.id === P.id && e.x === pit.x && e.z === pit.z));
+  assert.ok(ev.some((e) => e.type === 'dead' && e.abyss));
+  assert.ok(!ev.some((e) => e.type === 'jumpscare'), "pas d'entité qui surgit");
+  const bat = sim.floors[1].items.find((i) => i.kind === 'battery' && !i.taken && Math.hypot(i.x - pit.x, i.z - pit.z) < 6);
+  assert.ok(bat, 'la pile est tombée au bord');
+  assert.ok(sim.floors[1].pitAt(bat.gx, bat.gz) < 0, 'pas dans le puits');
+});
+
+test("puits sans fond : l'arête tient comme en haut, mais perdre l'équilibre est mortel (chez l'invité aussi)", () => {
+  for (const sd of [3, 9]) {
+    const { sim, P } = onDeepBeam(sd);
+    sim.step();
+    assert.ok(P.onBeam, `graine ${sd} : sur l'arête`);
+    let t = 0;
+    withSeed(sd, () => {
+      while (P.status === 'alive' && t < 20) {
+        sim.step();
+        t += DT;
+      }
+    });
+    assert.equal(P.status, 'dead', `graine ${sd} : tombé au bout de ${t.toFixed(1)} s`);
+    assert.ok(sim.drainEvents().some((e) => e.type === 'abyss' && e.balance));
+    // en corrigeant : on tient
+    const b = onDeepBeam(sd);
+    withSeed(sd + 7, () => {
+      for (let i = 0; i < 60 * 10; i++) b.sim.step({ mx: Math.abs(b.P.tilt) > 0.12 ? -Math.sign(b.P.tilt) : 0 });
+    });
+    assert.equal(b.P.status, 'alive', `graine ${sd} : tenu 10 s en corrigeant`);
+  }
+  // un invité qui bascule chez lui meurt chez l'hôte, et l'invité le voit
+  const players = [{ id: 1, name: 'Hôte' }, { id: 2, name: 'Invité' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 3, players, localId: 1 });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 3, players, localId: 2 });
+  const deep = host.floors[1].pits.filter((p) => p.deep);
+  const p0 = deep[0];
+  const p1 = deep.find((q) => Math.abs(q.gx - p0.gx) + Math.abs(q.gz - p0.gz) === 1);
+  const g = host.players[1];
+  g.floor = 1;
+  g.x = p0.gx === p1.gx ? p0.x : (p0.x + p1.x) / 2;
+  g.z = p0.gz === p1.gz ? p0.z : (p0.z + p1.z) / 2;
+  host.monster.floor = 0;
+  host.step({}, { 2: { remote: true, pos: { x: g.x, z: g.z }, tilt: 0.7 } });
+  assert.ok(g.onBeam);
+  host.step({}, { 2: { remote: true, beamFall: 1 } });
+  assert.equal(g.status, 'dead', "l'invité est tombé dans le puits");
+  assert.equal(host.players[0].status, 'alive');
+  guest.applySnapshot(host.snapshot());
+  assert.equal(guest.player.status, 'dead', "l'invité se voit mort");
+});
+
 test("chute : par un trou, on atterrit à l'étage du dessous, juste en dessous ; l'escalier fait remonter", () => {
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 7 });
   const P = sim.player;
@@ -1629,6 +1835,16 @@ test("chute : par un trou, on atterrit à l'étage du dessous, juste en dessous 
   run(sim, 2.5);
   P.x = st.down.x;
   P.z = st.down.z;
+  // la porte du bas est cadenassée elle aussi : il faut d'abord trouver la clé de cet étage
+  for (let i = 0; i < 60; i++) {
+    const w = W(0.3, C / 2);
+    sim.step({ my: 1, yaw: Math.atan2(-(w.x - P.x), -(w.z - P.z)) });
+  }
+  assert.ok(!stairAt(sim.stairs, P.x, P.z), 'tombé sans clé : la porte du bas ne cède pas');
+  sim.floors[1].key.taken = true;
+  sim.floors[0].key.taken = true;
+  P.x = st.down.x;
+  P.z = st.down.z;
   let climbed = false;
   let top = -Infinity;
   walk([W(0.3, C / 2), W(2.5 * C, C / 2), W(2.5 * C, 1.5 * C), W(0.3, 1.5 * C), st.up], (b) => {
@@ -1641,8 +1857,7 @@ test("chute : par un trou, on atterrit à l'étage du dessous, juste en dessous 
   assert.ok(climbed, 'on est passé par le palier, à mi-hauteur');
   assert.equal(P.floor, 0, "remonté par l'escalier");
   assert.ok(FLOOR_DY > 6, 'les étages sont loin l\'un de l\'autre');
-  // et on redescend par le même chemin (la porte du haut s'ouvre avec la clé)
-  sim.floors[0].key.taken = true;
+  // et on redescend par le même chemin
   walk([W(0.3, 1.5 * C), W(2.5 * C, 1.5 * C), W(2.5 * C, C / 2), W(0.3, C / 2), st.down], () => {});
   assert.equal(P.floor, 1, 'redescendu');
   // pas de raccourci d'une volée à l'autre par-dessus la rampe du milieu
@@ -1695,8 +1910,11 @@ test("ascenseurs : un en haut, un en bas ; les 6 cassettes trouvées, le faux de
     for (const c of sim.allCassettes) {
       putOn(sim, sim.player, c);
       sim.step();
+      sim.step({ pick: true });
     }
     assert.equal(sim.cassettes, 6);
+    assert.ok(!sim.fm(fake).elevator.fake, 'pendant la pause, rien ne bouge encore');
+    run(sim, FINALE_WAIT + 0.1);
     assert.ok(sim.fm(fake).elevator.fake, 'le faux est démasqué');
     assert.ok(!sim.fm(real).elevator.fake);
     assert.ok(sim.isColliding(sim.fm(fake).elevator.x, sim.fm(fake).elevator.z, 0.3, fake), "le faux n'est plus qu'un mur");
@@ -1708,11 +1926,11 @@ test("ascenseurs : un en haut, un en bas ; les 6 cassettes trouvées, le faux de
     P.x = sim.fm(fake).exit.x;
     P.z = sim.fm(fake).exit.z;
     sim.step();
-    assert.ok(P.sigTo === 'stairs' || (P.sigTo === 'key' && fake === 0), `à l'étage du faux : ${P.sigTo}`);
+    assert.ok(P.sigTo === 'stairs' || P.sigTo === 'key', `à l'étage du faux : ${P.sigTo}`);
     assert.ok(P.signal >= 0.2, 'jamais sans signal');
     assert.equal(P.status, 'alive', 'devant le faux, rien ne se passe');
-    if (fake === 0) {
-      sim.floors[0].key.taken = true;
+    if (P.sigTo === 'key') {
+      sim.floors[fake].key.taken = true;
       sim.step();
       assert.equal(P.sigTo, 'stairs', 'la porte ouverte : vers l\'escalier');
     }
@@ -1725,7 +1943,8 @@ test("ascenseurs : un en haut, un en bas ; les 6 cassettes trouvées, le faux de
     P.floor = real;
     P.x = sim.fm(real).elevator.x;
     P.z = sim.fm(real).elevator.z;
-    sim.step();
+    sim.step({ pick: true });
+    run(sim, LIFT_CLOSE_T + 0.1);
     assert.equal(P.status, 'elevator', 'le vrai emmène');
   }
 });
@@ -1790,7 +2009,7 @@ test("Level 0 : une seule panne de courant, au milieu de la partie (25 à 35 s d
   }
 });
 
-test("clé : la porte du haut de l'escalier est cadenassée ; la clé, au fond d'une zone morte, l'ouvre pour tous", () => {
+test("clés : les deux portes de l'escalier sont cadenassées ; une clé par étage, la première trouvée ouvre tout pour tous", () => {
   for (let seed = 1; seed <= 12; seed++) {
     const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
     const sim = new BackroomsSim({ difficulty: 'peaceful', seed, players, localId: 1 });
@@ -1836,8 +2055,46 @@ test("clé : la porte du haut de l'escalier est cadenassée ; la clé, au fond d
     assert.ok(!sim.stairsLocked);
     g.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
     assert.ok(g.floors[0].key.taken && !g.stairsLocked, "l'invité le sait aussi");
+    assert.ok(sim.floors[1].key.taken, "l'autre clé disparaît");
     go();
     assert.ok(stairAt(sim.stairs, P.x, P.z), "on entre dans l'escalier");
+  }
+});
+
+test("clés : tombé à l'étage du bas, la porte du bas est fermée aussi ; sa clé l'ouvre (et celle du haut disparaît)", () => {
+  for (let seed = 1; seed <= 8; seed++) {
+    const sim = new BackroomsSim({ difficulty: 'peaceful', seed });
+    const P = sim.player;
+    const K = sim.floors[1].key;
+    assert.ok(K, `graine ${seed} : une clé en bas aussi`);
+    const low = sim.floors[1];
+    assert.ok(!low.isWall(K.gx, K.gz) && !(low.pitAt && low.pitAt(K.gx, K.gz) >= 0), 'posée par terre');
+    assert.ok(!sim.litCell(low, K.x, K.z), 'dans le noir');
+    const st = sim.stairs[0];
+    const C = CELL_SIZE;
+    const W = (u, v) => ({ x: st.ox + st.dx * u + st.px * v, z: st.oz + st.dz * u + st.pz * v });
+    sim.monster.x = sim.monster.z = -999;
+    const go = () => {
+      const a = W(-0.6, 0.5 * C);
+      Object.assign(P, { x: a.x, z: a.z, floor: 1 });
+      const b = W(1.0, 0.5 * C);
+      const evs = [];
+      for (let i = 0; i < 90; i++) {
+        sim.step({ my: 1, yaw: Math.atan2(-(b.x - P.x), -(b.z - P.z)) });
+        evs.push(...sim.drainEvents());
+      }
+      return evs;
+    };
+    assert.ok(sim.lockedDoorNear(Object.assign(P, { floor: 1, ...W(-0.6, 0.5 * C) }), 99), 'la porte du bas est repérée');
+    const evs = go();
+    assert.ok(!stairAt(sim.stairs, P.x, P.z), 'la porte du bas ne cède pas');
+    assert.ok(evs.some((e) => e.type === 'locked'), 'le cadenas claque');
+    Object.assign(P, { x: K.x + 0.5, z: K.z, floor: 1 });
+    sim.step({ pick: true });
+    assert.ok(K.taken && sim.floors[0].key.taken, 'la clé du bas ramassée ; celle du haut disparaît');
+    assert.ok(!sim.stairsLocked);
+    go();
+    assert.ok(stairAt(sim.stairs, P.x, P.z), "on entre dans l'escalier par le bas");
   }
 });
 
@@ -1951,8 +2208,13 @@ test("réseau : l'étage, la chute et le faux ascenseur arrivent chez l'invité"
   for (const c of host.allCassettes) {
     putOn(host, host.player, c);
     host.step();
+    host.step({ pick: true });
   }
   wire();
+  assert.ok(!guest.open && guest.finaleT > 0, "l'invité attend lui aussi, rien ne s'ouvre encore");
+  run(host, FINALE_WAIT + 0.1);
+  wire();
+  assert.ok(guest.open);
   assert.equal(guest.realFloor, host.realFloor);
   assert.ok(guest.fm(1 - host.realFloor).elevator.fake);
   // objets posés aux deux étages
@@ -1999,20 +2261,27 @@ test("l'entité qui perd sa proie de vue va là où elle l'a vue, fouille autour
   assert.equal(M.mode, 'patrol', 'puis reprend sa ronde');
 });
 
-test("réseau : l'eau d'amande bue par un invité lui rend son souffle, et l'escalier ne le ramène pas en arrière", () => {
+test("réseau : l'eau d'amande bue par un invité le désaltère chez lui aussi, et l'escalier ne le ramène pas en arrière", () => {
   const players = [{ id: 1, name: 'Hôte' }, { id: 2, name: 'Invité' }];
   const host = new BackroomsSim({ difficulty: 'peaceful', seed: 7, players, localId: 1 });
   const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 7, players, localId: 2 });
   const G = guest.player;
   const HG = host.players[1];
   HG.inv = ['bottle', null];
-  HG.stamina = 100; // l'hôte croit l'invité reposé
-  G.stamina = 12; // chez lui, il est à bout de souffle
-  host.step({}, { 2: { remote: true, stamina: 12, useSel: true, sel: 1 } });
+  HG.water = 30; // la soif se tient chez l'hôte
+  G.water = 99;
+  host.step({}, { 2: { remote: true, useSel: true, sel: 1 } });
   assert.deepEqual(HG.inv, [null, null], 'la bouteille est bue');
   guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
-  assert.equal(G.stamina, 100 + ALMOND_GROW, "l'endurance de l'invité est pleine (jauge agrandie)");
-  // l'invité monte l'escalier chez lui ; l'hôte a un quart de seconde de retard dans chaque sens
+  assert.ok(Math.abs(G.water - (30 + ALMOND_WATER)) < 0.2, `l'invité reçoit sa gourde de l'hôte (${G.water})`);
+  // le bruit de chacun aussi (la barre de bruit des invités)
+  HG.noise = 0.8;
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  assert.ok(Math.abs(G.noise - 0.8) < 0.02 || G.noise >= 0.79, 'le bruit voyage dans l\'instantané');
+  // l'invité monte l'escalier chez lui (une clé a été trouvée) ; l'hôte a un quart de seconde de retard dans chaque sens
+  for (const f of host.floors) if (f.key) f.key.taken = true;
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  assert.ok(!guest.stairsLocked, "l'invité sait les portes ouvertes");
   const st = host.stairs[0];
   const C = CELL_SIZE;
   const Wp = (u, v) => ({ x: st.ox + st.dx * u + st.px * v, z: st.oz + st.dz * u + st.pz * v });
@@ -2279,7 +2548,7 @@ test('Level 37 : on traverse chaque porte en marchant, les cloisons arrêtent le
 // --- Level 2 : les galeries, les halles et le troupeau ---
 import { createPipesMap, Z as Z2, PIPES_LEVEL } from '../backrooms/engine/level2.js';
 import { GOAT_MODES, ALPHA_RAGE, ALPHA_TAME, isLit as isLitL2 } from '../backrooms/engine/goats.js';
-import { BREAKER_T, BLOW_DELAY, VALVE_T, ALMOND_GROW, staminaMax, WALK_SPEED, CHASE_MIN, DOOR_GAP } from '../backrooms/engine/sim.js';
+import { BREAKER_T, BLOW_DELAY, VALVE_T, WALK_SPEED, CHASE_MIN, DOOR_GAP } from '../backrooms/engine/sim.js';
 
 // un bout de galerie droite de n cases, sans grille, jet, renfoncement ni objet : { x0, z } (le long de x) ou null
 const straightRun = (m, n) => {
@@ -2608,13 +2877,11 @@ test("réseau : l'invité voit le troupeau et l'entend approcher", () => {
   assert.equal(guest.monster.mode, 'chase', 'la musique de poursuite');
 });
 
-test("saut : un petit bond qui coûte du souffle, s'entend à la réception et ne franchit pas un trou", () => {
+test("saut : un petit bond qui s'entend à la réception et ne franchit pas un trou", () => {
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players: [{ id: 1, name: 'A' }], localId: 1 });
   const P = sim.player;
-  const st = P.stamina;
   sim.step({ jump: true });
   assert.ok(P.jy > 0, 'en l\'air');
-  assert.ok(P.stamina < st - 5, 'le saut coûte du souffle');
   let air = 0;
   let top = 0;
   let landNoise = 0;
@@ -2656,10 +2923,10 @@ test("réseau : le caméscope (V) tire sur la pile, et l'on voit qui filme et qu
 });
 
 
-test("fin d'équipe : l'ascenseur attend les autres BOARD_T secondes, puis se ferme sur les retardataires", () => {
+test("fin d'équipe aux Poolrooms : le toboggan attend les autres BOARD_T secondes, puis se ferme sur les retardataires", () => {
   const players = [{ id: 1, name: 'Hôte' }, { id: 2, name: 'Invité' }];
-  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 11, players, localId: 1 });
-  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 11, players, localId: 2 });
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 11, players, localId: 1, level: 2 });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 11, players, localId: 2, level: 2 });
   host.players[0].status = 'elevator';
   host.step({}, { 2: { remote: true } });
   assert.ok(host.boardT > BOARD_T - 0.1, 'le compte à rebours démarre');
@@ -2667,7 +2934,7 @@ test("fin d'équipe : l'ascenseur attend les autres BOARD_T secondes, puis se fe
   guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
   assert.ok(Math.abs(guest.boardT - host.boardT) < 0.05, "l'invité voit le même compte à rebours");
   // le retardataire arrive à temps : le compte à rebours s'arrête et l'ascenseur part
-  const h2 = new BackroomsSim({ difficulty: 'peaceful', seed: 11, players, localId: 1 });
+  const h2 = new BackroomsSim({ difficulty: 'peaceful', seed: 11, players, localId: 1, level: 2 });
   h2.players[0].status = 'elevator';
   run(h2, 10, {}, { 2: { remote: true } });
   h2.players[1].status = 'elevator';
@@ -2874,10 +3141,10 @@ test("Level 1 : les fusibles en poche survivent au changement d'hôte et au dép
   assert.ok(host.map.fuses[0].taken === false && host.map.fuses[1].taken === false, 'les fusibles sont au sol');
 });
 
-test("l'ascenseur : celui qui attendait dedans s'en va, le compte à rebours s'arrête (personne ne meurt pour lui)", () => {
+test("le toboggan : celui qui attendait dedans s'en va, le compte à rebours s'arrête (personne ne meurt pour lui)", () => {
   const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }];
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 3, players, localId: 1 });
-  sim.loadLevel(1);
+  sim.loadLevel(2);
   const G = sim.players.find((q) => q.id === 2);
   G.status = 'elevator';
   sim.checkElevator();
@@ -2886,6 +3153,25 @@ test("l'ascenseur : celui qui attendait dedans s'en va, le compte à rebours s'a
   assert.equal(sim.boardT, 0, 'il est annulé');
   run(sim, 2);
   assert.equal(sim.player.status, 'alive');
+});
+
+test("l'ascenseur : celui qui a appuyé s'en va pendant que les portes se ferment ; elles se rouvrent, personne ne meurt", () => {
+  const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }];
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 3, players, localId: 1 });
+  sim.cassettes = 6;
+  sim.startFinale();
+  const E = sim.fm(sim.realFloor).elevator;
+  const G = sim.players.find((q) => q.id === 2);
+  Object.assign(G, { floor: sim.realFloor, x: E.x, z: E.z });
+  sim.step({}, { 2: { pick: true } });
+  assert.ok(sim.drainEvents().some((e) => e.type === 'liftWait' && e.names.includes('H')), "on lui dit qui est encore dehors");
+  sim.step({}, { 2: { pick: true } });
+  assert.ok(sim.liftT > 0, 'deuxième appui : on part sans H');
+  sim.removePlayer(2);
+  run(sim, LIFT_CLOSE_T + 0.2);
+  assert.ok(sim.drainEvents().some((e) => e.type === 'liftOpen'), 'personne dedans : les portes se rouvrent');
+  assert.equal(sim.player.status, 'alive');
+  assert.equal(sim.departT, 0);
 });
 
 test("à plusieurs : les néons de tous les niveaux, et ceux qu'on a éteints un instant, sont les mêmes chez l'invité", () => {

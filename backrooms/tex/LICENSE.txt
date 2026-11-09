@@ -4,7 +4,6 @@ On les cite quand même, avec plaisir.
 
 Poly Haven (https://polyhaven.com), réduites en 1024 px (depuis la 2K) puis recolorées et mélangées aux motifs dessinés dans
 backrooms/view/textures.js :
-  moquette.jpg  Dirty Carpet        https://polyhaven.com/a/dirty_carpet
   papier.jpg    Decrepit Wallpaper  https://polyhaven.com/a/decrepit_wallpaper
   plafond.jpg   Ceiling Interior    https://polyhaven.com/a/ceiling_interior
   l1_mur.jpg    Concrete Wall 004   https://polyhaven.com/a/concrete_wall_004  (Level 1 : parpaings peints)
@@ -17,6 +16,9 @@ backrooms/view/textures.js :
 
 Les objets abandonnés et ceux fixés aux murs viennent de Poly Haven (CC0) : voir backrooms/models/LICENSE.txt.
 Le souffle du joueur : voir backrooms/sfx/LICENSE.txt.
+
+Level 0 : ambientCG (https://ambientcg.com), domaine public (CC0 1.0), en 1024 px :
+  moquette_rase.jpg  Carpet011  https://ambientcg.com/view?id=Carpet011  (moquette rase, en niveaux de gris : sa couleur assombrie par ses cartes d’occlusion et de relief pour creuser les poils, grandes taches retirées pour que la répétition ne se voie pas ; seul son grain sert, recoloré)
 
 Level 37 (les Poolrooms) : ambientCG (https://ambientcg.com), domaine public (CC0 1.0), en 1024 px :
   l37_mur.jpg     Tiles133A  https://ambientcg.com/view?id=Tiles133A  (petits carreaux blancs des murs)

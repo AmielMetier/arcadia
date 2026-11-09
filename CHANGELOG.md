@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 4.75 — 8 novembre 2026
+## 4.84 — 9 novembre 2026
 - **Odyssée** — Les quinze arènes ont été entièrement redessinées, chacune avec sa propre énigme en plusieurs salles et un panneau qui en donne les règles à l'entrée.
   - Sylvebourg devient la Ruche : des ruchers font fondre ou rebâtir des murs de cire de cinq couleurs.
   - Port-Azur : deux bassins à trois niveaux d'eau, des pontons et des radeaux. Voltacité : des barrières qui s'inversent et trois fusibles à rapporter.
@@ -13,6 +13,102 @@
 - **Odyssée** — Les intérieurs ont de vrais murs : papier peint et lambris au fond, fenêtres, murs sur les côtés, ombres au sol et un tapis dans les maisons.
   - Quatre papiers peints différents pour les maisons.
   - Dans la maison de Maman, l'armoire se range au fond, à côté de l'évier.
+
+## 4.83 — 8 novembre 2026
+- **The Backrooms** — Les cassettes sont posées par terre, comme les piles et les bouteilles : on les ramasse avec F, sans coupure d'image.
+- **The Backrooms** — La fin du Level 0 se fait attendre : après la sixième cassette, quelques secondes de silence… puis l'alarme, les feux rouges, et l'entité vous traque sans relâche jusqu'à l'ascenseur.
+- **The Backrooms** — Fini l'endurance : on court sans limite.
+  - En échange, on se déshydrate peu à peu. Quand l'eau manque, la vue se brouille de plus en plus, jusqu'à en mourir. Les bouteilles d'eau d'amande vous désaltèrent.
+- **The Backrooms** — Tout fait du bruit, et l'entité l'entend.
+  - Accroupi, on ne fait presque pas de bruit ; en courant, beaucoup. Votre voix au micro compte aussi.
+  - Une barre de bruit, toujours affichée (même en solo), montre en continu le bruit que vous faites.
+- **The Backrooms** — La liste de l'équipe en haut à gauche : qui est encore là, qui est tombé, qui est parti, et qui parle.
+- **The Backrooms** — La cage d'escalier embellie et réparée : plus aucun filet de lumière au bord des murs, plus de textures qui clignotent.
+  - Une porte coupe-feu en bas aussi. Tombé à l'étage du bas, il faut trouver une clé pour remonter : il y en a une à chaque étage, et dès que l'une est trouvée, l'autre disparaît.
+- **The Backrooms** — L'ascenseur refait : on entre, on appuie sur le bouton de la cabine, les portes se ferment et il part. Coupure… on reprend au Level 1 dans la cabine qui finit de descendre, les portes s'ouvrent, et on sort.
+  - À plusieurs, la cabine attend ceux qui sont encore dehors ; un second appui part sans eux.
+  - Le monte-charge du Level 1 se lance aussi avec son bouton.
+- **The Backrooms** — Plus fluide, sans rien perdre à l'image : les objets hors de vue ne sont plus dessinés (cinq fois moins de triangles par image, image identique au pixel près).
+
+## 4.82 — 8 novembre 2026
+- **Odyssée** — Graphismes « Noir & Blanc » refaits avec les vrais décors du jeu Noir & Blanc.
+  - Centres Pokémon, Boutiques, arènes, labo, tours et une dizaine de maisons différentes, dessinés comme dans Noir & Blanc, à la bonne taille et la porte en face de l'entrée.
+  - La mer et les hautes herbes de Noir & Blanc.
+  - Un bâtiment qui n'a pas d'équivalent à sa taille garde son dessin de base.
+
+## 4.81 — 8 novembre 2026
+- **Odyssée** — Options → Graphismes plus simple : deux choix seulement, « Odyssée (de base) » ou « Noir & Blanc ».
+  - En Noir & Blanc, les Centres Pokémon, Boutiques, arènes et grands bâtiments gardent leur beau modèle en relief ; seules les maisons changent.
+  - Toits des maisons plus propres (plus de traits répétés).
+
+## 4.80 — 8 novembre 2026
+- **Odyssée** — Graphismes « Pokémon Noir & Blanc » : plus de variété dans les villes.
+  - Trois sortes de maisons : toit de tuiles orange, toit bleu avec auvent, toit turquoise.
+  - Les arbres et les sapins sont ceux des routes de Noir & Blanc.
+
+## 4.79 — 8 novembre 2026
+- **Odyssée** — Graphismes « Pokémon Noir & Blanc » : les maisons sont refaites.
+  - Elles gardent leur vraie taille et leur place : plus de dessin qui déborde sur la route ni de porte décalée.
+  - Toit de tuiles orange, corniche claire et murs beiges dans le style Noir 2 & Blanc 2, à la même échelle que le reste.
+  - Les Centres Pokémon, Boutiques et arènes reprennent leur dessin de base en attendant une vraie version Noir & Blanc.
+
+## 4.78 — 8 novembre 2026
+- **Odyssée** — Graphismes « Pokémon Noir & Blanc » : les bâtiments changent aussi.
+  - Centres Pokémon, arènes et maisons prennent les dessins des jeux Noir 2 & Blanc 2 (maisons de Phyromatical).
+  - L'herbe est plus verte, on ne la confond plus avec l'eau.
+
+## 4.77 — 8 novembre 2026
+- **The Backrooms** — La fin du Level 0 s'annonce : à la dernière cassette, les néons s'éteignent un à un, en vague qui arrive sur vous, chacun avec le claquement de son relais. Puis c'est le noir complet, et les feux rouges se rallument d'un coup dans un fracas électronique (une seule fois). Les alarmes se déclenchent à ce moment-là.
+- **The Backrooms** — Une bande son bien plus oppressante pour la phase rouge.
+  - Une sirène d'évacuation au son riche, noyée dans une grande réverbération.
+  - D'autres alarmes surgissent par-dessus, de toutes les directions (sonnerie d'incendie, bips, klaxon, sirènes), de plus en plus serrées au fil des minutes.
+  - Dessous, un grave qui bat, un accord dissonant et une gamme qui monte sans fin.
+  - Quand le courant se coupe, toutes les alarmes se taisent net ; les feux qui claquent près de vous grésillent.
+- **The Backrooms** — Les feux rouges vivent : leur lueur grésille et se déforme, des volutes de brume traversent leur cône, et une poussière très fine flotte dans la lumière, portée par les courants d'air.
+- **The Backrooms** — Pendant la phase rouge, la lampe torche est plus faible et ses pannes plus variées (salves, extinctions, faux contact, éclair trop fort, agonie). L'endurance s'use deux fois moins vite, pour courir jusqu'à l'ascenseur.
+- **The Backrooms** — Une fine pellicule d'eau au cœur des plus grosses taches de la moquette : elle reflète le plafond, les néons (ou les feux rouges) et la lampe torche, et vos pas y font un bruit mouillé.
+- **The Backrooms** — Un papier peint plus fidèle aux photos au Level 0, toujours discret : sur les rayures de deux teintes, de fines chaînes de perles et des chevrons emboîtés pointés vers le haut.
+- **The Backrooms** — Les grilles d'aération du plafond ne chevauchent plus les néons.
+- **The Backrooms** — Les recoins calmes du Level 0 refaits.
+  - Un vrai fauteuil, un lampadaire à abat-jour de tissu et une petite radio en bois.
+  - La lampe éclaire vraiment les murs, le sol et le plafond d'une lumière chaude, au lieu d'un disque orange.
+  - La radio joue doucement une vieille valse, avec son souffle et ses craquements, d'où elle est posée ; elle se dérègle quand le recoin s'use.
+- **The Backrooms** — Les pas dans l'eau des taches de moquette sont beaucoup plus discrets.
+- **The Backrooms** — À l'œil nu, l'image est calculée en pleine définition (les vrais pixels de l'écran) ; le caméscope garde l'image de sa bande.
+- **The Backrooms** — Ce que vous tenez en main prend la couleur de la lumière autour de vous : rouge à la fin, noir quand tout s'éteint.
+- **The Backrooms** — La flèche à côté du signal a maintenant une tige : on voit tout de suite dans quel sens elle pointe.
+- **Odyssée** — Nouveaux graphismes « Pokémon Noir & Blanc » : Options → Graphismes.
+  - Herbe turquoise, chemins, sable, eau, lave, hautes herbes, arbres, palmiers, sapins enneigés, buissons, rochers et arbres morts dans le style des jeux Noir & Blanc.
+  - Les Pokémon gardent leurs sprites ; on revient aux graphismes de base en choisissant « Odyssée » sur la même ligne (le jeu se relance).
+  - Les artistes (thefloofypanthar, UltimoSpriter, Phyromatical) sont crédités dans les Options.
+
+## 4.76 — 8 novembre 2026
+- **Odyssée** — Tu choisis maintenant tes graphismes : Options → « Sol du dehors » et « Sprites des Pokémon ».
+  - Sol du dehors : « Odyssée » (le sol dessiné par le jeu, avec son relief), « Classique » (les tuiles d'origine) ou le nouveau « Pokémon Lumineux » (herbe, terre, sable, pierre, neige, eau, lave et hautes herbes dans un style Rubis / Émeraude aux couleurs vives).
+  - Le sol change au prochain lancement d'Odyssée ; depuis l'écran-titre, le jeu se relance tout seul en quittant les Options.
+  - Sprites des Pokémon : « HeartGold / SoulSilver » (comme avant) ou « Noir & Blanc » (Gen 5) pour les 493 premiers Pokémon, avec leurs versions de dos et chromatiques. Le changement est immédiat.
+- **Odyssée** — Un écran « Crédits graphismes » dans les Options remercie les artistes dont les tuiles et les sprites sont utilisés.
+
+## 4.75 — 8 novembre 2026
+- **The Backrooms** — Des puits sans fond à l'étage du bas du Level 0.
+  - Dans certaines grandes salles, le sol laisse place à une grille de trous carrés séparés par d'étroites passerelles.
+  - Ils sont si profonds qu'on n'en voit jamais le fond : leurs parois s'enfoncent dans le noir.
+  - Y tomber est mortel : on bascule, on tombe longtemps en voyant la lumière rapetisser au-dessus… et personne ne vous entend atterrir.
+  - On peut les traverser par les passerelles en gardant l'équilibre ; le perdre, c'est tomber.
+  - Les escaliers, les cassettes et la sortie restent toujours accessibles sans passer au-dessus d'un puits.
+- **The Backrooms** — Les trous de l'étage du haut sont plus larges, avec des passerelles plus fines et des parois éclairées.
+- **The Backrooms** — L'intérieur des trous et des puits a la même teinte que les murs de l'étage, au lieu d'un gris-vert.
+- **The Backrooms** — Nouvelles couleurs à l'étage du haut du Level 0 : un jaune moins vert, murs jaune pâle, moquette beige à peine plus foncée que les murs, plafond blanc cassé à la grille discrète et néons d'un blanc à peine chaud.
+- **The Backrooms** — La fin du Level 0 plonge dans le noir : quand toutes les cassettes sont trouvées, les néons s'éteignent et seuls des feux de secours rouges restent allumés, un par zone : aucune région ne reste dans le noir pour de bon.
+  - Des feux à bout de souffle, chacun à son rythme : ils claquent en tentant de se rallumer, tiennent parfois une seconde, puis lâchent de nouveau. Le noir domine.
+  - Leur lumière, diffuse et sans bord net, porte un peu plus loin qu'un néon ; elle tombe vers le sol et laisse le plafond dans l'ombre. Chaque feu allumé jette une lueur sur les dalles autour de lui et un cône de lumière poussiéreuse vers le bas.
+  - Parfois tout se coupe d'un coup avant de se rallumer en hoquetant.
+  - La lampe torche aussi est à bout : elle claque, faiblit ou lâche par moments (elle reste blanche).
+- **The Backrooms** — Les piles sont de vraies piles AA, au sol comme dans la main.
+- **The Backrooms** — L'eau au Level 0 : flaques et plaques d'humidité plus rares, aux bords irréguliers (plus aucun rond parfait), auréoles du plafond plus discrètes qui ne passent plus d'une pièce à l'autre à travers les murs.
+- **The Backrooms** — Une vraie moquette rase au Level 0, la même aux deux étages : des poils fins qu'on distingue à hauteur d'homme, avec leurs ombres, et plus aucun motif qui se répète sur le sol.
+- **The Backrooms** — Les murs de l'étage du haut sont propres : plus de coulures, presque plus d'auréoles ni de traces d'humidité.
+- **The Backrooms** — L'étage du bas du Level 0 garde son ambiance d'avant : papier peint doré juste plus gris (plus aucune tache, fissure ni moisissure) et lumière plus chaude.
 
 ## 4.74 — 8 novembre 2026
 - Correction : sortie de la Caverne du Magma bien encadree de roche et chambre sud-est reliee au nord (Amiel)

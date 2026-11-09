@@ -388,6 +388,7 @@ function kitStyle(b, map) {
 export class WorldView {
   constructor(renderer, charsImg, art = {}) {
     this.renderer = renderer;
+    this.batPack = art.batiments || null;   // pack de graphismes : bâtiments dessinés d'un seul tenant (gfx.js)
     // Pokémon qui suivent le dresseur (img/suiveurs.png) : leurs lignes s'ajoutent sous celles des personnages
     if (charsImg && art.suiveurs && SPRITES.suiveurs) {
       const c = document.createElement('canvas'); c.width = charsImg.width; c.height = charsImg.height + art.suiveurs.height;
@@ -1200,6 +1201,29 @@ export class WorldView {
         hole.geometry.dispose(); hole.geometry = gg; hole.position.set(0, 0, 0); mat.polygonOffset = true; mat.polygonOffsetFactor = -2; mat.polygonOffsetUnits = -4;
       }
       g.add(hole); this.root.add(g); return;
+    }
+    // pack de graphismes (Options → Graphismes) : une image d'un seul tenant, à 32 px par case comme l'écran (pixel pour
+    // pixel), dont la largeur colle à l'emprise ; sa porte tombe sur la porte du jeu, son pied sur le bord avant
+    const BP = this.batPack, choix = BP?.styles[b.style];
+    if (choix) {
+      const ok = choix.filter(([n, w]) => BP.images[n] && Math.abs(w / 32 - b.w) <= 1.5);
+      const best = ok.length && Math.min(...ok.map(([, w]) => Math.abs(w / 32 - b.w)));
+      const pris = ok.filter(([, w]) => Math.abs(w / 32 - b.w) <= best + 0.35);
+      const pick = pris.length ? pris[(b.x * 7 + b.y * 3) % pris.length] : null;
+      if (pick) {
+        const [n, , porte] = pick, im = BP.images[n];
+        const t = T3('pack_' + n, () => im); t.flipY = true; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.needsUpdate = true;
+        const W = im.width * WPX / 2, H = im.height * HPX / 2;
+        const geo = new THREE.PlaneGeometry(W, H); geo.translate(0, H / 2, 0);
+        geo.setAttribute('anchor', new THREE.Float32BufferAttribute(new Array(12).fill(0), 3));
+        const px = porte == null || b.door < 0 ? null : porte / 32;
+        const left = px == null ? b.x + (b.w - W) / 2 : b.x + b.door + 0.5 - px;
+        const ax = Math.round((left + W / 2) * 32) / 32, az = b.y + b.d;
+        const mat = screenSprite(new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide }));
+        this.tinted.push(mat); mat.color.copy(this.tint);
+        const me = new THREE.Mesh(geo, mat); me.position.set(ax, hb, az); g.add(me); g.userData.b = b;
+        this.root.add(g); this.buildingMeshes.push(g); return;
+      }
     }
     // bâtiment en fausse 3D (modèle de batiments3d.js) quand un modèle a la bonne emprise ; sinon l'ancienne façade
     if (!/[?&]bati=0/.test(globalThis.location?.search || '')) {

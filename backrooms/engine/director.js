@@ -35,13 +35,13 @@ export function createDirector(level) {
   };
 }
 
-// la peur d'un joueur : l'entité proche, traqué, agrippé, à bout de souffle
+// la peur d'un joueur : l'entité proche, traqué, agrippé, assoiffé
 function playerStress(sim, P) {
   const M = sim.monster;
   let s = (P.danger || 0) * 0.65;
   if (M && M.mode === 'chase' && M.target === P.id) s += 0.45;
   if (P.grabT > 0) s += 1;
-  if (P.stamina < 20) s += 0.1;
+  if ((P.water ?? 100) < 20) s += 0.1;
   if (sim.goats) for (const g of sim.goats) if (g.target === P.id && (g.mode === 'charge' || g.mode === 'windup')) s += 0.5;
   return Math.min(1, s);
 }
