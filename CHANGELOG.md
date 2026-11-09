@@ -11,6 +11,7 @@
 - **The Backrooms** — La caméra se tourne au pavé tactile, sans souris (iPad compris) : glisser à deux doigts pour regarder autour de soi, ou cliquer-glisser.
   - En mode « Sans souris », le pavé tactile s'ajoute aux flèches ; pincer zoome le caméscope.
   - Sur tablette, un clic au pavé tactile ne fait plus apparaître le joystick de marche et reprend la partie mise en pause.
+
 ## 4.95 — 9 novembre 2026
 - **Hub** — Revert "feat(hub,backrooms): trailer officiel de 30 secondes pour The Backrooms avec bouton de lecture sur la carte du Hub" (Amiel)
 
