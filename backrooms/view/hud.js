@@ -61,7 +61,7 @@ export const NOTES = {
     "Nobody knows I'm here. Allah Akbar",
     'I keep the lights off so I can hear footsteps first. And I can cut the throat of the european people',
     "I'm not afraid anymore. I don't remember what that felt like. I just remember the hiding.",
-    "If you don't love islam, just died.",
+    "If you don't love islam, just die.",
   ] },
   2: { tag: 'CARVED TILE', list: [
     'Before the water, there were only equations. St Didier Auroux wrote them down, and the water began to flow.',
