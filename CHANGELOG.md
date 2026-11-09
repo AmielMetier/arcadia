@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.2 — 9 novembre 2026
+- Fix typo in hud.js string (Metier Amiel)
+
 ## 5.1 — 9 novembre 2026
 - Modify NOTES entries in hud.js (Metier Amiel)
 
