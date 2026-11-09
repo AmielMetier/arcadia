@@ -28,6 +28,7 @@ import { storyTalk, storyTrigger, storyWin, lugiaBattle, placeLugia, purify, ove
 import { syncJournal } from './core/questsData.js';
 import { QUIZ } from './world/arenes.js';
 import { souffle, stelesPleines, moitieDe } from './world/arene-sylve.js';
+import { preparerArene, surCaseArene, actionnerArene, remettreArene, pasArene, rocherDansFosse } from './arenes-jeu.js';
 import { casinoScreen, bourseScreen, entretienPierre } from './ui/metropole.js';
 import { arcadeScreen } from './ui/arcade.js';
 import { apparenceScreen } from './ui/apparence.js';
@@ -223,7 +224,7 @@ export class Game {
     if (mv) Object.assign(state, { map: mv.map, x: mv.x, y: mv.y, dir: mv.dir || state.dir, surf: false });
     if (state.map === 'monde' && !state.surf && !walkable(this.world.maps.monde.get(state.x, state.y))) [state.x, state.y] = nearestWalkable(this.world.maps.monde, state.x, state.y);
     // intérieur redessiné depuis (l'Arène de Sylvebourg, par exemple) : une partie arrêtée dans un mur reprend à l'entrée
-    { const M0 = this.world.maps[state.map]; if (M0 && state.map !== 'monde' && !state.surf && M0.exitX != null && (!M0.in(state.x, state.y) || !walkable(M0.get(state.x, state.y)))) Object.assign(state, { x: M0.exitX, y: M0.exitY - 1, dir: 'up' }); }
+    { const M0 = this.world.maps[state.map]; if (M0 && state.map !== 'monde' && !state.surf && M0.exitX != null && (!M0.in(state.x, state.y) || !walkable(M0.get(state.x, state.y)) || (M0.planArene && state.flags?.['PV:' + M0.id] !== (M0.planArene.version || 1)))) Object.assign(state, { x: M0.exitX, y: M0.exitY - 1, dir: 'up' }); }
     this.state = state; this._seen = null;
     revertMegas(state.party); revertMegas(state.box);
     this.stepLock = false; this.stepGap = false;
@@ -259,6 +260,7 @@ export class Game {
     // arbres coupés, rochers brisés : la carte garde la trace de ce qu'on a dégagé
     for (const k of this.state.cleared[m.id] || []) { const [x, y] = k.split(',').map(Number); if (m.get(x, y) === T.CUT || m.get(x, y) === T.SMASH) m.set(x, y, m.outdoor ? T.GRASS : T.CAVE); }
     this.applyTiles(m);   // rochers poussés avec Force, autel du Sanctuaire
+    preparerArene(this, m);   // arènes dessinées : portes, tapis, miroirs dans l'état sauvegardé
     if (this.strengthOn !== m.id) this.strengthOn = null;
     this.view.eclipse = this.eclipseOn();
     this.view.setMap(m);
@@ -595,7 +597,7 @@ export class Game {
     if (p.move) {
       const u = Math.min(1, p.move.t);
       px = p.move.fx + (p.move.tx - p.move.fx) * u; py = p.move.fy + (p.move.ty - p.move.fy) * u;
-      if (p.move.jump) hop = Math.sin(u * Math.PI) * 0.55;
+      if (p.move.jump) hop = Math.sin(u * Math.PI) * (p.move.haut || 0.55);
       stepFrame = p.surf ? 0 : u < 0.5 ? (p.step % 2 ? 1 : 2) : 0;
     } else if (p.bumpT > 0) stepFrame = p.bumpT > 0.15 ? (p.step % 2 ? 1 : 2) : 0;
     if (p.flyElevation) hop += p.flyElevation;
@@ -671,11 +673,15 @@ export class Game {
       if (m.in(tx, ty) && walkable(t) && t !== T.DOOR && t !== T.BRIDGE && !this.occupied(tx, ty) && m.height(tx, ty) === m.height(p.x, p.y)) { p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur: 0.25, jump: true, land: true }; p.walking = true; this.sound.sfx('ledge'); return; }
       p.walking = false; if (p.bumpT <= 0) { this.sound.sfx('bump'); p.bumpT = 0.3; } return;
     }
+    // arènes dessinées : un rayon de lumière barre la route, un bras de tourniquet se pousse
+    if (m.etat && pasArene(this, d, tx, ty)) return;
     // Force : pousser un rocher
     if (t === T.BOULDER && !m.bloc && (this.strengthOn === m.id || m.pushFree)) {
       const bx = tx + dx, by = ty + dy, bt = m.get(bx, by);
-      if (walkable(bt) && ![T.DOOR, T.MAT, T.CAVEDOOR, T.STAIRS].includes(bt) && !this.occupied(bx, by) && !m.warpAt(bx, by)) {
-        this.setTile(tx, ty, m.outdoor ? T.GRASS : T.CAVE); this.setTile(bx, by, T.BOULDER);
+      // arène de la Carrière : le rocher comble la fosse
+      if (m.etat && !this.occupied(bx, by) && rocherDansFosse(this, tx, ty, bx, by)) { p.bumpT = 0.3; p.walking = false; return; }
+      if (walkable(bt) && ![T.DOOR, T.MAT, T.CAVEDOOR, T.STAIRS].includes(bt) && !this.occupied(bx, by) && !m.warpAt(bx, by) && !(m.etat && m.objectAt(bx, by))) {
+        this.setTile(tx, ty, m.etat ? T.FLOOR : m.outdoor ? T.GRASS : T.CAVE); this.setTile(bx, by, T.BOULDER);
         this.sound.sfx('ledge'); this.view.shake = 0.08; p.bumpT = 0.3; p.walking = false;
         return;
       }
@@ -705,6 +711,12 @@ export class Game {
     if (mo?.type === 'dalle') this.dalle(mo);
     if (mo?.type === 'souffle' && !mv.slid) { this.busy = true; try { await this.souffle(mo); } finally { this.busy = false; } }
     if (mo?.type === 'tp' && !mv.slid) { this.busy = true; try { await this.teleporte(mo); } finally { this.busy = false; } return this.onStep({ slid: true }); }
+    // arènes dessinées : dalles-interrupteurs, trous, canons à vent, dalles d'argile
+    if (m.etat && mo && ['reg', 'chute', 'canon', 'fragile'].includes(mo.type)) {
+      this.busy = true; let bouge = false;
+      try { bouge = await surCaseArene(this, mo, mv.slid); } finally { this.busy = false; }
+      if (bouge) return this.onStep({ slid: true });
+    }
     if (isGrassEnc(t)) this.view.rustle(p.x, p.y);
     const w = m.warpAt(p.x, p.y);
     if (w && (t === T.DOOR || t === T.CAVEDOOR || w.step)) {
@@ -867,6 +879,7 @@ export class Game {
     for (const k of Object.keys(st.flags)) if (k.startsWith('T:' + m.id + ':') && !k.endsWith(':leader')) delete st.flags[k];
     st.flags['IN:' + m.id] = false;
     if (m.serre) { delete st.tiles?.[m.id]; this.applyTiles(m); }   // la Grande Serre repart de zéro
+    if (m.etat) await remettreArene(this);   // arène dessinée : registres, rochers et fosses comme au début
     this.busy = false;
     await this.warp(w, 'exit');
   }
@@ -1081,6 +1094,7 @@ export class Game {
         else if (it) await this.pickItem(it);
         else if (o?.type === 'baies') await cueillir(this, o);
         else if (o?.type === 'fouille') await fouiller(this, o);
+        else if (m.etat && ((o?.type === 'reg' && o.actionne) || o?.type === 'remise')) await actionnerArene(this, o);
         else if (o?.use) await o.use(this.api(), o, fx, fy);
         else if (o?.type === 'pc') await pcScreen(this);
         else if (o?.type === 'naturepc') await naturePcScreen(this);
