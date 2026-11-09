@@ -316,6 +316,7 @@ window.HUB_GAMES = [
     minPlayers: 1, maxPlayers: 6, maxWithBots: 6,
     accent: '#eab308',
     icon: '🚪', score: 'Cassettes trouvées',
+    trailer: 'backrooms/trailer.mp4',
     settings: [
       { key: 'difficulty', label: 'Difficulté de l\'entité', options: [['normal', 'Normale'], ['hard', 'Rapide & Agressive'], ['peaceful', 'Exploration (Sans monstre)']], def: 'normal' },
       { key: 'monsters', label: 'Monstres', options: [['normal', 'Normal'], ['vip', '⭐ VIP mode', { vip: true }]], def: 'normal' },
