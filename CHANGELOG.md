@@ -10,6 +10,19 @@
 - **The Backrooms** — Le Level 1 fait peau neuve : un vrai entrepôt de béton, aux murs de parpaings peints en gris clair, au sol lissé où les réglettes se reflètent en longues traînées, au plafond à caissons éclairé par la lueur des néons (qui grésille et s'éteint avec eux).
   - Au plafond, des gaines de ventilation sur leurs étriers, leurs branches rondes et leurs grilles ; aux murs, des postes d'incendie avec leur alarme, des coffrets électriques, des caméras, des horloges arrêtées et des quais de chargement condamnés.
   - Sur les palettes, des caisses clouées, des grands bacs, des sacs de terreau et de ciment, et enfin des fûts.
+## 4.84 — 9 novembre 2026
+- **Odyssée** — Les quinze arènes ont été entièrement redessinées, chacune avec sa propre énigme en plusieurs salles et un panneau qui en donne les règles à l'entrée.
+  - Sylvebourg devient la Ruche : des ruchers font fondre ou rebâtir des murs de cire de cinq couleurs.
+  - Port-Azur : deux bassins à trois niveaux d'eau, des pontons et des radeaux. Voltacité : des barrières qui s'inversent et trois fusibles à rapporter.
+  - Floralia : des parterres à faire fleurir dalle après dalle. Mirage : un palais de téléporteurs en trois phases (lune, soleil, étoile).
+  - Port-Granit : des rochers à pousser dans les fosses. Cendrelune : deux réseaux de coulées de lave à aiguiller, des trous et des gardiens du savoir. Fort-Écaille : des ponts-dragons qui pivotent.
+  - Métropole : une galerie où il faut examiner les vitrines dans le bon ordre, sans toucher à l'intrus. Port-Lisière : des îles volantes et des canons à vent qui tournent après chaque tir.
+  - Marais-Noir : un labyrinthe aux murs invisibles et cinq lanternes. Dunes d'Ocre : du sable qui glisse et des dalles d'argile qui cèdent si l'on repasse dessus.
+  - Forge-Acier : des tapis roulants à sens unique et deux inverseurs. Rosebrume : des miroirs qui guident un rayon infranchissable. Ombreval : des passerelles invisibles dans le noir et cinq torches.
+  - Un pupitre remet une arène à zéro si l'on s'est bloqué ; chaque arène a ses dresseurs et parfois un objet caché.
+- **Odyssée** — Les intérieurs ont de vrais murs : papier peint et lambris au fond, fenêtres, murs sur les côtés, ombres au sol et un tapis dans les maisons.
+  - Quatre papiers peints différents pour les maisons.
+  - Dans la maison de Maman, l'armoire se range au fond, à côté de l'évier.
 
 ## 4.83 — 8 novembre 2026
 - **The Backrooms** — Les cassettes sont posées par terre, comme les piles et les bouteilles : on les ramasse avec F, sans coupure d'image.
