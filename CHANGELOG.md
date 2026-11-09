@@ -1,5 +1,49 @@
 # Journal des versions — Arcadia
 
+## 4.93 — 6 novembre 2026
+- **The Backrooms** — au Terror Hotel (Level 5) :
+  - Caché sous un lit ou dans une armoire, une fois que l'entité a perdu ta trace, elle quitte la chambre et reprend sa ronde au loin, au lieu de fouiller autour de toi.
+  - Elle entend les pas de tous les joueurs : si un autre court ou marche près d'elle, elle part voir.
+  - L'hôtel est nettement plus éclairé : toutes les chambres ont leur plafonnier allumé, et presque toutes les appliques marchent.
+
+## 4.92 — 6 novembre 2026
+- **The Backrooms** — le hall du Terror Hotel (Level 5), où l'on arrive, est un vrai hall d'hôtel des années 1930, plus petit et meublé de partout.
+  - Une réception au comptoir de marbre et de bois mouluré, avec sa caisse enregistreuse, sa pendule, sa lampe à pétrole, sa sonnette et son registre ouvert ; derrière, la vitrine et les tableaux à clés.
+  - Un salon : canapé capitonné, deux fauteuils, table basse, pouf et tapis vert bordé d'or, sous un tableau.
+  - Au milieu, une banquette ronde de velours vert surmontée d'une plante ; deux colonnes de marbre encadrent l'entrée.
+  - Un chariot à bagages en laiton chargé de vieilles valises, une horloge comtoise, une commode et son miroir, un buste de marbre, des plantes et cinq lustres.
+
+## 4.91 — 6 novembre 2026
+- **The Backrooms** — aux Poolrooms (Level 37), l'entité ne se cache plus derrière les cloisons pour t'observer : elle rôde et te traque à découvert, tu la vois venir.
+  - Derrière une cloison, son bourdonnement est étouffé : on ne croit plus l'entendre à travers les murs.
+
+## 4.90 — 6 novembre 2026
+- **The Backrooms** — l'entité du Level 1 te suit aux Poolrooms (Level 37) : même apparence, mêmes sons, même screamer.
+  - Elle passe d'une salle à l'autre par les portes, jamais à travers les cloisons, et les cloisons te cachent d'elle.
+  - Elle marche au fond des bassins ; l'eau la freine, un peu moins que toi.
+
+## 4.89 — 6 novembre 2026
+- **The Backrooms** — au Terror Hotel (Level 5), se faire attraper donne un vrai screamer : l'entité de l'hôtel se jette sur toi en un quart de seconde, bras tendus vers ton visage, la tête qui tremble, l'image qui saute et se déchire, un éclair rouge et un hurlement déchiré, puis le noir.
+
+## 4.88 — 6 novembre 2026
+- **The Backrooms** — le Terror Hotel (Level 5) a sa propre entité : un homme en chemise sombre et jean, plus grand que toi, qui marche raide dans les couloirs, se penche en avant pour courir quand il te traque, et dont la tête penchée tressaute sans arrêt.
+
+## 4.87 — 6 novembre 2026
+- **The Backrooms** — le Terror Hotel (Level 5) est moins sombre : les appliques du couloir éclairent plus, presque toutes marchent, et chaque chambre a un plafonnier en plus de sa lampe de chevet.
+
+## 4.86 — 6 novembre 2026
+- **The Backrooms** — nouveau niveau : le Level 5, le Terror Hotel. On y arrive en prenant le toboggan rouge des Poolrooms.
+  - Un hôtel des années 1930 : papier peint damassé, lambris sombres, moquette rouge, appliques Art déco qui grésillent, et un couloir qui fait le tour sans fin de 21 chambres numérotées, de 201 à 221.
+  - Six lettres sur papier sont cachées dans les chambres, sur un lit, sur un bureau ou par terre. Chacune se poste dans la boîte aux lettres de sa chambre, dans le hall. Ensemble, elles forment un mot.
+  - Les six lettres postées, un code à quatre chiffres s'allume au plafond du hall. On le tape sur le clavier de la porte de l'escalier de secours, qui s'ouvre : c'est la sortie.
+  - On ne se bat pas : on court, on s'accroupit (C) et on se cache sous un lit ou dans une armoire (E).
+  - L'entité rôde dans le couloir et entre parfois dans les chambres. Elle entend la course de loin et la marche de près ; accroupi, on passe en silence. Un œil se remplit quand elle te voit : plein, elle te traque. Si tu te caches loin d'elle, elle perd ta trace ; si elle t'a vu te glisser dans ta cachette, elle t'en sort.
+  - Un joueur attrapé avec des lettres en poche : elles retournent là où il les avait trouvées.
+  - Parquet qui craque et boîte à musique désaccordée au loin.
+- **The Backrooms** — les toboggans jaune et bleu des Poolrooms mènent toujours à l'écran de fin, en attendant leurs niveaux.
+## 4.94 — 9 novembre 2026
+- **The Backrooms** — au Level 0, une feuille de cahier est scotchée au mur juste à côté de l'arrivée : le mot griffonné d'un survivant passé avant vous, qui dessine l'entité, les cassettes, les trous dans le sol et le faux ascenseur.
+
 ## 4.85 — 9 novembre 2026
 - **The Backrooms** — Un vrai inventaire : quatre cases d'objets à côté de la lampe, à choisir avec les touches 2 à 5 ou la molette.
   - G pose l'objet choisi par terre, juste devant soi : une eau d'amande ou des piles à laisser à un coéquipier, l'échelle à garder pour plus tard. On l'entend tomber.

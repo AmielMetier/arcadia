@@ -117,6 +117,8 @@ function build(sim, floor) {
         }
       }
     }
+    // Poolrooms (cloisons minces, colonnes) et Level 5 (meubles, montants des portes) : la collision propre à la carte
+    if (m.collide && m.collide(x, z, best)) return 0;
     return best;
   };
   const FW = W * SUB;

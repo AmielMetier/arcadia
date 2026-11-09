@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
 
@@ -26,6 +26,7 @@ const putOn = (sim, P, cas) => {
 };
 import { createWarehouseMap, DOCK_PASS } from '../backrooms/engine/level1.js';
 import { createPoolMap } from '../backrooms/engine/poolrooms.js';
+import { createHotelMap, parseWords, WORDS } from '../backrooms/engine/hotel.js';
 
 // avance la partie de n secondes
 const run = (sim, sec, input = {}, others = null) => {
@@ -1397,7 +1398,7 @@ test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui 
   assert.equal(sim.level, 2, 'on arrive aux Poolrooms');
   assert.ok(sim.drainEvents().some((e) => e.type === 'level' && e.level === 2));
   // les 3 volants de vanne ouvrent les toboggans ; on se glisse dans l'un d'eux : la partie est gagnée
-  const sl = sim.map.slides[0];
+  const sl = sim.map.slides[2]; // le bleu (le rouge mène au Terror Hotel, le jaune aux Tuyauteries)
   sim.player.x = sl.x - sl.dx * 0.6;
   sim.player.z = sl.z - sl.dz * 0.6;
   sim.step();
@@ -1413,9 +1414,9 @@ test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui 
   sim.player.z = sl.z - sl.dz * 0.6;
   sim.step();
   assert.equal(sim.player.status, 'elevator');
-  assert.equal(sim.slide, 0, 'le toboggan rouge est pris');
+  assert.equal(sim.slide, 2, 'le toboggan bleu est pris');
   run(sim, DEPART_T + 0.2);
-  assert.equal(sim.state, 'won', 'le toboggan rouge sort des Poolrooms : partie gagnée');
+  assert.equal(sim.state, 'won', 'le toboggan bleu sort des Poolrooms : partie gagnée');
 });
 
 test('Level 1 : coupures de courant de 15 à 20 s', () => {
@@ -2632,10 +2633,34 @@ test("Level 37 (Poolrooms) : salles et bassins reliés, 3 vannes et 3 toboggans 
   const a = walk(dry);
   const b = walk(deep);
   assert.ok(b < a * 0.8, `plus lent dans l'eau (${b.toFixed(4)} contre ${a.toFixed(4)})`);
-  // l'entité ne sort pas de l'eau : personne n'est poursuivi aux Poolrooms
-  run(sim, 5);
-  assert.equal(P.status, 'alive');
-  assert.equal(sim.monster.mode, 'patrol');
+  // l'entité du Level 1 y chasse aussi : elle part loin, au sec, et ses chemins ne passent que par les portes
+  const m = sim.map;
+  const ms = m.monsterSpawn;
+  assert.ok(m.dist[ms.gz * m.W + ms.gx] > 15, "l'entité part loin du départ");
+  assert.equal(m.depthAt(ms.x, ms.z), 0, "l'entité part au sec");
+  for (const sd of [3, 37, 99]) {
+    const pm = createPoolMap(sd);
+    const a = pm.monsterSpawn;
+    for (const r of pm.rooms.filter((q) => q.type === 'tech')) {
+      const path = findPath(pm, a.x, a.z, (r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2);
+      assert.ok(path && path.length, `graine ${sd} : l'entité trouve un chemin`);
+      let prev = a;
+      for (const w of path) {
+        const crossed = pm.segs.some((sg) => {
+          const d1x = w.x - prev.x, d1z = w.z - prev.z, d2x = sg.x1 - sg.x0, d2z = sg.z1 - sg.z0;
+          const den = d1x * d2z - d1z * d2x;
+          if (Math.abs(den) < 1e-9) return false;
+          const t = ((sg.x0 - prev.x) * d2z - (sg.z0 - prev.z) * d2x) / den;
+          const u = ((sg.x0 - prev.x) * d1z - (sg.z0 - prev.z) * d1x) / den;
+          return t > 0 && t < 1 && u >= 0 && u <= 1;
+        });
+        assert.ok(!crossed, `graine ${sd} : l'entité traverse une cloison`);
+        prev = w;
+      }
+    }
+  }
+  run(sim, 3);
+  assert.ok(sim.monster.x !== ms.x || sim.monster.z !== ms.z, "l'entité bouge aux Poolrooms");
 });
 
 test('Level 37 : le premier qui prend un toboggan choisit la couleur, les autres se referment', () => {
@@ -2666,7 +2691,9 @@ test('Level 37 : le premier qui prend un toboggan choisit la couleur, les autres
   sim.step();
   assert.equal(B.status, 'elevator');
   run(sim, DEPART_T + 0.2);
-  assert.equal(sim.state, 'won');
+  assert.equal(sim.state, 'playing');
+  assert.equal(sim.level, HOTEL_LEVEL, 'le toboggan rouge mène au Level 5, le Terror Hotel');
+  assert.ok(sim.players.every((p) => p.status === 'alive'), "tout le monde arrive à l'hôtel");
 });
 
 test('Level 37 : le toboggan jaune descend aux Tuyauteries (Level 2), le dernier niveau', () => {
@@ -2732,6 +2759,218 @@ test('Level 37 : on traverse chaque porte en marchant, les cloisons arrêtent le
     }
   }
   assert.ok(crossed > 60);
+});
+
+
+// --- Level 5, le Terror Hotel ---
+const goTo = (sim, P, x, z) => {
+  P.x = x;
+  P.z = z;
+};
+const hotelSim = (opts = {}) => new BackroomsSim({ difficulty: 'peaceful', seed: 7, level: HOTEL_LEVEL, ...opts });
+
+test('Level 5 : un hôtel de 21 chambres (201 à 221), 6 lettres, des cachettes, tout accessible', () => {
+  for (const sd of [1, 5, 9, 42, 77, 123]) {
+    const m = createHotelMap(sd);
+    assert.equal(m.level, HOTEL_LEVEL);
+    assert.equal(m.rooms.length, 21);
+    assert.deepEqual(m.rooms.map((r) => r.num), Array.from({ length: 21 }, (_, i) => 201 + i));
+    assert.equal(m.letters.length, 6);
+    assert.equal(new Set(m.letters.map((L) => L.room)).size, 6, 'une lettre par chambre');
+    for (const L of m.letters) assert.ok(m.dist[L.gz * m.W + L.gx] > 0 || m.collide(L.x, L.z, 0.01), `graine ${sd} : lettre accessible`);
+    // dans l'ordre des chambres, les boîtes aux lettres épellent le mot
+    assert.deepEqual(m.letters.map((L) => L.num), [...m.letters.map((L) => L.num)].sort((a, b) => a - b));
+    assert.equal(m.mailbox.boxes.length, 21);
+    assert.match(m.code, /^\d{4}$/);
+    assert.ok(m.spots.filter((s) => s.kind === 'bed').length === 21, 'un lit par chambre');
+    assert.ok(m.spots.some((s) => s.kind === 'wardrobe'), 'des armoires');
+    for (const s of m.spots) {
+      assert.ok(!m.collide(s.out.x, s.out.z, 0.38), 'on sort de sa cachette sans être coincé');
+      assert.ok(!m.isWall(Math.floor(s.out.x / CELL_SIZE), Math.floor(s.out.z / CELL_SIZE)));
+    }
+    // chaque chambre est reliée au hall ; l'entité part loin du hall
+    for (const r of m.rooms) assert.ok(m.dist[r.door.z * m.W + r.door.x] > 0, `graine ${sd} : chambre ${r.num} reliée`);
+    assert.ok(m.dist[m.monsterSpawn.gz * m.W + m.monsterSpawn.gx] > 12);
+  }
+  assert.deepEqual(parseWords('search, Shadow\nabc\nmirrors\nÉCLAIR'), ['SEARCH', 'SHADOW', 'ECLAIR']);
+});
+
+test('Level 5 : lettres ramassées, postées dans les boîtes, code au plafond, porte de secours', () => {
+  const sim = hotelSim();
+  const P = sim.player;
+  const m = sim.map;
+  assert.ok(WORDS.includes(sim.word), 'un mot de la liste standard');
+  assert.equal(sim.open, false);
+  // le clavier ne s'ouvre pas sans le bon code
+  goTo(sim, P, m.keypad.x, m.keypad.z - 0.6);
+  sim.step({ useSel: true });
+  assert.ok(sim.drainEvents().some((e) => e.type === 'keypad'));
+  sim.step({ code: '0000' === m.code ? '1111' : '0000' });
+  assert.ok(sim.drainEvents().some((e) => e.type === 'codeWrong'));
+  // les 6 lettres
+  for (const L of m.letters) {
+    goTo(sim, P, L.x, L.z);
+    sim.step();
+  }
+  assert.equal(P.letters.length, 6);
+  const got = sim.drainEvents().filter((e) => e.type === 'letter');
+  assert.equal(got.map((e) => e.char).join(''), sim.word, 'les lettres, dans l\'ordre des chambres, forment le mot');
+  // les poster
+  goTo(sim, P, m.mailbox.x + 0.7, (m.mailbox.z0 + m.mailbox.z1) / 2);
+  sim.step({ useSel: true });
+  assert.equal(sim.posted, 6);
+  assert.equal(sim.codeShown, true);
+  assert.equal(P.letters.length, 0);
+  assert.ok(sim.drainEvents().some((e) => e.type === 'codeShown'));
+  // le bon code ouvre la porte ; on la passe : partie gagnée
+  sim.step({ code: m.code });
+  assert.equal(sim.open, true);
+  const E = m.elevator;
+  goTo(sim, P, E.x, E.z);
+  sim.step();
+  assert.equal(P.status, 'elevator');
+  run(sim, DEPART_T + 0.2);
+  assert.equal(sim.state, 'won');
+});
+
+test('Level 5 : caché sous un lit, l\'entité perd sa trace ; elle tue si elle l\'a vu s\'y glisser', () => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 7, level: HOTEL_LEVEL });
+  const P = sim.player;
+  const M = sim.monster;
+  const m = sim.map;
+  const sp = m.spots.find((s) => s.kind === 'bed');
+  // se cacher puis ressortir
+  goTo(sim, P, sp.out.x, sp.out.z);
+  sim.step({ useSel: true });
+  assert.equal(P.hidden, sp.id);
+  sim.step({ my: 1, yaw: 0 });
+  assert.equal(P.x, sp.x, 'caché : on ne bouge pas');
+  sim.step({ useSel: true });
+  assert.equal(P.hidden, -1);
+  // l'entité le traque mais il se cache loin d'elle : elle le perd
+  sim.step({ useSel: true });
+  Object.assign(M, { x: sp.out.x + 9, z: sp.out.z, mode: 'chase', unseenT: 2, path: [], lastSeenX: sp.out.x, lastSeenZ: sp.out.z });
+  if (sim.map.isWall(Math.floor(M.x / CELL_SIZE), Math.floor(M.z / CELL_SIZE))) Object.assign(M, { x: m.monsterSpawn.x, z: m.monsterSpawn.z });
+  let lost = false;
+  for (let i = 0; i < 60 * 8; i++) {
+    sim.step();
+    if (sim.drainEvents().some((e) => e.type === 'lost')) lost = true;
+  }
+  assert.equal(P.status, 'alive', 'caché, il survit');
+  assert.ok(lost || M.mode !== 'chase', 'elle a perdu sa trace');
+  // elle est tout près et le voit se cacher : elle le sort de là
+  sim.step({ useSel: true });
+  assert.equal(P.hidden, -1);
+  Object.assign(M, { x: sp.out.x + 0.9, z: sp.out.z, mode: 'chase', unseenT: 0, path: [], dormantT: 0 });
+  M.yaw = Math.atan2(sp.x - M.x, sp.z - M.z); // elle regarde la cachette
+  sim.step({ useSel: true });
+  assert.equal(M.sawHide, sp.id, "elle l'a vu s'y glisser");
+  run(sim, 3);
+  assert.equal(P.status, 'dead');
+});
+
+test('Level 5 : la course s\'entend, accroupi on passe en silence ; les lettres d\'un mort reviennent', () => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 7, level: HOTEL_LEVEL });
+  const P = sim.player;
+  const M = sim.monster;
+  const m = sim.map;
+  // dans le couloir, l'entité à 8 m, sans le voir (de dos, derrière un coin : on coupe la vue)
+  const c = m.corridorCells.find((k) => k.z === m.ring.z0 && k.x === m.ring.x0 + 2);
+  P.x = (c.x + 0.5) * CELL_SIZE;
+  P.z = (c.z + 0.5) * CELL_SIZE;
+  const far = { x: P.x + 10, z: P.z };
+  const reset = () => Object.assign(M, { x: far.x, z: far.z, mode: 'patrol', path: [], targetWander: { x: far.x, z: far.z } });
+  reset();
+  P.detect = 0;
+  sim.step({ my: 1, yaw: Math.PI / 2, crouch: true });
+  assert.notEqual(M.mode, 'search', 'accroupi, elle n\'entend rien');
+  reset();
+  sim.step({ my: 1, yaw: Math.PI / 2, run: true });
+  assert.ok(M.mode === 'search' || M.mode === 'chase', 'la course attire l\'entité');
+  // un joueur attrapé avec des lettres en poche : elles retournent à leur place
+  const L = m.letters[0];
+  P.x = L.x;
+  P.z = L.z;
+  sim.step();
+  assert.equal(L.taken, true);
+  sim.dropLetters(P);
+  assert.equal(L.taken, false);
+});
+
+test('Level 5 : l\'invité reçoit le mot, les lettres, la cachette et le code affiché', () => {
+  const players = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 11, level: HOTEL_LEVEL, players, localId: 'a', words: ['MYWORD'] });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 11, level: HOTEL_LEVEL, players, localId: 'b' });
+  assert.equal(host.word, 'MYWORD', 'liste VIP');
+  const B = host.players[1];
+  const sp = host.map.spots[0];
+  B.x = sp.out.x;
+  B.z = sp.out.z;
+  host.step({}, { b: { useSel: true } });
+  const L = host.map.letters[2];
+  host.players[0].x = L.x;
+  host.players[0].z = L.z;
+  host.step();
+  guest.applySnapshot(host.snapshot());
+  assert.equal(guest.word, 'MYWORD');
+  assert.equal(guest.map.letters[2].taken, true);
+  assert.equal(guest.player.hidden, sp.id, 'l\'invité se voit caché');
+  assert.equal(guest.player.x, sp.x);
+  assert.deepEqual(guest.players[0].letters, [2]);
+});
+
+
+test("Level 5 : on entre dans chaque chambre par sa porte en marchant, les meubles arrêtent le joueur", () => {
+  const sim = hotelSim();
+  const P = sim.player;
+  const m = sim.map;
+  for (const r of m.rooms) {
+    const [dx, dz] = r.dir;
+    P.x = (r.door.x + dx + 0.5) * CELL_SIZE;
+    P.z = (r.door.z + dz + 0.5) * CELL_SIZE;
+    P.hidden = -1;
+    const yaw = Math.atan2(dx, dz); // vers la chambre
+    run(sim, 2.6, { my: 1, yaw });
+    const gx = Math.floor(P.x / CELL_SIZE);
+    const gz = Math.floor(P.z / CELL_SIZE);
+    assert.ok(gx >= r.x0 && gx <= r.x1 && gz >= r.z0 && gz <= r.z1, `chambre ${r.num} : on y entre`);
+  }
+  for (const f of m.furniture) assert.ok(sim.isColliding(f.x, f.z, 0.38), `${f.kind} : on ne le traverse pas`);
+});
+
+
+test("Level 5 : caché, l'entité quitte la pièce et reprend sa ronde ; un autre joueur qui court l'attire", () => {
+  const players = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }];
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 7, level: HOTEL_LEVEL, players, localId: 'a' });
+  const [A, B] = sim.players;
+  const M = sim.monster;
+  const m = sim.map;
+  const sp = m.spots.find((s) => s.kind === 'bed');
+  A.x = sp.out.x;
+  A.z = sp.out.z;
+  sim.step({ useSel: true });
+  assert.equal(A.hidden, sp.id);
+  // B attend sans bruit au bout du couloir
+  const far = m.corridorCells.reduce((b, c) => (Math.hypot((c.x + 0.5) * CELL_SIZE - A.x, (c.z + 0.5) * CELL_SIZE - A.z) > Math.hypot((b.x + 0.5) * CELL_SIZE - A.x, (b.z + 0.5) * CELL_SIZE - A.z) ? c : b));
+  B.x = (far.x + 0.5) * CELL_SIZE;
+  B.z = (far.z + 0.5) * CELL_SIZE;
+  // l'entité traquait A, qui s'est caché hors de sa vue
+  Object.assign(M, { x: sp.out.x, z: sp.out.z, mode: 'chase', unseenT: 0.6, path: [], lastSeenX: sp.out.x, lastSeenZ: sp.out.z, target: 'a' });
+  M.x += (sp.out.x - sp.x) * 0.8;
+  M.z += (sp.out.z - sp.z) * 0.8;
+  // A retient son souffle (Maj) : elle ne l'entend pas respirer
+  run(sim, 0.1, { run: true });
+  assert.equal(M.mode, 'patrol', 'elle renonce');
+  run(sim, 6, { run: true });
+  assert.equal(A.status, 'alive');
+  assert.ok(Math.hypot(M.x - A.x, M.z - A.z) > 5, "elle s'éloigne de la cachette");
+  // B se met à courir près d'elle : elle va voir
+  B.x = M.x + 6;
+  B.z = M.z;
+  if (sim.isColliding(B.x, B.z, 0.38, 0)) { B.x = M.x; B.z = M.z + 6; }
+  sim.step({}, { b: { my: 1, run: true, yaw: 0 } });
+  assert.ok(M.mode === 'search' || M.mode === 'chase', "le bruit de B l'attire");
+  assert.equal(M.target, 'b', 'elle part vers B');
 });
 
 // --- Level 2 : les galeries, les halles et le troupeau ---

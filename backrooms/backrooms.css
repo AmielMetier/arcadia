@@ -556,6 +556,45 @@ body.touch .click-prompt .ctrl-choice { display: none; }
   .team .mate { max-width: 160px; }
 }
 
+/* Level 5 : jauge de détection, vue depuis la cachette, clavier de la porte de secours, lettres */
+.detect { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; font-size: 16px; color: #e8dcc0; opacity: 0.85; pointer-events: none; }
+.detect-track { width: 160px; height: 6px; background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.35); }
+.detect-track i { display: block; height: 100%; width: 0; background: #e8c070; transition: width 0.15s linear; }
+.detect.hot .detect-track i { background: #ff4040; }
+.detect.hot { animation: detectPulse 0.5s infinite alternate; }
+.detect.hidden-on { opacity: 0.45; }
+@keyframes detectPulse { to { opacity: 0.55; } }
+.hide-view { position: absolute; inset: 0; pointer-events: none; }
+.hide-view.bed { background: linear-gradient(to bottom, #050302 0%, #050302 38%, rgba(5, 3, 2, 0.6) 46%, transparent 55%, transparent 80%, rgba(5, 3, 2, 0.85) 100%); }
+.hide-view.wardrobe { background: repeating-linear-gradient(to bottom, #070504 0px, #070504 26px, rgba(7, 5, 4, 0.15) 32px, rgba(7, 5, 4, 0.15) 40px, #070504 46px), radial-gradient(ellipse at center, transparent 30%, #070504 75%); background-blend-mode: multiply; }
+.keypad { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.45); z-index: 30; pointer-events: auto; }
+.keypad[hidden] { display: none; }
+.keypad-box { background: #2b2722; border: 2px solid #6b5a3e; border-radius: 10px; padding: 18px; width: 240px; box-shadow: 0 10px 40px #000; font-family: 'VT323', monospace; color: #e8dcc0; text-align: center; }
+.keypad-title { letter-spacing: 3px; font-size: 18px; color: #c9a86a; }
+.keypad-screen { margin: 10px 0 14px; padding: 8px; background: #0e1a10; color: #7dff8a; font-size: 34px; letter-spacing: 12px; border: 1px solid #000; }
+.keypad.wrong .keypad-screen { color: #ff5050; }
+.keypad-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.keypad-keys button { font: inherit; font-size: 24px; padding: 8px 0; background: #4a4239; color: #f0e6d0; border: 1px solid #1d1a16; border-radius: 6px; cursor: pointer; }
+.keypad-keys button:hover { background: #5b5146; }
+.keypad-help { margin-top: 10px; font-size: 14px; opacity: 0.7; }
+.tapes i.letter { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 18px; margin: 0 1px; border: 1px solid rgba(232, 220, 192, 0.5); font-style: normal; font-size: 13px; line-height: 1; color: #e8dcc0; background: transparent; vertical-align: middle; }
+.tapes i.letter.on { background: #e8dcc0; color: #2b2116; }
+.tapes i.letter.carry { border-color: #ffd36a; color: #ffd36a; }
+
+/* Level 5 : le screamer est dans la scène 3D ; par-dessus, un éclair rouge, de la neige, puis le noir */
+.jumpscare-overlay.l5 { background: transparent; }
+.jumpscare-overlay.l5::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.07) 0 2px, transparent 2px 4px); mix-blend-mode: screen; animation: scareSnow 0.08s steps(2) infinite; }
+.jumpscare-overlay.l5.flash { animation: scareFlash5 1.5s forwards; }
+@keyframes scareFlash5 {
+  0% { background: rgba(255, 0, 20, 0.75); }
+  5% { background: transparent; }
+  9% { background: rgba(255, 255, 255, 0.3); }
+  13% { background: transparent; }
+  40% { background: rgba(120, 0, 0, 0.18); }
+  80% { background: rgba(0, 0, 0, 0.2); }
+  100% { background: #000; }
+}
+@keyframes scareSnow { to { background-position: 0 3px; } }
 /* --- HUD minimal : ce qui ne sert pas s'efface --- */
 .stamina { transition: opacity 0.8s; }
 .stamina.idle { opacity: 0.45; }
