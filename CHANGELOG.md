@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.95 — 9 novembre 2026
+- **Hub** — Revert "feat(hub,backrooms): trailer officiel de 30 secondes pour The Backrooms avec bouton de lecture sur la carte du Hub" (Amiel)
+
 ## 4.94 — 9 novembre 2026
 - **Hub** — Nouveau : trailer officiel de 30 secondes pour The Backrooms avec bouton de lecture sur la carte du Hub (Amiel)
 
