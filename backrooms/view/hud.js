@@ -135,6 +135,8 @@ export class BackroomsHUD {
       <div class="toast" id="toast" hidden></div>
       <!-- Ce que tu peux faire ici : ramasser, échanger, poser l'échelle ; la jauge d'équilibre sur une arête -->
       <div class="prompt" id="prompt" hidden><span id="promptText"></span><div class="beam" id="beamBar" hidden><b></b><i></i></div></div>
+      <!-- Au poste de garde (Level 1) : l'incrustation de la caméra de surveillance regardée -->
+      <div class="cctv" id="cctv" hidden><div class="cctv-tl"><b id="cctvCam"></b><span id="cctvName"></span></div><div class="cctv-tr"><span class="cctv-rec">●</span> REC</div><div class="cctv-bl" id="cctvClock"></div><div class="cctv-hint" id="cctvHint"></div></div>
 
       <!-- Pause : prendre le contrôle et choisir ses commandes -->
       <div class="click-prompt" id="clickPrompt">
@@ -171,7 +173,7 @@ export class BackroomsHUD {
     this.$ = (s) => this.el.querySelector(s);
     // les éléments mis à jour à chaque image (on ne les recherche pas à chaque fois)
     this.E = {};
-    for (const id of ['vhsTimer', 'battery', 'levelTag', 'cassetteIcons', 'cassetteText', 'objBanner', 'blackoutTag', 'fadeBar', 'spectate', 'specTitle', 'specSub', 'specHaunt', 'signal', 'signalBars', 'signalLabel', 'stamina', 'staminaBar', 'noise', 'noiseBar', 'crouchTag', 'carryTag', 'inv', 'toast', 'locker', 'lockerText', 'breathBar', 'grab', 'grabBar', 'grabText', 'hurt', 'captions', 'lore', 'loreText', 'loreTag', 'prompt', 'promptText', 'beamBar', 'camSigLbl', 'signalArrow', 'camArrow', 'camNight', 'boardTimer', 'camZoom', 'camZoomBar', 'camZoomX', 'team']) this.E[id] = this.$('#' + id);
+    for (const id of ['vhsTimer', 'battery', 'levelTag', 'cassetteIcons', 'cassetteText', 'objBanner', 'blackoutTag', 'fadeBar', 'spectate', 'specTitle', 'specSub', 'specHaunt', 'signal', 'signalBars', 'signalLabel', 'stamina', 'staminaBar', 'noise', 'noiseBar', 'crouchTag', 'carryTag', 'inv', 'toast', 'locker', 'lockerText', 'breathBar', 'grab', 'grabBar', 'grabText', 'hurt', 'captions', 'lore', 'loreText', 'loreTag', 'prompt', 'promptText', 'beamBar', 'camSigLbl', 'signalArrow', 'camArrow', 'camNight', 'boardTimer', 'camZoom', 'camZoomBar', 'camZoomX', 'team', 'cctv', 'cctvCam', 'cctvName', 'cctvClock', 'cctvHint']) this.E[id] = this.$('#' + id);
     this.barEls = [...this.E.signalBars.children];
     this.camSigEls = [...this.$('#camSig').children];
     this.camIntEls = [...this.$('#camInt').children];
@@ -465,6 +467,25 @@ export class BackroomsHUD {
     // 4d. Invite : ce que la touche fait ici
     this.prompt(sim, P);
 
+    // 4e. Au poste de garde : la caméra regardée (son numéro, son nom), l'heure qui défile, les touches
+    const cams = sim.map.cams;
+    const cctv = !!(P.desk && P.status === 'alive' && cams && cams.length);
+    this.show('cctv', cctv);
+    if (this.cache.cctvOn !== cctv) {
+      this.cache.cctvOn = cctv;
+      this.el.classList.toggle('cctv-on', cctv);
+    }
+    if (cctv) {
+      const i = (P.camSel || 0) % cams.length;
+      const two = (n) => String(n).padStart(2, '0');
+      this.text('cctvCam', `CAM ${two(i + 1)}/${two(cams.length)}`);
+      this.text('cctvName', cams[i].name);
+      const t = Math.floor(time) + 3 * 3600 + 17 * 60;
+      this.text('cctvClock', `${this.$('#tapeDate').textContent}  ${two(Math.floor(t / 3600) % 24)}:${two(Math.floor(t / 60) % 60)}:${two(t % 60)}`);
+      const k = this.keyNames(this.qwerty);
+      this.text('cctvHint', document.body.classList.contains('touch') ? 'SLIDE ◄ ► TO SWITCH CAMERA · TAP F TO STAND UP' : `◄ ${k.l} / ${k.r} ► OR WHEEL · SWITCH CAMERA · F · STAND UP`);
+    }
+
     // 5. Messages passagers, sous-titres, enregistrement
     if (this.toastT > 0) {
       this.toastT -= dt;
@@ -690,6 +711,16 @@ export class BackroomsHUD {
     return qwerty ? { move: 'WASD', l: 'A', r: 'D', f: 'W' } : { move: 'ZQSD', l: 'Q', r: 'D', f: 'Z' };
   }
 
+  // ce que fait F devant une commande du Level 1
+  controlText(c) {
+    if (c.kind === 'alarm') return 'PRESS F · BREAK THE GLASS · THE BELL WILL DRAW IT THERE';
+    if (c.kind === 'desk') return 'PRESS F · SIT AT THE GUARD POST · WATCH THE CAMERAS';
+    const d = c.obj;
+    if (d.broken) return 'THE SHUTTER IS TORN OPEN · IT WILL NEVER CLOSE AGAIN';
+    const up = d.dir < 0 || (d.dir === 0 && d.o < 1);
+    return up ? 'PRESS F · RAISE THE SHUTTER (SLOW AND LOUD)' : 'PRESS F · LOWER THE SHUTTER';
+  }
+
   prompt(sim, P) {
     const NAME = { bottle: 'ALMOND WATER', battery: 'BATTERIES', ladder: 'THE LADDER' };
     let text = '';
@@ -706,6 +737,8 @@ export class BackroomsHUD {
         const it = sim.nearItem(P);
         const sel = P.inv[P.sel - 1];
         const h = P.hidden < 0 && sim.nearHide ? sim.nearHide(P) : null;
+        // Level 1 : le boîtier d'un quai, un déclencheur d'alarme, le fauteuil du poste (s'ils passent avant le reste)
+        const ctl = sim.level === 1 && sim.controlFor ? sim.controlFor(P, it, h) : null;
         const E1 = sim.level === 1 && sim.map.exit;
         const atPanel = E1 && !sim.powered && (sim.delivered || 0) >= 3 && Math.hypot(E1.x - P.x, E1.z - P.z) < 2.6;
         if (P.grabT > 0 || P.hidden >= 0) {
@@ -715,6 +748,9 @@ export class BackroomsHUD {
         } else if (N && !N.ladder && sel === 'ladder' && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.2) text = 'PRESS E · PLACE THE LADDER UNDER THE TAPE';
         else if (sim.inCabin && sim.inCabin(P) && sim.fm(P.floor).elevator) text = sim.liftT > 0 ? 'THE DOORS ARE CLOSING…' : 'PRESS F · PRESS THE BUTTON TO GO DOWN';
         else if (sim.nearCassette && sim.nearCassette(P)) text = 'PRESS F · TAKE THE TAPE';
+        else if (P.desk) {
+          // au poste : l'incrustation de la caméra dit les touches
+        } else if (ctl) text = this.controlText(ctl);
         else if (it) text = P.inv.includes(null) ? `PRESS F · PICK UP ${NAME[it.kind]}` : `PRESS F · SWAP ${NAME[sel || 'bottle']} (SLOT ${P.sel + 1}) FOR ${NAME[it.kind]}`;
         else if (h) text = 'PRESS F · HIDE IN THE LOCKER';
         else if (sim.nearKey && sim.nearKey(P)) text = 'PRESS F · TAKE THE STAIRWELL KEY';

@@ -54,10 +54,12 @@ function build(sim, floor) {
   const solid = new Uint8Array(W * H);
   const cage = new Set();
   for (const st of sim.stairs || []) for (const k of st.cells) cage.add(k.gz * W + k.gx);
+  // (Level 1 : les murs qui ne bougent pas ; les rideaux des quais, elle les force, voir sim.dockPush)
+  const wall = m.navWall ? (gx, gz) => m.navWall(gx, gz) : (gx, gz) => m.isWall(gx, gz);
   for (let gz = 0; gz < H; gz++) {
     for (let gx = 0; gx < W; gx++) {
       const k = gz * W + gx;
-      if (m.isWall(gx, gz)) solid[k] = m.pillarAt && m.pillarAt(gx, gz) ? 2 : 1;
+      if (wall(gx, gz)) solid[k] = m.pillarAt && m.pillarAt(gx, gz) ? 2 : 1;
       else if (cage.has(k)) solid[k] = 1;
       else if (below && m.pitAt && m.pitAt(gx, gz) >= 0) solid[k] = 3;
     }

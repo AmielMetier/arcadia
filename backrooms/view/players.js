@@ -126,14 +126,19 @@ export function createPlayerAvatars(scene, lamps = LAMPS) {
       a.mixer = new THREE.AnimationMixer(root);
       const clip = (n) => source.animations.find((c) => c.name.endsWith('|' + n) || c.name === n);
       a.acts = {};
-      for (const n of ['Idle', 'Walk', 'Run']) {
+      for (const n of ['Idle', 'Walk', 'Run', 'Duck']) {
         const c = clip(n);
         if (!c) continue;
         a.acts[n] = a.mixer.clipAction(c);
         a.acts[n].play();
         a.acts[n].weight = n === 'Idle' ? 1 : 0;
+        // assis au poste de garde : la pose basse de l'esquive, figée (genoux pliés, buste penché vers les écrans)
+        if (n === 'Duck') {
+          a.acts[n].time = c.duration * 0.45;
+          a.acts[n].paused = true;
+        }
       }
-      a.w = { Idle: 1, Walk: 0, Run: 0 };
+      a.w = { Idle: 1, Walk: 0, Run: 0, Duck: 0 };
     } else {
       // le modèle n'est pas encore là : une silhouette en combinaison
       const capsule = new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 0.9, 4, 10), mat.suit);
@@ -208,7 +213,7 @@ export function createPlayerAvatars(scene, lamps = LAMPS) {
       a.mat.grey.emissiveIntensity = k * 0.6;
       // attente, marche, course : les poses se fondent l'une dans l'autre
       if (a.mixer) {
-        const want = Q.moving ? (Q.running ? 'Run' : 'Walk') : 'Idle';
+        const want = Q.desk && a.acts.Duck ? 'Duck' : Q.moving ? (Q.running ? 'Run' : 'Walk') : 'Idle';
         for (const n in a.acts) {
           a.w[n] += ((n === want ? 1 : 0) - a.w[n]) * Math.min(1, dt * 7);
           a.acts[n].weight = a.w[n];

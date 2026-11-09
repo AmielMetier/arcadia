@@ -1,5 +1,5 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
-import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE } from './engine/sim.js';
+import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE, DOCK_OPEN_T, DOCK_CLOSE_T, ALARM_T, DUCT_LAND } from './engine/sim.js';
 import { hasLineOfSight } from './engine/nav.js';
 import { bfs, CELL_SIZE, cellsOnSeg, T } from './engine/map.js';
 import { createBackroomsScene, setMonsterMode, setSceneOptions } from './view/scene.js';
@@ -276,17 +276,32 @@ const CAM_ZOOM_MAX = 12;
 let camZoom = CAM_ZOOM_MIN;
 let wheelAcc = 0; // molette sans caméscope : le défilement accumulé vers la case suivante
 let wheelT = 0; // et le dernier changement de case (un lancer de pavé tactile ne fait pas défiler toutes les cases)
+// Level 1, assis au poste de garde : la caméra choisie (gauche / droite, la molette, les chiffres) et le sens du
+// dernier appui (une poussée du stick ou du doigt change d'une seule caméra)
+let deskCam = 0;
+let deskEdge = 0;
+function switchCam(i) {
+  const n = sim && sim.map.cams ? sim.map.cams.length : 0;
+  if (!n) return;
+  const k = ((i % n) + n) % n;
+  if (k === deskCam) return;
+  deskCam = k;
+  if (sfx) sfx.camSwitch();
+}
 window.addEventListener(
   'wheel',
   (e) => {
     if (paused || !sim || sim.player.status !== 'alive') return;
     e.preventDefault();
     const d = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
-    // caméscope rangé : la molette passe d'une case d'objet à l'autre (un cran, ou 60 px de pavé tactile, par case)
+    // caméscope rangé : la molette passe d'une case d'objet à l'autre (un cran, ou 60 px de pavé tactile, par case) ;
+    // au poste de garde, d'une caméra à l'autre
     if (!camOn) {
+      const desk = sim.player.desk;
       wheelAcc = Math.sign(d) !== Math.sign(wheelAcc) ? d : wheelAcc + d;
       if ((Math.abs(wheelAcc) < 60 && Math.abs(d) < 50) || performance.now() - wheelT < 90) return;
-      cycleSlot(wheelAcc > 0 ? 1 : -1);
+      if (desk) switchCam(deskCam + (wheelAcc > 0 ? 1 : -1));
+      else cycleSlot(wheelAcc > 0 ? 1 : -1);
       wheelAcc = 0;
       wheelT = performance.now();
       return;
@@ -325,7 +340,9 @@ window.addEventListener('keydown', (e) => {
   // F : ramasser, ou se cacher dans un casier ; T : siffler ; C : s'accroupir (bascule) ; Espace : sauter (accroupi :
   // se relever)
   const slot = /^(Digit|Numpad)([1-9])$/.exec(e.code);
-  if (slot && +slot[2] <= INV_SIZE + 1 && !e.repeat) useSlot(+slot[2] - 1);
+  // au poste de garde : les chiffres choisissent la caméra
+  if (slot && !e.repeat && sim && sim.player.desk) switchCam(+slot[2] - 1);
+  else if (slot && +slot[2] <= INV_SIZE + 1 && !e.repeat) useSlot(+slot[2] - 1);
   if (!e.repeat) {
     if (e.code === 'KeyE') act.use = true;
     else if (e.code === 'KeyG') act.drop = true;
@@ -690,7 +707,7 @@ function guestInputs() {
     const q = NET.actions[id] || (NET.actions[id] = []);
     // une action par pas, dans l'ordre où l'invité les a faites (avec la case qu'il avait choisie)
     const a = q.shift() || {};
-    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, cam: !!i.cm, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', drop: a.k === 'd', pick: a.k === 'p', whistle: a.k === 't', jump: a.k === 'j', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v, voice: i.vo, radio: i.ra, seq: i.seq };
+    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, cam: !!i.cm, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', drop: a.k === 'd', pick: a.k === 'p', whistle: a.k === 't', jump: a.k === 'j', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v, voice: i.vo, radio: i.ra, seq: i.seq, camSel: i.cs };
     i.pos = null; // une position annoncée ne sert qu'une fois
   }
   return out;
@@ -719,7 +736,7 @@ function onMsg(from, m) {
       sim.addPlayer(from, (p && p.name) || 'Player');
       send(from, goMessage());
     } else if (m.t === 'i' && m.run === NET.run) {
-      NET.inputs[from] = { at: performance.now(), seq: Number.isFinite(+m.n) ? +m.n : undefined, vo: num(m.vo, 0, 1), ra: !!m.ra, mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, cm: !!m.cm, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: slotOf(m.s), tilt: num(m.tl, -1, 1), st: num(m.st, 0, 200), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) }, v: m.v };
+      NET.inputs[from] = { at: performance.now(), seq: Number.isFinite(+m.n) ? +m.n : undefined, vo: num(m.vo, 0, 1), ra: !!m.ra, mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, cm: !!m.cm, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: slotOf(m.s), tilt: num(m.tl, -1, 1), st: num(m.st, 0, 200), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) }, v: m.v, cs: Number.isInteger(m.cs) ? Math.max(0, Math.min(99, m.cs)) : undefined };
     } else if (m.t === 'fp' && hud) {
       // un invité n'a pas la même carte que nous : s'il a une version plus récente, ou la même et qu'il s'est déjà
       // réparé sans succès, c'est nous qui avons tort (la partie continue chez les autres pendant qu'on se répare)
@@ -1107,6 +1124,68 @@ function handleEvent(ev, me) {
       if (scene && (V.floor || 0) === (ev.floor || 0) && Math.hypot(V.x - ev.x, V.z - ev.z) < 14) scene.tape('grab', 0.25);
       break;
     }
+    // Level 1 : les rideaux des quais, les alarmes incendie, le poste de garde, l'entité dans les gaines
+    case 'dock': {
+      const d = (sim.map.docks || [])[ev.id];
+      if (sfx && d) sfx.shutter(ev.id, { x: ev.x, z: ev.z }, ev.dir, ev.dir > 0 ? DOCK_OPEN_T * (1 - d.o) : DOCK_CLOSE_T * d.o);
+      if (ev.by === me && hud) hud.toast(ev.dir > 0 ? 'The motor screams… the whole warehouse can hear it' : 'The shutter rolls down');
+      break;
+    }
+    case 'dockStop':
+      if (sfx) sfx.shutterStop(ev.id, { x: ev.x, z: ev.z }, ev.open);
+      break;
+    case 'dockJam':
+      if (ev.by === me && hud) hud.toast('Torn off its rails · this shutter will never close again');
+      break;
+    case 'dockBang':
+      if (sfx) sfx.dockBang({ x: ev.x, z: ev.z }, ev.k || 0);
+      if (scene) scene.gearEvent(ev);
+      break;
+    case 'dockBreak':
+      if (sfx) {
+        sfx.shutterStop(ev.id, null);
+        sfx.dockBreak({ x: ev.x, z: ev.z });
+      }
+      if (hud) hud.toast('Something tore a dock shutter open!');
+      break;
+    case 'alarm':
+      if (sfx) {
+        sfx.glassBreak(ev.by === me ? null : { x: ev.x, z: ev.z });
+        sfx.alarmBell(ev.id, { x: ev.x, z: ev.z }, ALARM_T);
+      }
+      if (hud) hud.toast(ev.by === me ? 'The bell is ringing · it will come running · get away from here' : `${ev.name} pulled a fire alarm`);
+      break;
+    case 'alarmSmash':
+      if (sfx) sfx.alarmStop(ev.id, { x: ev.x, z: ev.z }, true);
+      if (scene) scene.gearEvent(ev);
+      break;
+    case 'alarmEnd':
+      if (sfx) sfx.alarmStop(ev.id);
+      break;
+    case 'desk':
+      if (sfx) sfx.creak({ x: ev.x, z: ev.z }, 0.6);
+      if (ev.id === me && ev.on && hud) {
+        const k = hud.keyNames(hud.qwerty);
+        hud.toast(document.body.classList.contains('touch') ? 'Guard post · slide left or right to switch cameras · tell the others what you see' : `Guard post · ${k.l} / ${k.r} to switch cameras · tell the others what you see`);
+      }
+      if (ev.id === me) deskCam = sim.player.camSel || 0;
+      break;
+    case 'ductIn':
+      if (sfx) sfx.ductBang({ x: ev.x, z: ev.z }, 0.2);
+      break;
+    case 'ductBang':
+      if (sfx) sfx.ductBang({ x: ev.x, z: ev.z }, ev.k);
+      break;
+    case 'ductOut': {
+      if (sfx) {
+        sfx.grilleDrop({ x: ev.x, z: ev.z });
+        setTimeout(() => sfx && sfx.heavyThud({ x: ev.x, z: ev.z }), DUCT_LAND * 1000);
+      }
+      if (scene) scene.gearEvent(ev);
+      const V = sim.viewPlayer(sim.spectate || 0);
+      if (scene && Math.hypot(V.x - ev.x, V.z - ev.z) < 12) setTimeout(() => scene && scene.tape('grab', 0.25), DUCT_LAND * 1000);
+      break;
+    }
     case 'glimpse':
       // la première rencontre : rien… puis le néon au-dessus d'elle qui claque
       if (ev.phase === 'show' && sfx && ev.id === me) sfx.silence(2.5);
@@ -1478,7 +1557,14 @@ function frame(currentTime) {
   const run = !!keys['ShiftLeft'] || !!keys['ShiftRight'] || touch.run || !!(gp && gp.run);
   // courir relève (on ne court pas accroupi)
   if (crouchOn && run && (mx || my)) crouchOn = false;
-  if (camOn && sim.player.status !== 'alive') camOn = false;
+  if (camOn && (sim.player.status !== 'alive' || sim.player.desk)) camOn = false;
+  // au poste de garde : gauche / droite (clavier, flèches, stick, doigt) passent à la caméra voisine, un appui à la fois
+  if (sim.player.desk && !paused) {
+    const side = mx || (keys['ArrowRight'] ? 1 : 0) - (keys['ArrowLeft'] ? 1 : 0);
+    const dir = side > 0.6 ? 1 : side < -0.6 ? -1 : 0;
+    if (dir && dir !== deskEdge) switchCam(deskCam + dir);
+    deskEdge = dir;
+  } else deskEdge = 0;
   const crouch = crouchOn || touch.crouch || padCrouch;
 
   // Sensibilité de rotation de la souris (réglage), axe vertical inversé au choix
@@ -1530,6 +1616,7 @@ function frame(currentTime) {
       view: sim.player.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined,
       voice: voice ? voice.raw || 0 : 0, // la voix au micro compte dans le bruit qu'on fait (même seul)
       radio: !!voice && voice.mode === 2,
+      camSel: sim.player.desk ? deskCam : undefined,
     };
     // spectateur : un signe aux vivants (E ou T), puis il faut attendre
     if (sim.player.status !== 'alive' && (act.use || act.whistle)) {
@@ -1558,7 +1645,7 @@ function frame(currentTime) {
       if (act.struggle) send('host', { t: 'a', k: 'g', n: act.struggle, run: NET.run });
       if (NET.tick % 3 === 0) {
         const P = sim.player;
-        send('host', { t: 'i', run: NET.run, n: NET.tick, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, c: input.crouch ? 1 : 0, cm: input.cam ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2), v: P.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined, vo: input.voice ? +input.voice.toFixed(2) : undefined, ra: input.radio ? 1 : undefined }, true);
+        send('host', { t: 'i', run: NET.run, n: NET.tick, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, c: input.crouch ? 1 : 0, cm: input.cam ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2), v: P.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined, vo: input.voice ? +input.voice.toFixed(2) : undefined, ra: input.radio ? 1 : undefined, cs: P.desk ? deskCam : undefined }, true);
       }
     } else {
       sim.step(input, NET.role === 'host' ? guestInputs() : null);
