@@ -223,6 +223,7 @@ window.HUB_GAMES = [
     desc: 'Une grande aventure Pokémon en fausse 3D, comme sur DS : 8 arènes, la Team Éclipse, Lugia Obscur, le Conseil 4 et la Ligue. Chacun mène son aventure, sauvegardée en ligne sur son compte, et on se croise dans la région pour échanger et se défier.',
     url: 'odyssee/',
     minPlayers: 1, maxPlayers: 6,
+    big: true, // « Gros jeux » : un jeu beaucoup plus complet, rangé à part à l'accueil et dans le salon
     accent: '#5a88c8',
     cover: 'odyssee/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
@@ -311,9 +312,11 @@ window.HUB_GAMES = [
     id: 'backrooms',
     title: 'The Backrooms',
     tag: 'Survie & Horreur',
-    desc: "Seul ou à plusieurs, échappe-toi des Backrooms : 6 cassettes VHS sur les deux étages du Level 0 pour ouvrir le bon ascenseur, puis 3 fusibles pour relancer le monte-charge de l'entrepôt du Level 1, et enfin 4 vannes de vapeur dans les tuyauteries du Level 2, où un troupeau de chèvres charge dans le noir.",
+    // volontairement vague : ce qu'on y trouve se découvre en jouant
+    desc: 'Seul ou à plusieurs, perds-toi dans un endroit étrange et immense… et trouve comment en sortir.',
     url: 'backrooms/',
     minPlayers: 1, maxPlayers: 6, maxWithBots: 6,
+    big: true, // « Gros jeux » : un jeu beaucoup plus complet, rangé à part à l'accueil et dans le salon
     accent: '#eab308',
     icon: '🚪', score: 'Cassettes trouvées',
     settings: [
@@ -321,16 +324,17 @@ window.HUB_GAMES = [
       { key: 'monsters', label: 'Monstres', options: [['normal', 'Normal'], ['vip', '⭐ VIP mode', { vip: true }]], def: 'normal' },
       { key: 'map', label: 'Carte', options: [['random', 'Au hasard'], ['daily', '🗓️ Carte du jour (la même pour tous)']], def: 'random' },
     ],
-    cover: 'backrooms/img/affiche.jpg?v=2', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau caméscope
+    cover: 'backrooms/img/affiche.jpg?v=3', // affiche 960 × 540 : le Level 0 du jeu, grand titre et bandeau caméscope
   },
 ];
 
 /* Fiche de présentation de chaque jeu : catégorie, durée d'une partie, commandes et astuces.
    Affichée sur l'écran de chargement commun, dans le menu Arcadia en jeu et pour les filtres de l'accueil. */
 window.HUB_GAME_INFO = {
-  backrooms: { genre: 'action', time: '10–20 min',
-    keys: [['ZQSD / Flèches', 'Se déplacer'], ['Souris', 'Regarder autour de soi'], ['Maj (Shift)', 'Courir (Endurance limitée)'], ['1', 'Allumer / Éteindre la lampe torche'], ['2 3 puis E', 'Choisir une case, utiliser son objet'], ['F', 'Ramasser (échange si l\'inventaire est plein)'], ['T', 'Siffler (trop, et l\'entité arrive)'], ['C (maintenu)', "S'accroupir : plus lent, mais silencieux"], ['E (Level 5)', 'Se cacher sous un lit ou dans une armoire, poster ses lettres, taper le code'], ['Échap', 'Pause'], ['⚙ Réglages', 'Mode Sans souris : les flèches tournent la vue'], ['🎮 Manette', 'Stick gauche : bouger · stick droit : regarder · A : ramasser · X : utiliser · Y : lampe · RB : objet · B : siffler · LB : courir · Menu : pause']],
-    tips: ['Écoute attentivement : le bourdonnement strident de l\'entité devient de plus en plus fort quand elle s\'approche.', "Casse sa ligne de vue : derrière quelques murs, l'entité finit par te perdre.", 'Suis les barres de SIGNAL du caméscope pour trouver les cassettes (Level 0) ou les fusibles (Level 1), puis l\'ascenseur.', "L'ascenseur part quand tout le monde est dedans : plus vous êtes à l'abri, plus l'entité s'acharne sur ceux qui restent.", "Le Level 0 a deux étages : un faux pas dans un trou t'envoie en bas, les escaliers font remonter.", "Il y a un ascenseur par étage, mais un seul est le vrai : l'autre se change en mur quand les cassettes sont trouvées.", 'Au Level 1, garde des piles : les coupures de courant te laissent seul avec ta lampe.', "Au bout d'une rangée d'étagères, l'entité peut t'attendre en silence.", "L'eau d'amande rend tout ton souffle : garde-la dans ton inventaire pour une poursuite.", 'Ta lampe vide sa pile : éteins-la dans les zones éclairées et ramasse les piles dans le noir.', "Au Level 2, les chèvres craignent la lumière : reste sous les néons, et braque ta lampe sur celle qui charge pour la faire fuir.", "Une chèvre qui charge ne tourne presque pas : un pas de côté au dernier moment, et elle s'écrase contre le mur.", 'Les jets de vapeur brûlent : attends qu\'ils se coupent pour passer.', "Chaque vanne fermée fait sauter les néons autour d'elle : cherche l'armoire ELECTRICAL au voyant rouge et réarme le disjoncteur.", "Quand la cloche sonne, le bouc ne craint plus la lumière : attire sa charge dans un jet de vapeur qui crache.", "Au Level 2, tout le courant saute parfois : le troupeau sait où tu es. Garde de la pile pour braquer ta lampe sur elles.", 'Aux Poolrooms, le toboggan rouge mène au Level 5, le Terror Hotel.', "Au Level 5, l'entité entend tes pas : accroupis-toi (C) près d'elle, et cache-toi avant qu'elle ne te voie.", 'Chaque lettre va dans la boîte aux lettres de sa chambre : une fois les six postées, lève les yeux au plafond du hall.'] },
+  backrooms: { genre: 'action', time: 'Plusieurs heures', // un niveau après l'autre : il y en a pour des heures
+    keys: [['ZQSD / Flèches', 'Se déplacer'], ['Souris', 'Regarder autour de soi'], ['Maj (Shift)', 'Courir (bruyant, et ça donne soif)'], ['1', 'Allumer / Éteindre la lampe torche'], ['2 3 puis E', 'Choisir une case, utiliser son objet'], ['F', 'Ramasser, actionner, se cacher (échange si l\'inventaire est plein)'], ['T', 'Siffler (trop, et l\'entité arrive)'], ['C (maintenu)', "S'accroupir : plus lent, mais silencieux"], ['Échap', 'Pause'], ['⚙ Réglages', 'Mode Sans souris : les flèches tournent la vue'], ['🎮 Manette', 'Stick gauche : bouger · stick droit : regarder · A : ramasser · X : utiliser · Y : lampe · RB : objet · B : siffler · LB : courir · Menu : pause']],
+    // astuces sans rien dévoiler de ce qui attend plus loin : la surprise fait partie du jeu
+    tips: ['Écoute attentivement : un bourdonnement qui enfle n\'annonce rien de bon.', "Casse sa ligne de vue : derrière quelques murs, ce qui te suit finit par te perdre.", 'Suis les barres de SIGNAL du caméscope : elles mènent à ce que tu cherches.', 'Ta lampe vide sa pile : éteins-la dans les zones éclairées et ramasse les piles que tu croises.', 'Courir s\'entend de loin et donne soif : garde un œil sur ta réserve d\'eau.', 'Accroupi, tu avances lentement, mais sans un bruit.', 'Siffle pour retrouver tes potes, mais pas trop : tu n\'es pas le seul à entendre.', 'Restez groupés : ici, on se perd très vite.'] },
   dogfight: { genre: 'action', time: '5–10 min',
     keys: [['Souris', 'Viser, l\'avion suit'], ['ZQSD / flèches', 'Piloter soi-même'], ['Espace / clic', 'Canon'], ['E / clic droit', 'Missile'], ['F', 'Leurres'], ['Maj', 'Postcombustion'], ['C', 'Aérofrein'], ['🎮 Manette', 'Sticks pour piloter, gâchettes pour tirer']],
     tips: ['Place le réticule blanc sur le cercle vert : c\'est là que les balles rencontrent la cible.', 'Monter et serrer les virages coûte de la vitesse : garde de l\'énergie.', 'Un nuage te cache des missiles et des bots.', 'En Domination, vole bas : au-dessus du plafond de la zone, tu ne captures rien.', 'En Escorte, le transport est fragile face à plusieurs attaquants : reste près de lui.'] },

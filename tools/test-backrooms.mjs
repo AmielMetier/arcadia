@@ -1086,9 +1086,11 @@ test("inventaire : G pose l'objet choisi devant soi (contre un mur : à ses pied
   // une case libre, loin des trous, avec un mur juste à l'est
   const cell = (() => {
     for (let gz = 1; gz < m.H - 1; gz++) for (let gx = 1; gx < m.W - 2; gx++) {
-      if (m.grid[gz * m.W + gx] !== T.FLOOR || m.grid[gz * m.W + gx + 1] === T.FLOOR || m.pitAt(gx, gz) >= 0) continue;
+      if (m.grid[gz * m.W + gx] !== T.FLOOR || m.grid[gz * m.W + gx + 1] !== T.WALL || m.pitAt(gx, gz) >= 0) continue; // un vrai mur (pas une cloison fine, au milieu de la case)
       if ([[-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => m.pitAt(gx + dx, gz + dz) >= 0 || m.grid[(gz + dz) * m.W + gx + dx] !== T.FLOOR)) continue;
       if (host.isColliding((gx + 0.5) * C, (gz + 0.5) * C, 0.5)) continue;
+      // et rien de posé contre ce mur (un meuble du décor) : on s'y tiendra, à 40 cm
+      if (host.isColliding((gx + 1) * C - 0.4, (gz + 0.5) * C, 0.3)) continue;
       return { gx, gz };
     }
   })();
@@ -2428,7 +2430,9 @@ test("l'entité qui perd sa proie de vue va là où elle l'a vue, fouille autour
   const cells = sim.map.walkable;
   const at = (c) => ({ x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE });
   // le joueur loin, hors de vue et à l'arrêt ; l'entité en chasse vient de le perdre
-  const far = cells.reduce((b, c) => (Math.hypot(at(c).x - M.x, at(c).z - M.z) > Math.hypot(at(b).x - M.x, at(b).z - M.z) ? c : b));
+  // (ni sous un néon franc ni dans un recoin calme : là, elle renoncerait exprès)
+  const open = cells.filter((c) => !sim.brightCell(sim.map, at(c).x, at(c).z) && !sim.calmAt({ ...P, ...at(c) }));
+  const far = open.reduce((b, c) => (Math.hypot(at(c).x - M.x, at(c).z - M.z) > Math.hypot(at(b).x - M.x, at(b).z - M.z) ? c : b));
   P.x = at(far).x;
   P.z = at(far).z;
   const last = cells.find((c) => {

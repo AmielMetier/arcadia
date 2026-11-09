@@ -977,17 +977,37 @@ function oldTimerSay(text) {
   if (hud) setTimeout(() => hud && hud.showLore(null, text, false, '📻 CHANNEL 9 · ???'), 350);
   try {
     if (window.speechSynthesis) {
-      const u = new SpeechSynthesisUtterance(text);
-      const v = speechSynthesis.getVoices().filter((v) => /^en/i.test(v.lang));
-      u.voice = v.find((x) => /male|daniel|fred|george|david/i.test(x.name)) || v[0] || null;
-      u.lang = 'en-US';
-      u.pitch = 0.1;
-      u.rate = 0.78;
-      u.volume = 0.85;
-      setTimeout(() => speechSynthesis.speak(u), 400);
+      // toujours la voix chuchotée : la liste des voix arrive après coup (vide au premier appel) ; on l'attend un peu
+      // plutôt que de parler avec la voix par défaut
+      const speak = () => {
+        const u = new SpeechSynthesisUtterance(text);
+        const v = oldTimerVoice();
+        u.voice = v;
+        u.lang = (v && v.lang) || 'en-US';
+        // la voix chuchotée garde sa hauteur (grave, elle deviendrait un grognement) ; à défaut, une voix grave et lente
+        u.pitch = v && WHISPER.test(v.name) ? 0.8 : 0.1;
+        u.rate = 0.78;
+        u.volume = 0.85;
+        speechSynthesis.speak(u);
+      };
+      if (speechSynthesis.getVoices().length) setTimeout(speak, 400);
+      else {
+        let done = false;
+        const go = () => { if (!done) { done = true; speak(); } };
+        speechSynthesis.addEventListener('voiceschanged', go, { once: true });
+        setTimeout(go, 1500);
+      }
     }
   } catch (e) {}
 }
+// la voix du Old Timer : la voix chuchotée du système (« Whisper » sur Mac, une voix anglaise dont le nom est traduit
+// dans la langue du système : « Murmure » en français…) ; sinon, une voix d'homme anglaise
+const WHISPER = /whisper|murmure|fl[üu]ster|susurr|sussurr|fluister|viskning|hvisken|kuiskaus|szept|šepot|шёпот|шепот|ささやき|耳语|耳語|속삭임/i;
+function oldTimerVoice() {
+  const en = speechSynthesis.getVoices().filter((v) => /^en/i.test(v.lang));
+  return en.find((x) => WHISPER.test(x.name) || WHISPER.test(x.voiceURI || '')) || en.find((x) => /male|daniel|fred|george|david/i.test(x.name)) || en[0] || null;
+}
+if (window.speechSynthesis) try { speechSynthesis.getVoices(); } catch (e) {} // lance le chargement de la liste
 function oldTimerTick() {
   if (!sim || sim.state !== 'playing' || paused) return;
   const key = sim.level === PIPES_LEVEL ? 'pipes' : sim.level === HOTEL_LEVEL ? 'hotel' : sim.level;

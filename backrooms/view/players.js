@@ -254,10 +254,11 @@ function animate(a, Q, dt, time) {
 // ---------------------------------------------------------------- Les mains
 // Ce qu'une main serre : r, le rayon de l'objet sous les doigts (m) ; tilt, son biais dans le poing (0 : en travers de
 // la paume ; une lampe se tient en diagonale, la tête qui sort entre le pouce et l'index, vers le bout des doigts) ;
-// thumb : où le pouce se pose, le long de l'objet vers sa tête (m)
+// thumb : où le pouce se pose, le long de l'objet vers sa tête (m) ; wrap : le pouce fait le tour de l'objet (une
+// bouteille, trop grosse pour qu'il se couche dessus), ses deux phalanges collées à la paroi, en face des doigts
 const HOLD = {
   torch: { r: 0.021, tilt: 0.75, thumb: 0.035 },
-  bottle: { r: 0.043, tilt: 0.05, thumb: 0.01 },
+  bottle: { r: 0.043, tilt: 0.05, thumb: 0.012, wrap: true },
   battery: { r: 0.017, tilt: 0.3, thumb: 0.015 },
 };
 // Pour chaque main et chaque objet, calculé une fois sur le modèle au repos (repère de l'os Hand) : l'axe de l'objet
@@ -296,6 +297,12 @@ function solveGrips(root) {
     const mZ = F.reduce((t, f) => t + f[0].z, 0) / 4;
     const T0 = get('Thumb1').position.clone();
     const T2 = T0.clone().add(get('Thumb2').position).add(get('ThumbTip').position);
+    const d1 = get('Thumb2').position.clone(); // la première phalange du pouce, au repos (repère de la main)
+    const L1 = d1.length();
+    d1.divideScalar(L1);
+    const d2 = get('ThumbTip').position.clone(); // la seconde
+    const L2 = d2.length();
+    d2.divideScalar(L2);
     const res = {};
     for (const kind in HOLD) {
       const { r, tilt, thumb } = HOLD[kind];
@@ -324,11 +331,36 @@ function solveGrips(root) {
       });
       // le pouce : de sa base au-dessus de l'objet (côté poignet), le bout posé dessus, vers la tête
       const N = new V(0, Math.cos(tilt), Math.sin(tilt));
-      const tgt = C.clone().addScaledVector(A, thumb).addScaledVector(N, r + thick * 0.45);
-      const qT = new THREE.Quaternion().setFromUnitVectors(T2.clone().sub(T0).normalize(), tgt.sub(T0).normalize());
-      res[kind] = { ang, qT, C, A, B: new V(1, 0, 0).cross(A) };
+      let qT, qT2 = new THREE.Quaternion();
+      if (HOLD[kind].wrap) {
+        // autour d'une bouteille : la jointure (J) puis le bout (K) sur le cercle que suit l'axe du pouce, de plus en
+        // plus loin de la paume, en descendant un peu vers `thumb`. U : vers la paume, V : vers le poignet
+        const R = r + thick * 0.45;
+        const U = new V(-sg, 0, 0);
+        const W = N.clone().addScaledVector(A, -N.dot(A)).normalize();
+        const at = (phi, z) => C.clone().addScaledVector(A, z).addScaledVector(U, R * Math.cos(phi)).addScaledVector(W, R * Math.sin(phi));
+        const b = T0.clone().sub(C);
+        const z0 = b.dot(A);
+        let phi = Math.atan2(b.dot(W), b.dot(U));
+        // le premier point du cercle à `len` de `from`, en tournant dans le sens du pouce
+        const walk = (from, len, z) => {
+          let p = at(phi, z);
+          for (let i = 0; i < 400 && p.distanceTo(from) < len; i++) p = at((phi += 0.01), z);
+          return p;
+        };
+        const J = walk(T0, L1, z0 + (thumb - z0) * 0.6);
+        const K = walk(J, L2, thumb);
+        qT = new THREE.Quaternion().setFromUnitVectors(d1, J.sub(T0).normalize());
+        // la seconde phalange, dans le repère de la première
+        const w = K.sub(T0.clone().addScaledVector(J, L1)).normalize().applyQuaternion(qT.clone().invert());
+        qT2 = new THREE.Quaternion().setFromUnitVectors(d2, w);
+      } else {
+        const tgt = C.clone().addScaledVector(A, thumb).addScaledVector(N, r + thick * 0.45);
+        qT = new THREE.Quaternion().setFromUnitVectors(T2.clone().sub(T0).normalize(), tgt.sub(T0).normalize());
+      }
+      res[kind] = { ang, qT, qT2, C, A, B: new V(1, 0, 0).cross(A) };
     }
-    res.none = { ang: F.map(() => [0.12, 0.2, 0.12]), qT: new THREE.Quaternion(), C: null, A: null, B: null };
+    res.none = { ang: F.map(() => [0.12, 0.2, 0.12]), qT: new THREE.Quaternion(), qT2: new THREE.Quaternion(), C: null, A: null, B: null };
     out[sd] = res;
   }
   return out;
@@ -395,7 +427,7 @@ export function createPlayerAvatars(scene, lamps = LAMPS) {
       if (!GRIPS) GRIPS = solveGrips(source.scene);
       // les doigts de chaque main (ils vont doucement vers la prise voulue)
       a.hp = {};
-      for (const sd of ['L', 'R']) a.hp[sd] = { ang: FING.map(() => [0.12, 0.2, 0.12]), q: new THREE.Quaternion() };
+      for (const sd of ['L', 'R']) a.hp[sd] = { ang: FING.map(() => [0.12, 0.2, 0.12]), q: new THREE.Quaternion(), q2: new THREE.Quaternion() };
       // la lampe, serrée dans le poing droit : son axe sur celui de la prise (la tête vers le pouce), l'interrupteur
       // sous le pouce, tenue un peu avant son milieu
       const G = GRIPS.R.torch;
@@ -535,7 +567,9 @@ export function createPlayerAvatars(scene, lamps = LAMPS) {
       }
     });
     h.q.slerp(G.qT, k);
+    h.q2.slerp(G.qT2, k);
     a.bones['Thumb1' + sd].quaternion.copy(h.q);
+    a.bones['Thumb2' + sd].quaternion.copy(h.q2);
   };
   // un os tourné vers une orientation monde
   const setWorldQuat = (b, q) => {

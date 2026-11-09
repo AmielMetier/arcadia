@@ -23,7 +23,7 @@ import { createPoolMap, MOUTH } from './poolrooms.js';
 import { createHotelMap, WORDS, LETTERS, HIDE_R as SPOT_R, MAIL_R, KEYPAD_R, LETTER_R } from './hotel.js';
 import { createPipesMap, VALVES, PIPES_LEVEL, jetState, inJet, JET_HALF } from './level2.js';
 import { hasLineOfSight } from './nav.js';
-import { planTo, move as gaitMove, faceTo, shove, stagger, feetOf, cageAt, BODY_R } from './gait.js';
+import { planTo, move as gaitMove, faceTo, shove, stagger, feetOf, cageAt, BODY_R, roamable } from './gait.js';
 import { Track } from './interp.js';
 import { createGoats, updateGoats, senseGoats, alertGoats, goatSnapshot, applyGoatSnapshot, goatCount } from './goats.js';
 import { createDirector, updateDirector, blackoutAllowed, entityRelaxed, updateLightsOut, lightsChanged } from './director.js';
@@ -4177,6 +4177,7 @@ export class BackroomsSim {
       if (kind === 'corner' && ang > 1.1) continue;
       if (kind === 'behind' && ang < 2.0) continue;
       if (this.inSomeView(floor, x, z, 0.2)) continue;
+      if (!roamable(this, floor, x, z)) continue; // pas dans un recoin d'où elle ne pourrait plus sortir
       let s = Math.random() * 2;
       if (kind === 'corner') {
         // juste derrière un angle : une case voisine est déjà en vue du joueur

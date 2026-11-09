@@ -1,6 +1,16 @@
 # Journal des versions — Arcadia
 
 ## 5.22 — 9 novembre 2026
+- **Hub** — Nouvelle catégorie « Gros jeux » : The Backrooms et Odyssée, des jeux bien plus complets, ont leur rangée à part en haut de l'accueil, avec leurs boutons pour jouer, et passent en tête dans le salon.
+- **Hub** — L'écran de chargement d'un jeu ne défile plus : tout tient dans l'écran, sur ordinateur comme sur téléphone, même tenu à l'horizontale.
+- **The Backrooms** — Nouvelle affiche tirée du Level 0, et une présentation qui ne gâche plus la surprise : un endroit étrange et immense, rien de plus. Compte plusieurs heures pour en voir le bout.
+- **The Backrooms** — au Level 0 :
+  - Moins de grands espaces ouverts : des salles plus petites, plus de cloisons, on se perd plus vite.
+  - L'entité n'apparaît plus dans un recoin trop étroit pour elle, où elle restait plantée.
+  - The Old Timer parle toujours avec la voix chuchotée, même sur un ordinateur réglé en français.
+- **The Backrooms** — Le pouce fait le tour de la bouteille au lieu de pointer dans le vide.
+- **The Backrooms** — Les commandes de l'écran de chargement disent juste : F pour ramasser, actionner et se cacher, et courir fait du bruit et donne soif.
+- **Hub** — Une manette branchée pendant le chargement affiche ses commandes à la place de celles du clavier, et le lien « Jeux » du haut mène aux Gros jeux.
 - **The Backrooms** — au Level 1, l'entrepôt :
   - Le poste de garde est une vraie pièce : on y entre par une porte d'acier qui s'ouvre devant soi. Assis au bureau, on passe d'une caméra à l'autre (flèches, molette ou chiffres), et l'image tombe pile dans les écrans.
   - L'entité se faufile aussi par les gaines du plafond : on l'entend cogner au-dessus, puis la grille tombe et elle ressort près de sa proie.

@@ -112,8 +112,8 @@ export const blocks = (v) => v === T.WALL || v === T.SHELF || v === T.EXIT || v 
 // de la case, pour borner)
 export const THIN_HALF = 0.06; // demi-épaisseur d'une cloison fine (12 cm)
 export const THIN_SHARE = 0.25; // part des murs d'une case d'épaisseur changés en cloisons (par régions)
-const PARTITIONS = 48; // cloisons ajoutées au milieu des espaces trop ouverts, par étage
-const PART_ROOMY = 21; // cases libres sur 5 × 5 autour du départ d'une cloison
+const PARTITIONS = 60; // cloisons ajoutées au milieu des espaces trop ouverts, par étage
+const PART_ROOMY = 20; // cases libres sur 5 × 5 autour du départ d'une cloison
 
 // le point (x, z) est-il hors du pilier (à margin près) ?
 export function outsidePillar(p, x, z, margin = 0) {
@@ -318,9 +318,10 @@ export function createBackroomsMap(seed = 42, opts = {}) {
 
   // 2. Grandes salles vides : on n'y pose aucune cloison (les « halls » du Level 0)
   const halls = [];
-  for (let i = 0; i < per(4); i++) {
-    const w = 6 + Math.floor(rnd() * 7);
-    const h = 6 + Math.floor(rnd() * 7);
+  // (trois, de 5 à 10 cases de côté : de grands espaces, mais pas au point de perdre le dédale)
+  for (let i = 0; i < per(3); i++) {
+    const w = 5 + Math.floor(rnd() * 6);
+    const h = 5 + Math.floor(rnd() * 6);
     halls.push({ x: BX + 2 + Math.floor(rnd() * (BW - w - 4)), z: BZ + 2 + Math.floor(rnd() * (BH - h - 4)), w, h });
   }
   const inHall = (x, z) => halls.some((r) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.h);
@@ -335,7 +336,7 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   };
   const xs = lines(W);
   const zs = lines(H);
-  const density = 0.62 + rnd() * 0.16; // certaines parties plus ouvertes, d'autres plus labyrinthiques
+  const density = 0.66 + rnd() * 0.14; // certaines parties plus ouvertes, d'autres plus labyrinthiques
   for (let j = 0; j < zs.length; j++) {
     for (let i = 0; i < xs.length; i++) {
       const gx = xs[i];
@@ -386,7 +387,7 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   for (const r of halls) {
     for (let z = r.z + 2; z + 1 < r.z + r.h - 2; z += 4 + Math.floor(rnd() * 2)) {
       for (let x = r.x + 2; x + 1 < r.x + r.w - 2; x += 4 + Math.floor(rnd() * 2)) {
-        if (rnd() < 0.45) continue;
+        if (rnd() < 0.3) continue;
         for (const [dx, dz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) set(x + dx, z + dz, T.WALL);
       }
     }

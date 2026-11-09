@@ -12,14 +12,17 @@
   // les commandes à la manette (ligne « 🎮 Manette » de la fiche, « Bouton : action · … ») ont leur propre bloc,
   // affiché en premier quand une manette est branchée
   const padOn = () => { try { return [...(navigator.getGamepads ? navigator.getGamepads() : [])].some((p) => p && p.connected); } catch (e) { return false; } };
+  // le bloc qui ne sert pas (la manette sans manette branchée, ou le clavier quand elle l'est) est marqué « alt » :
+  // l'écran de chargement le retire en premier quand la fiche ne tient pas dans l'écran
   const keysHTML = (keys, H = 'gl-h') => {
     const kb = (keys || []).filter(([k]) => !k.startsWith('🎮'));
     const padLine = (keys || []).find(([k]) => k.startsWith('🎮'));
     const pad = padLine ? padLine[1].split(' · ').map((x) => { const i = x.indexOf(' : '); const up = (t) => t.charAt(0).toUpperCase() + t.slice(1); return i > 0 ? [up(x.slice(0, i)), up(x.slice(i + 3))] : ['', up(x)]; }) : [];
     pad.push(['Vue (⧉)', 'Ouvrir ce menu']);
-    const padHTML = `<div class="${H}">🎮 Manette</div><div class="gl-keys">${pad.map(([k, a]) => `<div class="kr"><span class="kk">${k ? `<kbd>${esc(k)}</kbd>` : ''}</span><span>${esc(a)}</span></div>`).join('')}</div>`;
-    const kbHTML = kb.length ? `<div class="${H}">⌨️ Clavier et souris</div><div class="gl-keys">${keyRows(kb)}</div>` : '';
-    return padOn() ? padHTML + kbHTML : kbHTML + padHTML;
+    const pOn = padOn() || !kb.length, alt = (on) => (on ? ' alt' : '');
+    const padHTML = `<div class="${H}${alt(!pOn)}">🎮 Manette</div><div class="gl-keys${alt(!pOn)}">${pad.map(([k, a]) => `<div class="kr"><span class="kk">${k ? `<kbd>${esc(k)}</kbd>` : ''}</span><span>${esc(a)}</span></div>`).join('')}</div>`;
+    const kbHTML = kb.length ? `<div class="${H}${alt(pOn)}">⌨️ Clavier et souris</div><div class="gl-keys${alt(pOn)}">${keyRows(kb)}</div>` : '';
+    return pOn ? padHTML + kbHTML : kbHTML + padHTML;
   };
 
   let L = null, M = null, cur = null;
@@ -46,6 +49,19 @@
         </div>
       </div>`;
     document.body.appendChild(el); L = el;
+    fit();
+    el.querySelector('.gl-cover img').addEventListener('load', fit);
+    if (document.fonts) document.fonts.ready.then(fit);
+    // une manette branchée (ou touchée) pendant le chargement : ses commandes prennent la place de celles du clavier
+    const onPad = () => {
+      if (L !== el) return;
+      const hs = el.querySelectorAll('.gl-body > .gl-h, .gl-body > .gl-keys');
+      if (![...hs].some((n) => n.classList.contains('alt') && n.textContent.startsWith('🎮'))) return;
+      hs.forEach((n) => n.classList.toggle('alt'));
+      fit();
+    };
+    addEventListener('gamepadconnected', onPad);
+    cur.offPad = () => removeEventListener('gamepadconnected', onPad);
     requestAnimationFrame(() => el.classList.add('on'));
     el.querySelector('.gl-go').onclick = () => { sfx('go', 0.55); dismiss(); };
     // barre : avance seule vers 90 % (on ne sait pas ce qui reste à charger), file à 100 % quand le jeu est là
@@ -55,7 +71,10 @@
       const t = (performance.now() - cur.t0) / 1000;
       const p = cur.shown ? 100 : 90 * (1 - Math.exp(-t / 4));
       bar.style.width = p.toFixed(1) + '%';
-      if (!cur.shown && t > 6) el.querySelector('.gl-st').textContent = t > 14 ? 'Presque prêt… (la première fois prend plus de temps)' : 'Préparation des graphismes…';
+      if (!cur.shown && t > 6) {
+        const st = el.querySelector('.gl-st'), m = t > 14 ? 'Presque prêt… (la première fois prend plus de temps)' : 'Préparation des graphismes…';
+        if (st.textContent !== m) { st.textContent = m; fit(); }   // un texte plus long peut passer sur deux lignes
+      }
       requestAnimationFrame(tick);
     };
     tick();
@@ -63,6 +82,23 @@
     cur.safety = setTimeout(() => shown(), 35000);
     tab(true);
   }
+  // la fiche tient toujours dans l'écran : rien ne défile sur l'écran de chargement. On la resserre d'un cran à la fois
+  // (le bloc de commandes qui ne sert pas, des marges plus serrées, sans l'astuce, sans la description), et si elle
+  // dépasse encore, on la réduit juste assez (--fit), calée en haut puis recentrée (--fy)
+  const FIT = ['gl-c1', 'gl-c2', 'gl-c3', 'gl-c4'];
+  function fit() {
+    if (!L) return;
+    const card = L.querySelector('.gl-card'), cs = getComputedStyle(L);
+    const H = L.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const W = L.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    L.classList.remove(...FIT, 'gl-fit');
+    for (let i = 0; i < FIT.length && card.offsetHeight > H; i++) L.classList.add(FIT[i]);
+    const h = card.offsetHeight, s = Math.min(1, H / h, W / card.offsetWidth);
+    L.classList.toggle('gl-fit', s < 1);
+    card.style.setProperty('--fit', s < 1 ? s.toFixed(4) : '1');
+    card.style.setProperty('--fy', s < 1 ? Math.max(0, (H - s * h) / 2).toFixed(1) + 'px' : '0px');
+  }
+  addEventListener('resize', fit);
   // les autres joueurs ont-ils fini de charger ? (en solo : toujours oui) ; au bout de 60 s, on peut partir quand même
   function others() {
     const st = cur && cur.opts && cur.opts.loading ? cur.opts.loading() : null;
@@ -77,6 +113,7 @@
       btn.disabled = true; btn.textContent = `En attente… ${st.done}/${st.total}`; btn.classList.remove('ready');
       L.querySelector('.gl-st').textContent = `Chargement chez ${st.waiting.slice(0, 3).join(', ')}${st.waiting.length > 3 ? '…' : ''}`;
       clearTimeout(cur.wait); cur.wait = setTimeout(refresh, 1000);   // filet : on revérifie (et on débloque au bout de 60 s)
+      fit();   // le texte d'attente peut passer sur deux lignes
       return;
     }
     clearTimeout(cur.wait);
@@ -96,14 +133,14 @@
   }
   function dismiss() {
     if (!cur || !L) return;
-    clearTimeout(cur.auto); clearTimeout(cur.safety);
+    clearTimeout(cur.auto); clearTimeout(cur.safety); cur.offPad && cur.offPad();
     const el = L; L = null; el.classList.remove('on'); el.classList.add('off');
     setTimeout(() => el.remove(), 450);
     if (cur.opts && cur.opts.focus) cur.opts.focus();
     tabEl && tabEl.classList.add('peek'); setTimeout(() => tabEl && tabEl.classList.remove('peek'), 2600);
   }
   function close() {
-    if (cur) { cur.closed = true; clearTimeout(cur.auto); clearTimeout(cur.safety); clearTimeout(cur.wait); }
+    if (cur) { cur.closed = true; cur.offPad && cur.offPad(); clearTimeout(cur.auto); clearTimeout(cur.safety); clearTimeout(cur.wait); }
     if (L) { L.remove(); L = null; }
     menu(false); tab(false); cur = null;
   }

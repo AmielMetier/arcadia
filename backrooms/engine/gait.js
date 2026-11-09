@@ -188,6 +188,20 @@ export function navOf(sim, floor = 0) {
   return m.mnav;
 }
 
+// le point est-il dans la grande partie de l'étage où l'entité circule ? Un joueur se faufile partout, elle non : un
+// recoin dont l'entrée est trop étroite pour son corps l'y enfermerait (où elle n'apparaît donc jamais)
+export function roamable(sim, floor, x, z) {
+  const N = navOf(sim, floor);
+  if (N.main === undefined) {
+    const size = new Map();
+    for (let k = 0; k < N.comp.length; k++) if (N.comp[k] >= 0) size.set(N.comp[k], (size.get(N.comp[k]) || 0) + 1);
+    N.main = -1;
+    let best = 0;
+    for (const [c, n] of size) if (n > best) (best = n), (N.main = c);
+  }
+  return snap(N, x, z, 1.2, N.main) >= 0;
+}
+
 // la place libre autour d'un point, à son étage (pour ses déplacements)
 export const clearAt = (sim, floor, x, z, cap = 1) => navOf(sim, floor).clear(x, z, cap);
 
