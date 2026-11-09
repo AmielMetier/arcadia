@@ -426,6 +426,34 @@ export function createBackroomsScene(container, floors, lamps) {
       const p = map.pillarAt && map.pillarAt(x, z);
       return p && p.poly ? p : null;
     };
+    // la lumière cuite est rangée en texels alignés sur la grille : contre un mur en biais, ceux de sa moitié pleine
+    // (noirs) se mêlaient au sol, une ombre en dents de scie au pied du mur. Chacun prend la valeur de son reflet de
+    // l'autre côté de la face : au ras du mur, le sol ne mélange plus que de la lumière du couloir. [cible, source] …
+    const chamfMirror = [];
+    if (CHAMF) {
+      const RBc = Math.round(CELL_SIZE / TX);
+      for (let z = 0; z < H; z++) {
+        for (let x = 0; x < W; x++) {
+          const p = chamfAt(x, z);
+          if (!p) continue;
+          const f = p.face;
+          for (let j = 0; j < RBc; j++) {
+            for (let i = 0; i < RBc; i++) {
+              const tx = x * RBc + i;
+              const tz = z * RBc + j;
+              const px = (tx + 0.5) * TX;
+              const pz = (tz + 0.5) * TX;
+              const sd = (px - f.a[0]) * f.nx + (pz - f.a[1]) * f.nz;
+              if (sd >= 0) continue;
+              const qx = Math.floor((px - 2 * sd * f.nx) / TX);
+              const qz = Math.floor((pz - 2 * sd * f.nz) / TX);
+              if (qx < 0 || qz < 0 || qx >= BW || qz >= BH) continue;
+              chamfMirror.push(tz * BW + tx, qz * BW + qx);
+            }
+          }
+        }
+      }
+    }
     // Level 1 : les cloisons du poste de garde, sur les bords des cases (donc des texels) : la lumière cuite ne passe
     // pas dessous, comme sous les cloisons fines du Level 0
     const SEGS = !EDGE && map.segs && map.segs.length ? map.segs : null;
@@ -731,6 +759,7 @@ float occVis(vec3 p, vec3 lp) {
         bakeData[(tz * BW + tx) * 4 + 1] = Math.round((0.42 + 0.58 * t * t * (3 - 2 * t)) * 255);
       }
     }
+    for (let i = 0; i < chamfMirror.length; i += 2) bakeData[chamfMirror[i] * 4 + 1] = bakeData[chamfMirror[i + 1] * 4 + 1];
     // Les cloisons fines tombent sur des bords de texels (l'axe d'une case). Chaque texel note dans l'alpha les bords
     // que barre une cloison (1 : -x, 2 : +x, 4 : -z, 8 : +z) et, en seizièmes, sa proximité d'une cloison (3 : contre,
     // 2 et 1 : à un et deux texels) : le shader ne mélange pas la lumière à travers (elle passait dessous sur 30 cm) et
@@ -830,6 +859,10 @@ float occVis(vec3 p, vec3 lp) {
         const v = Math.min(1, (L2 || PIPES ? 0.03 : L3 ? 0.09 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
         bakeData[i * 4] = Math.round(v * 255);
         if (PIPES || alarm || nookLamps.length) bakeData[i * 4 + 2] = Math.round(Math.min(1, liveB[i] * 0.3 * power) * 255);
+      }
+      for (let i = 0; i < chamfMirror.length; i += 2) {
+        bakeData[chamfMirror[i] * 4] = bakeData[chamfMirror[i + 1] * 4];
+        bakeData[chamfMirror[i] * 4 + 2] = bakeData[chamfMirror[i + 1] * 4 + 2];
       }
       bakeTex.needsUpdate = true;
     };
@@ -4737,7 +4770,7 @@ void main() {
   // l'entité en 3D, animée (view/beast.js) ; au Level 1 en mode VIP : la vidéo d'origine
   // mode VIP au Level 0 : le même corps, avec le visage de la photo de l'entité d'origine
   // Level 5 : l'entité de l'hôtel, un modèle humain animé os par os (view/hotelEntity.js)
-  const beast = L3 ? createHotelEntity() : !ENTITY_VIP ? createBeast() : !(L1 || L2) ? createBeast({ photo: { url: VIP_IMG, crop: [490, 20, 300, 375] } }) : null;
+  const beast = L3 ? createHotelEntity() : !ENTITY_VIP ? createBeast({ wiry: !(L1 || L2) }) : !(L1 || L2) ? createBeast({ wiry: true, photo: { url: VIP_IMG, crop: [490, 20, 300, 375] } }) : null;
   if (beast) {
     monsterGroup.add(beast.group);
     shadow.visible = false;

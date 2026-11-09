@@ -242,6 +242,115 @@ const SEGMENTS = [
   ]),
 ];
 
+// Level 0 (opts.wiry) : le corps de l'entité de la photo de référence. Tout en brins noirs filiformes, noueux et
+// entortillés comme des branches mortes ou du fil de fer ; une barre d'épaules d'où pendent des bras qui touchent
+// presque le sol, aux doigts écartés ; une petite tête ronde coiffée d'un large disque plat. On voit à travers.
+// os, os enfant, rayon d'un brin (m), allongement de l'os enfant, nombre de brins
+// os, os enfant, rayon d'un brin (m), allongement de l'os enfant, nombre de brins, cassures (coudes en zigzag)
+const WIRY = [
+  ['Hips', 'Abdomen', 0.026, 1, 4, 2.5],
+  ['Abdomen', 'Torso', 0.024, 1, 4, 2.5],
+  ['Torso', 'Neck', 0.024, 1, 3, 2],
+  ['Neck', 'Head', 0.016, 1, 2, 1], // la tête posée presque sur la barre d'épaules
+  ...L.flatMap((s) => [
+    ['Hips', `UpperLeg${s}`, 0.022, 1, 3, 1.5],
+    [`Shoulder${s}`, `UpperArm${s}`, 0.018, 1.7, 2, 1], // la barre d'épaules, trop large
+    [`UpperArm${s}`, `LowerArm${s}`, 0.018, 1.8, 3, 1.4], // des bras qui pendent jusqu'au sol
+    [`LowerArm${s}`, `Middle1${s}`, 0.016, 1.95, 3, 1.4],
+    ...['Index', 'Middle', 'Pinky'].flatMap((f) => [
+      [`${f}1${s}`, `${f}2${s}`, 0.009, 3, 1, 1], // doigts interminables, en baguettes
+      [`${f}2${s}`, `${f}3${s}`, 0.008, 3, 1, 1],
+      [`${f}3${s}`, `${f}3${s}_end`, 0.006, 3.2, 1, 1],
+    ]),
+    [`Thumb1${s}`, `Thumb2${s}`, 0.009, 2.2, 1, 1],
+    [`UpperLeg${s}`, `LowerLeg${s}`, 0.024, LEG, 3, 3],
+    [`LowerLeg${s}`, `LowerLeg${s}_end`, 0.02, LEG, 3, 3],
+  ]),
+];
+// des rameaux qui partent de travers (os, os enfant, combien), comme les branches d'un bois mort
+const TWIGS = [['Abdomen', 'Torso', 2], ['Torso', 'Neck', 1], ...L.flatMap((s) => [[`UpperLeg${s}`, `LowerLeg${s}`, 2], [`LowerLeg${s}`, `LowerLeg${s}_end`, 1], [`UpperArm${s}`, `LowerArm${s}`, 1]])];
+
+// un petit hasard reproductible (la même silhouette à chaque partie)
+function seeded(n) {
+  let a = n >>> 0 || 1;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// réunit des géométries (position, normale) en une seule : un membre = un seul objet à dessiner
+function mergeGeos(geos) {
+  let n = 0;
+  let m = 0;
+  for (const g of geos) {
+    n += g.attributes.position.count;
+    m += g.index ? g.index.count : g.attributes.position.count;
+  }
+  const pos = new Float32Array(n * 3);
+  const nor = new Float32Array(n * 3);
+  const uv = new Float32Array(n * 2);
+  const idx = new Uint32Array(m);
+  let o = 0;
+  let k = 0;
+  for (const g of geos) {
+    const c = g.attributes.position.count;
+    pos.set(g.attributes.position.array, o * 3);
+    nor.set(g.attributes.normal.array, o * 3);
+    if (g.attributes.uv) uv.set(g.attributes.uv.array, o * 2);
+    if (g.index) for (let i = 0; i < g.index.count; i++) idx[k++] = g.index.array[i] + o;
+    else for (let i = 0; i < c; i++) idx[k++] = i + o;
+    o += c;
+    g.dispose();
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  out.setIndex(new THREE.BufferAttribute(idx, 1));
+  return out;
+}
+
+// un membre en brins : n fils entortillés le long de l'axe y (de -len/2 à len/2), qui se rejoignent aux articulations
+// en un nœud ; r : l'épaisseur d'un brin
+function strands(len, r, n, rnd, zig = 1) {
+  const geos = [];
+  for (let j = 0; j < n; j++) {
+    const ph = rnd() * Math.PI * 2;
+    const spread = r * (n > 1 ? rnd() * 1.6 + 0.8 : rnd() * 0.8);
+    const turns = rnd() * 1.2 - 0.6;
+    const pts = [];
+    const K = Math.max(4, Math.min(9, Math.round(len / 0.12)));
+    for (let i = 0; i <= K; i++) {
+      const t = i / K;
+      // l'écart au milieu du membre, nul aux deux bouts ; des coudes au hasard le long du brin (bois tordu)
+      const w = Math.sin(Math.PI * t) * spread + (i > 0 && i < K ? (rnd() - 0.5) * r * 1.6 * zig : 0);
+      const a = ph + turns * Math.PI * 2 * t;
+      pts.push(new THREE.Vector3(Math.cos(a) * w, -len / 2 + t * len, Math.sin(a) * w));
+    }
+    const rr = r * (0.55 + rnd() * 0.5);
+    geos.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), K * 2, rr, 4, false));
+  }
+  // le nœud de l'articulation (en haut du membre)
+  const knot = new THREE.SphereGeometry(r * (n > 1 ? 1.9 : 1.3), 6, 4);
+  knot.translate(0, len / 2, 0);
+  geos.push(knot);
+  // sur les membres épais, des nœuds anguleux çà et là (comme des vertèbres, du bois noueux)
+  if (r > 0.014) {
+    for (let j = 0, nk = 1 + Math.floor(rnd() * 3); j < nk; j++) {
+      const b = new THREE.BoxGeometry(r * (1.6 + rnd() * 1.6), r * (2.5 + rnd() * 4), r * (1.4 + rnd()));
+      b.rotateY(rnd() * Math.PI);
+      b.rotateZ((rnd() - 0.5) * 0.6);
+      b.translate((rnd() - 0.5) * r * 2.5, -len / 2 + (0.2 + rnd() * 0.6) * len, (rnd() - 0.5) * r * 2.5);
+      geos.push(b);
+    }
+  }
+  return mergeGeos(geos);
+}
+
 let source = null;
 const loading = new GLTFLoader().loadAsync(MODEL).then((g) => {
   source = g;
@@ -250,6 +359,9 @@ const loading = new GLTFLoader().loadAsync(MODEL).then((g) => {
 // opts.photo : { url, crop } pour porter le visage d'une photo (mode VIP) au lieu de celui de l'entité classique
 export function createBeast(opts = {}) {
   const group = new THREE.Group();
+  const wiry = !!opts.wiry;
+  // (mode VIP : le même corps, avec la photo du visage d'origine, toujours visible)
+  const boneMat = new THREE.MeshLambertMaterial({ color: '#9a8f78' });
   // (la lueur qui l'éclaire dans la pénombre suit la texture de la peau : pas un aplat qui l'efface)
   const skinTex = skinTexture();
   const skinMat = new THREE.MeshLambertMaterial({ map: skinTex, emissive: '#fff2ec', emissiveMap: skinTex, emissiveIntensity: 0 });
@@ -301,7 +413,8 @@ export function createBeast(opts = {}) {
     const Y = new THREE.Vector3(0, 1, 0);
     const ws = new THREE.Vector3();
     st.stretch = [];
-    for (const [a, b, r, k] of SEGMENTS) {
+    const wr = seeded(77);
+    for (const [a, b, r, k, nb, zig] of wiry ? WIRY : SEGMENTS) {
       const A = bones[a];
       const B = bones[b];
       if (!A || !B) continue;
@@ -310,7 +423,7 @@ export function createBeast(opts = {}) {
       const rest = B.position.clone();
       if (k !== 1) st.stretch.push({ B, rest, k });
       const len = rest.length() * k * ws.x;
-      const geo = new THREE.CapsuleGeometry(r, Math.max(0.001, len - r * 2), 3, 8);
+      const geo = wiry ? strands(len, r, nb, wr, zig) : new THREE.CapsuleGeometry(r, Math.max(0.001, len - r * 2), 3, 8);
       const m = new THREE.Mesh(geo, skinMat);
       m.frustumCulled = false;
       m.scale.setScalar(s);
@@ -318,12 +431,82 @@ export function createBeast(opts = {}) {
       m.quaternion.setFromUnitVectors(Y, rest.clone().normalize());
       A.add(m);
     }
+    if (wiry) {
+      // les rameaux de travers
+      for (const [a, b, n] of TWIGS) {
+        const A = bones[a];
+        const B = bones[b];
+        if (!A || !B) continue;
+        A.getWorldScale(ws);
+        const s = 1 / ws.x;
+        const st0 = st.stretch.find((q) => q.B === B);
+        const rest = B.position.clone();
+        const k = st0 ? st0.k : 1;
+        const axis = rest.clone().normalize();
+        for (let i = 0; i < n; i++) {
+          const len = 0.12 + wr() * 0.22;
+          const perp = new THREE.Vector3(wr() - 0.5, wr() - 0.5, wr() - 0.5).projectOnPlane(axis).normalize();
+          const dir = axis.clone().multiplyScalar(wr() < 0.5 ? 0.6 : -0.4).addScaledVector(perp, 1).normalize();
+          const tw = new THREE.Mesh(strands(len, 0.009, 1, wr, 1.5), skinMat);
+          tw.frustumCulled = false;
+          tw.scale.setScalar(s);
+          tw.quaternion.setFromUnitVectors(Y, dir);
+          tw.position.copy(rest).multiplyScalar(k * (0.25 + wr() * 0.55)).addScaledVector(dir, (len / 2) * s);
+          A.add(tw);
+        }
+      }
+      // un bout d'os pâle dans le tronc, qui accroche la lumière
+      const tor = bones.Torso;
+      const nk = bones.Neck;
+      if (tor && nk) {
+        tor.getWorldScale(ws);
+        const s = 1 / ws.x;
+        const rest = nk.position.clone();
+        const bone = new THREE.Mesh(strands(rest.length() * ws.x * 0.55, 0.02, 1, seeded(31), 0.5), boneMat);
+        bone.frustumCulled = false;
+        bone.scale.setScalar(s);
+        bone.quaternion.setFromUnitVectors(Y, rest.clone().normalize());
+        bone.position.copy(rest).multiplyScalar(0.45);
+        bone.position.x += 0.045 * s;
+        tor.add(bone);
+      }
+      // la barre d'épaules : une traverse droite et large, comme un cintre, d'où pendent les bras ; et sous elle, une
+      // seconde plus courte, décalée
+      const ua = bones.UpperArmL;
+      const ub = bones.UpperArmR;
+      if (tor && nk && ua && ub) {
+        for (const q of st.stretch) q.B.position.copy(q.rest).multiplyScalar(q.k);
+        root.updateMatrixWorld(true);
+        const pa = ua.getWorldPosition(new THREE.Vector3());
+        const pb = ub.getWorldPosition(new THREE.Vector3());
+        const la = tor.worldToLocal(pa.clone());
+        const lb = tor.worldToLocal(pb.clone());
+        tor.getWorldScale(ws);
+        const s = 1 / ws.x;
+        const span = pa.distanceTo(pb);
+        const across = lb.clone().sub(la).normalize();
+        const down = nk.position.clone().normalize().negate();
+        const bar = new THREE.Mesh(strands(span * 1.18, 0.016, 2, seeded(41), 1.2), skinMat);
+        bar.frustumCulled = false;
+        bar.scale.setScalar(s);
+        bar.quaternion.setFromUnitVectors(Y, across);
+        bar.position.copy(la).add(lb).multiplyScalar(0.5);
+        tor.add(bar);
+        const bar2 = new THREE.Mesh(strands(span * 0.45, 0.011, 1, seeded(43), 1.5), skinMat);
+        bar2.frustumCulled = false;
+        bar2.scale.setScalar(s);
+        bar2.quaternion.setFromUnitVectors(Y, across.clone().addScaledVector(down, 0.08).normalize());
+        bar2.position.copy(la).lerp(lb, 0.68).addScaledVector(down, 0.13 * s);
+        tor.add(bar2);
+      }
+    }
     // côtes saillantes sur le torse
     const torso = bones.Torso;
-    if (torso) {
+    if (torso && !wiry) {
       torso.getWorldScale(ws);
       for (let i = 0; i < 4; i++) {
-        const rib = new THREE.Mesh(new THREE.TorusGeometry(0.12 - i * 0.008, 0.012, 5, 14, Math.PI * 1.2), skinMat);
+        // (Level 0 : un cadre de fils de fer, à peine plus large que la colonne, qu'on voit à travers)
+        const rib = new THREE.Mesh(wiry ? new THREE.TorusGeometry(0.09 - i * 0.006, 0.008, 3, 10, Math.PI * 1.5) : new THREE.TorusGeometry(0.12 - i * 0.008, 0.012, 5, 14, Math.PI * 1.2), skinMat);
         rib.scale.setScalar(1 / ws.x);
         rib.rotation.set(Math.PI / 2, 0, -Math.PI * 0.1);
         rib.position.set(0, (0.04 + i * 0.05) / ws.x, 0.02 / ws.x);
@@ -341,18 +524,39 @@ export function createBeast(opts = {}) {
       root.getWorldQuaternion(rootQ);
       const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(rootQ).applyQuaternion(q.clone().invert()).normalize();
       const up = new THREE.Vector3(0, 1, 0);
-      const skull = new THREE.Mesh(new THREE.SphereGeometry(0.15, 14, 12), skinMat);
-      skull.scale.set(s, s * 1.45, s * 1.1);
-      skull.position.copy(up).multiplyScalar(0.17 * s);
+      const skull = new THREE.Mesh(new THREE.SphereGeometry(wiry ? 0.11 : 0.15, 14, 12), skinMat);
+      skull.scale.set(s * (wiry ? 1.25 : 1), s * (wiry ? 0.85 : 1.45), s * (wiry ? 1.15 : 1.1));
+      skull.position.copy(up).multiplyScalar((wiry ? 0.11 : 0.17) * s);
       head.add(skull);
+      if (wiry) {
+        // un bord plat, mince et large, autour du bas de la tête (un chapeau vu presque de profil), un peu de travers,
+        // son ourlet roulé, et une mèche de brins qui s'en échappe
+        const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.27, 0.012, 20), skinMat);
+        brim.scale.set(s, s, s * 0.75);
+        brim.position.copy(up).multiplyScalar(0.06 * s);
+        brim.rotation.set(0.08, 0, -0.12);
+        head.add(brim);
+        const hem = new THREE.Mesh(new THREE.TorusGeometry(0.265, 0.012, 4, 24), skinMat);
+        hem.scale.set(s, s * 0.75, s);
+        hem.position.copy(brim.position);
+        hem.rotation.set(Math.PI / 2 + 0.08, -0.12, 0);
+        head.add(hem);
+        const fray = new THREE.Mesh(strands(0.4, 0.006, 3, seeded(5)), skinMat);
+        fray.scale.setScalar(s);
+        fray.position.copy(up).multiplyScalar(0.05 * s);
+        fray.rotation.set(0.1, 0.4, Math.PI / 2 - 0.15);
+        head.add(fray);
+      }
       const face = new THREE.Mesh(new THREE.PlaneGeometry(0.27, 0.36), faceMat);
-      face.scale.setScalar(s);
-      face.position.copy(up).multiplyScalar(0.16 * s).addScaledVector(fwd, 0.162 * s);
+      face.scale.setScalar(s * (wiry ? 0.72 : 1));
+      // (devant le bord plat : il ne le barre pas)
+      if (wiry) face.position.copy(up).multiplyScalar(0.1 * s).addScaledVector(fwd, 0.215 * s);
+      else face.position.copy(up).multiplyScalar(0.16 * s).addScaledVector(fwd, 0.162 * s);
       face.lookAt(face.position.clone().add(fwd)); // dans le repère de l'os : le plan regarde vers l'avant
       head.add(face);
       st.head = head;
       st.face = face;
-      st.faceS = s;
+      st.faceS = s * (wiry ? 0.72 : 1);
       st.faceY = face.position.clone();
       st.faceDown = up.clone().multiplyScalar(-0.035 * s);
     }
@@ -398,7 +602,7 @@ export function createBeast(opts = {}) {
       const end = bones[`LowerLeg${s}_end`];
       if (!end) continue;
       end.getWorldScale(ws);
-      const foot = new THREE.Mesh(new THREE.CapsuleGeometry(0.035, 0.18, 3, 8), skinMat);
+      const foot = new THREE.Mesh(wiry ? strands(0.22, 0.01, 2, seeded(11)) : new THREE.CapsuleGeometry(0.035, 0.18, 3, 8), skinMat);
       foot.scale.setScalar(1 / ws.x);
       foot.rotation.x = Math.PI / 2;
       end.add(foot);
@@ -493,6 +697,7 @@ export function createBeast(opts = {}) {
     // juste devant l'objectif)
     scareFace() {
       faceMat.map = faces[3];
+      if (st.face) st.face.visible = true;
       group.position.set(0, 0, 0);
       group.rotation.set(0, 0, 0);
       return st.face || st.head || null;
@@ -521,6 +726,8 @@ export function createBeast(opts = {}) {
       const rush = (M.rushT || M.rush || 0) > 0;
       skinMat.emissiveIntensity = Math.min(0.6, light * 0.25);
       faceMat.map = rush ? faces[2] : chase || M.mode === 'grab' ? faces[1] : faces[0];
+      // Level 0 : une tête noire, sans visage ; la bouche n'apparaît que quand elle se rue ou qu'elle saisit
+      if (wiry && st.face) st.face.visible = !!photo || rush || M.mode === 'grab';
 
       // image par image : entre deux poses, le corps ne bouge pas et reste là où il était (sauf un saut de plus de
       // 2 m : un changement d'étage, une téléportation)
@@ -651,15 +858,17 @@ export function createBeast(opts = {}) {
       st.fl += sdt * (rush ? 17 : 11) * run;
 
       // --- le tronc : voûté, de travers, penché en avant pour courir ---
-      const lean = 0.22 + 0.3 * run + 0.35 * rk + 0.12 * still + 0.25 * gk - 0.55 * sk;
+      // (Level 0 : droite et raide comme un épouvantail ; elle ne se penche que pour courir ou se ruer)
+      const lean = wiry ? 0.03 + 0.28 * run + 0.35 * rk + 0.2 * gk - 0.55 * sk : 0.22 + 0.3 * run + 0.35 * rk + 0.12 * still + 0.25 * gk - 0.55 * sk;
       rot(B.Abdomen, 1, 0, 0, lean + clampS(st.sp.torso[0], 0.5) * 0.4);
-      rot(B.Torso, 1, 0, 0, 0.22 + 0.1 * run);
-      rot(B.Torso, 0, 0, 1, 0.13 + (st.w.Walk || 0) * 0.12 * Math.sin(st.acts.Walk ? (st.acts.Walk.time / st.acts.Walk.getClip().duration) * Math.PI * 2 : 0));
+      rot(B.Torso, 1, 0, 0, (wiry ? 0.02 : 0.22) + 0.1 * run);
+      rot(B.Torso, 0, 0, 1, (wiry ? 0.02 : 0.13) + (st.w.Walk || 0) * 0.12 * Math.sin(st.acts.Walk ? (st.acts.Walk.time / st.acts.Walk.getClip().duration) * Math.PI * 2 : 0));
       rot(B.Torso, 0, 1, 0, run * 0.28 * Math.sin(st.fl) + (rush ? rnd(-0.12, 0.12) : 0));
 
       // --- les épaules : l'une remontée, l'autre tombante ---
-      rot(B.ShoulderL, 0, 0, 1, 0.3 + clampS(st.sp.shL[0], 0.6) * 0.6 + 0.12 * still);
-      rot(B.ShoulderR, 0, 0, 1, 0.2 + clampS(st.sp.shR[0], 0.6) * 0.6);
+      const shK = wiry ? 0.25 : 1; // la barre d'épaules reste droite
+      rot(B.ShoulderL, 0, 0, 1, (0.3 + clampS(st.sp.shL[0], 0.6) * 0.6 + 0.12 * still) * shK);
+      rot(B.ShoulderR, 0, 0, 1, (0.2 + clampS(st.sp.shR[0], 0.6) * 0.6) * shK);
       rot(B.ShoulderL, 1, 0, 0, 0.15 + 0.2 * rk);
       rot(B.ShoulderR, 1, 0, 0, 0.15 + 0.2 * rk);
 
@@ -676,10 +885,10 @@ export function createBeast(opts = {}) {
         const side = left ? 1 : -1;
         // le bras : il pend (et ballotte), il bat l'air en courant, il se tend devant pour saisir
         const a = pend + flail * (1 - rk * 0.75) + reach + shake;
-        const c = 0.1 + sway * 0.5 * side + 0.3 * run + 0.12 * rk - 0.22 * gk + 0.5 * sk + (rush ? rnd(-0.1, 0.1) : 0) + 0.08 * still * side;
+        const c = (wiry ? 0.03 : 0.1) + sway * 0.5 * side + 0.3 * run + 0.12 * rk - 0.22 * gk + 0.5 * sk + (rush ? rnd(-0.1, 0.1) : 0) + 0.08 * still * side;
         aim(ua, la, armDir(a, c, side, _dir));
         // l'avant-bras : le coude plie à l'envers (la main part vers l'arrière) ; il se casse quand elle bat l'air
-        const bend = (0.42 + 0.35 * run * (0.5 + 0.5 * Math.sin(st.fl * 1.7 + (left ? 0 : 1.1)))) * (1 - 0.85 * Math.max(rk, gk)) - 1.4 * sk;
+        const bend = ((wiry ? 0.05 : 0.42) + 0.35 * run * (0.5 + 0.5 * Math.sin(st.fl * 1.7 + (left ? 0 : 1.1)))) * (1 - 0.85 * Math.max(rk, gk)) - 1.4 * sk;
         aim(la, B[`Middle1${s}`], armDir(a + bend, c + 0.1 * still, side, _dir));
       }
 
@@ -718,12 +927,12 @@ export function createBeast(opts = {}) {
       st.lookX = ease(st.lookX, wantX, 8, sdt);
       const lk = st.look;
 
-      const crane = 0.18 + 0.75 * still + 0.25 * run + 0.4 * rk + 0.45 * gk - 0.4 * sk;
+      const crane = wiry ? 0.04 + 0.12 * still + 0.15 * run + 0.4 * rk + 0.45 * gk - 0.4 * sk : 0.18 + 0.75 * still + 0.25 * run + 0.4 * rk + 0.45 * gk - 0.4 * sk;
       rot(B.Neck, 1, 0, 0, crane);
       rot(B.Neck, 0, 1, 0, 0.4 * lk * st.lookY);
-      const level = -(lean + 0.22 + crane) * (0.55 + 0.4 * Math.max(run, rk, still));
+      const level = -(lean + (wiry ? 0.02 : 0.22) + crane) * (0.55 + 0.4 * Math.max(run, rk, still));
       rot(B.Head, 1, 0, 0, level + st.tickX * still + clampS(st.sp.head[0], 0.7) * 0.3 - 0.25 * sk + (rush ? rnd(-0.08, 0.08) : 0) + 0.6 * lk * st.lookX);
-      const tilt = st.tilt * (1 - 0.45 * run) * (1 - 0.5 * rk) * (1 - 0.35 * lk) + clampS(st.sp.head[0], 0.8) * 0.7;
+      const tilt = st.tilt * (wiry ? 0.3 : 1) * (1 - 0.45 * run) * (1 - 0.5 * rk) * (1 - 0.35 * lk) + clampS(st.sp.head[0], 0.8) * 0.7;
       rot(B.Head, 0, 0, 1, tilt + (rush ? rnd(-0.25, 0.25) : 0));
       rot(B.Head, 0, 1, 0, st.tickY * still * (1 - lk) + 0.9 * sk + 0.6 * lk * st.lookY);
 

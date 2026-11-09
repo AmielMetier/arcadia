@@ -146,6 +146,11 @@ export const NEAR_CHARGE = 6; // s'approcher à moins de 6 m d'elle quand elle o
 // bout de PLANTED_T secondes (elle charge, ou se glisse hors de vue)
 export const PLANTED_T = 1.0;
 export const SEEN_R = 26;
+export const L0_AGGRO = 0.8; // Level 0 : son agressivité (1 : celle d'avant) ; ses tricheries et ses traques s'espacent d'autant
+export const FRONT_TAPES = 3; // Level 0 : avant la 3e cassette, elle ne se lance jamais sur quelqu'un qui ne l'a pas vue
+export const BACK_SHARE = 0.3; // ensuite, part des poursuites qui peuvent partir dans le dos
+export const RUSH_WIND = 0.6; // secondes de cri sur place avant de s'élancer, quand on la découvre
+export const SAW_T = 6; // secondes pendant lesquelles on « l'a vue » (elle peut alors se lancer)
 export const CALM_HOLD = 45; // secondes de répit dans un recoin calme, avant que sa lampe grésille
 export const HAUNT_COOLDOWN = 12; // un spectateur ne hante qu'une fois toutes les 12 s
 
@@ -884,7 +889,7 @@ export class BackroomsSim {
   // ; le vacarme des voix l'y pousse aussi
   get aggro() {
     const loud = (this.din || 0) * 0.45;
-    if (this.level === 0) return Math.min(1, this.cassettes / CASSETTES + loud);
+    if (this.level === 0) return Math.min(1, this.cassettes / CASSETTES + loud) * L0_AGGRO;
     if (this.level === HOTEL_LEVEL) return Math.min(1, 0.5 + (0.4 * this.posted) / LETTERS + loud);
     if (this.level === PIPES_LEVEL) return Math.min(1, 0.3 + (0.7 * this.valves) / VALVES + loud);
     return Math.min(1, 0.25 + (0.75 * (this.fuses + (this.powered ? FUSES : 0))) / FUSES + loud);
@@ -3256,6 +3261,7 @@ export class BackroomsSim {
       M.lastMode = M.mode;
       M.modeT = 0;
     } else M.modeT += DT;
+    if (M.mode === 'chase') M.chasedAt = this.time;
     // elle tient quelqu'un : elle ne fait rien d'autre
     if (M.mode === 'grab') return this.updateGrab(M);
     // sonnée (on s'est dégagé, ou un coéquipier l'a aveuglée) : elle titube en arrière, puis s'enfuit dans le noir
@@ -3345,6 +3351,8 @@ export class BackroomsSim {
     const dist = same ? Math.hypot(dx, dz) : Infinity;
     M.distToPlayer = dist;
     M.hasLineOfSight = P.seen;
+    // Level 0 : qui l'a vue (dans son champ, rien entre eux, assez de lumière pour la distinguer), et quand
+    if (this.level === 0) for (const Q of this.players) if (this.seesMonster(Q, M, dark)) Q.sawM = this.time;
 
     // Détection : vue directe (moins loin lampe éteinte ; dans le noir, une lampe allumée se voit de loin),
     // bruit de course, présence rapprochée. La colère allonge tout.
@@ -3496,7 +3504,7 @@ export class BackroomsSim {
       // en embuscade, elle attend que sa proie passe tout près
       M.waitT -= DT;
       const atSpot = M.ambush && Math.hypot(M.x - M.ambush.x, M.z - M.ambush.z) < 0.6;
-      if (dist < 6.5 || (M.hasLineOfSight && dist < 9)) {
+      if ((dist < 6.5 || (M.hasLineOfSight && dist < 9)) && this.mayChase(M, P, hunt)) {
         this.emit({ type: 'spotted', ambush: true });
         M.mode = 'chase';
         M.silent = false;
@@ -3514,11 +3522,11 @@ export class BackroomsSim {
         M.lastSeenZ = P.z;
         M.lastSeenF = P.floor || 0;
         M.repathT = 0;
-        M.ambushT = rand(14, 22) * (1 - rage * 0.5);
+        M.ambushT = (rand(14, 22) * (1 - rage * 0.5)) / (this.level === 0 ? L0_AGGRO : 1);
       } else if (atSpot) {
         M.path = [];
       }
-    } else if (canSee || canHear || isNearby) {
+    } else if ((canSee || canHear || isNearby) && (M.mode === 'chase' || this.mayChase(M, P, hunt))) {
       if (M.mode !== 'chase') {
         this.chases++;
         this.emit({ type: 'spotted', heard: !canSee && canHear, id: P.id });
@@ -3581,6 +3589,11 @@ export class BackroomsSim {
     else if (M.mode === 'stalk') M.speed = MONSTER_PATROL_SPEED * 1.15;
     else if (M.mode === 'watch') M.speed = 0;
     else M.speed = MONSTER_PATROL_SPEED * (1 + rage * 0.5) * (calm ? 0.8 : 1);
+    if (M.windT > 0) {
+      M.windT = Math.max(0, M.windT - DT);
+      M.speed = 0;
+      faceTo(M, P.x, P.z, 10);
+    }
     if (calm && M.mode === 'patrol') M.silent = true;
     else if (M.mode === 'patrol' && !calm) M.silent = false;
     // Poolrooms : l'eau la freine aussi (un peu moins que les joueurs)
@@ -3657,7 +3670,7 @@ export class BackroomsSim {
       M.ambushT -= DT;
       if (M.ambushT <= 0 && dist < 45) {
         const spot = (M.escapes.length && Math.random() < 0.5 ? this.escapeAmbush(P) : null) || (map.isAmbush || map.isShelfSide ? this.findAmbush(P) : null);
-        M.ambushT = 4;
+        M.ambushT = this.level === 0 ? 4 / L0_AGGRO : 4;
         if (spot) {
           M.mode = 'ambush';
           M.silent = true;
@@ -3986,6 +3999,73 @@ export class BackroomsSim {
     return this.level === 0 && !(this.blackout > 0) && this.brightCell(this.fm(Q.floor || 0), Q.x, Q.z);
   }
 
+  // Q la voit-il vraiment ? Dans le cadre de sa caméra (un peu en deçà des bords), rien entre eux, et assez de lumière
+  // pour la distinguer : sous un néon, dans sa lampe, dans le caméscope, ou tout près
+  seesMonster(Q, M, dark) {
+    if (Q.status !== 'alive' || Q.hidden >= 0 || Q.desk || (Q.floor || 0) !== (M.floor || 0)) return false;
+    const d = Math.hypot(Q.x - M.x, Q.z - M.z);
+    if (d > SEEN_R) return false;
+    const f = this.facing(Q, M.x, M.z);
+    if (f > 1.0 + Math.atan2(0.5, Math.max(0.5, d))) return false;
+    const map = this.fm(M.floor || 0);
+    if (!hasLineOfSight(map, Q.x, Q.z, M.x, M.z)) return false;
+    return d < 4 || (!dark && this.litCell(map, M.x, M.z)) || (Q.flashlight && d < 20 && f < 0.6) || (Q.cam && (Q.battery ?? 100) > 0 && d < 14);
+  }
+
+  // Level 0 : peut-elle se lancer sur P ? Seulement s'il l'a vue (pas par derrière), sauf pendant la traque finale, juste
+  // après l'avoir perdu de vue, et (à partir de la 3e cassette) de temps en temps. Sinon, elle se montre d'abord
+  mayChase(M, P, hunt) {
+    if (this.level !== 0 || hunt) return true;
+    if (this.time - (P.sawM ?? -1e9) < SAW_T || this.time - (M.chasedAt ?? -1e9) < 8) return true;
+    if (this.cassettes >= FRONT_TAPES) {
+      if (this.time > (M.backRollT || 0)) {
+        M.backRollT = this.time + 20;
+        M.backOk = Math.random() < BACK_SHARE;
+      }
+      if (M.backOk) return true;
+    }
+    this.showFirst(M, P);
+    return false;
+  }
+
+  // elle voudrait se lancer, mais sa proie ne l'a pas vue : hors de la vue de tous, elle passe devant elle, postée au
+  // coin d'un couloir, face à l'endroit d'où elle va surgir (ou, sans endroit où aller, elle attend là, tournée vers
+  // elle, sans un bruit). Dès qu'on la regarde, elle crie puis charge
+  showFirst(M, P) {
+    // quelqu'un l'a dans son champ (à découvert) : elle ne se fige pas, elle crie et se lance sur lui
+    const V = this.viewerOf(M, SEEN_R);
+    if (V && !this.shelteredAt(V.Q)) {
+      this.rushAt(M, V.Q);
+      if (V.Q !== P) M.target = V.Q.id;
+      return;
+    }
+    if (M.mode === 'watch' && M.lurk) return;
+    if ((M.showT || 0) > this.time) return;
+    M.showT = this.time + 1.5;
+    M.pending = null;
+    M.ambush = null;
+    M.pace = null;
+    M.watch = null;
+    M.path = [];
+    M.silent = true;
+    M.lurk = true;
+    M.mode = 'watch';
+    M.waitT = rand(10, 16);
+    if (!this.inSomeView(M.floor || 0, M.x, M.z, 0.15)) {
+      const spot = this.warpSpot(P, 'corner');
+      if (spot && !this.inSomeView(spot.floor, spot.x, spot.z, 0.1)) {
+        M.x = spot.x;
+        M.z = spot.z;
+        M.floor = spot.floor;
+        this.placed(M);
+        M.targetWander = null;
+        M.unseenAllT = 0;
+        this.emit({ type: 'warp', kind: 'corner' });
+      }
+    }
+    M.yaw = Math.atan2(P.x - M.x, P.z - M.z);
+  }
+
   // découverte, fixée : elle hurle et fonce sur sa proie (même au repos)
   rushAt(M, P) {
     M.faceT = 0;
@@ -3997,8 +4077,10 @@ export class BackroomsSim {
     M.lurk = false;
     M.ambush = null;
     M.silent = false;
-    M.rushT = 2.4;
-    M.burstT = 2.4;
+    // le cri d'abord (elle reste sur place, tournée vers lui, tout le corps qui tremble), la course ensuite
+    M.windT = RUSH_WIND;
+    M.rushT = 2.4 + RUSH_WIND;
+    M.burstT = 2.4 + RUSH_WIND;
     M.unseenT = 0;
     M.repathT = 0;
     M.lastSeenX = P.x;
@@ -4477,8 +4559,9 @@ export class BackroomsSim {
     }
     if (M.warpT > 0 || calm || (M.mode !== 'patrol' && M.mode !== 'search') || P.hidden >= 0 || this.calmAt(P)) return;
     // plus on joue bien (difficulté adaptative), plus elle triche souvent
-    M.warpT = rand(20, 38) * (1 - A * 0.35) * (1 - rage * 0.3) * (1.25 - this.skill * 0.5);
-    const kind = Math.random() < 0.65 ? 'corner' : 'behind';
+    M.warpT = (rand(20, 38) * (1 - A * 0.35) * (1 - rage * 0.3) * (1.25 - this.skill * 0.5)) / L0_AGGRO;
+    // (avant la 3e cassette, jamais dans le dos : elle doit être vue avant de se lancer)
+    const kind = this.cassettes >= FRONT_TAPES && Math.random() < 0.35 ? 'behind' : 'corner';
     let k2 = kind;
     let spot = this.warpSpot(P, kind);
     if (!spot && kind === 'behind') {

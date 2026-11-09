@@ -1,5 +1,17 @@
 # Journal des versions — Arcadia
 
+## 5.24 — 9 novembre 2026
+- **The Backrooms** — Plus d'ombre en dents de scie sur la moquette au pied des murs en biais du Level 0 : la lumière s'y pose bien à plat.
+- **The Backrooms** — au Level 0 :
+  - Un tiers de culs-de-sac en moins : bien des couloirs qui butaient contre un mur rejoignent maintenant le reste du dédale.
+  - L'entité est un peu moins agressive : elle voit et entend un peu moins loin, surgit et traque moins souvent, et laisse plus de répit après une poursuite.
+  - Elle ne se lance plus sur toi sans que tu l'aies vue. Jusqu'à la 3e cassette, jamais dans le dos : elle se montre d'abord, au bout d'un couloir ou au coin d'un mur, puis elle charge. Ensuite, c'est encore le cas la plupart du temps.
+  - Quand quelqu'un la regarde, elle ne se fige plus : elle pousse un de ses nouveaux cris, puis part en courant.
+  - Plus de bourdonnement qui monte à son approche : rien ne l'annonce, elle peut vraiment surprendre.
+  - Bien plus de cris pendant la poursuite (29 au lieu de 3), et les anciens retravaillés pour leur ressembler.
+  - Un nouveau corps : une longue silhouette droite de brins noirs noueux et hérissés, une large barre d'épaules, des bras qui pendent jusqu'au sol, une petite tête ronde coiffée d'un large bord plat. Plus de visage, sauf quand elle se rue sur toi.
+  - En mode VIP, elle a ce même corps, avec la photo pour visage.
+
 ## 5.23 — 9 novembre 2026
 - **Hub** — Nouvelle catégorie « Gros jeux » : The Backrooms et Odyssée, des jeux bien plus complets, ont leur rangée à part en haut de l'accueil, avec leurs boutons pour jouer, et passent en tête dans le salon.
 - **Hub** — L'écran de chargement d'un jeu ne défile plus : tout tient dans l'écran, sur ordinateur comme sur téléphone, même tenu à l'horizontale.
