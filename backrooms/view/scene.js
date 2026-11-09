@@ -420,6 +420,8 @@ export function createBackroomsScene(container, floors, lamps) {
     const EDGE = !!map.thinCount;
     // Level 0 : les murs en biais des couloirs en diagonale (la moitié pleine d'une case coupée)
     const CHAMF = !!(map.chamfers && map.chamfers.length);
+    const diagAt = new Map(); // case pleine d'un couloir en diagonale -> ce couloir
+    for (const dg of map.diags || []) for (const [x, z] of dg.cells) diagAt.set(z * W + x, dg);
     const chamfAt = (x, z) => {
       const p = map.pillarAt && map.pillarAt(x, z);
       return p && p.poly ? p : null;
@@ -481,6 +483,7 @@ export function createBackroomsScene(container, floors, lamps) {
     const filmU = {
       uFilmL: { value: Array.from({ length: NFILM }, () => new THREE.Vector3(-1000, -1000, 1)) },
       uFilmC: { value: Array.from({ length: NFILM }, () => new THREE.Vector3()) },
+      uFilmR: { value: new Float32Array(NFILM) }, // Level 0 : l'angle du diffuseur (couché le long d'un couloir en diagonale)
     };
     // Level 1 : les feux de couleur (gyrophares des quais, flashs des alarmes, écrans du poste), les plus proches de la
     // caméra, choisis à chaque image. P : position et portée ; C : couleur et puissance ; N : vers où il éclaire et la
@@ -926,6 +929,7 @@ uniform float uTileRow;
 #if defined(BK_FILM) || defined(BK_GLOSS)
 uniform vec3 uFilmL[${NFILM}];
 uniform vec3 uFilmC[${NFILM}];
+uniform float uFilmR[${NFILM}];
 #endif
 uniform float uGlossH;
 #ifdef BK_DYN
@@ -1088,7 +1092,10 @@ float bkCaust(vec2 uv, float t) {
               // les diffuseurs eux-mêmes : nets de près, brouillés de loin, une petite auréole autour
               float fBlur = 0.03 + fPath * 0.018;
               for (int i = 0; i < ${NFILM}; i++) {
-                vec2 fq = abs(fHit - uFilmL[i].xy) - vec2(0.61, 0.31) * uFilmL[i].z;
+                vec2 fdv = fHit - uFilmL[i].xy;
+                float fcR = cos(uFilmR[i]);
+                float fsR = sin(uFilmR[i]);
+                vec2 fq = abs(vec2(fdv.x * fcR - fdv.y * fsR, fdv.x * fsR + fdv.y * fcR)) - vec2(0.61, 0.31) * uFilmL[i].z;
                 float fd = max(fq.x, fq.y);
                 fRef += uFilmC[i] * ((1.0 - smoothstep(-fBlur, fBlur, fd)) * 3.0 + exp(-max(fd, 0.0) / (0.2 + fBlur * 2.0)) * 0.18);
               }
@@ -1429,14 +1436,70 @@ float bkCaust(vec2 uv, float t) {
     // (Level 2 : la dalle de béton, sombre, au-dessus des tuyaux)
     const ceilMat = baked(new THREE.MeshLambertMaterial({ map: ceilTex, color: PIPES ? '#9a958a' : '#ffffff' }), L1 ? { gloss: 1 } : null);
     const above = fi > 0 ? floors[fi - 1] : null;
-    if (above && holesOf(above).length) {
-      ceilMat.alphaMap = holeMask(W, H, holesOf(above), false);
+    // (et là où passe un couloir en diagonale : son propre plafond, plus bas, prend la place)
+    const diagHoles = L2 ? [] : (map.diags || []).flatMap((dg) => [...dg.cells, ...dg.cuts]).map(([x, z]) => ({ x: (x + 0.5) * CELL_SIZE, z: (z + 0.5) * CELL_SIZE, hx: CELL_SIZE / 2, hz: CELL_SIZE / 2 }));
+    if ((above && holesOf(above).length) || diagHoles.length) {
+      ceilMat.alphaMap = holeMask(W, H, [...(above ? holesOf(above) : []), ...diagHoles], false);
       ceilMat.alphaTest = 0.5;
     }
     const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(W * CELL_SIZE, H * CELL_SIZE), ceilMat);
     ceiling.rotation.x = Math.PI / 2;
     ceiling.position.set((W * CELL_SIZE) / 2, CEIL, (H * CELL_SIZE) / 2);
     if (!L2) group.add(ceiling); // Poolrooms : chaque salle a son propre plafond (voir water.js)
+    // Level 0 : le long d'un couloir en diagonale, les dalles suivent le couloir. Une pièce de faux plafond couvre ses
+    // cases pleines et la moitié libre de ses cases coupées, ses dalles tournées dans l'axe (la même texture, une
+    // répétition par 2,5 m, calée sur la ligne médiane du couloir) ; le plafond droit y est découpé
+    if (map.diags && map.diags.length && !L2) {
+      const pos = [];
+      const uvs = [];
+      const C = CELL_SIZE;
+      // (jamais sous un trou de l'étage du dessus : la carte tient ses couloirs en diagonale loin des cases imposées)
+      for (const dg of map.diags) {
+        const tx = dg.sx / Math.SQRT2;
+        const tz = 1 / Math.SQRT2;
+        // la ligne médiane passe par les coins des cases pleines : (x, z) et (x + 1, z + 1) quand sx = 1
+        const [x0, z0] = dg.cells[0];
+        const ox = (dg.sx > 0 ? x0 : x0 + 1) * C;
+        const oz = z0 * C;
+        const uvOf = (x, z) => [((x - ox) * tx + (z - oz) * tz) / C, ((x - ox) * tz - (z - oz) * tx) / C];
+        const tri = (a, b, c) => {
+          for (const [x, z] of [a, b, c]) {
+            pos.push(x, CEIL, z);
+            uvs.push(...uvOf(x, z));
+          }
+        };
+        for (const [x, z] of dg.cells) {
+          const a = [x * C, z * C];
+          const b = [(x + 1) * C, z * C];
+          const c = [(x + 1) * C, (z + 1) * C];
+          const d = [x * C, (z + 1) * C];
+          tri(a, c, b);
+          tri(a, d, c);
+        }
+        for (const [x, z] of dg.cuts) {
+          const p = map.pillarAt(x, z);
+          if (!p || !p.poly) continue;
+          const [e1, opp, e2] = p.poly;
+          // le coin libre : à l'opposé du coin plein
+          const free = [2 * p.x - opp[0], 2 * p.z - opp[1]];
+          tri(e1, free, e2);
+        }
+      }
+      // (des triangles dans les deux sens : vus d'en dessous, quel que soit l'ordre)
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(pos.map((v, i) => (i % 3 === 1 ? -1 : 0)), 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      const dTex = (LOW0 ? textures.ceilingLow : textures.ceiling).clone();
+      dTex.wrapS = dTex.wrapT = THREE.RepeatWrapping;
+      dTex.repeat.set(1, 1);
+      dTex.needsUpdate = true;
+      textures.ready.then(() => {
+        dTex.needsUpdate = true;
+      });
+      const dMat = baked(new THREE.MeshLambertMaterial({ map: dTex, side: THREE.DoubleSide }));
+      group.add(new THREE.Mesh(geo, dMat));
+    }
 
     // 3. Murs au papier peint jaune
     let wallCount = 0;
@@ -1693,6 +1756,7 @@ float bkCaust(vec2 uv, float t) {
       const twin = () => mergeGeometries([-0.045, 0.045].map((z) => new THREE.CylinderGeometry(0.014, 0.014, 1.5, 10, 1, true).rotateZ(Math.PI / 2).translate(0, 0, z)));
       fixSet(L2 ? new THREE.BoxGeometry(1.3, 0.03, 1.3) : L1 ? twin() : new THREE.BoxGeometry(1.22, 0.04, 0.62), new THREE.MeshBasicMaterial({ color: '#ffffff', map: L1 || L2 ? null : textures.lamp }), map.lights, (l) => {
         dummy.position.set(l.x, l.fy !== undefined ? l.fy : CEIL - (L1 ? 0.45 : 0.025), l.z); // au Level 1, les tubes pendent sous le plafond
+        dummy.rotation.set(0, l.rot || 0, 0); // Level 0 : couché le long d'un couloir en diagonale
         // Poolrooms : la lampe d'un couloir voûté est cachée dans la voûte ; sous une verrière, tout le plafond éclaire
         dummy.scale.setScalar(l.hidden ? 0.0001 : l.fs || 1);
       });
@@ -1871,7 +1935,7 @@ float bkCaust(vec2 uv, float t) {
     for (let z = 0; z < H; z++) {
       for (let x = 0; x < W; x++) {
         const i = z * W + x;
-        if (map.grid[i] === T.WALL || pitCells.has(i) || stairCells.has(i) || thinAt(x, z)) continue;
+        if (map.grid[i] === T.WALL || map.grid[i] === T.CHAMFER || pitCells.has(i) || stairCells.has(i) || thinAt(x, z)) continue;
         for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
           const nx = x + dx;
           const nz = z + dz;
@@ -1887,7 +1951,7 @@ float bkCaust(vec2 uv, float t) {
             break;
           }
         }
-        if (!L1 && !L2 && !L3 && !PIPES && drnd() < 0.045 && !holeAbove(x, z)) {
+        if (!L1 && !L2 && !L3 && !PIPES && drnd() < 0.045 && !holeAbove(x, z) && !diagAt.has(i)) {
           const ox = (drnd() - 0.5) * 1.2;
           const oz = (drnd() - 0.5) * 1.2;
           const rot = drnd() < 0.5 ? 0 : Math.PI / 2;
@@ -3992,6 +4056,7 @@ void main() {
               if (n >= NLAMP) break;
               if (d > 4 && !hasLineOfSight(map, P.x, P.z, l.x, l.z)) continue;
               filmU.uFilmL.value[n].set(l.x, l.z, l.fs || 1);
+              filmU.uFilmR.value[n] = l.rot || 0;
               if (alarm) filmU.uFilmC.value[n].set(1, 0.07, 0.04).multiplyScalar(k * 1.2);
               else filmU.uFilmC.value[n].set(1, LOW0 ? 0.93 : 0.97, LOW0 ? 0.74 : 0.84).multiplyScalar(k);
               n++;
@@ -4184,12 +4249,12 @@ void main() {
               const fs = a.l.fs || 1;
               dummy.scale.set(fs, fs, 1);
               dummy.position.set(a.l.x, CEIL - 0.008, a.l.z);
-              dummy.rotation.set(Math.PI / 2, 0, 0); // tournée vers le bas
+              dummy.rotation.set(Math.PI / 2, 0, -(a.l.rot || 0)); // tournée vers le bas (et dans l'axe du diffuseur)
               dummy.updateMatrix();
               ceilGlow.setMatrixAt(i, dummy.matrix);
               dummy.scale.set(fs, 1, fs);
               dummy.position.set(a.l.x, y - 0.02, a.l.z);
-              dummy.rotation.set(0, 0, 0);
+              dummy.rotation.set(0, a.l.rot || 0, 0);
               dummy.updateMatrix();
               cone.setMatrixAt(i, dummy.matrix);
               ceilGlow.setColorAt(i, fixTmp.setRGB(0, 0, 0));

@@ -6,7 +6,7 @@
 - **The Backrooms** — Nouvelle affiche tirée du Level 0, et une présentation qui ne gâche plus la surprise : un endroit étrange et immense, rien de plus. Compte plusieurs heures pour en voir le bout.
 - **The Backrooms** — au Level 0 :
   - Moins de grands espaces ouverts : des salles plus petites, plus de cloisons, on se perd plus vite.
-  - Quelques couloirs partent en diagonale et cassent le quadrillage : on ne sait plus trop dans quel sens on marche.
+  - Quelques couloirs partent en diagonale et cassent le quadrillage : on ne sait plus trop dans quel sens on marche. Leurs néons et les dalles du plafond suivent le couloir.
   - L'entité n'apparaît plus dans un recoin trop étroit pour elle, où elle restait plantée.
   - The Old Timer parle toujours avec la voix chuchotée, même sur un ordinateur réglé en français.
 - **The Backrooms** — Le pouce fait le tour de la bouteille au lieu de pointer dans le vide.

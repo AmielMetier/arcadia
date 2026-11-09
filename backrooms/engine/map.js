@@ -579,6 +579,10 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   const diagUsed = new Set();
   const chamferShape = new Map(); // case -> { x, z, h, poly, face }
   const chamfers = []; // pour le décor : { a: [x, z], b: [x, z], nx, nz } (la face du mur, vue du couloir), voir 6b
+  // les couloirs eux-mêmes : { sx, cells : [[x, z]] (les cases pleines, dans l'ordre), cuts : [[x, z]] (les cases
+  // coupées), rot : l'angle (autour de y) qui couche l'axe x le long du couloir } ; le plafond et les néons les suivent
+  const diags = [];
+  const diagCell = new Map(); // case pleine d'un couloir en diagonale -> son rang dans le couloir
   if (DIAG > 0) {
     let ds = Math.imul((seed >>> 0) ^ 0x51ed270b, 2246822519) >>> 0 || 1;
     const drnd = () => {
@@ -651,6 +655,9 @@ export function createBackroomsMap(seed = 42, opts = {}) {
       }
       for (const [x, z] of all) diagUsed.add(z * W + x);
       for (const [x, z] of fill) diagFill.add(z * W + x);
+      const dg = { sx, cells: I, cuts: ch.map((c) => [c[0], c[1]]), rot: Math.atan2(-1, sx) };
+      diags.push(dg);
+      I.forEach(([x, z], i) => diagCell.set(z * W + x, { dg, i }));
       for (const [x, z, A, B] of ch) {
         const cx = (x + 0.5) * C;
         const cz = (z + 0.5) * C;
@@ -1067,8 +1074,14 @@ export function createBackroomsMap(seed = 42, opts = {}) {
     return (v(ix, iz) * (1 - tx) + v(ix + 1, iz) * tx) * (1 - tz) + (v(ix, iz + 1) * (1 - tx) + v(ix + 1, iz + 1) * tx) * tz;
   };
   const lights = [];
-  for (let z = 1; z < H - 1; z += 2) {
-    for (let x = 1; x < W - 1; x += 2) {
+  // un néon par case pleine sur deux le long d'un couloir en diagonale (la grille des néons, une case sur deux en x et
+  // en z, en laisserait certains tout noirs), couché dans son axe ; ailleurs, la grille
+  const lightCells = [];
+  for (let z = 1; z < H - 1; z += 2) for (let x = 1; x < W - 1; x += 2) if (!diagCell.has(z * W + x)) lightCells.push([x, z]);
+  for (const dg of diags) dg.cells.forEach(([x, z], i) => i % 2 === 1 && lightCells.push([x, z, dg.rot]));
+  lightCells.sort((p, q) => p[1] - q[1] || p[0] - q[0]);
+  for (const [x, z, rot] of lightCells) {
+    {
       if (grid[z * W + x] !== T.FLOOR) continue;
       const nearSpawn = Math.hypot(x - sx, z - sz) < 7;
       const v = zone(x, z);
@@ -1087,6 +1100,7 @@ export function createBackroomsMap(seed = 42, opts = {}) {
         state,
         flicker: state === 'flicker',
         bright,
+        ...(rot !== undefined ? { rot } : null),
       });
     }
   }
@@ -1254,6 +1268,7 @@ export function createBackroomsMap(seed = 42, opts = {}) {
           })
       : null,
     chamfers,
+    diags,
     isWall(gx, gz) {
       if (gx < 0 || gx >= W || gz < 0 || gz >= H) return true;
       return blocks(grid[gz * W + gx]);
