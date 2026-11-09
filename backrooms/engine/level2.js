@@ -885,7 +885,7 @@ export function createPipesMap(seed = 3) {
     }
     return out;
   };
-  const bottles = scatter(8, 8);
+  const bottles = scatter(11, 8);
   const batteries = scatter(10, 6);
 
   // 12. Entité : loin du départ ; le troupeau part de la bergerie (ou, faute de bergerie, de cases lointaines)

@@ -1,5 +1,5 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
-import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T } from './engine/sim.js';
+import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE } from './engine/sim.js';
 import { hasLineOfSight } from './engine/nav.js';
 import { bfs, CELL_SIZE, cellsOnSeg, T } from './engine/map.js';
 import { createBackroomsScene, setMonsterMode, setSceneOptions } from './view/scene.js';
@@ -128,11 +128,11 @@ let noLock = false;
 let toggleFlashlightRequested = false; // touche 1 : la lampe
 let useRequested = null; // (tests) une case d'objet précise à utiliser
 // actions du prochain pas : E utilise la case choisie, F ramasse, T siffle
-const act = { use: false, pick: false, whistle: false, jump: false, struggle: 0 };
+const act = { use: false, pick: false, drop: false, whistle: false, jump: false, struggle: 0 };
 let crouchOn = false; // C : s'accroupir / se relever (bascule)
 let camOn = false; // V : sortir / ranger le caméscope
 let airborne = false; // en plein saut (pour le bruit de la réception)
-let selRequested = 0; // touches 2 et 3 : choisir la case d'objet (1 ou 2)
+let selRequested = 0; // touches 2 à 5 : choisir la case d'objet (1 à INV_SIZE)
 let kbMode = false;
 let paused = true; // la partie attend qu'on prenne le contrôle
 let started = false; // la première prise en main (avant : l'écran titre)
@@ -268,17 +268,29 @@ function toggleCam() {
   if (scene && scene.setCamZoom) scene.setCamZoom(camZoom);
 }
 
-// molette, caméscope sorti : le zoom de l'objectif (de ×1,5 à ×12), avec son petit moteur et la barre W–T de
-// l'écran. Une molette crantée avance d'environ ×1,14 par cran, un pavé tactile en continu.
+// molette : la case d'objet suivante ou précédente ; caméscope sorti, le zoom de l'objectif (de ×1,5 à ×12), avec
+// son petit moteur et la barre W–T de l'écran. Une molette crantée avance d'environ ×1,14 par cran, un pavé tactile
+// en continu.
 const CAM_ZOOM_MIN = 1.5;
 const CAM_ZOOM_MAX = 12;
 let camZoom = CAM_ZOOM_MIN;
+let wheelAcc = 0; // molette sans caméscope : le défilement accumulé vers la case suivante
+let wheelT = 0; // et le dernier changement de case (un lancer de pavé tactile ne fait pas défiler toutes les cases)
 window.addEventListener(
   'wheel',
   (e) => {
-    if (!camOn || paused || !sim || sim.player.status !== 'alive') return;
+    if (paused || !sim || sim.player.status !== 'alive') return;
     e.preventDefault();
     const d = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+    // caméscope rangé : la molette passe d'une case d'objet à l'autre (un cran, ou 60 px de pavé tactile, par case)
+    if (!camOn) {
+      wheelAcc = Math.sign(d) !== Math.sign(wheelAcc) ? d : wheelAcc + d;
+      if ((Math.abs(wheelAcc) < 60 && Math.abs(d) < 50) || performance.now() - wheelT < 90) return;
+      cycleSlot(wheelAcc > 0 ? 1 : -1);
+      wheelAcc = 0;
+      wheelT = performance.now();
+      return;
+    }
     const z = Math.min(CAM_ZOOM_MAX, Math.max(CAM_ZOOM_MIN, camZoom * Math.exp(Math.max(-0.3, Math.min(0.3, -d * 0.0013)))));
     if (Math.abs(z - camZoom) < 1e-3) return;
     const dir = z > camZoom ? 1 : -1;
@@ -309,12 +321,14 @@ window.addEventListener('keydown', (e) => {
     act.struggle++;
     return;
   }
-  // 1 : allumer / éteindre la lampe ; 2, 3 : choisir une case d'objet ; E : l'utiliser ; F : ramasser, ou se cacher
-  // dans un casier ; T : siffler ; C : s'accroupir (bascule) ; Espace : sauter (accroupi : se relever)
-  const slot = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
-  if (slot >= 0 && !e.repeat) useSlot(slot % 3);
+  // 1 : allumer / éteindre la lampe ; 2 à 5 : choisir une case d'objet ; E : l'utiliser ; G : la poser par terre ;
+  // F : ramasser, ou se cacher dans un casier ; T : siffler ; C : s'accroupir (bascule) ; Espace : sauter (accroupi :
+  // se relever)
+  const slot = /^(Digit|Numpad)([1-9])$/.exec(e.code);
+  if (slot && +slot[2] <= INV_SIZE + 1 && !e.repeat) useSlot(+slot[2] - 1);
   if (!e.repeat) {
     if (e.code === 'KeyE') act.use = true;
+    else if (e.code === 'KeyG') act.drop = true;
     else if (e.code === 'KeyF') act.pick = true;
     else if (e.code === 'KeyT') act.whistle = true;
     else if (e.code === 'KeyC' && sim && sim.player.status === 'alive') crouchOn = !crouchOn;
@@ -435,9 +449,8 @@ document.addEventListener('mousemove', (e) => {
   }
 });
 
-// Une case de l'inventaire : la 1re allume ou éteint la lampe, les deux autres utilisent un objet
-// Une case de l'inventaire : la 1re allume ou éteint la lampe ; les deux autres se choisissent (au doigt, toucher
-// la case déjà choisie l'utilise)
+// Une case de l'inventaire : la 1re allume ou éteint la lampe ; les autres se choisissent (au doigt, toucher la case
+// déjà choisie l'utilise)
 function useSlot(i, tap = false) {
   if (i === 0) {
     toggleFlashlightRequested = true;
@@ -448,6 +461,19 @@ function useSlot(i, tap = false) {
   if (tap && sim && sim.player.sel === i) act.use = true;
   selRequested = i;
   if (sim) sim.player.sel = i; // tout de suite à l'écran, l'hôte suit
+}
+
+// la case d'objet suivante (d = 1) ou précédente (d = -1), sans passer par la lampe : molette, manette
+function cycleSlot(d) {
+  if (!sim || sim.player.status !== 'alive') return;
+  useSlot(((sim.player.sel - 1 + d + INV_SIZE) % INV_SIZE) + 1);
+}
+
+// poser par terre l'objet d'une case (au doigt : appui long sur la case)
+function dropSlot(i) {
+  if (!sim || sim.player.status !== 'alive' || i < 1) return;
+  useSlot(i);
+  act.drop = true;
 }
 
 // le bruit d'un pas selon le sol : béton et carrelage (Level 1, Level 37 au sec), eau (Level 37), moquette (Level 0)
@@ -643,7 +669,7 @@ function resumeRun() {
   initGame(lastSettings, lv);
   play();
 }
-const hudActions = { play, setKbMode, use: (i) => useSlot(i, true), resume: resumeRun };
+const hudActions = { play, setKbMode, use: (i) => useSlot(i, true), drop: dropSlot, resume: resumeRun };
 
 // Hôte : les commandes des invités pour ce pas (la lampe et les objets ne servent qu'une fois)
 function guestInputs() {
@@ -664,13 +690,14 @@ function guestInputs() {
     const q = NET.actions[id] || (NET.actions[id] = []);
     // une action par pas, dans l'ordre où l'invité les a faites (avec la case qu'il avait choisie)
     const a = q.shift() || {};
-    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, cam: !!i.cm, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', jump: a.k === 'j', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v, voice: i.vo, radio: i.ra, seq: i.seq };
+    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, cam: !!i.cm, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', drop: a.k === 'd', pick: a.k === 'p', whistle: a.k === 't', jump: a.k === 'j', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v, voice: i.vo, radio: i.ra, seq: i.seq };
     i.pos = null; // une position annoncée ne sert qu'une fois
   }
   return out;
 }
 
 const num = (v, a, b) => (Number.isFinite(+v) ? Math.max(a, Math.min(b, +v)) : 0);
+const slotOf = (s) => (Number.isInteger(s) && s >= 1 && s <= INV_SIZE ? s : 1); // une case d'objet annoncée par un invité
 
 // Messages du réseau (from : l'identifiant donné par le salon, la seule identité fiable)
 function onMsg(from, m) {
@@ -692,7 +719,7 @@ function onMsg(from, m) {
       sim.addPlayer(from, (p && p.name) || 'Player');
       send(from, goMessage());
     } else if (m.t === 'i' && m.run === NET.run) {
-      NET.inputs[from] = { at: performance.now(), seq: Number.isFinite(+m.n) ? +m.n : undefined, vo: num(m.vo, 0, 1), ra: !!m.ra, mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, cm: !!m.cm, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), st: num(m.st, 0, 200), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) }, v: m.v };
+      NET.inputs[from] = { at: performance.now(), seq: Number.isFinite(+m.n) ? +m.n : undefined, vo: num(m.vo, 0, 1), ra: !!m.ra, mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, c: !!m.c, cm: !!m.cm, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: slotOf(m.s), tilt: num(m.tl, -1, 1), st: num(m.st, 0, 200), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) }, v: m.v };
     } else if (m.t === 'fp' && hud) {
       // un invité n'a pas la même carte que nous : s'il a une version plus récente, ou la même et qu'il s'est déjà
       // réparé sans succès, c'est nous qui avons tort (la partie continue chez les autres pendant qu'on se répare)
@@ -708,9 +735,9 @@ function onMsg(from, m) {
           ? `MAPS DON'T MATCH · ${who} HAS ${verLabel(gv)}, YOU HAVE ${verLabel(GAME_V)} · RELOAD THE PAGE (CTRL+SHIFT+R)`
           : `MAPS DON'T MATCH · ${who} HAS ${verLabel(gv)} · ${who} IS UPDATING`, 14);
       }
-    } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'p', 't', 'b', 'h', 'g'].includes(m.k)) {
+    } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'd', 'p', 't', 'b', 'h', 'g'].includes(m.k)) {
       const q = NET.actions[from] || (NET.actions[from] = []);
-      if (q.length < 8) q.push({ k: m.k, sel: m.s === 2 ? 2 : 1, side: m.side > 0 ? 1 : -1, n: Math.max(1, Math.min(4, m.n | 0)) });
+      if (q.length < 8) q.push({ k: m.k, sel: slotOf(m.s), side: m.side > 0 ? 1 : -1, n: Math.max(1, Math.min(4, m.n | 0)) });
     }
     return;
   }
@@ -809,6 +836,7 @@ function prunePlayers() {
 }
 
 const ITEM_NAME = { bottle: 'Almond water', battery: 'Batteries', ladder: 'Ladder' };
+let dropTip = 0; // au doigt : le premier objet ramassé rappelle qu'un appui long sur sa case le pose par terre
 
 // Événements de la partie : sons, messages, changement d'étage, fin
 function handleEvent(ev, me) {
@@ -930,7 +958,7 @@ function handleEvent(ev, me) {
     case 'pickup':
       if (!mine) break;
       if (sfx) sfx.battery();
-      if (hud) hud.toast(`${ITEM_NAME[ev.kind]} in your inventory${ev.dropped ? ` · ${ITEM_NAME[ev.dropped].toLowerCase()} dropped on the floor` : ''}`);
+      if (hud) hud.toast(`${ITEM_NAME[ev.kind]} in your inventory${ev.dropped ? ` · ${ITEM_NAME[ev.dropped].toLowerCase()} dropped on the floor` : ''}${document.body.classList.contains('touch') && !dropTip++ ? ' · hold a slot to drop it' : ''}`);
       break;
     case 'nothing':
       if (mine && hud) hud.toast('Nothing to pick up here');
@@ -955,7 +983,15 @@ function handleEvent(ev, me) {
       }
       break;
     case 'emptySlot':
-      if (mine && hud) hud.toast('Empty slot: pick an item with 2 or 3');
+      if (mine && hud) hud.toast(`Empty slot · choose an item with 2–${INV_SIZE + 1} or the mouse wheel`);
+      break;
+    case 'drop':
+      // on l'entend tomber (de l'autre étage, étouffé)
+      if (sfx) sfx.drop(ev.kind, { x: ev.x, z: ev.z, muffled: (ev.floor || 0) !== (sim.viewPlayer(sim.spectate || 0).floor || 0) });
+      if (mine && hud) hud.toast(`${ITEM_NAME[ev.kind]} left on the floor`);
+      break;
+    case 'noDrop':
+      if (mine && hud) hud.toast('Nowhere to put it down here');
       break;
     case 'ladderFar':
       if (mine && hud) hud.toast('Place the ladder right under the alcove with the tape');
@@ -1358,8 +1394,9 @@ const trackSeq = new Map(); // hôte : dernière position d'invité entrée dans
 const camPrev = { x: 0, z: 0, f: 0, ok: false }; // sa position avant le dernier pas (la caméra interpole jusqu'à la suivante)
 const lookIn = { yaw: NaN, pitch: NaN }; // le dernier regard donné à la simulation
 
-// Manette (disposition standard) : A ramasser, X utiliser l'objet, Y lampe, RB changer d'objet, B siffler,
-// LB / LT / stick gauche enfoncé courir, Menu pause ; A relance la partie en pause
+// Manette (disposition standard) : A ramasser, X utiliser l'objet, Y lampe, RB (ou croix gauche / droite) changer
+// d'objet, croix bas le poser par terre, B siffler, LB / LT / stick gauche enfoncé courir, Menu pause ; A relance la
+// partie en pause
 let padPrev = [];
 function readPad() {
   const pads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -1384,7 +1421,9 @@ function readPad() {
       else if (edge(0)) act.pick = true;
       if (edge(2)) act.use = true;
       if (edge(3)) useSlot(0);
-      if (edge(5)) useSlot(sim && sim.player.sel === 1 ? 2 : 1);
+      if (edge(5) || edge(15)) cycleSlot(1);
+      if (edge(14)) cycleSlot(-1);
+      if (edge(13)) act.drop = true;
       if (edge(1)) act.whistle = true;
       if (edge(9)) setPaused(true);
     }
@@ -1485,6 +1524,7 @@ function frame(currentTime) {
       use: useRequested,
       sel: selRequested || undefined,
       useSel: act.use,
+      drop: live && act.drop && sim.player.status === 'alive',
       pick: act.pick,
       whistle: act.whistle,
       view: sim.player.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined,
@@ -1514,7 +1554,7 @@ function frame(currentTime) {
       }
       const sel = sim.player.sel;
       if (toggleFlashlightRequested) send('host', { t: 'a', k: 'f', s: sel, run: NET.run });
-      for (const [k, on] of [['e', act.use], ['p', act.pick], ['t', act.whistle], ['j', input.jump]]) if (on) send('host', { t: 'a', k, s: sel, run: NET.run });
+      for (const [k, on] of [['e', act.use], ['d', input.drop], ['p', act.pick], ['t', act.whistle], ['j', input.jump]]) if (on) send('host', { t: 'a', k, s: sel, run: NET.run });
       if (act.struggle) send('host', { t: 'a', k: 'g', n: act.struggle, run: NET.run });
       if (NET.tick % 3 === 0) {
         const P = sim.player;
@@ -1540,7 +1580,7 @@ function frame(currentTime) {
     useRequested = null;
     selRequested = 0;
     if (act.struggle && sfx) sfx.struggle();
-    act.use = act.pick = act.whistle = act.jump = false;
+    act.use = act.pick = act.drop = act.whistle = act.jump = false;
     act.struggle = 0;
 
     // Détection de pas pour le son de marche sur moquette

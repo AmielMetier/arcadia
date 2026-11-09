@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
 
@@ -1003,18 +1003,18 @@ test("eau d'amande : rend la moitié de la gourde", () => {
   assert.equal(b.taken, false, 'on ne ramasse plus en passant');
   sim.step({ pick: true });
   assert.equal(b.taken, true);
-  assert.deepEqual(sim.player.inv, ['bottle', null], "F : la bouteille va dans l'inventaire");
+  assert.deepEqual(sim.player.inv, ['bottle', null, null, null], "F : la bouteille va dans l'inventaire");
   assert.ok(sim.player.water < 11, "elle ne se boit pas toute seule");
   const before = sim.player.water;
   sim.step({ useSel: true });
   assert.ok(Math.abs(sim.player.water - (before + ALMOND_WATER)) < 0.1, 'E : on boit la case choisie (+50)');
-  assert.deepEqual(sim.player.inv, [null, null]);
+  assert.deepEqual(sim.player.inv, [null, null, null, null]);
   assert.ok(sim.drainEvents().some((e) => e.type === 'bottle'));
   // gourde pleine : on la garde
   sim.player.water = 99;
-  sim.player.inv = ['bottle', null];
+  sim.player.inv = ['bottle', null, null, null];
   sim.step({ useSel: true, sel: 1 });
-  assert.deepEqual(sim.player.inv, ['bottle', null], 'pas soif : la bouteille reste dans le sac');
+  assert.deepEqual(sim.player.inv, ['bottle', null, null, null], 'pas soif : la bouteille reste dans le sac');
   assert.ok(sim.drainEvents().some((e) => e.type === 'useless'));
   // un nouvel étage : jamais à sec en arrivant
   sim.player.water = 5;
@@ -1022,24 +1022,25 @@ test("eau d'amande : rend la moitié de la gourde", () => {
   assert.equal(sim.player.water, WATER_LEVEL_MIN);
 });
 
-test("inventaire : deux cases d'objets ; plein, F échange l'objet de la case choisie contre celui du sol", () => {
+test("inventaire : quatre cases d'objets ; plein, F échange l'objet de la case choisie contre celui du sol", () => {
   const m = createBackroomsMap(9);
   const sim = new BackroomsSim({ map: m, difficulty: 'peaceful' });
   const P = sim.player;
+  assert.equal(INV_SIZE, 4);
   const ladder = m.items.find((i) => i.kind === 'ladder');
-  for (const o of [m.bottles[0], m.batteries[0]]) {
+  for (const o of [m.bottles[0], m.batteries[0], m.bottles[1], m.batteries[1]]) {
     P.x = o.x;
     P.z = o.z;
     sim.step({ pick: true });
   }
-  assert.deepEqual(P.inv, ['bottle', 'battery']);
+  assert.deepEqual(P.inv, ['bottle', 'battery', 'bottle', 'battery']);
   // plein : la case choisie (2, l'eau d'amande) part au sol à la place de l'échelle
   const at = { x: ladder.x, z: ladder.z };
   const n0 = m.items.length;
   P.x = ladder.x;
   P.z = ladder.z;
   sim.step({ pick: true, sel: 1 });
-  assert.deepEqual(P.inv, ['ladder', 'battery']);
+  assert.deepEqual(P.inv, ['ladder', 'battery', 'bottle', 'battery']);
   const dropped = m.items.find((o) => !o.taken && o.kind === 'bottle' && Math.hypot(o.x - at.x, o.z - at.z) < 0.01);
   assert.ok(dropped, "l'eau d'amande est posée là où était l'échelle");
   assert.ok(!m.items.some((o) => !o.taken && o.kind === 'ladder'), "l'échelle n'est plus au sol");
@@ -1048,7 +1049,7 @@ test("inventaire : deux cases d'objets ; plein, F échange l'objet de la case ch
   for (let i = 0; i < 6; i++) sim.step({ pick: true, sel: 1 });
   assert.equal(m.items.length, n0, 'des échanges répétés ne font pas grossir la partie');
   if (P.inv[0] !== 'ladder') sim.step({ pick: true, sel: 1 });
-  assert.deepEqual(P.inv, ['ladder', 'battery']);
+  assert.deepEqual(P.inv, ['ladder', 'battery', 'bottle', 'battery']);
   // une case vide : F y range l'objet sans rien poser
   P.x = m.spawn.x;
   P.z = m.spawn.z;
@@ -1056,18 +1057,98 @@ test("inventaire : deux cases d'objets ; plein, F échange l'objet de la case ch
   sim.step({ sel: 2 });
   sim.step({ useSel: true });
   assert.ok(P.battery > 60, 'E : la pile de la case 3 recharge la lampe');
-  assert.deepEqual(P.inv, ['ladder', null]);
+  assert.deepEqual(P.inv, ['ladder', null, 'bottle', 'battery']);
   P.x = dropped.x;
   P.z = dropped.z;
   const before = m.items.length;
   sim.step({ pick: true });
-  assert.deepEqual(P.inv, ['ladder', 'bottle']);
+  assert.deepEqual(P.inv, ['ladder', 'bottle', 'bottle', 'battery']);
   assert.equal(m.items.length, before, 'rien de posé : il restait une case');
   // E sur une eau d'amande quand on a soif : on la boit
   P.water = 40;
   sim.step({ useSel: true });
-  assert.deepEqual(P.inv, ['ladder', null]);
+  assert.deepEqual(P.inv, ['ladder', null, 'bottle', 'battery']);
   assert.ok(P.water > 89);
+  // une case qui n'existe pas ne se choisit pas
+  sim.step({ sel: INV_SIZE + 1 });
+  assert.equal(P.sel, 2);
+});
+
+test("inventaire : G pose l'objet choisi devant soi (contre un mur : à ses pieds ; sur un trou : nulle part), un coéquipier le ramasse, l'invité le voit", () => {
+  const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 9, players, localId: 1 });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 9, players, localId: 2 });
+  const wire = () => guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  const [A, B] = host.players;
+  const m = host.map;
+  const C = CELL_SIZE;
+  // une case libre, loin des trous, avec un mur juste à l'est
+  const cell = (() => {
+    for (let gz = 1; gz < m.H - 1; gz++) for (let gx = 1; gx < m.W - 2; gx++) {
+      if (m.grid[gz * m.W + gx] !== T.FLOOR || m.grid[gz * m.W + gx + 1] === T.FLOOR || m.pitAt(gx, gz) >= 0) continue;
+      if ([[-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => m.pitAt(gx + dx, gz + dz) >= 0 || m.grid[(gz + dz) * m.W + gx + dx] !== T.FLOOR)) continue;
+      if (host.isColliding((gx + 0.5) * C, (gz + 0.5) * C, 0.5)) continue;
+      return { gx, gz };
+    }
+  })();
+  assert.ok(cell, 'une case contre un mur');
+  const cx = (cell.gx + 0.5) * C;
+  const cz = (cell.gz + 0.5) * C;
+  A.x = cx;
+  A.z = cz;
+  A.yaw = Math.PI / 2; // regarde vers l'ouest (devant : -sin(yaw), -cos(yaw))
+  B.x = m.spawn.x;
+  B.z = m.spawn.z;
+  A.inv = [null, 'bottle', null, null];
+  const n0 = m.items.length;
+  host.drainEvents();
+  host.step({ sel: 2, drop: true });
+  assert.deepEqual(A.inv, [null, null, null, null], 'G : la case choisie se vide');
+  const ev = host.drainEvents().find((e) => e.type === 'drop');
+  assert.ok(ev && ev.kind === 'bottle' && ev.id === 1, "l'équipe entend tomber l'eau d'amande");
+  const it = m.items.find((o) => !o.taken && o.kind === 'bottle' && Math.hypot(o.x - (cx - DROP_AHEAD), o.z - cz) < 0.01);
+  assert.ok(it, 'posée par terre, juste devant soi');
+  assert.ok(m.items.length <= n0 + 1, "au plus un objet de plus (on reprend d'abord un objet déjà ramassé)");
+  assert.ok(Math.hypot(it.x - A.x, it.z - A.z) < 1.4, 'à portée de F');
+  // un deuxième objet posé au même endroit : à côté du premier, pas dedans
+  A.inv = [null, null, 'battery', null];
+  host.step({ sel: 3, drop: true });
+  const bat = m.items.find((o) => !o.taken && o.kind === 'battery' && Math.hypot(o.x - A.x, o.z - A.z) < 1);
+  assert.ok(bat && Math.hypot(bat.x - it.x, bat.z - it.z) >= 0.28, 'le deuxième objet se pose à côté du premier');
+  bat.taken = true;
+  wire();
+  const gi = guest.map.items.find((o) => !o.taken && o.kind === 'bottle' && Math.hypot(o.x - it.x, o.z - it.z) < 0.02);
+  assert.ok(gi, "l'invité la voit au même endroit");
+  assert.deepEqual(guest.players.find((p) => p.id === 1).inv, [null, null, null, null], "et l'inventaire de A, vide, chez lui aussi");
+  // B la ramasse
+  B.x = it.x;
+  B.z = it.z;
+  host.step({}, { 2: { pick: true } });
+  assert.ok(B.inv.includes('bottle') && it.taken, 'un coéquipier la ramasse');
+  wire();
+  assert.ok(guest.player.inv.includes('bottle') && !guest.map.items.some((o) => !o.taken && Math.hypot(o.x - it.x, o.z - it.z) < 0.02), "chez l'invité, elle est dans son sac");
+  // face au mur : à ses pieds
+  A.inv = [null, null, 'battery', null];
+  A.x = (cell.gx + 1) * C - 0.4;
+  A.z = cz;
+  A.yaw = -Math.PI / 2; // vers l'est, le mur
+  host.step({ sel: 3, drop: true });
+  assert.ok(m.items.some((o) => !o.taken && o.kind === 'battery' && Math.hypot(o.x - A.x, o.z - A.z) < 0.05), 'contre un mur : à ses pieds');
+  // une case vide : rien à poser
+  host.drainEvents();
+  host.step({ sel: 1, drop: true });
+  assert.ok(host.drainEvents().some((e) => e.type === 'emptySlot'));
+  // au-dessus d'un trou du couloir piégé : nulle part où le poser
+  let pit = null;
+  for (let gz = 0; gz < m.H && !pit; gz++) for (let gx = 0; gx < m.W && !pit; gx++) if (m.pitAt(gx, gz) >= 0 && !m.pits[m.pitAt(gx, gz)].deep) pit = { gx, gz };
+  assert.ok(pit, 'un trou à cet étage');
+  A.inv = ['bottle', null, null, null];
+  A.x = (pit.gx + 0.5) * C;
+  A.z = (pit.gz + 0.5) * C;
+  host.drainEvents();
+  host.step({ sel: 1, drop: true });
+  assert.ok(host.drainEvents().some((e) => e.type === 'noDrop'), 'au-dessus du vide : refusé');
+  assert.equal(A.inv[0], 'bottle', "l'objet reste dans le sac");
 });
 
 test("renfoncement : la cassette en hauteur s'attrape seulement depuis l'échelle, qu'il faut aller chercher", () => {
@@ -1092,7 +1173,7 @@ test("renfoncement : la cassette en hauteur s'attrape seulement depuis l'échell
     P.x = ladder.x;
     P.z = ladder.z;
     sim.step({ pick: true });
-    assert.deepEqual(P.inv, ['ladder', null], "l'échelle va dans l'inventaire");
+    assert.deepEqual(P.inv, ['ladder', null, null, null], "l'échelle va dans l'inventaire");
     P.x = N.baseX + 1.5;
     P.z = N.baseZ;
     if (sim.isColliding(P.x, P.z, 0.3)) {
@@ -1101,7 +1182,7 @@ test("renfoncement : la cassette en hauteur s'attrape seulement depuis l'échell
     }
     sim.step({ useSel: true });
     assert.ok(N.ladder, 'échelle posée');
-    assert.deepEqual(P.inv, [null, null]);
+    assert.deepEqual(P.inv, [null, null, null, null]);
     P.x = N.baseX;
     P.z = N.baseZ;
     sim.step();
@@ -2375,11 +2456,11 @@ test("réseau : l'eau d'amande bue par un invité le désaltère chez lui aussi,
   const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 7, players, localId: 2 });
   const G = guest.player;
   const HG = host.players[1];
-  HG.inv = ['bottle', null];
+  HG.inv = ['bottle', null, null, null];
   HG.water = 30; // la soif se tient chez l'hôte
   G.water = 99;
   host.step({}, { 2: { remote: true, useSel: true, sel: 1 } });
-  assert.deepEqual(HG.inv, [null, null], 'la bouteille est bue');
+  assert.deepEqual(HG.inv, [null, null, null, null], 'la bouteille est bue');
   guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
   assert.ok(Math.abs(G.water - (30 + ALMOND_WATER)) < 0.2, `l'invité reçoit sa gourde de l'hôte (${G.water})`);
   // le bruit de chacun aussi (la barre de bruit des invités)

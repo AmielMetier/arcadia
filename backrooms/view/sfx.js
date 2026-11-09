@@ -2145,6 +2145,25 @@ export class BackroomsSfx {
     }
   }
 
+  // un objet posé par terre (G) : le choc sourd au sol, puis le verre de l'eau d'amande qui tinte, les piles qui
+  // roulent un peu, ou l'échelle qui claque de tous ses barreaux ; pos : { x, z } (muffled : de l'autre étage)
+  drop(kind, pos) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = this.at({ ...pos, rolloff: 1, ref: 2 }, 0.9);
+    if (kind === 'ladder') {
+      this.burst(out, t, 0.18, 'lowpass', 500, 0.8, 0.5);
+      this.tone(out, t, 'triangle', 180, 90, 0.3, 0.25, 0.002);
+      for (let i = 0; i < 3; i++) this.burst(out, t + 0.05 + i * rnd(0.05, 0.09), 0.05, 'bandpass', rnd(1800, 2600), 6, 0.18);
+      return;
+    }
+    this.burst(out, t, 0.08, 'lowpass', 420, 0.7, 0.35);
+    if (kind === 'bottle') {
+      this.tone(out, t + 0.01, 'sine', 2350, 2300, 0.25, 0.03, 0.002);
+      this.tone(out, t + 0.01, 'sine', 3900, 3850, 0.16, 0.015, 0.002);
+    } else for (let i = 0; i < 4; i++) this.burst(out, t + 0.04 + i * 0.05, 0.02, 'bandpass', rnd(2500, 3500), 4, 0.06 * (1 - i / 4));
+  }
+
   battery(empty = false) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;

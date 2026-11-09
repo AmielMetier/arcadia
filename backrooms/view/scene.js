@@ -1986,12 +1986,23 @@ float bkCaust(vec2 uv, float t) {
       g.add(l);
       return g;
     };
-    const addItemMesh = (it) => {
+    const makeItem = (it) => {
       const g = it.kind === 'bottle' ? makeBottle() : it.kind === 'battery' ? makeBattery() : makeFloorLadder();
       g.position.set(it.x, 0, it.z);
       g.rotation.y = it.id * 1.7;
       group.add(g);
-      itemMeshes.push({ it, g });
+      return g;
+    };
+    const addItemMesh = (it) => itemMeshes.push({ it, g: makeItem(it), kind: it.kind });
+    // un objet du sol peut changer de genre (échangé contre celui de la case choisie) ou de place (posé avec G, ou
+    // tombé des poches d'un mort) : son maillage suit
+    const syncItemMesh = (im) => {
+      const { it } = im;
+      if (im.kind !== it.kind) {
+        group.remove(im.g);
+        im.g = makeItem(it);
+        im.kind = it.kind;
+      } else if (im.g.position.x !== it.x || im.g.position.z !== it.z) im.g.position.set(it.x, 0, it.z);
     };
     for (const it of map.items || []) addItemMesh(it);
     // la clé de l'escalier : un trousseau sur un carton, au fond du noir ; un reflet de laiton quand la lampe passe dessus
@@ -3136,7 +3147,10 @@ float bkCaust(vec2 uv, float t) {
         // objets au sol (ceux qu'un échange a posés apparaissent)
         const items = map.items || [];
         for (let i = itemMeshes.length; i < items.length; i++) addItemMesh(items[i]);
-        for (const im of itemMeshes) im.g.visible = !im.it.taken;
+        for (const im of itemMeshes) {
+          if (!im.it.taken) syncItemMesh(im);
+          im.g.visible = !im.it.taken;
+        }
         // la clé, puis la porte de l'escalier qui s'ouvre (vite, d'un coup de pied) une fois la clé trouvée
         if (keyGroup) {
           keyGroup.visible = !map.key.taken;

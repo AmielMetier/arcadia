@@ -1,6 +1,6 @@
 // The Backrooms - Interface façon caméscope (REC, signal, bande), jumpscare et écran de fin
 import { ENTITY_IMG, ENTITY_ANIM } from './scene.js';
-import { DEPART_T, PIPES_LEVEL, CASSETTES, NOISE, VOICE_MIN, THIRST_BLUR } from '../engine/sim.js';
+import { DEPART_T, PIPES_LEVEL, CASSETTES, NOISE, VOICE_MIN, THIRST_BLUR, INV_SIZE } from '../engine/sim.js';
 
 const GOAT_DEATH_IMG = new URL('../img/bouc.jpg', import.meta.url).href;
 const GOAT_DEATH_FADE = 8; // secondes de montée de l'image
@@ -116,8 +116,8 @@ export class BackroomsHUD {
       <div class="calib" id="calib" hidden><i></i><i></i><i></i><span>The left square should be barely visible</span></div>
       <div class="lore" id="lore" hidden><small id="loreTag"></small><p id="loreText"></p></div>
 
-      <!-- Inventaire : la case 1 est réservée à la lampe torche, les cases 2 et 3 aux piles et à l'eau d'amande -->
-      <div class="inv" id="inv">${[0, 1, 2].map((i) => `<button class="slot" data-slot="${i}"><b>${i + 1}</b><span></span></button>`).join('')}</div>
+      <!-- Inventaire : la case 1 est réservée à la lampe torche, les suivantes aux piles, à l'eau d'amande, à l'échelle -->
+      <div class="inv" id="inv">${Array.from({ length: INV_SIZE + 1 }, (_, i) => i).map((i) => `<button class="slot" data-slot="${i}"><b>${i + 1}</b><span></span></button>`).join('')}</div>
 
       <div class="corner c1"></div><div class="corner c2"></div><div class="corner c3"></div><div class="corner c4"></div>
       <div class="crosshair"></div>
@@ -191,12 +191,31 @@ export class BackroomsHUD {
     window.addEventListener('keydown', skip);
     window.addEventListener('pointerdown', skip);
     this.invKey = '';
-    this.$('#inv').addEventListener('pointerdown', (e) => {
+    // une case : la lampe s'allume d'un appui ; une case d'objet se choisit (ou s'utilise si elle l'était déjà) au
+    // relâcher, et un appui long (0,45 s) pose son objet par terre
+    const inv = this.$('#inv');
+    let hold = null;
+    inv.addEventListener('pointerdown', (e) => {
       const b = e.target.closest('.slot');
       if (!b) return;
       e.preventDefault();
       e.stopPropagation();
-      this.actions.use?.(+b.dataset.slot);
+      const i = +b.dataset.slot;
+      if (i === 0) return this.actions.use?.(0);
+      if (hold) clearTimeout(hold.t);
+      hold = { i, t: setTimeout(() => { hold = null; this.actions.drop?.(i); }, 450) };
+    });
+    inv.addEventListener('pointerup', (e) => {
+      if (!hold) return;
+      e.stopPropagation();
+      clearTimeout(hold.t);
+      const i = hold.i;
+      hold = null;
+      this.actions.use?.(i);
+    });
+    for (const ev of ['pointercancel', 'pointerleave']) inv.addEventListener(ev, () => {
+      if (hold) clearTimeout(hold.t);
+      hold = null;
     });
     this.$('#clickPrompt').addEventListener('click', (e) => {
       const b = e.target.closest('button[data-kb]');
@@ -604,7 +623,7 @@ export class BackroomsHUD {
     el.hidden = !on;
     if (!on) return;
     // la lampe part éteinte : sa touche vient en premier
-    const keys = [['1', 'LAMP'], ['F', 'INTERACT'], ['E', 'USE'], ['SPACE', 'JUMP'], ['C', 'CROUCH'], ['V', 'CAMCORDER']];
+    const keys = [['1', 'LAMP'], ['F', 'INTERACT'], ['E', 'USE'], ['G', 'DROP'], ['SPACE', 'JUMP'], ['C', 'CROUCH'], ['V', 'CAMCORDER']];
     if (multi) keys.push(['R', 'RADIO']);
     el.innerHTML = keys.map(([key, what]) => `<span><kbd>${key}</kbd>${what}</span>`).join('');
   }
@@ -948,8 +967,8 @@ export class BackroomsHUD {
     this.$('#pauseGo').textContent = tactile ? 'TAP THE SCREEN TO PLAY' : kb ? 'PRESS ENTER TO PLAY' : title ? 'CLICK TO PRESS PLAY' : 'CLICK TO TAKE CONTROL';
     const mv = this.qwerty ? 'WASD' : 'ZQSD';
     this.$('#pauseKeys').textContent = kb
-      ? `${mv} move · Arrows look · Shift run · Space jump · C crouch · V camcorder · 1 flashlight · 2 3 select · E use · F pick up / hide · T whistle · Esc pause`
-      : `${mv} move · Mouse look · Shift run · Space jump · C crouch · V camcorder · 1 flashlight · 2 3 select · E use · F pick up / hide · T whistle · Esc pause`;
+      ? `${mv} move · Arrows look · Shift run · Space jump · C crouch · V camcorder · 1 flashlight · 2–${INV_SIZE + 1} select · E use · G drop · F pick up / hide · T whistle · Esc pause`
+      : `${mv} move · Mouse look · Shift run · Space jump · C crouch · V camcorder · 1 flashlight · 2–${INV_SIZE + 1} or wheel select · E use · G drop · F pick up / hide · T whistle · Esc pause`;
     for (const b of this.el.querySelectorAll('button[data-kb]')) b.classList.toggle('on', (b.dataset.kb === '1') === kb);
   }
 }

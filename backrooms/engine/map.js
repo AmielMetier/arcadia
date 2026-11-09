@@ -1017,8 +1017,10 @@ export function createBackroomsMap(seed = 42, opts = {}) {
     const off = CELL_SIZE / 2 - 0.5;
     prop(WORKLIGHT, (c.x + 0.5) * CELL_SIZE + wall[0] * off, (c.z + 0.5) * CELL_SIZE + wall[1] * off, Math.atan2(-wall[0], -wall[1]) + (rnd() - 0.5) * 1.5);
   }
+  // eau d'amande : 13 bouteilles en haut, 11 dans l'étage du bas, plus petit (la soif ne pardonne pas)
   const bottles = [];
-  for (let i = 0; i < 40 && bottles.length < 9; i++) {
+  const nBottles = AREA === 1 ? 13 : 11;
+  for (let i = 0; i < 160 && bottles.length < nBottles; i++) {
     const c = pick(walkable);
     const k = c.z * W + c.x;
     if (busy.has(k) || D(c) < 8) continue;
