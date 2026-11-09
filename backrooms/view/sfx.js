@@ -2358,6 +2358,22 @@ export class BackroomsSfx {
     return this.samples.get(name);
   }
 
+  // Khaoula (Level 1) : sa voix enregistrée, qui part du bus de l'entité (distance, murs et écho du lieu font le volume)
+  khaoula() {
+    if (!this.unlocked || !this.ctx || !this.ent) return;
+    this.sample('level1/khaoula').then((buf) => {
+      if (!buf || !this.ent) return;
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = 0.94 + Math.random() * 0.1;
+      const g = this.ctx.createGain();
+      g.gain.value = 0.9;
+      src.connect(g).connect(this.ent.near);
+      src.start();
+    });
+    this.caption('a woman\'s voice');
+  }
+
   // Les cris de la poursuite : tant que l'entité traque, les enregistrements du niveau s'enchaînent au hasard ; ils
   // s'éteignent en une seconde et demie quand elle lâche prise. Au départ, l'élan de l'enregistrement commun ; puis,
   // de temps en temps, un rugissement grave et saturé (deepScream). Tout part du bus de l'entité : c'est la distance,

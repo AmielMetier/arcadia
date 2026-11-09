@@ -29,6 +29,7 @@ let scene = null;
 let sfx = null;
 let hud = null;
 let stepDist = 0;
+let khaoulaT = 6; // prochaine fois que Khaoula se fait entendre (Level 1)
 let letterN = 0; // lettres ramassées à l'hôtel (pour le registre)
 let monsterStepT = 0; // sans entité animée (mode VIP du Level 1) : le prochain pas, à la minuterie
 // l'entité entendue comme un joueur : ce qui la sépare de l'oreille (occ, détour par les couloirs) et l'espace autour
@@ -1874,6 +1875,14 @@ function frame(currentTime) {
     // Level 2 : pas de bourdonnement d'entité, les sabots du troupeau
     sfx.updateMonsterSound(sim.goats || M.away ? 0 : M.danger, M, sim.level === 1 || sim.level === 2, occl); // Poolrooms : la voix de l'entité du Level 1
     sfx.updateChase(chasing, M.danger, M, occl);
+    // Level 1 : Khaoula se fait entendre quand elle est proche (de temps en temps) et pendant la poursuite (plus souvent)
+    if (sim.level === 1 && !M.away && !paused) {
+      khaoulaT -= delta;
+      if (khaoulaT <= 0 && (chasing || M.danger > 0.35)) {
+        sfx.khaoula();
+        khaoulaT = chasing ? 7 + Math.random() * 6 : 18 + Math.random() * 20;
+      } else if (khaoulaT <= 0) khaoulaT = 2;
+    }
     // la musique de tension suit le directeur (la peur de l'équipe) et ce que fait l'entité
     const D = sim.director;
     const charging = sim.goats ? sim.goats.some((g) => g.mode === 'charge' || g.mode === 'windup') : false;
