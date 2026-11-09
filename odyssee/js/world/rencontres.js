@@ -49,6 +49,11 @@ export function enrichirTout(ENC) {
  * Le joueur ne voit pas les limites : la table change seulement à mesure qu'il avance. La table de la zone
  * (z.enc, m.encounter) devient la réunion de ses tronçons, pour le Pokédex et la carte. */
 
+/** tables d'avant les tronçons (pour qu'une nouvelle construction du monde reparte des mêmes tables) */
+const ORIGINAUX = new Map();
+/** remet les tables de rencontres telles qu'avant poserTroncons ; à appeler au début de la construction du monde */
+export function restaurerTables() { for (const [t, c] of ORIGINAUX) t.splice(0, t.length, ...c.map((e) => [...e])); }
+
 /** pose les tronçons sur les cartes ; à appeler une fois le monde construit */
 export function poserTroncons({ maps, routes }) {
   if (globalThis.ODYSSEE_SANS_TRONCONS) return;
@@ -75,6 +80,7 @@ export function poserTroncons({ maps, routes }) {
     for (const s of secs) for (const [sp, a, b, w] of s) {
       const e = u.get(sp); if (e) { e[1] = Math.min(e[1], a); e[2] = Math.max(e[2], b); e[3] += w; } else u.set(sp, [sp, a, b, w]);
     }
+    if (!ORIGINAUX.has(t)) ORIGINAUX.set(t, t.map((e) => [...e]));
     t.splice(0, t.length, ...[...u.values()].map((e) => [e[0], e[1], e[2], Math.round(e[3] / secs.length * 100) / 100]));
   }
 }
