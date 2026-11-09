@@ -13,12 +13,19 @@ function canvas(w, h = w) {
   return [c, c.getContext('2d')];
 }
 
+// une toile deux fois plus fine que son dessin (les petites textures : étiquettes, panneaux, cassettes…)
+function hd(w, h = w) {
+  const [c, ctx] = canvas(w * 2, h * 2);
+  ctx.setTransform(2, 0, 0, 2, 0, 0);
+  return [c, ctx];
+}
+
 function tex(c, repeat = 1) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(repeat, repeat);
-  t.anisotropy = 4;
+  t.anisotropy = 8; // le sol et le plafond restent nets jusqu'au fond des couloirs
   return t;
 }
 
@@ -33,6 +40,9 @@ function loadImage(name) {
 }
 
 function noise(ctx, w, h, amount) {
+  // sur toute la toile (elle peut être dessinée à l'échelle 2 : plus de pixels que d'unités de dessin)
+  w = ctx.canvas.width;
+  h = ctx.canvas.height;
   const d = ctx.getImageData(0, 0, w, h);
   for (let i = 0; i < d.data.length; i += 4) {
     const n = (Math.random() - 0.5) * amount;
@@ -171,43 +181,89 @@ function drawWallArt(ctx) {
   });
 }
 
-// Papier peint jaune pâle des films : fines rayures verticales et motif en chevrons à peine visible, un peu jauni,
-// cloqué par l'humidité, avec sa plinthe (une face de mur = 2,5 m × 3 m)
-function drawWallpaper(ctx, S, grime) {
+// Papier peint jaune pâle des photos du Level 0 : des rayures de deux teintes, chaînes de perles et chevrons
+// emboîtés, le tout discret, un peu jauni, avec sa plinthe (une face de mur = 2,5 m × 3 m)
+// worn : l'étage du bas du Level 0, qui garde l'ancien jaune doré (grisé ensuite par greyWall) et son usure
+function drawWallpaper(ctx, S, grime, worn = false) {
   ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1;
-  ctx.fillStyle = '#d4c37a';
+  ctx.fillStyle = worn ? '#d4c37a' : '#d6cb98'; // en haut, jaune pâle tirant sur l'olive
   ctx.fillRect(0, 0, S, S);
-  const band = S / 16; // 16 lés de rayures par face
-  for (let i = 0; i < 16; i++) {
-    const x = i * band;
-    ctx.fillStyle = 'rgba(150, 128, 52, 0.16)';
-    ctx.fillRect(x, 0, band * 0.5, S);
-    ctx.fillStyle = 'rgba(110, 92, 36, 0.22)';
-    ctx.fillRect(x, 0, 1.2, S);
-    ctx.fillRect(x + band * 0.5, 0, 1, S);
-    // chevrons pointés vers le haut, au milieu de la rayure claire
-    ctx.strokeStyle = 'rgba(140, 118, 46, 0.32)';
-    ctx.lineWidth = 1.4;
-    const cx = x + band * 0.75;
-    for (let y = (i % 2) * 9; y < S; y += 18) {
-      ctx.beginPath();
-      ctx.moveTo(cx - 6, y + 5);
-      ctx.lineTo(cx, y);
-      ctx.lineTo(cx + 6, y + 5);
-      ctx.stroke();
+  // le motif des photos du Level 0, discret, sur les rayures d'origine : 16 lés par face, chacun en deux bandes de
+  // 7,8 cm, l'une un peu plus foncée que l'autre. Sur chaque lisière, une chaîne fine (deux filets pâles, et entre
+  // eux des perles allongées qui alternent avec des points clairs) ; au milieu de chaque bande, des groupes de trois
+  // chevrons emboîtés pointés vers le haut, qui pâlissent du premier au dernier et reviennent tous les 11 cm ; d'une
+  // bande à l'autre, ils sont décalés d'une demi-période. La toile fait 2,5 m de large pour 3 m de haut : les
+  // hauteurs sont tassées d'autant
+  const N = 32; // bandes par face
+  const P = S / N;
+  const KY = 2.5 / 3; // une longueur verticale, en unités de toile, pour la même longueur horizontale
+  const ROWS = 26; // groupes de chevrons par hauteur de face
+  const BEADS = 120; // perles par hauteur de face (2,5 cm)
+  const tint = worn ? [150, 128, 52] : [140, 134, 66]; // la bande foncée
+  const dark = worn ? [110, 92, 36] : [100, 96, 44]; // les perles
+  const olive = worn ? [140, 118, 46] : [128, 122, 56]; // les chevrons
+  const pale = worn ? [250, 238, 182] : [246, 242, 206];
+  const rgba = (c, a) => `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
+  const bead = (x, y, rx, ry) => {
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  ctx.lineCap = 'butt';
+  ctx.lineJoin = 'miter';
+  const dy = S / BEADS;
+  const rowH = S / ROWS;
+  const hw = P * 0.3; // demi-largeur d'un chevron
+  const hh = hw * 0.62 * KY; // sa hauteur
+  const gap = P * 0.17 * KY; // l'écart entre deux chevrons emboîtés
+  const vee = (cx, y0) => {
+    ctx.beginPath();
+    ctx.moveTo(cx - hw, y0 + hh);
+    ctx.lineTo(cx, y0);
+    ctx.lineTo(cx + hw, y0 + hh);
+    ctx.stroke();
+  };
+  ctx.lineWidth = P * 0.07;
+  for (let i = 0; i < N; i++) {
+    const x = i * P;
+    if (i % 2 === 0) {
+      ctx.fillStyle = rgba(tint, 0.16);
+      ctx.fillRect(x, 0, P, S);
+    }
+    // la chaîne, sur la lisière de la bande
+    ctx.fillStyle = rgba(pale, 0.3);
+    ctx.fillRect(x - P * 0.1, 0, 0.5, S);
+    ctx.fillRect(x + P * 0.1 - 0.5, 0, 0.5, S);
+    for (let k = 0; k < BEADS; k++) {
+      const y = (k + 0.25) * dy;
+      ctx.fillStyle = rgba(dark, 0.26);
+      bead(x, y, P * 0.045, dy * 0.27);
+      ctx.fillStyle = rgba(pale, 0.42);
+      bead(x, y + dy * 0.5, P * 0.035, P * 0.035 * KY);
+    }
+    // les chevrons, au milieu de la bande
+    const cx = x + P * 0.5;
+    for (let r = 0; r < ROWS; r++) {
+      const y0 = (r + (i % 2) * 0.5 + 0.2) * rowH;
+      ctx.strokeStyle = rgba(olive, 0.28);
+      vee(cx, y0);
+      ctx.strokeStyle = rgba(olive, 0.2);
+      vee(cx, y0 + gap);
+      ctx.strokeStyle = rgba(olive, 0.12);
+      vee(cx, y0 + gap * 2);
     }
   }
   // le papier jauni, plus clair au milieu des lés
   if (grime) {
     ctx.globalCompositeOperation = 'soft-light';
-    ctx.globalAlpha = 0.55;
+    ctx.globalAlpha = worn ? 0.55 : 0.3;
     ctx.drawImage(grime, 0, 0, S, S);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
-  // coulures depuis le plafond
-  for (let i = 0; i < 3; i++) {
+  // coulures depuis le plafond (seulement à l'étage du bas : en haut, les murs restent propres)
+  for (let i = 0; i < (worn ? 3 : 0); i++) {
     const x = Math.random() * S;
     const len = S * (0.1 + Math.random() * 0.3);
     const g = ctx.createLinearGradient(0, 0, 0, len);
@@ -219,7 +275,7 @@ function drawWallpaper(ctx, S, grime) {
   // salissures au ras de la plinthe
   const dirt = ctx.createLinearGradient(0, S * 0.82, 0, S * 0.955);
   dirt.addColorStop(0, 'rgba(90, 70, 30, 0)');
-  dirt.addColorStop(1, 'rgba(90, 70, 30, 0.3)');
+  dirt.addColorStop(1, `rgba(90, 70, 30, ${worn ? 0.3 : 0.12})`);
   ctx.fillStyle = dirt;
   ctx.fillRect(0, S * 0.82, S, S * 0.14);
   // plinthe en vinyle brun, éraflée
@@ -230,31 +286,63 @@ function drawWallpaper(ctx, S, grime) {
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
   ctx.fillRect(0, S * 0.951, S, 2);
   noise(ctx, S, S, 10);
+  // en haut : un peu moins de vert (le jaune tirait sur l'olive)
+  if (!worn) {
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = 'rgb(255, 244, 247)';
+    ctx.fillRect(0, 0, S, S);
+    ctx.globalCompositeOperation = 'source-over';
+  }
 }
 
-// Moquette humide jaunâtre : la photo est recolorée, sinon une trame de bruit
+// Le même papier peint, à l'étage du bas du Level 0 : simplement délavé vers le gris, sans aucune tache. On le passe
+// par-dessus drawWallpaper (même toile, même échelle S)
+function greyWall(ctx, S) {
+  ctx.save();
+  // la couleur s'en va aux deux tiers, et le papier tire vers un gris un peu terne
+  ctx.globalCompositeOperation = 'saturation';
+  ctx.fillStyle = 'rgba(128, 128, 128, 0.7)';
+  ctx.fillRect(0, 0, S, S);
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = '#cbc8c0';
+  ctx.fillRect(0, 0, S, S);
+  ctx.restore();
+}
+
+// Moquette humide, rase (photo ambientCG Carpet011, ses poils creusés par l'ombre) : on ne garde que son grain, la
+// luminance de chaque poil aux trois quarts de son contraste, posée sur la couleur moyenne voulue : un beige à peine
+// plus foncé que les murs du haut, la même moquette aux deux étages. Sans photo, une trame de bruit
+const CARPET_RGB = [132, 119, 81];
+const CARPET_GRAIN = 0.75;
 function drawCarpet(ctx, S, photo) {
+  const [cr, cg, cb] = CARPET_RGB;
   ctx.globalCompositeOperation = 'source-over';
   if (photo) {
     ctx.drawImage(photo, 0, 0, S, S);
-    ctx.globalCompositeOperation = 'color';
-    ctx.fillStyle = '#9c8a3c';
-    ctx.fillRect(0, 0, S, S);
-    ctx.globalCompositeOperation = 'screen';
-    ctx.fillStyle = '#5f5226';
-    ctx.fillRect(0, 0, S, S);
-    ctx.globalCompositeOperation = 'source-over';
+    const { width: w, height: h } = ctx.canvas;
+    const img = ctx.getImageData(0, 0, w, h);
+    const d = img.data;
+    let sum = 0;
+    for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+    const mean = sum / (d.length / 4) || 1;
+    for (let i = 0; i < d.length; i += 4) {
+      const k = 1 + CARPET_GRAIN * ((0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / mean - 1);
+      d[i] = cr * k;
+      d[i + 1] = cg * k;
+      d[i + 2] = cb * k;
+    }
+    ctx.putImageData(img, 0, 0);
   } else {
-    ctx.fillStyle = '#8f7d45';
+    ctx.fillStyle = `rgb(${cr}, ${cg}, ${cb})`;
     ctx.fillRect(0, 0, S, S);
     noise(ctx, S, S, 36);
   }
 }
 
 // Dalles de faux plafond (4 × 4 par case), salies par la photo
-function drawCeiling(ctx, S, grime) {
+function drawCeiling(ctx, S, grime, low = false) {
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = '#ddd6bd';
+  ctx.fillStyle = low ? '#ddd6bd' : '#ddccb7'; // blanc cassé, un peu plus chaud en haut
   ctx.fillRect(0, 0, S, S);
   if (grime) {
     ctx.globalCompositeOperation = 'multiply';
@@ -266,53 +354,74 @@ function drawCeiling(ctx, S, grime) {
   // trous des dalles acoustiques
   ctx.fillStyle = 'rgba(90, 80, 60, 0.18)';
   for (let i = 0; i < 1400; i++) ctx.fillRect(Math.random() * S, Math.random() * S, 1.5, 1.5);
-  // rails de la grille métallique
+  // rails de la grille métallique. En bas, l'ancien gris olive ; en haut, la teinte moyenne des dalles (salissures
+  // comprises) à peine plus foncée, avec un relief minuscule : une arête claire d'un côté, une ombre de l'autre
   const n = 4;
-  ctx.fillStyle = '#9c957e';
-  for (let i = 0; i <= n; i++) {
-    const p = (i / n) * S;
-    ctx.fillRect(p - 2, 0, 4, S);
-    ctx.fillRect(0, p - 2, S, 4);
+  let rail = '#9c957e';
+  let lit = null;
+  let shade = null;
+  if (!low) {
+    const { width: w, height: h } = ctx.canvas;
+    const d = ctx.getImageData(0, 0, w, h).data;
+    let r = 0, g = 0, b = 0, k = 0;
+    for (let i = 0; i < d.length; i += 4 * 61) {
+      r += d[i];
+      g += d[i + 1];
+      b += d[i + 2];
+      k++;
+    }
+    const tone = (f) => `rgb(${Math.round((r / k) * f)}, ${Math.round((g / k) * f)}, ${Math.round((b / k) * f)})`;
+    rail = tone(0.9);
+    lit = tone(1.03);
+    shade = tone(0.74);
+  }
+  const lines = (dx, w) => {
+    for (let i = 0; i <= n; i++) {
+      const p = (i / n) * S;
+      ctx.fillRect(p + dx, 0, w, S);
+      ctx.fillRect(0, p + dx, S, w);
+    }
+  };
+  ctx.fillStyle = rail;
+  lines(-2, 4);
+  if (lit) {
+    ctx.fillStyle = lit;
+    lines(-2, 0.75);
+    ctx.fillStyle = shade;
+    lines(1.25, 0.75);
   }
 }
 
 // Level 1 : béton brut humide, coulures sombres au pied, bande jaune et noire de sécurité
 function drawConcreteWall(ctx, S, photo) {
   // parpaings peints (Poly Haven, concrete_wall_004) : la photo est répétée 3 × 5 fois pour que les blocs fassent
-  // leur vraie taille (40 × 20 cm) sur un mur de 2,5 m de large et 4,2 m de haut
+  // leur vraie taille (40 × 20 cm) sur un mur de 2,5 m de large et 4,2 m de haut. Rien d'accidentel dessiné ici (ni
+  // coulure ni tache) : la toile revient sur chaque case de mur, et la moindre marque se répéterait tous les 2,5 m
   ctx.globalCompositeOperation = 'source-over';
   ctx.fillStyle = '#80837c';
   ctx.fillRect(0, 0, S, S);
   if (photo) {
     for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) ctx.drawImage(photo, (i * S) / 3, (j * S) / 5, S / 3 + 1, S / 5 + 1);
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = '#b9bdb8';
+    // la peinture des parpaings : un gris clair à peine froid (la photo, jaunie, faisait des murs vert olive sous les
+    // réglettes), un peu éclairci
+    ctx.globalCompositeOperation = 'saturation';
+    ctx.fillStyle = 'rgba(128, 128, 128, 0.7)';
+    ctx.fillRect(0, 0, S, S);
+    ctx.globalCompositeOperation = 'screen';
+    ctx.fillStyle = 'rgb(34, 36, 38)';
     ctx.fillRect(0, 0, S, S);
     ctx.globalCompositeOperation = 'source-over';
   } else noise(ctx, S, S, 40);
-  // soubassement peint en gris foncé jusqu'à 1,2 m, souligné d'un filet jaune
+  // soubassement peint en gris-vert foncé jusqu'à 1,2 m, souligné d'un filet jaune
   const yb = S * (1 - 1.2 / 4.2);
   ctx.globalCompositeOperation = 'multiply';
-  ctx.fillStyle = '#8a9295';
+  ctx.fillStyle = '#7f8b88';
   ctx.fillRect(0, yb, S, S - yb);
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = 'rgba(214, 170, 40, 0.85)';
-  ctx.fillRect(0, yb - 5, S, 5);
-  // coulures sombres depuis le plafond, et l'humidité qui remonte
-  for (let i = 0; i < 12; i++) {
-    const x = Math.random() * S;
-    const w = 3 + Math.random() * 12;
-    const gg = ctx.createLinearGradient(0, 0, 0, S * (0.3 + Math.random() * 0.5));
-    gg.addColorStop(0, 'rgba(38, 34, 26, 0.45)');
-    gg.addColorStop(1, 'rgba(38, 34, 26, 0)');
-    ctx.fillStyle = gg;
-    ctx.fillRect(x, 0, w, S);
-  }
-  const g = ctx.createLinearGradient(0, S * 0.8, 0, S);
-  g.addColorStop(0, 'rgba(20, 22, 18, 0)');
-  g.addColorStop(1, 'rgba(20, 22, 18, 0.35)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, S, S);
+  ctx.fillStyle = 'rgba(214, 170, 40, 0.9)';
+  ctx.fillRect(0, yb - 4, S, 4);
+  ctx.fillStyle = 'rgba(255, 236, 170, 0.25)';
+  ctx.fillRect(0, yb - 4, S, 1);
   // plinthe de sécurité jaune et noire
   const y0 = S * 0.965;
   ctx.fillStyle = '#c9a227';
@@ -326,9 +435,13 @@ function drawConcreteWall(ctx, S, photo) {
     ctx.lineTo(x + (S - y0), y0);
     ctx.fill();
   }
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+  ctx.fillRect(0, y0 - 1, S, 1);
 }
 
-// Dalle de béton usé (Poly Haven, concrete_floor_worn_001), taches d'huile et traces de pneus de chariot
+// Dalle de béton lissé (Poly Haven, concrete_floor_worn_001) : une toile pour 5 m × 5 m de sol, bordée des joints
+// sciés de la dalle (un tous les 5 m). Les taches, les traces de roues et les reflets sont posés à part, au gré de
+// l'endroit (sinon chaque dalle aurait les mêmes)
 function drawConcreteFloor(ctx, S, photo) {
   ctx.globalCompositeOperation = 'source-over';
   ctx.fillStyle = '#5b5d5c';
@@ -336,46 +449,55 @@ function drawConcreteFloor(ctx, S, photo) {
   if (photo) {
     ctx.drawImage(photo, 0, 0, S, S);
     ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = '#a7aaa6';
+    ctx.fillStyle = '#b0b3af';
     ctx.fillRect(0, 0, S, S);
     ctx.globalCompositeOperation = 'source-over';
   } else noise(ctx, S, S, 30);
-  for (let i = 0; i < 5; i++) {
-    const x = Math.random() * S;
-    const y = Math.random() * S;
-    const r = 15 + Math.random() * 60;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, 'rgba(14, 12, 10, 0.45)');
-    g.addColorStop(0.6, 'rgba(14, 12, 10, 0.2)');
-    g.addColorStop(1, 'rgba(14, 12, 10, 0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, S, S);
-  }
-  // traces de roues : deux bandes sombres qui traversent la case
-  ctx.fillStyle = 'rgba(10, 10, 10, 0.12)';
-  const tx = S * (0.25 + Math.random() * 0.2);
-  ctx.fillRect(tx, 0, 18, S);
-  ctx.fillRect(tx + 120, 0, 18, S);
-  // joint de dalle sciée
-  ctx.fillStyle = 'rgba(15, 16, 16, 0.6)';
-  ctx.fillRect(0, 0, S, 3);
-  ctx.fillRect(0, 0, 3, S);
+  // joint scié : un trait sombre, l'arête un peu épaufrée
+  ctx.fillStyle = 'rgba(12, 13, 13, 0.75)';
+  ctx.fillRect(0, 0, S, 1.4);
+  ctx.fillRect(0, 0, 1.4, S);
+  ctx.fillStyle = 'rgba(200, 204, 200, 0.12)';
+  ctx.fillRect(0, 1.4, S, 0.8);
+  ctx.fillRect(1.4, 0, 0.8, S);
 }
 
-// Dalle de béton brut au plafond (Poly Haven, concrete_wall_006), avec les marques des coffrages
+// Dalle de béton brut au plafond (Poly Haven, concrete_wall_006), coulée dans des banches de 2,5 × 1,25 m : leurs joints
+// et les trous de leurs tiges d'écartement
 function drawConcreteCeiling(ctx, S, photo) {
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = '#4a4c4a';
+  ctx.fillStyle = '#6a6c69';
   ctx.fillRect(0, 0, S, S);
   if (photo) {
     ctx.drawImage(photo, 0, 0, S, S);
     ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = '#8a8c88';
+    ctx.fillStyle = '#c8cac6';
     ctx.fillRect(0, 0, S, S);
     ctx.globalCompositeOperation = 'source-over';
   }
-  ctx.fillStyle = 'rgba(20, 22, 22, 0.5)';
-  ctx.fillRect(0, S / 2 - 2, S, 4);
+  for (const y of [0, S / 2]) {
+    ctx.fillStyle = 'rgba(20, 22, 22, 0.3)';
+    ctx.fillRect(0, y, S, 1.5);
+    ctx.fillStyle = 'rgba(230, 232, 228, 0.08)';
+    ctx.fillRect(0, y + 1.5, S, 1);
+  }
+  ctx.fillStyle = 'rgba(20, 22, 22, 0.25)';
+  ctx.fillRect(0, 0, 1.5, S);
+  // trous de tiges : 4 × 2 par banche, à 30 cm des bords
+  for (const py of [0, S / 2]) {
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 2; j++) {
+        const x = S * (0.12 + i * 0.253);
+        const y = py + S * (0.12 + j * 0.26);
+        const g = ctx.createRadialGradient(x, y, 0, x, y, 3.2);
+        g.addColorStop(0, 'rgba(18, 18, 18, 0.7)');
+        g.addColorStop(0.6, 'rgba(30, 30, 30, 0.4)');
+        g.addColorStop(1, 'rgba(30, 30, 30, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(x - 4, y - 4, 8, 8);
+      }
+    }
+  }
 }
 
 // Level 37 (Poolrooms) : petits carreaux blancs (ambientCG Tiles133A), à leur vraie taille (environ 15 cm) sur un mur de
@@ -577,26 +699,46 @@ function drawHotelCeiling(ctx, S) {
 }
 
 export function createBackroomsTextures(level = 0) {
-  const S = level === 2 ? 1024 : 512; // la mosaïque des Poolrooms demande plus de détail
+  // Toutes les surfaces en 1024 px (photos Poly Haven en 1024 px) : les motifs du Level 0 et du Level 1 sont dessinés
+  // en 512 unités, à l'échelle 2 (même dessin qu'avant, deux fois plus fin) ; la mosaïque des Poolrooms en 1024
+  const S = level === 2 ? 1024 : 512;
+  const PX = 1024;
   const L1 = level === 1;
   const L2 = level === 2; // Level 37, les Poolrooms
   const L3 = level === 4; // Level 5, le Terror Hotel (HOTEL_LEVEL)
-  const [wallCanvas, wctx] = canvas(S);
-  const [carpetCanvas, cctx] = canvas(S);
-  const [ceilCanvas, clctx] = canvas(S);
+  const [wallCanvas, wctx] = canvas(PX);
+  const [carpetCanvas, cctx] = canvas(PX);
+  const [ceilCanvas, clctx] = canvas(PX);
+  for (const c of [wctx, cctx, clctx]) c.setTransform(PX / S, 0, 0, PX / S, 0, 0);
   const drawW = L3 ? drawHotelWall : L2 ? drawPoolWall : L1 ? drawConcreteWall : drawWallpaper;
   const drawF = L3 ? drawHotelCarpet : L2 ? drawPoolFloor : L1 ? drawConcreteFloor : drawCarpet;
   const drawC = L3 ? drawHotelCeiling : L2 ? drawPoolCeiling : L1 ? drawConcreteCeiling : drawCeiling;
   drawW(wctx, S, null);
   drawF(cctx, S, null);
   drawC(clctx, S, null);
+  // Level 0, étage du bas : l'ancien papier peint doré, délavé vers le gris, et son plafond clair (la moquette est
+  // celle du haut)
+  const [lowCanvas, lowCtx] = level === 0 ? canvas(PX) : [null, null];
+  const [ceilLowCanvas, clLowCtx] = level === 0 ? canvas(PX) : [null, null];
+  const drawLow = (pap, pla) => {
+    if (!lowCtx) return;
+    for (const c of [lowCtx, clLowCtx]) c.setTransform(PX / S, 0, 0, PX / S, 0, 0);
+    if (pap !== undefined) {
+      drawW(lowCtx, S, pap, true);
+      greyWall(lowCtx, S);
+    }
+    if (pla !== undefined) drawCeiling(clLowCtx, S, pla, true);
+  };
+  drawLow(null, null);
 
   const wall = tex(wallCanvas);
+  const wallLow = lowCanvas ? tex(lowCanvas) : wall;
   const carpet = tex(carpetCanvas);
   const ceiling = tex(ceilCanvas);
+  const ceilingLow = ceilLowCanvas ? tex(ceilLowCanvas) : ceiling;
 
   // les photos arrivent un peu plus tard : on redessine par-dessus
-  const files = L3 ? ['none', 'none', 'none'] : L2 ? ['l37_mur.jpg', 'l37_sol.jpg', 'l37_mur.jpg'] : L1 ? ['l1_mur.jpg', 'l1_sol.jpg', 'l1_plafond.jpg'] : ['papier.jpg', 'moquette.jpg', 'plafond.jpg'];
+  const files = L3 ? ['none', 'none', 'none'] : L2 ? ['l37_mur.jpg', 'l37_sol.jpg', 'l37_mur.jpg'] : L1 ? ['l1_mur.jpg', 'l1_sol.jpg', 'l1_plafond.jpg'] : ['papier.jpg', 'moquette_rase.jpg', 'plafond.jpg'];
   // Level 37 : le carrelage des bassins (cyan) et des fosses (bleu profond), ambientCG Tiles132A et Tiles135A
   const [poolCanvas, pctx2] = canvas(S);
   const [deepCanvas, dctx2] = canvas(S);
@@ -610,6 +752,8 @@ export function createBackroomsTextures(level = 0) {
   const mosaic = tex(ceilCanvas);
   const ready = Promise.all([...files.map(loadImage), ...(L2 ? ['l37_bassin.jpg', 'l37_fosse.jpg'].map(loadImage) : [])]).then(([pap, moq, pla, bas, fos]) => {
     if (pap) { drawW(wctx, S, pap); wall.needsUpdate = true; }
+    if (pap && lowCtx) { drawLow(pap, undefined); wallLow.needsUpdate = true; }
+    if (pla && lowCtx) { drawLow(undefined, pla); ceilingLow.needsUpdate = true; }
     if (moq) { drawF(cctx, S, moq); carpet.needsUpdate = true; }
     if (pla) { drawC(clctx, S, pla); ceiling.needsUpdate = true; }
     // carreaux des bassins deux fois plus petits (10 cm)
@@ -618,22 +762,107 @@ export function createBackroomsTextures(level = 0) {
     if (pla) mosaic.needsUpdate = true;
   });
 
-  // Portes d'ascenseur en inox brossé
-  const [doorCanvas, dctx] = canvas(128, 256);
-  dctx.fillStyle = '#8e9398';
-  dctx.fillRect(0, 0, 128, 256);
-  for (let x = 0; x < 128; x++) {
-    dctx.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '0,0,0'}, ${Math.random() * 0.08})`;
-    dctx.fillRect(x, 0, 1, 256);
+  // Portes d'ascenseur en inox brossé (512 × 1024) : brossage vertical, reflets en bandes, joint central, rayures,
+  // traces de doigts à hauteur de main et salissure au pied
+  const [doorCanvas, dctx] = canvas(512, 1024);
+  {
+    const g = dctx.createLinearGradient(0, 0, 512, 0);
+    g.addColorStop(0, '#7f858b');
+    g.addColorStop(0.35, '#a4aab0');
+    g.addColorStop(0.55, '#8b9197');
+    g.addColorStop(0.8, '#a0a6ab');
+    g.addColorStop(1, '#7a8086');
+    dctx.fillStyle = g;
+    dctx.fillRect(0, 0, 512, 1024);
+    for (let x = 0; x < 512; x++) {
+      dctx.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '0,0,0'}, ${Math.random() * 0.07})`;
+      dctx.fillRect(x, 0, 1, 1024);
+    }
+    for (let i = 0; i < 900; i++) {
+      dctx.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '20,20,20'}, ${0.04 + Math.random() * 0.06})`;
+      dctx.fillRect(Math.random() * 512, Math.random() * 1024, 1, 8 + Math.random() * 60);
+    }
+    // rayures fines en biais
+    dctx.lineWidth = 1;
+    for (let i = 0; i < 70; i++) {
+      const x = Math.random() * 512;
+      const y = 200 + Math.random() * 800;
+      const a = (Math.random() - 0.5) * 1.2;
+      const l = 10 + Math.random() * 70;
+      dctx.strokeStyle = `rgba(${Math.random() < 0.6 ? '230,232,235' : '40,40,40'}, ${0.12 + Math.random() * 0.2})`;
+      dctx.beginPath();
+      dctx.moveTo(x, y);
+      dctx.lineTo(x + Math.sin(a) * l, y + Math.cos(a) * l);
+      dctx.stroke();
+    }
+    // traces de doigts à hauteur de main (vers le milieu, là où on pousse)
+    for (let i = 0; i < 22; i++) {
+      const x = 330 + Math.random() * 160;
+      const y = 470 + Math.random() * 180;
+      const r = 8 + Math.random() * 10;
+      const fg = dctx.createRadialGradient(x, y, 0, x, y, r);
+      fg.addColorStop(0, 'rgba(60, 55, 45, 0.16)');
+      fg.addColorStop(1, 'rgba(60, 55, 45, 0)');
+      dctx.fillStyle = fg;
+      dctx.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+    // la crasse au pied, et les bords des vantaux
+    const dg = dctx.createLinearGradient(0, 860, 0, 1024);
+    dg.addColorStop(0, 'rgba(50, 42, 25, 0)');
+    dg.addColorStop(1, 'rgba(50, 42, 25, 0.45)');
+    dctx.fillStyle = dg;
+    dctx.fillRect(0, 860, 512, 164);
+    dctx.fillStyle = 'rgba(0,0,0,0.35)';
+    dctx.fillRect(0, 0, 8, 1024);
+    dctx.fillRect(504, 0, 8, 1024);
+    dctx.fillStyle = 'rgba(255,255,255,0.18)';
+    dctx.fillRect(8, 0, 2, 1024);
   }
-  dctx.fillStyle = 'rgba(0,0,0,0.25)';
-  dctx.fillRect(0, 0, 3, 256);
-  dctx.fillRect(125, 0, 3, 256);
   const steel = tex(doorCanvas);
   steel.wrapS = steel.wrapT = THREE.ClampToEdgeWrapping;
 
+  // Porte coupe-feu en acier peint (photo Poly Haven blue_metal_plate, repeinte en gris-vert d'usine) et tôle larmée
+  // du plancher de la cabine (Poly Haven metal_plate) : dessinées quand les photos arrivent
+  const [fireCanvas, fdctx] = canvas(512, 1024);
+  fdctx.fillStyle = '#6e7366';
+  fdctx.fillRect(0, 0, 512, 1024);
+  const fireDoor = tex(fireCanvas);
+  fireDoor.wrapS = fireDoor.wrapT = THREE.ClampToEdgeWrapping;
+  const [plateCanvas, plctx] = canvas(512);
+  plctx.fillStyle = '#55585a';
+  plctx.fillRect(0, 0, 512, 512);
+  const treadPlate = tex(plateCanvas);
+  const metalReady = Promise.all(['porte_metal.jpg', 'tole_larmee.jpg'].map(loadImage)).then(([pm, tl]) => {
+    if (pm) {
+      fdctx.drawImage(pm, 0, 0, 512, 512);
+      fdctx.drawImage(pm, 0, 512, 512, 512);
+      fdctx.globalCompositeOperation = 'color';
+      fdctx.fillStyle = '#7d8570';
+      fdctx.fillRect(0, 0, 512, 1024);
+      fdctx.globalCompositeOperation = 'soft-light';
+      fdctx.fillStyle = '#b8baa8';
+      fdctx.fillRect(0, 0, 512, 1024);
+      fdctx.globalCompositeOperation = 'source-over';
+      // la crasse au pied et autour de la poignée
+      const g2 = fdctx.createLinearGradient(0, 880, 0, 1024);
+      g2.addColorStop(0, 'rgba(40, 34, 20, 0)');
+      g2.addColorStop(1, 'rgba(40, 34, 20, 0.5)');
+      fdctx.fillStyle = g2;
+      fdctx.fillRect(0, 880, 512, 144);
+      fireDoor.needsUpdate = true;
+    }
+    if (tl) {
+      plctx.drawImage(tl, 0, 0, 512, 512);
+      plctx.globalCompositeOperation = 'color';
+      plctx.fillStyle = '#6b6f72';
+      plctx.fillRect(0, 0, 512, 512);
+      plctx.globalCompositeOperation = 'source-over';
+      treadPlate.needsUpdate = true;
+    }
+  });
+
   // Caisse en bois des étagères
-  const [crateCanvas, kctx] = canvas(128);
+  const [crateCanvas, kctx] = hd(128);
   kctx.fillStyle = '#8a6a3f';
   kctx.fillRect(0, 0, 128, 128);
   noise(kctx, 128, 128, 30);
@@ -667,7 +896,7 @@ export function createBackroomsTextures(level = 0) {
   fog.wrapS = fog.wrapT = THREE.RepeatWrapping;
 
   // Cassette VHS
-  const [vhsCanvas, vctx] = canvas(256, 160);
+  const [vhsCanvas, vctx] = hd(256, 160);
   vctx.fillStyle = '#1c1b18';
   vctx.fillRect(0, 0, 256, 160);
   vctx.fillStyle = '#e5dfcc';
@@ -689,7 +918,7 @@ export function createBackroomsTextures(level = 0) {
   vhs.wrapS = vhs.wrapT = THREE.ClampToEdgeWrapping;
 
   // Porte de sortie métallique (sans le panneau, posé à part)
-  const [exitCanvas, ectx] = canvas(256, 512);
+  const [exitCanvas, ectx] = hd(256, 512);
   ectx.fillStyle = '#3b3f45';
   ectx.fillRect(0, 0, 256, 512);
   ectx.strokeStyle = '#25282c';
@@ -714,7 +943,7 @@ export function createBackroomsTextures(level = 0) {
   exit.wrapS = exit.wrapT = THREE.ClampToEdgeWrapping;
 
   // Panneau EXIT lumineux
-  const [signCanvas, sctx] = canvas(256, 96);
+  const [signCanvas, sctx] = hd(256, 96);
   sctx.fillStyle = '#0b0b0b';
   sctx.fillRect(0, 0, 256, 96);
   sctx.fillStyle = '#fff';
@@ -728,7 +957,7 @@ export function createBackroomsTextures(level = 0) {
   // Étiquette de l'eau d'amande : la vraie (photo de la bouteille), deux fois autour (devant et derrière). Le canvas a
   // d'emblée la taille de la photo : une texture déjà envoyée à la carte graphique ne change plus de taille (sinon,
   // à un niveau où la bouteille s'affiche avant la fin du chargement, elle restait sans étiquette).
-  const [labelCanvas, lctx] = canvas(256, 176);
+  const [labelCanvas, lctx] = hd(256, 176);
   lctx.fillStyle = '#f1e7c9';
   lctx.fillRect(0, 0, 256, 176);
   lctx.fillStyle = '#c0306a';
@@ -746,7 +975,7 @@ export function createBackroomsTextures(level = 0) {
   });
 
   // Pavé lumineux encastré (diffuseur prismatique dans son cadre) ; au Level 1, un tube nu sous sa réglette
-  const [lampCanvas, pctx] = canvas(128, 64);
+  const [lampCanvas, pctx] = hd(128, 64);
   pctx.fillStyle = '#3a3a36';
   pctx.fillRect(0, 0, 128, 64);
   pctx.fillStyle = '#ffffff';
@@ -760,7 +989,7 @@ export function createBackroomsTextures(level = 0) {
   lamp.wrapS = lamp.wrapT = THREE.ClampToEdgeWrapping;
 
   // Prise électrique : plaque jaunie, deux trous ronds
-  const [outCanvas, octx] = canvas(64, 96);
+  const [outCanvas, octx] = hd(64, 96);
   octx.fillStyle = '#e4dcc4';
   octx.fillRect(0, 0, 64, 96);
   octx.strokeStyle = 'rgba(80, 70, 50, 0.5)';
@@ -784,7 +1013,7 @@ export function createBackroomsTextures(level = 0) {
   outlet.wrapS = outlet.wrapT = THREE.ClampToEdgeWrapping;
 
   // Grille d'aération du faux plafond : lames grises et poussière noire entre elles
-  const [ventCanvas, vtctx] = canvas(128);
+  const [ventCanvas, vtctx] = hd(128);
   vtctx.fillStyle = '#c9c4b2';
   vtctx.fillRect(0, 0, 128, 128);
   vtctx.fillStyle = '#9b9584';
@@ -800,7 +1029,7 @@ export function createBackroomsTextures(level = 0) {
   vent.wrapS = vent.wrapT = THREE.ClampToEdgeWrapping;
 
   // Rubalise de chantier : bandes jaunes et noires en biais, plastique un peu froissé
-  const [tapeCanvas, tpctx] = canvas(256, 32);
+  const [tapeCanvas, tpctx] = hd(256, 32);
   tpctx.fillStyle = '#e8c21a';
   tpctx.fillRect(0, 0, 256, 32);
   tpctx.fillStyle = '#16140f';
@@ -826,5 +1055,5 @@ export function createBackroomsTextures(level = 0) {
   const drawings = tex(drawCanvas);
   drawings.wrapS = drawings.wrapT = THREE.ClampToEdgeWrapping;
 
-  return { wall, carpet, ceiling, pool, deep, mosaic, vhs, exit, sign, label, steel, crate, fog, lamp, outlet, vent, tape, drawings, ready };
+  return { wall, wallLow, carpet, ceiling, ceilingLow, pool, deep, mosaic, vhs, exit, sign, label, steel, fireDoor, treadPlate, crate, fog, lamp, outlet, vent, tape, drawings, ready, metalReady };
 }

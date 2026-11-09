@@ -1,6 +1,9 @@
 // Fief Maudit : les sons. Enregistrements libres (CC0) déjà dans Arcadia : coups dans le bois et pas d'Island Rush,
 // arbre et ambiance de campagne de Birdie Party (crédits dans royale/sounds/LICENSE.txt et golf/sounds/LICENSE.txt).
-// Ce qui manque est synthétisé (WebAudio). Le contexte audio naît au premier geste.
+// Ce qui manque est synthétisé (WebAudio). Le contexte audio naît au premier geste. Les niveaux (musique, effets)
+// viennent du panneau Réglages commun d'Arcadia (shared/volume.js).
+import { Music } from './music.js';
+const V = window.DDVolume;
 const R = '../royale/sounds/', G = '../golf/sounds/';
 const BANK = {
   hache: [R + 'impact-bois-1.mp3', R + 'impact-bois-2.mp3', R + 'impact-bois-3.mp3'],
@@ -21,21 +24,26 @@ const BANK = {
 };
 
 export class Sfx {
-  constructor() { this.ctx = null; this.buf = new Map(); this.muted = false; this.amb = null; try { this.muted = localStorage.getItem('fief_mute') === '1'; } catch (e) {} }
+  constructor() { this.ctx = null; this.buf = new Map(); this.amb = null; this.mood = null; if (V) V.legacy('fief_mute'); }
   start() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
-    this.out = this.ctx.createGain(); this.out.gain.value = this.muted ? 0 : 0.9; this.out.connect(this.ctx.destination);
+    this.out = V ? V.gain(this.ctx, 'fx') : this.ctx.createGain(); this.out.connect(this.ctx.destination);
+    const mus = V ? V.gain(this.ctx, 'music') : this.ctx.createGain(); mus.connect(this.ctx.destination);
+    this.music = new Music(this.ctx, mus); if (this.mood) this.music.set(this.mood);
     for (const [k, list] of Object.entries(BANK)) list.forEach((u, i) => fetch(u).then((r) => r.arrayBuffer()).then((b) => this.ctx.decodeAudioData(b)).then((d) => { if (!this.buf.has(k)) this.buf.set(k, []); this.buf.get(k)[i] = d; }).catch(() => {}));
     // ambiance de campagne en boucle
     fetch(G + 'amb-campagne.mp3').then((r) => r.arrayBuffer()).then((b) => this.ctx.decodeAudioData(b)).then((d) => {
       const s = this.ctx.createBufferSource(), g = this.ctx.createGain(); s.buffer = d; s.loop = true; g.gain.value = this.isNight ? 0.08 : 0.35; s.connect(g).connect(this.out); s.start(); this.amb = g;
     }).catch(() => {});
   }
-  toggleMute() { this.muted = !this.muted; try { localStorage.setItem('fief_mute', this.muted ? '1' : '0'); } catch (e) {} if (this.out) this.out.gain.value = this.muted ? 0 : 0.9; return this.muted; }
+  toggleMute() { return V ? V.toggle() : false; }
+  setMood(m) { this.mood = m; if (this.music) this.music.set(m); }
+  // l'ambiance de la vallée se tait sous terre
+  under(on) { if (!this.ctx || this.isUnder === on) return; this.isUnder = on; const t = this.ctx.currentTime; if (this.amb) this.amb.gain.setTargetAtTime(on ? 0 : this.isNight ? 0.08 : 0.35, t, 1); if (this.wind) this.wind.gain.setTargetAtTime(on ? 0.12 : this.isNight ? 0.5 : 0, t, 1.5); }
   // vol : 0..1 ; dist : mètres jusqu'à la caméra (atténue)
   play(k, { vol = 1, rate = 1, dist = 0, delay = 0 } = {}) {
-    if (!this.ctx || this.muted) return;
+    if (!this.ctx) return;
     const list = (this.buf.get(k) || []).filter(Boolean);
     const att = 1 / (1 + Math.max(0, dist - 4) * 0.12);
     if (k === 'cloche') return this.bell(vol * att, rate, delay);

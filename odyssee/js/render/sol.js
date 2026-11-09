@@ -11,10 +11,11 @@
 //    laisse l'herbe qui était déjà dessinée dessous), et l'ancienne image reste affichée jusqu'à l'arrivée de la nouvelle ;
 //  - les blocs autour de ceux qu'on voit sont calculés d'avance (PREFETCH blocs autour du joueur) ;
 //  - en changeant de carte, le jeu attend que les blocs à l'écran soient prêts avant de rouvrir l'écran (pret()).
-// Désactiver pour comparer : ?sol=0 dans l'adresse, ou localStorage['odyssee-sol'] = '0'.
+// Désactiver pour comparer : ?sol=0 dans l'adresse, ou Options → Graphismes → Sol du dehors (gfx.js).
 import * as THREE from 'three';
 import { NFRAMES, LUT, CELL, MARGIN, zoneBloc } from './solgen.js';
 import { matSol } from './relief3d.js';
+import { solChoix } from '../gfx.js';
 
 const CH = 16;                 // taille d'un bloc de carte (comme world3d.js)
 const Y = 0.0044;              // hauteur du nouveau sol (au-dessus des décalques à 0,004, sous les plateaux de roche à 0,0049)
@@ -23,10 +24,7 @@ const PREFETCH = 3;            // blocs calculés d'avance autour du joueur (wor
 const BUDGET = 96 * 1024 * 1024;   // octets d'images gardés en cache (un bloc fixe : 256 Ko, un bloc d'eau : 2 Mo)
 
 function actif() {
-  try {
-    if (typeof location !== 'undefined' && /[?&]sol=0\b/.test(location.search)) return false;
-    return localStorage.getItem('odyssee-sol') !== '0';
-  } catch (e) { return true; }
+  try { return solChoix() === 'odyssee'; } catch (e) { return true; }
 }
 const graine = (id) => { let h = 7; for (const ch of String(id)) h = (Math.imul(h, 31) + ch.charCodeAt(0)) | 0; return (h >>> 0) % 100000; };
 function remplir(data, idx) { const u = new Uint32Array(data.buffer, data.byteOffset, idx.length); for (let i = 0; i < idx.length; i++) u[i] = LUT[idx[i]]; }

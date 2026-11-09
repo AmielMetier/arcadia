@@ -159,7 +159,7 @@ export function grandeRoute(W, S, ctx) {
 
   /* paysages, tronçon par tronçon */
   const PAYS = (S.paysages || ['prairie', 'bosquet', 'fleurs', 'etang', 'rochers']).filter((q) => !S.monte || (q !== 'plateau' && q !== 'riviere'));
-  let pays = pick(PAYS), reste = 2 + Math.floor(r() * 2), riviereFaite = false;
+  let pays = pick(PAYS), reste = 2 + Math.floor(r() * 2), riviereFaite = false, etangFait = false;
   const marque = [];
   chemin.forEach((b, i) => {
     if (i === 0 || i === chemin.length - 1) return;
@@ -181,7 +181,8 @@ export function grandeRoute(W, S, ctx) {
     else if (pays === 'rochers') {
       for (const [x, y] of C) if (loin(x, y, 2.8) && W.get(x, y) === herbe && r() < 0.05) W.set(x, y, T.ROCK);
       for (let k = 0; k < 2; k++) { const [x, y] = pick(C); if (loin(x, y, 3) && W.get(x, y) === herbe) W.prop('rocher_grand', x, y); }
-    } else if (pays === 'etang') {
+    } else if (pays === 'etang' && !etangFait) {
+      etangFait = true;
       // un étang sur le côté du chemin, qui mord un peu dans la forêt
       const p = along(pts, tBloc[i]), s = r() < 0.5 ? 1 : -1, ex = p.x + p.nx * s * 7, ey = p.y + p.ny * s * 7;
       for (let y = Math.floor(ey - 5); y <= ey + 5; y++) for (let x = Math.floor(ex - 6); x <= ex + 6; x++) {

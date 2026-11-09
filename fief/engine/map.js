@@ -2,6 +2,7 @@
 // en ruine), château en ruine sur sa colline, arbres à abattre, rochers et objets du décor, et les collisions.
 // Unités : mètres, y vers le haut. Le village est centré en (0, 0), la rivière passe au sud (z > 0), le château au nord.
 import { makeRng } from './rng.js';
+import { createCrypt } from './crypt.js';
 
 export const WATER = -0.55;        // niveau de la rivière
 export const R_PLAY = 112;         // rayon jouable (au-delà : la forêt dense)
@@ -93,17 +94,22 @@ export function createValley(seed = 1) {
     // pas de mare hors de la rivière : le fond des creux reste au sec
     return Math.max(h, 0.25 + 0.15 * h);
   }
+  const crypt = createCrypt();
   function heightAt(x, z) {
+    if (crypt.inside(x, z)) return crypt.y;
     let h = rawHeight(x, z);
     const d = Math.abs(z - riverZ(x));
     if (d < 11) h = lerp(h, -1.9, smooth(11, 3.5, d));
     return h;
   }
-  const isWater = (x, z) => heightAt(x, z) < WATER - 0.25;
+  const isWater = (x, z) => !crypt.inside(x, z) && heightAt(x, z) < WATER - 0.25;
 
   // ------------------------------------------------ colliders fixes : rectangles (bâtiments) et cercles (rochers, feu…)
   const boxes = [], circles = [];
   for (const b of [...BUILDINGS, ...CASTLE_PARTS]) boxes.push({ ...rectOf(b, 0.25), id: b.id });
+  // les murs de la crypte et sa herse (qui s'ouvre)
+  for (const w of crypt.walls) boxes.push(w);
+  boxes.push(crypt.gate);
   circles.push({ x: CAMPFIRE.x, z: CAMPFIRE.z, r: CAMPFIRE.r });
   for (const b of BRAZIERS) circles.push({ x: b.x, z: b.z, r: 0.45 });
 
@@ -166,6 +172,19 @@ export function createValley(seed = 1) {
     if (!trees.some((t) => Math.hypot(t.x - x, t.z - z) < 3) && heightAt(x, z) > WATER + 0.6) trees.push({ id: trees.length, x, z, y: heightAt(x, z), kind: 'round', s: 1, rot: x * z, v: 3 });
   }
 
+  // ------------------------------------------------ buissons de baies (les vivres), en lisière des clairières
+  const bushes = [];
+  tries = 0;
+  while (bushes.length < 26 && tries++ < 4000) {
+    const a = rng.range(0, Math.PI * 2), d = rng.range(20, 85), x = Math.sin(a) * d, z = Math.cos(a) * d;
+    if (blockedForDecor(x, z, 3.5) || heightAt(x, z) < WATER + 0.6) continue;
+    if (trees.some((t) => Math.hypot(t.x - x, t.z - z) < 2.6) || props.some((p) => Math.hypot(p.x - x, p.z - z) < 2.4) || bushes.some((o) => Math.hypot(o.x - x, o.z - z) < 7)) continue;
+    bushes.push({ id: bushes.length, x, z, y: heightAt(x, z), rot: rng.range(0, 6.28), s: rng.range(0.9, 1.2) });
+    circles.push({ x, z, r: 0.55 });
+  }
+  // deux buissons tout près du feu, pour qu'on les remarque
+  for (const [x, z] of [[-9, 18], [12, -16]]) if (!bushes.some((o) => Math.hypot(o.x - x, o.z - z) < 4) && !trees.some((t) => Math.hypot(t.x - x, t.z - z) < 2.6)) { bushes.push({ id: bushes.length, x, z, y: heightAt(x, z), rot: x, s: 1 }); circles.push({ x, z, r: 0.55 }); }
+
   // ------------------------------------------------ grille de recherche (cases de 8 m) pour les cercles et les arbres
   const CELL = 8, grid = new Map();
   const key = (cx, cz) => cx * 4096 + cz;
@@ -181,6 +200,7 @@ export function createValley(seed = 1) {
   function collide(x, z, r, fallen) {
     for (let pass = 0; pass < 2; pass++) {
       for (const b of boxes) {
+        if (b.open) continue;
         if (x < b.x0 - r || x > b.x1 + r || z < b.z0 - r || z > b.z1 + r) continue;
         const cx = clamp(x, b.x0, b.x1), cz = clamp(z, b.z0, b.z1), dx = x - cx, dz = z - cz, d = Math.hypot(dx, dz);
         if (d > 1e-6) { if (d < r) { x = cx + dx / d * r; z = cz + dz / d * r; } }
@@ -196,7 +216,7 @@ export function createValley(seed = 1) {
       });
     }
     const rr = Math.hypot(x, z);
-    if (rr > R_PLAY) { x *= R_PLAY / rr; z *= R_PLAY / rr; }
+    if (rr > R_PLAY && !crypt.inside(x, z)) { x *= R_PLAY / rr; z *= R_PLAY / rr; }
     return [x, z];
   }
   // arbre debout le plus proche dans un rayon (et, si yaw est donné, devant soi)
@@ -215,10 +235,12 @@ export function createValley(seed = 1) {
   const warehouse = BUILDINGS.find((b) => b.id === 'entrepot');
   const depot = doorPoint(warehouse, 1.2);
   const spawn = { x: 3, z: 4.5, yaw: Math.PI * 0.75 };
+  // l'entrée de la crypte : devant la porte du donjon
+  const cryptDoor = doorPoint(CASTLE_PARTS[0], 1.6);
 
   return {
     seed, heightAt, isWater, collide, treeNear, near,
-    buildings: BUILDINGS, castle: CASTLE_PARTS, campfire: CAMPFIRE, braziers: BRAZIERS, trees, props, rubble, boxes, circles, paths: PATHS,
-    warehouse, depot, spawn, riverZ, pathDist,
+    buildings: BUILDINGS, castle: CASTLE_PARTS, campfire: CAMPFIRE, braziers: BRAZIERS, bushes, trees, props, rubble, boxes, circles, paths: PATHS,
+    warehouse, depot, spawn, riverZ, pathDist, crypt, cryptDoor,
   };
 }

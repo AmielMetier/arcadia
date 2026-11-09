@@ -172,13 +172,16 @@ Bagarre de pantins mous au-dessus du vide (`mollo/`). Le dernier debout gagne la
   `?debug` expose `__mollo.run(2)`, qui fait avancer le jeu de 2 s image par image ; `?autostart`, `?seed`, `?arene=four`, `?hazards=0`, `?items=0`.
 - Graphismes : personnages et décors dessinés dans le code (`mollo/view/pantin.js`, `scene.js`), textures au canvas. Musique et sons synthétisés (WebAudio).
 
-## Fief Maudit (en construction)
+## Fief Maudit
 Survie médiévale en coopération, en 3D (`fief/`). Les derniers habitants d'un village en ruine le relèvent le jour et le défendent la nuit
-contre les morts sortis de la crypte du château. Le jeu se construit par étapes, décrites dans [docs/FIEF-MAUDIT.md](docs/FIEF-MAUDIT.md).
+contre les morts sortis de la crypte du château. Conception et étapes : [docs/FIEF-MAUDIT.md](docs/FIEF-MAUDIT.md).
 
 - **Déjà jouable** : la vallée (village en ruine, entrepôt, feu de camp, rivière, château sur sa colline, forêt), le bûcheron et sa hache, les arbres qui tombent, les bûches à ramasser, porter et ranger à l'entrepôt, un petit tutoriel
 - **La nuit** : cycle jour / crépuscule / nuit / aube, brume qui épouse le sol et s'ouvre autour des six braseros et du feu de camp, squelettes (soldats et guerriers à bouclier) qui sortent du sol côté château et se relèvent s'ils tombent dans la brume, joueur à terre qu'on relève en tenant E, coéquipiers IA (chevaliers), défaite et nuit à rejouer
-- **À venir** : le jeu à plusieurs et les métiers, la construction des bâtiments, les sièges, la crypte
+- **À plusieurs** : une seule vallée pour tout le salon (l'hôte fait foi, les invités prédisent leur déplacement, relais d'hôte), cinq métiers, poutres portées à deux ; banc d'essai sans relais : `tools/fief-duo.html`
+- **La boucle complète** : chantiers (maisons, forge, moulin, chapelle) payés avec le bois et les poutres de l'entrepôt, faim et baies, froid la nuit, expédition de dix nuits avec sièges du chevalier noir (nuits 5 et 10), mode sans fin, trois difficultés, sauvegarde à chaque aube
+- **La crypte** : après dix nuits, deux leviers à tenir ensemble, un couloir de brume, le Roi-Squelette en trois phases ; écran de fin et classement du salon
+- **Finitions** : une capacité par métier (F), musique synthétisée, panneau Réglages (son, qualité, souris), écran d'accueil, manette et tactile
 - Modèles : Medieval Village MegaKit de Quaternius, personnages et squelettes de KayKit (CC0), dans `fief/models/` ; arbres et ciel de Birdie Party
 
 ## Mystère Mystère, The Backrooms

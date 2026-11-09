@@ -127,6 +127,31 @@ export function createWarehouseMap(seed = 7) {
   let dist = bfs(grid, W, H, sx, sz);
   for (let i = 0; i < W * H; i++) if (grid[i] === T.FLOOR && dist[i] < 0) grid[i] = T.WALL;
 
+  // 4b. On sort de l'ascenseur pris au Level 0 : sa cabine est une gaine de béton prise dans un rayonnage (ou un mur),
+  // le plus près possible du centre ; le départ est la case devant ses portes. Seules des cases déjà pleines
+  // deviennent du béton : aucun passage n'est bouché
+  let arrival = null;
+  {
+    const isW = (x, z) => get(x, z) === T.WALL || get(x, z) === T.SHELF;
+    const cand = [];
+    for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) if (get(x, z) === T.FLOOR && dist[z * W + x] >= 0) cand.push({ x, z, d: Math.hypot(x - sx, z - sz) });
+    cand.sort((a, b) => a.d - b.d);
+    for (const c of cand) {
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const cx = c.x + dx;
+        const cz = c.z + dz;
+        if (!isW(cx, cz) || !isW(cx + dx, cz + dz) || !isW(cx + dz, cz + dx) || !isW(cx - dz, cz - dx)) continue;
+        if (get(c.x - dx, c.z - dz) !== T.FLOOR) continue; // de la place pour sortir
+        arrival = { gx: cx, gz: cz, x: (cx + 0.5) * CELL_SIZE, z: (cz + 0.5) * CELL_SIZE, dx, dz, arrival: true };
+        for (const [x, z] of [[cx, cz], [cx + dx, cz + dz], [cx + dz, cz + dx], [cx - dz, cz - dx]]) if (x > 0 && z > 0 && x < W - 1 && z < H - 1) grid[z * W + x] = T.WALL;
+        sx = c.x;
+        sz = c.z;
+        break;
+      }
+      if (arrival) break;
+    }
+  }
+
   const walkable = [];
   for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) if (grid[z * W + x] === T.FLOOR) walkable.push({ x, z });
   const D = (c) => dist[c.z * W + c.x];
@@ -197,7 +222,7 @@ export function createWarehouseMap(seed = 7) {
     }
     return out;
   };
-  const bottles = scatter(7, 8);
+  const bottles = scatter(10, 8);
   const batteries = scatter(10, 6);
 
   // 9. Contenu des étagères (caisses, cartons, fûts) tiré une fois pour toutes pour que chacun voie la même chose
@@ -227,6 +252,7 @@ export function createWarehouseMap(seed = 7) {
     spawn,
     exit,
     elevator,
+    arrival,
     cassettes: [],
     fuses,
     lights,

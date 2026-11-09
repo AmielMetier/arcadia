@@ -171,13 +171,15 @@ window.HUB_GAMES = [
   {
     id: 'fief',
     title: 'Fief Maudit',
-    tag: 'Survie médiévale en coop · en construction',
-    desc: 'Les derniers habitants d\'un village en ruine. Le jour, abats les arbres et rentre le bois ; la nuit, garde les braseros allumés pendant que les morts sortent de la brume. Avant-première : chacun dans sa vallée, avec un chevalier IA.',
+    tag: 'Survie médiévale en coop, jusqu\'à 6',
+    desc: 'Les derniers habitants d\'un village en ruine. Le jour, abats les arbres et rentre le bois ; la nuit, garde les braseros allumés pendant que les morts sortent de la brume. Relevez les maisons, la forge, le moulin et la chapelle, gardez des vivres, tenez dix nuits, dont deux sièges du chevalier noir, puis descendez dans la crypte abattre le Roi-Squelette.',
     url: 'fief/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#e08a3a',
-    icon: '🪓', score: 'Bûches rentrées',
+    icon: '🪓', score: 'Nuits tenues et squelettes abattus',
     settings: [
+      { key: 'mode', label: 'Mode', options: [['expedition', 'Expédition (10 nuits)'], ['sansfin', 'Sans fin']], def: 'expedition' },
+      { key: 'diff', label: 'Difficulté', options: [['paisible', 'Paisible'], ['normale', 'Normale'], ['peste', 'Peste noire']], def: 'normale' },
       { key: 'bots', label: 'Équipiers IA', options: [[0, 'Aucun'], [1, '1 chevalier'], [2, '2 chevaliers']], def: 1 },
     ],
     cover: 'fief/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
@@ -309,7 +311,7 @@ window.HUB_GAMES = [
     id: 'backrooms',
     title: 'The Backrooms',
     tag: 'Survie & Horreur',
-    desc: "Seul ou à plusieurs, échappe-toi des Backrooms : 5 cassettes VHS sur les deux étages du Level 0 pour ouvrir le bon ascenseur, puis 3 fusibles pour relancer le monte-charge de l'entrepôt du Level 1, et enfin 4 vannes de vapeur dans les tuyauteries du Level 2, où un troupeau de chèvres charge dans le noir.",
+    desc: "Seul ou à plusieurs, échappe-toi des Backrooms : 6 cassettes VHS sur les deux étages du Level 0 pour ouvrir le bon ascenseur, puis 3 fusibles pour relancer le monte-charge de l'entrepôt du Level 1, et enfin 4 vannes de vapeur dans les tuyauteries du Level 2, où un troupeau de chèvres charge dans le noir.",
     url: 'backrooms/',
     minPlayers: 1, maxPlayers: 6, maxWithBots: 6,
     accent: '#eab308',
@@ -317,6 +319,7 @@ window.HUB_GAMES = [
     settings: [
       { key: 'difficulty', label: 'Difficulté de l\'entité', options: [['normal', 'Normale'], ['hard', 'Rapide & Agressive'], ['peaceful', 'Exploration (Sans monstre)']], def: 'normal' },
       { key: 'monsters', label: 'Monstres', options: [['normal', 'Normal'], ['vip', '⭐ VIP mode', { vip: true }]], def: 'normal' },
+      { key: 'map', label: 'Carte', options: [['random', 'Au hasard'], ['daily', '🗓️ Carte du jour (la même pour tous)']], def: 'random' },
     ],
     cover: 'backrooms/img/affiche.jpg?v=2', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau caméscope
   },
@@ -353,8 +356,8 @@ window.HUB_GAME_INFO = {
     keys: [['Flèches / ZQSD', 'Conduire'], ['Maj en tournant', 'Drift (mini-turbo)'], ['E', 'Utiliser l\'objet'], ['↓ + E', 'Lancer vers l\'arrière'], ['🎮 Manette', 'Stick pour conduire, gâchettes pour accélérer et freiner']],
     tips: ['Alterne Q et D pendant un drift : le mini-turbo charge deux fois plus vite.', 'Colle-toi derrière un kart pour profiter de l\'aspiration.', 'Une figure en sautant donne un petit turbo à l\'atterrissage.'] },
   fief: { genre: 'action', time: '10–20 min',
-    keys: [['ZQSD + souris', 'Se déplacer, tourner la caméra'], ['Clic', 'Coup de hache'], ['E', 'Ramasser, ranger, charger un brasero · tenir pour relever'], ['Espace · Ctrl', 'Sauter · marcher'], ['Molette', 'Zoom'], ['Échap', 'Pause'], ['🎮 Manette', 'Stick gauche : bouger · stick droit : caméra · RT : hache · X : utiliser · A : sauter']],
-    tips: ['Un bûcheron abat un arbre en trois coups de hache.', 'Chaque arbre donne deux bûches : on n\'en porte qu\'une à la fois.', 'Charge les braseros avant la nuit : un squelette tombé dans leur lumière ne se relève pas.', 'Le guerrier pare de face avec son bouclier : prends-le de côté ou de dos.', 'E devant l\'entrepôt reprend une bûche du stock pour un brasero.', 'Tiens E près d\'un équipier à terre pour le relever.'] },
+    keys: [['ZQSD + souris', 'Se déplacer, tourner la caméra'], ['Clic', 'Coup de hache'], ['E', 'Ramasser, ranger, charger un brasero · tenir pour relever'], ['F', 'Capacité du métier'], ['Espace · Ctrl', 'Sauter · marcher'], ['Molette', 'Zoom'], ['Échap', 'Pause'], ['🎮 Manette', 'Stick gauche : bouger · stick droit : caméra · RT : hache · X : utiliser · Y : capacité · A : sauter']],
+    tips: ['Un bûcheron abat un arbre en trois coups de hache.', 'Chaque arbre donne deux bûches : on n\'en porte qu\'une à la fois.', 'Charge les braseros avant la nuit : un squelette tombé dans leur lumière ne se relève pas.', 'Le guerrier pare de face avec son bouclier : prends-le de côté ou de dos.', 'E devant l\'entrepôt reprend une bûche du stock pour un brasero.', 'Tiens E près d\'un équipier à terre pour le relever.', 'Les chênes donnent des poutres : prends un bout avec E, un équipier prend l\'autre.', 'Le prêtre soigne tous ceux qui restent près de lui : groupez-vous la nuit.', 'F lance la capacité de ton métier : la fusée de la chasseuse éclaire assez pour que les morts restent à terre.', 'Dans la crypte, les deux leviers se tiennent ensemble : il faut être deux.', 'Quand le Roi souffle les torches, rallume-les avec E : leur lumière soigne.', 'Les lueurs dorées dans les bois sont des coffres : bois, vivres, huile ou élixir, mais des morts dorment autour.', 'On porte trois bûches à la fois : E près d\'une autre pour l\'empiler.', 'Prêts avant l\'heure ? Sonnez la cloche du feu de camp pour faire tomber la nuit.'] },
   convoy: { genre: 'action', time: '15–30 min',
     keys: [['ZQSD', 'Se déplacer'], ['E', 'Interagir'], ['Souris', 'Viser · tirer'], ['🎮 Manette', 'Stick : se déplacer · X / RT : interagir, tirer']],
     tips: ['Le convoi ralentit en gare : profitez-en pour réparer.', 'Surveillez la pression de la chaudière.'] },

@@ -94,6 +94,7 @@ export function createKitInstancer({ group, convert }) {
     const R2 = R * R;
     for (const s of sets) {
       const arr = s.mesh.instanceMatrix.array;
+      const mats = s.mats;
       let n = 0;
       for (let i = 0; i < s.items.length; i++) {
         const it = s.items[i];
@@ -102,7 +103,11 @@ export function createKitInstancer({ group, convert }) {
         const d2 = dx * dx + dz * dz;
         if (d2 > R2) continue;
         if (d2 > 30 && dx * fx + dz * fz < -0.4 * Math.sqrt(d2)) continue;
-        arr.set(s.mats.subarray(i * 16, i * 16 + 16), n * 16);
+        // sa matrice (16 nombres), recopiée à la main : subarray créerait une vue par exemplaire visible, à chaque
+        // image (des milliers dans les Tuyauteries, autant de déchets pour le ramasse-miettes)
+        const o = n * 16;
+        const m = i * 16;
+        for (let k = 0; k < 16; k++) arr[o + k] = mats[m + k];
         if (s.glass) {
           const c = s.glow(it);
           s.mesh.instanceColor.setXYZ(n, c.r, c.g, c.b);

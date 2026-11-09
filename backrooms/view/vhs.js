@@ -1,7 +1,10 @@
-// The Backrooms - Filtre caméra : une image de caméscope propre (comme les vidéos des Backrooms), à peine marquée par
-// la bande : léger grain, lignes de balayage discrètes, couleurs franches, noirs profonds, vignette douce, et la petite
-// bande de commutation des têtes tout en bas de l'image. Les défauts de la cassette (bavure des couleurs, tracking,
-// déchirures, parasites) ne reviennent que quand l'entité approche, et montent jusqu'au bout (danger = 1).
+// The Backrooms - Filtre caméra. Deux régimes :
+//  - à l'œil nu (cam = 0) : une image nette, couleurs franches, noirs profonds, vignette douce, un grain à peine là.
+//    Quand l'entité approche, seules les couleurs se décalent un peu et le grain monte.
+//  - au caméscope (cam = 1, touche V) : la vraie cassette, en plus fort qu'avant. Image 4:3 entre deux bandes noires
+//    (box), objectif bombé, lignes de balayage, bavure des couleurs, bande des têtes, tracking qui flotte, et les
+//    défauts (déchirures, parasites) qui trahissent l'entité quand elle approche. Dans le noir, le mode nuit (night)
+//    passe l'image en vert monochrome, très granuleuse.
 // Les néons, plus forts que le blanc, bavent autour d'eux (halo flouté en quart de définition). L'exposition suit la
 // lumière (le caméscope pousse son gain dans le noir : l'image s'éclaircit, grésille et ses couleurs bruitent).
 // Le reste du langage « analog horror » se règle par setFx : tracking, perte de signal (neige puis écran bleu),
@@ -12,7 +15,7 @@ import * as THREE from '../../shared/vendor/three/three.module.min.js';
 const LINES = 720; // hauteur de rendu de la scène, en pixels (qualité « high »)
 const QUALITY = { low: 480, medium: 600, high: 720 }; // lignes de la bande selon la qualité
 const MIN_LINES = 240;
-const MAX_LINES = 1080;
+const MAX_LINES = 2880; // la pleine définition d'un grand écran (à l'œil nu)
 const RESIZE_EVERY = 0.5; // résolution dynamique : au plus un changement de taille toutes les 0,5 s
 const SOFT_RATE = 1.6; // flashs adoucis : un effet plein écran met au moins 0,6 s à passer de 0 à 1 (bien sous 3 Hz)
 
@@ -30,6 +33,8 @@ const FX_DEFAULTS = {
   reduceFlashes: false, // accessibilité : variations de luminosité plein écran adoucies
   brightness: 1, // luminosité réglée par le joueur (0.5 à 1.8)
   danger: 0, // danger plancher : l'image n'est jamais moins brouillée que ça, quoi que passe render()
+  cam: 0, // 0 : à l'œil nu, 1 : au caméscope (la transition est faite par l'appelant)
+  night: 0, // mode nuit du caméscope (0 à 1)
 };
 // les effets plein écran que l'option « flashs adoucis » ralentit
 const SLEW_KEYS = ['tracking', 'signalLoss', 'bars', 'splice'];
@@ -63,6 +68,9 @@ uniform float uFocus;
 uniform vec3 uWhite;
 uniform float uSoft;    // flashs adoucis
 uniform float uBright;
+uniform float uCam;     // 0 : à l'œil nu, 1 : au caméscope
+uniform float uBox;     // largeur visible de l'image (4:3 au caméscope, 1 sinon)
+uniform float uNight;   // mode nuit du caméscope (0 à 1)
 varying vec2 vUv;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
@@ -76,7 +84,9 @@ float vnoise(float x, float y) {
 
 vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
 
-vec3 grab(vec2 uv) { return texture2D(tDiffuse, uv).rgb; }
+// de l'image 4:3 du caméscope à la scène rendue (on en garde le centre)
+vec2 S(vec2 uv) { return vec2((uv.x - 0.5) * uBox + 0.5, uv.y); }
+vec3 grab(vec2 uv) { return texture2D(tDiffuse, S(uv)).rgb; }
 
 // mire de barres SMPTE simplifiée : blanc, jaune, cyan, vert, magenta, rouge, bleu à 75 %
 vec3 barColor(float i) {
@@ -100,19 +110,27 @@ vec3 smpte(vec2 p) {
 }
 
 void main() {
-  // les défauts de la cassette ne montent que quand l'entité est vraiment proche, et toujours plus jusqu'au bout
-  float dg = smoothstep(0.3, 1.0, uDanger) * 0.6;
+  // les bandes noires du format 4:3
+  vec2 fuv = vec2((vUv.x - 0.5) / uBox + 0.5, vUv.y);
+  if (fuv.x < 0.0 || fuv.x > 1.0) {
+    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
+  float cm = uCam;
+  // l'entité qui approche : à l'œil nu, à peine ; au caméscope, la bande se déchire (plus fort qu'avant)
+  float dg0 = smoothstep(0.3, 1.0, uDanger) * 0.6;
+  float dg = dg0 * cm * 1.35;
   float soft = uSoft;
-  // le tracking demandé, plus un peu quand l'entité approche
-  float trk = clamp(uTracking + dg * 0.3, 0.0, 1.0);
+  // le tracking demandé, plus un peu quand l'entité approche ; au caméscope, la bande flotte toujours un peu
+  float trk = clamp((uTracking + dg * 0.3) * cm + cm * 0.07, 0.0, 1.0);
   float t2 = trk * trk;
   float frame = floor(uTime * 30.0); // 30 images par seconde : le rythme de la bande
   float fr = mod(frame, 97.0);
-  vec2 cs = vUv - 0.5;
+  vec2 cs = fuv - 0.5;
   float r2 = dot(cs, cs);
 
   // 1. LA BANDE DANS LE MAGNÉTOSCOPE (coordonnées de l'image enregistrée)
-  vec2 uv = vUv;
+  vec2 uv = fuv;
   // raccord : l'image saute de quelques lignes et roule avant de se recaler
   float jump = (hash(vec2(floor(uTime * 12.0), 3.1)) - 0.5) * uSplice * uSplice * 0.12 * (1.0 - soft * 0.7);
   float shiftY = fract(uRoll + jump + 1.0);
@@ -148,29 +166,30 @@ void main() {
   uv.x += tear * (hash(vec2(blk, uTime)) - 0.5) * 0.09 * dg;
 
   // commutation des têtes : les dernières lignes de l'image partent vers la droite, déchirées et bruitées
-  float hsH = max((0.012 + dg * 0.02 + trk * 0.02) * uHead, 0.0001);
-  float inHead = step(uv.y, hsH) * step(0.001, uHead);
+  float hd = uHead * cm * 1.6;
+  float hsH = max((0.012 + dg * 0.02 + trk * 0.02) * hd, 0.0001);
+  float inHead = step(uv.y, hsH) * step(0.001, hd);
   float hsT = clamp(1.0 - uv.y / hsH, 0.0, 1.0); // 1 tout en bas
-  uv.x += inHead * (0.008 + 0.03 * hsT * hsT * (0.8 + 0.2 * sin(uTime * 1.7)) + (hash(vec2(tline, fr + 2.0)) - 0.5) * 0.008) * min(uHead, 2.0);
+  uv.x += inHead * (0.008 + 0.03 * hsT * hsT * (0.8 + 0.2 * sin(uTime * 1.7)) + (hash(vec2(tline, fr + 2.0)) - 0.5) * 0.008) * min(hd, 2.0);
 
   vec2 tuv = uv; // coordonnées sur la bande (la mire n'est pas passée par l'objectif)
-  // objectif bombé
+  // objectif bombé (au caméscope)
   vec2 c = uv - 0.5;
-  uv = 0.5 + c * (0.99 + 0.025 * dot(c, c));
+  uv = 0.5 + c * mix(1.0, 0.975 + 0.09 * dot(c, c), cm);
 
   // 2. L'IMAGE DU CAMÉSCOPE
   // bavure des couleurs (rouge et bleu décalés) et flou horizontal de la bande magnétique
-  float ca = 0.0006 + dg * 0.007 + trk * 0.004;
+  float ca = dg0 * 0.0035 + cm * 0.0018 + dg * 0.007 + trk * 0.004;
   vec3 col;
   col.r = grab(uv + vec2(ca, 0.0)).r;
   col.g = grab(uv).g;
   col.b = grab(uv - vec2(ca * 1.4, 0.0)).b;
   vec3 blur = (grab(uv + vec2(0.0035, 0.0)) + grab(uv - vec2(0.0035, 0.0)) + grab(uv + vec2(0.007, 0.0)) + grab(uv - vec2(0.007, 0.0))) * 0.25;
-  col = mix(col, blur, 0.04 + dg * 0.12 + trk * 0.15);
+  col = mix(col, blur, cm * 0.16 + dg * 0.12 + trk * 0.15);
   // mise au point qui cherche
-  if (uFocus > 0.001) col = mix(col, texture2D(tFocus, uv).rgb, smoothstep(0.0, 0.35, uFocus));
-  // halo des néons et des lumières vives
-  if (uBloomOn > 0.5) col += texture2D(tBloom, uv).rgb * 1.1;
+  if (uFocus > 0.001) col = mix(col, texture2D(tFocus, S(uv)).rgb, smoothstep(0.0, 0.35, uFocus));
+  // halo des néons et des lumières vives (il bave plus sur la bande)
+  if (uBloomOn > 0.5) col += texture2D(tBloom, S(uv)).rgb * (1.1 + cm * 0.5);
   // balance des blancs du caméscope
   col *= uWhite;
 
@@ -194,9 +213,9 @@ void main() {
 
   // 3. LES DÉFAUTS DE LA LECTURE
   // bruit de couleur : demandé, gain poussé dans le noir (exposition au-dessus de 1,15), tracking, entité
-  float chr = clamp(max(uChroma, smoothstep(1.15, 1.45, uExposure) * 0.3) + trk * 0.2 + dg * 0.15, 0.0, 1.0);
+  float chr = clamp(max(uChroma, smoothstep(1.15, 1.45, uExposure) * 0.3 * cm) + cm * 0.18 + trk * 0.2 + dg * 0.15, 0.0, 1.0);
   if (chr > 0.001) {
-    float nx = vUv.x * uRes.x / 7.0;
+    float nx = fuv.x * uRes.x / 7.0;
     float ny = tline + fr * 17.0;
     vec3 cn = vec3(vnoise(nx, ny), vnoise(nx + 31.0, ny + 5.0), vnoise(nx + 67.0, ny + 11.0)) - 0.5;
     cn -= dot(cn, vec3(0.299, 0.587, 0.114)); // la couleur seulement, pas la luminosité
@@ -210,10 +229,10 @@ void main() {
   col = mix(col, vec3(lumT), clamp(kill, 0.0, 0.95));
   // traits de bruit blancs, étirés à l'horizontale : dans les bandes de tracking et la bande des têtes
   float dash = mix(6.0, 60.0, hash(vec2(tline, fr + 3.0)));
-  float streak = step(1.0 - (tband * 0.35 * trk + t2 * 0.01 + inHead * hsT * 0.3 * min(uHead, 2.0)),
+  float streak = step(1.0 - (tband * 0.35 * trk + t2 * 0.01 + inHead * hsT * 0.3 * min(hd, 2.0)),
                       hash(vec2(floor(vUv.x * uRes.x / dash), tline + fr * 13.0)));
   col = mix(col, vec3(0.85), streak * (soft > 0.5 ? 0.45 : 0.8));
-  if (inHead > 0.5) col = mix(col, vec3(hash(vec2(floor(vUv.x * uRes.x / 3.0), tline + fr * 3.0))), hsT * 0.3 * min(uHead, 1.0));
+  if (inHead > 0.5) col = mix(col, vec3(hash(vec2(floor(vUv.x * uRes.x / 3.0), tline + fr * 3.0))), hsT * 0.3 * min(hd, 1.0));
 
   // hors de l'image, et la barre noire entre deux images quand l'image roule
   if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) col = vec3(0.0);
@@ -233,6 +252,19 @@ void main() {
     if (soft > 0.5) snc = mix(vec3(0.4), snc, 0.6);
     col = mix(col, snc, snowAmt);
   }
+  // au caméscope : la neige de fond d'un signal faible (permanente, plus forte par bouffées), une barre de bruit qui
+  // roule lentement de haut en bas, et des lignes qui décrochent
+  if (cm > 0.001) {
+    float sy2 = floor(vUv.y * uLines) + sfr * 7.13 + 3.0;
+    float sn2 = hash(vec2(floor(vUv.x * uRes.x * 0.5), sy2));
+    float gust = step(0.82, hash(vec2(floor(uTime * 3.0), 4.2)));
+    float st = cm * (0.06 + 0.045 * gust) * (soft > 0.5 ? 0.6 : 1.0);
+    col = mix(col, vec3(sn2 * sn2 * 1.2), st);
+    float rb = 1.0 - smoothstep(0.0, 0.045, abs(fract(vUv.y + uTime * 0.07) - 0.5));
+    col = mix(col, vec3(sn2) * 0.9, rb * cm * 0.13);
+    float drop = step(0.992, hash(vec2(floor(vUv.y * uLines * 0.5), fr)));
+    col = mix(col, vec3(0.9), drop * cm * 0.25);
+  }
   // flash du raccord
   col += uSplice * uSplice * uSplice * 0.3 * (soft > 0.5 ? 0.25 : 1.0);
   // écran bleu du magnétoscope (le texte « NO SIGNAL » est mis par l'interface)
@@ -245,19 +277,25 @@ void main() {
     float pn = step(0.45, hash(vec2(floor(vUv.x * uRes.x / 5.0), floor(vUv.y * uLines) + sfr)));
     col = mix(col, col * 0.4 + vec3(0.75) * pn, pb * 0.85);
   }
-  // lignes de balayage, calées sur les lignes de la bande (pas sur la fenêtre), estompées si l'écran est trop petit
+  // mode nuit : vert monochrome, gain poussé à fond
+  if (uNight > 0.001) {
+    float ln = dot(col, vec3(0.299, 0.587, 0.114));
+    vec3 ng = vec3(0.42, 1.0, 0.46) * pow(ln, 0.85) * 1.0 + vec3(0.0, 0.025, 0.0);
+    col = mix(col, ng, uNight);
+  }
+  // lignes de balayage (au caméscope), calées sur les lignes de la bande, estompées si l'écran est trop petit
   float cyc = uLines * 0.4;
-  float sAmp = 0.025 * clamp((uRes.y / cyc - 1.8) / 0.8, 0.0, 1.0);
+  float sAmp = 0.06 * cm * clamp((uRes.y / cyc - 1.8) / 0.8, 0.0, 1.0);
   col *= 1.0 - sAmp + sAmp * sin(vUv.y * cyc * 6.2831853);
-  // grain, plus fort quand le gain est poussé dans le noir
+  // grain : à peine à l'œil nu ; fort au caméscope, et plus encore dans le noir et en mode nuit
   float gain = clamp((uExposure - 1.0) * 0.06, 0.0, 0.04);
-  col += (hash(vUv * uRes + fract(uTime) * 91.0) - 0.5) * (0.014 + gain + dg * 0.18);
+  col += (hash(vUv * uRes + fract(uTime) * 91.0) - 0.5) * (0.006 + dg0 * 0.05 + cm * (0.03 + gain) + uNight * 0.09 + dg * 0.18);
   col += band * dg * 0.05;
   // parasites blancs : seulement quand l'entité est là
   if (dg > 0.05 && hash(vec2(floor(vUv.x * 160.0), floor(vUv.y * 120.0) + floor(uTime * 20.0))) > 1.0 - dg * 0.004) col += soft > 0.5 ? 0.2 : 0.5;
 
-  // vignette
-  col *= 1.0 - r2 * 0.95;
+  // vignette (plus lourde dans l'objectif du caméscope)
+  col *= 1.0 - r2 * mix(0.8, 1.25, cm);
   // luminosité du joueur : une courbe douce, le noir reste noir
   col = pow(max(col, vec3(0.0)), vec3(1.0 / uBright));
   gl_FragColor = vec4(col, 1.0);
@@ -299,6 +337,8 @@ export function createVhsFilter(renderer) {
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
     depthBuffer: true,
+    // anticrénelage : 4 échantillons par pixel (bords des murs, des néons et des piliers sans marches d'escalier)
+    samples: renderer.capabilities && renderer.capabilities.isWebGL2 === false ? 0 : 4,
   });
   const half = () => new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false });
   const bloomA = half();
@@ -331,6 +371,9 @@ export function createVhsFilter(renderer) {
       uWhite: { value: new THREE.Vector3(1, 1, 1) },
       uSoft: { value: 0 },
       uBright: { value: 1 },
+      uCam: { value: 0 },
+      uBox: { value: 1 },
+      uNight: { value: 0 },
     },
     vertexShader,
     fragmentShader,
@@ -349,6 +392,11 @@ export function createVhsFilter(renderer) {
   let quality = 'high';
   let tapeLines = LINES; // lignes de la bande pour la qualité choisie : elles calent le balayage
   let wantLines = LINES; // lignes de rendu voulues (résolution dynamique)
+  // à l'œil nu (sans caméscope), en qualité haute ou automatique : l'image est calculée en pleine définition (les
+  // pixels de l'écran) au lieu des lignes de la bande ; la résolution dynamique ne la baisse que si le jeu rame
+  let fullOk = true;
+  const fullH = () => Math.max(1, Math.round(ch * renderer.getPixelRatio()));
+  const wantH = () => Math.max(1, fx.cam < 0.5 && fullOk ? Math.min(wantLines, fullH()) : Math.min(wantLines, tapeLines, ch));
   let bloomOn = true;
   let cw = 1; // taille du canvas
   let ch = 1;
@@ -359,7 +407,7 @@ export function createVhsFilter(renderer) {
 
   // retaille les cibles seulement si la taille change vraiment (pas de réallocation sinon)
   function applySize() {
-    const lines = Math.max(1, Math.min(wantLines, ch));
+    const lines = wantH();
     const tw = Math.max(1, Math.round((lines * cw) / ch));
     lastResize = now();
     U.uLines.value = Math.max(1, Math.min(tapeLines, ch));
@@ -387,9 +435,17 @@ export function createVhsFilter(renderer) {
     get quality() {
       return quality;
     },
+    // largeur de chaque bande noire, en pixels CSS du canvas (pour y caler l'interface)
+    get bars() {
+      return ((1 - U.uBox.value) * cw) / 2;
+    },
     // lignes de rendu réellement utilisées en ce moment
     get lines() {
       return target.height;
+    },
+    // le plus de lignes que l'image peut prendre en ce moment (pleine définition à l'œil nu, la bande au caméscope)
+    get maxLines() {
+      return fx.cam < 0.5 && fullOk ? fullH() : Math.min(tapeLines, ch);
     },
     setSize(w, h) {
       cw = Math.max(1, w | 0);
@@ -397,11 +453,13 @@ export function createVhsFilter(renderer) {
       U.uRes.value.set(cw, ch);
       applySize();
     },
-    // qualité : 'low' (480 lignes, sans halo), 'medium' (600), 'high' (720, par défaut)
+    // qualité : 'low' (480 lignes, sans halo), 'medium' (600), 'high' (720 au caméscope, pleine définition à l'œil
+    // nu, par défaut)
     setQuality(q) {
       quality = QUALITY[q] ? q : 'high';
       tapeLines = QUALITY[quality];
-      wantLines = tapeLines;
+      fullOk = quality === 'high';
+      wantLines = fullOk ? MAX_LINES : tapeLines;
       bloomOn = quality !== 'low';
       U.uBloomOn.value = bloomOn ? 1 : 0;
       applySize();
@@ -411,32 +469,34 @@ export function createVhsFilter(renderer) {
     setLines(n) {
       wantLines = clamp(Math.round(num(n, tapeLines) / 8) * 8, MIN_LINES, MAX_LINES);
     },
-    // fusionne des réglages (voir FX_DEFAULTS) ; renvoie les réglages courants
+    // fusionne des réglages (voir FX_DEFAULTS) ; getFx les relit. Appelé à chaque image : ne renvoie rien et ne crée
+    // rien (avant, une copie de tous les réglages à jeter, à chaque appel)
     setFx(partial = {}) {
-      for (const k of Object.keys(partial)) {
+      for (const k in partial) {
         if (!(k in FX_DEFAULTS)) continue;
         const v = partial[k];
         if (k === 'white') {
-          if (Array.isArray(v) && v.length >= 3) fx.white = [num(v[0], 1), num(v[1], 1), num(v[2], 1)].map((x) => clamp(x, 0, 3));
+          if (Array.isArray(v) && v.length >= 3) for (let i = 0; i < 3; i++) fx.white[i] = clamp(num(v[i], 1), 0, 3);
         } else if (k === 'freeze' || k === 'reduceFlashes') fx[k] = !!v;
         else if (k === 'brightness') fx.brightness = clamp(num(v, 1), 0.5, 1.8);
         else if (k === 'headSwitch') fx.headSwitch = clamp(num(v, 1), 0, 3);
         else fx[k] = clamp(num(v, 0), 0, 1);
       }
-      return api.getFx();
     },
     getFx() {
       return { ...fx, white: [...fx.white] };
     },
+    // revient aux réglages par défaut ; renvoie les réglages courants
     resetFx() {
-      return api.setFx(FX_DEFAULTS);
+      api.setFx(FX_DEFAULTS);
+      return api.getFx();
     },
     // exposure : l'exposition voulue par la caméra (1 en pleine lumière, plus haut dans le noir)
     render(scene, camera, time, danger, exposure = 1.2) {
       const t = now();
       const dt = lastNow == null ? 0 : clamp(t - lastNow, 0, 0.1);
       lastNow = t;
-      if (target.height !== Math.max(1, Math.min(wantLines, ch)) && t - lastResize >= RESIZE_EVERY) applySize();
+      if (target.height !== wantH() && t - lastResize >= RESIZE_EVERY) applySize();
 
       // flashs adoucis : les effets plein écran glissent au lieu de sauter
       const soft = fx.reduceFlashes;
@@ -463,6 +523,10 @@ export function createVhsFilter(renderer) {
       U.uWhite.value.set(fx.white[0], fx.white[1], fx.white[2]);
       U.uSoft.value = soft ? 1 : 0;
       U.uBright.value = fx.brightness;
+      // au caméscope : l'image 4:3 au centre, deux bandes noires sur les côtés (rien si l'écran est déjà étroit)
+      U.uCam.value = fx.cam;
+      U.uNight.value = fx.night * fx.cam;
+      U.uBox.value = 1 + (Math.min(1, (ch * 4) / 3 / cw) - 1) * fx.cam;
       // mise au point qui cherche : le flou respire un peu autour de la valeur demandée
       const focus = fx.focus > 0.001 ? clamp(fx.focus * (0.88 + 0.12 * Math.sin(time * 4.1) * Math.sin(time * 1.3 + 1)), 0, 1) : 0;
       U.uFocus.value = focus;

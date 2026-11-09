@@ -2,7 +2,7 @@
 
 Survie en coopération en 3D (Three.js), vue à la troisième personne, de 1 à 6 joueurs, avec des bots pour compléter.
 Dossier : `fief/`. Ce document décrit le jeu visé, les assets retenus et l'ordre de développement.
-Où on en est : **étape 3 faite** (voir la section 8).
+Où on en est : **étapes 6 et 7 faites**, le jeu est complet ; étape 8 : un début plus vif (voir la section 8).
 
 ## 1. L'idée
 
@@ -211,7 +211,46 @@ Chaque étape se termine par une version jouable, poussée, et validée avant de
    - Le bois rangé peut ressortir de l'entrepôt (E devant la porte) : c'est lui qui nourrit les braseros.
    - Seuls les soldats (Skeleton_Minion) et les guerriers (Skeleton_Warrior) sont là ; archers, mages et chevalier noir viendront avec les sièges.
    - Défaite : on rejoue depuis le crépuscule (instantané pris à la cloche) ou depuis le début.
-4. **À plusieurs** : branchement au Hub, hôte qui fait autorité, prédiction, poutres à deux, métiers.
-5. **La boucle complète** : construction des bâtiments, faim, froid, nourriture, 10 jours, sauvegarde, sièges des jours 5 et 10.
-6. **La crypte** et le Roi-Squelette, écran de fin, `H.report`.
-7. **Finitions** : sons, musique, écran d'accueil, réglages graphiques, mode Sans fin, manette et tactile.
+4. **À plusieurs** : branchement au Hub, hôte qui fait autorité, prédiction, poutres à deux, métiers. ✔ (version 4.54)
+   - Réseau : état compact (~400 octets) 15 fois par seconde, monde à chaque changement et toutes les 2 s, instantané complet toutes les 4 s
+     (il sert au relais d'hôte). L'invité prédit seulement son déplacement ; ses gestes (hache, E) passent par l'hôte.
+   - Métiers : bonus passifs pour l'instant (vie, dégâts, vitesse, portée, soin, relève, bûches, réparation). Les capacités sur F viendront plus tard.
+   - Poutres : un chêne donne une bûche et une poutre (3,4 m). Seul, on ne peut que tenir son bout ; le bûcheron la porte seul, plus lentement.
+     Elles s'empilent à l'entrepôt (stock « poutre ») pour la construction de l'étape 5.
+   - Banc d'essai : `tools/fief-duo.html` (deux ou trois jeux dans une page, messages relayés comme par le salon).
+5. **La boucle complète** : construction des bâtiments, faim, froid, nourriture, 10 jours, sauvegarde, sièges des jours 5 et 10. ✔ (version 4.55)
+   - Chantiers : E devant une ruine (le stock de l'entrepôt paie), puis des coups de marteau (clic). Maisons 8 bois + 1 poutre, forge et moulin
+     10 + 2, chapelle 14 + 3. Pas encore de pierre : la carrière et la pioche viendront avec d'autres bâtiments (puits, remparts, tours).
+   - Effets : maison +15 PV et abri (soin la nuit), forge +30 % de dégâts, moulin faim ×0,5 et +4 vivres à l'aube, chapelle : pas de résurrection
+     à moins de 24 m, et les tombés y reviennent au bout de 20 s.
+   - Faim : 100 → 0 en ~520 s ; baies (2 vivres le panier, repoussent en 300 s) ; manger rend 55. Froid : 0,5 PV/s après 3 s dans le noir.
+   - Sièges : nuits 5 et 10 de 200 s, +30 % de squelettes, chevalier noir (420 PV, frappe l'entrepôt ×3), deux à la dixième nuit.
+   - Le nombre de squelettes suit la taille de l'équipe (×0,75 seul, ×1,6 à six). Sans bâtiment, trois bots tiennent 5 à 10 nuits en Normale
+     et gagnent en Paisible : avec la forge, les maisons et la chapelle, l'équipe a de quoi faire mieux.
+   - Sauvegarde : `localStorage` de l'hôte (jour, stock, bâtiments, arbres abattus, braseros) à chaque aube et à chaque bâtiment relevé ;
+     les joueurs repartent du feu de camp, vie pleine. Pas encore de sauvegarde en ligne (`server/saves.js`).
+6. **La crypte** et le Roi-Squelette, écran de fin, `H.report`. ✔ (version 4.56)
+   - La crypte (`engine/crypt.js`) est une zone à part, loin au nord (z ≈ -330), dessinée sur une grille de cases de 2 m : entrée, salle des leviers,
+     herse, couloir de brume, salle du trône. On y descend par la porte du donjon (E), à l'aube du onzième jour ; l'horloge s'arrête, la faim aussi.
+   - Leviers : tenir E près de chacun ; les deux ensemble pendant 1,2 s lèvent la herse (un seul suffit s'il ne reste qu'un joueur debout).
+   - Couloir de brume : 1 + 2 squelettes par joueur debout, qui s'y relèvent. Torches : 10, rayon 5,5 m, les morts tombés près d'elles restent
+     à terre, et on y reprend 4 PV/s loin des squelettes.
+   - Le Roi : 1 400 PV × (0,45 + 0,25 par joueur), 22 dégâts (×0,8 à deux ou moins). Phase 1 : appelle 1 à 2 morts toutes les 14 s ; sous 60 % toutes les 11 s ;
+     sous 30 % toutes les 9 s, souffle les quatre torches du trône et frappe 30 % plus fort. Sa mort brise la malédiction (victoire).
+   - Défaite dans la crypte : « Retenter la crypte » repart de l'instantané pris à la première descente.
+   - `H.report` : une ligne par partie, score = 10 par nuit tenue + squelettes abattus + 100 si le Roi tombe.
+   - Trois bots seuls battent le Roi à peu près une fois sur deux en Normale ; des joueurs qui esquivent et rallument les torches font mieux.
+7. **Finitions** : sons, musique, écran d'accueil, réglages graphiques, mode Sans fin, manette et tactile. ✔ (version 4.56)
+   - Capacités (F, manette Y, bouton tactile) : Grand coup (bûcheron, 45 dégâts en arc, sonne et repousse, 18 s), Rempart (chevalier, attire les morts à 10 m
+     et divise ses dégâts par deux pendant 6 s, 25 s), Fusée (chasseuse, éclaire 7,5 m pendant 14 s à 9 m devant elle, 22 s), Prière (prêtre, +35 PV à 9 m
+     et aide à relever, 28 s), Barricade (forgeronne, 150 PV, 45 s, les morts doivent la casser, 25 s). Les bots s'en servent.
+   - Musique synthétisée (`view/music.js`) : jour, nuit, crypte, Roi, en fondu. Le son passe par le panneau Réglages commun (`shared/volume.js`).
+   - Qualité basse / moyenne / haute : finesse de l'image, ombres, forêt lointaine, nappes de brume (`scene.setQuality`).
+   - Le mode Sans fin et la manette existaient déjà ; l'écran d'accueil prend la vallée en fond.
+8. **Un début plus vif** (retour de partie : « on s'ennuie au début »). ✔ (version 4.58)
+   - Premier jour de 150 s (`CYCLE.first`, `dayLen`), les suivants 220 s.
+   - Jusqu'à trois bûches portées (`LOAD_MAX`, `p.load`) : on fait trois fois moins d'allers-retours.
+   - Coffres gardés (`placeChests`, `LOOT`, `CHEST`) : 2 + un par paire de joueurs, dans des clairières à 28-95 m du feu ; gardes endormis
+     (`state: 'sleep'`, `guard`) réveillés à 11 m, qui ne s'éloignent pas à plus de 22 m et retournent dormir. Le premier coffre est le plus proche,
+     un seul garde, 5 bûches : on se bat dès la première minute. De nouveaux coffres à chaque aube.
+   - Cloche au feu de camp (`canRing`, `ring`) : passer directement au crépuscule.

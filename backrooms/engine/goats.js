@@ -545,7 +545,6 @@ export function updateGoats(sim) {
           P.hurtT = 3;
           P.lockT = 1.4;
           P.running = false;
-          P.stamina = Math.max(0, P.stamina - 50);
           // projeté dans le sens de la charge
           const p = sim.moveWithCollisions(P.x, P.z, g.dirX * 1.2, g.dirZ * 1.2, 0.38, 0);
           P.x = p.x;

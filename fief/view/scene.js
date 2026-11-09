@@ -12,6 +12,8 @@ import { WATER, R_PLAY } from '../engine/map.js';
 import { loadKit, buildVillage } from './village.js';
 import { createActors } from './actors.js';
 import { createNight } from './night.js';
+import { createCrypt3D, createAbilityFx, CEIL } from './crypt.js';
+import { createChests } from './chests.js';
 
 const MOBILE = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 560;
 const SUN_DIR = new THREE.Vector3(-0.5, 0.62, 0.6).normalize();
@@ -50,9 +52,24 @@ export function createScene(stage, { onLost } = {}) {
     scene.environmentIntensity = 0.45;
   }
 
-  let night = null, peaksMesh = null;
+  let night = null, peaksMesh = null, kitRef = null, villageGroup = null, villageKey = '', berryMesh = null, berryKey = '';
   let map = null, treeKit = null, trees = null, actors = null, logsGroup = null, fire = null, falling = [], stumps = null;
-  const logMeshes = new Map();
+  const logMeshes = new Map(), beamMeshes = new Map();
+  let crypt3d = null, fx = null, chests3d = null, villageLights = [], wasInside = false, farForest = null;
+  // qualité : finesse de l'image, ombres, forêt lointaine, nappes de brume
+  let quality = 'moyen';
+  try { quality = localStorage.getItem('fief_q') || (MOBILE ? 'bas' : 'moyen'); } catch (e) {}
+  function setQuality(q) {
+    if (!['bas', 'moyen', 'haut'].includes(q)) q = 'moyen';
+    quality = q; try { localStorage.setItem('fief_q', q); } catch (e) {}
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, { bas: 1, moyen: MOBILE ? 1.25 : 1.5, haut: 2 }[q]));
+    const size = q === 'haut' ? 4096 : MOBILE ? 1024 : 2048;
+    if (sun.shadow.mapSize.x !== size) { sun.shadow.mapSize.set(size, size); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } }
+    sun.castShadow = q !== 'bas' && !wasInside;
+    if (farForest) farForest.visible = q !== 'bas';
+    if (night) night.layers(q === 'bas' ? 1 : q === 'moyen' ? 2 : 3);
+    resize();
+  }
   let viewT = 0;
   const SEE = { uSeeThru: { value: 0 }, uSeeAt: { value: new THREE.Vector3() } };
   const scr = new THREE.Vector3(), dbuf = new THREE.Vector2();
@@ -157,6 +174,9 @@ export function createScene(stage, { onLost } = {}) {
   const barkTex = (() => { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 128; const g = cv.getContext('2d'); g.fillStyle = '#5a4030'; g.fillRect(0, 0, 64, 128); for (let i = 0; i < 90; i++) { g.fillStyle = `rgba(${30 + Math.random() * 40},${20 + Math.random() * 25},${12 + Math.random() * 15},0.7)`; g.fillRect(Math.random() * 64, Math.random() * 128, 2 + Math.random() * 3, 10 + Math.random() * 30); } const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; })();
   const logGeo = new THREE.CylinderGeometry(0.17, 0.19, 1.7, 12, 1).rotateZ(Math.PI / 2);
   const logMats = [new THREE.MeshStandardMaterial({ map: barkTex, roughness: 0.95 }), new THREE.MeshStandardMaterial({ color: 0xc89f6a, roughness: 0.8 }), new THREE.MeshStandardMaterial({ color: 0xc89f6a, roughness: 0.8 })];
+  // poutre équarrie : 3,4 m de long, faces sciées claires aux bouts
+  const beamGeo = new THREE.BoxGeometry(0.3, 0.3, 3.4);
+  const beamMats = [logMats[0], logMats[0], logMats[0], logMats[0], logMats[1], logMats[1]];
   function makeLog() { const m = new THREE.Mesh(logGeo, logMats); m.castShadow = true; m.receiveShadow = true; return m; }
 
   // ------------------------------------------------------------------ feu de camp
@@ -180,7 +200,7 @@ export function createScene(stage, { onLost } = {}) {
   async function load(M, { onProgress } = {}) {
     map = M;
     // hauteur des bâtiments pour la caméra (toit compris)
-    for (const b of M.boxes) { const B = [...M.buildings, ...M.castle].find((o) => o.id === b.id); b.top = M.heightAt((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2) + (B && B.state === 'debout' ? 8.5 : 3.4 * (B && B.tall || 1)); }
+    for (const b of M.boxes) { const B = [...M.buildings, ...M.castle].find((o) => o.id === b.id); b.top = b.id === 'crypte' || b.id === 'herse' ? 99 : M.heightAt((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2) + (B && B.state === 'debout' ? 8.5 : 3.4 * (B && B.tall || 1)); }
     const step = (k) => onProgress && onProgress(k);
     scene.add(buildTerrain(M)); step(0.1);
     const river = buildRiver(M); scene.add(river); fire = { river };
@@ -216,10 +236,10 @@ export function createScene(stage, { onLost } = {}) {
       if (Math.abs(z - M.riverZ(x)) < 12) continue;
       far.push({ x, z, y: M.heightAt(x, z), kind: rr(i + 0.11) < 0.7 ? 'pine' : 'round', s: 0.9 + rr(i + 0.5) * 0.6, rot: rr(i) * 6.28, v: Math.floor(rr(i + 0.9) * 8) });
     }
-    scene.add(plantTrees(treeKit, far, { lo: true, shadows: false, dark: true }).group); step(0.35);
+    farForest = plantTrees(treeKit, far, { lo: true, shadows: false, dark: true }).group; scene.add(farForest); step(0.35);
     // village et château
-    const kit = await loadKit('models/village.glb'); step(0.6);
-    scene.add(buildVillage(kit, M));
+    kitRef = await loadKit('models/village.glb'); step(0.6);
+    villageGroup = buildVillage(kitRef, M); scene.add(villageGroup);
     // décor de Kenney : rochers, souches, tas de bûches, feu de camp, buissons
     const names = { rockA: 'rock_largeA', rockC: 'rock_largeC', rockE: 'rock_largeE', rockS: 'rock_smallA', rockS2: 'rock_smallC', stump: 'stump_round', logstack: 'log_stackLarge' };
     const models = {};
@@ -237,25 +257,42 @@ export function createScene(stage, { onLost } = {}) {
       if (M.pathDist(x, z) < 3 || Math.abs(z - M.riverZ(x)) < 8 || M.trees.some((t) => Math.hypot(t.x - x, t.z - z) < 1.6)) continue;
       prop(rr(i) < 0.6 ? 'bush' : 'bushL', x, M.heightAt(x, z) - 0.05, z, rr(i + 1) * 6.28, 1.4 + rr(i + 2) * 1.2);
     }
+    // buissons de baies : un buisson de Kenney et des grappes rouges (cachées une fois cueillies)
+    for (const b of M.bushes) prop('bush', b.x, b.y - 0.05, b.z, b.rot, 1.7 * b.s);
+    {
+      const geo = new THREE.SphereGeometry(0.07, 6, 5), mat = new THREE.MeshStandardMaterial({ color: 0xc8243a, roughness: 0.35, emissive: 0x3a0008 });
+      const per = 9; berryMesh = new THREE.InstancedMesh(geo, mat, M.bushes.length * per); berryMesh.userData = { per, pos: [] };
+      const m4 = new THREE.Matrix4(), rr2 = (k) => { const v = Math.sin(k * 91.7) * 43758.5; return v - Math.floor(v); };
+      M.bushes.forEach((b, i) => { for (let k = 0; k < per; k++) { const a = rr2(i * 13 + k) * 6.28, r = 0.35 + rr2(i * 7 + k * 3) * 0.3, y = 0.35 + rr2(i + k * 11) * 0.45; const p = [b.x + Math.cos(a) * r * b.s, b.y + y * b.s, b.z + Math.sin(a) * r * b.s]; berryMesh.userData.pos.push(p); m4.makeTranslation(...p); berryMesh.setMatrixAt(i * per + k, m4); } });
+      scene.add(berryMesh);
+    }
     // souches qui remplacent les arbres abattus
     stumps = { model: models.stump, list: [] };
     const f = buildFire(M, models.campfire); scene.add(f.group); fire.update = f.update;
     logsGroup = new THREE.Group(); scene.add(logsGroup);
     night = createNight({ scene, renderer, sky, sun, hemi, map: M, noise, peaks: peaksMesh });
     actors = await createActors(scene, { makeLog }); step(0.95);
+    // la crypte et les effets des capacités ; les lumières du village s'éteignent quand on est sous terre (et inversement)
+    scene.traverse((o) => { if (o.isPointLight) villageLights.push(o); });
+    crypt3d = createCrypt3D({ scene, kit: kitRef, map: M, noise });
+    fx = createAbilityFx(scene, M);
+    chests3d = createChests(scene, M);
+    setQuality(quality);
     const s = M.spawn; cam.yaw = s.yaw + Math.PI; cam.tx = s.x; cam.tz = s.z; cam.ty = M.heightAt(s.x, s.z) + 1.6;
   }
 
   // ------------------------------------------------------------------ chaque image
   const tmpV = new THREE.Vector3();
-  function treeFell(sim, id, dir) {
+  function treeFell(sim, id, dir, quiet = false) {
     trees.hide(id);
     const t = map.trees[id];
+    if (quiet) { addStump(t); return; }
     const piv = treeMesh(treeKit, { ...t, y: t.y });
     piv.userData = { ...piv.userData, t0: viewT, dir, axis: new THREE.Vector3(Math.cos(dir), 0, -Math.sin(dir)) };
     scene.add(piv); falling.push(piv);
-    if (stumps.model) { const o = stumps.model.scene.clone(); o.position.set(t.x, t.y - 0.1, t.z); o.scale.setScalar(2.3 * t.s); o.rotation.y = t.rot; o.traverse((m) => { if (m.isMesh) m.castShadow = true; }); scene.add(o); }
+    addStump(t);
   }
+  function addStump(t) { if (stumps.model) { const o = stumps.model.scene.clone(); o.position.set(t.x, t.y - 0.1, t.z); o.scale.setScalar(2.3 * t.s); o.rotation.y = t.rot; o.traverse((m) => { if (m.isMesh) m.castShadow = true; }); scene.add(o); } }
   // un arbre déjà abattu au chargement (partie reprise) : juste la souche
   function syncTrees(sim) { sim.trees.forEach((T, i) => { if (T.down && !T.shown) { T.shown = true; treeFell(sim, i, T.dir); } }); }
 
@@ -264,6 +301,20 @@ export function createScene(stage, { onLost } = {}) {
     SWAY.uT.value = t;
     if (fire) { fire.river.userData.U.uT.value = t; fire.update && fire.update(t, sim.darkness); }
     if (night) night.update(sim, t);
+    // sous terre : ni ciel ni soleil, une lumière d'ambiance froide, un brouillard noir
+    const inside = !!(map && map.crypt.inside(cam.tx, cam.tz));
+    if (inside !== wasInside) {
+      wasInside = inside; for (const l of villageLights) l.visible = !inside; sky.visible = !inside; sun.castShadow = !inside && quality !== 'bas';
+      if (!inside && night) night.force();
+    }
+    if (inside) {
+      sun.intensity = 0; hemi.color.setHex(0x7a6c96); hemi.groundColor.setHex(0x2a1e16); hemi.intensity = 0.55;
+      scene.fog.color.setHex(0x07080c); scene.fog.near = 5; scene.fog.far = 36; renderer.toneMappingExposure = 1.15; scene.environmentIntensity = 0.04;
+      if (peaksMesh) peaksMesh.visible = false;
+    }
+    if (crypt3d) crypt3d.update(sim, t, camera, inside);
+    if (fx) fx.update(sim, dt, t);
+    if (chests3d) chests3d.update(sim, dt, t);
     // arbres qui tombent : bascule accélérée, petit rebond, puis s'enfoncent et disparaissent
     viewT = t;
     const now = t;
@@ -287,7 +338,30 @@ export function createScene(stage, { onLost } = {}) {
       const k = Math.min(1, (now - m.userData.born) / 0.25); m.scale.setScalar(0.6 + 0.4 * k);
     }
     for (const [id, m] of logMeshes) if (!seen.has(id)) { logsGroup.remove(m); logMeshes.delete(id); }
+    // poutres : au sol, ou portées à hauteur d'épaule entre leurs porteurs
+    const bseen = new Set();
+    for (const b of sim.beams || []) {
+      if (!b.ready) continue;
+      bseen.add(b.id);
+      let m = beamMeshes.get(b.id);
+      if (!m) { m = new THREE.Mesh(beamGeo, beamMats); m.castShadow = true; m.receiveShadow = true; logsGroup.add(m); beamMeshes.set(b.id, m); m.position.set(b.x, b.y + 0.16, b.z); }
+      const ty = b.lifted ? b.y : map.heightAt(b.x, b.z) + 0.16, k = 1 - Math.exp(-dt * 18);
+      m.position.x += (b.x - m.position.x) * k; m.position.z += (b.z - m.position.z) * k; m.position.y += (ty - m.position.y) * k;
+      let dr = b.rot - m.rotation.y; while (dr > Math.PI) dr -= 2 * Math.PI; while (dr < -Math.PI) dr += 2 * Math.PI;
+      m.rotation.y += dr * k;
+    }
+    for (const [id, m] of beamMeshes) if (!bseen.has(id)) { logsGroup.remove(m); beamMeshes.delete(id); }
     actors.update(sim, dt, me, t);
+    // le village change quand un chantier s'ouvre ou qu'un bâtiment est relevé
+    const vk = Object.entries(sim.build || {}).map(([k, v]) => k + v.state).join();
+    if (vk !== villageKey && kitRef) { villageKey = vk; if (villageGroup) scene.remove(villageGroup); villageGroup = buildVillage(kitRef, map, sim.build); scene.add(villageGroup); }
+    // les baies cueillies disparaissent du buisson
+    const bk = (sim.berries || []).map((b) => (b.ready ? 1 : 0)).join('');
+    if (bk !== berryKey && berryMesh) {
+      berryKey = bk; const m4 = new THREE.Matrix4(), per = berryMesh.userData.per;
+      sim.berries.forEach((b, i) => { for (let k = 0; k < per; k++) { const p = berryMesh.userData.pos[i * per + k]; if (b.ready) m4.makeTranslation(...p); else m4.makeScale(0, 0, 0); berryMesh.setMatrixAt(i * per + k, m4); } });
+      berryMesh.instanceMatrix.needsUpdate = true;
+    }
 
     // caméra à l'épaule : derrière le joueur, orientée par la souris
     const p = sim.player(me);
@@ -306,12 +380,13 @@ export function createScene(stage, { onLost } = {}) {
       let f = 1;
       for (let i = 1; i <= 24; i++) {
         const u = i / 24, x = ox + (cx - ox) * u, z = oz + (cz - oz) * u, y = oy + (cy - oy) * u;
-        if (y < map.heightAt(x, z) + 0.35 || map.boxes.some((b) => x > b.x0 - 0.3 && x < b.x1 + 0.3 && z > b.z0 - 0.3 && z < b.z1 + 0.3 && y < b.top)) { f = Math.max(0.12, (i - 1) / 24); break; }
+        if (y < map.heightAt(x, z) + 0.35 || map.boxes.some((b) => !b.open && x > b.x0 - 0.3 && x < b.x1 + 0.3 && z > b.z0 - 0.3 && z < b.z1 + 0.3 && y < b.top)) { f = Math.max(0.12, (i - 1) / 24); break; }
       }
       cam.pull = Math.min(f, (cam.pull ?? 1) + dt * 1.5);
       cx = ox + (cx - ox) * cam.pull; cz = oz + (cz - oz) * cam.pull; cy = oy + (cy - oy) * cam.pull;
     }
     cy = Math.max(cy, map.heightAt(cx, cz) + 0.6);
+    if (inside) cy = Math.min(cy, map.crypt.y + CEIL - 0.35);
     camera.position.set(cx, cy, cz);
     camera.updateMatrixWorld();
     SEE.uSeeThru.value = Math.max(0, Math.hypot(cx - cam.tx, cy - cam.ty, cz - cam.tz) - 1.1);
@@ -334,5 +409,5 @@ export function createScene(stage, { onLost } = {}) {
   }
   addEventListener('resize', resize); resize();
 
-  return { get falling() { return falling; }, cam, renderer, scene, camera, load, update, treeFell, syncTrees, actorsEvent: (e) => actors && actors.event(e), get actors() { return actors; } };
+  return { get quality() { return quality; }, setQuality, get falling() { return falling; }, cam, renderer, scene, camera, load, update, treeFell, syncTrees, actorsEvent: (e) => actors && actors.event && actors.event(e), fxEvent: (e, sim) => { if (fx) fx.event(e, sim); if (chests3d) chests3d.event(e); }, get actors() { return actors; } };
 }

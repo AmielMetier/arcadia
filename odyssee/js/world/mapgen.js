@@ -1,5 +1,6 @@
 // odyssee/js/world/mapgen.js — construction des cartes (sans DOM) : grille de terrain, bâtiments, PNJ, téléporteurs.
 import { T, walkable } from './tiles.js';
+import { REGLES } from '../data/regles.js';
 
 export function rng(seed) { let s = (seed >>> 0) || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
 const key = (x, y) => x + ',' + y;
@@ -84,8 +85,23 @@ export class GameMap {
   sign(x, y, text, kind = 'sign') { this.under.set(key(x, y), this.get(x, y)); this.set(x, y, T.SIGN); this.signs.set(key(x, y), text); this.deco.push({ k: kind === 'sign' ? 'sign' : kind, x, y }); }
   object(x, y, o) { this.objects.set(key(x, y), o); }
   objectAt(x, y) { return this.objects.get(key(x, y)); }
-  /** décor bloquant (lampadaire, pot…) */
-  prop(k, x, y, block = true, o = {}) { this.deco.push({ k, x, y, ...o }); if (block) { if (this.get(x, y) !== T.BLOCK) this.under.set(key(x, y), this.get(x, y)); this.set(x, y, T.BLOCK); } }
+  /** décor bloquant (lampadaire, pot, bateau…) */
+  prop(k, x, y, block = true, o = {}) {
+    this.deco.push({ k, x, y, ...o });
+    if (block) {
+      const blockTile = (bx, by) => {
+        if (this.in(bx, by)) {
+          if (this.get(bx, by) !== T.BLOCK) this.under.set(key(bx, by), this.get(bx, by));
+          this.set(bx, by, T.BLOCK);
+        }
+      };
+      if (k === 'bateau' || o.cases === 3) {
+        blockTile(x - 1, y); blockTile(x, y); blockTile(x + 1, y);
+      } else {
+        blockTile(x, y);
+      }
+    }
+  }
   underAt(x, y) { return this.under.get(key(x, y)); }
 
   /** pose un bâtiment ; renvoie la position de la porte */

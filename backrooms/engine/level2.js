@@ -7,7 +7,7 @@
 // couloirs (on voit au travers, il faut faire le tour), et des tuyaux percés crachent des jets de vapeur brûlante par
 // intervalles en travers des couloirs : chaque vanne fermée éteint ceux de son secteur.
 // Mêmes cases et même forme de carte que le Level 0 et le Level 1 (map.js) : le moteur et la scène lisent les trois.
-import { CELL_SIZE, T, blocks, bfs, carveElevator, itemList } from './map.js';
+import { CELL_SIZE, T, blocks, bfs, carveElevator, itemList, shuffle } from './map.js';
 
 export const LEVEL2_SIZE = 66;
 export const LEVEL2_CEIL = 3.3;
@@ -125,6 +125,11 @@ const DEN_KIT = [
   RUBBLE,
 ];
 
+// Distance pour les choix de la carte : la racine d'une somme de carrés exacte, que tous les navigateurs calculent
+// pareil. Math.hypot est arrondi différemment d'un moteur à l'autre (Chrome n'est pas au plus près) : à égalité de
+// distance, Chrome et Firefox ne choisissaient pas toujours la même halle, ni le même secteur pour un jet de vapeur.
+const span = (dx, dz) => Math.sqrt(dx * dx + dz * dz);
+
 export function createPipesMap(seed = 3) {
   const W = LEVEL2_SIZE;
   const H = LEVEL2_SIZE;
@@ -203,15 +208,15 @@ export function createPipesMap(seed = 3) {
         const z0 = bzs[j] === 0 ? 1 : bzs[j] + 2;
         const z1 = bzs[j + bh] === H - 1 ? H - 2 : bzs[j + bh] - 2;
         if (x1 - x0 + 1 < minW || z1 - z0 + 1 < minH) continue;
-        const near = Math.hypot(Math.max(x0 - sx0, 0, sx0 - x1), Math.max(z0 - sz0, 0, sz0 - z1));
+        const near = span(Math.max(x0 - sx0, 0, sx0 - x1), Math.max(z0 - sz0, 0, sz0 - z1));
         if (near < minD) continue;
-        cand.push({ i, j, bw, bh, x0, x1, z0, z1, d: Math.hypot((x0 + x1) / 2 - sx0, (z0 + z1) / 2 - sz0) });
+        cand.push({ i, j, bw, bh, x0, x1, z0, z1, d: span((x0 + x1) / 2 - sx0, (z0 + z1) / 2 - sz0) });
       }
     }
     if (!cand.length) return null;
     if (spread) {
       // assez loin des autres halles (au-delà de 16 cases, peu importe), mais plutôt vers le cœur du réseau
-      for (const q of cand) q.far = Math.min(16, ...halls.map((h) => Math.hypot((q.x0 + q.x1 - h.x0 - h.x1) / 2, (q.z0 + q.z1 - h.z0 - h.z1) / 2))) - 0.55 * q.d;
+      for (const q of cand) q.far = Math.min(16, ...halls.map((h) => span((q.x0 + q.x1 - h.x0 - h.x1) / 2, (q.z0 + q.z1 - h.z0 - h.z1) / 2))) - 0.55 * q.d;
       cand.sort((a, b) => b.far - a.far);
     } else cand.sort((a, b) => b.d - a.d);
     const c = cand[Math.floor(rnd() * Math.min(spread ? 3 : 5, cand.length))];
@@ -287,7 +292,7 @@ export function createPipesMap(seed = 3) {
         const tries = [];
         for (let x = room.x0; x <= room.x1; x++) tries.push([x, room.z0, 0, -1], [x, room.z1, 0, 1]);
         for (let z = room.z0; z <= room.z1; z++) tries.push([room.x0, z, -1, 0], [room.x1, z, 1, 0]);
-        tries.sort(() => rnd() - 0.5);
+        shuffle(tries, rnd);
         const want = w * h > 16 && rnd() < 0.6 ? 2 : 1;
         for (const [ex, ez, dx, dz] of tries) {
           if (room.doors.length >= want) break;
@@ -337,7 +342,7 @@ export function createPipesMap(seed = 3) {
   let best = Infinity;
   for (const x of xs) {
     for (const z of zs) {
-      const d = Math.hypot(x - W / 2, z - H / 2);
+      const d = span(x - W / 2, z - H / 2);
       if (d < best && isF(x, z)) {
         best = d;
         sx = x;
@@ -436,7 +441,7 @@ export function createPipesMap(seed = 3) {
     if (hall.den || hall.extra) continue;
     const spots = [];
     for (let z = hall.pz; z + 3 <= hall.z1 - 2; z += 3) for (let x = hall.px; x + 3 <= hall.x1 - 2; x += 3) spots.push([x + 1, z + 1]);
-    spots.sort(() => rnd() - 0.5);
+    shuffle(spots, rnd);
     const want = Math.min(spots.length, 3 + Math.floor(rnd() * 3));
     for (const [gx, gz] of spots) {
       if (hall.tanks.length >= want) break;
@@ -474,12 +479,12 @@ export function createPipesMap(seed = 3) {
       if (used.has(r) || !r.doors.length) return false;
       const c = center(r);
       const a = angle(c.x, c.z);
-      return a >= a0 && a < a1 && (D(c) < 0 ? 0 : D(c)) > maxD * minD && Math.hypot(c.x - exitCell.x, c.z - exitCell.z) > 6;
+      return a >= a0 && a < a1 && (D(c) < 0 ? 0 : D(c)) > maxD * minD && span(c.x - exitCell.x, c.z - exitCell.z) > 6;
     };
     let cand = rooms.filter((r) => okRoom(r, 0.35));
     if (!cand.length) cand = rooms.filter((r) => okRoom(r, 0.12));
     let valve = null;
-    for (const room of cand.sort(() => rnd() - 0.5)) {
+    for (const room of shuffle(cand, rnd)) {
       // la case où l'on se tient : contre un mur de la pièce, le plus loin possible de la porte
       const door = room.doors[0];
       const spots = [];
@@ -498,7 +503,7 @@ export function createPipesMap(seed = 3) {
       // les chaudières : dans les autres coins de la pièce, sans couper le passage ni boucher la porte
       const before = reachCount();
       const placed = [];
-      const corners = [[room.x0, room.z0], [room.x1, room.z0], [room.x0, room.z1], [room.x1, room.z1]].sort(() => rnd() - 0.5);
+      const corners = shuffle([[room.x0, room.z0], [room.x1, room.z0], [room.x0, room.z1], [room.x1, room.z1]], rnd);
       const wantB = (room.x1 - room.x0 + 1) * (room.z1 - room.z0 + 1) >= 12 ? 2 : 1;
       for (const [x, z] of corners) {
         if (placed.length >= wantB) break;
@@ -524,7 +529,14 @@ export function createPipesMap(seed = 3) {
         const a = angle(c.x, c.z);
         return a >= a0 && a < a1 && D(c) > maxD * 0.3 && !inRoom(c.x, c.z) && valves.every((o) => Math.abs(o.gx - c.x) + Math.abs(o.gz - c.z) > 10);
       });
-      const c = pick(spots.length ? spots : walkable.filter((w) => D(w) > 8));
+      let pool = spots.length ? spots : walkable.filter((w) => D(w) > 8);
+      // carte minuscule (aucune case à plus de 8 cases du départ) : la case accessible la plus lointaine, hors des
+      // autres vannes, au pire le départ lui-même (jamais de pick([]) suivi d'un plantage)
+      if (!pool.length) {
+        const free = walkable.filter((w) => D(w) >= 0 && valves.every((o) => o.gx !== w.x || o.gz !== w.z));
+        pool = [free.reduce((b, w) => (D(w) > D(b) ? w : b), free[0] || { x: sx, z: sz })];
+      }
+      const c = pick(pool);
       const d = DIRS.find(([dx, dz]) => get(c.x + dx, c.z + dz) === T.WALL) || [1, 0];
       valve = { x: c.x, z: c.z, dx: d[0], dz: d[1] };
     }
@@ -555,7 +567,7 @@ export function createPipesMap(seed = 3) {
   const gates = [];
   const keep = new Set([sz * W + sx, exitCell.z * W + exitCell.x, ...valves.map((v) => v.gz * W + v.gx)]);
   const nearKeep = (x, z, d) => [...keep].some((k) => Math.abs((k % W) - x) + Math.abs(Math.floor(k / W) - z) < d);
-  const straightCells = walkable.filter((c) => straight(c.x, c.z)).sort(() => rnd() - 0.5);
+  const straightCells = shuffle(walkable.filter((c) => straight(c.x, c.z)), rnd);
   for (const c of straightCells) {
     if (gates.filter((g) => !g.open).length >= 5) break;
     if (nearKeep(c.x, c.z, 5) || gates.some((g) => Math.abs(g.gx - c.x) + Math.abs(g.gz - c.z) < 12)) continue;
@@ -587,14 +599,14 @@ export function createPipesMap(seed = 3) {
   // Chacun a son rythme ; chacun dépend de la vanne la plus proche (la fermer l'éteint).
   const jets = [];
   const gateAt = (x, z) => gates.some((g) => g.gx === x && g.gz === z);
-  for (const c of walkable.filter((w) => straight(w.x, w.z)).sort(() => rnd() - 0.5)) {
+  for (const c of shuffle(walkable.filter((w) => straight(w.x, w.z)), rnd)) {
     if (jets.length >= 16) break;
     if (D(c) < 7 || nearKeep(c.x, c.z, 4) || gateAt(c.x, c.z)) continue;
     if (jets.some((j) => Math.abs(j.gx - c.x) + Math.abs(j.gz - c.z) < 8)) continue;
     if (gates.some((g) => Math.abs(g.gx - c.x) + Math.abs(g.gz - c.z) < 3)) continue;
     const axis = straight(c.x, c.z);
     const period = 5.5 + rnd() * 4;
-    const sector = valves.reduce((b, v) => (Math.hypot(v.gx - c.x, v.gz - c.z) < Math.hypot(b.gx - c.x, b.gz - c.z) ? v : b)).id;
+    const sector = valves.reduce((b, v) => (span(v.gx - c.x, v.gz - c.z) < span(b.gx - c.x, b.gz - c.z) ? v : b)).id;
     jets.push({ id: jets.length, gx: c.x, gz: c.z, x: (c.x + 0.5) * C, z: (c.z + 0.5) * C, axis, side: rnd() < 0.5 ? 1 : -1, y: 1.5 + rnd() * 0.7, period, on: 1.5 + rnd() * 0.9, off: rnd() * period, sector });
   }
   const jetGrid = new Int16Array(W * H).fill(-1);
@@ -603,7 +615,7 @@ export function createPipesMap(seed = 3) {
   // 8b. Des renfoncements obscurs le long des galeries : une case creusée dans le mur, en cul-de-sac (les chèvres s'y
   // tapissent, on s'y cache) ; la lampe de cette case-là n'est jamais posée
   const niches = [];
-  for (const c of walkable.filter((w) => straight(w.x, w.z)).sort(() => rnd() - 0.5)) {
+  for (const c of shuffle(walkable.filter((w) => straight(w.x, w.z)), rnd)) {
     if (niches.length >= 16) break;
     if (D(c) < 5 || nearKeep(c.x, c.z, 4) || jetGrid[c.z * W + c.x] >= 0) continue;
     if (gates.some((g) => Math.abs(g.gx - c.x) + Math.abs(g.gz - c.z) < 3)) continue;
@@ -650,7 +662,7 @@ export function createPipesMap(seed = 3) {
   const hash = (a, b) => ((((a * 73856093) ^ (b * 19349663) ^ (seed * 83492791)) >>> 0) % 1000) / 1000;
   const lights = [];
   const stateAt = (x, z) => {
-    if (Math.hypot(x - sx, z - sz) < 7) return 'on';
+    if (span(x - sx, z - sz) < 7) return 'on';
     const v = noiseAt(x, z);
     if (v < 0.27 || rnd() < 0.07) return 'off';
     if (v < 0.37 || rnd() < 0.08) return 'flicker';
@@ -763,17 +775,31 @@ export function createPipesMap(seed = 3) {
       if (gates.some((g) => Math.abs(g.gx - c.x) + Math.abs(g.gz - c.z) < 3)) return false;
       return !breakers.some((b) => Math.abs(b.gx - c.x) + Math.abs(b.gz - c.z) < 6);
     };
-    let cand = walkable.filter((c) => ok(c, 9, SECTOR_R - 2));
-    if (!cand.length) cand = walkable.filter((c) => ok(c, 4, SECTOR_R));
-    // vers le bord de la zone noire (parmi les plus éloignés de la vanne, un peu au hasard)
-    cand.sort((a, b) => dv[b.z * W + b.x] - dv[a.z * W + a.x] + (rnd() - 0.5) * 6);
+    // Faute de place le long d'une galerie (le secteur tient parfois tout entier dans la chaufferie : une autre vanne
+    // toute proche a pris les couloirs), des passes plus lâches : n'importe quelle case du secteur contre un mur, dans
+    // une pièce ou dans un coin, puis n'importe quelle case à moins de SECTOR_R de la vanne. Chaque secteur doit avoir
+    // son disjoncteur : sans lui, ses néons sautés ne se rallumeraient jamais.
+    const loose = (c, own) => {
+      const d = dv[c.z * W + c.x];
+      if (d < 1 || d > SECTOR_R || (own && sectorOf(c.x, c.z) !== v.id)) return false;
+      if (jetGrid[c.z * W + c.x] >= 0 || niches.some((n) => n.gx === c.x && n.gz === c.z) || nearKeep(c.x, c.z, 2)) return false;
+      if (gates.some((g) => Math.abs(g.gx - c.x) + Math.abs(g.gz - c.z) < 2)) return false;
+      return !breakers.some((b) => Math.abs(b.gx - c.x) + Math.abs(b.gz - c.z) < 3);
+    };
+    const passes = [(c) => ok(c, 9, SECTOR_R - 2), (c) => ok(c, 4, SECTOR_R), (c) => loose(c, true), (c) => loose(c, false)];
     let spot = null;
-    for (const c of cand) {
-      const d = DIRS.find(([dx, dz]) => get(c.x + dx, c.z + dz) === T.WALL && !lampFace.has(`${c.x},${c.z},${dx},${dz}`));
-      if (d) {
-        spot = { c, d };
-        break;
+    for (const pass of passes) {
+      // vers le bord de la zone noire (parmi les plus éloignés de la vanne, un peu au hasard) : une clé par case, tirée
+      // une fois (sa distance à la vanne, à 1,5 case près), puis un tri ordinaire sur cette clé
+      const cand = walkable.filter(pass).map((c) => ({ c, k: dv[c.z * W + c.x] + (rnd() - 0.5) * 3 })).sort((a, b) => b.k - a.k);
+      for (const { c } of cand) {
+        const d = DIRS.find(([dx, dz]) => get(c.x + dx, c.z + dz) === T.WALL && !lampFace.has(`${c.x},${c.z},${dx},${dz}`));
+        if (d) {
+          spot = { c, d };
+          break;
+        }
       }
+      if (spot) break;
     }
     if (!spot) continue;
     const { c, d } = spot;
@@ -840,7 +866,7 @@ export function createPipesMap(seed = 3) {
   }
   for (const c of walkable) {
     const k = c.z * W + c.x;
-    if (busy.has(k) || inRoom(c.x, c.z) || Math.hypot(c.x - sx, c.z - sz) < 3 || rnd() > 0.075) continue;
+    if (busy.has(k) || inRoom(c.x, c.z) || span(c.x - sx, c.z - sz) < 3 || rnd() > 0.075) continue;
     const walls = DIRS.filter(([dx, dz]) => get(c.x + dx, c.z + dz) === T.WALL);
     if (!walls.length) continue;
     busy.add(k);
@@ -859,13 +885,13 @@ export function createPipesMap(seed = 3) {
     }
     return out;
   };
-  const bottles = scatter(8, 8);
+  const bottles = scatter(11, 8);
   const batteries = scatter(10, 6);
 
   // 12. Entité : loin du départ ; le troupeau part de la bergerie (ou, faute de bergerie, de cases lointaines)
   const monsterCell = pick(walkable.filter((c) => D(c) > maxD * 0.55 && !busy.has(c.z * W + c.x))) || far[0];
   const goatCells = den ? walkable.filter((c) => c.x >= den.x0 && c.x <= den.x1 && c.z >= den.z0 && c.z <= den.z1) : walkable.filter((c) => D(c) > maxD * 0.6);
-  const goatSpawn = goatCells.sort(() => rnd() - 0.5).slice(0, 8).map(cellPos);
+  const goatSpawn = shuffle(goatCells, rnd).slice(0, 8).map(cellPos);
 
   const open = (x, z) => x >= 0 && z >= 0 && x < W && z < H && !blocks(grid[z * W + x]);
   const openCount = (x, z) => DIRS.filter(([dx, dz]) => open(x + dx, z + dz)).length;
