@@ -23,8 +23,9 @@ const range = (dir, base, n) => Array.from({ length: n }, (_, i) => `${dir}/${ba
 const LEVEL_SFX = {
   0: { chase: range('level0', 'chase', 3), ambient: range('level0', 'ambiant', 9), death: 'level0/death' },
   1: { chase: range('level1', 'chase', 1), ambient: [], death: null },
-  2: { chase: [], ambient: [], death: null }, // Poolrooms : tout est synthétisé (pompes, gouttes, clapotis)
+  2: null, // Poolrooms : la même entité qu'au Level 1, les mêmes sons (voir levelSfx)
   [PIPES_LEVEL]: { chase: [], ambient: [], death: null, entity: false }, // Tuyauteries : le troupeau, pas l'entité
+  4: { chase: [], ambient: [], death: null }, // Terror Hotel (HOTEL_LEVEL) : pas encore de sons (des craquements synthétisés)
 };
 const NO_SFX = { chase: [], ambient: [], death: null };
 // l'enregistrement commun à toutes les poursuites : un élan (ses 2,44 premières secondes, joué une fois quand la
@@ -60,7 +61,7 @@ function loudPart(buf) {
   LOUD.set(buf, out);
   return out;
 }
-const levelSfx = (level) => LEVEL_SFX[level] || NO_SFX;
+const levelSfx = (level) => LEVEL_SFX[level === 2 ? 1 : level] || NO_SFX; // Poolrooms : les sons du Level 1
 const hasEntity = (level) => levelSfx(level).entity !== false;
 
 const clamp01 = (v) => Math.max(0, Math.min(1, +v || 0));
@@ -1423,6 +1424,55 @@ export class BackroomsSfx {
       this.tapeCrumple(t0 + 1.3);
       return;
     }
+
+    // Level 5 : un hurlement humain déchiré (deux voix désaccordées qui montent puis s'effondrent), un coup sourd
+    if (level === 4) { // HOTEL_LEVEL
+      if (this.monsterGain) this.monsterGain.gain.setValueAtTime(0.0001, t);
+      const shaper = c.createWaveShaper();
+      const curve = new Float32Array(1024);
+      for (let i = 0; i < 1024; i++) {
+        const x = (i / 1023) * 2 - 1;
+        curve[i] = Math.tanh(x * 6);
+      }
+      shaper.curve = curve;
+      const out = c.createGain();
+      out.gain.setValueAtTime(0.0001, t);
+      out.gain.exponentialRampToValueAtTime(0.55, t + 0.03);
+      out.gain.setValueAtTime(0.55, t + 0.9);
+      out.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+      shaper.connect(out).connect(this.master || this.out);
+      for (const [f0, det] of [[420, 0], [445, 12], [210, -7]]) {
+        const o = c.createOscillator();
+        o.type = 'sawtooth';
+        o.detune.value = det;
+        o.frequency.setValueAtTime(f0 * 0.7, t);
+        o.frequency.exponentialRampToValueAtTime(f0 * 1.9, t + 0.25);
+        o.frequency.exponentialRampToValueAtTime(f0 * 0.45, t + 1.4);
+        // la voix tremble
+        const lfo = c.createOscillator();
+        lfo.frequency.value = 9 + Math.random() * 5;
+        const lg = c.createGain();
+        lg.gain.value = f0 * 0.08;
+        lfo.connect(lg).connect(o.frequency);
+        const g = c.createGain();
+        g.gain.value = 0.3;
+        o.connect(g).connect(shaper);
+        o.start(t);
+        lfo.start(t);
+        o.stop(t + 1.5);
+        lfo.stop(t + 1.5);
+      }
+      const thud = c.createOscillator();
+      const tg = c.createGain();
+      thud.frequency.setValueAtTime(90, t);
+      thud.frequency.exponentialRampToValueAtTime(35, t + 0.4);
+      tg.gain.setValueAtTime(0.9, t);
+      tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      thud.connect(tg).connect(this.master || this.out);
+      thud.start(t);
+      thud.stop(t + 0.55);
+      return;
+    }
     if (this.voiceGain) this.voiceGain.gain.setValueAtTime(0.0001, t);
     this.scareHit(t0, 1.35);
     this.scareScream(t0, 1.4);
@@ -2430,6 +2480,12 @@ export class BackroomsSfx {
     };
     const vol = (v0, v1) => v0 + (v1 - v0) * v;
     const lv = this.roomLevel;
+    if (slot === 'rec' && lv === 4) {
+      // Level 5 (l'hôtel) : un parquet qui craque quelque part, plus rarement une boîte à musique désaccordée au loin
+      if (w < 0.25) this.musicBox();
+      else this.creak();
+      return;
+    }
     if (slot === 'rec') {
       const AMBIENT = levelSfx(lv).ambient;
       if (!AMBIENT.length) return;
@@ -3301,6 +3357,26 @@ export class BackroomsSfx {
     this.caption('[power returns]');
   }
 
+  // Level 5 : une touche du clavier à code, et le refus d'un mauvais code
+  beep(f = 1250, len = 0.07, vol = 0.08, type = 'square') {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    const o = c.createOscillator();
+    const g = c.createGain();
+    o.type = type;
+    o.frequency.value = f;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    o.connect(g).connect(this.out);
+    o.start(t);
+    o.stop(t + len + 0.02);
+  }
+
+  buzz() {
+    this.beep(160, 0.45, 0.12, 'sawtooth');
+  }
+
   // Ding de l'ascenseur : une cloche frappée (partiels de bronze, un léger battement), deux notes qui descendent.
   // pos : { x, z } de l'ascenseur (null : non placé)
   ding(pos = null) {
@@ -3313,6 +3389,59 @@ export class BackroomsSfx {
       this.burst(out, t + d, 0.01, 'bandpass', 4000, 2, 0.04);
     }
     this.caption('[elevator ding]', pos);
+  }
+
+  // Level 5 : une latte de parquet qui craque, quelque part dans l'hôtel
+  creak() {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    const o = c.createOscillator();
+    o.type = 'sawtooth';
+    const f = 70 + Math.random() * 60;
+    o.frequency.setValueAtTime(f, t);
+    o.frequency.linearRampToValueAtTime(f * (1.3 + Math.random() * 0.6), t + 0.5 + Math.random() * 0.5);
+    // un grincement saccadé : le volume tremble vite
+    const am = c.createOscillator();
+    am.frequency.value = 18 + Math.random() * 20;
+    const amg = c.createGain();
+    amg.gain.value = 0.5;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.05, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
+    am.connect(amg).connect(g.gain);
+    const bp = c.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 600 + Math.random() * 500;
+    bp.Q.value = 4;
+    o.connect(bp).connect(g).connect(this.out);
+    o.start(t);
+    am.start(t);
+    o.stop(t + 1.2);
+    am.stop(t + 1.2);
+  }
+
+  // Level 5 : quelques notes de boîte à musique, lentes et désaccordées, très bas
+  musicBox() {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t0 = c.currentTime;
+    const notes = [659, 587, 523, 494, 523, 392, 440, 330];
+    const start = Math.floor(Math.random() * 3);
+    notes.slice(start, start + 5).forEach((f, i) => {
+      const t = t0 + i * 0.55;
+      const o = c.createOscillator();
+      const g = c.createGain();
+      o.type = 'triangle';
+      o.frequency.value = f * (0.985 + Math.random() * 0.02);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.025, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+      o.connect(g).connect(this.out);
+      o.start(t);
+      o.stop(t + 1.5);
+    });
   }
 
   // On se glisse dans un toboggan : un frottement d'eau qui file et s'éloigne, puis quelques gouttes

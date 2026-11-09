@@ -53,4 +53,4 @@ export function placeHides(map, n, seed = 1) {
 
 // où se tient un joueur caché dans le casier (au fond, face à la porte), et où il ressort (devant la porte)
 export const hideInside = (h) => ({ x: h.x - h.dx * 0.05, z: h.z - h.dz * 0.05, yaw: Math.atan2(-h.dx, -h.dz) });
-export const hideFront = (h) => ({ x: h.x + h.dx * 0.95, z: h.z + h.dz * 0.95 });
+export const hideFront = (h) => h.out || ({ x: h.x + h.dx * 0.95, z: h.z + h.dz * 0.95 });

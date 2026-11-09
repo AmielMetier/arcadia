@@ -8,7 +8,7 @@ import { classicEntity } from './entity.js';
 import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
 import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
 import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, NICHE_LO, NICHE_SIZE, NICHE_DEPTH, FLOOR_DY, DEEP_DEPTH, pillarDist } from '../engine/map.js';
-import { FUSES, feetY, stairAt, PIPES_LEVEL, THIRST_BLUR, LIFT_SHUT_T } from '../engine/sim.js';
+import { FUSES, feetY, stairAt, PIPES_LEVEL, THIRST_BLUR, LIFT_SHUT_T, HOTEL_LEVEL } from '../engine/sim.js';
 import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
 import { createInset } from './inset.js';
@@ -16,6 +16,8 @@ import { buildWarehouse } from './warehouse.js';
 import { createPlayerAvatars } from './players.js';
 import { createBeast } from './beast.js';
 import { buildWater } from './water.js';
+import { buildHotel } from './hotel.js';
+import { createHotelEntity } from './hotelEntity.js';
 import { createGoatHerd } from './goats.js';
 import { createPipesTextures } from './textures2.js';
 import { buildPipes, L2_PROC } from './pipes.js';
@@ -174,14 +176,15 @@ export function createBackroomsScene(container, floors, lamps) {
   const L1 = map0.level === 1;
   const L2 = map0.level === 2; // Level 37, les Poolrooms : clair, laiteux, carrelé, inondé
   const PIPES = map0.level === PIPES_LEVEL; // le Level 2, les Tuyauteries
-  const L0 = !L1 && !L2 && !PIPES; // le Level 0 : la moquette, le papier peint jaune, les néons
+  const L3 = map0.level === HOTEL_LEVEL; // Level 5, le Terror Hotel : pénombre chaude, boiseries, moquette rouge
+  const L0 = !L1 && !L2 && !PIPES && !L3; // le Level 0 : la moquette, le papier peint jaune, les néons
   const CEIL = map0.ceil || WALL_HEIGHT;
   const scene = new THREE.Scene();
   // Level 1 : un froid bleuté, un brouillard plus épais ; Level 2 : une moiteur brune, chaude
   // (Level 1 : le fond a la couleur du brouillard, si épais qu'à 65 m tout s'y est fondu, même un néon allumé — à un
   // millionième près : on ne dessine rien au-delà, l'image n'en change pas d'un pixel)
-  scene.background = new THREE.Color(L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#080604' : '#0d0b06');
-  scene.fog = new THREE.FogExp2(L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#0a0705' : '#080604', L2 ? 0.022 : L1 ? 0.058 : PIPES ? 0.033 : 0.05);
+  scene.background = new THREE.Color(L3 ? '#070403' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#080604' : '#0d0b06');
+  scene.fog = new THREE.FogExp2(L3 ? '#120a06' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#0a0705' : '#080604', L3 ? 0.022 : L2 ? 0.022 : L1 ? 0.058 : PIPES ? 0.033 : 0.05);
 
   const camera = new THREE.PerspectiveCamera(OPTS.fov, window.innerWidth / window.innerHeight, 0.08, L1 ? 65 : 90);
   camera.position.set(map0.spawn.x, 1.6, map0.spawn.z);
@@ -195,8 +198,8 @@ export function createBackroomsScene(container, floors, lamps) {
 
   const textures = createBackroomsTextures(PIPES ? 0 : map0.level || 0);
   const tx2 = PIPES ? createPipesTextures() : null;
-  const AMB = L2 ? 0.045 : 0.012;
-  const ambient = new THREE.AmbientLight(L2 ? '#eaf7f6' : L1 ? '#c9d8ff' : PIPES ? '#ffd9a8' : '#fff3c4', AMB);
+  const AMB = L2 ? 0.045 : L3 ? 0.1 : 0.012; // l'hôtel : une pénombre chaude, mais on y voit
+  const ambient = new THREE.AmbientLight(L3 ? '#ffcf96' : L2 ? '#eaf7f6' : L1 ? '#c9d8ff' : PIPES ? '#ffd9a8' : '#fff3c4', AMB);
   scene.add(ambient);
   const dummy = new THREE.Object3D();
   const loader = new GLTFLoader();
@@ -373,12 +376,12 @@ export function createBackroomsScene(container, floors, lamps) {
       uBake: { value: bakeTex },
       uBakeScale: { value: new THREE.Vector2(1 / (W * CELL_SIZE), 1 / (H * CELL_SIZE)) },
       uBakeTX: { value: TX },
-      uBakeTint: { value: L2 ? new THREE.Color(1.0, 1.05, 1.07) : L1 ? new THREE.Color(0.86, 0.98, 1.12) : PIPES ? new THREE.Color(1.25, 0.98, 0.7) : LOW0 ? new THREE.Color(1.12, 1.04, 0.8) : new THREE.Color(1.05, 1.03, 0.83) }, // Level 0 : en haut une lumière blanche à peine chaude ; en bas, la lumière chaude d'avant
+      uBakeTint: { value: L3 ? new THREE.Color(1.2, 0.92, 0.62) : L2 ? new THREE.Color(1.0, 1.05, 1.07) : L1 ? new THREE.Color(0.86, 0.98, 1.12) : PIPES ? new THREE.Color(1.25, 0.98, 0.7) : LOW0 ? new THREE.Color(1.12, 1.04, 0.8) : new THREE.Color(1.05, 1.03, 0.83) }, // Level 0 : en haut une lumière blanche à peine chaude ; en bas, la lumière chaude d'avant
       uBakeTint2: { value: PIPES ? new THREE.Color(0.78, 0.95, 1.08) : L0 ? new THREE.Color(1.2, 0.72, 0.38) : new THREE.Color(0, 0, 0) }, // Level 0 : les lampadaires des recoins calmes
       uCeilB: { value: 1 }, // la part du second canal reçue par le plafond (la phase rouge : des feux qui éclairent vers le bas)
       uBakeY: { value: -fi * FLOOR_DY },
       uCeil: { value: CEIL },
-      uDamp: { value: L2 ? 0 : L1 ? 0.6 : PIPES ? 0.5 : 1 },
+      uDamp: { value: L3 ? 0.35 : L2 ? 0 : L1 ? 0.6 : PIPES ? 0.5 : 1 },
       // Poolrooms : sous la surface, le carrelage prend la teinte de l'eau et les caustiques dansent dessus
       uPool: { value: L2 ? 1 : 0 },
       uTime: { value: 0 },
@@ -596,7 +599,7 @@ export function createBackroomsScene(container, floors, lamps) {
         for (const v of nookLamps) if (v.k > 0.01) addPrint(liveB, v.fp, v.k);
       }
       for (let i = 0; i < BW * BH; i++) {
-        const v = Math.min(1, (L2 || PIPES ? 0.03 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
+        const v = Math.min(1, (L2 || PIPES ? 0.03 : L3 ? 0.09 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
         bakeData[i * 4] = Math.round(v * 255);
         if (PIPES || alarm || nookLamps.length) bakeData[i * 4 + 2] = Math.round(Math.min(1, liveB[i] * 0.3 * power) * 255);
       }
@@ -1409,7 +1412,7 @@ float bkCaust(vec2 uv, float t) {
         const k = kind.h / (size.y || 1);
         const fix = new THREE.Matrix4().makeScale(k, k, k).multiply(new THREE.Matrix4().makeTranslation(-c.x, -box.min.y, -c.z));
         const place = list.map((p) => {
-          const m = new THREE.Matrix4().makeTranslation(p.x, p.tipped ? (size.x * k) / 2 : 0, p.z).multiply(new THREE.Matrix4().makeRotationY(p.rot));
+          const m = new THREE.Matrix4().makeTranslation(p.x, (p.y || 0) + (p.tipped ? (size.x * k) / 2 : 0), p.z).multiply(new THREE.Matrix4().makeRotationY(p.rot));
           if (p.tipped) m.multiply(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
           return m.multiply(fix);
         });
@@ -1499,7 +1502,7 @@ float bkCaust(vec2 uv, float t) {
         const k = l.fs || 1;
         return Math.abs(vx - l.x) >= 0.61 * k + 0.3 + 0.2 || Math.abs(vz - l.z) >= 0.31 * k + 0.3 + 0.2;
       });
-    const rates = L2
+    const rates = L2 || L3
       ? { outlet: 0, fire_alarm: 0, power_box_01: 0, wall_clock: 0, drawing: 0 }
       : L1
       ? { outlet: 0.02, fire_alarm: 0.01, power_box_01: 0.012, wall_clock: 0, drawing: 0 }
@@ -1526,7 +1529,7 @@ float bkCaust(vec2 uv, float t) {
             break;
           }
         }
-        if (!L1 && !L2 && !PIPES && drnd() < 0.045 && !holeAbove(x, z)) {
+        if (!L1 && !L2 && !L3 && !PIPES && drnd() < 0.045 && !holeAbove(x, z)) {
           const ox = (drnd() - 0.5) * 1.2;
           const oz = (drnd() - 0.5) * 1.2;
           const rot = drnd() < 0.5 ? 0 : Math.PI / 2;
@@ -1834,7 +1837,7 @@ float bkCaust(vec2 uv, float t) {
     }
 
     // 6a. Les casiers métalliques où l'on peut se cacher (Level 1, Tuyauteries)
-    if ((map.hides || []).length) {
+    if ((map.hides || []).length && !map.spots) { // les casiers (pas les lits et armoires de l'hôtel)
       const lockMat = baked(new THREE.MeshLambertMaterial({ color: PIPES ? '#6b6253' : '#55615a' }));
       const slitMat = new THREE.MeshBasicMaterial({ color: '#070707' });
       const body = new THREE.BoxGeometry(0.78, 1.95, 0.56);
@@ -2505,6 +2508,7 @@ float bkCaust(vec2 uv, float t) {
     // 9. Level 1 : l'habillage de l'entrepôt (rayonnages à palettes, marchandises, tuyaux, lignes au sol, piliers, panneaux)
     const wh = L1 ? buildWarehouse({ map, group, baked, CEIL, textures }) : null;
     if (wh) group.userData.wh = wh; // (?debug : wh.off dessine tout, pour comparer)
+    const hotel = L3 ? buildHotel({ map, group, baked, CEIL }) : null;
     // 9b. Level 2 : tuyauteries, lampes grillagées, grilles, chaudières, vannes et vapeur
     const pipesView = PIPES ? buildPipes({ map, group, baked, CEIL, tx: tx2, camera }) : null;
     if (pipesView) pipesView.setFog(scene.fog);
@@ -2830,7 +2834,7 @@ float bkCaust(vec2 uv, float t) {
       at.add(fakeWall);
       return { exitGroup, doors, fakeWall, btnMat };
     };
-    const lift = E ? buildLift(E, false) : null;
+    const lift = E && !E.fire ? buildLift(E, false) : null; // Level 5 : la porte de secours est dans view/hotel.js
     const exitGroup = lift ? lift.exitGroup : new THREE.Group();
     const doors = lift ? lift.doors : [];
     const fakeWall = lift ? lift.fakeWall : null;
@@ -3132,6 +3136,7 @@ float bkCaust(vec2 uv, float t) {
           water.update(sim, P, time, dt, camera);
           bakeUniforms.uWaterY.value = water.level;
         }
+        if (hotel) hotel.update(sim, P, time, dt);
 
         // Coupure de courant : les néons meurent d'un coup, puis reviennent en grésillant
         const want = !(sim.blackout > 0);
@@ -3802,6 +3807,7 @@ float bkCaust(vec2 uv, float t) {
   // choisie (eau d'amande ou piles ; l'échelle, trop grande, reste dans le sac). Ils suivent la caméra et prennent
   // la lumière d'où l'on est (néons autour, lampe allumée).
   const held = new THREE.Group();
+  let scareFx = null; // Level 5 : le screamer en cours
   camera.add(held);
   const heldMats = [];
   const heldCol = new THREE.Color(); // la lumière qui tombe sur ce que l'on tient
@@ -3921,12 +3927,13 @@ float bkCaust(vec2 uv, float t) {
   const faceTime = { value: 0 };
   // au Level 1, l'image de la planche affichée : décalage et taille dans la texture (xy, zw)
   const faceFrame = { value: new THREE.Vector4(0, 0, 1, 1) };
-  const anim = L1 || PIPES ? ENTITY_ANIM : null;
+  const anim = L1 || L2 || PIPES ? ENTITY_ANIM : null; // aux Poolrooms, la même entité qu'au Level 1
   face.visible = false;
   monsterGroup.add(face);
   // l'entité en 3D, animée (view/beast.js) ; au Level 1 en mode VIP : la vidéo d'origine
   // mode VIP au Level 0 : le même corps, avec le visage de la photo de l'entité d'origine
-  const beast = !ENTITY_VIP ? createBeast() : !L1 ? createBeast({ photo: { url: VIP_IMG, crop: [490, 20, 300, 375] } }) : null;
+  // Level 5 : l'entité de l'hôtel, un modèle humain animé os par os (view/hotelEntity.js)
+  const beast = L3 ? createHotelEntity() : !ENTITY_VIP ? createBeast() : !(L1 || L2) ? createBeast({ photo: { url: VIP_IMG, crop: [490, 20, 300, 375] } }) : null;
   if (beast) {
     monsterGroup.add(beast.group);
     shadow.visible = false;
@@ -4153,6 +4160,12 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       if (goatHerd) goatHerd.scare();
     },
 
+    // Level 5 : le screamer de la mort (l'entité 3D se jette sur la caméra)
+    scare() {
+      if (!L3 || !beast || !beast.scarePose) return;
+      scareFx = { t0: null, x: camera.position.x, y: camera.position.y, z: camera.position.z, yaw: camera.rotation.y };
+    },
+
     dispose() {
       window.removeEventListener('resize', onResize);
       if (liveScene === api) liveScene = null;
@@ -4278,9 +4291,13 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       // 1. Caméra : balancement lent de la marche, plus marqué en courant ; une chute la fait plonger d'un étage
       if (P.moving) bob += dt * (P.running ? 9 : 5.5);
       const pm = sim.fm(P.floor || 0);
-      const want = 1.6 + feetY(sim.stairs, P.x, P.z, P.floor) + (P.onLadder ? 1.0 : 0) - (pm.depthAt ? pm.depthAt(P.x, P.z) : 0);
+      let want = 1.6 + feetY(sim.stairs, P.x, P.z, P.floor) + (P.onLadder ? 1.0 : 0) - (pm.depthAt ? pm.depthAt(P.x, P.z) : 0);
+      // Level 5 : sous le lit, au ras du sol ; dans l'armoire, debout ; accroupi, plus bas
+      const low = (P.hidden >= 0 && pm.spots) || P.crouch;
+      if (P.hidden >= 0 && pm.spots) want = pm.spots[P.hidden].kind === 'bed' ? 0.28 : 1.5;
+      else if (P.crouch) want -= 0.62;
       // une chute : on tombe vraiment (gravité), puis le choc secoue la caméra
-      if (want < eyeY - 0.5 || fallV > 0) {
+      if ((want < eyeY - 0.5 && !low) || fallV > 0) {
         fallV += 9.8 * dt;
         eyeY -= fallV * dt;
         if (eyeY <= want) {
@@ -4450,8 +4467,9 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
           faceFrame.value.y = 1 - (Math.floor(f / anim.cols) + 1) / anim.rows;
         }
         const j = (chase ? 0.12 : 0.04) * faceGlitch.value;
-        // la hauteur de ses pieds : les marches de l'escalier, la chute dans un trou
-        const my = M.y ?? -(M.floor || 0) * FLOOR_DY;
+        // la hauteur de ses pieds : les marches de l'escalier, la chute dans un trou ; aux Poolrooms, le fond de l'eau
+        const mm = sim.fm(M.floor || 0);
+        const my = (M.y ?? -(M.floor || 0) * FLOOR_DY) - (mm.depthAt ? mm.depthAt(M.x, M.z) : 0);
         if (beast) {
           // en 3D : elle regarde où elle va (ou le joueur qu'elle observe), et marche vraiment
           monsterGroup.position.set(M.x + (Math.random() - 0.5) * j * 0.3, my, M.z + (Math.random() - 0.5) * j * 0.3);
@@ -4609,6 +4627,34 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         lines = Math.min(lines, Math.max(360, top));
         vhs.setLines(lines);
       }
+      // Level 5 : le screamer. La caméra reste où l'on est mort ; l'entité surgit à 2,40 m et se jette à 55 cm du
+      // visage en un quart de seconde, puis reste là, tremblante, pendant que l'image saute
+      let glitch = danger;
+      if (scareFx) {
+        if (scareFx.t0 === null) scareFx.t0 = time;
+        const k = time - scareFx.t0;
+        if (k > 1.5) {
+          scareFx = null;
+          held.visible = true;
+        } else {
+          const c = scareFx;
+          const fx = -Math.sin(c.yaw);
+          const fz = -Math.cos(c.yaw);
+          const d = THREE.MathUtils.lerp(2.4, 0.55, Math.pow(Math.min(1, k / 0.24), 0.55));
+          const sh = k < 0.24 ? 0.015 : 0.05 * (1 - k / 1.6);
+          const r = () => (Math.random() - 0.5) * sh;
+          camera.position.set(c.x + r(), c.y + r(), c.z + r());
+          camera.rotation.order = 'YXZ';
+          camera.rotation.set(0.05 + r() * 0.8, c.yaw + r() * 0.8, r() * 1.6);
+          held.visible = false;
+          monsterGroup.visible = true;
+          monsterGroup.position.set(c.x + fx * d, c.y - 1.8, c.z + fz * d);
+          monsterGroup.rotation.y = Math.atan2(c.x - monsterGroup.position.x, c.z - monsterGroup.position.z);
+          beast.update(sim.monster, true, 1, dt, time, 1);
+          glitch = 1;
+          exposure = 1.25;
+        }
+      }
       // le caméscope d'un coéquipier qui filme, en médaillon (vivant, au même étage, pas soi-même)
       const camQ = !RF && P === sim.player && P.status === 'alive' ? sim.players.find((q) => q !== P && q.cam && q.status === 'alive' && (q.floor || 0) === (P.floor || 0) && !(q.hidden >= 0)) : null;
       const S = camQ && (avatarPos.get(camQ.id) || camQ);
@@ -4618,7 +4664,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       const shotQ = camQ && (S.yaw !== undefined ? { ...camQ, yaw: S.yaw } : camQ); // son regard suit la même piste que son corps (sans à-coups)
       const eyeQ = camQ && { x: S.x, y: ey, z: S.z };
       cullFor(inset.due(shotQ) ? { x: S.x, y: ey, z: S.z, fr: inset.frustum(shotQ, eyeQ, fov, insetFr) } : null);
-      vhs.render(scene, camera, time, danger, exposure * (1 + nightT * 1.6));
+      vhs.render(scene, camera, time, glitch, exposure * (1 + nightT * 1.6));
 
       if (camQ) {
         const pm = sim.fm(P.floor || 0);

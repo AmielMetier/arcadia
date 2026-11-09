@@ -1,11 +1,24 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
-import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE } from './engine/sim.js';
+import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE, HOTEL_LEVEL } from './engine/sim.js';
 import { hasLineOfSight } from './engine/nav.js';
 import { bfs, CELL_SIZE, cellsOnSeg, T } from './engine/map.js';
 import { createBackroomsScene, setMonsterMode, setSceneOptions } from './view/scene.js';
 import { BackroomsSfx } from './view/sfx.js';
 import { createVoice } from './view/voice.js';
 import { BackroomsHUD, levelName, levelSub, LORE, loreOf, hearTape, tapesHeard, store } from './view/hud.js';
+import { parseWords } from './engine/hotel.js';
+
+// Level 5, version VIP : les mots du fichier backrooms/password_level5/mots.txt (6 lettres, un par ligne) ; sans
+// fichier (ou sans mot valide), la liste standard
+let vipWords = null;
+fetch('password_level5/mots.txt', { cache: 'no-cache' })
+  .then((r) => (r.ok ? r.text() : ''))
+  .then((t) => {
+    const w = parseWords(t);
+    vipWords = w.length ? w : null;
+    if (sim && monstersVip && vipWords) sim.words = vipWords;
+  })
+  .catch(() => {});
 
 const H = window.HubBridge;
 const stageEl = document.getElementById('stage');
@@ -133,6 +146,7 @@ let crouchOn = false; // C : s'accroupir / se relever (bascule)
 let camOn = false; // V : sortir / ranger le caméscope
 let airborne = false; // en plein saut (pour le bruit de la réception)
 let selRequested = 0; // touches 2 à 5 : choisir la case d'objet (1 à INV_SIZE)
+let codeRequested = null; // Level 5 : le code tapé sur le clavier de la porte de secours
 let kbMode = false;
 let paused = true; // la partie attend qu'on prenne le contrôle
 let started = false; // la première prise en main (avant : l'écran titre)
@@ -313,6 +327,11 @@ window.addEventListener('keydown', (e) => {
   }
   if (paused) {
     if (kbMode && (e.code === 'Enter' || e.code === 'Space')) play();
+    return;
+  }
+  if (hud && hud.keypadOpen) {
+    e.preventDefault();
+    hud.keypadKey(e);
     return;
   }
   keys[e.code] = true;
@@ -513,9 +532,9 @@ function initGame(settings = lastSettings, forceLevel = null) {
   // tout le salon, sauf ceux revenus au salon pendant la partie d'avant (ceux qui chargent encore arrivent vivants)
   const players = NET.role === 'host' ? H.players.filter((p) => p.id === NET.myId || !NET.quit.has(p.id)).map((p) => ({ id: p.id, name: p.name || 'Player' })) : [{ id: 0, name: 'Player' }];
   NET.run = Date.now();
-  // ?level1, ?level37 ou ?level2 (seul) : on commence directement au Level 1, aux Poolrooms ou aux Tuyauteries
-  const lvm = NET.role === 'solo' && location.search.match(/[?&]level(1|2|37)(&|=|$)/);
-  const lv = forceLevel != null ? forceLevel : lvm ? { 1: 1, 37: 2, 2: PIPES_LEVEL }[lvm[1]] : 0;
+  // ?level1, ?level37, ?level2 ou ?level5 (seul) : on commence directement au Level 1, aux Poolrooms ou aux Tuyauteries
+  const lvm = NET.role === 'solo' && location.search.match(/[?&]level(1|2|37|5)(&|=|$)/);
+  const lv = forceLevel != null ? forceLevel : lvm ? { 1: 1, 37: 2, 2: PIPES_LEVEL, 5: HOTEL_LEVEL }[lvm[1]] : 0;
   startRun({ seed, difficulty, players, run: NET.run, level: lv, vip: settings.monsters === 'vip' });
   // ?parkour (seul) : on commence devant le couloir piégé, tourné vers les trous
   const trap = sim.map.trap;
@@ -605,7 +624,7 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   if (!players.some((p) => p.id === NET.myId)) players = [...players, { id: NET.myId, name: 'Player' }];
   // la difficulté adaptative ne compte que chez l'hôte (c'est lui qui fait tourner l'entité)
   const skill = NET.role === 'guest' ? 0.5 : +store.get(SKILL_KEY, 0.5);
-  sim = new BackroomsSim({ difficulty, seed, players, localId: NET.myId, level, skill }); // les étages sortent de la graine
+  sim = new BackroomsSim({ difficulty, seed, players, localId: NET.myId, level, skill, words: monstersVip ? vipWords : null }); // les étages sortent de la graine
   if (NET.role !== 'solo') {
     ensureVoice().sync(players.map((p) => p.id));
   }
@@ -690,7 +709,7 @@ function guestInputs() {
     const q = NET.actions[id] || (NET.actions[id] = []);
     // une action par pas, dans l'ordre où l'invité les a faites (avec la case qu'il avait choisie)
     const a = q.shift() || {};
-    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, cam: !!i.cm, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', drop: a.k === 'd', pick: a.k === 'p', whistle: a.k === 't', jump: a.k === 'j', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v, voice: i.vo, radio: i.ra, seq: i.seq };
+    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, cam: !!i.cm, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', drop: a.k === 'd', pick: a.k === 'p', whistle: a.k === 't', jump: a.k === 'j', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v, voice: i.vo, radio: i.ra, seq: i.seq, code: a.k === 'c' ? a.v : undefined };
     i.pos = null; // une position annoncée ne sert qu'une fois
   }
   return out;
@@ -735,9 +754,9 @@ function onMsg(from, m) {
           ? `MAPS DON'T MATCH · ${who} HAS ${verLabel(gv)}, YOU HAVE ${verLabel(GAME_V)} · RELOAD THE PAGE (CTRL+SHIFT+R)`
           : `MAPS DON'T MATCH · ${who} HAS ${verLabel(gv)} · ${who} IS UPDATING`, 14);
       }
-    } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'd', 'p', 't', 'b', 'h', 'g'].includes(m.k)) {
+    } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'd', 'p', 't', 'b', 'h', 'g', 'c'].includes(m.k)) {
       const q = NET.actions[from] || (NET.actions[from] = []);
-      if (q.length < 8) q.push({ k: m.k, sel: slotOf(m.s), side: m.side > 0 ? 1 : -1, n: Math.max(1, Math.min(4, m.n | 0)) });
+      if (q.length < 8) q.push({ k: m.k, sel: slotOf(m.s), side: m.side > 0 ? 1 : -1, n: Math.max(1, Math.min(4, m.n | 0)), v: String(m.v || '').replace(/\D/g, '').slice(0, 4) });
     }
     return;
   }
@@ -854,6 +873,37 @@ function handleEvent(ev, me) {
       if (sfx) setTimeout(() => sfx && sfx.loreTape(4 + LORE[n].length / 16), 700);
       break;
     }
+    case 'letter':
+      if (sfx) sfx.cassette();
+      if (hud) hud.toast(ev.by === me ? `Letter « ${ev.char} » from room ${ev.num} · post it in the lobby mailboxes` : `${who(ev.by)} found a letter (room ${ev.num})`);
+      break;
+    case 'posted':
+      if (hud) hud.toast(`Mailbox ${ev.num}: « ${ev.char} » (${ev.count}/${ev.total})`);
+      break;
+    case 'mailEmpty':
+      if (mine && hud) hud.toast('No letter to post: they are hidden in the rooms');
+      break;
+    case 'codeShown':
+      if (sfx) sfx.exitUnlocked();
+      if (hud) hud.toast('All six letters are in… a code glows on the lobby ceiling');
+      break;
+    case 'keypad':
+      if (ev.id === me && hud) {
+        for (const k in keys) keys[k] = false;
+        hud.openKeypad(
+          (code) => {
+            codeRequested = code;
+          },
+          () => sfx && sfx.beep(),
+        );
+      }
+      break;
+    case 'codeWrong':
+      if (ev.id === me && hud) {
+        hud.keypadWrong();
+        if (sfx) sfx.buzz();
+      }
+      break;
     case 'fuse': {
       if (sfx) sfx.cassette(sim.level === 2 ? 'valve' : 'fuse');
       if (sim.level === 2) {
@@ -899,7 +949,7 @@ function handleEvent(ev, me) {
     case 'hide':
       if (sfx) sfx.hide(ev.id === me ? null : { x: ev.x, z: ev.z });
       if (sfx && ev.id === me && !ev.on && sfx.breathHeld) sfx.holdBreath(false);
-      if (ev.id === me && ev.on && hud) hud.toast('Hidden · hold [Shift] to hold your breath when it comes close');
+      if (ev.id === me && ev.on && hud) hud.toast(sim.map.spots ? 'Hidden · [E] to come out · hold [Shift] to hold your breath when it comes close' : 'Hidden · hold [Shift] to hold your breath when it comes close');
       break;
     case 'breath':
       if (ev.id === me && sfx) sfx.holdBreath(ev.on);
@@ -946,7 +996,7 @@ function handleEvent(ev, me) {
       if (sfx) sfx.silence(4);
       break;
     case 'powered':
-      if (hud) hud.toast(sim.level === 2 ? 'Valves closed: the pumps stop, the three slides open' : 'Fuses in place: the freight elevator is starting up');
+      if (hud) hud.toast(sim.level === HOTEL_LEVEL ? 'The keypad beeps: the fire escape door is unlocked' : sim.level === 2 ? 'Valves closed: the pumps stop, the three slides open' : 'Fuses in place: the freight elevator is starting up');
       if (sfx && sim.level === 2) sfx.setPool(false); // le silence d'un coup : les pompes s'arrêtent
       break;
     case 'exitUnlocked': {
@@ -1143,7 +1193,10 @@ function handleEvent(ev, me) {
     case 'board': {
       // (dans un ascenseur, on monte à bord quand ses portes se ferment : le son est celui des portes)
       const sl = ev.slide !== undefined && sim.map.slides ? sim.map.slides[ev.slide] : null;
-      if (!sl) break;
+      if (!sl) {
+        if (hud && ev.id !== me && sim.level === HOTEL_LEVEL) hud.toast(`${ev.name} reached the fire escape`);
+        break;
+      }
       if (sfx) sfx.splashDown();
       if (hud && ev.id !== me) hud.toast(`${ev.name} slid into the ${sl.name.toLowerCase()} slide`);
       break;
@@ -1200,10 +1253,11 @@ function handleEvent(ev, me) {
       break;
     case 'depart':
       if (sfx && ev.level === 2) sfx.splashDown();
-      else if (sfx) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
-      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
+      else if (sfx && ev.level !== HOTEL_LEVEL) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
+      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : ev.level === HOTEL_LEVEL ? 'YOU RUN DOWN THE FIRE ESCAPE, FLOOR AFTER FLOOR…' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
       break;
     case 'level':
+      if (hud) hud.closeKeypad();
       // un nouvel étage s'allume : le bourdonnement des néons revient (même si on est parti pendant une coupure)
       if (sfx) sfx.dark = false;
       // un étage de plus : elle s'enhardit un peu pour la prochaine partie
@@ -1245,15 +1299,17 @@ function handleEvent(ev, me) {
       }
       // elle surgit devant l'objectif (dans la scène), puis la bande saute… et rejoue tes dernières secondes, vues de sa
       // tête (sur une autre caméra) ; puis l'image se perd
-      if (sfx) sfx.jumpscare(sim.level);
-      if (scene) scene.jumpscare();
-      if (hud) hud.showJumpscare(sim.level);
+      // aux Poolrooms, le même screamer qu'au Level 1 (la même entité) ; au Level 5, l'entité de l'hôtel se jette sur la caméra
+      const look = sim.level === 2 ? 1 : sim.level;
+      if (sfx) sfx.jumpscare(look);
+      if (scene) sim.level === HOTEL_LEVEL ? scene.scare() : scene.jumpscare();
+      if (hud) hud.showJumpscare(look);
       {
         const now = performance.now() / 1000;
         const frames = tapeFrames.filter((f) => f.t > now - 3.6);
         const span = frames.length ? frames[frames.length - 1].t - frames[0].t : 0;
         const sc = scene;
-        replayed = span > 1.5 && !sim.goats;
+        replayed = span > 1.5 && !sim.goats && sim.level !== HOTEL_LEVEL; // Level 5 : son screamer en 3D, pas de rejeu
         const lose = () => {
           if (scene !== sc) return;
           replayed = false; // le rejeu est fini : l'écran de fin n'a plus à l'attendre
@@ -1375,8 +1431,8 @@ function handleEvent(ev, me) {
       if (H && H.embedded && NET.role !== 'guest') {
         const won = ev.type === 'win';
         // la vraie fin vaut bien plus qu'une fausse sortie, qui vaut plus que de mourir loin (Level 2 compris)
-        const trueEnd = won && sim.level === PIPES_LEVEL;
-        const depth = { 0: 0, 1: 1, 2: 2, [PIPES_LEVEL]: 3 }[sim.level] || 0;
+        const trueEnd = won && (sim.level === PIPES_LEVEL || sim.level === HOTEL_LEVEL); // sortir par les Tuyauteries ou par l'hôtel
+        const depth = { 0: 0, 1: 1, 2: 2, [PIPES_LEVEL]: 3, [HOTEL_LEVEL]: 3 }[sim.level] || 0;
         H.report({
           id: `backrooms-${Date.now()}`,
           mode: dailyLabel ? 'Carte du jour' : 'Survie',
@@ -1517,6 +1573,7 @@ function frame(currentTime) {
       pitch: newPitch,
       run: live && run,
       crouch: live && crouch,
+      code: codeRequested || undefined,
       jump: live && act.jump,
       cam: camOn && sim.player.status === 'alive',
       struggle: act.struggle,
@@ -1554,6 +1611,7 @@ function frame(currentTime) {
       }
       const sel = sim.player.sel;
       if (toggleFlashlightRequested) send('host', { t: 'a', k: 'f', s: sel, run: NET.run });
+      if (codeRequested) send('host', { t: 'a', k: 'c', v: codeRequested, s: sel, run: NET.run });
       for (const [k, on] of [['e', act.use], ['d', input.drop], ['p', act.pick], ['t', act.whistle], ['j', input.jump]]) if (on) send('host', { t: 'a', k, s: sel, run: NET.run });
       if (act.struggle) send('host', { t: 'a', k: 'g', n: act.struggle, run: NET.run });
       if (NET.tick % 3 === 0) {
@@ -1581,6 +1639,7 @@ function frame(currentTime) {
     selRequested = 0;
     if (act.struggle && sfx) sfx.struggle();
     act.use = act.pick = act.drop = act.whistle = act.jump = false;
+    codeRequested = null;
     act.struggle = 0;
 
     // Détection de pas pour le son de marche sur moquette
@@ -1667,7 +1726,7 @@ function frame(currentTime) {
     sfx.entUpdate(M, entEar.occ, floors, entEar.spaceS);
     entChase = chasing && !M.away && !sim.goats ? { danger: M.danger, occl } : null;
     // Level 2 : pas de bourdonnement d'entité, les sabots du troupeau
-    sfx.updateMonsterSound(sim.goats || M.away ? 0 : M.danger, M, sim.level === 1, occl);
+    sfx.updateMonsterSound(sim.goats || M.away ? 0 : M.danger, M, sim.level === 1 || sim.level === 2, occl); // Poolrooms : la voix de l'entité du Level 1
     sfx.updateChase(chasing, M.danger, M, occl);
     // la musique de tension suit le directeur (la peur de l'équipe) et ce que fait l'entité
     const D = sim.director;
@@ -1919,6 +1978,7 @@ if (window.DDVolume && btnSet) {
         ['Courir · lampe · accroupi', '<kbd>Maj</kbd> · <kbd>1</kbd> · <kbd>C</kbd>'],
         ['Choisir · utiliser · ramasser', '<kbd>2</kbd> <kbd>3</kbd> · <kbd>E</kbd> · <kbd>F</kbd>'],
         ['Siffler', '<kbd>T</kbd>'],
+        ["S'accroupir (Level 5)", '<kbd>C</kbd> maintenu'],
         ['Jouer · pause', '<kbd>Entrée</kbd> · <kbd>Échap</kbd> ou <kbd>P</kbd>'],
       ] }] },
     ],
