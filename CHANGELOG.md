@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.94 — 9 novembre 2026
+- **Hub** — Nouveau : trailer officiel de 30 secondes pour The Backrooms avec bouton de lecture sur la carte du Hub (Amiel)
+
 ## 4.93 — 6 novembre 2026
 - **The Backrooms** — au Terror Hotel (Level 5) :
   - Caché sous un lit ou dans une armoire, une fois que l'entité a perdu ta trace, elle quitte la chambre et reprend sa ronde au loin, au lieu de fouiller autour de toi.
