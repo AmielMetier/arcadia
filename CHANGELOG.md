@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 4.86 — 9 novembre 2026
+- **The Backrooms** — La caméra se tourne au pavé tactile, sans souris (iPad compris) : glisser à deux doigts pour regarder autour de soi, ou cliquer-glisser.
+  - En mode « Sans souris », le pavé tactile s'ajoute aux flèches ; pincer zoome le caméscope.
+  - Sur tablette, un clic au pavé tactile ne fait plus apparaître le joystick de marche et reprend la partie mise en pause.
+
 ## 4.85 — 9 novembre 2026
 - **The Backrooms** — Un vrai inventaire : quatre cases d'objets à côté de la lampe, à choisir avec les touches 2 à 5 ou la molette.
   - G pose l'objet choisi par terre, juste devant soi : une eau d'amande ou des piles à laisser à un coéquipier, l'échelle à garder pour plus tard. On l'entend tomber.
