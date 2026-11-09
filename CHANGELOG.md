@@ -1,7 +1,13 @@
 # Journal des versions — Arcadia
 
+## 4.96 — 9 novembre 2026
+- **The Backrooms** — Nouveau bruitage de course : le souffle enregistré, qui grésillait en boucle, laisse place à une vraie respiration (inspiration, expiration) plus douce, qui s'accélère à mesure que tu t'essouffles.
+
+## 4.95 — 9 novembre 2026
+- **Hub** — Revert "feat(hub,backrooms): trailer officiel de 30 secondes pour The Backrooms avec bouton de lecture sur la carte du Hub" (Amiel)
+
 ## 4.94 — 9 novembre 2026
-- **The Backrooms** — au Level 0, une feuille de cahier est scotchée au mur juste à côté de l'arrivée : le mot griffonné d'un survivant passé avant vous, qui dessine l'entité, les cassettes, les trous dans le sol et le faux ascenseur.
+- **Hub** — Nouveau : trailer officiel de 30 secondes pour The Backrooms avec bouton de lecture sur la carte du Hub (Amiel)
 
 ## 4.93 — 6 novembre 2026
 - **The Backrooms** — au Terror Hotel (Level 5) :

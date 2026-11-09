@@ -13,8 +13,6 @@
 import { growlBuffer } from './entity.js';
 import { PIPES_LEVEL } from '../engine/level2.js';
 const VOICE = new URL('../monster/david.mp3', import.meta.url).href;
-// souffle haletant (« breathing tired » de mikeask, OpenGameArt, CC0)
-const BREATH = new URL('../sfx/souffle.mp3', import.meta.url).href;
 // sons du jeu (backrooms/sfx/) : un dossier par niveau (cris de poursuite, ambiances jouées au hasard, le son de la
 // mort toute proche) ; ce qui est à la racine du dossier sert partout
 const SFX = (name) => new URL(`../sfx/${name}.mp3`, import.meta.url).href;
@@ -740,27 +738,43 @@ export class BackroomsSfx {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
     if (!this.breathGain) {
+      // souffle synthétisé (plus de boucle enregistrée) : inspiration courte par le nez/la bouche, expiration plus
+      // longue et plus grave, adoucies par un passe-bas pour ne jamais siffler
       this.breathGain = c.createGain();
       this.breathGain.gain.value = 0;
-      this.breathGain.connect(this.master);
-      fetch(BREATH)
-        .then((r) => r.arrayBuffer())
-        .then((b) => c.decodeAudioData(b))
-        .then((buf) => {
-          const src = c.createBufferSource();
-          src.buffer = buf;
-          src.loop = true;
-          src.connect(this.breathGain);
-          src.start();
-          this.breathSrc = src;
-        })
-        .catch(() => {});
+      const lp = c.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 2200;
+      lp.Q.value = 0.5;
+      this.breathGain.connect(lp).connect(this.master);
+      this.breathBus = c.createGain();
+      this.breathBus.gain.value = 1;
+      this.breathBus.connect(this.breathGain);
+      this.breathNext = 0;
     }
     if (this.breathHeld) level = 0;
+    level = Math.max(0, Math.min(1, level));
     const t = c.currentTime;
-    this.breathGain.gain.setTargetAtTime(Math.max(0, Math.min(1, level)) * 0.4, t, level > 0.05 ? 0.35 : this.breathHeld ? 0.06 : 0.6);
-    // plus essoufflé, plus rapide
-    if (this.breathSrc) this.breathSrc.playbackRate.setTargetAtTime(0.9 + Math.min(1, level) * 0.25, t, 0.5);
+    this.breathGain.gain.setTargetAtTime(level * 0.55, t, level > 0.05 ? 0.4 : this.breathHeld ? 0.06 : 0.7);
+    if (level < 0.03) {
+      this.breathNext = 0;
+      return;
+    }
+    if (!this.breathNext || this.breathNext < t) this.breathNext = t + 0.05;
+    // on programme le cycle suivant un peu à l'avance : plus essoufflé, plus rapide (1,5 s au trot, 0,8 s à bout)
+    if (this.breathNext - t > 0.12) return;
+    const period = (1.5 - level * 0.7) * (0.92 + Math.random() * 0.16);
+    const tIn = this.breathNext;
+    const dIn = period * 0.36;
+    const dOut = period * 0.5;
+    const tOut = tIn + dIn + period * 0.05;
+    const v = 0.85 + Math.random() * 0.3;
+    // inspiration : un peu plus aiguë, qui monte
+    this.breathNoise(this.breathBus, tIn, dIn, 700 * v, 1100 * v, 0.05);
+    // expiration : plus ronde, qui retombe, avec un léger voile grave
+    this.breathNoise(this.breathBus, tOut, dOut, 900 * v, 450 * v, 0.07 + level * 0.03);
+    this.breathNoise(this.breathBus, tOut, dOut * 0.9, 300, 220, 0.03);
+    this.breathNext = tIn + period;
   }
 
   // Le grésillement suit les néons autour de toi (light : la lumière reçue là où tu es, 0 dans le noir) ; sous une
