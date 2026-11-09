@@ -101,15 +101,33 @@ export const T = {
   PILLAR: 5, // pilier plus petit que la case (Level 0) : l'entité le contourne, les joueurs passent à côté
   GATE: 6, // grille à barreaux fermée (Level 2) : bloque le passage, pas la vue (voir seeThrough)
   MACHINE: 7, // chaudière (Level 2) : bloque le passage et la vue, mais ce n'est pas un mur
-  CHAMFER: 8, // case coupée en biais par le mur d'un couloir en diagonale (Level 0) : à moitié pleine, voir DIAG
+  CHAMFER: 8, // case coupée en biais par le mur d'un couloir en diagonale (Level 0) : à moitié pleine, voir DIAG. De 8
+  // à 11 selon le côté libre : + 1 s'il est vers -x, + 2 s'il est vers -z (voir chamferTile)
 };
+// une case coupée en biais, et de quel côté elle est libre ([fx, fz] : vers +x ou -x, vers +z ou -z)
+export const isChamfer = (v) => v >= T.CHAMFER && v <= T.CHAMFER + 3;
+export const chamferTile = (fx, fz) => T.CHAMFER + (fx > 0 ? 0 : 1) + (fz > 0 ? 0 : 2);
+export const chamferSide = (v) => [v & 1 ? -1 : 1, v & 2 ? -1 : 1];
 
 // cases qui bloquent le passage (et la vue) : murs, étagères, cabine d'ascenseur ; un pilier fin seulement pour les
 // chemins de l'entité (les collisions et la vue suivent sa vraie forme, voir outsidePillar) ; une grille, le passage seul
-export const blocks = (v) => v === T.WALL || v === T.SHELF || v === T.EXIT || v === T.PILLAR || v === T.GATE || v === T.MACHINE || v === T.CHAMFER;
+export const blocks = (v) => v === T.WALL || v === T.SHELF || v === T.EXIT || v === T.PILLAR || v === T.GATE || v === T.MACHINE || isChamfer(v);
 // … mais une case coupée en biais se traverse le long de son couloir : les parcours en largeur (bfs) y passent. Le
 // couloir est muré de part et d'autre (DIAG) : de là, on ne peut aller que dans le couloir
-export const crossable = (v) => !blocks(v) || v === T.CHAMFER;
+export const crossable = (v) => !blocks(v) || isChamfer(v);
+// un pas d'une case à sa voisine (dx, dz) : on n'entre dans une case coupée en biais, et on n'en sort, que par son côté
+// libre (sinon on traverserait le mur, de la moitié pleine à l'autre côté)
+export const chamferStep = (a, b, dx, dz) => {
+  if (isChamfer(a)) {
+    const [fx, fz] = chamferSide(a);
+    if (dx ? dx !== fx : dz !== fz) return false;
+  }
+  if (isChamfer(b)) {
+    const [fx, fz] = chamferSide(b);
+    if (dx ? -dx !== fx : -dz !== fz) return false;
+  }
+  return true;
+};
 
 // Les obstacles plus petits que leur case : un pilier ({ x, z, h, round }, h : demi-côté ou rayon), une cloison
 // fine ({ x, z, h, rects : [[x0, z0, x1, z1], …], thin: true } : un à trois rectangles en mètres, h : le demi-côté
@@ -286,7 +304,7 @@ export function carveElevator(grid, W, H, entrance, spawn, rnd, avoid = null) {
     const cx = entrance.x + dx;
     const cz = entrance.z + dz;
     if (cx < 1 || cx > W - 2 || cz < 1 || cz > H - 2) continue;
-    if (at(cx, cz) === T.FLOOR || at(cx, cz) === T.PILLAR || at(cx, cz) === T.CHAMFER) continue; // la cabine se creuse dans un mur (pas dans un pilier fin)
+    if (at(cx, cz) === T.FLOOR || at(cx, cz) === T.PILLAR || isChamfer(at(cx, cz))) continue; // la cabine se creuse dans un mur (pas dans un pilier fin)
     const around = [[cx + dx, cz + dz], [cx + dz, cz + dx], [cx - dz, cz - dx]];
     if (avoid && [[cx, cz], ...around].some(([x, z]) => avoid.has(z * W + x))) continue;
     const saved = around.map(([x, z]) => at(x, z));
@@ -576,6 +594,21 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   // traverse, l'autre est pleine. Derrière, des murs (fill), pour qu'on ne puisse aller de la case coupée que dans le
   // couloir. Aux deux bouts, il débouche dans le dédale. Il ne coupe rien en deux. Tiré à part, comme les cloisons.
   const diagFill = new Set();
+  // derrière le mur en biais, les cases murées en escalier, et le côté vers lequel elles donnent (voir 6b : là où il y a
+  // du sol, elles deviennent à leur tour des cases coupées en biais, tournées vers l'extérieur)
+  const diagOuter = new Map();
+  // la forme d'une case coupée en biais, libre vers A et B : le coin libre (entre ses deux voisins libres), le coin
+  // opposé, les deux bouts du biais ; la face regarde le côté libre
+  const chamferShapeOf = (x, z, A, B) => {
+    const cx = (x + 0.5) * CELL_SIZE;
+    const cz = (z + 0.5) * CELL_SIZE;
+    const h = CELL_SIZE / 2;
+    const opp = [cx - (A[0] + B[0]) * h, cz - (A[1] + B[1]) * h];
+    const e1 = [cx + (A[0] - B[0]) * h, cz + (A[1] - B[1]) * h];
+    const e2 = [cx + (B[0] - A[0]) * h, cz + (B[1] - A[1]) * h];
+    const face = { a: e1, b: e2, nx: (A[0] + B[0]) / Math.SQRT2, nz: (A[1] + B[1]) / Math.SQRT2 };
+    return { x: cx, z: cz, h, poly: [e1, opp, e2], face };
+  };
   const diagUsed = new Set();
   const chamferShape = new Map(); // case -> { x, z, h, poly, face }
   const chamfers = []; // pour le décor : { a: [x, z], b: [x, z], nx, nz } (la face du mur, vue du couloir), voir 6b
@@ -643,7 +676,7 @@ export function createBackroomsMap(seed = 42, opts = {}) {
       for (const [x, z] of fill) grid[z * W + x] = T.WALL;
       for (const [x, z] of I) grid[z * W + x] = T.FLOOR;
       for (const [x, z] of mouths) grid[z * W + x] = T.FLOOR;
-      for (const [x, z] of ch) grid[z * W + x] = T.CHAMFER;
+      for (const [x, z, A, B] of ch) grid[z * W + x] = chamferTile(A[0] || B[0], A[1] || B[1]);
       // rien de ce qu'on atteignait ne doit être coupé ; le couloir et ses deux bouts sont reliés au reste
       const start = grid[ref] === T.FLOOR ? ref : z0 * W + x0;
       const after = reachN(start);
@@ -655,21 +688,17 @@ export function createBackroomsMap(seed = 42, opts = {}) {
       }
       for (const [x, z] of all) diagUsed.add(z * W + x);
       for (const [x, z] of fill) diagFill.add(z * W + x);
+      for (const [x, z] of I.slice(0, -1)) {
+        diagOuter.set(z * W + x + 2 * sx, [sx, -1]);
+        diagOuter.set((z - 1) * W + x + sx, [sx, -1]);
+        diagOuter.set((z + 1) * W + x - sx, [-sx, 1]);
+        diagOuter.set((z + 2) * W + x, [-sx, 1]);
+      }
       const dg = { sx, cells: I, cuts: ch.map((c) => [c[0], c[1]]), rot: Math.atan2(-1, sx) };
       diags.push(dg);
       I.forEach(([x, z], i) => diagCell.set(z * W + x, { dg, i }));
       for (const [x, z, A, B] of ch) {
-        const cx = (x + 0.5) * C;
-        const cz = (z + 0.5) * C;
-        const h = C / 2;
-        // le coin du côté du couloir (entre ses deux voisins libres), le coin opposé, les deux bouts du biais
-        const opp = [cx - (A[0] + B[0]) * h, cz - (A[1] + B[1]) * h];
-        const e1 = [cx + (A[0] - B[0]) * h, cz + (A[1] - B[1]) * h];
-        const e2 = [cx + (B[0] - A[0]) * h, cz + (B[1] - A[1]) * h];
-        const nx = (A[0] + B[0]) / Math.SQRT2;
-        const nz = (A[1] + B[1]) / Math.SQRT2;
-        const face = { a: e1, b: e2, nx, nz };
-        chamferShape.set(z * W + x, { x: cx, z: cz, h, poly: [e1, opp, e2], face });
+        chamferShape.set(z * W + x, chamferShapeOf(x, z, A, B));
       }
       placed++;
     }
@@ -747,7 +776,19 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   // 6b. Piliers de toutes les tailles : un mur isolé (du sol tout autour) devient souvent un pilier plus petit que la
   // case, carré (60 cm à 1,5 m) ou rond (colonne de 60 cm à 1,1 m), un peu décentré ; les autres restent pleins
   const pillars = {};
-  for (const [k, sh] of chamferShape) if (grid[k] === T.CHAMFER) (pillars[k] = sh), chamfers.push(sh.face);
+  for (const [k, sh] of chamferShape) if (isChamfer(grid[k])) (pillars[k] = sh), chamfers.push(sh.face);
+  // de l'autre côté du mur en biais : là où une case murée donne sur du sol, elle est coupée en biais elle aussi, sa
+  // moitié libre de ce côté-là. Le mur est alors partout aussi épais (1,8 m), biais des deux côtés, sans escalier
+  for (const [k, [ox, oz]] of diagOuter) {
+    if (grid[k] !== T.WALL) continue;
+    const x = k % W;
+    const z = (k - x) / W;
+    if (get(x + ox, z) !== T.FLOOR && get(x, z + oz) !== T.FLOOR) continue;
+    grid[k] = chamferTile(ox, oz);
+    const sh = chamferShapeOf(x, z, [ox, 0], [0, oz]);
+    pillars[k] = sh;
+    chamfers.push(sh.face);
+  }
   for (let z = 2; z < H - 2; z++) {
     for (let x = 2; x < W - 2; x++) {
       const k = z * W + x;
@@ -1222,6 +1263,18 @@ export function createBackroomsMap(seed = 42, opts = {}) {
   }
   const items = itemList(['bottle', bottles], ['battery', batteries], ['ladder', ladders]);
 
+  // (une case coupée vers l'extérieur que la suite de la génération a refermée de partout redevient un mur plein)
+  for (const [k] of diagOuter) {
+    if (!isChamfer(grid[k])) continue;
+    const [fx, fz] = chamferSide(grid[k]);
+    const x = k % W;
+    const z = (k - x) / W;
+    if (get(x + fx, z) === T.FLOOR || get(x, z + fz) === T.FLOOR) continue;
+    grid[k] = T.WALL;
+    chamfers.splice(chamfers.indexOf(pillars[k].face), 1);
+    delete pillars[k];
+  }
+
   // 11. Point de départ de l'entité : loin du joueur, mais pas forcément au bout de la carte
   const monsterCell = pick(walkable.filter((c) => D(c) > maxD * 0.55)) || far[0];
 
@@ -1262,7 +1315,7 @@ export function createBackroomsMap(seed = 42, opts = {}) {
           cellsOnSeg(ax, az, bx, bz, (gx, gz) => {
             if (gx < 0 || gz < 0 || gx >= W || gz >= H) return false;
             const v = grid[gz * W + gx];
-            if (v !== T.PILLAR && v !== T.CHAMFER) return false;
+            if (v !== T.PILLAR && !isChamfer(v)) return false;
             const p = pillars[gz * W + gx];
             return !!(p && (p.rects || p.poly) && segHitsPillar(p, ax, az, bx, bz));
           })
@@ -1277,11 +1330,15 @@ export function createBackroomsMap(seed = 42, opts = {}) {
     pillarAt(gx, gz) {
       if (gx < 0 || gx >= W || gz < 0 || gz >= H) return null;
       const k = gz * W + gx;
-      return grid[k] === T.PILLAR || grid[k] === T.CHAMFER ? pillars[k] || null : null;
+      return grid[k] === T.PILLAR || isChamfer(grid[k]) ? pillars[k] || null : null;
     },
     // une case coupée en biais : un mur pour les cases voisines, mais on la traverse le long du couloir (findPath)
     crossable(gx, gz) {
-      return gx >= 0 && gz >= 0 && gx < W && gz < H && grid[gz * W + gx] === T.CHAMFER;
+      return gx >= 0 && gz >= 0 && gx < W && gz < H && isChamfer(grid[gz * W + gx]);
+    },
+    // (findPath) d'une case à sa voisine sans traverser un mur en biais
+    canStep(x, z, nx, nz) {
+      return chamferStep(get(x, z), get(nx, nz), nx - x, nz - z);
     },
     isWalkableWorld(wx, wz) {
       const gx = Math.floor(wx / CELL_SIZE);
@@ -1310,7 +1367,7 @@ export function bfs(grid, W, H, sx, sz) {
       const nz = z + dz;
       if (nx < 0 || nx >= W || nz < 0 || nz >= H) continue;
       const nk = nz * W + nx;
-      if (dist[nk] >= 0 || !crossable(grid[nk])) continue;
+      if (dist[nk] >= 0 || !crossable(grid[nk]) || !chamferStep(grid[k], grid[nk], dx, dz)) continue;
       dist[nk] = dist[k] + 1;
       queue[tail++] = nk;
     }

@@ -7,7 +7,7 @@ import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { classicEntity } from './entity.js';
 import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
 import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
-import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, NICHE_LO, NICHE_SIZE, NICHE_DEPTH, FLOOR_DY, DEEP_DEPTH, pillarDist } from '../engine/map.js';
+import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, NICHE_LO, NICHE_SIZE, NICHE_DEPTH, FLOOR_DY, DEEP_DEPTH, pillarDist, isChamfer, chamferSide } from '../engine/map.js';
 import { FUSES, feetY, stairAt, PIPES_LEVEL, THIRST_BLUR, LIFT_SHUT_T, HOTEL_LEVEL, CCTV_FOV, DUCT_LAND } from '../engine/sim.js';
 import { DUCT_LOW, DOCK_H, GUARD_T } from '../engine/level1.js';
 import { createBackroomsTextures } from './textures.js';
@@ -1676,7 +1676,25 @@ float bkCaust(vec2 uv, float t) {
       const nor = [];
       const uvs = [];
       const idx = [];
-      for (const f of map.chamfers) {
+      // (au bout d'un couloir, la moitié pleine d'une case coupée peut border une case libre par un de ses côtés droits :
+      // ce bout de mur-là aussi)
+      const legs = [];
+      for (let z = 0; z < H; z++) {
+        for (let x = 0; x < W; x++) {
+          const v = map.grid[z * W + x];
+          if (!isChamfer(v)) continue;
+          const [fx, fz] = chamferSide(v);
+          for (const [dx, dz] of [[-fx, 0], [0, -fz]]) {
+            const n = map.grid[(z + dz) * W + x + dx];
+            if (n === undefined || (n !== T.FLOOR && n !== T.PILLAR)) continue;
+            const cx = (x + 0.5) * CELL_SIZE;
+            const cz = (z + 0.5) * CELL_SIZE;
+            const h = CELL_SIZE / 2;
+            legs.push(dx ? { a: [cx + dx * h, cz - h], b: [cx + dx * h, cz + h], nx: dx, nz: 0 } : { a: [cx - h, cz + dz * h], b: [cx + h, cz + dz * h], nx: 0, nz: dz });
+          }
+        }
+      }
+      for (const f of [...map.chamfers, ...legs]) {
         // a à gauche, b à droite, vu du couloir (la normale vers soi)
         let [ax, az] = f.a;
         let [bx, bz] = f.b;
@@ -1935,7 +1953,7 @@ float bkCaust(vec2 uv, float t) {
     for (let z = 0; z < H; z++) {
       for (let x = 0; x < W; x++) {
         const i = z * W + x;
-        if (map.grid[i] === T.WALL || map.grid[i] === T.CHAMFER || pitCells.has(i) || stairCells.has(i) || thinAt(x, z)) continue;
+        if (map.grid[i] === T.WALL || isChamfer(map.grid[i]) || pitCells.has(i) || stairCells.has(i) || thinAt(x, z)) continue;
         for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
           const nx = x + dx;
           const nz = z + dz;
