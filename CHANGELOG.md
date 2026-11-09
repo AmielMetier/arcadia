@@ -1,5 +1,47 @@
 # Journal des versions — Arcadia
 
+## 5.21 — 9 novembre 2026
+- **The Backrooms** — Au Level 1, on entend maintenant Khaoula : sa voix résonne de temps en temps quand elle rôde près de toi, et bien plus souvent quand elle te poursuit. Plus elle est loin ou derrière les murs, plus elle est étouffée.
+
+## 5.2 — 9 novembre 2026
+- Fix typo in hud.js string (Metier Amiel)
+
+## 5.1 — 9 novembre 2026
+- Modify NOTES entries in hud.js (Metier Amiel)
+
+## 5.00 — 9 novembre 2026
+- **The Backrooms** — Une voix sur le talkie : « The Old Timer », là depuis toujours, prend parfois la parole sur le canal 9. Tout le monde l'entend en même temps, deux ou trois fois par niveau, jamais pendant une poursuite. Il aide un peu… et il en sait beaucoup trop. Quand il ne reste qu'un survivant, il ne parle plus qu'à lui.
+
+## 4.99 — 9 novembre 2026
+- **The Backrooms** — Du lore à chaque niveau : chaque monstre a une histoire, qu'on découvre en ramassant les objets.
+  - Level 0 : les cassettes sont celles de Safia, une exploratrice perdue dans le Lobby… qui n'en est jamais sortie.
+  - Level 1 : avec chaque fusible, un mot griffonné de Khaoula, qui s'est cachée au sous-sol pour fuir quelqu'un.
+  - Poolrooms : avec chaque volant de vanne, un carreau gravé à la gloire de St Didier Auroux, le père de toute chose.
+  - Pipe Dreams : à chaque vanne fermée, une trace à la craie sur Teo, l'élève de 1934 devenu le bouc à la cloche.
+  - Terror Hotel : avec chaque lettre, une ligne du registre de 1934… et ton nom y est déjà.
+  - Tout trouver débloque un dernier message à la sortie.
+
+## 4.98 — 9 novembre 2026
+- **Odyssée** — Pokémon sauvages refaits badge par badge :
+  - Chaque route, forêt, grotte ou mer a désormais les Pokémon que les jeux officiels, de Rouge à X / Y, font rencontrer au même moment de l'aventure, entre les mêmes badges et dans le même genre de lieu.
+  - Les îles, volcans, tours, grottes marines et lieux glacés reprennent les Pokémon des lieux officiels de même ambiance.
+  - Les Pokémon les plus forts en combat sont plus rares, et un Pokémon arrive évolué si la zone est d'un niveau assez haut.
+  - Les Terres du Sud accueillent les Pokémon d'après la Ligue des jeux officiels : les moins forts près de Métropole, les plus redoutables vers Ombreval.
+
+## 4.97 — 9 novembre 2026
+- **The Backrooms** — La caméra se tourne au pavé tactile, sans souris (iPad compris) : glisser à deux doigts pour regarder autour de soi, ou cliquer-glisser.
+  - En mode « Sans souris », le pavé tactile s'ajoute aux flèches ; pincer zoome le caméscope.
+  - Sur tablette, un clic au pavé tactile ne fait plus apparaître le joystick de marche et reprend la partie mise en pause.
+
+## 4.96 — 9 novembre 2026
+- **The Backrooms** — Nouveau bruitage de course : le souffle enregistré, qui grésillait en boucle, laisse place à une vraie respiration (inspiration, expiration) plus douce, qui s'accélère à mesure que tu t'essouffles.
+
+## 4.95 — 9 novembre 2026
+- **Hub** — Revert "feat(hub,backrooms): trailer officiel de 30 secondes pour The Backrooms avec bouton de lecture sur la carte du Hub" (Amiel)
+
+## 4.94 — 9 novembre 2026
+- **Hub** — Nouveau : trailer officiel de 30 secondes pour The Backrooms avec bouton de lecture sur la carte du Hub (Amiel)
+
 ## 4.93 — 6 novembre 2026
 - **The Backrooms** — au Terror Hotel (Level 5) :
   - Caché sous un lit ou dans une armoire, une fois que l'entité a perdu ta trace, elle quitte la chambre et reprend sa ronde au loin, au lieu de fouiller autour de toi.
@@ -41,9 +83,6 @@
   - Un joueur attrapé avec des lettres en poche : elles retournent là où il les avait trouvées.
   - Parquet qui craque et boîte à musique désaccordée au loin.
 - **The Backrooms** — les toboggans jaune et bleu des Poolrooms mènent toujours à l'écran de fin, en attendant leurs niveaux.
-## 4.94 — 9 novembre 2026
-- **The Backrooms** — au Level 0, une feuille de cahier est scotchée au mur juste à côté de l'arrivée : le mot griffonné d'un survivant passé avant vous, qui dessine l'entité, les cassettes, les trous dans le sol et le faux ascenseur.
-
 ## 4.85 — 9 novembre 2026
 - **The Backrooms** — Un vrai inventaire : quatre cases d'objets à côté de la lampe, à choisir avec les touches 2 à 5 ou la molette.
   - G pose l'objet choisi par terre, juste devant soi : une eau d'amande ou des piles à laisser à un coéquipier, l'échelle à garder pour plus tard. On l'entend tomber.
