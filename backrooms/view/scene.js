@@ -8,7 +8,7 @@ import { classicEntity } from './entity.js';
 import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
 import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
 import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, NICHE_LO, NICHE_SIZE, NICHE_DEPTH, FLOOR_DY, DEEP_DEPTH, pillarDist } from '../engine/map.js';
-import { FUSES, feetY, stairAt, PIPES_LEVEL, THIRST_BLUR } from '../engine/sim.js';
+import { FUSES, feetY, stairAt, PIPES_LEVEL, THIRST_BLUR, LIFT_SHUT_T } from '../engine/sim.js';
 import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
 import { createInset } from './inset.js';
@@ -178,10 +178,12 @@ export function createBackroomsScene(container, floors, lamps) {
   const CEIL = map0.ceil || WALL_HEIGHT;
   const scene = new THREE.Scene();
   // Level 1 : un froid bleuté, un brouillard plus épais ; Level 2 : une moiteur brune, chaude
-  scene.background = new THREE.Color(L2 ? '#d3e4e2' : L1 ? '#06080a' : PIPES ? '#080604' : '#0d0b06');
+  // (Level 1 : le fond a la couleur du brouillard, si épais qu'à 65 m tout s'y est fondu, même un néon allumé — à un
+  // millionième près : on ne dessine rien au-delà, l'image n'en change pas d'un pixel)
+  scene.background = new THREE.Color(L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#080604' : '#0d0b06');
   scene.fog = new THREE.FogExp2(L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#0a0705' : '#080604', L2 ? 0.022 : L1 ? 0.058 : PIPES ? 0.033 : 0.05);
 
-  const camera = new THREE.PerspectiveCamera(OPTS.fov, window.innerWidth / window.innerHeight, 0.08, 90);
+  const camera = new THREE.PerspectiveCamera(OPTS.fov, window.innerWidth / window.innerHeight, 0.08, L1 ? 65 : 90);
   camera.position.set(map0.spawn.x, 1.6, map0.spawn.z);
 
   const renderer = getRenderer();
@@ -386,9 +388,11 @@ export function createBackroomsScene(container, floors, lamps) {
       // Level 0 : les néons éclairent le mur presque jusqu'au sol, et les auréoles du plafond restent discrètes
       uSideLo: { value: L0 ? 0.8 : 0.5 },
       uStain: { value: L0 ? 0.5 : 1 },
-      uCeilStain: { value: L0 ? 0.55 : 1 }, // Level 0 : les auréoles du plafond, encore plus pâles
+      uCeilStain: { value: L0 ? 0.55 : L1 ? 0.3 : 1 }, // Level 0 : les auréoles du plafond, encore plus pâles ; Level 1 : à peine
       // Level 0, étage du haut : des murs propres (presque pas d'auréoles ni d'humidité au pied) ; le bas reste défraîchi
-      uWallDecay: { value: L0 && !LOW0 ? 0.15 : 1 },
+      // Level 1 : des parpaings repeints, à peine marqués par l'humidité
+      uWallDecay: { value: L0 && !LOW0 ? 0.15 : L1 ? 0.3 : 1 },
+      uGlossH: { value: L1 ? CEIL - 0.45 : 3 }, // Level 1 : la hauteur des tubes, qui se reflètent dans le béton lissé
     };
     // reflets des lampes (Level 2) : les plus proches que la caméra voit, choisies à chaque image
     const NLAMP = 12;
@@ -396,10 +400,12 @@ export function createBackroomsScene(container, floors, lamps) {
       uLampPos: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3(0, -100, 0)) },
       uLampCol: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3()) },
     };
-    // Level 0 : les diffuseurs qui se reflètent dans la pellicule d'eau (x, z, taille ; couleur selon leur état)
+    // Level 0 : les diffuseurs qui se reflètent dans la pellicule d'eau (x, z, taille ; couleur selon leur état) ;
+    // Level 1 : les réglettes qui se reflètent dans le béton et éclairent le plafond (plus nombreuses : on voit loin)
+    const NFILM = L1 ? 18 : NLAMP;
     const filmU = {
-      uFilmL: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3(-1000, -1000, 1)) },
-      uFilmC: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3()) },
+      uFilmL: { value: Array.from({ length: NFILM }, () => new THREE.Vector3(-1000, -1000, 1)) },
+      uFilmC: { value: Array.from({ length: NFILM }, () => new THREE.Vector3()) },
     };
     // un texel est-il éclairé par ce néon ? Le rayon ne doit traverser aucun mur, sauf, pour un texel de mur,
     // les 70 premiers centimètres de son propre mur (la face tournée vers le néon)
@@ -428,18 +434,22 @@ export function createBackroomsScene(container, floors, lamps) {
       const out = [];
       // Level 0 : les zones claires baignent dans la lumière des néons (comme dans les vidéos), sans flaque ni trou noir
       const LB = L0 && l.bright;
-      const LR = o ? o.r : LB ? LIGHT_R * CELL_SIZE * 2.3 : l.bright ? LIGHT_R * CELL_SIZE * 1.55 : l.kind === 'bulb' ? 2.2 * CELL_SIZE : l.kind === 'tube' ? 2.3 * CELL_SIZE : LIGHT_R * CELL_SIZE * (L0 ? 1.15 : 1);
+      // (Level 1 : des réglettes de 2 × 36 W, qui portent plus loin qu'un pavé de néon)
+      const LR = o ? o.r : LB ? LIGHT_R * CELL_SIZE * 2.3 : l.bright ? LIGHT_R * CELL_SIZE * 1.55 : l.kind === 'bulb' ? 2.2 * CELL_SIZE : l.kind === 'tube' ? 2.3 * CELL_SIZE : LIGHT_R * CELL_SIZE * (L0 ? 1.15 : L1 ? 1.2 : 1);
       const gain = o ? o.gain : LB ? 1.42 : l.bright ? 1.3 : l.kind === 'bulb' ? 1.05 : l.kind === 'tube' ? 1.45 : L0 ? 0.97 : 1; // Level 0 : l'image environ 10 % moins lumineuse qu'au réglage du 7 novembre (la courbe du caméscope compresse : il faut baisser plus les néons)
-      const fall = o ? o.fall : LB ? 1.5 : 2.4;
+      const fall = o ? o.fall : LB ? 1.5 : L1 ? 2.2 : 2.4;
+      // Level 1 : la réglette n'est pas un point mais deux tubes de 1,5 m (le long de x) : sa flaque s'allonge d'autant
+      const HX = L1 && !o ? 0.6 : 0;
       const r = Math.ceil(LR / TX);
+      const rx = Math.ceil((LR + HX) / TX);
       const tx0 = Math.floor(l.x / TX);
       const tz0 = Math.floor(l.z / TX);
       for (let tz = tz0 - r; tz <= tz0 + r; tz++) {
-        for (let tx = tx0 - r; tx <= tx0 + r; tx++) {
+        for (let tx = tx0 - rx; tx <= tx0 + rx; tx++) {
           if (tx < 0 || tz < 0 || tx >= BW || tz >= BH) continue;
           const px = (tx + 0.5) * TX;
           const pz = (tz + 0.5) * TX;
-          const d = Math.hypot(px - l.x, pz - l.z);
+          const d = Math.hypot(Math.max(Math.abs(px - l.x) - HX, 0), pz - l.z);
           if (d > LR || !seen(l.x, l.z, px, pz)) continue;
           out.push(tz * BW + tx, Math.pow(1 - d / LR, fall) * 1.05 * gain);
         }
@@ -615,12 +625,17 @@ export function createBackroomsScene(container, floors, lamps) {
       const tileU = tile ? { uTileRow: { value: opts.tile } } : null;
       const base = opts && opts.base; // une plinthe au pied du mur
       const film = L0 && opts && opts.film; // la pellicule d'eau au cœur des grosses taches (le sol du Level 0)
-      if (spec || PIPES || base || EDGE || film) mat.customProgramCacheKey = () => 'bk' + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE ? '-edge' : '') + (film ? '-film' : '');
+      const gloss = L1 && opts && opts.gloss; // le béton lissé du Level 1, où se reflètent les réglettes
+      if (spec || PIPES || base || EDGE || film || gloss) mat.customProgramCacheKey = () => 'bk' + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE ? '-edge' : '') + (film ? '-film' : '') + (gloss ? '-gloss' : '');
       mat.onBeforeCompile = (sh) => {
         Object.assign(sh.uniforms, bakeUniforms);
         if (film) {
           Object.assign(sh.uniforms, filmU);
           sh.defines = { ...(sh.defines || {}), BK_FILM: 1 };
+        }
+        if (gloss) {
+          Object.assign(sh.uniforms, filmU);
+          sh.defines = { ...(sh.defines || {}), BK_GLOSS: 1 };
         }
         if (spec) {
           Object.assign(sh.uniforms, lampU, specU);
@@ -670,10 +685,11 @@ uniform float uWallDecay;
 #ifdef BK_TILE
 uniform float uTileRow;
 #endif
-#ifdef BK_FILM
-uniform vec3 uFilmL[${NLAMP}];
-uniform vec3 uFilmC[${NLAMP}];
+#if defined(BK_FILM) || defined(BK_GLOSS)
+uniform vec3 uFilmL[${NFILM}];
+uniform vec3 uFilmC[${NFILM}];
 #endif
+uniform float uGlossH;
 varying vec3 vBakeP;
 varying vec3 vBakeN;
 float bkHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -812,7 +828,7 @@ float bkCaust(vec2 uv, float t) {
               vec3 fRef = (uBakeTint * fB.r + uBakeTint2 * fB.b * uCeilB) * vec3(0.78, 0.72, 0.55) * 0.42; // les dalles crème du plafond
               // les diffuseurs eux-mêmes : nets de près, brouillés de loin, une petite auréole autour
               float fBlur = 0.03 + fPath * 0.018;
-              for (int i = 0; i < ${NLAMP}; i++) {
+              for (int i = 0; i < ${NFILM}; i++) {
                 vec2 fq = abs(fHit - uFilmL[i].xy) - vec2(0.61, 0.31) * uFilmL[i].z;
                 float fd = max(fq.x, fq.y);
                 fRef += uFilmC[i] * ((1.0 - smoothstep(-fBlur, fBlur, fd)) * 3.0 + exp(-max(fd, 0.0) / (0.2 + fBlur * 2.0)) * 0.18);
@@ -837,6 +853,57 @@ float bkCaust(vec2 uv, float t) {
               // l'eau, teintée par la moquette dessous, assombrit un peu ce qu'elle reflète
               totalEmissiveRadiance += (fRef * vec3(0.95, 0.88, 0.72) * fFr * 1.25 + fS * max(fFr, 0.06)) * film;
             }
+          }
+          #endif
+          #ifdef BK_GLOSS
+          if (ny > 0.5 && by < 0.05) {
+            // le béton lissé du Level 1 : de grandes plaques plus ou moins claires (talochées à des jours différents), plus
+            // ou moins polies par le passage ; les réglettes s'y reflètent, floues, en traînées d'autant plus longues que
+            // l'on regarde loin (la surface n'est pas un miroir)
+            vec2 gq = vBakeP.xz;
+            float gTone = bkFbm(gq * 0.11 + 4.0);
+            diffuseColor.rgb *= mix(0.88, 1.1, gTone) * mix(1.0, 0.93, smoothstep(0.55, 0.8, bkFbm(gq * 0.45 + 21.0)));
+            float gPol = smoothstep(0.3, 0.72, bkFbm(gq * 0.19 + 13.0));
+            vec3 gE = cameraPosition - vBakeP;
+            float gLen = length(gE);
+            float gEy = max(gE.y, 0.03);
+            float gSin = clamp(gEy / gLen, 0.04, 1.0); // le regard rase le sol quand il est petit
+            float gFr = 0.035 + 0.965 * pow(1.0 - gSin, 5.0);
+            vec2 gHit = gq - gE.xz * (uGlossH / gEy); // où le rayon réfléchi coupe le plan des réglettes
+            vec2 gDir = normalize(gE.xz + vec2(1e-4));
+            vec2 gPerp = vec2(-gDir.y, gDir.x);
+            // la rugosité : un lobe de quelques degrés autour du reflet parfait. Sur le plan des réglettes, incliner la
+            // micro-surface dans l'axe du regard déplace le reflet de 2a·h / sin² ; en travers, de 2a·h seulement. D'où,
+            // de loin, les longues traînées verticales sous chaque réglette, et de près (on regarde à ses pieds) des
+            // reflets ronds
+            float gA = mix(0.038, 0.017, gPol);
+            vec2 gs = vec2(2.0 * gA * uGlossH / (gSin * gSin), 2.0 * gA * uGlossH) + 0.04;
+            float gAmp = 0.28 / (0.28 + 3.1416 * gs.x * gs.y); // la part du lobe que la réglette remplit
+            // le grain du béton moucheture les traînées (de près seulement : de loin, il scintillerait)
+            vec2 gN = (vec2(bkNoise(gq * 9.0), bkNoise(gq * 9.0 + 17.0)) - 0.5) * (1.0 - smoothstep(6.0, 14.0, gLen));
+            vec2 gHj = gHit + (gDir * gN.x * gs.x + gPerp * gN.y * gs.y) * 0.5;
+            vec2 gw = abs(gDir.x) * vec2(0.78, 0.09) + abs(gDir.y) * vec2(0.09, 0.78); // la réglette, dans ce repère
+            vec3 gRef = vec3(0.0);
+            for (int i = 0; i < ${NFILM}; i++) {
+              vec2 gd = gHj - uFilmL[i].xy;
+              vec2 gk = max(abs(vec2(dot(gd, gDir), dot(gd, gPerp))) - gw, 0.0) / gs;
+              gRef += uFilmC[i] * exp(-dot(gk, gk));
+            }
+            // (les tubes sont bien plus lumineux que ce que l'écran peut montrer : d'où le gain, qui sature en douceur)
+            totalEmissiveRadiance += (1.0 - exp(-gRef * gAmp * 10.0)) * gFr * mix(0.5, 1.0, gPol) * (1.0 + wet * 1.6);
+          } else if (by > uGlossH) {
+            // au-dessus des réglettes (plafond, poutres) : la lumière qui fuit par les fentes du réflecteur, vers le haut ;
+            // elle dessine un halo ovale au plafond autour de chacune, éclaire un peu le flanc des poutres voisines, et suit
+            // l'état des néons (grésillement, coupure)
+            vec3 hUp = vec3(0.0);
+            float hY = by - uGlossH;
+            for (int i = 0; i < ${NFILM}; i++) {
+              vec2 hd = vBakeP.xz - clamp(vBakeP.xz, uFilmL[i].xy - vec2(0.78, 0.07), uFilmL[i].xy + vec2(0.78, 0.07));
+              vec3 hL = vec3(-hd.x, -hY, -hd.y); // du point vers la réglette
+              float hD2 = dot(hL, hL) + 0.09;
+              hUp += uFilmC[i] * (max(dot(vBakeN, hL), 0.0) * hY / (hD2 * hD2));
+            }
+            totalEmissiveRadiance += diffuseColor.rgb * hUp * 0.6;
           }
           #endif
           diffuseColor.rgb *= mix(vec3(1.0), vec3(0.78, 0.66, 0.45), stain * uDamp * uStain);
@@ -935,14 +1002,15 @@ float bkCaust(vec2 uv, float t) {
     // (Level 2 : béton ciré, luisant d'humidité, qui reflète les lampes)
     const carpet = (PIPES ? tx2.floor : textures.carpet).clone();
     carpet.needsUpdate = true;
-    carpet.repeat.set(W * (L0 ? 1.5 : 1), H * (L0 ? 1.5 : 1));
+    carpet.repeat.set(W * (L0 ? 1.5 : L1 ? 0.5 : 1), H * (L0 ? 1.5 : L1 ? 0.5 : 1)); // Level 1 : une dalle de 5 m par répétition
+    if (L1) carpet.anisotropy = renderer.capabilities.getMaxAnisotropy(); // les joints restent nets jusqu'au fond des allées
     if (L0) carpet.anisotropy = renderer.capabilities.getMaxAnisotropy(); // le grain reste net jusqu'au fond des couloirs
     (PIPES ? tx2.ready : textures.ready).then(() => {
       carpet.needsUpdate = true;
     });
     const floorMat = PIPES
       ? baked(new THREE.MeshPhongMaterial({ map: carpet, specular: '#3a342a', shininess: 70 }), { spec: 1.05, gloss: 1100 })
-      : baked(new THREE.MeshLambertMaterial({ map: carpet }), L0 ? { film: 1 } : null);
+      : baked(new THREE.MeshLambertMaterial({ map: carpet }), L0 ? { film: 1 } : L1 ? { gloss: 1 } : null);
     const holes = holesOf(map);
     if (holes.length) {
       floorMat.alphaMap = holeMask(W, H, holes, true);
@@ -1032,7 +1100,7 @@ float bkCaust(vec2 uv, float t) {
       ceilTex.needsUpdate = true;
     });
     // (Level 2 : la dalle de béton, sombre, au-dessus des tuyaux)
-    const ceilMat = baked(new THREE.MeshLambertMaterial({ map: ceilTex, color: PIPES ? '#9a958a' : '#ffffff' }));
+    const ceilMat = baked(new THREE.MeshLambertMaterial({ map: ceilTex, color: PIPES ? '#9a958a' : '#ffffff' }), L1 ? { gloss: 1 } : null);
     const above = fi > 0 ? floors[fi - 1] : null;
     if (above && holesOf(above).length) {
       ceilMat.alphaMap = holeMask(W, H, holesOf(above), false);
@@ -1262,7 +1330,9 @@ float bkCaust(vec2 uv, float t) {
         dummy.rotation.set(l.alongX ? 0 : Math.PI / 2, 0, l.alongX ? Math.PI / 2 : 0);
       });
     } else {
-      fixSet(L2 ? new THREE.BoxGeometry(1.3, 0.03, 1.3) : L1 ? new THREE.BoxGeometry(1.55, 0.05, 0.12) : new THREE.BoxGeometry(1.22, 0.04, 0.62), new THREE.MeshBasicMaterial({ color: '#ffffff', map: L1 || L2 ? null : textures.lamp }), map.lights, (l) => {
+      // Level 1 : deux tubes nus de 1,5 m, côte à côte sous le capot de la réglette (warehouse.js)
+      const twin = () => mergeGeometries([-0.045, 0.045].map((z) => new THREE.CylinderGeometry(0.014, 0.014, 1.5, 10, 1, true).rotateZ(Math.PI / 2).translate(0, 0, z)));
+      fixSet(L2 ? new THREE.BoxGeometry(1.3, 0.03, 1.3) : L1 ? twin() : new THREE.BoxGeometry(1.22, 0.04, 0.62), new THREE.MeshBasicMaterial({ color: '#ffffff', map: L1 || L2 ? null : textures.lamp }), map.lights, (l) => {
         dummy.position.set(l.x, l.fy !== undefined ? l.fy : CEIL - (L1 ? 0.45 : 0.025), l.z); // au Level 1, les tubes pendent sous le plafond
         // Poolrooms : la lampe d'un couloir voûté est cachée dans la voûte ; sous une verrière, tout le plafond éclaire
         dummy.scale.setScalar(l.hidden ? 0.0001 : l.fs || 1);
@@ -2399,7 +2469,8 @@ float bkCaust(vec2 uv, float t) {
     }
 
     // 9. Level 1 : l'habillage de l'entrepôt (rayonnages à palettes, marchandises, tuyaux, lignes au sol, piliers, panneaux)
-    if (L1) buildWarehouse({ map, group, baked, CEIL });
+    const wh = L1 ? buildWarehouse({ map, group, baked, CEIL, textures }) : null;
+    if (wh) group.userData.wh = wh; // (?debug : wh.off dessine tout, pour comparer)
     // 9b. Level 2 : tuyauteries, lampes grillagées, grilles, chaudières, vannes et vapeur
     const pipesView = PIPES ? buildPipes({ map, group, baked, CEIL, tx: tx2, camera }) : null;
     if (pipesView) pipesView.setFog(scene.fog);
@@ -2516,6 +2587,13 @@ float bkCaust(vec2 uv, float t) {
       for (const sgn of [-1, 1]) {
         const d = new THREE.Mesh(new THREE.BoxGeometry(DW / 2 - 0.004, DH, 0.035), leafMat);
         d.position.set(sgn * (DW / 4), DH / 2, ZD + 0.02);
+        // le joint de caoutchouc au bord du vantail de droite : portes fermées, il bouche la fente entre les deux (on
+        // ne voit plus la lumière de la cabine filtrer au milieu)
+        if (sgn > 0) {
+          const seal = new THREE.Mesh(new THREE.BoxGeometry(0.009, DH - 0.004, 0.028), new THREE.MeshLambertMaterial({ color: '#141516' }));
+          seal.position.x = -DW / 4;
+          d.add(seal);
+        }
         exitGroup.add(d);
         doors.push({ d, sgn });
       }
@@ -2534,8 +2612,10 @@ float bkCaust(vec2 uv, float t) {
       cabPane(CW, 2.6, 0, 1.3, CZ + CD / 2, Math.PI, cabMat);
       cabPane(CD, 2.6, -CW / 2, 1.3, CZ, Math.PI / 2, cabMat);
       cabPane(CD, 2.6, CW / 2, 1.3, CZ, -Math.PI / 2, cabMat);
-      // le mur au-dessus de la baie, vu de la cabine
+      // le mur au-dessus de la baie, vu de la cabine, et ses deux pans de part et d'autre : les vantaux s'y rangent quand
+      // ils s'ouvrent (sans eux, une fois les portes refermées, on voyait le couloir à travers l'envers de la façade)
       cabPane(CW, 2.6 - DH, 0, DH + (2.6 - DH) / 2, ZD + 0.04, 0, cabMat);
+      for (const sx of [-1, 1]) cabPane(CW / 2 - DW / 2, DH, sx * (CW / 2 + DW / 2) / 2, DH / 2, ZD + 0.04, 0, cabMat);
       // le plancher de tôle larmée (photo Poly Haven), éclairé par le plafonnier
       const tread = textures.treadPlate.clone();
       tread.needsUpdate = true;
@@ -2935,10 +3015,11 @@ float bkCaust(vec2 uv, float t) {
     // en a un, ceux que peut montrer le caméscope du coéquipier en médaillon. Les autres ne changeraient pas un pixel :
     // on ne les dessine pas. Les matrices ne sont renvoyées que si la liste a changé
     const cull = (V) => {
-      if (!propKinds.length) return;
-      const gy = group.position.y;
       const here = V.band === fi || V.shaft;
       const insetHere = V.inset && (V.iBand === fi || V.iAll);
+      if (wh) wh.cull(V, here, insetHere);
+      if (!propKinds.length) return;
+      const gy = group.position.y;
       for (const K of propKinds) {
         let n = 0;
         let ch = false;
@@ -3083,7 +3164,7 @@ float bkCaust(vec2 uv, float t) {
         // (en un peu moins de deux secondes) et l'ascenseur part
         const closing = sim.liftT > 0 || sim.departT > 0;
         const doorWant = open && !closing ? 1 : 0;
-        doorOpen += Math.sign(doorWant - doorOpen) * Math.min(Math.abs(doorWant - doorOpen), dt / (doorWant ? 1.2 : 1.7));
+        doorOpen += Math.sign(doorWant - doorOpen) * Math.min(Math.abs(doorWant - doorOpen), dt / (doorWant ? 1.2 : LIFT_SHUT_T));
         for (const { d, sgn } of doors) d.position.x = sgn * (0.3 + doorOpen * 0.6);
         if (lift) lift.btnMat.color.setHex(closing ? 0xffb43a : 0xd8d4c4);
         if (arrivalLift) {
@@ -3132,6 +3213,43 @@ float bkCaust(vec2 uv, float t) {
           for (; n < NLAMP; n++) lampU.uLampCol.value[n].set(0, 0, 0);
         }
         if (pipesView) pipesView.update(sim, P, time, dt, lightAt, P.flashlight && P.status === 'alive');
+        // Level 1 : les réglettes allumées qui se reflètent dans le béton lissé et éclairent le plafond, les plus proches
+        // parmi celles qui sont devant (un reflet tombe entre l'œil et la lampe) ou juste derrière (leur halo au plafond)
+        if (L1) {
+          let n = 0;
+          if ((P.floor || 0) === fi && power) {
+            const cand = [];
+            const fx = -Math.sin(P.yaw);
+            const fz = -Math.cos(P.yaw);
+            for (const l of map.lights) {
+              const k = l.state !== 'off' ? (l.k ?? 1) : 0;
+              if (k <= 0.01) continue;
+              const dx = l.x - P.x;
+              const dz = l.z - P.z;
+              const d = Math.hypot(dx, dz);
+              if (d < 40 && dx * fx + dz * fz > -3.5) cand.push([d, l, k]);
+            }
+            cand.sort((a, b) => a[0] - b[0]);
+            const pick = [];
+            let dCut = 40;
+            for (const c of cand) {
+              if (c[0] > 4 && !hasLineOfSight(map, P.x, P.z, c[1].x, c[1].z)) continue;
+              if (pick.length === NFILM) {
+                dCut = c[0];
+                break;
+              }
+              pick.push(c);
+            }
+            // les dernières de la liste entrent et sortent en fondu (d'après la première laissée de côté) : aucun reflet
+            // ni halo n'apparaît d'un coup quand on avance
+            for (const [d, l, k] of pick) {
+              filmU.uFilmL.value[n].set(l.x, l.z, 1);
+              filmU.uFilmC.value[n].set(0.9, 0.96, 1.0).multiplyScalar(k * Math.min(1, (dCut - d) / 5));
+              n++;
+            }
+          }
+          for (; n < NFILM; n++) filmU.uFilmC.value[n].set(0, 0, 0);
+        }
         // Level 0 : les néons allumés (ou les feux rouges) qui se reflètent dans la pellicule d'eau, les plus proches du
         // joueur que l'on voit ; à l'étage où il n'est pas, aucun
         if (L0) {

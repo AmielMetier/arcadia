@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
 
@@ -403,10 +403,11 @@ test('la fixer de loin la provoque ; s\'en approcher aussi ; la lampe ne la fait
 });
 
 test('zone très éclairée : à l\'abri, elle ne s\'y lance pas ; elle renonce au bord de l\'ombre et s\'y fond, hors de vue', () => {
-  const sim = new BackroomsSim({ map, difficulty: 'normal' });
+  // une carte neuve : les parties d'avant laissent parfois un néon de la zone claire éteint ou grésillant (leurs
+  // fantômes n'ont pas eu le temps de le rallumer), et le départ ne serait plus à l'abri
+  const sim = new BackroomsSim({ map: createBackroomsMap(42), difficulty: 'normal' });
   const P = sim.player;
   const M = sim.monster;
-  sim.map.brightCells = null; // (un autre test l'a éteinte)
   assert.ok(sim.brightCell(sim.map, P.x, P.z), 'le départ est dans une zone claire');
   M.dormantT = 0;
   M.warpT = 999;
@@ -1455,8 +1456,9 @@ test("à plusieurs : un joueur attrapé devient spectateur, la partie continue ;
   assert.equal(sim.state, 'playing', 'B joue encore');
   assert.equal(sim.viewPlayer(0).id, b.id, 'A regarde B');
   sim.cassettes = 6;
-  sim.realFloor = 0;
   sim.startFinale();
+  sim.realFloor = 0; // (le test choisit lui-même le vrai ascenseur)
+  sim.unlockLevel0();
   b.x = sim.map.elevator.x;
   b.z = sim.map.elevator.z;
   sim.monster.x = sim.monster.z = -999;
@@ -1494,8 +1496,9 @@ test("réseau : l'invité reçoit l'état de l'hôte, se déplace chez lui et su
   assert.equal(guest.allCassettes.find((q) => q.id === c.id).collected, true);
   // tout le monde dans l'ascenseur : l'invité passe au Level 1 avec la même carte
   host.cassettes = 6;
-  host.realFloor = 0;
   host.startFinale();
+  host.realFloor = 0; // (le test choisit lui-même le vrai ascenseur)
+  host.unlockLevel0();
   for (const P of host.players) {
     P.x = host.map.elevator.x;
     P.z = host.map.elevator.z;
@@ -1577,8 +1580,9 @@ test("un joueur tombé au Level 0 repart au Level 1 avec une lampe (éteinte, co
   const [a, b] = sim.players;
   a.status = 'dead'; // attrapé avant d'avoir pris sa lampe
   sim.cassettes = 6;
-  sim.realFloor = 0;
   sim.startFinale();
+  sim.realFloor = 0; // (le test choisit lui-même le vrai ascenseur)
+  sim.unlockLevel0();
   b.x = sim.map.elevator.x;
   b.z = sim.map.elevator.z;
   sim.step({}, { 2: { pick: true } });
@@ -1645,6 +1649,27 @@ test("barre d'équilibre : sans rien faire on bascule dans le trou du côté où
     });
     assert.equal(b.P.floor, 0, `graine ${sd} : tenu 20 s en corrigeant`);
   }
+  // pas trop sensible : un joueur qui ne réagit qu'au bout de 0,4 s (et d'un coup) traverse une arête de trois cases
+  // en marchant, presque à chaque fois
+  let held = 0;
+  for (let sd = 1; sd <= 24; sd++) {
+    const b = onBeam(1 + (sd % 3) * 3);
+    const seen = [];
+    let mx = 0;
+    b.P.moving = true; // les à-coups de la marche
+    withSeed(100 + sd, () => {
+      for (let i = 0; i < 60 * 5.5 && b.P.floor === 0; i++) {
+        seen.push(b.P.tilt);
+        const t = seen[Math.max(0, seen.length - 1 - 24)];
+        if (Math.abs(t) > 0.3) mx = -Math.sign(t);
+        else if (Math.abs(t) < 0.12) mx = 0;
+        b.sim.balance(b.P, mx); // seulement l'équilibre : on reste sur l'arête (le pas en avant n'y change rien)
+        if (Math.abs(b.P.tilt) >= 1) b.P.floor = -1;
+      }
+    });
+    if (b.P.floor === 0) held++;
+  }
+  assert.ok(held >= 21, `réflexes de 0,4 s : ${held} traversées sur 24`);
 });
 
 test("barre d'équilibre : on n'y avance que tout droit et lentement, Q / D ne font pas de pas de côté", () => {
@@ -1720,6 +1745,36 @@ test("Level 0 : des puits sans fond à l'étage du bas, en grille au milieu d'un
     // rien posé dedans ; loin des cases d'atterrissage
     for (const it of down.items) assert.ok(down.pitAt(it.gx, it.gz) < 0, `graine ${sd} : objet dans un puits`);
     for (const p of deep) assert.ok(up.pits.every((q) => Math.max(Math.abs(q.gx - p.gx), Math.abs(q.gz - p.gz)) >= 4), `graine ${sd} : puits sous un trou du haut`);
+  }
+});
+
+test('puits sans fond : chaque arête entre deux puits débouche, à ses deux bouts, sur du sol libre (jamais sur un mur ni un meuble)', () => {
+  for (let sd = 1; sd <= 30; sd++) {
+    const sim = new BackroomsSim({ difficulty: 'peaceful', seed: sd });
+    const down = sim.floors[1];
+    const W = down.W;
+    const set = new Set(down.pits.filter((p) => p.deep).map((p) => p.gz * W + p.gx));
+    const has = (x, z) => set.has(z * W + x);
+    let ends = 0;
+    for (const k of set) {
+      const gx = k % W;
+      const gz = (k - gx) / W;
+      for (const lineX of [true, false]) {
+        // deux puits voisins : l'arête est la ligne qui les sépare ; on la suit jusqu'au bout, dans les deux sens
+        if (lineX ? !has(gx + 1, gz) : !has(gx, gz + 1)) continue;
+        for (const s of [-1, 1]) {
+          let n = 1;
+          while (lineX ? has(gx, gz + s * n) && has(gx + 1, gz + s * n) : has(gx + s * n, gz) && has(gx + s * n, gz + 1)) n++;
+          const x = lineX ? (gx + 1) * CELL_SIZE : (s > 0 ? gx + n : gx - n + 1) * CELL_SIZE + s * 0.6;
+          const z = lineX ? (s > 0 ? gz + n : gz - n + 1) * CELL_SIZE + s * 0.6 : (gz + 1) * CELL_SIZE;
+          if (lineX ? has(gx, gz + s * n) || has(gx + 1, gz + s * n) : has(gx + s * n, gz) || has(gx + s * n, gz + 1)) continue; // le bord du champ
+          ends++;
+          assert.ok(!sim.isColliding(x, z, PLAYER_RADIUS, 1), `graine ${sd} : l'arête finit contre un obstacle en (${(x / CELL_SIZE).toFixed(1)}, ${(z / CELL_SIZE).toFixed(1)})`);
+          assert.ok(sim.pitUnder(x, z, 1) < 0, `graine ${sd} : l'arête finit dans le vide`);
+        }
+      }
+    }
+    assert.ok(ends > 0, `graine ${sd} : des arêtes`);
   }
 });
 
@@ -1900,6 +1955,56 @@ test("Level 0 : la cage d'escalier ne coupe aucun étage, et le couloir piégé 
   }
 });
 
+test("le faux ascenseur est toujours le plus proche de l'équipe (le coéquipier le plus près compte)", () => {
+  for (const seed of [11, 23, 57]) {
+    for (const near of [0, 1]) {
+      const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
+      const sim = new BackroomsSim({ difficulty: 'peaceful', seed, players, localId: 1 });
+      const [a, b] = sim.players;
+      // A attend devant l'ascenseur de l'étage « near » ; B est quelque part à l'autre étage, loin de l'ascenseur
+      const X = sim.fm(near).exit;
+      Object.assign(a, { floor: near, x: X.x, z: X.z });
+      const other = sim.fm(1 - near);
+      const spot = other.walkable.reduce((best, c) => (Math.hypot(c.x * CELL_SIZE - other.exit.x, c.z * CELL_SIZE - other.exit.z) > Math.hypot(best.x * CELL_SIZE - other.exit.x, best.z * CELL_SIZE - other.exit.z) ? c : best));
+      Object.assign(b, { floor: 1 - near, x: (spot.x + 0.5) * CELL_SIZE, z: (spot.z + 0.5) * CELL_SIZE });
+      sim.cassettes = 6;
+      sim.startFinale();
+      assert.equal(sim.realFloor, 1 - near, `graine ${seed} : celui devant lequel attend A se referme`);
+      assert.ok(sim.fm(near).elevator.fake);
+    }
+  }
+});
+
+test("portes de la cabine : elles poussent celui qui reste entre les vantaux, et refermées on ne les traverse plus", () => {
+  const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players, localId: 1 });
+  const [a, b] = sim.players;
+  sim.cassettes = 6;
+  sim.startFinale();
+  sim.realFloor = 0;
+  sim.unlockLevel0();
+  sim.monster.x = sim.monster.z = -999;
+  const E = sim.map.elevator;
+  const fx = E.x - E.dx * (CELL_SIZE / 2);
+  const fz = E.z - E.dz * (CELL_SIZE / 2);
+  const lz = (P) => (P.x - fx) * E.dx + (P.z - fz) * E.dz;
+  // A entre à peine (dans le plan des portes), B se tient sur le seuil, côté couloir
+  Object.assign(a, { x: fx + E.dx * 0.06, z: fz + E.dz * 0.06 });
+  Object.assign(b, { x: fx - E.dx * 0.1, z: fz - E.dz * 0.1 });
+  assert.ok(sim.inCabin(a) && !sim.inCabin(b));
+  sim.step({ pick: true }, {});
+  sim.step({ pick: true }, {}); // à plusieurs : second appui, on part sans B
+  assert.ok(sim.liftT > 0, 'les portes se ferment');
+  run(sim, LIFT_SHUT_T - 0.05);
+  assert.ok(lz(a) >= LIFT_FACE + PLAYER_RADIUS - 0.01, 'A a été poussé au fond de la cabine');
+  assert.ok(lz(b) <= -PLAYER_RADIUS + 0.01, 'B a été repoussé dans le couloir');
+  // portes jointes : la baie est un mur, des deux côtés
+  run(sim, (LIFT_CLOSE_T - LIFT_SHUT_T) / 2);
+  assert.ok(sim.liftT > 0);
+  assert.ok(sim.isColliding(fx + E.dx * 0.1, fz + E.dz * 0.1, 0.3, 0), 'plus de passage entre les vantaux');
+  assert.ok(sim.isColliding(fx - E.dx * 0.15, fz - E.dz * 0.15, 0.3, 0), 'ni depuis le couloir');
+});
+
 test("ascenseurs : un en haut, un en bas ; les 6 cassettes trouvées, le faux devient un mur et seul le vrai emmène", () => {
   for (const real of [0, 1]) {
     const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 11 });
@@ -1914,7 +2019,10 @@ test("ascenseurs : un en haut, un en bas ; les 6 cassettes trouvées, le faux de
     }
     assert.equal(sim.cassettes, 6);
     assert.ok(!sim.fm(fake).elevator.fake, 'pendant la pause, rien ne bouge encore');
+    // le faux est toujours celui qui est le plus près de l'équipe : on attend devant celui de l'étage « fake »
+    Object.assign(sim.player, { floor: fake, x: sim.fm(fake).exit.x, z: sim.fm(fake).exit.z });
     run(sim, FINALE_WAIT + 0.1);
+    assert.equal(sim.realFloor, real, 'le vrai est le plus loin');
     assert.ok(sim.fm(fake).elevator.fake, 'le faux est démasqué');
     assert.ok(!sim.fm(real).elevator.fake);
     assert.ok(sim.isColliding(sim.fm(fake).elevator.x, sim.fm(fake).elevator.z, 0.3, fake), "le faux n'est plus qu'un mur");
@@ -2901,6 +3009,55 @@ test("saut : un petit bond qui s'entend à la réception et ne franchit pas un t
   P.onBeam = true;
   sim.step({ jump: true });
   assert.equal(P.jy, 0, 'pas de saut sur une arête');
+});
+
+test("saut : en courant, on garde son élan en l'air (touches lâchées), chez l'hôte comme chez l'invité ; un mur l'arrête", () => {
+  const players = [{ id: 1, name: 'Hôte' }, { id: 2, name: 'Invité' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players, localId: 1 });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players, localId: 2 });
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  // une direction dégagée sur 6 m, sans trou
+  const clear = (sim, P) => {
+    for (let a = 0; a < 6.28; a += 0.1) {
+      let ok = true;
+      for (let d = 0.25; d < 6 && ok; d += 0.25) ok = !sim.isColliding(P.x - Math.sin(a) * d, P.z - Math.cos(a) * d, PLAYER_RADIUS + 0.05, P.floor) && sim.pitUnder(P.x - Math.sin(a) * d, P.z - Math.cos(a) * d, P.floor) < 0;
+      if (ok) return a;
+    }
+    return null;
+  };
+  for (const [who, sim, P, step] of [
+    ['hôte', host, host.player, (i) => host.step(i)],
+    ['invité', guest, guest.player, (i) => guest.predict({ yaw: guest.player.yaw, ...i })],
+  ]) {
+    P.yaw = clear(sim, P);
+    assert.ok(P.yaw !== null, `${who} : de la place`);
+    for (let i = 0; i < 20; i++) step({ my: 1, run: true });
+    const x0 = P.x;
+    const z0 = P.z;
+    step({ my: 1, run: true, jump: true });
+    let n = 1;
+    while (P.jy > 0 && n < 60) {
+      step({});
+      n++;
+    }
+    const d = Math.hypot(P.x - x0, P.z - z0);
+    assert.ok(d > 0.9 * 4.4 * n * DT && d < 2 * PIT_HALF, `${who} : ${d.toFixed(2)} m en ${(n * DT).toFixed(2)} s, touches lâchées`);
+  }
+  // sur place, puis la marche en l'air : à peine un pas (on n'a pas d'élan)
+  const P = host.player;
+  const x0 = P.x;
+  const z0 = P.z;
+  host.step({ jump: true });
+  while (P.jy > 0) host.step({ my: 1 });
+  assert.ok(Math.hypot(P.x - x0, P.z - z0) < 0.5, "sans élan, on n'avance presque pas en l'air");
+  // élancé contre un mur : il arrête l'élan (on ne repart pas de plus belle une fois le mur dépassé)
+  P.jy = 0.2;
+  P.jvy = 0;
+  P.takeoff = false;
+  P.avx = 4;
+  P.avz = 0;
+  host.bumpAir(P, { x: P.x, z: P.z });
+  assert.equal(P.avx, 0, 'le mur arrête l\'élan');
 });
 
 test("réseau : le caméscope (V) tire sur la pile, et l'on voit qui filme et qui saute", () => {

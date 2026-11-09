@@ -395,40 +395,33 @@ function drawCeiling(ctx, S, grime, low = false) {
 // Level 1 : béton brut humide, coulures sombres au pied, bande jaune et noire de sécurité
 function drawConcreteWall(ctx, S, photo) {
   // parpaings peints (Poly Haven, concrete_wall_004) : la photo est répétée 3 × 5 fois pour que les blocs fassent
-  // leur vraie taille (40 × 20 cm) sur un mur de 2,5 m de large et 4,2 m de haut
+  // leur vraie taille (40 × 20 cm) sur un mur de 2,5 m de large et 4,2 m de haut. Rien d'accidentel dessiné ici (ni
+  // coulure ni tache) : la toile revient sur chaque case de mur, et la moindre marque se répéterait tous les 2,5 m
   ctx.globalCompositeOperation = 'source-over';
   ctx.fillStyle = '#80837c';
   ctx.fillRect(0, 0, S, S);
   if (photo) {
     for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) ctx.drawImage(photo, (i * S) / 3, (j * S) / 5, S / 3 + 1, S / 5 + 1);
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = '#b9bdb8';
+    // la peinture des parpaings : un gris clair à peine froid (la photo, jaunie, faisait des murs vert olive sous les
+    // réglettes), un peu éclairci
+    ctx.globalCompositeOperation = 'saturation';
+    ctx.fillStyle = 'rgba(128, 128, 128, 0.7)';
+    ctx.fillRect(0, 0, S, S);
+    ctx.globalCompositeOperation = 'screen';
+    ctx.fillStyle = 'rgb(34, 36, 38)';
     ctx.fillRect(0, 0, S, S);
     ctx.globalCompositeOperation = 'source-over';
   } else noise(ctx, S, S, 40);
-  // soubassement peint en gris foncé jusqu'à 1,2 m, souligné d'un filet jaune
+  // soubassement peint en gris-vert foncé jusqu'à 1,2 m, souligné d'un filet jaune
   const yb = S * (1 - 1.2 / 4.2);
   ctx.globalCompositeOperation = 'multiply';
-  ctx.fillStyle = '#8a9295';
+  ctx.fillStyle = '#7f8b88';
   ctx.fillRect(0, yb, S, S - yb);
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = 'rgba(214, 170, 40, 0.85)';
-  ctx.fillRect(0, yb - 5, S, 5);
-  // coulures sombres depuis le plafond, et l'humidité qui remonte
-  for (let i = 0; i < 12; i++) {
-    const x = Math.random() * S;
-    const w = 3 + Math.random() * 12;
-    const gg = ctx.createLinearGradient(0, 0, 0, S * (0.3 + Math.random() * 0.5));
-    gg.addColorStop(0, 'rgba(38, 34, 26, 0.45)');
-    gg.addColorStop(1, 'rgba(38, 34, 26, 0)');
-    ctx.fillStyle = gg;
-    ctx.fillRect(x, 0, w, S);
-  }
-  const g = ctx.createLinearGradient(0, S * 0.8, 0, S);
-  g.addColorStop(0, 'rgba(20, 22, 18, 0)');
-  g.addColorStop(1, 'rgba(20, 22, 18, 0.35)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, S, S);
+  ctx.fillStyle = 'rgba(214, 170, 40, 0.9)';
+  ctx.fillRect(0, yb - 4, S, 4);
+  ctx.fillStyle = 'rgba(255, 236, 170, 0.25)';
+  ctx.fillRect(0, yb - 4, S, 1);
   // plinthe de sécurité jaune et noire
   const y0 = S * 0.965;
   ctx.fillStyle = '#c9a227';
@@ -442,9 +435,13 @@ function drawConcreteWall(ctx, S, photo) {
     ctx.lineTo(x + (S - y0), y0);
     ctx.fill();
   }
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+  ctx.fillRect(0, y0 - 1, S, 1);
 }
 
-// Dalle de béton usé (Poly Haven, concrete_floor_worn_001), taches d'huile et traces de pneus de chariot
+// Dalle de béton lissé (Poly Haven, concrete_floor_worn_001) : une toile pour 5 m × 5 m de sol, bordée des joints
+// sciés de la dalle (un tous les 5 m). Les taches, les traces de roues et les reflets sont posés à part, au gré de
+// l'endroit (sinon chaque dalle aurait les mêmes)
 function drawConcreteFloor(ctx, S, photo) {
   ctx.globalCompositeOperation = 'source-over';
   ctx.fillStyle = '#5b5d5c';
@@ -452,46 +449,55 @@ function drawConcreteFloor(ctx, S, photo) {
   if (photo) {
     ctx.drawImage(photo, 0, 0, S, S);
     ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = '#a7aaa6';
+    ctx.fillStyle = '#b0b3af';
     ctx.fillRect(0, 0, S, S);
     ctx.globalCompositeOperation = 'source-over';
   } else noise(ctx, S, S, 30);
-  for (let i = 0; i < 5; i++) {
-    const x = Math.random() * S;
-    const y = Math.random() * S;
-    const r = 15 + Math.random() * 60;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, 'rgba(14, 12, 10, 0.45)');
-    g.addColorStop(0.6, 'rgba(14, 12, 10, 0.2)');
-    g.addColorStop(1, 'rgba(14, 12, 10, 0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, S, S);
-  }
-  // traces de roues : deux bandes sombres qui traversent la case
-  ctx.fillStyle = 'rgba(10, 10, 10, 0.12)';
-  const tx = S * (0.25 + Math.random() * 0.2);
-  ctx.fillRect(tx, 0, 18, S);
-  ctx.fillRect(tx + 120, 0, 18, S);
-  // joint de dalle sciée
-  ctx.fillStyle = 'rgba(15, 16, 16, 0.6)';
-  ctx.fillRect(0, 0, S, 3);
-  ctx.fillRect(0, 0, 3, S);
+  // joint scié : un trait sombre, l'arête un peu épaufrée
+  ctx.fillStyle = 'rgba(12, 13, 13, 0.75)';
+  ctx.fillRect(0, 0, S, 1.4);
+  ctx.fillRect(0, 0, 1.4, S);
+  ctx.fillStyle = 'rgba(200, 204, 200, 0.12)';
+  ctx.fillRect(0, 1.4, S, 0.8);
+  ctx.fillRect(1.4, 0, 0.8, S);
 }
 
-// Dalle de béton brut au plafond (Poly Haven, concrete_wall_006), avec les marques des coffrages
+// Dalle de béton brut au plafond (Poly Haven, concrete_wall_006), coulée dans des banches de 2,5 × 1,25 m : leurs joints
+// et les trous de leurs tiges d'écartement
 function drawConcreteCeiling(ctx, S, photo) {
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = '#4a4c4a';
+  ctx.fillStyle = '#6a6c69';
   ctx.fillRect(0, 0, S, S);
   if (photo) {
     ctx.drawImage(photo, 0, 0, S, S);
     ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = '#8a8c88';
+    ctx.fillStyle = '#c8cac6';
     ctx.fillRect(0, 0, S, S);
     ctx.globalCompositeOperation = 'source-over';
   }
-  ctx.fillStyle = 'rgba(20, 22, 22, 0.5)';
-  ctx.fillRect(0, S / 2 - 2, S, 4);
+  for (const y of [0, S / 2]) {
+    ctx.fillStyle = 'rgba(20, 22, 22, 0.3)';
+    ctx.fillRect(0, y, S, 1.5);
+    ctx.fillStyle = 'rgba(230, 232, 228, 0.08)';
+    ctx.fillRect(0, y + 1.5, S, 1);
+  }
+  ctx.fillStyle = 'rgba(20, 22, 22, 0.25)';
+  ctx.fillRect(0, 0, 1.5, S);
+  // trous de tiges : 4 × 2 par banche, à 30 cm des bords
+  for (const py of [0, S / 2]) {
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 2; j++) {
+        const x = S * (0.12 + i * 0.253);
+        const y = py + S * (0.12 + j * 0.26);
+        const g = ctx.createRadialGradient(x, y, 0, x, y, 3.2);
+        g.addColorStop(0, 'rgba(18, 18, 18, 0.7)');
+        g.addColorStop(0.6, 'rgba(30, 30, 30, 0.4)');
+        g.addColorStop(1, 'rgba(30, 30, 30, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(x - 4, y - 4, 8, 8);
+      }
+    }
+  }
 }
 
 // Level 37 (Poolrooms) : petits carreaux blancs (ambientCG Tiles133A), à leur vraie taille (environ 15 cm) sur un mur de

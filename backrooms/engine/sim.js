@@ -40,6 +40,8 @@ export const CROUCH_SPEED = 0.5; // accroupi : moitié moins vite, presque sans 
 // le saut : un petit bond (0,35 m, 0,4 s en l'air) ; même en courant on ne franchit pas un trou (2 m)
 export const JUMP_V = 3.4;
 export const JUMP_G = 17;
+// en l'air, on garde son élan (la vitesse prise à l'appel) ; les touches ne font que l'infléchir, de 3 m/s² au plus
+export const AIR_ACCEL = 3;
 // La soif : on court sans fin, mais on se déshydrate peu à peu (plus vite en courant). Sous THIRST_BLUR, la vue se
 // brouille de plus en plus ; à sec, on s'effondre. L'eau d'amande désaltère
 export const WATER_DRAIN = 100 / 540; // par seconde : 9 minutes d'une gourde pleine à sec, en marchant
@@ -75,10 +77,11 @@ export const PANEL_T = 4; // Level 1 : secondes devant le panneau du monte-charg
 // Barre d'équilibre : sur une arête entre deux trous, on n'avance que tout droit et le corps tangue ; Q et D
 // corrigent. tilt va de -1 (penché à gauche) à 1 (à droite) : au bout, on tombe dans le trou de ce côté.
 export const BEAM_SPEED = 0.65; // vitesse de marche sur une arête (part de la marche normale)
-export const BEAM_UNSTABLE = 4; // plus on penche, plus on penche
-export const BEAM_NOISE = [10, 16]; // à-coups au hasard (immobile, en marchant)
-export const BEAM_FIX = 4.5; // force de Q / D
-export const BEAM_DAMP = 2.5;
+// (réglé pour un joueur qui réagit en 0,4 s : il traverse ; sans rien faire, on tombe au bout de 6 s environ)
+export const BEAM_UNSTABLE = 2; // plus on penche, plus on penche
+export const BEAM_NOISE = [5, 8.5]; // à-coups au hasard (immobile, en marchant)
+export const BEAM_FIX = 5; // force de Q / D
+export const BEAM_DAMP = 3.5;
 export const FALL_LOCK = 2.2; // secondes à terre après une chute d'un étage (plus d'une seconde de chute, puis sonné)
 export const WHISTLE_CD = 1.2;
 export const WHISTLE_HEAT = 2.5; // chaque coup compte 1 et s'oublie en 20 s : au 3e coup rapproché, l'entité vient à coup sûr
@@ -95,6 +98,7 @@ export const BURN_LOCK = 0.9; // brûlé par un jet de vapeur : repoussé, sonn�
 export const DEPART_T = 3; // secondes entre la fermeture des portes et l'arrivée
 export const BOARD_T = 45; // Poolrooms : dès qu'un joueur est dans un toboggan, les autres ont ce temps pour le suivre
 export const LIFT_CLOSE_T = 2; // le bouton pressé dans la cabine : les portes mettent ce temps à se fermer
+export const LIFT_SHUT_T = 1.7; // … dont celui que mettent les vantaux à se rejoindre (à l'écran comme ici)
 export const ARRIVE_T = 4.2; // à l'arrivée, la cabine finit de descendre (portes fermées) avant de s'ouvrir
 export const LIFT_BAY = 0.6; // demi-largeur de la baie des portes de l'ascenseur : on n'entre dans la cabine que par là
 export const LIFT_FACE = 0.19; // épaisseur de sa façade (cadre et portes)
@@ -456,7 +460,7 @@ export class BackroomsSim {
     this.delivered = 0; // Level 1 : fusibles rapportés au panneau
     this.valves = 0; // vannes fermées (Level 2)
     this.items0 = this.floors.map((f) => (f.items || []).length); // objets d'origine (les suivants ont été posés par des joueurs)
-    // un seul vrai ascenseur : on ne sait pas lequel tant que les cassettes ne sont pas toutes trouvées
+    // un seul vrai ascenseur : décidé quand tout se met en route, le plus loin de l'équipe (pickRealFloor)
     this.realFloor = this.floors.length > 1 ? (hashRnd(this.seed, level, 7) < 0.5 ? 0 : 1) : 0;
     this.unlocked = false;
     this.powered = false; // panneau du monte-charge réalimenté (aux Poolrooms : les 3 volants trouvés)
@@ -874,6 +878,50 @@ export class BackroomsSim {
     return list;
   }
 
+  // Le vrai ascenseur, au moment où tout se met en route : le plus loin de l'équipe. Celui qui est le plus près (en
+  // marchant, par l'escalier pour l'autre étage) se referme en mur sous son nez
+  pickRealFloor() {
+    if (this.floors.length < 2) return 0;
+    const alive = this.players.filter((P) => P.status === 'alive');
+    if (!alive.length) return this.realFloor;
+    // la distance en cases d'un champ à une case (si elle est pleine, par sa voisine la plus proche)
+    const at = (m, d, x, z) => {
+      const gx = cellOf(x);
+      const gz = cellOf(z);
+      let best = Infinity;
+      for (const [ox, oz, k] of [[0, 0, 0], [1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1]]) {
+        const nx = gx + ox;
+        const nz = gz + oz;
+        if (nx < 0 || nz < 0 || nx >= m.W || nz >= m.H) continue;
+        const v = d[nz * m.W + nx];
+        if (v >= 0) best = Math.min(best, v + k);
+      }
+      return best;
+    };
+    const fromExit = this.floors.map((m) => (m.exit ? bfs(m.grid, m.W, m.H, m.exit.gx, m.exit.gz) : null));
+    const STAIR = 6; // les deux volées de la cage, en cases
+    const far = this.floors.map(() => Infinity); // pour chaque ascenseur : le coéquipier le plus proche
+    for (const P of alive) {
+      const a = P.floor || 0;
+      const m = this.fm(a);
+      const mine = bfs(m.grid, m.W, m.H, cellOf(P.x), cellOf(P.z));
+      for (let b = 0; b < this.floors.length; b++) {
+        if (!fromExit[b]) continue;
+        let d = Infinity;
+        if (b === a) d = at(m, mine, m.exit.x, m.exit.z);
+        else
+          for (const st of this.stairs) {
+            const here = a === 0 ? st.up : st.down;
+            const there = b === 0 ? st.up : st.down;
+            d = Math.min(d, at(m, mine, here.x, here.z) + STAIR + at(this.floors[b], fromExit[b], there.x, there.z));
+          }
+        far[b] = Math.min(far[b], d);
+      }
+    }
+    if (!Number.isFinite(far[0]) && !Number.isFinite(far[1])) return this.realFloor;
+    return far[0] < far[1] ? 1 : 0;
+  }
+
   // Toutes les cassettes trouvées : le faux ascenseur se referme en mur (on ne le sait qu'en arrivant devant)
   unlockLevel0() {
     this.unlocked = true;
@@ -912,11 +960,38 @@ export class BackroomsSim {
       if (lz < -radius || lz > LIFT_FACE + radius) continue;
       const ax = Math.abs((x - fx) * E.dz - (z - fz) * E.dx);
       if (ax > CELL_SIZE / 2 + radius || this.blocked(E.gx, E.gz, floor)) continue;
-      const ex = ax < LIFT_BAY ? LIFT_BAY - ax : ax > CELL_SIZE / 2 ? ax - CELL_SIZE / 2 : 0;
+      const gap = this.liftGap(E, m); // portes refermées : la baie est un mur comme la façade
+      const ex = ax < gap ? gap - ax : ax > CELL_SIZE / 2 ? ax - CELL_SIZE / 2 : 0;
       const ez = lz < 0 ? -lz : lz > LIFT_FACE ? lz - LIFT_FACE : 0;
       if (ex * ex + ez * ez < radius * radius * 0.8) return true;
     }
     return false;
+  }
+
+  // demi-largeur encore ouverte entre les portes d'une cabine (LIFT_BAY grandes ouvertes, 0 fermées) : après le
+  // bouton, elles se rejoignent en LIFT_SHUT_T, comme à l'écran
+  liftGap(E, m) {
+    if (E === m.arrival) return this.arriveT > 0 ? 0 : LIFT_BAY;
+    if (this.departT > 0) return 0;
+    if (this.liftT > 0) return LIFT_BAY * Math.max(0, Math.min(1, (this.liftT - (LIFT_CLOSE_T - LIFT_SHUT_T)) / LIFT_SHUT_T));
+    return LIFT_BAY;
+  }
+
+  // les portes qui se referment poussent celui qui se tient dans la baie : dans la cabine s'il y était entré, dehors
+  // sinon. Personne ne reste entre les vantaux (on y voyait à travers, et on y passait)
+  doorShove(P) {
+    const E = this.fm(P.floor).elevator;
+    if (!E || E.fake || (P.floor || 0) !== this.realFloor) return;
+    const fx = E.x - E.dx * (CELL_SIZE / 2);
+    const fz = E.z - E.dz * (CELL_SIZE / 2);
+    const lz = (P.x - fx) * E.dx + (P.z - fz) * E.dz;
+    const ax = Math.abs((P.x - fx) * E.dz - (P.z - fz) * E.dx);
+    const R = PLAYER_RADIUS + 0.03;
+    if (ax > LIFT_BAY + R || lz <= -R || lz >= LIFT_FACE + R) return;
+    const want = lz >= 0 ? LIFT_FACE + R : -R;
+    const step = Math.sign(want - lz) * Math.min(Math.abs(want - lz), 2.4 * DT);
+    P.x += E.dx * step;
+    P.z += E.dz * step;
   }
 
   isColliding(x, z, radius, floor = 0) {
@@ -1188,7 +1263,8 @@ export class BackroomsSim {
 
   // Barre d'équilibre : renvoie le côté de la chute (-1 gauche, 1 droite) ou 0
   balance(P, mx) {
-    P.onBeam = this.pitUnder(P.x, P.z, P.floor) >= 0;
+    // (en l'air, on passe au-dessus : l'élan du saut n'est pas cassé par l'arête qu'on survole)
+    P.onBeam = !(P.jy > 0) && this.pitUnder(P.x, P.z, P.floor) >= 0;
     if (!P.onBeam) {
       P.tilt *= Math.max(0, 1 - DT * 5);
       P.tiltV = 0;
@@ -1508,6 +1584,7 @@ export class BackroomsSim {
   // la phase finale du Level 0 : le vrai ascenseur s'ouvre, les néons s'éteignent un à un ; HUNT_DELAY plus tard, les
   // feux rouges et les alarmes, et l'entité se lance à la poursuite de l'équipe
   startFinale() {
+    this.realFloor = this.pickRealFloor();
     this.unlockLevel0();
     this.emit({ type: 'exitUnlocked' });
     this.huntT = HUNT_DELAY;
@@ -1686,19 +1763,19 @@ export class BackroomsSim {
         P.x = b.x;
         P.z = b.z;
       }
-    } else if (P.moving) {
-      const len = Math.hypot(mx, my) || 1;
-      const normX = mx / len;
-      const normY = my / len;
-      const fx = -Math.sin(P.yaw);
-      const fz = -Math.cos(P.yaw);
-      const rx = Math.cos(P.yaw);
-      const rz = -Math.sin(P.yaw);
-      const p2 = this.moveWithCollisions(P.x, P.z, (fx * normY + rx * normX) * speed * DT, (fz * normY + rz * normX) * speed * DT, PLAYER_RADIUS, P.floor);
-      const p3 = this.stairStep(P, p2.x, p2.z);
-      P.x = p3.x;
-      P.z = p3.z;
+    } else if (P.moving || P.jy > 0) {
+      const v = this.stride(P, this.wishVel(P, mx, my, speed));
+      if (v.x || v.z) {
+        const p2 = this.moveWithCollisions(P.x, P.z, v.x * DT, v.z * DT, PLAYER_RADIUS, P.floor);
+        this.bumpAir(P, p2);
+        const p3 = this.stairStep(P, p2.x, p2.z);
+        P.x = p3.x;
+        P.z = p3.z;
+      }
     }
+
+    // 3a. Les portes de la cabine se referment : on ne reste pas entre les vantaux
+    if (this.liftT > 0) this.doorShove(P);
 
     // le bruit qu'on fait : ce que l'entité peut entendre (la course s'entend loin, accroupi presque rien)
     let noise = !P.moving ? 0 : P.running ? NOISE.run : P.crouch ? NOISE.crouch : NOISE.walk;
@@ -1954,6 +2031,7 @@ export class BackroomsSim {
       P.jy = 0.001;
       P.jvy = JUMP_V;
       P.crouch = false;
+      P.takeoff = true; // l'élan est pris au premier pas en l'air (stride)
     }
     if (!(P.jy > 0)) return false;
     P.crouch = false;
@@ -1962,7 +2040,54 @@ export class BackroomsSim {
     if (P.jy > 0) return false;
     P.jy = 0;
     P.jvy = 0;
+    P.takeoff = false;
     return true;
+  }
+
+  // la vitesse voulue (m/s) d'après les touches, dans le repère du regard
+  wishVel(P, mx, my, speed) {
+    if (!mx && !my) return { x: 0, z: 0 };
+    const len = Math.hypot(mx, my) || 1;
+    const fx = -Math.sin(P.yaw);
+    const fz = -Math.cos(P.yaw);
+    const rx = Math.cos(P.yaw);
+    const rz = -Math.sin(P.yaw);
+    return { x: ((fx * my + rx * mx) / len) * speed, z: ((fz * my + rz * mx) / len) * speed };
+  }
+
+  // La vitesse du pas (m/s) : au sol, celle des touches ; en l'air, on garde l'élan pris à l'appel (un saut en courant
+  // file à la vitesse de la course, même touches lâchées). Les touches ne font que l'infléchir (AIR_ACCEL) : elles
+  // n'enlèvent rien à l'élan dans leur sens, et l'on ne dépasse jamais la course
+  stride(P, w) {
+    if (!(P.jy > 0)) return w;
+    if (P.takeoff) {
+      P.takeoff = false;
+      P.avx = w.x;
+      P.avz = w.z;
+      return w;
+    }
+    const ws = Math.hypot(w.x, w.z);
+    if (ws > 0) {
+      const ux = w.x / ws;
+      const uz = w.z / ws;
+      const add = Math.min(Math.max(0, ws - ((P.avx || 0) * ux + (P.avz || 0) * uz)), AIR_ACCEL * DT);
+      P.avx = (P.avx || 0) + ux * add;
+      P.avz = (P.avz || 0) + uz * add;
+      const v = Math.hypot(P.avx, P.avz);
+      const cap = SPRINT_SPEED * this.wade(P);
+      if (v > cap) {
+        P.avx *= cap / v;
+        P.avz *= cap / v;
+      }
+    }
+    return { x: P.avx || 0, z: P.avz || 0 };
+  }
+
+  // en l'air, un mur arrête l'élan qui va vers lui (on glisse le long)
+  bumpAir(P, p) {
+    if (!(P.jy > 0)) return;
+    P.avx = (p.x - P.x) / DT;
+    P.avz = (p.z - P.z) / DT;
   }
 
   predict(input = {}) {
@@ -2009,18 +2134,15 @@ export class BackroomsSim {
       return 0;
     }
     P.running = !!input.run && P.moving && !P.crouch;
-    if (!P.moving) {
+    const speed = (P.running ? SPRINT_SPEED : P.crouch ? WALK_SPEED * CROUCH_SPEED : WALK_SPEED) * this.wade(P);
+    const v = this.stride(P, this.wishVel(P, mx, my, speed));
+    if (!v.x && !v.z) {
       // immobile dans un jet de vapeur : on se brûle aussi
       this.predictBurn(P);
       return 0;
     }
-    const speed = (P.running ? SPRINT_SPEED : P.crouch ? WALK_SPEED * CROUCH_SPEED : WALK_SPEED) * this.wade(P);
-    const len = Math.hypot(mx, my) || 1;
-    const fx = -Math.sin(P.yaw);
-    const fz = -Math.cos(P.yaw);
-    const rx = Math.cos(P.yaw);
-    const rz = -Math.sin(P.yaw);
-    const pos = this.moveWithCollisions(P.x, P.z, ((fx * my + rx * mx) / len) * speed * DT, ((fz * my + rz * mx) / len) * speed * DT, PLAYER_RADIUS, P.floor);
+    const pos = this.moveWithCollisions(P.x, P.z, v.x * DT, v.z * DT, PLAYER_RADIUS, P.floor);
+    this.bumpAir(P, pos);
     const ps = this.stairStep(P, pos.x, pos.z);
     P.x = ps.x;
     P.z = ps.z;
