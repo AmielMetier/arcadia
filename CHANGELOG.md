@@ -1,5 +1,19 @@
 # Journal des versions — Arcadia
 
+## 5.22 — 9 novembre 2026
+- **The Backrooms** — au Level 1, l'entrepôt :
+  - Le poste de garde est une vraie pièce : on y entre par une porte d'acier qui s'ouvre devant soi. Assis au bureau, on passe d'une caméra à l'autre (flèches, molette ou chiffres), et l'image tombe pile dans les écrans.
+  - L'entité se faufile aussi par les gaines du plafond : on l'entend cogner au-dessus, puis la grille tombe et elle ressort près de sa proie.
+  - Les quais de chargement font un raccourci : un boîtier relève lentement leur rideau de fer, sous un gyrophare qui balaie le quai. L'entité bute sur un rideau baissé, cogne, puis l'arrache.
+  - Les alarmes incendie attirent l'entité, qui vient frapper la cloche ; chacune ne sert qu'une fois, et son flash baigne le couloir de rouge.
+  - Brume en volume au ras du sol, vrais tuyaux au plafond, béton gris sans taches qui se répètent, cabine d'ascenseur éclairée par son plafonnier.
+- **The Backrooms** — un nouvel explorateur : la combinaison jaune « Hazmat Suit » de Cj.savage, plus détaillée et animée.
+  - Sa tête suit ton regard, et ses doigts se referment vraiment sur la lampe, la bouteille et les piles.
+  - En baissant les yeux, tu vois tes bras, ton corps et tes pieds, la lampe dans la main droite et l'objet choisi dans la gauche.
+  - Gants noirs propres, le même jaune partout, plus aucun trou aux bras ni à la paume.
+  - L'inventaire revient à trois cases : la lampe, puis deux objets.
+  - Plus de rejeu de la mort : après l'attaque, l'image se perd tout de suite.
+
 ## 5.21 — 9 novembre 2026
 - **The Backrooms** — Au Level 1, on entend maintenant Khaoula : sa voix résonne de temps en temps quand elle rôde près de toi, et bien plus souvent quand elle te poursuit. Plus elle est loin ou derrière les murs, plus elle est étouffée.
 
