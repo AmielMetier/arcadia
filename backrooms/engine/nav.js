@@ -59,7 +59,8 @@ export function findPath(map, startX, startZ, targetX, targetZ) {
       const nz = cur.z + dirs[i].dz;
       if (nx >= 0 && nx < W && nz >= 0 && nz < H) {
         const nK = key(nx, nz);
-        if (!visited[nK] && !map.isWall(nx, nz)) {
+        // map.canStep (Poolrooms) : d'une salle à l'autre, seulement par une porte
+        if (!visited[nK] && !map.isWall(nx, nz) && (!map.canStep || map.canStep(cur.x, cur.z, nx, nz))) {
           visited[nK] = 1;
           cameFrom[nK] = curK;
           queue.push({ x: nx, z: nz });
@@ -96,6 +97,8 @@ export function hasLineOfSight(map, x1, z1, x2, z2) {
   const dist = Math.hypot(dx, dz);
   if (dist < 0.1) return true;
 
+  // Poolrooms : les cloisons minces entre les salles cachent aussi
+  if (map.lightBlocked && map.lightBlocked(x1, z1, x2, z2)) return false;
   const steps = Math.ceil(dist / (CELL_SIZE * 0.3));
   for (let i = 1; i < steps; i++) {
     const t = i / steps;

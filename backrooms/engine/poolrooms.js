@@ -26,7 +26,7 @@ export const DEPTH = { WADE: 0.2, GALLERY: 0.25, TUNNEL: 0.6 };
 // l'un d'eux. Chaque couleur mène ailleurs (to : le niveau d'arrivée ; null tant qu'il n'existe pas : on sort des
 // Backrooms). MOUTH : le tube, au ras du sol (rayon et hauteur du centre), et la distance où l'on s'y glisse.
 export const SLIDES = [
-  { color: 'red', name: 'RED', hex: '#e2402f', to: null },
+  { color: 'red', name: 'RED', hex: '#e2402f', to: 4 }, // vers le Level 5, le Terror Hotel (HOTEL_LEVEL)
   { color: 'yellow', name: 'YELLOW', hex: '#f2bf1d', to: PIPES_LEVEL }, // les galeries de service (Level 2)
   { color: 'blue', name: 'BLUE', hex: '#2c7fe0', to: null },
 ];
@@ -542,6 +542,11 @@ export function createPoolMap(seed = 37) {
     for (const [x, z, dx, dz] of opts) if (!collide(x - dx * 0.4, z - dz * 0.4, 0.3)) ladders.push({ x, z, dx, dz });
   }
 
+  // l'entité (la même qu'au Level 1) part au sec, dans une des salles les plus éloignées du départ
+  const farCells = walkable.filter((c) => depthAt((c.x + 0.5) * C, (c.z + 0.5) * C) === 0 && !collide((c.x + 0.5) * C, (c.z + 0.5) * C, 0.6)).sort((a, b) => D(b.x, b.z) - D(a.x, a.z));
+  const mc = farCells[Math.floor(rnd() * Math.min(10, farCells.length))] || walkable[walkable.length - 1];
+  const monsterSpawn = cellPos(mc);
+
   // profondeur par case (au centre)
   const depth = new Float32Array(W * H);
   for (const c of walkable) depth[c.z * W + c.x] = depthAt((c.x + 0.5) * C, (c.z + 0.5) * C);
@@ -577,7 +582,8 @@ export function createPoolMap(seed = 37) {
     ladders,
     dist,
     roomOf,
-    monsterSpawn: { x: -1000, z: -1000, gx: -1, gz: -1 },
+    monsterSpawn,
+    canStep: crossOk,
     isWall(gx, gz) {
       if (gx < 0 || gx >= W || gz < 0 || gz >= H) return true;
       const v = grid[gz * W + gx];
