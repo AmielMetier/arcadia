@@ -5,7 +5,7 @@ import { bfs, CELL_SIZE, cellsOnSeg, T } from './engine/map.js';
 import { createBackroomsScene, setMonsterMode, setSceneOptions } from './view/scene.js';
 import { BackroomsSfx } from './view/sfx.js';
 import { createVoice } from './view/voice.js';
-import { BackroomsHUD, levelName, levelSub, LORE, loreOf, hearTape, tapesHeard, store } from './view/hud.js';
+import { BackroomsHUD, levelName, levelSub, LORE, loreOf, hearTape, tapesHeard, store, NOTES, readNote, loreComplete, FINAL_LORE } from './view/hud.js';
 import { parseWords } from './engine/hotel.js';
 
 // Level 5, version VIP : les mots du fichier backrooms/password_level5/mots.txt (6 lettres, un par ligne) ; sans
@@ -29,6 +29,8 @@ let scene = null;
 let sfx = null;
 let hud = null;
 let stepDist = 0;
+let khaoulaT = 6; // prochaine fois que Khaoula se fait entendre (Level 1)
+let letterN = 0; // lettres ramassées à l'hôtel (pour le registre)
 let monsterStepT = 0; // sans entité animée (mode VIP du Level 1) : le prochain pas, à la minuterie
 // l'entité entendue comme un joueur : ce qui la sépare de l'oreille (occ, détour par les couloirs) et l'espace autour
 // des deux (space, pour l'écho), recalculés quelques fois par seconde
@@ -288,6 +290,19 @@ function toggleCam() {
 const CAM_ZOOM_MIN = 1.5;
 const CAM_ZOOM_MAX = 12;
 let camZoom = CAM_ZOOM_MIN;
+// Pavé tactile quand la souris n'est pas verrouillée (mode « sans souris », iPad, où le verrou n'existe pas) : le
+// défilement à deux doigts sert à regarder. Une molette crantée (lignes, ou grands pas entiers sans défilement de côté)
+// garde le choix des cases, sauf en mode sans souris où tout défilement vient du pavé.
+const PAD_K = 1.4;
+function padLook(e) {
+  if (isPointerLocked) return false;
+  if (kbMode) return true;
+  if (e.deltaMode !== 0) return false;
+  if (!document.body.classList.contains('touch')) return false;
+  return !(e.deltaX === 0 && Math.abs(e.deltaY) >= 100 && Number.isInteger(e.deltaY));
+}
+// Safari (macOS, iPad) : le pincement au pavé ne zoome pas la page
+for (const ev of ['gesturestart', 'gesturechange']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
 let wheelAcc = 0; // molette sans caméscope : le défilement accumulé vers la case suivante
 let wheelT = 0; // et le dernier changement de case (un lancer de pavé tactile ne fait pas défiler toutes les cases)
 window.addEventListener(
@@ -295,7 +310,16 @@ window.addEventListener(
   (e) => {
     if (paused || !sim || sim.player.status !== 'alive') return;
     e.preventDefault();
-    const d = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+    // pavé tactile sans souris verrouillée (mode sans souris, iPad) : glisser à deux doigts tourne la vue comme on
+    // déplacerait la souris (doigts vers la gauche, vue vers la gauche) ; pincer (ctrlKey) zoome le caméscope
+    if (padLook(e) && !e.ctrlKey) {
+      const k = PAD_K * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+      mouseDx -= e.deltaX * k;
+      mouseDy -= e.deltaY * k;
+      return;
+    }
+    if (e.ctrlKey && !camOn) return;
+    const d = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1) * (e.ctrlKey ? 4 : 1);
     // caméscope rangé : la molette passe d'une case d'objet à l'autre (un cran, ou 60 px de pavé tactile, par case)
     if (!camOn) {
       wheelAcc = Math.sign(d) !== Math.sign(wheelAcc) ? d : wheelAcc + d;
@@ -401,9 +425,16 @@ for (const b of touchBtns.querySelectorAll('button')) {
   b.addEventListener('pointerleave', up);
   b.addEventListener('pointercancel', up);
 }
+// sans verrou (mode sans souris, iPad avec pavé tactile ou souris, aperçu sans permission) : cliquer-glisser regarde
+let lookDrag = null;
 stageEl.addEventListener('pointerdown', (e) => {
   if (sim && sim.player.grabT > 0 && !paused) act.struggle++;
-  if (e.pointerType !== 'touch') return;
+  if (e.pointerType !== 'touch') {
+    lookDrag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    // sur tablette, un clic au pavé tactile reprend la partie comme un toucher
+    if (paused && document.body.classList.contains('touch')) play();
+    return;
+  }
   document.body.classList.add('touch');
   if (sfx) sfx.unlock();
   if (paused) setPaused(false);
@@ -434,7 +465,18 @@ stageEl.addEventListener('pointermove', (e) => {
     l.y = e.clientY;
   }
 });
+window.addEventListener('pointermove', (e) => {
+  const g = lookDrag;
+  if (!g || g.id !== e.pointerId) return;
+  if (!paused && !isPointerLocked && !touch.look && e.buttons & 1) {
+    mouseDx += e.clientX - g.x;
+    mouseDy += e.clientY - g.y;
+  }
+  g.x = e.clientX;
+  g.y = e.clientY;
+});
 const touchEnd = (e) => {
+  if (lookDrag && lookDrag.id === e.pointerId) lookDrag = null;
   if (touch.move && touch.move.id === e.pointerId) {
     touch.move = null;
     stick.hidden = true;
@@ -462,7 +504,7 @@ document.addEventListener('pointerlockchange', () => {
 });
 
 document.addEventListener('mousemove', (e) => {
-  if ((isPointerLocked || (noLock && !paused && e.buttons & 1)) && !kbMode && !touch.look) {
+  if (isPointerLocked && !kbMode && !touch.look) {
     mouseDx += e.movementX || 0;
     mouseDy += e.movementY || 0;
   }
@@ -678,6 +720,9 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   applyOpts();
 
   stepDist = 0;
+  letterN = 0;
+  otState.level = -1;
+  otState.last = false;
   setPaused(kbMode ? paused : !isPointerLocked);
 }
 
@@ -857,6 +902,103 @@ function prunePlayers() {
 const ITEM_NAME = { bottle: 'Almond water', battery: 'Batteries', ladder: 'Ladder' };
 let dropTip = 0; // au doigt : le premier objet ramassé rappelle qu'un appui long sur sa case le pose par terre
 
+// Un écrit du niveau, lu par celui qui a ramassé l'objet (k : la clé dans NOTES, i : le rang de l'objet)
+function showNote(k, i) {
+  if (!hud || !sim) return;
+  const { n, isNew } = readNote(k, sim.seed, i);
+  const text = NOTES[k].list[n].replace('{name}', (sim.player && sim.player.name) || 'You');
+  setTimeout(() => hud && hud.showLore(n, text, isNew, NOTES[k].tag), 1200);
+  if (sfx) setTimeout(() => sfx && sfx.loreTape && sfx.loreTape(4 + text.length / 16), 1000);
+}
+
+// « The Old Timer » : une voix sur le talkie, là depuis toujours. Il parle à tout le monde en même temps (le moment
+// et la phrase se tirent de la graine et du temps de la partie, pareils chez chacun), jamais pendant une poursuite.
+const OLD_TIMER = {
+  0: [
+    "Hello? Hello… ah. You can hear me. Good. Don't look behind you yet. I'll tell you when.",
+    "Count the lights in your hallway. Now count them again. …Yeah. It does that.",
+    "The last group found every tape. I helped them. They're still here. They just don't talk anymore.",
+    "She hums when she's close. If you catch yourself humming along… stop. Stop right now.",
+  ],
+  1: [
+    "Basement. Fuses in the side rooms. Whatever you do, don't take the stairs back up. Nothing is up there anymore.",
+    "There's a woman down there. She keeps the lights off. If she whispers that it's safe… it isn't. It never is.",
+    "Someone's been clocking in at three seventeen every night. Every night. Nobody works here.",
+  ],
+  2: [
+    "Smell the chlorine? That's him. He's in the water. He's in the numbers. He's been watching you solve things.",
+    "Don't swim. Don't put your face under. You'll see the floor, and the floor isn't empty.",
+    "Three slides. I took one, a long time ago. I'll let you guess which.",
+  ],
+  pipes: [
+    "Hear the bell? That's Teo. He's not lost. He's counting you. He likes to count.",
+    "If a goat stops and stares at you… don't stare back. That's how he picks the next one.",
+    "The warm pipes breathe at night. I can hear it from here. I can hear you from here too.",
+  ],
+  hotel: [
+    "Welcome to the hotel. Don't sign the register. …Oh. You already did. Before you got here.",
+    "Room thirteen is yours. It's been yours for a long time. They kept it clean for you.",
+    "If someone knocks on your door and says room service… there is no room service.",
+  ],
+  rare: [
+    "…sorry. Wrong channel. I wasn't talking to you. …Who were you talking to?",
+    "How long have you been down there? …No. No, that's not possible. Check your watch again.",
+    "I don't remember the way out. I just remember the screaming of the people who found it.",
+    "Hello? Is anybody… oh. Oh, it's you again. You always come back.",
+    "Stop for a second. Listen. …Hear that? That's not me breathing.",
+    "Why are there five of you? You came in with four.",
+  ],
+  last: "Just you now. That's okay. It's always just one, in the end. …I'll stay on the line. Until it finds you.",
+};
+const otState = { level: -1, t0: 0, said: 0, next: 0, last: false };
+// un tirage déterministe (graine, niveau, rang) : le même chez tous les joueurs
+const otRand = (a, b, c) => {
+  let x = (a * 374761393 + b * 668265263 + c * 2147483647) | 0;
+  x = Math.imul(x ^ (x >>> 13), 1274126177);
+  return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+};
+function oldTimerSay(text) {
+  if (!text) return;
+  const sec = 1.5 + text.length / 13;
+  if (sfx && sfx.radioIn) sfx.radioIn(sec);
+  if (hud) setTimeout(() => hud && hud.showLore(null, text, false, '📻 CHANNEL 9 · ???'), 350);
+  try {
+    if (window.speechSynthesis) {
+      const u = new SpeechSynthesisUtterance(text);
+      const v = speechSynthesis.getVoices().filter((v) => /^en/i.test(v.lang));
+      u.voice = v.find((x) => /male|daniel|fred|george|david/i.test(x.name)) || v[0] || null;
+      u.lang = 'en-US';
+      u.pitch = 0.1;
+      u.rate = 0.78;
+      u.volume = 0.85;
+      setTimeout(() => speechSynthesis.speak(u), 400);
+    }
+  } catch (e) {}
+}
+function oldTimerTick() {
+  if (!sim || sim.state !== 'playing' || paused) return;
+  const key = sim.level === PIPES_LEVEL ? 'pipes' : sim.level === HOTEL_LEVEL ? 'hotel' : sim.level;
+  if (otState.level !== sim.level) {
+    Object.assign(otState, { level: sim.level, t0: sim.time, said: 0, last: otState.last });
+    otState.next = 25 + otRand(sim.seed, sim.level, 0) * 20;
+  }
+  // le dernier vivant d'une équipe : il ne parle plus qu'à lui
+  const alive = sim.players.filter((p) => p.status === 'alive');
+  if (multi() && sim.players.length > 1 && alive.length === 1 && alive[0] === sim.player && !otState.last) {
+    otState.last = true;
+    return oldTimerSay(OLD_TIMER.last);
+  }
+  const M = sim.hasMonster ? sim.monster : null;
+  if (M && (M.mode === 'chase' || M.mode === 'grab')) return;
+  const pool = OLD_TIMER[key];
+  if (!pool || otState.said >= 3 || sim.time - otState.t0 < otState.next) return;
+  const r = otRand(sim.seed, sim.level, otState.said + 1);
+  const line = r < 0.25 ? OLD_TIMER.rare[Math.floor(otRand(sim.seed, sim.level, otState.said + 50) * OLD_TIMER.rare.length)] : pool[(Math.floor(r * 1000) + otState.said) % pool.length];
+  otState.said++;
+  otState.next += 70 + otRand(sim.seed, sim.level, otState.said + 9) * 80;
+  oldTimerSay(line);
+}
+
 // Événements de la partie : sons, messages, changement d'étage, fin
 function handleEvent(ev, me) {
   const mine = ev.by !== undefined ? ev.by === me : ev.id === undefined || ev.id === me;
@@ -875,6 +1017,7 @@ function handleEvent(ev, me) {
     }
     case 'letter':
       if (sfx) sfx.cassette();
+      if (ev.by === me) showNote('hotel', (letterN = (letterN || 0) + 1) - 1);
       if (hud) hud.toast(ev.by === me ? `Letter « ${ev.char} » from room ${ev.num} · post it in the lobby mailboxes` : `${who(ev.by)} found a letter (room ${ev.num})`);
       break;
     case 'posted':
@@ -909,6 +1052,7 @@ function handleEvent(ev, me) {
       if (sim.level === 2) {
         if (hud) hud.toast(ev.by === me ? `Valve wheel ${ev.count}/${ev.total}` : `${who(ev.by)} found a valve wheel (${ev.count}/${ev.total})`);
       } else if (hud) hud.toast(ev.by === me ? 'Fuse in your pocket · bring it to the freight elevator panel' : `${who(ev.by)} picked up a fuse`);
+      if (ev.by === me && (sim.level === 1 || sim.level === 2)) showNote(sim.level, (ev.count || 1) - 1);
       break;
     }
     case 'fuseIn':
@@ -1333,6 +1477,7 @@ function handleEvent(ev, me) {
     case 'valve':
       if (sfx) sfx.cassette('valve');
       if (hud) hud.toast(ev.by === me ? `Valve closed · ${ev.count}/${ev.total}` : `A valve slammed shut somewhere · ${ev.count}/${ev.total}`);
+      if (ev.by === me) showNote('pipes', (ev.count || 1) - 1);
       break;
     case 'valveStart':
       if (ev.by === me && hud) hud.toast('Turning the valve… stay in front of it');
@@ -1410,6 +1555,8 @@ function handleEvent(ev, me) {
       // rendre le curseur pour le bouton Rejouer (Entrée marche aussi)
       if (document.pointerLockElement) document.exitPointerLock();
       if (ev.type === 'win' && sfx) sfx.win();
+      // la fin cachée : toutes les cassettes et tous les écrits trouvés, un dernier mot
+      if (ev.type === 'win' && loreComplete() && hud) setTimeout(() => hud && hud.showLore(null, FINAL_LORE, false, 'THE LAST TAPE'), 1500);
       // (tombé dans un puits : la bande ne s'arrête qu'au bout de la chute)
       if (ev.type === 'gameover' && sfx) {
         if (lastAbyss) setTimeout(() => sfx && sfx.tapeStop(), 3000);
@@ -1728,6 +1875,14 @@ function frame(currentTime) {
     // Level 2 : pas de bourdonnement d'entité, les sabots du troupeau
     sfx.updateMonsterSound(sim.goats || M.away ? 0 : M.danger, M, sim.level === 1 || sim.level === 2, occl); // Poolrooms : la voix de l'entité du Level 1
     sfx.updateChase(chasing, M.danger, M, occl);
+    // Level 1 : Khaoula se fait entendre quand elle est proche (de temps en temps) et pendant la poursuite (plus souvent)
+    if (sim.level === 1 && !M.away && !paused) {
+      khaoulaT -= delta;
+      if (khaoulaT <= 0 && (chasing || M.danger > 0.35)) {
+        sfx.khaoula();
+        khaoulaT = chasing ? 7 + Math.random() * 6 : 18 + Math.random() * 20;
+      } else if (khaoulaT <= 0) khaoulaT = 2;
+    }
     // la musique de tension suit le directeur (la peur de l'équipe) et ce que fait l'entité
     const D = sim.director;
     const charging = sim.goats ? sim.goats.some((g) => g.mode === 'charge' || g.mode === 'windup') : false;
@@ -1898,6 +2053,7 @@ function frame(currentTime) {
       const fear = sim.hasMonster && sim.monster.danger > 0.6 ? (sim.monster.danger - 0.6) * 0.3 : 0;
       const grab = P.grabT > 0 ? 1 : 0;
       sfx.setBreath(P.status === 'alive' && sim.state === 'playing' && !paused && !P.holding ? Math.max(run, pant, fear, grab) : 0);
+      oldTimerTick();
     }
   }
   if (voice) {

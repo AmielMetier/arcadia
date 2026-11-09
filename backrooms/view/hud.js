@@ -14,16 +14,16 @@ export const levelSub = (lv) => (lv === HOTEL_LEVEL ? 'The Terror Hotel' : lv ==
 // Les cassettes du Level 0 racontent une histoire : dix enregistrements, cinq par partie (toujours d'autres, selon la
 // graine). Ceux qu'on a déjà écoutés restent dans la collection (sur cet appareil).
 export const LORE = [
-  'Day three. The hum never stops. I counted the lights in this hallway: forty-one. Then forty. Nobody turned one off.',
+  'Safia Expedition, day three. The hum never stops. I counted the lights: forty-one. Then forty. Nobody turned one off.',
   "If you hear it, don't run. Running is the loudest thing you can do down here. Crouch. Wait. Let it pass.",
   'The elevators lie. One of them is a wall. You only find out once every tape is in your bag.',
   'There are lockers further down. I sat in one for an hour. It stood right outside the door. Breathing with me.',
   'Kevin went to check the noise behind the shelves. The noise was Kevin. Kevin was standing next to me.',
   "Almond water. Drink it slowly. It doesn't fix you. It just buys you a minute.",
-  "Something whistled my name tonight. In my voice. Don't answer a whistle you didn't hear coming.",
+  "Something whistled my name tonight. In my voice. I think I'm the one whistling.",
   "The goats hate the light. The big one, with the bell… the big one stopped caring.",
   'The pool rooms have three slides. Red, blue, yellow. Two of them take you home. Home is wrong now.',
-  'If anyone finds this: the yellow one. Take the yellow one. It is the only way out that stays out.',
+  'If anyone finds this: the yellow slide. Take it. I never did. I stayed to keep the lights company.',
 ];
 export const loreOf = (seed, id) => {
   // cinq enregistrements différents pour cette graine
@@ -51,6 +51,52 @@ export function hearTape(i) {
   if (!h.includes(i)) store.set('backrooms_lore', [...h, i]);
 }
 export { store };
+
+// Les écrits des autres niveaux : ce qu'on trouve avec les fusibles (Level 1, Khaoula), les volants de vanne
+// (Poolrooms, St Didier Auroux), les vannes (Pipe Dreams, Teo le bouc) et les lettres (Terror Hotel, le registre).
+// Un par objet ramassé, dans un ordre qui dépend de la graine ; ceux qu'on a lus restent dans la collection.
+export const NOTES = {
+  1: { tag: 'SCRAWLED NOTE', list: [
+    "Daesh Daesh Daesh.... My mission kill all white",
+    "Nobody knows I'm here. Allah Akbar",
+    'I keep the lights off so I can hear footsteps first. And I can cut the throat of the european people',
+    "I'm not afraid anymore. I don't remember what that felt like. I just remember the hiding.",
+    "If you don't love islam, just die.",
+  ] },
+  2: { tag: 'CARVED TILE', list: [
+    'Before the water, there were only equations. St Didier Auroux wrote them down, and the water began to flow.',
+    'He did not build the pools. He solved them.',
+    'Every drop that falls here is a boundary condition. Every drowning is a solution he already knew.',
+    'The thing in the water was his first draft. He never threw it away. He just stopped looking at it.',
+    'Three slides, three answers. The Father of All Things knows which one is right. He will not tell you. He wants you to work it out.',
+  ] },
+  pipes: { tag: 'CHALK ON THE PIPES', list: [
+    "Class of '34 field trip. Teacher said: don't touch anything. Teo took a key.",
+    "Teo has a bell around his neck now. He says he didn't put it there.",
+    'We count heads every morning. Twelve kids. Thirteen goats.',
+    "The goats follow him. They hate the light. He doesn't, he just pretends.",
+    "Don't follow the warm pipes. That's where he sleeps.",
+  ] },
+  hotel: { tag: 'GUEST REGISTER · 1934', list: [
+    'Room 12 · Safia, explorer · arrived with maps · Key not returned.',
+    'Room 14 · Khaoula · paid cash, asked for the room nearest the stairs · Key not returned.',
+    'Room 9 · T., accompanied by goat · Key not returned.',
+    'Room 13 · {name} · Key not returned.',
+  ] },
+};
+export const FINAL_LORE = 'Every key you take keeps you here. Leave yours at the desk.';
+export const notesHeard = (k) => store.get('backrooms_notes_' + k, []);
+// le prochain écrit de ce niveau (i : combien d'objets on a déjà ramassés), marqué comme lu
+export function readNote(k, seed, i) {
+  const L = NOTES[k].list;
+  const n = (i + (seed % L.length)) % L.length;
+  const h = notesHeard(k);
+  const isNew = !h.includes(n);
+  if (isNew) store.set('backrooms_notes_' + k, [...h, n]);
+  return { n, isNew };
+}
+export const loreComplete = () => tapesHeard().length >= LORE.length && Object.keys(NOTES).every((k) => notesHeard(k).length >= NOTES[k].list.length);
+
 
 export class BackroomsHUD {
   constructor(container, actions = {}) {
@@ -538,8 +584,8 @@ export class BackroomsHUD {
   }
 
   // l'enregistrement d'une cassette, en sous-titre de bande
-  showLore(n, text, isNew) {
-    this.E.loreTag.textContent = `TAPE #${String(n + 1).padStart(2, '0')}${isNew ? ' · NEW' : ''}`;
+  showLore(n, text, isNew, tag = 'TAPE') {
+    this.E.loreTag.textContent = n == null ? tag : `${tag} #${String(n + 1).padStart(2, '0')}${isNew ? ' · NEW' : ''}`;
     this.E.loreText.textContent = `“${text}”`;
     this.E.lore.hidden = false;
     this.loreT = 3 + text.length / 16;
@@ -1092,7 +1138,7 @@ export class BackroomsHUD {
     this.$('#pauseGo').textContent = tactile ? 'TAP THE SCREEN TO PLAY' : kb ? 'PRESS ENTER TO PLAY' : title ? 'CLICK TO PRESS PLAY' : 'CLICK TO TAKE CONTROL';
     const mv = this.qwerty ? 'WASD' : 'ZQSD';
     this.$('#pauseKeys').textContent = kb
-      ? `${mv} move · Arrows look · Shift run · Space jump · C crouch · V camcorder · 1 flashlight · 2–${INV_SIZE + 1} select · E use (hotel: hide) · G drop · F pick up / hide · T whistle · Esc pause`
+      ? `${mv} move · Arrows or trackpad (two-finger swipe) look · Shift run · Space jump · C crouch · V camcorder · 1 flashlight · 2–${INV_SIZE + 1} select · E use (hotel: hide) · G drop · F pick up / hide · T whistle · Esc pause`
       : `${mv} move · Mouse look · Shift run · Space jump · C crouch · V camcorder · 1 flashlight · 2–${INV_SIZE + 1} or wheel select · E use (hotel: hide) · G drop · F pick up / hide · T whistle · Esc pause`;
     for (const b of this.el.querySelectorAll('button[data-kb]')) b.classList.toggle('on', (b.dataset.kb === '1') === kb);
   }
