@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.25 — 10 novembre 2026
+- **Odyssée** — Les Pokémon sauvages changent à mesure qu'on avance sur une route, dans une grotte ou sur une île :
+  - Chaque passage a sa quinzaine de Pokémon ; ceux qu'on croisait souvent juste avant s'y font plus rares, et de nouveaux apparaissent.
+  - Quelques Pokémon croisés un peu plus tôt réapparaissent de temps en temps, et chaque passage cache un ou deux Pokémon rares.
+  - Les Pokémon gagnent en niveau au fil du chemin.
+
 ## 5.24 — 9 novembre 2026
 - **The Backrooms** — Plus d'ombre en dents de scie sur la moquette au pied des murs en biais du Level 0 : la lumière s'y pose bien à plat.
 - **The Backrooms** — au Level 0 :

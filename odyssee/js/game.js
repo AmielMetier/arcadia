@@ -2,6 +2,7 @@
 // Surf, Éclate-Roc, Vol), menus, histoire (les quinze arènes et l'archipel des trois frères), sauvegarde
 import { T, walkable, isGrassEnc, DIRS, OPP } from './world/tiles.js';
 import { nearestWalkable } from './world/mapgen.js';
+import { encAt } from './world/rencontres.js';
 import { MEGAS_OF, MEGA_RING, LEGEND, STONE_FORM, revertMegas } from './core/mega.js';
 import { MEGA_FORMS } from './core/mega.js';
 import { createMon, monName, healFull, levelEvolution, itemEvolution, evolve, setUidBase, levelCap, ensureNature, apteCT } from './core/mon.js';
@@ -738,7 +739,7 @@ export class Game {
     if (z?.trigger && await this.trigger(z.trigger)) return;
     if (await this.checkTrainers()) return;
     // rencontres sauvages : hautes herbes, grottes, et la mer de l'archipel quand on surfe
-    const enc = this.noEnc ? null : m.outdoor ? z?.enc : m.encounter;   // noEnc : version test, rencontres coupées
+    const enc = this.noEnc ? null : encAt(m, p.x, p.y);   // le tronçon de la zone où l'on marche ; noEnc : version test, rencontres coupées
     if (p.surf && t === T.WATER && !this.noEnc) { const sea = m.zoneAt(p.x, p.y), enc = sea?.surfEnc || sea?.enc || m.surfEnc; if (enc && Math.random() < 0.05) await this.wildBattle(enc); return; }
     // un Pokémon visible dans l'herbe : on lui marche dessus, c'est lui qu'on affronte
     const vu = m.outdoor && !this.noEnc ? this.vie?.at(p.x, p.y) : null;
@@ -1480,7 +1481,7 @@ export class Game {
     let pool = z?.surfEnc || m.surfEnc;
 
     if (!pool || !pool.length) {
-      const waterSpecies = (z?.enc || m.encounter || []).filter(([sp]) => {
+      const waterSpecies = (encAt(m, fx, fy) || []).filter(([sp]) => {
         const types = SPECIES[sp]?.t || [];
         return types.includes('water');
       });
