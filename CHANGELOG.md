@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 5.22 — 9 novembre 2026
+- **The Backrooms** — Une partie qui commence au Level 0 s'ouvre sur une vidéo filmée au caméscope : une soirée d'urbex dans une usine abandonnée, où Safia passe à travers une trappe du plancher… et le groupe saute pour la rejoindre. Espace ou Entrée pour la passer.
+  - La feuille scotchée au mur de l'arrivée est signée Safia.
+
 ## 5.21 — 9 novembre 2026
 - **The Backrooms** — Au Level 1, on entend maintenant Khaoula : sa voix résonne de temps en temps quand elle rôde près de toi, et bien plus souvent quand elle te poursuit. Plus elle est loin ou derrière les murs, plus elle est étouffée.
 

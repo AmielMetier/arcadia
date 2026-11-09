@@ -215,7 +215,48 @@ try {
   kbMode = localStorage.getItem('backrooms_kb') === '1';
 } catch (e) {}
 
+// L'intro, au premier lancement d'une partie au Level 0 : le vlog d'urbex au caméscope où Safia tombe dans une trappe,
+// et le groupe saute le rejoindre. La partie reste en pause derrière ; Espace ou Entrée la passe.
+let intro = null; // { el, video, pending } pendant qu'elle passe
+let introRun = -1; // la partie dont on a déjà vu l'intro
+function playIntro() {
+  introRun = NET.run;
+  const el = document.createElement('div');
+  el.id = 'intro';
+  el.innerHTML = '<video src="video/intro.mp4" playsinline preload="auto"></video><div class="skip">SPACE · SKIP</div>';
+  document.body.appendChild(el);
+  const video = el.querySelector('video');
+  intro = { el, video, pending: false };
+  const end = () => {
+    if (!intro || intro.el !== el) return;
+    const go = intro.pending;
+    intro = null;
+    removeEventListener('keydown', onKey, true);
+    el.classList.add('out'); // le noir de la chute s'efface sur la moquette du Level 0
+    setTimeout(() => el.remove(), 1600);
+    if (go) setPaused(false);
+  };
+  const onKey = (e) => {
+    if ((e.code === 'Space' || e.code === 'Enter') && video.currentTime > 1) {
+      e.preventDefault();
+      e.stopPropagation();
+      end();
+    }
+  };
+  addEventListener('keydown', onKey, true);
+  video.addEventListener('ended', end);
+  video.addEventListener('error', end);
+  video.play().catch(end);
+}
+
 function setPaused(on) {
+  // l'intro passe : le jeu reprendra à la fin
+  if (intro && !on) {
+    intro.pending = true;
+    if (hud) hud.showPause(false, kbMode, false, null);
+    return;
+  }
+  if (intro) intro.pending = false; // la souris lâchée pendant l'intro : on retrouvera l'écran de pause
   paused = on;
   if (!on) started = true;
   if (on) for (const k in keys) keys[k] = false;
@@ -228,6 +269,7 @@ function setPaused(on) {
 function play() {
   if (sfx) sfx.unlock();
   askMic();
+  if (!started && !intro && sim && sim.level === 0 && introRun !== NET.run && !/[?&](parkour|nointro)(&|=|$)/.test(location.search)) playIntro();
   const tactile = document.body.classList.contains('touch') || matchMedia('(pointer: coarse)').matches;
   if (tactile) document.body.classList.add('touch');
   if (kbMode || tactile) setPaused(false);

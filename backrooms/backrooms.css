@@ -783,3 +783,11 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 .cam-gauge.interf i.on { background: #ff4b3b; border-color: #ff4b3b; box-shadow: 0 0 10px rgba(255, 75, 59, 0.45); }
 .cam-night { padding: 1px 6px; border: 1px solid rgba(242, 240, 230, 0.35); }
 .cam-night.on { color: #7dff8a; border-color: #7dff8a; }
+
+/* L'intro : le vlog d'urbex au caméscope, plein écran par-dessus tout ; elle s'efface sur le Level 0 */
+#intro { position: fixed; inset: 0; z-index: 200; background: #000; display: flex; align-items: center; justify-content: center; transition: opacity 1.4s ease-in; }
+#intro video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+#intro .skip { position: absolute; right: 18px; bottom: 14px; font: 12px/1 monospace; letter-spacing: 0.1em; color: rgba(255, 255, 255, 0.45); animation: introSkip 1s 1.2s both; }
+#intro.out { opacity: 0; pointer-events: none; }
+#intro.out video { visibility: hidden; }
+@keyframes introSkip { from { opacity: 0; } to { opacity: 1; } }
