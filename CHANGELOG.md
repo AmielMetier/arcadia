@@ -1,29 +1,8 @@
 # Journal des versions — Arcadia
 
-## 5.22 — 9 novembre 2026
-- **Hub** — Nouvelle catégorie « Gros jeux » : The Backrooms et Odyssée, des jeux bien plus complets, ont leur rangée à part en haut de l'accueil, avec leurs boutons pour jouer, et passent en tête dans le salon.
-- **Hub** — L'écran de chargement d'un jeu ne défile plus : tout tient dans l'écran, sur ordinateur comme sur téléphone, même tenu à l'horizontale.
-- **The Backrooms** — Nouvelle affiche tirée du Level 0, et une présentation qui ne gâche plus la surprise : un endroit étrange et immense, rien de plus. Compte plusieurs heures pour en voir le bout.
-- **The Backrooms** — au Level 0 :
-  - Moins de grands espaces ouverts : des salles plus petites, plus de cloisons, on se perd plus vite.
-  - Quelques couloirs partent en diagonale et cassent le quadrillage : on ne sait plus trop dans quel sens on marche. Leurs murs sont en biais des deux côtés, et leurs néons et les dalles du plafond suivent le couloir.
-  - L'entité n'apparaît plus dans un recoin trop étroit pour elle, où elle restait plantée.
-  - The Old Timer parle toujours avec la voix chuchotée, même sur un ordinateur réglé en français.
-- **The Backrooms** — Le pouce fait le tour de la bouteille au lieu de pointer dans le vide.
-- **The Backrooms** — Les commandes de l'écran de chargement disent juste : F pour ramasser, actionner et se cacher, et courir fait du bruit et donne soif.
-- **Hub** — Une manette branchée pendant le chargement affiche ses commandes à la place de celles du clavier, et le lien « Jeux » du haut mène aux Gros jeux.
-- **The Backrooms** — au Level 1, l'entrepôt :
-  - Le poste de garde est une vraie pièce : on y entre par une porte d'acier qui s'ouvre devant soi. Assis au bureau, on passe d'une caméra à l'autre (flèches, molette ou chiffres), et l'image tombe pile dans les écrans.
-  - L'entité se faufile aussi par les gaines du plafond : on l'entend cogner au-dessus, puis la grille tombe et elle ressort près de sa proie.
-  - Les quais de chargement font un raccourci : un boîtier relève lentement leur rideau de fer, sous un gyrophare qui balaie le quai. L'entité bute sur un rideau baissé, cogne, puis l'arrache.
-  - Les alarmes incendie attirent l'entité, qui vient frapper la cloche ; chacune ne sert qu'une fois, et son flash baigne le couloir de rouge.
-  - Brume en volume au ras du sol, vrais tuyaux au plafond, béton gris sans taches qui se répètent, cabine d'ascenseur éclairée par son plafonnier.
-- **The Backrooms** — un nouvel explorateur : la combinaison jaune « Hazmat Suit » de Cj.savage, plus détaillée et animée.
-  - Sa tête suit ton regard, et ses doigts se referment vraiment sur la lampe, la bouteille et les piles.
-  - En baissant les yeux, tu vois tes bras, ton corps et tes pieds, la lampe dans la main droite et l'objet choisi dans la gauche.
-  - Gants noirs propres, le même jaune partout, plus aucun trou aux bras ni à la paume.
-  - L'inventaire revient à trois cases : la lampe, puis deux objets.
-  - Plus de rejeu de la mort : après l'attaque, l'image se perd tout de suite.
+## 5.22 — 9 novembre 2026- **The Backrooms** — Une partie qui commence au Level 0 s'ouvre sur une vidéo filmée au caméscope : une soirée d'urbex dans une usine abandonnée, où Safia passe à travers une trappe du plancher… et le groupe saute pour la rejoindre. Espace ou Entrée pour la passer.
+  - En mode VIP, la vidéo est sous-titrée.
+  - La feuille scotchée au mur de l'arrivée est signée Safia.
 
 ## 5.21 — 9 novembre 2026
 - **The Backrooms** — Au Level 1, on entend maintenant Khaoula : sa voix résonne de temps en temps quand elle rôde près de toi, et bien plus souvent quand elle te poursuit. Plus elle est loin ou derrière les murs, plus elle est étouffée.

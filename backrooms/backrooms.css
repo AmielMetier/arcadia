@@ -781,23 +781,10 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 .cam-night { padding: 1px 6px; border: 1px solid rgba(242, 240, 230, 0.35); }
 .cam-night.on { color: #7dff8a; border-color: #7dff8a; }
 
-/* Au poste de garde (Level 1) : l'incrustation de la caméra de surveillance, calée dans l'image 4:3 ; le reste du
-   viseur (réticule, inventaire) s'efface */
-.cctv { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); height: 100%; aspect-ratio: 4 / 3; max-width: 100%; z-index: 9; pointer-events: none; color: #e6f0e0; text-shadow: 0 0 4px rgba(0, 0, 0, 0.9); letter-spacing: 2px; }
-.cctv-tl { position: absolute; top: 26px; left: 30px; display: flex; flex-direction: column; gap: 4px; font-size: 22px; }
-.cctv-tl b { font-weight: normal; font-size: 30px; }
-.cctv-tr { position: absolute; top: 26px; right: 30px; font-size: 24px; }
-.cctv-rec { color: #ff4a3a; animation: replayBlink 1s steps(2) infinite; }
-.cctv-bl { position: absolute; bottom: 26px; left: 30px; font-size: 22px; }
-.cctv-hint { position: absolute; bottom: 60px; left: 0; right: 0; text-align: center; font-size: 17px; opacity: 0.85; }
-#hud.cctv-on .crosshair,
-#hud.cctv-on .inv,
-#hud.cctv-on .prompt { display: none; }
-@media (max-width: 700px) {
-  .cctv-tl, .cctv-tr, .cctv-bl { font-size: 15px; top: 14px; }
-  .cctv-tl b { font-size: 19px; }
-  .cctv-bl { top: auto; bottom: 14px; }
-  .cctv-hint { font-size: 12px; bottom: 40px; }
-}
-#hud.cctv-on .cam,
-#hud.cctv-on .objective-banner { display: none; }
+/* L'intro : le vlog d'urbex au caméscope, plein écran par-dessus tout ; elle s'efface sur le Level 0 */
+#intro { position: fixed; inset: 0; z-index: 200; background: #000; display: flex; align-items: center; justify-content: center; transition: opacity 1.4s ease-in; }
+#intro video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+#intro .skip { position: absolute; right: 18px; bottom: 14px; font: 12px/1 monospace; letter-spacing: 0.1em; color: rgba(255, 255, 255, 0.45); animation: introSkip 1s 1.2s both; }
+#intro.out { opacity: 0; pointer-events: none; }
+#intro.out video { visibility: hidden; }
+@keyframes introSkip { from { opacity: 0; } to { opacity: 1; } }
