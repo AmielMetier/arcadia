@@ -222,7 +222,7 @@ export function createWarehouseMap(seed = 7) {
     }
     return out;
   };
-  const bottles = scatter(7, 8);
+  const bottles = scatter(10, 8);
   const batteries = scatter(10, 6);
 
   // 9. Contenu des étagères (caisses, cartons, fûts) tiré une fois pour toutes pour que chacun voie la même chose

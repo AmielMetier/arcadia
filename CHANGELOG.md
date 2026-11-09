@@ -1,6 +1,13 @@
 # Journal des versions — Arcadia
 
-## 4.84 — 8 novembre 2026
+## 4.85 — 9 novembre 2026
+- **The Backrooms** — Un vrai inventaire : quatre cases d'objets à côté de la lampe, à choisir avec les touches 2 à 5 ou la molette.
+  - G pose l'objet choisi par terre, juste devant soi : une eau d'amande ou des piles à laisser à un coéquipier, l'échelle à garder pour plus tard. On l'entend tomber.
+  - Au doigt, un appui long sur une case pose son objet ; à la manette, c'est la croix vers le bas.
+- **The Backrooms** — Plus de bouteilles d'eau d'amande à trouver, à tous les niveaux (environ 40 % de plus).
+- **The Backrooms** — Un objet échangé contre celui du sol s'affiche enfin tel qu'il est (on voyait encore l'ancien), et ce qui tombe des poches d'un coéquipier mort apparaît bien là où il est tombé.
+
+## 4.84 — 9 novembre 2026
 - **The Backrooms** — L'ascenseur qui se referme en mur est toujours le plus proche de l'équipe : il faut courir jusqu'à l'autre.
 - **The Backrooms** — Les portes de l'ascenseur refermées ne laissent plus voir le couloir à travers la cabine, et on ne passe plus au travers : elles poussent dans la cabine ou dans le couloir celui qui reste sur le seuil.
 - **The Backrooms** — Mort ou à l'abri dans l'ascenseur, l'écran de spectateur ne fait plus planter l'affichage.
@@ -10,7 +17,6 @@
 - **The Backrooms** — Le Level 1 fait peau neuve : un vrai entrepôt de béton, aux murs de parpaings peints en gris clair, au sol lissé où les réglettes se reflètent en longues traînées, au plafond à caissons éclairé par la lueur des néons (qui grésille et s'éteint avec eux).
   - Au plafond, des gaines de ventilation sur leurs étriers, leurs branches rondes et leurs grilles ; aux murs, des postes d'incendie avec leur alarme, des coffrets électriques, des caméras, des horloges arrêtées et des quais de chargement condamnés.
   - Sur les palettes, des caisses clouées, des grands bacs, des sacs de terreau et de ciment, et enfin des fûts.
-## 4.84 — 9 novembre 2026
 - **Odyssée** — Les quinze arènes ont été entièrement redessinées, chacune avec sa propre énigme en plusieurs salles et un panneau qui en donne les règles à l'entrée.
   - Sylvebourg devient la Ruche : des ruchers font fondre ou rebâtir des murs de cire de cinq couleurs.
   - Port-Azur : deux bassins à trois niveaux d'eau, des pontons et des radeaux. Voltacité : des barrières qui s'inversent et trois fusibles à rapporter.

@@ -411,7 +411,7 @@ html, body {
 }
 .btn-restart:hover { background: #f2f0e6; color: #000; text-shadow: none; }
 
-/* Inventaire : trois cases en bas au centre */
+/* Inventaire : cinq cases en bas au centre (la lampe, puis quatre objets) */
 .inv {
   position: absolute;
   left: 50%;
@@ -545,7 +545,8 @@ body.touch .click-prompt .ctrl-choice { display: none; }
   .cam-tr, .cam-br { right: 22px; }
   .inv { bottom: 92px; }
   .prompt { bottom: 152px; font-size: 16px; white-space: normal; width: 86vw; }
-  .inv .slot { width: 60px; height: 50px; }
+  .inv { gap: 6px; }
+  .inv .slot { width: 58px; height: 50px; }
   .icon-btn { top: 16px; right: 50%; transform: translateX(50%); }
   .stamina-track { width: calc(90px * var(--smax, 1)); height: 8px; }
   .noise-track { width: 90px; height: 8px; }

@@ -52,7 +52,8 @@ export const LOSE_TRACK_T = 4; // secondes sans voir le joueur avant que l'entit
 export const BATTERY_DRAIN = 0.42; // % par seconde de lampe allumée (environ 4 minutes pour une pile pleine)
 export const CAM_DRAIN = 0.15; // % par seconde de caméscope sorti (V) : il tire sur la même pile que la lampe
 export const BATTERY_PACK = 60; // % rendus par une pile utilisée
-export const INV_SIZE = 2; // cases d'objets (piles, eau d'amande, échelle) : la case 1 de l'inventaire est réservée à la lampe
+export const INV_SIZE = 4; // cases d'objets (piles, eau d'amande, échelle) : la case 1 de l'inventaire est réservée à la lampe
+export const DROP_AHEAD = 0.55; // m : G pose l'objet choisi par terre, à cette distance devant soi
 export const PICK_R = 1.4; // portée de F pour ramasser
 export const ALMOND_WATER = 50; // une bouteille d'eau d'amande rend la moitié de la gourde
 export const BLACKOUT_DRAIN = 1.5; // dans le noir d'une coupure, la lampe tire plus fort sur la pile
@@ -350,8 +351,9 @@ function newPlayer(id, name, map, i) {
     hasLamp: true, // lampe torche, toujours dans la case 1
     bottles: 0,
     battery: 100, // pile de la lampe torche (0 à 100)
-    inv: [null, null], // cases 2 et 3 de l'inventaire : 'battery', 'bottle', 'ladder' ou null
-    sel: 1, // case choisie (1 ou 2 ; la case 0, c'est la lampe) : E l'utilise, F l'échange contre un objet au sol
+    inv: new Array(INV_SIZE).fill(null), // cases 2 à 5 de l'inventaire : 'battery', 'bottle', 'ladder' ou null
+    sel: 1, // case choisie (1 à INV_SIZE ; la case 0, c'est la lampe) : E l'utilise, G la pose par terre, F l'échange
+    // contre un objet au sol quand l'inventaire est plein
     lockT: 0, // immobile un instant (après une chute, dans l'escalier)
     onBeam: false, // sur une arête entre deux trous
     tilt: 0, // équilibre (-1 à 1)
@@ -1189,6 +1191,35 @@ export class BackroomsSim {
     this.emit({ type: kind, used: true, id: P.id });
   }
 
+  // G : poser l'objet de la case choisie par terre, juste devant soi (un coéquipier peut le ramasser), un peu à côté
+  // si un autre objet y est déjà. Contre un mur ou au bord d'un trou, il tombe à nos pieds ; sur une arête ou dans
+  // l'escalier, nulle part où le poser. Comme pour les objets d'un joueur qui meurt, on reprend un objet ramassé du
+  // même genre à cet étage (les instantanés restent petits), sinon on en ajoute un
+  dropItem(P, i) {
+    const kind = P.inv[i];
+    if (!kind) return this.emit({ type: 'emptySlot', id: P.id });
+    const floor = P.floor || 0;
+    const m = this.fm(floor);
+    const items = m.items;
+    const ok = (x, z) => !this.isColliding(x, z, 0.15, floor) && this.pitUnder(x, z, floor) < 0 && !stairAt(this.stairs, x, z) && hasLineOfSight(m, P.x, P.z, x, z);
+    const clear = (x, z) => !(items || []).some((o) => !o.taken && Math.hypot(o.x - x, o.z - z) < 0.28);
+    const fx = -Math.sin(P.yaw);
+    const fz = -Math.cos(P.yaw);
+    // devant, puis de part et d'autre, puis à ses pieds (en avant, à droite)
+    const spots = [[DROP_AHEAD, 0], [DROP_AHEAD, 0.3], [DROP_AHEAD, -0.3], [0.3, 0.45], [0.3, -0.45], [0, 0]].map(([a, r]) => ({ x: P.x + fx * a - fz * r, z: P.z + fz * a + fx * r })).filter((s) => ok(s.x, s.z));
+    const spot = spots.find((s) => clear(s.x, s.z)) || spots[0];
+    if (!items || P.onLadder || !spot) return this.emit({ type: 'noDrop', id: P.id });
+    const { x, z } = spot;
+    let it = items.find((o) => o.taken && o.kind === kind);
+    if (it) placeItem(it, kind, x, z);
+    else items.push((it = { id: items.length, kind, x, z, gx: cellOf(x), gz: cellOf(z), taken: false }));
+    it.taken = false;
+    it.lost = false;
+    P.inv[i] = null;
+    this.makeNoise(P, NOISE.pick, 0.8);
+    this.emit({ type: 'drop', kind, id: P.id, x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100, floor });
+  }
+
   // F : ramasser l'objet le plus proche (dans une case vide, sinon échangé avec la case choisie)
   pickUp(P) {
     // dans un casier : F en ressort ; devant un casier (sans objet plus près) : on s'y enferme
@@ -1680,7 +1711,7 @@ export class BackroomsSim {
     // 1. Orientation, lampe et inventaire
     if (input.yaw !== undefined) P.yaw = input.yaw;
     if (input.pitch !== undefined) P.pitch = input.pitch;
-    if (input.sel === 1 || input.sel === 2) P.sel = input.sel;
+    if (Number.isInteger(input.sel) && input.sel >= 1 && input.sel <= INV_SIZE) P.sel = input.sel;
     P.whistleCd = Math.max(0, P.whistleCd - DT);
     P.heat = Math.max(0, P.heat - DT / 20);
     P.bumpT = Math.max(0, (P.bumpT || 0) - DT);
@@ -1711,6 +1742,7 @@ export class BackroomsSim {
     }
     if (input.use !== undefined && input.use !== null) this.useItem(P, input.use);
     if (input.useSel) this.useItem(P, P.sel - 1);
+    if (input.drop) this.dropItem(P, P.sel - 1);
 
     // le caméscope (V) : il tire un peu sur la pile (à plat, il filme encore, mais sans mode nuit)
     if (input.cam !== undefined) P.cam = !!input.cam;
@@ -2429,7 +2461,8 @@ export class BackroomsSim {
       P.hurt = hurt || 0;
       P.breath = breath ?? 100;
       P.holding = !!holding;
-      P.inv = (inv || ',').split(',').map((k) => k || null);
+      const kinds = (inv || '').split(',');
+      P.inv = Array.from({ length: INV_SIZE }, (_, i) => kinds[i] || null);
       P.signal = signal;
       P.found = found;
     }

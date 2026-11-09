@@ -528,7 +528,7 @@ export function createPoolMap(seed = 37) {
     }
     return out;
   };
-  const bottles = scatter(6);
+  const bottles = scatter(9);
   const batteries = scatter(6);
 
   // échelles : deux par bassin rectangulaire (verrière, voûtes), du bord sec vers l'eau
