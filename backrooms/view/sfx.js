@@ -1337,6 +1337,24 @@ export class BackroomsSfx {
     this.caption('[chain rattles]', pos);
   }
 
+  // La porte du poste de garde (Level 1) : à l'ouverture, le pêne qui claque et les gonds qui grincent un peu ; à la
+  // fermeture, le ferme-porte qui la ramène, le battant d'acier qui retombe dans l'huisserie
+  guardDoor(pos, open) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = this.at({ ...pos, rolloff: 0.9, ref: 3 }, 0.8);
+    if (open) {
+      this.burst(out, t, 0.025, 'bandpass', 2300, 3, 0.22);
+      this.burst(out, t + 0.02, 0.06, 'lowpass', 420, 0.9, 0.16);
+      // le grincement : un frottement étroit qui glisse vers le grave
+      for (let k = 0; k < 5; k++) this.burst(out, t + 0.08 + k * 0.05, 0.05, 'bandpass', 1500 - k * 140 + rnd(-60, 60), 9, 0.035 * (1 - k / 6));
+    } else {
+      this.burst(out, t + 0.75, 0.09, 'lowpass', 300, 0.9, 0.5);
+      this.ring(out, t + 0.75, 118, [[1, 1, 0.35], [2.6, 0.45, 0.2], [5.1, 0.2, 0.12]], 0.1);
+      this.burst(out, t + 0.79, 0.02, 'bandpass', 2600, 3, 0.18);
+    }
+  }
+
   // La clé ramassée : un trousseau qui tinte (pas de son à l'endroit : c'est dans ta main)
   keyJingle() {
     if (!this.unlocked || !this.ctx) return;
@@ -3054,6 +3072,235 @@ export class BackroomsSfx {
       k += rnd(0.03, 0.12);
     }
     this.caption('[metal creaks]', pos);
+  }
+
+  // ---------------------------------------------------------------- Level 1 : quais, alarmes, poste, gaines
+
+  // Le rideau d'un quai qui monte (dir 1) ou descend (-1) pendant sec secondes : le moteur qui peine, la chaîne et les
+  // lames de tôle qui s'enroulent. Un seul son par quai : un nouvel ordre coupe le précédent
+  shutter(id, pos, dir, sec) {
+    if (!this.unlocked || !this.ctx) return;
+    this.shutterStop(id, null);
+    const c = this.ctx;
+    const t = c.currentTime + 0.02;
+    const len = Math.max(0.4, sec);
+    const bus = this.place({ ...pos, rolloff: 0.45, ref: 5 }, 1).input;
+    const g = this.gainNode(0);
+    g.connect(bus);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(1, t + 0.25);
+    // le moteur : deux dents de scie graves qui battent, un peu de gras
+    const srcs = [];
+    for (const f of [dir > 0 ? 62 : 70, dir > 0 ? 63.3 : 71.1]) {
+      const o = this.osc('sawtooth', f);
+      o.frequency.setValueAtTime(f * 0.8, t);
+      o.frequency.linearRampToValueAtTime(f, t + 0.4);
+      const lp = this.filt('lowpass', 380, 0.8);
+      const e = this.gainNode(0.07);
+      o.connect(lp).connect(e).connect(g);
+      o.start(t);
+      srcs.push(o);
+    }
+    // le cliquetis de la chaîne et le roulement des lames (du bruit haché)
+    const n = this.longNoise();
+    const bp = this.filt('bandpass', 2300, 1.4);
+    const chop = this.gainNode(0.04);
+    const lfo = this.osc('square', dir > 0 ? 11 : 15);
+    const lg = this.gainNode(0.035);
+    lfo.connect(lg).connect(chop.gain);
+    n.connect(bp).connect(chop).connect(g);
+    n.start(t, Math.random() * 4);
+    lfo.start(t);
+    srcs.push(n, lfo);
+    const rumble = this.longNoise();
+    const lp2 = this.filt('lowpass', 160, 0.7);
+    const rg = this.gainNode(0.18);
+    rumble.connect(lp2).connect(rg).connect(g);
+    rumble.start(t, Math.random() * 4);
+    srcs.push(rumble);
+    g.gain.setValueAtTime(1, t + len - 0.15);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    for (const o of srcs) o.stop(t + len + 0.05);
+    this.shutters = this.shutters || {};
+    this.shutters[id] = { g, srcs, end: t + len };
+    this.caption(dir > 0 ? '[shutter motor grinding]' : '[shutter rolling down]', pos);
+  }
+
+  // il arrive en butée (pos) ; pos null : on coupe seulement le moteur (un nouvel ordre, il a cédé)
+  shutterStop(id, pos, open = false) {
+    if (!this.unlocked || !this.ctx) return;
+    const S = this.shutters && this.shutters[id];
+    const t = this.ctx.currentTime;
+    if (S && t < S.end) {
+      S.g.gain.cancelScheduledValues(t);
+      S.g.gain.setTargetAtTime(0, t, 0.05);
+      for (const o of S.srcs) {
+        try {
+          o.stop(t + 0.4);
+        } catch (e) {
+          /* déjà arrêté */
+        }
+      }
+    }
+    if (this.shutters) delete this.shutters[id];
+    if (!pos) return;
+    const out = this.at({ ...pos, rolloff: 0.5, ref: 4 }, 1);
+    this.burst(out, t + 0.01, open ? 0.12 : 0.22, 'lowpass', open ? 420 : 260, 0.8, open ? 0.5 : 0.9);
+    this.ring(out, t + 0.01, open ? 210 : 120, [[1, 1, 0.5], [2.6, 0.5, 0.3], [4.1, 0.25, 0.2]], 0.1);
+    this.caption(open ? '[shutter clanks open]' : '[shutter slams shut]', pos);
+  }
+
+  // l'entité cogne dans un rideau baissé : la tôle ondulée tonne et vibre (k : de 0 à 1, elle cède bientôt)
+  dockBang(pos, k = 0) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = this.at({ ...pos, rolloff: 0.4, ref: 6 }, 1.2 + k * 0.6);
+    this.burst(out, t, 0.35, 'lowpass', 300, 0.8, 1.1);
+    this.burst(out, t, 0.6, 'bandpass', 900 + k * 500, 2.5, 0.25);
+    this.ring(out, t, rnd(88, 104), [[1, 1, 0.9], [1.83, 0.6, 0.7], [2.71, 0.45, 0.5], [4.2, 0.2, 0.3]], 0.14 + k * 0.06);
+    // les lames qui claquent dans les glissières
+    for (let i = 0; i < 4 + Math.floor(k * 5); i++) this.burst(out, t + 0.05 + i * rnd(0.03, 0.07), 0.02, 'bandpass', rnd(2500, 4200), 5, 0.1);
+    this.caption('[metal booms]', pos);
+  }
+
+  // elle a arraché le rideau : un fracas, la tôle qui se déchire et retombe de travers
+  dockBreak(pos) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.01;
+    const out = this.at({ ...pos, rolloff: 0.35, ref: 7 }, 1.8);
+    this.burst(out, t, 0.6, 'lowpass', 420, 0.7, 1.4);
+    this.ring(out, t, 74, [[1, 1, 1.4], [2.2, 0.6, 1], [3.9, 0.3, 0.7]], 0.2);
+    // la déchirure : une scie qui grince en descendant
+    const o = this.osc('sawtooth', 900);
+    o.frequency.setValueAtTime(900, t + 0.05);
+    o.frequency.exponentialRampToValueAtTime(240, t + 0.9);
+    const bp = this.filt('bandpass', 1300, 3);
+    const e = this.gainNode(0);
+    e.gain.setValueAtTime(0.0001, t + 0.05);
+    e.gain.exponentialRampToValueAtTime(0.09, t + 0.12);
+    e.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
+    o.connect(bp).connect(e).connect(out);
+    o.start(t + 0.05);
+    o.stop(t + 1);
+    for (let i = 0; i < 9; i++) this.burst(out, t + 0.5 + i * rnd(0.04, 0.09), 0.03, 'bandpass', rnd(1800, 4000), 4, 0.18 * (1 - i / 10));
+    this.caption('[metal tears]', pos);
+  }
+
+  // Une cloche d'alarme incendie : le battant frappe vingt fois par seconde un timbre d'acier (sec secondes ; un seul
+  // son par cloche). Elle porte dans tout l'entrepôt
+  alarmBell(id, pos, sec = 20) {
+    if (!this.unlocked || !this.ctx) return;
+    this.alarmStop(id);
+    const c = this.ctx;
+    const t = c.currentTime + 0.02;
+    const bus = this.place({ ...pos, rolloff: 0.3, ref: 8 }, 1).input;
+    const g = this.gainNode(0);
+    g.connect(bus);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(1, t + 0.05);
+    g.gain.setValueAtTime(1, t + sec - 0.4);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + sec);
+    const srcs = [];
+    // le timbre : des partiels inharmoniques d'un bol d'acier, hachés par le battant
+    const strike = this.gainNode(0);
+    const lfo = this.osc('square', 19);
+    const lg = this.gainNode(0.5);
+    lfo.connect(lg).connect(strike.gain);
+    strike.gain.value = 0.5;
+    strike.connect(g);
+    for (const [m, v] of [[1, 0.09], [2.76, 0.05], [5.4, 0.03], [8.93, 0.015]]) {
+      const o = this.osc('sine', 980 * m);
+      const e = this.gainNode(v);
+      o.connect(e).connect(strike);
+      srcs.push(o);
+    }
+    const n = this.noise();
+    const hp = this.filt('bandpass', 5200, 2);
+    const ng = this.gainNode(0.03);
+    n.connect(hp).connect(ng).connect(strike);
+    srcs.push(n, lfo);
+    for (const o of srcs) {
+      o.start(t);
+      o.stop(t + sec + 0.05);
+    }
+    this.bells = this.bells || {};
+    this.bells[id] = { g, srcs, end: t + sec };
+    this.caption('[fire alarm bell ringing]', pos);
+  }
+
+  // la cloche se tait (smashed : un coup qui la fracasse d'abord)
+  alarmStop(id, pos = null, smashed = false) {
+    if (!this.unlocked || !this.ctx) return;
+    const B = this.bells && this.bells[id];
+    const t = this.ctx.currentTime;
+    if (B && t < B.end) {
+      B.g.gain.cancelScheduledValues(t);
+      B.g.gain.setTargetAtTime(0, t + (smashed ? 0.05 : 0), smashed ? 0.02 : 0.15);
+      for (const o of B.srcs) {
+        try {
+          o.stop(t + 0.8);
+        } catch (e) {
+          /* déjà arrêté */
+        }
+      }
+    }
+    if (this.bells) delete this.bells[id];
+    if (smashed && pos) {
+      const out = this.at({ ...pos, rolloff: 0.4, ref: 6 }, 1.3);
+      this.burst(out, t + 0.01, 0.2, 'lowpass', 600, 0.8, 1);
+      this.ring(out, t + 0.01, 980, [[1, 1, 0.3], [2.76, 0.6, 0.2], [0.5, 0.4, 0.5]], 0.12);
+      this.burst(out, t + 0.05, 0.4, 'highpass', 3000, 0.7, 0.25);
+      this.caption('[bell smashed]', pos);
+    }
+  }
+
+  // la vitre du déclencheur qui se brise (dans ta main, ou pas loin)
+  glassBreak(pos = null) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = pos ? this.at({ ...pos, rolloff: 0.8, ref: 3 }, 1) : this.gainNode(0.9);
+    if (!pos) out.connect(this.out);
+    this.burst(out, t, 0.06, 'lowpass', 900, 0.8, 0.6);
+    for (let i = 0; i < 7; i++) this.ring(out, t + i * rnd(0.01, 0.04), rnd(2600, 6200), [[1, 1, 0.12], [1.7, 0.5, 0.08]], 0.05);
+    this.burst(out, t, 0.25, 'highpass', 4500, 0.8, 0.3);
+  }
+
+  // l'entité dans une gaine : un coup de tôle creux au-dessus des têtes (k : de 0 à 1, sa force)
+  ductBang(pos, k = 0.5) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = this.at({ ...pos, rolloff: 0.55, ref: 4 }, 0.8 + k * 0.6);
+    this.burst(out, t, 0.18, 'lowpass', 260, 1, 0.9);
+    this.ring(out, t, rnd(150, 190), [[1, 1, 0.45], [1.58, 0.7, 0.35], [2.4, 0.5, 0.25], [3.3, 0.3, 0.18]], 0.12);
+    // la tôle qui se gondole
+    if (Math.random() < 0.5) this.burst(out, t + rnd(0.08, 0.2), 0.12, 'bandpass', rnd(600, 900), 4, 0.25);
+    this.caption('[thumping in the vents]', pos);
+  }
+
+  // une grille de bouche qui tombe : elle claque au sol, rebondit, tinte
+  grilleDrop(pos, delay = 0.45) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + delay;
+    const out = this.at({ ...pos, rolloff: 0.6, ref: 4 }, 1.2);
+    // elle se détache d'abord (un raclement)
+    this.burst(out, t - delay + 0.01, 0.15, 'bandpass', 1800, 3, 0.25);
+    this.burst(out, t, 0.12, 'lowpass', 500, 0.8, 0.8);
+    this.ring(out, t, 620, [[1, 1, 0.4], [2.3, 0.6, 0.3], [3.7, 0.4, 0.2]], 0.1);
+    for (let i = 1; i < 5; i++) {
+      const ti = t + 0.18 * i * (1 - i * 0.12);
+      this.burst(out, ti, 0.05, 'bandpass', rnd(1500, 3000), 3, 0.35 / i);
+      this.ring(out, ti, 620 * rnd(0.97, 1.03), [[1, 1, 0.2], [2.3, 0.5, 0.15]], 0.05 / i);
+    }
+    this.caption('[metal grate clatters]', pos);
+  }
+
+  // au poste : on change de caméra (le déclic du sélecteur et un souffle de neige)
+  camSwitch() {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.005;
+    this.burst(this.ui, t, 0.03, 'bandpass', 2600, 3, 0.25);
+    this.burst(this.ui, t + 0.02, 0.14, 'highpass', 3000, 0.7, 0.06);
   }
 
   // l'eau qui clapote : une vague étouffée qui enfle et retombe, deux gouttes

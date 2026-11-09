@@ -82,7 +82,7 @@ export function buildHotel({ map, group, baked, CEIL }) {
       c.textBaseline = 'middle';
       c.fillText(String(r.num), w / 2, h / 2 + 2);
     });
-    const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.13), baked(new THREE.MeshLambertMaterial({ map: t, emissive: '#3a2a10', emissiveIntensity: 0.6 })));
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.13), baked(new THREE.MeshLambertMaterial({ map: t, emissive: '#6a5230', emissiveMap: t, emissiveIntensity: 0.6 })));
     plate.position.set(map.doorW / 2 + 0.3, 1.55, C / 2 + 0.065);
     g.add(plate);
   }
@@ -316,7 +316,7 @@ export function buildHotel({ map, group, baked, CEIL }) {
       c.textAlign = 'center';
       c.fillText(String(b.num), w / 2, 48);
     });
-    const face = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.24), baked(new THREE.MeshLambertMaterial({ map: t, emissive: '#2a1a08', emissiveIntensity: 0.5 })));
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.24), baked(new THREE.MeshLambertMaterial({ map: t, emissive: '#5a4020', emissiveMap: t, emissiveIntensity: 0.5 })));
     face.position.set(-b.z, b.y, 0.252);
     mg.add(face);
     // la lettre postée dépasse du casier

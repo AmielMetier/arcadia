@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, HOTEL_LEVEL } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
 
@@ -24,7 +24,7 @@ const putOn = (sim, P, cas) => {
     P.z = cas.z;
   }
 };
-import { createWarehouseMap } from '../backrooms/engine/level1.js';
+import { createWarehouseMap, DOCK_PASS } from '../backrooms/engine/level1.js';
 import { createPoolMap } from '../backrooms/engine/poolrooms.js';
 import { createHotelMap, parseWords, WORDS } from '../backrooms/engine/hotel.js';
 
@@ -567,6 +567,10 @@ test("jamais plantée sous les yeux du joueur : fixée, elle charge ; vue de cô
       if (sim.director) Object.assign(sim.director, { huntT: 1e9, fakeT: 1e9 });
       const P = sim.player;
       const M = sim.monster;
+      // hors de la zone éclairée du départ (elle n'apparaît jamais dans la lumière franche), là où une longue vue s'ouvre
+      const dim = (p) => !sim.brightCell(sim.map, p.x, p.z);
+      const home = sim.map.walkable.map(at).find((p) => dim(p) && inView(sim, p, 13, 19, dim));
+      if (home) Object.assign(P, home);
       sim.glimpseAt = 0;
       let show = null;
       for (let i = 0; i < 60 * 30 && !show; i++) {
@@ -1004,18 +1008,18 @@ test("eau d'amande : rend la moitié de la gourde", () => {
   assert.equal(b.taken, false, 'on ne ramasse plus en passant');
   sim.step({ pick: true });
   assert.equal(b.taken, true);
-  assert.deepEqual(sim.player.inv, ['bottle', null, null, null], "F : la bouteille va dans l'inventaire");
+  assert.deepEqual(sim.player.inv, ['bottle', null], "F : la bouteille va dans l'inventaire");
   assert.ok(sim.player.water < 11, "elle ne se boit pas toute seule");
   const before = sim.player.water;
   sim.step({ useSel: true });
   assert.ok(Math.abs(sim.player.water - (before + ALMOND_WATER)) < 0.1, 'E : on boit la case choisie (+50)');
-  assert.deepEqual(sim.player.inv, [null, null, null, null]);
+  assert.deepEqual(sim.player.inv, [null, null]);
   assert.ok(sim.drainEvents().some((e) => e.type === 'bottle'));
   // gourde pleine : on la garde
   sim.player.water = 99;
-  sim.player.inv = ['bottle', null, null, null];
+  sim.player.inv = ['bottle', null];
   sim.step({ useSel: true, sel: 1 });
-  assert.deepEqual(sim.player.inv, ['bottle', null, null, null], 'pas soif : la bouteille reste dans le sac');
+  assert.deepEqual(sim.player.inv, ['bottle', null], 'pas soif : la bouteille reste dans le sac');
   assert.ok(sim.drainEvents().some((e) => e.type === 'useless'));
   // un nouvel étage : jamais à sec en arrivant
   sim.player.water = 5;
@@ -1023,25 +1027,25 @@ test("eau d'amande : rend la moitié de la gourde", () => {
   assert.equal(sim.player.water, WATER_LEVEL_MIN);
 });
 
-test("inventaire : quatre cases d'objets ; plein, F échange l'objet de la case choisie contre celui du sol", () => {
+test("inventaire : deux cases d'objets ; plein, F échange l'objet de la case choisie contre celui du sol", () => {
   const m = createBackroomsMap(9);
   const sim = new BackroomsSim({ map: m, difficulty: 'peaceful' });
   const P = sim.player;
-  assert.equal(INV_SIZE, 4);
+  assert.equal(INV_SIZE, 2);
   const ladder = m.items.find((i) => i.kind === 'ladder');
-  for (const o of [m.bottles[0], m.batteries[0], m.bottles[1], m.batteries[1]]) {
+  for (const o of [m.bottles[0], m.batteries[0]]) {
     P.x = o.x;
     P.z = o.z;
     sim.step({ pick: true });
   }
-  assert.deepEqual(P.inv, ['bottle', 'battery', 'bottle', 'battery']);
+  assert.deepEqual(P.inv, ['bottle', 'battery']);
   // plein : la case choisie (2, l'eau d'amande) part au sol à la place de l'échelle
   const at = { x: ladder.x, z: ladder.z };
   const n0 = m.items.length;
   P.x = ladder.x;
   P.z = ladder.z;
   sim.step({ pick: true, sel: 1 });
-  assert.deepEqual(P.inv, ['ladder', 'battery', 'bottle', 'battery']);
+  assert.deepEqual(P.inv, ['ladder', 'battery']);
   const dropped = m.items.find((o) => !o.taken && o.kind === 'bottle' && Math.hypot(o.x - at.x, o.z - at.z) < 0.01);
   assert.ok(dropped, "l'eau d'amande est posée là où était l'échelle");
   assert.ok(!m.items.some((o) => !o.taken && o.kind === 'ladder'), "l'échelle n'est plus au sol");
@@ -1050,7 +1054,7 @@ test("inventaire : quatre cases d'objets ; plein, F échange l'objet de la case 
   for (let i = 0; i < 6; i++) sim.step({ pick: true, sel: 1 });
   assert.equal(m.items.length, n0, 'des échanges répétés ne font pas grossir la partie');
   if (P.inv[0] !== 'ladder') sim.step({ pick: true, sel: 1 });
-  assert.deepEqual(P.inv, ['ladder', 'battery', 'bottle', 'battery']);
+  assert.deepEqual(P.inv, ['ladder', 'battery']);
   // une case vide : F y range l'objet sans rien poser
   P.x = m.spawn.x;
   P.z = m.spawn.z;
@@ -1058,17 +1062,17 @@ test("inventaire : quatre cases d'objets ; plein, F échange l'objet de la case 
   sim.step({ sel: 2 });
   sim.step({ useSel: true });
   assert.ok(P.battery > 60, 'E : la pile de la case 3 recharge la lampe');
-  assert.deepEqual(P.inv, ['ladder', null, 'bottle', 'battery']);
+  assert.deepEqual(P.inv, ['ladder', null]);
   P.x = dropped.x;
   P.z = dropped.z;
   const before = m.items.length;
   sim.step({ pick: true });
-  assert.deepEqual(P.inv, ['ladder', 'bottle', 'bottle', 'battery']);
+  assert.deepEqual(P.inv, ['ladder', 'bottle']);
   assert.equal(m.items.length, before, 'rien de posé : il restait une case');
   // E sur une eau d'amande quand on a soif : on la boit
   P.water = 40;
   sim.step({ useSel: true });
-  assert.deepEqual(P.inv, ['ladder', null, 'bottle', 'battery']);
+  assert.deepEqual(P.inv, ['ladder', null]);
   assert.ok(P.water > 89);
   // une case qui n'existe pas ne se choisit pas
   sim.step({ sel: INV_SIZE + 1 });
@@ -1086,9 +1090,11 @@ test("inventaire : G pose l'objet choisi devant soi (contre un mur : à ses pied
   // une case libre, loin des trous, avec un mur juste à l'est
   const cell = (() => {
     for (let gz = 1; gz < m.H - 1; gz++) for (let gx = 1; gx < m.W - 2; gx++) {
-      if (m.grid[gz * m.W + gx] !== T.FLOOR || m.grid[gz * m.W + gx + 1] === T.FLOOR || m.pitAt(gx, gz) >= 0) continue;
+      if (m.grid[gz * m.W + gx] !== T.FLOOR || m.grid[gz * m.W + gx + 1] !== T.WALL || m.pitAt(gx, gz) >= 0) continue; // un vrai mur (pas une cloison fine, au milieu de la case)
       if ([[-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => m.pitAt(gx + dx, gz + dz) >= 0 || m.grid[(gz + dz) * m.W + gx + dx] !== T.FLOOR)) continue;
       if (host.isColliding((gx + 0.5) * C, (gz + 0.5) * C, 0.5)) continue;
+      // et rien de posé contre ce mur (un meuble du décor) : on s'y tiendra, à 40 cm
+      if (host.isColliding((gx + 1) * C - 0.4, (gz + 0.5) * C, 0.3)) continue;
       return { gx, gz };
     }
   })();
@@ -1100,11 +1106,11 @@ test("inventaire : G pose l'objet choisi devant soi (contre un mur : à ses pied
   A.yaw = Math.PI / 2; // regarde vers l'ouest (devant : -sin(yaw), -cos(yaw))
   B.x = m.spawn.x;
   B.z = m.spawn.z;
-  A.inv = [null, 'bottle', null, null];
+  A.inv = [null, 'bottle'];
   const n0 = m.items.length;
   host.drainEvents();
   host.step({ sel: 2, drop: true });
-  assert.deepEqual(A.inv, [null, null, null, null], 'G : la case choisie se vide');
+  assert.deepEqual(A.inv, [null, null], 'G : la case choisie se vide');
   const ev = host.drainEvents().find((e) => e.type === 'drop');
   assert.ok(ev && ev.kind === 'bottle' && ev.id === 1, "l'équipe entend tomber l'eau d'amande");
   const it = m.items.find((o) => !o.taken && o.kind === 'bottle' && Math.hypot(o.x - (cx - DROP_AHEAD), o.z - cz) < 0.01);
@@ -1112,15 +1118,15 @@ test("inventaire : G pose l'objet choisi devant soi (contre un mur : à ses pied
   assert.ok(m.items.length <= n0 + 1, "au plus un objet de plus (on reprend d'abord un objet déjà ramassé)");
   assert.ok(Math.hypot(it.x - A.x, it.z - A.z) < 1.4, 'à portée de F');
   // un deuxième objet posé au même endroit : à côté du premier, pas dedans
-  A.inv = [null, null, 'battery', null];
-  host.step({ sel: 3, drop: true });
+  A.inv = [null, 'battery'];
+  host.step({ sel: 2, drop: true });
   const bat = m.items.find((o) => !o.taken && o.kind === 'battery' && Math.hypot(o.x - A.x, o.z - A.z) < 1);
   assert.ok(bat && Math.hypot(bat.x - it.x, bat.z - it.z) >= 0.28, 'le deuxième objet se pose à côté du premier');
   bat.taken = true;
   wire();
   const gi = guest.map.items.find((o) => !o.taken && o.kind === 'bottle' && Math.hypot(o.x - it.x, o.z - it.z) < 0.02);
   assert.ok(gi, "l'invité la voit au même endroit");
-  assert.deepEqual(guest.players.find((p) => p.id === 1).inv, [null, null, null, null], "et l'inventaire de A, vide, chez lui aussi");
+  assert.deepEqual(guest.players.find((p) => p.id === 1).inv, [null, null], "et l'inventaire de A, vide, chez lui aussi");
   // B la ramasse
   B.x = it.x;
   B.z = it.z;
@@ -1129,11 +1135,11 @@ test("inventaire : G pose l'objet choisi devant soi (contre un mur : à ses pied
   wire();
   assert.ok(guest.player.inv.includes('bottle') && !guest.map.items.some((o) => !o.taken && Math.hypot(o.x - it.x, o.z - it.z) < 0.02), "chez l'invité, elle est dans son sac");
   // face au mur : à ses pieds
-  A.inv = [null, null, 'battery', null];
+  A.inv = [null, 'battery'];
   A.x = (cell.gx + 1) * C - 0.4;
   A.z = cz;
   A.yaw = -Math.PI / 2; // vers l'est, le mur
-  host.step({ sel: 3, drop: true });
+  host.step({ sel: 2, drop: true });
   assert.ok(m.items.some((o) => !o.taken && o.kind === 'battery' && Math.hypot(o.x - A.x, o.z - A.z) < 0.05), 'contre un mur : à ses pieds');
   // une case vide : rien à poser
   host.drainEvents();
@@ -1143,7 +1149,7 @@ test("inventaire : G pose l'objet choisi devant soi (contre un mur : à ses pied
   let pit = null;
   for (let gz = 0; gz < m.H && !pit; gz++) for (let gx = 0; gx < m.W && !pit; gx++) if (m.pitAt(gx, gz) >= 0 && !m.pits[m.pitAt(gx, gz)].deep) pit = { gx, gz };
   assert.ok(pit, 'un trou à cet étage');
-  A.inv = ['bottle', null, null, null];
+  A.inv = ['bottle', null];
   A.x = (pit.gx + 0.5) * C;
   A.z = (pit.gz + 0.5) * C;
   host.drainEvents();
@@ -1174,7 +1180,7 @@ test("renfoncement : la cassette en hauteur s'attrape seulement depuis l'échell
     P.x = ladder.x;
     P.z = ladder.z;
     sim.step({ pick: true });
-    assert.deepEqual(P.inv, ['ladder', null, null, null], "l'échelle va dans l'inventaire");
+    assert.deepEqual(P.inv, ['ladder', null], "l'échelle va dans l'inventaire");
     P.x = N.baseX + 1.5;
     P.z = N.baseZ;
     if (sim.isColliding(P.x, P.z, 0.3)) {
@@ -1183,7 +1189,7 @@ test("renfoncement : la cassette en hauteur s'attrape seulement depuis l'échell
     }
     sim.step({ useSel: true });
     assert.ok(N.ladder, 'échelle posée');
-    assert.deepEqual(P.inv, [null, null, null, null]);
+    assert.deepEqual(P.inv, [null, null]);
     P.x = N.baseX;
     P.z = N.baseZ;
     sim.step();
@@ -2428,7 +2434,9 @@ test("l'entité qui perd sa proie de vue va là où elle l'a vue, fouille autour
   const cells = sim.map.walkable;
   const at = (c) => ({ x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE });
   // le joueur loin, hors de vue et à l'arrêt ; l'entité en chasse vient de le perdre
-  const far = cells.reduce((b, c) => (Math.hypot(at(c).x - M.x, at(c).z - M.z) > Math.hypot(at(b).x - M.x, at(b).z - M.z) ? c : b));
+  // (ni sous un néon franc ni dans un recoin calme : là, elle renoncerait exprès)
+  const open = cells.filter((c) => !sim.brightCell(sim.map, at(c).x, at(c).z) && !sim.calmAt({ ...P, ...at(c) }));
+  const far = open.reduce((b, c) => (Math.hypot(at(c).x - M.x, at(c).z - M.z) > Math.hypot(at(b).x - M.x, at(b).z - M.z) ? c : b));
   P.x = at(far).x;
   P.z = at(far).z;
   const last = cells.find((c) => {
@@ -2457,11 +2465,11 @@ test("réseau : l'eau d'amande bue par un invité le désaltère chez lui aussi,
   const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 7, players, localId: 2 });
   const G = guest.player;
   const HG = host.players[1];
-  HG.inv = ['bottle', null, null, null];
+  HG.inv = ['bottle', null];
   HG.water = 30; // la soif se tient chez l'hôte
   G.water = 99;
   host.step({}, { 2: { remote: true, useSel: true, sel: 1 } });
-  assert.deepEqual(HG.inv, [null, null, null, null], 'la bouteille est bue');
+  assert.deepEqual(HG.inv, [null, null], 'la bouteille est bue');
   guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
   assert.ok(Math.abs(G.water - (30 + ALMOND_WATER)) < 0.2, `l'invité reçoit sa gourde de l'hôte (${G.water})`);
   // le bruit de chacun aussi (la barre de bruit des invités)
@@ -3692,6 +3700,309 @@ test('Level 0 : on ne part jamais dans une cage d’escalier, et une chute ne fi
       assert.ok(!sim.isColliding(P.x, P.z, 0.37, 1), `graine ${seed}, trou ${id} : on retombe sur ses pieds, pas dans un meuble`);
     }
   }
+});
+
+// ------------------------------------------------------------------ Level 1 : quais, alarmes, poste de garde, gaines
+
+// les cases atteignables du départ, rideaux des quais baissés (ou relevés)
+const reachL1 = (m, open) => {
+  const g = m.grid.slice();
+  if (!open) for (const d of m.docks) for (const [gx, gz] of d.cells) g[gz * m.W + gx] = T.WALL;
+  return bfs(g, m.W, m.H, m.spawn.gx, m.spawn.gz);
+};
+
+test('Level 1 : un mur coupe-feu sépare le départ du monte-charge ; ses quais sont un raccourci, rien ne bouche le grand détour', () => {
+  let shorter = 0;
+  for (let seed = 1; seed <= 60; seed++) {
+    const m = createWarehouseMap(seed * 7 + 13);
+    assert.ok(m.docks.length >= 1, `graine ${seed} : au moins un quai`);
+    const shut = reachL1(m, false);
+    const open = reachL1(m, true);
+    const ek = m.exit.gz * m.W + m.exit.gx;
+    assert.ok(shut[ek] > 0, `graine ${seed} : le monte-charge s'atteint rideaux baissés (le grand détour)`);
+    for (const c of m.walkable) {
+      if (m.dockAt(c.x, c.z)) continue;
+      assert.ok(shut[c.z * m.W + c.x] >= 0, `graine ${seed} : la case ${c.x},${c.z} reste atteignable rideaux baissés`);
+    }
+    if (open[ek] < shut[ek]) shorter++;
+    // rien de posé sur un quai ni juste devant (caisses, objets, fusibles, alarmes, poste, bouches)
+    const near = (x, z) => m.docks.some((d) => Math.hypot(d.x - x, d.z - z) < 2.6);
+    for (const o of [...m.props, ...m.items, ...m.fuses, ...m.alarms, ...m.ducts.vents]) assert.ok(!near(o.x, o.z), `graine ${seed} : rien devant un quai`);
+    assert.ok(m.post && !near(m.post.x, m.post.z), `graine ${seed} : un poste de garde, à l'écart des quais`);
+    assert.ok(m.alarms.length >= 4 && m.cams.length >= 4, `graine ${seed} : des alarmes et des caméras`);
+    for (const v of m.ducts.vents) assert.ok(!m.isWall(v.gx, v.gz), `graine ${seed} : une bouche au-dessus d'une allée`);
+  }
+  assert.ok(shorter >= 50, `les quais raccourcissent le chemin du monte-charge (${shorter} graines sur 60)`);
+});
+
+test('Level 1 : le boîtier relève le rideau du quai (lentement), le rebaisse ; il ne retombe pas sur quelqu\'un ; l\'invité le voit', () => {
+  const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }];
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 4, players, localId: 1, level: 1 });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 4, players, localId: 2, level: 1 });
+  const d = sim.map.docks[0];
+  const P = sim.player;
+  const b = d.btn[0];
+  P.x = b.x + b.nx * 0.5;
+  P.z = b.z + b.nz * 0.5;
+  const G = sim.players.find((q) => q.id === 2);
+  const o = d.btn[1];
+  G.x = o.x + o.nx * 0.5;
+  G.z = o.z + o.nz * 0.5;
+  const [gx, gz] = d.cells[0];
+  assert.ok(sim.map.isWall(gx, gz) && !hasLineOfSight(sim.map, P.x, P.z, G.x, G.z), 'rideau baissé : il arrête le passage et la vue');
+  assert.ok(sim.isColliding(d.x, d.z, PLAYER_RADIUS), 'on ne passe pas au travers');
+  assert.ok(!sim.isColliding(P.x, P.z, PLAYER_RADIUS), 'mais on se tient devant, dans la baie');
+  sim.step({ pick: true });
+  assert.equal(d.dir, 1, 'F au boîtier : il monte');
+  run(sim, DOCK_OPEN_T * 0.5);
+  assert.ok(d.o > 0.3 && d.o < 0.7 && sim.map.isWall(gx, gz), 'à mi-course, on ne passe pas encore dessous');
+  run(sim, DOCK_OPEN_T * 0.55);
+  assert.equal(d.o, 1);
+  assert.ok(!sim.map.isWall(gx, gz) && !sim.isColliding(d.x, d.z, PLAYER_RADIUS) && hasLineOfSight(sim.map, P.x, P.z, G.x, G.z), 'relevé : on passe, on se voit');
+  guest.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
+  assert.ok(!guest.map.isWall(gx, gz) && !guest.isColliding(d.x, d.z, PLAYER_RADIUS), "chez l'invité aussi");
+  // quelqu'un dessous : il s'arrête au-dessus de lui
+  G.x = d.x;
+  G.z = d.z;
+  sim.step({ pick: true });
+  assert.equal(d.dir, -1, 'F encore : il redescend');
+  run(sim, DOCK_CLOSE_T * 1.2);
+  assert.ok(d.o >= DOCK_PASS, "il ne descend pas sur le coéquipier qui passe dessous");
+  G.x = o.x + o.nx * 0.5;
+  G.z = o.z + o.nz * 0.5;
+  run(sim, DOCK_CLOSE_T);
+  assert.equal(d.o, 0, 'le passage libre, il finit de descendre');
+  guest.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
+  assert.ok(guest.map.isWall(gx, gz) && guest.isColliding(d.x, d.z, PLAYER_RADIUS), "baissé chez l'invité");
+  // de l'autre côté, l'invité a son propre boîtier
+  sim.step({}, { 2: { pick: true } });
+  assert.equal(d.dir, 1, "le boîtier de l'autre côté le relève aussi");
+});
+
+test("Level 1 : l'entité bute sur un rideau baissé, cogne, l'arrache et passe ; elle n'attrape personne au travers", () => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 4, level: 1 });
+  const d = sim.map.docks[0];
+  const M = sim.monster;
+  const P = sim.player;
+  M.dormantT = 0;
+  // l'entité d'un côté, le joueur de l'autre, collé au rideau ; elle le cherche là
+  const ax = d.vert ? 1 : 0;
+  const side = (s) => ({ x: d.x + (ax ? s * 1.6 : 0), z: d.z + (ax ? 0 : s * 1.6) });
+  Object.assign(M, side(-1.6), { mode: 'search', floor: 0, path: [], repathT: 0, ductCD: 999 });
+  const near = side(0.3);
+  P.x = near.x;
+  P.z = near.z;
+  P.crouch = true;
+  const bangs = [];
+  let crossedShut = false;
+  const axis = (q) => (ax ? q.x - d.x : q.z - d.z);
+  for (let i = 0; i < Math.round((DOCK_FORCE_T + 6) / DT) && !d.broken; i++) {
+    M.mode = 'search';
+    M.lastSeenX = P.x;
+    M.lastSeenZ = P.z;
+    M.lastSeenF = 0;
+    const before = axis(M);
+    sim.step({ crouch: true });
+    for (const e of sim.events.splice(0)) if (e.type === 'dockBang') bangs.push(e);
+    if (d.o < DOCK_PASS && Math.sign(before) !== Math.sign(axis(M)) && before !== 0) crossedShut = true;
+    assert.ok(d.broken || (!(P.grabT > 0) && P.status === 'alive'), `pas attrapé au travers du rideau (o ${d.o.toFixed(2)}, force ${d.force.toFixed(2)}, elle à ${axis(M).toFixed(2)} m, lui à ${axis(P).toFixed(2)})`);
+  }
+  assert.ok(!crossedShut, 'elle ne passe pas au travers de la tôle');
+  assert.ok(bangs.length >= 3, `elle cogne (${bangs.length} coups)`);
+  assert.ok(d.broken && d.o >= DOCK_PASS, 'le rideau a cédé');
+  sim.step({ pick: true });
+  // (le boîtier ne le redescend plus)
+  run(sim, 1);
+  assert.ok(d.o >= DOCK_PASS, 'arraché, il reste ouvert');
+});
+
+test("Level 1 : l'alarme incendie attire l'entité (même en chasse, de loin), elle frappe la cloche ; chacune ne sert qu'une fois", () => {
+  const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }];
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 6, players, localId: 1, level: 1 });
+  const guest = new BackroomsSim({ difficulty: 'normal', seed: 6, players, localId: 2, level: 1 });
+  const a = sim.map.alarms[0];
+  const P = sim.player;
+  P.x = a.x + a.nx * 0.6;
+  P.z = a.z + a.nz * 0.6;
+  const G = sim.players.find((q) => q.id === 2);
+  const M = sim.monster;
+  M.dormantT = 0;
+  // l'entité poursuit le coéquipier, à une trentaine de mètres de l'alarme
+  const c = sim.map.walkable.find((q) => {
+    const x = (q.x + 0.5) * CELL_SIZE;
+    const z = (q.z + 0.5) * CELL_SIZE;
+    const dd = Math.hypot(x - a.x, z - a.z);
+    return dd > 26 && dd < 36 && !sim.map.dockAt(q.x, q.z);
+  });
+  G.x = (c.x + 0.5) * CELL_SIZE;
+  G.z = (c.z + 0.5) * CELL_SIZE;
+  Object.assign(M, { x: G.x + 9, z: G.z, floor: 0, mode: 'chase', target: 2, ductCD: 999 });
+  if (sim.isColliding(M.x, M.z, 0.4)) Object.assign(M, { x: G.x, z: G.z + 9 });
+  if (sim.isColliding(M.x, M.z, 0.4)) Object.assign(M, { x: G.x, z: G.z - 9 });
+  G.x += 0; // (il est à 9 m d'elle : elle ne le tient pas de près)
+  sim.step({ pick: true });
+  assert.ok(a.used && a.ringT > ALARM_T - 0.1, 'F au déclencheur : la cloche sonne');
+  guest.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
+  assert.ok(guest.map.alarms[0].used && guest.map.alarms[0].ringT > 0, "l'invité l'entend sonner");
+  run(sim, 0.5);
+  assert.equal(M.mode, 'search', 'elle lâche sa proie pour la cloche');
+  assert.ok(Math.hypot(M.lastSeenX - a.x, M.lastSeenZ - a.z) < 1.5, 'elle va à la cloche');
+  P.x = a.x + a.nx * 12; // (le joueur qui l'a déclenchée s'éloigne)
+  P.z = a.z + a.nz * 12;
+  if (sim.isColliding(P.x, P.z, 0.4)) {
+    P.x = G.x;
+    P.z = G.z + 3;
+  }
+  let smash = false;
+  for (let i = 0; i < Math.round((ALARM_T - 1) / DT) && !smash; i++) {
+    sim.step({});
+    if (sim.events.splice(0).some((e) => e.type === 'alarmSmash')) smash = true;
+  }
+  assert.ok(smash, 'elle arrive devant et frappe la cloche');
+  run(sim, 1);
+  assert.equal(a.ringT, 0, 'la cloche se tait');
+  P.x = a.x + a.nx * 0.6;
+  P.z = a.z + a.nz * 0.6;
+  assert.ok(!sim.nearControl(P), 'brisé, le déclencheur ne sert plus');
+});
+
+test('Level 1 : le poste de garde — assis, on ne bouge plus, on change de caméra ; ce que montre l\'écran compte comme vu', () => {
+  const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }];
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 5, players, localId: 1, level: 1 });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 5, players, localId: 2, level: 1 });
+  const S = sim.map.post;
+  const G = sim.players.find((q) => q.id === 2);
+  G.x = S.front.x;
+  G.z = S.front.z;
+  sim.step({}, { 2: { pick: true } });
+  assert.ok(G.desk && S.by === 2, 'F devant le fauteuil : on s\'assoit');
+  assert.ok(Math.hypot(G.x - S.seat.x, G.z - S.seat.z) < 0.01);
+  const x0 = G.x;
+  run(sim, 1, {}, { 2: { my: 1, mx: 1, run: true, camSel: 3 } });
+  assert.equal(G.x, x0, 'assis : on ne bouge pas');
+  assert.equal(G.camSel, 3, 'la caméra choisie');
+  guest.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
+  const g = guest.players.find((q) => q.id === 2);
+  assert.ok(g.desk && Math.hypot(g.x - S.seat.x, g.z - S.seat.z) < 0.01, "l'invité est au fauteuil chez lui");
+  assert.equal(guest.map.post.by, 2);
+  assert.equal(guest.predict({ my: 1 }), 0);
+  assert.ok(Math.hypot(g.x - S.seat.x, g.z - S.seat.z) < 0.01, 'il ne bouge pas chez lui non plus');
+  // ce que la caméra 3 filme : devant elle, dans l'allée
+  const c = sim.map.cams[3];
+  const fx = -Math.sin(c.yaw);
+  const fz = -Math.cos(c.yaw);
+  const spot = { x: c.x + fx * 8, z: c.z + fz * 8 };
+  sim.player.x = spot.x - fx * 30; // (le joueur de l'hôte regarde ailleurs, loin)
+  sim.player.yaw = c.yaw + Math.PI;
+  const watched = sim.inSomeView(0, spot.x, spot.z);
+  assert.ok(watched, "ce qu'il y a devant la caméra choisie est à l'écran du gardien");
+  run(sim, 0.1, {}, { 2: { camSel: 0 } });
+  assert.ok(!sim.onScreen(G, 0, spot.x, spot.z) || sim.map.cams[0] === c, "une autre caméra : plus à l'écran");
+  sim.step({}, { 2: { pick: true } });
+  assert.ok(!G.desk && S.by === -1 && Math.hypot(G.x - S.front.x, G.z - S.front.z) < 0.01, 'F : on se lève, devant le bureau');
+});
+
+test('Level 1 : le poste de garde est une pièce fermée — on y entre par la porte, qui s\'ouvre devant qui arrive ; les cloisons arrêtent, cachent et ne coupent aucune allée', () => {
+  for (const seed of [1, 5, 6, 11, 23]) {
+    const sim = new BackroomsSim({ difficulty: 'normal', seed, players: [{ id: 1, name: 'H' }], localId: 1, level: 1 });
+    const m = sim.map;
+    const S = m.post;
+    const gd = m.guardDoor;
+    assert.ok(S && S.room && gd && m.segs.length >= 3, `graine ${seed} : une pièce, sa porte, ses cloisons`);
+    const R = S.room;
+    const inside = (x, z) => x > R.x0 && x < R.x1 && z > R.z0 && z < R.z1;
+    assert.ok(inside(S.seat.x, S.seat.z) && inside(S.front.x, S.front.z), 'le fauteuil et le bureau sont dedans');
+    // les cloisons arrêtent le joueur ; la baie de la porte le laisse passer
+    for (const sg of m.segs) assert.ok(sim.isColliding((sg.x0 + sg.x1) / 2, (sg.z0 + sg.z1) / 2, PLAYER_RADIUS), 'une cloison arrête');
+    assert.ok(!sim.isColliding(gd.x, gd.z, PLAYER_RADIUS), 'on passe par la porte');
+    // en marchant du dehors vers le fauteuil, on entre par la porte
+    const P = sim.player;
+    P.x = gd.x + gd.nx * 1.4;
+    P.z = gd.z + gd.nz * 1.4;
+    sim.step({});
+    assert.ok(gd.open, 'devant la porte, elle s\'ouvre');
+    for (let i = 0; i < 90; i++) {
+      const tx = i < 40 ? gd.x - gd.nx * 0.8 : S.front.x;
+      const tz = i < 40 ? gd.z - gd.nz * 0.8 : S.front.z;
+      const p = sim.moveWithCollisions(P.x, P.z, Math.sign(tx - P.x) * Math.min(Math.abs(tx - P.x), 0.08), Math.sign(tz - P.z) * Math.min(Math.abs(tz - P.z), 0.08), PLAYER_RADIUS, 0);
+      P.x = p.x;
+      P.z = p.z;
+    }
+    assert.ok(inside(P.x, P.z), 'on est entré');
+    // personne devant : elle se referme, et cache comme une cloison
+    P.x = m.spawn.x;
+    P.z = m.spawn.z;
+    sim.monster.x = m.monsterSpawn.x;
+    sim.monster.z = m.monsterSpawn.z;
+    sim.step({});
+    assert.ok(!gd.open, 'personne devant : fermée');
+    const cx = (R.x0 + R.x1) / 2;
+    const cz = (R.z0 + R.z1) / 2;
+    assert.ok(!hasLineOfSight(m, cx, cz, gd.x + gd.nx * 2, gd.z + gd.nz * 2), 'porte fermée : on ne voit pas au travers');
+    gd.open = true;
+    assert.ok(hasLineOfSight(m, gd.x - gd.nx * 0.8, gd.z - gd.nz * 0.8, gd.x + gd.nx * 2, gd.z + gd.nz * 2), 'ouverte : on voit par la baie');
+    gd.open = false;
+    for (const sg of m.segs) {
+      const mx = (sg.x0 + sg.x1) / 2;
+      const mz = (sg.z0 + sg.z1) / 2;
+      const ox = sg.x0 === sg.x1 ? 1.2 : 0;
+      const oz = sg.x0 === sg.x1 ? 0 : 1.2;
+      assert.ok(!hasLineOfSight(m, mx - ox, mz - oz, mx + ox, mz + oz), 'une cloison cache');
+    }
+    // l'entité n'entre que par la porte
+    const path = findPath(m, m.monsterSpawn.x, m.monsterSpawn.z, S.seat.x, S.seat.z);
+    assert.ok(path && path.length, 'elle trouve le chemin du fauteuil');
+    const gin = Math.floor((gd.x - gd.nx * 0.5) / CELL_SIZE) + Math.floor((gd.z - gd.nz * 0.5) / CELL_SIZE) * m.W;
+    const gout = Math.floor((gd.x + gd.nx * 0.5) / CELL_SIZE) + Math.floor((gd.z + gd.nz * 0.5) / CELL_SIZE) * m.W;
+    let entered = -1;
+    path.forEach((q, i) => {
+      if (entered < 0 && inside(q.x, q.z)) entered = i;
+    });
+    assert.ok(entered > 0 && path[entered].gz * m.W + path[entered].gx === gin && path[entered - 1].gz * m.W + path[entered - 1].gx === gout, 'par la porte');
+  }
+});
+
+test("Level 1 : l'entité passe par les gaines — on l'entend cogner au-dessus, la grille tombe, elle ressort près de sa proie", () => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 9, level: 1 });
+  const m = sim.map;
+  const M = sim.monster;
+  const P = sim.player;
+  M.dormantT = 0;
+  // le joueur près d'une bouche, l'entité loin, près d'une autre
+  const v0 = m.ducts.vents.find((v) => m.ducts.vents.some((w) => Math.hypot(w.x - v.x, w.z - v.z) > 36 && Math.hypot(w.x - v.x, w.z - v.z) < 44));
+  P.x = v0.x + 10;
+  P.z = v0.z;
+  if (sim.isColliding(P.x, P.z, 0.4)) P.x = v0.x - 10;
+  if (sim.isColliding(P.x, P.z, 0.4)) {
+    P.x = v0.x;
+    P.z = v0.z + 10;
+  }
+  const far = m.ducts.vents.find((w) => Math.hypot(w.x - P.x, w.z - P.z) > 32 && Math.hypot(w.x - P.x, w.z - P.z) < 45);
+  Object.assign(M, { x: far.x, z: far.z + 0.3, floor: 0, mode: 'patrol', ductCD: 0, path: [], repathT: 0 });
+  P.yaw = Math.atan2(P.x - M.x, P.z - M.z); // (il lui tourne le dos)
+  const seen = { in: 0, bang: 0, out: null };
+  let hidden = false;
+  for (let i = 0; i < Math.round(60 / DT) && !(seen.out && !M.duct); i++) {
+    sim.step({});
+    for (const e of sim.events.splice(0)) {
+      if (e.type === 'ductIn') seen.in++;
+      if (e.type === 'ductBang') seen.bang++;
+      if (e.type === 'ductOut') seen.out = e;
+    }
+    if (M.inDuct) {
+      hidden = true;
+      const snap = sim.snapshot();
+      assert.equal(snap.m[12], 1, "l'invité sait qu'elle est dans la gaine (on ne la dessine pas)");
+    }
+    if (seen.out && M.duct) assert.equal(M.v, 0, 'elle tombe : rien d\'autre');
+  }
+  assert.ok(seen.in === 1 && hidden, 'elle entre dans une gaine');
+  assert.ok(seen.bang >= 5, `on l'entend cogner (${seen.bang} coups)`);
+  assert.ok(seen.out, 'elle ressort par une bouche');
+  const v = m.ducts.vents[seen.out.vent];
+  const d = Math.hypot(v.x - P.x, v.z - P.z);
+  assert.ok(v.open && d > 6.5 && d < 16.5, `près de sa proie (${d.toFixed(1)} m), la grille tombée`);
+  assert.equal(M.mode === 'search' || M.mode === 'chase', true, 'puis elle la cherche');
 });
 
 console.log(`\n${count} tests réussis pour The Backrooms !`);

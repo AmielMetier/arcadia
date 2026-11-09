@@ -392,6 +392,43 @@ function drawCeiling(ctx, S, grime, low = false) {
   }
 }
 
+// Le détail d'une photo sans ses grandes taches (passe-haut, en raccord sur les bords : la toile se répète), posé sur
+// une couleur moyenne (base) ; sat : ce qu'il garde de sa couleur (0 : gris), k : la force du détail
+function highPass(photo, n, base, k = 1, sat = 0) {
+  const [big, bctx] = canvas(n * 3);
+  for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) bctx.drawImage(photo, i * n, j * n, n, n);
+  const [low, lctx] = canvas(n);
+  lctx.filter = `blur(${Math.round(n / 22)}px)`;
+  lctx.drawImage(big, -n, -n);
+  const [out, octx] = canvas(n);
+  octx.drawImage(photo, 0, 0, n, n);
+  const a = octx.getImageData(0, 0, n, n);
+  const b = lctx.getImageData(0, 0, n, n).data;
+  const d = a.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const y = 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
+    const yl = 0.3 * b[i] + 0.59 * b[i + 1] + 0.11 * b[i + 2];
+    const dv = (y - yl) * k;
+    for (let c = 0; c < 3; c++) {
+      const tint = (d[i + c] - y) * sat;
+      d[i + c] = Math.max(0, Math.min(255, base[c] + dv + tint));
+    }
+  }
+  octx.putImageData(a, 0, 0);
+  return out;
+}
+
+// Level 1 : le relief des parpaings (la photo en niveaux de gris, répétée comme sur le mur) : les joints creusés, le
+// bullage du béton ; seule la lampe torche et les feux de couleur s'en servent (la lumière cuite est trop douce)
+function drawConcreteWallBump(ctx, S, photo) {
+  ctx.fillStyle = '#808080';
+  ctx.fillRect(0, 0, S, S);
+  if (!photo) return;
+  ctx.filter = 'grayscale(1) contrast(1.6)';
+  for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) ctx.drawImage(photo, (i * S) / 3, (j * S) / 5, S / 3 + 1, S / 5 + 1);
+  ctx.filter = 'none';
+}
+
 // Level 1 : béton brut humide, coulures sombres au pied, bande jaune et noire de sécurité
 function drawConcreteWall(ctx, S, photo) {
   // parpaings peints (Poly Haven, concrete_wall_004) : la photo est répétée 3 × 5 fois pour que les blocs fassent
@@ -466,14 +503,17 @@ function drawConcreteFloor(ctx, S, photo) {
 // et les trous de leurs tiges d'écartement
 function drawConcreteCeiling(ctx, S, photo) {
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = '#6a6c69';
+  ctx.fillStyle = '#5f605d';
   ctx.fillRect(0, 0, S, S);
   if (photo) {
-    ctx.drawImage(photo, 0, 0, S, S);
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = '#c8cac6';
-    ctx.fillRect(0, 0, S, S);
-    ctx.globalCompositeOperation = 'source-over';
+    // la photo garde son grain (bullage, reprises, traces de banches) mais perd ses grandes taches brunes : elles
+    // revenaient à l'identique tous les 2,5 m, et viraient à l'orange sous les feux rouges. Le béton est gris neutre,
+    // de la même famille que la peinture des murs ; ses nuances viennent de la scène (au gré de l'endroit)
+    const dst = ctx.canvas;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(highPass(photo, dst.width, [95, 95, 91], 0.75, 0.22), 0, 0);
+    ctx.restore();
   }
   for (const y of [0, S / 2]) {
     ctx.fillStyle = 'rgba(20, 22, 22, 0.3)';
@@ -733,6 +773,14 @@ export function createBackroomsTextures(level = 0) {
 
   const wall = tex(wallCanvas);
   const wallLow = lowCanvas ? tex(lowCanvas) : wall;
+  // Level 1 : le relief des parpaings
+  const [bumpCanvas, bumpCtx] = L1 ? canvas(PX) : [null, null];
+  if (bumpCtx) {
+    bumpCtx.setTransform(PX / S, 0, 0, PX / S, 0, 0);
+    drawConcreteWallBump(bumpCtx, S, null);
+  }
+  const wallBump = bumpCanvas ? tex(bumpCanvas) : null;
+  if (wallBump) wallBump.colorSpace = THREE.NoColorSpace;
   const carpet = tex(carpetCanvas);
   const ceiling = tex(ceilCanvas);
   const ceilingLow = ceilLowCanvas ? tex(ceilLowCanvas) : ceiling;
@@ -752,6 +800,7 @@ export function createBackroomsTextures(level = 0) {
   const mosaic = tex(ceilCanvas);
   const ready = Promise.all([...files.map(loadImage), ...(L2 ? ['l37_bassin.jpg', 'l37_fosse.jpg'].map(loadImage) : [])]).then(([pap, moq, pla, bas, fos]) => {
     if (pap) { drawW(wctx, S, pap); wall.needsUpdate = true; }
+    if (pap && bumpCtx) { drawConcreteWallBump(bumpCtx, S, pap); wallBump.needsUpdate = true; }
     if (pap && lowCtx) { drawLow(pap, undefined); wallLow.needsUpdate = true; }
     if (pla && lowCtx) { drawLow(undefined, pla); ceilingLow.needsUpdate = true; }
     if (moq) { drawF(cctx, S, moq); carpet.needsUpdate = true; }
@@ -1055,5 +1104,5 @@ export function createBackroomsTextures(level = 0) {
   const drawings = tex(drawCanvas);
   drawings.wrapS = drawings.wrapT = THREE.ClampToEdgeWrapping;
 
-  return { wall, wallLow, carpet, ceiling, ceilingLow, pool, deep, mosaic, vhs, exit, sign, label, steel, fireDoor, treadPlate, crate, fog, lamp, outlet, vent, tape, drawings, ready, metalReady };
+  return { wall, wallLow, wallBump, carpet, ceiling, ceilingLow, pool, deep, mosaic, vhs, exit, sign, label, steel, fireDoor, treadPlate, crate, fog, lamp, outlet, vent, tape, drawings, ready, metalReady };
 }

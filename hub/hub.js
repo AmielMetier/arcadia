@@ -107,8 +107,10 @@
       <span class="tx"><span class="ds">${esc(g.desc)}</span>
         <span class="meta"><span class="chip">👥 ${g.minPlayers} à ${g.maxPlayers} joueurs</span>${bots ? '<span class="chip">🤖 Bots</span>' : ''}</span>${extra}</span></${el}>`;
   }
-  $('#shelf').innerHTML = GAMES.map((g) => gameCard(g, { attrs: `data-g="${g.id}"` })).join('');
-  $('#shelfCount').textContent = GAMES.length + ' jeux';
+  // les « Gros jeux » (big: true dans le registre) ont leur rangée à part, au-dessus (hub/home.js) : la liste garde les autres
+  const SMALL = GAMES.filter((g) => !g.big);
+  $('#shelf').innerHTML = SMALL.map((g) => gameCard(g, { attrs: `data-g="${g.id}"` })).join('');
+  $('#shelfCount').textContent = SMALL.length + ' jeux';
   $('#name').value = me.name;
   $('#name').addEventListener('input', (e) => { me.name = e.target.value.slice(0, 12); DDProfile.save(me); FR.setMe(profile()); renderAccount(); if (room) room.updateMe(me); });
   function renderSwatches() {
@@ -521,15 +523,18 @@ renderPlayers(); renderNet(); pubState(); renderFriends(); renderPings();
     const running = room.game && !frame;
     $('#runBanner').hidden = !running;
     if (running) $('#runText').textContent = 'Partie de ' + gameDef(room.game.id).title + ' en cours';
-    // jeux
+    // jeux : les « Gros jeux » d'abord, dans leur groupe, puis les autres
     const n = room.players.length;
-    setHTML($('#games'), GAMES.map((g) => {
+    const card = (g) => {
       const tooMany = n > g.maxPlayers;
       const sel = (room.game ? room.game.id : pick.game) === g.id && (host || room.game);
       return gameCard(g, { el: 'button', cls: (sel ? ' sel' : '') + (tooMany ? ' off' : ''),
         attrs: `data-game="${g.id}" ${host && !tooMany ? '' : 'tabindex="-1"'} aria-pressed="${sel}"`,
         extra: tooMany ? `<span class="why">${g.maxPlayers} joueurs maximum</span>` : '' });
-    }).join(''));
+    };
+    const BIG = GAMES.filter((g) => g.big);
+    setHTML($('#games'), (BIG.length ? `<div class="ggrp"><b>Gros jeux</b><span>Des jeux beaucoup plus complets</span></div>${BIG.map(card).join('')}<div class="ggrp"><b>Les autres jeux</b></div>` : '')
+      + SMALL.map(card).join(''));
     renderLaunch();
   }
 

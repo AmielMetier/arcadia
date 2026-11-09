@@ -54,10 +54,12 @@ function build(sim, floor) {
   const solid = new Uint8Array(W * H);
   const cage = new Set();
   for (const st of sim.stairs || []) for (const k of st.cells) cage.add(k.gz * W + k.gx);
+  // (Level 1 : les murs qui ne bougent pas ; les rideaux des quais, elle les force, voir sim.dockPush)
+  const wall = m.navWall ? (gx, gz) => m.navWall(gx, gz) : (gx, gz) => m.isWall(gx, gz);
   for (let gz = 0; gz < H; gz++) {
     for (let gx = 0; gx < W; gx++) {
       const k = gz * W + gx;
-      if (m.isWall(gx, gz)) solid[k] = m.pillarAt && m.pillarAt(gx, gz) ? 2 : 1;
+      if (wall(gx, gz)) solid[k] = m.pillarAt && m.pillarAt(gx, gz) ? 2 : 1;
       else if (cage.has(k)) solid[k] = 1;
       else if (below && m.pitAt && m.pitAt(gx, gz) >= 0) solid[k] = 3;
     }
@@ -184,6 +186,20 @@ export function navOf(sim, floor = 0) {
     m.mnavKey = key;
   }
   return m.mnav;
+}
+
+// le point est-il dans la grande partie de l'étage où l'entité circule ? Un joueur se faufile partout, elle non : un
+// recoin dont l'entrée est trop étroite pour son corps l'y enfermerait (où elle n'apparaît donc jamais)
+export function roamable(sim, floor, x, z) {
+  const N = navOf(sim, floor);
+  if (N.main === undefined) {
+    const size = new Map();
+    for (let k = 0; k < N.comp.length; k++) if (N.comp[k] >= 0) size.set(N.comp[k], (size.get(N.comp[k]) || 0) + 1);
+    N.main = -1;
+    let best = 0;
+    for (const [c, n] of size) if (n > best) (best = n), (N.main = c);
+  }
+  return snap(N, x, z, 1.2, N.main) >= 0;
 }
 
 // la place libre autour d'un point, à son étage (pour ses déplacements)

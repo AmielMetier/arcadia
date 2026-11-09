@@ -411,7 +411,7 @@ html, body {
 }
 .btn-restart:hover { background: #f2f0e6; color: #000; text-shadow: none; }
 
-/* Inventaire : cinq cases en bas au centre (la lampe, puis quatre objets) */
+/* Inventaire : trois cases en bas au centre (la lampe, puis deux objets) */
 .inv {
   position: absolute;
   left: 50%;
@@ -696,9 +696,6 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 .voice-tag i[hidden] { display: none; }
 .voice-tag i b { display: block; height: 100%; width: 0; background: #9be37a; }
 .voice-tag i.loud b { background: #ff3b3b; }
-.replay-tag { position: fixed; top: 22px; left: 50%; transform: translateX(-50%); white-space: nowrap; z-index: 45; font-size: 26px; color: #f2f2f2; letter-spacing: 2px; text-shadow: 0 0 6px rgba(0,0,0,0.9); pointer-events: none; }
-.replay-tag b { color: #ef4444; font-weight: normal; animation: replayBlink 1s steps(2) infinite; }
-.replay-tag i { font-style: normal; }
 @keyframes replayBlink { 50% { opacity: 0; } }
 /* Bilan de la bande */
 .end-run { font-size: 19px; letter-spacing: 1px; line-height: 1.35; opacity: 0.85; white-space: pre-line; margin: -12px 0 22px; }

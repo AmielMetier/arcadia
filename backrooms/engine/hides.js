@@ -21,7 +21,7 @@ export function placeHides(map, n, seed = 1) {
     return (s >>> 0) / 4294967296;
   };
   const open = (x, z) => !map.isWall(x, z);
-  const avoid = [map.spawn, map.exit, ...(map.fuses || []), ...(map.valves || []), ...(map.breakers || []), ...(map.items || [])].filter(Boolean);
+  const avoid = [map.spawn, map.exit, map.guardDoor, ...(map.fuses || []), ...(map.valves || []), ...(map.breakers || []), ...(map.items || [])].filter(Boolean);
   const cand = [];
   for (const c of map.walkable || []) {
     const d = map.dist ? map.dist[c.z * W + c.x] : 99;

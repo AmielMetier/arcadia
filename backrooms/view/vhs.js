@@ -35,6 +35,7 @@ const FX_DEFAULTS = {
   danger: 0, // danger plancher : l'image n'est jamais moins brouillée que ça, quoi que passe render()
   cam: 0, // 0 : à l'œil nu, 1 : au caméscope (la transition est faite par l'appelant)
   night: 0, // mode nuit du caméscope (0 à 1)
+  cctv: 0, // caméra de surveillance (Level 1, poste de garde) : noir et blanc verdâtre, contrasté, lignes qui défilent
 };
 // les effets plein écran que l'option « flashs adoucis » ralentit
 const SLEW_KEYS = ['tracking', 'signalLoss', 'bars', 'splice'];
@@ -71,6 +72,7 @@ uniform float uBright;
 uniform float uCam;     // 0 : à l'œil nu, 1 : au caméscope
 uniform float uBox;     // largeur visible de l'image (4:3 au caméscope, 1 sinon)
 uniform float uNight;   // mode nuit du caméscope (0 à 1)
+uniform float uCctv;    // caméra de surveillance (0 à 1)
 varying vec2 vUv;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
@@ -283,6 +285,13 @@ void main() {
     vec3 ng = vec3(0.42, 1.0, 0.46) * pow(ln, 0.85) * 1.0 + vec3(0.0, 0.025, 0.0);
     col = mix(col, ng, uNight);
   }
+  // caméra de surveillance : un noir et blanc un peu vert, contrasté, une barre plus claire qui remonte lentement
+  if (uCctv > 0.001) {
+    float lc = dot(col, vec3(0.299, 0.587, 0.114));
+    lc = smoothstep(0.02, 0.95, pow(lc, 0.9));
+    float roll = 1.0 + 0.06 * smoothstep(0.08, 0.0, abs(fract(vUv.y + uTime * 0.07) - 0.5));
+    col = mix(col, vec3(0.86, 0.96, 0.86) * lc * roll, uCctv);
+  }
   // lignes de balayage (au caméscope), calées sur les lignes de la bande, estompées si l'écran est trop petit
   float cyc = uLines * 0.4;
   float sAmp = 0.06 * cm * clamp((uRes.y / cyc - 1.8) / 0.8, 0.0, 1.0);
@@ -343,6 +352,23 @@ export function createVhsFilter(renderer) {
   const half = () => new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false });
   const bloomA = half();
   const bloomB = half();
+  // l'éblouissement large (Level 1) : deux étages plus flous encore (1/8 et 1/16), ajoutés au halo serré. Une lampe
+  // vive bave sur une grande largeur, en s'éteignant doucement, comme dans l'optique d'un vrai caméscope
+  const bloomC = half();
+  const bloomC2 = half();
+  const bloomD = half();
+  const bloomD2 = half();
+  let glare = 0;
+  const addMat = new THREE.ShaderMaterial({
+    uniforms: { tDiffuse: { value: null }, uK: { value: 1 } },
+    vertexShader,
+    fragmentShader: 'uniform sampler2D tDiffuse;\nuniform float uK;\nvarying vec2 vUv;\nvoid main() { gl_FragColor = vec4(texture2D(tDiffuse, vUv).rgb * uK, 1.0); }',
+    depthTest: false,
+    depthWrite: false,
+  });
+  const addBlend = addMat.clone();
+  addBlend.blending = THREE.AdditiveBlending;
+  addBlend.transparent = true;
   // mise au point : la scène floutée en demi-définition (deux passes seulement quand le flou est demandé)
   const focusA = half();
   const focusB = half();
@@ -374,6 +400,7 @@ export function createVhsFilter(renderer) {
       uCam: { value: 0 },
       uBox: { value: 1 },
       uNight: { value: 0 },
+      uCctv: { value: 0 },
     },
     vertexShader,
     fragmentShader,
@@ -381,6 +408,68 @@ export function createVhsFilter(renderer) {
     depthWrite: false,
   });
   const U = material.uniforms;
+  // brume en volume (Level 1) : calculée d'après la profondeur de l'image, puis posée par-dessus la scène
+  // (lumière diffusée ajoutée, ce qu'elle cache assombri). La scène la fournit avec setFog
+  let fogFn = null;
+  let fogRT = null;
+  let fogRT2 = null;
+  // flou de la brume (horizontal puis vertical) qui ne traverse pas les contours : un pixel ne prend que ses voisins
+  // à la même profondeur (pas de brume qui bave sur un montant d'étagère devant elle). Il efface aussi le grain du
+  // calcul (le départ décalé d'un pixel à l'autre)
+  const fogBlur = new THREE.ShaderMaterial({
+    uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, uDir: { value: new THREE.Vector2() }, uNF: { value: new THREE.Vector2(0.1, 100) } },
+    vertexShader,
+    fragmentShader: `uniform sampler2D tDiffuse;
+uniform sampler2D tDepth;
+uniform vec2 uDir;
+uniform vec2 uNF;
+varying vec2 vUv;
+float lin(float d) {
+  float z = d * 2.0 - 1.0;
+  return 2.0 * uNF.x * uNF.y / (uNF.y + uNF.x - z * (uNF.y - uNF.x));
+}
+void main() {
+  float zc = lin(texture2D(tDepth, vUv).x);
+  float tol = 0.03 + zc * 0.05;
+  vec4 acc = vec4(0.0);
+  float ws = 0.0;
+  for (int i = -5; i <= 5; i++) {
+    vec2 uv = vUv + uDir * float(i);
+    float w = exp(-float(i * i) / 12.0) * exp(-abs(lin(texture2D(tDepth, uv).x) - zc) / tol);
+    acc += texture2D(tDiffuse, uv) * w;
+    ws += w;
+  }
+  gl_FragColor = acc / ws;
+}`,
+    depthTest: false,
+    depthWrite: false,
+  });
+  const fogComp = new THREE.ShaderMaterial({
+    uniforms: { tFog: { value: null } },
+    vertexShader,
+    fragmentShader: `uniform sampler2D tFog;
+varying vec2 vUv;
+void main() {
+  gl_FragColor = texture2D(tFog, vUv);
+}`,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.CustomBlending,
+    blendSrc: THREE.OneFactor,
+    blendDst: THREE.OneMinusSrcAlphaFactor,
+    blendSrcAlpha: THREE.ZeroFactor,
+    blendDstAlpha: THREE.OneFactor,
+  });
+  const fogSize = () => {
+    if (!fogRT) return;
+    const k = target.height > 760 ? 2 : 1; // en pleine définition, la brume (douce) se calcule en demi-définition
+    const w = Math.max(1, Math.round(target.width / k));
+    const h = Math.max(1, Math.round(target.height / k));
+    if (fogRT.width !== w || fogRT.height !== h) {
+      fogRT.setSize(w, h);
+      fogRT2.setSize(w, h);
+    }
+  };
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
   quad.frustumCulled = false;
   const post = new THREE.Scene();
@@ -415,9 +504,12 @@ export function createVhsFilter(renderer) {
     target.setSize(tw, lines);
     bloomA.setSize(Math.max(1, tw >> 2), Math.max(1, lines >> 2));
     bloomB.setSize(Math.max(1, tw >> 2), Math.max(1, lines >> 2));
+    for (const rt of [bloomC, bloomC2]) rt.setSize(Math.max(1, tw >> 3), Math.max(1, lines >> 3));
+    for (const rt of [bloomD, bloomD2]) rt.setSize(Math.max(1, tw >> 4), Math.max(1, lines >> 4));
     focusA.setSize(Math.max(1, tw >> 1), Math.max(1, lines >> 1));
     focusB.setSize(Math.max(1, tw >> 1), Math.max(1, lines >> 1));
     bright.uniforms.uTexel.value.set(1 / tw, 1 / lines);
+    fogSize();
     hasFrame = false;
   }
 
@@ -483,6 +575,22 @@ export function createVhsFilter(renderer) {
         else fx[k] = clamp(num(v, 0), 0, 1);
       }
     },
+    // brume en volume : fn(camera, profondeur) met à jour son matériau plein écran et le renvoie (ou null : pas de
+    // brume cette image). La profondeur de la scène devient alors une texture (lue par la brume)
+    setFog(fn) {
+      fogFn = typeof fn === 'function' ? fn : null;
+      if (fogFn && !target.depthTexture) {
+        target.depthTexture = new THREE.DepthTexture(target.width, target.height);
+        target.dispose(); // la cible se refait au prochain rendu, avec sa profondeur en texture
+        fogRT = half();
+        fogRT2 = half();
+        fogSize();
+      }
+    },
+    // l'éblouissement large autour des lumières vives (0 : le halo serré seul, comme aux autres niveaux)
+    setGlare(k) {
+      glare = clamp(num(k, 0), 0, 2);
+    },
     getFx() {
       return { ...fx, white: [...fx.white] };
     },
@@ -526,6 +634,7 @@ export function createVhsFilter(renderer) {
       // au caméscope : l'image 4:3 au centre, deux bandes noires sur les côtés (rien si l'écran est déjà étroit)
       U.uCam.value = fx.cam;
       U.uNight.value = fx.night * fx.cam;
+      U.uCctv.value = fx.cctv;
       U.uBox.value = 1 + (Math.min(1, (ch * 4) / 3 / cw) - 1) * fx.cam;
       // mise au point qui cherche : le flou respire un peu autour de la valeur demandée
       const focus = fx.focus > 0.001 ? clamp(fx.focus * (0.88 + 0.12 * Math.sin(time * 4.1) * Math.sin(time * 1.3 + 1)), 0, 1) : 0;
@@ -538,6 +647,32 @@ export function createVhsFilter(renderer) {
         renderer.setRenderTarget(target);
         renderer.render(scene, camera);
         hasFrame = true;
+        const fm = fogFn && target.depthTexture ? fogFn(camera, target.depthTexture) : null;
+        if (fm) {
+          quad.material = fm;
+          renderer.setRenderTarget(fogRT);
+          renderer.render(post, cam);
+          const B = fogBlur.uniforms;
+          B.tDepth.value = target.depthTexture;
+          B.uNF.value.set(camera.near, camera.far);
+          quad.material = fogBlur;
+          B.tDiffuse.value = fogRT.texture;
+          B.uDir.value.set(1 / fogRT.width, 0);
+          renderer.setRenderTarget(fogRT2);
+          renderer.render(post, cam);
+          B.tDiffuse.value = fogRT2.texture;
+          B.uDir.value.set(0, 1 / fogRT.height);
+          renderer.setRenderTarget(fogRT);
+          renderer.render(post, cam);
+          // posée sur l'image de la scène, sans l'effacer
+          quad.material = fogComp;
+          fogComp.uniforms.tFog.value = fogRT.texture;
+          const ac = renderer.autoClear;
+          renderer.autoClear = false;
+          renderer.setRenderTarget(target);
+          renderer.render(post, cam);
+          renderer.autoClear = ac;
+        }
         // halo des lumières vives
         if (bloomOn) {
           quad.material = bright;
@@ -548,6 +683,28 @@ export function createVhsFilter(renderer) {
           for (let i = 0; i < 2; i++) {
             pass(blurMat, bloomA.texture, dirTmp.set((1 + i) / bw, 0), bloomB);
             pass(blurMat, bloomB.texture, dirTmp.set(0, (1 + i) / bh), bloomA);
+          }
+          if (glare > 0) {
+            // les deux étages larges : chacun réduit du précédent et flouté, puis le plus large rendu au moyen, et le
+            // moyen au halo serré
+            addMat.uniforms.uK.value = 1;
+            pass(addMat, bloomA.texture, null, bloomC);
+            for (let i = 0; i < 2; i++) {
+              pass(blurMat, bloomC.texture, dirTmp.set((1 + i) / bloomC.width, 0), bloomC2);
+              pass(blurMat, bloomC2.texture, dirTmp.set(0, (1 + i) / bloomC.height), bloomC);
+            }
+            pass(addMat, bloomC.texture, null, bloomD);
+            for (let i = 0; i < 2; i++) {
+              pass(blurMat, bloomD.texture, dirTmp.set((1 + i) / bloomD.width, 0), bloomD2);
+              pass(blurMat, bloomD2.texture, dirTmp.set(0, (1 + i) / bloomD.height), bloomD);
+            }
+            const ac = renderer.autoClear;
+            renderer.autoClear = false;
+            addBlend.uniforms.uK.value = 1;
+            pass(addBlend, bloomD.texture, null, bloomC);
+            addBlend.uniforms.uK.value = glare;
+            pass(addBlend, bloomC.texture, null, bloomA);
+            renderer.autoClear = ac;
           }
         }
       }
@@ -566,8 +723,8 @@ export function createVhsFilter(renderer) {
       renderer.render(post, cam);
     },
     dispose() {
-      for (const rt of [target, bloomA, bloomB, focusA, focusB]) rt.dispose();
-      for (const m of [material, bright, blurMat]) m.dispose();
+      for (const rt of [target, bloomA, bloomB, bloomC, bloomC2, bloomD, bloomD2, focusA, focusB, fogRT, fogRT2]) if (rt) rt.dispose();
+      for (const m of [material, bright, blurMat, addMat, addBlend, fogComp, fogBlur]) m.dispose();
       quad.geometry.dispose();
     },
   };

@@ -250,7 +250,9 @@ const loading = new GLTFLoader().loadAsync(MODEL).then((g) => {
 // opts.photo : { url, crop } pour porter le visage d'une photo (mode VIP) au lieu de celui de l'entité classique
 export function createBeast(opts = {}) {
   const group = new THREE.Group();
-  const skinMat = new THREE.MeshLambertMaterial({ map: skinTexture(), emissive: '#1a1716', emissiveIntensity: 0 });
+  // (la lueur qui l'éclaire dans la pénombre suit la texture de la peau : pas un aplat qui l'efface)
+  const skinTex = skinTexture();
+  const skinMat = new THREE.MeshLambertMaterial({ map: skinTex, emissive: '#fff2ec', emissiveMap: skinTex, emissiveIntensity: 0 });
   const photo = opts.photo ? photoFace(opts.photo.url, opts.photo.crop, new THREE.Texture()) : null;
   const faces = photo ? [photo, photo, photo, photo] : [faceTexture(0.25), faceTexture(1), faceTexture(1.7), faceTexture(2.1, true)];
   const faceMat = new THREE.MeshBasicMaterial({ map: faces[0], transparent: true, alphaTest: photo ? 0.05 : 0.3, color: photo ? '#d8cfc2' : '#cfcac4' });
