@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.86 — 9 novembre 2026
+- **The Backrooms** — au Level 0, une feuille de cahier est scotchée au mur juste à côté de l'arrivée : le mot griffonné d'un survivant passé avant vous, qui dessine l'entité, les cassettes, les trous dans le sol et le faux ascenseur.
+
 ## 4.85 — 9 novembre 2026
 - **The Backrooms** — Un vrai inventaire : quatre cases d'objets à côté de la lampe, à choisir avec les touches 2 à 5 ou la molette.
   - G pose l'objet choisi par terre, juste devant soi : une eau d'amande ou des piles à laisser à un coéquipier, l'échelle à garder pour plus tard. On l'entend tomber.

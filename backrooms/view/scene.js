@@ -1810,6 +1810,29 @@ float bkCaust(vec2 uv, float t) {
       cassetteMeshes.push({ id: cas.id, cas, group: cg });
     }
 
+    // 6. bis Level 0 : la feuille d'un survivant scotchée au mur le plus proche du départ, de préférence celui qu'on a en
+    // face en arrivant (vers -z) ; elle résume les règles du niveau sans sortir du jeu
+    if (L0 && fi === 0 && map.spawn) {
+      let best = null;
+      for (const [dx, dz] of [[0, -1], [1, 0], [-1, 0], [0, 1]]) {
+        for (let k = 1; k <= 6; k++) {
+          const x = map.spawn.gx + dx * k, z = map.spawn.gz + dz * k;
+          if (map.grid[z * W + x] === T.FLOOR) continue;
+          if (map.grid[z * W + x] === T.WALL && !stairSet.has(z * W + x) && (!best || k < best.k)) best = { k, x, z, dx, dz };
+          break;
+        }
+      }
+      if (best) {
+        const tex = new THREE.TextureLoader().load(new URL('../img/note_level0.svg', import.meta.url).href);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = 4;
+        const note = new THREE.Mesh(new THREE.PlaneGeometry(1.35, 1.14), baked(new THREE.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.4 })));
+        note.position.set((best.x + 0.5 - best.dx * 0.5) * CELL_SIZE - best.dx * 0.012, 1.5,(best.z + 0.5 - best.dz * 0.5) * CELL_SIZE - best.dz * 0.012);
+        note.rotation.y = Math.atan2(-best.dx, -best.dz);
+        group.add(note);
+      }
+    }
+
     // 6a. Les casiers métalliques où l'on peut se cacher (Level 1, Tuyauteries)
     if ((map.hides || []).length) {
       const lockMat = baked(new THREE.MeshLambertMaterial({ color: PIPES ? '#6b6253' : '#55615a' }));
