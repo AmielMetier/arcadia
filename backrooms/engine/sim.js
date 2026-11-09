@@ -149,6 +149,7 @@ export const SEEN_R = 26;
 export const L0_AGGRO = 0.8; // Level 0 : son agressivité (1 : celle d'avant) ; ses tricheries et ses traques s'espacent d'autant
 export const FRONT_TAPES = 3; // Level 0 : avant la 3e cassette, elle ne se lance jamais sur quelqu'un qui ne l'a pas vue
 export const BACK_SHARE = 0.3; // ensuite, part des poursuites qui peuvent partir dans le dos
+export const RUSH_WIND = 0.6; // secondes de cri sur place avant de s'élancer, quand on la découvre
 export const SAW_T = 6; // secondes pendant lesquelles on « l'a vue » (elle peut alors se lancer)
 export const CALM_HOLD = 45; // secondes de répit dans un recoin calme, avant que sa lampe grésille
 export const HAUNT_COOLDOWN = 12; // un spectateur ne hante qu'une fois toutes les 12 s
@@ -3588,6 +3589,11 @@ export class BackroomsSim {
     else if (M.mode === 'stalk') M.speed = MONSTER_PATROL_SPEED * 1.15;
     else if (M.mode === 'watch') M.speed = 0;
     else M.speed = MONSTER_PATROL_SPEED * (1 + rage * 0.5) * (calm ? 0.8 : 1);
+    if (M.windT > 0) {
+      M.windT = Math.max(0, M.windT - DT);
+      M.speed = 0;
+      faceTo(M, P.x, P.z, 10);
+    }
     if (calm && M.mode === 'patrol') M.silent = true;
     else if (M.mode === 'patrol' && !calm) M.silent = false;
     // Poolrooms : l'eau la freine aussi (un peu moins que les joueurs)
@@ -4023,9 +4029,16 @@ export class BackroomsSim {
   }
 
   // elle voudrait se lancer, mais sa proie ne l'a pas vue : hors de la vue de tous, elle passe devant elle, postée au
-  // coin d'un couloir, face à l'endroit d'où elle va surgir ; sinon elle se fige, tournée vers elle. Dès qu'on la voit,
-  // elle charge (voir « Jamais plantée sous les yeux de quelqu'un »)
+  // coin d'un couloir, face à l'endroit d'où elle va surgir (ou, sans endroit où aller, elle attend là, tournée vers
+  // elle, sans un bruit). Dès qu'on la regarde, elle crie puis charge
   showFirst(M, P) {
+    // quelqu'un l'a dans son champ (à découvert) : elle ne se fige pas, elle crie et se lance sur lui
+    const V = this.viewerOf(M, SEEN_R);
+    if (V && !this.shelteredAt(V.Q)) {
+      this.rushAt(M, V.Q);
+      if (V.Q !== P) M.target = V.Q.id;
+      return;
+    }
     if (M.mode === 'watch' && M.lurk) return;
     if ((M.showT || 0) > this.time) return;
     M.showT = this.time + 1.5;
@@ -4064,8 +4077,10 @@ export class BackroomsSim {
     M.lurk = false;
     M.ambush = null;
     M.silent = false;
-    M.rushT = 2.4;
-    M.burstT = 2.4;
+    // le cri d'abord (elle reste sur place, tournée vers lui, tout le corps qui tremble), la course ensuite
+    M.windT = RUSH_WIND;
+    M.rushT = 2.4 + RUSH_WIND;
+    M.burstT = 2.4 + RUSH_WIND;
     M.unseenT = 0;
     M.repathT = 0;
     M.lastSeenX = P.x;

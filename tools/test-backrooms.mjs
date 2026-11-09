@@ -392,6 +392,12 @@ test('nez à nez : découverte en face, de près, elle hurle et fonce (même au 
   assert.equal(M.mode, 'chase', 'découverte : elle charge');
   assert.ok(M.rushT > 0, 'en hurlant (charge rapide)');
   assert.ok(sim.events.some((e) => e.type === 'rush'), 'le cri est annoncé');
+  // elle crie d'abord sur place, puis part en courant
+  for (let i = 0; i < 60 && M.windT > 0; i++) {
+    assert.equal(M.speed, 0, 'immobile le temps du cri');
+    sim.step({ yaw, pitch: 0 });
+  }
+  sim.step({ yaw, pitch: 0 });
   assert.ok(M.speed > sim.monsterChaseSpeed, 'plus vite qu\'une poursuite ordinaire');
   sim.map.brightCells = null;
 });

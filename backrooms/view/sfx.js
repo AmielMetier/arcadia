@@ -19,7 +19,7 @@ const SFX = (name) => new URL(`../sfx/${name}.mp3`, import.meta.url).href;
 const range = (dir, base, n) => Array.from({ length: n }, (_, i) => `${dir}/${base}_${i + 1}`);
 // entity : false là où l'entité ne vit pas (ses cris, ses pas, son bourdonnement ne doivent pas y jouer)
 const LEVEL_SFX = {
-  0: { chase: range('level0', 'chase', 29), ambient: range('level0', 'ambiant', 9), death: 'level0/death' },
+  0: { chase: range('level0', 'chase', 29), rush: range('level0', 'chase', 29).slice(3), ambient: range('level0', 'ambiant', 9), death: 'level0/death' },
   1: { chase: range('level1', 'chase', 1), ambient: [], death: null },
   2: null, // Poolrooms : la même entité qu'au Level 1, les mêmes sons (voir levelSfx)
   [PIPES_LEVEL]: { chase: [], ambient: [], death: null, entity: false }, // Tuyauteries : le troupeau, pas l'entité
@@ -1012,6 +1012,7 @@ export class BackroomsSfx {
     const d = ent ? clamp01(danger) : 0;
     if (!ent) voice = false;
     if (voice && !this.voiceGain) this.initVoice();
+    if (ent && !this.rushBufs && (levelSfx(this.roomLevel).rush || []).length) this.rushReady(levelSfx(this.roomLevel).rush);
     // toujours un murmure au loin, de plus en plus fort à mesure qu'elle approche
     if (this.voiceGain && !(t < this.scareUntil)) this.voiceGain.gain.setTargetAtTime(voice ? 0.04 + Math.pow(d, 0.8) * 1.3 : 0.0001, t, 0.1);
     if (voice && d > 0.25) this.caption('[garbled voice]', pos);
@@ -2095,14 +2096,46 @@ export class BackroomsSfx {
   }
 
   // Découverte nez à nez : elle hurle avant de foncer (un cri saturé, un choc grave, l'ambiance qui se tait)
+  // Level 0 : le cri est un des enregistrements de l'entité (les nouveaux cris de la poursuite), sa partie la plus forte
   rush(pos = null) {
     if (!this.unlocked || !this.ctx) return;
     const t = this.ctx.currentTime + 0.02;
     this.duck(0.2, 3);
     this.scareHit(t, 0.45);
+    const list = levelSfx(this.roomLevel).rush || [];
     // le cri vient d'elle : placé là où elle est, avec l'écho du lieu (tout près, il est aussi fort qu'avant)
-    this.scareScream(t + 0.05, this.ent ? 1.1 : 0.9, this.ent ? this.ent.near : null);
+    const dest = this.ent ? this.ent.near : this.out;
+    const buf = this.rushReady(list);
+    if (buf) {
+      const [a, b] = loudPart(buf);
+      const from = Math.max(0, a - 0.05);
+      const len = Math.min(buf.duration - from, Math.max(1.2, Math.min(2.6, b - from + 0.3)));
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(1.5, t + 0.02);
+      g.gain.setValueAtTime(1.5, t + Math.max(0.03, len - 0.3));
+      g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+      src.connect(g).connect(dest);
+      src.start(t, from, len);
+    } else this.scareScream(t + 0.05, this.ent ? 1.1 : 0.9, this.ent ? this.ent.near : null);
     this.caption('[the entity screams]', pos);
+  }
+
+  // un des cris enregistrés déjà chargé (jamais deux fois le même de suite) ; les autres se chargent pour la suite
+  rushReady(list) {
+    if (!list.length) return null;
+    this.rushBufs = this.rushBufs || new Map();
+    for (const n of list) {
+      if (this.rushBufs.has(n)) continue;
+      this.rushBufs.set(n, null);
+      this.sample(n).then((b) => this.rushBufs.set(n, b || null));
+    }
+    const ok = list.filter((n) => this.rushBufs.get(n) && n !== this.lastRush);
+    if (!ok.length) return null;
+    this.lastRush = ok[Math.floor(Math.random() * ok.length)];
+    return this.rushBufs.get(this.lastRush);
   }
 
   // L'entité vient de repérer le joueur : un coup très grave et deux cordes qui frottent à un demi-ton d'écart
