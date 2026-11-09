@@ -288,6 +288,19 @@ function toggleCam() {
 const CAM_ZOOM_MIN = 1.5;
 const CAM_ZOOM_MAX = 12;
 let camZoom = CAM_ZOOM_MIN;
+// Pavé tactile quand la souris n'est pas verrouillée (mode « sans souris », iPad, où le verrou n'existe pas) : le
+// défilement à deux doigts sert à regarder. Une molette crantée (lignes, ou grands pas entiers sans défilement de côté)
+// garde le choix des cases, sauf en mode sans souris où tout défilement vient du pavé.
+const PAD_K = 1.4;
+function padLook(e) {
+  if (isPointerLocked) return false;
+  if (kbMode) return true;
+  if (e.deltaMode !== 0) return false;
+  if (!document.body.classList.contains('touch')) return false;
+  return !(e.deltaX === 0 && Math.abs(e.deltaY) >= 100 && Number.isInteger(e.deltaY));
+}
+// Safari (macOS, iPad) : le pincement au pavé ne zoome pas la page
+for (const ev of ['gesturestart', 'gesturechange']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
 let wheelAcc = 0; // molette sans caméscope : le défilement accumulé vers la case suivante
 let wheelT = 0; // et le dernier changement de case (un lancer de pavé tactile ne fait pas défiler toutes les cases)
 window.addEventListener(
@@ -295,7 +308,16 @@ window.addEventListener(
   (e) => {
     if (paused || !sim || sim.player.status !== 'alive') return;
     e.preventDefault();
-    const d = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+    // pavé tactile sans souris verrouillée (mode sans souris, iPad) : glisser à deux doigts tourne la vue comme on
+    // déplacerait la souris (doigts vers la gauche, vue vers la gauche) ; pincer (ctrlKey) zoome le caméscope
+    if (padLook(e) && !e.ctrlKey) {
+      const k = PAD_K * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+      mouseDx -= e.deltaX * k;
+      mouseDy -= e.deltaY * k;
+      return;
+    }
+    if (e.ctrlKey && !camOn) return;
+    const d = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1) * (e.ctrlKey ? 4 : 1);
     // caméscope rangé : la molette passe d'une case d'objet à l'autre (un cran, ou 60 px de pavé tactile, par case)
     if (!camOn) {
       wheelAcc = Math.sign(d) !== Math.sign(wheelAcc) ? d : wheelAcc + d;
@@ -401,9 +423,16 @@ for (const b of touchBtns.querySelectorAll('button')) {
   b.addEventListener('pointerleave', up);
   b.addEventListener('pointercancel', up);
 }
+// sans verrou (mode sans souris, iPad avec pavé tactile ou souris, aperçu sans permission) : cliquer-glisser regarde
+let lookDrag = null;
 stageEl.addEventListener('pointerdown', (e) => {
   if (sim && sim.player.grabT > 0 && !paused) act.struggle++;
-  if (e.pointerType !== 'touch') return;
+  if (e.pointerType !== 'touch') {
+    lookDrag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    // sur tablette, un clic au pavé tactile reprend la partie comme un toucher
+    if (paused && document.body.classList.contains('touch')) play();
+    return;
+  }
   document.body.classList.add('touch');
   if (sfx) sfx.unlock();
   if (paused) setPaused(false);
@@ -434,7 +463,18 @@ stageEl.addEventListener('pointermove', (e) => {
     l.y = e.clientY;
   }
 });
+window.addEventListener('pointermove', (e) => {
+  const g = lookDrag;
+  if (!g || g.id !== e.pointerId) return;
+  if (!paused && !isPointerLocked && !touch.look && e.buttons & 1) {
+    mouseDx += e.clientX - g.x;
+    mouseDy += e.clientY - g.y;
+  }
+  g.x = e.clientX;
+  g.y = e.clientY;
+});
 const touchEnd = (e) => {
+  if (lookDrag && lookDrag.id === e.pointerId) lookDrag = null;
   if (touch.move && touch.move.id === e.pointerId) {
     touch.move = null;
     stick.hidden = true;
@@ -462,7 +502,7 @@ document.addEventListener('pointerlockchange', () => {
 });
 
 document.addEventListener('mousemove', (e) => {
-  if ((isPointerLocked || (noLock && !paused && e.buttons & 1)) && !kbMode && !touch.look) {
+  if (isPointerLocked && !kbMode && !touch.look) {
     mouseDx += e.movementX || 0;
     mouseDy += e.movementY || 0;
   }

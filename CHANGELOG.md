@@ -1,5 +1,17 @@
 # Journal des versions — Arcadia
 
+## 4.98 — 9 novembre 2026
+- **Odyssée** — Pokémon sauvages refaits badge par badge :
+  - Chaque route, forêt, grotte ou mer a désormais les Pokémon que les jeux officiels, de Rouge à X / Y, font rencontrer au même moment de l'aventure, entre les mêmes badges et dans le même genre de lieu.
+  - Les îles, volcans, tours, grottes marines et lieux glacés reprennent les Pokémon des lieux officiels de même ambiance.
+  - Les Pokémon les plus forts en combat sont plus rares, et un Pokémon arrive évolué si la zone est d'un niveau assez haut.
+  - Les Terres du Sud accueillent les Pokémon d'après la Ligue des jeux officiels : les moins forts près de Métropole, les plus redoutables vers Ombreval.
+
+## 4.97 — 9 novembre 2026
+- **The Backrooms** — La caméra se tourne au pavé tactile, sans souris (iPad compris) : glisser à deux doigts pour regarder autour de soi, ou cliquer-glisser.
+  - En mode « Sans souris », le pavé tactile s'ajoute aux flèches ; pincer zoome le caméscope.
+  - Sur tablette, un clic au pavé tactile ne fait plus apparaître le joystick de marche et reprend la partie mise en pause.
+
 ## 4.96 — 9 novembre 2026
 - **The Backrooms** — Nouveau bruitage de course : le souffle enregistré, qui grésillait en boucle, laisse place à une vraie respiration (inspiration, expiration) plus douce, qui s'accélère à mesure que tu t'essouffles.
 
