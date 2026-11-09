@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.24 — 9 novembre 2026
+- **The Backrooms** — Plus d'ombre en dents de scie sur la moquette au pied des murs en biais du Level 0 : la lumière s'y pose bien à plat.
+
 ## 5.23 — 9 novembre 2026
 - **Hub** — Nouvelle catégorie « Gros jeux » : The Backrooms et Odyssée, des jeux bien plus complets, ont leur rangée à part en haut de l'accueil, avec leurs boutons pour jouer, et passent en tête dans le salon.
 - **Hub** — L'écran de chargement d'un jeu ne défile plus : tout tient dans l'écran, sur ordinateur comme sur téléphone, même tenu à l'horizontale.
