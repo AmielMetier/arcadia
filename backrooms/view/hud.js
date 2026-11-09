@@ -57,11 +57,11 @@ export { store };
 // Un par objet ramassé, dans un ordre qui dépend de la graine ; ceux qu'on a lus restent dans la collection.
 export const NOTES = {
   1: { tag: 'SCRAWLED NOTE', list: [
-    "I took the stairs down because he never takes the stairs. I didn't stop counting until the numbers ran out.",
-    "Nobody knows I'm here. That was the point.",
-    'I keep the lights off so I can hear footsteps first. I always hear them first now.',
+    "Daesh Daesh Daesh.... My mission kill all white",
+    "Nobody knows I'm here. Allah Akbar",
+    'I keep the lights off so I can hear footsteps first. And I can cut the throat of the european people',
     "I'm not afraid anymore. I don't remember what that felt like. I just remember the hiding.",
-    "If you're down here running from someone, I understand. But don't come closer. I can't tell the difference anymore.",
+    "If you don't love islam, just died.",
   ] },
   2: { tag: 'CARVED TILE', list: [
     'Before the water, there were only equations. St Didier Auroux wrote them down, and the water began to flow.',
