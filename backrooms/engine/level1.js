@@ -17,6 +17,20 @@ export const DOCK_BTN = 0.9; // le boîtier de commande, de chaque côté du rid
 export const DUCT_Y = LEVEL1_CEIL - 0.62;
 export const DUCT_LOW = DUCT_Y - 0.26 * 0.78;
 export const DUCT_W = 0.66; // largeur d'une gaine
+// le poste de garde : une pièce fermée de cloisons de parpaings (épaisseur GUARD_T), jusqu'au plafond ; sa porte
+// (GUARD_DOOR de large) s'ouvre quand quelqu'un arrive devant
+export const GUARD_T = 0.2;
+export const GUARD_DOOR = 1.2; // (une porte large : on y passe à deux, l'entité aussi)
+export const GUARD_DOOR_H = 2.1; // au-dessus, l'imposte de parpaings
+export const GUARD_NEAR = 1.7; // à moins de ça du milieu de la porte, elle s'ouvre
+
+// la porte du poste de garde doit-elle être ouverte ? (quelqu'un de vivant, ou l'entité, tout près ; bodies : des
+// { x, z }) ; le moteur et la vue tranchent de la même façon
+export function guardDoorWant(door, bodies) {
+  if (!door) return false;
+  for (const b of bodies) if (b && Math.hypot(b.x - door.x, b.z - door.z) < GUARD_NEAR) return true;
+  return false;
+}
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 // caisses et matériel abandonnés dans les allées (modèles Poly Haven, CC0) : nom, hauteur, rayon de collision ;
@@ -305,30 +319,172 @@ export function createWarehouseMap(seed = 7) {
     }
   }
 
-  // 8a. Le poste de garde : un bureau métallique contre un mur, pas loin de l'arrivée, ses trois moniteurs reliés aux
-  // caméras de l'entrepôt et le fauteuil devant. Assis (F), on ne bouge plus : on regarde les écrans
+  // 8a. Le poste de garde : une petite pièce de 5 m sur 5 (quatre cases) adossée à un mur, pas loin de l'arrivée,
+  // fermée de cloisons de parpaings jusqu'au plafond ; on y entre par une porte, qui s'ouvre quand on la pousse.
+  // Dedans, un bureau métallique contre le mur, ses trois moniteurs reliés aux caméras de l'entrepôt et le fauteuil
+  // devant. Assis (F), on ne bouge plus : on regarde les écrans. L'entité n'y entre que par la porte, ne voit pas à
+  // travers les cloisons, et la lumière des néons s'y arrête
   let post = null;
+  const roomCells = new Set();
+  const segs = []; // les cloisons : { x0, z0, x1, z1 } (sur le bord des cases)
+  let door = null;
+  // les distances (en cases) depuis k0, en ne passant la cloison que par la porte (kIn, kOut : ses deux cases)
+  const reach = (k0, inRoom, kIn, kOut) => {
+    const dd = new Int16Array(W * H).fill(-1);
+    const q = [k0];
+    dd[k0] = 0;
+    for (let h = 0; h < q.length; h++) {
+      const k = q[h];
+      const x = k % W;
+      const z = (k - x) / W;
+      for (const [ex, ez] of DIRS) {
+        const nx = x + ex;
+        const nz = z + ez;
+        if (nx < 0 || nz < 0 || nx >= W || nz >= H) continue;
+        const nk = nz * W + nx;
+        if (dd[nk] >= 0 || blocks(grid[nk])) continue;
+        if (inRoom && inRoom.has(k) !== inRoom.has(nk) && !((k === kIn && nk === kOut) || (k === kOut && nk === kIn))) continue;
+        dd[nk] = dd[k] + 1;
+        q.push(nk);
+      }
+    }
+    return dd;
+  };
+  // la pièce ne doit rien couper ni allonger les trajets de plus de quelques pas (qu'elle ne bouche pas une allée) :
+  // mesuré depuis le départ, le monte-charge et quelques cases réparties dans l'entrepôt
+  const probes = [sz * W + sx, exitCell.z * W + exitCell.x, ...[1, 2, 3, 4, 5, 6].map((i) => {
+    const c = walkable[Math.floor((i * walkable.length) / 7)];
+    return c.z * W + c.x;
+  })];
+  const base0 = probes.map((k) => reach(k, null));
+  const keeps = (inRoom, kIn, kOut, slack) =>
+    probes.every((k0, i) => {
+      if (inRoom.has(k0)) return false;
+      const dd = reach(k0, inRoom, kIn, kOut);
+      const d0 = base0[i];
+      for (let k = 0; k < W * H; k++) {
+        if (d0[k] < 0 || inRoom.has(k)) continue;
+        if (dd[k] < 0 || dd[k] - d0[k] > slack) return false;
+      }
+      return true;
+    });
+  const roomFree = (x, z) => get(x, z) === T.FLOOR && !busy.has(z * W + x) && dockAt[z * W + x] < 0 && !lifts.has(z * W + x);
   // (le plus près possible de l'arrivée, à quelques pas près)
-  for (const f of faces.map((f) => ({ f, k: D(f.c) + rnd() * 6 })).sort((p, q) => p.k - q.k).map((o) => o.f)) {
+  // (au besoin, plus loin de l'arrivée, puis un détour un peu plus long)
+  const order = faces.map((f) => ({ f, k: D(f.c) + rnd() * 6 })).sort((p, q) => p.k - q.k).map((o) => o.f);
+  search: for (const [far, slack] of [[24, 3], [40, 3], [40, 6], [99, 10]])
+  for (const f of order) {
     const { c, dx, dz } = f;
     const d = D(c);
-    if (d < 4 || d > 24 || busy.has(c.z * W + c.x)) continue;
-    // de quoi passer devant le fauteuil, et pas dans un cul-de-sac
-    const open = (x, z) => get(x, z) === T.FLOOR && !busy.has(z * W + x);
-    if (!open(c.x - dx, c.z - dz) || (!open(c.x + dz, c.z + dx) && !open(c.x - dz, c.z - dx))) continue;
+    if (d < 4 || d > far) continue;
     if (Math.hypot(f.x - spawn.x, f.z - spawn.z) < 5) continue;
-    const ry = Math.atan2(-dx, -dz); // le bureau tourne le dos au mur
-    const seat = { x: f.x - dx * 1.35, z: f.z - dz * 1.35, yaw: Math.atan2(-dx, -dz) }; // assis, on regarde le mur (le regard va vers -sin, -cos)
-    post = { x: f.x - dx * 0.5, z: f.z - dz * 0.5, dx, dz, ry, gx: c.x, gz: c.z, seat, front: { x: f.x - dx * 2.1, z: f.z - dz * 2.1 }, by: -1 };
-    const tx = dz;
-    const tz = dx;
-    props.push({ m: 'metal_office_desk', h: 0.79, r: 0.45, x: post.x, z: post.z, rot: ry, tipped: false, post: true });
-    for (const o of [-0.58, 0.58]) props.push({ m: null, ghost: true, h: 0, r: 0.42, x: post.x + tx * o, z: post.z + tz * o, rot: 0 });
-    for (const [i, o] of [[0, -0.62], [1, 0], [2, 0.62]]) props.push({ m: 'Television_01', h: 0.46, r: 0.3, walk: true, y: 0.79, x: f.x - dx * 0.36 + tx * o, z: f.z - dz * 0.36 + tz * o, rot: ry + (i - 1) * -0.18 * (dx + dz > 0 ? 1 : -1), tipped: false, screen: i });
-    props.push({ m: 'modern_arm_chair_01', h: 1.0, r: 0.28, x: seat.x, z: seat.z, rot: Math.atan2(dx, dz), tipped: false, post: true });
-    for (const [x, z] of [[c.x, c.z], [c.x - dx, c.z - dz], [c.x + dz, c.z + dx], [c.x - dz, c.z - dx]]) busy.add(z * W + x);
-    break;
+    // la pièce s'étend d'un côté ou de l'autre le long du mur (t)
+    for (const sgn of [1, -1]) {
+      const tx = dz * sgn;
+      const tz = dx * sgn;
+      const cells = [[c.x, c.z], [c.x + tx, c.z + tz], [c.x - dx, c.z - dz], [c.x - dx + tx, c.z - dz + tz]];
+      if (!cells.every(([x, z]) => roomFree(x, z))) continue;
+      // le mur du fond, plein sur les deux cases
+      if (get(c.x + dx, c.z + dz) !== T.WALL || get(c.x + tx + dx, c.z + tz + dz) !== T.WALL) continue;
+      if (lifts.has((c.z + dz) * W + c.x + dx) || lifts.has((c.z + tz + dz) * W + c.x + tx + dx)) continue;
+      // la porte : devant la case du coin, ou sur son côté ; il faut une case libre devant
+      const [bx, bz] = cells[3];
+      const opts = [[bx - dx, bz - dz, -dx, -dz], [bx + tx, bz + tz, tx, tz]].filter(([x, z]) => roomFree(x, z));
+      for (const [ox, oz, nx, nz] of opts) {
+        const inRoom = new Set(cells.map(([x, z]) => z * W + x));
+        const kIn = bz * W + bx;
+        const kOut = oz * W + ox;
+        if (!keeps(inRoom, kIn, kOut, slack)) continue;
+        // les cloisons : sur chaque bord de la pièce qui ne donne pas sur un mur (le mur du fond est déjà là). Jamais
+        // contre un rayonnage (elle passerait dans ses montants), ni contre un quai ou un ascenseur
+        const xs = cells.map(([x]) => x);
+        const zs = cells.map(([, z]) => z);
+        const X0 = Math.min(...xs) * C;
+        const X1 = (Math.max(...xs) + 1) * C;
+        const Z0 = Math.min(...zs) * C;
+        const Z1 = (Math.max(...zs) + 1) * C;
+        // le milieu de la porte, sur le bord de la case du coin
+        const dmx = (bx + 0.5) * C + nx * (C / 2);
+        const dmz = (bz + 0.5) * C + nz * (C / 2);
+        const pieces = [];
+        let bad = false;
+        for (const [x, z] of cells) {
+          for (const [ex, ez] of DIRS) {
+            if (inRoom.has((z + ez) * W + x + ex)) continue;
+            const k2 = (z + ez) * W + x + ex;
+            const t2 = get(x + ex, z + ez);
+            if (t2 === T.WALL) continue;
+            if (t2 !== T.FLOOR || dockAt[k2] >= 0 || lifts.has(k2)) bad = true;
+            // le bord de la case, dans le sens des x croissants ou des z croissants
+            const lx = (x + 0.5) * C + ex * (C / 2);
+            const lz = (z + 0.5) * C + ez * (C / 2);
+            const h = C / 2;
+            const sg = ex ? { x0: lx, z0: lz - h, x1: lx, z1: lz + h } : { x0: lx - h, z0: lz, x1: lx + h, z1: lz };
+            if (x === bx && z === bz && ex === nx && ez === nz) {
+              // le bord de la porte : deux pans, de part et d'autre de la baie
+              const g = GUARD_DOOR / 2;
+              if (ex) pieces.push({ ...sg, z1: dmz - g }, { ...sg, z0: dmz + g });
+              else pieces.push({ ...sg, x1: dmx - g }, { ...sg, x0: dmx + g });
+            } else pieces.push(sg);
+          }
+        }
+        if (bad) continue;
+        // les morceaux bout à bout sur une même ligne n'en font qu'un
+        pieces.sort((p, q) => p.x0 - q.x0 || p.z0 - q.z0);
+        const merged = [];
+        for (const q of pieces) {
+          const m = merged.find((o) => (q.x0 === q.x1 ? o.x0 === o.x1 && o.x0 === q.x0 && Math.abs(o.z1 - q.z0) < 1e-6 : o.z0 === o.z1 && o.z0 === q.z0 && Math.abs(o.x1 - q.x0) < 1e-6));
+          if (m) {
+            m.x1 = q.x1;
+            m.z1 = q.z1;
+          } else merged.push({ ...q });
+        }
+        segs.push(...merged);
+        // la porte : dans la baie, sa normale vers le dehors ; elle s'ouvre vers l'intérieur
+        door = { x: dmx, z: dmz, nx, nz, w: GUARD_DOOR, h: GUARD_DOOR_H, open: false };
+        for (const k of inRoom) roomCells.add(k);
+        const ry = Math.atan2(-dx, -dz); // le bureau tourne le dos au mur
+        const seat = { x: f.x - dx * 1.35, z: f.z - dz * 1.35, yaw: Math.atan2(-dx, -dz) }; // assis, on regarde le mur (le regard va vers -sin, -cos)
+        post = { x: f.x - dx * 0.5, z: f.z - dz * 0.5, dx, dz, ry, gx: c.x, gz: c.z, seat, front: { x: f.x - dx * 2.1, z: f.z - dz * 2.1 }, by: -1, room: { x0: X0, z0: Z0, x1: X1, z1: Z1, tx, tz }, door };
+        const ttx = dz;
+        const ttz = dx;
+        props.push({ m: 'metal_office_desk', h: 0.79, r: 0.45, x: post.x, z: post.z, rot: ry, tipped: false, post: true });
+        for (const o of [-0.58, 0.58]) props.push({ m: null, ghost: true, h: 0, r: 0.42, x: post.x + ttx * o, z: post.z + ttz * o, rot: 0 });
+        for (const [i, o] of [[0, -0.62], [1, 0], [2, 0.62]]) props.push({ m: 'Television_01', h: 0.46, r: 0.3, walk: true, y: 0.79, x: f.x - dx * 0.36 + ttx * o, z: f.z - dz * 0.36 + ttz * o, rot: ry + (i - 1) * -0.18 * (dx + dz > 0 ? 1 : -1), tipped: false, screen: i });
+        props.push({ m: 'modern_arm_chair_01', h: 1.0, r: 0.28, x: seat.x, z: seat.z, rot: Math.atan2(dx, dz), tipped: false, post: true });
+        for (const k of inRoom) busy.add(k);
+        busy.add(kOut);
+        // une réglette au plafond de la pièce (celles de l'entrepôt restent dehors)
+        if (!lights.some((l) => inRoom.has(l.gz * W + l.gx))) {
+          const lx = (X0 + X1) / 2;
+          const lz = (Z0 + Z1) / 2;
+          lights.push({ x: lx, y: LEVEL1_CEIL - 0.02, z: lz, gx: Math.floor(lx / C), gz: Math.floor(lz / C), state: 'on', flicker: false });
+        }
+        break search;
+      }
+    }
   }
+  // (les cloisons : 20 cm de parpaings, de part et d'autre de leur axe)
+  const segDist = (sg, x, z) => {
+    const ex = sg.x1 - sg.x0;
+    const ez = sg.z1 - sg.z0;
+    const L2 = ex * ex + ez * ez || 1;
+    const u = Math.max(0, Math.min(1, ((x - sg.x0) * ex + (z - sg.z0) * ez) / L2));
+    return Math.hypot(x - sg.x0 - ex * u, z - sg.z0 - ez * u);
+  };
+  const crosses = (ax, az, bx, bz, sg) => {
+    const d1x = bx - ax;
+    const d1z = bz - az;
+    const d2x = sg.x1 - sg.x0;
+    const d2z = sg.z1 - sg.z0;
+    const den = d1x * d2z - d1z * d2x;
+    if (Math.abs(den) < 1e-9) return false;
+    const t = ((sg.x0 - ax) * d2z - (sg.z0 - az) * d2x) / den;
+    const u = ((sg.x0 - ax) * d1z - (sg.z0 - az) * d1x) / den;
+    return t > 0 && t < 1 && u >= 0 && u <= 1;
+  };
+  // la porte fermée, comme une cloison de plus (pour la vue et le son ; on la traverse toujours : elle s'ouvre)
+  const doorSeg = door ? (door.nx ? { x0: door.x, z0: door.z - door.w / 2, x1: door.x, z1: door.z + door.w / 2 } : { x0: door.x - door.w / 2, z0: door.z, x1: door.x + door.w / 2, z1: door.z }) : null;
 
   // 8b. Les déclencheurs manuels d'alarme incendie : sur les murs, loin les uns des autres. Brisé, le boîtier fait
   // sonner la cloche au-dessus pendant une vingtaine de secondes : l'entité y court (une seule fois chacun)
@@ -431,7 +587,7 @@ export function createWarehouseMap(seed = 7) {
   }
 
   // 10. Entité : loin du départ
-  const monsterCell = pick(walkable.filter((c) => D(c) > maxD * 0.55)) || walkable[walkable.length - 1];
+  const monsterCell = pick(walkable.filter((c) => D(c) > maxD * 0.55 && !roomCells.has(c.z * W + c.x))) || walkable[walkable.length - 1];
 
   return {
     level: 1,
@@ -462,6 +618,32 @@ export function createWarehouseMap(seed = 7) {
     shelves,
     dist,
     monsterSpawn: cellPos(monsterCell),
+    segs,
+    guardDoor: door,
+    // les cloisons du poste de garde arrêtent les joueurs et l'entité (le moteur connaît déjà les murs de la grille)
+    collide(x, z, rad) {
+      for (const sg of segs) {
+        if (x < Math.min(sg.x0, sg.x1) - rad - 0.2 || x > Math.max(sg.x0, sg.x1) + rad + 0.2) continue;
+        if (z < Math.min(sg.z0, sg.z1) - rad - 0.2 || z > Math.max(sg.z0, sg.z1) + rad + 0.2) continue;
+        if (segDist(sg, x, z) < GUARD_T / 2 + rad) return true;
+      }
+      return false;
+    },
+    // la lumière d'une lampe en (lx, lz) atteint-elle (px, pz) sans traverser de cloison (ni la porte fermée) ? Sert
+    // aussi à la vue de l'entité et au bruit étouffé
+    lightBlocked: segs.length
+      ? (ax, az, bx, bz) => segs.some((sg) => crosses(ax, az, bx, bz, sg)) || (!!doorSeg && !door.open && crosses(ax, az, bx, bz, doorSeg))
+      : null,
+    // d'une case à l'autre (chemins de l'entité) : on n'entre au poste et on n'en sort que par la porte
+    canStep: segs.length
+      ? (gx, gz, nx, nz) => {
+          const a = roomCells.has(gz * W + gx);
+          if (a === roomCells.has(nz * W + nx)) return true;
+          const mx = (Math.max(gx, nx) + (gx === nx ? 0.5 : 0)) * C;
+          const mz = (Math.max(gz, nz) + (gz === nz ? 0.5 : 0)) * C;
+          return Math.hypot(mx - door.x, mz - door.z) < 0.6;
+        }
+      : null,
     // un quai : mur tant que son rideau est baissé (au-dessous de DOCK_PASS) ; sa vraie forme est une tôle mince
     isWall(gx, gz) {
       if (gx < 0 || gx >= W || gz < 0 || gz >= H) return true;
@@ -487,7 +669,7 @@ export function createWarehouseMap(seed = 7) {
       return d >= 0 ? docks[d] : null;
     },
     isWalkableWorld(wx, wz) {
-      return !this.isWall(Math.floor(wx / CELL_SIZE), Math.floor(wz / CELL_SIZE));
+      return !this.isWall(Math.floor(wx / CELL_SIZE), Math.floor(wz / CELL_SIZE)) && !this.collide(wx, wz, 0.05);
     },
     // cases d'embuscade : au bout ou le long d'une rangée d'étagères
     isShelfSide(gx, gz) {

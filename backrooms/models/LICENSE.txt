@@ -47,10 +47,17 @@ Projecteurs de chantier, cônes, rubalise et dessins muraux : dessinés dans le 
 Level 1 : rayonnages, palettes, cartons, fûts, sacs, bacs, tuyaux, gaines, panneaux et marquages au sol dessinés dans
 le code (backrooms/view/warehouse.js) ; bois des palettes : kart/tex/planks.jpg (Poly Haven, CC0).
 
-Explorateurs (les autres joueurs) : hazmat.glb, Quaternius « Character Hazmat » (CC0), https://poly.pizza/m/z3TSQYx1Kn ,
-sans les armes du modèle d'origine.
-Le squelette et les animations de hazmat.glb servent aussi à l'entité en 3D (mode normal), dont le corps et le visage
-sont dessinés dans le code (backrooms/view/beast.js).
+Explorateurs (les autres joueurs) : hazmat_suit.glb, « Hazmat Suit » par Cj.savage
+(https://sketchfab.com/Cj.savage), https://sketchfab.com/3d-models/hazmat-suit-2819a9b345fb44958fc025fb52610526 ,
+sous licence Creative Commons Attribution 4.0 (CC BY 4.0, http://creativecommons.org/licenses/by/4.0/).
+Modifications (tools/rig-hazmat.mjs) : mis à l'échelle, squelette (doigts compris) et poids ajoutés ; triangles de
+contact entre les bras et le corps retirés, trous refermés (pièces lissées sur les gants) ; bout des manches lissé ;
+texture agrandie en 4096, repeinte en jaune sous les bras et au bas des manches, gants débarrassés des taches jaunes ;
+bottes assombries au rendu. Maillage d'origine conservé, sans simplification.
+
+hazmat.glb, Quaternius « Character Hazmat » (CC0), https://poly.pizza/m/z3TSQYx1Kn , sans les armes du modèle
+d'origine : son squelette et ses animations servent à l'entité en 3D (mode normal), dont le corps et le visage sont
+dessinés dans le code (backrooms/view/beast.js).
 
 Le hall du Terror Hotel (Level 5), Poly Haven, CC0 (glTF 1k compacté en .glb, seule la texture de couleur, JPEG 512 px) :
   Chandelier_01.glb  https://polyhaven.com/a/Chandelier_01

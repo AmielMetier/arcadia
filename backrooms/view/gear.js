@@ -1,10 +1,11 @@
 // The Backrooms (Level 1) - Le matériel du jeu qui bouge : les rideaux des quais du mur coupe-feu (ils montent,
 // redescendent, se cabossent et cèdent sous les coups de l'entité), les cloches d'alarme incendie et leurs flashs, les
-// grilles des bouches de gaine (elles tombent quand l'entité passe), les écrans du poste de garde et la diode rouge de
-// la caméra regardée. Rideaux et grilles sont des modèles Poly Haven (CC0) de backrooms/models/, déjà dans le décor.
+// grilles des bouches de gaine (elles tombent quand l'entité passe), la pièce du poste de garde (cloisons de
+// parpaings, huisserie d'acier, la porte qui s'ouvre devant qui arrive), ses écrans et la diode rouge de la caméra
+// regardée. Rideaux et grilles sont des modèles Poly Haven (CC0) de backrooms/models/, déjà dans le décor.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL_SIZE } from '../engine/map.js';
-import { DOCK_H, DUCT_LOW } from '../engine/level1.js';
+import { DOCK_H, DUCT_LOW, GUARD_T } from '../engine/level1.js';
 import { loadKit } from './kit.js';
 
 const C = CELL_SIZE;
@@ -23,7 +24,91 @@ function canvasTex(w, h, draw, repeat = false) {
   return t;
 }
 
-// un disque doux (halo d'une lampe, nuage de poussière)
+// le battant de la porte du poste : de la tôle peinte gris-vert au rouleau (des traînées verticales à peine visibles),
+// usée autour de la poignée et au pied, la plaque de propreté d'inox brossé en bas ; u : la largeur, v : la hauteur
+const doorTex = () =>
+  canvasTex(256, 512, (g, w, h) => {
+    let sd = 7;
+    const r = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+    g.fillStyle = '#6f7a72';
+    g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 260; i++) {
+      g.fillStyle = `rgba(${r() < 0.5 ? '255,255,255' : '0,0,0'},${0.012 + r() * 0.02})`;
+      g.fillRect(r() * w, r() * h, 1 + r() * 3, 30 + r() * 160);
+    }
+    // la crasse : plus sombre en bas (les coups de pied, l'eau du sol), des mains autour de la poignée (des deux côtés)
+    const foot = g.createLinearGradient(0, h, 0, h * 0.72);
+    foot.addColorStop(0, 'rgba(40,34,24,0.45)');
+    foot.addColorStop(1, 'rgba(40,34,24,0)');
+    g.fillStyle = foot;
+    g.fillRect(0, h * 0.72, w, h * 0.28);
+    for (const x of [w * 0.12, w * 0.88]) {
+      const hand = g.createRadialGradient(x, h * 0.5, 2, x, h * 0.5, 46);
+      hand.addColorStop(0, 'rgba(30,26,20,0.32)');
+      hand.addColorStop(1, 'rgba(30,26,20,0)');
+      g.fillStyle = hand;
+      g.fillRect(x - 50, h * 0.5 - 50, 100, 100);
+    }
+    // des éraflures jusqu'au métal, des éclats de peinture
+    for (let i = 0; i < 70; i++) {
+      const x = r() * w;
+      const y = h * (0.45 + r() * 0.5);
+      g.strokeStyle = `rgba(${150 + r() * 40},${150 + r() * 40},${145 + r() * 40},${0.18 + r() * 0.3})`;
+      g.lineWidth = 0.6 + r();
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(x + (r() - 0.5) * 30, y + (r() - 0.5) * 6);
+      g.stroke();
+    }
+    // la plaque de propreté (25 cm sur 2,07 m), vissée
+    const ky = h * (1 - 0.25 / 2.07);
+    const kick = g.createLinearGradient(0, ky, 0, h);
+    kick.addColorStop(0, '#a7aaa6');
+    kick.addColorStop(1, '#8a8c88');
+    g.fillStyle = kick;
+    g.fillRect(4, ky, w - 8, h - ky - 3);
+    for (let i = 0; i < 90; i++) {
+      g.fillStyle = `rgba(255,255,255,${0.04 + r() * 0.06})`;
+      g.fillRect(4 + r() * (w - 8), ky + r() * (h - ky), 20 + r() * 60, 1);
+    }
+    g.fillStyle = 'rgba(30,30,28,0.5)';
+    g.fillRect(4, ky, w - 8, 1.5);
+    for (const x of [12, w / 2, w - 12]) {
+      g.beginPath();
+      g.arc(x, ky + 7, 2, 0, Math.PI * 2);
+      g.fill();
+    }
+  });
+
+// la plaque vissée sur la porte, côté entrepôt
+const securitySign = () =>
+  canvasTex(256, 160, (g, w, h) => {
+    g.fillStyle = '#e9e4d6';
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = '#1d4f9a';
+    g.fillRect(0, 0, w, 58);
+    g.fillStyle = '#f4f1e8';
+    g.font = 'bold 40px Arial, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('SECURITY', w / 2, 31);
+    g.fillStyle = '#1d1d1b';
+    g.font = 'bold 21px Arial, sans-serif';
+    g.fillText('AUTHORIZED', w / 2, 86);
+    g.fillText('PERSONNEL ONLY', w / 2, 114);
+    g.font = '14px Arial, sans-serif';
+    g.fillText('KEEP DOOR CLOSED', w / 2, 142);
+    // l'usure : des coulures, les coins jaunis
+    for (let i = 0; i < 40; i++) {
+      g.fillStyle = `rgba(110,90,40,${0.03 + Math.random() * 0.05})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 14, 2 + Math.random() * 30);
+    }
+    g.strokeStyle = 'rgba(40,40,40,0.6)';
+    g.lineWidth = 3;
+    g.strokeRect(1.5, 1.5, w - 3, h - 3);
+  });
+
+// un disque doux (nuage de poussière)
 const softDisc = () =>
   canvasTex(64, 64, (g) => {
     const r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
@@ -205,11 +290,6 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
   const disc = softDisc();
   const hazard = hazardTex();
   const slats = (map.docks || []).length ? shutterTex() : null;
-  const halo = (color, size, opacity = 1, additive = true) => {
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: disc, color, transparent: true, opacity, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending }));
-    s.scale.setScalar(size);
-    return s;
-  };
   const lambert = (o) => baked(new THREE.MeshLambertMaterial(o));
   // les matières des modèles, éclairées comme le reste de l'entrepôt
   const kitMats = new Map();
@@ -276,14 +356,13 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
       const domeMat = new THREE.MeshBasicMaterial({ color: '#5a2a08' });
       const dome = new THREE.Mesh(new THREE.SphereGeometry(0.06, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), domeMat);
       dome.position.set(bx, DOCK_H + 0.295, s * (C / 2 + 0.07));
-      // (l'éblouissement reste plus loin du linteau que son rayon : le mur ne le coupe pas)
-      const shine = halo('#ff8a1e', 0.5, 0);
-      shine.position.set(bx, DOCK_H + 0.31, s * (C / 2 + 0.26));
-      g.add(base, dome, shine);
+      // (pas de disque d'éblouissement collé devant : le dôme lui-même devient plus lumineux que ce que l'écran peut
+      // montrer, et c'est le caméscope qui en fait le halo ; la lumière dans l'air, c'est la poussière qui la renvoie)
+      g.add(base, dome);
       // sa place dans le monde (le quai est tourné d'un quart de tour quand il est dans un mur nord-sud)
       const ry = d.vert ? Math.PI / 2 : 0;
       const lz = s * (C / 2 + 0.12);
-      beacons.push({ domeMat, shine, x: d.x + bx * Math.cos(ry) + lz * Math.sin(ry), y: DOCK_H + 0.31, z: d.z - bx * Math.sin(ry) + lz * Math.cos(ry), ph: s > 0 ? 0 : 2.1, k: 0, a: 0 });
+      beacons.push({ domeMat, x: d.x + bx * Math.cos(ry) + lz * Math.sin(ry), y: DOCK_H + 0.31, z: d.z - bx * Math.sin(ry) + lz * Math.cos(ry), ph: s > 0 ? 0 : 2.1, k: 0, a: 0 });
     }
     // les bandes au sol, sous le rideau
     const floorStripe = new THREE.Mesh(new THREE.PlaneGeometry(2 * C, 0.36), lambert({ map: hazard, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
@@ -348,7 +427,6 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
 
   // ---------------------------------------------------------------- Les cloches d'alarme
   const crack = crackTex();
-  const bellMat = lambert({ color: '#b3231b', emissive: '#2a0504', emissiveIntensity: 0.4 });
   const alarmSt = [];
   for (const a of map.alarms || []) {
     // au-dessus du déclencheur (posé par le décor à 58 cm du milieu du poste d'incendie, le long du mur)
@@ -360,6 +438,9 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
     group.add(g);
     const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.03, 20).rotateX(Math.PI / 2), lambert({ color: '#7a1712' }));
     plate.position.set(0, 2.3, 0.015);
+    // le dôme de la sirène : un verre rouge avec sa lampe dedans, qui s'allume en alternance avec le flash (deux
+    // voyants côte à côte : on s'attend à voir les deux s'allumer)
+    const bellMat = lambert({ color: '#b3231b', emissive: '#ff0804', emissiveIntensity: 0.04 });
     const dome = new THREE.Mesh(new THREE.SphereGeometry(0.115, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(Math.PI / 2), bellMat);
     dome.position.set(0, 2.3, 0.03);
     const striker = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.05, 0.05), lambert({ color: '#3a3632' }));
@@ -368,19 +449,16 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
     const flashMat = new THREE.MeshBasicMaterial({ color: '#4a1d1a' });
     const flash = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.07, 0.05), flashMat);
     flash.position.set(0.27, 2.3, 0.025);
-    // l'éblouissement du flash : petit, et plus loin du mur que son rayon (un grand disque était coupé net par le
-    // mur) ; c'est la lumière du flash (voir lights) qui baigne la pièce
-    const flashHalo = halo('#ff5a40', 0.56, 0);
-    flashHalo.position.set(0.27, 2.3, 0.3);
+    // (allumé, le plexiglas brille bien au-delà du blanc : le halo vient du caméscope, la lumière de lights)
     // la vitre brisée du déclencheur (à 1,45 m, sur sa face avant)
     const glass = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.15), new THREE.MeshBasicMaterial({ map: crack, transparent: true, depthWrite: false }));
     glass.position.set(0, 1.443, 0.042);
     glass.visible = false;
-    g.add(plate, dome, striker, flash, flashHalo, glass);
+    g.add(plate, dome, striker, flash, glass);
     // le flash, dans le monde (x local : le long du mur ; z local : hors du mur)
     const fx = g.position.x + 0.27 * a.nz + 0.14 * a.nx;
     const fz = g.position.z - 0.27 * a.nx + 0.14 * a.nz;
-    alarmSt.push({ a, dome, flashMat, flashHalo, glass, dent: false, fx, fz, on: 0 });
+    alarmSt.push({ a, dome, bellMat, flashMat, glass, dent: false, fx, fz, bx: g.position.x + 0.16 * a.nx, bz: g.position.z + 0.16 * a.nz, on: 0, on2: 0 });
   }
 
   // ---------------------------------------------------------------- Les bouches de gaine
@@ -417,21 +495,37 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
   // ---------------------------------------------------------------- Les écrans du poste et les caméras
   const cams = map.cams || [];
   const screens = [];
+  // La dalle du téléviseur (Television_01, mesurée sur le modèle, une fois recentré et mis à 46 cm de haut comme dans
+  // la scène) : à gauche des boutons, 30,1 × 29,2 cm, son centre à 6,6 cm à gauche du milieu et à 26,1 cm du bas ; le
+  // verre est bombé, son bord à 19,3 cm devant le centre du poste et son milieu 2,3 cm plus en avant. L'image épouse
+  // ce bombé, à 2 mm devant le verre
+  const SCR = { x: -0.066, y: 0.261, w: 0.301, h: 0.292, z: 0.1953, bulge: 0.0232 };
+  const screenGeo = new THREE.PlaneGeometry(SCR.w, SCR.h, 12, 12);
+  {
+    const pp = screenGeo.attributes.position;
+    for (let i = 0; i < pp.count; i++) {
+      const ux = (2 * pp.getX(i)) / SCR.w;
+      const uy = (2 * pp.getY(i)) / SCR.h;
+      pp.setZ(i, SCR.bulge * (1 - ux * ux) * (1 - uy * uy));
+    }
+    screenGeo.computeVertexNormals();
+  }
   for (const p of map.props || []) {
     if (p.screen === undefined) continue;
     const cv = document.createElement('canvas');
     cv.width = 160;
-    cv.height = 120;
+    cv.height = 155; // (la dalle est presque carrée)
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.43, 0.32), new THREE.MeshBasicMaterial({ map: tex, color: '#d8dcd0' }));
-    // l'écran du téléviseur (modèle centré, 46 cm de haut) : sa face avant regarde +z
-    const fz = 0.236;
-    mesh.position.set(p.x + Math.sin(p.rot) * fz, (p.y || 0) + 0.25, p.z + Math.cos(p.rot) * fz);
+    const mesh = new THREE.Mesh(screenGeo, new THREE.MeshBasicMaterial({ map: tex, color: '#d8dcd0' }));
+    // dans le repère du téléviseur (sa face avant regarde +z), tourné comme lui
+    const c = Math.cos(p.rot);
+    const sn = Math.sin(p.rot);
+    mesh.position.set(p.x + SCR.x * c + SCR.z * sn, (p.y || 0) + SCR.y, p.z - SCR.x * sn + SCR.z * c);
     mesh.rotation.y = p.rot;
     group.add(mesh);
-    const nx = Math.sin(p.rot);
-    const nz = Math.cos(p.rot);
+    const nx = sn;
+    const nz = c;
     screens.push({ i: p.screen, cv, ctx: cv.getContext('2d'), tex, mesh, nx, nz, lx: mesh.position.x + nx * 0.12, ly: mesh.position.y, lz: mesh.position.z + nz * 0.12, glow: 0.5 });
   }
   // la diode rouge des caméras : elle s'allume sur celle qu'un gardien regarde
@@ -440,15 +534,143 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
     g.position.set(c.x, c.y - 0.2, c.z);
     g.rotation.y = c.yaw + Math.PI;
     g.scale.setScalar(1.1);
-    const led = new THREE.Mesh(new THREE.SphereGeometry(0.011, 8, 6), new THREE.MeshBasicMaterial({ color: '#ff2a1a' }));
+    // (une diode vive : plus lumineuse que le blanc de l'écran, elle fait son petit halo dans le caméscope)
+    const led = new THREE.Mesh(new THREE.SphereGeometry(0.011, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ff2a1a').multiplyScalar(6) }));
     led.position.set(0.055, 0.215, 0.17);
-    const glow = halo('#ff2a1a', 0.32, 0.9);
-    glow.position.copy(led.position);
-    g.add(led, glow);
+    g.add(led);
     g.visible = false;
     group.add(g);
     return g;
   });
+
+
+  // ---------------------------------------------------------------- La pièce du poste de garde
+  // Les cloisons (parpaings peints, la texture des murs calée sur le monde, une rangée de blocs à la même hauteur que
+  // sur les murs), l'imposte au-dessus de la baie, l'huisserie d'acier et la porte, qui pivote vers l'intérieur
+  const gd = map.guardDoor;
+  let doorK = 0; // 0 : fermée, 1 : grande ouverte
+  let doorPivot = null;
+  let doorSign = 1; // le sens où elle s'ouvre
+  let doorBase = 0;
+  if (gd && map.segs && map.segs.length) {
+    const pos = [];
+    const nor = [];
+    const uvs = [];
+    // une boîte (x0..x1, y0..y1, z0..z1) : ses faces, la texture des murs à l'échelle du monde (u le long, v en hauteur)
+    const box = (x0, x1, y0, y1, z0, z1) => {
+      const quad = (a, b, c, d, n, uv) => {
+        pos.push(...a, ...b, ...c, ...a, ...c, ...d);
+        for (let k = 0; k < 6; k++) nor.push(...n);
+        const [ua, ub, uc, ud] = uv;
+        uvs.push(...ua, ...ub, ...uc, ...ua, ...uc, ...ud);
+      };
+      const v = (y) => y / CEIL;
+      // +z, -z
+      quad([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1], [[x0 / C, v(y0)], [x1 / C, v(y0)], [x1 / C, v(y1)], [x0 / C, v(y1)]]);
+      quad([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [0, 0, -1], [[-x1 / C, v(y0)], [-x0 / C, v(y0)], [-x0 / C, v(y1)], [-x1 / C, v(y1)]]);
+      // +x, -x
+      quad([x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [1, 0, 0], [[-z1 / C, v(y0)], [-z0 / C, v(y0)], [-z0 / C, v(y1)], [-z1 / C, v(y1)]]);
+      quad([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [-1, 0, 0], [[z0 / C, v(y0)], [z1 / C, v(y0)], [z1 / C, v(y1)], [z0 / C, v(y1)]]);
+      // le dessous (l'imposte)
+      if (y0 > 0.01) quad([x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [0, -1, 0], [[x0 / C, z0 / C], [x1 / C, z0 / C], [x1 / C, z1 / C], [x0 / C, z1 / C]]);
+    };
+    const hT = GUARD_T / 2;
+    const jamb = (x, z) => Math.abs(x - gd.x) + Math.abs(z - gd.z) < gd.w / 2 + 1e-4 && (gd.nx ? Math.abs(x - gd.x) < 1e-4 : Math.abs(z - gd.z) < 1e-4);
+    for (const sg of map.segs) {
+      const alongX = Math.abs(sg.z0 - sg.z1) < 1e-6;
+      if (alongX) {
+        const a0 = Math.min(sg.x0, sg.x1);
+        const a1 = Math.max(sg.x0, sg.x1);
+        // les cloisons le long de x couvrent les angles (celles le long de z s'y arrêtent) : pas de jour dans un coin
+        box(a0 - (jamb(a0, sg.z0) ? 0 : hT), a1 + (jamb(a1, sg.z0) ? 0 : hT), 0, CEIL, sg.z0 - hT, sg.z0 + hT);
+      } else {
+        box(sg.x0 - hT, sg.x0 + hT, 0, CEIL, Math.min(sg.z0, sg.z1), Math.max(sg.z0, sg.z1));
+      }
+    }
+    // l'imposte
+    const gh = gd.w / 2;
+    if (gd.nx) box(gd.x - hT, gd.x + hT, gd.h, CEIL, gd.z - gh, gd.z + gh);
+    else box(gd.x - gh, gd.x + gh, gd.h, CEIL, gd.z - hT, gd.z + hT);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.computeBoundingSphere();
+    group.add(new THREE.Mesh(geo, wallMat));
+
+    // repère de la porte : x le long de la baie, z vers le dehors (la normale de la porte)
+    const g = new THREE.Group();
+    g.position.set(gd.x, 0, gd.z);
+    g.rotation.y = Math.atan2(gd.nx, gd.nz);
+    group.add(g);
+    // l'huisserie : deux montants et la traverse, en acier peint, qui débordent un peu des deux faces
+    const frameMat = lambert({ color: '#4c524d' });
+    const FD = GUARD_T + 0.03;
+    for (const sx of [-1, 1]) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.09, gd.h + 0.06, FD), frameMat);
+      m.position.set(sx * (gh - 0.015), (gd.h + 0.06) / 2, 0);
+      g.add(m);
+    }
+    const head = new THREE.Mesh(new THREE.BoxGeometry(gd.w + 0.15, 0.09, FD), frameMat);
+    head.position.set(0, gd.h + 0.015, 0);
+    g.add(head);
+    // le battant : sur ses gonds, côté pièce ; s'ouvre vers l'intérieur (z < 0 dans le repère de la porte)
+    const LW = gd.w - 0.08;
+    const LH = gd.h - 0.035;
+    const LT = 0.045;
+    // le gond : du côté le plus près du coin de la pièce (le battant ouvert se range le long de la cloison)
+    const R = map.post.room;
+    const ax = gd.nx ? 0 : 1; // le long de la baie, en x du monde ?
+    const mid = ax ? (R.x0 + R.x1) / 2 : (R.z0 + R.z1) / 2;
+    const along = ax ? gd.x : gd.z;
+    // (le repère tourne de atan2(nx, nz) : son x local va vers (nz, -nx) dans le monde)
+    const lx = ax ? gd.nz : -gd.nx; // l'x local, projeté sur l'axe de la baie
+    const hingeS = Math.sign((along > mid ? 1 : -1) * lx) || 1;
+    doorPivot = new THREE.Group();
+    doorPivot.position.set(hingeS * (gh - 0.06), 0, -(hT - 0.035));
+    g.add(doorPivot);
+    const leafMat = lambert({ map: doorTex() });
+    const edgeMat = lambert({ color: '#5d665f' });
+    const leaf = new THREE.Mesh(new THREE.BoxGeometry(LW, LH, LT), [edgeMat, edgeMat, edgeMat, edgeMat, leafMat, leafMat]);
+    leaf.position.set(-hingeS * (LW / 2), LH / 2 + 0.008, 0);
+    doorPivot.add(leaf);
+    // la plaque, côté entrepôt
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.21), lambert({ map: securitySign() }));
+    sign.position.set(-hingeS * (LW / 2), 1.55, LT / 2 + 0.002);
+    doorPivot.add(sign);
+    // la béquille, des deux côtés, du côté libre ; la serrure
+    const steel = lambert({ color: '#b4b6b1' });
+    for (const sz of [1, -1]) {
+      const rose = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.012, 16), steel);
+      rose.rotation.x = Math.PI / 2;
+      rose.position.set(-hingeS * (LW - 0.075), 1.02, sz * (LT / 2 + 0.006));
+      doorPivot.add(rose);
+      const lever = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.018, 0.018), steel);
+      lever.position.set(-hingeS * (LW - 0.075 - 0.055), 1.02, sz * (LT / 2 + 0.045));
+      doorPivot.add(lever);
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.04, 8), steel);
+      stem.rotation.x = Math.PI / 2;
+      stem.position.set(-hingeS * (LW - 0.075), 1.02, sz * (LT / 2 + 0.025));
+      doorPivot.add(stem);
+      const lock = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.01, 12), steel);
+      lock.rotation.x = Math.PI / 2;
+      lock.position.set(-hingeS * (LW - 0.075), 0.86, sz * (LT / 2 + 0.005));
+      doorPivot.add(lock);
+    }
+    // le ferme-porte, côté pièce, en haut près des gonds
+    const closer = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.055, 0.05), lambert({ color: '#3e3f3d' }));
+    closer.position.set(-hingeS * 0.24, LH - 0.07, -(LT / 2 + 0.025));
+    doorPivot.add(closer);
+    // trois paumelles
+    for (const y of [0.25, LH / 2 + 0.1, LH - 0.25]) {
+      const k = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.11, 8), steel);
+      k.position.set(hingeS * 0.004, y, -LT / 2);
+      doorPivot.add(k);
+    }
+    // elle s'ouvre vers l'intérieur (-z local) : le côté libre (x = -hingeS·LW) part vers -z
+    doorSign = hingeS;
+    doorBase = 0;
+  }
 
   let screenT = 0;
   const drawScreen = (s, cam, live, time) => {
@@ -485,18 +707,30 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
     g.font = 'bold 11px monospace';
     g.textBaseline = 'top';
     g.fillStyle = '#e8eee0';
-    g.fillText(cam ? `CAM ${String(n).padStart(2, '0')}` : 'NO VIDEO', 6, 6);
-    if (cam) g.fillText(cam.name.slice(0, 22), 6, H - 18);
+    g.fillText(cam ? `CAM ${String(n).padStart(2, '0')}` : 'NO VIDEO', 11, 10);
+    if (cam) g.fillText(cam.name.slice(0, 22), 11, H - 22);
     if (live && Math.floor(time * 1.5) % 2 === 0) {
       g.fillStyle = '#ff3a2a';
       g.beginPath();
-      g.arc(W - 12, 11, 4, 0, Math.PI * 2);
+      g.arc(W - 15, 15, 4, 0, Math.PI * 2);
       g.fill();
     }
+    // le tube : l'image s'assombrit vers les bords et les coins du verre
+    if (!s.vig) {
+      s.vig = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.hypot(W, H) * 0.52);
+      s.vig.addColorStop(0, 'rgba(0,0,0,0)');
+      s.vig.addColorStop(1, 'rgba(0,0,0,0.7)');
+    }
+    g.fillStyle = s.vig;
+    g.fillRect(0, 0, W, H);
     s.tex.needsUpdate = true;
   };
 
   return {
+    // la porte du poste : 0 fermée, 1 grande ouverte
+    get doorK() {
+      return doorK;
+    },
     update(sim, P, time, dt) {
       // les rideaux : ils suivent la partie (lissés chez un invité, qui ne les reçoit que 20 fois par seconde)
       for (const st of dockSt) {
@@ -519,8 +753,9 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
           const dz = P.z - b.z;
           const dl = Math.hypot(dx, dz) || 1;
           const face = Math.pow(Math.max(0, (Math.cos(b.a + b.ph) * dx + Math.sin(b.a + b.ph) * dz) / dl), 4) * b.k;
-          b.domeMat.color.setRGB(0.35 + 0.65 * face + 0.25 * b.k, 0.16 + 0.42 * face + 0.08 * b.k, 0.03 + 0.05 * face);
-          b.shine.material.opacity = face * 0.95;
+          // l'ampoule derrière le miroir : face à nous, bien plus vive que le blanc de l'écran (halo du caméscope)
+          const hot = face * 11 + b.k * 0.8;
+          b.domeMat.color.setRGB(0.3 + hot, 0.12 + 0.4 * hot, 0.02 + 0.05 * hot);
         }
         for (const m of st.lamps) m.color.set(moving ? (Math.floor(time * 4) % 2 ? '#ffb43a' : '#5a3a0c') : d.broken ? '#6a0d08' : '#3a2a0c');
       }
@@ -531,8 +766,12 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
         st.glass.visible = !!a.used;
         const on = ring && time % 0.5 < 0.09;
         st.on = on ? 1 : 0;
-        st.flashMat.color.set(on ? '#fff1ee' : ring ? '#8a2a22' : '#4a1d1a');
-        st.flashHalo.material.opacity = on ? 0.95 : 0;
+        // le dôme rouge, à contretemps du flash (sa lampe chauffe et refroidit un peu : pas un simple clignotant)
+        const ph = (time + 0.25 + st.a.id * 0.07) % 0.5;
+        st.on2 = ring ? Math.max(0, 1 - Math.abs(ph - 0.08) / 0.09) : 0;
+        st.bellMat.emissiveIntensity = 0.04 + st.on2 * 5;
+        if (on) st.flashMat.color.setRGB(18, 10.5, 9.5); // le tube au xénon derrière le plexiglas
+        else st.flashMat.color.set(ring ? '#8a2a22' : '#4a1d1a');
         st.dome.position.set(ring ? (Math.random() - 0.5) * 0.005 : 0, 2.3 + (st.dent ? -0.03 : 0), 0.03);
         st.dome.rotation.z = st.dent ? 0.5 : 0;
       }
@@ -578,6 +817,13 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
           }
         }
       }
+      // la porte du poste : elle s'ouvre vite (on la pousse), se referme doucement (le ferme-porte)
+      if (doorPivot) {
+        const want = gd.open ? 1 : 0;
+        doorK = want > doorK ? Math.min(1, doorK + dt / 0.4) : Math.max(0, doorK - dt / 1.1);
+        const e = doorK * doorK * (3 - 2 * doorK);
+        doorPivot.rotation.y = doorBase - doorSign * e * 1.62;
+      }
       // les écrans (de près seulement) et la diode de la caméra regardée
       const S = map.post;
       const guard = S && S.by >= 0 ? sim.players.find((q) => q.id === S.by && q.status === 'alive' && q.desk) : null;
@@ -612,6 +858,12 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
         if (!st.on) continue;
         // le flash : blanc rosé au cœur, rouge en s'éloignant (le plexiglas), vers la pièce (rien derrière le mur)
         out.push({ x: st.fx, y: 2.3, z: st.fz, r: 5.5, g: 1.2, b: 0.9, rad: 11, nx: st.a.nx, ny: 0, nz: st.a.nz, w: -0.55 });
+      }
+      for (const st of alarmSt) {
+        if (st.on2 < 0.02) continue;
+        // le dôme : rouge franc, moins fort que le flash
+        const k = st.on2;
+        out.push({ x: st.bx, y: 2.3, z: st.bz, r: 3.2 * k, g: 0.22 * k, b: 0.12 * k, rad: 8, nx: st.a.nx, ny: 0, nz: st.a.nz, w: -0.55 });
       }
       for (const s of screens) out.push({ x: s.lx, y: s.ly, z: s.lz, r: 0.6 * s.glow, g: 0.78 * s.glow, b: 0.66 * s.glow, rad: 2.8, nx: s.nx, ny: 0, nz: s.nz, w: -0.35 });
       return out;

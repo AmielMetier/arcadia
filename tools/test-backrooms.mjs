@@ -1004,18 +1004,18 @@ test("eau d'amande : rend la moitié de la gourde", () => {
   assert.equal(b.taken, false, 'on ne ramasse plus en passant');
   sim.step({ pick: true });
   assert.equal(b.taken, true);
-  assert.deepEqual(sim.player.inv, ['bottle', null, null, null], "F : la bouteille va dans l'inventaire");
+  assert.deepEqual(sim.player.inv, ['bottle', null], "F : la bouteille va dans l'inventaire");
   assert.ok(sim.player.water < 11, "elle ne se boit pas toute seule");
   const before = sim.player.water;
   sim.step({ useSel: true });
   assert.ok(Math.abs(sim.player.water - (before + ALMOND_WATER)) < 0.1, 'E : on boit la case choisie (+50)');
-  assert.deepEqual(sim.player.inv, [null, null, null, null]);
+  assert.deepEqual(sim.player.inv, [null, null]);
   assert.ok(sim.drainEvents().some((e) => e.type === 'bottle'));
   // gourde pleine : on la garde
   sim.player.water = 99;
-  sim.player.inv = ['bottle', null, null, null];
+  sim.player.inv = ['bottle', null];
   sim.step({ useSel: true, sel: 1 });
-  assert.deepEqual(sim.player.inv, ['bottle', null, null, null], 'pas soif : la bouteille reste dans le sac');
+  assert.deepEqual(sim.player.inv, ['bottle', null], 'pas soif : la bouteille reste dans le sac');
   assert.ok(sim.drainEvents().some((e) => e.type === 'useless'));
   // un nouvel étage : jamais à sec en arrivant
   sim.player.water = 5;
@@ -1023,25 +1023,25 @@ test("eau d'amande : rend la moitié de la gourde", () => {
   assert.equal(sim.player.water, WATER_LEVEL_MIN);
 });
 
-test("inventaire : quatre cases d'objets ; plein, F échange l'objet de la case choisie contre celui du sol", () => {
+test("inventaire : deux cases d'objets ; plein, F échange l'objet de la case choisie contre celui du sol", () => {
   const m = createBackroomsMap(9);
   const sim = new BackroomsSim({ map: m, difficulty: 'peaceful' });
   const P = sim.player;
-  assert.equal(INV_SIZE, 4);
+  assert.equal(INV_SIZE, 2);
   const ladder = m.items.find((i) => i.kind === 'ladder');
-  for (const o of [m.bottles[0], m.batteries[0], m.bottles[1], m.batteries[1]]) {
+  for (const o of [m.bottles[0], m.batteries[0]]) {
     P.x = o.x;
     P.z = o.z;
     sim.step({ pick: true });
   }
-  assert.deepEqual(P.inv, ['bottle', 'battery', 'bottle', 'battery']);
+  assert.deepEqual(P.inv, ['bottle', 'battery']);
   // plein : la case choisie (2, l'eau d'amande) part au sol à la place de l'échelle
   const at = { x: ladder.x, z: ladder.z };
   const n0 = m.items.length;
   P.x = ladder.x;
   P.z = ladder.z;
   sim.step({ pick: true, sel: 1 });
-  assert.deepEqual(P.inv, ['ladder', 'battery', 'bottle', 'battery']);
+  assert.deepEqual(P.inv, ['ladder', 'battery']);
   const dropped = m.items.find((o) => !o.taken && o.kind === 'bottle' && Math.hypot(o.x - at.x, o.z - at.z) < 0.01);
   assert.ok(dropped, "l'eau d'amande est posée là où était l'échelle");
   assert.ok(!m.items.some((o) => !o.taken && o.kind === 'ladder'), "l'échelle n'est plus au sol");
@@ -1050,7 +1050,7 @@ test("inventaire : quatre cases d'objets ; plein, F échange l'objet de la case 
   for (let i = 0; i < 6; i++) sim.step({ pick: true, sel: 1 });
   assert.equal(m.items.length, n0, 'des échanges répétés ne font pas grossir la partie');
   if (P.inv[0] !== 'ladder') sim.step({ pick: true, sel: 1 });
-  assert.deepEqual(P.inv, ['ladder', 'battery', 'bottle', 'battery']);
+  assert.deepEqual(P.inv, ['ladder', 'battery']);
   // une case vide : F y range l'objet sans rien poser
   P.x = m.spawn.x;
   P.z = m.spawn.z;
@@ -1058,17 +1058,17 @@ test("inventaire : quatre cases d'objets ; plein, F échange l'objet de la case 
   sim.step({ sel: 2 });
   sim.step({ useSel: true });
   assert.ok(P.battery > 60, 'E : la pile de la case 3 recharge la lampe');
-  assert.deepEqual(P.inv, ['ladder', null, 'bottle', 'battery']);
+  assert.deepEqual(P.inv, ['ladder', null]);
   P.x = dropped.x;
   P.z = dropped.z;
   const before = m.items.length;
   sim.step({ pick: true });
-  assert.deepEqual(P.inv, ['ladder', 'bottle', 'bottle', 'battery']);
+  assert.deepEqual(P.inv, ['ladder', 'bottle']);
   assert.equal(m.items.length, before, 'rien de posé : il restait une case');
   // E sur une eau d'amande quand on a soif : on la boit
   P.water = 40;
   sim.step({ useSel: true });
-  assert.deepEqual(P.inv, ['ladder', null, 'bottle', 'battery']);
+  assert.deepEqual(P.inv, ['ladder', null]);
   assert.ok(P.water > 89);
   // une case qui n'existe pas ne se choisit pas
   sim.step({ sel: INV_SIZE + 1 });
@@ -1100,11 +1100,11 @@ test("inventaire : G pose l'objet choisi devant soi (contre un mur : à ses pied
   A.yaw = Math.PI / 2; // regarde vers l'ouest (devant : -sin(yaw), -cos(yaw))
   B.x = m.spawn.x;
   B.z = m.spawn.z;
-  A.inv = [null, 'bottle', null, null];
+  A.inv = [null, 'bottle'];
   const n0 = m.items.length;
   host.drainEvents();
   host.step({ sel: 2, drop: true });
-  assert.deepEqual(A.inv, [null, null, null, null], 'G : la case choisie se vide');
+  assert.deepEqual(A.inv, [null, null], 'G : la case choisie se vide');
   const ev = host.drainEvents().find((e) => e.type === 'drop');
   assert.ok(ev && ev.kind === 'bottle' && ev.id === 1, "l'équipe entend tomber l'eau d'amande");
   const it = m.items.find((o) => !o.taken && o.kind === 'bottle' && Math.hypot(o.x - (cx - DROP_AHEAD), o.z - cz) < 0.01);
@@ -1112,15 +1112,15 @@ test("inventaire : G pose l'objet choisi devant soi (contre un mur : à ses pied
   assert.ok(m.items.length <= n0 + 1, "au plus un objet de plus (on reprend d'abord un objet déjà ramassé)");
   assert.ok(Math.hypot(it.x - A.x, it.z - A.z) < 1.4, 'à portée de F');
   // un deuxième objet posé au même endroit : à côté du premier, pas dedans
-  A.inv = [null, null, 'battery', null];
-  host.step({ sel: 3, drop: true });
+  A.inv = [null, 'battery'];
+  host.step({ sel: 2, drop: true });
   const bat = m.items.find((o) => !o.taken && o.kind === 'battery' && Math.hypot(o.x - A.x, o.z - A.z) < 1);
   assert.ok(bat && Math.hypot(bat.x - it.x, bat.z - it.z) >= 0.28, 'le deuxième objet se pose à côté du premier');
   bat.taken = true;
   wire();
   const gi = guest.map.items.find((o) => !o.taken && o.kind === 'bottle' && Math.hypot(o.x - it.x, o.z - it.z) < 0.02);
   assert.ok(gi, "l'invité la voit au même endroit");
-  assert.deepEqual(guest.players.find((p) => p.id === 1).inv, [null, null, null, null], "et l'inventaire de A, vide, chez lui aussi");
+  assert.deepEqual(guest.players.find((p) => p.id === 1).inv, [null, null], "et l'inventaire de A, vide, chez lui aussi");
   // B la ramasse
   B.x = it.x;
   B.z = it.z;
@@ -1129,11 +1129,11 @@ test("inventaire : G pose l'objet choisi devant soi (contre un mur : à ses pied
   wire();
   assert.ok(guest.player.inv.includes('bottle') && !guest.map.items.some((o) => !o.taken && Math.hypot(o.x - it.x, o.z - it.z) < 0.02), "chez l'invité, elle est dans son sac");
   // face au mur : à ses pieds
-  A.inv = [null, null, 'battery', null];
+  A.inv = [null, 'battery'];
   A.x = (cell.gx + 1) * C - 0.4;
   A.z = cz;
   A.yaw = -Math.PI / 2; // vers l'est, le mur
-  host.step({ sel: 3, drop: true });
+  host.step({ sel: 2, drop: true });
   assert.ok(m.items.some((o) => !o.taken && o.kind === 'battery' && Math.hypot(o.x - A.x, o.z - A.z) < 0.05), 'contre un mur : à ses pieds');
   // une case vide : rien à poser
   host.drainEvents();
@@ -1143,7 +1143,7 @@ test("inventaire : G pose l'objet choisi devant soi (contre un mur : à ses pied
   let pit = null;
   for (let gz = 0; gz < m.H && !pit; gz++) for (let gx = 0; gx < m.W && !pit; gx++) if (m.pitAt(gx, gz) >= 0 && !m.pits[m.pitAt(gx, gz)].deep) pit = { gx, gz };
   assert.ok(pit, 'un trou à cet étage');
-  A.inv = ['bottle', null, null, null];
+  A.inv = ['bottle', null];
   A.x = (pit.gx + 0.5) * C;
   A.z = (pit.gz + 0.5) * C;
   host.drainEvents();
@@ -1174,7 +1174,7 @@ test("renfoncement : la cassette en hauteur s'attrape seulement depuis l'échell
     P.x = ladder.x;
     P.z = ladder.z;
     sim.step({ pick: true });
-    assert.deepEqual(P.inv, ['ladder', null, null, null], "l'échelle va dans l'inventaire");
+    assert.deepEqual(P.inv, ['ladder', null], "l'échelle va dans l'inventaire");
     P.x = N.baseX + 1.5;
     P.z = N.baseZ;
     if (sim.isColliding(P.x, P.z, 0.3)) {
@@ -1183,7 +1183,7 @@ test("renfoncement : la cassette en hauteur s'attrape seulement depuis l'échell
     }
     sim.step({ useSel: true });
     assert.ok(N.ladder, 'échelle posée');
-    assert.deepEqual(P.inv, [null, null, null, null]);
+    assert.deepEqual(P.inv, [null, null]);
     P.x = N.baseX;
     P.z = N.baseZ;
     sim.step();
@@ -2457,11 +2457,11 @@ test("réseau : l'eau d'amande bue par un invité le désaltère chez lui aussi,
   const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 7, players, localId: 2 });
   const G = guest.player;
   const HG = host.players[1];
-  HG.inv = ['bottle', null, null, null];
+  HG.inv = ['bottle', null];
   HG.water = 30; // la soif se tient chez l'hôte
   G.water = 99;
   host.step({}, { 2: { remote: true, useSel: true, sel: 1 } });
-  assert.deepEqual(HG.inv, [null, null, null, null], 'la bouteille est bue');
+  assert.deepEqual(HG.inv, [null, null], 'la bouteille est bue');
   guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
   assert.ok(Math.abs(G.water - (30 + ALMOND_WATER)) < 0.2, `l'invité reçoit sa gourde de l'hôte (${G.water})`);
   // le bruit de chacun aussi (la barre de bruit des invités)
@@ -3892,6 +3892,66 @@ test('Level 1 : le poste de garde — assis, on ne bouge plus, on change de cam�
   assert.ok(!sim.onScreen(G, 0, spot.x, spot.z) || sim.map.cams[0] === c, "une autre caméra : plus à l'écran");
   sim.step({}, { 2: { pick: true } });
   assert.ok(!G.desk && S.by === -1 && Math.hypot(G.x - S.front.x, G.z - S.front.z) < 0.01, 'F : on se lève, devant le bureau');
+});
+
+test('Level 1 : le poste de garde est une pièce fermée — on y entre par la porte, qui s\'ouvre devant qui arrive ; les cloisons arrêtent, cachent et ne coupent aucune allée', () => {
+  for (const seed of [1, 5, 6, 11, 23]) {
+    const sim = new BackroomsSim({ difficulty: 'normal', seed, players: [{ id: 1, name: 'H' }], localId: 1, level: 1 });
+    const m = sim.map;
+    const S = m.post;
+    const gd = m.guardDoor;
+    assert.ok(S && S.room && gd && m.segs.length >= 3, `graine ${seed} : une pièce, sa porte, ses cloisons`);
+    const R = S.room;
+    const inside = (x, z) => x > R.x0 && x < R.x1 && z > R.z0 && z < R.z1;
+    assert.ok(inside(S.seat.x, S.seat.z) && inside(S.front.x, S.front.z), 'le fauteuil et le bureau sont dedans');
+    // les cloisons arrêtent le joueur ; la baie de la porte le laisse passer
+    for (const sg of m.segs) assert.ok(sim.isColliding((sg.x0 + sg.x1) / 2, (sg.z0 + sg.z1) / 2, PLAYER_RADIUS), 'une cloison arrête');
+    assert.ok(!sim.isColliding(gd.x, gd.z, PLAYER_RADIUS), 'on passe par la porte');
+    // en marchant du dehors vers le fauteuil, on entre par la porte
+    const P = sim.player;
+    P.x = gd.x + gd.nx * 1.4;
+    P.z = gd.z + gd.nz * 1.4;
+    sim.step({});
+    assert.ok(gd.open, 'devant la porte, elle s\'ouvre');
+    for (let i = 0; i < 90; i++) {
+      const tx = i < 40 ? gd.x - gd.nx * 0.8 : S.front.x;
+      const tz = i < 40 ? gd.z - gd.nz * 0.8 : S.front.z;
+      const p = sim.moveWithCollisions(P.x, P.z, Math.sign(tx - P.x) * Math.min(Math.abs(tx - P.x), 0.08), Math.sign(tz - P.z) * Math.min(Math.abs(tz - P.z), 0.08), PLAYER_RADIUS, 0);
+      P.x = p.x;
+      P.z = p.z;
+    }
+    assert.ok(inside(P.x, P.z), 'on est entré');
+    // personne devant : elle se referme, et cache comme une cloison
+    P.x = m.spawn.x;
+    P.z = m.spawn.z;
+    sim.monster.x = m.monsterSpawn.x;
+    sim.monster.z = m.monsterSpawn.z;
+    sim.step({});
+    assert.ok(!gd.open, 'personne devant : fermée');
+    const cx = (R.x0 + R.x1) / 2;
+    const cz = (R.z0 + R.z1) / 2;
+    assert.ok(!hasLineOfSight(m, cx, cz, gd.x + gd.nx * 2, gd.z + gd.nz * 2), 'porte fermée : on ne voit pas au travers');
+    gd.open = true;
+    assert.ok(hasLineOfSight(m, gd.x - gd.nx * 0.8, gd.z - gd.nz * 0.8, gd.x + gd.nx * 2, gd.z + gd.nz * 2), 'ouverte : on voit par la baie');
+    gd.open = false;
+    for (const sg of m.segs) {
+      const mx = (sg.x0 + sg.x1) / 2;
+      const mz = (sg.z0 + sg.z1) / 2;
+      const ox = sg.x0 === sg.x1 ? 1.2 : 0;
+      const oz = sg.x0 === sg.x1 ? 0 : 1.2;
+      assert.ok(!hasLineOfSight(m, mx - ox, mz - oz, mx + ox, mz + oz), 'une cloison cache');
+    }
+    // l'entité n'entre que par la porte
+    const path = findPath(m, m.monsterSpawn.x, m.monsterSpawn.z, S.seat.x, S.seat.z);
+    assert.ok(path && path.length, 'elle trouve le chemin du fauteuil');
+    const gin = Math.floor((gd.x - gd.nx * 0.5) / CELL_SIZE) + Math.floor((gd.z - gd.nz * 0.5) / CELL_SIZE) * m.W;
+    const gout = Math.floor((gd.x + gd.nx * 0.5) / CELL_SIZE) + Math.floor((gd.z + gd.nz * 0.5) / CELL_SIZE) * m.W;
+    let entered = -1;
+    path.forEach((q, i) => {
+      if (entered < 0 && inside(q.x, q.z)) entered = i;
+    });
+    assert.ok(entered > 0 && path[entered].gz * m.W + path[entered].gx === gin && path[entered - 1].gz * m.W + path[entered - 1].gx === gout, 'par la porte');
+  }
 });
 
 test("Level 1 : l'entité passe par les gaines — on l'entend cogner au-dessus, la grille tombe, elle ressort près de sa proie", () => {

@@ -352,6 +352,23 @@ export function createVhsFilter(renderer) {
   const half = () => new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false });
   const bloomA = half();
   const bloomB = half();
+  // l'éblouissement large (Level 1) : deux étages plus flous encore (1/8 et 1/16), ajoutés au halo serré. Une lampe
+  // vive bave sur une grande largeur, en s'éteignant doucement, comme dans l'optique d'un vrai caméscope
+  const bloomC = half();
+  const bloomC2 = half();
+  const bloomD = half();
+  const bloomD2 = half();
+  let glare = 0;
+  const addMat = new THREE.ShaderMaterial({
+    uniforms: { tDiffuse: { value: null }, uK: { value: 1 } },
+    vertexShader,
+    fragmentShader: 'uniform sampler2D tDiffuse;\nuniform float uK;\nvarying vec2 vUv;\nvoid main() { gl_FragColor = vec4(texture2D(tDiffuse, vUv).rgb * uK, 1.0); }',
+    depthTest: false,
+    depthWrite: false,
+  });
+  const addBlend = addMat.clone();
+  addBlend.blending = THREE.AdditiveBlending;
+  addBlend.transparent = true;
   // mise au point : la scène floutée en demi-définition (deux passes seulement quand le flou est demandé)
   const focusA = half();
   const focusB = half();
@@ -487,6 +504,8 @@ void main() {
     target.setSize(tw, lines);
     bloomA.setSize(Math.max(1, tw >> 2), Math.max(1, lines >> 2));
     bloomB.setSize(Math.max(1, tw >> 2), Math.max(1, lines >> 2));
+    for (const rt of [bloomC, bloomC2]) rt.setSize(Math.max(1, tw >> 3), Math.max(1, lines >> 3));
+    for (const rt of [bloomD, bloomD2]) rt.setSize(Math.max(1, tw >> 4), Math.max(1, lines >> 4));
     focusA.setSize(Math.max(1, tw >> 1), Math.max(1, lines >> 1));
     focusB.setSize(Math.max(1, tw >> 1), Math.max(1, lines >> 1));
     bright.uniforms.uTexel.value.set(1 / tw, 1 / lines);
@@ -567,6 +586,10 @@ void main() {
         fogRT2 = half();
         fogSize();
       }
+    },
+    // l'éblouissement large autour des lumières vives (0 : le halo serré seul, comme aux autres niveaux)
+    setGlare(k) {
+      glare = clamp(num(k, 0), 0, 2);
     },
     getFx() {
       return { ...fx, white: [...fx.white] };
@@ -661,6 +684,28 @@ void main() {
             pass(blurMat, bloomA.texture, dirTmp.set((1 + i) / bw, 0), bloomB);
             pass(blurMat, bloomB.texture, dirTmp.set(0, (1 + i) / bh), bloomA);
           }
+          if (glare > 0) {
+            // les deux étages larges : chacun réduit du précédent et flouté, puis le plus large rendu au moyen, et le
+            // moyen au halo serré
+            addMat.uniforms.uK.value = 1;
+            pass(addMat, bloomA.texture, null, bloomC);
+            for (let i = 0; i < 2; i++) {
+              pass(blurMat, bloomC.texture, dirTmp.set((1 + i) / bloomC.width, 0), bloomC2);
+              pass(blurMat, bloomC2.texture, dirTmp.set(0, (1 + i) / bloomC.height), bloomC);
+            }
+            pass(addMat, bloomC.texture, null, bloomD);
+            for (let i = 0; i < 2; i++) {
+              pass(blurMat, bloomD.texture, dirTmp.set((1 + i) / bloomD.width, 0), bloomD2);
+              pass(blurMat, bloomD2.texture, dirTmp.set(0, (1 + i) / bloomD.height), bloomD);
+            }
+            const ac = renderer.autoClear;
+            renderer.autoClear = false;
+            addBlend.uniforms.uK.value = 1;
+            pass(addBlend, bloomD.texture, null, bloomC);
+            addBlend.uniforms.uK.value = glare;
+            pass(addBlend, bloomC.texture, null, bloomA);
+            renderer.autoClear = ac;
+          }
         }
       }
       if (focus > 0) {
@@ -678,8 +723,8 @@ void main() {
       renderer.render(post, cam);
     },
     dispose() {
-      for (const rt of [target, bloomA, bloomB, focusA, focusB, fogRT, fogRT2]) if (rt) rt.dispose();
-      for (const m of [material, bright, blurMat, fogComp, fogBlur]) m.dispose();
+      for (const rt of [target, bloomA, bloomB, bloomC, bloomC2, bloomD, bloomD2, focusA, focusB, fogRT, fogRT2]) if (rt) rt.dispose();
+      for (const m of [material, bright, blurMat, addMat, addBlend, fogComp, fogBlur]) m.dispose();
       quad.geometry.dispose();
     },
   };

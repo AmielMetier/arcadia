@@ -1323,6 +1323,24 @@ export class BackroomsSfx {
     this.caption('[chain rattles]', pos);
   }
 
+  // La porte du poste de garde (Level 1) : à l'ouverture, le pêne qui claque et les gonds qui grincent un peu ; à la
+  // fermeture, le ferme-porte qui la ramène, le battant d'acier qui retombe dans l'huisserie
+  guardDoor(pos, open) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = this.at({ ...pos, rolloff: 0.9, ref: 3 }, 0.8);
+    if (open) {
+      this.burst(out, t, 0.025, 'bandpass', 2300, 3, 0.22);
+      this.burst(out, t + 0.02, 0.06, 'lowpass', 420, 0.9, 0.16);
+      // le grincement : un frottement étroit qui glisse vers le grave
+      for (let k = 0; k < 5; k++) this.burst(out, t + 0.08 + k * 0.05, 0.05, 'bandpass', 1500 - k * 140 + rnd(-60, 60), 9, 0.035 * (1 - k / 6));
+    } else {
+      this.burst(out, t + 0.75, 0.09, 'lowpass', 300, 0.9, 0.5);
+      this.ring(out, t + 0.75, 118, [[1, 1, 0.35], [2.6, 0.45, 0.2], [5.1, 0.2, 0.12]], 0.1);
+      this.burst(out, t + 0.79, 0.02, 'bandpass', 2600, 3, 0.18);
+    }
+  }
+
   // La clé ramassée : un trousseau qui tinte (pas de son à l'endroit : c'est dans ta main)
   keyJingle() {
     if (!this.unlocked || !this.ctx) return;

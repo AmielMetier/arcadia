@@ -140,7 +140,6 @@ export class BackroomsHUD {
       <div class="spectate" id="spectate" hidden><b id="specTitle"></b><span id="specSub"></span><small id="specHaunt"></small></div>
       <!-- Le rejeu de la mort, vu de sa tête -->
       <div class="voice-tag" id="voiceTag" hidden><span id="voiceOut"></span><i id="voiceBar"><b></b></i><span id="voiceIn"></span><span id="voiceLore"></span></div>
-      <div class="replay-tag" id="replayTag" hidden><b>▶ PLAY</b> CAM 02 · <span>00:00:0<i id="replayClock">0</i></span></div>
       <!-- Fondu : l'ascenseur descend, carte de l'étage -->
       <div class="fade" id="fade"><div><b id="fadeTitle"></b><span id="fadeSub"></span><div class="fade-bar" id="fadeBarBox" hidden><i id="fadeBar"></i></div></div></div>
       <div class="toast" id="toast" hidden></div>
@@ -588,7 +587,6 @@ export class BackroomsHUD {
     }).join('');
   }
 
-  // le bandeau du rejeu (on = false : caché)
   // la voix : ce qu'on émet (VOICE à côté de soi, RADIO dans le talkie) et qui parle dans le talkie
   voice(v, sim, multi, dead = false) {
     this.micRaw = v && v.micState === 'on' ? v.raw || 0 : 0; // la voix compte dans la jauge de bruit
@@ -717,17 +715,6 @@ export class BackroomsHUD {
     el.className = `mic-meter ${state}`;
     this.$('#micTxt').textContent = 'MIC';
     this.$('#micFill').style.width = `${w}%`;
-  }
-
-  replayTag(on) {
-    this.$('#replayTag').hidden = !on;
-    clearInterval(this.replayI);
-    if (!on) return;
-    let k = 0;
-    this.replayI = setInterval(() => {
-      k = (k + 1) % 4;
-      this.$('#replayClock').textContent = String(k);
-    }, 1000);
   }
 
   // calibrage de la luminosité : trois carrés presque noirs, éclaircis comme l'image du jeu
@@ -1012,7 +999,7 @@ export class BackroomsHUD {
     if (el) el.hidden = true;
   }
 
-  // extra : { stats: { seen, rushes, escapes, closest, haunts }, daily: 'Nov 7' | null, best: secondes | null, replay: bool,
+  // extra : { stats: { seen, rushes, escapes, closest, haunts }, daily: 'Nov 7' | null, best: secondes | null,
   // abyss: bool (le dernier mort est tombé dans un puits sans fond : on le laisse tomber jusqu'au noir),
   // thirst: bool (le dernier mort s'est effondré, mort de soif) }
   showEnd(sim, onRestart, extra = {}) {
@@ -1035,7 +1022,7 @@ export class BackroomsHUD {
     };
     this.endAt = performance.now();
     this.endPending = reveal;
-    this.endT = setTimeout(reveal, goat ? 12500 : sim.state === 'dead' ? (extra.replay ? 5600 : extra.abyss ? 5200 : extra.thirst ? 3400 : 1300) : 300);
+    this.endT = setTimeout(reveal, goat ? 12500 : sim.state === 'dead' ? (extra.abyss ? 5200 : extra.thirst ? 3400 : 1300) : 300);
     // le bilan de la bande : ce qu'elle a vu de toi
     const S = extra.stats;
     const lines = [];

@@ -18,7 +18,7 @@
 // Chacun part avec sa lampe torche dans la case 1. Un joueur attrapé regarde les autres jusqu'à la fin de l'étage ;
 // si l'équipe le termine, tout le monde repart à l'étage suivant, lampe en main.
 import { CELL_SIZE, T, CASSETTES, createLevel0, PIT_HALF, FLOOR_DY, bfs, pillarDist, segHitsPillar } from './map.js';
-import { createWarehouseMap, DOCK_PASS } from './level1.js';
+import { createWarehouseMap, DOCK_PASS, guardDoorWant } from './level1.js';
 import { createPoolMap, MOUTH } from './poolrooms.js';
 import { createHotelMap, WORDS, LETTERS, HIDE_R as SPOT_R, MAIL_R, KEYPAD_R, LETTER_R } from './hotel.js';
 import { createPipesMap, VALVES, PIPES_LEVEL, jetState, inJet, JET_HALF } from './level2.js';
@@ -53,7 +53,7 @@ export const LOSE_TRACK_T = 4; // secondes sans voir le joueur avant que l'entit
 export const BATTERY_DRAIN = 0.42; // % par seconde de lampe allumée (environ 4 minutes pour une pile pleine)
 export const CAM_DRAIN = 0.15; // % par seconde de caméscope sorti (V) : il tire sur la même pile que la lampe
 export const BATTERY_PACK = 60; // % rendus par une pile utilisée
-export const INV_SIZE = 4; // cases d'objets (piles, eau d'amande, échelle) : la case 1 de l'inventaire est réservée à la lampe
+export const INV_SIZE = 2; // cases d'objets (piles, eau d'amande, échelle) : la case 1 de l'inventaire est réservée à la lampe
 export const DROP_AHEAD = 0.55; // m : G pose l'objet choisi par terre, à cette distance devant soi
 export const PICK_R = 1.4; // portée de F pour ramasser
 export const ALMOND_WATER = 50; // une bouteille d'eau d'amande rend la moitié de la gourde
@@ -369,7 +369,7 @@ function newPlayer(id, name, map, i) {
     hasLamp: true, // lampe torche, toujours dans la case 1
     bottles: 0,
     battery: 100, // pile de la lampe torche (0 à 100)
-    inv: new Array(INV_SIZE).fill(null), // cases 2 à 5 de l'inventaire : 'battery', 'bottle', 'ladder' ou null
+    inv: new Array(INV_SIZE).fill(null), // cases 2 et 3 de l'inventaire : 'battery', 'bottle', 'ladder' ou null
     sel: 1, // case choisie (1 à INV_SIZE ; la case 0, c'est la lampe) : E l'utilise, G la pose par terre, F l'échange
     // contre un objet au sol quand l'inventaire est plein
     lockT: 0, // immobile un instant (après une chute, dans l'escalier)
@@ -2006,6 +2006,13 @@ export class BackroomsSim {
       this.updatePanel();
       this.updateDocks();
       this.updateAlarms();
+      // la porte du poste de garde s'ouvre devant qui arrive (fermée, elle cache et étouffe comme une cloison)
+      const gd = this.map.guardDoor;
+      if (gd) {
+        const want = guardDoorWant(gd, [...this.players.filter((q) => q.status === 'alive' && !((q.floor || 0) > 0)), this.monster && !this.monster.duct ? this.monster : null]);
+        if (want !== gd.open) this.emit({ type: 'guardDoor', open: want, x: gd.x, z: gd.z });
+        gd.open = want;
+      }
     }
     updateDirector(this);
     updateLightsOut(this);

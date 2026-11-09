@@ -85,10 +85,8 @@ let goatBellT = 0; // la cloche du bouc alpha
 let goatHint = false; // le conseil « elles craignent la lumière », une fois par partie
 const goatHoofN = [];
 let deathNear = false; // le son de la mort a été joué (il revient quand l'entité s'est éloignée)
-// le bilan de la bande (ce qu'elle a vu de toi), tenu sur cet écran ; les dernières secondes pour le rejeu de la mort
+// le bilan de la bande (ce qu'elle a vu de toi), tenu sur cet écran
 let runStats = { seen: 0, rushes: 0, escapes: 0, closest: Infinity, haunts: 0 };
-let tapeFrames = [];
-let replayed = false;
 let lastAbyss = false; // le dernier mort est tombé dans un puits sans fond (texte et délai de l'écran de fin)
 let lastThirst = false; // … ou s'est effondré, mort de soif
 let runT = 0; // secondes de course d'affilée (le souffle qui s'emballe)
@@ -145,7 +143,7 @@ const act = { use: false, pick: false, drop: false, whistle: false, jump: false,
 let crouchOn = false; // C : s'accroupir / se relever (bascule)
 let camOn = false; // V : sortir / ranger le caméscope
 let airborne = false; // en plein saut (pour le bruit de la réception)
-let selRequested = 0; // touches 2 à 5 : choisir la case d'objet (1 à INV_SIZE)
+let selRequested = 0; // touches 2 et 3 : choisir la case d'objet (1 à INV_SIZE)
 let codeRequested = null; // Level 5 : le code tapé sur le clavier de la porte de secours
 let kbMode = false;
 let paused = true; // la partie attend qu'on prenne le contrôle
@@ -355,7 +353,7 @@ window.addEventListener('keydown', (e) => {
     act.struggle++;
     return;
   }
-  // 1 : allumer / éteindre la lampe ; 2 à 5 : choisir une case d'objet ; E : l'utiliser ; G : la poser par terre ;
+  // 1 : allumer / éteindre la lampe ; 2 et 3 : choisir une case d'objet ; E : l'utiliser ; G : la poser par terre ;
   // F : ramasser, ou se cacher dans un casier ; T : siffler ; C : s'accroupir (bascule) ; Espace : sauter (accroupi :
   // se relever)
   const slot = /^(Digit|Numpad)([1-9])$/.exec(e.code);
@@ -646,8 +644,6 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
     ensureVoice().sync(players.map((p) => p.id));
   }
   runStats = { seen: 0, rushes: 0, escapes: 0, closest: Infinity, haunts: 0 };
-  tapeFrames = [];
-  replayed = false;
   lastAbyss = false;
   lastThirst = false;
   echoT = 0;
@@ -671,7 +667,6 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
     hud.$('#endScreen').hidden = true;
     hud.lastCount = -1;
     hud.endPending = null;
-    hud.replayTag(false);
     if (hud.hideGoatDeath) hud.hideGoatDeath();
   }
 
@@ -843,12 +838,12 @@ function onRoster() {
 // revenir ; après un changement d'hôte, les autres reviennent un par un dans le nouveau salon : on ne les sort pas
 // de la partie pour autant. Au-delà, il la quitte (ce qu'il portait reste par terre)
 // les lampes d'explorateurs à poser d'avance dans la scène (chacune coûte un peu à chaque image, même éteinte ; en
-// ajouter une en cours de partie fige l'image le temps de recompiler) : une par joueur du salon, plus celle du rejeu
-// de la mort, et une de réserve à plusieurs pour un retardataire
+// ajouter une en cours de partie fige l'image le temps de recompiler) : une par joueur du salon, et une de réserve à
+// plusieurs pour un retardataire
 function lampsFor() {
-  if (NET.role === 'solo') return 2;
+  if (NET.role === 'solo') return 1;
   const n = Math.max(sim ? sim.players.length : 1, H && H.players ? H.players.length : 1);
-  return Math.min(8, n + 2);
+  return Math.min(7, n + 1);
 }
 
 function prunePlayers() {
@@ -1212,6 +1207,11 @@ function handleEvent(ev, me) {
     case 'alarmEnd':
       if (sfx) sfx.alarmStop(ev.id);
       break;
+    case 'guardDoor':
+      // (chez un invité aussi : fermée, elle cache comme une cloison)
+      if (sim.map.guardDoor) sim.map.guardDoor.open = !!ev.open;
+      if (sfx) sfx.guardDoor({ x: ev.x, z: ev.z }, !!ev.open);
+      break;
     case 'desk':
       if (sfx) sfx.creak({ x: ev.x, z: ev.z }, 0.6);
       if (ev.id === me && ev.on && hud) {
@@ -1376,37 +1376,20 @@ function handleEvent(ev, me) {
         if (sfx) setTimeout(() => sfx.goatDeath(), 850);
         break;
       }
-      // elle surgit devant l'objectif (dans la scène), puis la bande saute… et rejoue tes dernières secondes, vues de sa
-      // tête (sur une autre caméra) ; puis l'image se perd
+      // elle surgit devant l'objectif (dans la scène), puis l'image se perd
       // aux Poolrooms, le même screamer qu'au Level 1 (la même entité) ; au Level 5, l'entité de l'hôtel se jette sur la caméra
       const look = sim.level === 2 ? 1 : sim.level;
       if (sfx) sfx.jumpscare(look);
       if (scene) sim.level === HOTEL_LEVEL ? scene.scare() : scene.jumpscare();
       if (hud) hud.showJumpscare(look);
       {
-        const now = performance.now() / 1000;
-        const frames = tapeFrames.filter((f) => f.t > now - 3.6);
-        const span = frames.length ? frames[frames.length - 1].t - frames[0].t : 0;
         const sc = scene;
-        replayed = span > 1.5 && !sim.goats && sim.level !== HOTEL_LEVEL; // Level 5 : son screamer en 3D, pas de rejeu
-        const lose = () => {
+        setTimeout(() => {
           if (scene !== sc) return;
-          replayed = false; // le rejeu est fini : l'écran de fin n'a plus à l'attendre
-          if (hud) hud.replayTag(false);
           if (scene) scene.tape('loss', 2.6);
           if (sfx) sfx.noSignal(true);
           setTimeout(() => sfx && sfx.noSignal(false), 2400);
-        };
-        if (replayed) {
-          setTimeout(() => {
-            if (scene !== sc) return;
-            scene.tape('splice', 0.7);
-            if (sfx) sfx.tapeSplice();
-            scene.replay(frames);
-            if (hud) hud.replayTag(true);
-            setTimeout(lose, span * 1000 + 350);
-          }, 1700);
-        } else setTimeout(lose, 1400);
+        }, 1400);
       }
       break;
     case 'valve':
@@ -1506,7 +1489,7 @@ function handleEvent(ev, me) {
         best = Math.max(rec.key === key ? rec.best || 0 : 0, sim.time);
         store.set('backrooms_daily', { key, best });
       }
-      if (hud) hud.showEnd(sim, NET.role === 'guest' ? null : () => initGame(), { stats: runStats, daily: dailyLabel, best, replay: replayed && ev.type === 'gameover', abyss: lastAbyss && ev.type === 'gameover', thirst: lastThirst && ev.type === 'gameover' });
+      if (hud) hud.showEnd(sim, NET.role === 'guest' ? null : () => initGame(), { stats: runStats, daily: dailyLabel, best, abyss: lastAbyss && ev.type === 'gameover', thirst: lastThirst && ev.type === 'gameover' });
       if (H && H.embedded && NET.role !== 'guest') {
         const won = ev.type === 'win';
         // la vraie fin vaut bien plus qu'une fausse sortie, qui vaut plus que de mourir loin (Level 2 compris)
@@ -1899,16 +1882,11 @@ function frame(currentTime) {
     }
   }
 
-  // la bande : les dernières secondes (pour le rejeu de la mort), l'appel le plus serré, l'air des recoins calmes
+  // la bande : l'appel le plus serré, l'air des recoins calmes
   if (sim.hasMonster && !sim.goats && sim.state === 'playing') {
     const P = sim.player;
     const M = sim.monster;
-    if (P.status === 'alive' && !(P.grabT > 0)) {
-      const t = performance.now() / 1000;
-      tapeFrames.push({ t, mx: M.x, mz: M.z, myaw: M.yaw || 0, mf: M.floor || 0, px: P.x, pz: P.z, pyaw: P.yaw, pf: P.floor || 0, mv: P.moving ? 1 : 0, rn: P.running ? 1 : 0, fl: P.flashlight ? 1 : 0 });
-      while (tapeFrames.length && tapeFrames[0].t < t - 4) tapeFrames.shift();
-      if (M.mode === 'chase' && (M.floor || 0) === (P.floor || 0)) runStats.closest = Math.min(runStats.closest, Math.hypot(M.x - P.x, M.z - P.z));
-    }
+    if (P.status === 'alive' && !(P.grabT > 0) && M.mode === 'chase' && (M.floor || 0) === (P.floor || 0)) runStats.closest = Math.min(runStats.closest, Math.hypot(M.x - P.x, M.z - P.z));
   }
   echoT = Math.max(0, echoT - delta);
   if (hud) hud.hauntWait = Math.max(0, (hauntAt - performance.now()) / 1000);
