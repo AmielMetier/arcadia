@@ -567,6 +567,10 @@ test("jamais plantée sous les yeux du joueur : fixée, elle charge ; vue de cô
       if (sim.director) Object.assign(sim.director, { huntT: 1e9, fakeT: 1e9 });
       const P = sim.player;
       const M = sim.monster;
+      // hors de la zone éclairée du départ (elle n'apparaît jamais dans la lumière franche), là où une longue vue s'ouvre
+      const dim = (p) => !sim.brightCell(sim.map, p.x, p.z);
+      const home = sim.map.walkable.map(at).find((p) => dim(p) && inView(sim, p, 13, 19, dim));
+      if (home) Object.assign(P, home);
       sim.glimpseAt = 0;
       let show = null;
       for (let i = 0; i < 60 * 30 && !show; i++) {

@@ -418,6 +418,12 @@ export function createBackroomsScene(container, floors, lamps) {
       return p && p.rects ? p : null;
     };
     const EDGE = !!map.thinCount;
+    // Level 0 : les murs en biais des couloirs en diagonale (la moitié pleine d'une case coupée)
+    const CHAMF = !!(map.chamfers && map.chamfers.length);
+    const chamfAt = (x, z) => {
+      const p = map.pillarAt && map.pillarAt(x, z);
+      return p && p.poly ? p : null;
+    };
     // Level 1 : les cloisons du poste de garde, sur les bords des cases (donc des texels) : la lumière cuite ne passe
     // pas dessous, comme sous les cloisons fines du Level 0
     const SEGS = !EDGE && map.segs && map.segs.length ? map.segs : null;
@@ -617,6 +623,18 @@ float occVis(vec3 p, vec3 lp) {
     const seen = (lx, lz, px, pz) => {
       const gx = Math.floor(px / CELL_SIZE);
       const gz = Math.floor(pz / CELL_SIZE);
+      // un texel dans la moitié pleine d'une case coupée en biais : comme pour un mur droit, les 70 premiers
+      // centimètres derrière la face prennent la lumière de la face (sinon le mur en biais se marbre d'ombre)
+      if (CHAMF) {
+        const c = chamfAt(gx, gz);
+        const f = c && c.face;
+        const sd = f ? (px - f.a[0]) * f.nx + (pz - f.a[1]) * f.nz : 0;
+        if (sd < 0) {
+          if (sd < -0.7) return false;
+          px += f.nx * (0.02 - sd);
+          pz += f.nz * (0.02 - sd);
+        }
+      }
       const own = isWall(gx, gz);
       const d = Math.hypot(px - lx, pz - lz);
       const n = Math.ceil(d / 0.2);
@@ -697,10 +715,10 @@ float occVis(vec3 p, vec3 lp) {
           }
           // et au pied des cloisons fines
           if (SEGS) for (const sg of SEGS) d = Math.min(d, Math.max(0, segGap(sg, px, pz)));
-          if (EDGE) {
+          if (EDGE || CHAMF) {
             for (let dz = -1; dz <= 1; dz++) {
               for (let dx = -1; dx <= 1; dx++) {
-                const p = thinAt(gx + dx, gz + dz);
+                const p = thinAt(gx + dx, gz + dz) || (CHAMF && chamfAt(gx + dx, gz + dz));
                 if (p) d = Math.min(d, pillarDist(p, px, pz));
               }
             }
@@ -838,7 +856,8 @@ float occVis(vec3 p, vec3 lp) {
       const gloss = L1 && opts && opts.gloss; // le béton lissé du Level 1, où se reflètent les réglettes
       const bump = L1 && opts && opts.bump; // Level 1 : un relief (les joints des parpaings) que prennent aussi les feux de couleur
       const wall1 = L1 && opts && opts.wall1; // les murs du Level 1 : la poussière et la suie sous le plafond
-      if (spec || PIPES || base || EDGE || SEGS || film || gloss || L1) mat.customProgramCacheKey = () => 'bk' + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE || SEGS ? '-edge' : '') + (film ? '-film' : '') + (gloss ? '-gloss' : '') + (L1 ? '-dyn' : '') + (bump ? '-bump' : '') + (wall1 ? '-wall1' : '');
+      const push = opts && opts.push; // les murs en biais : la lumière lue un peu devant eux, dans le couloir (pas au coin des cases)
+      if (spec || PIPES || base || EDGE || SEGS || film || gloss || L1 || push) mat.customProgramCacheKey = () => 'bk' + (push ? '-push' : '') + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE || SEGS ? '-edge' : '') + (film ? '-film' : '') + (gloss ? '-gloss' : '') + (L1 ? '-dyn' : '') + (bump ? '-bump' : '') + (wall1 ? '-wall1' : '');
       mat.onBeforeCompile = (sh) => {
         Object.assign(sh.uniforms, bakeUniforms);
         if (L1) {
@@ -866,6 +885,7 @@ float occVis(vec3 p, vec3 lp) {
         }
         if (PIPES) sh.defines = { ...(sh.defines || {}), BK_PIPES: 1 };
         if (base) sh.defines = { ...(sh.defines || {}), BK_BASE: 1 };
+        if (push) sh.defines = { ...(sh.defines || {}), BK_PUSH: push.toFixed(3) };
         if (EDGE || SEGS) sh.defines = { ...(sh.defines || {}), BK_EDGE: 1 };
         sh.vertexShader = 'varying vec3 vBakeP;\nvarying vec3 vBakeN;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
           vec4 bakeWP = vec4(transformed, 1.0);
@@ -973,6 +993,9 @@ float bkCaust(vec2 uv, float t) {
           // les néons sont au plafond : un mur s'assombrit vers le bas, et plus encore au ras du sol et sous le plafond ;
           // le sol et le plafond s'assombrissent au pied des murs
           vec2 bkUv = vBakeP.xz * uBakeScale;
+          #ifdef BK_PUSH
+          bkUv = (vBakeP.xz + vBakeN.xz * BK_PUSH) * uBakeScale;
+          #endif
           float bkNear = 0.0; // près d'une cloison fine : 1 contre elle, 0 à trois texels et plus
           #ifdef BK_EDGE
           {
@@ -1503,7 +1526,7 @@ float bkCaust(vec2 uv, float t) {
       for (let z = 0; z < H; z++) {
         for (let x = 0; x < W; x++) {
           const p = map.pillarAt(x, z);
-          if (!p || p.rects) continue; // les cloisons fines : plus bas (3c)
+          if (!p || p.rects || p.poly) continue; // les cloisons fines (3c) et les murs en biais (3d) : plus bas
           const key = (p.round ? 'r' : 's') + p.h + (p.hall ? 'h' : '');
           if (!kinds.has(key)) kinds.set(key, { p, list: [] });
           kinds.get(key).list.push(p);
@@ -1581,6 +1604,37 @@ float bkCaust(vec2 uv, float t) {
       geo.setIndex(idx);
       geo.computeBoundingSphere();
       group.add(new THREE.Mesh(geo, wallMat));
+    }
+
+    // 3d. Les murs en biais des couloirs en diagonale : une face du sol au plafond, d'un coin à l'autre de la case
+    // coupée, tournée vers le couloir ; le papier peint calé sur le monde le long du mur (une répétition par 2,5 m)
+    if (CHAMF) {
+      const pos = [];
+      const nor = [];
+      const uvs = [];
+      const idx = [];
+      for (const f of map.chamfers) {
+        // a à gauche, b à droite, vu du couloir (la normale vers soi)
+        let [ax, az] = f.a;
+        let [bx, bz] = f.b;
+        if ((bx - ax) * f.nz - (bz - az) * f.nx < 0) [ax, az, bx, bz] = [bx, bz, ax, az]; // (la droite du regard : (nz, -nx))
+        const tx = (bx - ax) / Math.hypot(bx - ax, bz - az);
+        const tz = (bz - az) / Math.hypot(bx - ax, bz - az);
+        const ua = (ax * tx + az * tz) / CELL_SIZE;
+        const ub = (bx * tx + bz * tz) / CELL_SIZE;
+        const i = pos.length / 3;
+        pos.push(ax, 0, az, bx, 0, bz, bx, CEIL, bz, ax, CEIL, az);
+        for (let k = 0; k < 4; k++) nor.push(f.nx, 0, f.nz);
+        uvs.push(ua, 0, ub, 0, ub, 1, ua, 1);
+        idx.push(i, i + 1, i + 2, i, i + 2, i + 3);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geo.setIndex(idx);
+      geo.computeBoundingSphere();
+      group.add(new THREE.Mesh(geo, baked(new THREE.MeshLambertMaterial({ map: wallMat.map }), { base: true, push: 0.45 })));
     }
 
     // 4. Néons au plafond (les morts sont gris, ceux qui grésillent clignotent)

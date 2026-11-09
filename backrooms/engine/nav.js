@@ -60,7 +60,8 @@ export function findPath(map, startX, startZ, targetX, targetZ) {
       if (nx >= 0 && nx < W && nz >= 0 && nz < H) {
         const nK = key(nx, nz);
         // map.canStep (Poolrooms) : d'une salle à l'autre, seulement par une porte
-        if (!visited[nK] && !map.isWall(nx, nz) && (!map.canStep || map.canStep(cur.x, cur.z, nx, nz))) {
+        // (une case coupée en biais se traverse le long de son couloir en diagonale)
+        if (!visited[nK] && (!map.isWall(nx, nz) || (map.crossable && map.crossable(nx, nz))) && (!map.canStep || map.canStep(cur.x, cur.z, nx, nz))) {
           visited[nK] = 1;
           cameFrom[nK] = curK;
           queue.push({ x: nx, z: nz });
