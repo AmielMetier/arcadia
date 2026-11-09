@@ -44,7 +44,6 @@
   - Un joueur attrapé avec des lettres en poche : elles retournent là où il les avait trouvées.
   - Parquet qui craque et boîte à musique désaccordée au loin.
 - **The Backrooms** — les toboggans jaune et bleu des Poolrooms mènent toujours à l'écran de fin, en attendant leurs niveaux.
-
 ## 4.85 — 9 novembre 2026
 - **The Backrooms** — Un vrai inventaire : quatre cases d'objets à côté de la lampe, à choisir avec les touches 2 à 5 ou la molette.
   - G pose l'objet choisi par terre, juste devant soi : une eau d'amande ou des piles à laisser à un coéquipier, l'échelle à garder pour plus tard. On l'entend tomber.
