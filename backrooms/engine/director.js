@@ -17,6 +17,7 @@ export const RELAX_T = [30, 60]; // secondes de répit après un pic
 export const FAKE_EVERY = [28, 55]; // une fausse alerte de temps en temps, pendant la montée
 export const CALM_BEFORE_BLACKOUT = 10; // secondes de calme avant qu'une coupure puisse tomber
 export const RARE_CHANCE = 0.4; // chance d'un événement rare par niveau
+const L0_AGGRO = 0.8; // Level 0 : l'entité moins agressive (même valeur que dans sim.js) : répits et traques plus espacés
 
 export function createDirector(level) {
   return {
@@ -31,7 +32,7 @@ export function createDirector(level) {
     t: 0,
     drops: [], // néons éteints un instant : [{ l, t, back }]
     // Level 0 : de temps en temps, les néons meurent un à un jusqu'à soi… et quand ils reviennent, elle arrive
-    huntT: level === 0 ? rand(85, 130) : Infinity,
+    huntT: level === 0 ? rand(85, 130) / L0_AGGRO : Infinity,
   };
 }
 
@@ -62,7 +63,7 @@ export function updateDirector(sim) {
   if (D.phase === 'build' && D.stress > 0.65) D.phase = 'peak';
   else if (D.phase === 'peak' && D.stress < 0.35 && !chasing) {
     D.phase = 'relax';
-    D.relaxT = rand(...RELAX_T) * (sim.difficulty === 'hard' ? 0.65 : 1);
+    D.relaxT = (rand(...RELAX_T) * (sim.difficulty === 'hard' ? 0.65 : 1)) / (D.level === 0 ? L0_AGGRO : 1);
     sim.emit({ type: 'relief' });
   } else if (D.phase === 'relax') {
     D.relaxT -= DT;
@@ -97,7 +98,7 @@ export function updateDirector(sim) {
   if (D.level === 0 && sim.hasMonster && M && D.phase === 'build' && D.stress < 0.3 && !sim.lightsOut && !(sim.blackout > 0) && M.mode === 'patrol' && !M.glimpse && !(M.dormantT > 0)) {
     D.huntT -= DT;
     if (D.huntT <= 0) {
-      D.huntT = rand(100, 160) * (1.2 - (sim.skill ?? 0.5) * 0.4);
+      D.huntT = (rand(100, 160) * (1.2 - (sim.skill ?? 0.5) * 0.4)) / L0_AGGRO;
       // de préférence celui qui s'est isolé
       const lone = alive.slice().sort((a, b) => isolation(sim, b) - isolation(sim, a))[0];
       if (!sim.calmAt || !sim.calmAt(lone)) lightsDie(sim, lone, true);
@@ -157,7 +158,7 @@ function fakeAlarm(sim, P) {
   const pipes = !!sim.goats || (sim.map.valves || []).length > 0;
   // Level 0 : aussi l'écho (des pas qui s'arrêtent quand on s'arrête), une silhouette qui s'efface, l'ascenseur qui
   // sonne tout seul
-  const kinds = pipes ? ['hammer', 'groan', 'knock', 'steps', 'neon', 'neon'] : lv === 1 ? ['buzz', 'steps', 'door', 'knock', 'groan', 'neon'] : lv === 2 ? ['steps', 'knock', 'drag'] : ['buzz', 'steps', 'door', 'drag', 'neon', 'echo', 'echo', 'figure', 'ding', 'row', 'row', 'surge', 'surge'];
+  const kinds = pipes ? ['hammer', 'groan', 'knock', 'steps', 'neon', 'neon'] : lv === 1 ? ['buzz', 'steps', 'door', 'knock', 'groan', 'neon'] : lv === 2 ? ['steps', 'knock', 'drag'] : ['steps', 'door', 'drag', 'neon', 'echo', 'echo', 'figure', 'ding', 'row', 'row', 'surge', 'surge'];
   // à plusieurs, l'entité imite parfois le sifflet d'un coéquipier… qui est ailleurs
   const mates = sim.players.filter((Q) => Q !== P && Q.status === 'alive');
   if (mates.length && sim.hasMonster && !sim.goats && Math.random() < 0.25) {

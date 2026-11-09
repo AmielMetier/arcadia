@@ -134,6 +134,8 @@ export const chamferStep = (a, b, dx, dz) => {
 // de la case, pour borner) ou la moitié pleine d'une case coupée en biais ({ x, z, h, poly : [[x, z] ×3], face })
 export const THIN_HALF = 0.06; // demi-épaisseur d'une cloison fine (12 cm)
 export const THIN_SHARE = 0.25; // part des murs d'une case d'épaisseur changés en cloisons (par régions)
+export const POCKET = 24; // une poche sans autre issue jusqu'à 24 cases compte comme un cul-de-sac (voir 8d)
+export const DEAD_OPEN = 0.5; // part des culs-de-sac rouverts sur le reste du dédale (un tiers de moins, voir 8d)
 const PARTITIONS = 60; // cloisons ajoutées au milieu des espaces trop ouverts, par étage
 const PART_ROOMY = 20; // cases libres sur 5 × 5 autour du départ d'une cloison
 const DIAG = 3; // couloirs en diagonale par étage (45°, 3,5 m de large, de 4 à 7 cases de long)
@@ -1096,6 +1098,124 @@ export function createBackroomsMap(seed = 42, opts = {}) {
       pillars[t.k] = { x: cx, z: cz, h: hc, rects, thin: true };
     }
     thinCount = list.length;
+  }
+
+  // 8d. Moins de culs-de-sac : une poche (jusqu'à POCKET cases) qu'on ne quitte que par où l'on est entré est, une
+  // fois sur DEAD_OPEN, reliée au reste par un mur percé (une case d'épaisseur, sinon deux) : on tourne en rond au
+  // lieu de buter contre un mur. Le couloir piégé, le trou à cassette, l'ascenseur, les couloirs en diagonale et les
+  // cloisons fines n'y sont pour rien. Tiré à part : le reste du tirage de la carte ne bouge pas.
+  {
+    let ds = Math.imul((seed >>> 0) ^ 0x6a09e667, 2246822519) >>> 0 || 1;
+    const drnd = () => {
+      ds = (ds + 0x6d2b79f5) >>> 0;
+      let t = ds;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const pass = (k) => dist[k] >= 0 && crossable(grid[k]);
+    // cases qu'on ne perce pas : autour de l'ascenseur, du couloir piégé, du trou à cassette, des biais et des cloisons
+    const hold = new Set(vaultCells || []);
+    const ring = (gx, gz, r) => {
+      for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) hold.add((gz + dz) * W + gx + dx);
+    };
+    if (elevator) ring(elevator.gx, elevator.gz, 1);
+    if (niche) ring(niche.gx + niche.dx, niche.gz + niche.dz, 1);
+    for (const k of diagFill) hold.add(k);
+    for (let k = 0; k < W * H; k++) {
+      const v = grid[k];
+      if (isChamfer(v) || (v === T.PILLAR && pillars[k] && pillars[k].thin)) ring(k % W, (k / W) | 0, 1);
+    }
+    // les points de passage obligés (Tarjan, sans récursion) depuis le départ : la descendance d'une case c qui ne
+    // remonte pas plus haut que son parent est une poche fermée par ce parent
+    const disc = new Int32Array(W * H).fill(-1);
+    const low = new Int32Array(W * H);
+    const size = new Int32Array(W * H);
+    const order = [];
+    const pockets = [];
+    const stack = [[sz * W + sx, -1, 0]];
+    disc[sz * W + sx] = low[sz * W + sx] = 0;
+    order.push(sz * W + sx);
+    while (stack.length) {
+      const top = stack[stack.length - 1];
+      const [k, par] = top;
+      if (top[2] < 4) {
+        const [dx, dz] = N4[top[2]++];
+        const x = k % W;
+        const z = (k - x) / W;
+        const nx = x + dx;
+        const nz = z + dz;
+        if (nx < 0 || nz < 0 || nx >= W || nz >= H) continue;
+        const nk = nz * W + nx;
+        if (!pass(nk) || !chamferStep(grid[k], grid[nk], dx, dz)) continue;
+        if (disc[nk] < 0) {
+          disc[nk] = low[nk] = order.length;
+          order.push(nk);
+          stack.push([nk, k, 0]);
+        } else if (nk !== par) low[k] = Math.min(low[k], disc[nk]);
+        continue;
+      }
+      stack.pop();
+      size[k] += 1;
+      if (par >= 0) {
+        size[par] += size[k];
+        low[par] = Math.min(low[par], low[k]);
+        if (low[k] >= disc[par] && size[k] <= POCKET) pockets.push(k);
+      }
+    }
+    // seulement les plus grandes poches (une poche dans une poche compte une fois)
+    pockets.sort((a, b) => disc[a] - disc[b]);
+    const outer = [];
+    for (const c of pockets) {
+      const o = outer[outer.length - 1];
+      if (o !== undefined && disc[c] < disc[o] + size[o]) continue;
+      outer.push(c);
+    }
+    const exitK = exitCell.z * W + exitCell.x;
+    const exitD0 = dist[exitK];
+    const done = []; // les murs percés, poche par poche
+    for (const c of outer) {
+      if (drnd() >= DEAD_OPEN) continue;
+      const lo = disc[c];
+      const hi = lo + size[c];
+      const inPocket = (k) => disc[k] >= lo && disc[k] < hi;
+      const thin1 = [];
+      const thin2 = [];
+      for (let i = lo; i < hi; i++) {
+        const k = order[i];
+        const x = k % W;
+        const z = (k - x) / W;
+        if (grid[k] !== T.FLOOR) continue;
+        for (const [dx, dz] of N4) {
+          const a = (z + dz) * W + x + dx;
+          if (!inside(x + dx, z + dz) || grid[a] !== T.WALL || hold.has(a)) continue;
+          const b = (z + 2 * dz) * W + x + 2 * dx;
+          if (pass(b) && grid[b] === T.FLOOR && !inPocket(b)) {
+            thin1.push([a]);
+            continue;
+          }
+          const e = (z + 3 * dz) * W + x + 3 * dx;
+          if (inside(x + 2 * dx, z + 2 * dz) && grid[b] === T.WALL && !hold.has(b) && pass(e) && grid[e] === T.FLOOR && !inPocket(e)) thin2.push([a, b]);
+        }
+      }
+      const pickFrom = thin1.length ? thin1 : thin2;
+      if (!pickFrom.length) continue;
+      const cut = pickFrom[Math.floor(drnd() * pickFrom.length)];
+      for (const a of cut) grid[a] = T.FLOOR;
+      done.push(cut);
+    }
+    if (done.length) {
+      // un raccourci ne doit pas rapprocher l'ascenseur du départ (de plus de 10 %, ni à moins de 42 cases) : on
+      // rebouche les derniers percés jusqu'à ce que ce soit le cas
+      for (;;) {
+        dist = bfs(grid, W, H, sx, sz);
+        if (!done.length || dist[exitK] >= Math.min(exitD0, Math.max(42, Math.ceil(exitD0 * 0.9)))) break;
+        for (const a of done.pop()) grid[a] = T.WALL;
+      }
+      walkable.length = 0;
+      for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) if (grid[z * W + x] === T.FLOOR && pitGrid[z * W + x] < 0) walkable.push({ x, z });
+    }
   }
 
   // 9. Éclairage : un néon par case paire. Un bruit à basse fréquence découpe des zones où les néons sont morts

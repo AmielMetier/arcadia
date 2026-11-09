@@ -242,6 +242,102 @@ const SEGMENTS = [
   ]),
 ];
 
+// Level 0 (opts.wiry) : le corps de l'entité de la photo de référence. Tout en brins noirs filiformes, noueux et
+// entortillés comme des branches mortes ou du fil de fer ; une barre d'épaules d'où pendent des bras qui touchent
+// presque le sol, aux doigts écartés ; une petite tête ronde coiffée d'un large disque plat. On voit à travers.
+// os, os enfant, rayon d'un brin (m), allongement de l'os enfant, nombre de brins
+const WIRY = [
+  ['Hips', 'Abdomen', 0.028, 1, 4],
+  ['Abdomen', 'Torso', 0.026, 1, 4],
+  ['Torso', 'Neck', 0.028, 1, 4],
+  ['Neck', 'Head', 0.018, 2.2, 3],
+  ...L.flatMap((s) => [
+    ['Hips', `UpperLeg${s}`, 0.022, 1, 3],
+    [`Shoulder${s}`, `UpperArm${s}`, 0.02, 1.5, 3], // la barre d'épaules, trop large
+    [`UpperArm${s}`, `LowerArm${s}`, 0.02, 1.75, 3], // des bras qui pendent jusqu'en bas
+    [`LowerArm${s}`, `Middle1${s}`, 0.018, 1.9, 3],
+    ...['Index', 'Middle', 'Pinky'].flatMap((f) => [
+      [`${f}1${s}`, `${f}2${s}`, 0.009, 3, 1], // doigts interminables, en baguettes
+      [`${f}2${s}`, `${f}3${s}`, 0.008, 3, 1],
+      [`${f}3${s}`, `${f}3${s}_end`, 0.006, 3.2, 1],
+    ]),
+    [`Thumb1${s}`, `Thumb2${s}`, 0.009, 2.2, 1],
+    [`UpperLeg${s}`, `LowerLeg${s}`, 0.024, LEG, 3],
+    [`LowerLeg${s}`, `LowerLeg${s}_end`, 0.02, LEG, 3],
+  ]),
+];
+
+// un petit hasard reproductible (la même silhouette à chaque partie)
+function seeded(n) {
+  let a = n >>> 0 || 1;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// réunit des géométries (position, normale) en une seule : un membre = un seul objet à dessiner
+function mergeGeos(geos) {
+  let n = 0;
+  let m = 0;
+  for (const g of geos) {
+    n += g.attributes.position.count;
+    m += g.index ? g.index.count : g.attributes.position.count;
+  }
+  const pos = new Float32Array(n * 3);
+  const nor = new Float32Array(n * 3);
+  const uv = new Float32Array(n * 2);
+  const idx = new Uint32Array(m);
+  let o = 0;
+  let k = 0;
+  for (const g of geos) {
+    const c = g.attributes.position.count;
+    pos.set(g.attributes.position.array, o * 3);
+    nor.set(g.attributes.normal.array, o * 3);
+    if (g.attributes.uv) uv.set(g.attributes.uv.array, o * 2);
+    if (g.index) for (let i = 0; i < g.index.count; i++) idx[k++] = g.index.array[i] + o;
+    else for (let i = 0; i < c; i++) idx[k++] = i + o;
+    o += c;
+    g.dispose();
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  out.setIndex(new THREE.BufferAttribute(idx, 1));
+  return out;
+}
+
+// un membre en brins : n fils entortillés le long de l'axe y (de -len/2 à len/2), qui se rejoignent aux articulations
+// en un nœud ; r : l'épaisseur d'un brin
+function strands(len, r, n, rnd) {
+  const geos = [];
+  for (let j = 0; j < n; j++) {
+    const ph = rnd() * Math.PI * 2;
+    const spread = r * (n > 1 ? rnd() * 1.6 + 0.8 : rnd() * 0.8);
+    const turns = rnd() * 1.2 - 0.6;
+    const pts = [];
+    const K = Math.max(4, Math.min(9, Math.round(len / 0.12)));
+    for (let i = 0; i <= K; i++) {
+      const t = i / K;
+      // l'écart au milieu du membre, nul aux deux bouts ; des coudes au hasard le long du brin (bois tordu)
+      const w = Math.sin(Math.PI * t) * spread + (i > 0 && i < K ? (rnd() - 0.5) * r * 1.6 : 0);
+      const a = ph + turns * Math.PI * 2 * t;
+      pts.push(new THREE.Vector3(Math.cos(a) * w, -len / 2 + t * len, Math.sin(a) * w));
+    }
+    const rr = r * (0.55 + rnd() * 0.5);
+    geos.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), K * 2, rr, 4, false));
+  }
+  // le nœud de l'articulation (en haut du membre)
+  const knot = new THREE.SphereGeometry(r * (n > 1 ? 1.9 : 1.3), 6, 4);
+  knot.translate(0, len / 2, 0);
+  geos.push(knot);
+  return mergeGeos(geos);
+}
+
 let source = null;
 const loading = new GLTFLoader().loadAsync(MODEL).then((g) => {
   source = g;
@@ -250,6 +346,7 @@ const loading = new GLTFLoader().loadAsync(MODEL).then((g) => {
 // opts.photo : { url, crop } pour porter le visage d'une photo (mode VIP) au lieu de celui de l'entité classique
 export function createBeast(opts = {}) {
   const group = new THREE.Group();
+  const wiry = !!opts.wiry && !opts.photo;
   // (la lueur qui l'éclaire dans la pénombre suit la texture de la peau : pas un aplat qui l'efface)
   const skinTex = skinTexture();
   const skinMat = new THREE.MeshLambertMaterial({ map: skinTex, emissive: '#fff2ec', emissiveMap: skinTex, emissiveIntensity: 0 });
@@ -301,7 +398,8 @@ export function createBeast(opts = {}) {
     const Y = new THREE.Vector3(0, 1, 0);
     const ws = new THREE.Vector3();
     st.stretch = [];
-    for (const [a, b, r, k] of SEGMENTS) {
+    const wr = seeded(77);
+    for (const [a, b, r, k, nb] of wiry ? WIRY : SEGMENTS) {
       const A = bones[a];
       const B = bones[b];
       if (!A || !B) continue;
@@ -310,7 +408,7 @@ export function createBeast(opts = {}) {
       const rest = B.position.clone();
       if (k !== 1) st.stretch.push({ B, rest, k });
       const len = rest.length() * k * ws.x;
-      const geo = new THREE.CapsuleGeometry(r, Math.max(0.001, len - r * 2), 3, 8);
+      const geo = wiry ? strands(len, r, nb, wr) : new THREE.CapsuleGeometry(r, Math.max(0.001, len - r * 2), 3, 8);
       const m = new THREE.Mesh(geo, skinMat);
       m.frustumCulled = false;
       m.scale.setScalar(s);
@@ -323,7 +421,8 @@ export function createBeast(opts = {}) {
     if (torso) {
       torso.getWorldScale(ws);
       for (let i = 0; i < 4; i++) {
-        const rib = new THREE.Mesh(new THREE.TorusGeometry(0.12 - i * 0.008, 0.012, 5, 14, Math.PI * 1.2), skinMat);
+        // (Level 0 : un cadre de fils de fer, à peine plus large que la colonne, qu'on voit à travers)
+        const rib = new THREE.Mesh(wiry ? new THREE.TorusGeometry(0.09 - i * 0.006, 0.008, 3, 10, Math.PI * 1.5) : new THREE.TorusGeometry(0.12 - i * 0.008, 0.012, 5, 14, Math.PI * 1.2), skinMat);
         rib.scale.setScalar(1 / ws.x);
         rib.rotation.set(Math.PI / 2, 0, -Math.PI * 0.1);
         rib.position.set(0, (0.04 + i * 0.05) / ws.x, 0.02 / ws.x);
@@ -341,10 +440,23 @@ export function createBeast(opts = {}) {
       root.getWorldQuaternion(rootQ);
       const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(rootQ).applyQuaternion(q.clone().invert()).normalize();
       const up = new THREE.Vector3(0, 1, 0);
-      const skull = new THREE.Mesh(new THREE.SphereGeometry(0.15, 14, 12), skinMat);
-      skull.scale.set(s, s * 1.45, s * 1.1);
-      skull.position.copy(up).multiplyScalar(0.17 * s);
+      const skull = new THREE.Mesh(new THREE.SphereGeometry(wiry ? 0.1 : 0.15, 14, 12), skinMat);
+      skull.scale.set(s, s * (wiry ? 1.05 : 1.45), s * (wiry ? 1 : 1.1));
+      skull.position.copy(up).multiplyScalar((wiry ? 0.14 : 0.17) * s);
       head.add(skull);
+      if (wiry) {
+        // le large disque plat qui la coiffe, un peu de travers, et sa bordure effilochée en brins
+        const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.27, 0.022, 18), skinMat);
+        brim.scale.set(s, s, s * 0.8);
+        brim.position.copy(up).multiplyScalar(0.11 * s);
+        brim.rotation.set(0.12, 0, -0.18);
+        head.add(brim);
+        const fray = new THREE.Mesh(strands(0.5, 0.006, 3, seeded(5)), skinMat);
+        fray.scale.setScalar(s);
+        fray.position.copy(up).multiplyScalar(0.1 * s);
+        fray.rotation.set(0.1, 0.4, Math.PI / 2 - 0.15);
+        head.add(fray);
+      }
       const face = new THREE.Mesh(new THREE.PlaneGeometry(0.27, 0.36), faceMat);
       face.scale.setScalar(s);
       face.position.copy(up).multiplyScalar(0.16 * s).addScaledVector(fwd, 0.162 * s);
@@ -398,7 +510,7 @@ export function createBeast(opts = {}) {
       const end = bones[`LowerLeg${s}_end`];
       if (!end) continue;
       end.getWorldScale(ws);
-      const foot = new THREE.Mesh(new THREE.CapsuleGeometry(0.035, 0.18, 3, 8), skinMat);
+      const foot = new THREE.Mesh(wiry ? strands(0.22, 0.01, 2, seeded(11)) : new THREE.CapsuleGeometry(0.035, 0.18, 3, 8), skinMat);
       foot.scale.setScalar(1 / ws.x);
       foot.rotation.x = Math.PI / 2;
       end.add(foot);
@@ -493,6 +605,7 @@ export function createBeast(opts = {}) {
     // juste devant l'objectif)
     scareFace() {
       faceMat.map = faces[3];
+      if (st.face) st.face.visible = true;
       group.position.set(0, 0, 0);
       group.rotation.set(0, 0, 0);
       return st.face || st.head || null;
@@ -521,6 +634,8 @@ export function createBeast(opts = {}) {
       const rush = (M.rushT || M.rush || 0) > 0;
       skinMat.emissiveIntensity = Math.min(0.6, light * 0.25);
       faceMat.map = rush ? faces[2] : chase || M.mode === 'grab' ? faces[1] : faces[0];
+      // Level 0 : une tête noire, sans visage ; la bouche n'apparaît que quand elle se rue ou qu'elle saisit
+      if (wiry && st.face) st.face.visible = rush || M.mode === 'grab';
 
       // image par image : entre deux poses, le corps ne bouge pas et reste là où il était (sauf un saut de plus de
       // 2 m : un changement d'étage, une téléportation)

@@ -303,8 +303,54 @@ test('perception : accroupi derrière elle, on passe ; en courant, elle entend',
   P.running = true;
   P.bumpV = NOISE.run;
   P.bumpT = 1;
+  P.sawM = sim.time; // il l'a vue (sinon elle se montre d'abord : voir le test suivant)
   sim.step();
   assert.equal(M.mode, 'chase', 'un bruit de course tout près : elle se retourne');
+  sim.map.brightCells = null;
+});
+
+test("vue d'abord : avant la 3e cassette, elle ne se lance pas sur quelqu'un qui ne l'a pas vue ; vue, elle charge", () => {
+  const sim = new BackroomsSim({ map, difficulty: 'normal' });
+  const P = sim.player;
+  const M = sim.monster;
+  M.dormantT = 0;
+  sim.map.brightCells = new Uint8Array(sim.map.W * sim.map.H);
+  M.warpT = 999;
+  M.stalkT = 99;
+  M.ambushT = 99;
+  P.flashlight = false;
+  // elle est dans son dos, à 5 m, et l'entend courir
+  M.x = P.x - Math.sin(P.yaw) * -5;
+  M.z = P.z - Math.cos(P.yaw) * -5;
+  M.mode = 'patrol';
+  let chased = false;
+  for (let i = 0; i < 60; i++) {
+    P.running = true;
+    P.bumpV = NOISE.run;
+    P.bumpT = 1;
+    sim.step();
+    if (M.mode === 'chase') chased = true;
+  }
+  assert.ok(!chased, "jamais lancée dans le dos de quelqu'un qui ne l'a pas vue");
+  assert.equal(M.mode, 'watch', 'elle se montre : postée, tournée vers lui');
+  // il la voit (de près) : elle charge
+  P.yaw = Math.atan2(-(M.x - P.x), -(M.z - P.z));
+  let charged = false;
+  for (let i = 0; i < 120 && !charged; i++) {
+    sim.step();
+    if (M.mode === 'chase') charged = true;
+  }
+  assert.ok(charged, 'vue, elle se lance');
+  // à partir de la 3e cassette, une partie des poursuites peut partir dans le dos
+  sim.cassettes = 3;
+  M.mode = 'patrol';
+  M.chasedAt = -1e9;
+  P.sawM = -1e9;
+  M.backRollT = sim.time + 99;
+  M.backOk = true;
+  assert.ok(sim.mayChase(M, P, false), 'tirage favorable : elle peut partir dans le dos');
+  M.backOk = false;
+  assert.ok(!sim.mayChase(M, P, false), 'sinon elle se montre encore');
   sim.map.brightCells = null;
 });
 
@@ -388,7 +434,8 @@ test('la fixer de loin la provoque ; s\'en approcher aussi ; la lampe ne la fait
     assert.equal(M.mode, 'chase', 'fixée une seconde à 12 m : elle charge');
     assert.ok(M.rushT > 0 && sim.events.some((e) => e.type === 'rush'), 'en hurlant');
     stared++;
-    // une autre : elle observe à 5 m, il regarde ailleurs mais elle le voit
+    // une autre : elle observe à 5 m, il regarde ailleurs mais elle le voit (et lui l'a vue juste avant de se
+    // détourner : sans ça, elle ne se lance pas dans son dos)
     const s2 = make();
     const Q = s2.player;
     const N = s2.monster;
@@ -396,6 +443,7 @@ test('la fixer de loin la provoque ; s\'en approcher aussi ; la lampe ne la fait
     N.z = Q.z + dz * 5;
     Object.assign(N, { mode: 'watch', waitT: 99, dormantT: 0, warpT: 1e9 });
     Q.flashlight = false;
+    Q.sawM = s2.time;
     for (let i = 0; i < 10; i++) s2.step({ yaw: Math.atan2(dx, dz), pitch: 0 });
     assert.equal(N.mode, 'chase', 'trop près d\'elle : elle charge');
     approached++;
@@ -2591,7 +2639,7 @@ test("l'entité se tapit dans le noir pour observer (sans jamais rester plantée
   const s3 = speedAt(3);
   const s5 = speedAt(7);
   assert.ok(s0 < s3 && s3 < s5, `la charge s'accélère : ${s0.toFixed(2)} < ${s3.toFixed(2)} < ${s5.toFixed(2)}`);
-  assert.equal(sim.aggro, 1);
+  assert.ok(Math.abs(sim.aggro - 0.8) < 1e-9, `au plus 0,8 au Level 0 (${sim.aggro})`);
 });
 
 test("Level 37 (Poolrooms) : salles et bassins reliés, 3 vannes et 3 toboggans accessibles, l'eau ralentit", () => {
