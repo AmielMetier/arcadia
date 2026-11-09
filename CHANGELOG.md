@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.1 — 9 novembre 2026
+- Modify NOTES entries in hud.js (Metier Amiel)
+
 ## 5.00 — 9 novembre 2026
 - **The Backrooms** — Une voix sur le talkie : « The Old Timer », là depuis toujours, prend parfois la parole sur le canal 9. Tout le monde l'entend en même temps, deux ou trois fois par niveau, jamais pendant une poursuite. Il aide un peu… et il en sait beaucoup trop. Quand il ne reste qu'un survivant, il ne parle plus qu'à lui.
 
