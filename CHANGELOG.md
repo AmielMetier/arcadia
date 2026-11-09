@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 4.99 — 9 novembre 2026
+- **The Backrooms** — Du lore à chaque niveau : chaque monstre a une histoire, qu'on découvre en ramassant les objets.
+  - Level 0 : les cassettes sont celles de Safia, une exploratrice perdue dans le Lobby… qui n'en est jamais sortie.
+  - Level 1 : avec chaque fusible, un mot griffonné de Khaoula, qui s'est cachée au sous-sol pour fuir quelqu'un.
+  - Poolrooms : avec chaque volant de vanne, un carreau gravé à la gloire de St Didier Auroux, le père de toute chose.
+  - Pipe Dreams : à chaque vanne fermée, une trace à la craie sur Teo, l'élève de 1934 devenu le bouc à la cloche.
+  - Terror Hotel : avec chaque lettre, une ligne du registre de 1934… et ton nom y est déjà.
+  - Tout trouver débloque un dernier message à la sortie.
+
 ## 4.98 — 9 novembre 2026
 - **Odyssée** — Pokémon sauvages refaits badge par badge :
   - Chaque route, forêt, grotte ou mer a désormais les Pokémon que les jeux officiels, de Rouge à X / Y, font rencontrer au même moment de l'aventure, entre les mêmes badges et dans le même genre de lieu.

@@ -5,7 +5,7 @@ import { bfs, CELL_SIZE, cellsOnSeg, T } from './engine/map.js';
 import { createBackroomsScene, setMonsterMode, setSceneOptions } from './view/scene.js';
 import { BackroomsSfx } from './view/sfx.js';
 import { createVoice } from './view/voice.js';
-import { BackroomsHUD, levelName, levelSub, LORE, loreOf, hearTape, tapesHeard, store } from './view/hud.js';
+import { BackroomsHUD, levelName, levelSub, LORE, loreOf, hearTape, tapesHeard, store, NOTES, readNote, loreComplete, FINAL_LORE } from './view/hud.js';
 import { parseWords } from './engine/hotel.js';
 
 // Level 5, version VIP : les mots du fichier backrooms/password_level5/mots.txt (6 lettres, un par ligne) ; sans
@@ -29,6 +29,7 @@ let scene = null;
 let sfx = null;
 let hud = null;
 let stepDist = 0;
+let letterN = 0; // lettres ramassées à l'hôtel (pour le registre)
 let monsterStepT = 0; // sans entité animée (mode VIP du Level 1) : le prochain pas, à la minuterie
 // l'entité entendue comme un joueur : ce qui la sépare de l'oreille (occ, détour par les couloirs) et l'espace autour
 // des deux (space, pour l'écho), recalculés quelques fois par seconde
@@ -718,6 +719,7 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   applyOpts();
 
   stepDist = 0;
+  letterN = 0;
   setPaused(kbMode ? paused : !isPointerLocked);
 }
 
@@ -897,6 +899,15 @@ function prunePlayers() {
 const ITEM_NAME = { bottle: 'Almond water', battery: 'Batteries', ladder: 'Ladder' };
 let dropTip = 0; // au doigt : le premier objet ramassé rappelle qu'un appui long sur sa case le pose par terre
 
+// Un écrit du niveau, lu par celui qui a ramassé l'objet (k : la clé dans NOTES, i : le rang de l'objet)
+function showNote(k, i) {
+  if (!hud || !sim) return;
+  const { n, isNew } = readNote(k, sim.seed, i);
+  const text = NOTES[k].list[n].replace('{name}', (sim.player && sim.player.name) || 'You');
+  setTimeout(() => hud && hud.showLore(n, text, isNew, NOTES[k].tag), 1200);
+  if (sfx) setTimeout(() => sfx && sfx.loreTape && sfx.loreTape(4 + text.length / 16), 1000);
+}
+
 // Événements de la partie : sons, messages, changement d'étage, fin
 function handleEvent(ev, me) {
   const mine = ev.by !== undefined ? ev.by === me : ev.id === undefined || ev.id === me;
@@ -915,6 +926,7 @@ function handleEvent(ev, me) {
     }
     case 'letter':
       if (sfx) sfx.cassette();
+      if (ev.by === me) showNote('hotel', (letterN = (letterN || 0) + 1) - 1);
       if (hud) hud.toast(ev.by === me ? `Letter « ${ev.char} » from room ${ev.num} · post it in the lobby mailboxes` : `${who(ev.by)} found a letter (room ${ev.num})`);
       break;
     case 'posted':
@@ -949,6 +961,7 @@ function handleEvent(ev, me) {
       if (sim.level === 2) {
         if (hud) hud.toast(ev.by === me ? `Valve wheel ${ev.count}/${ev.total}` : `${who(ev.by)} found a valve wheel (${ev.count}/${ev.total})`);
       } else if (hud) hud.toast(ev.by === me ? 'Fuse in your pocket · bring it to the freight elevator panel' : `${who(ev.by)} picked up a fuse`);
+      if (ev.by === me && (sim.level === 1 || sim.level === 2)) showNote(sim.level, (ev.count || 1) - 1);
       break;
     }
     case 'fuseIn':
@@ -1373,6 +1386,7 @@ function handleEvent(ev, me) {
     case 'valve':
       if (sfx) sfx.cassette('valve');
       if (hud) hud.toast(ev.by === me ? `Valve closed · ${ev.count}/${ev.total}` : `A valve slammed shut somewhere · ${ev.count}/${ev.total}`);
+      if (ev.by === me) showNote('pipes', (ev.count || 1) - 1);
       break;
     case 'valveStart':
       if (ev.by === me && hud) hud.toast('Turning the valve… stay in front of it');
@@ -1450,6 +1464,8 @@ function handleEvent(ev, me) {
       // rendre le curseur pour le bouton Rejouer (Entrée marche aussi)
       if (document.pointerLockElement) document.exitPointerLock();
       if (ev.type === 'win' && sfx) sfx.win();
+      // la fin cachée : toutes les cassettes et tous les écrits trouvés, un dernier mot
+      if (ev.type === 'win' && loreComplete() && hud) setTimeout(() => hud && hud.showLore(null, FINAL_LORE, false, 'THE LAST TAPE'), 1500);
       // (tombé dans un puits : la bande ne s'arrête qu'au bout de la chute)
       if (ev.type === 'gameover' && sfx) {
         if (lastAbyss) setTimeout(() => sfx && sfx.tapeStop(), 3000);
