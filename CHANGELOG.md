@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.96 — 9 novembre 2026
+- **The Backrooms** — Nouveau bruitage de course : le souffle enregistré, qui grésillait en boucle, laisse place à une vraie respiration (inspiration, expiration) plus douce, qui s'accélère à mesure que tu t'essouffles.
+
 ## 4.95 — 9 novembre 2026
 - **Hub** — Revert "feat(hub,backrooms): trailer officiel de 30 secondes pour The Backrooms avec bouton de lecture sur la carte du Hub" (Amiel)
 
