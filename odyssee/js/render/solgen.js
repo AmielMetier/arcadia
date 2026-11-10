@@ -10,6 +10,7 @@
 // Port de tools/pixelforge/terrain2.py (atelier).
 
 import { T } from '../world/tiles.js';
+import { sensPont } from '../world/ponts.js';
 
 export const NFRAMES = 8;      // images de l'eau animée
 export const CELL = 32;        // pixels par case
@@ -22,7 +23,9 @@ export const K = { X: 0, G: 1, F: 2, T: 3, TD: 4, P: 5, V: 6, W: 7, B: 8, C: 9, 
   // relief et lieux (world/relief.js) : feuilles mortes d'automne, gravier ratissé des jardins, mousse, sol ocre des canyons
   FA: 20, GR: 21, MO: 22, RC: 23, TA: 24,
   // montagnes à gravir (world/relief.js, montagne) : sol de roche (comme celui des grottes) et sol sous les gradins
-  MT: 25, MR: 26, MP: 27 };   // … hautes herbes dorées de l'automne   // … bitume des grandes villes
+  MT: 25, MR: 26, MP: 27,
+  // pont qu'on traverse du nord au sud (K.B : d'ouest en est) ; le sens se lit sur tout le pont (world/ponts.js)
+  BN: 28 };   // … hautes herbes dorées de l'automne   // … bitume des grandes villes
 /** grandes villes : rues en bitume et trottoirs, escaliers à l'entrée ; les autres sont des villages pavés */
 export const GRANDES_VILLES = new Set(['Métropole', 'Voltacité', 'Forge-Acier']);   // … hautes herbes enneigées   // herbe de forêt, neige, cendre, sable
 /** sols « d'herbe » : on y marche, le décor (arbres, rochers…) s'y pose ; la zone choisit lequel */
@@ -32,8 +35,13 @@ const SOLS = new Set([K.G, K.GF, K.SN, K.AS, K.SA, K.FA, K.GR, K.MO, K.RC]);
  *  d'un talus d'herbe sont du chemin, la roche des montagnes du dehors a son sol de roche. Réglé par world3d.js. */
 let RELIEF3D = false;
 export function setRelief3dSol(v) { RELIEF3D = !!v; }
+/** relief façon HeartGold (falaises.js) : les pentes et les falaises sont en 3D, le sol généré n'a plus de talus peints ;
+ *  les marches sont du chemin (le relief les dessine). Réglé par world3d.js. */
+let HGSS = false;
+export function setReliefHGSSSol(v) { HGSS = !!v; }
 /** sorte d'une case de la carte du jeu (K.X : le jeu garde son propre sol) */
 export function sorteCase(m, x, y) {
+  if (HGSS && m.outdoor && m.get(x, y) === T.STAIRS) return m.zoneAt?.(x, y)?.theme === 'snow' ? K.SN : K.P;
   if (RELIEF3D && m.outdoor) {
     const t = m.get(x, y), th = m.zoneAt?.(x, y)?.theme, dans = x >= 0 && y >= 0 && x < m.w && y < m.h;
     const monts = dans && m.monts && m.monts[y * m.w + x];
@@ -46,7 +54,7 @@ export function sorteCase(m, x, y) {
   if (!m.outdoor) {
     if (m.floor !== 'cave') return K.X;                                   // intérieurs : sols du jeu
     if (t === T.WATER) return K.W;
-    if (t === T.BRIDGE) return K.B;
+    if (t === T.BRIDGE) return sensPont(m, x, y) === 'ns' ? K.BN : K.B;
     if (t === T.CAVEWALL) return K.CW;                                    // sol fin sous les plateaux de roche du jeu
     return [T.CAVE, T.CAVEDOOR, T.ROCK, T.BOULDER, T.SMASH, T.BLOCK, T.SIGN].includes(t) ? K.C : K.X;
   }
@@ -63,7 +71,7 @@ export function sorteCase(m, x, y) {
   }
   switch (t) {
     case T.WATER: return K.W;
-    case T.BRIDGE: return m.ravins?.[y * m.w + x] ? K.X : K.B;   // passerelle au-dessus d'un ravin : dessinée par le jeu
+    case T.BRIDGE: return m.ravins?.[y * m.w + x] ? K.X : sensPont(m, x, y) === 'ns' ? K.BN : K.B;   // passerelle au-dessus d'un ravin : dessinée par le jeu
     case T.PAVE: return GRANDES_VILLES.has(m.zoneAt?.(x, y)?.name) ? K.A : K.V;
     case T.PATH: case T.DOOR: return K.P;
     case T.SNOW: return K.SN;
@@ -97,7 +105,7 @@ export function zoneBloc(m, ci, cj, CH = 16) {
   const kinds = new Uint8Array(zw * zh);
   for (let y = 0; y < zh; y++) for (let x = 0; x < zw; x++) kinds[y * zw + x] = sorteCase(m, zx0 + x, zy0 + y);
   let rel = null;
-  if (m.outdoor && m.pentes && !RELIEF3D) {
+  if (m.outdoor && m.pentes && !RELIEF3D && !HGSS) {
     rel = new Uint8Array(zw * zh); let any = false;
     for (let y = 0; y < zh; y++) for (let x = 0; x < zw; x++) { const v = reliefCase(m, zx0 + x, zy0 + y); rel[y * zw + x] = v; if (v & REL.HERBE) any = true; }
     if (!any) rel = null;
@@ -107,7 +115,16 @@ export function zoneBloc(m, ci, cj, CH = 16) {
   if (RELIEF3D && m.outdoor) {
     for (let y = MARGIN - 1; y < MARGIN + bh && !roche; y++) for (let x = MARGIN; x < MARGIN + bw; x++) { const k = kinds[y * zw + x]; if (k === K.MR || k === K.MT) { roche = ROCHE_PLUS; break; } }
   }
-  return { kinds, zw, zh, zx0, zy0, bw, bh, rel, roche };
+  // ESSAI (?relief3d&r3calme) : les grandes taches d'herbe s'effacent près des talus (la lumière du relief s'y lit seule)
+  let calme = null;
+  if (RELIEF3D && m.outdoor && m.hg && typeof location !== 'undefined' && /[?&]r3calme/.test(location.search)) {
+    calme = new Uint8Array(zw * zh); const R = 2;
+    for (let y = 0; y < zh; y++) for (let x = 0; x < zw; x++) {
+      let lo = 99, hi = -99; for (let b = -R; b <= R; b++) for (let a = -R; a <= R; a++) { const h = m.height(zx0 + x + a, zy0 + y + b); lo = Math.min(lo, h); hi = Math.max(hi, h); }
+      calme[y * zw + x] = hi > lo ? 1 : 0;
+    }
+  }
+  return { kinds, zw, zh, zx0, zy0, bw, bh, rel, roche, calme };
 }
 /** cases de roche ajoutées sous le bloc dans la bande de roche (le motif déroulé d'une pente descend plus bas que la case) */
 export const ROCHE_PLUS = 4;
@@ -437,12 +454,20 @@ function brins(cap) {
   };
 }
 
-function herbe(Z, img, mask, block, foret = null) {
+function herbe(Z, img, mask, block, foret = null, calme = null) {
   const s = Z.s, c = Z.c, Wd = Z.W;
   const light = Z.field(120, s + 1), patch = Z.field(30, s + 2), colony = Z.field(70, s + 3, 2);
   const lv = new Uint8Array(Z.N);
   // forêt : l'herbe y est plus sombre d'un ton (bord tramé, voir foretMasque)
-  for (let i = 0; i < Z.N; i++) { lv[i] = digitize(0.65 * light[i] + 0.35 * patch[i], [0.42, 0.58]) + 2 - (foret && foret[i] ? 1 : 0); if (mask[i]) img[i] = G[lv[i] + 1]; }
+  const cw = Z.cw, ch = Z.ch, cc = Z.c, cal = (i) => {   // poids « calme » lissé (interpolé entre les centres des cases)
+    const fx = Math.max(0, Math.min(cw - 1.001, (i % Wd) / cc - 0.5)), fy = Math.max(0, Math.min(ch - 1.001, ((i / Wd) | 0) / cc - 0.5));
+    const x = fx | 0, y = fy | 0, tx = fx - x, ty = fy - y, at = (a, b) => calme[Math.min(ch - 1, b) * cw + Math.min(cw - 1, a)];
+    return (at(x, y) * (1 - tx) + at(x + 1, y) * tx) * (1 - ty) + (at(x, y + 1) * (1 - tx) + at(x + 1, y + 1) * tx) * ty; };
+  for (let i = 0; i < Z.N; i++) {
+    let v = 0.65 * light[i] + 0.35 * patch[i];
+    if (calme) { const w = cal(i); if (w > 0) v = v + (0.5 - v) * Math.min(1, w * 1.3); }
+    lv[i] = digitize(v, [0.42, 0.58]) + 2 - (foret && foret[i] ? 1 : 0); if (mask[i]) img[i] = G[lv[i] + 1];
+  }
   // brins : tirés case par case, puis dessinés de haut en bas (tri par pixel, l'ordre du tirage départage) ; les cases
   // sans herbe sont sautées (rien n'y serait dessiné)
   const fl = [], nb = Math.floor(c * c / 5.5), occ = occupees(Z, mask);
@@ -735,15 +760,15 @@ function fondJardin(Z, img, mask, voisin, kind) {
   }
 }
 /** automne : l'herbe tourne à l'olive et au doré, des feuilles mortes s'y posent en petits tas (et un peu sur les chemins) */
-function feuilles(Z, img, mask) {
+function feuilles(Z, img, mask, part = null) {
   const s = Z.s + 501, amas = Z.field(22, s + 1, 2), Wd = Z.W;
-  // herbe roussie : chaque vert de l'herbe prend son équivalent olive
-  for (let i = 0; i < Z.N; i++) if (mask[i] && IS_GALL[img[i]]) img[i] = AG[G.indexOf(img[i])];
+  // herbe roussie : chaque vert de l'herbe prend son équivalent olive (au bord de la zone, par plaques : part < 1)
+  for (let i = 0; i < Z.N; i++) if (mask[i] && IS_GALL[img[i]] && (!part || part[i] > 0.5 + (hash2(Z.X(i), Z.Y(i), s + 9) - 0.5) * 0.1)) img[i] = AG[G.indexOf(img[i])];
   // feuilles : une par bloc de 3 × 3 pixels au plus, plus serrées dans les tas
   for (let by = 0; by < Z.H; by += 3) for (let bx = 0; bx < Wd; bx += 3) {
     const i0 = by * Wd + bx; if (!mask[i0]) continue;
     const X = Z.X(i0), Y = Z.Y(i0), u = hash2(X, Y, s + 2), a = amas[i0];
-    if (u > 0.1 + 0.55 * a * a) continue;
+    if (u > (0.1 + 0.55 * a * a) * (part ? part[i0] * part[i0] : 1)) continue;
     const c = hash2(X, Y, s + 3), col = c < 0.24 ? FA[1] : c < 0.5 ? FA[2] : c < 0.7 ? FA[3] : c < 0.8 ? FA[4] : c < 0.92 ? FA[5] : FA[0];
     const ox = bx + Math.floor(hash2(X, Y, s + 4) * 2), oy = by + Math.floor(hash2(X, Y, s + 5) * 2), vert = hash2(X, Y, s + 6) < 0.5;
     // petite feuille en losange (3 × 2 ou 2 × 3), ombre d'un pixel sous elle
@@ -821,7 +846,8 @@ function eau(Z, img, E, frame) {
       else if (dw[i] <= fd + 1.2 && hash2(X, Y, s + 45) < 0.35) img[i] = W[5];
     } else {                                                                    // berge
       if (sd[i] <= 4) img[i] = sd[i] <= 1.5 + (lap > 0.3 ? 1 : 0) ? sp[0] : sd[i] <= 3 ? sp[1] : sp[2];
-      else img[i] = rocky ? rocky[0] : G[1];                                    // lisière
+      else if (rocky) img[i] = rocky[0];                                         // lisière : roche,
+      else if (IS_GALL[img[i]]) img[i] = G[1];                                   // … ou herbe plus sombre (jamais un trait vert sur une plage)
     }
   }
   for (let cy = 0; cy < Z.ch; cy++) for (let cx = 0; cx < Z.cw; cx++) {
@@ -856,32 +882,45 @@ function eau(Z, img, E, frame) {
   }
 }
 
+/** planches des ponts : en travers du sens de la traversée (K.B : d'ouest en est, K.BN : du nord au sud), garde-corps
+ *  le long, seulement sur les bords du pont (deux voies côte à côte forment un seul pont, sans garde-corps au milieu) ;
+ *  pieux et ombre dans l'eau sous le bord aval */
 function ponton(Z, img, frame) {
   const c = Z.c, Wd = Z.W, ph = frame / NFRAMES, s = Z.s;
-  const isB = (cx, cy) => Z.kind(cx, cy) === K.B;
+  const isP = (k) => k === K.B || k === K.BN;
   const tile = new Uint8Array(c * c);
   for (let cy = 0; cy < Z.ch; cy++) for (let cx = 0; cx < Z.cw; cx++) {
-    if (!isB(cx, cy)) continue;
-    const horiz = isB(cx - 1, cy) || isB(cx + 1, cy);
+    const k = Z.kind(cx, cy); if (!isP(k)) continue;
+    const horiz = k === K.B;
     const at = (u, v) => horiz ? (cy * c + v) * Wd + cx * c + u : (cy * c + u) * Wd + cx * c + v;   // u : le long, v : en travers
+    // voies voisines du même pont, de part et d'autre (en travers) : on prolonge le tablier jusqu'à elles
+    const intA = horiz ? Z.kind(cx, cy - 1) === k : Z.kind(cx - 1, cy) === k;
+    const intB = horiz ? Z.kind(cx, cy + 1) === k : Z.kind(cx + 1, cy) === k;
     for (let v = 0; v < c; v++) for (let u = 0; u < c; u++) tile[v * c + u] = img[at(u, v)];
-    const a = c >> 3, b = c - (c >> 3), set = (u, v, col) => { if (u >= 0 && u < c && v >= 0 && v < c) tile[v * c + u] = col; };
-    for (let u = 0; u < c; u++) { for (let v = b; v < Math.min(c, b + 5); v++) set(u, v, W[0]); set(u, b, B[0]); set(u, b + 1, B[0]); }
-    const gx = cx + Z.rx0, gy = cy + Z.ry0;
-    for (const px of [Math.floor(c / 6), c - Math.floor(c / 6) - 4]) {                          // pieux et ronds dans l'eau
-      for (let v = b; v < Math.min(c, b + 6); v++) { for (let u = px; u < px + 4; u++) set(u, v, B[1]); set(px, v, B[3]); set(px + 3, v, B[0]); }
-      const rr = Math.floor(1 + 3 * ((ph + hash2(gx + px, gy, s + 61)) % 1)), vv = Math.min(c - 1, b + 6);
-      for (let du = -rr; du < 4 + rr; du++) if (Math.abs(du - 1.5) > rr) set(px + du, vv, W[5]);
+    const a = intA ? -4 : c >> 3, b = intB ? c + 4 : c - (c >> 3), set = (u, v, col) => { if (u >= 0 && u < c && v >= 0 && v < c) tile[v * c + u] = col; };
+    const gx = cx + Z.rx0, gy = cy + Z.ry0, le = horiz ? gx : gy, tr = horiz ? gy : gx;   // le long, en travers (monde)
+    if (!intB) {
+      for (let u = 0; u < c; u++) { for (let v = b; v < Math.min(c, b + 5); v++) set(u, v, W[0]); set(u, b, B[0]); set(u, b + 1, B[0]); }
+      for (const px of [Math.floor(c / 6), c - Math.floor(c / 6) - 4]) {                          // pieux et ronds dans l'eau
+        for (let v = b; v < Math.min(c, b + 6); v++) { for (let u = px; u < px + 4; u++) set(u, v, B[1]); set(px, v, B[3]); set(px + 3, v, B[0]); }
+        const rr = Math.floor(1 + 3 * ((ph + hash2(le + px, tr, s + 61)) % 1)), vv = Math.min(c - 1, b + 6);
+        for (let du = -rr; du < 4 + rr; du++) if (Math.abs(du - 1.5) > rr) set(px + du, vv, W[5]);
+      }
     }
+    const v0 = Math.max(0, a + 2), v1 = Math.min(c, b - 2);
     let u = 0;
     while (u < c) {                                                                            // planches en travers
-      const wv = 4 + Math.floor(hash2(u + gx * c, gy, s + 62) * 2), tone = hash2(u + gx * c, gy, s + 63) < 0.5 ? B[2] : B[3];
-      for (let uu = u; uu < Math.min(c, u + wv); uu++) for (let v = a + 2; v < b - 2; v++) set(uu, v, hash2(uu + gx * c, v + gy * c, s + 64) < 0.06 ? B[1] : tone);
-      for (let v = a + 2; v < b - 2; v++) set(Math.min(c - 1, u + wv - 1), v, B[0]);
-      if (u + 1 < c) { set(u + 1, a + 3, P[3]); set(u + 1, b - 4, P[3]); }
+      // mêmes planches sur toutes les voies du pont (le motif ne dépend que de la position le long)
+      const wv = 4 + Math.floor(hash2(u + le * c, 7, s + 62) * 2), tone = hash2(u + le * c, 7, s + 63) < 0.5 ? B[2] : B[3];
+      for (let uu = u; uu < Math.min(c, u + wv); uu++) for (let v = v0; v < v1; v++) set(uu, v, hash2(uu + le * c, v + tr * c, s + 64) < 0.06 ? B[1] : tone);
+      for (let v = v0; v < v1; v++) set(Math.min(c - 1, u + wv - 1), v, B[0]);
+      if (u + 1 < c) { if (!intA) set(u + 1, a + 3, P[3]); if (!intB) set(u + 1, b - 4, P[3]); }
       u += wv;
     }
-    for (let uu = 0; uu < c; uu++) { set(uu, a, B[3]); set(uu, a + 1, B[2]); set(uu, b - 2, B[1]); set(uu, b - 1, B[0]); }
+    for (let uu = 0; uu < c; uu++) {                                                            // garde-corps des bords
+      if (!intA) { set(uu, a, B[3]); set(uu, a + 1, B[2]); }
+      if (!intB) { set(uu, b - 2, B[1]); set(uu, b - 1, B[0]); }
+    }
     for (let v = 0; v < c; v++) for (let uu = 0; uu < c; uu++) img[at(uu, v)] = tile[v * c + uu];
   }
 }
@@ -1169,13 +1208,13 @@ function marchesTalus(Z, img, rel) {
  */
 /** style des talus d'herbe (propositions) : actuel, hgss, terre, roche, douce */
 let STYLE_TALUS = 'actuel';
-export function rendreBloc({ kinds, zw, zh, zx0, zy0, bw, bh, seed = 7, cave = null, rel = null, talus: styleTalus = null }) {
+export function rendreBloc({ kinds, zw, zh, zx0, zy0, bw, bh, seed = 7, cave = null, rel = null, talus: styleTalus = null, calme = null }) {
   STYLE_TALUS = styleTalus || globalThis.TALUS_STYLE || 'actuel';
   const Z = new Zone(kinds, zw, zh, zx0, zy0, seed), c = CELL;
   const img = new Uint8Array(Z.N).fill(TRANSPARENT);
   const has = (k) => kinds.includes(k);
-  const isW = (k) => k === K.W || k === K.B;
-  const water = has(K.W) || has(K.B) ? Z.region(isW, seed + 100, { wobble: 0.7, round: 0.45 }) : new Uint8Array(Z.N);
+  const isW = (k) => k === K.W || k === K.B || k === K.BN;
+  const water = has(K.W) || has(K.B) || has(K.BN) ? Z.region(isW, seed + 100, { wobble: 0.7, round: 0.45 }) : new Uint8Array(Z.N);
   let path = has(K.P) || has(K.MP) ? Z.region((k) => k === K.P || k === K.MP, seed + 101, { wobble: 0.9, round: 0.55, band: c >> 1 }) : new Uint8Array(Z.N);
   const asph = has(K.A) ? Z.region((k) => k === K.A, seed + 104, { wobble: 0, round: 0.05, band: c >> 3 }) : new Uint8Array(Z.N);
   const pave = has(K.V) ? Z.region((k) => k === K.V, seed + 103, { wobble: 0.35, round: 0.1, band: c >> 2 }) : new Uint8Array(Z.N);
@@ -1202,7 +1241,7 @@ export function rendreBloc({ kinds, zw, zh, zx0, zy0, bw, bh, seed = 7, cave = n
   let lv = null;
   if (!cave) {
     const grass = new Uint8Array(Z.N); for (let i = 0; i < Z.N; i++) grass[i] = hard[i] | path[i] | (mont ? mont[i] : 0) ? 0 : 1;
-    lv = herbe(Z, img, grass, water, foret);
+    lv = herbe(Z, img, grass, water, foret, calme);
     if (mont) grotte(Z, img, andNot(mont, or(path, hard)), caveRamp('montagne'), K.MR);
     let fondAll = new Uint8Array(Z.N);
     for (const [k, mk] of fonds) {
@@ -1219,12 +1258,21 @@ export function rendreBloc({ kinds, zw, zh, zx0, zy0, bw, bh, seed = 7, cave = n
     }
     if (anyOf(path)) chemin(Z, img, path, mont ? or(water, hard, mont) : or(water, hard));
     // automne : feuilles mortes sur l'herbe et les chemins de la zone
+    // le bord de la zone se fond sur une case et demie de part et d'autre : l'herbe roussit par plaques qui ondulent, les
+    // feuilles se raréfient et quelques-unes s'envolent sur l'herbe verte voisine (plus de ligne droite entre deux sols)
     if (has(K.FA)) {
-      const fa = Z.region((q) => q === K.FA || q === K.P, seed + 130, { wobble: 1.2, round: 0.5, band: c >> 1, freq: 0.3 });
+      const fa = Z.region((q) => q === K.FA || q === K.P || q === K.G || q === K.GF, seed + 130, { wobble: 1.2, round: 0.5, band: c >> 1, freq: 0.3 });
       const zoneFA = Z.region((q) => q === K.FA, seed + 131, { wobble: 1.4, round: 0.6, band: c, freq: 0.25 });
-      const dz = edt(zoneFA, Z.W, Z.H, 0), m = new Uint8Array(Z.N);   // distance à la zone d'automne (0 dedans)
-      for (let i = 0; i < Z.N; i++) m[i] = fa[i] && !hard[i] && dz[i] < 24 ? 1 : 0;
-      feuilles(Z, img, m);
+      const dOut = edt(zoneFA, Z.W, Z.H, 0), dIn = edt(zoneFA, Z.W, Z.H, 1);   // distance à la zone (dehors), à son bord (dedans)
+      const bruit = Z.field(20, seed + 132, 2), B = c * 0.75;
+      const m = new Uint8Array(Z.N), part = new Float32Array(Z.N);
+      for (let i = 0; i < Z.N; i++) {
+        if (!fa[i] || hard[i]) continue;
+        const v = 0.5 + 0.5 * ((dIn[i] - dOut[i]) / B + (bruit[i] - 0.5) * 1.1);
+        if (v <= 0) continue;
+        m[i] = 1; part[i] = Math.min(1, v);
+      }
+      feuilles(Z, img, m, part);
     }
     if (anyOf(pave)) paves(Z, img, pave, andNot(andNot(grass, path), water), path);
     if (anyOf(asph)) { bitume(Z, img, asph); escaliers(Z, img); }
@@ -1233,13 +1281,13 @@ export function rendreBloc({ kinds, zw, zh, zx0, zy0, bw, bh, seed = 7, cave = n
   // transparence : cases que le jeu dessine lui-même (sable, neige, maisons, parois de grotte…)
   const keep = Z.px((k) => k !== K.X);
   for (let i = 0; i < Z.N; i++) if (!keep[i]) img[i] = TRANSPARENT;
-  const animated = anyOf(water) || has(K.B);
+  const animated = anyOf(water) || has(K.B) || has(K.BN);
   const E = anyOf(water) ? prepEau(Z, water, cave ? path : or(pave, path), C) : null;
   const frames = [];
   for (let f = 0; f < (animated ? NFRAMES : 1); f++) {
     const im = animated ? img.slice() : img;
     if (E) eau(Z, im, E, f);
-    if (has(K.B)) ponton(Z, im, f);
+    if (has(K.B) || has(K.BN)) ponton(Z, im, f);
     if (has(K.L) || has(K.LE) || has(K.LW)) rebords(Z, im);
     for (let i = 0; i < Z.N; i++) if (!keep[i]) im[i] = TRANSPARENT;
     // on ne garde que le bloc central

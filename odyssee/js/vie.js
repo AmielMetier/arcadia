@@ -9,6 +9,7 @@ export { addFauneVilles } from './world/faune.js';
 import { SPECIES } from './data/species.js';
 import { ASSETS } from './assets.js';
 import { SAUVAGE } from './data/remplacants.js';
+import { encAt } from './world/rencontres.js';
 
 /** parler à un Pokémon de la ville : son cri et un petit mot */
 export async function parlerFaune(game, n) {
@@ -83,7 +84,7 @@ export class Vie {
     for (let essai = 0; essai < 24; essai++) {
       const x = p.x + Math.round((Math.random() * 2 - 1) * 8), y = p.y + Math.round((Math.random() * 2 - 1) * 6);
       if (Math.abs(x - p.x) + Math.abs(y - p.y) < 3 || !this.herbeLibre(m, x, y)) continue;
-      const enc = m.zoneAt(x, y)?.enc; if (!enc?.length) continue;
+      const enc = encAt(m, x, y); if (!enc?.length) continue;
       const tot = enc.reduce((a, e) => a + e[3], 0); let r = Math.random() * tot, e = enc[0];
       for (const q of enc) { r -= q[3]; if (r <= 0) { e = q; break; } }
       const sp = SAUVAGE(e[0]); if (!SPECIES[sp]) continue;

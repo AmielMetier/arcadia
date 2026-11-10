@@ -1,5 +1,32 @@
 # Journal des versions — Arcadia
 
+## 5.27 — 10 novembre 2026
+- **The Backrooms** — Le passage d'un niveau à l'autre ne donne plus l'impression d'un plantage : l'image ne fige plus, un écran noir « LOADING THE TAPE… » clignote pendant que le nouvel étage se prépare, et il n'apparaît qu'une fois prêt.
+
+## 5.26 — 10 novembre 2026
+- **Odyssée** — Le relief façon HeartGold / SoulSilver : falaises en étages de pierres, roches en terrasses et en pentes arrondies, talus d'herbe, grottes en relief, et des ravins aux parois de roche qui plongent dans le noir.
+- **Odyssée** — Une région plus vivante :
+  - Fumée des cheminées, papillons, lucioles, feuilles qui tombent, vols d'oiseaux, ailes des moulins au vent, carpes koï dans les bassins.
+  - Un vrai soir orangé, une vraie nuit : lanternes, braseros, phares et lampadaires éclairent autour d'eux.
+  - Pluie, grêle, sable et cendre qu'on voit enfin ; neige douce sur les zones enneigées ; empreintes de pas dans le sable, la neige et la cendre.
+  - Arbres retouchés, chaque arbre un peu différent ; Forêt des Torii aux couleurs d'automne ; Bois Murmure vraiment sombre.
+- **Odyssée** — Villes et routes :
+  - Chaque ville a son plan et son architecture, ses maisons meublées à son image, de l'air entre les maisons et des terrasses où l'on marche.
+  - Rebords à sauter, raccourcis à sens unique, récompenses à aller chercher avec Coupe ou Surf, dresseurs aux passages étroits, un panneau aux deux bouts de chaque route.
+  - Des objets cachés à trouver en fouillant les routes, et en ville dans les tonneaux et les pots.
+  - De nouvelles grottes à explorer, un volcan pour Cendrelune, des canyons où l'on descend enfin.
+  - Plus de bord de carte visible, plus de décor hors d'atteinte, plus de porte cachée derrière une maison.
+- **Odyssée** — La tenue garde le dresseur d'origine : on choisit seulement la couleur de la casquette (le serre-tête pour la dresseuse), du haut, du bas, des chaussures et de la sacoche.
+- **Odyssée** — Se joue à la manette et au doigt sur téléphone.
+- **Odyssée** — Démarrage plus court, plus d'à-coups en changeant de bloc de carte, moins de mémoire prise sur les petits téléphones, et une partie reprend toujours à un endroit d'où l'on peut repartir.
+- **Odyssée** — Le bouton Amis ne compte plus son propre dresseur, et le son s'arrête quand on quitte l'onglet.
+
+## 5.25 — 10 novembre 2026
+- **Odyssée** — Les Pokémon sauvages changent à mesure qu'on avance sur une route, dans une grotte ou sur une île :
+  - Chaque passage a sa quinzaine de Pokémon ; ceux qu'on croisait souvent juste avant s'y font plus rares, et de nouveaux apparaissent.
+  - Quelques Pokémon croisés un peu plus tôt réapparaissent de temps en temps, et chaque passage cache un ou deux Pokémon rares.
+  - Les Pokémon gagnent en niveau au fil du chemin.
+
 ## 5.24 — 9 novembre 2026
 - **The Backrooms** — Plus d'ombre en dents de scie sur la moquette au pied des murs en biais du Level 0 : la lumière s'y pose bien à plat.
 - **The Backrooms** — au Level 0 :
@@ -38,12 +65,12 @@
   - Plus de rejeu de la mort : après l'attaque, l'image se perd tout de suite.
 
 ## 5.22 — 9 novembre 2026
-- **The Backrooms** — Une partie qui commence au Level 0 s'ouvre sur une vidéo filmée au caméscope : une soirée d'urbex dans une usine abandonnée, où Safia passe à travers une trappe du plancher… et le groupe saute pour la rejoindre. Espace ou Entrée pour la passer.
+- **The Backrooms** — Une partie qui commence au Level 0 s'ouvre sur une vidéo filmée au caméscope : une soirée d'urbex dans une usine abandonnée, où l'une d'entre vous passe à travers une trappe du plancher… et le groupe saute pour la rejoindre. Espace ou Entrée pour la passer.
   - En mode VIP, la vidéo est sous-titrée.
-  - La feuille scotchée au mur de l'arrivée est signée Safia.
+  - La feuille scotchée au mur de l'arrivée est signée.
 
 ## 5.21 — 9 novembre 2026
-- **The Backrooms** — Au Level 1, on entend maintenant Khaoula : sa voix résonne de temps en temps quand elle rôde près de toi, et bien plus souvent quand elle te poursuit. Plus elle est loin ou derrière les murs, plus elle est étouffée.
+- **The Backrooms** — Au Level 1, on entend maintenant l'entité : sa voix résonne de temps en temps quand elle rôde près de toi, et bien plus souvent quand elle te poursuit. Plus elle est loin ou derrière les murs, plus elle est étouffée.
 
 ## 5.2 — 9 novembre 2026
 - Fix typo in hud.js string (Metier Amiel)
@@ -56,10 +83,10 @@
 
 ## 4.99 — 9 novembre 2026
 - **The Backrooms** — Du lore à chaque niveau : chaque monstre a une histoire, qu'on découvre en ramassant les objets.
-  - Level 0 : les cassettes sont celles de Safia, une exploratrice perdue dans le Lobby… qui n'en est jamais sortie.
-  - Level 1 : avec chaque fusible, un mot griffonné de Khaoula, qui s'est cachée au sous-sol pour fuir quelqu'un.
-  - Poolrooms : avec chaque volant de vanne, un carreau gravé à la gloire de St Didier Auroux, le père de toute chose.
-  - Pipe Dreams : à chaque vanne fermée, une trace à la craie sur Teo, l'élève de 1934 devenu le bouc à la cloche.
+  - Level 0 : les cassettes sont celles d'une exploratrice perdue dans le Lobby… qui n'en est jamais sortie.
+  - Level 1 : avec chaque fusible, un mot griffonné de l'entité du sous-sol, qui s'est cachée au sous-sol pour fuir quelqu'un.
+  - Poolrooms : avec chaque volant de vanne, un carreau gravé à la gloire du père de toute chose.
+  - Pipe Dreams : à chaque vanne fermée, une trace à la craie sur l'élève de 1934 devenu le bouc à la cloche.
   - Terror Hotel : avec chaque lettre, une ligne du registre de 1934… et ton nom y est déjà.
   - Tout trouver débloque un dernier message à la sortie.
 

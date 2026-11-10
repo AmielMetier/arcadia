@@ -7,6 +7,9 @@ import { BackroomsSfx } from './view/sfx.js';
 import { createVoice } from './view/voice.js';
 import { BackroomsHUD, levelName, levelSub, LORE, loreOf, hearTape, tapesHeard, store, NOTES, readNote, loreComplete, FINAL_LORE } from './view/hud.js';
 import { parseWords } from './engine/hotel.js';
+import { vaultReady } from './view/vault.js';
+// les photos des monstres sont décodées avant de construire la scène et l'interface
+await vaultReady;
 
 // Level 5, version VIP : les mots du fichier backrooms/password_level5/mots.txt (6 lettres, un par ligne) ; sans
 // fichier (ou sans mot valide), la liste standard
@@ -1124,6 +1127,41 @@ function oldTimerTick() {
   oldTimerSay(line);
 }
 
+// Construit la scène d'un nouvel étage derrière l'écran de chargement (levelTok : seul le dernier demandé compte)
+let levelTok = 0;
+function buildLevel(level) {
+  const tok = ++levelTok;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (tok !== levelTok || !sim || sim.level !== level) return;
+    if (scene) scene.dispose();
+    stageEl.innerHTML = '';
+    const sc = createBackroomsScene(stageEl, sim.floors, lampsFor());
+    sc.onDrip = (pos) => sfx && sfx.drip(pos);
+    sc.onRedCut = (on) => sfx && sfx.finCut(on);
+    sc.onRedFlick = (pos, on) => sfx && sfx.redFlick(pos, on);
+    sc.onCascade = onCascade;
+    sc.onRedStart = onRedStart;
+    sc.onMonsterStep = onMonsterStep;
+    scene = sc;
+    // au plus 8 s d'attente : une texture qui ne vient pas ne doit pas bloquer la partie
+    Promise.race([sc.ready, new Promise((r) => setTimeout(r, 8000))]).then(() => {
+      if (tok !== levelTok || scene !== sc) return;
+      requestAnimationFrame(() => {
+        if (tok !== levelTok || scene !== sc) return;
+        if (hud) {
+          hud.loading(false);
+          hud.fade(`LEVEL ${levelName(level)}`, levelSub(level), 2.2);
+        }
+        sc.tape('bars', 0.8);
+        sc.tape('splice', 1.2);
+        if (sfx) sfx.tapeSplice();
+        // on arrive dans la cabine qui finit de descendre (portes fermées)
+        if (sfx && sim.arriveT > 0) sfx.elevator(ARRIVE_T + 0.4, true);
+      });
+    });
+  }));
+}
+
 // Événements de la partie : sons, messages, changement d'étage, fin
 function handleEvent(ev, me) {
   const mine = ev.by !== undefined ? ev.by === me : ev.id === undefined || ev.id === me;
@@ -1639,23 +1677,18 @@ function handleEvent(ev, me) {
       if (NET.role !== 'guest' && ev.level && !ev.rebuild) nudgeSkill(0.05);
       // nouvel étage : nouvelle scène
       if (scene && scene.level === ev.level && scene.map === sim.map) break;
+      // l'ancien étage disparaît tout de suite, un écran de chargement le remplace (l'image ne fige plus) ; le nouveau
+      // se construit à l'image suivante, et ne se montre qu'une fois ses textures prêtes
       if (scene) scene.dispose();
+      scene = null;
       stageEl.innerHTML = '';
-      scene = createBackroomsScene(stageEl, sim.floors, lampsFor());
-      scene.onDrip = (pos) => sfx && sfx.drip(pos);
-      scene.onRedCut = (on) => sfx && sfx.finCut(on);
-      scene.onRedFlick = (pos, on) => sfx && sfx.redFlick(pos, on);
-      scene.onCascade = onCascade;
-      scene.onRedStart = onRedStart;
-      scene.onMonsterStep = onMonsterStep;
       sim.spectate = 0;
       stepDist = 0;
-      scene.tape('bars', 0.8);
-      scene.tape('splice', 1.2);
-      if (sfx) sfx.tapeSplice();
-      if (hud) hud.fade(`LEVEL ${levelName(ev.level)}`, levelSub(ev.level), 2.2);
-      // on arrive dans la cabine qui finit de descendre (portes fermées)
-      if (sfx && sim.arriveT > 0) sfx.elevator(ARRIVE_T + 0.4, true);
+      if (hud) {
+        hud.fade(`LEVEL ${levelName(ev.level)}`, 'LOADING THE TAPE…', 0);
+        hud.loading(true);
+      }
+      buildLevel(ev.level);
       // seul, on pourra reprendre à ce niveau-ci
       if (NET.role === 'solo') store.set('backrooms_resume', ev.level);
       break;

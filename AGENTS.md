@@ -22,6 +22,7 @@ Les joueurs voient les nouveautés dans le Hub (bouton « ✨ Nouveautés »), q
      pas de noms de fichiers ni de fonctions.
    - Une ligne par nouveauté ou correction ; regrouper ce qui concerne le même jeu.
    - La date est celle du jour, en toutes lettres (`28 octobre 2026`).
+   - The Backrooms : ne jamais écrire le nom des monstres ni des personnages du lore (prénoms des personnes qui leur servent de modèle) dans le journal ni dans les messages de commit. Parler de « l'entité », « le monstre du Level 1 », « le bouc »…
 3. **Mettre le même numéro dans les `?v=` de `index.html` et `apropos.html`** (liens vers `hub/` et `shared/`) : sinon les navigateurs gardent l'ancienne version en cache.
 4. **Faire tout ça dans le même commit** que le changement (ou le même push).
 

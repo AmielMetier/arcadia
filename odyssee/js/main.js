@@ -6,6 +6,8 @@ import { setArt } from './render/textures.js';
 import { packActif } from './gfx.js';
 import { buildWorld } from './world/region.js';
 import { Input } from './input.js';
+import { brancherManette } from './manette.js';
+import { brancherTactile } from './tactile.js';
 import { Sound } from './audio.js';
 import { UI, el, esc, wait } from './ui/ui.js';
 import { optionsScreen, loadCodeScreen } from './ui/screens.js';
@@ -21,6 +23,9 @@ import { SOL16_FICHIERS } from './data/sol16.js';
 import { R, ORIGINALES } from './data/remplacants.js';
 
 const H = window.HubBridge;
+// étapes du démarrage, en millisecondes depuis l'ouverture de la page (lues par tools/odyssee-parcours.mjs)
+const BOOT = window.__odyBoot = { module: Math.round(performance.now()) };
+const etape = (k) => { BOOT[k] = Math.round(performance.now()); };
 const canvas = document.getElementById('gl'), uiRoot = document.getElementById('ui'), loading = document.getElementById('loading');
 
 function fatal(e) {
@@ -28,15 +33,27 @@ function fatal(e) {
   loading.style.display = 'flex'; loading.innerHTML = `<div>Oups, le jeu a rencontré un problème.<br><small>${esc(e && e.message ? e.message : e)}</small></div>`;
   if (H && H.logCrash) H.logCrash('CRASH_JS_ERROR', 'Odyssée : ' + (e && e.message ? e.message : e), { stack: e && e.stack });
 }
-addEventListener('error', (e) => fatal(e.error || e.message));
-addEventListener('unhandledrejection', (e) => fatal(e.reason));
+// une fois le jeu affiché, une erreur isolée (un script de PNJ, une image, une promesse oubliée) ne cache plus l'écran :
+// elle est notée (console, journal du Hub) et la partie continue ; l'écran d'erreur reste pour le démarrage, ou si
+// chaque image échoue pendant 3 s (la partie ne peut plus avancer)
+let enJeu = false;
+const signales = new Set();
+function incident(e) {
+  if (!enJeu) { fatal(e); return; }
+  console.error('[odyssée] incident', e);
+  const msg = e && e.message ? e.message : String(e);
+  if (H && H.logCrash && !signales.has(msg) && signales.size < 20) { signales.add(msg); H.logCrash('CRASH_JS_ERROR', 'Odyssée (en jeu) : ' + msg, { stack: e && e.stack }); }
+}
+addEventListener('error', (e) => incident(e.error || e.message));
+addEventListener('unhandledrejection', (e) => incident(e.reason));
 
 // éléments de décor dessinés repris dans le jeu (les autres restent dessinés par le code : herbes, fleurs…)
 const NATURE = ['tree', 'tree2', 'pine', 'snowpine', 'deadtree', 'palm', 'bush', 'rock', 'stalag', 'sign', 'fence', 'lamp', 'mailbox', 'pot', 'itemball', 'bang', 'statue'];
 const MOBILIER_PLUS = ['machine_sous', 'borne_tetris', 'borne_invaders', 'borne_briques', 'borne_serpent'];
 const SOLS = ['tall0', 'tall1', 'darktall0', 'darktall1', 'snowtall0', 'snowtall1', 'floor_wood', 'floor_center', 'floor_mart', 'floor_lab', 'floor_league', 'floor_gymBug', 'floor_gymRock', 'floor_gymWater', 'floor_gymElec', 'floor_gymGrass', 'floor_gymPsy', 'floor_gymFire', 'floor_gymDragon', 'wall_center', 'wall_mart', 'wall_gym', 'wall_league'];
 
-async function loadArt() {
+/** les images du décor ; prechauffe : seulement lancer leur téléchargement (rendu tout de suite, sans attendre) */
+async function loadArt(prechauffe = false) {
   const sprites = {};
   // décor version 2 (vue de 3/4, bible) : tout ce que la planche fournit ; sinon la sélection de la première planche
   for (const k of SPRITES.natureV2 ? Object.keys(SPRITES.nature) : NATURE) sprites[k] = ASSETS.nature(k);
@@ -72,18 +89,33 @@ async function loadArt() {
   sprites.grassfront = ASSETS.sol16('hautes_herbes_front'); sprites.grassfront2 = ASSETS.sol16('hautes_herbes_front2'); dens.grassfront = dens.grassfront2 = 1;
   // animations de terrain de HeartGold / SoulSilver (mer, rivages, fleurs)
   const hg = {}; for (const k of Object.keys(SPRITES.hgss || {})) hg[k] = ASSETS.hgss(k);
+  if (prechauffe) {
+    // même requête que loadImg (crossOrigin), pour que le cache des images du navigateur la resserve telle quelle
+    const L = [sprites, kits, sols, sol32, hg, tuilesPack, batsPack].flatMap(Object.values).concat([ASSETS.chars, ASSETS.title, SPRITES.suiveurs && ASSETS.suiveurs, ASSETS.relief]);
+    return L.filter(Boolean).map((src) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.src = src; return im; });
+  }
   const [S, K, L, L32, HGI, chars, title, suiveurs, relief, PK, PB] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(ASSETS.chars), loadImg(ASSETS.title), SPRITES.suiveurs ? loadImg(ASSETS.suiveurs) : null, loadImg(ASSETS.relief).catch(() => null), loadAll(tuilesPack), loadAll(batsPack)]);
   return { sprites: S, dens, kits: K, sols: L, sol32: L32, hgss: HGI, chars, title, suiveurs, relief, pack: pack ? PK : null, batiments: pack?.batiments ? { images: PB, styles: pack.batiments } : null };
 }
 
 async function boot() {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, stencil: true, powerPreference: 'high-performance' });   // stencil : ombres au sol sans double couche (render/ombres.js)
   renderer.setPixelRatio(1); renderer.outputColorSpace = THREE.SRGBColorSpace;
   const input = new Input(), sound = new Sound(), ui = new UI(uiRoot, input, sound);
+  brancherManette(input); brancherTactile(input);   // manette et commandes tactiles : les mêmes touches que le clavier
+  // la construction de la carte occupe le processeur plusieurs secondes d'un seul tenant : les images se téléchargent
+  // pendant ce temps (loadArt les retrouve ensuite dans le cache du navigateur), et l'écran de chargement est affiché avant
+  const prechauffe = await loadArt(true);
+  await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+  etape('ecran');
   const world = buildWorld();
+  etape('carte');
   const art = await loadArt();
+  prechauffe.length = 0;
+  etape('images');
   setArt({ kits: art.kits, sols: art.sols, sol32: art.sol32, hgss: art.hgss, relief: art.relief, pack: art.pack });
   const view = new WorldView(renderer, art.chars, { sprites: art.sprites, dens: art.dens, suiveurs: art.suiveurs, batiments: art.batiments });
+  etape('vue');
   const game = new Game({ view, ui, input, sound, world });
   // sauvegarde en ligne (compte du Hub) : chaque sauvegarde part aussi sur le serveur, regroupée
   const cloud = game.cloud = new Cloud();
@@ -111,14 +143,16 @@ async function boot() {
   addEventListener('keydown', unlock); addEventListener('pointerdown', unlock);
   ui.helpButton();
 
-  let mode = 'title', last = performance.now();
+  let mode = 'title', last = performance.now(), enPanne = 0;
   const loop = (now) => {
+    requestAnimationFrame(loop);   // d'abord : une erreur dans l'image ne doit pas arrêter le jeu
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
-    if (mode === 'game') game.tick(dt);
-    requestAnimationFrame(loop);
+    if (mode !== 'game') return;
+    try { game.tick(dt); enPanne = 0; } catch (e) { if (!enPanne) incident(e); if (++enPanne === 180) fatal(e); }
   };
   view.setMap(world.maps.monde); view.setTimeOfDay(new Date().getHours() + new Date().getMinutes() / 60);
   loading.style.display = 'none';
+  etape('pret'); enJeu = true;
   requestAnimationFrame(loop);
   ui.fade(false, 500);
   if (H && H.embedded) H.signalReady();
@@ -475,7 +509,7 @@ async function intro(game, ui, sound) {
   ui.say('Mais parle-moi un peu de toi... Qui es-tu ?', { speaker: 'Prof. Saule', keep: true, noWaitLast: true });
   let gender = await chooseGenderCard(ui, input, sound, s);
 
-  // l'apparence : casquette ou bonnet, haut, bas, chaussures, sac, couleurs (si le modèle de base est dessiné)
+  // la tenue : le dresseur par défaut, aux couleurs choisies (casquette ou serre-tête, haut, bas, chaussures, sacoche)
   let tenue = null;
   if (game.view.baseDe?.(gender)) {
     chap.textContent = 'TA TENUE DE DRESSEUR';

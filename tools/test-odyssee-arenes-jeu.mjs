@@ -38,7 +38,7 @@ const page = await browser.newPage({ viewport: { width: 960, height: 640 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 try {
-  await page.goto(`${BASE}/odyssee/index.html?local&glb=0`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/odyssee/index.html?local&glb=0`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__ody?.play, null, { timeout: 120000 });
   await page.evaluate(async () => {
     const { game } = window.__ody;

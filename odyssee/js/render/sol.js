@@ -16,12 +16,15 @@ import * as THREE from 'three';
 import { NFRAMES, LUT, CELL, MARGIN, zoneBloc } from './solgen.js';
 import { matSol } from './relief3d.js';
 import { solChoix } from '../gfx.js';
+import { matTerrain } from './falaises.js';
 
 const CH = 16;                 // taille d'un bloc de carte (comme world3d.js)
 const Y = 0.0044;              // hauteur du nouveau sol (au-dessus des décalques à 0,004, sous les plateaux de roche à 0,0049)
 const PAS = 0.15;              // secondes par image de l'eau
 const PREFETCH = 3;            // blocs calculés d'avance autour du joueur (world3d.js en construit 2 : on garde une avance)
-const BUDGET = 96 * 1024 * 1024;   // octets d'images gardés en cache (un bloc fixe : 256 Ko, un bloc d'eau : 2 Mo)
+// octets d'images gardés en cache (un bloc fixe : 256 Ko, un bloc d'eau : 2 Mo) ; moitié moins sur un appareil qui annonce
+// 4 Go de mémoire ou moins (navigator.deviceMemory : Chrome et Android ; inconnu ailleurs, on garde 96 Mo)
+const BUDGET = (typeof navigator !== 'undefined' && navigator.deviceMemory && navigator.deviceMemory <= 4 ? 48 : 96) * 1024 * 1024;
 
 function actif() {
   try { return solChoix() === 'odyssee'; } catch (e) { return true; }
@@ -162,7 +165,7 @@ export class Sol {
 
   liberer(grp) {
     const o = grp.userData.sol; if (!o) return;
-    grp.remove(o.mesh); o.mesh.geometry.dispose(); o.tex.dispose(); o.mat.dispose();
+    grp.remove(o.mesh); o.mesh.geometry.userData.cases?.dispose(); o.mesh.geometry.dispose(); o.tex.dispose(); o.mat.dispose();
     this.view.tinted = this.view.tinted.filter((m) => m !== o.mat); this.anim.delete(grp); grp.userData.sol = null;
   }
 
@@ -183,11 +186,15 @@ export class Sol {
     // dessiné juste après l'ancien sol (ordre -3) et avant tout le reste, sans écrire la profondeur : rien ne se bat avec lui
     // relief en 3D (?relief3d, relief3d.js) : le sol est un maillage posé sur les hauteurs, il écrit la profondeur
     const mat = new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.5, depthTest: !!r3d, depthWrite: !!r3d });
-    if (r3d) matSol(mat, w, h);
+    if (r3d) { if (r3d.isHGSS) matTerrain(mat, w, h, r3d.grotte); else matSol(mat, w, h); }
     mat.userData.sol = true; mat.userData.own = true; mat.color.copy(this.view.tint); this.view.tinted.push(mat);
     const x0 = ci * CH, z0 = cj * CH, x1 = x0 + d.bw, z1 = z0 + d.bh;
     let geo;
-    if (r3d) geo = r3d.geoSol(ci, cj, d.bw, d.bh, roche ? d.rocheH : 0);
+    if (r3d) {
+      geo = r3d.geoSol(ci, cj, d.bw, d.bh, roche ? d.rocheH : 0);
+      // relief façon HGSS : la texture des cases du bloc (raccords entre cases voisines, calculés par le shader)
+      if (geo.userData.cases) { mat.userData.cases = geo.userData.cases; mat.userData.orig = geo.userData.orig; }
+    }
     else {
       geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.Float32BufferAttribute([x0, Y, z0, x1, Y, z0, x1, Y, z1, x0, Y, z1], 3));
