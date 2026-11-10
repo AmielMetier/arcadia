@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.27 — 10 novembre 2026
+- **The Backrooms** — Le passage d'un niveau à l'autre ne donne plus l'impression d'un plantage : l'image ne fige plus, un écran noir « LOADING THE TAPE… » clignote pendant que le nouvel étage se prépare, et il n'apparaît qu'une fois prêt.
+
 ## 5.26 — 10 novembre 2026
 - **Odyssée** — Le relief façon HeartGold / SoulSilver : falaises en étages de pierres, roches en terrasses et en pentes arrondies, talus d'herbe, grottes en relief, et des ravins aux parois de roche qui plongent dans le noir.
 - **Odyssée** — Une région plus vivante :

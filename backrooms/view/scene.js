@@ -4951,6 +4951,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   let focusWait = 3 + Math.random() * 4; // secondes de course avant la prochaine
   let lastExp = 1.2;
   const api = {
+    // les textures du niveau chargées (l'écran de chargement attend ça avant de montrer le nouvel étage)
+    ready: Promise.all([textures.ready, tx2 ? tx2.ready : null]).catch(() => null),
     level: map0.level || 0,
     map: map0,
     floors,

@@ -1134,6 +1134,11 @@ export class BackroomsHUD {
   }
 
   // Fondu au noir : l'ascenseur descend, puis la carte de l'étage
+  // l'écran de chargement d'un nouvel étage : le titre reste, « LOADING » clignote façon caméscope
+  loading(on) {
+    this.$('#fade').classList.toggle('loading', !!on);
+  }
+
   fade(title, sub = '', hold = 0, ride = false) {
     const f = this.$('#fade');
     this.fadeRide = ride;
