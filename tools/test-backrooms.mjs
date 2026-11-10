@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL, RELAY_ARM, RELAY_SYNC, LIFT_CALL_T, L1_CALM, L1_FIRST_BLACKOUT, SECTOR_STEP } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
 import { navOf, roamable } from '../backrooms/engine/gait.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
@@ -43,6 +43,44 @@ function test(name, fn) {
   } catch (err) {
     console.error('✗', name);
     throw err;
+  }
+}
+
+// Level 1 : ramasser les fusibles (celui du casier en s'y enfermant)
+function stepAs(sim, P, inp, others = {}) {
+  if (P === sim.player) sim.step(inp, others);
+  else sim.step({}, { ...others, [P.id]: inp });
+}
+function takeFuses(sim, P = sim.player) {
+  for (const f of sim.map.fuses) {
+    if (f.locker >= 0) {
+      const fr = hideFront(sim.map.hides[f.locker]);
+      P.x = fr.x;
+      P.z = fr.z;
+      stepAs(sim, P, { pick: true });
+      stepAs(sim, P, { pick: true });
+    } else {
+      P.x = f.x;
+      P.z = f.z;
+      sim.step();
+    }
+  }
+}
+// Level 1 : tenir les disjoncteurs généraux, seul (la console du poste de garde, puis les armoires)
+function throwMains(sim, P = sim.player) {
+  for (const r of sim.relaysNeeded()) {
+    if (r.desk) {
+      const S = sim.map.post;
+      P.x = S.front.x;
+      P.z = S.front.z;
+      stepAs(sim, P, { pick: true });
+      for (let t = 0; t < RELAY_ARM + 0.2; t += DT) stepAs(sim, P, {});
+      stepAs(sim, P, { pick: true });
+    } else {
+      P.x = r.x + r.nx * 0.9;
+      P.z = r.z + r.nz * 0.9;
+      stepAs(sim, P, { pick: true });
+    }
   }
 }
 
@@ -1432,12 +1470,15 @@ test("Level 1 : l'entrepôt, ses étagères, ses 3 fusibles et le monte-charge",
 test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui descend aux Poolrooms (Level 37)', () => {
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 4, level: 1 });
   assert.equal(sim.open, false);
-  for (const f of sim.map.fuses) {
-    sim.player.x = f.x;
-    sim.player.z = f.z;
-    sim.step();
-  }
+  const lk = sim.map.fuses.find((f) => f.locker >= 0);
+  assert.ok(lk, 'un des fusibles est rangé dans un casier');
+  sim.player.x = lk.x;
+  sim.player.z = lk.z;
+  sim.step();
+  assert.equal(lk.taken, false, 'celui du casier ne se ramasse pas en passant devant');
+  takeFuses(sim);
   assert.equal(sim.fuses, FUSES);
+  assert.equal(sim.player.hidden, -1);
   assert.equal(sim.open, false, 'il faut encore les brancher au panneau');
   sim.player.x = sim.map.exit.x;
   sim.player.z = sim.map.exit.z;
@@ -1445,8 +1486,18 @@ test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui 
   assert.equal(sim.delivered, FUSES, 'les fusibles sont au panneau');
   assert.equal(sim.powered, false, 'il faut encore relancer le monte-charge');
   run(sim, PANEL_T + 0.2);
+  assert.equal(sim.powered, false, 'sans les disjoncteurs généraux, le panneau ne répond pas');
+  throwMains(sim);
+  assert.equal(sim.mains, true, "seul, les disjoncteurs tiennent le temps de courir de l'un à l'autre");
+  sim.player.x = sim.map.exit.x;
+  sim.player.z = sim.map.exit.z;
+  run(sim, PANEL_T + 0.2);
   assert.equal(sim.powered, true);
   assert.ok(sim.drainEvents().some((e) => e.type === 'powered'));
+  assert.equal(sim.open, false, 'le monte-charge descend encore');
+  assert.ok(sim.liftCallT > LIFT_CALL_T - 1 && sim.hunt, "elle traque l'équipe pendant ce temps");
+  run(sim, sim.liftCallT + 0.1);
+  assert.equal(sim.open, true, 'le monte-charge est arrivé');
   const E = sim.map.elevator;
   sim.player.x = E.x;
   sim.player.z = E.z;
@@ -1480,18 +1531,18 @@ test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui 
   assert.equal(sim.state, 'won', 'le toboggan bleu sort des Poolrooms : partie gagnée');
 });
 
-test('Level 1 : coupures de courant de 15 à 20 s', () => {
+test('Level 1 : la première coupure est un vrai noir de 15 à 20 s, au bout de deux minutes environ', () => {
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 8, level: 1 });
   let start = -1;
   let len = 0;
-  for (let i = 0; i < 60 * 120; i++) {
+  for (let i = 0; i < 60 * 200; i++) {
     sim.step();
     for (const e of sim.drainEvents()) {
       if (e.type === 'blackout' && start < 0) start = sim.time;
       if (e.type === 'power' && start >= 0 && !len) len = sim.time - start;
     }
   }
-  assert.ok(start > 0, 'une coupure arrive dans les deux premières minutes');
+  assert.ok(start >= L1_FIRST_BLACKOUT[0] - 0.1 && start < 200, `elle tombe à ${start.toFixed(0)} s`);
   assert.ok(len >= 14.9 && len <= 20.1, `elle dure ${len.toFixed(1)} s`);
 });
 
@@ -1505,6 +1556,7 @@ test("Level 1 : l'entité se cache au bout des étagères pour tendre une embusc
     M.x = P.x + 25;
     M.z = P.z;
     M.ambushT = 0;
+    M.dormantT = 0; // (en pleine partie : passé le calme de l'arrivée)
     P.yaw = -Math.PI / 2;
     sim.step({});
     if (M.mode === 'ambush') {
@@ -1657,6 +1709,8 @@ test("réseau : l'invité reçoit l'état de l'hôte, se déplace chez lui et su
   host.blackout = 12;
   host.monster.x = host.players[1].x + 6;
   host.monster.z = host.players[1].z;
+  host.monster.dormantT = 0; // (passé le calme de l'arrivée, où elle se tait)
+  host.monster.silent = false;
   wire();
   assert.ok(guest.blackout > 0);
   assert.ok(guest.monster.danger > 0.3, "l'invité entend l'entité approcher");
@@ -3873,8 +3927,8 @@ test("Level 1 : l'entité bute sur un rideau baissé, cogne, l'arrache et passe 
 
 test("Level 1 : l'alarme incendie attire l'entité (même en chasse, de loin), elle frappe la cloche ; chacune ne sert qu'une fois", () => {
   const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }];
-  const sim = new BackroomsSim({ difficulty: 'normal', seed: 6, players, localId: 1, level: 1 });
-  const guest = new BackroomsSim({ difficulty: 'normal', seed: 6, players, localId: 2, level: 1 });
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 9, players, localId: 1, level: 1 });
+  const guest = new BackroomsSim({ difficulty: 'normal', seed: 9, players, localId: 2, level: 1 });
   const a = sim.map.alarms[0];
   const P = sim.player;
   P.x = a.x + a.nx * 0.6;
@@ -3887,14 +3941,18 @@ test("Level 1 : l'alarme incendie attire l'entité (même en chasse, de loin), e
     const x = (q.x + 0.5) * CELL_SIZE;
     const z = (q.z + 0.5) * CELL_SIZE;
     const dd = Math.hypot(x - a.x, z - a.z);
-    return dd > 26 && dd < 36 && !sim.map.dockAt(q.x, q.z);
+    if (!(dd > 26 && dd < 36) || sim.map.dockAt(q.x, q.z)) return false;
+    // (à moins de 45 m de marche de la cloche, quel que soit le plan de l'entrepôt)
+    const path = findPath(sim.map, x, z, a.x + a.nx, a.z + a.nz);
+    return path && path.length * CELL_SIZE < 45;
   });
   G.x = (c.x + 0.5) * CELL_SIZE;
   G.z = (c.z + 0.5) * CELL_SIZE;
-  Object.assign(M, { x: G.x + 9, z: G.z, floor: 0, mode: 'chase', target: 2, ductCD: 999 });
-  if (sim.isColliding(M.x, M.z, 0.4)) Object.assign(M, { x: G.x, z: G.z + 9 });
-  if (sim.isColliding(M.x, M.z, 0.4)) Object.assign(M, { x: G.x, z: G.z - 9 });
-  G.x += 0; // (il est à 9 m d'elle : elle ne le tient pas de près)
+  // (il est à une quinzaine de mètres d'elle : elle ne le tient pas de près)
+  for (const [dx, dz] of [[15, 0], [-15, 0], [0, 15], [0, -15], [11, 11], [-11, -11]]) {
+    Object.assign(M, { x: G.x + dx, z: G.z + dz, floor: 0, mode: 'chase', target: 2, ductCD: 999 });
+    if (!sim.isColliding(M.x, M.z, 0.4) && !sim.map.isWall(Math.floor(M.x / CELL_SIZE), Math.floor(M.z / CELL_SIZE))) break;
+  }
   sim.step({ pick: true });
   assert.ok(a.used && a.ringT > ALARM_T - 0.1, 'F au déclencheur : la cloche sonne');
   guest.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
@@ -4507,6 +4565,135 @@ test("le code : aucune méthode définie deux fois dans une même classe (la sec
       }
     }
   }
+});
+
+test("Level 1 : l'arrivée est calme — elle reste au loin, pas de coupure avant deux minutes", () => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 6, level: 1 });
+  assert.ok(sim.monster.dormantT >= L1_CALM - 0.1, 'elle ne chasse pas encore');
+  assert.ok(sim.nextBlackout >= L1_FIRST_BLACKOUT[0], 'la première coupure attend');
+});
+
+test('Level 1 : coupures variées — jamais deux fois de suite le même genre ; le délestage éteint un tiers après l\'autre', () => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 3, level: 1 });
+  const kinds = [];
+  for (let i = 0; i < 12; i++) {
+    sim.blackout = 0;
+    sim.cut = null;
+    sim.restoreLights();
+    sim.startCut();
+    kinds.push(sim.lastCut);
+  }
+  assert.equal(kinds[0], 'full', 'la première est un vrai noir');
+  for (let i = 1; i < kinds.length; i++) assert.notEqual(kinds[i], kinds[i - 1]);
+  assert.ok(new Set(kinds).size >= 3, `plusieurs genres : ${kinds.join(', ')}`);
+  // un délestage, du début à la fin
+  sim.cut = null;
+  sim.blackout = 0;
+  sim.restoreLights();
+  sim.lastCut = 'full';
+  let n = 0;
+  while (sim.lastCut !== 'sector' && n++ < 50) {
+    sim.cut = null;
+    sim.blackout = 0;
+    sim.restoreLights();
+    sim.lastCut = 'brown';
+    sim.startCut();
+  }
+  assert.equal(sim.cut.kind, 'sector');
+  const on0 = sim.map.lights.filter((l) => l.s0 !== 'off').length;
+  const off = () => sim.map.lights.filter((l) => l.s0 !== 'off' && l.state === 'off').length;
+  const a = off();
+  assert.ok(a > on0 * 0.15 && a < on0 * 0.6, `un tiers de l'entrepôt dans le noir (${a} néons sur ${on0})`);
+  assert.equal(sim.blackout, 0, 'ailleurs, le courant tient (le caméscope capte)');
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 3, level: 1, players: [{ id: 'g', name: 'G' }], localId: 'g' });
+  guest.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
+  assert.equal(guest.cut && guest.cut.kind, 'sector', "l'invité sait qu'un délestage est en cours");
+  assert.equal(guest.map.lights.filter((l) => l.s0 !== 'off' && l.state === 'off').length, a, 'et voit les mêmes néons éteints');
+  run(sim, SECTOR_STEP + 0.1);
+  assert.ok(off() > 0 && off() !== a, 'le tiers suivant');
+  run(sim, SECTOR_STEP * 2);
+  assert.equal(sim.cut, null);
+  assert.equal(off(), 0, 'tout revient comme avant');
+});
+
+test('Level 1 : disjoncteurs généraux — à deux, deux postes tenus ensemble ; seul, ils tiennent le temps de courir', () => {
+  const two = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 9, players: two, localId: 1, level: 1 });
+  assert.equal(sim.relayNeed, 2);
+  const need = sim.relaysNeeded();
+  assert.equal(need.length, 2);
+  assert.ok(need[0].desk, 'la console du poste de garde en est un');
+  assert.ok(Math.hypot(need[0].x - need[1].x, need[0].z - need[1].z) > 20, 'les postes sont loin l\'un de l\'autre');
+  const [A, B] = sim.players;
+  const box = need[1];
+  B.x = box.x + box.nx * 0.9;
+  B.z = box.z + box.nz * 0.9;
+  stepAs(sim, B, { pick: true });
+  assert.ok(Math.abs(box.on - RELAY_SYNC) < 0.1, 'à deux, une armoire ne tient que quelques secondes');
+  run(sim, RELAY_SYNC + 0.2);
+  assert.equal(box.on, 0, 'seule, elle retombe');
+  assert.ok(sim.drainEvents().some((e) => e.type === 'relayOff'));
+  // A s'assoit au poste : la console s'arme, et tient tant qu'il reste assis
+  const S = sim.map.post;
+  A.x = S.front.x;
+  A.z = S.front.z;
+  sim.step({ pick: true });
+  assert.ok(A.desk);
+  run(sim, RELAY_ARM + 0.2);
+  assert.ok(need[0].on > 0, 'la console tient');
+  stepAs(sim, B, { pick: true });
+  assert.equal(sim.mains, true, 'les deux en même temps : le courant arrive au panneau');
+  // à trois, trois postes
+  const three = [...two, { id: 3, name: 'C' }];
+  const s3 = new BackroomsSim({ difficulty: 'peaceful', seed: 9, players: three, localId: 1, level: 1 });
+  assert.equal(s3.relayNeed, Math.min(3, s3.map.relays.length));
+  // seul : bien plus longtemps (de quoi courir d'un poste à l'autre)
+  const s1 = new BackroomsSim({ difficulty: 'peaceful', seed: 9, level: 1 });
+  assert.ok(s1.relayLatch() > 20, `seul, une armoire tient ${s1.relayLatch().toFixed(0)} s`);
+  // à deux, si l'un meurt, la tâche s'adapte
+  B.status = 'dead';
+  assert.ok(sim.relayLatch() > 20);
+});
+
+test('Level 1 : le courant revenu, le monte-charge descend (plus longtemps à plusieurs) ; les rideaux retombent, elle traque', () => {
+  const four = [1, 2, 3, 4].map((id) => ({ id, name: 'P' + id }));
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 2, players: four, localId: 1, level: 1 });
+  const d = sim.map.docks[0];
+  d.o = 1;
+  sim.delivered = FUSES;
+  sim.mains = true;
+  sim.players[0].x = sim.map.exit.x;
+  sim.players[0].z = sim.map.exit.z;
+  run(sim, PANEL_T + 0.2);
+  assert.equal(sim.powered, true);
+  assert.ok(sim.liftCallT > LIFT_CALL_T + 10, `à quatre, ${sim.liftCallT.toFixed(0)} s d'attente`);
+  assert.equal(sim.open, false);
+  assert.ok(sim.hunt, 'la traque');
+  assert.equal(sim.monster.dormantT, 0);
+  assert.ok(d.dir < 0 || d.o < 1, 'la surtension fait retomber les rideaux');
+  const guest = new BackroomsSim({ difficulty: 'normal', seed: 2, players: four, localId: 2, level: 1 });
+  guest.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
+  assert.ok(Math.abs(guest.liftCallT - sim.liftCallT) < 0.05, "l'invité voit le monte-charge descendre");
+  assert.equal(guest.open, false);
+  sim.liftCallT = 0.01;
+  sim.step();
+  assert.equal(sim.open, true);
+  assert.ok(sim.drainEvents().some((e) => e.type === 'liftArrive'));
+});
+
+test("Level 1 : le plan de l'entrepôt change avec la graine (travées, chambres froides, grande halle, allées serrées) ; tout reste atteignable", () => {
+  const plans = new Set();
+  for (let sd = 1; sd <= 12; sd++) {
+    const m = createWarehouseMap(sd * 7 + 13);
+    plans.add(m.plan);
+    const d = bfs(m.grid, m.W, m.H, m.spawn.gx, m.spawn.gz);
+    const reach = (o) => d[o.gz * m.W + o.gx] >= 0;
+    assert.ok(reach(m.exit), `graine ${sd} (${m.plan}) : le monte-charge`);
+    for (const f of m.fuses) assert.ok(reach(f), `graine ${sd} (${m.plan}) : un fusible`);
+    for (const r of m.relays) if (!r.desk) assert.ok(d[r.gz * m.W + r.gx] >= 0, `graine ${sd} (${m.plan}) : une armoire`);
+    assert.ok(m.relays.length >= 2, `graine ${sd} : au moins deux postes de disjoncteurs`);
+  }
+  assert.equal(plans.size, 4, [...plans].join(', '));
 });
 
 console.log(`\n${count} tests réussis pour The Backrooms !`);

@@ -341,7 +341,9 @@ export class BackroomsHUD {
     const got = L5 ? sim.posted : PIPES ? sim.valves : L1 ? sim.fuses : sim.cassettes;
     const total = L5 ? 6 : PIPES ? 4 : L1 ? 3 : CASSETTES;
     const delivered = sim.delivered || 0;
-    const objKey = `${sim.level}:${got}:${delivered}:${sim.open}:${sim.slide}:${sim.codeShown}:${(P.letters || []).length}:${sim.word}`;
+    // (Level 1 : aussi les disjoncteurs, le courant au panneau, le monte-charge qui descend)
+    const L1call = L1 && sim.liftCallT > 0;
+    const objKey = `${sim.level}:${got}:${delivered}:${sim.open}:${sim.slide}:${sim.codeShown}:${(P.letters || []).length}:${sim.word}:${L1 ? `${sim.mains}:${sim.powered}:${L1call}` : ''}`;
     if (objKey !== this.lastCount) {
       this.lastCount = objKey;
       this.text('levelTag', `LEVEL ${levelName(sim.level)}`);
@@ -372,19 +374,29 @@ export class BackroomsHUD {
       else if (PIPES) {
         const dark = (sim.map.breakers || []).some((x) => !x.done && (sim.map.valves[x.sector] || {}).power === 2);
         b = got === 0 ? 'LEVEL 2 · CLOSE THE 4 STEAM VALVES IN THE BOILER ROOMS · STAY IN THE LIGHT' : `VALVE ${got}/4 CLOSED` + (dark ? ' · A SECTOR WENT DARK: RESET ITS BREAKER (ELECTRICAL)' : '');
-      } else if (L1 && delivered >= total) b = 'ALL FUSES IN · STAY AT THE PANEL TO RESTART THE FREIGHT ELEVATOR · IT WILL BE LOUD';
-      else if (L1 && got > delivered) b = `FUSE IN YOUR POCKET · BRING IT TO THE FREIGHT ELEVATOR PANEL (${delivered}/3 IN)`;
-      else if (L1) b = got === 0 ? 'LEVEL 1 · FIND THE 3 FUSES IN THE AISLES' : `FUSE ${got}/3 RECOVERED`;
+      } else if (L1call) b = 'IT KNOWS WHERE YOU ARE · LOCKERS, SHUTTERS AND FIRE ALARMS BUY TIME';
+      else if (L1 && sim.powered) b = 'THE FREIGHT ELEVATOR IS HERE: EVERYONE GET IN';
+      else if (L1 && delivered >= total && sim.mains) b = 'POWER IS BACK AT THE PANEL · STAY AT IT TO RESTART THE FREIGHT ELEVATOR';
+      else if (L1 && delivered >= total) {
+        const k = sim.relayNeed || 2;
+        const alive = sim.players.filter((q) => q.status === 'alive').length;
+        b = alive >= k ? `THE MAIN BREAKERS ARE OFF · ${k} MUST BE ON AT ONCE · SPLIT UP, COUNT DOWN` : 'THE MAIN BREAKERS ARE OFF · THROW ONE, RUN TO THE NEXT BEFORE IT TRIPS';
+      } else if (L1 && got > delivered) b = `FUSE IN YOUR POCKET · BRING IT TO THE FREIGHT ELEVATOR PANEL (${delivered}/3 IN)`;
+      else if (L1) b = got === 0 ? 'LEVEL 1 · FIND THE 3 FUSES · ONE OF THEM IS KEPT IN A STAFF LOCKER' : `FUSE ${got}/3 RECOVERED`;
       else b = got === 0 ? `FIND THE ${CASSETTES} VHS TAPES · THE SIGNAL GETS STRONGER AS YOU GET CLOSER` : `TAPE ${got}/${CASSETTES} RECOVERED`;
       banner.textContent = b;
     }
     this.bannerT -= dt;
     this.flag('objBanner', 'hide', this.bannerT <= 0);
-    this.show('blackoutTag', sim.blackout > 0);
+    // la coupure : le noir complet, la baisse de tension, le délestage d'un tiers de l'entrepôt
+    const cutK = sim.cut ? sim.cut.kind : '';
+    this.show('blackoutTag', sim.blackout > 0 || !!cutK);
+    this.text('blackoutTag', sim.blackout > 0 ? '⚠ POWER OUTAGE' : cutK === 'brown' ? '⚠ POWER FLUCTUATION' : cutK === 'sector' ? `⚠ LOAD SHEDDING · SECTOR ${'ABC'[Math.max(0, sim.cut.band)]}` : '');
     // compte à rebours de l'équipe : dehors, il faut courir ; dedans, on regarde les autres arriver
     const bt = sim.departT > 0 ? 0 : sim.boardT || 0;
-    this.show('boardTimer', bt > 0 && sim.state === 'playing');
-    if (bt > 0) {
+    this.show('boardTimer', (bt > 0 || L1call) && sim.state === 'playing');
+    if (L1call) E.boardTimer.textContent = `FREIGHT ELEVATOR ARRIVING IN ${Math.ceil(sim.liftCallT)}s · STAY ALIVE`;
+    else if (bt > 0) {
       const sec = Math.ceil(bt);
       const out = sim.players.filter((p) => p.status === 'alive').length;
       const sl = slideOf(sim);
@@ -439,7 +451,7 @@ export class BackroomsHUD {
       }
     }
     const noSig = !(P.signal > 0);
-    this.text('signalLabel', noSig ? 'NO SIGNAL' : L5 ? (sim.open ? 'FIRE ESCAPE' : P.sigTo === 'keypad' ? 'KEYPAD' : P.sigTo === 'mail' ? 'MAILBOXES' : 'LETTER') : P.sigTo === 'stairs' ? 'STAIRS' : P.sigTo === 'key' ? 'KEY' : P.sigTo === 'ladder' ? 'LADDER' : L37 && sim.open ? 'SLIDE' : sim.open || (sim.level === 1 && delivered >= total) || (sim.level === 1 && !(sim.map.fuses || []).some((f) => !f.taken)) ? (sim.level === 1 ? 'FREIGHT ELEVATOR' : 'ELEVATOR') : 'SIGNAL');
+    this.text('signalLabel', noSig ? 'NO SIGNAL' : L5 ? (sim.open ? 'FIRE ESCAPE' : P.sigTo === 'keypad' ? 'KEYPAD' : P.sigTo === 'mail' ? 'MAILBOXES' : 'LETTER') : P.sigTo === 'stairs' ? 'STAIRS' : P.sigTo === 'breaker' ? 'BREAKER' : P.sigTo === 'key' ? 'KEY' : P.sigTo === 'ladder' ? 'LADDER' : L37 && sim.open ? 'SLIDE' : sim.open || (sim.level === 1 && delivered >= total) || (sim.level === 1 && !(sim.map.fuses || []).some((f) => !f.taken)) ? (sim.level === 1 ? 'FREIGHT ELEVATOR' : 'ELEVATOR') : 'SIGNAL');
     this.flag('signal', 'none', noSig);
     if (this.camOn) this.text('camSigLbl', this.E.signalLabel.textContent.replace('FREIGHT ', ''));
     // Level 0, tout trouvé : une flèche montre la direction du vrai ascenseur (ou de l'escalier, de la clé qui y mène)
@@ -568,7 +580,10 @@ export class BackroomsHUD {
       const t = Math.floor(time) + 3 * 3600 + 17 * 60;
       this.text('cctvClock', `${this.$('#tapeDate').textContent}  ${two(Math.floor(t / 3600) % 24)}:${two(Math.floor(t / 60) % 60)}:${two(t % 60)}`);
       const k = this.keyNames(this.qwerty);
-      this.text('cctvHint', document.body.classList.contains('touch') ? 'SLIDE ◄ ► TO SWITCH CAMERA · TAP F TO STAND UP' : `◄ ${k.l} / ${k.r} ► OR WHEEL · SWITCH CAMERA · F · STAND UP`);
+      // la console des disjoncteurs généraux : elle s'arme, puis tient tant qu'on reste assis
+      const desk = !sim.mains && (sim.relaysNeeded ? sim.relaysNeeded() : []).find((r) => r.desk);
+      const con = desk ? (desk.on > 0 ? 'MAIN BREAKER CONSOLE ON · STAY SEATED · ' : 'MAIN BREAKER CONSOLE ARMING… · ') : '';
+      this.text('cctvHint', con + (document.body.classList.contains('touch') ? 'SLIDE ◄ ► TO SWITCH CAMERA · TAP F TO STAND UP' : `◄ ${k.l} / ${k.r} ► OR WHEEL · SWITCH CAMERA · F · STAND UP`));
     }
 
     // 5. Messages passagers, sous-titres, enregistrement
@@ -789,6 +804,7 @@ export class BackroomsHUD {
   controlText(c) {
     if (c.kind === 'alarm') return 'PRESS F · BREAK THE GLASS · THE BELL WILL DRAW IT THERE';
     if (c.kind === 'desk') return 'PRESS F · SIT AT THE GUARD POST · WATCH THE CAMERAS';
+    if (c.kind === 'relay') return c.obj.on > 0 ? `MAIN BREAKER ON · ${Math.ceil(c.obj.on)}s · PRESS F TO RESET THE TIMER` : 'PRESS F · THROW THE MAIN BREAKER (LOUD)';
     const d = c.obj;
     if (d.broken) return 'THE SHUTTER IS TORN OPEN · IT WILL NEVER CLOSE AGAIN';
     const up = d.dir < 0 || (d.dir === 0 && d.o < 1);
@@ -826,7 +842,7 @@ export class BackroomsHUD {
           // au poste : l'incrustation de la caméra dit les touches
         } else if (ctl) text = this.controlText(ctl);
         else if (it) text = P.inv.includes(null) ? `PRESS F · PICK UP ${NAME[it.kind]}` : `PRESS F · SWAP ${NAME[sel || 'bottle']} (SLOT ${P.sel + 1}) FOR ${NAME[it.kind]}`;
-        else if (h) text = 'PRESS F · HIDE IN THE LOCKER';
+        else if (h) text = (sim.map.fuses || []).some((f) => !f.taken && f.locker === h.id) ? 'PRESS F · SEARCH THE LOCKER · THE FUSE IS INSIDE' : 'PRESS F · HIDE IN THE LOCKER';
         else if (sim.nearKey && sim.nearKey(P)) text = 'PRESS F · TAKE THE STAIRWELL KEY';
         else if (sim.lockedDoorNear && sim.lockedDoorNear(P)) text = 'LOCKED · FIND THE STAIRWELL KEY ON THIS FLOOR';
         else if (atPanel) text = `RESTARTING THE FREIGHT ELEVATOR… ${Math.round((sim.panel || 0) * 100)}% · STAY HERE`;

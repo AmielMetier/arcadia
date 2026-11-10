@@ -3631,6 +3631,8 @@ void main() {
 
     let lit = true;
     let powerFlick = 0;
+    let sagT = 0; // Level 1 : la baisse de tension (et la surtension pendant que le monte-charge descend)
+    let sagWas = false;
     let flickT = 0;
     let alarmT = 0;
     let redCut = 0; // phase rouge : tout éteint encore tant de secondes
@@ -3639,7 +3641,7 @@ void main() {
     const setPower = (v) => {
       if (v === power) return;
       power = v;
-      ambient.intensity = v ? AMB : 0;
+      ambient.intensity = v ? AMB * Math.max(0.55, v) : 0; // (la baisse de tension : un peu moins de lumière diffuse)
       for (const l of map.lights) {
         fixColor(l, power && l.state !== 'off');
         l.k = power && l.state !== 'off' ? 1 : 0;
@@ -3970,6 +3972,17 @@ void main() {
           powerFlick -= dt;
           setPower(powerFlick <= 0 || Math.random() < 0.55 ? 1 : 0);
         }
+        // Level 1 : le courant faiblit et tremble (baisse de tension, ou la surtension pendant que le monte-charge
+        // descend) : toute la lumière de l'entrepôt baisse par à-coups, parfois presque jusqu'au noir
+        const sag = lit && sim.level === 1 && ((sim.cut && sim.cut.kind === 'brown') || sim.liftCallT > 0);
+        if (sag && powerFlick <= 0) {
+          sagT -= dt;
+          if (sagT <= 0) {
+            sagT = 0.05 + Math.random() * 0.14;
+            setPower(Math.random() < 0.08 ? 0.12 : 0.36 + Math.random() * 0.32);
+          }
+        } else if (sagWas && !sag && lit && powerFlick <= 0) setPower(1);
+        sagWas = sag;
 
         // Level 2 : un secteur dont les néons ont sauté (ou que son disjoncteur a rallumé)
         if ((map.lightGen || 0) !== lightGen) {

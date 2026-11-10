@@ -36,6 +36,8 @@ const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 // caisses et matériel abandonnés dans les allées (modèles Poly Haven, CC0) : nom, hauteur, rayon de collision ;
 // face : posé dos au mur ou au rayonnage (armoires électriques, coffres à outils), un nombre si l'avant du modèle
 // ne regarde pas +z
+export const WAREHOUSE_PLANS = ['aisles', 'cold', 'hall', 'dense'];
+
 export const L1_PROPS = [
   { m: 'wooden_crate_01', h: 0.62, r: 0.38 },
   { m: 'wooden_crate_02', h: 0.5, r: 0.45 },
@@ -81,11 +83,18 @@ export function createWarehouseMap(seed = 7) {
 
   for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) grid[z * W + x] = inside(x, z) ? T.FLOOR : T.WALL;
 
+  // 0. Le plan de l'entrepôt change avec la graine (sans tirage : le plan classique garde la carte d'avant) :
+  // 'aisles' (des travées de rayonnages), 'cold' (des chambres froides aux murs de béton, qu'on traverse par leurs
+  // portes), 'hall' (une grande halle d'expédition presque vide au milieu, des piles de palettes, des piliers),
+  // 'dense' (des grandes allées plus serrées, des rayonnages dos à dos)
+  const plan = WAREHOUSE_PLANS[(Math.imul(seed >>> 0, 2654435761) >>> 0) % WAREHOUSE_PLANS.length];
+
   // 1. Grandes allées (2 cases de large) à des places tirées au hasard : elles découpent l'entrepôt en travées
   const AW = 2;
   const cuts = (n) => {
     const out = [];
-    for (let v = 9 + Math.floor(rnd() * 5); v < n - 9; v += 11 + Math.floor(rnd() * 5)) out.push(v);
+    const step = () => (plan === 'dense' ? 9 + Math.floor(rnd() * 3) : 11 + Math.floor(rnd() * 5));
+    for (let v = 9 + Math.floor(rnd() * 5); v < n - 9; v += step()) out.push(v);
     return out;
   };
   const ax = cuts(W);
@@ -103,6 +112,59 @@ export function createWarehouseMap(seed = 7) {
       const [x0, x1] = ends(bx, i);
       const [z0, z1] = ends(bz, j);
       if (x1 - x0 < 4 || z1 - z0 < 4) continue;
+      // la grande halle : les travées du milieu (à moins de 15 cases du centre), sans rayonnages
+      if (plan === 'hall' && Math.hypot((x0 + x1) / 2 - W / 2, (z0 + z1) / 2 - H / 2) < 15) {
+        for (let z = z0 + 2; z < z1 - 1; z += 4) for (let x = x0 + 2; x < x1 - 1; x += 4) set(x, z, T.WALL);
+        // des piles de palettes (une case de rayonnage bas, ou deux côte à côte), clairsemées
+        for (let z = z0 + 1; z < z1 - 1; z++) {
+          for (let x = x0 + 1; x < x1 - 1; x++) {
+            if (get(x, z) !== T.FLOOR || rnd() > 0.07) continue;
+            set(x, z, T.SHELF);
+            const two = rnd() < 0.5 && get(x + 1, z) === T.FLOOR && x + 1 < x1 - 1;
+            if (two) set(x + 1, z, T.SHELF);
+            shelfRows.push({ alongX: true, cells: two ? [{ x, z }, { x: x + 1, z }] : [{ x, z }] });
+          }
+        }
+        continue;
+      }
+      // une chambre froide : des murs de béton sur le pourtour de la travée, deux portes vers les grandes allées,
+      // dedans des rayonnages et une allée tout autour
+      if (plan === 'cold' && x1 - x0 >= 7 && z1 - z0 >= 7 && rnd() < 0.45) {
+        for (let x = x0; x < x1; x++) {
+          set(x, z0, T.WALL);
+          set(x, z1 - 1, T.WALL);
+        }
+        for (let z = z0; z < z1; z++) {
+          set(x0, z, T.WALL);
+          set(x1 - 1, z, T.WALL);
+        }
+        // les portes : au milieu des côtés qui donnent sur une grande allée (pas sur le mur de l'entrepôt)
+        const sides = [];
+        if (z0 > 1) sides.push([0, -1]);
+        if (z1 < H - 1) sides.push([0, 1]);
+        if (x0 > 1) sides.push([-1, 0]);
+        if (x1 < W - 1) sides.push([1, 0]);
+        const doors = sides.sort(() => rnd() - 0.5).slice(0, 2);
+        for (const [dx, dz] of doors) {
+          const mx = dx ? (dx < 0 ? x0 : x1 - 1) : x0 + Math.floor((x1 - x0) / 2) - 1 + Math.floor(rnd() * 2);
+          const mz = dz ? (dz < 0 ? z0 : z1 - 1) : z0 + Math.floor((z1 - z0) / 2) - 1 + Math.floor(rnd() * 2);
+          for (let k = 0; k < 2; k++) set(mx + (dz ? k : 0), mz + (dx ? k : 0), T.FLOOR);
+        }
+        const alongX = x1 - x0 >= z1 - z0;
+        const [a0, a1] = alongX ? [z0 + 2, z1 - 2] : [x0 + 2, x1 - 2];
+        const [l0, l1] = alongX ? [x0 + 2, x1 - 2] : [z0 + 2, z1 - 2];
+        for (let r = a0 + 1; r < a1; r += 3) {
+          const row = [];
+          for (let k = l0; k < l1; k++) {
+            const x = alongX ? k : r;
+            const z = alongX ? r : k;
+            set(x, z, T.SHELF);
+            row.push({ x, z });
+          }
+          if (row.length) shelfRows.push({ alongX, cells: row });
+        }
+        continue;
+      }
       if (rnd() < 0.14) {
         // parking : piliers tous les 4 cases et un muret de béton
         for (let z = z0 + 2; z < z1 - 1; z += 4) for (let x = x0 + 2; x < x1 - 1; x += 4) set(x, z, T.WALL);
@@ -119,7 +181,7 @@ export function createWarehouseMap(seed = 7) {
       const [a0, a1] = alongX ? [z0, z1] : [x0, x1]; // sens où les rangées se succèdent
       const [l0, l1] = alongX ? [x0, x1] : [z0, z1]; // longueur d'une rangée
       // racks simples (1 case) ou dos à dos (2 cases), toujours séparés par une allée de 2 cases
-      const thick = rnd() < 0.45 ? 2 : 1;
+      const thick = rnd() < (plan === 'dense' ? 0.75 : 0.45) ? 2 : 1;
       for (let r = a0 + (rnd() < 0.5 ? 0 : 1); r + thick <= a1; r += thick + 2) {
         const gap = rnd() < 0.5 ? l0 + 2 + Math.floor(rnd() * Math.max(1, l1 - l0 - 4)) : -1;
         for (let t = 0; t < thick; t++) {
@@ -500,6 +562,52 @@ export function createWarehouseMap(seed = 7) {
     busy.add(k);
   }
 
+  // 8b'. Les disjoncteurs généraux (le courant du monte-charge) : la console du poste de garde, une armoire du côté du
+  // monte-charge (à une trentaine de mètres de marche de ses portes) et une autre au plus loin de tout. Il faut les tenir
+  // relevés en même temps : à deux, la console et la première armoire ; à partir de trois joueurs, les trois (voir
+  // relayNeed dans sim.js). relayRun : les secondes qu'il faut à quelqu'un seul pour courir de l'un à l'autre (rideaux
+  // baissés : par le grand détour)
+  const relays = [];
+  if (post) relays.push({ id: 0, desk: true, x: post.seat.x, z: post.seat.z, gx: Math.floor(post.seat.x / C), gz: Math.floor(post.seat.z / C), nx: 0, nz: 0, on: 0 });
+  {
+    const shut = grid.slice();
+    docks.forEach((d) => d.cells.forEach(([gx, gz]) => (shut[gz * W + gx] = T.WALL)));
+    const walkFrom = gridDist(shut, W, H);
+    const fromExit = walkFrom(exitCell);
+    const fromStart = walkFrom({ x: sx, z: sz });
+    const ok = (f) => {
+      const k = f.c.z * W + f.c.x;
+      if (busy.has(k) || roomCells.has(k) || !(fromStart(f.c) >= 0)) return false;
+      if (Math.hypot(f.x - spawn.x, f.z - spawn.z) < 10 || Math.hypot(f.x - exit.x, f.z - exit.z) < 10) return false;
+      if (post && Math.hypot(f.x - post.x, f.z - post.z) < 9) return false;
+      if (docks.some((d) => Math.hypot(f.x - d.x, f.z - d.z) < 6) || alarms.some((a) => Math.hypot(a.x - f.x, a.z - f.z) < 5)) return false;
+      return true;
+    };
+    const cand = faces.filter(ok); // (sans tirage : la suite de la carte reste la même)
+    // la première : du côté du monte-charge (plus près de lui que de l'arrivée), à ~12 cases de marche de ses portes
+    const near = cand.filter((f) => fromExit(f.c) >= 0 && fromExit(f.c) < fromStart(f.c));
+    const b1 = (near.length ? near : cand).reduce((b, f) => (!b || Math.abs(fromExit(f.c) - 12) < Math.abs(fromExit(b.c) - 12) ? f : b), null);
+    // la seconde : au plus loin de la première, de l'arrivée (ou du poste) et du monte-charge
+    const far = (f) => Math.min(...[b1, post || spawn, exit].filter(Boolean).map((o) => Math.hypot(f.x - o.x, f.z - o.z)));
+    const b2 = b1 ? cand.filter((f) => f !== b1).reduce((b, f) => (!b || far(f) > far(b) ? f : b), null) : null;
+    for (const f of [b1, b2]) {
+      if (!f) continue;
+      relays.push({ id: relays.length, desk: false, x: f.x, z: f.z, nx: -f.dx, nz: -f.dz, gx: f.c.x, gz: f.c.z, on: 0 });
+      busy.add(f.c.z * W + f.c.x);
+    }
+  }
+  // le trajet de quelqu'un seul : de poste en poste, dans le meilleur ordre (2 postes, puis 3)
+  const relayRun = [0, 0];
+  {
+    const shut = grid.slice();
+    docks.forEach((d) => d.cells.forEach(([gx, gz]) => (shut[gz * W + gx] = T.WALL)));
+    const walkFrom = gridDist(shut, W, H);
+    const cell = (r) => ({ x: r.desk ? Math.floor(post.front.x / C) : r.gx, z: r.desk ? Math.floor(post.front.z / C) : r.gz });
+    const leg = (a, b) => Math.max(0, walkFrom(cell(a))(cell(b))) * C;
+    if (relays.length >= 2) relayRun[0] = leg(relays[0], relays[1]);
+    if (relays.length >= 3) relayRun[1] = Math.min(leg(relays[0], relays[1]) + leg(relays[1], relays[2]), leg(relays[0], relays[2]) + leg(relays[2], relays[1]), leg(relays[1], relays[0]) + leg(relays[0], relays[2]));
+  }
+
   // 8c. Les caméras de surveillance : au bout des grandes allées, sous le plafond, elles plongent le long de l'allée ;
   // une au-dessus des portes du monte-charge, une au-dessus du poste de garde (ce qui arrive dans son dos)
   const cams = [];
@@ -591,9 +699,12 @@ export function createWarehouseMap(seed = 7) {
 
   return {
     level: 1,
+    plan,
     ceil: LEVEL1_CEIL,
     docks,
     alarms,
+    relays,
+    relayRun,
     cams,
     post,
     ducts,

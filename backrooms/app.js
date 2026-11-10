@@ -1140,13 +1140,13 @@ function handleEvent(ev, me) {
       if (sfx) sfx.cassette(sim.level === 2 ? 'valve' : 'fuse');
       if (sim.level === 2) {
         if (hud) hud.toast(ev.by === me ? `Valve wheel ${ev.count}/${ev.total}` : `${who(ev.by)} found a valve wheel (${ev.count}/${ev.total})`);
-      } else if (hud) hud.toast(ev.by === me ? 'Fuse in your pocket · bring it to the freight elevator panel' : `${who(ev.by)} picked up a fuse`);
+      } else if (hud) hud.toast(ev.by === me ? (ev.locker ? 'A fuse, at the back of the locker · bring it to the freight elevator panel' : 'Fuse in your pocket · bring it to the freight elevator panel') : `${who(ev.by)} picked up a fuse`);
       if (ev.by === me && (sim.level === 1 || sim.level === 2)) showNote(sim.level, (ev.count || 1) - 1);
       break;
     }
     case 'fuseIn':
       if (sfx) sfx.cassette('fuse');
-      if (hud) hud.toast(ev.count >= ev.total ? 'All 3 fuses are in · now restart the freight elevator: stay at the panel' : `${ev.id === me ? 'Fuse' : `${who(ev.id)}'s fuse`} in the panel · ${ev.count}/${ev.total}`);
+      if (hud) hud.toast(ev.count >= ev.total ? (sim.mains ? 'All 3 fuses are in · now restart the freight elevator: stay at the panel' : 'All 3 fuses are in · but the main breakers are off') : `${ev.id === me ? 'Fuse' : `${who(ev.id)}'s fuse`} in the panel · ${ev.count}/${ev.total}`);
       break;
     case 'fuseDrop':
       if (hud) hud.toast(`${ev.name} dropped ${ev.n > 1 ? `${ev.n} fuses` : 'a fuse'} where they fell…`);
@@ -1229,7 +1229,7 @@ function handleEvent(ev, me) {
       if (sfx) sfx.silence(4);
       break;
     case 'powered':
-      if (hud) hud.toast(sim.level === HOTEL_LEVEL ? 'The keypad beeps: the fire escape door is unlocked' : sim.level === 2 ? 'Valves closed: the pumps stop, the three slides open' : 'Fuses in place: the freight elevator is starting up');
+      if (hud) hud.toast(sim.level === HOTEL_LEVEL ? 'The keypad beeps: the fire escape door is unlocked' : sim.level === 2 ? 'Valves closed: the pumps stop, the three slides open' : 'The motor catches: the freight elevator is starting up');
       if (sfx && sim.level === 2) sfx.setPool(false); // le silence d'un coup : les pompes s'arrêtent
       break;
     case 'exitUnlocked': {
@@ -1335,6 +1335,36 @@ function handleEvent(ev, me) {
       break;
     case 'power':
       if (sfx) sfx.power();
+      break;
+    // Level 1 : la baisse de tension (tout grésille) et le délestage (un tiers de l'entrepôt après l'autre)
+    case 'cut':
+      if (ev.kind === 'brown') {
+        if (sfx) sfx.neonSurge({ x: sim.player.x, z: sim.player.z }, 5);
+        if (hud) hud.toast('The lights sag and buzz… the power is failing');
+      } else if (hud) hud.toast('Somewhere, the breakers are shedding the load…');
+      break;
+    case 'sectorOut':
+      if (sfx) sfx.breakerClunk({ x: ev.x, z: ev.z });
+      break;
+    // Level 1 : les disjoncteurs généraux, le monte-charge qui descend
+    case 'relay':
+      if (sfx) sfx.breakerClunk({ x: ev.x, z: ev.z });
+      if (hud && ev.by === me) hud.toast(ev.desk ? 'The console is armed · stay seated, it holds while you do' : `Main breaker on · it holds ${Math.round(ev.t || 0)} s${(ev.t || 0) > 10 ? ' · run to the next one' : ' · the others must be on now'}`);
+      else if (hud) hud.toast(`${who(ev.by)} threw a main breaker`);
+      break;
+    case 'relayOff':
+      if (sfx) sfx.breakerClunk({ x: ev.x, z: ev.z });
+      if (hud) hud.toast('A main breaker tripped back off…');
+      break;
+    case 'mains':
+      if (sfx) sfx.neonSurge({ x: ev.x, z: ev.z }, 4.5);
+      if (hud) hud.toast('Power reaches the freight elevator panel · go restart it');
+      break;
+    case 'liftCall':
+      if (sfx) sfx.elevator(4, false);
+      break;
+    case 'liftArrive':
+      if (hud) hud.toast('The freight elevator is here · everyone get in');
       break;
     case 'spotted':
       if (sfx) sfx.spotted();
@@ -1541,7 +1571,7 @@ function handleEvent(ev, me) {
     case 'finalHunt':
       // la phase finale : elle sait où l'on est. Un cri, au loin, puis plus rien que l'alarme
       if (sfx && (ev.floor || 0) === (sim.viewPlayer(sim.spectate || 0).floor || 0)) sfx.distant('drag', { x: ev.x, z: ev.z }, 1.2);
-      if (hud && sim.player.status === 'alive') hud.toast('It knows where you are. RUN to the elevator', 4);
+      if (hud && sim.player.status === 'alive') hud.toast(sim.level === 1 ? 'It knows where you are. Keep moving until the freight elevator comes' : 'It knows where you are. RUN to the elevator', 4);
       break;
     case 'boardCount':
       // les portes vont se fermer : la cabine sonne, et à 10 s un second coup plus pressant
