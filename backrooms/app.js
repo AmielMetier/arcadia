@@ -1958,13 +1958,14 @@ addEventListener('mousedown', () => hud && hud.pad && hud.setPad(false), true);
 addEventListener('mousemove', (e) => hud && hud.pad && Math.abs(e.movementX) + Math.abs(e.movementY) > 6 && hud.setPad(false), true);
 
 // Manette (disposition standard) : A ramasser, X utiliser l'objet, Y lampe, RB (ou croix gauche / droite) changer
-// d'objet, croix bas le poser par terre, B siffler, LB / LT / stick gauche enfoncé courir, Menu pause ; A relance la
+// d'objet, croix bas le poser par terre, B siffler, RT maintenu le talkie, LB / LT / stick gauche enfoncé courir, Menu pause ; A relance la
 // partie en pause
 let padPrev = [];
+let padRadio = false; // RT maintenu : le talkie, comme R au clavier
 function readPad() {
   const pads = navigator.getGamepads ? navigator.getGamepads() : [];
   const p = [...pads].find((x) => x && x.connected);
-  if (!p) { padPrev = []; return null; }
+  if (!p) { padPrev = []; padRadio = false; return null; }
   const b = (i) => !!(p.buttons[i] && (p.buttons[i].pressed || p.buttons[i].value > 0.5));
   const edge = (i) => b(i) && !padPrev[i];
   let hubMenu = false;
@@ -1989,10 +1990,16 @@ function readPad() {
       if (edge(13)) act.drop = true;
       if (edge(1)) act.whistle = true;
       if (edge(9)) setPaused(true);
+      // RT : le talkie (maintenir)
+      if (edge(7)) {
+        askMic(true);
+        if (!multi() && hud) hud.toast('The radio only hisses · no one else is out there');
+      }
     }
   }
   // on joue à la manette : les touches affichées deviennent ses boutons (le clavier ou la souris les rendent)
   if (hud && !hud.pad && (p.buttons.some((_, i) => b(i)) || p.axes.some((a) => Math.abs(a) > 0.45))) hud.setPad(true);
+  padRadio = !hubMenu && !paused && b(7);
   padPrev = p.buttons.map((_, i) => b(i));
   if (hubMenu || paused) return null;
   return { lx: p.axes[0] || 0, ly: p.axes[1] || 0, rx: p.axes[2] || 0, ry: p.axes[3] || 0, run: b(4) || b(6) || b(10) };
@@ -2442,11 +2449,11 @@ function frame(currentTime) {
     // V : parler autour de soi ; R : dans le talkie (à plusieurs) ; micro ouvert : la voix passe sans touche
     const me = sim.player;
     // la voix part toute seule dès qu'on parle (proximité) ; le talkie, seulement en maintenant R
-    const want = OPTS.mic !== 'off' && keys['KeyR'] && multi() ? 2 : 0;
+    const want = OPTS.mic !== 'off' && (keys['KeyR'] || padRadio) && multi() ? 2 : 0;
     // le talkie grésille tout seul de temps en temps (plus souvent quand elle rôde) ; en coupure, il est mort
     const radioOk = !sim.radioDead;
     voice.update(sim, sim.viewPlayer(sim.spectate || 0), delta, want, OPTS.mic !== 'off' && !paused, me.status === 'alive', { ok: radioOk, danger: me.danger || 0, live: !paused && sim.state === 'playing' && !sim.prelude });
-    if (hud) hud.voice(voice, sim, multi(), !!keys['KeyR'] && !radioOk && multi());
+    if (hud) hud.voice(voice, sim, multi(), !!(keys['KeyR'] || padRadio) && !radioOk && multi());
   }
   if (hud) {
     hud.update(sim, sim.time, delta);

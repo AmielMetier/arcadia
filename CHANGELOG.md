@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.33 — 10 novembre 2026
+- **The Backrooms** — À la manette, le talkie se prend en maintenant RT, comme R au clavier.
+
 ## 5.32 — 10 novembre 2026
 - **The Backrooms** — À la manette, le jeu affiche les boutons de la manette au lieu des touches du clavier : les indications à l'écran (« PRESS A », « HOLD LB »…), la barre de commandes en bas et l'écran de pause. Toucher le clavier ou la souris remet les touches du clavier.
 

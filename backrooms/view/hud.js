@@ -101,7 +101,7 @@ export const loreComplete = () => tapesHeard().length >= LORE.length && Object.k
 // Manette branchée et utilisée : les touches affichées deviennent les boutons de la manette (disposition Xbox,
 // comme readPad dans app.js). Les textes du jeu restent écrits avec les touches du clavier ; padify les traduit.
 const PAD_KEYS = {
-  E: 'X', F: 'A', G: 'D-PAD ↓', C: 'R3', V: 'L3', T: 'B', 1: 'Y', SHIFT: 'LB', SPACE: 'D-PAD ↑', ESC: 'MENU', ENTER: 'A',
+  E: 'X', F: 'A', R: 'RT', G: 'D-PAD ↓', C: 'R3', V: 'L3', T: 'B', 1: 'Y', SHIFT: 'LB', SPACE: 'D-PAD ↑', ESC: 'MENU', ENTER: 'A',
 };
 const padKey = (k) => PAD_KEYS[String(k).toUpperCase()];
 export function padify(s) {
@@ -814,6 +814,7 @@ export class BackroomsHUD {
     if (multi) keys.push(['R', 'RADIO']);
     if (this.pad) {
       keys.splice(0, keys.length, ['Y', 'LAMP'], ['A', 'INTERACT'], ['X', 'USE'], ['RB', 'NEXT ITEM'], ['D-PAD ↓', 'DROP'], ['D-PAD ↑', 'JUMP'], ['R3', 'CROUCH'], ['L3', 'CAMCORDER'], ['B', 'WHISTLE']);
+      if (multi) keys.push(['RT', 'RADIO']);
     }
     el.innerHTML = keys.map(([key, what]) => `<span><kbd>${key}</kbd>${what}</span>`).join('');
   }
@@ -1328,7 +1329,7 @@ export class BackroomsHUD {
       ? `${mv} move · Arrows or trackpad (two-finger swipe) look · Shift run · Space jump · C crouch · V camcorder · 1 flashlight · 2–${INV_SIZE + 1} select · E use (hotel: hide) · G drop · F pick up / hide · T whistle · Esc pause`
       : `${mv} move · Mouse look · Shift run · Space jump · C crouch · V camcorder · 1 flashlight · 2–${INV_SIZE + 1} or wheel select · E use (hotel: hide) · G drop · F pick up / hide · T whistle · Esc pause`;
     if (this.pad) {
-      this.$('#pauseKeys').textContent = `Left stick move · Right stick look · LB run · D-pad ↑ jump · R3 crouch · L3 camcorder · Y flashlight · RB or D-pad ←→ select · X use (hotel: hide) · D-pad ↓ drop · A pick up / hide · B whistle · Menu pause`;
+      this.$('#pauseKeys').textContent = `Left stick move · Right stick look · LB run · D-pad ↑ jump · R3 crouch · L3 camcorder · Y flashlight · RB or D-pad ←→ select · X use (hotel: hide) · D-pad ↓ drop · A pick up / hide · B whistle · RT (hold) radio · Menu pause`;
     }
     for (const b of this.el.querySelectorAll('button[data-kb]')) b.classList.toggle('on', (b.dataset.kb === '1') === kb);
   }
