@@ -624,7 +624,8 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
   let doorPivot = null;
   let doorSign = 1; // le sens où elle s'ouvre
   let doorBase = 0;
-  if (gd && map.segs && map.segs.length) {
+  const safes = map.safes || [];
+  if (map.segs && map.segs.length) {
     const pos = [];
     const nor = [];
     const uvs = [];
@@ -647,7 +648,8 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
       if (y0 > 0.01) quad([x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [0, -1, 0], [[x0 / C, z0 / C], [x1 / C, z0 / C], [x1 / C, z1 / C], [x0 / C, z1 / C]]);
     };
     const hT = GUARD_T / 2;
-    const jamb = (x, z) => Math.abs(x - gd.x) + Math.abs(z - gd.z) < gd.w / 2 + 1e-4 && (gd.nx ? Math.abs(x - gd.x) < 1e-4 : Math.abs(z - gd.z) < 1e-4);
+    const jambOf = (D, x, z) => Math.abs(x - D.x) + Math.abs(z - D.z) < D.w / 2 + 1e-4 && (D.nx ? Math.abs(x - D.x) < 1e-4 : Math.abs(z - D.z) < 1e-4);
+    const jamb = (x, z) => (gd && jambOf(gd, x, z)) || safes.some((S) => jambOf(S, x, z));
     for (const sg of map.segs) {
       const alongX = Math.abs(sg.z0 - sg.z1) < 1e-6;
       if (alongX) {
@@ -659,16 +661,23 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
         box(sg.x0 - hT, sg.x0 + hT, 0, CEIL, Math.min(sg.z0, sg.z1), Math.max(sg.z0, sg.z1));
       }
     }
-    // l'imposte
-    const gh = gd.w / 2;
-    if (gd.nx) box(gd.x - hT, gd.x + hT, gd.h, CEIL, gd.z - gh, gd.z + gh);
-    else box(gd.x - gh, gd.x + gh, gd.h, CEIL, gd.z - hT, gd.z + hT);
+    // l'imposte (au-dessus de chaque baie)
+    for (const D of [gd, ...safes]) {
+      if (!D) continue;
+      const h2 = D.w / 2;
+      if (D.nx) box(D.x - hT, D.x + hT, D.h, CEIL, D.z - h2, D.z + h2);
+      else box(D.x - h2, D.x + h2, D.h, CEIL, D.z - hT, D.z + hT);
+    }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     geo.computeBoundingSphere();
     group.add(new THREE.Mesh(geo, wallMat));
+  }
+  if (gd && map.post && map.segs && map.segs.length) {
+    const hT = GUARD_T / 2;
+    const gh = gd.w / 2;
 
     // repère de la porte : x le long de la baie, z vers le dehors (la normale de la porte)
     const g = new THREE.Group();
@@ -744,6 +753,84 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
     doorBase = 0;
   }
 
+  // ---------------------------------------------------------------- Les salles de sécurité
+  // Une porte blindée gris acier, plus épaisse que celle du poste, ses gonds lourds côté pièce ; le levier du verrou à
+  // l'intérieur ; au-dessus de la baie, de chaque côté, un voyant (vert : ouverte, rouge : verrouillée) et, dehors, le
+  // mot SHELTER peint au pochoir
+  const safeSt = safes.map((S) => {
+    const hT = GUARD_T / 2;
+    const g = new THREE.Group();
+    g.position.set(S.x, 0, S.z);
+    g.rotation.y = Math.atan2(S.nx, S.nz); // z local : vers l'entrepôt
+    group.add(g);
+    const frameMat = lambert({ color: '#3d4144' });
+    const FD = GUARD_T + 0.05;
+    const h2 = S.w / 2;
+    for (const sx of [-1, 1]) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.11, S.h + 0.08, FD), frameMat);
+      m.position.set(sx * (h2 - 0.02), (S.h + 0.08) / 2, 0);
+      g.add(m);
+    }
+    const head = new THREE.Mesh(new THREE.BoxGeometry(S.w + 0.2, 0.11, FD), frameMat);
+    head.position.set(0, S.h + 0.02, 0);
+    g.add(head);
+    const R = S.room;
+    const ax = S.nx ? 0 : 1;
+    const mid = ax ? (R.x0 + R.x1) / 2 : (R.z0 + R.z1) / 2;
+    const along = ax ? S.x : S.z;
+    const lx = ax ? S.nz : -S.nx;
+    const hingeS = Math.sign((along > mid ? 1 : -1) * lx) || 1;
+    const LW = S.w - 0.1;
+    const LH = S.h - 0.04;
+    const LT = 0.09;
+    const pivot = new THREE.Group();
+    pivot.position.set(hingeS * (h2 - 0.07), 0, -(hT - 0.05));
+    g.add(pivot);
+    const steel = lambert({ color: '#59605f' });
+    const leaf = new THREE.Mesh(new THREE.BoxGeometry(LW, LH, LT), steel);
+    leaf.position.set(-hingeS * (LW / 2), LH / 2 + 0.01, 0);
+    pivot.add(leaf);
+    // les renforts rivetés, des deux côtés
+    const ribMat = lambert({ color: '#4a504f' });
+    for (const sz of [1, -1]) for (const y of [0.35, LH / 2, LH - 0.35]) {
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(LW - 0.12, 0.08, 0.02), ribMat);
+      rib.position.set(-hingeS * (LW / 2), y, sz * (LT / 2 + 0.01));
+      pivot.add(rib);
+    }
+    // le levier du verrou, côté pièce : relevé (ouvert) ou abaissé (verrouillé)
+    const lever = new THREE.Group();
+    lever.position.set(-hingeS * (LW - 0.12), 1.1, -(LT / 2 + 0.03));
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.32, 0.035), lambert({ color: '#9d2a1e' }));
+    bar.position.y = 0.14;
+    lever.add(bar);
+    pivot.add(lever);
+    // la poignée, dehors
+    const pull = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.3, 0.05), lambert({ color: '#a9aba6' }));
+    pull.position.set(-hingeS * (LW - 0.12), 1.05, LT / 2 + 0.04);
+    pivot.add(pull);
+    // les voyants, des deux côtés, au-dessus de la baie
+    const lamps = [1, -1].map((sz) => {
+      const mat = new THREE.MeshBasicMaterial({ color: '#1f6b2a' });
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 0.04), mat);
+      m.position.set(0, S.h + 0.22, sz * (hT + 0.03));
+      g.add(m);
+      return mat;
+    });
+    // SHELTER, au pochoir, dehors au-dessus des voyants
+    const word = canvasTex(256, 64, (c, w, h) => {
+      c.clearRect(0, 0, w, h);
+      c.fillStyle = 'rgba(222,196,60,0.88)';
+      c.font = 'bold 44px Impact, "Arial Black", sans-serif';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText('SHELTER', w / 2, h / 2 + 2);
+    });
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.22), lambert({ map: word, transparent: true }));
+    sign.position.set(0, S.h + 0.5, hT + 0.012);
+    g.add(sign);
+    return { S, pivot, lever, lamps, hingeS, k: S.shut ? 0 : 1, shake: 0 };
+  });
+
   let screenT = 0;
   const drawScreen = (s, cam, live, time) => {
     const g = s.ctx;
@@ -813,6 +900,16 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
         const blink = !sim.mains && on && st.r.on < 3 && Math.floor(time * 6) % 2;
         st.green.color.set(need && on && !blink ? '#7dff8a' : '#0a2a0e');
         st.red.color.set(need && !on ? (Math.floor(time * 1.5) % 2 ? '#ff2a1a' : '#5a0e0a') : '#2a0806');
+      }
+      // les portes blindées : ouvertes à plat contre la cloison, côté pièce ; elles claquent vite et s'ouvrent lourdement
+      for (const st of safeSt) {
+        const want = st.S.shut ? 0 : 1;
+        st.k = want < st.k ? Math.max(0, st.k - dt / 0.25) : Math.min(1, st.k + dt / 1.2);
+        st.shake = Math.max(0, st.shake - dt);
+        const e = st.k * st.k * (3 - 2 * st.k);
+        st.pivot.rotation.y = -st.hingeS * e * 1.55 + (st.shake > 0 ? Math.sin(st.shake * 80) * st.shake * 0.03 : 0);
+        st.lever.rotation.x = st.S.shut ? 1.2 : 0;
+        for (const m of st.lamps) m.color.set(st.S.shut ? '#ff3020' : '#2bd24a');
       }
       // les rideaux : ils suivent la partie (lissés chez un invité, qui ne les reçoit que 20 fois par seconde)
       for (const st of dockSt) {
@@ -955,6 +1052,9 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
       if (ev.type === 'dockBang') {
         const st = dockSt.find((s) => s.d.id === ev.id);
         if (st) st.shake = 0.3 + (ev.k || 0) * 0.2;
+      } else if (ev.type === 'safeBang') {
+        const st = safeSt.find((q) => q.S.id === ev.id);
+        if (st) st.shake = 0.25 + (ev.k || 0) * 0.15;
       } else if (ev.type === 'alarmSmash') {
         const st = alarmSt.find((s) => s.a.id === ev.id);
         if (st) st.dent = true;

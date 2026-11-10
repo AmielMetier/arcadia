@@ -21,7 +21,7 @@ export function placeHides(map, n, seed = 1) {
     return (s >>> 0) / 4294967296;
   };
   const open = (x, z) => !map.isWall(x, z);
-  const avoid = [map.spawn, map.exit, map.guardDoor, ...(map.fuses || []), ...(map.valves || []), ...(map.breakers || []), ...(map.items || [])].filter(Boolean);
+  const avoid = [map.spawn, map.exit, map.guardDoor, ...(map.safes || []), ...(map.fuses || []), ...(map.valves || []), ...(map.breakers || []), ...(map.items || [])].filter(Boolean);
   const cand = [];
   for (const c of map.walkable || []) {
     const d = map.dist ? map.dist[c.z * W + c.x] : 99;
@@ -31,6 +31,7 @@ export function placeHides(map, n, seed = 1) {
     const x = (c.x + 0.5) * C;
     const z = (c.z + 0.5) * C;
     if (avoid.some((o) => Math.hypot((o.x ?? 0) - x, (o.z ?? 0) - z) < 3.5)) continue;
+    if (map.safeAt && map.safeAt(x, z)) continue; // pas de casier dans une salle de sécurité
     if ((map.props || []).some((p) => Math.hypot(p.x - x, p.z - z) < p.r + 1.4)) continue;
     // un mur d'un côté, un couloir en face (on doit pouvoir passer devant le casier)
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {

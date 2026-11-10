@@ -633,8 +633,10 @@ export class BackroomsHUD {
     const ps = [P, ...sim.players.filter((Q) => Q !== P)];
     const talk = this.talkIds || new Set();
     const selfTalk = (this.micRaw || 0) > VOICE_MIN;
+    // (Level 1 : celui dont l'entité porte l'apparence a l'air encore en vie, pour les vivants)
+    const worn = P.status === 'alive' && sim.hasMonster && sim.monster.mimic != null ? sim.monster.mimic : null;
     const row = (Q) => {
-      const st = Q.status === 'dead' ? 'dead' : Q.status === 'elevator' ? 'gone' : 'alive';
+      const st = Q.status === 'dead' && Q.id !== worn ? 'dead' : Q.status === 'elevator' ? 'gone' : 'alive';
       return [Q.id, Q.name, st, Q === P ? selfTalk : talk.has(Q.id)];
     };
     const rows = ps.map(row);
@@ -857,6 +859,7 @@ export class BackroomsHUD {
     if (c.kind === 'alarm') return 'PRESS F · BREAK THE GLASS · THE BELL WILL DRAW IT THERE';
     if (c.kind === 'desk') return 'PRESS F · SIT AT THE GUARD POST · WATCH THE CAMERAS';
     if (c.kind === 'relay') return c.obj.on > 0 ? `MAIN BREAKER ON · ${Math.ceil(c.obj.on)}s · PRESS F TO RESET THE TIMER` : 'PRESS F · THROW THE MAIN BREAKER (LOUD)';
+    if (c.kind === 'safe') return c.obj.shut ? 'PRESS F · SLIDE THE BOLT BACK · OPEN THE DOOR' : 'PRESS F · BOLT THE DOOR SHUT';
     const d = c.obj;
     if (d.broken) return 'THE SHUTTER IS TORN OPEN · IT WILL NEVER CLOSE AGAIN';
     const up = d.dir < 0 || (d.dir === 0 && d.o < 1);

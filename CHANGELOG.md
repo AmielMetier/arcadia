@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 5.28 — 10 novembre 2026
+- **The Backrooms** — au Level 1 :
+  - Des salles de sécurité, deux à quatre selon la taille de l'entrepôt, marquées SHELTER au-dessus de leur porte blindée. Dedans, F verrouille la porte (le voyant passe au rouge) ou la rouvre.
+  - Enfermé à temps, tu es hors de sa portée. L'entité frappe la porte une dizaine de secondes, hurle de rage, puis part rôder loin de là : on entend ses pas lourds s'éloigner.
+  - Quand l'entité tue quelqu'un, elle prend son apparence : même tenue, même démarche de joueur, lampe éteinte. Les vivants ne voient pas sa mort et il reste dans la liste de l'équipe.
+  - Elle vient vers vous en marchant et vous appelle avec sa voix, des bribes de ce qu'il a dit plus tôt, un peu ralenties et hachées, de vive voix ou au talkie. Pas de bourdonnement quand elle approche.
+  - Elle se démasque si tu la laisses arriver à deux pas, ou si tu la gardes dans ta lampe. Elle reprend alors sa forme dans un hurlement et fonce sur toi. Devant une salle verrouillée, elle frappe doucement et supplie qu'on lui ouvre, puis renonce.
+
 ## 5.27 — 10 novembre 2026
 - **The Backrooms** — Le passage d'un niveau à l'autre ne donne plus l'impression d'un plantage : l'image ne fige plus, un écran noir « LOADING THE TAPE… » clignote pendant que le nouvel étage se prépare, et il n'apparaît qu'une fois prêt.
 
