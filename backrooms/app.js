@@ -2,7 +2,7 @@
 import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE, HOTEL_LEVEL, DOCK_OPEN_T, DOCK_CLOSE_T, ALARM_T, DUCT_LAND } from './engine/sim.js';
 import { hasLineOfSight } from './engine/nav.js';
 import { bfs, CELL_SIZE, cellsOnSeg, T } from './engine/map.js';
-import { createBackroomsScene, setMonsterMode, setSceneOptions } from './view/scene.js';
+import { createBackroomsScene, setMonsterMode, setSceneOptions, onGlContext } from './view/scene.js';
 import { BackroomsSfx } from './view/sfx.js';
 import { createVoice } from './view/voice.js';
 import { BackroomsHUD, levelName, levelSub, LORE, loreOf, hearTape, tapesHeard, store, NOTES, readNote, loreComplete, FINAL_LORE } from './view/hud.js';
@@ -154,6 +154,15 @@ let kbMode = false;
 let paused = true; // la partie attend qu'on prenne le contrôle
 let started = false; // la première prise en main (avant : l'écran titre)
 let padCrouch = false; // accroupi à la manette (stick droit enfoncé : bascule)
+// L'image perdue (le contexte WebGL repris par le système ou le pilote) : le navigateur la rend en général en quelques
+// secondes. En attendant, on le dit au lieu de laisser une image figée, et seul, le monde attend (voir la boucle)
+let glLost = 0; // l'heure de la perte (ms) ; 0 : l'image est là
+let glWarned = false; // « recharge la page » déjà dit (l'image ne revient pas)
+onGlContext((ok) => {
+  glLost = ok ? 0 : performance.now();
+  glWarned = false;
+  if (hud) hud.toast(ok ? 'VIDEO SIGNAL RESTORED' : 'VIDEO SIGNAL LOST · RECOVERING', ok ? 2.5 : 600);
+});
 
 // Réglages du joueur (sur cet appareil) : souris, image, accessibilité
 const OPT_DEFAULT = { sens: 1, invertY: false, fov: 72, motion: 1, bright: 1, reduceFlashes: false, subs: false, layout: 'auto', quality: 'auto', mic: 'on', voiceVol: 1 };
@@ -178,9 +187,45 @@ function applyOpts() {
 let voice = null;
 let micWarned = false;
 const sfxRef = { get ctx() { return sfx && sfx.ctx; }, get verb() { return sfx && sfx.verb; }, get level() { return sfx ? sfx.roomLevel || 0 : 0; }, moveTo: (...a) => sfx && sfx.moveTo(...a), caption: (...a) => sfx && sfx.caption(...a) };
+// Les règles qu'on apprend en jouant : la première fois (et encore une seconde fois) qu'une règle joue contre ou pour
+// le joueur, une ligne la dit, juste après. Gardé d'une partie à l'autre.
+const LEARN = {
+  stare: 'It charged because you stared at it · look away and keep moving',
+  light: "It won't step into the bright light · until the power goes out",
+};
+function learn(k) {
+  if (!LEARN[k] || !hud) return;
+  let seen = {};
+  try {
+    seen = JSON.parse(localStorage.getItem('backrooms.learned') || '{}') || {};
+  } catch (e) {
+    seen = {};
+  }
+  if ((seen[k] || 0) >= 2) return;
+  seen[k] = (seen[k] || 0) + 1;
+  try {
+    localStorage.setItem('backrooms.learned', JSON.stringify(seen));
+  } catch (e) {
+    /* stockage plein ou interdit : on le redira */
+  }
+  setTimeout(() => hud && hud.toast(LEARN[k], 5.5), 1200);
+}
+
+// la voix qui ne passe pas en direct avec quelqu'un : on le dit (une fois par joueur et par état)
+const voiceSaid = new Map();
+function voiceTrouble(id, kind) {
+  if (voiceSaid.get(id) === kind || (kind === 'direct' && !voiceSaid.has(id))) return;
+  voiceSaid.set(id, kind);
+  const p = sim && sim.players.find((q) => q.id === id);
+  const name = ((p && p.name) || 'a player').toUpperCase();
+  if (!hud) return;
+  if (kind === 'relay') hud.toast(`Voice · no direct link with ${name} · going through the server (lower quality)`);
+  else if (kind === 'failed') hud.toast(`Voice · can't reach ${name} · this browser can't send through the server`);
+  else hud.toast(`Voice · direct link with ${name} restored`);
+}
 function ensureVoice() {
   if (!voice) {
-    voice = createVoice({ send: (to, m) => send(to, m), myId: NET.myId, sfx: sfxRef });
+    voice = createVoice({ send: (to, m, vol) => send(to, m, vol), myId: NET.myId, sfx: sfxRef, onTrouble: voiceTrouble });
     voice.setVolume(OPTS.voiceVol);
   }
   return voice;
@@ -843,13 +888,17 @@ function guestInputs() {
 }
 
 const num = (v, a, b) => (Number.isFinite(+v) ? Math.max(a, Math.min(b, +v)) : 0);
+// les actions qu'un invité envoie à l'hôte (t: 'a') : lampe, utiliser, poser, ramasser, siffler, sauter, tomber de la
+// barre, brûlure, se débattre, code. Une action absente d'ici est jetée par l'hôte (le saut l'a été jusqu'en 5.24 :
+// l'hôte voyait l'invité marcher dans le trou qu'il venait de sauter)
+const GUEST_ACTS = ['f', 'e', 'd', 'p', 't', 'j', 'b', 'h', 'g', 'c'];
 const slotOf = (s) => (Number.isInteger(s) && s >= 1 && s <= INV_SIZE ? s : 1); // une case d'objet annoncée par un invité
 
 // Messages du réseau (from : l'identifiant donné par le salon, la seule identité fiable)
 function onMsg(from, m) {
   if (!m || typeof m !== 'object') return;
   // la voix : d'un joueur à l'autre, sans passer par l'hôte
-  if (m.t === 'rtc' || m.t === 'vx') {
+  if (m.t === 'rtc' || m.t === 'vx' || m.t === 'va') {
     ensureVoice().onMessage(from, m);
     return;
   }
@@ -881,7 +930,7 @@ function onMsg(from, m) {
           ? `MAPS DON'T MATCH · ${who} HAS ${verLabel(gv)}, YOU HAVE ${verLabel(GAME_V)} · RELOAD THE PAGE (CTRL+SHIFT+R)`
           : `MAPS DON'T MATCH · ${who} HAS ${verLabel(gv)} · ${who} IS UPDATING`, 14);
       }
-    } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'd', 'p', 't', 'b', 'h', 'g', 'c'].includes(m.k)) {
+    } else if (m.t === 'a' && m.run === NET.run && GUEST_ACTS.includes(m.k)) {
       const q = NET.actions[from] || (NET.actions[from] = []);
       if (q.length < 8) q.push({ k: m.k, sel: slotOf(m.s), side: m.side > 0 ? 1 : -1, n: Math.max(1, Math.min(4, m.n | 0)), v: String(m.v || '').replace(/\D/g, '').slice(0, 4) });
     }
@@ -1188,13 +1237,13 @@ function handleEvent(ev, me) {
       if (sfx) sfx.cassette(sim.level === 2 ? 'valve' : 'fuse');
       if (sim.level === 2) {
         if (hud) hud.toast(ev.by === me ? `Valve wheel ${ev.count}/${ev.total}` : `${who(ev.by)} found a valve wheel (${ev.count}/${ev.total})`);
-      } else if (hud) hud.toast(ev.by === me ? 'Fuse in your pocket · bring it to the freight elevator panel' : `${who(ev.by)} picked up a fuse`);
+      } else if (hud) hud.toast(ev.by === me ? (ev.locker ? 'A fuse, at the back of the locker · bring it to the freight elevator panel' : 'Fuse in your pocket · bring it to the freight elevator panel') : `${who(ev.by)} picked up a fuse`);
       if (ev.by === me && (sim.level === 1 || sim.level === 2)) showNote(sim.level, (ev.count || 1) - 1);
       break;
     }
     case 'fuseIn':
       if (sfx) sfx.cassette('fuse');
-      if (hud) hud.toast(ev.count >= ev.total ? 'All 3 fuses are in · now restart the freight elevator: stay at the panel' : `${ev.id === me ? 'Fuse' : `${who(ev.id)}'s fuse`} in the panel · ${ev.count}/${ev.total}`);
+      if (hud) hud.toast(ev.count >= ev.total ? (sim.mains ? 'All 3 fuses are in · now restart the freight elevator: stay at the panel' : 'All 3 fuses are in · but the main breakers are off') : `${ev.id === me ? 'Fuse' : `${who(ev.id)}'s fuse`} in the panel · ${ev.count}/${ev.total}`);
       break;
     case 'fuseDrop':
       if (hud) hud.toast(`${ev.name} dropped ${ev.n > 1 ? `${ev.n} fuses` : 'a fuse'} where they fell…`);
@@ -1217,8 +1266,8 @@ function handleEvent(ev, me) {
     case 'release':
       if (ev.id === me) {
         if (sfx) sfx.release(true);
-        if (hud) hud.toast(ev.blinded ? 'The light blinded it · RUN' : 'You broke free · RUN · it will not let go twice');
-      } else if (hud) hud.toast(ev.blinded ? 'Your light blinded it!' : `${who(ev.id)} broke free`);
+        if (hud) hud.toast(ev.doors ? 'The doors tore you free' : ev.blinded ? 'The light blinded it · RUN' : 'You broke free · RUN · it will not let go twice');
+      } else if (hud) hud.toast(ev.doors ? `The doors tore ${who(ev.id)} free` : ev.blinded ? 'Your light blinded it!' : `${who(ev.id)} broke free`);
       break;
     case 'hurt':
       if (ev.id === me) {
@@ -1277,7 +1326,7 @@ function handleEvent(ev, me) {
       if (sfx) sfx.silence(4);
       break;
     case 'powered':
-      if (hud) hud.toast(sim.level === HOTEL_LEVEL ? 'The keypad beeps: the fire escape door is unlocked' : sim.level === 2 ? 'Valves closed: the pumps stop, the three slides open' : 'Fuses in place: the freight elevator is starting up');
+      if (hud) hud.toast(sim.level === HOTEL_LEVEL ? 'The keypad beeps: the fire escape door is unlocked' : sim.level === 2 ? 'Valves closed: the pumps stop, the three slides open' : 'The motor catches: the freight elevator is starting up');
       if (sfx && sim.level === 2) sfx.setPool(false); // le silence d'un coup : les pompes s'arrêtent
       break;
     case 'exitUnlocked': {
@@ -1383,6 +1432,41 @@ function handleEvent(ev, me) {
       break;
     case 'power':
       if (sfx) sfx.power();
+      break;
+    // Level 1 : la baisse de tension (tout grésille) et le délestage (un tiers de l'entrepôt après l'autre)
+    case 'cut':
+      if (ev.kind === 'brown') {
+        if (sfx) sfx.neonSurge({ x: sim.player.x, z: sim.player.z }, 5);
+        if (sfx) sfx.brownSag(Math.min(9, ev.len || 5));
+        if (hud) hud.toast('The lights sag and buzz… the power is failing');
+      } else if (hud) hud.toast('Somewhere, the breakers are shedding the load…');
+      break;
+    case 'sectorOut':
+      if (sfx) sfx.sectorThunk({ x: ev.x, z: ev.z });
+      break;
+    // Level 1 : les disjoncteurs généraux, le monte-charge qui descend
+    case 'relay':
+      if (sfx) sfx.relayTimer(ev.id, { x: ev.x, z: ev.z }, ev.desk ? 0 : ev.t || 0);
+      if (hud && ev.by === me) hud.toast(ev.desk ? 'The console is armed · stay seated, it holds while you do' : `Main breaker on · it holds ${Math.round(ev.t || 0)} s${(ev.t || 0) > 10 ? ' · run to the next one' : ' · the others must be on now'}`);
+      else if (hud) hud.toast(`${who(ev.by)} threw a main breaker`);
+      break;
+    case 'relayOff':
+      if (sfx) sfx.relayStop(ev.id);
+      if (sfx) sfx.breakerTrip({ x: ev.x, z: ev.z });
+      if (hud) hud.toast('A main breaker tripped back off…');
+      break;
+    case 'mains':
+      if (sfx) for (let i = 0; i < 3; i++) sfx.relayStop(i);
+      if (sfx) sfx.neonSurge({ x: ev.x, z: ev.z }, 4.5);
+      if (hud) hud.toast('Power reaches the freight elevator panel · go restart it');
+      break;
+    case 'liftCall':
+      if (sfx) sfx.elevator(4, false);
+      if (sfx && ev.x != null) sfx.liftDescend({ x: ev.x, z: ev.z }, ev.t || 40);
+      break;
+    case 'liftArrive':
+      if (sfx) sfx.liftDescend(null);
+      if (hud) hud.toast('The freight elevator is here · everyone get in');
       break;
     case 'spotted':
       if (sfx) sfx.spotted();
@@ -1519,7 +1603,7 @@ function handleEvent(ev, me) {
       if (sfx) sfx.guardDoor({ x: ev.x, z: ev.z }, !!ev.open);
       break;
     case 'desk':
-      if (sfx) sfx.creak({ x: ev.x, z: ev.z }, 0.6);
+      if (sfx) sfx.creak({ x: ev.x, z: ev.z }, 0.6, '[chair creaks]');
       if (ev.id === me && ev.on && hud) {
         const k = hud.keyNames(hud.qwerty);
         hud.toast(document.body.classList.contains('touch') ? 'Guard post · slide left or right to switch cameras · tell the others what you see' : `Guard post · ${k.l} / ${k.r} to switch cameras · tell the others what you see`);
@@ -1569,7 +1653,11 @@ function handleEvent(ev, me) {
       if (ev.id === me) {
         runStats.rushes++;
         runStats.seen++;
+        if (ev.why === 'stare') learn('stare');
       }
+      break;
+    case 'spared':
+      if (ev.id === me) learn(ev.why);
       break;
     case 'lost':
       if (sfx) sfx.heartbeat(0);
@@ -1626,7 +1714,7 @@ function handleEvent(ev, me) {
     case 'finalHunt':
       // la phase finale : elle sait où l'on est. Un cri, au loin, puis plus rien que l'alarme
       if (sfx && (ev.floor || 0) === (sim.viewPlayer(sim.spectate || 0).floor || 0)) sfx.distant('drag', { x: ev.x, z: ev.z }, 1.2);
-      if (hud && sim.player.status === 'alive') hud.toast('It knows where you are. RUN to the elevator', 4);
+      if (hud && sim.player.status === 'alive') hud.toast(sim.level === 1 ? 'It knows where you are. Keep moving until the freight elevator comes' : 'It knows where you are. RUN to the elevator', 4);
       break;
     case 'boardCount':
       // les portes vont se fermer : la cabine sonne, et à 10 s un second coup plus pressant
@@ -1872,7 +1960,12 @@ function frame(currentTime) {
   if (NET.role === 'guest') watchHost();
   // en pause, le monde est figé (seul) ; à plusieurs, il continue sans toi. Le trajet en ascenseur, lui, va
   // toujours jusqu'au bout : sinon une pause pendant la descente laissait l'écran noir pour toujours
-  if (paused && !multi() && !(sim.departT > 0)) accumulator = 0;
+  if ((paused || glLost) && !multi() && !(sim.departT > 0)) accumulator = 0;
+  // l'image ne revient pas : le navigateur ne rendra plus le contexte, il n'y a plus qu'à recharger
+  if (glLost && !glWarned && currentTime - glLost > 8000) {
+    glWarned = true;
+    if (hud) hud.toast('VIDEO SIGNAL LOST · RELOAD THE PAGE', 600);
+  }
 
   // Lecture des entrées utilisateur (en mode sans souris, les flèches tournent la vue)
   const arrows = !kbMode;
@@ -2113,13 +2206,17 @@ function frame(currentTime) {
     }
     // la musique de tension suit le directeur (la peur de l'équipe) et ce que fait l'entité
     const D = sim.director;
+    const me0 = sim.player;
     const charging = sim.goats ? sim.goats.some((g) => g.mode === 'charge' || g.mode === 'windup') : false;
     const mode = D && D.phase === 'relax' ? 'relief' : chasing || charging ? 'chase' : M.mode === 'search' ? 'search' : M.mode === 'stalk' || M.mode === 'watch' || M.mode === 'ambush' ? 'stalk' : 'calm';
-    sfx.setTension(paused ? 0 : Math.max(M.danger, D ? D.stress : 0), mode);
+    // ce qu'on perçoit d'elle : derrière des murs (un long détour), sa présence ne se devine plus. La musique et le cœur
+    // suivent ce qu'on entend, pas sa distance à vol d'oiseau (ils trahissaient où elle était, à travers les murs)
+    const heard = chasing || me0.grabT > 0 ? M.danger : M.danger * (1 - 0.7 * entEar.occ);
+    sfx.setTension(paused ? 0 : Math.max(heard, D ? D.stress : 0), mode);
     if (sim.goats) sfx.setChase(charging && !paused);
     // le cœur : la peur, la prise, et l'entité qui passe devant le casier
-    const me = sim.player;
-    const near = me.status === 'alive' ? Math.max(M.danger, me.grabT > 0 ? 1 : 0) : 0;
+    const me = me0;
+    const near = me.status === 'alive' ? Math.max(heard, me.grabT > 0 ? 1 : 0) : 0;
     const bpm = paused || near < 0.4 ? 0 : Math.round((70 + near * 75 + (me.hidden >= 0 ? 15 : 0)) / 5) * 5;
     if (bpm !== heartShown) {
       heartShown = bpm;

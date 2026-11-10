@@ -462,7 +462,8 @@ void main() {
   });
   const fogSize = () => {
     if (!fogRT) return;
-    const k = target.height > 760 ? 2 : 1; // en pleine définition, la brume (douce) se calcule en demi-définition
+    // en pleine définition, la brume (douce) se calcule en demi-définition ; au-delà de 1100 lignes, au tiers (5.25)
+    const k = target.height > 1100 ? 3 : target.height > 760 ? 2 : 1;
     const w = Math.max(1, Math.round(target.width / k));
     const h = Math.max(1, Math.round(target.height / k));
     if (fogRT.width !== w || fogRT.height !== h) {
@@ -475,6 +476,48 @@ void main() {
   const post = new THREE.Scene();
   post.add(quad);
   const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+  // La cellule du caméscope : 4 fois par seconde, l'image de la scène réduite à 16×9 (chaque point, la moyenne en log
+  // de 16 échantillons), relue sans bloquer la carte graphique ; on en tire la lumière moyenne de l'image, pondérée
+  // vers le centre (comme la mesure d'un vrai caméscope). meter : cette lumière (-1 tant qu'il n'y a pas de mesure)
+  const MW = 16;
+  const MH = 9;
+  const meterRT = new THREE.WebGLRenderTarget(MW, MH, { depthBuffer: false });
+  const meterMat = new THREE.ShaderMaterial({
+    uniforms: { tDiffuse: { value: null } },
+    vertexShader,
+    fragmentShader: `uniform sampler2D tDiffuse;
+varying vec2 vUv;
+void main() {
+  float acc = 0.0;
+  for (int j = 0; j < 4; j++) for (int i = 0; i < 4; i++) {
+    vec2 o = (vec2(float(i), float(j)) - 1.5) / vec2(${MW * 4}.0, ${MH * 4}.0);
+    vec3 c = texture2D(tDiffuse, vUv + o).rgb;
+    acc += log2(max(dot(c, vec3(0.2126, 0.7152, 0.0722)), 1e-4));
+  }
+  gl_FragColor = vec4(clamp((acc / 16.0 + 14.0) / 16.0, 0.0, 1.0), 0.0, 0.0, 1.0);
+}`,
+    depthTest: false,
+    depthWrite: false,
+  });
+  const meterBuf = new Uint8Array(MW * MH * 4);
+  let meterT = -1;
+  let meterBusy = false;
+  let meter = -1;
+  const meterRead = () => {
+    let acc = 0;
+    let wsum = 0;
+    for (let y = 0; y < MH; y++) {
+      for (let x = 0; x < MW; x++) {
+        const dx = (x + 0.5) / MW - 0.5;
+        const dy = (y + 0.5) / MH - 0.5;
+        const w = 1 + 2 * Math.exp(-(dx * dx + dy * dy) / 0.06);
+        acc += ((meterBuf[(y * MW + x) * 4] / 255) * 16 - 14) * w;
+        wsum += w;
+      }
+    }
+    meter = Math.pow(2, acc / wsum);
+  };
 
   const fx = { ...FX_DEFAULTS, white: [...FX_DEFAULTS.white] };
   const live = { tracking: 0, signalLoss: 0, bars: 0, splice: 0 }; // valeurs réellement affichées (ralenties si flashs adoucis)
@@ -594,6 +637,10 @@ void main() {
     getFx() {
       return { ...fx, white: [...fx.white] };
     },
+    // la lumière moyenne de la dernière image mesurée (-1 : pas encore, ou pas possible sur cette machine)
+    get meter() {
+      return meter;
+    },
     // revient aux réglages par défaut ; renvoie les réglages courants
     resetFx() {
       api.setFx(FX_DEFAULTS);
@@ -673,6 +720,25 @@ void main() {
           renderer.render(post, cam);
           renderer.autoClear = ac;
         }
+        // la mesure de la lumière (voir meter)
+        if (t - meterT > 0.25 && !meterBusy && renderer.readRenderTargetPixelsAsync) {
+          meterT = t;
+          quad.material = meterMat;
+          meterMat.uniforms.tDiffuse.value = target.texture;
+          renderer.setRenderTarget(meterRT);
+          renderer.render(post, cam);
+          meterBusy = true;
+          renderer
+            .readRenderTargetPixelsAsync(meterRT, 0, 0, MW, MH, meterBuf)
+            .then(() => {
+              meterRead();
+              meterBusy = false;
+            })
+            .catch(() => {
+              meterBusy = false;
+              meterT = Infinity; // pas de relecture possible ici : l'exposition reste celle d'avant
+            });
+        }
         // halo des lumières vives
         if (bloomOn) {
           quad.material = bright;
@@ -685,19 +751,14 @@ void main() {
             pass(blurMat, bloomB.texture, dirTmp.set(0, (1 + i) / bh), bloomA);
           }
           if (glare > 0) {
-            // les deux étages larges : chacun réduit du précédent et flouté, puis le plus large rendu au moyen, et le
-            // moyen au halo serré
-            addMat.uniforms.uK.value = 1;
-            pass(addMat, bloomA.texture, null, bloomC);
-            for (let i = 0; i < 2; i++) {
-              pass(blurMat, bloomC.texture, dirTmp.set((1 + i) / bloomC.width, 0), bloomC2);
-              pass(blurMat, bloomC2.texture, dirTmp.set(0, (1 + i) / bloomC.height), bloomC);
-            }
-            pass(addMat, bloomC.texture, null, bloomD);
-            for (let i = 0; i < 2; i++) {
-              pass(blurMat, bloomD.texture, dirTmp.set((1 + i) / bloomD.width, 0), bloomD2);
-              pass(blurMat, bloomD2.texture, dirTmp.set(0, (1 + i) / bloomD.height), bloomD);
-            }
+            // les deux étages larges, puis le plus large rendu au moyen, et le moyen au halo serré. Six passes au lieu
+            // de douze (5.25) : le flou horizontal réduit en même temps (il lit l'étage du dessus et écrit dans la
+            // cible deux fois plus petite), le vertical finit l'étage. Sur les cartes graphiques à tuiles (les Mac),
+            // chaque passe coûte cher, même toute petite
+            pass(blurMat, bloomA.texture, dirTmp.set(3 / bw, 0), bloomC2);
+            pass(blurMat, bloomC2.texture, dirTmp.set(0, 1.6 / bloomC.height), bloomC);
+            pass(blurMat, bloomC.texture, dirTmp.set(3 / bloomC.width, 0), bloomD2);
+            pass(blurMat, bloomD2.texture, dirTmp.set(0, 1.6 / bloomD.height), bloomD);
             const ac = renderer.autoClear;
             renderer.autoClear = false;
             addBlend.uniforms.uK.value = 1;
@@ -723,8 +784,8 @@ void main() {
       renderer.render(post, cam);
     },
     dispose() {
-      for (const rt of [target, bloomA, bloomB, bloomC, bloomC2, bloomD, bloomD2, focusA, focusB, fogRT, fogRT2]) if (rt) rt.dispose();
-      for (const m of [material, bright, blurMat, addMat, addBlend, fogComp, fogBlur]) m.dispose();
+      for (const rt of [target, bloomA, bloomB, bloomC, bloomC2, bloomD, bloomD2, focusA, focusB, fogRT, fogRT2, meterRT]) if (rt) rt.dispose();
+      for (const m of [material, bright, blurMat, addMat, addBlend, fogComp, fogBlur, meterMat]) m.dispose();
       quad.geometry.dispose();
     },
   };

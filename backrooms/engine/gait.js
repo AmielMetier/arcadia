@@ -61,7 +61,11 @@ function build(sim, floor) {
       const k = gz * W + gx;
       if (wall(gx, gz)) solid[k] = m.pillarAt && m.pillarAt(gx, gz) ? 2 : 1;
       else if (cage.has(k)) solid[k] = 1;
-      else if (below && m.pitAt && m.pitAt(gx, gz) >= 0) solid[k] = 3;
+      else {
+        // un trou qui donne sur l'étage du dessous, ou un puits sans fond (étage du bas) : elle le contourne comme nous
+        const pit = m.pitAt ? m.pitAt(gx, gz) : -1;
+        if (pit >= 0 && (below || m.pits[pit].deep)) solid[k] = 3;
+      }
     }
   }
   // meubles et casiers : des cercles, rangés par case (chaque case connaît ceux qui la touchent à 1 m près)

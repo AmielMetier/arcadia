@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL, RELAY_ARM, RELAY_SYNC, LIFT_CALL_T, L1_CALM, L1_FIRST_BLACKOUT, SECTOR_STEP } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
+import { navOf, roamable } from '../backrooms/engine/gait.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
 
 // distance en marche (en cases) entre deux cases
@@ -42,6 +43,44 @@ function test(name, fn) {
   } catch (err) {
     console.error('✗', name);
     throw err;
+  }
+}
+
+// Level 1 : ramasser les fusibles (celui du casier en s'y enfermant)
+function stepAs(sim, P, inp, others = {}) {
+  if (P === sim.player) sim.step(inp, others);
+  else sim.step({}, { ...others, [P.id]: inp });
+}
+function takeFuses(sim, P = sim.player) {
+  for (const f of sim.map.fuses) {
+    if (f.locker >= 0) {
+      const fr = hideFront(sim.map.hides[f.locker]);
+      P.x = fr.x;
+      P.z = fr.z;
+      stepAs(sim, P, { pick: true });
+      stepAs(sim, P, { pick: true });
+    } else {
+      P.x = f.x;
+      P.z = f.z;
+      sim.step();
+    }
+  }
+}
+// Level 1 : tenir les disjoncteurs généraux, seul (la console du poste de garde, puis les armoires)
+function throwMains(sim, P = sim.player) {
+  for (const r of sim.relaysNeeded()) {
+    if (r.desk) {
+      const S = sim.map.post;
+      P.x = S.front.x;
+      P.z = S.front.z;
+      stepAs(sim, P, { pick: true });
+      for (let t = 0; t < RELAY_ARM + 0.2; t += DT) stepAs(sim, P, {});
+      stepAs(sim, P, { pick: true });
+    } else {
+      P.x = r.x + r.nx * 0.9;
+      P.z = r.z + r.nz * 0.9;
+      stepAs(sim, P, { pick: true });
+    }
   }
 }
 
@@ -439,6 +478,8 @@ test('la fixer de loin la provoque ; s\'en approcher aussi ; la lampe ne la fait
     for (let i = 0; i < 60 && M.mode !== 'chase'; i++) sim.step({ yaw, pitch: 0 });
     assert.equal(M.mode, 'chase', 'fixée une seconde à 12 m : elle charge');
     assert.ok(M.rushT > 0 && sim.events.some((e) => e.type === 'rush'), 'en hurlant');
+    // le joueur apprend pourquoi : l'annonce dit qu'on l'a fixée (le jeu l'écrit à l'écran)
+    assert.ok(sim.events.some((e) => e.type === 'rush' && e.why === 'stare' && e.id === P.id), 'la charge dit qu’on l’a fixée');
     stared++;
     // une autre : elle observe à 5 m, il regarde ailleurs mais elle le voit (et lui l'a vue juste avant de se
     // détourner : sans ça, elle ne se lance pas dans son dos)
@@ -1431,12 +1472,15 @@ test("Level 1 : l'entrepôt, ses étagères, ses 3 fusibles et le monte-charge",
 test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui descend aux Poolrooms (Level 37)', () => {
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 4, level: 1 });
   assert.equal(sim.open, false);
-  for (const f of sim.map.fuses) {
-    sim.player.x = f.x;
-    sim.player.z = f.z;
-    sim.step();
-  }
+  const lk = sim.map.fuses.find((f) => f.locker >= 0);
+  assert.ok(lk, 'un des fusibles est rangé dans un casier');
+  sim.player.x = lk.x;
+  sim.player.z = lk.z;
+  sim.step();
+  assert.equal(lk.taken, false, 'celui du casier ne se ramasse pas en passant devant');
+  takeFuses(sim);
   assert.equal(sim.fuses, FUSES);
+  assert.equal(sim.player.hidden, -1);
   assert.equal(sim.open, false, 'il faut encore les brancher au panneau');
   sim.player.x = sim.map.exit.x;
   sim.player.z = sim.map.exit.z;
@@ -1444,8 +1488,18 @@ test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui 
   assert.equal(sim.delivered, FUSES, 'les fusibles sont au panneau');
   assert.equal(sim.powered, false, 'il faut encore relancer le monte-charge');
   run(sim, PANEL_T + 0.2);
+  assert.equal(sim.powered, false, 'sans les disjoncteurs généraux, le panneau ne répond pas');
+  throwMains(sim);
+  assert.equal(sim.mains, true, "seul, les disjoncteurs tiennent le temps de courir de l'un à l'autre");
+  sim.player.x = sim.map.exit.x;
+  sim.player.z = sim.map.exit.z;
+  run(sim, PANEL_T + 0.2);
   assert.equal(sim.powered, true);
   assert.ok(sim.drainEvents().some((e) => e.type === 'powered'));
+  assert.equal(sim.open, false, 'le monte-charge descend encore');
+  assert.ok(sim.liftCallT > LIFT_CALL_T - 1 && sim.hunt, "elle traque l'équipe pendant ce temps");
+  run(sim, sim.liftCallT + 0.1);
+  assert.equal(sim.open, true, 'le monte-charge est arrivé');
   const E = sim.map.elevator;
   sim.player.x = E.x;
   sim.player.z = E.z;
@@ -1479,18 +1533,18 @@ test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui 
   assert.equal(sim.state, 'won', 'le toboggan bleu sort des Poolrooms : partie gagnée');
 });
 
-test('Level 1 : coupures de courant de 15 à 20 s', () => {
+test('Level 1 : la première coupure est un vrai noir de 15 à 20 s, au bout de deux minutes environ', () => {
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 8, level: 1 });
   let start = -1;
   let len = 0;
-  for (let i = 0; i < 60 * 120; i++) {
+  for (let i = 0; i < 60 * 200; i++) {
     sim.step();
     for (const e of sim.drainEvents()) {
       if (e.type === 'blackout' && start < 0) start = sim.time;
       if (e.type === 'power' && start >= 0 && !len) len = sim.time - start;
     }
   }
-  assert.ok(start > 0, 'une coupure arrive dans les deux premières minutes');
+  assert.ok(start >= L1_FIRST_BLACKOUT[0] - 0.1 && start < 200, `elle tombe à ${start.toFixed(0)} s`);
   assert.ok(len >= 14.9 && len <= 20.1, `elle dure ${len.toFixed(1)} s`);
 });
 
@@ -1504,6 +1558,7 @@ test("Level 1 : l'entité se cache au bout des étagères pour tendre une embusc
     M.x = P.x + 25;
     M.z = P.z;
     M.ambushT = 0;
+    M.dormantT = 0; // (en pleine partie : passé le calme de l'arrivée)
     P.yaw = -Math.PI / 2;
     sim.step({});
     if (M.mode === 'ambush') {
@@ -1656,6 +1711,8 @@ test("réseau : l'invité reçoit l'état de l'hôte, se déplace chez lui et su
   host.blackout = 12;
   host.monster.x = host.players[1].x + 6;
   host.monster.z = host.players[1].z;
+  host.monster.dormantT = 0; // (passé le calme de l'arrivée, où elle se tait)
+  host.monster.silent = false;
   wire();
   assert.ok(guest.blackout > 0);
   assert.ok(guest.monster.danger > 0.3, "l'invité entend l'entité approcher");
@@ -3872,8 +3929,8 @@ test("Level 1 : l'entité bute sur un rideau baissé, cogne, l'arrache et passe 
 
 test("Level 1 : l'alarme incendie attire l'entité (même en chasse, de loin), elle frappe la cloche ; chacune ne sert qu'une fois", () => {
   const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }];
-  const sim = new BackroomsSim({ difficulty: 'normal', seed: 6, players, localId: 1, level: 1 });
-  const guest = new BackroomsSim({ difficulty: 'normal', seed: 6, players, localId: 2, level: 1 });
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 9, players, localId: 1, level: 1 });
+  const guest = new BackroomsSim({ difficulty: 'normal', seed: 9, players, localId: 2, level: 1 });
   const a = sim.map.alarms[0];
   const P = sim.player;
   P.x = a.x + a.nx * 0.6;
@@ -3886,14 +3943,18 @@ test("Level 1 : l'alarme incendie attire l'entité (même en chasse, de loin), e
     const x = (q.x + 0.5) * CELL_SIZE;
     const z = (q.z + 0.5) * CELL_SIZE;
     const dd = Math.hypot(x - a.x, z - a.z);
-    return dd > 26 && dd < 36 && !sim.map.dockAt(q.x, q.z);
+    if (!(dd > 26 && dd < 36) || sim.map.dockAt(q.x, q.z)) return false;
+    // (à moins de 45 m de marche de la cloche, quel que soit le plan de l'entrepôt)
+    const path = findPath(sim.map, x, z, a.x + a.nx, a.z + a.nz);
+    return path && path.length * CELL_SIZE < 45;
   });
   G.x = (c.x + 0.5) * CELL_SIZE;
   G.z = (c.z + 0.5) * CELL_SIZE;
-  Object.assign(M, { x: G.x + 9, z: G.z, floor: 0, mode: 'chase', target: 2, ductCD: 999 });
-  if (sim.isColliding(M.x, M.z, 0.4)) Object.assign(M, { x: G.x, z: G.z + 9 });
-  if (sim.isColliding(M.x, M.z, 0.4)) Object.assign(M, { x: G.x, z: G.z - 9 });
-  G.x += 0; // (il est à 9 m d'elle : elle ne le tient pas de près)
+  // (il est à une quinzaine de mètres d'elle : elle ne le tient pas de près)
+  for (const [dx, dz] of [[15, 0], [-15, 0], [0, 15], [0, -15], [11, 11], [-11, -11]]) {
+    Object.assign(M, { x: G.x + dx, z: G.z + dz, floor: 0, mode: 'chase', target: 2, ductCD: 999 });
+    if (!sim.isColliding(M.x, M.z, 0.4) && !sim.map.isWall(Math.floor(M.x / CELL_SIZE), Math.floor(M.z / CELL_SIZE))) break;
+  }
   sim.step({ pick: true });
   assert.ok(a.used && a.ringT > ALARM_T - 0.1, 'F au déclencheur : la cloche sonne');
   guest.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
@@ -4057,6 +4118,650 @@ test("Level 1 : l'entité passe par les gaines — on l'entend cogner au-dessus,
   const d = Math.hypot(v.x - P.x, v.z - P.z);
   assert.ok(v.open && d > 6.5 && d < 16.5, `près de sa proie (${d.toFixed(1)} m), la grille tombée`);
   assert.equal(M.mode === 'search' || M.mode === 'chase', true, 'puis elle la cherche');
+});
+
+// ------------------------------------------------------------------ les failles relevées par l'audit (5.25)
+test("cage d'escalier : immobile sur une volée ou sur le palier, on n'est plus à l'abri — elle prend l'escalier et attrape", () => {
+  const C = CELL_SIZE;
+  for (const seed of [7, 1]) {
+    for (const [where, u, v, floor] of [['bas de la 1re volée', 1.8, 0.5, 1], ['palier', 2.5, 1.0, 1], ['seconde volée', 1.0, 1.5, 0]]) {
+      const sim = new BackroomsSim({ difficulty: 'normal', seed });
+      for (const f of sim.floors) {
+        if (f.key) f.key.taken = true;
+        f.brightCells = new Uint8Array(f.W * f.H);
+      }
+      const st = sim.stairs[0];
+      const P = sim.player;
+      const M = sim.monster;
+      P.x = st.ox + st.dx * u * C + st.px * v * C;
+      P.z = st.oz + st.dz * u * C + st.pz * v * C;
+      P.floor = floor;
+      // elle part de l'étage du bas, à une douzaine de mètres, déjà lancée sur lui
+      const m = sim.fm(1);
+      let best = null;
+      for (const c of m.walkable) {
+        const x = (c.x + 0.5) * C;
+        const z = (c.z + 0.5) * C;
+        const d = Math.hypot(x - P.x, z - P.z);
+        if (d < 10 || d > 14 || !roamable(sim, 1, x, z) || m.pitAt(c.x, c.z) >= 0) continue;
+        if (!best || Math.abs(d - 12) < Math.abs(best.d - 12)) best = { x, z, d };
+      }
+      assert.ok(best, `graine ${seed} : une case de départ pour elle`);
+      M.x = best.x;
+      M.z = best.z;
+      M.floor = 1;
+      sim.placed(M);
+      M.dormantT = 0;
+      M.away = false;
+      M.mode = 'chase';
+      M.unseenT = 0;
+      M.lastSeenX = P.x;
+      M.lastSeenZ = P.z;
+      M.lastSeenF = P.floor;
+      M.target = P.id;
+      M.warpT = 1e9;
+      let caught = -1;
+      let turned = 0;
+      let yaw = M.yaw;
+      for (let i = 0; i < 40 / DT && caught < 0; i++) {
+        P.sawM = sim.time; // il la regarde venir : elle a le droit de charger
+        sim.step({ mx: 0, mz: 0, pitch: 0, yaw: Math.atan2(-(M.x - P.x), -(M.z - P.z)) });
+        turned += Math.abs(Math.atan2(Math.sin(M.yaw - yaw), Math.cos(M.yaw - yaw)));
+        yaw = M.yaw;
+        if (P.grabT > 0 || P.status !== 'alive') caught = sim.time;
+      }
+      assert.ok(caught >= 0, `graine ${seed}, ${where} : attrapé en moins de 40 s`);
+      assert.ok(turned < Math.PI * 8, `graine ${seed}, ${where} : sans tourner sur place (${(turned / (2 * Math.PI)).toFixed(1)} tours)`);
+    }
+  }
+});
+
+test("dos tourné : postée devant quelqu'un qui ne se retourne pas, elle s'efface une fois ; la deuxième, elle crie puis charge", () => {
+  const sim = new BackroomsSim({ map, difficulty: 'normal' });
+  const P = sim.player;
+  const M = sim.monster;
+  sim.map.brightCells = new Uint8Array(sim.map.W * sim.map.H);
+  P.flashlight = false;
+  // une case à 9-12 m de lui, en vue directe, où elle peut se tenir ; il lui tourne le dos
+  let spot = null;
+  for (const c of sim.map.walkable) {
+    const x = (c.x + 0.5) * CELL_SIZE;
+    const z = (c.z + 0.5) * CELL_SIZE;
+    const d = Math.hypot(x - P.x, z - P.z);
+    if (d < 9 || d > 12 || !roamable(sim, 0, x, z) || !hasLineOfSight(sim.map, x, z, P.x, P.z)) continue;
+    spot = { x, z };
+    break;
+  }
+  assert.ok(spot, 'une case en vue du joueur');
+  P.yaw = Math.atan2(-(spot.x - P.x), -(spot.z - P.z)) + Math.PI;
+  const post = (lurk) => {
+    M.x = spot.x;
+    M.z = spot.z;
+    M.floor = 0;
+    sim.placed(M);
+    M.dormantT = 0;
+    M.away = false;
+    M.vanish = false;
+    M.warpT = 999;
+    M.stalkT = 99;
+    M.ambushT = 99;
+    M.mode = 'watch';
+    M.lurk = lurk;
+    M.silent = true;
+    M.waitT = 0.2;
+    P.sawM = -1e9;
+    M.chasedAt = -1e9;
+    sim.drainEvents();
+    for (let i = 0; i < 30 && M.mode === 'watch'; i++) sim.step({ mx: 0, mz: 0, pitch: 0, yaw: P.yaw });
+  };
+  assert.ok(!sim.shelteredAt(P), "le joueur n'est pas à l'abri");
+  post(true);
+  assert.equal(M.mode, 'patrol', 'la première fois, elle renonce');
+  assert.equal(M.snubs, 1, 'et elle le retient');
+  assert.ok(!sim.drainEvents().some((e) => e.type === 'rush'), 'sans un cri');
+  // la deuxième fois de suite (même en simple guet, à découvert) : le cri d'abord, sur place, puis la course
+  post(false);
+  assert.equal(M.mode, 'chase', 'la deuxième fois, elle se lance');
+  assert.ok(sim.drainEvents().some((e) => e.type === 'rush' && e.id === P.id), 'son cri le prévient');
+  assert.ok(M.windT > 0 && M.speed === 0, 'elle crie sur place avant de courir');
+  assert.equal(M.snubs, 0, 'le compte repart de zéro');
+  // il la voit entre-temps : le compte repart de zéro aussi
+  M.snubs = 1;
+  P.sawM = sim.time;
+  assert.ok(sim.mayChase(M, P, false));
+  assert.equal(M.snubs, 0, "vue, elle n'a plus rien à lui reprocher");
+  // à l'abri (recoin calme, zone claire, casier), rien ne compte
+  M.mode = 'patrol';
+  M.windT = 0;
+  M.rushT = 0;
+  const cx = Math.floor(P.x / CELL_SIZE);
+  const cz = Math.floor(P.z / CELL_SIZE);
+  sim.map.brightCells[cz * sim.map.W + cx] = 1;
+  assert.ok(sim.shelteredAt(P), 'dans la lumière franche');
+  post(true);
+  post(true);
+  assert.notEqual(M.mode, 'chase', "à l'abri, elle ne charge pas");
+  assert.equal(M.snubs || 0, 0);
+  sim.map.brightCells = null;
+});
+
+test("puits sans fond : l'entité ne marche plus au-dessus, elle les contourne ; le reste de l'étage lui reste ouvert", () => {
+  for (const seed of [1, 7, 42, 101]) {
+    const sim = new BackroomsSim({ difficulty: 'normal', seed });
+    for (let f = 0; f < sim.floors.length; f++) {
+      const m = sim.fm(f);
+      const N = navOf(sim, f);
+      for (const p of m.pits) assert.equal(N.clear(p.x, p.z, 1), 0, `graine ${seed}, étage ${f} : le centre d'un trou lui est fermé`);
+    }
+    // en bas, les cassettes et le pied des escaliers restent dans la partie de l'étage où elle circule
+    const down = sim.fm(1);
+    for (const st of sim.stairs) assert.ok(roamable(sim, 1, st.down.x, st.down.z), `graine ${seed} : le pied de l'escalier`);
+    let reach = 0;
+    for (const c of down.walkable) if (roamable(sim, 1, (c.x + 0.5) * CELL_SIZE, (c.z + 0.5) * CELL_SIZE)) reach++;
+    assert.ok(reach > down.walkable.length * 0.8, `graine ${seed} : elle circule presque partout (${reach} cases sur ${down.walkable.length})`);
+    // sa proie de l'autre côté d'une rangée de puits : elle fait le tour, sans jamais passer au-dessus du vide
+    const deep = down.pits.filter((p) => p.deep);
+    const line = deep.filter((p) => p.gz === deep[0].gz).sort((a, b) => a.gx - b.gx);
+    const row = line.filter((p, i) => p.gx - line[0].gx === i); // la première rangée d'un seul tenant
+    const a = { x: (row[0].gx - 0.5) * CELL_SIZE, z: row[0].z };
+    const b = { x: (row[row.length - 1].gx + 1.5) * CELL_SIZE, z: row[0].z };
+    assert.ok(roamable(sim, 1, a.x, a.z) && roamable(sim, 1, b.x, b.z), `graine ${seed} : du sol aux deux bouts de la rangée`);
+    // (ni zone claire ni recoin calme : rien ne la retient)
+    for (const f of sim.floors) {
+      f.brightCells = new Uint8Array(f.W * f.H);
+      for (const n of f.calm || []) n.wear = 1;
+    }
+    const P = sim.player;
+    const M = sim.monster;
+    P.floor = 1;
+    P.x = b.x;
+    P.z = b.z;
+    M.floor = 1;
+    M.x = a.x;
+    M.z = a.z;
+    sim.placed(M);
+    M.dormantT = 0;
+    M.away = false;
+    M.mode = 'chase';
+    M.unseenT = 0;
+    M.lastSeenX = P.x;
+    M.lastSeenZ = P.z;
+    M.lastSeenF = 1;
+    M.target = P.id;
+    M.warpT = 1e9;
+    let caught = false;
+    for (let i = 0; i < 40 / DT && !caught; i++) {
+      P.sawM = sim.time;
+      sim.step({ mx: 0, mz: 0, pitch: 0, yaw: Math.atan2(-(M.x - P.x), -(M.z - P.z)) });
+      if ((M.floor || 0) === 1) assert.ok(sim.pitUnder(M.x, M.z, 1) < 0, `graine ${seed} : elle marche au-dessus d'un puits`);
+      caught = P.grabT > 0 || P.status !== 'alive';
+    }
+    assert.ok(caught, `graine ${seed} : elle le rejoint en contournant`);
+  }
+});
+
+// ------------------------------------------------------------------ les bugs relevés par l'audit (5.25)
+import { autoRes, RES_MIN } from '../backrooms/view/autores.js';
+
+test("à plusieurs : chaque action qu'un invité envoie est acceptée par l'hôte, et il en fait quelque chose (le saut était jeté)", () => {
+  const src = fs.readFileSync(new URL('../backrooms/app.js', import.meta.url), 'utf8');
+  const acts = new Set(JSON.parse(/const GUEST_ACTS = (\[[^\]]*\]);/.exec(src)[1].replace(/'/g, '"')));
+  const sent = new Set();
+  for (const m of src.matchAll(/send\('host', \{ t: 'a', k: '(\w+)'/g)) sent.add(m[1]);
+  // (les actions envoyées en boucle : [['e', act.use], ['d', input.drop], …])
+  for (const m of src.matchAll(/for \(const \[k, on\] of \[(.*?)\]\) if \(on\) send\('host', \{ t: 'a', k,/g)) for (const q of m[1].matchAll(/\['(\w+)',/g)) sent.add(q[1]);
+  assert.ok(sent.size >= 9 && sent.has('j'), `les envois sont bien relevés (${[...sent].join(' ')})`);
+  for (const k of sent) assert.ok(acts.has(k), `l'action « ${k} » est acceptée par l'hôte`);
+  const line = src.split('\n').find((l) => l.includes('out[id] = { remote: true'));
+  for (const k of acts) assert.ok(line.includes(`a.k === '${k}'`), `l'action « ${k} » arrive jusqu'à la partie`);
+});
+
+test("à plusieurs : les portes de la cabine qui se ferment arrivent chez l'invité, et ne se mélangent plus avec les lettres du Level 5", () => {
+  const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 3, players, localId: 1 });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 3, players, localId: 2 });
+  host.cassettes = 6;
+  host.startFinale();
+  const E = host.fm(host.realFloor).elevator;
+  for (const P of host.players) Object.assign(P, { floor: host.realFloor, x: E.x, z: E.z });
+  host.step({ pick: true });
+  assert.ok(host.liftT > 0, 'tout le monde dedans : les portes se ferment');
+  const snap = JSON.parse(JSON.stringify(host.snapshot()));
+  guest.applySnapshot(snap);
+  assert.ok(Math.abs(guest.liftT - host.liftT) < 0.02, `l'invité voit les portes se fermer (${guest.liftT})`);
+  // Level 5 : les lettres voyagent sous leur propre clé
+  const h5 = new BackroomsSim({ difficulty: 'peaceful', seed: 11, level: HOTEL_LEVEL, players, localId: 1 });
+  const g5 = new BackroomsSim({ difficulty: 'peaceful', seed: 11, level: HOTEL_LEVEL, players, localId: 2 });
+  assert.ok(h5.map.letters.length > 0, 'il y a des lettres au Level 5');
+  h5.map.letters[0].taken = true;
+  const s5 = JSON.parse(JSON.stringify(h5.snapshot()));
+  assert.equal(typeof s5.lt, 'string');
+  assert.equal(typeof s5.lc, 'number');
+  g5.applySnapshot(s5);
+  assert.equal(g5.liftT, 0, "pas de portes qui se ferment à cause d'une lettre ramassée");
+  assert.ok(g5.map.letters[0].taken, "la lettre ramassée l'est aussi chez l'invité");
+});
+
+test("Level 1 : celui qui s'en va assis au poste de garde rend le fauteuil", () => {
+  const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }];
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 5, players, localId: 1, level: 1 });
+  const S = sim.map.post;
+  const G = sim.players.find((q) => q.id === 2);
+  G.x = S.front.x;
+  G.z = S.front.z;
+  sim.step({}, { 2: { pick: true } });
+  assert.ok(G.desk && S.by === 2, 'il est assis');
+  sim.removePlayer(2);
+  assert.equal(S.by, -1, 'le fauteuil est libre');
+  const P = sim.player;
+  P.x = S.front.x;
+  P.z = S.front.z;
+  sim.step({ pick: true });
+  assert.ok(P.desk && S.by === 1, "quelqu'un d'autre peut s'y asseoir");
+});
+
+test("d'un niveau à l'autre : le vacarme de l'étage d'avant ne suit pas l'équipe", () => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 5 });
+  sim.din = 0.9;
+  sim.dinLv = 3;
+  sim.loadLevel(1);
+  assert.equal(sim.din, 0);
+  assert.equal(sim.dinLv, 0);
+});
+
+test("la cabine : l'entité n'attrape qu'à travers la baie ouverte — ni à travers la tôle, ni derrière les portes closes", () => {
+  const setup = () => {
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 3 });
+    sim.cassettes = 6;
+    sim.startFinale();
+    sim.huntT = 1e9;
+    const P = sim.player;
+    const M = sim.monster;
+    const E = sim.fm(sim.realFloor).elevator;
+    const fx = E.x - E.dx * (CELL_SIZE / 2);
+    const fz = E.z - E.dz * (CELL_SIZE / 2);
+    // un point dans le repère de la façade : lz le long de l'entrée (négatif : dehors), off en travers
+    const at = (lz, off) => ({ x: fx + E.dx * lz + E.dz * off, z: fz + E.dz * lz - E.dx * off });
+    const put = (pl, pm) => {
+      Object.assign(P, { floor: sim.realFloor, ...pl });
+      Object.assign(M, { floor: sim.realFloor, ...pm, mode: 'chase', dormantT: 0, away: false, unseenT: 0, target: P.id, lastSeenX: pl.x, lastSeenZ: pl.z, lastSeenF: sim.realFloor, warpT: 1e9, path: [], v: 0, speed: 0 });
+      sim.placed(M);
+      P.sawM = sim.time;
+    };
+    return { sim, P, M, E, at, put };
+  };
+  const inside = LIFT_FACE + PLAYER_RADIUS + 0.05;
+  {
+    // à travers la tôle : lui contre la façade, dedans, elle dehors, à côté de la baie (à un mètre l'un de l'autre)
+    const { sim, P, M, at, put } = setup();
+    put(at(inside, 0.85), at(-0.42, 0.85));
+    assert.ok(sim.inCabin(P), 'il est dans la cabine');
+    assert.ok(Math.hypot(M.x - P.x, M.z - P.z) < 1.1, 'à portée de bras');
+    assert.ok(sim.liftBetween(sim.realFloor, M.x, M.z, P.x, P.z), 'la tôle les sépare');
+    sim.step({});
+    assert.ok(!(P.grabT > 0) && P.status === 'alive', 'pas de prise à travers la façade');
+  }
+  {
+    // par la baie grande ouverte : là, elle l'attrape
+    const { sim, P, M, at, put } = setup();
+    put(at(inside, 0), at(-0.42, 0));
+    assert.ok(!sim.liftBetween(sim.realFloor, M.x, M.z, P.x, P.z), 'rien entre eux');
+    sim.step({});
+    assert.ok(P.grabT > 0 && M.mode === 'grab', 'la baie ouverte ne protège pas');
+  }
+  {
+    // les portes presque jointes (le bouton vient d'être pressé) : elle ne passe plus le bras
+    const { sim, P, M, at, put } = setup();
+    put(at(inside, 0), at(-0.42, 0));
+    sim.liftT = LIFT_CLOSE_T - LIFT_SHUT_T + 0.2; // il reste 7 cm d'ouverture de chaque côté
+    assert.ok(sim.liftBetween(sim.realFloor, M.x, M.z, P.x, P.z), 'les vantaux les séparent');
+    sim.step({});
+    assert.ok(!(P.grabT > 0) && P.status === 'alive', 'pas de prise derrière les portes');
+  }
+  {
+    // dans la cabine d'arrivée du Level 1, portes encore fermées
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 5, level: 1 });
+    const A = sim.map.arrival;
+    assert.ok(A, "la cabine d'arrivée");
+    sim.arriveT = 2;
+    assert.ok(sim.liftBetween(0, A.x, A.z, A.x - A.dx * CELL_SIZE, A.z - A.dz * CELL_SIZE), "fermée : rien ne passe");
+    sim.arriveT = 0;
+    assert.ok(!sim.liftBetween(0, A.x, A.z, A.x - A.dx * CELL_SIZE, A.z - A.dz * CELL_SIZE), 'ouverte : la baie est libre');
+  }
+});
+
+test("la cabine : tenu à travers la baie quand les portes se ferment, on est arraché à elle et on part ; si elle est dedans, les portes se rouvrent", () => {
+  const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }];
+  const setup = (mLz, mOff = 0) => {
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 3, players, localId: 1 });
+    sim.cassettes = 6;
+    sim.startFinale();
+    sim.huntT = 1e9;
+    const P = sim.player;
+    const G = sim.players.find((q) => q.id === 2);
+    const M = sim.monster;
+    const E = sim.fm(sim.realFloor).elevator;
+    const fx = E.x - E.dx * (CELL_SIZE / 2);
+    const fz = E.z - E.dz * (CELL_SIZE / 2);
+    const at = (lz, off) => ({ x: fx + E.dx * lz + E.dz * off, z: fz + E.dz * lz - E.dx * off });
+    const pl = at(LIFT_FACE + PLAYER_RADIUS + 0.05, 0);
+    Object.assign(P, { floor: sim.realFloor, ...pl });
+    Object.assign(G, { floor: sim.realFloor, ...at(2.1, 0.9), flashlight: false }); // le coéquipier, au fond de la cabine
+    Object.assign(M, { floor: sim.realFloor, ...at(mLz, mOff), mode: 'chase', dormantT: 0, away: false, unseenT: 0, target: P.id, lastSeenX: pl.x, lastSeenZ: pl.z, lastSeenF: sim.realFloor, warpT: 1e9, path: [], v: 0, speed: 0 });
+    sim.placed(M);
+    P.sawM = sim.time;
+    sim.step({});
+    assert.ok(P.grabT > 0 && M.mode === 'grab', 'elle le tient');
+    sim.drainEvents();
+    return { sim, P, G, M };
+  };
+  {
+    const { sim, P, G, M } = setup(-0.42);
+    // son coéquipier, au fond de la cabine, presse le bouton (tout le monde est dedans)
+    sim.step({}, { 2: { pick: true } });
+    assert.ok(sim.liftT > 0, 'les portes se ferment');
+    run(sim, LIFT_CLOSE_T + 0.1, {}, { 2: {} });
+    const ev = sim.drainEvents();
+    assert.ok(ev.some((e) => e.type === 'release' && e.id === 1 && e.doors), 'les portes lui font lâcher prise');
+    assert.ok(!ev.some((e) => e.type === 'leftBehind'), 'personne ne reste dehors');
+    assert.equal(P.status, 'elevator', 'il part avec la cabine');
+    assert.equal(G.status, 'elevator');
+    assert.equal(M.mode, 'stun', 'elle recule, sonnée');
+    assert.equal(M.grabbing, null);
+  }
+  {
+    // elle est entrée dans la cabine avec lui : on ne part pas avec elle
+    const { sim, P, G } = setup(LIFT_FACE + PLAYER_RADIUS + 0.85, -0.3);
+    sim.liftT = 0.05;
+    for (let i = 0; i < 6; i++) sim.step({}, { 2: {} });
+    const ev = sim.drainEvents();
+    assert.ok(ev.some((e) => e.type === 'liftOpen'), 'les portes se rouvrent');
+    assert.ok(!ev.some((e) => e.type === 'board' || e.type === 'leftBehind'), 'personne ne part, personne ne meurt');
+    assert.equal(P.status, 'alive');
+    assert.equal(G.status, 'alive');
+    assert.equal(sim.departT, 0);
+  }
+});
+
+test("définition automatique : à 60 Hz, elle remonte après un passage chargé ; elle ne descend pas sous le plancher, ne fait pas le yoyo, et garde son budget quand le caméscope est levé", () => {
+  const F = 1000 / 60;
+  // une machine qui tient `hold` lignes à 60 Hz : au-delà, une image sur deux arrive un balayage en retard
+  const play = (res, sec, top, cost, t0) => {
+    let t = t0;
+    let n = 0;
+    let out = 0;
+    while (t < t0 + sec) {
+      const ms = cost(out || res.lines, n++);
+      t += ms / 1000;
+      out = res.step(ms, t, top);
+    }
+    return { t, out };
+  };
+  const steady = (hold) => (lines, n) => (lines > hold && n % 2 ? F * 2 : F);
+  {
+    const res = autoRes();
+    // un passage chargé : 40 ms par image pendant 3 s, à n'importe quelle définition
+    let r = play(res, 3, 1080, () => 40, 0);
+    const low = r.out;
+    assert.ok(low < 700, `elle a baissé (${low})`);
+    assert.ok(low >= RES_MIN, 'jamais sous le plancher');
+    // puis la machine tient tout à 16,7 ms : avec l'ancien seuil (15 ms), elle ne remontait jamais
+    r = play(res, 40, 1080, () => F, r.t);
+    assert.equal(r.out, 1080, `revenue à la pleine définition (${r.out})`);
+  }
+  {
+    const res = autoRes();
+    let r = play(res, 4, 1080, () => 60, 0);
+    assert.equal(r.out, RES_MIN, 'au plancher, pas plus bas');
+    // la machine ne tient que 800 lignes : elle s'en approche et s'y tient, sans yoyo
+    r = play(res, 60, 1080, steady(800), r.t);
+    assert.ok(r.out >= 700 && r.out <= 800, `au plus près de ce qu'elle tient (${r.out})`);
+    let changes = 0;
+    let last = r.out;
+    let t = r.t;
+    let n = 0;
+    while (t < r.t + 120) {
+      const ms = steady(800)(last, n++);
+      t += ms / 1000;
+      const out = res.step(ms, t, 1080);
+      if (out !== last) changes++;
+      last = out;
+    }
+    assert.ok(changes <= 8, `pas de yoyo : ${changes} changements en 2 minutes`);
+  }
+  {
+    // le caméscope (une image plus petite) ne mange pas le budget : rangé, on retrouve la définition d'avant
+    const res = autoRes();
+    let r = play(res, 5, 1080, () => F, 0);
+    assert.equal(r.out, 1080);
+    r = play(res, 20, 480, () => F, r.t);
+    assert.equal(r.out, 480, 'bornée par la vue');
+    r = play(res, 0.05, 1080, () => F, r.t);
+    assert.equal(r.out, 1080, 'la pleine définition revient tout de suite');
+  }
+  {
+    // un écran à 120 Hz : « à l'aise » se mesure à sa cadence, pas à 60 Hz
+    const res = autoRes();
+    let r = play(res, 4, 1080, () => 40, 0);
+    r = play(res, 40, 1080, () => 1000 / 120, r.t);
+    assert.equal(r.out, 1080);
+    assert.ok(res.screen < 10, `la cadence de l'écran est reconnue (${res.screen.toFixed(1)} ms)`);
+  }
+});
+
+test("le code : aucune méthode définie deux fois dans une même classe (la seconde écrasait la première en silence)", () => {
+  const root = new URL('../backrooms/', import.meta.url);
+  for (const dir of ['engine/', 'view/', '']) {
+    for (const f of fs.readdirSync(new URL(dir, root))) {
+      if (!f.endsWith('.js')) continue;
+      const seen = new Map();
+      let cls = '';
+      for (const l of fs.readFileSync(new URL(dir + f, root), 'utf8').split('\n')) {
+        const c = /^(?:export )?class (\w+)/.exec(l);
+        if (c) cls = c[1];
+        const m = cls && /^  ((?:static |async |get |set )*)([A-Za-z_$][\w$]*)\([^)]*\) \{$/.exec(l);
+        if (!m) continue;
+        const key = `${cls}.${/get |set /.test(m[1]) ? m[1].trim() + ' ' : ''}${m[2]}`;
+        assert.ok(!seen.has(key), `${dir}${f} : ${key} est défini deux fois`);
+        seen.set(key, true);
+      }
+    }
+  }
+});
+
+test("Level 1 : l'arrivée est calme — elle reste au loin, pas de coupure avant deux minutes", () => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 6, level: 1 });
+  assert.ok(sim.monster.dormantT >= L1_CALM - 0.1, 'elle ne chasse pas encore');
+  assert.ok(sim.nextBlackout >= L1_FIRST_BLACKOUT[0], 'la première coupure attend');
+});
+
+test('Level 1 : coupures variées — jamais deux fois de suite le même genre ; le délestage éteint un tiers après l\'autre', () => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 3, level: 1 });
+  const kinds = [];
+  for (let i = 0; i < 12; i++) {
+    sim.blackout = 0;
+    sim.cut = null;
+    sim.restoreLights();
+    sim.startCut();
+    kinds.push(sim.lastCut);
+  }
+  assert.equal(kinds[0], 'full', 'la première est un vrai noir');
+  for (let i = 1; i < kinds.length; i++) assert.notEqual(kinds[i], kinds[i - 1]);
+  assert.ok(new Set(kinds).size >= 3, `plusieurs genres : ${kinds.join(', ')}`);
+  // un délestage, du début à la fin
+  sim.cut = null;
+  sim.blackout = 0;
+  sim.restoreLights();
+  sim.lastCut = 'full';
+  let n = 0;
+  while (sim.lastCut !== 'sector' && n++ < 50) {
+    sim.cut = null;
+    sim.blackout = 0;
+    sim.restoreLights();
+    sim.lastCut = 'brown';
+    sim.startCut();
+  }
+  assert.equal(sim.cut.kind, 'sector');
+  const on0 = sim.map.lights.filter((l) => l.s0 !== 'off').length;
+  const off = () => sim.map.lights.filter((l) => l.s0 !== 'off' && l.state === 'off').length;
+  const a = off();
+  assert.ok(a > on0 * 0.15 && a < on0 * 0.6, `un tiers de l'entrepôt dans le noir (${a} néons sur ${on0})`);
+  assert.equal(sim.blackout, 0, 'ailleurs, le courant tient (le caméscope capte)');
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 3, level: 1, players: [{ id: 'g', name: 'G' }], localId: 'g' });
+  guest.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
+  assert.equal(guest.cut && guest.cut.kind, 'sector', "l'invité sait qu'un délestage est en cours");
+  assert.equal(guest.map.lights.filter((l) => l.s0 !== 'off' && l.state === 'off').length, a, 'et voit les mêmes néons éteints');
+  run(sim, SECTOR_STEP + 0.1);
+  assert.ok(off() > 0 && off() !== a, 'le tiers suivant');
+  run(sim, SECTOR_STEP * 2);
+  assert.equal(sim.cut, null);
+  assert.equal(off(), 0, 'tout revient comme avant');
+});
+
+test('Level 1 : disjoncteurs généraux — à deux, deux postes tenus ensemble ; seul, ils tiennent le temps de courir', () => {
+  const two = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 9, players: two, localId: 1, level: 1 });
+  assert.equal(sim.relayNeed, 2);
+  const need = sim.relaysNeeded();
+  assert.equal(need.length, 2);
+  assert.ok(need[0].desk, 'la console du poste de garde en est un');
+  assert.ok(Math.hypot(need[0].x - need[1].x, need[0].z - need[1].z) > 20, 'les postes sont loin l\'un de l\'autre');
+  const [A, B] = sim.players;
+  const box = need[1];
+  B.x = box.x + box.nx * 0.9;
+  B.z = box.z + box.nz * 0.9;
+  stepAs(sim, B, { pick: true });
+  assert.ok(Math.abs(box.on - RELAY_SYNC) < 0.1, 'à deux, une armoire ne tient que quelques secondes');
+  run(sim, RELAY_SYNC + 0.2);
+  assert.equal(box.on, 0, 'seule, elle retombe');
+  assert.ok(sim.drainEvents().some((e) => e.type === 'relayOff'));
+  // A s'assoit au poste : la console s'arme, et tient tant qu'il reste assis
+  const S = sim.map.post;
+  A.x = S.front.x;
+  A.z = S.front.z;
+  sim.step({ pick: true });
+  assert.ok(A.desk);
+  run(sim, RELAY_ARM + 0.2);
+  assert.ok(need[0].on > 0, 'la console tient');
+  stepAs(sim, B, { pick: true });
+  assert.equal(sim.mains, true, 'les deux en même temps : le courant arrive au panneau');
+  // à trois, trois postes
+  const three = [...two, { id: 3, name: 'C' }];
+  const s3 = new BackroomsSim({ difficulty: 'peaceful', seed: 9, players: three, localId: 1, level: 1 });
+  assert.equal(s3.relayNeed, Math.min(3, s3.map.relays.length));
+  // seul : bien plus longtemps (de quoi courir d'un poste à l'autre)
+  const s1 = new BackroomsSim({ difficulty: 'peaceful', seed: 9, level: 1 });
+  assert.ok(s1.relayLatch() > 20, `seul, une armoire tient ${s1.relayLatch().toFixed(0)} s`);
+  // à deux, si l'un meurt, la tâche s'adapte
+  B.status = 'dead';
+  assert.ok(sim.relayLatch() > 20);
+});
+
+test('Level 1 : le courant revenu, le monte-charge descend (plus longtemps à plusieurs) ; les rideaux retombent, elle traque', () => {
+  const four = [1, 2, 3, 4].map((id) => ({ id, name: 'P' + id }));
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 2, players: four, localId: 1, level: 1 });
+  const d = sim.map.docks[0];
+  d.o = 1;
+  sim.delivered = FUSES;
+  sim.mains = true;
+  sim.players[0].x = sim.map.exit.x;
+  sim.players[0].z = sim.map.exit.z;
+  run(sim, PANEL_T + 0.2);
+  assert.equal(sim.panelHands(), 3, 'à quatre, trois paires de mains au panneau');
+  assert.ok(sim.powered === false && sim.panel < 0.3, 'seul au panneau, ça avance à peine');
+  for (const Q of sim.players.slice(1, 3)) {
+    Q.x = sim.map.exit.x;
+    Q.z = sim.map.exit.z;
+  }
+  run(sim, PANEL_T + 0.2);
+  assert.equal(sim.powered, true);
+  assert.ok(sim.liftCallT > LIFT_CALL_T + 10, `à quatre, ${sim.liftCallT.toFixed(0)} s d'attente`);
+  assert.equal(sim.open, false);
+  assert.ok(sim.hunt, 'la traque');
+  assert.equal(sim.monster.dormantT, 0);
+  assert.ok(d.dir < 0 || d.o < 1, 'la surtension fait retomber les rideaux');
+  const guest = new BackroomsSim({ difficulty: 'normal', seed: 2, players: four, localId: 2, level: 1 });
+  guest.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
+  assert.ok(Math.abs(guest.liftCallT - sim.liftCallT) < 0.05, "l'invité voit le monte-charge descendre");
+  assert.equal(guest.open, false);
+  sim.liftCallT = 0.01;
+  sim.step();
+  assert.equal(sim.open, true);
+  assert.ok(sim.drainEvents().some((e) => e.type === 'liftArrive'));
+});
+
+test("Level 1 : le plan de l'entrepôt change avec la graine (travées, chambres froides, grande halle, allées serrées) ; tout reste atteignable", () => {
+  const plans = new Set();
+  for (let sd = 1; sd <= 12; sd++) {
+    const m = createWarehouseMap(sd * 7 + 13);
+    plans.add(m.plan);
+    const d = bfs(m.grid, m.W, m.H, m.spawn.gx, m.spawn.gz);
+    const reach = (o) => d[o.gz * m.W + o.gx] >= 0;
+    assert.ok(reach(m.exit), `graine ${sd} (${m.plan}) : le monte-charge`);
+    for (const f of m.fuses) assert.ok(reach(f), `graine ${sd} (${m.plan}) : un fusible`);
+    for (const r of m.relays) if (!r.desk) assert.ok(d[r.gz * m.W + r.gx] >= 0, `graine ${sd} (${m.plan}) : une armoire`);
+    assert.ok(m.relays.length >= 2, `graine ${sd} : au moins deux postes de disjoncteurs`);
+  }
+  assert.equal(plans.size, 4, [...plans].join(', '));
+});
+
+test('à plusieurs : départs vraiment séparés (hors de vue les uns des autres), pression et réserves selon le nombre', () => {
+  const six = [1, 2, 3, 4, 5, 6].map((id) => ({ id, name: 'P' + id }));
+  for (const sd of [3, 14, 42]) {
+    const sim = new BackroomsSim({ difficulty: 'peaceful', seed: sd, players: six, localId: 1 });
+    const ps = sim.players;
+    for (const p of ps) {
+      for (const q of ps) {
+        if (p === q) continue;
+        assert.ok(Math.hypot(p.x - q.x, p.z - q.z) > 9, `graine ${sd} : ${p.name} et ${q.name} pas côte à côte`);
+        assert.ok(!hasLineOfSight(sim.map, p.x, p.z, q.x, q.z), `graine ${sd} : ${p.name} ne voit pas ${q.name} au départ`);
+      }
+    }
+  }
+  // la pression : seulement à partir du Level 1, et plus forte à plusieurs
+  const crowd = (n, level) => new BackroomsSim({ difficulty: 'peaceful', seed: 4, level, players: six.slice(0, n), localId: 1 }).crowd;
+  assert.equal(crowd(4, 0), 0, 'le Level 0 ne change pas');
+  assert.equal(crowd(1, 1), 0);
+  assert.ok(crowd(2, 1) > 0 && crowd(2, 1) < crowd(4, 1));
+  assert.equal(crowd(6, 1), 1);
+  // les réserves (piles, eau d'amande) : un peu plus à six qu'à quatre
+  const kept = (n) => new BackroomsSim({ difficulty: 'peaceful', seed: 4, level: 1, players: six.slice(0, n), localId: 1 }).map.items.filter((it) => !it.taken).length;
+  assert.ok(kept(6) > kept(4), `${kept(6)} objets à six, ${kept(4)} à quatre`);
+});
+
+import { iceServers, mulawEncode, mulawDecode, down8k, toB64, fromB64 } from '../backrooms/view/voice.js';
+test('voix : serveurs ICE réglables, et la voix par le relais (8 kHz, loi µ) reste fidèle et légère', () => {
+  // un TURN ajouté dans l'adresse passe devant les STUN publics ; un réglage illisible est ignoré
+  const turn = [{ urls: 'turn:turn.example.com:3478', username: 'u', credential: 'p' }];
+  const a = iceServers('?ice=' + encodeURIComponent(JSON.stringify(turn)));
+  assert.equal(a[0].urls, 'turn:turn.example.com:3478');
+  assert.ok(a.some((s) => String(s.urls).startsWith('stun:')));
+  const store = { getItem: (k) => (k === 'backrooms.ice' ? JSON.stringify(turn) : null) };
+  assert.equal(iceServers('', store)[0].urls, 'turn:turn.example.com:3478');
+  assert.ok(iceServers('?ice=pas-du-json').every((s) => String(s.urls).startsWith('stun:')));
+  // 100 ms de voix à 48 kHz : 800 octets à 8 kHz, moins de 1,1 ko en base64 (10 paquets par seconde quand on parle)
+  const x = new Float32Array(4800).map((_, i) => 0.5 * Math.sin((2 * Math.PI * 300 * i) / 48000));
+  const d = down8k(x, 48000);
+  assert.equal(d.length, 800);
+  const b64 = toB64(mulawEncode(d));
+  assert.ok(b64.length < 1100, `${b64.length} caractères`);
+  const y = mulawDecode(fromB64(b64));
+  let err = 0;
+  for (let i = 0; i < d.length; i++) err = Math.max(err, Math.abs(d[i] - y[i]));
+  assert.ok(err < 0.02, `erreur ${err}`);
+  // le silence reste le silence (pas de souffle ajouté)
+  assert.ok(mulawDecode(mulawEncode(new Float32Array(10))).every((v) => Math.abs(v) < 1e-3));
+});
+
+test('Level 1 : le monte-charge qui descend dit d’où il vient (son de la gaine)', () => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 3, level: 1, players: [{ id: 1, name: 'A' }], localId: 1 });
+  const evs = [];
+  const emit = sim.emit.bind(sim);
+  sim.emit = (e) => (evs.push(e), emit(e));
+  sim.startLiftCall();
+  const ev = evs.find((e) => e.type === 'liftCall');
+  assert.ok(ev && ev.t >= 40 && Number.isFinite(ev.x) && Number.isFinite(ev.z));
+  assert.equal(ev.x, sim.map.exit.x);
 });
 
 // --------------------------------------------------------------------------- Level 1 : salles de sécurité, imposteur
