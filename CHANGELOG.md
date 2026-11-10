@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.30 — 10 novembre 2026
+- **The Backrooms** — Nouvelle vidéo d'intro en mode VIP, avec le son.
+
 ## 5.29 — 10 novembre 2026
 - **The Backrooms** — au Level 1, l'entrepôt devient un vrai niveau :
   - On arrive au calme : l'entité reste au loin un moment, et la première coupure de courant attend deux minutes.
