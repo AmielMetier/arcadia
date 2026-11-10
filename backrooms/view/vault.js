@@ -1,7 +1,9 @@
 // Le coffre du mode VIP : les médias des monstres d'origine (photos, voix, intro sous-titrée) sont chiffrés dans
 // data/*.bin, en AES-GCM 256 bits (WebCrypto). La clé sort d'une phrase secrète par PBKDF2 (SHA-256, ROUNDS tours,
-// sel SALT) ; la phrase n'est jamais dans le dépôt. L'hôte la tape quand il lance une partie en mode VIP : seule la
-// clé qui en sort reste dans son navigateur (localStorage) et part aux invités avec la partie (le « go » du salon).
+// sel SALT) ; ni la phrase ni la clé ne sont dans le dépôt. Le relais garde la clé (base64) lui-même, enveloppée par son
+// jeton GitHub, après l'avoir apprise une fois (server/vip.js : il n'accepte qu'une clé qui ouvre le témoin), et la
+// donne aux seuls comptes Arcadia VIP connectés : l'hôte VIP n'a rien à taper ni à copier. Son navigateur la garde
+// (localStorage), la réapprend au relais s'il l'a perdue et l'envoie aux invités avec la partie (le « go » du salon).
 // Sans clé, rien ne se déchiffre et le jeu garde l'entité, la voix et l'intro classiques.
 //
 // Un fichier du coffre : « ARV1 » (4 octets), l'IV (12 octets, tiré au hasard), puis le chiffré suivi de son
@@ -93,7 +95,7 @@ export async function checkKey(key, load = fetchData) {
   }
 }
 
-// la phrase tapée par l'hôte : la clé (base64) si c'est la bonne, '' sinon, null si le témoin est introuvable
+// la clé (base64) qui sort de la phrase si c'est la bonne, '' sinon, null si le témoin est introuvable (outil, tests)
 export async function keyFromPhrase(phrase, load = fetchData) {
   if (!String(phrase || '').trim()) return '';
   const key = await deriveKey(phrase);

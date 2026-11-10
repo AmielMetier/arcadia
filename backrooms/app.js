@@ -7,7 +7,7 @@ import { BackroomsSfx } from './view/sfx.js';
 import { createVoice } from './view/voice.js';
 import { BackroomsHUD, levelName, levelSub, LORE, loreOf, hearTape, tapesHeard, store, NOTES, readNote, loreComplete, FINAL_LORE } from './view/hud.js';
 import { parseWords } from './engine/hotel.js';
-import { vault, vaultOpen, vaultKey, openVault, storedKey, rememberKey, keyFromPhrase } from './view/vault.js';
+import { vault, vaultOpen, vaultKey, openVault, storedKey, rememberKey } from './view/vault.js';
 
 // Level 5, version VIP : les mots du fichier backrooms/password_level5/mots.txt (6 lettres, un par ligne) ; sans
 // fichier (ou sans mot valide), la liste standard
@@ -667,31 +667,47 @@ function stepKind(P) {
 
 let lastSettings = {};
 // Mode VIP : les monstres d'origine sont dans un coffre chiffré (view/vault.js). Avant la première partie VIP, l'hôte
-// l'ouvre : avec la clé gardée par son navigateur, sinon avec la phrase secrète qu'on lui demande. Une seule fois par
-// page ; s'il passe (ou sans la bonne phrase), les parties gardent les monstres, la voix et l'intro classiques.
+// l'ouvre sans rien taper : avec la clé gardée par son navigateur, sinon avec celle que le relais donne à son compte
+// Arcadia s'il est VIP (HubAccount.vipKey du Hub). Une seule fois par page ; sans clé, les parties gardent les
+// monstres, la voix et l'intro classiques. Un navigateur qui a la clé la réapprend au relais s'il l'a perdue
+// (HubAccount.vipSeed : le relais ne l'accepte que si elle ouvre le coffre).
 let vipGate = null; // null : pas encore essayé ; une promesse pendant l'ouverture ; true une fois tranché
+async function hubVipKey() {
+  try {
+    const A = window.parent !== window ? window.parent.HubAccount : null;
+    if (!A || !A.vipKey) return null;
+    return await Promise.race([A.vipKey(), new Promise((r) => setTimeout(() => r(null), 50000))]);
+  } catch (e) {
+    return null; // pas dans le Hub (ou pas le même site)
+  }
+}
+function hubVipSeed(key) {
+  try {
+    const A = window.parent !== window ? window.parent.HubAccount : null;
+    if (A && A.vipSeed) A.vipSeed(key).catch(() => {});
+  } catch (e) {}
+}
 async function unlockVip() {
   const kept = storedKey();
   if (kept) {
     const r = await openVault(kept);
-    if (r === 'ok') return true;
+    if (r === 'ok') {
+      hubVipSeed(kept);
+      return true;
+    }
     if (r === 'wrong') rememberKey(''); // une clé qui n'ouvre plus le coffre (il a été rechiffré)
   }
-  if (document.pointerLockElement) document.exitPointerLock?.();
-  return hud.askPhrase(async (phrase) => {
-    const k = await keyFromPhrase(phrase);
-    if (!k) return k === '' ? false : null; // '' : pas la bonne phrase ; null : coffre introuvable
-    const r = await openVault(k);
-    if (r !== 'ok') return r === 'wrong' ? false : null;
-    rememberKey(k);
-    return true;
-  });
+  if (hud) hud.toast('OPENING THE VIP VAULT…', 4);
+  const k = await hubVipKey();
+  if (!k || (await openVault(k)) !== 'ok') return false;
+  rememberKey(k);
+  return true;
 }
 // Nouvelle partie (solo ou hôte) : l'hôte l'annonce aux invités, qui construisent la même carte avec la même graine
 function initGame(settings = lastSettings, forceLevel = null) {
   lastSettings = settings;
   if (NET.role === 'guest') return; // l'invité attend le « go » de l'hôte
-  // ?vip (seul) : le mode VIP sans passer par le salon (la phrase reste demandée)
+  // ?vip (seul) : le mode VIP sans passer par le salon (la clé gardée par ce navigateur, sinon rien : monstres classiques)
   if (NET.role === 'solo' && /[?&]vip(&|=|$)/.test(location.search)) settings = { ...settings, monsters: 'vip' };
   if (settings.monsters === 'vip' && !vaultOpen() && vipGate !== true) {
     if (!vipGate) {

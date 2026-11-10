@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 5.34 — 10 novembre 2026
+- **The Backrooms** — Le mode VIP ne demande plus de phrase : le compte Arcadia VIP de l'hôte suffit pour débloquer les monstres d'origine, et ses invités les voient avec lui.
+  - Si l'hôte n'est pas connecté à son compte VIP, la partie se joue avec les monstres, la voix et l'intro classiques.
+- **Hub** — Le grade VIP est vérifié en ligne à chaque visite : impossible de se faire passer pour un compte VIP sans son mot de passe.
+
 ## 5.33 — 10 novembre 2026
 - **The Backrooms** — À la manette, le talkie se prend en maintenant RT, comme R au clavier.
 

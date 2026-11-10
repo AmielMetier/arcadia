@@ -1,7 +1,8 @@
 Le coffre du mode VIP de The Backrooms : les médias des monstres d'origine, chiffrés en AES-256-GCM.
-La clé sort d'une phrase secrète (PBKDF2, SHA-256) qui n'est pas dans le dépôt, pas plus que les originaux.
-view/vault.js les déchiffre dans le navigateur de l'hôte quand il a tapé la phrase, puis chez ses invités avec la
-clé qu'il leur envoie. Outil pour chiffrer, déchiffrer ou vérifier : tools/backrooms-vault.mjs.
+La clé sort d'une phrase secrète (PBKDF2, SHA-256) ; ni l'une ni l'autre ne sont dans le dépôt, pas plus que les
+originaux. Le relais donne la clé aux comptes VIP connectés ; view/vault.js déchiffre dans le navigateur de l'hôte,
+puis chez ses invités avec la clé qu'il leur envoie. Outil pour chiffrer, déchiffrer ou vérifier :
+tools/backrooms-vault.mjs.
 
 e0.bin  le témoin : un court texte connu, qui reconnaît la bonne phrase
 e1.bin  photo de l'entité du Level 0 (png)

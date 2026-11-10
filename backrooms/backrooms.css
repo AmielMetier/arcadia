@@ -809,20 +809,6 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 #hud.cctv-on .objective-banner { display: none; }
 
 /* L'intro : le vlog d'urbex au caméscope, plein écran par-dessus tout ; elle s'efface sur le Level 0 */
-/* Mode VIP : la phrase du coffre, demandée à l'hôte avant la partie */
-.vip-gate { position: fixed; inset: 0; z-index: 250; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, 0.82); font-family: 'VT323', monospace; color: #f2f0e6; }
-.vip-box { width: min(440px, 100%); padding: 22px 24px; border: 2px solid rgba(242, 240, 230, 0.7); background: #0b0a08; text-align: center; box-shadow: 0 10px 40px #000; }
-.vip-title { font-size: 34px; letter-spacing: 3px; color: #ffd36a; }
-.vip-sub { margin: 6px 0 14px; font-size: 18px; letter-spacing: 1px; opacity: 0.8; }
-.vip-input { box-sizing: border-box; width: 100%; padding: 8px 10px; font: inherit; font-size: 24px; letter-spacing: 2px; color: #7dff8a; background: #0e1a10; border: 1px solid #000; outline: 1px solid rgba(242, 240, 230, 0.35); }
-.vip-input:focus { outline-color: #ffd36a; }
-.vip-msg { min-height: 24px; margin: 8px 0 6px; font-size: 20px; letter-spacing: 1px; color: #ff6a5a; }
-.vip-gate.busy .vip-msg { color: #f2f0e6; animation: recBlink 1.4s steps(1) infinite; }
-.vip-btns { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-.vip-btns button { font: inherit; font-size: 22px; letter-spacing: 2px; padding: 4px 14px; color: #f2f0e6; background: transparent; border: 2px solid rgba(242, 240, 230, 0.5); cursor: pointer; }
-.vip-btns .vip-go { border-color: #ffd36a; color: #ffd36a; }
-.vip-btns button:hover { background: rgba(242, 240, 230, 0.12); }
-.vip-gate.busy button { opacity: 0.4; cursor: default; }
 #intro { position: fixed; inset: 0; z-index: 200; background: #000; display: flex; align-items: center; justify-content: center; transition: opacity 1.4s ease-in; }
 #intro video { width: 100%; height: 100%; object-fit: contain; background: #000; }
 #intro .skip { position: absolute; right: 18px; bottom: 14px; font: 12px/1 monospace; letter-spacing: 0.1em; color: rgba(255, 255, 255, 0.45); animation: introSkip 1s 1.2s both; }

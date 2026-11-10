@@ -1034,53 +1034,6 @@ export class BackroomsHUD {
     this.toastT = secs;
   }
 
-  // Mode VIP, avant la partie : la phrase secrète du coffre, demandée à l'hôte par-dessus le jeu. tryPhrase(phrase)
-  // rend true (coffre ouvert), false (pas la bonne phrase) ou null (coffre introuvable). Se résout en true (ouvert) ou
-  // false (l'hôte joue avec les monstres classiques).
-  askPhrase(tryPhrase) {
-    return new Promise((resolve) => {
-      const el = document.createElement('div');
-      el.className = 'vip-gate';
-      el.innerHTML = `<form class="vip-box" autocomplete="off">
-          <div class="vip-title">⭐ VIP MODE</div>
-          <div class="vip-sub">ENTER THE PASSPHRASE TO UNLOCK THE ORIGINAL MONSTERS</div>
-          <input class="vip-input" type="password" name="vip-phrase" autocomplete="off" spellcheck="false" aria-label="VIP passphrase">
-          <div class="vip-msg" role="status"></div>
-          <div class="vip-btns"><button type="submit" class="vip-go">UNLOCK</button><button type="button" class="vip-skip">PLAY CLASSIC</button></div>
-        </form>`;
-      document.body.appendChild(el);
-      const form = el.querySelector('form');
-      const input = el.querySelector('input');
-      const msg = el.querySelector('.vip-msg');
-      let busy = false;
-      const done = (ok) => {
-        el.remove();
-        resolve(ok);
-      };
-      // le jeu n'entend rien de ce qui se tape ou se clique ici
-      for (const t of ['keydown', 'keyup', 'pointerdown', 'click', 'wheel']) el.addEventListener(t, (e) => e.stopPropagation());
-      el.addEventListener('keydown', (e) => {
-        if (e.code === 'Escape' && !busy) done(false);
-      });
-      el.querySelector('.vip-skip').addEventListener('click', () => !busy && done(false));
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (busy || !input.value.trim()) return;
-        busy = true;
-        el.classList.add('busy');
-        msg.textContent = 'CHECKING…';
-        const r = await Promise.resolve(tryPhrase(input.value)).catch(() => null);
-        busy = false;
-        el.classList.remove('busy');
-        if (r) return done(true);
-        input.value = '';
-        input.focus();
-        msg.textContent = r === false ? 'WRONG PASSPHRASE' : "CAN'T REACH THE VAULT · TRY AGAIN";
-      });
-      setTimeout(() => input.focus(), 0);
-    });
-  }
-
   // images du screamer selon le mode (normal / VIP) : à rappeler quand l'hôte lance une partie
   applyMonsters() {
     const img = this.$('#scareImg');
