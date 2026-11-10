@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.35 — 10 novembre 2026
+- **The Backrooms** — La phrase du mode VIP revient, mais ne se tape qu'une seule fois : le premier hôte VIP qui la donne débloque les monstres d'origine pour tous les comptes VIP, qui n'ont ensuite plus rien à taper.
+
 ## 5.34 — 10 novembre 2026
 - **The Backrooms** — Le mode VIP ne demande plus de phrase : le compte Arcadia VIP de l'hôte suffit pour débloquer les monstres d'origine, et ses invités les voient avec lui.
   - Si l'hôte n'est pas connecté à son compte VIP, la partie se joue avec les monstres, la voix et l'intro classiques.
