@@ -6,6 +6,7 @@ import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL_SIZE } from '../engine/map.js';
 import { buildHotelRooms } from './hotelRooms.js';
 import { buildHotelCorridor } from './hotelCorridor.js';
+import { buildHotelLobby } from './hotelLobby.js';
 
 const C = CELL_SIZE;
 
@@ -195,6 +196,9 @@ export function buildHotel({ map, group, baked, wallMat, CEIL }) {
   }
 
   // --- 5. Le hall : comptoir de la réception, boîtes aux lettres, clavier, porte de l'escalier de secours ---
+  // (le sol de marbre, les tapis, les colonnes, le plafond à caissons, les portes vitrées, la trappe d'arrivée :
+  // view/hotelLobby.js)
+  buildHotelLobby({ map, group, baked, CEIL });
   const marble = lam({ color: '#d9d2c4' });
   for (const s of map.solids) {
     if (s.reception) {
@@ -249,13 +253,7 @@ export function buildHotel({ map, group, baked, wallMat, CEIL }) {
       tuft.position.set(s.x, 0.97, s.z);
       group.add(seat, base, back, rim, tuft);
     } else if (s.column) {
-      // colonne de marbre, base et chapiteau de laiton
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.3, CEIL, 20), marble);
-      shaft.position.set(s.x, CEIL / 2, s.z);
-      group.add(shaft);
-      box(0.72, 0.18, 0.72, M.darkWood, s.x, 0.09, s.z);
-      box(0.66, 0.14, 0.66, M.brass, s.x, CEIL - 0.07, s.z);
-      box(0.58, 0.05, 0.58, M.brass, s.x, 0.2, s.z);
+      // (les colonnes : view/hotelLobby.js)
     } else if (s.cart) {
       // le chariot à bagages : plateau de moquette rouge, deux arceaux de laiton, quatre roues
       box(s.hx * 2, 0.06, s.hz * 2, M.blanket, s.x, 0.29, s.z);

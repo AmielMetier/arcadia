@@ -1,5 +1,15 @@
 # Journal des versions — Arcadia
 
+## 5.42 — 10 novembre 2026
+- **The Backrooms** — Le hall du Terror Hotel en grand :
+  - Un sol en damier de marbre blanc et noir, poli, où brillent les reflets des lustres. La moquette s'arrête au seuil ; il reste un grand tapis d'Orient sous la banquette et un chemin rouge depuis l'entrée.
+  - Les colonnes sont en marbre noir veiné, avec une base et un chapiteau dorés.
+  - Un plafond à caissons, filets dorés et rosaces, avec un grand caisson au milieu, là où s'allume le code.
+  - Des portes vitrées à double battant, à côté des boîtes aux lettres, qui ne donnent que sur le noir. On y lit HOTEL à l’envers.
+  - On arrive du toboggan par une trappe ouverte au plafond : un drap pend du bord, et on atterrit sur un tas de linge.
+  - Le comptoir de la réception a sa barre de pied en laiton.
+  - La lueur au bout du toboggan prend la couleur ambrée des appliques.
+
 ## 5.41 — 10 novembre 2026
 - **The Backrooms** — Les portes et les couloirs du Terror Hotel :
   - Des portes des années 1930 : battant en noyer à quatre panneaux, bouton et serrure en laiton, judas, plaque de propreté ; un chambranle mouluré avec ses plinthes et sa corniche. Le papier peint continue autour de l'entrée, jusque dans la petite entrée de chaque chambre.

@@ -1169,8 +1169,9 @@ float occVis(vec3 p, vec3 lp) {
       const gloss = L1 && opts && opts.gloss; // le béton lissé du Level 1, où se reflètent les réglettes
       const bump = L1 && opts && opts.bump; // Level 1 : un relief (les joints des parpaings) que prennent aussi les feux de couleur
       const wall1 = L1 && opts && opts.wall1; // les murs du Level 1 : la poussière et la suie sous le plafond
+      const marble = L3 && opts && opts.marble; // le hall de l'hôtel : un marbre poli, sans l'usure de la moquette
       const push = opts && opts.push; // les murs en biais : la lumière lue un peu devant eux, dans le couloir (pas au coin des cases)
-      if (spec || PIPES || base || EDGE || SEGS || film || gloss || DYN || push || pool || hotel) mat.customProgramCacheKey = () => 'bk' + (hotel ? '-hotel' : '') + (pool ? '-pool-' + pool : '') + (push ? '-push' : '') + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE || SEGS ? '-edge' : '') + (film ? '-film' : '') + (gloss ? '-gloss' : '') + (DYN ? '-dyn' : '') + (bump ? '-bump' : '') + (wall1 ? '-wall1' : '');
+      if (spec || PIPES || base || EDGE || SEGS || film || gloss || DYN || push || pool || hotel) mat.customProgramCacheKey = () => 'bk' + (hotel ? '-hotel' : '') + (marble ? '-marble' : '') + (pool ? '-pool-' + pool : '') + (push ? '-push' : '') + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE || SEGS ? '-edge' : '') + (film ? '-film' : '') + (gloss ? '-gloss' : '') + (DYN ? '-dyn' : '') + (bump ? '-bump' : '') + (wall1 ? '-wall1' : '');
       mat.onBeforeCompile = (sh) => {
         Object.assign(sh.uniforms, bakeUniforms);
         if (DYN) {
@@ -1197,7 +1198,7 @@ float occVis(vec3 p, vec3 lp) {
         if (grime) sh.defines = { ...(sh.defines || {}), BK_GRIME: 1 };
         if (hotel) {
           Object.assign(sh.uniforms, lampU);
-          sh.defines = { ...(sh.defines || {}), BK_HOTEL: 1 };
+          sh.defines = { ...(sh.defines || {}), BK_HOTEL: 1, ...(marble ? { BK_MARBLE: 1 } : null) };
         }
         if (bump) sh.defines = { ...(sh.defines || {}), BK_BUMP: 1 };
         // Poolrooms : le relief des joints s'efface quand un carreau ne fait plus que quelques pixels (au loin, en
@@ -1530,7 +1531,7 @@ float bkCaust(vec2 uv, float t) {
           }
           #endif
           diffuseColor.rgb *= mix(vec3(1.0), vec3(0.78, 0.66, 0.45), stain * uDamp * uStain);
-          #ifdef BK_HOTEL
+          #if defined(BK_HOTEL) && !defined(BK_MARBLE)
           if (ny > 0.5) {
             // la moquette de l'hôtel : un chemin pâli et tassé au milieu des couloirs (loin des murs, là où l'on marche
             // depuis des décennies), aux bords irréguliers ; des taches sombres en plaques (vin, café, pire)
@@ -1937,9 +1938,14 @@ float bkCaust(vec2 uv, float t) {
     } else {
       const floorGeo = new THREE.PlaneGeometry(W * CELL_SIZE, H * CELL_SIZE, L3 ? W : 1, L3 ? H : 1);
       if (L3 && map.elevator) {
-        // l'hôtel : derrière la porte de secours, l'escalier descend ; le sol s'arrête au seuil (view/hotelCorridor.js)
-        const idx = Array.from(floorGeo.index.array);
-        idx.splice((map.elevator.gz * W + map.elevator.gx) * 6, 6);
+        // l'hôtel : derrière la porte de secours, l'escalier descend (le sol s'arrête au seuil, view/hotelCorridor.js) ;
+        // le hall a son propre sol, en marbre (view/hotelLobby.js)
+        const cut = new Set([map.elevator.gz * W + map.elevator.gx]);
+        const lb = map.lobby;
+        if (lb) for (let z = lb.z0; z <= lb.z1; z++) for (let x = lb.x0; x <= lb.x1; x++) cut.add(z * W + x);
+        const src = floorGeo.index.array;
+        const idx = [];
+        for (let i = 0; i < src.length; i++) if (!cut.has(Math.floor(i / 6))) idx.push(src[i]);
         floorGeo.setIndex(idx);
       }
       const floor = new THREE.Mesh(floorGeo, floorMat);
