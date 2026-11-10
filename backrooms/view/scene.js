@@ -4951,6 +4951,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   let focusWait = 3 + Math.random() * 4; // secondes de course avant la prochaine
   let lastExp = 1.2;
   const api = {
+    // les textures du niveau chargées (l'écran de chargement attend ça avant de montrer le nouvel étage)
+    ready: Promise.all([textures.ready, tx2 ? tx2.ready : null]).catch(() => null),
     level: map0.level || 0,
     map: map0,
     floors,
@@ -5366,8 +5368,9 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       for (const Q of sim.players) {
         if (Q === P) continue; // soi-même : plus bas (vue subjective)
         // Level 1 : l'imposteur porte le corps (la tenue, la lampe) de sa victime ; il marche là où est l'entité, lampe éteinte
+        // (le regard d'un joueur va vers -sin, -cos : l'inverse de celui de l'entité, d'où le demi-tour)
         if (Mw && Mw.mimic === Q.id && Q.status === 'dead') {
-          const D = { ...Q, status: 'alive', x: Mw.x, z: Mw.z, yaw: (Mw.yaw || 0) + Math.PI, pitch: 0, // (le regard d'un joueur va vers -sin, -cos : l'inverse de celui de l'entité) floor: Mw.floor || 0, flashlight: false, cam: false, moving: (Mw.v || 0) > 0.2, running: false, crouch: false, hidden: -1, jy: 0, tilt: 0, onLadder: false };
+          const D = { ...Q, status: 'alive', x: Mw.x, z: Mw.z, yaw: (Mw.yaw || 0) + Math.PI, pitch: 0, floor: Mw.floor || 0, flashlight: false, cam: false, moving: (Mw.v || 0) > 0.2, running: false, crouch: false, hidden: -1, jy: 0, tilt: 0, onLadder: false };
           const mv2 = floorViews[D.floor];
           avatars.update(D, true, Mw.y ?? feetY(sim.stairs, D.x, D.z, D.floor), mv2 ? mv2.lightAt(D.x, D.z) : 0.3, dt, time);
           continue;

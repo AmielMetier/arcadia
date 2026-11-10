@@ -218,6 +218,11 @@ html, body {
 .click-prompt { z-index: 40; }
 .fade b { display: block; font-weight: normal; font-size: 54px; letter-spacing: 6px; color: #f2f0e6; }
 .fade span { font-size: 24px; opacity: 0.75; }
+/* chargement d'un étage : fond noir opaque, sous-titre qui clignote comme un REC */
+.fade.loading { background: #000; opacity: 1; }
+.fade.loading span { animation: brLoadBlink 1s steps(2, start) infinite; }
+.fade.loading span::before { content: '● '; color: #d22; }
+@keyframes brLoadBlink { to { visibility: hidden; } }
 .toast {
   position: absolute;
   top: 62%;
