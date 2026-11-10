@@ -4981,6 +4981,12 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   const res = autoRes(); // résolution dynamique : commence au plus haut (borné par ce que permet l'écran)
   let qualityWas = null; // la qualité déjà appliquée au filtre (il ne retaille l'image que si elle change)
   const camState = { t: 0, night: 0, bars: 0 }; // api.cam, lu à chaque image : le même objet, remis à jour
+  // un point du monde à l'écran (x, y de 0 à 1 ; behind : derrière la caméra) : les repères des coéquipiers du viseur
+  const projV = new THREE.Vector3();
+  camState.project = (x, y, z) => {
+    projV.set(x, y, z).project(camera);
+    return { x: (projV.x + 1) / 2, y: (1 - projV.y) / 2, behind: projV.z > 1 };
+  };
   const avatarPos = new Map(); // position affichée de chaque coéquipier (sa piste interpolée)
   let focusT = 0;
   let focusPulse = 0; // temps restant de la « chasse » de mise au point en cours

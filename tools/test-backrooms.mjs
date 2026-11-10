@@ -4665,6 +4665,13 @@ test('Level 1 : le courant revenu, le monte-charge descend (plus longtemps à pl
   sim.players[0].x = sim.map.exit.x;
   sim.players[0].z = sim.map.exit.z;
   run(sim, PANEL_T + 0.2);
+  assert.equal(sim.panelHands(), 3, 'à quatre, trois paires de mains au panneau');
+  assert.ok(sim.powered === false && sim.panel < 0.3, 'seul au panneau, ça avance à peine');
+  for (const Q of sim.players.slice(1, 3)) {
+    Q.x = sim.map.exit.x;
+    Q.z = sim.map.exit.z;
+  }
+  run(sim, PANEL_T + 0.2);
   assert.equal(sim.powered, true);
   assert.ok(sim.liftCallT > LIFT_CALL_T + 10, `à quatre, ${sim.liftCallT.toFixed(0)} s d'attente`);
   assert.equal(sim.open, false);
@@ -4694,6 +4701,30 @@ test("Level 1 : le plan de l'entrepôt change avec la graine (travées, chambres
     assert.ok(m.relays.length >= 2, `graine ${sd} : au moins deux postes de disjoncteurs`);
   }
   assert.equal(plans.size, 4, [...plans].join(', '));
+});
+
+test('à plusieurs : départs vraiment séparés (hors de vue les uns des autres), pression et réserves selon le nombre', () => {
+  const six = [1, 2, 3, 4, 5, 6].map((id) => ({ id, name: 'P' + id }));
+  for (const sd of [3, 14, 42]) {
+    const sim = new BackroomsSim({ difficulty: 'peaceful', seed: sd, players: six, localId: 1 });
+    const ps = sim.players;
+    for (const p of ps) {
+      for (const q of ps) {
+        if (p === q) continue;
+        assert.ok(Math.hypot(p.x - q.x, p.z - q.z) > 9, `graine ${sd} : ${p.name} et ${q.name} pas côte à côte`);
+        assert.ok(!hasLineOfSight(sim.map, p.x, p.z, q.x, q.z), `graine ${sd} : ${p.name} ne voit pas ${q.name} au départ`);
+      }
+    }
+  }
+  // la pression : seulement à partir du Level 1, et plus forte à plusieurs
+  const crowd = (n, level) => new BackroomsSim({ difficulty: 'peaceful', seed: 4, level, players: six.slice(0, n), localId: 1 }).crowd;
+  assert.equal(crowd(4, 0), 0, 'le Level 0 ne change pas');
+  assert.equal(crowd(1, 1), 0);
+  assert.ok(crowd(2, 1) > 0 && crowd(2, 1) < crowd(4, 1));
+  assert.equal(crowd(6, 1), 1);
+  // les réserves (piles, eau d'amande) : un peu plus à six qu'à quatre
+  const kept = (n) => new BackroomsSim({ difficulty: 'peaceful', seed: 4, level: 1, players: six.slice(0, n), localId: 1 }).map.items.filter((it) => !it.taken).length;
+  assert.ok(kept(6) > kept(4), `${kept(6)} objets à six, ${kept(4)} à quatre`);
 });
 
 console.log(`\n${count} tests réussis pour The Backrooms !`);

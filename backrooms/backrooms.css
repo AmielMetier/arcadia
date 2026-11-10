@@ -809,3 +809,21 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 #intro.out { opacity: 0; pointer-events: none; }
 #intro.out video { visibility: hidden; }
 @keyframes introSkip { from { opacity: 0; } to { opacity: 1; } }
+
+/* les coéquipiers dans le viseur du caméscope : leur nom et la distance, au-dessus d'eux (ou collés au bord) */
+.cam-tag {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  font: 17px/1 'VT323', ui-monospace, monospace;
+  letter-spacing: 0.06em;
+  color: #f4f1dc;
+  background: rgba(0, 0, 0, 0.42);
+  text-shadow: 0 0 2px #000;
+  padding: 2px 6px 1px;
+  border-bottom: 2px solid rgba(244, 241, 220, 0.7);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 3;
+}
+.cam-tag.edge { border-bottom: none; opacity: 0.8; }
+.cam-tag[hidden] { display: none; }

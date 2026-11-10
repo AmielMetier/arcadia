@@ -705,6 +705,7 @@ export class BackroomsHUD {
       this.el.style.setProperty('--bx', `${bx}px`);
       this.el.classList.toggle('cam-wide', bx >= 64);
     }
+    this.teamTags(c, sim, on);
     if (!on) return;
     this.intT = (this.intT || 0) - dt;
     if (this.intT > 0) return;
@@ -721,6 +722,38 @@ export class BackroomsHUD {
     const night = (P.battery ?? 100) <= 0 ? 'NO IR' : c.night > 0.5 ? 'NIGHT' : 'AUTO';
     this.text('camNight', night);
     this.flag('camNight', 'on', night === 'NIGHT');
+  }
+
+  // Les coéquipiers dans le viseur du caméscope : un repère au-dessus de chacun (son nom, la distance) ; hors du
+  // cadre, collé au bord, une flèche de son côté. Rien pour les morts, ni hors du caméscope
+  teamTags(c, sim, on) {
+    const P = sim.player;
+    const mates = on && c.project && P.status === 'alive' ? sim.players.filter((q) => q !== P && q.status === 'alive') : [];
+    this.tagEls = this.tagEls || [];
+    while (this.tagEls.length < mates.length) {
+      const el = document.createElement('div');
+      el.className = 'cam-tag';
+      this.el.appendChild(el);
+      this.tagEls.push(el);
+    }
+    this.tagEls.forEach((el, i) => {
+      const Q = mates[i];
+      el.hidden = !Q;
+      if (!Q) return;
+      const y = 2.05 - (Q.floor || 0) * 6.4;
+      const p = c.project(Q.x, y, Q.z);
+      const d = Math.round(Math.hypot(Q.x - P.x, Q.z - P.z));
+      const other = (Q.floor || 0) !== (P.floor || 0);
+      let x = p.behind ? (p.x < 0.5 ? 1 : 0) : p.x;
+      const out = p.behind || x < 0.05 || x > 0.95 || p.y < 0.08 || p.y > 0.9;
+      x = Math.max(0.05, Math.min(0.95, x));
+      const top = out ? 0.5 : Math.max(0.1, Math.min(0.88, p.y));
+      const txt = `${out && x < 0.5 ? '◄ ' : ''}${(Q.name || 'PLAYER').toUpperCase()} · ${d}M${other ? ' · ' + ((Q.floor || 0) > (P.floor || 0) ? 'BELOW' : 'ABOVE') : ''}${out && x >= 0.5 ? ' ►' : ''}`;
+      if (el.textContent !== txt) el.textContent = txt;
+      el.style.left = `${(x * 100).toFixed(2)}%`;
+      el.style.top = `${(top * 100).toFixed(2)}%`;
+      el.classList.toggle('edge', out);
+    });
   }
 
   // le zoom de l'objectif (molette) : la barre W ─── T et le grossissement, affichés le temps de zoomer
@@ -845,7 +878,12 @@ export class BackroomsHUD {
         else if (h) text = (sim.map.fuses || []).some((f) => !f.taken && f.locker === h.id) ? 'PRESS F · SEARCH THE LOCKER · THE FUSE IS INSIDE' : 'PRESS F · HIDE IN THE LOCKER';
         else if (sim.nearKey && sim.nearKey(P)) text = 'PRESS F · TAKE THE STAIRWELL KEY';
         else if (sim.lockedDoorNear && sim.lockedDoorNear(P)) text = 'LOCKED · FIND THE STAIRWELL KEY ON THIS FLOOR';
-        else if (atPanel) text = `RESTARTING THE FREIGHT ELEVATOR… ${Math.round((sim.panel || 0) * 100)}% · STAY HERE`;
+        else if (atPanel && sim.mains) {
+          // il faut plusieurs paires de mains (voir panelHands) : combien sont là
+          const hands = sim.panelHands ? sim.panelHands() : 1;
+          const here = sim.players.filter((q) => q.status === 'alive' && q.hidden < 0 && Math.hypot(E1.x - q.x, E1.z - q.z) < 2.6).length;
+          text = `RESTARTING THE FREIGHT ELEVATOR… ${Math.round((sim.panel || 0) * 100)}%` + (here < hands ? ` · NEEDS ${hands} PEOPLE AT THE PANEL (${here}/${hands})` : ' · STAY HERE');
+        } else if (atPanel) text = 'THE PANEL IS DEAD · THE MAIN BREAKERS ARE OFF';
         else if (N && !N.ladder && nicheCas && !nicheCas.collected && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.6) text = 'THE TAPE IS TOO HIGH: YOU NEED A LADDER';
         else if (sim.level === HOTEL_LEVEL) text = this.hotelPrompt(sim, P);
         // ce qu'on tient servirait maintenant : assoiffé avec de l'eau d'amande, la lampe presque vide avec des piles

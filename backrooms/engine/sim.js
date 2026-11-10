@@ -76,6 +76,7 @@ export const VISION_CONE = 0.96; // demi-angle du regard de l'entité (55°) ; t
 export const DORMANT_T = 60; // au tout début, l'entité reste au loin une minute (on apprend à se déplacer)
 const GLIMPSE_DARK_R = 9.5; // m : le noir qui entoure son apparition (et sa disparition) : ni elle, ni sa silhouette
 export const PANEL_T = 4; // Level 1 : secondes devant le panneau du monte-charge pour le relancer (bruyant)
+export const PANEL_SHORT = 0.15; // … à qui manque des mains (voir panelHands) : presque sept fois plus long
 // Barre d'équilibre : sur une arête entre deux trous, on n'avance que tout droit et le corps tangue ; Q et D
 // corrigent. tilt va de -1 (penché à gauche) à 1 (à droite) : au bout, on tombe dans le trou de ce côté.
 export const BEAM_SPEED = 0.65; // vitesse de marche sur une arête (part de la marche normale)
@@ -259,7 +260,7 @@ const hashRnd = (...k) => {
   return ((h >>> 0) % 100000) / 100000;
 };
 // part des piles et de l'eau d'amande gardée selon le nombre de joueurs (le reste n'est jamais là)
-const KEEP_ITEMS = [0.6, 0.6, 0.72, 0.82, 0.9];
+const KEEP_ITEMS = [0.6, 0.6, 0.72, 0.82, 0.9, 0.95, 1];
 
 // les étages d'un niveau : même graine de partie, des cartes différentes par niveau
 export function makeLevelMap(level, seed) {
@@ -269,9 +270,6 @@ export function makeLevelMap(level, seed) {
   return level === 1 ? [createWarehouseMap(seed * 7 + 13)] : createLevel0(seed).floors;
 }
 
-// Départ du Level 0 à plusieurs : chacun dans son coin du dédale, à 4 à 8 cases de marche du départ (pas en vue des
-// autres, mais assez près pour s'entendre siffler), au moins 3 cases entre deux joueurs. Le tirage ne dépend que de la
-// carte : l'hôte et les invités placent tout le monde au même endroit.
 // Level 1 : le dernier fusible est rangé dans un des casiers du personnel, le plus à l'écart des deux autres (on ne le
 // trouve qu'en s'y enfermant). Le tirage ne dépend que de la carte : l'hôte et les invités le mettent au même endroit
 export function stashFuse(map) {
@@ -297,6 +295,9 @@ export function stashFuse(map) {
   f.locker = best.id;
 }
 
+// Départ du Level 0 à plusieurs : chacun dans son coin du dédale, à 5 à 16 cases de marche du départ (à moins de 38 m,
+// chacun à moins de 42 m de tous les autres : on s'entend siffler), le plus loin possible des autres et hors de leur vue. Le tirage ne dépend que de
+// la carte : l'hôte et les invités placent tout le monde au même endroit.
 export function spreadSpawns(map, n) {
   const spots = [{ x: map.spawn.x, z: map.spawn.z }];
   if (!map.dist || !map.walkable || n < 2) return spots;
@@ -314,16 +315,37 @@ export function spreadSpawns(map, n) {
     !nearCage(c) &&
     !(map.props || []).some((p) => Math.hypot(p.x - (c.x + 0.5) * CELL_SIZE, p.z - (c.z + 0.5) * CELL_SIZE) < p.r + 0.6);
   const hash = (c) => (((c.x * 73856093) ^ (c.z * 19349663) ^ (map.spawn.gx * 83492791)) >>> 0) % 1000;
+  const pos = (c) => ({ x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE });
   const cand = map.walkable.filter((c) => {
     const d = map.dist[c.z * W + c.x];
-    return d >= 4 && d <= 8 && Math.hypot(c.x - map.spawn.gx, c.z - map.spawn.gz) * CELL_SIZE < 22 && free(c);
-  }).sort((a, b) => hash(a) - hash(b));
-  const taken = [{ x: map.spawn.gx, z: map.spawn.gz }];
-  for (const c of cand) {
-    if (spots.length >= n) break;
-    if (taken.some((t) => Math.abs(t.x - c.x) + Math.abs(t.z - c.z) < 3)) continue;
-    taken.push(c);
-    spots.push({ x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE });
+    return d >= 5 && d <= 16 && Math.hypot(c.x - map.spawn.gx, c.z - map.spawn.gz) * CELL_SIZE < 38 && free(c);
+  });
+  // chacun à son tour : la case la plus éloignée de ceux déjà placés (le premier reste au départ), en pénalisant
+  // celles d'où l'on voit quelqu'un (un dédale : on doit se chercher, se héler)
+  for (let i = 1; i < n && cand.length; i++) {
+    let best = null;
+    let bs = -Infinity;
+    for (const c of cand) {
+      const p = pos(c);
+      let mn = Infinity;
+      let mx = 0;
+      let seen = 0;
+      for (const o of spots) {
+        const d = Math.hypot(o.x - p.x, o.z - p.z);
+        mn = Math.min(mn, d);
+        mx = Math.max(mx, d);
+        if (hasLineOfSight(map, o.x, o.z, p.x, p.z)) seen++;
+      }
+      if (mx >= 42) continue; // (tout le monde à portée de sifflet de tout le monde)
+      const sc = Math.min(mn, 30) - seen * 12 + hash(c) / 1000;
+      if (sc > bs) {
+        bs = sc;
+        best = c;
+      }
+    }
+    if (!best) break;
+    spots.push(pos(best));
+    cand.splice(cand.indexOf(best), 1);
   }
   return spots;
 }
@@ -559,6 +581,8 @@ export class BackroomsSim {
     this.hunt = false; // … et l'entité traque l'équipe sans la lâcher
     this.panel = 0; // Level 1 : avancée du redémarrage du monte-charge (0 à 1)
     this.panelNoiseT = 0;
+    // à plusieurs, à partir du Level 1, elle presse davantage (répits, embuscades, gaines, coupures) : 0 seul, 1 à 4 et plus
+    this.crowd = level >= 1 ? Math.min(1, Math.max(0, (this.roster.length - 1) / 3)) : 0;
     this.relayNeed = level === 1 ? Math.min((this.map.relays || []).length, this.roster.length >= 3 ? 3 : 2) : 0;
     this.mains = !this.relayNeed; // Level 1 : les disjoncteurs généraux tenus ensemble (le courant arrive au panneau)
     for (const r of this.map.relays || []) r.on = 0;
@@ -1648,7 +1672,7 @@ export class BackroomsSim {
       if (T.landT > 0) return;
       M.duct = null;
       M.silent = false;
-      M.ductCD = rand(...DUCT_CD);
+      M.ductCD = rand(...DUCT_CD) * (1 - 0.3 * (this.crowd || 0));
       M.mode = 'search';
       M.lastSeenX = P.x;
       M.lastSeenZ = P.z;
@@ -2078,7 +2102,7 @@ export class BackroomsSim {
         this.blackout -= DT;
         if (this.blackout <= 0) {
           this.blackout = 0;
-          this.nextBlackout = rand(...(L2 ? PIPES_BLACKOUT_EVERY : BLACKOUT_EVERY));
+          this.nextBlackout = rand(...(L2 ? PIPES_BLACKOUT_EVERY : BLACKOUT_EVERY)) * (1 - 0.2 * (this.crowd || 0));
           this.map.dark = false;
           this.emit({ type: 'power' });
         }
@@ -2732,7 +2756,7 @@ export class BackroomsSim {
     if (C.t < C.len) return;
     this.restoreLights();
     this.cut = null;
-    this.nextBlackout = rand(...BLACKOUT_EVERY);
+    this.nextBlackout = rand(...BLACKOUT_EVERY) * (1 - 0.2 * (this.crowd || 0));
     this.emit({ type: 'power', kind: C.kind });
   }
 
@@ -2841,13 +2865,22 @@ export class BackroomsSim {
     this.emit({ type: 'exitUnlocked' });
   }
 
+  // combien de mains pour relancer le monte-charge : 1 seul, 2 à deux ou trois, 3 à partir de quatre (selon les vivants)
+  panelHands() {
+    const alive = this.players.filter((P) => P.status === 'alive').length;
+    return alive >= 4 ? 3 : alive >= 2 ? 2 : 1;
+  }
+
   updatePanel() {
     if (this.powered || (this.delivered || 0) < FUSES || !this.mains) return;
     const E = this.map.exit;
     const near = this.players.filter((P) => P.status === 'alive' && P.hidden < 0 && Math.hypot(E.x - P.x, E.z - P.z) < 2.6);
     if (near.length) {
-      if (this.panel === 0) this.emit({ type: 'panelStart', by: near[0].id, x: E.x, z: E.z });
-      this.panel = Math.min(1, this.panel + (DT / PANEL_T) * (near.length > 1 ? 1.5 : 1));
+      if (this.panel === 0) this.emit({ type: 'panelStart', by: near[0].id, x: E.x, z: E.z, hands: this.panelHands() });
+      // il faut panelHands() personnes au panneau (l'un tient le levier, l'autre le bouton…) : moins, ça avance à peine
+      const hands = this.panelHands();
+      const rate = near.length >= hands ? (near.length > hands ? 1.5 : 1) : PANEL_SHORT;
+      this.panel = Math.min(1, this.panel + (DT / PANEL_T) * rate);
       this.panelNoiseT -= DT;
       if (this.panelNoiseT <= 0) {
         this.panelNoiseT = 1.5;
@@ -3803,7 +3836,7 @@ export class BackroomsSim {
         M.lastSeenZ = P.z;
         M.lastSeenF = P.floor || 0;
         M.repathT = 0;
-        M.ambushT = (rand(14, 22) * (1 - rage * 0.5)) / (this.level === 0 ? L0_AGGRO : 1);
+        M.ambushT = (rand(14, 22) * (1 - rage * 0.5) * (1 - 0.3 * (this.crowd || 0))) / (this.level === 0 ? L0_AGGRO : 1);
       } else if (atSpot) {
         M.path = [];
       }
