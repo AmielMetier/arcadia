@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 5.38 — 10 novembre 2026
+- **The Backrooms** — Le Terror Hotel (Level 5) change de matières, dans les couloirs comme dans les chambres :
+  - Un vrai papier peint damassé lie-de-vin, ton sur ton et en léger relief, avec ses lés, son grain et ses taches ; plus sombre sous la corniche, patiné au-dessus de la cimaise.
+  - Un lambris en noyer verni à panneaux biseautés, qui brille sous les appliques et la lampe torche, avec sa cimaise et sa plinthe.
+  - Une corniche et un plafond en plâtre crème, jaunis par les années.
+  - Une moquette en velours rouge à motif Art déco (losanges et éventails or, pastilles vertes), usée et pâlie au milieu des couloirs, tachée par endroits.
+
 ## 5.37 — 10 novembre 2026
 - **The Backrooms** — Les Poolrooms (Level 37) rattrapent le réalisme des Level 0 et 1.
   - Plus rien à ramasser : les trois toboggans sont ouverts dès l'arrivée, il suffit d'en trouver un dans le dédale. L'entité, elle, s'enhardit à mesure qu'on erre.

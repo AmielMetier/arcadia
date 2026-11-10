@@ -1155,7 +1155,8 @@ float occVis(vec3 p, vec3 lp) {
     };
 
     const baked = (mat, opts = null) => {
-      const spec = (PIPES || L2) && opts && opts.spec > 0;
+      const spec = (PIPES || L2 || L3) && opts && opts.spec > 0;
+      const hotel = L3 && opts && opts.hotel; // Level 5 : le vernis du lambris (carte de brillance), l'usure de la moquette
       // Poolrooms : carrelage émaillé (joints, reflets de la salle, reflets de l'eau) ; pool : 'floor' (le sol, qui
       // reflète les dalles lumineuses), 'wall', 'ceil', 'bottom' (sous l'eau)
       const pool = L2 && opts && opts.pool;
@@ -1169,7 +1170,7 @@ float occVis(vec3 p, vec3 lp) {
       const bump = L1 && opts && opts.bump; // Level 1 : un relief (les joints des parpaings) que prennent aussi les feux de couleur
       const wall1 = L1 && opts && opts.wall1; // les murs du Level 1 : la poussière et la suie sous le plafond
       const push = opts && opts.push; // les murs en biais : la lumière lue un peu devant eux, dans le couloir (pas au coin des cases)
-      if (spec || PIPES || base || EDGE || SEGS || film || gloss || DYN || push || pool) mat.customProgramCacheKey = () => 'bk' + (pool ? '-pool-' + pool : '') + (push ? '-push' : '') + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE || SEGS ? '-edge' : '') + (film ? '-film' : '') + (gloss ? '-gloss' : '') + (DYN ? '-dyn' : '') + (bump ? '-bump' : '') + (wall1 ? '-wall1' : '');
+      if (spec || PIPES || base || EDGE || SEGS || film || gloss || DYN || push || pool || hotel) mat.customProgramCacheKey = () => 'bk' + (hotel ? '-hotel' : '') + (pool ? '-pool-' + pool : '') + (push ? '-push' : '') + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE || SEGS ? '-edge' : '') + (film ? '-film' : '') + (gloss ? '-gloss' : '') + (DYN ? '-dyn' : '') + (bump ? '-bump' : '') + (wall1 ? '-wall1' : '');
       mat.onBeforeCompile = (sh) => {
         Object.assign(sh.uniforms, bakeUniforms);
         if (DYN) {
@@ -1194,6 +1195,7 @@ float occVis(vec3 p, vec3 lp) {
           sh.defines = { ...(sh.defines || {}), BK_POOL: 1, ...(pool === 'floor' ? { BK_POOLFLOOR: 1 } : pool === 'wall' ? { BK_POOLWALL: 1 } : pool === 'ceil' ? { BK_POOLCEIL: 1 } : null) };
         }
         if (grime) sh.defines = { ...(sh.defines || {}), BK_GRIME: 1 };
+        if (hotel) sh.defines = { ...(sh.defines || {}), BK_HOTEL: 1 };
         if (bump) sh.defines = { ...(sh.defines || {}), BK_BUMP: 1 };
         // Poolrooms : le relief des joints s'efface quand un carreau ne fait plus que quelques pixels (au loin, en
         // rasant) ; sinon sa pente, prise d'un pixel à l'autre, crénelle les joints en pointillés qui scintillent
@@ -1523,6 +1525,18 @@ float bkCaust(vec2 uv, float t) {
           }
           #endif
           diffuseColor.rgb *= mix(vec3(1.0), vec3(0.78, 0.66, 0.45), stain * uDamp * uStain);
+          #ifdef BK_HOTEL
+          if (ny > 0.5) {
+            // la moquette de l'hôtel : un chemin pâli et tassé au milieu des couloirs (loin des murs, là où l'on marche
+            // depuis des décennies), aux bords irréguliers ; des taches sombres en plaques (vin, café, pire)
+            float hLane = smoothstep(0.86, 0.99, bk.g) * smoothstep(0.25, 0.65, bkFbm(vBakeP.xz * 0.55 + 17.0));
+            vec3 hGrey = vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11)));
+            diffuseColor.rgb = mix(diffuseColor.rgb, mix(hGrey, diffuseColor.rgb, 0.5) * vec3(1.42, 1.28, 1.16), hLane * 0.75);
+            vec2 hq = vBakeP.xz * 0.6 + 4.0;
+            float hSpot = bkFbmW(hq + (vec2(bkFbmW(hq * 2.7 + 1.0), bkFbmW(hq * 2.7 + 6.0)) - 0.5) * 0.9);
+            diffuseColor.rgb *= mix(1.0, 0.55, smoothstep(0.7, 0.76, hSpot));
+          }
+          #endif
           #ifdef BK_BASE
           // la plinthe : une bande de bois peint brun-jaune, un peu plus claire sur son arête du haut
           if (abs(ny) < 0.5 && by < 0.105) {
@@ -1761,6 +1775,9 @@ float bkCaust(vec2 uv, float t) {
             #endif
             // le sol : plus luisant là où il est humide, mat là où la poussière s'est déposée
             if (ny > 0.5) sm *= 0.45 + wet * 1.3 + bkFbm(vBakeP.xz * 0.6 + 3.0) * 0.5;
+            #ifdef BK_HOTEL
+            sm *= specularStrength; // l'hôtel : le noyer verni brille, le papier peint presque pas
+            #endif
             // pas de reflet là où aucune lampe n'éclaire (un mur caché derrière un angle)
             sm *= mix(0.25, 1.0, smoothstep(0.0, 0.12, bk.r + bk.b));
             vec3 sAcc = vec3(0.0);
@@ -1803,7 +1820,7 @@ float bkCaust(vec2 uv, float t) {
     });
     const floorMat = PIPES
       ? baked(new THREE.MeshPhongMaterial({ map: carpet, specular: '#3a342a', shininess: 70 }), { spec: 1.05, gloss: 1100 })
-      : baked(new THREE.MeshLambertMaterial({ map: carpet, ...(L0 ? { bumpMap: relief(carpet), bumpScale: 1.4 } : null) }), L0 ? { film: 1 } : L1 ? { gloss: 1 } : null);
+      : baked(new THREE.MeshLambertMaterial({ map: carpet, ...(L0 ? { bumpMap: relief(carpet), bumpScale: 1.4 } : L3 ? { bumpMap: relief(carpet), bumpScale: 1.1 } : null) }), L0 ? { film: 1 } : L1 ? { gloss: 1 } : L3 ? { hotel: 1 } : null);
     const holes = holesOf(map);
     if (holes.length) {
       floorMat.alphaMap = holeMask(W, H, holes, true);
@@ -2018,6 +2035,8 @@ float bkCaust(vec2 uv, float t) {
       // (Level 1 : le relief des parpaings, et la crasse du haut des murs)
       // Poolrooms : la mosaïque émaillée, en relief, qui brille sous les dalles (voir tileRelief et BK_POOL)
       if (L2) wallMat = baked(new THREE.MeshPhongMaterial({ map: textures.wall, bumpMap: tileRelief(textures.wall), bumpScale: 1.2, specular: '#2c3537', shininess: 70 }), { pool: 'wall', spec: 0.22, gloss: 140 });
+      // Level 5 : le damas en relief, le lambris de noyer verni qui brille sous les appliques et la lampe torche
+      else if (L3) wallMat = baked(new THREE.MeshPhongMaterial({ map: textures.wall, bumpMap: textures.wallBump, bumpScale: 1.5, specularMap: textures.wallSpec, specular: '#5a4636', shininess: 38 }), { spec: 0.55, gloss: 45, mask: 0, hotel: 1 });
       else wallMat = baked(new THREE.MeshLambertMaterial({ map: L0 && fi === 1 ? textures.wallLow : textures.wall, ...(L1 && textures.wallBump ? { bumpMap: textures.wallBump, bumpScale: 1.6 } : L0 ? { bumpMap: relief(fi === 1 ? textures.wallLow : textures.wall), bumpScale: 1.0 } : null) }), L0 ? { base: true } : L1 ? { bump: !!textures.wallBump, wall1: true } : null);
       const wallsMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(CELL_SIZE, CEIL + SUNK, CELL_SIZE), wallMat, wallCount);
       // le mur percé du trou de la cassette perchée se construit à part (6b)
@@ -4544,11 +4563,11 @@ void main() {
         }
 
         // Level 2 : les lampes qui se reflètent dans le carrelage et le sol ciré (les plus proches que l'on voit)
-        if (PIPES || L2) {
+        if (PIPES || L2 || L3) {
           const cand = [];
           for (const l of map.lights) {
-            const k = power && l.state !== 'off' ? (l.k ?? 1) : 0;
-            if (k <= 0 || l.hidden) continue;
+            const k = power && l.state !== 'off' && !(L3 && sim.blackout > 0) ? (l.k ?? 1) * (l.state === 'flicker' ? 0.6 : 1) : 0;
+            if (k <= 0 || (l.hidden && !L3)) continue; // (l'hôtel : les appliques n'ont pas de plafonnier, mais brillent)
             const d = Math.abs(l.x - P.x) + Math.abs(l.z - P.z);
             if (d < 32) cand.push([d, l, k]);
           }
@@ -4559,6 +4578,7 @@ void main() {
             if (d > 4 && !hasLineOfSight(map, P.x, P.z, l.x, l.z)) continue;
             lampU.uLampPos.value[n].set(l.x, l.y + group.position.y, l.z);
             if (L2) lampU.uLampCol.value[n].set(0.95, 1.0, 1.02).multiplyScalar(1.2 * k * (l.fs || 1));
+            else if (L3) lampU.uLampCol.value[n].set(1.0, 0.68, 0.38).multiplyScalar((l.lamp ? 0.8 : 1.6) * k);
             else if (l.kind === 'tube') lampU.uLampCol.value[n].set(0.75, 0.88, 1.0).multiplyScalar(k);
             else lampU.uLampCol.value[n].set(1.0, 0.7, 0.4).multiplyScalar(1.5 * k);
             n++;
