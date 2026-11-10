@@ -39,9 +39,9 @@ THREE.ShaderChunk.lights_pars_begin = THREE.ShaderChunk.lights_pars_begin.replac
 );
 const MODELS = new URL('../models/', import.meta.url).href; // modèles Poly Haven (CC0), voir models/LICENSE.txt
 import { vault } from './vault.js';
-const VIP = { get img() { return vault.entite || ''; } }; // photo brouillée dans data/ (vault.js)
+const VIP = { get img() { return vault.entite || ''; } }; // photo chiffrée dans data/ (vault.js)
 // L'entité du Level 1 : une vidéo détourée, découpée en planche d'images (12 par seconde, 16 par rangée) jouée en boucle
-const VIP_ANIM = { get url() { return vault.david || ''; }, frames: 119, cols: 16, rows: 8, fps: 12, aspect: 246 / 400, tint: '#463e37', vip: true };
+const VIP_ANIM = { get url() { return vault.level1 || ''; }, frames: 119, cols: 16, rows: 8, fps: 12, aspect: 246 / 400, tint: '#463e37', vip: true };
 // mode normal : l'entité classique dessinée dans le code ; mode VIP : les monstres d'origine (réservés, choisis par l'hôte)
 export let ENTITY_IMG = classicEntity().img;
 export let ENTITY_ANIM = classicEntity().anim;

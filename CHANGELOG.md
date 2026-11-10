@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.31 — 10 novembre 2026
+- **The Backrooms** — Le mode VIP se déverrouille avec une phrase secrète :
+  - L'hôte la tape une fois en lançant une partie VIP ; son navigateur s'en souvient et ses invités n'ont rien à taper.
+  - Sans la phrase (ou avec « Play classic »), la partie se joue avec les monstres, la voix et l'intro classiques.
+  - La voix qui appelle au Level 1 et la photo du bouc sont désormais réservées au mode VIP.
+
 ## 5.30 — 10 novembre 2026
 - **The Backrooms** — Nouvelle vidéo d'intro en mode VIP, avec le son.
 

@@ -7,9 +7,7 @@ import { BackroomsSfx } from './view/sfx.js';
 import { createVoice } from './view/voice.js';
 import { BackroomsHUD, levelName, levelSub, LORE, loreOf, hearTape, tapesHeard, store, NOTES, readNote, loreComplete, FINAL_LORE } from './view/hud.js';
 import { parseWords } from './engine/hotel.js';
-import { vaultReady } from './view/vault.js';
-// les photos des monstres sont décodées avant de construire la scène et l'interface
-await vaultReady;
+import { vault, vaultOpen, vaultKey, openVault, storedKey, rememberKey, keyFromPhrase } from './view/vault.js';
 
 // Level 5, version VIP : les mots du fichier backrooms/password_level5/mots.txt (6 lettres, un par ligne) ; sans
 // fichier (ou sans mot valide), la liste standard
@@ -32,7 +30,7 @@ let scene = null;
 let sfx = null;
 let hud = null;
 let stepDist = 0;
-let khaoulaT = 6; // prochaine fois que Khaoula se fait entendre (Level 1)
+let callT = 6; // prochaine fois que la voix qui appelle se fait entendre (Level 1, mode VIP)
 let letterN = 0; // lettres ramassées à l'hôtel (pour le registre)
 let monsterStepT = 0; // sans entité animée (mode VIP du Level 1) : le prochain pas, à la minuterie
 // l'entité entendue comme un joueur : ce qui la sépare de l'oreille (occ, détour par les couloirs) et l'espace autour
@@ -261,7 +259,7 @@ try {
   kbMode = localStorage.getItem('backrooms_kb') === '1';
 } catch (e) {}
 
-// L'intro, au premier lancement d'une partie au Level 0 : le vlog d'urbex au caméscope où Safia tombe dans une trappe,
+// L'intro, au premier lancement d'une partie au Level 0 : le vlog d'urbex au caméscope où l'exploratrice tombe dans une trappe,
 // et le groupe saute le rejoindre. La partie reste en pause derrière ; Espace ou Entrée la passe.
 let intro = null; // { el, video, pending } pendant qu'elle passe
 let introRun = -1; // la partie dont on a déjà vu l'intro
@@ -269,8 +267,8 @@ function playIntro() {
   introRun = NET.run;
   const el = document.createElement('div');
   el.id = 'intro';
-  // le mode VIP a la version sous-titrée ; le mode normal, l'image seule
-  el.innerHTML = `<video src="video/${monstersVip ? 'intro_vip' : 'intro'}.mp4" playsinline preload="auto"></video><div class="skip">SPACE · SKIP</div>`;
+  // le mode VIP a la version sous-titrée (déchiffrée du coffre) ; le mode normal, l'image seule
+  el.innerHTML = `<video src="${monstersVip && vault.intro ? vault.intro : 'video/intro.mp4'}" playsinline preload="auto"></video><div class="skip">SPACE · SKIP</div>`;
   document.body.appendChild(el);
   const video = el.querySelector('video');
   intro = { el, video, pending: false };
@@ -668,10 +666,45 @@ function stepKind(P) {
 }
 
 let lastSettings = {};
+// Mode VIP : les monstres d'origine sont dans un coffre chiffré (view/vault.js). Avant la première partie VIP, l'hôte
+// l'ouvre : avec la clé gardée par son navigateur, sinon avec la phrase secrète qu'on lui demande. Une seule fois par
+// page ; s'il passe (ou sans la bonne phrase), les parties gardent les monstres, la voix et l'intro classiques.
+let vipGate = null; // null : pas encore essayé ; une promesse pendant l'ouverture ; true une fois tranché
+async function unlockVip() {
+  const kept = storedKey();
+  if (kept) {
+    const r = await openVault(kept);
+    if (r === 'ok') return true;
+    if (r === 'wrong') rememberKey(''); // une clé qui n'ouvre plus le coffre (il a été rechiffré)
+  }
+  if (document.pointerLockElement) document.exitPointerLock?.();
+  return hud.askPhrase(async (phrase) => {
+    const k = await keyFromPhrase(phrase);
+    if (!k) return k === '' ? false : null; // '' : pas la bonne phrase ; null : coffre introuvable
+    const r = await openVault(k);
+    if (r !== 'ok') return r === 'wrong' ? false : null;
+    rememberKey(k);
+    return true;
+  });
+}
 // Nouvelle partie (solo ou hôte) : l'hôte l'annonce aux invités, qui construisent la même carte avec la même graine
 function initGame(settings = lastSettings, forceLevel = null) {
   lastSettings = settings;
   if (NET.role === 'guest') return; // l'invité attend le « go » de l'hôte
+  // ?vip (seul) : le mode VIP sans passer par le salon (la phrase reste demandée)
+  if (NET.role === 'solo' && /[?&]vip(&|=|$)/.test(location.search)) settings = { ...settings, monsters: 'vip' };
+  if (settings.monsters === 'vip' && !vaultOpen() && vipGate !== true) {
+    if (!vipGate) {
+      vipGate = unlockVip()
+        .catch(() => false)
+        .then((ok) => {
+          vipGate = true;
+          if (!ok && hud) hud.toast('VIP MODE LOCKED · CLASSIC MONSTERS', 6);
+          if (NET.role !== 'guest') initGame(lastSettings, forceLevel);
+        });
+    }
+    return;
+  }
   // ?seed=1234 (seul) : toujours la même carte, pour comparer deux réglages
   const sm = NET.role === 'solo' && location.search.match(/[?&]seed=(\d+)/);
   const daily = settings.map === 'daily' && !sm ? dailyOf() : null;
@@ -756,7 +789,8 @@ function checkPrint(fp) {
   send(H.info.hostId, { t: 'fp', v: GAME_V, tried: triedUpdate(GAME_V) ? 1 : 0 });
 }
 
-const goMessage = () => ({ t: 'go', v: GAME_V, run: NET.run, seed: sim.seed, diff: sim.difficulty, players: sim.roster, lv: sim.level, vip: monstersVip, dy: dailyLabel });
+// en mode VIP, la clé du coffre part avec la partie : les invités l'ouvrent avant de la commencer
+const goMessage = () => ({ t: 'go', v: GAME_V, run: NET.run, seed: sim.seed, diff: sim.difficulty, players: sim.roster, lv: sim.level, vip: monstersVip, k: monstersVip ? vaultKey : undefined, dy: dailyLabel });
 
 let monstersVip = false;
 const TEST_BOT = 99;
@@ -782,7 +816,7 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   NET.run = run;
   camPrev.ok = false;
   trackSeq.clear();
-  monstersVip = !!vip;
+  monstersVip = !!vip && vaultOpen(); // sans coffre ouvert, les monstres classiques
   setMonsterMode(monstersVip); // les monstres VIP pour toute la partie si l'hôte les a choisis
   if (hud) hud.applyMonsters();
   if (sfx) sfx.setVoiceMode(monstersVip);
@@ -940,9 +974,22 @@ function onMsg(from, m) {
   NET.lastHost = performance.now();
   if (m.t === 'go') {
     hostV = typeof m.v === 'string' ? m.v.slice(0, 8) : '';
-    if (m.run !== NET.run || !sim) {
-      dailyLabel = typeof m.dy === 'string' ? m.dy.slice(0, 12) : null;
-      startRun({ seed: m.seed, difficulty: m.diff, players: m.players || [], run: m.run, level: m.lv || 0, vip: !!m.vip });
+    if ((m.run !== NET.run || !sim) && !(NET.goWait && NET.goRun === m.run)) {
+      // en mode VIP, on ouvre d'abord le coffre avec la clé de l'hôte (sans elle, ou si elle n'ouvre rien : les monstres
+      // classiques) ; les « go » répétés de la même partie attendent pendant ce temps
+      NET.goRun = m.run;
+      const go = (vip) => {
+        if (NET.goRun !== m.run) return; // une autre partie est arrivée entre-temps
+        NET.goWait = false;
+        if (m.run === NET.run && sim) return;
+        dailyLabel = typeof m.dy === 'string' ? m.dy.slice(0, 12) : null;
+        startRun({ seed: m.seed, difficulty: m.diff, players: m.players || [], run: m.run, level: m.lv || 0, vip });
+      };
+      if (!m.vip) go(false);
+      else {
+        NET.goWait = true;
+        openVault(typeof m.k === 'string' ? m.k.slice(0, 64) : '').then((r) => go(r === 'ok'), () => go(false));
+      }
     }
   } else if (m.t === 's' && m.run !== NET.run) {
     // une partie que l'on n'a pas (le « go » de l'hôte s'est perdu, une nouvelle partie a commencé sans nous) : on la
@@ -2196,13 +2243,14 @@ function frame(currentTime) {
     // Level 2 : pas de bourdonnement d'entité, les sabots du troupeau
     sfx.updateMonsterSound(sim.goats || M.away ? 0 : M.danger, M, sim.level === 1 || sim.level === 2, occl); // Poolrooms : la voix de l'entité du Level 1
     sfx.updateChase(chasing, M.danger, M, occl);
-    // Level 1 : Khaoula se fait entendre quand elle est proche (de temps en temps) et pendant la poursuite (plus souvent)
-    if (sim.level === 1 && !M.away && !paused) {
-      khaoulaT -= delta;
-      if (khaoulaT <= 0 && (chasing || M.danger > 0.35)) {
-        sfx.khaoula();
-        khaoulaT = chasing ? 7 + Math.random() * 6 : 18 + Math.random() * 20;
-      } else if (khaoulaT <= 0) khaoulaT = 2;
+    // Level 1, mode VIP : la voix qui appelle se fait entendre quand l'entité est proche (de temps en temps) et pendant
+    // la poursuite (plus souvent)
+    if (sim.level === 1 && monstersVip && !M.away && !paused) {
+      callT -= delta;
+      if (callT <= 0 && (chasing || M.danger > 0.35)) {
+        sfx.level1Voice();
+        callT = chasing ? 7 + Math.random() * 6 : 18 + Math.random() * 20;
+      } else if (callT <= 0) callT = 2;
     }
     // la musique de tension suit le directeur (la peur de l'équipe) et ce que fait l'entité
     const D = sim.director;

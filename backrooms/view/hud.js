@@ -1,5 +1,5 @@
 // The Backrooms - Interface façon caméscope (REC, signal, bande), jumpscare et écran de fin
-import { ENTITY_IMG, ENTITY_ANIM } from './scene.js';
+import { ENTITY_IMG, ENTITY_ANIM, ENTITY_VIP } from './scene.js';
 import { DEPART_T, PIPES_LEVEL, CASSETTES, NOISE, VOICE_MIN, THIRST_BLUR, INV_SIZE, HOTEL_LEVEL } from '../engine/sim.js';
 
 import { vault } from './vault.js';
@@ -52,8 +52,8 @@ export function hearTape(i) {
 }
 export { store };
 
-// Les écrits des autres niveaux : ce qu'on trouve avec les fusibles (Level 1, Khaoula), les volants de vanne
-// (Poolrooms, St Didier Auroux), les vannes (Pipe Dreams, Teo le bouc) et les lettres (Terror Hotel, le registre).
+// Les écrits des autres niveaux : ce qu'on trouve avec les fusibles (Level 1), les volants de vanne (Poolrooms), les
+// vannes (Pipe Dreams, le bouc) et les lettres (Terror Hotel, le registre).
 // Un par objet ramassé, dans un ordre qui dépend de la graine ; ceux qu'on a lus restent dans la collection.
 export const NOTES = {
   1: { tag: 'SCRAWLED NOTE', list: [
@@ -106,9 +106,9 @@ export class BackroomsHUD {
       <div class="jumpscare-overlay" id="jumpscareOverlay" hidden><img id="scareImg" alt=""><div class="scare-anim" id="scareAnim" hidden></div></div>
       <div class="goat-death" id="goatDeath" hidden>
         <div class="gd-pic" id="gdImg">
-          <img class="gd-img" src="${vault.bouc || ''}" alt="">
-          <img class="gd-img gd-red" src="${vault.bouc || ''}" alt="">
-          <img class="gd-img gd-cyan" src="${vault.bouc || ''}" alt="">
+          <img class="gd-img" alt="" hidden>
+          <img class="gd-img gd-red" alt="" hidden>
+          <img class="gd-img gd-cyan" alt="" hidden>
           <div class="gd-grain" id="gdGrain"></div>
         </div>
         <div class="gd-vignette"></div>
@@ -1005,6 +1005,53 @@ export class BackroomsHUD {
     this.toastT = secs;
   }
 
+  // Mode VIP, avant la partie : la phrase secrète du coffre, demandée à l'hôte par-dessus le jeu. tryPhrase(phrase)
+  // rend true (coffre ouvert), false (pas la bonne phrase) ou null (coffre introuvable). Se résout en true (ouvert) ou
+  // false (l'hôte joue avec les monstres classiques).
+  askPhrase(tryPhrase) {
+    return new Promise((resolve) => {
+      const el = document.createElement('div');
+      el.className = 'vip-gate';
+      el.innerHTML = `<form class="vip-box" autocomplete="off">
+          <div class="vip-title">⭐ VIP MODE</div>
+          <div class="vip-sub">ENTER THE PASSPHRASE TO UNLOCK THE ORIGINAL MONSTERS</div>
+          <input class="vip-input" type="password" name="vip-phrase" autocomplete="off" spellcheck="false" aria-label="VIP passphrase">
+          <div class="vip-msg" role="status"></div>
+          <div class="vip-btns"><button type="submit" class="vip-go">UNLOCK</button><button type="button" class="vip-skip">PLAY CLASSIC</button></div>
+        </form>`;
+      document.body.appendChild(el);
+      const form = el.querySelector('form');
+      const input = el.querySelector('input');
+      const msg = el.querySelector('.vip-msg');
+      let busy = false;
+      const done = (ok) => {
+        el.remove();
+        resolve(ok);
+      };
+      // le jeu n'entend rien de ce qui se tape ou se clique ici
+      for (const t of ['keydown', 'keyup', 'pointerdown', 'click', 'wheel']) el.addEventListener(t, (e) => e.stopPropagation());
+      el.addEventListener('keydown', (e) => {
+        if (e.code === 'Escape' && !busy) done(false);
+      });
+      el.querySelector('.vip-skip').addEventListener('click', () => !busy && done(false));
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (busy || !input.value.trim()) return;
+        busy = true;
+        el.classList.add('busy');
+        msg.textContent = 'CHECKING…';
+        const r = await Promise.resolve(tryPhrase(input.value)).catch(() => null);
+        busy = false;
+        el.classList.remove('busy');
+        if (r) return done(true);
+        input.value = '';
+        input.focus();
+        msg.textContent = r === false ? 'WRONG PASSPHRASE' : "CAN'T REACH THE VAULT · TRY AGAIN";
+      });
+      setTimeout(() => input.focus(), 0);
+    });
+  }
+
   // images du screamer selon le mode (normal / VIP) : à rappeler quand l'hôte lance une partie
   applyMonsters() {
     const img = this.$('#scareImg');
@@ -1015,6 +1062,13 @@ export class BackroomsHUD {
     anim.style.backgroundImage = `url("${A.url}")`;
     anim.style.backgroundSize = `${A.cols * 100}% ${A.rows * 100}%`;
     anim.style.aspectRatio = String(A.aspect);
+    // le bouc (Level 2) : sa photo en mode VIP (coffre ouvert) ; sinon le noir et le grain seuls
+    const bouc = ENTITY_VIP ? vault.bouc || '' : '';
+    for (const g of this.el.querySelectorAll('.gd-img')) {
+      if (bouc) g.src = bouc;
+      else g.removeAttribute('src');
+      g.hidden = !bouc;
+    }
   }
 
   // level : le screamer est celui de l'entité du level en cours

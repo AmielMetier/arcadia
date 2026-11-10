@@ -4945,4 +4945,111 @@ test('Level 1 : l\'imposteur — après une victime, l\'entité prend son appare
   assert.ok(why === 'light' || why === 'near', `dans la lampe, elle se démasque (${why})`);
 });
 
+
+// Le coffre du mode VIP (view/vault.js) : AES-GCM, clé tirée d'une phrase secrète (PBKDF2). Un coffre de test en
+// mémoire, chiffré avec une phrase de test ; puis le vrai coffre du dépôt, qui doit refuser une mauvaise phrase (et
+// s'ouvrir avec la bonne si on la donne : BACKROOMS_VIP='…' node tools/test-backrooms.mjs).
+{
+  const V = await import('../backrooms/view/vault.js');
+  const { resolveObjectURL } = await import('node:buffer');
+  const { execFileSync } = await import('node:child_process');
+  const atest = async (name, fn) => {
+    try {
+      await fn();
+      count++;
+      console.log('✓', name);
+    } catch (err) {
+      console.error('✗', name);
+      throw err;
+    }
+  };
+  const bytes = (b) => Buffer.from(b);
+
+  await atest('coffre VIP : déchiffrement correct, mauvaise phrase refusée, repli sans phrase', async () => {
+    const key = await V.deriveKey('  une phrase de test  ');
+    const files = new Map([[V.CHECK, await V.seal(key, new TextEncoder().encode(V.CHECK_TEXT))]]);
+    const orig = {};
+    for (const [name, [file]] of Object.entries(V.VAULT_FILES)) {
+      orig[name] = crypto.getRandomValues(new Uint8Array(2000 + name.length));
+      files.set(file, await V.seal(key, orig[name]));
+    }
+    const load = async (f) => {
+      if (!files.has(f)) throw new Error(`${f} absent`);
+      return files.get(f);
+    };
+    // chiffré : l'en-tête, un IV neuf à chaque fois, rien du contenu d'origine
+    const sealed = files.get(V.VAULT_FILES.entite[0]);
+    assert.ok(V.isSealed(sealed) && !V.isSealed(orig.entite), 'en-tête du coffre');
+    const again = await V.seal(key, orig.entite);
+    assert.notDeepEqual(bytes(again.subarray(4, 16)), bytes(sealed.subarray(4, 16)), 'IV tiré à chaque chiffrement');
+    assert.equal(bytes(sealed).indexOf(bytes(orig.entite.subarray(0, 16))), -1, 'pas le contenu en clair');
+    // déchiffrement correct, avec la phrase (espaces autour et forme Unicode ne comptent pas)
+    assert.deepEqual(bytes(await V.unseal(key, sealed)), bytes(orig.entite));
+    const k = await V.keyFromPhrase('une phrase de test', load);
+    assert.ok(typeof k === 'string' && k.length === 44, 'la clé, en base64');
+    assert.equal(await V.exportKey(await V.deriveKey('été'.normalize('NFD'))), await V.exportKey(await V.deriveKey('été')), 'même phrase, autre forme Unicode');
+    // mauvaise phrase, fichier abîmé : refusés
+    const bad = await V.deriveKey('pas la bonne phrase');
+    assert.equal(await V.keyFromPhrase('pas la bonne phrase', load), '', 'mauvaise phrase refusée');
+    assert.equal(await V.keyFromPhrase('   ', load), '', 'phrase vide');
+    await assert.rejects(V.unseal(bad, sealed), 'mauvaise clé : le déchiffrement échoue');
+    const torn = sealed.slice();
+    torn[40] ^= 1;
+    await assert.rejects(V.unseal(key, torn), 'un octet changé : refusé');
+    await assert.rejects(V.unseal(key, orig.entite), "un fichier qui n'est pas du coffre");
+    // repli : sans phrase (ou avec une mauvaise clé), le coffre reste fermé et le jeu garde les monstres classiques
+    assert.equal(V.vaultOpen(), false);
+    assert.equal(await V.openVault('', load), 'wrong');
+    assert.equal(await V.openVault(null, load), 'wrong');
+    assert.equal(await V.openVault('pas-du-base64!', load), 'wrong');
+    assert.equal(await V.openVault(await V.exportKey(bad), load), 'wrong');
+    assert.equal(await V.openVault(k, async () => { throw new Error('réseau'); }), 'error', 'coffre introuvable');
+    assert.equal(await V.keyFromPhrase('une phrase de test', async () => { throw new Error('réseau'); }), null);
+    assert.equal(V.vaultOpen(), false);
+    assert.deepEqual(Object.keys(V.vault), [], 'aucun média sans la bonne clé');
+    // la bonne clé (celle que l'hôte envoie à ses invités) : tout s'ouvre, chaque média à son type
+    assert.equal(await V.openVault(k, load), 'ok');
+    assert.ok(V.vaultOpen() && V.vaultKey === k);
+    for (const [name, [, type]] of Object.entries(V.VAULT_FILES)) {
+      const blob = resolveObjectURL(V.vault[name]);
+      assert.ok(blob && blob.type === type, `${name} : ${type}`);
+      assert.deepEqual(bytes(await blob.arrayBuffer()), bytes(orig[name]), `${name} déchiffré à l'identique`);
+    }
+    assert.equal(await V.openVault(k, async () => { throw new Error('déjà ouvert'); }), 'ok', 'déjà ouvert : rien à recharger');
+    V.closeVault();
+    assert.ok(!V.vaultOpen() && Object.keys(V.vault).length === 0);
+  });
+
+  await atest('coffre VIP : aucun média du mode VIP en clair dans le dépôt, le vrai coffre refuse une mauvaise phrase', async () => {
+    const dir = new URL('../backrooms/', import.meta.url);
+    const real = async (f) => fs.readFileSync(new URL(`data/${f}.bin`, dir));
+    // chaque fichier du coffre est chiffré
+    for (const f of [V.CHECK, ...Object.values(V.VAULT_FILES).map(([file]) => file)]) assert.ok(V.isSealed(await real(f)), `data/${f}.bin chiffré`);
+    // à côté, seulement les sons et l'intro du mode normal
+    assert.ok(!fs.existsSync(new URL('monster', dir)), 'plus de voix en clair hors du coffre');
+    assert.deepEqual(fs.readdirSync(new URL('video', dir)).filter((f) => !f.startsWith('.')).sort(), ['LICENSE.txt', 'intro.mp4']);
+    for (const f of fs.readdirSync(new URL('sfx/level1', dir))) assert.match(f, /^chase_\d+\.mp3$/, `sfx/level1/${f}`);
+    // une mauvaise phrase n'ouvre ni le témoin ni l'outil
+    assert.equal(await V.keyFromPhrase('pas la bonne phrase', real), '');
+    assert.throws(() => execFileSync(process.execPath, [new URL('backrooms-vault.mjs', import.meta.url).pathname, 'verifier'], { env: { ...process.env, BACKROOMS_VIP: 'pas la bonne phrase' }, stdio: 'pipe' }), "l'outil refuse une mauvaise phrase");
+    // avec la vraie phrase (si on la donne), tout s'ouvre et chaque média a la signature de son format
+    const phrase = process.env.BACKROOMS_VIP;
+    if (phrase) {
+      const k = await V.keyFromPhrase(phrase, real);
+      assert.ok(k, 'BACKROOMS_VIP ouvre le témoin');
+      assert.equal(await V.openVault(k, real), 'ok');
+      const head = async (name, n = 12) => bytes(await resolveObjectURL(V.vault[name]).arrayBuffer()).subarray(0, n);
+      assert.equal((await head('entite')).subarray(1, 4).toString(), 'PNG');
+      assert.deepEqual([...(await head('bouc')).subarray(0, 3)], [0xff, 0xd8, 0xff]);
+      assert.equal((await head('level1')).subarray(8, 12).toString(), 'WEBP');
+      for (const n of ['voix', 'appel']) {
+        const h = await head(n);
+        assert.ok(h.subarray(0, 3).toString() === 'ID3' || (h[0] === 0xff && (h[1] & 0xe0) === 0xe0), `${n} : mp3`);
+      }
+      assert.equal((await head('intro')).subarray(4, 8).toString(), 'ftyp');
+      V.closeVault();
+    } else console.log('  (BACKROOMS_VIP absent : le vrai coffre n\'est vérifié qu\'avec une mauvaise phrase)');
+  });
+}
+
 console.log(`\n${count} tests réussis pour The Backrooms !`);
