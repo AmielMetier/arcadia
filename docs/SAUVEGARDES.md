@@ -54,12 +54,13 @@ Le relais garde leur clé et la donne aux seuls comptes VIP connectés (`POST /a
 les VIP n'ont rien à taper. **Rien à régler sur Render** : le relais range la clé dans la branche `saves`
 (`vip/backrooms.json`), enveloppée en AES-GCM par une clé tirée de son `GITHUB_TOKEN` (le fichier seul ne dit rien).
 
-- **La première fois** (une fois le relais redéployé), quelqu'un qui a la phrase la lui apprend :
-  `BACKROOMS_VIP='la phrase' node tools/backrooms-vault.mjs semer` (la clé ne s'affiche pas).
+- **La première fois**, Amiel tape la phrase dans le jeu : tant que le relais n'a pas la clé, une partie VIP la demande à
+  l'hôte. La bonne phrase ouvre le coffre et son navigateur apprend la clé au relais ; ensuite, plus aucun VIP n'a rien
+  à taper. (Autre façon : `BACKROOMS_VIP='la phrase' node tools/backrooms-vault.mjs semer`, la clé ne s'affiche pas.)
 - Le relais ne l'accepte (`POST /account/vipseed { key }`) que si elle ouvre le témoin du coffre (`backrooms/data/e0.bin`) ;
   une clé au hasard est refusée, et les ratés sont limités comme les mots de passe.
 - **Si le jeton GitHub change**, l'ancienne enveloppe ne s'ouvre plus : le navigateur d'un hôte VIP qui a déjà la clé
-  la réapprend tout seul au relais à sa prochaine partie VIP (sinon, relancer `semer`).
+  la réapprend tout seul au relais à sa prochaine partie VIP (sinon, la phrase est redemandée une fois).
 - Vérifie : `https://duo-drift-relay.onrender.com/account/status` doit répondre `{"ok":true,"on":true,"vipkey":true}`.
 - `BACKROOMS_VIP_KEY` (facultatif) donne la clé directement au relais, sans passer par la branche `saves`.
 
