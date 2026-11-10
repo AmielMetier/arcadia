@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 5.41 — 10 novembre 2026
+- **The Backrooms** — Les portes et les couloirs du Terror Hotel :
+  - Des portes des années 1930 : battant en noyer à quatre panneaux, bouton et serrure en laiton, judas, plaque de propreté ; un chambranle mouluré avec ses plinthes et sa corniche. Le papier peint continue autour de l'entrée, jusque dans la petite entrée de chaque chambre.
+  - La plinthe, la cimaise et la corniche sont en vrai relief, le long de tous les murs, et tournent aux angles.
+  - Devant certaines portes, ce que les clients ont laissé : un plateau de room service sous sa cloche, une paire de chaussures cirées, le journal du soir.
+  - Par endroits, le papier peint se décolle du haut et laisse voir le plâtre jauni. Les appliques mortes ont la tulipe cassée, et le verre est resté sur la moquette.
+  - Derrière la porte de secours, une vraie cage d'escalier : un palier, des marches de béton qui descendent vers une ampoule grillagée, une rampe, et un grand « 5 » peint au pochoir.
+
 ## 5.40 — 10 novembre 2026
 - **The Backrooms** — Les chambres du Terror Hotel sont habitées :
   - Un vrai lit : tête de lit sculptée et capitonnée de velours, matelas, draps, gros oreillers, couvre-lit de velours qui retombe sur les côtés. Caché dessous, on voit les lattes, les pieds du lit et la chambre par la fente.

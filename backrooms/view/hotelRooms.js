@@ -48,11 +48,57 @@ function softSlab(w, d, t, bevel) {
   return g;
 }
 // une planche découpée : le contour (x, y) en mètres, extrudé de t vers +z (centré sur z = 0)
-function board(points, t) {
+export function board(points, t) {
   const s = new THREE.Shape(points.map(([x, y]) => new THREE.Vector2(x, y)));
   const g = new THREE.ExtrudeGeometry(s, { depth: t, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 1, curveSegments: 8 });
   g.translate(0, 0, -t / 2);
   return g;
+}
+
+// --- Le lot : chaque pièce est copiée dans le repère du monde, puis fusionnée avec celles de même matière ---
+// setFrame(x, z, ry) fixe le repère courant (+z local : l'avant du meuble) ; bx / cyl / ball / flat y posent des pièces.
+export function makeBatch() {
+  const bins = new Map();
+  const add = (geo, mat, m) => {
+    const g = geo.index ? geo.toNonIndexed() : geo.clone();
+    g.applyMatrix4(m);
+    for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k);
+    g.clearGroups();
+    if (!bins.has(mat)) bins.set(mat, []);
+    bins.get(mat).push(g);
+  };
+  const base = new THREE.Matrix4();
+  const setFrame = (x, z, ry, y = 0) => base.makeRotationY(ry).setPosition(x, y, z);
+  const E = new THREE.Euler();
+  const Q = new THREE.Quaternion();
+  const local = (x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0) => new THREE.Matrix4().multiplyMatrices(base, new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), Q.setFromEuler(E.set(rx, ry, rz)), new THREE.Vector3(sx, sy, sz)));
+  const UNIT = new THREE.BoxGeometry(1, 1, 1);
+  const bx = (w, h, d, mat, x, y, z, rx = 0, ry = 0, rz = 0) => add(UNIT, mat, local(x, y, z, w, h, d, rx, ry, rz));
+  const geoCache = new Map();
+  const cached = (key, make) => {
+    if (!geoCache.has(key)) geoCache.set(key, make());
+    return geoCache.get(key);
+  };
+  const cyl = (rt, rb, h, mat, x, y, z, seg = 10, rx = 0, rz = 0) => add(cached(`c${rt}/${rb}/${h}/${seg}`, () => new THREE.CylinderGeometry(rt, rb, h, seg)), mat, local(x, y, z, 1, 1, 1, rx, 0, rz));
+  const ball = (sx, sy, sz, mat, x, y, z) => add(cached('ball', () => new THREE.SphereGeometry(1, 14, 10)), mat, local(x, y, z, sx, sy, sz));
+  const flat = (w, d, mat, x, y, z, ry = 0) => add(cached('flat', () => new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), mat, local(x, y, z, w, 1, d, 0, ry, 0));
+  return {
+    add, setFrame, local, bx, cyl, ball, flat, cached,
+    // un maillage par matière ; order(mat) donne l'ordre de dessin (les ombres et les reflets après le reste)
+    flush(group, order = () => 0) {
+      const meshes = [];
+      for (const [mat, list] of bins) {
+        const mesh = new THREE.Mesh(mergeGeometries(list), mat);
+        mesh.renderOrder = order(mat);
+        group.add(mesh);
+        meshes.push(mesh);
+      }
+      for (const g of geoCache.values()) if (g) g.dispose();
+      geoCache.clear();
+      bins.clear();
+      return meshes;
+    },
+  };
 }
 
 export function buildHotelRooms({ map, group, baked, brass, lampShades, CEIL }) {
@@ -94,31 +140,7 @@ export function buildHotelRooms({ map, group, baked, brass, lampShades, CEIL }) 
     brass,
   };
 
-  // --- le lot : chaque pièce est copiée dans le repère du monde, puis fusionnée avec celles de même matière ---
-  const bins = new Map();
-  const add = (geo, mat, m) => {
-    const g = geo.index ? geo.toNonIndexed() : geo.clone();
-    g.applyMatrix4(m);
-    for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k);
-    g.clearGroups();
-    if (!bins.has(mat)) bins.set(mat, []);
-    bins.get(mat).push(g);
-  };
-  const base = new THREE.Matrix4();
-  const setFrame = (x, z, ry, y = 0) => base.makeRotationY(ry).setPosition(x, y, z);
-  const E = new THREE.Euler();
-  const Q = new THREE.Quaternion();
-  const local = (x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0) => new THREE.Matrix4().multiplyMatrices(base, new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), Q.setFromEuler(E.set(rx, ry, rz)), new THREE.Vector3(sx, sy, sz)));
-  const UNIT = new THREE.BoxGeometry(1, 1, 1);
-  const bx = (w, h, d, mat, x, y, z, rx = 0, ry = 0, rz = 0) => add(UNIT, mat, local(x, y, z, w, h, d, rx, ry, rz));
-  const geoCache = new Map();
-  const cached = (key, make) => {
-    if (!geoCache.has(key)) geoCache.set(key, make());
-    return geoCache.get(key);
-  };
-  const cyl = (rt, rb, h, mat, x, y, z, seg = 10, rx = 0, rz = 0) => add(cached(`c${rt}/${rb}/${h}/${seg}`, () => new THREE.CylinderGeometry(rt, rb, h, seg)), mat, local(x, y, z, 1, 1, 1, rx, 0, rz));
-  const ball = (sx, sy, sz, mat, x, y, z) => add(cached('ball', () => new THREE.SphereGeometry(1, 14, 10)), mat, local(x, y, z, sx, sy, sz));
-  const flat = (w, d, mat, x, y, z, ry = 0) => add(cached('flat', () => new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), mat, local(x, y, z, w, 1, d, 0, ry, 0));
+  const { add, setFrame, local, bx, cyl, ball, flat, cached, flush } = makeBatch();
   const shadow = (w, d, x = 0, z = 0, ry = 0, y = 0.004) => flat(w, d, M.shadow, x, y, z, ry); // dans le repère courant
 
   const roomOf = new Map(map.rooms.map((r) => [r.id, r]));
@@ -221,7 +243,7 @@ export function buildHotelRooms({ map, group, baked, brass, lampShades, CEIL }) 
     const l = map.lights.find((q) => q.lamp && Math.hypot(q.x - f.x, q.z - f.z) < 0.1);
     const shadeMat = new THREE.MeshLambertMaterial({ color: '#d9b67a', emissive: '#ffb860', emissiveIntensity: 0, side: THREE.DoubleSide });
     const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.15, 0.2, 16, 1, true), shadeMat);
-    shade.position.set(0.32, h + 0.4, -0.05).applyMatrix4(base);
+    shade.position.set(0.32, h + 0.4, -0.05).applyMatrix4(local(0, 0, 0));
     shade.rotation.y = f.rot;
     group.add(shade);
     if (l) lampShades.push({ l, mat: shadeMat, k: 1.2 });
@@ -311,12 +333,7 @@ export function buildHotelRooms({ map, group, baked, brass, lampShades, CEIL }) 
     shadow(p.r * 2.6, p.r * 2.6);
   }
 
-  for (const [mat, list] of bins) {
-    const mesh = new THREE.Mesh(mergeGeometries(list), mat);
-    if (mat === M.shadow || mat === M.streak) mesh.renderOrder = 1;
-    group.add(mesh);
-  }
-  for (const g of geoCache.values()) if (g) g.dispose();
+  flush(group, (mat) => (mat === M.shadow || mat === M.streak ? 1 : 0));
 
   return {
     update(sim) {

@@ -1935,7 +1935,14 @@ float bkCaust(vec2 uv, float t) {
       // Poolrooms : sols, bassins, parois des bassins, margelles et la surface de l'eau (view/water.js)
       water = buildWater({ map, group, baked, textures, bake: bakeUniforms, fog: scene.fog, film: filmU, tileRelief });
     } else {
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * CELL_SIZE, H * CELL_SIZE), floorMat);
+      const floorGeo = new THREE.PlaneGeometry(W * CELL_SIZE, H * CELL_SIZE, L3 ? W : 1, L3 ? H : 1);
+      if (L3 && map.elevator) {
+        // l'hôtel : derrière la porte de secours, l'escalier descend ; le sol s'arrête au seuil (view/hotelCorridor.js)
+        const idx = Array.from(floorGeo.index.array);
+        idx.splice((map.elevator.gz * W + map.elevator.gx) * 6, 6);
+        floorGeo.setIndex(idx);
+      }
+      const floor = new THREE.Mesh(floorGeo, floorMat);
       floor.rotation.x = -Math.PI / 2;
       floor.position.set((W * CELL_SIZE) / 2, 0, (H * CELL_SIZE) / 2);
       group.add(floor);
@@ -3486,7 +3493,7 @@ float bkCaust(vec2 uv, float t) {
     // 9. Level 1 : l'habillage de l'entrepôt (rayonnages à palettes, marchandises, tuyaux, lignes au sol, piliers, panneaux)
     const wh = L1 ? buildWarehouse({ map, group, baked, CEIL, textures }) : null;
     if (wh) group.userData.wh = wh; // (?debug : wh.off dessine tout, pour comparer)
-    const hotel = L3 ? buildHotel({ map, group, baked, CEIL }) : null;
+    const hotel = L3 ? buildHotel({ map, group, baked, wallMat, CEIL }) : null;
     // 9a. Level 1 : le matériel du jeu qui bouge (rideaux des quais, cloches d'alarme, grilles des gaines, écrans du poste)
     const gear = L1 && map.docks ? buildGear({ map, group, baked, wallMat, CEIL }) : null;
     // 9b. Level 2 : tuyauteries, lampes grillagées, grilles, chaudières, vannes et vapeur

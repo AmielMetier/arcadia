@@ -5,6 +5,7 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL_SIZE } from '../engine/map.js';
 import { buildHotelRooms } from './hotelRooms.js';
+import { buildHotelCorridor } from './hotelCorridor.js';
 
 const C = CELL_SIZE;
 
@@ -19,7 +20,7 @@ function label(w, h, draw) {
   return t;
 }
 
-export function buildHotel({ map, group, baked, CEIL }) {
+export function buildHotel({ map, group, baked, wallMat, CEIL }) {
   const lam = (o) => baked(new THREE.MeshLambertMaterial(o));
   const M = {
     wood: lam({ color: '#3b2314' }),
@@ -31,7 +32,6 @@ export function buildHotel({ map, group, baked, CEIL }) {
     pillow: lam({ color: '#e6dccb' }),
     metal: lam({ color: '#5d5a55' }),
     fire: lam({ color: '#7a2a20' }),
-    stair: new THREE.MeshLambertMaterial({ color: '#2a2724', side: THREE.BackSide, emissive: '#0d0b09', emissiveIntensity: 1 }),
     black: new THREE.MeshBasicMaterial({ color: '#050403' }),
   };
   const box = (w, h, d, mat, x, y, z, parent = group) => {
@@ -49,26 +49,13 @@ export function buildHotel({ map, group, baked, CEIL }) {
     return g;
   };
 
-  // --- 1. Portes des chambres : linteau, battant entrouvert vers la chambre, plaque de laiton numérotée ---
+  // --- 1. Portes des chambres (view/hotelCorridor.js : embrasure, chambranle, battant, moulures, vie du couloir,
+  // cage d'escalier), et ici la plaque de laiton numérotée ---
+  buildHotelCorridor({ map, group, baked, wallMat, CEIL });
   for (const r of map.rooms) {
     const { x, z } = r.door;
     const [dx, dz] = r.dir; // de la chambre vers le couloir
-    const cx = (x + 0.5) * C;
-    const cz = (z + 0.5) * C;
-    const g = frame(cx, cz, Math.atan2(dx, dz)); // +z local : vers le couloir ; x local : le long du mur
-    const jw = (C - map.doorW) / 2;
-    for (const sx of [-1, 1]) box(jw, CEIL, C, M.darkWood, sx * (map.doorW / 2 + jw / 2), CEIL / 2, 0, g);
-    box(map.doorW, CEIL - 2.25, C, M.darkWood, 0, 2.25 + (CEIL - 2.25) / 2, 0, g);
-    // chambranle côté couloir
-    for (const sx of [-1, 1]) box(0.09, 2.3, 0.06, M.wood, sx * (map.doorW / 2 + 0.045), 1.15, C / 2 + 0.03, g);
-    box(map.doorW + 0.18, 0.1, 0.06, M.wood, 0, 2.3, C / 2 + 0.03, g);
-    // le battant, ouvert dans la chambre contre le mur
-    const leaf = new THREE.Group();
-    leaf.position.set(-map.doorW / 2, 0, -C / 2);
-    leaf.rotation.y = 1.45 + Math.random() * 0.25;
-    box(map.doorW - 0.05, 2.22, 0.05, M.door, (map.doorW - 0.05) / 2, 1.11, 0, leaf);
-    box(0.06, 0.06, 0.08, M.brass, map.doorW - 0.18, 1.0, 0, leaf);
-    g.add(leaf);
+    const g = frame((x + 0.5) * C, (z + 0.5) * C, Math.atan2(dx, dz)); // +z local : vers le couloir
     // la plaque du numéro
     const t = label(128, 64, (c, w, h) => {
       c.fillStyle = '#7a5a26';
@@ -83,7 +70,7 @@ export function buildHotel({ map, group, baked, CEIL }) {
       c.fillText(String(r.num), w / 2, h / 2 + 2);
     });
     const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.13), baked(new THREE.MeshLambertMaterial({ map: t, emissive: '#6a5230', emissiveMap: t, emissiveIntensity: 0.6 })));
-    plate.position.set(map.doorW / 2 + 0.3, 1.55, C / 2 + 0.065);
+    plate.position.set(map.doorW / 2 + 0.36, 1.55, C / 2 + 0.012);
     g.add(plate);
   }
 
@@ -115,7 +102,24 @@ export function buildHotel({ map, group, baked, CEIL }) {
   const tulipGeo = new THREE.LatheGeometry(
     [[0.012, 0], [0.03, 0.006], [0.05, 0.022], [0.068, 0.05], [0.083, 0.088], [0.094, 0.126], [0.1, 0.15], [0.106, 0.162], [0.1, 0.166]].map(([r, y]) => new THREE.Vector2(r, y)),
     16,
-  );
+  );  // la tulipe d'une applique morte : il n'en reste que le fond, au bord dentelé
+  let brokenN = 0;
+  const brokenTulip = () => {
+    const g = tulipGeo.clone();
+    const p = g.attributes.position;
+    const seed = ++brokenN * 1.7;
+    for (let i = 0; i < p.count; i++) {
+      const a = Math.atan2(p.getZ(i), p.getX(i));
+      const cut = 0.045 + 0.03 * Math.abs(Math.sin(a * 3 + seed)) + 0.02 * Math.abs(Math.sin(a * 7.3 + seed * 2.1));
+      if (p.getY(i) > cut) {
+        const k = cut / p.getY(i);
+        p.setXYZ(i, p.getX(i) * (0.9 + 0.1 * k), cut, p.getZ(i) * (0.9 + 0.1 * k));
+      }
+    }
+    g.computeVertexNormals();
+    return g;
+  };
+
   const plateGeo = new THREE.CylinderGeometry(0.06, 0.07, 0.014, 20);
   plateGeo.rotateX(Math.PI / 2);
   const plate2Geo = new THREE.CylinderGeometry(0.035, 0.045, 0.012, 16);
@@ -142,13 +146,13 @@ export function buildHotel({ map, group, baked, CEIL }) {
       cup.position.set(0, -0.006, 0.11);
       a.add(cup);
       const mat = new THREE.MeshLambertMaterial({ color: '#e8d2a8', emissive: '#ffffff', emissiveMap: tulipTex, emissiveIntensity: 0, side: THREE.DoubleSide, transparent: true, opacity: 0.93 });
-      const glass = new THREE.Mesh(tulipGeo, mat);
+      const glass = new THREE.Mesh(l.state === 'off' ? brokenTulip() : tulipGeo, mat); // les mortes ont la tulipe cassée
       glass.position.set(0, 0, 0.11);
       a.add(glass);
       const bulbMat = new THREE.MeshBasicMaterial({ color: '#fff0c8' });
       const bulb = new THREE.Mesh(bulbGeo, bulbMat);
       bulb.position.set(0, 0.04, 0.11);
-      a.add(bulb);
+      if (l.state !== 'off') a.add(bulb);
       const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#ffffff', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
       halo.scale.set(0.62, 0.62, 1);
       halo.position.set(0, 0.07, 0.13);
@@ -350,13 +354,11 @@ export function buildHotel({ map, group, baked, CEIL }) {
   const DW = 1.2;
   const DH = 2.2;
   const side = (C - DW) / 2;
-  const wallMat = M.darkWood;
-  box(side, CEIL, 0.12, wallMat, -(DW / 2 + side / 2), CEIL / 2, 0.06, eg);
-  box(side, CEIL, 0.12, wallMat, DW / 2 + side / 2, CEIL / 2, 0.06, eg);
-  box(DW, CEIL - DH, 0.12, wallMat, 0, DH + (CEIL - DH) / 2, 0.06, eg);
-  const stair = new THREE.Mesh(new THREE.BoxGeometry(C - 0.1, CEIL, C - 0.2), M.stair);
-  stair.position.set(0, CEIL / 2, C / 2 + 0.05);
-  eg.add(stair);
+  const frameMat = M.darkWood;
+  box(side, CEIL, 0.12, frameMat, -(DW / 2 + side / 2), CEIL / 2, 0.06, eg);
+  box(side, CEIL, 0.12, frameMat, DW / 2 + side / 2, CEIL / 2, 0.06, eg);
+  box(DW, CEIL - DH, 0.12, frameMat, 0, DH + (CEIL - DH) / 2, 0.06, eg);
+  // (la cage d'escalier derrière : view/hotelCorridor.js)
   const hinge = new THREE.Group();
   hinge.position.set(-DW / 2, 0, 0.1);
   eg.add(hinge);
