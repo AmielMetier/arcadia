@@ -516,3 +516,119 @@ export function drawHotelCeiling(ctx, S, photo) {
   }
   noise(ctx, 6);
 }
+
+// Un tapis d'Orient (w × h px, le long côté en hauteur) : un champ rouge garance semé de petits motifs, un médaillon
+// central bleu nuit et ivoire, des écoinçons, une large bordure bleue entre deux galons ivoire, les franges aux deux
+// bouts ; usé au milieu (la trame claire apparaît)
+export function drawRug(ctx, w, h) {
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#efe4cc';
+  ctx.fillRect(0, 0, w, h);
+  const fr = h * 0.03; // les franges
+  ctx.strokeStyle = 'rgba(200, 186, 150, 0.9)';
+  ctx.lineWidth = 1.2;
+  for (let x = 2; x < w - 2; x += 3) {
+    for (const [y0, y1] of [[0, fr], [h - fr, h]]) {
+      ctx.beginPath();
+      ctx.moveTo(x, y0 + Math.random() * 3);
+      ctx.lineTo(x + (Math.random() - 0.5) * 2, y1 - Math.random() * 3);
+      ctx.stroke();
+    }
+  }
+  const x0 = w * 0.02;
+  const y0 = fr;
+  const W = w - 2 * x0;
+  const H = h - 2 * fr;
+  ctx.fillStyle = '#1e2747';
+  ctx.fillRect(x0, y0, W, H);
+  const b = W * 0.12; // la bordure
+  ctx.fillStyle = '#d8c9a2';
+  ctx.fillRect(x0 + b * 0.12, y0 + b * 0.12, W - b * 0.24, H - b * 0.24);
+  ctx.fillStyle = '#1e2747';
+  ctx.fillRect(x0 + b * 0.22, y0 + b * 0.22, W - b * 0.44, H - b * 0.44);
+  // les fleurs de la bordure
+  ctx.fillStyle = '#a3342a';
+  const per = (len) => Math.max(4, Math.round(len / (b * 0.9)));
+  for (const [ax, ay, bx, by] of [[x0 + b / 2, y0 + b / 2, x0 + W - b / 2, y0 + b / 2], [x0 + b / 2, y0 + H - b / 2, x0 + W - b / 2, y0 + H - b / 2], [x0 + b / 2, y0 + b / 2, x0 + b / 2, y0 + H - b / 2], [x0 + W - b / 2, y0 + b / 2, x0 + W - b / 2, y0 + H - b / 2]]) {
+    const n = per(Math.hypot(bx - ax, by - ay));
+    for (let i = 0; i <= n; i++) {
+      const x = ax + ((bx - ax) * i) / n;
+      const y = ay + ((by - ay) * i) / n;
+      ctx.beginPath();
+      ctx.ellipse(x, y, b * 0.16, b * 0.16, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#d8c9a2';
+      ctx.beginPath();
+      ctx.arc(x, y, b * 0.05, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#a3342a';
+    }
+  }
+  ctx.fillStyle = '#d8c9a2';
+  ctx.fillRect(x0 + b * 0.9, y0 + b * 0.9, W - b * 1.8, H - b * 1.8);
+  // le champ
+  const fx = x0 + b;
+  const fy = y0 + b;
+  const FW = W - 2 * b;
+  const FH = H - 2 * b;
+  ctx.fillStyle = '#8a1f1c';
+  ctx.fillRect(fx, fy, FW, FH);
+  ctx.fillStyle = 'rgba(30, 39, 71, 0.55)';
+  for (let j = 0; j < 14; j++) {
+    for (let i = 0; i < 8; i++) {
+      const x = fx + ((i + 0.5 + (j % 2) * 0.5) * FW) / 8.5;
+      const y = fy + ((j + 0.5) * FH) / 14;
+      ctx.beginPath();
+      ctx.moveTo(x, y - FH * 0.018);
+      ctx.lineTo(x + FW * 0.02, y);
+      ctx.lineTo(x, y + FH * 0.018);
+      ctx.lineTo(x - FW * 0.02, y);
+      ctx.fill();
+    }
+  }
+  // le médaillon : un losange à redents, bleu nuit, cœur ivoire et rouge
+  const cx = fx + FW / 2;
+  const cy = fy + FH / 2;
+  for (const [k, col] of [[1, '#d8c9a2'], [0.9, '#1e2747'], [0.55, '#d8c9a2'], [0.4, '#8a1f1c'], [0.18, '#1e2747']]) {
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    const rx = FW * 0.38 * k;
+    const ry = FH * 0.3 * k;
+    for (let a = 0; a < 16; a++) {
+      const t = (a / 16) * Math.PI * 2;
+      const rr = a % 2 ? 0.86 : 1;
+      const px = cx + Math.sin(t) * rx * rr * (Math.abs(Math.cos(t)) * 0.5 + 0.5);
+      const py = cy - Math.cos(t) * ry * rr;
+      if (a === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+  // les écoinçons
+  ctx.fillStyle = '#1e2747';
+  for (const [sx, sy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+    ctx.beginPath();
+    ctx.moveTo(fx + sx * FW, fy + sy * FH);
+    ctx.lineTo(fx + sx * FW + (sx ? -1 : 1) * FW * 0.28, fy + sy * FH);
+    ctx.quadraticCurveTo(fx + sx * FW + (sx ? -1 : 1) * FW * 0.12, fy + sy * FH + (sy ? -1 : 1) * FH * 0.08, fx + sx * FW, fy + sy * FH + (sy ? -1 : 1) * FH * 0.2);
+    ctx.fill();
+  }
+  // l'usure : la trame qui apparaît au milieu, et un peu de poussière partout
+  const g = ctx.createRadialGradient(cx, cy + FH * 0.15, 0, cx, cy + FH * 0.15, FH * 0.35);
+  g.addColorStop(0, 'rgba(210, 190, 160, 0.3)');
+  g.addColorStop(1, 'rgba(210, 190, 160, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  noise(ctx, 26);
+}
+
+// une ombre de contact : un rectangle sombre aux bords très doux (sous les meubles)
+export function drawContactShadow(ctx, s) {
+  const g = ctx.createRadialGradient(s / 2, s / 2, s * 0.1, s / 2, s / 2, s / 2);
+  g.addColorStop(0, 'rgba(0, 0, 0, 0.85)');
+  g.addColorStop(0.6, 'rgba(0, 0, 0, 0.55)');
+  g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+}

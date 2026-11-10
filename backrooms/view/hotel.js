@@ -4,7 +4,7 @@
 // chiffres qui s'allume au plafond du hall quand les 6 lettres sont postées.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL_SIZE } from '../engine/map.js';
-import { FURNITURE } from '../engine/hotel.js';
+import { buildHotelRooms } from './hotelRooms.js';
 
 const C = CELL_SIZE;
 
@@ -87,48 +87,10 @@ export function buildHotel({ map, group, baked, CEIL }) {
     g.add(plate);
   }
 
-  // --- 2. Meubles : lit (cadre, matelas, couverture, oreiller, tête de lit), armoire, bureau et lampe ---
+  // --- 2. Meubles des chambres : lits, armoires, bureaux et leur lampe, tables de nuit, fenêtres, radiateurs,
+  // plafonniers, tapis (view/hotelRooms.js) ---
   const lampShades = [];
-  for (const f of map.furniture) {
-    const g = frame(f.x, f.z, f.rot); // +z local : vers la porte (l'avant du meuble)
-    const F = FURNITURE[f.kind];
-    if (f.kind === 'bed') {
-      const W2 = F.hw * 2;
-      const L = F.hd * 2;
-      box(W2, 0.28, L, M.darkWood, 0, 0.2, 0, g);
-      for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(0.08, 0.2, 0.08, M.darkWood, sx * (F.hw - 0.05), 0.1, sz * (F.hd - 0.05), g);
-      box(W2 - 0.08, 0.16, L - 0.12, M.sheet, 0, 0.42, 0.02, g);
-      box(W2 - 0.02, 0.06, L * 0.62, M.blanket, 0, 0.52, L * 0.18, g);
-      box(W2 * 0.7, 0.1, 0.35, M.pillow, 0, 0.55, -F.hd + 0.3, g);
-      box(W2 + 0.06, 1.15, 0.08, M.wood, 0, 0.58, -F.hd - 0.02, g);
-      box(W2 + 0.1, 0.06, 0.12, M.darkWood, 0, 1.18, -F.hd - 0.02, g);
-      // dessous du lit : le noir
-      box(W2 - 0.1, 0.02, L - 0.1, M.black, 0, 0.07, 0, g);
-    } else if (f.kind === 'wardrobe') {
-      const W2 = F.hw * 2;
-      const D = F.hd * 2;
-      box(W2, F.h, D, M.wood, 0, F.h / 2, 0, g);
-      box(W2 + 0.06, 0.08, D + 0.06, M.darkWood, 0, F.h + 0.04, 0, g);
-      for (const sx of [-1, 1]) {
-        box(W2 / 2 - 0.05, F.h - 0.2, 0.03, M.door, sx * (W2 / 4), F.h / 2, D / 2 + 0.015, g);
-        box(0.03, 0.14, 0.04, M.brass, sx * 0.07, F.h * 0.55, D / 2 + 0.04, g);
-      }
-    } else {
-      const W2 = F.hw * 2;
-      const D = F.hd * 2;
-      box(W2, 0.05, D, M.wood, 0, F.h, 0, g);
-      for (const sx of [-1, 1]) box(0.08, F.h, D - 0.06, M.darkWood, sx * (F.hw - 0.05), F.h / 2, 0, g);
-      // la lampe de chevet
-      const l = map.lights.find((q) => q.lamp && Math.hypot(q.x - f.x, q.z - f.z) < 0.1);
-      box(0.12, 0.02, 0.12, M.brass, 0.25, F.h + 0.04, 0, g);
-      box(0.03, 0.3, 0.03, M.brass, 0.25, F.h + 0.2, 0, g);
-      const shadeMat = new THREE.MeshLambertMaterial({ color: '#d8b880', emissive: '#ffb860', emissiveIntensity: 0 });
-      const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.17, 0.2, 12, 1, true), shadeMat);
-      shade.position.set(0.25, F.h + 0.4, 0);
-      g.add(shade);
-      if (l) lampShades.push({ l, mat: shadeMat, k: 1.2 });
-    }
-  }
+  const rooms = buildHotelRooms({ map, group, baked, brass: M.brass, lampShades, CEIL });
 
   // --- 3. Appliques Art déco du couloir et lustre du hall ---
   // une platine de laiton à gradins, un bras en col de cygne, une coupelle, et une tulipe de verre dépoli ouverte vers
@@ -470,6 +432,7 @@ export function buildHotel({ map, group, baked, CEIL }) {
   let flickT = 0;
   return {
     update(sim, P, time, dt) {
+      rooms.update(sim);
       // les lettres, une fois le mot connu (l'hôte l'envoie à ses invités)
       for (const p of papers) {
         const ch = sim.word[p.L.idx] || '?';

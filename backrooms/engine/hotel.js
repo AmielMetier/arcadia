@@ -275,6 +275,72 @@ export function createHotelMap(seed = 5) {
   });
   for (const L of letters) mailbox.boxes.find((b) => b.num === L.num).letter = L.id;
 
+  // 6b. L'habillage des chambres, tiré d'un second hasard (les lettres, le code et les lumières ne changent pas) :
+  // une fenêtre aux rideaux tirés sur un mur de côté, son radiateur et un fauteuil ; une table de nuit de chaque côté
+  // du lit ; parfois une commode et son miroir sur l'autre mur, une valise ; un tableau au-dessus du lit, un miroir
+  // au-dessus du bureau. Les meubles qu'on heurte restent contre les murs (à moins d'un mètre), loin des lettres.
+  let s2 = ((seed * 7919) >>> 0) || 7;
+  const drnd = () => {
+    s2 = (s2 + 0x6d2b79f5) >>> 0;
+    let t = s2;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const roomProps = [];
+  for (const r of rooms) {
+    const [dx, dz] = r.dir;
+    const nU = dx !== 0 ? r.z1 - r.z0 + 1 : r.x1 - r.x0 + 1; // cases le long du mur du fond
+    const nV = dx !== 0 ? r.x1 - r.x0 + 1 : r.z1 - r.z0 + 1; // cases du fond vers la porte
+    const ux = dz; // l'axe u, le long du mur du fond
+    const uz = -dx;
+    const fx = ((r.x0 + r.x1 + 1) / 2) * C - dx * (nV * C) / 2; // le milieu du mur du fond
+    const fz = ((r.z0 + r.z1 + 1) / 2) * C - dz * (nV * C) / 2;
+    const at = (u, v) => ({ x: fx + ux * u + dx * v, z: fz + uz * u + dz * v });
+    const yawTo = (vx, vz) => Math.atan2(vx, vz); // un modèle dont l'avant (+z) regarde vers (vx, vz)
+    const half = (nU * C) / 2;
+    const free = (p, d) => !letters.some((L) => L.room === r.id && Math.hypot(L.x - p.x, L.z - p.z) < d);
+    const box = (p, hu, hv) => (ux !== 0 ? { hx: hu, hz: hv } : { hx: hv, hz: hu }); // demi-tailles selon u (le long du mur du fond) et v (vers la porte)
+    const side = drnd() < 0.5 ? -1 : 1; // le mur de la fenêtre
+    const vW = Math.min(nV * C - 2.4, 2.1 * C);
+    const wp = at(side * half, vW);
+    r.win = { x: wp.x, z: wp.z, nx: -side * ux, nz: -side * uz, w: 1.5 };
+    // le radiateur sous la fenêtre (en fonte, 15 cm d'épaisseur)
+    const rp = at(side * (half - 0.11), vW);
+    solids.push({ ...rp, ...box(rp, 0.08, 0.46), radiator: true, nx: -side * ux, nz: -side * uz });
+    // les tables de nuit, de part et d'autre du lit
+    const bedU = 0; // le lit est au milieu du mur du fond
+    for (const sgn of [-1, 1]) {
+      const np = at(bedU + sgn * (FURNITURE.bed.hw + 0.27), 0.22);
+      solids.push({ ...np, ...(ux !== 0 ? { hx: 0.22, hz: 0.2 } : { hx: 0.2, hz: 0.22 }), nightstand: true, rot: yawTo(dx, dz), phone: sgn === (r.id % 2 ? 1 : -1) });
+    }
+    // le fauteuil, près de la fenêtre, tourné vers le lit
+    const ap = at(side * (half - 0.5), vW + 1.3);
+    if (free(ap, 1.1)) roomProps.push({ m: drnd() < 0.6 ? 'ArmChair_01' : 'GreenChair_01', h: 1.0, r: 0.38, ...ap, rot: yawTo(-side * ux - dx * 0.6, -side * uz - dz * 0.6) });
+    // la commode et son miroir, en face de la fenêtre ; dessus, une pendule ou un vase
+    if (drnd() < 0.65) {
+      const cp = at(-side * (half - 0.3), vW);
+      if (free(cp, 1.0)) {
+        const face = yawTo(side * ux, side * uz);
+        roomProps.push({ m: 'GothicCommode_01', h: 0.95, r: 0.36, ...cp, rot: face });
+        roomProps.push({ m: drnd() < 0.5 ? 'mantel_clock_01' : 'antique_ceramic_vase_01', h: drnd() < 0.5 ? 0.32 : 0.38, r: 0, ...at(-side * (half - 0.3), vW + 0.25), y: 0.95, rot: face });
+        const mp = at(-side * (half - 0.03), vW);
+        roomProps.push({ m: 'ornate_mirror_01', h: 0.95, r: 0, ...mp, y: 1.3, rot: face });
+      }
+    }
+    // un tableau au-dessus de la tête de lit, un miroir au-dessus du bureau
+    roomProps.push({ m: 'fancy_picture_frame_01', h: 0.62, r: 0, ...at(bedU, 0.03), y: 1.45, rot: yawTo(dx, dz) });
+    const dU = (r.desk.x - fx) * ux + (r.desk.z - fz) * uz;
+    roomProps.push({ m: 'ornate_mirror_01', h: 0.8, r: 0, ...at(dU, 0.03), y: 1.2, rot: yawTo(dx, dz) });
+    // une valise laissée contre le mur de la fenêtre, près du fond
+    if (drnd() < 0.5) {
+      const vp = at(side * (half - 0.32), 1.9);
+      if (free(vp, 0.9)) roomProps.push({ m: 'vintage_suitcase', h: 0.55, r: 0.3, ...vp, rot: yawTo(-side * ux, -side * uz) + (drnd() - 0.5) * 0.5 });
+    }
+    // une chambre sur trois a été fouillée : tiroirs ouverts, draps défaits (voir view/hotelRooms.js)
+    r.mess = drnd() < 0.33;
+  }
+
   // 7. Le code à 4 chiffres (même graine, même code chez tout le monde)
   const code = String(1000 + Math.floor(rnd() * 9000));
 
@@ -303,7 +369,7 @@ export function createHotelMap(seed = 5) {
   for (const [ox, oz] of [[-1, -0.8], [1, -0.8], [0, 1.2]]) addLight(lobbyCenter.x + ox * C * 1.5, lobbyCenter.z + oz * C, { state: 'on', bright: true, y: HOTEL_CEIL - 0.5, fy: HOTEL_CEIL - 0.5, chandelier: true });
 
   // 9. Quelques piles et eaux d'amande, dans les chambres sans lettre et le couloir
-  const busy = [cellPos(spawnCell.x, spawnCell.z), ...letters, ...furniture, ...lobbyProps, ...solids];
+  const busy = [cellPos(spawnCell.x, spawnCell.z), ...letters, ...furniture, ...lobbyProps, ...roomProps, ...solids];
   const scatter = (n) => {
     const out = [];
     for (let i = 0; i < 2000 && out.length < n; i++) {
@@ -343,7 +409,7 @@ export function createHotelMap(seed = 5) {
     cassettes: [],
     fuses: [],
     lights,
-    props: lobbyProps,
+    props: [...lobbyProps, ...roomProps],
     bottles,
     batteries,
     items: itemList(['bottle', bottles], ['battery', batteries]),

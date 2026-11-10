@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 5.40 — 10 novembre 2026
+- **The Backrooms** — Les chambres du Terror Hotel sont habitées :
+  - Un vrai lit : tête de lit sculptée et capitonnée de velours, matelas, draps, gros oreillers, couvre-lit de velours qui retombe sur les côtés. Caché dessous, on voit les lattes, les pieds du lit et la chambre par la fente.
+  - Une armoire à panneaux avec un miroir terni, un bureau à sous-main de cuir et sa lampe, une table de nuit de chaque côté du lit, avec un vieux téléphone sur l'une d'elles.
+  - Un tapis d'Orient sous le lit, un plafonnier en verre dépoli, des ombres sous les meubles.
+  - Une fenêtre aux lourds rideaux tirés, avec un filet de lumière froide entre eux, et un radiateur en fonte dessous.
+  - Selon la chambre : un fauteuil, une commode avec sa pendule ou son vase et un miroir, un tableau au-dessus du lit, une valise oubliée.
+  - Une chambre sur trois a été fouillée : lit défait, couvre-lit par terre, tiroir du bureau resté ouvert.
+
 ## 5.39 — 10 novembre 2026
 - **The Backrooms** — La lumière du Terror Hotel :
   - Chaque applique dessine son éventail de lumière sur le papier peint, qui monte de la tulipe en s'évasant, et une tache chaude au plafond au-dessus d'elle. Entre deux appliques, la pénombre.
