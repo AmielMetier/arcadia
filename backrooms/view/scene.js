@@ -5273,7 +5273,9 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         goatHerd.update(sim, P, camera, gv ? gv.lightAt : () => 0.3, lampOn, dt, time);
       } else if (sim.hasMonster) {
         const M = sim.monster;
-        monsterGroup.visible = !M.away && !M.inDuct; // le prélude (avant la première cassette) : elle n'est pas là ; dans les gaines non plus
+        // (le prélude : elle n'est pas là ; dans les gaines non plus ; Level 1, sous l'apparence d'une victime : c'est le
+        // corps du joueur qu'on voit, plus bas)
+        monsterGroup.visible = !M.away && !M.inDuct && M.mimic == null;
         const chase = M.mode === 'chase';
         // plus elle est proche, moins elle est brouillée : nette à moins de 2,5 m
         const g = THREE.MathUtils.clamp((Math.hypot(P.x - M.x, P.z - M.z) - 2.5) / 14, 0, 1);
@@ -5300,7 +5302,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
           monsterGroup.position.set(M.x + (Math.random() - 0.5) * j * 0.3, my, M.z + (Math.random() - 0.5) * j * 0.3);
           monsterGroup.rotation.y = M.yaw || 0;
           const mv = floorViews[M.floor || 0];
-          const foot = beast.update(M, chase, mv ? mv.lightAt(M.x, M.z) : 0.3, dt, time, camera.position);
+          const foot = M.mimic == null ? beast.update(M, chase, mv ? mv.lightAt(M.x, M.z) : 0.3, dt, time, camera.position) : null;
           if (foot && api.onMonsterStep) api.onMonsterStep(foot);
         } else {
           monsterGroup.position.set(M.x + (Math.random() - 0.5) * j, my + (chase ? Math.abs(Math.sin(time * 9)) * 0.08 : Math.sin(time * 2) * 0.03), M.z + (Math.random() - 0.5) * j);
@@ -5360,8 +5362,16 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       }
 
       // 3. Les autres joueurs encore dehors
+      const Mw = sim.hasMonster ? sim.monster : null;
       for (const Q of sim.players) {
         if (Q === P) continue; // soi-même : plus bas (vue subjective)
+        // Level 1 : l'imposteur porte le corps (la tenue, la lampe) de sa victime ; il marche là où est l'entité, lampe éteinte
+        if (Mw && Mw.mimic === Q.id && Q.status === 'dead') {
+          const D = { ...Q, status: 'alive', x: Mw.x, z: Mw.z, yaw: Mw.yaw || 0, pitch: 0, floor: Mw.floor || 0, flashlight: false, cam: false, moving: (Mw.v || 0) > 0.2, running: false, crouch: false, hidden: -1, jy: 0, tilt: 0, onLadder: false };
+          const mv2 = floorViews[D.floor];
+          avatars.update(D, true, Mw.y ?? feetY(sim.stairs, D.x, D.z, D.floor), mv2 ? mv2.lightAt(D.x, D.z) : 0.3, dt, time);
+          continue;
+        }
         const show = Q.status === 'alive' && !(Q.hidden >= 0); // un coéquipier caché dans un casier ne se voit pas
         if (!show && !avatars.has(Q.id)) continue;
         // à l'écran, chacun suit sa piste : les positions reçues (20 par seconde), interpolées un peu dans le passé,

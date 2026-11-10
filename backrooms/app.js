@@ -1418,6 +1418,43 @@ function handleEvent(ev, me) {
     case 'alarmEnd':
       if (sfx) sfx.alarmStop(ev.id);
       break;
+    // Level 1 : les salles de sécurité (la porte blindée, les coups de l'entité, sa rage) et l'imposteur
+    case 'safe': {
+      const S = (sim.map.safes || [])[ev.id];
+      if (S) S.shut = !!ev.shut; // (chez un invité aussi : fermée, elle arrête tout)
+      if (sfx) sfx.safeDoor({ x: ev.x, z: ev.z }, !!ev.shut);
+      if (ev.by === me && hud) hud.toast(ev.shut ? 'Bolted shut · it cannot get in · it will try' : 'The bolt slides back · the door is open');
+      break;
+    }
+    case 'safeJam':
+      if (ev.by === me && hud) hud.toast('Something is in the doorway · the door will not close');
+      break;
+    case 'safeBang':
+      if (sfx) sfx.dockBang({ x: ev.x, z: ev.z }, ev.k || 0);
+      if (scene && scene.gearEvent) scene.gearEvent(ev);
+      break;
+    case 'safeKnock':
+      if (sfx) sfx.knock({ x: ev.x, z: ev.z });
+      break;
+    case 'frustrated':
+      // elle renonce à la porte : un cri de rage, puis ses pas lourds qui s'éloignent
+      if (sfx) sfx.rush({ x: ev.x, z: ev.z });
+      break;
+    case 'mimic':
+      // (rien pour les vivants : ils ne savent pas encore que ce n'est plus lui)
+      if (ev.id === me && hud) setTimeout(() => hud && hud.toast('It is wearing your face now. It speaks with your voice'), 2600);
+      break;
+    case 'mimicCall':
+      // l'imposteur appelle avec la voix volée (de vive voix, là où il est, ou au talkie) ; chacun la rejoue chez soi
+      // (au talkie : pas pendant une coupure, le talkie est mort)
+      if (voice && sim.player.status === 'alive' && !(ev.radio && sim.radioDead)) voice.mimic(ev.id, { x: ev.x, z: ev.z }, !!ev.radio, who(ev.id));
+      break;
+    case 'unmask':
+      if (sfx) sfx.rush({ x: ev.x, z: ev.z });
+      if (scene && Math.hypot(sim.player.x - ev.x, sim.player.z - ev.z) < 14) scene.tape('grab', 0.6);
+      if (hud) hud.toast(`That was not ${who(ev.id)}!`);
+      if (voice) voice.mimicStop();
+      break;
     case 'guardDoor':
       // (chez un invité aussi : fermée, elle cache comme une cloison)
       if (sim.map.guardDoor) sim.map.guardDoor.open = !!ev.open;
@@ -1653,7 +1690,8 @@ function handleEvent(ev, me) {
       break;
     }
     case 'dead':
-      if (ev.id !== me && hud && !ev.abyss) hud.toast(ev.thirst ? `${ev.name} collapsed, dehydrated…` : `${ev.name} got caught…`);
+      // (quiet : l'entité va prendre sa place, les vivants ne l'apprennent pas ; les spectateurs, si)
+      if (ev.id !== me && hud && !ev.abyss && !(ev.quiet && sim.player.status === 'alive')) hud.toast(ev.thirst ? `${ev.name} collapsed, dehydrated…` : `${ev.name} got caught…`);
       lastAbyss = !!ev.abyss;
       lastThirst = !!ev.thirst;
       // mort de soif : la vue part, la bande se perd
@@ -2171,6 +2209,13 @@ function frame(currentTime) {
         if (left <= 0) sfx.step(stepKind(O), { x: O.x, z: O.z, muffled: (O.floor || 0) !== (V.floor || 0) }, O.running ? 1 : 0.7);
         otherStepT.set(O.id, left <= 0 ? (O.running ? 0.32 : 0.5) : left);
       }
+      // l'imposteur : les pas d'un joueur qui marche (pas les siens, lourds)
+      const Mm = sim.hasMonster ? sim.monster : null;
+      if (Mm && Mm.mimic != null && (Mm.v || 0) > 0.3 && !paused) {
+        const left = (otherStepT.get('M') ?? 0.2) - delta;
+        if (left <= 0) sfx.step(stepKind(Mm), { x: Mm.x, z: Mm.z, muffled: (Mm.floor || 0) !== (V.floor || 0) }, 0.7);
+        otherStepT.set('M', left <= 0 ? 0.52 : left);
+      } else otherStepT.delete('M');
     }
     if (sfx) {
       // le souffle : sprint, puis halètement le temps de récupérer, et la peur quand l'entité est là

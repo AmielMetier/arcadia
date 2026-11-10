@@ -18,7 +18,7 @@
 // Chacun part avec sa lampe torche dans la case 1. Un joueur attrapé regarde les autres jusqu'à la fin de l'étage ;
 // si l'équipe le termine, tout le monde repart à l'étage suivant, lampe en main.
 import { CELL_SIZE, T, CASSETTES, createLevel0, PIT_HALF, FLOOR_DY, bfs, pillarDist, segHitsPillar } from './map.js';
-import { createWarehouseMap, DOCK_PASS, guardDoorWant } from './level1.js';
+import { createWarehouseMap, DOCK_PASS, guardDoorWant, inSafe, SAFE_LEVER_R } from './level1.js';
 import { createPoolMap, MOUTH } from './poolrooms.js';
 import { createHotelMap, WORDS, LETTERS, HIDE_R as SPOT_R, MAIL_R, KEYPAD_R, LETTER_R } from './hotel.js';
 import { createPipesMap, VALVES, PIPES_LEVEL, jetState, inJet, JET_HALF } from './level2.js';
@@ -153,6 +153,17 @@ export const RUSH_WIND = 0.6; // secondes de cri sur place avant de s'élancer, 
 export const SAW_T = 6; // secondes pendant lesquelles on « l'a vue » (elle peut alors se lancer)
 export const CALM_HOLD = 45; // secondes de répit dans un recoin calme, avant que sa lampe grésille
 export const HAUNT_COOLDOWN = 12; // un spectateur ne hante qu'une fois toutes les 12 s
+// Level 1 : l'imposteur. Après une victime, l'entité prend son apparence et sa voix, et vient vers les vivants en marchant
+// comme un joueur. Elle se démasque tout près (UNMASK_R), ou quand une lampe la fixe trop longtemps (UNMASK_LIT)
+export const UNMASK_R = 2.5;
+export const UNMASK_LIT = 1.6; // s dans le faisceau d'une lampe, à moins de 12 m
+export const MIMIC_SPEED = 0.95; // part de la marche d'un joueur
+export const MIMIC_CALL = [7, 13]; // s entre deux appels (la voix volée, de vive voix ou au talkie)
+// Level 1 : les salles de sécurité. L'entité qui bute sur une porte blindée fermée frappe BANG_T secondes, hurle de
+// rage et va rôder au moins RETREAT_R mètres plus loin
+export const BANG_T = [8, 12];
+export const RETREAT_R = 45;
+export const KNOCK_T = [10, 14]; // l'imposteur, lui, frappe doucement (et appelle) avant de renoncer
 
 // Les recoins calmes d'un étage du Level 0 : des culs-de-sac (une seule case voisine libre), loin du départ et les uns
 // des autres. Une lampe chaude y brille, un air doux y joue : rien ne s'y passe… pendant un moment
@@ -576,6 +587,14 @@ export class BackroomsSim {
       pending: null, // apparition annoncée : { spot, kind, t } (le signe a été donné, elle arrive)
       glimpse: null, // Level 0 : la toute première rencontre, mise en scène ({ t, looked })
       sawHide: -1, // le casier où elle a vu quelqu'un entrer
+      mimic: null, // Level 1 : le joueur dont elle a pris l'apparence (null : sa vraie forme)
+      callT: 0, // l'imposteur : délai avant son prochain appel
+      litT: 0, // l'imposteur : depuis combien de temps une lampe le fixe
+      hesT: 0, // l'imposteur : délai avant sa prochaine hésitation (négatif : l'arrêt en cours)
+      hesLen: 1,
+      restT: 0, // l'imposteur : il a renoncé à une porte, il s'éloigne (vers away0)
+      away0: null,
+      bang: null, // devant une porte blindée fermée : { id, t, hitT }
       // sa marche (gait.js) : vitesse réelle, passage en cours (escalier, trou), hauteur des pieds, poussée
       v: 0,
       trav: null,
@@ -1094,7 +1113,8 @@ export class BackroomsSim {
     this.dropLetters(P);
     // (tombé dans un puits sans fond, ou mort de soif : pas d'entité qui surgit)
     if (!extra.abyss && !extra.thirst) this.emit({ type: 'jumpscare', x: extra.x ?? P.x, z: extra.z ?? P.z, id: P.id, goat: !!extra.goat });
-    this.emit({ type: 'dead', id: P.id, name: P.name, time: this.time, abyss: !!extra.abyss, thirst: !!extra.thirst });
+    // (quiet, Level 1 : l'entité qui l'a tué va prendre sa place : les autres ne l'apprennent pas tout de suite)
+    this.emit({ type: 'dead', id: P.id, name: P.name, time: this.time, abyss: !!extra.abyss, thirst: !!extra.thirst, quiet: !!extra.quiet });
   }
 
   // Level 1 : les fusibles en poche tombent par terre (on peut aller les rechercher)
@@ -1220,6 +1240,8 @@ export class BackroomsSim {
     for (const a of m.alarms || []) if (!a.used) see('alarm', a, a.x + a.nx * 0.55, a.z + a.nz * 0.55);
     const S = m.post;
     if (S && S.by < 0) see('desk', S, S.seat.x, S.seat.z);
+    // le verrou d'une salle de sécurité : seulement de l'intérieur
+    for (const R of m.safes || []) if (inSafe(R, P.x, P.z) && Math.hypot(R.lever.x - P.x, R.lever.z - P.z) < SAFE_LEVER_R) see('safe', R, R.lever.x, R.lever.z);
     return best;
   }
 
@@ -1237,6 +1259,225 @@ export class BackroomsSim {
     if (c.kind === 'dock') return this.toggleDock(c.obj, P);
     if (c.kind === 'alarm') return this.ringAlarm(c.obj, P);
     if (c.kind === 'desk') return this.sitDesk(P);
+    if (c.kind === 'safe') return this.toggleSafe(c.obj, P);
+  }
+
+  // Le verrou d'une salle de sécurité (de l'intérieur) : la porte blindée claque et se verrouille, ou se rouvre. Elle ne
+  // se ferme pas sur quelqu'un dans la baie, ni avec l'entité dedans
+  toggleSafe(S, P) {
+    const M = this.monster;
+    if (!S.shut) {
+      const inWay = (b) => b && Math.hypot(b.x - S.x, b.z - S.z) < 0.55; // (dans la baie, sous le battant)
+      const mIn = this.hasMonster && M && !M.duct && (inWay(M) || inSafe(S, M.x, M.z));
+      if (mIn || this.players.some((Q) => Q.status === 'alive' && inWay(Q))) return this.emit({ type: 'safeJam', id: S.id, by: P.id, x: S.x, z: S.z });
+    }
+    S.shut = !S.shut;
+    S.by = S.shut ? P.id : -1;
+    this.makeNoise(P, NOISE.use, 0.6);
+    this.emit({ type: 'safe', id: S.id, shut: S.shut, by: P.id, x: S.x, z: S.z });
+  }
+
+  // personne de vivant dedans : la porte se rouvre (un joueur parti ne laisse pas une salle fermée pour toujours)
+  updateSafes() {
+    for (const S of this.map.safes || []) {
+      if (!S.shut || this.players.some((Q) => Q.status === 'alive' && inSafe(S, Q.x, Q.z))) continue;
+      S.shut = false;
+      S.by = -1;
+      this.emit({ type: 'safe', id: S.id, shut: false, x: S.x, z: S.z });
+    }
+  }
+
+  // la salle de sécurité fermée où le joueur s'est enfermé (ou null)
+  lockedIn(P) {
+    if (this.level !== 1 || !P || P.status !== 'alive' || !this.map.safeAt) return null;
+    const S = this.map.safeAt(P.x, P.z);
+    return S && S.shut ? S : null;
+  }
+
+  // devant une porte blindée, côté entrepôt
+  safeFront(S, d = 0.95) {
+    return { x: S.x + S.nx * d, z: S.z + S.nz * d };
+  }
+
+  // un endroit d'où repartir, au moins RETREAT_R mètres de (x, z) (sinon le plus loin possible)
+  retreatSpot(x, z) {
+    const map = this.map;
+    const at = (c) => [(c.x + 0.5) * CELL_SIZE, (c.z + 0.5) * CELL_SIZE];
+    const cells = map.walkable.filter((c) => !(map.safeAt && map.safeAt(...at(c))));
+    const far = cells.filter((c) => Math.hypot(at(c)[0] - x, at(c)[1] - z) >= RETREAT_R);
+    let c = far.length ? far[Math.floor(Math.random() * far.length)] : null;
+    if (!c) {
+      let bd = -1;
+      for (const q of cells) {
+        const d = Math.hypot(at(q)[0] - x, at(q)[1] - z);
+        if (d > bd) [bd, c] = [d, q];
+      }
+    }
+    return c ? { x: at(c)[0], z: at(c)[1] } : null;
+  }
+
+  // Level 1 : elle vient de tuer V : elle prend son apparence (sa tenue, sa voix) et part rejoindre les autres
+  startMimic(M, V) {
+    if (!this.players.some((Q) => Q.status === 'alive')) return;
+    M.mimic = V.id;
+    M.mode = 'mimic';
+    M.silent = true;
+    M.callT = rand(4, 7);
+    M.litT = 0;
+    M.hesT = rand(3, 6);
+    M.restT = 0;
+    M.bang = null;
+    M.path = [];
+    M.repathT = 0;
+    this.emit({ type: 'mimic', id: V.id, x: M.x, z: M.z });
+  }
+
+  // démasquée : elle reprend sa forme dans un hurlement et fonce sur celui qui l'a percée à jour
+  unmask(M, Q, why) {
+    const id = M.mimic;
+    M.mimic = null;
+    M.bang = null;
+    M.mode = 'chase';
+    M.silent = false;
+    M.target = Q.id;
+    M.windT = 0.55; // la transformation : un instant sur place, le temps de se déchirer
+    M.rushT = 1.6;
+    M.burstT = 2;
+    M.unseenT = 0;
+    M.lastSeenX = Q.x;
+    M.lastSeenZ = Q.z;
+    M.lastSeenF = Q.floor || 0;
+    M.repathT = 0;
+    this.chases++;
+    this.emit({ type: 'unmask', id, by: Q.id, why, x: M.x, z: M.z });
+  }
+
+  // L'imposteur : il marche comme un joueur (vitesse de marche, petites hésitations, il se tourne vers les pas des
+  // autres), vient vers les vivants et les appelle avec la voix volée ; tout près, ou fixé par une lampe, il se démasque
+  mimicStep(M, P) {
+    const map = this.map;
+    const alive = this.players.filter((Q) => Q.status === 'alive' && (Q.floor || 0) === (M.floor || 0));
+    // percé à jour : à deux pas de quelqu'un (qu'il voit), ou tenu dans le faisceau d'une lampe
+    let lit = null;
+    for (const Q of alive) {
+      const d = Math.hypot(Q.x - M.x, Q.z - M.z);
+      const los = hasLineOfSight(map, Q.x, Q.z, M.x, M.z);
+      if (d < UNMASK_R && los && !(Q.hidden >= 0)) return this.unmask(M, Q, 'near');
+      if (Q.flashlight && d < 12 && los && this.facing(Q, M.x, M.z) < 0.3) lit = Q;
+    }
+    M.litT = lit ? M.litT + DT : Math.max(0, M.litT - DT * 0.5);
+    if (lit && M.litT > UNMASK_LIT) return this.unmask(M, lit, 'light');
+    M.restT = Math.max(0, M.restT - DT);
+    const locked = this.lockedIn(P);
+    let goal = null;
+    let speed = WALK_SPEED * MIMIC_SPEED;
+    if (M.restT > 0 && M.away0) goal = M.away0;
+    else if (locked) {
+      // sa proie s'est enfermée : il frappe doucement et appelle (« ouvre, c'est moi »), puis renonce
+      const F = this.safeFront(locked);
+      goal = F;
+      if (!M.bang || M.bang.id !== locked.id) M.bang = { id: locked.id, t: rand(KNOCK_T[0], KNOCK_T[1]), hitT: 0 };
+      if (Math.hypot(M.x - F.x, M.z - F.z) < 1.1) {
+        speed = 0;
+        faceTo(M, locked.x, locked.z, 6);
+        M.bang.t -= DT;
+        M.bang.hitT -= DT;
+        if (M.bang.hitT <= 0) {
+          M.bang.hitT = rand(2.2, 3.6);
+          this.emit({ type: 'safeKnock', id: locked.id, x: locked.x, z: locked.z });
+        }
+        M.callT = Math.min(M.callT, 3.5);
+        if (M.bang.t <= 0) {
+          M.bang = null;
+          M.restT = 25;
+          M.away0 = this.retreatSpot(locked.x, locked.z);
+          M.repathT = 0;
+        }
+      }
+    } else {
+      M.bang = null;
+      goal = { x: P.x, z: P.z };
+    }
+    // ses appels : de vive voix quand il est assez près (et le voit), sinon au talkie
+    const dist = Math.hypot(P.x - M.x, P.z - M.z);
+    M.callT -= DT;
+    if (M.callT <= 0 && M.restT <= 0) { // (le talkie porte partout)
+      M.callT = rand(MIMIC_CALL[0], MIMIC_CALL[1]);
+      const near = dist < 16 && (locked ? Math.hypot(M.x - locked.x, M.z - locked.z) < 6 : hasLineOfSight(map, M.x, M.z, P.x, P.z));
+      this.emit({ type: 'mimicCall', id: M.mimic, to: P.id, radio: !near, x: M.x, z: M.z });
+    }
+    // une hésitation de temps en temps : il s'arrête, se tourne vers les pas les plus proches, et repart
+    M.hesT -= DT;
+    if (M.hesT < 0) {
+      speed = 0;
+      let Q0 = null;
+      for (const Q of alive) if ((Q.noise || 0) > 0.1 && (!Q0 || Math.hypot(Q.x - M.x, Q.z - M.z) < Math.hypot(Q0.x - M.x, Q0.z - M.z))) Q0 = Q;
+      if (Q0) faceTo(M, Q0.x, Q0.z, 3);
+      if (M.hesT < -M.hesLen) M.hesT = rand(4, 9);
+    } else if (M.hesT < DT) M.hesLen = rand(0.6, 1.5);
+    M.speed = speed;
+    M.mode = 'mimic';
+    M.silent = true;
+    M.repathT -= DT;
+    if (M.repathT <= 0 && goal) {
+      M.repathT = 1;
+      planTo(this, M, goal.x, goal.z, M.floor || 0, {});
+    }
+    const x0 = M.x;
+    const z0 = M.z;
+    gaitMove(this, M, { speed, turn: 3.6, accel: 3, decel: 7, direct: null, stopR: 0.4 });
+    if (map.docks && map.docks.length) this.dockPush(M, x0, z0);
+  }
+
+  // Devant une porte blindée fermée : elle frappe (ça résonne dans la salle), BANG_T secondes ; si personne n'ouvre, elle
+  // hurle de rage et part rôder loin de là (et reste calme un moment : on entend ses pas lourds s'éloigner)
+  bangStep(M, P) {
+    const S = (this.map.safes || [])[M.bang ? M.bang.id : -1];
+    if (!S) {
+      M.bang = null;
+      M.mode = 'patrol';
+      return;
+    }
+    if (!S.shut) {
+      // on lui a ouvert : la voie est libre
+      M.bang = null;
+      M.mode = 'chase';
+      M.unseenT = 0;
+      M.repathT = 0;
+      return;
+    }
+    const F = this.safeFront(S);
+    const at = Math.hypot(M.x - F.x, M.z - F.z) < 1.1;
+    M.speed = at ? 0 : this.monsterChaseSpeed;
+    M.silent = false;
+    if (at) {
+      faceTo(M, S.x, S.z, 8);
+      M.bang.t -= DT;
+      M.bang.hitT -= DT;
+      if (M.bang.hitT <= 0) {
+        M.bang.hitT = rand(0.45, 0.85);
+        this.emit({ type: 'safeBang', id: S.id, x: S.x, z: S.z, k: Math.round(Math.random() * 100) / 100 });
+      }
+      if (M.bang.t <= 0) {
+        M.bang = null;
+        const spot = this.retreatSpot(S.x, S.z);
+        M.mode = spot ? 'flee' : 'patrol';
+        M.watch = spot;
+        M.dormantT = Math.max(M.dormantT || 0, 14);
+        M.safeCD = 30; // (elle ne revient pas tout de suite frapper à une porte)
+        M.repathT = 0;
+        this.emit({ type: 'frustrated', id: S.id, x: M.x, z: M.z });
+        if (P) this.emit({ type: 'lost', id: P.id });
+        return;
+      }
+    } else {
+      M.repathT -= DT;
+      if (M.repathT <= 0) {
+        M.repathT = 0.5;
+        planTo(this, M, F.x, F.z, M.floor || 0, {});
+      }
+    }
+    gaitMove(this, M, { speed: M.speed, turn: 7, accel: 8, decel: 10, direct: null, stopR: 0.3 });
   }
 
   // Le bouton d'un quai : le rideau monte (lentement, à grand bruit) ou redescend ; arraché par l'entité, il reste en haut
@@ -2011,6 +2252,7 @@ export class BackroomsSim {
       this.updatePanel();
       this.updateDocks();
       this.updateAlarms();
+      this.updateSafes();
       // la porte du poste de garde s'ouvre devant qui arrive (fermée, elle cache et étouffe comme une cloison)
       const gd = this.map.guardDoor;
       if (gd) {
@@ -2848,7 +3090,7 @@ export class BackroomsSim {
       p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.water * 10) / 10, P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.floor, P.sigTo, P.onLadder ? 1 : 0, r2(P.lockT), r2(P.tilt), P.onBeam ? 1 : 0, P.bottles, r2(P.grabT), P.hidden, P.crouch ? 1 : 0, P.carry.join('.'), P.hurt || 0, Math.round(P.breath), P.holding ? 1 : 0, P.grabs || 0, r2(P.struggle || 0), r2(P.jy || 0), P.cam ? 1 : 0, r2(P.noise || 0), P.letters.join('.'), r2(P.detect), P.desk ? 1 : 0, P.camSel || 0]),
       // l'entité : position, regard, mode, … et la hauteur de ses pieds (les marches, la chute dans un trou)
       // (et, pour un invité qui deviendrait l'hôte : sa minute de calme, et si la première rencontre a eu lieu)
-      m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0, M.floor, M.grabbing ?? -1, r2(M.rushT || 0), M.away ? 1 : 0, r2(M.y ?? -(M.floor || 0) * FLOOR_DY), Math.round(M.dormantT || 0), this.glimpseAt === Infinity ? 1 : 0, M.inDuct ? 1 : 0, r2(M.duct && M.duct.landT > 0 ? M.duct.landT : 0)],
+      m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0, M.floor, M.grabbing ?? -1, r2(M.rushT || 0), M.away ? 1 : 0, r2(M.y ?? -(M.floor || 0) * FLOOR_DY), Math.round(M.dormantT || 0), this.glimpseAt === Infinity ? 1 : 0, M.inDuct ? 1 : 0, r2(M.duct && M.duct.landT > 0 ? M.duct.landT : 0), M.mimic ?? -1],
       // néons : 1 allumé, 0 éteint, 2 qui grésille (les coupures du directeur, les néons qui meurent un à un)
       ls: this.floors.map((f) => (f.lights || []).flatMap((l, i) => (l.state !== l.s0 ? [i * 3 + (l.state === 'off' ? 0 : l.state === 'flicker' ? 2 : 1)] : []))),
       // les néons éteints un instant par le metteur en scène : [étage, néon, secondes, état au retour]
@@ -2868,6 +3110,7 @@ export class BackroomsSim {
       al: this.map.alarms ? this.map.alarms.map((a) => (a.used ? 1 + r2(a.ringT) : 0)) : undefined,
       vo: this.map.ducts ? bits(this.map.ducts.vents, 'open') : undefined,
       pb: this.map.post ? this.map.post.by : undefined,
+      sf: this.map.safes ? bits(this.map.safes, 'shut') : undefined, // les portes blindées fermées
       k: [bits(this.allCassettes, 'collected'), bits(this.map.fuses, 'taken'), this.floors.map((f) => bits(f.items, 'taken')).join('|'), ''],
       // objets posés par des joueurs (échanges) : [étage, objet, x, z] ; échelle posée
       ix: this.floors.flatMap((f, fi) => (f.items || []).slice(this.items0[fi]).map((o) => [fi, o.kind, r2(o.x), r2(o.z)])),
@@ -3063,6 +3306,7 @@ export class BackroomsSim {
     if (snap.m[11]) this.glimpseAt = Infinity;
     M.inDuct = !!snap.m[12];
     M.landT = snap.m[13] || 0;
+    M.mimic = snap.m[14] >= 0 ? snap.m[14] : null;
     if (snap.fp) (this.map.fuses || []).forEach((f, i) => {
       const q = snap.fp[i];
       if (!q) return;
@@ -3093,6 +3337,7 @@ export class BackroomsSim {
     });
     if (this.map.ducts && typeof snap.vo === 'string') this.map.ducts.vents.forEach((v, i) => (v.open = snap.vo[i] === '1'));
     if (this.map.post && snap.pb !== undefined) this.map.post.by = snap.pb;
+    if (this.map.safes && typeof snap.sf === 'string') this.map.safes.forEach((S, i) => (S.shut = snap.sf[i] === '1'));
     const set = (list, k, b) => (list || []).forEach((o, i) => {
       o[k] = (b || '')[i] === '1';
     });
@@ -3240,7 +3485,7 @@ export class BackroomsSim {
       for (const Q of this.players) if (Q !== P && Q.status === 'alive' && Q.floor === P.floor) mate = Math.min(mate, Math.hypot(Q.x - P.x, Q.z - P.z));
       // plus il est loin des autres, plus elle le préfère (jusqu'à 22 m d'avance sur un joueur bien entouré)
       const alone = mate !== Infinity && mate > 12 ? Math.min(22, 6 + (mate - 12) * 0.6) : 0;
-      const resting = this.calmAt(P);
+      const resting = this.calmAt(P) || !!this.lockedIn(P); // (enfermé dans une salle de sécurité : elle préfère les autres)
       // (pendant sa charge, elle ne lâche pas celui sur qui elle fonce)
       const score = P.mDist - (P.seen && !concealed ? 12 : 0) - (P.id === M.target ? (M.rushT > 0 ? 60 : 6) : 0) - alone - Math.min(12, (P.noise || 0) * 12) + (concealed ? 30 : 0) + (resting ? 40 : 0);
       if (score < bestScore) {
@@ -3248,6 +3493,8 @@ export class BackroomsSim {
         target = P;
       }
     }
+    // l'imposteur ne fait pas bourdonner l'air : rien ne trahit qu'il approche
+    if (M.mimic != null) for (const P of this.players) P.danger = 0;
     const view = this.viewPlayer(this.spectate || 0);
     M.danger = view.danger;
     M.pan = view.pan;
@@ -3342,6 +3589,9 @@ export class BackroomsSim {
     M.away = false;
     // Level 1 : dans les gaines de ventilation (on l'entend cogner au-dessus), puis sa chute par une bouche
     if (M.duct) return this.ductStep(M, P);
+    // Level 1 : sous l'apparence d'une victime ; ou devant une porte blindée fermée
+    if (M.mimic != null) return this.mimicStep(M, P);
+    if (M.mode === 'bang') return this.bangStep(M, P);
     const map = this.fm(M.floor);
     const rage = this.rage; // 0 seul ou personne à l'abri, jusqu'à 1 quand il ne reste qu'un joueur dehors
     const dark = this.blackout > 0;
@@ -3455,6 +3705,14 @@ export class BackroomsSim {
       } else M.edgeT = 0;
     } else M.edgeT = 0;
 
+    // Level 1 : derrière une porte blindée fermée, on est hors de sa portée (ni vu, ni entendu, ni senti)
+    if (this.lockedIn(P)) {
+      canSee = false;
+      canHear = false;
+      isNearby = false;
+    }
+    M.safeCD = Math.max(0, (M.safeCD || 0) - DT);
+
     // Jamais plantée sous les yeux de quelqu'un : hors poursuite, presque immobile dans le cadre d'un joueur, elle agit
     // au bout d'une seconde (d'une demi, postée au coin d'un couloir). Fixée par quelqu'un à découvert (sa proie ou un
     // autre : c'est alors lui qu'elle charge), découverte de près ou à son poste : elle hurle et charge. Vue de côté,
@@ -3499,6 +3757,15 @@ export class BackroomsSim {
       isNearby = false;
       this.lureTo(M, bell);
     } else M.lure = -1;
+
+    // Level 1 : sa proie s'est enfermée dans une salle de sécurité sous son nez : elle va frapper à la porte
+    const locked = this.lockedIn(P);
+    if (locked && !(M.safeCD > 0) && (M.mode === 'chase' || M.mode === 'search') && Math.hypot(M.x - locked.x, M.z - locked.z) < 22) {
+      M.mode = 'bang';
+      M.bang = { id: locked.id, t: rand(BANG_T[0], BANG_T[1]), hitT: 0 };
+      M.repathT = 0;
+      return this.bangStep(M, P);
+    }
 
     if (M.mode === 'ambush') {
       // en embuscade, elle attend que sa proie passe tout près
@@ -3813,8 +4080,8 @@ export class BackroomsSim {
       if (P.hidden >= 0) this.leaveHide(P);
       if (P.desk) this.leaveDesk(P, true);
       if (this.level === HOTEL_LEVEL || P.grabs >= 1 || this.difficulty === 'hard' && this.rage >= 1) {
-        this.killPlayer(P, { x: M.x, z: M.z });
-        this.afterCatch(M);
+        this.killPlayer(P, { x: M.x, z: M.z, quiet: this.level === 1 });
+        this.afterCatch(M, P);
         return;
       }
       P.grabs++;
@@ -3864,19 +4131,21 @@ export class BackroomsSim {
     }
     if (G.grabT <= 0) {
       G.grabT = 0;
-      this.killPlayer(G, { x: M.x, z: M.z });
-      this.afterCatch(M);
+      this.killPlayer(G, { x: M.x, z: M.z, quiet: this.level === 1 });
+      this.afterCatch(M, G);
     }
   }
 
   // après une victime : elle repart en ronde, loin de la cabine
-  afterCatch(M) {
+  afterCatch(M, victim = null) {
     M.mode = 'patrol';
     M.grabbing = null;
     M.target = null;
     M.path = [];
     M.ambushT = 6;
     M.sawHide = -1;
+    // Level 1 : elle prend l'apparence de sa victime
+    if (victim && this.level === 1 && victim.status === 'dead') this.startMimic(M, victim);
   }
 
   // angle entre le regard de l'entité et un point (0 : droit devant elle)
