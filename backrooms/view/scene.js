@@ -637,9 +637,11 @@ export function createBackroomsScene(container, floors, lamps) {
       uFilmC: { value: Array.from({ length: NFILM }, () => new THREE.Vector3()) },
       uFilmR: { value: new Float32Array(NFILM) }, // Level 0 : l'angle du diffuseur (couché le long d'un couloir en diagonale)
     };
-    // Level 1 : les feux de couleur (gyrophares des quais, flashs des alarmes, écrans du poste), les plus proches de la
-    // caméra, choisis à chaque image. P : position et portée ; C : couleur et puissance ; N : vers où il éclaire et la
-    // largeur de son lobe (rien : dans tous les sens)
+    // Le moteur de lumière, branché à tous les levels : les feux de couleur (Level 1 : gyrophares des quais, flashs des
+    // alarmes, écrans du poste ; Level 2 : brûleurs des chaudières, voyants ; Level 37 : volants de vanne, bouches de
+    // toboggan ; Level 5 : le boîtier EXIT, le clavier, la ventouse, l'ampoule de l'escalier ; partout : la cabine d'un
+    // ascenseur ouvert), les plus proches de la caméra, choisis à chaque image. P : position et portée ; C : couleur et
+    // puissance ; N : vers où il éclaire et la largeur de son lobe (rien : dans tous les sens)
     const NDYN = 8;
     const NSEG = 8; // les cloisons du poste de garde (Level 1)
     const OCC_GLSL = `
@@ -735,7 +737,7 @@ float occVis(vec3 p, vec3 lp) {
     // bloque (en part du plafond) ; alpha : une tôle mince au milieu de la case (le rideau d'un quai, sous son linteau ;
     // 128 : la tôle court le long de x, 255 : le long de z)
     // (Poolrooms : les murs seulement ; les cloisons entre les salles arrêtent la lumière par uDynB)
-    const DYN = L1 || L2;
+    const DYN = true; // (à tous les levels : un level sans feu de couleur proche ne paie qu'un test de portée par feu)
     const occData = DYN ? new Uint8Array(W * H * 4) : null;
     const occTex = DYN ? new THREE.DataTexture(occData, W, H, THREE.RGBAFormat) : null;
     if (DYN) {
@@ -1799,7 +1801,10 @@ float bkCaust(vec2 uv, float t) {
               // (le point, décollé de sa surface de quelques centimètres : un mur ne se fait pas d'ombre à lui-même)
               if (a > 0.0005) dAcc += uDynC[i] * a * occVis(vec3(vBakeP.x + vBakeN.x * 0.06, vBakeP.y - uBakeY, vBakeP.z + vBakeN.z * 0.06), vec3(uDynP[i].x, uDynP[i].y - uBakeY, uDynP[i].z));
             }
-            totalEmissiveRadiance += diffuseColor.rgb * dAcc;
+            // (une teinte de texture est plus pure qu'une vraie peinture : un damas rouge renvoie quand même un peu du vert
+            // d'un boîtier EXIT. Pour les feux de couleur seulement, la surface est prise un peu moins saturée)
+            vec3 dAlb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.4);
+            totalEmissiveRadiance += dAlb * dAcc;
           }
           #endif
           totalEmissiveRadiance += vec3(0.8, 1.0, 1.0) * bkCaust(vBakeP.xz * 0.32, uTime * 0.45) * 0.55 * sub * (0.35 + bk.r * 1.6);
@@ -1827,6 +1832,20 @@ float bkCaust(vec2 uv, float t) {
               float sH = max(dot(normal, normalize(sL + sV)), 0.0);
               sAcc += uLampCol[i] * (pow(sH, uGloss) + 0.05 * pow(sH, uGloss * 0.1)) * sNl / (1.0 + sD2 * 0.05); // un reflet net, et son halo
             }
+            #ifdef BK_DYN
+            // les feux de couleur aussi : leur reflet garde leur couleur, quelle que soit la teinte de la surface (le vert
+            // d'un boîtier EXIT luit sur un lambris verni bordeaux, qui n'en renverrait presque rien en diffus)
+            for (int i = 0; i < ${NDYN}; i++) {
+              vec3 dl;
+              float a = bkDyn(i, vBakeP, dl);
+              if (a < 0.0005) continue;
+              vec3 sL = normalize((viewMatrix * vec4(dl, 0.0)).xyz);
+              float sNl = max(dot(normal, sL), 0.0);
+              if (sNl <= 0.0) continue;
+              float sH = max(dot(normal, normalize(sL + sV)), 0.0);
+              sAcc += uDynC[i] * a * (pow(sH, uGloss) + 0.08 * pow(sH, uGloss * 0.1)) * sNl * occVis(vec3(vBakeP.x + vBakeN.x * 0.06, vBakeP.y - uBakeY, vBakeP.z + vBakeN.z * 0.06), vec3(uDynP[i].x, uDynP[i].y - uBakeY, uDynP[i].z));
+            }
+            #endif
             totalEmissiveRadiance += sAcc * sm * (uGloss + 8.0) * 0.04;
           }
           #endif`);
@@ -4416,38 +4435,17 @@ void main() {
         bakeUniforms.uTime.value = time;
         if (gear) {
           gear.update(sim, P, time, dt);
-          // les feux de couleur : les plus proches de la caméra (au bord de leur portée), dans les cases du shader
-          dynList.length = 0;
-          gear.lights(dynList);
           occDocks();
           if (dynU.uOccDoorK) dynU.uOccDoorK.value.x = gear.doorK > 0.25 ? 0 : 1;
-          // l'ascenseur d'arrivée, portes ouvertes : la lumière de sa cabine déborde sur le couloir
-          if (arrivalLift && arrivalLift.open > 0.02) {
-            const A = map.arrival;
-            const k = arrivalLift.open;
-            dynList.push({ x: A.x - A.dx * (CELL_SIZE / 2 + 0.2), y: 2.0, z: A.z - A.dz * (CELL_SIZE / 2 + 0.2), r: 1.25 * k, g: 1.15 * k, b: 0.95 * k, rad: 6, nx: -A.dx, ny: -0.35, nz: -A.dz, w: 0.05 });
-          }
-          const cx = camera.position.x;
-          const cz = camera.position.z;
-          for (const L of dynList) L.d = Math.hypot(L.x - cx, L.z - cz) - L.rad;
-          dynList.sort((a, b) => a.d - b.d);
-          for (let i = 0; i < NDYN; i++) {
-            const L = dynList[i];
-            if (L && L.d < 6) {
-              dynU.uDynP.value[i].set(L.x, L.y + group.position.y, L.z, L.rad);
-              dynU.uDynC.value[i].set(L.r, L.g, L.b);
-              dynU.uDynN.value[i].set(L.nx, L.ny, L.nz, L.w);
-            } else {
-              dynU.uDynP.value[i].set(0, -100, 0, 0.001);
-              dynU.uDynC.value[i].set(0, 0, 0);
-            }
-          }
         }
-        // Poolrooms : les feux de couleur. Les volants de vanne rougeoient (une lueur qui respire) ; la bouche d'un
-        // toboggan luit de sa couleur, à peine tant qu'il est fermé, franchement quand les volants sont trouvés (plus
-        // du tout quand un autre a été pris). Chaque feu reste dans sa salle (uDynB)
+        // Le moteur de lumière : chaque level verse ses feux de couleur dans la liste, puis les plus proches de la
+        // caméra (au bord de leur portée) prennent les cases du shader
+        dynList.length = 0;
+        if (gear) gear.lights(dynList);
+        // Poolrooms : les volants de vanne rougeoient (une lueur qui respire) ; la bouche d'un toboggan luit de sa
+        // couleur, à peine tant qu'il est fermé, franchement quand les volants sont trouvés (plus du tout quand un autre
+        // a été pris). Chaque feu reste dans sa salle (uDynB)
         if (L2) {
-          dynList.length = 0;
           const roomBox = (x, z) => {
             const r = map.roomAt && map.roomAt(x, z);
             return r ? [r.x0 - 0.25, r.z0 - 0.25, r.x1 + 0.25, r.z1 + 0.25] : [x - 6, z - 6, x + 6, z + 6];
@@ -4465,17 +4463,34 @@ void main() {
             const z = sl.z - sl.dz * 0.9;
             dynList.push({ x, y: 1.0, z, r: c.r * k, g: c.g * k, b: c.b * k, rad: 5.5, nx: -sl.dx, ny: -0.1, nz: -sl.dz, w: -0.2, box: sl.box || (sl.box = roomBox(x, z)) });
           }
+        }
+        if (pipesView) pipesView.lights(dynList, time);
+        if (hotel) hotel.lights(dynList, time);
+        // l'ascenseur d'arrivée, portes ouvertes : la lumière de sa cabine déborde sur le couloir
+        if (arrivalLift && arrivalLift.open > 0.02) {
+          const A = map.arrival;
+          const k = arrivalLift.open;
+          dynList.push({ x: A.x - A.dx * (CELL_SIZE / 2 + 0.2), y: 2.0, z: A.z - A.dz * (CELL_SIZE / 2 + 0.2), r: 1.25 * k, g: 1.15 * k, b: 0.95 * k, rad: 6, nx: -A.dx, ny: -0.35, nz: -A.dz, w: 0.05 });
+        }
+        {
+          // (Level 1 : seuls les feux tout proches, sans fondu, comme avant ; ailleurs, jusqu'à 30 m, et un feu qui sort
+          // des huit cases s'éteint en douceur sur ses 4 derniers mètres au lieu de sauter)
+          const far = gear ? 6 : 30;
           const cx = camera.position.x;
           const cz = camera.position.z;
           for (const L of dynList) L.d = Math.hypot(L.x - cx, L.z - cz) - L.rad;
           dynList.sort((a, b) => a.d - b.d);
+          const edge = dynList.length > NDYN ? dynList[NDYN].d : far;
           for (let i = 0; i < NDYN; i++) {
             const L = dynList[i];
-            if (L && L.d < 30) {
+            if (L && L.d < far) {
+              const f = gear ? 1 : Math.min(1, Math.max(0, (Math.min(far, edge + 1) - L.d) / 4));
               dynU.uDynP.value[i].set(L.x, L.y + group.position.y, L.z, L.rad);
-              dynU.uDynC.value[i].set(L.r, L.g, L.b);
+              dynU.uDynC.value[i].set(L.r * f, L.g * f, L.b * f);
               dynU.uDynN.value[i].set(L.nx, L.ny, L.nz, L.w);
-              dynU.uDynB.value[i].set(L.box[0], L.box[1], L.box[2], L.box[3]);
+              const b = L.box;
+              if (b) dynU.uDynB.value[i].set(b[0], b[1], b[2], b[3]);
+              else dynU.uDynB.value[i].set(-1e5, -1e5, 1e5, 1e5);
             } else {
               dynU.uDynP.value[i].set(0, -100, 0, 0.001);
               dynU.uDynC.value[i].set(0, 0, 0);

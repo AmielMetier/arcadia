@@ -122,18 +122,20 @@ function drawSign(x, w, h) {
 
 // le pictogramme de l'homme qui court vers une porte (en blanc sur vert), le mot EXIT et la flèche
 function drawExit(x, w, h) {
-  x.fillStyle = '#0c6b2e';
+  // (rétroéclairé : plus vif au milieu, devant les diodes, un peu terne aux coins)
+  x.fillStyle = '#0b7a35';
   x.fillRect(0, 0, w, h);
-  const g = x.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, 'rgba(255,255,255,0.18)');
-  g.addColorStop(1, 'rgba(0,0,0,0.12)');
+  const g = x.createRadialGradient(w / 2, h / 2, 10, w / 2, h / 2, w * 0.62);
+  g.addColorStop(0, 'rgba(120,255,160,0.55)');
+  g.addColorStop(0.6, 'rgba(40,200,100,0.25)');
+  g.addColorStop(1, 'rgba(0,40,10,0.25)');
   x.fillStyle = g;
   x.fillRect(0, 0, w, h);
   x.fillStyle = '#f4fff6';
+  x.strokeStyle = '#f4fff6';
   // la porte
-  x.fillRect(16, 14, 54, h - 28);
-  x.fillStyle = '#0c6b2e';
-  x.fillRect(22, 20, 42, h - 34);
+  x.lineWidth = 6;
+  x.strokeRect(19, 17, 48, h - 34);
   // l'homme qui court
   x.fillStyle = '#f4fff6';
   x.strokeStyle = '#f4fff6';
@@ -283,7 +285,7 @@ function drawGlow(x, text, col, red, green) {
 export function buildHotelExit({ map, group, baked, CEIL }) {
   const E = map.elevator;
   const kp = map.keypad;
-  if (!E || !kp) return { update() {} };
+  if (!E || !kp) return { update() {}, lights() {} };
   const DW = 1.2;
   const DH = 2.2;
   const box = (w, h, d, mat, x, y, z, parent) => {
@@ -419,27 +421,20 @@ export function buildHotelExit({ map, group, baked, CEIL }) {
   box(Math.abs(kx - cx0) + cd, cd, cd, pipe, (kx + cx0) / 2, conduitY, -0.012, eg);
   box(cd, conduitY - (DH + 0.07), cd, pipe, cx0, (conduitY + DH + 0.07) / 2, -0.012, eg);
 
-  // --- Le boîtier EXIT : un caisson blanc, la face verte qui luit, et son halo sur le mur ---
+  // --- Le boîtier EXIT : un caisson blanc, la face verte qui luit. Sa lumière verte (sur le mur, l'huisserie, le
+  // battant, le sol et le plafond, arrêtée par les murs) est un feu du moteur de lumière : voir lights() ---
   const ex = new THREE.Group();
   ex.position.set(0, DH + 0.36, -0.045);
   eg.add(ex);
   box(0.46, 0.2, 0.08, baked(new THREE.MeshLambertMaterial({ color: '#d8d6cf' })), 0, 0, 0, ex);
+  // le diffuseur, sous le caisson : une fente laiteuse par où la lumière tombe sur la porte
+  box(0.4, 0.004, 0.05, new THREE.MeshBasicMaterial({ color: '#9dffc0' }), 0, -0.101, -0.005, ex);
   const [xc, xx] = canvas(320, 128);
   drawExit(xx, 320, 128);
-  const exitFace = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.168), new THREE.MeshBasicMaterial({ map: tex(xc) }));
+  const exitFace = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.168), new THREE.MeshBasicMaterial({ map: tex(xc), toneMapped: false }));
   exitFace.position.set(0, 0, -0.0405);
   exitFace.rotation.y = Math.PI;
   ex.add(exitFace);
-  const [hc, hx] = canvas(128, 64);
-  const hg = hx.createRadialGradient(64, 32, 4, 64, 32, 64);
-  hg.addColorStop(0, 'rgba(90,255,140,0.55)');
-  hg.addColorStop(1, 'rgba(90,255,140,0)');
-  hx.fillStyle = hg;
-  hx.fillRect(0, 0, 128, 64);
-  const halo = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.55), new THREE.MeshBasicMaterial({ map: tex(hc), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.28 }));
-  halo.position.set(0, DH + 0.36, -0.006);
-  halo.rotation.y = Math.PI;
-  eg.add(halo);
 
   // --- Le clavier ---
   const kg = frame(kp.x, kp.z, kp.rot); // +z local : vers le hall
@@ -469,7 +464,31 @@ export function buildHotelExit({ map, group, baked, CEIL }) {
   let lastCode = '';
   let pressed = null;
   let pressT = 0;
+  // les feux du moteur de lumière (repère de l'étage) : le boîtier EXIT, juste devant sa face et un peu plus bas ; la
+  // ventouse ; l'écran du clavier ; l'ampoule de la cage, qui déborde dans le hall quand le battant s'ouvre
+  const hx = -E.dx;
+  const hz = -E.dz;
+  const fx = eg.position.x;
+  const fz = eg.position.z;
+  const lockAt = { x: fx + lockX * Math.cos(eg.rotation.y) + hx * 0.06, z: fz - lockX * Math.sin(eg.rotation.y) + hz * 0.06 };
+  const kr = kp.rot;
+  const GLOW_IDLE = [0.05, 0.22, 0.09];
+  const GLOW_ON = [0.08, 0.36, 0.14];
+  const GLOW_OK = [0.1, 0.5, 0.18];
+  const GLOW_BAD = [0.6, 0.06, 0.04];
+  const GLOW_OFF = [0, 0, 0];
+  let kpGlow = GLOW_IDLE;
   return {
+    lights(out) {
+      // (en tous sens : le caisson est collé au mur, rien n'éclaire derrière ; à 40 cm devant la face, pour que le mur
+      // autour prenne la lumière sous un angle franc, pas seulement en rasant)
+      out.push({ x: fx + hx * 0.4, y: DH + 0.3, z: fz + hz * 0.4, r: 0.27, g: 1.6, b: 0.7, rad: 4.2, nx: 0, ny: 0, nz: 0, w: 0 });
+      const open = doorOpen > 0.02 || openT >= 0;
+      out.push({ x: lockAt.x, y: DH - 0.08, z: lockAt.z, r: open ? 0.04 : 0.32, g: open ? 0.3 : 0.03, b: open ? 0.08 : 0.02, rad: 0.7, nx: hx, ny: 0, nz: hz, w: -0.6 });
+      if (kpGlow !== GLOW_OFF) out.push({ x: kp.x + Math.sin(kr) * 0.12, y: kp.y + 0.02, z: kp.z + Math.cos(kr) * 0.12, r: kpGlow[0], g: kpGlow[1], b: kpGlow[2], rad: 1.1, nx: Math.sin(kr), ny: 0, nz: Math.cos(kr), w: -0.5 });
+      const k = Math.min(1, doorOpen / 1.2);
+      if (k > 0.02) out.push({ x: fx - hx * 1.0, y: 2.1, z: fz - hz * 1.0, r: 1.0 * k, g: 0.78 * k, b: 0.5 * k, rad: 5.5, nx: hx, ny: -0.3, nz: hz, w: 0.1 });
+    },
     update(sim, dt) {
       const now = performance.now();
       const ui = hotelUi;
@@ -483,6 +502,8 @@ export function buildHotelExit({ map, group, baked, CEIL }) {
       if (now - pressT > 140) pressed = null;
       const wrong = now - ui.wrongAt < 1400;
       const blink = Math.floor(now / 160) % 2;
+      // (la lueur de l'écran sur le mur, pour le moteur de lumière : verte, rouge qui clignote sur un mauvais code)
+      kpGlow = sim.open ? GLOW_OK : wrong ? (blink ? GLOW_BAD : GLOW_OFF) : code !== null ? GLOW_ON : GLOW_IDLE;
       if (sim.open) paintKeypad('OPEN', 'green', 0, 1, null);
       else if (wrong) paintKeypad('DENIED', 'red', blink, 0, null);
       else if (code !== null) paintKeypad(code.length ? '* '.repeat(code.length).trim() : 'CODE ?', 'green', 1, 0, pressed);
@@ -498,6 +519,163 @@ export function buildHotelExit({ map, group, baked, CEIL }) {
       const want = openT < 0 ? 0 : ease * 1.42 + Math.sin(Math.min(1, k) * Math.PI) * 0.04;
       doorOpen += (want - doorOpen) * Math.min(1, dt * 12);
       hinge.rotation.y = -doorOpen;
+    },
+  };
+}
+
+// --- Le palier des ascenseurs (map.lifts) : deux cabines Art déco hors service, portes de laiton gravées, cadran
+// d'étage en demi-lune au-dessus, la plaque des boutons d'appel entre les deux ; l'une a ses portes entrouvertes sur le
+// noir de la gaine, l'autre porte un mot scotché « OUT OF ORDER » ---
+function drawLiftDoor(x, w, h, left) {
+  const g = x.createLinearGradient(0, 0, w, 0);
+  g.addColorStop(0, '#8a6a2c');
+  g.addColorStop(0.5, '#c9a457');
+  g.addColorStop(1, '#93722f');
+  x.fillStyle = g;
+  x.fillRect(0, 0, w, h);
+  const r = rng(left ? 3 : 4);
+  for (let i = 0; i < 260; i++) {
+    x.fillStyle = `rgba(${r() < 0.5 ? '255,240,200' : '40,25,5'},${0.04 + r() * 0.05})`;
+    x.fillRect(r() * w, r() * h, 1, 30 + r() * 120);
+  }
+  // le motif : un soleil levant depuis le joint des deux portes, des filets verticaux
+  x.strokeStyle = 'rgba(60,38,8,0.55)';
+  x.lineWidth = 2;
+  const ox = left ? w : 0;
+  const oy = h * 0.42;
+  for (let i = 0; i <= 8; i++) {
+    const a = Math.PI / 2 + (left ? 1 : -1) * (i / 8) * (Math.PI / 2);
+    x.beginPath();
+    x.moveTo(ox, oy);
+    x.lineTo(ox + Math.cos(a) * h * 0.3, oy - Math.sin(a) * h * 0.3);
+    x.stroke();
+  }
+  for (const rr0 of [0.08, 0.12]) {
+    x.beginPath();
+    x.arc(ox, oy, h * rr0, Math.PI, 0);
+    x.stroke();
+  }
+  x.lineWidth = 1.5;
+  for (const u of [0.15, 0.85]) {
+    x.beginPath();
+    x.moveTo(w * u, h * 0.06);
+    x.lineTo(w * u, h * 0.94);
+    x.stroke();
+  }
+  // les traces de mains au milieu, les rayures du bas
+  x.fillStyle = 'rgba(40,25,8,0.18)';
+  x.fillRect(left ? w - 30 : 0, h * 0.45, 30, h * 0.12);
+  x.fillStyle = 'rgba(30,20,6,0.35)';
+  x.fillRect(0, h * 0.93, w, h * 0.07);
+}
+function drawDial(x, w, h, at) {
+  x.clearRect(0, 0, w, h);
+  x.fillStyle = '#b8924a';
+  x.beginPath();
+  x.arc(w / 2, h, h - 2, Math.PI, 0);
+  x.fill();
+  x.fillStyle = '#1b140a';
+  x.beginPath();
+  x.arc(w / 2, h, h - 14, Math.PI, 0);
+  x.fill();
+  const labels = ['L', '1', '2', '3', '4', '5', '6', '7', '8'];
+  x.fillStyle = '#e8c97a';
+  x.font = 'bold 18px Georgia, serif';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  labels.forEach((t, i) => {
+    const a = Math.PI + ((i + 0.5) / labels.length) * Math.PI;
+    x.fillText(t, w / 2 + Math.cos(a) * (h - 30), h + Math.sin(a) * (h - 30));
+  });
+  const a = Math.PI + ((at + 0.5) / labels.length) * Math.PI;
+  x.strokeStyle = '#e04a2a';
+  x.lineWidth = 4;
+  x.beginPath();
+  x.moveTo(w / 2, h);
+  x.lineTo(w / 2 + Math.cos(a) * (h - 46), h + Math.sin(a) * (h - 46));
+  x.stroke();
+}
+export function buildLifts({ map, group, baked }) {
+  const lifts = map.lifts || [];
+  if (!lifts.length) return null;
+  const brass = baked(new THREE.MeshLambertMaterial({ color: '#9a7330', emissive: '#2a1a06', emissiveIntensity: 0.35 }));
+  const voidMat = new THREE.MeshBasicMaterial({ color: '#030303' });
+  const box = (w, h, d, mat, x, y, z, parent) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z);
+    parent.add(m);
+    return m;
+  };
+  const DW = 1.1;
+  const DH = 2.15;
+  lifts.forEach((L, i) => {
+    const g = new THREE.Group();
+    g.position.set(L.x, 0, L.z);
+    g.rotation.y = L.rot;
+    group.add(g);
+    // l'encadrement de laiton
+    for (const s of [-1, 1]) box(0.12, DH + 0.12, 0.07, brass, s * (DW / 2 + 0.06), (DH + 0.12) / 2, 0.035, g);
+    box(DW + 0.24, 0.18, 0.08, brass, 0, DH + 0.09, 0.04, g);
+    // le noir de la gaine derrière
+    box(DW, DH, 0.01, voidMat, 0, DH / 2, 0.004, g);
+    // les deux portes coulissantes ; la seconde cabine est restée entrouverte
+    const gap = i === 1 ? 0.07 : 0.004;
+    for (const left of [true, false]) {
+      const [c, x] = canvas(128, 512);
+      drawLiftDoor(x, 128, 512, left);
+      const leaf = new THREE.Mesh(new THREE.BoxGeometry(DW / 2 - 0.004, DH - 0.01, 0.03), [brass, brass, brass, brass, baked(new THREE.MeshLambertMaterial({ map: tex(c), color: '#c8b8a0' })), brass]);
+      leaf.position.set((left ? -1 : 1) * (DW / 4 + gap / 2), DH / 2, 0.025);
+      g.add(leaf);
+    }
+    // le cadran d'étage, l'aiguille arrêtée (au 5, ou entre deux étages)
+    const [dc, dx] = canvas(256, 128);
+    drawDial(dx, 256, 128, i === 0 ? 5 : 2.5);
+    const dial = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.31), baked(new THREE.MeshLambertMaterial({ map: tex(dc), transparent: true, alphaTest: 0.3 })));
+    dial.position.set(0, DH + 0.36, 0.012);
+    g.add(dial);
+    // un mot scotché sur la première
+    if (i === 0) {
+      const [nc, nx] = canvas(192, 128);
+      nx.fillStyle = '#ece4d0';
+      nx.fillRect(0, 0, 192, 128);
+      nx.fillStyle = 'rgba(220,210,170,0.7)';
+      nx.fillRect(70, 0, 52, 14);
+      nx.fillStyle = '#1d1a16';
+      nx.font = 'bold 28px "Comic Sans MS", "Marker Felt", cursive';
+      nx.textAlign = 'center';
+      nx.fillText('OUT OF', 96, 56);
+      nx.fillText('ORDER', 96, 92);
+      const note = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.16), baked(new THREE.MeshLambertMaterial({ map: tex(nc) })));
+      note.position.set(0.08, 1.5, 0.042);
+      note.rotation.z = -0.06;
+      g.add(note);
+    }
+  });
+  // la plaque des boutons d'appel, entre les deux cabines : ▲ éteint, ▼ qui luit faiblement
+  const a = lifts[0];
+  const b = lifts[lifts.length - 1];
+  const pg = new THREE.Group();
+  pg.position.set((a.x + b.x) / 2, 0, (a.z + b.z) / 2);
+  pg.rotation.y = a.rot;
+  group.add(pg);
+  box(0.12, 0.26, 0.015, brass, 0, 1.22, 0.008, pg);
+  const lit = new THREE.MeshBasicMaterial({ color: '#ffb347' });
+  const dark = baked(new THREE.MeshLambertMaterial({ color: '#4a3a24' }));
+  const cone = (up, mat, y) => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0, 0.03, 0.012, 3), mat);
+    m.rotation.x = Math.PI / 2;
+    m.rotation.y = up ? Math.PI : 0; // (la pointe du triangle : en haut ou en bas)
+    m.position.set(0, y, 0.02);
+    pg.add(m);
+  };
+  cone(true, dark, 1.28);
+  cone(false, lit, 1.16);
+  // (la flèche allumée teinte d'ambre la plaque et le mur autour : un feu du moteur de lumière)
+  const ax = pg.position.x + Math.sin(a.rot) * 0.1;
+  const az = pg.position.z + Math.cos(a.rot) * 0.1;
+  return {
+    lights(out) {
+      out.push({ x: ax, y: 1.16, z: az, r: 0.4, g: 0.22, b: 0.06, rad: 0.8, nx: Math.sin(a.rot), ny: 0, nz: Math.cos(a.rot), w: -0.6 });
     },
   };
 }

@@ -1,5 +1,17 @@
 # Journal des versions — Arcadia
 
+## 5.46 — 11 novembre 2026
+- **The Backrooms** — Le Terror Hotel n'est plus un hall avec une grande boucle autour :
+  - une galerie part du hall, traverse l'étage et mène au palier des ascenseurs, deux cabines dorées hors service (l'une entrouverte sur le noir de la gaine, l'autre avec un mot scotché « OUT OF ORDER ») ;
+  - deux boucles de couloirs autour d'îlots de chambres, pour semer l'entité au lieu de tourner en rond ;
+  - un salon d'étage au bout de l'aile ouest (canapé, fauteuils, table basse), un couloir de service à l'est ;
+  - 21 chambres réparties dans toutes les ailes, qui donnent sur la galerie et sur chaque couloir.
+- **The Backrooms** — La lumière colorée éclaire vraiment, à tous les levels :
+  - au-dessus de la sortie de l'hôtel, le boîtier EXIT luit pour de vrai : son vert se pose sur le papier peint, la corniche, l'huisserie, la porte et le sol, et s'arrête aux murs (fini le halo plaqué sur le mur) ;
+  - l'écran du digicode teinte le mur (rouge quand le code est faux), le voyant de la ventouse aussi, et la lumière de l'escalier entre dans le hall quand la porte s'ouvre ;
+  - aux Tuyauteries, la flamme des brûleurs lèche le sol devant les chaudières, et les voyants des vannes et des disjoncteurs colorent le mur autour d'eux ;
+  - partout, la cabine d'un ascenseur ouvert éclaire le couloir, et les reflets colorés luisent sur les surfaces vernies.
+
 ## 5.45 — 11 novembre 2026
 - **The Backrooms** — La sortie du Terror Hotel, refaite pour de bon :
   - une vraie porte coupe-feu en acier rouge, usée en bas, avec un hublot en verre armé, une barre anti-panique « PUSH TO OPEN » et l'étiquette « EMERGENCY EXIT ONLY » ;

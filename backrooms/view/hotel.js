@@ -7,7 +7,7 @@ import { CELL_SIZE } from '../engine/map.js';
 import { buildHotelRooms } from './hotelRooms.js';
 import { buildHotelCorridor } from './hotelCorridor.js';
 import { buildHotelLobby } from './hotelLobby.js';
-import { buildHotelExit } from './hotelExit.js';
+import { buildHotelExit, buildLifts } from './hotelExit.js';
 
 const C = CELL_SIZE;
 
@@ -340,6 +340,7 @@ export function buildHotel({ map, group, baked, wallMat, CEIL }) {
   }
   // la porte de secours et son clavier à code : view/hotelExit.js
   const exitView = buildHotelExit({ map, group, baked, CEIL });
+  const liftsView = buildLifts({ map, group, baked });
 
   // --- 6. Le code au plafond du hall ---
   const codeTex = label(512, 192, (c, w, h) => {
@@ -395,6 +396,11 @@ export function buildHotel({ map, group, baked, wallMat, CEIL }) {
 
   let flickT = 0;
   return {
+    // les feux de couleur de l'étage, pour le moteur de lumière (view/scene.js)
+    lights(out) {
+      exitView.lights(out);
+      if (liftsView) liftsView.lights(out);
+    },
     update(sim, P, time, dt) {
       rooms.update(sim);
       // les lettres, une fois le mot connu (l'hôte l'envoie à ses invités)
