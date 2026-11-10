@@ -7,6 +7,9 @@ import { BackroomsSfx } from './view/sfx.js';
 import { createVoice } from './view/voice.js';
 import { BackroomsHUD, levelName, levelSub, LORE, loreOf, hearTape, tapesHeard, store, NOTES, readNote, loreComplete, FINAL_LORE } from './view/hud.js';
 import { parseWords } from './engine/hotel.js';
+import { vaultReady } from './view/vault.js';
+// les photos des monstres sont décodées avant de construire la scène et l'interface
+await vaultReady;
 
 // Level 5, version VIP : les mots du fichier backrooms/password_level5/mots.txt (6 lettres, un par ligne) ; sans
 // fichier (ou sans mot valide), la liste standard

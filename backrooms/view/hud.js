@@ -2,7 +2,7 @@
 import { ENTITY_IMG, ENTITY_ANIM } from './scene.js';
 import { DEPART_T, PIPES_LEVEL, CASSETTES, NOISE, VOICE_MIN, THIRST_BLUR, INV_SIZE, HOTEL_LEVEL } from '../engine/sim.js';
 
-const GOAT_DEATH_IMG = new URL('../img/bouc.jpg', import.meta.url).href;
+import { vault } from './vault.js';
 const GOAT_DEATH_FADE = 8; // secondes de montée de l'image
 
 // nom affiché d'un niveau : le troisième, ce sont les Poolrooms (Level 37) ; le quatrième, les Tuyauteries (Level 2)
@@ -106,9 +106,9 @@ export class BackroomsHUD {
       <div class="jumpscare-overlay" id="jumpscareOverlay" hidden><img id="scareImg" alt=""><div class="scare-anim" id="scareAnim" hidden></div></div>
       <div class="goat-death" id="goatDeath" hidden>
         <div class="gd-pic" id="gdImg">
-          <img class="gd-img" src="${GOAT_DEATH_IMG}" alt="">
-          <img class="gd-img gd-red" src="${GOAT_DEATH_IMG}" alt="">
-          <img class="gd-img gd-cyan" src="${GOAT_DEATH_IMG}" alt="">
+          <img class="gd-img" src="${vault.bouc || ''}" alt="">
+          <img class="gd-img gd-red" src="${vault.bouc || ''}" alt="">
+          <img class="gd-img gd-cyan" src="${vault.bouc || ''}" alt="">
           <div class="gd-grain" id="gdGrain"></div>
         </div>
         <div class="gd-vignette"></div>

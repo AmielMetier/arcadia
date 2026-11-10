@@ -27,16 +27,17 @@ import { hasLineOfSight, findPath } from '../engine/nav.js';
 import { Z } from '../engine/level2.js';
 
 const MODELS = new URL('../models/', import.meta.url).href; // modèles Poly Haven (CC0), voir models/LICENSE.txt
-const VIP_IMG = new URL('../img/entite.png?v=2', import.meta.url).href; // ?v : image plus nette, ne pas garder l'ancienne en cache
+import { vault } from './vault.js';
+const VIP = { get img() { return vault.entite || ''; } }; // photo brouillée dans data/ (vault.js)
 // L'entité du Level 1 : une vidéo détourée, découpée en planche d'images (12 par seconde, 16 par rangée) jouée en boucle
-const VIP_ANIM = { url: new URL('../monster/david.webp?v=2', import.meta.url).href, frames: 119, cols: 16, rows: 8, fps: 12, aspect: 246 / 400, tint: '#463e37', vip: true };
+const VIP_ANIM = { get url() { return vault.david || ''; }, frames: 119, cols: 16, rows: 8, fps: 12, aspect: 246 / 400, tint: '#463e37', vip: true };
 // mode normal : l'entité classique dessinée dans le code ; mode VIP : les monstres d'origine (réservés, choisis par l'hôte)
 export let ENTITY_IMG = classicEntity().img;
 export let ENTITY_ANIM = classicEntity().anim;
 export let ENTITY_VIP = false;
 export function setMonsterMode(vip) {
   ENTITY_VIP = !!vip;
-  ENTITY_IMG = vip ? VIP_IMG : classicEntity().img;
+  ENTITY_IMG = vip ? VIP.img : classicEntity().img;
   ENTITY_ANIM = vip ? VIP_ANIM : classicEntity().anim;
 }
 
@@ -4770,7 +4771,7 @@ void main() {
   // l'entité en 3D, animée (view/beast.js) ; au Level 1 en mode VIP : la vidéo d'origine
   // mode VIP au Level 0 : le même corps, avec le visage de la photo de l'entité d'origine
   // Level 5 : l'entité de l'hôtel, un modèle humain animé os par os (view/hotelEntity.js)
-  const beast = L3 ? createHotelEntity() : !ENTITY_VIP ? createBeast({ wiry: !(L1 || L2) }) : !(L1 || L2) ? createBeast({ wiry: true, photo: { url: VIP_IMG, crop: [490, 20, 300, 375] } }) : null;
+  const beast = L3 ? createHotelEntity() : !ENTITY_VIP ? createBeast({ wiry: !(L1 || L2) }) : !(L1 || L2) ? createBeast({ wiry: true, photo: { url: VIP.img, crop: [490, 20, 300, 375] } }) : null;
   if (beast) {
     monsterGroup.add(beast.group);
     shadow.visible = false;
