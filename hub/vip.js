@@ -16,7 +16,8 @@
      - la session est vérifiée par le relais à chaque visite (HubAccount.verify) : une session écrite à la main dans le
        navigateur (identifiant d'un VIP sans son mot de passe) est oubliée et la page se recharge sans le grade ;
      - le contenu réservé (les médias du mode VIP des Backrooms) est chiffré, et le relais n'en donne la clé qu'aux
-       comptes de la liste de GitHub qui prouvent leur mot de passe (server/vip.js) ;
+       comptes de ACCOUNTS (les VIP d'origine) qui prouvent leur mot de passe (server/vip.js) ; les VIP ajoutés depuis
+       (HASHES, tools/vip-add.mjs) ont le grade mais tapent la phrase du coffre une fois, puis leur navigateur la garde ;
      - un navigateur qui n'est pas (ou plus) VIP oublie la clé des Backrooms qu'il gardait.
    C'est un site statique : quelqu'un qui modifie le code dans son navigateur peut faire apparaître les menus chez lui,
    mais pas déchiffrer le contenu réservé. */
@@ -25,7 +26,8 @@
     // empreintes des identifiants VIP (tools/vip-add.mjs)
   ];
   // comptes en ligne VIP désignés par le nom de leur fichier sur GitHub (branche saves, accounts/<id>.json) :
-  // les 5 comptes inscrits le 4 novembre 2026
+  // les 5 comptes inscrits le 4 novembre 2026, les VIP d'origine, les seuls à qui le relais donne la clé du coffre des
+  // Backrooms sans qu'ils tapent la phrase
   const ACCOUNTS = [
     '171379463336fbba34735af308802c65',
     '24348069406b1041600ea8aed25ccf63',

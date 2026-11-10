@@ -50,8 +50,8 @@ Vérification : `https://duo-drift-relay.onrender.com/account/status` doit répo
 ## Clé du coffre VIP des Backrooms
 
 Les médias du mode VIP des Backrooms sont chiffrés dans le dépôt (`backrooms/data/`, voir `backrooms/data/LICENSE.txt`).
-Le relais garde leur clé et la donne aux seuls comptes VIP connectés (`POST /account/vipkey { user, auth }`, liste de `hub/vip.js`) :
-les VIP n'ont rien à taper. **Rien à régler sur Render** : le relais range la clé dans la branche `saves`
+Le relais garde leur clé et la donne aux seuls VIP d'origine connectés (`POST /account/vipkey { user, auth }`, liste `ACCOUNTS`
+de `hub/vip.js`) : ils n'ont rien à taper. Les VIP ajoutés depuis (`tools/vip-add.mjs`) tapent la phrase une fois. **Rien à régler sur Render** : le relais range la clé dans la branche `saves`
 (`vip/backrooms.json`), enveloppée en AES-GCM par une clé tirée de son `GITHUB_TOKEN` (le fichier seul ne dit rien).
 
 - **La première fois**, Amiel tape la phrase dans le jeu : tant que le relais n'a pas la clé, une partie VIP la demande à
