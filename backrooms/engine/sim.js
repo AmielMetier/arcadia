@@ -5,7 +5,8 @@
 //             vrai : quand les 6 cassettes sont trouvées, le faux se referme en mur et le vrai s'ouvre.
 //   Level 1 : l'entrepôt ; 3 fusibles à rapporter au panneau du monte-charge, des coupures de courant, et l'entité
 //             qui se cache au bout des rangées d'étagères pour tendre des embuscades.
-//   Level 37 (numéro interne 2) : les Poolrooms (engine/poolrooms.js) ; 3 volants de vanne, puis trois toboggans.
+//   Level 37 (numéro interne 2) : les Poolrooms (engine/poolrooms.js) ; rien à ramasser : trois toboggans ouverts
+//             dès l'arrivée, à trouver dans le dédale.
 //   Level 2 (numéro interne 3, derrière le toboggan jaune des Poolrooms) : les galeries de service ; 4 vannes à
 //             tourner (rester devant) pour couper la vapeur qui bloque l'ascenseur de service, des jets de vapeur
 //             brûlante en travers des couloirs (ils repoussent). Pas d'entité ici : un troupeau de chèvres noires qui
@@ -114,6 +115,7 @@ const rnd2 = (v) => Math.round(v * 100) / 100;
 export const BLOW_DELAY = 2.2; // la vanne fermée, les néons de son secteur grésillent puis sautent
 export const BURN_LOCK = 0.9; // brûlé par un jet de vapeur : repoussé, sonné un instant
 export const DEPART_T = 3; // secondes entre la fermeture des portes et l'arrivée
+export const SLIDE_T = 6.5; // Poolrooms : la descente dans le toboggan, avant l'écran de chargement (plus longue qu'un ascenseur)
 export const BOARD_T = 45; // Poolrooms : dès qu'un joueur est dans un toboggan, les autres ont ce temps pour le suivre
 export const LIFT_CLOSE_T = 2; // le bouton pressé dans la cabine : les portes mettent ce temps à se fermer
 export const LIFT_SHUT_T = 1.7; // … dont celui que mettent les vantaux à se rejoindre (à l'écran comme ici)
@@ -259,7 +261,7 @@ export function findStairKey(map, seed, dark) {
 const AMB_CUES = {
   0: { rec: [20, 50] },
   1: { rec: [20, 50], a: [7, 20], b: [25, 50] },
-  2: { rec: [20, 50], a: [4, 10] },
+  2: { rec: [20, 50], a: [4, 10], b: [12, 28], c: [22, 48] }, // Poolrooms : clapotis, skimmers, bruits lointains
   [PIPES_LEVEL]: { rec: [20, 50], a: [9, 22], b: [18, 40], c: [14, 32] },
   4: { rec: [9, 27] }, // Level 5 (HOTEL_LEVEL) : craquements et boîte à musique, plus souvent
 };
@@ -569,14 +571,14 @@ export class BackroomsSim {
       return P;
     });
     this.cassettes = 0; // cassettes trouvées par l'équipe (Level 0)
-    this.fuses = 0; // fusibles ramassés (Level 1 ; aux Poolrooms, les volants)
+    this.fuses = 0; // fusibles ramassés (Level 1)
     this.delivered = 0; // Level 1 : fusibles rapportés au panneau
     this.valves = 0; // vannes fermées (Level 2)
     this.items0 = this.floors.map((f) => (f.items || []).length); // objets d'origine (les suivants ont été posés par des joueurs)
     // un seul vrai ascenseur : décidé quand tout se met en route, le plus loin de l'équipe (pickRealFloor)
     this.realFloor = this.floors.length > 1 ? (hashRnd(this.seed, level, 7) < 0.5 ? 0 : 1) : 0;
     this.unlocked = false;
-    this.powered = false; // panneau du monte-charge réalimenté (aux Poolrooms : les 3 volants trouvés)
+    this.powered = false; // panneau du monte-charge réalimenté (Level 1)
     this.slide = -1; // Poolrooms : le toboggan pris par le premier qui s'y est glissé (les autres le suivent)
     // Level 5 : le mot des 6 lettres (même graine, même mot ; l'hôte l'envoie de toute façon), lettres postées, code
     this.word = level === HOTEL_LEVEL ? this.words[(((this.seed * 2654435761) >>> 0) % 9973) % this.words.length] : '';
@@ -734,6 +736,7 @@ export class BackroomsSim {
 
   get open() {
     if (this.level === PIPES_LEVEL) return this.valves >= VALVES;
+    if (this.level === 2) return true; // Poolrooms : les toboggans sont ouverts dès l'arrivée
     // (Level 1 : le courant revenu, le monte-charge doit encore descendre jusqu'à l'équipe)
     if (this.level === 1) return this.powered && !(this.liftCallT > 0);
     return this.level === 0 ? this.cassettes >= CASSETTES && !(this.finaleT > 0) : this.powered;
@@ -995,6 +998,8 @@ export class BackroomsSim {
     if (this.level === 0) return Math.min(1, this.cassettes / CASSETTES + loud) * L0_AGGRO;
     if (this.level === HOTEL_LEVEL) return Math.min(1, 0.5 + (0.4 * this.posted) / LETTERS + loud);
     if (this.level === PIPES_LEVEL) return Math.min(1, 0.3 + (0.7 * this.valves) / VALVES + loud);
+    // Poolrooms : rien à ramasser, elle s'enhardit avec le temps passé à errer (de 0,3 à 0,85 en cinq minutes)
+    if (this.level === 2) return Math.min(1, 0.3 + 0.55 * Math.min(1, this.time / 300) + loud);
     return Math.min(1, 0.25 + (0.75 * (this.fuses + (this.powered ? FUSES : 0))) / FUSES + loud);
   }
 
@@ -2686,12 +2691,6 @@ export class BackroomsSim {
       this.emit({ type: 'fuseIn', id: P.id, n: P.carry.length, count: this.delivered, total: FUSES });
       P.carry = [];
     }
-    // aux Poolrooms, les 3 volants trouvés suffisent : les toboggans s'ouvrent
-    if (this.level === 2 && !this.powered && this.fuses >= FUSES) {
-      this.powered = true;
-      this.emit({ type: 'powered', by: P.id });
-      this.emit({ type: 'exitUnlocked' });
-    }
 
     // 4c. Signal (à vol d'oiseau, 0 au-delà de 45 m) : l'objectif le plus proche à cet étage ; s'il n'en reste qu'à
     // l'autre étage, l'escalier ; une fois tout trouvé, l'ascenseur de cet étage (le vrai… ou le faux)
@@ -2891,7 +2890,7 @@ export class BackroomsSim {
           P.sigTo = 'stairs';
         }
       }
-    } else if ((this.level === 1 || this.level === 2) && (map.fuses || []).some((f) => !f.taken)) {
+    } else if (this.level === 1 && (map.fuses || []).some((f) => !f.taken)) {
       best = near((map.fuses || []).filter((f) => !f.taken));
     } else if (this.level === 1 && !this.mains && (this.delivered || 0) >= FUSES) {
       // Level 1 : les fusibles en place, les disjoncteurs généraux (le plus proche de ceux qui ne tiennent pas)
@@ -3743,8 +3742,8 @@ export class BackroomsSim {
     if (alive > 0) return;
     this.boardT = 0;
     if (inside > 0) {
-      this.departT = DEPART_T;
-      this.emit({ type: 'depart', level: this.level });
+      this.departT = this.map.slides ? SLIDE_T : DEPART_T;
+      this.emit({ type: 'depart', level: this.level, t: this.departT });
     } else {
       this.state = 'dead';
       this.emit({ type: 'gameover', time: this.time });

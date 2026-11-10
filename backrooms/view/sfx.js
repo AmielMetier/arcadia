@@ -743,6 +743,11 @@ export class BackroomsSfx {
   setHum(light) {
     if (!this.unlocked || !this.ambientGain || this.dark) return;
     const t = this.ctx.currentTime;
+    // (aux Poolrooms, pas de néons qui grésillent : les dalles lumineuses sont muettes)
+    if (this.poolOn) {
+      this.ambientGain.gain.setTargetAtTime(0, t, 0.3);
+      return;
+    }
     this.ambientGain.gain.setTargetAtTime(HUM_DARK + Math.min(1, light) * HUM_LIT, t, 0.3);
     if (this.humFlutterT === undefined) this.humFlutterT = t + rnd(8, 20);
     if (light > 0.35 && t > this.humFlutterT) {
@@ -1049,8 +1054,8 @@ export class BackroomsSfx {
   // Bruit de pas feutrés sur moquette
   // Un pas : étouffé et un peu spongieux sur la moquette humide, sec et claquant sur le béton (hard)
   // pos : { x, z, muffled } pour les pas d'un autre joueur (sinon ce sont les tiens) ; vol : plus bas pour les autres
-  // hard : true sur le béton ou le carrelage, false sur la moquette, 'water' dans l'eau (Poolrooms), 'soak' sur la
-  // moquette noyée (Level 0)
+  // hard : true sur le béton, false sur la moquette, 'tile' sur le carrelage mouillé et 'water' dans l'eau (Poolrooms),
+  // 'soak' sur la moquette noyée (Level 0)
   step(hard = false, pos = null, vol = 1) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
@@ -1078,6 +1083,38 @@ export class BackroomsSfx {
       src.connect(f).connect(g).connect(dest);
       src.start(t);
       for (let k = 0; k < 2 + Math.floor(Math.random() * 2); k++) this.plop(t + 0.12 + Math.random() * 0.25, 0.04 * v, dest);
+      return;
+    }
+
+    if (hard === 'tile') {
+      // le carrelage mouillé : le talon qui se pose, mat ; la semelle qui claque à plat sur l'émail (un « tchap » dans le
+      // médium, rien de sec ni d'aigu : la salle carrelée le ferait sonner comme un clic) ; l'eau chassée sous la semelle,
+      // et souvent la gomme qui se décolle de la pellicule d'eau
+      this.tone(dest, t, 'sine', 140 * v, 55, 0.07, 0.065 * v, 0.004);
+      const smack = (at, dur, att, f0, f1, q, vol, curve) => {
+        const n = Math.floor(c.sampleRate * dur);
+        const a = Math.max(1, Math.floor(c.sampleRate * att));
+        const buf = c.createBuffer(1, n, c.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.min(1, i / a) * Math.pow(1 - i / n, curve);
+        const src = c.createBufferSource();
+        src.buffer = buf;
+        const f = c.createBiquadFilter();
+        f.type = 'bandpass';
+        f.frequency.setValueAtTime(f0, at);
+        f.frequency.exponentialRampToValueAtTime(f1, at + dur * 0.8);
+        f.Q.value = q;
+        const lp = c.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 3200;
+        const g = c.createGain();
+        g.gain.value = vol;
+        src.connect(f).connect(lp).connect(g).connect(dest);
+        src.start(at);
+      };
+      smack(t + 0.02, 0.11, 0.004, 1200 * v, 650 * v, 0.9, 0.12 * v, 3);
+      smack(t + 0.03, 0.09, 0.008, 1600 * v, 500 * v, 1.6, 0.045 * v, 2.2);
+      if (Math.random() < 0.6) smack(t + rnd(0.13, 0.18), 0.05, 0.012, 2200 * v, 1500 * v, 1.2, 0.014 * v, 1.5);
       return;
     }
 
@@ -1206,14 +1243,50 @@ export class BackroomsSfx {
       lp.connect(g).connect(this.bedWet || this.out);
       this.pump = { g, oscs, lfo };
       this.dripT = 2;
+      // les gouttelettes près du bord (drips) : setLap dit où est l'eau la plus proche
+      this.lapK = 0;
+      this.lapT = 1;
     }
     if (this.pump) this.pump.g.gain.setTargetAtTime(on ? 0.022 : 0, c.currentTime, 1.5);
     this.poolOn = on;
   }
 
+  // Poolrooms : le bord d'eau le plus proche (pos) et sa proximité (k, de 0 : loin ou pas d'eau, à 1 : dedans)
+  setLap(pos, k) {
+    this.lapK = this.poolOn ? Math.max(0, Math.min(1, k)) : 0;
+    this.lapPos = pos;
+  }
+
+  // l'eau qui claque contre la margelle : un petit coup sourd et mouillé
+  cluck(t, vol, dest) {
+    const c = this.ctx;
+    const o = c.createOscillator();
+    const g = c.createGain();
+    o.type = 'sine';
+    const f0 = rnd(170, 320);
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f0 * 1.8, t + 0.035);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    o.connect(g).connect(dest);
+    o.start(t);
+    o.stop(t + 0.06);
+    this.burst(dest, t, 0.06, 'bandpass', 900, 0.9, vol * 0.5);
+  }
+
   // Poolrooms : des gouttes lointaines, à intervalles irréguliers, d'un côté ou de l'autre
   drips(dt) {
     if (!this.poolOn || !this.unlocked || !this.ctx) return;
+    // près du bord : l'eau qui claque contre la margelle, d'autant plus souvent qu'on en est près
+    if (this.lapK > 0.2 && this.lapPos && (this.lapT -= dt) <= 0) {
+      this.lapT = rnd(0.5, 2.2) / this.lapK;
+      const p = this.lapPos;
+      const out = this.at({ x: p.x + rnd(-0.8, 0.8), z: p.z + rnd(-0.8, 0.8), rolloff: 1.2, ref: 1.5 }, 1);
+      const t = this.ctx.currentTime + 0.01;
+      this.cluck(t, rnd(0.02, 0.05) * this.lapK, out);
+      if (Math.random() < 0.4) this.cluck(t + rnd(0.08, 0.2), rnd(0.01, 0.03) * this.lapK, out);
+    }
     this.dripT -= dt;
     if (this.dripT > 0) return;
     this.dripT = 0.7 + Math.random() * 3.3;
@@ -2850,8 +2923,18 @@ export class BackroomsSfx {
       if (slot === 'a') this.creak(pos(8, 25), vol(0.5, 1));
       else if (slot === 'b') this.distant(w < 0.6 ? 'groan' : 'knock', pos(18, 32), 0.5, this.bedWet);
     } else if (lv === 2) {
-      // l'eau qui clapote contre le carrelage
+      // l'eau qui clapote contre le carrelage ; un skimmer qui avale l'eau en glougloutant ; et au loin, dans ces salles
+      // où il n'y a personne : une balle qui rebondit sur le carrelage, quelque chose de lourd qui tombe à l'eau, la
+      // porte d'une cabine qui claque, une rampe d'échelle qu'on a heurtée, très rarement un rire d'enfant étouffé
       if (slot === 'a') this.slosh(pos(5, 16), vol(0.5, 1));
+      else if (slot === 'b') this.gurgle(pos(4, 14), vol(0.5, 1));
+      else if (slot === 'c') {
+        if (w < 0.3) this.ballFar(pos(15, 35), vol(0.6, 1));
+        else if (w < 0.55) this.splashFar(pos(18, 40), vol(0.6, 1));
+        else if (w < 0.75) this.distant('door', pos(20, 40), 0.5, this.bedWet);
+        else if (w < 0.94) this.clink(pos(10, 28), vol(0.5, 1));
+        else this.distant('laugh', pos(25, 40), 0.4, this.bedWet);
+      }
     } else if (lv === PIPES_LEVEL) {
       // coups de bélier, vapeur qui siffle au loin, tuyaux qui gémissent
       if (slot === 'a') this.steamFar(pos(14, 30), vol(0.5, 0.9));
@@ -3299,17 +3382,6 @@ export class BackroomsSfx {
       src(this.longNoise()).connect(this.filt('bandpass', 820, 1.2)).connect(this.gainNode(0.12)).connect(am);
       src(this.osc('sawtooth', 24)).connect(this.filt('lowpass', 90, 0.7)).connect(this.gainNode(0.12)).connect(am);
       vol = 0.2;
-    } else if (level === 2) {
-      // l'eau qui s'écoule dans les rigoles : un filet aigu qui frémit, et un écoulement grave
-      const am = this.gainNode(0.5);
-      for (const [f, d] of [[3.3, 0.25], [5.9, 0.2]]) {
-        const lfo = src(this.osc('sine', f));
-        const lg = this.gainNode(d);
-        lfo.connect(lg).connect(am.gain);
-      }
-      src(this.longNoise()).connect(this.filt('bandpass', 2400, 1.2)).connect(am).connect(g);
-      src(this.longNoise()).connect(this.filt('lowpass', 500, 0.7)).connect(this.gainNode(0.3)).connect(g);
-      vol = 0.08;
     } else if (level === PIPES_LEVEL) {
       // le grondement des conduites, le flux qui chuinte, et un tuyau qui chante tout bas
       src(this.longNoise()).connect(this.filt('lowpass', 80, 0.7)).connect(this.gainNode(0.9)).connect(g);
@@ -3670,6 +3742,82 @@ export class BackroomsSfx {
     n.stop(t + 0.9);
     this.plop(t + 0.35, 0.03, out);
     this.plop(t + 0.5, 0.02, out);
+  }
+
+  // Poolrooms : un skimmer qui avale l'eau, glouglou par glouglou, avec l'aspiration dessous
+  gurgle(pos, vol = 1) {
+    const c = this.ctx;
+    const out = this.at({ ...pos, rolloff: 0.7, ref: 2.5 }, vol, 0, this.bedWet);
+    const lp = this.filt('lowpass', 900, 0.7);
+    lp.connect(out);
+    const t0 = c.currentTime + 0.02;
+    let t = t0;
+    const n = 5 + Math.floor(Math.random() * 8);
+    for (let i = 0; i < n; i++) {
+      const o = c.createOscillator();
+      o.type = 'sine';
+      const f0 = rnd(90, 240);
+      o.frequency.setValueAtTime(f0, t);
+      o.frequency.exponentialRampToValueAtTime(f0 * rnd(1.6, 2.4), t + 0.06);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(rnd(0.05, 0.11), t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+      o.connect(g).connect(lp);
+      o.start(t);
+      o.stop(t + 0.1);
+      t += rnd(0.04, 0.16);
+    }
+    this.burst(lp, t0, t - t0 + 0.3, 'lowpass', 420, 0.7, 0.05);
+    this.caption('[water gurgling]', pos);
+  }
+
+  // Poolrooms : une balle creuse qui rebondit sur le carrelage, loin, de plus en plus vite, puis roule
+  ballFar(pos, vol = 1) {
+    const c = this.ctx;
+    const out = this.at({ ...pos, rolloff: 0.35, ref: 4 }, vol, 0, this.bedWet);
+    let t = c.currentTime + 0.02;
+    let gap = rnd(0.5, 0.7);
+    let v = 0.3;
+    const f = rnd(380, 520);
+    for (let i = 0; i < 9 && v > 0.02; i++) {
+      this.burst(out, t, 0.05, 'bandpass', 1100, 1.5, v * 0.6);
+      this.tone(out, t, 'sine', f, f * 0.92, 0.07, v * 0.5, 0.002);
+      t += gap;
+      gap *= 0.74;
+      v *= 0.72;
+    }
+    this.burst(out, t, 0.9, 'bandpass', 700, 0.8, 0.02);
+    this.caption('[a ball bouncing, far away]', pos);
+  }
+
+  // Poolrooms : quelque chose de lourd qui tombe à l'eau, loin (le choc sourd, la gerbe, les gouttes qui retombent)
+  splashFar(pos, vol = 1) {
+    const c = this.ctx;
+    const out = this.at({ ...pos, rolloff: 0.35, ref: 4 }, vol, 0, this.bedWet);
+    const t = c.currentTime + 0.02;
+    this.tone(out, t, 'sine', 90, 45, 0.35, 0.25, 0.005);
+    const n = this.noise();
+    const lp = this.filt('lowpass', 2600, 0.7);
+    lp.frequency.setValueAtTime(2600, t);
+    lp.frequency.exponentialRampToValueAtTime(700, t + 1.0);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.03, t + 0.35);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
+    n.connect(lp).connect(g).connect(out);
+    n.start(t);
+    n.stop(t + 1.2);
+    for (let i = 0; i < 7; i++) this.plop(t + rnd(0.3, 1.6), rnd(0.02, 0.05), out);
+    this.caption('[splash, far away]', pos);
+  }
+
+  // Poolrooms : une rampe d'échelle chromée qu'on a heurtée : un tintement de tube creux
+  clink(pos, vol = 1) {
+    const out = this.at({ ...pos, rolloff: 0.5, ref: 3 }, vol, 0, this.bedWet);
+    this.ring(out, this.ctx.currentTime + 0.02, rnd(700, 950), [[1, 1, 0.9], [2.76, 0.5, 0.5], [5.4, 0.25, 0.3]], 0.12);
+    this.caption('[metal clink]', pos);
   }
 
   // un jet de vapeur qui siffle au loin, qui crachote puis se tait
@@ -4094,6 +4242,59 @@ export class BackroomsSfx {
   }
 
   // On se glisse dans un toboggan : un frottement d'eau qui file et s'éloigne, puis quelques gouttes
+  // La glissade dans le tube du toboggan : le frottement sur le polyester et le souffle de l'air (plus aigus et plus
+  // forts avec la vitesse), et le grondement sourd du tube. Renvoie { set(vitesse, volume), stop() }
+  slideRush() {
+    if (!this.unlocked || !this.ctx) return null;
+    const c = this.ctx;
+    const src = this.longNoise();
+    const bp = c.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 0.8;
+    bp.frequency.value = 600;
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 170;
+    const hiss = c.createGain();
+    const rumble = c.createGain();
+    hiss.gain.value = 0.0001;
+    rumble.gain.value = 0.0001;
+    src.connect(bp).connect(hiss).connect(this.out);
+    src.connect(lp).connect(rumble).connect(this.out);
+    src.start(c.currentTime);
+    let on = true;
+    return {
+      set: (v, k = 1) => {
+        if (!on) return;
+        const t = c.currentTime;
+        const x = Math.min(1, Math.max(0, v / 19));
+        hiss.gain.setTargetAtTime(Math.max(0.0001, (0.025 + 0.13 * x) * k), t, 0.08);
+        bp.frequency.setTargetAtTime(450 + 1700 * x, t, 0.12);
+        rumble.gain.setTargetAtTime(Math.max(0.0001, (0.08 + 0.32 * x) * k), t, 0.1);
+      },
+      stop: () => {
+        if (!on) return;
+        on = false;
+        const t = c.currentTime;
+        hiss.gain.setTargetAtTime(0.0001, t, 0.08);
+        rumble.gain.setTargetAtTime(0.0001, t, 0.08);
+        src.stop(t + 0.6);
+      },
+    };
+  }
+
+  // Au bout du toboggan : on tombe dans l'eau (kind 'splash') ou sur le sol (kind 'thud')
+  slideLand(kind = 'splash') {
+    if (!this.unlocked || !this.ctx) return;
+    if (kind === 'splash') {
+      this.splashDown();
+      return;
+    }
+    const t = this.ctx.currentTime + 0.02;
+    this.burst(this.out, t, 0.16, 'lowpass', 220, 0.7, 0.6);
+    this.burst(this.out, t + 0.01, 0.35, 'bandpass', 900, 0.8, 0.12);
+  }
+
   splashDown() {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;

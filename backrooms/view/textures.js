@@ -542,19 +542,37 @@ function drawConcreteCeiling(ctx, S, photo) {
 
 // Level 37 (Poolrooms) : petits carreaux blancs (ambientCG Tiles133A), à leur vraie taille (environ 15 cm) sur un mur de
 // 2,5 m de large et 5,3 m de haut (il descend sous l'eau), avec une frise de carreaux bleu pastel à hauteur de main
+// Poolrooms : une photo de carrelage répétée nx × ny fois sur la toile. Chaque copie commence sur un pixel entier et
+// touche la suivante sans la chevaucher : les demi-joints des bords se rejoignent en un joint entier, de la même
+// largeur que les autres (un chevauchement d'un pixel en cachait la moitié, et la grille glissait d'une copie à
+// l'autre)
+function tilePhoto(ctx, photo, S, nx, ny) {
+  ctx.imageSmoothingQuality = 'high';
+  const t = ctx.getTransform();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const W = S * t.a;
+  const H = S * t.d;
+  for (let j = 0; j < Math.ceil(ny); j++) {
+    for (let i = 0; i < nx; i++) {
+      const x0 = Math.round((i * W) / nx);
+      const y0 = Math.round((j * H) / ny);
+      ctx.drawImage(photo, x0, y0, Math.round(((i + 1) * W) / nx) - x0, Math.round(((j + 1) * H) / ny) - y0);
+    }
+  }
+  ctx.setTransform(t);
+}
+
 function drawPoolWall(ctx, S, photo) {
   ctx.globalCompositeOperation = 'source-over';
   ctx.fillStyle = '#e9efee';
   ctx.fillRect(0, 0, S, S);
-  if (photo) {
-    // mosaïque fine : des carreaux d'environ 7 cm
-    const tw = S / 3;
-    const th = S / 6.3;
-    for (let y = 0; y < S; y += th) for (let x = 0; x < S; x += tw) ctx.drawImage(photo, x, y, tw + 1, th + 1);
-  } else noise(ctx, S, S, 10);
+  // mosaïque fine : des carreaux d'environ 7 cm (3 × 6,3 photos de 12 carreaux, sur une toile deux fois plus haute
+  // que large : le mur fait 2,5 m sur 5,3 m)
+  if (photo) tilePhoto(ctx, photo, S, 3, 6.3);
+  else noise(ctx, S, S, 10);
   // frise bleu pastel de deux rangs, à 1,1 m au-dessus de l'eau (le mur va de -1,3 m à 4 m)
   const row = S / 6.3 / 12;
-  const yf = S * (1 - (1.1 + 1.3) / 5.3);
+  const yf = Math.round((S * (1 - (1.1 + 1.3) / 5.3)) / row) * row; // (calée sur un joint)
   ctx.globalCompositeOperation = 'multiply';
   ctx.fillStyle = '#9fd3e3';
   ctx.fillRect(0, yf - row * 2, S, row * 2);
@@ -573,7 +591,7 @@ function drawPoolWall(ctx, S, photo) {
 function drawPoolFloor(ctx, S, photo) {
   ctx.fillStyle = '#f1f4f3';
   ctx.fillRect(0, 0, S, S);
-  if (photo) for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) ctx.drawImage(photo, (x * S) / 2, (y * S) / 2, S / 2 + 1, S / 2 + 1);
+  if (photo) tilePhoto(ctx, photo, S, 2, 2);
   else noise(ctx, S, S, 8);
 }
 
@@ -581,7 +599,7 @@ function drawPoolFloor(ctx, S, photo) {
 function drawPoolCeiling(ctx, S, photo) {
   ctx.fillStyle = '#e8eeee';
   ctx.fillRect(0, 0, S, S);
-  if (photo) for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) ctx.drawImage(photo, (x * S) / 3, (y * S) / 3, S / 3 + 1, S / 3 + 1);
+  if (photo) tilePhoto(ctx, photo, S, 3, 3);
   else noise(ctx, S, S, 6);
 }
 
@@ -746,10 +764,12 @@ export function createBackroomsTextures(level = 0) {
   const L1 = level === 1;
   const L2 = level === 2; // Level 37, les Poolrooms
   const L3 = level === 4; // Level 5, le Terror Hotel (HOTEL_LEVEL)
-  const [wallCanvas, wctx] = canvas(PX);
+  // (Poolrooms : le mur, 2,5 m sur 5,3 m, sur une toile deux fois plus haute, pour que ses joints horizontaux soient
+  // aussi fins et nets que les verticaux ; le dessin reste en S × S unités)
+  const [wallCanvas, wctx] = canvas(PX, L2 ? PX * 2 : PX);
   const [carpetCanvas, cctx] = canvas(PX);
   const [ceilCanvas, clctx] = canvas(PX);
-  for (const c of [wctx, cctx, clctx]) c.setTransform(PX / S, 0, 0, PX / S, 0, 0);
+  for (const c of [wctx, cctx, clctx]) c.setTransform(PX / S, 0, 0, (PX / S) * (L2 && c === wctx ? 2 : 1), 0, 0);
   const drawW = L3 ? drawHotelWall : L2 ? drawPoolWall : L1 ? drawConcreteWall : drawWallpaper;
   const drawF = L3 ? drawHotelCarpet : L2 ? drawPoolFloor : L1 ? drawConcreteFloor : drawCarpet;
   const drawC = L3 ? drawHotelCeiling : L2 ? drawPoolCeiling : L1 ? drawConcreteCeiling : drawCeiling;
@@ -798,6 +818,13 @@ export function createBackroomsTextures(level = 0) {
   const deep = tex(deepCanvas);
   // la mosaïque des voûtes : le même dessin que le plafond (2,5 m par répétition)
   const mosaic = tex(ceilCanvas);
+  // le nombre de carreaux par répétition, en largeur et en hauteur (pour retrouver chaque carreau dans le shader)
+  if (L2) {
+    wall.userData.tiles = [36, 75.6];
+    carpet.userData.tiles = [16, 16];
+    ceiling.userData.tiles = mosaic.userData.tiles = [36, 36];
+    pool.userData.tiles = deep.userData.tiles = [24, 24];
+  }
   const ready = Promise.all([...files.map(loadImage), ...(L2 ? ['l37_bassin.jpg', 'l37_fosse.jpg'].map(loadImage) : [])]).then(([pap, moq, pla, bas, fos]) => {
     if (pap) { drawW(wctx, S, pap); wall.needsUpdate = true; }
     if (pap && bumpCtx) { drawConcreteWallBump(bumpCtx, S, pap); wallBump.needsUpdate = true; }
@@ -806,8 +833,8 @@ export function createBackroomsTextures(level = 0) {
     if (moq) { drawF(cctx, S, moq); carpet.needsUpdate = true; }
     if (pla) { drawC(clctx, S, pla); ceiling.needsUpdate = true; }
     // carreaux des bassins deux fois plus petits (10 cm)
-    if (bas) { for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) pctx2.drawImage(bas, (x * S) / 2, (y * S) / 2, S / 2 + 1, S / 2 + 1); pool.needsUpdate = true; }
-    if (fos) { for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) dctx2.drawImage(fos, (x * S) / 2, (y * S) / 2, S / 2 + 1, S / 2 + 1); deep.needsUpdate = true; }
+    if (bas) { tilePhoto(pctx2, bas, S, 2, 2); pool.needsUpdate = true; }
+    if (fos) { tilePhoto(dctx2, fos, S, 2, 2); deep.needsUpdate = true; }
     if (pla) mosaic.needsUpdate = true;
   });
 
