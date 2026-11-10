@@ -146,6 +146,38 @@ try {
   const { parse } = (await import('node:module')).createRequire(import.meta.url)('../server/vip.js');
   const real = parse(fs.readFileSync(new URL('../hub/vip.js', import.meta.url), 'utf8'));
   ok(real.accounts.size >= 1 && [...real.accounts].every((h) => /^[0-9a-f]{32}$/.test(h)), `liste VIP du Hub lue par le relais (${real.accounts.size} comptes, ${real.hashes.size} empreintes)`);
+  // le grade VIP ne vient que de la liste du dépôt : le relais vérifie la session du Hub à chaque visite
+  const amielSess = { user: 'amiel', auth: amielAuth, ek: 'x' };
+  const verifyAs = async (sess) => { if (sess) ls.set('hub_login', JSON.stringify(sess)); else ls.delete('hub_login'); return A.verify(); };
+  ok(await verifyAs(amielSess) === 'vip', 'session VIP vraie : confirmée, VIP');
+  ok(await verifyAs({ user: 'bob', auth: bobAuth, ek: 'x' }) === 'ok', 'session ordinaire vraie : confirmée, pas VIP');
+  ok(await verifyAs({ user: 'carla', auth: bobAuth, ek: 'x' }) === 'bad' && !ls.has('hub_login'), 'identifiant VIP sans son mot de passe : session oubliée');
+  ok(await verifyAs({ user: 'amiel', auth: 'nimporte', ek: 'x' }) === 'bad' && !ls.has('hub_login'), 'session trafiquée (clé d\'accès inventée) : oubliée');
+  ok(await verifyAs({ user: 'zz_inconnu', auth: '0'.repeat(64), ek: 'x' }) === 'bad', 'compte qui n\'existe pas : session oubliée');
+  ok(await verifyAs(null) === null, 'pas de session : rien à vérifier');
+  // hub/vip.js lui-même, avec la liste de test à la place de la vraie
+  const vipSrc = fs.readFileSync(new URL('../hub/vip.js', import.meta.url), 'utf8')
+    .replace(/const ACCOUNTS = \[[\s\S]*?\];/, `const ACCOUNTS = ['${crypto.createHash('sha256').update('arcadia-account:amiel').digest('hex').slice(0, 32)}'];`);
+  const runHubVip = async (sess) => {
+    if (sess) ls.set('hub_login', JSON.stringify(sess)); else ls.delete('hub_login');
+    ls.set('backrooms_vip_key', 'cle-gardee');
+    let reloaded = false;
+    globalThis.location.reload = () => { reloaded = true; };
+    globalThis.HUB_GAMES = [{ id: 'backrooms', settings: [{ key: 'monsters', options: [['normal', 'Normal'], ['vip', 'VIP', { vip: true }]] }] }];
+    new Function(vipSrc)();
+    const shown = globalThis.HubVIP.is(), keptNow = ls.has('backrooms_vip_key');
+    await sleep(1500);
+    return { shown, keptNow, reloaded, kept: ls.has('backrooms_vip_key'), sess: ls.has('hub_login'), vipOpt: globalThis.HUB_GAMES[0].settings[0].options.length === 2 };
+  };
+  let h = await runHubVip(amielSess);
+  ok(h.shown && h.vipOpt && h.kept && h.sess && !h.reloaded, 'Hub, vrai compte VIP : grade, option VIP et clé gardés');
+  h = await runHubVip({ user: 'amiel', auth: '0'.repeat(64), ek: 'x' });
+  ok(h.reloaded && !h.sess, 'Hub, session VIP écrite à la main : oubliée, la page se recharge sans le grade');
+  h = await runHubVip({ user: 'bob', auth: bobAuth, ek: 'x' });
+  ok(!h.shown && !h.vipOpt && !h.keptNow && h.sess && !h.reloaded, 'Hub, compte ordinaire : pas d\'option VIP, la clé des Backrooms est oubliée');
+  h = await runHubVip(null);
+  ok(!h.shown && !h.keptNow, 'Hub, sans compte : pas de grade, pas de clé');
+  delete globalThis.location.reload;
   A.logout();
   await A.login('amiel', 'motdepasse1');
   // essais à la chaîne : bloqués au bout de 8 ratés

@@ -12,6 +12,7 @@
 //   POST /account/create { user, auth, blob }  → { ok } | 409 identifiant pris
 //   POST /account/login  { user, auth }        → { ok, blob, updated } | 403 mauvais mot de passe
 //   POST /account/put    { user, auth, blob }  → { ok, updated }
+//   POST /account/check  { user, auth }        → { ok, vip } | 403 mauvais mot de passe (session trafiquée ou périmée)
 //   POST /account/vipkey { user, auth }        → { ok, key } | 403 mauvais mot de passe ou pas VIP | 503 pas de clé
 //   POST /account/vipseed { key }              → { ok } | 403 la clé n'ouvre pas le coffre
 //   GET  /account/status                       → { on, vipkey }
@@ -58,7 +59,7 @@ function handle(req, res, route) {
     vip.vaultKey().catch(() => '').then((k) => send(res, 200, { ok: true, on: saves.enabled(), vipkey: !!k }));
     return true;
   }
-  const m = /^\/account\/(create|login|put|vipkey|vipseed)$/.exec(route);
+  const m = /^\/account\/(create|login|put|check|vipkey|vipseed)$/.exec(route);
   if (!m || req.method !== 'POST') { send(res, 404, { ok: false, error: 'route' }); return true; }
   if (!saves.enabled()) { req.resume(); send(res, 503, { ok: false, error: 'off' }); return true; }
   let body = '', big = false;
@@ -100,6 +101,8 @@ function handle(req, res, route) {
       if (tooMany(lim)) { send(res, 429, { ok: false, error: 'wait' }); return; }
       if (!rec || !(await check(rec, q.auth))) { failed(lim); send(res, 403, { ok: false, error: 'auth' }); return; }
       if (m[1] === 'login') { send(res, 200, { ok: true, blob: rec.blob, updated: rec.updated }); return; }
+      // le Hub vérifie sa session à chaque visite : le grade VIP vient de la liste du dépôt, pas du navigateur
+      if (m[1] === 'check') { send(res, 200, { ok: true, vip: await vip.isVip(user).catch(() => false) }); return; }
       if (m[1] === 'vipkey') {
         if (!(await vip.isVip(user))) { send(res, 403, { ok: false, error: 'vip' }); return; }
         const key = await vip.vaultKey();

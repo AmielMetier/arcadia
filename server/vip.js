@@ -2,8 +2,9 @@
 // Le mode VIP des Backrooms vu du relais : qui est VIP, et la clé du coffre (les médias chiffrés de backrooms/data/).
 //
 // Qui est VIP : la même liste que le Hub (hub/vip.js, tenue par tools/vip-add.mjs), qui ne contient que des
-// empreintes d'identifiants. Lue sur le disque quand le relais a le dépôt entier, sinon dans le dépôt public sur
-// GitHub ; gardée 5 minutes. VIP_FILE désigne un autre fichier (tests).
+// empreintes d'identifiants. Lue dans le dépôt sur GitHub (branche main), gardée 5 minutes : c'est la seule façon de
+// donner ou de retirer le grade, et elle compte sans redéployer le relais. Le disque ne sert que si GitHub ne répond
+// pas. VIP_FILE et VIP_CHECK_FILE désignent d'autres fichiers (tests).
 //
 // La clé du coffre n'est jamais dans le dépôt, et personne n'a à la copier nulle part : le relais l'apprend une fois
 // (/account/vipseed, envoyée par tools/backrooms-vault.mjs semer, ou par le navigateur d'un hôte VIP qui l'a déjà) et
@@ -18,22 +19,24 @@ const saves = require('./saves');
 
 const REPO = process.env.SAVES_REPO || 'AmielMetier/arcadia';
 const RAW = `https://raw.githubusercontent.com/${REPO}/main`;
-const LIST_LOCAL = process.env.VIP_FILE || path.join(__dirname, '..', 'hub', 'vip.js');
-const CHECK_LOCAL = process.env.VIP_CHECK_FILE || path.join(__dirname, '..', 'backrooms', 'data', 'e0.bin');
+const LIST_LOCAL = path.join(__dirname, '..', 'hub', 'vip.js');
+const CHECK_LOCAL = path.join(__dirname, '..', 'backrooms', 'data', 'e0.bin');
 const STORE = 'vip/backrooms.json';
 const CHECK_TEXT = 'arcadia · backrooms · vip'; // le texte du témoin (CHECK_TEXT de backrooms/view/vault.js)
 const KEEP_MS = 5 * 60 * 1000;
 const KEY_RE = /^[A-Za-z0-9+/]{43}=$/;
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
-// un fichier du dépôt : sur le disque s'il y est, sinon sur GitHub (dépôt public)
-async function repoFile(local, rel, binary) {
+// un fichier du dépôt, tel qu'il est sur GitHub (dépôt public) ; la copie du disque si GitHub ne répond pas
+async function repoFile(local, rel, binary, override) {
+  const read = (f) => fs.readFileSync(f, binary ? undefined : 'utf8');
+  if (override) return read(override);
   try {
-    return fs.readFileSync(local, binary ? undefined : 'utf8');
-  } catch (e) {
-    const r = await fetch(`${RAW}/${rel}`, { signal: AbortSignal.timeout(8000) });
+    const r = await fetch(`${RAW}/${rel}`, { signal: AbortSignal.timeout(8000), cache: 'no-store' });
     if (!r.ok) throw new Error(`${rel} : ${r.status}`);
-    return binary ? Buffer.from(await r.arrayBuffer()) : r.text();
+    return binary ? Buffer.from(await r.arrayBuffer()) : await r.text();
+  } catch (e) {
+    return read(local);
   }
 }
 
@@ -48,7 +51,7 @@ function parse(src) {
 }
 let listCache = null; // { t, list }
 async function isVip(user) {
-  if (!listCache || Date.now() - listCache.t > KEEP_MS) listCache = { t: Date.now(), list: parse(await repoFile(LIST_LOCAL, 'hub/vip.js')) };
+  if (!listCache || Date.now() - listCache.t > KEEP_MS) listCache = { t: Date.now(), list: parse(await repoFile(LIST_LOCAL, 'hub/vip.js', false, process.env.VIP_FILE)) };
   const l = listCache.list;
   return l.hashes.has(sha256('arcadia-vip:' + user)) || l.accounts.has(sha256('arcadia-account:' + user).slice(0, 32));
 }
@@ -56,7 +59,7 @@ async function isVip(user) {
 // la clé ouvre-t-elle le témoin ? (format du coffre : « ARV1 », IV de 12 octets, chiffré, étiquette de 16 octets)
 let checkCache = null; // { t, data }
 async function opensCheck(key) {
-  if (!checkCache || Date.now() - checkCache.t > KEEP_MS) checkCache = { t: Date.now(), data: await repoFile(CHECK_LOCAL, 'backrooms/data/e0.bin', true) };
+  if (!checkCache || Date.now() - checkCache.t > KEEP_MS) checkCache = { t: Date.now(), data: await repoFile(CHECK_LOCAL, 'backrooms/data/e0.bin', true, process.env.VIP_CHECK_FILE) };
   const b = checkCache.data;
   try {
     const k = Buffer.from(key, 'base64');

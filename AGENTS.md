@@ -90,7 +90,9 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   (même branche, dossier `accounts/`). Test : `node tools/test-accounts.mjs`. Le relais doit être redéployé sur Render pour qu'ils marchent.
   Comptes VIP (`hub/vip.js`) : jeux, réglages ou options réservés avec `vip: true` dans `hub/games.js` (option : `['val', 'Libellé', { vip: true }]`),
   retirés de la liste des autres joueurs ; dans un jeu, `HubBridge.info.vip`. Donner le grade à un compte en ligne : `node tools/vip-add.mjs <identifiant>`
-  (`--retirer` pour l'enlever). Test : `node tools/test-vip.mjs`.
+  (`--retirer` pour l'enlever) : c'est la seule façon de donner le grade. Le Hub fait vérifier sa session par le relais à chaque visite (`HubAccount.verify`, `/account/check`) :
+  une session trafiquée est oubliée ; le relais lit la liste sur GitHub (pas sa copie du disque). Tout contenu réservé doit être chiffré comme le coffre des Backrooms
+  (le code d'un site statique se lit). Tests : `node tools/test-vip.mjs`, `node tools/test-accounts.mjs`.
 - Mini-Golf Party : `node tools/test-minigolf.mjs` construit les 72 trous (dont les 18 du Marathon, ~2 min) et vérifie qu'un bot expert les termine (à lancer quand on touche aux trous ou à la physique).
 - Odyssée (aventure solo façon DS, `odyssee/`) : `node tools/test-odyssee.mjs` joue 600 combats aléatoires et vérifie que toute la région
   (portes, grottes, PNJ, objets, arènes) est accessible depuis Bourg-Aube sans qu'un PNJ ne bloque le passage, et que la progression
