@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 5.39 — 10 novembre 2026
+- **The Backrooms** — La lumière du Terror Hotel :
+  - Chaque applique dessine son éventail de lumière sur le papier peint, qui monte de la tulipe en s'évasant, et une tache chaude au plafond au-dessus d'elle. Entre deux appliques, la pénombre.
+  - Les appliques sont refaites : platine et bras en laiton, tulipe en verre dépoli plus vive au fond, et un halo quand elles sont allumées. Celles qui grésillent ou sont mortes le montrent sur le mur.
+  - Les lampes de chevet éclairent le mur derrière elles.
+  - Le vernis du lambris renvoie la lueur des appliques les plus proches.
+
 ## 5.38 — 10 novembre 2026
 - **The Backrooms** — Le Terror Hotel (Level 5) change de matières, dans les couloirs comme dans les chambres :
   - Un vrai papier peint damassé lie-de-vin, ton sur ton et en léger relief, avec ses lés, son grain et ses taches ; plus sombre sous la corniche, patiné au-dessus de la cimaise.

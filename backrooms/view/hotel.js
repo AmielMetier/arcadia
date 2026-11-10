@@ -131,18 +131,67 @@ export function buildHotel({ map, group, baked, CEIL }) {
   }
 
   // --- 3. Appliques Art déco du couloir et lustre du hall ---
+  // une platine de laiton à gradins, un bras en col de cygne, une coupelle, et une tulipe de verre dépoli ouverte vers
+  // le haut (sa lueur plus vive au fond, là où est l'ampoule) ; allumée, un halo doux l'entoure
+  const glowTex = label(64, 64, (c, w, h) => {
+    const g = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    g.addColorStop(0, 'rgba(255, 214, 150, 1)');
+    g.addColorStop(0.25, 'rgba(255, 170, 90, 0.45)');
+    g.addColorStop(1, 'rgba(255, 140, 60, 0)');
+    c.fillStyle = g;
+    c.fillRect(0, 0, w, h);
+  });
+  const tulipTex = label(8, 64, (c, w, h) => {
+    const g = c.createLinearGradient(0, h, 0, 0); // v = 0 au fond de la tulipe, 1 au bord
+    g.addColorStop(0, '#fff2d0');
+    g.addColorStop(0.35, '#ffd08a');
+    g.addColorStop(0.85, '#b8702c');
+    g.addColorStop(1, '#f0c080');
+    c.fillStyle = g;
+    c.fillRect(0, 0, w, h);
+  });
+  const tulipGeo = new THREE.LatheGeometry(
+    [[0.012, 0], [0.03, 0.006], [0.05, 0.022], [0.068, 0.05], [0.083, 0.088], [0.094, 0.126], [0.1, 0.15], [0.106, 0.162], [0.1, 0.166]].map(([r, y]) => new THREE.Vector2(r, y)),
+    16,
+  );
+  const plateGeo = new THREE.CylinderGeometry(0.06, 0.07, 0.014, 20);
+  plateGeo.rotateX(Math.PI / 2);
+  const plate2Geo = new THREE.CylinderGeometry(0.035, 0.045, 0.012, 16);
+  plate2Geo.rotateX(Math.PI / 2);
+  const armGeo = new THREE.TubeGeometry(new THREE.CubicBezierCurve3(new THREE.Vector3(0, -0.07, 0.015), new THREE.Vector3(0, -0.1, 0.08), new THREE.Vector3(0, -0.06, 0.11), new THREE.Vector3(0, -0.012, 0.11)), 10, 0.007, 6);
+  const cupGeo = new THREE.CylinderGeometry(0.022, 0.012, 0.018, 12);
+  const bulbGeo = new THREE.SphereGeometry(0.022, 10, 8);
   for (const l of map.lights) {
     if (l.sconce) {
       const { dx, dz } = l.sconce;
       const g = frame(l.x + dx * 0.2, l.z + dz * 0.2, Math.atan2(-dx, -dz)); // +z local : vers le couloir
       const y = l.fy || 2.0;
-      box(0.1, 0.22, 0.04, M.brass, 0, y, 0.02, g);
-      const mat = new THREE.MeshLambertMaterial({ color: '#f0d8a8', emissive: '#ffc070', emissiveIntensity: 0 });
-      const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.05, 0.16, 6, 1, true), mat);
-      glass.position.set(0, y + 0.08, 0.1);
-      mat.side = THREE.DoubleSide;
-      g.add(glass);
-      lampShades.push({ l, mat, k: 1.6 });
+      const a = new THREE.Group();
+      a.position.y = y;
+      g.add(a);
+      const plate = new THREE.Mesh(plateGeo, M.brass);
+      plate.position.set(0, -0.06, 0.007);
+      a.add(plate);
+      const plate2 = new THREE.Mesh(plate2Geo, M.brass);
+      plate2.position.set(0, -0.06, 0.018);
+      a.add(plate2);
+      a.add(new THREE.Mesh(armGeo, M.brass));
+      const cup = new THREE.Mesh(cupGeo, M.brass);
+      cup.position.set(0, -0.006, 0.11);
+      a.add(cup);
+      const mat = new THREE.MeshLambertMaterial({ color: '#e8d2a8', emissive: '#ffffff', emissiveMap: tulipTex, emissiveIntensity: 0, side: THREE.DoubleSide, transparent: true, opacity: 0.93 });
+      const glass = new THREE.Mesh(tulipGeo, mat);
+      glass.position.set(0, 0, 0.11);
+      a.add(glass);
+      const bulbMat = new THREE.MeshBasicMaterial({ color: '#fff0c8' });
+      const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+      bulb.position.set(0, 0.04, 0.11);
+      a.add(bulb);
+      const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#ffffff', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+      halo.scale.set(0.62, 0.62, 1);
+      halo.position.set(0, 0.07, 0.13);
+      a.add(halo);
+      lampShades.push({ l, mat, k: 1.25, bulb, halo });
     }
     // les lustres du hall sont des modèles (Chandelier_01, dans map.props)
   }
@@ -461,6 +510,8 @@ export function buildHotel({ map, group, baked, CEIL }) {
         if (s.l.state === 'flicker') on = Math.sin(tick * 12.9898 + s.l.x * 78.233) * 43758.5453 % 1 > -0.2 ? 0.9 : 0.1;
         if (sim.blackout > 0) on = 0;
         s.mat.emissiveIntensity = on * s.k;
+        if (s.bulb) s.bulb.visible = on > 0.5;
+        if (s.halo) s.halo.material.opacity = on * 0.42;
       }
       // le code au plafond, quand les 6 lettres sont postées : il s'allume en grésillant
       codeK = Math.min(1, codeK + (sim.codeShown ? dt * 0.4 : -dt));

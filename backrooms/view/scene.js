@@ -330,7 +330,7 @@ export function createBackroomsScene(container, floors, lamps) {
 
   const textures = createBackroomsTextures(PIPES ? 0 : map0.level || 0);
   const tx2 = PIPES ? createPipesTextures() : null;
-  const AMB = L2 ? 0.045 : L3 ? 0.1 : 0.012; // l'hôtel : une pénombre chaude, mais on y voit
+  const AMB = L2 ? 0.045 : L3 ? 0.06 : 0.012; // l'hôtel : une pénombre chaude, mais on y voit (entre deux appliques, plus sombre)
   const ambient = new THREE.AmbientLight(L3 ? '#ffcf96' : L2 ? '#eaf7f6' : L1 ? '#c9d8ff' : PIPES ? '#ffd9a8' : '#fff3c4', AMB);
   scene.add(ambient);
   const dummy = new THREE.Object3D();
@@ -624,7 +624,7 @@ export function createBackroomsScene(container, floors, lamps) {
       uPoolMap: { value: poolTex }, // Poolrooms : la carte de l'eau (voir plus haut)
     };
     // reflets des lampes (Level 2) : les plus proches que la caméra voit, choisies à chaque image
-    const NLAMP = 12;
+    const NLAMP = L3 ? 16 : 12; // (l'hôtel : on voit loin dans ses couloirs, et chaque applique dessine sur le mur)
     const lampU = {
       uLampPos: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3(0, -100, 0)) },
       uLampCol: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3()) },
@@ -986,7 +986,7 @@ float occVis(vec3 p, vec3 lp) {
         for (const v of nookLamps) if (v.k > 0.01) addPrint(liveB, v.fp, v.k);
       }
       for (let i = 0; i < BW * BH; i++) {
-        const v = Math.min(1, (L2 || PIPES ? 0.03 : L3 ? 0.09 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
+        const v = Math.min(1, (L2 || PIPES ? 0.03 : L3 ? 0.055 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
         bakeData[i * 4] = Math.round(v * 255);
         if (PIPES || alarm || nookLamps.length) bakeData[i * 4 + 2] = Math.round(Math.min(1, liveB[i] * 0.3 * power) * 255);
       }
@@ -1195,7 +1195,10 @@ float occVis(vec3 p, vec3 lp) {
           sh.defines = { ...(sh.defines || {}), BK_POOL: 1, ...(pool === 'floor' ? { BK_POOLFLOOR: 1 } : pool === 'wall' ? { BK_POOLWALL: 1 } : pool === 'ceil' ? { BK_POOLCEIL: 1 } : null) };
         }
         if (grime) sh.defines = { ...(sh.defines || {}), BK_GRIME: 1 };
-        if (hotel) sh.defines = { ...(sh.defines || {}), BK_HOTEL: 1 };
+        if (hotel) {
+          Object.assign(sh.uniforms, lampU);
+          sh.defines = { ...(sh.defines || {}), BK_HOTEL: 1 };
+        }
         if (bump) sh.defines = { ...(sh.defines || {}), BK_BUMP: 1 };
         // Poolrooms : le relief des joints s'efface quand un carreau ne fait plus que quelques pixels (au loin, en
         // rasant) ; sinon sa pente, prise d'un pixel à l'autre, crénelle les joints en pointillés qui scintillent
@@ -1224,9 +1227,11 @@ uniform float uBakeTX;
 uniform vec3 uBakeTint;
 uniform vec3 uBakeTint2;
 uniform float uCeilB;
-#ifdef BK_SPEC
+#if defined(BK_SPEC) || defined(BK_HOTEL)
 uniform vec3 uLampPos[${NLAMP}];
 uniform vec3 uLampCol[${NLAMP}];
+#endif
+#ifdef BK_SPEC
 uniform float uSpecK;
 uniform float uGloss;
 uniform float uSpecMask;
@@ -1750,6 +1755,38 @@ float bkCaust(vec2 uv, float t) {
             #endif
           }
           #endif
+          #ifdef BK_HOTEL
+          // l'hôtel n'a pas de plafonniers : des appliques contre les murs, des lampes de chevet. La lumière cuite (au sol)
+          // n'éclaire plus qu'à moitié les murs et le plafond ; chaque lampe proche y dessine la sienne : sur son mur, un
+          // éventail qui monte de la tulipe en s'évasant et un plus court qui descend ; au plafond, une tache ovale
+          // au-dessus d'elle ; partout ailleurs, un halo qui baisse avec la distance et l'angle
+          vec3 hSc = vec3(0.0);
+          if (ny < 0.5) {
+            shape *= ny < -0.5 ? 0.3 : 0.45;
+            for (int i = 0; i < ${NLAMP}; i++) {
+              vec3 hd = vBakeP - uLampPos[i];
+              float hD2 = dot(hd, hd);
+              if (hD2 > 64.0) continue;
+              float hInc = max(dot(vBakeN, -hd) * inversesqrt(hD2 + 0.0001), 0.0);
+              float hI = hInc * 0.75 / (1.0 + hD2 * 1.2);
+              if (ny < -0.5) {
+                float hR2 = dot(hd.xz, hd.xz);
+                hI = hI * 0.35 + 1.1 * exp(-hR2 * 3.2) * smoothstep(0.2, 0.8, hd.y);
+              } else {
+                float hP = dot(hd.xz, vBakeN.xz); // la lampe est à 20 cm devant son mur
+                if (hP < 0.05 && hP > -0.5) {
+                  float hH = length(hd.xz - vBakeN.xz * hP);
+                  float hUp = hd.y > 0.0 ? 1.0 : 0.0;
+                  float hW = mix(0.16 + -hd.y * 0.75, 0.09 + hd.y * 0.5, hUp);
+                  float hFan = exp(-(hH * hH) / (hW * hW)) * mix(0.55 / (1.0 + hd.y * hd.y * 1.6), 1.7 / (1.0 + hd.y * hd.y * 0.7), hUp);
+                  hI += (hFan + 0.32 / (1.0 + (hH * hH + hd.y * hd.y) * 2.2)) * smoothstep(-0.5, -0.3, hP);
+                }
+              }
+              hSc += uLampCol[i] * hI;
+            }
+          }
+          totalEmissiveRadiance += diffuseColor.rgb * hSc * (ny < -0.5 ? 0.7 : 1.0);
+          #endif
           totalEmissiveRadiance += diffuseColor.rgb * (uBakeTint * bk.r + uBakeTint2 * bk.b * (ny < -0.5 ? uCeilB : 1.0)) * 2.0 * shape;
           totalEmissiveRadiance += bkPoolAdd;
           #ifdef BK_DYN
@@ -1912,7 +1949,7 @@ float bkCaust(vec2 uv, float t) {
       ceilTex.needsUpdate = true;
     });
     // (Level 2 : la dalle de béton, sombre, au-dessus des tuyaux)
-    const ceilMat = baked(new THREE.MeshLambertMaterial({ map: ceilTex, color: PIPES ? '#9a958a' : '#ffffff' }), L1 ? { gloss: 1 } : null);
+    const ceilMat = baked(new THREE.MeshLambertMaterial({ map: ceilTex, color: PIPES ? '#9a958a' : '#ffffff' }), L1 ? { gloss: 1 } : L3 ? { hotel: 1 } : null);
     const above = fi > 0 ? floors[fi - 1] : null;
     // (et là où passe un couloir en diagonale : son propre plafond, plus bas, prend la place)
     const diagHoles = L2 ? [] : (map.diags || []).flatMap((dg) => [...dg.cells, ...dg.cuts]).map(([x, z]) => ({ x: (x + 0.5) * CELL_SIZE, z: (z + 0.5) * CELL_SIZE, hx: CELL_SIZE / 2, hz: CELL_SIZE / 2 }));
@@ -2036,7 +2073,7 @@ float bkCaust(vec2 uv, float t) {
       // Poolrooms : la mosaïque émaillée, en relief, qui brille sous les dalles (voir tileRelief et BK_POOL)
       if (L2) wallMat = baked(new THREE.MeshPhongMaterial({ map: textures.wall, bumpMap: tileRelief(textures.wall), bumpScale: 1.2, specular: '#2c3537', shininess: 70 }), { pool: 'wall', spec: 0.22, gloss: 140 });
       // Level 5 : le damas en relief, le lambris de noyer verni qui brille sous les appliques et la lampe torche
-      else if (L3) wallMat = baked(new THREE.MeshPhongMaterial({ map: textures.wall, bumpMap: textures.wallBump, bumpScale: 1.5, specularMap: textures.wallSpec, specular: '#5a4636', shininess: 38 }), { spec: 0.55, gloss: 45, mask: 0, hotel: 1 });
+      else if (L3) wallMat = baked(new THREE.MeshPhongMaterial({ map: textures.wall, bumpMap: textures.wallBump, bumpScale: 1.5, specularMap: textures.wallSpec, specular: '#3a2a20', shininess: 70 }), { spec: 0.55, gloss: 45, mask: 0, hotel: 1 });
       else wallMat = baked(new THREE.MeshLambertMaterial({ map: L0 && fi === 1 ? textures.wallLow : textures.wall, ...(L1 && textures.wallBump ? { bumpMap: textures.wallBump, bumpScale: 1.6 } : L0 ? { bumpMap: relief(fi === 1 ? textures.wallLow : textures.wall), bumpScale: 1.0 } : null) }), L0 ? { base: true } : L1 ? { bump: !!textures.wallBump, wall1: true } : null);
       const wallsMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(CELL_SIZE, CEIL + SUNK, CELL_SIZE), wallMat, wallCount);
       // le mur percé du trou de la cassette perchée se construit à part (6b)
@@ -4578,7 +4615,8 @@ void main() {
             if (d > 4 && !hasLineOfSight(map, P.x, P.z, l.x, l.z)) continue;
             lampU.uLampPos.value[n].set(l.x, l.y + group.position.y, l.z);
             if (L2) lampU.uLampCol.value[n].set(0.95, 1.0, 1.02).multiplyScalar(1.2 * k * (l.fs || 1));
-            else if (L3) lampU.uLampCol.value[n].set(1.0, 0.68, 0.38).multiplyScalar((l.lamp ? 0.8 : 1.6) * k);
+            // (l'hôtel : les plus lointaines s'effacent en douceur au lieu de s'éteindre d'un coup)
+            else if (L3) lampU.uLampCol.value[n].set(1.0, 0.68, 0.38).multiplyScalar((l.lamp ? 0.8 : 1.6) * k * Math.min(1, (32 - d) / 8));
             else if (l.kind === 'tube') lampU.uLampCol.value[n].set(0.75, 0.88, 1.0).multiplyScalar(k);
             else lampU.uLampCol.value[n].set(1.0, 0.7, 0.4).multiplyScalar(1.5 * k);
             n++;
