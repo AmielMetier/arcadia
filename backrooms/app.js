@@ -2,7 +2,9 @@
 import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE, HOTEL_LEVEL, DOCK_OPEN_T, DOCK_CLOSE_T, ALARM_T, DUCT_LAND } from './engine/sim.js';
 import { hasLineOfSight } from './engine/nav.js';
 import { bfs, CELL_SIZE, cellsOnSeg, T } from './engine/map.js';
-import { createBackroomsScene, setMonsterMode, setSceneOptions, onGlContext } from './view/scene.js';
+import { createBackroomsScene, setMonsterMode, setSceneOptions, onGlContext, sceneGl } from './view/scene.js';
+import { createSlideRide } from './view/slide.js';
+import { MOUTH } from './engine/poolrooms.js';
 import { BackroomsSfx } from './view/sfx.js';
 import { createVoice } from './view/voice.js';
 import { BackroomsHUD, levelName, levelSub, LORE, loreOf, hearTape, tapesHeard, store, NOTES, readNote, loreComplete, FINAL_LORE } from './view/hud.js';
@@ -27,6 +29,12 @@ const hudEl = document.getElementById('hud');
 
 let sim = null;
 let scene = null;
+// la descente en toboggan des Poolrooms (slide.js) : avant l'écran de chargement, puis après ; rideDelay : le temps
+// de s'asseoir au bord et de s'y glisser (dans la scène) avant que le tube prenne l'image
+let ride = null;
+let rideDelay = 0;
+let boardedAt = -1; // quand ce joueur-ci s'est glissé dans un toboggan (temps de la partie)
+const ENTRY_T = 1.1;
 let sfx = null;
 let hud = null;
 let stepDist = 0;
@@ -654,11 +662,44 @@ function onRedStart() {
   sfx.redStart();
 }
 
+// Poolrooms : un carreau gravé dans chaque local technique, lu en y entrant (rien d'obligatoire : la sortie, ce sont
+// les toboggans)
+const techRead = new Set();
+function poolNotes() {
+  const P = sim.player;
+  const r = P && P.status === 'alive' && sim.map.roomAt ? sim.map.roomAt(P.x, P.z) : null;
+  if (!r || r.type !== 'tech') return;
+  const k = `${sim.seed}:${r.id}`;
+  if (techRead.has(k)) return;
+  techRead.add(k);
+  showNote(2, [...techRead].filter((x) => x.startsWith(`${sim.seed}:`)).length - 1);
+}
+
+// Poolrooms : le bord d'eau le plus proche du joueur (quatre fois par seconde) ; les gouttelettes y tombent
+let lapT = 0;
+function poolLap(dt) {
+  if ((lapT -= dt) > 0 || !sim || !sim.player) return;
+  lapT = 0.25;
+  const P = sim.player;
+  const m = sim.fm(P.floor || 0);
+  if (!m.depthAt) return;
+  let best = m.depthAt(P.x, P.z) > 0 ? { x: P.x, z: P.z, r: 0 } : null;
+  for (const r of [0.7, 1.5, 2.6, 4, 5.5]) {
+    if (best) break;
+    for (let k = 0; k < 8 && !best; k++) {
+      const x = P.x + Math.cos((k * Math.PI) / 4) * r;
+      const z = P.z + Math.sin((k * Math.PI) / 4) * r;
+      if (m.depthAt(x, z) > 0) best = { x, z, r };
+    }
+  }
+  sfx.setLap(best || { x: P.x, z: P.z }, best ? 1 - best.r / 6.5 : 0);
+}
+
 function stepKind(P) {
   if (!sim || !P) return false;
   if (sim.level === 2) {
     const m = sim.fm(P.floor || 0);
-    return m.depthAt && m.depthAt(P.x, P.z) > 0 ? 'water' : true;
+    return m.depthAt && m.depthAt(P.x, P.z) > 0 ? 'water' : 'tile';
   }
   // Level 0 : dans la pellicule d'eau des grosses taches de la moquette, des pas mouillés
   if (sim.level === 0 && scene && scene.filmAt && scene.filmAt(P.x, P.z) > 0.35) return 'soak';
@@ -721,6 +762,7 @@ async function unlockVip() {
 // Nouvelle partie (solo ou hôte) : l'hôte l'annonce aux invités, qui construisent la même carte avec la même graine
 function initGame(settings = lastSettings, forceLevel = null) {
   lastSettings = settings;
+  endRide();
   if (NET.role === 'guest') return; // l'invité attend le « go » de l'hôte
   // ?vip (seul) : le mode VIP sans passer par le salon (la clé gardée par ce navigateur, sinon la phrase est demandée)
   if (NET.role === 'solo' && /[?&]vip(&|=|$)/.test(location.search)) settings = { ...settings, monsters: 'vip' };
@@ -1228,6 +1270,29 @@ function oldTimerTick() {
   oldTimerSay(line);
 }
 
+// Poolrooms : la descente dans le toboggan sl. Celui qui vient d'y entrer s'assoit au bord et s'y laisse glisser
+// (dans la scène), puis le tube prend l'image ; les autres (qui regardaient, ou y attendaient) y sont déjà
+function startRide(sl) {
+  endRide();
+  const entering = sim.player.status === 'elevator' && boardedAt >= 0 && sim.time - boardedAt < 0.5;
+  ride = createSlideRide({ gl: sceneGl(), hex: sl.hex, side: sl.id % 2 ? -1 : 1, sfx });
+  if (entering && scene && scene.slideIn) {
+    scene.slideIn(sl, MOUTH.y);
+    rideDelay = ENTRY_T;
+  } else {
+    rideDelay = 0;
+    ride.start();
+  }
+  document.body.classList.add('riding');
+}
+
+function endRide() {
+  if (ride) ride.dispose();
+  ride = null;
+  rideDelay = 0;
+  document.body.classList.remove('riding');
+}
+
 // Construit la scène d'un nouvel étage derrière l'écran de chargement (levelTok : seul le dernier demandé compte)
 let levelTok = 0;
 function buildLevel(level) {
@@ -1249,6 +1314,19 @@ function buildLevel(level) {
       if (tok !== levelTok || scene !== sc) return;
       requestAnimationFrame(() => {
         if (tok !== levelTok || scene !== sc) return;
+        if (ride && ride.held) {
+          // arrivé par un toboggan : la fin de la descente (dans le noir, puis la lumière du bout), et on tombe dedans
+          if (hud) {
+            hud.loading(false);
+            hud.unfade();
+          }
+          ride.finish(level === HOTEL_LEVEL ? 'hotel' : 'pipes', () => {
+            endRide();
+            if (scene === sc) sc.dropIn(1.4);
+            if (hud) hud.fade(`LEVEL ${levelName(level)}`, levelSub(level), 2.4, false, true);
+          });
+          return;
+        }
         if (hud) {
           hud.loading(false);
           hud.fade(`LEVEL ${levelName(level)}`, levelSub(level), 2.2);
@@ -1312,11 +1390,9 @@ function handleEvent(ev, me) {
       }
       break;
     case 'fuse': {
-      if (sfx) sfx.cassette(sim.level === 2 ? 'valve' : 'fuse');
-      if (sim.level === 2) {
-        if (hud) hud.toast(ev.by === me ? `Valve wheel ${ev.count}/${ev.total}` : `${who(ev.by)} found a valve wheel (${ev.count}/${ev.total})`);
-      } else if (hud) hud.toast(ev.by === me ? (ev.locker ? 'A fuse, at the back of the locker · bring it to the freight elevator panel' : 'Fuse in your pocket · bring it to the freight elevator panel') : `${who(ev.by)} picked up a fuse`);
-      if (ev.by === me && (sim.level === 1 || sim.level === 2)) showNote(sim.level, (ev.count || 1) - 1);
+      if (sfx) sfx.cassette('fuse');
+      if (hud) hud.toast(ev.by === me ? (ev.locker ? 'A fuse, at the back of the locker · bring it to the freight elevator panel' : 'Fuse in your pocket · bring it to the freight elevator panel') : `${who(ev.by)} picked up a fuse`);
+      if (ev.by === me && sim.level === 1) showNote(1, (ev.count || 1) - 1);
       break;
     }
     case 'fuseIn':
@@ -1404,8 +1480,7 @@ function handleEvent(ev, me) {
       if (sfx) sfx.silence(4);
       break;
     case 'powered':
-      if (hud) hud.toast(sim.level === HOTEL_LEVEL ? 'The keypad beeps: the fire escape door is unlocked' : sim.level === 2 ? 'Valves closed: the pumps stop, the three slides open' : 'The motor catches: the freight elevator is starting up');
-      if (sfx && sim.level === 2) sfx.setPool(false); // le silence d'un coup : les pompes s'arrêtent
+      if (hud) hud.toast(sim.level === HOTEL_LEVEL ? 'The keypad beeps: the fire escape door is unlocked' : 'The motor catches: the freight elevator is starting up');
       break;
     case 'exitUnlocked': {
       const X = sim.map.exit;
@@ -1749,6 +1824,7 @@ function handleEvent(ev, me) {
         break;
       }
       if (sfx) sfx.splashDown();
+      if (ev.id === me) boardedAt = sim.time;
       if (hud && ev.id !== me) hud.toast(`${ev.name} slid into the ${sl.name.toLowerCase()} slide`);
       break;
     }
@@ -1803,12 +1879,23 @@ function handleEvent(ev, me) {
       if (hud) hud.toast(ev.id === me ? 'The doors closed without you' : `${ev.name} was left behind`);
       break;
     case 'depart':
+      // Poolrooms : la descente dans le toboggan (celui qui vient d'y entrer s'y glisse d'abord, sous nos yeux)
+      if (ev.level === 2 && sim.map.slides && sim.slide >= 0 && scene) {
+        startRide(sim.map.slides[sim.slide]);
+        break;
+      }
       if (sfx && ev.level === 2) sfx.splashDown();
       else if (sfx && ev.level !== HOTEL_LEVEL) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
       if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : ev.level === HOTEL_LEVEL ? 'YOU RUN DOWN THE FIRE ESCAPE, FLOOR AFTER FLOOR…' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
       break;
     case 'level':
       if (hud) hud.closeKeypad();
+      // la descente s'interrompt le temps du chargement (elle reprend une fois le niveau prêt) : le noir d'un coup,
+      // sinon le nouveau niveau se voyait un instant à travers le fondu
+      if (ride) {
+        ride.hold();
+        if (hud) hud.blackNow();
+      }
       // un nouvel étage s'allume : le bourdonnement des néons revient (même si on est parti pendant une coupure)
       if (sfx) sfx.dark = false;
       // un étage de plus : elle s'enhardit un peu pour la prochaine partie
@@ -1823,8 +1910,9 @@ function handleEvent(ev, me) {
       sim.spectate = 0;
       stepDist = 0;
       if (hud) {
-        hud.fade(`LEVEL ${levelName(ev.level)}`, 'LOADING THE TAPE…', 0);
-        hud.loading(true);
+        // (au milieu d'un toboggan : pas de titre, le seul est celui de l'arrivée ; « LOADING » seulement si ça dure)
+        hud.fade(ride ? '' : `LEVEL ${levelName(ev.level)}`, 'LOADING THE TAPE…', 0);
+        hud.loading(true, !!ride);
       }
       buildLevel(ev.level);
       // seul, on pourra reprendre à ce niveau-ci
@@ -1938,6 +2026,15 @@ function handleEvent(ev, me) {
       break;
     case 'gameover':
     case 'win':
+      // le toboggan bleu sort des Poolrooms : la fin de la descente, les néons du Level 0 au bout, puis l'écran de fin
+      if (ev.type === 'win' && ride && !ev.rode) {
+        const done = { ...ev, rode: true };
+        ride.finish('out', () => {
+          endRide();
+          handleEvent(done, me);
+        });
+        break;
+      }
       // rendre le curseur pour le bouton Rejouer (Entrée marche aussi)
       if (document.pointerLockElement) document.exitPointerLock();
       if (ev.type === 'win' && sfx) sfx.win();
@@ -2124,7 +2221,7 @@ function frame(currentTime) {
     camPrev.f = sim.player.floor || 0;
     camPrev.ok = true;
 
-    const live = !paused;
+    const live = !paused && !ride; // (pendant la descente en toboggan, on ne se dirige pas)
     const input = {
       mx: live ? mx : 0,
       my: live ? my : 0,
@@ -2353,6 +2450,10 @@ function frame(currentTime) {
     if (M.danger < 0.25 && sim.player.status === 'alive') sfx.stopDeath(); // échappé : la mort s'éloigne
     sfx.ambience(delta, !paused && !chasing && M.danger < 0.4);
     sfx.drips(paused ? 0 : delta);
+    if (sim.level === 2) {
+      poolLap(paused ? 0 : delta);
+      if (!paused) poolNotes();
+    }
   } else if (sfx) {
     sfx.updateMonsterSound(0, 0); // partie finie : l'entité se tait
     sfx.updateChase(false, 0, null);
@@ -2411,6 +2512,9 @@ function frame(currentTime) {
     sfx.setCalm(paused || sim.state !== 'playing' || sim.open ? 0 : calm, wear, radio);
   } else if (sfx && sfx.calm) sfx.setCalm(0);
 
+  // la descente en toboggan démarre une fois glissé dans la bouche
+  if (ride && rideDelay > 0 && (rideDelay -= delta) <= 0) ride.start();
+
   // Rendu graphique et HUD
   if (scene) {
     if (!document.hidden) {
@@ -2426,7 +2530,9 @@ function frame(currentTime) {
         Pl.z = camPrev.z + (cz - camPrev.z) * a;
       }
       try {
-        scene.render(sim, currentTime / 1000); // en arrière-plan : la partie tourne, sans image
+        // la descente en toboggan prend l'image (le moteur est le même) ; sinon, la scène du niveau
+        if (ride && ride.active) ride.render(delta, currentTime / 1000, sim.departT > 0 ? sim.departT : null);
+        else scene.render(sim, currentTime / 1000); // en arrière-plan : la partie tourne, sans image
       } finally {
         if (lerp) {
           Pl.x = cx;

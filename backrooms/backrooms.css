@@ -212,6 +212,9 @@ html, body {
   text-align: center;
 }
 .fade.on { opacity: 1; }
+.fade.clear { background: transparent; }
+/* la descente en toboggan : l'image seule (l'écran de chargement reste) */
+body.riding #hud > :not(#fade) { visibility: hidden !important; }
 .fade-bar { width: min(360px, 70vw); height: 12px; margin: 22px auto 0; border: 2px solid #f2f0e6; padding: 2px; }
 .fade-bar i { display: block; height: 100%; width: 0; background: #f2f0e6; transition: width 0.15s linear; }
 /* la pause passe toujours au-dessus du fondu */
@@ -223,6 +226,9 @@ html, body {
 .fade.loading span { animation: brLoadBlink 1s steps(2, start) infinite; }
 .fade.loading span::before { content: '● '; color: #d22; }
 @keyframes brLoadBlink { to { visibility: hidden; } }
+.fade.loading.quiet b { display: none; }
+.fade.loading.quiet span { opacity: 0; animation: brLoadBlink 1s steps(2, start) infinite, brLoadLate 0.01s 1s forwards; }
+@keyframes brLoadLate { to { opacity: 1; } }
 .toast {
   position: absolute;
   top: 62%;

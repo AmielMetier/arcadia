@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL, RELAY_ARM, RELAY_SYNC, LIFT_CALL_T, L1_CALM, L1_FIRST_BLACKOUT, SECTOR_STEP } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, SLIDE_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL, RELAY_ARM, RELAY_SYNC, LIFT_CALL_T, L1_CALM, L1_FIRST_BLACKOUT, SECTOR_STEP } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
 import { navOf, roamable } from '../backrooms/engine/gait.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
@@ -1511,25 +1511,16 @@ test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui 
   assert.equal(sim.state, 'playing');
   assert.equal(sim.level, 2, 'on arrive aux Poolrooms');
   assert.ok(sim.drainEvents().some((e) => e.type === 'level' && e.level === 2));
-  // les 3 volants de vanne ouvrent les toboggans ; on se glisse dans l'un d'eux : la partie est gagnée
+  // rien à ramasser : les toboggans sont ouverts dès l'arrivée ; on se glisse dans l'un d'eux : la partie est gagnée
   const sl = sim.map.slides[2]; // le bleu (le rouge mène au Terror Hotel, le jaune aux Tuyauteries)
-  sim.player.x = sl.x - sl.dx * 0.6;
-  sim.player.z = sl.z - sl.dz * 0.6;
-  sim.step();
-  assert.equal(sim.player.status, 'alive', 'toboggan fermé tant que les vannes manquent');
-  for (const f of sim.map.fuses) {
-    sim.player.x = f.x;
-    sim.player.z = f.z;
-    sim.step();
-  }
-  assert.equal(sim.fuses, FUSES, 'les 3 vannes');
-  assert.equal(sim.open, true, "les toboggans s'ouvrent dès la troisième vanne");
+  assert.equal(sim.map.fuses.length, 0, 'aucun objet à trouver aux Poolrooms');
+  assert.equal(sim.open, true, 'les toboggans sont ouverts dès l\'arrivée');
   sim.player.x = sl.x - sl.dx * 0.6;
   sim.player.z = sl.z - sl.dz * 0.6;
   sim.step();
   assert.equal(sim.player.status, 'elevator');
   assert.equal(sim.slide, 2, 'le toboggan bleu est pris');
-  run(sim, DEPART_T + 0.2);
+  run(sim, SLIDE_T + 0.2);
   assert.equal(sim.state, 'won', 'le toboggan bleu sort des Poolrooms : partie gagnée');
 });
 
@@ -2705,12 +2696,11 @@ test("l'entité se tapit dans le noir pour observer (sans jamais rester plantée
   assert.ok(Math.abs(sim.aggro - 0.8) < 1e-9, `au plus 0,8 au Level 0 (${sim.aggro})`);
 });
 
-test("Level 37 (Poolrooms) : salles et bassins reliés, 3 vannes et 3 toboggans accessibles, l'eau ralentit", () => {
+test("Level 37 (Poolrooms) : salles et bassins reliés, rien à ramasser, 3 toboggans accessibles, l'eau ralentit", () => {
   for (const sd of [1, 2, 3, 37, 99, 123, 500, 777]) {
     const m = createPoolMap(sd);
     assert.equal(m.level, 2);
-    assert.equal(m.fuses.length, 3, `graine ${sd} : 3 vannes`);
-    for (const f of m.fuses) assert.ok(m.dist[f.gz * m.W + f.gx] > 0, `graine ${sd} : vanne accessible`);
+    assert.equal(m.fuses.length, 0, `graine ${sd} : rien à ramasser`);
     // 3 toboggans de couleurs différentes, dans un mur, devant une case accessible, au sec ou presque
     assert.deepEqual(m.slides.map((x) => x.color), ['red', 'yellow', 'blue'], `graine ${sd} : 3 toboggans`);
     for (const x of m.slides) {
@@ -2719,8 +2709,8 @@ test("Level 37 (Poolrooms) : salles et bassins reliés, 3 vannes et 3 toboggans 
       assert.ok(m.depthAt(x.x - x.dx * 0.6, x.z - x.dz * 0.6) <= 0.21, 'on y entre au sec ou presque');
       assert.ok(!m.collide(x.x - x.dx * 0.6, x.z - x.dz * 0.6, 0.38), 'rien devant la bouche');
     }
-    // objectifs et toboggans bien écartés les uns des autres
-    const pts = [...m.fuses, ...m.slides];
+    // toboggans bien écartés les uns des autres
+    const pts = m.slides;
     for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) assert.ok(Math.hypot(pts[i].x - pts[j].x, pts[i].z - pts[j].z) > 7, `graine ${sd} : deux objectifs trop proches`);
     assert.ok(m.walkable.some((c) => m.depth[c.z * m.W + c.x] >= 0.5), `graine ${sd} : des bassins`);
     for (const it of m.items) assert.equal(m.depthAt(it.x, it.z), 0, 'les objets sont au sec');
@@ -2782,13 +2772,20 @@ test("Level 37 (Poolrooms) : salles et bassins reliés, 3 vannes et 3 toboggans 
   assert.ok(sim.monster.x !== ms.x || sim.monster.z !== ms.z, "l'entité bouge aux Poolrooms");
 });
 
+test("Level 37 : sans objet à ramasser, l'entité s'enhardit avec le temps passé à errer", () => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 9, level: 2 });
+  const a0 = sim.aggro;
+  assert.ok(a0 >= 0.25 && a0 < 0.4, `calme à l'arrivée (${a0})`);
+  sim.time = 150;
+  const a1 = sim.aggro;
+  sim.time = 600;
+  const a2 = sim.aggro;
+  assert.ok(a0 < a1 && a1 < a2, `elle monte : ${a0} < ${a1} < ${a2}`);
+  assert.ok(a2 >= 0.8 && a2 < 1, `sans aller jusqu'au maximum (${a2})`);
+});
+
 test('Level 37 : le premier qui prend un toboggan choisit la couleur, les autres se referment', () => {
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 12, level: 2, players: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], localId: 'a' });
-  for (const f of sim.map.fuses) {
-    sim.players[0].x = f.x;
-    sim.players[0].z = f.z;
-    sim.step();
-  }
   assert.equal(sim.open, true);
   const [red, , blue] = sim.map.slides;
   const [A, B] = sim.players;
@@ -2809,7 +2806,7 @@ test('Level 37 : le premier qui prend un toboggan choisit la couleur, les autres
   B.z = red.z - red.dz * 0.6;
   sim.step();
   assert.equal(B.status, 'elevator');
-  run(sim, DEPART_T + 0.2);
+  run(sim, SLIDE_T + 0.2);
   assert.equal(sim.state, 'playing');
   assert.equal(sim.level, HOTEL_LEVEL, 'le toboggan rouge mène au Level 5, le Terror Hotel');
   assert.ok(sim.players.every((p) => p.status === 'alive'), "tout le monde arrive à l'hôtel");
@@ -2817,11 +2814,6 @@ test('Level 37 : le premier qui prend un toboggan choisit la couleur, les autres
 
 test('Level 37 : le toboggan jaune descend aux Tuyauteries (Level 2), le dernier niveau', () => {
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 12, level: 2 });
-  for (const f of sim.map.fuses) {
-    sim.player.x = f.x;
-    sim.player.z = f.z;
-    sim.step();
-  }
   const yellow = sim.map.slides.find((x) => x.color === 'yellow');
   assert.equal(yellow.to, PIPES_LEVEL);
   sim.player.x = yellow.x - yellow.dx * 0.6;
@@ -2829,7 +2821,7 @@ test('Level 37 : le toboggan jaune descend aux Tuyauteries (Level 2), le dernier
   sim.step();
   assert.equal(sim.player.status, 'elevator');
   sim.drainEvents();
-  run(sim, DEPART_T + 0.2);
+  run(sim, SLIDE_T + 0.2);
   assert.equal(sim.state, 'playing', 'pas encore gagné : il reste les Tuyauteries');
   assert.equal(sim.level, PIPES_LEVEL);
   assert.ok(sim.drainEvents().some((e) => e.type === 'level' && e.level === PIPES_LEVEL));

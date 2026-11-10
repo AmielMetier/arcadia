@@ -1,6 +1,6 @@
 // The Backrooms - Interface façon caméscope (REC, signal, bande), jumpscare et écran de fin
 import { ENTITY_IMG, ENTITY_ANIM, ENTITY_VIP } from './scene.js';
-import { DEPART_T, PIPES_LEVEL, CASSETTES, NOISE, VOICE_MIN, THIRST_BLUR, INV_SIZE, HOTEL_LEVEL } from '../engine/sim.js';
+import { DEPART_T, SLIDE_T, PIPES_LEVEL, CASSETTES, NOISE, VOICE_MIN, THIRST_BLUR, INV_SIZE, HOTEL_LEVEL } from '../engine/sim.js';
 
 import { vault } from './vault.js';
 const GOAT_DEATH_FADE = 8; // secondes de montée de l'image
@@ -52,7 +52,7 @@ export function hearTape(i) {
 }
 export { store };
 
-// Les écrits des autres niveaux : ce qu'on trouve avec les fusibles (Level 1), les volants de vanne (Poolrooms), les
+// Les écrits des autres niveaux : ce qu'on trouve avec les fusibles (Level 1), dans les locaux techniques (Poolrooms), les
 // vannes (Pipe Dreams, le bouc) et les lettres (Terror Hotel, le registre).
 // Un par objet ramassé, dans un ordre qui dépend de la graine ; ceux qu'on a lus restent dans la collection.
 export const NOTES = {
@@ -345,8 +345,8 @@ export class BackroomsHUD {
     // 1 bis. L'équipe, en haut à gauche : réécrite seulement quand quelque chose change
     this.teamList(sim, P);
 
-    // 2. Objectif de l'étage : 5 cassettes (Level 0), 3 fusibles à rapporter au monte-charge (Level 1), 3 volants
-    // (Level 37), 4 vannes (Level 2), 6 lettres à poster (Level 5)
+    // 2. Objectif de l'étage : 5 cassettes (Level 0), 3 fusibles à rapporter au monte-charge (Level 1), un des 3
+    // toboggans à trouver (Level 37, rien à compter), 4 vannes (Level 2), 6 lettres à poster (Level 5)
     const L5 = sim.level === HOTEL_LEVEL;
     const L1 = sim.level === 1 || sim.level === 2;
     const L37 = sim.level === 2;
@@ -366,9 +366,10 @@ export class BackroomsHUD {
         ? (sim.map.letters || []).map((Lt) => `<i class="letter${Lt.posted ? ' on' : P.letters.includes(Lt.id) ? ' carry' : ''}">${Lt.posted ? sim.word[Lt.idx] || '?' : P.letters.includes(Lt.id) ? '✉' : ''}</i>`).join('')
         : Array.from({ length: total }, (_, i) => `<i class="${i < (sim.level === 1 ? delivered : got) ? 'on' : i < got ? 'half' : ''}${L1 ? ' fuse' : ''}"></i>`).join('');
       this.text('cassetteText', `${sim.level === 1 ? delivered : got}/${total}`);
+      E.cassetteText.parentElement.style.display = L37 ? 'none' : '';
       this.bannerT = 6;
       const banner = E.objBanner;
-      banner.classList.toggle('unlocked', sim.open);
+      banner.classList.toggle('unlocked', sim.open && !(L37 && !slideOf(sim)));
       let b;
       if (L5) {
         const carry = (P.letters || []).length;
@@ -381,9 +382,8 @@ export class BackroomsHUD {
           : got === 0
           ? 'LEVEL 5 · 6 LETTERS ARE HIDDEN IN THE ROOMS · HIDE UNDER BEDS AND IN WARDROBES (E), CROUCH (C)'
           : `LETTER ${got}/6 POSTED`;
-      } else if (sim.open && L37) b = slideOf(sim) ? `EVERYONE INTO THE ${slideOf(sim).name} SLIDE · THE OTHERS ARE SHUT` : 'THE PUMPS STOPPED · THE SLIDES ARE OPEN: RED, YELLOW OR BLUE, EACH ONE LEADS SOMEWHERE ELSE';
+      } else if (sim.open && L37) b = slideOf(sim) ? `EVERYONE INTO THE ${slideOf(sim).name} SLIDE · THE OTHERS ARE SHUT` : 'LEVEL 37 · FIND ONE OF THE 3 SLIDES AND GET IN · RED, YELLOW OR BLUE: EACH ONE LEADS SOMEWHERE ELSE';
       else if (sim.open) b = PIPES ? 'THE STEAM IS OFF: THE SERVICE ELEVATOR IS OPEN · EVERYONE GET IN' : L1 ? 'THE FREIGHT ELEVATOR HAS POWER: EVERYONE GET IN' : 'ONLY ONE OF THE TWO ELEVATORS OPENED… THE OTHER ONE IS JUST A WALL NOW · FOLLOW THE RED ARROW';
-      else if (L37) b = got === 0 ? 'LEVEL 37 · FIND THE 3 VALVE WHEELS IN THE PUMP ROOMS' : `VALVE WHEEL ${got}/3 RECOVERED`;
       else if (PIPES) {
         const dark = (sim.map.breakers || []).some((x) => !x.done && (sim.map.valves[x.sector] || {}).power === 2);
         b = got === 0 ? 'LEVEL 2 · CLOSE THE 4 STEAM VALVES IN THE BOILER ROOMS · STAY IN THE LIGHT' : `VALVE ${got}/4 CLOSED` + (dark ? ' · A SECTOR WENT DARK: RESET ITS BREAKER (ELECTRICAL)' : '');
@@ -420,7 +420,7 @@ export class BackroomsHUD {
 
     // 2a. Trajet en ascenseur : barre de chargement ; à l'arrivée, la carte de l'étage (même si l'annonce s'est perdue)
     if (this.fadeRide) {
-      const k = sim.departT > 0 ? 1 - sim.departT / DEPART_T : 1;
+      const k = sim.departT > 0 ? 1 - sim.departT / (sim.map.slides ? SLIDE_T : DEPART_T) : 1;
       E.fadeBar.style.width = `${Math.round(k * 100)}%`;
       if (!(sim.departT > 0)) {
         this.fadeRide = false;
@@ -1274,7 +1274,7 @@ export class BackroomsHUD {
       title.style.color = '#ef4444';
       const PIPES = sim.level === PIPES_LEVEL;
       sub.textContent = sim.level === HOTEL_LEVEL ? 'Room service never knocks…' : PIPES ? 'The herd found you in the dark…' : sim.level === 1 ? 'The entity was waiting at the end of the shelves…' : extra.abyss ? 'You fell, and you are still falling. Nobody heard you land…' : extra.thirst ? 'Your mouth went dry, then your eyes. The hum went on without you…' : 'The entity caught you in the endless hallways…';
-      stats.textContent = `Level ${levelName(sim.level)} · ${sim.level === HOTEL_LEVEL ? `letters ${sim.posted}/6` : PIPES ? `valves ${sim.valves}/4` : sim.level === 2 ? `valves ${sim.fuses}/3` : sim.level === 1 ? `fuses ${sim.delivered || 0}/3` : `tapes ${sim.cassettes}/${CASSETTES}`} · Survived for ${formatTime(sim.time)}`;
+      stats.textContent = `Level ${levelName(sim.level)} · ${sim.level === HOTEL_LEVEL ? `letters ${sim.posted}/6` : PIPES ? `valves ${sim.valves}/4` : sim.level === 2 ? (sim.slide >= 0 ? `${sim.map.slides[sim.slide].name.toLowerCase()} slide` : 'no slide found') : sim.level === 1 ? `fuses ${sim.delivered || 0}/3` : `tapes ${sim.cassettes}/${CASSETTES}`} · Survived for ${formatTime(sim.time)}`;
       this.$('#endTape').textContent = `${d} · RECORDING STOPPED`;
     }
 
@@ -1295,12 +1295,17 @@ export class BackroomsHUD {
 
   // Fondu au noir : l'ascenseur descend, puis la carte de l'étage
   // l'écran de chargement d'un nouvel étage : le titre reste, « LOADING » clignote façon caméscope
-  loading(on) {
-    this.$('#fade').classList.toggle('loading', !!on);
+  // quiet : le noir seul (pas de titre), « LOADING » n'apparaît qu'au bout d'une seconde
+  loading(on, quiet = false) {
+    const f = this.$('#fade');
+    f.classList.toggle('loading', !!on);
+    f.classList.toggle('quiet', !!on && quiet);
   }
 
-  fade(title, sub = '', hold = 0, ride = false) {
+  // clear : le titre seul, par-dessus l'image (l'arrivée par un toboggan : on voit déjà le niveau)
+  fade(title, sub = '', hold = 0, ride = false, clear = false) {
     const f = this.$('#fade');
+    f.classList.toggle('clear', !!clear);
     this.fadeRide = ride;
     this.$('#fadeBarBox').hidden = !ride;
     if (ride) this.$('#fadeBar').style.width = '0%';
@@ -1309,6 +1314,22 @@ export class BackroomsHUD {
     f.classList.add('on');
     clearTimeout(this.fadeTimer);
     if (hold > 0) this.fadeTimer = setTimeout(() => f.classList.remove('on'), hold * 1000);
+  }
+
+  // le noir tout de suite, sans fondu (la descente en toboggan y est déjà plongée : rien ne doit transparaître du
+  // niveau qui se construit derrière)
+  blackNow() {
+    const f = this.$('#fade');
+    f.style.transition = 'none';
+    f.classList.add('on');
+    void f.offsetWidth;
+    f.style.transition = '';
+  }
+
+  // le fondu au noir s'efface (sans attendre)
+  unfade() {
+    clearTimeout(this.fadeTimer);
+    this.$('#fade').classList.remove('on');
   }
 
   // pause ; avant la toute première prise en main, c'est l'écran titre (et « Continuer » si une partie s'est arrêtée
