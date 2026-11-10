@@ -2,6 +2,7 @@
 // Surf, Éclate-Roc, Vol), menus, histoire (les quinze arènes et l'archipel des trois frères), sauvegarde
 import { T, walkable, isGrassEnc, DIRS, OPP } from './world/tiles.js';
 import { nearestWalkable } from './world/mapgen.js';
+import { encAt } from './world/rencontres.js';
 import { MEGAS_OF, MEGA_RING, LEGEND, STONE_FORM, revertMegas } from './core/mega.js';
 import { MEGA_FORMS } from './core/mega.js';
 import { createMon, monName, healFull, levelEvolution, itemEvolution, evolve, setUidBase, levelCap, ensureNature, apteCT } from './core/mon.js';
@@ -33,7 +34,7 @@ import { casinoScreen, bourseScreen, entretienPierre } from './ui/metropole.js';
 import { arcadeScreen } from './ui/arcade.js';
 import { apparenceScreen } from './ui/apparence.js';
 import { preparerDomaine, frigo, architecte, recolter, allerDomaine, resident, arrivees } from './ui/domaine.js';
-import { composer } from './render/tenue.js';
+import { composer, tenueValide, tenueOrigine } from './render/tenue.js';
 import { buildRivalParty, getRivalItems } from './world/rival.js';
 import { Vie, parlerFaune, rentreLeSoir } from './vie.js';
 import { VieMonde, colporteur, marche, cueillir, fouiller, revanchePossible, revanche, noteCombat, ragot, echange, relais, concours, loterie, musicien } from './vie-monde.js';
@@ -738,7 +739,7 @@ export class Game {
     if (z?.trigger && await this.trigger(z.trigger)) return;
     if (await this.checkTrainers()) return;
     // rencontres sauvages : hautes herbes, grottes, et la mer de l'archipel quand on surfe
-    const enc = this.noEnc ? null : m.outdoor ? z?.enc : m.encounter;   // noEnc : version test, rencontres coupées
+    const enc = this.noEnc ? null : encAt(m, p.x, p.y);   // le tronçon de la zone où l'on marche ; noEnc : version test, rencontres coupées
     if (p.surf && t === T.WATER && !this.noEnc) { const sea = m.zoneAt(p.x, p.y), enc = sea?.surfEnc || sea?.enc || m.surfEnc; if (enc && Math.random() < 0.05) await this.wildBattle(enc); return; }
     // un Pokémon visible dans l'herbe : on lui marche dessus, c'est lui qu'on affronte
     const vu = m.outdoor && !this.noEnc ? this.vie?.at(p.x, p.y) : null;
@@ -1480,7 +1481,7 @@ export class Game {
     let pool = z?.surfEnc || m.surfEnc;
 
     if (!pool || !pool.length) {
-      const waterSpecies = (z?.enc || m.encounter || []).filter(([sp]) => {
+      const waterSpecies = (encAt(m, fx, fy) || []).filter(([sp]) => {
         const types = SPECIES[sp]?.t || [];
         return types.includes('water');
       });
@@ -1656,9 +1657,10 @@ export class Game {
   }
 
   playerSprite() { return this.state.tenue && this._tenueOk ? 'joueur' : this.state.gender === 'f' ? 'player_f' : 'player_m'; }
-  /** compose la tenue du joueur dans la planche des personnages */
+  /** recolore le dresseur par défaut aux couleurs de sa tenue, dans la planche des personnages */
   appliquerTenue() {
-    const T = this.state?.tenue, b = T && this.view.baseDe?.(T.genre);
+    if (this.state?.tenue) this.state.tenue = tenueValide(this.state.tenue, this.state.gender);
+    const T = this.state?.tenue, b = T && !tenueOrigine(T) && this.view.baseDe?.(T.genre);
     this._tenueOk = false;
     if (!b) return;
     this.view.setJoueur(composer(b.src, b.sx, b.sy, T)); this._tenueOk = true;
@@ -1668,8 +1670,8 @@ export class Game {
     const ui = this.ui, sp = o.armoire ? {} : { speaker: 'Styliste' };
     if (!this.view.baseDe?.('m')) { await ui.say(o.armoire ? 'Ton armoire. Elle est bien rangée.' : ['Bienvenue à la boutique de mode !', 'Nos nouvelles collections arrivent très bientôt.'], sp); return; }
     if (o.armoire) await ui.say('Ton armoire ! Tu veux changer de tenue ?', sp);
-    else await ui.say(['Bienvenue à la boutique de mode !', 'Casquette, bonnet, t-shirt, veste, short, sandales… et toutes les couleurs que tu veux. C\'est offert pour les dresseurs !'], sp);
-    const T = await apparenceScreen(ui, { tenue: this.state.tenue || { genre: this.state.gender || 'm' }, base: (g) => this.view.baseDe(g) });
+    else await ui.say(['Bienvenue à la boutique de mode !', 'Casquette, haut, bas, chaussures, sacoche : choisis leurs couleurs. C\'est offert pour les dresseurs !'], sp);
+    const T = await apparenceScreen(ui, { tenue: tenueValide(this.state.tenue, this.state.gender), base: (g) => this.view.baseDe(g) });
     if (!T) { if (!o.armoire) await ui.say('Reviens quand tu veux changer de style !', sp); return; }
     this.state.tenue = T; this.state.gender = T.genre; this.appliquerTenue(); this.sound.sfx('levelup');
     await ui.say(o.armoire ? 'Te voilà prêt' + (T.genre === 'f' ? 'e' : '') + ' pour l\'aventure !' : 'Superbe ! Ce style te va à merveille.', sp);
