@@ -1,5 +1,23 @@
 # Journal des versions — Arcadia
 
+## 5.26 — 10 novembre 2026
+- **Odyssée** — Le relief façon HeartGold / SoulSilver : falaises en étages de pierres, roches en terrasses et en pentes arrondies, talus d'herbe, grottes en relief, et des ravins aux parois de roche qui plongent dans le noir.
+- **Odyssée** — Une région plus vivante :
+  - Fumée des cheminées, papillons, lucioles, feuilles qui tombent, vols d'oiseaux, ailes des moulins au vent, carpes koï dans les bassins.
+  - Un vrai soir orangé, une vraie nuit : lanternes, braseros, phares et lampadaires éclairent autour d'eux.
+  - Pluie, grêle, sable et cendre qu'on voit enfin ; neige douce sur les zones enneigées ; empreintes de pas dans le sable, la neige et la cendre.
+  - Arbres retouchés, chaque arbre un peu différent ; Forêt des Torii aux couleurs d'automne ; Bois Murmure vraiment sombre.
+- **Odyssée** — Villes et routes :
+  - Chaque ville a son plan et son architecture, ses maisons meublées à son image, de l'air entre les maisons et des terrasses où l'on marche.
+  - Rebords à sauter, raccourcis à sens unique, récompenses à aller chercher avec Coupe ou Surf, dresseurs aux passages étroits, un panneau aux deux bouts de chaque route.
+  - Des objets cachés à trouver en fouillant les routes, et en ville dans les tonneaux et les pots.
+  - De nouvelles grottes à explorer, un volcan pour Cendrelune, des canyons où l'on descend enfin.
+  - Plus de bord de carte visible, plus de décor hors d'atteinte, plus de porte cachée derrière une maison.
+- **Odyssée** — La tenue garde le dresseur d'origine : on choisit seulement la couleur de la casquette (le serre-tête pour la dresseuse), du haut, du bas, des chaussures et de la sacoche.
+- **Odyssée** — Se joue à la manette et au doigt sur téléphone.
+- **Odyssée** — Démarrage plus court, plus d'à-coups en changeant de bloc de carte, moins de mémoire prise sur les petits téléphones, et une partie reprend toujours à un endroit d'où l'on peut repartir.
+- **Odyssée** — Le bouton Amis ne compte plus son propre dresseur, et le son s'arrête quand on quitte l'onglet.
+
 ## 5.25 — 10 novembre 2026
 - **Odyssée** — Les Pokémon sauvages changent à mesure qu'on avance sur une route, dans une grotte ou sur une île :
   - Chaque passage a sa quinzaine de Pokémon ; ceux qu'on croisait souvent juste avant s'y font plus rares, et de nouveaux apparaissent.

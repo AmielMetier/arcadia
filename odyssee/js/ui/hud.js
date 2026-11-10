@@ -347,7 +347,7 @@ export class Hud {
           <img src="img/hud/trophy.png" alt="" onerror="this.src='img/trophies/box_120.png'"><span>TROPHÉES</span>
         </button>
         <button type="button" class="hud-btn hud-friends-btn" data-act="friends" tabindex="-1" title="Amis (touche O)">
-          <img src="img/hud/friends.png" alt="" onerror="this.src='img/hud/team.png'"><span>AMIS (${onlineCount})</span>
+          <img src="img/hud/friends.png" alt="" onerror="this.src='img/hud/team.png'"><span>AMIS${onlineCount > 1 ? ` (${onlineCount - 1})` : ''}</span>
         </button>
         <button type="button" class="hud-btn hud-chat-btn" data-act="chat" tabindex="-1" title="Émotes & Chat (Touche P)">
           <img src="img/hud/chat.png" alt=""><span>CHAT</span>

@@ -17,8 +17,7 @@
   const PROFILES = {
     golf: { ls: { left: 'ArrowLeft', right: 'ArrowRight' }, dpad: ARROWS, btn: { 0: 'Space', 9: 'Escape' } },
     pokemon: { ls: ARROWS, dpad: ARROWS, btn: { 0: 'Enter', 1: 'Escape', 9: 'Escape' } },
-    // Odyssée : A interagir, B annuler, X courir, Y menu, Menu = menu, LB carte, RB vélo, Vue = quêtes
-    odyssee: { ls: ARROWS, dpad: ARROWS, btn: { 0: 'KeyF', 1: 'Escape', 2: 'ShiftLeft', 3: 'Tab', 9: 'Tab', 4: 'KeyC', 5: 'KeyV' } },
+    // Odyssée lit la manette elle-même (odyssee/js/manette.js) : pas de profil ici
     calcul: { cursor: true, btn: { 9: 'Escape' } },
     david: { cursor: true, rs: ARROWS, btn: { 9: 'Escape' } },
     bastion: { cursor: true, rs: ZQSD, btn: { 4: 'F1', 5: 'F2', 9: 'Escape' } },
