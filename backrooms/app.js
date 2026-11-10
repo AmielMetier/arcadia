@@ -714,6 +714,25 @@ function checkPrint(fp) {
 const goMessage = () => ({ t: 'go', v: GAME_V, run: NET.run, seed: sim.seed, diff: sim.difficulty, players: sim.roster, lv: sim.level, vip: monstersVip, dy: dailyLabel });
 
 let monstersVip = false;
+const TEST_BOT = 99;
+let testBot = false;
+// le bot de test : posé à 20-30 m du joueur, l'entité tout près de lui et déjà lancée sur lui (il ne se débat pas)
+function placeTestBot() {
+  const B = sim.players.find((p) => p.id === TEST_BOT);
+  const P = sim.player;
+  const m = sim.map;
+  const C = 2.5; // CELL_SIZE
+  const cells = m.walkable.map((c) => ({ x: (c.x + 0.5) * C, z: (c.z + 0.5) * C })).filter((q) => !(m.safeAt && m.safeAt(q.x, q.z)));
+  const spot = cells.find((q) => { const d = Math.hypot(q.x - P.x, q.z - P.z); return d > 20 && d < 30; }) || cells[cells.length - 1];
+  B.x = spot.x;
+  B.z = spot.z;
+  B.grabs = 1; // (la première prise est mortelle)
+  const M = sim.monster;
+  if (!M || sim.goats) return;
+  const near = cells.find((q) => { const d = Math.hypot(q.x - B.x, q.z - B.z); return d > 2 && d < 4; }) || spot;
+  Object.assign(M, { x: near.x, z: near.z, dormantT: 0, mode: 'chase', target: TEST_BOT, unseenT: 0, lastSeenX: B.x, lastSeenZ: B.z, lastSeenF: 0, path: [], repathT: 0, away: false });
+}
+
 function startRun({ seed, difficulty, players, run, level, vip = false }) {
   NET.run = run;
   camPrev.ok = false;
@@ -726,6 +745,9 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   NET.actions = {};
   NET.events = [];
   if (!players.some((p) => p.id === NET.myId)) players = [...players, { id: NET.myId, name: 'Player' }];
+  // ?bot (seul) : un coéquipier immobile, pour voir l'entité prendre l'apparence de sa victime (Level 1)
+  testBot = NET.role === 'solo' && /[?&]bot(&|=|$)/.test(location.search);
+  if (testBot) players = [...players, { id: TEST_BOT, name: 'Bot' }];
   // la difficulté adaptative ne compte que chez l'hôte (c'est lui qui fait tourner l'entité)
   const skill = NET.role === 'guest' ? 0.5 : +store.get(SKILL_KEY, 0.5);
   sim = new BackroomsSim({ difficulty, seed, players, localId: NET.myId, level, skill, words: monstersVip ? vipWords : null }); // les étages sortent de la graine
@@ -738,6 +760,7 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   echoT = 0;
   hauntAt = 0;
   if (level && sim.level !== level) sim.loadLevel(level);
+  if (testBot) placeTestBot();
   // un invité qui arrive en cours de partie regarde les autres jusqu'au prochain étage (l'hôte le dira)
   if (scene) {
     scene.dispose();

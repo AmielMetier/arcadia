@@ -5367,7 +5367,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         if (Q === P) continue; // soi-même : plus bas (vue subjective)
         // Level 1 : l'imposteur porte le corps (la tenue, la lampe) de sa victime ; il marche là où est l'entité, lampe éteinte
         if (Mw && Mw.mimic === Q.id && Q.status === 'dead') {
-          const D = { ...Q, status: 'alive', x: Mw.x, z: Mw.z, yaw: Mw.yaw || 0, pitch: 0, floor: Mw.floor || 0, flashlight: false, cam: false, moving: (Mw.v || 0) > 0.2, running: false, crouch: false, hidden: -1, jy: 0, tilt: 0, onLadder: false };
+          const D = { ...Q, status: 'alive', x: Mw.x, z: Mw.z, yaw: (Mw.yaw || 0) + Math.PI, pitch: 0, // (le regard d'un joueur va vers -sin, -cos : l'inverse de celui de l'entité) floor: Mw.floor || 0, flashlight: false, cam: false, moving: (Mw.v || 0) > 0.2, running: false, crouch: false, hidden: -1, jy: 0, tilt: 0, onLadder: false };
           const mv2 = floorViews[D.floor];
           avatars.update(D, true, Mw.y ?? feetY(sim.stairs, D.x, D.z, D.floor), mv2 ? mv2.lightAt(D.x, D.z) : 0.3, dt, time);
           continue;
