@@ -1,5 +1,39 @@
 # Journal des versions — Arcadia
 
+## 5.29 — 10 novembre 2026
+- **The Backrooms** — au Level 1, l'entrepôt devient un vrai niveau :
+  - On arrive au calme : l'entité reste au loin un moment, et la première coupure de courant attend deux minutes.
+  - Les coupures changent : vrai noir, micro-coupure, baisse de tension où tout grésille, délestage qui éteint l'entrepôt par morceaux. Jamais deux fois de suite la même.
+  - Un des trois fusibles est rangé dans un casier du personnel : il faut s'y enfermer pour le trouver.
+  - Les fusibles en place, il faut tenir les disjoncteurs généraux en même temps ; seul, chacun tient le temps de courir au suivant.
+  - Le courant revenu, le monte-charge met 40 à 60 secondes à descendre : les rideaux des quais retombent, le courant tremble et l'entité sait où tu es. Casiers, rideaux et alarmes font gagner du temps.
+  - Le plan de l'entrepôt change d'une partie à l'autre : travées, chambres froides, grande halle d'expédition, allées serrées.
+- **The Backrooms** — à plusieurs :
+  - Au Level 1, le panneau ne redémarre qu'à deux (à trois quand on est au moins quatre en vie) ; seul, il avance lentement.
+  - Plus on est nombreux, plus la pression monte : l'entité se repose moins et les coupures reviennent plus tôt. Les objets à trouver suivent le nombre de joueurs.
+  - Chacun part de son côté : hors de vue des autres, mais assez près pour s'entendre.
+  - Le caméscope montre le nom et la distance de chaque coéquipier, même hors du cadre.
+  - Le saut des invités se voit chez tout le monde, les portes de la cabine se ferment aussi chez eux, et le fauteuil du poste de garde se libère quand son occupant s'en va.
+- **The Backrooms** — l'entité :
+  - Elle ne se laisse plus berner : plus moyen de la semer sur un palier d'escalier ou au fond d'un puits.
+  - Elle n'attrape plus à travers la tôle du monte-charge ni derrière ses portes fermées ; celui qu'elle tient à travers la baie lui échappe quand les portes se ferment.
+  - Les règles s'apprennent en jouant : une ligne dit qu'elle a chargé parce que tu l'as fixée, ou qu'elle n'entre pas dans la lumière franche.
+- **The Backrooms** — le son :
+  - Plus aucune boucle audible : les souffles, le silence de la pièce et la voix du Level 1 ne repassent plus au même endroit.
+  - Le cri du Level 1 change à chaque fois, plus ou moins grave, parfois à deux gorges.
+  - L'entrepôt a ses bruits lointains : bip de chariot qui recule, annonce incompréhensible, chaînes, charge qui tombe. Disjoncteurs, délestage, baisse de tension et monte-charge s'entendent.
+  - La capture a plusieurs sursauts, jamais deux fois le même de suite.
+  - Le cœur et la musique de tension ne trahissent plus l'entité derrière un mur : ils suivent ce qu'on entend d'elle.
+  - Voix : si la liaison directe ne passe pas, la voix passe par le serveur (qualité talkie) et l'écran le dit.
+- **The Backrooms** — l'image :
+  - Le faisceau de la lampe s'éteint en douceur sur ses bords, avec le léger anneau du réflecteur.
+  - Les joueurs et l'entité ont une ombre au sol : ils ne flottent plus dans la lumière.
+  - Au Level 0, le papier peint gaufré et la moquette prennent du relief sous la lampe.
+  - Le caméscope règle son exposition d'après ce qu'il filme : il se referme face à une zone éclairée et s'ouvre un peu dans le noir.
+  - Le rappel des touches s'efface au bout de 45 secondes et revient quand on reste une minute sans bouger. La date du caméscope est celle de l'intro.
+  - La définition automatique remonte après un passage chargé, et une carte graphique qui décroche est annoncée : l'image revient seule.
+  - Le Level 1 demande moins à la carte graphique, et la combinaison se charge plus vite.
+
 ## 5.28 — 10 novembre 2026
 - **The Backrooms** — au Level 1 :
   - Des salles de sécurité, deux à quatre selon la taille de l'entrepôt, marquées SHELTER au-dessus de leur porte blindée. Dedans, F verrouille la porte (le voyant passe au rouge) ou la rouvre.
