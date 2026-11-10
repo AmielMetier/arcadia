@@ -6,7 +6,8 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
 
-const MODEL = new URL('../models/hazmat_suit.glb', import.meta.url).href;
+// (rangé plus serré par tools/pack-glb.mjs en 5.25 : 6,9 Mo au lieu de 8,4, même forme ; ?v : ne pas garder l'ancien)
+const MODEL = new URL('../models/hazmat_suit.glb?v=525', import.meta.url).href;
 const HEIGHT = 1.78; // taille d'un explorateur, capuche comprise
 // le reflet des lampes sur la combinaison (couleur spéculaire) ; en vue subjective, sa propre lampe part de la caméra,
 // à quelques centimètres des bras : un reflet bien plus faible

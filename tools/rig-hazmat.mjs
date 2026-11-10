@@ -8,6 +8,7 @@
 // sont débarrassés de leurs taches jaunes, et elle est agrandie en 4096 (nette de près, en vue subjective).
 //
 //   node tools/rig-hazmat.mjs <hazmat_suit.glb de Sketchfab> [backrooms/models/hazmat_suit.glb]
+//   puis : node tools/pack-glb.mjs backrooms/models/hazmat_suit.glb (les sommets rangés plus serré, même forme)
 //
 // Les poids : chaque sommet va d'abord à une partie du corps (tronc, un bras, une jambe) selon sa distance à l'os
 // rapportée à l'épaisseur du membre, et selon le sens de sa surface (la face d'un bras tournée vers le torse n'est pas

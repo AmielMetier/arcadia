@@ -279,7 +279,9 @@ export function createBackroomsScene(container, floors, lamps) {
   scene.background = new THREE.Color(L3 ? '#070403' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#080604' : '#0d0b06');
   scene.fog = new THREE.FogExp2(L3 ? '#120a06' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#0a0705' : '#080604', L3 ? 0.022 : L2 ? 0.022 : L1 ? 0.058 : PIPES ? 0.033 : 0.05);
 
-  const camera = new THREE.PerspectiveCamera(OPTS.fov, window.innerWidth / window.innerHeight, 0.08, L1 ? 65 : 90);
+  // Level 1 : le brouillard (0,058) ne laisse plus rien passer vers 40 m ; au-delà de 45 m, rien à dessiner (65 avant
+  // la 5.25)
+  const camera = new THREE.PerspectiveCamera(OPTS.fov, window.innerWidth / window.innerHeight, 0.08, L1 ? 45 : 90);
   camera.position.set(map0.spawn.x, 1.6, map0.spawn.z);
 
   const renderer = getRenderer();
@@ -3177,7 +3179,8 @@ uniform float uHaze;
 uniform float uHazeLamp;
 varying vec2 vUv;
 const float TOP = 1.0; // au-dessus, plus rien
-const int N = 20;
+const int N = 14; // pas dans la nappe au sol (20 avant la 5.25 : le flou qui suit lisse la différence)
+const int HZ = 4; // échantillons par feu dans la poussière (6 avant la 5.25)
 ${OCC_GLSL}
 void main() {
   // le point de la scène vu par ce pixel, remis dans le monde
@@ -3218,8 +3221,8 @@ void main() {
     bool lobed = dot(n, n) > 0.25;
     vec3 lpF = vec3(lp.x, lp.y - uFloorY, lp.z);
     float acc = 0.0;
-    for (int m = 0; m < 6; m++) {
-      float t = tc + hh * tan(mix(a0, a1, (float(m) + j) / 6.0));
+    for (int m = 0; m < HZ; m++) {
+      float t = tc + hh * tan(mix(a0, a1, (float(m) + j) / float(HZ)));
       vec3 p = uCam + rd * t;
       vec3 dv = lp - p;
       float dd = length(dv);
@@ -3232,7 +3235,7 @@ void main() {
       acc += lobe * fall * fall * ph * occVis(vec3(p.x, p.y - uFloorY, p.z), lpF);
     }
     float tm = clamp(tc, ta, tb);
-    hz += uDynC[k] * acc * (a1 - a0) / (hh * 6.0) * exp(-uFogDensity * uFogDensity * tm * tm);
+    hz += uDynC[k] * acc * (a1 - a0) / (hh * float(HZ)) * exp(-uFogDensity * uFogDensity * tm * tm);
   }
   hz *= uHaze;
   // la lampe torche : son faisceau dans la poussière (on le voit surtout de biais), jusqu'à ce qu'il touche
@@ -3245,14 +3248,14 @@ void main() {
     float a0 = atan(-tc, hh);
     float a1 = atan(tb - tc, hh);
     float acc = 0.0;
-    for (int m = 0; m < 6; m++) {
-      float t = tc + hh * tan(mix(a0, a1, (float(m) + j) / 6.0));
+    for (int m = 0; m < HZ; m++) {
+      float t = tc + hh * tan(mix(a0, a1, (float(m) + j) / float(HZ)));
       vec3 lv = uCam + rd * t - uLampPos;
       float ld = length(lv);
       float c = dot(lv / max(ld, 0.001), uLampDir);
       acc += smoothstep(0.89, 0.978, c) * 0.8775 / pow(1.1225 + 0.7 * dot(lv / max(ld, 0.001), rd), 1.5);
     }
-    hz += vec3(1.0, 0.93, 0.8) * uLamp * uHazeLamp * acc * (a1 - a0) / (hh * 6.0);
+    hz += vec3(1.0, 0.93, 0.8) * uLamp * uHazeLamp * acc * (a1 - a0) / (hh * float(HZ));
   }
   // 2. La brume au sol : la part du regard qui passe sous son haut
   float y0 = uCam.y - uFloorY;

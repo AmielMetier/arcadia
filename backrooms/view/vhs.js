@@ -462,7 +462,8 @@ void main() {
   });
   const fogSize = () => {
     if (!fogRT) return;
-    const k = target.height > 760 ? 2 : 1; // en pleine définition, la brume (douce) se calcule en demi-définition
+    // en pleine définition, la brume (douce) se calcule en demi-définition ; au-delà de 1100 lignes, au tiers (5.25)
+    const k = target.height > 1100 ? 3 : target.height > 760 ? 2 : 1;
     const w = Math.max(1, Math.round(target.width / k));
     const h = Math.max(1, Math.round(target.height / k));
     if (fogRT.width !== w || fogRT.height !== h) {
@@ -750,19 +751,14 @@ void main() {
             pass(blurMat, bloomB.texture, dirTmp.set(0, (1 + i) / bh), bloomA);
           }
           if (glare > 0) {
-            // les deux étages larges : chacun réduit du précédent et flouté, puis le plus large rendu au moyen, et le
-            // moyen au halo serré
-            addMat.uniforms.uK.value = 1;
-            pass(addMat, bloomA.texture, null, bloomC);
-            for (let i = 0; i < 2; i++) {
-              pass(blurMat, bloomC.texture, dirTmp.set((1 + i) / bloomC.width, 0), bloomC2);
-              pass(blurMat, bloomC2.texture, dirTmp.set(0, (1 + i) / bloomC.height), bloomC);
-            }
-            pass(addMat, bloomC.texture, null, bloomD);
-            for (let i = 0; i < 2; i++) {
-              pass(blurMat, bloomD.texture, dirTmp.set((1 + i) / bloomD.width, 0), bloomD2);
-              pass(blurMat, bloomD2.texture, dirTmp.set(0, (1 + i) / bloomD.height), bloomD);
-            }
+            // les deux étages larges, puis le plus large rendu au moyen, et le moyen au halo serré. Six passes au lieu
+            // de douze (5.25) : le flou horizontal réduit en même temps (il lit l'étage du dessus et écrit dans la
+            // cible deux fois plus petite), le vertical finit l'étage. Sur les cartes graphiques à tuiles (les Mac),
+            // chaque passe coûte cher, même toute petite
+            pass(blurMat, bloomA.texture, dirTmp.set(3 / bw, 0), bloomC2);
+            pass(blurMat, bloomC2.texture, dirTmp.set(0, 1.6 / bloomC.height), bloomC);
+            pass(blurMat, bloomC.texture, dirTmp.set(3 / bloomC.width, 0), bloomD2);
+            pass(blurMat, bloomD2.texture, dirTmp.set(0, 1.6 / bloomD.height), bloomD);
             const ac = renderer.autoClear;
             renderer.autoClear = false;
             addBlend.uniforms.uK.value = 1;
