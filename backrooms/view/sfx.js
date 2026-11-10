@@ -1287,6 +1287,35 @@ export class BackroomsSfx {
     }
   }
 
+  // La porte blindée d'une salle de sécurité (Level 1) : fermée, le battant d'acier qui claque dans son cadre et le gros
+  // pêne qui s'enfonce ; rouverte, le pêne qui recule et les gonds lourds
+  safeDoor(pos, shut) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = this.at({ ...pos, rolloff: 0.7, ref: 4 }, 1);
+    if (shut) {
+      this.burst(out, t, 0.14, 'lowpass', 260, 0.9, 0.9);
+      this.ring(out, t, 96, [[1, 1, 0.6], [2.4, 0.6, 0.4], [4.7, 0.3, 0.25]], 0.16);
+      this.burst(out, t + 0.26, 0.05, 'bandpass', 1900, 3, 0.35);
+      this.ring(out, t + 0.28, 620, [[1, 1, 0.15], [2.3, 0.5, 0.1]], 0.1);
+      this.caption('[a steel door slams · the bolt locks]', pos);
+    } else {
+      this.burst(out, t, 0.05, 'bandpass', 1700, 3, 0.3);
+      this.ring(out, t + 0.02, 540, [[1, 1, 0.12], [2.3, 0.5, 0.08]], 0.08);
+      for (let k = 0; k < 6; k++) this.burst(out, t + 0.15 + k * 0.06, 0.06, 'bandpass', 900 - k * 70 + rnd(-40, 40), 9, 0.04 * (1 - k / 7));
+      this.caption('[the bolt slides back]', pos);
+    }
+  }
+
+  // des coups frappés à une porte, doucement, comme quelqu'un qui demande à entrer
+  knock(pos) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.01;
+    const out = this.at({ ...pos, rolloff: 0.7, ref: 4 }, 0.9);
+    this.farKnock(out, t);
+    this.caption('[someone knocks at the door]', pos);
+  }
+
   // La clé ramassée : un trousseau qui tinte (pas de son à l'endroit : c'est dans ta main)
   keyJingle() {
     if (!this.unlocked || !this.ctx) return;

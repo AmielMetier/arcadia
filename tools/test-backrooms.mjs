@@ -4017,7 +4017,7 @@ test('Level 1 : le poste de garde est une pièce fermée — on y entre par la p
 });
 
 test("Level 1 : l'entité passe par les gaines — on l'entend cogner au-dessus, la grille tombe, elle ressort près de sa proie", () => {
-  const sim = new BackroomsSim({ difficulty: 'normal', seed: 9, level: 1 });
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 10, level: 1 });
   const m = sim.map;
   const M = sim.monster;
   const P = sim.player;
@@ -4057,6 +4057,187 @@ test("Level 1 : l'entité passe par les gaines — on l'entend cogner au-dessus,
   const d = Math.hypot(v.x - P.x, v.z - P.z);
   assert.ok(v.open && d > 6.5 && d < 16.5, `près de sa proie (${d.toFixed(1)} m), la grille tombée`);
   assert.equal(M.mode === 'search' || M.mode === 'chase', true, 'puis elle la cherche');
+});
+
+// --------------------------------------------------------------------------- Level 1 : salles de sécurité, imposteur
+const L1_SAFE = await import('../backrooms/engine/level1.js');
+const SIMX = await import('../backrooms/engine/sim.js');
+
+// met le joueur P au milieu de la salle S (contre le levier), porte fermée ou non
+function intoSafe(sim, P, S, shut) {
+  P.x = S.lever.x;
+  P.z = S.lever.z;
+  P.floor = 0;
+  if (shut) {
+    const c = sim.nearControl(P);
+    assert.ok(c && c.kind === 'safe' && c.obj === S, 'le levier du verrou est à portée, dedans');
+    sim.useControl(P, c);
+    assert.ok(S.shut, 'la porte est verrouillée');
+  }
+}
+
+test('Level 1 : les salles de sécurité — assez mais pas trop (selon la taille de l\'entrepôt), une porte blindée qu\'on verrouille de l\'intérieur, qui arrête tout', () => {
+  for (const seed of [1, 4, 6, 11, 23]) {
+    const sim = new BackroomsSim({ difficulty: 'normal', seed, players: [{ id: 1, name: 'H' }], localId: 1, level: 1 });
+    sim.arriveT = 0;
+    const m = sim.map;
+    assert.ok(m.safes.length >= 2 && m.safes.length <= 4, `graine ${seed} : ${m.safes.length} salles`);
+    for (const S of m.safes) {
+      for (const T2 of m.safes) if (T2 !== S) assert.ok(Math.hypot(S.x - T2.x, S.z - T2.z) > 16, 'loin les unes des autres');
+      assert.ok(Math.hypot(S.x - m.spawn.x, S.z - m.spawn.z) > 10, 'pas au départ');
+      assert.ok(L1_SAFE.inSafe(S, S.cx, S.cz) && m.safeAt(S.cx, S.cz) === S, 'son milieu est dedans');
+      assert.ok(!(m.hides || []).some((h) => L1_SAFE.inSafe(S, h.x, h.z)), 'pas de casier dedans');
+      // ouverte : on passe, on voit, l'entité trouve son chemin par la porte
+      assert.ok(!sim.isColliding(S.x, S.z, PLAYER_RADIUS), 'ouverte : on passe');
+      const out = sim.safeFront(S, 2);
+      assert.ok(hasLineOfSight(m, S.cx, S.cz, S.x + S.nx * 1.5, S.z + S.nz * 1.5), 'ouverte : on voit par la baie');
+      assert.ok((findPath(m, m.monsterSpawn.x, m.monsterSpawn.z, S.cx, S.cz) || []).length, 'ouverte : elle sait y entrer');
+      // dehors, pas de levier
+      const P = sim.player;
+      P.x = out.x;
+      P.z = out.z;
+      const c0 = sim.nearControl(P);
+      assert.ok(!c0 || c0.kind !== 'safe', 'le verrou ne se manie que de l\'intérieur');
+      // fermée : elle arrête le joueur, la vue et les chemins de l'entité
+      intoSafe(sim, P, S, true);
+      assert.ok(sim.isColliding(S.x, S.z, PLAYER_RADIUS), 'fermée : on ne passe plus');
+      assert.ok(!hasLineOfSight(m, S.cx, S.cz, S.x + S.nx * 1.5, S.z + S.nz * 1.5), 'fermée : on ne voit plus au travers');
+      const path = findPath(m, m.monsterSpawn.x, m.monsterSpawn.z, S.cx, S.cz);
+      assert.ok(!path || !path.length || !L1_SAFE.inSafe(S, path[path.length - 1].x, path[path.length - 1].z), 'fermée : aucun chemin n\'y entre');
+      assert.ok(sim.lockedIn(P) === S, 'enfermé');
+      // on rouvre ; personne dedans : une porte fermée se rouvre d'elle-même
+      sim.useControl(P, sim.nearControl(P));
+      assert.ok(!S.shut, 'rouverte');
+      sim.useControl(P, sim.nearControl(P));
+      P.x = m.spawn.x;
+      P.z = m.spawn.z;
+      sim.updateSafes();
+      assert.ok(!S.shut, 'personne dedans : elle se rouvre');
+    }
+    // elle ne se ferme pas avec l'entité dans la baie
+    const S = m.safes[0];
+    const P = sim.player;
+    intoSafe(sim, P, S, false);
+    sim.monster.x = S.x;
+    sim.monster.z = S.z;
+    sim.useControl(P, sim.nearControl(P));
+    assert.ok(!S.shut, 'l\'entité dans la baie : la porte bute');
+    // l'invité reçoit l'état des portes
+    sim.monster.x = m.monsterSpawn.x;
+    sim.monster.z = m.monsterSpawn.z;
+    sim.useControl(P, sim.nearControl(P));
+    const guest = new BackroomsSim({ difficulty: 'normal', seed, players: [{ id: 1, name: 'H' }], localId: 1, level: 1 });
+    guest.applySnapshot(sim.snapshot(), 0);
+    assert.ok(guest.map.safes[0].shut && !guest.map.safes.slice(1).some((q) => q.shut), 'l\'instantané porte les portes');
+  }
+});
+
+test('Level 1 : enfermé dans une salle de sécurité, l\'entité frappe à la porte 8 à 12 s, hurle de rage et va rôder à plus de 45 m', () => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 6, players: [{ id: 1, name: 'H' }], localId: 1, level: 1 });
+  sim.arriveT = 0;
+  const m = sim.map;
+  const P = sim.player;
+  const M = sim.monster;
+  M.dormantT = 0;
+  const S = m.safes[0];
+  intoSafe(sim, P, S, true);
+  const F = sim.safeFront(S, 3);
+  Object.assign(M, { x: F.x, z: F.z, mode: 'chase', unseenT: 0, lastSeenX: P.x, lastSeenZ: P.z, lastSeenF: 0, path: [], repathT: 0 });
+  const seen = { bang: 0, rage: 0, t0: -1, t1: -1 };
+  for (let i = 0; i < 60 * 25 && !seen.rage; i++) {
+    sim.step({});
+    for (const ev of sim.drainEvents()) {
+      if (ev.type === 'safeBang') {
+        seen.bang++;
+        if (seen.t0 < 0) seen.t0 = sim.time;
+      }
+      if (ev.type === 'frustrated') {
+        seen.rage++;
+        seen.t1 = sim.time;
+      }
+    }
+    assert.equal(P.status, 'alive', 'à l\'abri derrière la porte');
+    assert.ok(S.shut, 'la porte tient');
+  }
+  assert.ok(seen.bang >= 8, `elle frappe (${seen.bang} coups)`);
+  const dur = seen.t1 - seen.t0;
+  assert.ok(seen.rage === 1 && dur > 7.5 && dur < 12.6, `puis elle renonce (${dur.toFixed(1)} s de coups)`);
+  assert.ok(M.mode === 'flee' && M.watch && Math.hypot(M.watch.x - S.x, M.watch.z - S.z) >= 45, 'et part loin de la salle');
+  // elle s'éloigne vraiment : le danger retombe pour celui qui est dedans
+  const d0 = Math.hypot(M.x - S.x, M.z - S.z);
+  for (let i = 0; i < 60 * 8; i++) sim.step({});
+  assert.ok(Math.hypot(M.x - S.x, M.z - S.z) > d0 + 8, 'ses pas s\'éloignent');
+});
+
+test('Level 1 : l\'imposteur — après une victime, l\'entité prend son apparence et sa voix, marche comme un joueur, et se démasque de près ou dans la lampe', () => {
+  const players = [{ id: 0, name: 'A' }, { id: 1, name: 'B' }];
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 11, players, localId: 0, level: 1 });
+  sim.arriveT = 0;
+  const m = sim.map;
+  const [A, B] = sim.players;
+  const M = sim.monster;
+  M.dormantT = 0;
+  // B tombe entre ses griffes (deuxième prise : mortelle)
+  B.grabs = 1;
+  const c = m.walkable.find((q) => Math.hypot((q.x + 0.5) * CELL_SIZE - m.spawn.x, (q.z + 0.5) * CELL_SIZE - m.spawn.z) > 30 && !m.safeAt((q.x + 0.5) * CELL_SIZE, (q.z + 0.5) * CELL_SIZE));
+  B.x = (c.x + 0.5) * CELL_SIZE;
+  B.z = (c.z + 0.5) * CELL_SIZE;
+  Object.assign(M, { x: B.x + 0.3, z: B.z, mode: 'chase', unseenT: 0, path: [] });
+  A.x = m.spawn.x;
+  A.z = m.spawn.z;
+  let evs = [];
+  for (let i = 0; i < 30 && B.status === 'alive'; i++) {
+    sim.step({});
+    evs.push(...sim.drainEvents());
+  }
+  assert.equal(B.status, 'dead', 'B est tué');
+  const dead = evs.find((e) => e.type === 'dead');
+  assert.ok(dead && dead.quiet, 'sa mort reste secrète pour les vivants');
+  assert.ok(evs.some((e) => e.type === 'mimic' && e.id === 1), 'elle prend son apparence');
+  assert.equal(M.mimic, 1);
+  // l'invité le sait aussi (le corps de B, à la place de l'entité)
+  const guest = new BackroomsSim({ difficulty: 'normal', seed: 11, players, localId: 1, level: 1 });
+  guest.applySnapshot(sim.snapshot(), 0);
+  assert.equal(guest.monster.mimic, 1, 'l\'instantané porte l\'apparence volée');
+  // elle vient vers A en marchant (pas plus vite qu'un joueur), sans bourdonnement, et l'appelle
+  const calls = [];
+  let vmax = 0;
+  const d0 = Math.hypot(M.x - A.x, M.z - A.z);
+  for (let i = 0; i < 60 * 20 && M.mimic != null; i++) {
+    sim.step({});
+    vmax = Math.max(vmax, M.v || 0);
+    assert.equal(A.danger, 0, 'rien ne trahit qu\'elle approche');
+    for (const e of sim.drainEvents()) if (e.type === 'mimicCall') calls.push(e);
+  }
+  assert.ok(vmax <= SIMX.WALK_SPEED + 0.05, `elle marche comme un joueur (${vmax.toFixed(2)} m/s)`);
+  assert.ok(Math.hypot(M.x - A.x, M.z - A.z) < d0 - 10 || M.mimic == null, 'elle se rapproche de A');
+  assert.ok(calls.length >= 1 && calls.every((e) => e.id === 1 && e.to === 0), `elle l'appelle avec la voix de B (${calls.length} appels)`);
+  // tout près : elle se démasque et fonce sur A
+  if (M.mimic != null) {
+    M.x = A.x + 1.6;
+    M.z = A.z;
+    if (sim.isColliding(M.x, M.z, 0.3)) M.x = A.x - 1.6;
+    sim.step({});
+  }
+  const un = sim.drainEvents().find((e) => e.type === 'unmask');
+  assert.ok(M.mimic == null && M.mode === 'chase' && M.target === 0, 'démasquée, elle charge');
+  assert.ok(un ? un.id === 1 : true, 'démasquage annoncé');
+  // une autre fois : la lampe de A la tient dans son faisceau
+  sim.startMimic(M, B);
+  const away = m.walkable.map((q) => ({ x: (q.x + 0.5) * CELL_SIZE, z: (q.z + 0.5) * CELL_SIZE })).find((q) => {
+    const d = Math.hypot(q.x - A.x, q.z - A.z);
+    return d > 6 && d < 10 && hasLineOfSight(m, A.x, A.z, q.x, q.z);
+  });
+  Object.assign(M, { x: away.x, z: away.z, path: [], hesT: 99 });
+  A.flashlight = true;
+  A.battery = 100;
+  let why = null;
+  for (let i = 0; i < 60 * 3 && !why; i++) {
+    A.yaw = Math.atan2(-(M.x - A.x), -(M.z - A.z)); // (le regard va vers -sin, -cos)
+    sim.step({});
+    for (const e of sim.drainEvents()) if (e.type === 'unmask') why = e.why;
+  }
+  assert.ok(why === 'light' || why === 'near', `dans la lampe, elle se démasque (${why})`);
 });
 
 console.log(`\n${count} tests réussis pour The Backrooms !`);
