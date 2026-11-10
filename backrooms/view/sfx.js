@@ -12,7 +12,7 @@
 
 import { growlBuffer } from './entity.js';
 import { PIPES_LEVEL } from '../engine/level2.js';
-const VOICE = new URL('../monster/david.mp3', import.meta.url).href;
+import { vault } from './vault.js'; // les voix d'origine du mode VIP, chiffrées dans data/
 // sons du jeu (backrooms/sfx/) : un dossier par niveau (cris de poursuite, ambiances jouées au hasard, le son de la
 // mort toute proche) ; ce qui est à la racine du dossier sert partout
 const SFX = (name) => new URL(`../sfx/${name}.mp3`, import.meta.url).href;
@@ -981,7 +981,7 @@ export class BackroomsSfx {
     this.loadVoice();
   }
 
-  // mode VIP : la voix d'origine ; sinon un grognement grave synthétisé
+  // mode VIP : la voix d'origine (si le coffre est ouvert) ; sinon un grognement grave synthétisé
   setVoiceMode(vip) {
     if (this.voiceVip === !!vip) return;
     this.voiceVip = !!vip;
@@ -993,7 +993,8 @@ export class BackroomsSfx {
     try { this.voiceSrc?.stop(); } catch {}
     this.voiceSrc = null;
     const want = !!this.voiceVip;
-    (want ? fetch(VOICE).then((r) => r.arrayBuffer()).then((b) => c.decodeAudioData(b)) : Promise.resolve(growlBuffer(c)))
+    const url = want && vault.voix;
+    (url ? fetch(url).then((r) => r.arrayBuffer()).then((b) => c.decodeAudioData(b)) : Promise.resolve(growlBuffer(c)))
       .then((buf) => {
         if (want !== !!this.voiceVip) return;
         this.voiceBuf = buf;
@@ -2591,14 +2592,14 @@ export class BackroomsSfx {
     this.caption('[heavy footsteps]', pos);
   }
 
-  // Un son du dossier sfx/, chargé une fois puis gardé
+  // Un son du dossier sfx/ (ou une URL blob : un son du coffre), chargé une fois puis gardé
   sample(name) {
     this.samples = this.samples || new Map();
     if (!this.samples.has(name)) {
       const c = this.ctx;
       this.samples.set(
         name,
-        fetch(SFX(name))
+        fetch(name.startsWith('blob:') ? name : SFX(name))
           .then((r) => r.arrayBuffer())
           .then((b) => c.decodeAudioData(b))
           .catch(() => null),
@@ -2607,10 +2608,11 @@ export class BackroomsSfx {
     return this.samples.get(name);
   }
 
-  // Khaoula (Level 1) : sa voix enregistrée, qui part du bus de l'entité (distance, murs et écho du lieu font le volume)
-  khaoula() {
-    if (!this.unlocked || !this.ctx || !this.ent) return;
-    this.sample('level1/khaoula').then((buf) => {
+  // Level 1, mode VIP : la voix qui appelle, enregistrée (dans le coffre), qui part du bus de l'entité (distance, murs
+  // et écho du lieu font le volume). Rien en mode normal.
+  level1Voice() {
+    if (!this.unlocked || !this.ctx || !this.ent || !this.voiceVip || !vault.appel) return;
+    this.sample(vault.appel).then((buf) => {
       if (!buf || !this.ent) return;
       const src = this.ctx.createBufferSource();
       src.buffer = buf;

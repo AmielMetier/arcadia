@@ -1,0 +1,14 @@
+Le coffre du mode VIP de The Backrooms : les médias des monstres d'origine, chiffrés en AES-256-GCM.
+La clé sort d'une phrase secrète (PBKDF2, SHA-256) qui n'est pas dans le dépôt, pas plus que les originaux.
+view/vault.js les déchiffre dans le navigateur de l'hôte quand il a tapé la phrase, puis chez ses invités avec la
+clé qu'il leur envoie. Outil pour chiffrer, déchiffrer ou vérifier : tools/backrooms-vault.mjs.
+
+e0.bin  le témoin : un court texte connu, qui reconnaît la bonne phrase
+e1.bin  photo de l'entité du Level 0 (png)
+e2.bin  photo du bouc, Level 2 (jpeg)
+e3.bin  l'entité du Level 1 : planche d'images de sa vidéo détourée (webp)
+e4.bin  la voix d'origine de l'entité (mp3)
+e5.bin  la voix qui appelle au Level 1 (mp3), fournie par Amiel pour le jeu
+e6.bin  l'intro du Level 0, version sous-titrée (mp4) ; ses sources sont dans video/LICENSE.txt
+
+Photos et voix fournies pour le jeu par l'équipe d'Arcadia : à ne pas sortir du jeu.
