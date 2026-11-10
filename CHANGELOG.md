@@ -38,12 +38,12 @@
   - Plus de rejeu de la mort : après l'attaque, l'image se perd tout de suite.
 
 ## 5.22 — 9 novembre 2026
-- **The Backrooms** — Une partie qui commence au Level 0 s'ouvre sur une vidéo filmée au caméscope : une soirée d'urbex dans une usine abandonnée, où Safia passe à travers une trappe du plancher… et le groupe saute pour la rejoindre. Espace ou Entrée pour la passer.
+- **The Backrooms** — Une partie qui commence au Level 0 s'ouvre sur une vidéo filmée au caméscope : une soirée d'urbex dans une usine abandonnée, où l'une d'entre vous passe à travers une trappe du plancher… et le groupe saute pour la rejoindre. Espace ou Entrée pour la passer.
   - En mode VIP, la vidéo est sous-titrée.
-  - La feuille scotchée au mur de l'arrivée est signée Safia.
+  - La feuille scotchée au mur de l'arrivée est signée.
 
 ## 5.21 — 9 novembre 2026
-- **The Backrooms** — Au Level 1, on entend maintenant Khaoula : sa voix résonne de temps en temps quand elle rôde près de toi, et bien plus souvent quand elle te poursuit. Plus elle est loin ou derrière les murs, plus elle est étouffée.
+- **The Backrooms** — Au Level 1, on entend maintenant l'entité : sa voix résonne de temps en temps quand elle rôde près de toi, et bien plus souvent quand elle te poursuit. Plus elle est loin ou derrière les murs, plus elle est étouffée.
 
 ## 5.2 — 9 novembre 2026
 - Fix typo in hud.js string (Metier Amiel)
@@ -56,10 +56,10 @@
 
 ## 4.99 — 9 novembre 2026
 - **The Backrooms** — Du lore à chaque niveau : chaque monstre a une histoire, qu'on découvre en ramassant les objets.
-  - Level 0 : les cassettes sont celles de Safia, une exploratrice perdue dans le Lobby… qui n'en est jamais sortie.
-  - Level 1 : avec chaque fusible, un mot griffonné de Khaoula, qui s'est cachée au sous-sol pour fuir quelqu'un.
-  - Poolrooms : avec chaque volant de vanne, un carreau gravé à la gloire de St Didier Auroux, le père de toute chose.
-  - Pipe Dreams : à chaque vanne fermée, une trace à la craie sur Teo, l'élève de 1934 devenu le bouc à la cloche.
+  - Level 0 : les cassettes sont celles d'une exploratrice perdue dans le Lobby… qui n'en est jamais sortie.
+  - Level 1 : avec chaque fusible, un mot griffonné de l'entité du sous-sol, qui s'est cachée au sous-sol pour fuir quelqu'un.
+  - Poolrooms : avec chaque volant de vanne, un carreau gravé à la gloire du père de toute chose.
+  - Pipe Dreams : à chaque vanne fermée, une trace à la craie sur l'élève de 1934 devenu le bouc à la cloche.
   - Terror Hotel : avec chaque lettre, une ligne du registre de 1934… et ton nom y est déjà.
   - Tout trouver débloque un dernier message à la sortie.
 
