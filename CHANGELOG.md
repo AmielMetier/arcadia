@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 5.44 — 11 novembre 2026
+- **The Backrooms** — Le Terror Hotel, plus grand et plus habité :
+  - le hall monte à 4,40 m de plafond, avec une frise dorée tout autour et des lustres qui pendent de plus haut ; on tombe de plus haut en arrivant par la trappe ;
+  - beaucoup moins de papier peint décollé dans les couloirs ;
+  - les couloirs se meublent : tableaux entre les appliques, consoles avec un vase ou une lampe sous un miroir, plantes dans les angles, banquettes, extincteurs, une pendule arrêtée, un panneau « sol glissant » oublié ;
+  - dans les chambres, un pouf au pied du lit et une plante dans un coin.
+
 ## 5.43 — 10 novembre 2026
 - **The Backrooms** — Le Terror Hotel s'entend enfin :
   - les pas claquent sur le marbre du hall et s'étouffent dans la moquette épaisse des couloirs ;

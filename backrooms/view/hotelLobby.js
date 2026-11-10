@@ -155,9 +155,11 @@ function drawRunner(ctx, w, h) {
   ctx.fillRect(0, 0, w, h);
 }
 
-export function buildHotelLobby({ map, group, baked, CEIL }) {
+export function buildHotelLobby({ map, group, baked, CEIL: WALL_TOP }) {
   const L = map.lobby;
   if (!L) return { update() {} };
+  // le hall est plus haut de plafond que les couloirs (WALL_TOP : le haut des murs et des passages, 3,10 m)
+  const CEIL = map.lobbyCeil || WALL_TOP;
   const X0 = L.x0 * C;
   const X1 = (L.x1 + 1) * C;
   const Z0 = L.z0 * C;
@@ -216,6 +218,7 @@ export function buildHotelLobby({ map, group, baked, CEIL }) {
     gold: phong({ color: '#c09a48', specular: '#ffe6a8', shininess: 80, emissive: '#2e2008', emissiveIntensity: 0.4 }, { spec: 0.6, gloss: 60, mask: 0 }),
     plaster: lam({ color: '#b3a17c' }, { hotel: 1 }),
     plasterDark: lam({ color: '#8c7a58' }, { hotel: 1 }),
+    lid: lam({ color: '#c6b48e' }, { hotel: 1 }),
     linen: lam({ color: '#ddd5c4' }),
     linen2: lam({ color: '#cbbfa8' }),
     towel: lam({ color: '#8f2a26' }),
@@ -260,18 +263,52 @@ export function buildHotelLobby({ map, group, baked, CEIL }) {
     for (const [ax, az] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) bx(az ? 0.36 : 0.02, 0.05, ax ? 0.36 : 0.02, M.blackMarble, ax * 0.32, CEIL - 0.22, az * 0.32);
   }
 
+  // --- 3b. Le haut du hall : le plafond lui-même (4,40 m) et, tout autour, au-dessus des murs et des passages (3,10 m),
+  // une frise de plâtre à panneaux soulignés d'or, posée sur une cimaise, sous une corniche à gradins ---
+  if (CEIL > WALL_TOP + 0.05) {
+    const lid = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0, Z1 - Z0).rotateX(Math.PI / 2), M.lid);
+    lid.position.set((X0 + X1) / 2, CEIL, (Z0 + Z1) / 2);
+    group.add(lid);
+    const FH = CEIL - WALL_TOP;
+    const side = (x, z, ry, len) => {
+      setFrame(x, z, ry);
+      bx(len, FH, 0.04, M.plaster, 0, WALL_TOP + FH / 2, 0.02);
+      // la cimaise : une moulure sombre et un filet doré
+      bx(len, 0.1, 0.08, M.plasterDark, 0, WALL_TOP + 0.05, 0.04);
+      bx(len, 0.02, 0.09, M.gold, 0, WALL_TOP + 0.1, 0.045);
+      // la corniche, trois gradins qui avancent
+      bx(len, 0.07, 0.1, M.plasterDark, 0, CEIL - 0.035, 0.05);
+      bx(len, 0.06, 0.16, M.plaster, 0, CEIL - 0.1, 0.08);
+      bx(len, 0.04, 0.2, M.plasterDark, 0, CEIL - 0.15, 0.1);
+      // un panneau cerné d'or par travée
+      const n = Math.max(1, Math.round(len / C));
+      const pw = len / n - 0.36;
+      const y0 = WALL_TOP + 0.3;
+      const y1 = CEIL - 0.34;
+      for (let i = 0; i < n; i++) {
+        const u = -len / 2 + (i + 0.5) * (len / n);
+        for (const y of [y0, y1]) bx(pw, 0.025, 0.012, M.gold, u, y, 0.046);
+        for (const s of [-1, 1]) bx(0.025, y1 - y0, 0.012, M.gold, u + (s * pw) / 2, (y0 + y1) / 2, 0.046);
+      }
+    };
+    side((X0 + X1) / 2, Z0, 0, X1 - X0);
+    side((X0 + X1) / 2, Z1, Math.PI, X1 - X0);
+    side(X0, (Z0 + Z1) / 2, Math.PI / 2, Z1 - Z0);
+    side(X1, (Z0 + Z1) / 2, -Math.PI / 2, Z1 - Z0);
+  }
+
   // --- 4. Le plafond à caissons : des poutres sur les lignes des cases, filet doré dessous ; une rosace à chaque
   // croisement ; au milieu, un grand caisson encadré d'or (le code s'y allume) ---
   const BW = 0.24;
   const BD = 0.2;
   const inCenter = (x, z) => Math.abs(x - cx) < C - 0.01 && Math.abs(z - cz) < C / 2 - 0.01;
-  const beam = (x0, z0, x1, z1) => {
+  const beam = (x0, z0, x1, z1, top = CEIL) => {
     const len = Math.hypot(x1 - x0, z1 - z0);
     if (len < 0.01) return;
     setFrame((x0 + x1) / 2, (z0 + z1) / 2, Math.atan2(x1 - x0, z1 - z0));
-    bx(BW, BD, len, M.plaster, 0, CEIL - BD / 2, 0);
-    for (const s of [-1, 1]) bx(0.02, 0.025, len, M.gold, s * (BW / 2 - 0.01), CEIL - BD - 0.0125, 0);
-    bx(BW + 0.06, 0.03, len, M.plasterDark, 0, CEIL - 0.015, 0);
+    bx(BW, BD, len, M.plaster, 0, top - BD / 2, 0);
+    for (const s of [-1, 1]) bx(0.02, 0.025, len, M.gold, s * (BW / 2 - 0.01), top - BD - 0.0125, 0);
+    bx(BW + 0.06, 0.03, len, M.plasterDark, 0, top - 0.015, 0);
   };
   for (let gx = L.x0 + 1; gx <= L.x1; gx++) {
     const x = gx * C;
@@ -289,7 +326,7 @@ export function buildHotelLobby({ map, group, baked, CEIL }) {
       const open = gx <= L.x1 && map.grid[(L.z0 - 1) * map.W + gx] !== T.WALL;
       if (open && a < 0) a = gx;
       if (!open && a >= 0) {
-        beam(a * C, Z0, gx * C, Z0);
+        beam(a * C, Z0, gx * C, Z0, WALL_TOP);
         a = -1;
       }
     }

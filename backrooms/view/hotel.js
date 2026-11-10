@@ -397,7 +397,7 @@ export function buildHotel({ map, group, baked, wallMat, CEIL }) {
   const codePlane = new THREE.Mesh(new THREE.PlaneGeometry(5, 1.9), codeMat);
   codePlane.rotation.x = Math.PI / 2;
   // lisible en levant les yeux, face au nord (depuis le fond du hall)
-  codePlane.position.set(map.lobbyCenter.x, CEIL - 0.02, map.lobbyCenter.z);
+  codePlane.position.set(map.lobbyCenter.x, (map.lobbyCeil || CEIL) - 0.02, map.lobbyCenter.z);
   group.add(codePlane);
   let codeK = 0;
 

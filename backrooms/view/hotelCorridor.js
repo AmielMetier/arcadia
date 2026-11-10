@@ -286,12 +286,14 @@ export function buildHotelCorridor({ map, group, baked, wallMat, CEIL }) {
     for (let a = r.a0; a < r.a1; a++) {
       const x = r.dz !== 0 ? a : r.b;
       const z = r.dz !== 0 ? r.b : a;
-      if (!corridor.has(z * W + x) || hash(z * W + x, 11) > 0.09 || peels >= 14) continue;
-      peels++;
+      if (!corridor.has(z * W + x) || hash(z * W + x, 11) > 0.035 || peels >= 5) continue; // (rares : quelques lés sur tout l'étage)
       const nx = r.dz !== 0 ? 0 : -r.dx;
       const nz = r.dz !== 0 ? -r.dz : 0;
       const wxp = (x + 0.5) * C + r.dx * (C / 2);
       const wzp = (z + 0.5) * C + r.dz * (C / 2);
+      // (pas derrière un tableau, un miroir ou une console)
+      if ((map.props || []).some((q) => Math.hypot(q.x - wxp, q.z - wzp) < 1.1)) continue;
+      peels++;
       frameOn(wxp, wzp, nx, nz);
       // le lé : entre deux joints (un sixième de case), à gauche ou à droite de l'applique
       const slot = hash(z * W + x, 12) < 0.5 ? 0 : 4;

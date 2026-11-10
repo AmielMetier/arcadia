@@ -1356,7 +1356,7 @@ function buildLevel(level) {
           }
           ride.finish(level === HOTEL_LEVEL ? 'hotel' : 'pipes', () => {
             endRide();
-            if (scene === sc) sc.dropIn(1.4);
+            if (scene === sc) sc.dropIn(level === HOTEL_LEVEL ? 2.3 : 1.4); // (le hall de l'hôtel est haut de plafond)
             if (hud) hud.fade(`LEVEL ${levelName(level)}`, levelSub(level), 2.4, false, true);
           });
           return;

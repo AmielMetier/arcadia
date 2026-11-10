@@ -1966,6 +1966,9 @@ float bkCaust(vec2 uv, float t) {
     const above = fi > 0 ? floors[fi - 1] : null;
     // (et là où passe un couloir en diagonale : son propre plafond, plus bas, prend la place)
     const diagHoles = L2 ? [] : (map.diags || []).flatMap((dg) => [...dg.cells, ...dg.cuts]).map(([x, z]) => ({ x: (x + 0.5) * CELL_SIZE, z: (z + 0.5) * CELL_SIZE, hx: CELL_SIZE / 2, hz: CELL_SIZE / 2 }));
+    // (et le hall de l'hôtel : il a son plafond à lui, plus haut, view/hotelLobby.js)
+    const lb = L3 && map.lobbyCeil ? map.lobby : null;
+    if (lb) diagHoles.push({ x: ((lb.x0 + lb.x1 + 1) / 2) * CELL_SIZE, z: ((lb.z0 + lb.z1 + 1) / 2) * CELL_SIZE, hx: ((lb.x1 - lb.x0 + 1) / 2) * CELL_SIZE, hz: ((lb.z1 - lb.z0 + 1) / 2) * CELL_SIZE });
     if ((above && holesOf(above).length) || diagHoles.length) {
       ceilMat.alphaMap = holeMask(W, H, [...(above ? holesOf(above) : []), ...diagHoles], false);
       ceilMat.alphaTest = 0.5;

@@ -11,6 +11,8 @@ import { CELL_SIZE, T, itemList, bfs } from './map.js';
 
 const C = CELL_SIZE;
 export const HOTEL_CEIL = 3.1;
+// le hall monte plus haut que les couloirs (un vrai hall d'hôtel) : ses lustres pendent de 4,40 m
+export const LOBBY_CEIL = 4.4;
 export const HOTEL_W = 36;
 export const HOTEL_H = 31;
 export const LETTERS = 6;
@@ -219,9 +221,9 @@ export function createHotelMap(seed = 5) {
     // la plante au sommet de la banquette ronde du milieu
     { m: 'potted_plant_02', h: 0.95, r: 0, x: lobbyCenter.x, z: lobbyCenter.z, y: 0.92, rot: 0 },
     // les lustres : les trois du milieu, un au-dessus du salon, un devant la réception
-    ...[[-1, -0.8], [1, -0.8], [0, 1.2]].map(([ox, oz]) => ({ m: 'Chandelier_01', h: 1.0, r: 0, x: lobbyCenter.x + ox * C * 1.5, z: lobbyCenter.z + oz * C, y: HOTEL_CEIL - 1.0, rot: 0 })),
-    { m: 'Chandelier_01', h: 1.0, r: 0, x: X0 + 5, z: Z1 - 2.6, y: HOTEL_CEIL - 1.0, rot: 0.4 },
-    { m: 'Chandelier_01', h: 1.0, r: 0, x: desk.x - 2.2, z: desk.z, y: HOTEL_CEIL - 1.0, rot: 0.4 },
+    ...[[-1, -0.8], [1, -0.8], [0, 1.2]].map(([ox, oz]) => ({ m: 'Chandelier_01', h: 1.0, r: 0, x: lobbyCenter.x + ox * C * 1.5, z: lobbyCenter.z + oz * C, y: LOBBY_CEIL - 1.0, rot: 0 })),
+    { m: 'Chandelier_01', h: 1.0, r: 0, x: X0 + 5, z: Z1 - 2.6, y: LOBBY_CEIL - 1.0, rot: 0.4 },
+    { m: 'Chandelier_01', h: 1.0, r: 0, x: desk.x - 2.2, z: desk.z, y: LOBBY_CEIL - 1.0, rot: 0.4 },
   ];
   // la banquette ronde de velours au milieu du hall, et deux colonnes de marbre de part et d'autre de l'entrée
   solids.push({ x: lobbyCenter.x, z: lobbyCenter.z, hx: 1.15, hz: 1.15, banquette: true });
@@ -337,8 +339,69 @@ export function createHotelMap(seed = 5) {
       const vp = at(side * (half - 0.32), 1.9);
       if (free(vp, 0.9)) roomProps.push({ m: 'vintage_suitcase', h: 0.55, r: 0.3, ...vp, rot: yawTo(-side * ux, -side * uz) + (drnd() - 0.5) * 0.5 });
     }
+    // un pouf au pied du lit, une plante dans un coin du fond (loin de l'armoire et des lettres)
+    const clear = (p, d) => free(p, d) && !spots.some((h) => h.room === r.id && Math.hypot(h.x - p.x, h.z - p.z) < d + 0.5) && !roomProps.some((q) => q.r > 0 && Math.hypot(q.x - p.x, q.z - p.z) < d);
+    const op = at(bedU, 2 * FURNITURE.bed.hd + 0.42);
+    if (drnd() < 0.55 && clear(op, 0.9)) roomProps.push({ m: 'Ottoman_01', h: 0.42, r: 0.3, ...op, rot: yawTo(dx, dz) + (drnd() - 0.5) * 0.3 });
+    const pp = at(-side * (half - 0.42), 0.42);
+    if (drnd() < 0.6 && clear(pp, 1.0)) roomProps.push({ m: 'potted_plant_02', h: 0.95, r: 0.3, ...pp, rot: drnd() * 6.28 });
     // une chambre sur trois a été fouillée : tiroirs ouverts, draps défaits (voir view/hotelRooms.js)
     r.mess = drnd() < 0.33;
+  }
+
+  // 6c. L'habillage des couloirs (même second hasard) : contre les murs sans applique, des tableaux, des consoles avec
+  // un vase ou une lampe à pétrole sous un miroir, une banquette, un extincteur et son déclencheur ; une plante dans les
+  // angles ; une pendule arrêtée ; un panneau « sol glissant » oublié. Rien devant les portes des chambres (plateaux,
+  // chaussures, journaux), rien de plus profond que 50 cm : le couloir reste libre
+  const hallProps = [];
+  {
+    const DIRS = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+    const wallAt = (x, z) => grid[z * W + x] === T.WALL;
+    const doorCells = new Set(rooms.map((r) => r.door.z * W + r.door.x));
+    const nearDoor = (c) => DIRS.some(([dx, dz]) => doorCells.has((c.z + dz) * W + c.x + dx));
+    const yawTo = (vx, vz) => Math.atan2(vx, vz);
+    let clock = false;
+    for (const c of corridorCells) {
+      if (nearDoor(c)) continue;
+      const walls = DIRS.filter(([dx, dz]) => wallAt(c.x + dx, c.z + dz));
+      const sconce = (c.x + c.z) % 2 === 0 ? walls[0] : null; // (voir 8 : l'applique prend le premier mur trouvé)
+      const cx = (c.x + 0.5) * C;
+      const cz = (c.z + 0.5) * C;
+      // un angle : une plante
+      const corner = walls.find(([ax, az]) => walls.some(([bx, bz]) => ax * bx + az * bz === 0 && (ax !== bx || az !== bz)));
+      if (corner) {
+        const other = walls.find(([bx, bz]) => corner[0] * bx + corner[1] * bz === 0);
+        hallProps.push({ m: 'potted_plant_02', h: 1.0, r: 0.3, x: cx + (corner[0] + other[0]) * (C / 2 - 0.42), z: cz + (corner[1] + other[1]) * (C / 2 - 0.42), rot: drnd() * 6.28 });
+        continue;
+      }
+      for (const [dx, dz] of walls) {
+        if (sconce && sconce[0] === dx && sconce[1] === dz) continue;
+        const face = yawTo(-dx, -dz); // l'avant du modèle tourné vers le couloir
+        const on = (d, y = 0) => ({ x: cx + dx * (C / 2 - d), z: cz + dz * (C / 2 - d), ...(y ? { y } : {}) });
+        const u = drnd();
+        if (u < 0.3) {
+          if (!clock && drnd() < 0.12) {
+            clock = true;
+            hallProps.push({ m: 'wall_clock', h: 0.36, r: 0, ...on(0.04, 1.95), rot: face });
+          } else hallProps.push({ m: 'fancy_picture_frame_01', h: 0.72, r: 0, ...on(0.03, 1.45), rot: face });
+        } else if (u < 0.4) {
+          hallProps.push({ m: 'ClassicConsole_01', h: 0.85, r: 0.3, ...on(0.24), rot: face });
+          hallProps.push({ m: drnd() < 0.6 ? 'antique_ceramic_vase_01' : 'vintage_oil_lamp', h: 0.42, r: 0, ...on(0.24, 0.85), rot: face + drnd() });
+          hallProps.push({ m: 'ornate_mirror_01', h: 0.85, r: 0, ...on(0.03, 1.4), rot: face });
+        } else if (u < 0.44) {
+          hallProps.push({ m: 'painted_wooden_bench', h: 0.48, r: 0.3, ...on(0.26), rot: face });
+        } else if (u < 0.47) {
+          hallProps.push({ m: 'korean_fire_extinguisher_01', h: 0.62, r: 0.14, ...on(0.14), rot: face });
+          hallProps.push({ m: 'fire_alarm', h: 0.16, r: 0, ...on(0.02, 1.4), rot: face });
+        }
+      }
+    }
+    // le panneau « sol glissant », planté au milieu d'un couloir droit
+    const straight = corridorCells.filter((c) => !nearDoor(c) && DIRS.filter(([dx, dz]) => wallAt(c.x + dx, c.z + dz)).length === 2);
+    if (straight.length) {
+      const c = straight[Math.floor(drnd() * straight.length)];
+      hallProps.push({ m: 'WetFloorSign_01', h: 0.62, r: 0.22, x: (c.x + 0.3 + drnd() * 0.4) * C, z: (c.z + 0.3 + drnd() * 0.4) * C, rot: drnd() * 6.28 });
+    }
   }
 
   // 7. Le code à 4 chiffres (même graine, même code chez tout le monde)
@@ -364,12 +427,12 @@ export function createHotelMap(seed = 5) {
   }
   // une applique au-dessus des boîtes aux lettres
   addLight(mailbox.x + 0.2, mbMid, { state: 'on', y: 2.5, fy: 2.5, bright: true, sconce: { dx: -1, dz: 0 } });
-  addLight(X0 + 5, Z1 - 2.6, { state: 'on', bright: true, y: HOTEL_CEIL - 0.5, fy: HOTEL_CEIL - 0.5, chandelier: true });
-  addLight(desk.x - 2.2, desk.z, { state: 'on', bright: true, y: HOTEL_CEIL - 0.5, fy: HOTEL_CEIL - 0.5, chandelier: true });
-  for (const [ox, oz] of [[-1, -0.8], [1, -0.8], [0, 1.2]]) addLight(lobbyCenter.x + ox * C * 1.5, lobbyCenter.z + oz * C, { state: 'on', bright: true, y: HOTEL_CEIL - 0.5, fy: HOTEL_CEIL - 0.5, chandelier: true });
+  addLight(X0 + 5, Z1 - 2.6, { state: 'on', bright: true, y: LOBBY_CEIL - 0.5, fy: LOBBY_CEIL - 0.5, chandelier: true });
+  addLight(desk.x - 2.2, desk.z, { state: 'on', bright: true, y: LOBBY_CEIL - 0.5, fy: LOBBY_CEIL - 0.5, chandelier: true });
+  for (const [ox, oz] of [[-1, -0.8], [1, -0.8], [0, 1.2]]) addLight(lobbyCenter.x + ox * C * 1.5, lobbyCenter.z + oz * C, { state: 'on', bright: true, y: LOBBY_CEIL - 0.5, fy: LOBBY_CEIL - 0.5, chandelier: true });
 
   // 9. Quelques piles et eaux d'amande, dans les chambres sans lettre et le couloir
-  const busy = [cellPos(spawnCell.x, spawnCell.z), ...letters, ...furniture, ...lobbyProps, ...roomProps, ...solids];
+  const busy = [cellPos(spawnCell.x, spawnCell.z), ...letters, ...furniture, ...lobbyProps, ...roomProps, ...hallProps, ...solids];
   const scatter = (n) => {
     const out = [];
     for (let i = 0; i < 2000 && out.length < n; i++) {
@@ -398,6 +461,7 @@ export function createHotelMap(seed = 5) {
     level: 4, // HOTEL_LEVEL (le 3 est le Level 2, les Tuyauteries)
     name: 5,
     ceil: HOTEL_CEIL,
+    lobbyCeil: LOBBY_CEIL,
     W,
     H,
     grid,
@@ -409,7 +473,7 @@ export function createHotelMap(seed = 5) {
     cassettes: [],
     fuses: [],
     lights,
-    props: [...lobbyProps, ...roomProps],
+    props: [...lobbyProps, ...roomProps, ...hallProps],
     bottles,
     batteries,
     items: itemList(['bottle', bottles], ['battery', batteries]),
