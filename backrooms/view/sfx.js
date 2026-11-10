@@ -271,6 +271,9 @@ export class BackroomsSfx {
   setRoom(level = 0) {
     if (!this.ctx || this.roomLevel === level) return;
     this.roomLevel = level;
+    // ce qui tient d'un niveau à l'autre se tait : le monte-charge qui descend, les relais qui tiquent
+    if (this.lift) this.lift.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1), (this.lift = null);
+    for (const id of Object.keys(this.relayGs || {})) this.relayStop(id);
     const c = this.ctx;
     const pipes = level === PIPES_LEVEL;
     // Poolrooms : salle carrelée immense et vide, une queue de 4,5 s et des échos plus francs
@@ -670,7 +673,7 @@ export class BackroomsSfx {
     whine.connect(whineGain).connect(this.ambientGain);
 
     // Le « silence » d'une pièce vide : un souffle grave, toujours là, même dans le noir
-    const len = c.sampleRate * 2;
+    const len = c.sampleRate * 13; // assez long pour qu'on n'entende pas la boucle
     const buf = c.createBuffer(1, len, c.sampleRate);
     const d = buf.getChannelData(0);
     let last = 0;
@@ -678,9 +681,11 @@ export class BackroomsSfx {
       last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; // bruit brun
       d[i] = last * 3.5;
     }
-    const room = c.createBufferSource();
-    room.buffer = buf;
-    room.loop = true;
+    // la fin rejoint doucement le début : la boucle ne claque pas
+    const fl = c.sampleRate * 0.5;
+    const gap = d[0] - d[len - 1];
+    for (let i = 0; i < fl; i++) d[len - fl + i] += (gap * (i + 1)) / fl;
+    const room = this.anyStart(buf);
     const roomLp = this.filt('lowpass', 380);
     this.roomGain = this.gainNode(0.05);
     room.connect(roomLp).connect(this.roomGain).connect(this.master);
@@ -991,14 +996,33 @@ export class BackroomsSfx {
     (want ? fetch(VOICE).then((r) => r.arrayBuffer()).then((b) => c.decodeAudioData(b)) : Promise.resolve(growlBuffer(c)))
       .then((buf) => {
         if (want !== !!this.voiceVip) return;
-        const src = c.createBufferSource();
-        this.voiceSrc = src;
-        src.buffer = buf;
-        src.loop = true;
-        src.connect(this.voiceGain);
-        src.start();
+        this.voiceBuf = buf;
+        this.voiceNext = 0;
       })
       .catch(() => {});
+  }
+
+  // La voix ne tourne plus en boucle : des souffles de 0,9 à 2,4 s pris n'importe où dans l'enregistrement, plus ou
+  // moins graves, enchaînés en fondu ; de temps en temps elle reprend sa respiration. On ne reconnaît jamais un motif.
+  voiceTick(t) {
+    const buf = this.voiceBuf;
+    if (!buf || !this.voiceGain || t < (this.voiceNext || 0) - 0.15) return;
+    const at = Math.max(t + 0.02, this.voiceNext || 0);
+    const rate = rnd(0.86, 1.1);
+    const len = Math.min(buf.duration * 0.9, rnd(0.9, 2.4));
+    const real = len / rate;
+    const g = this.gainNode(0);
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(1, at + 0.12);
+    g.gain.setValueAtTime(1, at + real - 0.22);
+    g.gain.linearRampToValueAtTime(0, at + real);
+    g.connect(this.voiceGain);
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = rate;
+    src.connect(g);
+    src.start(at, Math.random() * Math.max(0, buf.duration - len), len);
+    this.voiceNext = at + real - 0.2 + (Math.random() < 0.25 ? rnd(0.3, 1.1) : 0);
   }
 
   // À chaque image : la voix du Level 1 (voice), plus forte à mesure qu'elle approche. L'entité du Level 0, elle, ne
@@ -1015,6 +1039,7 @@ export class BackroomsSfx {
     if (ent && !this.rushBufs && (levelSfx(this.roomLevel).rush || []).length) this.rushReady(levelSfx(this.roomLevel).rush);
     // toujours un murmure au loin, de plus en plus fort à mesure qu'elle approche
     if (this.voiceGain && !(t < this.scareUntil)) this.voiceGain.gain.setTargetAtTime(voice ? 0.04 + Math.pow(d, 0.8) * 1.3 : 0.0001, t, 0.1);
+    if (voice) this.voiceTick(t);
     if (voice && d > 0.25) this.caption('[garbled voice]', pos);
 
     // (plus de bourdonnement qui monte à mesure qu'elle approche : il trahissait son arrivée et gâchait la surprise)
@@ -1369,7 +1394,9 @@ export class BackroomsSfx {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
     const t = c.currentTime;
-    const t0 = this.scareCut(0.2);
+    // le genre de sursaut : jamais deux fois le même de suite (voir scareKind)
+    const kind = level === 4 ? 'hotel' : this.scareKind(level);
+    const t0 = this.scareCut(kind === 'silence' ? 0.6 : 0.2);
     this.duck(0.12, 4);
 
     // Coupe le son de traque continu
@@ -1377,7 +1404,7 @@ export class BackroomsSfx {
     this.scareUntil = t0 + 1.6;
 
     // Level 1 : sa voix à plein volume, collée à l'oreille, puis le silence
-    if (level === 1 && this.voiceGain) {
+    if (kind === 'voice' && this.voiceGain) {
       // juste devant toi
       this.entPin(t0 + 1.6);
       this.voiceGain.gain.cancelScheduledValues(t);
@@ -1438,10 +1465,64 @@ export class BackroomsSfx {
       return;
     }
     if (this.voiceGain) this.voiceGain.gain.setValueAtTime(0.0001, t);
+    if (kind === 'roar') {
+      // son propre cri, enregistré, une demi-octave plus bas, saturé et collé à l'oreille
+      this.scareHit(t0, 1.2);
+      this.scareRoar(t0);
+      this.tapeCrumple(t0 + 1.35);
+      return;
+    }
+    if (kind === 'silence') {
+      // six dixièmes de seconde de silence complet (scareCut), puis le coup, le crissement et la bande qui s'arrête
+      this.scareHit(t0, 1.5);
+      this.scareScreech(t0);
+      const sat = this.shaper(3);
+      sat.connect(this.gainNode(0.5)).connect(this.master);
+      this.tone(sat, t0 + 0.05, 'sawtooth', 1300, 45, 0.8, 0.14, 0.002);
+      this.tapeCrumple(t0 + 0.85, 1);
+      return;
+    }
     this.scareHit(t0, 1.35);
-    this.scareScream(t0, 1.4);
+    this.scareScream(t0, 1.4, null, rnd(0.85, 1.15));
     this.scareScreech(t0);
     this.tapeCrumple(t0 + 1.25);
+  }
+
+  // Le sursaut de la capture : Level 0, le cri synthétique, son propre cri enregistré ou le silence puis le coup ;
+  // Level 1, sa voix collée à l'oreille, son cri ou le silence. Jamais deux fois le même de suite.
+  scareKind(level) {
+    const pool = level === 1 ? ['voice', 'roar', 'silence'] : ['scream', 'roar', 'silence'];
+    const ok = pool.filter((k) => k !== this.lastScare && (k !== 'roar' || levelSfx(this.roomLevel).chase.length));
+    const k = ok[Math.floor(Math.random() * ok.length)];
+    this.lastScare = k;
+    return k;
+  }
+
+  // le cri enregistré du niveau, joué plus bas et saturé, à l'oreille ; s'il n'est pas encore chargé, le cri synthétique
+  scareRoar(t0) {
+    const list = levelSfx(this.roomLevel).chase;
+    const name = list[Math.floor(Math.random() * list.length)];
+    this.sample(name).then((buf) => {
+      const c = this.ctx;
+      const at = Math.max(t0, c.currentTime + 0.005);
+      if (!buf) return this.scareScream(at, 1.4);
+      const [a, b] = loudPart(buf);
+      const rate = rnd(0.62, 0.78);
+      const len = Math.max(0.5, Math.min(1.5, (b - a) / rate));
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.setValueAtTime(rate, at);
+      src.playbackRate.linearRampToValueAtTime(rate * 0.85, at + len);
+      const env = c.createGain();
+      env.gain.setValueAtTime(0.0001, at);
+      env.gain.exponentialRampToValueAtTime(0.5, at + 0.01);
+      env.gain.setValueAtTime(0.5, at + len * 0.6);
+      env.gain.exponentialRampToValueAtTime(0.0001, at + len);
+      src.connect(this.filt('highpass', 60, 0.7)).connect(this.gainNode(2)).connect(this.shaper(7)).connect(env).connect(this.master);
+      env.connect(this.gainNode(0.3)).connect(this.out);
+      src.start(at, a);
+      src.stop(at + len + 0.05);
+    });
   }
 
   // le crissement par-dessus le cri : une grappe de cordes désaccordées, très aiguës, qui grincent et tombent
@@ -1489,17 +1570,17 @@ export class BackroomsSfx {
 
   // le cri : une voix (dent de scie et souffle) qui tremble, passe d'un « aa » à un « ii », très saturée ; dest : où
   // il part (le bus de l'entité pour la ruée : placé là où elle est, avec son écho), sinon collé à l'oreille
-  scareScream(t, k = 1, dest = null) {
+  scareScream(t, k = 1, dest = null, pf = 1) {
     const c = this.ctx;
     const D = 1.3;
-    const vo = this.osc('sawtooth', 520);
-    vo.frequency.setValueAtTime(480, t);
-    vo.frequency.linearRampToValueAtTime(660, t + 0.15);
-    vo.frequency.exponentialRampToValueAtTime(300, t + D);
-    const sub = this.osc('sawtooth', 260);
-    sub.frequency.setValueAtTime(240, t);
-    sub.frequency.linearRampToValueAtTime(330, t + 0.15);
-    sub.frequency.exponentialRampToValueAtTime(150, t + D);
+    const vo = this.osc('sawtooth', 520 * pf);
+    vo.frequency.setValueAtTime(480 * pf, t);
+    vo.frequency.linearRampToValueAtTime(660 * pf, t + 0.15);
+    vo.frequency.exponentialRampToValueAtTime(300 * pf, t + D);
+    const sub = this.osc('sawtooth', 260 * pf);
+    sub.frequency.setValueAtTime(240 * pf, t);
+    sub.frequency.linearRampToValueAtTime(330 * pf, t + 0.15);
+    sub.frequency.exponentialRampToValueAtTime(150 * pf, t + D);
     // le tremblement : deux vibratos qui ne s'accordent pas
     const j1 = this.osc('sine', 23);
     const j2 = this.osc('sine', 37);
@@ -1573,30 +1654,34 @@ export class BackroomsSfx {
     this.burst(out, t + sec + 0.45, 0.04, 'highpass', 2500, 0.8, 0.05);
   }
 
+  // un bruit blanc de 2,7 s, partagé ; chaque lecture part d'un point au hasard (deux souffles qui jouent en même
+  // temps ne sont pas le même, et un souffle qui dure ne repasse pas au même endroit à intervalle fixe)
   noise() {
-    if (!this.noiseBuf) {
-      const c = this.ctx;
-      this.noiseBuf = c.createBuffer(1, c.sampleRate, c.sampleRate);
-      const d = this.noiseBuf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    }
-    const n = this.ctx.createBufferSource();
-    n.buffer = this.noiseBuf;
-    n.loop = true;
-    return n;
+    if (!this.noiseBuf) this.noiseBuf = this.whiteBuf(2.7);
+    return this.anyStart(this.noiseBuf);
   }
 
-  // un bruit plus long (5 s) pour les fonds continus : on n'entend pas la boucle
+  // un bruit plus long (17 s) pour les fonds continus : la boucle est trop longue pour qu'on la reconnaisse
   longNoise() {
-    if (!this.longBuf) {
-      const c = this.ctx;
-      this.longBuf = c.createBuffer(1, c.sampleRate * 5, c.sampleRate);
-      const d = this.longBuf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    }
+    if (!this.longBuf) this.longBuf = this.whiteBuf(17);
+    return this.anyStart(this.longBuf);
+  }
+
+  whiteBuf(sec) {
+    const c = this.ctx;
+    const b = c.createBuffer(1, Math.floor(c.sampleRate * sec), c.sampleRate);
+    const d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return b;
+  }
+
+  // une source en boucle qui, si on ne lui dit pas où commencer, commence n'importe où
+  anyStart(buf) {
     const n = this.ctx.createBufferSource();
-    n.buffer = this.longBuf;
+    n.buffer = buf;
     n.loop = true;
+    const start = n.start.bind(n);
+    n.start = (when = 0, off, dur) => (dur === undefined ? start(when, off ?? Math.random() * buf.duration) : start(when, off ?? Math.random() * buf.duration, dur));
     return n;
   }
 
@@ -1798,6 +1883,159 @@ export class BackroomsSfx {
     o.start(t);
     o.stop(t + 1.3);
     this.caption('[lights blow out]', pos);
+  }
+
+  // --- Level 1 : les disjoncteurs généraux, les coupures, le monte-charge ---
+
+  // Un disjoncteur général qu'on abaisse : le levier qui claque, puis, tant qu'il tient (sec), son relais temporisé
+  // qui tique dans l'armoire, de plus en plus vite sur la fin. Un par armoire (id) : relayStop le fait taire.
+  relayTimer(id, pos, sec) {
+    if (!this.unlocked || !this.ctx) return;
+    this.relayStop(id);
+    const c = this.ctx;
+    const t = c.currentTime + 0.01;
+    const g = this.gainNode(1);
+    g.connect(this.at({ ...pos, rolloff: 0.8, ref: 3 }, 1));
+    // le levier, lourd, et le contacteur qui colle
+    this.burst(g, t, 0.1, 'lowpass', 350, 1, 1.3);
+    this.burst(g, t + 0.06, 0.05, 'bandpass', 1900, 3, 0.7);
+    this.tone(g, t + 0.06, 'sine', 120, 70, 0.3, 0.3, 0.002);
+    if (!(sec > 0)) return;
+    let k = t + 0.6;
+    while (k < t + sec) {
+      const left = t + sec - k;
+      this.burst(g, k, 0.012, 'bandpass', left < 3 ? 3600 : 2800, 6, left < 3 ? 0.22 : 0.12);
+      k += left < 3 ? 0.25 : left < 8 ? 0.5 : 1;
+    }
+    (this.relayGs = this.relayGs || {})[id] = g;
+  }
+
+  relayStop(id) {
+    const g = this.relayGs && this.relayGs[id];
+    if (!g || !this.ctx) return;
+    g.gain.cancelScheduledValues(this.ctx.currentTime);
+    g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.02);
+    delete this.relayGs[id];
+  }
+
+  // le disjoncteur qui retombe : le ressort qui claque, une étincelle, et le bourdon du transformateur qui s'éteint
+  breakerTrip(pos) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.01;
+    const out = this.at({ ...pos, rolloff: 0.7, ref: 4 }, 1.3);
+    this.burst(out, t, 0.04, 'highpass', 1800, 0.8, 0.9);
+    this.burst(out, t + 0.01, 0.1, 'lowpass', 600, 1, 0.8);
+    for (let i = 0; i < 6; i++) this.burst(out, t + 0.03 + Math.random() * 0.18, 0.006, 'bandpass', rnd(3000, 7000), 4, 0.3);
+    const o = this.osc('sawtooth', 100);
+    o.frequency.setValueAtTime(100, t);
+    o.frequency.exponentialRampToValueAtTime(38, t + 1.4);
+    const e = this.gainNode(0);
+    e.gain.setValueAtTime(0.08, t);
+    e.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+    o.connect(this.filt('lowpass', 420, 0.8)).connect(e).connect(out);
+    o.start(t);
+    o.stop(t + 1.6);
+    this.caption('[a breaker trips]', pos);
+  }
+
+  // le délestage : au loin, un gros contacteur qui retombe et tout un secteur de ballasts qui s'éteint en sifflant
+  sectorThunk(pos) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.01;
+    const pl = this.place({ ...pos, rolloff: 0.35, ref: 5 }, 0.9, 0, this.out);
+    const o = this.filt('lowpass', 1600, 0.6);
+    o.connect(pl.input);
+    o.connect(this.gainNode(0.5)).connect(this.verb);
+    this.tone(o, t, 'sine', 90, 40, 0.7, 0.7, 0.003);
+    this.burst(o, t, 0.2, 'lowpass', 500, 0.8, 0.7);
+    const w = this.osc('sine', 9000);
+    w.frequency.setValueAtTime(9000, t + 0.05);
+    w.frequency.exponentialRampToValueAtTime(2500, t + 1.6);
+    const e = this.gainNode(0);
+    e.gain.setValueAtTime(0.025, t + 0.05);
+    e.gain.exponentialRampToValueAtTime(0.0001, t + 1.7);
+    w.connect(e).connect(o);
+    w.start(t + 0.05);
+    w.stop(t + 1.8);
+    this.caption('[a sector shuts down]', pos);
+  }
+
+  // la baisse de tension : le transformateur qui peine, un grondement qui ralentit et remonte pendant sec secondes
+  brownSag(sec = 5) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.02;
+    const end = t + sec;
+    const o = this.osc('sawtooth', 60);
+    o.frequency.setValueAtTime(60, t);
+    o.frequency.linearRampToValueAtTime(rnd(44, 50), t + sec * 0.4);
+    o.frequency.setValueAtTime(rnd(44, 50), t + sec * 0.75);
+    o.frequency.linearRampToValueAtTime(60, end);
+    const lfo = this.osc('sine', rnd(3, 5));
+    lfo.connect(this.gainNode(0.25)).connect(o.frequency);
+    const e = this.gainNode(0);
+    e.gain.setTargetAtTime(0.06, t, 0.4);
+    e.gain.setTargetAtTime(0, end - 0.6, 0.25);
+    o.connect(this.filt('lowpass', 300, 0.9)).connect(this.shaper(2)).connect(e).connect(this.bedWet || this.out);
+    for (const n of [o, lfo]) {
+      n.start(t);
+      n.stop(end + 0.3);
+    }
+    this.caption('[the power groans]');
+  }
+
+  // Le monte-charge qui descend (sec secondes) : dans la gaine, le moteur qui ronfle, les câbles qui claquent sur
+  // les poulies et les galets qui frottent ; d'abord à peine audible, de plus en plus fort à mesure qu'il approche.
+  // À l'arrivée (liftDescend(null)) : le choc de la cabine en bas, puis le silence du moteur.
+  liftDescend(pos, sec = 40) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.02;
+    const L = this.lift;
+    if (L) {
+      L.g.gain.cancelScheduledValues(t);
+      L.g.gain.setTargetAtTime(0, t, 0.15);
+      for (const n of L.srcs) {
+        try {
+          n.stop(t + 1);
+        } catch (e) {
+          /* déjà programmé plus tôt */
+        }
+      }
+      this.lift = null;
+      if (!pos) {
+        this.tone(L.out, t, 'sine', 70, 30, 0.8, 0.7, 0.004);
+        this.burst(L.out, t, 0.25, 'lowpass', 600, 0.8, 0.8);
+        this.burst(L.out, t + 0.05, 0.08, 'bandpass', 1800, 2, 0.4);
+        this.caption('[the elevator car lands]', L.pos);
+      }
+    }
+    if (!pos) return;
+    const out = this.at({ ...pos, rolloff: 0.5, ref: 5 }, 1);
+    const g = this.gainNode(0);
+    g.connect(out);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.05, t + 3);
+    g.gain.exponentialRampToValueAtTime(0.5, t + sec);
+    const srcs = [];
+    const mot = this.osc('sawtooth', 46);
+    const wob = this.osc('sine', 0.7);
+    wob.connect(this.gainNode(2)).connect(mot.frequency);
+    mot.connect(this.filt('lowpass', 200, 0.8)).connect(this.gainNode(0.6)).connect(g);
+    const rub = this.longNoise();
+    rub.connect(this.filt('bandpass', 380, 1.5)).connect(this.gainNode(0.4)).connect(g);
+    srcs.push(mot, wob, rub);
+    // garde-fou : si la cabine n'arrive jamais (partie finie avant), le moteur se tait de lui-même
+    for (const n of srcs) {
+      n.start(t);
+      n.stop(t + sec + 15);
+    }
+    // les câbles sur les poulies : un claquement métallique tous les 1,1 à 1,6 s
+    for (let k = t + rnd(0.5, 1.5); k < t + sec; k += rnd(1.1, 1.6)) this.ring(g, k, rnd(500, 800), [[1, 1, 0.3], [2.3, 0.5, 0.18], [3.9, 0.2, 0.1]], 0.2);
+    this.lift = { g, srcs, out, pos };
+    this.caption('[the freight elevator is coming down]', pos);
   }
 
   // le levier du disjoncteur qui claque, puis les ballasts qui se rallument
@@ -2437,6 +2675,7 @@ export class BackroomsSfx {
     while (this.recentChase.length > Math.min(8, CHASE.length - 1)) this.recentChase.shift();
     this.sample(name).then((buf) => {
       if (!buf) return (this.chasePlaying = false);
+      if (CHASE.length < 4) return this.chaseGrain(buf);
       const src = this.ctx.createBufferSource();
       src.buffer = buf;
       src.connect(this.shriekG);
@@ -2447,6 +2686,41 @@ export class BackroomsSfx {
         else this.chasePlaying = false;
       };
     });
+  }
+
+  // Peu d'enregistrements (Level 1 : un seul cri de 10 s) : on n'en joue jamais le tout, mais un morceau de 1,4 à
+  // 3,8 s pris au hasard, plus ou moins aigu, qui glisse un peu, parfois doublé d'une seconde gorge plus grave ; entre
+  // deux, un temps de respiration variable. Le même cri ne revient jamais pareil.
+  chaseGrain(buf) {
+    const c = this.ctx;
+    const t = c.currentTime + 0.02;
+    const len = Math.min(buf.duration - 0.1, rnd(1.4, 3.8));
+    const off = Math.random() * (buf.duration - len);
+    const rate = rnd(0.84, 1.12);
+    const real = len / rate;
+    const env = this.gainNode(0);
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(1, t + 0.05);
+    env.gain.setValueAtTime(1, t + real - 0.3);
+    env.gain.linearRampToValueAtTime(0, t + real);
+    env.connect(this.shriekG);
+    const play = (r, vol, dl) => {
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.setValueAtTime(r, t + dl);
+      src.playbackRate.linearRampToValueAtTime(r * rnd(0.9, 1.06), t + dl + real);
+      src.connect(this.gainNode(vol)).connect(env);
+      src.start(t + dl, off, len);
+      src.stop(t + real + 0.05);
+      return src;
+    };
+    const main = play(rate, 1, 0);
+    if (Math.random() < 0.35) play(rate * rnd(0.72, 0.8), 0.45, rnd(0.03, 0.09));
+    main.onended = () => {
+      const on = () => this.chaseGain && this.chaseGain.gain.value > 0.02;
+      if (!on()) return (this.chasePlaying = false);
+      setTimeout(() => (on() ? this.nextChase() : (this.chasePlaying = false)), rnd(60, 700));
+    };
   }
 
   // Un rugissement grave et saturé pendant la traque : la partie forte d'un des cris du niveau, jouée une octave
@@ -2525,6 +2799,7 @@ export class BackroomsSfx {
       else this.floorCreak();
       return;
     }
+    if (slot === 'rec' && lv === 1) return this.warehouseFar(w, pos(22, 40), vol(0.6, 1));
     if (slot === 'rec') {
       const AMBIENT = levelSfx(lv).ambient;
       if (!AMBIENT.length) return;
@@ -3019,6 +3294,79 @@ export class BackroomsSfx {
     for (const s of srcs) s.start(t, s.buffer ? Math.random() * 4 : 0);
     g.gain.setTargetAtTime(vol, t, 2);
     this.bed = { g, srcs };
+  }
+
+  // Les bruits lointains de l'entrepôt (Level 1), joués au hasard toutes les 20 à 50 s : un bip de recul de chariot
+  // (il n'y a personne), le carillon puis une annonce qu'on ne comprend pas, des chaînes qui s'entrechoquent, quelque
+  // chose de lourd qui tombe sur le béton, un raclement, le « ding » d'un monte-charge. Loin, avec beaucoup d'écho.
+  warehouseFar(w, p, vol = 1) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.02;
+    const kind = ['beeper', 'announce', 'chains', 'fall', 'drag', 'ding'][Math.min(5, Math.floor(w * 6))];
+    if (kind === 'drag' || kind === 'ding') return this.distant(kind, p, vol, this.bedWet);
+    const pl = this.place({ ...p, rolloff: 0.35, ref: 4 }, 0.6 * vol, 0, this.bedWet);
+    const o = this.filt('lowpass', kind === 'chains' ? 3200 : 2400, 0.5);
+    o.connect(pl.input);
+    o.connect(this.gainNode(0.4 * vol)).connect(this.verb);
+    if (kind === 'beeper') {
+      const n = 4 + Math.floor(Math.random() * 5);
+      const f = rnd(980, 1120);
+      for (let i = 0; i < n; i++) this.tone(o, t + i * 0.74, 'square', f, f, 0.38, 0.035, 0.004);
+      this.caption('[a reversing beeper, far away]', p);
+    } else if (kind === 'announce') {
+      // le carillon (deux notes), puis une voix nasillarde dans un haut-parleur qui sature
+      const part = [[1, 1, 1.4], [2, 0.3, 0.8], [3, 0.12, 0.5]];
+      this.ring(o, t, 659, part, 0.09);
+      this.ring(o, t + 0.6, 523, part, 0.09);
+      const t1 = t + 1.6;
+      const end = t1 + rnd(2.4, 4);
+      const vo = this.osc('sawtooth', rnd(100, 130));
+      const br = this.noise();
+      const vmix = this.gainNode(1);
+      const forms = [[8, 1], [10, 0.5], [12, 0.25]].map(([q, v], j) => {
+        const b = this.filt('bandpass', VOWELS[0][j], q);
+        vo.connect(b);
+        br.connect(this.gainNode(0.2)).connect(b);
+        b.connect(this.gainNode(v * 3)).connect(vmix);
+        return b;
+      });
+      const gate = this.gainNode(0);
+      vmix.connect(this.filt('highpass', 450, 0.7)).connect(this.filt('lowpass', 2800, 0.7)).connect(this.shaper(4)).connect(gate).connect(this.gainNode(0.07)).connect(o);
+      let k = t1;
+      while (k < end) {
+        const len = rnd(0.1, 0.26);
+        const v = VOWELS[Math.floor(Math.random() * VOWELS.length)];
+        forms.forEach((b, j) => b.frequency.setTargetAtTime(v[j] * rnd(0.92, 1.08), k, 0.025));
+        vo.frequency.setTargetAtTime(rnd(100, 135), k, 0.04);
+        gate.gain.setTargetAtTime(rnd(0.6, 1), k, 0.02);
+        gate.gain.setTargetAtTime(0, k + len, 0.03);
+        k += len + rnd(0.03, 0.1) + (Math.random() < 0.15 ? rnd(0.3, 0.6) : 0);
+      }
+      for (const n of [vo, br]) {
+        n.start(t1);
+        n.stop(end + 0.2);
+      }
+      this.caption('[a garbled announcement]', p);
+    } else if (kind === 'chains') {
+      let k = t;
+      const n = 9 + Math.floor(Math.random() * 8);
+      for (let i = 0; i < n; i++) {
+        this.ring(o, k, rnd(1700, 3300), [[1, 1, 0.22], [2.7, 0.4, 0.12], [5.2, 0.2, 0.06]], rnd(0.025, 0.06) * (1 - i / (n * 1.4)));
+        k += rnd(0.04, 0.2) * (1 + i / n);
+      }
+      this.caption('[chains rattling]', p);
+    } else {
+      // une charge qui tombe : le choc sourd, puis du métal qui rebondit et roule
+      this.tone(o, t, 'sine', 80, 34, 0.6, 0.5, 0.003);
+      this.burst(o, t, 0.3, 'lowpass', 500, 0.7, 0.5);
+      let k = t + 0.12;
+      for (let i = 0; i < 5; i++) {
+        this.ring(o, k, rnd(600, 1300), [[1, 1, 0.35], [2.4, 0.5, 0.2], [4.1, 0.25, 0.1]], 0.05 * (1 - i / 6));
+        k += rnd(0.08, 0.25) * (1 - i / 8);
+      }
+      this.caption('[something heavy falls]', p);
+    }
   }
 
   // un craquement de tôle ou d'étagère : quelques grains métalliques très résonants

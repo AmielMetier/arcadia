@@ -184,9 +184,21 @@ function applyOpts() {
 let voice = null;
 let micWarned = false;
 const sfxRef = { get ctx() { return sfx && sfx.ctx; }, get verb() { return sfx && sfx.verb; }, get level() { return sfx ? sfx.roomLevel || 0 : 0; }, moveTo: (...a) => sfx && sfx.moveTo(...a), caption: (...a) => sfx && sfx.caption(...a) };
+// la voix qui ne passe pas en direct avec quelqu'un : on le dit (une fois par joueur et par état)
+const voiceSaid = new Map();
+function voiceTrouble(id, kind) {
+  if (voiceSaid.get(id) === kind || (kind === 'direct' && !voiceSaid.has(id))) return;
+  voiceSaid.set(id, kind);
+  const p = sim && sim.players.find((q) => q.id === id);
+  const name = ((p && p.name) || 'a player').toUpperCase();
+  if (!hud) return;
+  if (kind === 'relay') hud.toast(`Voice · no direct link with ${name} · going through the server (lower quality)`);
+  else if (kind === 'failed') hud.toast(`Voice · can't reach ${name} · this browser can't send through the server`);
+  else hud.toast(`Voice · direct link with ${name} restored`);
+}
 function ensureVoice() {
   if (!voice) {
-    voice = createVoice({ send: (to, m) => send(to, m), myId: NET.myId, sfx: sfxRef });
+    voice = createVoice({ send: (to, m, vol) => send(to, m, vol), myId: NET.myId, sfx: sfxRef, onTrouble: voiceTrouble });
     voice.setVolume(OPTS.voiceVol);
   }
   return voice;
@@ -836,7 +848,7 @@ const slotOf = (s) => (Number.isInteger(s) && s >= 1 && s <= INV_SIZE ? s : 1); 
 function onMsg(from, m) {
   if (!m || typeof m !== 'object') return;
   // la voix : d'un joueur à l'autre, sans passer par l'hôte
-  if (m.t === 'rtc' || m.t === 'vx') {
+  if (m.t === 'rtc' || m.t === 'vx' || m.t === 'va') {
     ensureVoice().onMessage(from, m);
     return;
   }
@@ -1340,30 +1352,35 @@ function handleEvent(ev, me) {
     case 'cut':
       if (ev.kind === 'brown') {
         if (sfx) sfx.neonSurge({ x: sim.player.x, z: sim.player.z }, 5);
+        if (sfx) sfx.brownSag(Math.min(9, ev.len || 5));
         if (hud) hud.toast('The lights sag and buzz… the power is failing');
       } else if (hud) hud.toast('Somewhere, the breakers are shedding the load…');
       break;
     case 'sectorOut':
-      if (sfx) sfx.breakerClunk({ x: ev.x, z: ev.z });
+      if (sfx) sfx.sectorThunk({ x: ev.x, z: ev.z });
       break;
     // Level 1 : les disjoncteurs généraux, le monte-charge qui descend
     case 'relay':
-      if (sfx) sfx.breakerClunk({ x: ev.x, z: ev.z });
+      if (sfx) sfx.relayTimer(ev.id, { x: ev.x, z: ev.z }, ev.desk ? 0 : ev.t || 0);
       if (hud && ev.by === me) hud.toast(ev.desk ? 'The console is armed · stay seated, it holds while you do' : `Main breaker on · it holds ${Math.round(ev.t || 0)} s${(ev.t || 0) > 10 ? ' · run to the next one' : ' · the others must be on now'}`);
       else if (hud) hud.toast(`${who(ev.by)} threw a main breaker`);
       break;
     case 'relayOff':
-      if (sfx) sfx.breakerClunk({ x: ev.x, z: ev.z });
+      if (sfx) sfx.relayStop(ev.id);
+      if (sfx) sfx.breakerTrip({ x: ev.x, z: ev.z });
       if (hud) hud.toast('A main breaker tripped back off…');
       break;
     case 'mains':
+      if (sfx) for (let i = 0; i < 3; i++) sfx.relayStop(i);
       if (sfx) sfx.neonSurge({ x: ev.x, z: ev.z }, 4.5);
       if (hud) hud.toast('Power reaches the freight elevator panel · go restart it');
       break;
     case 'liftCall':
       if (sfx) sfx.elevator(4, false);
+      if (sfx && ev.x != null) sfx.liftDescend({ x: ev.x, z: ev.z }, ev.t || 40);
       break;
     case 'liftArrive':
+      if (sfx) sfx.liftDescend(null);
       if (hud) hud.toast('The freight elevator is here · everyone get in');
       break;
     case 'spotted':
@@ -2067,13 +2084,17 @@ function frame(currentTime) {
     }
     // la musique de tension suit le directeur (la peur de l'équipe) et ce que fait l'entité
     const D = sim.director;
+    const me0 = sim.player;
     const charging = sim.goats ? sim.goats.some((g) => g.mode === 'charge' || g.mode === 'windup') : false;
     const mode = D && D.phase === 'relax' ? 'relief' : chasing || charging ? 'chase' : M.mode === 'search' ? 'search' : M.mode === 'stalk' || M.mode === 'watch' || M.mode === 'ambush' ? 'stalk' : 'calm';
-    sfx.setTension(paused ? 0 : Math.max(M.danger, D ? D.stress : 0), mode);
+    // ce qu'on perçoit d'elle : derrière des murs (un long détour), sa présence ne se devine plus. La musique et le cœur
+    // suivent ce qu'on entend, pas sa distance à vol d'oiseau (ils trahissaient où elle était, à travers les murs)
+    const heard = chasing || me0.grabT > 0 ? M.danger : M.danger * (1 - 0.7 * entEar.occ);
+    sfx.setTension(paused ? 0 : Math.max(heard, D ? D.stress : 0), mode);
     if (sim.goats) sfx.setChase(charging && !paused);
     // le cœur : la peur, la prise, et l'entité qui passe devant le casier
-    const me = sim.player;
-    const near = me.status === 'alive' ? Math.max(M.danger, me.grabT > 0 ? 1 : 0) : 0;
+    const me = me0;
+    const near = me.status === 'alive' ? Math.max(heard, me.grabT > 0 ? 1 : 0) : 0;
     const bpm = paused || near < 0.4 ? 0 : Math.round((70 + near * 75 + (me.hidden >= 0 ? 15 : 0)) / 5) * 5;
     if (bpm !== heartShown) {
       heartShown = bpm;

@@ -804,11 +804,13 @@ export class BackroomsHUD {
     const lv = Math.max(0, Math.min(1, v.raw || 0));
     const w = Math.round(lv * 40) * 2.5; // par pas de 2,5 % : assez fin, sans réécrire le style à chaque image
     const state = v.mode === 0 ? 'quiet' : lv >= 0.8 ? 'loud' : 'heard';
-    const k = `${w}|${state}`;
+    // la voix qui passe par le serveur (pas de liaison directe), ou qui ne passe pas du tout
+    const tr = v.trouble ? v.trouble() : '';
+    const k = `${w}|${state}|${tr}`;
     if (k === this.micK) return;
     this.micK = k;
     el.className = `mic-meter ${state}`;
-    this.$('#micTxt').textContent = 'MIC';
+    this.$('#micTxt').textContent = tr === 'relay' ? 'MIC · RELAY' : tr === 'failed' ? 'MIC · NO LINK' : 'MIC';
     this.$('#micFill').style.width = `${w}%`;
   }
 

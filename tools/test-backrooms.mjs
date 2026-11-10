@@ -4727,4 +4727,39 @@ test('à plusieurs : départs vraiment séparés (hors de vue les uns des autres
   assert.ok(kept(6) > kept(4), `${kept(6)} objets à six, ${kept(4)} à quatre`);
 });
 
+import { iceServers, mulawEncode, mulawDecode, down8k, toB64, fromB64 } from '../backrooms/view/voice.js';
+test('voix : serveurs ICE réglables, et la voix par le relais (8 kHz, loi µ) reste fidèle et légère', () => {
+  // un TURN ajouté dans l'adresse passe devant les STUN publics ; un réglage illisible est ignoré
+  const turn = [{ urls: 'turn:turn.example.com:3478', username: 'u', credential: 'p' }];
+  const a = iceServers('?ice=' + encodeURIComponent(JSON.stringify(turn)));
+  assert.equal(a[0].urls, 'turn:turn.example.com:3478');
+  assert.ok(a.some((s) => String(s.urls).startsWith('stun:')));
+  const store = { getItem: (k) => (k === 'backrooms.ice' ? JSON.stringify(turn) : null) };
+  assert.equal(iceServers('', store)[0].urls, 'turn:turn.example.com:3478');
+  assert.ok(iceServers('?ice=pas-du-json').every((s) => String(s.urls).startsWith('stun:')));
+  // 100 ms de voix à 48 kHz : 800 octets à 8 kHz, moins de 1,1 ko en base64 (10 paquets par seconde quand on parle)
+  const x = new Float32Array(4800).map((_, i) => 0.5 * Math.sin((2 * Math.PI * 300 * i) / 48000));
+  const d = down8k(x, 48000);
+  assert.equal(d.length, 800);
+  const b64 = toB64(mulawEncode(d));
+  assert.ok(b64.length < 1100, `${b64.length} caractères`);
+  const y = mulawDecode(fromB64(b64));
+  let err = 0;
+  for (let i = 0; i < d.length; i++) err = Math.max(err, Math.abs(d[i] - y[i]));
+  assert.ok(err < 0.02, `erreur ${err}`);
+  // le silence reste le silence (pas de souffle ajouté)
+  assert.ok(mulawDecode(mulawEncode(new Float32Array(10))).every((v) => Math.abs(v) < 1e-3));
+});
+
+test('Level 1 : le monte-charge qui descend dit d’où il vient (son de la gaine)', () => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 3, level: 1, players: [{ id: 1, name: 'A' }], localId: 1 });
+  const evs = [];
+  const emit = sim.emit.bind(sim);
+  sim.emit = (e) => (evs.push(e), emit(e));
+  sim.startLiftCall();
+  const ev = evs.find((e) => e.type === 'liftCall');
+  assert.ok(ev && ev.t >= 40 && Number.isFinite(ev.x) && Number.isFinite(ev.z));
+  assert.equal(ev.x, sim.map.exit.x);
+});
+
 console.log(`\n${count} tests réussis pour The Backrooms !`);

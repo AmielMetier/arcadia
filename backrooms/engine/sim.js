@@ -2851,7 +2851,7 @@ export class BackroomsSim {
   startLiftCall() {
     this.liftCallT = Math.min(60, LIFT_CALL_T + LIFT_CALL_MORE * Math.max(0, this.roster.length - 1));
     for (const d of this.map.docks || []) if (!d.broken && (d.o > 0 || d.dir > 0)) d.dir = -1;
-    this.emit({ type: 'liftCall', t: this.liftCallT });
+    this.emit({ type: 'liftCall', t: this.liftCallT, x: this.map.exit.x, z: this.map.exit.z });
     this.startHunt();
   }
 
