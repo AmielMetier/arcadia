@@ -3705,7 +3705,7 @@ export class BackroomsSim {
     if (exposed && M.mode !== 'chase' && M.mode !== 'flee' && M.mode !== 'ambush') M.faceT += DT;
     else M.faceT = Math.max(0, M.faceT - DT * 2);
     if (M.faceT > (near ? 0.5 : STARE_T)) {
-      this.rushAt(M, P);
+      this.rushAt(M, P, 'stare');
       canSee = true;
     }
     M.rushT = Math.max(0, M.rushT - DT);
@@ -3785,10 +3785,14 @@ export class BackroomsSim {
           M.repathT = 0;
           if (M.mode === 'patrol') M.targetWander = null;
         } else if (!shelter && !calm && V.d < STARE_R + 5 && (V.f < 0.45 || M.lurk || M.mode === 'ambush' || V.d < NEAR_CHARGE + 2)) {
-          this.rushAt(M, Q);
+          this.rushAt(M, Q, V.f < 0.45 ? 'stare' : '');
           if (Q === P) canSee = true;
           else M.target = Q.id; // elle change de proie : celui qui l'a fixée (voir senseMonster)
-        } else this.slipAway(M, Q, shelter || calm);
+        } else {
+          this.slipAway(M, Q, shelter || calm);
+          // épargné par la lumière d'une zone claire (pas un casier, pas un recoin calme) : le joueur l'apprend
+          if (shelter && !(Q.hidden >= 0) && !this.calmAt(Q)) this.emit({ type: 'spared', id: Q.id, why: 'light' });
+        }
       }
     } else M.plantT = 0;
 
@@ -4411,7 +4415,8 @@ export class BackroomsSim {
   }
 
   // découverte, fixée : elle hurle et fonce sur sa proie (même au repos)
-  rushAt(M, P) {
+  // why : ce qui l'a lancée ('stare' : on l'a fixée), pour que le joueur apprenne la règle
+  rushAt(M, P, why = '') {
     M.faceT = 0;
     M.plantT = 0;
     M.dormantT = 0;
@@ -4432,7 +4437,7 @@ export class BackroomsSim {
     M.lastSeenZ = P.z;
     M.lastSeenF = P.floor || 0;
     this.chases++;
-    this.emit({ type: 'rush', id: P.id, x: M.x, z: M.z, floor: M.floor });
+    this.emit({ type: 'rush', id: P.id, x: M.x, z: M.z, floor: M.floor, why });
   }
 
   // vue sans pouvoir (ou devoir) charger : elle se glisse derrière un angle, à quelques pas, hors de la vue de tous ;

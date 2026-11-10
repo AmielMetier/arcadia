@@ -685,7 +685,8 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 .mic-meter.loud b { background: #ff5b4b; }
 .mic-meter.off { opacity: 0.4; }
 /* le rappel des touches : une ligne pâle de l'écran du caméscope, sous l'endurance */
-.keys-tag { display: flex; gap: 14px; margin-top: 8px; font-size: 16px; letter-spacing: 2px; opacity: 0.55; }
+.keys-tag { display: flex; gap: 14px; margin-top: 8px; font-size: 16px; letter-spacing: 2px; opacity: 0.55; transition: opacity 3s ease; }
+.keys-tag.faded { opacity: 0; }
 .keys-tag[hidden] { display: none; }
 .keys-tag kbd { font: inherit; display: inline-block; min-width: 1.15em; padding: 0 3px; margin-right: 5px; text-align: center; border: 1px solid currentColor; line-height: 1.15; }
 .voice-tag #voiceOut { color: #9be37a; }

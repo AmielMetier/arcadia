@@ -184,6 +184,30 @@ function applyOpts() {
 let voice = null;
 let micWarned = false;
 const sfxRef = { get ctx() { return sfx && sfx.ctx; }, get verb() { return sfx && sfx.verb; }, get level() { return sfx ? sfx.roomLevel || 0 : 0; }, moveTo: (...a) => sfx && sfx.moveTo(...a), caption: (...a) => sfx && sfx.caption(...a) };
+// Les règles qu'on apprend en jouant : la première fois (et encore une seconde fois) qu'une règle joue contre ou pour
+// le joueur, une ligne la dit, juste après. Gardé d'une partie à l'autre.
+const LEARN = {
+  stare: 'It charged because you stared at it · look away and keep moving',
+  light: "It won't step into the bright light · until the power goes out",
+};
+function learn(k) {
+  if (!LEARN[k] || !hud) return;
+  let seen = {};
+  try {
+    seen = JSON.parse(localStorage.getItem('backrooms.learned') || '{}') || {};
+  } catch (e) {
+    seen = {};
+  }
+  if ((seen[k] || 0) >= 2) return;
+  seen[k] = (seen[k] || 0) + 1;
+  try {
+    localStorage.setItem('backrooms.learned', JSON.stringify(seen));
+  } catch (e) {
+    /* stockage plein ou interdit : on le redira */
+  }
+  setTimeout(() => hud && hud.toast(LEARN[k], 5.5), 1200);
+}
+
 // la voix qui ne passe pas en direct avec quelqu'un : on le dit (une fois par joueur et par état)
 const voiceSaid = new Map();
 function voiceTrouble(id, kind) {
@@ -1531,7 +1555,11 @@ function handleEvent(ev, me) {
       if (ev.id === me) {
         runStats.rushes++;
         runStats.seen++;
+        if (ev.why === 'stare') learn('stare');
       }
+      break;
+    case 'spared':
+      if (ev.id === me) learn(ev.why);
       break;
     case 'lost':
       if (sfx) sfx.heartbeat(0);

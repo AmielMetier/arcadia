@@ -135,6 +135,32 @@ const torchLoading = new GLTFLoader().loadAsync(new URL('../models/small_plastic
   torchSrc = g.scene;
 }, () => {});
 
+// Les ombres de contact : une tache sombre et floue au sol, sous les joueurs et sous l'entité. Rien ne projette
+// d'ombre en temps réel (trop cher) ; sans elle, les corps semblaient flotter dans le faisceau de la lampe. Dans le
+// noir, elle ne se voit pas (elle assombrit du noir) : seulement là où la lumière tombe.
+let blobTex = null;
+const blobGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+export function contactBlob(w, d, k = 1) {
+  if (!blobTex) {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 64;
+    const c = cv.getContext('2d');
+    const gr = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(0,0,0,0.8)');
+    gr.addColorStop(0.4, 'rgba(0,0,0,0.5)');
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = gr;
+    c.fillRect(0, 0, 64, 64);
+    blobTex = new THREE.CanvasTexture(cv);
+  }
+  const m = new THREE.Mesh(blobGeo, new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, opacity: k, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  m.scale.set(w, 1, d);
+  m.position.y = 0.012;
+  m.renderOrder = 1;
+  m.name = 'contactBlob';
+  return m;
+}
+
 function makeTorch(mat) {
   const g = new THREE.Group();
   if (torchSrc) {
@@ -457,6 +483,7 @@ export function createPlayerAvatars(scene, lamps = LAMPS) {
       a = { g: new THREE.Group() };
       scene.add(a.g);
       build(a);
+      a.g.add(contactBlob(0.95, 0.95, 0.85));
       avatars.set(P.id, a);
       if (!torchSrc) torchLoading.then(() => {
         // la torche vient d'arriver : on la met dans sa main
@@ -471,6 +498,7 @@ export function createPlayerAvatars(scene, lamps = LAMPS) {
         a.g.clear();
         a.mat.suit = null;
         build(a);
+        a.g.add(contactBlob(0.95, 0.95, 0.85));
       });
     }
     // sa lampe : une de celles posées d'avance (une nouvelle seulement si toutes sont prises : les matériaux se

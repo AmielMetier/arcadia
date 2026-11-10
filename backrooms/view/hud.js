@@ -285,9 +285,8 @@ export class BackroomsHUD {
     });
     this.applyMonsters();
 
-    // date du caméscope, figée en 1996 comme une vieille cassette retrouvée
-    const d = new Date();
-    this.$('#tapeDate').textContent = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.1996`;
+    // date du caméscope : celle de l'intro (le vlog d'urbex filmé le 12 octobre 1996, le jour de la chute)
+    this.$('#tapeDate').textContent = 'OCT.12 1996';
     this.bannerT = 9;
     this.lastCount = -1;
     this.toastT = 0;
@@ -771,6 +770,24 @@ export class BackroomsHUD {
     if (!el) return;
     const P = sim.player;
     const on = !!P && P.status === 'alive' && P.hidden < 0 && !document.body.classList.contains('touch');
+    // le rappel des touches s'efface au bout de 45 s dans chaque niveau, et revient 12 s quand on reste une minute
+    // sans bouger (perdu, ou à chercher une touche)
+    const now = performance.now() / 1000;
+    if (sim.level !== this.keysLv) {
+      this.keysLv = sim.level;
+      this.keysUntil = now + 45;
+      this.keysMoved = now;
+    }
+    if (P && P.moving) this.keysMoved = now;
+    else if (now - (this.keysMoved || now) > 60) {
+      this.keysMoved = now;
+      this.keysUntil = now + 12;
+    }
+    const faded = now > (this.keysUntil || 0);
+    if (faded !== this.keysFaded) {
+      this.keysFaded = faded;
+      el.classList.toggle('faded', faded);
+    }
     const k = on ? `${multi ? 1 : 0}` : '';
     if (k === this.keysK) return;
     this.keysK = k;

@@ -478,6 +478,8 @@ test('la fixer de loin la provoque ; s\'en approcher aussi ; la lampe ne la fait
     for (let i = 0; i < 60 && M.mode !== 'chase'; i++) sim.step({ yaw, pitch: 0 });
     assert.equal(M.mode, 'chase', 'fixée une seconde à 12 m : elle charge');
     assert.ok(M.rushT > 0 && sim.events.some((e) => e.type === 'rush'), 'en hurlant');
+    // le joueur apprend pourquoi : l'annonce dit qu'on l'a fixée (le jeu l'écrit à l'écran)
+    assert.ok(sim.events.some((e) => e.type === 'rush' && e.why === 'stare' && e.id === P.id), 'la charge dit qu’on l’a fixée');
     stared++;
     // une autre : elle observe à 5 m, il regarde ailleurs mais elle le voit (et lui l'a vue juste avant de se
     // détourner : sans ça, elle ne se lance pas dans son dos)

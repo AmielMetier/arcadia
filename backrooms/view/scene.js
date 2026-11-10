@@ -16,7 +16,7 @@ import { autoRes } from './autores.js';
 import { createInset } from './inset.js';
 import { buildWarehouse } from './warehouse.js';
 import { buildGear } from './gear.js';
-import { createPlayerAvatars } from './players.js';
+import { createPlayerAvatars, contactBlob } from './players.js';
 import { createBeast } from './beast.js';
 import { buildWater } from './water.js';
 import { buildHotel } from './hotel.js';
@@ -27,6 +27,16 @@ import { buildPipes, L2_PROC } from './pipes.js';
 import { hasLineOfSight, findPath } from '../engine/nav.js';
 import { Z } from '../engine/level2.js';
 
+// Le faisceau des lampes torches (les seuls projecteurs du jeu) : pas une flaque à bord net mais une cloche douce,
+// mesurée en angle (exp(-2,2·a²), a de 0 au centre à 1 au bord du cône), qui s'éteint sans palier ; plus un anneau
+// très léger, celui du réflecteur d'une vraie torche. Remplace le profil de three.js (un smoothstep en cosinus, qui
+// garde un plateau puis tombe d'un coup).
+THREE.ShaderChunk.lights_pars_begin = THREE.ShaderChunk.lights_pars_begin.replace(
+  'return smoothstep( coneCosine, penumbraCosine, angleCosine );',
+  `float bkA = clamp( acos( clamp( angleCosine, -1.0, 1.0 ) ) / max( acos( coneCosine ), 1e-3 ), 0.0, 1.0 );
+	float bkRing = 0.07 * exp( -pow( ( bkA - 0.6 ) / 0.07, 2.0 ) );
+	return ( exp( -2.2 * bkA * bkA ) + bkRing ) * smoothstep( 1.0, 0.7, bkA );`,
+);
 const MODELS = new URL('../models/', import.meta.url).href; // modèles Poly Haven (CC0), voir models/LICENSE.txt
 const VIP_IMG = new URL('../img/entite.png?v=2', import.meta.url).href; // ?v : image plus nette, ne pas garder l'ancienne en cache
 // L'entité du Level 1 : une vidéo détourée, découpée en planche d'images (12 par seconde, 16 par rangée) jouée en boucle
@@ -43,6 +53,7 @@ export function setMonsterMode(vip) {
 
 const LIGHT_R = 1.55; // portée d'un néon, en cases : une flaque de lumière nette, le noir juste à côté
 const AMBIENT = 0.003; // lumière minimale dans les zones mortes (presque le noir complet)
+const EXPO_KEY = 0.02; // la lumière moyenne d'une image « normale » pour la cellule du caméscope (un couloir éclairé)
 const RB = 4; // finesse de l'éclairage cuit : texels par case (des flaques de lumière rondes, des ombres nettes au coin des murs)
 const AO_R = 0.8; // portée de l'ombre de contact au pied des murs, en mètres
 const SLAB = FLOOR_DY - WALL_HEIGHT; // épaisseur de la dalle entre deux étages
@@ -906,6 +917,60 @@ float occVis(vec3 p, vec3 lp) {
     // Au Level 2, opts.grime salit les murs (coulures de rouille, crasse en plaques, pied du mur), opts.tile (la
     // hauteur d'une rangée de carreaux) fait tomber ou remplacer quelques carreaux ; tous les matériaux du niveau
     // baignent dans une brume que les lampes éclairent
+    // Le relief du Level 0 (le papier peint gaufré, les poils de la moquette) : tiré de la texture elle-même (ce qui est
+    // plus sombre que son entourage est en creux), il ne joue que sous la lampe (la lumière des néons est cuite)
+    const reliefs = new Map();
+    const relief = (tex, size = 512) => {
+      if (reliefs.has(tex)) return reliefs.get(tex);
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = size;
+      const out = new THREE.CanvasTexture(cv);
+      out.colorSpace = THREE.NoColorSpace;
+      out.wrapS = tex.wrapS;
+      out.wrapT = tex.wrapT;
+      out.repeat.copy(tex.repeat);
+      out.offset.copy(tex.offset);
+      out.anisotropy = tex.anisotropy;
+      const fill = () => {
+        const img = tex.image;
+        if (!img || !img.width) return;
+        const c = cv.getContext('2d', { willReadFrequently: true });
+        c.drawImage(img, 0, 0, size, size);
+        const d = c.getImageData(0, 0, size, size);
+        const px = d.data;
+        const N = size * size;
+        const L = new Float32Array(N);
+        for (let i = 0; i < N; i++) L[i] = px[i * 4] * 0.3 + px[i * 4 + 1] * 0.59 + px[i * 4 + 2] * 0.11;
+        // flou en boîte de rayon r, en tuile (le motif se répète), dans les deux sens : l'entourage de chaque point
+        const r = 6;
+        const blur = (src, dst, stepIn, stepOut) => {
+          for (let a = 0; a < size; a++) {
+            let acc = 0;
+            for (let k = -r; k <= r; k++) acc += src[a * stepOut + ((k + size) % size) * stepIn];
+            for (let b = 0; b < size; b++) {
+              dst[a * stepOut + b * stepIn] = acc / (2 * r + 1);
+              acc += src[a * stepOut + ((b + r + 1) % size) * stepIn] - src[a * stepOut + ((b - r + size) % size) * stepIn];
+            }
+          }
+        };
+        const T1 = new Float32Array(N);
+        const B = new Float32Array(N);
+        blur(L, T1, 1, size);
+        blur(T1, B, size, 1);
+        for (let i = 0; i < N; i++) {
+          const v = Math.max(0, Math.min(255, 128 + (L[i] - B[i]) * 1.6));
+          px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = v;
+          px[i * 4 + 3] = 255;
+        }
+        c.putImageData(d, 0, 0);
+        out.needsUpdate = true;
+      };
+      fill();
+      textures.ready.then(fill);
+      reliefs.set(tex, out);
+      return out;
+    };
+
     const baked = (mat, opts = null) => {
       const spec = PIPES && opts && opts.spec > 0;
       const grime = PIPES && opts && opts.grime;
@@ -1402,7 +1467,7 @@ float bkCaust(vec2 uv, float t) {
     });
     const floorMat = PIPES
       ? baked(new THREE.MeshPhongMaterial({ map: carpet, specular: '#3a342a', shininess: 70 }), { spec: 1.05, gloss: 1100 })
-      : baked(new THREE.MeshLambertMaterial({ map: carpet }), L0 ? { film: 1 } : L1 ? { gloss: 1 } : null);
+      : baked(new THREE.MeshLambertMaterial({ map: carpet, ...(L0 ? { bumpMap: relief(carpet), bumpScale: 1.4 } : null) }), L0 ? { film: 1 } : L1 ? { gloss: 1 } : null);
     const holes = holesOf(map);
     if (holes.length) {
       floorMat.alphaMap = holeMask(W, H, holes, true);
@@ -1613,7 +1678,7 @@ float bkCaust(vec2 uv, float t) {
     } else {
       // l'étage du bas du Level 0 : le même papier peint, délavé vers le gris
       // (Level 1 : le relief des parpaings, et la crasse du haut des murs)
-      wallMat = baked(new THREE.MeshLambertMaterial({ map: L0 && fi === 1 ? textures.wallLow : textures.wall, ...(L1 && textures.wallBump ? { bumpMap: textures.wallBump, bumpScale: 1.6 } : null) }), L0 ? { base: true } : L1 ? { bump: !!textures.wallBump, wall1: true } : null);
+      wallMat = baked(new THREE.MeshLambertMaterial({ map: L0 && fi === 1 ? textures.wallLow : textures.wall, ...(L1 && textures.wallBump ? { bumpMap: textures.wallBump, bumpScale: 1.6 } : L0 ? { bumpMap: relief(fi === 1 ? textures.wallLow : textures.wall), bumpScale: 1.0 } : null) }), L0 ? { base: true } : L1 ? { bump: !!textures.wallBump, wall1: true } : null);
       const wallsMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(CELL_SIZE, CEIL + SUNK, CELL_SIZE), wallMat, wallCount);
       // le mur percé du trou de la cassette perchée se construit à part (6b)
       const nicheWall = map.niche ? (map.niche.gz + map.niche.dz) * W + map.niche.gx + map.niche.dx : -1;
@@ -4813,6 +4878,7 @@ void main() {
     monsterGroup.add(beast.group);
     shadow.visible = false;
   }
+  monsterGroup.add(contactBlob(1.2, 1.0, 0.9)); // son ombre de contact (voir players.js)
   if (!beast) new THREE.TextureLoader().load(anim ? anim.url : ENTITY_IMG, (t) => {
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = renderer.capabilities.getMaxAnisotropy();
@@ -4993,6 +5059,13 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   let focusWait = 3 + Math.random() * 4; // secondes de course avant la prochaine
   let lastExp = 1.2;
   const api = {
+    // (réglage et tests) la lumière mesurée sur l'image et l'exposition du caméscope
+    get meter() {
+      return vhs.meter;
+    },
+    get exposure() {
+      return lastExp;
+    },
     level: map0.level || 0,
     map: map0,
     floors,
@@ -5466,7 +5539,12 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         }
       }
       const lightHere = lightNow + (lampOn ? 0.3 : 0);
-      const wantExp = THREE.MathUtils.clamp(0.45 / (0.15 + lightHere), 0.9, 1.4);
+      // l'exposition d'après la lumière là où l'on est, corrigée par la cellule (vhs.meter : la lumière de l'image, ce
+      // que l'on regarde) : face à une zone éclairée depuis le noir, le caméscope se referme ; dans le noir, il s'ouvre
+      // un peu, pas trop (le noir doit rester noir)
+      const expHere = THREE.MathUtils.clamp(0.45 / (0.15 + lightHere), 0.9, 1.4);
+      const cell = vhs.meter;
+      const wantExp = cell > 0 ? THREE.MathUtils.clamp(expHere * THREE.MathUtils.clamp(Math.pow(EXPO_KEY / cell, 0.25), 0.8, 1.15), 0.8, 1.5) : expHere;
       // il s'ouvre lentement dans le noir, se referme vite sous la lumière (comme un vrai caméscope)
       exposure += (wantExp - exposure) * Math.min(1, dt * (wantExp > exposure ? 0.65 : 2.4));
       // la mise au point ne décroche qu'en courant (la caméra secouée), et seulement par à-coups : de temps en temps
