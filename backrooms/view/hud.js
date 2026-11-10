@@ -98,6 +98,20 @@ export function readNote(k, seed, i) {
 export const loreComplete = () => tapesHeard().length >= LORE.length && Object.keys(NOTES).every((k) => notesHeard(k).length >= NOTES[k].list.length);
 
 
+// Manette branchée et utilisée : les touches affichées deviennent les boutons de la manette (disposition Xbox,
+// comme readPad dans app.js). Les textes du jeu restent écrits avec les touches du clavier ; padify les traduit.
+const PAD_KEYS = {
+  E: 'X', F: 'A', G: 'D-PAD ↓', C: 'R3', V: 'L3', T: 'B', 1: 'Y', SHIFT: 'LB', SPACE: 'D-PAD ↑', ESC: 'MENU', ENTER: 'A',
+};
+const padKey = (k) => PAD_KEYS[String(k).toUpperCase()];
+export function padify(s) {
+  if (typeof s !== 'string') return s;
+  return s
+    .replace(/\[([A-Za-z0-9]+)\]/g, (m, k) => (padKey(k) ? `[${padKey(k)}]` : m))
+    .replace(/\b(PRESS|HOLD|Press|Hold|press|hold) ([A-Z][A-Za-z]*|\d)\b/g, (m, w, k) => (padKey(k) ? `${w} ${padKey(k)}` : m))
+    .replace('MASH ANY KEY', 'MASH ANY BUTTON');
+}
+
 export class BackroomsHUD {
   constructor(container, actions = {}) {
     this.el = container;
@@ -296,7 +310,7 @@ export class BackroomsHUD {
   text(id, v) {
     if (this.cache[id] === v) return;
     this.cache[id] = v;
-    this.E[id].textContent = v;
+    this.E[id].textContent = this.pad ? padify(v) : v;
   }
 
   // une classe d'un élément, seulement si elle change
@@ -790,7 +804,7 @@ export class BackroomsHUD {
       this.keysFaded = faded;
       el.classList.toggle('faded', faded);
     }
-    const k = on ? `${multi ? 1 : 0}` : '';
+    const k = on ? `${multi ? 1 : 0}${this.pad ? 'p' : ''}` : '';
     if (k === this.keysK) return;
     this.keysK = k;
     el.hidden = !on;
@@ -798,6 +812,9 @@ export class BackroomsHUD {
     // la lampe part éteinte : sa touche vient en premier
     const keys = [['1', 'LAMP'], ['F', 'INTERACT'], ['E', 'USE'], ['G', 'DROP'], ['SPACE', 'JUMP'], ['C', 'CROUCH'], ['V', 'CAMCORDER']];
     if (multi) keys.push(['R', 'RADIO']);
+    if (this.pad) {
+      keys.splice(0, keys.length, ['Y', 'LAMP'], ['A', 'INTERACT'], ['X', 'USE'], ['RB', 'NEXT ITEM'], ['D-PAD ↓', 'DROP'], ['D-PAD ↑', 'JUMP'], ['R3', 'CROUCH'], ['L3', 'CAMCORDER'], ['B', 'WHISTLE']);
+    }
     el.innerHTML = keys.map(([key, what]) => `<span><kbd>${key}</kbd>${what}</span>`).join('');
   }
 
@@ -998,9 +1015,20 @@ export class BackroomsHUD {
     this.$('#keypad').hidden = true;
   }
 
+  // la manette prend la main (ou le clavier la reprend) : les touches affichées suivent
+  setPad(on) {
+    on = !!on;
+    if (on === !!this.pad) return;
+    this.pad = on;
+    this.cache = {};
+    this.keysK = null;
+    document.body.classList.toggle('pad', on);
+    if (this.lastPause) this.showPause(...this.lastPause);
+  }
+
   toast(text, secs = 2.5) {
     const t = this.$('#toast');
-    t.textContent = text;
+    t.textContent = this.pad ? padify(text) : text;
     t.hidden = false;
     this.toastT = secs;
   }
@@ -1285,6 +1313,7 @@ export class BackroomsHUD {
   // pause ; avant la toute première prise en main, c'est l'écran titre (et « Continuer » si une partie s'est arrêtée
   // plus loin, en solo)
   showPause(visible, kb, title = false, resume = null) {
+    this.lastPause = [visible, kb, title, resume];
     this.$('#clickPrompt').style.display = visible ? 'block' : 'none';
     this.$('#clickPrompt').classList.toggle('title', !!title);
     this.$('#titleCard').hidden = !title;
@@ -1293,11 +1322,14 @@ export class BackroomsHUD {
     btn.hidden = !(title && resume);
     if (resume) btn.textContent = `▶▶ CONTINUE FROM LEVEL ${levelName(resume)}`;
     const tactile = document.body.classList.contains('touch') || matchMedia('(pointer: coarse)').matches;
-    this.$('#pauseGo').textContent = tactile ? 'TAP THE SCREEN TO PLAY' : kb ? 'PRESS ENTER TO PLAY' : title ? 'CLICK TO PRESS PLAY' : 'CLICK TO TAKE CONTROL';
+    this.$('#pauseGo').textContent = this.pad ? 'PRESS A TO PLAY' : tactile ? 'TAP THE SCREEN TO PLAY' : kb ? 'PRESS ENTER TO PLAY' : title ? 'CLICK TO PRESS PLAY' : 'CLICK TO TAKE CONTROL';
     const mv = this.qwerty ? 'WASD' : 'ZQSD';
     this.$('#pauseKeys').textContent = kb
       ? `${mv} move · Arrows or trackpad (two-finger swipe) look · Shift run · Space jump · C crouch · V camcorder · 1 flashlight · 2–${INV_SIZE + 1} select · E use (hotel: hide) · G drop · F pick up / hide · T whistle · Esc pause`
       : `${mv} move · Mouse look · Shift run · Space jump · C crouch · V camcorder · 1 flashlight · 2–${INV_SIZE + 1} or wheel select · E use (hotel: hide) · G drop · F pick up / hide · T whistle · Esc pause`;
+    if (this.pad) {
+      this.$('#pauseKeys').textContent = `Left stick move · Right stick look · LB run · D-pad ↑ jump · R3 crouch · L3 camcorder · Y flashlight · RB or D-pad ←→ select · X use (hotel: hide) · D-pad ↓ drop · A pick up / hide · B whistle · Menu pause`;
+    }
     for (const b of this.el.querySelectorAll('button[data-kb]')) b.classList.toggle('on', (b.dataset.kb === '1') === kb);
   }
 }

@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.32 — 10 novembre 2026
+- **The Backrooms** — À la manette, le jeu affiche les boutons de la manette au lieu des touches du clavier : les indications à l'écran (« PRESS A », « HOLD LB »…), la barre de commandes en bas et l'écran de pause. Toucher le clavier ou la souris remet les touches du clavier.
+
 ## 5.31 — 10 novembre 2026
 - **The Backrooms** — Le mode VIP se déverrouille avec une phrase secrète :
   - L'hôte la tape une fois en lançant une partie VIP ; son navigateur s'en souvient et ses invités n'ont rien à taper.

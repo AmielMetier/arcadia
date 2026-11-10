@@ -1952,6 +1952,11 @@ const trackSeq = new Map(); // hôte : dernière position d'invité entrée dans
 const camPrev = { x: 0, z: 0, f: 0, ok: false }; // sa position avant le dernier pas (la caméra interpole jusqu'à la suivante)
 const lookIn = { yaw: NaN, pitch: NaN }; // le dernier regard donné à la simulation
 
+// Clavier ou souris utilisés : les touches affichées redeviennent celles du clavier
+addEventListener('keydown', () => hud && hud.pad && hud.setPad(false), true);
+addEventListener('mousedown', () => hud && hud.pad && hud.setPad(false), true);
+addEventListener('mousemove', (e) => hud && hud.pad && Math.abs(e.movementX) + Math.abs(e.movementY) > 6 && hud.setPad(false), true);
+
 // Manette (disposition standard) : A ramasser, X utiliser l'objet, Y lampe, RB (ou croix gauche / droite) changer
 // d'objet, croix bas le poser par terre, B siffler, LB / LT / stick gauche enfoncé courir, Menu pause ; A relance la
 // partie en pause
@@ -1986,6 +1991,8 @@ function readPad() {
       if (edge(9)) setPaused(true);
     }
   }
+  // on joue à la manette : les touches affichées deviennent ses boutons (le clavier ou la souris les rendent)
+  if (hud && !hud.pad && (p.buttons.some((_, i) => b(i)) || p.axes.some((a) => Math.abs(a) > 0.45))) hud.setPad(true);
   padPrev = p.buttons.map((_, i) => b(i));
   if (hubMenu || paused) return null;
   return { lx: p.axes[0] || 0, ly: p.axes[1] || 0, rx: p.axes[2] || 0, ry: p.axes[3] || 0, run: b(4) || b(6) || b(10) };
