@@ -6,6 +6,7 @@ import { createBackroomsScene, setMonsterMode, setSceneOptions, onGlContext, sce
 import { createSlideRide } from './view/slide.js';
 import { MOUTH } from './engine/poolrooms.js';
 import { BackroomsSfx } from './view/sfx.js';
+import { hotelUi } from './view/hotelExit.js';
 import { createVoice } from './view/voice.js';
 import { BackroomsHUD, levelName, levelSub, LORE, loreOf, hearTape, tapesHeard, store, NOTES, readNote, loreComplete, FINAL_LORE } from './view/hud.js';
 import { parseWords } from './engine/hotel.js';
@@ -1515,6 +1516,7 @@ function handleEvent(ev, me) {
       break;
     case 'powered':
       if (hud) hud.toast(sim.level === HOTEL_LEVEL ? 'The keypad beeps: the fire escape door is unlocked' : 'The motor catches: the freight elevator is starting up');
+      if (sfx && sim.level === HOTEL_LEVEL && sim.map.elevator) sfx.maglock({ x: sim.map.elevator.x - sim.map.elevator.dx * 1.25, z: sim.map.elevator.z - sim.map.elevator.dz * 1.25 });
       break;
     case 'exitUnlocked': {
       const X = sim.map.exit;
@@ -2575,6 +2577,11 @@ function frame(currentTime) {
       }
     }
     if (sfx) sfx.setHum(scene.lightHere); // le grésillement des néons autour de soi
+    // le clavier de la porte de secours montre ce qu'on tape (view/hotelExit.js)
+    if (hud && sim.level === HOTEL_LEVEL) {
+      hotelUi.code = hud.keypadOpen ? hud.keypadCode : null;
+      hotelUi.wrongAt = hud.keypadWrongAt || 0;
+    }
     if (sfx) {
       // l'oreille suit la caméra (le joueur, ou celui qu'on regarde) ; l'écho change avec le niveau
       const V = sim.viewPlayer(sim.spectate || 0);

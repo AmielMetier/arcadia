@@ -7,6 +7,7 @@ import { CELL_SIZE } from '../engine/map.js';
 import { buildHotelRooms } from './hotelRooms.js';
 import { buildHotelCorridor } from './hotelCorridor.js';
 import { buildHotelLobby } from './hotelLobby.js';
+import { buildHotelExit } from './hotelExit.js';
 
 const C = CELL_SIZE;
 
@@ -31,8 +32,6 @@ export function buildHotel({ map, group, baked, wallMat, CEIL }) {
     sheet: lam({ color: '#d9d0bd' }),
     blanket: lam({ color: '#6b1f1c' }),
     pillow: lam({ color: '#e6dccb' }),
-    metal: lam({ color: '#5d5a55' }),
-    fire: lam({ color: '#7a2a20' }),
     black: new THREE.MeshBasicMaterial({ color: '#050403' }),
   };
   const box = (w, h, d, mat, x, y, z, parent = group) => {
@@ -339,43 +338,8 @@ export function buildHotel({ map, group, baked, wallMat, CEIL }) {
     mg.add(paper);
     slots.push({ b, paper, char: '' });
   }
-  // le clavier à code, à côté de la porte de secours
-  const kp = map.keypad;
-  const kg = frame(kp.x, kp.z, kp.rot);
-  box(0.2, 0.3, 0.05, M.metal, 0, kp.y, 0.025, kg);
-  const kscreenMat = new THREE.MeshBasicMaterial({ color: '#1e3a20' });
-  box(0.14, 0.05, 0.01, kscreenMat, 0, kp.y + 0.09, 0.055, kg);
-  for (let i = 0; i < 12; i++) box(0.035, 0.03, 0.012, M.sheet, ((i % 3) - 1) * 0.05, kp.y + 0.02 - Math.floor(i / 3) * 0.045, 0.055, kg);
-  // la porte de secours : cadre, battant métallique peint, panneau EXIT, cage d'escalier sombre derrière
-  const E = map.elevator;
-  const eg = frame(E.x - E.dx * (C / 2), E.z - E.dz * (C / 2), Math.atan2(E.dx, E.dz)); // +z local : vers la cage
-  const DW = 1.2;
-  const DH = 2.2;
-  const side = (C - DW) / 2;
-  const frameMat = M.darkWood;
-  box(side, CEIL, 0.12, frameMat, -(DW / 2 + side / 2), CEIL / 2, 0.06, eg);
-  box(side, CEIL, 0.12, frameMat, DW / 2 + side / 2, CEIL / 2, 0.06, eg);
-  box(DW, CEIL - DH, 0.12, frameMat, 0, DH + (CEIL - DH) / 2, 0.06, eg);
-  // (la cage d'escalier derrière : view/hotelCorridor.js)
-  const hinge = new THREE.Group();
-  hinge.position.set(-DW / 2, 0, 0.1);
-  eg.add(hinge);
-  box(DW - 0.04, DH - 0.04, 0.06, M.fire, (DW - 0.04) / 2, DH / 2, 0, hinge);
-  box(DW * 0.7, 0.05, 0.08, M.metal, DW / 2, 1.05, -0.05, hinge); // la barre anti-panique
-  const exitSign = label(128, 48, (c, w, h) => {
-    c.fillStyle = '#0d3a14';
-    c.fillRect(0, 0, w, h);
-    c.fillStyle = '#7dff8a';
-    c.font = 'bold 34px Arial, sans-serif';
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillText('EXIT', w / 2, h / 2 + 1);
-  });
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.16), new THREE.MeshBasicMaterial({ map: exitSign }));
-  sign.position.set(0, DH + 0.25, -0.01);
-  sign.rotation.y = Math.PI;
-  eg.add(sign);
-  let doorOpen = 0;
+  // la porte de secours et son clavier à code : view/hotelExit.js
+  const exitView = buildHotelExit({ map, group, baked, CEIL });
 
   // --- 6. Le code au plafond du hall ---
   const codeTex = label(512, 192, (c, w, h) => {
@@ -480,11 +444,7 @@ export function buildHotel({ map, group, baked, wallMat, CEIL }) {
       codeK = Math.min(1, codeK + (sim.codeShown ? dt * 0.4 : -dt));
       codeMat.opacity = Math.max(0, codeK) * (0.75 + Math.random() * 0.25);
       codePlane.visible = codeK > 0;
-      kscreenMat.color.set(sim.open ? '#3cff6a' : sim.codeShown ? '#c9ff9a' : '#1e3a20');
-      // la porte de secours s'ouvre quand le bon code est tapé
-      const want = sim.open ? 1 : 0;
-      doorOpen += Math.sign(want - doorOpen) * Math.min(Math.abs(want - doorOpen), dt / 1.4);
-      hinge.rotation.y = -doorOpen * 1.6;
+      exitView.update(sim, dt);
     },
   };
 }

@@ -4250,6 +4250,41 @@ export class BackroomsSfx {
     this.beep(160, 0.45, 0.12, 'sawtooth');
   }
 
+  // Level 5 : le bon code. Le clavier bipe deux fois (aigu, plus aigu), la ventouse lâche d'un coup (un « clonk » sourd
+  // et métallique), la barre anti-panique claque, puis le lourd battant d'acier pivote sur ses gonds en grinçant.
+  // pos : la porte de secours
+  maglock(pos) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.02;
+    this.tone(this.out, t, 'square', 1480, 0, 0.08, 0.05, 0.002);
+    this.tone(this.out, t + 0.12, 'square', 1975, 0, 0.16, 0.05, 0.002);
+    const o = this.hotelOut({ ...pos, rolloff: 0.5, ref: 3 }, 1, 0, 0.45);
+    const u = t + 0.45;
+    this.tone(o, u, 'sine', 120, 48, 0.22, 0.32, 0.002);
+    this.ring(o, u, 240, [[1, 1, 0.35], [2.4, 0.45, 0.22], [4.2, 0.2, 0.12]], 0.06);
+    this.burst(o, u, 0.04, 'bandpass', 1800, 1.2, 0.12);
+    this.burst(o, u + 0.18, 0.05, 'highpass', 2400, 0.8, 0.08);
+    // les gonds : un grincement grave qui monte et retombe, saccadé, pendant que la porte s'ouvre
+    const s = u + 0.25;
+    const g = this.gainNode(0);
+    g.gain.setValueAtTime(0.0001, s);
+    g.gain.exponentialRampToValueAtTime(0.06, s + 0.4);
+    g.gain.setTargetAtTime(0.0001, s + 1.9, 0.25);
+    const am = this.osc('square', 23);
+    am.connect(this.gainNode(0.03)).connect(g.gain);
+    const saw = this.osc('sawtooth', 92);
+    saw.frequency.setValueAtTime(92, s);
+    saw.frequency.linearRampToValueAtTime(150, s + 1.0);
+    saw.frequency.linearRampToValueAtTime(118, s + 2.4);
+    saw.connect(this.filt('bandpass', 760, 5)).connect(g).connect(o);
+    for (const n of [am, saw]) {
+      n.start(s);
+      n.stop(s + 3);
+    }
+    this.caption('[the lock releases, the fire door swings open]', pos);
+  }
+
   // Ding de l'ascenseur : une cloche frappée (partiels de bronze, un léger battement), deux notes qui descendent.
   // pos : { x, z } de l'ascenseur (null : non placé)
   ding(pos = null) {

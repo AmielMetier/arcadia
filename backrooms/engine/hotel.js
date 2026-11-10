@@ -101,8 +101,8 @@ export function createHotelMap(seed = 5) {
   grid[EX.z * W + EX.x] = T.EXIT;
   const elevator = { gx: EX.x, gz: EX.z, x: (EX.x + 0.5) * C, z: (EX.z + 0.5) * C, dx: 0, dz: 1, fire: true };
   const exit = cellPos(EX.x, EX.z - 1);
-  // le clavier à code, à gauche de la porte (sur le mur du fond) ; les boîtes aux lettres sur le mur ouest du hall
-  const keypad = { x: (EX.x - 0.15) * C, z: LOBBY.z1 * C + C, y: 1.4, rot: Math.PI }; // face au nord
+  // le clavier à code, à droite de la porte vu du hall, côté serrure (sur le mur du fond) ; les boîtes aux lettres sur le mur ouest du hall
+  const keypad = { x: (EX.x + 1.15) * C, z: LOBBY.z1 * C + C, y: 1.4, rot: Math.PI }; // face au nord
   const mbMid = ((LOBBY.z0 + LOBBY.z1 + 1) / 2) * C;
   const mailbox = { x: LOBBY.x0 * C, z0: mbMid - 1.45, z1: mbMid + 1.45, y0: 0.85, y1: 2.15, rot: Math.PI / 2 }; // face à l'est, 7 × 3 casiers
   mailbox.boxes = rooms.map((r, i) => {

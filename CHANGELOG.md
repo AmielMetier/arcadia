@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 5.45 — 11 novembre 2026
+- **The Backrooms** — La sortie du Terror Hotel, refaite pour de bon :
+  - une vraie porte coupe-feu en acier rouge, usée en bas, avec un hublot en verre armé, une barre anti-panique « PUSH TO OPEN » et l'étiquette « EMERGENCY EXIT ONLY » ;
+  - une ventouse magnétique tient la porte fermée : son voyant reste rouge tant que le code n'est pas bon ;
+  - au-dessus, un boîtier EXIT lumineux avec son petit bonhomme qui court ;
+  - le digicode est maintenant à droite de la porte, côté serrure : une plaque d'inox avec douze touches, un écran et deux voyants. Sur le mur, il affiche des étoiles quand tu tapes, « DENIED » sur un mauvais code et « OPEN » sur le bon ;
+  - à l'écran, le clavier ressemble au vrai : les touches s'enfoncent (même au clavier de l'ordinateur), il tremble sur une erreur et passe au vert quand ça s'ouvre ;
+  - le bon code fait claquer la ventouse, puis le lourd battant s'ouvre lentement en grinçant sur l'escalier.
+
 ## 5.44 — 11 novembre 2026
 - **The Backrooms** — Le Terror Hotel, plus grand et plus habité :
   - le hall monte à 4,40 m de plafond, avec une frise dorée tout autour et des lustres qui pendent de plus haut ; on tombe de plus haut en arrivant par la trappe ;
