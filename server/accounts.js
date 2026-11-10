@@ -13,7 +13,8 @@
 //   POST /account/login  { user, auth }        → { ok, blob, updated } | 403 mauvais mot de passe
 //   POST /account/put    { user, auth, blob }  → { ok, updated }
 //   POST /account/check  { user, auth }        → { ok, vip } | 403 mauvais mot de passe (session trafiquée ou périmée)
-//   POST /account/vipkey { user, auth }        → { ok, key } | 403 mauvais mot de passe ou pas VIP | 503 pas de clé
+//   POST /account/vipkey { user, auth }        → { ok, key } | 403 mauvais mot de passe, pas VIP ou VIP ajouté depuis
+//                                                (« phrase » : il la tape une fois) | 503 pas de clé
 //   POST /account/vipseed { key }              → { ok } | 403 la clé n'ouvre pas le coffre
 //   GET  /account/status                       → { on, vipkey }
 //
@@ -105,6 +106,7 @@ function handle(req, res, route) {
       if (m[1] === 'check') { send(res, 200, { ok: true, vip: await vip.isVip(user).catch(() => false) }); return; }
       if (m[1] === 'vipkey') {
         if (!(await vip.isVip(user))) { send(res, 403, { ok: false, error: 'vip' }); return; }
+        if (!(await vip.autoKey(user))) { send(res, 403, { ok: false, error: 'phrase' }); return; }
         const key = await vip.vaultKey();
         send(res, key ? 200 : 503, key ? { ok: true, key } : { ok: false, error: 'nokey' });
         return;

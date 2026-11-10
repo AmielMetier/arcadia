@@ -44,10 +44,10 @@ const start = (port, env) => {
   return p;
 };
 // coffre VIP des Backrooms : une clé de test, son témoin (même format que backrooms/data/e0.bin) et une liste VIP de
-// test (comme hub/vip.js) : « amiel » et « carla »
+// test (comme hub/vip.js) : « amiel » VIP d'origine (ACCOUNTS), « carla » VIP ajoutée depuis (HASHES, tools/vip-add.mjs)
 const VIP_KEY = crypto.randomBytes(32).toString('base64');
 const VIP_FILE = '/tmp/ddtest-accounts-vip.js', VIP_CHECK_FILE = '/tmp/ddtest-accounts-e0.bin';
-(await import('node:fs')).writeFileSync(VIP_FILE, `const HASHES = [\n    '${crypto.createHash('sha256').update('arcadia-vip:amiel').digest('hex')}', // am…\n    '${crypto.createHash('sha256').update('arcadia-vip:carla').digest('hex')}', // ca…\n  ];\n  const ACCOUNTS = [\n  ];\n`);
+(await import('node:fs')).writeFileSync(VIP_FILE, `const HASHES = [\n    '${crypto.createHash('sha256').update('arcadia-vip:carla').digest('hex')}', // ca…\n  ];\n  const ACCOUNTS = [\n    '${crypto.createHash('sha256').update('arcadia-account:amiel').digest('hex').slice(0, 32)}',\n  ];\n`);
 {
   const iv = crypto.randomBytes(12), c = crypto.createCipheriv('aes-256-gcm', Buffer.from(VIP_KEY, 'base64'), iv);
   const ct = Buffer.concat([c.update('arcadia · backrooms · vip', 'utf8'), c.final()]);
@@ -133,6 +133,12 @@ try {
   v = await post(8141, '/account/vipkey', { user: 'bob', auth: bobAuth });
   ok(v.status === 403 && !JSON.stringify(v.json || '').includes(VIP_KEY), 'compte ordinaire : 403, la clé ne part pas');
   await A.create('Carla', 'motdepasse3', { ...profil, n: 'Carla' });
+  const carlaAuth = JSON.parse(ls.get('hub_login')).auth;
+  // un VIP ajouté depuis (tools/vip-add.mjs) : le grade, mais pas la clé sans la phrase
+  ok(await A.vipKey() === null, 'VIP ajouté depuis, connecté : pas de clé sans la phrase');
+  v = await post(8141, '/account/vipkey', { user: 'carla', auth: carlaAuth });
+  ok(v.status === 403 && v.json && v.json.error === 'phrase' && !JSON.stringify(v.json).includes(VIP_KEY), 'VIP ajouté depuis : 403 « phrase », la clé ne part pas');
+  ok(await A.verify() === 'vip', 'VIP ajouté depuis : le relais confirme bien le grade');
   v = await post(8141, '/account/vipkey', { user: 'carla', auth: bobAuth });
   ok(v.status === 403 && !JSON.stringify(v.json || '').includes(VIP_KEY), 'compte VIP sans son mot de passe : 403');
   v = await post(8141, '/account/vipkey', { user: 'amiel', auth: amielAuth });

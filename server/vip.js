@@ -50,10 +50,20 @@ function parse(src) {
   return out;
 }
 let listCache = null; // { t, list }
-async function isVip(user) {
+async function vipList() {
   if (!listCache || Date.now() - listCache.t > KEEP_MS) listCache = { t: Date.now(), list: parse(await repoFile(LIST_LOCAL, 'hub/vip.js', false, process.env.VIP_FILE)) };
-  const l = listCache.list;
-  return l.hashes.has(sha256('arcadia-vip:' + user)) || l.accounts.has(sha256('arcadia-account:' + user).slice(0, 32));
+  return listCache.list;
+}
+const accountId = (user) => sha256('arcadia-account:' + user).slice(0, 32);
+// le grade : l'une ou l'autre liste
+async function isVip(user) {
+  const l = await vipList();
+  return l.hashes.has(sha256('arcadia-vip:' + user)) || l.accounts.has(accountId(user));
+}
+// la clé du coffre sans taper la phrase : seulement les VIP d'origine (ACCOUNTS). Les VIP ajoutés depuis par
+// tools/vip-add.mjs (HASHES) ont le grade, mais tapent la phrase une fois (leur navigateur la garde ensuite).
+async function autoKey(user) {
+  return (await vipList()).accounts.has(accountId(user));
 }
 
 // la clé ouvre-t-elle le témoin ? (format du coffre : « ARV1 », IV de 12 octets, chiffré, étiquette de 16 octets)
@@ -124,4 +134,4 @@ async function seed(key) {
   return 'ok';
 }
 
-module.exports = { parse, isVip, vaultKey, seed, STORE };
+module.exports = { parse, isVip, autoKey, vaultKey, seed, STORE };
