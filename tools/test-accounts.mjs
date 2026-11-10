@@ -43,7 +43,18 @@ const start = (port, env) => {
   const p = spawn('node', [fileURLToPath(new URL('../server/server.js', import.meta.url))], { env: { ...process.env, PORT: String(port), RELAY_LOG_DIR: '/tmp/ddtest-accounts-logs', ...env }, stdio: ['ignore', 'ignore', 'inherit'] });
   return p;
 };
-const srv = start(8141, { GITHUB_TOKEN: 'jeton-test', SAVES_REPO: 'o/r', SAVES_API: `http://127.0.0.1:${apiPort}`, SAVES_GAP_MS: '400' });
+// coffre VIP des Backrooms : une clé de test, son témoin (même format que backrooms/data/e0.bin) et une liste VIP de
+// test (comme hub/vip.js) : « amiel » et « carla »
+const VIP_KEY = crypto.randomBytes(32).toString('base64');
+const VIP_FILE = '/tmp/ddtest-accounts-vip.js', VIP_CHECK_FILE = '/tmp/ddtest-accounts-e0.bin';
+(await import('node:fs')).writeFileSync(VIP_FILE, `const HASHES = [\n    '${crypto.createHash('sha256').update('arcadia-vip:amiel').digest('hex')}', // am…\n    '${crypto.createHash('sha256').update('arcadia-vip:carla').digest('hex')}', // ca…\n  ];\n  const ACCOUNTS = [\n  ];\n`);
+{
+  const iv = crypto.randomBytes(12), c = crypto.createCipheriv('aes-256-gcm', Buffer.from(VIP_KEY, 'base64'), iv);
+  const ct = Buffer.concat([c.update('arcadia · backrooms · vip', 'utf8'), c.final()]);
+  (await import('node:fs')).writeFileSync(VIP_CHECK_FILE, Buffer.concat([Buffer.from('ARV1'), iv, ct, c.getAuthTag()]));
+}
+const SRV_ENV = { GITHUB_TOKEN: 'jeton-test', SAVES_REPO: 'o/r', SAVES_API: `http://127.0.0.1:${apiPort}`, SAVES_GAP_MS: '400', BACKROOMS_VIP_KEY: '', VIP_FILE, VIP_CHECK_FILE };
+let srv = start(8141, SRV_ENV);
 const off = start(8142, { GITHUB_TOKEN: '' });
 await sleep(700);
 const post = async (port, path, o) => { const r = await fetch(`http://127.0.0.1:${port}${path}`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: typeof o === 'string' ? o : JSON.stringify(o) }); return { status: r.status, json: await r.json().catch(() => null), cors: r.headers.get('access-control-allow-origin') }; };
@@ -83,6 +94,60 @@ try {
   A.logout();
   const back2 = await A.login('amiel', 'motdepasse1');
   ok(back2.n === 'Amiel2' && back2.c === '#ffc531', 'mise à jour enregistrée');
+  // la clé du coffre VIP : le relais l'apprend (seule la vraie passe), la garde enveloppée, la donne au compte VIP connecté
+  const status = async (port = 8141) => (await (await fetch(`http://127.0.0.1:${port}/account/status`)).json()).vipkey;
+  ok(await status() === false, 'statut : le relais neuf n\'a pas la clé du coffre VIP');
+  ok(await A.vipKey() === null, 'relais sans la clé : le compte VIP n\'a rien (monstres classiques)');
+  let v = await post(8141, '/account/vipseed', { key: crypto.randomBytes(32).toString('base64') });
+  ok(v.status === 403 && v.json && v.json.error === 'wrong', 'apprendre une autre clé : refusé (elle n\'ouvre pas le témoin)');
+  v = await post(8141, '/account/vipseed', { key: 'pas une clé' });
+  ok(v.status === 403, 'apprendre n\'importe quoi : refusé');
+  ok(await status() === false && !store.has('vip/backrooms.json'), 'rien de gardé après un refus');
+  ok(await A.vipSeed(VIP_KEY) === true, 'le navigateur qui a la clé la réapprend au relais');
+  const kept = store.get('vip/backrooms.json');
+  const rec = kept && JSON.parse(Buffer.from(kept.content, 'base64').toString('utf8'));
+  const keptText = kept ? Buffer.from(kept.content, 'base64').toString('utf8') : '';
+  ok(rec && rec.v === 1 && !keptText.includes(VIP_KEY) && !keptText.includes(Buffer.from(VIP_KEY, 'base64').toString('hex')), 'branche saves : la clé y est enveloppée, pas en clair');
+  const unwrapWith = (token) => {
+    try {
+      const d = crypto.createDecipheriv('aes-256-gcm', crypto.createHmac('sha256', token).update('arcadia-backrooms-vip-wrap').digest(), Buffer.from(rec.iv, 'base64'));
+      d.setAuthTag(Buffer.from(rec.tag, 'base64'));
+      return Buffer.concat([d.update(Buffer.from(rec.ct, 'base64')), d.final()]).toString('utf8');
+    } catch (e) { return null; }
+  };
+  ok(unwrapWith('jeton-test') === VIP_KEY && unwrapWith('un-autre-jeton') === null, 'enveloppe : s\'ouvre avec le jeton du relais, pas avec un autre');
+  ok(await status() === true, 'statut : le relais a la clé du coffre VIP');
+  ok(await A.vipKey() === VIP_KEY, 'compte VIP connecté : le relais lui donne la clé du coffre');
+  const putsBefore = puts;
+  ok(await A.vipSeed(VIP_KEY) === true && (await post(8141, '/account/vipseed', { key: VIP_KEY })).status === 200 && puts === putsBefore, 'la renvoyer : rien de réécrit');
+  // le relais redémarre (Render le fait souvent) : il la retrouve dans la branche saves
+  srv.kill(); await sleep(200);
+  srv = start(8141, SRV_ENV); await sleep(700);
+  ok(await status() === true && await A.vipKey() === VIP_KEY, 'après un redémarrage du relais : la clé est toujours là');
+  const amielAuth = JSON.parse(ls.get('hub_login')).auth;
+  A.logout();
+  ok(await A.vipKey() === null, 'déconnecté : pas de clé');
+  await A.create('Bob', 'motdepasse2', { ...profil, n: 'Bob' });
+  ok(await A.vipKey() === null, 'compte ordinaire : pas de clé');
+  const bobAuth = JSON.parse(ls.get('hub_login')).auth;
+  v = await post(8141, '/account/vipkey', { user: 'bob', auth: bobAuth });
+  ok(v.status === 403 && !JSON.stringify(v.json || '').includes(VIP_KEY), 'compte ordinaire : 403, la clé ne part pas');
+  await A.create('Carla', 'motdepasse3', { ...profil, n: 'Carla' });
+  v = await post(8141, '/account/vipkey', { user: 'carla', auth: bobAuth });
+  ok(v.status === 403 && !JSON.stringify(v.json || '').includes(VIP_KEY), 'compte VIP sans son mot de passe : 403');
+  v = await post(8141, '/account/vipkey', { user: 'amiel', auth: amielAuth });
+  ok(v.status === 200 && v.json && v.json.key === VIP_KEY, 'compte VIP avec sa clé d\'accès : la clé');
+  ok(await status(8142) === false, 'relais sans jeton GitHub : statut sans clé');
+  // envoyer des clés au hasard : bloqué au bout de 8 ratés
+  const seeds = [];
+  for (let i = 0; i < 9; i++) seeds.push((await post(8141, '/account/vipseed', { key: crypto.randomBytes(32).toString('base64') })).status);
+  ok(seeds.slice(0, 8).every((c) => c === 403) && seeds.at(-1) === 429, `clés au hasard : attente (${seeds.join(',')})`);
+  // la liste du relais est celle du Hub (hub/vip.js)
+  const { parse } = (await import('node:module')).createRequire(import.meta.url)('../server/vip.js');
+  const real = parse(fs.readFileSync(new URL('../hub/vip.js', import.meta.url), 'utf8'));
+  ok(real.accounts.size >= 1 && [...real.accounts].every((h) => /^[0-9a-f]{32}$/.test(h)), `liste VIP du Hub lue par le relais (${real.accounts.size} comptes, ${real.hashes.size} empreintes)`);
+  A.logout();
+  await A.login('amiel', 'motdepasse1');
   // essais à la chaîne : bloqués au bout de 8 ratés
   let codes = [];
   for (let i = 0; i < 9; i++) codes.push((await A.login('amiel', 'x' + i).catch((x) => x)).code);

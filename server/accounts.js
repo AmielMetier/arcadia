@@ -12,9 +12,16 @@
 //   POST /account/create { user, auth, blob }  → { ok } | 409 identifiant pris
 //   POST /account/login  { user, auth }        → { ok, blob, updated } | 403 mauvais mot de passe
 //   POST /account/put    { user, auth, blob }  → { ok, updated }
-//   GET  /account/status                       → { on }
+//   POST /account/vipkey { user, auth }        → { ok, key } | 403 mauvais mot de passe ou pas VIP | 503 pas de clé
+//   POST /account/vipseed { key }              → { ok } | 403 la clé n'ouvre pas le coffre
+//   GET  /account/status                       → { on, vipkey }
+//
+// /account/vipkey : la clé du coffre VIP des Backrooms, que le relais garde lui-même (voir vip.js : jamais dans le
+// dépôt), donnée aux seuls comptes VIP (liste de hub/vip.js) qui prouvent leur mot de passe. /account/vipseed la lui
+// apprend : seule la vraie clé (celle qui ouvre le témoin du coffre) est acceptée.
 const crypto = require('crypto');
 const saves = require('./saves');
+const vip = require('./vip');
 
 const MAX_BODY = 200 * 1024, MAX_BLOB = 150 * 1024;
 const USER_RE = /^[a-z0-9_.-]{3,20}$/;
@@ -47,8 +54,11 @@ async function check(rec, auth) {
 /** renvoie true si la requête concerne les comptes (et y répond) */
 function handle(req, res, route) {
   if (!route.startsWith('/account/')) return false;
-  if (route === '/account/status') { send(res, 200, { ok: true, on: saves.enabled() }); return true; }
-  const m = /^\/account\/(create|login|put)$/.exec(route);
+  if (route === '/account/status') {
+    vip.vaultKey().catch(() => '').then((k) => send(res, 200, { ok: true, on: saves.enabled(), vipkey: !!k }));
+    return true;
+  }
+  const m = /^\/account\/(create|login|put|vipkey|vipseed)$/.exec(route);
   if (!m || req.method !== 'POST') { send(res, 404, { ok: false, error: 'route' }); return true; }
   if (!saves.enabled()) { req.resume(); send(res, 503, { ok: false, error: 'off' }); return true; }
   let body = '', big = false;
@@ -56,6 +66,20 @@ function handle(req, res, route) {
   req.on('end', async () => {
     if (big) { send(res, 413, { ok: false, error: 'big' }); return; }
     let q; try { q = JSON.parse(body); } catch (e) { send(res, 400, { ok: false, error: 'json' }); return; }
+    if (m[1] === 'vipseed') {
+      // la clé du coffre VIP : pas de compte à prouver, seule la vraie clé passe (et les ratés comptent)
+      const lim = 'vipseed|' + String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+      if (tooMany(lim)) { send(res, 429, { ok: false, error: 'wait' }); return; }
+      try {
+        const r = await vip.seed(q && q.key);
+        if (r === 'wrong') failed(lim);
+        send(res, r === 'ok' ? 200 : r === 'wrong' ? 403 : 503, r === 'ok' ? { ok: true } : { ok: false, error: r });
+      } catch (e) {
+        console.error(new Date().toISOString(), 'coffre VIP', e.message);
+        send(res, 502, { ok: false, error: 'github' });
+      }
+      return;
+    }
     const user = String((q && q.user) || '').toLowerCase();
     if (!USER_RE.test(user) || !AUTH_RE.test(String(q.auth || ''))) { send(res, 400, { ok: false, error: 'input' }); return; }
     const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
@@ -76,6 +100,12 @@ function handle(req, res, route) {
       if (tooMany(lim)) { send(res, 429, { ok: false, error: 'wait' }); return; }
       if (!rec || !(await check(rec, q.auth))) { failed(lim); send(res, 403, { ok: false, error: 'auth' }); return; }
       if (m[1] === 'login') { send(res, 200, { ok: true, blob: rec.blob, updated: rec.updated }); return; }
+      if (m[1] === 'vipkey') {
+        if (!(await vip.isVip(user))) { send(res, 403, { ok: false, error: 'vip' }); return; }
+        const key = await vip.vaultKey();
+        send(res, key ? 200 : 503, key ? { ok: true, key } : { ok: false, error: 'nokey' });
+        return;
+      }
       if (!validBlob(q.blob)) { send(res, 400, { ok: false, error: 'blob' }); return; }
       const data = { ...rec, blob: { iv: q.blob.iv, ct: q.blob.ct }, updated: new Date().toISOString() };
       const w = saves.queueWrite(p, data, 'Compte Arcadia mis à jour');

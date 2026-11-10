@@ -7,6 +7,9 @@
 //   node tools/backrooms-vault.mjs dechiffrer backrooms/data/eN.bin <fichier>
 //   node tools/backrooms-vault.mjs verifier          (le témoin et tous les médias du coffre s'ouvrent-ils ?)
 //   node tools/backrooms-vault.mjs temoin            (écrit le témoin de cette phrase : pour changer de phrase)
+//   node tools/backrooms-vault.mjs semer [relais]    (apprend la clé au relais, une fois après son déploiement :
+//                                                     il la garde lui-même ; voir docs/SAUVEGARDES.md)
+//   node tools/backrooms-vault.mjs cle | pbcopy      (la clé tirée de la phrase, copiée sans s'afficher)
 //
 // Chiffrer refuse une phrase qui n'ouvre pas le témoin (data/e0.bin) : tous les fichiers gardent la même clé.
 // Changer de phrase : déchiffrer chaque média avec l'ancienne (hors du dépôt), écrire le témoin de la nouvelle,
@@ -14,7 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { deriveKey, seal, unseal, checkKey, CHECK, CHECK_TEXT, VAULT_FILES } from '../backrooms/view/vault.js';
+import { deriveKey, exportKey, seal, unseal, checkKey, CHECK, CHECK_TEXT, VAULT_FILES } from '../backrooms/view/vault.js';
 
 const DATA = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'backrooms', 'data');
 const load = async (file) => fs.readFileSync(path.join(DATA, `${file}.bin`));
@@ -29,11 +32,11 @@ if (pi >= 0) {
 }
 const [cmd, src, dst] = args;
 const usage = () => {
-  console.error('usage : node tools/backrooms-vault.mjs chiffrer|dechiffrer|verifier|temoin [entrée] [sortie]');
+  console.error('usage : node tools/backrooms-vault.mjs chiffrer|dechiffrer|verifier|temoin|semer|cle [entrée] [sortie]');
   console.error('        (phrase : BACKROOMS_VIP=… ou --phrase …, sinon demandée)');
   process.exit(2);
 };
-if (!['chiffrer', 'dechiffrer', 'verifier', 'temoin'].includes(cmd)) usage();
+if (!['chiffrer', 'dechiffrer', 'verifier', 'temoin', 'semer', 'cle'].includes(cmd)) usage();
 if ((cmd === 'chiffrer' || cmd === 'dechiffrer') && (!src || !dst)) usage();
 
 // la phrase tapée au clavier, sans écho
@@ -73,7 +76,37 @@ phrase = '';
 const check = path.join(DATA, `${CHECK}.bin`);
 const kb = (n) => `${Math.round(n / 1024)} Ko`;
 
-if (cmd === 'temoin') {
+if (cmd === 'semer') {
+  // le relais (par défaut celui du Hub) apprend la clé et la garde ; la clé ne s'affiche jamais
+  if (!(await checkKey(key, load))) {
+    console.error("Cette phrase n'ouvre pas le témoin du coffre (data/e0.bin).");
+    process.exit(1);
+  }
+  const relay = (src || 'https://duo-drift-relay.onrender.com').replace(/^wss:/i, 'https:').replace(/^ws:/i, 'http:').replace(/\/$/, '');
+  let r, j;
+  try {
+    // le relais gratuit peut mettre ~30 s à se réveiller
+    r = await fetch(`${relay}/account/vipseed`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ key: await exportKey(key) }), signal: AbortSignal.timeout(90000) });
+    j = await r.json().catch(() => null);
+  } catch (e) {
+    console.error(`${relay} injoignable (${e.message})`);
+    process.exit(1);
+  }
+  if (j && j.ok) console.log(`✓ ${relay} a la clé du coffre VIP.`);
+  else {
+    const why = { wrong: "il refuse la clé : son témoin du coffre n'est pas le même (relais pas à jour ?)", off: "il n'a pas de jeton GitHub (GITHUB_TOKEN) pour la garder", wait: 'trop d’essais, réessayer dans une minute', github: 'GitHub ne répond pas, réessayer' };
+    console.error(`✗ ${relay} : ${(j && why[j.error]) || (r.status === 404 || !j ? 'route absente : le relais n’est pas encore redéployé' : `erreur ${r.status}`)}`);
+    process.exit(1);
+  }
+} else if (cmd === 'cle') {
+  // seulement une phrase qui ouvre le témoin : la clé d'une phrase mal tapée n'ouvrirait rien
+  if (!(await checkKey(key, load))) {
+    console.error("Cette phrase n'ouvre pas le témoin du coffre (data/e0.bin).");
+    process.exit(1);
+  }
+  process.stdout.write((await exportKey(key)) + (process.stdout.isTTY ? '\n' : ''));
+  if (!process.stdout.isTTY) console.error('Clé écrite sur la sortie (à mettre dans BACKROOMS_VIP_KEY du relais).');
+} else if (cmd === 'temoin') {
   fs.writeFileSync(check, await seal(key, new TextEncoder().encode(CHECK_TEXT)));
   console.log(`Témoin écrit : ${path.relative(process.cwd(), check)}`);
 } else if (cmd === 'chiffrer') {

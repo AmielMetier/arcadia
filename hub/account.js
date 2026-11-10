@@ -13,7 +13,9 @@
      login(user, pass) → Promise<data>     se connecte et renvoie le profil déchiffré (erreur 'auth', 'wait', 'off'…)
      save(data) → Promise                  envoie le profil chiffré (compte connecté)
      session() → { user } | null           compte connecté sur ce navigateur
-     logout()                              oublie la session (le compte en ligne reste) */
+     vipKey() → Promise<string|null>       clé du coffre VIP des Backrooms, si le compte connecté est VIP
+     vipSeed(key) → Promise<bool>          la réapprend au relais s'il ne l'a plus (true : le relais l'a)
+     logout()                            oublie la session (le compte en ligne reste) */
 (function () {
   const QS = new URLSearchParams(location.search);
   const WS = QS.get('ws') || 'wss://duo-drift-relay.onrender.com';
@@ -87,6 +89,14 @@
       await call('/account/put', { user: s.user, auth: s.auth, blob: await seal(s.ek, data) });
     },
     session() { const s = getSess(); return s ? { user: s.user } : null; },
+    // la clé du coffre VIP des Backrooms : le relais la donne au compte connecté s'il est VIP (null sinon, ou hors ligne)
+    async vipKey() {
+      const s = getSess(); if (!s) return null;
+      try { const r = await call('/account/vipkey', { user: s.user, auth: s.auth }); return typeof r.key === 'string' ? r.key : null; } catch (e) { return null; }
+    },
+    async vipSeed(key) {
+      try { if ((await call('/account/status')).vipkey) return true; await call('/account/vipseed', { key }); return true; } catch (e) { return false; }
+    },
     logout() { setSess(null); },
   };
 })();
