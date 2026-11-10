@@ -76,6 +76,7 @@ export const VISION_CONE = 0.96; // demi-angle du regard de l'entité (55°) ; t
 export const DORMANT_T = 60; // au tout début, l'entité reste au loin une minute (on apprend à se déplacer)
 const GLIMPSE_DARK_R = 9.5; // m : le noir qui entoure son apparition (et sa disparition) : ni elle, ni sa silhouette
 export const PANEL_T = 4; // Level 1 : secondes devant le panneau du monte-charge pour le relancer (bruyant)
+export const PANEL_SHORT = 0.15; // … à qui manque des mains (voir panelHands) : presque sept fois plus long
 // Barre d'équilibre : sur une arête entre deux trous, on n'avance que tout droit et le corps tangue ; Q et D
 // corrigent. tilt va de -1 (penché à gauche) à 1 (à droite) : au bout, on tombe dans le trou de ce côté.
 export const BEAM_SPEED = 0.65; // vitesse de marche sur une arête (part de la marche normale)
@@ -124,9 +125,30 @@ export const LIFT_FACE = 0.19; // épaisseur de sa façade (cadre et portes)
 export const FINALE_WAIT = 7;
 export const HUNT_DELAY = 4.8;
 export const DOOR_GAP = 0.32; // distance minimale entre le joueur et les murs (et la porte) de la cage d'escalier, vus du dehors
-// coupures de courant du Level 1 : toutes les 45 à 80 s (et seulement après un moment de calme), pendant 15 à 20 s
-export const BLACKOUT_EVERY = [45, 80];
-export const BLACKOUT_LEN = [15, 20];
+// coupures de courant du Level 1 : la première au bout de deux minutes environ, puis toutes les 70 à 115 s (et
+// seulement après un moment de calme), jamais deux fois de suite du même genre (voir L1_CUTS)
+export const L1_FIRST_BLACKOUT = [105, 145];
+export const BLACKOUT_EVERY = [70, 115];
+export const BLACKOUT_LEN = [15, 20]; // la coupure complète : tout est noir
+// les genres : 'full' (tout s'éteint), 'short' (une micro-coupure), 'brown' (une baisse de tension : tout grésille),
+// 'sector' (un délestage : un tiers de l'entrepôt après l'autre s'éteint)
+export const L1_CUTS = ['full', 'short', 'brown', 'sector'];
+export const SHORT_LEN = [3.5, 6];
+export const BROWN_LEN = [18, 26];
+export const SECTOR_STEP = 9; // secondes par tiers, pendant un délestage (trois tiers)
+export const L1_CALM = 50; // Level 1 : l'arrivée est calme, elle reste au loin (le temps de découvrir l'entrepôt)
+// Level 1 : les disjoncteurs généraux, à tenir relevés en même temps (2 postes à 1 ou 2 joueurs, 3 à partir de 3).
+// Chacun, relevé, tient RELAY_SYNC secondes ; s'il n'y a pas assez de joueurs en vie pour les tenir tous, il tient le
+// temps de courir aux autres (relayRun de la carte, à RELAY_PACE m/s, plus RELAY_SPARE)
+export const RELAY_SYNC = 6;
+export const RELAY_PACE = 3.8;
+export const RELAY_SPARE = 8;
+export const RELAY_ARM = 2.5; // assis au poste de garde, le temps que la console s'arme
+export const RELAY_NOISE = 30; // une armoire relevée s'entend jusque-là (un claquement de contacteur)
+// le courant revenu, le monte-charge descend : il met ce temps à arriver (plus long à plusieurs) ; pendant ce temps,
+// elle traque l'équipe (voir hunt)
+export const LIFT_CALL_T = 40;
+export const LIFT_CALL_MORE = 5; // par joueur de plus (au plus 60 s)
 // Level 2 : de temps en temps, tout le courant saute ; plus rien ne protège, le troupeau passe à l'attaque
 export const PIPES_BLACKOUT_EVERY = [85, 130];
 export const PIPES_BLACKOUT_LEN = [11, 15];
@@ -147,7 +169,9 @@ export const NEAR_CHARGE = 6; // s'approcher à moins de 6 m d'elle quand elle o
 export const PLANTED_T = 1.0;
 export const SEEN_R = 26;
 export const L0_AGGRO = 0.8; // Level 0 : son agressivité (1 : celle d'avant) ; ses tricheries et ses traques s'espacent d'autant
-export const FRONT_TAPES = 3; // Level 0 : avant la 3e cassette, elle ne se lance jamais sur quelqu'un qui ne l'a pas vue
+export const FRONT_TAPES = 3; // Level 0 : avant la 3e cassette, elle ne se lance pas sans prévenir sur quelqu'un qui ne l'a pas vue
+export const SNUBS = 2; // postée devant quelqu'un qui ne se retourne pas : à la 2e fois de suite, elle crie puis charge
+export const SNUB_R = 18; // (en simple guet, cela ne compte que si elle était à découvert à moins de tant de mètres)
 export const BACK_SHARE = 0.3; // ensuite, part des poursuites qui peuvent partir dans le dos
 export const RUSH_WIND = 0.6; // secondes de cri sur place avant de s'élancer, quand on la découvre
 export const SAW_T = 6; // secondes pendant lesquelles on « l'a vue » (elle peut alors se lancer)
@@ -247,7 +271,7 @@ const hashRnd = (...k) => {
   return ((h >>> 0) % 100000) / 100000;
 };
 // part des piles et de l'eau d'amande gardée selon le nombre de joueurs (le reste n'est jamais là)
-const KEEP_ITEMS = [0.6, 0.6, 0.72, 0.82, 0.9];
+const KEEP_ITEMS = [0.6, 0.6, 0.72, 0.82, 0.9, 0.95, 1];
 
 // les étages d'un niveau : même graine de partie, des cartes différentes par niveau
 export function makeLevelMap(level, seed) {
@@ -257,9 +281,34 @@ export function makeLevelMap(level, seed) {
   return level === 1 ? [createWarehouseMap(seed * 7 + 13)] : createLevel0(seed).floors;
 }
 
-// Départ du Level 0 à plusieurs : chacun dans son coin du dédale, à 4 à 8 cases de marche du départ (pas en vue des
-// autres, mais assez près pour s'entendre siffler), au moins 3 cases entre deux joueurs. Le tirage ne dépend que de la
-// carte : l'hôte et les invités placent tout le monde au même endroit.
+// Level 1 : le dernier fusible est rangé dans un des casiers du personnel, le plus à l'écart des deux autres (on ne le
+// trouve qu'en s'y enfermant). Le tirage ne dépend que de la carte : l'hôte et les invités le mettent au même endroit
+export function stashFuse(map) {
+  const fuses = map.fuses || [];
+  const f = fuses[fuses.length - 1];
+  const hides = map.hides || [];
+  if (!f || !hides.length || f.locker !== undefined) return;
+  let best = null;
+  let bs = -Infinity;
+  for (const h of hides) {
+    const others = fuses.filter((g) => g !== f).reduce((m, g) => Math.min(m, Math.hypot(g.x - h.x, g.z - h.z)), Infinity);
+    const s = Math.min(others, 34) + 0.3 * Math.min(Math.hypot(h.x - map.spawn.x, h.z - map.spawn.z), 40);
+    if (s > bs) {
+      bs = s;
+      best = h;
+    }
+  }
+  const p = hideInside(best);
+  f.x = p.x;
+  f.z = p.z;
+  f.gx = Math.floor(p.x / CELL_SIZE);
+  f.gz = Math.floor(p.z / CELL_SIZE);
+  f.locker = best.id;
+}
+
+// Départ du Level 0 à plusieurs : chacun dans son coin du dédale, à 5 à 16 cases de marche du départ (à moins de 38 m,
+// chacun à moins de 42 m de tous les autres : on s'entend siffler), le plus loin possible des autres et hors de leur vue. Le tirage ne dépend que de
+// la carte : l'hôte et les invités placent tout le monde au même endroit.
 export function spreadSpawns(map, n) {
   const spots = [{ x: map.spawn.x, z: map.spawn.z }];
   if (!map.dist || !map.walkable || n < 2) return spots;
@@ -277,16 +326,37 @@ export function spreadSpawns(map, n) {
     !nearCage(c) &&
     !(map.props || []).some((p) => Math.hypot(p.x - (c.x + 0.5) * CELL_SIZE, p.z - (c.z + 0.5) * CELL_SIZE) < p.r + 0.6);
   const hash = (c) => (((c.x * 73856093) ^ (c.z * 19349663) ^ (map.spawn.gx * 83492791)) >>> 0) % 1000;
+  const pos = (c) => ({ x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE });
   const cand = map.walkable.filter((c) => {
     const d = map.dist[c.z * W + c.x];
-    return d >= 4 && d <= 8 && Math.hypot(c.x - map.spawn.gx, c.z - map.spawn.gz) * CELL_SIZE < 22 && free(c);
-  }).sort((a, b) => hash(a) - hash(b));
-  const taken = [{ x: map.spawn.gx, z: map.spawn.gz }];
-  for (const c of cand) {
-    if (spots.length >= n) break;
-    if (taken.some((t) => Math.abs(t.x - c.x) + Math.abs(t.z - c.z) < 3)) continue;
-    taken.push(c);
-    spots.push({ x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE });
+    return d >= 5 && d <= 16 && Math.hypot(c.x - map.spawn.gx, c.z - map.spawn.gz) * CELL_SIZE < 38 && free(c);
+  });
+  // chacun à son tour : la case la plus éloignée de ceux déjà placés (le premier reste au départ), en pénalisant
+  // celles d'où l'on voit quelqu'un (un dédale : on doit se chercher, se héler)
+  for (let i = 1; i < n && cand.length; i++) {
+    let best = null;
+    let bs = -Infinity;
+    for (const c of cand) {
+      const p = pos(c);
+      let mn = Infinity;
+      let mx = 0;
+      let seen = 0;
+      for (const o of spots) {
+        const d = Math.hypot(o.x - p.x, o.z - p.z);
+        mn = Math.min(mn, d);
+        mx = Math.max(mx, d);
+        if (hasLineOfSight(map, o.x, o.z, p.x, p.z)) seen++;
+      }
+      if (mx >= 42) continue; // (tout le monde à portée de sifflet de tout le monde)
+      const sc = Math.min(mn, 30) - seen * 12 + hash(c) / 1000;
+      if (sc > bs) {
+        bs = sc;
+        best = c;
+      }
+    }
+    if (!best) break;
+    spots.push(pos(best));
+    cand.splice(cand.indexOf(best), 1);
   }
   return spots;
 }
@@ -460,6 +530,7 @@ export class BackroomsSim {
     }
     // des casiers où se cacher (entrepôt, galeries de service)
     if ((level === 1 || level === PIPES_LEVEL) && !this.map.hides) this.map.hides = placeHides(this.map, level === 1 ? 5 : 6, this.seed * 31 + level);
+    if (level === 1) stashFuse(this.map);
     this.stairs = this.map.stairs || [];
     // au début de la partie, chacun part de son côté ; aux étages suivants, tout le monde sort ensemble de l'ascenseur
     const spots = level === 0 && !prev.length ? spreadSpawns(this.map, this.roster.length) : [];
@@ -521,8 +592,18 @@ export class BackroomsSim {
     this.hunt = false; // … et l'entité traque l'équipe sans la lâcher
     this.panel = 0; // Level 1 : avancée du redémarrage du monte-charge (0 à 1)
     this.panelNoiseT = 0;
+    // à plusieurs, à partir du Level 1, elle presse davantage (répits, embuscades, gaines, coupures) : 0 seul, 1 à 4 et plus
+    this.crowd = level >= 1 ? Math.min(1, Math.max(0, (this.roster.length - 1) / 3)) : 0;
+    this.relayNeed = level === 1 ? Math.min((this.map.relays || []).length, this.roster.length >= 3 ? 3 : 2) : 0;
+    this.mains = !this.relayNeed; // Level 1 : les disjoncteurs généraux tenus ensemble (le courant arrive au panneau)
+    for (const r of this.map.relays || []) r.on = 0;
+    this.liftCallT = 0; // Level 1 : le courant revenu, le monte-charge descend (et elle traque l'équipe)
+    this.cut = null; // Level 1 : la coupure en cours, quand ce n'est pas un noir ({ kind, t, len, axis, dir, band })
+    this.lastCut = '';
     this.director = createDirector(level);
     this.ambT = null; // les bruits d'ambiance repartent avec le niveau
+    this.din = 0; // le vacarme de l'étage d'avant ne suit pas l'équipe (l'entité du suivant partait déjà énervée)
+    this.dinLv = 0;
     // Level 0 : un ou deux recoins calmes par étage, où rien ne se passe… un moment ; la première rencontre, mise en scène
     if (level === 0) this.floors.forEach((f, fi) => (f.calm = f.calm || findCalmNooks(f, this.seed * 13 + fi, fi === 0 ? f.spawn : null)));
     // Level 0 : les portes des cages d'escalier sont cadenassées, en haut comme en bas ; une clé à chaque étage (la
@@ -539,7 +620,7 @@ export class BackroomsSim {
 
     this.lightsOut = null;
     this.blackout = 0; // secondes de noir restantes
-    this.nextBlackout = level === 1 ? rand(...BLACKOUT_EVERY) * 0.6 : level === PIPES_LEVEL && this.hasMonster ? rand(...PIPES_BLACKOUT_EVERY) * 0.75 : Infinity;
+    this.nextBlackout = level === 1 ? rand(...L1_FIRST_BLACKOUT) : level === PIPES_LEVEL && this.hasMonster ? rand(...PIPES_BLACKOUT_EVERY) * 0.75 : Infinity;
     this.midBlackout = false; // Level 0 : la panne du milieu de partie a eu lieu
     this.blackoutWait = 0;
 
@@ -572,7 +653,8 @@ export class BackroomsSim {
       stalkT: 4, // délai avant d'aller se cacher pour observer
       watch: null, // case sombre d'où elle observe
       // au tout début de la partie, elle reste au loin une minute : on apprend à se déplacer
-      dormantT: level === 0 && !this.time ? DORMANT_T * (this.difficulty === 'hard' ? 0.75 : 1) * (1.3 - 0.6 * this.skill) : 0,
+      // (au Level 1 aussi, on arrive au calme : elle est loin et ne chasse pas encore)
+      dormantT: level === 0 && !this.time ? DORMANT_T * (this.difficulty === 'hard' ? 0.75 : 1) * (1.3 - 0.6 * this.skill) : level === 1 ? L1_CALM * (this.difficulty === 'hard' ? 0.75 : 1) : 0,
       flees: 0, // fuites devant la lampe : à la troisième, elle ne fuit plus
       escapes: [], // là où on l'a semée : elle s'en souvient pour ses embuscades
       stunT: 0, // sonnée (aveuglée, ou après avoir lâché sa prise)
@@ -652,6 +734,8 @@ export class BackroomsSim {
 
   get open() {
     if (this.level === PIPES_LEVEL) return this.valves >= VALVES;
+    // (Level 1 : le courant revenu, le monte-charge doit encore descendre jusqu'à l'équipe)
+    if (this.level === 1) return this.powered && !(this.liftCallT > 0);
     return this.level === 0 ? this.cassettes >= CASSETTES && !(this.finaleT > 0) : this.powered;
   }
 
@@ -1023,6 +1107,28 @@ export class BackroomsSim {
     return false;
   }
 
+  // La façade d'une cabine ouverte (ou ses portes en train de se refermer) sépare-t-elle ces deux points ? L'entité
+  // n'attrape qu'à travers la baie encore ouverte : avant, elle agrippait à travers la tôle de la façade, et jusque
+  // derrière les portes closes. shut : les portes de la cabine du départ comptées jointes (l'instant où elles finissent
+  // de se fermer, avant que la cabine ne parte).
+  liftBetween(floor, ax, az, bx, bz, shut = false) {
+    const m = this.fm(floor);
+    for (const E of [m.elevator, m.arrival]) {
+      if (!E || this.blocked(E.gx, E.gz, floor)) continue; // cabine condamnée : un mur comme un autre
+      const fx = E.x - E.dx * (CELL_SIZE / 2);
+      const fz = E.z - E.dz * (CELL_SIZE / 2);
+      const la = (ax - fx) * E.dx + (az - fz) * E.dz - LIFT_FACE / 2;
+      const lb = (bx - fx) * E.dx + (bz - fz) * E.dz - LIFT_FACE / 2;
+      if (la < 0 === lb < 0) continue; // du même côté de la façade
+      const k = la / (la - lb);
+      const off = Math.abs((ax + (bx - ax) * k - fx) * E.dz - (az + (bz - az) * k - fz) * E.dx);
+      if (off > CELL_SIZE / 2 + 0.2) continue; // à côté de la cabine : ce sont les murs qui comptent
+      const gap = shut && E === m.elevator ? 0 : this.liftGap(E, m);
+      if (off > gap - 0.15) return true; // (un bras ne passe pas dans les 15 derniers centimètres)
+    }
+    return false;
+  }
+
   // demi-largeur encore ouverte entre les portes d'une cabine (LIFT_BAY grandes ouvertes, 0 fermées) : après le
   // bouton, elles se rejoignent en LIFT_SHUT_T, comme à l'écran
   liftGap(E, m) {
@@ -1117,6 +1223,16 @@ export class BackroomsSim {
     this.emit({ type: 'dead', id: P.id, name: P.name, time: this.time, abyss: !!extra.abyss, thirst: !!extra.thirst, quiet: !!extra.quiet });
   }
 
+  takeFuse(P, f) {
+    f.taken = true;
+    this.fuses++;
+    P.found++;
+    // Level 1 : le fusible reste en poche jusqu'au panneau (s'il tombe, il le lâche)
+    if (this.level === 1) P.carry.push(f.id);
+    this.makeNoise(P, NOISE.pick, 0.8);
+    this.emit({ type: 'fuse', id: f.id, by: P.id, count: this.fuses, total: FUSES, x: f.x, z: f.z, locker: f.locker >= 0 ? 1 : 0 });
+  }
+
   // Level 1 : les fusibles en poche tombent par terre (on peut aller les rechercher)
   dropCarry(P) {
     if (!P.carry || !P.carry.length) return;
@@ -1136,6 +1252,7 @@ export class BackroomsSim {
       f.gx = cellOf(x);
       f.gz = cellOf(z);
       f.taken = false;
+      f.locker = -1; // (tombé du casier : il est par terre, maintenant)
     });
     this.fuses = Math.max(0, this.fuses - P.carry.length);
     this.emit({ type: 'fuseDrop', id: P.id, name: P.name, n: P.carry.length, x: P.x, z: P.z });
@@ -1205,6 +1322,8 @@ export class BackroomsSim {
     const M = this.monster;
     if (this.hasMonster && !this.goats && M.floor === (P.floor || 0) && Math.hypot(M.x - P.x, M.z - P.z) < 22 && this.inCone(M, P.x, P.z) && hasLineOfSight(this.fm(M.floor), M.x, M.z, h.x + h.dx, h.z + h.dz)) M.sawHide = h.id;
     this.emit({ type: 'hide', id: P.id, on: true, x: h.x, z: h.z });
+    // Level 1 : le fusible rangé au fond de ce casier
+    for (const f of this.fm(P.floor).fuses || []) if (!f.taken && f.locker === h.id) this.takeFuse(P, f);
   }
 
   leaveHide(P) {
@@ -1238,6 +1357,7 @@ export class BackroomsSim {
     };
     for (const d of m.docks || []) for (const b of d.btn) see('dock', d, b.x + b.nx * 0.5, b.z + b.nz * 0.5);
     for (const a of m.alarms || []) if (!a.used) see('alarm', a, a.x + a.nx * 0.55, a.z + a.nz * 0.55);
+    if (!this.mains) for (const r of this.relaysNeeded()) if (!r.desk) see('relay', r, r.x + r.nx * 0.5, r.z + r.nz * 0.5);
     const S = m.post;
     if (S && S.by < 0) see('desk', S, S.seat.x, S.seat.z);
     // le verrou d'une salle de sécurité : seulement de l'intérieur
@@ -1259,6 +1379,7 @@ export class BackroomsSim {
     if (c.kind === 'dock') return this.toggleDock(c.obj, P);
     if (c.kind === 'alarm') return this.ringAlarm(c.obj, P);
     if (c.kind === 'desk') return this.sitDesk(P);
+    if (c.kind === 'relay') return this.throwRelay(c.obj, P);
     if (c.kind === 'safe') return this.toggleSafe(c.obj, P);
   }
 
@@ -1612,6 +1733,7 @@ export class BackroomsSim {
     if (!S || S.by >= 0) return;
     S.by = P.id;
     P.desk = true;
+    P.deskT = 0; // (la console des disjoncteurs s'arme au bout de RELAY_ARM)
     P.x = S.seat.x;
     P.z = S.seat.z;
     P.yaw = S.seat.yaw;
@@ -1791,7 +1913,7 @@ export class BackroomsSim {
       if (T.landT > 0) return;
       M.duct = null;
       M.silent = false;
-      M.ductCD = rand(...DUCT_CD);
+      M.ductCD = rand(...DUCT_CD) * (1 - 0.3 * (this.crowd || 0));
       M.mode = 'search';
       M.lastSeenX = P.x;
       M.lastSeenZ = P.z;
@@ -2221,16 +2343,19 @@ export class BackroomsSim {
         this.blackout -= DT;
         if (this.blackout <= 0) {
           this.blackout = 0;
-          this.nextBlackout = rand(...(L2 ? PIPES_BLACKOUT_EVERY : BLACKOUT_EVERY));
+          this.nextBlackout = rand(...(L2 ? PIPES_BLACKOUT_EVERY : BLACKOUT_EVERY)) * (1 - 0.2 * (this.crowd || 0));
           this.map.dark = false;
           this.emit({ type: 'power' });
         }
-      } else {
+      } else if (this.cut) this.stepCut();
+      else if (L2 || !this.powered) {
+        // (au Level 1, plus de coupure une fois le courant revenu : c'est le monte-charge qui descend)
         this.nextBlackout -= DT;
         // la coupure attend un vrai moment de calme (jamais en pleine poursuite)
         if (this.nextBlackout <= 0 && !blackoutAllowed(this)) this.nextBlackout = 2;
+        else if (this.nextBlackout <= 0 && !L2) this.startCut();
         else if (this.nextBlackout <= 0) {
-          this.blackout = rand(...(L2 ? PIPES_BLACKOUT_LEN : BLACKOUT_LEN));
+          this.blackout = rand(...PIPES_BLACKOUT_LEN);
           this.map.dark = L2;
           this.emit({ type: 'blackout', len: this.blackout, level: this.level });
         }
@@ -2249,7 +2374,9 @@ export class BackroomsSim {
     if (this.level === 0) this.updateCalm();
     if (this.state !== 'playing') return;
     if (this.level === 1) {
+      this.updateRelays();
       this.updatePanel();
+      this.updateLiftCall();
       this.updateDocks();
       this.updateAlarms();
       this.updateSafes();
@@ -2369,8 +2496,20 @@ export class BackroomsSim {
     if (!(this.liftT > 0)) return;
     this.liftT = Math.max(0, this.liftT - DT);
     if (this.liftT > 0) return;
-    // les portes sont fermées : ceux qui sont dedans partent (pas celui qu'elle tient), les autres restent
     const alive = this.players.filter((P) => P.status === 'alive');
+    // Celui qu'elle tenait dans la cabine, à travers la baie : les portes qui se rejoignent lui font lâcher prise
+    // (avant, il était « resté dehors » et mourait, debout dans la cabine). Si elle est dedans avec lui, les portes
+    // butent et se rouvrent : on ne part pas avec elle.
+    const M = this.hasMonster ? this.monster : null;
+    const held = M && M.mode === 'grab' ? alive.find((P) => P.id === M.grabbing && this.inCabin(P)) : null;
+    if (held) {
+      if (!this.liftBetween(held.floor || 0, M.x, M.z, held.x, held.z, true)) {
+        this.emit({ type: 'liftOpen' });
+        return;
+      }
+      this.breakGrab(M, held, { doors: true });
+    }
+    // les portes sont fermées : ceux qui sont dedans partent (pas celui qu'elle tient dehors), les autres restent
     const inside = alive.filter((P) => this.inCabin(P) && !(P.grabT > 0));
     if (!inside.length) {
       // tout le monde est ressorti : les portes se rouvrent
@@ -2529,14 +2668,9 @@ export class BackroomsSim {
 
     // 4. Objectifs : les fusibles (Level 1), pour toute l'équipe (les cassettes du Level 0 se ramassent avec F)
     for (const f of map.fuses || []) {
-      if (f.taken || Math.hypot(f.x - P.x, f.z - P.z) >= 1.3) continue;
-      f.taken = true;
-      this.fuses++;
-      P.found++;
-      // Level 1 : le fusible reste en poche jusqu'au panneau (s'il tombe, il le lâche)
-      if (this.level === 1) P.carry.push(f.id);
-      this.makeNoise(P, NOISE.pick, 0.8);
-      this.emit({ type: 'fuse', id: f.id, by: P.id, count: this.fuses, total: FUSES, x: f.x, z: f.z });
+      // (celui qui est rangé dans un casier : seulement en s'y enfermant, voir enterHide)
+      if (f.taken || f.locker >= 0 || Math.hypot(f.x - P.x, f.z - P.z) >= 1.3) continue;
+      this.takeFuse(P, f);
     }
     // Level 5 : les lettres sur papier, ramassées en passant (chacun garde les siennes jusqu'aux boîtes aux lettres)
     for (const L of map.letters || []) {
@@ -2759,6 +2893,12 @@ export class BackroomsSim {
       }
     } else if ((this.level === 1 || this.level === 2) && (map.fuses || []).some((f) => !f.taken)) {
       best = near((map.fuses || []).filter((f) => !f.taken));
+    } else if (this.level === 1 && !this.mains && (this.delivered || 0) >= FUSES) {
+      // Level 1 : les fusibles en place, les disjoncteurs généraux (le plus proche de ceux qui ne tiennent pas)
+      const need = this.relaysNeeded();
+      const off = need.filter((r) => !(r.on > 0));
+      best = near(off.length ? off : need);
+      P.sigTo = 'breaker';
     } else if (this.level === HOTEL_LEVEL && !this.open) {
       // Level 5 : les lettres à trouver ; des lettres en poche, les boîtes aux lettres ; toutes postées, le clavier
       const mb = map.mailbox;
@@ -2819,13 +2959,170 @@ export class BackroomsSim {
 
   // Level 1 : les 3 fusibles au panneau, il faut encore relancer le monte-charge en restant devant (bruyant : le moteur
   // tousse, l'entité l'entend de loin). À plusieurs, plus vite ; lâché, il redescend doucement.
+  // ------------------------------------------------------------------ Level 1 : coupures, disjoncteurs, monte-charge
+
+  // une coupure, d'un genre tiré au sort (la première est un vrai noir ; jamais deux fois de suite le même genre)
+  startCut() {
+    const kinds = this.lastCut ? L1_CUTS.filter((k) => k !== this.lastCut) : ['full'];
+    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    this.lastCut = kind;
+    if (kind === 'full' || kind === 'short') {
+      this.blackout = rand(...(kind === 'full' ? BLACKOUT_LEN : SHORT_LEN));
+      this.emit({ type: 'blackout', len: this.blackout, level: this.level, kind });
+      return;
+    }
+    // la baisse de tension : tout grésille (l'image s'en charge) ; le délestage : un tiers de l'entrepôt après
+    // l'autre, le long d'un axe et dans un sens tirés au sort
+    const len = kind === 'brown' ? rand(...BROWN_LEN) : SECTOR_STEP * 3;
+    this.cut = { kind, t: 0, len, axis: Math.random() < 0.5 ? 0 : 1, dir: Math.random() < 0.5 ? 1 : -1, band: -1 };
+    this.emit({ type: 'cut', kind, len: rnd2(len) });
+    this.stepCut(0);
+  }
+
+  stepCut(dt = DT) {
+    const C = this.cut;
+    C.t += dt;
+    if (C.kind === 'sector') {
+      const step = Math.min(2, Math.floor(C.t / SECTOR_STEP));
+      if (step !== C.band && C.t < C.len) {
+        C.band = step;
+        const b = C.dir > 0 ? step : 2 - step;
+        const size = this.map.W * CELL_SIZE;
+        const third = (v) => Math.min(2, Math.floor((v / size) * 3));
+        this.restoreLights();
+        this.dimLights((l) => third(C.axis ? l.z : l.x) === b, 'off');
+        const mid = ((b + 0.5) * size) / 3;
+        this.emit({ type: 'sectorOut', band: b, x: C.axis ? size / 2 : mid, z: C.axis ? mid : size / 2 });
+      }
+    }
+    if (C.t < C.len) return;
+    this.restoreLights();
+    this.cut = null;
+    this.nextBlackout = rand(...BLACKOUT_EVERY) * (1 - 0.2 * (this.crowd || 0));
+    this.emit({ type: 'power', kind: C.kind });
+  }
+
+  // éteint (ou fait grésiller) les néons allumés qui répondent à test ; restoreLights les rend tels qu'ils étaient (un
+  // néon éteint un instant par le metteur en scène reviendra, lui aussi, dans l'état voulu)
+  dimLights(test, state) {
+    const drops = this.director ? this.director.drops : [];
+    for (const l of this.map.lights || []) {
+      if (l.s0 === 'off' || l.cutBack !== undefined || !test(l)) continue;
+      const dr = drops.find((d) => d.l === l);
+      l.cutBack = dr ? dr.back : l.state;
+      l.state = state;
+      l.flicker = state === 'flicker';
+      if (dr) dr.back = state;
+    }
+    lightsChanged(this.map);
+  }
+
+  restoreLights() {
+    const drops = this.director ? this.director.drops : [];
+    let any = false;
+    for (const l of this.map.lights || []) {
+      if (l.cutBack === undefined) continue;
+      const dr = drops.find((d) => d.l === l);
+      if (dr) dr.back = l.cutBack;
+      else l.state = l.cutBack;
+      l.flicker = l.state === 'flicker';
+      delete l.cutBack;
+      any = true;
+    }
+    if (any) lightsChanged(this.map);
+  }
+
+  // les postes des disjoncteurs généraux à tenir (les relayNeed premiers de la carte)
+  relaysNeeded() {
+    return (this.map.relays || []).slice(0, this.relayNeed);
+  }
+
+  // combien de temps une armoire relevée tient : RELAY_SYNC s'il y a assez de monde en vie pour tenir chaque poste,
+  // sinon le temps qu'il faut pour courir aux autres (à deux pour trois postes, il n'en reste qu'un à rejoindre)
+  relayLatch() {
+    const alive = this.players.filter((P) => P.status === 'alive').length;
+    if (alive >= this.relayNeed) return RELAY_SYNC;
+    const run = (this.map.relayRun || [])[this.relayNeed >= 3 ? 1 : 0] || 120;
+    return (run * (alive >= 2 ? 0.6 : 1)) / RELAY_PACE + RELAY_SPARE;
+  }
+
+  // une armoire : on abaisse le levier (un claquement de contacteur, qui s'entend loin)
+  throwRelay(r, P) {
+    if (this.mains || r.desk) return;
+    const again = r.on > 0;
+    r.on = this.relayLatch();
+    this.makeNoise(P, NOISE.use, 0.8);
+    this.alertMonster(r.x, r.z, RELAY_NOISE);
+    this.emit({ type: 'relay', id: r.id, by: P.id, on: 1, t: rnd2(r.on), again: again ? 1 : 0, x: r.x, z: r.z });
+  }
+
+  // les postes tiennent le temps voulu puis retombent ; la console du poste de garde tient tant qu'on reste assis
+  // devant (une fois armée). Tous tenus en même temps : le courant arrive au panneau du monte-charge
+  updateRelays() {
+    if (this.mains || !this.relayNeed) return;
+    const need = this.relaysNeeded();
+    const S = this.map.post;
+    for (const r of need) {
+      if (r.desk) {
+        const Q = S && S.by >= 0 ? this.players.find((p) => p.id === S.by && p.desk && p.status === 'alive') : null;
+        if (Q) {
+          Q.deskT = (Q.deskT || 0) + DT;
+          if (Q.deskT >= RELAY_ARM) {
+            if (!(r.on > 0)) this.emit({ type: 'relay', id: r.id, by: Q.id, on: 1, desk: 1, x: r.x, z: r.z });
+            r.on = Math.max(r.on, this.relayLatch());
+            continue;
+          }
+        }
+      }
+      if (r.on > 0) {
+        r.on = Math.max(0, r.on - DT);
+        if (r.on === 0) this.emit({ type: 'relayOff', id: r.id, x: r.x, z: r.z });
+      }
+    }
+    if (!need.every((r) => r.on > 0)) return;
+    this.mains = true;
+    for (const r of need) r.on = 1;
+    const E = this.map.exit;
+    this.alertMonster(E.x, E.z, 40);
+    this.emit({ type: 'mains', x: E.x, z: E.z });
+  }
+
+  // le courant revenu : le monte-charge descend (de 40 à 60 s selon le nombre). La surtension fait retomber les
+  // rideaux des quais ; elle sait où l'on est (la traque, comme à la fin du Level 0) : on la sème, on se cache, on la
+  // détourne avec une alarme
+  startLiftCall() {
+    this.liftCallT = Math.min(60, LIFT_CALL_T + LIFT_CALL_MORE * Math.max(0, this.roster.length - 1));
+    for (const d of this.map.docks || []) if (!d.broken && (d.o > 0 || d.dir > 0)) d.dir = -1;
+    this.emit({ type: 'liftCall', t: this.liftCallT, x: this.map.exit.x, z: this.map.exit.z });
+    this.startHunt();
+  }
+
+  updateLiftCall() {
+    if (!(this.liftCallT > 0)) return;
+    this.liftCallT = Math.max(0, this.liftCallT - DT);
+    if (this.liftCallT > 0) return;
+    const E = this.map.exit;
+    this.alertMonster(E.x, E.z, 60);
+    this.emit({ type: 'liftArrive', x: E.x, z: E.z });
+    this.emit({ type: 'exitUnlocked' });
+  }
+
+  // combien de mains pour relancer le monte-charge : 1 seul, 2 à deux ou trois, 3 à partir de quatre (selon les vivants)
+  panelHands() {
+    const alive = this.players.filter((P) => P.status === 'alive').length;
+    return alive >= 4 ? 3 : alive >= 2 ? 2 : 1;
+  }
+
   updatePanel() {
-    if (this.powered || (this.delivered || 0) < FUSES) return;
+    if (this.powered || (this.delivered || 0) < FUSES || !this.mains) return;
     const E = this.map.exit;
     const near = this.players.filter((P) => P.status === 'alive' && P.hidden < 0 && Math.hypot(E.x - P.x, E.z - P.z) < 2.6);
     if (near.length) {
-      if (this.panel === 0) this.emit({ type: 'panelStart', by: near[0].id, x: E.x, z: E.z });
-      this.panel = Math.min(1, this.panel + (DT / PANEL_T) * (near.length > 1 ? 1.5 : 1));
+      if (this.panel === 0) this.emit({ type: 'panelStart', by: near[0].id, x: E.x, z: E.z, hands: this.panelHands() });
+      // il faut panelHands() personnes au panneau (l'un tient le levier, l'autre le bouton…) : moins, ça avance à peine
+      const hands = this.panelHands();
+      const rate = near.length >= hands ? (near.length > hands ? 1.5 : 1) : PANEL_SHORT;
+      this.panel = Math.min(1, this.panel + (DT / PANEL_T) * rate);
       this.panelNoiseT -= DT;
       if (this.panelNoiseT <= 0) {
         this.panelNoiseT = 1.5;
@@ -2837,7 +3134,7 @@ export class BackroomsSim {
     if (this.panel < 1) return;
     this.powered = true;
     this.emit({ type: 'powered', by: near[0].id });
-    this.emit({ type: 'exitUnlocked' });
+    this.startLiftCall();
   }
 
   // Invité : il déplace seulement son joueur, sans rien ramasser ni décider (l'hôte le fera). Renvoie le côté d'une
@@ -3041,6 +3338,9 @@ export class BackroomsSim {
         if (h && h.by === id) h.by = -1;
         P.hidden = -1;
       }
+      // … et le fauteuil du poste de garde aussi (sinon plus personne ne peut s'y asseoir de la partie)
+      P.desk = false;
+      if (this.map.post && this.map.post.by === id) this.map.post.by = -1;
       const M = this.monster;
       if (M && M.grabbing === id) {
         M.grabbing = null;
@@ -3075,7 +3375,7 @@ export class BackroomsSim {
       dp: r2(this.departT),
       bt: r2(this.boardT),
       // les portes de la cabine qui se ferment, la cabine d'arrivée (Level 1), le silence puis la traque du Level 0
-      lt: r2(this.liftT),
+      lc: r2(this.liftT), // (pas « lt » : ce sont les lettres du Level 5, plus bas)
       at: r2(this.arriveT),
       lk: this.liftShut ? 1 : 0,
       fw: r2(this.finaleT),
@@ -3100,9 +3400,14 @@ export class BackroomsSim {
       mp: this.fp, // l’empreinte de la carte : un invité qui n'a pas la même (vieille version en cache) est prévenu
       kk: this.floors.some((f) => f.key) ? (this.stairsLocked ? 0 : 1) : undefined, // une des clés de l'escalier trouvée
       // Level 1 : fusibles (ils peuvent être tombés ailleurs), fusibles au panneau, redémarrage du monte-charge
-      fp: this.level === 1 ? (this.map.fuses || []).map((f) => [r2(f.x), r2(f.z)]) : null,
+      fp: this.level === 1 ? (this.map.fuses || []).map((f) => [r2(f.x), r2(f.z), f.locker ?? -1]) : null,
       dl: this.delivered || 0,
       pn: r2(this.panel || 0),
+      // Level 1 : les disjoncteurs généraux [postes à tenir, courant arrivé, puis ce que tient chaque poste], la descente
+      // du monte-charge, la coupure en cours qui n'est pas un noir [genre, tiers éteint, avancée, durée]
+      ry: this.level === 1 ? [this.relayNeed, this.mains ? 1 : 0, ...(this.map.relays || []).map((r) => r2(r.on || 0))] : undefined,
+      lw: this.level === 1 ? r2(this.liftCallT) : undefined,
+      cu: this.cut ? [L1_CUTS.indexOf(this.cut.kind), this.cut.band, r2(this.cut.t), r2(this.cut.len), this.cut.axis, this.cut.dir] : undefined,
       hd: (this.map.hides || []).map((h) => h.by),
       // Level 1 : les rideaux des quais [ouverture, sens, arraché, forcé], les alarmes (0 : intacte, sinon 1 + ce qu'il
       // reste à sonner), les bouches de ventilation ouvertes, qui est assis au poste
@@ -3173,7 +3478,7 @@ export class BackroomsSim {
     this.map.dark = this.level === PIPES_LEVEL && this.blackout > 0;
     this.departT = snap.dp;
     this.boardT = snap.bt || 0;
-    this.liftT = snap.lt || 0;
+    this.liftT = snap.lc || 0;
     this.arriveT = snap.at || 0;
     this.liftShut = !!snap.lk;
     this.finaleT = snap.fw || 0;
@@ -3314,9 +3619,17 @@ export class BackroomsSim {
       f.z = q[1];
       f.gx = cellOf(q[0]);
       f.gz = cellOf(q[1]);
+      if (q[2] !== undefined) f.locker = q[2];
     });
     this.delivered = snap.dl || 0;
     this.panel = snap.pn || 0;
+    if (Array.isArray(snap.ry)) {
+      this.relayNeed = snap.ry[0];
+      this.mains = !!snap.ry[1];
+      (this.map.relays || []).forEach((r, i) => (r.on = snap.ry[2 + i] || 0));
+    }
+    this.liftCallT = snap.lw || 0;
+    this.cut = Array.isArray(snap.cu) ? { kind: L1_CUTS[snap.cu[0]], band: snap.cu[1], t: snap.cu[2], len: snap.cu[3], axis: snap.cu[4], dir: snap.cu[5] } : null;
     (snap.hd || []).forEach((by, i) => {
       const h = (this.map.hides || [])[i];
       if (h) h.by = by;
@@ -3534,7 +3847,8 @@ export class BackroomsSim {
     const prelude = this.prelude;
     if (prelude) M.dormantT = Math.max(M.dormantT, 20);
     // la phase finale du Level 0 : elle sait où l'on est et ne lâche plus (ni répit, ni abri, ni lumière qui protège)
-    const hunt = this.hunt && this.level === 0;
+    // (au Level 1 : pendant que le monte-charge descend, et jusqu'au départ)
+    const hunt = this.hunt && (this.level === 0 || this.level === 1);
     if (hunt) M.dormantT = 0;
     // au tout début de la partie, ou pendant le répit qui suit une poursuite, elle reste au loin et se tait
     const calm = !hunt && (M.dormantT > 0 || (entityRelaxed(this) && M.mode !== 'chase'));
@@ -3641,7 +3955,7 @@ export class BackroomsSim {
     if (exposed && M.mode !== 'chase' && M.mode !== 'flee' && M.mode !== 'ambush') M.faceT += DT;
     else M.faceT = Math.max(0, M.faceT - DT * 2);
     if (M.faceT > (near ? 0.5 : STARE_T)) {
-      this.rushAt(M, P);
+      this.rushAt(M, P, 'stare');
       canSee = true;
     }
     M.rushT = Math.max(0, M.rushT - DT);
@@ -3729,10 +4043,14 @@ export class BackroomsSim {
           M.repathT = 0;
           if (M.mode === 'patrol') M.targetWander = null;
         } else if (!shelter && !calm && V.d < STARE_R + 5 && (V.f < 0.45 || M.lurk || M.mode === 'ambush' || V.d < NEAR_CHARGE + 2)) {
-          this.rushAt(M, Q);
+          this.rushAt(M, Q, V.f < 0.45 ? 'stare' : '');
           if (Q === P) canSee = true;
           else M.target = Q.id; // elle change de proie : celui qui l'a fixée (voir senseMonster)
-        } else this.slipAway(M, Q, shelter || calm);
+        } else {
+          this.slipAway(M, Q, shelter || calm);
+          // épargné par la lumière d'une zone claire (pas un casier, pas un recoin calme) : le joueur l'apprend
+          if (shelter && !(Q.hidden >= 0) && !this.calmAt(Q)) this.emit({ type: 'spared', id: Q.id, why: 'light' });
+        }
       }
     } else M.plantT = 0;
 
@@ -3789,7 +4107,7 @@ export class BackroomsSim {
         M.lastSeenZ = P.z;
         M.lastSeenF = P.floor || 0;
         M.repathT = 0;
-        M.ambushT = (rand(14, 22) * (1 - rage * 0.5)) / (this.level === 0 ? L0_AGGRO : 1);
+        M.ambushT = (rand(14, 22) * (1 - rage * 0.5) * (1 - 0.3 * (this.crowd || 0))) / (this.level === 0 ? L0_AGGRO : 1);
       } else if (atSpot) {
         M.path = [];
       }
@@ -3920,14 +4238,25 @@ export class BackroomsSim {
       }
       if (!M.pace) faceTo(M, P.x, P.z, 3.2);
       if (M.waitT <= 0 || !same) {
-        M.mode = 'patrol';
-        M.silent = false;
-        M.watch = null;
-        M.pace = null;
-        M.stalkT = rand(3, 8);
-        // Level 0 : on se retourne… elle n'est plus là
-        if (this.level === 0) M.vanish = true;
-        M.lurk = false;
+        // Level 0 : elle a attendu qu'il la voie (postée devant lui, ou à découvert à quelques pas), et il ne s'est pas
+        // retourné. La première fois, elle s'efface ; la deuxième de suite, elle ne s'efface plus : son cri le prévient,
+        // puis elle charge (lui tourner le dos n'est plus un abri avant la 3e cassette, et elle ne frappe toujours pas
+        // sans prévenir)
+        const snub = same && this.level === 0 && !calm && !this.shelteredAt(P) && (M.lurk ? dist < SEEN_R + 6 : M.hasLineOfSight && dist < SNUB_R);
+        if (snub) M.snubs = (M.snubs || 0) + 1;
+        if (snub && M.snubs >= SNUBS) {
+          M.vanish = false;
+          this.rushAt(M, P);
+        } else {
+          M.mode = 'patrol';
+          M.silent = false;
+          M.watch = null;
+          M.pace = null;
+          M.stalkT = rand(3, 8);
+          // Level 0 : on se retourne… elle n'est plus là
+          if (this.level === 0) M.vanish = true;
+          M.lurk = false;
+        }
       }
     }
 
@@ -3966,6 +4295,10 @@ export class BackroomsSim {
         tx = P.x;
         tz = P.z;
         tf = !same ? P.floor || 0 : (M.floor || 0) === 1 ? 0 : 1;
+      } else if (M.mode === 'chase' && this.stairs.length && tf === (M.floor || 0) && cageAt(this.stairs, tx, tz)) {
+        // elle vient de le perdre de vue dans la cage (un regard ailleurs suffit) : on n'y entre que par une volée, elle
+        // la prend quand même, au lieu de buter contre le mur de la cage en changeant d'avis à chaque pas
+        tf = (M.floor || 0) === 1 ? 0 : 1;
       } else if (M.mode === 'patrol') {
         if (!M.targetWander || Math.hypot(M.x - M.targetWander.x, M.z - M.targetWander.z) < 1.5 || M.arrived || (M.bumps || 0) > 2) {
           M.bumps = 0;
@@ -4076,7 +4409,12 @@ export class BackroomsSim {
     const reach = P.hidden >= 0 ? (map.spots ? 2.0 : 1.4) : 1.15; // Level 5 : sous un lit, elle t'attrape par le pied du lit
     const leaping = M.trav && M.trav.kind === 'drop' && M.trav.phase !== 'peer';
     const level = Math.abs(feetOf(this, M) - feetY(this.stairs, P.x, P.z, P.floor || 0)) < 1.3;
-    if (same && dist < reach && level && !leaping && (P.hidden < 0 || M.sawHide === P.hidden) && !this.calmAt(P) && !this.dockBetween(M.floor || 0, M.x, M.z, P.x, P.z)) {
+    // dans la même cage d'escalier, l'étage ne compte pas (il change à mi-hauteur, au pied de la seconde volée) : seule
+    // la hauteur des pieds les sépare
+    const pc = !same && this.stairs.length ? cageAt(this.stairs, P.x, P.z) : null;
+    const mc = pc ? cageAt(this.stairs, M.x, M.z) : null;
+    const close = same ? dist : pc && mc && pc.st === mc.st ? Math.hypot(dx, dz) : Infinity;
+    if (close < reach && level && !leaping && (P.hidden < 0 || M.sawHide === P.hidden) && !this.calmAt(P) && !this.dockBetween(M.floor || 0, M.x, M.z, P.x, P.z) && !this.liftBetween(M.floor || 0, M.x, M.z, P.x, P.z)) {
       if (P.hidden >= 0) this.leaveHide(P);
       if (P.desk) this.leaveDesk(P, true);
       if (this.level === HOTEL_LEVEL || P.grabs >= 1 || this.difficulty === 'hard' && this.rage >= 1) {
@@ -4117,16 +4455,7 @@ export class BackroomsSim {
     const need = GRAB_STRUGGLES + (this.difficulty === 'hard' ? 3 : 0);
     const blinded = this.players.some((Q) => Q !== G && Q.status === 'alive' && Q.flashlight && Q.floor === M.floor && Math.hypot(Q.x - M.x, Q.z - M.z) < 12 && this.facing(Q, M.x, M.z) < 0.35 && hasLineOfSight(this.fm(M.floor), Q.x, Q.z, M.x, M.z));
     if (G.struggle >= need || blinded) {
-      G.grabT = 0;
-      G.struggle = 0;
-      G.lockT = 0.3;
-      M.mode = 'stun';
-      M.stunT = MONSTER_STUN_T;
-      M.grabbing = null;
-      M.unseenT = 0;
-      // repoussée, elle titube en arrière (un mètre environ, en une demi-seconde)
-      shove(M, -Math.sin(a), -Math.cos(a), 4.2);
-      this.emit({ type: 'release', id: G.id, escaped: true, blinded, x: M.x, z: M.z, floor: M.floor });
+      this.breakGrab(M, G, { blinded });
       return;
     }
     if (G.grabT <= 0) {
@@ -4134,6 +4463,22 @@ export class BackroomsSim {
       this.killPlayer(G, { x: M.x, z: M.z, quiet: this.level === 1 });
       this.afterCatch(M, G);
     }
+  }
+
+  // La prise lâchée : on s'est débattu, un coéquipier l'a aveuglée, ou les portes de la cabine se sont refermées
+  // sur son bras
+  breakGrab(M, G, extra = {}) {
+    const a = Math.atan2(G.x - M.x, G.z - M.z);
+    G.grabT = 0;
+    G.struggle = 0;
+    G.lockT = 0.3;
+    M.mode = 'stun';
+    M.stunT = MONSTER_STUN_T;
+    M.grabbing = null;
+    M.unseenT = 0;
+    // repoussée, elle titube en arrière (un mètre environ, en une demi-seconde)
+    shove(M, -Math.sin(a), -Math.cos(a), 4.2);
+    this.emit({ type: 'release', id: G.id, escaped: true, x: M.x, z: M.z, floor: M.floor, ...extra });
   }
 
   // après une victime : elle repart en ronde, loin de la cabine
@@ -4285,7 +4630,10 @@ export class BackroomsSim {
   // après l'avoir perdu de vue, et (à partir de la 3e cassette) de temps en temps. Sinon, elle se montre d'abord
   mayChase(M, P, hunt) {
     if (this.level !== 0 || hunt) return true;
-    if (this.time - (P.sawM ?? -1e9) < SAW_T || this.time - (M.chasedAt ?? -1e9) < 8) return true;
+    if (this.time - (P.sawM ?? -1e9) < SAW_T || this.time - (M.chasedAt ?? -1e9) < 8) {
+      M.snubs = 0;
+      return true;
+    }
     if (this.cassettes >= FRONT_TAPES) {
       if (this.time > (M.backRollT || 0)) {
         M.backRollT = this.time + 20;
@@ -4336,7 +4684,8 @@ export class BackroomsSim {
   }
 
   // découverte, fixée : elle hurle et fonce sur sa proie (même au repos)
-  rushAt(M, P) {
+  // why : ce qui l'a lancée ('stare' : on l'a fixée), pour que le joueur apprenne la règle
+  rushAt(M, P, why = '') {
     M.faceT = 0;
     M.plantT = 0;
     M.dormantT = 0;
@@ -4344,6 +4693,7 @@ export class BackroomsSim {
     M.watch = null;
     M.pace = null;
     M.lurk = false;
+    M.snubs = 0;
     M.ambush = null;
     M.silent = false;
     // le cri d'abord (elle reste sur place, tournée vers lui, tout le corps qui tremble), la course ensuite
@@ -4356,7 +4706,7 @@ export class BackroomsSim {
     M.lastSeenZ = P.z;
     M.lastSeenF = P.floor || 0;
     this.chases++;
-    this.emit({ type: 'rush', id: P.id, x: M.x, z: M.z, floor: M.floor });
+    this.emit({ type: 'rush', id: P.id, x: M.x, z: M.z, floor: M.floor, why });
   }
 
   // vue sans pouvoir (ou devoir) charger : elle se glisse derrière un angle, à quelques pas, hors de la vue de tous ;

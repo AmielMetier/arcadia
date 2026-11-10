@@ -461,6 +461,78 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
     alarmSt.push({ a, dome, bellMat, flashMat, glass, dent: false, fx, fz, bx: g.position.x + 0.16 * a.nx, bz: g.position.z + 0.16 * a.nz, on: 0, on2: 0 });
   }
 
+  // ---------------------------------------------------------------- Les disjoncteurs généraux
+  // Une armoire électrique grise contre le mur (la porte, son étiquette pochoir), le gros levier rouge sur le côté
+  // (en haut : coupé ; en bas : enclenché) et deux voyants au-dessus : rouge coupé, vert enclenché (il clignote quand
+  // il va retomber). La console du poste de garde : un boîtier à clé posé sur le bureau, avec son voyant
+  const relaySt = [];
+  const cabMat = lambert({ color: '#6f7479' });
+  const leverMat = lambert({ color: '#a3241b' });
+  const darkMat = lambert({ color: '#26282a' });
+  const NAMES = 'ABC';
+  (map.relays || []).forEach((r, i) => {
+    const g = new THREE.Group();
+    group.add(g);
+    const red = new THREE.MeshBasicMaterial({ color: '#3a0a08' });
+    const green = new THREE.MeshBasicMaterial({ color: '#0a2a0e' });
+    const lamp = (m, x, y, z) => {
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.028, 12, 8), m);
+      b.position.set(x, y, z);
+      g.add(b);
+    };
+    let lever = null;
+    if (r.desk) {
+      const S = map.post;
+      // sur le bureau, à droite des écrans, au bord côté fauteuil
+      const ttx = S.dz;
+      const ttz = S.dx;
+      g.position.set(S.x - S.dx * 0.18 + ttx * 0.5, 0.79, S.z - S.dz * 0.18 + ttz * 0.5);
+      g.rotation.y = Math.atan2(-S.dx, -S.dz);
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.07, 0.14), cabMat);
+      box.position.y = 0.035;
+      const key = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.03, 12), darkMat);
+      key.position.set(-0.04, 0.08, 0.02);
+      g.add(box, key);
+      lamp(red, 0.04, 0.078, 0.03);
+      lamp(green, 0.08, 0.078, 0.03);
+    } else {
+      g.position.set(r.x + r.nx * 0.004, 0, r.z + r.nz * 0.004);
+      g.rotation.y = Math.atan2(r.nx, r.nz); // z : hors du mur
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.72, 1.05, 0.26), cabMat);
+      body.position.set(0, 1.3, 0.13);
+      const label = canvasTex(256, 96, (c, w, h) => {
+        c.fillStyle = '#e6e1d2';
+        c.fillRect(0, 0, w, h);
+        c.fillStyle = '#16140f';
+        c.font = 'bold 30px monospace';
+        c.textAlign = 'center';
+        c.fillText('MAIN BREAKER', w / 2, 40);
+        c.font = 'bold 34px monospace';
+        c.fillText(`· ${NAMES[i] || i + 1} ·`, w / 2, 80);
+      });
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.16), baked(new THREE.MeshLambertMaterial({ map: label })));
+      plate.position.set(0, 1.58, 0.262);
+      const strip = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.06), baked(new THREE.MeshLambertMaterial({ map: hazard })));
+      strip.position.set(0, 0.82, 0.262);
+      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.16, 0.03), darkMat);
+      handle.position.set(-0.28, 1.3, 0.275);
+      // le levier : son axe sur la joue droite de l'armoire
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.06, 16).rotateZ(Math.PI / 2), darkMat);
+      hub.position.set(0.4, 1.3, 0.13);
+      lever = new THREE.Group();
+      lever.position.copy(hub.position);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.42, 0.04), leverMat);
+      arm.position.set(0.03, 0.21, 0);
+      const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.12, 12).rotateZ(Math.PI / 2), darkMat);
+      grip.position.set(0.05, 0.42, 0);
+      lever.add(arm, grip);
+      g.add(body, plate, strip, handle, hub, lever);
+      lamp(red, -0.12, 1.9, 0.12);
+      lamp(green, 0.12, 1.9, 0.12);
+    }
+    relaySt.push({ r, i, g, red, green, lever, k: 0 });
+  });
+
   // ---------------------------------------------------------------- Les bouches de gaine
   const ventSt = [];
   const holeMat = new THREE.MeshBasicMaterial({ color: '#030303' });
@@ -819,6 +891,16 @@ export function buildGear({ map, group, baked, wallMat, CEIL }) {
       return doorK;
     },
     update(sim, P, time, dt) {
+      // les disjoncteurs : seuls ceux qu'il faut tenir sont là (les autres armoires sont débranchées, voyants morts)
+      for (const st of relaySt) {
+        const need = st.i < (sim.relayNeed || 0);
+        const on = sim.mains || st.r.on > 0;
+        st.k += ((on ? 1 : 0) - st.k) * Math.min(1, dt * 14);
+        if (st.lever) st.lever.rotation.x = -0.15 + st.k * 2.7; // de haut (coupé) en bas (enclenché)
+        const blink = !sim.mains && on && st.r.on < 3 && Math.floor(time * 6) % 2;
+        st.green.color.set(need && on && !blink ? '#7dff8a' : '#0a2a0e');
+        st.red.color.set(need && !on ? (Math.floor(time * 1.5) % 2 ? '#ff2a1a' : '#5a0e0a') : '#2a0806');
+      }
       // les portes blindées : ouvertes à plat contre la cloison, côté pièce ; elles claquent vite et s'ouvrent lourdement
       for (const st of safeSt) {
         const want = st.S.shut ? 0 : 1;
