@@ -2522,7 +2522,7 @@ export class BackroomsSfx {
     if (slot === 'rec' && lv === 4) {
       // Level 5 (l'hôtel) : un parquet qui craque quelque part, plus rarement une boîte à musique désaccordée au loin
       if (w < 0.25) this.musicBox();
-      else this.creak();
+      else this.floorCreak();
       return;
     }
     if (slot === 'rec') {
@@ -3022,7 +3022,8 @@ export class BackroomsSfx {
   }
 
   // un craquement de tôle ou d'étagère : quelques grains métalliques très résonants
-  creak(pos, vol = 1) {
+  creak(pos, vol = 1, label = '[metal creaks]') {
+    if (!this.unlocked || !this.ctx) return;
     const out = this.at({ ...pos, rolloff: 0.5, ref: 4 }, vol, 0, this.bedWet);
     const t = this.ctx.currentTime + 0.02;
     let k = t;
@@ -3039,7 +3040,7 @@ export class BackroomsSfx {
       o.stop(k + 0.04);
       k += rnd(0.03, 0.12);
     }
-    this.caption('[metal creaks]', pos);
+    this.caption(label, pos);
   }
 
   // ---------------------------------------------------------------- Level 1 : quais, alarmes, poste, gaines
@@ -3660,7 +3661,8 @@ export class BackroomsSfx {
   }
 
   // Level 5 : une latte de parquet qui craque, quelque part dans l'hôtel
-  creak() {
+  // (à part de creak, la tôle du Level 1 : sous le même nom, celle-ci l'écrasait et l'entrepôt ne craquait plus)
+  floorCreak() {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
     const t = c.currentTime;

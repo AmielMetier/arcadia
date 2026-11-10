@@ -2,7 +2,7 @@
 import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE, HOTEL_LEVEL, DOCK_OPEN_T, DOCK_CLOSE_T, ALARM_T, DUCT_LAND } from './engine/sim.js';
 import { hasLineOfSight } from './engine/nav.js';
 import { bfs, CELL_SIZE, cellsOnSeg, T } from './engine/map.js';
-import { createBackroomsScene, setMonsterMode, setSceneOptions } from './view/scene.js';
+import { createBackroomsScene, setMonsterMode, setSceneOptions, onGlContext } from './view/scene.js';
 import { BackroomsSfx } from './view/sfx.js';
 import { createVoice } from './view/voice.js';
 import { BackroomsHUD, levelName, levelSub, LORE, loreOf, hearTape, tapesHeard, store, NOTES, readNote, loreComplete, FINAL_LORE } from './view/hud.js';
@@ -151,6 +151,15 @@ let kbMode = false;
 let paused = true; // la partie attend qu'on prenne le contrôle
 let started = false; // la première prise en main (avant : l'écran titre)
 let padCrouch = false; // accroupi à la manette (stick droit enfoncé : bascule)
+// L'image perdue (le contexte WebGL repris par le système ou le pilote) : le navigateur la rend en général en quelques
+// secondes. En attendant, on le dit au lieu de laisser une image figée, et seul, le monde attend (voir la boucle)
+let glLost = 0; // l'heure de la perte (ms) ; 0 : l'image est là
+let glWarned = false; // « recharge la page » déjà dit (l'image ne revient pas)
+onGlContext((ok) => {
+  glLost = ok ? 0 : performance.now();
+  glWarned = false;
+  if (hud) hud.toast(ok ? 'VIDEO SIGNAL RESTORED' : 'VIDEO SIGNAL LOST · RECOVERING', ok ? 2.5 : 600);
+});
 
 // Réglages du joueur (sur cet appareil) : souris, image, accessibilité
 const OPT_DEFAULT = { sens: 1, invertY: false, fov: 72, motion: 1, bright: 1, reduceFlashes: false, subs: false, layout: 'auto', quality: 'auto', mic: 'on', voiceVol: 1 };
@@ -817,6 +826,10 @@ function guestInputs() {
 }
 
 const num = (v, a, b) => (Number.isFinite(+v) ? Math.max(a, Math.min(b, +v)) : 0);
+// les actions qu'un invité envoie à l'hôte (t: 'a') : lampe, utiliser, poser, ramasser, siffler, sauter, tomber de la
+// barre, brûlure, se débattre, code. Une action absente d'ici est jetée par l'hôte (le saut l'a été jusqu'en 5.24 :
+// l'hôte voyait l'invité marcher dans le trou qu'il venait de sauter)
+const GUEST_ACTS = ['f', 'e', 'd', 'p', 't', 'j', 'b', 'h', 'g', 'c'];
 const slotOf = (s) => (Number.isInteger(s) && s >= 1 && s <= INV_SIZE ? s : 1); // une case d'objet annoncée par un invité
 
 // Messages du réseau (from : l'identifiant donné par le salon, la seule identité fiable)
@@ -855,7 +868,7 @@ function onMsg(from, m) {
           ? `MAPS DON'T MATCH · ${who} HAS ${verLabel(gv)}, YOU HAVE ${verLabel(GAME_V)} · RELOAD THE PAGE (CTRL+SHIFT+R)`
           : `MAPS DON'T MATCH · ${who} HAS ${verLabel(gv)} · ${who} IS UPDATING`, 14);
       }
-    } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'd', 'p', 't', 'b', 'h', 'g', 'c'].includes(m.k)) {
+    } else if (m.t === 'a' && m.run === NET.run && GUEST_ACTS.includes(m.k)) {
       const q = NET.actions[from] || (NET.actions[from] = []);
       if (q.length < 8) q.push({ k: m.k, sel: slotOf(m.s), side: m.side > 0 ? 1 : -1, n: Math.max(1, Math.min(4, m.n | 0)), v: String(m.v || '').replace(/\D/g, '').slice(0, 4) });
     }
@@ -1156,8 +1169,8 @@ function handleEvent(ev, me) {
     case 'release':
       if (ev.id === me) {
         if (sfx) sfx.release(true);
-        if (hud) hud.toast(ev.blinded ? 'The light blinded it · RUN' : 'You broke free · RUN · it will not let go twice');
-      } else if (hud) hud.toast(ev.blinded ? 'Your light blinded it!' : `${who(ev.id)} broke free`);
+        if (hud) hud.toast(ev.doors ? 'The doors tore you free' : ev.blinded ? 'The light blinded it · RUN' : 'You broke free · RUN · it will not let go twice');
+      } else if (hud) hud.toast(ev.doors ? `The doors tore ${who(ev.id)} free` : ev.blinded ? 'Your light blinded it!' : `${who(ev.id)} broke free`);
       break;
     case 'hurt':
       if (ev.id === me) {
@@ -1421,7 +1434,7 @@ function handleEvent(ev, me) {
       if (sfx) sfx.guardDoor({ x: ev.x, z: ev.z }, !!ev.open);
       break;
     case 'desk':
-      if (sfx) sfx.creak({ x: ev.x, z: ev.z }, 0.6);
+      if (sfx) sfx.creak({ x: ev.x, z: ev.z }, 0.6, '[chair creaks]');
       if (ev.id === me && ev.on && hud) {
         const k = hud.keyNames(hud.qwerty);
         hud.toast(document.body.classList.contains('touch') ? 'Guard post · slide left or right to switch cameras · tell the others what you see' : `Guard post · ${k.l} / ${k.r} to switch cameras · tell the others what you see`);
@@ -1778,7 +1791,12 @@ function frame(currentTime) {
   if (NET.role === 'guest') watchHost();
   // en pause, le monde est figé (seul) ; à plusieurs, il continue sans toi. Le trajet en ascenseur, lui, va
   // toujours jusqu'au bout : sinon une pause pendant la descente laissait l'écran noir pour toujours
-  if (paused && !multi() && !(sim.departT > 0)) accumulator = 0;
+  if ((paused || glLost) && !multi() && !(sim.departT > 0)) accumulator = 0;
+  // l'image ne revient pas : le navigateur ne rendra plus le contexte, il n'y a plus qu'à recharger
+  if (glLost && !glWarned && currentTime - glLost > 8000) {
+    glWarned = true;
+    if (hud) hud.toast('VIDEO SIGNAL LOST · RELOAD THE PAGE', 600);
+  }
 
   // Lecture des entrées utilisateur (en mode sans souris, les flèches tournent la vue)
   const arrows = !kbMode;

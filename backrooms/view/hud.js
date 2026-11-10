@@ -596,7 +596,8 @@ export class BackroomsHUD {
     const el = document.createElement('div');
     el.dataset.text = text;
     const arrow = { left: '◀ ', right: '', behind: '▼ ', ahead: '▲ ' }[dir] || '';
-    el.textContent = `${arrow}[${text}]${dir === 'right' ? ' ▶' : ''}`;
+    // (la plupart des sous-titres arrivent déjà entre crochets : pas de « [[…]] »)
+    el.textContent = `${arrow}[${text.replace(/^\[+|\]+$/g, '')}]${dir === 'right' ? ' ▶' : ''}`;
     el.t = 2.6;
     box.appendChild(el);
     while (box.children.length > 3) box.firstChild.remove();

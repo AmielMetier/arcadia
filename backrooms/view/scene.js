@@ -12,6 +12,7 @@ import { FUSES, feetY, stairAt, PIPES_LEVEL, THIRST_BLUR, LIFT_SHUT_T, HOTEL_LEV
 import { DUCT_LOW, DOCK_H, GUARD_T } from '../engine/level1.js';
 import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
+import { autoRes } from './autores.js';
 import { createInset } from './inset.js';
 import { buildWarehouse } from './warehouse.js';
 import { buildGear } from './gear.js';
@@ -119,8 +120,32 @@ function getRenderer() {
   if (!sharedRenderer) {
     sharedRenderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     sharedRenderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); // les vrais pixels de l'écran (Retina compris)
+    // le contexte WebGL perdu puis rendu (voir onGlContext). three.js s'est abonné avant nous : quand « rendu » nous
+    // arrive, il a déjà tout remis en état (les textures et les géométries repartent à la carte à l'image suivante)
+    const cv = sharedRenderer.domElement;
+    // (perdue, la toile s'affiche en blanc avec une icône d'image cassée : on la cache, le fond noir de la page suffit)
+    cv.addEventListener('webglcontextlost', () => {
+      cv.style.visibility = 'hidden';
+      glTell(false);
+    });
+    cv.addEventListener('webglcontextrestored', () => {
+      cv.style.visibility = '';
+      glTell(true);
+    });
   }
   return sharedRenderer;
+}
+
+// Le contexte WebGL perdu (la carte graphique reprise par le système, un pilote qui redémarre, trop d'onglets en 3D) :
+// l'image se fige ou vire au noir, le temps que le navigateur le rende. Le jeu s'abonne ici pour le dire au joueur
+// (fn(false) : perdu ; fn(true) : revenu) ; avant, rien ne l'annonçait et la partie semblait plantée.
+const glWatchers = new Set();
+function glTell(ok) {
+  for (const fn of glWatchers) fn(ok);
+}
+export function onGlContext(fn) {
+  glWatchers.add(fn);
+  return () => glWatchers.delete(fn);
 }
 
 // Réglages d'image du joueur (view/../app.js) : champ de vision, mouvements de caméra, luminosité, flashs, qualité
@@ -4940,8 +4965,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   let plunge = null;
   let ductDrop = 0; // Level 1 : l'entité qui se laisse tomber d'une bouche de gaine (le temps qui reste)
   let cctvWas = -1; // au poste de garde : la caméra affichée à l'image précédente (-1 : pas au poste)
-  let frameAvg = 16;
-  let lines = 2880; // résolution dynamique : commence au plus haut (ramené tout de suite au plus que permet l'écran)
+  const res = autoRes(); // résolution dynamique : commence au plus haut (borné par ce que permet l'écran)
   let qualityWas = null; // la qualité déjà appliquée au filtre (il ne retaille l'image que si elle change)
   const camState = { t: 0, night: 0, bars: 0 }; // api.cam, lu à chaque image : le même objet, remis à jour
   const avatarPos = new Map(); // position affichée de chaque coéquipier (sa piste interpolée)
@@ -5464,16 +5488,9 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         cctv: cctvCam ? 1 : 0,
       });
 
-      // résolution dynamique : moins de lignes quand l'image peine, plus quand elle est à l'aise
-      frameAvg += (dt * 1000 - frameAvg) * 0.05;
+      // résolution dynamique : moins de lignes quand l'image peine, plus quand elle tient la cadence de l'écran
       // (jusqu'à la pleine définition de l'écran à l'œil nu, aux lignes de la bande au caméscope)
-      if (OPTS.quality === 'auto' && vhs.setLines) {
-        const top = vhs.maxLines || 720;
-        if (frameAvg > 24 && lines > 360) lines -= Math.max(8, Math.round(lines * 0.03));
-        else if (frameAvg < 15 && lines < top) lines += Math.max(4, Math.round(lines * 0.015));
-        lines = Math.min(lines, Math.max(360, top));
-        vhs.setLines(lines);
-      }
+      if (OPTS.quality === 'auto' && vhs.setLines) vhs.setLines(res.step(dt * 1000, time, vhs.maxLines || 720));
       // Level 5 : le screamer. La caméra reste où l'on est mort ; l'entité surgit à 2,40 m et se jette à 55 cm du
       // visage en un quart de seconde, puis reste là, tremblante, pendant que l'image saute
       let glitch = danger;

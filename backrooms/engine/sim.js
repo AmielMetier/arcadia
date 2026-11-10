@@ -147,7 +147,9 @@ export const NEAR_CHARGE = 6; // s'approcher à moins de 6 m d'elle quand elle o
 export const PLANTED_T = 1.0;
 export const SEEN_R = 26;
 export const L0_AGGRO = 0.8; // Level 0 : son agressivité (1 : celle d'avant) ; ses tricheries et ses traques s'espacent d'autant
-export const FRONT_TAPES = 3; // Level 0 : avant la 3e cassette, elle ne se lance jamais sur quelqu'un qui ne l'a pas vue
+export const FRONT_TAPES = 3; // Level 0 : avant la 3e cassette, elle ne se lance pas sans prévenir sur quelqu'un qui ne l'a pas vue
+export const SNUBS = 2; // postée devant quelqu'un qui ne se retourne pas : à la 2e fois de suite, elle crie puis charge
+export const SNUB_R = 18; // (en simple guet, cela ne compte que si elle était à découvert à moins de tant de mètres)
 export const BACK_SHARE = 0.3; // ensuite, part des poursuites qui peuvent partir dans le dos
 export const RUSH_WIND = 0.6; // secondes de cri sur place avant de s'élancer, quand on la découvre
 export const SAW_T = 6; // secondes pendant lesquelles on « l'a vue » (elle peut alors se lancer)
@@ -512,6 +514,8 @@ export class BackroomsSim {
     this.panelNoiseT = 0;
     this.director = createDirector(level);
     this.ambT = null; // les bruits d'ambiance repartent avec le niveau
+    this.din = 0; // le vacarme de l'étage d'avant ne suit pas l'équipe (l'entité du suivant partait déjà énervée)
+    this.dinLv = 0;
     // Level 0 : un ou deux recoins calmes par étage, où rien ne se passe… un moment ; la première rencontre, mise en scène
     if (level === 0) this.floors.forEach((f, fi) => (f.calm = f.calm || findCalmNooks(f, this.seed * 13 + fi, fi === 0 ? f.spawn : null)));
     // Level 0 : les portes des cages d'escalier sont cadenassées, en haut comme en bas ; une clé à chaque étage (la
@@ -1000,6 +1004,28 @@ export class BackroomsSim {
       const ex = ax < gap ? gap - ax : ax > CELL_SIZE / 2 ? ax - CELL_SIZE / 2 : 0;
       const ez = lz < 0 ? -lz : lz > LIFT_FACE ? lz - LIFT_FACE : 0;
       if (ex * ex + ez * ez < radius * radius * 0.8) return true;
+    }
+    return false;
+  }
+
+  // La façade d'une cabine ouverte (ou ses portes en train de se refermer) sépare-t-elle ces deux points ? L'entité
+  // n'attrape qu'à travers la baie encore ouverte : avant, elle agrippait à travers la tôle de la façade, et jusque
+  // derrière les portes closes. shut : les portes de la cabine du départ comptées jointes (l'instant où elles finissent
+  // de se fermer, avant que la cabine ne parte).
+  liftBetween(floor, ax, az, bx, bz, shut = false) {
+    const m = this.fm(floor);
+    for (const E of [m.elevator, m.arrival]) {
+      if (!E || this.blocked(E.gx, E.gz, floor)) continue; // cabine condamnée : un mur comme un autre
+      const fx = E.x - E.dx * (CELL_SIZE / 2);
+      const fz = E.z - E.dz * (CELL_SIZE / 2);
+      const la = (ax - fx) * E.dx + (az - fz) * E.dz - LIFT_FACE / 2;
+      const lb = (bx - fx) * E.dx + (bz - fz) * E.dz - LIFT_FACE / 2;
+      if (la < 0 === lb < 0) continue; // du même côté de la façade
+      const k = la / (la - lb);
+      const off = Math.abs((ax + (bx - ax) * k - fx) * E.dz - (az + (bz - az) * k - fz) * E.dx);
+      if (off > CELL_SIZE / 2 + 0.2) continue; // à côté de la cabine : ce sont les murs qui comptent
+      const gap = shut && E === m.elevator ? 0 : this.liftGap(E, m);
+      if (off > gap - 0.15) return true; // (un bras ne passe pas dans les 15 derniers centimètres)
     }
     return false;
   }
@@ -2127,8 +2153,20 @@ export class BackroomsSim {
     if (!(this.liftT > 0)) return;
     this.liftT = Math.max(0, this.liftT - DT);
     if (this.liftT > 0) return;
-    // les portes sont fermées : ceux qui sont dedans partent (pas celui qu'elle tient), les autres restent
     const alive = this.players.filter((P) => P.status === 'alive');
+    // Celui qu'elle tenait dans la cabine, à travers la baie : les portes qui se rejoignent lui font lâcher prise
+    // (avant, il était « resté dehors » et mourait, debout dans la cabine). Si elle est dedans avec lui, les portes
+    // butent et se rouvrent : on ne part pas avec elle.
+    const M = this.hasMonster ? this.monster : null;
+    const held = M && M.mode === 'grab' ? alive.find((P) => P.id === M.grabbing && this.inCabin(P)) : null;
+    if (held) {
+      if (!this.liftBetween(held.floor || 0, M.x, M.z, held.x, held.z, true)) {
+        this.emit({ type: 'liftOpen' });
+        return;
+      }
+      this.breakGrab(M, held, { doors: true });
+    }
+    // les portes sont fermées : ceux qui sont dedans partent (pas celui qu'elle tient dehors), les autres restent
     const inside = alive.filter((P) => this.inCabin(P) && !(P.grabT > 0));
     if (!inside.length) {
       // tout le monde est ressorti : les portes se rouvrent
@@ -2799,6 +2837,9 @@ export class BackroomsSim {
         if (h && h.by === id) h.by = -1;
         P.hidden = -1;
       }
+      // … et le fauteuil du poste de garde aussi (sinon plus personne ne peut s'y asseoir de la partie)
+      P.desk = false;
+      if (this.map.post && this.map.post.by === id) this.map.post.by = -1;
       const M = this.monster;
       if (M && M.grabbing === id) {
         M.grabbing = null;
@@ -2833,7 +2874,7 @@ export class BackroomsSim {
       dp: r2(this.departT),
       bt: r2(this.boardT),
       // les portes de la cabine qui se ferment, la cabine d'arrivée (Level 1), le silence puis la traque du Level 0
-      lt: r2(this.liftT),
+      lc: r2(this.liftT), // (pas « lt » : ce sont les lettres du Level 5, plus bas)
       at: r2(this.arriveT),
       lk: this.liftShut ? 1 : 0,
       fw: r2(this.finaleT),
@@ -2930,7 +2971,7 @@ export class BackroomsSim {
     this.map.dark = this.level === PIPES_LEVEL && this.blackout > 0;
     this.departT = snap.dp;
     this.boardT = snap.bt || 0;
-    this.liftT = snap.lt || 0;
+    this.liftT = snap.lc || 0;
     this.arriveT = snap.at || 0;
     this.liftShut = !!snap.lk;
     this.finaleT = snap.fw || 0;
@@ -3653,14 +3694,25 @@ export class BackroomsSim {
       }
       if (!M.pace) faceTo(M, P.x, P.z, 3.2);
       if (M.waitT <= 0 || !same) {
-        M.mode = 'patrol';
-        M.silent = false;
-        M.watch = null;
-        M.pace = null;
-        M.stalkT = rand(3, 8);
-        // Level 0 : on se retourne… elle n'est plus là
-        if (this.level === 0) M.vanish = true;
-        M.lurk = false;
+        // Level 0 : elle a attendu qu'il la voie (postée devant lui, ou à découvert à quelques pas), et il ne s'est pas
+        // retourné. La première fois, elle s'efface ; la deuxième de suite, elle ne s'efface plus : son cri le prévient,
+        // puis elle charge (lui tourner le dos n'est plus un abri avant la 3e cassette, et elle ne frappe toujours pas
+        // sans prévenir)
+        const snub = same && this.level === 0 && !calm && !this.shelteredAt(P) && (M.lurk ? dist < SEEN_R + 6 : M.hasLineOfSight && dist < SNUB_R);
+        if (snub) M.snubs = (M.snubs || 0) + 1;
+        if (snub && M.snubs >= SNUBS) {
+          M.vanish = false;
+          this.rushAt(M, P);
+        } else {
+          M.mode = 'patrol';
+          M.silent = false;
+          M.watch = null;
+          M.pace = null;
+          M.stalkT = rand(3, 8);
+          // Level 0 : on se retourne… elle n'est plus là
+          if (this.level === 0) M.vanish = true;
+          M.lurk = false;
+        }
       }
     }
 
@@ -3699,6 +3751,10 @@ export class BackroomsSim {
         tx = P.x;
         tz = P.z;
         tf = !same ? P.floor || 0 : (M.floor || 0) === 1 ? 0 : 1;
+      } else if (M.mode === 'chase' && this.stairs.length && tf === (M.floor || 0) && cageAt(this.stairs, tx, tz)) {
+        // elle vient de le perdre de vue dans la cage (un regard ailleurs suffit) : on n'y entre que par une volée, elle
+        // la prend quand même, au lieu de buter contre le mur de la cage en changeant d'avis à chaque pas
+        tf = (M.floor || 0) === 1 ? 0 : 1;
       } else if (M.mode === 'patrol') {
         if (!M.targetWander || Math.hypot(M.x - M.targetWander.x, M.z - M.targetWander.z) < 1.5 || M.arrived || (M.bumps || 0) > 2) {
           M.bumps = 0;
@@ -3809,7 +3865,12 @@ export class BackroomsSim {
     const reach = P.hidden >= 0 ? (map.spots ? 2.0 : 1.4) : 1.15; // Level 5 : sous un lit, elle t'attrape par le pied du lit
     const leaping = M.trav && M.trav.kind === 'drop' && M.trav.phase !== 'peer';
     const level = Math.abs(feetOf(this, M) - feetY(this.stairs, P.x, P.z, P.floor || 0)) < 1.3;
-    if (same && dist < reach && level && !leaping && (P.hidden < 0 || M.sawHide === P.hidden) && !this.calmAt(P) && !this.dockBetween(M.floor || 0, M.x, M.z, P.x, P.z)) {
+    // dans la même cage d'escalier, l'étage ne compte pas (il change à mi-hauteur, au pied de la seconde volée) : seule
+    // la hauteur des pieds les sépare
+    const pc = !same && this.stairs.length ? cageAt(this.stairs, P.x, P.z) : null;
+    const mc = pc ? cageAt(this.stairs, M.x, M.z) : null;
+    const close = same ? dist : pc && mc && pc.st === mc.st ? Math.hypot(dx, dz) : Infinity;
+    if (close < reach && level && !leaping && (P.hidden < 0 || M.sawHide === P.hidden) && !this.calmAt(P) && !this.dockBetween(M.floor || 0, M.x, M.z, P.x, P.z) && !this.liftBetween(M.floor || 0, M.x, M.z, P.x, P.z)) {
       if (P.hidden >= 0) this.leaveHide(P);
       if (P.desk) this.leaveDesk(P, true);
       if (this.level === HOTEL_LEVEL || P.grabs >= 1 || this.difficulty === 'hard' && this.rage >= 1) {
@@ -3850,16 +3911,7 @@ export class BackroomsSim {
     const need = GRAB_STRUGGLES + (this.difficulty === 'hard' ? 3 : 0);
     const blinded = this.players.some((Q) => Q !== G && Q.status === 'alive' && Q.flashlight && Q.floor === M.floor && Math.hypot(Q.x - M.x, Q.z - M.z) < 12 && this.facing(Q, M.x, M.z) < 0.35 && hasLineOfSight(this.fm(M.floor), Q.x, Q.z, M.x, M.z));
     if (G.struggle >= need || blinded) {
-      G.grabT = 0;
-      G.struggle = 0;
-      G.lockT = 0.3;
-      M.mode = 'stun';
-      M.stunT = MONSTER_STUN_T;
-      M.grabbing = null;
-      M.unseenT = 0;
-      // repoussée, elle titube en arrière (un mètre environ, en une demi-seconde)
-      shove(M, -Math.sin(a), -Math.cos(a), 4.2);
-      this.emit({ type: 'release', id: G.id, escaped: true, blinded, x: M.x, z: M.z, floor: M.floor });
+      this.breakGrab(M, G, { blinded });
       return;
     }
     if (G.grabT <= 0) {
@@ -3867,6 +3919,22 @@ export class BackroomsSim {
       this.killPlayer(G, { x: M.x, z: M.z });
       this.afterCatch(M);
     }
+  }
+
+  // La prise lâchée : on s'est débattu, un coéquipier l'a aveuglée, ou les portes de la cabine se sont refermées
+  // sur son bras
+  breakGrab(M, G, extra = {}) {
+    const a = Math.atan2(G.x - M.x, G.z - M.z);
+    G.grabT = 0;
+    G.struggle = 0;
+    G.lockT = 0.3;
+    M.mode = 'stun';
+    M.stunT = MONSTER_STUN_T;
+    M.grabbing = null;
+    M.unseenT = 0;
+    // repoussée, elle titube en arrière (un mètre environ, en une demi-seconde)
+    shove(M, -Math.sin(a), -Math.cos(a), 4.2);
+    this.emit({ type: 'release', id: G.id, escaped: true, x: M.x, z: M.z, floor: M.floor, ...extra });
   }
 
   // après une victime : elle repart en ronde, loin de la cabine
@@ -4016,7 +4084,10 @@ export class BackroomsSim {
   // après l'avoir perdu de vue, et (à partir de la 3e cassette) de temps en temps. Sinon, elle se montre d'abord
   mayChase(M, P, hunt) {
     if (this.level !== 0 || hunt) return true;
-    if (this.time - (P.sawM ?? -1e9) < SAW_T || this.time - (M.chasedAt ?? -1e9) < 8) return true;
+    if (this.time - (P.sawM ?? -1e9) < SAW_T || this.time - (M.chasedAt ?? -1e9) < 8) {
+      M.snubs = 0;
+      return true;
+    }
     if (this.cassettes >= FRONT_TAPES) {
       if (this.time > (M.backRollT || 0)) {
         M.backRollT = this.time + 20;
@@ -4075,6 +4146,7 @@ export class BackroomsSim {
     M.watch = null;
     M.pace = null;
     M.lurk = false;
+    M.snubs = 0;
     M.ambush = null;
     M.silent = false;
     // le cri d'abord (elle reste sur place, tournée vers lui, tout le corps qui tremble), la course ensuite
