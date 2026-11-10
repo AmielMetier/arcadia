@@ -263,7 +263,9 @@ const AMB_CUES = {
   1: { rec: [20, 50], a: [7, 20], b: [25, 50] },
   2: { rec: [20, 50], a: [4, 10], b: [12, 28], c: [22, 48] }, // Poolrooms : clapotis, skimmers, bruits lointains
   [PIPES_LEVEL]: { rec: [20, 50], a: [9, 22], b: [18, 40], c: [14, 32] },
-  4: { rec: [9, 27] }, // Level 5 (HOTEL_LEVEL) : craquements et boîte à musique, plus souvent
+  // Level 5 (HOTEL_LEVEL) : craquements et boîte à musique, plus souvent ; un radiateur ; un téléphone, la sonnette de la
+  // réception ou une porte ; rarement un gramophone
+  4: { rec: [9, 27], a: [12, 28], b: [18, 40], c: [50, 110] },
 };
 
 // un tirage qui ne dépend que de la graine (hôte et invités tirent pareil)

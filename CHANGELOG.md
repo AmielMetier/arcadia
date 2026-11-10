@@ -1,5 +1,15 @@
 # Journal des versions — Arcadia
 
+## 5.43 — 10 novembre 2026
+- **The Backrooms** — Le Terror Hotel s'entend enfin :
+  - les pas claquent sur le marbre du hall et s'étouffent dans la moquette épaisse des couloirs ;
+  - plus de grésillement de néons : c'est la vieille installation électrique qui ronfle dans les murs, un peu plus fort sous les appliques allumées ;
+  - un radiateur cogne et siffle derrière une porte ;
+  - un téléphone sonne dans une chambre… et se tait net quand tu arrives à la porte ;
+  - la sonnette de la réception tinte alors qu'il n'y a personne au comptoir ;
+  - une porte se referme quelque part, des pas passent au loin ;
+  - rarement, un gramophone joue une valse désaccordée derrière les murs, jusqu'à ce que son ressort lâche.
+
 ## 5.42 — 10 novembre 2026
 - **The Backrooms** — Le hall du Terror Hotel en grand :
   - Un sol en damier de marbre blanc et noir, poli, où brillent les reflets des lustres. La moquette s'arrête au seuil ; il reste un grand tapis d'Orient sous la banquette et un chemin rouge depuis l'entrée.

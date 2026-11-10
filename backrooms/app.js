@@ -703,7 +703,41 @@ function stepKind(P) {
   }
   // Level 0 : dans la pellicule d'eau des grosses taches de la moquette, des pas mouillés
   if (sim.level === 0 && scene && scene.filmAt && scene.filmAt(P.x, P.z) > 0.35) return 'soak';
+  // Level 5 : le marbre du hall, la moquette épaisse partout ailleurs
+  if (sim.level === HOTEL_LEVEL) {
+    const L = sim.fm(0).lobby;
+    const cx = Math.floor(P.x / CELL_SIZE);
+    const cz = Math.floor(P.z / CELL_SIZE);
+    return L && cx >= L.x0 && cx <= L.x1 && cz >= L.z0 && cz <= L.z1 ? 'marble' : 'hotelCarpet';
+  }
   return sim.level === 1;
+}
+
+// Level 5 : l'endroit d'un bruit d'ambiance de l'hôtel, choisi sur la carte à partir du joueur tiré par l'hôte et de ses
+// tirages (tout le monde choisit le même) : slot 'a', un radiateur à moins de 22 m ; slot 'b', le téléphone d'une chambre
+// à 8-26 m (w < 0.35) ou la sonnette de la réception (w < 0.6)
+function hotelSpot(ev) {
+  const m = sim.fm(0);
+  const solids = m.solids || [];
+  const pick = (list) => (list.length ? list[Math.min(list.length - 1, Math.floor(ev.u * list.length))] : null);
+  const d = (s) => Math.hypot(s.x - ev.x, s.z - ev.z);
+  if (ev.s === 'a') {
+    const r = pick(solids.filter((s) => s.radiator && d(s) < 22));
+    return r && { x: r.x, z: r.z };
+  }
+  if (ev.s !== 'b') return null;
+  if (ev.w < 0.35) {
+    const n = pick(solids.filter((s) => s.phone && d(s) > 8 && d(s) < 26));
+    if (!n) return null;
+    const room = (m.rooms || []).find((r) => n.x >= r.x0 * CELL_SIZE && n.x <= (r.x1 + 1) * CELL_SIZE && n.z >= r.z0 * CELL_SIZE && n.z <= (r.z1 + 1) * CELL_SIZE);
+    const door = room && { x: (room.door.x + 0.5) * CELL_SIZE, z: (room.door.z + 0.5) * CELL_SIZE };
+    return { x: n.x, z: n.z, phone: true, door };
+  }
+  if (ev.w < 0.6) {
+    const desk = solids.find((s) => s.reception);
+    return desk && { x: desk.x, z: desk.z, bell: true };
+  }
+  return null;
 }
 
 let lastSettings = {};
@@ -1636,7 +1670,7 @@ function handleEvent(ev, me) {
       if (!sfx || paused || !sim) break;
       const V = sim.viewPlayer(sim.spectate || 0);
       if (ev.s !== 'rec' && (ev.floor || 0) !== (V.floor || 0)) break; // à un autre étage : la dalle l'étouffe
-      sfx.ambCue(ev.s, { x: ev.x, z: ev.z }, ev.a, ev.u, ev.v, ev.w);
+      sfx.ambCue(ev.s, { x: ev.x, z: ev.z }, ev.a, ev.u, ev.v, ev.w, sim.level === HOTEL_LEVEL ? hotelSpot(ev) : null);
       break;
     }
     case 'lampCut': {
