@@ -2998,10 +2998,15 @@ export class BackroomsSfx {
         else this.distant('laugh', pos(25, 40), 0.4, this.bedWet);
       }
     } else if (lv === PIPES_LEVEL) {
-      // coups de bélier, vapeur qui siffle au loin, tuyaux qui gémissent
-      if (slot === 'a') this.steamFar(pos(14, 30), vol(0.5, 0.9));
-      else if (slot === 'b') this.distant('hammer', pos(15, 35), vol(0.5, 0.8), this.bedWet);
-      else if (slot === 'c') this.distant('groan', pos(12, 30), vol(0.4, 0.7), this.bedWet);
+      // vapeur qui siffle au loin ou eau qui dévale une conduite au-dessus de toi ; coups de bélier ou tuyau qui se
+      // dilate tout près ; tuyaux qui gémissent
+      if (slot === 'a') {
+        if (w < 0.45) this.pipeGurgle(pos(1, 6), a * 3.7, vol(0.6, 1));
+        else this.steamFar(pos(14, 30), vol(0.5, 0.9));
+      } else if (slot === 'b') {
+        if (w < 0.4) this.pipeTicks(pos(2, 7), vol(0.6, 1));
+        else this.distant('hammer', pos(15, 35), vol(0.5, 0.8), this.bedWet);
+      } else if (slot === 'c') this.distant('groan', pos(12, 30), vol(0.4, 0.7), this.bedWet);
     }
   }
 
@@ -3895,6 +3900,143 @@ export class BackroomsSfx {
     const out = this.at({ ...pos, rolloff: 0.5, ref: 3 }, vol, 0, this.bedWet);
     this.ring(out, this.ctx.currentTime + 0.02, rnd(700, 950), [[1, 1, 0.9], [2.76, 0.5, 0.5], [5.4, 0.25, 0.3]], 0.12);
     this.caption('[metal clink]', pos);
+  }
+
+  // Tuyauteries : les machines qui tournent près de toi. list : [{ key, kind, x, z, on, occ }] (kind : 'burner', le
+  // brûleur d'une chaudière ; 'pump', une pompe ; 'panel', une armoire électrique) ; on : en marche ; occ : un mur
+  // entre elle et toi (le son passe étouffé). Une boucle par machine, créée à l'approche, arrêtée quand elle sort de
+  // la liste (l'application ne garde que les plus proches)
+  machines(list) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    if (!this.mach) this.mach = new Map();
+    const seen = new Set();
+    for (const m of list) {
+      seen.add(m.key);
+      let L = this.mach.get(m.key);
+      if (!L) {
+        L = this.machineLoop(m.kind);
+        this.mach.set(m.key, L);
+        this.moveTo(L.p, m.x, m.z);
+      }
+      L.g.gain.setTargetAtTime(m.on ? L.vol : 0.0001, t, m.on ? 0.5 : 1.5);
+      L.lp.frequency.setTargetAtTime(m.occ ? 600 : 9000, t, 0.25);
+    }
+    for (const [k, L] of this.mach) {
+      if (seen.has(k)) continue;
+      L.stop();
+      this.mach.delete(k);
+    }
+  }
+
+  machineLoop(kind) {
+    const c = this.ctx;
+    const t = c.currentTime;
+    const g = this.gainNode(0.0001);
+    const lp = this.filt('lowpass', 9000, 0.7);
+    const p = this.panner(kind === 'panel' ? 2 : 1.3, kind === 'panel' ? 1 : 2, this.out);
+    g.connect(lp).connect(p);
+    const srcs = [];
+    const go = (n) => {
+      n.start(t);
+      srcs.push(n);
+      return n;
+    };
+    // une modulation lente ou rapide (la flamme qui ronfle, le moteur qui bat) : un gain en série
+    const am = this.gainNode(1);
+    am.connect(g);
+    const wobble = (f, depth) => go(this.osc('sine', f)).connect(this.gainNode(depth)).connect(am.gain);
+    let vol;
+    if (kind === 'burner') {
+      // le brûleur : le souffle grave de la flamme, son crépitement, le grondement de la chaudière
+      go(this.longNoise()).connect(this.filt('lowpass', 150, 0.7)).connect(this.gainNode(1.0)).connect(am);
+      go(this.longNoise()).connect(this.filt('bandpass', 480, 0.9)).connect(this.gainNode(0.22)).connect(am);
+      go(this.osc('sawtooth', 31)).connect(this.filt('lowpass', 75, 0.7)).connect(this.gainNode(0.35)).connect(am);
+      wobble(5.3, 0.16);
+      wobble(1.7, 0.12);
+      vol = 0.5;
+    } else if (kind === 'pump') {
+      // la pompe : le moteur à 50 Hz et ses harmoniques, la volute qui chuinte, un roulement qui siffle à peine
+      go(this.osc('sine', 49)).connect(this.gainNode(0.55)).connect(am);
+      go(this.osc('sine', 98)).connect(this.gainNode(0.3)).connect(am);
+      go(this.osc('sawtooth', 147)).connect(this.filt('lowpass', 420, 0.7)).connect(this.gainNode(0.09)).connect(am);
+      go(this.longNoise()).connect(this.filt('bandpass', 900, 1.2)).connect(this.gainNode(0.12)).connect(am);
+      go(this.osc('sine', 1730)).connect(this.gainNode(0.012)).connect(am);
+      wobble(6.5, 0.1);
+      vol = 0.32;
+    } else if (kind === 'xfmr') {
+      // le transformateur : le gros bourdonnement à 100 Hz et ses harmoniques impaires, la tôle qui vibre, un grésillement
+      go(this.osc('sine', 100)).connect(this.gainNode(0.6)).connect(am);
+      go(this.osc('sine', 200)).connect(this.gainNode(0.22)).connect(am);
+      go(this.osc('sawtooth', 300)).connect(this.filt('lowpass', 700, 0.8)).connect(this.gainNode(0.1)).connect(am);
+      go(this.longNoise()).connect(this.filt('bandpass', 3200, 2.5)).connect(this.gainNode(0.035)).connect(am);
+      wobble(0.17, 0.12);
+      vol = 0.24;
+    } else {
+      // l'armoire électrique : le ronflement d'un transformateur
+      go(this.osc('sawtooth', 50)).connect(this.filt('lowpass', 320, 0.8)).connect(this.gainNode(0.45)).connect(am);
+      go(this.osc('sine', 100)).connect(this.gainNode(0.3)).connect(am);
+      wobble(0.3, 0.1);
+      vol = 0.1;
+    }
+    return {
+      g,
+      lp,
+      p,
+      vol,
+      stop: () => {
+        const t2 = c.currentTime;
+        g.gain.setTargetAtTime(0.0001, t2, 0.3);
+        for (const n of srcs) n.stop(t2 + 1.5);
+      },
+    };
+  }
+
+  // de l'eau qui dévale une conduite au-dessus de toi : des glouglous qui passent d'un bout de la galerie à l'autre
+  // (la source se déplace de 10 m en 3 s, d'un côté du point vers l'autre, dans la direction ang)
+  pipeGurgle(pos, ang, vol = 1) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.05;
+    const dur = 3.2;
+    const { input, panner } = this.place({ ...pos, rolloff: 1.1, ref: 3 }, vol * 0.5, 0, this.bedWet);
+    const dx = Math.cos(ang) * 5;
+    const dz = Math.sin(ang) * 5;
+    if (panner.positionX) {
+      panner.positionX.setValueAtTime(pos.x - dx, t);
+      panner.positionZ.setValueAtTime(pos.z - dz, t);
+      panner.positionY.setValueAtTime(3, t);
+      panner.positionX.linearRampToValueAtTime(pos.x + dx, t + dur);
+      panner.positionZ.linearRampToValueAtTime(pos.z + dz, t + dur);
+    }
+    // le flux qui chuinte, et par-dessus les bulles : de courtes bouffées de bruit dans un formant qui saute
+    const src = this.noise();
+    const bp = this.filt('bandpass', 300, 2.2);
+    const g = this.gainNode(0.0001);
+    src.connect(bp).connect(g).connect(input);
+    g.gain.setTargetAtTime(0.14, t, 0.4);
+    g.gain.setTargetAtTime(0.0001, t + dur - 0.6, 0.3);
+    src.start(t);
+    src.stop(t + dur + 0.6);
+    for (let k = t + 0.2; k < t + dur - 0.3; k += 0.07 + Math.random() * 0.16) {
+      const f = 180 + Math.random() * 520;
+      this.burst(input, k, 0.05 + Math.random() * 0.06, 'bandpass', f, 6 + Math.random() * 6, 0.35 + Math.random() * 0.4);
+    }
+    this.caption('[water gurgles in the pipes]', pos);
+  }
+
+  // un tuyau qui se dilate : quelques tics métalliques secs, de plus en plus espacés
+  pipeTicks(pos, vol = 1) {
+    if (!this.unlocked || !this.ctx) return;
+    const out = this.at({ ...pos, rolloff: 1.2, ref: 2 }, vol * 0.6, 0, this.bedWet);
+    let t = this.ctx.currentTime + 0.05;
+    const n = 3 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < n; i++) {
+      const f = 1900 + Math.random() * 900;
+      this.ring(out, t, f, [[1, 0.5, 0.05], [2.7, 0.25, 0.03], [5.1, 0.12, 0.02]], 0.22);
+      t += 0.12 + i * 0.09 + Math.random() * 0.25;
+    }
+    this.caption('[pipes tick]', pos);
   }
 
   // un jet de vapeur qui siffle au loin, qui crachote puis se tait

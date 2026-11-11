@@ -714,6 +714,47 @@ function stepKind(P) {
   return sim.level === 1;
 }
 
+// Tuyauteries : les six machines les plus proches de l'oreille (à moins de 24 m), pour sfx.machines. Un brûleur se tait
+// quand la vanne de sa chaufferie est fermée ; une pompe ou une armoire, quand son secteur n'a plus de courant. Un mur
+// entre elle et l'oreille étouffe le son (occ). La liste des machines de la carte est faite une fois.
+const NO_MACHINES = [];
+let machineList = null;
+function pipeMachines(V) {
+  const m = sim.map;
+  if (!machineList || machineList.map !== m) {
+    const valves = m.valves || [];
+    const nearest = (x, z) => {
+      let best = -1;
+      let bd = 20;
+      valves.forEach((v, i) => {
+        const d = Math.hypot(v.x - x, v.z - z);
+        if (d < bd) [best, bd] = [i, d];
+      });
+      return best;
+    };
+    const L = [];
+    (m.boilers || []).forEach((b, i) => L.push({ key: 'b' + i, kind: 'burner', x: b.x, z: b.z, valve: b.valve }));
+    (m.plant || []).forEach((p, i) => p.kind !== 'lockers' && p.kind !== 'bench' && L.push({ key: 'p' + i, kind: p.kind, x: p.x, z: p.z, valve: nearest(p.x, p.z) }));
+    machineList = { map: m, L };
+  }
+  const out = [];
+  for (const q of machineList.L) {
+    const d = Math.hypot(q.x - V.x, q.z - V.z);
+    if (d > 24) continue;
+    const v = m.valves && m.valves[q.valve];
+    const on = q.kind === 'burner' ? !(v && v.closed) : !(v && v.power === 2);
+    // un mur sur le trajet (on s'arrête 1,4 m avant la machine : une chaudière occupe sa case)
+    let occ = false;
+    const n = Math.floor((d - 1.4) / 0.6);
+    for (let k = 1; k <= n && !occ; k++) {
+      const f = (k * 0.6) / d;
+      if (!m.isWalkableWorld(V.x + (q.x - V.x) * f, V.z + (q.z - V.z) * f)) occ = true;
+    }
+    out.push({ key: q.key, kind: q.kind, x: q.x, z: q.z, on, occ, d });
+  }
+  return out.sort((a, b) => a.d - b.d).slice(0, 6);
+}
+
 // Level 5 : l'endroit d'un bruit d'ambiance de l'hôtel, choisi sur la carte à partir du joueur tiré par l'hôte et de ses
 // tirages (tout le monde choisit le même) : slot 'a', un radiateur à moins de 22 m ; slot 'b', le téléphone d'une chambre
 // à 8-26 m (w < 0.35) ou la sonnette de la réception (w < 0.6)
@@ -2587,6 +2628,8 @@ function frame(currentTime) {
       const V = sim.viewPlayer(sim.spectate || 0);
       sfx.setListener(V.x, V.z, V.yaw);
       sfx.setRoom(sim.level);
+      // Tuyauteries : les machines qui tournent autour de toi (brûleurs, pompes, armoires électriques)
+      sfx.machines(sim.level === PIPES_LEVEL ? pipeMachines(V) : NO_MACHINES);
       // le final du Level 0 : toutes les cassettes trouvées, une alarme au loin jusqu'à l'ascenseur
       sfx.finale(sim.level === 0 && !!sim.open && sim.state === 'playing' && (!scene || scene.redOn));
       // les pas des autres joueurs, là où ils marchent (plus rapprochés quand ils courent)

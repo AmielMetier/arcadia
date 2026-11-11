@@ -1,5 +1,49 @@
 # Journal des versions — Arcadia
 
+## 5.52 — 11 novembre 2026
+- **The Backrooms** — La sortie des Tuyauteries devient un vrai monte-charge de service :
+  - des chevrons jaunes et noirs autour des portes, des butoirs d'acier au pied des montants, une bande de danger en U au sol avec « KEEP CLEAR » peint au pochoir, la plaque « SERVICE LIFT » ;
+  - un voyant d'appel rouge qui clignote tant que la vapeur bloque l'accès, puis passe au vert ;
+  - une fois les 4 vannes fermées, un gyrophare orange se met à tourner et balaie les murs de la galerie ;
+  - la vapeur devant les portes forme un rideau sur toute la hauteur et s'étiole sous le plafond, au lieu d'un gros bloc blanc coupé net.
+
+## 5.51 — 11 novembre 2026
+- **The Backrooms** — De nouvelles salles aux Tuyauteries, à la place de réserves vides :
+  - une salle des pompes : une rangée de pompes sur leurs socles, une armoire de commande, la nourrice à volants au mur ;
+  - des locaux électriques : de gros transformateurs à ailettes avec leurs isolateurs et leurs câbles qui montent au plafond, un voyant vert « sous tension » qui s'éteint quand le disjoncteur saute, des armoires ; on les entend bourdonner de loin ;
+  - des vestiaires : des rangées de casiers métalliques, dont un entrouvert sur le noir de temps en temps, et des bancs en bois ;
+  - les salles des pompes et les locaux électriques ont toujours du courant : leurs réglettes ne meurent pas.
+
+## 5.50 — 11 novembre 2026
+- **The Backrooms** — Les Tuyauteries s'entendent :
+  - les chaudières grondent : le souffle de la flamme, son crépitement, la tôle qui vibre ; on les entend étouffées depuis la galerie, en plein en entrant dans la chaufferie ;
+  - fermer la vanne d'une chaufferie éteint ses brûleurs : le grondement se tait et la flamme retombe en braises derrière le judas ;
+  - les pompes ronronnent et chuintent, les armoires électriques bourdonnent ; plus de courant dans le secteur, elles se taisent ;
+  - de l'eau dévale parfois une conduite au-dessus de toi, en glouglous qui passent d'un bout de la galerie à l'autre ;
+  - un tuyau qui se dilate fait quelques tics secs tout près.
+
+## 5.49 — 11 novembre 2026
+- **The Backrooms** — Les galeries des Tuyauteries, plus vraies :
+  - les gros tuyaux portent leurs bandes de marquage, avec le nom du fluide et la flèche du sens d'écoulement : eau chaude, vapeur, eau froide, air comprimé, gaz ;
+  - l'eau froide perle sur le cuivre et l'acier : des gouttes tombent des tuyaux et font des ronds dans leur flaque, et on les entend tomber ;
+  - de loin en loin, un robinet d'incendie armé : un coffret rouge vitré, le dévidoir et son tuyau enroulé, la plaque « FIRE HOSE REEL » et sa conduite rouge.
+
+## 5.48 — 11 novembre 2026
+- **The Backrooms** — La lumière des Tuyauteries :
+  - les grandes halles à piliers ne sont plus plongées dans le noir : une suspension en tôle émaillée verte pend au milieu de chaque travée, et son ampoule se reflète dans le béton ciré ; une sur trois est morte ou grésille ;
+  - la bergerie reste presque toute noire ;
+  - plus de halo collé autour des lampes : seuls le verre des hublots et la brume brillent, comme en vrai.
+
+## 5.47 — 11 novembre 2026
+- **The Backrooms** — Les chaufferies des Tuyauteries ne sont plus de grandes salles vides :
+  - les grandes chaufferies alignent trois chaudières ; chacune a sa porte de foyer avec un judas où danse la flamme, un niveau d'eau en tube de verre, une soupape à contrepoids rouge, sa plaque en laiton et ses rangées de rivets ;
+  - au sol, des rayures jaunes et noires usées entourent chaque chaudière ;
+  - le long du grand mur court une nourrice rouge sur ses consoles, avec ses départs vers le plafond et vers le sol, leurs volants rouges ou bleus, un thermomètre et un grand manomètre ;
+  - des conduites calorifugées montent des chaudières, traversent la salle sous la dalle et plongent dans la nourrice ;
+  - une armoire de commande à cinq voyants (celui de la vanne passe au vert quand tu la fermes), deux cadrans et un arrêt d'urgence ; ses voyants teintent le mur autour ;
+  - une pompe sur son socle de béton : moteur à ailettes, carter jaune, volute rouge, clapet et manomètre ;
+  - une réglette éclaire le milieu des grandes chaufferies, et la flamme des brûleurs éclaire plus loin devant les chaudières.
+
 ## 5.46 — 11 novembre 2026
 - **The Backrooms** — Le Terror Hotel n'est plus un hall avec une grande boucle autour :
   - une galerie part du hall, traverse l'étage et mène au palier des ascenseurs, deux cabines dorées hors service (l'une entrouverte sur le noir de la gaine, l'autre avec un mot scotché « OUT OF ORDER ») ;

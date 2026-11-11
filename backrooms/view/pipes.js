@@ -8,6 +8,7 @@ import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL_SIZE, T } from '../engine/map.js';
 import { Z } from '../engine/level2.js';
 import { createKitInstancer, loadKit } from './kit.js';
+import { buildPlant } from './pipesPlant.js';
 
 const C = CELL_SIZE;
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -299,18 +300,64 @@ function puffTexture() {
   return t;
 }
 
-function glowTexture() {
+// Les bandes de marquage des tuyaux : le fluide écrit deux fois autour du tube, le long de son axe, avec la flèche du
+// sens d'écoulement, sur la couleur de la norme (vert l'eau, gris et rouge la vapeur, jaune le gaz, bleu l'air)
+const MARKS = [
+  { t: 'HOT WATER', bg: '#2f7a46', fg: '#f2efe4', band: '#b3261e' },
+  { t: 'STEAM', bg: '#9a9c98', fg: '#141414', band: '#b3261e' },
+  { t: 'COLD WATER', bg: '#2f7a46', fg: '#f2efe4', band: '#2456a8' },
+  { t: 'GAS', bg: '#d8a51c', fg: '#141414', band: null },
+  { t: 'COMPRESSED AIR', bg: '#3f78b8', fg: '#f2efe4', band: null },
+];
+function markTexture(m) {
   const c = document.createElement('canvas');
-  c.width = c.height = 64;
+  c.width = 256;
+  c.height = 512;
   const x = c.getContext('2d');
-  const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
-  g.addColorStop(0, 'rgba(255,255,255,1)');
-  g.addColorStop(0.15, 'rgba(255,255,255,0.55)');
-  g.addColorStop(0.45, 'rgba(255,255,255,0.12)');
-  g.addColorStop(1, 'rgba(255,255,255,0)');
-  x.fillStyle = g;
-  x.fillRect(0, 0, 64, 64);
-  return new THREE.CanvasTexture(c);
+  x.fillStyle = m.bg;
+  x.fillRect(0, 0, 256, 512);
+  if (m.band) {
+    x.fillStyle = m.band;
+    x.fillRect(0, 20, 256, 44);
+    x.fillRect(0, 448, 256, 44);
+  }
+  x.fillStyle = m.fg;
+  x.font = 'bold 40px "Arial Narrow", Arial, sans-serif';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  for (const cx of [64, 192]) {
+    x.save();
+    x.translate(cx, 256);
+    x.rotate(-Math.PI / 2);
+    x.fillText(m.t + '  \u2192', 0, 0, 330);
+    x.restore();
+  }
+  // la peinture salie : poussière en plaques, coulures
+  for (let k = 0; k < 220; k++) {
+    x.fillStyle = `rgba(${Math.random() < 0.5 ? '70,50,30' : '20,20,20'},${Math.random() * 0.18})`;
+    x.fillRect(Math.random() * 256, Math.random() * 512, 2 + Math.random() * 14, 2 + Math.random() * 10);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// Le coffret d'un robinet d'incendie armé : sa plaque, en blanc sur rouge
+function hoseLabel() {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 64;
+  const x = c.getContext('2d');
+  x.fillStyle = '#b01e17';
+  x.fillRect(0, 0, 256, 64);
+  x.fillStyle = '#f4efe2';
+  x.font = 'bold 30px "Arial Narrow", Arial, sans-serif';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  x.fillText('FIRE HOSE REEL', 128, 33);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 // map, group : l'étage ; baked(mat, { spec, gloss }) ajoute l'éclairage cuit ; tx : textures du Level 2
@@ -369,6 +416,11 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
     wheel: phong({ color: '#9c1b12', shininess: 50, specular: '#553333' }, 0.4, 40),
     tank: phong({ map: tx.pipe.boiler, color: '#9aa58f', shininess: 25, specular: '#333' }, 0.25, 20),
     straw: baked(new THREE.MeshLambertMaterial({ map: strawTexture(false), alphaTest: 0.4 })),
+    riaRed: phong({ map: tx.pipe.steel, color: '#d0392c', shininess: 50, specular: '#3a2a2a' }, 0.4, 40),
+    riaGlass: phong({ color: '#26302f', shininess: 140, specular: '#cccccc', transparent: true, opacity: 0.32, depthWrite: false }, 1.0, 160),
+    riaHose: lambert({ color: '#cfc4a4' }),
+    riaReel: lambert({ color: '#9e2a20' }),
+    riaLabel: lambert({ map: hoseLabel() }),
   };
   const signMats = new Map();
   const signMat = (i) => {
@@ -532,6 +584,12 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
   const WIRE = [lambert({ color: '#1d4fb0' }), lambert({ color: '#c8581a' }), lambert({ color: '#c9a321' }), lambert({ color: '#161616' }), lambert({ color: '#9a1d18' })];
   const runs = [];
   const leaks = []; // points des fuites (petites vapeurs) sur les tuyaux
+  const condens = []; // les gouttes de condensation, sous l'eau froide
+  const jetGridV = new Set((map.jets || []).map((j) => j.gz * W + j.gx));
+  // tuyau (son rang dans PIPES) → son marquage : eau chaude, vapeur, eau froide, air comprimé, gaz
+  const MARK_OF = { 0: 0, 1: 1, 5: 2, 7: 4, 8: 3 };
+  const markGeo = new THREE.CylinderGeometry(1, 1, 1, 20, 1, true);
+  const markMats = MARKS.map((m) => phong({ map: markTexture(m), shininess: 40, specular: '#2a2a2a' }, 0.3, 30));
   const HALF = Math.PI / 2;
   const layRun = (axis, line, a, b, room = false) => {
     const L = (b - a + 1) * C;
@@ -650,6 +708,21 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
         const [x, z] = pos(u0 + 1 + rnd() * (L - 2), lat);
         leaks.push({ x, y: y - 0.05 * p.r, z });
       }
+      // les bandes de marquage, tous les 6 à 10 m (tirées du lieu : rien ne déplace le reste du décor)
+      const mk = MARK_OF[PIPES.indexOf(p)];
+      if (!room && mk !== undefined && (p.kind === 'pvc' || p.kind === 'metal')) {
+        for (let u = u0 + 1.2 + hash(line * 5 + a, p.o * 33) * 3; u < u1 - 0.8; u += 6 + hash(u, line * 9) * 4) {
+          const [x, z] = pos(u, lat);
+          cyl(bin('mark' + mk, markGeo, markMats[mk]), ax ? 'x' : 'z', x, y, z, 0.05 * p.r * 1.06, 0.5);
+        }
+      }
+      // la condensation : l'eau froide (cuivre, acier sombre) perle et goutte dans une flaque, une fois par galerie
+      // au plus, hors des jets de vapeur
+      if (!room && (p.v === 'copper' || p.v === 'dark') && L > 4 && hash(line * 11 + a, p.o * 57) < 0.3) {
+        const u = u0 + L * (0.2 + hash(a * 3, line) * 0.6);
+        const [x, z] = pos(u, lat);
+        if (!jetGridV.has(Math.floor(z / C) * W + Math.floor(x / C))) condens.push({ x, y: y - 0.05 * p.r * (p.kind === 'thin' ? 0.6 : 1), z, period: 1.3 + hash(x, z) * 2.2, ph: hash(z, x) * 5, last: -1 });
+      }
     }
     if (room) {
       runs.push({ axis, line, a, b });
@@ -761,6 +834,22 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
     // gaine électrique vissée au mur jusqu'au plafond, et sa boîte de dérivation (modèles Poly Haven)
     wallConduit(fx, fz, Math.atan2(-dx, -dz), l.y + 0.18, l.y + 0.42, 'cable_box_double');
   }
+  // les suspensions des halles : un abat-jour conique en tôle émaillée (vert dehors, blanc dedans), sa douille, et le
+  // câble gainé qui monte au plafond, sur sa rosace
+  const shadeOut = phong({ color: '#2f5444', shininess: 70, specular: '#3a3a3a' }, 0.6, 60);
+  const shadeIn = lambert({ color: '#efe9da', side: THREE.BackSide });
+  const shadeGeo = new THREE.CylinderGeometry(0.07, 0.34, 0.24, 24, 1, true);
+  const rimGeo = new THREE.TorusGeometry(1, 0.03, 6, 24);
+  const c12 = new THREE.CylinderGeometry(1, 1, 1, 12);
+  for (const l of map.lights) {
+    if (!l.hang) continue;
+    put(bin('hshade', shadeGeo, shadeOut), l.x, l.y + 0.08, l.z, 1, 1, 1);
+    put(bin('hshadeIn', shadeGeo, shadeIn), l.x, l.y + 0.08, l.z, 0.985, 0.985, 0.985);
+    put(bin('hrim', rimGeo, M.lampMetal), l.x, l.y - 0.04, l.z, 0.34, 0.34, 0.34, Math.PI / 2, 0, 0);
+    cyl(bin('hsock', c12, M.lampMetal), 'y', l.x, l.y + 0.24, l.z, 0.045, 0.1);
+    cyl(bin('hcord', c12, M.cage), 'y', l.x, (l.y + 0.29 + CEIL) / 2, l.z, 0.008, CEIL - l.y - 0.29);
+    cyl(bin('hrose', c12, M.lampMetal), 'y', l.x, CEIL - 0.02, l.z, 0.06, 0.04);
+  }
   // les néons des réserves : deux réglettes côte à côte sous un réflecteur, pendues à deux tiges filetées
   for (const l of map.lights) {
     if (l.kind !== 'tube') continue;
@@ -846,6 +935,31 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
           const az2 = dx ? 0.3 : 0;
           kit.put('fire_alarm', 'fire_alarm', fx - dx * 0.002 + ox + ax2, 1.4, fz - dz * 0.002 + oz + az2, ry, 1.2);
           kit.put('fire_alarm', 'fire_alarm_lever', fx - dx * 0.014 + ox + ax2, 1.4 - 0.036, fz - dz * 0.014 + oz + az2, ry, 1.2);
+        } else if (!room && q > 0.952) {
+          // un robinet d'incendie armé : coffret rouge, porte vitrée sur le dévidoir et son tuyau enroulé, plaque
+          // au-dessus ; la conduite rouge qui l'alimente monte au plafond (tiré du lieu : le reste du décor ne bouge pas)
+          const lat = (hash(x * 3 + dx, z * 5 + dz) - 0.5) * 1.0;
+          const hx = fx + (dz ? lat : 0);
+          const hz = fz + (dx ? lat : 0);
+          // repère du coffret : lz sort du mur, lx le long du mur (le coffret est symétrique)
+          const rb = (b, lx, y, lz, sx, sy, sz) => put(b, hx - dx * lz + (dz ? lx : 0), y, hz - dz * lz + (dx ? lx : 0), dz ? sx : sz, sy, dz ? sz : sx, 0, 0, 0);
+          const red = bin('ria-box', unitBox, M.riaRed);
+          rb(red, 0, 1.3, 0.012, 0.72, 0.82, 0.024); // le fond
+          for (const e of [-1, 1]) {
+            rb(red, 0, 1.3 + e * 0.4, 0.12, 0.72, 0.024, 0.24); // dessus, dessous
+            rb(red, e * 0.35, 1.3, 0.12, 0.024, 0.82, 0.24); // côtés
+            rb(red, 0, 1.3 + e * 0.36, 0.238, 0.72, 0.08, 0.012); // le cadre de la porte
+            rb(red, e * 0.33, 1.3, 0.238, 0.06, 0.82, 0.012);
+          }
+          rb(bin('ria-glass', unitBox, M.riaGlass), 0, 1.3, 0.24, 0.6, 0.64, 0.006);
+          // le dévidoir : un tambour rouge et le tuyau plat enroulé (des spires écrues)
+          const reelRot = [dz ? Math.PI / 2 : 0, 0, dx ? Math.PI / 2 : 0];
+          put(bin('ria-reel', new THREE.CylinderGeometry(1, 1, 1, 24), M.riaReel), hx - dx * 0.13, 1.3, hz - dz * 0.13, 0.27, 0.16, 0.27, ...reelRot);
+          for (const [r2, o] of [[0.25, 0.07], [0.22, 0.12], [0.25, 0.17]]) put(bin('ria-hose', new THREE.TorusGeometry(1, 0.1, 6, 24), M.riaHose), hx - dx * o, 1.3, hz - dz * o, r2, r2, r2, dx ? 0 : 0, dx ? Math.PI / 2 : 0, 0);
+          put(bin('ria-hub', new THREE.CylinderGeometry(1, 1, 1, 12), M.handle), hx - dx * 0.21, 1.3, hz - dz * 0.21, 0.05, 0.03, 0.05, ...reelRot);
+          rb(bin('ria-handle', unitBox, M.handle), 0.27, 1.3, 0.252, 0.02, 0.14, 0.03);
+          put(bin('ria-label', new THREE.PlaneGeometry(1, 1), M.riaLabel), hx - dx * 0.006, 1.86, hz - dz * 0.006, 0.6, 0.15, 1, 0, ry, 0);
+          cyl(bin('ria-pipe', new THREE.CylinderGeometry(1, 1, 1, 10), M.wheel), 'y', hx - dx * 0.07 + (dz ? -0.28 : 0), (1.72 + CEIL) / 2, hz - dz * 0.07 + (dx ? -0.28 : 0), 0.03, CEIL - 1.72);
         }
       }
     }
@@ -995,7 +1109,7 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
     win.position.set(bx + d[0] * 0.145, 0.45, bz + d[1] * 0.145);
     win.rotation.y = Math.atan2(d[0], d[1]);
     group.add(win);
-    burners.push({ win, ph: rnd() * 10, x: bx, z: bz, dx: d[0], dz: d[1] });
+    burners.push({ win, ph: rnd() * 10, x: bx, z: bz, dx: d[0], dz: d[1], v: b.valve });
     // manomètre sur le corps
     const gm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.04, 20), lambert({ map: tx.gauge }));
     gm.position.set(b.x + d[0] * 0.93, 1.55, b.z + d[1] * 0.93);
@@ -1151,7 +1265,7 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
     return new THREE.CanvasTexture(c);
   })();
   const puddleMat = new THREE.MeshBasicMaterial({ color: '#000000', alphaMap: puddleTex, transparent: true, opacity: 0.14, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
-  const puddles = [...(map.jets || []).map((j) => ({ x: j.x, z: j.z, r: 1.1 })), ...leaks.map((l) => ({ x: l.x, z: l.z, r: 0.6 }))];
+  const puddles = [...(map.jets || []).map((j) => ({ x: j.x, z: j.z, r: 1.1 })), ...leaks.map((l) => ({ x: l.x, z: l.z, r: 0.6 })), ...condens.map((d) => ({ x: d.x, z: d.z, r: 0.4 }))];
   if (puddles.length) {
     const pm = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), puddleMat, puddles.length);
     puddles.forEach((p, i) => {
@@ -1165,6 +1279,23 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
     group.add(pm);
   }
 
+  // --- 7a. Les gouttes de condensation : les six plus proches tombent du tuyau et font un rond dans leur flaque ---
+  const DRIPN = 6;
+  const dripDropGeo = new THREE.SphereGeometry(0.011, 6, 5);
+  const dripRingGeo = new THREE.RingGeometry(0.86, 1, 28);
+  const dripPool = Array.from({ length: Math.min(DRIPN, condens.length) }, () => {
+    const drop = new THREE.Mesh(dripDropGeo, new THREE.MeshBasicMaterial({ color: '#cfd6d2', transparent: true, opacity: 0.85 }));
+    drop.scale.set(1, 2, 1);
+    const ring = new THREE.Mesh(dripRingGeo, new THREE.MeshBasicMaterial({ color: '#c8cdc4', transparent: true, opacity: 0, depthWrite: false }));
+    ring.rotation.x = -Math.PI / 2;
+    drop.visible = ring.visible = false;
+    group.add(drop, ring);
+    return { drop, ring };
+  });
+
+  // --- 7b. L'équipement des chaufferies (pipesPlant.js) : chaudières complètes, nourrice, armoires, pompes ---
+  const plant = buildPlant({ map, group, bin, lambert, phong, M, tx, CEIL, at, rnd });
+
   // --- Création des maillages ---
   kit.build(glassGlow);
   for (const b of bins.values()) {
@@ -1176,23 +1307,7 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
     group.add(inst);
   }
 
-  // --- 8. Halos des lampes : une lueur douce autour de chaque globe allumé (elle suit le grésillement) ---
-  const glowLights = map.lights.filter((l) => (l.base || l.state) !== 'off'); // (un secteur peut sauter, puis revenir)
-  const gPos = new Float32Array(glowLights.length * 3);
-  const gCol = new Float32Array(glowLights.length * 3);
-  glowLights.forEach((l, i) => {
-    const w = l.wall || [0, 0];
-    gPos.set([l.x - w[0] * 0.05, l.kind === 'tube' ? l.y - 0.06 : l.y, l.z - w[1] * 0.05], i * 3);
-  });
-  const gGeo = new THREE.BufferGeometry();
-  gGeo.setAttribute('position', new THREE.BufferAttribute(gPos, 3));
-  gGeo.setAttribute('color', new THREE.BufferAttribute(gCol, 3));
-  const glow = new THREE.Points(gGeo, new THREE.PointsMaterial({ map: glowTexture(), size: 0.9, sizeAttenuation: true, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: true }));
-  glow.frustumCulled = false;
-  group.add(glow);
-  const WARM = new THREE.Color('#ffc477');
-  const COOL = new THREE.Color('#cfe4ff');
-
+  // --- 8. (plus de halo autour des lampes : la lumière vient de la scène cuite, la brume et les feux de couleur) ---
   // --- 9. La vapeur : des bouffées en billboard, éclairées par les lampes et la lampe torche ---
   const MAXP = 900;
   const pGeo = new THREE.InstancedBufferGeometry();
@@ -1207,6 +1322,7 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
   pGeo.instanceCount = 0;
   const steamU = {
     map: { value: puffTexture() },
+    uCeil: { value: CEIL },
     uRight: { value: new THREE.Vector3(1, 0, 0) },
     uUp: { value: new THREE.Vector3(0, 1, 0) },
     uFlashPos: { value: new THREE.Vector3() },
@@ -1246,6 +1362,7 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
       uniform float uFlashOn;
       uniform float uFog;
       uniform vec3 uFogColor;
+      uniform float uCeil;
       varying vec2 vUv;
       varying vec4 vData;
       varying vec3 vWorld;
@@ -1261,6 +1378,9 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
         a *= 1.0 - f * 0.8;
         // tout près de l'objectif, elle s'efface (on la traverse sans voir un mur blanc)
         a *= smoothstep(0.15, 0.7, vDepth);
+        // contre le plafond et le sol, elle s'étiole au lieu d'être tranchée net par la dalle
+        a *= 1.0 - smoothstep(uCeil - 0.75, uCeil - 0.05, vWorld.y);
+        a *= smoothstep(0.0, 0.3, vWorld.y);
         if (a < 0.003) discard;
         gl_FragColor = vec4(col, a);
       }`,
@@ -1300,13 +1420,15 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
   const fwd = new THREE.Vector3();
   let exitSteam = 1;
 
-  return {
+  const view = {
+    onDrip: null, // une goutte de condensation tombe dans sa flaque près du joueur ({ x, z }) : la scène la fait entendre
     // le moteur de lumière : la flamme d'un brûleur lèche le sol devant sa lucarne ; un voyant de vanne ou de
     // disjoncteur teinte le mur autour de lui (rouge qui clignote quand le secteur est noir, vert une fois réarmé)
     lights(out) {
+      plant.lights(out);
       for (const b of burners) {
         const c = b.win.material.color;
-        out.push({ x: b.x + b.dx * 0.3, y: 0.5, z: b.z + b.dz * 0.3, r: c.r * 0.9, g: c.g * 0.9, b: c.b * 0.9, rad: 3.4, nx: b.dx, ny: -0.15, nz: b.dz, w: -0.25 });
+        out.push({ x: b.x + b.dx * 0.3, y: 0.55, z: b.z + b.dz * 0.3, r: c.r * 1.25, g: c.g * 1.2, b: c.b, rad: 4.4, nx: b.dx, ny: -0.1, nz: b.dz, w: -0.3 });
       }
       for (const vv of valveViews) {
         const c = vv.lamp.material.color;
@@ -1336,9 +1458,41 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
         vv.needle.rotation.z = Math.PI * 0.75 - pr * Math.PI * 1.5;
         vv.lamp.material.color.set(vv.v.closed ? '#2bff6a' : vv.v.turn > 0 ? (Math.sin(time * 14) > 0 ? '#ffb020' : '#ff2a1a') : '#ff2a1a');
       }
+      plant.update(time, dt, sim, P);
+      // les gouttes : les plus proches du joueur ; chacune tombe (chute libre), puis son rond s'étale dans la flaque
+      if (dripPool.length) {
+        const near6 = condens.map((d) => [d, (d.x - P.x) ** 2 + (d.z - P.z) ** 2]).sort((a, b) => a[1] - b[1]).slice(0, dripPool.length);
+        near6.forEach(([d, d2], i) => {
+          const { drop, ring } = dripPool[i];
+          const u = (time + d.ph) / d.period;
+          const n = Math.floor(u);
+          const tt = (u - n) * d.period; // secondes depuis le décrochage
+          const fallT = Math.sqrt((2 * d.y) / 9.81);
+          const lit = Math.min(1.2, 0.25 + lightAt(d.x, d.z) * 0.8);
+          drop.visible = d2 < 400 && tt < fallT;
+          if (drop.visible) drop.position.set(d.x, d.y - 4.905 * tt * tt, d.z);
+          drop.material.color.setRGB(0.81 * lit, 0.84 * lit, 0.82 * lit);
+          const rt = (tt - fallT) / 0.7;
+          ring.visible = d2 < 400 && rt >= 0 && rt < 1;
+          if (ring.visible) {
+            ring.position.set(d.x, 0.012, d.z);
+            ring.scale.setScalar(0.02 + rt * 0.22);
+            ring.material.opacity = 0.5 * (1 - rt);
+            ring.material.color.setRGB(0.78 * lit, 0.8 * lit, 0.77 * lit);
+          }
+          // le « plic » : une fois par goutte, quand elle touche l'eau
+          if (rt >= 0 && d.last !== n) {
+            d.last = n;
+            if (d2 < 196 && view.onDrip) view.onDrip({ x: d.x, z: d.z });
+          }
+        });
+      }
       // brûleurs : la flamme danse derrière la lucarne
       for (const b of burners) {
-        const k = 0.55 + Math.sin(time * 7 + b.ph) * 0.15 + Math.sin(time * 23 + b.ph * 3) * 0.1 + Math.random() * 0.1;
+        // (la vanne de la chaufferie fermée, le brûleur s'éteint : il ne reste que des braises)
+        const v = (map.valves || [])[b.v];
+        b.fire = Math.max(0.15, Math.min(1, (b.fire ?? 1) + (v && v.closed ? -dt * 0.4 : dt * 0.8)));
+        const k = (0.55 + Math.sin(time * 7 + b.ph) * 0.15 + Math.sin(time * 23 + b.ph * 3) * 0.1 + Math.random() * 0.1) * b.fire;
         b.win.material.color.setRGB(1.6 * k, 0.62 * k, 0.15 * k);
       }
       // disjoncteurs : levier en bas et voyant rouge qui clignote quand le secteur est noir, vert une fois réarmé
@@ -1353,16 +1507,6 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
         else if (v && v.power === 1) bv.led.material.color.set(Math.random() < 0.5 ? '#ff2a1a' : ledOff);
         else bv.led.material.color.set('#3a8a3a');
       }
-      // halos : la couleur suit l'éclat du moment de chaque lampe
-      glowLights.forEach((l, i) => {
-        const k = l.state === 'off' ? 0 : l.k === undefined ? 1 : l.k;
-        const c = l.kind === 'tube' ? COOL : WARM;
-        const m = (l.kind === 'tube' ? 0.35 : 0.8) * k;
-        gCol[i * 3] = c.r * m;
-        gCol[i * 3 + 1] = c.g * m;
-        gCol[i * 3 + 2] = c.b * m;
-      });
-      gGeo.attributes.color.needsUpdate = true;
 
       // vapeur : émetteurs proches seulement
       const near = (x, z, r) => Math.abs(x - P.x) < r && Math.abs(z - P.z) < r;
@@ -1392,7 +1536,8 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
       if (E && exitSteam > 0.02 && near(E.x, E.z, 30)) {
         const ox = E.x - E.dx * (C / 2 + 0.05);
         const oz = E.z - E.dz * (C / 2 + 0.05);
-        for (let k = rate('exit', 55 * exitSteam, dt); k > 0; k--) emit(ox + (E.dz ? (Math.random() - 0.5) * 1.6 : 0), 2.5, oz + (E.dx ? (Math.random() - 0.5) * 1.6 : 0), -E.dx * (0.6 + Math.random()), -0.4 - Math.random() * 0.4, -E.dz * (0.6 + Math.random()), 3, 0.4, 2.2, 0.32 * exitSteam);
+        // (un rideau sur toute la hauteur de la baie, pas un paquet blanc collé sous la dalle)
+        for (let k = rate('exit', 70 * exitSteam, dt); k > 0; k--) emit(ox + (E.dz ? (Math.random() - 0.5) * 1.6 : 0), 0.4 + Math.random() * 2.0, oz + (E.dx ? (Math.random() - 0.5) * 1.6 : 0), -E.dx * (0.5 + Math.random() * 0.9), (Math.random() - 0.6) * 0.35, -E.dz * (0.5 + Math.random() * 0.9), 3, 0.45, 1.9, 0.3 * exitSteam);
       }
       // soupapes des chaudières : une bouffée de temps en temps
       for (const b of map.boilers || []) {
@@ -1452,4 +1597,5 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
       steamU.uFlashOn.value = flashOn ? 1 : 0;
     },
   };
+  return view;
 }

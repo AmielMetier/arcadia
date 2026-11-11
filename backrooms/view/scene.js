@@ -2317,8 +2317,10 @@ float bkCaust(vec2 uv, float t) {
       const bulbs = map.lights.filter((l) => l.kind === 'bulb');
       // l'ampoule, dans le hublot de verre de la lampe (pipes.js)
       fixSet(new THREE.SphereGeometry(0.045, 12, 10), new THREE.MeshBasicMaterial({ color: '#ffffff' }), bulbs, (l) => {
-        dummy.position.set(l.x + l.wall[0] * 0.13, l.y, l.z + l.wall[1] * 0.13);
-        dummy.scale.set(1, 1.3, 1);
+        // (une suspension des halles : l'ampoule pend sous son abat-jour, plus grosse)
+        if (l.wall) dummy.position.set(l.x + l.wall[0] * 0.13, l.y, l.z + l.wall[1] * 0.13);
+        else dummy.position.set(l.x, l.y - 0.02, l.z);
+        dummy.scale.set(l.wall ? 1 : 1.5, l.wall ? 1.3 : 1.6, l.wall ? 1 : 1.5);
       });
       const tubes = map.lights.filter((l) => l.kind === 'tube');
       fixSet(new THREE.CylinderGeometry(0.01, 0.01, 1.4, 8), new THREE.MeshBasicMaterial({ color: '#ffffff' }), tubes, (l) => {
@@ -3526,7 +3528,10 @@ float bkCaust(vec2 uv, float t) {
     const gear = L1 && map.docks ? buildGear({ map, group, baked, wallMat, CEIL }) : null;
     // 9b. Level 2 : tuyauteries, lampes grillagées, grilles, chaudières, vannes et vapeur
     const pipesView = PIPES ? buildPipes({ map, group, baked, CEIL, tx: tx2, camera }) : null;
-    if (pipesView) pipesView.setFog(scene.fog);
+    if (pipesView) {
+      pipesView.setFog(scene.fog);
+      pipesView.onDrip = (pos) => api.onDrip && api.onDrip(pos); // les gouttes de condensation des Tuyauteries
+    }
 
     // 10. Fusibles (Level 1) : un gros fusible céramique aux bouts de cuivre, lueur ambrée
     const fuseMeshes = [];
