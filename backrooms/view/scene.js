@@ -5723,6 +5723,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     gearEvent(ev) {
       for (const fv of floorViews) if (fv.gear) fv.gear.event(ev);
       if (ev.type === 'ductOut') ductDrop = DUCT_LAND;
+      // un coup à la porte blindée : le geste de l'entité tombe avec le bruit
+      if (ev.type === 'safeBang' && beast && beast.hit) beast.hit(performance.now() / 1000);
     },
 
     // tombé dans un puits sans fond (x, z : le milieu du puits)
@@ -5990,6 +5992,11 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
           monsterGroup.position.set(M.x + (Math.random() - 0.5) * j * 0.3, my, M.z + (Math.random() - 0.5) * j * 0.3);
           monsterGroup.rotation.y = M.yaw || 0;
           const mv = floorViews[M.floor || 0];
+          // Level 1 : sous la porte du poste de garde ou d'une salle de sécurité (2,10 m), elle se courbe
+          if (L1 && beast.duck) {
+            const mp = sim.map;
+            beast.duck([mp.guardDoor, ...(mp.safes || [])].some((d) => d && Math.hypot(d.x - M.x, d.z - M.z) < 1.5));
+          }
           const foot = M.mimic == null ? beast.update(M, chase, mv ? mv.lightAt(M.x, M.z) : 0.3, dt, time, camera.position) : null;
           if (foot && api.onMonsterStep) api.onMonsterStep(foot);
         } else {

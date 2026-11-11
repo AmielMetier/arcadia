@@ -1628,7 +1628,7 @@ export class BackroomsSim {
       M.bang.t -= DT;
       M.bang.hitT -= DT;
       if (M.bang.hitT <= 0) {
-        M.bang.hitT = rand(0.45, 0.85);
+        M.bang.hitT = rand(0.6, 0.8); // (des coups assez réguliers : le geste de l'entité se cale dessus, voir view/creature.js)
         this.emit({ type: 'safeBang', id: S.id, x: S.x, z: S.z, k: Math.round(Math.random() * 100) / 100 });
       }
       if (M.bang.t <= 0) {
