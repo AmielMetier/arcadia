@@ -3451,6 +3451,7 @@ export class BackroomsSim {
       vo: this.map.ducts ? bits(this.map.ducts.vents, 'open') : undefined,
       pb: this.map.post ? this.map.post.by : undefined,
       sf: this.map.safes ? bits(this.map.safes, 'shut') : undefined, // les portes blindées fermées
+      gd: this.map.guardDoor ? (this.map.guardDoor.open ? 1 : 0) : undefined, // la porte du poste de garde (un invité arrivé en route ne l'a pas vue s'ouvrir)
       k: [bits(this.allCassettes, 'collected'), bits(this.map.fuses, 'taken'), this.floors.map((f) => bits(f.items, 'taken')).join('|'), ''],
       // objets posés par des joueurs (échanges) : [étage, objet, x, z] ; échelle posée
       ix: this.floors.flatMap((f, fi) => (f.items || []).slice(this.items0[fi]).map((o) => [fi, o.kind, r2(o.x), r2(o.z)])),
@@ -3686,6 +3687,7 @@ export class BackroomsSim {
     if (this.map.ducts && typeof snap.vo === 'string') this.map.ducts.vents.forEach((v, i) => (v.open = snap.vo[i] === '1'));
     if (this.map.post && snap.pb !== undefined) this.map.post.by = snap.pb;
     if (this.map.safes && typeof snap.sf === 'string') this.map.safes.forEach((S, i) => (S.shut = snap.sf[i] === '1'));
+    if (this.map.guardDoor && snap.gd !== undefined) this.map.guardDoor.open = !!snap.gd;
     const set = (list, k, b) => (list || []).forEach((o, i) => {
       o[k] = (b || '')[i] === '1';
     });

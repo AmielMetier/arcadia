@@ -4616,6 +4616,31 @@ test("Level 1 : le calme de l'arrivée vaut aussi pour l'imposteur — déguisé
   }
 });
 
+test("Level 1 à plusieurs : la porte du poste de garde arrive par l'instantané (un invité arrivé en route la voit comme l'hôte)", () => {
+  const players = [{ id: 0, name: 'A' }, { id: 1, name: 'B' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 6, level: 1, players: players.map((p) => ({ ...p })), localId: 0 });
+  const gd = host.map.guardDoor;
+  assert.ok(gd, 'un poste de garde, avec sa porte');
+  const P = host.player;
+  host.arriveT = 0;
+  P.x = gd.x;
+  P.z = gd.z;
+  for (let i = 0; i < 30; i++) host.step({});
+  assert.equal(gd.open, true, "ouverte devant l'hôte");
+  // l'invité n'a reçu aucun événement : il vient d'arriver
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 6, level: 1, players: players.map((p) => ({ ...p })), localId: 1 });
+  assert.equal(guest.map.guardDoor.open, false);
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  assert.equal(guest.map.guardDoor.open, true, "ouverte chez l'invité");
+  host.players[0].x = host.map.spawn.x;
+  host.players[0].z = host.map.spawn.z;
+  for (let i = 0; i < 120; i++) host.step({});
+  if (!gd.open) {
+    guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+    assert.equal(guest.map.guardDoor.open, false, "refermée chez l'invité");
+  }
+});
+
 test('Level 1 : coupures variées — jamais deux fois de suite le même genre ; le délestage éteint un tiers après l\'autre', () => {
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 3, level: 1 });
   const kinds = [];

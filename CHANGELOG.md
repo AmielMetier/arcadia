@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.56 — 11 novembre 2026
+- **The Backrooms** — Level 1 à plusieurs : la porte du poste de garde s'affiche comme chez l'hôte pour un joueur qui arrive ou revient en cours de partie (il pouvait la voir fermée alors qu'elle était ouverte, et buter dessus).
+
 ## 5.55 — 11 novembre 2026
 - **The Backrooms** — Level 1 : l'arrivée est vraiment calme.
   - Déguisée en joueur, l'entité venait droit sur l'équipe dès la première seconde ; elle reste maintenant au loin pendant les 50 premières secondes, sans appeler ni forcer un rideau, et s'écarte de qui s'approche
