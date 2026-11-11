@@ -1,5 +1,5 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
-import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE, HOTEL_LEVEL, DOCK_OPEN_T, DOCK_CLOSE_T, ALARM_T, DUCT_LAND } from './engine/sim.js';
+import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE, HOTEL_LEVEL, MALL_LEVEL, DOCK_OPEN_T, DOCK_CLOSE_T, ALARM_T, DUCT_LAND } from './engine/sim.js';
 import { hasLineOfSight } from './engine/nav.js';
 import { bfs, CELL_SIZE, cellsOnSeg, T } from './engine/map.js';
 import { createBackroomsScene, setMonsterMode, setSceneOptions, onGlContext, sceneGl } from './view/scene.js';
@@ -863,9 +863,10 @@ function initGame(settings = lastSettings, forceLevel = null) {
   // tout le salon, sauf ceux revenus au salon pendant la partie d'avant (ceux qui chargent encore arrivent vivants)
   const players = NET.role === 'host' ? H.players.filter((p) => p.id === NET.myId || !NET.quit.has(p.id)).map((p) => ({ id: p.id, name: p.name || 'Player' })) : [{ id: 0, name: 'Player' }];
   NET.run = Date.now();
-  // ?level1, ?level37, ?level2 ou ?level5 (seul) : on commence directement au Level 1, aux Poolrooms ou aux Tuyauteries
-  const lvm = NET.role === 'solo' && location.search.match(/[?&]level(1|2|37|5)(&|=|$)/);
-  const lv = forceLevel != null ? forceLevel : lvm ? { 1: 1, 37: 2, 2: PIPES_LEVEL, 5: HOTEL_LEVEL }[lvm[1]] : 0;
+  // ?level1, ?level37, ?level2, ?level5 ou ?level17 (seul) : on commence directement au Level 1, aux Poolrooms, aux
+  // Tuyauteries, à l'hôtel ou au mall
+  const lvm = NET.role === 'solo' && location.search.match(/[?&]level(17|1|2|37|5)(&|=|$)/);
+  const lv = forceLevel != null ? forceLevel : lvm ? { 1: 1, 37: 2, 2: PIPES_LEVEL, 5: HOTEL_LEVEL, 17: MALL_LEVEL }[lvm[1]] : 0;
   startRun({ seed, difficulty, players, run: NET.run, level: lv, vip: settings.monsters === 'vip' });
   // ?parkour (seul) : on commence devant le couloir piégé, tourné vers les trous
   const trap = sim.map.trap;
@@ -2138,8 +2139,8 @@ function handleEvent(ev, me) {
       if (H && H.embedded && NET.role !== 'guest') {
         const won = ev.type === 'win';
         // la vraie fin vaut bien plus qu'une fausse sortie, qui vaut plus que de mourir loin (Level 2 compris)
-        const trueEnd = won && (sim.level === PIPES_LEVEL || sim.level === HOTEL_LEVEL); // sortir par les Tuyauteries ou par l'hôtel
-        const depth = { 0: 0, 1: 1, 2: 2, [PIPES_LEVEL]: 3, [HOTEL_LEVEL]: 3 }[sim.level] || 0;
+        const trueEnd = won && (sim.level === PIPES_LEVEL || sim.level === HOTEL_LEVEL || sim.level === MALL_LEVEL); // sortir par les Tuyauteries, l'hôtel ou le mall
+        const depth = { 0: 0, 1: 1, 2: 2, [PIPES_LEVEL]: 3, [HOTEL_LEVEL]: 3, [MALL_LEVEL]: 4 }[sim.level] || 0;
         H.report({
           id: `backrooms-${Date.now()}`,
           mode: dailyLabel ? 'Carte du jour' : 'Survie',

@@ -1,15 +1,15 @@
 // The Backrooms - Interface façon caméscope (REC, signal, bande), jumpscare et écran de fin
 import { ENTITY_IMG, ENTITY_ANIM, ENTITY_VIP } from './scene.js';
-import { DEPART_T, SLIDE_T, PIPES_LEVEL, CASSETTES, NOISE, VOICE_MIN, THIRST_BLUR, INV_SIZE, HOTEL_LEVEL } from '../engine/sim.js';
+import { DEPART_T, SLIDE_T, PIPES_LEVEL, CASSETTES, NOISE, VOICE_MIN, THIRST_BLUR, INV_SIZE, HOTEL_LEVEL, MALL_LEVEL } from '../engine/sim.js';
 
 import { vault } from './vault.js';
 const GOAT_DEATH_FADE = 8; // secondes de montée de l'image
 
 // nom affiché d'un niveau : le troisième, ce sont les Poolrooms (Level 37) ; le quatrième, les Tuyauteries (Level 2)
-export const levelName = (lv) => (lv === 2 ? 37 : lv === PIPES_LEVEL ? 2 : lv === HOTEL_LEVEL ? 5 : lv);
+export const levelName = (lv) => (lv === 2 ? 37 : lv === PIPES_LEVEL ? 2 : lv === HOTEL_LEVEL ? 5 : lv === MALL_LEVEL ? 17 : lv);
 // Poolrooms : le toboggan pris par l'équipe (ou null)
 const slideOf = (sim) => (sim.map.slides && sim.slide >= 0 ? sim.map.slides[sim.slide] : null);
-export const levelSub = (lv) => (lv === HOTEL_LEVEL ? 'The Terror Hotel' : lv === PIPES_LEVEL ? 'Pipe Dreams · the service tunnels' : lv === 2 ? 'The Poolrooms' : lv === 1 ? 'The industrial basement' : 'The Lobby');
+export const levelSub = (lv) => (lv === MALL_LEVEL ? 'The Mall · after hours' : lv === HOTEL_LEVEL ? 'The Terror Hotel' : lv === PIPES_LEVEL ? 'Pipe Dreams · the service tunnels' : lv === 2 ? 'The Poolrooms' : lv === 1 ? 'The industrial basement' : 'The Lobby');
 
 // Les cassettes du Level 0 racontent une histoire : dix enregistrements, cinq par partie (toujours d'autres, selon la
 // graine). Ceux qu'on a déjà écoutés restent dans la collection (sur cet appareil).

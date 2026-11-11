@@ -23,6 +23,7 @@ import { createWarehouseMap, DOCK_PASS, guardDoorWant, inSafe, SAFE_LEVER_R } fr
 import { createPoolMap, MOUTH } from './poolrooms.js';
 import { createHotelMap, WORDS, LETTERS, HIDE_R as SPOT_R, MAIL_R, KEYPAD_R, LETTER_R } from './hotel.js';
 import { createPipesMap, VALVES, PIPES_LEVEL, jetState, inJet, JET_HALF } from './level2.js';
+import { createMallMap, MALL_LEVEL } from './mall.js';
 import { hasLineOfSight } from './nav.js';
 import { planTo, move as gaitMove, faceTo, shove, stagger, feetOf, cageAt, BODY_R, roamable } from './gait.js';
 import { Track } from './interp.js';
@@ -93,6 +94,7 @@ export { CASSETTES };
 export const FUSES = 3;
 export { VALVES, PIPES_LEVEL };
 export const HOTEL_LEVEL = 4; // Level 5, le Terror Hotel (par le toboggan rouge des Poolrooms)
+export { MALL_LEVEL }; // 5 : Level 17, le Mall (deux étages, engine/mall.js)
 export const LAST_LEVEL = PIPES_LEVEL; // 0 : Level 0, 1 : Level 1 (entrepôt), 2 : Level 37 (Poolrooms), 3 : Level 2 (Tuyauteries, toboggan jaune), 4 : Level 5 (Terror Hotel, toboggan rouge)
 export const VALVE_T = 6.5; // secondes devant une vanne pour la fermer (elle revient doucement si on la lâche) : on s'expose
 export const VALVE_R = 1.5; // portée : il faut se tenir devant
@@ -280,6 +282,7 @@ const KEEP_ITEMS = [0.6, 0.6, 0.72, 0.82, 0.9, 0.95, 1];
 // les étages d'un niveau : même graine de partie, des cartes différentes par niveau
 export function makeLevelMap(level, seed) {
   if (level === HOTEL_LEVEL) return [createHotelMap(seed * 13 + 5)];
+  if (level === MALL_LEVEL) return createMallMap(seed * 17 + 3).floors;
   if (level === 2) return [createPoolMap(seed * 11 + 37)];
   if (level === PIPES_LEVEL) return [createPipesMap(seed * 11 + 29)];
   return level === 1 ? [createWarehouseMap(seed * 7 + 13)] : createLevel0(seed).floors;
@@ -739,6 +742,7 @@ export class BackroomsSim {
   get open() {
     if (this.level === PIPES_LEVEL) return this.valves >= VALVES;
     if (this.level === 2) return true; // Poolrooms : les toboggans sont ouverts dès l'arrivée
+    if (this.level === MALL_LEVEL) return true; // Level 17 : le monte-charge marche (le but du niveau viendra)
     // (Level 1 : le courant revenu, le monte-charge doit encore descendre jusqu'à l'équipe)
     if (this.level === 1) return this.powered && !(this.liftCallT > 0);
     return this.level === 0 ? this.cassettes >= CASSETTES && !(this.finaleT > 0) : this.powered;

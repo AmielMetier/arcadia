@@ -28,6 +28,7 @@ const putOn = (sim, P, cas) => {
 import { createWarehouseMap, DOCK_PASS } from '../backrooms/engine/level1.js';
 import { createPoolMap } from '../backrooms/engine/poolrooms.js';
 import { createHotelMap, parseWords, WORDS } from '../backrooms/engine/hotel.js';
+import { createMallMap, MALL_LEVEL, polyDist as mallPolyDist } from '../backrooms/engine/mall.js';
 
 // avance la partie de n secondes
 const run = (sim, sec, input = {}, others = null) => {
@@ -2872,6 +2873,90 @@ test('Level 37 : on traverse chaque porte en marchant, les cloisons arrêtent le
   assert.ok(crossed > 60);
 });
 
+
+// --- Level 17, le Mall ---
+test('Level 17 : deux étages reliés par trois escaliers, des vides bordés, tout ce qui est ouvert est accessible', () => {
+  for (const sd of [1, 3, 17, 42, 99, 1234]) {
+    const { floors, stairs } = createMallMap(sd);
+    const [up, dn] = floors;
+    assert.equal(up.level, MALL_LEVEL);
+    assert.equal(floors.length, 2);
+    assert.equal(stairs.length, 3);
+    assert.ok(up.voids.length >= 7 && !dn.voids.length, 'les vides sont à l\'étage du haut');
+    for (const st of stairs) {
+      // les six cases de l'escalier sont libres aux deux étages, ses deux entrées aussi, et hors des vides
+      for (const c of st.cells) for (const f of floors) assert.equal(f.grid[c.gz * f.W + c.gx], T.FLOOR, `graine ${sd} : escalier ${st.id}`);
+      assert.ok(up.dist[Math.floor(st.up.z / CELL_SIZE) * up.W + Math.floor(st.up.x / CELL_SIZE)] >= 0, `graine ${sd} : haut de l'escalier ${st.id} atteint`);
+      assert.ok(dn.dist[Math.floor(st.down.z / CELL_SIZE) * dn.W + Math.floor(st.down.x / CELL_SIZE)] >= 0);
+      for (const v of up.voids) for (const c of st.cells) assert.ok(mallPolyDist(v.pts, (c.gx + 0.5) * CELL_SIZE, (c.gz + 0.5) * CELL_SIZE) > 1.2, 'pas d\'escalier dans un vide');
+    }
+    // aucun pilier, objet, départ ni lumière au sol dans un vide ; on ne peut pas y entrer
+    for (const v of up.voids) {
+      for (const k in up.pillars) assert.ok(mallPolyDist(v.pts, up.pillars[k].x, up.pillars[k].z) > 1, 'pilier hors du vide');
+      for (const it of up.items) assert.ok(mallPolyDist(v.pts, it.x, it.z) > 0.7, 'objet hors du vide');
+      const c = v.pts.reduce((a, p) => [a[0] + p[0] / v.pts.length, a[1] + p[1] / v.pts.length], [0, 0]);
+      assert.ok(up.collide(c[0], c[1], 0.38), 'le vide arrête les joueurs');
+    }
+    assert.ok(!up.collide(up.spawn.x, up.spawn.z, 0.38) && up.dist[up.spawn.gz * up.W + up.spawn.gx] === 0);
+    // toutes les salles sont atteintes, sauf le grand magasin fermé et les boutiques fermées sans porte de service
+    for (const f of floors)
+      for (const r of f.rooms) {
+        let ok = false;
+        for (let z = r.z0; z <= r.z1 && !ok; z++) for (let x = r.x0; x <= r.x1 && !ok; x++) ok = f.dist[z * f.W + x] >= 0;
+        const sh = r.kind === 'shop' ? f.shops[r.shop] : null;
+        const shut = r.kind === 'closed' || (sh && (sh.state === 'grille' || sh.state === 'glass') && !sh.back);
+        assert.equal(ok, !shut, `graine ${sd}, étage ${f.floor} : ${r.kind} ${r.name}`);
+      }
+    // les objets sont sur des cases parcourues, loin les uns des autres ; les escalators de la cour centrale montent
+    // jusqu'au bord de son vide
+    for (const f of floors) for (const it of f.items) assert.ok(f.dist[it.gz * f.W + it.gx] > 0 && !f.collide(it.x, it.z, 0.4));
+    for (const e of dn.escalators) {
+      const edge = mallPolyDist(up.voids.find((v) => v.court === 'center').pts, e.x + e.dir * (e.land + e.run), e.z);
+      assert.ok(edge < 0.2, `escalator ${e.id} : arrive au bord du vide (${edge.toFixed(2)})`);
+    }
+    // les deux monte-charges ont une case libre devant eux
+    for (const f of floors) assert.ok(f.dist[f.exit.gz * f.W + f.exit.gx] >= 0, `graine ${sd} : monte-charge de l'étage ${f.floor} atteint`);
+  }
+});
+
+test('Level 17 : on monte et on descend l\'escalier monumental, on bute sur le garde-corps du vide', () => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 4, level: MALL_LEVEL });
+  const P = sim.players[0];
+  assert.equal(sim.floors.length, 2);
+  const st = sim.stairs[0];
+  // en haut, devant la seconde volée : on la descend jusqu'au palier, demi-tour, la première volée, l'étage du bas
+  P.x = st.up.x;
+  P.z = st.up.z;
+  P.floor = 0;
+  const walk = (tx, tz, n = 400) => {
+    for (let i = 0; i < n; i++) {
+      const d = Math.hypot(tx - P.x, tz - P.z);
+      if (d < 0.15) return true;
+      const k = Math.min(0.08, d) / d;
+      const q = sim.stairStep(P, P.x + (tx - P.x) * k, P.z + (tz - P.z) * k);
+      if (Math.hypot(q.x - P.x, q.z - P.z) < 1e-6) return false;
+      P.x = q.x;
+      P.z = q.z;
+    }
+    return false;
+  };
+  const C = CELL_SIZE;
+  const L = (u, v) => ({ x: st.ox + st.dx * u + st.px * v, z: st.oz + st.dz * u + st.pz * v });
+  let q = L(0.3, 1.5 * C);
+  assert.ok(walk(q.x, q.z), 'on entre dans la seconde volée');
+  q = L(2.5 * C, 1.5 * C);
+  assert.ok(walk(q.x, q.z), 'on descend jusqu\'au palier');
+  q = L(2.5 * C, 0.5 * C);
+  assert.ok(walk(q.x, q.z), 'demi-tour sur le palier');
+  q = L(-0.5, 0.5 * C);
+  assert.ok(walk(q.x, q.z), 'on descend la première volée');
+  assert.equal(P.floor, 1, 'on est à l\'étage du bas');
+  // en haut : au bord du vide de la cour centrale, le garde-corps arrête
+  const v = sim.floors[0].voids.find((o) => o.court === 'center');
+  const xs = v.pts.map((p) => p[0]);
+  assert.ok(sim.isColliding(Math.max(...xs) - 0.1, sim.floors[0].mailZ, 0.38, 0), 'le vide arrête en haut');
+  assert.ok(!sim.isColliding(Math.max(...xs) - 0.1, sim.floors[0].mailZ, 0.38, 1), 'en bas, on passe dessous');
+});
 
 // --- Level 5, le Terror Hotel ---
 const goTo = (sim, P, x, z) => {
