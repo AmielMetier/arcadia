@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.61 — 11 novembre 2026
+- **The Backrooms** — L'écran de fin ne cite plus que les niveaux vraiment traversés : une partie commencée plus loin (« Continuer », ou le niveau de départ des VIP) n'annonce plus le Level 0 et le Level 1 comme réussis.
+
 ## 5.60 — 11 novembre 2026
 - **The Backrooms** — Level 1 : après une poursuite, tu as vraiment le temps de souffler. Pendant le répit, l'imposteur garde ses distances et se tait, au lieu de revenir sous une autre apparence à peine semé.
 

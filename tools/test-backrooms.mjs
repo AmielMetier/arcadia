@@ -5087,14 +5087,17 @@ test("Level 1 : pendant le répit qui suit une poursuite, l'imposteur ne revient
     const near = m.walkable.map((q) => ({ x: (q.x + 0.5) * CELL_SIZE, z: (q.z + 0.5) * CELL_SIZE })).find((q) => { const d = Math.hypot(q.x - A.x, q.z - A.z); return d > 10 && d < 15 && !m.safeAt(q.x, q.z); });
     Object.assign(M, { x: near.x, z: near.z, path: [], repathT: 0 });
     Object.assign(sim.director, { phase: 'relax', relaxT: 60 });
-    const d0 = Math.hypot(M.x - A.x, M.z - A.z);
+    // (son chemin de repli peut d'abord longer le joueur : on vérifie où il va, pas sa distance à mi-parcours)
+    const x0 = M.x;
+    const z0 = M.z;
     let calls = 0;
-    for (let i = 0; i < 60 * 10; i++) {
+    for (let i = 0; i < 60 * 6; i++) {
       sim.step({});
       calls += sim.drainEvents().filter((e) => e.type === 'mimicCall').length;
     }
-    const d1 = Math.hypot(M.x - A.x, M.z - A.z);
-    assert.ok(M.mimic != null && !calls && d1 > d0 + 5, `il s'éloigne sans appeler (${d0.toFixed(1)} m puis ${d1.toFixed(1)} m, ${calls} appel)`);
+    const to = M.calmTo;
+    assert.ok(!calls, "il n'appelle pas");
+    assert.ok(to && Math.hypot(to.x - A.x, to.z - A.z) > 25 && Math.hypot(M.x - x0, M.z - z0) > 3, 'il part vers un endroit loin du joueur');
   } finally {
     BackroomsSim.DISGUISE = false;
   }

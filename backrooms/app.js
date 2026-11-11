@@ -952,9 +952,10 @@ function checkPrint(fp) {
 }
 
 // en mode VIP, la clé du coffre part avec la partie : les invités l'ouvrent avant de la commencer
-const goMessage = () => ({ t: 'go', v: GAME_V, run: NET.run, seed: sim.seed, diff: sim.difficulty, players: sim.roster, lv: sim.level, vip: monstersVip, k: monstersVip ? vaultKey : undefined, dy: dailyLabel });
+const goMessage = () => ({ t: 'go', v: GAME_V, run: NET.run, seed: sim.seed, diff: sim.difficulty, players: sim.roster, lv: sim.level, l0: runFrom, vip: monstersVip, k: monstersVip ? vaultKey : undefined, dy: dailyLabel });
 
 let monstersVip = false;
+let runFrom = 0; // le niveau où la partie a commencé (l'écran de fin ne compte que les niveaux traversés)
 const TEST_BOT = 99;
 let testBot = false;
 // le bot de test : posé à 20-30 m du joueur, l'entité tout près de lui et déjà lancée sur lui (il ne se débat pas)
@@ -974,8 +975,9 @@ function placeTestBot() {
   Object.assign(M, { x: near.x, z: near.z, dormantT: 0, mode: 'chase', target: TEST_BOT, unseenT: 0, lastSeenX: B.x, lastSeenZ: B.z, lastSeenF: 0, path: [], repathT: 0, away: false });
 }
 
-function startRun({ seed, difficulty, players, run, level, vip = false }) {
+function startRun({ seed, difficulty, players, run, level, vip = false, from = level }) {
   NET.run = run;
+  runFrom = from || 0;
   camPrev.ok = false;
   trackSeq.clear();
   monstersVip = !!vip && vaultOpen(); // sans coffre ouvert, les monstres classiques
@@ -1148,7 +1150,7 @@ function onMsg(from, m) {
         NET.goWait = false;
         if (m.run === NET.run && sim) return;
         dailyLabel = typeof m.dy === 'string' ? m.dy.slice(0, 12) : null;
-        startRun({ seed: m.seed, difficulty: m.diff, players: m.players || [], run: m.run, level: m.lv || 0, vip });
+        startRun({ seed: m.seed, difficulty: m.diff, players: m.players || [], run: m.run, level: m.lv || 0, vip, from: Number.isInteger(m.l0) ? m.l0 : m.lv || 0 });
       };
       if (!m.vip) go(false);
       else {
@@ -2182,7 +2184,7 @@ function handleEvent(ev, me) {
         best = Math.max(rec.key === key ? rec.best || 0 : 0, sim.time);
         store.set('backrooms_daily', { key, best });
       }
-      if (hud) hud.showEnd(sim, NET.role === 'guest' ? null : () => initGame(), { stats: runStats, daily: dailyLabel, best, abyss: lastAbyss && ev.type === 'gameover', thirst: lastThirst && ev.type === 'gameover' });
+      if (hud) hud.showEnd(sim, NET.role === 'guest' ? null : () => initGame(), { stats: runStats, from: runFrom, daily: dailyLabel, best, abyss: lastAbyss && ev.type === 'gameover', thirst: lastThirst && ev.type === 'gameover' });
       if (H && H.embedded && NET.role !== 'guest') {
         const won = ev.type === 'win';
         // la vraie fin vaut bien plus qu'une fausse sortie, qui vaut plus que de mourir loin (Level 2 compris)
