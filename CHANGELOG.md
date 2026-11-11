@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.70 — 11 novembre 2026
+- **The Backrooms** — Terror Hotel : le jeu ne dessine plus les meubles cachés derrière un mur. Même image, mais presque moitié moins de travail pour la carte graphique dans le hall, et bien moins encore dans les couloirs : le niveau est plus fluide sur un PC modeste.
+
 ## 5.69 — 11 novembre 2026
 - **The Backrooms** — L'arrivée dans un niveau ne fige plus la page. Pendant le chargement, l'écran « LOADING » reste vivant, et le niveau n'apparaît qu'une fois prêt à être dessiné, sans saccades au premier regard. Sur un PC modeste, les Poolrooms s'affichent en quelques secondes au lieu de plusieurs dizaines.
 

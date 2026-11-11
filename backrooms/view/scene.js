@@ -4375,6 +4375,21 @@ void main() {
     // deçà de son plan lointain, et à cet étage (ou près d'un trou ou de la cage par où on voit l'autre) ; plus, s'il y
     // en a un, ceux que peut montrer le caméscope du coéquipier en médaillon. Les autres ne changeraient pas un pixel :
     // on ne les dessine pas. Les matrices ne sont renvoyées que si la liste a changé
+    // Terror Hotel : un meuble derrière un mur ne se voit pas. Trois rayons (son milieu et ses deux bords, vus d'ici) :
+    // s'ils butent tous sur un mur, on ne le dessine pas. Au hall, les quatre cinquièmes des triangles du mobilier
+    // étaient dessinés pour rien (1,0 million sur 1,2), dans le couloir presque tous
+    // shortcut: seulement à l'hôtel (murs pleins, un seul étage) ; ailleurs les rayonnages ajourés et les trous du sol
+    // laissent voir ce que ces rayons croient caché
+    const losTo = (cx, cz, x, z) => hasLineOfSight(map, cx, cz, x, z);
+    const behindWall = (cx, cz, x, z, w) => {
+      const dx = x - cx;
+      const dz = z - cz;
+      const d = Math.hypot(dx, dz);
+      if (d < 6) return false;
+      const px = (-dz / d) * w;
+      const pz = (dx / d) * w;
+      return !losTo(cx, cz, x, z) && !losTo(cx, cz, x + px, z + pz) && !losTo(cx, cz, x - px, z - pz);
+    };
     const cull = (V) => {
       const here = V.band === fi || V.shaft;
       const insetHere = V.inset && (V.iBand === fi || V.iAll);
@@ -4397,6 +4412,7 @@ void main() {
               V.sph.center.set(x, y, z);
               V.sph.radius = K.r;
               ok = V.fr.intersectsSphere(V.sph);
+              if (ok && L3 && !K.near[i] && behindWall(V.cam.x, V.cam.z, x, z, Math.max(0.9, K.r))) ok = false;
             }
           }
           if (!ok && V.inset && (insetHere || K.near[i])) {
