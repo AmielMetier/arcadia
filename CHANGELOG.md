@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 5.51 — 11 novembre 2026
+- **The Backrooms** — De nouvelles salles aux Tuyauteries, à la place de réserves vides :
+  - une salle des pompes : une rangée de pompes sur leurs socles, une armoire de commande, la nourrice à volants au mur ;
+  - des locaux électriques : de gros transformateurs à ailettes avec leurs isolateurs et leurs câbles qui montent au plafond, un voyant vert « sous tension » qui s'éteint quand le disjoncteur saute, des armoires ; on les entend bourdonner de loin ;
+  - des vestiaires : des rangées de casiers métalliques, dont un entrouvert sur le noir de temps en temps, et des bancs en bois ;
+  - les salles des pompes et les locaux électriques ont toujours du courant : leurs réglettes ne meurent pas.
+
 ## 5.50 — 11 novembre 2026
 - **The Backrooms** — Les Tuyauteries s'entendent :
   - les chaudières grondent : le souffle de la flamme, son crépitement, la tôle qui vibre ; on les entend étouffées depuis la galerie, en plein en entrant dans la chaufferie ;

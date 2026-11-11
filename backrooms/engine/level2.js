@@ -561,6 +561,22 @@ export function createPipesMap(seed = 3) {
       power: 0, // le courant de son secteur (sim.setSector)
     });
   }
+  // 6b. D'autres locaux techniques parmi les réserves : une salle des pompes (une rangée de pompes sur leurs socles), un
+  // ou deux locaux électriques (transformateurs et armoires qui bourdonnent), un ou deux vestiaires (casiers, bancs). Ils
+  // gardent leurs portes ; leur brique est peinte, comme dans les chaufferies.
+  {
+    const stores = shuffle(rooms.filter((r) => r.type === 'store' && r.doors.length), rnd);
+    for (const [type, minA, n] of [['pumps', 9, 1], ['elec', 6, 2], ['locker', 8, 2]]) {
+      let k = 0;
+      for (const r of stores) {
+        if (k >= n) break;
+        if (r.type !== 'store' || (r.x1 - r.x0 + 1) * (r.z1 - r.z0 + 1) < minA) continue;
+        r.type = type;
+        k++;
+        for (let z = r.z0; z <= r.z1; z++) for (let x = r.x0; x <= r.x1; x++) if (grid[z * W + x] === T.FLOOR) zone[z * W + x] = Z.BOILER;
+      }
+    }
+  }
   dist = bfs(grid, W, H, sx, sz);
   walkable = listFloor();
 
@@ -736,12 +752,14 @@ export function createPipesMap(seed = 3) {
       }
       continue;
     }
-    const dead = rnd() < 0.15;
+    // (les locaux des machines, pompes et transformateurs, ont toujours du courant : leurs réglettes ne meurent pas)
+    const tech = r.type === 'pumps' || r.type === 'elec';
+    const dead = rnd() < 0.15 && !tech;
     for (let z = r.z0 + ((r.z1 - r.z0) % 2 ? 0 : 1); z <= r.z1; z += 2) {
       for (let x = r.x0 + ((r.x1 - r.x0) % 2 ? 0 : 1); x <= r.x1; x += 2) {
         if (grid[z * W + x] !== T.FLOOR) continue;
         const q = rnd();
-        const state = dead ? (q < 0.8 ? 'off' : 'flicker') : q < 0.08 ? 'off' : q < 0.22 ? 'flicker' : 'on';
+        const state = dead ? (q < 0.8 ? 'off' : 'flicker') : q < 0.08 && !tech ? 'off' : q < 0.22 ? 'flicker' : 'on';
         lights.push({ kind: 'tube', x: (x + 0.5) * C, y: LEVEL2_CEIL - 0.42, z: (z + 0.5) * C, gx: x, gz: z, wall: null, state, flicker: state === 'flicker', alongX: r.x1 - r.x0 >= r.z1 - r.z0 });
       }
     }
@@ -840,41 +858,98 @@ export function createPipesMap(seed = 3) {
       tipped: !!kind.tipped,
     });
   };
-  // 10a. L'équipement des chaufferies, contre les murs : l'armoire de commande et ses voyants, près de la vanne, et une
-  // pompe sur son socle, plus loin. La vue les dessine (map.plant) ; ici, leur emprise seule (des fantômes), qui
-  // arrête le pas comme un meuble. Jamais devant une chaudière (son brûleur), une porte ou la vanne.
+  // 10a. L'équipement des locaux techniques, contre les murs. Chaufferie : l'armoire de commande et ses voyants, près
+  // de la vanne, et une pompe sur son socle, plus loin. Salle des pompes : une rangée de pompes. Local électrique : des
+  // transformateurs et des armoires. Vestiaire : des rangées de casiers, et des bancs au milieu. La vue les dessine
+  // (map.plant) ; ici, leur emprise seule (des fantômes), qui arrête le pas comme un meuble. Jamais devant une chaudière
+  // (son brûleur), une porte ou la vanne.
   const plant = [];
   const ghost = (x, z, r) => props.push({ m: null, ghost: true, h: 0, r, x, z, rot: 0 });
   for (const r of rooms) {
-    if (r.type !== 'boiler') continue;
+    if (r.type === 'store' || r.type === 'hall') continue;
     const v = valves.find((q) => q.gx >= r.x0 && q.gx <= r.x1 && q.gz >= r.z0 && q.gz <= r.z1);
     const spots = [];
+    const mid = [];
     for (let z = r.z0; z <= r.z1; z++) {
       for (let x = r.x0; x <= r.x1; x++) {
         const k = z * W + x;
         if (grid[k] !== T.FLOOR || busy.has(k) || DIRS.some(([dx, dz]) => get(x + dx, z + dz) === T.MACHINE)) continue;
-        for (const w of DIRS) if (get(x + w[0], z + w[1]) === T.WALL) spots.push({ x, z, w, dv: v ? Math.abs(v.gx - x) + Math.abs(v.gz - z) : 9 });
+        let wall = false;
+        for (const w of DIRS) {
+          if (get(x + w[0], z + w[1]) !== T.WALL) continue;
+          wall = true;
+          spots.push({ x, z, w, dv: v ? Math.abs(v.gx - x) + Math.abs(v.gz - z) : 9 });
+        }
+        if (!wall) mid.push({ x, z });
       }
     }
-    const take = (s, kind, depth, r0) => {
+    // kind : ce qui est posé ; depth : sa profondeur depuis le mur ; r0 : le rayon de son emprise ; lat : des emprises
+    // de plus de part et d'autre, le long du mur
+    const take = (s, kind, depth, r0, lat = []) => {
       busy.add(s.z * W + s.x);
       const off = C / 2 - depth / 2 - 0.02;
       const x = (s.x + 0.5) * C + s.w[0] * off;
       const z = (s.z + 0.5) * C + s.w[1] * off;
       plant.push({ kind, gx: s.x, gz: s.z, x, z, dx: s.w[0], dz: s.w[1], ry: Math.atan2(-s.w[0], -s.w[1]) });
       ghost(x, z, r0);
-      if (kind === 'pump') for (const e of [-0.32, 0.32]) ghost(x + s.w[1] * e, z - s.w[0] * e, r0 * 0.8); // le socle est long
+      for (const e of lat) ghost(x + s.w[1] * e, z - s.w[0] * e, r0 * 0.8);
     };
-    // l'armoire : la place libre la plus proche de la vanne (pas collée à elle)
-    const near = spots.filter((s) => s.dv >= 1).sort((a, b) => a.dv - b.dv);
-    if (near.length) take(near[0], 'panel', 0.45, 0.36);
-    // la pompe : la plus loin de l'armoire et de la vanne
-    const far = spots.filter((s) => !busy.has(s.z * W + s.x) && s.dv >= 2).sort((a, b) => b.dv - a.dv);
-    if (far.length) take(far[Math.floor(rnd() * Math.min(2, far.length))], 'pump', 0.62, 0.36);
+    const free = (list) => list.filter((s) => !busy.has(s.z * W + s.x));
+    if (r.type === 'boiler') {
+      // l'armoire : la place libre la plus proche de la vanne (pas collée à elle)
+      const near = spots.filter((s) => s.dv >= 1).sort((a, b) => a.dv - b.dv);
+      if (near.length) take(near[0], 'panel', 0.45, 0.36);
+      // la pompe : la plus loin de l'armoire et de la vanne
+      const far = free(spots).filter((s) => s.dv >= 2).sort((a, b) => b.dv - a.dv);
+      if (far.length) take(far[Math.floor(rnd() * Math.min(2, far.length))], 'pump', 0.62, 0.36, [-0.32, 0.32]);
+    } else if (r.type === 'pumps') {
+      // une pompe sur deux cases le long des murs, jusqu'à quatre ; une armoire pour les commander
+      let n = 0;
+      for (const s of shuffle(spots, rnd)) {
+        if (n >= 4 || busy.has(s.z * W + s.x)) continue;
+        if (plant.some((p) => p.kind === 'pump' && Math.abs(p.gx - s.x) + Math.abs(p.gz - s.z) < 2)) continue;
+        take(s, 'pump', 0.62, 0.36, [-0.32, 0.32]);
+        n++;
+      }
+      const sp = free(spots);
+      if (sp.length) take(sp[Math.floor(rnd() * sp.length)], 'panel', 0.45, 0.36);
+    } else if (r.type === 'elec') {
+      // un ou deux transformateurs, deux ou trois armoires
+      const sp = shuffle(spots, rnd);
+      let t = 0;
+      let a = 0;
+      for (const s of sp) {
+        if (busy.has(s.z * W + s.x)) continue;
+        if (t < (spots.length > 8 ? 2 : 1)) {
+          take(s, 'xfmr', 0.9, 0.42, [-0.45, 0.45]);
+          t++;
+        } else if (a < 3) {
+          take(s, 'panel', 0.45, 0.36);
+          a++;
+        }
+      }
+    } else if (r.type === 'locker') {
+      // les casiers contre presque tous les murs ; un banc sur deux cases libres au milieu
+      for (const s of shuffle(spots, rnd)) if (!busy.has(s.z * W + s.x) && rnd() < 0.8) take(s, 'lockers', 0.5, 0.3, [-0.65, 0.65]);
+      let nb = 0;
+      for (const m of mid) {
+        // (deux bancs au plus, sur une case dégagée tout autour : on en fait le tour)
+        if (nb >= 2 || busy.has(m.z * W + m.x) || DIRS.some(([dx, dz]) => get(m.x + dx, m.z + dz) !== T.FLOOR) || rnd() < 0.4) continue;
+        nb++;
+        busy.add(m.z * W + m.x);
+        const along = r.x1 - r.x0 >= r.z1 - r.z0;
+        const x = (m.x + 0.5) * C;
+        const z = (m.z + 0.5) * C;
+        plant.push({ kind: 'bench', gx: m.x, gz: m.z, x, z, dx: 0, dz: 0, ry: along ? 0 : Math.PI / 2 });
+        for (const e of [-0.5, 0.5]) ghost(x + (along ? e : 0), z + (along ? 0 : e), 0.26);
+      }
+    }
   }
+  // (pas d'objets épars dans les vestiaires et les locaux électriques : ils restent rangés)
   for (const r of rooms) {
-    const kit = r.type === 'boiler' ? BOILER_KIT : r.type === 'hall' ? (r.den ? DEN_KIT : HALL_KIT) : STORE;
-    const p = r.type === 'boiler' ? 0.35 : r.type === 'hall' ? 0.3 : 0.6;
+    if (r.type === 'locker' || r.type === 'elec') continue;
+    const kit = r.type === 'boiler' || r.type === 'pumps' ? BOILER_KIT : r.type === 'hall' ? (r.den ? DEN_KIT : HALL_KIT) : STORE;
+    const p = r.type === 'boiler' ? 0.35 : r.type === 'pumps' ? 0.2 : r.type === 'hall' ? 0.3 : 0.6;
     for (let z = r.z0; z <= r.z1; z++) {
       for (let x = r.x0; x <= r.x1; x++) {
         const k = z * W + x;

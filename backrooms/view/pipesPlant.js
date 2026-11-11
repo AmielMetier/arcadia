@@ -54,6 +54,46 @@ function hazardTexture() {
   return t;
 }
 
+// la plaque des transformateurs : le triangle jaune à l'éclair, et « DANGER HIGH VOLTAGE »
+function dangerTexture() {
+  const cv = document.createElement('canvas');
+  cv.width = 256;
+  cv.height = 320;
+  const c = cv.getContext('2d');
+  c.fillStyle = '#e9e4d6';
+  c.fillRect(0, 0, 256, 320);
+  c.fillStyle = '#e0b21a';
+  c.strokeStyle = '#141414';
+  c.lineWidth = 12;
+  c.beginPath();
+  c.moveTo(128, 22);
+  c.lineTo(234, 202);
+  c.lineTo(22, 202);
+  c.closePath();
+  c.fill();
+  c.stroke();
+  c.fillStyle = '#141414';
+  c.beginPath();
+  c.moveTo(140, 70);
+  c.lineTo(104, 140);
+  c.lineTo(130, 140);
+  c.lineTo(112, 186);
+  c.lineTo(156, 120);
+  c.lineTo(130, 120);
+  c.lineTo(148, 70);
+  c.closePath();
+  c.fill();
+  c.fillStyle = '#b3261e';
+  c.font = 'bold 38px "Arial Narrow", Arial, sans-serif';
+  c.textAlign = 'center';
+  c.fillText('DANGER', 128, 252);
+  c.font = 'bold 28px "Arial Narrow", Arial, sans-serif';
+  c.fillText('HIGH VOLTAGE', 128, 292);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 export function buildPlant({ map, group, bin, lambert, phong, M, tx, CEIL, at, rnd }) {
   const W = map.W;
   const H = map.H;
@@ -116,6 +156,11 @@ export function buildPlant({ map, group, bin, lambert, phong, M, tx, CEIL, at, r
     white: lambert({ color: '#d8d4c8' }),
     hazard: lambert({ map: hazardTexture(), alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
     blueWheel: phong({ color: '#1f4fa0', shininess: 50, specular: '#334' }, 0.4, 40),
+    xfmr: phong({ map: tx.pipe.steel, color: '#8f9c8e', shininess: 40, specular: '#333' }, 0.35, 30),
+    porcelain: phong({ color: '#6e3a1e', shininess: 110, specular: '#888' }, 0.8, 100),
+    danger: lambert({ map: dangerTexture() }),
+    wood: lambert({ map: tx.pipe.steel, color: '#a07a4c' }),
+    lockers: ['#5d6f7d', '#6f7c5a', '#8b908a', '#7d5e4e'].map((c) => phong({ map: tx.pipe.steel, color: c, shininess: 45, specular: '#333' }, 0.4, 35)),
   };
   P_.hazard.map.repeat.x = 2; // une bande de 2,46 m : des chevrons à 45°
   const gaugeMat = lambert({ map: tx.gauge });
@@ -186,7 +231,7 @@ export function buildPlant({ map, group, bin, lambert, phong, M, tx, CEIL, at, r
     ...(map.lights || []).filter((l) => l.wall).map((l) => l.gz * W + l.gx + ',' + l.wall[0] + ',' + l.wall[1]),
   ]);
   for (const r of map.rooms || []) {
-    if (r.type !== 'boiler') continue;
+    if (r.type !== 'boiler' && r.type !== 'pumps') continue;
     let best = null;
     for (const [dx, dz] of DIRS) {
       // les cases le long du mur de ce côté
@@ -372,6 +417,77 @@ export function buildPlant({ map, group, bin, lambert, phong, M, tx, CEIL, at, r
     }
   }
 
+  // --- 4. Les transformateurs, les casiers et les bancs ---
+  const pilots = [];
+  for (const p of map.plant || []) {
+    const ox = (p.gx + 0.5) * C + p.dx * (C / 2);
+    const oz = (p.gz + 0.5) * C + p.dz * (C / 2);
+    const f = frame(ox, oz, p.ry);
+    const hsh = (((p.gx * 73856093) ^ (p.gz * 19349663)) >>> 0) % 1000 / 1000;
+    if (p.kind === 'xfmr') {
+      // socle, cuve, radiateurs à ailettes de chaque côté, conservateur, trois traversées en porcelaine, câbles
+      f.box(bin('tf-plinth', unitBox, M.concrete), 0, 0.06, 0.47, 1.66, 0.12, 0.92);
+      f.box(bin('tf-tank', unitBox, P_.xfmr), 0, 0.8, 0.47, 1.0, 1.36, 0.62);
+      f.box(bin('tf-lid', unitBox, P_.xfmr), 0, 1.5, 0.47, 1.06, 0.05, 0.68);
+      for (const sx of [-1, 1]) for (let i = 0; i < 9; i++) f.box(bin('tf-fin', unitBox, P_.xfmr), sx * (0.56 + 0.12), 0.78, 0.22 + i * 0.062, 0.24, 1.05, 0.018);
+      f.cyl(bin('tf-cons', cylGeo, P_.xfmr), 'x', 0.1, 1.72, 0.25, 0.14, 0.7);
+      for (const sx of [-0.3, 0, 0.3]) {
+        f.cyl(bin('tf-bush', cylGeo, P_.porcelain), 'y', sx, 1.7, 0.6, 0.05, 0.34);
+        for (const y of [1.6, 1.7, 1.8]) f.cyl(bin('tf-rib', cylGeo, P_.porcelain), 'y', sx, y, 0.6, 0.075, 0.025);
+        f.cyl(bin('tf-cable', cylGeoS, P_.black), 'y', sx, (1.87 + CEIL) / 2, 0.6, 0.022, CEIL - 1.87);
+      }
+      f.box(bin('tf-tray', unitBox, M.frame), 0, CEIL - 0.12, 0.6, 1.0, 0.06, 0.3);
+      // la plaque de danger et la plaque signalétique
+      const [sx2, sz2] = f.P(0, 0.785);
+      put(bin('tf-danger', planeGeo, P_.danger), sx2, 1.05, sz2, 0.32, 0.4, 1, 0, p.ry, 0);
+      f.box(bin('plate', unitBox, P_.brass), 0.32, 1.3, 0.785, 0.18, 0.1, 0.01);
+      // le voyant « sous tension » : vert, il s'éteint quand le disjoncteur du secteur saute
+      const m = new THREE.Mesh(sphGeo, new THREE.MeshBasicMaterial({ color: '#000000' }));
+      const [lx, lz] = f.P(-0.32, 0.79);
+      m.position.set(lx, 1.32, lz);
+      m.scale.set(0.03, 0.03, 0.018);
+      m.rotation.y = p.ry;
+      group.add(m);
+      const valve = (map.valves || []).find((v) => Math.abs(v.gx - p.gx) + Math.abs(v.gz - p.gz) <= 10);
+      const [ax, az] = f.P(-0.32, 0.95);
+      pilots.push({ m, valve, at: { x: ax, y: 1.3, z: az }, nx: -p.dx, nz: -p.dz, on: 1 });
+      // un tapis de caoutchouc noir devant
+      f.box(bin('tf-mat', unitBox, P_.black), 0, 0.006, 1.25, 1.3, 0.012, 0.6);
+    } else if (p.kind === 'lockers') {
+      // une rangée de quatre casiers métalliques : socle, caisson, portes à ouïes et poignée, numéro ; un sur huit
+      // entrouvert sur le noir
+      const mat = P_.lockers[Math.floor(hsh * 4)];
+      const key = 'lk' + Math.floor(hsh * 4);
+      f.box(bin('lk-base', unitBox, P_.black), 0, 0.05, 0.24, 2.0, 0.1, 0.44);
+      f.box(bin(key + '-body', unitBox, mat), 0, 0.97, 0.25, 2.0, 1.74, 0.48);
+      for (let i = 0; i < 4; i++) {
+        const x = -0.75 + i * 0.5;
+        const open = ((p.gx * 7 + p.gz * 13 + i * 5) % 8) === 0;
+        if (open) {
+          f.box(bin('lk-dark', unitBox, P_.black), x, 0.97, 0.49, 0.44, 1.6, 0.012);
+          // la porte ouverte : tournée sur ses gonds de 70°
+          const [hx, hz] = f.P(x - 0.235, 0.5);
+          const a = p.ry - 1.2;
+          put(bin(key + '-door', unitBox, mat), hx + Math.cos(a) * 0.235, 0.97, hz - Math.sin(a) * 0.235, 0.47, 1.66, 0.02, 0, a, 0);
+          continue;
+        }
+        f.box(bin(key + '-door', unitBox, mat), x, 0.97, 0.495, 0.47, 1.66, 0.02);
+        for (const y of [1.62, 1.66, 1.7, 0.3, 0.34, 0.38]) f.box(bin('lk-vent', unitBox, P_.black), x, y, 0.507, 0.24, 0.012, 0.004);
+        f.box(bin('lk-handle', unitBox, M.handle), x + 0.17, 1.0, 0.515, 0.025, 0.12, 0.02);
+        f.box(bin('lk-num', unitBox, P_.white), x, 1.5, 0.507, 0.08, 0.05, 0.004);
+      }
+    } else if (p.kind === 'bench') {
+      // un banc de vestiaire : l'assise en lattes de bois, deux piétements en acier
+      const g = frame(p.x, p.z, p.ry);
+      for (const z of [-0.1, 0, 0.1]) g.box(bin('bn-slat', unitBox, P_.wood), 0, 0.45, z, 1.6, 0.035, 0.085);
+      for (const x of [-0.65, 0.65]) {
+        g.box(bin('bn-leg', unitBox, M.frame), x, 0.22, -0.11, 0.04, 0.44, 0.04);
+        g.box(bin('bn-leg', unitBox, M.frame), x, 0.22, 0.11, 0.04, 0.44, 0.04);
+        g.box(bin('bn-leg', unitBox, M.frame), x, 0.42, 0, 0.04, 0.04, 0.3);
+      }
+    }
+  }
+
   const tmp = new THREE.Color();
   return {
     // le moteur de lumière : un voyant d'armoire teinte le mur et le sol autour de lui ; le judas d'un foyer, peu
@@ -380,6 +496,7 @@ export function buildPlant({ map, group, bin, lambert, phong, M, tx, CEIL, at, r
         const c = p.col;
         out.push({ x: p.at.x, y: p.at.y, z: p.at.z, r: c.r, g: c.g, b: c.b, rad: 1.7, nx: p.nx, ny: -0.1, nz: p.nz, w: -0.5 });
       }
+      for (const p of pilots) if (p.on > 0) out.push({ x: p.at.x, y: p.at.y, z: p.at.z, r: 0.05 * p.on, g: 0.5 * p.on, b: 0.14 * p.on, rad: 1.4, nx: p.nx, ny: -0.1, nz: p.nz, w: -0.5 });
     },
     update(time, dt) {
       for (const fl of flick) {
@@ -387,6 +504,11 @@ export function buildPlant({ map, group, bin, lambert, phong, M, tx, CEIL, at, r
         fl.fire = Math.max(0.15, Math.min(1, (fl.fire ?? 1) + (v && v.closed ? -dt * 0.4 : dt * 0.8)));
         const k = (0.55 + Math.sin(time * 7 + fl.ph) * 0.15 + Math.sin(time * 23 + fl.ph * 3) * 0.1 + Math.random() * 0.1) * fl.k * fl.fire;
         fl.mat.color.setRGB(1.6 * k, 0.62 * k, 0.15 * k);
+      }
+      for (const p of pilots) {
+        const on = !p.valve || p.valve.power !== 2;
+        p.on = on ? 0.92 + Math.random() * 0.08 : 0;
+        p.m.material.color.setRGB(0.25 * p.on, 2.2 * p.on, 0.6 * p.on);
       }
       for (const p of panels) {
         p.col.setRGB(0, 0, 0);

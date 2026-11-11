@@ -3964,6 +3964,14 @@ export class BackroomsSfx {
       go(this.osc('sine', 1730)).connect(this.gainNode(0.012)).connect(am);
       wobble(6.5, 0.1);
       vol = 0.32;
+    } else if (kind === 'xfmr') {
+      // le transformateur : le gros bourdonnement à 100 Hz et ses harmoniques impaires, la tôle qui vibre, un grésillement
+      go(this.osc('sine', 100)).connect(this.gainNode(0.6)).connect(am);
+      go(this.osc('sine', 200)).connect(this.gainNode(0.22)).connect(am);
+      go(this.osc('sawtooth', 300)).connect(this.filt('lowpass', 700, 0.8)).connect(this.gainNode(0.1)).connect(am);
+      go(this.longNoise()).connect(this.filt('bandpass', 3200, 2.5)).connect(this.gainNode(0.035)).connect(am);
+      wobble(0.17, 0.12);
+      vol = 0.24;
     } else {
       // l'armoire électrique : le ronflement d'un transformateur
       go(this.osc('sawtooth', 50)).connect(this.filt('lowpass', 320, 0.8)).connect(this.gainNode(0.45)).connect(am);

@@ -734,7 +734,7 @@ function pipeMachines(V) {
     };
     const L = [];
     (m.boilers || []).forEach((b, i) => L.push({ key: 'b' + i, kind: 'burner', x: b.x, z: b.z, valve: b.valve }));
-    (m.plant || []).forEach((p, i) => L.push({ key: 'p' + i, kind: p.kind, x: p.x, z: p.z, valve: nearest(p.x, p.z) }));
+    (m.plant || []).forEach((p, i) => p.kind !== 'lockers' && p.kind !== 'bench' && L.push({ key: 'p' + i, kind: p.kind, x: p.x, z: p.z, valve: nearest(p.x, p.z) }));
     machineList = { map: m, L };
   }
   const out = [];
