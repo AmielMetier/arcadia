@@ -260,6 +260,18 @@ function makeBuilder(MATS, wells = []) {
       return g;
     });
   };
+  // un tube rond de rayon r, de A à B (une main courante)
+  const tube = (k, A, B, r, seg = 10) => {
+    const L = Math.hypot(B[0] - A[0], B[1] - A[1], B[2] - A[2]);
+    if (L < 1e-3) return;
+    const g = new THREE.CylinderGeometry(r, r, L, seg).rotateX(Math.PI / 2);
+    tmpO.position.set((A[0] + B[0]) / 2, (A[1] + B[1]) / 2, (A[2] + B[2]) / 2);
+    tmpO.up.set(0, 1, 0);
+    tmpO.lookAt(B[0], B[1], B[2]);
+    tmpO.updateMatrix();
+    g.applyMatrix4(tmpO.matrix);
+    add(k, g);
+  };
   const inner = []; // les dalles qu'on ne voit pas d'un autre étage
   const build = (group) => {
     const keys = new Set([...bins.keys(), ...extra.keys()]);
@@ -288,7 +300,7 @@ function makeBuilder(MATS, wells = []) {
       }
     }
   };
-  return { tri, quad, hpoly, vface, box, beam, add, build, inner };
+  return { tri, quad, hpoly, vface, box, beam, tube, add, build, inner };
 }
 
 // --- Les matières ---
@@ -319,7 +331,11 @@ function makeMaterials(tx, baked) {
     paper: { m: baked(lam({ map: tx.paper })), S: 2.5 },
     // la verrière la nuit : le ciel noir ne prend pas la lumière des lampes
     sky: { m: new THREE.MeshBasicMaterial({ map: tx.skyGlass, color: '#8f98a3' }), S: 3.0 },
-    trim: { m: baked(phong({ color: '#e6decb', specular: '#2e2b26', shininess: 40 }), { spec: 0.35, gloss: 60, mask: 0 }), S: 1 },
+    trim: { m: baked(phong({ color: '#ebe7dc', specular: '#2e2b26', shininess: 40 }), { spec: 0.35, gloss: 60, mask: 0 }), S: 1 },
+    // la main courante des garde-corps : un tube de laiton poli, qui accroche toutes les lampes
+    rail: { m: baked(phong({ color: '#8f7a52', specular: '#fff0c8', shininess: 140 }), { spec: 1.3, gloss: 260, mask: 0 }), S: 1 },
+    // le bronze sombre des suspensions
+    bronze: { m: baked(phong({ color: '#2a2219', specular: '#8a6a3a', shininess: 60 }), { spec: 0.5, gloss: 90, mask: 0 }), S: 1 },
     brass: { m: baked(phong({ color: '#7d5f2c', specular: '#c9a060', shininess: 80 }), { spec: 0.7, gloss: 110, mask: 0 }), S: 1 },
     steel: { m: baked(phong({ color: '#7f8286', specular: '#c4c8cc', shininess: 70 }), { spec: 0.6, gloss: 110, mask: 0 }), S: 1 },
     black: { m: baked(phong({ color: '#151515', specular: '#3a3a3a', shininess: 50 })), S: 1 },
@@ -338,13 +354,16 @@ function makeMaterials(tx, baked) {
 }
 
 // le revêtement du sol d'une salle
-function floorKey(r, fi, shops) {
+function floorKey(r, fi, shops, x, z) {
   if (!r) return 'concrete';
   switch (r.kind) {
     case 'mail':
     case 'court':
+      // (en bas : le même carrelage crème à cabochons, bordé d'une bande de damier le long des boutiques et autour des cours)
+      if (fi === 1 && (z === r.z0 || z === r.z1 || (r.kind === 'court' && (x === r.x0 || x === r.x1)))) return 'checker';
+      return 'terrazzo';
     case 'portal':
-      return fi === 1 ? 'checker' : 'terrazzo';
+      return 'terrazzo';
     case 'plaza':
     case 'lobby':
       return 'terrazzo';
@@ -406,11 +425,11 @@ function wallKey(r) {
       return 'paintGrey';
   }
 }
-const CEIL_KEY = { coffer: 'plaster', soffit: 'plaster', vault: 'plaster', dome: 'plaster', grid: 'ceilTiles', slab: 'slab', black: 'paintDark', spots: 'paintDark', sky: 'sky', lantern: 'sky' };
+const CEIL_KEY = { greyc: 'paintGrey', coffer: 'plaster', soffit: 'plaster', vault: 'plaster', dome: 'plaster', grid: 'ceilTiles', slab: 'slab', black: 'paintDark', spots: 'paintDark', sky: 'sky', lantern: 'sky' };
 
 // Les couleurs des lampes du mall (plus fortes que le blanc : le caméscope sature)
 export const MALL_ON = {
-  warm: new THREE.Color('#ffd7a0').multiplyScalar(3.0),
+  warm: new THREE.Color('#ffe2b4').multiplyScalar(3.0),
   spot: new THREE.Color('#fff0d4').multiplyScalar(3.4),
   cool: new THREE.Color('#e6f0ff').multiplyScalar(3.0),
   glow: new THREE.Color('#ffe8c8').multiplyScalar(1.9),
@@ -515,7 +534,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       // le sol (en haut : pas dans la trémie d'un escalier, rogné par les vides)
       if (!(fi === 0 && stairCell.has(i))) {
         // (la moquette à motif du hall du cinéma est peinte pour sa salle : dans le passage qui y mène, la même laine, unie)
-        const fk0 = floorKey(r, fi, map.shops);
+        const fk0 = floorKey(r, fi, map.shops, x, z);
         const fk = fk0 === 'cine' && (x < r.x0 || x > r.x1 || z < r.z0 || z > r.z1) ? 'carpetV' : fk0;
         const pieces = fi === 0 ? cellPieces(x, z, voidBoxes) : [rectPts(x * C, z * C, (x + 1) * C, (z + 1) * C)];
         for (const p of pieces) G.hpoly(fk, p, 0, 1);
@@ -597,8 +616,9 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     }
   }
 
-  // 3. Les voûtes des cours (étage du haut) : une corniche moulurée autour de l'ouverture, une voussure (un quart
-  // d'ellipse) jusqu'au plafond du haut, ses nervures aux angles ; à la cour centrale, la lanterne vitrée au sommet
+  // 3. Les plafonds des cours (étage du haut) : une corniche moulurée autour de l'ouverture (elle cache la gorge
+  // lumineuse), un tambour droit lavé par sa lumière, un plafond à caissons sous de hautes poutres blanches ; à la
+  // cour centrale, la lanterne vitrée au sommet
   const glowGeos = []; // le plafond lumineux de la place est : une lampe (fixtures)
   // une moulure : un profil ([d0, y0, d1, y1, hd, hy] : d vers le centre, y depuis la hauteur donnée, (hd, hy) : vers
   // où regarde la face) balayé le long du contour, d'onglet aux angles
@@ -617,59 +637,6 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   };
   // la corniche d'une ouverture : deux ressauts sous le plafond de la galerie, une lèvre qui cache la gorge lumineuse
   const CORNICE = [[-0.24, 0, -0.24, -0.1, -1, 0], [-0.24, -0.1, -0.1, -0.1, 0, -1], [-0.1, -0.1, -0.1, -0.27, -1, 0], [-0.1, -0.27, 0.1, -0.27, 0, -1], [0.1, -0.27, 0.1, 0.05, 1, 0], [0.1, 0.05, 0, 0.05, 0, 1]];
-  // le cadre du plafond du haut : une bande en retombée de 10 cm
-  const CROWN = [[-0.03, 0, -0.03, -0.1, -1, 0], [-0.03, -0.1, 0.2, -0.1, 0, -1], [0.2, -0.1, 0.2, 0, 1, 0]];
-  // une voussure du contour A (à y0) au contour B (à y1, plus petit) : un quart d'ellipse, lisse le long de la courbe
-  const cove = (A, B, y0, y1, k, steps = 8) => {
-    const N = edgeNormals(A);
-    const pos = [];
-    const nor = [];
-    const uv = [];
-    const S = MATS[k].S || 1;
-    for (let i = 0; i < A.length; i++) {
-      const j = (i + 1) % A.length;
-      const run = ((B[i][0] - A[i][0]) * N[i][0] + (B[i][1] - A[i][1]) * N[i][1] + (B[j][0] - A[j][0]) * N[i][0] + (B[j][1] - A[j][1]) * N[i][1]) / 2;
-      const rise = y1 - y0;
-      const len = Math.hypot(A[j][0] - A[i][0], A[j][1] - A[i][1]);
-      const at = (v, s) => {
-        const th = (s / steps) * (Math.PI / 2);
-        const f = 1 - Math.cos(th);
-        const a = rise * Math.cos(th);
-        const b = run * Math.sin(th);
-        const l = Math.hypot(a, b) || 1;
-        return { p: [A[v][0] + (B[v][0] - A[v][0]) * f, y0 + rise * Math.sin(th), A[v][1] + (B[v][1] - A[v][1]) * f], n: [(N[i][0] * a) / l, -b / l, (N[i][1] * a) / l], u: v === i ? 0 : len / S, w: ((s / steps) * (run + rise) * 0.8) / S };
-      };
-      for (let s = 0; s < steps; s++) {
-        const q = [at(i, s), at(j, s), at(j, s + 1), at(i, s + 1)];
-        // (l'ordre des sommets : la face regarde le dedans de la cour)
-        const e1 = [q[1].p[0] - q[0].p[0], q[1].p[1] - q[0].p[1], q[1].p[2] - q[0].p[2]];
-        const e2 = [q[3].p[0] - q[0].p[0], q[3].p[1] - q[0].p[1], q[3].p[2] - q[0].p[2]];
-        const c = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
-        const ok = c[0] * q[0].n[0] + c[1] * q[0].n[1] + c[2] * q[0].n[2] > 0;
-        for (const v of ok ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2]) {
-          pos.push(...q[v].p);
-          nor.push(...q[v].n);
-          uv.push(q[v].u, q[v].w);
-        }
-      }
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    G.add(k, g);
-    // les nervures : un jonc crème le long de chaque arête de la voussure
-    for (let i = 0; i < A.length; i++) {
-      let prev = null;
-      for (let s = 0; s <= steps; s++) {
-        const th = (s / steps) * (Math.PI / 2);
-        const f = 1 - Math.cos(th);
-        const p = [A[i][0] + (B[i][0] - A[i][0]) * f, y0 + (y1 - y0) * Math.sin(th) - 0.02, A[i][1] + (B[i][1] - A[i][1]) * f];
-        if (prev) G.beam('trim', prev, p, 0.16, 0.07);
-        prev = p;
-      }
-    }
-  };
   for (const vo of vaults) {
     const { r, O1 } = vo;
     const V = r.vault;
@@ -683,19 +650,38 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       }
     };
     molding(O1, V.base, CORNICE, 'trim');
+    // la charpente du plafond, comme au centre de référence : de hautes poutres blanches, un anneau et des rayons, des
+    // caissons entre elles ; les poutres finissent dans les murs du tambour (rien ne dépasse)
+    const frame = (outer, innerPts, y, deep) => {
+      for (let i = 0; i < outer.length; i++) {
+        const o = outer[i];
+        const n = innerPts ? innerPts[i] : [cx, cz];
+        const l = Math.hypot(o[0] - n[0], o[1] - n[1]) || 1;
+        // (le bout du rayon entre de 15 cm dans le mur)
+        G.beam('trim', [n[0], y - deep / 2, n[1]], [o[0] + ((o[0] - n[0]) / l) * 0.15, y - deep / 2, o[1] + ((o[1] - n[1]) / l) * 0.15], 0.42, deep);
+      }
+    };
+    const hoop = (pts, y, deep, w = 0.36) => {
+      for (let i = 0; i < pts.length; i++) {
+        const a2 = pts[i];
+        const b2 = pts[(i + 1) % pts.length];
+        G.beam('trim', [a2[0], y - deep / 2, a2[1]], [b2[0], y - deep / 2, b2[1]], w, deep);
+      }
+    };
+    const scale = (pts, k) => pts.map(([x, z]) => [cx + (x - cx) * k, cz + (z - cz) * k]);
     if (V.ring) {
-      // la cour centrale : la voussure monte jusqu'à l'anneau, puis le tambour de la lanterne et sa verrière
+      // la cour centrale : le tambour, un plafond à caissons en couronne, et au milieu la lanterne vitrée
       const O2 = shrinkTo(vo.v.pts, V.inner);
-      cove(O1, O2, V.base, V.ring, 'plaster');
-      molding(O2, V.ring, CROWN, 'trim');
+      ring(O1, V.base, V.ring, 'plaster');
+      for (const p of convexMinus(O1, O2)) G.hpoly('plaster', p, V.ring, -1);
+      frame(O1, O2, V.ring, 0.75);
+      hoop(O2, V.ring, 0.75, 0.42);
+      hoop(scale(O1, 0.5 + (0.5 * V.inner) / Math.hypot(O1[0][0] - cx, O1[0][1] - cz)), V.ring, 0.45);
       ring(O2, V.ring, V.top, 'plaster');
       G.hpoly('sky', O2, V.top, -1);
-      // les fers de la verrière : huit rayons et deux anneaux
-      for (let i = 0; i < O2.length; i++) G.beam('black', [cx, V.top - 0.08, cz], [O2[i][0], V.top - 0.08, O2[i][1]], 0.08, 0.14);
-      for (const k of [0.4, 0.75]) {
-        const P = shrinkTo(vo.v.pts, V.inner * k);
-        for (let i = 0; i < P.length; i++) G.beam('black', [P[i][0], V.top - 0.08, P[i][1]], [P[(i + 1) % P.length][0], V.top - 0.08, P[(i + 1) % P.length][1]], 0.08, 0.14);
-      }
+      // les fers blancs de la verrière : huit rayons et deux anneaux
+      frame(O2, null, V.top, 0.22);
+      for (const k of [0.4, 0.75]) hoop(scale(O2, k), V.top, 0.18, 0.1);
     } else if (V.glow) {
       // la lanterne lumineuse : un tambour droit, un plafond diffusant (une lampe) dans un cadre noir
       ring(O1, V.base, V.top, 'plaster');
@@ -709,11 +695,12 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       const b = bbox(O1);
       for (let x = Math.ceil(b.x0 / 1.2) * 1.2; x < b.x1; x += 1.2) G.beam('black', [x, V.top - 0.03, b.z0], [x, V.top - 0.03, b.z1], 0.04, 0.05);
     } else {
-      // la cour ouest : la voussure, puis un plafond plat encadré, d'où pend le lustre
-      const O2 = O1.map(([x, z]) => [cx + (x - cx) * 0.7, cz + (z - cz) * 0.7]);
-      cove(O1, O2, V.base, V.top, 'plaster');
-      molding(O2, V.top, CROWN, 'trim');
-      G.hpoly('plaster', O2, V.top, -1);
+      // la cour ouest : le tambour, un plafond plat, sa charpente (huit rayons, un anneau à mi-portée), le lustre au moyeu
+      ring(O1, V.base, V.top, 'plaster');
+      G.hpoly('plaster', O1, V.top, -1);
+      frame(O1, null, V.top, 0.8);
+      hoop(scale(O1, 0.52), V.top, 0.55);
+      G.add('trim', new THREE.CylinderGeometry(0.75, 0.75, 0.84, 8).rotateY(Math.PI / 8).translate(cx, V.top - 0.42, cz));
     }
   }
 
@@ -725,7 +712,8 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
         for (const [z0, z1] of [[r.z0 * C, VZ0 * C], [(VZ1 + 1) * C, (r.z1 + 1) * C]]) G.box('plaster', x - 0.22, x + 0.22, r.ceilH - 0.55, r.ceilH, z0, z1, '+y');
       }
       // les lanternes : des fers tous les 2,5 m
-      for (let x = r.x0 * C + C; x < (r.x1 + 1) * C; x += C) G.beam('black', [x, LANTERN - 0.06, VZ0 * C], [x, LANTERN - 0.06, (VZ1 + 1) * C], 0.07, 0.12);
+      for (let x = r.x0 * C + C; x < (r.x1 + 1) * C; x += C) G.beam('trim', [x, LANTERN - 0.08, VZ0 * C], [x, LANTERN - 0.08, (VZ1 + 1) * C], 0.09, 0.16);
+      G.beam('trim', [r.x0 * C, LANTERN - 0.08, (VZ0 + 2) * C], [(r.x1 + 1) * C, LANTERN - 0.08, (VZ0 + 2) * C], 0.09, 0.16);
     }
   }
 
@@ -749,7 +737,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
         G.beam('trim', [p0[0], y0 + 0.06, p0[1]], [p1[0], y0 + 0.06, p1[1]], 0.18, 0.12); // le socle
         G.beam('trim', [p0[0], y0 + 0.17, p0[1]], [p1[0], y0 + 0.17, p1[1]], 0.05, 0.04);
         G.beam('trim', [p0[0], y0 + MALL_RAIL - 0.05, p0[1]], [p1[0], y0 + MALL_RAIL - 0.05, p1[1]], 0.07, 0.06);
-        G.beam('brass', [p0[0], y0 + MALL_RAIL - 0.005, p0[1]], [p1[0], y0 + MALL_RAIL - 0.005, p1[1]], 0.09, 0.035); // la main courante
+        G.tube('rail', [p0[0], y0 + MALL_RAIL + 0.02, p0[1]], [p1[0], y0 + MALL_RAIL + 0.02, p1[1]], 0.042); // la main courante
         const len = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
         const m = Math.max(1, Math.round(len / 0.13));
         for (let j = 0; j <= m; j++) {
@@ -828,6 +816,12 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       const rk = 'paintDark';
       G.add(rk, new THREE.CylinderGeometry(h, h, top, 28, 1, true).translate(p.x, top / 2, p.z));
       G.add('steel', new THREE.CylinderGeometry(h + 0.025, h + 0.03, 0.14, 28).translate(p.x, 0.07, p.z));
+      if (p.kind === 'cineHall') {
+        // le couloir des salles : un grand disque blanc sous le plafond gris, ourlé d'une gorge lumineuse (cuite) ; un
+        // pied d'inox brossé
+        G.add('trim', new THREE.CylinderGeometry(1.75, 1.75, 0.14, 48).translate(p.x, top - 0.07, p.z));
+        G.add('steel', new THREE.CylinderGeometry(h + 0.012, h + 0.012, 0.22, 28, 1, true).translate(p.x, 0.25, p.z));
+      }
       if (p.kind === 'cine') {
         // le disque blanc au plafond, cerclé dessous d'un ruban de LED bleues (une lumière du moteur, lights())
         G.add('trim', new THREE.CylinderGeometry(1.55, 1.55, 0.32, 48).translate(p.x, top - 0.16, p.z));
@@ -838,13 +832,11 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     }
     const fancy = p.kind === 'mail' || p.kind === 'court';
     const sk = fancy ? 'plaster' : p.kind === 'dock' ? 'block' : 'paintGrey';
-    G.box(sk, p.x - h, p.x + h, 0, top, p.z - h, p.z + h, '+y-y');
+    G.box(sk, p.x - h, p.x + h, 0, fancy ? top - 0.1 : top, p.z - h, p.z + h, fancy ? '-y' : '+y-y');
     G.box('marbleDark', p.x - h - 0.025, p.x + h + 0.025, 0, fancy ? 0.22 : 0.12, p.z - h - 0.025, p.z + h + 0.025, '-y');
     if (fancy) {
-      // le chapiteau : deux bandeaux qui s'élargissent sous le plafond, un filet de laiton
-      G.box('trim', p.x - h - 0.06, p.x + h + 0.06, top - 0.42, top - 0.22, p.z - h - 0.06, p.z + h + 0.06, '+y');
-      G.box('trim', p.x - h - 0.13, p.x + h + 0.13, top - 0.22, top, p.z - h - 0.13, p.z + h + 0.13, '+y');
-      G.box('brass', p.x - h - 0.008, p.x + h + 0.008, 1.05, 1.09, p.z - h - 0.008, p.z + h + 0.008, '+y-y');
+      // (des piliers nus, comme au centre de référence : un joint creux sous le plafond, rien d'autre)
+      G.box('marbleDark', p.x - h + 0.02, p.x + h - 0.02, top - 0.1, top, p.z - h + 0.02, p.z + h - 0.02, '+y-y');
       // les appliques regardent les allées : de part et d'autre du vide le plus proche
       let best = null;
       let bd = Infinity;
@@ -918,7 +910,8 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       const t = (2 * C) / N;
       const RISE = FLOOR_DY / 2 / N; // 20 cm
       const MID = FLOOR_DY / 2;
-      const LIFT = 0.14; // le dessus des limons, au-dessus de la ligne des nez de marche
+      const PAR = 1.0; // la hauteur des parapets pleins, au-dessus de la ligne des nez de marche
+      const TH = 0.14; // leur épaisseur
       const TOP = 15 * t; // (la dernière marche de chaque volée est de plain-pied avec le palier ou l'étage)
       // la première volée : des marches pleines, du sol au palier ; un nez de laiton à chaque marche
       for (let k = 0; k < N; k++) {
@@ -946,43 +939,34 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       // (t ; étage) à (2C ; palier + 0,20)
       const n1 = (u) => RISE + (Math.min(u, TOP) / t) * RISE;
       const n2 = (u) => FLOOR_DY - ((Math.max(u, t) - t) / t) * RISE;
-      // les limons : la première volée (pleins jusqu'au sol), puis la seconde (du dessous de la dalle à la lisse)
-      for (const [v0, v1] of [[-0.02, 0.06], [C - 0.06, C]]) {
-        board(0, TOP, v0, v1, 0, n1(0) + LIFT, 0, n1(TOP) + LIFT);
-        board(TOP, 2 * C, v0, v1, 0, n1(TOP) + LIFT, 0, n1(TOP) + LIFT);
+      // les parapets pleins, blancs (comme l'escalier monumental du centre de référence) : la première volée jusqu'au
+      // sol, la seconde du dessous de sa dalle jusqu'à hauteur d'appui ; une lisse de pierre les coiffe
+      for (const [v0, v1] of [[-0.02, TH - 0.02], [C - TH, C]]) {
+        board(0, TOP, v0, v1, 0, n1(0) + PAR, 0, n1(TOP) + PAR);
+        board(TOP, 2 * C, v0, v1, 0, n1(TOP) + PAR, 0, n1(TOP) + PAR);
       }
-      for (const [v0, v1] of [[C, C + 0.06], [2 * C - 0.06, 2 * C + 0.02]]) {
-        board(0, t, v0, v1, soff(0), n2(0) + LIFT, soff(t), n2(t) + LIFT);
-        board(t, 2 * C, v0, v1, soff(t), n2(t) + LIFT, soff(2 * C), n2(2 * C) + LIFT);
+      for (const [v0, v1] of [[C, C + TH], [2 * C - TH + 0.02, 2 * C + 0.02]]) {
+        board(0, t, v0, v1, soff(0), n2(0) + PAR, soff(t), n2(t) + PAR);
+        board(t, 2 * C, v0, v1, soff(t), n2(t) + PAR, soff(2 * C), n2(2 * C) + PAR);
       }
-      // les garde-corps qui suivent les volées : barreaux et main courante en pente ; lift : les barreaux posent sur
-      // la lisse du limon, pas sur les marches
-      const slopeRail = (u0, v0, y0, u1, v1, y1, lift = 0) => {
-        const a = P(u0, v0);
-        const b = P(u1, v1);
-        const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
-        G.beam('trim', [a[0], y0 + MALL_RAIL - 0.05, a[1]], [b[0], y1 + MALL_RAIL - 0.05, b[1]], 0.07, 0.06);
-        G.beam('brass', [a[0], y0 + MALL_RAIL, a[1]], [b[0], y1 + MALL_RAIL, b[1]], 0.09, 0.035);
-        const m = Math.max(1, Math.round(L / 0.13));
-        for (let j = 0; j <= m; j++) {
-          const f = j / m;
-          const y = y0 + (y1 - y0) * f;
-          const end = j === 0 || j === m;
-          postsAt.push([a[0] + (b[0] - a[0]) * f, y + (end ? 0 : lift), a[1] + (b[1] - a[1]) * f, MALL_RAIL - 0.08 - (end ? 0 : lift), end ? 0.085 : 0.03]);
+      // le palier : un parapet sur ses trois côtés libres
+      board(2 * C, 3 * C, -0.02, TH - 0.02, MID - 0.1, MID + PAR, MID - 0.1, MID + PAR);
+      board(2 * C, 3 * C, 2 * C - TH + 0.02, 2 * C + 0.02, MID - 0.1, MID + PAR, MID - 0.1, MID + PAR);
+      lbox('plaster', 3 * C - TH, 3 * C, MID, MID + PAR, TH - 0.02, 2 * C - TH + 0.02, '-y');
+      lbox('trim', 3 * C - TH - 0.015, 3 * C + 0.015, MID + PAR, MID + PAR + 0.03, -0.02, 2 * C + 0.02);
+      // une main courante ronde, sur de courts potelets, du côté du mur de chaque volée
+      const hand = (u0, v, y0, u1, y1) => {
+        const a = P(u0, v);
+        const b = P(u1, v);
+        G.tube('rail', [a[0], y0, a[1]], [b[0], y1, b[1]], 0.024, 8);
+        const n = Math.max(1, Math.round(Math.abs(u1 - u0) / 1.1));
+        for (let i = 0; i <= n; i++) {
+          const f = i / n;
+          G.box('steel', a[0] + (b[0] - a[0]) * f - 0.012, a[0] + (b[0] - a[0]) * f + 0.012, y0 + (y1 - y0) * f - 0.13, y0 + (y1 - y0) * f, a[1] + (b[1] - a[1]) * f - 0.012, a[1] + (b[1] - a[1]) * f + 0.012);
         }
       };
-      const inset = 0.07;
-      for (const v of [0.02, C - 0.03]) {
-        slopeRail(0, v, n1(0), TOP, v, n1(TOP), LIFT); // la première volée, des deux côtés
-        slopeRail(TOP, v, MID, 2 * C, v, MID, LIFT);
-      }
-      slopeRail(2 * C, inset, MID, 3 * C - inset, inset, MID); // le palier
-      slopeRail(3 * C - inset, inset, MID, 3 * C - inset, 2 * C - inset, MID);
-      slopeRail(3 * C - inset, 2 * C - inset, MID, 2 * C, 2 * C - inset, MID);
-      for (const v of [C + 0.03, 2 * C - 0.02]) {
-        slopeRail(2 * C, v, n2(2 * C), t, v, n2(t), LIFT); // la seconde volée, des deux côtés
-        slopeRail(t, v, FLOOR_DY, 0, v, FLOOR_DY, LIFT);
-      }
+      hand(0.1, TH / 2 - 0.02, n1(0) + PAR + 0.16, TOP, n1(TOP) + PAR + 0.16);
+      hand(2 * C, 2 * C - TH / 2 + 0.02, n2(2 * C) + PAR + 0.16, t, n2(t) + PAR + 0.16);
     }
   }
 
@@ -1149,7 +1133,9 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     kit.put(name, piece, x, y, z, ry, s, inner ? INNER : undefined, rx, rz);
   };
   // (les portes fermées des salles 3 à 6 : rien d'autre sur ce bout de mur)
-  for (const d of map.fakeScreens || []) placed.push([d.x * C - 0.1, (d.z + 0.5) * C, 1.7]);
+  for (const d of map.fakeScreens || []) placed.push([d.x * C - 0.1, (d.z + 0.5) * C, 2.9]);
+  // (ni autour des portes des deux salles ouvertes : leur portique blanc, leur grand chiffre)
+  for (const d of map.doors || []) if (d.kind === 'screen') placed.push([d.x * C - 0.1, (d.z + 0.5) * C, 2.9]);
   const props = drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, placed });
   drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed, show: props.show, arcade: props.arcade, goods: props.goods });
   drawMallSigns({ map, fi, G, MATS, rooms, goods: props.goods, hAt, model, arcade: props.arcade });
@@ -1174,13 +1160,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   const fixtures = (fixSet, dummy) => {
     const white = () => new THREE.MeshBasicMaterial({ color: '#ffffff' });
     const of = (kind) => map.lights.filter((l) => l.kind === kind);
-    // la corniche : un tube lumineux caché dans la lèvre (mail : le long des caissons ; cours : autour du tambour)
-    // (autour des cours, le tube est caché dans la corniche moulurée : on ne voit que sa lueur sur la voussure)
-    fixSet(new THREE.BoxGeometry(1, 0.04, 0.09), white(), of('cove').filter((l) => !l.ring), (l) => {
-      dummy.position.set(l.x, l.y, l.z);
-      dummy.rotation.set(0, l.rot || 0, 0);
-      dummy.scale.set(l.ring ? 5.2 : 4.1, 1, 1);
-    });
+    // (les corniches : des tubes cachés dans une gorge ; on n'en voit que la lueur, cuite, sur le plafond et les retombées)
     // les spots encastrés et les balises des allées
     fixSet(new THREE.CylinderGeometry(0.085, 0.085, 0.02, 20), white(), of('spot'), (l) => {
       dummy.position.set(l.x, l.y - 0.012, l.z);
@@ -1201,18 +1181,19 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       dummy.position.set(l.x, l.y, l.z);
       dummy.scale.set(0.38, 0.4, 0.38);
     });
-    // le lustre des cours : deux couronnes de globes dépolis (douze dehors, six dedans, plus bas)
-    const globes = [];
-    for (const [R, n, y, ph] of LUSTRE) for (let i = 0; i < n; i++) globes.push(new THREE.SphereGeometry(0.15, 12, 9).translate(Math.cos((i / n) * 6.2832 + ph) * R, y, Math.sin((i / n) * 6.2832 + ph) * R));
-    fixSet(mergeGeometries(globes), white(), pend.filter((l) => l.big), (l) => {
+    // la grande suspension des cours : une vasque de verre dépoli, large et plate, qui éclaire vers le haut
+    const dish = new THREE.LatheGeometry([[0, -0.3], [0.5, -0.27], [0.95, -0.17], [1.22, -0.02], [1.28, 0.06], [1.2, 0.07], [0.9, -0.06], [0, -0.14]].map(([r, y]) => new THREE.Vector2(r, y)), 40);
+    fixSet(dish, new THREE.MeshBasicMaterial({ color: '#ffffff', side: THREE.DoubleSide }), pend.filter((l) => l.big), (l) => {
       dummy.position.set(l.x, l.y, l.z);
       dummy.scale.set(1, 1, 1);
     });
-    // les appliques des piliers, par paire
-    // (les piliers du mail et des cours font tous 90 cm)
-    const sconceGeo = mergeGeometries([-1, 1].map((s) => new THREE.CylinderGeometry(0.075, 0.05, 0.2, 14).translate(0, 0, s * 0.58)));
+    // les appliques des piliers : sur deux faces opposées, une platine de laiton et deux bras qui portent chacun une
+    // coupe de verre dépoli tournée vers le plafond (les piliers du mail et des cours font tous 90 cm)
+    const BOWL = [[0.03, 0], [0.11, 0.02], [0.17, 0.065], [0.19, 0.12], [0.175, 0.12], [0.15, 0.07], [0, 0.03]].map(([r, y]) => new THREE.Vector2(r, y));
+    const SC = { out: 0.3, side: 0.21, up: 0.2 }; // la coupe : devant la face, de part et d'autre de la platine, au-dessus du pied
+    const sconceGeo = mergeGeometries([-1, 1].flatMap((s) => [-1, 1].map((t) => new THREE.LatheGeometry(BOWL, 14).translate(t * SC.side, SC.up, s * (0.45 + SC.out)))));
     const sconces = of('sconce');
-    fixSet(sconceGeo, white(), sconces, (l) => {
+    fixSet(sconceGeo, new THREE.MeshBasicMaterial({ color: '#ffffff', side: THREE.DoubleSide }), sconces, (l) => {
       const axis = sconcePose.get(l.pillar) || 'z';
       dummy.position.set(l.x, l.y, l.z);
       dummy.rotation.set(0, axis === 'x' ? Math.PI / 2 : 0, 0);
@@ -1235,49 +1216,51 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
         deco.push(['black', new THREE.CylinderGeometry(0.012, 0.012, ceil - l.y, 6).translate(l.x, (ceil + l.y) / 2, l.z)]);
         continue;
       }
-      // le lustre : deux couronnes de laiton, leurs coupelles sous les globes, des rayons jusqu'au moyeu, trois
-      // tirants qui remontent vers la tige, la rosace au plafond
-      const at = (g) => deco.push(['brass', g.translate(l.x, l.y, l.z)]);
-      for (const [R, n, y, ph] of LUSTRE) {
-        at(new THREE.TorusGeometry(R, 0.035, 8, 48).rotateX(Math.PI / 2).translate(0, y - 0.2, 0));
-        for (let i = 0; i < n; i++) {
-          const a = (i / n) * 6.2832 + ph;
-          at(new THREE.CylinderGeometry(0.1, 0.05, 0.1, 10).translate(Math.cos(a) * R, y - 0.16, Math.sin(a) * R));
-          if (i % 2 === 0) at(new THREE.CylinderGeometry(0.018, 0.018, R, 6).rotateZ(Math.PI / 2).translate(R / 2, y - 0.2, 0).rotateY(-a));
-        }
-      }
-      at(new THREE.CylinderGeometry(0.1, 0.14, 0.9, 12).translate(0, -0.25, 0));
-      at(new THREE.SphereGeometry(0.16, 12, 9).translate(0, -0.75, 0));
+      // la couronne de bronze autour de la vasque, ses trois tiges jusqu'au pavillon, la tige et la rosace au plafond
+      const at = (g) => deco.push(['bronze', g.translate(l.x, l.y, l.z)]);
+      at(new THREE.TorusGeometry(1.42, 0.06, 8, 48).rotateX(Math.PI / 2).translate(0, 0.04, 0));
+      at(new THREE.TorusGeometry(1.3, 0.025, 6, 48).rotateX(Math.PI / 2).translate(0, 0.09, 0));
+      at(new THREE.CylinderGeometry(0.1, 0.16, 0.12, 14).translate(0, -0.34, 0));
+      const hubY = 1.5;
       for (let i = 0; i < 3; i++) {
-        const a = (i / 3) * 6.2832 + 0.4;
-        const g = new THREE.CylinderGeometry(0.014, 0.014, 2.3, 6).translate(0, 1.15, 0).rotateZ(0.72).rotateY(-a);
-        at(g.translate(Math.cos(a) * 1.5, -0.2, Math.sin(a) * 1.5));
+        const a = (i / 3) * 6.2832 + 0.5;
+        const L = Math.hypot(1.42 - 0.08, hubY - 0.06);
+        const g = new THREE.CylinderGeometry(0.016, 0.016, L, 6).translate(0, L / 2, 0).rotateZ(Math.atan2(1.42 - 0.08, hubY - 0.06)).rotateY(-a);
+        at(g.translate(Math.cos(a) * 1.42, 0.06, Math.sin(a) * 1.42));
+        at(new THREE.CylinderGeometry(0.02, 0.02, 0.28, 6).rotateZ(Math.PI / 2).translate(1.3, 0.05, 0).rotateY(-a));
       }
-      at(new THREE.CylinderGeometry(0.03, 0.03, ceil - l.y - 0.2, 8).translate(0, (ceil - l.y + 0.2) / 2, 0));
-      at(new THREE.CylinderGeometry(0.42, 0.5, 0.08, 24).translate(0, ceil - l.y - 0.04, 0));
-      at(new THREE.CylinderGeometry(0.2, 0.42, 0.14, 24).translate(0, ceil - l.y - 0.15, 0));
+      at(new THREE.CylinderGeometry(0.13, 0.09, 0.18, 12).translate(0, hubY, 0));
+      at(new THREE.CylinderGeometry(0.028, 0.028, Math.max(0.1, ceil - l.y - hubY - 0.75), 8).translate(0, hubY + Math.max(0.1, ceil - l.y - hubY - 0.75) / 2, 0));
+      at(new THREE.CylinderGeometry(0.3, 0.42, 0.1, 20).translate(0, ceil - l.y - 0.8, 0));
     }
     for (const l of sconces) {
       const axis = sconcePose.get(l.pillar) || 'z';
       const p = map.pillars[l.pillar];
-      const d = (p ? p.h : 0.45) + 0.012;
-      for (const s of [-1, 1]) {
-        const g = new THREE.BoxGeometry(0.14, 0.34, 0.024).translate(0, 0, s * d);
+      const d = p ? p.h : 0.45;
+      const put = (g) => {
         if (axis === 'x') g.rotateY(Math.PI / 2);
         deco.push(['brass', g.translate(l.x, l.y, l.z)]);
+      };
+      for (const sd of [-1, 1]) {
+        // la platine (une barre verticale), son médaillon, deux bras coudés, les coupelles sous les verres
+        put(new THREE.BoxGeometry(0.075, 0.86, 0.022).translate(0, -0.12, sd * (d + 0.011)));
+        put(new THREE.CylinderGeometry(0.07, 0.07, 0.03, 12).rotateX(Math.PI / 2).translate(0, 0.08, sd * (d + 0.03)));
+        for (const t of [-1, 1]) {
+          const A = [0, 0.08, sd * (d + 0.04)];
+          const B = [t * SC.side, 0.03, sd * (d + SC.out)];
+          const L = Math.hypot(B[0] - A[0], B[1] - A[1], B[2] - A[2]);
+          const g = new THREE.CylinderGeometry(0.014, 0.014, L, 6).rotateX(Math.PI / 2);
+          const o = new THREE.Object3D();
+          o.position.set((A[0] + B[0]) / 2, (A[1] + B[1]) / 2, (A[2] + B[2]) / 2);
+          o.lookAt(B[0], B[1], B[2]);
+          o.updateMatrix();
+          put(g.applyMatrix4(o.matrix));
+          put(new THREE.CylinderGeometry(0.016, 0.016, 0.17, 6).translate(B[0], 0.115, B[2]));
+          put(new THREE.CylinderGeometry(0.05, 0.025, 0.035, 10).translate(B[0], SC.up - 0.012, B[2]));
+        }
       }
     }
     for (const l of of('tube')) deco.push(['steel', new THREE.BoxGeometry(1.56, 0.05, 0.08).translate(l.x, l.y - 0.035, l.z)]);
-    // la gorge des corniches : une tablette crème sous le tube, qui le cache d'en bas (on voit la lueur au plafond)
-    for (const l of of('cove')) {
-      if (l.ring) continue; // (la corniche des cours les cache déjà)
-      const g = new THREE.BoxGeometry(l.ring ? 5.4 : 4.3, 0.035, 0.46).translate(0, -0.06, 0);
-      g.rotateY(l.rot || 0);
-      deco.push(['trim', g.translate(l.x, l.y, l.z)]);
-      const lip = new THREE.BoxGeometry(l.ring ? 5.4 : 4.3, 0.16, 0.03).translate(0, 0.0, 0.23);
-      lip.rotateY(l.rot || 0);
-      deco.push(['trim', lip.translate(l.x, l.y, l.z)]);
-    }
     const byKey = new Map();
     for (const [k, g] of deco) (byKey.get(k) || byKey.set(k, []).get(k)).push(g.index ? g.toNonIndexed() : g);
     for (const [k, list] of byKey) {
@@ -1322,8 +1305,6 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   };
 }
 const camDir = new THREE.Vector3();
-// le lustre des cours : ses couronnes [rayon, nombre de globes, hauteur, décalage]
-const LUSTRE = [[1.5, 12, 0, 0], [0.8, 6, -0.38, 0.26]];
 // la bande (en mètres, du nord au sud) où un étage se voit de l'autre : les cours et le mail, leurs vides, les escaliers
 const OPEN_Z0 = 46;
 const OPEN_Z1 = 114;

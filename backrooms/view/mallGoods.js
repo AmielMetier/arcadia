@@ -470,7 +470,8 @@ export const SIGN = Object.fromEntries(SIGNS.map((s, i) => [s, i]));
 export const DEPT_SIGN = { beauty: 0, ladies: 1, shoes: 2, home: 3, electro: 4, toys: 5, mens: 6, luggage: 7, kitchen: 8, stock: 9 };
 // (les petites cases : 2 colonnes × 18 rangées de 512 × 64 ; dessous, quatre grandes enseignes de 1024 × 128)
 const SIGN_A0 = 1152;
-const SIGN_H = SIGN_A0 + 512;
+const SIGN_H = SIGN_A0 + 512 + 256; // (les quatre enseignes, puis une rangée de six grands chiffres de 160 × 256)
+export const digitUV = (n) => [((n - 1) * 160 + 2) / 1024, 1 - (SIGN_A0 + 512 + 254) / SIGN_H, (n * 160 - 2) / 1024, 1 - (SIGN_A0 + 512 + 2) / SIGN_H];
 export const SIGN_MARKET = 22; // les grandes surfaces de l'annexe, puis le fléchage vers l'annexe
 export const SIGN_FLEA = 23;
 export const SIGN_GARDEN = 24;
@@ -640,18 +641,12 @@ function signAtlas() {
   // les grandes enseignes (1024 × 128)
   const A0 = SIGN_A0;
   {
-    // Hartwell's : une anglaise dorée sur un vert profond
+    // Hartwell's : des lettres de bronze découpées, posées à même le mur (le fond reste transparent)
     const y = A0;
-    g.fillStyle = '#10261c';
-    g.fillRect(0, y, 1024, 128);
-    g.fillStyle = '#c9a24a';
-    g.fillRect(16, y + 10, 992, 3);
-    g.fillRect(16, y + 115, 992, 3);
-    g.fillStyle = '#e6c56e';
-    g.font = 'italic 84px "Snell Roundhand", "Brush Script MT", Georgia, serif';
-    g.fillText("Hartwell's", 512, y + 82);
-    g.font = `bold 15px ${FONT}`;
-    g.fillText('D E P A R T M E N T   S T O R E   ·   E S T .  1 9 4 7', 512, y + 108);
+    g.clearRect(0, y, 1024, 128);
+    g.fillStyle = '#2b241c';
+    g.font = '300 96px "Helvetica Neue", "Futura", Arial, sans-serif';
+    g.fillText("Hartwell's", 512, y + 100);
   }
   {
     // Brandt & Co. : des capitales d'acier ; le D est tombé (il reste sa trace plus claire)
@@ -712,6 +707,19 @@ function signAtlas() {
       g.fill();
     }
   }
+  // les grands chiffres des salles : bordeaux, ourlés d'un halo bleuté (rétroéclairés), sur fond transparent
+  for (let n = 1; n <= 6; n++) {
+    const x = (n - 1) * 160;
+    const y = A0 + 512;
+    g.clearRect(x, y, 160, 256);
+    g.font = '900 250px "Arial Black", "Helvetica Neue", Arial, sans-serif';
+    g.shadowColor = n > 2 ? 'rgba(0,0,0,0)' : 'rgba(170,190,255,1)';
+    g.shadowBlur = 16;
+    g.fillStyle = n > 2 ? '#4a1620' : '#8f2433';
+    g.fillText(String(n), x + 80, y + 222, 132);
+    g.fillText(String(n), x + 80, y + 222, 132);
+    g.shadowBlur = 0;
+  }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
@@ -727,8 +735,9 @@ export function createGoods({ G, MATS, baked }) {
   const lam = (o) => new THREE.MeshLambertMaterial(o);
   if (!MATS.goods) {
     MATS.goods = { m: baked(lam({ map: TEX.goods, color: '#d6d2c8' })), S: 1 };
-    MATS.deptSign = { m: baked(lam({ map: TEX.signs })), S: 1 };
-    MATS.deptLit = { m: new THREE.MeshBasicMaterial({ map: TEX.signs, color: new THREE.Color(1, 1, 1).multiplyScalar(1.15) }), S: 1 };
+    // (alphaTest : quelques enseignes sont des lettres découpées, sans fond)
+    MATS.deptSign = { m: baked(lam({ map: TEX.signs, alphaTest: 0.4 })), S: 1 };
+    MATS.deptLit = { m: new THREE.MeshBasicMaterial({ map: TEX.signs, alphaTest: 0.4, color: new THREE.Color(1, 1, 1).multiplyScalar(1.15) }), S: 1 };
   }
   const pos = [];
   const nor = [];

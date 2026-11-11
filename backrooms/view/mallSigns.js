@@ -5,7 +5,7 @@
 // viennent de l'atlas des panneaux (view/mallGoods.js).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL_SIZE as C } from '../engine/map.js';
-import { signUV, anchorUV, ANCHOR, SIGN_EXIT, SIGN_SCREEN, SIGN_SCREENS78, SIGN_PARKING, SIGN_MARKET, SIGN_FLEA, SIGN_GARDEN, SIGN_ANNEX } from './mallGoods.js';
+import { digitUV, signUV, anchorUV, ANCHOR, SIGN_EXIT, SIGN_SCREEN, SIGN_SCREENS78, SIGN_PARKING, SIGN_MARKET, SIGN_FLEA, SIGN_GARDEN, SIGN_ANNEX } from './mallGoods.js';
 
 const PI = Math.PI;
 const WALL = 2;
@@ -37,7 +37,7 @@ export function drawMallSigns({ map, fi, G, MATS, rooms, goods, hAt, model, arca
 
   // --- 1. Les grandes enseignes, au-dessus des passages (ou suspendues dedans quand le plafond de la cour est bas) ---
   // r : le passage ; (nx, nz) : le côté d'où on la lit ; U : sa case ; w × h ; far : suspendue au fond du passage
-  const anchor = (r, nx, nz, U, w, h, lit, far = false) => {
+  const anchor = (r, nx, nz, U, w, h, lit, far = false, bare = false) => {
     if (!r) return;
     const mx = ((r.x0 + r.x1 + 1) * C) / 2;
     const mz = ((r.z0 + r.z1 + 1) * C) / 2;
@@ -48,9 +48,10 @@ export function drawMallSigns({ map, fi, G, MATS, rooms, goods, hAt, model, arca
     const k = lit ? 'deptLit' : 'deptSign';
     if (!far && out >= r.ceilH + h + 0.3) {
       // au mur, au-dessus de l'ouverture
-      const y = r.ceilH + 0.18 + h / 2;
-      slab('black', ex, ez, nx, nz, w / 2 + 0.12, y - h / 2 - 0.1, y + h / 2 + 0.1, 0, 0.07);
-      panel(k, U, ex + nx * 0.075, y, ez + nz * 0.075, w, h, nx, nz);
+      const y = r.ceilH + (bare ? 0.2 : 0.18) + h / 2;
+      // (bare : des lettres découpées posées à même le mur, sans caisson)
+      if (!bare) slab('black', ex, ez, nx, nz, w / 2 + 0.12, y - h / 2 - 0.1, y + h / 2 + 0.1, 0, 0.07);
+      panel(bare ? 'deptSign' : k, U, ex + nx * (bare ? 0.03 : 0.075), y, ez + nz * (bare ? 0.03 : 0.075), w, h, nx, nz);
     } else {
       // suspendue sous le plafond du passage (au fond : on la voit de loin, sous le plafond bas de la cour)
       const depth = nx ? (r.x1 - r.x0 + 1) * C : (r.z1 - r.z0 + 1) * C;
@@ -63,7 +64,7 @@ export function drawMallSigns({ map, fi, G, MATS, rooms, goods, hAt, model, arca
       for (const s of [-0.42, 0.42]) G.beam('steel', [x + (nx ? 0 : s * w), y + h / 2 + 0.08, z + (nz ? 0 : s * w)], [x + (nx ? 0 : s * w), r.ceilH, z + (nz ? 0 : s * w)], 0.03, 0.03);
     }
   };
-  anchor(byName("Hartwell's entrance"), 1, 0, anchorUV(ANCHOR.hartwell), 8.8, 1.1, fi === 0);
+  anchor(byName("Hartwell's entrance"), 1, 0, anchorUV(ANCHOR.hartwell), 10.4, 1.3, false, false, true);
   anchor(byName('Brandt & Co. entrance'), 0, -1, anchorUV(ANCHOR.brandt), 9.6, 1.2, false);
   anchor(byName('Pavilion entrance'), 0, 1, anchorUV(ANCHOR.pavilion), 8.8, 1.1, true);
   anchor(byName('Cinema entrance'), 0, 1, anchorUV(ANCHOR.stardust), 8.8, 1.1, true, true);
@@ -154,18 +155,25 @@ export function drawMallSigns({ map, fi, G, MATS, rooms, goods, hAt, model, arca
 
   // --- 3. Le couloir des salles : les portes fermées des salles 3 à 6, un numéro au-dessus de chaque porte ---
   if (fi === 0 && map.fakeScreens) {
+    // (comme au multiplexe de référence : un portique blanc en saillie autour de la porte, un grand chiffre rétroéclairé)
+    const portal = (num, x, z) => {
+      G.box('trim', x - 0.22, x, 0, 3.3, z - 2.5, z - 1.08, '-y');
+      G.box('trim', x - 0.22, x, 0, 3.3, z + 1.08, z + 2.5, '-y');
+      G.box('trim', x - 0.22, x, 2.42, 3.3, z - 1.08, z + 1.08);
+      for (const y of [0.7, 1.4, 2.1, 2.8]) G.box('steel', x - 0.226, x - 0.22, y - 0.012, y + 0.012, z - 2.4, z - 1.2);
+      goods.sign(0, x - 0.232, 1.75, z + 1.78, 0.9, 1.44, -1, 0, num < 3, false, digitUV(num));
+    };
     const plate = (num, x, z) => {
+      portal(num, x, z);
       const U = signUV(SIGN_SCREEN + Math.floor((num - 1) / 2), (num - 1) % 2 ? 0.502 : 0.002, (num - 1) % 2 ? 0.998 : 0.498);
-      G.box('black', x - 0.05, x, 2.78, 3.2, z - 0.76, z + 0.76);
-      goods.sign(0, x - 0.052, 2.99, z, 1.44, 0.36, -1, 0, num < 3 || num === 4, false, U);
+      G.box('black', x - 0.27, x - 0.22, 2.56, 2.98, z - 0.76, z + 0.76);
+      goods.sign(0, x - 0.272, 2.77, z, 1.44, 0.36, -1, 0, num < 3 || num === 4, false, U);
     };
     for (const fs of map.fakeScreens) {
       const x = fs.x * C;
       const z = (fs.z + 0.5) * C;
       // le chambranle, puis les deux vantaux fermés
-      G.box('black', x - 0.05, x, 0, 2.36, z - 1.06, z - 0.95, '-y');
-      G.box('black', x - 0.05, x, 0, 2.36, z + 0.95, z + 1.06, '-y');
-      G.box('black', x - 0.05, x, 2.28, 2.4, z - 1.06, z + 1.06);
+      G.box('black', x - 0.05, x, 0, 2.42, z - 1.08, z + 1.08, '-y');
       leaf('screen', -0.95, 1, 0.945, 0, 1);
       leaf('screen', 0.95, -1, 0.945, 0, 1);
       place(x, z, -1, 0);

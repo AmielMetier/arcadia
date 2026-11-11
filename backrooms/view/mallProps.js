@@ -927,7 +927,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         const gx = Math.floor((w + s * 0.5) / C) - s;
         const gz = Math.floor(z / C);
         if (map.grid[gz * map.W + gx] !== 2) continue; // (un mur derrière, pas une porte)
-        if (s < 0 && (map.fakeScreens || []).some((d) => Math.abs((d.z + 0.5) * C - z) < 2.0)) continue; // (ni une porte de salle)
+        if (s < 0 && [...(map.fakeScreens || []), ...(map.doors || []).filter((d) => d.kind === 'screen')].some((d) => Math.abs((d.z + 0.5) * C - z) < 3.2)) continue; // (ni une porte de salle, son portique)
         if (furn.some((o) => Math.abs(o.x - w) < 2 && Math.abs(o.z - z) < 1.6)) continue; // (ni derrière une borne)
         const x = w + s * 0.06;
         G.box('black', Math.min(w, w + s * 0.08), Math.max(w, w + s * 0.08), 0.9, 2.65, z - 0.62, z + 0.62);

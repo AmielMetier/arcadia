@@ -65,7 +65,7 @@ const CEILS = [
     closed: [3.8, 'grid'],
     portal: [4.6, 'soffit'],
     cine: [6.2, 'black'],
-    cineHall: [3.6, 'black'],
+    cineHall: [3.6, 'greyc'],
     screen: [8.2, 'black'],
     wc: [2.8, 'grid'],
     office: [2.8, 'grid'],
@@ -832,10 +832,15 @@ export function createMallMap(seed = 17) {
           light(0, cx, MZ, 'pendant', { room: r.id, y: r.ceilH - 2.2, big: true, state: 'on' });
           for (let i = 0; i < 12; i++) {
             const a = ((i + 0.5) / 12) * Math.PI * 2;
-            const rr = (r.court === 'west' ? rW : rC) + v.open + 0.5;
+            // (dans le tambour, juste derrière sa corniche)
+            const rr = ((r.court === 'west' ? rW : rC) + v.open) * 0.924 - 0.5;
             light(0, cx + Math.cos(a) * rr, MZ + Math.sin(a) * rr, 'cove', { room: r.id, y: v.base - 0.12, rot: Math.PI / 2 - a, ring: true });
           }
         } else grid(5, 'spot', { y: r.ceilH });
+      } else if (r.kind === RK.PORTAL && r.store && !r.gate && fi === 0) {
+        // l'entrée du grand magasin : une gorge lumineuse au-dessus du portail, qui lave le mur où sont posées ses lettres
+        grid(5, 'spot', { y: r.ceilH, pOff: 0.3 });
+        for (let z = Z0 + 1.5; z < Z1; z += 3) light(0, X1 + 1.0, z, 'cove', { y: r.ceilH + 0.3, state: 'on' });
       } else if (r.kind === RK.PLAZA) {
         // la lanterne ovale : un plafond lumineux au-dessus du vide, le seul endroit vraiment clair de l'étage
         light(0, ECX, MZ, 'glow', { room: r.id, y: r.vault.top, state: 'on', big: true });
@@ -854,7 +859,12 @@ export function createMallMap(seed = 17) {
       else if (r.kind === RK.FOOD) grid(7.5, 'pendant', { y: 4.6, pOff: 0.3 });
       else if (r.kind === RK.STORE || r.kind === RK.CLOSED) grid(r.kind === RK.CLOSED ? 10 : 7.5, 'panel', { y: r.ceilH, pOff: r.kind === RK.CLOSED ? 0.9 : 0.6 });
       else if (r.kind === RK.CINE) grid(5, 'spot', { y: r.ceilH, pOff: 0.2 });
-      else if (r.kind === RK.CINE_HALL) grid(3.75, 'spot', { y: r.ceilH, pOff: 0.3 });
+      else if (r.kind === RK.CINE_HALL) {
+        grid(3.75, 'spot', { y: r.ceilH, pOff: 0.3 });
+        // une gorge lumineuse autour du disque de plafond de chaque pilier
+        // (deux par pilier, hors de sa case : la lumière ne traverse pas le pilier)
+        for (const k in f.pillars) if (f.pillars[k].kind === 'cineHall') for (const dz of [-1.5, 1.5]) light(fi, f.pillars[k].x - 0.6, f.pillars[k].z + dz, 'cove', { room: r.id, y: r.ceilH - 0.1, ring: true, pOff: 0.25 });
+      }
       else if (r.kind === RK.SCREEN) grid(5, 'aisle', { y: 0.4, pOff: 0.2 });
       else if (r.kind === RK.WC || r.kind === RK.LOBBY) grid(5, 'panel', { y: r.ceilH, pOff: 0.45 });
       else if (r.kind === RK.OFFICE) grid(7.5, 'panel', { y: r.ceilH, pOff: 0.45 });

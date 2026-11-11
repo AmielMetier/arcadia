@@ -502,7 +502,7 @@ export function createMallTextures() {
   drawCarpet(dg, 512, null, '#33343a', '#55565e');
   out.carpetDark = tex(dc);
   const [pc, pg] = mk(512);
-  drawPlaster(pg, 512, '214,203,180', null);
+  drawPlaster(pg, 512, '230,225,213', null);
   out.plaster = tex(pc);
   const [ac, ag] = mk(512);
   drawPlaster(ag, 512, '58,59,64', null);
@@ -607,7 +607,7 @@ export function createMallTextures() {
     out.carpetViolet.needsUpdate = true;
     drawCarpet(dg, 512, moq, '#2e2f35', '#5a5b63');
     out.carpetDark.needsUpdate = true;
-    drawPlaster(pg, 512, '214,203,180', pap);
+    drawPlaster(pg, 512, '230,225,213', pap);
     out.plaster.needsUpdate = true;
     drawPlaster(ag, 512, '58,59,64', pap);
     out.paintDark.needsUpdate = true;
