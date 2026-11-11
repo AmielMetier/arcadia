@@ -94,6 +94,12 @@ export const FUSES = 3;
 export { VALVES, PIPES_LEVEL };
 export const HOTEL_LEVEL = 4; // Level 5, le Terror Hotel (par le toboggan rouge des Poolrooms)
 export const LAST_LEVEL = PIPES_LEVEL; // 0 : Level 0, 1 : Level 1 (entrepôt), 2 : Level 37 (Poolrooms), 3 : Level 2 (Tuyauteries, toboggan jaune), 4 : Level 5 (Terror Hotel, toboggan rouge)
+// ⭐ Le niveau de départ d'un VIP (réglage « start » du salon, hub/games.js, ou ?level1, ?level37, ?level2, ?level5 seul) :
+// le nom du level → son numéro dans le moteur. Il ne compte que pour un VIP (vip : compte VIP du Hub, ou hors du Hub) qui
+// a le coffre VIP ouvert (vault : le même test d'accès que le mode VIP) ; sinon, et pour un nom inconnu, le Level 0
+export const START_LEVELS = { 0: 0, 1: 1, 37: 2, 2: PIPES_LEVEL, 5: HOTEL_LEVEL };
+export const startLevel = (name, { vip = false, vault = false } = {}) =>
+  vip === true && vault === true && (typeof name === 'number' || typeof name === 'string') && Object.hasOwn(START_LEVELS, String(name)) ? START_LEVELS[String(name)] : 0;
 export const VALVE_T = 6.5; // secondes devant une vanne pour la fermer (elle revient doucement si on la lâche) : on s'expose
 export const VALVE_R = 1.5; // portée : il faut se tenir devant
 export const BREAKER_T = 4.5; // secondes devant un disjoncteur pour le réarmer
@@ -269,7 +275,9 @@ const AMB_CUES = {
   1: { rec: [20, 50], a: [7, 20], b: [25, 50] },
   2: { rec: [20, 50], a: [4, 10], b: [12, 28], c: [22, 48] }, // Poolrooms : clapotis, skimmers, bruits lointains
   [PIPES_LEVEL]: { rec: [20, 50], a: [9, 22], b: [18, 40], c: [14, 32] },
-  4: { rec: [9, 27] }, // Level 5 (HOTEL_LEVEL) : craquements et boîte à musique, plus souvent
+  // Level 5 (HOTEL_LEVEL) : craquements et boîte à musique, plus souvent ; un radiateur ; un téléphone, la sonnette de la
+  // réception ou une porte ; rarement un gramophone
+  4: { rec: [9, 27], a: [12, 28], b: [18, 40], c: [50, 110] },
 };
 
 // un tirage qui ne dépend que de la graine (hôte et invités tirent pareil)

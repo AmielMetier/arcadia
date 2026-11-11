@@ -11,6 +11,8 @@ import { CELL_SIZE, T, itemList, bfs } from './map.js';
 
 const C = CELL_SIZE;
 export const HOTEL_CEIL = 3.1;
+// le hall monte plus haut que les couloirs (un vrai hall d'hôtel) : ses lustres pendent de 4,40 m
+export const LOBBY_CEIL = 4.4;
 export const HOTEL_W = 36;
 export const HOTEL_H = 31;
 export const LETTERS = 6;
@@ -65,14 +67,30 @@ export function createHotelMap(seed = 5) {
   };
   const cellPos = (x, z) => ({ x: (x + 0.5) * C, z: (z + 0.5) * C, gx: x, gz: z });
 
-  // 1. Le couloir en boucle autour du bloc central
-  const RING = { x0: 8, z0: 8, x1: 27, z1: 19 };
-  carve(RING.x0, RING.z0, RING.x1, RING.z0);
-  carve(RING.x0, RING.z1, RING.x1, RING.z1);
-  carve(RING.x0, RING.z0, RING.x0, RING.z1);
-  carve(RING.x1, RING.z0, RING.x1, RING.z1);
+  // 1. Les couloirs, en deux boucles qui se partagent une galerie :
+  //  - l'allée principale, au nord, d'un bout à l'autre de l'étage ;
+  //  - la galerie, large de deux cases, qui monte du hall jusqu'au palier des ascenseurs ;
+  //  - à l'est, une boucle autour d'un bloc de chambres (le couloir de service longe le mur extérieur) ;
+  //  - à l'ouest, une boucle plus courte qui passe par le salon d'étage ;
+  //  - le palier des ascenseurs, en cul-de-sac au bout de la galerie.
+  // (RING : l'allée principale et le couloir du sud, que les tests prennent pour repères)
+  const RING = { x0: 4, z0: 9, x1: 32, z1: 19 };
   const corridorCells = [];
-  for (let z = RING.z0; z <= RING.z1; z++) for (let x = RING.x0; x <= RING.x1; x++) if (grid[z * W + x] === T.FLOOR) corridorCells.push({ x, z });
+  const corridorSet = new Set();
+  const inRect = (R, c) => c.x >= R.x0 && c.x <= R.x1 && c.z >= R.z0 && c.z <= R.z1;
+  const hall = (x0, z0, x1, z1) => {
+    carve(x0, z0, x1, z1);
+    for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) if (!corridorSet.has(z * W + x)) corridorSet.add(z * W + x), corridorCells.push({ x, z });
+  };
+  hall(4, 9, 32, 9); // l'allée principale
+  hall(17, 10, 18, 18); // la galerie
+  hall(7, 19, 32, 19); // le couloir du sud, devant le hall
+  hall(32, 10, 32, 18); // le couloir de service, à l'est
+  hall(5, 10, 5, 16); // le couloir de l'ouest
+  const LOUNGE = { x0: 3, z0: 17, x1: 6, z1: 19 }; // le salon d'étage
+  hall(LOUNGE.x0, LOUNGE.z0, LOUNGE.x1, LOUNGE.z1);
+  const ALCOVE = { x0: 16, z0: 6, x1: 19, z1: 8 }; // le palier des ascenseurs
+  hall(ALCOVE.x0, ALCOVE.z0, ALCOVE.x1, ALCOVE.z1);
 
   // 2. Les chambres : (x0, z0, x1, z1) inclus, la porte (case dans le mur) et le sens de la porte vers le couloir
   const rooms = [];
@@ -81,12 +99,13 @@ export function createHotelMap(seed = 5) {
     carve(door.x, door.z, door.x, door.z);
     rooms.push({ id: rooms.length, x0, z0, x1, z1, door, dir, num: 0 });
   };
-  for (const a of [8, 12, 16, 20, 24]) room(a, 3, a + 2, 6, { x: a + 1, z: 7 }, [0, 1]); // côté nord
-  for (const b of [8, 12, 16]) room(29, b, 32, b + 2, { x: 28, z: b + 1 }, [-1, 0]); // côté est
-  for (const a of [24, 8]) room(a, 21, a + 2, 24, { x: a + 1, z: 20 }, [0, -1]); // côté sud, de part et d'autre du hall
-  for (const b of [16, 12, 8]) room(3, b, 6, b + 2, { x: 7, z: b + 1 }, [1, 0]); // côté ouest
-  for (const a of [10, 14, 18, 22]) room(a, 10, a + 2, 12, { x: a + 1, z: 9 }, [0, -1]); // bloc central, nord
-  for (const a of [22, 18, 14, 10]) room(a, 15, a + 2, 17, { x: a + 1, z: 18 }, [0, 1]); // bloc central, sud
+  for (const a of [3, 7, 11, 21, 25, 29]) room(a, 4, a + 2, 7, { x: a + 1, z: 8 }, [0, 1]); // au nord de l'allée
+  for (const a of [20, 24, 28]) room(a, 11, a + 2, 13, { x: a + 1, z: 10 }, [0, -1]); // le bloc de l'est, côté allée
+  for (const a of [28, 24, 20]) room(a, 15, a + 2, 17, { x: a + 1, z: 18 }, [0, 1]); // le bloc de l'est, côté sud
+  for (const a of [31, 27, 23]) room(a, 21, a + 2, 24, { x: a + 1, z: 20 }, [0, -1]); // au sud-est, à côté du hall
+  for (const b of [14, 10]) room(12, b, 15, b + 2, { x: 16, z: b + 1 }, [1, 0]); // sur la galerie, côté ouest
+  for (const b of [10, 14]) room(7, b, 10, b + 2, { x: 6, z: b + 1 }, [-1, 0]); // sur le couloir de l'ouest
+  for (const a of [5, 9]) room(a, 21, a + 2, 24, { x: a + 1, z: 20 }, [0, -1]); // au sud-ouest (l'une s'ouvre sur le salon)
   rooms.forEach((r, i) => {
     r.num = 201 + i;
   });
@@ -99,8 +118,8 @@ export function createHotelMap(seed = 5) {
   grid[EX.z * W + EX.x] = T.EXIT;
   const elevator = { gx: EX.x, gz: EX.z, x: (EX.x + 0.5) * C, z: (EX.z + 0.5) * C, dx: 0, dz: 1, fire: true };
   const exit = cellPos(EX.x, EX.z - 1);
-  // le clavier à code, à gauche de la porte (sur le mur du fond) ; les boîtes aux lettres sur le mur ouest du hall
-  const keypad = { x: (EX.x - 0.15) * C, z: LOBBY.z1 * C + C, y: 1.4, rot: Math.PI }; // face au nord
+  // le clavier à code, à droite de la porte vu du hall, côté serrure (sur le mur du fond) ; les boîtes aux lettres sur le mur ouest du hall
+  const keypad = { x: (EX.x + 1.15) * C, z: LOBBY.z1 * C + C, y: 1.4, rot: Math.PI }; // face au nord
   const mbMid = ((LOBBY.z0 + LOBBY.z1 + 1) / 2) * C;
   const mailbox = { x: LOBBY.x0 * C, z0: mbMid - 1.45, z1: mbMid + 1.45, y0: 0.85, y1: 2.15, rot: Math.PI / 2 }; // face à l'est, 7 × 3 casiers
   mailbox.boxes = rooms.map((r, i) => {
@@ -219,9 +238,9 @@ export function createHotelMap(seed = 5) {
     // la plante au sommet de la banquette ronde du milieu
     { m: 'potted_plant_02', h: 0.95, r: 0, x: lobbyCenter.x, z: lobbyCenter.z, y: 0.92, rot: 0 },
     // les lustres : les trois du milieu, un au-dessus du salon, un devant la réception
-    ...[[-1, -0.8], [1, -0.8], [0, 1.2]].map(([ox, oz]) => ({ m: 'Chandelier_01', h: 1.0, r: 0, x: lobbyCenter.x + ox * C * 1.5, z: lobbyCenter.z + oz * C, y: HOTEL_CEIL - 1.0, rot: 0 })),
-    { m: 'Chandelier_01', h: 1.0, r: 0, x: X0 + 5, z: Z1 - 2.6, y: HOTEL_CEIL - 1.0, rot: 0.4 },
-    { m: 'Chandelier_01', h: 1.0, r: 0, x: desk.x - 2.2, z: desk.z, y: HOTEL_CEIL - 1.0, rot: 0.4 },
+    ...[[-1, -0.8], [1, -0.8], [0, 1.2]].map(([ox, oz]) => ({ m: 'Chandelier_01', h: 1.0, r: 0, x: lobbyCenter.x + ox * C * 1.5, z: lobbyCenter.z + oz * C, y: LOBBY_CEIL - 1.0, rot: 0 })),
+    { m: 'Chandelier_01', h: 1.0, r: 0, x: X0 + 5, z: Z1 - 2.6, y: LOBBY_CEIL - 1.0, rot: 0.4 },
+    { m: 'Chandelier_01', h: 1.0, r: 0, x: desk.x - 2.2, z: desk.z, y: LOBBY_CEIL - 1.0, rot: 0.4 },
   ];
   // la banquette ronde de velours au milieu du hall, et deux colonnes de marbre de part et d'autre de l'entrée
   solids.push({ x: lobbyCenter.x, z: lobbyCenter.z, hx: 1.15, hz: 1.15, banquette: true });
@@ -275,6 +294,145 @@ export function createHotelMap(seed = 5) {
   });
   for (const L of letters) mailbox.boxes.find((b) => b.num === L.num).letter = L.id;
 
+  // 6b. L'habillage des chambres, tiré d'un second hasard (les lettres, le code et les lumières ne changent pas) :
+  // une fenêtre aux rideaux tirés sur un mur de côté, son radiateur et un fauteuil ; une table de nuit de chaque côté
+  // du lit ; parfois une commode et son miroir sur l'autre mur, une valise ; un tableau au-dessus du lit, un miroir
+  // au-dessus du bureau. Les meubles qu'on heurte restent contre les murs (à moins d'un mètre), loin des lettres.
+  let s2 = ((seed * 7919) >>> 0) || 7;
+  const drnd = () => {
+    s2 = (s2 + 0x6d2b79f5) >>> 0;
+    let t = s2;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const roomProps = [];
+  for (const r of rooms) {
+    const [dx, dz] = r.dir;
+    const nU = dx !== 0 ? r.z1 - r.z0 + 1 : r.x1 - r.x0 + 1; // cases le long du mur du fond
+    const nV = dx !== 0 ? r.x1 - r.x0 + 1 : r.z1 - r.z0 + 1; // cases du fond vers la porte
+    const ux = dz; // l'axe u, le long du mur du fond
+    const uz = -dx;
+    const fx = ((r.x0 + r.x1 + 1) / 2) * C - dx * (nV * C) / 2; // le milieu du mur du fond
+    const fz = ((r.z0 + r.z1 + 1) / 2) * C - dz * (nV * C) / 2;
+    const at = (u, v) => ({ x: fx + ux * u + dx * v, z: fz + uz * u + dz * v });
+    const yawTo = (vx, vz) => Math.atan2(vx, vz); // un modèle dont l'avant (+z) regarde vers (vx, vz)
+    const half = (nU * C) / 2;
+    const free = (p, d) => !letters.some((L) => L.room === r.id && Math.hypot(L.x - p.x, L.z - p.z) < d);
+    const box = (p, hu, hv) => (ux !== 0 ? { hx: hu, hz: hv } : { hx: hv, hz: hu }); // demi-tailles selon u (le long du mur du fond) et v (vers la porte)
+    const side = drnd() < 0.5 ? -1 : 1; // le mur de la fenêtre
+    const vW = Math.min(nV * C - 2.4, 2.1 * C);
+    const wp = at(side * half, vW);
+    r.win = { x: wp.x, z: wp.z, nx: -side * ux, nz: -side * uz, w: 1.5 };
+    // le radiateur sous la fenêtre (en fonte, 15 cm d'épaisseur)
+    const rp = at(side * (half - 0.11), vW);
+    solids.push({ ...rp, ...box(rp, 0.08, 0.46), radiator: true, nx: -side * ux, nz: -side * uz });
+    // les tables de nuit, de part et d'autre du lit
+    const bedU = 0; // le lit est au milieu du mur du fond
+    for (const sgn of [-1, 1]) {
+      const np = at(bedU + sgn * (FURNITURE.bed.hw + 0.27), 0.22);
+      solids.push({ ...np, ...(ux !== 0 ? { hx: 0.22, hz: 0.2 } : { hx: 0.2, hz: 0.22 }), nightstand: true, rot: yawTo(dx, dz), phone: sgn === (r.id % 2 ? 1 : -1) });
+    }
+    // le fauteuil, près de la fenêtre, tourné vers le lit
+    const ap = at(side * (half - 0.5), vW + 1.3);
+    if (free(ap, 1.1)) roomProps.push({ m: drnd() < 0.6 ? 'ArmChair_01' : 'GreenChair_01', h: 1.0, r: 0.38, ...ap, rot: yawTo(-side * ux - dx * 0.6, -side * uz - dz * 0.6) });
+    // la commode et son miroir, en face de la fenêtre ; dessus, une pendule ou un vase
+    if (drnd() < 0.65) {
+      const cp = at(-side * (half - 0.3), vW);
+      if (free(cp, 1.0)) {
+        const face = yawTo(side * ux, side * uz);
+        roomProps.push({ m: 'GothicCommode_01', h: 0.95, r: 0.36, ...cp, rot: face });
+        roomProps.push({ m: drnd() < 0.5 ? 'mantel_clock_01' : 'antique_ceramic_vase_01', h: drnd() < 0.5 ? 0.32 : 0.38, r: 0, ...at(-side * (half - 0.3), vW + 0.25), y: 0.95, rot: face });
+        const mp = at(-side * (half - 0.03), vW);
+        roomProps.push({ m: 'ornate_mirror_01', h: 0.95, r: 0, ...mp, y: 1.3, rot: face });
+      }
+    }
+    // un tableau au-dessus de la tête de lit, un miroir au-dessus du bureau
+    roomProps.push({ m: 'fancy_picture_frame_01', h: 0.62, r: 0, ...at(bedU, 0.03), y: 1.45, rot: yawTo(dx, dz) });
+    const dU = (r.desk.x - fx) * ux + (r.desk.z - fz) * uz;
+    roomProps.push({ m: 'ornate_mirror_01', h: 0.8, r: 0, ...at(dU, 0.03), y: 1.2, rot: yawTo(dx, dz) });
+    // une valise laissée contre le mur de la fenêtre, près du fond
+    if (drnd() < 0.5) {
+      const vp = at(side * (half - 0.32), 1.9);
+      if (free(vp, 0.9)) roomProps.push({ m: 'vintage_suitcase', h: 0.55, r: 0.3, ...vp, rot: yawTo(-side * ux, -side * uz) + (drnd() - 0.5) * 0.5 });
+    }
+    // un pouf au pied du lit, une plante dans un coin du fond (loin de l'armoire et des lettres)
+    const clear = (p, d) => free(p, d) && !spots.some((h) => h.room === r.id && Math.hypot(h.x - p.x, h.z - p.z) < d + 0.5) && !roomProps.some((q) => q.r > 0 && Math.hypot(q.x - p.x, q.z - p.z) < d);
+    const op = at(bedU, 2 * FURNITURE.bed.hd + 0.42);
+    if (drnd() < 0.55 && clear(op, 0.9)) roomProps.push({ m: 'Ottoman_01', h: 0.42, r: 0.3, ...op, rot: yawTo(dx, dz) + (drnd() - 0.5) * 0.3 });
+    const pp = at(-side * (half - 0.42), 0.42);
+    if (drnd() < 0.6 && clear(pp, 1.0)) roomProps.push({ m: 'potted_plant_02', h: 0.95, r: 0.3, ...pp, rot: drnd() * 6.28 });
+    // une chambre sur trois a été fouillée : tiroirs ouverts, draps défaits (voir view/hotelRooms.js)
+    r.mess = drnd() < 0.33;
+  }
+
+  // 6c. L'habillage des couloirs (même second hasard) : contre les murs sans applique, des tableaux, des consoles avec
+  // un vase ou une lampe à pétrole sous un miroir, une banquette, un extincteur et son déclencheur ; une plante dans les
+  // angles ; une pendule arrêtée ; un panneau « sol glissant » oublié. Rien devant les portes des chambres (plateaux,
+  // chaussures, journaux), rien de plus profond que 50 cm : le couloir reste libre
+  const hallProps = [];
+  {
+    const DIRS = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+    const wallAt = (x, z) => grid[z * W + x] === T.WALL;
+    const doorCells = new Set(rooms.map((r) => r.door.z * W + r.door.x));
+    const nearDoor = (c) => DIRS.some(([dx, dz]) => doorCells.has((c.z + dz) * W + c.x + dx));
+    const yawTo = (vx, vz) => Math.atan2(vx, vz);
+    let clock = false;
+    for (const c of corridorCells) {
+      if (nearDoor(c) || inRect(ALCOVE, c)) continue;
+      const walls = DIRS.filter(([dx, dz]) => wallAt(c.x + dx, c.z + dz));
+      const sconce = (c.x + c.z) % 2 === 0 ? walls[0] : null; // (voir 8 : l'applique prend le premier mur trouvé)
+      const cx = (c.x + 0.5) * C;
+      const cz = (c.z + 0.5) * C;
+      // un angle : une plante
+      const corner = walls.find(([ax, az]) => walls.some(([bx, bz]) => ax * bx + az * bz === 0 && (ax !== bx || az !== bz)));
+      if (corner) {
+        const other = walls.find(([bx, bz]) => corner[0] * bx + corner[1] * bz === 0);
+        hallProps.push({ m: 'potted_plant_02', h: 1.0, r: 0.3, x: cx + (corner[0] + other[0]) * (C / 2 - 0.42), z: cz + (corner[1] + other[1]) * (C / 2 - 0.42), rot: drnd() * 6.28 });
+        continue;
+      }
+      if (inRect(LOUNGE, c)) continue; // (le salon est meublé plus bas)
+      for (const [dx, dz] of walls) {
+        if (sconce && sconce[0] === dx && sconce[1] === dz) continue;
+        const face = yawTo(-dx, -dz); // l'avant du modèle tourné vers le couloir
+        const on = (d, y = 0) => ({ x: cx + dx * (C / 2 - d), z: cz + dz * (C / 2 - d), ...(y ? { y } : {}) });
+        const u = drnd();
+        if (u < 0.3) {
+          if (!clock && drnd() < 0.12) {
+            clock = true;
+            hallProps.push({ m: 'wall_clock', h: 0.36, r: 0, ...on(0.04, 1.95), rot: face });
+          } else hallProps.push({ m: 'fancy_picture_frame_01', h: 0.72, r: 0, ...on(0.03, 1.45), rot: face });
+        } else if (u < 0.4) {
+          hallProps.push({ m: 'ClassicConsole_01', h: 0.85, r: 0.3, ...on(0.24), rot: face });
+          hallProps.push({ m: drnd() < 0.6 ? 'antique_ceramic_vase_01' : 'vintage_oil_lamp', h: 0.42, r: 0, ...on(0.24, 0.85), rot: face + drnd() });
+          hallProps.push({ m: 'ornate_mirror_01', h: 0.85, r: 0, ...on(0.03, 1.4), rot: face });
+        } else if (u < 0.44) {
+          hallProps.push({ m: 'painted_wooden_bench', h: 0.48, r: 0.3, ...on(0.26), rot: face });
+        } else if (u < 0.47) {
+          hallProps.push({ m: 'korean_fire_extinguisher_01', h: 0.62, r: 0.14, ...on(0.14), rot: face });
+          hallProps.push({ m: 'fire_alarm', h: 0.16, r: 0, ...on(0.02, 1.4), rot: face });
+        }
+      }
+    }
+    // le salon d'étage : un canapé contre le mur ouest sous un tableau, une table basse, deux fauteuils tournés vers lui,
+    // une lampe à pétrole sur la table
+    const lx = LOUNGE.x0 * C;
+    const lz = ((LOUNGE.z0 + LOUNGE.z1 + 1) / 2) * C;
+    hallProps.push({ m: 'sofa_02', h: 0.95, r: 0.8, x: lx + 0.55, z: lz, rot: Math.PI / 2 });
+    hallProps.push({ m: 'fancy_picture_frame_01', h: 0.8, r: 0, x: lx + 0.03, z: lz, y: 1.55, rot: Math.PI / 2 });
+    hallProps.push({ m: 'gothic_coffee_table', h: 0.5, r: 0.5, x: lx + 2.3, z: lz, rot: Math.PI / 2 });
+    hallProps.push({ m: 'vintage_oil_lamp', h: 0.5, r: 0, x: lx + 2.3, z: lz + 0.25, y: 0.5, rot: 0.6 });
+    for (const sz of [-1, 1]) hallProps.push({ m: drnd() < 0.5 ? 'ArmChair_01' : 'GreenChair_01', h: 1.0, r: 0.45, x: lx + 3.9, z: lz + sz * 1.3, rot: -Math.PI / 2 + sz * 0.35 });
+    // le palier des ascenseurs : une plante de chaque côté des portes
+    for (const ax of [ALCOVE.x0 * C + 0.45, (ALCOVE.x1 + 1) * C - 0.45]) hallProps.push({ m: 'potted_plant_02', h: 1.05, r: 0.3, x: ax, z: ALCOVE.z0 * C + 0.45, rot: drnd() * 6.28 });
+    // le panneau « sol glissant », planté au milieu d'un couloir droit
+    const straight = corridorCells.filter((c) => !nearDoor(c) && DIRS.filter(([dx, dz]) => wallAt(c.x + dx, c.z + dz)).length === 2);
+    if (straight.length) {
+      const c = straight[Math.floor(drnd() * straight.length)];
+      hallProps.push({ m: 'WetFloorSign_01', h: 0.62, r: 0.22, x: (c.x + 0.3 + drnd() * 0.4) * C, z: (c.z + 0.3 + drnd() * 0.4) * C, rot: drnd() * 6.28 });
+    }
+  }
+
   // 7. Le code à 4 chiffres (même graine, même code chez tout le monde)
   const code = String(1000 + Math.floor(rnd() * 9000));
 
@@ -287,9 +445,14 @@ export function createHotelMap(seed = 5) {
     const v = rnd();
     const st = v < 0.04 ? 'off' : v < 0.14 ? 'flicker' : 'on';
     // contre le mur le plus proche (le mur extérieur du couloir)
-    const wall = [[0, -1], [0, 1], [-1, 0], [1, 0]].find(([dx, dz]) => grid[(c.z + dz) * W + c.x + dx] === T.WALL) || [0, -1];
+    const wall = [[0, -1], [0, 1], [-1, 0], [1, 0]].find(([dx, dz]) => grid[(c.z + dz) * W + c.x + dx] === T.WALL);
+    if (!wall || inRect(ALCOVE, c)) return; // (au milieu du salon, rien à quoi l'accrocher ; le palier a les siennes)
     addLight((c.x + 0.5 + wall[0] * 0.42) * C, (c.z + 0.5 + wall[1] * 0.42) * C, { state: st, flicker: st === 'flicker', bright: st === 'on', sconce: { dx: wall[0], dz: wall[1] } });
   });
+  // le palier des ascenseurs : une applique sur chaque mur de côté
+  const az = (ALCOVE.z0 + 1.5) * C;
+  addLight((ALCOVE.x0 + 0.08) * C, az, { state: 'on', bright: true, sconce: { dx: -1, dz: 0 } });
+  addLight((ALCOVE.x1 + 0.92) * C, az, { state: 'on', bright: true, sconce: { dx: 1, dz: 0 } });
   for (const r of rooms) {
     const st = rnd() < 0.85 ? 'on' : 'flicker';
     addLight(r.desk.x, r.desk.z, { state: st, flicker: st === 'flicker', bright: st === 'on', y: 1.2, fy: 1.2, lamp: true });
@@ -298,12 +461,12 @@ export function createHotelMap(seed = 5) {
   }
   // une applique au-dessus des boîtes aux lettres
   addLight(mailbox.x + 0.2, mbMid, { state: 'on', y: 2.5, fy: 2.5, bright: true, sconce: { dx: -1, dz: 0 } });
-  addLight(X0 + 5, Z1 - 2.6, { state: 'on', bright: true, y: HOTEL_CEIL - 0.5, fy: HOTEL_CEIL - 0.5, chandelier: true });
-  addLight(desk.x - 2.2, desk.z, { state: 'on', bright: true, y: HOTEL_CEIL - 0.5, fy: HOTEL_CEIL - 0.5, chandelier: true });
-  for (const [ox, oz] of [[-1, -0.8], [1, -0.8], [0, 1.2]]) addLight(lobbyCenter.x + ox * C * 1.5, lobbyCenter.z + oz * C, { state: 'on', bright: true, y: HOTEL_CEIL - 0.5, fy: HOTEL_CEIL - 0.5, chandelier: true });
+  addLight(X0 + 5, Z1 - 2.6, { state: 'on', bright: true, y: LOBBY_CEIL - 0.5, fy: LOBBY_CEIL - 0.5, chandelier: true });
+  addLight(desk.x - 2.2, desk.z, { state: 'on', bright: true, y: LOBBY_CEIL - 0.5, fy: LOBBY_CEIL - 0.5, chandelier: true });
+  for (const [ox, oz] of [[-1, -0.8], [1, -0.8], [0, 1.2]]) addLight(lobbyCenter.x + ox * C * 1.5, lobbyCenter.z + oz * C, { state: 'on', bright: true, y: LOBBY_CEIL - 0.5, fy: LOBBY_CEIL - 0.5, chandelier: true });
 
   // 9. Quelques piles et eaux d'amande, dans les chambres sans lettre et le couloir
-  const busy = [cellPos(spawnCell.x, spawnCell.z), ...letters, ...furniture, ...lobbyProps, ...solids];
+  const busy = [cellPos(spawnCell.x, spawnCell.z), ...letters, ...furniture, ...lobbyProps, ...roomProps, ...hallProps, ...solids];
   const scatter = (n) => {
     const out = [];
     for (let i = 0; i < 2000 && out.length < n; i++) {
@@ -332,6 +495,7 @@ export function createHotelMap(seed = 5) {
     level: 4, // HOTEL_LEVEL (le 3 est le Level 2, les Tuyauteries)
     name: 5,
     ceil: HOTEL_CEIL,
+    lobbyCeil: LOBBY_CEIL,
     W,
     H,
     grid,
@@ -343,7 +507,7 @@ export function createHotelMap(seed = 5) {
     cassettes: [],
     fuses: [],
     lights,
-    props: lobbyProps,
+    props: [...lobbyProps, ...roomProps, ...hallProps],
     bottles,
     batteries,
     items: itemList(['bottle', bottles], ['battery', batteries]),
@@ -354,6 +518,10 @@ export function createHotelMap(seed = 5) {
     lobby: LOBBY,
     lobbyCenter,
     ring: RING,
+    lounge: LOUNGE,
+    alcove: ALCOVE,
+    // les deux ascenseurs du palier (hors service) : le milieu de leur porte, sur le mur du fond, face au sud
+    lifts: [ALCOVE.x0 + 1, ALCOVE.x0 + 3].map((gx) => ({ x: gx * C, z: ALCOVE.z0 * C, rot: 0 })),
     corridorCells,
     furniture,
     solids,
