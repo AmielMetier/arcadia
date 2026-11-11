@@ -5,6 +5,11 @@
   - Elle marche en se déhanchant, les mains sur les hanches, puis court buste penché en pompant des bras, et se rue bras tendus vers toi.
   - Elle a ses propres gestes : elle t'agrippe, titube quand on se dégage, abat ses deux poings sur une porte blindée, se tord quand l'imposteur reprend sa forme, se relève après être tombée d'une gaine et se jette sur la caméra au jumpscare.
   - Ses pas s'entendent au rythme de sa marche et de sa course.
+- **The Backrooms** — au Level 1, l'entité est un imposteur dès le début :
+  - Elle a l'apparence d'un joueur et marche à la même vitesse que vous. Ta lampe ne la trahit plus : elle ne se dévoile que lorsqu'elle arrive tout près de quelqu'un.
+  - Elle se transforme alors sur place pendant une seconde, puis te poursuit un peu plus vite que ton sprint. Il faut une salle de sécurité ou un casier pour lui échapper.
+  - Loin de tout le monde et hors de vue, elle reprend l'apparence d'un joueur.
+- **The Backrooms** — En sprint, on court moins vite de côté et encore moins à reculons : toute la vitesse n'est que droit devant.
 
 ## 5.37 — 10 novembre 2026
 - **The Backrooms** — Les Poolrooms (Level 37) rattrapent le réalisme des Level 0 et 1.

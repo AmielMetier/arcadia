@@ -1737,7 +1737,7 @@ function handleEvent(ev, me) {
       break;
     case 'mimic':
       // (rien pour les vivants : ils ne savent pas encore que ce n'est plus lui)
-      if (ev.id === me && hud) setTimeout(() => hud && hud.toast('It is wearing your face now. It speaks with your voice'), 2600);
+      if (ev.kill && ev.id === me && hud) setTimeout(() => hud && hud.toast('It is wearing your face now. It speaks with your voice'), 2600);
       break;
     case 'mimicCall':
       // l'imposteur appelle avec la voix volée (de vive voix, là où il est, ou au talkie) ; chacun la rejoue chez soi

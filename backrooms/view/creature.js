@@ -19,6 +19,7 @@ import { clone as cloneSkinned } from '../../shared/vendor/three/SkeletonUtils.j
 
 export const CREATURE_URL = new URL('../models/level1/entite.glb', import.meta.url).href;
 const DONOR_URL = new URL('../models/hazmat.glb', import.meta.url).href;
+const UNMASK_T = 1; // s : la transformation (UNMASK_T du moteur, engine/sim.js)
 export const STATES = ['idle', 'walk', 'run', 'rush', 'grab', 'stun', 'bang', 'unmask', 'drop', 'scare'];
 const LIMITS = { tris: 150000, bytes: 15e6, tex: 2048, bones: 120 };
 
@@ -401,7 +402,7 @@ export function createCreature(opts = {}) {
   const group = new THREE.Group();
   const info = { ok: false, error: null, warnings: [], tris: 0, meshes: 0, skinned: false, bones: 0, rig: {}, clips: [], uses: {}, bytes: 0, height: 0, textures: [] };
   const height = opts.height || 2.7;
-  const st = { root: null, rig: {}, mixer: null, acts: {}, w: {}, mats: [], last: { x: 0, z: 0, ok: false }, speed: 0, force: null, forceT: 0, t: 0, head: null, prevMimic: null, unmaskT: 0, unmaskLen: 1.1, low: null, gripT: 0, rest: [] };
+  const st = { root: null, rig: {}, mixer: null, acts: {}, w: {}, mats: [], last: { x: 0, z: 0, ok: false }, speed: 0, force: null, forceT: 0, t: 0, head: null, prevMimic: null, unmaskT: 0, unmaskLen: UNMASK_T, low: null, gripT: 0, rest: [] };
 
   const ready = (async () => {
     try {
@@ -474,13 +475,14 @@ export function createCreature(opts = {}) {
           }
         }
       }
-      st.unmaskLen = clips.unmask && clipsOwn(info, 'unmask') ? clips.unmask.duration : 1.1;
+      st.unmaskLen = UNMASK_T; // (la transformation du moteur : son clip est joué à cette durée)
       st.mixer = new THREE.AnimationMixer(root);
       for (const [s, c] of Object.entries(clips)) {
         const a = st.mixer.clipAction(c);
         a.setLoop(LOOP.has(s) ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
         a.clampWhenFinished = !LOOP.has(s);
         a.play();
+        if (s === 'unmask') a.timeScale = c.duration / UNMASK_T;
         a.weight = s === 'idle' ? 1 : 0;
         st.acts[s] = a;
         st.w[s] = s === 'idle' ? 1 : 0;

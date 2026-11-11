@@ -5956,16 +5956,17 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 
       // 3. Les autres joueurs encore dehors
       const Mw = sim.hasMonster ? sim.monster : null;
+      // Level 1 : l'imposteur a le corps d'un joueur (son propre avatar : celui qu'il imite peut être encore en vie, à
+      // côté) ; il marche là où est l'entité, lampe éteinte. (Le regard d'un joueur va vers -sin, -cos : l'inverse de
+      // celui de l'entité, d'où le demi-tour)
+      const Mq = Mw && Mw.mimic != null && !Mw.away ? sim.players.find((q) => q.id === Mw.mimic) : null;
+      if (Mq) {
+        const D = { ...Mq, id: 'mimic', status: 'alive', x: Mw.x, z: Mw.z, yaw: (Mw.yaw || 0) + Math.PI, pitch: 0, floor: Mw.floor || 0, flashlight: false, cam: false, moving: (Mw.v || 0) > 0.2, running: false, crouch: false, hidden: -1, jy: 0, tilt: 0, onLadder: false };
+        const mv2 = floorViews[D.floor];
+        avatars.update(D, true, Mw.y ?? feetY(sim.stairs, D.x, D.z, D.floor), mv2 ? mv2.lightAt(D.x, D.z) : 0.3, dt, time);
+      } else if (avatars.has('mimic')) avatars.update({ id: 'mimic' }, false);
       for (const Q of sim.players) {
         if (Q === P) continue; // soi-même : plus bas (vue subjective)
-        // Level 1 : l'imposteur porte le corps (la tenue, la lampe) de sa victime ; il marche là où est l'entité, lampe éteinte
-        // (le regard d'un joueur va vers -sin, -cos : l'inverse de celui de l'entité, d'où le demi-tour)
-        if (Mw && Mw.mimic === Q.id && Q.status === 'dead') {
-          const D = { ...Q, status: 'alive', x: Mw.x, z: Mw.z, yaw: (Mw.yaw || 0) + Math.PI, pitch: 0, floor: Mw.floor || 0, flashlight: false, cam: false, moving: (Mw.v || 0) > 0.2, running: false, crouch: false, hidden: -1, jy: 0, tilt: 0, onLadder: false };
-          const mv2 = floorViews[D.floor];
-          avatars.update(D, true, Mw.y ?? feetY(sim.stairs, D.x, D.z, D.floor), mv2 ? mv2.lightAt(D.x, D.z) : 0.3, dt, time);
-          continue;
-        }
         const show = Q.status === 'alive' && !(Q.hidden >= 0); // un coéquipier caché dans un casier ne se voit pas
         if (!show && !avatars.has(Q.id)) continue;
         // à l'écran, chacun suit sa piste : les positions reçues (20 par seconde), interpolées un peu dans le passé,
