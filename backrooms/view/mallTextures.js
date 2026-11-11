@@ -433,6 +433,54 @@ export function cinemaCarpet(w, h, discs, img) {
   return t;
 }
 
+// la moquette de la salle de jeux : des confettis fluo sur un fond bleu nuit (le motif se raccorde d'un carreau à l'autre)
+function drawConfetti(g, S) {
+  let seed = 11;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const COLS = ['#ff3d8f', '#22d3c5', '#ffd23a', '#7c5cff', '#ff7a2a', '#39d86a'];
+  for (let i = 0; i < 70; i++) {
+    const x = rnd() * S;
+    const y = rnd() * S;
+    const a = rnd() * 6.28;
+    const kind = Math.floor(rnd() * 4);
+    const col = COLS[Math.floor(rnd() * COLS.length)];
+    const sz = 9 + rnd() * 13;
+    for (const ox of [-S, 0, S])
+      for (const oy of [-S, 0, S]) {
+        g.save();
+        g.translate(x + ox, y + oy);
+        g.rotate(a);
+        g.strokeStyle = col;
+        g.fillStyle = col;
+        g.lineWidth = 3.2;
+        g.lineCap = 'round';
+        g.globalAlpha = 0.82;
+        g.beginPath();
+        if (kind === 0) {
+          // un zigzag
+          g.moveTo(-sz, 0);
+          for (let k = 1; k <= 4; k++) g.lineTo(-sz + (k * sz) / 2, k % 2 ? -sz * 0.35 : sz * 0.35);
+          g.stroke();
+        } else if (kind === 1) {
+          // un triangle
+          g.moveTo(0, -sz * 0.6);
+          g.lineTo(sz * 0.6, sz * 0.5);
+          g.lineTo(-sz * 0.6, sz * 0.5);
+          g.closePath();
+          g.stroke();
+        } else if (kind === 2) {
+          // une virgule
+          g.arc(0, 0, sz * 0.6, 0.3, 3.6);
+          g.stroke();
+        } else {
+          // un confetti
+          g.fillRect(-sz * 0.45, -2.5, sz * 0.9, 5);
+        }
+        g.restore();
+      }
+  }
+}
+
 export function createMallTextures() {
   const S = 1024;
   const mk = (size = S) => canvas(size, size);
@@ -446,6 +494,10 @@ export function createMallTextures() {
   const [vc, vg] = mk(512);
   drawCarpet(vg, 512, null, '#6a2f8e', '#8e48b8');
   out.carpetViolet = tex(vc);
+  const [fc, fg] = mk(512);
+  drawCarpet(fg, 512, null, '#1b1634', '#2a2350');
+  drawConfetti(fg, 512);
+  out.carpetArcade = tex(fc);
   const [dc, dg] = mk(512);
   drawCarpet(dg, 512, null, '#33343a', '#55565e');
   out.carpetDark = tex(dc);

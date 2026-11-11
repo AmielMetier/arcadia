@@ -31,9 +31,9 @@
   const COL = {
     mail: '#cdbf9e', court: '#e6d6ad', plaza: '#7d7466', shop: '#a99a7c', service: '#6f6b63', food: '#cfb98a', store: '#b7ad98',
     closed: '#4e473d', portal: '#d8c9a4', cine: '#7b4fa8', cineHall: '#4a4a52', screen: '#5a2830', wc: '#9fb3b5', office: '#a3a08f',
-    dock: '#76736c', lobby: '#b4ab97',
+    dock: '#76736c', lobby: '#b4ab97', fun: '#c0528e', parking: '#8f949b',
   };
-  const NAMES = { mail: 'mail', court: 'cour', plaza: 'place basse', shop: 'boutique', service: 'service', food: 'food court', store: 'grand magasin', closed: 'magasin fermé', portal: 'passage', cine: 'cinéma', cineHall: 'couloir des salles', screen: 'salle', wc: 'toilettes', office: 'bureaux', dock: 'quais', lobby: 'hall des parkings' };
+  const NAMES = { mail: 'mail', court: 'cour', plaza: 'place basse', shop: 'boutique', service: 'service', food: 'food court', store: 'grand magasin', closed: 'magasin fermé', portal: 'passage', cine: 'cinéma', cineHall: 'couloir des salles', screen: 'salle', wc: 'toilettes', office: 'bureaux', dock: 'quais', lobby: 'hall des parkings', fun: 'salle de jeux', parking: 'parking' };
   const S = 9; // pixels par case
   const draw = (seed) => {
     const m = createMallMap(seed * 17 + 3);
@@ -102,6 +102,16 @@
           g.lineTo(px(o.bx), px(o.bz));
           g.stroke();
         }
+      }
+      // le mobilier (son emprise)
+      g.fillStyle = '#3a2c1c99';
+      for (const it of f.furn || []) {
+        const [w, d] = it.rot ? [it.d, it.w] : [it.w, it.d];
+        if (it.round) {
+          g.beginPath();
+          g.arc(px(it.x), px(it.z), Math.max(1, px(Math.max(it.w, it.d) / 2)), 0, 7);
+          g.fill();
+        } else g.fillRect(px(it.x - w / 2), px(it.z - d / 2), Math.max(1, px(w)), Math.max(1, px(d)));
       }
       // les escalators (tout le tracé)
       for (const e of f.escalators) {
