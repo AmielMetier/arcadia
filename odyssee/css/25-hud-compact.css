@@ -1,0 +1,32 @@
+/* HUD d'exploration plus compact (les deux graphismes) : la fiche du lieu prend moins de place, tous les boutons tiennent
+   sur une seule rangée, l'équipe est un peu plus petite ; sur un écran étroit, tout rapetisse encore. */
+.hud-gear { width: calc(var(--px) * 176); gap: calc(var(--px) * 1.8); top: calc(var(--px) * 4); right: calc(var(--px) * 4); }
+.hud-gear-card { padding: calc(var(--px) * 2.6) calc(var(--px) * 4) calc(var(--px) * 2.6) calc(var(--px) * 5); gap: calc(var(--px) * 1.4);
+  border-radius: calc(var(--px) * 8) calc(var(--px) * 4) calc(var(--px) * 4) calc(var(--px) * 8); }
+.hud-loc { font-size: calc(var(--px) * 7.6); }
+.hud-money, .hud-badge-cnt { font-size: calc(var(--px) * 6.8); }
+.hud-stat-ico { width: calc(var(--px) * 10); height: calc(var(--px) * 10); }
+.hud-actions { grid-template-columns: repeat(8, 1fr); gap: calc(var(--px) * 1); }
+.hud-btn { font-size: calc(var(--px) * 3.6); padding: calc(var(--px) * 1.4) 0 calc(var(--px) * 1.1); letter-spacing: -.02em; border-radius: calc(var(--px) * 3); }
+.hud-btn img { width: calc(var(--px) * 11.5); height: calc(var(--px) * 11.5); }
+.hud-btn span, .hud-btn b { overflow: hidden; text-overflow: clip; max-width: 100%; }
+.hud-party { top: calc(var(--px) * 6); gap: calc(var(--px) * 1.2); zoom: .86; }
+.hud-dexnav { width: auto; max-width: none; }
+.hud-dexnav-row { max-height: calc(var(--px) * 22); }
+@media (max-aspect-ratio: 8/5) {
+  .hud-gear { zoom: .84; }
+  .hud-party { zoom: .74; }
+}
+@media (max-aspect-ratio: 1/1) {
+  .hud-gear { zoom: .7; }
+  .hud-party { zoom: .62; }
+}
+
+/* Graphismes « Noir & Blanc » : l'habillage du menu de Noir 2 & Blanc 2 (gris anthracite, liseré clair, touche de rouge) */
+.gfx-noirblanc .hud-gear-card { background: linear-gradient(180deg, #4a4e58 0%, #2c2f38 100%); border-color: #14151a;
+  box-shadow: inset 0 0 0 calc(var(--px) * 1.2) #f2f4f8, inset 0 0 0 calc(var(--px) * 2) #8a8f9c, 0 calc(var(--px) * 2) 0 rgba(0,0,0,.45); text-shadow: var(--px) var(--px) 0 #16171c; }
+.gfx-noirblanc .hud-loc-row { border-bottom-color: #e8413c; }
+.gfx-noirblanc .hud-btn { background: linear-gradient(180deg, #5a5f6c 0%, #34373f 100%); border-color: #14151a;
+  box-shadow: inset 0 0 0 calc(var(--px) * 1) #e4e7ee, 0 calc(var(--px) * 1.5) 0 rgba(0,0,0,.45); text-shadow: var(--px) var(--px) 0 #16171c; }
+.gfx-noirblanc .hud-btn:hover { background: linear-gradient(180deg, #e8514c 0%, #a82a26 100%); }
+.gfx-noirblanc .hud-toggle { background: rgba(255,255,255,.18); }

@@ -535,7 +535,8 @@ export class WorldView {
     if (art.sprites) { const dens = art.dens || (art.dens = {}); densifier(art.sprites, dens); variantesArbres(art.sprites, dens); applySpriteImages(S, art.sprites, dens); }
     this.A = A; this.N = N; this.S = S;
     // ?arbres=0 : un seul dessin par essence, sans teinte (comparaison)
-    this.arbresUnis = /[?&]arbres=0/.test(globalThis.location?.search || '');
+    this.packDecor = !!art.packDecor;   // pack de graphismes : ses arbres ont un seul dessin, avec leur ombre
+    this.arbresUnis = this.packDecor || /[?&]arbres=0/.test(globalThis.location?.search || '');
     this.charRows = charsImg ? Math.round(charsImg.height / CHH) : 10;
     this.texA = tex(A.canvas); this.texN = tex(N.canvas); this.texS = tex(S.canvas); this.texC = tex(this.packChars());
     const mk = (map, o = {}) => new THREE.MeshBasicMaterial({ map, vertexColors: true, ...o });
@@ -632,7 +633,8 @@ export class WorldView {
 
   groundCell(x, y) {
     const m = this.map, t = m.get(x, y), A = this.A.cells, v = hash(x, y);
-    const g4 = () => 'grass' + (v < 0.55 ? 0 : v < 0.8 ? 1 : v < 0.93 ? 2 : 3);
+    const pg = A.pg_0_0;   // pack de graphismes : herbe à motif de 3 × 2 cases, la même partout (sous les arbres aussi)
+    const g4 = () => (pg ? `pg_${x % 3}_${y % 2}` : 'grass' + (v < 0.55 ? 0 : v < 0.8 ? 1 : v < 0.93 ? 2 : 3));
     const zone = m.outdoor ? m.zoneAt(x, y) : null, theme = zone?.theme;
     const grassKey = theme === 'volcanic' ? 'ash' + (v < 0.5 ? 0 : 1) : theme === 'snow' ? 'snow' + (v < 0.5 ? 0 : 1) : g4();
     const mask = (same) => { let k = 0; if (same(m.get(x, y - 1))) k |= 1; if (same(m.get(x + 1, y))) k |= 2; if (same(m.get(x, y + 1))) k |= 4; if (same(m.get(x - 1, y))) k |= 8; return k; };
@@ -676,7 +678,7 @@ export class WorldView {
         if (tt === T.DARKTALL) return { c: A['darktall' + (v < 0.5 ? 0 : 1)] };
         return { c: A[(theme === 'snow' && A.snowtall0 ? 'snowtall' : 'tall') + (v < 0.5 ? 0 : 1)] };
       }
-      case T.TREE: case T.PINE: return { c: theme === 'volcanic' ? A.ash1 : theme === 'snow' ? A.snow1 : A['forest' + (v < 0.5 ? 0 : 1)] };
+      case T.TREE: case T.PINE: return { c: theme === 'volcanic' ? A.ash1 : theme === 'snow' ? A.snow1 : pg ? A[g4()] : A['forest' + (v < 0.5 ? 0 : 1)] };
       case T.PATH: return { c: A['path' + edge(isPathish)] };
       case T.PAVE: case T.DOOR: case T.BUILD: return { c: A['pave' + edge((q) => isPathish(q))] };
       case T.SAND: return { c: A['sand' + edge((q) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.FLOWER && q !== T.PINE)] };
@@ -1040,7 +1042,7 @@ export class WorldView {
           if (!this.arbresUnis) key = variante(S, key, x, y);
           const r = S[key], cx = x + 0.5 + (v - 0.5) * 0.2, cz = y + 0.7;
           billboard(P, cx, cz, SW(r), SH(r), r, 0, this.arbresUnis ? vb > 0.5 : miroir(x, y), this.arbresUnis ? 1 : teinte(x, y, key.startsWith('snowpine') || key.startsWith('deadtree')));
-          this.ombreSol(Sh, cx - 0.75, cz - 0.3, cx + 0.75, cz + 0.3);
+          if (!this.packDecor) this.ombreSol(Sh, cx - 0.75, cz - 0.3, cx + 0.75, cz + 0.3);
         }
       } else if (t === T.FENCE) {
         // barrière : de face (rangée horizontale) ou vue dans l'axe (colonne nord-sud, le long d'un chemin vertical)

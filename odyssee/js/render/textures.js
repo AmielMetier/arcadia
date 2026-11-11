@@ -208,10 +208,13 @@ export function buildAtlas() {
   for (let v = 0; v < 2; v++) put('snowtall' + v, (P) => grassCell(P, PAL.tall, 1.6));
   for (let v = 0; v < 2; v++) putSol('forest' + v, 'forest' + v, (P) => grassCell(P, PAL.dark, 1));
   const grassImg = img.grass0;
+  // pack de graphismes : herbe à motif (pg_<colonne>_<ligne>, choisie selon la case)
+  for (const k of Object.keys(SOL32)) if (k.startsWith('pg_')) putImg(k, up2(SOL32[k]));
   for (const [k, pal, outline] of [['path', PAL.path, '#a88a58'], ['sand', PAL.sand, '#c8b070'], ['pave', PAL.pave, '#a09888']]) {
     const base = drawn(k + '0');
     for (let m = 0; m < 16; m++) {
-      if (base) putImg(k + m, grassEdges32(up2(base), grassImg, m, k.length));
+      if (SOL32[`${k}_m${m}`]) putImg(k + m, up2(SOL32[`${k}_m${m}`]));   // pack de graphismes : bords dessinés du terrain
+      else if (base) putImg(k + m, grassEdges32(up2(base), grassImg, m, k.length));
       else put(k + m, (P) => { if (k === 'pave') paveCell(P, pal); else dirtCell(P, pal, k === 'path' ? 3 : 1); grassEdges(P, m, outline); });
     }
   }
@@ -443,7 +446,7 @@ export function buildAnimAtlas() {
   const keys = [];
   const W = [0, 1, 2, 3].map((f) => SOL32['water' + f]);
   const E16 = [0, 1, 2, 3].map((f) => SOL32['s16_eau' + f]);
-  for (let m = 0; m < 16; m++) keys.push(['water' + m, (P, f) => waterCell(P, m, f), E16[0] ? ((f) => up2(E16[(f >> 1) % 4])) : HG.mer ? ((f) => hgWater(m, f)) : W[0] && ((f) => shore32(up2(W[f % 4] || W[0]), m, f))]);
+  for (let m = 0; m < 16; m++) keys.push(['water' + m, (P, f) => waterCell(P, m, f), SOL32[`water_m${m}_f0`] ? ((f) => up2(SOL32[`water_m${m}_f${(f >> 1) % 4}`])) : E16[0] ? ((f) => up2(E16[(f >> 1) % 4])) : HG.mer ? ((f) => hgWater(m, f)) : W[0] && ((f) => shore32(up2(W[f % 4] || W[0]), m, f))]);
   const FL = [SOL32.flowerR, SOL32.flowerW, SOL32.flowerR, SOL32.flowerW], HGF = ['fleur_r', 'fleur_y', 'fleur_b', 'fleur_p'];
   const F16 = ['fleur_r', 'fleur_y', 'fleur_w', 'fleur_p'].map((k) => SOL32['s16_' + k]);
   // massifs de fleurs : les fleurs dessinées de HeartGold / SoulSilver (32 px, qui se balancent) posées sur l'herbe du jeu ;
@@ -629,6 +632,7 @@ export function setArt({ kits = {}, sols = {}, sol32 = {}, hgss = {}, relief = n
       if (/^(tall|darktall|snowtall)\d$/.test(k)) SOLS[k] = v; else SOL32[k] = v;
     }
     for (let f = 0; f < 4; f++) delete SOL32['s16_eau' + f];
+    for (const k of Object.keys(SOL32)) if (k.startsWith('h_')) delete SOL32[k];   // nappes de hautes herbes du jeu : celles du pack à la place
     delete HG.mer;   // la mer animée de HeartGold passerait devant les tuiles d'eau du pack
   }
 }

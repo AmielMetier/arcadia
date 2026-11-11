@@ -2,13 +2,16 @@
 // Les choix sont gardés dans le navigateur (localStorage). Le sol se charge au lancement du jeu (il faut relancer pour
 // le changer) ; les sprites se lisent à chaque image demandée (assets.js) et changent tout de suite pour les nouveaux écrans.
 
+import { NB_TUILES, NB_COLS, NB_DECOR, NB_BATIMENTS } from './data/gfx-noirblanc.js';
+
+const NB_MAISONS = ['maison_bleue', 'maison_a', 'maison_c', 'maison_brique', 'maison_b', 'maison_orange'];
 const lire = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } };
 const ecrire = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* navigation privée : le choix ne dure que le temps de la page */ } };
 
 /** sol du dehors : « odyssee » (sol généré, relief 3D), « classique » (tuiles d'origine) ou un pack de tuiles Pokémon */
 export const SOLS_CHOIX = [
   { id: 'odyssee', nom: 'Odyssée (de base)', info: 'les graphismes d\'origine du jeu' },
-  { id: 'noirblanc', nom: 'Noir & Blanc', info: 'sol, eau, arbres et maisons dans le style Pokémon Noir & Blanc' },
+  { id: 'noirblanc', nom: 'Noir & Blanc', info: 'le monde de Pokémon Noir 2 & Blanc 2 : sol, mer, arbres, bâtiments et personnages' },
 ];
 /** sprites de Pokémon (face, dos, chromatiques) : HeartGold / SoulSilver (Gen 4) ou Noir / Blanc (Gen 5) */
 export const SPRITES_CHOIX = [
@@ -24,20 +27,17 @@ export const PACKS = {
       'grass0', 'grass1', 'grass2', 'lava0', 'lava1', 'path0', 'pave0', 'sand0', 'snow0', 'snow1', 'snowtall0', 'snowtall1',
       'tall0', 'tall1', 'water0', 'water1', 'water2', 'water3'],
   },
+  // tout vient du kit Pokémon Essentials BW (tools/odyssee-pack-noirblanc.py → data/gfx-noirblanc.js)
   noirblanc: {
     dossier: 'gfx/noirblanc',
-    tuiles: ['ash0', 'ash1', 'cave0', 'cave1', 'darktall0', 'darktall1', 'deep0', 'deep1', 'deep2', 'deep3', 'forest0', 'forest1',
-      'grass0', 'grass1', 'grass2', 'lava0', 'lava1', 'path0', 'pave0', 'sand0', 'snow0', 'snow1', 'snowtall0', 'snowtall1',
-      'tall0', 'tall1', 'water0', 'water1', 'water2', 'water3'],
-    // décor remplacé (fichier d_<nom>.png, dessiné pixel pour pixel)
-    decor: ['tree', 'tree2', 'pine', 'snowpine', 'palm', 'bush', 'rock', 'deadtree'],
-    // bâtiments entiers du kit Pokémon Essentials BW (b_<nom>.png, 32 px par case : posés pixel pour pixel) :
-    // [image, largeur en px, colonne du milieu de la porte]. Le jeu prend l'image dont la largeur colle à l'emprise
-    // (à une case et demie près) ; sinon le bâtiment de base reste.
-    batiments: {
-      center: [['centre', 200, 99]], mart: [['boutique', 148, 91], ['boutique_b', 150, 75]], gym: [['arene', 222, 143]], lab: [['labo', 188, 88]], tower: [['tour', 116, null]],
-      house: [['maison_bleue', 154, 48], ['maison_a', 148, 73], ['maison_c', 176, 71], ['maison_d', 150, 75], ['maison_brique', 192, 94], ['maison_b', 200, 99], ['maison_e', 200, 74], ['maison_orange', 246, 134]], house2: [['maison_bleue', 154, 48], ['maison_a', 148, 73], ['maison_c', 176, 71], ['maison_d', 150, 75], ['maison_brique', 192, 94], ['maison_b', 200, 99], ['maison_e', 200, 74], ['maison_orange', 246, 134]], house3: [['maison_bleue', 154, 48], ['maison_a', 148, 73], ['maison_c', 176, 71], ['maison_d', 150, 75], ['maison_brique', 192, 94], ['maison_b', 200, 99], ['maison_e', 200, 74], ['maison_orange', 246, 134]], bighouse: [['maison_bleue', 154, 48], ['maison_a', 148, 73], ['maison_c', 176, 71], ['maison_d', 150, 75], ['maison_brique', 192, 94], ['maison_b', 200, 99], ['maison_e', 200, 74], ['maison_orange', 246, 134]],
-    },
+    planche: { fichier: 'sol', tuiles: NB_TUILES, cols: NB_COLS },   // tuiles de sol de 16 px sur une seule image
+    decor: NB_DECOR,          // d_<nom>.png, 32 px par case : dessiné pixel pour pixel
+    chars: 'chars',           // planche des personnages de Noir & Blanc 2 (même disposition que celle du jeu)
+    // bâtiments entiers (b_<nom>.png) par style du jeu : le jeu prend celui dont la largeur colle à l'emprise
+    batiments: Object.fromEntries(Object.entries({
+      center: ['centre'], mart: ['boutique'], gym: ['arene'], lab: ['labo'], tower: ['tour'],
+      house: NB_MAISONS, house2: NB_MAISONS, house3: NB_MAISONS, bighouse: NB_MAISONS,
+    }).map(([st, L]) => [st, L.map((n) => [n, ...NB_BATIMENTS[n]])])),
   },
 };
 
@@ -57,7 +57,7 @@ export function choisirSprites(id) { if (SPRITES_CHOIX.some((s) => s.id === id))
 /** crédits affichés dans Options → Crédits graphismes */
 export const CREDITS = [
   ['Sol « Pokémon Lumineux »', 'Tuiles de Flurmimon (planche « Bright »), adaptées par Bivurnum — Team Aqua\'s Asset Repo.'],
-  ['Graphismes « Noir & Blanc »', 'Bâtiments, mer et hautes herbes du kit « Pokémon Essentials BW » de KleinStudio ; sol de thefloofypanthar ; lave et rochers de Phyromatical ; arbres des planches Noir & Blanc partagées sur DeviantArt. Graphismes de Pokémon Noir & Blanc © Nintendo / Game Freak.'],
+  ['Graphismes « Noir & Blanc »', 'Sol, mer, arbres, bâtiments et personnages : kit « Pokémon Essentials BW » de KleinStudio (graphismes de Pokémon Noir & Blanc 2 © Nintendo / Game Freak / Creatures). Lave : Phyromatical.'],
   ['Sprites Noir & Blanc', 'Sprites des jeux Pokémon © Nintendo / Game Freak / Creatures, récupérés par PokeAPI (projet PokeAPI/sprites).'],
   ['Sprites HeartGold / SoulSilver', 'Même source : PokeAPI/sprites.'],
   ['Utilisation', 'Projet de fans sans but lucratif. Les artistes restent propriétaires de leurs créations.'],

@@ -1,5 +1,16 @@
 # Journal des versions — Arcadia
 
+## 5.55 — 11 novembre 2026
+- **Odyssée** — Les graphismes « Noir & Blanc » sont refaits de fond en comble pour ressembler à Pokémon Noir 2 & Blanc 2.
+  - Le sol : l'herbe turquoise du jeu, les chemins de sable et les routes pavées avec leurs vrais bords, la mer bordée de rochers, les hautes herbes sombres.
+  - Les arbres et les sapins de Noir & Blanc, à leur vraie taille, avec leurs versions d'automne, de cerisier et de neige ; haies fleuries et lampadaires.
+  - Les personnages : ton dresseur devient le héros ou l'héroïne de Noir 2 & Blanc 2, et les habitants, dresseurs, champions et sbires prennent leur allure de Noir & Blanc.
+  - Les maisons trop sombres sont retirées ; les intérieurs et les combats gardent leur dessin habituel.
+- **Odyssée** — Le HUD prend moins de place, dans les deux graphismes.
+  - La fiche du lieu est plus petite, tous les boutons tiennent sur une seule rangée et l'équipe est plus fine.
+  - Sur un écran étroit, tout rapetisse encore pour laisser voir le jeu.
+  - En Noir & Blanc, le HUD prend les gris et le rouge du menu de Noir 2 & Blanc 2.
+
 ## 5.54 — 11 novembre 2026
 - **Hub** — Nouveau : le monstre du Level 1 change de corps, avec ses propres animations (TahitoaSenis)
   - Models/level1/entite.glb : une silhouette voilée, 26 os, 10 clips nommés comme les états du jeu
