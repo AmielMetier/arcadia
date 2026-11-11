@@ -5044,4 +5044,79 @@ test('Level 1 : l\'imposteur — après une victime, l\'entité prend son appare
   });
 }
 
+// ------------------------------------------------------------------ ⭐ le niveau de départ d'un VIP (5.38)
+import vm from 'node:vm';
+import nodeCrypto from 'node:crypto';
+import { START_LEVELS, startLevel } from '../backrooms/engine/sim.js';
+import { SLIDES } from '../backrooms/engine/poolrooms.js';
+import { levelName } from '../backrooms/view/hud.js';
+
+test('⭐ niveau de départ : chaque level du moteur est au choix, sous son nom affiché en jeu', () => {
+  // les levels que le moteur sait construire (makeLevelMap : « level === X », et le Level 0 par défaut)
+  const src = fs.readFileSync(new URL('../backrooms/engine/sim.js', import.meta.url), 'utf8');
+  const body = /export function makeLevelMap\(level, seed\) \{([\s\S]*?)\n\}/.exec(src)[1];
+  const consts = { HOTEL_LEVEL, PIPES_LEVEL };
+  const built = new Set([0, ...[...body.matchAll(/level === (\w+)/g)].map((m) => (m[1] in consts ? consts[m[1]] : +m[1]))]);
+  assert.ok(built.size >= 5 && [...built].every(Number.isInteger), `levels du moteur : ${[...built]}`);
+  const levels = Object.values(START_LEVELS);
+  for (const lv of built) assert.ok(levels.includes(lv), `le level ${levelName(lv)} (moteur : ${lv}) est au choix`);
+  assert.equal(new Set(levels).size, levels.length, 'un nom par level');
+  for (const [name, lv] of Object.entries(START_LEVELS)) assert.equal(levelName(lv), +name, `« Level ${name} » est bien le level ${levelName(lv)} en jeu`);
+  // chaque départ donne une partie jouable, avec son arrivée : la cabine qui descend au Level 1, le toboggan de la
+  // bonne couleur aux Tuyauteries et au Terror Hotel
+  for (const [name, lv] of Object.entries(START_LEVELS)) {
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 77, level: lv, players: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }], localId: 1 });
+    assert.equal(sim.level, lv);
+    assert.ok(sim.players.length === 2 && sim.players.every((P) => P.status === 'alive'), `Level ${name} : tout le monde au départ`);
+    if (lv === 1) assert.ok(sim.arriveT > 0, 'Level 1 : on arrive dans la cabine qui descend');
+    if (lv === PIPES_LEVEL || lv === HOTEL_LEVEL) assert.equal(SLIDES.filter((sl) => sl.to === lv).length, 1, `Level ${name} : un toboggan des Poolrooms y mène`);
+  }
+});
+
+test("⭐ niveau de départ : seul un VIP qui a le coffre ouvert choisit (ni l'adresse ni un réglage glissé n'y suffisent)", () => {
+  const ok = { vip: true, vault: true };
+  assert.equal(startLevel(5, ok), HOTEL_LEVEL);
+  assert.equal(startLevel('2', ok), PIPES_LEVEL, "le nom tel qu'il vient de l'adresse (?level2)");
+  assert.equal(startLevel(37, ok), 2);
+  assert.equal(startLevel(1, ok), 1);
+  assert.equal(startLevel(0, ok), 0);
+  for (const who of [{ vip: false, vault: true }, { vip: true, vault: false }, { vip: false, vault: false }, {}, undefined, { vip: 'true', vault: 1 }]) {
+    for (const n of [1, 2, 5, 37]) assert.equal(startLevel(n, who), 0, `${JSON.stringify(who)} : le Level 0, pas le ${n}`);
+  }
+  for (const n of [undefined, null, '', 3, 4, -1, 99, '5 ', '__proto__', 'constructor', 'toString', [5], { 5: 5 }]) assert.equal(startLevel(n, ok), 0, `nom inconnu (${String(n)}) : le Level 0`);
+  // dans le jeu : l'hôte (ou seul) ne part ailleurs qu'avec ce test-là, celui du coffre VIP, et le grade du compte ;
+  // l'invité ne lit aucun réglage (il suit le « go » de l'hôte), et ne peut rien envoyer qui change de level
+  const app = fs.readFileSync(new URL('../backrooms/app.js', import.meta.url), 'utf8');
+  const init = /function initGame\([\s\S]*?\n\}/.exec(app)[0];
+  assert.match(init, /const vipHere = !\(H && H\.embedded\) \|\| H\.info\.vip === true;/);
+  assert.match(init, /const lv = forceLevel != null \? forceLevel : startLevel\(asked, \{ vip: vipHere, vault: vaultOpen\(\) \}\);/);
+  assert.ok(init.indexOf("if (NET.role === 'guest') return;") < init.indexOf('const asked'), "l'invité s'arrête avant le niveau de départ");
+  assert.ok(!/level\(1\|2\|37\|5\)[\s\S]*?\{ 1: 1, 37: 2/.test(app), "plus d'adresse ?levelN qui saute le test");
+  assert.equal((app.match(/startLevel\(/g) || []).length, 2, 'un seul chemin vers un level de départ (initGame)');
+});
+
+test('⭐ niveau de départ : le sélecteur est dans le salon pour un VIP, et caché à tous les autres', () => {
+  const games = fs.readFileSync(new URL('../hub/games.js', import.meta.url), 'utf8');
+  const vipSrc = fs.readFileSync(new URL('../hub/vip.js', import.meta.url), 'utf8')
+    .replace(/    \/\/ empreintes des identifiants VIP \(tools\/vip-add\.mjs\)\r?\n/, (m) => m + `    '${nodeCrypto.createHash('sha256').update('arcadia-vip:testvip').digest('hex')}',\n`);
+  const hub = (user) => {
+    const w = { HubAccount: { session: () => (user ? { user } : null) } };
+    vm.runInNewContext(games, { window: w });
+    vm.runInNewContext(vipSrc, { window: w, TextEncoder, localStorage: { removeItem() {} } });
+    return w;
+  };
+  const startOf = (w) => (w.HUB_GAMES.find((g) => g.id === 'backrooms').settings || []).find((s) => s.key === 'start');
+  const v = hub('testvip');
+  assert.ok(v.HubVIP.is());
+  const s = startOf(v);
+  assert.ok(s && s.vip === true && s.def === 0, 'le VIP a le réglage, réservé, Level 0 par défaut');
+  assert.deepEqual([...s.options].map(([n]) => n).sort((a, b) => a - b), Object.keys(START_LEVELS).map(Number).sort((a, b) => a - b), 'chaque level du moteur, et rien de plus');
+  for (const who of ['nico', null]) {
+    const n = hub(who);
+    assert.ok(!n.HubVIP.is());
+    assert.equal(startOf(n), undefined, `${who || 'sans compte'} : pas de sélecteur`);
+    assert.ok(n.HUB_GAMES.find((g) => g.id === 'backrooms').settings.some((x) => x.key === 'difficulty'), 'les autres réglages restent');
+  }
+});
+
 console.log(`\n${count} tests réussis pour The Backrooms !`);

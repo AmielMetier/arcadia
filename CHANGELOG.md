@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 5.53 — 11 novembre 2026
+- **The Backrooms** — Les joueurs VIP choisissent le niveau où commence la partie.
+  - Dans le salon, un réglage ⭐ « Niveau de départ » propose le Level 0, le Level 1, le Level 37 (Poolrooms), le Level 2 (Tuyauteries) et le Level 5 (Terror Hotel). Il n'apparaît que pour un compte VIP.
+  - À plusieurs, c'est l'hôte qui choisit : toute l'équipe part du même niveau.
+  - Il faut le mode VIP débloqué, comme pour les monstres d'origine : sans lui, la partie commence au Level 0.
+  - On arrive dans le niveau choisi comme en jouant : au bout du toboggan pour les Tuyauteries et le Terror Hotel, dans la cabine qui finit de descendre au Level 1, sur la bande qui saute aux Poolrooms. Le Level 0 garde son intro.
+  - Pour tous : « Continuer » depuis l'écran titre fait lui aussi arriver dans le niveau par son passage, au lieu d'y apparaître d'un coup.
+
 ## 5.52 — 11 novembre 2026
 - **The Backrooms** — La sortie des Tuyauteries devient un vrai monte-charge de service :
   - des chevrons jaunes et noirs autour des portes, des butoirs d'acier au pied des montants, une bande de danger en U au sol avec « KEEP CLEAR » peint au pochoir, la plaque « SERVICE LIFT » ;
