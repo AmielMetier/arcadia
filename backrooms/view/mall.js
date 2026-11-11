@@ -465,6 +465,35 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
         const ez = dz > 0 ? (z + 1) * C : dz < 0 ? z * C : null;
         if (ex !== null) G.vface(k, ex, z * C, ex, (z + 1) * C, y0, h, dx, 0);
         else G.vface(k, x * C, ez, (x + 1) * C, ez, y0, h, 0, dz);
+        // la plinthe : marbre noir dans les galeries, plinthe noire ailleurs (pas dans les coulisses)
+        if (y0 === 0 && k !== 'block' && k !== 'faience') {
+          const pk = k === 'plaster' ? 'marbleDark' : 'black';
+          const ph = k === 'plaster' ? 0.16 : 0.1;
+          if (ex !== null) G.box(pk, Math.min(ex, ex + dx * 0.018), Math.max(ex, ex + dx * 0.018), 0, ph, z * C, (z + 1) * C, '-y');
+          else G.box(pk, x * C, (x + 1) * C, 0, ph, Math.min(ez, ez + dz * 0.018), Math.max(ez, ez + dz * 0.018), '-y');
+        }
+      }
+    }
+  }
+
+  // 2b. Les portes de service, des coulisses, de secours et des salles : un linteau à 2,40 m (le mur reprend
+  // au-dessus) et un chambranle d'acier de chaque côté de l'épaisseur du mur
+  for (const d of map.doors || []) {
+    if (d.kind === 'passage') continue;
+    const h = hAt(d.x, d.z);
+    const wallX = map.grid[d.z * W + d.x - 1] === T.WALL || map.grid[d.z * W + d.x + 1] === T.WALL; // le mur court le long de x
+    const DOOR_H = 2.4;
+    const x0 = d.x * C;
+    const z0 = d.z * C;
+    if (h > DOOR_H) G.box(wallKey(roomOf(d.x, d.z)), x0, x0 + C, DOOR_H, h, z0, z0 + C, '+y');
+    const fk = d.kind === 'fire' ? 'black' : 'steel';
+    for (const e of [0, C]) {
+      if (wallX) {
+        for (const x of [x0 + 0.04, x0 + C - 0.04]) G.box(fk, x - 0.04, x + 0.04, 0, DOOR_H, z0 + e - 0.03, z0 + e + 0.03, '-y');
+        G.box(fk, x0, x0 + C, DOOR_H - 0.06, DOOR_H, z0 + e - 0.03, z0 + e + 0.03);
+      } else {
+        for (const z of [z0 + 0.04, z0 + C - 0.04]) G.box(fk, x0 + e - 0.03, x0 + e + 0.03, 0, DOOR_H, z - 0.04, z + 0.04, '-y');
+        G.box(fk, x0 + e - 0.03, x0 + e + 0.03, DOOR_H - 0.06, DOOR_H, z0, z0 + C);
       }
     }
   }
