@@ -68,6 +68,18 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 const HUM_REST = 0.03;
 const HUM_DARK = 0.008;
 const HUM_LIT = 0.046;
+
+// la valse du gramophone de l'hôtel (Level 5), huit mesures en la mineur : [basse, accord, mélodie [fréquence, temps, durée]]
+const WALTZ = [
+  [110, [261.6, 329.6], [[659.3, 0, 2], [523.3, 2, 1]]],
+  [146.8, [293.7, 349.2], [[587.3, 0, 2], [698.5, 2, 1]]],
+  [82.4, [207.7, 246.9], [[659.3, 0, 1], [587.3, 1, 1], [493.9, 2, 1]]],
+  [110, [261.6, 329.6], [[523.3, 0, 3]]],
+  [87.3, [220, 261.6], [[440, 0, 2], [523.3, 2, 1]]],
+  [146.8, [293.7, 349.2], [[698.5, 0, 1], [659.3, 1, 1], [587.3, 2, 1]]],
+  [82.4, [207.7, 246.9], [[415.3, 0, 2], [493.9, 2, 1]]],
+  [110, [261.6, 329.6], [[440, 0, 3]]],
+];
 // l'occlusion (un mur entre la source et toi) : true, ou de 0 à 1 ; passe-bas jusqu'à 700 Hz et -4 dB
 const occOf = (o) => (o === true ? 1 : clamp01(o));
 // la fréquence la plus haute que la carte son accepte (la moitié de sa fréquence d'échantillonnage)
@@ -274,6 +286,9 @@ export class BackroomsSfx {
     // ce qui tient d'un niveau à l'autre se tait : le monte-charge qui descend, les relais qui tiquent
     if (this.lift) this.lift.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1), (this.lift = null);
     for (const id of Object.keys(this.relayGs || {})) this.relayStop(id);
+    // (et ceux de l'hôtel : le téléphone qui sonne, le gramophone)
+    if (this.phone) this.phone.stop(false);
+    if (this.gramo) this.gramo.stop();
     const c = this.ctx;
     const pipes = level === PIPES_LEVEL;
     // Poolrooms : salle carrelée immense et vide, une queue de 4,5 s et des échos plus francs
@@ -741,11 +756,20 @@ export class BackroomsSfx {
   // Le grésillement suit les néons autour de toi (light : la lumière reçue là où tu es, 0 dans le noir) ; sous une
   // bonne lumière, de temps en temps, un tube papillote
   setHum(light) {
+    // (le téléphone de l'hôtel se tait quand on s'approche de la porte : on vérifie à chaque image, même dans le noir)
+    if (this.phone) this.phone.near();
     if (!this.unlocked || !this.ambientGain || this.dark) return;
     const t = this.ctx.currentTime;
     // (aux Poolrooms, pas de néons qui grésillent : les dalles lumineuses sont muettes)
     if (this.poolOn) {
       this.ambientGain.gain.setTargetAtTime(0, t, 0.3);
+      return;
+    }
+    // (à l'hôtel non plus : les appliques ont des ampoules ; c'est la vieille installation électrique qui ronfle, dans
+    // le fond du niveau, un peu plus fort sous une applique allumée)
+    if (this.roomLevel === 4) {
+      this.ambientGain.gain.setTargetAtTime(0, t, 0.3);
+      if (this.bed && this.bed.wire) this.bed.wire.gain.setTargetAtTime(0.35 + Math.min(1, light) * 0.9, t, 0.5);
       return;
     }
     this.ambientGain.gain.setTargetAtTime(HUM_DARK + Math.min(1, light) * HUM_LIT, t, 0.3);
@@ -1055,7 +1079,7 @@ export class BackroomsSfx {
   // Un pas : étouffé et un peu spongieux sur la moquette humide, sec et claquant sur le béton (hard)
   // pos : { x, z, muffled } pour les pas d'un autre joueur (sinon ce sont les tiens) ; vol : plus bas pour les autres
   // hard : true sur le béton, false sur la moquette, 'tile' sur le carrelage mouillé et 'water' dans l'eau (Poolrooms),
-  // 'soak' sur la moquette noyée (Level 0)
+  // 'soak' sur la moquette noyée (Level 0), 'marble' sur le marbre du hall et 'hotelCarpet' dans les couloirs (Level 5)
   step(hard = false, pos = null, vol = 1) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
@@ -1147,6 +1171,26 @@ export class BackroomsSfx {
         this.tone(dest, t + rnd(0.03, 0.2), 'sine', f0, f0 * 1.5, rnd(0.008, 0.016), rnd(0.002, 0.005), 0.001);
       }
       if (Math.random() < 0.5) this.plop(t + rnd(0.15, 0.3), 0.007 * v, dest);
+      return;
+    }
+
+    if (hard === 'marble') {
+      // le marbre du hall : le talon qui claque net (un « toc » dur et clair, la pierre qui sonne un instant), la semelle
+      // qui frotte à peine ; le grand hall le renvoie, on s'entend marcher
+      this.tone(dest, t, 'sine', 170 * v, 75, 0.05, 0.05 * v, 0.002);
+      this.burst(dest, t, 0.02, 'bandpass', 3100 * v, 1.3, 0.075 * v);
+      this.tone(dest, t + 0.001, 'triangle', 1350 * v, 1180 * v, 0.04, 0.016 * v, 0.001);
+      const wet = this.gainNode(0.45 * v);
+      wet.connect(this.verb);
+      this.burst(wet, t, 0.03, 'bandpass', 2400 * v, 1, 0.06 * v);
+      this.burst(dest, t + 0.05, 0.06, 'highpass', 2600, 0.7, 0.008 * v);
+      return;
+    }
+
+    if (hard === 'hotelCarpet') {
+      // la moquette épaisse des couloirs de l'hôtel : un pas qui s'enfonce, presque rien (plus feutré qu'au Level 0)
+      this.tone(dest, t, 'triangle', 66 * v, 30, 0.09, 0.038 * v);
+      this.burst(dest, t + 0.015, 0.11, 'lowpass', 520 * v, 0.7, 0.03 * v);
       return;
     }
 
@@ -2887,8 +2931,9 @@ export class BackroomsSfx {
   ambience() {}
 
   // Un bruit d'ambiance tiré par l'hôte : slot 'rec' (un des enregistrements du niveau, bas, avec l'écho des couloirs)
-  // ou 'a', 'b', 'c' (les bruits synthétisés du niveau), placé à partir d'un joueur (anchor) ; a, u, v, w : ses tirages
-  ambCue(slot, anchor, a = 0, u = 0.5, v = 0.5, w = 0.5) {
+  // ou 'a', 'b', 'c' (les bruits synthétisés du niveau), placé à partir d'un joueur (anchor) ; a, u, v, w : ses tirages ;
+  // spot : à l'hôtel, l'endroit que le jeu a choisi sur la carte (un radiateur, un téléphone de chambre, la réception)
+  ambCue(slot, anchor, a = 0, u = 0.5, v = 0.5, w = 0.5, spot = null) {
     if (!this.unlocked || !this.ctx || !anchor) return;
     if (this.ctx.currentTime < this.silenceUntil) return;
     const pos = (r1, r2) => {
@@ -2901,6 +2946,23 @@ export class BackroomsSfx {
       // Level 5 (l'hôtel) : un parquet qui craque quelque part, plus rarement une boîte à musique désaccordée au loin
       if (w < 0.25) this.musicBox();
       else this.floorCreak();
+      return;
+    }
+    if (lv === 4) {
+      // et l'hôtel vit encore, sans personne : un radiateur qui cogne et siffle ; un téléphone qui sonne derrière une
+      // porte, une sonnette de réception, une porte qu'on referme ; très rarement un gramophone désaccordé au loin.
+      // Jamais deux longs sons à la fois (téléphone, gramophone), ni deux coups l'un sur l'autre
+      const now = this.ctx.currentTime;
+      const long = this.phone || this.gramo;
+      if (slot !== 'c' && now < (this.hotelHitT || 0)) return;
+      if (slot === 'a') this.radiator(spot || pos(4, 16), w);
+      else if (slot === 'b') {
+        if (w < 0.35 && spot && spot.phone) {
+          if (!long) this.phoneRing(spot, 3 + Math.floor(v * 4));
+        } else if (w < 0.6 && spot && spot.bell) this.deskBell(spot, v < 0.4 ? 2 : 1);
+        else this.distant(w < 0.85 ? 'door' : 'steps', pos(14, 30), 0.55, this.bedWet);
+      } else if (slot === 'c' && !long) this.gramophone(pos(16, 30), 12 + v * 10);
+      if (slot !== 'c') this.hotelHitT = now + 2.5;
       return;
     }
     if (slot === 'rec' && lv === 1) return this.warehouseFar(w, pos(22, 40), vol(0.6, 1));
@@ -2936,10 +2998,15 @@ export class BackroomsSfx {
         else this.distant('laugh', pos(25, 40), 0.4, this.bedWet);
       }
     } else if (lv === PIPES_LEVEL) {
-      // coups de bélier, vapeur qui siffle au loin, tuyaux qui gémissent
-      if (slot === 'a') this.steamFar(pos(14, 30), vol(0.5, 0.9));
-      else if (slot === 'b') this.distant('hammer', pos(15, 35), vol(0.5, 0.8), this.bedWet);
-      else if (slot === 'c') this.distant('groan', pos(12, 30), vol(0.4, 0.7), this.bedWet);
+      // vapeur qui siffle au loin ou eau qui dévale une conduite au-dessus de toi ; coups de bélier ou tuyau qui se
+      // dilate tout près ; tuyaux qui gémissent
+      if (slot === 'a') {
+        if (w < 0.45) this.pipeGurgle(pos(1, 6), a * 3.7, vol(0.6, 1));
+        else this.steamFar(pos(14, 30), vol(0.5, 0.9));
+      } else if (slot === 'b') {
+        if (w < 0.4) this.pipeTicks(pos(2, 7), vol(0.6, 1));
+        else this.distant('hammer', pos(15, 35), vol(0.5, 0.8), this.bedWet);
+      } else if (slot === 'c') this.distant('groan', pos(12, 30), vol(0.4, 0.7), this.bedWet);
     }
   }
 
@@ -3371,6 +3438,7 @@ export class BackroomsSfx {
     const srcs = [];
     const src = (n) => (srcs.push(n), n);
     let vol = 0;
+    let wire = null;
     if (level === 1) {
       // la ventilation : un souffle grave dans les gaines, l'air qui siffle aux grilles, une pale qui tourne
       const am = this.gainNode(0.8);
@@ -3393,10 +3461,24 @@ export class BackroomsSfx {
       src(this.osc('sine', 58)).connect(sing).connect(g);
       src(this.osc('sawtooth', 29)).connect(this.filt('lowpass', 70, 0.7)).connect(this.gainNode(0.2)).connect(g);
       vol = 0.08;
+    } else if (level === 4) {
+      // l'hôtel : le silence épais d'un bâtiment fermé (un souffle grave, la moquette et les tentures mangent tout), et
+      // la vieille installation électrique qui ronfle à 50 Hz dans les murs, avec un léger bourdonnement de transformateur
+      // qui respire lentement (wire : setHum le monte sous les appliques allumées)
+      src(this.longNoise()).connect(this.filt('lowpass', 240, 0.6)).connect(this.gainNode(0.5)).connect(g);
+      wire = this.gainNode(0.6);
+      wire.connect(g);
+      const swell = this.gainNode(0.85);
+      const lfo = src(this.osc('sine', 0.07));
+      lfo.connect(this.gainNode(0.15)).connect(swell.gain);
+      swell.connect(wire);
+      src(this.osc('sawtooth', 50)).connect(this.filt('lowpass', 165, 0.8)).connect(this.gainNode(0.32)).connect(swell);
+      src(this.osc('square', 100)).connect(this.filt('bandpass', 1500, 7)).connect(this.gainNode(0.018)).connect(swell);
+      vol = 0.07;
     } else return;
     for (const s of srcs) s.start(t, s.buffer ? Math.random() * 4 : 0);
     g.gain.setTargetAtTime(vol, t, 2);
-    this.bed = { g, srcs };
+    this.bed = { g, srcs, wire };
   }
 
   // Les bruits lointains de l'entrepôt (Level 1), joués au hasard toutes les 20 à 50 s : un bip de recul de chariot
@@ -3820,6 +3902,143 @@ export class BackroomsSfx {
     this.caption('[metal clink]', pos);
   }
 
+  // Tuyauteries : les machines qui tournent près de toi. list : [{ key, kind, x, z, on, occ }] (kind : 'burner', le
+  // brûleur d'une chaudière ; 'pump', une pompe ; 'panel', une armoire électrique) ; on : en marche ; occ : un mur
+  // entre elle et toi (le son passe étouffé). Une boucle par machine, créée à l'approche, arrêtée quand elle sort de
+  // la liste (l'application ne garde que les plus proches)
+  machines(list) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    if (!this.mach) this.mach = new Map();
+    const seen = new Set();
+    for (const m of list) {
+      seen.add(m.key);
+      let L = this.mach.get(m.key);
+      if (!L) {
+        L = this.machineLoop(m.kind);
+        this.mach.set(m.key, L);
+        this.moveTo(L.p, m.x, m.z);
+      }
+      L.g.gain.setTargetAtTime(m.on ? L.vol : 0.0001, t, m.on ? 0.5 : 1.5);
+      L.lp.frequency.setTargetAtTime(m.occ ? 600 : 9000, t, 0.25);
+    }
+    for (const [k, L] of this.mach) {
+      if (seen.has(k)) continue;
+      L.stop();
+      this.mach.delete(k);
+    }
+  }
+
+  machineLoop(kind) {
+    const c = this.ctx;
+    const t = c.currentTime;
+    const g = this.gainNode(0.0001);
+    const lp = this.filt('lowpass', 9000, 0.7);
+    const p = this.panner(kind === 'panel' ? 2 : 1.3, kind === 'panel' ? 1 : 2, this.out);
+    g.connect(lp).connect(p);
+    const srcs = [];
+    const go = (n) => {
+      n.start(t);
+      srcs.push(n);
+      return n;
+    };
+    // une modulation lente ou rapide (la flamme qui ronfle, le moteur qui bat) : un gain en série
+    const am = this.gainNode(1);
+    am.connect(g);
+    const wobble = (f, depth) => go(this.osc('sine', f)).connect(this.gainNode(depth)).connect(am.gain);
+    let vol;
+    if (kind === 'burner') {
+      // le brûleur : le souffle grave de la flamme, son crépitement, le grondement de la chaudière
+      go(this.longNoise()).connect(this.filt('lowpass', 150, 0.7)).connect(this.gainNode(1.0)).connect(am);
+      go(this.longNoise()).connect(this.filt('bandpass', 480, 0.9)).connect(this.gainNode(0.22)).connect(am);
+      go(this.osc('sawtooth', 31)).connect(this.filt('lowpass', 75, 0.7)).connect(this.gainNode(0.35)).connect(am);
+      wobble(5.3, 0.16);
+      wobble(1.7, 0.12);
+      vol = 0.5;
+    } else if (kind === 'pump') {
+      // la pompe : le moteur à 50 Hz et ses harmoniques, la volute qui chuinte, un roulement qui siffle à peine
+      go(this.osc('sine', 49)).connect(this.gainNode(0.55)).connect(am);
+      go(this.osc('sine', 98)).connect(this.gainNode(0.3)).connect(am);
+      go(this.osc('sawtooth', 147)).connect(this.filt('lowpass', 420, 0.7)).connect(this.gainNode(0.09)).connect(am);
+      go(this.longNoise()).connect(this.filt('bandpass', 900, 1.2)).connect(this.gainNode(0.12)).connect(am);
+      go(this.osc('sine', 1730)).connect(this.gainNode(0.012)).connect(am);
+      wobble(6.5, 0.1);
+      vol = 0.32;
+    } else if (kind === 'xfmr') {
+      // le transformateur : le gros bourdonnement à 100 Hz et ses harmoniques impaires, la tôle qui vibre, un grésillement
+      go(this.osc('sine', 100)).connect(this.gainNode(0.6)).connect(am);
+      go(this.osc('sine', 200)).connect(this.gainNode(0.22)).connect(am);
+      go(this.osc('sawtooth', 300)).connect(this.filt('lowpass', 700, 0.8)).connect(this.gainNode(0.1)).connect(am);
+      go(this.longNoise()).connect(this.filt('bandpass', 3200, 2.5)).connect(this.gainNode(0.035)).connect(am);
+      wobble(0.17, 0.12);
+      vol = 0.24;
+    } else {
+      // l'armoire électrique : le ronflement d'un transformateur
+      go(this.osc('sawtooth', 50)).connect(this.filt('lowpass', 320, 0.8)).connect(this.gainNode(0.45)).connect(am);
+      go(this.osc('sine', 100)).connect(this.gainNode(0.3)).connect(am);
+      wobble(0.3, 0.1);
+      vol = 0.1;
+    }
+    return {
+      g,
+      lp,
+      p,
+      vol,
+      stop: () => {
+        const t2 = c.currentTime;
+        g.gain.setTargetAtTime(0.0001, t2, 0.3);
+        for (const n of srcs) n.stop(t2 + 1.5);
+      },
+    };
+  }
+
+  // de l'eau qui dévale une conduite au-dessus de toi : des glouglous qui passent d'un bout de la galerie à l'autre
+  // (la source se déplace de 10 m en 3 s, d'un côté du point vers l'autre, dans la direction ang)
+  pipeGurgle(pos, ang, vol = 1) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.05;
+    const dur = 3.2;
+    const { input, panner } = this.place({ ...pos, rolloff: 1.1, ref: 3 }, vol * 0.5, 0, this.bedWet);
+    const dx = Math.cos(ang) * 5;
+    const dz = Math.sin(ang) * 5;
+    if (panner.positionX) {
+      panner.positionX.setValueAtTime(pos.x - dx, t);
+      panner.positionZ.setValueAtTime(pos.z - dz, t);
+      panner.positionY.setValueAtTime(3, t);
+      panner.positionX.linearRampToValueAtTime(pos.x + dx, t + dur);
+      panner.positionZ.linearRampToValueAtTime(pos.z + dz, t + dur);
+    }
+    // le flux qui chuinte, et par-dessus les bulles : de courtes bouffées de bruit dans un formant qui saute
+    const src = this.noise();
+    const bp = this.filt('bandpass', 300, 2.2);
+    const g = this.gainNode(0.0001);
+    src.connect(bp).connect(g).connect(input);
+    g.gain.setTargetAtTime(0.14, t, 0.4);
+    g.gain.setTargetAtTime(0.0001, t + dur - 0.6, 0.3);
+    src.start(t);
+    src.stop(t + dur + 0.6);
+    for (let k = t + 0.2; k < t + dur - 0.3; k += 0.07 + Math.random() * 0.16) {
+      const f = 180 + Math.random() * 520;
+      this.burst(input, k, 0.05 + Math.random() * 0.06, 'bandpass', f, 6 + Math.random() * 6, 0.35 + Math.random() * 0.4);
+    }
+    this.caption('[water gurgles in the pipes]', pos);
+  }
+
+  // un tuyau qui se dilate : quelques tics métalliques secs, de plus en plus espacés
+  pipeTicks(pos, vol = 1) {
+    if (!this.unlocked || !this.ctx) return;
+    const out = this.at({ ...pos, rolloff: 1.2, ref: 2 }, vol * 0.6, 0, this.bedWet);
+    let t = this.ctx.currentTime + 0.05;
+    const n = 3 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < n; i++) {
+      const f = 1900 + Math.random() * 900;
+      this.ring(out, t, f, [[1, 0.5, 0.05], [2.7, 0.25, 0.03], [5.1, 0.12, 0.02]], 0.22);
+      t += 0.12 + i * 0.09 + Math.random() * 0.25;
+    }
+    this.caption('[pipes tick]', pos);
+  }
+
   // un jet de vapeur qui siffle au loin, qui crachote puis se tait
   steamFar(pos, vol = 1) {
     const c = this.ctx;
@@ -4173,6 +4392,41 @@ export class BackroomsSfx {
     this.beep(160, 0.45, 0.12, 'sawtooth');
   }
 
+  // Level 5 : le bon code. Le clavier bipe deux fois (aigu, plus aigu), la ventouse lâche d'un coup (un « clonk » sourd
+  // et métallique), la barre anti-panique claque, puis le lourd battant d'acier pivote sur ses gonds en grinçant.
+  // pos : la porte de secours
+  maglock(pos) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.02;
+    this.tone(this.out, t, 'square', 1480, 0, 0.08, 0.05, 0.002);
+    this.tone(this.out, t + 0.12, 'square', 1975, 0, 0.16, 0.05, 0.002);
+    const o = this.hotelOut({ ...pos, rolloff: 0.5, ref: 3 }, 1, 0, 0.45);
+    const u = t + 0.45;
+    this.tone(o, u, 'sine', 120, 48, 0.22, 0.32, 0.002);
+    this.ring(o, u, 240, [[1, 1, 0.35], [2.4, 0.45, 0.22], [4.2, 0.2, 0.12]], 0.06);
+    this.burst(o, u, 0.04, 'bandpass', 1800, 1.2, 0.12);
+    this.burst(o, u + 0.18, 0.05, 'highpass', 2400, 0.8, 0.08);
+    // les gonds : un grincement grave qui monte et retombe, saccadé, pendant que la porte s'ouvre
+    const s = u + 0.25;
+    const g = this.gainNode(0);
+    g.gain.setValueAtTime(0.0001, s);
+    g.gain.exponentialRampToValueAtTime(0.06, s + 0.4);
+    g.gain.setTargetAtTime(0.0001, s + 1.9, 0.25);
+    const am = this.osc('square', 23);
+    am.connect(this.gainNode(0.03)).connect(g.gain);
+    const saw = this.osc('sawtooth', 92);
+    saw.frequency.setValueAtTime(92, s);
+    saw.frequency.linearRampToValueAtTime(150, s + 1.0);
+    saw.frequency.linearRampToValueAtTime(118, s + 2.4);
+    saw.connect(this.filt('bandpass', 760, 5)).connect(g).connect(o);
+    for (const n of [am, saw]) {
+      n.start(s);
+      n.stop(s + 3);
+    }
+    this.caption('[the lock releases, the fire door swings open]', pos);
+  }
+
   // Ding de l'ascenseur : une cloche frappée (partiels de bronze, un léger battement), deux notes qui descendent.
   // pos : { x, z } de l'ascenseur (null : non placé)
   ding(pos = null) {
@@ -4239,6 +4493,197 @@ export class BackroomsSfx {
       o.start(t);
       o.stop(t + 1.5);
     });
+  }
+
+  // Level 5 : l'entrée d'un son posé dans l'hôtel (occluded : derrière une porte ou un mur, de 0 à 1), avec sa part
+  // d'écho en plus (wet)
+  hotelOut(pos, vol = 1, occluded = 0, wet = 0.25) {
+    const pl = this.place({ ...pos, rolloff: pos.rolloff ?? 0.6, ref: pos.ref ?? 3 }, vol, occluded, this.out);
+    const o = this.gainNode(1);
+    o.connect(pl.input);
+    o.connect(this.gainNode(wet)).connect(this.verb);
+    return o;
+  }
+
+  // Level 5 : un radiateur en fonte qui se réveille (pos : le radiateur, sous la fenêtre d'une chambre) : des coups
+  // métalliques irréguliers, l'eau chaude qui fait travailler les tuyaux ; une fois sur deux, la vanne siffle ensuite
+  radiator(pos, w = 0.5) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const near = this.ear && Math.hypot(this.ear.x - pos.x, this.ear.z - pos.z) < 3.5;
+    const o = this.hotelOut(pos, 0.9, near ? 0 : 0.55, 0.3);
+    let t = c.currentTime + 0.03;
+    const f = 330 + Math.random() * 120;
+    for (let i = 0, n = 2 + Math.floor(w * 4); i < n; i++) {
+      const k = 0.6 + Math.random() * 0.5;
+      this.tone(o, t, 'triangle', 95, 40, 0.1, 0.07 * k, 0.002);
+      this.ring(o, t, f * (0.97 + Math.random() * 0.06), [[1, 1, 0.45], [2.31, 0.5, 0.3], [4.07, 0.22, 0.18], [6.6, 0.08, 0.1]], 0.05 * k);
+      this.burst(o, t, 0.025, 'highpass', 2200, 0.7, 0.03 * k);
+      t += i === 0 ? rnd(0.5, 1.1) : rnd(0.18, 0.75);
+    }
+    this.caption('[a radiator knocks]', pos);
+    if (w < 0.5) return;
+    // la vanne : un souffle aigu qui monte, tient, retombe, et une petite note qui chante dedans
+    const hs = t + rnd(0.3, 0.8);
+    const dur = rnd(1.8, 3.2);
+    const src = this.longNoise();
+    const g = this.gainNode(0);
+    g.gain.setValueAtTime(0.0001, hs);
+    g.gain.exponentialRampToValueAtTime(0.05, hs + 0.35);
+    g.gain.setTargetAtTime(0.0001, hs + dur * 0.7, dur * 0.12);
+    src.connect(this.filt('bandpass', 4300, 1.6)).connect(g).connect(o);
+    src.start(hs);
+    src.stop(hs + dur + 0.6);
+    this.tone(o, hs + 0.2, 'sine', 2050, 2150, dur * 0.8, 0.006, 0.3);
+  }
+
+  // Level 5 : le téléphone d'une chambre qui sonne derrière la porte (pos : la table de nuit ; pos.door : la porte de la
+  // chambre), l'ancienne sonnerie à deux timbres et marteau, 1,5 s de sonnerie et 3,5 s de silence. Si on arrive à la
+  // porte (ou à 6 m du téléphone), ça s'arrête net au milieu d'une sonnerie : quelqu'un a décroché. Personne ne parle.
+  phoneRing(pos, rings = 4) {
+    if (!this.unlocked || !this.ctx || this.phone) return;
+    const c = this.ctx;
+    const t0 = c.currentTime + 0.05;
+    const o = this.hotelOut({ ...pos, rolloff: 0.7, ref: 2.5 }, 0.8, 0.7, 0.25);
+    const gate = this.gainNode(0);
+    gate.connect(o);
+    // le marteau qui bat entre les deux timbres, 22 fois par seconde
+    const ham = this.gainNode(0.5);
+    const lfo = this.osc('square', 22);
+    lfo.connect(this.gainNode(0.5)).connect(ham.gain);
+    ham.connect(this.filt('lowpass', 3200, 0.6)).connect(gate);
+    const srcs = [lfo];
+    for (const [f, v] of [[1330, 0.5], [1330 * 2.72, 0.12], [1490, 0.4], [1490 * 2.69, 0.1]]) {
+      const b = this.osc('sine', f);
+      b.connect(this.gainNode(v * 0.12)).connect(ham);
+      srcs.push(b);
+    }
+    for (let i = 0; i < rings; i++) {
+      gate.gain.setTargetAtTime(1, t0 + i * 5, 0.008);
+      gate.gain.setTargetAtTime(0, t0 + i * 5 + 1.5, 0.07);
+    }
+    const end = t0 + (rings - 1) * 5 + 2.2;
+    for (const s of srcs) {
+      s.start(t0);
+      s.stop(end);
+    }
+    this.caption('[a phone rings behind a door]', pos);
+    const ph = {
+      near: () => {
+        if (this.phone !== ph) return;
+        if (c.currentTime > end) return void (this.phone = null);
+        const e = this.ear;
+        if (!e) return;
+        const d = pos.door;
+        if (Math.hypot(e.x - pos.x, e.z - pos.z) < 6 || (d && Math.hypot(e.x - d.x, e.z - d.z) < 2.2)) ph.stop(true);
+      },
+      stop: (pickup) => {
+        if (this.phone === ph) this.phone = null;
+        const t = c.currentTime;
+        if (t > end) return;
+        gate.gain.cancelScheduledValues(t);
+        gate.gain.setTargetAtTime(0, t, 0.015);
+        for (const s of srcs) s.stop(t + 0.3);
+        if (!pickup) return;
+        // le combiné qu'on soulève, et le timbre qui finit de vibrer
+        this.burst(o, t + 0.02, 0.03, 'bandpass', 1100, 2, 0.05);
+        this.tone(o, t + 0.02, 'sine', 1330, 0, 0.6, 0.004, 0.002);
+        this.caption('[the ringing stops]', pos);
+      },
+    };
+    this.phone = ph;
+  }
+
+  // Level 5 : la sonnette de la réception, frappée une ou deux fois (pos : le comptoir), alors qu'il n'y a personne
+  deskBell(pos, n = 1) {
+    if (!this.unlocked || !this.ctx) return;
+    const o = this.hotelOut({ ...pos, rolloff: 0.45, ref: 4 }, 0.8, 0, 0.5);
+    let t = this.ctx.currentTime + 0.03;
+    const f = 2280 * (0.98 + Math.random() * 0.04);
+    for (let i = 0; i < n; i++) {
+      const k = i ? 0.75 : 1;
+      this.burst(o, t, 0.012, 'bandpass', 4200, 2, 0.03 * k);
+      this.ring(o, t, f, [[1, 1, 2.2], [1.004, 0.6, 2], [2.66, 0.3, 0.9], [4.8, 0.12, 0.45], [7.1, 0.05, 0.25]], 0.035 * k);
+      t += rnd(0.45, 0.9);
+    }
+    this.caption('[a reception bell rings]', pos);
+  }
+
+  // Level 5 : un gramophone, quelque part derrière les murs : une valse lente en la mineur, voilée par le pavillon,
+  // qui pleure (le disque est voilé, la vitesse ondule) et qui craque ; à la fin le ressort lâche : elle descend, plus
+  // grave, et se tait. dur : en secondes
+  gramophone(pos, dur = 16) {
+    if (!this.unlocked || !this.ctx || this.gramo) return;
+    const c = this.ctx;
+    const t0 = c.currentTime + 0.1;
+    const end = t0 + dur;
+    const o = this.hotelOut({ ...pos, rolloff: 0.4, ref: 5 }, 0.7, 0.6, 0.45);
+    const g = this.gainNode(0);
+    g.connect(o);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(1, t0 + 2);
+    g.gain.setTargetAtTime(0.0001, end - 1.2, 0.4);
+    // le pavillon : un médium serré, sans graves ni aigus
+    const horn = this.filt('bandpass', 1100, 0.7);
+    horn.connect(this.filt('lowpass', 2800, 0.5)).connect(g);
+    // la vitesse qui ondule (un disque voilé), puis le ressort qui lâche : jusqu'à 7 demi-tons plus bas
+    const wow = this.osc('sine', 0.58);
+    const wowG = this.gainNode(22);
+    wow.connect(wowG);
+    const drop = c.createConstantSource();
+    drop.offset.setValueAtTime(0, t0);
+    drop.offset.setValueAtTime(0, end - 3.5);
+    drop.offset.linearRampToValueAtTime(-700, end);
+    // l'aiguille dans le sillon : un souffle et des craquements
+    if (!this.crackleBuf) {
+      const n = Math.floor(c.sampleRate * 3);
+      this.crackleBuf = c.createBuffer(1, n, c.sampleRate);
+      const d = this.crackleBuf.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * 0.08 + (Math.random() < 0.0012 ? Math.random() * 2 - 1 : 0);
+    }
+    const cr = this.anyStart(this.crackleBuf);
+    cr.connect(this.filt('highpass', 900, 0.6)).connect(this.gainNode(0.12)).connect(g);
+    const srcs = [wow, drop, cr];
+    for (const s of srcs) {
+      s.start(t0);
+      s.stop(end + 0.1);
+    }
+    const note = (f, t, len, vol, type = 'triangle') => {
+      if (t > end - 0.15) return;
+      const n = this.osc(type, f * (0.992 + Math.random() * 0.016));
+      wowG.connect(n.detune);
+      drop.connect(n.detune);
+      const ng = this.gainNode(0);
+      const off = Math.min(end, t + len);
+      ng.gain.setValueAtTime(0.0001, t);
+      ng.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+      ng.gain.exponentialRampToValueAtTime(0.0001, off);
+      n.connect(ng).connect(horn);
+      n.start(t);
+      n.stop(off + 0.05);
+    };
+    // huit mesures à trois temps : la basse sur le premier temps, l'accord sur les deux autres, la mélodie au-dessus
+    const beat = 0.62;
+    let bar = Math.floor(Math.random() * 8);
+    for (let tb = t0; tb < end; tb += beat * 3, bar = (bar + 1) % 8) {
+      const B = WALTZ[bar];
+      note(B[0], tb, beat * 1.1, 0.08);
+      for (const k of [1, 2]) for (const f of B[1]) note(f, tb + k * beat, beat * 0.8, 0.018);
+      for (const [f, s, l] of B[2]) note(f, tb + s * beat, l * beat * 1.05, 0.045, 'sawtooth');
+    }
+    this.caption('[an old gramophone plays somewhere]', pos);
+    const gr = {
+      stop: () => {
+        if (this.gramo === gr) this.gramo = null;
+        const t = c.currentTime;
+        if (t > end) return;
+        g.gain.cancelScheduledValues(t);
+        g.gain.setTargetAtTime(0.0001, t, 0.2);
+        for (const s of srcs) s.stop(t + 1);
+      },
+    };
+    this.gramo = gr;
+    setTimeout(() => this.gramo === gr && (this.gramo = null), (dur + 0.5) * 1000);
   }
 
   // On se glisse dans un toboggan : un frottement d'eau qui file et s'éloigne, puis quelques gouttes

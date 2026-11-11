@@ -188,9 +188,11 @@ export class BackroomsHUD {
       <div class="hide-view" id="hideView" hidden></div>
       <div class="keypad" id="keypad" hidden>
         <div class="keypad-box">
-          <div class="keypad-title">FIRE ESCAPE</div>
+          <div class="keypad-head"><span class="keypad-brand">SECURA<small>ACCESS 4</small></span><span class="keypad-leds"><i class="led-r"></i><i class="led-g"></i></span></div>
+          <div class="keypad-title">FIRE ESCAPE · STAFF ONLY</div>
           <div class="keypad-screen" id="keypadScreen">····</div>
-          <div class="keypad-keys">${['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'OK'].map((k) => `<button data-k="${k}">${k}</button>`).join('')}</div>
+          <div class="keypad-keys">${['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'OK'].map((k) => `<button data-k="${k}"${k === 'C' ? ' class="k-clear"' : k === 'OK' ? ' class="k-ok"' : ''}>${k}</button>`).join('')}</div>
+          <div class="keypad-grille"></div>
           <div class="keypad-help">Type the code · Enter to confirm · Esc to step back</div>
         </div>
       </div>
@@ -576,7 +578,9 @@ export class BackroomsHUD {
     const sp = L5 && P.hidden >= 0 && sim.map.spots ? sim.map.spots[P.hidden] : null;
     hv.hidden = !sp || P.status !== 'alive';
     if (sp) hv.className = `hide-view ${sp.kind}`;
-    if (this.keypadOpen && (!L5 || P.status !== 'alive' || sim.open)) this.closeKeypad();
+    if (this.keypadOpen && (!L5 || P.status !== 'alive')) this.closeKeypad();
+    else if (this.keypadOpen && sim.open && !this.keypadOkAt) this.keypadOk();
+    if (this.keypadOpen && this.keypadOkAt && performance.now() - this.keypadOkAt > 1100) this.closeKeypad();
     // 4f. Au poste de garde : la caméra regardée (son numéro, son nom), l'heure qui défile, les touches
     const cams = sim.map.cams;
     const cctv = !!(P.desk && P.status === 'alive' && cams && cams.length);
@@ -964,7 +968,8 @@ export class BackroomsHUD {
     this.keypadBeep = onKey;
     const el = this.$('#keypad');
     el.hidden = false;
-    el.classList.remove('wrong');
+    el.classList.remove('wrong', 'ok');
+    this.keypadOkAt = 0;
     this.drawKeypad();
     if (!this.keypadBound) {
       this.keypadBound = true;
@@ -988,9 +993,18 @@ export class BackroomsHUD {
   }
 
   keypadPress(k) {
-    if (!this.keypadOpen) return;
+    if (!this.keypadOpen || this.keypadOkAt) return;
     if (this.keypadBeep) this.keypadBeep();
     this.$('#keypad').classList.remove('wrong');
+    // la touche s'enfonce, même tapée au clavier de l'ordinateur
+    const b = this.$(`#keypad button[data-k="${k}"]`);
+    if (b) {
+      b.classList.remove('down');
+      void b.offsetWidth;
+      b.classList.add('down');
+      clearTimeout(this.keyDownT);
+      this.keyDownT = setTimeout(() => b.classList.remove('down'), 130);
+    }
     if (k === 'C') this.keypadCode = this.keypadCode.slice(0, -1);
     else if (k === 'OK') {
       if (this.keypadCode.length === 4 && this.keypadSubmit) this.keypadSubmit(this.keypadCode);
@@ -1003,16 +1017,29 @@ export class BackroomsHUD {
     this.$('#keypadScreen').textContent = (this.keypadCode + '····').slice(0, 4);
   }
 
+  // le bon code : l'écran passe au vert, OPEN, le voyant vert s'allume ; le clavier se referme une seconde après
+  keypadOk() {
+    const el = this.$('#keypad');
+    el.classList.remove('wrong');
+    el.classList.add('ok');
+    this.$('#keypadScreen').textContent = 'OPEN';
+    this.keypadOkAt = performance.now();
+  }
+
   keypadWrong() {
     const el = this.$('#keypad');
+    el.classList.remove('wrong');
+    void el.offsetWidth;
     el.classList.add('wrong');
+    this.keypadWrongAt = performance.now();
     this.keypadCode = '';
-    this.$('#keypadScreen').textContent = 'ERR ';
+    this.$('#keypadScreen').textContent = 'DENIED';
   }
 
   closeKeypad() {
     if (!this.keypadOpen) return;
     this.keypadOpen = false;
+    this.keypadOkAt = 0;
     this.$('#keypad').hidden = true;
   }
 

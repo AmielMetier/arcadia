@@ -27,7 +27,7 @@ const smooth = (x) => {
 // Ce qui attend au bout du tube : la couleur et la force de sa lumière
 const DEST = {
   pipes: { light: [1.0, 0.6, 0.28], k: 1.6 }, // les galeries de service : les lampes au sodium
-  hotel: { light: [1.0, 0.38, 0.22], k: 1.3 }, // le Terror Hotel : la lueur rouge de ses couloirs
+  hotel: { light: [1.0, 0.6, 0.32], k: 1.3 }, // le Terror Hotel : la lueur ambrée de ses appliques et de ses lustres
   out: { light: [1.0, 0.9, 0.55], k: 2.6 }, // le toboggan bleu recrache au Level 0 : les néons jaunes
 };
 

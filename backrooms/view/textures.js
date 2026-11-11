@@ -2,6 +2,7 @@
 // Motifs dessinés au canvas, salis par des photos CC0 de Poly Haven dès qu'elles sont chargées :
 // backrooms/tex/ pour les deux niveaux (l1_* : parpaings peints, béton usé et dalle brute de l'entrepôt).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
+import { drawHotelWall, drawHotelWallBump, drawHotelWallSpec, drawHotelCarpet, drawHotelCeiling } from './hotelTextures.js';
 
 const TEX = new URL('../tex/', import.meta.url).href;
 const KART_TEX = new URL('../../kart/tex/', import.meta.url).href;
@@ -603,158 +604,7 @@ function drawPoolCeiling(ctx, S, photo) {
   else noise(ctx, S, S, 6);
 }
 
-// Level 5, le Terror Hotel. Une face de mur (2,5 m de large, 3,1 m de haut) : corniche, papier peint damassé
-// lie-de-vin fané, cimaise, lambris de noyer sombre à deux panneaux, plinthe.
-function drawHotelWall(ctx, S) {
-  const y = (m) => S * (1 - m / 3.1); // hauteur en mètres -> pixel
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = '#4b1f1b';
-  ctx.fillRect(0, 0, S, S);
-  // rayures et damas : un losange orné tous les 1/4 de face, décalé une rangée sur deux
-  for (let i = 0; i < 8; i++) {
-    ctx.fillStyle = i % 2 ? 'rgba(120, 52, 40, 0.18)' : 'rgba(30, 8, 6, 0.12)';
-    ctx.fillRect((i * S) / 8, 0, S / 8, S);
-  }
-  const step = S / 6;
-  ctx.strokeStyle = 'rgba(196, 150, 84, 0.32)';
-  ctx.fillStyle = 'rgba(196, 150, 84, 0.2)';
-  ctx.lineWidth = 2;
-  for (let row = 0; row * step * 0.8 < y(1.05); row++) {
-    for (let col = -1; col <= 4; col++) {
-      const cx = col * step + (row % 2 ? step / 2 : 0) + step / 2;
-      const cy = row * step * 0.8 + step * 0.35;
-      const w = step * 0.28;
-      const h = step * 0.36;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - h);
-      ctx.bezierCurveTo(cx + w * 0.9, cy - h * 0.5, cx + w * 0.9, cy + h * 0.5, cx, cy + h);
-      ctx.bezierCurveTo(cx - w * 0.9, cy + h * 0.5, cx - w * 0.9, cy - h * 0.5, cx, cy - h);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(cx, cy, w * 0.28, 0, Math.PI * 2);
-      ctx.fill();
-      // fleurons
-      for (const sgn of [-1, 1]) {
-        ctx.beginPath();
-        ctx.moveTo(cx, cy - h * 0.2);
-        ctx.quadraticCurveTo(cx + sgn * w * 1.6, cy - h * 0.9, cx + sgn * w * 0.5, cy + h * 0.1);
-        ctx.stroke();
-      }
-    }
-  }
-  // le papier a pâli par endroits, des coulures brunes descendent de la corniche
-  for (let i = 0; i < 18; i++) {
-    const x = Math.random() * S;
-    const g = ctx.createLinearGradient(0, y(3.0), 0, y(1.2 + Math.random()));
-    g.addColorStop(0, 'rgba(40, 22, 10, 0.35)');
-    g.addColorStop(1, 'rgba(40, 22, 10, 0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(x, y(3.0), 2 + Math.random() * 6, y(1.2) - y(3.0));
-  }
-  for (let i = 0; i < 6; i++) {
-    const x = Math.random() * S;
-    const yy = Math.random() * y(1.1);
-    const r = 20 + Math.random() * 60;
-    const g = ctx.createRadialGradient(x, yy, 0, x, yy, r);
-    g.addColorStop(0, 'rgba(210, 170, 120, 0.12)');
-    g.addColorStop(1, 'rgba(210, 170, 120, 0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(x - r, yy - r, r * 2, r * 2);
-  }
-  noise(ctx, S, S, 14);
-  // corniche
-  ctx.fillStyle = '#2c1a10';
-  ctx.fillRect(0, 0, S, y(2.95));
-  ctx.fillStyle = 'rgba(200, 160, 100, 0.25)';
-  ctx.fillRect(0, y(2.95) - 3, S, 2);
-  // lambris : noyer sombre, deux panneaux moulurés par face
-  const top = y(1.05);
-  ctx.fillStyle = '#2e1a0e';
-  ctx.fillRect(0, top, S, S - top);
-  for (let i = 0; i < 90; i++) {
-    ctx.strokeStyle = `rgba(${Math.random() < 0.5 ? '70, 42, 22' : '20, 10, 4'}, ${0.25 + Math.random() * 0.3})`;
-    ctx.lineWidth = 1;
-    const yy = top + Math.random() * (S - top);
-    ctx.beginPath();
-    ctx.moveTo(0, yy);
-    ctx.bezierCurveTo(S * 0.3, yy + (Math.random() - 0.5) * 6, S * 0.7, yy + (Math.random() - 0.5) * 6, S, yy);
-    ctx.stroke();
-  }
-  for (let k = 0; k < 2; k++) {
-    const x0 = (k * S) / 2 + S * 0.05;
-    const w = S / 2 - S * 0.1;
-    const y0 = y(0.9);
-    const h = y(0.2) - y(0.9);
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(x0, y0, w, h);
-    ctx.strokeStyle = 'rgba(150, 100, 60, 0.35)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x0 + 4, y0 + 4, w - 8, h - 8);
-  }
-  // cimaise et plinthe
-  ctx.fillStyle = '#1e1008';
-  ctx.fillRect(0, top - 6, S, 10);
-  ctx.fillStyle = 'rgba(190, 140, 80, 0.4)';
-  ctx.fillRect(0, top - 6, S, 2);
-  ctx.fillStyle = '#160b05';
-  ctx.fillRect(0, y(0.14), S, S - y(0.14));
-}
-
-// La moquette du Terror Hotel : rouge sang usé, motif Art déco (éventails et losanges dorés), une case = 2,5 m
-function drawHotelCarpet(ctx, S) {
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = '#5a1512';
-  ctx.fillRect(0, 0, S, S);
-  const n = 4;
-  const c = S / n;
-  ctx.lineWidth = 3;
-  for (let j = 0; j < n; j++) {
-    for (let i = 0; i < n; i++) {
-      const x = i * c;
-      const y = j * c;
-      ctx.strokeStyle = 'rgba(200, 150, 70, 0.4)';
-      // losange
-      ctx.beginPath();
-      ctx.moveTo(x + c / 2, y + 4);
-      ctx.lineTo(x + c - 4, y + c / 2);
-      ctx.lineTo(x + c / 2, y + c - 4);
-      ctx.lineTo(x + 4, y + c / 2);
-      ctx.closePath();
-      ctx.stroke();
-      // éventail Art déco au centre
-      ctx.strokeStyle = 'rgba(30, 60, 50, 0.55)';
-      for (let r = c * 0.12; r < c * 0.32; r += c * 0.06) {
-        ctx.beginPath();
-        ctx.arc(x + c / 2, y + c / 2 + c * 0.12, r, Math.PI * 1.15, Math.PI * 1.85);
-        ctx.stroke();
-      }
-      ctx.fillStyle = 'rgba(200, 150, 70, 0.45)';
-      ctx.fillRect(x + c / 2 - 3, y + c / 2 - 3, 6, 6);
-    }
-  }
-  // usure : zones pâles, taches sombres
-  for (let i = 0; i < 10; i++) {
-    const x = Math.random() * S;
-    const y = Math.random() * S;
-    const r = 30 + Math.random() * 90;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    const dark = Math.random() < 0.5;
-    g.addColorStop(0, dark ? 'rgba(20, 4, 2, 0.35)' : 'rgba(160, 110, 90, 0.15)');
-    g.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(x - r, y - r, r * 2, r * 2);
-  }
-  noise(ctx, S, S, 26);
-}
-
-// Le plafond : plâtre crème jauni (uni : une case = une répétition, les taches se verraient en damier)
-function drawHotelCeiling(ctx, S) {
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = '#b5a584';
-  ctx.fillRect(0, 0, S, S);
-  noise(ctx, S, S, 10);
-}
+// Level 5, le Terror Hotel : voir hotelTextures.js
 
 export function createBackroomsTextures(level = 0) {
   // Toutes les surfaces en 1024 px (photos Poly Haven en 1024 px) : les motifs du Level 0 et du Level 1 sont dessinés
@@ -793,20 +643,28 @@ export function createBackroomsTextures(level = 0) {
 
   const wall = tex(wallCanvas);
   const wallLow = lowCanvas ? tex(lowCanvas) : wall;
-  // Level 1 : le relief des parpaings
-  const [bumpCanvas, bumpCtx] = L1 ? canvas(PX) : [null, null];
+  // Level 1 : le relief des parpaings ; Level 5 : celui du damas, du lambris et des moulures (et sa brillance)
+  const [bumpCanvas, bumpCtx] = L1 || L3 ? canvas(PX) : [null, null];
   if (bumpCtx) {
     bumpCtx.setTransform(PX / S, 0, 0, PX / S, 0, 0);
-    drawConcreteWallBump(bumpCtx, S, null);
+    if (L3) drawHotelWallBump(bumpCtx, S);
+    else drawConcreteWallBump(bumpCtx, S, null);
   }
   const wallBump = bumpCanvas ? tex(bumpCanvas) : null;
   if (wallBump) wallBump.colorSpace = THREE.NoColorSpace;
+  const [specCanvas, specCtx] = L3 ? canvas(PX / 2) : [null, null];
+  if (specCtx) {
+    specCtx.setTransform(PX / 2 / S, 0, 0, PX / 2 / S, 0, 0);
+    drawHotelWallSpec(specCtx, S);
+  }
+  const wallSpec = specCanvas ? tex(specCanvas) : null;
+  if (wallSpec) wallSpec.colorSpace = THREE.NoColorSpace;
   const carpet = tex(carpetCanvas);
   const ceiling = tex(ceilCanvas);
   const ceilingLow = ceilLowCanvas ? tex(ceilLowCanvas) : ceiling;
 
   // les photos arrivent un peu plus tard : on redessine par-dessus
-  const files = L3 ? ['none', 'none', 'none'] : L2 ? ['l37_mur.jpg', 'l37_sol.jpg', 'l37_mur.jpg'] : L1 ? ['l1_mur.jpg', 'l1_sol.jpg', 'l1_plafond.jpg'] : ['papier.jpg', 'moquette_rase.jpg', 'plafond.jpg'];
+  const files = L3 ? ['papier.jpg', 'moquette_rase.jpg', 'plafond.jpg'] : L2 ? ['l37_mur.jpg', 'l37_sol.jpg', 'l37_mur.jpg'] : L1 ? ['l1_mur.jpg', 'l1_sol.jpg', 'l1_plafond.jpg'] : ['papier.jpg', 'moquette_rase.jpg', 'plafond.jpg'];
   // Level 37 : le carrelage des bassins (cyan) et des fosses (bleu profond), ambientCG Tiles132A et Tiles135A
   const [poolCanvas, pctx2] = canvas(S);
   const [deepCanvas, dctx2] = canvas(S);
@@ -825,15 +683,16 @@ export function createBackroomsTextures(level = 0) {
     ceiling.userData.tiles = mosaic.userData.tiles = [36, 36];
     pool.userData.tiles = deep.userData.tiles = [24, 24];
   }
-  const ready = Promise.all([...files.map(loadImage), ...(L2 ? ['l37_bassin.jpg', 'l37_fosse.jpg'].map(loadImage) : [])]).then(([pap, moq, pla, bas, fos]) => {
-    if (pap) { drawW(wctx, S, pap); wall.needsUpdate = true; }
-    if (pap && bumpCtx) { drawConcreteWallBump(bumpCtx, S, pap); wallBump.needsUpdate = true; }
+  const ready = Promise.all([...files.map(loadImage), ...(L2 ? ['l37_bassin.jpg', 'l37_fosse.jpg'] : L3 ? ['l5_noyer.jpg'] : []).map(loadImage)]).then(([pap, moq, pla, bas, fos]) => {
+    if (L3) { drawHotelWall(wctx, S, pap, bas); wall.needsUpdate = true; } // (le 4e : le placage de noyer)
+    else if (pap) { drawW(wctx, S, pap); wall.needsUpdate = true; }
+    if (pap && bumpCtx && L1) { drawConcreteWallBump(bumpCtx, S, pap); wallBump.needsUpdate = true; }
     if (pap && lowCtx) { drawLow(pap, undefined); wallLow.needsUpdate = true; }
     if (pla && lowCtx) { drawLow(undefined, pla); ceilingLow.needsUpdate = true; }
     if (moq) { drawF(cctx, S, moq); carpet.needsUpdate = true; }
     if (pla) { drawC(clctx, S, pla); ceiling.needsUpdate = true; }
     // carreaux des bassins deux fois plus petits (10 cm)
-    if (bas) { tilePhoto(pctx2, bas, S, 2, 2); pool.needsUpdate = true; }
+    if (bas && L2) { tilePhoto(pctx2, bas, S, 2, 2); pool.needsUpdate = true; }
     if (fos) { tilePhoto(dctx2, fos, S, 2, 2); deep.needsUpdate = true; }
     if (pla) mosaic.needsUpdate = true;
   });
@@ -1131,5 +990,5 @@ export function createBackroomsTextures(level = 0) {
   const drawings = tex(drawCanvas);
   drawings.wrapS = drawings.wrapT = THREE.ClampToEdgeWrapping;
 
-  return { wall, wallLow, wallBump, carpet, ceiling, ceilingLow, pool, deep, mosaic, vhs, exit, sign, label, steel, fireDoor, treadPlate, crate, fog, lamp, outlet, vent, tape, drawings, ready, metalReady };
+  return { wall, wallLow, wallBump, wallSpec, carpet, ceiling, ceilingLow, pool, deep, mosaic, vhs, exit, sign, label, steel, fireDoor, treadPlate, crate, fog, lamp, outlet, vent, tape, drawings, ready, metalReady };
 }

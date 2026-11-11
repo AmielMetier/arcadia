@@ -1,12 +1,135 @@
 # Journal des versions — Arcadia
 
-## 5.38 — 11 novembre 2026
+## 5.53 — 11 novembre 2026
 - **The Backrooms** — Les joueurs VIP choisissent le niveau où commence la partie.
   - Dans le salon, un réglage ⭐ « Niveau de départ » propose le Level 0, le Level 1, le Level 37 (Poolrooms), le Level 2 (Tuyauteries) et le Level 5 (Terror Hotel). Il n'apparaît que pour un compte VIP.
   - À plusieurs, c'est l'hôte qui choisit : toute l'équipe part du même niveau.
   - Il faut le mode VIP débloqué, comme pour les monstres d'origine : sans lui, la partie commence au Level 0.
   - On arrive dans le niveau choisi comme en jouant : au bout du toboggan pour les Tuyauteries et le Terror Hotel, dans la cabine qui finit de descendre au Level 1, sur la bande qui saute aux Poolrooms. Le Level 0 garde son intro.
   - Pour tous : « Continuer » depuis l'écran titre fait lui aussi arriver dans le niveau par son passage, au lieu d'y apparaître d'un coup.
+
+## 5.52 — 11 novembre 2026
+- **The Backrooms** — La sortie des Tuyauteries devient un vrai monte-charge de service :
+  - des chevrons jaunes et noirs autour des portes, des butoirs d'acier au pied des montants, une bande de danger en U au sol avec « KEEP CLEAR » peint au pochoir, la plaque « SERVICE LIFT » ;
+  - un voyant d'appel rouge qui clignote tant que la vapeur bloque l'accès, puis passe au vert ;
+  - une fois les 4 vannes fermées, un gyrophare orange se met à tourner et balaie les murs de la galerie ;
+  - la vapeur devant les portes forme un rideau sur toute la hauteur et s'étiole sous le plafond, au lieu d'un gros bloc blanc coupé net.
+
+## 5.51 — 11 novembre 2026
+- **The Backrooms** — De nouvelles salles aux Tuyauteries, à la place de réserves vides :
+  - une salle des pompes : une rangée de pompes sur leurs socles, une armoire de commande, la nourrice à volants au mur ;
+  - des locaux électriques : de gros transformateurs à ailettes avec leurs isolateurs et leurs câbles qui montent au plafond, un voyant vert « sous tension » qui s'éteint quand le disjoncteur saute, des armoires ; on les entend bourdonner de loin ;
+  - des vestiaires : des rangées de casiers métalliques, dont un entrouvert sur le noir de temps en temps, et des bancs en bois ;
+  - les salles des pompes et les locaux électriques ont toujours du courant : leurs réglettes ne meurent pas.
+
+## 5.50 — 11 novembre 2026
+- **The Backrooms** — Les Tuyauteries s'entendent :
+  - les chaudières grondent : le souffle de la flamme, son crépitement, la tôle qui vibre ; on les entend étouffées depuis la galerie, en plein en entrant dans la chaufferie ;
+  - fermer la vanne d'une chaufferie éteint ses brûleurs : le grondement se tait et la flamme retombe en braises derrière le judas ;
+  - les pompes ronronnent et chuintent, les armoires électriques bourdonnent ; plus de courant dans le secteur, elles se taisent ;
+  - de l'eau dévale parfois une conduite au-dessus de toi, en glouglous qui passent d'un bout de la galerie à l'autre ;
+  - un tuyau qui se dilate fait quelques tics secs tout près.
+
+## 5.49 — 11 novembre 2026
+- **The Backrooms** — Les galeries des Tuyauteries, plus vraies :
+  - les gros tuyaux portent leurs bandes de marquage, avec le nom du fluide et la flèche du sens d'écoulement : eau chaude, vapeur, eau froide, air comprimé, gaz ;
+  - l'eau froide perle sur le cuivre et l'acier : des gouttes tombent des tuyaux et font des ronds dans leur flaque, et on les entend tomber ;
+  - de loin en loin, un robinet d'incendie armé : un coffret rouge vitré, le dévidoir et son tuyau enroulé, la plaque « FIRE HOSE REEL » et sa conduite rouge.
+
+## 5.48 — 11 novembre 2026
+- **The Backrooms** — La lumière des Tuyauteries :
+  - les grandes halles à piliers ne sont plus plongées dans le noir : une suspension en tôle émaillée verte pend au milieu de chaque travée, et son ampoule se reflète dans le béton ciré ; une sur trois est morte ou grésille ;
+  - la bergerie reste presque toute noire ;
+  - plus de halo collé autour des lampes : seuls le verre des hublots et la brume brillent, comme en vrai.
+
+## 5.47 — 11 novembre 2026
+- **The Backrooms** — Les chaufferies des Tuyauteries ne sont plus de grandes salles vides :
+  - les grandes chaufferies alignent trois chaudières ; chacune a sa porte de foyer avec un judas où danse la flamme, un niveau d'eau en tube de verre, une soupape à contrepoids rouge, sa plaque en laiton et ses rangées de rivets ;
+  - au sol, des rayures jaunes et noires usées entourent chaque chaudière ;
+  - le long du grand mur court une nourrice rouge sur ses consoles, avec ses départs vers le plafond et vers le sol, leurs volants rouges ou bleus, un thermomètre et un grand manomètre ;
+  - des conduites calorifugées montent des chaudières, traversent la salle sous la dalle et plongent dans la nourrice ;
+  - une armoire de commande à cinq voyants (celui de la vanne passe au vert quand tu la fermes), deux cadrans et un arrêt d'urgence ; ses voyants teintent le mur autour ;
+  - une pompe sur son socle de béton : moteur à ailettes, carter jaune, volute rouge, clapet et manomètre ;
+  - une réglette éclaire le milieu des grandes chaufferies, et la flamme des brûleurs éclaire plus loin devant les chaudières.
+
+## 5.46 — 11 novembre 2026
+- **The Backrooms** — Le Terror Hotel n'est plus un hall avec une grande boucle autour :
+  - une galerie part du hall, traverse l'étage et mène au palier des ascenseurs, deux cabines dorées hors service (l'une entrouverte sur le noir de la gaine, l'autre avec un mot scotché « OUT OF ORDER ») ;
+  - deux boucles de couloirs autour d'îlots de chambres, pour semer l'entité au lieu de tourner en rond ;
+  - un salon d'étage au bout de l'aile ouest (canapé, fauteuils, table basse), un couloir de service à l'est ;
+  - 21 chambres réparties dans toutes les ailes, qui donnent sur la galerie et sur chaque couloir.
+- **The Backrooms** — La lumière colorée éclaire vraiment, à tous les levels :
+  - au-dessus de la sortie de l'hôtel, le boîtier EXIT luit pour de vrai : son vert se pose sur le papier peint, la corniche, l'huisserie, la porte et le sol, et s'arrête aux murs (fini le halo plaqué sur le mur) ;
+  - l'écran du digicode teinte le mur (rouge quand le code est faux), le voyant de la ventouse aussi, et la lumière de l'escalier entre dans le hall quand la porte s'ouvre ;
+  - aux Tuyauteries, la flamme des brûleurs lèche le sol devant les chaudières, et les voyants des vannes et des disjoncteurs colorent le mur autour d'eux ;
+  - partout, la cabine d'un ascenseur ouvert éclaire le couloir, et les reflets colorés luisent sur les surfaces vernies.
+
+## 5.45 — 11 novembre 2026
+- **The Backrooms** — La sortie du Terror Hotel, refaite pour de bon :
+  - une vraie porte coupe-feu en acier rouge, usée en bas, avec un hublot en verre armé, une barre anti-panique « PUSH TO OPEN » et l'étiquette « EMERGENCY EXIT ONLY » ;
+  - une ventouse magnétique tient la porte fermée : son voyant reste rouge tant que le code n'est pas bon ;
+  - au-dessus, un boîtier EXIT lumineux avec son petit bonhomme qui court ;
+  - le digicode est maintenant à droite de la porte, côté serrure : une plaque d'inox avec douze touches, un écran et deux voyants. Sur le mur, il affiche des étoiles quand tu tapes, « DENIED » sur un mauvais code et « OPEN » sur le bon ;
+  - à l'écran, le clavier ressemble au vrai : les touches s'enfoncent (même au clavier de l'ordinateur), il tremble sur une erreur et passe au vert quand ça s'ouvre ;
+  - le bon code fait claquer la ventouse, puis le lourd battant s'ouvre lentement en grinçant sur l'escalier.
+
+## 5.44 — 11 novembre 2026
+- **The Backrooms** — Le Terror Hotel, plus grand et plus habité :
+  - le hall monte à 4,40 m de plafond, avec une frise dorée tout autour et des lustres qui pendent de plus haut ; on tombe de plus haut en arrivant par la trappe ;
+  - beaucoup moins de papier peint décollé dans les couloirs ;
+  - les couloirs se meublent : tableaux entre les appliques, consoles avec un vase ou une lampe sous un miroir, plantes dans les angles, banquettes, extincteurs, une pendule arrêtée, un panneau « sol glissant » oublié ;
+  - dans les chambres, un pouf au pied du lit et une plante dans un coin.
+
+## 5.43 — 10 novembre 2026
+- **The Backrooms** — Le Terror Hotel s'entend enfin :
+  - les pas claquent sur le marbre du hall et s'étouffent dans la moquette épaisse des couloirs ;
+  - plus de grésillement de néons : c'est la vieille installation électrique qui ronfle dans les murs, un peu plus fort sous les appliques allumées ;
+  - un radiateur cogne et siffle derrière une porte ;
+  - un téléphone sonne dans une chambre… et se tait net quand tu arrives à la porte ;
+  - la sonnette de la réception tinte alors qu'il n'y a personne au comptoir ;
+  - une porte se referme quelque part, des pas passent au loin ;
+  - rarement, un gramophone joue une valse désaccordée derrière les murs, jusqu'à ce que son ressort lâche.
+
+## 5.42 — 10 novembre 2026
+- **The Backrooms** — Le hall du Terror Hotel en grand :
+  - Un sol en damier de marbre blanc et noir, poli, où brillent les reflets des lustres. La moquette s'arrête au seuil ; il reste un grand tapis d'Orient sous la banquette et un chemin rouge depuis l'entrée.
+  - Les colonnes sont en marbre noir veiné, avec une base et un chapiteau dorés.
+  - Un plafond à caissons, filets dorés et rosaces, avec un grand caisson au milieu, là où s'allume le code.
+  - Des portes vitrées à double battant, à côté des boîtes aux lettres, qui ne donnent que sur le noir. On y lit HOTEL à l’envers.
+  - On arrive du toboggan par une trappe ouverte au plafond : un drap pend du bord, et on atterrit sur un tas de linge.
+  - Le comptoir de la réception a sa barre de pied en laiton.
+  - La lueur au bout du toboggan prend la couleur ambrée des appliques.
+
+## 5.41 — 10 novembre 2026
+- **The Backrooms** — Les portes et les couloirs du Terror Hotel :
+  - Des portes des années 1930 : battant en noyer à quatre panneaux, bouton et serrure en laiton, judas, plaque de propreté ; un chambranle mouluré avec ses plinthes et sa corniche. Le papier peint continue autour de l'entrée, jusque dans la petite entrée de chaque chambre.
+  - La plinthe, la cimaise et la corniche sont en vrai relief, le long de tous les murs, et tournent aux angles.
+  - Devant certaines portes, ce que les clients ont laissé : un plateau de room service sous sa cloche, une paire de chaussures cirées, le journal du soir.
+  - Par endroits, le papier peint se décolle du haut et laisse voir le plâtre jauni. Les appliques mortes ont la tulipe cassée, et le verre est resté sur la moquette.
+  - Derrière la porte de secours, une vraie cage d'escalier : un palier, des marches de béton qui descendent vers une ampoule grillagée, une rampe, et un grand « 5 » peint au pochoir.
+
+## 5.40 — 10 novembre 2026
+- **The Backrooms** — Les chambres du Terror Hotel sont habitées :
+  - Un vrai lit : tête de lit sculptée et capitonnée de velours, matelas, draps, gros oreillers, couvre-lit de velours qui retombe sur les côtés. Caché dessous, on voit les lattes, les pieds du lit et la chambre par la fente.
+  - Une armoire à panneaux avec un miroir terni, un bureau à sous-main de cuir et sa lampe, une table de nuit de chaque côté du lit, avec un vieux téléphone sur l'une d'elles.
+  - Un tapis d'Orient sous le lit, un plafonnier en verre dépoli, des ombres sous les meubles.
+  - Une fenêtre aux lourds rideaux tirés, avec un filet de lumière froide entre eux, et un radiateur en fonte dessous.
+  - Selon la chambre : un fauteuil, une commode avec sa pendule ou son vase et un miroir, un tableau au-dessus du lit, une valise oubliée.
+  - Une chambre sur trois a été fouillée : lit défait, couvre-lit par terre, tiroir du bureau resté ouvert.
+
+## 5.39 — 10 novembre 2026
+- **The Backrooms** — La lumière du Terror Hotel :
+  - Chaque applique dessine son éventail de lumière sur le papier peint, qui monte de la tulipe en s'évasant, et une tache chaude au plafond au-dessus d'elle. Entre deux appliques, la pénombre.
+  - Les appliques sont refaites : platine et bras en laiton, tulipe en verre dépoli plus vive au fond, et un halo quand elles sont allumées. Celles qui grésillent ou sont mortes le montrent sur le mur.
+  - Les lampes de chevet éclairent le mur derrière elles.
+  - Le vernis du lambris renvoie la lueur des appliques les plus proches.
+
+## 5.38 — 10 novembre 2026
+- **The Backrooms** — Le Terror Hotel (Level 5) change de matières, dans les couloirs comme dans les chambres :
+  - Un vrai papier peint damassé lie-de-vin, ton sur ton et en léger relief, avec ses lés, son grain et ses taches ; plus sombre sous la corniche, patiné au-dessus de la cimaise.
+  - Un lambris en noyer verni à panneaux biseautés, qui brille sous les appliques et la lampe torche, avec sa cimaise et sa plinthe.
+  - Une corniche et un plafond en plâtre crème, jaunis par les années.
+  - Une moquette en velours rouge à motif Art déco (losanges et éventails or, pastilles vertes), usée et pâlie au milieu des couloirs, tachée par endroits.
 
 ## 5.37 — 10 novembre 2026
 - **The Backrooms** — Les Poolrooms (Level 37) rattrapent le réalisme des Level 0 et 1.

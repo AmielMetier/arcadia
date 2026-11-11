@@ -330,7 +330,7 @@ export function createBackroomsScene(container, floors, lamps) {
 
   const textures = createBackroomsTextures(PIPES ? 0 : map0.level || 0);
   const tx2 = PIPES ? createPipesTextures() : null;
-  const AMB = L2 ? 0.045 : L3 ? 0.1 : 0.012; // l'hôtel : une pénombre chaude, mais on y voit
+  const AMB = L2 ? 0.045 : L3 ? 0.06 : 0.012; // l'hôtel : une pénombre chaude, mais on y voit (entre deux appliques, plus sombre)
   const ambient = new THREE.AmbientLight(L3 ? '#ffcf96' : L2 ? '#eaf7f6' : L1 ? '#c9d8ff' : PIPES ? '#ffd9a8' : '#fff3c4', AMB);
   scene.add(ambient);
   const dummy = new THREE.Object3D();
@@ -624,7 +624,7 @@ export function createBackroomsScene(container, floors, lamps) {
       uPoolMap: { value: poolTex }, // Poolrooms : la carte de l'eau (voir plus haut)
     };
     // reflets des lampes (Level 2) : les plus proches que la caméra voit, choisies à chaque image
-    const NLAMP = 12;
+    const NLAMP = L3 ? 16 : 12; // (l'hôtel : on voit loin dans ses couloirs, et chaque applique dessine sur le mur)
     const lampU = {
       uLampPos: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3(0, -100, 0)) },
       uLampCol: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3()) },
@@ -637,9 +637,11 @@ export function createBackroomsScene(container, floors, lamps) {
       uFilmC: { value: Array.from({ length: NFILM }, () => new THREE.Vector3()) },
       uFilmR: { value: new Float32Array(NFILM) }, // Level 0 : l'angle du diffuseur (couché le long d'un couloir en diagonale)
     };
-    // Level 1 : les feux de couleur (gyrophares des quais, flashs des alarmes, écrans du poste), les plus proches de la
-    // caméra, choisis à chaque image. P : position et portée ; C : couleur et puissance ; N : vers où il éclaire et la
-    // largeur de son lobe (rien : dans tous les sens)
+    // Le moteur de lumière, branché à tous les levels : les feux de couleur (Level 1 : gyrophares des quais, flashs des
+    // alarmes, écrans du poste ; Level 2 : brûleurs des chaudières, voyants ; Level 37 : volants de vanne, bouches de
+    // toboggan ; Level 5 : le boîtier EXIT, le clavier, la ventouse, l'ampoule de l'escalier ; partout : la cabine d'un
+    // ascenseur ouvert), les plus proches de la caméra, choisis à chaque image. P : position et portée ; C : couleur et
+    // puissance ; N : vers où il éclaire et la largeur de son lobe (rien : dans tous les sens)
     const NDYN = 8;
     const NSEG = 8; // les cloisons du poste de garde (Level 1)
     const OCC_GLSL = `
@@ -735,7 +737,7 @@ float occVis(vec3 p, vec3 lp) {
     // bloque (en part du plafond) ; alpha : une tôle mince au milieu de la case (le rideau d'un quai, sous son linteau ;
     // 128 : la tôle court le long de x, 255 : le long de z)
     // (Poolrooms : les murs seulement ; les cloisons entre les salles arrêtent la lumière par uDynB)
-    const DYN = L1 || L2;
+    const DYN = true; // (à tous les levels : un level sans feu de couleur proche ne paie qu'un test de portée par feu)
     const occData = DYN ? new Uint8Array(W * H * 4) : null;
     const occTex = DYN ? new THREE.DataTexture(occData, W, H, THREE.RGBAFormat) : null;
     if (DYN) {
@@ -986,7 +988,7 @@ float occVis(vec3 p, vec3 lp) {
         for (const v of nookLamps) if (v.k > 0.01) addPrint(liveB, v.fp, v.k);
       }
       for (let i = 0; i < BW * BH; i++) {
-        const v = Math.min(1, (L2 || PIPES ? 0.03 : L3 ? 0.09 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
+        const v = Math.min(1, (L2 || PIPES ? 0.03 : L3 ? 0.055 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
         bakeData[i * 4] = Math.round(v * 255);
         if (PIPES || alarm || nookLamps.length) bakeData[i * 4 + 2] = Math.round(Math.min(1, liveB[i] * 0.3 * power) * 255);
       }
@@ -1155,7 +1157,8 @@ float occVis(vec3 p, vec3 lp) {
     };
 
     const baked = (mat, opts = null) => {
-      const spec = (PIPES || L2) && opts && opts.spec > 0;
+      const spec = (PIPES || L2 || L3) && opts && opts.spec > 0;
+      const hotel = L3 && opts && opts.hotel; // Level 5 : le vernis du lambris (carte de brillance), l'usure de la moquette
       // Poolrooms : carrelage émaillé (joints, reflets de la salle, reflets de l'eau) ; pool : 'floor' (le sol, qui
       // reflète les dalles lumineuses), 'wall', 'ceil', 'bottom' (sous l'eau)
       const pool = L2 && opts && opts.pool;
@@ -1168,8 +1171,9 @@ float occVis(vec3 p, vec3 lp) {
       const gloss = L1 && opts && opts.gloss; // le béton lissé du Level 1, où se reflètent les réglettes
       const bump = L1 && opts && opts.bump; // Level 1 : un relief (les joints des parpaings) que prennent aussi les feux de couleur
       const wall1 = L1 && opts && opts.wall1; // les murs du Level 1 : la poussière et la suie sous le plafond
+      const marble = L3 && opts && opts.marble; // le hall de l'hôtel : un marbre poli, sans l'usure de la moquette
       const push = opts && opts.push; // les murs en biais : la lumière lue un peu devant eux, dans le couloir (pas au coin des cases)
-      if (spec || PIPES || base || EDGE || SEGS || film || gloss || DYN || push || pool) mat.customProgramCacheKey = () => 'bk' + (pool ? '-pool-' + pool : '') + (push ? '-push' : '') + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE || SEGS ? '-edge' : '') + (film ? '-film' : '') + (gloss ? '-gloss' : '') + (DYN ? '-dyn' : '') + (bump ? '-bump' : '') + (wall1 ? '-wall1' : '');
+      if (spec || PIPES || base || EDGE || SEGS || film || gloss || DYN || push || pool || hotel) mat.customProgramCacheKey = () => 'bk' + (hotel ? '-hotel' : '') + (marble ? '-marble' : '') + (pool ? '-pool-' + pool : '') + (push ? '-push' : '') + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE || SEGS ? '-edge' : '') + (film ? '-film' : '') + (gloss ? '-gloss' : '') + (DYN ? '-dyn' : '') + (bump ? '-bump' : '') + (wall1 ? '-wall1' : '');
       mat.onBeforeCompile = (sh) => {
         Object.assign(sh.uniforms, bakeUniforms);
         if (DYN) {
@@ -1194,6 +1198,10 @@ float occVis(vec3 p, vec3 lp) {
           sh.defines = { ...(sh.defines || {}), BK_POOL: 1, ...(pool === 'floor' ? { BK_POOLFLOOR: 1 } : pool === 'wall' ? { BK_POOLWALL: 1 } : pool === 'ceil' ? { BK_POOLCEIL: 1 } : null) };
         }
         if (grime) sh.defines = { ...(sh.defines || {}), BK_GRIME: 1 };
+        if (hotel) {
+          Object.assign(sh.uniforms, lampU);
+          sh.defines = { ...(sh.defines || {}), BK_HOTEL: 1, ...(marble ? { BK_MARBLE: 1 } : null) };
+        }
         if (bump) sh.defines = { ...(sh.defines || {}), BK_BUMP: 1 };
         // Poolrooms : le relief des joints s'efface quand un carreau ne fait plus que quelques pixels (au loin, en
         // rasant) ; sinon sa pente, prise d'un pixel à l'autre, crénelle les joints en pointillés qui scintillent
@@ -1222,9 +1230,11 @@ uniform float uBakeTX;
 uniform vec3 uBakeTint;
 uniform vec3 uBakeTint2;
 uniform float uCeilB;
-#ifdef BK_SPEC
+#if defined(BK_SPEC) || defined(BK_HOTEL)
 uniform vec3 uLampPos[${NLAMP}];
 uniform vec3 uLampCol[${NLAMP}];
+#endif
+#ifdef BK_SPEC
 uniform float uSpecK;
 uniform float uGloss;
 uniform float uSpecMask;
@@ -1523,6 +1533,18 @@ float bkCaust(vec2 uv, float t) {
           }
           #endif
           diffuseColor.rgb *= mix(vec3(1.0), vec3(0.78, 0.66, 0.45), stain * uDamp * uStain);
+          #if defined(BK_HOTEL) && !defined(BK_MARBLE)
+          if (ny > 0.5) {
+            // la moquette de l'hôtel : un chemin pâli et tassé au milieu des couloirs (loin des murs, là où l'on marche
+            // depuis des décennies), aux bords irréguliers ; des taches sombres en plaques (vin, café, pire)
+            float hLane = smoothstep(0.86, 0.99, bk.g) * smoothstep(0.25, 0.65, bkFbm(vBakeP.xz * 0.55 + 17.0));
+            vec3 hGrey = vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11)));
+            diffuseColor.rgb = mix(diffuseColor.rgb, mix(hGrey, diffuseColor.rgb, 0.5) * vec3(1.42, 1.28, 1.16), hLane * 0.75);
+            vec2 hq = vBakeP.xz * 0.6 + 4.0;
+            float hSpot = bkFbmW(hq + (vec2(bkFbmW(hq * 2.7 + 1.0), bkFbmW(hq * 2.7 + 6.0)) - 0.5) * 0.9);
+            diffuseColor.rgb *= mix(1.0, 0.55, smoothstep(0.7, 0.76, hSpot));
+          }
+          #endif
           #ifdef BK_BASE
           // la plinthe : une bande de bois peint brun-jaune, un peu plus claire sur son arête du haut
           if (abs(ny) < 0.5 && by < 0.105) {
@@ -1736,6 +1758,38 @@ float bkCaust(vec2 uv, float t) {
             #endif
           }
           #endif
+          #ifdef BK_HOTEL
+          // l'hôtel n'a pas de plafonniers : des appliques contre les murs, des lampes de chevet. La lumière cuite (au sol)
+          // n'éclaire plus qu'à moitié les murs et le plafond ; chaque lampe proche y dessine la sienne : sur son mur, un
+          // éventail qui monte de la tulipe en s'évasant et un plus court qui descend ; au plafond, une tache ovale
+          // au-dessus d'elle ; partout ailleurs, un halo qui baisse avec la distance et l'angle
+          vec3 hSc = vec3(0.0);
+          if (ny < 0.5) {
+            shape *= ny < -0.5 ? 0.3 : 0.45;
+            for (int i = 0; i < ${NLAMP}; i++) {
+              vec3 hd = vBakeP - uLampPos[i];
+              float hD2 = dot(hd, hd);
+              if (hD2 > 64.0) continue;
+              float hInc = max(dot(vBakeN, -hd) * inversesqrt(hD2 + 0.0001), 0.0);
+              float hI = hInc * 0.75 / (1.0 + hD2 * 1.2);
+              if (ny < -0.5) {
+                float hR2 = dot(hd.xz, hd.xz);
+                hI = hI * 0.35 + 1.1 * exp(-hR2 * 3.2) * smoothstep(0.2, 0.8, hd.y);
+              } else {
+                float hP = dot(hd.xz, vBakeN.xz); // la lampe est à 20 cm devant son mur
+                if (hP < 0.05 && hP > -0.5) {
+                  float hH = length(hd.xz - vBakeN.xz * hP);
+                  float hUp = hd.y > 0.0 ? 1.0 : 0.0;
+                  float hW = mix(0.16 + -hd.y * 0.75, 0.09 + hd.y * 0.5, hUp);
+                  float hFan = exp(-(hH * hH) / (hW * hW)) * mix(0.55 / (1.0 + hd.y * hd.y * 1.6), 1.7 / (1.0 + hd.y * hd.y * 0.7), hUp);
+                  hI += (hFan + 0.32 / (1.0 + (hH * hH + hd.y * hd.y) * 2.2)) * smoothstep(-0.5, -0.3, hP);
+                }
+              }
+              hSc += uLampCol[i] * hI;
+            }
+          }
+          totalEmissiveRadiance += diffuseColor.rgb * hSc * (ny < -0.5 ? 0.7 : 1.0);
+          #endif
           totalEmissiveRadiance += diffuseColor.rgb * (uBakeTint * bk.r + uBakeTint2 * bk.b * (ny < -0.5 ? uCeilB : 1.0)) * 2.0 * shape;
           totalEmissiveRadiance += bkPoolAdd;
           #ifdef BK_DYN
@@ -1747,7 +1801,10 @@ float bkCaust(vec2 uv, float t) {
               // (le point, décollé de sa surface de quelques centimètres : un mur ne se fait pas d'ombre à lui-même)
               if (a > 0.0005) dAcc += uDynC[i] * a * occVis(vec3(vBakeP.x + vBakeN.x * 0.06, vBakeP.y - uBakeY, vBakeP.z + vBakeN.z * 0.06), vec3(uDynP[i].x, uDynP[i].y - uBakeY, uDynP[i].z));
             }
-            totalEmissiveRadiance += diffuseColor.rgb * dAcc;
+            // (une teinte de texture est plus pure qu'une vraie peinture : un damas rouge renvoie quand même un peu du vert
+            // d'un boîtier EXIT. Pour les feux de couleur seulement, la surface est prise un peu moins saturée)
+            vec3 dAlb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))), 0.4);
+            totalEmissiveRadiance += dAlb * dAcc;
           }
           #endif
           totalEmissiveRadiance += vec3(0.8, 1.0, 1.0) * bkCaust(vBakeP.xz * 0.32, uTime * 0.45) * 0.55 * sub * (0.35 + bk.r * 1.6);
@@ -1761,6 +1818,9 @@ float bkCaust(vec2 uv, float t) {
             #endif
             // le sol : plus luisant là où il est humide, mat là où la poussière s'est déposée
             if (ny > 0.5) sm *= 0.45 + wet * 1.3 + bkFbm(vBakeP.xz * 0.6 + 3.0) * 0.5;
+            #ifdef BK_HOTEL
+            sm *= specularStrength; // l'hôtel : le noyer verni brille, le papier peint presque pas
+            #endif
             // pas de reflet là où aucune lampe n'éclaire (un mur caché derrière un angle)
             sm *= mix(0.25, 1.0, smoothstep(0.0, 0.12, bk.r + bk.b));
             vec3 sAcc = vec3(0.0);
@@ -1772,6 +1832,20 @@ float bkCaust(vec2 uv, float t) {
               float sH = max(dot(normal, normalize(sL + sV)), 0.0);
               sAcc += uLampCol[i] * (pow(sH, uGloss) + 0.05 * pow(sH, uGloss * 0.1)) * sNl / (1.0 + sD2 * 0.05); // un reflet net, et son halo
             }
+            #ifdef BK_DYN
+            // les feux de couleur aussi : leur reflet garde leur couleur, quelle que soit la teinte de la surface (le vert
+            // d'un boîtier EXIT luit sur un lambris verni bordeaux, qui n'en renverrait presque rien en diffus)
+            for (int i = 0; i < ${NDYN}; i++) {
+              vec3 dl;
+              float a = bkDyn(i, vBakeP, dl);
+              if (a < 0.0005) continue;
+              vec3 sL = normalize((viewMatrix * vec4(dl, 0.0)).xyz);
+              float sNl = max(dot(normal, sL), 0.0);
+              if (sNl <= 0.0) continue;
+              float sH = max(dot(normal, normalize(sL + sV)), 0.0);
+              sAcc += uDynC[i] * a * (pow(sH, uGloss) + 0.08 * pow(sH, uGloss * 0.1)) * sNl * occVis(vec3(vBakeP.x + vBakeN.x * 0.06, vBakeP.y - uBakeY, vBakeP.z + vBakeN.z * 0.06), vec3(uDynP[i].x, uDynP[i].y - uBakeY, uDynP[i].z));
+            }
+            #endif
             totalEmissiveRadiance += sAcc * sm * (uGloss + 8.0) * 0.04;
           }
           #endif`);
@@ -1803,7 +1877,7 @@ float bkCaust(vec2 uv, float t) {
     });
     const floorMat = PIPES
       ? baked(new THREE.MeshPhongMaterial({ map: carpet, specular: '#3a342a', shininess: 70 }), { spec: 1.05, gloss: 1100 })
-      : baked(new THREE.MeshLambertMaterial({ map: carpet, ...(L0 ? { bumpMap: relief(carpet), bumpScale: 1.4 } : null) }), L0 ? { film: 1 } : L1 ? { gloss: 1 } : null);
+      : baked(new THREE.MeshLambertMaterial({ map: carpet, ...(L0 ? { bumpMap: relief(carpet), bumpScale: 1.4 } : L3 ? { bumpMap: relief(carpet), bumpScale: 1.1 } : null) }), L0 ? { film: 1 } : L1 ? { gloss: 1 } : L3 ? { hotel: 1 } : null);
     const holes = holesOf(map);
     if (holes.length) {
       floorMat.alphaMap = holeMask(W, H, holes, true);
@@ -1881,7 +1955,19 @@ float bkCaust(vec2 uv, float t) {
       // Poolrooms : sols, bassins, parois des bassins, margelles et la surface de l'eau (view/water.js)
       water = buildWater({ map, group, baked, textures, bake: bakeUniforms, fog: scene.fog, film: filmU, tileRelief });
     } else {
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * CELL_SIZE, H * CELL_SIZE), floorMat);
+      const floorGeo = new THREE.PlaneGeometry(W * CELL_SIZE, H * CELL_SIZE, L3 ? W : 1, L3 ? H : 1);
+      if (L3 && map.elevator) {
+        // l'hôtel : derrière la porte de secours, l'escalier descend (le sol s'arrête au seuil, view/hotelCorridor.js) ;
+        // le hall a son propre sol, en marbre (view/hotelLobby.js)
+        const cut = new Set([map.elevator.gz * W + map.elevator.gx]);
+        const lb = map.lobby;
+        if (lb) for (let z = lb.z0; z <= lb.z1; z++) for (let x = lb.x0; x <= lb.x1; x++) cut.add(z * W + x);
+        const src = floorGeo.index.array;
+        const idx = [];
+        for (let i = 0; i < src.length; i++) if (!cut.has(Math.floor(i / 6))) idx.push(src[i]);
+        floorGeo.setIndex(idx);
+      }
+      const floor = new THREE.Mesh(floorGeo, floorMat);
       floor.rotation.x = -Math.PI / 2;
       floor.position.set((W * CELL_SIZE) / 2, 0, (H * CELL_SIZE) / 2);
       group.add(floor);
@@ -1895,10 +1981,13 @@ float bkCaust(vec2 uv, float t) {
       ceilTex.needsUpdate = true;
     });
     // (Level 2 : la dalle de béton, sombre, au-dessus des tuyaux)
-    const ceilMat = baked(new THREE.MeshLambertMaterial({ map: ceilTex, color: PIPES ? '#9a958a' : '#ffffff' }), L1 ? { gloss: 1 } : null);
+    const ceilMat = baked(new THREE.MeshLambertMaterial({ map: ceilTex, color: PIPES ? '#9a958a' : '#ffffff' }), L1 ? { gloss: 1 } : L3 ? { hotel: 1 } : null);
     const above = fi > 0 ? floors[fi - 1] : null;
     // (et là où passe un couloir en diagonale : son propre plafond, plus bas, prend la place)
     const diagHoles = L2 ? [] : (map.diags || []).flatMap((dg) => [...dg.cells, ...dg.cuts]).map(([x, z]) => ({ x: (x + 0.5) * CELL_SIZE, z: (z + 0.5) * CELL_SIZE, hx: CELL_SIZE / 2, hz: CELL_SIZE / 2 }));
+    // (et le hall de l'hôtel : il a son plafond à lui, plus haut, view/hotelLobby.js)
+    const lb = L3 && map.lobbyCeil ? map.lobby : null;
+    if (lb) diagHoles.push({ x: ((lb.x0 + lb.x1 + 1) / 2) * CELL_SIZE, z: ((lb.z0 + lb.z1 + 1) / 2) * CELL_SIZE, hx: ((lb.x1 - lb.x0 + 1) / 2) * CELL_SIZE, hz: ((lb.z1 - lb.z0 + 1) / 2) * CELL_SIZE });
     if ((above && holesOf(above).length) || diagHoles.length) {
       ceilMat.alphaMap = holeMask(W, H, [...(above ? holesOf(above) : []), ...diagHoles], false);
       ceilMat.alphaTest = 0.5;
@@ -2018,6 +2107,8 @@ float bkCaust(vec2 uv, float t) {
       // (Level 1 : le relief des parpaings, et la crasse du haut des murs)
       // Poolrooms : la mosaïque émaillée, en relief, qui brille sous les dalles (voir tileRelief et BK_POOL)
       if (L2) wallMat = baked(new THREE.MeshPhongMaterial({ map: textures.wall, bumpMap: tileRelief(textures.wall), bumpScale: 1.2, specular: '#2c3537', shininess: 70 }), { pool: 'wall', spec: 0.22, gloss: 140 });
+      // Level 5 : le damas en relief, le lambris de noyer verni qui brille sous les appliques et la lampe torche
+      else if (L3) wallMat = baked(new THREE.MeshPhongMaterial({ map: textures.wall, bumpMap: textures.wallBump, bumpScale: 1.5, specularMap: textures.wallSpec, specular: '#3a2a20', shininess: 70 }), { spec: 0.55, gloss: 45, mask: 0, hotel: 1 });
       else wallMat = baked(new THREE.MeshLambertMaterial({ map: L0 && fi === 1 ? textures.wallLow : textures.wall, ...(L1 && textures.wallBump ? { bumpMap: textures.wallBump, bumpScale: 1.6 } : L0 ? { bumpMap: relief(fi === 1 ? textures.wallLow : textures.wall), bumpScale: 1.0 } : null) }), L0 ? { base: true } : L1 ? { bump: !!textures.wallBump, wall1: true } : null);
       const wallsMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(CELL_SIZE, CEIL + SUNK, CELL_SIZE), wallMat, wallCount);
       // le mur percé du trou de la cassette perchée se construit à part (6b)
@@ -2226,8 +2317,10 @@ float bkCaust(vec2 uv, float t) {
       const bulbs = map.lights.filter((l) => l.kind === 'bulb');
       // l'ampoule, dans le hublot de verre de la lampe (pipes.js)
       fixSet(new THREE.SphereGeometry(0.045, 12, 10), new THREE.MeshBasicMaterial({ color: '#ffffff' }), bulbs, (l) => {
-        dummy.position.set(l.x + l.wall[0] * 0.13, l.y, l.z + l.wall[1] * 0.13);
-        dummy.scale.set(1, 1.3, 1);
+        // (une suspension des halles : l'ampoule pend sous son abat-jour, plus grosse)
+        if (l.wall) dummy.position.set(l.x + l.wall[0] * 0.13, l.y, l.z + l.wall[1] * 0.13);
+        else dummy.position.set(l.x, l.y - 0.02, l.z);
+        dummy.scale.set(l.wall ? 1 : 1.5, l.wall ? 1.3 : 1.6, l.wall ? 1 : 1.5);
       });
       const tubes = map.lights.filter((l) => l.kind === 'tube');
       fixSet(new THREE.CylinderGeometry(0.01, 0.01, 1.4, 8), new THREE.MeshBasicMaterial({ color: '#ffffff' }), tubes, (l) => {
@@ -3430,12 +3523,15 @@ float bkCaust(vec2 uv, float t) {
     // 9. Level 1 : l'habillage de l'entrepôt (rayonnages à palettes, marchandises, tuyaux, lignes au sol, piliers, panneaux)
     const wh = L1 ? buildWarehouse({ map, group, baked, CEIL, textures }) : null;
     if (wh) group.userData.wh = wh; // (?debug : wh.off dessine tout, pour comparer)
-    const hotel = L3 ? buildHotel({ map, group, baked, CEIL }) : null;
+    const hotel = L3 ? buildHotel({ map, group, baked, wallMat, CEIL }) : null;
     // 9a. Level 1 : le matériel du jeu qui bouge (rideaux des quais, cloches d'alarme, grilles des gaines, écrans du poste)
     const gear = L1 && map.docks ? buildGear({ map, group, baked, wallMat, CEIL }) : null;
     // 9b. Level 2 : tuyauteries, lampes grillagées, grilles, chaudières, vannes et vapeur
     const pipesView = PIPES ? buildPipes({ map, group, baked, CEIL, tx: tx2, camera }) : null;
-    if (pipesView) pipesView.setFog(scene.fog);
+    if (pipesView) {
+      pipesView.setFog(scene.fog);
+      pipesView.onDrip = (pos) => api.onDrip && api.onDrip(pos); // les gouttes de condensation des Tuyauteries
+    }
 
     // 10. Fusibles (Level 1) : un gros fusible céramique aux bouts de cuivre, lueur ambrée
     const fuseMeshes = [];
@@ -4344,38 +4440,17 @@ void main() {
         bakeUniforms.uTime.value = time;
         if (gear) {
           gear.update(sim, P, time, dt);
-          // les feux de couleur : les plus proches de la caméra (au bord de leur portée), dans les cases du shader
-          dynList.length = 0;
-          gear.lights(dynList);
           occDocks();
           if (dynU.uOccDoorK) dynU.uOccDoorK.value.x = gear.doorK > 0.25 ? 0 : 1;
-          // l'ascenseur d'arrivée, portes ouvertes : la lumière de sa cabine déborde sur le couloir
-          if (arrivalLift && arrivalLift.open > 0.02) {
-            const A = map.arrival;
-            const k = arrivalLift.open;
-            dynList.push({ x: A.x - A.dx * (CELL_SIZE / 2 + 0.2), y: 2.0, z: A.z - A.dz * (CELL_SIZE / 2 + 0.2), r: 1.25 * k, g: 1.15 * k, b: 0.95 * k, rad: 6, nx: -A.dx, ny: -0.35, nz: -A.dz, w: 0.05 });
-          }
-          const cx = camera.position.x;
-          const cz = camera.position.z;
-          for (const L of dynList) L.d = Math.hypot(L.x - cx, L.z - cz) - L.rad;
-          dynList.sort((a, b) => a.d - b.d);
-          for (let i = 0; i < NDYN; i++) {
-            const L = dynList[i];
-            if (L && L.d < 6) {
-              dynU.uDynP.value[i].set(L.x, L.y + group.position.y, L.z, L.rad);
-              dynU.uDynC.value[i].set(L.r, L.g, L.b);
-              dynU.uDynN.value[i].set(L.nx, L.ny, L.nz, L.w);
-            } else {
-              dynU.uDynP.value[i].set(0, -100, 0, 0.001);
-              dynU.uDynC.value[i].set(0, 0, 0);
-            }
-          }
         }
-        // Poolrooms : les feux de couleur. Les volants de vanne rougeoient (une lueur qui respire) ; la bouche d'un
-        // toboggan luit de sa couleur, à peine tant qu'il est fermé, franchement quand les volants sont trouvés (plus
-        // du tout quand un autre a été pris). Chaque feu reste dans sa salle (uDynB)
+        // Le moteur de lumière : chaque level verse ses feux de couleur dans la liste, puis les plus proches de la
+        // caméra (au bord de leur portée) prennent les cases du shader
+        dynList.length = 0;
+        if (gear) gear.lights(dynList);
+        // Poolrooms : les volants de vanne rougeoient (une lueur qui respire) ; la bouche d'un toboggan luit de sa
+        // couleur, à peine tant qu'il est fermé, franchement quand les volants sont trouvés (plus du tout quand un autre
+        // a été pris). Chaque feu reste dans sa salle (uDynB)
         if (L2) {
-          dynList.length = 0;
           const roomBox = (x, z) => {
             const r = map.roomAt && map.roomAt(x, z);
             return r ? [r.x0 - 0.25, r.z0 - 0.25, r.x1 + 0.25, r.z1 + 0.25] : [x - 6, z - 6, x + 6, z + 6];
@@ -4393,17 +4468,34 @@ void main() {
             const z = sl.z - sl.dz * 0.9;
             dynList.push({ x, y: 1.0, z, r: c.r * k, g: c.g * k, b: c.b * k, rad: 5.5, nx: -sl.dx, ny: -0.1, nz: -sl.dz, w: -0.2, box: sl.box || (sl.box = roomBox(x, z)) });
           }
+        }
+        if (pipesView) pipesView.lights(dynList, time);
+        if (hotel) hotel.lights(dynList, time);
+        // l'ascenseur d'arrivée, portes ouvertes : la lumière de sa cabine déborde sur le couloir
+        if (arrivalLift && arrivalLift.open > 0.02) {
+          const A = map.arrival;
+          const k = arrivalLift.open;
+          dynList.push({ x: A.x - A.dx * (CELL_SIZE / 2 + 0.2), y: 2.0, z: A.z - A.dz * (CELL_SIZE / 2 + 0.2), r: 1.25 * k, g: 1.15 * k, b: 0.95 * k, rad: 6, nx: -A.dx, ny: -0.35, nz: -A.dz, w: 0.05 });
+        }
+        {
+          // (Level 1 : seuls les feux tout proches, sans fondu, comme avant ; ailleurs, jusqu'à 30 m, et un feu qui sort
+          // des huit cases s'éteint en douceur sur ses 4 derniers mètres au lieu de sauter)
+          const far = gear ? 6 : 30;
           const cx = camera.position.x;
           const cz = camera.position.z;
           for (const L of dynList) L.d = Math.hypot(L.x - cx, L.z - cz) - L.rad;
           dynList.sort((a, b) => a.d - b.d);
+          const edge = dynList.length > NDYN ? dynList[NDYN].d : far;
           for (let i = 0; i < NDYN; i++) {
             const L = dynList[i];
-            if (L && L.d < 30) {
+            if (L && L.d < far) {
+              const f = gear ? 1 : Math.min(1, Math.max(0, (Math.min(far, edge + 1) - L.d) / 4));
               dynU.uDynP.value[i].set(L.x, L.y + group.position.y, L.z, L.rad);
-              dynU.uDynC.value[i].set(L.r, L.g, L.b);
+              dynU.uDynC.value[i].set(L.r * f, L.g * f, L.b * f);
               dynU.uDynN.value[i].set(L.nx, L.ny, L.nz, L.w);
-              dynU.uDynB.value[i].set(L.box[0], L.box[1], L.box[2], L.box[3]);
+              const b = L.box;
+              if (b) dynU.uDynB.value[i].set(b[0], b[1], b[2], b[3]);
+              else dynU.uDynB.value[i].set(-1e5, -1e5, 1e5, 1e5);
             } else {
               dynU.uDynP.value[i].set(0, -100, 0, 0.001);
               dynU.uDynC.value[i].set(0, 0, 0);
@@ -4544,11 +4636,11 @@ void main() {
         }
 
         // Level 2 : les lampes qui se reflètent dans le carrelage et le sol ciré (les plus proches que l'on voit)
-        if (PIPES || L2) {
+        if (PIPES || L2 || L3) {
           const cand = [];
           for (const l of map.lights) {
-            const k = power && l.state !== 'off' ? (l.k ?? 1) : 0;
-            if (k <= 0 || l.hidden) continue;
+            const k = power && l.state !== 'off' && !(L3 && sim.blackout > 0) ? (l.k ?? 1) * (l.state === 'flicker' ? 0.6 : 1) : 0;
+            if (k <= 0 || (l.hidden && !L3)) continue; // (l'hôtel : les appliques n'ont pas de plafonnier, mais brillent)
             const d = Math.abs(l.x - P.x) + Math.abs(l.z - P.z);
             if (d < 32) cand.push([d, l, k]);
           }
@@ -4559,6 +4651,8 @@ void main() {
             if (d > 4 && !hasLineOfSight(map, P.x, P.z, l.x, l.z)) continue;
             lampU.uLampPos.value[n].set(l.x, l.y + group.position.y, l.z);
             if (L2) lampU.uLampCol.value[n].set(0.95, 1.0, 1.02).multiplyScalar(1.2 * k * (l.fs || 1));
+            // (l'hôtel : les plus lointaines s'effacent en douceur au lieu de s'éteindre d'un coup)
+            else if (L3) lampU.uLampCol.value[n].set(1.0, 0.68, 0.38).multiplyScalar((l.lamp ? 0.8 : 1.6) * k * Math.min(1, (32 - d) / 8));
             else if (l.kind === 'tube') lampU.uLampCol.value[n].set(0.75, 0.88, 1.0).multiplyScalar(k);
             else lampU.uLampCol.value[n].set(1.0, 0.7, 0.4).multiplyScalar(1.5 * k);
             n++;
