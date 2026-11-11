@@ -32,3 +32,12 @@ Le papier peint, la moquette et le plafond reprennent papier.jpg, moquette_rase.
   l5_velours.jpg        Velour Velvet           https://polyhaven.com/a/velour_velvet           (Poly Haven, 512 px : rideaux, couvre-lits, banquettes)
   l5_marbre_blanc.jpg   Marble012               https://ambientcg.com/view?id=Marble012         (ambientCG, 1024 px : le damier du hall, cases claires, colonnes)
   l5_marbre_noir.jpg    Marble016               https://ambientcg.com/view?id=Marble016         (ambientCG, 1024 px : le damier du hall, cases sombres)
+
+Level 17 (le mall) : Poly Haven, domaine public (CC0 1.0), texture de couleur 1024 px, recolorée dans backrooms/view/mallTextures.js.
+  l17_parpaing.jpg   Concrete Block Wall        https://polyhaven.com/a/concrete_block_wall        (les couloirs de service)
+  l17_beton.jpg      Smooth Concrete Floor      https://polyhaven.com/a/smooth_concrete_floor      (les quais, les locaux techniques)
+  l17_faience.jpg    Long White Tiles           https://polyhaven.com/a/long_white_tiles           (les toilettes)
+  l17_lino.jpg       Old Linoleum Flooring 01   https://polyhaven.com/a/old_linoleum_flooring_01   (les bureaux)
+  l17_rideau.jpg     Painted Metal Shutter      https://polyhaven.com/a/painted_metal_shutter      (les rideaux des kiosques)
+  l17_tole.jpg       Metal Plate                https://polyhaven.com/a/metal_plate                (les paliers des escalators)
+  (le velours des fauteuils du cinéma reprend l5_velours.jpg)

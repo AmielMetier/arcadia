@@ -19,6 +19,7 @@ import { CELL_SIZE as C, T, FLOOR_DY } from '../engine/map.js';
 import { MALL_CEIL, MALL_RAIL } from '../engine/mall.js';
 import { cinemaCarpet } from './mallTextures.js';
 import { drawMallProps } from './mallProps.js';
+import { createKitInstancer } from './kit.js';
 
 const SLAB = FLOOR_DY - MALL_CEIL; // l'épaisseur de la dalle sous le mail du haut (le bandeau des vides)
 const LANTERN = 8.4; // la verrière du mail du haut, au-dessus du vide
@@ -251,6 +252,9 @@ function makeMaterials(tx, baked) {
     grille: { m: baked(lam({ map: tx.grille, alphaTest: 0.45, side: THREE.DoubleSide, color: '#bdbbb4' })), S: 0.5 },
     glass: { m: new THREE.MeshPhongMaterial({ color: '#0b1214', transparent: true, opacity: 0.2, specular: '#8fa6ae', shininess: 120, depthWrite: false, side: THREE.DoubleSide }), S: 1, order: 2 },
     // les rubans de LED bleues du cinéma (plus forts que le blanc : ils bavent dans le caméscope)
+    velvet: { m: baked(lam({ map: tx.velvet })), S: 0.9 },
+    shutter: { m: baked(phong({ map: tx.shutter, specular: '#2c2c2c', shininess: 30 }), { spec: 0.3, gloss: 60, mask: 0 }), S: 2.0 },
+    plate: { m: baked(phong({ map: tx.plate, specular: '#9a9ea4', shininess: 60 }), { spec: 0.55, gloss: 100, mask: 0 }), S: 1.2 },
     led: { m: new THREE.MeshBasicMaterial({ color: new THREE.Color('#3a74ff').multiplyScalar(2.6) }), S: 1 },
   };
 }
@@ -790,8 +794,8 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     const x0 = (s0, s1) => Math.min(xOf(s0), xOf(s1));
     const x1 = (s0, s1) => Math.max(xOf(s0), xOf(s1));
     // les paliers (plaques d'acier)
-    G.box('steel', x0(0, e.land), x1(0, e.land), -0.02, 0.01, e.z - zIn, e.z + zIn, '-y');
-    G.box('steel', x0(e.land + e.run, e.len), x1(e.land + e.run, e.len), e.rise - 0.02, e.rise + 0.01, e.z - zIn, e.z + zIn, '-y');
+    G.box('plate', x0(0, e.land), x1(0, e.land), -0.02, 0.01, e.z - zIn, e.z + zIn, '-y');
+    G.box('plate', x0(e.land + e.run, e.len), x1(e.land + e.run, e.len), e.rise - 0.02, e.rise + 0.01, e.z - zIn, e.z + zIn, '-y');
     // les marches
     const n = Math.round(e.rise / 0.2);
     const tr = e.run / n;
@@ -851,6 +855,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     G.box(sh.sign % 2 ? 'black' : 'marbleDark', xa, xb, HEAD, top, z - 0.14, z + 0.14, '+y');
     G.box('brass', xa, xb, HEAD - 0.03, HEAD, z - 0.15, z + 0.15, '+y');
     if (sh.state === 'gutted') continue;
+    if (sh.state === 'grille' && sh.id % 2 === 1) continue; // (un rideau métallique, view/mallProps.js)
     if (sh.state === 'grille') {
       // le rideau à mailles, baissé ; ses coulisses de part et d'autre
       G.vface('grille', xa + 0.06, z, xb - 0.06, z, 0, HEAD - 0.03, 0, out);
@@ -882,7 +887,28 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   }
 
   // 10. Le mobilier, les enseignes, les affiches (view/mallProps.js)
-  const props = drawMallProps({ map, fi, G, MATS, hAt, baked, rooms });
+  // les modèles Poly Haven (CC0, backrooms/models) : une matière cuite par matière du modèle ; « @rust », « @dark »…
+  // teintent la même photo
+  const TINT = { dark: [0.45, 0.43, 0.42], rust: [0.7, 0.5, 0.36], red: [0.9, 0.3, 0.26], pale: [1.15, 1.12, 1.05] };
+  const kitMats = new Map();
+  const kit = createKitInstancer({
+    group,
+    convert: (src, kitName, piece, variant) => {
+      const key = src.uuid + '@' + variant;
+      if (!kitMats.has(key)) {
+        const color = src.color ? src.color.clone().multiplyScalar(0.85) : new THREE.Color('#888888');
+        if (TINT[variant]) color.multiply(new THREE.Color(...TINT[variant]));
+        const m = new THREE.MeshLambertMaterial({ map: src.map || null, color, alphaTest: src.alphaTest || (src.transparent ? 0.5 : 0), side: src.side });
+        kitMats.set(key, { mat: baked(m) });
+      }
+      return kitMats.get(key);
+    },
+  });
+  // model(nom, x, y, z, lacet, échelle, roulis x, roulis z, morceaux) : « * » le modèle entier, « a+b » ces morceaux,
+  // « a » un seul morceau recentré
+  const model = (name, x, y, z, ry = 0, s = 1, rx = 0, rz = 0, piece = '*') => kit.put(name, piece, x, y, z, ry, s, undefined, rx, rz);
+  const props = drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model });
+  kit.build();
   G.build(group);
   // les barreaux : un seul maillage
   if (postsAt.length) {
@@ -1000,6 +1026,12 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
         out.push({ x: L.x, y: L.y, z: L.z, r: L.c[0] * k, g: L.c[1] * k, b: L.c[2] * k, rad: L.rad, nx: L.nx, ny: 0, nz: L.nz, w: -0.2, box: L.box });
       }
     },
-    update() {},
+    // à chaque image : les modèles proches de la caméra (et pas loin derrière elle)
+    update(camera) {
+      camera.getWorldDirection(camDir);
+      const f = Math.hypot(camDir.x, camDir.z) || 1;
+      kit.update(camera.position.x, camera.position.z, camDir.x / f, camDir.z / f, 58);
+    },
   };
 }
+const camDir = new THREE.Vector3();

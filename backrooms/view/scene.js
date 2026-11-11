@@ -4557,6 +4557,7 @@ void main() {
           bakeUniforms.uWaterY.value = water.level;
         }
         if (hotel) hotel.update(sim, P, time, dt);
+        if (mall) mall.update(camera);
 
         // Coupure de courant : les néons meurent d'un coup, puis reviennent en grésillant
         const want = !(sim.blackout > 0);

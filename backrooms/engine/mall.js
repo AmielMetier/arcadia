@@ -727,8 +727,8 @@ export function createMallMap(seed = 17) {
       for (let x = r.x0 * C + 5; x < (r.x1 + 1) * C - 2; x += 10) {
         // (en haut, les files de piliers longent le garde-corps : les bancs sont devant, côté allée)
         for (const z of fi === 0 ? [29.5 * C - 1.1, 34.5 * C + 1.1] : [29.5 * C, 34.5 * C]) {
-          const b = furn(fi, 'bench', x, z, 1.9, 0.55, { m: 0.15, face: z < MZ ? -1 : 1 });
-          if (b && rnd() < 0.5) furn(fi, 'bin', x + 1.45, z, 0.5, 0.5, { round: true, m: 0.1 });
+          const b = furn(fi, 'bench', x, z, 2.45, 0.7, { m: 0.15, face: z < MZ ? -1 : 1 });
+          if (b && rnd() < 0.5) furn(fi, 'bin', x + 1.75, z, 0.6, 0.6, { round: true, m: 0.1, rust: rnd() < 0.4 });
         }
       }
       // en bas, sous le vide : des jardinières, des kiosques fermés, des bancs autour
@@ -737,8 +737,13 @@ export function createMallMap(seed = 17) {
         for (let x = r.x0 * C + 7.5; x < (r.x1 + 1) * C - 5; x += 12.5, k++) {
           if (k % 2 === 0) {
             const p = furn(1, 'planter', x, MZ, 2.2, 2.2, { m: 0.3, plant: Math.floor(rnd() * 3) });
-            if (p) for (const s of [-1, 1]) furn(1, 'bench', x, MZ + s * 1.75, 1.9, 0.55, { m: 0.05, face: s });
-          } else furn(1, 'kiosk', x, MZ, 3.4, 2.2, { m: 0.4, nav: true, sign: Math.floor(rnd() * 4) });
+            if (p) for (const s of [-1, 1]) furn(1, 'bench', x, MZ + s * 1.85, 2.45, 0.7, { m: 0.05, face: s });
+          } else {
+            // un kiosque fermé (rideaux baissés) ou un chariot à café abandonné
+            const sign = Math.floor(rnd() * 4);
+            if (sign < 2) furn(1, 'cart', x, MZ, 2.3, 1.2, { m: 0.4, nav: true, sign, yaw: rnd() * 0.6 - 0.3 });
+            else furn(1, 'kiosk', x, MZ, 3.4, 2.2, { m: 0.4, nav: true, sign });
+          }
         }
       }
     }
@@ -804,6 +809,21 @@ export function createMallMap(seed = 17) {
         if (t && rnd() < 0.12) t.tipped = 1;
       }
   }
+  // un fauteuil roulant, seul, tourné vers une vitrine du mail du bas ; le hall du parking : un coin d'attente (deux
+  // canapés face à face, une table basse, deux fauteuils)
+  {
+    const r = roomsOf(1, RK.MAIL)[0];
+    furn(1, 'wheelchair', r.x0 * C + 14 + rnd() * 6, (MAIL.z1 + 1) * C - 1.3, 0.85, 1.15, { m: 0.2, yaw: 0.15 });
+    const lb = roomsOf(1, RK.LOBBY)[0];
+    if (lb) {
+      const x = lb.x0 * C + 5;
+      const z = (lb.z0 + lb.z1 + 1) * C * 0.5;
+      furn(1, 'sofa', x, z - 1.6, 1.85, 0.85, { m: 0.1, room: lb.id, face: 1 });
+      furn(1, 'sofa', x, z + 1.6, 1.85, 0.85, { m: 0.1, room: lb.id, face: -1 });
+      furn(1, 'ctable', x, z, 1.2, 0.6, { m: 0.05, room: lb.id, solid: false });
+      for (const s of [-1, 1]) furn(1, 'lounge', x + s * 2.0, z, 1.0, 1.2, { m: 0.05, room: lb.id, yaw: s > 0 ? -Math.PI / 2 : Math.PI / 2 });
+    }
+  }
   // le grand magasin : des gondoles en files, des portants, les caisses près du portail
   for (const fi of [0, 1]) {
     for (const r of [...roomsOf(fi, RK.STORE), ...roomsOf(fi, RK.CLOSED)]) {
@@ -857,7 +877,7 @@ export function createMallMap(seed = 17) {
     }
     for (const r of roomsOf(fi, RK.OFFICE)) {
       for (let z = r.z0 * C + 2.5; z < (r.z1 + 1) * C - 2; z += 3.4)
-        for (let x = r.x0 * C + 2.5; x < (r.x1 + 1) * C - 2; x += 3.8) furn(fi, 'desk', x, z, 1.6, 0.8, { m: 0.7, pm: 0.4, room: r.id, yaw: rnd() < 0.2 ? 0.4 : 0 });
+        for (let x = r.x0 * C + 2.5; x < (r.x1 + 1) * C - 2; x += 3.8) furn(fi, 'desk', x, z, 2.0, 0.95, { m: 0.6, pm: 0.4, room: r.id, yaw: rnd() < 0.2 ? 0.4 : 0, security: r.name === 'Security' });
     }
     for (const r of roomsOf(fi, RK.DOCK)) {
       for (let i = 0; i < 22; i++) furn(fi, rnd() < 0.6 ? 'pallet' : 'crate', r.x0 * C + 2 + rnd() * ((r.x1 - r.x0 + 1) * C - 4), r.z0 * C + 2 + rnd() * ((r.z1 - r.z0 + 1) * C - 4), 1.2, 1.0, { m: 0.8, room: r.id, stack: 1 + Math.floor(rnd() * 3) });

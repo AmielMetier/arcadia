@@ -492,8 +492,38 @@ export function createMallTextures() {
   out.wood = tex(woC);
   const [slC, slG] = blank('70,70,72');
   out.slab = tex(slC);
+  // les photos en 1024 px : le velours des fauteuils, le rideau métallique des kiosques, la tôle larmée des paliers
+  const big = (rgb) => {
+    const [c, g] = mk(S);
+    g.fillStyle = `rgb(${rgb})`;
+    g.fillRect(0, 0, S, S);
+    return [c, g];
+  };
+  const [veC, veG] = big('110,24,30');
+  out.velvet = tex(veC);
+  const [ruC, ruG] = big('150,150,146');
+  out.shutter = tex(ruC);
+  const [toC, toG] = big('120,122,124');
+  out.plate = tex(toC);
   out.carpetImg = null;
-  out.ready = Promise.all(['l5_marbre_blanc.jpg', 'l5_marbre_noir.jpg', 'moquette_rase.jpg', 'plafond.jpg', 'l1_mur.jpg', 'l1_sol.jpg', 'l37_mur.jpg', 'l5_noyer.jpg', 'l1_plafond.jpg', 'papier.jpg'].map(loadImage)).then(([mw, mb, moq, pla, mur, sol, fai, noy, dal, pap]) => {
+  const files = ['l5_marbre_blanc.jpg', 'l5_marbre_noir.jpg', 'moquette_rase.jpg', 'plafond.jpg', 'l17_parpaing.jpg', 'l17_beton.jpg', 'l17_faience.jpg', 'l5_noyer.jpg', 'l1_plafond.jpg', 'papier.jpg', 'l17_lino.jpg', 'l5_velours.jpg', 'l17_rideau.jpg', 'l17_tole.jpg'];
+  out.ready = Promise.all(files.map(loadImage)).then(([mw, mb, moq, pla, mur, sol, fai, noy, dal, pap, lin, vel, rid, tol]) => {
+    if (lin) {
+      photo(lg, lin, S, S, 'rgb(236,228,206)');
+      out.lino.needsUpdate = true;
+    }
+    if (vel) {
+      photo(veG, vel, S, S, 'rgb(150,40,46)', 1.05);
+      out.velvet.needsUpdate = true;
+    }
+    if (rid) {
+      photo(ruG, rid, S, S, 'rgb(214,212,206)');
+      out.shutter.needsUpdate = true;
+    }
+    if (tol) {
+      photo(toG, tol, S, S, 'rgb(205,208,212)', 1.1);
+      out.plate.needsUpdate = true;
+    }
     drawTerrazzo(tg, S, mw, mb);
     out.terrazzo.needsUpdate = true;
     drawChecker(cg, S, mw, mb);
@@ -513,15 +543,15 @@ export function createMallTextures() {
       out.ceilTiles.needsUpdate = true;
     }
     if (mur) {
-      photo(blG, mur, 512, 512, 'rgb(212,204,188)');
+      photo(blG, mur, 512, 512, 'rgb(232,226,212)', 1.15);
       out.block.needsUpdate = true;
     }
     if (sol) {
-      photo(coG, sol, 512, 512, 'rgb(170,166,158)');
+      photo(coG, sol, 512, 512, 'rgb(196,192,184)');
       out.concrete.needsUpdate = true;
     }
     if (fai) {
-      photo(faG, fai, 512, 512, 'rgb(232,226,206)');
+      photo(faG, fai, 512, 512, 'rgb(240,236,222)');
       out.faience.needsUpdate = true;
     }
     if (noy) {

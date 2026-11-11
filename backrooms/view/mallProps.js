@@ -4,7 +4,9 @@
 // food court (comptoirs et leurs menus lumineux, tables rondes, chaises renversées) ; le grand magasin (gondoles,
 // portants, mannequins) ; le cinéma (confiserie, bornes d'arcade, cordons, fauteuils rouges, écrans) ; toilettes,
 // bureaux, quais, locaux techniques. Tout passe par le constructeur de mall.js (G) : une géométrie par matière.
-// Les noms (boutiques, stands, films) sont inventés.
+// Les noms (boutiques, stands, films) sont inventés. Les objets réels (bancs, poubelles, chaises, caisses, plantes,
+// téléviseurs, cabines téléphoniques, climatiseurs…) sont des modèles Poly Haven (CC0, backrooms/models), posés par
+// model() (view/kit.js : les exemplaires proches seulement).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL_SIZE as C } from '../engine/map.js';
 
@@ -202,7 +204,7 @@ function directoryTex(name) {
 }
 
 // --- Le mobilier ---
-export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms }) {
+export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
   const furn = map.furn || [];
   // les matières propres au mobilier
   const lam = (o) => new THREE.MeshLambertMaterial(o);
@@ -234,17 +236,6 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms }) {
     if (yaw) geo.rotateY(yaw);
     G.add(k, geo.translate(x, y, z));
   };
-  const chairAt = (x, z, yaw, tipped = false) => {
-    const parts = [
-      ['plastic', new THREE.BoxGeometry(0.44, 0.04, 0.42).translate(0, 0.45, 0)],
-      ['plastic', new THREE.BoxGeometry(0.44, 0.42, 0.04).translate(0, 0.68, -0.2)],
-      ...[[-0.19, -0.18], [0.19, -0.18], [-0.19, 0.18], [0.19, 0.18]].map(([a, b]) => ['steel', new THREE.CylinderGeometry(0.014, 0.014, 0.45, 6).translate(a, 0.225, b)]),
-    ];
-    for (const [k, g] of parts) {
-      if (tipped) g.rotateX(-Math.PI / 2).translate(0, 0.22, 0.45);
-      put(k, g, x, 0, z, yaw);
-    }
-  };
   let si = 0;
   const signs = map.shops && map.shops.length ? signAtlas(map.shops) : null;
   const menus = menuAtlas();
@@ -267,57 +258,93 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms }) {
   };
   const lights = []; // les feux de couleur du mobilier (bornes d'arcade allumées)
 
+  // --- les modèles (Poly Haven, CC0) : leur avant est +z, sauf mention ---
+  const PI = Math.PI;
+  const front = (it) => {
+    const f = it.face || 1;
+    return it.rot ? [f, 0] : [0, f];
+  };
+  const yawZ = (F) => Math.atan2(F[0], F[1]); // un modèle dont l'avant est +z, tourné vers F
+  // pose un modèle dont le centre de l'emprise est (ox, oz) dans son propre repère, centré en (cx, cz)
+  const placeAt = (name, cx, y, cz, yaw, ox = 0, oz = 0, s = 1, rx = 0, rz = 0, piece = '*') => {
+    const c = Math.cos(yaw);
+    const sn = Math.sin(yaw);
+    const k = Array.isArray(s) ? s : [s, s, s];
+    model(name, cx - (ox * k[0] * c + oz * k[2] * sn), y, cz - (-ox * k[0] * sn + oz * k[2] * c), yaw, s, rx, rz, piece);
+  };
+  const rand = (i, k = 0) => {
+    const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
+    return v - Math.floor(v);
+  };
+  // ce qu'on pose sur une table de présentation, selon le commerce
+  const SHOW = {
+    toys: [['rubber_duck_toy', 1.6], ['rubber_duck_toy', 1.6], ['cardboard_box_01', 0.6]],
+    kids: [['rubber_duck_toy', 1.6], ['cardboard_box_01', 0.6]],
+    music: [['boombox', 0.9], ['cardboard_box_01', 0.5]],
+    electronics: [['television_02', 1], ['boombox', 0.9], ['Television_01', 0.85]],
+    video: [['Television_01', 0.85], ['television_02', 1]],
+    gifts: [['ceramic_vase_01', 1], ['antique_ceramic_vase_01', 1], ['marble_bust_01', 0.8]],
+    jewelry: [['ceramic_vase_01', 0.8], ['mantel_clock_01', 1]],
+    watches: [['mantel_clock_01', 1], ['wall_clock', 1]],
+    florist: [['potted_plant_04', 2.2], ['potted_plant_04', 2.2], ['ceramic_vase_01', 1]],
+    kitchen: [['ceramic_vase_01', 1], ['antique_ceramic_vase_01', 0.9]],
+    luggage: [['vintage_suitcase', 0.55]],
+    perfume: [['ceramic_vase_01', 0.6], ['ceramic_vase_01', 0.5]],
+  };
+  const shopOf = (it) => (it.shop !== undefined && map.shops ? map.shops.find((s) => s.id === it.shop) : null);
+
   for (const it of furn) {
     const hw = it.w / 2;
     const hd = it.d / 2;
+    const F = front(it);
+    const P = frame(it);
     switch (it.kind) {
       case 'bench': {
-        lbox('wood', it, -hw, hw, 0.42, 0.47, -hd, hd - 0.05);
-        lbox('wood', it, -hw, hw, 0.55, 0.86, -hd, -hd + 0.05);
-        for (const lx of [-hw + 0.15, hw - 0.15]) {
-          lbox('black', it, lx - 0.03, lx + 0.03, 0, 0.42, -hd + 0.05, hd - 0.1);
-          lbox('black', it, lx - 0.03, lx + 0.03, 0.42, 0.86, -hd, -hd + 0.06);
-        }
+        // un banc à lattes de bois sur pieds de fonte (le banc à dossier de « modular_street_seating »)
+        placeAt('modular_street_seating', it.x, 0, it.z, yawZ(F), -1.135, 0.03, 1, 0, 0, 'legs_single+seat+seat_back+back_support_r+back_support_l+crossbar+legs_double');
         break;
       }
       case 'bin':
-        put('steel', new THREE.CylinderGeometry(0.24, 0.22, 0.8, 18, 1, true), it.x, 0.4, it.z);
-        put('black', new THREE.CylinderGeometry(0.255, 0.255, 0.07, 18), it.x, 0.8, it.z);
+        model('metal_trash_can', it.x, 0, it.z, rand(it.id) * 6.28, 1, 0, 0, it.rust ? 'metal_trash_can_rust' : 'metal_trash_can');
         break;
       case 'planter': {
         lbox('marbleDark', it, -hw, hw, 0, 0.62, -hd, hd, '-y+y');
         lbox('trim', it, -hw - 0.04, hw + 0.04, 0.62, 0.68, -hd - 0.04, hd + 0.04, '-y');
         lbox('soil', it, -hw + 0.06, hw - 0.06, 0.55, 0.6, -hd + 0.06, hd - 0.06, '-y');
+        const a = rand(it.id) * 6.28;
         if (it.plant === 0) {
-          // un palmier mort : le tronc, des palmes brunes qui pendent
-          put('wood', new THREE.CylinderGeometry(0.09, 0.14, 2.6, 10), it.x, 0.6 + 1.3, it.z);
-          for (let i = 0; i < 7; i++) {
-            const a = (i / 7) * Math.PI * 2;
-            const g = new THREE.PlaneGeometry(0.28, 1.5).translate(0, -0.75, 0).rotateX(-0.9 - (i % 3) * 0.2);
-            put('frond', g, it.x, 3.15, it.z, a);
-          }
+          // un arbre mort, debout, et un autre plus petit
+          model('dead_quiver_trunk', it.x + 0.2, 0.5, it.z - 0.1, a, 1.55);
+          model('dead_quiver_trunk', it.x - 0.45, 0.5, it.z + 0.35, a + 2, 0.8, 0.12, 0.08);
         } else if (it.plant === 1) {
-          // des tiges sèches
-          for (let i = 0; i < 9; i++) put('wood', new THREE.CylinderGeometry(0.012, 0.02, 0.9 + (i % 3) * 0.3, 5), it.x + Math.cos(i) * 0.3, 1.0, it.z + Math.sin(i * 1.7) * 0.3, i, 0.2 + (i % 4) * 0.1);
+          // des plantes en plastique, toujours vertes (le pot est caché dans la jardinière)
+          model('potted_plant_02', it.x, 0.6 - 0.34 * 2.3, it.z, a, 2.3);
+        } else {
+          // un tronc mort, couché dans la terre, quelques plantes grasses
+          model('dead_quiver_trunk', it.x - 0.15, 0.66, it.z + 0.85, a, 0.85, 0, 1.45);
+          for (let i = 0; i < 3; i++) model('potted_plant_04', it.x + 0.5 - i * 0.45, 0.6 - 0.15 * 2.4, it.z - 0.4 + (i % 2) * 0.5, a + i, 2.4, 0, 0, 'potted_plant_04_plant+potted_plant_04_dirt');
         }
         break;
       }
+      case 'cart':
+        // un chariot à café, ses machines encore dessus
+        model('CoffeeCart_01', it.x + 0.3, 0, it.z, (it.yaw || 0) + PI / 2, 1.05);
+        break;
       case 'kiosk': {
         lbox('trim', it, -hw, hw, 0, 1.0, -hd, hd);
         lbox('marbleDark', it, -hw - 0.06, hw + 0.06, 1.0, 1.05, -hd - 0.06, hd + 0.06);
         for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) lbox('brass', it, a * (hw - 0.05) - 0.04, a * (hw - 0.05) + 0.04, 1.05, 2.35, b * (hd - 0.05) - 0.04, b * (hd - 0.05) + 0.04, '+y-y');
-        // les volets roulants baissés, le toit
-        lbox('steel', it, -hw + 0.08, hw - 0.08, 1.05, 2.35, -hd + 0.08, hd - 0.08, '-y');
+        // les rideaux métalliques baissés, le toit
+        lbox('shutter', it, -hw + 0.08, hw - 0.08, 1.05, 2.35, -hd + 0.08, hd - 0.08, '-y');
         lbox('trim', it, -hw - 0.2, hw + 0.2, 2.35, 2.62, -hd - 0.2, hd + 0.2);
         lbox('brass', it, -hw - 0.21, hw + 0.21, 2.44, 2.5, -hd - 0.21, hd + 0.21, '+y-y');
+        model('WetFloorSign_01', it.x + hw + 0.5, 0, it.z + 0.3, 0.6);
         break;
       }
       case 'directory': {
         for (const lx of [-hw + 0.08, hw - 0.08]) lbox('black', it, lx - 0.04, lx + 0.04, 0, 2.15, -0.04, 0.04, '-y');
         lbox('black', it, -hw, hw, 0.45, 2.1, -hd, hd);
-        // les deux faces éclairées
         for (const s of [-1, 1]) {
-          const P = frame(it);
           const [x, z] = P(0, s * (hd + 0.004));
           const n = P(0, s);
           panel('directory', [0, 0, 1, 1], x, 1.28, z, it.w - 0.14, 1.52, n[0] - it.x, n[1] - it.z);
@@ -326,7 +353,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms }) {
       }
       case 'fountain': {
         const R = it.w / 2;
-        const oct = (r) => Array.from({ length: 8 }, (_, i) => [it.x + Math.cos(((i + 0.5) / 8) * Math.PI * 2) * r, it.z + Math.sin(((i + 0.5) / 8) * Math.PI * 2) * r]);
+        const oct = (r) => Array.from({ length: 8 }, (_, i) => [it.x + Math.cos(((i + 0.5) / 8) * PI * 2) * r, it.z + Math.sin(((i + 0.5) / 8) * PI * 2) * r]);
         const O = oct(R);
         const I = oct(R - 0.35);
         for (let i = 0; i < 8; i++) {
@@ -344,75 +371,114 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms }) {
         put('trim', new THREE.CylinderGeometry(0.32, 0.45, 1.3, 16), it.x, 0.12 + 0.65, it.z);
         put('trim', new THREE.CylinderGeometry(1.3, 0.5, 0.3, 24), it.x, 1.5, it.z);
         put('soil', new THREE.CylinderGeometry(1.15, 1.15, 0.02, 24), it.x, 1.65, it.z);
+        // ce qu'on a jeté dans le bassin à sec
+        model('trashbag', it.x + 1.6, 0.12, it.z - 1.2, rand(it.id) * 6, 0.9);
+        model('plastic_crate_01', it.x - 1.9, 0.12, it.z + 0.8, 0.7, 1, 0, 0.3);
         break;
       }
       case 'chair':
-        chairAt(it.x, it.z, it.yaw || 0);
+        model('plastic_monobloc_chair_01', it.x, 0, it.z, it.yaw || 0);
+        break;
+      case 'wheelchair':
+        model('wheelchair_01', it.x, 0, it.z, it.yaw || 0);
+        break;
+      case 'sofa':
+        placeAt('sofa_02', it.x, 0, it.z, yawZ(F), 0, -0.07, 1.02);
+        break;
+      case 'lounge':
+        model('mid_century_lounge_chair', it.x, 0, it.z, it.yaw || 0);
+        model('side_table_01', it.x, 0, it.z + 1.0, it.yaw || 0);
+        break;
+      case 'ctable':
+        model('modern_coffee_table_01', it.x, 0, it.z, PI / 2);
+        model('television_02', it.x + 0.1, 0.39, it.z, PI * 0.8, 0.7);
         break;
       case 'shelf': {
-        lbox('paintGrey', it, -hw, hw, 0, 2.0, -hd, -hd + 0.03);
-        for (const lx of [-hw, hw - 0.03]) lbox('steel', it, lx, lx + 0.03, 0, 2.0, -hd, hd);
-        for (let k = 0; k < 5; k++) lbox('steel', it, -hw, hw, 0.12 + k * 0.45, 0.15 + k * 0.45, -hd, hd);
-        // ce qui reste sur les étagères
-        for (let k = 0; k < 4; k++)
-          for (let i = 0; i < 6; i++) {
-            if ((it.id * 7 + k * 3 + i * 5) % 4) continue;
-            const lx = -hw + 0.3 + (i / 6) * (it.w - 0.6);
-            lbox('carton', it, lx - 0.12, lx + 0.12, 0.15 + k * 0.45, 0.15 + k * 0.45 + 0.22, -hd + 0.06, hd - 0.1);
+        // des étagères contre les murs : trois éléments côte à côte
+        const yaw = yawZ(F);
+        const sh = shopOf(it);
+        const wood = sh && ['books', 'gifts', 'florist', 'kitchen', 'candy', 'cards', 'toys', 'kids'].includes(sh.trade);
+        if (sh && ['pharmacy', 'sports', 'outdoor', 'electronics', 'video'].includes(sh.trade)) {
+          for (let i = 0; i < 5; i++) {
+            const [x, z] = P(-1.2 + i * 0.6, 0);
+            model('steel_frame_shelves_02', x, 0, z, yaw);
           }
-        break;
-      }
-      case 'counter':
-        lbox('wood', it, -hw, hw, 0, 1.0, -hd, hd, '-y');
-        lbox('marbleDark', it, -hw - 0.03, hw + 0.03, 1.0, 1.04, -hd - 0.03, hd + 0.03);
-        lbox('black', it, -0.2, 0.2, 1.04, 1.2, -0.15, 0.15, '-y');
-        break;
-      case 'rack': {
-        put('steel', new THREE.CylinderGeometry(0.3, 0.3, 0.03, 16), it.x, 0.015, it.z);
-        put('steel', new THREE.CylinderGeometry(0.02, 0.02, 1.35, 6), it.x, 0.68, it.z);
-        put('steel', new THREE.TorusGeometry(0.52, 0.015, 6, 28).rotateX(Math.PI / 2), it.x, 1.35, it.z);
-        const n = (it.id * 5) % 9;
-        for (let i = 0; i < n; i++) {
-          const a = (i / 9) * Math.PI * 2 + it.id;
-          put(i % 2 ? 'cloth' : 'cloth2', new THREE.BoxGeometry(0.4, 0.75, 0.04), it.x + Math.cos(a) * 0.52, 0.95, it.z + Math.sin(a) * 0.52, -a);
+          break;
+        }
+        for (const lx of [-1.15, 0, 1.15]) {
+          const [x, z] = P(lx, -hd + 0.13);
+          if (wood) placeAt('wooden_display_shelves_01', x, 0, z, yaw - PI / 2, 0, 0, [1, 1.15, 1.04]);
+          else placeAt('Shelf_01', x, 0, z, yaw, 0, 0.13, [1.1, 1, 1]);
         }
         break;
       }
-      case 'table':
+      case 'counter': {
+        lbox('wood', it, -hw, hw, 0, 1.0, -hd, hd, '-y');
+        lbox('marbleDark', it, -hw - 0.03, hw + 0.03, 1.0, 1.04, -hd - 0.03, hd + 0.03);
+        const sh = shopOf(it);
+        model('CashRegister_01', it.x - 0.3, 1.04, it.z, sh && sh.dir > 0 ? PI : 0);
+        break;
+      }
+      case 'rack': {
+        put('steel', new THREE.CylinderGeometry(0.3, 0.3, 0.03, 16), it.x, 0.015, it.z);
+        put('steel', new THREE.CylinderGeometry(0.02, 0.02, 1.35, 6), it.x, 0.68, it.z);
+        put('steel', new THREE.TorusGeometry(0.52, 0.015, 6, 28).rotateX(PI / 2), it.x, 1.35, it.z);
+        const n = (it.id * 5) % 9;
+        for (let i = 0; i < n; i++) {
+          const a = (i / 9) * PI * 2 + it.id;
+          put(i % 2 ? 'cloth' : 'cloth2', new THREE.BoxGeometry(0.42, 0.78, 0.05), it.x + Math.cos(a) * 0.52, 0.95, it.z + Math.sin(a) * 0.52, -a);
+          put('steel', new THREE.TorusGeometry(0.05, 0.006, 4, 10, PI), it.x + Math.cos(a) * 0.52, 1.36, it.z + Math.sin(a) * 0.52, -a);
+        }
+        break;
+      }
+      case 'table': {
         lbox('wood', it, -hw, hw, 0.78, 0.84, -hd, hd);
         lbox('wood', it, -hw + 0.05, hw - 0.05, 0, 0.78, -hd + 0.05, hd - 0.05, '+y-y');
-        if (it.id % 3) lbox('carton', it, -0.3, 0.1, 0.84, 1.0, -0.2, 0.15, '-y');
+        const sh = shopOf(it);
+        if (sh && sh.trade === 'salon') {
+          // le salon de coiffure : des fauteuils de barbier à la place des tables
+          model('BarberShopChair_01', it.x, 0, it.z, yawZ([0, -sh.dir]) + (rand(it.id) - 0.5) * 0.6);
+          break;
+        }
+        const list = (sh && SHOW[sh.trade]) || [['cardboard_box_01', 0.6]];
+        const n = 1 + (it.id % 3);
+        for (let i = 0; i < n; i++) {
+          const [name, s] = list[(it.id + i) % list.length];
+          model(name, it.x - hw + 0.35 + (i * (it.w - 0.7)) / Math.max(1, n - 1 || 1), 0.84, it.z + (rand(it.id, i) - 0.5) * 0.3, rand(it.id, i + 3) * 6.28, s);
+        }
         break;
+      }
       case 'debris':
         for (let i = 0; i < 6; i++) {
           const a = it.id * 3 + i;
           put(i % 3 === 0 ? 'ceilTiles' : i % 3 === 1 ? 'block' : 'plaster', new THREE.BoxGeometry(0.3 + (a % 4) * 0.12, 0.04 + (a % 3) * 0.05, 0.3 + (a % 5) * 0.1), it.x + ((a * 37) % 100) / 100 - 0.5, 0.04, it.z + ((a * 61) % 100) / 100 - 0.5, a, (a % 3) * 0.1);
         }
+        model('cardboard_box_01', it.x + 0.6, 0, it.z - 0.3, rand(it.id) * 6, 1.1, 0, it.id % 2 ? 1.57 : 0);
+        if (it.id % 2) model('trashbag', it.x - 0.5, 0, it.z + 0.4, rand(it.id, 1) * 6);
         break;
-      case 'ladder': {
-        for (const s of [-1, 1]) {
-          G.beam('steel', [it.x - 0.25, 0, it.z + s * 0.6], [it.x - 0.25, 1.9, it.z], 0.05, 0.03);
-          G.beam('steel', [it.x + 0.25, 0, it.z + s * 0.6], [it.x + 0.25, 1.9, it.z], 0.05, 0.03);
-        }
-        for (let k = 1; k < 6; k++) G.beam('steel', [it.x - 0.25, k * 0.3, it.z + 0.6 - k * 0.095], [it.x + 0.25, k * 0.3, it.z + 0.6 - k * 0.095], 0.03, 0.03);
+      case 'ladder':
+        model('wooden_ladder', it.x, 0, it.z, rand(it.id) * 6.28, 1.4);
         break;
-      }
       case 'stall':
         if (it.toilet) {
-          // une cabine : deux cloisons, une porte entrouverte, la cuvette
           for (const lx of [-hw, hw - 0.03]) lbox('paintGrey', it, lx, lx + 0.03, 0.15, 2.0, -hd, hd);
           lbox('paintGrey', it, -hw, -hw + 0.5, 0.15, 2.0, -hd, -hd + 0.03);
-          const [tx, tz] = frame(it)(0, hd - 0.4);
+          const [tx, tz] = P(0, hd - 0.4);
           put('plastic', new THREE.CylinderGeometry(0.2, 0.16, 0.42, 14), tx, 0.21, tz);
+          put('plastic', new THREE.BoxGeometry(0.42, 0.36, 0.18), tx, 0.6, tz + 0.3);
         } else {
-          // un stand du food court : le comptoir, l'auvent, le menu lumineux (un sur trois éteint)
           lbox('trim', it, -hw, hw, 0, 1.05, -hd, hd, '-y');
           lbox('steel', it, -hw - 0.03, hw + 0.03, 1.05, 1.09, -hd - 0.05, hd + 0.03);
           lbox('trim', it, -hw, hw, 3.3, 3.75, -hd - 0.1, -hd + 0.6);
-          const P = frame(it);
           const [x, z] = P(0, -hd - 0.08);
           panel(it.sign % 3 === 2 ? 'menusOff' : 'menus', menus.uv(it.sign), x, 2.75, z, it.w - 0.6, 0.95, P(0, 1)[0] - it.x, P(0, 1)[1] - it.z);
           for (const lx of [-hw + 0.04, hw - 0.04]) lbox('trim', it, lx - 0.04, lx + 0.04, 1.05, 3.3, -hd - 0.1, -hd);
+          // la caisse sur le comptoir, des tabourets de bar devant (un renversé)
+          model('CashRegister_01', it.x - hw + 0.8, 1.09, it.z, PI);
+          for (let i = 0; i < 3; i++) {
+            const tip = (it.sign + i) % 5 === 0;
+            model('bar_chair_round_01', it.x - 1.6 + i * 1.6, tip ? 0.24 : 0, it.z + hd + 0.55 + (tip ? 0.3 : 0), rand(it.id, i) * 6, 1, tip ? PI / 2 : 0);
+          }
         }
         break;
       case 'diner': {
@@ -421,8 +487,12 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms }) {
         put('black', new THREE.CylinderGeometry(0.28, 0.32, 0.03, 16), it.x, 0.015, it.z);
         for (let i = 0; i < 4; i++) {
           if (!((it.chairs >> i) & 1)) continue;
-          const a = (i / 4) * Math.PI * 2 + it.id * 0.3;
-          chairAt(it.x + Math.cos(a) * 0.95, it.z + Math.sin(a) * 0.95, Math.PI / 2 - a + Math.PI, it.tipped && i === 0);
+          const a = (i / 4) * PI * 2 + it.id * 0.3;
+          const cx = it.x + Math.cos(a) * 0.95;
+          const cz = it.z + Math.sin(a) * 0.95;
+          const yaw = Math.atan2(-Math.cos(a), -Math.sin(a)) + (rand(it.id, i) - 0.5) * 0.5;
+          if (it.tipped && i === 0) model('plastic_monobloc_chair_01', cx, 0.34, cz, yaw, 1, -PI / 2);
+          else model('plastic_monobloc_chair_01', cx, 0, cz, yaw);
         }
         if (it.tipped) put('plastic', new THREE.CylinderGeometry(0.62, 0.62, 0.035, 24).rotateX(1.35), it.x + 0.4, 0.62, it.z);
         break;
@@ -434,10 +504,13 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms }) {
         for (let k = 1; k < 4; k++) for (const s of [-1, 1]) lbox('steel', it, -hw, hw, 0.12 + k * 0.42, 0.15 + k * 0.42, s > 0 ? 0.03 : -hd, s > 0 ? hd : -0.03);
         if (!it.empty)
           for (let k = 0; k < 4; k++)
-            for (let i = 0; i < 8; i++) {
+            for (let i = 0; i < 7; i++) {
               if ((it.id + k * 3 + i * 7) % 3 === 0) continue;
-              const lx = -hw + 0.4 + (i / 8) * (it.w - 0.8);
-              for (const s of [-1, 1]) lbox('carton', it, lx - 0.13, lx + 0.13, 0.15 + k * 0.42, 0.15 + k * 0.42 + 0.25, s > 0 ? 0.08 : -hd + 0.05, s > 0 ? hd - 0.05 : -0.08);
+              const lx = -hw + 0.45 + (i / 7) * (it.w - 0.9);
+              // (des cartons simples : le modèle de carton, 17 000 triangles, posé par milliers coûterait trop cher)
+              const h = 0.16 + ((it.id + i + k) % 3) * 0.05;
+              const y0 = 0.15 + k * 0.42;
+              for (const s of [-1, 1]) lbox((i + k) % 4 ? 'carton' : 'cloth2', it, lx - 0.14, lx + 0.14, y0, y0 + h, s > 0 ? 0.1 : -hd + 0.06, s > 0 ? hd - 0.06 : -0.1, '-y');
             }
         break;
       }
@@ -445,23 +518,20 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms }) {
         const y = it.yaw || 0;
         put('steel', new THREE.CylinderGeometry(0.22, 0.22, 0.03, 16), it.x, 0.015, it.z);
         put('steel', new THREE.CylinderGeometry(0.015, 0.015, 0.25, 6), it.x, 0.14, it.z);
-        put('plastic', new THREE.CylinderGeometry(0.055, 0.05, 0.85, 8).translate(-0.09, 0, 0), it.x, 0.68, it.z, y);
-        put('plastic', new THREE.CylinderGeometry(0.055, 0.05, 0.85, 8).translate(0.09, 0, 0), it.x, 0.68, it.z, y);
-        put('plastic', new THREE.CylinderGeometry(0.19, 0.15, 0.62, 12).scale(1, 1, 0.65), it.x, 1.42, it.z, y);
-        put('plastic', new THREE.SphereGeometry(0.11, 12, 10).scale(0.85, 1.1, 0.95), it.x, 1.86, it.z, y);
-        put('plastic', new THREE.CylinderGeometry(0.04, 0.035, 0.6, 6).translate(-0.24, 0, 0).rotateZ(0.12), it.x, 1.42, it.z, y);
+        const body = new THREE.LatheGeometry([[0.0, 0], [0.11, 0.02], [0.13, 0.25], [0.16, 0.5], [0.13, 0.62], [0.17, 0.82], [0.2, 1.0], [0.12, 1.08], [0.05, 1.12], [0.05, 1.18], [0.0, 1.2]].map(([r, h]) => new THREE.Vector2(r, h)), 16).scale(1, 1, 0.7);
+        put('plastic', body, it.x, 0.27, it.z, y);
+        put('plastic', new THREE.SphereGeometry(0.11, 14, 12).scale(0.85, 1.12, 0.95), it.x, 1.6, it.z, y);
+        for (const s of [-1, 1]) put('plastic', new THREE.CylinderGeometry(0.04, 0.03, 0.62, 8).translate(s * 0.23, 0, 0).rotateZ(s * 0.1), it.x, 1.0, it.z, y);
         break;
       }
       case 'concession': {
         lbox('marbleDark', it, -hw, hw, 0, 1.05, -hd, hd, '-y');
         lbox('steel', it, -hw - 0.03, hw + 0.03, 1.05, 1.09, -hd - 0.03, hd + 0.03);
         lbox('glass', it, -hw + 0.2, hw - 0.2, 1.09, 1.5, hd - 0.12, hd - 0.1);
-        // la machine à pop-corn, vide
         lbox('led', it, hw - 1.4, hw - 0.6, 1.09, 1.14, -0.3, 0.3, '-y');
         lbox('glass', it, hw - 1.4, hw - 0.6, 1.14, 1.9, -0.3, 0.3, '-y');
         lbox('red', it, hw - 1.45, hw - 0.55, 1.9, 2.05, -0.35, 0.35, '-y');
-        // les menus au mur
-        const P = frame(it);
+        for (let i = 0; i < 2; i++) model('CashRegister_01', it.x - hw + 1.5 + i * 3, 1.09, it.z, PI);
         for (let i = 0; i < 3; i++) {
           const [x, z] = P(-hw + 1.5 + i * 3, -hd - 0.12 + 0.02);
           panel(i === 1 ? 'menusOff' : 'menus', menus.uv(7 + i), x, 3.0, z, 2.6, 0.7, P(0, 1)[0] - it.x, P(0, 1)[1] - it.z);
@@ -470,7 +540,6 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms }) {
       }
       case 'arcade': {
         lbox('black', it, -hw, hw, 0, 1.85, -hd, hd);
-        const P = frame(it);
         const [x, z] = P(0, hd + 0.004);
         const n = P(0, 1);
         const glow = it.lit ? (it.id % 2 ? 'arcadeGlow' : 'arcadeGlow2') : 'black';
@@ -496,21 +565,23 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms }) {
         }
         break;
       case 'seats': {
-        // une rangée de fauteuils rouges (tournés vers +x : l'écran est à l'est)
+        // une rangée de fauteuils de velours rouge, accoudoirs noirs (tournés vers l'écran, à l'est)
         const n = Math.floor(it.w / 0.56);
         for (let i = 0; i < n; i++) {
           const lx = -hw + 0.28 + i * 0.56;
-          lbox('red', it, lx - 0.25, lx + 0.25, 0.38, 0.5, -0.25, 0.22);
-          lbox('red', it, lx - 0.25, lx + 0.25, 0.4, 1.05, -0.31, -0.18);
-          lbox('black', it, lx + 0.25, lx + 0.31, 0, 0.66, -0.3, 0.22);
+          const up = (it.id * 7 + i * 3) % 11 === 0; // un siège relevé
+          if (up) lbox('velvet', it, lx - 0.24, lx + 0.24, 0.3, 0.75, -0.2, -0.1);
+          else lbox('velvet', it, lx - 0.24, lx + 0.24, 0.36, 0.5, -0.24, 0.24);
+          lbox('velvet', it, lx - 0.25, lx + 0.25, 0.42, 1.08, -0.33, -0.16);
+          lbox('black', it, lx + 0.25, lx + 0.31, 0, 0.68, -0.32, 0.24);
+          lbox('black', it, lx + 0.24, lx + 0.32, 0.64, 0.7, -0.3, 0.26);
         }
-        lbox('black', it, -hw - 0.03, -hw + 0.03, 0, 0.66, -0.3, 0.22);
+        lbox('black', it, -hw - 0.03, -hw + 0.03, 0, 0.68, -0.32, 0.24);
         break;
       }
       case 'sinks': {
         lbox('marbleDark', it, -hw, hw, 0.82, 0.88, -hd, hd);
         lbox('paintGrey', it, -hw, hw, 0, 0.82, -hd + 0.05, -hd + 0.1);
-        const P = frame(it);
         for (let i = 0; i < 3; i++) {
           const [x, z] = P(-hw + 0.9 + i * 1.6, 0.05);
           put('plastic', new THREE.CylinderGeometry(0.2, 0.14, 0.12, 14), x, 0.84, z);
@@ -520,30 +591,130 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms }) {
         break;
       }
       case 'desk': {
+        // un bureau métallique, sa chaise, un écran ; au poste de sécurité, des moniteurs empilés
         const y = it.yaw || 0;
-        put('wood', new THREE.BoxGeometry(1.6, 0.04, 0.8), it.x, 0.74, it.z, y);
-        put('steel', new THREE.BoxGeometry(0.04, 0.72, 0.76).translate(-0.76, 0, 0), it.x, 0.36, it.z, y);
-        put('steel', new THREE.BoxGeometry(0.4, 0.72, 0.76).translate(0.58, 0, 0), it.x, 0.36, it.z, y);
-        put('plastic', new THREE.BoxGeometry(0.42, 0.36, 0.4).translate(-0.3, 0.2, -0.1), it.x, 0.76, it.z, y);
-        put('black', new THREE.BoxGeometry(0.36, 0.28, 0.01).translate(-0.3, 0.2, 0.105), it.x, 0.76, it.z, y);
-        put('black', new THREE.CylinderGeometry(0.24, 0.24, 0.06, 12).translate(0, 0, 0.75), it.x, 0.46, it.z, y);
-        put('black', new THREE.BoxGeometry(0.44, 0.5, 0.06).translate(0, 0.25, 0.98), it.x, 0.5, it.z, y);
+        model('metal_office_desk', it.x, 0, it.z, y);
+        const c = Math.cos(y);
+        const s = Math.sin(y);
+        const at = (lx, lz) => [it.x + lx * c + lz * s, it.z - lx * s + lz * c];
+        const [chx, chz] = at(0.1, 0.8);
+        if (it.id % 4 !== 1) model(it.id % 3 ? 'SchoolChair_01' : 'modern_arm_chair_01', chx, 0, chz, y + PI + (rand(it.id) - 0.5) * 0.8);
+        const [tx, tz] = at(-0.35, -0.1);
+        model('Television_01', tx, 0.79, tz, y, 0.75);
+        if (it.security) {
+          const [ux, uz] = at(0.35, -0.12);
+          model('television_02', ux, 0.79, uz, y - 0.15);
+          model('television_02', ux, 0.79 + 0.41, uz, y - 0.1);
+        } else if (it.id % 3 === 0) model('cardboard_box_01', ...at(0.55, 0.05).flatMap((v, i) => (i ? [0.79, v] : [v])), y + 0.3, 0.8);
         break;
       }
-      case 'pallet':
+      case 'pallet': {
         lbox('wood', it, -hw, hw, 0, 0.14, -hd, hd);
-        for (let k = 0; k < (it.stack || 1); k++) lbox('carton', it, -hw + 0.1, hw - 0.1, 0.14 + k * 0.5, 0.62 + k * 0.5, -hd + 0.1, hd - 0.1, '-y');
+        const st = it.stack || 1;
+        for (let k = 0; k < st; k++)
+          for (const [lx, lz] of [[-0.29, -0.23], [0.29, -0.23], [-0.29, 0.23], [0.29, 0.23]]) {
+            if (k === st - 1 && Math.abs(it.id + lx * 10 + lz * 7) % 3 < 1) continue;
+            const y0 = 0.14 + k * 0.4;
+            lbox('carton', it, lx - 0.27, lx + 0.27, y0, y0 + 0.38, lz - 0.21, lz + 0.21, '-y');
+          }
+        if (it.id % 4 === 0) model('cardboard_box_01', it.x + 0.9, 0, it.z + 0.2, rand(it.id) * 6, 1.1, 0, 1.57);
         break;
-      case 'crate':
-        for (let k = 0; k < Math.min(2, it.stack || 1); k++) lbox('wood', it, -hw + k * 0.05, hw - k * 0.05, k * 1.0, k * 1.0 + 0.98, -hd + k * 0.05, hd - k * 0.05);
+      }
+      case 'crate': {
+        const st = Math.min(3, it.stack || 1);
+        if (it.id % 5 === 0) model('industrial_storage_cart', it.x, 0, it.z, rand(it.id) * 0.4, 0.75);
+        else if (it.id % 5 === 1) for (let k = 0; k < st; k++) model('plastic_crate_03', it.x, k * 0.27, it.z, rand(it.id, k) * 0.3, 1.8);
+        else if (it.id % 5 === 2) model('hand_truck', it.x, 0, it.z, rand(it.id) * 6);
+        else for (let k = 0; k < st; k++) model('wooden_crate_02', it.x, k * 0.45, it.z, PI / 2 + rand(it.id, k) * 0.2, 1);
         break;
-      case 'machine':
-        lbox('steel', it, -hw, hw, 0, 2.2, -hd, hd);
-        lbox('paintGrey', it, -hw + 0.3, -hw + 1.0, 0.8, 1.7, hd, hd + 0.02, '-y');
-        for (let k = 0; k < 3; k++) G.beam('black', [it.x - hw + 0.4 + k * 1.2, 2.2, it.z], [it.x - hw + 0.4 + k * 1.2, (hAt(Math.floor(it.x / C), Math.floor(it.z / C)) || 3) - 0.05, it.z], 0.18, 0.18);
+      }
+      case 'machine': {
+        // des groupes de climatisation, une armoire électrique, des gaines jusqu'au plafond
+        const yaw = it.z < (map.H * C) / 2 ? 0 : PI;
+        for (const s of [-1, 1]) model('exterior_aircon_unit', it.x + s * 1.0, 0.64, it.z, yaw, 2.0, 0, 0, (it.id + s) % 3 ? 'exterior_aircon_unit_rusted' : 'exterior_aircon_unit');
+        model('utility_box_01', it.x + 2.3, 0, it.z, yaw);
+        for (let k = 0; k < 2; k++) G.beam('steel', [it.x - 1.0 + k * 2.0, 1.86, it.z], [it.x - 1.0 + k * 2.0, (hAt(Math.floor(it.x / C), Math.floor(it.z / C)) || 3) - 0.05, it.z], 0.42, 0.3);
         break;
+      }
       default:
         break;
+    }
+  }
+
+  // --- Les détails posés sur les murs et sous les plafonds (modèles) ---
+  const cell = (gx, gz) => (gx < 0 || gz < 0 || gx >= map.W || gz >= map.H ? 2 : map.grid[gz * map.W + gx]);
+  // les rideaux métalliques des boutiques fermées (une sur deux ; les autres gardent leur rideau à mailles)
+  for (const sh of map.shops || []) {
+    if (sh.state !== 'grille' || sh.id % 2 !== 1) continue;
+    const xa = sh.x0 * C;
+    const xb = (sh.x1 + 1) * C;
+    const head = rooms[sh.room].ceilH - 0.62;
+    const n = Math.max(1, Math.round((xb - xa) / 3));
+    const w = (xb - xa - 0.08) / n;
+    for (let i = 0; i < n; i++) model('rollershutter_window_01', xa + 0.04 + w * (i + 0.5), 0, sh.frontZ - sh.dir * 0.15, sh.dir > 0 ? 0 : PI, [w / 2.1, head / 1.85, 1], 0, 0, (sh.id + i) % 4 === 3 ? 'rollershutter_window_01_graffiti' : 'rollershutter_window_01');
+  }
+  // les cabines téléphoniques, de part et d'autre du passage des toilettes
+  for (const gx of [21, 24]) {
+    if (cell(gx, 42) !== 2 || cell(gx, 41) !== 1) continue;
+    const zf = 42 * C;
+    for (let k = 0; k < 2; k++) {
+      const x = gx * C + 0.75 + k * 1.0;
+      G.box('steel', x - 0.42, x + 0.42, 0.7, 2.0, zf - 0.04, zf, '+z');
+      G.box('black', x - 0.44, x + 0.44, 2.0, 2.1, zf - 0.36, zf, '+z');
+      model('korean_public_payphone_01', x + 0.06, 1.0, zf - 0.15, PI);
+    }
+  }
+  // des caméras de surveillance sur un pilier sur quatre du mail et des cours, tournées vers les vitrines
+  let ci = 0;
+  for (const k in map.pillars) {
+    const p = map.pillars[k];
+    if (p.kind !== 'mail' && p.kind !== 'court') continue;
+    if (ci++ % 4 !== 0) continue;
+    const s = p.z < (map.mailZ || 0) ? -1 : 1;
+    model('security_camera_02', p.x, fi === 0 ? 4.7 : 3.75, p.z + s * ((p.h || 0.45) + 0.01), s > 0 ? 0 : PI, 1.3, 0.25 * 0, 0);
+  }
+  // « sol glissant » : des panneaux oubliés près d'un banc sur cinq
+  let bi = 0;
+  for (const it of furn) if (it.kind === 'bench' && bi++ % 5 === 2) model('WetFloorSign_01', it.x + 1.7, 0, it.z + (it.face || 1) * 0.9, rand(it.id) * 6.28, 1.2);
+  for (const r of rooms) {
+    const X0 = r.x0 * C;
+    const X1 = (r.x1 + 1) * C;
+    const Z0 = r.z0 * C;
+    const Z1 = (r.z1 + 1) * C;
+    if (r.kind === 'service' && r.z0 === r.z1 && r.x1 - r.x0 > 6) {
+      // les couloirs de service : un extincteur et une alarme tous les 14 m, des sacs, un balai, un bidon
+      for (let x = X0 + 4; x < X1 - 2; x += 14) {
+        const gx = Math.floor(x / C);
+        if (cell(gx, r.z0 - 1) !== 2) continue;
+        model('korean_fire_extinguisher_01', x, 0, Z0 + 0.16, rand(gx) * 0.6 - 0.3);
+        model('fire_alarm', x + 0.6, 1.45, Z0, 0);
+      }
+      for (let x = X0 + 9; x < X1 - 4; x += 23) {
+        const gx = Math.floor(x / C);
+        if (cell(gx, r.z0 + 1) !== 2) continue;
+        model('trashbag', x, 0, Z1 - 0.35, rand(gx) * 6);
+        model('trashbag', x + 0.55, 0, Z1 - 0.3, rand(gx, 1) * 6, 0.85);
+        if (gx % 2) model('plastic_broom', x + 1.3, 0.03, Z1 - 0.12, PI, 1, -1.25);
+        else model('multi_cleaner_5_litre', x + 1.2, 0, Z1 - 0.25, rand(gx, 2) * 6);
+      }
+    } else if (r.kind === 'dock') {
+      // les quais : des rideaux de quai sur le mur nord
+      for (let x = X0 + 4; x < X1 - 3; x += 6.5) {
+        if (cell(Math.floor(x / C), r.z0 - 1) !== 2) continue;
+        model('rollershutter_door', x, 0, Z0, 0, [2.8, 1.45, 1], 0, 0, Math.floor(x) % 3 === 0 ? 'rollershutter_door_graffiti' : 'rollershutter_door');
+      }
+    } else if (r.kind === 'office') {
+      // les bureaux : une armoire à tiroirs dans un coin, une horloge au mur
+      if (cell(r.x0, r.z0 - 1) === 2) model('drawer_cabinet', X0 + 0.75, 0, Z0 + 0.27, 0);
+      if (cell(Math.floor((X0 + X1) / 2 / C), r.z0 - 1) === 2) model('wall_clock', (X0 + X1) / 2, 2.15, Z0 + 0.005, 0);
+      if (r.name === 'Lost & found') for (let i = 0; i < 4; i++) model('vintage_suitcase', X1 - 1.2 - i * 0.5, 0, Z1 - 0.5, PI + (rand(i) - 0.5) * 0.4, 0.6);
+    } else if (r.kind === 'wc') {
+      model('WetFloorSign_01', (X0 + X1) / 2, 0, (Z0 + Z1) / 2, rand(r.id) * 6.28, 1.2);
+      model('plastic_broom', X1 - 0.3, 0.03, Z0 + 0.15, PI / 2, 1, -1.25);
+    } else if (r.kind === 'lobby') {
+      for (const [x, z] of [[X0 + 0.6, Z0 + 0.6], [X1 - 0.6, Z0 + 0.6]]) model('potted_plant_02', x, 0, z, rand(x) * 6, 1.6);
+    } else if (r.kind === 'food') {
+      for (let x = X0 + 6; x < X1 - 4; x += 12) model('metal_trash_can', x, 0, Z1 - 0.5, rand(x) * 6, 1, 0, 0, 'metal_trash_can');
     }
   }
 

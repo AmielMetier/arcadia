@@ -30,6 +30,7 @@ export function loadKit(name) {
                 if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
                 parts.push({ geo: o.geometry, mat, m: back.clone().multiply(o.matrixWorld) });
               });
+              parts.at = root.position.clone(); // (sa place dans le modèle : pour poser le modèle entier, « * »)
               pieces.set(root.name, parts);
             }
             resolve(pieces);
@@ -72,18 +73,28 @@ export function createKitInstancer({ group, convert }) {
         for (const [key, items] of lists) {
           const [k, pv] = key.split('|');
           const [piece, variant = ''] = pv.split('@');
-          if (k !== kit || !pieces.has(piece)) continue;
-          for (const part of pieces.get(piece)) {
-            const { mat, glass } = convert(part.mat, kit, piece, variant);
-            const mesh = new THREE.InstancedMesh(part.geo, mat, items.length);
-            mesh.frustumCulled = false;
-            mesh.count = 0;
-            if (glass) mesh.setColorAt(0, new THREE.Color());
-            const mats = new Float32Array(items.length * 16);
-            const tmpM = new THREE.Matrix4();
-            items.forEach((it, i) => tmpM.copy(it.m).multiply(part.m).toArray(mats, i * 16));
-            group.add(mesh);
-            sets.push({ mesh, items, mats, glass, glow });
+          if (k !== kit) continue;
+          // « * » : le modèle entier, chaque morceau à sa place ; « a+b » : ces morceaux-là, à leur place
+          const whole = piece === '*' || piece.includes('+');
+          const names = piece === '*' ? [...pieces.keys()] : piece.split('+').filter((n) => pieces.has(n));
+          for (const pn of names) {
+            const at = whole ? new THREE.Matrix4().makeTranslation(pieces.get(pn).at) : null;
+            for (const part of pieces.get(pn)) {
+              const { mat, glass } = convert(part.mat, kit, pn, variant);
+              const mesh = new THREE.InstancedMesh(part.geo, mat, items.length);
+              mesh.frustumCulled = false;
+              mesh.count = 0;
+              if (glass) mesh.setColorAt(0, new THREE.Color());
+              const mats = new Float32Array(items.length * 16);
+              const tmpM = new THREE.Matrix4();
+              items.forEach((it, i) => {
+                tmpM.copy(it.m);
+                if (at) tmpM.multiply(at);
+                tmpM.multiply(part.m).toArray(mats, i * 16);
+              });
+              group.add(mesh);
+              sets.push({ mesh, items, mats, glass, glow });
+            }
           }
         }
       });
