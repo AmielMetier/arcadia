@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.71 — 11 novembre 2026
+- **The Backrooms** — Tuyauteries : le jeu ne dessine plus les tuyaux, lampes et machines des galeries voisines, cachés derrière les murs. Même image, environ un tiers de travail en moins pour la carte graphique.
+
 ## 5.70 — 11 novembre 2026
 - **The Backrooms** — Terror Hotel : le jeu ne dessine plus les meubles cachés derrière un mur. Même image, mais presque moitié moins de travail pour la carte graphique dans le hall, et bien moins encore dans les couloirs : le niveau est plus fluide sur un PC modeste.
 

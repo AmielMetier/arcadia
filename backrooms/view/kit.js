@@ -90,7 +90,8 @@ export function createKitInstancer({ group, convert }) {
     }
   };
   // à chaque image : seuls les exemplaires à moins de R mètres, et pas loin derrière la caméra
-  const update = (cx, cz, fx, fz, R = 38) => {
+  // seen(x, z) (facultatif) : faux pour un exemplaire caché par les murs (à plus de 6 m)
+  const update = (cx, cz, fx, fz, R = 38, seen = null) => {
     const R2 = R * R;
     for (const s of sets) {
       const arr = s.mesh.instanceMatrix.array;
@@ -103,6 +104,7 @@ export function createKitInstancer({ group, convert }) {
         const d2 = dx * dx + dz * dz;
         if (d2 > R2) continue;
         if (d2 > 30 && dx * fx + dz * fz < -0.4 * Math.sqrt(d2)) continue;
+        if (seen && d2 > 36 && !seen(it.x, it.z)) continue;
         // sa matrice (16 nombres), recopiée à la main : subarray créerait une vue par exemplaire visible, à chaque
         // image (des milliers dans les Tuyauteries, autant de déchets pour le ramasse-miettes)
         const o = n * 16;
