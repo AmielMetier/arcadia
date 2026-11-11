@@ -195,6 +195,37 @@ function makeBuilder(MATS) {
     g.applyMatrix4(tmpO.matrix);
     add(k, g);
   };
+  // les triangles d'une géométrie (sans index), rangés par dalle d'après leur centre
+  // (en z : trois bandes, au nord des cours, les cours et le mail, au sud : seule celle du milieu se voit d'un étage à l'autre)
+  const byChunk = (geo, S = 55) => {
+    const P = geo.attributes.position.array;
+    const N = geo.attributes.normal.array;
+    const U = geo.attributes.uv.array;
+    const sets = new Map();
+    for (let t = 0; t < P.length / 9; t++) {
+      const o = t * 9;
+      const z = (P[o + 2] + P[o + 5] + P[o + 8]) / 3;
+      const key = Math.floor((P[o] + P[o + 3] + P[o + 6]) / (3 * S)) * 4 + (z < OPEN_Z0 ? 0 : z < OPEN_Z1 ? 1 : 2);
+      (sets.get(key) || sets.set(key, []).get(key)).push(t);
+    }
+    return [...sets.entries()].map(([key, tris]) => {
+      const p = new Float32Array(tris.length * 9);
+      const n = new Float32Array(tris.length * 9);
+      const u = new Float32Array(tris.length * 6);
+      tris.forEach((t, i) => {
+        p.set(P.subarray(t * 9, t * 9 + 9), i * 9);
+        n.set(N.subarray(t * 9, t * 9 + 9), i * 9);
+        u.set(U.subarray(t * 6, t * 6 + 6), i * 6);
+      });
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+      g.setAttribute('normal', new THREE.BufferAttribute(n, 3));
+      g.setAttribute('uv', new THREE.BufferAttribute(u, 2));
+      g.userData.inner = key % 4 !== 1;
+      return g;
+    });
+  };
+  const inner = []; // les dalles qu'on ne voit pas d'un autre étage
   const build = (group) => {
     const keys = new Set([...bins.keys(), ...extra.keys()]);
     for (const k of keys) {
@@ -213,12 +244,16 @@ function makeBuilder(MATS) {
       }
       if (!list.length) continue;
       const geo = list.length > 1 ? mergeGeometries(list) : list[0];
-      const mesh = new THREE.Mesh(geo, MATS[k].m);
-      if (MATS[k].order) mesh.renderOrder = MATS[k].order;
-      group.add(mesh);
+      // une matière lourde est découpée en dalles de 60 m : ce qui est hors champ (ou trop loin) n'est pas dessiné
+      for (const g of geo.attributes.position.count > 18000 && !geo.index ? byChunk(geo) : [geo]) {
+        const mesh = new THREE.Mesh(g, MATS[k].m);
+        if (MATS[k].order) mesh.renderOrder = MATS[k].order;
+        if (g.userData.inner) inner.push(mesh);
+        group.add(mesh);
+      }
     }
   };
-  return { tri, quad, hpoly, vface, box, beam, add, build };
+  return { tri, quad, hpoly, vface, box, beam, add, build, inner };
 }
 
 // --- Les matières ---
@@ -904,6 +939,9 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       k: 40,
       cap: {
         korean_public_payphone_01: 16, wheelchair_01: 18, old_gas_mask: 12, garden_hose_wall_mounted_01: 16, gamepad: 12, rubber_duck_toy: 18,
+        desk_lamp_arm_01: 9, metal_office_desk: 30, cardboard_box_01: 14, SchoolChair_01: 26, modern_arm_chair_01: 20, GreenChair_01: 26, stationery_supplies: 9,
+        vintage_stapler: 7, clipboard: 8, office_notepads: 10, rubber_boots: 9, vintage_electric_kettle: 9, portable_generator: 22, power_box_01: 14,
+        ceramic_vase_03: 10, ceramic_vase_04: 10, vintage_suitcase: 22, potted_plant_02: 22, metal_stool_02: 20, bar_chair_round_01: 14, tool_cart: 18,
         binder_notebook: 12, carrot_cake: 12, food_apple_01: 10, book_encyclopedia_set_01: 14, anthurium_botany_01: 22, vintage_crutches_01: 16,
         round_spectacles: 10, jug_01: 14, brass_vase_03: 14, croissant: 10, medical_box: 14, american_football: 16, concrete_cat_statue: 18,
       },
@@ -923,13 +961,15 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   // « a » un seul morceau recentré
   // (chaque modèle posé laisse sa place aux murs habillés : un rayon, plus grand pour les rideaux et les meubles hauts)
   const placed = [];
+  let wasHere = true;
   const WIDE = { rollershutter_door: 1.7, rollershutter_window_01: 2.7, korean_public_payphone_01: 0.6, drawer_cabinet: 0.7, wooden_bookshelf_worn: 0.8, exterior_aircon_unit: 1.0, utility_box_01: 0.4 };
   const model = (name, x, y, z, ry = 0, s = 1, rx = 0, rz = 0, piece = '*') => {
     placed.push([x, z, WIDE[name] || 0.4]);
-    kit.put(name, piece, x, y, z, ry, s, undefined, rx, rz);
+    kit.put(name, piece, x, y, z, ry, s, z < OPEN_Z0 || z > OPEN_Z1 ? INNER : undefined, rx, rz);
   };
   const props = drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, placed });
-  drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed, show: props.show, arcade: props.arcade });
+  drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed, show: props.show, arcade: props.arcade, goods: props.goods });
+  props.goods.flush();
   kit.build();
   G.build(group);
   // les barreaux : un seul maillage
@@ -1052,8 +1092,20 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     update(camera) {
       camera.getWorldDirection(camDir);
       const f = Math.hypot(camDir.x, camDir.z) || 1;
-      kit.update(camera.position.x, camera.position.z, camDir.x / f, camDir.z / f, 58);
+      // hors du champ (son demi-angle horizontal, plus une marge pour les grands objets), on ne dessine pas ; quand
+      // la caméra plonge ou se cabre, le champ au sol s'élargit : on garde tout sauf ce qui est derrière
+      const half = Math.atan(Math.tan((camera.fov * Math.PI) / 360) * camera.aspect);
+      const cosMin = f > 0.8 ? Math.cos(Math.min(1.95, half + 0.42)) : -0.4;
+      // d'un autre étage, on ne voit de celui-ci que les cours et le mail (par les vides) : le reste n'est pas dessiné
+      const here = Math.abs(camera.position.y - group.matrixWorld.elements[13] - 1.6) < 3.3;
+      if (here !== wasHere) for (const m of G.inner) m.visible = here;
+      wasHere = here;
+      kit.update(camera.position.x, camera.position.z, camDir.x / f, camDir.z / f, 58, cosMin, here);
     },
   };
 }
 const camDir = new THREE.Vector3();
+// la bande (en mètres, du nord au sud) où un étage se voit de l'autre : les cours et le mail, leurs vides, les escaliers
+const OPEN_Z0 = 46;
+const OPEN_Z1 = 114;
+const INNER = { inner: 1 };

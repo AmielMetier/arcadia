@@ -10,6 +10,8 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL_SIZE as C } from '../engine/map.js';
 import { createArcade } from './mallArcade.js';
+import { createGoods } from './mallGoods.js';
+import { createDept } from './mallDept.js';
 
 // --- Les textures écrites : enseignes, menus, affiches, plan du centre ---
 const SIGN_FONTS = ['bold 64px "Futura", "Century Gothic", sans-serif', 'italic bold 66px Georgia, serif', 'bold 60px "Arial Narrow", Arial, sans-serif', '700 62px "Brush Script MT", "Snell Roundhand", cursive'];
@@ -316,6 +318,9 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     candy: [['carrot_cake', 1], ['croissant', 1.2], ['food_apple_01', 1.4], ['jug_01', 1]],
   };
   const shopOf = (it) => (it.shop !== undefined && map.shops ? map.shops.find((s) => s.id === it.shop) : null);
+  // les marchandises (emballages imprimés) et le mobilier du grand magasin
+  const goods = createGoods({ G, MATS, baked });
+  const dept = createDept({ G, MATS, baked, model, placeAt, lbox, frame, front, yawZ, fab, rand, goods, rooms, C, hAt });
 
   for (const it of furn) {
     const hw = it.w / 2;
@@ -427,7 +432,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         break;
       case 'ctable':
         model('modern_coffee_table_01', it.x, 0, it.z, PI / 2);
-        model('television_02', it.x + 0.1, 0.39, it.z, PI * 0.8, 0.7);
+        if (!it.bare) model('television_02', it.x + 0.1, 0.39, it.z, PI * 0.8, 0.7);
         break;
       case 'shelf': {
         // des étagères contre les murs : trois éléments côte à côte
@@ -476,28 +481,30 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         if (it.id % 2) model('clipboard', it.x + 0.15, 1.045, it.z + 0.1, rand(it.id, 1) * 6, 1, -PI / 2);
         break;
       }
-      case 'rack': {
-        put('steel', new THREE.CylinderGeometry(0.3, 0.3, 0.03, 16), it.x, 0.015, it.z);
-        put('steel', new THREE.CylinderGeometry(0.02, 0.02, 1.35, 6), it.x, 0.68, it.z);
-        put('steel', new THREE.TorusGeometry(0.52, 0.015, 6, 28).rotateX(PI / 2), it.x, 1.35, it.z);
-        const n = (it.id * 5) % 9;
-        for (let i = 0; i < n; i++) {
-          const a = (i / 9) * PI * 2 + it.id;
-          put(fab(it.id * 3 + i), new THREE.BoxGeometry(0.42, 0.78, 0.05), it.x + Math.cos(a) * 0.52, 0.95, it.z + Math.sin(a) * 0.52, -a);
-          put('steel', new THREE.TorusGeometry(0.05, 0.006, 4, 10, PI), it.x + Math.cos(a) * 0.52, 1.36, it.z + Math.sin(a) * 0.52, -a);
-        }
+      case 'rack':
+        dept.rack(it);
         break;
-      }
       case 'table': {
         lbox('wood', it, -hw, hw, 0.78, 0.84, -hd, hd);
         lbox('wood', it, -hw + 0.05, hw - 0.05, 0, 0.78, -hd + 0.05, hd - 0.05, '+y-y');
         const sh = shopOf(it);
+        const trade = it.trade || (sh && sh.trade);
+        if (trade === 'fold') {
+          // des piles de vêtements pliés, deux rangs
+          for (let j = 0; j < 2; j++)
+            for (let i = 0; i < Math.floor(it.w / 0.42); i++) {
+              const q = it.id * 11 + j * 5 + i;
+              if (rand(q) < 0.2) continue;
+              goods.folded(P, -hw + 0.24 + i * 0.42, 0.34, 0.84, (j - 0.5) * it.d * 0.48 - 0.14, (j - 0.5) * it.d * 0.48 + 0.14, q);
+            }
+          break;
+        }
         if (sh && sh.trade === 'salon') {
           // le salon de coiffure : des fauteuils de barbier à la place des tables
           model('BarberShopChair_01', it.x, 0, it.z, yawZ([0, -sh.dir]) + (rand(it.id) - 0.5) * 0.6);
           break;
         }
-        const list = (sh && SHOW[sh.trade]) || [['cardboard_box_01', 0.6]];
+        const list = SHOW[trade] || [['cardboard_box_01', 0.6]];
         // 2 rangées de 2 ou 3 objets, un peu de travers ; une case vide de temps en temps (on s'est servi)
         const cols = it.w > 1.4 ? 3 : 2;
         const P2 = frame(it);
@@ -582,31 +589,48 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         if (it.tipped) put('plastic', new THREE.CylinderGeometry(0.62, 0.62, 0.035, 24).rotateX(1.35), it.x + 0.4, 0.62, it.z);
         break;
       }
-      case 'gondola': {
-        lbox('paintGrey', it, -hw, hw, 0, 1.6, -0.03, 0.03);
-        lbox('paintGrey', it, -hw, hw, 0, 0.12, -hd, hd, '-y');
-        for (const lx of [-hw, hw - 0.04]) lbox('steel', it, lx, lx + 0.04, 0, 1.65, -hd, hd, '-y');
-        for (let k = 1; k < 4; k++) for (const s of [-1, 1]) lbox('steel', it, -hw, hw, 0.12 + k * 0.42, 0.15 + k * 0.42, s > 0 ? 0.03 : -hd, s > 0 ? hd : -0.03);
-        if (!it.empty)
-          for (let k = 0; k < 4; k++)
-            for (let i = 0; i < 7; i++) {
-              if ((it.id + k * 3 + i * 7) % 3 === 0) continue;
-              const lx = -hw + 0.45 + (i / 7) * (it.w - 0.9);
-              // (des cartons simples : le modèle de carton, 17 000 triangles, posé par milliers coûterait trop cher)
-              const h = 0.16 + ((it.id + i + k) % 3) * 0.05;
-              const y0 = 0.15 + k * 0.42;
-              for (const s of [-1, 1]) lbox((i + k) % 4 ? 'carton' : 'cloth2', it, lx - 0.14, lx + 0.14, y0, y0 + h, s > 0 ? 0.1 : -hd + 0.06, s > 0 ? hd - 0.06 : -0.1, '-y');
-            }
+      case 'gondola':
+        dept.gondola(it);
         break;
-      }
+      case 'cosmetic':
+      case 'booth':
+      case 'pot':
+      case 'partition':
+      case 'meeting':
+      case 'kitchenette':
+      case 'tanks':
+      case 'panelbox':
+      case 'genset':
+      case 'workbench':
+        dept[it.kind](it);
+        break;
+      case 'fitting':
+        dept.fitting(it);
+        break;
+      case 'shoetable':
+        dept.shoetable(it);
+        break;
+      case 'ottoman':
+        model('Ottoman_01', it.x, 0, it.z, rand(it.id) * 6.28);
+        break;
+      case 'roomset':
+        dept.roomset(it);
+        break;
+      case 'tvwall':
+        dept.tvwall(it);
+        break;
+      case 'luggage':
+        dept.luggage(it);
+        break;
       case 'mannequin': {
         const y = it.yaw || 0;
         put('steel', new THREE.CylinderGeometry(0.22, 0.22, 0.03, 16), it.x, 0.015, it.z);
         put('steel', new THREE.CylinderGeometry(0.015, 0.015, 0.25, 6), it.x, 0.14, it.z);
         const body = new THREE.LatheGeometry([[0.0, 0], [0.11, 0.02], [0.13, 0.25], [0.16, 0.5], [0.13, 0.62], [0.17, 0.82], [0.2, 1.0], [0.12, 1.08], [0.05, 1.12], [0.05, 1.18], [0.0, 1.2]].map(([r, h]) => new THREE.Vector2(r, h)), 16).scale(1, 1, 0.7);
         put(it.id % 2 ? fab(it.id) : 'plastic', body, it.x, 0.27, it.z, y);
-        put('plastic', new THREE.SphereGeometry(0.11, 14, 12).scale(0.85, 1.12, 0.95), it.x, 1.6, it.z, y);
-        for (const s of [-1, 1]) put('plastic', new THREE.CylinderGeometry(0.04, 0.03, 0.62, 8).translate(s * 0.23, 0, 0).rotateZ(s * 0.1), it.x, 1.0, it.z, y);
+        // (un buste de couturière : pas de tête ni de bras, un bouton de bois tourné au col)
+        put('wood', new THREE.CylinderGeometry(0.05, 0.06, 0.035, 12), it.x, 1.485, it.z);
+        put('wood', new THREE.SphereGeometry(0.03, 8, 6), it.x, 1.52, it.z);
         break;
       }
       case 'concession': {
@@ -711,18 +735,9 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         }
         break;
       }
-      case 'pallet': {
-        lbox('wood', it, -hw, hw, 0, 0.14, -hd, hd);
-        const st = it.stack || 1;
-        for (let k = 0; k < st; k++)
-          for (const [lx, lz] of [[-0.29, -0.23], [0.29, -0.23], [-0.29, 0.23], [0.29, 0.23]]) {
-            if (k === st - 1 && Math.abs(it.id + lx * 10 + lz * 7) % 3 < 1) continue;
-            const y0 = 0.14 + k * 0.4;
-            lbox('carton', it, lx - 0.27, lx + 0.27, y0, y0 + 0.38, lz - 0.21, lz + 0.21, '-y');
-          }
-        if (it.id % 4 === 0) model('cardboard_box_01', it.x + 0.9, 0, it.z + 0.2, rand(it.id) * 6, 1.1, 0, 1.57);
+      case 'pallet':
+        dept.pallet(it);
         break;
-      }
       case 'crate': {
         const st = Math.min(3, it.stack || 1);
         if (it.id % 5 === 0) model('industrial_storage_cart', it.x, 0, it.z, rand(it.id) * 0.4, 0.75);
@@ -743,6 +758,8 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         break;
     }
   }
+
+  dept.signs(furn);
 
   // --- Les détails posés sur les murs et sous les plafonds (modèles) ---
   const cell = (gx, gz) => (gx < 0 || gz < 0 || gx >= map.W || gz >= map.H ? 2 : map.grid[gz * map.W + gx]);
@@ -929,5 +946,5 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     }
   }
 
-  return { lights, show: SHOW, arcade };
+  return { lights, show: SHOW, arcade, goods };
 }

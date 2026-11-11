@@ -662,7 +662,7 @@ const grimeUV = (i) => {
 
 let ATLAS = null; // les deux atlas, dessinés une fois (les deux étages s'en servent)
 
-export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed = [], show = {}, arcade = null }) {
+export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed = [], show = {}, arcade = null, goods: packs = null }) {
   const W = map.W;
   const H = map.H;
   const PI = Math.PI;
@@ -682,7 +682,6 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     MATS.lineW = { m: baked(lam({ color: '#b9b3a2', ...off })), S: 1 };
     MATS.lineY = { m: baked(lam({ color: '#b8932a', ...off })), S: 1 };
     MATS.stencil = { m: baked(lam({ map: ATLAS.stencil, transparent: true, depthWrite: false, ...off })), S: 1, order: 1 };
-    ['#5a1f1b', '#1f3a5a', '#2f4a2a', '#6a5a3a', '#3a2a4a', '#8a7a5a'].forEach((c, i) => (MATS['bk' + i] = { m: baked(lam({ map: MATS.__tx && MATS.__tx.fabrics ? MATS.__tx.fabrics[1] : null, color: c })), S: 4 }));
   }
   const cell = (x, z) => (x < 0 || z < 0 || x >= W || z >= H ? WALL : map.grid[z * W + x]);
   const zoneAt = (x, z) => map.zone[z * W + x];
@@ -811,22 +810,17 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
   // ce qu'on range sur une étagère quand les modèles seraient trop lourds : des vêtements pliés en piles (boutiques de
   // mode), des livres, des boîtes de produits
   const FOLD = ['clothes', 'shoes', 'lingerie', 'kids', 'salon', 'luggage', 'outdoor', 'sports'];
+  // ce qu'on range sur une étagère murale, selon le commerce : des emballages imprimés par facings, des piles de
+  // vêtements pliés, des rangées de livres (view/mallGoods.js)
+  const SHELF_ROW = { toys: 'toys', kids: 'toys', electronics: 'electro', video: 'electro', music: 'electro', kitchen: 'kitchen', gifts: 'kitchen', florist: 'kitchen', candy: 'stock', sports: 'sport', outdoor: 'sport', shoes: 'shoes', luggage: 'sport' };
   const goods = (R, s, y, w, trade, seed) => {
-    if (trade === 'books' || trade === 'cards') return books(R, s, y, w, seed);
-    const n = Math.floor(w / 0.34);
-    for (let i = 0; i < n; i++) {
-      if (hash(seed, i, 5) < 0.2) continue;
-      const u = s - w / 2 + 0.17 + i * 0.34;
-      if (FOLD.includes(trade)) {
-        const m = MATS.fab0 ? 'fab' + Math.floor(hash(seed, i, 6) * 6) : 'cloth';
-        const k = 2 + Math.floor(hash(seed, i, 7) * 4);
-        for (let j = 0; j < k; j++) wbox(m, R, u + (hash(seed, i, j) - 0.5) * 0.03, 0.28, y + j * 0.055, y + j * 0.055 + 0.05, 0.04, 0.27);
-      } else {
-        const bw = 0.1 + hash(seed, i, 6) * 0.12;
-        const bh = 0.12 + hash(seed, i, 7) * 0.14;
-        for (let j = 0; j < 2; j++) wbox(hash(seed, i, 8) < 0.5 ? 'carton' : 'bk' + Math.floor(hash(seed, i, 9) * 6), R, u - 0.07 + j * (bw + 0.02), bw, y, y + bh, 0.05, 0.05 + bw * 1.2);
-      }
+    const P = (u, d) => at(R, u, d);
+    if (trade === 'books' || trade === 'cards') return packs.books(P, s - w / 2 + 0.04, s + w / 2 - 0.04, y, 0.02, 0.24, seed);
+    if (FOLD.includes(trade) && !SHELF_ROW[trade]) {
+      for (let i = 0; i < Math.floor(w / 0.36); i++) if (hash(seed, i, 5) >= 0.2) packs.folded(P, s - w / 2 + 0.2 + i * 0.36, 0.3, y, 0.03, 0.27, seed * 7 + i, trade === 'lingerie');
+      return;
     }
+    packs.shelf(P, s - w / 2 + 0.04, s + w / 2 - 0.04, y, 0.03, 0.27, SHELF_ROW[trade] || 'stock', seed, 0.36, 0.2);
   };
   // les objets assez légers pour être posés par dizaines sur des étagères (moins de 9 000 triangles)
   const LIGHT = new Set(['office_notepads', 'Television_01', 'croissant', 'television_02', 'brass_vase_03', 'baseball_bat', 'postcard_set_01', 'wooden_cutting_board', 'medical_box', 'bleach_bottle', 'rubber_duck_toy', 'football', 'brass_pan_01', 'american_football', 'all_purpose_cleaner', 'cassette_player', 'jug_01', 'multi_cleaner_bottle', 'food_apple_01', 'Ukulele_01', 'potted_plant_04', 'alarm_clock_01']);
@@ -845,32 +839,9 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
       model(name, x, y + dy, z, yawOf(R) + (hash(seed, i) - 0.5) * 0.8, sc * 0.85, rx, rz, piece);
     }
   };
-  // une rangée de livres et de classeurs (dos de couleur, hauteurs inégales, un livre penché de temps en temps)
-  const books = (R, s, y, w, seed) => {
-    let u = s - w / 2 + 0.06;
-    let k = 0;
-    while (u < s + w / 2 - 0.08) {
-      const t = 0.025 + hash(seed, k) * 0.035;
-      const h = 0.17 + hash(seed, k, 1) * 0.12;
-      const dp = 0.15 + hash(seed, k, 2) * 0.07;
-      if (hash(seed, k, 3) < 0.07) {
-        u += 0.12; // un trou
-      } else {
-        wbox('bk' + Math.floor(hash(seed, k, 4) * 6), R, u + t / 2, t, y, y + h, 0.03, 0.03 + dp);
-        u += t + 0.003;
-      }
-      k++;
-    }
-  };
-  // des cartons rangés sur une étagère (réserves, coulisses)
-  const cartons = (R, s, y, w, seed) => {
-    for (let i = 0; i < Math.floor(w / 0.45); i++) {
-      if (hash(seed, i) < 0.3) continue;
-      const bw = 0.32 + hash(seed, i, 1) * 0.1;
-      const bh = 0.22 + hash(seed, i, 2) * 0.16;
-      wbox('carton', R, s - w / 2 + 0.25 + i * 0.45, bw, y, y + bh, 0.02, 0.02 + bw * 0.9);
-    }
-  };
+  // une rangée de livres et de classeurs ; des cartons rangés sur une étagère (réserves, coulisses)
+  const books = (R, s, y, w, seed) => packs.books((u, d) => at(R, u, d), s - w / 2 + 0.04, s + w / 2 - 0.04, y, 0.02, 0.24, seed);
+  const cartons = (R, s, y, w, seed) => packs.shelf((u, d) => at(R, u, d), s - w / 2 + 0.05, s + w / 2 - 0.05, y, 0.02, 0.29, 'carton', seed, 0.4, 0.25);
   // un cadre (modèle) ou un tableau
   const frames = ['hanging_picture_frame_01', 'hanging_picture_frame_02', 'fancy_picture_frame_01'];
   // une prise, un interrupteur : de petites plaques blanches
