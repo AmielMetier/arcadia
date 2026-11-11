@@ -5075,6 +5075,31 @@ test("Level 1 : devant le casier de sa proie, l'imposteur attend, appelle, puis 
   }
 });
 
+test("Level 1 : pendant le répit qui suit une poursuite, l'imposteur ne revient pas — il s'écarte et se tait", () => {
+  BackroomsSim.DISGUISE = true;
+  try {
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 11, players: [{ id: 0, name: 'A' }], localId: 0, level: 1 });
+    sim.arriveT = 0;
+    const M = sim.monster;
+    const A = sim.players[0];
+    const m = sim.map;
+    M.dormantT = 0;
+    const near = m.walkable.map((q) => ({ x: (q.x + 0.5) * CELL_SIZE, z: (q.z + 0.5) * CELL_SIZE })).find((q) => { const d = Math.hypot(q.x - A.x, q.z - A.z); return d > 10 && d < 15 && !m.safeAt(q.x, q.z); });
+    Object.assign(M, { x: near.x, z: near.z, path: [], repathT: 0 });
+    Object.assign(sim.director, { phase: 'relax', relaxT: 60 });
+    const d0 = Math.hypot(M.x - A.x, M.z - A.z);
+    let calls = 0;
+    for (let i = 0; i < 60 * 10; i++) {
+      sim.step({});
+      calls += sim.drainEvents().filter((e) => e.type === 'mimicCall').length;
+    }
+    const d1 = Math.hypot(M.x - A.x, M.z - A.z);
+    assert.ok(M.mimic != null && !calls && d1 > d0 + 5, `il s'éloigne sans appeler (${d0.toFixed(1)} m puis ${d1.toFixed(1)} m, ${calls} appel)`);
+  } finally {
+    BackroomsSim.DISGUISE = false;
+  }
+});
+
 test("Level 1 : dès le départ, l'entité a l'apparence d'un joueur et marche à sa vitesse ; tout près, elle se transforme une seconde sur place, puis court un peu plus vite qu'un sprint ; loin de tous, elle reprend une apparence", () => {
   BackroomsSim.DISGUISE = true;
   try {

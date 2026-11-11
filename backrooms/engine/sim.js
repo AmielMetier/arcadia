@@ -1520,7 +1520,8 @@ export class BackroomsSim {
     let goal = null;
     let speed = WALK_SPEED * MIMIC_SPEED;
     // le calme de l'arrivée vaut aussi pour l'imposteur : il reste au loin et se tait (il s'écarte de qui approche)
-    const calm = M.dormantT > 0 && !this.hunt;
+    // (et pour le répit qui suit une poursuite : sans lui, à peine semé, il revenait déjà sous une autre apparence)
+    const calm = (M.dormantT > 0 || entityRelaxed(this)) && !this.hunt;
     if (calm) {
       M.bang = null;
       M.callT = Math.max(M.callT, 1);

@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.60 — 11 novembre 2026
+- **The Backrooms** — Level 1 : après une poursuite, tu as vraiment le temps de souffler. Pendant le répit, l'imposteur garde ses distances et se tait, au lieu de revenir sous une autre apparence à peine semé.
+
 ## 5.59 — 11 novembre 2026
 - **The Backrooms** — Level 5, le digicode de la porte de secours :
   - il faut être devant le clavier pour que le code compte ;
