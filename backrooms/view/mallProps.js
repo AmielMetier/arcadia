@@ -512,7 +512,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         const yaw = yawZ(F);
         const sh = shopOf(it);
         const wood = sh && ['books', 'gifts', 'florist', 'kitchen', 'candy', 'cards', 'toys', 'kids'].includes(sh.trade);
-        if (sh && sh.trade === 'books') {
+        if ((sh && sh.trade === 'books') || it.trade === 'books') {
           for (const lx of [-0.95, 0.95]) {
             const [x, z] = P(lx, -hd + 0.29);
             placeAt('wooden_bookshelf_worn', x, 0, z, yaw);
@@ -558,10 +558,15 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         dept.rack(it);
         break;
       case 'table': {
-        lbox('wood', it, -hw, hw, 0.78, 0.84, -hd, hd);
-        lbox('wood', it, -hw + 0.05, hw - 0.05, 0, 0.78, -hd + 0.05, hd - 0.05, '+y-y');
+        // une vraie table (trois modèles, mis aux dimensions de l'emprise : le plateau à 84 cm) : une table de bois
+        // brut, une table peinte, une table nappée
         const sh = shopOf(it);
         const trade = it.trade || (sh && sh.trade);
+        if (trade !== 'salon') {
+          const TABLES = [['WoodenTable_01', 1.8, 0.66, 0.55], ['painted_wooden_table', 2.4, 1.14, 0.96], ['dining_table', 2.25, 1.39, 0.87]];
+          const [tn, tw, td, th] = TABLES[['candy', 'florist', 'gifts', 'fold'].includes(trade) ? 2 : it.id % 2];
+          model(tn, it.x, 0, it.z, it.rot ? PI / 2 : 0, [it.w / tw, 0.84 / th, it.d / td]);
+        }
         if (trade === 'fold') {
           // des piles de vêtements pliés, deux rangs
           for (let j = 0; j < 2; j++)
@@ -611,9 +616,17 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         if (it.toilet) {
           for (const lx of [-hw, hw - 0.03]) lbox('paintGrey', it, lx, lx + 0.03, 0.15, 2.0, -hd, hd);
           lbox('paintGrey', it, -hw, -hw + 0.5, 0.15, 2.0, -hd, -hd + 0.03);
+          // la façade de la cabine : deux montants, la porte (fermée, entrouverte ou grande ouverte)
+          lbox('paintGrey', it, -hw + 0.5, -hw + 0.62, 0.15, 2.0, -hd, -hd + 0.03);
+          lbox('paintGrey', it, hw - 0.14, hw, 0.15, 2.0, -hd, -hd + 0.03);
+          {
+            const [hx, hz] = P(-hw + 0.62, -hd + 0.015);
+            const open = [0, 0.5, 1.45, 0.15][it.id % 4];
+            G.add('paintGrey', new THREE.BoxGeometry(0.72, 1.8, 0.025).translate(0.36, 1.07, 0).rotateY(open).translate(hx, 0, hz));
+            G.add('steel', new THREE.BoxGeometry(0.03, 0.1, 0.05).translate(0.64, 1.05, 0).rotateY(open).translate(hx, 0, hz));
+          }
           const [tx, tz] = P(0, hd - 0.4);
-          put('plastic', new THREE.CylinderGeometry(0.2, 0.16, 0.42, 14), tx, 0.21, tz);
-          put('plastic', new THREE.BoxGeometry(0.42, 0.36, 0.18), tx, 0.6, tz + 0.3);
+          dept.toilet(tx, tz, it.id);
           if (it.id % 3 === 0) model('plunger', tx + 0.4, 0, tz - 0.1, rand(it.id) * 6);
         } else {
           lbox('trim', it, -hw, hw, 0, 1.05, -hd, hd, '-y');
@@ -664,6 +677,14 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
       }
       case 'gondola':
         dept.gondola(it);
+        break;
+      case 'wcwall':
+        lbox('faience', it, -hw, hw, 0, 2.1, -hd, hd, '-y');
+        lbox('steel', it, -hw - 0.01, hw + 0.01, 2.1, 2.13, -hd - 0.01, hd + 0.01);
+        break;
+      case 'standee':
+      case 'boxoffice':
+        dept[it.kind](it, { posters, menus, panel });
         break;
       case 'cosmetic':
       case 'booth':
@@ -776,9 +797,10 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         lbox('paintGrey', it, -hw, hw, 0, 0.82, -hd + 0.05, -hd + 0.1);
         for (let i = 0; i < 3; i++) {
           const [x, z] = P(-hw + 0.9 + i * 1.6, 0.05);
-          put('plastic', new THREE.CylinderGeometry(0.2, 0.14, 0.12, 14), x, 0.84, z);
+          dept.basin(x, z);
           const [mx, mz] = P(-hw + 0.9 + i * 1.6, -hd + 0.02);
-          lbox('glass', { ...it, x: mx, z: mz }, -0.45, 0.45, 1.15, 2.0, 0, 0.01);
+          lbox('steel', { ...it, x: mx, z: mz }, -0.48, 0.48, 1.12, 2.03, 0, 0.008);
+          lbox('mirror', { ...it, x: mx, z: mz }, -0.45, 0.45, 1.15, 2.0, 0.008, 0.016);
         }
         break;
       }

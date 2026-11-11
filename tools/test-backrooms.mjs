@@ -2877,13 +2877,13 @@ test('Level 37 : on traverse chaque porte en marchant, les cloisons arrêtent le
 
 
 // --- Level 17, le Mall ---
-test('Level 17 : deux étages reliés par trois escaliers, des vides bordés, tout ce qui est ouvert est accessible', () => {
+test('Level 17 : deux étages reliés par cinq escaliers, des vides bordés, tout ce qui est ouvert est accessible', () => {
   for (const sd of [1, 3, 17, 42, 99, 1234]) {
     const { floors, stairs } = createMallMap(sd);
     const [up, dn] = floors;
     assert.equal(up.level, MALL_LEVEL);
     assert.equal(floors.length, 2);
-    assert.equal(stairs.length, 3);
+    assert.equal(stairs.length, 5); // trois dans les cours, deux dans la galerie de l'annexe
     assert.ok(up.voids.length >= 7 && !dn.voids.length, 'les vides sont à l\'étage du haut');
     for (const st of stairs) {
       // les six cases de l'escalier sont libres aux deux étages, ses deux entrées aussi, et hors des vides

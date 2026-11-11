@@ -218,3 +218,6 @@ Level 17 (le mall) : même source, même traitement (tools/polyhaven-glb.py puis
   vintage_day_bed.glb  https://polyhaven.com/a/vintage_day_bed
   vintage_electric_kettle.glb  https://polyhaven.com/a/vintage_electric_kettle
   standing_picture_frame_01.glb  https://polyhaven.com/a/standing_picture_frame_01
+  WoodenTable_01.glb  https://polyhaven.com/a/WoodenTable_01
+  dining_table.glb  https://polyhaven.com/a/dining_table
+  painted_wooden_table.glb  https://polyhaven.com/a/painted_wooden_table

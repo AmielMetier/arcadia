@@ -3,6 +3,7 @@
 ## 5.57 — 11 novembre 2026
 - **The Backrooms** — Un nouveau niveau à visiter en avant-première : le Level 17, un centre commercial abandonné sur deux étages. Pour l'instant, on n'y entre que par le ⭐ niveau de départ des VIP ; l'objectif et l'entité viendront plus tard :
   - un mail et trois cours sous verrière, des boutiques ouvertes, fermées ou vidées, deux grands magasins, un food court, un cinéma, une salle de jeux, un parking, des quais, des bureaux et des coulisses ;
+  - au sud, une aile plus ancienne : une galerie basse de plafond, ses boutiques, un supermarché, une brocante et une jardinerie ; dessous, un dédale de couloirs de service et de réserves, sans cul-de-sac ;
   - chaque grande salle a plusieurs issues : on fait des boucles au lieu de revenir sur ses pas ;
   - le grand magasin se visite rayon par rayon, et ses rayons portent de vrais emballages ;
   - des enseignes, des plaques « EXIT » vertes au-dessus des portes, des salles de cinéma numérotées ;

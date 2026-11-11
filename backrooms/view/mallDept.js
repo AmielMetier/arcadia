@@ -56,7 +56,7 @@ export function createDept(K) {
   };
 
   // une gondole à deux faces : un fond, quatre niveaux de chaque côté, leurs réglettes de prix ; garnie par facings
-  const GOODS = { archive: ['carton', 'carton', 'carton', 'carton'], toys: ['toys', 'toys', 'toys', 'toys'], electro: ['electro', 'electro', 'electro', 'electro'], kitchen: ['kitchen', 'kitchen', 'kitchen', 'stock'], sport: ['sport', 'sport', 'shoes', 'sport'], stock: ['carton', 'carton', 'stock', 'stock'] };
+  const GOODS = { archive: ['carton', 'carton', 'carton', 'carton'], grocery: ['stock', 'kitchen', 'stock', 'stock'], toys: ['toys', 'toys', 'toys', 'toys'], electro: ['electro', 'electro', 'electro', 'electro'], kitchen: ['kitchen', 'kitchen', 'kitchen', 'stock'], sport: ['sport', 'sport', 'shoes', 'sport'], stock: ['carton', 'carton', 'stock', 'stock'] };
   const gondola = (it) => {
     const hw = it.w / 2;
     const hd = it.d / 2;
@@ -300,6 +300,74 @@ export function createDept(K) {
     }
   };
 
+  // --- les sanitaires : une cuvette tournée (le pied, la vasque, son rebord), l'abattant, le réservoir ; des vasques
+  // posées sur le plan des lavabos, leur robinet ---
+  MATS.china = MATS.china || { m: baked(phong({ color: '#dcd8cc', specular: '#9a9a9a', shininess: 90 }), { spec: 0.5, gloss: 120, mask: 0 }), S: 1 };
+  const lathe = (pts, seg = 16) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg);
+  const BOWL = lathe([[0.1, 0], [0.13, 0.02], [0.115, 0.2], [0.15, 0.32], [0.2, 0.39], [0.21, 0.415], [0.185, 0.42], [0.14, 0.33], [0.06, 0.24], [0, 0.23]]).scale(1, 1, 1.22);
+  const SEAT = new THREE.TorusGeometry(0.175, 0.026, 6, 20).rotateX(PI / 2).scale(1, 0.45, 1.22);
+  const VESSEL = lathe([[0.06, 0], [0.17, 0.015], [0.2, 0.09], [0.205, 0.125], [0.19, 0.125], [0.16, 0.05], [0, 0.035]]);
+  const toilet = (x, z, id) => {
+    G.add('china', BOWL.clone().translate(x, 0, z));
+    G.add(id % 4 === 1 ? 'black' : 'china', SEAT.clone().translate(x, 0.43, z));
+    G.box('china', x - 0.21, x + 0.21, 0.42, 0.8, z + 0.21, z + 0.39, '-y');
+    G.box('china', x - 0.225, x + 0.225, 0.8, 0.83, z + 0.2, z + 0.4, '-y');
+    G.add('steel', new THREE.CylinderGeometry(0.018, 0.018, 0.012, 10).translate(x + 0.12, 0.836, z + 0.3));
+    G.add('steel', new THREE.CylinderGeometry(0.012, 0.012, 0.2, 6).translate(x, 0.33, z + 0.2));
+  };
+  const basin = (x, z) => {
+    G.add('china', VESSEL.clone().translate(x, 0.88, z));
+    G.add('steel', new THREE.CylinderGeometry(0.012, 0.014, 0.16, 8).translate(x, 0.96, z - 0.22));
+    G.beam('steel', [x, 1.035, z - 0.22], [x, 1.02, z - 0.1], 0.02, 0.016);
+    G.add('steel', new THREE.CylinderGeometry(0.02, 0.02, 0.02, 8).translate(x + 0.08, 0.89, z - 0.22));
+  };
+
+  // --- le cinéma : une affiche sur pied (un cadre de laiton sur deux montants, l'affiche éteinte derrière sa vitre) ;
+  // la caisse (un comptoir de marbre, trois guichets vitrés à hygiaphone, le bandeau « BOX OFFICE », les tarifs) ---
+  const standee = (it, { posters, panel }) => {
+    const yaw = it.yaw || 0;
+    const c = Math.cos(yaw);
+    const sn = Math.sin(yaw);
+    const at = (lx, lz) => [it.x + lx * c + lz * sn, it.z - lx * sn + lz * c];
+    const B = (k, w, h, d, lx, y, lz) => G.add(k, new THREE.BoxGeometry(w, h, d).translate(lx, y, lz).rotateY(yaw).translate(it.x, 0, it.z));
+    B('brass', 0.86, 1.36, 0.05, 0, 1.2, 0);
+    for (const s of [-1, 1]) {
+      B('brass', 0.04, 0.55, 0.04, s * 0.36, 0.27, 0);
+      B('brass', 0.08, 0.03, 0.5, s * 0.36, 0.015, 0);
+    }
+    for (const s of [1, -1]) {
+      const [x, z] = at(0, s * 0.027);
+      panel((it.film + (s > 0 ? 0 : 3)) % 4 === 3 ? 'postersOff' : 'posters', posters.uv(it.film + (s > 0 ? 0 : 4)), x, 1.2, z, 0.78, 1.28, s * sn, s * c);
+    }
+  };
+  const boxoffice = (it, { menus, panel }) => {
+    const hw = it.w / 2;
+    const hd = it.d / 2;
+    const P = frame(it);
+    const F = front(it);
+    const y0 = yawZ(F);
+    lbox('marbleDark', it, -hw, hw, 0, 1.05, -hd, hd, '-y');
+    lbox('brass', it, -hw - 0.02, hw + 0.02, 1.05, 1.08, -hd - 0.02, hd + 0.04);
+    lbox('shelfBlack', it, -hw, hw, 1.08, 2.25, -hd, -hd + 0.06);
+    for (const lx of [-hw, -hw / 3, hw / 3, hw - 0.06]) lbox('brass', it, lx, lx + 0.06, 1.08, 2.25, hd - 0.06, hd);
+    lbox('glass', it, -hw + 0.06, hw - 0.06, 1.08, 2.25, hd - 0.04, hd - 0.03);
+    lbox('shelfBlack', it, -hw - 0.05, hw + 0.05, 2.25, 2.85, -hd - 0.05, hd + 0.1);
+    const [sx, sz] = P(0, hd + 0.105);
+    goods.sign(26, sx, 2.55, sz, 3.6, 0.45, F[0], F[1], true);
+    for (let i = 0; i < 3; i++) {
+      const lx = -hw + (it.w * (i + 0.5)) / 3;
+      const [hx, hz] = P(lx, hd - 0.02);
+      G.add('brass', new THREE.TorusGeometry(0.09, 0.012, 5, 18).rotateY(y0).translate(hx, 1.5, hz));
+      lbox('brass', it, lx - 0.22, lx + 0.22, 1.08, 1.1, hd - 0.1, hd + 0.12);
+      if (i !== 1) {
+        const [rx, rz] = P(lx, -0.1);
+        model('CashRegister_01', rx, 1.08, rz, y0 + PI);
+      }
+      const [px, pz] = P(lx, -hd + 0.065);
+      panel(i === 2 ? 'menusOff' : 'menus', menus.uv(3 + i), px, 1.72, pz, 1.5, 0.5, F[0], F[1]);
+    }
+  };
+
   // --- le food court, les bureaux, les locaux techniques ---
   // un box : deux banquettes de bois face à face, une table sur son pied
   const booth = (it) => {
@@ -438,5 +506,5 @@ export function createDept(K) {
     goods.shelf(P, -hw + 0.1, hw - 0.1, 0.25, -hd + 0.08, hd - 0.08, 'carton', it.id * 5, 0.5, 0.35);
   };
 
-  return { gondola, pallet, rack, cosmetic, fitting, shoetable, roomset, tvwall, luggage, signs, curtain, booth, pot, partition, meeting, kitchenette, tanks, panelbox, genset, workbench };
+  return { standee, boxoffice, toilet, basin, gondola, pallet, rack, cosmetic, fitting, shoetable, roomset, tvwall, luggage, signs, curtain, booth, pot, partition, meeting, kitchenette, tanks, panelbox, genset, workbench };
 }

@@ -465,8 +465,13 @@ function goodsAtlas() {
 const SIGNS = ['BEAUTY', 'LADIES', 'SHOES', 'HOME', 'ELECTRONICS', 'TOYS', 'MENSWEAR', 'LUGGAGE', 'KITCHEN', 'STOCKROOM', 'FITTING ROOMS', 'PAY HERE', 'CUSTOMER SERVICE', 'CLEARANCE', 'LUMIÈRE', 'ORCHID & ASH'];
 export const SIGN = Object.fromEntries(SIGNS.map((s, i) => [s, i]));
 export const DEPT_SIGN = { beauty: 0, ladies: 1, shoes: 2, home: 3, electro: 4, toys: 5, mens: 6, luggage: 7, kitchen: 8, stock: 9 };
-// (les petites cases : 2 colonnes × 12 rangées de 512 × 64 ; dessous, quatre grandes enseignes de 1024 × 128)
-const SIGN_H = 1280;
+// (les petites cases : 2 colonnes × 14 rangées de 512 × 64 ; dessous, quatre grandes enseignes de 1024 × 128)
+const SIGN_A0 = 896;
+const SIGN_H = SIGN_A0 + 512;
+export const SIGN_MARKET = 22; // les grandes surfaces de l'annexe, puis le fléchage vers l'annexe
+export const SIGN_FLEA = 23;
+export const SIGN_GARDEN = 24;
+export const SIGN_ANNEX = 25;
 const FILMS = ['STARFALL', 'THE LAST SUMMER', 'NIGHT SHIFT', 'PARADE OF LIGHTS', 'THE QUIET FLOOR', 'CLOSING TIME'];
 export const SIGN_EXIT = 16; // trois plaques dans la case : EXIT, ← EXIT, EXIT →
 export const SIGN_SCREEN = 17; // 17 à 19 : deux plaques par case (salles 1 à 6)
@@ -564,8 +569,40 @@ function signAtlas() {
     g.font = `bold 34px "Futura", "Century Gothic", ${FONT}`;
     g.fillText('P A R K I N G  ·  L E V E L  P 1', x + 286, y + 44, 420);
   }
+  // l'annexe : le supermarché, la brocante, la jardinerie, le fléchage
+  {
+    const plate = (i, bg, ink, font, text, deco) => {
+      const [x, y] = cellXY(i);
+      g.fillStyle = bg;
+      g.fillRect(x, y, 512, 64);
+      g.fillStyle = ink;
+      g.font = font;
+      g.fillText(text, x + 256, y + 45, 440);
+      if (deco) deco(x, y);
+    };
+    plate(SIGN_MARKET, '#f4f1e6', '#1f7a3a', `900 40px ${FONT}`, 'GREENFIELD MARKET', (x, y) => {
+      g.fillStyle = '#d8262c';
+      g.fillRect(x, y, 512, 7);
+      g.fillRect(x, y + 57, 512, 7);
+    });
+    plate(SIGN_FLEA, '#2a1f16', '#e0c48a', 'italic 38px Georgia, "Times New Roman", serif', 'Second Chance Antiques', (x, y) => {
+      g.strokeStyle = '#e0c48a';
+      g.lineWidth = 1.5;
+      g.strokeRect(x + 6, y + 6, 500, 52);
+    });
+    plate(SIGN_GARDEN, '#16331f', '#dfe9c8', `bold 34px "Futura", "Century Gothic", ${FONT}`, 'EVERGREEN · GARDEN CENTRE', null);
+    plate(26, '#1a0f3a', '#ffd86a', `900 44px ${FONT}`, 'B O X   O F F I C E', (x, y) => {
+      g.fillStyle = '#ff5fa8';
+      g.fillRect(x + 10, y + 6, 492, 3);
+      g.fillRect(x + 10, y + 55, 492, 3);
+    });
+    plate(SIGN_ANNEX, '#3a2a1c', '#f1e2c4', `bold 30px "Futura", "Century Gothic", ${FONT}`, 'THE ANNEX · MARKET · ANTIQUES · GARDEN', (x, y) => {
+      g.fillStyle = '#d9a441';
+      g.fillRect(x, y + 58, 512, 6);
+    });
+  }
   // les grandes enseignes (1024 × 128)
-  const A0 = 768;
+  const A0 = SIGN_A0;
   {
     // Hartwell's : une anglaise dorée sur un vert profond
     const y = A0;
@@ -646,7 +683,7 @@ function signAtlas() {
 }
 // une petite case (c0 à c1 : la part de sa largeur) ; une grande enseigne
 export const signUV = (i, c0 = 0, c1 = 1) => [((i % 2) * 512 + 2 + 508 * c0) / 1024, 1 - (Math.floor(i / 2) * 64 + 62) / SIGN_H, ((i % 2) * 512 + 2 + 508 * c1) / 1024, 1 - (Math.floor(i / 2) * 64 + 2) / SIGN_H];
-export const anchorUV = (k) => [2 / 1024, 1 - (768 + k * 128 + 126) / SIGN_H, 1022 / 1024, 1 - (768 + k * 128 + 2) / SIGN_H];
+export const anchorUV = (k) => [2 / 1024, 1 - (SIGN_A0 + k * 128 + 126) / SIGN_H, 1022 / 1024, 1 - (SIGN_A0 + k * 128 + 2) / SIGN_H];
 
 let TEX = null;
 export function createGoods({ G, MATS, baked }) {

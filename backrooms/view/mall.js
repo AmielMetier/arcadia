@@ -147,7 +147,8 @@ function offsetPoly(pts, d) {
 
 // le constructeur : des listes de sommets par matière, chaque triangle tourné vers sa normale, ses coordonnées de
 // texture prises sur le monde
-function makeBuilder(MATS) {
+// wells : les escaliers hors de la bande des cours ([x, z]) : par leur trémie aussi, on voit l'autre étage
+function makeBuilder(MATS, wells = []) {
   const bins = new Map();
   const extra = new Map(); // des géométries toutes faites (cylindres, poutres en biais), par matière
   const get = (k) => {
@@ -237,7 +238,7 @@ function makeBuilder(MATS) {
     for (let t = 0; t < P.length / 9; t++) {
       const o = t * 9;
       const z = (P[o + 2] + P[o + 5] + P[o + 8]) / 3;
-      const key = Math.floor((P[o] + P[o + 3] + P[o + 6]) / (3 * S)) * 4 + (z < OPEN_Z0 ? 0 : z < OPEN_Z1 ? 1 : 2);
+      const key = Math.floor((P[o] + P[o + 3] + P[o + 6]) / (3 * S)) * 8 + (z < OPEN_Z0 ? 0 : z < OPEN_Z1 ? 1 : 2 + Math.min(2, Math.floor((z - OPEN_Z1) / 46)));
       (sets.get(key) || sets.set(key, []).get(key)).push(t);
     }
     return [...sets.entries()].map(([key, tris]) => {
@@ -253,7 +254,9 @@ function makeBuilder(MATS) {
       g.setAttribute('position', new THREE.BufferAttribute(p, 3));
       g.setAttribute('normal', new THREE.BufferAttribute(n, 3));
       g.setAttribute('uv', new THREE.BufferAttribute(u, 2));
-      g.userData.inner = key % 4 !== 1;
+      g.computeBoundingBox();
+      const bb = g.boundingBox;
+      g.userData.inner = key % 8 !== 1 && !wells.some(([x, z]) => x > bb.min.x - WELL_R && x < bb.max.x + WELL_R && z > bb.min.z - WELL_R && z < bb.max.z + WELL_R);
       return g;
     });
   };
@@ -300,6 +303,8 @@ function makeMaterials(tx, baked) {
     carpetD: { m: baked(lam({ map: tx.carpetDark })), S: 1.5 },
     carpetFun: { m: baked(lam({ map: tx.carpetArcade })), S: 2.6 },
     carpetV: { m: baked(lam({ map: tx.carpetViolet })), S: 1.5 },
+    // l'annexe : le damier du mail du bas, en brun et crème (une aile plus ancienne)
+    annexTile: { m: baked(phong({ map: tx.checker, color: '#c08f62', specular: '#1c1a16', shininess: 30 }), { spec: 0.3, gloss: 80, mask: 0 }), S: 2.4 },
     lino: { m: baked(phong({ map: tx.lino, specular: '#1c1a16', shininess: 30 }), { spec: 0.35, gloss: 90, mask: 0 }), S: 2.4 },
     quarry: { m: baked(lam({ map: tx.quarry })), S: 2.4 },
     concrete: { m: baked(lam({ map: tx.concrete })), S: 2.5 },
@@ -346,10 +351,16 @@ function floorKey(r, fi, shops) {
       return ['wood', 'lino', 'carpetD', 'terrazzo', 'wood'][((r.shop || 0) * 7 + fi * 3) % 5];
     }
     case 'food':
+    case 'garden':
       return 'quarry';
     case 'store':
     case 'closed':
+    case 'market':
       return 'lino';
+    case 'annex':
+      return 'annexTile';
+    case 'flea':
+      return 'wood';
     case 'cine':
       return 'cine';
     case 'fun':
@@ -374,10 +385,12 @@ function wallKey(r) {
     case 'portal':
     case 'lobby':
     case 'food':
+    case 'annex':
       return 'plaster';
     case 'service':
     case 'dock':
     case 'parking':
+    case 'storage':
       return 'block';
     case 'cine':
     case 'cineHall':
@@ -439,7 +452,8 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       old.dispose();
     });
   }
-  const G = makeBuilder(MATS);
+  const wells = (map.stairs || []).filter((st) => st.cz < OPEN_Z0 || st.cz > OPEN_Z1).map((st) => [st.cx, st.cz]);
+  const G = makeBuilder(MATS, wells);
 
   // --- Les plafonds : hauteur et genre case par case ---
   const VZ0 = Math.round((map.mailZ - 2 * C) / C); // les quatre cases du milieu du mail (la lanterne, au-dessus du vide)
@@ -1113,7 +1127,8 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   const WIDE = { rollershutter_door: 1.7, rollershutter_window_01: 2.7, korean_public_payphone_01: 0.6, drawer_cabinet: 0.7, wooden_bookshelf_worn: 0.8, exterior_aircon_unit: 1.0, utility_box_01: 0.4 };
   const model = (name, x, y, z, ry = 0, s = 1, rx = 0, rz = 0, piece = '*') => {
     placed.push([x, z, WIDE[name] || 0.4]);
-    kit.put(name, piece, x, y, z, ry, s, z < OPEN_Z0 || z > OPEN_Z1 ? INNER : undefined, rx, rz);
+    const inner = (z < OPEN_Z0 || z > OPEN_Z1) && !wells.some(([wx, wz]) => Math.abs(x - wx) < WELL_R && Math.abs(z - wz) < WELL_R);
+    kit.put(name, piece, x, y, z, ry, s, inner ? INNER : undefined, rx, rz);
   };
   // (les portes fermées des salles 3 à 6 : rien d'autre sur ce bout de mur)
   for (const d of map.fakeScreens || []) placed.push([d.x * C - 0.1, (d.z + 0.5) * C, 1.7]);
@@ -1295,3 +1310,4 @@ const LUSTRE = [[1.5, 12, 0, 0], [0.8, 6, -0.38, 0.26]];
 const OPEN_Z0 = 46;
 const OPEN_Z1 = 114;
 const INNER = { inner: 1 };
+const WELL_R = 24; // autour d'un escalier du sud : ce qu'on dessine encore depuis l'autre étage

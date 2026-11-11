@@ -926,7 +926,7 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     if (kind !== 'screen' && kind !== 'court' && kind !== 'plaza')
       for (let s = R.s0 + 1.2; s < R.s1 - 0.8; s += 3.5 + hash(seed, s) * 2) if (free(...at(R, s, 0.3), 0.2)) outlet(R, s, 0.32);
 
-    if (kind === 'service' || kind === 'dock') {
+    if (kind === 'service' || kind === 'dock' || kind === 'storage') {
       const corridor = R.room.x0 === R.room.x1 || R.room.z0 === R.room.z1;
       // les tuyaux : sur le mur sud des couloirs est-ouest (le nord porte la gaine de ventilation), sur tous les grands murs ailleurs
       if (len > 5 && (!corridor || (R.alongX ? R.nz < 0 : R.nx < 0))) pipes(R);
@@ -1000,7 +1000,7 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         else wmodel(frames[i % 3], R, s, 1.7, 0, 1.4);
       }, seed);
       grimeRun(R, gutted ? 2.5 : 5, gutted ? [5, 6, 7, 11, 12, 3, 1, 10, 4] : [12, 3, 9, 0], seed);
-    } else if (kind === 'store') {
+    } else if (kind === 'store' || kind === 'market' || kind === 'flea' || kind === 'garden') {
       slots(R, 2.6, 0.9, 0.55, (s, i, h) => {
         if (h < 0.3) {
           wbox('black', R, s, 2.5, 2.85, 3.4, 0, 0.06);
@@ -1086,7 +1086,7 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         else plate(R, s, 1.6, NOTE(4), 0.4, 0.52, null);
       }, seed);
       grimeRun(R, 5, [3, 9, 0, 12], seed);
-    } else if (kind === 'court' || kind === 'plaza' || kind === 'mail') {
+    } else if (kind === 'court' || kind === 'plaza' || kind === 'mail' || kind === 'annex') {
       slots(R, 2.5, 0.9, 0.5, (s, i, h) => {
         if (h < 0.4) adBox(R, s, 1.8, i + seed, i % 3 === 0);
         else if (h < 0.6) sign(R, s, 2.6, i % 3, 1.1);

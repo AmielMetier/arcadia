@@ -5,7 +5,7 @@
 // viennent de l'atlas des panneaux (view/mallGoods.js).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL_SIZE as C } from '../engine/map.js';
-import { signUV, anchorUV, ANCHOR, SIGN_EXIT, SIGN_SCREEN, SIGN_SCREENS78, SIGN_PARKING } from './mallGoods.js';
+import { signUV, anchorUV, ANCHOR, SIGN_EXIT, SIGN_SCREEN, SIGN_SCREENS78, SIGN_PARKING, SIGN_MARKET, SIGN_FLEA, SIGN_GARDEN, SIGN_ANNEX } from './mallGoods.js';
 
 const PI = Math.PI;
 const WALL = 2;
@@ -68,6 +68,11 @@ export function drawMallSigns({ map, fi, G, MATS, rooms, goods, hAt, model, arca
   anchor(byName('Pavilion entrance'), 0, 1, anchorUV(ANCHOR.pavilion), 8.8, 1.1, true);
   anchor(byName('Cinema entrance'), 0, 1, anchorUV(ANCHOR.stardust), 8.8, 1.1, true, true);
   anchor(byName('Parking entrance'), 0, 1, signUV(SIGN_PARKING), 6.4, 0.8, true);
+  // l'annexe : l'enseigne de chaque grande surface à son portail, le fléchage à l'entrée des deux transepts
+  anchor(byName('Greenfield Market entrance'), 0, -1, signUV(SIGN_MARKET), 6.4, 0.8, true);
+  anchor(byName('Second Chance Antiques entrance'), 0, -1, signUV(SIGN_FLEA), 6.4, 0.8, false);
+  anchor(byName('Evergreen Garden Centre entrance'), 0, -1, signUV(SIGN_GARDEN), 6.4, 0.8, true);
+  for (const n of ['West transept', 'East transept']) anchor(rooms.find((r) => r.name === n && !r.part), 0, -1, signUV(SIGN_ANNEX), 4.8, 0.6, true);
 
   // Funland : une enseigne au néon suspendue à l'entrée de chacun de ses deux passages
   if (arcade) {
