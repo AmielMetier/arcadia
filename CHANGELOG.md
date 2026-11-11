@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 5.58 — 11 novembre 2026
+- **The Backrooms** — Level 1 : caché dans un casier, tu n'es plus pris au piège par l'imposteur. Il attend devant en t'appelant une dizaine de secondes, puis renonce et s'éloigne (avant, il campait là sans fin, et sortir, c'était mourir).
+- **The Backrooms** — En quittant les Tuyauteries, l'écran parle bien du monte-charge de service qui remonte, et plus d'un toboggan.
+
 ## 5.57 — 11 novembre 2026
 - **The Backrooms** — Level 5 : on ne meurt plus en posant le pied dans l'hôtel.
   - L'entité reste au loin pendant les 30 premières secondes (un peu moins en difficile) : le temps de repérer les chambres et les cachettes
@@ -14,16 +18,13 @@
   - Passé ce répit, elle vient vous chercher comme avant
 
 ## 5.54 — 11 novembre 2026
-- **Hub** — Nouveau : le monstre du Level 1 change de corps, avec ses propres animations (TahitoaSenis)
-  - Models/level1/entite.glb : une silhouette voilée, 26 os, 10 clips nommés comme les états du jeu
-  - View/creature.js : un clip nommé comme l'état est joué tel quel (rien de l'explorateur, pas de gestes ajoutés) ; prise, démasquage, chute et jumpscare joués une fois ; démasquage de la durée de son clip ; pas comptés par rapport à la hauteur de repos de chaque pied
-  - Scene.js : la nouvelle entité au Level 1 et aux Poolrooms (hors mode VIP)
-- Nouveau : au Level 1, l'entité est un imposteur dès le début ; sprint plus lent de côté et à reculons (TahitoaSenis)
-  - L'entité commence avec l'apparence d'un joueur, marche à sa vitesse et ne se dévoile que tout près (la lampe ne la trahit plus)
-  - La transformation dure une seconde sur place, puis elle chasse un peu plus vite qu'un sprint ; loin de tous et hors de vue, elle reprend une apparence
-  - L'imposteur a son propre avatar (celui qu'il imite peut être vivant à côté)
-  - Le sprint : toute la vitesse droit devant, 72 % de côté, 60 % en arrière
-- **Hub** — Nouveau : au Level 1, la prise du monstre devient une étreinte qui étouffe (TahitoaSenis)
+- **The Backrooms** — Le monstre du Level 1 change de corps : une silhouette voilée, avec ses propres animations (marche, course, prise, chute, cri). On la croise aussi aux Poolrooms.
+- **The Backrooms** — Au Level 1, l'entité est un imposteur dès le début :
+  - elle commence avec l'apparence d'un joueur, marche à sa vitesse et ne se dévoile que tout près (la lampe ne la trahit plus) ;
+  - sa transformation dure une seconde sur place, puis elle chasse un peu plus vite qu'un sprint ; loin de tous et hors de vue, elle reprend une apparence ;
+  - celui qu'elle imite peut être vivant, juste à côté.
+- **The Backrooms** — Le sprint dépend du sens : toute la vitesse droit devant, 72 % de côté, 60 % en arrière.
+- **The Backrooms** — Au Level 1, la prise du monstre devient une étreinte qui étouffe.
 
 ## 5.53 — 11 novembre 2026
 - **The Backrooms** — Les joueurs VIP choisissent le niveau où commence la partie.

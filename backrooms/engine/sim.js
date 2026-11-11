@@ -1515,6 +1515,7 @@ export class BackroomsSim {
     }
     M.restT = Math.max(0, M.restT - DT);
     const locked = this.lockedIn(P);
+    const dist = Math.hypot(P.x - M.x, P.z - M.z);
     let goal = null;
     let speed = WALK_SPEED * MIMIC_SPEED;
     // le calme de l'arrivée vaut aussi pour l'imposteur : il reste au loin et se tait (il s'écarte de qui approche)
@@ -1555,9 +1556,21 @@ export class BackroomsSim {
     } else {
       M.bang = null;
       goal = { x: P.x, z: P.z };
+      // sa proie est dans un casier : il attend devant en l'appelant, puis renonce (sinon il campait là sans fin, et
+      // en sortir, c'était mourir)
+      if (!(P.hidden >= 0)) M.campT = 0;
+      else if (dist < 3) {
+        M.campT = (M.campT || rand(KNOCK_T[0], KNOCK_T[1])) - DT;
+        M.callT = Math.min(M.callT, 3.5);
+        if (M.campT <= 0) {
+          M.campT = 0;
+          M.restT = 25;
+          M.away0 = this.retreatSpot(P.x, P.z);
+          M.repathT = 0;
+        }
+      }
     }
     // ses appels : de vive voix quand il est assez près (et le voit), sinon au talkie
-    const dist = Math.hypot(P.x - M.x, P.z - M.z);
     M.callT -= DT;
     if (M.callT <= 0 && M.restT <= 0) { // (le talkie porte partout)
       M.callT = rand(MIMIC_CALL[0], MIMIC_CALL[1]);

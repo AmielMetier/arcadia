@@ -5029,6 +5029,32 @@ test('Level 1 : l\'imposteur — après une victime, l\'entité prend son appare
   assert.ok(!why && M.mimic === 1, 'dans la lampe, de loin, elle garde son déguisement');
 });
 
+test("Level 1 : devant le casier de sa proie, l'imposteur attend, appelle, puis renonce et s'éloigne (il ne campe plus là sans fin)", () => {
+  BackroomsSim.DISGUISE = true;
+  try {
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 11, players: [{ id: 0, name: 'A' }], localId: 0, level: 1 });
+    sim.arriveT = 0;
+    const M = sim.monster;
+    const A = sim.players[0];
+    assert.ok(M.mimic != null, 'déguisée');
+    const h = sim.map.hides.find((q) => !sim.map.safeAt(q.x, q.z));
+    M.dormantT = 0;
+    sim.enterHide(A, h);
+    M.sawHide = -1;
+    Object.assign(M, { x: h.x + h.dx * 1.2, z: h.z + h.dz * 1.2, path: [], repathT: 0 });
+    let gone = false;
+    for (let i = 0; i < 60 * (SIMX.KNOCK_T[1] + 2) && !gone; i++) {
+      sim.step({});
+      gone = M.restT > 0;
+    }
+    assert.ok(gone && M.mimic != null && A.status === 'alive', 'il renonce sans se démasquer, le joueur est toujours en vie');
+    for (let i = 0; i < 60 * 12; i++) sim.step({});
+    assert.ok(Math.hypot(M.x - A.x, M.z - A.z) > 8, `il s'est éloigné du casier (${Math.hypot(M.x - A.x, M.z - A.z).toFixed(1)} m)`);
+  } finally {
+    BackroomsSim.DISGUISE = false;
+  }
+});
+
 test("Level 1 : dès le départ, l'entité a l'apparence d'un joueur et marche à sa vitesse ; tout près, elle se transforme une seconde sur place, puis court un peu plus vite qu'un sprint ; loin de tous, elle reprend une apparence", () => {
   BackroomsSim.DISGUISE = true;
   try {

@@ -2011,7 +2011,7 @@ function handleEvent(ev, me) {
       }
       if (sfx && ev.level === 2) sfx.splashDown();
       else if (sfx && ev.level !== HOTEL_LEVEL) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
-      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : ev.level === HOTEL_LEVEL ? 'YOU RUN DOWN THE FIRE ESCAPE, FLOOR AFTER FLOOR…' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
+      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : ev.level === HOTEL_LEVEL ? 'YOU RUN DOWN THE FIRE ESCAPE, FLOOR AFTER FLOOR…' : ev.level === PIPES_LEVEL ? 'THE SERVICE ELEVATOR IS CLIMBING… AND CLIMBING…' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
       break;
     case 'level':
       if (hud) hud.closeKeypad();
