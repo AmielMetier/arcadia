@@ -505,6 +505,15 @@ export function createMallTextures() {
   out.shutter = tex(ruC);
   const [toC, toG] = big('120,122,124');
   out.plate = tex(toC);
+  // les tissus des vêtements (photos Poly Haven, 512 px) : denim, jersey, vichy, jacquard
+  const tl = new THREE.TextureLoader();
+  out.fabrics = ['l17_denim.jpg', 'l17_jersey.jpg', 'l17_vichy.jpg', 'l17_jacquard.jpg'].map((f) => {
+    const t = tl.load(TEX + f);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 4;
+    return t;
+  });
   out.carpetImg = null;
   const files = ['l5_marbre_blanc.jpg', 'l5_marbre_noir.jpg', 'moquette_rase.jpg', 'plafond.jpg', 'l17_parpaing.jpg', 'l17_beton.jpg', 'l17_faience.jpg', 'l5_noyer.jpg', 'l1_plafond.jpg', 'papier.jpg', 'l17_lino.jpg', 'l5_velours.jpg', 'l17_rideau.jpg', 'l17_tole.jpg'];
   out.ready = Promise.all(files.map(loadImage)).then(([mw, mb, moq, pla, mur, sol, fai, noy, dal, pap, lin, vel, rid, tol]) => {

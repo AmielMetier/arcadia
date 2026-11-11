@@ -19,6 +19,7 @@ import { CELL_SIZE as C, T, FLOOR_DY } from '../engine/map.js';
 import { MALL_CEIL, MALL_RAIL } from '../engine/mall.js';
 import { cinemaCarpet } from './mallTextures.js';
 import { drawMallProps } from './mallProps.js';
+import { drawMallWalls } from './mallWalls.js';
 import { createKitInstancer } from './kit.js';
 
 const SLAB = FLOOR_DY - MALL_CEIL; // l'épaisseur de la dalle sous le mail du haut (le bandeau des vides)
@@ -333,6 +334,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   const H = map.H;
   const up = floors[0];
   const MATS = makeMaterials(tx, baked);
+  MATS.__tx = tx; // (les tissus des vêtements, view/mallProps.js)
   const rooms = map.rooms;
   const roomOf = (x, z) => {
     if (x < 0 || z < 0 || x >= W || z >= H) return null;
@@ -893,6 +895,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   const kitMats = new Map();
   const kit = createKitInstancer({
     group,
+    reach: { base: 16, k: 40 },
     convert: (src, kitName, piece, variant) => {
       const key = src.uuid + '@' + variant;
       if (!kitMats.has(key)) {
@@ -906,8 +909,15 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   });
   // model(nom, x, y, z, lacet, échelle, roulis x, roulis z, morceaux) : « * » le modèle entier, « a+b » ces morceaux,
   // « a » un seul morceau recentré
-  const model = (name, x, y, z, ry = 0, s = 1, rx = 0, rz = 0, piece = '*') => kit.put(name, piece, x, y, z, ry, s, undefined, rx, rz);
-  const props = drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model });
+  // (chaque modèle posé laisse sa place aux murs habillés : un rayon, plus grand pour les rideaux et les meubles hauts)
+  const placed = [];
+  const WIDE = { rollershutter_door: 1.7, rollershutter_window_01: 2.7, korean_public_payphone_01: 0.6, drawer_cabinet: 0.7, wooden_bookshelf_worn: 0.8, exterior_aircon_unit: 1.0, utility_box_01: 0.4 };
+  const model = (name, x, y, z, ry = 0, s = 1, rx = 0, rz = 0, piece = '*') => {
+    placed.push([x, z, WIDE[name] || 0.4]);
+    kit.put(name, piece, x, y, z, ry, s, undefined, rx, rz);
+  };
+  const props = drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, placed });
+  drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed, show: props.show });
   kit.build();
   G.build(group);
   // les barreaux : un seul maillage

@@ -204,7 +204,7 @@ function directoryTex(name) {
 }
 
 // --- Le mobilier ---
-export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
+export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, placed = [] }) {
   const furn = map.furn || [];
   // les matières propres au mobilier
   const lam = (o) => new THREE.MeshLambertMaterial(o);
@@ -216,6 +216,19 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
   MATS.cloth = MATS.cloth || { m: baked(lam({ color: '#5b5560' })), S: 1 };
   MATS.cloth2 = MATS.cloth2 || { m: baked(lam({ color: '#7d5a46' })), S: 1 };
   MATS.carton = MATS.carton || { m: baked(lam({ color: '#8f7350' })), S: 1 };
+  // les vêtements : six étoffes (denim, jerseys de couleur, vichy, jacquard), sur les portants et les mannequins
+  // une valise seule (le modèle en range deux côte à côte)
+  const SUITCASE = ['01', '02'].map((k) => ['bottom', 'clasp', 'handle', 'top'].map((p) => `vintage_suitcase_${k}_${p}`).join('+'));
+  const FAB = MATS.__fabrics || [];
+  const fx = MATS.__tx && MATS.__tx.fabrics;
+  if (fx && !FAB.length) {
+    [[0, '#d8dce4'], [1, '#9c3a36'], [1, '#2e4466'], [2, '#d8c8c0'], [3, '#c9bba4'], [1, '#b08a3a']].forEach(([k, c], i) => {
+      MATS['fab' + i] = { m: baked(lam({ map: fx[k], color: c })), S: 1 };
+      FAB.push('fab' + i);
+    });
+    MATS.__fabrics = FAB;
+  }
+  const fab = (i) => (FAB.length ? FAB[((i % FAB.length) + FAB.length) % FAB.length] : i % 2 ? 'cloth' : 'cloth2');
   MATS.screenWhite = MATS.screenWhite || { m: baked(lam({ color: '#b9b6ae' })), S: 1 };
   const lit = (map2, k = 1.25) => new THREE.MeshBasicMaterial({ map: map2, color: new THREE.Color(1, 1, 1).multiplyScalar(k) });
 
@@ -250,6 +263,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
   MATS.arcadeGlow2 = { m: new THREE.MeshBasicMaterial({ color: new THREE.Color('#14c8b4').multiplyScalar(1.5) }), S: 1 };
   // un panneau texturé (une case d'atlas) : une face de w × h, centrée en (x, y, z), tournée vers (nx, nz)
   const panel = (k, uv, x, y, z, w, h, nx, nz) => {
+    placed.push([x, z, w / 2 + 0.2]); // (les murs habillés, view/mallWalls.js, laissent la place)
     const g = new THREE.PlaneGeometry(w, h);
     const a = g.attributes.uv;
     for (let i = 0; i < a.count; i++) a.setXY(i, a.getX(i) ? uv[2] : uv[0], a.getY(i) ? uv[3] : uv[1]);
@@ -277,19 +291,27 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
     return v - Math.floor(v);
   };
   // ce qu'on pose sur une table de présentation, selon le commerce
+  // ce qu'on pose sur une table de présentation, selon le commerce : [modèle, échelle, morceaux, roulis x, hauteur]
   const SHOW = {
-    toys: [['rubber_duck_toy', 1.6], ['rubber_duck_toy', 1.6], ['cardboard_box_01', 0.6]],
-    kids: [['rubber_duck_toy', 1.6], ['cardboard_box_01', 0.6]],
-    music: [['boombox', 0.9], ['cardboard_box_01', 0.5]],
-    electronics: [['television_02', 1], ['boombox', 0.9], ['Television_01', 0.85]],
-    video: [['Television_01', 0.85], ['television_02', 1]],
-    gifts: [['ceramic_vase_01', 1], ['antique_ceramic_vase_01', 1], ['marble_bust_01', 0.8]],
-    jewelry: [['ceramic_vase_01', 0.8], ['mantel_clock_01', 1]],
-    watches: [['mantel_clock_01', 1], ['wall_clock', 1]],
-    florist: [['potted_plant_04', 2.2], ['potted_plant_04', 2.2], ['ceramic_vase_01', 1]],
-    kitchen: [['ceramic_vase_01', 1], ['antique_ceramic_vase_01', 0.9]],
-    luggage: [['vintage_suitcase', 0.55]],
-    perfume: [['ceramic_vase_01', 0.6], ['ceramic_vase_01', 0.5]],
+    toys: [['rubber_duck_toy', 1.6], ['gamepad', 1], ['football', 1, 'football_inflated'], ['rubber_duck_toy', 1.6], ['concrete_cat_statue', 1]],
+    kids: [['rubber_duck_toy', 1.6], ['football', 1, 'football_inflated'], ['gamepad', 1]],
+    music: [['boombox', 0.9], ['Ukulele_01', 1, '*', -PI / 2, 0.03], ['cassette_player', 1.4], ['portable_cassette_player', 1.3]],
+    electronics: [['television_02', 1], ['boombox', 0.9], ['Television_01', 0.85], ['vintage_video_camera', 1.5], ['portable_cassette_player', 1.3]],
+    video: [['Television_01', 0.85], ['television_02', 1], ['gamepad', 1], ['vintage_video_camera', 1.5]],
+    gifts: [['ceramic_vase_01', 1], ['antique_ceramic_vase_01', 1], ['marble_bust_01', 0.8], ['garden_gnome', 0.8], ['concrete_cat_statue', 1], ['ceramic_vase_02', 1]],
+    jewelry: [['ceramic_vase_03', 0.8], ['vintage_pocket_watch', 2], ['brass_vase_03', 1]],
+    watches: [['alarm_clock_01', 1], ['vintage_pocket_watch', 2], ['digital_wrist_watch', 1.5, '*', -PI / 2, 0.02]],
+    optician: [['round_spectacles', 1.3], ['office_notepads', 1, 'office_notepads_note_stack'], ['brass_vase_03', 0.8], ['medical_box', 0.8]],
+    florist: [['potted_plant_04', 2.2], ['ceramic_vase_02', 1], ['potted_plant_04', 2.2], ['ceramic_vase_04', 1]],
+    kitchen: [['jug_01', 1], ['pot_enamel_01', 1], ['brass_pan_01', 1], ['wooden_cutting_board', 1], ['ceramic_vase_04', 1]],
+    luggage: [['vintage_suitcase', 0.55, SUITCASE[0]], ['vintage_suitcase', 0.55, SUITCASE[1]]],
+    perfume: [['ceramic_vase_03', 0.6], ['brass_vase_03', 1], ['ceramic_vase_04', 0.6]],
+    pharmacy: [['medical_box', 1], ['all_purpose_cleaner', 1], ['bleach_bottle', 1], ['multi_cleaner_bottle', 1], ['plastic_bottle_gallon', 1]],
+    sports: [['football', 1, 'football_inflated'], ['american_football', 1], ['baseball_bat', 1, '*', 0, 0, PI / 2], ['baseball_01', 1.5]],
+    outdoor: [['fishermans_hat', 1], ['binoculars', 1], ['old_gas_mask', 0.9, '*', 0, 0, PI / 2], ['metal_jerrycan', 0.7]],
+    cards: [['postcard_set_01', 1, '*', -PI / 2, -0.215], ['office_notepads', 1, 'office_notepads_note_stack']],
+    books: [['book_encyclopedia_set_01', 1, 'book_encyclopedia_set_01_book01+book_encyclopedia_set_01_book02+book_encyclopedia_set_01_book03'], ['office_notepads', 1, 'office_notepads_note_stack'], ['binder_notebook', 1, 'binder_notebook_closed']],
+    candy: [['carrot_cake', 1], ['croissant', 1.2], ['food_apple_01', 1.4], ['jug_01', 1]],
   };
   const shopOf = (it) => (it.shop !== undefined && map.shops ? map.shops.find((s) => s.id === it.shop) : null);
 
@@ -302,6 +324,8 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
       case 'bench': {
         // un banc à lattes de bois sur pieds de fonte (le banc à dossier de « modular_street_seating »)
         placeAt('modular_street_seating', it.x, 0, it.z, yawZ(F), -1.135, 0.03, 1, 0, 0, 'legs_single+seat+seat_back+back_support_r+back_support_l+crossbar+legs_double');
+        if (it.id % 13 === 4) model('old_gas_mask', it.x + 0.4, 0.46, it.z + F[1] * 0.05, rand(it.id) * 6, 1, 0, PI / 2);
+        else if (it.id % 11 === 6) model('vintage_suitcase', it.x - 0.5, 0.45, it.z, yawZ(F), 0.5, 0, 0, SUITCASE[it.id % 2]);
         break;
       }
       case 'bin':
@@ -318,7 +342,14 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
           model('dead_quiver_trunk', it.x - 0.45, 0.5, it.z + 0.35, a + 2, 0.8, 0.12, 0.08);
         } else if (it.plant === 1) {
           // des plantes en plastique, toujours vertes (le pot est caché dans la jardinière)
-          model('potted_plant_02', it.x, 0.6 - 0.34 * 2.3, it.z, a, 2.3);
+          if (it.id % 3 === 0) model('potted_plant_02', it.x, 0.6 - 0.34 * 2.3, it.z, a, 2.3);
+          else if (it.id % 3 === 1) {
+            model('fern_02', it.x - 0.2, 0.58, it.z, a, 2.3, 0, 0, 'fern_02_b');
+            model('fern_02', it.x + 0.45, 0.58, it.z + 0.4, a + 1, 1.8, 0, 0, 'fern_02_c');
+          } else {
+            model('anthurium_botany_01', it.x, 0.58, it.z - 0.15, a, 1.9, 0, 0, 'anthurium_botany_01_b');
+            model('calathea_orbifolia_01', it.x + 0.2, 0.58, it.z + 0.5, a + 2, 1.1, 0, 0, 'calathea_orbifolia_01_a');
+          }
         } else {
           // un tronc mort, couché dans la terre, quelques plantes grasses
           model('dead_quiver_trunk', it.x - 0.15, 0.66, it.z + 0.85, a, 0.85, 0, 1.45);
@@ -371,6 +402,9 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
         put('trim', new THREE.CylinderGeometry(0.32, 0.45, 1.3, 16), it.x, 0.12 + 0.65, it.z);
         put('trim', new THREE.CylinderGeometry(1.3, 0.5, 0.3, 24), it.x, 1.5, it.z);
         put('soil', new THREE.CylinderGeometry(1.15, 1.15, 0.02, 24), it.x, 1.65, it.z);
+        // une sculpture de bronze sur la vasque (une baleine à l'ouest, une raie à l'est)
+        if (it.x < (map.W * C) / 2) model('bronze_whale_statue', it.x, 1.66, it.z, 0.6, 1.25);
+        else model('bronze_ray_statue', it.x, 1.66, it.z, 2.2, 1.8);
         // ce qu'on a jeté dans le bassin à sec
         model('trashbag', it.x + 1.6, 0.12, it.z - 1.2, rand(it.id) * 6, 0.9);
         model('plastic_crate_01', it.x - 1.9, 0.12, it.z + 0.8, 0.7, 1, 0, 0.3);
@@ -398,10 +432,29 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
         const yaw = yawZ(F);
         const sh = shopOf(it);
         const wood = sh && ['books', 'gifts', 'florist', 'kitchen', 'candy', 'cards', 'toys', 'kids'].includes(sh.trade);
+        if (sh && sh.trade === 'books') {
+          for (const lx of [-0.95, 0.95]) {
+            const [x, z] = P(lx, -hd + 0.29);
+            placeAt('wooden_bookshelf_worn', x, 0, z, yaw);
+          }
+          break;
+        }
         if (sh && ['pharmacy', 'sports', 'outdoor', 'electronics', 'video'].includes(sh.trade)) {
           for (let i = 0; i < 5; i++) {
             const [x, z] = P(-1.2 + i * 0.6, 0);
             model('steel_frame_shelves_02', x, 0, z, yaw);
+          }
+          if (sh.trade === 'pharmacy') {
+            const [x, z] = P(1.75, 0.15);
+            model('vintage_crutches_01', x, 0, z, yaw + 0.3, 1, 0, -0.18);
+          }
+          break;
+        }
+        if (sh && sh.trade === 'cards') {
+          // des présentoirs peints, comme chez un papetier
+          for (let i = 0; i < 4; i++) {
+            const [x, z] = P(-0.9 + i * 0.6, -hd + 0.02);
+            model('painted_wooden_shelves', x, 0, z, yaw);
           }
           break;
         }
@@ -417,6 +470,8 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
         lbox('marbleDark', it, -hw - 0.03, hw + 0.03, 1.0, 1.04, -hd - 0.03, hd + 0.03);
         const sh = shopOf(it);
         model('CashRegister_01', it.x - 0.3, 1.04, it.z, sh && sh.dir > 0 ? PI : 0);
+        model('stationery_supplies', it.x + 0.55, 1.04, it.z - 0.05, rand(it.id) * 6);
+        if (it.id % 2) model('clipboard', it.x + 0.15, 1.045, it.z + 0.1, rand(it.id, 1) * 6, 1, -PI / 2);
         break;
       }
       case 'rack': {
@@ -426,7 +481,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
         const n = (it.id * 5) % 9;
         for (let i = 0; i < n; i++) {
           const a = (i / 9) * PI * 2 + it.id;
-          put(i % 2 ? 'cloth' : 'cloth2', new THREE.BoxGeometry(0.42, 0.78, 0.05), it.x + Math.cos(a) * 0.52, 0.95, it.z + Math.sin(a) * 0.52, -a);
+          put(fab(it.id * 3 + i), new THREE.BoxGeometry(0.42, 0.78, 0.05), it.x + Math.cos(a) * 0.52, 0.95, it.z + Math.sin(a) * 0.52, -a);
           put('steel', new THREE.TorusGeometry(0.05, 0.006, 4, 10, PI), it.x + Math.cos(a) * 0.52, 1.36, it.z + Math.sin(a) * 0.52, -a);
         }
         break;
@@ -441,11 +496,17 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
           break;
         }
         const list = (sh && SHOW[sh.trade]) || [['cardboard_box_01', 0.6]];
-        const n = 1 + (it.id % 3);
-        for (let i = 0; i < n; i++) {
-          const [name, s] = list[(it.id + i) % list.length];
-          model(name, it.x - hw + 0.35 + (i * (it.w - 0.7)) / Math.max(1, n - 1 || 1), 0.84, it.z + (rand(it.id, i) - 0.5) * 0.3, rand(it.id, i + 3) * 6.28, s);
-        }
+        // 2 rangées de 2 ou 3 objets, un peu de travers ; une case vide de temps en temps (on s'est servi)
+        const cols = it.w > 1.4 ? 3 : 2;
+        const P2 = frame(it);
+        for (let j = 0; j < 2; j++)
+          for (let i = 0; i < cols; i++) {
+            const q = it.id * 7 + j * 3 + i;
+            if (rand(q) < 0.22) continue;
+            const [name, sc, piece = '*', rx = 0, dy = 0, rz = 0] = list[q % list.length];
+            const [x, z] = P2(-hw + (it.w * (i + 0.5)) / cols + (rand(q, 1) - 0.5) * 0.12, (j - 0.5) * it.d * 0.45);
+            model(name, x, 0.84 + dy, z, rand(q, 2) * 6.28, sc, rx, rz, piece);
+          }
         break;
       }
       case 'debris':
@@ -455,9 +516,14 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
         }
         model('cardboard_box_01', it.x + 0.6, 0, it.z - 0.3, rand(it.id) * 6, 1.1, 0, it.id % 2 ? 1.57 : 0);
         if (it.id % 2) model('trashbag', it.x - 0.5, 0, it.z + 0.4, rand(it.id, 1) * 6);
+        for (let k = 0; k < 1 + (it.id % 3); k++) model('cement_bag', it.x - 0.2 + (k % 2) * 0.1, k * 0.17, it.z - 0.6, PI / 2 + rand(it.id, k + 4) * 0.4, 1);
+        model('spray_paint_bottles_02', it.x + 0.2, 0, it.z + 0.6, rand(it.id, 5) * 6, 1, 0, 0, it.id % 2 ? 'spray_paint_bottles_02_dented' : 'spray_paint_bottles_02');
+        if (it.id % 3 === 0) model('old_gas_mask', it.x - 0.9, 0, it.z - 0.1, rand(it.id, 6) * 6, 1, 0, PI / 2);
         break;
       case 'ladder':
         model('wooden_ladder', it.x, 0, it.z, rand(it.id) * 6.28, 1.4);
+        model('metal_tool_chest', it.x + 1.2, 0, it.z + 0.3, rand(it.id, 1) * 6);
+        model('mousetrap', it.x - 0.8, 0, it.z + 0.9, rand(it.id, 2) * 6, 1.4);
         break;
       case 'stall':
         if (it.toilet) {
@@ -466,6 +532,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
           const [tx, tz] = P(0, hd - 0.4);
           put('plastic', new THREE.CylinderGeometry(0.2, 0.16, 0.42, 14), tx, 0.21, tz);
           put('plastic', new THREE.BoxGeometry(0.42, 0.36, 0.18), tx, 0.6, tz + 0.3);
+          if (it.id % 3 === 0) model('plunger', tx + 0.4, 0, tz - 0.1, rand(it.id) * 6);
         } else {
           lbox('trim', it, -hw, hw, 0, 1.05, -hd, hd, '-y');
           lbox('steel', it, -hw - 0.03, hw + 0.03, 1.05, 1.09, -hd - 0.05, hd + 0.03);
@@ -475,6 +542,22 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
           for (const lx of [-hw + 0.04, hw - 0.04]) lbox('trim', it, lx - 0.04, lx + 0.04, 1.05, 3.3, -hd - 0.1, -hd);
           // la caisse sur le comptoir, des tabourets de bar devant (un renversé)
           model('CashRegister_01', it.x - hw + 0.8, 1.09, it.z, PI);
+          // ce qui est resté sur le comptoir : des petits pains, des croissants, des pommes, un gâteau sous cloche
+          const FOOD = [['hamburger_buns', 1.2], ['croissant', 1.2], ['food_apple_01', 1.3], ['carrot_cake', 1]];
+          for (let i = 0; i < 4; i++) {
+            if (rand(it.id, i + 7) < 0.35) continue;
+            const [name, sc] = FOOD[(it.sign + i) % FOOD.length];
+            const [x, z] = P(-hw + 1.8 + i * 0.9, 0.2);
+            model(name, x, 1.09, z, rand(it.id, i) * 6, sc);
+          }
+          if (it.sign % 2 === 0) {
+            const [x, z] = P(hw - 1.0, -0.12);
+            model('vintage_microwave', x, 1.09, z, yawZ(F), 0.8);
+          }
+          if (it.sign % 3 === 1) {
+            const [x, z] = P(2.6, hd + 1.3);
+            model('standing_chalkboard_01', x, 0, z, yawZ(F) + 0.25);
+          }
           for (let i = 0; i < 3; i++) {
             const tip = (it.sign + i) % 5 === 0;
             model('bar_chair_round_01', it.x - 1.6 + i * 1.6, tip ? 0.24 : 0, it.z + hd + 0.55 + (tip ? 0.3 : 0), rand(it.id, i) * 6, 1, tip ? PI / 2 : 0);
@@ -519,7 +602,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
         put('steel', new THREE.CylinderGeometry(0.22, 0.22, 0.03, 16), it.x, 0.015, it.z);
         put('steel', new THREE.CylinderGeometry(0.015, 0.015, 0.25, 6), it.x, 0.14, it.z);
         const body = new THREE.LatheGeometry([[0.0, 0], [0.11, 0.02], [0.13, 0.25], [0.16, 0.5], [0.13, 0.62], [0.17, 0.82], [0.2, 1.0], [0.12, 1.08], [0.05, 1.12], [0.05, 1.18], [0.0, 1.2]].map(([r, h]) => new THREE.Vector2(r, h)), 16).scale(1, 1, 0.7);
-        put('plastic', body, it.x, 0.27, it.z, y);
+        put(it.id % 2 ? fab(it.id) : 'plastic', body, it.x, 0.27, it.z, y);
         put('plastic', new THREE.SphereGeometry(0.11, 14, 12).scale(0.85, 1.12, 0.95), it.x, 1.6, it.z, y);
         for (const s of [-1, 1]) put('plastic', new THREE.CylinderGeometry(0.04, 0.03, 0.62, 8).translate(s * 0.23, 0, 0).rotateZ(s * 0.1), it.x, 1.0, it.z, y);
         break;
@@ -606,6 +689,17 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
           model('television_02', ux, 0.79, uz, y - 0.15);
           model('television_02', ux, 0.79 + 0.41, uz, y - 0.1);
         } else if (it.id % 3 === 0) model('cardboard_box_01', ...at(0.55, 0.05).flatMap((v, i) => (i ? [0.79, v] : [v])), y + 0.3, 0.8);
+        const PAPER = [['binder_notebook', 'binder_notebook'], ['clipboard', '*'], ['office_notepads', 'office_notepads_yellow_pad+office_notepads_note_stack'], ['binder_notebook', 'binder_notebook_closed']];
+        const [pn, pp] = PAPER[it.id % PAPER.length];
+        const [px, pz] = at(0.3, 0.12);
+        model(pn, px, 0.795, pz, y + (rand(it.id, 2) - 0.5) * 0.8, 1, pn === 'clipboard' ? -PI / 2 : 0, 0, pp);
+        const [sx, sz] = at(0.05, -0.2);
+        if (it.id % 2) model('vintage_stapler', sx, 0.79, sz, y + rand(it.id, 3) * 2, 1.2);
+        else model('stationery_supplies', sx, 0.79, sz, y + rand(it.id, 3) * 2);
+        if (it.id % 3 === 2) {
+          const [lx, lz] = at(0.78, -0.3);
+          model('desk_lamp_arm_01', lx, 0.88, lz, y + PI);
+        }
         break;
       }
       case 'pallet': {
@@ -694,25 +788,60 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
         if (cell(gx, r.z0 + 1) !== 2) continue;
         model('trashbag', x, 0, Z1 - 0.35, rand(gx) * 6);
         model('trashbag', x + 0.55, 0, Z1 - 0.3, rand(gx, 1) * 6, 0.85);
-        if (gx % 2) model('plastic_broom', x + 1.3, 0.03, Z1 - 0.12, PI, 1, -1.25);
+        if (gx % 4 === 1) model('plastic_broom', x + 1.3, 0.03, Z1 - 0.12, PI, 1, -1.25);
         else model('multi_cleaner_5_litre', x + 1.2, 0, Z1 - 0.25, rand(gx, 2) * 6);
+        model('dustpan', x - 0.7, 0, Z1 - 0.4, rand(gx, 3) * 6);
+        if (gx % 3 === 0) model('wooden_broom', x + 1.9, 0.12, Z1 - 0.08, 0, 1, -1.3);
+      }
+      // une gaine de ventilation sous le plafond, le long du mur nord, tenue par des colliers, avec une grille tous les 9 m
+      const hy = (hAt(r.x0 + 1, r.z0) || 3) - 0.24;
+      for (let x = X0 + 0.3, n = 0; x + 3.6 < X1 - 0.3; x += 3.6, n++) {
+        model('modular_airduct_rectangular_01', x, hy, Z0 + 0.42, PI / 2, [0.8, 0.7, 2], 0, 0, 'modular_airduct_rectangular_01_tripple_01');
+        {
+          // un collier : une barre sous la gaine, deux tiges jusqu'au plafond
+          model('modular_airduct_rectangular_01', x + 0.9, hy - 0.2, Z0 + 0.42, PI / 2, [0.8, 1, 1], 0, 0, 'modular_airduct_rectangular_01_brace_01');
+          model('modular_airduct_rectangular_01', x + 0.9, hy + 0.185, Z0 + 0.42, PI / 2, [0.8, 0.7, 1], 0, 0, 'modular_airduct_rectangular_01_brace_wire_01');
+        }
+        if (n % 3 === 1) model('modular_airduct_rectangular_01', x + 2.4, hy - 0.19, Z0 + 0.42, PI / 2, 0.8, -PI / 2, 0, 'modular_airduct_rectangular_01_vent_02');
       }
     } else if (r.kind === 'dock') {
       // les quais : des rideaux de quai sur le mur nord
       for (let x = X0 + 4; x < X1 - 3; x += 6.5) {
         if (cell(Math.floor(x / C), r.z0 - 1) !== 2) continue;
         model('rollershutter_door', x, 0, Z0, 0, [2.8, 1.45, 1], 0, 0, Math.floor(x) % 3 === 0 ? 'rollershutter_door_graffiti' : 'rollershutter_door');
+        model('security_light', x, 3.55, Z0 + 0.03, 0, 1.2, 0.35);
+        const k = Math.floor(x);
+        if (k % 2) {
+          model('Barrel_01', x + 2.0, 0, Z0 + 0.5, rand(k) * 6);
+          model(k % 4 === 1 ? 'Barrel_02' : 'Barrel_01', x + 2.0, 0, Z0 + 1.15, rand(k, 1) * 6);
+        } else {
+          model('propane_tank', x - 2.1, 0, Z0 + 0.35, rand(k) * 6);
+          model('small_lpg_tank', x - 1.7, 0, Z0 + 0.4, rand(k, 1) * 6);
+          model('metal_jerrycan', x - 2.0, 0, Z0 + 0.85, rand(k, 2) * 6, 0.9);
+        }
       }
+      model('ladder_sectioned_01', X1 - 0.25, 0, Z0 + 2.5, -PI / 2 + 0.05, 1, 0, -0.32);
     } else if (r.kind === 'office') {
       // les bureaux : une armoire à tiroirs dans un coin, une horloge au mur
       if (cell(r.x0, r.z0 - 1) === 2) model('drawer_cabinet', X0 + 0.75, 0, Z0 + 0.27, 0);
       if (cell(Math.floor((X0 + X1) / 2 / C), r.z0 - 1) === 2) model('wall_clock', (X0 + X1) / 2, 2.15, Z0 + 0.005, 0);
-      if (r.name === 'Lost & found') for (let i = 0; i < 4; i++) model('vintage_suitcase', X1 - 1.2 - i * 0.5, 0, Z1 - 0.5, PI + (rand(i) - 0.5) * 0.4, 0.6);
+      if (r.z1 > r.z0 && cell(r.x0 - 1, r.z0 + 1) === 2) model(r.id % 2 ? 'hanging_picture_frame_01' : 'hanging_picture_frame_02', X0 + 0.005, 1.65, Z0 + C * 1.5, PI / 2);
+      if (r.name === 'Security') model('vintage_telephone_wall_clock', X1 - 0.005, 1.4, Z0 + 1.2, -PI / 2);
+      else if (r.id % 3 === 1 && cell(r.x1 + 1, r.z0) === 2) model('dartboard', X1 - 0.005, 1.73, Z0 + 1.4, -PI / 2);
+      if (r.name === 'Lost & found') for (let i = 0; i < 4; i++) model('vintage_suitcase', X1 - 1.2 - i * 0.5, 0, Z1 - 0.5, PI + (rand(i) - 0.5) * 0.4, 0.6, 0, 0, SUITCASE[i % 2]);
     } else if (r.kind === 'wc') {
       model('WetFloorSign_01', (X0 + X1) / 2, 0, (Z0 + Z1) / 2, rand(r.id) * 6.28, 1.2);
       model('plastic_broom', X1 - 0.3, 0.03, Z0 + 0.15, PI / 2, 1, -1.25);
+      model('mousetrap', X0 + 0.25, 0, Z1 - 0.3, rand(r.id, 1) * 6, 1.4);
     } else if (r.kind === 'lobby') {
       for (const [x, z] of [[X0 + 0.6, Z0 + 0.6], [X1 - 0.6, Z0 + 0.6]]) model('potted_plant_02', x, 0, z, rand(x) * 6, 1.6);
+      // un coin d'attente contre le mur est : un guéridon, deux fauteuils, un pouf
+      const ex = X1 - 2.2;
+      const ez = (Z0 + Z1) / 2;
+      model('coffee_table_round_01', ex, 0, ez, 0, 0.8);
+      model('GreenChair_01', ex + 0.1, 0, ez - 0.95, 0.2);
+      model('GreenChair_01', ex - 0.1, 0, ez + 0.95, PI - 0.3);
+      model('Ottoman_01', ex + 1.15, 0, ez + 0.2, PI / 2 + 0.15, 0.9);
     } else if (r.kind === 'food') {
       for (let x = X0 + 6; x < X1 - 4; x += 12) model('metal_trash_can', x, 0, Z1 - 0.5, rand(x) * 6, 1, 0, 0, 'metal_trash_can');
     }
@@ -790,5 +919,5 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model }) {
     }
   }
 
-  return { lights };
+  return { lights, show: SHOW };
 }
