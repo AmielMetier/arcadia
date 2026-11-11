@@ -18,6 +18,7 @@ import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.j
 import { CELL_SIZE as C, T, FLOOR_DY } from '../engine/map.js';
 import { MALL_CEIL, MALL_RAIL } from '../engine/mall.js';
 import { cinemaCarpet } from './mallTextures.js';
+import { drawMallProps } from './mallProps.js';
 
 const SLAB = FLOOR_DY - MALL_CEIL; // l'épaisseur de la dalle sous le mail du haut (le bandeau des vides)
 const LANTERN = 8.4; // la verrière du mail du haut, au-dessus du vide
@@ -880,6 +881,8 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     G.box('steel', Math.min(o.ax, o.bx), Math.max(o.ax, o.bx), h - 0.35, h, o.az - 0.12, o.az + 0.12, '+y');
   }
 
+  // 10. Le mobilier, les enseignes, les affiches (view/mallProps.js)
+  const props = drawMallProps({ map, fi, G, MATS, hAt, baked, rooms });
   G.build(group);
   // les barreaux : un seul maillage
   if (postsAt.length) {
@@ -989,6 +992,12 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
         const sag = i % 5 === 3 ? 0.55 + 0.45 * Math.max(0, Math.sin(time * 0.7 + i) * Math.sin(time * 5.3 + i * 2)) : 1;
         const k = L.k * sag;
         out.push({ x: L.x, y: L.y, z: L.z, r: 0.1 * k, g: 0.3 * k, b: 1.15 * k, rad: L.rad, nx: 0, ny: -1, nz: 0, w: -0.45, box: cineBox });
+      }
+      // les bornes d'arcade encore allumées : leur écran colore le sol devant elles (et clignote un peu)
+      for (let i = 0; i < props.lights.length; i++) {
+        const L = props.lights[i];
+        const k = 0.75 + 0.25 * Math.sin(time * (2.1 + i) + i * 1.7);
+        out.push({ x: L.x, y: L.y, z: L.z, r: L.c[0] * k, g: L.c[1] * k, b: L.c[2] * k, rad: L.rad, nx: L.nx, ny: 0, nz: L.nz, w: -0.2, box: L.box });
       }
     },
     update() {},

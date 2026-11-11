@@ -659,6 +659,215 @@ export function createMallMap(seed = 17) {
     f.lights.forEach((l, i) => (l.id = i));
   }
 
+  // --- 11b. Le mobilier : ce qui gêne le passage est une forme de collision (la même chez tout le monde), le reste
+  // n'est que du décor. Chaque meuble : { kind, x, z, w, d (emprise en mètres, w le long de x), rot (1 : tourné d'un
+  // quart de tour), ...}. Jamais devant une porte, un escalier, un escalator, au bord d'un vide, contre un pilier ---
+  for (const f of F) f.furn = [];
+  const overlap = (ax0, az0, ax1, az1, bx0, bz0, bx1, bz1, m) => ax0 < bx1 + m && ax1 > bx0 - m && az0 < bz1 + m && az1 > bz0 - m;
+  const doorNear = (f, x0, z0, x1, z1, m) => f.doors.some((d) => overlap(x0, z0, x1, z1, d.x * C, d.z * C, (d.x + 1) * C, (d.z + 1) * C, m));
+  const stairNear = (x0, z0, x1, z1, m) =>
+    stairs.some((st) => {
+      const xs = [st.ox, st.ox + st.dx * 3 * C + st.px * 2 * C];
+      const zs = [st.oz, st.oz + st.dz * 3 * C + st.pz * 2 * C];
+      return overlap(x0, z0, x1, z1, Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs), m);
+    });
+  const escNear = (fi, x0, z0, x1, z1, m) => escalators.some((e) => overlap(x0, z0, x1, z1, Math.min(e.x, e.top) - 1.5, e.z - e.w / 2, Math.max(e.x, e.top) + 1.5, e.z + e.w / 2, m));
+  const pillarNear = (f, x0, z0, x1, z1, m) => {
+    for (let gz = Math.floor((z0 - m) / C) - 1; gz <= Math.floor((z1 + m) / C) + 1; gz++)
+      for (let gx = Math.floor((x0 - m) / C) - 1; gx <= Math.floor((x1 + m) / C) + 1; gx++) {
+        const p = gx >= 0 && gz >= 0 && gx < W && gz < H && f.grid[gz * W + gx] === T.PILLAR ? f.pillars[gz * W + gx] : null;
+        if (!p) continue;
+        const dx = Math.max(x0 - (p.x + p.h), 0, p.x - p.h - x1);
+        const dz = Math.max(z0 - (p.z + p.h), 0, p.z - p.h - z1);
+        if (Math.hypot(dx, dz) < m) return true;
+      }
+    return false;
+  };
+  // o.solid : false pour du décor qu'on enjambe ; o.m : la marge laissée autour ; o.room : la salle où il doit rester
+  const furn = (fi, kind, x, z, w, d, o = {}) => {
+    const f = F[fi];
+    const [ww, dd] = o.rot ? [d, w] : [w, d];
+    const x0 = x - ww / 2;
+    const z0 = z - dd / 2;
+    const x1 = x + ww / 2;
+    const z1 = z + dd / 2;
+    const m = o.m ?? 0.4;
+    for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1], [x, z]]) {
+      const gx = Math.floor(px / C);
+      const gz = Math.floor(pz / C);
+      if (get(f, gx, gz) !== T.FLOOR) return null;
+      if (o.room !== undefined && f.zone[gz * W + gx] !== o.room) return null;
+    }
+    if (doorNear(f, x0, z0, x1, z1, 0.6) || stairNear(x0, z0, x1, z1, C + 0.5) || escNear(fi, x0, z0, x1, z1, 0.8)) return null;
+    if (pillarNear(f, x0, z0, x1, z1, o.pm ?? 0.35)) return null;
+    // (des points sur toute l'emprise : un vide, une vitrine, un autre meuble à moins de m)
+    const nx = Math.max(1, Math.ceil(ww / 0.6));
+    const nz = Math.max(1, Math.ceil(dd / 0.6));
+    for (let j = 0; j <= nz; j++)
+      for (let i = 0; i <= nx; i++) {
+        const px = x0 + (ww * i) / nx;
+        const pz = z0 + (dd * j) / nz;
+        if (f.solids.hit(px, pz, m)) return null;
+        if (fi === 0 && up.voids.some((v) => polyDist(v.pts, px, pz) < 0.6)) return null;
+      }
+    if (Math.hypot(x - (spawnAt.gx + 0.5) * C, z - (spawnAt.gz + 0.5) * C) < 3.5 && fi === 0) return null;
+    const it = { id: f.furn.length, kind, x, z, w, d, rot: o.rot ? 1 : 0, ...o };
+    delete it.m;
+    delete it.pm;
+    f.furn.push(it);
+    if (o.solid !== false) f.solids.add(o.round ? { x, z, r: Math.max(w, d) / 2, furn: it.id } : { pts: rect(x0, z0, x1, z1), furn: it.id });
+    if (o.nav) for (let gz = Math.floor(z0 / C); gz <= Math.floor(z1 / C); gz++) for (let gx = Math.floor(x0 / C); gx <= Math.floor(x1 / C); gx++) f.navBlock.add(gz * W + gx);
+    return it;
+  };
+  const spawnAt = { gx: 19, gz: 23 };
+  const roomsOf = (fi, kind) => F[fi].rooms.filter((r) => r.kind === kind);
+  for (const fi of [0, 1]) {
+    // le mail : des bancs entre les piliers, dos aux allées du milieu ; une poubelle sur deux
+    for (const r of roomsOf(fi, RK.MAIL)) {
+      for (let x = r.x0 * C + 5; x < (r.x1 + 1) * C - 2; x += 10) {
+        // (en haut, les files de piliers longent le garde-corps : les bancs sont devant, côté allée)
+        for (const z of fi === 0 ? [29.5 * C - 1.1, 34.5 * C + 1.1] : [29.5 * C, 34.5 * C]) {
+          const b = furn(fi, 'bench', x, z, 1.9, 0.55, { m: 0.15, face: z < MZ ? -1 : 1 });
+          if (b && rnd() < 0.5) furn(fi, 'bin', x + 1.45, z, 0.5, 0.5, { round: true, m: 0.1 });
+        }
+      }
+      // en bas, sous le vide : des jardinières, des kiosques fermés, des bancs autour
+      if (fi === 1) {
+        let k = 0;
+        for (let x = r.x0 * C + 7.5; x < (r.x1 + 1) * C - 5; x += 12.5, k++) {
+          if (k % 2 === 0) {
+            const p = furn(1, 'planter', x, MZ, 2.2, 2.2, { m: 0.3, plant: Math.floor(rnd() * 3) });
+            if (p) for (const s of [-1, 1]) furn(1, 'bench', x, MZ + s * 1.75, 1.9, 0.55, { m: 0.05, face: s });
+          } else furn(1, 'kiosk', x, MZ, 3.4, 2.2, { m: 0.4, nav: true, sign: Math.floor(rnd() * 4) });
+        }
+      }
+    }
+    // les cours : des jardinières aux quatre coins, un plan du centre près de chaque mail
+    for (const key of ['west', 'center', 'east']) {
+      const cr = COURTS[key];
+      const cx = (cr.x0 + cr.x1 + 1) * C * 0.5;
+      for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        const x = cx + sx * ((cr.x1 - cr.x0 + 1) * C * 0.5 - 3.2);
+        const z = MZ + sz * ((cr.z1 - cr.z0 + 1) * C * 0.5 - 3.2);
+        furn(fi, 'planter', x, z, 2.0, 2.0, { m: 0.3, plant: Math.floor(rnd() * 3) });
+      }
+      furn(fi, 'directory', cx - 9 + rnd() * 2, 27 * C + 0.4, 1.3, 0.35, { m: 0.2 }) || furn(fi, 'directory', cx + 8, 36 * C - 0.4, 1.3, 0.35, { m: 0.2 });
+    }
+  }
+  // en bas, sous les vides des cours ouest et est : une fontaine à sec, octogonale ; une chaise seule, tournée vers elle
+  for (const key of ['west', 'east']) {
+    const v = up.voids.find((o) => o.court === key);
+    const [cx, cz] = v.pts.reduce((a, p) => [a[0] + p[0] / v.pts.length, a[1] + p[1] / v.pts.length], [0, 0]);
+    if (furn(1, 'fountain', cx, cz, 7.2, 7.2, { round: true, m: 0.2, nav: true }) && key === 'west') furn(1, 'chair', cx - 6.2, cz + 2.4, 0.5, 0.5, { solid: false, yaw: 1.9 });
+  }
+  // les boutiques : des rayonnages le long des murs, un comptoir au fond, des portants (les vêtements), des gravats
+  // dans les boutiques vidées
+  for (const fi of [0, 1]) {
+    for (const sh of F[fi].shops) {
+      const r = F[fi].rooms[sh.room];
+      const X0 = sh.x0 * C;
+      const X1 = (sh.x1 + 1) * C;
+      const Z0 = sh.z0 * C;
+      const Z1 = (sh.z1 + 1) * C;
+      const back = sh.side === 'N' ? Z0 : Z1; // le mur du fond
+      const inw = sh.side === 'N' ? 1 : -1; // du fond vers la devanture
+      const o = { room: r.id, m: 0.05, pm: 0.1, shop: sh.id };
+      if (sh.state === 'gutted') {
+        for (let i = 0; i < 3; i++) furn(fi, 'debris', X0 + 1.5 + rnd() * (X1 - X0 - 3), back + inw * (2 + rnd() * 6), 1.6, 1.2, { ...o, solid: false });
+        furn(fi, 'ladder', X0 + 1.2, back + inw * 4, 0.6, 1.6, { ...o, solid: false });
+        continue;
+      }
+      // rayonnages contre les murs latéraux
+      for (const [x, sx] of [[X0 + 0.3, 1], [X1 - 0.3, -1]]) furn(fi, 'shelf', x, (Z0 + Z1) / 2 + inw * 0.6, 3.6, 0.5, { ...o, rot: 1, face: sx });
+      // le comptoir, dans un coin du fond (la porte de service est au milieu)
+      furn(fi, 'counter', X0 + 2.2, back + inw * 1.6, 2.2, 0.7, { ...o, m: 0.1 });
+      const clothes = ['clothes', 'lingerie', 'kids', 'shoes', 'sports', 'outdoor'].includes(sh.trade);
+      const n = Math.floor((X1 - X0) / 3);
+      for (let i = 0; i < n; i++) {
+        const x = X0 + 2.4 + i * 3;
+        const z = back + inw * (5.2 + (i % 2) * 1.4);
+        if (clothes) furn(fi, 'rack', x, z, 1.2, 1.2, { ...o, round: true, m: 0.3 });
+        else furn(fi, 'table', x, z, 1.6, 0.9, { ...o, m: 0.4, display: true });
+      }
+    }
+  }
+  // le food court : des comptoirs le long du mur nord, des tables rondes et leurs chaises
+  for (const r of roomsOf(0, RK.FOOD)) {
+    const X0 = r.x0 * C;
+    const X1 = (r.x1 + 1) * C;
+    let k = 0;
+    for (let x = X0 + 4; x + 3 < X1 - 1; x += 8.5, k++) furn(0, 'stall', x + 2.5, r.z0 * C + 1.1, 6.0, 1.0, { m: 0.1, pm: 0.2, sign: k, room: r.id });
+    for (let z = r.z0 * C + 6; z < (r.z1 + 1) * C - 2.5; z += 4.2)
+      for (let x = X0 + 3; x < X1 - 2; x += 4.4) {
+        if (rnd() < 0.15) continue;
+        const t = furn(0, 'diner', x + (rnd() - 0.5) * 0.6, z + (rnd() - 0.5) * 0.6, 1.3, 1.3, { round: true, m: 0.9, pm: 0.6, room: r.id, chairs: Math.floor(rnd() * 16) });
+        if (t && rnd() < 0.12) t.tipped = 1;
+      }
+  }
+  // le grand magasin : des gondoles en files, des portants, les caisses près du portail
+  for (const fi of [0, 1]) {
+    for (const r of [...roomsOf(fi, RK.STORE), ...roomsOf(fi, RK.CLOSED)]) {
+      const closed = r.kind === RK.CLOSED;
+      const X0 = r.x0 * C;
+      const X1 = (r.x1 + 1) * C;
+      const Z0 = r.z0 * C;
+      const Z1 = (r.z1 + 1) * C;
+      if (!closed) {
+        for (let z = Z0 + 4; z < Z1 - 4; z += 4.5)
+          for (let x = X0 + 3.5; x < X1 - 3; x += 9) {
+            if (rnd() < 0.3) furn(fi, 'rack', x, z, 1.2, 1.2, { round: true, m: 0.5, room: r.id });
+            else furn(fi, 'gondola', x, z, 5.5, 1.0, { m: 0.9, pm: 0.4, room: r.id, empty: rnd() < 0.5 });
+          }
+      } else {
+        // fermé : presque vide ; quelques portants, des mannequins debout dans le noir
+        for (let i = 0; i < 14; i++) {
+          const x = X0 + 3 + rnd() * (X1 - X0 - 6);
+          const z = Z0 + 3 + rnd() * (Z1 - Z0 - 6);
+          if (i % 3 === 0) furn(fi, 'rack', x, z, 1.2, 1.2, { round: true, m: 0.6, room: r.id });
+          else furn(fi, 'mannequin', x, z, 0.5, 0.5, { round: true, m: 0.4, room: r.id, yaw: rnd() * 6.28 });
+        }
+      }
+    }
+  }
+  // le cinéma : le comptoir des confiseries, une rangée de bornes d'arcade, les cordons devant le contrôle des billets
+  {
+    const r = roomsOf(0, RK.CINE)[0];
+    const X0 = r.x0 * C;
+    furn(0, 'concession', X0 + 9, r.z0 * C + 1.0, 9.0, 1.1, { m: 0.1, pm: 0.2, room: r.id });
+    for (let i = 0; i < 6; i++) furn(0, 'arcade', X0 + 0.55, r.z0 * C + 12 + i * 1.0, 0.8, 0.9, { m: 0.02, pm: 0.2, room: r.id, rot: 1, lit: i % 3 !== 1, face: 1 });
+    for (let i = 0; i < 4; i++) furn(0, 'stanchion', (r.x1 + 1) * C - 2.5, 6.5 * C + i * 1.6, 0.3, 0.3, { round: true, m: 0.05, room: r.id, solid: false });
+  }
+  // les salles : des rangées de fauteuils rouges face à l'écran (mur est), des allées aux deux bouts
+  for (const r of roomsOf(0, RK.SCREEN)) {
+    const X0 = r.x0 * C;
+    const X1 = (r.x1 + 1) * C;
+    const Z0 = r.z0 * C;
+    const Z1 = (r.z1 + 1) * C;
+    for (let x = X0 + 2.6; x < X1 - 4.5; x += 1.15) {
+      const it = furn(0, 'seats', x, (Z0 + Z1) / 2, Z1 - Z0 - 3.0, 0.62, { rot: 1, m: 0.02, pm: 0, room: r.id });
+      if (!it) continue;
+    }
+  }
+  // les toilettes : des cabines contre le mur du fond, les lavabos en face ; le poste de sécurité et les bureaux : des
+  // bureaux en rangs ; les quais : des palettes et des caisses ; les locaux techniques : de grosses machines
+  for (const fi of [0, 1]) {
+    for (const r of roomsOf(fi, RK.WC)) {
+      for (let x = r.x0 * C + 1.2; x < (r.x1 + 1) * C - 1; x += 1.6) furn(fi, 'stall', x, (r.z1 + 1) * C - 0.9, 1.5, 1.6, { m: 0.02, pm: 0.1, room: r.id, toilet: true });
+      furn(fi, 'sinks', (r.x0 + 3) * C, r.z0 * C + 0.45, 5.0, 0.6, { m: 0.05, room: r.id });
+    }
+    for (const r of roomsOf(fi, RK.OFFICE)) {
+      for (let z = r.z0 * C + 2.5; z < (r.z1 + 1) * C - 2; z += 3.4)
+        for (let x = r.x0 * C + 2.5; x < (r.x1 + 1) * C - 2; x += 3.8) furn(fi, 'desk', x, z, 1.6, 0.8, { m: 0.7, pm: 0.4, room: r.id, yaw: rnd() < 0.2 ? 0.4 : 0 });
+    }
+    for (const r of roomsOf(fi, RK.DOCK)) {
+      for (let i = 0; i < 22; i++) furn(fi, rnd() < 0.6 ? 'pallet' : 'crate', r.x0 * C + 2 + rnd() * ((r.x1 - r.x0 + 1) * C - 4), r.z0 * C + 2 + rnd() * ((r.z1 - r.z0 + 1) * C - 4), 1.2, 1.0, { m: 0.8, room: r.id, stack: 1 + Math.floor(rnd() * 3) });
+    }
+    if (fi === 1) {
+      const r = F[1].rooms.find((o) => o.name === 'Plant rooms');
+      if (r) for (let x = r.x0 * C + 4; x < (r.x1 + 1) * C - 4; x += 7) for (const z of [r.z0 * C + 2.5, (r.z1 + 1) * C - 2.5]) furn(1, 'machine', x, z, 4.0, 2.2, { m: 0.5, room: r.id });
+    }
+  }
+
   // --- 12. Ce qui se parcourt : les cases libres atteintes depuis l'arrivée (en haut) et depuis le pied des
   // escaliers (en bas), sans passer par ce que l'entité évite ---
   const isWallOf = (f) => (gx, gz) => {
@@ -759,6 +968,7 @@ export function createMallMap(seed = 17) {
       fuses: [],
       lights: f.lights,
       props: [],
+      furn: f.furn,
       bottles,
       batteries,
       items: itemList(['bottle', bottles], ['battery', batteries]),
