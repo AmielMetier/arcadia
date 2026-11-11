@@ -12,7 +12,7 @@ import { FUSES, feetY, stairAt, PIPES_LEVEL, THIRST_BLUR, LIFT_SHUT_T, HOTEL_LEV
 import { DUCT_LOW, DOCK_H, GUARD_T } from '../engine/level1.js';
 import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
-import { autoRes } from './autores.js';
+import { autoRes, RES_MIN } from './autores.js';
 import { createInset } from './inset.js';
 import { buildWarehouse } from './warehouse.js';
 import { buildGear } from './gear.js';
@@ -608,6 +608,7 @@ export function createBackroomsScene(container, floors, lamps) {
       uBakeY: { value: -fi * FLOOR_DY },
       uCeil: { value: CEIL },
       uDamp: { value: L3 ? 0.35 : L2 ? 0 : L1 ? 0.6 : PIPES ? 0.5 : 1 },
+      uLowQ: { value: 0 }, // qualité basse : sans l'usure fine du carrelage des Poolrooms (voir lightQuality)
       // Poolrooms : sous la surface, le carrelage prend la teinte de l'eau et les caustiques dansent dessus
       uPool: { value: L2 ? 1 : 0 },
       uTime: { value: 0 },
@@ -1244,6 +1245,7 @@ uniform float uSpecMask;
 uniform float uBakeY;
 uniform float uCeil;
 uniform float uDamp;
+uniform float uLowQ;
 uniform float uPool;
 uniform float uTime;
 uniform float uWaterY;
@@ -1648,7 +1650,9 @@ float bkCaust(vec2 uv, float t) {
             // des murs et près de l'eau
             vec2 tq = abs(ny) > 0.5 ? vBakeP.xz / (ny > 0.5 && sub < 0.5 ? 0.3125 : 0.20833) : vec2(vBakeP.x + vBakeP.z, by) / 0.20833;
             #ifdef USE_MAP
-            if (uTileG.x > 0.0) {
+            // (qualité basse : un carrelage intact, sans carreaux tombés, écornés ni fêlés ; c'est le gros du coût de
+            // chaque pixel aux Poolrooms)
+            if (uTileG.x > 0.0 && uLowQ < 0.5) {
               // le carreau, retrouvé sur la grille des joints de la photo
               vec2 tc = vMapUv * uTileG.xy - uTileG.zw;
               vec2 tI = floor(tc);
@@ -4440,6 +4444,7 @@ void main() {
       },
       lightQuality(low) {
         if (water) water.setMirror(!low);
+        bakeUniforms.uLowQ.value = low ? 1 : 0;
         if (dynU.uOccInfo) dynU.uOccInfo.value.w = low ? 0 : 1;
         if (groundFog) {
           groundFog.u.uHaze.value = low ? 0 : L2 ? 0.01 : 0.006;
@@ -5597,6 +5602,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   let ductDrop = 0; // Level 1 : l'entité qui se laisse tomber d'une bouche de gaine (le temps qui reste)
   let cctvWas = -1; // au poste de garde : la caméra affichée à l'image précédente (-1 : pas au poste)
   const res = autoRes(); // résolution dynamique : commence au plus haut (borné par ce que permet l'écran)
+  let autoLow = false; // « Auto » a dû passer aux effets de la qualité basse (voir plus bas)
+  let floorT = 0; // secondes passées à la définition plancher, l'image peinant encore
   let qualityWas = null; // la qualité déjà appliquée au filtre (il ne retaille l'image que si elle change)
   const camState = { t: 0, night: 0, bars: 0 }; // api.cam, lu à chaque image : le même objet, remis à jour
   // un point du monde à l'écran (x, y de 0 à 1 ; behind : derrière la caméra) : les repères des coéquipiers du viseur
@@ -5718,6 +5725,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         // Level 1, qualité basse : ni ombres des feux de couleur, ni lumière dans la poussière
         const low = OPTS.quality === 'low';
         for (const fl of floorViews) fl.lightQuality?.(low);
+        autoLow = false;
+        floorT = 0;
       }
     },
 
@@ -6187,7 +6196,20 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 
       // résolution dynamique : moins de lignes quand l'image peine, plus quand elle tient la cadence de l'écran
       // (jusqu'à la pleine définition de l'écran à l'œil nu, aux lignes de la bande au caméscope)
-      if (OPTS.quality === 'auto' && vhs.setLines) vhs.setLines(res.step(dt * 1000, time, vhs.maxLines || 720));
+      if (OPTS.quality === 'auto' && vhs.setLines) {
+        const ln = res.step(dt * 1000, time, vhs.maxLines || 720);
+        vhs.setLines(ln);
+        // « Auto » sur une machine modeste : la définition est au plancher depuis 4 s et l'image peine encore. On passe
+        // aux effets de la qualité basse (ni reflet de la salle dans l'eau, ni usure fine du carrelage, ni lumière dans
+        // la poussière) pour le reste du niveau : la définition peut alors remonter
+        if (!autoLow && ln <= RES_MIN && res.avg > 20) {
+          floorT += dt;
+          if (floorT > 4) {
+            autoLow = true;
+            for (const fl of floorViews) fl.lightQuality?.(true);
+          }
+        } else if (!autoLow) floorT = 0;
+      }
       // Level 5 : le screamer. La caméra reste où l'on est mort ; l'entité surgit à 2,40 m et se jette à 55 cm du
       // visage en un quart de seconde, puis reste là, tremblante, pendant que l'image saute
       let glitch = danger;

@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 5.68 — 11 novembre 2026
+- **The Backrooms** — Un vrai réglage pour les PC modestes :
+  - en qualité « Basse », le carrelage des Poolrooms est dessiné intact (sans carreaux tombés ni fêlés) : c'était le plus lourd à calculer. Sur une puce graphique intégrée, le niveau passe d'environ 30 à plus de 50 images par seconde ;
+  - en qualité « Auto », le jeu passe de lui-même à ces effets allégés quand l'image peine encore à la définition la plus basse, au lieu de rester saccadé jusqu'à la fin du niveau.
+
 ## 5.67 — 11 novembre 2026
 - **The Backrooms** — Poolrooms : l'image demande moins de calcul à la carte graphique, pour le même rendu. De quoi gagner un peu de fluidité sur un PC modeste.
 
