@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.64 — 11 novembre 2026
+- **The Backrooms** — Level 0, étage du haut : les murs ne sont plus tout à fait neufs. Quelques auréoles pâles et un peu d'humidité au pied du papier peint, par endroits. L'étage du bas reste bien plus défraîchi.
+
 ## 5.63 — 11 novembre 2026
 - **The Backrooms** — L'écran titre est plus net : le bandeau d'objectif, l'aide des touches et les cases d'objets ne dépassent plus derrière la carte. Le bandeau d'objectif s'affiche en entier quand tu prends la main, au lieu de s'écouler pendant que tu lis l'écran titre.
 

@@ -618,9 +618,10 @@ export function createBackroomsScene(container, floors, lamps) {
       uSideLo: { value: L0 ? 0.8 : 0.5 },
       uStain: { value: L0 ? 0.5 : 1 },
       uCeilStain: { value: L0 ? 0.55 : L1 ? 0.3 : 1 }, // Level 0 : les auréoles du plafond, encore plus pâles ; Level 1 : à peine
-      // Level 0, étage du haut : des murs propres (presque pas d'auréoles ni d'humidité au pied) ; le bas reste défraîchi
+      // Level 0, étage du haut : des murs peu marqués (quelques auréoles pâles, un peu d'humidité au pied : assez pour
+      // casser l'uni du papier, sans l'air défraîchi de l'étage du bas)
       // Level 1 : des parpaings repeints, à peine marqués par l'humidité
-      uWallDecay: { value: L0 && !LOW0 ? 0.15 : L1 ? 0.3 : 1 },
+      uWallDecay: { value: L0 && !LOW0 ? 0.4 : L1 ? 0.3 : 1 },
       uGlossH: { value: L1 ? CEIL - 0.45 : L2 ? CEIL - 0.03 : 3 }, // Level 1 : la hauteur des tubes, qui se reflètent dans le béton lissé ; Poolrooms : les dalles lumineuses
       uPoolMap: { value: poolTex }, // Poolrooms : la carte de l'eau (voir plus haut)
     };
