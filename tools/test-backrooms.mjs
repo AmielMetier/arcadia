@@ -5103,6 +5103,36 @@ test("Level 1 : pendant le répit qui suit une poursuite, l'imposteur ne revient
   }
 });
 
+test("Level 1 : l'imposteur se fige une seconde quand on siffle près de lui, pas quand on siffle de loin", () => {
+  BackroomsSim.DISGUISE = true;
+  try {
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 11, players: [{ id: 0, name: 'A' }], localId: 0, level: 1 });
+    sim.arriveT = 0;
+    const M = sim.monster;
+    const A = sim.players[0];
+    const m = sim.map;
+    const cells = m.walkable.map((q) => ({ x: (q.x + 0.5) * CELL_SIZE, z: (q.z + 0.5) * CELL_SIZE })).filter((q) => !m.safeAt(q.x, q.z));
+    const walked = (dMin, dMax) => {
+      const q = cells.find((c) => { const d = Math.hypot(c.x - A.x, c.z - A.z); return d > dMin && d < dMax; });
+      Object.assign(M, { x: q.x, z: q.z, path: [], repathT: 0, dormantT: 0, hesT: 20, restT: 0 });
+      Object.assign(sim.director, { phase: 'build' });
+      for (let i = 0; i < 60 * 2; i++) sim.step({}); // il est en marche
+      sim.step({ whistle: true });
+      A.whistleCd = 0;
+      const x0 = M.x;
+      const z0 = M.z;
+      for (let i = 0; i < 60; i++) sim.step({});
+      return Math.hypot(M.x - x0, M.z - z0);
+    };
+    const near = walked(9, 13);
+    assert.ok(M.mimic != null && near < 0.4, `sifflé de près, il se fige (${near.toFixed(2)} m en une seconde)`);
+    const far = walked(SIMX.WHISTLE_FREEZE_R + 8, SIMX.WHISTLE_FREEZE_R + 16);
+    assert.ok(far > 1, `sifflé de loin, il continue (${far.toFixed(2)} m en une seconde)`);
+  } finally {
+    BackroomsSim.DISGUISE = false;
+  }
+});
+
 test("Level 1 : dès le départ, l'entité a l'apparence d'un joueur et marche à sa vitesse ; tout près, elle se transforme une seconde sur place, puis court un peu plus vite qu'un sprint ; loin de tous, elle reprend une apparence", () => {
   BackroomsSim.DISGUISE = true;
   try {

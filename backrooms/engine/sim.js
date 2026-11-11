@@ -199,6 +199,7 @@ export const REDISGUISE_T = 6; // s de ronde, hors de vue et loin de tous, avant
 // le sprint dépend du sens : droit devant, toute la vitesse ; de côté et en arrière, moins
 export const SPRINT_SIDE = 0.72;
 export const SPRINT_BACK = 0.6;
+export const WHISTLE_FREEZE_R = 18; // m : un sifflet à moins de ça fige l'imposteur une seconde ou deux
 export const MIMIC_CALL = [7, 13]; // s entre deux appels (la voix volée, de vive voix ou au talkie)
 // Level 1 : les salles de sécurité. L'entité qui bute sur une porte blindée fermée frappe BANG_T secondes, hurle de
 // rage et va rôder au moins RETREAT_R mètres plus loin
@@ -2359,6 +2360,12 @@ export class BackroomsSim {
     }
     const M = this.monster;
     if (!this.hasMonster || M.mode === 'chase' || M.floor !== P.floor) return;
+    // l'imposteur se fige un instant quand on siffle près de lui (un joueur, lui, continuerait ou sifflerait en retour) :
+    // un indice pour qui le teste
+    if (M.mimic != null && Math.hypot(M.x - P.x, M.z - P.z) < WHISTLE_FREEZE_R) {
+      M.hesT = -1e-6;
+      M.hesLen = rand(1.2, 1.8);
+    }
     if (Math.hypot(M.x - P.x, M.z - P.z) > 45) return;
     // trop de coups rapprochés : elle vient à coup sûr (de près, elle l'entend de toute façon : c'est du bruit)
     if (P.heat >= WHISTLE_HEAT && this.alertMonster(P.x, P.z, 45, P.floor)) this.emit({ type: 'heard', id: P.id });

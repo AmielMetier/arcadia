@@ -2692,13 +2692,7 @@ function frame(currentTime) {
         if (left <= 0) sfx.step(stepKind(O), { x: O.x, z: O.z, muffled: (O.floor || 0) !== (V.floor || 0) }, O.running ? 1 : 0.7);
         otherStepT.set(O.id, left <= 0 ? (O.running ? 0.32 : 0.5) : left);
       }
-      // l'imposteur : les pas d'un joueur qui marche (pas les siens, lourds)
-      const Mm = sim.hasMonster ? sim.monster : null;
-      if (Mm && Mm.mimic != null && (Mm.v || 0) > 0.3 && !paused) {
-        const left = (otherStepT.get('M') ?? 0.2) - delta;
-        if (left <= 0) sfx.step(stepKind(Mm), { x: Mm.x, z: Mm.z, muffled: (Mm.floor || 0) !== (V.floor || 0) }, 0.7);
-        otherStepT.set('M', left <= 0 ? 0.52 : left);
-      } else otherStepT.delete('M');
+      // l'imposteur, lui, marche sans un bruit : un indice pour qui tend l'oreille (ni ses pas lourds, ni ceux d'un joueur)
     }
     if (sfx) {
       // le souffle : sprint, puis halètement le temps de récupérer, et la peur quand l'entité est là

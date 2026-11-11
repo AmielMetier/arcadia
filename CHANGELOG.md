@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 5.66 — 11 novembre 2026
+- **The Backrooms** — Level 1 : l'imposteur laisse deux indices à qui fait attention.
+  - Il marche sans faire le moindre bruit de pas.
+  - Si tu siffles près de lui, il se fige une seconde ou deux avant de repartir.
+
 ## 5.65 — 11 novembre 2026
 - **The Backrooms** — Level 1, l'entité est mieux finie :
   - elle se courbe pour passer la porte du poste de garde et celles des salles de sécurité, au lieu de traverser le mur du dessus avec la tête ;
