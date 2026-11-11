@@ -314,6 +314,7 @@ export function createDept(K) {
     lbox('black', it, -0.26, 0.26, 0, 0.03, -0.2, 0.2, '-y');
     if (it.mess === 1) model('CoffeeCart_01', it.x - 0.41, 0.76 - 1.06, it.z - 0.17, 0, 1, 0, 0, 'CoffeeCart_01_mugs');
     else if (it.mess === 2) goods.pack(P, -0.2, 0.16, 0.76, 0.86, -0.12, 0.14, goods.cellOf('stock', it.id), 1, true);
+    else if (it.mess === 3 && it.id % 3 === 0) model('carrot_cake', it.x, 0.76, it.z, it.id, 1);
   };
   // une plante en pot, posée au sol
   const pot = (it) => {

@@ -869,6 +869,8 @@ export function createMallMap(seed = 17) {
       }
     furn(0, 'cart', xb + 4.5, Z0 + 5, 2.3, 1.2, { m: 0.4, sign: 0, yaw: 0.2, ...o });
     for (let x = X0 + 6; x < X1 - 4; x += 14) furn(0, 'bin', x, Z1 - 1.2, 0.6, 0.6, { round: true, m: 0.1, rust: rnd() < 0.4, ...o });
+    // (sept chaises en rang, face au mur)
+    for (let i = 0; i < 7; i++) furn(0, 'chair', X0 + 10 + i * 0.95, Z1 - 1.0, 0.5, 0.5, { solid: false, yaw: 0, ...o });
   }
   // un fauteuil roulant, seul, tourné vers une vitrine du mail du bas ; le hall du parking : un coin d'attente (deux
   // canapés face à face, une table basse, deux fauteuils)
@@ -956,7 +958,7 @@ export function createMallMap(seed = 17) {
             }
           } else if (dept === 'home') {
             // la maison : des salons mis en scène (tapis, canapé, fauteuil, table basse, lampe)
-            for (const z of [za + 4, za + 12.5, za + 21]) for (const x of [9.5, 30.0]) tryF('roomset', x, z, 4.4, 3.6, { m: 0.6, pm: 0.2, set: Math.floor(rnd() * 4) });
+            for (const z of [za + 4, za + 12.5, za + 21]) for (const x of [9.5, 30.0]) tryF('roomset', x, z, 4.4, 3.6, { m: 0.6, pm: 0.2, set: x < 20 ? 0 : 1 + Math.floor(rnd() * 3) }); // (à l'ouest : trois fois le même séjour)
           } else if (dept === 'electro') {
             for (let z = za + 2.0; z <= zb - 1.5; z += 4.0) for (const x of WEST) tryF('tvwall', x, z, 5.0, 0.7, { m: 0.9, pm: 0.3, face: z < (za + zb) / 2 ? 1 : -1 });
             gond('electro', za, zb, EAST, 0.25);
@@ -983,13 +985,20 @@ export function createMallMap(seed = 17) {
           if (b === 2) for (const z of [72.2, 87.8]) tryF('counter', 29.5, z, 2.8, 0.9, { m: 0.6, pm: 0.2, cash: 1 });
         });
       } else {
-        // fermé : presque vide ; quelques portants, des mannequins debout dans le noir
-        for (let i = 0; i < 14; i++) {
-          const x = X0 + 3 + rnd() * (X1 - X0 - 6);
-          const z = Z0 + 3 + rnd() * (Z1 - Z0 - 6);
-          if (i % 3 === 0) furn(fi, 'rack', x, z, 1.2, 1.2, { round: true, m: 0.6, room: r.id });
-          else furn(fi, 'mannequin', x, z, 0.5, 0.5, { round: true, m: 0.4, room: r.id, yaw: rnd() * 6.28 });
+        // fermé : presque vide ; quelques portants ; et, au milieu du noir, des bustes de couturière : en haut, neuf en
+        // cercle autour d'une chaise ; en bas, seize en carré, à intervalles égaux
+        const cx = (X0 + X1) / 2 + 3;
+        const cz = (Z0 + Z1) / 2 + 2;
+        if (fi === 0) {
+          furn(fi, 'chair', cx, cz, 0.5, 0.5, { solid: false, yaw: Math.PI, room: r.id });
+          for (let i = 0; i < 9; i++) {
+            const a = (i / 9) * Math.PI * 2;
+            furn(fi, 'mannequin', cx + Math.cos(a) * 2.4, cz + Math.sin(a) * 2.4, 0.5, 0.5, { round: true, m: 0.15, pm: 0.1, room: r.id, yaw: -a });
+          }
+        } else {
+          for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) furn(fi, 'mannequin', cx - 2.7 + i * 1.8, cz - 2.7 + j * 1.8, 0.5, 0.5, { round: true, m: 0.15, pm: 0.1, room: r.id, yaw: 0 });
         }
+        for (let i = 0; i < 6; i++) furn(fi, 'rack', X0 + 3 + rnd() * (X1 - X0 - 6), Z0 + 3 + rnd() * (Z1 - Z0 - 6), 1.2, 1.2, { round: true, m: 0.6, room: r.id });
       }
     }
   }
@@ -1012,7 +1021,9 @@ export function createMallMap(seed = 17) {
     const cab = (x, z, face) => furn(0, 'arcade', x, z, 0.8, 0.9, { ...o, rot: 1, face, lit: n++ % 4 === 1 || rnd() < 0.12, game: Math.floor(rnd() * 8) });
     for (let z = Z0 + 2.4; z < Z1 - 0.6; z += 0.95) {
       cab(X0 + 0.5, z, 1);
-      cab(X1 - 0.5, z, -1);
+      // (la dernière de la rangée est tournée vers le mur, allumée)
+      if (z + 0.95 >= Z1 - 0.6) furn(0, 'arcade', X1 - 0.85, z, 0.8, 0.9, { ...o, rot: 1, face: 1, lit: true, game: 3 });
+      else cab(X1 - 0.5, z, -1);
     }
     for (const [za, zb] of [[Z0 + 5.2, Z0 + 13.6], [Z1 - 11.4, Z1 - 2.6]])
       for (let z = za; z < zb; z += 0.95) {
@@ -1043,6 +1054,8 @@ export function createMallMap(seed = 17) {
       if (x > X1 - 16 && z < Z0 + 5) continue; // (devant la sortie fermée)
       if (furn(1, 'car', x, z, 1.9, 4.5, { ...o, face: f, tint: Math.floor(rnd() * 3) })) cars++;
     }
+    // (une voiture en travers de l'allée, le nez vers un pilier)
+    furn(1, 'car', X0 + (X1 - X0) * 0.56, Z0 + 8.4, 1.9, 4.5, { ...o, rot: 1, askew: 1 });
     furn(1, 'barrier', X1 - 11, Z0 + 1.6, 1.6, 0.5, o);
     furn(1, 'barrier', X1 - 8.6, Z0 + 1.9, 1.6, 0.5, { ...o, yaw: 0.25 });
     for (let k = 0; k < 3; k++) {

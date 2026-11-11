@@ -20,6 +20,7 @@ import { MALL_CEIL, MALL_RAIL } from '../engine/mall.js';
 import { cinemaCarpet } from './mallTextures.js';
 import { drawMallProps } from './mallProps.js';
 import { drawMallWalls } from './mallWalls.js';
+import { drawMallSigns } from './mallSigns.js';
 import { createKitInstancer } from './kit.js';
 
 const SLAB = FLOOR_DY - MALL_CEIL; // l'épaisseur de la dalle sous le mail du haut (le bandeau des vides)
@@ -939,10 +940,12 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       k: 40,
       cap: {
         korean_public_payphone_01: 16, wheelchair_01: 18, old_gas_mask: 12, garden_hose_wall_mounted_01: 16, gamepad: 12, rubber_duck_toy: 18,
-        desk_lamp_arm_01: 9, metal_office_desk: 30, cardboard_box_01: 14, SchoolChair_01: 26, modern_arm_chair_01: 20, GreenChair_01: 26, stationery_supplies: 9,
+        desk_lamp_arm_01: 8, metal_office_desk: 25, cardboard_box_01: 11, SchoolChair_01: 21, modern_arm_chair_01: 18, GreenChair_01: 24, stationery_supplies: 8,
+        Television_01: 26, wooden_broom: 12, plastic_broom: 12, modular_street_seating: 36, dead_quiver_trunk: 36, korean_fire_extinguisher_01: 14,
+        modular_airduct_rectangular_01: 32, modular_electric_cables: 20,
         vintage_stapler: 7, clipboard: 8, office_notepads: 10, rubber_boots: 9, vintage_electric_kettle: 9, portable_generator: 22, power_box_01: 14,
         ceramic_vase_03: 10, ceramic_vase_04: 10, vintage_suitcase: 22, potted_plant_02: 22, metal_stool_02: 20, bar_chair_round_01: 14, tool_cart: 18,
-        binder_notebook: 12, carrot_cake: 12, food_apple_01: 10, book_encyclopedia_set_01: 14, anthurium_botany_01: 22, vintage_crutches_01: 16,
+        binder_notebook: 9, carrot_cake: 12, food_apple_01: 10, book_encyclopedia_set_01: 14, anthurium_botany_01: 22, vintage_crutches_01: 16,
         round_spectacles: 10, jug_01: 14, brass_vase_03: 14, croissant: 10, medical_box: 14, american_football: 16, concrete_cat_statue: 18,
       },
     },
@@ -967,8 +970,11 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     placed.push([x, z, WIDE[name] || 0.4]);
     kit.put(name, piece, x, y, z, ry, s, z < OPEN_Z0 || z > OPEN_Z1 ? INNER : undefined, rx, rz);
   };
+  // (les portes fermées des salles 3 à 6 : rien d'autre sur ce bout de mur)
+  for (const d of map.fakeScreens || []) placed.push([d.x * C - 0.1, (d.z + 0.5) * C, 1.7]);
   const props = drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, placed });
   drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed, show: props.show, arcade: props.arcade, goods: props.goods });
+  drawMallSigns({ map, fi, G, MATS, rooms, goods: props.goods, hAt, model, arcade: props.arcade });
   props.goods.flush();
   kit.build();
   G.build(group);

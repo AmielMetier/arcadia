@@ -206,6 +206,79 @@ function directoryTex(name) {
   return toTex(c);
 }
 
+// les fauteuils du cinéma : trois profils extrudés (le dossier, l'assise, l'accoudoir), dans le repère du fauteuil
+// (x : la rangée, z : vers l'écran)
+const SEAT = (() => {
+  const prof = (build, width, x0) => {
+    const sh = new THREE.Shape();
+    build(sh);
+    const g = new THREE.ExtrudeGeometry(sh, { depth: width, bevelEnabled: false, curveSegments: 4 }).rotateY(-Math.PI / 2).translate(x0 + width, 0, 0);
+    const u = g.attributes.uv;
+    for (let i = 0; i < u.count; i++) u.setXY(i, u.getX(i) * 2, u.getY(i) * 2);
+    return g;
+  };
+  const back = prof((s) => {
+    s.moveTo(-0.2, 0.36);
+    s.lineTo(-0.31, 0.98);
+    s.quadraticCurveTo(-0.325, 1.09, -0.25, 1.085);
+    s.quadraticCurveTo(-0.195, 1.07, -0.185, 0.98);
+    s.lineTo(-0.1, 0.44);
+    s.lineTo(-0.12, 0.36);
+  }, 0.5, -0.25);
+  const pan = prof((s) => {
+    s.moveTo(-0.16, 0.37);
+    s.lineTo(0.2, 0.37);
+    s.quadraticCurveTo(0.285, 0.39, 0.275, 0.46);
+    s.quadraticCurveTo(0.26, 0.515, 0.17, 0.51);
+    s.lineTo(-0.14, 0.49);
+  }, 0.48, -0.24);
+  const up = pan.clone().translate(0, -0.4, 0.16).rotateX(-1.2).translate(0, 0.4, -0.16);
+  const arm = prof((s) => {
+    s.moveTo(-0.3, 0);
+    s.lineTo(0.18, 0);
+    s.lineTo(0.23, 0.6);
+    s.quadraticCurveTo(0.245, 0.69, 0.16, 0.69);
+    s.lineTo(-0.27, 0.69);
+    s.quadraticCurveTo(-0.33, 0.69, -0.325, 0.62);
+  }, 0.06, 0.25);
+  return { back, pan, up, arm };
+})();
+
+// l'image restée sur l'écran de la salle 1 : le carton de l'entracte
+function intermissionTex() {
+  const [c, g] = atlas(1, 1, 1024, 512);
+  const gr = g.createRadialGradient(512, 256, 60, 512, 256, 620);
+  gr.addColorStop(0, '#26344a');
+  gr.addColorStop(1, '#0a0e16');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 1024, 512);
+  g.strokeStyle = '#c8b68a';
+  g.lineWidth = 3;
+  g.strokeRect(46, 40, 932, 432);
+  g.lineWidth = 1;
+  g.strokeRect(58, 52, 908, 408);
+  g.textAlign = 'center';
+  g.fillStyle = 'rgba(0,0,0,0.5)';
+  g.font = 'italic 112px Georgia, "Times New Roman", serif';
+  g.fillText('Intermission', 518, 282);
+  g.fillStyle = '#e9dcc0';
+  g.fillText('Intermission', 512, 276);
+  g.font = 'bold 24px "Arial Narrow", Arial, sans-serif';
+  g.fillText('T H E   F E A T U R E   W I L L   R E S U M E   S H O R T L Y', 512, 360);
+  g.font = '18px "Arial Narrow", Arial, sans-serif';
+  g.fillText('S T A R D U S T   8   C I N E M A S', 512, 420);
+  // des rayures de pellicule, des poussières
+  for (let i = 0; i < 26; i++) {
+    g.fillStyle = `rgba(255,255,255,${0.04 + ((i * 37) % 10) / 120})`;
+    g.fillRect(((i * 197) % 1024) + 0.5, 0, 1, 512);
+  }
+  for (let i = 0; i < 160; i++) {
+    g.fillStyle = i % 3 ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.35)';
+    g.fillRect((i * 271) % 1024, (i * 149) % 512, 1 + (i % 3), 1 + (i % 2));
+  }
+  return toTex(c);
+}
+
 // --- Le mobilier ---
 export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, placed = [] }) {
   const furn = map.furn || [];
@@ -658,7 +731,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         break;
       // le parking : une voiture sous sa bâche, des blocs de béton, des pneus en tas
       case 'car':
-        model('covered_car', it.x, 0, it.z, (it.face || 1) > 0 ? 0 : PI);
+        model('covered_car', it.x, 0, it.z, it.askew ? PI / 2 + 0.14 : (it.face || 1) > 0 ? 0 : PI);
         break;
       case 'barrier': {
         model('concrete_road_barrier_02', it.x, 0, it.z, it.yaw || 0);
@@ -681,18 +754,21 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         }
         break;
       case 'seats': {
-        // une rangée de fauteuils de velours rouge, accoudoirs noirs (tournés vers l'écran, à l'est)
+        // une rangée de fauteuils de velours rouge (dossier galbé, assise arrondie, un sur onze relevé), accoudoirs noirs
         const n = Math.floor(it.w / 0.56);
+        const th = yawZ(F);
+        const armLow = Math.cos(th) * (it.rot ? 0 : 1) - Math.sin(th) * (it.rot ? 1 : 0) < 0; // l'accoudoir est du côté des petits lx
+        const seat = (k, tpl, lx) => {
+          const [x, z] = P(lx, 0);
+          G.add(k, tpl.clone().rotateY(th).translate(x, 0, z));
+        };
         for (let i = 0; i < n; i++) {
           const lx = -hw + 0.28 + i * 0.56;
-          const up = (it.id * 7 + i * 3) % 11 === 0; // un siège relevé
-          if (up) lbox('velvet', it, lx - 0.24, lx + 0.24, 0.3, 0.75, -0.2, -0.1);
-          else lbox('velvet', it, lx - 0.24, lx + 0.24, 0.36, 0.5, -0.24, 0.24);
-          lbox('velvet', it, lx - 0.25, lx + 0.25, 0.42, 1.08, -0.33, -0.16);
-          lbox('black', it, lx + 0.25, lx + 0.31, 0, 0.68, -0.32, 0.24);
-          lbox('black', it, lx + 0.24, lx + 0.32, 0.64, 0.7, -0.3, 0.26);
+          seat('velvet', SEAT.back, lx);
+          seat('velvet', (it.id * 7 + i * 3) % 11 === 0 ? SEAT.up : SEAT.pan, lx);
+          seat('black', SEAT.arm, lx);
         }
-        lbox('black', it, -hw - 0.03, -hw + 0.03, 0, 0.68, -0.32, 0.24);
+        seat('black', SEAT.arm, armLow ? -hw + 0.28 + n * 0.56 : -hw + 0.28 - 0.56);
         break;
       }
       case 'sinks': {
@@ -721,15 +797,15 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
           const [ux, uz] = at(0.35, -0.12);
           model('television_02', ux, 0.79, uz, y - 0.15);
           model('television_02', ux, 0.79 + 0.41, uz, y - 0.1);
-        } else if (it.id % 3 === 0) model('cardboard_box_01', ...at(0.55, 0.05).flatMap((v, i) => (i ? [0.79, v] : [v])), y + 0.3, 0.8);
-        const PAPER = [['binder_notebook', 'binder_notebook'], ['clipboard', '*'], ['office_notepads', 'office_notepads_yellow_pad+office_notepads_note_stack'], ['binder_notebook', 'binder_notebook_closed']];
+        } else if (it.id % 5 === 0) model('cardboard_box_01', ...at(0.55, 0.05).flatMap((v, i) => (i ? [0.79, v] : [v])), y + 0.3, 0.8);
+        const PAPER = [['office_notepads', 'office_notepads_a4_stack'], ['clipboard', '*'], ['office_notepads', 'office_notepads_yellow_pad+office_notepads_note_stack'], ['binder_notebook', 'binder_notebook_closed']];
         const [pn, pp] = PAPER[it.id % PAPER.length];
         const [px, pz] = at(0.3, 0.12);
         model(pn, px, 0.795, pz, y + (rand(it.id, 2) - 0.5) * 0.8, 1, pn === 'clipboard' ? -PI / 2 : 0, 0, pp);
         const [sx, sz] = at(0.05, -0.2);
         if (it.id % 2) model('vintage_stapler', sx, 0.79, sz, y + rand(it.id, 3) * 2, 1.2);
         else model('stationery_supplies', sx, 0.79, sz, y + rand(it.id, 3) * 2);
-        if (it.id % 3 === 2) {
+        if (it.id % 5 === 2) {
           const [lx, lz] = at(0.78, -0.3);
           model('desk_lamp_arm_01', lx, 0.88, lz, y + PI);
         }
@@ -895,6 +971,12 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     G.box('black', X1 - 0.1, X1 - 0.02, 1.2, r.ceilH - 1.0, Z0 + 2.6, Z0 + 3.0, '+x');
     G.box('black', X1 - 0.1, X1 - 0.02, 1.2, r.ceilH - 1.0, Z1 - 3.0, Z1 - 2.6, '+x');
     G.box('red', X1 - 1.2, X1 - 0.1, 0, 1.2, Z0 + 2.6, Z1 - 2.6, '-y');
+    // (la salle 1 : le projecteur tourne encore ; sur l'écran, le carton de l'entracte, et sa lueur qui tremble)
+    if (r.num === 1) {
+      MATS.screenLit = MATS.screenLit || { m: new THREE.MeshBasicMaterial({ map: intermissionTex(), color: new THREE.Color(1, 1, 1).multiplyScalar(0.8) }), S: 1 };
+      panel('screenLit', [0, 0, 1, 1], X1 - 0.09, (1.4 + r.ceilH - 1.2) / 2, (Z0 + Z1) / 2, Z1 - Z0 - 6.0, r.ceilH - 2.6, -1, 0);
+      lights.push({ x: X1 - 3, y: 2.8, z: (Z0 + Z1) / 2, c: [0.4, 0.46, 0.6], rad: 12, nx: -1, nz: 0, box: [r.x0 * C - 0.25, Z0 - 0.25, X1 + 0.25, Z1 + 0.25] });
+    }
   }
 
   // le cinéma : des affiches dans des caissons lumineux le long des murs du hall et du couloir des salles
@@ -911,6 +993,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         const gx = Math.floor((w + s * 0.5) / C) - s;
         const gz = Math.floor(z / C);
         if (map.grid[gz * map.W + gx] !== 2) continue; // (un mur derrière, pas une porte)
+        if (s < 0 && (map.fakeScreens || []).some((d) => Math.abs((d.z + 0.5) * C - z) < 2.0)) continue; // (ni une porte de salle)
         if (furn.some((o) => Math.abs(o.x - w) < 2 && Math.abs(o.z - z) < 1.6)) continue; // (ni derrière une borne)
         const x = w + s * 0.06;
         G.box('black', Math.min(w, w + s * 0.08), Math.max(w, w + s * 0.08), 0.9, 2.65, z - 0.62, z + 0.62);

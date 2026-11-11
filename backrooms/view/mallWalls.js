@@ -907,6 +907,16 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     }
   };
 
+  // dans le couloir de service du nord, à l'étage : la même affichette, collée des dizaines de fois sur dix mètres de mur
+  if (fi === 0) {
+    const R = runs.find((r) => r.room.name === 'Service corridor N' && r.alongX && r.nz > 0 && r.s0 <= 119.5 && r.s1 >= 131);
+    if (R)
+      for (let s = 120; s <= 130.6; s += 0.36) {
+        for (let y = 0.72; y < 2.45; y += 0.46) plate(R, s + (hash(s, y) - 0.5) * 0.05, y + (hash(y, s) - 0.5) * 0.04, NOTE(3), 0.3, 0.4, null);
+        mark(...at(R, s, 0.1), 0.5);
+      }
+  }
+
   for (const R of runs) {
     const kind = R.room.kind;
     const len = R.s1 - R.s0;
