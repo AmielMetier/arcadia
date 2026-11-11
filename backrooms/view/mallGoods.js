@@ -8,8 +8,8 @@ import * as THREE from '../../shared/vendor/three/three.module.min.js';
 const CW = 128; // une case : 128 × 128 ; le dessus = la bande du haut (16 px), la tranche = la bande de gauche (16 px)
 const COLS = 16;
 const AW = 2048;
-const AH = 1024;
-export const ROW = { toys: 0, electro: 1, kitchen: 2, sport: 3, shoes: 4, stock: 5, carton: 6, misc: 7 };
+const AH = 1152; // neuf rangées de 128
+export const ROW = { toys: 0, electro: 1, kitchen: 2, sport: 3, shoes: 4, stock: 5, carton: 6, misc: 7, candy: 8 };
 
 const NAMES = {
   toys: ['ROBO-PAL', 'TURBO RACER', 'DOLLY DREAMS', 'MEGA BLOX', 'SPACE CADET', 'PUZZLE 500', 'DINO PARK', 'MAGIC SET', 'KITE PRO', 'YO-YO CHAMP', 'BUBBLE FUN', 'TEDDY & CO', 'PAINT KIT', 'RC BUGGY', 'STAR FORCE', 'FARM PALS'],
@@ -18,8 +18,10 @@ const NAMES = {
   sport: ['PRO BALL', 'TENNIS x3', 'ROLLER SKATES', 'DUMBBELLS', 'JUMP ROPE', 'SWIM GOGGLES', 'BIKE HELMET', 'FLYING DISC', 'CAMP STOVE', 'THERMOS 1L', 'FISHING REEL', 'KNEE PADS', 'SPORT BOTTLE', 'BALL PUMP', 'GOLF x12', 'SHIN GUARDS'],
   stock: ['SUDS', 'BRITE', 'PAPER TOWELS', 'TRASH BAGS', 'BULBS 60W', 'TISSUE', 'SPONGES x4', 'DISH SOAP', 'AIR FRESH', 'FLOOR WAX', 'GLOVES', 'CANDLES', 'MATCHES', 'FILM 35mm', 'TAPE', 'LAUNDRY'],
 };
-const BRANDS = { toys: ['HAPPYTIME', 'KIDCO', 'PLAYWELL'], electro: ['ZENTRA', 'AUREL', 'KOBA', 'VISTA'], kitchen: ['HOMESTEAD', 'CUCINA', 'MAPLE & CO'], sport: ['STRIDE', 'APEX', 'NORTHPOINT'], stock: ['VALU-PAK', 'CLEANWAY', 'DAYBRIGHT'] };
+NAMES.candy = ['CHOCO CRUNCH', 'SOUR STARS', 'MINT DROPS', 'CARAMEL CHEWS', 'FRUIT GEMS', 'POP ROCKETS', 'JELLY BEARS', 'PEANUT BRITTLE', 'RED TWISTS', 'TOFFEE BITS', 'BUTTER CORN', 'NACHO CHIPS', 'COLA GUMMIES', 'MALT BALLS', 'LEMON FIZZ', 'COCOA NIBS'];
+const BRANDS = { candy: ['SWEETWATER', 'GOLDEN TREAT', 'MATINEE'], toys: ['HAPPYTIME', 'KIDCO', 'PLAYWELL'], electro: ['ZENTRA', 'AUREL', 'KOBA', 'VISTA'], kitchen: ['HOMESTEAD', 'CUCINA', 'MAPLE & CO'], sport: ['STRIDE', 'APEX', 'NORTHPOINT'], stock: ['VALU-PAK', 'CLEANWAY', 'DAYBRIGHT'] };
 const PALS = {
+  candy: [['#5a2a12', '#f0c23a', '#fff4d6'], ['#d81f6a', '#fff06a', '#ffffff'], ['#1f9a8a', '#ffffff', '#0d3a34'], ['#f08c1a', '#7a1f12', '#fff4d6'], ['#7a2fc4', '#ffd23a', '#ffffff'], ['#c41f1f', '#fff2c8', '#ffffff']],
   toys: [['#e23b2e', '#ffd21f', '#ffffff'], ['#1f6fd1', '#ff7a1a', '#ffffff'], ['#8a2fc4', '#3fe0c5', '#ffffff'], ['#f08c1a', '#2440b0', '#ffffff'], ['#2fa84a', '#ffe14a', '#ffffff'], ['#e83f8c', '#fff06a', '#ffffff']],
   electro: [['#e9e7e1', '#1c3f8f', '#1b1b1f'], ['#1d1e24', '#d8262c', '#f1f1f1'], ['#d9dde2', '#0f7a6a', '#16181c'], ['#2a3142', '#f0b21a', '#f4f4f4'], ['#f0efe9', '#7a1f8a', '#1b1b1f']],
   kitchen: [['#f1e7cf', '#b5482a', '#3a2a1e'], ['#dfe9e2', '#2f7a5a', '#1f2f28'], ['#f4e3da', '#a8322f', '#3a1f1c'], ['#e4e8f1', '#2f4f8f', '#1c2436'], ['#f3efc9', '#8a6a1a', '#3a3010']],
@@ -169,6 +171,7 @@ function pic(g, kind, x, y, s, col, col2) {
   }
 }
 const PICS = {
+  candy: [3, 15, 5, 3, 5, 4, 2, 3, 15, 3, 9, 3, 8, 5, 8, 3],
   toys: [0, 1, 2, 3, 4, 3, 15, 15, 15, 5, 5, 2, 8, 1, 4, 3],
   electro: [10, 5, 12, 10, 11, 8, 14, 10, 11, 12, 10, 11, 11, 12, 14, 12],
   kitchen: [3, 8, 6, 6, 3, 7, 5, 6, 8, 3, 8, 7, 7, 3, 6, 3],
@@ -192,7 +195,7 @@ function goodsAtlas() {
     g.fillRect(cx, cy, 16, CW);
   };
   // les boîtes imprimées (jouets, électronique, cuisine, sport, ménage)
-  for (const cat of ['toys', 'electro', 'kitchen', 'sport', 'stock']) {
+  for (const cat of ['toys', 'electro', 'kitchen', 'sport', 'stock', 'candy']) {
     const r = ROW[cat];
     for (let i = 0; i < COLS; i++) {
       const cx = i * CW;
@@ -282,10 +285,10 @@ function goodsAtlas() {
         g.fill();
         g.fillStyle = bg;
         fit(g, name, fx + 56, fy + 53, 88, 22, '900');
-        pic(g, PICS.stock[i], fx + 26, fy + 90, 26, ink, ac);
+        pic(g, PICS[cat][i], fx + 26, fy + 90, 26, ink, ac);
         g.fillStyle = ink;
         fit(g, brand, fx + 76, fy + 88, 60, 10);
-        fit(g, ['NEW!', '25% MORE', 'VALUE SIZE', 'LEMON'][i % 4], fx + 76, fy + 102, 60, 10, '900');
+        fit(g, (cat === 'candy' ? ['NET WT 5 OZ', 'KING SIZE', 'THEATER BOX', 'NEW!'] : ['NEW!', '25% MORE', 'VALUE SIZE', 'LEMON'])[i % 4], fx + 76, fy + 102, 60, 10, '900');
       }
       g.restore();
     }
@@ -465,13 +468,18 @@ function goodsAtlas() {
 const SIGNS = ['BEAUTY', 'LADIES', 'SHOES', 'HOME', 'ELECTRONICS', 'TOYS', 'MENSWEAR', 'LUGGAGE', 'KITCHEN', 'STOCKROOM', 'FITTING ROOMS', 'PAY HERE', 'CUSTOMER SERVICE', 'CLEARANCE', 'LUMIÈRE', 'ORCHID & ASH'];
 export const SIGN = Object.fromEntries(SIGNS.map((s, i) => [s, i]));
 export const DEPT_SIGN = { beauty: 0, ladies: 1, shoes: 2, home: 3, electro: 4, toys: 5, mens: 6, luggage: 7, kitchen: 8, stock: 9 };
-// (les petites cases : 2 colonnes × 14 rangées de 512 × 64 ; dessous, quatre grandes enseignes de 1024 × 128)
-const SIGN_A0 = 896;
+// (les petites cases : 2 colonnes × 18 rangées de 512 × 64 ; dessous, quatre grandes enseignes de 1024 × 128)
+const SIGN_A0 = 1152;
 const SIGN_H = SIGN_A0 + 512;
 export const SIGN_MARKET = 22; // les grandes surfaces de l'annexe, puis le fléchage vers l'annexe
 export const SIGN_FLEA = 23;
 export const SIGN_GARDEN = 24;
 export const SIGN_ANNEX = 25;
+export const SIGN_BOXOFFICE = 26;
+export const SIGN_SNACKS = 27; // 27 à 29 : les tarifs du comptoir des confiseries
+export const SIGN_KIOSK = 30; // 30 à 33 : les bandeaux des kiosques
+export const SIGN_BACK5 = 34; // « BACK IN 5 MINUTES »
+export const SIGN_POPCORN = 35;
 const FILMS = ['STARFALL', 'THE LAST SUMMER', 'NIGHT SHIFT', 'PARADE OF LIGHTS', 'THE QUIET FLOOR', 'CLOSING TIME'];
 export const SIGN_EXIT = 16; // trois plaques dans la case : EXIT, ← EXIT, EXIT →
 export const SIGN_SCREEN = 17; // 17 à 19 : deux plaques par case (salles 1 à 6)
@@ -595,6 +603,34 @@ function signAtlas() {
       g.fillStyle = '#ff5fa8';
       g.fillRect(x + 10, y + 6, 492, 3);
       g.fillRect(x + 10, y + 55, 492, 3);
+    });
+    // le comptoir des confiseries : trois tableaux de tarifs
+    [['POPCORN', ['SMALL 1.50', 'MEDIUM 2.25', 'LARGE 3.00', 'BUTTER +.25']], ['COLD DRINKS', ['COLA', 'ORANGE', 'LEMON-LIME', 'ROOT BEER']], ['CANDY · NACHOS', ['CANDY 1.25', 'NACHOS 2.50', 'HOT DOG 1.75', 'PRETZEL 1.50']]].forEach(([title, items], k) => {
+      const [x, y] = cellXY(SIGN_SNACKS + k);
+      g.fillStyle = '#16121c';
+      g.fillRect(x, y, 512, 64);
+      g.fillStyle = ['#ffd23a', '#5fd0ff', '#ff7ab0'][k];
+      g.font = `900 26px ${FONT}`;
+      g.textAlign = 'left';
+      g.fillText(title, x + 14, y + 27);
+      g.fillStyle = '#f3ecd8';
+      g.font = `bold 15px ${FONT}`;
+      items.forEach((t, i) => g.fillText(t, x + 14 + i * 124, y + 52, 116));
+      g.textAlign = 'center';
+      g.strokeStyle = '#b08a3a';
+      g.lineWidth = 2;
+      g.strokeRect(x + 3, y + 3, 506, 58);
+    });
+    // les kiosques
+    [['KEYS CUT · ENGRAVING', '#f2c230', '#1a1a1a'], ['SUNGLASS SHACK', '#0f6f7a', '#f4f4f0'], ['PHONE CARDS · PAGERS', '#b3202a', '#ffffff'], ['LOTTO · NEWS · TOBACCO', '#1f3f8a', '#ffe14a']].forEach(([t, bg, ink], k) => plate(SIGN_KIOSK + k, bg, ink, `900 36px ${FONT}`, t, null));
+    plate(SIGN_BACK5, '#efe9d8', '#b3202a', `900 40px ${FONT}`, 'BACK IN 5 MINUTES', (x, y) => {
+      g.strokeStyle = '#b3202a';
+      g.lineWidth = 3;
+      g.strokeRect(x + 6, y + 6, 500, 52);
+    });
+    plate(SIGN_POPCORN, '#c41f1f', '#ffe14a', `900 46px ${FONT}`, 'P O P C O R N', (x, y) => {
+      g.fillStyle = '#ffffff';
+      for (let k = 0; k < 13; k++) g.fillRect(x + 6 + k * 40, y + 2, 20, 6);
     });
     plate(SIGN_ANNEX, '#3a2a1c', '#f1e2c4', `bold 30px "Futura", "Century Gothic", ${FONT}`, 'THE ANNEX · MARKET · ANTIQUES · GARDEN', (x, y) => {
       g.fillStyle = '#d9a441';

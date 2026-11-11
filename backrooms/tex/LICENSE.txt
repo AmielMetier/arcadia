@@ -44,4 +44,6 @@ Level 17 (le mall) : Poly Haven, domaine public (CC0 1.0), texture de couleur 10
   l17_jersey.jpg     Cotton Jersey              https://polyhaven.com/a/cotton_jersey              (les tee-shirts, les mannequins)
   l17_vichy.jpg      Gingham Check              https://polyhaven.com/a/gingham_check              (les chemises à carreaux)
   l17_jacquard.jpg   Floral Jacquard            https://polyhaven.com/a/floral_jacquard            (les robes et les foulards)
+  l17_carrelage_brun.jpg  Brown Floor Tiles     https://polyhaven.com/a/brown_floor_tiles          (le sol de l'annexe)
+  l17_carrelage_use.jpg   Dirty Tiles           https://polyhaven.com/a/dirty_tiles                (le food court, la jardinerie)
   (le velours des fauteuils du cinéma reprend l5_velours.jpg)

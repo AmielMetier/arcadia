@@ -812,7 +812,7 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
   const FOLD = ['clothes', 'shoes', 'lingerie', 'kids', 'salon', 'luggage', 'outdoor', 'sports'];
   // ce qu'on range sur une étagère murale, selon le commerce : des emballages imprimés par facings, des piles de
   // vêtements pliés, des rangées de livres (view/mallGoods.js)
-  const SHELF_ROW = { toys: 'toys', kids: 'toys', electronics: 'electro', video: 'electro', music: 'electro', kitchen: 'kitchen', gifts: 'kitchen', florist: 'kitchen', candy: 'stock', sports: 'sport', outdoor: 'sport', shoes: 'shoes', luggage: 'sport' };
+  const SHELF_ROW = { toys: 'toys', kids: 'toys', electronics: 'electro', video: 'electro', music: 'electro', kitchen: 'kitchen', gifts: 'kitchen', florist: 'kitchen', candy: 'candy', sports: 'sport', outdoor: 'sport', shoes: 'shoes', luggage: 'sport' };
   const goods = (R, s, y, w, trade, seed) => {
     const P = (u, d) => at(R, u, d);
     if (trade === 'books' || trade === 'cards') return packs.books(P, s - w / 2 + 0.04, s + w / 2 - 0.04, y, 0.02, 0.24, seed);

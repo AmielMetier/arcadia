@@ -303,10 +303,10 @@ function makeMaterials(tx, baked) {
     carpetD: { m: baked(lam({ map: tx.carpetDark })), S: 1.5 },
     carpetFun: { m: baked(lam({ map: tx.carpetArcade })), S: 2.6 },
     carpetV: { m: baked(lam({ map: tx.carpetViolet })), S: 1.5 },
-    // l'annexe : le damier du mail du bas, en brun et crème (une aile plus ancienne)
-    annexTile: { m: baked(phong({ map: tx.checker, color: '#c08f62', specular: '#1c1a16', shininess: 30 }), { spec: 0.3, gloss: 80, mask: 0 }), S: 2.4 },
+    // l'annexe : un grès brun des années 70 (une aile plus ancienne)
+    annexTile: { m: baked(phong({ map: tx.annexTile, specular: '#1c1a16', shininess: 30 }), { spec: 0.3, gloss: 80, mask: 0 }), S: 2.1 },
     lino: { m: baked(phong({ map: tx.lino, specular: '#1c1a16', shininess: 30 }), { spec: 0.35, gloss: 90, mask: 0 }), S: 2.4 },
-    quarry: { m: baked(lam({ map: tx.quarry })), S: 2.4 },
+    quarry: { m: baked(phong({ map: tx.quarry, specular: '#1c1a16', shininess: 30 }), { spec: 0.25, gloss: 70, mask: 0 }), S: 3.0 },
     concrete: { m: baked(lam({ map: tx.concrete })), S: 2.5 },
     wood: { m: baked(phong({ map: tx.wood, specular: '#241b12', shininess: 40 }), { spec: 0.3, gloss: 70, mask: 0 }), S: 2.0 },
     faience: { m: baked(phong({ map: tx.faience, specular: '#3a3a3a', shininess: 80 }), { spec: 0.35, gloss: 140, mask: 0 }), S: 2.0 },
@@ -330,6 +330,9 @@ function makeMaterials(tx, baked) {
     velvet: { m: baked(lam({ map: tx.velvet })), S: 0.9 },
     shutter: { m: baked(phong({ map: tx.shutter, specular: '#2c2c2c', shininess: 30 }), { spec: 0.3, gloss: 60, mask: 0 }), S: 2.0 },
     plate: { m: baked(phong({ map: tx.plate, specular: '#9a9ea4', shininess: 60 }), { spec: 0.55, gloss: 100, mask: 0 }), S: 1.2 },
+    // les marches des escalators : de l'aluminium sombre, un liseré jaune
+    escStep: { m: baked(phong({ color: '#303236', specular: '#8a8e94', shininess: 50 }), { spec: 0.4, gloss: 80, mask: 0 }), S: 1 },
+    escYellow: { m: baked(lam({ color: '#c9a21e' })), S: 1 },
     led: { m: new THREE.MeshBasicMaterial({ color: new THREE.Color('#3a74ff').multiplyScalar(2.6) }), S: 1 },
   };
 }
@@ -1001,8 +1004,15 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     const tr = e.run / n;
     for (let i = 0; i < n; i++) {
       const s0 = e.land + i * tr;
-      G.box('steel', x0(s0, s0 + tr), x1(s0, s0 + tr), (i + 1) * 0.2 - 0.2, (i + 1) * 0.2, e.z - zIn, e.z + zIn, '-y');
+      const yt = (i + 1) * 0.2;
+      G.box('escStep', x0(s0, s0 + tr), x1(s0, s0 + tr), yt - 0.2, yt, e.z - zIn, e.z + zIn, '-y');
+      // le liseré jaune : au nez de la marche et le long des deux jupes
+      G.box('escYellow', x0(s0, s0 + 0.03), x1(s0, s0 + 0.03), yt, yt + 0.002, e.z - zIn, e.z + zIn, '-y');
+      for (const sd of [-1, 1]) G.box('escYellow', x0(s0 + 0.03, s0 + tr), x1(s0 + 0.03, s0 + tr), yt, yt + 0.002, e.z + sd * zIn - (sd > 0 ? 0.03 : 0), e.z + sd * zIn + (sd > 0 ? 0 : 0.03), '-y');
     }
+    // les peignes, au raccord des paliers
+    G.box('escYellow', x0(e.land - 0.05, e.land), x1(e.land - 0.05, e.land), 0.01, 0.014, e.z - zIn, e.z + zIn, '-y');
+    G.box('escYellow', x0(e.land + e.run, e.land + e.run + 0.05), x1(e.land + e.run, e.land + e.run + 0.05), e.rise + 0.01, e.rise + 0.014, e.z - zIn, e.z + zIn, '-y');
     // le long du profil : jupes, verre, main courante, habillage
     for (let j = 0; j < 3; j++) {
       const sa = prof[j];
@@ -1034,10 +1044,17 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       if (ba > 0.01 || bb > 0.01) G.quad('trim', [xa, ba, e.z - hw - 0.09], [xb, bb, e.z - hw - 0.09], [xb, bb, e.z + hw + 0.09], [xa, ba, e.z + hw + 0.09], [0, -1, 0]);
     }
     // les bouts : la main courante redescend (le tambour), le caisson se ferme
+    // (un demi-tour de la main courante autour d'un bout de verre arrondi, sur un prolongement du caisson)
     for (const sd of [-1, 1]) {
       const zg = e.z + sd * (hw - 0.03);
-      G.beam('black', [xOf(-0.35), 0.7, zg], [xOf(0), 1.0, zg], 0.09, 0.08);
-      G.beam('black', [xOf(e.len), e.rise + 1.0, zg], [xOf(e.len + 0.35), e.rise + 0.7, zg], 0.09, 0.08);
+      const zs = e.z + sd * zIn;
+      const zo = e.z + sd * (hw + 0.09);
+      for (const [s, y, out] of [[0, 0, -e.dir], [e.len, e.rise, e.dir]]) {
+        const x = xOf(s);
+        G.add('black', new THREE.TorusGeometry(0.4, 0.045, 6, 14, Math.PI).rotateZ(out < 0 ? Math.PI / 2 : -Math.PI / 2).translate(x, y + 0.6, zg));
+        G.add('glass', new THREE.CircleGeometry(0.37, 12, out < 0 ? Math.PI / 2 : -Math.PI / 2, Math.PI).translate(x, y + 0.6, zg));
+        G.box('steel', Math.min(x, x + out * 0.5), Math.max(x, x + out * 0.5), y, y + 0.2, Math.min(zs, zo), Math.max(zs, zo), '-y');
+      }
     }
     G.vface('trim', xOf(0), e.z - hw - 0.09, xOf(0), e.z + hw + 0.09, 0, 0.2, -e.dir, 0);
   }
@@ -1105,7 +1122,8 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
         vintage_stapler: 7, clipboard: 8, office_notepads: 10, rubber_boots: 9, vintage_electric_kettle: 9, portable_generator: 22, power_box_01: 14,
         ceramic_vase_03: 10, ceramic_vase_04: 10, vintage_suitcase: 22, potted_plant_02: 22, metal_stool_02: 20, bar_chair_round_01: 14, tool_cart: 18,
         binder_notebook: 9, carrot_cake: 12, food_apple_01: 10, book_encyclopedia_set_01: 14, anthurium_botany_01: 22, vintage_crutches_01: 16,
-        round_spectacles: 10, jug_01: 14, brass_vase_03: 14, croissant: 10, medical_box: 14, american_football: 16, concrete_cat_statue: 18,
+        alarm_clock_01: 10, vintage_pocket_watch: 8, digital_wrist_watch: 8, pot_enamel_01: 11, brass_pan_01: 12, padlock: 12,
+        round_spectacles: 10, jug_01: 11, brass_vase_03: 14, croissant: 10, medical_box: 14, american_football: 16, concrete_cat_statue: 18,
       },
     },
     convert: (src, kitName, piece, variant) => {

@@ -516,6 +516,11 @@ export function createMallTextures() {
   const [qc, qg] = mk();
   drawQuarry(qg, S);
   out.quarry = tex(qc);
+  // le carrelage de l'annexe (en attendant la photo : un grès brun uni)
+  const [anC, anG] = mk();
+  anG.fillStyle = '#8a6a48';
+  anG.fillRect(0, 0, S, S);
+  out.annexTile = tex(anC);
   const [gc, gg] = mk(256);
   drawGrille(gg, 256);
   out.grille = tex(gc);
@@ -567,8 +572,17 @@ export function createMallTextures() {
     return t;
   });
   out.carpetImg = null;
-  const files = ['l5_marbre_blanc.jpg', 'l5_marbre_noir.jpg', 'moquette_rase.jpg', 'plafond.jpg', 'l17_parpaing.jpg', 'l17_beton.jpg', 'l17_faience.jpg', 'l5_noyer.jpg', 'l1_plafond.jpg', 'papier.jpg', 'l17_lino.jpg', 'l5_velours.jpg', 'l17_rideau.jpg', 'l17_tole.jpg'];
-  out.ready = Promise.all(files.map(loadImage)).then(([mw, mb, moq, pla, mur, sol, fai, noy, dal, pap, lin, vel, rid, tol]) => {
+  const files = ['l5_marbre_blanc.jpg', 'l5_marbre_noir.jpg', 'moquette_rase.jpg', 'plafond.jpg', 'l17_parpaing.jpg', 'l17_beton.jpg', 'l17_faience.jpg', 'l5_noyer.jpg', 'l1_plafond.jpg', 'papier.jpg', 'l17_lino.jpg', 'l5_velours.jpg', 'l17_rideau.jpg', 'l17_tole.jpg', 'l17_carrelage_brun.jpg', 'l17_carrelage_use.jpg'];
+  out.ready = Promise.all(files.map(loadImage)).then(([mw, mb, moq, pla, mur, sol, fai, noy, dal, pap, lin, vel, rid, tol, cab, cau]) => {
+    // les carrelages photographiés : le grès brun de l'annexe, la terre cuite usée du food court et de la jardinerie
+    if (cab) {
+      photo(anG, cab, S, S, 'rgb(232,222,204)', 1.04);
+      out.annexTile.needsUpdate = true;
+    }
+    if (cau) {
+      photo(qg, cau, S, S, 'rgb(255,236,214)', 1.22);
+      out.quarry.needsUpdate = true;
+    }
     if (lin) {
       photo(lg, lin, S, S, 'rgb(236,228,206)');
       out.lino.needsUpdate = true;

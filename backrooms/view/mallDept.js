@@ -56,7 +56,7 @@ export function createDept(K) {
   };
 
   // une gondole à deux faces : un fond, quatre niveaux de chaque côté, leurs réglettes de prix ; garnie par facings
-  const GOODS = { archive: ['carton', 'carton', 'carton', 'carton'], grocery: ['stock', 'kitchen', 'stock', 'stock'], toys: ['toys', 'toys', 'toys', 'toys'], electro: ['electro', 'electro', 'electro', 'electro'], kitchen: ['kitchen', 'kitchen', 'kitchen', 'stock'], sport: ['sport', 'sport', 'shoes', 'sport'], stock: ['carton', 'carton', 'stock', 'stock'] };
+  const GOODS = { archive: ['carton', 'carton', 'carton', 'carton'], grocery: ['candy', 'stock', 'candy', 'stock'], toys: ['toys', 'toys', 'toys', 'toys'], electro: ['electro', 'electro', 'electro', 'electro'], kitchen: ['kitchen', 'kitchen', 'kitchen', 'stock'], sport: ['sport', 'sport', 'shoes', 'sport'], stock: ['carton', 'carton', 'stock', 'stock'] };
   const gondola = (it) => {
     const hw = it.w / 2;
     const hd = it.d / 2;
