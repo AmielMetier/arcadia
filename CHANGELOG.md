@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 5.57 — 11 novembre 2026
+- **The Backrooms** — Un nouveau niveau à visiter en avant-première : le Level 17, un centre commercial abandonné sur deux étages. Pour l'instant, on n'y entre que par le ⭐ niveau de départ des VIP ; l'objectif et l'entité viendront plus tard :
+  - un mail et trois cours sous verrière, des boutiques ouvertes, fermées ou vidées, deux grands magasins, un food court, un cinéma, une salle de jeux, un parking, des quais, des bureaux et des coulisses ;
+  - chaque grande salle a plusieurs issues : on fait des boucles au lieu de revenir sur ses pas ;
+  - le grand magasin se visite rayon par rayon, et ses rayons portent de vrais emballages ;
+  - des enseignes, des plaques « EXIT » vertes au-dessus des portes, des salles de cinéma numérotées ;
+  - et quelques détails qui n'ont rien à faire là.
+
 ## 5.56 — 11 novembre 2026
 - **Odyssée** — Graphismes « Noir & Blanc » : les intérieurs s'y mettent.
   - Le Centre Pokémon prend son sol crème, ses murs orangés, son comptoir bleu-vert, ses canapés, ses plantes et ses machines de Noir & Blanc ; la Boutique son carrelage bleu.
