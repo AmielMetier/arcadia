@@ -249,6 +249,8 @@ function makeMaterials(tx, baked) {
     marbleDark: { m: baked(phong({ color: '#2a2521', specular: '#4a4540', shininess: 70 }), { spec: 0.45, gloss: 120, mask: 0 }), S: 1 },
     grille: { m: baked(lam({ map: tx.grille, alphaTest: 0.45, side: THREE.DoubleSide, color: '#bdbbb4' })), S: 0.5 },
     glass: { m: new THREE.MeshPhongMaterial({ color: '#0b1214', transparent: true, opacity: 0.2, specular: '#8fa6ae', shininess: 120, depthWrite: false, side: THREE.DoubleSide }), S: 1, order: 2 },
+    // les rubans de LED bleues du cinéma (plus forts que le blanc : ils bavent dans le caméscope)
+    led: { m: new THREE.MeshBasicMaterial({ color: new THREE.Color('#3a74ff').multiplyScalar(2.6) }), S: 1 },
   };
 }
 
@@ -630,6 +632,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   }
 
   // 6. Les piliers
+  const blues = []; // les rubans de LED bleues du cinéma (des feux de couleur)
   const sconcePose = new Map(); // pilier -> axe de ses appliques ('x' ou 'z')
   const voidCs = voids.map((v) => centroid(v.pts));
   for (const k in map.pillars) {
@@ -643,8 +646,10 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       G.add(rk, new THREE.CylinderGeometry(h, h, top, 28, 1, true).translate(p.x, top / 2, p.z));
       G.add('steel', new THREE.CylinderGeometry(h + 0.025, h + 0.03, 0.14, 28).translate(p.x, 0.07, p.z));
       if (p.kind === 'cine') {
-        // le disque blanc au plafond (son anneau de LED bleues viendra avec l'éclairage du cinéma)
+        // le disque blanc au plafond, cerclé dessous d'un ruban de LED bleues (une lumière du moteur, lights())
         G.add('trim', new THREE.CylinderGeometry(1.55, 1.55, 0.32, 48).translate(p.x, top - 0.16, p.z));
+        G.add('led', new THREE.TorusGeometry(1.47, 0.022, 6, 64).rotateX(Math.PI / 2).translate(p.x, top - 0.33, p.z));
+        blues.push({ x: p.x, y: top - 0.5, z: p.z, rad: 5.2, k: 1 });
       }
       continue;
     }
@@ -668,6 +673,20 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
         }
       }
       sconcePose.set(+k, best && Math.abs(p.x - best[0]) > Math.abs(p.z - best[1]) * 1.4 ? 'x' : 'z');
+    }
+  }
+
+  // 6b. Le plafond noir du hall du cinéma : deux retombées en long, bordées en dessous de rubans de LED bleues
+  let cineBox = null;
+  if (cine) {
+    const X0 = cine.x0 * C;
+    const X1 = (cine.x1 + 1) * C;
+    const top = cine.ceilH;
+    cineBox = [X0 - 0.25, cine.z0 * C - 0.25, X1 + 0.25, (cine.z1 + 1) * C + 0.25];
+    for (const zc of [(cine.z0 + 2) * C, (cine.z0 + 7) * C]) {
+      G.box('paintDark', X0 + 1.2, X1 - 1.2, top - 0.34, top, zc - 0.7, zc + 0.7, '+y');
+      for (const e of [-0.7, 0.7]) G.box('led', X0 + 1.25, X1 - 1.25, top - 0.36, top - 0.33, zc + e - 0.018, zc + e + 0.018, '+y');
+      for (let x = X0 + 6; x < X1 - 3; x += 9) blues.push({ x, y: top - 0.5, z: zc, rad: 5.5, k: 0.8 });
     }
   }
 
@@ -913,6 +932,15 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       }
     }
     for (const l of of('tube')) deco.push(['steel', new THREE.BoxGeometry(1.56, 0.05, 0.08).translate(l.x, l.y - 0.035, l.z)]);
+    // la gorge des corniches : une tablette crème sous le tube, qui le cache d'en bas (on voit la lueur au plafond)
+    for (const l of of('cove')) {
+      const g = new THREE.BoxGeometry(l.ring ? 5.4 : 4.3, 0.035, 0.46).translate(0, -0.06, 0);
+      g.rotateY(l.rot || 0);
+      deco.push(['trim', g.translate(l.x, l.y, l.z)]);
+      const lip = new THREE.BoxGeometry(l.ring ? 5.4 : 4.3, 0.16, 0.03).translate(0, 0.0, 0.23);
+      lip.rotateY(l.rot || 0);
+      deco.push(['trim', lip.translate(l.x, l.y, l.z)]);
+    }
     const byKey = new Map();
     for (const [k, g] of deco) (byKey.get(k) || byKey.set(k, []).get(k)).push(g.index ? g.toNonIndexed() : g);
     for (const [k, list] of byKey) {
@@ -924,8 +952,16 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   return {
     fixtures,
     wallMat: MATS.plaster.m,
-    // les feux de couleur (le moteur de lumière) : rien encore
-    lights() {},
+    // les feux de couleur (le moteur de lumière) : les rubans de LED bleues du cinéma, qui éclairent vers le bas et
+    // restent dans le hall ; un ruban fatigué bat de temps en temps
+    lights(out, time) {
+      for (let i = 0; i < blues.length; i++) {
+        const L = blues[i];
+        const sag = i % 5 === 3 ? 0.55 + 0.45 * Math.max(0, Math.sin(time * 0.7 + i) * Math.sin(time * 5.3 + i * 2)) : 1;
+        const k = L.k * sag;
+        out.push({ x: L.x, y: L.y, z: L.z, r: 0.1 * k, g: 0.3 * k, b: 1.15 * k, rad: L.rad, nx: 0, ny: -1, nz: 0, w: -0.45, box: cineBox });
+      }
+    },
     update() {},
   };
 }

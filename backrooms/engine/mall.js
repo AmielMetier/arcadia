@@ -632,6 +632,19 @@ export function createMallMap(seed = 17) {
       else if (r.kind === RK.DOCK) grid(5, 'tube', { y: r.ceilH, pOff: 0.4 });
       else if (r.kind === RK.PORTAL) grid(5, 'spot', { y: r.ceilH, pOff: 0.3 });
     }
+    // en bas, sous les vides : la lumière des grandes suspensions et de la lanterne du haut tombe jusqu'au sol (une
+    // lampe sans luminaire ; rad : jusqu'où elle porte, un peu au-delà du bord du vide)
+    if (fi === 1) {
+      for (const l of F[0].lights) {
+        if (!(l.kind === 'pendant' && l.big) && l.kind !== 'glow') continue;
+        const v = up.voids.find((o) => polyDist(o.pts, l.x, l.z) === 0);
+        if (!v) continue;
+        const xs = v.pts.map((p) => p[0]);
+        const zs = v.pts.map((p) => p[1]);
+        const rad = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)) / 2 + 3;
+        light(1, l.x, l.z, 'well', { y: MALL_CEIL, state: 'on', rad, gain: l.kind === 'glow' ? 0.95 : 1.2, fall: 1.25, src: l.id });
+      }
+    }
     // les appliques des piliers du mail et des cours (une paire par pilier, tournées vers les allées)
     for (const k in f.pillars) {
       const p = f.pillars[k];

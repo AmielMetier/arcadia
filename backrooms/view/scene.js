@@ -643,7 +643,7 @@ export function createBackroomsScene(container, floors, lamps) {
       uPoolMap: { value: poolTex }, // Poolrooms : la carte de l'eau (voir plus haut)
     };
     // reflets des lampes (Level 2) : les plus proches que la caméra voit, choisies à chaque image
-    const NLAMP = L3 ? 16 : 12; // (l'hôtel : on voit loin dans ses couloirs, et chaque applique dessine sur le mur)
+    const NLAMP = L3 || MALL ? 16 : 12; // (l'hôtel : on voit loin dans ses couloirs, et chaque applique dessine sur le mur)
     const lampU = {
       uLampPos: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3(0, -100, 0)) },
       uLampCol: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3()) },
@@ -839,7 +839,8 @@ float occVis(vec3 p, vec3 lp) {
       const LB = L0 && l.bright;
       // (Level 1 : des réglettes de 2 × 36 W, qui portent plus loin qu'un pavé de néon)
       // Level 17 : chaque genre de lampe a sa portée, sa force et sa pente (voir MALL_FP)
-      const mk = MALL && !o ? (l.kind === 'pendant' && l.big ? MALL_FP.big : MALL_FP[l.kind] || MALL_FP.spot) : null;
+      // (rad : une lampe qui porte où elle veut, la lumière des voûtes du haut tombée dans les vides)
+      const mk = MALL && !o ? (l.rad ? [l.rad, l.gain ?? 1, l.fall ?? 1.4] : l.kind === 'pendant' && l.big ? MALL_FP.big : MALL_FP[l.kind] || MALL_FP.spot) : null;
       const LR = o ? o.r : mk ? mk[0] : LB ? LIGHT_R * CELL_SIZE * 2.3 : l.bright ? LIGHT_R * CELL_SIZE * 1.55 : l.kind === 'bulb' ? 2.2 * CELL_SIZE : l.kind === 'tube' ? 2.3 * CELL_SIZE : LIGHT_R * CELL_SIZE * (L0 ? 1.15 : L1 ? 1.2 : 1);
       const gain = o ? o.gain : mk ? mk[1] : LB ? 1.42 : l.bright ? 1.3 : l.kind === 'bulb' ? 1.05 : l.kind === 'tube' ? 1.45 : L0 ? 0.97 : 1; // Level 0 : l'image environ 10 % moins lumineuse qu'au réglage du 7 novembre (la courbe du caméscope compresse : il faut baisser plus les néons)
       const fall = o ? o.fall : mk ? mk[2] : LB ? 1.5 : L1 ? 2.2 : 2.4;
@@ -4499,6 +4500,7 @@ void main() {
         }
         if (pipesView) pipesView.lights(dynList, time);
         if (hotel) hotel.lights(dynList, time);
+        if (mall) mall.lights(dynList, time);
         // l'ascenseur d'arrivée, portes ouvertes : la lumière de sa cabine déborde sur le couloir
         if (arrivalLift && arrivalLift.open > 0.02) {
           const A = map.arrival;
@@ -4664,13 +4666,13 @@ void main() {
         }
 
         // Level 2 : les lampes qui se reflètent dans le carrelage et le sol ciré (les plus proches que l'on voit)
-        if (PIPES || L2 || L3) {
+        if (PIPES || L2 || L3 || MALL) {
           const cand = [];
           for (const l of map.lights) {
             const k = power && l.state !== 'off' && !(L3 && sim.blackout > 0) ? (l.k ?? 1) * (l.state === 'flicker' ? 0.6 : 1) : 0;
-            if (k <= 0 || (l.hidden && !L3)) continue; // (l'hôtel : les appliques n'ont pas de plafonnier, mais brillent)
+            if (k <= 0 || (l.hidden && !L3) || (MALL && (l.kind === 'well' || l.kind === 'aisle'))) continue; // (l'hôtel : les appliques n'ont pas de plafonnier, mais brillent)
             const d = Math.abs(l.x - P.x) + Math.abs(l.z - P.z);
-            if (d < 32) cand.push([d, l, k]);
+            if (d < (MALL ? 48 : 32)) cand.push([d, l, k]);
           }
           cand.sort((a, b) => a[0] - b[0]);
           let n = 0;
@@ -4681,7 +4683,12 @@ void main() {
             if (L2) lampU.uLampCol.value[n].set(0.95, 1.0, 1.02).multiplyScalar(1.2 * k * (l.fs || 1));
             // (l'hôtel : les plus lointaines s'effacent en douceur au lieu de s'éteindre d'un coup)
             else if (L3) lampU.uLampCol.value[n].set(1.0, 0.68, 0.38).multiplyScalar((l.lamp ? 0.8 : 1.6) * k * Math.min(1, (32 - d) / 8));
-            else if (l.kind === 'tube') lampU.uLampCol.value[n].set(0.75, 0.88, 1.0).multiplyScalar(k);
+            // (le mall : le sol poli reflète tout, les plus lointaines s'effacent en douceur)
+            else if (MALL) {
+              const c = mallOnCol(l);
+              const far = Math.min(1, (48 - d) / 12);
+              lampU.uLampCol.value[n].set(c.r, c.g, c.b).multiplyScalar((l.kind === 'glow' || l.big ? 0.55 : l.kind === 'cove' ? 0.3 : 0.4) * k * far);
+            } else if (l.kind === 'tube') lampU.uLampCol.value[n].set(0.75, 0.88, 1.0).multiplyScalar(k);
             else lampU.uLampCol.value[n].set(1.0, 0.7, 0.4).multiplyScalar(1.5 * k);
             n++;
           }
