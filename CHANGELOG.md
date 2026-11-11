@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 5.55 — 11 novembre 2026
+- **The Backrooms** — Level 1 : l'arrivée est vraiment calme.
+  - Déguisée en joueur, l'entité venait droit sur l'équipe dès la première seconde ; elle reste maintenant au loin pendant les 50 premières secondes, sans appeler ni forcer un rideau, et s'écarte de qui s'approche
+  - Passé ce répit, elle vient vous chercher comme avant
+
 ## 5.54 — 11 novembre 2026
 - **Hub** — Nouveau : le monstre du Level 1 change de corps, avec ses propres animations (TahitoaSenis)
   - Models/level1/entite.glb : une silhouette voilée, 26 os, 10 clips nommés comme les états du jeu

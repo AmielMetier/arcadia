@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, SLIDE_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL, RELAY_ARM, RELAY_SYNC, LIFT_CALL_T, L1_CALM, L1_FIRST_BLACKOUT, SECTOR_STEP } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, SLIDE_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL, RELAY_ARM, RELAY_SYNC, LIFT_CALL_T, L1_CALM, L1_FIRST_BLACKOUT, SECTOR_STEP, CALM_KEEP } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
 import { navOf, roamable } from '../backrooms/engine/gait.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
@@ -4567,6 +4567,53 @@ test("Level 1 : l'arrivée est calme — elle reste au loin, pas de coupure avan
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 6, level: 1 });
   assert.ok(sim.monster.dormantT >= L1_CALM - 0.1, 'elle ne chasse pas encore');
   assert.ok(sim.nextBlackout >= L1_FIRST_BLACKOUT[0], 'la première coupure attend');
+});
+
+test("Level 1 : le calme de l'arrivée vaut aussi pour l'imposteur — déguisé, il reste au loin, se tait et n'approche qu'ensuite", () => {
+  const was = BackroomsSim.DISGUISE;
+  BackroomsSim.DISGUISE = true;
+  try {
+    for (const seed of [2, 6, 11]) {
+      const sim = new BackroomsSim({ difficulty: 'normal', seed, level: 1 });
+      const M = sim.monster;
+      const P = sim.player;
+      assert.ok(M.mimic != null, `déguisé dès le départ (graine ${seed})`);
+      const d0 = Math.hypot(M.x - P.x, M.z - P.z);
+      let calls = 0;
+      let closest = Infinity;
+      for (let i = 0; i < Math.round((L1_CALM - 1) / DT); i++) {
+        sim.step({});
+        closest = Math.min(closest, Math.hypot(M.x - P.x, M.z - P.z));
+        for (const ev of sim.drainEvents()) if (ev.type === 'mimicCall' || ev.type === 'unmask' || ev.type === 'dockBang') calls++;
+      }
+      assert.equal(calls, 0, `ni appel, ni rideau forcé, ni démasquage pendant le calme (graine ${seed})`);
+      assert.ok(closest >= Math.min(d0, CALM_KEEP) - 1, `il reste au loin : ${closest.toFixed(1)} m au plus près, parti de ${d0.toFixed(1)} m (graine ${seed})`);
+      // le calme passé, il vient
+      const d1 = Math.hypot(M.x - P.x, M.z - P.z);
+      let best = d1; // (à vol d'oiseau : un mur à contourner l'éloigne d'abord)
+      for (let i = 0; i < Math.round(45 / DT) && M.mimic != null; i++) {
+        sim.step({});
+        best = Math.min(best, Math.hypot(M.x - P.x, M.z - P.z));
+      }
+      assert.ok(M.mimic == null || best < d1 - 5, `ensuite il approche : ${d1.toFixed(1)} → ${best.toFixed(1)} m (graine ${seed})`);
+    }
+    // … et il s'écarte de qui vient vers lui
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 6, level: 1 });
+    const M = sim.monster;
+    const P = sim.player;
+    const cell = sim.map.walkable.map((c) => ({ x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE }))
+      .filter((q) => !sim.isColliding(q.x, q.z, 0.38, 0) && Math.hypot(q.x - M.x, q.z - M.z) > 10 && Math.hypot(q.x - M.x, q.z - M.z) < 16)[0];
+    assert.ok(cell, 'une case à une quinzaine de mètres de lui');
+    sim.arriveT = 0;
+    P.x = cell.x;
+    P.z = cell.z;
+    const near = Math.hypot(M.x - P.x, M.z - P.z);
+    for (let i = 0; i < Math.round(15 / DT); i++) sim.step({});
+    assert.ok(M.mimic != null, 'il ne se démasque pas');
+    assert.ok(Math.hypot(M.x - P.x, M.z - P.z) > near + 5, `il s'éloigne : ${near.toFixed(1)} → ${Math.hypot(M.x - P.x, M.z - P.z).toFixed(1)} m`);
+  } finally {
+    BackroomsSim.DISGUISE = was;
+  }
 });
 
 test('Level 1 : coupures variées — jamais deux fois de suite le même genre ; le délestage éteint un tiers après l\'autre', () => {

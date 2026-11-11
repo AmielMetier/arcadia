@@ -145,6 +145,7 @@ export const SHORT_LEN = [3.5, 6];
 export const BROWN_LEN = [18, 26];
 export const SECTOR_STEP = 9; // secondes par tiers, pendant un délestage (trois tiers)
 export const L1_CALM = 50; // Level 1 : l'arrivée est calme, elle reste au loin (le temps de découvrir l'entrepôt)
+export const CALM_KEEP = 30; // m : pendant ce calme, l'imposteur se tient au moins à cette distance des joueurs
 // Level 1 : les disjoncteurs généraux, à tenir relevés en même temps (2 postes à 1 ou 2 joueurs, 3 à partir de 3).
 // Chacun, relevé, tient RELAY_SYNC secondes ; s'il n'y a pas assez de joueurs en vie pour les tenir tous, il tient le
 // temps de courir aux autres (relayRun de la carte, à RELAY_PACE m/s, plus RELAY_SPARE)
@@ -691,6 +692,7 @@ export class BackroomsSim {
       hesLen: 1,
       restT: 0, // l'imposteur : il a renoncé à une porte, il s'éloigne (vers away0)
       away0: null,
+      calmTo: null, // l'imposteur : là où il s'écarte pendant le calme de l'arrivée
       bang: null, // devant une porte blindée fermée : { id, t, hitT }
       // sa marche (gait.js) : vitesse réelle, passage en cours (escalier, trou), hauteur des pieds, poussée
       v: 0,
@@ -1514,7 +1516,19 @@ export class BackroomsSim {
     const locked = this.lockedIn(P);
     let goal = null;
     let speed = WALK_SPEED * MIMIC_SPEED;
-    if (M.restT > 0 && M.away0) goal = M.away0;
+    // le calme de l'arrivée vaut aussi pour l'imposteur : il reste au loin et se tait (il s'écarte de qui approche)
+    const calm = M.dormantT > 0 && !this.hunt;
+    if (calm) {
+      M.bang = null;
+      M.callT = Math.max(M.callT, 1);
+      const close = alive.some((Q) => Math.hypot(Q.x - M.x, Q.z - M.z) < CALM_KEEP);
+      if (close && (!M.calmTo || Math.hypot(M.calmTo.x - M.x, M.calmTo.z - M.z) < 2 || alive.some((Q) => Math.hypot(Q.x - M.calmTo.x, Q.z - M.calmTo.z) < CALM_KEEP))) {
+        M.calmTo = this.retreatSpot(P.x, P.z);
+        M.repathT = 0;
+      }
+      if (close && M.calmTo) goal = M.calmTo;
+      else speed = 0;
+    } else if (M.restT > 0 && M.away0) goal = M.away0;
     else if (locked) {
       // sa proie s'est enfermée : il frappe doucement et appelle (« ouvre, c'est moi »), puis renonce
       const F = this.safeFront(locked);
