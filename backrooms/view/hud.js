@@ -1064,16 +1064,17 @@ export class BackroomsHUD {
   // Mode VIP, avant la partie : la phrase secrète du coffre, demandée à l'hôte par-dessus le jeu. tryPhrase(phrase)
   // rend true (coffre ouvert), false (pas la bonne phrase) ou null (coffre introuvable). Se résout en true (ouvert) ou
   // false (l'hôte joue avec les monstres classiques).
-  askPhrase(tryPhrase) {
+  // (sub, skip : la ligne d'explication et le bouton pour s'en passer, quand c'est le niveau de départ qui la demande)
+  askPhrase(tryPhrase, { sub = 'ENTER THE PASSPHRASE TO UNLOCK THE ORIGINAL MONSTERS', skip = 'PLAY CLASSIC' } = {}) {
     return new Promise((resolve) => {
       const el = document.createElement('div');
       el.className = 'vip-gate';
       el.innerHTML = `<form class="vip-box" autocomplete="off">
           <div class="vip-title">⭐ VIP MODE</div>
-          <div class="vip-sub">ENTER THE PASSPHRASE TO UNLOCK THE ORIGINAL MONSTERS</div>
+          <div class="vip-sub">${sub}</div>
           <input class="vip-input" type="password" name="vip-phrase" autocomplete="off" spellcheck="false" aria-label="VIP passphrase">
           <div class="vip-msg" role="status"></div>
-          <div class="vip-btns"><button type="submit" class="vip-go">UNLOCK</button><button type="button" class="vip-skip">PLAY CLASSIC</button></div>
+          <div class="vip-btns"><button type="submit" class="vip-go">UNLOCK</button><button type="button" class="vip-skip">${skip}</button></div>
         </form>`;
       document.body.appendChild(el);
       const form = el.querySelector('form');

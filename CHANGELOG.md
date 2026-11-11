@@ -1,5 +1,43 @@
 # Journal des versions — Arcadia
 
+## 5.56 — 11 novembre 2026
+- **Odyssée** — Graphismes « Noir & Blanc » : les intérieurs s'y mettent.
+  - Le Centre Pokémon prend son sol crème, ses murs orangés, son comptoir bleu-vert, ses canapés, ses plantes et ses machines de Noir & Blanc ; la Boutique son carrelage bleu.
+  - Dehors : panneaux de bois des routes, rebords à sauter et bancs de Noir & Blanc.
+  - Un bâtiment s'estompe quand tu passes derrière lui : tu ne perds plus ton personnage de vue.
+- **Odyssée** — HUD replié (touche U) : la fiche du lieu redevient toute petite, la grille Habitat ne s'étale plus sur l'écran.
+
+## 5.55 — 11 novembre 2026
+- **Odyssée** — Les graphismes « Noir & Blanc » sont refaits de fond en comble pour ressembler à Pokémon Noir 2 & Blanc 2.
+  - Le sol : l'herbe turquoise du jeu, les chemins de sable et les routes pavées avec leurs vrais bords, la mer bordée de rochers, les hautes herbes sombres.
+  - Les arbres et les sapins de Noir & Blanc, à leur vraie taille, avec leurs versions d'automne, de cerisier et de neige ; haies fleuries et lampadaires.
+  - Les personnages : ton dresseur devient le héros ou l'héroïne de Noir 2 & Blanc 2, et les habitants, dresseurs, champions et sbires prennent leur allure de Noir & Blanc.
+  - Les maisons trop sombres sont retirées ; les intérieurs et les combats gardent leur dessin habituel.
+- **Odyssée** — Le HUD prend moins de place, dans les deux graphismes.
+  - La fiche du lieu est plus petite, tous les boutons tiennent sur une seule rangée et l'équipe est plus fine.
+  - Sur un écran étroit, tout rapetisse encore pour laisser voir le jeu.
+  - En Noir & Blanc, le HUD prend les gris et le rouge du menu de Noir 2 & Blanc 2.
+
+## 5.54 — 11 novembre 2026
+- **Hub** — Nouveau : le monstre du Level 1 change de corps, avec ses propres animations (TahitoaSenis)
+  - Models/level1/entite.glb : une silhouette voilée, 26 os, 10 clips nommés comme les états du jeu
+  - View/creature.js : un clip nommé comme l'état est joué tel quel (rien de l'explorateur, pas de gestes ajoutés) ; prise, démasquage, chute et jumpscare joués une fois ; démasquage de la durée de son clip ; pas comptés par rapport à la hauteur de repos de chaque pied
+  - Scene.js : la nouvelle entité au Level 1 et aux Poolrooms (hors mode VIP)
+- Nouveau : au Level 1, l'entité est un imposteur dès le début ; sprint plus lent de côté et à reculons (TahitoaSenis)
+  - L'entité commence avec l'apparence d'un joueur, marche à sa vitesse et ne se dévoile que tout près (la lampe ne la trahit plus)
+  - La transformation dure une seconde sur place, puis elle chasse un peu plus vite qu'un sprint ; loin de tous et hors de vue, elle reprend une apparence
+  - L'imposteur a son propre avatar (celui qu'il imite peut être vivant à côté)
+  - Le sprint : toute la vitesse droit devant, 72 % de côté, 60 % en arrière
+- **Hub** — Nouveau : au Level 1, la prise du monstre devient une étreinte qui étouffe (TahitoaSenis)
+
+## 5.53 — 11 novembre 2026
+- **The Backrooms** — Les joueurs VIP choisissent le niveau où commence la partie.
+  - Dans le salon, un réglage ⭐ « Niveau de départ » propose le Level 0, le Level 1, le Level 37 (Poolrooms), le Level 2 (Tuyauteries) et le Level 5 (Terror Hotel). Il n'apparaît que pour un compte VIP.
+  - À plusieurs, c'est l'hôte qui choisit : toute l'équipe part du même niveau.
+  - Il faut le mode VIP débloqué, comme pour les monstres d'origine : sans lui, la partie commence au Level 0.
+  - On arrive dans le niveau choisi comme en jouant : au bout du toboggan pour les Tuyauteries et le Terror Hotel, dans la cabine qui finit de descendre au Level 1, sur la bande qui saute aux Poolrooms. Le Level 0 garde son intro.
+  - Pour tous : « Continuer » depuis l'écran titre fait lui aussi arriver dans le niveau par son passage, au lieu d'y apparaître d'un coup.
+
 ## 5.52 — 11 novembre 2026
 - **The Backrooms** — La sortie des Tuyauteries devient un vrai monte-charge de service :
   - des chevrons jaunes et noirs autour des portes, des butoirs d'acier au pied des montants, une bande de danger en U au sol avec « KEEP CLEAR » peint au pochoir, la plaque « SERVICE LIFT » ;

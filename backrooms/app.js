@@ -1,10 +1,10 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
-import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE, HOTEL_LEVEL, MALL_LEVEL, DOCK_OPEN_T, DOCK_CLOSE_T, ALARM_T, DUCT_LAND } from './engine/sim.js';
+import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE, HOTEL_LEVEL, MALL_LEVEL, DOCK_OPEN_T, DOCK_CLOSE_T, ALARM_T, DUCT_LAND, startLevel } from './engine/sim.js';
 import { hasLineOfSight } from './engine/nav.js';
 import { bfs, CELL_SIZE, cellsOnSeg, T } from './engine/map.js';
 import { createBackroomsScene, setMonsterMode, setSceneOptions, onGlContext, sceneGl } from './view/scene.js';
 import { createSlideRide } from './view/slide.js';
-import { MOUTH } from './engine/poolrooms.js';
+import { MOUTH, SLIDES } from './engine/poolrooms.js';
 import { BackroomsSfx } from './view/sfx.js';
 import { hotelUi } from './view/hotelExit.js';
 import { createVoice } from './view/voice.js';
@@ -312,7 +312,10 @@ function setPaused(on) {
   }
   if (intro) intro.pending = false; // la souris lâchée pendant l'intro : on retrouvera l'écran de pause
   paused = on;
-  if (!on) started = true;
+  if (!on && !started) {
+    started = true;
+    if (entry) enterLevel(); // la première prise en main d'une partie qui commence plus loin : son arrivée
+  }
   if (on) for (const k in keys) keys[k] = false;
   if (hud) hud.showPause(on, kbMode, !started, resumeLevel());
   // seul, la pause fige l'image comme un magnétoscope
@@ -806,7 +809,7 @@ function hubVipSeed(key) {
     if (A && A.vipSeed) A.vipSeed(key).catch(() => {});
   } catch (e) {}
 }
-async function unlockVip() {
+async function unlockVip(ask = {}) {
   const kept = storedKey();
   if (kept) {
     const r = await openVault(kept);
@@ -833,7 +836,7 @@ async function unlockVip() {
     rememberKey(key);
     hubVipSeed(key);
     return true;
-  });
+  }, ask);
 }
 // Nouvelle partie (solo ou hôte) : l'hôte l'annonce aux invités, qui construisent la même carte avec la même graine
 function initGame(settings = lastSettings, forceLevel = null) {
@@ -842,13 +845,22 @@ function initGame(settings = lastSettings, forceLevel = null) {
   if (NET.role === 'guest') return; // l'invité attend le « go » de l'hôte
   // ?vip (seul) : le mode VIP sans passer par le salon (la clé gardée par ce navigateur, sinon la phrase est demandée)
   if (NET.role === 'solo' && /[?&]vip(&|=|$)/.test(location.search)) settings = { ...settings, monsters: 'vip' };
-  if (settings.monsters === 'vip' && !vaultOpen() && vipGate !== true) {
+  // ⭐ le niveau de départ : choisi au salon par un hôte VIP (réglage caché aux autres), ou ?level1, ?level37, ?level2,
+  // ?level5, ?level17 (seul). Il ne compte que pour un compte VIP (hors du Hub : celui qui a la clé) qui a le coffre VIP ouvert :
+  // le même test que le mode VIP. Sinon (réglage glissé par un autre joueur, adresse tapée par un non-VIP), le Level 0
+  const lvm = NET.role === 'solo' && location.search.match(/[?&]level(17|1|2|37|5)(&|=|$)/);
+  const asked = forceLevel == null ? (lvm ? lvm[1] : settings.start) : null;
+  const vipHere = !(H && H.embedded) || H.info.vip === true;
+  const wants = !!startLevel(asked, { vip: vipHere, vault: true });
+  if ((settings.monsters === 'vip' || wants) && !vaultOpen() && vipGate !== true) {
     if (!vipGate) {
-      vipGate = unlockVip()
+      // (le niveau de départ seul : la phrase le dit, et sans elle on part du Level 0)
+      const ask = settings.monsters === 'vip' ? (wants ? { sub: 'ENTER THE PASSPHRASE TO UNLOCK THE ORIGINAL MONSTERS AND YOUR STARTING LEVEL' } : {}) : { sub: 'ENTER THE PASSPHRASE TO START AT THE LEVEL YOU PICKED', skip: 'START AT LEVEL 0' };
+      vipGate = unlockVip(ask)
         .catch(() => false)
         .then((ok) => {
           vipGate = true;
-          if (!ok && hud) hud.toast('VIP MODE LOCKED · CLASSIC MONSTERS', 6);
+          if (!ok && hud && settings.monsters === 'vip') hud.toast('VIP MODE LOCKED · CLASSIC MONSTERS', 6);
           if (NET.role !== 'guest') initGame(lastSettings, forceLevel);
         });
     }
@@ -863,10 +875,10 @@ function initGame(settings = lastSettings, forceLevel = null) {
   // tout le salon, sauf ceux revenus au salon pendant la partie d'avant (ceux qui chargent encore arrivent vivants)
   const players = NET.role === 'host' ? H.players.filter((p) => p.id === NET.myId || !NET.quit.has(p.id)).map((p) => ({ id: p.id, name: p.name || 'Player' })) : [{ id: 0, name: 'Player' }];
   NET.run = Date.now();
-  // ?level1, ?level37, ?level2, ?level5 ou ?level17 (seul) : on commence directement au Level 1, aux Poolrooms, aux
-  // Tuyauteries, à l'hôtel ou au mall
-  const lvm = NET.role === 'solo' && location.search.match(/[?&]level(17|1|2|37|5)(&|=|$)/);
-  const lv = forceLevel != null ? forceLevel : lvm ? { 1: 1, 37: 2, 2: PIPES_LEVEL, 5: HOTEL_LEVEL, 17: MALL_LEVEL }[lvm[1]] : 0;
+  // (forceLevel : « continuer » depuis l'écran titre, au dernier niveau atteint seul : pour tout le monde)
+  const lv = forceLevel != null ? forceLevel : startLevel(asked, { vip: vipHere, vault: vaultOpen() });
+  if (wants && !lv && hud) hud.toast(settings.monsters === 'vip' && !vaultOpen() ? 'VIP MODE LOCKED · CLASSIC MONSTERS · LEVEL 0' : 'LEVEL SELECT LOCKED (VIP ONLY) · LEVEL 0', 6);
+  else if (asked && String(asked) !== '0' && !vipHere && hud) hud.toast('LEVEL SELECT IS FOR VIP ACCOUNTS · LEVEL 0', 6);
   startRun({ seed, difficulty, players, run: NET.run, level: lv, vip: settings.monsters === 'vip' });
   // ?parkour (seul) : on commence devant le couloir piégé, tourné vers les trous
   const trap = sim.map.trap;
@@ -990,6 +1002,8 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   hauntAt = 0;
   if (level && sim.level !== level) sim.loadLevel(level);
   if (testBot) placeTestBot();
+  // une partie qui commence plus loin : son arrivée, quand on prend la main (tout de suite si on joue déjà)
+  entry = level ? { run, level } : null;
   // un invité qui arrive en cours de partie regarde les autres jusqu'au prochain étage (l'hôte le dira)
   if (scene) {
     scene.dispose();
@@ -1035,6 +1049,7 @@ function startRun({ seed, difficulty, players, run, level, vip = false }) {
   otState.level = -1;
   otState.last = false;
   setPaused(kbMode ? paused : !isPointerLocked);
+  if (started && entry) enterLevel(); // une nouvelle partie, alors qu'on joue déjà
 }
 
 // l'écran titre : reprendre au dernier niveau atteint (seul)
@@ -1386,36 +1401,68 @@ function buildLevel(level) {
     sc.onRedStart = onRedStart;
     sc.onMonsterStep = onMonsterStep;
     scene = sc;
-    // au plus 8 s d'attente : une texture qui ne vient pas ne doit pas bloquer la partie
-    Promise.race([sc.ready, new Promise((r) => setTimeout(r, 8000))]).then(() => {
-      if (tok !== levelTok || scene !== sc) return;
-      requestAnimationFrame(() => {
-        if (tok !== levelTok || scene !== sc) return;
-        if (ride && ride.held) {
-          // arrivé par un toboggan : la fin de la descente (dans le noir, puis la lumière du bout), et on tombe dedans
-          if (hud) {
-            hud.loading(false);
-            hud.unfade();
-          }
-          ride.finish(level === HOTEL_LEVEL ? 'hotel' : 'pipes', () => {
-            endRide();
-            if (scene === sc) sc.dropIn(level === HOTEL_LEVEL ? 2.3 : 1.4); // (le hall de l'hôtel est haut de plafond)
-            if (hud) hud.fade(`LEVEL ${levelName(level)}`, levelSub(level), 2.4, false, true);
-          });
-          return;
-        }
-        if (hud) {
-          hud.loading(false);
-          hud.fade(`LEVEL ${levelName(level)}`, levelSub(level), 2.2);
-        }
-        sc.tape('bars', 0.8);
-        sc.tape('splice', 1.2);
-        if (sfx) sfx.tapeSplice();
-        // on arrive dans la cabine qui finit de descendre (portes fermées)
-        if (sfx && sim.arriveT > 0) sfx.elevator(ARRIVE_T + 0.4, true);
-      });
-    });
+    whenReady(sc, () => tok === levelTok, () => arrive(level, sc));
   }));
+}
+
+// au plus 8 s d'attente : une texture qui ne vient pas ne doit pas bloquer la partie (still : la demande compte encore)
+function whenReady(sc, still, fn) {
+  Promise.race([sc.ready, new Promise((r) => setTimeout(r, 8000))]).then(() => {
+    if (!still() || scene !== sc) return;
+    requestAnimationFrame(() => {
+      if (still() && scene === sc) fn();
+    });
+  });
+}
+
+// L'arrivée dans un étage dont la scène est prête : au bout du toboggan (tenu pendant le chargement), la fin de la
+// descente et la chute dedans ; sinon, après l'ascenseur, le titre sur la bande qui saute, et au Level 1 la cabine qui
+// finit de descendre
+function arrive(level, sc) {
+  if (ride && ride.held) {
+    // arrivé par un toboggan : la fin de la descente (dans le noir, puis la lumière du bout), et on tombe dedans
+    if (hud) {
+      hud.loading(false);
+      hud.unfade();
+    }
+    ride.finish(level === HOTEL_LEVEL ? 'hotel' : 'pipes', () => {
+      endRide();
+      if (scene === sc) sc.dropIn(level === HOTEL_LEVEL ? 2.3 : 1.4); // (le hall de l'hôtel est haut de plafond)
+      if (hud) hud.fade(`LEVEL ${levelName(level)}`, levelSub(level), 2.4, false, true);
+    });
+    return;
+  }
+  if (hud) {
+    hud.loading(false);
+    hud.fade(`LEVEL ${levelName(level)}`, levelSub(level), 2.2);
+  }
+  sc.tape('bars', 0.8);
+  sc.tape('splice', 1.2);
+  if (sfx) sfx.tapeSplice();
+  // on arrive dans la cabine qui finit de descendre (portes fermées)
+  if (sfx && sim.arriveT > 0) sfx.elevator(ARRIVE_T + 0.4, true);
+}
+
+// Une partie qui commence plus loin que le Level 0 (niveau de départ d'un VIP, « continuer », ?levelN) : quand on prend
+// la main, on y arrive comme en jouant, par la fin du passage qui y mène. Les Tuyauteries et le Terror Hotel : la fin
+// de la descente dans le toboggan des Poolrooms qui y mène (de sa couleur) ; le Level 1 et les Poolrooms : le titre
+// sur la bande qui saute, et au Level 1 la cabine qui finit de descendre. (Le Level 0 a son intro.) Pas pour celui qui
+// arrive en cours de partie : il regarde les autres jusqu'au prochain étage.
+let entry = null; // { run, level } : l'arrivée qui attend la prise en main
+function enterLevel() {
+  const e = entry;
+  entry = null;
+  if (!e || !sim || !scene || e.run !== NET.run || sim.level !== e.level || sim.player.status !== 'alive') return;
+  const sc = scene;
+  const i = SLIDES.findIndex((s) => s.to === e.level);
+  if (i >= 0) {
+    endRide();
+    ride = createSlideRide({ gl: sceneGl(), hex: SLIDES[i].hex, side: i % 2 ? -1 : 1, sfx });
+    ride.hold(); // le noir, le temps que le niveau finisse de se charger
+    document.body.classList.add('riding');
+    if (hud) hud.blackNow();
+  }
+  whenReady(sc, () => NET.run === e.run && sim.level === e.level, () => arrive(e.level, sc));
 }
 
 // Événements de la partie : sons, messages, changement d'étage, fin
@@ -1815,7 +1862,7 @@ function handleEvent(ev, me) {
       break;
     case 'mimic':
       // (rien pour les vivants : ils ne savent pas encore que ce n'est plus lui)
-      if (ev.id === me && hud) setTimeout(() => hud && hud.toast('It is wearing your face now. It speaks with your voice'), 2600);
+      if (ev.kill && ev.id === me && hud) setTimeout(() => hud && hud.toast('It is wearing your face now. It speaks with your voice'), 2600);
       break;
     case 'mimicCall':
       // l'imposteur appelle avec la voix volée (de vive voix, là où il est, ou au talkie) ; chacun la rejoue chez soi

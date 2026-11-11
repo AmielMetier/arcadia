@@ -11,6 +11,8 @@ import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.j
 // distance en marche (en cases) entre deux cases
 // les tests du comportement de l'entité la veulent présente dès le départ : le prélude a son propre test
 BackroomsSim.PRELUDE = false;
+// (de même, au Level 1, l'entité commence sous sa vraie forme : son déguisement a ses propres tests)
+BackroomsSim.DISGUISE = false;
 const bfsDist = (m, ax, az, bx, bz) => bfs(m.grid, m.W, m.H, ax, az)[bz * m.W + bx];
 
 // amène un joueur sur une cassette, à son étage (celle du renfoncement : échelle posée, au pied de l'échelle)
@@ -4952,7 +4954,7 @@ test('Level 1 : enfermé dans une salle de sécurité, l\'entité frappe à la p
   assert.ok(Math.hypot(M.x - S.x, M.z - S.z) > d0 + 8, 'ses pas s\'éloignent');
 });
 
-test('Level 1 : l\'imposteur — après une victime, l\'entité prend son apparence et sa voix, marche comme un joueur, et se démasque de près ou dans la lampe', () => {
+test('Level 1 : l\'imposteur — après une victime, l\'entité prend son apparence et sa voix, marche comme un joueur, et ne se démasque que de près (pas dans la lampe)', () => {
   const players = [{ id: 0, name: 'A' }, { id: 1, name: 'B' }];
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 11, players, localId: 0, level: 1 });
   sim.arriveT = 0;
@@ -5005,13 +5007,13 @@ test('Level 1 : l\'imposteur — après une victime, l\'entité prend son appare
   const un = sim.drainEvents().find((e) => e.type === 'unmask');
   assert.ok(M.mimic == null && M.mode === 'chase' && M.target === 0, 'démasquée, elle charge');
   assert.ok(un ? un.id === 1 : true, 'démasquage annoncé');
-  // une autre fois : la lampe de A la tient dans son faisceau
+  // une autre fois : la lampe de A a beau la tenir dans son faisceau, elle ne se démasque que de près
   sim.startMimic(M, B);
   const away = m.walkable.map((q) => ({ x: (q.x + 0.5) * CELL_SIZE, z: (q.z + 0.5) * CELL_SIZE })).find((q) => {
     const d = Math.hypot(q.x - A.x, q.z - A.z);
     return d > 6 && d < 10 && hasLineOfSight(m, A.x, A.z, q.x, q.z);
   });
-  Object.assign(M, { x: away.x, z: away.z, path: [], hesT: 99 });
+  Object.assign(M, { x: away.x, z: away.z, path: [], hesT: 99, restT: 99, away0: { x: away.x, z: away.z } }); // (elle reste là)
   A.flashlight = true;
   A.battery = 100;
   let why = null;
@@ -5020,7 +5022,85 @@ test('Level 1 : l\'imposteur — après une victime, l\'entité prend son appare
     sim.step({});
     for (const e of sim.drainEvents()) if (e.type === 'unmask') why = e.why;
   }
-  assert.ok(why === 'light' || why === 'near', `dans la lampe, elle se démasque (${why})`);
+  assert.ok(!why && M.mimic === 1, 'dans la lampe, de loin, elle garde son déguisement');
+});
+
+test("Level 1 : dès le départ, l'entité a l'apparence d'un joueur et marche à sa vitesse ; tout près, elle se transforme une seconde sur place, puis court un peu plus vite qu'un sprint ; loin de tous, elle reprend une apparence", () => {
+  BackroomsSim.DISGUISE = true;
+  try {
+    const players = [{ id: 0, name: 'A' }, { id: 1, name: 'B' }];
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 11, players, localId: 0, level: 1 });
+    sim.arriveT = 0;
+    const m = sim.map;
+    const M = sim.monster;
+    const [A, B] = sim.players;
+    M.dormantT = 0;
+    assert.ok(M.mimic === 0 || M.mimic === 1, 'au départ, déguisée en un des joueurs');
+    assert.equal(M.mode, 'mimic');
+    const ev0 = sim.drainEvents().find((e) => e.type === 'mimic');
+    assert.ok(!ev0 || !ev0.kill, 'personne n\'est mort');
+    // elle vient vers A (posé dans une allée dégagée), à la vitesse de marche d'un joueur
+    const open = m.walkable.find((q) => [-1, 0, 1].every((dx) => [-1, 0, 1].every((dz) => m.grid[(q.z + dz) * m.W + q.x + dx] === m.grid[q.z * m.W + q.x])) && !m.safeAt((q.x + 0.5) * CELL_SIZE, (q.z + 0.5) * CELL_SIZE) && Math.hypot((q.x + 0.5) * CELL_SIZE - M.x, (q.z + 0.5) * CELL_SIZE - M.z) > 25);
+    A.x = (open.x + 0.5) * CELL_SIZE;
+    A.z = (open.z + 0.5) * CELL_SIZE;
+    B.x = m.spawn.x;
+    B.z = m.spawn.z;
+    let vmax = 0;
+    for (let i = 0; i < 60 * 8 && M.mimic != null; i++) {
+      sim.step({});
+      vmax = Math.max(vmax, M.v || 0);
+    }
+    assert.ok(vmax > SIMX.WALK_SPEED * 0.9 && vmax <= SIMX.WALK_SPEED + 0.05, `à la vitesse d'un joueur qui marche (${vmax.toFixed(2)} m/s)`);
+    // à deux pas de A : la transformation, une seconde sur place
+    if (M.mimic != null) {
+      // (à 2 m de A, dans une direction libre)
+      const c = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => ({ x: A.x + Math.cos(k * 0.785) * 2, z: A.z + Math.sin(k * 0.785) * 2 })).find((q) => hasLineOfSight(m, A.x, A.z, q.x, q.z) && !sim.isColliding(q.x, q.z, 0.4));
+      Object.assign(M, { x: c.x, z: c.z });
+    }
+    sim.step({});
+    const un = sim.drainEvents().find((e) => e.type === 'unmask');
+    assert.ok(un && M.mimic == null && M.mode === 'chase', 'tout près : démasquée');
+    const x0 = M.x;
+    const z0 = M.z;
+    for (let i = 0; i < Math.round((SIMX.UNMASK_T - 0.1) / DT); i++) {
+      A.x = x0 + 2.2;
+      A.z = z0;
+      sim.step({});
+    }
+    assert.ok(Math.hypot(M.x - x0, M.z - z0) < 0.05, 'elle se transforme sur place, une seconde');
+    // puis elle court, un peu plus vite qu'un sprint droit devant
+    let v = 0;
+    for (let i = 0; i < 60 * 2; i++) {
+      sim.step({});
+      v = Math.max(v, M.speed || 0);
+    }
+    assert.ok(v > SIMX.SPRINT_SPEED && v < SIMX.SPRINT_SPEED * 1.15, `en chasse, un peu plus vite qu'un sprint (${v.toFixed(2)} m/s)`);
+    // en ronde, loin de tous et hors de vue : elle reprend une apparence
+    const far = m.walkable.map((q) => ({ x: (q.x + 0.5) * CELL_SIZE, z: (q.z + 0.5) * CELL_SIZE })).find((q) => Math.hypot(q.x - A.x, q.z - A.z) > 40 && Math.hypot(q.x - B.x, q.z - B.z) > 40);
+    Object.assign(M, { x: far.x, z: far.z, mode: 'patrol', lastMode: 'patrol', modeT: SIMX.REDISGUISE_T + 1, rushT: 0, windT: 0, path: [] });
+    sim.step({});
+    assert.ok(M.mimic != null, 'loin de tous, elle a repris l\'apparence d\'un joueur');
+  } finally {
+    BackroomsSim.DISGUISE = false;
+  }
+});
+
+test('le sprint dépend du sens : toute la vitesse droit devant, moins de côté, encore moins en arrière', () => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 3, players: [{ id: 1, name: 'H' }], localId: 1, level: 1 });
+  const P = sim.player;
+  P.running = true;
+  P.yaw = 0.7;
+  const sp = (mx, my) => Math.hypot(...Object.values(sim.wishVel(P, mx, my, SIMX.SPRINT_SPEED)));
+  const fwd = sp(0, 1);
+  const side = sp(1, 0);
+  const back = sp(0, -1);
+  const diag = sp(1, 1);
+  assert.ok(Math.abs(fwd - SIMX.SPRINT_SPEED) < 1e-6, 'droit devant : le sprint entier');
+  assert.ok(Math.abs(side - SIMX.SPRINT_SPEED * SIMX.SPRINT_SIDE) < 1e-6 && Math.abs(back - SIMX.SPRINT_SPEED * SIMX.SPRINT_BACK) < 1e-6, `de côté ${side.toFixed(2)}, en arrière ${back.toFixed(2)} m/s`);
+  assert.ok(diag < fwd && diag > side, 'en diagonale vers l\'avant : entre les deux');
+  assert.ok(back > SIMX.WALK_SPEED && side > back, 'toujours plus vite qu\'en marchant');
+  P.running = false;
+  assert.ok(Math.abs(sp(0, -1) - SIMX.SPRINT_SPEED) < 1e-6, 'sans courir, rien ne change');
 });
 
 
@@ -5129,5 +5209,80 @@ test('Level 1 : l\'imposteur — après une victime, l\'entité prend son appare
     } else console.log('  (BACKROOMS_VIP absent : le vrai coffre n\'est vérifié qu\'avec une mauvaise phrase)');
   });
 }
+
+// ------------------------------------------------------------------ ⭐ le niveau de départ d'un VIP (5.38)
+import vm from 'node:vm';
+import nodeCrypto from 'node:crypto';
+import { START_LEVELS, startLevel } from '../backrooms/engine/sim.js';
+import { SLIDES } from '../backrooms/engine/poolrooms.js';
+import { levelName } from '../backrooms/view/hud.js';
+
+test('⭐ niveau de départ : chaque level du moteur est au choix, sous son nom affiché en jeu', () => {
+  // les levels que le moteur sait construire (makeLevelMap : « level === X », et le Level 0 par défaut)
+  const src = fs.readFileSync(new URL('../backrooms/engine/sim.js', import.meta.url), 'utf8');
+  const body = /export function makeLevelMap\(level, seed\) \{([\s\S]*?)\n\}/.exec(src)[1];
+  const consts = { HOTEL_LEVEL, PIPES_LEVEL, MALL_LEVEL };
+  const built = new Set([0, ...[...body.matchAll(/level === (\w+)/g)].map((m) => (m[1] in consts ? consts[m[1]] : +m[1]))]);
+  assert.ok(built.size >= 5 && [...built].every(Number.isInteger), `levels du moteur : ${[...built]}`);
+  const levels = Object.values(START_LEVELS);
+  for (const lv of built) assert.ok(levels.includes(lv), `le level ${levelName(lv)} (moteur : ${lv}) est au choix`);
+  assert.equal(new Set(levels).size, levels.length, 'un nom par level');
+  for (const [name, lv] of Object.entries(START_LEVELS)) assert.equal(levelName(lv), +name, `« Level ${name} » est bien le level ${levelName(lv)} en jeu`);
+  // chaque départ donne une partie jouable, avec son arrivée : la cabine qui descend au Level 1, le toboggan de la
+  // bonne couleur aux Tuyauteries et au Terror Hotel
+  for (const [name, lv] of Object.entries(START_LEVELS)) {
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 77, level: lv, players: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }], localId: 1 });
+    assert.equal(sim.level, lv);
+    assert.ok(sim.players.length === 2 && sim.players.every((P) => P.status === 'alive'), `Level ${name} : tout le monde au départ`);
+    if (lv === 1) assert.ok(sim.arriveT > 0, 'Level 1 : on arrive dans la cabine qui descend');
+    if (lv === PIPES_LEVEL || lv === HOTEL_LEVEL) assert.equal(SLIDES.filter((sl) => sl.to === lv).length, 1, `Level ${name} : un toboggan des Poolrooms y mène`);
+  }
+});
+
+test("⭐ niveau de départ : seul un VIP qui a le coffre ouvert choisit (ni l'adresse ni un réglage glissé n'y suffisent)", () => {
+  const ok = { vip: true, vault: true };
+  assert.equal(startLevel(5, ok), HOTEL_LEVEL);
+  assert.equal(startLevel('2', ok), PIPES_LEVEL, "le nom tel qu'il vient de l'adresse (?level2)");
+  assert.equal(startLevel(37, ok), 2);
+  assert.equal(startLevel(1, ok), 1);
+  assert.equal(startLevel(0, ok), 0);
+  for (const who of [{ vip: false, vault: true }, { vip: true, vault: false }, { vip: false, vault: false }, {}, undefined, { vip: 'true', vault: 1 }]) {
+    for (const n of [1, 2, 5, 37]) assert.equal(startLevel(n, who), 0, `${JSON.stringify(who)} : le Level 0, pas le ${n}`);
+  }
+  for (const n of [undefined, null, '', 3, 4, -1, 99, '5 ', '__proto__', 'constructor', 'toString', [5], { 5: 5 }]) assert.equal(startLevel(n, ok), 0, `nom inconnu (${String(n)}) : le Level 0`);
+  // dans le jeu : l'hôte (ou seul) ne part ailleurs qu'avec ce test-là, celui du coffre VIP, et le grade du compte ;
+  // l'invité ne lit aucun réglage (il suit le « go » de l'hôte), et ne peut rien envoyer qui change de level
+  const app = fs.readFileSync(new URL('../backrooms/app.js', import.meta.url), 'utf8');
+  const init = /function initGame\([\s\S]*?\n\}/.exec(app)[0];
+  assert.match(init, /const vipHere = !\(H && H\.embedded\) \|\| H\.info\.vip === true;/);
+  assert.match(init, /const lv = forceLevel != null \? forceLevel : startLevel\(asked, \{ vip: vipHere, vault: vaultOpen\(\) \}\);/);
+  assert.ok(init.indexOf("if (NET.role === 'guest') return;") < init.indexOf('const asked'), "l'invité s'arrête avant le niveau de départ");
+  assert.ok(!/level\(1\|2\|37\|5\)[\s\S]*?\{ 1: 1, 37: 2/.test(app), "plus d'adresse ?levelN qui saute le test");
+  assert.equal((app.match(/startLevel\(/g) || []).length, 2, 'un seul chemin vers un level de départ (initGame)');
+});
+
+test('⭐ niveau de départ : le sélecteur est dans le salon pour un VIP, et caché à tous les autres', () => {
+  const games = fs.readFileSync(new URL('../hub/games.js', import.meta.url), 'utf8');
+  const vipSrc = fs.readFileSync(new URL('../hub/vip.js', import.meta.url), 'utf8')
+    .replace(/    \/\/ empreintes des identifiants VIP \(tools\/vip-add\.mjs\)\r?\n/, (m) => m + `    '${nodeCrypto.createHash('sha256').update('arcadia-vip:testvip').digest('hex')}',\n`);
+  const hub = (user) => {
+    const w = { HubAccount: { session: () => (user ? { user } : null) } };
+    vm.runInNewContext(games, { window: w });
+    vm.runInNewContext(vipSrc, { window: w, TextEncoder, localStorage: { removeItem() {} } });
+    return w;
+  };
+  const startOf = (w) => (w.HUB_GAMES.find((g) => g.id === 'backrooms').settings || []).find((s) => s.key === 'start');
+  const v = hub('testvip');
+  assert.ok(v.HubVIP.is());
+  const s = startOf(v);
+  assert.ok(s && s.vip === true && s.def === 0, 'le VIP a le réglage, réservé, Level 0 par défaut');
+  assert.deepEqual([...s.options].map(([n]) => n).sort((a, b) => a - b), Object.keys(START_LEVELS).map(Number).sort((a, b) => a - b), 'chaque level du moteur, et rien de plus');
+  for (const who of ['nico', null]) {
+    const n = hub(who);
+    assert.ok(!n.HubVIP.is());
+    assert.equal(startOf(n), undefined, `${who || 'sans compte'} : pas de sélecteur`);
+    assert.ok(n.HUB_GAMES.find((g) => g.id === 'backrooms').settings.some((x) => x.key === 'difficulty'), 'les autres réglages restent');
+  }
+});
 
 console.log(`\n${count} tests réussis pour The Backrooms !`);
