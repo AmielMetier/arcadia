@@ -393,7 +393,9 @@ const OWN = {
   stun: /hit.?react|hurt|damage|stagger|flinch|pain|stun|knock/,
   drop: /land|fall|jump.?land|drop/,
 };
-const DONOR = { idle: 'Idle', walk: 'Walk', run: 'Run', stun: 'HitReact', bang: 'Punch', drop: 'Jump_Land', grab: 'Punch' };
+const DONOR = { idle: 'Idle', walk: 'Walk', run: 'Run', stun: 'HitReact', bang: 'Punch', drop: 'Jump_Land' };
+// la prise est toujours faite dans le code (l'étreinte qui étouffe), même quand le modèle a son clip
+const PROC = new Set(['grab']);
 const LOOP = new Set(['idle', 'walk', 'run', 'rush', 'stun', 'bang']);
 
 // ---------------------------------------------------------------- la créature
@@ -449,6 +451,7 @@ export function createCreature(opts = {}) {
       const own = gltf.animations;
       const clips = {};
       for (const s of STATES) {
+        if (PROC.has(s)) continue;
         const name = (a) => a.name.toLowerCase().replace(/^.*\|/, '');
         const c = own.find((a) => name(a) === s) || (OWN[s] && own.find((a) => OWN[s].test(name(a))));
         if (c) {
@@ -597,11 +600,21 @@ export function createCreature(opts = {}) {
       add(R.head, -0.6 + 0.8 * Math.min(1, t / 0.5) + Math.sin(t * 50) * 0.04, 0, Math.sin(t * 37) * 0.05, W.rush);
       add(R.upperArmL, 0, 0, 0.5, W.rush);
       add(R.upperArmR, 0, 0, -0.5, W.rush);
-      // la prise : les bras tendus en avant, les mains qui serrent, la tête qui vient au contact
-      add(R.upperArmL, -1.2, 0, 0.15, W.grab * (st.acts.grab && clipsOwn(info, 'grab') ? 0 : 1));
-      add(R.upperArmR, -1.2, 0, -0.15, W.grab * (st.acts.grab && clipsOwn(info, 'grab') ? 0 : 1));
-      add(R.chest, 0.25, 0, 0, W.grab);
-      add(R.head, 0.2 + Math.sin(t * 23) * 0.05, 0, 0, W.grab);
+      // la prise : elle ouvre grand les bras (0,4 s), les referme d'un coup sur le joueur (0,2 s), puis serre et l'étouffe,
+      // par à-coups, penchée sur lui, la tête qui vient tout contre la sienne
+      const sm = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+      const gO = sm(t / 0.4);
+      const gC = sm((t - 0.4) / 0.2);
+      const sq = gC * (0.5 + 0.5 * Math.sin(t * 13)) * Math.min(1, (t - 0.6) / 0.6 + 0.3);
+      const gz = 1.4 * gO * (1 - gC) - 0.9 * gC - 0.12 * sq;
+      const gx = -0.5 * gO * (1 - gC) - 1.25 * gC;
+      add(R.upperArmL, gx, 0, gz, W.grab);
+      add(R.upperArmR, gx, 0, -gz, W.grab);
+      // (les mains se rejoignent devant, à hauteur de gorge ; les poignets se tordent à chaque serrement)
+      add(R.lowerArmL, 0, 0.6 * gC + 0.3 * sq, 0, W.grab);
+      add(R.lowerArmR, 0, -0.6 * gC - 0.3 * sq, 0, W.grab);
+      add(R.chest, -0.3 * gO * (1 - gC) + 0.4 * gC + 0.06 * sq, 0, 0, W.grab);
+      add(R.head, -0.4 * gO * (1 - gC) + 0.35 * gC, 0, 0.3 * gC + Math.sin(t * 23) * 0.04 * gC, W.grab);
       // sonnée : le buste rejeté, la tête qui roule
       add(R.chest, -0.3 + Math.sin(t * 4) * 0.08, Math.sin(t * 3) * 0.15, 0, W.stun);
       add(R.head, Math.sin(t * 5) * 0.25, 0, Math.sin(t * 3.4) * 0.35, W.stun);
@@ -642,7 +655,7 @@ export function createCreature(opts = {}) {
         H.scale.set(sc, 1 / sc, sc);
       } else if (H) {
         // tremblement du cri et du démasquage
-        const j = (W.rush * 0.03 + W.unmask * 0.06 + W.scare * 0.02) * (Math.random() - 0.5);
+        const j = (W.rush * 0.03 + W.unmask * 0.06 + W.scare * 0.02 + W.grab * 0.025) * (Math.random() - 0.5);
         H.position.set(j, H.position.y, j);
         H.position.y = -0.35 * W.drop * Math.max(0, 1 - Math.abs(t - 0.35) / 0.35);
       }

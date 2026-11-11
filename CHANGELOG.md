@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.39 — 11 novembre 2026
+- **The Backrooms** — Quand le monstre du Level 1 t'attrape, il ouvre grand les bras, les referme d'un coup sur toi et te serre à la gorge pour t'étouffer, par à-coups, penché sur toi.
+
 ## 5.38 — 11 novembre 2026
 - **The Backrooms** — Le monstre du Level 1 change de corps, aux Poolrooms aussi : une grande silhouette voilée dans une longue robe, qui bouge vraiment.
   - Elle marche en se déhanchant, les mains sur les hanches, puis court buste penché en pompant des bras, et se rue bras tendus vers toi.
