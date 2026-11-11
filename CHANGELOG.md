@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 5.57 — 11 novembre 2026
+- **Odyssée** — Graphismes « Noir & Blanc » : fini les textures découpées dehors.
+  - Les chemins de sable, les plages, les routes pavées et les rives de la mer ont maintenant leurs coins arrondis partout, même dans les virages et les recoins : plus de carrés coupés net.
+  - L'herbe garde son motif sous les bords des chemins, des étangs et des hautes herbes.
+  - Les routes des villes sont en pavés clairs, comme dans Noir & Blanc.
+  - Les falaises et les plateaux rocheux prennent le brun clair des montagnes de Noir & Blanc au lieu du gris.
+
 ## 5.56 — 11 novembre 2026
 - **Odyssée** — Graphismes « Noir & Blanc » : les intérieurs s'y mettent.
   - Le Centre Pokémon prend son sol crème, ses murs orangés, son comptoir bleu-vert, ses canapés, ses plantes et ses machines de Noir & Blanc ; la Boutique son carrelage bleu.
