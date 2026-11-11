@@ -1,14 +1,11 @@
-Pack de graphismes « Pokémon Noir & Blanc » (Odyssée → Options → Graphismes), découpé par tools/odyssee-pack-noirblanc.py
-dans les planches de assets/graphics/noirblanc/ :
-  printemps.png — BW Spring Tileset v2, thefloofypanthar (DeviantArt)
-  eau.png       — B/W Water Tiles, UltimoSpriter (DeviantArt)
-  volcan.png    — DoT Day 23 Alternate Volcano Tiles, Phyromatical (DeviantArt)
-  arbres.png    — BW Taragonia Mix Special Trees, Phyromatical (DeviantArt)
-Planches reçues mais pas encore utilisées : saisons (shiney570), maisons BW2 (Phyromatical), Dreamyard, Cold Storage, Starter Kit (UltimoSpriter).
-Tuiles retournées, décalées ou recolorées par le script. Projet de fans sans but lucratif ; crédits obligatoires.
-Planches de villes et de routes reçues ensuite (fond en damier enlevé par tools/odyssee-detourer.py) :
-  maisons_toits.png, ville.png, route.png, maisons_japon.png — artistes à confirmer d'après les pages DeviantArt d'origine.
-  Utilisées : arbres et sapins (route.png), maisons au toit bleu (maisons_toits.png) et turquoise (ville.png).
-Kit « Pokémon Essentials BW » v3.1.1 (KleinStudio) : planche PkmnBlackWhiteSet.png (kit_bw_set.png) pour les bâtiments
-(positions et portes : assets/graphics/noirblanc/kit_bw_batiments.json), autotiles Sea / Sea deep (mer) et hautes herbes.
-Ces tuiles reprennent les graphismes de Pokémon Noir & Blanc (© Nintendo / Game Freak).
+Graphismes « Noir & Blanc » d'Odyssée (Options → Graphismes), fabriqués par tools/odyssee-pack-noirblanc.py.
+
+Tout vient du kit « Pokémon Essentials BW » v3.1.1 de KleinStudio (planches gardées dans assets/graphics/noirblanc/) :
+  sol.png     herbe, chemins, sable, pavés, mer et rivages, hautes herbes, sol de grotte
+  d_*.png     arbres, sapins, haies, lampadaires, rochers
+  b_*.png     Centre Pokémon, Boutique, arène, labo, tour, maisons
+  chars.png   personnages du monde (héros de Noir 2 & Blanc 2, habitants, dresseurs, champions)
+Seule la lave vient d'ailleurs : « Alternate Volcano Tiles » de Phyromatical (DeviantArt).
+
+Ces graphismes sont ceux de Pokémon Noir & Blanc / Noir 2 & Blanc 2 (© Nintendo / Game Freak / Creatures),
+repris ici pour un projet de fans sans but lucratif. Crédits affichés dans le jeu : Options → Crédits graphismes.

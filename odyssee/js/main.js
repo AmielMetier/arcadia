@@ -3,7 +3,9 @@
 import * as THREE from 'three';
 import { WorldView } from './render/world3d.js';
 import { setArt } from './render/textures.js';
-import { packActif } from './gfx.js';
+import { packActif, solChoix } from './gfx.js';
+import { paletteMurs } from './render/murs-tex.js';
+try { document.documentElement.classList.add('gfx-' + solChoix()); } catch (e) { /* hors navigateur */ }
 import { buildWorld } from './world/region.js';
 import { Input } from './input.js';
 import { brancherManette } from './manette.js';
@@ -75,7 +77,8 @@ async function loadArt(prechauffe = false) {
   // sols à 16 px (PixelLab) : ils remplacent ceux du tileset
   const pack = packActif();   // Options → Graphismes → Sol du dehors : un pack de tuiles remplace aussi les sols à 16 px
   if (!pack) for (const k of SOL16_FICHIERS) sol32['s16_' + k] = ASSETS.sol16(k);
-  const tuilesPack = {}; if (pack) for (const k of pack.tuiles) tuilesPack[k] = ASSETS.gfx(pack.dossier, k);
+  const tuilesPack = {}; if (pack?.tuiles) for (const k of pack.tuiles) tuilesPack[k] = ASSETS.gfx(pack.dossier, k);
+  if (pack?.planche) tuilesPack.__planche = ASSETS.gfx(pack.dossier, pack.planche.fichier);
   // décor du pack (arbres, rochers…) : remplace celui du jeu, dessiné pixel pour pixel
   if (pack?.kits) for (const [k, f] of Object.entries(pack.kits)) kits[k] = ASSETS.gfx(pack.dossier, f);   // façades du pack
   const batsPack = {}; if (pack?.batiments) for (const L of Object.values(pack.batiments)) for (const [n] of L) batsPack[n] = ASSETS.gfx(pack.dossier, 'b_' + n);
@@ -87,6 +90,7 @@ async function loadArt(prechauffe = false) {
   }
   // devant un personnage dans les hautes herbes à 16 px : le bas de la tuile
   sprites.grassfront = ASSETS.sol16('hautes_herbes_front'); sprites.grassfront2 = ASSETS.sol16('hautes_herbes_front2'); dens.grassfront = dens.grassfront2 = 1;
+  if (pack?.decor) for (const k of pack.decor) { sprites[k] = ASSETS.gfx(pack.dossier, 'd_' + k); dens[k] = 2; }   // le pack a le dernier mot
   // animations de terrain de HeartGold / SoulSilver (mer, rivages, fleurs)
   const hg = {}; for (const k of Object.keys(SPRITES.hgss || {})) hg[k] = ASSETS.hgss(k);
   if (prechauffe) {
@@ -94,7 +98,12 @@ async function loadArt(prechauffe = false) {
     const L = [sprites, kits, sols, sol32, hg, tuilesPack, batsPack].flatMap(Object.values).concat([ASSETS.chars, ASSETS.title, SPRITES.suiveurs && ASSETS.suiveurs, ASSETS.relief]);
     return L.filter(Boolean).map((src) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.src = src; return im; });
   }
-  const [S, K, L, L32, HGI, chars, title, suiveurs, relief, PK, PB] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(ASSETS.chars), loadImg(ASSETS.title), SPRITES.suiveurs ? loadImg(ASSETS.suiveurs) : null, loadImg(ASSETS.relief).catch(() => null), loadAll(tuilesPack), loadAll(batsPack)]);
+  const [S, K, L, L32, HGI, chars, title, suiveurs, relief, PK, PB] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(pack?.chars ? ASSETS.gfx(pack.dossier, pack.chars) : ASSETS.chars), loadImg(ASSETS.title), SPRITES.suiveurs ? loadImg(ASSETS.suiveurs) : null, loadImg(ASSETS.relief).catch(() => null), loadAll(tuilesPack), loadAll(batsPack)]);
+  // pack sur une seule planche : chaque tuile de 16 px découpée dans son petit canevas
+  if (pack?.planche && PK.__planche) {
+    const im = PK.__planche; delete PK.__planche;
+    pack.planche.tuiles.forEach((k, i) => { const c = document.createElement('canvas'); c.width = c.height = 16; c.getContext('2d').drawImage(im, (i % pack.planche.cols) * 16, Math.floor(i / pack.planche.cols) * 16, 16, 16, 0, 0, 16, 16); PK[k] = c; });
+  }
   return { sprites: S, dens, kits: K, sols: L, sol32: L32, hgss: HGI, chars, title, suiveurs, relief, pack: pack ? PK : null, batiments: pack?.batiments ? { images: PB, styles: pack.batiments } : null };
 }
 
@@ -113,8 +122,9 @@ async function boot() {
   const art = await loadArt();
   prechauffe.length = 0;
   etape('images');
+  for (const [nom, pal] of Object.entries(packActif()?.murs || {})) paletteMurs(nom, pal);
   setArt({ kits: art.kits, sols: art.sols, sol32: art.sol32, hgss: art.hgss, relief: art.relief, pack: art.pack });
-  const view = new WorldView(renderer, art.chars, { sprites: art.sprites, dens: art.dens, suiveurs: art.suiveurs, batiments: art.batiments });
+  const view = new WorldView(renderer, art.chars, { sprites: art.sprites, dens: art.dens, suiveurs: art.suiveurs, batiments: art.batiments, packDecor: !!packActif()?.decor });
   etape('vue');
   const game = new Game({ view, ui, input, sound, world });
   // sauvegarde en ligne (compte du Hub) : chaque sauvegarde part aussi sur le serveur, regroupée

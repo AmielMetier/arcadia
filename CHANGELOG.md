@@ -1,68 +1,93 @@
 # Journal des versions — Arcadia
 
-## 5.71 — 11 novembre 2026
+## 5.74 — 11 novembre 2026
 - **The Backrooms** — Tuyauteries : le jeu ne dessine plus les tuyaux, lampes et machines des galeries voisines, cachés derrière les murs. Même image, environ un tiers de travail en moins pour la carte graphique.
 
-## 5.70 — 11 novembre 2026
+## 5.73 — 11 novembre 2026
 - **The Backrooms** — Terror Hotel : le jeu ne dessine plus les meubles cachés derrière un mur. Même image, mais presque moitié moins de travail pour la carte graphique dans le hall, et bien moins encore dans les couloirs : le niveau est plus fluide sur un PC modeste.
 
-## 5.69 — 11 novembre 2026
+## 5.72 — 11 novembre 2026
 - **The Backrooms** — L'arrivée dans un niveau ne fige plus la page. Pendant le chargement, l'écran « LOADING » reste vivant, et le niveau n'apparaît qu'une fois prêt à être dessiné, sans saccades au premier regard. Sur un PC modeste, les Poolrooms s'affichent en quelques secondes au lieu de plusieurs dizaines.
 
-## 5.68 — 11 novembre 2026
+## 5.71 — 11 novembre 2026
 - **The Backrooms** — Un vrai réglage pour les PC modestes :
   - en qualité « Basse », le carrelage des Poolrooms est dessiné intact (sans carreaux tombés ni fêlés) : c'était le plus lourd à calculer. Sur une puce graphique intégrée, le niveau passe d'environ 30 à plus de 50 images par seconde ;
   - en qualité « Auto », le jeu passe de lui-même à ces effets allégés quand l'image peine encore à la définition la plus basse, au lieu de rester saccadé jusqu'à la fin du niveau.
 
-## 5.67 — 11 novembre 2026
+## 5.70 — 11 novembre 2026
 - **The Backrooms** — Poolrooms : l'image demande moins de calcul à la carte graphique, pour le même rendu. De quoi gagner un peu de fluidité sur un PC modeste.
 
-## 5.66 — 11 novembre 2026
+## 5.69 — 11 novembre 2026
 - **The Backrooms** — Level 1 : l'imposteur laisse deux indices à qui fait attention.
   - Il marche sans faire le moindre bruit de pas.
   - Si tu siffles près de lui, il se fige une seconde ou deux avant de repartir.
 
-## 5.65 — 11 novembre 2026
+## 5.68 — 11 novembre 2026
 - **The Backrooms** — Level 1, l'entité est mieux finie :
   - elle se courbe pour passer la porte du poste de garde et celles des salles de sécurité, au lieu de traverser le mur du dessus avec la tête ;
   - devant une porte blindée, chacun de ses coups tombe avec son bruit. Les coups sont aussi un peu plus réguliers.
 
-## 5.64 — 11 novembre 2026
+## 5.67 — 11 novembre 2026
 - **The Backrooms** — Level 0, étage du haut : les murs ne sont plus tout à fait neufs. Quelques auréoles pâles et un peu d'humidité au pied du papier peint, par endroits. L'étage du bas reste bien plus défraîchi.
 
-## 5.63 — 11 novembre 2026
+## 5.66 — 11 novembre 2026
 - **The Backrooms** — L'écran titre est plus net : le bandeau d'objectif, l'aide des touches et les cases d'objets ne dépassent plus derrière la carte. Le bandeau d'objectif s'affiche en entier quand tu prends la main, au lieu de s'écouler pendant que tu lis l'écran titre.
 
-## 5.62 — 11 novembre 2026
+## 5.65 — 11 novembre 2026
 - **The Backrooms** — Au début de chaque niveau, l'aide des touches en bas à gauche ne passe plus sous les cases d'objets : sur un écran de moins de 1540 px de large, elle revient à la ligne.
 
-## 5.61 — 11 novembre 2026
+## 5.64 — 11 novembre 2026
 - **The Backrooms** — L'écran de fin ne cite plus que les niveaux vraiment traversés : une partie commencée plus loin (« Continuer », ou le niveau de départ des VIP) n'annonce plus le Level 0 et le Level 1 comme réussis.
 
-## 5.60 — 11 novembre 2026
+## 5.63 — 11 novembre 2026
 - **The Backrooms** — Level 1 : après une poursuite, tu as vraiment le temps de souffler. Pendant le répit, l'imposteur garde ses distances et se tait, au lieu de revenir sous une autre apparence à peine semé.
 
-## 5.59 — 11 novembre 2026
+## 5.62 — 11 novembre 2026
 - **The Backrooms** — Level 5, le digicode de la porte de secours :
   - il faut être devant le clavier pour que le code compte ;
   - un code faux s'entend : l'entité vient voir ce qui se passe près de la porte. Fini de taper des codes au hasard.
 
-## 5.58 — 11 novembre 2026
+## 5.61 — 11 novembre 2026
 - **The Backrooms** — Level 1 : caché dans un casier, tu n'es plus pris au piège par l'imposteur. Il attend devant en t'appelant une dizaine de secondes, puis renonce et s'éloigne (avant, il campait là sans fin, et sortir, c'était mourir).
 - **The Backrooms** — En quittant les Tuyauteries, l'écran parle bien du monte-charge de service qui remonte, et plus d'un toboggan.
 
-## 5.57 — 11 novembre 2026
+## 5.60 — 11 novembre 2026
 - **The Backrooms** — Level 5 : on ne meurt plus en posant le pied dans l'hôtel.
   - L'entité reste au loin pendant les 30 premières secondes (un peu moins en difficile) : le temps de repérer les chambres et les cachettes
   - Ensuite, rien ne change : un seul contact reste mortel
 
-## 5.56 — 11 novembre 2026
+## 5.59 — 11 novembre 2026
 - **The Backrooms** — Level 1 à plusieurs : la porte du poste de garde s'affiche comme chez l'hôte pour un joueur qui arrive ou revient en cours de partie (il pouvait la voir fermée alors qu'elle était ouverte, et buter dessus).
 
-## 5.55 — 11 novembre 2026
+## 5.58 — 11 novembre 2026
 - **The Backrooms** — Level 1 : l'arrivée est vraiment calme.
   - Déguisée en joueur, l'entité venait droit sur l'équipe dès la première seconde ; elle reste maintenant au loin pendant les 50 premières secondes, sans appeler ni forcer un rideau, et s'écarte de qui s'approche
   - Passé ce répit, elle vient vous chercher comme avant
+
+## 5.57 — 11 novembre 2026
+- **Odyssée** — Graphismes « Noir & Blanc » : fini les textures découpées dehors.
+  - Les chemins de sable, les plages, les routes pavées et les rives de la mer ont maintenant leurs coins arrondis partout, même dans les virages et les recoins : plus de carrés coupés net.
+  - L'herbe garde son motif sous les bords des chemins, des étangs et des hautes herbes.
+  - Les routes des villes sont en pavés clairs, comme dans Noir & Blanc.
+  - Les falaises et les plateaux rocheux prennent le brun clair des montagnes de Noir & Blanc au lieu du gris.
+
+## 5.56 — 11 novembre 2026
+- **Odyssée** — Graphismes « Noir & Blanc » : les intérieurs s'y mettent.
+  - Le Centre Pokémon prend son sol crème, ses murs orangés, son comptoir bleu-vert, ses canapés, ses plantes et ses machines de Noir & Blanc ; la Boutique son carrelage bleu.
+  - Dehors : panneaux de bois des routes, rebords à sauter et bancs de Noir & Blanc.
+  - Un bâtiment s'estompe quand tu passes derrière lui : tu ne perds plus ton personnage de vue.
+- **Odyssée** — HUD replié (touche U) : la fiche du lieu redevient toute petite, la grille Habitat ne s'étale plus sur l'écran.
+
+## 5.55 — 11 novembre 2026
+- **Odyssée** — Les graphismes « Noir & Blanc » sont refaits de fond en comble pour ressembler à Pokémon Noir 2 & Blanc 2.
+  - Le sol : l'herbe turquoise du jeu, les chemins de sable et les routes pavées avec leurs vrais bords, la mer bordée de rochers, les hautes herbes sombres.
+  - Les arbres et les sapins de Noir & Blanc, à leur vraie taille, avec leurs versions d'automne, de cerisier et de neige ; haies fleuries et lampadaires.
+  - Les personnages : ton dresseur devient le héros ou l'héroïne de Noir 2 & Blanc 2, et les habitants, dresseurs, champions et sbires prennent leur allure de Noir & Blanc.
+  - Les maisons trop sombres sont retirées ; les intérieurs et les combats gardent leur dessin habituel.
+- **Odyssée** — Le HUD prend moins de place, dans les deux graphismes.
+  - La fiche du lieu est plus petite, tous les boutons tiennent sur une seule rangée et l'équipe est plus fine.
+  - Sur un écran étroit, tout rapetisse encore pour laisser voir le jeu.
+  - En Noir & Blanc, le HUD prend les gris et le rouge du menu de Noir 2 & Blanc 2.
 
 ## 5.54 — 11 novembre 2026
 - **The Backrooms** — Le monstre du Level 1 change de corps : une silhouette voilée, avec ses propres animations (marche, course, prise, chute, cri). On la croise aussi aux Poolrooms.
@@ -368,7 +393,7 @@
 ## 5.1 — 9 novembre 2026
 - Modify NOTES entries in hud.js (Metier Amiel)
 
-## 5.00 — 9 novembre 2026
+## 5.0 — 9 novembre 2026
 - **The Backrooms** — Une voix sur le talkie : « The Old Timer », là depuis toujours, prend parfois la parole sur le canal 9. Tout le monde l'entend en même temps, deux ou trois fois par niveau, jamais pendant une poursuite. Il aide un peu… et il en sait beaucoup trop. Quand il ne reste qu'un survivant, il ne parle plus qu'à lui.
 
 ## 4.99 — 9 novembre 2026
