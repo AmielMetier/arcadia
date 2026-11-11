@@ -1382,9 +1382,16 @@ float bkCaust(vec2 uv, float t) {
           // humidité : la moquette détrempée par plaques, l'eau qui remonte au pied des murs
           // (des plaques éparses, environ un dixième du sol, déformées par un second bruit : des bords déchiquetés, jamais des ronds)
           vec2 wq = vBakeP.xz * 0.17 + 11.0;
-          float wF = bkFbmW(wq + (vec2(bkFbmW(wq * 3.1 + 2.0), bkFbmW(wq * 3.1 + 9.0)) - 0.5) * 1.1);
-          float wet = smoothstep(0.62, 0.8, wF) * uDamp;
-          float rise = (1.0 - smoothstep(0.05, 0.45 + bkFbm(vBakeP.xz * 0.9 + vBakeP.y) * 0.5, by)) * smoothstep(0.3, 0.7, bkFbm(vBakeP.xz * 0.3 + 5.0)) * uDamp * uWallDecay;
+          float wF = 0.0;
+          float wet = 0.0;
+          float rise = 0.0;
+          float stain = 0.0;
+          // (sans humidité, aux Poolrooms : rien de tout cela ne se voit, on ne le calcule pas ; c'était un bon tiers du
+          // coût de chaque pixel de mur, de sol et de plafond)
+          if (uDamp > 0.0) {
+          wF = bkFbmW(wq + (vec2(bkFbmW(wq * 3.1 + 2.0), bkFbmW(wq * 3.1 + 9.0)) - 0.5) * 1.1);
+          wet = smoothstep(0.62, 0.8, wF) * uDamp;
+          rise = (1.0 - smoothstep(0.05, 0.45 + bkFbm(vBakeP.xz * 0.9 + vBakeP.y) * 0.5, by)) * smoothstep(0.3, 0.7, bkFbm(vBakeP.xz * 0.3 + 5.0)) * uDamp * uWallDecay;
           // auréoles d'eau sur les murs : un cerne plus foncé autour d'une tache pâle
           float n2 = bkFbm(vec2(vBakeP.x + vBakeP.z * 0.37, vBakeP.y + vBakeP.z) * 0.45 + 31.0);
           float ring = smoothstep(0.6, 0.66, n2) * (1.0 - smoothstep(0.68, 0.75, n2)) * 0.8 + smoothstep(0.66, 0.75, n2) * 0.3;
@@ -1404,7 +1411,8 @@ float bkCaust(vec2 uv, float t) {
               cst = smoothstep(-0.06, 0.02, s) * (1.0 - smoothstep(0.04, 0.16, s)) * 0.8 + smoothstep(0.02, 0.2, s) * 0.3;
             }
           }
-          float stain = ny < -0.5 ? cst * uCeilStain : (abs(ny) < 0.5 ? ring * 0.6 * uWallDecay : 0.0);
+          stain = ny < -0.5 ? cst * uCeilStain : (abs(ny) < 0.5 ? ring * 0.6 * uWallDecay : 0.0);
+          }
           diffuseColor.rgb *= mix(1.0, 0.62, ny > 0.5 ? wet : (abs(ny) < 0.5 ? rise : 0.0));
           #ifdef BK_FILM
           if (ny > 0.5) {

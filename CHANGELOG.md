@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.67 — 11 novembre 2026
+- **The Backrooms** — Poolrooms : l'image demande moins de calcul à la carte graphique, pour le même rendu. De quoi gagner un peu de fluidité sur un PC modeste.
+
 ## 5.66 — 11 novembre 2026
 - **The Backrooms** — Level 1 : l'imposteur laisse deux indices à qui fait attention.
   - Il marche sans faire le moindre bruit de pas.
