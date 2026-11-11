@@ -504,7 +504,9 @@ export function createPipesMap(seed = 3) {
       const before = reachCount();
       const placed = [];
       const corners = shuffle([[room.x0, room.z0], [room.x1, room.z0], [room.x0, room.z1], [room.x1, room.z1]], rnd);
-      const wantB = (room.x1 - room.x0 + 1) * (room.z1 - room.z0 + 1) >= 12 ? 2 : 1;
+      // (une grande chaufferie, d'au moins 24 cases, en aligne trois : elle ne reste pas un grand vide)
+      const area = (room.x1 - room.x0 + 1) * (room.z1 - room.z0 + 1);
+      const wantB = area >= 24 ? 3 : area >= 12 ? 2 : 1;
       for (const [x, z] of corners) {
         if (placed.length >= wantB) break;
         if (Math.abs(x - v.x) + Math.abs(z - v.z) < 2) continue;
@@ -709,6 +711,10 @@ export function createPipesMap(seed = 3) {
         }
       }
       if (best && (!v || best.far >= 2)) lights.push({ kind: 'bulb', x: (best.x + 0.5) * C + best.d[0] * (C / 2 - 0.2), y: 2.3, z: (best.z + 0.5) * C + best.d[1] * (C / 2 - 0.2), gx: best.x, gz: best.z, wall: best.d, state: 'on', flicker: false });
+      // une réglette pendue au milieu des grandes chaufferies (le fond de la salle ne reste plus noir)
+      const mx = Math.round((r.x0 + r.x1) / 2);
+      const mz = Math.round((r.z0 + r.z1) / 2);
+      if ((r.x1 - r.x0 + 1) * (r.z1 - r.z0 + 1) >= 12 && grid[mz * W + mx] === T.FLOOR) lights.push({ kind: 'tube', x: (mx + 0.5) * C, y: LEVEL2_CEIL - 0.42, z: (mz + 0.5) * C, gx: mx, gz: mz, wall: null, state: 'on', flicker: false, alongX: r.x1 - r.x0 >= r.z1 - r.z0 });
       continue;
     }
     if (r.type === 'hall') {
@@ -833,6 +839,38 @@ export function createPipesMap(seed = 3) {
       tipped: !!kind.tipped,
     });
   };
+  // 10a. L'équipement des chaufferies, contre les murs : l'armoire de commande et ses voyants, près de la vanne, et une
+  // pompe sur son socle, plus loin. La vue les dessine (map.plant) ; ici, leur emprise seule (des fantômes), qui
+  // arrête le pas comme un meuble. Jamais devant une chaudière (son brûleur), une porte ou la vanne.
+  const plant = [];
+  const ghost = (x, z, r) => props.push({ m: null, ghost: true, h: 0, r, x, z, rot: 0 });
+  for (const r of rooms) {
+    if (r.type !== 'boiler') continue;
+    const v = valves.find((q) => q.gx >= r.x0 && q.gx <= r.x1 && q.gz >= r.z0 && q.gz <= r.z1);
+    const spots = [];
+    for (let z = r.z0; z <= r.z1; z++) {
+      for (let x = r.x0; x <= r.x1; x++) {
+        const k = z * W + x;
+        if (grid[k] !== T.FLOOR || busy.has(k) || DIRS.some(([dx, dz]) => get(x + dx, z + dz) === T.MACHINE)) continue;
+        for (const w of DIRS) if (get(x + w[0], z + w[1]) === T.WALL) spots.push({ x, z, w, dv: v ? Math.abs(v.gx - x) + Math.abs(v.gz - z) : 9 });
+      }
+    }
+    const take = (s, kind, depth, r0) => {
+      busy.add(s.z * W + s.x);
+      const off = C / 2 - depth / 2 - 0.02;
+      const x = (s.x + 0.5) * C + s.w[0] * off;
+      const z = (s.z + 0.5) * C + s.w[1] * off;
+      plant.push({ kind, gx: s.x, gz: s.z, x, z, dx: s.w[0], dz: s.w[1], ry: Math.atan2(-s.w[0], -s.w[1]) });
+      ghost(x, z, r0);
+      if (kind === 'pump') for (const e of [-0.32, 0.32]) ghost(x + s.w[1] * e, z - s.w[0] * e, r0 * 0.8); // le socle est long
+    };
+    // l'armoire : la place libre la plus proche de la vanne (pas collée à elle)
+    const near = spots.filter((s) => s.dv >= 1).sort((a, b) => a.dv - b.dv);
+    if (near.length) take(near[0], 'panel', 0.45, 0.36);
+    // la pompe : la plus loin de l'armoire et de la vanne
+    const far = spots.filter((s) => !busy.has(s.z * W + s.x) && s.dv >= 2).sort((a, b) => b.dv - a.dv);
+    if (far.length) take(far[Math.floor(rnd() * Math.min(2, far.length))], 'pump', 0.62, 0.36);
+  }
   for (const r of rooms) {
     const kit = r.type === 'boiler' ? BOILER_KIT : r.type === 'hall' ? (r.den ? DEN_KIT : HALL_KIT) : STORE;
     const p = r.type === 'boiler' ? 0.35 : r.type === 'hall' ? 0.3 : 0.6;
@@ -913,6 +951,7 @@ export function createPipesMap(seed = 3) {
     valves,
     breakers,
     boilers,
+    plant,
     gates,
     jets,
     halls,

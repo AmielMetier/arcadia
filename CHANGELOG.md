@@ -1,5 +1,15 @@
 # Journal des versions — Arcadia
 
+## 5.47 — 11 novembre 2026
+- **The Backrooms** — Les chaufferies des Tuyauteries ne sont plus de grandes salles vides :
+  - les grandes chaufferies alignent trois chaudières ; chacune a sa porte de foyer avec un judas où danse la flamme, un niveau d'eau en tube de verre, une soupape à contrepoids rouge, sa plaque en laiton et ses rangées de rivets ;
+  - au sol, des rayures jaunes et noires usées entourent chaque chaudière ;
+  - le long du grand mur court une nourrice rouge sur ses consoles, avec ses départs vers le plafond et vers le sol, leurs volants rouges ou bleus, un thermomètre et un grand manomètre ;
+  - des conduites calorifugées montent des chaudières, traversent la salle sous la dalle et plongent dans la nourrice ;
+  - une armoire de commande à cinq voyants (celui de la vanne passe au vert quand tu la fermes), deux cadrans et un arrêt d'urgence ; ses voyants teintent le mur autour ;
+  - une pompe sur son socle de béton : moteur à ailettes, carter jaune, volute rouge, clapet et manomètre ;
+  - une réglette éclaire le milieu des grandes chaufferies, et la flamme des brûleurs éclaire plus loin devant les chaudières.
+
 ## 5.46 — 11 novembre 2026
 - **The Backrooms** — Le Terror Hotel n'est plus un hall avec une grande boucle autour :
   - une galerie part du hall, traverse l'étage et mène au palier des ascenseurs, deux cabines dorées hors service (l'une entrouverte sur le noir de la gaine, l'autre avec un mot scotché « OUT OF ORDER ») ;

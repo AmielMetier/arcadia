@@ -8,6 +8,7 @@ import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL_SIZE, T } from '../engine/map.js';
 import { Z } from '../engine/level2.js';
 import { createKitInstancer, loadKit } from './kit.js';
+import { buildPlant } from './pipesPlant.js';
 
 const C = CELL_SIZE;
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -1165,6 +1166,9 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
     group.add(pm);
   }
 
+  // --- 7b. L'équipement des chaufferies (pipesPlant.js) : chaudières complètes, nourrice, armoires, pompes ---
+  const plant = buildPlant({ map, group, bin, lambert, phong, M, tx, CEIL, at, rnd });
+
   // --- Création des maillages ---
   kit.build(glassGlow);
   for (const b of bins.values()) {
@@ -1304,9 +1308,10 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
     // le moteur de lumière : la flamme d'un brûleur lèche le sol devant sa lucarne ; un voyant de vanne ou de
     // disjoncteur teinte le mur autour de lui (rouge qui clignote quand le secteur est noir, vert une fois réarmé)
     lights(out) {
+      plant.lights(out);
       for (const b of burners) {
         const c = b.win.material.color;
-        out.push({ x: b.x + b.dx * 0.3, y: 0.5, z: b.z + b.dz * 0.3, r: c.r * 0.9, g: c.g * 0.9, b: c.b * 0.9, rad: 3.4, nx: b.dx, ny: -0.15, nz: b.dz, w: -0.25 });
+        out.push({ x: b.x + b.dx * 0.3, y: 0.55, z: b.z + b.dz * 0.3, r: c.r * 1.25, g: c.g * 1.2, b: c.b, rad: 4.4, nx: b.dx, ny: -0.1, nz: b.dz, w: -0.3 });
       }
       for (const vv of valveViews) {
         const c = vv.lamp.material.color;
@@ -1336,6 +1341,7 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
         vv.needle.rotation.z = Math.PI * 0.75 - pr * Math.PI * 1.5;
         vv.lamp.material.color.set(vv.v.closed ? '#2bff6a' : vv.v.turn > 0 ? (Math.sin(time * 14) > 0 ? '#ffb020' : '#ff2a1a') : '#ff2a1a');
       }
+      plant.update(time);
       // brûleurs : la flamme danse derrière la lucarne
       for (const b of burners) {
         const k = 0.55 + Math.sin(time * 7 + b.ph) * 0.15 + Math.sin(time * 23 + b.ph * 3) * 0.1 + Math.random() * 0.1;
