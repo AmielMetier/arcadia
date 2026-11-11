@@ -146,6 +146,7 @@ export const BROWN_LEN = [18, 26];
 export const SECTOR_STEP = 9; // secondes par tiers, pendant un délestage (trois tiers)
 export const L1_CALM = 50; // Level 1 : l'arrivée est calme, elle reste au loin (le temps de découvrir l'entrepôt)
 export const CALM_KEEP = 30; // m : pendant ce calme, l'imposteur se tient au moins à cette distance des joueurs
+export const ARRIVAL_CALM = 30; // Level 5 : à l'arrivée, l'entité reste au loin ce temps-là (un seul contact y est mortel)
 // Level 1 : les disjoncteurs généraux, à tenir relevés en même temps (2 postes à 1 ou 2 joueurs, 3 à partir de 3).
 // Chacun, relevé, tient RELAY_SYNC secondes ; s'il n'y a pas assez de joueurs en vie pour les tenir tous, il tient le
 // temps de courir aux autres (relayRun de la carte, à RELAY_PACE m/s, plus RELAY_SPARE)
@@ -671,7 +672,7 @@ export class BackroomsSim {
       watch: null, // case sombre d'où elle observe
       // au tout début de la partie, elle reste au loin une minute : on apprend à se déplacer
       // (au Level 1 aussi, on arrive au calme : elle est loin et ne chasse pas encore)
-      dormantT: level === 0 && !this.time ? DORMANT_T * (this.difficulty === 'hard' ? 0.75 : 1) * (1.3 - 0.6 * this.skill) : level === 1 ? L1_CALM * (this.difficulty === 'hard' ? 0.75 : 1) : 0,
+      dormantT: level === 0 && !this.time ? DORMANT_T * (this.difficulty === 'hard' ? 0.75 : 1) * (1.3 - 0.6 * this.skill) : level === 1 ? L1_CALM * (this.difficulty === 'hard' ? 0.75 : 1) : level === HOTEL_LEVEL ? ARRIVAL_CALM * (this.difficulty === 'hard' ? 0.75 : 1) : 0,
       flees: 0, // fuites devant la lampe : à la troisième, elle ne fuit plus
       escapes: [], // là où on l'a semée : elle s'en souvient pour ses embuscades
       stunT: 0, // sonnée (aveuglée, ou après avoir lâché sa prise)

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, SLIDE_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL, RELAY_ARM, RELAY_SYNC, LIFT_CALL_T, L1_CALM, L1_FIRST_BLACKOUT, SECTOR_STEP, CALM_KEEP } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, SLIDE_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL, RELAY_ARM, RELAY_SYNC, LIFT_CALL_T, L1_CALM, L1_FIRST_BLACKOUT, SECTOR_STEP, CALM_KEEP, ARRIVAL_CALM } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
 import { navOf, roamable } from '../backrooms/engine/gait.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
@@ -2948,6 +2948,7 @@ test('Level 5 : lettres ramassées, postées dans les boîtes, code au plafond, 
 
 test('Level 5 : caché sous un lit, l\'entité perd sa trace ; elle tue si elle l\'a vu s\'y glisser', () => {
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 7, level: HOTEL_LEVEL });
+  sim.monster.dormantT = 0; // (en pleine partie : passé le calme de l'arrivée)
   const P = sim.player;
   const M = sim.monster;
   const m = sim.map;
@@ -2984,6 +2985,7 @@ test('Level 5 : caché sous un lit, l\'entité perd sa trace ; elle tue si elle 
 
 test('Level 5 : la course s\'entend, accroupi on passe en silence ; les lettres d\'un mort reviennent', () => {
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 7, level: HOTEL_LEVEL });
+  sim.monster.dormantT = 0; // (en pleine partie : passé le calme de l'arrivée)
   const P = sim.player;
   const M = sim.monster;
   const m = sim.map;
@@ -3055,6 +3057,7 @@ test("Level 5 : on entre dans chaque chambre par sa porte en marchant, les meubl
 test("Level 5 : caché, l'entité quitte la pièce et reprend sa ronde ; un autre joueur qui court l'attire", () => {
   const players = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }];
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 7, level: HOTEL_LEVEL, players, localId: 'a' });
+  sim.monster.dormantT = 0; // (en pleine partie : passé le calme de l'arrivée)
   const [A, B] = sim.players;
   const M = sim.monster;
   const m = sim.map;
@@ -4614,6 +4617,21 @@ test("Level 1 : le calme de l'arrivée vaut aussi pour l'imposteur — déguisé
   } finally {
     BackroomsSim.DISGUISE = was;
   }
+});
+
+test("Level 5 : l'arrivée est calme — l'entité ne repère personne pendant la première demi-minute", () => {
+  for (const seed of [1, 3, 4, 9]) {
+    const sim = new BackroomsSim({ difficulty: 'normal', seed, level: HOTEL_LEVEL });
+    assert.ok(sim.monster.dormantT >= ARRIVAL_CALM - 0.1, 'elle ne chasse pas encore');
+    const input = { mx: 0, my: 1, yaw: 0, pitch: 0 };
+    for (let i = 0; i < Math.round((ARRIVAL_CALM - 2) / DT); i++) {
+      if (i % 90 === 0) input.yaw += 1.3; // on tourne en rond dans le couloir, debout, sans se cacher
+      sim.step(input);
+      assert.notEqual(sim.monster.mode, 'chase', `pas de traque à ${sim.time.toFixed(1)} s (graine ${seed})`);
+      assert.equal(sim.player.status, 'alive', `en vie à ${sim.time.toFixed(1)} s (graine ${seed})`);
+    }
+  }
+  assert.ok(new BackroomsSim({ difficulty: 'hard', seed: 1, level: HOTEL_LEVEL }).monster.dormantT < ARRIVAL_CALM, 'plus court en difficile');
 });
 
 test("Level 1 à plusieurs : la porte du poste de garde arrive par l'instantané (un invité arrivé en route la voit comme l'hôte)", () => {

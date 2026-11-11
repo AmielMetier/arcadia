@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 5.57 — 11 novembre 2026
+- **The Backrooms** — Level 5 : on ne meurt plus en posant le pied dans l'hôtel.
+  - L'entité reste au loin pendant les 30 premières secondes (un peu moins en difficile) : le temps de repérer les chambres et les cachettes
+  - Ensuite, rien ne change : un seul contact reste mortel
+
 ## 5.56 — 11 novembre 2026
 - **The Backrooms** — Level 1 à plusieurs : la porte du poste de garde s'affiche comme chez l'hôte pour un joueur qui arrive ou revient en cours de partie (il pouvait la voir fermée alors qu'elle était ouverte, et buter dessus).
 
