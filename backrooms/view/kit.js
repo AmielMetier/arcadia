@@ -48,7 +48,8 @@ export function loadKit(name) {
 // glass : une vitre qui s'allume (sa couleur vient de l'exemplaire : glow(item) → THREE.Color ou null). Un morceau
 // nommé "piece@variante" est le même maillage avec une autre matière (un tuyau peint en rouge, une tige rouillée…).
 // reach (facultatif) : chaque exemplaire n'est dessiné qu'à moins de reach.base + reach.k × (sa demi-diagonale) mètres :
-// une montre sur une table disparaît à 20 m, un banc reste visible au bout du mail
+// une montre sur une table disparaît à 20 m, un banc reste visible au bout du mail ; reach.cap[modèle] borne la portée
+// d'un modèle très lourd (en mètres)
 export function createKitInstancer({ group, convert, reach }) {
   const lists = new Map(); // "kit|morceau" → exemplaires
   const sets = [];
@@ -96,7 +97,7 @@ export function createKitInstancer({ group, convert, reach }) {
             far = new Float32Array(items.length);
             items.forEach((it, i) => {
               sc.setFromMatrixScale(it.m);
-              const r = reach.base + reach.k * rad * Math.max(sc.x, sc.y, sc.z);
+              const r = Math.min(reach.cap?.[kit] ?? Infinity, reach.base + reach.k * rad * Math.max(sc.x, sc.y, sc.z));
               far[i] = r * r;
             });
           }

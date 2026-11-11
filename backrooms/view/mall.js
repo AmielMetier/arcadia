@@ -282,6 +282,7 @@ function floorKey(r, fi, shops) {
     case 'closed':
       return 'lino';
     case 'cine':
+    case 'fun':
       return 'cine';
     case 'cineHall':
     case 'screen':
@@ -306,10 +307,12 @@ function wallKey(r) {
       return 'plaster';
     case 'service':
     case 'dock':
+    case 'parking':
       return 'block';
     case 'cine':
     case 'cineHall':
     case 'screen':
+    case 'fun':
       return 'paintDark';
     case 'wc':
       return 'faience';
@@ -895,7 +898,16 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   const kitMats = new Map();
   const kit = createKitInstancer({
     group,
-    reach: { base: 16, k: 40 },
+    // (les modèles très lourds pour leur taille ne se voient que de près)
+    reach: {
+      base: 16,
+      k: 40,
+      cap: {
+        korean_public_payphone_01: 16, wheelchair_01: 18, old_gas_mask: 12, garden_hose_wall_mounted_01: 16, gamepad: 12, rubber_duck_toy: 18,
+        binder_notebook: 12, carrot_cake: 12, food_apple_01: 10, book_encyclopedia_set_01: 14, anthurium_botany_01: 22, vintage_crutches_01: 16,
+        round_spectacles: 10, jug_01: 14, brass_vase_03: 14, croissant: 10, medical_box: 14, american_football: 16, concrete_cat_statue: 18,
+      },
+    },
     convert: (src, kitName, piece, variant) => {
       const key = src.uuid + '@' + variant;
       if (!kitMats.has(key)) {
@@ -917,7 +929,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     kit.put(name, piece, x, y, z, ry, s, undefined, rx, rz);
   };
   const props = drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, placed });
-  drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed, show: props.show });
+  drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed, show: props.show, arcade: props.arcade });
   kit.build();
   G.build(group);
   // les barreaux : un seul maillage

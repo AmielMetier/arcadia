@@ -2898,13 +2898,14 @@ test('Level 17 : deux étages reliés par trois escaliers, des vides bordés, to
       assert.ok(up.collide(c[0], c[1], 0.38), 'le vide arrête les joueurs');
     }
     assert.ok(!up.collide(up.spawn.x, up.spawn.z, 0.38) && up.dist[up.spawn.gz * up.W + up.spawn.gx] === 0);
-    // toutes les salles sont atteintes, sauf le grand magasin fermé et les boutiques fermées sans porte de service
+    // toutes les salles sont atteintes (le grand magasin fermé par sa porte de réserve), sauf les boutiques fermées sans
+    // porte de service
     for (const f of floors)
       for (const r of f.rooms) {
         let ok = false;
         for (let z = r.z0; z <= r.z1 && !ok; z++) for (let x = r.x0; x <= r.x1 && !ok; x++) ok = f.dist[z * f.W + x] >= 0;
         const sh = r.kind === 'shop' ? f.shops[r.shop] : null;
-        const shut = r.kind === 'closed' || (sh && (sh.state === 'grille' || sh.state === 'glass') && !sh.back);
+        const shut = sh && (sh.state === 'grille' || sh.state === 'glass') && !sh.back;
         assert.equal(ok, !shut, `graine ${sd}, étage ${f.floor} : ${r.kind} ${r.name}`);
       }
     // les objets sont sur des cases parcourues, loin les uns des autres ; les escalators de la cour centrale montent

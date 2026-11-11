@@ -9,6 +9,7 @@
 // model() (view/kit.js : les exemplaires proches seulement).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL_SIZE as C } from '../engine/map.js';
+import { createArcade } from './mallArcade.js';
 
 // --- Les textures écrites : enseignes, menus, affiches, plan du centre ---
 const SIGN_FONTS = ['bold 64px "Futura", "Century Gothic", sans-serif', 'italic bold 66px Georgia, serif', 'bold 60px "Arial Narrow", Arial, sans-serif', '700 62px "Brush Script MT", "Snell Roundhand", cursive'];
@@ -271,6 +272,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     G.add(k, g.translate(x, y, z));
   };
   const lights = []; // les feux de couleur du mobilier (bornes d'arcade allumées)
+  const arcade = createArcade({ G, MATS, baked, model, placed, lights, rooms, C });
 
   // --- les modèles (Poly Haven, CC0) : leur avant est +z, sauf mention ---
   const PI = Math.PI;
@@ -621,22 +623,29 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         }
         break;
       }
-      case 'arcade': {
-        lbox('black', it, -hw, hw, 0, 1.85, -hd, hd);
-        const [x, z] = P(0, hd + 0.004);
-        const n = P(0, 1);
-        const glow = it.lit ? (it.id % 2 ? 'arcadeGlow' : 'arcadeGlow2') : 'black';
-        panel(glow, [0, 0, 1, 1], x, 1.32, z, it.w - 0.2, 0.42, n[0] - it.x, n[1] - it.z);
-        panel(it.lit ? 'menus' : 'menusOff', menus.uv(it.id), x, 1.74, z, it.w - 0.1, 0.16, n[0] - it.x, n[1] - it.z);
-        lbox('steel', it, -hw, hw, 0.95, 1.0, hd, hd + 0.2, '-y');
-        if (it.lit) {
-          const [lx, lz] = P(0, hd + 0.5);
-          const r = rooms[it.room];
-          const box = r ? [r.x0 * C - 0.25, r.z0 * C - 0.25, (r.x1 + 1) * C + 0.25, (r.z1 + 1) * C + 0.25] : null;
-          lights.push({ x: lx, y: 1.3, z: lz, c: it.id % 2 ? [0.45, 0.2, 1.0] : [0.1, 0.85, 0.75], rad: 3.2, nx: n[0] - it.x, nz: n[1] - it.z, box });
-        }
+      case 'arcade':
+        arcade.cabinet(it);
+        break;
+      case 'claw':
+        arcade.claw(it);
+        break;
+      case 'prizes':
+        arcade.prizes(it);
+        break;
+      // le parking : une voiture sous sa bâche, des blocs de béton, des pneus en tas
+      case 'car':
+        model('covered_car', it.x, 0, it.z, (it.face || 1) > 0 ? 0 : PI);
+        break;
+      case 'barrier': {
+        model('concrete_road_barrier_02', it.x, 0, it.z, it.yaw || 0);
+        // derrière le premier bloc : la sortie des voitures, son rideau baissé (tagué)
+        const r = rooms[it.room];
+        if (!it.yaw && r) model('rollershutter_door', it.x + 1.2, 0, r.z0 * C, 0, [3.6, 1.15, 1], 0, 0, 'rollershutter_door_graffiti');
         break;
       }
+      case 'tyres':
+        for (let k = 0; k < (it.n || 3); k++) model('old_tyre', it.x + (rand(it.id, k) - 0.5) * 0.12, 0.08 + k * 0.155, it.z + (rand(it.id, k + 5) - 0.5) * 0.12, 0, 1, PI / 2);
+        break;
       case 'stanchion':
         put('brass', new THREE.CylinderGeometry(0.025, 0.025, 0.95, 8), it.x, 0.48, it.z);
         put('brass', new THREE.CylinderGeometry(0.16, 0.18, 0.03, 16), it.x, 0.015, it.z);
@@ -858,16 +867,17 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
       panel('signs', signs.uv(si++), (xa + xb) / 2, y, z, Math.min(xb - xa - 0.6, 6.5), 0.44, 0, sh.dir);
     }
 
-  // les salles de projection : l'écran (une toile grise entre des caches noirs) contre le mur est
+  // les salles de projection : l'écran (une toile grise entre des caches noirs) contre le mur est ; dans les coins, de
+  // part et d'autre de la scène, les sorties de secours
   for (const r of rooms) {
     if (r.kind !== 'screen') continue;
     const X1 = (r.x1 + 1) * C;
     const Z0 = r.z0 * C;
     const Z1 = (r.z1 + 1) * C;
-    G.box('screenWhite', X1 - 0.08, X1 - 0.02, 1.4, r.ceilH - 1.2, Z0 + 1.6, Z1 - 1.6, '+x');
-    G.box('black', X1 - 0.1, X1 - 0.02, 1.2, r.ceilH - 1.0, Z0 + 1.2, Z0 + 1.6, '+x');
-    G.box('black', X1 - 0.1, X1 - 0.02, 1.2, r.ceilH - 1.0, Z1 - 1.6, Z1 - 1.2, '+x');
-    G.box('red', X1 - 1.2, X1 - 0.1, 0, 1.2, Z0 + 0.5, Z1 - 0.5, '-y');
+    G.box('screenWhite', X1 - 0.08, X1 - 0.02, 1.4, r.ceilH - 1.2, Z0 + 3.0, Z1 - 3.0, '+x');
+    G.box('black', X1 - 0.1, X1 - 0.02, 1.2, r.ceilH - 1.0, Z0 + 2.6, Z0 + 3.0, '+x');
+    G.box('black', X1 - 0.1, X1 - 0.02, 1.2, r.ceilH - 1.0, Z1 - 3.0, Z1 - 2.6, '+x');
+    G.box('red', X1 - 1.2, X1 - 0.1, 0, 1.2, Z0 + 2.6, Z1 - 2.6, '-y');
   }
 
   // le cinéma : des affiches dans des caissons lumineux le long des murs du hall et du couloir des salles
@@ -919,5 +929,5 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     }
   }
 
-  return { lights, show: SHOW };
+  return { lights, show: SHOW, arcade };
 }

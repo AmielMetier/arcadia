@@ -211,3 +211,6 @@ Level 17 (le mall) : même source, même traitement (tools/polyhaven-glb.py puis
   wooden_broom.glb  https://polyhaven.com/a/wooden_broom
   wooden_cutting_board.glb  https://polyhaven.com/a/wooden_cutting_board
   garden_hose_wall_mounted_01.glb  https://polyhaven.com/a/garden_hose_wall_mounted_01
+  covered_car.glb  https://polyhaven.com/a/covered_car
+  metal_stool_02.glb  https://polyhaven.com/a/metal_stool_02
+  concrete_road_barrier_02.glb  https://polyhaven.com/a/concrete_road_barrier_02

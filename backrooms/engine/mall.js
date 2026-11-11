@@ -18,7 +18,7 @@ import { CELL_SIZE, T, itemList } from './map.js';
 
 const C = CELL_SIZE;
 export const MALL_LEVEL = 5;
-export const MALL_W = 108;
+export const MALL_W = 110;
 export const MALL_H = 64;
 export const MALL_CEIL = 4.4; // hauteur sous plafond ordinaire (le mail de l'étage du bas)
 export const MALL_RAIL = 1.05; // hauteur des garde-corps
@@ -42,6 +42,8 @@ export const RK = {
   OFFICE: 'office',
   DOCK: 'dock',
   LOBBY: 'lobby', // le hall des parkings
+  FUN: 'fun', // la salle de jeux (bornes d'arcade), entre le grand magasin et le food court
+  PARK: 'parking', // le parking couvert, sous la salle de jeux
 };
 
 // hauteur et genre de plafond par genre de salle, étage du haut (0) et du bas (1). L'étage du bas reste sous la dalle
@@ -62,6 +64,7 @@ const CEILS = [
     screen: [8.2, 'black'],
     wc: [2.8, 'grid'],
     office: [2.8, 'grid'],
+    fun: [4.4, 'black'],
   },
   {
     mail: [4.4, 'soffit'],
@@ -73,6 +76,7 @@ const CEILS = [
     portal: [4.0, 'soffit'],
     lobby: [3.2, 'grid'],
     dock: [5.4, 'slab'],
+    parking: [3.0, 'slab'],
     wc: [2.8, 'grid'],
     office: [2.8, 'grid'],
   },
@@ -376,6 +380,40 @@ export function createMallMap(seed = 17) {
     door(fi, 72, 45, 'service');
     for (let x = X.corr[0]; x <= X.corr[1]; x++) door(fi, x, 45, 'passage');
   }
+  // --- 4b. Pas de cul-de-sac : chaque grand espace a plusieurs issues, et l'on peut faire des boucles ---
+  // (une porte dans un mur de plusieurs cases d'épaisseur : une case de porte par case de mur)
+  const thru = (fi, cells, kind = 'service') => cells.forEach(([x, z]) => door(fi, x, z, kind));
+  for (const fi of [0, 1]) {
+    // le grand magasin : une porte sur chaque couloir de service, et le passage du personnel vers le poste de sécurité
+    // (en haut) ou les objets trouvés (en bas)
+    thru(fi, [[15, SERV_N], [16, SERV_N]]);
+    thru(fi, [[15, SERV_S], [16, SERV_S]]);
+    thru(fi, [[15, 56], [16, 56], [17, 56]]);
+    // le grand magasin fermé : sa porte de réserve donne sur les bureaux (en haut), les locaux techniques (en bas)
+    thru(fi, [[69, 52], [69, 53]]);
+  }
+  // en haut, entre le grand magasin et le food court : la salle de jeux, ouverte des deux côtés et sur le couloir nord
+  room(0, RK.FUN, 17, 4, 27, 17, { name: 'Funland' });
+  thru(0, [[15, 10], [16, 10], [15, 11], [16, 11]], 'passage');
+  thru(0, [[28, 10], [29, 10], [28, 11], [29, 11]], 'passage');
+  thru(0, [[22, 18], [22, 19]]);
+  // le food court : ouvert sur le hall du cinéma, deux portes de service sur le couloir nord
+  thru(0, [[65, 9], [65, 10], [65, 11]], 'passage');
+  thru(0, [[36, 18], [36, 19]]);
+  thru(0, [[46, 18], [46, 19]]);
+  // les salles de cinéma : une sortie de secours au pied de l'écran, sur un couloir qui longe les salles jusqu'aux bureaux
+  room(0, RK.SERVICE, 108, 3, 108, 50, { name: 'Cinema exits' });
+  door(0, 107, 3, 'fire');
+  door(0, 107, 23, 'fire');
+  door(0, 107, 50, 'service');
+  // en bas, sous la salle de jeux : le parking couvert, entre le grand magasin et le hall des parkings
+  room(1, RK.PARK, 17, 4, 42, 17, { name: 'Parking P1' });
+  thru(1, [[15, 10], [16, 10], [15, 11], [16, 11]], 'passage');
+  thru(1, [[43, 10], [43, 11], [43, 12], [43, 13]], 'passage');
+  thru(1, [[30, 18], [30, 19]]);
+  // le hall des parkings : une porte vers les quais
+  thru(1, [[65, 12], [66, 12], [67, 12]]);
+
   // les couloirs de service : des portes sur les cours (issues de secours, accès du personnel)
   for (const fi of [0, 1]) {
     door(fi, 18, 21, 'fire'); // (en haut : l'issue de secours par où l'on arrive)
@@ -521,6 +559,8 @@ export function createMallMap(seed = 17) {
   for (let z = 6; z <= 16; z += 5) for (let x = 33; x <= 63; x += 5) pillar(0, x, z, { kind: 'food' });
   for (let z = 10; z <= 16; z += 5) for (let x = 46; x <= 63; x += 5) pillar(1, x, z, { kind: 'store' });
   for (let z = 6; z <= 14; z += 4) for (let x = 71; x <= 91; x += 5) pillar(1, x, z, { kind: 'dock', h: 0.3 });
+  for (const z of [8, 13]) for (let x = 20; x <= 40; x += 5) pillar(1, x, z, { kind: 'dock', h: 0.35 });
+  for (const [x, z] of [[20, 7], [25, 7], [20, 14], [25, 14]]) pillar(0, x, z, { kind: 'cine', round: true, h: 0.4 });
   // le cinéma : des piliers ronds sous leurs disques de plafond ; le couloir des salles en a une file au milieu
   for (const [x, z] of [[71, 7], [76, 12], [81, 7], [86, 12], [71, 14], [81, 14], [90, 7]]) pillar(0, x, z, { kind: 'cine', round: true, h: 0.5 });
   for (let z = 5; z <= 42; z += 5) pillar(0, 96, z, { kind: 'cineHall', round: true, h: 0.32 });
@@ -630,6 +670,8 @@ export function createMallMap(seed = 17) {
       else if (r.kind === RK.WC || r.kind === RK.LOBBY) grid(5, 'panel', { y: r.ceilH, pOff: 0.45 });
       else if (r.kind === RK.OFFICE) grid(7.5, 'panel', { y: r.ceilH, pOff: 0.45 });
       else if (r.kind === RK.DOCK) grid(5, 'tube', { y: r.ceilH, pOff: 0.4 });
+      else if (r.kind === RK.PARK) grid(C * 3, 'tube', { y: r.ceilH, pOff: 0.55 });
+      else if (r.kind === RK.FUN) grid(5, 'spot', { y: r.ceilH, pOff: 0.5 });
       else if (r.kind === RK.PORTAL) grid(5, 'spot', { y: r.ceilH, pOff: 0.3 });
     }
     // en bas, sous les vides : la lumière des grandes suspensions et de la lanterne du haut tombe jusqu'au sol (une
@@ -847,6 +889,63 @@ export function createMallMap(seed = 17) {
           else furn(fi, 'mannequin', x, z, 0.5, 0.5, { round: true, m: 0.4, room: r.id, yaw: rnd() * 6.28 });
         }
       }
+    }
+  }
+  // la salle de jeux : le comptoir des lots au fond, des machines à pince de part et d'autre, des bornes d'arcade le
+  // long des murs et en îlot dos à dos au milieu (une allée en travers, d'une porte à l'autre)
+  {
+    const r = roomsOf(0, RK.FUN)[0];
+    const X0 = r.x0 * C;
+    const X1 = (r.x1 + 1) * C;
+    const Z0 = r.z0 * C;
+    const Z1 = (r.z1 + 1) * C;
+    const xm = (X0 + X1) / 2;
+    const o = { m: 0.02, pm: 0.2, room: r.id };
+    furn(0, 'prizes', xm, Z0 + 2.2, 7.0, 0.8, { ...o, m: 0.1 });
+    for (let i = 0; i < 4; i++) {
+      furn(0, 'claw', X0 + 2.6 + i * 1.15, Z0 + 0.6, 1.0, 1.0, { ...o, claw: i });
+      furn(0, 'claw', X1 - 2.6 - i * 1.15, Z0 + 0.6, 1.0, 1.0, { ...o, claw: i + 4 });
+    }
+    let n = 0;
+    const cab = (x, z, face) => furn(0, 'arcade', x, z, 0.8, 0.9, { ...o, rot: 1, face, lit: n++ % 4 === 1 || rnd() < 0.12, game: Math.floor(rnd() * 8) });
+    for (let z = Z0 + 2.4; z < Z1 - 0.6; z += 0.95) {
+      cab(X0 + 0.5, z, 1);
+      cab(X1 - 0.5, z, -1);
+    }
+    for (const [za, zb] of [[Z0 + 5.2, Z0 + 13.6], [Z1 - 11.4, Z1 - 2.6]])
+      for (let z = za; z < zb; z += 0.95) {
+        cab(xm - 0.46, z, -1);
+        cab(xm + 0.46, z, 1);
+      }
+  }
+  // le parking : des places peintes le long des murs nord et sud et dos à dos entre les deux files de piliers ; quelques
+  // voitures sous leur bâche, des pneus en tas ; la sortie des voitures, au nord-est, fermée par son rideau et des blocs
+  {
+    const r = roomsOf(1, RK.PARK)[0];
+    const X0 = r.x0 * C;
+    const X1 = (r.x1 + 1) * C;
+    const Z0 = r.z0 * C;
+    const Z1 = (r.z1 + 1) * C;
+    const o = { m: 0.15, pm: 0.15, room: r.id };
+    const bays = [];
+    // (une place : son centre, et le côté de sa tête, vers le mur ou vers l'autre rangée)
+    for (let x = X0 + 5; x + 2.5 <= X1 - 5; x += 2.5) {
+      bays.push([x + 1.25, Z0 + 2.6, -1], [x + 1.25, Z1 - 2.6, 1]);
+      if (x > X0 + 6 && x + 2.5 < X1 - 7) bays.push([x + 1.25, (Z0 + Z1) / 2 - 2.75, 1], [x + 1.25, (Z0 + Z1) / 2 + 2.75, -1]);
+    }
+    r.bays = bays.map(([x, z, head]) => ({ x, z, head }));
+    let cars = 0;
+    for (const i of bays.map((_, i) => i).sort(() => rnd() - 0.5)) {
+      if (cars >= 6) break;
+      const [x, z, f] = bays[i];
+      if (x > X1 - 16 && z < Z0 + 5) continue; // (devant la sortie fermée)
+      if (furn(1, 'car', x, z, 1.9, 4.5, { ...o, face: f, tint: Math.floor(rnd() * 3) })) cars++;
+    }
+    furn(1, 'barrier', X1 - 11, Z0 + 1.6, 1.6, 0.5, o);
+    furn(1, 'barrier', X1 - 8.6, Z0 + 1.9, 1.6, 0.5, { ...o, yaw: 0.25 });
+    for (let k = 0; k < 3; k++) {
+      const [x, z] = [[X0 + 2.0, Z0 + 1.6], [X1 - 2.5, Z1 - 1.6], [(X0 + X1) / 2 + 9, Z1 - 1.5]][k];
+      furn(1, 'tyres', x, z, 0.9, 0.9, { ...o, round: true, n: 3 + k });
     }
   }
   // le cinéma : le comptoir des confiseries, une rangée de bornes d'arcade, les cordons devant le contrôle des billets

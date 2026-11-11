@@ -626,6 +626,34 @@ function grimeAtlas() {
   cells.forEach((f, i) => f((i % 8) * 256, Math.floor(i / 8) * 512));
   return toTex(c);
 }
+// les numéros des places au pochoir (jaune usé, sur fond transparent) : 32 cases de 128 × 64
+function stencilAtlas() {
+  const c = document.createElement('canvas');
+  c.width = 1024;
+  c.height = 256;
+  const g = c.getContext('2d');
+  g.textAlign = 'center';
+  g.font = 'bold 52px "DIN Condensed", "Arial Narrow", Impact, sans-serif';
+  for (let i = 0; i < 32; i++) {
+    const x = (i % 8) * 128;
+    const y = Math.floor(i / 8) * 64;
+    g.fillStyle = 'rgba(214, 178, 62, 0.85)';
+    g.fillText('A' + String(i + 1).padStart(2, '0'), x + 64, y + 52);
+    // l'usure : la peinture partie par endroits
+    g.globalCompositeOperation = 'destination-out';
+    for (let k = 0; k < 26; k++) {
+      g.fillStyle = `rgba(0,0,0,${0.3 + hash(i, k) * 0.6})`;
+      g.fillRect(x + hash(i, k, 1) * 128, y + hash(i, k, 2) * 64, 2 + hash(i, k, 3) * 14, 1 + hash(i, k, 4) * 5);
+    }
+    g.globalCompositeOperation = 'source-over';
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+const stencilUV = (i) => [(i % 8) / 8, 1 - (Math.floor(i / 8) + 1) / 4, ((i % 8) + 1) / 8, 1 - Math.floor(i / 8) / 4];
+
 const grimeUV = (i) => {
   const cx = (i % 8) * 256;
   const cy = Math.floor(i / 8) * 512;
@@ -634,13 +662,13 @@ const grimeUV = (i) => {
 
 let ATLAS = null; // les deux atlas, dessinés une fois (les deux étages s'en servent)
 
-export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed = [], show = {} }) {
+export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed = [], show = {}, arcade = null }) {
   const W = map.W;
   const H = map.H;
   const PI = Math.PI;
   const lam = (o) => new THREE.MeshLambertMaterial(o);
   const phong = (o) => new THREE.MeshPhongMaterial(o);
-  if (!ATLAS) ATLAS = { plates: plateAtlas(), grime: grimeAtlas() };
+  if (!ATLAS) ATLAS = { plates: plateAtlas(), grime: grimeAtlas(), stencil: stencilAtlas() };
   if (!MATS.plates) {
     MATS.plates = { m: baked(lam({ map: ATLAS.plates })), S: 1 };
     MATS.platesLit = { m: new THREE.MeshBasicMaterial({ map: ATLAS.plates, color: new THREE.Color(1, 1, 1).multiplyScalar(0.95) }), S: 1 };
@@ -649,6 +677,11 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     MATS.mirror = { m: baked(phong({ color: '#1e272b', specular: '#b4c4cc', shininess: 150 }), { spec: 0.9, gloss: 160, mask: 0 }), S: 1 };
     MATS.cream = { m: baked(lam({ color: '#cfc8b6' })), S: 1 };
     MATS.fireRed = { m: baked(phong({ color: '#8c1a16', specular: '#5a3a3a', shininess: 40 })), S: 1 };
+    // la peinture au sol du parking : les lignes blanches, les numéros au pochoir (posés sur le béton, sans scintiller)
+    const off = { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 };
+    MATS.lineW = { m: baked(lam({ color: '#b9b3a2', ...off })), S: 1 };
+    MATS.lineY = { m: baked(lam({ color: '#b8932a', ...off })), S: 1 };
+    MATS.stencil = { m: baked(lam({ map: ATLAS.stencil, transparent: true, depthWrite: false, ...off })), S: 1, order: 1 };
     ['#5a1f1b', '#1f3a5a', '#2f4a2a', '#6a5a3a', '#3a2a4a', '#8a7a5a'].forEach((c, i) => (MATS['bk' + i] = { m: baked(lam({ map: MATS.__tx && MATS.__tx.fabrics ? MATS.__tx.fabrics[1] : null, color: c })), S: 4 }));
   }
   const cell = (x, z) => (x < 0 || z < 0 || x >= W || z >= H ? WALL : map.grid[z * W + x]);
@@ -1045,6 +1078,33 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         else wmodel('industrial_wall_lamp', R, s, 2.6, 0);
       }, seed);
       grimeRun(R, 4, [3, 9, 0, 1, 12, 15], seed);
+    } else if (kind === 'parking') {
+      // le parking : des tuyaux sous le plafond, les sorties, des consignes, des bandes de danger, l'eau qui a coulé
+      if (len > 5) pipes(R);
+      slots(R, 2.5, 0.8, 0.45, (s, i, h) => {
+        if (h < 0.18) sign(R, s, 2.25, 3, 0.9);
+        else if (h < 0.34) wmodel('industrial_wall_lamp', R, s, 2.35, 0);
+        else if (h < 0.48) conduit(R, s, 1.3);
+        else if (h < 0.58) fireCabinet(R, s);
+        else if (h < 0.72) plate(R, s, 1.6, SAFE([0, 3, 6, 7][i % 4]), 0.42, 0.31);
+        else if (h < 0.86) plate(R, s, 0.55, 29, 1.6, 0.5, null);
+        else wmodel('fire_alarm', R, s, 1.45, 0, 1.2);
+      }, seed);
+      grimeRun(R, 3, [1, 2, 3, 9, 15, 10, 13, 5], seed);
+    } else if (kind === 'fun') {
+      // la salle de jeux : des affiches de jeux sous cadre, les enseignes TOKENS et FUNLAND, l'horloge
+      slots(R, 2.0, 0.6, 0.45, (s, i, h) => {
+        if (h < 0.5 && arcade) {
+          wbox('black', R, s, 1.0, 1.16, 2.64, 0, 0.03);
+          face(i % 3 ? 'arcDim' : 'arcLit', arcade.poster(i + seed), R, s, 1.9, 0.92, 1.42, 0.032);
+        } else if (h < 0.64 && arcade) {
+          wbox('black', R, s, 1.3, 2.62, 3.28, 0, 0.05);
+          face('arcLit', arcade.sign(i % 2 ? 'tokens' : 'funland'), R, s, 2.95, 1.2, 0.6, 0.052);
+        } else if (h < 0.76) wmodel('wall_clock', R, s, 2.5, 0, 1.2);
+        else if (h < 0.88) fireCabinet(R, s);
+        else plate(R, s, 1.6, NOTE(4), 0.4, 0.52, null);
+      }, seed);
+      grimeRun(R, 5, [3, 9, 0, 12], seed);
     } else if (kind === 'court' || kind === 'plaza' || kind === 'mail') {
       slots(R, 2.5, 0.9, 0.5, (s, i, h) => {
         if (h < 0.4) adBox(R, s, 1.8, i + seed, i % 3 === 0);
@@ -1055,5 +1115,40 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
       }, seed);
       grimeRun(R, 5, [3, 9, 0, 1, 12], seed);
     }
+  }
+
+  // --- le sol du parking : les places (lignes, butées de béton, numéros au pochoir), les taches d'huile, les flèches ---
+  for (const r of rooms) {
+    if (r.kind !== 'parking' || !r.bays) continue;
+    const seen = new Set();
+    const flat = (k, uv, x, z, w, d, yaw = 0) => {
+      const g = new THREE.PlaneGeometry(w, d).rotateX(-PI / 2);
+      if (uv) {
+        const a = g.attributes.uv;
+        for (let i = 0; i < a.count; i++) a.setXY(i, a.getX(i) > 0 ? uv[2] : uv[0], a.getY(i) > 0 ? uv[3] : uv[1]);
+      }
+      G.add(k, g.rotateY(yaw).translate(x, 0.004, z));
+    };
+    r.bays.forEach((b, i) => {
+      for (const sx of [-1.25, 1.25]) {
+        const k = Math.round((b.x + sx) * 4) + ':' + Math.round(b.z * 4);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        flat('lineW', null, b.x + sx, b.z, 0.1, 4.9);
+      }
+      // la butée, à la tête de la place ; le numéro, peint côté allée
+      if (hash(i, fi, 7) < 0.85) G.box('lineY', b.x - 0.85, b.x + 0.85, 0, 0.11, b.z + b.head * 2.05 - 0.08, b.z + b.head * 2.05 + 0.08, '-y');
+      flat('stencil', stencilUV(i % 32), b.x, b.z - b.head * 1.7, 0.9, 0.45, b.head > 0 ? PI : 0);
+      if (hash(i, fi, 41) < 0.45) flat('grime', grimeUV([3, 9, 13, 5][i % 4]), b.x + (hash(i, 2) - 0.5) * 0.6, b.z + (hash(i, 3) - 0.5) * 1.2, 1.1 + hash(i, 4), 1.4 + hash(i, 5), hash(i, 6) * 6);
+    });
+    // les flèches de circulation dans les deux allées (un sens unique : vers l'est au nord, vers l'ouest au sud)
+    const X0 = r.x0 * C;
+    const X1 = (r.x1 + 1) * C;
+    const arrow = new THREE.Shape([[-0.9, -0.12], [0.3, -0.12], [0.3, -0.4], [0.9, 0], [0.3, 0.4], [0.3, 0.12], [-0.9, 0.12]].map(([a, b]) => new THREE.Vector2(a, b)));
+    for (const [z, dir] of [[r.z0 * C + 7.6, 1], [(r.z1 + 1) * C - 7.6, -1]])
+      for (let x = X0 + 9; x < X1 - 8; x += 14) {
+        const g = new THREE.ShapeGeometry(arrow).rotateX(-PI / 2);
+        G.add('lineW', g.rotateY(dir > 0 ? 0 : PI).translate(x, 0.005, z));
+      }
   }
 }
