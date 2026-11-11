@@ -275,9 +275,12 @@ export function createMallMap(seed = 17) {
   const CMID = Math.floor((X.center[0] + X.center[1]) / 2); // 57
   const EMID = Math.floor((X.east[0] + X.east[1]) / 2); // 86
   for (const sg of SEGS) both(RK.MAIL, sg.x0, MAIL.z0, sg.x1, MAIL.z1);
-  both(RK.COURT, COURTS.west.x0, COURTS.west.z0, COURTS.west.x1, COURTS.west.z1, { name: 'West Court', court: 'west' });
-  both(RK.COURT, COURTS.center.x0, COURTS.center.z0, COURTS.center.x1, COURTS.center.z1, { up: { name: 'Center Court', court: 'center', ceil: [11.5, 'dome'] }, down: { name: 'Center Court', court: 'center' } });
-  room(0, RK.PLAZA, COURTS.east.x0, COURTS.east.z0, COURTS.east.x1, COURTS.east.z1, { name: 'East Court', court: 'east' });
+  // Le plafond des cours du haut (vault) : plat à base mètres autour, percé au-dessus du vide (son contour agrandi de
+  // open mètres) d'un tambour qui monte à top ; la cour centrale a deux tambours, un anneau à ring et une verrière
+  // (inner : le rayon du second) ; la place est, basse et noire, s'ouvre sur une lanterne ovale lumineuse (glow)
+  both(RK.COURT, COURTS.west.x0, COURTS.west.z0, COURTS.west.x1, COURTS.west.z1, { up: { name: 'West Court', court: 'west', ceil: [10, 'vault'], vault: { base: 6.4, open: 1.2, top: 10 } }, down: { name: 'West Court', court: 'west' } });
+  both(RK.COURT, COURTS.center.x0, COURTS.center.z0, COURTS.center.x1, COURTS.center.z1, { up: { name: 'Center Court', court: 'center', ceil: [11.5, 'dome'], vault: { base: 7.0, open: 1.6, ring: 10.0, inner: 8.0, top: 11.5 } }, down: { name: 'Center Court', court: 'center' } });
+  room(0, RK.PLAZA, COURTS.east.x0, COURTS.east.z0, COURTS.east.x1, COURTS.east.z1, { name: 'East Court', court: 'east', vault: { base: 2.9, open: 2.6, top: 5.8, glow: true } });
   room(1, RK.COURT, COURTS.east.x0, COURTS.east.z0, COURTS.east.x1, COURTS.east.z1, { name: 'East Court', court: 'east' });
 
   // --- 2. Les couloirs de service, derrière les boutiques (les deux étages) ---
@@ -482,7 +485,7 @@ export function createMallMap(seed = 17) {
     if (f.grid[k] !== T.FLOOR) return null;
     const x = o.x ?? (gx + 0.5) * C;
     const z = o.z ?? (gz + 0.5) * C;
-    if (fi === 0 && up.voids.some((v) => polyDist(v.pts, x, z) < 1.6)) return null;
+    if (fi === 0 && up.voids.some((v) => polyDist(v.pts, x, z) < 1.0)) return null; // (les files du mail longent le vide, 80 cm devant le garde-corps)
     if (stairs.some((st) => st.cells.some((c) => Math.abs(c.gx - gx) <= 1 && Math.abs(c.gz - gz) <= 1))) return null;
     if (f.doors.some((d) => Math.abs(d.x - gx) + Math.abs(d.z - gz) <= 1)) return null;
     if (escalators.some((e) => e.fi === fi && Math.abs(z - e.z) < 2.4 && (x - e.x) * e.dir > -1.5 && (x - e.x) * e.dir < e.len + 1.5)) return null;
@@ -586,10 +589,11 @@ export function createMallMap(seed = 17) {
       const Z0 = r.z0 * C;
       const X1 = (r.x1 + 1) * C;
       const Z1 = (r.z1 + 1) * C;
-      const grid = (step, kind, o = {}) => {
+      // (m : la marge laissée autour des vides, plus large sous l'ouverture d'une voûte)
+      const grid = (step, kind, o = {}, m = 0.8) => {
         for (let z = Z0 + step / 2; z < Z1; z += step)
           for (let x = X0 + step / 2; x < X1; x += step) {
-            if (fi === 0 && inVoid(x, z, 0.8)) continue;
+            if (fi === 0 && inVoid(x, z, m)) continue;
             light(fi, x, z, kind, { room: r.id, ...o });
           }
       };
@@ -601,15 +605,21 @@ export function createMallMap(seed = 17) {
       } else if (r.kind === RK.COURT) {
         if (fi === 0) {
           // la coupole ou les caissons au-dessus du vide : une grande suspension, et la corniche tout autour
+          // la corniche lumineuse court tout autour du tambour, cachée dans sa lèvre (douze tronçons)
           const cx = r.court === 'west' ? WCX : CCX;
+          const v = r.vault;
           light(0, cx, MZ, 'pendant', { room: r.id, y: r.ceilH - 2.2, big: true, state: 'on' });
           for (let i = 0; i < 12; i++) {
-            const a = (i / 12) * Math.PI * 2;
-            const rr = r.court === 'west' ? 13.5 : 16.5;
-            light(0, cx + Math.cos(a) * rr, MZ + Math.sin(a) * rr, 'cove', { room: r.id, y: 5.4 });
+            const a = ((i + 0.5) / 12) * Math.PI * 2;
+            const rr = (r.court === 'west' ? rW : rC) + v.open + 0.5;
+            light(0, cx + Math.cos(a) * rr, MZ + Math.sin(a) * rr, 'cove', { room: r.id, y: v.base - 0.12, rot: Math.PI / 2 - a, ring: true });
           }
         } else grid(5, 'spot', { y: r.ceilH });
-      } else if (r.kind === RK.PLAZA) grid(5, 'spot', { y: r.ceilH, pOff: 0.35 });
+      } else if (r.kind === RK.PLAZA) {
+        // la lanterne ovale : un plafond lumineux au-dessus du vide, le seul endroit vraiment clair de l'étage
+        light(0, ECX, MZ, 'glow', { room: r.id, y: r.vault.top, state: 'on', big: true });
+        grid(5, 'spot', { y: r.ceilH, pOff: 0.35 }, r.vault.open + 0.5);
+      }
       else if (r.kind === RK.SHOP) grid(5, 'panel', { y: r.ceilH, pOff: r.state === 'open' ? 0.55 : 0.85 });
       else if (r.kind === RK.SERVICE) grid(C * 3, 'tube', { y: r.ceilH, pOff: 0.4 });
       else if (r.kind === RK.FOOD) grid(7.5, 'pendant', { y: 4.6, pOff: 0.3 });
