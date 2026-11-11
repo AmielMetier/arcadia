@@ -94,6 +94,12 @@ export const FUSES = 3;
 export { VALVES, PIPES_LEVEL };
 export const HOTEL_LEVEL = 4; // Level 5, le Terror Hotel (par le toboggan rouge des Poolrooms)
 export const LAST_LEVEL = PIPES_LEVEL; // 0 : Level 0, 1 : Level 1 (entrepôt), 2 : Level 37 (Poolrooms), 3 : Level 2 (Tuyauteries, toboggan jaune), 4 : Level 5 (Terror Hotel, toboggan rouge)
+// ⭐ Le niveau de départ d'un VIP (réglage « start » du salon, hub/games.js, ou ?level1, ?level37, ?level2, ?level5 seul) :
+// le nom du level → son numéro dans le moteur. Il ne compte que pour un VIP (vip : compte VIP du Hub, ou hors du Hub) qui
+// a le coffre VIP ouvert (vault : le même test d'accès que le mode VIP) ; sinon, et pour un nom inconnu, le Level 0
+export const START_LEVELS = { 0: 0, 1: 1, 37: 2, 2: PIPES_LEVEL, 5: HOTEL_LEVEL };
+export const startLevel = (name, { vip = false, vault = false } = {}) =>
+  vip === true && vault === true && (typeof name === 'number' || typeof name === 'string') && Object.hasOwn(START_LEVELS, String(name)) ? START_LEVELS[String(name)] : 0;
 export const VALVE_T = 6.5; // secondes devant une vanne pour la fermer (elle revient doucement si on la lâche) : on s'expose
 export const VALVE_R = 1.5; // portée : il faut se tenir devant
 export const BREAKER_T = 4.5; // secondes devant un disjoncteur pour le réarmer

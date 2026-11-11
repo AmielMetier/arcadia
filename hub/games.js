@@ -322,6 +322,9 @@ window.HUB_GAMES = [
     settings: [
       { key: 'difficulty', label: 'Difficulté de l\'entité', options: [['normal', 'Normale'], ['hard', 'Rapide & Agressive'], ['peaceful', 'Exploration (Sans monstre)']], def: 'normal' },
       { key: 'monsters', label: 'Monstres', options: [['normal', 'Normal'], ['vip', '⭐ VIP mode', { vip: true }]], def: 'normal' },
+      // VIP seulement (caché aux autres par hub/vip.js) : toute l'équipe part du level choisi par l'hôte
+      // (START_LEVELS dans backrooms/engine/sim.js : chaque level du moteur doit y être)
+      { key: 'start', label: '⭐ Niveau de départ', vip: true, options: [[0, 'Level 0'], [1, 'Level 1'], [37, 'Level 37 · Poolrooms'], [2, 'Level 2 · Tuyauteries'], [5, 'Level 5 · Terror Hotel']], def: 0 },
       { key: 'map', label: 'Carte', options: [['random', 'Au hasard'], ['daily', '🗓️ Carte du jour (la même pour tous)']], def: 'random' },
     ],
     cover: 'backrooms/img/affiche.jpg?v=3', // affiche 960 × 540 : le Level 0 du jeu, grand titre et bandeau caméscope
