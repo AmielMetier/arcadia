@@ -1477,6 +1477,8 @@ export class WorldView {
         const mat = screenSprite(new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide }));
         this.tinted.push(mat); mat.color.copy(this.tint);
         const me = new THREE.Mesh(geo, mat); me.position.set(ax, hb, az); g.add(me); g.userData.b = b;
+        // le dessin dépasse l'emprise vers le nord : il s'estompe quand on passe derrière lui (toute sa hauteur, toute sa largeur)
+        g.userData.ecran = { zN: b.d - im.height / 32, x0: ax - W / 2 - b.x, x1: ax + W / 2 - b.x };
         this.root.add(g); this.buildingMeshes.push(g); return;
       }
     }

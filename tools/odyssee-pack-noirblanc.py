@@ -108,6 +108,18 @@ for f in range(4):
         T[f'water_m{m}_f{f}'] = t
     T[f'water{f}'] = fr.crop((32, 64, 64, 96))
     T[f'deep{f}'] = MERP.crop((f * 192 + 32, 64, f * 192 + 64, 96))
+# rebord à sauter (vers le sud) et intérieurs : sol du Centre Pokémon et de la Boutique, comptoirs aux couleurs du kit
+T['ledge'] = over(G0, BW.crop((112, 960, 144, 992)))
+CENTRE, BOUTIQUE = L('centre_interieur.png'), L('boutique_interieur.png')
+T['floor_pink'] = cell(1, 10, CENTRE); T['floor_blue'] = cell(0, 5, BOUTIQUE)
+
+
+def uni(haut, milieu, bas, h=4, b=6):
+    t = Image.new('RGBA', (32, 32), milieu); t.paste(haut, (0, 0, 32, h)); t.paste(bas, (0, 32 - b, 32, 32)); return t
+
+
+T['x_counter'] = uni((240, 248, 250, 255), (206, 224, 230, 255), (150, 176, 186, 255))
+T['x_counterfront'] = uni((120, 178, 190, 255), (62, 128, 146, 255), (36, 84, 100, 255))
 noms = sorted(T)
 COLS = 32
 planche = Image.new('RGBA', (COLS * 16, ((len(noms) + COLS - 1) // COLS) * 16))
@@ -150,6 +162,10 @@ D = {
     'bush': net(trim(BW.crop((0, 632, 32, 672)))), 'lamp': net(trim(BW.crop((224, 608, 256, 736)))),
     'rock': trim(L('objet_rocher.png').crop((0, 0, 32, 32))), 'cuttree': trim(L('objet_arbuste.png').crop((0, 0, 32, 32))),
 }
+# mobilier du Centre Pokémon et panneau de bois des routes
+D['plant'] = net(trim(CENTRE.crop((192, 1096, 224, 1170)))); D['pc'] = net(trim(CENTRE.crop((192, 1010, 224, 1090))))
+D['healer'] = net(trim(CENTRE.crop((130, 1012, 192, 1090)))); D['bench'] = net(trim(CENTRE.crop((64, 960, 160, 992))))
+D['sign'] = net(trim(BW.crop((176, 98 * 32, 256, 100 * 32))))
 # devant les jambes de qui marche dans les hautes herbes : le bas de la touffe
 bas = lambda t: t.crop((0, 16, 32, 32))
 D['grassfront'], D['grassfront2'] = bas(touffe), bas(flip(touffe))

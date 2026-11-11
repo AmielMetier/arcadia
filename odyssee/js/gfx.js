@@ -32,6 +32,8 @@ export const PACKS = {
     dossier: 'gfx/noirblanc',
     planche: { fichier: 'sol', tuiles: NB_TUILES, cols: NB_COLS },   // tuiles de sol de 16 px sur une seule image
     decor: NB_DECOR,          // d_<nom>.png, 32 px par case : dessiné pixel pour pixel
+    // murs des intérieurs aux couleurs de Noir & Blanc (render/murs-tex.js) : le Centre Pokémon crème et orange
+    murs: { center: { fond: '#f6eab4', motif: '#eedd98', bande: '#f09a52', bandeS: '#c8692c', lam: '#f2d68a', lamC: '#faeab0', lamS: '#d2a85c', cim: '#fffdf2', pl: '#a8602c', cap: '#b06830', capC: '#f0b070' } },
     chars: 'chars',           // planche des personnages de Noir & Blanc 2 (même disposition que celle du jeu)
     // bâtiments entiers (b_<nom>.png) par style du jeu : le jeu prend celui dont la largeur colle à l'emprise
     batiments: Object.fromEntries(Object.entries({

@@ -36,6 +36,9 @@ const STYLES = {
   cendre: { fond: '#5a4a44', motif: '#4a3c36', motifK: 'pierres', lam: '#3e322c', lamC: '#5a4a42', lamS: '#2a201c', cim: '#8a6a50', pl: '#1e1612', cap: '#2e2420', capC: '#6a5444' },
 };
 /** style des murs d'une carte d'intérieur (null : on garde l'ancien rendu) */
+/** pack de graphismes : d'autres couleurs pour les murs d'un style (avant de fabriquer les textures) */
+export function paletteMurs(nom, p) { if (STYLES[nom]) Object.assign(STYLES[nom], p); }
+
 export function styleMur(m) {
   const w = m.wallStyle || 'wall_in';
   if (w === 'wall_in') { let h = 0; for (const ch of String(m.id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return 'in' + (h % 4); }

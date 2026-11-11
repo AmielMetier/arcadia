@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { WorldView } from './render/world3d.js';
 import { setArt } from './render/textures.js';
 import { packActif, solChoix } from './gfx.js';
+import { paletteMurs } from './render/murs-tex.js';
 try { document.documentElement.classList.add('gfx-' + solChoix()); } catch (e) { /* hors navigateur */ }
 import { buildWorld } from './world/region.js';
 import { Input } from './input.js';
@@ -121,6 +122,7 @@ async function boot() {
   const art = await loadArt();
   prechauffe.length = 0;
   etape('images');
+  for (const [nom, pal] of Object.entries(packActif()?.murs || {})) paletteMurs(nom, pal);
   setArt({ kits: art.kits, sols: art.sols, sol32: art.sol32, hgss: art.hgss, relief: art.relief, pack: art.pack });
   const view = new WorldView(renderer, art.chars, { sprites: art.sprites, dens: art.dens, suiveurs: art.suiveurs, batiments: art.batiments, packDecor: !!packActif()?.decor });
   etape('vue');

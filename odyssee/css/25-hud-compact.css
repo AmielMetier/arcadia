@@ -11,7 +11,8 @@
 .hud-btn img { width: calc(var(--px) * 11.5); height: calc(var(--px) * 11.5); }
 .hud-btn span, .hud-btn b { overflow: hidden; text-overflow: clip; max-width: 100%; }
 .hud-party { top: calc(var(--px) * 6); gap: calc(var(--px) * 1.2); zoom: .86; }
-.hud-dexnav { width: auto; max-width: none; }
+.hud:not(.collapsed) .hud-dexnav { width: auto; max-width: none; }
+.hud.collapsed .hud-dexnav-row { display: none; }
 .hud-dexnav-row { max-height: calc(var(--px) * 22); }
 @media (max-aspect-ratio: 8/5) {
   .hud-gear { zoom: .84; }

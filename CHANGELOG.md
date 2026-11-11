@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 5.56 — 11 novembre 2026
+- **Odyssée** — Graphismes « Noir & Blanc » : les intérieurs s'y mettent.
+  - Le Centre Pokémon prend son sol crème, ses murs orangés, son comptoir bleu-vert, ses canapés, ses plantes et ses machines de Noir & Blanc ; la Boutique son carrelage bleu.
+  - Dehors : panneaux de bois des routes, rebords à sauter et bancs de Noir & Blanc.
+  - Un bâtiment s'estompe quand tu passes derrière lui : tu ne perds plus ton personnage de vue.
+- **Odyssée** — HUD replié (touche U) : la fiche du lieu redevient toute petite, la grille Habitat ne s'étale plus sur l'écran.
+
 ## 5.55 — 11 novembre 2026
 - **Odyssée** — Les graphismes « Noir & Blanc » sont refaits de fond en comble pour ressembler à Pokémon Noir 2 & Blanc 2.
   - Le sol : l'herbe turquoise du jeu, les chemins de sable et les routes pavées avec leurs vrais bords, la mer bordée de rochers, les hautes herbes sombres.
