@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 5.59 — 11 novembre 2026
+- **The Backrooms** — Level 5, le digicode de la porte de secours :
+  - il faut être devant le clavier pour que le code compte ;
+  - un code faux s'entend : l'entité vient voir ce qui se passe près de la porte. Fini de taper des codes au hasard.
+
 ## 5.58 — 11 novembre 2026
 - **The Backrooms** — Level 1 : caché dans un casier, tu n'es plus pris au piège par l'imposteur. Il attend devant en t'appelant une dizaine de secondes, puis renonce et s'éloigne (avant, il campait là sans fin, et sortir, c'était mourir).
 - **The Backrooms** — En quittant les Tuyauteries, l'écran parle bien du monte-charge de service qui remonte, et plus d'un toboggan.

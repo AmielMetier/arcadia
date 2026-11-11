@@ -2908,6 +2908,23 @@ test('Level 5 : un hôtel de 21 chambres (201 à 221), 6 lettres, des cachettes,
   assert.deepEqual(parseWords('search, Shadow\nabc\nmirrors\nÉCLAIR'), ['SEARCH', 'SHADOW', 'ECLAIR']);
 });
 
+test("Level 5 : un code faux s'entend — l'entité à portée vient au clavier, sauf pendant le répit de l'arrivée", () => {
+  const sim = hotelSim({ difficulty: 'normal' });
+  const P = sim.player;
+  const m = sim.map;
+  const M = sim.monster;
+  const bad = '0000' === m.code ? '1111' : '0000';
+  P.x = m.keypad.x;
+  P.z = m.keypad.z - 0.6;
+  Object.assign(M, { mode: 'patrol', x: m.keypad.x, z: m.keypad.z - 12, floor: 0 });
+  assert.ok(M.dormantT > 0, "le répit de l'arrivée");
+  sim.enterCode(P, bad);
+  assert.ok(sim.drainEvents().some((e) => e.type === 'codeWrong') && M.mode === 'patrol', 'pendant le répit, elle ne vient pas');
+  M.dormantT = 0;
+  sim.enterCode(P, bad);
+  assert.ok(M.mode === 'search' && Math.hypot(M.lastSeenX - m.keypad.x, M.lastSeenZ - m.keypad.z) < 0.1, 'ensuite, elle vient voir au clavier');
+});
+
 test('Level 5 : lettres ramassées, postées dans les boîtes, code au plafond, porte de secours', () => {
   const sim = hotelSim();
   const P = sim.player;
@@ -2935,7 +2952,10 @@ test('Level 5 : lettres ramassées, postées dans les boîtes, code au plafond, 
   assert.equal(sim.codeShown, true);
   assert.equal(P.letters.length, 0);
   assert.ok(sim.drainEvents().some((e) => e.type === 'codeShown'));
-  // le bon code ouvre la porte ; on la passe : partie gagnée
+  // le bon code, tapé loin du clavier : rien ; devant lui, il ouvre la porte ; on la passe : partie gagnée
+  sim.step({ code: m.code });
+  assert.equal(sim.open, false, 'loin du clavier, le code ne compte pas');
+  goTo(sim, P, m.keypad.x, m.keypad.z - 0.6);
   sim.step({ code: m.code });
   assert.equal(sim.open, true);
   const E = m.elevator;

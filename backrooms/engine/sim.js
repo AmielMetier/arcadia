@@ -146,6 +146,7 @@ export const BROWN_LEN = [18, 26];
 export const SECTOR_STEP = 9; // secondes par tiers, pendant un délestage (trois tiers)
 export const L1_CALM = 50; // Level 1 : l'arrivée est calme, elle reste au loin (le temps de découvrir l'entrepôt)
 export const CALM_KEEP = 30; // m : pendant ce calme, l'imposteur se tient au moins à cette distance des joueurs
+export const WRONG_CODE_R = 30; // m : Level 5, un code faux au clavier s'entend jusque-là (l'entité vient voir)
 export const ARRIVAL_CALM = 30; // Level 5 : à l'arrivée, l'entité reste au loin ce temps-là (un seul contact y est mortel)
 // Level 1 : les disjoncteurs généraux, à tenir relevés en même temps (2 postes à 1 ou 2 joueurs, 3 à partir de 3).
 // Chacun, relevé, tient RELAY_SYNC secondes ; s'il n'y a pas assez de joueurs en vie pour les tenir tous, il tient le
@@ -2834,11 +2835,19 @@ export class BackroomsSim {
   enterCode(P, code) {
     const map = this.fm(P.floor);
     if (this.level !== HOTEL_LEVEL || this.open || !map.code) return;
+    // il faut être devant le clavier (un peu de marge : l'hôte voit un invité avec un temps de retard)
+    const kp = map.keypad;
+    if (Math.hypot(P.x - kp.x, P.z - kp.z) > KEYPAD_R + 1) return;
     if (String(code) === map.code) {
       this.powered = true;
       this.emit({ type: 'powered', by: P.id });
       this.emit({ type: 'exitUnlocked' });
-    } else this.emit({ type: 'codeWrong', id: P.id });
+    } else {
+      // un code faux : le clavier proteste, et ça s'entend (pas pendant le répit de l'arrivée)
+      this.emit({ type: 'codeWrong', id: P.id });
+      this.makeNoise(P, NOISE.use, 1);
+      if (!(this.monster && this.monster.dormantT > 0)) this.alertMonster(kp.x, kp.z, WRONG_CODE_R, P.floor);
+    }
   }
 
   // Level 0 : la cassette perchée ne se prend qu'avec l'échelle. Tant que personne ne l'a en main ni ne l'a posée sous
