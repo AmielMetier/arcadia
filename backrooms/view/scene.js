@@ -3528,7 +3528,10 @@ float bkCaust(vec2 uv, float t) {
     const gear = L1 && map.docks ? buildGear({ map, group, baked, wallMat, CEIL }) : null;
     // 9b. Level 2 : tuyauteries, lampes grillagées, grilles, chaudières, vannes et vapeur
     const pipesView = PIPES ? buildPipes({ map, group, baked, CEIL, tx: tx2, camera }) : null;
-    if (pipesView) pipesView.setFog(scene.fog);
+    if (pipesView) {
+      pipesView.setFog(scene.fog);
+      pipesView.onDrip = (pos) => api.onDrip && api.onDrip(pos); // les gouttes de condensation des Tuyauteries
+    }
 
     // 10. Fusibles (Level 1) : un gros fusible céramique aux bouts de cuivre, lueur ambrée
     const fuseMeshes = [];

@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.49 — 11 novembre 2026
+- **The Backrooms** — Les galeries des Tuyauteries, plus vraies :
+  - les gros tuyaux portent leurs bandes de marquage, avec le nom du fluide et la flèche du sens d'écoulement : eau chaude, vapeur, eau froide, air comprimé, gaz ;
+  - l'eau froide perle sur le cuivre et l'acier : des gouttes tombent des tuyaux et font des ronds dans leur flaque, et on les entend tomber ;
+  - de loin en loin, un robinet d'incendie armé : un coffret rouge vitré, le dévidoir et son tuyau enroulé, la plaque « FIRE HOSE REEL » et sa conduite rouge.
+
 ## 5.48 — 11 novembre 2026
 - **The Backrooms** — La lumière des Tuyauteries :
   - les grandes halles à piliers ne sont plus plongées dans le noir : une suspension en tôle émaillée verte pend au milieu de chaque travée, et son ampoule se reflète dans le béton ciré ; une sur trois est morte ou grésille ;
