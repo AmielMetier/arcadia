@@ -14,7 +14,8 @@
 <body>
 <!-- Petit Hub de poche pour tester The Backrooms à deux (ou trois) dans une même page, sans relais :
      il donne à chaque jeu son identité (hôte / invité) et fait passer leurs messages comme le ferait le salon.
-     Adresse : tools/backrooms-duo.html?n=2 (nombre de joueurs) ; &q=… est ajouté à l'adresse de chaque jeu (ex. &q=debug) ; &vs=4.62,4.63 donne à chacun sa version.
+     Adresse : tools/backrooms-duo.html?n=2 (nombre de joueurs) ; &q=… est ajouté à l'adresse de chaque jeu (ex. &q=debug) ; &vs=4.62,4.63 donne à chacun sa version ;
+     &monsters=vip lance le mode VIP (l'hôte prend la clé gardée par le navigateur ou celle du relais pour son compte VIP, les invités reçoivent sa clé).
      window.duo.dropHost() fait partir l'hôte : le joueur suivant devient hôte, comme dans le vrai salon. -->
 <header><b>The Backrooms · banc d'essai</b><button id="drop">Faire partir l'hôte</button><span id="log"></span></header>
 <main id="grid"></main>
@@ -26,7 +27,7 @@ const NAMES = ['Amiel', 'Bastien', 'Chloé', 'Dalia'], COLORS = ['#e0a040', '#6a
 let hostId = 1;
 const players = () => slots.filter((s) => s.alive).map((s) => ({ id: s.id, name: s.name, color: s.color }));
 const slots = Array.from({ length: N }, (_, i) => ({ id: i + 1, name: NAMES[i], color: COLORS[i], alive: true, frame: null, ready: false }));
-const info = (s) => ({ myId: s.id, role: s.id === hostId ? 'host' : 'guest', hostId, players: players(), settings: { difficulty: 'normal' }, game: 'backrooms', code: 'TEST', ready: Object.fromEntries(slots.filter((o) => o.ready).map((o) => [o.id, 'backrooms'])) });
+const info = (s) => ({ myId: s.id, role: s.id === hostId ? 'host' : 'guest', hostId, players: players(), settings: { difficulty: 'normal', monsters: QS.get('monsters') || 'normal' }, game: 'backrooms', code: 'TEST', ready: Object.fromEntries(slots.filter((o) => o.ready).map((o) => [o.id, 'backrooms'])) });
 const stats = { msgs: 0, bytes: 0 };
 for (const s of slots) {
   const box = document.createElement('div');

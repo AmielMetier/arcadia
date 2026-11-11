@@ -46,3 +46,22 @@ Vérification : `https://duo-drift-relay.onrender.com/account/status` doit répo
   et une clé de chiffrement AES-GCM qui reste dans le navigateur. Le fichier ne contient que du chiffré : ni pseudo, ni amis, ni clé ami lisibles.
 - 8 mauvais mots de passe en 10 minutes pour un même identifiant et une même adresse : on attend.
 - Mot de passe oublié = compte perdu (personne ne peut déchiffrer). Test : `node tools/test-accounts.mjs`.
+
+## Clé du coffre VIP des Backrooms
+
+Les médias du mode VIP des Backrooms sont chiffrés dans le dépôt (`backrooms/data/`, voir `backrooms/data/LICENSE.txt`).
+Le relais garde leur clé et la donne aux seuls VIP d'origine connectés (`POST /account/vipkey { user, auth }`, liste `ACCOUNTS`
+de `hub/vip.js`) : ils n'ont rien à taper. Les VIP ajoutés depuis (`tools/vip-add.mjs`) tapent la phrase une fois. **Rien à régler sur Render** : le relais range la clé dans la branche `saves`
+(`vip/backrooms.json`), enveloppée en AES-GCM par une clé tirée de son `GITHUB_TOKEN` (le fichier seul ne dit rien).
+
+- **La première fois**, Amiel tape la phrase dans le jeu : tant que le relais n'a pas la clé, une partie VIP la demande à
+  l'hôte. La bonne phrase ouvre le coffre et son navigateur apprend la clé au relais ; ensuite, plus aucun VIP n'a rien
+  à taper. (Autre façon : `BACKROOMS_VIP='la phrase' node tools/backrooms-vault.mjs semer`, la clé ne s'affiche pas.)
+- Le relais ne l'accepte (`POST /account/vipseed { key }`) que si elle ouvre le témoin du coffre (`backrooms/data/e0.bin`) ;
+  une clé au hasard est refusée, et les ratés sont limités comme les mots de passe.
+- **Si le jeton GitHub change**, l'ancienne enveloppe ne s'ouvre plus : le navigateur d'un hôte VIP qui a déjà la clé
+  la réapprend tout seul au relais à sa prochaine partie VIP (sinon, la phrase est redemandée une fois).
+- Vérifie : `https://duo-drift-relay.onrender.com/account/status` doit répondre `{"ok":true,"on":true,"vipkey":true}`.
+- `BACKROOMS_VIP_KEY` (facultatif) donne la clé directement au relais, sans passer par la branche `saves`.
+
+Tant que le relais n'a pas la clé, le mode VIP des Backrooms retombe sur les monstres classiques.

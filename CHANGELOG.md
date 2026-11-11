@@ -1,5 +1,49 @@
 # Journal des versions — Arcadia
 
+## 5.37 — 10 novembre 2026
+- **The Backrooms** — Les Poolrooms (Level 37) rattrapent le réalisme des Level 0 et 1.
+  - Plus rien à ramasser : les trois toboggans sont ouverts dès l'arrivée, il suffit d'en trouver un dans le dédale. L'entité, elle, s'enhardit à mesure qu'on erre.
+  - Les carreaux gravés de l'histoire se lisent en entrant dans les locaux techniques.
+  - Les toboggans sont refaits : un vrai départ de toboggan en polyester brillant, avec son pavillon, ses brides boulonnées, la barre d'appui en inox, une plaque émaillée à sa couleur et un tapis antidérapant devant. Par la bouche, on voit le tube continuer derrière le mur, puis plonger et tourner dans le noir.
+  - On descend vraiment le toboggan : on s'assoit au bord, on s'y laisse glisser, et on file dans un long tube qui tourne et plonge, de plus en plus vite, en montant sur la paroi dans les virages. La descente se poursuit après l'écran de chargement, jusqu'à la lumière du bout du tube, et on tombe dans le niveau suivant, son nom affiché par-dessus.
+  - Entre deux salles où l'eau n'a pas la même profondeur, une marche carrelée au pas de la porte : plus de bande blanche ni de trou sous l'eau, et l'eau ne se dédouble plus sur le seuil.
+  - Le carrelage émaillé a du relief : les joints se creusent, nets et réguliers, chaque carreau a sa nuance, la lumière des dalles brille dessus.
+  - Le sol mouillé reflète les plafonniers, surtout près des bassins et dans les flaques.
+  - L'eau est transparente : on voit le fond carrelé, les colonnes s'y reflètent et la lampe torche y fait un reflet.
+  - Le bord des bassins suit leur courbe, sans dents de scie, avec sa margelle.
+  - Les reflets de l'eau dansent sur les murs et les plafonds au-dessus des bassins.
+  - Une brume de vapeur flotte au ras de l'eau ; la bouche des toboggans éclaire de sa couleur autour d'elle.
+  - Par endroits, des carreaux tombés ou fêlés ; une bonde au fond des bassins, des skimmers au ras de l'eau, la profondeur peinte sur les margelles (« NO DIVING » là où c'est peu profond), des bouches d'aération au plafond.
+  - Les salles sous verrière ont de vraies vitres, inégales et sales, avec leurs petits bois, des feuilles mortes, quelques vitres fêlées et des fermes en acier.
+  - Une ambiance sonore à elles : des gouttelettes qui résonnent au bord des bassins, les skimmers qui glougloutent, et au loin une balle qui rebondit, un plongeon, une porte de cabine, une rampe qu'on heurte… Plus de grésillement de néons du Level 0, ni de grattement continu, ni de bruit de vagues : l'eau est immobile.
+  - Les pas sur le carrelage mouillé claquent doucement, à plat, au lieu de faire des clics.
+
+## 5.36 — 10 novembre 2026
+- **The Backrooms** — Les nouveaux comptes VIP tapent la phrase du mode VIP une fois pour débloquer les monstres d'origine ; leur navigateur s'en souvient ensuite. Les VIP actuels n'ont toujours rien à taper.
+
+## 5.35 — 10 novembre 2026
+- **The Backrooms** — La phrase du mode VIP revient, mais ne se tape qu'une seule fois : le premier hôte VIP qui la donne débloque les monstres d'origine pour tous les comptes VIP, qui n'ont ensuite plus rien à taper.
+
+## 5.34 — 10 novembre 2026
+- **The Backrooms** — Le mode VIP ne demande plus de phrase : le compte Arcadia VIP de l'hôte suffit pour débloquer les monstres d'origine, et ses invités les voient avec lui.
+  - Si l'hôte n'est pas connecté à son compte VIP, la partie se joue avec les monstres, la voix et l'intro classiques.
+- **Hub** — Le grade VIP est vérifié en ligne à chaque visite : impossible de se faire passer pour un compte VIP sans son mot de passe.
+
+## 5.33 — 10 novembre 2026
+- **The Backrooms** — À la manette, le talkie se prend en maintenant RT, comme R au clavier.
+
+## 5.32 — 10 novembre 2026
+- **The Backrooms** — À la manette, le jeu affiche les boutons de la manette au lieu des touches du clavier : les indications à l'écran (« PRESS A », « HOLD LB »…), la barre de commandes en bas et l'écran de pause. Toucher le clavier ou la souris remet les touches du clavier.
+
+## 5.31 — 10 novembre 2026
+- **The Backrooms** — Le mode VIP se déverrouille avec une phrase secrète :
+  - L'hôte la tape une fois en lançant une partie VIP ; son navigateur s'en souvient et ses invités n'ont rien à taper.
+  - Sans la phrase (ou avec « Play classic »), la partie se joue avec les monstres, la voix et l'intro classiques.
+  - La voix qui appelle au Level 1 et la photo du bouc sont désormais réservées au mode VIP.
+
+## 5.30 — 10 novembre 2026
+- **The Backrooms** — Nouvelle vidéo d'intro en mode VIP, avec le son.
+
 ## 5.29 — 10 novembre 2026
 - **The Backrooms** — au Level 1, l'entrepôt devient un vrai niveau :
   - On arrive au calme : l'entité reste au loin un moment, et la première coupure de courant attend deux minutes.

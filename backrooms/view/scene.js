@@ -39,9 +39,9 @@ THREE.ShaderChunk.lights_pars_begin = THREE.ShaderChunk.lights_pars_begin.replac
 );
 const MODELS = new URL('../models/', import.meta.url).href; // modèles Poly Haven (CC0), voir models/LICENSE.txt
 import { vault } from './vault.js';
-const VIP = { get img() { return vault.entite || ''; } }; // photo brouillée dans data/ (vault.js)
+const VIP = { get img() { return vault.entite || ''; } }; // photo chiffrée dans data/ (vault.js)
 // L'entité du Level 1 : une vidéo détourée, découpée en planche d'images (12 par seconde, 16 par rangée) jouée en boucle
-const VIP_ANIM = { get url() { return vault.david || ''; }, frames: 119, cols: 16, rows: 8, fps: 12, aspect: 246 / 400, tint: '#463e37', vip: true };
+const VIP_ANIM = { get url() { return vault.level1 || ''; }, frames: 119, cols: 16, rows: 8, fps: 12, aspect: 246 / 400, tint: '#463e37', vip: true };
 // mode normal : l'entité classique dessinée dans le code ; mode VIP : les monstres d'origine (réservés, choisis par l'hôte)
 export let ENTITY_IMG = classicEntity().img;
 export let ENTITY_ANIM = classicEntity().anim;
@@ -128,6 +128,11 @@ function showGroup(g, on) {
 // Un seul moteur de rendu (un seul contexte WebGL) pour toute la session : chaque nouvel étage le réutilise. Avant,
 // chaque étage en créait un, et le navigateur finissait par perdre les plus anciens (écran noir au 4e niveau).
 let sharedRenderer = null;
+// le moteur partagé et les réglages d'image, pour ce qui se rend hors de la scène d'un niveau (la descente en
+// toboggan, voir slide.js)
+export function sceneGl() {
+  return { renderer: getRenderer(), opts: OPTS };
+}
 function getRenderer() {
   if (!sharedRenderer) {
     sharedRenderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
@@ -207,6 +212,37 @@ export function wetField(x, z) {
 export function filmAt(x, z) {
   const t = Math.min(1, Math.max(0, (wetField(x, z) - 0.8) / 0.035));
   return t * t * (3 - 2 * t);
+}
+
+// Poolrooms : le diffuseur d'une dalle lumineuse (vu d'en dessous). Le plastique prismatique laisse deviner les trois
+// tubes : trois bandes plus vives, un cœur plus clair que les bords, une fine marge plus terne contre le cadre
+let poolPanel = null;
+function poolPanelTex() {
+  if (poolPanel) return poolPanel;
+  const S = 128;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = S;
+  const g = cv.getContext('2d');
+  const img = g.createImageData(S, S);
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const u = (x + 0.5) / S - 0.5;
+      const v = (y + 0.5) / S - 0.5;
+      const edge = Math.max(Math.abs(u), Math.abs(v));
+      let k = 0.86 + 0.14 * (1 - Math.min(1, edge / 0.5) ** 2);
+      for (const t of [-0.25, 0, 0.25]) k += 0.12 * Math.exp(-(((u - t) / 0.055) ** 2));
+      k *= edge > 0.46 ? 0.72 : 1;
+      k += ((x * 7 + y * 13) % 5) * 0.004; // le grain du prisme
+      const c = Math.round(Math.min(1, k / 1.12) * 255);
+      const i = (y * S + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = c;
+      img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  poolPanel = new THREE.CanvasTexture(cv);
+  poolPanel.colorSpace = THREE.SRGBColorSpace;
+  return poolPanel;
 }
 
 // La matière de la brume : trois bruits doux qui se répètent sans couture (cinq octaves de bruit de valeur chacun),
@@ -509,6 +545,54 @@ export function createBackroomsScene(container, floors, lamps) {
     const live = new Float32Array(BW * BH);
     const baseB = new Float32Array(BW * BH);
     const liveB = new Float32Array(BW * BH);
+    // Poolrooms : la carte de l'eau, deux fois plus fine que la lumière cuite. Rouge : la présence de l'eau, floutée
+    // sur deux mètres (les reflets de l'eau qui dansent sur les murs et les plafonds, la margelle et le sol mouillés,
+    // la vapeur au-dessus des bassins) ; vert : la même, nette ; bleu : la profondeur (2 m pour 1)
+    let poolTex = null;
+    if (L2 && map.depthAt) {
+      const PW = BW * 2;
+      const PH = BH * 2;
+      const PT = TX / 2;
+      const sharp = new Float32Array(PW * PH);
+      const deep = new Float32Array(PW * PH);
+      for (let tz = 0; tz < PH; tz++) {
+        for (let tx = 0; tx < PW; tx++) {
+          const d = map.depthAt((tx + 0.5) * PT, (tz + 0.5) * PT) || 0;
+          sharp[tz * PW + tx] = d > 0.01 ? 1 : 0;
+          deep[tz * PW + tx] = Math.min(1, d / 2);
+        }
+      }
+      // flou en boîte, trois passes (presque une gaussienne), rayon 2 texels de 31 cm
+      const blurA = new Float32Array(sharp);
+      const tmp = new Float32Array(PW * PH);
+      const R = 2;
+      for (let pass = 0; pass < 3; pass++) {
+        for (let z = 0; z < PH; z++) {
+          for (let x = 0; x < PW; x++) {
+            let a = 0;
+            for (let k = -R; k <= R; k++) a += blurA[z * PW + Math.min(PW - 1, Math.max(0, x + k))];
+            tmp[z * PW + x] = a / (2 * R + 1);
+          }
+        }
+        for (let z = 0; z < PH; z++) {
+          for (let x = 0; x < PW; x++) {
+            let a = 0;
+            for (let k = -R; k <= R; k++) a += tmp[Math.min(PH - 1, Math.max(0, z + k)) * PW + x];
+            blurA[z * PW + x] = a / (2 * R + 1);
+          }
+        }
+      }
+      const pd = new Uint8Array(PW * PH * 4);
+      for (let i = 0; i < PW * PH; i++) {
+        pd[i * 4] = Math.round(Math.min(1, blurA[i] * 1.6) * 255);
+        pd[i * 4 + 1] = sharp[i] * 255;
+        pd[i * 4 + 2] = Math.round(deep[i] * 255);
+        pd[i * 4 + 3] = 255;
+      }
+      poolTex = new THREE.DataTexture(pd, PW, PH, THREE.RGBAFormat);
+      poolTex.magFilter = poolTex.minFilter = THREE.LinearFilter;
+      poolTex.needsUpdate = true;
+    }
     const bakeData = new Uint8Array(BW * BH * 4);
     const bakeTex = new THREE.DataTexture(bakeData, BW, BH, THREE.RGBAFormat);
     bakeTex.magFilter = THREE.LinearFilter;
@@ -536,7 +620,8 @@ export function createBackroomsScene(container, floors, lamps) {
       // Level 0, étage du haut : des murs propres (presque pas d'auréoles ni d'humidité au pied) ; le bas reste défraîchi
       // Level 1 : des parpaings repeints, à peine marqués par l'humidité
       uWallDecay: { value: L0 && !LOW0 ? 0.15 : L1 ? 0.3 : 1 },
-      uGlossH: { value: L1 ? CEIL - 0.45 : 3 }, // Level 1 : la hauteur des tubes, qui se reflètent dans le béton lissé
+      uGlossH: { value: L1 ? CEIL - 0.45 : L2 ? CEIL - 0.03 : 3 }, // Level 1 : la hauteur des tubes, qui se reflètent dans le béton lissé ; Poolrooms : les dalles lumineuses
+      uPoolMap: { value: poolTex }, // Poolrooms : la carte de l'eau (voir plus haut)
     };
     // reflets des lampes (Level 2) : les plus proches que la caméra voit, choisies à chaque image
     const NLAMP = 12;
@@ -642,14 +727,18 @@ float occVis(vec3 p, vec3 lp) {
       uDynP: { value: Array.from({ length: NDYN }, () => new THREE.Vector4(0, -100, 0, 0.001)) },
       uDynC: { value: Array.from({ length: NDYN }, () => new THREE.Vector3()) },
       uDynN: { value: Array.from({ length: NDYN }, () => new THREE.Vector4()) },
+      // Poolrooms : la salle d'un feu (x0, z0, x1, z1) ; il n'éclaire pas au-delà de ses cloisons
+      uDynB: { value: Array.from({ length: NDYN }, () => new THREE.Vector4(-1e5, -1e5, 1e5, 1e5)) },
     };
     // leurs ombres : la grille des cases, parcourue case par case du point éclairé jusqu'au feu. Rouge : la part de
     // lumière arrêtée (mur, pilier : tout ; étagère chargée : la moitié) ; vert et bleu : le haut et le bas de ce qui
     // bloque (en part du plafond) ; alpha : une tôle mince au milieu de la case (le rideau d'un quai, sous son linteau ;
     // 128 : la tôle court le long de x, 255 : le long de z)
-    const occData = L1 ? new Uint8Array(W * H * 4) : null;
-    const occTex = L1 ? new THREE.DataTexture(occData, W, H, THREE.RGBAFormat) : null;
-    if (L1) {
+    // (Poolrooms : les murs seulement ; les cloisons entre les salles arrêtent la lumière par uDynB)
+    const DYN = L1 || L2;
+    const occData = DYN ? new Uint8Array(W * H * 4) : null;
+    const occTex = DYN ? new THREE.DataTexture(occData, W, H, THREE.RGBAFormat) : null;
+    if (DYN) {
       const SHELF_TOP = Math.min(CEIL - 0.5, 3.4) / CEIL;
       for (let z = 0; z < H; z++) {
         for (let x = 0; x < W; x++) {
@@ -785,6 +874,8 @@ float occVis(vec3 p, vec3 lp) {
           }
           // et au pied des cloisons fines
           if (SEGS) for (const sg of SEGS) d = Math.min(d, Math.max(0, segGap(sg, px, pz)));
+          // Poolrooms : et au pied des colonnes
+          if (L2 && map.cols) for (const c of map.cols) if (Math.abs(c.x - px) < c.r + AO_R && Math.abs(c.z - pz) < c.r + AO_R) d = Math.min(d, Math.max(0, Math.hypot(px - c.x, pz - c.z) - c.r));
           if (EDGE || CHAMF) {
             for (let dz = -1; dz <= 1; dz++) {
               for (let dx = -1; dx <= 1; dx++) {
@@ -973,9 +1064,101 @@ float occVis(vec3 p, vec3 lp) {
       reliefs.set(tex, out);
       return out;
     };
+    // Poolrooms : le relief d'un carrelage photographié. Les joints sont ce qui s'écarte le plus de la couleur des
+    // carreaux (gris sur blanc, gris sur cyan) : la part de l'image la plus éloignée de sa couleur médiane (un joint
+    // couvre environ 12 % d'un carrelage de 20 cm) est en creux, le reste est la face émaillée, à 1. Un flou léger
+    // arrondit l'arête des carreaux (leur chanfrein). Le rouge sert aussi de masque aux reflets (le joint ne brille pas)
+    const tileReliefs = new Map();
+    // tex.userData.tiles = [carreaux par répétition en largeur, en hauteur] (posé par textures.js) ; userData.tile du
+    // relief = (ces deux nombres, décalage de la grille des joints en x, en y, en carreaux), mesuré sur la photo
+    // (pour retrouver chaque carreau dans le shader : usure, nuance). Le relief a la taille de la texture
+    const tileRelief = (tex) => {
+      if (tileReliefs.has(tex)) return tileReliefs.get(tex);
+      const [nx, ny] = tex.userData.tiles || [12, 12];
+      const W = (tex.image && tex.image.width) || 1024;
+      const H = (tex.image && tex.image.height) || 1024;
+      const cv = document.createElement('canvas');
+      cv.width = W;
+      cv.height = H;
+      const out = new THREE.CanvasTexture(cv);
+      out.userData.tile = new THREE.Vector4(nx, ny, 0, 0);
+      out.colorSpace = THREE.NoColorSpace;
+      out.wrapS = tex.wrapS;
+      out.wrapT = tex.wrapT;
+      out.repeat.copy(tex.repeat);
+      out.offset.copy(tex.offset);
+      out.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      const fill = () => {
+        const img = tex.image;
+        if (!img || !img.width) return;
+        const c = cv.getContext('2d', { willReadFrequently: true });
+        c.drawImage(img, 0, 0, W, H);
+        const d = c.getImageData(0, 0, W, H);
+        const px = d.data;
+        const N = W * H;
+        const med = [0, 1, 2].map((k) => {
+          const h = new Uint32Array(256);
+          for (let i = 0; i < N; i += 7) h[px[i * 4 + k]]++;
+          let acc = 0;
+          const half = N / 14;
+          for (let v = 0; v < 256; v++) if ((acc += h[v]) >= half) return v;
+          return 128;
+        });
+        const dist = new Float32Array(N);
+        const hd = new Uint32Array(442);
+        for (let i = 0; i < N; i++) {
+          const v = Math.hypot(px[i * 4] - med[0], px[i * 4 + 1] - med[1], px[i * 4 + 2] - med[2]);
+          dist[i] = v;
+          hd[Math.min(441, Math.round(v))]++;
+        }
+        let acc = 0;
+        let cut = 40;
+        for (let v = 441; v >= 0; v--) if ((acc += hd[v]) >= N * 0.12) { cut = Math.max(18, v); break; }
+        const H0 = new Float32Array(N);
+        for (let i = 0; i < N; i++) H0[i] = 1 - Math.min(1, Math.max(0, (dist[i] - cut * 0.55) / (cut * 0.6)));
+        // le chanfrein : un flou de rayon 1 (deux passes)
+        const H1 = new Float32Array(N);
+        for (let pass = 0; pass < 2; pass++) {
+          for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) H1[y * W + x] = (H0[y * W + x] * 2 + H0[y * W + ((x + 1) % W)] + H0[y * W + ((x - 1 + W) % W)]) / 4;
+          for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) H0[y * W + x] = (H1[y * W + x] * 2 + H1[((y + 1) % H) * W + x] + H1[((y - 1 + H) % H) * W + x]) / 4;
+        }
+        for (let i = 0; i < N; i++) {
+          const v = Math.round(Math.pow(H0[i], 1.6) * 255);
+          px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = v;
+          px[i * 4 + 3] = 255;
+        }
+        // la grille des joints : les colonnes (puis les lignes) les plus creuses, de carreau en carreau
+        const phase = (len, cross, at, n) => {
+          const cell = len / n;
+          const avg = new Float32Array(len);
+          for (let a = 0; a < len; a++) for (let b = 0; b < cross; b += 2) avg[a] += H0[at(a, b)];
+          let best = 0;
+          let bestS = Infinity;
+          for (let p0 = 0; p0 < cell; p0 += 0.25) {
+            let s = 0;
+            for (let k = 0; k < Math.floor(n); k++) s += avg[Math.round(p0 + k * cell) % len];
+            if (s < bestS) [bestS, best] = [s, p0];
+          }
+          return best / cell;
+        };
+        const gx = phase(W, H, (a, b) => b * W + a, nx);
+        const gy = phase(H, W, (a, b) => a * W + b, ny);
+        // (la photo est retournée : v monte depuis le bas de l'image, v × ny = ny - lignes)
+        out.userData.tile.set(nx, ny, gx, (((ny - gy) % 1) + 1) % 1);
+        c.putImageData(d, 0, 0);
+        out.needsUpdate = true;
+      };
+      fill();
+      textures.ready.then(fill);
+      tileReliefs.set(tex, out);
+      return out;
+    };
 
     const baked = (mat, opts = null) => {
-      const spec = PIPES && opts && opts.spec > 0;
+      const spec = (PIPES || L2) && opts && opts.spec > 0;
+      // Poolrooms : carrelage émaillé (joints, reflets de la salle, reflets de l'eau) ; pool : 'floor' (le sol, qui
+      // reflète les dalles lumineuses), 'wall', 'ceil', 'bottom' (sous l'eau)
+      const pool = L2 && opts && opts.pool;
       const grime = PIPES && opts && opts.grime;
       const tile = PIPES && opts && opts.tile;
       const specU = spec ? { uSpecK: { value: opts.spec }, uGloss: { value: opts.gloss || 40 }, uSpecMask: { value: opts.mask ?? (mat.bumpMap ? 1 : 0) } } : null;
@@ -986,10 +1169,10 @@ float occVis(vec3 p, vec3 lp) {
       const bump = L1 && opts && opts.bump; // Level 1 : un relief (les joints des parpaings) que prennent aussi les feux de couleur
       const wall1 = L1 && opts && opts.wall1; // les murs du Level 1 : la poussière et la suie sous le plafond
       const push = opts && opts.push; // les murs en biais : la lumière lue un peu devant eux, dans le couloir (pas au coin des cases)
-      if (spec || PIPES || base || EDGE || SEGS || film || gloss || L1 || push) mat.customProgramCacheKey = () => 'bk' + (push ? '-push' : '') + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE || SEGS ? '-edge' : '') + (film ? '-film' : '') + (gloss ? '-gloss' : '') + (L1 ? '-dyn' : '') + (bump ? '-bump' : '') + (wall1 ? '-wall1' : '');
+      if (spec || PIPES || base || EDGE || SEGS || film || gloss || DYN || push || pool) mat.customProgramCacheKey = () => 'bk' + (pool ? '-pool-' + pool : '') + (push ? '-push' : '') + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE || SEGS ? '-edge' : '') + (film ? '-film' : '') + (gloss ? '-gloss' : '') + (DYN ? '-dyn' : '') + (bump ? '-bump' : '') + (wall1 ? '-wall1' : '');
       mat.onBeforeCompile = (sh) => {
         Object.assign(sh.uniforms, bakeUniforms);
-        if (L1) {
+        if (DYN) {
           Object.assign(sh.uniforms, dynU);
           sh.defines = { ...(sh.defines || {}), BK_DYN: 1 };
         }
@@ -1005,8 +1188,16 @@ float occVis(vec3 p, vec3 lp) {
           Object.assign(sh.uniforms, lampU, specU);
           sh.defines = { ...(sh.defines || {}), BK_SPEC: 1 };
         }
+        if (pool) {
+          Object.assign(sh.uniforms, filmU);
+          sh.uniforms.uTileG = { value: (mat.bumpMap && mat.bumpMap.userData.tile) || new THREE.Vector4() };
+          sh.defines = { ...(sh.defines || {}), BK_POOL: 1, ...(pool === 'floor' ? { BK_POOLFLOOR: 1 } : pool === 'wall' ? { BK_POOLWALL: 1 } : pool === 'ceil' ? { BK_POOLCEIL: 1 } : null) };
+        }
         if (grime) sh.defines = { ...(sh.defines || {}), BK_GRIME: 1 };
         if (bump) sh.defines = { ...(sh.defines || {}), BK_BUMP: 1 };
+        // Poolrooms : le relief des joints s'efface quand un carreau ne fait plus que quelques pixels (au loin, en
+        // rasant) ; sinon sa pente, prise d'un pixel à l'autre, crénelle les joints en pointillés qui scintillent
+        if (pool && mat.bumpMap) sh.fragmentShader = sh.fragmentShader.replace('#include <bumpmap_pars_fragment>', THREE.ShaderChunk.bumpmap_pars_fragment.replace('return vec2( dBx, dBy );', 'return vec2( dBx, dBy ) * (1.0 - smoothstep(0.55, 1.6, max(length(dSTdx * vec2(textureSize(bumpMap, 0))), length(dSTdy * vec2(textureSize(bumpMap, 0))))));'));
         if (wall1) sh.defines = { ...(sh.defines || {}), BK_WALL1: 1 };
         if (tile) {
           Object.assign(sh.uniforms, tileU);
@@ -1052,18 +1243,26 @@ uniform float uWallDecay;
 #ifdef BK_TILE
 uniform float uTileRow;
 #endif
-#if defined(BK_FILM) || defined(BK_GLOSS)
+#if defined(BK_FILM) || defined(BK_GLOSS) || defined(BK_POOL)
 uniform vec3 uFilmL[${NFILM}];
 uniform vec3 uFilmC[${NFILM}];
 uniform float uFilmR[${NFILM}];
 #endif
 uniform float uGlossH;
+#ifdef BK_POOL
+uniform sampler2D uPoolMap;
+uniform vec4 uTileG;
+#endif
 #ifdef BK_DYN
 uniform vec4 uDynP[${NDYN}];
 uniform vec3 uDynC[${NDYN}];
 uniform vec4 uDynN[${NDYN}];
+uniform vec4 uDynB[${NDYN}];
 // la part d'un feu de couleur qui arrive en p (portée, recul en 1/d², lobe), sans l'angle de la surface
 float bkDyn(int i, vec3 p, out vec3 dl) {
+  vec4 bx = uDynB[i];
+  dl = vec3(0.0, 1.0, 0.0);
+  if (p.x < bx.x || p.x > bx.z || p.z < bx.y || p.z > bx.w) return 0.0;
   vec3 dv = uDynP[i].xyz - p;
   float dd = length(dv);
   dl = dv / max(dd, 0.001);
@@ -1404,7 +1603,141 @@ float bkCaust(vec2 uv, float t) {
           // sous l'eau (Poolrooms) : teinte cyan qui fonce avec la profondeur, et les caustiques
           float sub = uPool * smoothstep(0.0, 0.06, uWaterY - by);
           diffuseColor.rgb *= mix(vec3(1.0), vec3(0.62, 0.9, 0.96) * mix(1.0, 0.6, clamp((uWaterY - by) / 1.2, 0.0, 1.0)), sub);
+          vec3 bkPoolAdd = vec3(0.0);
+          #ifdef BK_POOL
+          {
+            // le relief du carrelage : 1 sur la face émaillée, 0 au fond du joint
+            float pH = 1.0;
+            #ifdef USE_BUMPMAP
+            pH = texture2D(bumpMap, vBumpMapUv).r;
+            #endif
+            float grout = 1.0 - smoothstep(0.25, 0.75, pH);
+            // chaque carreau a sa nuance d'émail (à peine) ; le joint se creuse d'ombre et s'encrasse, surtout au pied
+            // des murs et près de l'eau
+            vec2 tq = abs(ny) > 0.5 ? vBakeP.xz / (ny > 0.5 && sub < 0.5 ? 0.3125 : 0.20833) : vec2(vBakeP.x + vBakeP.z, by) / 0.20833;
+            #ifdef USE_MAP
+            if (uTileG.x > 0.0) {
+              // le carreau, retrouvé sur la grille des joints de la photo
+              vec2 tc = vMapUv * uTileG.xy - uTileG.zw;
+              vec2 tI = floor(tc);
+              vec2 tf = fract(tc) - 0.5;
+              tq = tI;
+              // l'usure : des plaques arrachées, de forme libre (un bruit lent) ; les carreaux du cœur sont tombés
+              // entiers (par grappes, bord sur les joints), ceux du pourtour cassés en travers ; ici et là un coin
+              // écorné, un carreau fêlé. Plus au plafond, moins sous l'eau
+              float tSz = 2.5 / uTileG.x;
+              // (les écornures et les fêlures, au mètre carré : autant sur la petite mosaïque que sur les grands carreaux)
+              float tA = tSz * tSz;
+              vec2 wq = abs(ny) > 0.5 ? vBakeP.xz : vec2(vBakeP.x + vBakeP.z, by);
+              float thr = (ny < -0.5 ? 0.765 : ny > 0.5 ? 0.85 : 0.81) + sub * 0.05;
+              float th = bkHash(tI + vec2(41.3, 7.9));
+              float nT = bkFbm((wq - tf * tSz) * 1.15 + 31.0);
+              float holeT = step(thr + 0.03, nT);
+              float dP = bkFbm(wq * 1.15 + 31.0) + (bkNoise(wq * 21.0) - 0.5) * 0.03 - thr + (bkHash(tI + 6.1) - 0.5) * 0.025;
+              float pxP = max(fwidth(dP), 1e-4);
+              float holeP = clamp(dP / pxP + 0.5, 0.0, 1.0);
+              float hc = bkHash(tI + vec2(13.7, 3.1));
+              float holeC = 0.0;
+              if (hc < (ny < -0.5 ? 0.33 : ny > 0.5 ? 0.06 : 0.12) * tA) {
+                vec2 cs = sign(vec2(bkHash(tI + 1.3), bkHash(tI + 4.4)) - 0.5);
+                float cd = dot(tf * cs, vec2(0.7071)) - 0.5 - (bkNoise(tf * 8.0 + tI * 3.1) - 0.5) * 0.14;
+                holeC = clamp(cd / max(fwidth(cd), 1e-4) + 0.5, 0.0, 1.0);
+              }
+              float m = max(max(holeT, holeP), holeC);
+              if (m > 0.001) {
+                // le ciment gris, rugueux et mat ; une ombre le long de la cassure (l'épaisseur du carreau)
+                float eT = 0.5 - max(abs(tf.x), abs(tf.y));
+                float rim = max(holeP * (1.0 - smoothstep(0.0, 0.012, dP)), holeT * (1.0 - holeP) * (1.0 - smoothstep(0.0, 0.08, eT)));
+                vec3 cem = vec3(0.75, 0.76, 0.73) * (0.82 + 0.3 * bkFbm(wq * 13.0 + 5.0)) * (1.0 - 0.35 * rim);
+                diffuseColor.rgb = mix(diffuseColor.rgb, cem, m);
+                shape *= 1.0 - m * 0.16;
+                bkGloss *= 1.0 - m;
+              } else if (th < (ny > 0.5 ? 0.1 : 0.22) * tA) {
+                float a = bkHash(tI + 5.3) * 6.2832;
+                vec2 cd = vec2(cos(a), sin(a));
+                float l = dot(tf, cd) - (bkHash(tI + 8.1) - 0.5) * 0.5 + 0.025 * sin(dot(tf, vec2(-cd.y, cd.x)) * 21.0 + th * 900.0);
+                float px = max(fwidth(l), 1e-4);
+                // (un trait de 1,2 % du carreau ; vu de loin, plus pâle au lieu de plus large)
+                float cr = clamp((0.006 + px * 0.5 - abs(l)) / px, 0.0, 1.0) * min(1.0, 0.012 / px);
+                diffuseColor.rgb *= 1.0 - cr * 0.6;
+                bkGloss *= 1.0 - cr * 0.8;
+              }
+            }
+            #endif
+            diffuseColor.rgb *= 0.965 + 0.06 * bkHash(floor(tq) + 17.0);
+            float pNear = texture2D(uPoolMap, (vBakeP.xz + vBakeN.xz * 0.5) * uBakeScale).r;
+            float low = abs(ny) < 0.5 ? 1.0 - smoothstep(0.0, 1.2, by) : (ny > 0.5 ? 1.0 : 0.0);
+            diffuseColor.rgb *= mix(vec3(1.0), vec3(0.8, 0.81, 0.78), grout * (0.35 + 0.5 * max(low, pNear)));
+            shape *= mix(1.0, 0.9, grout);
+            bkGloss *= 1.0 - grout * 0.9;
+            #ifdef BK_POOLFLOOR
+            if (ny > 0.5 && sub < 0.5) {
+              // le sol : de grands carreaux émaillés, mouillés près des bassins et par flaques. Les dalles lumineuses
+              // et le plafond éclairé s'y reflètent, flous et étirés vers soi (d'autant plus qu'on regarde loin), nets
+              // dans l'eau qui le couvre ; Fresnel : presque rien vu d'en haut, un miroir en rasant
+              vec2 gq = vBakeP.xz;
+              float wetD = clamp(pNear * 1.3 + smoothstep(0.58, 0.74, bkFbm(gq * 0.21 + 7.0)) * 0.9, 0.0, 1.0);
+              diffuseColor.rgb *= mix(1.0, 0.9, wetD);
+              vec3 gE = cameraPosition - vBakeP;
+              float gLen = length(gE);
+              float gEy = max(gE.y, 0.03);
+              float gSin = clamp(gEy / gLen, 0.04, 1.0);
+              float gFr = 0.04 + 0.96 * pow(1.0 - gSin, 5.0);
+              vec2 gDir = normalize(gE.xz + vec2(1e-4));
+              vec2 gPerp = vec2(-gDir.y, gDir.x);
+              float gH = max(uGlossH - by, 0.5);
+              // chaque carreau est posé un peu de travers : son reflet saute d'un carreau à l'autre (l'eau le lisse)
+              vec2 tId = floor(gq / 0.3125);
+              vec2 tilt = (vec2(bkHash(tId + 3.7), bkHash(tId + 9.1)) - 0.5) * 0.01 * (1.0 - wetD * 0.8);
+              float gA = mix(0.02, 0.006, wetD);
+              vec2 gHit = gq - gE.xz * (gH / gEy) + gDir * dot(tilt, gDir) * 2.0 * gH / (gSin * gSin) + gPerp * dot(tilt, gPerp) * 2.0 * gH;
+              vec2 gs = vec2(2.0 * gA * gH / (gSin * gSin), 2.0 * gA * gH) + 0.03;
+              vec3 gRef = vec3(0.0);
+              for (int i = 0; i < ${NFILM}; i++) {
+                vec2 gd = gHit - uFilmL[i].xy;
+                vec2 o = max(abs(gd) - vec2(0.64) * uFilmL[i].z, 0.0) * sign(gd);
+                vec2 ok = vec2(dot(o, gDir), dot(o, gPerp)) / gs;
+                gRef += uFilmC[i] * exp(-dot(ok, ok));
+              }
+              vec3 cRef = uBakeTint * texture2D(uBake, clamp(gHit * uBakeScale, 0.0, 1.0)).r * 1.5;
+              float gm = bkGloss * mix(0.45, 1.0, wetD);
+              bkPoolAdd += (gRef * 2.0 * (1.64 / (1.64 + 3.1416 * gs.x * gs.y)) + cRef) * gFr * gm;
+              diffuseColor.rgb *= 1.0 - gFr * 0.6 * gm;
+            }
+            #endif
+            #ifdef BK_POOLWALL
+            if (abs(ny) < 0.5) {
+              // le liseré de calcaire au ras de l'eau (là où elle se tient d'habitude)
+              float pW = texture2D(uPoolMap, (vBakeP.xz + vBakeN.xz * 0.2) * uBakeScale).g;
+              diffuseColor.rgb *= mix(vec3(1.0), vec3(0.82, 0.81, 0.7), exp(-pow((by + 0.012) / 0.03, 2.0)) * pW * 0.85);
+              // l'émail : la salle claire s'y reflète, surtout en rasant
+              float wFr = 0.04 + 0.96 * pow(1.0 - abs(dot(normalize(cameraPosition - vBakeP), vBakeN)), 5.0);
+              bkPoolAdd += uBakeTint * bk.r * 1.2 * wFr * bkGloss * (1.0 - sub);
+              // au-dessus de l'eau, la lumière qu'elle renvoie danse sur le mur : un réseau clair qui ondule, plus
+              // vif au ras de l'eau, qui s'efface en montant
+              float cz = pNear * (1.0 - smoothstep(0.0, 2.6, by)) * smoothstep(-0.03, 0.02, by) * (1.0 - sub);
+              if (cz > 0.01) {
+                vec2 cu = vec2(vBakeP.x + vBakeP.z, by * 1.7);
+                float cs = bkCaust(cu * 0.21, uTime * 0.3) * 0.6 + bkCaust(cu * 0.17 + 3.1, uTime * 0.26 + 1.7) * 0.4;
+                bkPoolAdd += vec3(0.85, 1.0, 1.0) * cs * cz * (0.12 + bk.r * 0.9) * 0.5;
+              }
+            }
+            #endif
+            #ifdef BK_POOLCEIL
+            {
+              // au plafond, au-dessus d'un bassin : les reflets de l'eau, larges et lents
+              float pc = texture2D(uPoolMap, vBakeP.xz * uBakeScale).r;
+              if (pc > 0.01) {
+                vec2 cu = vBakeP.xz * 0.15;
+                float cs = bkCaust(cu, uTime * 0.22) * 0.5 + bkCaust(cu * 1.3 + 5.0, uTime * 0.19 + 2.0) * 0.5;
+                bkPoolAdd += vec3(0.85, 1.0, 1.0) * cs * pc * (0.15 + bk.r) * 0.32;
+              }
+            }
+            #endif
+          }
+          #endif
           totalEmissiveRadiance += diffuseColor.rgb * (uBakeTint * bk.r + uBakeTint2 * bk.b * (ny < -0.5 ? uCeilB : 1.0)) * 2.0 * shape;
+          totalEmissiveRadiance += bkPoolAdd;
           #ifdef BK_DYN
           {
             vec3 dAcc = vec3(0.0);
@@ -1542,9 +1875,11 @@ float bkCaust(vec2 uv, float t) {
       }
     }
     let water = null;
+    const waterLampP = new THREE.Vector3();
+    const waterLampT = new THREE.Vector3();
     if (L2) {
       // Poolrooms : sols, bassins, parois des bassins, margelles et la surface de l'eau (view/water.js)
-      water = buildWater({ map, group, baked, textures, bake: bakeUniforms, fog: scene.fog });
+      water = buildWater({ map, group, baked, textures, bake: bakeUniforms, fog: scene.fog, film: filmU, tileRelief });
     } else {
       const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * CELL_SIZE, H * CELL_SIZE), floorMat);
       floor.rotation.x = -Math.PI / 2;
@@ -1681,7 +2016,9 @@ float bkCaust(vec2 uv, float t) {
     } else {
       // l'étage du bas du Level 0 : le même papier peint, délavé vers le gris
       // (Level 1 : le relief des parpaings, et la crasse du haut des murs)
-      wallMat = baked(new THREE.MeshLambertMaterial({ map: L0 && fi === 1 ? textures.wallLow : textures.wall, ...(L1 && textures.wallBump ? { bumpMap: textures.wallBump, bumpScale: 1.6 } : L0 ? { bumpMap: relief(fi === 1 ? textures.wallLow : textures.wall), bumpScale: 1.0 } : null) }), L0 ? { base: true } : L1 ? { bump: !!textures.wallBump, wall1: true } : null);
+      // Poolrooms : la mosaïque émaillée, en relief, qui brille sous les dalles (voir tileRelief et BK_POOL)
+      if (L2) wallMat = baked(new THREE.MeshPhongMaterial({ map: textures.wall, bumpMap: tileRelief(textures.wall), bumpScale: 1.2, specular: '#2c3537', shininess: 70 }), { pool: 'wall', spec: 0.22, gloss: 140 });
+      else wallMat = baked(new THREE.MeshLambertMaterial({ map: L0 && fi === 1 ? textures.wallLow : textures.wall, ...(L1 && textures.wallBump ? { bumpMap: textures.wallBump, bumpScale: 1.6 } : L0 ? { bumpMap: relief(fi === 1 ? textures.wallLow : textures.wall), bumpScale: 1.0 } : null) }), L0 ? { base: true } : L1 ? { bump: !!textures.wallBump, wall1: true } : null);
       const wallsMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(CELL_SIZE, CEIL + SUNK, CELL_SIZE), wallMat, wallCount);
       // le mur percé du trou de la cassette perchée se construit à part (6b)
       const nicheWall = map.niche ? (map.niche.gz + map.niche.dz) * W + map.niche.gx + map.niche.dx : -1;
@@ -1845,8 +2182,10 @@ float bkCaust(vec2 uv, float t) {
     }
 
     // 4. Néons au plafond (les morts sont gris, ceux qui grésillent clignotent)
-    const ON = new THREE.Color(L2 ? '#f2fbff' : L1 ? '#eef6ff' : LOW0 ? '#fffbe2' : '#fffaea').multiplyScalar(L2 ? 2.2 : 3.2); // plus fort que le blanc : le caméscope sature et ils bavent
+    const ON = new THREE.Color(L2 ? '#f2fbff' : L1 ? '#eef6ff' : LOW0 ? '#fffbe2' : '#fffaea').multiplyScalar(L2 ? 2.6 : 3.2); // plus fort que le blanc : le caméscope sature et ils bavent
     const OFF = new THREE.Color(L2 ? '#7d8b8d' : '#4a473c'); // aux Poolrooms, un diffuseur éteint reste gris-bleu
+    const slideCols = new Map();
+    const slideCol = (sl) => slideCols.get(sl) || slideCols.set(sl, new THREE.Color(sl.hex).convertSRGBToLinear().multiplyScalar(1.6)).get(sl);
     // Level 2 : des globes de verre dépoli au mur (ampoules chaudes) et des tubes nus dans les réserves
     const ON_BULB = new THREE.Color('#ffc27a').multiplyScalar(3.4);
     const ON_TUBE = new THREE.Color('#e4f0ff').multiplyScalar(3.2);
@@ -1898,7 +2237,7 @@ float bkCaust(vec2 uv, float t) {
     } else {
       // Level 1 : deux tubes nus de 1,5 m, côte à côte sous le capot de la réglette (warehouse.js)
       const twin = () => mergeGeometries([-0.045, 0.045].map((z) => new THREE.CylinderGeometry(0.014, 0.014, 1.5, 10, 1, true).rotateZ(Math.PI / 2).translate(0, 0, z)));
-      fixSet(L2 ? new THREE.BoxGeometry(1.3, 0.03, 1.3) : L1 ? twin() : new THREE.BoxGeometry(1.22, 0.04, 0.62), new THREE.MeshBasicMaterial({ color: '#ffffff', map: L1 || L2 ? null : textures.lamp }), map.lights, (l) => {
+      fixSet(L2 ? new THREE.BoxGeometry(1.26, 0.03, 1.26) : L1 ? twin() : new THREE.BoxGeometry(1.22, 0.04, 0.62), new THREE.MeshBasicMaterial({ color: '#ffffff', map: L2 ? poolPanelTex() : L1 ? null : textures.lamp }), map.lights, (l) => {
         dummy.position.set(l.x, l.fy !== undefined ? l.fy : CEIL - (L1 ? 0.45 : 0.025), l.z); // au Level 1, les tubes pendent sous le plafond
         dummy.rotation.set(0, l.rot || 0, 0); // Level 0 : couché le long d'un couloir en diagonale
         // Poolrooms : la lampe d'un couloir voûté est cachée dans la voûte ; sous une verrière, tout le plafond éclaire
@@ -1906,6 +2245,23 @@ float bkCaust(vec2 uv, float t) {
       });
     }
     for (const l of map.lights) fixColor(l, l.state !== 'off');
+    // Poolrooms : le cadre de chaque dalle lumineuse, une cornière d'aluminium laqué blanc, un peu en saillie
+    if (L2) {
+      const shown = map.lights.filter((l) => !l.hidden);
+      const frameGeo = mergeGeometries([[1.4, 0.07, 0, 0.665], [1.4, 0.07, 0, -0.665], [0.07, 1.26, 0.665, 0], [0.07, 1.26, -0.665, 0]].map(([w, d, x, z]) => new THREE.BoxGeometry(w, 0.05, d).translate(x, -0.005, z)));
+      const frames = new THREE.InstancedMesh(frameGeo, baked(new THREE.MeshPhongMaterial({ color: '#d4dad9', specular: '#4a5052', shininess: 50 })), shown.length);
+      shown.forEach((l, i) => {
+        dummy.position.set(l.x, l.fy !== undefined ? l.fy : CEIL - 0.025, l.z);
+        dummy.rotation.set(0, l.rot || 0, 0);
+        dummy.scale.setScalar(l.fs || 1);
+        dummy.updateMatrix();
+        frames.setMatrixAt(i, dummy.matrix);
+      });
+      dummy.scale.set(1, 1, 1);
+      frames.instanceMatrix.needsUpdate = true;
+      frames.frustumCulled = false;
+      group.add(frames);
+    }
 
     // 5. Objets abandonnés (modèles Poly Haven CC0), un InstancedMesh par morceau ; leur photo de couleur est gardée.
     // Ils sont détaillés (des dizaines de milliers de triangles chacun) : à chaque image, on ne dessine que ceux qu'on
@@ -3097,7 +3453,7 @@ float bkCaust(vec2 uv, float t) {
           g.add(spoke);
         }
         g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.06, 12).rotateX(Math.PI / 2), valveMat));
-        g.add(new THREE.PointLight('#ff5a3c', 0.9, 3, 1.8));
+        // (sa lueur rouge est un feu de couleur du moteur de lumière : elle s'arrête aux cloisons, voir dynList)
         g.position.set(f.x, 0.9, f.z);
         group.add(g);
         fuseMeshes.push({ f, g });
@@ -3124,7 +3480,9 @@ float bkCaust(vec2 uv, float t) {
     // et le faisceau de la lampe torche s'y dessine. Poolrooms : deux nappes de vapeur claire sur l'eau
     const fogLayers = [];
     let groundFog = null;
-    if (L1) {
+    // Poolrooms : la même brume en volume, mais une vapeur claire, plus haute et plus fine, qui s'épaissit au-dessus de
+    // l'eau (la carte de l'eau) et prend la lumière blanche des salles
+    if (L1 || L2) {
       const fogU = {
         tDepth: { value: null },
         uNoise: { value: fogNoise() },
@@ -3144,9 +3502,13 @@ float bkCaust(vec2 uv, float t) {
         uGlow: { value: 1 }, // l'éclat qu'elle prend sous les lampes
         uBeam: { value: 0.8 }, // et dans le faisceau de la lampe torche
         ...dynU,
-        uK: { value: 0.6 }, // épaisseur de la brume (par mètre traversé, là où elle est la plus dense)
-        uHaze: { value: 0.006 }, // la poussière en suspension dans tout l'entrepôt : ce qu'elle renvoie de la lumière des feux
-        uHazeLamp: { value: 0.0035 }, // et du faisceau de la lampe torche
+        uK: { value: L2 ? 0.2 : 0.6 }, // épaisseur de la brume (par mètre traversé, là où elle est la plus dense)
+        uHaze: { value: L2 ? 0.01 : 0.006 }, // la poussière en suspension dans tout l'entrepôt : ce qu'elle renvoie de la lumière des feux
+        uHazeLamp: { value: L2 ? 0.0025 : 0.0035 }, // et du faisceau de la lampe torche
+        uTop: { value: L2 ? 1.5 : 1.0 }, // au-dessus, plus rien
+        uBase: { value: L2 ? new THREE.Vector3(0.05, 0.06, 0.06) : new THREE.Vector3(0.01, 0.012, 0.015) }, // la lumière là où aucune lampe n'éclaire
+        uPoolMap: { value: poolTex },
+        uPoolK: { value: L2 ? 1 : 0 }, // la part de la vapeur qui ne tient qu'au-dessus de l'eau
       };
       const mat = new THREE.ShaderMaterial({
         uniforms: fogU,
@@ -3178,8 +3540,12 @@ uniform vec3 uDynC[${NDYN}];
 uniform vec4 uDynN[${NDYN}];
 uniform float uHaze;
 uniform float uHazeLamp;
+uniform float uTop;
+uniform vec3 uBase;
+uniform sampler2D uPoolMap;
+uniform float uPoolK;
+uniform vec4 uDynB[${NDYN}];
 varying vec2 vUv;
-const float TOP = 1.0; // au-dessus, plus rien
 const int N = 14; // pas dans la nappe au sol (20 avant la 5.25 : le flou qui suit lisse la différence)
 const int HZ = 4; // échantillons par feu dans la poussière (6 avant la 5.25)
 ${OCC_GLSL}
@@ -3207,6 +3573,7 @@ void main() {
     float r = uDynP[k].w;
     if (r < 0.01) continue;
     vec3 lp = uDynP[k].xyz;
+    vec4 bx = uDynB[k];
     vec3 oc = lp - uCam;
     float tc = dot(oc, rd);
     float h2 = max(dot(oc, oc) - tc * tc, 0.0);
@@ -3225,6 +3592,7 @@ void main() {
     for (int m = 0; m < HZ; m++) {
       float t = tc + hh * tan(mix(a0, a1, (float(m) + j) / float(HZ)));
       vec3 p = uCam + rd * t;
+      if (p.x < bx.x || p.x > bx.z || p.z < bx.y || p.z > bx.w) continue;
       vec3 dv = lp - p;
       float dd = length(dv);
       float fall = 1.0 - dd / r;
@@ -3262,10 +3630,10 @@ void main() {
   float y0 = uCam.y - uFloorY;
   float t0 = 0.0;
   float t1 = tEnd;
-  if (y0 > TOP) {
+  if (y0 > uTop) {
     if (rd.y > -0.0005) { gl_FragColor = vec4(hz, 0.0); return; }
-    t0 = (TOP - y0) / rd.y;
-  } else if (rd.y > 0.0005) t1 = min(t1, (TOP - y0) / rd.y);
+    t0 = (uTop - y0) / rd.y;
+  } else if (rd.y > 0.0005) t1 = min(t1, (uTop - y0) / rd.y);
   if (t0 >= t1) { gl_FragColor = vec4(hz, 0.0); return; }
   // les feux de couleur vus depuis le milieu de ce bout de brume : un feu caché derrière un mur ne l'allume pas
   float fv[${NDYN}];
@@ -3300,14 +3668,15 @@ void main() {
     vec2 w = vec2(bank - 0.5, texture2D(uNoise, q * 0.021 - vec2(uTime * 0.002, 0.0)).r - 0.5) * 0.55;
     float curl = texture2D(uNoise, q * 0.11 + w + vec2(-uTime * 0.0105, uTime * 0.0068) + vec2(h * 0.19, -h * 0.13)).g;
     float fil = texture2D(uNoise, q * 0.27 + w * 1.6 + vec2(uTime * 0.017, -uTime * 0.011) + h * 0.35).b;
-    float top = 0.05 + 0.82 * smoothstep(0.34, 0.95, bank);
+    float pm = uPoolK > 0.0 ? texture2D(uPoolMap, q * uBakeScale).r : 0.0;
+    float top = (0.05 + 0.82 * smoothstep(0.34, 0.95, bank)) * mix(1.0, 1.0 + pm * 0.8, uPoolK) * uTop;
     float dens = pow(clamp(1.0 - h / top, 0.0, 1.0), 1.25) * smoothstep(0.3, 0.8, curl) * (0.55 + 0.9 * fil);
-    dens *= uK;
+    dens *= uK * mix(1.0, 0.18 + pm * 1.3, uPoolK);
     if (dens < 0.002) continue;
     vec4 bk = texture2D(uBake, q * uBakeScale);
     float L = bk.r * 3.3;
     // la lumière des réglettes qui tombe là (et celle des feux colorés), un fond très sombre ailleurs
-    vec3 light = vec3(0.010, 0.012, 0.015) + (uBakeTint * L * 0.34 + uBakeTint2 * bk.b * 1.6) * uGlow;
+    vec3 light = uBase + (uBakeTint * L * 0.34 + uBakeTint2 * bk.b * 1.6) * uGlow;
     // la lampe torche : un cône doux, plus vif près de la lampe
     vec3 lv = p - uLampPos;
     float ld = length(lv);
@@ -3317,6 +3686,8 @@ void main() {
     for (int k = 0; k < ${NDYN}; k++) {
       float r = uDynP[k].w;
       if (fv[k] < 0.01) continue;
+      vec4 bx = uDynB[k];
+      if (p.x < bx.x || p.x > bx.z || p.z < bx.y || p.z > bx.w) continue;
       vec3 dv = uDynP[k].xyz - p;
       float dd = length(dv);
       if (dd >= r) continue;
@@ -3353,21 +3724,9 @@ void main() {
         return mat;
       });
       groundFog = { u: fogU };
-      // l'éblouissement des lumières vives (gyrophares, flashs, diodes) : large, comme dans l'optique du caméscope
-      vhs.setGlare(0.9);
-    }
-    if (L2) {
-      for (const [y, o, rep, sp] of [[0.06, 0.32, 8, 0.01], [0.32, 0.16, 5, -0.006]]) {
-        const t = textures.fog.clone();
-        t.needsUpdate = true;
-        t.repeat.set(rep, rep);
-        const m = new THREE.Mesh(new THREE.PlaneGeometry(70, 70), new THREE.MeshBasicMaterial({ map: t, color: L2 ? '#f3fbfa' : '#3e4850', transparent: true, opacity: o, depthWrite: false }));
-        m.rotation.x = -Math.PI / 2;
-        m.position.y = y;
-        m.renderOrder = 2;
-        group.add(m);
-        fogLayers.push({ m, t, o, sp, rep });
-      }
+      // l'éblouissement des lumières vives (gyrophares, flashs, diodes) : large, comme dans l'optique du caméscope ;
+      // aux Poolrooms, les dalles lumineuses bavent un peu dans l'air humide
+      vhs.setGlare(L2 ? 0.6 : 0.9);
     }
 
     // 12. L'ascenseur (monte-charge au Level 1) : cabine creusée dans le mur, portes coulissantes, voyant rouge ou vert.
@@ -3969,11 +4328,16 @@ void main() {
       nooks,
       gear,
       // qualité basse : sans les ombres des feux de couleur ni la lumière renvoyée par la poussière (plus léger)
+      // Poolrooms : le reflet de la salle dans l'eau, rendu juste avant l'image (rien en qualité basse)
+      reflect(cam, hide) {
+        if (water) water.reflect(renderer, scene, cam, hide);
+      },
       lightQuality(low) {
+        if (water) water.setMirror(!low);
         if (dynU.uOccInfo) dynU.uOccInfo.value.w = low ? 0 : 1;
         if (groundFog) {
-          groundFog.u.uHaze.value = low ? 0 : 0.006;
-          groundFog.u.uHazeLamp.value = low ? 0 : 0.0035;
+          groundFog.u.uHaze.value = low ? 0 : L2 ? 0.01 : 0.006;
+          groundFog.u.uHazeLamp.value = low ? 0 : L2 ? 0.0025 : 0.0035;
         }
       },
       update(sim, P, time, dt) {
@@ -4007,6 +4371,45 @@ void main() {
             }
           }
         }
+        // Poolrooms : les feux de couleur. Les volants de vanne rougeoient (une lueur qui respire) ; la bouche d'un
+        // toboggan luit de sa couleur, à peine tant qu'il est fermé, franchement quand les volants sont trouvés (plus
+        // du tout quand un autre a été pris). Chaque feu reste dans sa salle (uDynB)
+        if (L2) {
+          dynList.length = 0;
+          const roomBox = (x, z) => {
+            const r = map.roomAt && map.roomAt(x, z);
+            return r ? [r.x0 - 0.25, r.z0 - 0.25, r.x1 + 0.25, r.z1 + 0.25] : [x - 6, z - 6, x + 6, z + 6];
+          };
+          for (const f of map.fuses || []) {
+            if (f.taken) continue;
+            const k = 0.85 + 0.15 * Math.sin(time * 2.2 + f.id);
+            dynList.push({ x: f.x, y: 0.95, z: f.z, r: 1.15 * k, g: 0.2 * k, b: 0.1 * k, rad: 3.6, nx: 0, ny: 0, nz: 0, w: 0, box: f.box || (f.box = roomBox(f.x, f.z)) });
+          }
+          for (const sl of map.slides || []) {
+            const k = sim.open ? (sim.slide >= 0 && sim.slide !== sl.id ? 0 : 0.9 + 0.1 * Math.sin(time * 1.3 + sl.id)) : 0.18;
+            if (k <= 0) continue;
+            const c = slideCol(sl);
+            const x = sl.x - sl.dx * 0.9;
+            const z = sl.z - sl.dz * 0.9;
+            dynList.push({ x, y: 1.0, z, r: c.r * k, g: c.g * k, b: c.b * k, rad: 5.5, nx: -sl.dx, ny: -0.1, nz: -sl.dz, w: -0.2, box: sl.box || (sl.box = roomBox(x, z)) });
+          }
+          const cx = camera.position.x;
+          const cz = camera.position.z;
+          for (const L of dynList) L.d = Math.hypot(L.x - cx, L.z - cz) - L.rad;
+          dynList.sort((a, b) => a.d - b.d);
+          for (let i = 0; i < NDYN; i++) {
+            const L = dynList[i];
+            if (L && L.d < 30) {
+              dynU.uDynP.value[i].set(L.x, L.y + group.position.y, L.z, L.rad);
+              dynU.uDynC.value[i].set(L.r, L.g, L.b);
+              dynU.uDynN.value[i].set(L.nx, L.ny, L.nz, L.w);
+              dynU.uDynB.value[i].set(L.box[0], L.box[1], L.box[2], L.box[3]);
+            } else {
+              dynU.uDynP.value[i].set(0, -100, 0, 0.001);
+              dynU.uDynC.value[i].set(0, 0, 0);
+            }
+          }
+        }
         // les gouttes : elles tombent du plafond (un peu plus d'une demi-seconde), puis des ronds dans la flaque
         for (const d of drips) {
           const u = (time + d.phase) / d.period;
@@ -4025,6 +4428,9 @@ void main() {
         }
         if (nooks.length) updateNooks(time);
         if (water) {
+          flashLight.getWorldPosition(waterLampP);
+          flashLight.target.getWorldPosition(waterLampT);
+          water.setLamp(waterLampP, waterLampT.sub(waterLampP).normalize(), P.status === 'alive' ? Math.min(1.2, flashLight.intensity / 17) : 0);
           water.update(sim, P, time, dt, camera);
           bakeUniforms.uWaterY.value = water.level;
         }
@@ -4138,11 +4544,11 @@ void main() {
         }
 
         // Level 2 : les lampes qui se reflètent dans le carrelage et le sol ciré (les plus proches que l'on voit)
-        if (PIPES) {
+        if (PIPES || L2) {
           const cand = [];
           for (const l of map.lights) {
             const k = power && l.state !== 'off' ? (l.k ?? 1) : 0;
-            if (k <= 0) continue;
+            if (k <= 0 || l.hidden) continue;
             const d = Math.abs(l.x - P.x) + Math.abs(l.z - P.z);
             if (d < 32) cand.push([d, l, k]);
           }
@@ -4152,11 +4558,47 @@ void main() {
             if (n >= NLAMP) break;
             if (d > 4 && !hasLineOfSight(map, P.x, P.z, l.x, l.z)) continue;
             lampU.uLampPos.value[n].set(l.x, l.y + group.position.y, l.z);
-            if (l.kind === 'tube') lampU.uLampCol.value[n].set(0.75, 0.88, 1.0).multiplyScalar(k);
+            if (L2) lampU.uLampCol.value[n].set(0.95, 1.0, 1.02).multiplyScalar(1.2 * k * (l.fs || 1));
+            else if (l.kind === 'tube') lampU.uLampCol.value[n].set(0.75, 0.88, 1.0).multiplyScalar(k);
             else lampU.uLampCol.value[n].set(1.0, 0.7, 0.4).multiplyScalar(1.5 * k);
             n++;
           }
           for (; n < NLAMP; n++) lampU.uLampCol.value[n].set(0, 0, 0);
+        }
+        // Poolrooms : les dalles lumineuses qui se reflètent dans le sol mouillé et dans l'eau, les plus proches que l'on
+        // voit (devant soi, ou juste derrière : leur reflet peut tomber devant) ; les dernières entrent en fondu
+        if (L2) {
+          let n = 0;
+          if (power) {
+            const cand = [];
+            const fx = -Math.sin(P.yaw);
+            const fz = -Math.cos(P.yaw);
+            for (const l of map.lights) {
+              const k = l.state !== 'off' ? (l.k ?? 1) : 0;
+              if (k <= 0.01 || l.hidden) continue;
+              const dx = l.x - P.x;
+              const dz = l.z - P.z;
+              const d = Math.hypot(dx, dz);
+              if (d < 36 && dx * fx + dz * fz > -6) cand.push([d, l, k]);
+            }
+            cand.sort((a, b) => a[0] - b[0]);
+            const pick = [];
+            let dCut = 36;
+            for (const c of cand) {
+              if (c[0] > 4 && !hasLineOfSight(map, P.x, P.z, c[1].x, c[1].z)) continue;
+              if (pick.length === NFILM) {
+                dCut = c[0];
+                break;
+              }
+              pick.push(c);
+            }
+            for (const [d, l, k] of pick) {
+              filmU.uFilmL.value[n].set(l.x, l.z, l.fs || 1);
+              filmU.uFilmC.value[n].set(0.96, 1.0, 1.02).multiplyScalar(k * Math.min(1, (dCut - d) / 5));
+              n++;
+            }
+          }
+          for (; n < NFILM; n++) filmU.uFilmC.value[n].set(0, 0, 0);
         }
         if (pipesView) pipesView.update(sim, P, time, dt, lightAt, P.flashlight && P.status === 'alive');
         // Level 1 : les réglettes allumées qui se reflètent dans le béton lissé et éclairent le plafond, les plus proches
@@ -5046,6 +5488,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   // qui rapetisse, puis il n'y a plus que le noir
   const PLUNGE_T = 3.2;
   let plunge = null;
+  let entry = null; // Poolrooms : on se laisse glisser dans le toboggan (voir slideIn)
   let ductDrop = 0; // Level 1 : l'entité qui se laisse tomber d'une bouche de gaine (le temps qui reste)
   let cctvWas = -1; // au poste de garde : la caméra affichée à l'image précédente (-1 : pas au poste)
   const res = autoRes(); // résolution dynamique : commence au plus haut (borné par ce que permet l'écran)
@@ -5117,6 +5560,15 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     },
 
     // Level 5 : le screamer de la mort (l'entité 3D se jette sur la caméra)
+    // Poolrooms : on entre dans le toboggan sl (my : la hauteur de l'axe de sa bouche) ; la caméra quitte le joueur
+    slideIn(sl, my) {
+      entry = { sl, my, t: 0, x: camera.position.x, y: camera.position.y, z: camera.position.z, yaw: camera.rotation.y, pitch: camera.rotation.x };
+    },
+    // au bout du toboggan, on tombe de h mètres dans le nouveau niveau (la chute et le choc de la caméra)
+    dropIn(h = 1.3) {
+      eyeY += h;
+      fallV = 0.01;
+    },
     scare() {
       if (!L3 || !beast || !beast.scarePose) return;
       scareFx = { t0: null, x: camera.position.x, y: camera.position.y, z: camera.position.z, yaw: camera.rotation.y };
@@ -5218,7 +5670,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       // la caméra suit le joueur de cet écran, ou celui qu'il regarde quand il est spectateur
       // la chute dure le temps de passer la main à un coéquipier encore en vie ; seul, on reste dans le noir du puits
       if (plunge && (plunge.t += dt) > PLUNGE_T && sim.players.some((p) => p.status === 'alive')) plunge = null;
-      const P = plunge ? plunge.P : sim.viewPlayer(sim.spectate || 0);
+      const P = plunge ? plunge.P : entry ? sim.player : sim.viewPlayer(sim.spectate || 0);
       viewFloor = P.floor || 0;
       for (const fv of floorViews) fv.update(sim, P, time, dt);
 
@@ -5292,6 +5744,24 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         camera.rotation.set(plunge.pitch + (-0.9 - plunge.pitch) * tip * (1 - up) + 1.35 * up, plunge.yaw + t * 0.5, Math.sin(t * 1.3) * 0.25 * up, 'YXZ');
         eyeY = 1.6 + feetY(sim.stairs, plunge.x, plunge.z, plunge.floor);
         fallV = 0;
+      }
+      if (entry) {
+        // Poolrooms : on s'assoit au bord du toboggan, puis on s'y laisse glisser, jusqu'au noir du tube (la suite de
+        // la descente se rend à part : slide.js)
+        const e = entry;
+        e.t += dt;
+        const { sl, my } = e;
+        const A = [sl.x - sl.dx * 1.45, my + 0.4, sl.z - sl.dz * 1.45];
+        const B = [sl.x - sl.dx * 0.32, my - 0.2, sl.z - sl.dz * 0.32];
+        const u = Math.min(1, e.t / 0.5);
+        const su = u * u * (3 - 2 * u);
+        const w = Math.min(1, Math.max(0, (e.t - 0.42) / 0.7));
+        const ww = w * w; // on prend de la vitesse
+        camera.position.set(e.x + (A[0] - e.x) * su + (B[0] - A[0]) * ww, e.y + (A[1] - e.y) * su + (B[1] - A[1]) * ww, e.z + (A[2] - e.z) * su + (B[2] - A[2]) * ww);
+        let dy = Math.atan2(-sl.dx, -sl.dz) - e.yaw;
+        while (dy > Math.PI) dy -= 2 * Math.PI;
+        while (dy < -Math.PI) dy += 2 * Math.PI;
+        camera.rotation.set(e.pitch + (-0.36 - e.pitch) * su + 0.3 * ww, e.yaw + dy * su, Math.sin(e.t * 5) * 0.025 * su, 'YXZ');
       }
       // Level 1, assis au poste de garde : l'image est celle de la caméra de surveillance choisie (fixe, au plafond)
       const cams = sim.map.cams;
@@ -5644,6 +6114,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       cullFor(inset.due(shotQ) ? { x: S.x, y: ey, z: S.z, fr: inset.frustum(shotQ, eyeQ, fov, insetFr) } : null);
       // au poste : on se voit soi-même, assis, sur la caméra qui filme le poste
       if (cctvCam) avatars.update(P, true, feetY(sim.stairs, P.x, P.z, P.floor || 0), lightNow, dt, time);
+      if (!cctvCam) for (const fv of floorViews) fv.reflect(camera, [held]);
       vhs.render(scene, camera, time, glitch, cctvCam ? cctvExp : exposure * (1 + nightT * 1.6));
       if (cctvCam) avatars.update(P, false);
 

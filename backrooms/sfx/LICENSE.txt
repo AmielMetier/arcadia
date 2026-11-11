@@ -12,4 +12,4 @@ fournie par Nicolas Muratore pour le jeu (« My attempt of isolating all bacteri
 entre ses silences, fondus aux bords, ramenés au même volume (−10 LUFS visé, crêtes à −0,8 dB), mono 112 kb/s.
 level0/chase_1.mp3 à chase_3.mp3 : ceux de TahitoaSenis, égalisés pour prendre le timbre de cette compilation (plus
 sombre, plus de corps entre 300 et 800 Hz).
-level1/khaoula.mp3 (la voix de Khaoula au Level 1, quand elle est proche ou te poursuit) : fourni par Amiel pour le jeu.
+La voix qui appelle au Level 1 (mode VIP) est chiffrée dans le coffre : voir data/LICENSE.txt.
