@@ -995,7 +995,7 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
     win.position.set(bx + d[0] * 0.145, 0.45, bz + d[1] * 0.145);
     win.rotation.y = Math.atan2(d[0], d[1]);
     group.add(win);
-    burners.push({ win, ph: rnd() * 10, x: bx, z: bz });
+    burners.push({ win, ph: rnd() * 10, x: bx, z: bz, dx: d[0], dz: d[1] });
     // manomètre sur le corps
     const gm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.04, 20), lambert({ map: tx.gauge }));
     gm.position.set(b.x + d[0] * 0.93, 1.55, b.z + d[1] * 0.93);
@@ -1031,6 +1031,11 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
 
   // --- 6. Les vannes : collecteur vertical, corps, chapeau, volant rouge qui tourne, manomètre, voyant ---
   const valveViews = [];
+  // un point du groupe g (posé contre un mur, tourné de g.rotation.y), dans le repère de l'étage
+  const wallPt = (g, lx, ly, lz) => {
+    const r = g.rotation.y;
+    return { x: g.position.x + lx * Math.cos(r) + lz * Math.sin(r), y: ly, z: g.position.z - lx * Math.sin(r) + lz * Math.cos(r) };
+  };
   for (const v of map.valves || []) {
     const vg = new THREE.Group();
     // origine : la face du mur, au droit de la case ; +z sort du mur
@@ -1087,7 +1092,7 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
     sign.position.set(0, 1.95, 0.012);
     sign.scale.set(0.5, 0.5, 1);
     vg.add(sign);
-    valveViews.push({ v, wheel, needle, lamp, angle: 0, lastTurn: 0 });
+    valveViews.push({ v, wheel, needle, lamp, angle: 0, lastTurn: 0, at: wallPt(vg, -0.32, 1.62, 0.1), nx: -v.dx, nz: -v.dz });
   }
 
   // --- 6b. Les disjoncteurs : armoire électrique grise, gaine vers le plafond, levier (en bas : déclenché), voyant ---
@@ -1125,7 +1130,7 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
     sign.position.set(-0.1, 1.98, 0.012);
     sign.scale.set(0.46, 0.46, 1);
     bg.add(sign);
-    breakerViews.push({ b, lever, led, a: 0 });
+    breakerViews.push({ b, lever, led, a: 0, at: wallPt(bg, 0.17, 1.66, 0.26), nx: -b.dx, nz: -b.dz });
   }
 
   // --- 7. Flaques sous les fuites et les jets ---
@@ -1296,6 +1301,22 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
   let exitSteam = 1;
 
   return {
+    // le moteur de lumière : la flamme d'un brûleur lèche le sol devant sa lucarne ; un voyant de vanne ou de
+    // disjoncteur teinte le mur autour de lui (rouge qui clignote quand le secteur est noir, vert une fois réarmé)
+    lights(out) {
+      for (const b of burners) {
+        const c = b.win.material.color;
+        out.push({ x: b.x + b.dx * 0.3, y: 0.5, z: b.z + b.dz * 0.3, r: c.r * 0.9, g: c.g * 0.9, b: c.b * 0.9, rad: 3.4, nx: b.dx, ny: -0.15, nz: b.dz, w: -0.25 });
+      }
+      for (const vv of valveViews) {
+        const c = vv.lamp.material.color;
+        out.push({ x: vv.at.x, y: vv.at.y, z: vv.at.z, r: c.r * 0.55, g: c.g * 0.55, b: c.b * 0.55, rad: 1.3, nx: vv.nx, ny: 0, nz: vv.nz, w: -0.6 });
+      }
+      for (const bv of breakerViews) {
+        const c = bv.led.material.color;
+        out.push({ x: bv.at.x, y: bv.at.y, z: bv.at.z, r: c.r * 0.55, g: c.g * 0.55, b: c.b * 0.55, rad: 1.3, nx: bv.nx, ny: 0, nz: bv.nz, w: -0.6 });
+      }
+    },
     setFog(fog) {
       steamU.uFog.value = fog.density;
       steamU.uFogColor.value.copy(fog.color);

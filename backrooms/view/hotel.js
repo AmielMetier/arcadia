@@ -4,7 +4,10 @@
 // chiffres qui s'allume au plafond du hall quand les 6 lettres sont postées.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL_SIZE } from '../engine/map.js';
-import { FURNITURE } from '../engine/hotel.js';
+import { buildHotelRooms } from './hotelRooms.js';
+import { buildHotelCorridor } from './hotelCorridor.js';
+import { buildHotelLobby } from './hotelLobby.js';
+import { buildHotelExit, buildLifts } from './hotelExit.js';
 
 const C = CELL_SIZE;
 
@@ -19,7 +22,7 @@ function label(w, h, draw) {
   return t;
 }
 
-export function buildHotel({ map, group, baked, CEIL }) {
+export function buildHotel({ map, group, baked, wallMat, CEIL }) {
   const lam = (o) => baked(new THREE.MeshLambertMaterial(o));
   const M = {
     wood: lam({ color: '#3b2314' }),
@@ -29,9 +32,6 @@ export function buildHotel({ map, group, baked, CEIL }) {
     sheet: lam({ color: '#d9d0bd' }),
     blanket: lam({ color: '#6b1f1c' }),
     pillow: lam({ color: '#e6dccb' }),
-    metal: lam({ color: '#5d5a55' }),
-    fire: lam({ color: '#7a2a20' }),
-    stair: new THREE.MeshLambertMaterial({ color: '#2a2724', side: THREE.BackSide, emissive: '#0d0b09', emissiveIntensity: 1 }),
     black: new THREE.MeshBasicMaterial({ color: '#050403' }),
   };
   const box = (w, h, d, mat, x, y, z, parent = group) => {
@@ -49,26 +49,13 @@ export function buildHotel({ map, group, baked, CEIL }) {
     return g;
   };
 
-  // --- 1. Portes des chambres : linteau, battant entrouvert vers la chambre, plaque de laiton numérotée ---
+  // --- 1. Portes des chambres (view/hotelCorridor.js : embrasure, chambranle, battant, moulures, vie du couloir,
+  // cage d'escalier), et ici la plaque de laiton numérotée ---
+  buildHotelCorridor({ map, group, baked, wallMat, CEIL });
   for (const r of map.rooms) {
     const { x, z } = r.door;
     const [dx, dz] = r.dir; // de la chambre vers le couloir
-    const cx = (x + 0.5) * C;
-    const cz = (z + 0.5) * C;
-    const g = frame(cx, cz, Math.atan2(dx, dz)); // +z local : vers le couloir ; x local : le long du mur
-    const jw = (C - map.doorW) / 2;
-    for (const sx of [-1, 1]) box(jw, CEIL, C, M.darkWood, sx * (map.doorW / 2 + jw / 2), CEIL / 2, 0, g);
-    box(map.doorW, CEIL - 2.25, C, M.darkWood, 0, 2.25 + (CEIL - 2.25) / 2, 0, g);
-    // chambranle côté couloir
-    for (const sx of [-1, 1]) box(0.09, 2.3, 0.06, M.wood, sx * (map.doorW / 2 + 0.045), 1.15, C / 2 + 0.03, g);
-    box(map.doorW + 0.18, 0.1, 0.06, M.wood, 0, 2.3, C / 2 + 0.03, g);
-    // le battant, ouvert dans la chambre contre le mur
-    const leaf = new THREE.Group();
-    leaf.position.set(-map.doorW / 2, 0, -C / 2);
-    leaf.rotation.y = 1.45 + Math.random() * 0.25;
-    box(map.doorW - 0.05, 2.22, 0.05, M.door, (map.doorW - 0.05) / 2, 1.11, 0, leaf);
-    box(0.06, 0.06, 0.08, M.brass, map.doorW - 0.18, 1.0, 0, leaf);
-    g.add(leaf);
+    const g = frame((x + 0.5) * C, (z + 0.5) * C, Math.atan2(dx, dz)); // +z local : vers le couloir
     // la plaque du numéro
     const t = label(128, 64, (c, w, h) => {
       c.fillStyle = '#7a5a26';
@@ -83,66 +70,94 @@ export function buildHotel({ map, group, baked, CEIL }) {
       c.fillText(String(r.num), w / 2, h / 2 + 2);
     });
     const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.13), baked(new THREE.MeshLambertMaterial({ map: t, emissive: '#6a5230', emissiveMap: t, emissiveIntensity: 0.6 })));
-    plate.position.set(map.doorW / 2 + 0.3, 1.55, C / 2 + 0.065);
+    plate.position.set(map.doorW / 2 + 0.36, 1.55, C / 2 + 0.012);
     g.add(plate);
   }
 
-  // --- 2. Meubles : lit (cadre, matelas, couverture, oreiller, tête de lit), armoire, bureau et lampe ---
+  // --- 2. Meubles des chambres : lits, armoires, bureaux et leur lampe, tables de nuit, fenêtres, radiateurs,
+  // plafonniers, tapis (view/hotelRooms.js) ---
   const lampShades = [];
-  for (const f of map.furniture) {
-    const g = frame(f.x, f.z, f.rot); // +z local : vers la porte (l'avant du meuble)
-    const F = FURNITURE[f.kind];
-    if (f.kind === 'bed') {
-      const W2 = F.hw * 2;
-      const L = F.hd * 2;
-      box(W2, 0.28, L, M.darkWood, 0, 0.2, 0, g);
-      for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(0.08, 0.2, 0.08, M.darkWood, sx * (F.hw - 0.05), 0.1, sz * (F.hd - 0.05), g);
-      box(W2 - 0.08, 0.16, L - 0.12, M.sheet, 0, 0.42, 0.02, g);
-      box(W2 - 0.02, 0.06, L * 0.62, M.blanket, 0, 0.52, L * 0.18, g);
-      box(W2 * 0.7, 0.1, 0.35, M.pillow, 0, 0.55, -F.hd + 0.3, g);
-      box(W2 + 0.06, 1.15, 0.08, M.wood, 0, 0.58, -F.hd - 0.02, g);
-      box(W2 + 0.1, 0.06, 0.12, M.darkWood, 0, 1.18, -F.hd - 0.02, g);
-      // dessous du lit : le noir
-      box(W2 - 0.1, 0.02, L - 0.1, M.black, 0, 0.07, 0, g);
-    } else if (f.kind === 'wardrobe') {
-      const W2 = F.hw * 2;
-      const D = F.hd * 2;
-      box(W2, F.h, D, M.wood, 0, F.h / 2, 0, g);
-      box(W2 + 0.06, 0.08, D + 0.06, M.darkWood, 0, F.h + 0.04, 0, g);
-      for (const sx of [-1, 1]) {
-        box(W2 / 2 - 0.05, F.h - 0.2, 0.03, M.door, sx * (W2 / 4), F.h / 2, D / 2 + 0.015, g);
-        box(0.03, 0.14, 0.04, M.brass, sx * 0.07, F.h * 0.55, D / 2 + 0.04, g);
-      }
-    } else {
-      const W2 = F.hw * 2;
-      const D = F.hd * 2;
-      box(W2, 0.05, D, M.wood, 0, F.h, 0, g);
-      for (const sx of [-1, 1]) box(0.08, F.h, D - 0.06, M.darkWood, sx * (F.hw - 0.05), F.h / 2, 0, g);
-      // la lampe de chevet
-      const l = map.lights.find((q) => q.lamp && Math.hypot(q.x - f.x, q.z - f.z) < 0.1);
-      box(0.12, 0.02, 0.12, M.brass, 0.25, F.h + 0.04, 0, g);
-      box(0.03, 0.3, 0.03, M.brass, 0.25, F.h + 0.2, 0, g);
-      const shadeMat = new THREE.MeshLambertMaterial({ color: '#d8b880', emissive: '#ffb860', emissiveIntensity: 0 });
-      const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.17, 0.2, 12, 1, true), shadeMat);
-      shade.position.set(0.25, F.h + 0.4, 0);
-      g.add(shade);
-      if (l) lampShades.push({ l, mat: shadeMat, k: 1.2 });
-    }
-  }
+  const rooms = buildHotelRooms({ map, group, baked, brass: M.brass, lampShades, CEIL });
 
   // --- 3. Appliques Art déco du couloir et lustre du hall ---
+  // une platine de laiton à gradins, un bras en col de cygne, une coupelle, et une tulipe de verre dépoli ouverte vers
+  // le haut (sa lueur plus vive au fond, là où est l'ampoule) ; allumée, un halo doux l'entoure
+  const glowTex = label(64, 64, (c, w, h) => {
+    const g = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    g.addColorStop(0, 'rgba(255, 214, 150, 1)');
+    g.addColorStop(0.25, 'rgba(255, 170, 90, 0.45)');
+    g.addColorStop(1, 'rgba(255, 140, 60, 0)');
+    c.fillStyle = g;
+    c.fillRect(0, 0, w, h);
+  });
+  const tulipTex = label(8, 64, (c, w, h) => {
+    const g = c.createLinearGradient(0, h, 0, 0); // v = 0 au fond de la tulipe, 1 au bord
+    g.addColorStop(0, '#fff2d0');
+    g.addColorStop(0.35, '#ffd08a');
+    g.addColorStop(0.85, '#b8702c');
+    g.addColorStop(1, '#f0c080');
+    c.fillStyle = g;
+    c.fillRect(0, 0, w, h);
+  });
+  const tulipGeo = new THREE.LatheGeometry(
+    [[0.012, 0], [0.03, 0.006], [0.05, 0.022], [0.068, 0.05], [0.083, 0.088], [0.094, 0.126], [0.1, 0.15], [0.106, 0.162], [0.1, 0.166]].map(([r, y]) => new THREE.Vector2(r, y)),
+    16,
+  );  // la tulipe d'une applique morte : il n'en reste que le fond, au bord dentelé
+  let brokenN = 0;
+  const brokenTulip = () => {
+    const g = tulipGeo.clone();
+    const p = g.attributes.position;
+    const seed = ++brokenN * 1.7;
+    for (let i = 0; i < p.count; i++) {
+      const a = Math.atan2(p.getZ(i), p.getX(i));
+      const cut = 0.045 + 0.03 * Math.abs(Math.sin(a * 3 + seed)) + 0.02 * Math.abs(Math.sin(a * 7.3 + seed * 2.1));
+      if (p.getY(i) > cut) {
+        const k = cut / p.getY(i);
+        p.setXYZ(i, p.getX(i) * (0.9 + 0.1 * k), cut, p.getZ(i) * (0.9 + 0.1 * k));
+      }
+    }
+    g.computeVertexNormals();
+    return g;
+  };
+
+  const plateGeo = new THREE.CylinderGeometry(0.06, 0.07, 0.014, 20);
+  plateGeo.rotateX(Math.PI / 2);
+  const plate2Geo = new THREE.CylinderGeometry(0.035, 0.045, 0.012, 16);
+  plate2Geo.rotateX(Math.PI / 2);
+  const armGeo = new THREE.TubeGeometry(new THREE.CubicBezierCurve3(new THREE.Vector3(0, -0.07, 0.015), new THREE.Vector3(0, -0.1, 0.08), new THREE.Vector3(0, -0.06, 0.11), new THREE.Vector3(0, -0.012, 0.11)), 10, 0.007, 6);
+  const cupGeo = new THREE.CylinderGeometry(0.022, 0.012, 0.018, 12);
+  const bulbGeo = new THREE.SphereGeometry(0.022, 10, 8);
   for (const l of map.lights) {
     if (l.sconce) {
       const { dx, dz } = l.sconce;
       const g = frame(l.x + dx * 0.2, l.z + dz * 0.2, Math.atan2(-dx, -dz)); // +z local : vers le couloir
       const y = l.fy || 2.0;
-      box(0.1, 0.22, 0.04, M.brass, 0, y, 0.02, g);
-      const mat = new THREE.MeshLambertMaterial({ color: '#f0d8a8', emissive: '#ffc070', emissiveIntensity: 0 });
-      const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.05, 0.16, 6, 1, true), mat);
-      glass.position.set(0, y + 0.08, 0.1);
-      mat.side = THREE.DoubleSide;
-      g.add(glass);
-      lampShades.push({ l, mat, k: 1.6 });
+      const a = new THREE.Group();
+      a.position.y = y;
+      g.add(a);
+      const plate = new THREE.Mesh(plateGeo, M.brass);
+      plate.position.set(0, -0.06, 0.007);
+      a.add(plate);
+      const plate2 = new THREE.Mesh(plate2Geo, M.brass);
+      plate2.position.set(0, -0.06, 0.018);
+      a.add(plate2);
+      a.add(new THREE.Mesh(armGeo, M.brass));
+      const cup = new THREE.Mesh(cupGeo, M.brass);
+      cup.position.set(0, -0.006, 0.11);
+      a.add(cup);
+      const mat = new THREE.MeshLambertMaterial({ color: '#e8d2a8', emissive: '#ffffff', emissiveMap: tulipTex, emissiveIntensity: 0, side: THREE.DoubleSide, transparent: true, opacity: 0.93 });
+      const glass = new THREE.Mesh(l.state === 'off' ? brokenTulip() : tulipGeo, mat); // les mortes ont la tulipe cassée
+      glass.position.set(0, 0, 0.11);
+      a.add(glass);
+      const bulbMat = new THREE.MeshBasicMaterial({ color: '#fff0c8' });
+      const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+      bulb.position.set(0, 0.04, 0.11);
+      if (l.state !== 'off') a.add(bulb);
+      const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#ffffff', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+      halo.scale.set(0.62, 0.62, 1);
+      halo.position.set(0, 0.07, 0.13);
+      a.add(halo);
+      lampShades.push({ l, mat, k: 1.25, bulb, halo });
     }
     // les lustres du hall sont des modèles (Chandelier_01, dans map.props)
   }
@@ -180,6 +195,9 @@ export function buildHotel({ map, group, baked, CEIL }) {
   }
 
   // --- 5. Le hall : comptoir de la réception, boîtes aux lettres, clavier, porte de l'escalier de secours ---
+  // (le sol de marbre, les tapis, les colonnes, le plafond à caissons, les portes vitrées, la trappe d'arrivée :
+  // view/hotelLobby.js)
+  buildHotelLobby({ map, group, baked, CEIL });
   const marble = lam({ color: '#d9d2c4' });
   for (const s of map.solids) {
     if (s.reception) {
@@ -234,13 +252,7 @@ export function buildHotel({ map, group, baked, CEIL }) {
       tuft.position.set(s.x, 0.97, s.z);
       group.add(seat, base, back, rim, tuft);
     } else if (s.column) {
-      // colonne de marbre, base et chapiteau de laiton
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.3, CEIL, 20), marble);
-      shaft.position.set(s.x, CEIL / 2, s.z);
-      group.add(shaft);
-      box(0.72, 0.18, 0.72, M.darkWood, s.x, 0.09, s.z);
-      box(0.66, 0.14, 0.66, M.brass, s.x, CEIL - 0.07, s.z);
-      box(0.58, 0.05, 0.58, M.brass, s.x, 0.2, s.z);
+      // (les colonnes : view/hotelLobby.js)
     } else if (s.cart) {
       // le chariot à bagages : plateau de moquette rouge, deux arceaux de laiton, quatre roues
       box(s.hx * 2, 0.06, s.hz * 2, M.blanket, s.x, 0.29, s.z);
@@ -326,45 +338,9 @@ export function buildHotel({ map, group, baked, CEIL }) {
     mg.add(paper);
     slots.push({ b, paper, char: '' });
   }
-  // le clavier à code, à côté de la porte de secours
-  const kp = map.keypad;
-  const kg = frame(kp.x, kp.z, kp.rot);
-  box(0.2, 0.3, 0.05, M.metal, 0, kp.y, 0.025, kg);
-  const kscreenMat = new THREE.MeshBasicMaterial({ color: '#1e3a20' });
-  box(0.14, 0.05, 0.01, kscreenMat, 0, kp.y + 0.09, 0.055, kg);
-  for (let i = 0; i < 12; i++) box(0.035, 0.03, 0.012, M.sheet, ((i % 3) - 1) * 0.05, kp.y + 0.02 - Math.floor(i / 3) * 0.045, 0.055, kg);
-  // la porte de secours : cadre, battant métallique peint, panneau EXIT, cage d'escalier sombre derrière
-  const E = map.elevator;
-  const eg = frame(E.x - E.dx * (C / 2), E.z - E.dz * (C / 2), Math.atan2(E.dx, E.dz)); // +z local : vers la cage
-  const DW = 1.2;
-  const DH = 2.2;
-  const side = (C - DW) / 2;
-  const wallMat = M.darkWood;
-  box(side, CEIL, 0.12, wallMat, -(DW / 2 + side / 2), CEIL / 2, 0.06, eg);
-  box(side, CEIL, 0.12, wallMat, DW / 2 + side / 2, CEIL / 2, 0.06, eg);
-  box(DW, CEIL - DH, 0.12, wallMat, 0, DH + (CEIL - DH) / 2, 0.06, eg);
-  const stair = new THREE.Mesh(new THREE.BoxGeometry(C - 0.1, CEIL, C - 0.2), M.stair);
-  stair.position.set(0, CEIL / 2, C / 2 + 0.05);
-  eg.add(stair);
-  const hinge = new THREE.Group();
-  hinge.position.set(-DW / 2, 0, 0.1);
-  eg.add(hinge);
-  box(DW - 0.04, DH - 0.04, 0.06, M.fire, (DW - 0.04) / 2, DH / 2, 0, hinge);
-  box(DW * 0.7, 0.05, 0.08, M.metal, DW / 2, 1.05, -0.05, hinge); // la barre anti-panique
-  const exitSign = label(128, 48, (c, w, h) => {
-    c.fillStyle = '#0d3a14';
-    c.fillRect(0, 0, w, h);
-    c.fillStyle = '#7dff8a';
-    c.font = 'bold 34px Arial, sans-serif';
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillText('EXIT', w / 2, h / 2 + 1);
-  });
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.16), new THREE.MeshBasicMaterial({ map: exitSign }));
-  sign.position.set(0, DH + 0.25, -0.01);
-  sign.rotation.y = Math.PI;
-  eg.add(sign);
-  let doorOpen = 0;
+  // la porte de secours et son clavier à code : view/hotelExit.js
+  const exitView = buildHotelExit({ map, group, baked, CEIL });
+  const liftsView = buildLifts({ map, group, baked });
 
   // --- 6. Le code au plafond du hall ---
   const codeTex = label(512, 192, (c, w, h) => {
@@ -386,7 +362,7 @@ export function buildHotel({ map, group, baked, CEIL }) {
   const codePlane = new THREE.Mesh(new THREE.PlaneGeometry(5, 1.9), codeMat);
   codePlane.rotation.x = Math.PI / 2;
   // lisible en levant les yeux, face au nord (depuis le fond du hall)
-  codePlane.position.set(map.lobbyCenter.x, CEIL - 0.02, map.lobbyCenter.z);
+  codePlane.position.set(map.lobbyCenter.x, (map.lobbyCeil || CEIL) - 0.02, map.lobbyCenter.z);
   group.add(codePlane);
   let codeK = 0;
 
@@ -420,7 +396,13 @@ export function buildHotel({ map, group, baked, CEIL }) {
 
   let flickT = 0;
   return {
+    // les feux de couleur de l'étage, pour le moteur de lumière (view/scene.js)
+    lights(out) {
+      exitView.lights(out);
+      if (liftsView) liftsView.lights(out);
+    },
     update(sim, P, time, dt) {
+      rooms.update(sim);
       // les lettres, une fois le mot connu (l'hôte l'envoie à ses invités)
       for (const p of papers) {
         const ch = sim.word[p.L.idx] || '?';
@@ -461,16 +443,14 @@ export function buildHotel({ map, group, baked, CEIL }) {
         if (s.l.state === 'flicker') on = Math.sin(tick * 12.9898 + s.l.x * 78.233) * 43758.5453 % 1 > -0.2 ? 0.9 : 0.1;
         if (sim.blackout > 0) on = 0;
         s.mat.emissiveIntensity = on * s.k;
+        if (s.bulb) s.bulb.visible = on > 0.5;
+        if (s.halo) s.halo.material.opacity = on * 0.42;
       }
       // le code au plafond, quand les 6 lettres sont postées : il s'allume en grésillant
       codeK = Math.min(1, codeK + (sim.codeShown ? dt * 0.4 : -dt));
       codeMat.opacity = Math.max(0, codeK) * (0.75 + Math.random() * 0.25);
       codePlane.visible = codeK > 0;
-      kscreenMat.color.set(sim.open ? '#3cff6a' : sim.codeShown ? '#c9ff9a' : '#1e3a20');
-      // la porte de secours s'ouvre quand le bon code est tapé
-      const want = sim.open ? 1 : 0;
-      doorOpen += Math.sign(want - doorOpen) * Math.min(Math.abs(want - doorOpen), dt / 1.4);
-      hinge.rotation.y = -doorOpen * 1.6;
+      exitView.update(sim, dt);
     },
   };
 }

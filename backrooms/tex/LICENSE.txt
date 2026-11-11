@@ -25,3 +25,10 @@ Level 37 (les Poolrooms) : ambientCG (https://ambientcg.com), domaine public (CC
   l37_sol.jpg     Tiles107   https://ambientcg.com/view?id=Tiles107   (grands carreaux blancs des sols)
   l37_bassin.jpg  Tiles132A  https://ambientcg.com/view?id=Tiles132A  (carreaux cyan des bassins)
   l37_fosse.jpg   Tiles135A  https://ambientcg.com/view?id=Tiles135A  (carreaux bleu profond)
+
+Level 5 (le Terror Hotel) : domaine public (CC0 1.0), recolorées et mêlées aux motifs dessinés dans backrooms/view/textures.js.
+Le papier peint, la moquette et le plafond reprennent papier.jpg, moquette_rase.jpg et plafond.jpg (plus haut).
+  l5_noyer.jpg          American Walnut Veneer  https://polyhaven.com/a/american_walnut_veneer  (Poly Haven, 1024 px : le lambris, les portes, les meubles)
+  l5_velours.jpg        Velour Velvet           https://polyhaven.com/a/velour_velvet           (Poly Haven, 512 px : rideaux, couvre-lits, banquettes)
+  l5_marbre_blanc.jpg   Marble012               https://ambientcg.com/view?id=Marble012         (ambientCG, 1024 px : le damier du hall, cases claires, colonnes)
+  l5_marbre_noir.jpg    Marble016               https://ambientcg.com/view?id=Marble016         (ambientCG, 1024 px : le damier du hall, cases sombres)
