@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.38 — 11 novembre 2026
+- **The Backrooms** — Le monstre du Level 1 change de corps, aux Poolrooms aussi : une grande silhouette voilée dans une longue robe, qui bouge vraiment.
+  - Elle marche en se déhanchant, les mains sur les hanches, puis court buste penché en pompant des bras, et se rue bras tendus vers toi.
+  - Elle a ses propres gestes : elle t'agrippe, titube quand on se dégage, abat ses deux poings sur une porte blindée, se tord quand l'imposteur reprend sa forme, se relève après être tombée d'une gaine et se jette sur la caméra au jumpscare.
+  - Ses pas s'entendent au rythme de sa marche et de sa course.
+
 ## 5.37 — 10 novembre 2026
 - **The Backrooms** — Les Poolrooms (Level 37) rattrapent le réalisme des Level 0 et 1.
   - Plus rien à ramasser : les trois toboggans sont ouverts dès l'arrivée, il suffit d'en trouver un dans le dédale. L'entité, elle, s'enhardit à mesure qu'on erre.

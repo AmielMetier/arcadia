@@ -249,14 +249,30 @@ function isFree(rig, k) {
   for (let o = rig[k].parent; o; o = o.parent) if (o === up) return false;
   return true;
 }
+// ni en T ni en A : les bras le long du corps, ou les coudes pliés (mains sur les hanches, bras croisés)
+function armsDown(rig) {
+  let n = 0;
+  for (const sd of ['L', 'R']) {
+    const a = rig['upperArm' + sd];
+    const b = rig['lowerArm' + sd];
+    const c = rig['hand' + sd];
+    if (!a || !b) continue;
+    const up = wpos(b).sub(wpos(a)).normalize();
+    const low = c ? wpos(c).sub(wpos(b)).normalize() : null;
+    if (up.y < -0.85 || (low && up.angleTo(low) > 0.7)) n++;
+  }
+  return n > 0;
+}
 function legLength(rig) {
   let l = 0;
   for (const [a, b] of [['upperLegL', 'lowerLegL'], ['lowerLegL', 'footL']]) if (rig[a] && rig[b]) l += wpos(rig[a]).distanceTo(wpos(rig[b], _v2));
   return l;
 }
 
-export function retarget(src, tgt, clip, fps = 30) {
-  // src, tgt : { holder, rig } normalisés (même sens, mêmes pieds au sol) ; rend un AnimationClip pour tgt
+export function retarget(src, tgt, clip, fps = 30, ref = null) {
+  // src, tgt : { holder, rig } normalisés (même sens, mêmes pieds au sol) ; rend un AnimationClip pour tgt.
+  // ref (un clip de la source, son attente) : la pose de la cible n'est pas en T ou en A (mains sur les hanches, bras
+  // croisés…) ; elle devient sa pose d'attente, et seul l'écart de la source à sa propre attente est repris
   const keys = ORDER.filter((k) => src.rig[k] && tgt.rig[k]);
   if (!keys.includes('hips')) return null;
   src.holder.updateMatrixWorld(true);
@@ -270,11 +286,23 @@ export function retarget(src, tgt, clip, fps = 30) {
     for (const k of keys) r[k] = { q: wquat(side.rig[k]), d: boneDir(side.rig, k, new THREE.Vector3()), lq: side.rig[k].quaternion.clone(), p: wpos(side.rig[k]) };
     return r;
   };
-  const srcRest0 = restOf(src); // (la pose de repos de la source : son clip à t = 0 ne l'est pas toujours)
+  let refMixer = null;
+  if (ref) {
+    refMixer = new THREE.AnimationMixer(src.root);
+    refMixer.clipAction(ref).play();
+    refMixer.setTime(0);
+    src.holder.updateMatrixWorld(true);
+  }
+  const srcRest0 = restOf(src); // (la pose de repos de la source, ou son attente : son clip à t = 0 ne l'est pas toujours)
+  if (refMixer) {
+    refMixer.stopAllAction();
+    refMixer.uncacheRoot(src.root);
+  }
   const tgtRest = restOf(tgt);
   // l'alignement de chaque os : la rotation qui amène la direction cible (au repos) sur la direction source (au repos)
   const align = {};
-  for (const k of keys) align[k] = new THREE.Quaternion().setFromUnitVectors(tgtRest[k].d, srcRest0[k].d);
+  // (avec ref, la cible garde sa propre pose : pas d'alignement, seul le mouvement passe)
+  for (const k of keys) align[k] = ref ? new THREE.Quaternion() : new THREE.Quaternion().setFromUnitVectors(tgtRest[k].d, srcRest0[k].d);
   const ratio = legLength(tgt.rig) / (legLength(src.rig) || 1) || 1;
   const n = Math.max(2, Math.round(clip.duration * fps) + 1);
   const times = new Float32Array(n);
@@ -287,15 +315,31 @@ export function retarget(src, tgt, clip, fps = 30) {
   const D = new THREE.Quaternion();
   const W = new THREE.Quaternion();
   const P = new THREE.Quaternion();
+  // un bras (ou une jambe) que le clip source n'anime pas, quand l'autre l'est (l'explorateur tient sa lampe de la
+  // main droite) : il reprend le mouvement de l'autre, en miroir et décalé d'un demi-cycle
+  const animated = (k) => clip.tracks.some((tr) => tr.name.startsWith(src.rig[k].name + '.') && tr.name.endsWith('quaternion'));
+  const other = (k) => (k.endsWith('L') ? k.slice(0, -1) + 'R' : k.endsWith('R') ? k.slice(0, -1) + 'L' : null);
+  const mirrored = keys.filter((k) => /Arm|hand/.test(k) && other(k) && !animated(k) && keys.includes(other(k)) && animated(other(k)));
+  const Dm = Object.fromEntries(mirrored.map((k) => [k, new THREE.Quaternion()]));
   for (let i = 0; i < n; i++) {
     const t = Math.min(clip.duration, (i / (n - 1)) * clip.duration);
     times[i] = t;
+    if (mirrored.length) {
+      mixer.setTime((t + clip.duration / 2) % clip.duration);
+      src.holder.updateMatrixWorld(true);
+      for (const k of mirrored) {
+        const o = other(k);
+        const q = wquat(src.rig[o], _q).multiply(_q2.copy(srcRest0[o].q).invert());
+        Dm[k].set(q.x, -q.y, -q.z, q.w); // (le miroir gauche-droite : x → -x)
+      }
+    }
     mixer.setTime(t);
     src.holder.updateMatrixWorld(true);
     // de la racine vers les bouts : chaque os cible se place, puis ses enfants le voient bouger
     for (const k of keys) {
       const b = tgt.rig[k];
-      D.copy(wquat(src.rig[k], _q)).multiply(_q2.copy(srcRest0[k].q).invert()); // la rotation monde de l'os source depuis son repos
+      if (Dm[k]) D.copy(Dm[k]);
+      else D.copy(wquat(src.rig[k], _q)).multiply(_q2.copy(srcRest0[k].q).invert()); // la rotation monde de l'os source depuis son repos
       W.copy(D).multiply(align[k]).multiply(tgtRest[k].q); // la rotation monde voulue pour l'os cible
       b.parent.updateWorldMatrix(true, false);
       wquat(b.parent, P);
@@ -349,7 +393,7 @@ const OWN = {
   drop: /land|fall|jump.?land|drop/,
 };
 const DONOR = { idle: 'Idle', walk: 'Walk', run: 'Run', stun: 'HitReact', bang: 'Punch', drop: 'Jump_Land', grab: 'Punch' };
-const LOOP = new Set(['idle', 'walk', 'run', 'grab', 'bang']);
+const LOOP = new Set(['idle', 'walk', 'run', 'rush', 'stun', 'bang']);
 
 // ---------------------------------------------------------------- la créature
 // opts : { url (ou buffer, un ArrayBuffer), height (m, 2,7 par défaut) }
@@ -357,7 +401,7 @@ export function createCreature(opts = {}) {
   const group = new THREE.Group();
   const info = { ok: false, error: null, warnings: [], tris: 0, meshes: 0, skinned: false, bones: 0, rig: {}, clips: [], uses: {}, bytes: 0, height: 0, textures: [] };
   const height = opts.height || 2.7;
-  const st = { root: null, rig: {}, mixer: null, acts: {}, w: {}, mats: [], last: { x: 0, z: 0, ok: false }, speed: 0, force: null, forceT: 0, t: 0, head: null, prevMimic: null, unmaskT: 0, low: null, gripT: 0, rest: [] };
+  const st = { root: null, rig: {}, mixer: null, acts: {}, w: {}, mats: [], last: { x: 0, z: 0, ok: false }, speed: 0, force: null, forceT: 0, t: 0, head: null, prevMimic: null, unmaskT: 0, unmaskLen: 1.1, low: null, gripT: 0, rest: [] };
 
   const ready = (async () => {
     try {
@@ -381,32 +425,46 @@ export function createCreature(opts = {}) {
       st.mats = fixMaterials(root, info);
       st.root = root;
       st.rig = rig;
+      st.arms = new Set(['upperArmL', 'upperArmR', 'lowerArmL', 'lowerArmR'].map((k) => rig[k]).filter(Boolean));
       st.holder = fx;
-      st.head = rig.head || null;
+      // la tête (le jumpscare la plaque devant l'objectif) : l'os de la tête, sinon un repère en haut du corps
+      if (rig.head) st.head = rig.head;
+      else {
+        st.head = new THREE.Object3D();
+        st.head.position.set(0, height * 0.9, 0.12);
+        fx.add(st.head);
+      }
       // les clips : les siens, puis ceux de l'explorateur pour ce qui manque
       const own = gltf.animations;
       const clips = {};
-      for (const s of Object.keys(OWN)) {
-        const c = own.find((a) => OWN[s].test(a.name.toLowerCase()));
+      for (const s of STATES) {
+        const name = (a) => a.name.toLowerCase().replace(/^.*\|/, '');
+        const c = own.find((a) => name(a) === s) || (OWN[s] && own.find((a) => OWN[s].test(name(a))));
         if (c) {
           clips[s] = c;
           info.uses[s] = `son clip « ${c.name} »`;
         }
       }
-      if (info.skinned && rig.hips && donor) {
+      if (info.skinned && rig.hips && donor && Object.keys(DONOR).some((k) => !clips[k])) {
         const dRoot = cloneSkinned(donor.gltf.scene);
         const dRig = findRig(dRoot);
         const DN = normalize(dRoot, dRig, height);
+        // ni en T ni en A (les bras le long du corps ou repliés) : sa pose sert d'attente (voir retarget)
+        const donorIdle = donor.gltf.animations.find((a) => a.name.endsWith('|Idle'));
+        const posed = armsDown(rig);
+        st.posed = posed;
+        if (posed) info.warnings.push("pose d'origine ni en T ni en A : elle sert de pose d'attente, les mouvements partent d'elle");
         for (const [s, name] of Object.entries(DONOR)) {
           if (clips[s]) continue;
           const src = donor.gltf.animations.find((a) => a.name.endsWith('|' + name));
-          const c = src && retarget({ holder: DN.holder, rig: dRig, root: dRoot }, { holder: N.holder, rig, root }, src);
+          const c = src && retarget({ holder: DN.holder, rig: dRig, root: dRoot }, { holder: N.holder, rig, root }, src, 30, posed ? donorIdle : null);
           if (c) {
             clips[s] = c;
             info.uses[s] = `l'explorateur (${name}), repris sur son squelette`;
           }
         }
       }
+      st.unmaskLen = clips.unmask && clipsOwn(info, 'unmask') ? clips.unmask.duration : 1.1;
       st.mixer = new THREE.AnimationMixer(root);
       for (const [s, c] of Object.entries(clips)) {
         const a = st.mixer.clipAction(c);
@@ -422,6 +480,11 @@ export function createCreature(opts = {}) {
       root.traverse((o) => {
         if (o.isBone) st.rest.push({ o, q: o.quaternion.clone(), p: o.position.clone() });
       });
+      // la hauteur de chaque pied au repos (les pas se comptent par rapport à elle)
+      group.updateMatrixWorld(true);
+      const fl = rig.footL || rig.lowerLegL;
+      const fr = rig.footR || rig.lowerLegR;
+      st.footRest = { L: fl ? wpos(fl).y - group.getWorldPosition(_v2).y : 0, R: fr ? wpos(fr).y - group.getWorldPosition(_v2).y : 0 };
       info.ok = true;
     } catch (e) {
       info.error = String((e && e.message) || e);
@@ -443,6 +506,8 @@ export function createCreature(opts = {}) {
   const ease = (a, b, k, dt) => a + (b - a) * Math.min(1, dt * k);
   const add = (b, x, y, z, k) => {
     if (!b || !k) return;
+    // (pose d'origine mains sur les hanches, bras croisés… : les gestes des bras, pensés pour un T, restent mesurés)
+    if (st.posed && st.arms.has(b)) k *= 0.4;
     _q.setFromEuler(new THREE.Euler(x * k, y * k, z * k));
     b.quaternion.multiply(_q);
   };
@@ -456,7 +521,7 @@ export function createCreature(opts = {}) {
     show(s) {
       st.force = s;
       st.cur = null; // (rejoue l'état depuis le début, même s'il était déjà montré)
-      if (s === 'unmask') st.unmaskT = 1.1;
+      if (s === 'unmask') st.unmaskT = st.unmaskLen;
     },
     // la hauteur (aperçu) : même mise aux normes, autre échelle
     get state() {
@@ -482,7 +547,7 @@ export function createCreature(opts = {}) {
       L0.z = M.z;
       L0.ok = true;
       // le démasquage : quand l'imposteur reprend sa forme
-      if (st.prevMimic != null && M.mimic == null) st.unmaskT = 1.1;
+      if (st.prevMimic != null && M.mimic == null) st.unmaskT = st.unmaskLen;
       st.prevMimic = M.mimic ?? null;
       st.unmaskT = Math.max(0, st.unmaskT - dt);
       if (st.force === 'unmask' && st.unmaskT <= 0) st.force = 'idle'; // (aperçu : le démasquage fini, il attend)
@@ -496,7 +561,7 @@ export function createCreature(opts = {}) {
       st.cur = s;
       for (const m of st.mats) if ('emissiveIntensity' in m) m.emissiveIntensity = Math.min(0.6, (light || 0) * 0.25);
       // les poids des clips : l'état voulu, ou ce qui le porte (la ruée court, le démasquage attend, le jumpscare saisit)
-      const base = { rush: 'run', unmask: 'idle', scare: st.acts.grab ? 'grab' : 'idle' }[s] || s;
+      const base = clipsOwn(info, s) ? s : { rush: 'run', unmask: 'idle', scare: st.acts.grab ? 'grab' : 'idle' }[s] || s;
       const has = (n) => (st.acts[n] ? n : null);
       const want = has(base) || (base === 'run' ? has('walk') : null) || has('idle');
       for (const n in st.acts) {
@@ -513,7 +578,7 @@ export function createCreature(opts = {}) {
 
       // --- par-dessus les clips : ce qui manque (sur les os reconnus ; sans squelette, tout le corps) ---
       const R = st.rig;
-      for (const k of ['rush', 'grab', 'stun', 'bang', 'unmask', 'scare', 'drop']) W[k] = ease(W[k] || 0, s === k ? 1 : 0, 10, dt);
+      for (const k of ['rush', 'grab', 'stun', 'bang', 'unmask', 'scare', 'drop']) W[k] = ease(W[k] || 0, s === k && !clipsOwn(info, k) ? 1 : 0, 10, dt);
       const t = st.t;
       // la ruée : la tête rejetée en arrière dans le cri, les bras ouverts, puis tout le corps penché en avant
       add(R.chest, -0.35 + 0.65 * Math.min(1, t / 0.5), 0, 0, W.rush);
@@ -535,7 +600,7 @@ export function createCreature(opts = {}) {
       add(R.upperArmL, -2.3 + hitL * 1.4, 0, 0.2, W.bang * (clipsOwn(info, 'bang') ? 0 : 1));
       add(R.upperArmR, -2.3 + hitR * 1.4, 0, -0.2, W.bang * (clipsOwn(info, 'bang') ? 0 : 1));
       // le démasquage : le corps se tord et se déplie dans tous les sens, de plus en plus fort, puis se redresse
-      const u = 1 - st.unmaskT / 1.1;
+      const u = 1 - st.unmaskT / st.unmaskLen;
       const tw = Math.sin(u * Math.PI) * W.unmask;
       add(R.spine, Math.sin(t * 31) * 0.4, Math.sin(t * 23) * 0.5, Math.sin(t * 29) * 0.3, tw);
       add(R.neck, Math.sin(t * 41) * 0.6, Math.sin(t * 17) * 0.8, 0, tw);
@@ -576,8 +641,10 @@ export function createCreature(opts = {}) {
       const fR = R.footR || R.lowerLegR;
       if (st.speed > 0.3 && fL && fR) {
         group.updateMatrixWorld(true);
-        const yL = wpos(fL, _v).y;
-        const yR = wpos(fR, _v2).y;
+        // (chacun par rapport à sa hauteur au repos : dans une pose asymétrique, un pied est toujours plus haut)
+        const g0 = group.getWorldPosition(_v2).y;
+        const yL = wpos(fL, _v).y - g0 - st.footRest.L;
+        const yR = wpos(fR, _v).y - g0 - st.footRest.R;
         const gap = 0.012 * (height / 1.8);
         const low = yL < yR - gap ? 'L' : yR < yL - gap ? 'R' : st.low;
         if (st.low && low !== st.low) foot = low;

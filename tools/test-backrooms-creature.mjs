@@ -104,12 +104,17 @@ await test('la marche de l\'explorateur, reprise sur ce modèle, reproduit chaqu
   const dir = (r, k, n) => r[n].getWorldPosition(new THREE.Vector3()).sub(r[k].getWorldPosition(new THREE.Vector3())).normalize();
   let ang = 0;
   let dy = 0;
+  const swing = { min: 1, max: -1 };
   for (const t of [0.1, 0.3, 0.5, 0.7, 0.9]) {
     ma.setTime(t);
     mb.setTime(t);
     A.holder.updateMatrixWorld(true);
     B.holder.updateMatrixWorld(true);
-    for (const [k, n] of [['upperLegL', 'lowerLegL'], ['upperLegR', 'lowerLegR'], ['upperArmR', 'lowerArmR'], ['upperArmL', 'lowerArmL'], ['spine', 'chest'], ['neck', 'head']]) ang = Math.max(ang, dir(ra, k, n).angleTo(dir(rb, k, n)));
+    for (const [k, n] of [['upperLegL', 'lowerLegL'], ['upperLegR', 'lowerLegR'], ['upperArmL', 'lowerArmL'], ['spine', 'chest'], ['neck', 'head']]) ang = Math.max(ang, dir(ra, k, n).angleTo(dir(rb, k, n)));
+    // (le bras droit de l'explorateur tient la lampe : immobile dans le clip, il prend le balancement du gauche en miroir)
+    const r = dir(rb, 'upperArmR', 'lowerArmR');
+    swing.min = Math.min(swing.min, r.z);
+    swing.max = Math.max(swing.max, r.z);
     for (const k of ['footL', 'footR', 'hips', 'head']) {
       ra[k].getWorldPosition(P);
       rb[k].getWorldPosition(Q);
@@ -118,6 +123,7 @@ await test('la marche de l\'explorateur, reprise sur ce modèle, reproduit chaqu
   }
   assert.ok(ang < Math.PI / 180, `directions (${((ang * 180) / Math.PI).toFixed(2)}°)`);
   assert.ok(dy < 0.03, `hauteurs (${(dy * 100).toFixed(1)} cm)`);
+  assert.ok(swing.max - swing.min > 0.3, `le bras droit se balance d'avant en arrière (${(swing.max - swing.min).toFixed(2)})`);
 });
 
 console.log(`\n${count} tests réussis pour le chargeur de créatures des Backrooms !`);
