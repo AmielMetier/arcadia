@@ -952,9 +952,10 @@ function checkPrint(fp) {
 }
 
 // en mode VIP, la clé du coffre part avec la partie : les invités l'ouvrent avant de la commencer
-const goMessage = () => ({ t: 'go', v: GAME_V, run: NET.run, seed: sim.seed, diff: sim.difficulty, players: sim.roster, lv: sim.level, vip: monstersVip, k: monstersVip ? vaultKey : undefined, dy: dailyLabel });
+const goMessage = () => ({ t: 'go', v: GAME_V, run: NET.run, seed: sim.seed, diff: sim.difficulty, players: sim.roster, lv: sim.level, l0: runFrom, vip: monstersVip, k: monstersVip ? vaultKey : undefined, dy: dailyLabel });
 
 let monstersVip = false;
+let runFrom = 0; // le niveau où la partie a commencé (l'écran de fin ne compte que les niveaux traversés)
 const TEST_BOT = 99;
 let testBot = false;
 // le bot de test : posé à 20-30 m du joueur, l'entité tout près de lui et déjà lancée sur lui (il ne se débat pas)
@@ -974,8 +975,9 @@ function placeTestBot() {
   Object.assign(M, { x: near.x, z: near.z, dormantT: 0, mode: 'chase', target: TEST_BOT, unseenT: 0, lastSeenX: B.x, lastSeenZ: B.z, lastSeenF: 0, path: [], repathT: 0, away: false });
 }
 
-function startRun({ seed, difficulty, players, run, level, vip = false }) {
+function startRun({ seed, difficulty, players, run, level, vip = false, from = level }) {
   NET.run = run;
+  runFrom = from || 0;
   camPrev.ok = false;
   trackSeq.clear();
   monstersVip = !!vip && vaultOpen(); // sans coffre ouvert, les monstres classiques
@@ -1148,7 +1150,7 @@ function onMsg(from, m) {
         NET.goWait = false;
         if (m.run === NET.run && sim) return;
         dailyLabel = typeof m.dy === 'string' ? m.dy.slice(0, 12) : null;
-        startRun({ seed: m.seed, difficulty: m.diff, players: m.players || [], run: m.run, level: m.lv || 0, vip });
+        startRun({ seed: m.seed, difficulty: m.diff, players: m.players || [], run: m.run, level: m.lv || 0, vip, from: Number.isInteger(m.l0) ? m.l0 : m.lv || 0 });
       };
       if (!m.vip) go(false);
       else {
@@ -1406,8 +1408,9 @@ function buildLevel(level) {
 }
 
 // au plus 8 s d'attente : une texture qui ne vient pas ne doit pas bloquer la partie (still : la demande compte encore)
+// puis les matériaux compilés (sc.compiled, qui se borne lui-même) : le niveau ne se montre que prêt à être dessiné
 function whenReady(sc, still, fn) {
-  Promise.race([sc.ready, new Promise((r) => setTimeout(r, 8000))]).then(() => {
+  Promise.all([Promise.race([sc.ready, new Promise((r) => setTimeout(r, 8000))]), sc.compiled]).then(() => {
     if (!still() || scene !== sc) return;
     requestAnimationFrame(() => {
       if (still() && scene === sc) fn();
@@ -2011,7 +2014,7 @@ function handleEvent(ev, me) {
       }
       if (sfx && ev.level === 2) sfx.splashDown();
       else if (sfx && ev.level !== HOTEL_LEVEL) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
-      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : ev.level === HOTEL_LEVEL ? 'YOU RUN DOWN THE FIRE ESCAPE, FLOOR AFTER FLOOR…' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
+      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : ev.level === HOTEL_LEVEL ? 'YOU RUN DOWN THE FIRE ESCAPE, FLOOR AFTER FLOOR…' : ev.level === PIPES_LEVEL ? 'THE SERVICE ELEVATOR IS CLIMBING… AND CLIMBING…' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
       break;
     case 'level':
       if (hud) hud.closeKeypad();
@@ -2182,7 +2185,7 @@ function handleEvent(ev, me) {
         best = Math.max(rec.key === key ? rec.best || 0 : 0, sim.time);
         store.set('backrooms_daily', { key, best });
       }
-      if (hud) hud.showEnd(sim, NET.role === 'guest' ? null : () => initGame(), { stats: runStats, daily: dailyLabel, best, abyss: lastAbyss && ev.type === 'gameover', thirst: lastThirst && ev.type === 'gameover' });
+      if (hud) hud.showEnd(sim, NET.role === 'guest' ? null : () => initGame(), { stats: runStats, from: runFrom, daily: dailyLabel, best, abyss: lastAbyss && ev.type === 'gameover', thirst: lastThirst && ev.type === 'gameover' });
       if (H && H.embedded && NET.role !== 'guest') {
         const won = ev.type === 'win';
         // la vraie fin vaut bien plus qu'une fausse sortie, qui vaut plus que de mourir loin (Level 2 compris)
@@ -2690,13 +2693,7 @@ function frame(currentTime) {
         if (left <= 0) sfx.step(stepKind(O), { x: O.x, z: O.z, muffled: (O.floor || 0) !== (V.floor || 0) }, O.running ? 1 : 0.7);
         otherStepT.set(O.id, left <= 0 ? (O.running ? 0.32 : 0.5) : left);
       }
-      // l'imposteur : les pas d'un joueur qui marche (pas les siens, lourds)
-      const Mm = sim.hasMonster ? sim.monster : null;
-      if (Mm && Mm.mimic != null && (Mm.v || 0) > 0.3 && !paused) {
-        const left = (otherStepT.get('M') ?? 0.2) - delta;
-        if (left <= 0) sfx.step(stepKind(Mm), { x: Mm.x, z: Mm.z, muffled: (Mm.floor || 0) !== (V.floor || 0) }, 0.7);
-        otherStepT.set('M', left <= 0 ? 0.52 : left);
-      } else otherStepT.delete('M');
+      // l'imposteur, lui, marche sans un bruit : un indice pour qui tend l'oreille (ni ses pas lourds, ni ceux d'un joueur)
     }
     if (sfx) {
       // le souffle : sprint, puis halètement le temps de récupérer, et la peur quand l'entité est là

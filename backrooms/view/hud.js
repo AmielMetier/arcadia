@@ -1275,26 +1275,30 @@ export class BackroomsHUD {
     const d = this.$('#tapeDate').textContent;
     if (sim.state === 'won') {
       const sl = slideOf(sim);
+      // les niveaux traversés, depuis celui où la partie a commencé (un départ plus loin n'en compte pas d'autres)
+      const from = extra.from || 0;
+      const done = [0, 1, 2, sim.level].filter((l, i, a) => a.indexOf(l) === i && (from > 2 ? l === sim.level : l >= from)).map(levelName);
+      const cleared = `Level ${done.length > 1 ? `${done.slice(0, -1).join(', ')} and ${done[done.length - 1]}` : done[0]} cleared`;
       if (sim.level === HOTEL_LEVEL) {
         // le Terror Hotel : par l'escalier de secours
         title.textContent = solo ? 'YOU ESCAPED' : 'YOU ALL ESCAPED';
         title.style.color = '#22c55e';
         sub.textContent = 'The fire escape spiralled down for hours, then opened onto daylight. The hotel let you go… this time.';
-        stats.textContent = `HOTEL ENDING · ${formatTime(sim.time)} · Level 0, 1, 37 and 5 cleared`;
+        stats.textContent = `HOTEL ENDING · ${formatTime(sim.time)} · ${cleared}`;
         this.$('#endTape').textContent = `${d} · CHECK-OUT`;
       } else if (sim.level === PIPES_LEVEL) {
         // la vraie fin : par le toboggan jaune et les tuyauteries
         title.textContent = solo ? 'YOU ESCAPED' : 'YOU ALL ESCAPED';
         title.style.color = '#22c55e';
         sub.textContent = 'The service elevator climbed for a long time. Then daylight, real daylight, through a crack in a door. Nobody is humming.';
-        stats.textContent = `TRUE ENDING · ${formatTime(sim.time)} · Level 0, 1, 37 and 2 cleared`;
+        stats.textContent = `TRUE ENDING · ${formatTime(sim.time)} · ${cleared}`;
         this.$('#endTape').textContent = `${d} · FINAL TAPE · DO NOT ERASE`;
       } else {
         // la fausse sortie : rouge ou bleu… on se réveille sur la moquette du Level 0
         title.textContent = 'YOU WOKE UP';
         title.style.color = '#ffcf3a';
         sub.textContent = `The ${sl ? sl.name.toLowerCase() : ''} slide spat you out onto wet carpet. The lights hum. The wallpaper is yellow. Level 0, again. Maybe the yellow slide…`.replace('The  slide', 'The slide');
-        stats.textContent = `LOOP ENDING · ${formatTime(sim.time)} · Level 0, 1 and 37 cleared`;
+        stats.textContent = `LOOP ENDING · ${formatTime(sim.time)} · ${cleared}`;
         this.$('#endTape').textContent = `${d} · TAPE ENDS · REWIND?`;
       }
     } else {
@@ -1366,6 +1370,12 @@ export class BackroomsHUD {
     this.lastPause = [visible, kb, title, resume];
     this.$('#clickPrompt').style.display = visible ? 'block' : 'none';
     this.$('#clickPrompt').classList.toggle('title', !!title);
+    // derrière l'écran titre, ni bandeau d'objectif ni aide des touches (ils dépassaient de la carte) ; le bandeau
+    // revient en entier quand on prend la main (son temps s'écoulait pendant qu'on lisait l'écran titre)
+    const titled = !!(visible && title);
+    if (this.titled && !titled) this.bannerT = Math.max(this.bannerT || 0, 9);
+    this.titled = titled;
+    this.el.classList.toggle('titled', titled);
     this.$('#titleCard').hidden = !title;
     this.$('#pauseTitle').hidden = !!title;
     const btn = this.$('#btnContinue');

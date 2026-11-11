@@ -1,5 +1,69 @@
 # Journal des versions — Arcadia
 
+## 5.74 — 11 novembre 2026
+- **The Backrooms** — Tuyauteries : le jeu ne dessine plus les tuyaux, lampes et machines des galeries voisines, cachés derrière les murs. Même image, environ un tiers de travail en moins pour la carte graphique.
+
+## 5.73 — 11 novembre 2026
+- **The Backrooms** — Terror Hotel : le jeu ne dessine plus les meubles cachés derrière un mur. Même image, mais presque moitié moins de travail pour la carte graphique dans le hall, et bien moins encore dans les couloirs : le niveau est plus fluide sur un PC modeste.
+
+## 5.72 — 11 novembre 2026
+- **The Backrooms** — L'arrivée dans un niveau ne fige plus la page. Pendant le chargement, l'écran « LOADING » reste vivant, et le niveau n'apparaît qu'une fois prêt à être dessiné, sans saccades au premier regard. Sur un PC modeste, les Poolrooms s'affichent en quelques secondes au lieu de plusieurs dizaines.
+
+## 5.71 — 11 novembre 2026
+- **The Backrooms** — Un vrai réglage pour les PC modestes :
+  - en qualité « Basse », le carrelage des Poolrooms est dessiné intact (sans carreaux tombés ni fêlés) : c'était le plus lourd à calculer. Sur une puce graphique intégrée, le niveau passe d'environ 30 à plus de 50 images par seconde ;
+  - en qualité « Auto », le jeu passe de lui-même à ces effets allégés quand l'image peine encore à la définition la plus basse, au lieu de rester saccadé jusqu'à la fin du niveau.
+
+## 5.70 — 11 novembre 2026
+- **The Backrooms** — Poolrooms : l'image demande moins de calcul à la carte graphique, pour le même rendu. De quoi gagner un peu de fluidité sur un PC modeste.
+
+## 5.69 — 11 novembre 2026
+- **The Backrooms** — Level 1 : l'imposteur laisse deux indices à qui fait attention.
+  - Il marche sans faire le moindre bruit de pas.
+  - Si tu siffles près de lui, il se fige une seconde ou deux avant de repartir.
+
+## 5.68 — 11 novembre 2026
+- **The Backrooms** — Level 1, l'entité est mieux finie :
+  - elle se courbe pour passer la porte du poste de garde et celles des salles de sécurité, au lieu de traverser le mur du dessus avec la tête ;
+  - devant une porte blindée, chacun de ses coups tombe avec son bruit. Les coups sont aussi un peu plus réguliers.
+
+## 5.67 — 11 novembre 2026
+- **The Backrooms** — Level 0, étage du haut : les murs ne sont plus tout à fait neufs. Quelques auréoles pâles et un peu d'humidité au pied du papier peint, par endroits. L'étage du bas reste bien plus défraîchi.
+
+## 5.66 — 11 novembre 2026
+- **The Backrooms** — L'écran titre est plus net : le bandeau d'objectif, l'aide des touches et les cases d'objets ne dépassent plus derrière la carte. Le bandeau d'objectif s'affiche en entier quand tu prends la main, au lieu de s'écouler pendant que tu lis l'écran titre.
+
+## 5.65 — 11 novembre 2026
+- **The Backrooms** — Au début de chaque niveau, l'aide des touches en bas à gauche ne passe plus sous les cases d'objets : sur un écran de moins de 1540 px de large, elle revient à la ligne.
+
+## 5.64 — 11 novembre 2026
+- **The Backrooms** — L'écran de fin ne cite plus que les niveaux vraiment traversés : une partie commencée plus loin (« Continuer », ou le niveau de départ des VIP) n'annonce plus le Level 0 et le Level 1 comme réussis.
+
+## 5.63 — 11 novembre 2026
+- **The Backrooms** — Level 1 : après une poursuite, tu as vraiment le temps de souffler. Pendant le répit, l'imposteur garde ses distances et se tait, au lieu de revenir sous une autre apparence à peine semé.
+
+## 5.62 — 11 novembre 2026
+- **The Backrooms** — Level 5, le digicode de la porte de secours :
+  - il faut être devant le clavier pour que le code compte ;
+  - un code faux s'entend : l'entité vient voir ce qui se passe près de la porte. Fini de taper des codes au hasard.
+
+## 5.61 — 11 novembre 2026
+- **The Backrooms** — Level 1 : caché dans un casier, tu n'es plus pris au piège par l'imposteur. Il attend devant en t'appelant une dizaine de secondes, puis renonce et s'éloigne (avant, il campait là sans fin, et sortir, c'était mourir).
+- **The Backrooms** — En quittant les Tuyauteries, l'écran parle bien du monte-charge de service qui remonte, et plus d'un toboggan.
+
+## 5.60 — 11 novembre 2026
+- **The Backrooms** — Level 5 : on ne meurt plus en posant le pied dans l'hôtel.
+  - L'entité reste au loin pendant les 30 premières secondes (un peu moins en difficile) : le temps de repérer les chambres et les cachettes
+  - Ensuite, rien ne change : un seul contact reste mortel
+
+## 5.59 — 11 novembre 2026
+- **The Backrooms** — Level 1 à plusieurs : la porte du poste de garde s'affiche comme chez l'hôte pour un joueur qui arrive ou revient en cours de partie (il pouvait la voir fermée alors qu'elle était ouverte, et buter dessus).
+
+## 5.58 — 11 novembre 2026
+- **The Backrooms** — Level 1 : l'arrivée est vraiment calme.
+  - Déguisée en joueur, l'entité venait droit sur l'équipe dès la première seconde ; elle reste maintenant au loin pendant les 50 premières secondes, sans appeler ni forcer un rideau, et s'écarte de qui s'approche
+  - Passé ce répit, elle vient vous chercher comme avant
+
 ## 5.57 — 11 novembre 2026
 - **Odyssée** — Graphismes « Noir & Blanc » : fini les textures découpées dehors.
   - Les chemins de sable, les plages, les routes pavées et les rives de la mer ont maintenant leurs coins arrondis partout, même dans les virages et les recoins : plus de carrés coupés net.
@@ -26,16 +90,13 @@
   - En Noir & Blanc, le HUD prend les gris et le rouge du menu de Noir 2 & Blanc 2.
 
 ## 5.54 — 11 novembre 2026
-- **Hub** — Nouveau : le monstre du Level 1 change de corps, avec ses propres animations (TahitoaSenis)
-  - Models/level1/entite.glb : une silhouette voilée, 26 os, 10 clips nommés comme les états du jeu
-  - View/creature.js : un clip nommé comme l'état est joué tel quel (rien de l'explorateur, pas de gestes ajoutés) ; prise, démasquage, chute et jumpscare joués une fois ; démasquage de la durée de son clip ; pas comptés par rapport à la hauteur de repos de chaque pied
-  - Scene.js : la nouvelle entité au Level 1 et aux Poolrooms (hors mode VIP)
-- Nouveau : au Level 1, l'entité est un imposteur dès le début ; sprint plus lent de côté et à reculons (TahitoaSenis)
-  - L'entité commence avec l'apparence d'un joueur, marche à sa vitesse et ne se dévoile que tout près (la lampe ne la trahit plus)
-  - La transformation dure une seconde sur place, puis elle chasse un peu plus vite qu'un sprint ; loin de tous et hors de vue, elle reprend une apparence
-  - L'imposteur a son propre avatar (celui qu'il imite peut être vivant à côté)
-  - Le sprint : toute la vitesse droit devant, 72 % de côté, 60 % en arrière
-- **Hub** — Nouveau : au Level 1, la prise du monstre devient une étreinte qui étouffe (TahitoaSenis)
+- **The Backrooms** — Le monstre du Level 1 change de corps : une silhouette voilée, avec ses propres animations (marche, course, prise, chute, cri). On la croise aussi aux Poolrooms.
+- **The Backrooms** — Au Level 1, l'entité est un imposteur dès le début :
+  - elle commence avec l'apparence d'un joueur, marche à sa vitesse et ne se dévoile que tout près (la lampe ne la trahit plus) ;
+  - sa transformation dure une seconde sur place, puis elle chasse un peu plus vite qu'un sprint ; loin de tous et hors de vue, elle reprend une apparence ;
+  - celui qu'elle imite peut être vivant, juste à côté.
+- **The Backrooms** — Le sprint dépend du sens : toute la vitesse droit devant, 72 % de côté, 60 % en arrière.
+- **The Backrooms** — Au Level 1, la prise du monstre devient une étreinte qui étouffe.
 
 ## 5.53 — 11 novembre 2026
 - **The Backrooms** — Les joueurs VIP choisissent le niveau où commence la partie.
@@ -332,7 +393,7 @@
 ## 5.1 — 9 novembre 2026
 - Modify NOTES entries in hud.js (Metier Amiel)
 
-## 5.00 — 9 novembre 2026
+## 5.0 — 9 novembre 2026
 - **The Backrooms** — Une voix sur le talkie : « The Old Timer », là depuis toujours, prend parfois la parole sur le canal 9. Tout le monde l'entend en même temps, deux ou trois fois par niveau, jamais pendant une poursuite. Il aide un peu… et il en sait beaucoup trop. Quand il ne reste qu'un survivant, il ne parle plus qu'à lui.
 
 ## 4.99 — 9 novembre 2026
