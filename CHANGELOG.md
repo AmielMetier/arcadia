@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.63 — 11 novembre 2026
+- **The Backrooms** — L'écran titre est plus net : le bandeau d'objectif, l'aide des touches et les cases d'objets ne dépassent plus derrière la carte. Le bandeau d'objectif s'affiche en entier quand tu prends la main, au lieu de s'écouler pendant que tu lis l'écran titre.
+
 ## 5.62 — 11 novembre 2026
 - **The Backrooms** — Au début de chaque niveau, l'aide des touches en bas à gauche ne passe plus sous les cases d'objets : sur un écran de moins de 1540 px de large, elle revient à la ligne.
 

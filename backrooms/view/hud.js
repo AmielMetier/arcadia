@@ -1370,6 +1370,12 @@ export class BackroomsHUD {
     this.lastPause = [visible, kb, title, resume];
     this.$('#clickPrompt').style.display = visible ? 'block' : 'none';
     this.$('#clickPrompt').classList.toggle('title', !!title);
+    // derrière l'écran titre, ni bandeau d'objectif ni aide des touches (ils dépassaient de la carte) ; le bandeau
+    // revient en entier quand on prend la main (son temps s'écoulait pendant qu'on lisait l'écran titre)
+    const titled = !!(visible && title);
+    if (this.titled && !titled) this.bannerT = Math.max(this.bannerT || 0, 9);
+    this.titled = titled;
+    this.el.classList.toggle('titled', titled);
     this.$('#titleCard').hidden = !title;
     this.$('#pauseTitle').hidden = !!title;
     const btn = this.$('#btnContinue');
