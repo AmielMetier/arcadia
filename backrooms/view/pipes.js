@@ -1109,7 +1109,7 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
     win.position.set(bx + d[0] * 0.145, 0.45, bz + d[1] * 0.145);
     win.rotation.y = Math.atan2(d[0], d[1]);
     group.add(win);
-    burners.push({ win, ph: rnd() * 10, x: bx, z: bz, dx: d[0], dz: d[1] });
+    burners.push({ win, ph: rnd() * 10, x: bx, z: bz, dx: d[0], dz: d[1], v: b.valve });
     // manomètre sur le corps
     const gm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.04, 20), lambert({ map: tx.gauge }));
     gm.position.set(b.x + d[0] * 0.93, 1.55, b.z + d[1] * 0.93);
@@ -1453,7 +1453,7 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
         vv.needle.rotation.z = Math.PI * 0.75 - pr * Math.PI * 1.5;
         vv.lamp.material.color.set(vv.v.closed ? '#2bff6a' : vv.v.turn > 0 ? (Math.sin(time * 14) > 0 ? '#ffb020' : '#ff2a1a') : '#ff2a1a');
       }
-      plant.update(time);
+      plant.update(time, dt);
       // les gouttes : les plus proches du joueur ; chacune tombe (chute libre), puis son rond s'étale dans la flaque
       if (dripPool.length) {
         const near6 = condens.map((d) => [d, (d.x - P.x) ** 2 + (d.z - P.z) ** 2]).sort((a, b) => a[1] - b[1]).slice(0, dripPool.length);
@@ -1484,7 +1484,10 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
       }
       // brûleurs : la flamme danse derrière la lucarne
       for (const b of burners) {
-        const k = 0.55 + Math.sin(time * 7 + b.ph) * 0.15 + Math.sin(time * 23 + b.ph * 3) * 0.1 + Math.random() * 0.1;
+        // (la vanne de la chaufferie fermée, le brûleur s'éteint : il ne reste que des braises)
+        const v = (map.valves || [])[b.v];
+        b.fire = Math.max(0.15, Math.min(1, (b.fire ?? 1) + (v && v.closed ? -dt * 0.4 : dt * 0.8)));
+        const k = (0.55 + Math.sin(time * 7 + b.ph) * 0.15 + Math.sin(time * 23 + b.ph * 3) * 0.1 + Math.random() * 0.1) * b.fire;
         b.win.material.color.setRGB(1.6 * k, 0.62 * k, 0.15 * k);
       }
       // disjoncteurs : levier en bas et voyant rouge qui clignote quand le secteur est noir, vert une fois réarmé

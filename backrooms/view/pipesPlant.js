@@ -138,7 +138,7 @@ export function buildPlant({ map, group, bin, lambert, phong, M, tx, CEIL, at, r
     peep.position.set(px, 1.08, pz);
     peep.rotation.y = ry;
     group.add(peep);
-    flick.push({ mat: peep.material, ph: rnd() * 10, k: 1.25 });
+    flick.push({ mat: peep.material, ph: rnd() * 10, k: 1.25, v: b.valve });
     f.ring(bin('pf-peepring', torusGeo, M.handle), 'z', 0.02, 1.08, 0.963, 0.05);
     // le niveau d'eau : deux robinets et un tube de verre entre eux, l'eau au tiers ; tourné de 50° vers la gauche
     const fl = frame(b.x, b.z, ry - 0.85);
@@ -381,9 +381,11 @@ export function buildPlant({ map, group, bin, lambert, phong, M, tx, CEIL, at, r
         out.push({ x: p.at.x, y: p.at.y, z: p.at.z, r: c.r, g: c.g, b: c.b, rad: 1.7, nx: p.nx, ny: -0.1, nz: p.nz, w: -0.5 });
       }
     },
-    update(time) {
+    update(time, dt) {
       for (const fl of flick) {
-        const k = (0.55 + Math.sin(time * 7 + fl.ph) * 0.15 + Math.sin(time * 23 + fl.ph * 3) * 0.1 + Math.random() * 0.1) * fl.k;
+        const v = (map.valves || [])[fl.v];
+        fl.fire = Math.max(0.15, Math.min(1, (fl.fire ?? 1) + (v && v.closed ? -dt * 0.4 : dt * 0.8)));
+        const k = (0.55 + Math.sin(time * 7 + fl.ph) * 0.15 + Math.sin(time * 23 + fl.ph * 3) * 0.1 + Math.random() * 0.1) * fl.k * fl.fire;
         fl.mat.color.setRGB(1.6 * k, 0.62 * k, 0.15 * k);
       }
       for (const p of panels) {

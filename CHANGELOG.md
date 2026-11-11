@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 5.50 — 11 novembre 2026
+- **The Backrooms** — Les Tuyauteries s'entendent :
+  - les chaudières grondent : le souffle de la flamme, son crépitement, la tôle qui vibre ; on les entend étouffées depuis la galerie, en plein en entrant dans la chaufferie ;
+  - fermer la vanne d'une chaufferie éteint ses brûleurs : le grondement se tait et la flamme retombe en braises derrière le judas ;
+  - les pompes ronronnent et chuintent, les armoires électriques bourdonnent ; plus de courant dans le secteur, elles se taisent ;
+  - de l'eau dévale parfois une conduite au-dessus de toi, en glouglous qui passent d'un bout de la galerie à l'autre ;
+  - un tuyau qui se dilate fait quelques tics secs tout près.
+
 ## 5.49 — 11 novembre 2026
 - **The Backrooms** — Les galeries des Tuyauteries, plus vraies :
   - les gros tuyaux portent leurs bandes de marquage, avec le nom du fluide et la flèche du sens d'écoulement : eau chaude, vapeur, eau froide, air comprimé, gaz ;
