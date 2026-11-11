@@ -94,6 +94,31 @@ function dangerTexture() {
   return t;
 }
 
+// la plaque du monte-charge : lettres pochées en noir sur tôle jaune
+function liftPlateTexture() {
+  const cv = document.createElement('canvas');
+  cv.width = 512;
+  cv.height = 160;
+  const c = cv.getContext('2d');
+  c.fillStyle = '#c99a18';
+  c.fillRect(0, 0, 512, 160);
+  c.strokeStyle = '#1b1a17';
+  c.lineWidth = 8;
+  c.strokeRect(10, 10, 492, 140);
+  c.fillStyle = '#1b1a17';
+  c.textAlign = 'center';
+  c.font = 'bold 64px "Arial Narrow", Arial, sans-serif';
+  c.fillText('SERVICE LIFT', 256, 82);
+  c.font = 'bold 34px "Arial Narrow", Arial, sans-serif';
+  c.fillText('MAX 2000 KG \u00b7 NO PASSENGERS', 256, 130);
+  // la crasse : des coulures sombres
+  c.globalAlpha = 0.18;
+  for (let i = 0; i < 14; i++) c.fillRect((i * 97) % 500, 140, 6 + (i % 3) * 4, -20 - ((i * 53) % 60));
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 export function buildPlant({ map, group, bin, lambert, phong, M, tx, CEIL, at, rnd }) {
   const W = map.W;
   const H = map.H;
@@ -488,6 +513,122 @@ export function buildPlant({ map, group, bin, lambert, phong, M, tx, CEIL, at, r
     }
   }
 
+  // --- 5. Le monte-charge de service (la sortie) ---
+  // L'ascenseur commun est habillé en monte-charge : des chevrons jaunes et noirs autour de la baie, des butoirs d'acier
+  // au pied des montants, une bande de danger au sol, la plaque « SERVICE LIFT », un boîtier de voyants d'appel (rouge
+  // tant que les vannes sont ouvertes, vert ensuite) et un gyrophare orange qui tourne dès que la sortie est ouverte.
+  // Leurs feux passent par le moteur de lumière.
+  let lift = null;
+  const E = map.elevator;
+  if (E && !E.fire) {
+    // origine au milieu de la baie, au ras de la façade ; +z sort du mur (vers le couloir)
+    const f = frame(E.x - E.dx * (C / 2), E.z - E.dz * (C / 2), Math.atan2(E.dx, E.dz) + Math.PI);
+    const ry = Math.atan2(E.dx, E.dz) + Math.PI;
+    const stripe = (w, h, d, lx, y, lz, vertical, flat) => {
+      const t = hazardTexture();
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      const len = vertical ? h : w;
+      const thick = flat ? d : vertical ? w : h;
+      if (vertical) {
+        t.center.set(0.5, 0.5);
+        t.rotation = Math.PI / 2;
+      }
+      t.repeat.set(len / (8 * thick), 1);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), lambert({ map: t, alphaTest: 0.5 }));
+      const [x, z] = f.P(lx, lz);
+      m.position.set(x, y, z);
+      m.rotation.y = ry;
+      group.add(m);
+    };
+    const XJ = 0.79; // l'axe des montants peints, juste à côté du cadre d'inox (qui va jusqu'à 0,71)
+    stripe(0.15, 1.36, 0.016, -XJ, 1.68, 0.008, true);
+    stripe(0.15, 1.36, 0.016, XJ, 1.68, 0.008, true);
+    stripe(1.73, 0.1, 0.016, 0, 2.41, 0.008, false);
+    // les butoirs : des cornières d'acier peintes en jaune, le haut en noir, cabossées par les transpalettes
+    for (const sx of [-1, 1]) {
+      f.box(bin('lift-bumper', unitBox, P_.guard), sx * XJ, 0.5, 0.045, 0.16, 1.0, 0.09);
+      f.box(bin('lift-bumpcap', unitBox, P_.black), sx * XJ, 1.0, 0.045, 0.165, 0.03, 0.095);
+      for (const y of [0.25, 0.75]) f.box(bin('bolt', unitBox, M.handle), sx * XJ, y, 0.093, 0.03, 0.03, 0.01);
+    }
+    // la bande de danger au sol, en U devant les portes (le passage des chariots)
+    stripe(1.9, 0.006, 0.16, 0, 0.004, 1.25, false, true);
+    for (const sx of [-1, 1]) {
+      const t = hazardTexture();
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(1.1 / (8 * 0.16), 1);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.006, 0.16), lambert({ map: t, alphaTest: 0.5 }));
+      const [x, z] = f.P(sx * 0.87, 0.67);
+      m.position.set(x, 0.004, z);
+      m.rotation.y = ry + Math.PI / 2;
+      group.add(m);
+    }
+    // la plaque, à hauteur des yeux au-dessus des voyants d'appel (plus haut, les tuyaux du mur la cacheraient)
+    {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.11, 0.01), [P_.guard, P_.guard, P_.guard, P_.guard, lambert({ map: liftPlateTexture() }), P_.guard]);
+      const [x, z] = f.P(1.02, 0.006);
+      m.position.set(x, 1.82, z);
+      m.rotation.y = ry;
+      group.add(m);
+      for (const sx of [0.87, 1.17]) f.box(bin('bolt', unitBox, M.handle), sx, 1.82, 0.012, 0.014, 0.014, 0.006);
+    }
+    // et au sol, dans le U de la bande, « KEEP CLEAR » peint au pochoir, usé par les roues
+    {
+      const cv = document.createElement('canvas');
+      cv.width = 512;
+      cv.height = 128;
+      const c = cv.getContext('2d');
+      c.fillStyle = '#d9a514';
+      c.textAlign = 'center';
+      c.font = 'bold 92px "Arial Narrow", Arial, sans-serif';
+      c.fillText('KEEP CLEAR', 256, 100);
+      const d = c.getImageData(0, 0, 512, 128);
+      let q = 991;
+      const r = () => ((q = (q * 16807) % 2147483647) / 2147483647);
+      for (let k = 0; k < 260; k++) {
+        const cx = r() * 512;
+        const cy = r() * 128;
+        const rad = 1 + r() * 6;
+        for (let y = Math.max(0, Math.floor(cy - rad)); y < Math.min(128, cy + rad); y++) for (let x = Math.max(0, Math.floor(cx - rad)); x < Math.min(512, cx + rad); x++) if ((x - cx) ** 2 + (y - cy) ** 2 < rad * rad) d.data[(y * 512 + x) * 4 + 3] = 0;
+      }
+      c.putImageData(d, 0, 0);
+      const t = new THREE.CanvasTexture(cv);
+      t.colorSpace = THREE.SRGBColorSpace;
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(1.36, 0.34), lambert({ map: t, alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+      const [x, z] = f.P(0, 0.72);
+      m.position.set(x, 0.006, z);
+      // à plat, lisible depuis le couloir (le haut des lettres vers les portes)
+      m.rotation.order = 'YXZ';
+      m.rotation.set(-Math.PI / 2, ry, 0);
+      group.add(m);
+    }
+    // le boîtier des voyants d'appel : du côté opposé aux boutons
+    f.box(bin('lift-callbox', unitBox, P_.black), 0.99, 1.42, 0.03, 0.13, 0.3, 0.06);
+    const callLamps = [];
+    for (const [y, off] of [[1.5, '#3a0805'], [1.34, '#06300f']]) {
+      f.cyl(bin('pn-bezel', cylGeoS, M.handle), 'z', 0.99, y, 0.062, 0.036, 0.012);
+      const m = new THREE.Mesh(sphGeo, new THREE.MeshBasicMaterial({ color: off }));
+      const [x, z] = f.P(0.99, 0.068);
+      m.position.set(x, y, z);
+      m.scale.set(0.028, 0.028, 0.016);
+      m.rotation.y = ry;
+      group.add(m);
+      callLamps.push(m);
+    }
+    // le gyrophare orange, sur sa potence, au coin du cadre
+    const GX = -0.98;
+    const GY = 2.52;
+    f.box(bin('lift-arm', unitBox, M.frame), GX, GY - 0.05, 0.09, 0.05, 0.05, 0.18);
+    f.box(bin('lift-armplate', unitBox, M.frame), GX, GY - 0.05, 0.005, 0.12, 0.14, 0.01);
+    f.cyl(bin('lift-gbase', cylGeoS, P_.black), 'y', GX, GY, 0.17, 0.075, 0.06);
+    const domeMat = new THREE.MeshBasicMaterial({ color: '#4a2206' });
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.068, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), domeMat);
+    const [gx, gz] = f.P(GX, 0.17);
+    dome.position.set(gx, GY + 0.03, gz);
+    group.add(dome);
+    const [lx, lz] = f.P(0.99, 0.25);
+    lift = { domeMat, callLamps, x: gx, y: GY + 0.07, z: gz, call: { x: lx, y: 1.42, z: lz }, nx: -E.dx, nz: -E.dz, k: 0, a: 0, open: 0, blink: 0 };
+  }
+
   const tmp = new THREE.Color();
   return {
     // le moteur de lumière : un voyant d'armoire teinte le mur et le sol autour de lui ; le judas d'un foyer, peu
@@ -496,9 +637,46 @@ export function buildPlant({ map, group, bin, lambert, phong, M, tx, CEIL, at, r
         const c = p.col;
         out.push({ x: p.at.x, y: p.at.y, z: p.at.z, r: c.r, g: c.g, b: c.b, rad: 1.7, nx: p.nx, ny: -0.1, nz: p.nz, w: -0.5 });
       }
+      if (lift) {
+        const L = lift;
+        // les voyants d'appel : rouge qui clignote lentement tant que c'est fermé, vert fixe ensuite
+        const k = L.open > 0.5 ? 0.6 : L.blink * 0.55;
+        if (k > 0.01) out.push({ x: L.call.x, y: L.call.y, z: L.call.z, r: L.open > 0.5 ? 0.05 * k : k, g: L.open > 0.5 ? k : 0.06 * k, b: L.open > 0.5 ? 0.2 * k : 0.03 * k, rad: 1.5, nx: L.nx, ny: -0.1, nz: L.nz, w: -0.5 });
+        if (L.k > 0.02) {
+          // le gyrophare : un faisceau qui tourne (lobe étroit) et un peu de lumière tout autour
+          out.push({ x: L.x, y: L.y, z: L.z, r: 2.6 * L.k, g: 1.05 * L.k, b: 0.12 * L.k, rad: 8, nx: Math.cos(L.a), ny: -0.25, nz: Math.sin(L.a), w: 0.55 });
+          out.push({ x: L.x, y: L.y, z: L.z, r: 0.45 * L.k, g: 0.18 * L.k, b: 0.02 * L.k, rad: 3, nx: 0, ny: 0, nz: 0, w: 0 });
+        }
+      }
       for (const p of pilots) if (p.on > 0) out.push({ x: p.at.x, y: p.at.y, z: p.at.z, r: 0.05 * p.on, g: 0.5 * p.on, b: 0.14 * p.on, rad: 1.4, nx: p.nx, ny: -0.1, nz: p.nz, w: -0.5 });
     },
-    update(time, dt) {
+    update(time, dt, sim, P) {
+      if (lift && sim) {
+        const L = lift;
+        // la sortie ouverte (les 4 vannes fermées), ou la cabine qui part : le gyrophare tourne
+        const go = sim.open || sim.liftT > 0 ? 1 : 0;
+        L.open += (go - L.open) * Math.min(1, dt * 3);
+        L.k += (go - L.k) * Math.min(1, dt * (go ? 5 : 2));
+        L.a += dt * 7.5 * L.k;
+        L.blink = Math.sin(time * 2.4) > 0 ? 1 : 0.15;
+        let face = 0;
+        if (P) {
+          const dx = P.x - L.x;
+          const dz = P.z - L.z;
+          const dl = Math.hypot(dx, dz) || 1;
+          face = Math.pow(Math.max(0, (Math.cos(L.a) * dx + Math.sin(L.a) * dz) / dl), 4) * L.k;
+        }
+        const hot = face * 11 + L.k * 0.8;
+        L.domeMat.color.setRGB(0.29 + hot, 0.13 + 0.4 * hot, 0.02 + 0.05 * hot);
+        const [red, green] = L.callLamps;
+        if (L.open > 0.5) {
+          red.material.color.set('#3a0805');
+          green.material.color.setRGB(0.3, 2.4, 0.7);
+        } else {
+          red.material.color.setRGB(2.4 * L.blink, 0.2 * L.blink, 0.1 * L.blink);
+          green.material.color.set('#06300f');
+        }
+      }
       for (const fl of flick) {
         const v = (map.valves || [])[fl.v];
         fl.fire = Math.max(0.15, Math.min(1, (fl.fire ?? 1) + (v && v.closed ? -dt * 0.4 : dt * 0.8)));

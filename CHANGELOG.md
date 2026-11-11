@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 5.52 — 11 novembre 2026
+- **The Backrooms** — La sortie des Tuyauteries devient un vrai monte-charge de service :
+  - des chevrons jaunes et noirs autour des portes, des butoirs d'acier au pied des montants, une bande de danger en U au sol avec « KEEP CLEAR » peint au pochoir, la plaque « SERVICE LIFT » ;
+  - un voyant d'appel rouge qui clignote tant que la vapeur bloque l'accès, puis passe au vert ;
+  - une fois les 4 vannes fermées, un gyrophare orange se met à tourner et balaie les murs de la galerie ;
+  - la vapeur devant les portes forme un rideau sur toute la hauteur et s'étiole sous le plafond, au lieu d'un gros bloc blanc coupé net.
+
 ## 5.51 — 11 novembre 2026
 - **The Backrooms** — De nouvelles salles aux Tuyauteries, à la place de réserves vides :
   - une salle des pompes : une rangée de pompes sur leurs socles, une armoire de commande, la nourrice à volants au mur ;

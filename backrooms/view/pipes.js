@@ -1322,6 +1322,7 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
   pGeo.instanceCount = 0;
   const steamU = {
     map: { value: puffTexture() },
+    uCeil: { value: CEIL },
     uRight: { value: new THREE.Vector3(1, 0, 0) },
     uUp: { value: new THREE.Vector3(0, 1, 0) },
     uFlashPos: { value: new THREE.Vector3() },
@@ -1361,6 +1362,7 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
       uniform float uFlashOn;
       uniform float uFog;
       uniform vec3 uFogColor;
+      uniform float uCeil;
       varying vec2 vUv;
       varying vec4 vData;
       varying vec3 vWorld;
@@ -1376,6 +1378,9 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
         a *= 1.0 - f * 0.8;
         // tout près de l'objectif, elle s'efface (on la traverse sans voir un mur blanc)
         a *= smoothstep(0.15, 0.7, vDepth);
+        // contre le plafond et le sol, elle s'étiole au lieu d'être tranchée net par la dalle
+        a *= 1.0 - smoothstep(uCeil - 0.75, uCeil - 0.05, vWorld.y);
+        a *= smoothstep(0.0, 0.3, vWorld.y);
         if (a < 0.003) discard;
         gl_FragColor = vec4(col, a);
       }`,
@@ -1453,7 +1458,7 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
         vv.needle.rotation.z = Math.PI * 0.75 - pr * Math.PI * 1.5;
         vv.lamp.material.color.set(vv.v.closed ? '#2bff6a' : vv.v.turn > 0 ? (Math.sin(time * 14) > 0 ? '#ffb020' : '#ff2a1a') : '#ff2a1a');
       }
-      plant.update(time, dt);
+      plant.update(time, dt, sim, P);
       // les gouttes : les plus proches du joueur ; chacune tombe (chute libre), puis son rond s'étale dans la flaque
       if (dripPool.length) {
         const near6 = condens.map((d) => [d, (d.x - P.x) ** 2 + (d.z - P.z) ** 2]).sort((a, b) => a[1] - b[1]).slice(0, dripPool.length);
@@ -1531,7 +1536,8 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
       if (E && exitSteam > 0.02 && near(E.x, E.z, 30)) {
         const ox = E.x - E.dx * (C / 2 + 0.05);
         const oz = E.z - E.dz * (C / 2 + 0.05);
-        for (let k = rate('exit', 55 * exitSteam, dt); k > 0; k--) emit(ox + (E.dz ? (Math.random() - 0.5) * 1.6 : 0), 2.5, oz + (E.dx ? (Math.random() - 0.5) * 1.6 : 0), -E.dx * (0.6 + Math.random()), -0.4 - Math.random() * 0.4, -E.dz * (0.6 + Math.random()), 3, 0.4, 2.2, 0.32 * exitSteam);
+        // (un rideau sur toute la hauteur de la baie, pas un paquet blanc collé sous la dalle)
+        for (let k = rate('exit', 70 * exitSteam, dt); k > 0; k--) emit(ox + (E.dz ? (Math.random() - 0.5) * 1.6 : 0), 0.4 + Math.random() * 2.0, oz + (E.dx ? (Math.random() - 0.5) * 1.6 : 0), -E.dx * (0.5 + Math.random() * 0.9), (Math.random() - 0.6) * 0.35, -E.dz * (0.5 + Math.random() * 0.9), 3, 0.45, 1.9, 0.3 * exitSteam);
       }
       // soupapes des chaudières : une bouffée de temps en temps
       for (const b of map.boilers || []) {
