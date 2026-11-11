@@ -11,6 +11,8 @@ import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.j
 // distance en marche (en cases) entre deux cases
 // les tests du comportement de l'entité la veulent présente dès le départ : le prélude a son propre test
 BackroomsSim.PRELUDE = false;
+// (de même, au Level 1, l'entité commence sous sa vraie forme : son déguisement a ses propres tests)
+BackroomsSim.DISGUISE = false;
 const bfsDist = (m, ax, az, bx, bz) => bfs(m.grid, m.W, m.H, ax, az)[bz * m.W + bx];
 
 // amène un joueur sur une cassette, à son étage (celle du renfoncement : échelle posée, au pied de l'échelle)
@@ -4866,7 +4868,7 @@ test('Level 1 : enfermé dans une salle de sécurité, l\'entité frappe à la p
   assert.ok(Math.hypot(M.x - S.x, M.z - S.z) > d0 + 8, 'ses pas s\'éloignent');
 });
 
-test('Level 1 : l\'imposteur — après une victime, l\'entité prend son apparence et sa voix, marche comme un joueur, et se démasque de près ou dans la lampe', () => {
+test('Level 1 : l\'imposteur — après une victime, l\'entité prend son apparence et sa voix, marche comme un joueur, et ne se démasque que de près (pas dans la lampe)', () => {
   const players = [{ id: 0, name: 'A' }, { id: 1, name: 'B' }];
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 11, players, localId: 0, level: 1 });
   sim.arriveT = 0;
@@ -4919,13 +4921,13 @@ test('Level 1 : l\'imposteur — après une victime, l\'entité prend son appare
   const un = sim.drainEvents().find((e) => e.type === 'unmask');
   assert.ok(M.mimic == null && M.mode === 'chase' && M.target === 0, 'démasquée, elle charge');
   assert.ok(un ? un.id === 1 : true, 'démasquage annoncé');
-  // une autre fois : la lampe de A la tient dans son faisceau
+  // une autre fois : la lampe de A a beau la tenir dans son faisceau, elle ne se démasque que de près
   sim.startMimic(M, B);
   const away = m.walkable.map((q) => ({ x: (q.x + 0.5) * CELL_SIZE, z: (q.z + 0.5) * CELL_SIZE })).find((q) => {
     const d = Math.hypot(q.x - A.x, q.z - A.z);
     return d > 6 && d < 10 && hasLineOfSight(m, A.x, A.z, q.x, q.z);
   });
-  Object.assign(M, { x: away.x, z: away.z, path: [], hesT: 99 });
+  Object.assign(M, { x: away.x, z: away.z, path: [], hesT: 99, restT: 99, away0: { x: away.x, z: away.z } }); // (elle reste là)
   A.flashlight = true;
   A.battery = 100;
   let why = null;
@@ -4934,7 +4936,85 @@ test('Level 1 : l\'imposteur — après une victime, l\'entité prend son appare
     sim.step({});
     for (const e of sim.drainEvents()) if (e.type === 'unmask') why = e.why;
   }
-  assert.ok(why === 'light' || why === 'near', `dans la lampe, elle se démasque (${why})`);
+  assert.ok(!why && M.mimic === 1, 'dans la lampe, de loin, elle garde son déguisement');
+});
+
+test("Level 1 : dès le départ, l'entité a l'apparence d'un joueur et marche à sa vitesse ; tout près, elle se transforme une seconde sur place, puis court un peu plus vite qu'un sprint ; loin de tous, elle reprend une apparence", () => {
+  BackroomsSim.DISGUISE = true;
+  try {
+    const players = [{ id: 0, name: 'A' }, { id: 1, name: 'B' }];
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 11, players, localId: 0, level: 1 });
+    sim.arriveT = 0;
+    const m = sim.map;
+    const M = sim.monster;
+    const [A, B] = sim.players;
+    M.dormantT = 0;
+    assert.ok(M.mimic === 0 || M.mimic === 1, 'au départ, déguisée en un des joueurs');
+    assert.equal(M.mode, 'mimic');
+    const ev0 = sim.drainEvents().find((e) => e.type === 'mimic');
+    assert.ok(!ev0 || !ev0.kill, 'personne n\'est mort');
+    // elle vient vers A (posé dans une allée dégagée), à la vitesse de marche d'un joueur
+    const open = m.walkable.find((q) => [-1, 0, 1].every((dx) => [-1, 0, 1].every((dz) => m.grid[(q.z + dz) * m.W + q.x + dx] === m.grid[q.z * m.W + q.x])) && !m.safeAt((q.x + 0.5) * CELL_SIZE, (q.z + 0.5) * CELL_SIZE) && Math.hypot((q.x + 0.5) * CELL_SIZE - M.x, (q.z + 0.5) * CELL_SIZE - M.z) > 25);
+    A.x = (open.x + 0.5) * CELL_SIZE;
+    A.z = (open.z + 0.5) * CELL_SIZE;
+    B.x = m.spawn.x;
+    B.z = m.spawn.z;
+    let vmax = 0;
+    for (let i = 0; i < 60 * 8 && M.mimic != null; i++) {
+      sim.step({});
+      vmax = Math.max(vmax, M.v || 0);
+    }
+    assert.ok(vmax > SIMX.WALK_SPEED * 0.9 && vmax <= SIMX.WALK_SPEED + 0.05, `à la vitesse d'un joueur qui marche (${vmax.toFixed(2)} m/s)`);
+    // à deux pas de A : la transformation, une seconde sur place
+    if (M.mimic != null) {
+      // (à 2 m de A, dans une direction libre)
+      const c = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => ({ x: A.x + Math.cos(k * 0.785) * 2, z: A.z + Math.sin(k * 0.785) * 2 })).find((q) => hasLineOfSight(m, A.x, A.z, q.x, q.z) && !sim.isColliding(q.x, q.z, 0.4));
+      Object.assign(M, { x: c.x, z: c.z });
+    }
+    sim.step({});
+    const un = sim.drainEvents().find((e) => e.type === 'unmask');
+    assert.ok(un && M.mimic == null && M.mode === 'chase', 'tout près : démasquée');
+    const x0 = M.x;
+    const z0 = M.z;
+    for (let i = 0; i < Math.round((SIMX.UNMASK_T - 0.1) / DT); i++) {
+      A.x = x0 + 2.2;
+      A.z = z0;
+      sim.step({});
+    }
+    assert.ok(Math.hypot(M.x - x0, M.z - z0) < 0.05, 'elle se transforme sur place, une seconde');
+    // puis elle court, un peu plus vite qu'un sprint droit devant
+    let v = 0;
+    for (let i = 0; i < 60 * 2; i++) {
+      sim.step({});
+      v = Math.max(v, M.speed || 0);
+    }
+    assert.ok(v > SIMX.SPRINT_SPEED && v < SIMX.SPRINT_SPEED * 1.15, `en chasse, un peu plus vite qu'un sprint (${v.toFixed(2)} m/s)`);
+    // en ronde, loin de tous et hors de vue : elle reprend une apparence
+    const far = m.walkable.map((q) => ({ x: (q.x + 0.5) * CELL_SIZE, z: (q.z + 0.5) * CELL_SIZE })).find((q) => Math.hypot(q.x - A.x, q.z - A.z) > 40 && Math.hypot(q.x - B.x, q.z - B.z) > 40);
+    Object.assign(M, { x: far.x, z: far.z, mode: 'patrol', lastMode: 'patrol', modeT: SIMX.REDISGUISE_T + 1, rushT: 0, windT: 0, path: [] });
+    sim.step({});
+    assert.ok(M.mimic != null, 'loin de tous, elle a repris l\'apparence d\'un joueur');
+  } finally {
+    BackroomsSim.DISGUISE = false;
+  }
+});
+
+test('le sprint dépend du sens : toute la vitesse droit devant, moins de côté, encore moins en arrière', () => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 3, players: [{ id: 1, name: 'H' }], localId: 1, level: 1 });
+  const P = sim.player;
+  P.running = true;
+  P.yaw = 0.7;
+  const sp = (mx, my) => Math.hypot(...Object.values(sim.wishVel(P, mx, my, SIMX.SPRINT_SPEED)));
+  const fwd = sp(0, 1);
+  const side = sp(1, 0);
+  const back = sp(0, -1);
+  const diag = sp(1, 1);
+  assert.ok(Math.abs(fwd - SIMX.SPRINT_SPEED) < 1e-6, 'droit devant : le sprint entier');
+  assert.ok(Math.abs(side - SIMX.SPRINT_SPEED * SIMX.SPRINT_SIDE) < 1e-6 && Math.abs(back - SIMX.SPRINT_SPEED * SIMX.SPRINT_BACK) < 1e-6, `de côté ${side.toFixed(2)}, en arrière ${back.toFixed(2)} m/s`);
+  assert.ok(diag < fwd && diag > side, 'en diagonale vers l\'avant : entre les deux');
+  assert.ok(back > SIMX.WALK_SPEED && side > back, 'toujours plus vite qu\'en marchant');
+  P.running = false;
+  assert.ok(Math.abs(sp(0, -1) - SIMX.SPRINT_SPEED) < 1e-6, 'sans courir, rien ne change');
 });
 
 

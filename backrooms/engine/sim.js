@@ -185,11 +185,17 @@ export const RUSH_WIND = 0.6; // secondes de cri sur place avant de s'élancer, 
 export const SAW_T = 6; // secondes pendant lesquelles on « l'a vue » (elle peut alors se lancer)
 export const CALM_HOLD = 45; // secondes de répit dans un recoin calme, avant que sa lampe grésille
 export const HAUNT_COOLDOWN = 12; // un spectateur ne hante qu'une fois toutes les 12 s
-// Level 1 : l'imposteur. Après une victime, l'entité prend son apparence et sa voix, et vient vers les vivants en marchant
-// comme un joueur. Elle se démasque tout près (UNMASK_R), ou quand une lampe la fixe trop longtemps (UNMASK_LIT)
+// Level 1 : l'imposteur. Dès le début, l'entité a l'apparence d'un joueur (après une victime, la sienne, et sa voix) ;
+// elle vient vers les vivants en marchant comme eux, et ne se démasque que tout près (UNMASK_R). La transformation dure
+// UNMASK_T ; sous sa vraie forme, elle court un peu plus vite qu'un joueur qui sprinte (L1_CHASE)
 export const UNMASK_R = 2.5;
-export const UNMASK_LIT = 1.6; // s dans le faisceau d'une lampe, à moins de 12 m
-export const MIMIC_SPEED = 0.95; // part de la marche d'un joueur
+export const UNMASK_T = 1; // s : la transformation, sur place
+export const MIMIC_SPEED = 1; // part de la marche d'un joueur : la même
+export const L1_CHASE = 1.08; // part du sprint d'un joueur (droit devant) : à peine plus vite
+export const REDISGUISE_T = 6; // s de ronde, hors de vue et loin de tous, avant qu'elle reprenne l'apparence d'un joueur
+// le sprint dépend du sens : droit devant, toute la vitesse ; de côté et en arrière, moins
+export const SPRINT_SIDE = 0.72;
+export const SPRINT_BACK = 0.6;
 export const MIMIC_CALL = [7, 13]; // s entre deux appels (la voix volée, de vive voix ou au talkie)
 // Level 1 : les salles de sécurité. L'entité qui bute sur une porte blindée fermée frappe BANG_T secondes, hurle de
 // rage et va rôder au moins RETREAT_R mètres plus loin
@@ -681,7 +687,6 @@ export class BackroomsSim {
       sawHide: -1, // le casier où elle a vu quelqu'un entrer
       mimic: null, // Level 1 : le joueur dont elle a pris l'apparence (null : sa vraie forme)
       callT: 0, // l'imposteur : délai avant son prochain appel
-      litT: 0, // l'imposteur : depuis combien de temps une lampe le fixe
       hesT: 0, // l'imposteur : délai avant sa prochaine hésitation (négatif : l'arrêt en cours)
       hesLen: 1,
       restT: 0, // l'imposteur : il a renoncé à une porte, il s'éloigne (vers away0)
@@ -704,6 +709,8 @@ export class BackroomsSim {
       lastMode: 'patrol',
     };
     // la première rencontre arrive pendant la minute de calme du début (elle n'est encore qu'une silhouette)
+    // Level 1 : elle commence sous l'apparence d'un joueur (BackroomsSim.DISGUISE = false : sa vraie forme, pour les tests)
+    if (level === 1 && this.hasMonster && BackroomsSim.DISGUISE !== false) this.disguise(this.monster);
     this.glimpseAt = level === 0 && !prev.length && this.hasMonster && this.monster.dormantT > 0 ? this.monster.dormantT * rand(0.4, 0.7) : Infinity;
     this.glimpseTries = 0;
     // Level 2 : le troupeau remplace l'entité (elle reste là pour relayer le son et l'image de la chèvre la plus proche)
@@ -1450,20 +1457,26 @@ export class BackroomsSim {
     return c ? { x: at(c)[0], z: at(c)[1] } : null;
   }
 
-  // Level 1 : elle vient de tuer V : elle prend son apparence (sa tenue, sa voix) et part rejoindre les autres
-  startMimic(M, V) {
+  // l'apparence d'un joueur, sans victime : celle d'un mort s'il y en a (personne ne fait double), sinon de n'importe qui
+  disguise(M) {
+    const dead = this.players.filter((Q) => Q.status === 'dead');
+    const pool = dead.length ? dead : this.players;
+    if (pool.length) this.startMimic(M, pool[Math.floor(Math.random() * pool.length)], false);
+  }
+
+  // Level 1 : elle prend l'apparence de V (sa tenue, sa voix) et part rejoindre les autres ; kill : elle vient de le tuer
+  startMimic(M, V, kill = true) {
     if (!this.players.some((Q) => Q.status === 'alive')) return;
     M.mimic = V.id;
     M.mode = 'mimic';
     M.silent = true;
     M.callT = rand(4, 7);
-    M.litT = 0;
     M.hesT = rand(3, 6);
     M.restT = 0;
     M.bang = null;
     M.path = [];
     M.repathT = 0;
-    this.emit({ type: 'mimic', id: V.id, x: M.x, z: M.z });
+    this.emit({ type: 'mimic', id: V.id, kill, x: M.x, z: M.z });
   }
 
   // démasquée : elle reprend sa forme dans un hurlement et fonce sur celui qui l'a percée à jour
@@ -1474,8 +1487,10 @@ export class BackroomsSim {
     M.mode = 'chase';
     M.silent = false;
     M.target = Q.id;
-    M.windT = 0.55; // la transformation : un instant sur place, le temps de se déchirer
-    M.rushT = 1.6;
+    M.windT = UNMASK_T; // la transformation : sur place, le temps de se déchirer
+    M.v = 0;
+    M.path = [];
+    M.rushT = UNMASK_T + 0.6;
     M.burstT = 2;
     M.unseenT = 0;
     M.lastSeenX = Q.x;
@@ -1486,21 +1501,15 @@ export class BackroomsSim {
     this.emit({ type: 'unmask', id, by: Q.id, why, x: M.x, z: M.z });
   }
 
-  // L'imposteur : il marche comme un joueur (vitesse de marche, petites hésitations, il se tourne vers les pas des
-  // autres), vient vers les vivants et les appelle avec la voix volée ; tout près, ou fixé par une lampe, il se démasque
+  // L'imposteur : il marche comme un joueur (à sa vitesse, petites hésitations, il se tourne vers les pas des autres),
+  // vient vers les vivants et les appelle avec la voix volée ; il ne se démasque que tout près de l'un d'eux
   mimicStep(M, P) {
     const map = this.map;
     const alive = this.players.filter((Q) => Q.status === 'alive' && (Q.floor || 0) === (M.floor || 0));
-    // percé à jour : à deux pas de quelqu'un (qu'il voit), ou tenu dans le faisceau d'une lampe
-    let lit = null;
     for (const Q of alive) {
       const d = Math.hypot(Q.x - M.x, Q.z - M.z);
-      const los = hasLineOfSight(map, Q.x, Q.z, M.x, M.z);
-      if (d < UNMASK_R && los && !(Q.hidden >= 0)) return this.unmask(M, Q, 'near');
-      if (Q.flashlight && d < 12 && los && this.facing(Q, M.x, M.z) < 0.3) lit = Q;
+      if (d < UNMASK_R && !(Q.hidden >= 0) && hasLineOfSight(map, Q.x, Q.z, M.x, M.z)) return this.unmask(M, Q, 'near');
     }
-    M.litT = lit ? M.litT + DT : Math.max(0, M.litT - DT * 0.5);
-    if (lit && M.litT > UNMASK_LIT) return this.unmask(M, lit, 'light');
     M.restT = Math.max(0, M.restT - DT);
     const locked = this.lockedIn(P);
     let goal = null;
@@ -3170,6 +3179,11 @@ export class BackroomsSim {
   wishVel(P, mx, my, speed) {
     if (!mx && !my) return { x: 0, z: 0 };
     const len = Math.hypot(mx, my) || 1;
+    // en courant : toute la vitesse droit devant, moins de côté (SPRINT_SIDE), encore moins en arrière (SPRINT_BACK)
+    if (P.running) {
+      const f = my / len;
+      speed *= f >= 0 ? SPRINT_SIDE + (1 - SPRINT_SIDE) * f : SPRINT_SIDE + (SPRINT_BACK - SPRINT_SIDE) * -f;
+    }
     const fx = -Math.sin(P.yaw);
     const fz = -Math.cos(P.yaw);
     const rx = Math.cos(P.yaw);
@@ -3910,7 +3924,10 @@ export class BackroomsSim {
     M.away = false;
     // Level 1 : dans les gaines de ventilation (on l'entend cogner au-dessus), puis sa chute par une bouche
     if (M.duct) return this.ductStep(M, P);
-    // Level 1 : sous l'apparence d'une victime ; ou devant une porte blindée fermée
+    // Level 1 : sous l'apparence d'un joueur ; ou devant une porte blindée fermée. Revenue en ronde, loin de tous et hors de
+    // vue, elle en reprend une
+    if (this.level === 1 && M.mimic == null && M.mode === 'patrol' && M.modeT > REDISGUISE_T && BackroomsSim.DISGUISE !== false &&
+      !this.players.some((Q) => Q.status === 'alive' && Math.hypot(Q.x - M.x, Q.z - M.z) < 18) && !this.inSomeView(M.floor || 0, M.x, M.z, 0.2)) this.disguise(M);
     if (M.mimic != null) return this.mimicStep(M, P);
     if (M.mode === 'bang') return this.bangStep(M, P);
     const map = this.fm(M.floor);
@@ -4175,6 +4192,7 @@ export class BackroomsSim {
       M.speed = Math.max(WALK_SPEED * CHASE_MIN * (1 + A * 0.15), this.monsterChaseSpeed * k * (M.rushT > 0 ? 1.25 : M.burstT > 0 ? 1.15 : 1) * (this.chases <= (this.skill < 0.3 ? 2 : 1) && !(M.rushT > 0) ? 0.86 : 1));
       // la traque : presque aussi vite qu'on court (on ne la distance qu'en courant tout droit, sans se tromper de chemin)
       if (hunt) M.speed = Math.min(SPRINT_SPEED * 0.94, Math.max(M.speed, SPRINT_SPEED * 0.86));
+      if (this.level === 1) M.speed = SPRINT_SPEED * L1_CHASE;
     } else if (M.mode === 'search') M.speed = Math.max(MONSTER_PATROL_SPEED * 1.3, WALK_SPEED * 1.15) * k; // elle cherche plus vite qu'on ne marche
     else if (M.mode === 'ambush') M.speed = MONSTER_PATROL_SPEED * 1.5;
     else if (M.mode === 'flee') M.speed = this.monsterChaseSpeed * 1.05;
@@ -4184,6 +4202,7 @@ export class BackroomsSim {
     if (M.windT > 0) {
       M.windT = Math.max(0, M.windT - DT);
       M.speed = 0;
+      if (this.level === 1) M.v = 0; // (Level 1 : figée net pendant la transformation, pas un pas d'élan)
       faceTo(M, P.x, P.z, 10);
     }
     if (calm && M.mode === 'patrol') M.silent = true;

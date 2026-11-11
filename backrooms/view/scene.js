@@ -18,6 +18,7 @@ import { buildWarehouse } from './warehouse.js';
 import { buildGear } from './gear.js';
 import { createPlayerAvatars, contactBlob } from './players.js';
 import { createBeast } from './beast.js';
+import { createCreature } from './creature.js';
 import { buildWater } from './water.js';
 import { buildHotel } from './hotel.js';
 import { createHotelEntity } from './hotelEntity.js';
@@ -5413,7 +5414,8 @@ void main() {
   // l'entité en 3D, animée (view/beast.js) ; au Level 1 en mode VIP : la vidéo d'origine
   // mode VIP au Level 0 : le même corps, avec le visage de la photo de l'entité d'origine
   // Level 5 : l'entité de l'hôtel, un modèle humain animé os par os (view/hotelEntity.js)
-  const beast = L3 ? createHotelEntity() : !ENTITY_VIP ? createBeast({ wiry: !(L1 || L2) }) : !(L1 || L2) ? createBeast({ wiry: true, photo: { url: VIP.img, crop: [490, 20, 300, 375] } }) : null;
+  // (Level 1 et Poolrooms : la nouvelle entité, models/level1/entite.glb, view/creature.js)
+  const beast = L3 ? createHotelEntity() : !ENTITY_VIP ? (L1 || L2 ? createCreature({ height: 2.7 }) : createBeast({ wiry: true })) : !(L1 || L2) ? createBeast({ wiry: true, photo: { url: VIP.img, crop: [490, 20, 300, 375] } }) : null;
   if (beast) {
     monsterGroup.add(beast.group);
     shadow.visible = false;
@@ -6048,16 +6050,17 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 
       // 3. Les autres joueurs encore dehors
       const Mw = sim.hasMonster ? sim.monster : null;
+      // Level 1 : l'imposteur a le corps d'un joueur (son propre avatar : celui qu'il imite peut être encore en vie, à
+      // côté) ; il marche là où est l'entité, lampe éteinte. (Le regard d'un joueur va vers -sin, -cos : l'inverse de
+      // celui de l'entité, d'où le demi-tour)
+      const Mq = Mw && Mw.mimic != null && !Mw.away ? sim.players.find((q) => q.id === Mw.mimic) : null;
+      if (Mq) {
+        const D = { ...Mq, id: 'mimic', status: 'alive', x: Mw.x, z: Mw.z, yaw: (Mw.yaw || 0) + Math.PI, pitch: 0, floor: Mw.floor || 0, flashlight: false, cam: false, moving: (Mw.v || 0) > 0.2, running: false, crouch: false, hidden: -1, jy: 0, tilt: 0, onLadder: false };
+        const mv2 = floorViews[D.floor];
+        avatars.update(D, true, Mw.y ?? feetY(sim.stairs, D.x, D.z, D.floor), mv2 ? mv2.lightAt(D.x, D.z) : 0.3, dt, time);
+      } else if (avatars.has('mimic')) avatars.update({ id: 'mimic' }, false);
       for (const Q of sim.players) {
         if (Q === P) continue; // soi-même : plus bas (vue subjective)
-        // Level 1 : l'imposteur porte le corps (la tenue, la lampe) de sa victime ; il marche là où est l'entité, lampe éteinte
-        // (le regard d'un joueur va vers -sin, -cos : l'inverse de celui de l'entité, d'où le demi-tour)
-        if (Mw && Mw.mimic === Q.id && Q.status === 'dead') {
-          const D = { ...Q, status: 'alive', x: Mw.x, z: Mw.z, yaw: (Mw.yaw || 0) + Math.PI, pitch: 0, floor: Mw.floor || 0, flashlight: false, cam: false, moving: (Mw.v || 0) > 0.2, running: false, crouch: false, hidden: -1, jy: 0, tilt: 0, onLadder: false };
-          const mv2 = floorViews[D.floor];
-          avatars.update(D, true, Mw.y ?? feetY(sim.stairs, D.x, D.z, D.floor), mv2 ? mv2.lightAt(D.x, D.z) : 0.3, dt, time);
-          continue;
-        }
         const show = Q.status === 'alive' && !(Q.hidden >= 0); // un coéquipier caché dans un casier ne se voit pas
         if (!show && !avatars.has(Q.id)) continue;
         // à l'écran, chacun suit sa piste : les positions reçues (20 par seconde), interpolées un peu dans le passé,

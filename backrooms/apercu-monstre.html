@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aperçu de l'entité</title>
+<style>
+  :root { --bg: #0b0b09; --panel: #15140f; --line: #2c2a22; --ink: #e8e2cf; --dim: #9a937c; --ok: #7fc77a; --warn: #e2a33c; --bad: #e0614f; --acc: #d9c26a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.4 ui-monospace, Consolas, monospace; overflow: hidden; }
+  #view { position: fixed; inset: 0 340px 0 0; }
+  #view canvas { display: block; width: 100%; height: 100%; }
+  aside { position: fixed; top: 0; right: 0; bottom: 0; width: 340px; background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 14px; }
+  h1 { font-size: 15px; margin: 0 0 4px; letter-spacing: .04em; }
+  h2 { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .12em; margin: 16px 0 6px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  button { background: #201e17; color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 7px 8px; font: inherit; cursor: pointer; text-align: left; }
+  button:hover { border-color: var(--acc); }
+  button.on { background: var(--acc); color: #111; border-color: var(--acc); }
+  button.wide { grid-column: 1 / -1; text-align: center; }
+  #status { color: var(--dim); }
+  #status.err { color: var(--bad); }
+  ul { margin: 0; padding-left: 16px; }
+  li.warn { color: var(--warn); }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  td { padding: 2px 4px; border-bottom: 1px solid #201e17; vertical-align: top; }
+  td:first-child { color: var(--dim); white-space: nowrap; }
+  .ok { color: var(--ok); } .no { color: var(--bad); }
+  label { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  input[type=range] { flex: 1; }
+  #drop { position: fixed; inset: 0 340px 0 0; display: none; place-items: center; background: rgba(10,10,8,.85); border: 3px dashed var(--acc); font-size: 18px; z-index: 5; }
+  #drop.on { display: grid; }
+  #step { position: fixed; left: 14px; bottom: 14px; font-size: 18px; color: var(--acc); opacity: 0; transition: opacity .25s; }
+  #hint { position: fixed; left: 14px; top: 12px; color: var(--dim); font-size: 12px; }
+  @media (max-width: 760px) { #view, #drop { inset: 0 0 45% 0; } aside { top: 55%; width: 100%; border-left: 0; border-top: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<div id="view"></div>
+<div id="drop">Lâche le .glb ici</div>
+<div id="hint">Clic-glisser : tourner · molette : zoom · F : lampe</div>
+<div id="step"></div>
+<aside>
+  <h1>Aperçu de l'entité · Level 1</h1>
+  <div id="status">Chargement…</div>
+  <h2>Modèle</h2>
+  <div class="grid">
+    <button id="pick" class="wide">Choisir un .glb… (ou le glisser sur la vue)</button>
+  </div>
+  <input id="file" type="file" accept=".glb,.gltf" hidden>
+  <label>Taille <input id="height" type="range" min="1.6" max="3.8" step="0.05" value="2.7"> <span id="hv">2,70 m</span></label>
+  <h2>Animations du jeu</h2>
+  <div class="grid" id="states"></div>
+  <h2>Caméra</h2>
+  <div class="grid">
+    <button id="orbit" class="on">Libre</button>
+    <button id="eye">Vue d'un joueur</button>
+    <button id="lamp">Lampe torche (F)</button>
+    <button id="dark">Coupure de courant</button>
+  </div>
+  <h2>Compatibilité</h2>
+  <ul id="warn"></ul>
+  <table id="stats"></table>
+  <h2>Où vient chaque animation</h2>
+  <table id="uses"></table>
+  <h2>Os reconnus</h2>
+  <table id="rig"></table>
+  <h2>Ses propres animations</h2>
+  <ul id="clips"></ul>
+</aside>
+<script type="module">
+import * as THREE from '../shared/vendor/three/three.module.min.js';
+import { OrbitControls } from '../shared/vendor/three/OrbitControls.js';
+// (toujours la dernière version du chargeur : l'aperçu sert à régler, le cache du navigateur gênerait)
+const { createCreature, CREATURE_URL, STATES } = await import(`./view/creature.js?t=${Date.now()}`);
+
+const LABELS = {
+  idle: 'Attente / observe', walk: 'Marche (ronde)', run: 'Course (poursuite)', rush: 'Ruée : cri puis charge', grab: 'Prise (agrippe)',
+  stun: 'Sonnée (titube)', bang: 'Frappe une porte', unmask: "Démasquage de l'imposteur", drop: "Chute d'une gaine", scare: 'Jumpscare',
+};
+const $ = (id) => document.getElementById(id);
+const view = $('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+view.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#050504');
+scene.fog = new THREE.Fog('#050504', 8, 30);
+const camera = new THREE.PerspectiveCamera(72, 1, 0.05, 80);
+camera.position.set(3.5, 2.2, 6);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.4, 0);
+controls.enableDamping = true;
+
+// une allée de l'entrepôt : béton au sol, parpaings, plafond à 4,20 m, deux néons
+const tex = (f, r) => {
+  const t = new THREE.TextureLoader().load(`tex/${f}`);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(r[0], r[1]);
+  return t;
+};
+const CEIL = 4.2;
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(10, 40), new THREE.MeshLambertMaterial({ map: tex('l1_sol.jpg', [4, 16]) }));
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
+const wallMat = new THREE.MeshLambertMaterial({ map: tex('l1_mur.jpg', [16, 1.7]) });
+for (const s of [-1, 1]) {
+  const w = new THREE.Mesh(new THREE.PlaneGeometry(40, CEIL), wallMat);
+  w.position.set(s * 5, CEIL / 2, 0);
+  w.rotation.y = -s * Math.PI / 2;
+  scene.add(w);
+}
+const ceil = new THREE.Mesh(new THREE.PlaneGeometry(10, 40), new THREE.MeshLambertMaterial({ map: tex('l1_plafond.jpg', [4, 16]) }));
+ceil.rotation.x = Math.PI / 2;
+ceil.position.y = CEIL;
+scene.add(ceil);
+const neons = [];
+for (const z of [-4, 5]) {
+  const tube = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 1.3), new THREE.MeshBasicMaterial({ color: '#f4f1df' }));
+  tube.position.set(0, CEIL - 0.03, z);
+  scene.add(tube);
+  const l = new THREE.PointLight('#eef0dd', 9, 14, 1.6);
+  l.position.set(0, CEIL - 0.2, z);
+  scene.add(l);
+  neons.push({ tube, l });
+}
+const amb = new THREE.AmbientLight('#8a8a7a', 0.25);
+scene.add(amb);
+// la lampe du joueur, dans l'axe de la caméra
+const lamp = new THREE.SpotLight('#fff3d6', 0, 22, 0.42, 0.45, 1.4);
+camera.add(lamp);
+camera.add(lamp.target);
+lamp.target.position.set(0, 0, -1);
+scene.add(camera);
+
+// l'entité et son « moteur » de démonstration
+const M = { x: 0, z: 0, yaw: 0, mode: 'patrol', rushT: 0, windT: 0, landT: 0, mimic: null };
+const holder = new THREE.Group();
+scene.add(holder);
+let creature = null;
+let source = { url: new URLSearchParams(location.search).get('m') ? new URL(new URLSearchParams(location.search).get('m'), location.href).href : CREATURE_URL };
+let state = 'idle';
+let loopT = 0;
+
+async function build() {
+  if (creature) holder.remove(creature.group);
+  $('status').className = '';
+  $('status').textContent = 'Chargement…';
+  const c = createCreature({ ...source, height: +$('height').value });
+  creature = c;
+  holder.add(c.group);
+  const info = await c.ready;
+  if (c !== creature) return;
+  if (!info.ok) {
+    $('status').className = 'err';
+    $('status').textContent = `Impossible de lire le modèle : ${info.error}. Glisse un .glb sur la vue, ou dépose-le sous backrooms/models/level1/entite.glb.`;
+  } else $('status').textContent = `${source.name || decodeURIComponent(source.url.split('/').pop())} · prêt`;
+  report(info);
+  play(state);
+}
+function report(info) {
+  $('warn').innerHTML = info.ok
+    ? (info.warnings.length ? info.warnings.map((w) => `<li class="warn">${w}</li>`).join('') : '<li class="ok">Rien à signaler : compatible avec le jeu.</li>')
+    : '';
+  const mo = (b) => (b / 1e6).toFixed(2) + ' Mo';
+  $('stats').innerHTML = info.ok ? [
+    ['Fichier', mo(info.bytes)], ['Triangles', info.tris.toLocaleString('fr')], ['Objets', info.meshes], ['Squelette', info.skinned ? `oui, ${info.bones} os` : 'non'],
+    ['Taille d\'origine', `${info.rawHeight} unités → ${info.height} m`], ['Textures', info.textures.join('<br>') || 'aucune'],
+  ].map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('') : '';
+  $('uses').innerHTML = STATES.map((s) => `<tr><td>${LABELS[s]}</td><td>${info.uses[s] || '—'}</td></tr>`).join('');
+  $('rig').innerHTML = Object.entries(info.rig).map(([k, n]) => `<tr><td>${k}</td><td class="${n ? 'ok' : 'no'}">${n ? '✓ ' + n : '✗'}</td></tr>`).join('');
+  $('clips').innerHTML = info.clips.length ? info.clips.map((c) => `<li>${c}</li>`).join('') : '<li>aucune (tout vient de l\'explorateur ou du code)</li>';
+}
+
+// les boutons d'état : la marche et la course tournent dans l'allée (la vitesse est réelle), le reste sur place
+for (const s of STATES) {
+  const b = document.createElement('button');
+  b.textContent = LABELS[s];
+  b.dataset.s = s;
+  b.onclick = () => play(s);
+  $('states').appendChild(b);
+}
+const all = document.createElement('button');
+all.className = 'wide';
+all.textContent = 'Tout enchaîner';
+all.onclick = () => chain();
+$('states').appendChild(all);
+let chainT = null;
+function play(s, keepChain = false) {
+  if (!keepChain && chainT) {
+    clearInterval(chainT);
+    chainT = null;
+  }
+  state = s;
+  for (const b of $('states').children) b.classList.toggle('on', b.dataset.s === s);
+  if (!creature) return;
+  if (s === 'scare') return scare();
+  scareOn = false;
+  creature.show(s === 'walk' || s === 'run' ? null : s);
+  M.x = 0;
+  M.z = 0;
+  M.yaw = 0;
+  loopT = 0;
+}
+function chain() {
+  let i = 0;
+  play(STATES[0], true);
+  chainT = setInterval(() => {
+    i = (i + 1) % STATES.length;
+    play(STATES[i], true);
+  }, 3200);
+}
+
+// le jumpscare comme dans le jeu : son visage plaqué juste devant l'objectif
+let scareOn = false;
+let scareT = 0;
+function scare() {
+  scareOn = true;
+  scareT = 0;
+  setCam('eye');
+}
+
+// caméra libre ou à hauteur d'yeux, à 6 m d'elle
+let camMode = 'orbit';
+function setCam(m) {
+  camMode = m;
+  $('orbit').classList.toggle('on', m === 'orbit');
+  $('eye').classList.toggle('on', m === 'eye');
+  controls.enabled = m === 'orbit';
+  if (m === 'eye') {
+    camera.position.set(0, 1.62, 6);
+    camera.lookAt(0, 1.62, 0);
+  } else {
+    camera.position.set(3.5, 2.2, 6);
+    controls.target.set(0, 1.4, 0);
+  }
+}
+$('orbit').onclick = () => setCam('orbit');
+$('eye').onclick = () => setCam('eye');
+const toggleLamp = () => {
+  lamp.intensity = lamp.intensity ? 0 : 60;
+  $('lamp').classList.toggle('on', !!lamp.intensity);
+};
+$('lamp').onclick = toggleLamp;
+addEventListener('keydown', (e) => {
+  if (e.code === 'KeyF') toggleLamp();
+});
+let dark = false;
+$('dark').onclick = () => {
+  dark = !dark;
+  $('dark').classList.toggle('on', dark);
+  for (const n of neons) {
+    n.l.visible = !dark;
+    n.tube.material.color.set(dark ? '#222' : '#f4f1df');
+  }
+  amb.intensity = dark ? 0.03 : 0.25;
+};
+
+// la taille et le fichier
+$('height').oninput = () => ($('hv').textContent = (+$('height').value).toFixed(2).replace('.', ',') + ' m');
+$('height').onchange = () => build();
+$('pick').onclick = () => $('file').click();
+const useFile = async (f) => {
+  if (!f) return;
+  source = { buffer: await f.arrayBuffer(), name: f.name };
+  build();
+};
+$('file').onchange = () => useFile($('file').files[0]);
+addEventListener('dragover', (e) => {
+  e.preventDefault();
+  $('drop').classList.add('on');
+});
+addEventListener('dragleave', (e) => {
+  if (!e.relatedTarget) $('drop').classList.remove('on');
+});
+addEventListener('drop', (e) => {
+  e.preventDefault();
+  $('drop').classList.remove('on');
+  useFile(e.dataTransfer.files[0]);
+});
+
+// un pas : un petit choc sourd, et l'indication du pied
+let actx = null;
+function stepSound(side) {
+  $('step').textContent = side === 'L' ? '● pas gauche' : 'pas droit ●';
+  $('step').style.opacity = 1;
+  clearTimeout(stepSound.t);
+  stepSound.t = setTimeout(() => ($('step').style.opacity = 0), 160);
+  try {
+    actx = actx || new AudioContext();
+    const o = actx.createOscillator();
+    const g = actx.createGain();
+    o.frequency.setValueAtTime(state === 'run' || state === 'rush' ? 70 : 55, actx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(30, actx.currentTime + 0.12);
+    g.gain.setValueAtTime(0.25, actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.14);
+    o.connect(g).connect(actx.destination);
+    o.start();
+    o.stop(actx.currentTime + 0.15);
+  } catch (e) {}
+}
+
+function resize() {
+  const r = view.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / Math.max(1, r.height);
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize();
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(0.05, clock.getDelta());
+  const t = clock.elapsedTime;
+  // l'entité « du moteur » : une boucle dans l'allée à la vitesse de l'état (1,8 m/s en ronde, 3,3 en poursuite)
+  if (state === 'walk' || state === 'run') {
+    const v = state === 'run' ? 3.3 : 1.8;
+    loopT += (dt * v) / 4;
+    const nx = Math.sin(loopT) * 2.5;
+    const nz = Math.sin(loopT * 2) * 4;
+    M.yaw = Math.atan2(nx - M.x, nz - M.z);
+    M.x = nx;
+    M.z = nz;
+  }
+  if (creature) {
+    const foot = creature.update(M, state === 'run', dark ? 0 : 0.6, dt, t, camera);
+    if (foot) stepSound(foot);
+  }
+  if (scareOn && creature) {
+    // comme scene.js : le groupe se recolle à la caméra, le visage à ~0,5 m dans l'axe
+    scareT += dt;
+    const face = creature.scareFace();
+    const near = 1.9 - 1.5 * Math.min(1, scareT / 0.09) ** 2;
+    // (comme scene.js : face à la caméra, d'après son regard)
+    const fwd = camera.getWorldDirection(new THREE.Vector3());
+    holder.rotation.set(0, Math.atan2(fwd.x, fwd.z) + Math.PI, 0);
+    holder.position.set(camera.position.x, 0, camera.position.z - near);
+    holder.updateMatrixWorld(true);
+    if (face) {
+      const p = face.getWorldPosition(new THREE.Vector3());
+      holder.position.x += camera.position.x - p.x;
+      holder.position.y += camera.position.y - p.y;
+      holder.position.z += camera.position.z - near - p.z;
+    }
+    camera.rotation.z = (Math.random() - 0.5) * 0.04;
+    if (scareT > 2.2) play('idle');
+  } else {
+    holder.position.set(M.x, 0, M.z);
+    holder.rotation.set(0, M.yaw, 0);
+    if (camMode === 'eye') camera.lookAt(M.x, 1.62, M.z);
+    camera.rotation.z = 0;
+  }
+  if (camMode === 'orbit') controls.update();
+  renderer.render(scene, camera);
+});
+window.__apercu = { get creature() { return creature; }, M, play }; // (console)
+build();
+</script>
+</body>
+</html>

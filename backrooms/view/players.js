@@ -796,7 +796,7 @@ export function createPlayerAvatars(scene, lamps = LAMPS) {
     // Ils se cachent et leur lampe retourne dans la réserve
     hideGone(players) {
       avatars.forEach((a, id) => {
-        if (!a.light) return;
+        if (!a.light || id === 'mimic') return; // (l'imposteur n'est pas un joueur de la liste)
         for (let i = 0; i < players.length; i++) if (players[i].id === id) return;
         a.g.visible = false;
         a.light.intensity = 0;
