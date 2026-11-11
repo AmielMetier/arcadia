@@ -5602,6 +5602,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   let ductDrop = 0; // Level 1 : l'entité qui se laisse tomber d'une bouche de gaine (le temps qui reste)
   let cctvWas = -1; // au poste de garde : la caméra affichée à l'image précédente (-1 : pas au poste)
   const res = autoRes(); // résolution dynamique : commence au plus haut (borné par ce que permet l'écran)
+  let compiled = false; // les matériaux sont compilés : on peut dessiner (voir api.compiled)
   let autoLow = false; // « Auto » a dû passer aux effets de la qualité basse (voir plus bas)
   let floorT = 0; // secondes passées à la définition plancher, l'image peinant encore
   let qualityWas = null; // la qualité déjà appliquée au filtre (il ne retaille l'image que si elle change)
@@ -5780,6 +5781,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 
     // Rendu d'une frame
     render(sim, time) {
+      if (!compiled) return; // (les matériaux se compilent encore : voir api.compiled)
       const dt = Math.min(0.1, Math.max(0, time - lastTime));
       lastTime = time;
       const nowS = performance.now() / 1000; // l'horloge des pistes d'affichage des coéquipiers (sim.netSample)
@@ -6284,9 +6286,23 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   };
   liveScene = api;
   api.applyOptions();
-  // les matériaux se compilent en arrière-plan avant la première image (sinon le jeu se fige au premier regard)
-  try {
-    renderer.compileAsync?.(scene, camera)?.catch?.(() => {});
-  } catch (e) {}
+  // les matériaux se compilent en arrière-plan AVANT la première image : tant que ce n'est pas fini, rien n'est
+  // dessiné (render ne fait rien). Avant, le dessin commençait tout de suite, et chaque matériau pas encore prêt
+  // bloquait la page le temps de sa compilation : l'écran de chargement restait figé 20 à 45 s sur une puce intégrée
+  // (au plus 40 s d'attente : une carte qui ne répond pas ne bloque pas la partie)
+  api.compiled = new Promise((done) => {
+    const ok = () => {
+      compiled = true;
+      done();
+    };
+    setTimeout(ok, 40000);
+    try {
+      const p = renderer.compileAsync?.(scene, camera);
+      if (p && p.then) p.then(ok, ok);
+      else ok();
+    } catch (e) {
+      ok();
+    }
+  });
   return api;
 }

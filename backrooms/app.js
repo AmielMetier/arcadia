@@ -1408,8 +1408,9 @@ function buildLevel(level) {
 }
 
 // au plus 8 s d'attente : une texture qui ne vient pas ne doit pas bloquer la partie (still : la demande compte encore)
+// puis les matériaux compilés (sc.compiled, qui se borne lui-même) : le niveau ne se montre que prêt à être dessiné
 function whenReady(sc, still, fn) {
-  Promise.race([sc.ready, new Promise((r) => setTimeout(r, 8000))]).then(() => {
+  Promise.all([Promise.race([sc.ready, new Promise((r) => setTimeout(r, 8000))]), sc.compiled]).then(() => {
     if (!still() || scene !== sc) return;
     requestAnimationFrame(() => {
       if (still() && scene === sc) fn();

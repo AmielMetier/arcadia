@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.69 — 11 novembre 2026
+- **The Backrooms** — L'arrivée dans un niveau ne fige plus la page. Pendant le chargement, l'écran « LOADING » reste vivant, et le niveau n'apparaît qu'une fois prêt à être dessiné, sans saccades au premier regard. Sur un PC modeste, les Poolrooms s'affichent en quelques secondes au lieu de plusieurs dizaines.
+
 ## 5.68 — 11 novembre 2026
 - **The Backrooms** — Un vrai réglage pour les PC modestes :
   - en qualité « Basse », le carrelage des Poolrooms est dessiné intact (sans carreaux tombés ni fêlés) : c'était le plus lourd à calculer. Sur une puce graphique intégrée, le niveau passe d'environ 30 à plus de 50 images par seconde ;
