@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 5.75 — 12 novembre 2026
+- **Bastion Clash** — Le jeu ne dépend plus d'un site extérieur pour s'afficher : il démarre même si ce site est en panne.
+- **The Backrooms** — Chargement allégé de près de 3 Mo (modèles de l'explorateur et de l'entité du Level 1).
+- **Arcadia** — Les rapports de plantage partent enfin au bon endroit depuis le site en ligne, et Fief Maudit y est reconnu.
+
 ## 5.74 — 11 novembre 2026
 - **The Backrooms** — Tuyauteries : le jeu ne dessine plus les tuyaux, lampes et machines des galeries voisines, cachés derrière les murs. Même image, environ un tiers de travail en moins pour la carte graphique.
 

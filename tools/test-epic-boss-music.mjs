@@ -16,6 +16,8 @@ class MockAudioNode {
       setValueAtTime() {},
       exponentialRampToValueAtTime() {},
     };
+    // tout autre réglage (detune, Q, pan…) : un paramètre audio factice, créé à la demande
+    return new Proxy(this, { get(t, k) { if (k in t || typeof k === 'symbol' || k === 'then') return t[k]; return (t[k] = { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {}, cancelScheduledValues() {}, setTargetAtTime() {} }); } });
   }
   connect() {}
   disconnect() {}

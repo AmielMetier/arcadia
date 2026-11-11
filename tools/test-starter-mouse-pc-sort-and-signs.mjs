@@ -1,3 +1,7 @@
+// les chemins du test partent de la racine du dépôt, d'où qu'on le lance
+import { fileURLToPath as __fichier } from 'node:url'; import __chemin from 'node:path';
+process.chdir(__chemin.resolve(__chemin.dirname(__fichier(import.meta.url)), '..'));
+
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -5,12 +9,12 @@ import path from 'node:path';
 console.log('=== TEST SUITE: Starter Mouse Selection, Directional Signs HUD & PC Box Auto-Sort ===');
 
 // 1. Check code integration in game.js, ui.js, pc.js and css files
-const gameSrc = fs.readFileSync('arcadia/odyssee/js/game.js', 'utf8');
-const uiSrc = fs.readFileSync('arcadia/odyssee/js/ui/ui.js', 'utf8');
-const pcSrc = fs.readFileSync('arcadia/odyssee/js/ui/screens/pc.js', 'utf8');
-const hudCss = fs.readFileSync('arcadia/odyssee/css/10-hud.css', 'utf8');
-const pcCss = fs.readFileSync('arcadia/odyssee/css/14-pc.css', 'utf8');
-const diversCss = fs.readFileSync('arcadia/odyssee/css/07-divers.css', 'utf8');
+const gameSrc = fs.readFileSync('odyssee/js/game.js', 'utf8');
+const uiSrc = fs.readFileSync('odyssee/js/ui/ui.js', 'utf8');
+const pcSrc = fs.readFileSync('odyssee/js/ui/screens/pc.js', 'utf8');
+const hudCss = fs.readFileSync('odyssee/css/10-hud.css', 'utf8');
+const pcCss = fs.readFileSync('odyssee/css/14-pc.css', 'utf8');
+const diversCss = fs.readFileSync('odyssee/css/07-divers.css', 'utf8');
 
 assert.ok(gameSrc.includes('promptStarterChoice('), 'game.js should have promptStarterChoice');
 assert.ok(gameSrc.includes('checkNearbySigns()'), 'game.js should have checkNearbySigns');

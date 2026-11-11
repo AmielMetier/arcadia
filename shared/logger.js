@@ -21,7 +21,7 @@
       if (qs.get('game')) return qs.get('game');
       // jeu ouvert seul (hors du Hub) : son dossier, un par entrée de hub/games.js
       if (/\/odyssee\/test(?:\/|$)/i.test(location.pathname)) return 'odysseetest';
-      const m = /\/(backrooms|bastion|calcul|dogfight|convoy|david|drift|filrouge|golf|kart|minigolf|mollo|mystery|odyssee|odysseetest|outbreak|pokemon|royale|sitenoir)(?:\/|$)/i.exec(location.pathname);
+      const m = /\/(backrooms|bastion|calcul|dogfight|convoy|david|drift|fief|filrouge|golf|kart|minigolf|mollo|mystery|odyssee|odysseetest|outbreak|pokemon|royale|sitenoir)(?:\/|$)/i.exec(location.pathname);
       if (m) return m[1].toLowerCase();
     } catch (e) {}
     return 'hub';
@@ -203,7 +203,9 @@
     // Envoi asynchrone au serveur local (tools/serve.mjs) ou relais (server/server.js) pour écriture dans logs/crash/
     if (typeof fetch === 'function' && typeof location !== 'undefined' && location.protocol && location.protocol.startsWith('http')) {
       try {
-        fetch('/api/log', {
+        // sur le site en ligne (pages statiques), c'est le relais qui reçoit les rapports
+        const statique = /(^|\.)github\.io$/i.test(location.hostname);
+        fetch(statique ? 'https://duo-drift-relay.onrender.com/api/log' : '/api/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(entry),

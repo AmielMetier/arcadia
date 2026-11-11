@@ -1,6 +1,10 @@
 // test-options-abc.mjs
 // Automated verification suite for Options A, B, and C
 
+// les chemins du test partent de la racine du dépôt, d'où qu'on le lance
+import { fileURLToPath as __fichier } from 'node:url'; import __chemin from 'node:path';
+process.chdir(__chemin.resolve(__chemin.dirname(__fichier(import.meta.url)), '..'));
+
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,7 +13,7 @@ console.log('=== RUNNING TESTS FOR OPTIONS A, B & C ===');
 
 const resolvePath = (p) => {
   if (fs.existsSync(p)) return p;
-  if (p.startsWith('arcadia/') && fs.existsSync(p.slice('arcadia/'.length))) return p.slice('arcadia/'.length);
+  if (p.startsWith('') && fs.existsSync(p.slice(''.length))) return p.slice(''.length);
   if (fs.existsSync(path.join('arcadia', p))) return path.join('arcadia', p);
   if (fs.existsSync(path.join('..', p))) return path.join('..', p);
   return p;
@@ -17,11 +21,11 @@ const resolvePath = (p) => {
 
 // --- 1. OPTION A : Registered Item & Quick Shortcut ---
 console.log('1. Checking Option A (Registered Item)...');
-const bagJs = fs.readFileSync(resolvePath('arcadia/odyssee/js/ui/screens/bag.js'), 'utf8');
-const bagCss = fs.readFileSync(resolvePath('arcadia/odyssee/css/03-sac.css'), 'utf8');
-const gameJs = fs.readFileSync(resolvePath('arcadia/odyssee/js/game.js'), 'utf8');
-const hudJs = fs.readFileSync(resolvePath('arcadia/odyssee/js/ui/hud.js'), 'utf8');
-const hudCss = fs.readFileSync(resolvePath('arcadia/odyssee/css/10-hud.css'), 'utf8');
+const bagJs = fs.readFileSync(resolvePath('odyssee/js/ui/screens/bag.js'), 'utf8');
+const bagCss = fs.readFileSync(resolvePath('odyssee/css/03-sac.css'), 'utf8');
+const gameJs = fs.readFileSync(resolvePath('odyssee/js/game.js'), 'utf8');
+const hudJs = fs.readFileSync(resolvePath('odyssee/js/ui/hud.js'), 'utf8');
+const hudCss = fs.readFileSync(resolvePath('odyssee/css/10-hud.css'), 'utf8');
 
 assert.ok(bagJs.includes('b2w2-btn-reg'), 'bag.js must include b2w2-btn-reg button');
 assert.ok(bagJs.includes('b2w2-reg-badge'), 'bag.js must include b2w2-reg-badge badge in renderList');
@@ -42,7 +46,7 @@ console.log('✔ Option A verified: Bag register action, [Y] badge, quick overwo
 
 // --- 2. OPTION B : Habitat DexNav Bar ---
 console.log('2. Checking Option B (Habitat DexNav)...');
-const trophiesJs = fs.readFileSync(resolvePath('arcadia/odyssee/js/core/trophies.js'), 'utf8');
+const trophiesJs = fs.readFileSync(resolvePath('odyssee/js/core/trophies.js'), 'utf8');
 assert.ok(trophiesJs.includes('speciesList: [...pool]'), 'getZoneCatchStats must return speciesList');
 
 assert.ok(hudJs.includes('hud-dexnav'), 'hud.js must render .hud-dexnav');
@@ -55,14 +59,14 @@ console.log('✔ Option B verified: Habitat DexNav data, full route species slot
 
 // --- 3. OPTION C : Multiplayer Speech Bubbles & Live Chat ---
 console.log('3. Checking Option C (Multiplayer Speech Bubbles & Live Chat)...');
-assert.ok(fs.existsSync(resolvePath('arcadia/odyssee/img/hud/chat.png')), 'img/hud/chat.png must exist');
-assert.ok(fs.existsSync(resolvePath('arcadia/odyssee/js/ui/chatModal.js')), 'chatModal.js must exist');
+assert.ok(fs.existsSync(resolvePath('odyssee/img/hud/chat.png')), 'img/hud/chat.png must exist');
+assert.ok(fs.existsSync(resolvePath('odyssee/js/ui/chatModal.js')), 'chatModal.js must exist');
 
-const chatModalJs = fs.readFileSync(resolvePath('arcadia/odyssee/js/ui/chatModal.js'), 'utf8');
+const chatModalJs = fs.readFileSync(resolvePath('odyssee/js/ui/chatModal.js'), 'utf8');
 assert.ok(chatModalJs.includes('export function openChatModal'), 'chatModal.js must export openChatModal');
 assert.ok(chatModalJs.includes('chat-emote-btn'), 'chatModal.js must provide emote buttons');
 
-const socialJs = fs.readFileSync(resolvePath('arcadia/odyssee/js/net/social.js'), 'utf8');
+const socialJs = fs.readFileSync(resolvePath('odyssee/js/net/social.js'), 'utf8');
 assert.ok(socialJs.includes('game.showSpeechBubble ='), 'social.js must define showSpeechBubble');
 assert.ok(socialJs.includes('speech-bubble'), 'social.js must create .speech-bubble elements');
 assert.ok(socialJs.includes('link.onChat ='), 'social.js must listen for P2P chat messages');
@@ -73,7 +77,7 @@ assert.ok(gameJs.includes('openChat()'), 'game.js must define openChat');
 assert.ok(hudJs.includes('hud-chat-btn'), 'hud.js must include chat button in hud-actions');
 assert.ok(hudJs.includes('data-act="chat"'), 'hud.js must handle data-act="chat"');
 
-const diversCss = fs.readFileSync('arcadia/odyssee/css/07-divers.css', 'utf8');
+const diversCss = fs.readFileSync('odyssee/css/07-divers.css', 'utf8');
 assert.ok(diversCss.includes('.speech-bubble'), '07-divers.css must style .speech-bubble');
 assert.ok(diversCss.includes('@keyframes bubblePop'), '07-divers.css must animate bubbles with bubblePop');
 assert.ok(diversCss.includes('.chat-modal'), '07-divers.css must style .chat-modal');

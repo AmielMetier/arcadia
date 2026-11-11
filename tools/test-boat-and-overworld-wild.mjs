@@ -1,5 +1,9 @@
 // arcadia/tools/test-boat-and-overworld-wild.mjs
 // Teste la non-traversabilité du bateau (3 cases bloquées) et la cohérence sprite vu -> combat sauvage
+// les chemins du test partent de la racine du dépôt, d'où qu'on le lance
+import { fileURLToPath as __fichier } from 'node:url'; import __chemin from 'node:path';
+process.chdir(__chemin.resolve(__chemin.dirname(__fichier(import.meta.url)), '..'));
+
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { GameMap } from '../odyssee/js/world/mapgen.js';
@@ -73,7 +77,7 @@ console.log('\n=== TEST 2 : COHÉRENCE DU POKÉMON VISIBLE DANS L HERBE ===');
   console.log('✓ 200/200 combats testés : avec fixed: true, aucun remplacement inattendu en Mystherbe !');
 
   // Vérifier que game.js passe bien { fixed: true } sur la rencontre avec vu
-  const gameSrc = fs.readFileSync('arcadia/odyssee/js/game.js', 'utf8');
+  const gameSrc = fs.readFileSync('odyssee/js/game.js', 'utf8');
   assert(
     gameSrc.includes('if (vu) { this.vie.remove(vu); await this.wildBattle([vu.e], { fixed: true }); return; }'),
     'game.js doit passer { fixed: true } lors de la rencontre avec le Pokémon visible de l herbe'

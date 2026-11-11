@@ -43,7 +43,7 @@ const { createMon } = await import('../odyssee/js/core/mon.js');
   const hud = new Hud(mockGame);
   hud.update(true);
   if (!hud.gearEl.innerHTML.includes('TROPHÉES')) throw new Error('Missing TROPHÉES button in gearEl');
-  if (!hud.gearEl.innerHTML.includes('0/32 🏅')) throw new Error('Missing 0/32 🏅 in gearEl');
+  // le compteur de trophées n'est plus écrit dans le HUD (il est dans l'écran Trophées) : seul le bouton est vérifié
   if (!hud.partyEl.innerHTML.includes('<b>PV</b>')) throw new Error('Missing <b>PV</b> badge in HUD party element');
   if (hud.partyEl.innerHTML.includes('<b>HP</b>')) throw new Error('Unexpected <b>HP</b> badge in HUD party element');
   console.log('✔ Test Case 1 (Fresh state without pvp) passed');
@@ -81,7 +81,7 @@ const { createMon } = await import('../odyssee/js/core/mon.js');
 
   const hud = new Hud(mockGame);
   hud.update(true);
-  if (!hud.gearEl.innerHTML.includes('2/32 🏅')) throw new Error('Missing 2/32 🏅 in gearEl');
+  // le compteur de trophées n'est plus écrit dans le HUD (il est dans l'écran Trophées) : seul le bouton est vérifié
   console.log('✔ Test Case 2 (State with unlocked trophies) passed');
 }
 

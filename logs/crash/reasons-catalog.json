@@ -372,6 +372,20 @@
         "EXP_HOST_STOPPED_GAME : l'hôte a quitté l'exploration",
         "EXP_PEER_LEFT_MIDGAME : un explorateur s'est déconnecté"
       ]
+    },
+    {
+      "id": "fief",
+      "title": "Fief Maudit",
+      "maxPlayers": 4,
+      "engine": "Three.js (survie médiévale coopérative 3D)",
+      "crashReasons": [
+        "CRASH_WEBGL_CONTEXT_LOST : perte de contexte WebGL dans la vallée ou la crypte",
+        "Échec de chargement des modèles du village ou des squelettes"
+      ],
+      "expulsionReasons": [
+        "EXP_HOST_STOPPED_GAME : l'hôte a arrêté la veillée",
+        "EXP_PEER_LEFT_MIDGAME : un villageois s'est déconnecté"
+      ]
     }
   ]
 }

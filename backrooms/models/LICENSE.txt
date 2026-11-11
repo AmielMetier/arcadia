@@ -82,7 +82,7 @@ Le hall du Terror Hotel (Level 5), Poly Haven, CC0 (glTF 1k compacté en .glb, s
   fancy_picture_frame_01.glb  https://polyhaven.com/a/fancy_picture_frame_01
 
 Level 5 (le Terror Hotel), l'entité de l'hôtel :
-  jeffrey_epstein_web.glb  « Jeffrey Epstein » de SigmaGrindsetMog, Sketchfab
+  hotel_entite.glb  « Jeffrey Epstein » de SigmaGrindsetMog, Sketchfab
   (https://sketchfab.com/3d-models/jeffrey-epstein-bd6c6bf543184c8da1f457fc7bf0c494),
   licence CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/) : citation de l'auteur obligatoire.
   Textures réencodées en WebP (tools/glb-webp.py) ; animé dans le jeu (view/hotelEntity.js), le modèle est en T-pose.

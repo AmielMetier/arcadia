@@ -1,4 +1,4 @@
-// The Backrooms (Level 5, le Terror Hotel) - L'entité de l'hôtel : un modèle humain rigué (models/jeffrey_epstein_web.glb,
+// The Backrooms (Level 5, le Terror Hotel) - L'entité de l'hôtel : un modèle humain rigué (models/hotel_entite.glb,
 // livré en T-pose, sans animation), animé ici à la main, os par os : bras ramenés le long du corps, marche raide, course
 // penchée en avant, au repos un balancement lent, et toujours la tête qui se penche et tressaute.
 // Les rotations sont données dans le repère du modèle (x : sa droite, y : le haut, z : là où il regarde) et appliquées
@@ -6,7 +6,7 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
 
-const MODEL = new URL('../models/jeffrey_epstein_web.glb', import.meta.url).href;
+const MODEL = new URL('../models/hotel_entite.glb', import.meta.url).href;
 const HEIGHT = 2.05; // un peu plus grand qu'un homme : il se baisse presque sous les lustres
 let loading = null; // chargé à la première entité de l'hôtel seulement
 
