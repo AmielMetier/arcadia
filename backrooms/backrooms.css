@@ -725,6 +725,8 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 /* le rappel des touches : une ligne pâle de l'écran du caméscope, sous l'endurance */
 .keys-tag { display: flex; gap: 14px; margin-top: 8px; font-size: 16px; letter-spacing: 2px; opacity: 0.55; transition: opacity 3s ease; }
 .keys-tag.faded { opacity: 0; }
+/* sous 1540 px de large, la ligne passait sous les cases d'objets (au centre) : elle s'arrête avant et revient à la ligne */
+@media (min-width: 701px) { .keys-tag { flex-wrap: wrap; row-gap: 4px; max-width: calc(50vw - 190px); } }
 .keys-tag[hidden] { display: none; }
 .keys-tag kbd { font: inherit; display: inline-block; min-width: 1.15em; padding: 0 3px; margin-right: 5px; text-align: center; border: 1px solid currentColor; line-height: 1.15; }
 .voice-tag #voiceOut { color: #9be37a; }

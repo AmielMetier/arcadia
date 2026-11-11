@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.62 — 11 novembre 2026
+- **The Backrooms** — Au début de chaque niveau, l'aide des touches en bas à gauche ne passe plus sous les cases d'objets : sur un écran de moins de 1540 px de large, elle revient à la ligne.
+
 ## 5.61 — 11 novembre 2026
 - **The Backrooms** — L'écran de fin ne cite plus que les niveaux vraiment traversés : une partie commencée plus loin (« Continuer », ou le niveau de départ des VIP) n'annonce plus le Level 0 et le Level 1 comme réussis.
 
