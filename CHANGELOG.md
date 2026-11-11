@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.48 — 11 novembre 2026
+- **The Backrooms** — La lumière des Tuyauteries :
+  - les grandes halles à piliers ne sont plus plongées dans le noir : une suspension en tôle émaillée verte pend au milieu de chaque travée, et son ampoule se reflète dans le béton ciré ; une sur trois est morte ou grésille ;
+  - la bergerie reste presque toute noire ;
+  - plus de halo collé autour des lampes : seuls le verre des hublots et la brume brillent, comme en vrai.
+
 ## 5.47 — 11 novembre 2026
 - **The Backrooms** — Les chaufferies des Tuyauteries ne sont plus de grandes salles vides :
   - les grandes chaufferies alignent trois chaudières ; chacune a sa porte de foyer avec un judas où danse la flamme, un niveau d'eau en tube de verre, une soupape à contrepoids rouge, sa plaque en laiton et ses rangées de rivets ;

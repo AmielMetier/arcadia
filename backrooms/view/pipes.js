@@ -300,20 +300,6 @@ function puffTexture() {
   return t;
 }
 
-function glowTexture() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 64;
-  const x = c.getContext('2d');
-  const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
-  g.addColorStop(0, 'rgba(255,255,255,1)');
-  g.addColorStop(0.15, 'rgba(255,255,255,0.55)');
-  g.addColorStop(0.45, 'rgba(255,255,255,0.12)');
-  g.addColorStop(1, 'rgba(255,255,255,0)');
-  x.fillStyle = g;
-  x.fillRect(0, 0, 64, 64);
-  return new THREE.CanvasTexture(c);
-}
-
 // map, group : l'étage ; baked(mat, { spec, gloss }) ajoute l'éclairage cuit ; tx : textures du Level 2
 export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
   const W = map.W;
@@ -762,6 +748,22 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
     // gaine électrique vissée au mur jusqu'au plafond, et sa boîte de dérivation (modèles Poly Haven)
     wallConduit(fx, fz, Math.atan2(-dx, -dz), l.y + 0.18, l.y + 0.42, 'cable_box_double');
   }
+  // les suspensions des halles : un abat-jour conique en tôle émaillée (vert dehors, blanc dedans), sa douille, et le
+  // câble gainé qui monte au plafond, sur sa rosace
+  const shadeOut = phong({ color: '#2f5444', shininess: 70, specular: '#3a3a3a' }, 0.6, 60);
+  const shadeIn = lambert({ color: '#efe9da', side: THREE.BackSide });
+  const shadeGeo = new THREE.CylinderGeometry(0.07, 0.34, 0.24, 24, 1, true);
+  const rimGeo = new THREE.TorusGeometry(1, 0.03, 6, 24);
+  const c12 = new THREE.CylinderGeometry(1, 1, 1, 12);
+  for (const l of map.lights) {
+    if (!l.hang) continue;
+    put(bin('hshade', shadeGeo, shadeOut), l.x, l.y + 0.08, l.z, 1, 1, 1);
+    put(bin('hshadeIn', shadeGeo, shadeIn), l.x, l.y + 0.08, l.z, 0.985, 0.985, 0.985);
+    put(bin('hrim', rimGeo, M.lampMetal), l.x, l.y - 0.04, l.z, 0.34, 0.34, 0.34, Math.PI / 2, 0, 0);
+    cyl(bin('hsock', c12, M.lampMetal), 'y', l.x, l.y + 0.24, l.z, 0.045, 0.1);
+    cyl(bin('hcord', c12, M.cage), 'y', l.x, (l.y + 0.29 + CEIL) / 2, l.z, 0.008, CEIL - l.y - 0.29);
+    cyl(bin('hrose', c12, M.lampMetal), 'y', l.x, CEIL - 0.02, l.z, 0.06, 0.04);
+  }
   // les néons des réserves : deux réglettes côte à côte sous un réflecteur, pendues à deux tiges filetées
   for (const l of map.lights) {
     if (l.kind !== 'tube') continue;
@@ -1180,23 +1182,7 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
     group.add(inst);
   }
 
-  // --- 8. Halos des lampes : une lueur douce autour de chaque globe allumé (elle suit le grésillement) ---
-  const glowLights = map.lights.filter((l) => (l.base || l.state) !== 'off'); // (un secteur peut sauter, puis revenir)
-  const gPos = new Float32Array(glowLights.length * 3);
-  const gCol = new Float32Array(glowLights.length * 3);
-  glowLights.forEach((l, i) => {
-    const w = l.wall || [0, 0];
-    gPos.set([l.x - w[0] * 0.05, l.kind === 'tube' ? l.y - 0.06 : l.y, l.z - w[1] * 0.05], i * 3);
-  });
-  const gGeo = new THREE.BufferGeometry();
-  gGeo.setAttribute('position', new THREE.BufferAttribute(gPos, 3));
-  gGeo.setAttribute('color', new THREE.BufferAttribute(gCol, 3));
-  const glow = new THREE.Points(gGeo, new THREE.PointsMaterial({ map: glowTexture(), size: 0.9, sizeAttenuation: true, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: true }));
-  glow.frustumCulled = false;
-  group.add(glow);
-  const WARM = new THREE.Color('#ffc477');
-  const COOL = new THREE.Color('#cfe4ff');
-
+  // --- 8. (plus de halo autour des lampes : la lumière vient de la scène cuite, la brume et les feux de couleur) ---
   // --- 9. La vapeur : des bouffées en billboard, éclairées par les lampes et la lampe torche ---
   const MAXP = 900;
   const pGeo = new THREE.InstancedBufferGeometry();
@@ -1359,16 +1345,6 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
         else if (v && v.power === 1) bv.led.material.color.set(Math.random() < 0.5 ? '#ff2a1a' : ledOff);
         else bv.led.material.color.set('#3a8a3a');
       }
-      // halos : la couleur suit l'éclat du moment de chaque lampe
-      glowLights.forEach((l, i) => {
-        const k = l.state === 'off' ? 0 : l.k === undefined ? 1 : l.k;
-        const c = l.kind === 'tube' ? COOL : WARM;
-        const m = (l.kind === 'tube' ? 0.35 : 0.8) * k;
-        gCol[i * 3] = c.r * m;
-        gCol[i * 3 + 1] = c.g * m;
-        gCol[i * 3 + 2] = c.b * m;
-      });
-      gGeo.attributes.color.needsUpdate = true;
 
       // vapeur : émetteurs proches seulement
       const near = (x, z, r) => Math.abs(x - P.x) < r && Math.abs(z - P.z) < r;

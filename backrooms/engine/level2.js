@@ -718,19 +718,20 @@ export function createPipesMap(seed = 3) {
       continue;
     }
     if (r.type === 'hall') {
-      // halles : des réglettes pendues entre les piliers, une sur deux ; beaucoup sont mortes, et la bergerie est
-      // presque toute noire
+      // halles : une suspension émaillée pendue au milieu de chaque travée entre les piliers (hang : une ampoule qui
+      // n'est pas au mur) ; une sur trois est morte ou grésille. La bergerie, une travée sur deux, presque toute noire
       const st = r.st || 3;
       for (let z = r.pz - st; z <= r.z1 - 1; z += st) {
         for (let x = r.px - st; x <= r.x1 - 1; x += st) {
-          if ((((x - r.px) / st + (z - r.pz) / st) & 1) !== 0) continue;
+          if (r.den && (((x - r.px) / st + (z - r.pz) / st) & 1) !== 0) continue;
           const gx = Math.max(r.x0, x + 1);
           const gz = Math.max(r.z0, z + 1);
           if (grid[gz * W + gx] !== T.FLOOR) continue;
           const q = rnd();
-          const state = r.den ? (q < 0.15 ? 'flicker' : 'off') : q < 0.42 ? 'on' : q < 0.62 ? 'flicker' : 'off';
+          const state = r.den ? (q < 0.15 ? 'flicker' : 'off') : q < 0.6 ? 'on' : q < 0.75 ? 'flicker' : 'off';
           const lx = gx + 1 <= r.x1 && grid[gz * W + gx + 1] === T.FLOOR ? (gx + 1) * C : (gx + 0.5) * C;
-          lights.push({ kind: 'tube', x: lx, y: LEVEL2_CEIL - 0.42, z: (gz + 0.5) * C, gx, gz, wall: null, state, flicker: state === 'flicker', alongX: true });
+          const lz = gz + 1 <= r.z1 && grid[(gz + 1) * W + gx] === T.FLOOR ? (gz + 1) * C : (gz + 0.5) * C;
+          lights.push({ kind: 'bulb', hang: true, x: lx, y: LEVEL2_CEIL - 0.95, z: lz, gx, gz, wall: null, state, flicker: state === 'flicker' });
         }
       }
       continue;
