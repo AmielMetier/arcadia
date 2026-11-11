@@ -71,7 +71,8 @@
 <script type="module">
 import * as THREE from '../shared/vendor/three/three.module.min.js';
 import { OrbitControls } from '../shared/vendor/three/OrbitControls.js';
-import { createCreature, CREATURE_URL, STATES } from './view/creature.js';
+// (toujours la dernière version du chargeur : l'aperçu sert à régler, le cache du navigateur gênerait)
+const { createCreature, CREATURE_URL, STATES } = await import(`./view/creature.js?t=${Date.now()}`);
 
 const LABELS = {
   idle: 'Attente / observe', walk: 'Marche (ronde)', run: 'Course (poursuite)', rush: 'Ruée : cri puis charge', grab: 'Prise (agrippe)',
@@ -334,8 +335,9 @@ renderer.setAnimationLoop(() => {
     scareT += dt;
     const face = creature.scareFace();
     const near = 1.9 - 1.5 * Math.min(1, scareT / 0.09) ** 2;
-    holder.position.set(0, 0, 0);
-    holder.rotation.set(0, Math.PI, 0);
+    // (comme scene.js : face à la caméra, d'après son regard)
+    const fwd = camera.getWorldDirection(new THREE.Vector3());
+    holder.rotation.set(0, Math.atan2(fwd.x, fwd.z) + Math.PI, 0);
     holder.position.set(camera.position.x, 0, camera.position.z - near);
     holder.updateMatrixWorld(true);
     if (face) {

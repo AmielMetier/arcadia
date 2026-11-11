@@ -428,8 +428,18 @@ export function createCreature(opts = {}) {
       st.arms = new Set(['upperArmL', 'upperArmR', 'lowerArmL', 'lowerArmR'].map((k) => rig[k]).filter(Boolean));
       st.holder = fx;
       // la tête (le jumpscare la plaque devant l'objectif) : l'os de la tête, sinon un repère en haut du corps
-      if (rig.head) st.head = rig.head;
-      else {
+      if (rig.head) {
+        // devant le visage (pas la base du crâne, où passerait la caméra au jumpscare) : à hauteur des yeux, à une
+        // longueur de tête vers l'avant (le modèle regarde +z)
+        N.holder.updateMatrixWorld(true);
+        const top = rig.head.children.find((o) => o.isBone);
+        const h0 = wpos(rig.head);
+        const len = top ? wpos(top).distanceTo(h0) : height * 0.1;
+        const face = new THREE.Object3D();
+        rig.head.add(face);
+        face.position.copy(rig.head.worldToLocal(h0.clone().add(new THREE.Vector3(0, len * 0.5, len * 0.55))));
+        st.head = face;
+      } else {
         st.head = new THREE.Object3D();
         st.head.position.set(0, height * 0.9, 0.12);
         fx.add(st.head);
