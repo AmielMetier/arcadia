@@ -21,6 +21,7 @@ import { cinemaCarpet } from './mallTextures.js';
 import { drawMallProps } from './mallProps.js';
 import { drawMallWalls } from './mallWalls.js';
 import { drawMallSigns } from './mallSigns.js';
+import { drawMallCinema } from './mallCinema.js';
 import { createKitInstancer } from './kit.js';
 
 const SLAB = FLOOR_DY - MALL_CEIL; // l'épaisseur de la dalle sous le mail du haut (le bandeau des vides)
@@ -398,6 +399,8 @@ function floorKey(r, fi, shops, x, z) {
     case 'screen':
     case 'office':
       return 'carpetD';
+    case 'booth':
+      return 'lino';
     case 'wc':
       return 'faience';
     default:
@@ -1221,6 +1224,8 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   const props = drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, placed });
   drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed, show: props.show, arcade: props.arcade, goods: props.goods });
   drawMallSigns({ map, fi, G, MATS, rooms, goods: props.goods, hAt, model, arcade: props.arcade });
+  // la cabine de projection, l'écran de la salle 1 et son film (view/mallCinema.js) : à l'étage du haut
+  const cinema = drawMallCinema({ map, fi, floors, G, MATS, baked, model, group, placed });
   props.goods.flush();
   kit.build();
   G.build(group);
@@ -1369,9 +1374,11 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
         const k = 0.75 + 0.25 * Math.sin(time * (2.1 + i) + i * 1.7);
         out.push({ x: L.x, y: L.y, z: L.z, r: L.c[0] * k, g: L.c[1] * k, b: L.c[2] * k, rad: L.rad, nx: L.nx, ny: 0, nz: L.nz, w: -0.2, box: L.box });
       }
+      if (cinema) cinema.lights(out, time);
     },
     // à chaque image : les modèles proches de la caméra (et pas loin derrière elle)
-    update(camera) {
+    update(camera, sim, time, dt) {
+      if (cinema && sim) cinema.update(sim, time, dt, camera);
       camera.getWorldDirection(camDir);
       const f = Math.hypot(camDir.x, camDir.z) || 1;
       // hors du champ (son demi-angle horizontal, plus une marge pour les grands objets), on ne dessine pas ; quand

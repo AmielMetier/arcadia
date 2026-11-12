@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, SLIDE_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL, RELAY_ARM, RELAY_SYNC, LIFT_CALL_T, L1_CALM, L1_FIRST_BLACKOUT, SECTOR_STEP } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, SLIDE_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL, RELAY_ARM, RELAY_SYNC, LIFT_CALL_T, L1_CALM, L1_FIRST_BLACKOUT, SECTOR_STEP, REELS, FILM_LEAD_T, PICK_R, USE_R } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
 import { navOf, roamable } from '../backrooms/engine/gait.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
@@ -2959,6 +2959,165 @@ test('Level 17 : on monte et on descend l\'escalier monumental, on bute sur le g
   const xs = v.pts.map((p) => p[0]);
   assert.ok(sim.isColliding(Math.max(...xs) - 0.1, sim.floors[0].mailZ, 0.38, 0), 'le vide arrête en haut');
   assert.ok(!sim.isColliding(Math.max(...xs) - 0.1, sim.floors[0].mailZ, 0.38, 1), 'en bas, on passe dessous');
+});
+
+// Level 17 : ce qu'un joueur atteint à pied (un quadrillage de 50 cm, ses vraies collisions), depuis l'arrivée en haut
+// et depuis le pied des escaliers en bas
+const mallWalked = (sim) => {
+  const S = 0.5;
+  const R = 0.38;
+  return sim.floors.map((f, fi) => {
+    const NX = Math.ceil((f.W * CELL_SIZE) / S);
+    const NZ = Math.ceil((f.H * CELL_SIZE) / S);
+    const seen = new Uint8Array(NX * NZ);
+    const q = [];
+    const push = (x, z) => {
+      const i = Math.round(x / S);
+      const j = Math.round(z / S);
+      if (i < 0 || j < 0 || i >= NX || j >= NZ || seen[j * NX + i] || sim.isColliding(i * S, j * S, R, fi)) return;
+      seen[j * NX + i] = 1;
+      q.push(i, j);
+    };
+    const starts = fi === 0 ? [f.spawn] : sim.stairs.map((st) => st.down);
+    for (const p of starts) for (const [dx, dz] of [[0, 0], [S, 0], [-S, 0], [0, S], [0, -S]]) push(p.x + dx, p.z + dz);
+    for (let h = 0; h < q.length; h += 2) for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) push((q[h] + di) * S, (q[h + 1] + dj) * S);
+    // un point est atteint si l'on peut se tenir à moins de r de lui
+    return (x, z, r) => {
+      const n = Math.ceil(r / S);
+      const ci = Math.round(x / S);
+      const cj = Math.round(z / S);
+      for (let j = cj - n; j <= cj + n; j++) for (let i = ci - n; i <= ci + n; i++) if (i >= 0 && j >= 0 && i < NX && j < NZ && seen[j * NX + i] && Math.hypot(i * S - x, j * S - z) <= r) return true;
+      return false;
+    };
+  });
+};
+
+test('Level 17 : cinq bobines sur les deux étages et aux quatre coins, toutes à portée de main ; la cabine et la sortie aussi', () => {
+  for (const sd of [1, 3, 17, 42, 99, 1234, 2026]) {
+    const sim = new BackroomsSim({ difficulty: 'peaceful', seed: sd, level: MALL_LEVEL });
+    const reels = sim.allCassettes;
+    assert.equal(reels.length, REELS, `graine ${sd} : cinq bobines`);
+    assert.deepEqual(reels.map((c) => c.id), [0, 1, 2, 3, 4]);
+    for (const fi of [0, 1]) assert.ok(reels.filter((c) => c.fi === fi).length >= 2, `graine ${sd} : au moins deux bobines à l'étage ${fi}`);
+    // les quatre coins : au nord et au sud du mail, à l'ouest et à l'est de la cour centrale
+    const mz = sim.floors[0].mailZ;
+    const mx = (sim.floors[0].W * CELL_SIZE) / 2;
+    for (const [name, ok] of [['nord', (c) => c.z < mz], ['sud', (c) => c.z > mz + 60], ['ouest', (c) => c.x < mx - 40], ['est', (c) => c.x > mx + 20]]) assert.ok(reels.some(ok), `graine ${sd} : une bobine au ${name}`);
+    const at = mallWalked(sim);
+    for (const c of reels) {
+      assert.ok(c.where && c.reel, 'une bobine dit où elle est (le journal du projectionniste)');
+      assert.ok(at[c.fi](c.x, c.z, PICK_R - 0.25), `graine ${sd} : la bobine ${c.id + 1} (${c.where}, étage ${c.fi}) est à portée`);
+      for (const o of reels) if (o !== c && o.fi === c.fi) assert.ok(Math.hypot(o.x - c.x, o.z - c.z) > 20, 'les bobines sont loin les unes des autres');
+    }
+    const b = sim.map.booth;
+    assert.ok(at[0](b.use.x, b.use.z, USE_R - 0.3), `graine ${sd} : on atteint la table de montage`);
+    const E = sim.map.elevator;
+    assert.ok(at[0](sim.map.exit.x, sim.map.exit.z, 0.6), `graine ${sd} : on atteint le monte-charge, derrière l'écran`);
+    // … derrière l'écran de la salle 1 : dans le couloir qui longe son mur est, à la hauteur de l'écran
+    assert.ok(E.x > b.screen.x && E.z > b.screen.z0 && E.z < b.screen.z1 && !E.dead, 'la sortie est derrière l\'écran');
+    assert.ok(sim.floors[1].elevator.dead, 'le monte-charge du quai est hors service');
+  }
+});
+
+test('Level 17 : la sortie reste fermée tant que le film ne passe pas ; les cinq bobines montées, l\'amorce défile, puis elle s\'ouvre', () => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 9, level: MALL_LEVEL });
+  const P = sim.players[0];
+  const b = sim.map.booth;
+  const E = sim.map.elevator;
+  const types = () => sim.drainEvents().map((e) => e.type);
+  const toLift = () => {
+    P.floor = 0;
+    P.x = E.x;
+    P.z = E.z;
+  };
+  assert.equal(sim.realFloor, 0);
+  assert.ok(!sim.open, 'fermée à l\'arrivée');
+  toLift();
+  assert.ok(!sim.inCabin(P), 'portes fermées : personne dans la cabine');
+  // devant la table sans bobine : le journal dit où elles sont
+  P.x = b.use.x;
+  P.z = b.use.z;
+  sim.step({ pick: true });
+  const log = sim.drainEvents().find((e) => e.type === 'benchEmpty');
+  assert.ok(log && log.left.length === REELS, 'le journal liste les cinq bobines');
+  // trois bobines : on les monte, le film ne démarre pas
+  const reels = sim.allCassettes;
+  const take = (c) => {
+    P.floor = c.fi;
+    P.x = c.x + 0.4;
+    P.z = c.z;
+    sim.step({});
+    assert.ok(P.signal > 0.9, 'le caméscope capte la bobine toute proche');
+    sim.step({ pick: true });
+    assert.ok(c.collected);
+  };
+  for (const c of reels.slice(0, 3)) take(c);
+  assert.equal(sim.cassettes, 3);
+  assert.ok(types().filter((t) => t === 'reel').length === 3);
+  P.floor = 0;
+  P.x = b.use.x;
+  P.z = b.use.z;
+  sim.step({ pick: true });
+  assert.equal(sim.delivered, 3);
+  assert.ok(types().includes('reelMount'));
+  assert.ok(!(sim.film > 0) && !sim.open, 'trois bobines sur cinq : rien ne démarre');
+  // les deux dernières : à la cinquième, le projecteur démarre ; la sortie attend la fin de l'amorce
+  for (const c of reels.slice(3)) take(c);
+  P.floor = 0;
+  P.x = b.use.x;
+  P.z = b.use.z;
+  sim.step({});
+  assert.equal(P.sigTo, 'booth', 'tout est trouvé : le caméscope montre la cabine');
+  sim.step({ pick: true });
+  assert.equal(sim.delivered, REELS);
+  assert.ok(sim.film > 0 && !sim.open);
+  assert.ok(types().includes('filmStart'));
+  for (let i = 0; i < (FILM_LEAD_T - 1) * 60; i++) sim.step({});
+  assert.ok(!sim.open, 'pendant l\'amorce, la sortie est encore fermée');
+  for (let i = 0; i < 70; i++) sim.step({});
+  assert.ok(sim.open, 'le film passe : la sortie est ouverte');
+  assert.ok(types().includes('exitUnlocked'));
+  assert.equal(P.sigTo, 'exit');
+  toLift();
+  assert.ok(sim.inCabin(P), 'on entre dans le monte-charge');
+  sim.step({ pick: true });
+  for (let i = 0; i < (LIFT_CLOSE_T + DEPART_T) * 60 + 30 && sim.state === 'playing' && sim.level === MALL_LEVEL; i++) sim.step({});
+  assert.ok(sim.state === 'won' || sim.level !== MALL_LEVEL, 'le monte-charge emmène l\'équipe');
+});
+
+test('Level 17 : les bobines, leur montage et le film arrivent chez un invité', () => {
+  const players = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 21, level: MALL_LEVEL, players, localId: 'a' });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 21, level: MALL_LEVEL, players, localId: 'b' });
+  assert.equal(guest.fp, host.fp, 'la même carte des deux côtés (les bobines aux mêmes endroits)');
+  const A = host.players[0];
+  const reels = host.allCassettes;
+  for (const c of reels.slice(0, 2)) {
+    A.floor = c.fi;
+    A.x = c.x + 0.3;
+    A.z = c.z;
+    host.step({ pick: true });
+  }
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())), 0);
+  assert.equal(guest.cassettes, 2);
+  assert.deepEqual(guest.allCassettes.map((c) => c.collected), [true, true, false, false, false]);
+  assert.ok(!guest.open);
+  for (const c of reels.slice(2)) {
+    A.floor = c.fi;
+    A.x = c.x + 0.3;
+    A.z = c.z;
+    host.step({ pick: true });
+  }
+  A.floor = 0;
+  A.x = host.map.booth.use.x;
+  A.z = host.map.booth.use.z;
+  host.step({ pick: true });
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())), 0.1);
+  assert.equal(guest.delivered, REELS);
+  assert.ok(guest.film > 0 && !guest.open, 'chez l\'invité aussi, l\'amorce défile');
+  for (let i = 0; i < FILM_LEAD_T * 60 + 5; i++) host.step({});
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())), 0.2);
+  assert.ok(guest.open && guest.realFloor === 0, 'la sortie est ouverte chez l\'invité');
 });
 
 // --- Level 5, le Terror Hotel ---

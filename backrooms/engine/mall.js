@@ -23,6 +23,8 @@ export const MALL_H = 100;
 export const MALL_CEIL = 4.4; // hauteur sous plafond ordinaire (le mail de l'étage du bas)
 export const MALL_RAIL = 1.05; // hauteur des garde-corps
 export const MALL_NAME = 'HALCYON PARK MALL';
+export const REELS = 5; // les bobines du film à retrouver (le but du niveau)
+export const FILM_LEAD_T = 8; // l'amorce du film (le décompte à l'écran) avant que la sortie ne s'ouvre
 
 // les genres de salles (ce qui décide du sol, des murs, du plafond et des lumières)
 export const RK = {
@@ -49,6 +51,7 @@ export const RK = {
   FLEA: 'flea', // la brocante
   GARDEN: 'garden', // la jardinerie, sous sa verrière
   STORAGE: 'storage', // une réserve, dans le dédale des couloirs de service du bas
+  BOOTH: 'booth', // la cabine de projection, au fond de la salle 1
 };
 
 // hauteur et genre de plafond par genre de salle, étage du haut (0) et du bas (1). L'étage du bas reste sous la dalle
@@ -67,6 +70,7 @@ const CEILS = [
     cine: [4.4, 'char'],
     cineHall: [3.6, 'greyc'],
     screen: [8.2, 'black'],
+    booth: [2.8, 'grid'],
     wc: [2.8, 'grid'],
     office: [2.8, 'grid'],
     fun: [4.4, 'black'],
@@ -391,6 +395,15 @@ export function createMallMap(seed = 17) {
   const screens = [room(0, RK.SCREEN, X.screens[0], 3, X.screens[1], 12, { name: 'Screen 1', num: 1 }), room(0, RK.SCREEN, X.screens[0], 14, X.screens[1], 23, { name: 'Screen 2', num: 2 })];
   door(0, 98, 10, 'screen', { num: 1, open: true });
   door(0, 98, 21, 'screen', { num: 2, open: true });
+  // la cabine de projection : au fond de la salle 1, dans l'axe de l'écran. Deux murs de refend la détachent de la
+  // salle ; côté fauteuils, une cloison mince percée du hublot (une forme de collision, plus bas) ; on y entre par une
+  // porte du personnel, depuis le couloir des salles
+  const BOOTH = { x0: 99, x1: 100, z0: 6, z1: 8 };
+  for (const z of [BOOTH.z0 - 1, BOOTH.z1 + 1])
+    for (let x = BOOTH.x0; x <= BOOTH.x1; x++) {
+      F[0].grid[z * W + x] = T.WALL;
+      F[0].zone[z * W + x] = -1;
+    }
   // les autres salles : des portes closes le long du couloir (décor)
   const fakeScreens = [3, 4, 5, 6].map((num, i) => ({ x: 98, z: 27 + i * 5, num }));
   // en bas, sous le cinéma : les quais de livraison et un couloir de service
@@ -613,6 +626,10 @@ export function createMallMap(seed = 17) {
   // au pied des deux escaliers de l'annexe : un palier haut de plafond, à cheval sur deux couloirs du dédale
   const LOBBIES = [39, 69].map((x) => room(1, RK.SERVICE, x, 70, x + 6, 76, { name: 'Stair lobby', ceil: [MALL_CEIL, 'slab'] }));
 
+  // la cabine de projection (créée la dernière : les numéros des autres salles, dont dépend leur décor, ne bougent pas)
+  const boothRoom = room(0, RK.BOOTH, BOOTH.x0, BOOTH.z0, BOOTH.x1, BOOTH.z1, { name: 'Projection booth' });
+  door(0, 98, BOOTH.z0, 'service', { booth: true });
+
   // en bas, le portail du cinéma n'existe pas : une simple porte entre la cour est et le couloir de service
   door(1, EMID, 21, 'service');
 
@@ -800,8 +817,11 @@ export function createMallMap(seed = 17) {
     F[fi].grid[gz * W + gx] = T.EXIT;
     return { elevator: { gx, gz, x: (gx + 0.5) * C, z: (gz + 0.5) * C, dx, dz, freight: true }, exit: cellPos(gx - dx, gz - dz) };
   };
-  const L0 = lift(0, 102, 62, 0, 1); // au fond des bureaux
-  const L1 = lift(1, 70, 2, 0, -1); // sur le quai
+  // la sortie : le monte-charge de scène, dans le couloir qui passe derrière l'écran de la salle 1 (il ne s'ouvre que
+  // quand le film passe) ; celui du quai, en bas, est hors service (dead : il ne s'ouvre jamais)
+  const L0 = lift(0, 109, 7, 1, 0);
+  const L1 = lift(1, 70, 2, 0, -1);
+  L1.elevator.dead = true;
 
   // --- 11. Les lumières (la plupart en panne : un centre abandonné ne laisse allumé que l'éclairage de veille) ---
   const light = (fi, x, z, kind, o = {}) => {
@@ -933,9 +953,13 @@ export function createMallMap(seed = 17) {
       if (p.kind !== 'mail' && p.kind !== 'court') continue;
       light(fi, p.x, p.z, 'sconce', { y: 2.7, pillar: +k, pOff: 0.3 });
     }
-    // une lumière n'est jamais dans un mur
+    // la cabine de projection : une seule lampe, faible, au-dessus de la table de montage (posée sans tirage au sort :
+    // l'état des autres lampes du centre ne change pas)
+    if (fi === 0) f.lights.push({ id: f.lights.length, x: BOOTH.x0 * C + 1.6, z: (BOOTH.z1 + 1) * C - 1.2, gx: BOOTH.x0, gz: BOOTH.z1, kind: 'spot', state: 'on', room: boothRoom.id, y: boothRoom.ceilH, rad: 4.2, gain: 0.55 });
+    // une lumière n'est jamais dans un mur (ni une balise d'allée dans la cabine de projection)
     f.lights = f.lights.filter((l) => {
       const v = get(f, l.gx, l.gz);
+      if (l.kind === 'aisle' && f.zone[l.gz * W + l.gx] !== l.room) return false;
       return v === T.FLOOR || v === T.PILLAR;
     });
     f.lights.forEach((l, i) => (l.id = i));
@@ -1625,6 +1649,38 @@ export function createMallMap(seed = 17) {
     }
   }
 
+  // --- 11c. La cabine de projection (étage du haut) : la cloison mince côté salle, le projecteur dans l'axe de l'écran,
+  // la table de montage contre le mur du sud. Le moteur n'en retient que les formes de collision et les repères
+  // (booth) ; le reste se dessine dans view/mallCinema.js ---
+  const booth = (() => {
+    const x0 = BOOTH.x0 * C;
+    const x1 = (BOOTH.x1 + 1) * C;
+    const z0 = BOOTH.z0 * C;
+    const z1 = (BOOTH.z1 + 1) * C;
+    const sc = screens[0];
+    const axis = ((sc.z0 + sc.z1 + 1) * C) / 2; // l'axe de l'écran
+    // (le projecteur : son axe optique à 1,62 m, l'objectif à 45 cm du hublot ; de la lanterne à l'objectif, 1,60 m)
+    const proj = { x: x1 - 1.0, y: 1.62, z: axis };
+    const bench = { x: x0 + 1.8, z: z1 - 0.41, w: 2.2, d: 0.82 };
+    up.solids.add({ pts: rect(x1 - 0.12, z0, x1, z1), booth: 1 });
+    up.solids.add({ pts: rect(proj.x - 1.08, proj.z - 0.34, proj.x + 0.56, proj.z + 0.34), booth: 1 });
+    up.solids.add({ pts: rect(bench.x - bench.w / 2, bench.z - bench.d / 2, bench.x + bench.w / 2, z1), booth: 1 });
+    return {
+      room: boothRoom.id,
+      x0,
+      z0,
+      x1,
+      z1,
+      ceil: boothRoom.ceilH,
+      proj,
+      port: { x: x1, y: proj.y, z: axis },
+      bench,
+      use: { x: bench.x, z: bench.z - bench.d / 2 - 0.45 }, // là où l'on se tient pour monter les bobines
+      // l'écran de la salle 1 (contre le mur est) : là où tombe l'image
+      screen: { x: (sc.x1 + 1) * C - 0.09, y0: 1.4, y1: sc.ceilH - 1.2, z0: sc.z0 * C + 3.0, z1: (sc.z1 + 1) * C - 3.0, room: sc.id },
+    };
+  })();
+
   // --- 12. Ce qui se parcourt : les cases libres atteintes depuis l'arrivée (en haut) et depuis le pied des
   // escaliers (en bas), sans passer par ce que l'entité évite ---
   const isWallOf = (f) => (gx, gz) => {
@@ -1762,7 +1818,93 @@ export function createMallMap(seed = 17) {
     map.nav.isWall = (gx, gz) => isWall(gx, gz) || f.navBlock.has(gz * W + gx);
     return map;
   };
-  const upper = finish(up, distUp, walkUp, L0, cellPos(spawnCell.gx, spawnCell.gz), { monsterSpawn: cellPos(monsterCell.x, monsterCell.z), escNowhere });
+  const upper = finish(up, distUp, walkUp, L0, cellPos(spawnCell.gx, spawnCell.gz), { monsterSpawn: cellPos(monsterCell.x, monsterCell.z), escNowhere, booth });
   const lower = finish(dn, distDn, walkDn, L1, { ...stairs[0].down, gx: Math.floor(stairs[0].down.x / C), gz: Math.floor(stairs[0].down.z / C) }, { monsterSpawn: cellPos(80, 10) });
+
+  // --- 14. Les cinq bobines du film (le but du niveau) : des boîtes rondes en métal, restées là où on les avait
+  // prêtées. Une dans une boutique ouverte du bas, une dans une réserve du dédale, une dans une grande surface de
+  // l'aile sud (du côté opposé à la réserve), une dans les bureaux, une au nord-ouest (salle de jeux, grand magasin,
+  // food court, parking) : les deux étages, les quatre coins. Elles se rangent avec les cassettes du Level 0 (même
+  // ramassage, même état partagé). Un tirage à part : le décor d'une graine ne change pas ---
+  {
+    let q = ((seed ^ 0x5bd1e995) >>> 0) || 7;
+    const rr = () => {
+      q = (q + 0x6d2b79f5) >>> 0;
+      let t = q;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const mix = (arr) => {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(rr() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
+    const dists = [distUp, distDn];
+    const maps = [upper, lower];
+    const placed = [];
+    // une place dans la salle r : une case atteinte dont les quatre voisines le sont aussi, rien à moins de `clear`
+    // autour (on peut en faire le tour), loin des autres bobines et de l'arrivée
+    const spotIn = (fi, r) => {
+      const f = F[fi];
+      const d = dists[fi];
+      const cells = [];
+      for (let z = r.z0; z <= r.z1; z++) for (let x = r.x0; x <= r.x1; x++) if (f.zone[z * W + x] === r.id && d[z * W + x] > 0 && f.grid[z * W + x] === T.FLOOR) cells.push([x, z]);
+      for (const clear of [1.0, 0.75, 0.55]) {
+        for (let i = 0; i < 300 && cells.length; i++) {
+          const [cx, cz] = cells[Math.floor(rr() * cells.length)];
+          const x = (cx + 0.3 + rr() * 0.4) * C;
+          const z = (cz + 0.3 + rr() * 0.4) * C;
+          if (f.solids.hit(x, z, clear) || (fi === 0 && up.voids.some((v) => polyDist(v.pts, x, z) < 1.5))) continue;
+          if (placed.some((b) => b.fi === fi && Math.hypot(b.x - x, b.z - z) < 25)) continue;
+          if (fi === 0 && Math.hypot(x - upper.spawn.x, z - upper.spawn.z) < 20) continue;
+          return { x, z, gx: cx, gz: cz };
+        }
+      }
+      return null;
+    };
+    const named = (fi, ...names) => F[fi].rooms.filter((r) => names.includes(r.name)).map((r) => [fi, r]);
+    const west = rr() < 0.5; // la réserve du dédale au sud-ouest et l'autre coin du sud en haut, ou l'inverse
+    const stores = F[1].rooms.filter((r) => r.kind === RK.STORAGE);
+    const sideOf = (r) => ((r.x0 + r.x1) / 2 < 40 ? 'west' : (r.x0 + r.x1) / 2 > 70 ? 'east' : 'middle');
+    const storage = (side) => [...mix(stores.filter((r) => sideOf(r) === side)), ...mix(stores)].map((r) => [1, r]);
+    // (les boutiques ouvertes du vieux centre, à l'ouest ou à l'est de la cour centrale)
+    const openShops = (fi, east) => F[fi].shops.filter((sh) => sh.state === 'open' && sh.z1 < 60 && sh.x0 > 60 === east).map((sh) => [fi, F[fi].rooms[sh.room]]);
+    const plan = [
+      // au sud-ouest et au sud-est : une réserve du dédale d'un côté ; de l'autre, une grande surface ou des bureaux
+      west ? storage('west') : storage('east'),
+      west ? [...mix(named(0, 'Evergreen Garden Centre', 'Administration', 'Mall management')), ...named(0, 'Evergreen Garden Centre')] : [...mix([...named(0, 'Greenfield Market', 'Security'), ...named(1, 'Lost & found')]), ...named(0, 'Greenfield Market')],
+      // au nord-ouest : la salle de jeux, le grand magasin, le parking
+      [...mix([...named(0, 'Funland', "Hartwell's"), ...named(1, "Hartwell's", 'Parking P1')]), ...named(0, 'The Pavilion')],
+      // au nord-est : une boutique ouverte du petit tronçon de mail, les quais de livraison, ou le hall du cinéma
+      [...mix([...openShops(1, true), ...openShops(0, true), ...named(1, 'Loading docks')]), ...named(0, 'Stardust 8 Cinemas'), ...named(1, 'Loading docks')],
+    ];
+    // la cinquième, au milieu : à l'étage qui en a le moins
+    const mid = () => {
+      const up2 = placed.filter((b) => b.fi === 0).length;
+      const c0 = mix([...named(0, 'Second Chance Antiques', 'The Pavilion'), ...openShops(0, false)]);
+      const c1 = mix([...openShops(1, false), ...named(1, 'Parking lobby')]);
+      return up2 > placed.length - up2 ? [...c1, ...c0] : up2 < placed.length - up2 ? [...c0, ...c1] : mix([...c0, ...c1]);
+    };
+    plan.push(mid);
+    for (const step of plan) {
+      // (jamais plus de trois bobines au même étage)
+      const all = typeof step === 'function' ? step() : step;
+      const free = all.filter(([fi]) => placed.filter((b) => b.fi === fi).length < 3);
+      for (const [fi, r] of free.length ? free : all) {
+        const sp = spotIn(fi, r);
+        if (!sp) continue;
+        const id = placed.length;
+        const where = r.kind === RK.STORAGE ? `Service tunnels, ${sideOf(r)} storage` : r.name;
+        const reel = { id, ...sp, collected: false, reel: true, fi, where };
+        placed.push(reel);
+        maps[fi].cassettes.push(reel);
+        break;
+      }
+    }
+  }
   return { level: MALL_LEVEL, floors: [upper, lower], stairs, bridges, voids: { west: voidW, center: voidC, east: voidE } };
 }

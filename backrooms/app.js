@@ -1481,6 +1481,22 @@ function handleEvent(ev, me) {
       if (sfx) setTimeout(() => sfx && sfx.loreTape(4 + LORE[n].length / 16), 700);
       break;
     }
+    // Level 17 : une bobine du film trouvée ; les bobines montées sur le projecteur ; le journal du projectionniste (où
+    // sont celles qui manquent) ; le film qui démarre
+    case 'reel':
+      if (sfx) sfx.cassette('tape');
+      if (hud) hud.toast(ev.by === me ? `Film reel ${ev.count}/${ev.total} · thread it in the projection booth, behind Screen 1` : `${who(ev.by)} found a film reel (${ev.count}/${ev.total})`, 4);
+      break;
+    case 'reelMount':
+      if (sfx) sfx.cassette('fuse');
+      if (hud) hud.toast(ev.count >= ev.total ? 'The last reel is threaded: the projector rattles to life' : `${ev.by === me ? 'You thread' : `${who(ev.by)} threads`} ${ev.n > 1 ? `${ev.n} reels` : 'a reel'} on the projector (${ev.count}/${ev.total})`, 4);
+      break;
+    case 'benchEmpty':
+      if (ev.id === me && hud) hud.toast(ev.left.length ? `Projectionist's log · reels lent to: ${ev.left.map(([, fi, where]) => `${where} (${fi ? 'lower' : 'upper'} level)`).join(' · ')}` : 'Every reel is on the projector', 7);
+      break;
+    case 'filmStart':
+      if (hud && sim.player.status === 'alive') setTimeout(() => hud && hud.toast('The feature is starting in Screen 1…', 4), 1500);
+      break;
     case 'letter':
       if (sfx) sfx.cassette();
       if (ev.by === me) showNote('hotel', (letterN = (letterN || 0) + 1) - 1);

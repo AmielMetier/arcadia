@@ -185,6 +185,8 @@ html, body {
 .team .mate s { text-decoration: none; color: #ffcf3a; font-size: 15px; animation: recBlink 0.5s steps(1) infinite; }
 .tapes i.fuse { border-radius: 50%; width: 14px; }
 .tapes i.fuse.on { background: #ffb020; border-color: #ffb020; }
+/* Level 17 : les bobines du film (rondes ; à moitié : trouvée, pleine : montée sur le projecteur) */
+.tapes i.reel { border-radius: 50%; width: 14px; }
 .spectate {
   position: absolute;
   left: 50%;

@@ -23,7 +23,7 @@ import { createWarehouseMap, DOCK_PASS, guardDoorWant, inSafe, SAFE_LEVER_R } fr
 import { createPoolMap, MOUTH } from './poolrooms.js';
 import { createHotelMap, WORDS, LETTERS, HIDE_R as SPOT_R, MAIL_R, KEYPAD_R, LETTER_R } from './hotel.js';
 import { createPipesMap, VALVES, PIPES_LEVEL, jetState, inJet, JET_HALF } from './level2.js';
-import { createMallMap, MALL_LEVEL } from './mall.js';
+import { createMallMap, MALL_LEVEL, REELS, FILM_LEAD_T } from './mall.js';
 import { hasLineOfSight } from './nav.js';
 import { planTo, move as gaitMove, faceTo, shove, stagger, feetOf, cageAt, BODY_R, roamable } from './gait.js';
 import { Track } from './interp.js';
@@ -94,7 +94,7 @@ export { CASSETTES };
 export const FUSES = 3;
 export { VALVES, PIPES_LEVEL };
 export const HOTEL_LEVEL = 4; // Level 5, le Terror Hotel (par le toboggan rouge des Poolrooms)
-export { MALL_LEVEL }; // 5 : Level 17, le Mall (deux étages, engine/mall.js)
+export { MALL_LEVEL, REELS, FILM_LEAD_T }; // 5 : Level 17, le Mall (deux étages, engine/mall.js) ; ses 5 bobines de film, l'amorce du film
 export const LAST_LEVEL = PIPES_LEVEL; // 0 : Level 0, 1 : Level 1 (entrepôt), 2 : Level 37 (Poolrooms), 3 : Level 2 (Tuyauteries, toboggan jaune), 4 : Level 5 (Terror Hotel, toboggan rouge)
 // ⭐ Le niveau de départ d'un VIP (réglage « start » du salon, hub/games.js, ou ?level1, ?level37, ?level2, ?level5, ?level17 seul) :
 // le nom du level → son numéro dans le moteur. Il ne compte que pour un VIP (vip : compte VIP du Hub, ou hors du Hub) qui
@@ -593,8 +593,10 @@ export class BackroomsSim {
     this.valves = 0; // vannes fermées (Level 2)
     this.items0 = this.floors.map((f) => (f.items || []).length); // objets d'origine (les suivants ont été posés par des joueurs)
     // un seul vrai ascenseur : décidé quand tout se met en route, le plus loin de l'équipe (pickRealFloor)
-    this.realFloor = this.floors.length > 1 ? (hashRnd(this.seed, level, 7) < 0.5 ? 0 : 1) : 0;
+    // (Level 17 : la sortie est en haut, derrière l'écran de la salle 1)
+    this.realFloor = this.floors.length > 1 && level !== MALL_LEVEL ? (hashRnd(this.seed, level, 7) < 0.5 ? 0 : 1) : 0;
     this.unlocked = false;
+    this.film = 0; // Level 17 : depuis combien de temps le film passe (0 : le projecteur attend ses bobines)
     this.powered = false; // panneau du monte-charge réalimenté (Level 1)
     this.slide = -1; // Poolrooms : le toboggan pris par le premier qui s'y est glissé (les autres le suivent)
     // Level 5 : le mot des 6 lettres (même graine, même mot ; l'hôte l'envoie de toute façon), lettres postées, code
@@ -755,7 +757,7 @@ export class BackroomsSim {
   get open() {
     if (this.level === PIPES_LEVEL) return this.valves >= VALVES;
     if (this.level === 2) return true; // Poolrooms : les toboggans sont ouverts dès l'arrivée
-    if (this.level === MALL_LEVEL) return true; // Level 17 : le monte-charge marche (le but du niveau viendra)
+    if (this.level === MALL_LEVEL) return this.film >= FILM_LEAD_T; // Level 17 : le film passe, le monte-charge de scène s'ouvre
     // (Level 1 : le courant revenu, le monte-charge doit encore descendre jusqu'à l'équipe)
     if (this.level === 1) return this.powered && !(this.liftCallT > 0);
     return this.level === 0 ? this.cassettes >= CASSETTES && !(this.finaleT > 0) : this.powered;
@@ -2050,6 +2052,7 @@ export class BackroomsSim {
     }
     const cas = this.nearCassette(P);
     if (cas) return this.takeCassette(P, cas);
+    if (this.nearBench(P)) return this.mountReels(P);
     if (P.desk) return this.leaveDesk(P);
     const it = this.nearItem(P);
     const h = this.nearHide(P);
@@ -2353,6 +2356,15 @@ export class BackroomsSim {
     }
     this.updateBoarding();
     this.updateLift();
+    // Level 17 : le film passe ; l'amorce finie, le monte-charge s'ouvre derrière l'écran
+    if (this.film > 0) {
+      const was = this.film;
+      this.film += DT;
+      if (was < FILM_LEAD_T && this.film >= FILM_LEAD_T) {
+        this.unlocked = true;
+        this.emit({ type: 'exitUnlocked', film: true });
+      }
+    }
     if (this.finaleT > 0) {
       this.finaleT = Math.max(0, this.finaleT - DT);
       if (this.finaleT === 0) this.startFinale();
@@ -2445,8 +2457,38 @@ export class BackroomsSim {
     this.cassettes++;
     P.found++;
     this.makeNoise(P, NOISE.pick, 0.8);
+    // Level 17 : une bobine du film (elle reste à monter dans la cabine de projection)
+    if (cas.reel) return this.emit({ type: 'reel', id: cas.id, by: P.id, count: this.cassettes, total: REELS, x: cas.x, z: cas.z, floor: P.floor || 0 });
     this.emit({ type: 'cassette', id: cas.id, by: P.id, count: this.cassettes, total: CASSETTES, x: cas.x, z: cas.z, floor: P.floor || 0 });
     if (this.cassettes === CASSETTES && this.level === 0) this.finaleT = FINALE_WAIT;
+  }
+
+  // Level 17 : devant la table de montage de la cabine de projection (tant que le film ne passe pas)
+  nearBench(P) {
+    const b = this.level === MALL_LEVEL ? this.map.booth : null;
+    return !!b && !(this.film > 0) && (P.floor || 0) === 0 && Math.hypot(b.use.x - P.x, b.use.z - P.z) < USE_R;
+  }
+
+  // F devant la table : les bobines trouvées par l'équipe et pas encore montées le sont. À la cinquième, le
+  // projecteur démarre : l'amorce défile (FILM_LEAD_T), puis la sortie s'ouvre derrière l'écran
+  mountReels(P) {
+    const n = this.cassettes - this.delivered;
+    if (n <= 0) {
+      const left = this.allCassettes.filter((c) => !c.collected).map((c) => [c.id, c.fi, c.where]);
+      return this.emit({ type: 'benchEmpty', id: P.id, left });
+    }
+    this.delivered = this.cassettes;
+    this.makeNoise(P, NOISE.use, 1.2);
+    this.emit({ type: 'reelMount', by: P.id, name: P.name, n, count: this.delivered, total: REELS });
+    if (this.delivered >= REELS) this.startFilm();
+  }
+
+  startFilm() {
+    if (this.film > 0) return;
+    const b = this.map.booth;
+    this.film = DT;
+    this.powered = true;
+    this.emit({ type: 'filmStart', x: b.proj.x, z: b.proj.z });
   }
 
   // la phase finale du Level 0 : le vrai ascenseur s'ouvre, les néons s'éteignent un à un ; HUNT_DELAY plus tard, les
@@ -2911,6 +2953,22 @@ export class BackroomsSim {
           P.sigTo = 'stairs';
         }
       }
+    } else if (this.level === MALL_LEVEL && !(this.film > 0)) {
+      // Level 17 : la bobine la plus proche à cet étage ; plus aucune ici : l'escalier ; toutes trouvées (ou déjà en
+      // main) : la cabine de projection
+      const left = (map.cassettes || []).filter((c) => !c.collected);
+      const fl = P.floor || 0;
+      const toStairs = () => {
+        best = this.stairs.reduce((b, st) => Math.min(b, Math.hypot((fl === 0 ? st.up : st.down).x - P.x, (fl === 0 ? st.up : st.down).z - P.z)), Infinity);
+        P.sigTo = 'stairs';
+      };
+      if (left.length) best = near(left);
+      else if (this.cassettes < REELS && this.cassettes <= this.delivered) toStairs();
+      else if (fl !== 0) toStairs();
+      else {
+        best = near([this.map.booth.use]);
+        P.sigTo = 'booth';
+      }
     } else if (this.level === 1 && (map.fuses || []).some((f) => !f.taken)) {
       best = near((map.fuses || []).filter((f) => !f.taken));
     } else if (this.level === 1 && !this.mains && (this.delivered || 0) >= FUSES) {
@@ -2935,8 +2993,9 @@ export class BackroomsSim {
       P.sigTo = 'exit';
     } else if (this.level === PIPES_LEVEL && !this.open) {
       best = (map.valves || []).filter((v) => !v.closed).reduce((b, v) => Math.min(b, Math.hypot(v.sx - P.x, v.sz - P.z)), Infinity);
-    } else if (this.level === 0 && this.floors.length > 1) {
+    } else if ((this.level === 0 || this.level === MALL_LEVEL) && this.floors.length > 1) {
       // tout est trouvé : le caméscope montre le vrai ascenseur, de partout (jamais tout à fait sans signal)
+      // (Level 17 : le film passe, la flèche mène au monte-charge de scène, derrière l'écran)
       const G = this.exitGoal(P);
       P.sigTo = G.sig;
       P.sigX = G.x;
@@ -3406,6 +3465,7 @@ export class BackroomsSim {
       fw: r2(this.finaleT),
       hu: this.hunt ? 1 : 0,
       sl: this.slide,
+      fm: this.film > 0 ? r2(this.film) : undefined, // Level 17 : le film qui passe
       wd: this.word,
       po: this.posted,
       cs: this.codeShown ? 1 : 0,
@@ -3509,6 +3569,7 @@ export class BackroomsSim {
     this.finaleT = snap.fw || 0;
     this.hunt = !!snap.hu;
     this.slide = snap.sl ?? -1;
+    this.film = snap.fm || 0;
     if (snap.wd) this.word = snap.wd;
     this.posted = snap.po || 0;
     this.codeShown = !!snap.cs;

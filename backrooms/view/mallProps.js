@@ -245,41 +245,6 @@ const SEAT = (() => {
   return { back, pan, up, arm };
 })();
 
-// l'image restée sur l'écran de la salle 1 : le carton de l'entracte
-function intermissionTex() {
-  const [c, g] = atlas(1, 1, 1024, 512);
-  const gr = g.createRadialGradient(512, 256, 60, 512, 256, 620);
-  gr.addColorStop(0, '#26344a');
-  gr.addColorStop(1, '#0a0e16');
-  g.fillStyle = gr;
-  g.fillRect(0, 0, 1024, 512);
-  g.strokeStyle = '#c8b68a';
-  g.lineWidth = 3;
-  g.strokeRect(46, 40, 932, 432);
-  g.lineWidth = 1;
-  g.strokeRect(58, 52, 908, 408);
-  g.textAlign = 'center';
-  g.fillStyle = 'rgba(0,0,0,0.5)';
-  g.font = 'italic 112px Georgia, "Times New Roman", serif';
-  g.fillText('Intermission', 518, 282);
-  g.fillStyle = '#e9dcc0';
-  g.fillText('Intermission', 512, 276);
-  g.font = 'bold 24px "Arial Narrow", Arial, sans-serif';
-  g.fillText('T H E   F E A T U R E   W I L L   R E S U M E   S H O R T L Y', 512, 360);
-  g.font = '18px "Arial Narrow", Arial, sans-serif';
-  g.fillText('S T A R D U S T   8   C I N E M A S', 512, 420);
-  // des rayures de pellicule, des poussières
-  for (let i = 0; i < 26; i++) {
-    g.fillStyle = `rgba(255,255,255,${0.04 + ((i * 37) % 10) / 120})`;
-    g.fillRect(((i * 197) % 1024) + 0.5, 0, 1, 512);
-  }
-  for (let i = 0; i < 160; i++) {
-    g.fillStyle = i % 3 ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.35)';
-    g.fillRect((i * 271) % 1024, (i * 149) % 512, 1 + (i % 3), 1 + (i % 2));
-  }
-  return toTex(c);
-}
-
 // --- Le mobilier ---
 export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, placed = [] }) {
   const furn = map.furn || [];
@@ -907,12 +872,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     G.box('black', X1 - 0.1, X1 - 0.02, 1.2, r.ceilH - 1.0, Z0 + 2.6, Z0 + 3.0, '+x');
     G.box('black', X1 - 0.1, X1 - 0.02, 1.2, r.ceilH - 1.0, Z1 - 3.0, Z1 - 2.6, '+x');
     G.box('red', X1 - 1.2, X1 - 0.1, 0, 1.2, Z0 + 2.6, Z1 - 2.6, '-y');
-    // (la salle 1 : le projecteur tourne encore ; sur l'écran, le carton de l'entracte, et sa lueur qui tremble)
-    if (r.num === 1) {
-      MATS.screenLit = MATS.screenLit || { m: new THREE.MeshBasicMaterial({ map: intermissionTex(), color: new THREE.Color(1, 1, 1).multiplyScalar(0.8) }), S: 1 };
-      panel('screenLit', [0, 0, 1, 1], X1 - 0.09, (1.4 + r.ceilH - 1.2) / 2, (Z0 + Z1) / 2, Z1 - Z0 - 6.0, r.ceilH - 2.6, -1, 0);
-      lights.push({ x: X1 - 3, y: 2.8, z: (Z0 + Z1) / 2, c: [0.4, 0.46, 0.6], rad: 12, nx: -1, nz: 0, box: [r.x0 * C - 0.25, Z0 - 0.25, X1 + 0.25, Z1 + 0.25] });
-    }
+    // (la salle 1 : ce qui passe à l'écran, carton de l'entracte puis film, est dessiné par view/mallCinema.js)
   }
 
   // le cinéma : des affiches dans des caissons lumineux le long des murs du hall et du couloir des salles

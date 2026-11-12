@@ -24,6 +24,7 @@ import { buildHotel } from './hotel.js';
 import { buildMall, mallOnCol, MALL_OFF } from './mall.js';
 import { createMallTextures } from './mallTextures.js';
 import { MALL_LEVEL } from '../engine/mall.js';
+import { reelCan } from './mallCinema.js';
 import { createHotelEntity } from './hotelEntity.js';
 import { createGoatHerd } from './goats.js';
 import { createPipesTextures } from './textures2.js';
@@ -2910,9 +2911,22 @@ float bkCaust(vec2 uv, float t) {
     const cassetteMat = new THREE.MeshLambertMaterial({ map: textures.vhs, emissive: '#ffe2b8', emissiveMap: textures.vhs, emissiveIntensity: 0.42 });
     const flatMat = baked(new THREE.MeshLambertMaterial({ map: textures.vhs, emissive: '#ffe2b8', emissiveMap: textures.vhs, emissiveIntensity: 0.12 }));
     const cassetteMeshes = [];
+    // (Level 17 : des boîtes de film rondes, en métal, étiquetées ; même reflet dans le faisceau de la lampe)
+    const reelMat = MALL ? baked(new THREE.MeshPhongMaterial({ color: '#8b8f92', specular: '#d8dadc', shininess: 70, emissive: '#55585a', emissiveIntensity: 0.3 }), { spec: 0.6, gloss: 110, mask: 0 }) : null;
+    const reelLabels = new Map();
+    const reelLabel = (tex) => reelLabels.get(tex) || reelLabels.set(tex, baked(new THREE.MeshLambertMaterial({ map: tex, emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 0.16 }))).get(tex);
     for (const cas of map.cassettes || []) {
       const cg = new THREE.Group();
-      if (cas.high) {
+      if (cas.reel) {
+        cg.add(reelCan(cas.id + 1, reelMat, reelLabel));
+        const glint = new THREE.Sprite(glintMat());
+        glint.scale.setScalar(0.24);
+        glint.position.set(0.09, 0.09, -0.06);
+        cg.add(glint);
+        cg.userData.glint = glint;
+        cg.position.set(cas.x, 0, cas.z);
+        cg.rotation.y = ((cas.gx * 7 + cas.gz * 13 + cas.id * 5) % 12) * 0.52;
+      } else if (cas.high) {
         cg.add(new THREE.Mesh(cassetteGeo, cassetteMat));
         cg.add(new THREE.PointLight('#f5a524', 1.1, 3.5, 1.8));
         cg.position.set(cas.x, NICHE_Y, cas.z);
@@ -4632,7 +4646,7 @@ void main() {
           bakeUniforms.uWaterY.value = water.level;
         }
         if (hotel) hotel.update(sim, P, time, dt);
-        if (mall) mall.update(camera);
+        if (mall) mall.update(camera, sim, time, dt);
 
         // Coupure de courant : les néons meurent d'un coup, puis reviennent en grésillant
         const want = !(sim.blackout > 0);
@@ -4702,12 +4716,12 @@ void main() {
         // Ascenseur : rouge verrouillé, vert ouvert ; le faux devient un mur (couleurs en nombres : à chaque image,
         // pas de texte à relire)
         const fake = !!(E && E.fake);
-        const open = sim.open && !fake;
+        const open = sim.open && !fake && !(E && E.dead); // (Level 17 : le monte-charge du quai est hors service)
         showGroup(exitGroup, !fake);
         if (fakeWall) fakeWall.visible = fake;
         exitLight.color.setHex(open ? 0x22c55e : 0xef4444);
-        exitLight.intensity = fake || !E ? 0 : open ? 3 : 1; // aux Poolrooms, pas d'ascenseur : les toboggans
-        signMat.color.setHex(open ? 0x4ade80 : 0xff3030);
+        exitLight.intensity = fake || !E || E.dead ? 0 : open ? 3 : 1; // aux Poolrooms, pas d'ascenseur : les toboggans
+        signMat.color.setHex(E && E.dead ? 0x2a0c0c : open ? 0x4ade80 : 0xff3030);
         callMat.color.setHex(open ? 0xf4f1e0 : 0xc2701c);
         // les portes s'ouvrent quand l'ascenseur est alimenté ; le bouton pressé dans la cabine, elles se referment
         // (en un peu moins de deux secondes) et l'ascenseur part
