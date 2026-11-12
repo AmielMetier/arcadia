@@ -309,29 +309,37 @@ function makeBuilder(MATS, wells = []) {
 function makeMaterials(tx, baked) {
   const lam = (o) => new THREE.MeshLambertMaterial(o);
   const phong = (o) => new THREE.MeshPhongMaterial(o);
-  // le sol poli : il reflète les lampes (spec), net comme une vitre sombre
-  const polish = (map) => baked(phong({ map, specular: '#3a352c', shininess: 90 }), { spec: 0.85, gloss: 320, mask: 0 });
+  // le sol poli : il reflète les lampes (spec), net comme une vitre sombre ; son poli vient de la matière scannée
+  // (les joints et les rayures ne brillent pas)
+  const polish = (map, gloss) => baked(phong({ map, specularMap: gloss, specular: '#3a352c', shininess: 90 }), { spec: 0.95, gloss: 320, mask: 0 });
+  // l'enduit peint des murs : le grain de la photo, en relief (la lumière qui tombe du plafond l'accroche)
+  const paint = (map) => baked(lam({ map, bumpMap: tx.plasterRelief, bumpScale: 0.7 }), { bump: true, fade: [1.0, 3.0] });
+  // un rideau métallique à lames : chaque lame prend la lumière du haut
+  const slats = (map, relief) => baked(phong({ map, bumpMap: relief, bumpScale: 3.2, specular: '#2c2c2c', shininess: 30 }), { spec: 0.3, gloss: 60, mask: 0, bump: true, fade: [1.3, 3.2] });
+  // S : la taille réelle d'une répétition de la matière scannée, en mètres (la même densité partout)
   return {
-    terrazzo: { m: polish(tx.terrazzo), S: 2.4 },
-    checker: { m: polish(tx.checker), S: 2.4 },
+    terrazzo: { m: polish(tx.terrazzo, tx.terrazzoGloss), S: 1.9 },
+    checker: { m: polish(tx.checker, tx.checkerGloss), S: 3.0 },
     carpetD: { m: baked(lam({ map: tx.carpetDark })), S: 1.5 },
     carpetFun: { m: baked(lam({ map: tx.carpetArcade })), S: 2.6 },
     carpetV: { m: baked(lam({ map: tx.carpetViolet })), S: 1.5 },
     // l'annexe : un grès brun des années 70 (une aile plus ancienne)
-    annexTile: { m: baked(phong({ map: tx.annexTile, specular: '#1c1a16', shininess: 30 }), { spec: 0.3, gloss: 80, mask: 0 }), S: 2.1 },
-    lino: { m: baked(phong({ map: tx.lino, specular: '#1c1a16', shininess: 30 }), { spec: 0.35, gloss: 90, mask: 0 }), S: 2.4 },
-    quarry: { m: baked(phong({ map: tx.quarry, specular: '#1c1a16', shininess: 30 }), { spec: 0.25, gloss: 70, mask: 0 }), S: 3.0 },
-    concrete: { m: baked(lam({ map: tx.concrete })), S: 2.5 },
+    annexTile: { m: baked(phong({ map: tx.annexTile, bumpMap: tx.annexRelief, bumpScale: 1.2, specularMap: tx.annexGloss, specular: '#1c1a16', shininess: 30 }), { spec: 0.4, gloss: 80, mask: 0 }), S: 1.7 },
+    lino: { m: baked(phong({ map: tx.lino, specularMap: tx.linoGloss, specular: '#1c1a16', shininess: 30 }), { spec: 0.4, gloss: 90, mask: 0 }), S: 2.0 },
+    quarry: { m: baked(phong({ map: tx.quarry, bumpMap: tx.quarryRelief, bumpScale: 1.2, specularMap: tx.quarryGloss, specular: '#1c1a16', shininess: 30 }), { spec: 0.35, gloss: 70, mask: 0 }), S: 2.26 },
+    concrete: { m: baked(lam({ map: tx.concrete })), S: 2.0 },
+    // le sol stratifié des boutiques
+    laminate: { m: baked(phong({ map: tx.laminate, specularMap: tx.laminateGloss, specular: '#241b12', shininess: 40 }), { spec: 0.35, gloss: 90, mask: 0 }), S: 1.7 },
     wood: { m: baked(phong({ map: tx.wood, specular: '#241b12', shininess: 40 }), { spec: 0.3, gloss: 70, mask: 0 }), S: 2.0 },
     woodFront: { m: baked(phong({ map: tx.wood, color: '#b06c40', specular: '#241b12', shininess: 40 }), { spec: 0.3, gloss: 70, mask: 0 }), S: 1.6 },
-    faience: { m: baked(phong({ map: tx.faience, specular: '#3a3a3a', shininess: 80 }), { spec: 0.35, gloss: 140, mask: 0 }), S: 2.0 },
-    plaster: { m: baked(lam({ map: tx.plaster })), S: 2.5 },
-    paintGrey: { m: baked(lam({ map: tx.paintGrey })), S: 2.5 },
-    paintDark: { m: baked(lam({ map: tx.paintDark })), S: 2.5 },
-    paintChar: { m: baked(lam({ map: tx.paintChar })), S: 2.5 },
-    block: { m: baked(lam({ map: tx.block })), S: 2.5 },
-    ceilTiles: { m: baked(lam({ map: tx.ceilTiles })), S: 2.5 },
-    slab: { m: baked(lam({ map: tx.slab })), S: 2.5 },
+    faience: { m: baked(phong({ map: tx.faience, bumpMap: tx.faienceRelief, bumpScale: 0.3, specular: '#3a3a3a', shininess: 80 }), { spec: 0.35, gloss: 140, mask: 0, bump: true, fade: [0.6, 1.8] }), S: 1.27 },
+    plaster: { m: paint(tx.plaster), S: 2.0 },
+    paintGrey: { m: paint(tx.paintGrey), S: 2.0 },
+    paintDark: { m: paint(tx.paintDark), S: 2.0 },
+    paintChar: { m: paint(tx.paintChar), S: 2.0 },
+    block: { m: baked(lam({ map: tx.block, bumpMap: tx.blockRelief, bumpScale: 1.6 }), { bump: true, fade: [1.0, 3.0] }), S: 2.0 },
+    ceilTiles: { m: baked(lam({ map: tx.ceilTiles })), S: 2.0 },
+    slab: { m: baked(lam({ map: tx.slab })), S: 2.0 },
     paper: { m: baked(lam({ map: tx.paper })), S: 2.5 },
     // la verrière la nuit : le ciel noir ne prend pas la lumière des lampes
     sky: { m: new THREE.MeshBasicMaterial({ map: tx.skyGlass, color: '#8f98a3' }), S: 3.0 },
@@ -348,10 +356,12 @@ function makeMaterials(tx, baked) {
     glass: { m: new THREE.MeshPhongMaterial({ color: '#0b1214', transparent: true, opacity: 0.2, specular: '#8fa6ae', shininess: 120, depthWrite: false, side: THREE.DoubleSide }), S: 1, order: 2 },
     // les rubans de LED bleues du cinéma (plus forts que le blanc : ils bavent dans le caméscope)
     velvet: { m: baked(lam({ map: tx.velvet })), S: 0.9 },
-    shutter: { m: baked(phong({ map: tx.shutter, specular: '#2c2c2c', shininess: 30 }), { spec: 0.3, gloss: 60, mask: 0 }), S: 2.0 },
+    shutter: { m: slats(tx.shutter, tx.shutterRelief), S: 2.0 },
+    shutterBeige: { m: slats(tx.shutterBeige, tx.shutterBeigeRelief), S: 1.9 },
     plate: { m: baked(phong({ map: tx.plate, specular: '#9a9ea4', shininess: 60 }), { spec: 0.55, gloss: 100, mask: 0 }), S: 1.2 },
     // les marches des escalators : de l'aluminium sombre, un liseré jaune
-    escStep: { m: baked(phong({ color: '#303236', specular: '#8a8e94', shininess: 50 }), { spec: 0.4, gloss: 80, mask: 0 }), S: 1 },
+    // (une marche : de l'aluminium rainuré dans le sens de la marche — les lames du rideau scanné, serrées à un centimètre)
+    escStep: { m: baked(phong({ map: tx.shutter, color: '#4c4e54', bumpMap: tx.shutterRelief, bumpScale: 2.4, specular: '#8a8e94', shininess: 50 }), { spec: 0.55, gloss: 60, mask: 0, bump: true, fade: [1.3, 3.2] }), S: 0.42 },
     escYellow: { m: baked(lam({ color: '#c9a21e' })), S: 1 },
     banner: { m: baked(lam({ map: tx.banner, side: THREE.DoubleSide })), S: 1 },
     led: { m: new THREE.MeshBasicMaterial({ color: new THREE.Color('#86a8ff').multiplyScalar(3.0) }), S: 1 },
@@ -453,7 +463,6 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   const H = map.H;
   const up = floors[0];
   const MATS = makeMaterials(tx, baked);
-  MATS.__tx = tx; // (les tissus des vêtements, view/mallProps.js)
   const rooms = map.rooms;
   const roomOf = (x, z) => {
     if (x < 0 || z < 0 || x >= W || z >= H) return null;
@@ -548,7 +557,8 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       if (!(fi === 0 && stairCell.has(i))) {
         // (la moquette à motif du hall du cinéma est peinte pour sa salle : dans le passage qui y mène, la même laine, unie)
         const fk0 = floorKey(r, fi, map.shops, x, z);
-        const fk = fk0 === 'cine' && (x < r.x0 || x > r.x1 || z < r.z0 || z > r.z1) ? 'carpetV' : fk0;
+        // (le plancher d'une boutique : un stratifié ; la clé « wood » reste celle du bruit des pas)
+        const fk = fk0 === 'cine' && (x < r.x0 || x > r.x1 || z < r.z0 || z > r.z1) ? 'carpetV' : fk0 === 'wood' ? 'laminate' : fk0;
         const pieces = fi === 0 ? cellPieces(x, z, voidBoxes) : [rectPts(x * C, z * C, (x + 1) * C, (z + 1) * C)];
         for (const p of pieces) G.hpoly(fk, p, 0, 1);
       }
@@ -1223,11 +1233,10 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   // (ni autour des portes des deux salles ouvertes : leur portique blanc, leur grand chiffre)
   for (const d of map.doors || []) if (d.kind === 'screen') placed.push([d.x * C - 0.1, (d.z + 0.5) * C, 2.9]);
   const props = drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, placed });
-  drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed, show: props.show, arcade: props.arcade, goods: props.goods });
+  drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed, show: props.show, arcade: props.arcade });
   drawMallSigns({ map, fi, G, MATS, rooms, goods: props.goods, hAt, model, arcade: props.arcade });
   // la cabine de projection, l'écran de la salle 1 et son film (view/mallCinema.js) : à l'étage du haut
   const cinema = drawMallCinema({ map, fi, floors, G, MATS, baked, model, group, placed, art: marigoldFilmArt });
-  props.goods.flush();
   kit.build();
   G.build(group);
   // les barreaux : un seul maillage

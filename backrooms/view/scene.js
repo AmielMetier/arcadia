@@ -1252,11 +1252,11 @@ float occVis(vec3 p, vec3 lp) {
       const base = opts && opts.base; // une plinthe au pied du mur
       const film = L0 && opts && opts.film; // la pellicule d'eau au cœur des grosses taches (le sol du Level 0)
       const gloss = L1 && opts && opts.gloss; // le béton lissé du Level 1, où se reflètent les réglettes
-      const bump = L1 && opts && opts.bump; // Level 1 : un relief (les joints des parpaings) que prennent aussi les feux de couleur
+      const bump = (L1 || MALL) && opts && opts.bump; // Level 1, Level 17 : un relief (les joints des parpaings, les lames d'un rideau métallique) que prennent aussi les feux de couleur
       const wall1 = L1 && opts && opts.wall1; // les murs du Level 1 : la poussière et la suie sous le plafond
       const marble = L3 && opts && opts.marble; // le hall de l'hôtel : un marbre poli, sans l'usure de la moquette
       const push = opts && opts.push; // les murs en biais : la lumière lue un peu devant eux, dans le couloir (pas au coin des cases)
-      if (spec || PIPES || base || EDGE || SEGS || film || gloss || DYN || push || pool || hotel || MALL) mat.customProgramCacheKey = () => 'bk' + (MALL ? '-mall' : '') + (hotel ? '-hotel' : '') + (marble ? '-marble' : '') + (pool ? '-pool-' + pool : '') + (push ? '-push' : '') + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE || SEGS ? '-edge' : '') + (film ? '-film' : '') + (gloss ? '-gloss' : '') + (DYN ? '-dyn' : '') + (bump ? '-bump' : '') + (wall1 ? '-wall1' : '');
+      if (spec || PIPES || base || EDGE || SEGS || film || gloss || DYN || push || pool || hotel || MALL) mat.customProgramCacheKey = () => 'bk' + (MALL ? '-mall' : '') + (hotel ? '-hotel' : '') + (marble ? '-marble' : '') + (pool ? '-pool-' + pool : '') + (push ? '-push' : '') + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE || SEGS ? '-edge' : '') + (film ? '-film' : '') + (gloss ? '-gloss' : '') + (DYN ? '-dyn' : '') + (bump ? '-bump' + (MALL && opts.fade ? opts.fade.join('_') : '') : '') + (wall1 ? '-wall1' : '');
       mat.onBeforeCompile = (sh) => {
         Object.assign(sh.uniforms, bakeUniforms);
         if (DYN) {
@@ -1288,7 +1288,10 @@ float occVis(vec3 p, vec3 lp) {
         if (bump) sh.defines = { ...(sh.defines || {}), BK_BUMP: 1 };
         // Poolrooms : le relief des joints s'efface quand un carreau ne fait plus que quelques pixels (au loin, en
         // rasant) ; sinon sa pente, prise d'un pixel à l'autre, crénelle les joints en pointillés qui scintillent
-        if (pool && mat.bumpMap) sh.fragmentShader = sh.fragmentShader.replace('#include <bumpmap_pars_fragment>', THREE.ShaderChunk.bumpmap_pars_fragment.replace('return vec2( dBx, dBy );', 'return vec2( dBx, dBy ) * (1.0 - smoothstep(0.55, 1.6, max(length(dSTdx * vec2(textureSize(bumpMap, 0))), length(dSTdy * vec2(textureSize(bumpMap, 0))))));'));
+        // (Level 17 : chaque matière scannée dit quand son relief s'efface, en texels par pixel : les lames d'un rideau
+        // métallique tiennent plus loin que les joints d'une faïence ; sans cela, des moirés)
+        const fadeB = pool ? [0.55, 1.6] : MALL && bump && opts.fade;
+        if (fadeB && mat.bumpMap) sh.fragmentShader = sh.fragmentShader.replace('#include <bumpmap_pars_fragment>', THREE.ShaderChunk.bumpmap_pars_fragment.replace('return vec2( dBx, dBy );', `return vec2( dBx, dBy ) * (1.0 - smoothstep(${fadeB[0].toFixed(2)}, ${fadeB[1].toFixed(2)}, max(length(dSTdx * vec2(textureSize(bumpMap, 0))), length(dSTdy * vec2(textureSize(bumpMap, 0))))));`));
         if (wall1) sh.defines = { ...(sh.defines || {}), BK_WALL1: 1 };
         if (tile) {
           Object.assign(sh.uniforms, tileU);
@@ -1714,9 +1717,11 @@ float bkCaust(vec2 uv, float t) {
           // le relief (les joints des parpaings) : la lumière cuite vient d'en haut, la lèvre basse d'un joint, tournée
           // vers le haut, la prend, sa lèvre haute reste dans l'ombre
           vec3 bkNW = normalize((vec4(normal, 0.0) * viewMatrix).xyz);
-          if (abs(ny) < 0.5) shape *= 1.0 + clamp((bkNW.y - vBakeN.y) * 1.5, -0.4, 0.3);
+          float bkRel = abs(ny) < 0.5 ? 1.0 + clamp((bkNW.y - vBakeN.y) * 1.5, -0.4, 0.3) : 1.0;
+          shape *= bkRel;
           #else
           vec3 bkNW = vBakeN;
+          float bkRel = 1.0;
           #endif
           // sous l'eau (Poolrooms) : teinte cyan qui fonce avec la profondeur, et les caustiques
           float sub = uPool * smoothstep(0.0, 0.06, uWaterY - by);
@@ -1899,7 +1904,8 @@ float bkCaust(vec2 uv, float t) {
             vec3 hi = (uBakeTint * up.r + uBakeTint2 * up.b + vec3(0.34, 0.46, 1.6) * up.g) * mix(0.8, 1.0, bk.g) * (ny < -0.5 ? 1.0 : 0.92);
             // un sol très éclairé (le hall du cinéma) renvoie de sa lumière vers le plafond et le haut des murs
             hi += (uBakeTint * bk.r + uBakeTint2 * bk.b) * 1.1 * max(bk.r + bk.b - 0.22, 0.0);
-            totalEmissiveRadiance += diffuseColor.rgb * mix(lo, hi, kUp) * 2.0;
+            // (le relief d'une matière scannée : la lumière du haut le prend comme celle du bas)
+            totalEmissiveRadiance += diffuseColor.rgb * mix(lo, hi * bkRel, kUp) * 2.0;
           }
           #else
           totalEmissiveRadiance += diffuseColor.rgb * (uBakeTint * bk.r + uBakeTint2 * bk.b * (ny < -0.5 ? uCeilB : 1.0)) * 2.0 * shape;
@@ -1931,8 +1937,8 @@ float bkCaust(vec2 uv, float t) {
             #endif
             // le sol : plus luisant là où il est humide, mat là où la poussière s'est déposée
             if (ny > 0.5) sm *= 0.45 + wet * 1.3 + bkFbm(vBakeP.xz * 0.6 + 3.0) * 0.5;
-            #ifdef BK_HOTEL
-            sm *= specularStrength; // l'hôtel : le noyer verni brille, le papier peint presque pas
+            #if defined(BK_HOTEL) || defined(BK_MALL)
+            sm *= specularStrength; // l'hôtel : le noyer verni brille, le papier peint presque pas ; le mall : le poli de la matière scannée
             #endif
             // pas de reflet là où aucune lampe n'éclaire (un mur caché derrière un angle)
             sm *= mix(0.25, 1.0, smoothstep(0.0, 0.12, bk.r + bk.b));

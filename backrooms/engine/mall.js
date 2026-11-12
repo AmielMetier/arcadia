@@ -234,8 +234,17 @@ function solidSet(W, H) {
     for (const o of arr) if (dist(o, x, z) < r) return true;
     return false;
   };
-  return { add, hit, list, dist };
+  // retire des formes (un meuble qu'on ne pose plus)
+  const remove = (pred) => {
+    for (let i = list.length - 1; i >= 0; i--) if (pred(list[i])) list.splice(i, 1);
+    for (const arr of byCell.values()) for (let i = arr.length - 1; i >= 0; i--) if (pred(arr[i])) arr.splice(i, 1);
+  };
+  return { add, hit, list, dist, remove };
 }
+
+// Le mobilier qu'on ne pose plus : il n'existe pas de modèle scanné de ces pièces, et celles qu'on avait modelées à
+// la main sentaient le jeu. Un centre plus vide, mais vrai (voir la section 15)
+const FURN_GONE = new Set(['kiosk', 'fountain', 'counter', 'concession', 'boxoffice', 'standee', 'stanchion', 'rack', 'mannequin', 'cosmetic', 'fitting', 'shoetable', 'roomset', 'tvwall', 'luggage', 'booth', 'partition', 'meeting', 'kitchenette', 'workbench', 'arcade', 'claw', 'prizes']);
 
 export function createMallMap(seed = 17) {
   const W = MALL_W;
@@ -969,6 +978,7 @@ export function createMallMap(seed = 17) {
   // n'est que du décor. Chaque meuble : { kind, x, z, w, d (emprise en mètres, w le long de x), rot (1 : tourné d'un
   // quart de tour), ...}. Jamais devant une porte, un escalier, un escalator, au bord d'un vide, contre un pilier ---
   for (const f of F) f.furn = [];
+  const navBase = F.map((f) => new Set(f.navBlock)); // ce que l'entité évite, avant les meubles (voir 15)
   const overlap = (ax0, az0, ax1, az1, bx0, bz0, bx1, bz1, m) => ax0 < bx1 + m && ax1 > bx0 - m && az0 < bz1 + m && az1 > bz0 - m;
   const doorNear = (f, x0, z0, x1, z1, m) => f.doors.some((d) => overlap(x0, z0, x1, z1, d.x * C, d.z * C, (d.x + 1) * C, (d.z + 1) * C, m));
   const stairNear = (x0, z0, x1, z1, m) =>
@@ -1904,6 +1914,26 @@ export function createMallMap(seed = 17) {
         maps[fi].cassettes.push(reel);
         break;
       }
+    }
+  }
+  // --- 15. Le mobilier sans modèle scanné n'est plus posé (kiosques, fontaines, comptoirs, bornes, rayons, cloisons… :
+  // voir FURN_GONE). Il a été tiré comme avant, pour que le reste du décor d'une graine ne bouge pas, puis il est
+  // retiré ici, avec sa forme de collision et ses cases interdites à l'entité. Les stands du food court restent comme
+  // habillage de mur (un rideau baissé) : sans emprise au sol ---
+  for (const f of F) {
+    const flat = (it) => it.kind === 'stall' && !it.toilet;
+    const gone = new Set(f.furn.filter((it) => FURN_GONE.has(it.kind) || flat(it)).map((it) => it.id));
+    f.solids.remove((o) => o.furn !== undefined && gone.has(o.furn));
+    const kept = f.furn.filter((it) => !gone.has(it.id) || flat(it));
+    for (const it of kept) if (flat(it)) it.shut = true;
+    f.furn.length = 0;
+    f.furn.push(...kept);
+    f.navBlock.clear();
+    for (const k of navBase[f.fi]) f.navBlock.add(k);
+    for (const it of kept) {
+      if (!it.nav || it.shut) continue;
+      const [ww, dd] = it.rot ? [it.d, it.w] : [it.w, it.d];
+      for (let gz = Math.floor((it.z - dd / 2) / C); gz <= Math.floor((it.z + dd / 2) / C); gz++) for (let gx = Math.floor((it.x - ww / 2) / C); gx <= Math.floor((it.x + ww / 2) / C); gx++) f.navBlock.add(gz * W + gx);
     }
   }
   return { level: MALL_LEVEL, floors: [upper, lower], stairs, bridges, voids: { west: voidW, center: voidC, east: voidE } };

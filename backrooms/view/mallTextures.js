@@ -1,13 +1,14 @@
-// The Backrooms (Level 17, le Mall) - Les matières du centre commercial, dessinées au canvas sur les photos CC0 déjà
-// utilisées par les autres levels (backrooms/tex, voir LICENSE.txt) :
-//  - le sol poli du mail : des dalles crème de 60 cm (le marbre blanc de l'hôtel, recoloré), joints fins, un cabochon
-//    noir en losange à un croisement sur deux ; le damier noir et blanc des cours du bas ;
-//  - les moquettes du cinéma : violette (le hall, ses motifs sont tracés à part, à la taille de la salle) et anthracite ;
-//  - l'enduit crème des murs et des piliers, la peinture anthracite du cinéma, les parpaings des couloirs de service,
-//    le béton des quais, les dalles de faux plafond, la faïence des toilettes, le lino du grand magasin, les tomettes du
-//    food court ; le rideau à mailles des boutiques fermées (transparent entre les maillons), le papier kraft collé
-//    derrière une vitrine, le verre des verrières la nuit.
-// Une photo qui n'arrive pas laisse la version dessinée (même couleur, sans le grain).
+// The Backrooms (Level 17, le Mall) - Les matières du centre commercial : des matières scannées (Poly Haven, CC0 :
+// backrooms/tex, voir LICENSE.txt), posées à leur vraie taille et teintées au canvas ; leur relief et leur poli sont
+// lus par le matériau cuit (bumpMap, specularMap : voir baked() dans scene.js) :
+//  - le sol du mail : un dallage crème posé en diagonale ; le damier des cours du bas ; le grès brun de l'annexe, la terre
+//    cuite du food court, le lino du grand magasin, le stratifié des boutiques, la faïence des toilettes ;
+//  - l'enduit peint des murs et des piliers (crème, gris, anthracite), les parpaings des couloirs de service, le béton
+//    des quais, le crépi des faux plafonds, les rideaux métalliques à lames ;
+//  - les moquettes du cinéma (le grain d'une moquette rase, teinté ; les motifs du hall sont tracés à part, à la
+//    taille de la salle) ; le rideau à mailles des boutiques fermées, le papier kraft collé derrière une vitrine, le
+//    verre des verrières la nuit : dessinés.
+// Une photo qui n'arrive pas laisse un aplat de la même couleur.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { paintMarigold } from './mallDoll.js';
 
@@ -78,112 +79,20 @@ function photo(g, img, w, h, tint, k = 1, alpha = 1) {
   }
 }
 
-// 1. Le sol poli du mail : 4 × 4 dalles de 60 cm (une répétition = 2,40 m)
-function drawTerrazzo(g, S, marble, dark) {
-  const T = S / 4;
-  seed = 101;
-  g.fillStyle = '#d6cab2';
-  g.fillRect(0, 0, S, S);
-  for (let j = 0; j < 4; j++)
-    for (let i = 0; i < 4; i++) {
-      g.save();
-      g.beginPath();
-      g.rect(i * T, j * T, T, T);
-      g.clip();
-      if (marble) {
-        // chaque dalle prend un morceau différent de la photo, tourné : pas deux pareilles côte à côte
-        g.translate(i * T + T / 2, j * T + T / 2);
-        g.rotate((Math.floor(R() * 4) * Math.PI) / 2);
-        const sx = R() * (marble.width - marble.width / 2);
-        const sy = R() * (marble.height - marble.height / 2);
-        g.globalAlpha = 0.55;
-        g.drawImage(marble, sx, sy, marble.width / 2, marble.height / 2, -T / 2, -T / 2, T, T);
-        g.setTransform(1, 0, 0, 1, 0, 0);
-      }
-      // la teinte crème, un peu différente d'une dalle à l'autre
-      const t = 0.94 + R() * 0.08;
-      g.globalAlpha = 0.5;
-      g.fillStyle = `rgb(${Math.round(214 * t)},${Math.round(202 * t)},${Math.round(178 * t)})`;
-      g.fillRect(i * T, j * T, T, T);
-      g.restore();
-    }
-  seed = 7;
-  grain(g, S, S, 9000, 0.12, 1.5);
-  // le terrazzo : de petits éclats de pierre
-  for (let i = 0; i < 2600; i++) {
-    const v = 90 + R() * 120;
-    g.fillStyle = `rgba(${v},${v * 0.95},${v * 0.86},${0.25 + R() * 0.3})`;
-    g.beginPath();
-    g.arc(R() * S, R() * S, 0.6 + R() * 1.6, 0, 7);
-    g.fill();
-  }
-  // les joints (2 mm de ciment gris), un peu plus sombres là où passent les chariots
-  g.strokeStyle = 'rgba(120,110,95,0.55)';
-  g.lineWidth = 2;
-  for (let i = 0; i <= 4; i++) {
-    g.beginPath();
-    g.moveTo(i * T, 0);
-    g.lineTo(i * T, S);
-    g.moveTo(0, i * T);
-    g.lineTo(S, i * T);
-    g.stroke();
-  }
-  // un cabochon noir en losange (10 cm) à un croisement sur deux
-  const cab = S * (0.1 / 2.4);
-  for (let j = 0; j <= 4; j++)
-    for (let i = 0; i <= 4; i++) {
-      if ((i + j) % 2) continue;
-      g.save();
-      g.translate(i * T, j * T);
-      g.rotate(Math.PI / 4);
-      if (dark) {
-        g.beginPath();
-        g.rect(-cab / 2, -cab / 2, cab, cab);
-        g.clip();
-        g.drawImage(dark, R() * dark.width * 0.8, R() * dark.height * 0.8, dark.width * 0.1, dark.height * 0.1, -cab / 2, -cab / 2, cab, cab);
-        g.fillStyle = 'rgba(20,18,16,0.55)';
-        g.fillRect(-cab / 2, -cab / 2, cab, cab);
-      } else {
-        g.fillStyle = '#1d1a17';
-        g.fillRect(-cab / 2, -cab / 2, cab, cab);
-      }
-      g.restore();
-    }
-  // l'usure : des voiles plus mats, quelques salissures
-  blotches(g, S, S, 14, '90,80,62', 0.12, S * 0.05, S * 0.18);
-}
-
-// 2. Le damier des cours du bas : 4 × 4 carreaux de 60 cm, marbre blanc et noir
-function drawChecker(g, S, white, black) {
-  const T = S / 4;
-  seed = 202;
-  for (let j = 0; j < 4; j++)
-    for (let i = 0; i < 4; i++) {
-      const dk = (i + j) % 2 === 1;
-      g.fillStyle = dk ? '#2a2622' : '#d9cfbd';
-      g.fillRect(i * T, j * T, T, T);
-      const img = dk ? black : white;
-      if (img) {
-        g.save();
-        g.globalAlpha = 0.7;
-        g.drawImage(img, R() * img.width * 0.5, R() * img.height * 0.5, img.width / 2, img.height / 2, i * T, j * T, T, T);
-        g.restore();
-        g.fillStyle = dk ? 'rgba(40,34,28,0.35)' : 'rgba(220,206,180,0.35)';
-        g.fillRect(i * T, j * T, T, T);
-      }
-    }
-  grain(g, S, S, 6000, 0.1, 1.5);
-  g.strokeStyle = 'rgba(110,100,88,0.6)';
-  g.lineWidth = 2;
-  for (let i = 0; i <= 4; i++) {
-    g.beginPath();
-    g.moveTo(i * T, 0);
-    g.lineTo(i * T, S);
-    g.moveTo(0, i * T);
-    g.lineTo(S, i * T);
-    g.stroke();
-  }
-  blotches(g, S, S, 10, '70,60,50', 0.12, S * 0.05, S * 0.2);
+// une photo étalée sur le canvas, ramenée d'une teinte moyenne (mean) à une autre (to), canal par canal : son grain
+// reste, plus sombre (multiply) ou plus clair (color-dodge : dst / (1 - src))
+function retint(g, img, w, h, mean, to) {
+  if (!img) return;
+  const gain = to.map((v, i) => v / mean[i]);
+  g.save();
+  g.drawImage(img, 0, 0, w, h);
+  g.globalCompositeOperation = 'multiply';
+  g.fillStyle = `rgb(${gain.map((k) => Math.round(Math.min(1, k) * 255)).join(',')})`;
+  g.fillRect(0, 0, w, h);
+  g.globalCompositeOperation = 'color-dodge';
+  g.fillStyle = `rgb(${gain.map((k) => Math.round((1 - 1 / Math.max(1, k)) * 255)).join(',')})`;
+  g.fillRect(0, 0, w, h);
+  g.restore();
 }
 
 // 3. Une moquette (photo de moquette rase, teintée)
@@ -194,84 +103,6 @@ function drawCarpet(g, S, img, base, tint) {
   seed = 303;
   grain(g, S, S, 14000, 0.1, 1);
   blotches(g, S, S, 8, '0,0,0', 0.12, S * 0.1, S * 0.3);
-}
-
-// 4. L'enduit des murs (une répétition = 2,5 m)
-function drawPlaster(g, S, rgb, img) {
-  g.fillStyle = `rgb(${rgb})`;
-  g.fillRect(0, 0, S, S);
-  if (img) {
-    g.save();
-    g.globalAlpha = 0.18;
-    g.drawImage(img, 0, 0, S, S);
-    g.restore();
-    g.save();
-    g.globalCompositeOperation = 'multiply';
-    g.fillStyle = `rgb(${rgb})`;
-    g.fillRect(0, 0, S, S);
-    g.restore();
-  }
-  seed = 404;
-  blotches(g, S, S, 30, '120,105,80', 0.07, S * 0.04, S * 0.16);
-  blotches(g, S, S, 20, '255,250,235', 0.06, S * 0.04, S * 0.14);
-  grain(g, S, S, 7000, 0.06, 1);
-}
-
-// 5. Le lino du grand magasin : 8 × 8 dalles de 30 cm, deux tons, mouchetées
-function drawLino(g, S) {
-  const T = S / 8;
-  seed = 505;
-  for (let j = 0; j < 8; j++)
-    for (let i = 0; i < 8; i++) {
-      const v = (i + j) % 2 ? 196 : 206;
-      const d = (R() - 0.5) * 8;
-      g.fillStyle = `rgb(${v + d},${v + d - 4},${v + d - 12})`;
-      g.fillRect(i * T, j * T, T, T);
-    }
-  for (let i = 0; i < 9000; i++) {
-    const v = R() < 0.5 ? 120 + R() * 40 : 230;
-    g.fillStyle = `rgba(${v},${v - 6},${v - 14},0.5)`;
-    g.fillRect(R() * S, R() * S, 1 + R() * 2, 1 + R() * 2);
-  }
-  g.strokeStyle = 'rgba(90,85,75,0.35)';
-  g.lineWidth = 1;
-  for (let i = 0; i <= 8; i++) {
-    g.beginPath();
-    g.moveTo(i * T, 0);
-    g.lineTo(i * T, S);
-    g.moveTo(0, i * T);
-    g.lineTo(S, i * T);
-    g.stroke();
-  }
-  blotches(g, S, S, 16, '80,70,55', 0.12, S * 0.04, S * 0.16);
-}
-
-// 6. Les tomettes du food court : 8 × 8 carreaux de 30 cm, terre cuite, joints larges
-function drawQuarry(g, S) {
-  const T = S / 8;
-  seed = 606;
-  g.fillStyle = '#7d6a58';
-  g.fillRect(0, 0, S, S);
-  for (let j = 0; j < 8; j++)
-    for (let i = 0; i < 8; i++) {
-      const r = 150 + R() * 30;
-      g.fillStyle = `rgb(${r},${r * 0.55},${r * 0.38})`;
-      g.fillRect(i * T + 3, j * T + 3, T - 6, T - 6);
-      blotchesIn(g, i * T + 3, j * T + 3, T - 6);
-    }
-  grain(g, S, S, 9000, 0.12, 1);
-  function blotchesIn(gg, x, y, s) {
-    for (let k = 0; k < 3; k++) {
-      const cx = x + R() * s;
-      const cy = y + R() * s;
-      const r = s * (0.2 + R() * 0.4);
-      const gr = gg.createRadialGradient(cx, cy, 0, cx, cy, r);
-      gr.addColorStop(0, `rgba(60,30,15,${0.15 * R()})`);
-      gr.addColorStop(1, 'rgba(60,30,15,0)');
-      gg.fillStyle = gr;
-      gg.fillRect(x, y, s, s);
-    }
-  }
 }
 
 // 7. Le rideau à mailles (une répétition = 50 cm) : des maillons en quinconce, du vide entre eux (alpha)
@@ -490,12 +321,27 @@ export function createMallTextures() {
   const S = 1024;
   const mk = (size = S) => canvas(size, size);
   const out = {};
-  const [tc, tg] = mk();
-  drawTerrazzo(tg, S, null, null);
+  // un aplat, en attendant la photo
+  const flat = (rgb, size = S) => {
+    const [c, g] = mk(size);
+    g.fillStyle = `rgb(${rgb})`;
+    g.fillRect(0, 0, size, size);
+    return [c, g];
+  };
+  // une carte en gris (le relief ou le poli d'une matière scannée), lue telle quelle
+  const tl = new THREE.TextureLoader();
+  const grey = (file) => {
+    const t = tl.load(TEX + file);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 4;
+    return t;
+  };
+  const [tc, tg] = flat('222,212,192');
   out.terrazzo = tex(tc);
-  const [cc, cg] = mk();
-  drawChecker(cg, S, null, null);
+  out.terrazzoGloss = grey('l17_dallage_lisse.jpg');
+  const [cc, cg] = flat('120,108,98');
   out.checker = tex(cc);
+  out.checkerGloss = grey('l17_damier_lisse.jpg');
   const [vc, vg] = mk(512);
   drawCarpet(vg, 512, null, '#6a2f8e', '#8e48b8');
   out.carpetViolet = tex(vc);
@@ -506,12 +352,15 @@ export function createMallTextures() {
   const [dc, dg] = mk(512);
   drawCarpet(dg, 512, null, '#33343a', '#55565e');
   out.carpetDark = tex(dc);
-  const [pc, pg] = mk(512);
-  drawPlaster(pg, 512, '230,225,213', null);
-  out.plaster = tex(pc);
-  const [ac, ag] = mk(512);
-  drawPlaster(ag, 512, '58,59,64', null);
-  out.paintDark = tex(ac);
+  // l'enduit peint : une seule photo, quatre teintes (crème, gris clair, anthracite du cinéma, anthracite clair)
+  const PLASTER = { plaster: '230,225,213', paintDark: '58,59,64', paintChar: '104,106,116', paintGrey: '196,192,180' };
+  const plasterG = {};
+  for (const k in PLASTER) {
+    const [c, g] = flat(PLASTER[k]);
+    plasterG[k] = g;
+    out[k] = tex(c);
+  }
+  out.plasterRelief = grey('l17_enduit_relief.jpg');
   // les bannières de toile de la cour ouest : deux visuels côte à côte (256 × 1024 chacun)
   {
     const [bc, bg] = canvas(512, 1024);
@@ -574,24 +423,22 @@ export function createMallTextures() {
     out.banner = tex(bc);
     out.banner.wrapS = out.banner.wrapT = THREE.ClampToEdgeWrapping;
   }
-  // le plafond du hall du cinéma : un anthracite plus clair (il renvoie la lumière de la moquette)
-  const [hc, hg] = mk(512);
-  drawPlaster(hg, 512, '104,106,116', null);
-  out.paintChar = tex(hc);
-  const [wc, wg] = mk(512);
-  drawPlaster(wg, 512, '196,192,180', null);
-  out.paintGrey = tex(wc);
-  const [lc, lg] = mk();
-  drawLino(lg, S);
+  const [lc, lg] = flat('150,140,120');
   out.lino = tex(lc);
-  const [qc, qg] = mk();
-  drawQuarry(qg, S);
+  out.linoGloss = grey('l17_lino_lisse.jpg');
+  const [qc, qg] = flat('150,84,56');
   out.quarry = tex(qc);
-  // le carrelage de l'annexe (en attendant la photo : un grès brun uni)
-  const [anC, anG] = mk();
-  anG.fillStyle = '#8a6a48';
-  anG.fillRect(0, 0, S, S);
+  out.quarryRelief = grey('l17_carrelage_use_relief.jpg');
+  out.quarryGloss = grey('l17_carrelage_use_lisse.jpg');
+  // le carrelage de l'annexe : un grès brun
+  const [anC, anG] = flat('138,106,72');
   out.annexTile = tex(anC);
+  out.annexRelief = grey('l17_carrelage_brun_relief.jpg');
+  out.annexGloss = grey('l17_carrelage_brun_lisse.jpg');
+  // le stratifié des boutiques
+  const [laC, laG] = flat('168,138,100');
+  out.laminate = tex(laC);
+  out.laminateGloss = grey('l17_stratifie_lisse.jpg');
   const [gc, gg] = mk(256);
   drawGrille(gg, 256);
   out.grille = tex(gc);
@@ -602,49 +449,58 @@ export function createMallTextures() {
   drawSkyGlass(sg, 512);
   out.skyGlass = tex(sc);
   // les photos : dalles de plafond, parpaings, béton, faïence, noyer (recolorées une fois arrivées)
-  const blank = (rgb) => {
-    const [c, g] = mk(512);
-    g.fillStyle = `rgb(${rgb})`;
-    g.fillRect(0, 0, 512, 512);
-    return [c, g];
-  };
-  const [ceC, ceG] = blank('206,200,186');
+  const [ceC, ceG] = flat('206,200,186');
   out.ceilTiles = tex(ceC);
-  const [blC, blG] = blank('178,172,160');
+  const [blC, blG] = flat('178,172,160');
   out.block = tex(blC);
-  const [coC, coG] = blank('128,124,118');
+  out.blockRelief = grey('l17_parpaing_relief.jpg');
+  const [coC, coG] = flat('128,124,118');
   out.concrete = tex(coC);
-  const [faC, faG] = blank('214,210,196');
+  const [faC, faG] = flat('214,210,196');
   out.faience = tex(faC);
-  const [woC, woG] = blank('90,58,36');
+  out.faienceRelief = grey('l17_faience_relief.jpg');
+  const [woC, woG] = flat('90,58,36', 512);
   out.wood = tex(woC);
-  const [slC, slG] = blank('70,70,72');
+  const [slC, slG] = flat('70,70,72');
   out.slab = tex(slC);
   // les photos en 1024 px : le velours des fauteuils, le rideau métallique des kiosques, la tôle larmée des paliers
-  const big = (rgb) => {
-    const [c, g] = mk(S);
-    g.fillStyle = `rgb(${rgb})`;
-    g.fillRect(0, 0, S, S);
-    return [c, g];
-  };
-  const [veC, veG] = big('110,24,30');
+  const [veC, veG] = flat('110,24,30');
   out.velvet = tex(veC);
-  const [ruC, ruG] = big('150,150,146');
+  // les rideaux métalliques à lames : gris clair (les kiosques, les stands), beige (les boutiques fermées)
+  const [ruC, ruG] = flat('150,150,146');
   out.shutter = tex(ruC);
-  const [toC, toG] = big('120,122,124');
+  out.shutterRelief = grey('l17_rideau_relief.jpg');
+  const [rbC, rbG] = flat('160,140,110');
+  out.shutterBeige = tex(rbC);
+  out.shutterBeigeRelief = grey('l17_rideau_beige_relief.jpg');
+  const [toC, toG] = flat('120,122,124');
   out.plate = tex(toC);
-  // les tissus des vêtements (photos Poly Haven, 512 px) : denim, jersey, vichy, jacquard
-  const tl = new THREE.TextureLoader();
-  out.fabrics = ['l17_denim.jpg', 'l17_jersey.jpg', 'l17_vichy.jpg', 'l17_jacquard.jpg'].map((f) => {
-    const t = tl.load(TEX + f);
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.anisotropy = 4;
-    return t;
-  });
   out.carpetImg = null;
-  const files = ['l5_marbre_blanc.jpg', 'l5_marbre_noir.jpg', 'moquette_rase.jpg', 'plafond.jpg', 'l17_parpaing.jpg', 'l17_beton.jpg', 'l17_faience.jpg', 'l5_noyer.jpg', 'l1_plafond.jpg', 'papier.jpg', 'l17_lino.jpg', 'l5_velours.jpg', 'l17_rideau.jpg', 'l17_tole.jpg', 'l17_carrelage_brun.jpg', 'l17_carrelage_use.jpg'];
-  out.ready = Promise.all(files.map(loadImage)).then(([mw, mb, moq, pla, mur, sol, fai, noy, dal, pap, lin, vel, rid, tol, cab, cau]) => {
+  const files = ['moquette_rase.jpg', 'plafond.jpg', 'l17_parpaing.jpg', 'l17_beton.jpg', 'l17_faience.jpg', 'l5_noyer.jpg', 'l1_plafond.jpg', 'l17_lino.jpg', 'l5_velours.jpg', 'l17_rideau.jpg', 'l17_tole.jpg', 'l17_carrelage_brun.jpg', 'l17_carrelage_use.jpg', 'l17_dallage.jpg', 'l17_damier.jpg', 'l17_enduit.jpg', 'l17_stratifie.jpg', 'l17_rideau_beige.jpg'];
+  out.ready = Promise.all(files.map(loadImage)).then(([moq, pla, mur, sol, fai, noy, dal, lin, vel, rid, tol, cab, cau, mar, dam, end, str, rib]) => {
+    // le dallage crème du mail, posé en diagonale (éclairci : un ivoire), le damier des cours du bas
+    if (mar) {
+      retint(tg, mar, S, S, [170, 152, 132], [206, 196, 178]);
+      out.terrazzo.needsUpdate = true;
+    }
+    if (dam) {
+      photo(cg, dam, S, S, 'rgb(255,248,236)', 1.06);
+      out.checker.needsUpdate = true;
+    }
+    if (str) {
+      photo(laG, str, S, S, 'rgb(236,214,190)');
+      out.laminate.needsUpdate = true;
+    }
+    if (rib) {
+      photo(rbG, rib, S, S, 'rgb(236,230,214)', 1.05);
+      out.shutterBeige.needsUpdate = true;
+    }
+    // l'enduit peint : le grain de la photo, ramené à la teinte voulue (sa moyenne est un gris rosé : 171, 163, 160)
+    if (end)
+      for (const k in PLASTER) {
+        retint(plasterG[k], end, S, S, [171, 163, 160], PLASTER[k].split(',').map(Number));
+        out[k].needsUpdate = true;
+      }
     // les carrelages photographiés : le grès brun de l'annexe, la terre cuite usée du food court et de la jardinerie
     if (cab) {
       photo(anG, cab, S, S, 'rgb(232,222,204)', 1.04);
@@ -670,36 +526,24 @@ export function createMallTextures() {
       photo(toG, tol, S, S, 'rgb(205,208,212)', 1.1);
       out.plate.needsUpdate = true;
     }
-    drawTerrazzo(tg, S, mw, mb);
-    out.terrazzo.needsUpdate = true;
-    drawChecker(cg, S, mw, mb);
-    out.checker.needsUpdate = true;
     drawCarpet(vg, 512, moq, '#7634aa', '#a055d0');
     out.carpetViolet.needsUpdate = true;
     drawCarpet(dg, 512, moq, '#2e2f35', '#5a5b63');
     out.carpetDark.needsUpdate = true;
-    drawPlaster(pg, 512, '230,225,213', pap);
-    out.plaster.needsUpdate = true;
-    drawPlaster(ag, 512, '58,59,64', pap);
-    out.paintDark.needsUpdate = true;
-    drawPlaster(hg, 512, '104,106,116', pap);
-    out.paintChar.needsUpdate = true;
-    drawPlaster(wg, 512, '196,192,180', pap);
-    out.paintGrey.needsUpdate = true;
     if (pla) {
-      photo(ceG, pla, 512, 512, 'rgb(236,232,222)', 1.06);
+      photo(ceG, pla, S, S, 'rgb(236,232,222)', 1.06);
       out.ceilTiles.needsUpdate = true;
     }
     if (mur) {
-      photo(blG, mur, 512, 512, 'rgb(232,226,212)', 1.15);
+      photo(blG, mur, S, S, 'rgb(232,226,212)', 1.15);
       out.block.needsUpdate = true;
     }
     if (sol) {
-      photo(coG, sol, 512, 512, 'rgb(196,192,184)');
+      photo(coG, sol, S, S, 'rgb(196,192,184)');
       out.concrete.needsUpdate = true;
     }
     if (fai) {
-      photo(faG, fai, 512, 512, 'rgb(240,236,222)');
+      photo(faG, fai, S, S, 'rgb(240,236,222)');
       out.faience.needsUpdate = true;
     }
     if (noy) {
@@ -707,7 +551,7 @@ export function createMallTextures() {
       out.wood.needsUpdate = true;
     }
     if (dal) {
-      photo(slG, dal, 512, 512, 'rgb(120,118,116)');
+      photo(slG, dal, S, S, 'rgb(120,118,116)');
       out.slab.needsUpdate = true;
     }
     out.carpetImg = moq;

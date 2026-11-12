@@ -254,23 +254,9 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
   MATS.red = MATS.red || { m: baked(lam({ color: '#6e1418' })), S: 1 };
   MATS.plastic = MATS.plastic || { m: baked(phong({ color: '#d9d3c4', specular: '#333', shininess: 40 })), S: 1 };
   MATS.soil = MATS.soil || { m: baked(lam({ color: '#2a2018' })), S: 1 };
-  MATS.frond = MATS.frond || { m: baked(lam({ color: '#4a3f26', side: THREE.DoubleSide })), S: 1 };
-  MATS.cloth = MATS.cloth || { m: baked(lam({ color: '#5b5560' })), S: 1 };
-  MATS.cloth2 = MATS.cloth2 || { m: baked(lam({ color: '#7d5a46' })), S: 1 };
-  MATS.carton = MATS.carton || { m: baked(lam({ color: '#8f7350' })), S: 1 };
-  // les vêtements : six étoffes (denim, jerseys de couleur, vichy, jacquard), sur les portants et les mannequins
   // une valise seule (le modèle en range deux côte à côte)
   const SUITCASE = ['01', '02'].map((k) => ['bottom', 'clasp', 'handle', 'top'].map((p) => `vintage_suitcase_${k}_${p}`).join('+'));
-  const FAB = MATS.__fabrics || [];
-  const fx = MATS.__tx && MATS.__tx.fabrics;
-  if (fx && !FAB.length) {
-    [[0, '#d8dce4'], [1, '#9c3a36'], [1, '#2e4466'], [2, '#d8c8c0'], [3, '#c9bba4'], [1, '#b08a3a']].forEach(([k, c], i) => {
-      MATS['fab' + i] = { m: baked(lam({ map: fx[k], color: c })), S: 1 };
-      FAB.push('fab' + i);
-    });
-    MATS.__fabrics = FAB;
-  }
-  const fab = (i) => (FAB.length ? FAB[((i % FAB.length) + FAB.length) % FAB.length] : i % 2 ? 'cloth' : 'cloth2');
+  MATS.mirror = MATS.mirror || { m: baked(phong({ color: '#1e272b', specular: '#b4c4cc', shininess: 150 }), { spec: 0.9, gloss: 160, mask: 0 }), S: 1 };
   MATS.screenWhite = MATS.screenWhite || { m: baked(lam({ color: '#b9b6ae' })), S: 1 };
   const lit = (map2, k = 1.25) => new THREE.MeshBasicMaterial({ map: map2, color: new THREE.Color(1, 1, 1).multiplyScalar(k) });
 
@@ -301,8 +287,6 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
   MATS.posters = { m: lit(posters.tex, 1.15), S: 1 };
   MATS.postersOff = { m: baked(lam({ map: posters.tex, color: '#777' })), S: 1 };
   MATS.directory = { m: lit(directoryTex('HALCYON PARK MALL'), 1.1), S: 1 };
-  MATS.arcadeGlow = { m: new THREE.MeshBasicMaterial({ color: new THREE.Color('#6f3cff').multiplyScalar(1.6) }), S: 1 };
-  MATS.arcadeGlow2 = { m: new THREE.MeshBasicMaterial({ color: new THREE.Color('#14c8b4').multiplyScalar(1.5) }), S: 1 };
   // un panneau texturé (une case d'atlas) : une face de w × h, centrée en (x, y, z), tournée vers (nx, nz)
   const panel = (k, uv, x, y, z, w, h, nx, nz) => {
     placed.push([x, z, w / 2 + 0.2]); // (les murs habillés, view/mallWalls.js, laissent la place)
@@ -312,8 +296,8 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     g.rotateY(Math.atan2(nx, nz));
     G.add(k, g.translate(x, y, z));
   };
-  const lights = []; // les feux de couleur du mobilier (bornes d'arcade allumées)
-  const arcade = createArcade({ G, MATS, baked, model, placed, lights, rooms, C });
+  const lights = []; // les feux de couleur du mobilier (les caissons d'affiches allumés, les écrans)
+  const arcade = createArcade({ MATS, baked });
 
   // --- les modèles (Poly Haven, CC0) : leur avant est +z, sauf mention ---
   const PI = Math.PI;
@@ -357,12 +341,12 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     candy: [['carrot_cake', 1], ['croissant', 1.2], ['food_apple_01', 1.4], ['jug_01', 1]],
   };
   const shopOf = (it) => (it.shop !== undefined && map.shops ? map.shops.find((s) => s.id === it.shop) : null);
-  // les marchandises (emballages imprimés) et le mobilier du grand magasin
+  // les panneaux imprimés (enseignes, plaques), ce qui reste des grandes surfaces et des locaux techniques
   const goods = createGoods({ G, MATS, baked });
-  const dept = createDept({ G, MATS, baked, model, placeAt, lbox, frame, front, yawZ, fab, rand, goods, rooms, C, hAt });
+  const dept = createDept({ G, model, lbox, frame, front, yawZ, rand, goods, rooms, C, hAt });
 
-  // les gros meubles fixes, modelés (fontaines, kiosques, comptoirs, stands, tables du food court)
-  const fixtures = createFixtures({ G, MATS, baked, model, lbox, frame, front, yawZ, rand, goods, rooms, map, C, panel, menus, shopOf });
+  // le gros mobilier fixe (jardinières, pots, tables du food court, stands fermés)
+  const fixtures = createFixtures({ G, MATS, model, lbox, frame, front, rand, panel, menus });
   for (const it of furn) {
     const hw = it.w / 2;
     const hd = it.d / 2;
@@ -381,17 +365,13 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         break;
       case 'planter': {
         lbox('marbleDark', it, -hw, hw, 0, 0.62, -hd, hd, '-y+y');
-        // la margelle : un cadre de pierre ; au milieu, la terre, en mottes
+        // la margelle : un cadre de pierre ; au milieu, la terre
         const cw = 0.17;
         lbox('trim', it, -hw - 0.04, hw + 0.04, 0.62, 0.68, -hd - 0.04, -hd + cw, '-y');
         lbox('trim', it, -hw - 0.04, hw + 0.04, 0.62, 0.68, hd - cw, hd + 0.04, '-y');
         lbox('trim', it, -hw - 0.04, -hw + cw, 0.62, 0.68, -hd + cw, hd - cw, '-y');
         lbox('trim', it, hw - cw, hw + 0.04, 0.62, 0.68, -hd + cw, hd - cw, '-y');
         lbox('soil', it, -hw + cw, hw - cw, 0.5, 0.635, -hd + cw, hd - cw, '-y');
-        for (let i = 0; i < 7; i++) {
-          const r = 0.16 + rand(it.id, i + 30) * 0.2;
-          put('soil', new THREE.SphereGeometry(r, 7, 5).scale(1, 0.28, 1), it.x + (rand(it.id, i + 40) - 0.5) * (it.w - 0.8), 0.632, it.z + (rand(it.id, i + 50) - 0.5) * (it.d - 0.8), rand(it.id, i) * 3);
-        }
         const a = rand(it.id) * 6.28;
         if (it.plant === 0) {
           // un arbre mort, debout, et un autre plus petit
@@ -418,12 +398,8 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         // un chariot à café, ses machines encore dessus
         model('CoffeeCart_01', it.x + 0.3, 0, it.z, (it.yaw || 0) + PI / 2, 1.05);
         break;
-      case 'kiosk':
       case 'terrace':
       case 'claypot':
-      case 'fountain':
-      case 'counter':
-      case 'concession':
       case 'diner':
         fixtures[it.kind](it);
         break;
@@ -492,9 +468,6 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         }
         break;
       }
-      case 'rack':
-        dept.rack(it);
-        break;
       case 'table': {
         // une vraie table (trois modèles, mis aux dimensions de l'emprise : le plateau à 84 cm) : une table de bois
         // brut, une table peinte, une table nappée
@@ -505,16 +478,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
           const [tn, tw, td, th] = TABLES[['candy', 'florist', 'gifts', 'fold'].includes(trade) ? 2 : it.id % 2];
           model(tn, it.x, 0, it.z, it.rot ? PI / 2 : 0, [it.w / tw, 0.84 / th, it.d / td]);
         }
-        if (trade === 'fold') {
-          // des piles de vêtements pliés, deux rangs
-          for (let j = 0; j < 2; j++)
-            for (let i = 0; i < Math.floor(it.w / 0.42); i++) {
-              const q = it.id * 11 + j * 5 + i;
-              if (rand(q) < 0.2) continue;
-              goods.folded(P, -hw + 0.24 + i * 0.42, 0.34, 0.84, (j - 0.5) * it.d * 0.48 - 0.14, (j - 0.5) * it.d * 0.48 + 0.14, q);
-            }
-          break;
-        }
+        if (trade === 'fold') break; // (une table restée vide)
         if (sh && sh.trade === 'salon') {
           // le salon de coiffure : des fauteuils de barbier à la place des tables
           model('BarberShopChair_01', it.x, 0, it.z, yawZ([0, -sh.dir]) + (rand(it.id) - 0.5) * 0.6);
@@ -552,21 +516,14 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         break;
       case 'stall':
         if (it.toilet) {
+          // une cabine : deux cloisons, sa façade, la porte tirée (on ne voit pas dedans)
           for (const lx of [-hw, hw - 0.03]) lbox('paintGrey', it, lx, lx + 0.03, 0.15, 2.0, -hd, hd);
           lbox('paintGrey', it, -hw, -hw + 0.5, 0.15, 2.0, -hd, -hd + 0.03);
-          // la façade de la cabine : deux montants, la porte (fermée, entrouverte ou grande ouverte)
           lbox('paintGrey', it, -hw + 0.5, -hw + 0.62, 0.15, 2.0, -hd, -hd + 0.03);
           lbox('paintGrey', it, hw - 0.14, hw, 0.15, 2.0, -hd, -hd + 0.03);
-          {
-            const [hx, hz] = P(-hw + 0.62, -hd + 0.015);
-            const open = [0, 0.5, 1.45, 0.15][it.id % 4];
-            G.add('paintGrey', new THREE.BoxGeometry(0.72, 1.8, 0.025).translate(0.36, 1.07, 0).rotateY(open).translate(hx, 0, hz));
-            G.add('steel', new THREE.BoxGeometry(0.03, 0.1, 0.05).translate(0.64, 1.05, 0).rotateY(open).translate(hx, 0, hz));
-          }
-          const [tx, tz] = P(0, hd - 0.4);
-          dept.toilet(tx, tz, it.id);
-          if (it.id % 3 === 0) model('plunger', tx + 0.4, 0, tz - 0.1, rand(it.id) * 6);
-        } else fixtures.stall(it);
+          lbox('paintGrey', it, -hw + 0.62, hw - 0.14, 0.17, 1.97, -hd + 0.002, -hd + 0.027);
+          lbox('steel', it, hw - 0.24, hw - 0.2, 1.0, 1.1, -hd - 0.02, -hd + 0.002);
+        } else if (it.shut) fixtures.stallShut(it);
         break;
       case 'gondola':
         dept.gondola(it);
@@ -575,59 +532,14 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         lbox('faience', it, -hw, hw, 0, 2.1, -hd, hd, '-y');
         lbox('steel', it, -hw - 0.01, hw + 0.01, 2.1, 2.13, -hd - 0.01, hd + 0.01);
         break;
-      case 'standee':
-      case 'boxoffice':
-        dept[it.kind](it, { posters, menus, panel });
-        break;
-      case 'cosmetic':
-      case 'booth':
       case 'pot':
-      case 'partition':
-      case 'meeting':
-      case 'kitchenette':
       case 'tanks':
       case 'panelbox':
       case 'genset':
-      case 'workbench':
         dept[it.kind](it);
-        break;
-      case 'fitting':
-        dept.fitting(it);
-        break;
-      case 'shoetable':
-        dept.shoetable(it);
         break;
       case 'ottoman':
         model('Ottoman_01', it.x, 0, it.z, rand(it.id) * 6.28);
-        break;
-      case 'roomset':
-        dept.roomset(it);
-        break;
-      case 'tvwall':
-        dept.tvwall(it);
-        break;
-      case 'luggage':
-        dept.luggage(it);
-        break;
-      case 'mannequin': {
-        const y = it.yaw || 0;
-        put('steel', new THREE.CylinderGeometry(0.22, 0.22, 0.03, 16), it.x, 0.015, it.z);
-        put('steel', new THREE.CylinderGeometry(0.015, 0.015, 0.25, 6), it.x, 0.14, it.z);
-        const body = new THREE.LatheGeometry([[0.0, 0], [0.11, 0.02], [0.13, 0.25], [0.16, 0.5], [0.13, 0.62], [0.17, 0.82], [0.2, 1.0], [0.12, 1.08], [0.05, 1.12], [0.05, 1.18], [0.0, 1.2]].map(([r, h]) => new THREE.Vector2(r, h)), 16).scale(1, 1, 0.7);
-        put(it.id % 2 ? fab(it.id) : 'plastic', body, it.x, 0.27, it.z, y);
-        // (un buste de couturière : pas de tête ni de bras, un bouton de bois tourné au col)
-        put('wood', new THREE.CylinderGeometry(0.05, 0.06, 0.035, 12), it.x, 1.485, it.z);
-        put('wood', new THREE.SphereGeometry(0.03, 8, 6), it.x, 1.52, it.z);
-        break;
-      }
-      case 'arcade':
-        arcade.cabinet(it);
-        break;
-      case 'claw':
-        arcade.claw(it);
-        break;
-      case 'prizes':
-        arcade.prizes(it);
         break;
       // le parking : une voiture sous sa bâche, des blocs de béton, des pneus en tas
       case 'car':
@@ -642,16 +554,6 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
       }
       case 'tyres':
         for (let k = 0; k < (it.n || 3); k++) model('old_tyre', it.x + (rand(it.id, k) - 0.5) * 0.12, 0.08 + k * 0.155, it.z + (rand(it.id, k + 5) - 0.5) * 0.12, 0, 1, PI / 2);
-        break;
-      case 'stanchion':
-        put('brass', new THREE.CylinderGeometry(0.025, 0.025, 0.95, 8), it.x, 0.48, it.z);
-        put('brass', new THREE.CylinderGeometry(0.16, 0.18, 0.03, 16), it.x, 0.015, it.z);
-        put('brass', new THREE.SphereGeometry(0.045, 10, 8), it.x, 0.97, it.z);
-        if (it.id < furn.length - 1 && furn[it.id + 1].kind === 'stanchion') {
-          const o = furn[it.id + 1];
-          G.beam('red', [it.x, 0.88, it.z], [(it.x + o.x) / 2, 0.72, (it.z + o.z) / 2], 0.035, 0.035);
-          G.beam('red', [(it.x + o.x) / 2, 0.72, (it.z + o.z) / 2], [o.x, 0.88, o.z], 0.035, 0.035);
-        }
         break;
       case 'seats': {
         // une rangée de fauteuils de velours rouge (dossier galbé, assise arrondie, un sur onze relevé), accoudoirs noirs
@@ -672,11 +574,15 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         break;
       }
       case 'sinks': {
-        lbox('marbleDark', it, -hw, hw, 0.82, 0.88, -hd, hd);
-        lbox('paintGrey', it, -hw, hw, 0, 0.82, -hd + 0.05, -hd + 0.1);
+        // un plan de pierre sombre, creusé d'une auge d'inox sur toute sa longueur ; les miroirs au mur
+        lbox('marbleDark', it, -hw, hw, 0.8, 0.88, -hd, -hd + 0.1);
+        lbox('marbleDark', it, -hw, hw, 0.8, 0.88, hd - 0.07, hd);
+        for (const s of [-1, 1]) lbox('marbleDark', it, s > 0 ? hw - 0.12 : -hw, s > 0 ? hw : -hw + 0.12, 0.8, 0.88, -hd + 0.1, hd - 0.07);
+        lbox('steel', it, -hw + 0.12, hw - 0.12, 0.7, 0.72, -hd + 0.1, hd - 0.07, '-y');
+        lbox('steel', it, -hw + 0.12, hw - 0.12, 0.72, 0.87, -hd + 0.1, -hd + 0.11);
+        lbox('steel', it, -hw + 0.12, hw - 0.12, 0.72, 0.87, hd - 0.08, hd - 0.07);
+        lbox('paintGrey', it, -hw, hw, 0, 0.8, hd - 0.12, hd - 0.07);
         for (let i = 0; i < 3; i++) {
-          const [x, z] = P(-hw + 0.9 + i * 1.6, 0.05);
-          dept.basin(x, z);
           const [mx, mz] = P(-hw + 0.9 + i * 1.6, -hd + 0.02);
           lbox('steel', { ...it, x: mx, z: mz }, -0.48, 0.48, 1.12, 2.03, 0, 0.008);
           lbox('mirror', { ...it, x: mx, z: mz }, -0.45, 0.45, 1.15, 2.0, 0.008, 0.016);
@@ -736,7 +642,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     }
   }
 
-  dept.signs(furn);
+  dept.signs();
 
   // --- Les détails posés sur les murs et sous les plafonds (modèles) ---
   const cell = (gx, gz) => (gx < 0 || gz < 0 || gx >= map.W || gz >= map.H ? 2 : map.grid[gz * map.W + gx]);
