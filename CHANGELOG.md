@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 5.83 — 13 novembre 2026
+- **The Backrooms** — Au Level 1, l'entité imite vraiment vos voix :
+  - Elle rejoue vos phrases telles que vous les avez dites, en entier, avec votre vraie voix : plus de voix ralentie, hachée ou grésillante. Elle sonne comme un joueur, de près, derrière un mur ou au talkie.
+  - Elle répète des choses que vous avez dites pendant la partie, surtout celles qui ont fait réagir les autres.
+  - Près de vous, elle bavarde pour passer pour l'un des vôtres ; de loin, elle appelle pour vous attirer.
+  - Elle choisit qui imiter : jamais la voix de quelqu'un qui est à côté de vous, et elle change d'apparence quand la sienne ne tient plus. Celui qu'elle imite ne l'entend pas.
+  - Si le joueur imité n'a encore rien dit, elle se tait comme lui.
+
 ## 5.82 — 12 novembre 2026
 - **Odyssée** — Sur la carte :
   - Chaque lieu a sa carte locale, et la carte de la région se dévoile à mesure qu'on explore.

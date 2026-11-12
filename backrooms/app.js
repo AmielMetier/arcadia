@@ -1913,7 +1913,8 @@ function handleEvent(ev, me) {
     case 'mimicCall':
       // l'imposteur appelle avec la voix volée (de vive voix, là où il est, ou au talkie) ; chacun la rejoue chez soi
       // (au talkie : pas pendant une coupure, le talkie est mort)
-      if (voice && sim.player.status === 'alive' && !(ev.radio && sim.radioDead)) voice.mimic(ev.id, { x: ev.x, z: ev.z }, !!ev.radio, who(ev.id));
+      // (celui qu'elle imite ne l'entend pas : il est loin, et au talkie il se reconnaîtrait)
+      if (voice && sim.player.status === 'alive' && !(ev.radio && sim.radioDead) && (ev.id !== me || sim.players.length < 2)) voice.mimic(ev.id, { x: ev.x, z: ev.z }, !!ev.radio, who(ev.id), ev.kind, ev.seed);
       break;
     case 'unmask':
       if (sfx) sfx.rush({ x: ev.x, z: ev.z });
@@ -2773,6 +2774,7 @@ function frame(currentTime) {
     // le talkie grésille tout seul de temps en temps (plus souvent quand elle rôde) ; en coupure, il est mort
     const radioOk = !sim.radioDead;
     voice.update(sim, sim.viewPlayer(sim.spectate || 0), delta, want, OPTS.mic !== 'off' && !paused, me.status === 'alive', { ok: radioOk, danger: me.danger || 0, live: !paused && sim.state === 'playing' && !sim.prelude });
+    if (NET.role !== 'guest') sim.voiceBank = voice.bank(); // (l'entité imite de préférence quelqu'un dont on a des phrases)
     if (hud) hud.voice(voice, sim, multi(), !!(keys['KeyR'] || padRadio) && !radioOk && multi());
   }
   if (hud) {

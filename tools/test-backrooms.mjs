@@ -5622,6 +5622,118 @@ test("Level 1 : l'imposteur se fige une seconde quand on siffle près de lui, pa
   }
 });
 
+import { voicedSpan, pickUtterance } from '../backrooms/view/voice.js';
+test('voix volée : la phrase est taillée du premier mot au silence, et tous choisissent la même', () => {
+  // une fenêtre : la fin d'une phrase d'avant, un silence, la phrase (1,4 s, avec une courte pause), un silence
+  const sr = 48000;
+  const w = new Float32Array(sr * 4);
+  const tone = (a, b, amp) => { for (let i = Math.round(a * sr); i < Math.round(b * sr); i++) w[i] = Math.sin(i * 0.05) * amp; };
+  tone(0, 0.3, 0.2);
+  tone(1.0, 1.6, 0.25);
+  tone(1.85, 2.4, 0.2);
+  for (let i = 0; i < w.length; i++) w[i] += (Math.random() - 0.5) * 0.002; // le souffle
+  const span = voicedSpan(w, sr, 1.4);
+  assert.ok(span && Math.abs(span[0] / sr - 0.94) < 0.05 && Math.abs(span[1] / sr - 2.53) < 0.06, `la phrase entière, avec sa marge (${span && span.map((x) => (x / sr).toFixed(2))})`);
+  assert.equal(voicedSpan(new Float32Array(sr), sr, 1), null, 'du silence : rien');
+  // le choix : pour bavarder, une phrase qui a fait réagir ; pour appeler, courte et dite fort ; au talkie, dite au talkie
+  const bank = [
+    { n: 1, d: 0.8, l: 0.9, r: 0, f: 0 },
+    { n: 2, d: 2.5, l: 0.5, r: 0, f: 1.2 },
+    { n: 3, d: 1.5, l: 0.6, r: 1, f: 0 },
+    { n: 4, d: 3.5, l: 0.4, r: 0, f: 0 },
+    { n: 5, d: 1.8, l: 0.5, r: 0, f: 0.9 },
+    { n: 6, d: 3.8, l: 0.95, r: 0, f: 0 },
+  ];
+  for (let seed = 0; seed < 40; seed++) {
+    assert.ok([2, 5, 4, 6].includes(pickUtterance(bank, 'chat', seed).n) && pickUtterance(bank, 'chat', seed * 4).n === 5, 'bavarder : la plus récente qui a fait réagir passe devant');
+    assert.ok(pickUtterance(bank, 'call', seed * 4).n === 1, 'appeler : la courte dite fort');
+    assert.ok(pickUtterance(bank, 'radio', seed * 4).n === 3, 'au talkie : celle dite au talkie');
+    assert.equal(pickUtterance(bank, 'chat', seed).n, pickUtterance(bank.slice(), 'chat', seed).n, 'même tirage, même phrase');
+  }
+  assert.notEqual(pickUtterance(bank, 'call', 0, [1]).n, 1, 'pas deux fois de suite la même');
+  assert.equal(pickUtterance([], 'chat', 3), null);
+});
+
+test("Level 1 : la voix volée ne trahit pas l'imposteur — il prend l'apparence d'un joueur loin de sa proie, se tait si celui qu'il imite est à portée d'oreille, bavarde de près", () => {
+  BackroomsSim.DISGUISE = true;
+  try {
+    const players = [{ id: 0, name: 'A' }, { id: 1, name: 'B' }, { id: 2, name: 'C' }];
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 11, players, localId: 0, level: 1 });
+    sim.arriveT = 0;
+    const m = sim.map;
+    const M = sim.monster;
+    const [A, B, C] = sim.players;
+    M.dormantT = 0;
+    Object.assign(sim.director, { phase: 'build', relaxT: 0 });
+    const cells = m.walkable.map((q) => ({ x: (q.x + 0.5) * CELL_SIZE, z: (q.z + 0.5) * CELL_SIZE })).filter((q) => !m.safeAt(q.x, q.z) && !sim.isColliding(q.x, q.z, 0.4));
+    const D = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+    const put = (Q, q) => { Q.x = q.x; Q.z = q.z; };
+    // B et C côte à côte, A très loin : devant B, la seule apparence qui tient est celle de A
+    const b0 = cells.find((q) => cells.some((r) => D(q, r) > 60));
+    const c0 = cells.find((q) => D(q, b0) > 3 && D(q, b0) < 7);
+    const a0 = cells.find((q) => D(q, b0) > 60);
+    put(B, b0); put(C, c0); put(A, a0);
+    for (let i = 0; i < 30; i++) {
+      const V = sim.bestFace(M, B);
+      assert.ok(V.ok && V.who === A, 'celle du joueur loin de la proie');
+    }
+    // elle imite C, à côté de B : à portée de voix de B, elle se tait ; hors de vue, elle change pour A
+    const spot = cells.find((q) => D(q, b0) > 12 && D(q, b0) < 18 && D(q, c0) > 10 && !hasLineOfSight(m, q.x, q.z, b0.x, b0.z) && !hasLineOfSight(m, q.x, q.z, c0.x, c0.z)) || cells.find((q) => D(q, b0) > 12 && D(q, b0) < 18);
+    M.mimic = C.id;
+    Object.assign(M, { x: spot.x, z: spot.z, mode: 'mimic', callT: 0.1, hesT: 99, restT: 0, coverT: 99, path: [], repathT: 0, silent: true });
+    let calls = [];
+    for (let i = 0; i < 60 * 3 && M.mimic != null; i++) {
+      Object.assign(M, { x: spot.x, z: spot.z });
+      sim.step({});
+      calls.push(...sim.drainEvents().filter((e) => e.type === 'mimicCall'));
+    }
+    assert.equal(calls.length, 0, 'la voix de C, alors que C est à côté de B : elle se tait');
+    assert.ok(!sim.mimicCover(M, B) && sim.mimicCover({ mimic: A.id }, B), 'C la trahirait, A non');
+    // avec la voix de A (loin, seul, muet) : elle parle ; jamais quand A est au talkie
+    M.mimic = A.id;
+    M.callT = 0.1;
+    calls = [];
+    for (let i = 0; i < 60 * 12 && M.mimic != null && !calls.length; i++) {
+      Object.assign(M, { x: spot.x, z: spot.z });
+      sim.step({});
+      calls.push(...sim.drainEvents().filter((e) => e.type === 'mimicCall'));
+    }
+    assert.ok(calls.length && calls[0].id === A.id && ['call', 'chat', 'radio'].includes(calls[0].kind) && Number.isInteger(calls[0].seed), `elle parle avec la voix de A (${calls[0] && calls[0].kind})`);
+    // tout près de B, en vue : elle bavarde
+    const close = cells.filter((q) => D(q, b0) > 5 && D(q, b0) < 9 && hasLineOfSight(m, q.x, q.z, b0.x, b0.z)).sort((p, q) => D(q, c0) - D(p, c0))[0];
+    if (close) {
+      M.callT = 0.05;
+      calls = [];
+      for (let i = 0; i < 20 && !calls.length && M.mimic != null; i++) {
+        Object.assign(M, { x: close.x, z: close.z });
+        sim.step({});
+        calls.push(...sim.drainEvents().filter((e) => e.type === 'mimicCall'));
+      }
+      assert.ok(calls.length && calls[0].kind === 'chat' && !calls[0].radio, 'près d\'un joueur, de vive voix : une phrase ordinaire');
+    }
+    // au talkie : pas si A a quelqu'un près de lui (on le verrait se taire)
+    const farM = cells.find((q) => D(q, b0) > 40 && D(q, a0) > 40 && D(q, c0) > 40);
+    put(C, cells.find((q) => D(q, a0) > 3 && D(q, a0) < 8));
+    M.mimic = A.id;
+    M.callT = 0.1;
+    calls = [];
+    for (let i = 0; i < 60 * 3 && M.mimic != null; i++) {
+      Object.assign(M, { x: farM.x, z: farM.z, coverT: 99 });
+      sim.step({});
+      calls.push(...sim.drainEvents().filter((e) => e.type === 'mimicCall'));
+    }
+    assert.equal(calls.length, 0, 'A a C près de lui : pas de fausse voix de A au talkie');
+    // la préférence va à quelqu'un qu'on a entendu parler
+    put(C, cells.find((q) => D(q, b0) > 60 && D(q, a0) > 20));
+    sim.voiceBank = { [C.id]: 6 };
+    let nC = 0;
+    for (let i = 0; i < 40; i++) if (sim.bestFace(M, B).who === C) nC++;
+    assert.ok(nC >= 30, `celui dont on a des phrases est préféré (${nC}/40)`);
+  } finally {
+    BackroomsSim.DISGUISE = false;
+  }
+});
+
 test("Level 1 : dès le départ, l'entité a l'apparence d'un joueur et marche à sa vitesse ; tout près, elle se transforme une seconde sur place, puis court un peu plus vite qu'un sprint ; loin de tous, elle reprend une apparence", () => {
   BackroomsSim.DISGUISE = true;
   try {
