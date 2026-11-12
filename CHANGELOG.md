@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 5.80 — 12 novembre 2026
+- **Hub** — Correction : en mode VIP aussi, le Level 1 et les Poolrooms ont l'entité voilée animée (TahitoaSenis)
+- **Hub** — Correction : aux Poolrooms, l'entité redevient la silhouette vidéo (TahitoaSenis)
+- Correction : en mode normal, chaque niveau garde son monstre ; seul le Level 1 VIP prend l'entité voilée (TahitoaSenis)
+- **Hub** — Correction : en mode normal, le monstre de base à tous les niveaux ; le mode VIP garde les siens (TahitoaSenis)
+- Améliorations techniques sous le capot (1 modification).
+
 ## 5.79 — 12 novembre 2026
 - **Tête de Calcul** — The Candidate a un mode entretien, à activer dans les réglages : il ne pose que des questions d'entretien d'embauche en finance (produits financiers, maths financières, économie, informatique).
   - Plus de 230 nouvelles questions sur ces sujets, surtout pour le desk et le comité final : grecques, obligations, swaps, crédit, VaR, Black-Scholes, mouvement brownien, C++, SQL, VBA, Excel, Access et débogage.
