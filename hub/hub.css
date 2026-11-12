@@ -570,3 +570,14 @@ html:has(#play.on),body:has(#play.on){overflow:hidden;overscroll-behavior:none}
 .ggrp b{font-family:Bungee,Impact,sans-serif;font-weight:400;font-size:18px}
 .ggrp span{font-weight:700;font-size:13px;color:#c9c0ad}
 .ggrp:not(:first-child){margin-top:14px}
+
+/* bandes-annonces (hub/trailers.js) : la vidéo recouvre l'affiche et apparaît en fondu quand elle joue */
+.game .cv,.sp-slide{position:relative}
+.sp-slide{position:absolute}
+video.trailer{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .35s ease;pointer-events:none;background:transparent}
+video.trailer.in{opacity:1}
+.sp-slide .sp-txt,.sp-slide::after{z-index:1}
+.sp-slide .sp-txt{z-index:2}
+/* dans la vitrine, le texte du Hub passe devant : la vidéo est cadrée vers le haut et le dégradé renforcé */
+.sp-slide video.trailer{object-position:50% 12%}
+.sp-slide:has(video.trailer.in)::after{background:linear-gradient(180deg,transparent 20%,rgba(8,9,13,.72) 50%,rgba(8,9,13,.97) 100%)}
