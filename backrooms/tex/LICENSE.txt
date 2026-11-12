@@ -46,6 +46,7 @@ couleur en 1024 px, teintée dans backrooms/view/mallTextures.js ; « _relief »
   l17_beton.jpg                      Smooth Concrete Floor      https://polyhaven.com/a/smooth_concrete_floor      (les quais, les locaux techniques)
   l17_faience.jpg (+ _relief)        Long White Tiles           https://polyhaven.com/a/long_white_tiles           (les toilettes)
   l17_lino.jpg (+ _lisse)            Old Linoleum Flooring 01   https://polyhaven.com/a/old_linoleum_flooring_01   (le grand magasin, le marché)
+  l17_contreplaque.jpg               Plywood                    https://polyhaven.com/a/plywood                    (les palissades des escalators condamnés)
   l17_tole.jpg                       Metal Plate                https://polyhaven.com/a/metal_plate                (les paliers des escalators)
   l17_carrelage_brun.jpg (+ _relief, _lisse)  Brown Floor Tiles  https://polyhaven.com/a/brown_floor_tiles         (le sol de l'annexe)
   l17_carrelage_use.jpg (+ _relief, _lisse)   Dirty Tiles        https://polyhaven.com/a/dirty_tiles               (le food court, la jardinerie)

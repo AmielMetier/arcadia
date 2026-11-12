@@ -654,7 +654,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     const head = rooms[sh.room].ceilH - 0.62;
     const n = Math.max(1, Math.round((xb - xa) / 3));
     const w = (xb - xa - 0.08) / n;
-    for (let i = 0; i < n; i++) model('rollershutter_window_01', xa + 0.04 + w * (i + 0.5), 0, sh.frontZ - sh.dir * 0.15, sh.dir > 0 ? 0 : PI, [w / 2.1, head / 1.85, 1], 0, 0, (sh.id + i) % 4 === 3 ? 'rollershutter_window_01_graffiti' : 'rollershutter_window_01');
+    for (let i = 0; i < n; i++) model('rollershutter_window_01', xa + 0.04 + w * (i + 0.5), 0, sh.frontZ - sh.dir * 0.15, sh.dir > 0 ? 0 : PI, [w / 2.1, head / 1.85, 1], 0, 0, 'rollershutter_window_01');
   }
   // les cabines téléphoniques, de part et d'autre du passage des toilettes
   for (const gx of [21, 24]) {
@@ -848,29 +848,31 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     }
   }
 
-  // en haut des escalators croisés : des poteaux et une chaîne en travers, « OUT OF ORDER »
-  if (fi === 0) {
-    const [c, g] = atlas(1, 1, 256, 96);
-    g.fillStyle = '#e9e1cf';
-    g.fillRect(0, 0, 256, 96);
-    g.fillStyle = '#b3241b';
-    g.fillRect(6, 6, 244, 84);
-    g.fillStyle = '#f4ecdc';
-    g.font = 'bold 34px "Arial Narrow", Arial, sans-serif';
-    g.textAlign = 'center';
-    g.fillText('OUT OF ORDER', 128, 60);
-    MATS.ooo = { m: baked(lam({ map: toTex(c) })), S: 1 };
+  // les escalators, condamnés : à chaque bout, une palissade de contreplaqué sur deux chevrons (on ne voit plus les
+  // marches de près), un écriteau « OUT OF ORDER » ; en haut (fi 0) devant le palier d'arrivée, en bas devant le pied
+  {
+    if (!MATS.ooo) {
+      const [c, g] = atlas(1, 1, 256, 96);
+      g.fillStyle = '#e9e1cf';
+      g.fillRect(0, 0, 256, 96);
+      g.fillStyle = '#b3241b';
+      g.fillRect(6, 6, 244, 84);
+      g.fillStyle = '#f4ecdc';
+      g.font = 'bold 34px "Arial Narrow", Arial, sans-serif';
+      g.textAlign = 'center';
+      g.fillText('OUT OF ORDER', 128, 60);
+      MATS.ooo = { m: baked(lam({ map: toTex(c) })), S: 1 };
+    }
     for (const e of map.allEscalators || []) {
       if (e.fi !== 1) continue;
-      const x = e.top + e.dir * 0.35;
-      for (const s of [-1, 1]) {
-        put('steel', new THREE.CylinderGeometry(0.03, 0.03, 1.0, 8), x, 0.5, e.z + s * (e.w / 2 + 0.15));
-        put('steel', new THREE.CylinderGeometry(0.17, 0.19, 0.04, 14), x, 0.02, e.z + s * (e.w / 2 + 0.15));
-      }
-      G.beam('red', [x, 0.9, e.z - e.w / 2 - 0.15], [x, 0.78, e.z], 0.03, 0.03);
-      G.beam('red', [x, 0.78, e.z], [x, 0.9, e.z + e.w / 2 + 0.15], 0.03, 0.03);
-      panel('ooo', [0, 0, 1, 1], x - e.dir * 0.02, 0.62, e.z, 0.7, 0.26, -e.dir, 0);
-      panel('ooo', [0, 0, 1, 1], x + e.dir * 0.02, 0.62, e.z, 0.7, 0.26, e.dir, 0);
+      // (x : le plan de la palissade ; out : de quel côté on arrive)
+      const out = fi === 0 ? e.dir : -e.dir;
+      const x = fi === 0 ? e.top + e.dir * 0.4 : e.x - e.dir * 0.4;
+      const hw = e.w / 2 + 0.3;
+      G.box('plywood', x - 0.012, x + 0.012, 0.04, 2.1, e.z - hw, e.z + hw);
+      for (const s of [-1, 1]) G.box('plywood', x - out * 0.012 - 0.045, x - out * 0.012 + 0.045, 0, 2.14, e.z + s * hw - 0.045, e.z + s * hw + 0.045);
+      G.box('plywood', x - out * 0.06 - 0.02, x - out * 0.06 + 0.02, 1.02, 1.11, e.z - hw, e.z + hw);
+      panel('ooo', [0, 0, 1, 1], x + out * 0.016, 1.45, e.z, 0.7, 0.26, out, 0);
     }
   }
 

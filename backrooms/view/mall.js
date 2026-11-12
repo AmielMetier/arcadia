@@ -359,6 +359,7 @@ function makeMaterials(tx, baked) {
     velvet: { m: baked(lam({ map: tx.velvet })), S: 0.9 },
     shutter: { m: slats(tx.shutter, tx.shutterRelief), S: 2.0 },
     shutterBeige: { m: slats(tx.shutterBeige, tx.shutterBeigeRelief), S: 1.9 },
+    plywood: { m: baked(lam({ map: tx.plywood })), S: 1.0 },
     plate: { m: baked(phong({ map: tx.plate, specular: '#9a9ea4', shininess: 60 }), { spec: 0.55, gloss: 100, mask: 0 }), S: 1.2 },
     // les marches des escalators : de l'aluminium sombre, un liseré jaune
     // (une marche : de l'aluminium rainuré dans le sens de la marche — les lames du rideau scanné, serrées à un centimètre)
