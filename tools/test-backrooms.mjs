@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, SLIDE_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL, RELAY_ARM, RELAY_SYNC, LIFT_CALL_T, L1_CALM, L1_FIRST_BLACKOUT, SECTOR_STEP, REELS, FILM_LEAD_T, PICK_R, USE_R, SPRINT_SPEED, STAIRS_T } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, SLIDE_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL, RELAY_ARM, RELAY_SYNC, LIFT_CALL_T, L1_CALM, L1_FIRST_BLACKOUT, SECTOR_STEP, REELS, FILM_LEAD_T, PICK_R, USE_R, SPRINT_SPEED, STAIRS_T, CALM_KEEP, ARRIVAL_CALM } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
 import { navOf, roamable } from '../backrooms/engine/gait.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
@@ -3351,6 +3351,23 @@ test('Level 5 : un hôtel de 21 chambres (201 à 221), 6 lettres, des cachettes,
   assert.deepEqual(parseWords('search, Shadow\nabc\nmirrors\nÉCLAIR'), ['SEARCH', 'SHADOW', 'ECLAIR']);
 });
 
+test("Level 5 : un code faux s'entend — l'entité à portée vient au clavier, sauf pendant le répit de l'arrivée", () => {
+  const sim = hotelSim({ difficulty: 'normal' });
+  const P = sim.player;
+  const m = sim.map;
+  const M = sim.monster;
+  const bad = '0000' === m.code ? '1111' : '0000';
+  P.x = m.keypad.x;
+  P.z = m.keypad.z - 0.6;
+  Object.assign(M, { mode: 'patrol', x: m.keypad.x, z: m.keypad.z - 12, floor: 0 });
+  assert.ok(M.dormantT > 0, "le répit de l'arrivée");
+  sim.enterCode(P, bad);
+  assert.ok(sim.drainEvents().some((e) => e.type === 'codeWrong') && M.mode === 'patrol', 'pendant le répit, elle ne vient pas');
+  M.dormantT = 0;
+  sim.enterCode(P, bad);
+  assert.ok(M.mode === 'search' && Math.hypot(M.lastSeenX - m.keypad.x, M.lastSeenZ - m.keypad.z) < 0.1, 'ensuite, elle vient voir au clavier');
+});
+
 test('Level 5 : lettres ramassées, postées dans les boîtes, code au plafond, porte de secours', () => {
   const sim = hotelSim();
   const P = sim.player;
@@ -3378,7 +3395,11 @@ test('Level 5 : lettres ramassées, postées dans les boîtes, code au plafond, 
   assert.equal(sim.codeShown, true);
   assert.equal(P.letters.length, 0);
   assert.ok(sim.drainEvents().some((e) => e.type === 'codeShown'));
-  // le bon code ouvre la porte ; on la passe : l'escalier de secours descend jusqu'au Level 17, le Mall
+  // le bon code, tapé loin du clavier : rien ; devant lui, il ouvre la porte ; on la passe : l'escalier de secours
+  // descend jusqu'au Level 17, le Mall
+  sim.step({ code: m.code });
+  assert.equal(sim.open, false, 'loin du clavier, le code ne compte pas');
+  goTo(sim, P, m.keypad.x, m.keypad.z - 0.6);
   sim.step({ code: m.code });
   assert.equal(sim.open, true);
   const E = m.elevator;
@@ -3436,6 +3457,7 @@ test('Level 5 → Level 17 : avec la poupée, on arrive loin d\'elle et elle dor
 
 test('Level 5 : caché sous un lit, l\'entité perd sa trace ; elle tue si elle l\'a vu s\'y glisser', () => {
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 7, level: HOTEL_LEVEL });
+  sim.monster.dormantT = 0; // (en pleine partie : passé le calme de l'arrivée)
   const P = sim.player;
   const M = sim.monster;
   const m = sim.map;
@@ -3472,6 +3494,7 @@ test('Level 5 : caché sous un lit, l\'entité perd sa trace ; elle tue si elle 
 
 test('Level 5 : la course s\'entend, accroupi on passe en silence ; les lettres d\'un mort reviennent', () => {
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 7, level: HOTEL_LEVEL });
+  sim.monster.dormantT = 0; // (en pleine partie : passé le calme de l'arrivée)
   const P = sim.player;
   const M = sim.monster;
   const m = sim.map;
@@ -3543,6 +3566,7 @@ test("Level 5 : on entre dans chaque chambre par sa porte en marchant, les meubl
 test("Level 5 : caché, l'entité quitte la pièce et reprend sa ronde ; un autre joueur qui court l'attire", () => {
   const players = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }];
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 7, level: HOTEL_LEVEL, players, localId: 'a' });
+  sim.monster.dormantT = 0; // (en pleine partie : passé le calme de l'arrivée)
   const [A, B] = sim.players;
   const M = sim.monster;
   const m = sim.map;
@@ -5057,6 +5081,93 @@ test("Level 1 : l'arrivée est calme — elle reste au loin, pas de coupure avan
   assert.ok(sim.nextBlackout >= L1_FIRST_BLACKOUT[0], 'la première coupure attend');
 });
 
+test("Level 1 : le calme de l'arrivée vaut aussi pour l'imposteur — déguisé, il reste au loin, se tait et n'approche qu'ensuite", () => {
+  const was = BackroomsSim.DISGUISE;
+  BackroomsSim.DISGUISE = true;
+  try {
+    for (const seed of [2, 6, 11]) {
+      const sim = new BackroomsSim({ difficulty: 'normal', seed, level: 1 });
+      const M = sim.monster;
+      const P = sim.player;
+      assert.ok(M.mimic != null, `déguisé dès le départ (graine ${seed})`);
+      const d0 = Math.hypot(M.x - P.x, M.z - P.z);
+      let calls = 0;
+      let closest = Infinity;
+      for (let i = 0; i < Math.round((L1_CALM - 1) / DT); i++) {
+        sim.step({});
+        closest = Math.min(closest, Math.hypot(M.x - P.x, M.z - P.z));
+        for (const ev of sim.drainEvents()) if (ev.type === 'mimicCall' || ev.type === 'unmask' || ev.type === 'dockBang') calls++;
+      }
+      assert.equal(calls, 0, `ni appel, ni rideau forcé, ni démasquage pendant le calme (graine ${seed})`);
+      assert.ok(closest >= Math.min(d0, CALM_KEEP) - 1, `il reste au loin : ${closest.toFixed(1)} m au plus près, parti de ${d0.toFixed(1)} m (graine ${seed})`);
+      // le calme passé, il vient
+      const d1 = Math.hypot(M.x - P.x, M.z - P.z);
+      let best = d1; // (à vol d'oiseau : un mur à contourner l'éloigne d'abord)
+      for (let i = 0; i < Math.round(45 / DT) && M.mimic != null; i++) {
+        sim.step({});
+        best = Math.min(best, Math.hypot(M.x - P.x, M.z - P.z));
+      }
+      assert.ok(M.mimic == null || best < d1 - 5, `ensuite il approche : ${d1.toFixed(1)} → ${best.toFixed(1)} m (graine ${seed})`);
+    }
+    // … et il s'écarte de qui vient vers lui
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 6, level: 1 });
+    const M = sim.monster;
+    const P = sim.player;
+    const cell = sim.map.walkable.map((c) => ({ x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE }))
+      .filter((q) => !sim.isColliding(q.x, q.z, 0.38, 0) && Math.hypot(q.x - M.x, q.z - M.z) > 10 && Math.hypot(q.x - M.x, q.z - M.z) < 16)[0];
+    assert.ok(cell, 'une case à une quinzaine de mètres de lui');
+    sim.arriveT = 0;
+    P.x = cell.x;
+    P.z = cell.z;
+    const near = Math.hypot(M.x - P.x, M.z - P.z);
+    for (let i = 0; i < Math.round(15 / DT); i++) sim.step({});
+    assert.ok(M.mimic != null, 'il ne se démasque pas');
+    assert.ok(Math.hypot(M.x - P.x, M.z - P.z) > near + 5, `il s'éloigne : ${near.toFixed(1)} → ${Math.hypot(M.x - P.x, M.z - P.z).toFixed(1)} m`);
+  } finally {
+    BackroomsSim.DISGUISE = was;
+  }
+});
+
+test("Level 5 : l'arrivée est calme — l'entité ne repère personne pendant la première demi-minute", () => {
+  for (const seed of [1, 3, 4, 9]) {
+    const sim = new BackroomsSim({ difficulty: 'normal', seed, level: HOTEL_LEVEL });
+    assert.ok(sim.monster.dormantT >= ARRIVAL_CALM - 0.1, 'elle ne chasse pas encore');
+    const input = { mx: 0, my: 1, yaw: 0, pitch: 0 };
+    for (let i = 0; i < Math.round((ARRIVAL_CALM - 2) / DT); i++) {
+      if (i % 90 === 0) input.yaw += 1.3; // on tourne en rond dans le couloir, debout, sans se cacher
+      sim.step(input);
+      assert.notEqual(sim.monster.mode, 'chase', `pas de traque à ${sim.time.toFixed(1)} s (graine ${seed})`);
+      assert.equal(sim.player.status, 'alive', `en vie à ${sim.time.toFixed(1)} s (graine ${seed})`);
+    }
+  }
+  assert.ok(new BackroomsSim({ difficulty: 'hard', seed: 1, level: HOTEL_LEVEL }).monster.dormantT < ARRIVAL_CALM, 'plus court en difficile');
+});
+
+test("Level 1 à plusieurs : la porte du poste de garde arrive par l'instantané (un invité arrivé en route la voit comme l'hôte)", () => {
+  const players = [{ id: 0, name: 'A' }, { id: 1, name: 'B' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 6, level: 1, players: players.map((p) => ({ ...p })), localId: 0 });
+  const gd = host.map.guardDoor;
+  assert.ok(gd, 'un poste de garde, avec sa porte');
+  const P = host.player;
+  host.arriveT = 0;
+  P.x = gd.x;
+  P.z = gd.z;
+  for (let i = 0; i < 30; i++) host.step({});
+  assert.equal(gd.open, true, "ouverte devant l'hôte");
+  // l'invité n'a reçu aucun événement : il vient d'arriver
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 6, level: 1, players: players.map((p) => ({ ...p })), localId: 1 });
+  assert.equal(guest.map.guardDoor.open, false);
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  assert.equal(guest.map.guardDoor.open, true, "ouverte chez l'invité");
+  host.players[0].x = host.map.spawn.x;
+  host.players[0].z = host.map.spawn.z;
+  for (let i = 0; i < 120; i++) host.step({});
+  if (!gd.open) {
+    guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+    assert.equal(guest.map.guardDoor.open, false, "refermée chez l'invité");
+  }
+});
+
 test('Level 1 : coupures variées — jamais deux fois de suite le même genre ; le délestage éteint un tiers après l\'autre', () => {
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 3, level: 1 });
   const kinds = [];
@@ -5425,6 +5536,90 @@ test('Level 1 : l\'imposteur — après une victime, l\'entité prend son appare
     for (const e of sim.drainEvents()) if (e.type === 'unmask') why = e.why;
   }
   assert.ok(!why && M.mimic === 1, 'dans la lampe, de loin, elle garde son déguisement');
+});
+
+test("Level 1 : devant le casier de sa proie, l'imposteur attend, appelle, puis renonce et s'éloigne (il ne campe plus là sans fin)", () => {
+  BackroomsSim.DISGUISE = true;
+  try {
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 11, players: [{ id: 0, name: 'A' }], localId: 0, level: 1 });
+    sim.arriveT = 0;
+    const M = sim.monster;
+    const A = sim.players[0];
+    assert.ok(M.mimic != null, 'déguisée');
+    const h = sim.map.hides.find((q) => !sim.map.safeAt(q.x, q.z));
+    M.dormantT = 0;
+    sim.enterHide(A, h);
+    M.sawHide = -1;
+    Object.assign(M, { x: h.x + h.dx * 1.2, z: h.z + h.dz * 1.2, path: [], repathT: 0 });
+    let gone = false;
+    for (let i = 0; i < 60 * (SIMX.KNOCK_T[1] + 2) && !gone; i++) {
+      sim.step({});
+      gone = M.restT > 0;
+    }
+    assert.ok(gone && M.mimic != null && A.status === 'alive', 'il renonce sans se démasquer, le joueur est toujours en vie');
+    for (let i = 0; i < 60 * 12; i++) sim.step({});
+    assert.ok(Math.hypot(M.x - A.x, M.z - A.z) > 8, `il s'est éloigné du casier (${Math.hypot(M.x - A.x, M.z - A.z).toFixed(1)} m)`);
+  } finally {
+    BackroomsSim.DISGUISE = false;
+  }
+});
+
+test("Level 1 : pendant le répit qui suit une poursuite, l'imposteur ne revient pas — il s'écarte et se tait", () => {
+  BackroomsSim.DISGUISE = true;
+  try {
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 11, players: [{ id: 0, name: 'A' }], localId: 0, level: 1 });
+    sim.arriveT = 0;
+    const M = sim.monster;
+    const A = sim.players[0];
+    const m = sim.map;
+    M.dormantT = 0;
+    const near = m.walkable.map((q) => ({ x: (q.x + 0.5) * CELL_SIZE, z: (q.z + 0.5) * CELL_SIZE })).find((q) => { const d = Math.hypot(q.x - A.x, q.z - A.z); return d > 10 && d < 15 && !m.safeAt(q.x, q.z); });
+    Object.assign(M, { x: near.x, z: near.z, path: [], repathT: 0 });
+    Object.assign(sim.director, { phase: 'relax', relaxT: 60 });
+    // (son chemin de repli peut d'abord longer le joueur : on vérifie où il va, pas sa distance à mi-parcours)
+    const x0 = M.x;
+    const z0 = M.z;
+    let calls = 0;
+    for (let i = 0; i < 60 * 6; i++) {
+      sim.step({});
+      calls += sim.drainEvents().filter((e) => e.type === 'mimicCall').length;
+    }
+    const to = M.calmTo;
+    assert.ok(!calls, "il n'appelle pas");
+    assert.ok(to && Math.hypot(to.x - A.x, to.z - A.z) > 25 && Math.hypot(M.x - x0, M.z - z0) > 3, 'il part vers un endroit loin du joueur');
+  } finally {
+    BackroomsSim.DISGUISE = false;
+  }
+});
+
+test("Level 1 : l'imposteur se fige une seconde quand on siffle près de lui, pas quand on siffle de loin", () => {
+  BackroomsSim.DISGUISE = true;
+  try {
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 11, players: [{ id: 0, name: 'A' }], localId: 0, level: 1 });
+    sim.arriveT = 0;
+    const M = sim.monster;
+    const A = sim.players[0];
+    const m = sim.map;
+    const cells = m.walkable.map((q) => ({ x: (q.x + 0.5) * CELL_SIZE, z: (q.z + 0.5) * CELL_SIZE })).filter((q) => !m.safeAt(q.x, q.z));
+    const walked = (dMin, dMax) => {
+      const q = cells.find((c) => { const d = Math.hypot(c.x - A.x, c.z - A.z); return d > dMin && d < dMax; });
+      Object.assign(M, { x: q.x, z: q.z, path: [], repathT: 0, dormantT: 0, hesT: 20, restT: 0 });
+      Object.assign(sim.director, { phase: 'build' });
+      for (let i = 0; i < 60 * 2; i++) sim.step({}); // il est en marche
+      sim.step({ whistle: true });
+      A.whistleCd = 0;
+      const x0 = M.x;
+      const z0 = M.z;
+      for (let i = 0; i < 60; i++) sim.step({});
+      return Math.hypot(M.x - x0, M.z - z0);
+    };
+    const near = walked(9, 13);
+    assert.ok(M.mimic != null && near < 0.4, `sifflé de près, il se fige (${near.toFixed(2)} m en une seconde)`);
+    const far = walked(SIMX.WHISTLE_FREEZE_R + 8, SIMX.WHISTLE_FREEZE_R + 16);
+    assert.ok(far > 1, `sifflé de loin, il continue (${far.toFixed(2)} m en une seconde)`);
+  } finally {
+    BackroomsSim.DISGUISE = false;
+  }
 });
 
 test("Level 1 : dès le départ, l'entité a l'apparence d'un joueur et marche à sa vitesse ; tout près, elle se transforme une seconde sur place, puis court un peu plus vite qu'un sprint ; loin de tous, elle reprend une apparence", () => {

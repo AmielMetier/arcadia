@@ -2,7 +2,7 @@
 // tools/avions-dogfight.mjs ; chargés une fois, clonés par joueur, avec un modèle très simple au loin, reflets du ciel,
 // flamme de postcombustion, éclair du canon et couleur d'escadron.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
-import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
+import { gltfLoader } from '../../shared/vendor/three/gltf-draco.js';
 
 // fins et tips : sommet des dérives et bouts d'ailes, relevés sur les modèles
 // nozzles : centre de chaque tuyère, un peu à l'intérieur pour que la flamme en sorte, et demi-largeur, demi-hauteur de son ouverture
@@ -73,7 +73,7 @@ export function loadPlanes(env, onProgress) {
   skyEnv = env;
   glassMat = new THREE.MeshStandardMaterial({ color: 0x1d2f3f, roughness: 0.06, metalness: 0.9, envMap: env, envMapIntensity: 1.4 });
   metalMat = new THREE.MeshStandardMaterial({ color: 0x3a3c40, roughness: 0.45, metalness: 0.8, envMap: env });
-  const loader = new GLTFLoader(), files = [...Object.entries(FILES).map(([type, def]) => [type, def.url, (g) => prepare(g, def, env)]),
+  const loader = gltfLoader(), files = [...Object.entries(FILES).map(([type, def]) => [type, def.url, (g) => prepare(g, def, env)]),
     ...[...Object.keys(STL), ...Object.keys(CARGO)].map((type) => [type, `avions/${type}.glb`, prepareSTL])];
   return Promise.all(files.map(([type, url, make]) => new Promise((resolve) => {
     loader.load(url, (gltf) => { templates[type] = make(gltf); if (onProgress) onProgress(type); resolve(); }, undefined, (err) => { console.warn(`Modèle ${url} indisponible, modèle simple utilisé :`, err); resolve(); });

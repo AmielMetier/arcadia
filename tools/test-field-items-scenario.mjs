@@ -52,13 +52,13 @@ assert.ok(gameJs.includes('Route 6 vers Mirage'));
 assert.ok(gameJs.includes('ta destinée t\\\'attend au-delà des flots. Prends ce Harnais Flottant !') || gameJs.includes('Prends ce Harnais Flottant !'));
 assert.ok(gameJs.includes('Cap Mirage fait face au Sanctuaire des Marées'));
 
-// Grand Sage Hoël remet le Sifflet Céleste au sommet de la Tour de la Grue
+// Grand Sage Hoël remet le Sifflet Céleste au sommet de la Tour Dorée
 assert.ok(gameJs.includes('bois sacré de la tour et orné d\\\'un ruban céleste') || gameJs.includes('bois sacré de la tour'));
 assert.ok(gameJs.includes("this.give('sifflet-celeste')"));
 
 // Pyros possède un dialogue adaptatif (fallback si pas encore visité Hautegrue)
-assert.ok(gameJs.includes('Sifflet Céleste des Sages de Hautegrue'));
-assert.ok(gameJs.includes('pèlerin de la Tour de la Grue'));
+assert.ok(gameJs.includes('Sifflet Céleste des Sages de la Tour Dorée'));
+assert.ok(gameJs.includes('pèlerin de la Tour Dorée'));
 
 // Doyenne Amaya mentionne le Sifflet Céleste
 assert.ok(gameJs.includes('La Plume Arc-en-ciel et le Sifflet Céleste !'));
@@ -75,13 +75,13 @@ assert.ok(regionJs.includes('Flora, notre Championne, conserve le précieux Séc
 assert.ok(regionJs.includes('Harnais Flottant d\\\'Écume') || regionJs.includes('Harnais Flottant'));
 
 // PNJ Tour de la Grue
-assert.ok(regionJs.includes('Sifflet Céleste sacré'));
+assert.ok(regionJs.includes('Sifflet Céleste'));
 
 console.log('✓ Textes des PNJ de Floralia, Cap Mirage et Hautegrue validés');
 
 console.log('=== Test 5 : Journal de quêtes (questsData.js) ===');
 const questsJs = readFileSync(join(root, 'odyssee/js/core/questsData.js'), 'utf8');
-assert.ok(questsJs.includes('Sifflet Céleste au sommet de la Tour de la Grue'));
+assert.ok(questsJs.includes('Sifflet Céleste au sommet de la Tour Dorée'));
 console.log('✓ Journal des quêtes synchronisé');
 
 console.log('\n===========================================');

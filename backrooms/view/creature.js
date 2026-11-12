@@ -18,7 +18,8 @@ import { MeshoptDecoder } from '../../shared/vendor/three/meshopt_decoder.module
 import { clone as cloneSkinned } from '../../shared/vendor/three/SkeletonUtils.js';
 
 export const CREATURE_URL = new URL('../models/level1/entite.glb', import.meta.url).href;
-const DONOR_URL = new URL('../models/hazmat.glb', import.meta.url).href;
+const DONOR_URL = new URL('../models/commun/hazmat.glb', import.meta.url).href;
+const BANG_HIT = 0.56; // s : l'impact dans le clip « bang » d'entite.glb (models/level1/LISEZMOI.txt)
 const UNMASK_T = 1; // s : la transformation (UNMASK_T du moteur, engine/sim.js)
 export const STATES = ['idle', 'walk', 'run', 'rush', 'grab', 'stun', 'bang', 'unmask', 'drop', 'scare'];
 const LIMITS = { tris: 150000, bytes: 15e6, tex: 2048, bones: 120 };
@@ -548,6 +549,22 @@ export function createCreature(opts = {}) {
       group.rotation.set(0, 0, 0);
       return st.head || st.holder || null;
     },
+    // un coup contre une porte blindée vient de sonner (le moteur décide de l'instant) : le clip de frappe se recale
+    // sur son impact, et prend le rythme des coups (l'écart depuis le précédent), au lieu de tourner à sa propre cadence
+    // shortcut: l'instant de l'impact (BANG_HIT) est celui d'entite.glb ; à lire dans le modèle s'il change
+    hit(now) {
+      const a = st.acts.bang;
+      if (!a) return;
+      const gap = now - (st.hitAt || 0);
+      st.hitAt = now;
+      a.time = BANG_HIT;
+      const len = a.getClip().duration;
+      if (gap > 0.2 && gap < 1.5) a.timeScale = THREE.MathUtils.clamp(len / gap, 0.6, 2.5);
+    },
+    // sous une porte plus basse qu'elle (2,10 m pour ses 2,70 m) : la scène dit quand, elle se courbe pour passer
+    duck(on) {
+      st.duckTo = on ? 1 : 0;
+    },
     // M : l'entité ; chase : elle poursuit ; light : lumière des néons là où elle est ; dt, time ; eye : la caméra.
     // Rend le pied qui vient de toucher le sol ('L' ou 'R'), sinon null
     update(M, chase, light, dt, time, eye = null) {
@@ -644,11 +661,21 @@ export function createCreature(opts = {}) {
       add(R.lowerLegR, 1.6 * land, 0, 0, W.drop);
       add(R.chest, 0.5 * land, 0, 0, W.drop);
 
+      // sous une porte : genoux fléchis, le dos rond, la tête rentrée (sa tête passait à travers l'imposte)
+      const dk = (st.duck = ease(st.duck || 0, st.duckTo || 0, 7, dt));
+      add(R.upperLegL, -0.75, 0, 0, dk);
+      add(R.upperLegR, -0.75, 0, 0, dk);
+      add(R.lowerLegL, 1.3, 0, 0, dk);
+      add(R.lowerLegR, 1.3, 0, 0, dk);
+      add(R.spine, 0.45, 0, 0, dk);
+      add(R.chest, 0.55, 0, 0, dk);
+      add(R.head, 0.3, 0, 0, dk);
+
       // sans squelette : le corps entier se penche, rebondit et tremble selon l'état
       const H = st.holder;
       if (!info.skinned && H) {
         const bob = st.speed > 0.25 ? Math.abs(Math.sin(t * (st.speed > 2.4 ? 9 : 5))) * 0.06 : Math.sin(t * 1.6) * 0.01;
-        H.position.y = bob - 0.4 * (W.drop * (1 - Math.min(1, t / 0.6)));
+        H.position.y = bob - 0.4 * (W.drop * (1 - Math.min(1, t / 0.6))) - 0.7 * dk; // (sans os : elle s'enfonce d'autant)
         H.rotation.x = 0.25 * W.rush + 0.15 * W.grab - 0.2 * W.stun + 0.25 * W.bang * (0.5 + 0.5 * Math.sin(t * 9)) + (st.speed > 2.4 ? 0.12 : 0);
         H.rotation.z = Math.sin(t * 30) * 0.08 * (W.unmask + W.rush * 0.4 + W.scare);
         const sc = 1 + Math.sin(t * 40) * 0.05 * W.unmask;
@@ -657,7 +684,7 @@ export function createCreature(opts = {}) {
         // tremblement du cri et du démasquage
         const j = (W.rush * 0.03 + W.unmask * 0.06 + W.scare * 0.02 + W.grab * 0.025) * (Math.random() - 0.5);
         H.position.set(j, H.position.y, j);
-        H.position.y = -0.35 * W.drop * Math.max(0, 1 - Math.abs(t - 0.35) / 0.35);
+        H.position.y = -0.35 * W.drop * Math.max(0, 1 - Math.abs(t - 0.35) / 0.35) - 0.3 * dk * (height / 2.7);
       }
 
       // les pas : quand l'autre pied devient le plus bas (il vient de se poser), quelle que soit la forme du pied

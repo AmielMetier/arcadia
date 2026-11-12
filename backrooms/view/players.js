@@ -4,10 +4,10 @@
 // squelette et poids ajoutés par tools/rig-hazmat.mjs (models/hazmat_suit.glb) ; les mouvements sont calculés ici.
 // Leur lampe éclaire vraiment devant eux (un projecteur doux qui part de la main), sans cône dessiné dans l'air.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
-import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
+import { gltfLoader } from '../../shared/vendor/three/gltf-draco.js';
 
 // (rangé plus serré par tools/pack-glb.mjs en 5.25 : 6,9 Mo au lieu de 8,4, même forme ; ?v : ne pas garder l'ancien)
-const MODEL = new URL('../models/hazmat_suit.glb?v=525', import.meta.url).href;
+const MODEL = new URL('../models/commun/hazmat_suit.glb?v=525', import.meta.url).href;
 const HEIGHT = 1.78; // taille d'un explorateur, capuche comprise
 // le reflet des lampes sur la combinaison (couleur spéculaire) ; en vue subjective, sa propre lampe part de la caméra,
 // à quelques centimètres des bras : un reflet bien plus faible
@@ -42,7 +42,7 @@ function cloneSkinned(src) {
 
 let source = null;
 let scale = 1;
-const loading = new GLTFLoader().loadAsync(MODEL).then((g) => {
+const loading = gltfLoader().loadAsync(MODEL).then((g) => {
   g.scene.updateMatrixWorld(true);
   const box = new THREE.Box3();
   g.scene.traverse((o) => {
@@ -123,7 +123,7 @@ function suitMaterial(map) {
 
 // leur lampe : la torche jaune de Poly Haven (small_plastic_torch, CC0), la même que la nôtre
 let torchSrc = null;
-const torchLoading = new GLTFLoader().loadAsync(new URL('../models/small_plastic_torch.glb', import.meta.url).href).then((g) => {
+const torchLoading = gltfLoader().loadAsync(new URL('../models/commun/small_plastic_torch.glb', import.meta.url).href).then((g) => {
   const body = new THREE.MeshLambertMaterial({ color: '#ffffff', emissive: '#4a3a10', emissiveIntensity: 0.6 });
   g.scene.traverse((o) => {
     if (!o.isMesh) return;

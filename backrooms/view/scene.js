@@ -5,20 +5,21 @@
 // dessous par les trous et les cages d'escalier. L'image finale passe par le filtre de vieille caméra (vhs.js).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { classicEntity } from './entity.js';
-import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
+import { gltfLoader } from '../../shared/vendor/three/gltf-draco.js';
 import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
 import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, NICHE_LO, NICHE_SIZE, NICHE_DEPTH, FLOOR_DY, DEEP_DEPTH, pillarDist, isChamfer, chamferSide } from '../engine/map.js';
 import { FUSES, feetY, stairAt, PIPES_LEVEL, THIRST_BLUR, LIFT_SHUT_T, HOTEL_LEVEL, CCTV_FOV, DUCT_LAND } from '../engine/sim.js';
 import { DUCT_LOW, DOCK_H, GUARD_T } from '../engine/level1.js';
 import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
-import { autoRes } from './autores.js';
+import { autoRes, RES_MIN } from './autores.js';
 import { createInset } from './inset.js';
 import { buildWarehouse } from './warehouse.js';
 import { buildGear } from './gear.js';
 import { createPlayerAvatars, contactBlob } from './players.js';
 import { createBeast } from './beast.js';
 import { createCreature } from './creature.js';
+import { modelUrl } from './models.js'; // modèles Poly Haven (CC0), voir models/LICENSE.txt
 import { buildWater } from './water.js';
 import { buildHotel } from './hotel.js';
 import { buildMall, mallOnCol, MALL_OFF } from './mall.js';
@@ -44,7 +45,6 @@ THREE.ShaderChunk.lights_pars_begin = THREE.ShaderChunk.lights_pars_begin.replac
 	float bkRing = 0.07 * exp( -pow( ( bkA - 0.6 ) / 0.07, 2.0 ) );
 	return ( exp( -2.2 * bkA * bkA ) + bkRing ) * smoothstep( 1.0, 0.7, bkA );`,
 );
-const MODELS = new URL('../models/', import.meta.url).href; // modèles Poly Haven (CC0), voir models/LICENSE.txt
 import { vault } from './vault.js';
 const VIP = { get img() { return vault.entite || ''; } }; // photo chiffrée dans data/ (vault.js)
 // L'entité du Level 1 : une vidéo détourée, découpée en planche d'images (12 par seconde, 16 par rangée) jouée en boucle
@@ -375,10 +375,10 @@ export function createBackroomsScene(container, floors, lamps) {
   const ambient = new THREE.AmbientLight(MALL ? '#ffe3bd' : L3 ? '#ffcf96' : L2 ? '#eaf7f6' : L1 ? '#c9d8ff' : PIPES ? '#ffd9a8' : '#fff3c4', AMB);
   scene.add(ambient);
   const dummy = new THREE.Object3D();
-  const loader = new GLTFLoader();
+  const loader = gltfLoader();
   // le cadenas de la porte de la cage d'escalier (Quaternius, CC0) : laiton patiné, anse d'acier, 10 cm de haut
   const padlockModel = new Promise((resolve) => {
-    loader.load(MODELS + 'padlock.glb', (g) => {
+    loader.load(modelUrl('padlock'), (g) => {
       const root = g.scene;
       const box = new THREE.Box3().setFromObject(root);
       const k = 0.1 / Math.max(0.001, box.max.y - box.min.y);
@@ -398,7 +398,7 @@ export function createBackroomsScene(container, floors, lamps) {
   // la pile AA (Poly by Google, CC-BY 3.0) : 1,4 × 5,2 cm, debout le long de y, centrée. On garde sa forme et son
   // étiquette ; chaque usage (au sol, en main) lui donne son matériau
   const batteryModel = new Promise((resolve) => {
-    loader.load(MODELS + 'aa_battery.glb', (g) => {
+    loader.load(modelUrl('aa_battery'), (g) => {
       let src = null;
       g.scene.traverse((o) => {
         if (o.isMesh && !src) src = { geo: o.geometry, map: o.material.map };
@@ -658,6 +658,7 @@ export function createBackroomsScene(container, floors, lamps) {
       uBakeY: { value: -fi * FLOOR_DY },
       uCeil: { value: CEIL },
       uDamp: { value: MALL ? 0.12 : L3 ? 0.35 : L2 ? 0 : L1 ? 0.6 : PIPES ? 0.5 : 1 },
+      uLowQ: { value: 0 }, // qualité basse : sans l'usure fine du carrelage des Poolrooms (voir lightQuality)
       // Poolrooms : sous la surface, le carrelage prend la teinte de l'eau et les caustiques dansent dessus
       uPool: { value: L2 ? 1 : 0 },
       uTime: { value: 0 },
@@ -668,9 +669,10 @@ export function createBackroomsScene(container, floors, lamps) {
       uSideLo: { value: L0 ? 0.8 : MALL ? 0.62 : 0.5 },
       uStain: { value: L0 ? 0.5 : MALL ? 0.4 : 1 },
       uCeilStain: { value: MALL ? 0.22 : L0 ? 0.55 : L1 ? 0.3 : 1 }, // Level 0 : les auréoles du plafond, encore plus pâles ; Level 1 : à peine
-      // Level 0, étage du haut : des murs propres (presque pas d'auréoles ni d'humidité au pied) ; le bas reste défraîchi
+      // Level 0, étage du haut : des murs peu marqués (quelques auréoles pâles, un peu d'humidité au pied : assez pour
+      // casser l'uni du papier, sans l'air défraîchi de l'étage du bas)
       // Level 1 : des parpaings repeints, à peine marqués par l'humidité
-      uWallDecay: { value: MALL ? 0.22 : L0 && !LOW0 ? 0.15 : L1 ? 0.3 : 1 },
+      uWallDecay: { value: MALL ? 0.22 : L0 && !LOW0 ? 0.4 : L1 ? 0.3 : 1 },
       uGlossH: { value: L1 ? CEIL - 0.45 : L2 ? CEIL - 0.03 : 3 }, // Level 1 : la hauteur des tubes, qui se reflètent dans le béton lissé ; Poolrooms : les dalles lumineuses
       uPoolMap: { value: poolTex }, // Poolrooms : la carte de l'eau (voir plus haut)
     };
@@ -1327,6 +1329,7 @@ uniform float uSpecMask;
 uniform float uBakeY;
 uniform float uCeil;
 uniform float uDamp;
+uniform float uLowQ;
 uniform float uPool;
 uniform float uTime;
 uniform float uWaterY;
@@ -1465,9 +1468,16 @@ float bkCaust(vec2 uv, float t) {
           // humidité : la moquette détrempée par plaques, l'eau qui remonte au pied des murs
           // (des plaques éparses, environ un dixième du sol, déformées par un second bruit : des bords déchiquetés, jamais des ronds)
           vec2 wq = vBakeP.xz * 0.17 + 11.0;
-          float wF = bkFbmW(wq + (vec2(bkFbmW(wq * 3.1 + 2.0), bkFbmW(wq * 3.1 + 9.0)) - 0.5) * 1.1);
-          float wet = smoothstep(0.62, 0.8, wF) * uDamp;
-          float rise = (1.0 - smoothstep(0.05, 0.45 + bkFbm(vBakeP.xz * 0.9 + vBakeP.y) * 0.5, by)) * smoothstep(0.3, 0.7, bkFbm(vBakeP.xz * 0.3 + 5.0)) * uDamp * uWallDecay;
+          float wF = 0.0;
+          float wet = 0.0;
+          float rise = 0.0;
+          float stain = 0.0;
+          // (sans humidité, aux Poolrooms : rien de tout cela ne se voit, on ne le calcule pas ; c'était un bon tiers du
+          // coût de chaque pixel de mur, de sol et de plafond)
+          if (uDamp > 0.0) {
+          wF = bkFbmW(wq + (vec2(bkFbmW(wq * 3.1 + 2.0), bkFbmW(wq * 3.1 + 9.0)) - 0.5) * 1.1);
+          wet = smoothstep(0.62, 0.8, wF) * uDamp;
+          rise = (1.0 - smoothstep(0.05, 0.45 + bkFbm(vBakeP.xz * 0.9 + vBakeP.y) * 0.5, by)) * smoothstep(0.3, 0.7, bkFbm(vBakeP.xz * 0.3 + 5.0)) * uDamp * uWallDecay;
           // auréoles d'eau sur les murs : un cerne plus foncé autour d'une tache pâle
           float n2 = bkFbm(vec2(vBakeP.x + vBakeP.z * 0.37, vBakeP.y + vBakeP.z) * 0.45 + 31.0);
           float ring = smoothstep(0.6, 0.66, n2) * (1.0 - smoothstep(0.68, 0.75, n2)) * 0.8 + smoothstep(0.66, 0.75, n2) * 0.3;
@@ -1487,7 +1497,8 @@ float bkCaust(vec2 uv, float t) {
               cst = smoothstep(-0.06, 0.02, s) * (1.0 - smoothstep(0.04, 0.16, s)) * 0.8 + smoothstep(0.02, 0.2, s) * 0.3;
             }
           }
-          float stain = ny < -0.5 ? cst * uCeilStain : (abs(ny) < 0.5 ? ring * 0.6 * uWallDecay : 0.0);
+          stain = ny < -0.5 ? cst * uCeilStain : (abs(ny) < 0.5 ? ring * 0.6 * uWallDecay : 0.0);
+          }
           diffuseColor.rgb *= mix(1.0, 0.62, ny > 0.5 ? wet : (abs(ny) < 0.5 ? rise : 0.0));
           #ifdef BK_FILM
           if (ny > 0.5) {
@@ -1723,7 +1734,9 @@ float bkCaust(vec2 uv, float t) {
             // des murs et près de l'eau
             vec2 tq = abs(ny) > 0.5 ? vBakeP.xz / (ny > 0.5 && sub < 0.5 ? 0.3125 : 0.20833) : vec2(vBakeP.x + vBakeP.z, by) / 0.20833;
             #ifdef USE_MAP
-            if (uTileG.x > 0.0) {
+            // (qualité basse : un carrelage intact, sans carreaux tombés, écornés ni fêlés ; c'est le gros du coût de
+            // chaque pixel aux Poolrooms)
+            if (uTileG.x > 0.0 && uLowQ < 0.5) {
               // le carreau, retrouvé sur la grille des joints de la photo
               vec2 tc = vMapUv * uTileG.xy - uTileG.zw;
               vec2 tI = floor(tc);
@@ -2552,7 +2565,7 @@ float bkCaust(vec2 uv, float t) {
         else place(made);
       }
       else
-        loader.load(MODELS + kind.m + '.glb', (g) => {
+        loader.load(modelUrl(kind.m), (g) => {
           let root = g.scene;
           const piece = kind.node && root.getObjectByName(kind.node);
           if (piece) {
@@ -2726,7 +2739,7 @@ float bkCaust(vec2 uv, float t) {
     for (const name of ['fire_alarm', 'power_box_01', 'wall_clock']) {
       const spots = wallSpots[name];
       if (!spots.length) continue;
-      loader.load(MODELS + name + '.glb', (g) => {
+      loader.load(modelUrl(name), (g) => {
         const root = g.scene;
         root.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(root);
@@ -4185,7 +4198,7 @@ void main() {
         exitGroup.add(plate, btn);
       }
       // une caméra de surveillance dans le coin du fond (Poly Haven, security_camera_01, CC0), braquée sur la porte
-      loader.load(MODELS + 'security_camera_01.glb', (g) => {
+      loader.load(modelUrl('security_camera_01'), (g) => {
         const cam = g.scene;
         cam.traverse((o) => {
           if (o.isMesh) o.material = cabLit(new THREE.MeshLambertMaterial({ map: o.material.map || null, color: o.material.map ? '#ffffff' : '#9a9a9a' }), 0.2);
@@ -4418,7 +4431,7 @@ void main() {
         nookLamps.push(v);
       }
       // le fauteuil : le modèle Poly Haven des objets abandonnés, avec sa photo de couleur
-      loader.load(MODELS + 'modern_arm_chair_01.glb', (gl) => {
+      loader.load(modelUrl('modern_arm_chair_01'), (gl) => {
         const root = gl.scene;
         root.updateMatrixWorld(true);
         const bb = new THREE.Box3().setFromObject(root);
@@ -4481,6 +4494,21 @@ void main() {
     // deçà de son plan lointain, et à cet étage (ou près d'un trou ou de la cage par où on voit l'autre) ; plus, s'il y
     // en a un, ceux que peut montrer le caméscope du coéquipier en médaillon. Les autres ne changeraient pas un pixel :
     // on ne les dessine pas. Les matrices ne sont renvoyées que si la liste a changé
+    // Terror Hotel : un meuble derrière un mur ne se voit pas. Trois rayons (son milieu et ses deux bords, vus d'ici) :
+    // s'ils butent tous sur un mur, on ne le dessine pas. Au hall, les quatre cinquièmes des triangles du mobilier
+    // étaient dessinés pour rien (1,0 million sur 1,2), dans le couloir presque tous
+    // shortcut: seulement à l'hôtel (murs pleins, un seul étage) ; ailleurs les rayonnages ajourés et les trous du sol
+    // laissent voir ce que ces rayons croient caché
+    const losTo = (cx, cz, x, z) => hasLineOfSight(map, cx, cz, x, z);
+    const behindWall = (cx, cz, x, z, w) => {
+      const dx = x - cx;
+      const dz = z - cz;
+      const d = Math.hypot(dx, dz);
+      if (d < 6) return false;
+      const px = (-dz / d) * w;
+      const pz = (dx / d) * w;
+      return !losTo(cx, cz, x, z) && !losTo(cx, cz, x + px, z + pz) && !losTo(cx, cz, x - px, z - pz);
+    };
     const cull = (V) => {
       const here = V.band === fi || V.shaft;
       const insetHere = V.inset && (V.iBand === fi || V.iAll);
@@ -4503,6 +4531,7 @@ void main() {
               V.sph.center.set(x, y, z);
               V.sph.radius = K.r;
               ok = V.fr.intersectsSphere(V.sph);
+              if (ok && L3 && !K.near[i] && behindWall(V.cam.x, V.cam.z, x, z, Math.max(0.9, K.r))) ok = false;
             }
           }
           if (!ok && V.inset && (insetHere || K.near[i])) {
@@ -4551,6 +4580,7 @@ void main() {
       },
       lightQuality(low) {
         if (water) water.setMirror(!low);
+        bakeUniforms.uLowQ.value = low ? 1 : 0;
         if (dynU.uOccInfo) dynU.uOccInfo.value.w = low ? 0 : 1;
         if (groundFog) {
           groundFog.u.uHaze.value = low ? 0 : L2 ? 0.01 : 0.006;
@@ -5410,7 +5440,7 @@ void main() {
   held.add(heldLamp);
   // la vraie lampe : la torche en plastique jaune usée de Poly Haven (small_plastic_torch, CC0) ; la lampe dessinée
   // ci-dessus ne sert qu'en attendant qu'elle arrive. Son verre s'allume avec elle.
-  loader.load(MODELS + 'small_plastic_torch.glb', (g) => {
+  loader.load(modelUrl('small_plastic_torch'), (g) => {
     const m = g.scene;
     m.traverse((o) => {
       if (!o.isMesh) return;
@@ -5538,12 +5568,12 @@ void main() {
   const anim = L1 || L2 || PIPES ? ENTITY_ANIM : null; // aux Poolrooms, la même entité qu'au Level 1
   face.visible = false;
   monsterGroup.add(face);
-  // l'entité en 3D, animée (view/beast.js) ; au Level 1 en mode VIP : la vidéo d'origine
-  // mode VIP au Level 0 : le même corps, avec le visage de la photo de l'entité d'origine
-  // Level 5 : l'entité de l'hôtel, un modèle humain animé os par os (view/hotelEntity.js)
-  // (Level 1 et Poolrooms : la nouvelle entité, models/level1/entite.glb, view/creature.js)
-  // Level 17 : la grande poupée (view/mallDoll.js), jamais animée : on ne la voit pas bouger
-  const beast = MALL ? createMallDoll({ bakedOf: (fi) => floorViews[fi].baked, floors: floors.length }) : L3 ? createHotelEntity() : !ENTITY_VIP ? (L1 || L2 ? createCreature({ height: 2.7 }) : createBeast({ wiry: true })) : !(L1 || L2) ? createBeast({ wiry: true, photo: { url: VIP.img, crop: [490, 20, 300, 375] } }) : null;
+  // mode normal : l'entité de base en 3D, animée (view/beast.js), à tous les niveaux
+  // mode VIP : au Level 0 et aux Tuyauteries le même corps, avec le visage de la photo de l'entité d'origine ; au Level 1 la
+  // silhouette voilée (models/level1/entite.glb, view/creature.js) ; aux Poolrooms la vidéo, à plat ; au Level 5 l'entité de
+  // l'hôtel, un modèle humain animé os par os (view/hotelEntity.js)
+  // Level 17, dans les deux modes : la grande poupée (view/mallDoll.js), jamais animée : on ne la voit pas bouger
+  const beast = MALL ? createMallDoll({ bakedOf: (fi) => floorViews[fi].baked, floors: floors.length }) : !ENTITY_VIP ? createBeast({ wiry: true }) : L3 ? createHotelEntity() : L1 ? createCreature({ height: 2.7 }) : L2 ? null : createBeast({ wiry: true, photo: { url: VIP.img, crop: [490, 20, 300, 375] } });
   if (beast) {
     monsterGroup.add(beast.group);
     shadow.visible = false;
@@ -5717,6 +5747,9 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   let ductDrop = 0; // Level 1 : l'entité qui se laisse tomber d'une bouche de gaine (le temps qui reste)
   let cctvWas = -1; // au poste de garde : la caméra affichée à l'image précédente (-1 : pas au poste)
   const res = autoRes(); // résolution dynamique : commence au plus haut (borné par ce que permet l'écran)
+  let compiled = false; // les matériaux sont compilés : on peut dessiner (voir api.compiled)
+  let autoLow = false; // « Auto » a dû passer aux effets de la qualité basse (voir plus bas)
+  let floorT = 0; // secondes passées à la définition plancher, l'image peinant encore
   let qualityWas = null; // la qualité déjà appliquée au filtre (il ne retaille l'image que si elle change)
   const camState = { t: 0, night: 0, bars: 0 }; // api.cam, lu à chaque image : le même objet, remis à jour
   // un point du monde à l'écran (x, y de 0 à 1 ; behind : derrière la caméra) : les repères des coéquipiers du viseur
@@ -5795,7 +5828,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       fallV = 0.01;
     },
     scare() {
-      if (!L3 || !beast || !beast.scarePose) return;
+      if (!L3) return;
+      if (!beast || !beast.scarePose) return this.jumpscare(); // (l'entité de base, en mode normal : son screamer habituel)
       scareFx = { t0: null, x: camera.position.x, y: camera.position.y, z: camera.position.z, yaw: camera.rotation.y };
     },
 
@@ -5838,6 +5872,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         // Level 1, qualité basse : ni ombres des feux de couleur, ni lumière dans la poussière
         const low = OPTS.quality === 'low';
         for (const fl of floorViews) fl.lightQuality?.(low);
+        autoLow = false;
+        floorT = 0;
       }
     },
 
@@ -5851,6 +5887,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     gearEvent(ev) {
       for (const fv of floorViews) if (fv.gear) fv.gear.event(ev);
       if (ev.type === 'ductOut') ductDrop = DUCT_LAND;
+      // un coup à la porte blindée : le geste de l'entité tombe avec le bruit
+      if (ev.type === 'safeBang' && beast && beast.hit) beast.hit(performance.now() / 1000);
     },
 
     // tombé dans un puits sans fond (x, z : le milieu du puits)
@@ -5889,6 +5927,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 
     // Rendu d'une frame
     render(sim, time) {
+      if (!compiled) return; // (les matériaux se compilent encore : voir api.compiled)
       const dt = Math.min(0.1, Math.max(0, time - lastTime));
       lastTime = time;
       const nowS = performance.now() / 1000; // l'horloge des pistes d'affichage des coéquipiers (sim.netSample)
@@ -6140,6 +6179,11 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
           monsterGroup.position.set(M.x + (Math.random() - 0.5) * j * 0.3, my, M.z + (Math.random() - 0.5) * j * 0.3);
           monsterGroup.rotation.y = M.yaw || 0;
           const mv = floorViews[M.floor || 0];
+          // Level 1 : sous la porte du poste de garde ou d'une salle de sécurité (2,10 m), elle se courbe
+          if (L1 && beast.duck) {
+            const mp = sim.map;
+            beast.duck([mp.guardDoor, ...(mp.safes || [])].some((d) => d && Math.hypot(d.x - M.x, d.z - M.z) < 1.5));
+          }
           const foot = M.mimic == null ? beast.update(M, chase, mv ? mv.lightAt(M.x, M.z) : 0.3, dt, time, camera.position) : null;
           if (foot && api.onMonsterStep) api.onMonsterStep(foot);
         } else {
@@ -6322,7 +6366,20 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 
       // résolution dynamique : moins de lignes quand l'image peine, plus quand elle tient la cadence de l'écran
       // (jusqu'à la pleine définition de l'écran à l'œil nu, aux lignes de la bande au caméscope)
-      if (OPTS.quality === 'auto' && vhs.setLines) vhs.setLines(res.step(dt * 1000, time, vhs.maxLines || 720));
+      if (OPTS.quality === 'auto' && vhs.setLines) {
+        const ln = res.step(dt * 1000, time, vhs.maxLines || 720);
+        vhs.setLines(ln);
+        // « Auto » sur une machine modeste : la définition est au plancher depuis 4 s et l'image peine encore. On passe
+        // aux effets de la qualité basse (ni reflet de la salle dans l'eau, ni usure fine du carrelage, ni lumière dans
+        // la poussière) pour le reste du niveau : la définition peut alors remonter
+        if (!autoLow && ln <= RES_MIN && res.avg > 20) {
+          floorT += dt;
+          if (floorT > 4) {
+            autoLow = true;
+            for (const fl of floorViews) fl.lightQuality?.(true);
+          }
+        } else if (!autoLow) floorT = 0;
+      }
       // Level 5 : le screamer. La caméra reste où l'on est mort ; l'entité surgit à 2,40 m et se jette à 55 cm du
       // visage en un quart de seconde, puis reste là, tremblante, pendant que l'image saute
       let glitch = danger;
@@ -6397,9 +6454,23 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   };
   liveScene = api;
   api.applyOptions();
-  // les matériaux se compilent en arrière-plan avant la première image (sinon le jeu se fige au premier regard)
-  try {
-    renderer.compileAsync?.(scene, camera)?.catch?.(() => {});
-  } catch (e) {}
+  // les matériaux se compilent en arrière-plan AVANT la première image : tant que ce n'est pas fini, rien n'est
+  // dessiné (render ne fait rien). Avant, le dessin commençait tout de suite, et chaque matériau pas encore prêt
+  // bloquait la page le temps de sa compilation : l'écran de chargement restait figé 20 à 45 s sur une puce intégrée
+  // (au plus 40 s d'attente : une carte qui ne répond pas ne bloque pas la partie)
+  api.compiled = new Promise((done) => {
+    const ok = () => {
+      compiled = true;
+      done();
+    };
+    setTimeout(ok, 40000);
+    try {
+      const p = renderer.compileAsync?.(scene, camera);
+      if (p && p.then) p.then(ok, ok);
+      else ok();
+    } catch (e) {
+      ok();
+    }
+  });
   return api;
 }

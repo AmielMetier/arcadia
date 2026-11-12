@@ -3,10 +3,10 @@
 // la caméra, et pas dans son dos, sont dessinés à chaque image : des milliers de pièces pour le prix de quelques
 // centaines.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
-import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
+import { gltfLoader } from '../../shared/vendor/three/gltf-draco.js';
+import { modelUrl } from './models.js';
 
-const MODELS = new URL('../models/', import.meta.url).href;
-const loader = new GLTFLoader();
+const loader = gltfLoader();
 const cache = new Map();
 
 // name → Promise(Map(morceau → [{ geo, mat, m }])) ; m place le maillage dans le repère du morceau (son origine,
@@ -17,7 +17,7 @@ export function loadKit(name) {
       name,
       new Promise((resolve) =>
         loader.load(
-          MODELS + name + '.glb',
+          modelUrl(name),
           (g) => {
             const pieces = new Map();
             g.scene.updateMatrixWorld(true);
@@ -129,7 +129,8 @@ export function createKitInstancer({ group, convert, reach }) {
   // l'angle au-delà duquel on ne dessine plus, par rapport à l'axe du regard ; par défaut, un peu derrière les épaules)
   // inner : faux quand la caméra est à un autre étage : les exemplaires marqués « inner » (loin de tout vide, donc
   // invisibles de là) ne sont pas dessinés
-  const update = (cx, cz, fx, fz, R = 38, cosMin = -0.4, inner = true) => {
+  // seen(x, z) (facultatif) : faux pour un exemplaire caché par les murs (à plus de 6 m)
+  const update = (cx, cz, fx, fz, R = 38, cosMin = -0.4, inner = true, seen = null) => {
     const R2 = R * R;
     const near2 = cosMin > -0.4 ? 81 : 30;
     for (const s of sets) {
@@ -144,6 +145,7 @@ export function createKitInstancer({ group, convert, reach }) {
         const d2 = dx * dx + dz * dz;
         if (d2 > R2 || (s.far && d2 > s.far[i])) continue;
         if (d2 > near2 && dx * fx + dz * fz < cosMin * Math.sqrt(d2)) continue;
+        if (seen && d2 > 36 && !seen(it.x, it.z)) continue;
         // sa matrice (16 nombres), recopiée à la main : subarray créerait une vue par exemplaire visible, à chaque
         // image (des milliers dans les Tuyauteries, autant de déchets pour le ramasse-miettes)
         const o = n * 16;

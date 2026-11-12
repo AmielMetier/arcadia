@@ -69,7 +69,7 @@ function qSeed(seed, i, salt = 0) {
 }
 
 // Liste des catégories de la partie : tirée une fois, d'après les poids du thème, sans trois fois la même d'affilée
-export function planCats(seed, len, theme, { code = true, d = 1 } = {}) {
+export function planCats(seed, len, theme, { code = true, d = 1, interview = false } = {}) {
   const w = THEMES[theme] || THEMES.mix;
   const r = rngOf({ seed: qSeed(seed, 9999) });
   const keys = Object.keys(w), total = keys.reduce((s, k) => s + w[k], 0);
@@ -87,7 +87,8 @@ export function planCats(seed, len, theme, { code = true, d = 1 } = {}) {
   if (keys.length > 1 && out[0] === 'compte') { const j = out.findIndex((c) => c !== 'compte'); if (j > 0) [out[0], out[j]] = [out[j], out[0]]; }
   // The Candidate : une épreuve de code au desk, et une seconde au comité final dans les parties longues
   if (theme === 'chartier' && code) for (const k of codeSlots(len)) out[k] = 'code';
-  if (theme === 'chartier') for (const [cat, k] of Object.entries(blockSlots(len, out, d))) for (let j = 0; j < BLOCK[cat]; j++) out[k + j] = cat;
+  // (le mode entretien n'a ni relance, ni market making, ni cas pratique : que des questions d'entretien)
+  if (theme === 'chartier' && !interview) for (const [cat, k] of Object.entries(blockSlots(len, out, d))) for (let j = 0; j < BLOCK[cat]; j++) out[k + j] = cat;
   return out;
 }
 
@@ -869,14 +870,49 @@ function mentalQ(r, tier) {
   }
   return null;
 }
+// Mode entretien : seulement des questions d'entretien d'embauche. Surtout la série de préparation aux entretiens
+// (src « prepa » : produits, maths financières, économie, informatique), complétée par les questions posées aux
+// candidats de l'émission sur les mêmes sujets. Ni calcul mental, ni brainteaser, ni fat finger, ni graphique.
+export const INTERVIEW_PREPA = 0.7; // part des questions tirées de la série de préparation
+const IV_CATS = ['Dérivés', 'Taux', 'Risques', 'Macro', 'Marchés', 'Probas', 'Stats', 'Maths', 'Corporate', 'Informatique', 'Java'];
+// poste généraliste : finance aux deux tiers, informatique pour le reste (comme la série de préparation)
+const IV_WEIGHTS = { Dérivés: 26, Taux: 18, Risques: 9, Macro: 10, Marchés: 3, Probas: 9, Stats: 2, Maths: 2, Corporate: 3, Informatique: 26, Java: 4 };
+const IV_POOL = Object.fromEntries([1, 2, 3].map((t) => {
+  const by = (keep) => CH_POOL[t].filter(keep).reduce((m, q) => ((m[q.cat] = m[q.cat] || []).push(q), m), {});
+  return [t, { prepa: by((q) => q.src === 'prepa'), more: by((q) => q.src === 'emission' && IV_CATS.includes(q.cat)) }];
+}));
+// une part des questions de produits et de risques tirée à la volée (prix d'obligation, parité, VaR…), sur le même modèle
+const IV_GEN = { Dérivés: 0.2, Taux: 0.25, Risques: 0.25, Macro: 0.15 };
+function interviewPick(r, tier, M) {
+  const by = IV_POOL[tier][r.next() < INTERVIEW_PREPA ? 'prepa' : 'more'];
+  const W = M.weights || IV_WEIGHTS, cats = Object.keys(W).filter((c) => by[c] && by[c].length);
+  const pool = cats.length ? cats : Object.keys(by);
+  let x = r.next() * pool.reduce((t, c) => t + (W[c] || 1), 0);
+  const q = pick(r, by[pool.find((c) => (x -= W[c] || 1) < 0) || pool[pool.length - 1]]);
+  if (IV_GEN[q.cat] && r.next() < IV_GEN[q.cat]) {
+    const g = genQuestion(r, gensFor(q.cat, tier), tier);
+    if (g) return { ...g, cat: q.cat };
+  }
+  return q;
+}
+function interview(r, tier, module, head) {
+  // de temps en temps, un programme à lire (C++, Java ou Python, comme en entretien d'informatique)
+  if (r.next() < (module === 'quant' ? 0.1 : 0.05)) {
+    const c = readCode(r, tier);
+    return { ...c, ...head('Code'), sub: `Lire du code · ${TIER_LABEL[tier]}`, time: CH_TIME[tier] + 14 };
+  }
+  return askBank(r, interviewPick(r, tier, MODULES[module] || MODULES.gen), tier, head);
+}
+
 const CH_TIME = { 1: 12, 2: 17, 3: 24 };
 const UNIT_TIME = 10; // une réponse à taper prend plus de temps qu'un clic
-function chartier(r, d, i = 0, len = 10, module = 'gen') {
+function chartier(r, d, i = 0, len = 10, module = 'gen', opts = {}) {
   const tier = chartierTier(d, i, len), M = MODULES[module] || MODULES.gen;
   const head = (rubric) => ({ isChartier: true, pts: tier, tier, rubric, sub: `${rubric} · ${TIER_LABEL[tier]}` });
   // page d'aperçu (calcul/apercu.html) : seulement les questions listées, plus les fat finger et les numéros de téléphone
   const demo = typeof globalThis !== 'undefined' && globalThis.__candidateDemo;
   if (demo) return demoPick(r, tier, head);
+  if (opts.interview) return interview(r, tier, module, head);
   // une question sur sept environ : une suite logique ou une figure à compter, comme les brainteasers de l'émission
   // (davantage en quant)
   if (r.next() < (module === 'quant' ? 0.24 : 0.15)) {
@@ -927,7 +963,11 @@ function chartier(r, d, i = 0, len = 10, module = 'gen') {
       answer: x53 ? sum * 53 : sum, time: x53 ? CH_TIME[tier] + 14 : CH_TIME[tier] + 6,
       tip: x53 ? `Somme : ${sum}. Puis ${sum} × 53 = ${sum} × 50 + ${sum} × 3 = ${sum * 50} + ${sum * 3} = ${sum * 53}.` : `${[...ph.replace(/\D/g, '')].join(' + ')} = ${sum}. On regroupe par paires pour aller plus vite.` };
   }
-  const q = bankPick(r, tier, M);
+  return askBank(r, bankPick(r, tier, M), tier, head);
+}
+
+// Une question de la banque (ou tirée à la volée sur son modèle), mise en forme pour la partie
+function askBank(r, q, tier, head) {
   const dedup = q.dedup ? { dedup: q.dedup } : {};
   if (q.type === 'multi') {
     // « coche toutes les bonnes réponses » : il faut toutes les bonnes, et aucune mauvaise

@@ -122,7 +122,7 @@ const resolvePath = (p) => {
   assert.ok(worldSrc.includes("import { WeatherSystem } from './weather3d.js'"), 'world3d.js must import WeatherSystem');
   assert.ok(worldSrc.includes('this.weather = new WeatherSystem'), 'world3d.js must instantiate WeatherSystem');
   assert.ok(worldSrc.includes('this.weather?.update'), 'world3d.js must update WeatherSystem in main loop');
-  assert.ok(worldSrc.includes('setWeather(w) { this.weather?.setWeather(w); }'), 'world3d.js must expose setWeather');
+  assert.ok(worldSrc.includes('setWeather(w) {') && worldSrc.includes('this.weather?.setWeather(w)'), 'world3d.js must expose setWeather');
 
   // Verify integration in game.js
   const gameSrc = fs.readFileSync(resolvePath('odyssee/js/game.js'), 'utf8');

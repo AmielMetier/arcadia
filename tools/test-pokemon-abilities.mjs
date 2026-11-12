@@ -66,7 +66,7 @@ console.log(`✓ ${POKEMON_ROSTER.length} Pokémon, chacun avec un talent qui a 
   ok(b.teamB[0].hp === hp, 'Lévitation : Séisme sans effet');
   const c = battle([mon(9, { ability: null })], [mon(131, { ability: 'water-absorb' })]);
   c.teamB[0].hp = 50;
-  resolveTurn(c, move(first(c.teamA[0], (m) => m.type === 'water' && m.power) || 'surf'), pass);
+  resolveTurn(c, move(first(c.teamA[0], (m) => m.type === 'water' && m.power && (m.accuracy ?? m.acc ?? 100) >= 100 /* une attaque qui ne rate pas : sinon le test échoue une fois sur trois */) || 'surf'), pass);
   ok(c.teamB[0].hp > 50, 'Absorb Eau : une attaque Eau soigne');
 }
 { // Coloforce : Attaque ×2 ; Multiécaille : ÷2 à PV pleins

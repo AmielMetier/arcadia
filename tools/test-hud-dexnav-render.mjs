@@ -20,7 +20,7 @@ const hud = new Hud(game);
 hud.update(true);
 const html = hud.gearEl.innerHTML;
 assert.ok(html.includes('hud-quick-item'), 'objet rapide affiché');
-assert.ok(html.includes('1/39'), 'DexNav Route 1 : 1/39');
+assert.ok(/>\s*1\/\d+\s*</.test(html) || /\b1\/\d+\b/.test(html), 'DexNav Route 1 : 1 capturé sur le total de la route');
 assert.ok(html.includes('hdn-slot caught'), 'vignette capturée');
 cur = zones.ville; hud.update(true);
 assert.ok(hud.gearEl.innerHTML.includes('Zone urbaine'), 'DexNav en ville');

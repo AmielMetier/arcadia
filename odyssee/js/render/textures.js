@@ -210,6 +210,8 @@ export function buildAtlas() {
   const grassImg = img.grass0;
   // pack de graphismes : herbe à motif (pg_<colonne>_<ligne>, choisie selon la case)
   for (const k of Object.keys(SOL32)) if (k.startsWith('pg_')) putImg(k, up2(SOL32[k]));
+  // pack de graphismes : terrains en cinq tuiles à fond transparent (q_<terrain>_<0|v|h|f|i>), assemblés par quarts
+  for (const k of Object.keys(SOL32)) if (k.startsWith('q_') && !/_f\d$/.test(k)) putImg(k, up2(SOL32[k]));
   for (const [k, pal, outline] of [['path', PAL.path, '#a88a58'], ['sand', PAL.sand, '#c8b070'], ['pave', PAL.pave, '#a09888']]) {
     const base = drawn(k + '0');
     for (let m = 0; m < 16; m++) {
@@ -451,6 +453,7 @@ export function buildAnimAtlas() {
   const W = [0, 1, 2, 3].map((f) => SOL32['water' + f]);
   const E16 = [0, 1, 2, 3].map((f) => SOL32['s16_eau' + f]);
   for (let m = 0; m < 16; m++) keys.push(['water' + m, (P, f) => waterCell(P, m, f), SOL32[`water_m${m}_f0`] ? ((f) => up2(SOL32[`water_m${m}_f${(f >> 1) % 4}`])) : E16[0] ? ((f) => up2(E16[(f >> 1) % 4])) : HG.mer ? ((f) => hgWater(m, f)) : W[0] && ((f) => shore32(up2(W[f % 4] || W[0]), m, f))]);
+  for (const st of ['0', 'v', 'h', 'f', 'i']) if (SOL32[`q_water_${st}_f0`]) keys.push([`q_water_${st}`, null, (f) => up2(SOL32[`q_water_${st}_f${(f >> 1) % 4}`])]);
   const FL = [SOL32.flowerR, SOL32.flowerW, SOL32.flowerR, SOL32.flowerW], HGF = ['fleur_r', 'fleur_y', 'fleur_b', 'fleur_p'];
   const F16 = ['fleur_r', 'fleur_y', 'fleur_w', 'fleur_p'].map((k) => SOL32['s16_' + k]);
   // massifs de fleurs : les fleurs dessinées de HeartGold / SoulSilver (32 px, qui se balancent) posées sur l'herbe du jeu ;
@@ -618,7 +621,17 @@ export function applySpriteImages(S, images, dens = {}) {
 /* ---------------- images dessinées (planches préparées par tools/odyssee-sprites.py) ---------------- */
 // kits de façade (4 × 4 tuiles de 16 px) par style, et sols d'intérieur ; chargés au démarrage, sinon dessin du code
 const KITS = {}, SOLS = {}, SOL32 = {}, HG = {}, ART = {};
-export function setArt({ kits = {}, sols = {}, sol32 = {}, hgss = {}, relief = null, pack = null } = {}) { ART.relief = relief; ART.pack = !!pack; Object.assign(KITS, kits); Object.assign(SOLS, sols); for (const [k, v] of Object.entries(sol32)) if (v) SOL32[k] = v; for (const [k, v] of Object.entries(hgss)) if (v) HG[k] = v; 
+/** pack de graphismes : les roches grises du relief (falaises, plateaux) prennent le brun clair des montagnes de Noir & Blanc */
+function rocheBrune(img) {
+  const c = canvas(img.width, img.height), x = c.getContext('2d'); x.drawImage(img, 0, 0);
+  const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+  for (let i = 0; i < p.length; i += 4) {
+    const r = p[i], g = p[i + 1], b = p[i + 2]; if (!p[i + 3] || Math.max(r, g, b) - Math.min(r, g, b) > 26) continue;   // gris seulement
+    p[i] = Math.min(255, r * 1.16 + 6); p[i + 1] = Math.min(255, g * 1.0 + 2); p[i + 2] = b * 0.76;
+  }
+  x.putImageData(d, 0, 0); return c;
+}
+export function setArt({ kits = {}, sols = {}, sol32 = {}, hgss = {}, relief = null, pack = null } = {}) { ART.relief = relief; ART.pack = !!pack; if (pack && relief) ART.relief = rocheBrune(relief); Object.assign(KITS, kits); Object.assign(SOLS, sols); for (const [k, v] of Object.entries(sol32)) if (v) SOL32[k] = v; for (const [k, v] of Object.entries(hgss)) if (v) HG[k] = v; 
   // sols à 16 px (PixelLab) : ils prennent la place des tuiles du tileset (agrandies ×2 comme les autres)
   const s = (k) => SOL32['s16_' + k];
   if (s('chemin_0')) {

@@ -149,6 +149,9 @@ export const SHORT_LEN = [3.5, 6];
 export const BROWN_LEN = [18, 26];
 export const SECTOR_STEP = 9; // secondes par tiers, pendant un délestage (trois tiers)
 export const L1_CALM = 50; // Level 1 : l'arrivée est calme, elle reste au loin (le temps de découvrir l'entrepôt)
+export const CALM_KEEP = 30; // m : pendant ce calme, l'imposteur se tient au moins à cette distance des joueurs
+export const WRONG_CODE_R = 30; // m : Level 5, un code faux au clavier s'entend jusque-là (l'entité vient voir)
+export const ARRIVAL_CALM = 30; // Level 5 : à l'arrivée, l'entité reste au loin ce temps-là (un seul contact y est mortel)
 // Level 1 : les disjoncteurs généraux, à tenir relevés en même temps (2 postes à 1 ou 2 joueurs, 3 à partir de 3).
 // Chacun, relevé, tient RELAY_SYNC secondes ; s'il n'y a pas assez de joueurs en vie pour les tenir tous, il tient le
 // temps de courir aux autres (relayRun de la carte, à RELAY_PACE m/s, plus RELAY_SPARE)
@@ -200,6 +203,7 @@ export const REDISGUISE_T = 6; // s de ronde, hors de vue et loin de tous, avant
 // le sprint dépend du sens : droit devant, toute la vitesse ; de côté et en arrière, moins
 export const SPRINT_SIDE = 0.72;
 export const SPRINT_BACK = 0.6;
+export const WHISTLE_FREEZE_R = 18; // m : un sifflet à moins de ça fige l'imposteur une seconde ou deux
 export const MIMIC_CALL = [7, 13]; // s entre deux appels (la voix volée, de vive voix ou au talkie)
 // Level 1 : les salles de sécurité. L'entité qui bute sur une porte blindée fermée frappe BANG_T secondes, hurle de
 // rage et va rôder au moins RETREAT_R mètres plus loin
@@ -680,7 +684,7 @@ export class BackroomsSim {
       watch: null, // case sombre d'où elle observe
       // au tout début de la partie, elle reste au loin une minute : on apprend à se déplacer
       // (au Level 1 aussi, on arrive au calme : elle est loin et ne chasse pas encore)
-      dormantT: level === 0 && !this.time ? DORMANT_T * (this.difficulty === 'hard' ? 0.75 : 1) * (1.3 - 0.6 * this.skill) : level === 1 ? L1_CALM * (this.difficulty === 'hard' ? 0.75 : 1) : 0,
+      dormantT: level === 0 && !this.time ? DORMANT_T * (this.difficulty === 'hard' ? 0.75 : 1) * (1.3 - 0.6 * this.skill) : level === 1 ? L1_CALM * (this.difficulty === 'hard' ? 0.75 : 1) : level === HOTEL_LEVEL ? ARRIVAL_CALM * (this.difficulty === 'hard' ? 0.75 : 1) : 0,
       flees: 0, // fuites devant la lampe : à la troisième, elle ne fuit plus
       escapes: [], // là où on l'a semée : elle s'en souvient pour ses embuscades
       stunT: 0, // sonnée (aveuglée, ou après avoir lâché sa prise)
@@ -701,6 +705,7 @@ export class BackroomsSim {
       hesLen: 1,
       restT: 0, // l'imposteur : il a renoncé à une porte, il s'éloigne (vers away0)
       away0: null,
+      calmTo: null, // l'imposteur : là où il s'écarte pendant le calme de l'arrivée
       bang: null, // devant une porte blindée fermée : { id, t, hitT }
       // sa marche (gait.js) : vitesse réelle, passage en cours (escalier, trou), hauteur des pieds, poussée
       v: 0,
@@ -1533,9 +1538,23 @@ export class BackroomsSim {
     }
     M.restT = Math.max(0, M.restT - DT);
     const locked = this.lockedIn(P);
+    const dist = Math.hypot(P.x - M.x, P.z - M.z);
     let goal = null;
     let speed = WALK_SPEED * MIMIC_SPEED;
-    if (M.restT > 0 && M.away0) goal = M.away0;
+    // le calme de l'arrivée vaut aussi pour l'imposteur : il reste au loin et se tait (il s'écarte de qui approche)
+    // (et pour le répit qui suit une poursuite : sans lui, à peine semé, il revenait déjà sous une autre apparence)
+    const calm = (M.dormantT > 0 || entityRelaxed(this)) && !this.hunt;
+    if (calm) {
+      M.bang = null;
+      M.callT = Math.max(M.callT, 1);
+      const close = alive.some((Q) => Math.hypot(Q.x - M.x, Q.z - M.z) < CALM_KEEP);
+      if (close && (!M.calmTo || Math.hypot(M.calmTo.x - M.x, M.calmTo.z - M.z) < 2 || alive.some((Q) => Math.hypot(Q.x - M.calmTo.x, Q.z - M.calmTo.z) < CALM_KEEP))) {
+        M.calmTo = this.retreatSpot(P.x, P.z);
+        M.repathT = 0;
+      }
+      if (close && M.calmTo) goal = M.calmTo;
+      else speed = 0;
+    } else if (M.restT > 0 && M.away0) goal = M.away0;
     else if (locked) {
       // sa proie s'est enfermée : il frappe doucement et appelle (« ouvre, c'est moi »), puis renonce
       const F = this.safeFront(locked);
@@ -1561,9 +1580,21 @@ export class BackroomsSim {
     } else {
       M.bang = null;
       goal = { x: P.x, z: P.z };
+      // sa proie est dans un casier : il attend devant en l'appelant, puis renonce (sinon il campait là sans fin, et
+      // en sortir, c'était mourir)
+      if (!(P.hidden >= 0)) M.campT = 0;
+      else if (dist < 3) {
+        M.campT = (M.campT || rand(KNOCK_T[0], KNOCK_T[1])) - DT;
+        M.callT = Math.min(M.callT, 3.5);
+        if (M.campT <= 0) {
+          M.campT = 0;
+          M.restT = 25;
+          M.away0 = this.retreatSpot(P.x, P.z);
+          M.repathT = 0;
+        }
+      }
     }
     // ses appels : de vive voix quand il est assez près (et le voit), sinon au talkie
-    const dist = Math.hypot(P.x - M.x, P.z - M.z);
     M.callT -= DT;
     if (M.callT <= 0 && M.restT <= 0) { // (le talkie porte partout)
       M.callT = rand(MIMIC_CALL[0], MIMIC_CALL[1]);
@@ -1619,7 +1650,7 @@ export class BackroomsSim {
       M.bang.t -= DT;
       M.bang.hitT -= DT;
       if (M.bang.hitT <= 0) {
-        M.bang.hitT = rand(0.45, 0.85);
+        M.bang.hitT = rand(0.6, 0.8); // (des coups assez réguliers : le geste de l'entité se cale dessus, voir view/creature.js)
         this.emit({ type: 'safeBang', id: S.id, x: S.x, z: S.z, k: Math.round(Math.random() * 100) / 100 });
       }
       if (M.bang.t <= 0) {
@@ -2351,6 +2382,12 @@ export class BackroomsSim {
     }
     const M = this.monster;
     if (!this.hasMonster || M.mode === 'chase' || M.floor !== P.floor) return;
+    // l'imposteur se fige un instant quand on siffle près de lui (un joueur, lui, continuerait ou sifflerait en retour) :
+    // un indice pour qui le teste
+    if (M.mimic != null && Math.hypot(M.x - P.x, M.z - P.z) < WHISTLE_FREEZE_R) {
+      M.hesT = -1e-6;
+      M.hesLen = rand(1.2, 1.8);
+    }
     if (Math.hypot(M.x - P.x, M.z - P.z) > 45) return;
     // trop de coups rapprochés : elle vient à coup sûr (de près, elle l'entend de toute façon : c'est du bruit)
     if (P.heat >= WHISTLE_HEAT && this.alertMonster(P.x, P.z, 45, P.floor)) this.emit({ type: 'heard', id: P.id });
@@ -2869,11 +2906,19 @@ export class BackroomsSim {
   enterCode(P, code) {
     const map = this.fm(P.floor);
     if (this.level !== HOTEL_LEVEL || this.open || !map.code) return;
+    // il faut être devant le clavier (un peu de marge : l'hôte voit un invité avec un temps de retard)
+    const kp = map.keypad;
+    if (Math.hypot(P.x - kp.x, P.z - kp.z) > KEYPAD_R + 1) return;
     if (String(code) === map.code) {
       this.powered = true;
       this.emit({ type: 'powered', by: P.id });
       this.emit({ type: 'exitUnlocked' });
-    } else this.emit({ type: 'codeWrong', id: P.id });
+    } else {
+      // un code faux : le clavier proteste, et ça s'entend (pas pendant le répit de l'arrivée)
+      this.emit({ type: 'codeWrong', id: P.id });
+      this.makeNoise(P, NOISE.use, 1);
+      if (!(this.monster && this.monster.dormantT > 0)) this.alertMonster(kp.x, kp.z, WRONG_CODE_R, P.floor);
+    }
   }
 
   // Level 0 : la cassette perchée ne se prend qu'avec l'échelle. Tant que personne ne l'a en main ni ne l'a posée sous
@@ -3518,6 +3563,7 @@ export class BackroomsSim {
       vo: this.map.ducts ? bits(this.map.ducts.vents, 'open') : undefined,
       pb: this.map.post ? this.map.post.by : undefined,
       sf: this.map.safes ? bits(this.map.safes, 'shut') : undefined, // les portes blindées fermées
+      gd: this.map.guardDoor ? (this.map.guardDoor.open ? 1 : 0) : undefined, // la porte du poste de garde (un invité arrivé en route ne l'a pas vue s'ouvrir)
       k: [bits(this.allCassettes, 'collected'), bits(this.map.fuses, 'taken'), this.floors.map((f) => bits(f.items, 'taken')).join('|'), ''],
       // objets posés par des joueurs (échanges) : [étage, objet, x, z] ; échelle posée
       ix: this.floors.flatMap((f, fi) => (f.items || []).slice(this.items0[fi]).map((o) => [fi, o.kind, r2(o.x), r2(o.z)])),
@@ -3754,6 +3800,7 @@ export class BackroomsSim {
     if (this.map.ducts && typeof snap.vo === 'string') this.map.ducts.vents.forEach((v, i) => (v.open = snap.vo[i] === '1'));
     if (this.map.post && snap.pb !== undefined) this.map.post.by = snap.pb;
     if (this.map.safes && typeof snap.sf === 'string') this.map.safes.forEach((S, i) => (S.shut = snap.sf[i] === '1'));
+    if (this.map.guardDoor && snap.gd !== undefined) this.map.guardDoor.open = !!snap.gd;
     const set = (list, k, b) => (list || []).forEach((o, i) => {
       o[k] = (b || '')[i] === '1';
     });

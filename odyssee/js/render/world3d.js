@@ -637,6 +637,21 @@ export class WorldView {
     const g4 = () => (pg ? `pg_${x % 3}_${y % 2}` : 'grass' + (v < 0.55 ? 0 : v < 0.8 ? 1 : v < 0.93 ? 2 : 3));
     const zone = m.outdoor ? m.zoneAt(x, y) : null, theme = zone?.theme;
     const grassKey = theme === 'volcanic' ? 'ash' + (v < 0.5 ? 0 : 1) : theme === 'snow' ? 'snow' + (v < 0.5 ? 0 : 1) : g4();
+    // pack de graphismes : un terrain en cinq tuiles (q_<nom>_<état>) posé par quarts sur l'herbe, selon les huit voisins
+    // (coin sortant, bord, coin rentrant, plein) ; eau = planche animée
+    const quarts = (nom, same, eau) => {
+      const C = eau ? this.N.cells : A, s = (dx, dy) => same(m.get(x + dx, y + dy)), q = [];
+      let pleins = 0;
+      for (let qy = 0; qy < 2; qy++) for (let qx = 0; qx < 2; qx++) {
+        const dx = qx ? 1 : -1, dy = qy ? 1 : -1, H = s(dx, 0), V = s(0, dy);
+        const st = !H && !V ? '0' : V && !H ? 'v' : H && !V ? 'h' : s(dx, dy) ? 'f' : 'i';
+        if (st === 'f') pleins++;
+        const c = C[`q_${nom}_${st}`], hu = (c[2] - c[0]) / 2, hv = (c[3] - c[1]) / 2;
+        q.push([c[0] + qx * hu, c[1] + qy * hv, c[0] + (qx + 1) * hu, c[1] + (qy + 1) * hv]);
+      }
+      if (pleins === 4) return eau ? { anim: C[`q_${nom}_f`] } : { c: C[`q_${nom}_f`] };
+      return { c: A[grassKey], q, qEau: eau };
+    };
     const mask = (same) => { let k = 0; if (same(m.get(x, y - 1))) k |= 1; if (same(m.get(x + 1, y))) k |= 2; if (same(m.get(x, y + 1))) k |= 4; if (same(m.get(x - 1, y))) k |= 8; return k; };
     // sur la neige, pas de bordure d'herbe autour des chemins : on prend la case pleine
     const edge = theme === 'snow' ? () => 15 : mask;
@@ -672,6 +687,7 @@ export class WorldView {
       case T.SMASH: case T.BOULDER: return { c: m.outdoor ? A[grassKey] : A['cave' + (v < 0.5 ? 0 : 1)] };
       // hautes herbes : un tapis dessiné au sol, comme sur DS (les jambes de qui s'y tient sont cachées par view.cover)
       case T.TALL: case T.DARKTALL: {
+        if (A.q_tall0 && theme !== 'snow') return { c: A[grassKey], ov: A[(tt === T.DARKTALL ? 'q_darktall' : 'q_tall') + (v < 0.5 ? 0 : 1)] };
         // tileset : nappe d'herbe avec ses bords et ses coins arrondis (pièce choisie selon les voisins)
         const hk = 'h_' + (tt === T.DARKTALL ? 'bois' : theme === 'snow' ? 'neige' : 'prairie') + '_' + herbePiece(m, x, y, tt, v);
         if (A[hk]) return { c: A[hk] };
@@ -679,10 +695,14 @@ export class WorldView {
         return { c: A[(theme === 'snow' && A.snowtall0 ? 'snowtall' : 'tall') + (v < 0.5 ? 0 : 1)] };
       }
       case T.TREE: case T.PINE: return { c: theme === 'volcanic' ? A.ash1 : theme === 'snow' ? A.snow1 : pg ? A[g4()] : A['forest' + (v < 0.5 ? 0 : 1)] };
-      case T.PATH: return { c: A['path' + edge(isPathish)] };
-      case T.PAVE: case T.DOOR: case T.BUILD: return { c: A['pave' + edge((q) => isPathish(q))] };
-      case T.SAND: return { c: A['sand' + edge((q) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.FLOWER && q !== T.PINE)] };
-      case T.WATER: return { anim: this.N.cells['water' + mask((q) => q === T.WATER || q === T.BRIDGE)] };
+      case T.PATH: if (A.q_path_f && theme !== 'snow') return quarts('path', isPathish);
+        return { c: A['path' + edge(isPathish)] };
+      case T.PAVE: case T.DOOR: case T.BUILD: if (A.q_pave_f && theme !== 'snow') return quarts('pave', isPathish);
+        return { c: A['pave' + edge((q) => isPathish(q))] };
+      case T.SAND: if (A.q_sand_f && theme !== 'snow') return quarts('sand', (q) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.FLOWER && q !== T.PINE);
+        return { c: A['sand' + edge((q) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.FLOWER && q !== T.PINE)] };
+      case T.WATER: if (this.N.cells.q_water_f) return quarts('water', (q) => q === T.WATER || q === T.BRIDGE || q === T.WHIRL, true);
+        return { anim: this.N.cells['water' + mask((q) => q === T.WATER || q === T.BRIDGE)] };
       case T.BRIDGE: { const ns = sensPont(m, x, y) === 'ns'; return { anim: this.N.cells.water15, bridge: ns ? A.bridge : A.bridgeEW || A.bridge }; }
       // une couleur par massif (par carré de 3 × 3 cases), avec parfois une fleur d'une autre couleur
       case T.FLOWER: { const nf = this.N.cells.flower5 ? 6 : 4, pv = hash(Math.floor(x / 3) + 101, Math.floor(y / 3) + 37), k = v < 0.85 ? Math.floor(pv * nf) : Math.floor(v * 97) % nf; return { anim: this.N.cells['flower' + k] || this.N.cells.flower0 }; }
@@ -1003,6 +1023,8 @@ export class WorldView {
       const t = m.get(x, y), g = this.groundCell(x, y), v = hash(x + 7, y + 3);
       if (g.c) flat(G, x, y, x + 1, y + 1, 0, g.c, g.shade);
       if (g.anim) flat(N, x, y, x + 1, y + 1, 0, g.anim);
+      if (g.q) for (let i = 0; i < 4; i++) { const qx = i & 1, qy = i >> 1; flat(g.qEau ? NO : O0, x + qx / 2, y + qy / 2, x + (qx + 1) / 2, y + (qy + 1) / 2, 0.003, g.q[i]); }
+      if (g.ov) flat(O0, x, y, x + 1, y + 1, 0.003, g.ov);
       if (g.bridge && !this.sol.couvre()) flat(G, x - 0.02, y, x + 1.02, y + 1, 0.012, g.bridge);   // le sol généré dessine ses pontons
       if (g.passerelle) flat(r3d ? PB : G, x, y, x + 1, y + 1, 0.012 + (r3d ? r3d.Hmarche(x + 0.5, y + 0.5) : 0), g.passerelle);
       // détails de l'herbe (touffes, trèfles, cailloux, fleurettes…) : une case d'herbe sur six environ, jamais deux

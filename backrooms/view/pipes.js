@@ -8,6 +8,7 @@ import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL_SIZE, T } from '../engine/map.js';
 import { Z } from '../engine/level2.js';
 import { createKitInstancer, loadKit } from './kit.js';
+import { hasLineOfSight } from '../engine/nav.js';
 import { buildPlant } from './pipesPlant.js';
 
 const C = CELL_SIZE;
@@ -362,6 +363,36 @@ function hoseLabel() {
 
 // map, group : l'étage ; baked(mat, { spec, gloss }) ajoute l'éclairage cuit ; tx : textures du Level 2
 export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
+  // Les cases que l'on voit d'où l'on est, et leurs voisines (un tuyau dépasse de sa case, une applique tient au mur
+  // d'à côté) : les modèles des autres galeries, derrière les murs, ne sont pas dessinés. Sur les 3,5 millions de
+  // triangles d'une image, la plupart l'étaient pour rien. Refait quand on a bougé de 60 cm
+  const visC = new Uint8Array(map.W * map.H);
+  let visAt = null;
+  const seeCells = (px, pz) => {
+    if (visAt && Math.hypot(px - visAt.x, pz - visAt.z) < 0.6) return;
+    visAt = { x: px, z: pz };
+    visC.fill(0);
+    const RC = 16; // (38 m : la portée des modèles)
+    const cx = Math.floor(px / CELL_SIZE);
+    const cz = Math.floor(pz / CELL_SIZE);
+    for (let gz = Math.max(0, cz - RC); gz <= Math.min(map.H - 1, cz + RC); gz++) {
+      for (let gx = Math.max(0, cx - RC); gx <= Math.min(map.W - 1, cx + RC); gx++) {
+        if (!hasLineOfSight(map, px, pz, (gx + 0.5) * CELL_SIZE, (gz + 0.5) * CELL_SIZE)) continue;
+        for (let dz = -1; dz <= 1; dz++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const x = gx + dx;
+            const z = gz + dz;
+            if (x >= 0 && z >= 0 && x < map.W && z < map.H) visC[z * map.W + x] = 1;
+          }
+        }
+      }
+    }
+  };
+  const seenCell = (x, z) => {
+    const gx = Math.floor(x / CELL_SIZE);
+    const gz = Math.floor(z / CELL_SIZE);
+    return gx < 0 || gz < 0 || gx >= map.W || gz >= map.H || visC[gz * map.W + gx] === 1;
+  };
   const W = map.W;
   const H = map.H;
   const grid = map.grid;
@@ -1448,7 +1479,8 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
       // modèles : seuls ceux qui sont près de la caméra et devant elle
       camera.matrixWorld.extractBasis(rightV, upV, fwd);
       const fl = Math.hypot(fwd.x, fwd.z) || 1;
-      kit.update(P.x, P.z, -fwd.x / fl, -fwd.z / fl);
+      seeCells(P.x, P.z);
+      kit.update(P.x, P.z, -fwd.x / fl, -fwd.z / fl, 38, -0.4, true, seenCell);
       // vannes : le volant tourne avec l'avancée, l'aiguille tombe quand la vanne est fermée
       for (const vv of valveViews) {
         const want = vv.v.closed ? 1 : vv.v.turn;

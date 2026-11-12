@@ -86,11 +86,26 @@ for i in range(3):
 G0 = herbe[0][0]
 T['grass0'] = T['grass1'] = T['grass2'] = G0
 T['forest0'] = T['forest1'] = G0
-bloc = lambda cx, cy: BW.crop((cx * 32, cy * 32, cx * 32 + 96, cy * 32 + 96))
-for nom, b in [('path', bloc(3, 5)), ('sand', bloc(0, 8)), ('pave', bloc(0, 22))]:
-    for m, t in enumerate(auto16(sans(b, HERBE_UNIE), G0)):
-        T[f'{nom}_m{m}'] = t
-    T[nom + '0'] = b.crop((32, 32, 64, 64))
+def pieces(auto, cle=None):
+    """les cinq tuiles d'un terrain du kit (autotile de 96 × 128 : coins rentrants en haut à droite, bloc 3 × 3 dessous),
+    fond transparent : « 0 » coins sortants, « v » bords gauche et droit, « h » bords haut et bas, « f » plein,
+    « i » coins rentrants. Le jeu assemble chaque case par quarts selon ses huit voisins (groundCell de world3d.js)."""
+    if cle:
+        auto = sans(auto, cle)
+    # les pixels à moitié transparents de la frange : posés sur l'herbe unie du kit, puis opaques
+    a = np.array(auto).astype(float); al = a[..., 3:4] / 255.0; semi = (a[..., 3] > 0) & (a[..., 3] < 255)
+    mix = a[..., :3] * al + np.array(HERBE_UNIE[:3]) * (1 - al)
+    a[..., :3][semi] = mix[semi]; a[..., 3][semi] = 255
+    auto = Image.fromarray(a.astype('uint8'), 'RGBA')
+    m = auto16(auto.crop((0, 32, 96, 128)))
+    return {'0': m[0], 'v': m[5], 'h': m[10], 'f': m[15], 'i': auto.crop((64, 0, 96, 32))}
+
+
+SABLE, PAVES = L('auto_sable.png'), L('auto_paves.png')
+for nom, P in [('path', pieces(SABLE)), ('sand', pieces(tone(SABLE, 1.12, 0.55))), ('pave', pieces(PAVES, PAVES.getpixel((2, 34))))]:
+    for k, t in P.items():
+        T[f'q_{nom}_{k}'] = t
+    T[nom + '0'] = P['f']
 sable = T['sand0']
 T['snow0'] = tone(sable, 1.06, 0.12); T['snow1'] = flip(T['snow0'])
 T['cave0'] = GROTTE.crop((32, 64, 64, 96)); T['cave1'] = flip(T['cave0'])
@@ -98,14 +113,17 @@ T['ash0'] = tone(T['cave0'], 0.72, 0.25); T['ash1'] = flip(T['ash0'])
 lave = lambda cx, cy: VOLC.crop((cx * 16, cy * 16, cx * 16 + 16, cy * 16 + 16)).resize((32, 32), Image.NEAREST)
 T['lava0'], T['lava1'] = lave(5, 5), lave(4, 5)
 touffe, touffe_s = cell(4, 11), cell(5, 11)
+# hautes herbes : la touffe seule, posée par le jeu sur l'herbe de la case
+T['q_tall0'], T['q_tall1'] = touffe, flip(touffe)
+T['q_darktall0'], T['q_darktall1'] = touffe_s, flip(touffe_s)
 T['tall0'] = over(G0, touffe); T['tall1'] = over(G0, flip(touffe))
 T['darktall0'] = over(G0, touffe_s); T['darktall1'] = over(G0, flip(touffe_s))
 T['snowtall0'] = over(T['snow0'], touffe_s); T['snowtall1'] = over(T['snow1'], flip(touffe_s))
-# mer : 4 images d'animation, rivage de rochers du kit selon les voisins
+# mer : 4 images d'animation, rivage de rochers ; mêmes cinq tuiles que les chemins
 for f in range(4):
     fr = MER.crop((f * 192, 0, f * 192 + 96, 128))
-    for m, t in enumerate(auto16(fr.crop((0, 32, 96, 128)), G0)):
-        T[f'water_m{m}_f{f}'] = t
+    for k, t in pieces(fr).items():
+        T[f'q_water_{k}_f{f}'] = t
     T[f'water{f}'] = fr.crop((32, 64, 64, 96))
     T[f'deep{f}'] = MERP.crop((f * 192 + 32, 64, f * 192 + 64, 96))
 # rebord à sauter (vers le sud) et intérieurs : sol du Centre Pokémon et de la Boutique, comptoirs aux couleurs du kit
