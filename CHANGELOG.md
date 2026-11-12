@@ -1,5 +1,16 @@
 # Journal des versions — Arcadia
 
+## 5.81 — 12 novembre 2026
+- **The Backrooms** — Un nouveau niveau après le Terror Hotel : le Level 17, un centre commercial abandonné sur deux étages.
+  - On y arrive par l'escalier de secours du Level 5 : la porte coupe-feu passée, on dévale les étages jusqu'au palier « 17 », qui s'ouvre sur le mall. Sortir du mall termine la partie.
+  - L'objectif : retrouver cinq bobines de film, dispersées sur les deux étages, et les monter sur le projecteur de la cabine, derrière la salle 1 du cinéma. Quand le film passe, le monte-charge s'ouvre derrière l'écran.
+  - Le caméscope capte la bobine la plus proche ; dans la cabine, le journal du projectionniste dit où elles sont parties.
+  - L'entité : une grande poupée de parade de près de quatre mètres, sur un socle à roulettes. Elle ne bouge jamais tant qu'on la regarde ; dès qu'on détourne les yeux, elle roule vers le joueur le plus proche, de plus en plus vite. On entend ses roulettes approcher.
+  - Elle ne passe pas sous les plafonds bas : les boutiques, les coulisses et la vieille galerie du sud sont des refuges… le temps qu'elle se replace ailleurs, hors de vue.
+  - Le décor : un mail et trois cours sous verrière, des boutiques ouvertes, fermées ou vidées, deux grands magasins, un food court, un cinéma, une salle de jeux, un parking, des quais et des bureaux ; au sud, une aile plus ancienne, et dessous un dédale de couloirs de service.
+  - Le son : la ventilation, le bourdonnement des tubes, un carillon d'annonce au loin, le projecteur et la musique du film, et des pas qui changent selon le sol.
+  - Les VIP peuvent toujours y commencer directement, par le ⭐ niveau de départ.
+
 ## 5.80 — 12 novembre 2026
 - **Hub** — Correction : en mode VIP aussi, le Level 1 et les Poolrooms ont l'entité voilée animée (TahitoaSenis)
 - **Hub** — Correction : aux Poolrooms, l'entité redevient la silhouette vidéo (TahitoaSenis)
