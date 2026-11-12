@@ -45,7 +45,7 @@ const BATTLE_WEATHERS = ['rain', 'sun', 'sandstorm', 'hail'];
 // v2 : nouvelle région (arènes dans un autre ordre, archipel, créatures originales) — les sauvegardes v1 ne sont pas reprises
 const SAVE_KEY = 'odyssee-save-v2';
 const SUIVEUR = 0.75;   // taille du Pokémon qui suit (1 = celle de son dessin)
-export const WALK = 0.20, SURF = 0.11, VELO = 0.042;
+export const WALK = 0.27, SURF = 0.11, VELO = 0.042;
 export const RUN_SPEEDS = [
   { id: 'norm', label: 'Normale (1×)', dur: 0.100 },
   { id: 'fast', label: 'Rapide (1.7×)', dur: 0.068 },
@@ -188,7 +188,7 @@ export class Game {
     return {
       v: 2, name, gender, id: Math.floor(Math.random() * 65536), money: 3000, badges: Array(BADGES.length).fill(false), flags: {},
       party: [], box: [], bag: { potion: 1 }, dex: { seen: [], caught: [], seenCount: {} }, time: 0, visited: ['aube'], repel: 0,
-      cleared: {}, surf: false, explored: [], journal: {},
+      cleared: {}, surf: false, explored: [], explores: {}, journal: {},
       pvp: { totalWins: 0, totalLosses: 0, totalDraws: 0, currentStreak: 0, bestStreak: 0, players: {}, trophies: {} },
       lastCenter: { map: 'aube:maison', x: 4, y: 5, dir: 'up' }, ...this.world.start, carte: CARTE_VERSION,
     };
@@ -203,7 +203,7 @@ export class Game {
   }
   load(from) {
     const s = from ? JSON.parse(JSON.stringify(from)) : JSON.parse(localStorage.getItem(SAVE_KEY));
-    s.cleared ||= {}; s.explored ||= [];
+    s.cleared ||= {}; s.explored ||= []; s.explores ||= {};
     s.dex ||= { seen: [], caught: [], seenCount: {} };
     s.dex.seenCount ||= {};
     let maxUid = 0; for (const m of s.party.concat(s.box)) maxUid = Math.max(maxUid, m.uid || 0);
@@ -418,7 +418,7 @@ export class Game {
 
   /** la carte se découvre en marchant : blocs de 8 × 8 cases autour du joueur (et toute ville visitée) */
   explore() {
-    if (this.mapObj.id !== 'monde') return;
+    if (this.mapObj.id !== 'monde') return this.exploreLocal();
     const st = this.state, W = this.mapObj, B = 8, cw = Math.ceil(W.w / B), p = this.player;
     this._seen ||= new Set(st.explored);
     const add = (i) => { if (!this._seen.has(i)) { this._seen.add(i); st.explored.push(i); } };
@@ -426,6 +426,19 @@ export class Game {
     for (let y = Math.floor((p.y - R) / B); y <= Math.floor((p.y + R) / B); y++) for (let x = Math.floor((p.x - R) / B); x <= Math.floor((p.x + R) / B); x++) if (x >= 0 && y >= 0 && x < cw && y * B < W.h) add(y * cw + x);
     const t = this.zone?.town && Object.values(this.world.towns).find((q) => q.id === this.zone.town);
     if (t) for (let y = Math.floor(t.y / B); y <= Math.floor((t.y + t.h) / B); y++) for (let x = Math.floor(t.x / B); x <= Math.floor((t.x + t.w) / B); x++) add(y * cw + x);
+  }
+  /** grottes et autres lieux du dehors : leur carte locale se découvre aussi en marchant (blocs de 4 × 4 cases) */
+  exploreLocal() {
+    const m = this.mapObj; if (!m || !(m.floor === 'cave' || m.outdoor)) return;
+    const st = this.state, B = 4, cw = Math.ceil(m.w / B), p = this.player, R = m.floor === 'cave' ? 5 : 8;
+    st.explores ||= {};
+    const L = st.explores[m.id] ||= [];
+    this._seenL ||= {};
+    const S = this._seenL[m.id] && this._seenL[m.id].L === L ? this._seenL[m.id] : (this._seenL[m.id] = { L, set: new Set(L) });
+    for (let y = Math.floor((p.y - R) / B); y <= Math.floor((p.y + R) / B); y++) for (let x = Math.floor((p.x - R) / B); x <= Math.floor((p.x + R) / B); x++) {
+      if (x < 0 || y < 0 || x >= cw || y * B >= m.h) continue;
+      const i = y * cw + x; if (!S.set.has(i)) { S.set.add(i); L.push(i); }
+    }
   }
   updateZone() {
     const m = this.mapObj, p = this.player;
@@ -481,7 +494,8 @@ export class Game {
   async warp(to, sfx = 'door') {
     this.busy = true;
     if (this.currentRoadSign) { this.currentRoadSign = null; this.ui.hideRoadSign?.(); }
-    this.sound.sfx(sfx);
+    if (!this.porteOuverte) this.sound.sfx(sfx);   // la porte a déjà fait son bruit en s'ouvrant
+    this.porteOuverte = false;
     await this.ui.doorTransition(true, 240);
     const from = this.mapObj.id;
     this.clearSpeechBubbles?.();
@@ -491,7 +505,12 @@ export class Game {
     this.view.update(0, this.player.x, this.player.y);
     this.save(true);
     await this.view.solPret?.();   // l'écran se rouvre sur le sol généré, jamais sur l'ancien
+    // on sort d'un bâtiment : le joueur est dans l'embrasure, porte ouverte ; il fait un pas dehors et elle se referme
+    const pl = this.player, mo = this.mapObj;
+    const sortie = mo.outdoor && (to.dir || pl.dir) === 'down' && mo.get(to.x, to.y - 1) === T.DOOR && !this.occupied(to.x, to.y, pl) && this.view.porte?.(to.x, to.y - 1, true, true);
+    if (sortie) { pl.y = to.y - 1; this.view.update(0, pl.x, pl.y); }
     await this.ui.doorTransition(false, 240);
+    if (sortie) { await this.playerWalk('down', 1); if (pl.y !== to.y) { pl.y = to.y; pl.move = null; } this.view.porte?.(to.x, to.y - 1, false); }
     if (this.mapObj.dark && this.mapObj.dark !== 'arene' && this.canField('flash') && this.lead()) await this.ui.say(`${monName(this.lead())} utilise Flash !\nLa grotte s'éclaire.`, { auto: 900 });
     await this.onEnterMap(from);
     this.busy = false;
@@ -637,6 +656,11 @@ export class Game {
       if (n.bang) { const b = v.actor('bang:' + n.id, { kind: 'bang' }); b.mesh.position.set(nx + 0.5, 34 * HPX + v.hAt(nx + 0.5, ny + 0.55), ny + 0.56); }
       else if (v.actors.has('bang:' + n.id)) v.removeActor('bang:' + n.id);
     }
+    // éditeur de carte : caméra libre, sans dresseur ni compagnon
+    if (this.camLibre) {
+      px = this.camLibre.x; py = this.camLibre.y;
+      for (const k of ['player', 'follower', 'velo', 'wake']) { const x = v.actors.get(k); if (x) { x.mesh.visible = false; if (x.shadow) x.shadow.visible = false; } }
+    }
     v.update(dt, px, py);
     v.render();
   }
@@ -693,6 +717,12 @@ export class Game {
       if (walkable(m.get(lx, ly)) && !this.occupied(lx, ly)) { p.move = { fx: p.x, fy: p.y, tx: lx, ty: ly, t: 0, dur: 0.42, jump: true }; p.walking = true; this.sound.sfx('ledge'); return; }
     }
     if (m.in(tx, ty) && walkable(t) && !this.occupied(tx, ty) && m.canStep(p.x, p.y, tx, ty)) {
+      // une porte du dehors : elle s'ouvre d'abord (son, battant), puis on entre au pas ; le fondu vient ensuite (warp)
+      if (t === T.DOOR && d === 'up' && m.outdoor && m.warpAt(tx, ty) && !this.porteOuverte && this.view.porte?.(tx, ty, true)) {
+        this.porteOuverte = true; this.busy = true; p.walking = false; this.sound.sfx('door');
+        wait(240).then(() => { p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur: WALK }; p.walking = true; this.busy = false; });
+        return;
+      }
       const dur = this.onBike() ? VELO : isRunning ? this.runDur(isTurbo) : WALK;
       p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur }; p.walking = true;
       return;
@@ -724,7 +754,7 @@ export class Game {
       if (w.need && !this.state.bag[w.need]) {
         this.busy = true;
         await this.ui.say(['Une force mystérieuse bloque l\'entrée...', 'Il faudrait un objet lié à ce lieu pour l\'ouvrir.']);
-        await this.playerWalk('down', 1); this.busy = false; return;
+        await this.playerWalk('down', 1); this.view.porte?.(p.x, p.y - 1, false); this.porteOuverte = false; this.busy = false; return;
       }
       await this.warp(w, t === T.CAVEDOOR || w.step ? 'exit' : 'door'); return;
     }
@@ -747,9 +777,11 @@ export class Game {
     if (enc && (isGrassEnc(t) || (!m.outdoor && t === T.CAVE))) {
       const rate = isGrassEnc(t) ? (t === T.DARKTALL ? 0.12 : 0.1) : 0.065;
       if (Math.random() < rate) {
+        // le Pokémon est tiré d'abord : si un Repousse le fait fuir, le pas continue sans aucun arrêt
+        const tir = this.tirageSauvage(enc); if (!tir) return;
         // dans les grottes, il arrive qu'un Pokémon tombe du plafond
         if (!m.outdoor && t === T.CAVE && Math.random() < 0.3) await this.vie?.embuscade();
-        await this.wildBattle(enc);
+        await this.wildBattle(enc, { tirage: tir });
       }
     }
   }
@@ -1854,7 +1886,8 @@ export class Game {
     return curtain;
   }
 
-  async wildBattle(enc, o = {}) {
+  /** tire le Pokémon sauvage d'une rencontre (espèce, niveau) ; null si un Repousse le fait fuir (ou équipe K.O.) */
+  tirageSauvage(enc, o = {}) {
     let pool = enc;
     const h = this.hour();
     const isNight = h >= 20 || h < 6;
@@ -1868,8 +1901,14 @@ export class Game {
     let e = pool[0];
     if (!o.fixed) { const tot = pool.reduce((a, x) => a + x[3], 0); let r = Math.random() * tot; for (const x of pool) { r -= x[3]; if (r <= 0) { e = x; break; } } }
     const lvl = e[1] + Math.floor(Math.random() * (e[2] - e[1] + 1));
-    const lead = this.lead(); if (!lead) return;
-    if (!o.fixed && this.state.repel > 0 && lead.lvl >= lvl) return;
+    const lead = this.lead(); if (!lead) return null;
+    if (!o.fixed && this.state.repel > 0 && lead.lvl >= lvl) return null;
+    return { e, lvl };
+  }
+
+  async wildBattle(enc, o = {}) {
+    const tir = o.tirage || this.tirageSauvage(enc, o); if (!tir) return;
+    const { e, lvl } = tir;
     this.busy = true;
     const wild = createMon(o.fixed ? e[0] : SAUVAGE(e[0]), lvl, { met: this.locationName() });
     const res = await this.runBattle({ wild, music: o.music });
@@ -2051,6 +2090,9 @@ export class Game {
     const m = this.mapObj, z = this.zone;
     if (!m) return 'none';
     if (m.weather) return m.weather;
+    // sous un toit ou sous terre, il ne pleut pas : les maisons de Cendrelune (« cendre:… ») recevaient des cendres,
+    // celles de Marais-Noir de la pluie, parce que le nom de la ville est dans celui de la carte
+    if (!m.outdoor) return 'none';
     if (z?.weather) return z.weather;
     if (z?.theme === 'snow' || m.id?.includes('snow') || m.id?.includes('glace')) return 'hail';
     // zones volcaniques : pluie de cendres (sans effet en combat) qui alterne avec la tempête de sable
