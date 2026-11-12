@@ -652,6 +652,12 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
         G.box(fk, x0 + e - 0.03, x0 + e + 0.03, DOOR_H - 0.06, DOOR_H, z0, z0 + C);
       }
     }
+    // (la porte de réserve d'une boutique fermée pour la nuit : deux vantaux d'acier tirés, de chaque côté du mur)
+    if (d.locked)
+      for (const e of [0.02, C - 0.06]) {
+        if (wallX) G.box('shutter', x0 + 0.08, x0 + C - 0.08, 0.01, DOOR_H - 0.06, z0 + e, z0 + e + 0.04);
+        else G.box('shutter', x0 + e, x0 + e + 0.04, 0.01, DOOR_H - 0.06, z0 + 0.08, z0 + C - 0.08);
+      }
   }
 
   // 3. Les plafonds des cours (étage du haut) : une corniche moulurée autour de l'ouverture (elle cache la gorge
@@ -1139,7 +1145,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     G.box(bandK, xa, xb, HEAD, top, z - 0.14, z + 0.14, '+y');
     G.box(lineK, xa, xb, HEAD - 0.03, HEAD, z - 0.15, z + 0.15, '+y');
     if (sh.state === 'gutted') continue;
-    const PIL = style === 0 ? 0.55 : 0;
+    const PIL = sh.state !== 'shut' && style === 0 ? 0.55 : 0;
     if (PIL)
       for (const [p0, p1] of [[xa, xa + PIL], [xb - PIL, xb]]) {
         G.box('woodFront', p0, p1, 0.16, HEAD - 0.03, z - 0.16, z + 0.16, '-y');
@@ -1148,6 +1154,18 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       }
     const fa = xa + PIL;
     const fb = xb - PIL;
+    if (sh.state === 'shut') {
+      // fermée pour la nuit : son rideau métallique à lames, baissé sur toute la devanture ; une coulisse tous les
+      // trois mètres environ, la lame finale au sol
+      const n = Math.max(1, Math.round((fb - fa) / 3.2));
+      G.vface(sh.id % 3 === 1 ? 'shutterBeige' : 'shutter', fa + 0.04, z, fb - 0.04, z, 0.06, HEAD - 0.03, 0, out);
+      G.box('steel', fa + 0.04, fb - 0.04, 0, 0.06, z - 0.035, z + 0.035, '-y');
+      for (let j = 0; j <= n; j++) {
+        const x = fa + 0.04 + ((fb - fa - 0.08) * j) / n;
+        G.box('steel', x - 0.04, x + 0.04, 0, HEAD - 0.03, z - 0.05, z + 0.05, '+y-y');
+      }
+      continue;
+    }
     if (sh.state === 'grille' && sh.id % 2 === 1) continue; // (un rideau métallique, view/mallProps.js)
     if (sh.state === 'grille') {
       // le rideau à mailles, baissé ; ses coulisses de part et d'autre

@@ -2902,13 +2902,13 @@ test('Level 17 : deux étages reliés par cinq escaliers, des vides bordés, tou
     }
     assert.ok(!up.collide(up.spawn.x, up.spawn.z, 0.38) && up.dist[up.spawn.gz * up.W + up.spawn.gx] === 0);
     // toutes les salles sont atteintes (le grand magasin fermé par sa porte de réserve), sauf les boutiques fermées sans
-    // porte de service
+    // porte de service et celles dont le rideau est baissé pour la nuit (porte de réserve verrouillée)
     for (const f of floors)
       for (const r of f.rooms) {
         let ok = false;
         for (let z = r.z0; z <= r.z1 && !ok; z++) for (let x = r.x0; x <= r.x1 && !ok; x++) ok = f.dist[z * f.W + x] >= 0;
         const sh = r.kind === 'shop' ? f.shops[r.shop] : null;
-        const shut = sh && (sh.state === 'grille' || sh.state === 'glass') && !sh.back;
+        const shut = sh && (sh.state === 'shut' || ((sh.state === 'grille' || sh.state === 'glass') && !sh.back));
         assert.equal(ok, !shut, `graine ${sd}, étage ${f.floor} : ${r.kind} ${r.name}`);
       }
     // les objets sont sur des cases parcourues, loin les uns des autres ; les escalators de la cour centrale montent
@@ -2920,6 +2920,40 @@ test('Level 17 : deux étages reliés par cinq escaliers, des vides bordés, tou
     }
     // les deux monte-charges ont une case libre devant eux
     for (const f of floors) assert.ok(f.dist[f.exit.gz * f.W + f.exit.gx] >= 0, `graine ${sd} : monte-charge de l'étage ${f.floor} atteint`);
+  }
+});
+
+test('Level 17 : fermé pour la nuit — peu de boutiques ouvertes, rien derrière un rideau baissé, plus de mobilier sans modèle, un éclairage de veille régulier', () => {
+  const GONE = ['kiosk', 'fountain', 'counter', 'concession', 'rack', 'mannequin', 'arcade', 'claw', 'partition', 'booth'];
+  for (const sd of [1, 3, 17, 42, 99, 1234]) {
+    const { floors } = createMallMap(sd);
+    let flick = 0;
+    for (const f of floors) {
+      // une à trois boutiques ouvertes par étage ; les autres boutiques ouvertes ou vidées ont le rideau baissé
+      const open = f.shops.filter((sh) => sh.state === 'open');
+      assert.ok(open.length >= 1 && open.length <= 3, `graine ${sd} : ${open.length} boutiques ouvertes`);
+      assert.ok(!f.shops.some((sh) => sh.state === 'gutted'), 'plus de boutique vidée ouverte à tous les vents');
+      const shut = new Set(f.shops.filter((sh) => sh.state === 'shut').map((sh) => sh.room));
+      assert.ok(shut.size >= 3, 'des rideaux baissés');
+      const roomOf = (x, z) => f.zone[Math.floor(z / CELL_SIZE) * f.W + Math.floor(x / CELL_SIZE)];
+      // derrière un rideau baissé : ni meuble, ni objet, ni bobine, ni lampe allumée ; on n'y entre pas
+      for (const it of f.furn) {
+        assert.ok(!GONE.includes(it.kind), `${it.kind} : plus posé`);
+        assert.ok(!shut.has(roomOf(it.x, it.z)), `${it.kind} dans une boutique fermée`);
+      }
+      for (const it of [...f.items, ...f.cassettes]) assert.ok(!shut.has(roomOf(it.x, it.z)), 'un objet dans une boutique fermée');
+      for (const l of f.lights) if (shut.has(l.room)) assert.equal(l.state, 'off');
+      for (const sh of f.shops) {
+        if (sh.state !== 'shut') continue;
+        const r = f.rooms[sh.room];
+        for (let z = r.z0; z <= r.z1; z++) for (let x = r.x0; x <= r.x1; x++) assert.ok(!(f.dist[z * f.W + x] >= 0), `${sh.name} : fermée, on n'y entre pas`);
+      }
+      // l'éclairage de veille : au moins quatre lampes sur dix restent allumées, presque aucune ne grésille
+      const on = f.lights.filter((l) => l.state === 'on').length;
+      assert.ok(on / f.lights.length > 0.4, `graine ${sd} : ${on}/${f.lights.length} lampes allumées`);
+      flick += f.lights.filter((l) => l.state === 'flicker').length;
+    }
+    assert.ok(flick <= 2, `graine ${sd} : ${flick} lampes grésillent`);
   }
 });
 

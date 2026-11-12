@@ -905,6 +905,7 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     const len = R.s1 - R.s0;
     const seed = R.row * 131 + Math.floor(R.s0) * 7 + (R.nx + 2) * 3 + R.nz + fi * 977;
     const sh = shopOfRoom.get(R.room.id);
+    if (sh && sh.state === 'shut') continue; // (rideau baissé : on n'y entre pas, on n'y voit rien)
     // une prise de courant tous les 4 m environ, presque partout
     if (kind !== 'screen' && kind !== 'court' && kind !== 'plaza')
       for (let s = R.s0 + 1.2; s < R.s1 - 0.8; s += 3.5 + hash(seed, s) * 2) if (free(...at(R, s, 0.3), 0.2)) outlet(R, s, 0.32);

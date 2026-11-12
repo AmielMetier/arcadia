@@ -1736,6 +1736,11 @@ float bkCaust(vec2 uv, float t) {
             diffuseColor.rgb *= 0.84 + 0.28 * bkFbm(vBakeP.xz * 0.3 + vBakeP.y * 0.7 + 3.0);
           }
           #endif
+          #ifdef BK_MALL
+          // Level 17 : un mur peint n'est jamais d'un seul ton sur vingt mètres : de larges nuances, à peine (reprises de
+          // peinture, poussière en hauteur) ; rien sur le sol, qu'on lave
+          if (ny < 0.5) diffuseColor.rgb *= 0.93 + 0.14 * bkFbm(vBakeP.xz * 0.23 + vBakeP.y * 0.41 + 7.0);
+          #endif
           #ifdef BK_BUMP
           // le relief (les joints des parpaings) : la lumière cuite vient d'en haut, la lèvre basse d'un joint, tournée
           // vers le haut, la prend, sa lèvre haute reste dans l'ombre

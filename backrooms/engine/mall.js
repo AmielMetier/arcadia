@@ -1711,6 +1711,37 @@ export function createMallMap(seed = 17) {
     };
   })();
 
+  // --- 11d. Un centre fermé pour la nuit, propre : deux ou trois boutiques seulement sont restées ouvertes à chaque
+  // étage (une de chaque côté de la cour centrale, une dans l'annexe) ; toutes les autres boutiques ouvertes ou vidées
+  // ont leur rideau baissé (sh.shut) : on n'y entre plus, ni par la devanture ni par la porte de réserve, leurs lampes
+  // sont éteintes, leur mobilier est retiré à la fin (section 15). Leur état d'origine a servi à tirer le décor : le
+  // reste d'une graine ne bouge pas ---
+  for (const f of F) {
+    const keep = new Set();
+    const first = (pred) => {
+      const sh = f.shops.find((o) => o.state === 'open' && pred(o));
+      if (sh) keep.add(sh.id);
+    };
+    first((o) => o.z1 < 60 && o.x0 <= 60);
+    first((o) => o.z1 < 60 && o.x0 > 60);
+    first((o) => o.z1 >= 60);
+    f.shutNav = [];
+    for (const sh of f.shops) {
+      if ((sh.state !== 'open' && sh.state !== 'gutted') || keep.has(sh.id)) continue;
+      sh.shut = true;
+      const row = sh.side === 'N' ? sh.z1 : sh.z0;
+      f.solids.add({ ax: sh.x0 * C, az: sh.frontZ, bx: (sh.x1 + 1) * C, bz: sh.frontZ, t: 0.08, front: sh.id });
+      for (let x = sh.x0; x <= sh.x1; x++) f.shutNav.push(row * W + x);
+      if (sh.back) {
+        sh.back.locked = true;
+        f.solids.add({ pts: rect(sh.back.x * C, sh.back.z * C, (sh.back.x + 1) * C, (sh.back.z + 1) * C), locked: 1 });
+        f.shutNav.push(sh.back.z * W + sh.back.x);
+      }
+      for (const k of f.shutNav) f.navBlock.add(k);
+      for (const l of f.lights) if (l.room === sh.room) l.state = 'off';
+    }
+  }
+
   // --- 12. Ce qui se parcourt : les cases libres atteintes depuis l'arrivée (en haut) et depuis le pied des
   // escaliers (en bas), sans passer par ce que l'entité évite ---
   const isWallOf = (f) => (gx, gz) => {
@@ -1902,7 +1933,7 @@ export function createMallMap(seed = 17) {
     const sideOf = (r) => ((r.x0 + r.x1) / 2 < 40 ? 'west' : (r.x0 + r.x1) / 2 > 70 ? 'east' : 'middle');
     const storage = (side) => [...mix(stores.filter((r) => sideOf(r) === side)), ...mix(stores)].map((r) => [1, r]);
     // (les boutiques ouvertes du vieux centre, à l'ouest ou à l'est de la cour centrale)
-    const openShops = (fi, east) => F[fi].shops.filter((sh) => sh.state === 'open' && sh.z1 < 60 && sh.x0 > 60 === east).map((sh) => [fi, F[fi].rooms[sh.room]]);
+    const openShops = (fi, east) => F[fi].shops.filter((sh) => sh.state === 'open' && !sh.shut && sh.z1 < 60 && sh.x0 > 60 === east).map((sh) => [fi, F[fi].rooms[sh.room]]);
     const plan = [
       // au sud-ouest et au sud-est : une réserve du dédale d'un côté ; de l'autre, une grande surface ou des bureaux
       west ? storage('west') : storage('east'),
@@ -1942,7 +1973,10 @@ export function createMallMap(seed = 17) {
   // habillage de mur (un rideau baissé) : sans emprise au sol ---
   for (const f of F) {
     const flat = (it) => it.kind === 'stall' && !it.toilet;
-    const gone = new Set(f.furn.filter((it) => FURN_GONE.has(it.kind) || flat(it)).map((it) => it.id));
+    // (… et tout ce qui meublait une boutique dont le rideau est baissé)
+    const shutRooms = new Set(f.shops.filter((sh) => sh.shut).map((sh) => sh.room));
+    const inShut = (it) => (it.shop !== undefined && f.shops[it.shop] && f.shops[it.shop].shut) || shutRooms.has(f.zone[Math.floor(it.z / C) * W + Math.floor(it.x / C)]);
+    const gone = new Set(f.furn.filter((it) => FURN_GONE.has(it.kind) || flat(it) || inShut(it)).map((it) => it.id));
     f.solids.remove((o) => o.furn !== undefined && gone.has(o.furn));
     const kept = f.furn.filter((it) => !gone.has(it.id) || flat(it));
     for (const it of kept) if (flat(it)) it.shut = true;
@@ -1950,6 +1984,8 @@ export function createMallMap(seed = 17) {
     f.furn.push(...kept);
     f.navBlock.clear();
     for (const k of navBase[f.fi]) f.navBlock.add(k);
+    for (const k of f.shutNav) f.navBlock.add(k);
+    for (const sh of f.shops) if (sh.shut) sh.state = 'shut';
     for (const it of kept) {
       if (!it.nav || it.shut) continue;
       const [ww, dd] = it.rot ? [it.d, it.w] : [it.w, it.d];
