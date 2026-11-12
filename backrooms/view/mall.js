@@ -338,7 +338,8 @@ function makeMaterials(tx, baked) {
     paintDark: { m: paint(tx.paintDark), S: 2.0 },
     paintChar: { m: paint(tx.paintChar), S: 2.0 },
     block: { m: baked(lam({ map: tx.block, bumpMap: tx.blockRelief, bumpScale: 1.6 }), { bump: true, fade: [1.0, 3.0] }), S: 2.0 },
-    ceilTiles: { m: baked(lam({ map: tx.ceilTiles })), S: 2.0 },
+    // (le faux plafond : quatre dalles de 62,5 cm par répétition, calées sur la trame des luminaires)
+    ceilTiles: { m: baked(lam({ map: tx.ceilTiles })), S: 2.5 },
     slab: { m: baked(lam({ map: tx.slab })), S: 2.0 },
     paper: { m: baked(lam({ map: tx.paper })), S: 2.5 },
     // la verrière la nuit : le ciel noir ne prend pas la lumière des lampes
@@ -1274,9 +1275,10 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     });
     // les suspensions : la grande (cours) et celles du food court
     const pend = of('pendant');
-    fixSet(new THREE.CylinderGeometry(1, 1, 0.5, 40, 1), white(), pend.filter((l) => !l.big), (l) => {
+    // (un globe aplati de verre opale, 60 cm : c'est le caméscope qui bave autour, plus de grand disque lumineux)
+    fixSet(new THREE.SphereGeometry(0.3, 24, 14).scale(1, 0.5, 1), white(), pend.filter((l) => !l.big), (l) => {
       dummy.position.set(l.x, l.y, l.z);
-      dummy.scale.set(0.38, 0.4, 0.38);
+      dummy.scale.set(1, 1, 1);
     });
     // la grande suspension des cours : une vasque de verre dépoli, large et plate, qui éclaire vers le haut
     const dish = new THREE.LatheGeometry([[0, -0.3], [0.5, -0.27], [0.95, -0.17], [1.22, -0.02], [1.28, 0.06], [1.2, 0.07], [0.9, -0.06], [0, -0.14]].map(([r, y]) => new THREE.Vector2(r, y)), 40);
@@ -1309,8 +1311,8 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       const room = rooms.find((r) => r.id === l.room);
       const ceil = (room && room.vault && room.vault.top) || hAt(l.gx, l.gz) || l.y + 1;
       if (!l.big) {
-        deco.push(['brass', new THREE.CylinderGeometry(0.44, 0.46, 0.36, 40, 1, true).translate(l.x, l.y + 0.1, l.z)]);
-        deco.push(['black', new THREE.CylinderGeometry(0.012, 0.012, ceil - l.y, 6).translate(l.x, (ceil + l.y) / 2, l.z)]);
+        deco.push(['brass', new THREE.CylinderGeometry(0.05, 0.1, 0.07, 14).translate(l.x, l.y + 0.165, l.z)]);
+        deco.push(['black', new THREE.CylinderGeometry(0.012, 0.012, ceil - l.y - 0.2, 6).translate(l.x, (ceil + l.y + 0.2) / 2, l.z)]);
         continue;
       }
       // la couronne de bronze autour de la vasque, ses trois tiges jusqu'au pavillon, la tige et la rosace au plafond

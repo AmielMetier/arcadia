@@ -531,7 +531,19 @@ export function createMallTextures() {
     drawCarpet(dg, 512, moq, '#2e2f35', '#5a5b63');
     out.carpetDark.needsUpdate = true;
     if (pla) {
-      photo(ceG, pla, S, S, 'rgb(236,232,222)', 1.06);
+      retint(ceG, pla, S, S, [124, 110, 101], [200, 195, 182]); // (des dalles de fibre minérale blanc cassé)
+      // la trame du faux plafond : des profilés en T laqués blanc, toutes les 62,5 cm (décalés d'une demi-dalle : les
+      // luminaires, posés sur la trame des salles, tombent au milieu d'une dalle), leur ombre portée d'un côté
+      const T = S / 4;
+      for (let i = 0; i < 4; i++) {
+        const p = (i + 0.5) * T;
+        ceG.fillStyle = 'rgba(40,36,30,0.3)';
+        ceG.fillRect(p + 5, 0, 3, S);
+        ceG.fillRect(0, p + 5, S, 3);
+        ceG.fillStyle = '#d6d2c6';
+        ceG.fillRect(p - 5, 0, 10, S);
+        ceG.fillRect(0, p - 5, S, 10);
+      }
       out.ceilTiles.needsUpdate = true;
     }
     if (mur) {

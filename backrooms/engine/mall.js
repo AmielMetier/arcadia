@@ -832,16 +832,17 @@ export function createMallMap(seed = 17) {
   const L1 = lift(1, 70, 2, 0, -1);
   L1.elevator.dead = true;
 
-  // --- 11. Les lumières (la plupart en panne : un centre abandonné ne laisse allumé que l'éclairage de veille) ---
+  // --- 11. Les lumières : un centre fermé ne laisse allumé que son éclairage de veille, un circuit régulier (une
+  // lampe sur deux, sur trois ou sur six selon les lieux : o.night dit si celle-ci en fait partie), jamais des pannes
+  // au hasard. Deux lampes seulement grésillent dans tout le centre (voir plus bas) ---
   const light = (fi, x, z, kind, o = {}) => {
     const f = F[fi];
     const gx = Math.floor(x / C);
     const gz = Math.floor(z / C);
-    const r = rnd();
-    const pOff = o.pOff ?? 0.25;
-    const state = o.state || (r < pOff ? 'off' : r < pOff + 0.07 ? 'flicker' : 'on');
+    rnd(); // (ce tirage décidait des pannes ; il reste, pour que le décor d'une graine ne bouge pas)
+    const state = o.state || (o.night === false ? 'off' : 'on');
     const l = { id: f.lights.length, x, z, gx, gz, kind, state, ...o };
-    delete l.pOff;
+    delete l.night;
     f.lights.push(l);
     return l;
   };
@@ -854,18 +855,19 @@ export function createMallMap(seed = 17) {
       const X1 = (r.x1 + 1) * C;
       const Z1 = (r.z1 + 1) * C;
       // (m : la marge laissée autour des vides, plus large sous l'ouverture d'une voûte)
-      const grid = (step, kind, o = {}, m = 0.8) => {
-        for (let z = Z0 + step / 2; z < Z1; z += step)
-          for (let x = X0 + step / 2; x < X1; x += step) {
+      // (every : le circuit de veille, une lampe sur `every`, en quinconce d'un rang à l'autre ; 1 : tout est allumé)
+      const grid = (step, kind, o = {}, m = 0.8, every = 3) => {
+        for (let z = Z0 + step / 2, iz = 0; z < Z1; z += step, iz++)
+          for (let x = X0 + step / 2, ix = 0; x < X1; x += step, ix++) {
             if (fi === 0 && inVoid(x, z, m)) continue;
-            light(fi, x, z, kind, { room: r.id, ...o });
+            light(fi, x, z, kind, { room: r.id, ...o, night: (ix + (every === 2 ? 1 : 2) * iz) % every === 0 });
           }
       };
       if (r.kind === RK.MAIL) {
         if (fi === 0) {
           // les caissons du plafond : une corniche lumineuse par caisson (5 m), au-dessus des deux allées
           for (let x = X0 + 2.5; x < X1; x += 5) for (const z of [27 * C + 1.25, 36 * C + 1.25]) light(0, x, z, 'cove', { room: r.id, y: 5.4 });
-        } else for (let x = X0 + 2.5; x < X1; x += 5) for (const z of [27 * C, 29.5 * C, 34.5 * C, 37 * C]) light(1, x, z, 'spot', { room: r.id, y: 4.4 });
+        } else for (let x = X0 + 2.5, ix = 0; x < X1; x += 5, ix++) [27 * C, 29.5 * C, 34.5 * C, 37 * C].forEach((z, k) => light(1, x, z, 'spot', { room: r.id, y: 4.4, night: (ix + k) % 2 === 0 }));
       } else if (r.kind === RK.COURT) {
         if (fi === 0) {
           // la coupole ou les caissons au-dessus du vide : une grande suspension, et la corniche tout autour
@@ -879,28 +881,41 @@ export function createMallMap(seed = 17) {
             const rr = ((r.court === 'west' ? rW : rC) + v.open) * 0.924 - 0.5;
             light(0, cx + Math.cos(a) * rr, MZ + Math.sin(a) * rr, 'cove', { room: r.id, y: v.base - 0.12, rot: Math.PI / 2 - a, ring: true });
           }
-        } else grid(5, 'spot', { y: r.ceilH });
+        } else grid(5, 'spot', { y: r.ceilH }, 0.8, 2);
       } else if (r.kind === RK.PORTAL && r.store && !r.gate && fi === 0) {
         // l'entrée du grand magasin : une gorge lumineuse au-dessus du portail, qui lave le mur où sont posées ses lettres
-        grid(5, 'spot', { y: r.ceilH, pOff: 0.3 });
+        grid(5, 'spot', { y: r.ceilH }, 0.8, 2);
         for (let z = Z0 + 1.5; z < Z1; z += 3) light(0, X1 + 1.0, z, 'cove', { y: r.ceilH + 0.3, state: 'on' });
       } else if (r.kind === RK.PLAZA) {
         // la lanterne ovale : un plafond lumineux au-dessus du vide, le seul endroit vraiment clair de l'étage
         light(0, ECX, MZ, 'glow', { room: r.id, y: r.vault.top, state: 'on', big: true });
-        grid(5, 'spot', { y: r.ceilH, pOff: 0.35 }, r.vault.open + 0.5);
+        grid(5, 'spot', { y: r.ceilH }, r.vault.open + 0.5, 2);
       }
-      else if (r.kind === RK.SHOP) grid(5, 'panel', { y: r.ceilH, pOff: r.state === 'open' ? 0.55 : 0.85 });
+      else if (r.kind === RK.SHOP) grid(5, 'panel', { y: r.ceilH }, 0.8, r.state === 'open' ? 3 : 6);
       else if (r.kind === RK.SERVICE && r.maze) {
         // le dédale : un tube au milieu de chaque tronçon, un à chaque croisement sur deux
-        for (const [i, j, h] of mazeEdges) light(1, (nx(i) + (h ? 3 : 0) + 0.5) * C, (nz(j) + (h ? 0 : 3) + 0.5) * C, 'tube', { room: r.id, y: r.ceilH, pOff: 0.5 });
-      } else if (r.kind === RK.SERVICE) grid(C * 3, 'tube', { y: r.ceilH, pOff: 0.4 });
-      else if (r.kind === RK.STORAGE) grid(7.5, 'tube', { y: r.ceilH, pOff: 0.55 });
-      else if (r.kind === RK.ANNEX) grid(5, 'panel', { y: r.ceilH, pOff: 0.5 });
-      else if (r.kind === RK.MARKET) grid(7.5, 'panel', { y: r.ceilH, pOff: 0.55 });
-      else if (r.kind === RK.FLEA) grid(7.5, 'tube', { y: r.ceilH, pOff: 0.6 });
-      else if (r.kind === RK.GARDEN) grid(10, 'pendant', { y: 4.2, pOff: 0.45 });
-      else if (r.kind === RK.FOOD) grid(7.5, 'pendant', { y: 4.6, pOff: 0.3 });
-      else if (r.kind === RK.STORE || r.kind === RK.CLOSED) grid(r.kind === RK.CLOSED ? 10 : 7.5, 'panel', { y: r.ceilH, pOff: r.kind === RK.CLOSED ? 0.9 : 0.6 });
+        mazeEdges.forEach(([i, j, h], k) => light(1, (nx(i) + (h ? 3 : 0) + 0.5) * C, (nz(j) + (h ? 0 : 3) + 0.5) * C, 'tube', { room: r.id, y: r.ceilH, night: k % 2 === 0 }));
+      } else if (r.kind === RK.SERVICE) {
+        const n0 = f.lights.length;
+        grid(C * 3, 'tube', { y: r.ceilH }, 0.8, 2);
+        // (un couloir large d'une case : la trame de 7,5 m tombait à côté, il restait noir. Une réglette tous les
+        // 7,5 m dans son axe, une sur deux en veille ; posées sans tirage au sort)
+        if (f.lights.length === n0) {
+          const alongX = X1 - X0 >= Z1 - Z0;
+          for (let a = (alongX ? X0 : Z0) + 3.75, k = 0; a < (alongX ? X1 : Z1); a += 7.5, k++) {
+            const x = alongX ? a : (X0 + X1) / 2;
+            const z = alongX ? (Z0 + Z1) / 2 : a;
+            f.lights.push({ id: f.lights.length, x, z, gx: Math.floor(x / C), gz: Math.floor(z / C), kind: 'tube', state: k % 2 ? 'off' : 'on', room: r.id, y: r.ceilH });
+          }
+        }
+      }
+      else if (r.kind === RK.STORAGE) grid(7.5, 'tube', { y: r.ceilH }, 0.8, 2);
+      else if (r.kind === RK.ANNEX) grid(5, 'panel', { y: r.ceilH });
+      else if (r.kind === RK.MARKET) grid(7.5, 'panel', { y: r.ceilH });
+      else if (r.kind === RK.FLEA) grid(7.5, 'tube', { y: r.ceilH });
+      else if (r.kind === RK.GARDEN) grid(10, 'pendant', { y: 4.2 }, 0.8, 2);
+      else if (r.kind === RK.FOOD) grid(7.5, 'pendant', { y: 4.6 }, 0.8, 2);
+      else if (r.kind === RK.STORE || r.kind === RK.CLOSED) grid(r.kind === RK.CLOSED ? 10 : 7.5, 'panel', { y: r.ceilH }, 0.8, r.kind === RK.CLOSED ? 6 : 3);
       else if (r.kind === RK.CINE) {
         // le hall du cinéma, bien éclairé : des spots puissants serrés dans le plafond bas (un sur deux dans le plateau)
         const t = r.tray;
@@ -910,13 +925,13 @@ export function createMallMap(seed = 17) {
           for (let x = X0 + 1.875; x < X1; x += 3.75, n++) {
             const up2 = inTray(x, z);
             if (up2 && n % 2) continue;
-            light(0, x, z, 'spot', { room: r.id, y: up2 ? t.h : r.ceilH, pOff: 0.07, strong: true });
+            light(0, x, z, 'spot', { room: r.id, y: up2 ? t.h : r.ceilH, strong: true });
           }
         // sous le grand disque blanc de chaque pilier : quatre spots, et une gorge (cachée) qui en lave le dessous
         for (const k in f.pillars) {
           const p = f.pillars[k];
           if (p.kind !== 'cine' || p.x < X0 || p.x > X1 || p.z < Z0 || p.z > Z1) continue;
-          for (let i = 0; i < 4; i++) light(0, p.x + Math.cos(i * 1.5708 + 0.785) * 1.9, p.z + Math.sin(i * 1.5708 + 0.785) * 1.9, 'spot', { room: r.id, y: 3.3, pOff: 0.1, strong: true });
+          for (let i = 0; i < 4; i++) light(0, p.x + Math.cos(i * 1.5708 + 0.785) * 1.9, p.z + Math.sin(i * 1.5708 + 0.785) * 1.9, 'spot', { room: r.id, y: 3.3, strong: true });
           light(0, p.x + 1.3, p.z + 0.5, 'cove', { room: r.id, y: 3.2, ring: true, state: 'on' });
         }
         // le ruban de LED : il fait le tour du plateau, à 60 cm de ses bords (deux coins coupés) ; une lampe par 2,5 m
@@ -930,18 +945,18 @@ export function createMallMap(seed = 17) {
         }
       }
       else if (r.kind === RK.CINE_HALL) {
-        grid(3.75, 'spot', { y: r.ceilH, pOff: 0.3 });
+        grid(3.75, 'spot', { y: r.ceilH }, 0.8, 2);
         // une gorge lumineuse autour du disque de plafond de chaque pilier
         // (deux par pilier, hors de sa case : la lumière ne traverse pas le pilier)
-        for (const k in f.pillars) if (f.pillars[k].kind === 'cineHall') for (const dz of [-1.5, 1.5]) light(fi, f.pillars[k].x - 0.6, f.pillars[k].z + dz, 'cove', { room: r.id, y: r.ceilH - 0.1, ring: true, pOff: 0.25 });
+        for (const k in f.pillars) if (f.pillars[k].kind === 'cineHall') for (const dz of [-1.5, 1.5]) light(fi, f.pillars[k].x - 0.6, f.pillars[k].z + dz, 'cove', { room: r.id, y: r.ceilH - 0.1, ring: true });
       }
-      else if (r.kind === RK.SCREEN) grid(5, 'aisle', { y: 0.4, pOff: 0.2 });
-      else if (r.kind === RK.WC || r.kind === RK.LOBBY) grid(5, 'panel', { y: r.ceilH, pOff: 0.45 });
-      else if (r.kind === RK.OFFICE) grid(7.5, 'panel', { y: r.ceilH, pOff: 0.45 });
-      else if (r.kind === RK.DOCK) grid(5, 'tube', { y: r.ceilH, pOff: 0.4 });
-      else if (r.kind === RK.PARK) grid(C * 3, 'tube', { y: r.ceilH, pOff: 0.55 });
-      else if (r.kind === RK.FUN) grid(5, 'spot', { y: r.ceilH, pOff: 0.5 });
-      else if (r.kind === RK.PORTAL) grid(5, 'spot', { y: r.ceilH, pOff: 0.3 });
+      else if (r.kind === RK.SCREEN) grid(5, 'aisle', { y: 0.4 }, 0.8, 1);
+      else if (r.kind === RK.WC || r.kind === RK.LOBBY) grid(5, 'panel', { y: r.ceilH }, 0.8, 2);
+      else if (r.kind === RK.OFFICE) grid(7.5, 'panel', { y: r.ceilH });
+      else if (r.kind === RK.DOCK) grid(5, 'tube', { y: r.ceilH });
+      else if (r.kind === RK.PARK) grid(C * 3, 'tube', { y: r.ceilH }, 0.8, 2);
+      else if (r.kind === RK.FUN) grid(5, 'spot', { y: r.ceilH });
+      else if (r.kind === RK.PORTAL) grid(5, 'spot', { y: r.ceilH }, 0.8, 2);
     }
     // en bas, sous les vides : la lumière des grandes suspensions et de la lanterne du haut tombe jusqu'au sol (une
     // lampe sans luminaire ; rad : jusqu'où elle porte, un peu au-delà du bord du vide)
@@ -960,7 +975,7 @@ export function createMallMap(seed = 17) {
     for (const k in f.pillars) {
       const p = f.pillars[k];
       if (p.kind !== 'mail' && p.kind !== 'court') continue;
-      light(fi, p.x, p.z, 'sconce', { y: 2.7, pillar: +k, pOff: 0.3 });
+      light(fi, p.x, p.z, 'sconce', { y: 2.7, pillar: +k });
     }
     // la cabine de projection : une seule lampe, faible, au-dessus de la table de montage (posée sans tirage au sort :
     // l'état des autres lampes du centre ne change pas)
@@ -972,6 +987,11 @@ export function createMallMap(seed = 17) {
       return v === T.FLOOR || v === T.PILLAR;
     });
     f.lights.forEach((l, i) => (l.id = i));
+    // deux lampes fatiguées grésillent, pas plus : en haut un tube du couloir de service nord, en bas une dalle des
+    // toilettes
+    const kindOf = (l) => (f.rooms[l.room] ? f.rooms[l.room].kind : null);
+    const tired = fi === 0 ? f.lights.find((l) => l.kind === 'tube' && l.state === 'on' && kindOf(l) === RK.SERVICE && l.x > 110) : f.lights.find((l) => l.kind === 'panel' && l.state === 'on' && kindOf(l) === RK.WC);
+    if (tired) tired.state = 'flicker';
   }
 
   // --- 11b. Le mobilier : ce qui gêne le passage est une forme de collision (la même chez tout le monde), le reste

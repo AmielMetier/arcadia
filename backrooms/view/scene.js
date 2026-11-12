@@ -962,6 +962,27 @@ float occVis(vec3 p, vec3 lp) {
         bakeData[(tz * BW + tx) * 4 + 1] = Math.round((0.42 + 0.58 * t * t * (3 - 2 * t)) * 255);
       }
     }
+    // Level 17 : une ombre de contact sous le mobilier et à son pied (l'emprise de chaque meuble posé : un banc, une
+    // table, une travée de rayonnage), plus légère que celle des murs : sans elle, les meubles flottent sur le sol
+    if (MALL && map.solids) {
+      const FR = 0.7;
+      for (const o of map.solids) {
+        if (o.furn === undefined) continue;
+        const [x0, z0, x1, z1] = o.pts ? [Math.min(...o.pts.map((p) => p[0])), Math.min(...o.pts.map((p) => p[1])), Math.max(...o.pts.map((p) => p[0])), Math.max(...o.pts.map((p) => p[1]))] : [o.x, o.z, o.x, o.z];
+        const rad = o.pts ? 0 : o.r;
+        for (let tz = Math.max(0, Math.floor((z0 - rad - FR) / TX)); tz <= Math.min(BH - 1, Math.floor((z1 + rad + FR) / TX)); tz++)
+          for (let tx = Math.max(0, Math.floor((x0 - rad - FR) / TX)); tx <= Math.min(BW - 1, Math.floor((x1 + rad + FR) / TX)); tx++) {
+            const px = (tx + 0.5) * TX;
+            const pz = (tz + 0.5) * TX;
+            const d = Math.max(0, Math.hypot(Math.max(x0 - px, 0, px - x1), Math.max(z0 - pz, 0, pz - z1)) - rad);
+            if (d >= FR) continue;
+            const t = d / FR;
+            const v = Math.round((0.6 + 0.4 * t * t * (3 - 2 * t)) * 255);
+            const i = (tz * BW + tx) * 4 + 1;
+            if (v < bakeData[i]) bakeData[i] = v;
+          }
+      }
+    }
     for (let i = 0; i < chamfMirror.length; i += 2) bakeData[chamfMirror[i] * 4 + 1] = bakeData[chamfMirror[i + 1] * 4 + 1];
     // Les cloisons fines tombent sur des bords de texels (l'axe d'une case). Chaque texel note dans l'alpha les bords
     // que barre une cloison (1 : -x, 2 : +x, 4 : -z, 8 : +z) et, en seizièmes, sa proximité d'une cloison (3 : contre,
@@ -1902,8 +1923,10 @@ float bkCaust(vec2 uv, float t) {
             float kUp = ny < -0.5 ? 1.0 : (ny > 0.5 ? 0.0 : smoothstep(1.0, 3.4, by));
             vec3 lo = (uBakeTint * bk.r + uBakeTint2 * bk.b) * shape;
             vec3 hi = (uBakeTint * up.r + uBakeTint2 * up.b + vec3(0.34, 0.46, 1.6) * up.g) * mix(0.8, 1.0, bk.g) * (ny < -0.5 ? 1.0 : 0.92);
-            // un sol très éclairé (le hall du cinéma) renvoie de sa lumière vers le plafond et le haut des murs
-            hi += (uBakeTint * bk.r + uBakeTint2 * bk.b) * 1.1 * max(bk.r + bk.b - 0.22, 0.0);
+            // le sol renvoie de sa lumière vers le plafond et le haut des murs : sous une dalle lumineuse ou un spot
+            // encastré, qui n'éclairent pas le plafond qui les porte, on voit quand même sa trame (un sol très éclairé,
+            // comme celui du hall du cinéma, en renvoie davantage)
+            hi += (uBakeTint * bk.r + uBakeTint2 * bk.b) * (0.3 + 1.1 * max(bk.r + bk.b - 0.22, 0.0));
             // (le relief d'une matière scannée : la lumière du haut le prend comme celle du bas)
             totalEmissiveRadiance += diffuseColor.rgb * mix(lo, hi * bkRel, kUp) * 2.0;
           }
