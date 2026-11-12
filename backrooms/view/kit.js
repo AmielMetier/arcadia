@@ -4,8 +4,8 @@
 // centaines.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { gltfLoader } from '../../shared/vendor/three/gltf-draco.js';
+import { modelUrl } from './models.js';
 
-const MODELS = new URL('../models/', import.meta.url).href;
 const loader = gltfLoader();
 const cache = new Map();
 
@@ -17,7 +17,7 @@ export function loadKit(name) {
       name,
       new Promise((resolve) =>
         loader.load(
-          MODELS + name + '.glb',
+          modelUrl(name),
           (g) => {
             const pieces = new Map();
             g.scene.updateMatrixWorld(true);

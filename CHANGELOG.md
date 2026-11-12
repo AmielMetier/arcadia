@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.82 — 12 novembre 2026
+- **The Backrooms** — Les modèles du jeu sont rangés par niveau : rien ne change en partie, tout se charge comme avant.
+
 ## 5.81 — 12 novembre 2026
 - **The Backrooms** — En mode normal, le même monstre te poursuit partout : celui du Level 0, aussi au Level 1, aux Poolrooms et à l'hôtel.
 - **The Backrooms** — En mode VIP, le monstre du Level 1 est la silhouette voilée, avec toutes ses animations.
