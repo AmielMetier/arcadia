@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.79 — 12 novembre 2026
+- **Tête de Calcul** — The Candidate a un mode entretien, à activer dans les réglages : il ne pose que des questions d'entretien d'embauche en finance (produits financiers, maths financières, économie, informatique).
+  - Plus de 230 nouvelles questions sur ces sujets, surtout pour le desk et le comité final : grecques, obligations, swaps, crédit, VaR, Black-Scholes, mouvement brownien, C++, SQL, VBA, Excel, Access et débogage.
+  - Dans ce mode, ni calcul mental, ni brainteaser, ni fat finger, ni relance, ni market making : l'épreuve de code reste au choix, et sans face-à-face final, c'est le score de l'entretien qui désigne la recrue.
+  - Les nouvelles questions sortent aussi dans les parties habituelles de The Candidate.
+
 ## 5.78 — 12 novembre 2026
 - **The Backrooms** — L'intro du mode VIP reçoit la même nouvelle fin : le choc, la neige de la cassette, puis le caméscope qui se rallume au Level 0.
 
