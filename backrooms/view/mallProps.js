@@ -454,6 +454,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         model('CoffeeCart_01', it.x + 0.3, 0, it.z, (it.yaw || 0) + PI / 2, 1.05);
         break;
       case 'kiosk':
+      case 'terrace':
       case 'claypot':
       case 'fountain':
       case 'counter':
@@ -916,6 +917,37 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
 
   // le cinéma : des affiches dans des caissons lumineux le long des murs du hall et du couloir des salles
   let pi = 0;
+  let wall3 = false;
+  // l'image du mur d'écrans : un bleu de glace, de grandes formes claires
+  const wall3Tex = () => {
+    const c = document.createElement('canvas');
+    c.width = 384;
+    c.height = 320;
+    const g = c.getContext('2d');
+    const gr = g.createLinearGradient(0, 0, 384, 320);
+    gr.addColorStop(0, '#0d3f8f');
+    gr.addColorStop(0.5, '#2f8fd6');
+    gr.addColorStop(1, '#0a2f6e');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 384, 320);
+    for (const [x, y, rx, ry, a, col] of [[120, 150, 150, 70, -0.5, 'rgba(210,240,255,0.75)'], [250, 210, 130, 60, -0.35, 'rgba(160,215,250,0.6)'], [300, 80, 110, 40, -0.6, 'rgba(235,250,255,0.55)'], [60, 280, 120, 40, -0.2, 'rgba(120,190,240,0.5)']]) {
+      g.save();
+      g.translate(x, y);
+      g.rotate(a);
+      const rg = g.createRadialGradient(0, 0, 4, 0, 0, rx);
+      rg.addColorStop(0, col);
+      rg.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = rg;
+      g.scale(1, ry / rx);
+      g.beginPath();
+      g.arc(0, 0, rx, 0, 7);
+      g.fill();
+      g.restore();
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  };
   for (const r of rooms) {
     if (r.kind !== 'cine' && r.kind !== 'cineHall') continue;
     const X0 = r.x0 * C;
@@ -931,8 +963,20 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         if (s < 0 && [...(map.fakeScreens || []), ...(map.doors || []).filter((d) => d.kind === 'screen')].some((d) => Math.abs((d.z + 0.5) * C - z) < 3.2)) continue; // (ni une porte de salle, son portique)
         if (furn.some((o) => Math.abs(o.x - w) < 2 && Math.abs(o.z - z) < 1.6)) continue; // (ni derrière une borne)
         const x = w + s * 0.06;
+        const box = [X0 - 0.25, Z0 - 0.25, X1 + 0.25, Z1 + 0.25];
+        if (r.kind === 'cineHall' && s > 0 && !wall3) {
+          // (comme au multiplexe de référence) un mur de trois écrans en hauteur, une seule image d'un écran à l'autre
+          wall3 = true;
+          if (!MATS.wall3) MATS.wall3 = { m: lit(wall3Tex(), 1.2), S: 1 };
+          G.box('black', Math.min(w, w + s * 0.09), Math.max(w, w + s * 0.09), 0.78, 2.72, z - 1.14, z + 1.14);
+          for (let k = 0; k < 3; k++) panel('wall3', [k / 3 + 0.004, 0, (k + 1) / 3 - 0.004, 1], x + s * 0.035, 1.75, z + (k - 1) * 0.74, 0.7, 1.86, s, 0);
+          lights.push({ x: w + s * 0.7, y: 1.8, z, c: [0.25, 0.45, 0.8], rad: 4.6, nx: s, nz: 0, box });
+          continue;
+        }
         G.box('black', Math.min(w, w + s * 0.08), Math.max(w, w + s * 0.08), 0.9, 2.65, z - 0.62, z + 0.62);
         panel(pi % 4 === 3 ? 'postersOff' : 'posters', posters.uv(pi), x + s * 0.025, 1.78, z, 1.1, 1.65, s, 0);
+        // un caisson allumé éclaire la moquette devant lui (un feu de couleur)
+        if (pi % 4 !== 3) lights.push({ x: w + s * 0.6, y: 1.8, z, c: [0.42, 0.44, 0.5], rad: 3.4, nx: s, nz: 0, box });
         pi++;
       }
     }

@@ -351,6 +351,7 @@ function makeMaterials(tx, baked) {
     // les marches des escalators : de l'aluminium sombre, un liseré jaune
     escStep: { m: baked(phong({ color: '#303236', specular: '#8a8e94', shininess: 50 }), { spec: 0.4, gloss: 80, mask: 0 }), S: 1 },
     escYellow: { m: baked(lam({ color: '#c9a21e' })), S: 1 },
+    banner: { m: baked(lam({ map: tx.banner, side: THREE.DoubleSide })), S: 1 },
     led: { m: new THREE.MeshBasicMaterial({ color: new THREE.Color('#86a8ff').multiplyScalar(3.0) }), S: 1 },
     // les petits spots des gradins de la lanterne (cour est)
     lampW: { m: new THREE.MeshBasicMaterial({ color: new THREE.Color('#fff0d4').multiplyScalar(3.2) }), S: 1 },
@@ -360,6 +361,8 @@ function makeMaterials(tx, baked) {
 // le revêtement du sol d'une salle
 function floorKey(r, fi, shops, x, z) {
   if (!r) return 'concrete';
+  // (un tapis de carrelage incrusté : une terre cuite, bordée d'un filet noir)
+  if (r.rugs && r.rugs.some((q) => x >= q.x0 && x <= q.x1 && z >= q.z0 && z <= q.z1)) return 'quarry';
   switch (r.kind) {
     case 'mail':
     case 'court':
@@ -572,6 +575,17 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     }
   }
 
+  // 1b. Le filet noir autour des tapis de carrelage
+  for (const r of rooms)
+    for (const q of r.rugs || []) {
+      const x0 = q.x0 * C;
+      const x1 = (q.x1 + 1) * C;
+      const z0 = q.z0 * C;
+      const z1 = (q.z1 + 1) * C;
+      for (const z of [z0, z1]) G.box('black', x0 - 0.04, x1 + 0.04, 0, 0.004, z - 0.04, z + 0.04, '-y');
+      for (const x of [x0, x1]) G.box('black', x - 0.04, x + 0.04, 0, 0.004, z0 + 0.04, z1 - 0.04, '-y');
+    }
+
   // 2. Les murs : une face par côté visible, à la hauteur du plafond de la case qu'elle regarde
   for (let z = 0; z < H; z++) {
     for (let x = 0; x < W; x++) {
@@ -592,8 +606,10 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
         else G.vface(k, x * C, ez, (x + 1) * C, ez, y0, h, 0, dz);
         // la plinthe : marbre noir dans les galeries, plinthe noire ailleurs (pas dans les coulisses)
         if (y0 === 0 && k !== 'block' && k !== 'faience') {
-          const pk = k === 'plaster' ? 'marbleDark' : 'black';
-          const ph = k === 'plaster' ? 0.16 : 0.1;
+          // (au cinéma : une plinthe d'inox brossé)
+          const rk = (roomOf(nx, nz) || {}).kind;
+          const pk = k === 'plaster' ? 'marbleDark' : rk === 'cine' || rk === 'cineHall' ? 'steel' : 'black';
+          const ph = k === 'plaster' ? 0.16 : pk === 'steel' ? 0.13 : 0.1;
           if (ex !== null) G.box(pk, Math.min(ex, ex + dx * 0.018), Math.max(ex, ex + dx * 0.018), 0, ph, z * C, (z + 1) * C, '-y');
           else G.box(pk, x * C, (x + 1) * C, 0, ph, Math.min(ez, ez + dz * 0.018), Math.max(ez, ez + dz * 0.018), '-y');
         }
@@ -728,6 +744,18 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       frame(O1, null, V.top, 0.8);
       hoop(scale(O1, 0.52), V.top, 0.55);
       G.add('trim', new THREE.CylinderGeometry(0.75, 0.75, 0.84, 8).rotateY(Math.PI / 8).translate(cx, V.top - 0.42, cz));
+      // deux bannières de toile pendues dans le vide, à leurs câbles (une barre en haut, une en bas)
+      for (const [dz, half] of [[-3.4, 0], [3.4, 1]]) {
+        const bx = cx - 5.2;
+        const y1 = V.top - 0.85;
+        const y0 = y1 - 6.4;
+        const g = new THREE.PlaneGeometry(1.25, 6.4).rotateY(Math.PI / 2);
+        const u = g.attributes.uv;
+        for (let i = 0; i < u.count; i++) u.setX(i, half * 0.5 + u.getX(i) * 0.5);
+        G.add('banner', g.translate(bx, (y0 + y1) / 2, cz + dz));
+        for (const y of [y0, y1]) G.add('steel', new THREE.CylinderGeometry(0.02, 0.02, 1.35, 8).rotateX(Math.PI / 2).translate(bx, y, cz + dz));
+        for (const e of [-0.6, 0.6]) G.add('black', new THREE.CylinderGeometry(0.006, 0.006, 0.85, 4).translate(bx, y1 + 0.425, cz + dz + e));
+      }
     }
   }
 

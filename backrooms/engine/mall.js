@@ -320,7 +320,7 @@ export function createMallMap(seed = 17) {
   // (inner : le rayon du second) ; la place est, basse et noire, s'ouvre sur une lanterne ovale lumineuse (glow)
   both(RK.COURT, COURTS.west.x0, COURTS.west.z0, COURTS.west.x1, COURTS.west.z1, { up: { name: 'West Court', court: 'west', ceil: [10, 'vault'], vault: { base: 6.4, open: 1.2, top: 10 } }, down: { name: 'West Court', court: 'west' } });
   both(RK.COURT, COURTS.center.x0, COURTS.center.z0, COURTS.center.x1, COURTS.center.z1, { up: { name: 'Center Court', court: 'center', ceil: [11.5, 'dome'], vault: { base: 7.0, open: 1.6, ring: 10.0, inner: 8.0, top: 11.5 } }, down: { name: 'Center Court', court: 'center' } });
-  room(0, RK.PLAZA, COURTS.east.x0, COURTS.east.z0, COURTS.east.x1, COURTS.east.z1, { name: 'East Court', court: 'east', vault: { base: 2.9, open: 2.6, top: 4.9, glow: true, steps: 4, tread: 1.3 } });
+  room(0, RK.PLAZA, COURTS.east.x0, COURTS.east.z0, COURTS.east.x1, COURTS.east.z1, { name: 'East Court', court: 'east', vault: { base: 2.9, open: 2.6, top: 4.9, glow: true, steps: 4, tread: 1.3 }, rugs: [{ x0: 87, z0: 36, x1: 91, z1: 37 }, { x0: 88, z0: 26, x1: 92, z1: 27 }] });
   room(1, RK.COURT, COURTS.east.x0, COURTS.east.z0, COURTS.east.x1, COURTS.east.z1, { name: 'East Court', court: 'east' });
 
   // --- 2. Les couloirs de service, derrière les boutiques (les deux étages) ---
@@ -1040,9 +1040,11 @@ export function createMallMap(seed = 17) {
           const l = Math.hypot(px - cx, pz - MZ);
           furn(0, 'claypot', px + ((px - cx) / l) * 1.2, pz + ((pz - MZ) / l) * 1.2, 0.8, 0.8, { round: true, m: 0.1, plant: i });
         });
-        for (const s of [-1, 1]) {
-          const bx = cx + s * 5.5;
-          const bz = MZ + s * 11.6;
+        // (au milieu de chaque tapis de carrelage)
+        for (const q of F[0].rooms.find((r) => r.rugs).rugs) {
+          const bx = (q.x0 + q.x1 + 1) * C * 0.5;
+          const bz = (q.z0 + q.z1 + 1) * C * 0.5;
+          const s = bz > MZ ? 1 : -1;
           if (furn(0, 'bench', bx, bz, 2.45, 0.7, { m: 0.1, face: -s })) for (const e of [-1, 1]) furn(0, 'claypot', bx + e * 2.0, bz, 0.8, 0.8, { round: true, m: 0.05, plant: e + s + 3 });
         }
       } else
@@ -1059,6 +1061,14 @@ export function createMallMap(seed = 17) {
     const v = up.voids.find((o) => o.court === key);
     const [cx, cz] = v.pts.reduce((a, p) => [a[0] + p[0] / v.pts.length, a[1] + p[1] / v.pts.length], [0, 0]);
     if (furn(1, 'fountain', cx, cz, 7.2, 7.2, { round: true, m: 0.2, nav: true }) && key === 'west') furn(1, 'chair', cx - 6.2, cz + 2.4, 0.5, 0.5, { solid: false, yaw: 1.9 });
+  }
+  // en bas, sous le vide de la cour centrale, de part et d'autre des escalators croisés : des jardinières blanches en
+  // gradins (comme au centre de référence), une coupe noire sur son socle
+  {
+    const v = up.voids.find((o) => o.court === 'center');
+    const [cx, cz] = v.pts.reduce((a, p) => [a[0] + p[0] / v.pts.length, a[1] + p[1] / v.pts.length], [0, 0]);
+    furn(1, 'terrace', cx - 1.5, cz + 8.0, 9.4, 5.2, { m: 0.2, nav: true, face: 1, plant: 0 });
+    furn(1, 'terrace', cx + 2.5, cz - 8.0, 9.4, 5.2, { m: 0.2, nav: true, face: -1, plant: 1 });
   }
   // les boutiques : des rayonnages le long des murs, un comptoir au fond, des portants (les vêtements), des gravats
   // dans les boutiques vidées

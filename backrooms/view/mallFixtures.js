@@ -91,6 +91,38 @@ export function createFixtures(K) {
     } else model('potted_plant_04', x, 0.54 - 0.15 * 3.4, z, a + 1, 3.4, 0, 0, 'potted_plant_04_plant+potted_plant_04_dirt');
   };
 
+  // --- des jardinières blanches en gradins (sous la cour centrale, comme au centre de référence) : des bacs d'enduit
+  // blanc de hauteurs croissantes qui se chevauchent, leur margelle, leur terre, quelques plantes ; devant, une coupe
+  // noire sur son socle ---
+  const TERRACE = [[-4.7, -2.7, -0.2, 1.8, 0.5], [-2.9, -0.9, -1.0, 1.0, 0.9], [-1.1, 1.1, -1.9, 0.3, 1.3], [0.9, 2.9, -2.6, -0.6, 1.7], [2.7, 4.7, -1.6, 0.4, 1.1], [-1.6, 0.2, 0.8, 2.6, 0.45], [1.0, 3.0, 0.2, 2.2, 0.7]];
+  const terrace = (it) => {
+    const P = frame(it);
+    TERRACE.forEach(([x0, x1, z0, z1, h], i) => {
+      const cw = 0.14;
+      lbox('plaster', it, x0, x1, 0.05, h - 0.06, z0, z1, '-y+y');
+      lbox('marbleDark', it, x0 + 0.03, x1 - 0.03, 0, 0.05, z0 + 0.03, z1 - 0.03, '-y+y');
+      // la margelle (un cadre) et la terre, un peu en retrait
+      lbox('trim', it, x0 - 0.02, x1 + 0.02, h - 0.06, h, z0 - 0.02, z0 + cw, '-y');
+      lbox('trim', it, x0 - 0.02, x1 + 0.02, h - 0.06, h, z1 - cw, z1 + 0.02, '-y');
+      lbox('trim', it, x0 - 0.02, x0 + cw, h - 0.06, h, z0 + cw, z1 - cw, '-y');
+      lbox('trim', it, x1 - cw, x1 + 0.02, h - 0.06, h, z0 + cw, z1 - cw, '-y');
+      lbox('soil', it, x0 + cw, x1 - cw, h - 0.2, h - 0.045, z0 + cw, z1 - cw, '-y');
+      const [px, pz] = P((x0 + x1) / 2, (z0 + z1) / 2);
+      const a = rand(it.id, i) * 6.28;
+      const k = (i + (it.plant || 0) * 3) % 7;
+      if (k === 0) model('dead_quiver_trunk', px, h - 0.1, pz, a, 0.9);
+      else if (k === 2) {
+        model('fern_02', px - 0.2, h - 0.06, pz, a, 2.2, 0, 0, 'fern_02_b');
+        model('fern_02', px + 0.35, h - 0.06, pz + 0.3, a + 1, 1.7, 0, 0, 'fern_02_c');
+      } else if (k === 3) model('potted_plant_04', px, h - 0.05 - 0.15 * 2.6, pz, a, 2.6, 0, 0, 'potted_plant_04_plant+potted_plant_04_dirt');
+      else if (k === 5) model('fern_02', px, h - 0.06, pz, a, 1.9, 0, 0, 'fern_02_c');
+    });
+    // la coupe noire sur son socle blanc
+    lbox('plaster', it, -4.45, -3.45, 0, 0.42, 1.9, 2.6, '-y');
+    const [bx, bz] = P(-3.95, 2.25);
+    turn('marbleDark', [[0.0, 0], [0.14, 0], [0.2, 0.03], [0.5, 0.2], [0.6, 0.31], [0.57, 0.33], [0.46, 0.24], [0.0, 0.12]], bx, 0.42, bz, 28);
+  };
+
   // --- une fontaine à sec ---
   const fountain = (it) => {
     const R = it.w / 2;
@@ -453,5 +485,5 @@ export function createFixtures(K) {
     }
   };
 
-  return { fountain, kiosk, concession, stall, counter, diner, claypot };
+  return { fountain, kiosk, concession, stall, counter, diner, claypot, terrace };
 }

@@ -511,6 +511,60 @@ export function createMallTextures() {
   const [ac, ag] = mk(512);
   drawPlaster(ag, 512, '58,59,64', null);
   out.paintDark = tex(ac);
+  // les bannières de toile de la cour ouest : deux visuels côte à côte (256 × 1024 chacun)
+  {
+    const [bc, bg] = canvas(512, 1024);
+    const ink = [['#a8322c', '#f2e6c8', '#e0a43a'], ['#1f5c6b', '#f2e6c8', '#d9652e']];
+    for (let i = 0; i < 2; i++) {
+      const x = i * 256;
+      const [bgc, fg, ac] = ink[i];
+      bg.fillStyle = bgc;
+      bg.fillRect(x, 0, 256, 1024);
+      // des aplats en éventail, façon affiche de fête
+      for (let k = 0; k < 9; k++) {
+        bg.fillStyle = k % 2 ? ac : fg;
+        bg.globalAlpha = 0.9;
+        bg.beginPath();
+        bg.moveTo(x + 128, 300);
+        bg.arc(x + 128, 300, 150, Math.PI * (1 + k / 9), Math.PI * (1 + (k + 0.62) / 9));
+        bg.closePath();
+        bg.fill();
+      }
+      bg.globalAlpha = 1;
+      bg.fillStyle = bgc;
+      bg.beginPath();
+      bg.arc(x + 128, 300, 52, 0, 7);
+      bg.fill();
+      bg.fillStyle = fg;
+      bg.textAlign = 'center';
+      bg.font = 'bold 30px Georgia, serif';
+      bg.fillText(i ? 'HALCYON PARK' : 'SPRING', x + 128, 96);
+      bg.font = 'bold 44px Georgia, serif';
+      bg.fillText(i ? 'ARTS' : 'FAIR', x + 128, 420);
+      bg.fillText(i ? 'WALK' : '1994', x + 128, 470);
+      // le reste du texte, à la verticale
+      bg.save();
+      bg.translate(x + 128, 740);
+      bg.rotate(-Math.PI / 2);
+      bg.font = 'bold 64px Georgia, serif';
+      bg.fillStyle = ac;
+      bg.fillText(i ? 'GALLERY' : 'ALL MONTH', 0, 22);
+      bg.restore();
+      bg.fillStyle = fg;
+      bg.fillRect(x + 28, 520, 200, 5);
+      bg.fillRect(x + 28, 960, 200, 5);
+      bg.font = '20px Georgia, serif';
+      bg.fillText(i ? 'UPPER LEVEL · WEST COURT' : 'EVERY SATURDAY', x + 128, 1000);
+    }
+    // la toile passée : des plis en long, des auréoles
+    for (let k = 0; k < 40; k++) {
+      bg.fillStyle = k % 2 ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.04)';
+      bg.fillRect(R() * 512, 0, 3 + R() * 10, 1024);
+    }
+    blotches(bg, 512, 1024, 26, '60,40,20', 0.16, 20, 110);
+    out.banner = tex(bc);
+    out.banner.wrapS = out.banner.wrapT = THREE.ClampToEdgeWrapping;
+  }
   // le plafond du hall du cinéma : un anthracite plus clair (il renvoie la lumière de la moquette)
   const [hc, hg] = mk(512);
   drawPlaster(hg, 512, '104,106,116', null);
