@@ -9,3 +9,6 @@ Vidéos Pexels (licence Pexels : utilisation et modification libres, sans crédi
 Son
   « Snapping twig.ogg », Wikimedia Commons, domaine public (le craquement du plancher, ralenti)
   Le vent, le souffle de la pièce, les parasites et le bourdonnement sont fabriqués au montage (ffmpeg).
+
+Fin refaite le 12 novembre 2026 (ffmpeg) : après la chute, choc sourd, neige en noir et blanc, puis une image du Level 0
+prise dans le jeu lui-même (teinte jaune, grain, bourdonnement des néons fabriqué) avec le titre « LEVEL 0 ».

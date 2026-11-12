@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.77 — 12 novembre 2026
+- **The Backrooms** — L'intro a une vraie fin : après la chute dans la trappe, un choc, la neige d'une cassette abîmée, puis le caméscope se rallume dans les couloirs jaunes du Level 0, néons qui bourdonnent.
+
 ## 5.76 — 12 novembre 2026
 - **The Backrooms** — Le jeu se charge bien plus vite : ses plus gros modèles (explorateur, entités, bouc, meubles) pèsent 4 Mo au lieu de 22.
 - **Dogfight 3D** — Le F-16 et le F-22 pèsent cinq fois moins lourd : le hangar s'ouvre plus vite.
