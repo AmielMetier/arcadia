@@ -25,6 +25,7 @@ import { createHotelMap, WORDS, LETTERS, HIDE_R as SPOT_R, MAIL_R, KEYPAD_R, LET
 import { createPipesMap, VALVES, PIPES_LEVEL, jetState, inJet, JET_HALF } from './level2.js';
 import { createMallMap, MALL_LEVEL, REELS, FILM_LEAD_T } from './mall.js';
 import { hasLineOfSight } from './nav.js';
+import { updateDoll, dollInit, dollOnFilm, DOLL_BODY } from './doll.js';
 import { planTo, move as gaitMove, faceTo, shove, stagger, feetOf, cageAt, BODY_R, roamable } from './gait.js';
 import { Track } from './interp.js';
 import { createGoats, updateGoats, senseGoats, alertGoats, goatSnapshot, applyGoatSnapshot, goatCount } from './goats.js';
@@ -721,6 +722,9 @@ export class BackroomsSim {
     // Level 2 : le troupeau remplace l'entité (elle reste là pour relayer le son et l'image de la chèvre la plus proche)
     this.goats = level === PIPES_LEVEL && this.hasMonster ? createGoats(this.map, goatCount(this.roster.length, this.difficulty)) : null;
     this.herd = null;
+    // Level 17 : la grande poupée tient la place de l'entité (engine/doll.js)
+    this.doll = level === MALL_LEVEL && this.hasMonster;
+    if (this.doll) dollInit(this);
   }
 
   // dans l'eau (Poolrooms) on avance moins vite : 90 % dans 20 cm d'eau, 70 % dans 60 cm, 40 % au plus profond
@@ -808,7 +812,7 @@ export class BackroomsSim {
       return true;
     }
     const M = this.monster;
-    if (!this.hasMonster || M.mode === 'chase' || M.floor !== floor) return false;
+    if (!this.hasMonster || this.doll || M.mode === 'chase' || M.floor !== floor) return false; // (la poupée n'écoute pas : elle guette les regards)
     if (Math.hypot(M.x - x, M.z - z) > range) return false;
     M.mode = 'search';
     M.silent = false;
@@ -1205,6 +1209,8 @@ export class BackroomsSim {
       }
     }
     if (this.facadeHit(x, z, radius, floor)) return true;
+    // Level 17 : la poupée (on frôle sa jupe, on ne la traverse pas)
+    if (this.doll && (this.monster.floor || 0) === floor && Math.hypot(this.monster.x - x, this.monster.z - z) < radius + DOLL_BODY) return true;
     // caisses et meubles abandonnés (cercles)
     for (const pr of this.fm(floor).props || []) {
       if (pr.walk || !(pr.r > 0)) continue; // papiers, canettes : on marche dessus ; posé sur un meuble ou suspendu : rien à heurter
@@ -2436,7 +2442,8 @@ export class BackroomsSim {
     if (this.goats) {
       updateGoats(this);
       senseGoats(this);
-    } else if (this.hasMonster) this.updateMonster(); // aux Poolrooms aussi : l'entité du Level 1 y chasse
+    } else if (this.doll) updateDoll(this);
+    else if (this.hasMonster) this.updateMonster(); // aux Poolrooms aussi : l'entité du Level 1 y chasse
     this.checkElevator();
   }
 
@@ -2489,6 +2496,7 @@ export class BackroomsSim {
     this.film = DT;
     this.powered = true;
     this.emit({ type: 'filmStart', x: b.proj.x, z: b.proj.z });
+    dollOnFilm(this); // la poupée vient attendre devant l'écran
   }
 
   // la phase finale du Level 0 : le vrai ascenseur s'ouvre, les néons s'éteignent un à un ; HUNT_DELAY plus tard, les
@@ -4525,6 +4533,27 @@ export class BackroomsSim {
       M.v = 0;
       this.emit({ type: 'grab', id: P.id, name: P.name, x: M.x, z: M.z, floor: M.floor });
     }
+  }
+
+  // Level 17 : la poupée attrape (jamais sous un regard). La première fois elle agrippe, on peut se dégager ; la seconde
+  // est la fin, comme avec les entités des autres niveaux
+  dollCatch(M, P) {
+    if (P.grabs >= 1 || (this.difficulty === 'hard' && this.rage >= 1)) {
+      this.killPlayer(P, { x: M.x, z: M.z });
+      this.afterCatch(M, P);
+      return;
+    }
+    P.grabs++;
+    P.grabT = GRAB_T * (this.difficulty === 'hard' ? 0.8 : 1);
+    P.struggle = 0;
+    P.running = false;
+    P.crouch = false;
+    P.jy = P.jvy = 0;
+    M.mode = 'grab';
+    M.grabbing = P.id;
+    M.path = [];
+    M.v = 0;
+    this.emit({ type: 'grab', id: P.id, name: P.name, x: M.x, z: M.z, floor: M.floor });
   }
 
   // La prise : on se débat (n'importe quelle touche), ou un coéquipier l'aveugle avec sa lampe ; sinon c'est la fin

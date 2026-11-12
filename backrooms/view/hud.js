@@ -1319,7 +1319,7 @@ export class BackroomsHUD {
       title.textContent = solo ? 'YOU DIED' : 'NOBODY MADE IT OUT';
       title.style.color = '#ef4444';
       const PIPES = sim.level === PIPES_LEVEL;
-      sub.textContent = sim.level === HOTEL_LEVEL ? 'Room service never knocks…' : PIPES ? 'The herd found you in the dark…' : sim.level === 1 ? 'The entity was waiting at the end of the shelves…' : extra.abyss ? 'You fell, and you are still falling. Nobody heard you land…' : extra.thirst ? 'Your mouth went dry, then your eyes. The hum went on without you…' : 'The entity caught you in the endless hallways…';
+      sub.textContent = sim.level === MALL_LEVEL && !extra.thirst ? 'You looked away. Miss Marigold never does…' : sim.level === HOTEL_LEVEL ? 'Room service never knocks…' : PIPES ? 'The herd found you in the dark…' : sim.level === 1 ? 'The entity was waiting at the end of the shelves…' : extra.abyss ? 'You fell, and you are still falling. Nobody heard you land…' : extra.thirst ? 'Your mouth went dry, then your eyes. The hum went on without you…' : 'The entity caught you in the endless hallways…';
       stats.textContent = `Level ${levelName(sim.level)} · ${sim.level === HOTEL_LEVEL ? `letters ${sim.posted}/6` : PIPES ? `valves ${sim.valves}/4` : sim.level === 2 ? (sim.slide >= 0 ? `${sim.map.slides[sim.slide].name.toLowerCase()} slide` : 'no slide found') : sim.level === 1 ? `fuses ${sim.delivered || 0}/3` : sim.level === MALL_LEVEL ? `reels ${sim.cassettes}/${REELS}` : `tapes ${sim.cassettes}/${CASSETTES}`} · Survived for ${formatTime(sim.time)}`;
       this.$('#endTape').textContent = `${d} · RECORDING STOPPED`;
     }

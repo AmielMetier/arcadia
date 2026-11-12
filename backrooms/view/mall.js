@@ -22,6 +22,7 @@ import { drawMallProps } from './mallProps.js';
 import { drawMallWalls } from './mallWalls.js';
 import { drawMallSigns } from './mallSigns.js';
 import { drawMallCinema } from './mallCinema.js';
+import { marigoldFilmArt } from './mallDoll.js';
 import { createKitInstancer } from './kit.js';
 
 const SLAB = FLOOR_DY - MALL_CEIL; // l'épaisseur de la dalle sous le mail du haut (le bandeau des vides)
@@ -1225,7 +1226,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed, show: props.show, arcade: props.arcade, goods: props.goods });
   drawMallSigns({ map, fi, G, MATS, rooms, goods: props.goods, hAt, model, arcade: props.arcade });
   // la cabine de projection, l'écran de la salle 1 et son film (view/mallCinema.js) : à l'étage du haut
-  const cinema = drawMallCinema({ map, fi, floors, G, MATS, baked, model, group, placed });
+  const cinema = drawMallCinema({ map, fi, floors, G, MATS, baked, model, group, placed, art: marigoldFilmArt });
   props.goods.flush();
   kit.build();
   G.build(group);

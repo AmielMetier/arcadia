@@ -9,6 +9,7 @@
 //    derrière une vitrine, le verre des verrières la nuit.
 // Une photo qui n'arrive pas laisse la version dessinée (même couleur, sans le grain).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
+import { paintMarigold } from './mallDoll.js';
 
 const TEX = new URL('../tex/', import.meta.url).href;
 
@@ -542,19 +543,27 @@ export function createMallTextures() {
       bg.font = 'bold 44px Georgia, serif';
       bg.fillText(i ? 'ARTS' : 'FAIR', x + 128, 420);
       bg.fillText(i ? 'WALK' : '1994', x + 128, 470);
-      // le reste du texte, à la verticale
-      bg.save();
-      bg.translate(x + 128, 740);
-      bg.rotate(-Math.PI / 2);
-      bg.font = 'bold 64px Georgia, serif';
-      bg.fillStyle = ac;
-      bg.fillText(i ? 'GALLERY' : 'ALL MONTH', 0, 22);
-      bg.restore();
+      // le reste du texte, à la verticale ; sur la bannière de la foire, la mascotte du centre : Miss Marigold
+      if (i) {
+        bg.save();
+        bg.translate(x + 128, 740);
+        bg.rotate(-Math.PI / 2);
+        bg.font = 'bold 64px Georgia, serif';
+        bg.fillStyle = ac;
+        bg.fillText('GALLERY', 0, 22);
+        bg.restore();
+      } else {
+        bg.fillStyle = 'rgba(242,230,200,0.16)';
+        bg.beginPath();
+        bg.ellipse(x + 128, 760, 104, 190, 0, 0, 7);
+        bg.fill();
+        paintMarigold(bg, x + 128, 946, 400);
+      }
       bg.fillStyle = fg;
       bg.fillRect(x + 28, 520, 200, 5);
       bg.fillRect(x + 28, 960, 200, 5);
-      bg.font = '20px Georgia, serif';
-      bg.fillText(i ? 'UPPER LEVEL · WEST COURT' : 'EVERY SATURDAY', x + 128, 1000);
+      bg.font = i ? '20px Georgia, serif' : 'bold 21px Georgia, serif';
+      bg.fillText(i ? 'UPPER LEVEL · WEST COURT' : 'MEET MISS MARIGOLD', x + 128, 1000);
     }
     // la toile passée : des plis en long, des auréoles
     for (let k = 0; k < 40; k++) {

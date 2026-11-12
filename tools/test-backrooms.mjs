@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, SLIDE_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL, RELAY_ARM, RELAY_SYNC, LIFT_CALL_T, L1_CALM, L1_FIRST_BLACKOUT, SECTOR_STEP, REELS, FILM_LEAD_T, PICK_R, USE_R } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, SLIDE_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL, RELAY_ARM, RELAY_SYNC, LIFT_CALL_T, L1_CALM, L1_FIRST_BLACKOUT, SECTOR_STEP, REELS, FILM_LEAD_T, PICK_R, USE_R, SPRINT_SPEED } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
 import { navOf, roamable } from '../backrooms/engine/gait.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
@@ -31,6 +31,7 @@ import { createWarehouseMap, DOCK_PASS } from '../backrooms/engine/level1.js';
 import { createPoolMap } from '../backrooms/engine/poolrooms.js';
 import { createHotelMap, parseWords, WORDS } from '../backrooms/engine/hotel.js';
 import { createMallMap, MALL_LEVEL, polyDist as mallPolyDist } from '../backrooms/engine/mall.js';
+import { dollTerrain, dollCanStand, DOLL_R, DOLL_VMAX, DOLL_RELOC_T, DOLL_BORED_T } from '../backrooms/engine/doll.js';
 
 // avance la partie de n secondes
 const run = (sim, sec, input = {}, others = null) => {
@@ -3118,6 +3119,203 @@ test('Level 17 : les bobines, leur montage et le film arrivent chez un invité',
   for (let i = 0; i < FILM_LEAD_T * 60 + 5; i++) host.step({});
   guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())), 0.2);
   assert.ok(guest.open && guest.realFloor === 0, 'la sortie est ouverte chez l\'invité');
+});
+
+// --- Level 17 : la grande poupée ---
+// un témoin indépendant du moteur : la poupée (son axe) est-elle dans le cadre d'un joueur (un cadre plus étroit que
+// celui du moteur), sans mur plein ni pilier entre eux ?
+const dollInFrame = (sim, Q, floor, x, z) => {
+  if (Q.status !== 'alive' || (Q.floor || 0) !== floor) return false;
+  const d = Math.hypot(Q.x - x, Q.z - z);
+  if (d > 60 || d < 0.6) return false;
+  let a = Math.atan2(-(x - Q.x), -(z - Q.z)) - Q.yaw;
+  a = Math.abs(Math.atan2(Math.sin(a), Math.cos(a)));
+  return a < 1.1 && hasLineOfSight(dollTerrain(sim.fm(floor)).see, Q.x, Q.z, x, z);
+};
+const mallDollSim = (seed, opts = {}) => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed, level: MALL_LEVEL, ...opts });
+  sim.monster.dormantT = 0;
+  return sim;
+};
+
+test('Level 17 : la poupée attend sous la coupole, immobile ; elle ne s\'éveille qu\'au bout d\'un moment, à la première bobine ou si l\'on s\'approche', () => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 5, level: MALL_LEVEL });
+  const M = sim.monster;
+  const P = sim.players[0];
+  assert.ok(sim.doll && M.doll && M.floor === 0 && M.dormantT > 60);
+  assert.ok(dollCanStand(sim.floors[0], M.x, M.z), 'elle est sur son terrain');
+  assert.equal(sim.floors[0].roomAt(M.x, M.z).name, 'Center Court');
+  assert.ok(Math.hypot(M.x - sim.map.spawn.x, M.z - sim.map.spawn.z) > 60, 'loin de l\'arrivée');
+  // dos tourné, au loin : elle ne bouge pas tant qu'elle dort
+  P.x = M.x - 30;
+  P.z = M.z;
+  P.yaw = Math.PI / 2;
+  const at = [M.x, M.z];
+  for (let i = 0; i < 20 * 60; i++) sim.step({});
+  assert.deepEqual([M.x, M.z], at);
+  // la première bobine la réveille
+  sim.takeCassette(P, sim.allCassettes[0]);
+  for (let i = 0; i < 4 * 60; i++) sim.step({});
+  assert.ok(M.dormantT === 0 && Math.hypot(M.x - at[0], M.z - at[1]) > 2, 'réveillée, elle roule');
+  // sans entité (mode paisible) : pas de poupée
+  assert.ok(!new BackroomsSim({ difficulty: 'peaceful', seed: 5, level: MALL_LEVEL }).doll);
+});
+
+test('Level 17 : la poupée ne bouge jamais sous un regard, n\'entre jamais dans un champ de vision, ne quitte jamais son terrain', () => {
+  let moves = 0;
+  let frozen = 0;
+  for (const sd of [2, 11, 23]) {
+    const sim = mallDollSim(sd);
+    sim.dollCatch = () => {}; // (on la laisse venir : ce test ne regarde que ses déplacements)
+    const M = sim.monster;
+    const P = sim.players[0];
+    const map = sim.floors[0];
+    const t = dollTerrain(map);
+    const cells = [];
+    for (let k = 0; k < t.ok.length; k++) if (t.ok[k] && t.comp[k] === 0) cells.push(k);
+    let rs = sd * 7919;
+    const rnd = () => ((rs = (rs * 1664525 + 1013904223) >>> 0) / 4294967296);
+    P.x = M.x - 25;
+    P.z = M.z + 3;
+    let goal = null;
+    let look = 0;
+    let lookT = 0;
+    for (let i = 0; i < 150 * 60; i++) {
+      // le joueur se promène dans le mail et les cours, et regarde derrière lui de temps en temps
+      if (!goal || Math.hypot(goal.x - P.x, goal.z - P.z) < 0.5) {
+        let k = cells[Math.floor(rnd() * cells.length)];
+        for (let n = 0; n < 30 && Math.hypot(((k % t.W) + 0.5) * CELL_SIZE - P.x, (Math.floor(k / t.W) + 0.5) * CELL_SIZE - P.z) > 30; n++) k = cells[Math.floor(rnd() * cells.length)];
+        goal = { x: ((k % t.W) + 0.5) * CELL_SIZE, z: (Math.floor(k / t.W) + 0.5) * CELL_SIZE };
+      }
+      const d = Math.hypot(goal.x - P.x, goal.z - P.z);
+      P.x += ((goal.x - P.x) / d) * 0.035;
+      P.z += ((goal.z - P.z) / d) * 0.035;
+      lookT -= 1 / 60;
+      if (lookT <= 0) {
+        look = rnd() < 0.4 ? Math.PI * (0.6 + rnd() * 0.8) : (rnd() - 0.5) * 1.2;
+        lookT = 0.6 + rnd() * 3;
+      }
+      P.yaw = Math.atan2(-(goal.x - P.x), -(goal.z - P.z)) + look;
+      const was = [M.x, M.z, M.floor];
+      sim.step({});
+      const moved = M.x !== was[0] || M.z !== was[1] || M.floor !== was[2];
+      if (dollInFrame(sim, P, was[2], was[0], was[1])) {
+        frozen++;
+        assert.ok(!moved, `graine ${sd}, pas ${i} : elle a bougé sous le regard`);
+      }
+      if (moved) {
+        moves++;
+        assert.ok(!dollInFrame(sim, P, M.floor, M.x, M.z), `graine ${sd}, pas ${i} : elle est entrée dans le champ de vision`);
+        assert.ok(dollCanStand(sim.fm(M.floor), M.x, M.z), `graine ${sd}, pas ${i} : hors de son terrain (${sim.fm(M.floor).roomAt(M.x, M.z)?.name})`);
+        assert.ok(!sim.fm(M.floor).collide(M.x, M.z, DOLL_R - 0.05), 'son socle ne traverse rien');
+      }
+    }
+  }
+  assert.ok(moves > 3000 && frozen > 3000, `elle a roulé (${moves} pas) et s'est figée (${frozen} pas)`);
+});
+
+test('Level 17 : regardée, la poupée reste figée ; on lui tourne le dos, elle arrive, agrippe, et la seconde fois c\'est la fin', () => {
+  for (const sd of [4, 31]) {
+    const sim = mallDollSim(sd);
+    const M = sim.monster;
+    const P = sim.players[0];
+    // face à elle, à 25 m dans le mail : rien ne bouge
+    P.x = M.x - 25;
+    P.z = M.z;
+    P.yaw = Math.atan2(-(M.x - P.x), -(M.z - P.z));
+    const at = [M.x, M.z];
+    for (let i = 0; i < 30 * 60; i++) sim.step({});
+    assert.deepEqual([M.x, M.z], at, 'figée sous le regard');
+    assert.equal(M.mode, 'still');
+    // dos tourné : elle roule, de plus en plus vite, et agrippe
+    P.yaw += Math.PI;
+    let top = 0;
+    let t = 0;
+    for (; t < 20 * 60 && !(P.grabT > 0); t++) {
+      const was = [M.x, M.z];
+      sim.step({});
+      top = Math.max(top, Math.hypot(M.x - was[0], M.z - was[1]) * 60);
+    }
+    assert.ok(P.grabT > 0 && M.mode === 'grab', `graine ${sd} : elle l'a rejoint (en ${(t / 60).toFixed(1)} s)`);
+    assert.ok(top > SPRINT_SPEED && top < DOLL_VMAX + 0.1, `lancée, elle va plus vite qu'un sprint (${top.toFixed(1)} m/s)`);
+    assert.ok(sim.drainEvents().some((e) => e.type === 'grab'));
+    // on se débat : elle lâche, sonnée un instant ; la seconde prise est mortelle
+    for (let i = 0; i < 200 && P.grabT > 0; i++) sim.step({ struggle: true, mx: i % 2 ? 1 : -1 });
+    if (P.grabT > 0) for (let i = 0; i < 40 && P.grabT > 0; i++) { P.struggle = 99; sim.step({}); }
+    assert.ok(!(P.grabT > 0) && P.status === 'alive', 'dégagé');
+    P.yaw = Math.atan2(-(M.x - P.x), -(M.z - P.z)) + Math.PI;
+    for (let i = 0; i < 30 * 60 && P.status === 'alive'; i++) sim.step({});
+    assert.equal(P.status, 'dead', 'la seconde fois, c\'est la fin');
+  }
+});
+
+test('Level 17 : un plafond bas est un refuge ; plantée devant trop longtemps, la poupée va attendre ailleurs ; à l\'autre étage, elle se replace hors champ', () => {
+  const sim = mallDollSim(8);
+  const M = sim.monster;
+  const P = sim.players[0];
+  const up = sim.floors[0];
+  // dans une boutique ouverte du mail (3,60 m sous plafond), dos à la devanture
+  const sh = up.shops.find((q) => q.state === 'open' && q.z1 < 60);
+  P.x = ((sh.x0 + sh.x1 + 1) / 2) * CELL_SIZE;
+  P.z = (sh.side === 'N' ? sh.z0 + 1 : sh.z1) * CELL_SIZE;
+  P.yaw = sh.side === 'N' ? 0 : Math.PI; // vers le fond
+  assert.ok(!dollCanStand(up, P.x, P.z), 'la boutique n\'est pas son terrain');
+  let jumped = false;
+  let nearest = Infinity;
+  for (let i = 0; i < (DOLL_BORED_T + 60) * 60 && !jumped; i++) {
+    const was = [M.x, M.z];
+    sim.step({});
+    assert.ok(P.status === 'alive' && !(P.grabT > 0), 'à l\'abri sous le plafond bas');
+    assert.ok(dollCanStand(up, M.x, M.z), 'elle reste sur son terrain');
+    nearest = Math.min(nearest, Math.hypot(M.x - P.x, M.z - P.z));
+    jumped = Math.hypot(M.x - was[0], M.z - was[1]) > 5;
+  }
+  assert.ok(nearest < 12, `elle est venue se planter devant la boutique (${nearest.toFixed(1)} m)`);
+  assert.ok(jumped, 'au bout d\'un moment, elle va attendre ailleurs');
+  assert.ok(Math.hypot(M.x - P.x, M.z - P.z) >= 14 && !dollInFrame(sim, P, M.floor, M.x, M.z));
+  assert.ok(sim.drainEvents().some((e) => e.type === 'dollMoved'));
+  // le joueur descend : elle le retrouve en bas, sans jamais apparaître dans son champ de vision
+  const dn = sim.floors[1];
+  const t1 = dollTerrain(dn);
+  const k = t1.comp.findIndex((c, i) => c >= 0 && t1.sizes[c] > 500 && dn.roomAt(((i % t1.W) + 0.5) * CELL_SIZE, (Math.floor(i / t1.W) + 0.5) * CELL_SIZE)?.name === 'Center Court');
+  P.floor = 1;
+  P.x = ((k % t1.W) + 0.5) * CELL_SIZE;
+  P.z = (Math.floor(k / t1.W) + 0.5) * CELL_SIZE;
+  P.yaw = 0;
+  let down = -1;
+  for (let i = 0; i < (DOLL_RELOC_T + 30) * 60 && down < 0; i++) {
+    sim.step({});
+    if (M.floor === 1) down = i / 60;
+  }
+  assert.ok(down >= DOLL_RELOC_T - 1, `elle a mis un moment à le rejoindre en bas (${down.toFixed(1)} s)`);
+  assert.ok(dollCanStand(dn, M.x, M.z) && Math.hypot(M.x - P.x, M.z - P.z) >= 14 && !dollInFrame(sim, P, 1, M.x, M.z), 'replacée hors champ, à distance');
+  for (let i = 0; i < 40 * 60 && !(P.grabT > 0); i++) sim.step({});
+  assert.ok(P.grabT > 0, 'et elle le rejoint');
+});
+
+test('Level 17 : quand le film démarre, la poupée vient attendre devant l\'écran de la salle 1 ; on ne la traverse pas ; un invité la voit au même endroit', () => {
+  const players = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }];
+  const sim = mallDollSim(6, { players, localId: 'a' });
+  const guest = new BackroomsSim({ difficulty: 'normal', seed: 6, level: MALL_LEVEL, players, localId: 'b' });
+  const M = sim.monster;
+  const [A, B] = sim.players;
+  const b = sim.map.booth;
+  // les deux joueurs dans la cabine, tournés vers la table de montage (pas vers la salle)
+  for (const Q of [A, B]) {
+    Q.x = b.use.x + (Q === B ? 0.8 : 0);
+    Q.z = b.use.z;
+    Q.yaw = Math.PI;
+  }
+  for (const c of sim.allCassettes) sim.takeCassette(A, c);
+  sim.step({ pick: true });
+  assert.ok(sim.film > 0);
+  for (let i = 0; i < 6 * 60; i++) sim.step({});
+  assert.equal(sim.floors[0].roomAt(M.x, M.z).name, 'Screen 1', 'elle est dans la salle 1');
+  assert.ok(M.x > b.screen.x - 4, 'devant l\'écran');
+  assert.ok(sim.isColliding(M.x - 0.5, M.z, 0.38, 0) && !sim.isColliding(M.x - 1.2, M.z, 0.38, 0), 'on bute sur elle, on la frôle');
+  guest.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())), 0);
+  assert.ok(guest.doll && Math.hypot(guest.monster.x - M.x, guest.monster.z - M.z) < 0.02 && guest.monster.floor === 0);
+  assert.ok(guest.isColliding(M.x - 0.5, M.z, 0.38, 0));
 });
 
 // --- Level 5, le Terror Hotel ---

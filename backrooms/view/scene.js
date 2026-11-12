@@ -25,6 +25,8 @@ import { buildMall, mallOnCol, MALL_OFF } from './mall.js';
 import { createMallTextures } from './mallTextures.js';
 import { MALL_LEVEL } from '../engine/mall.js';
 import { reelCan } from './mallCinema.js';
+import { createMallDoll } from './mallDoll.js';
+import { dollSeenBy } from '../engine/doll.js';
 import { createHotelEntity } from './hotelEntity.js';
 import { createGoatHerd } from './goats.js';
 import { createPipesTextures } from './textures2.js';
@@ -4534,6 +4536,7 @@ void main() {
       cull,
       lightAt,
       lightColorAt,
+      baked, // (Level 17 : la poupée prend la lumière cuite de l'étage où elle se tient)
       // la phase rouge est lancée à cet étage (après la vague d'extinction) : les alarmes peuvent hurler
       get redOn() {
         return !!alarm;
@@ -5539,7 +5542,8 @@ void main() {
   // mode VIP au Level 0 : le même corps, avec le visage de la photo de l'entité d'origine
   // Level 5 : l'entité de l'hôtel, un modèle humain animé os par os (view/hotelEntity.js)
   // (Level 1 et Poolrooms : la nouvelle entité, models/level1/entite.glb, view/creature.js)
-  const beast = L3 ? createHotelEntity() : !ENTITY_VIP ? (L1 || L2 ? createCreature({ height: 2.7 }) : createBeast({ wiry: true })) : !(L1 || L2) ? createBeast({ wiry: true, photo: { url: VIP.img, crop: [490, 20, 300, 375] } }) : null;
+  // Level 17 : la grande poupée (view/mallDoll.js), jamais animée : on ne la voit pas bouger
+  const beast = MALL ? createMallDoll({ bakedOf: (fi) => floorViews[fi].baked, floors: floors.length }) : L3 ? createHotelEntity() : !ENTITY_VIP ? (L1 || L2 ? createCreature({ height: 2.7 }) : createBeast({ wiry: true })) : !(L1 || L2) ? createBeast({ wiry: true, photo: { url: VIP.img, crop: [490, 20, 300, 375] } }) : null;
   if (beast) {
     monsterGroup.add(beast.group);
     shadow.visible = false;
@@ -5589,6 +5593,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 
   monsterGroup.position.set(map0.monsterSpawn.x, 0, map0.monsterSpawn.z);
   scene.add(monsterGroup);
+  const dollAt = { on: false, x: 0, z: 0, f: 0, yaw: 0 }; // Level 17 : là où la poupée est montrée
   // l'événement rare : une silhouette immobile au bout du couloir, qui n'est plus là quand on s'approche
   const figure = new THREE.Group();
   const figMat = new THREE.MeshBasicMaterial({ color: '#030303', fog: true });
@@ -6082,6 +6087,28 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         monsterGroup.visible = false;
         const gv = floorViews[0];
         goatHerd.update(sim, P, camera, gv ? gv.lightAt : () => 0.3, lampOn, dt, time);
+      } else if (sim.hasMonster && MALL && beast) {
+        // Level 17 : la poupée. On ne la voit jamais bouger : tant que celui que suit la caméra l'a dans son cadre, elle
+        // reste où il l'a vue et dans la pose qu'elle avait (chez un invité, sa position arrive avec un temps de retard) ;
+        // hors de son regard, elle prend sa vraie place, et sa pose se règle sur la distance : au loin elle salue, de près
+        // elle tend les bras et tourne la tête vers lui
+        const M = sim.monster;
+        const held = dollAt.on && M.mode !== 'grab' && dollSeenBy(sim, P, dollAt.f, dollAt.x, dollAt.z, 0.12);
+        if (!held) {
+          dollAt.on = true;
+          dollAt.x = M.x;
+          dollAt.z = M.z;
+          dollAt.f = M.floor || 0;
+          dollAt.yaw = M.yaw || 0;
+          beast.setFloor(dollAt.f);
+          const dx = camera.position.x - M.x;
+          const dz = camera.position.z - M.z;
+          const a = Math.atan2(dx, dz) - dollAt.yaw;
+          beast.setPose((14 - Math.hypot(dx, dz)) / 10, Math.atan2(Math.sin(a), Math.cos(a)));
+        }
+        monsterGroup.visible = true;
+        monsterGroup.position.set(dollAt.x, -dollAt.f * FLOOR_DY, dollAt.z);
+        monsterGroup.rotation.set(0, dollAt.yaw, 0);
       } else if (sim.hasMonster) {
         const M = sim.monster;
         // (le prélude : elle n'est pas là ; dans les gaines non plus ; Level 1, sous l'apparence d'une victime : c'est le

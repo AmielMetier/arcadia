@@ -1283,6 +1283,12 @@ const OLD_TIMER = {
     "Room thirteen is yours. It's been yours for a long time. They kept it clean for you.",
     "If someone knocks on your door and says room service… there is no room service.",
   ],
+  mall: [
+    "A mall. Closed for years, and the lights are still on. They never finished the opening-day film. Five reels. Maybe you will.",
+    "The big doll in the court? Miss Marigold. She only moves when nobody is watching. So watch her. Take turns.",
+    "She can't follow you under a low ceiling. The shops, the back corridors… stay low when you need to breathe.",
+    "Hear little wheels on the tile? Turn around. Don't run. Look at her.",
+  ],
   rare: [
     "…sorry. Wrong channel. I wasn't talking to you. …Who were you talking to?",
     "How long have you been down there? …No. No, that's not possible. Check your watch again.",
@@ -1340,7 +1346,7 @@ function oldTimerVoice() {
 if (window.speechSynthesis) try { speechSynthesis.getVoices(); } catch (e) {} // lance le chargement de la liste
 function oldTimerTick() {
   if (!sim || sim.state !== 'playing' || paused) return;
-  const key = sim.level === PIPES_LEVEL ? 'pipes' : sim.level === HOTEL_LEVEL ? 'hotel' : sim.level;
+  const key = sim.level === PIPES_LEVEL ? 'pipes' : sim.level === HOTEL_LEVEL ? 'hotel' : sim.level === MALL_LEVEL ? 'mall' : sim.level;
   if (otState.level !== sim.level) {
     Object.assign(otState, { level: sim.level, t0: sim.time, said: 0, last: otState.last });
     otState.next = 25 + otRand(sim.seed, sim.level, 0) * 20;
