@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.79 — 12 novembre 2026
+- **The Backrooms** — En mode VIP aussi, le monstre du Level 1 et des Poolrooms est la silhouette voilée, avec toutes ses animations (avant, c'était l'ancienne image plate).
+
 ## 5.78 — 12 novembre 2026
 - **The Backrooms** — L'intro du mode VIP reçoit la même nouvelle fin : le choc, la neige de la cassette, puis le caméscope qui se rallume au Level 0.
 
