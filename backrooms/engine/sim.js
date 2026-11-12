@@ -36,6 +36,7 @@ export const DT = 1 / 60;
 export const PLAYER_RADIUS = 0.38;
 // On avance lentement dans les Backrooms : la carte est immense et chaque pas compte
 export const WALK_SPEED = 2.1;
+export const MALL_PACE = 0.72; // Level 17 : on marche au pas d'un vrai promeneur (1,5 m/s), caméscope à l'épaule ; la course ne change pas
 export const SPRINT_SPEED = 4.4; // la course : nettement plus vite que la marche (l'entité en chasse reste en dessous)
 export const MONSTER_PATROL_SPEED = 1.8;
 export const MONSTER_CHASE_SPEED = 3.3; // plus vite qu'en marchant, un peu moins qu'en sprintant
@@ -742,6 +743,11 @@ export class BackroomsSim {
   }
 
   // dans l'eau (Poolrooms) on avance moins vite : 90 % dans 20 cm d'eau, 70 % dans 60 cm, 40 % au plus profond
+  // la part de la vitesse de marche qu'on garde à ce niveau
+  get pace() {
+    return this.level === MALL_LEVEL ? MALL_PACE : 1;
+  }
+
   wade(P) {
     const m = this.fm(P.floor);
     const d = m.depthAt ? m.depthAt(P.x, P.z) : 0;
@@ -2713,7 +2719,7 @@ export class BackroomsSim {
     P.running = !!input.run && (mx !== 0 || my !== 0) && !P.onBeam && !P.crouch;
 
     // 3. Déplacement (un invité se déplace chez lui et annonce sa position : l'hôte la prend si elle est plausible)
-    const speed = (P.running ? SPRINT_SPEED : P.crouch ? WALK_SPEED * CROUCH_SPEED : WALK_SPEED) * this.wade(P);
+    const speed = (P.running ? SPRINT_SPEED : P.crouch ? WALK_SPEED * CROUCH_SPEED : WALK_SPEED * this.pace) * this.wade(P);
     P.moving = mx !== 0 || my !== 0;
     const pos = input.pos;
     // un invité a perdu l'équilibre chez lui : il bascule dans le trou de ce côté
@@ -3398,7 +3404,7 @@ export class BackroomsSim {
       return 0;
     }
     P.running = !!input.run && P.moving && !P.crouch;
-    const speed = (P.running ? SPRINT_SPEED : P.crouch ? WALK_SPEED * CROUCH_SPEED : WALK_SPEED) * this.wade(P);
+    const speed = (P.running ? SPRINT_SPEED : P.crouch ? WALK_SPEED * CROUCH_SPEED : WALK_SPEED * this.pace) * this.wade(P);
     const v = this.stride(P, this.wishVel(P, mx, my, speed));
     if (!v.x && !v.z) {
       // immobile dans un jet de vapeur : on se brûle aussi
