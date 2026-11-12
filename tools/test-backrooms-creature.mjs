@@ -59,7 +59,7 @@ await test('les os se reconnaissent sous les noms de Mixamo, Unreal, Rigify, 3ds
   }
 });
 
-const { gltf } = await loadGltf(new URL('../backrooms/models/hazmat.glb', import.meta.url).href);
+const { gltf } = await loadGltf(new URL('../backrooms/models/commun/hazmat.glb', import.meta.url).href);
 const walk = gltf.animations.find((c) => c.name.endsWith('|Walk'));
 
 await test('un modèle couché (Z en haut), tourné et cent fois trop petit est remis debout, face à +z, pieds au sol, à la bonne taille', () => {

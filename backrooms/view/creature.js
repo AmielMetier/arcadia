@@ -18,7 +18,7 @@ import { MeshoptDecoder } from '../../shared/vendor/three/meshopt_decoder.module
 import { clone as cloneSkinned } from '../../shared/vendor/three/SkeletonUtils.js';
 
 export const CREATURE_URL = new URL('../models/level1/entite.glb', import.meta.url).href;
-const DONOR_URL = new URL('../models/hazmat.glb', import.meta.url).href;
+const DONOR_URL = new URL('../models/commun/hazmat.glb', import.meta.url).href;
 const BANG_HIT = 0.56; // s : l'impact dans le clip « bang » d'entite.glb (models/level1/LISEZMOI.txt)
 const UNMASK_T = 1; // s : la transformation (UNMASK_T du moteur, engine/sim.js)
 export const STATES = ['idle', 'walk', 'run', 'rush', 'grab', 'stun', 'bang', 'unmask', 'drop', 'scare'];

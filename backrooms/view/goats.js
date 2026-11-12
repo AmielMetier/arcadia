@@ -5,7 +5,7 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { gltfLoader } from '../../shared/vendor/three/gltf-draco.js';
 
-const MODEL = new URL('../models/chevre.glb', import.meta.url).href;
+const MODEL = new URL('../models/tuyauteries/chevre.glb', import.meta.url).href;
 const SCALE = 0.64; // le modèle fait 2 unités de haut : 1,25 m jusqu'au haut de la tête
 const FOOT = 1.0; // le bas des sabots, sous l'origine du modèle
 const EYES = [[0.19, 0.56, 0.84], [-0.21, 0.56, 0.83]]; // les yeux, dans le repère du modèle

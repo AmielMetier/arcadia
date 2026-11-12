@@ -19,6 +19,7 @@ import { buildGear } from './gear.js';
 import { createPlayerAvatars, contactBlob } from './players.js';
 import { createBeast } from './beast.js';
 import { createCreature } from './creature.js';
+import { modelUrl } from './models.js'; // modèles Poly Haven (CC0), voir models/LICENSE.txt
 import { buildWater } from './water.js';
 import { buildHotel } from './hotel.js';
 import { createHotelEntity } from './hotelEntity.js';
@@ -38,7 +39,6 @@ THREE.ShaderChunk.lights_pars_begin = THREE.ShaderChunk.lights_pars_begin.replac
 	float bkRing = 0.07 * exp( -pow( ( bkA - 0.6 ) / 0.07, 2.0 ) );
 	return ( exp( -2.2 * bkA * bkA ) + bkRing ) * smoothstep( 1.0, 0.7, bkA );`,
 );
-const MODELS = new URL('../models/', import.meta.url).href; // modèles Poly Haven (CC0), voir models/LICENSE.txt
 import { vault } from './vault.js';
 const VIP = { get img() { return vault.entite || ''; } }; // photo chiffrée dans data/ (vault.js)
 // L'entité du Level 1 : une vidéo détourée, découpée en planche d'images (12 par seconde, 16 par rangée) jouée en boucle
@@ -338,7 +338,7 @@ export function createBackroomsScene(container, floors, lamps) {
   const loader = gltfLoader();
   // le cadenas de la porte de la cage d'escalier (Quaternius, CC0) : laiton patiné, anse d'acier, 10 cm de haut
   const padlockModel = new Promise((resolve) => {
-    loader.load(MODELS + 'padlock.glb', (g) => {
+    loader.load(modelUrl('padlock'), (g) => {
       const root = g.scene;
       const box = new THREE.Box3().setFromObject(root);
       const k = 0.1 / Math.max(0.001, box.max.y - box.min.y);
@@ -358,7 +358,7 @@ export function createBackroomsScene(container, floors, lamps) {
   // la pile AA (Poly by Google, CC-BY 3.0) : 1,4 × 5,2 cm, debout le long de y, centrée. On garde sa forme et son
   // étiquette ; chaque usage (au sol, en main) lui donne son matériau
   const batteryModel = new Promise((resolve) => {
-    loader.load(MODELS + 'aa_battery.glb', (g) => {
+    loader.load(modelUrl('aa_battery'), (g) => {
       let src = null;
       g.scene.traverse((o) => {
         if (o.isMesh && !src) src = { geo: o.geometry, map: o.material.map };
@@ -2459,7 +2459,7 @@ float bkCaust(vec2 uv, float t) {
         else place(made);
       }
       else
-        loader.load(MODELS + kind.m + '.glb', (g) => {
+        loader.load(modelUrl(kind.m), (g) => {
           let root = g.scene;
           const piece = kind.node && root.getObjectByName(kind.node);
           if (piece) {
@@ -2633,7 +2633,7 @@ float bkCaust(vec2 uv, float t) {
     for (const name of ['fire_alarm', 'power_box_01', 'wall_clock']) {
       const spots = wallSpots[name];
       if (!spots.length) continue;
-      loader.load(MODELS + name + '.glb', (g) => {
+      loader.load(modelUrl(name), (g) => {
         const root = g.scene;
         root.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(root);
@@ -4079,7 +4079,7 @@ void main() {
         exitGroup.add(plate, btn);
       }
       // une caméra de surveillance dans le coin du fond (Poly Haven, security_camera_01, CC0), braquée sur la porte
-      loader.load(MODELS + 'security_camera_01.glb', (g) => {
+      loader.load(modelUrl('security_camera_01'), (g) => {
         const cam = g.scene;
         cam.traverse((o) => {
           if (o.isMesh) o.material = cabLit(new THREE.MeshLambertMaterial({ map: o.material.map || null, color: o.material.map ? '#ffffff' : '#9a9a9a' }), 0.2);
@@ -4312,7 +4312,7 @@ void main() {
         nookLamps.push(v);
       }
       // le fauteuil : le modèle Poly Haven des objets abandonnés, avec sa photo de couleur
-      loader.load(MODELS + 'modern_arm_chair_01.glb', (gl) => {
+      loader.load(modelUrl('modern_arm_chair_01'), (gl) => {
         const root = gl.scene;
         root.updateMatrixWorld(true);
         const bb = new THREE.Box3().setFromObject(root);
@@ -5313,7 +5313,7 @@ void main() {
   held.add(heldLamp);
   // la vraie lampe : la torche en plastique jaune usée de Poly Haven (small_plastic_torch, CC0) ; la lampe dessinée
   // ci-dessus ne sert qu'en attendant qu'elle arrive. Son verre s'allume avec elle.
-  loader.load(MODELS + 'small_plastic_torch.glb', (g) => {
+  loader.load(modelUrl('small_plastic_torch'), (g) => {
     const m = g.scene;
     m.traverse((o) => {
       if (!o.isMesh) return;
@@ -5441,11 +5441,11 @@ void main() {
   const anim = L1 || L2 || PIPES ? ENTITY_ANIM : null; // aux Poolrooms, la même entité qu'au Level 1
   face.visible = false;
   monsterGroup.add(face);
-  // l'entité en 3D, animée (view/beast.js) ; au Level 1 en mode VIP : la vidéo d'origine
-  // mode VIP au Level 0 : le même corps, avec le visage de la photo de l'entité d'origine
-  // Level 5 : l'entité de l'hôtel, un modèle humain animé os par os (view/hotelEntity.js)
-  // (Level 1 et Poolrooms : la nouvelle entité, models/level1/entite.glb, view/creature.js)
-  const beast = L3 ? createHotelEntity() : !ENTITY_VIP ? (L1 || L2 ? createCreature({ height: 2.7 }) : createBeast({ wiry: true })) : !(L1 || L2) ? createBeast({ wiry: true, photo: { url: VIP.img, crop: [490, 20, 300, 375] } }) : null;
+  // mode normal : l'entité de base en 3D, animée (view/beast.js), à tous les niveaux
+  // mode VIP : au Level 0 et aux Tuyauteries le même corps, avec le visage de la photo de l'entité d'origine ; au Level 1 la
+  // silhouette voilée (models/level1/entite.glb, view/creature.js) ; aux Poolrooms la vidéo, à plat ; au Level 5 l'entité de
+  // l'hôtel, un modèle humain animé os par os (view/hotelEntity.js)
+  const beast = !ENTITY_VIP ? createBeast({ wiry: true }) : L3 ? createHotelEntity() : L1 ? createCreature({ height: 2.7 }) : L2 ? null : createBeast({ wiry: true, photo: { url: VIP.img, crop: [490, 20, 300, 375] } });
   if (beast) {
     monsterGroup.add(beast.group);
     shadow.visible = false;
@@ -5699,7 +5699,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       fallV = 0.01;
     },
     scare() {
-      if (!L3 || !beast || !beast.scarePose) return;
+      if (!L3) return;
+      if (!beast || !beast.scarePose) return this.jumpscare(); // (l'entité de base, en mode normal : son screamer habituel)
       scareFx = { t0: null, x: camera.position.x, y: camera.position.y, z: camera.position.z, yaw: camera.rotation.y };
     },
 

@@ -6,7 +6,7 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { gltfLoader } from '../../shared/vendor/three/gltf-draco.js';
 
-const MODEL = new URL('../models/hotel_entite.glb', import.meta.url).href;
+const MODEL = new URL('../models/hotel/hotel_entite.glb', import.meta.url).href;
 const HEIGHT = 2.05; // un peu plus grand qu'un homme : il se baisse presque sous les lustres
 let loading = null; // chargé à la première entité de l'hôtel seulement
 

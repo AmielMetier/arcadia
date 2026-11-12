@@ -2,6 +2,9 @@ Modèles de The Backrooms : Poly Haven (https://polyhaven.com), domaine public (
 https://creativecommons.org/publicdomain/zero/1.0/) : utilisation libre, même commerciale, sans obligation de citer.
 On les cite quand même, avec plaisir.
 
+Rangement : un dossier par niveau (level0, level1, poolrooms, tuyauteries, hotel) et commun/ pour les modèles
+de plusieurs niveaux ; la table est dans view/models.js.
+
 Version glTF 1k compactée en .glb : géométrie d'origine, seule la texture de couleur est gardée (réduite en JPEG 512 px).
   WetFloorSign_01.glb  https://polyhaven.com/a/WetFloorSign_01
   SchoolChair_01.glb  https://polyhaven.com/a/SchoolChair_01
