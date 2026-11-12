@@ -1293,7 +1293,14 @@ export class BackroomsHUD {
     const d = this.$('#tapeDate').textContent;
     if (sim.state === 'won') {
       const sl = slideOf(sim);
-      if (sim.level === HOTEL_LEVEL) {
+      if (sim.level === MALL_LEVEL) {
+        // le Mall : par le monte-charge de scène, derrière l'écran de la salle 1
+        title.textContent = solo ? 'YOU ESCAPED' : 'YOU ALL ESCAPED';
+        title.style.color = '#22c55e';
+        sub.textContent = 'The stage elevator went down while the film kept flickering above you. The doors opened on an empty parking lot at dawn. Far behind, in the glass, something in a striped dress was still waving.';
+        stats.textContent = `MATINEE ENDING · ${formatTime(sim.time)} · Level 0, 1, 37, 5 and 17 cleared`;
+        this.$('#endTape').textContent = `${d} · END OF REEL`;
+      } else if (sim.level === HOTEL_LEVEL) {
         // le Terror Hotel : par l'escalier de secours
         title.textContent = solo ? 'YOU ESCAPED' : 'YOU ALL ESCAPED';
         title.style.color = '#22c55e';

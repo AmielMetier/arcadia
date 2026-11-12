@@ -1,5 +1,6 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
 import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE, HOTEL_LEVEL, MALL_LEVEL, DOCK_OPEN_T, DOCK_CLOSE_T, ALARM_T, DUCT_LAND, startLevel } from './engine/sim.js';
+import { createStairRide } from './view/stairwell.js';
 import { hasLineOfSight } from './engine/nav.js';
 import { bfs, CELL_SIZE, cellsOnSeg, T } from './engine/map.js';
 import { createBackroomsScene, setMonsterMode, setSceneOptions, onGlContext, sceneGl } from './view/scene.js';
@@ -1431,9 +1432,12 @@ function arrive(level, sc) {
       hud.loading(false);
       hud.unfade();
     }
-    ride.finish(level === HOTEL_LEVEL ? 'hotel' : 'pipes', () => {
+    // (Level 17 : arrivé par l'escalier de secours ; sa dernière porte s'ouvre sur la cour ouest du mall, où l'on est
+    // déjà debout : pas de chute)
+    const stairs = ride.kind === 'stairs';
+    ride.finish(stairs ? 'mall' : level === HOTEL_LEVEL ? 'hotel' : 'pipes', () => {
       endRide();
-      if (scene === sc) sc.dropIn(level === HOTEL_LEVEL ? 2.3 : 1.4); // (le hall de l'hôtel est haut de plafond)
+      if (scene === sc && !stairs) sc.dropIn(level === HOTEL_LEVEL ? 2.3 : 1.4); // (le hall de l'hôtel est haut de plafond)
       if (hud) hud.fade(`LEVEL ${levelName(level)}`, levelSub(level), 2.4, false, true);
     });
     return;
@@ -1461,9 +1465,10 @@ function enterLevel() {
   if (!e || !sim || !scene || e.run !== NET.run || sim.level !== e.level || sim.player.status !== 'alive') return;
   const sc = scene;
   const i = SLIDES.findIndex((s) => s.to === e.level);
-  if (i >= 0) {
+  if (i >= 0 || e.level === MALL_LEVEL) {
     endRide();
-    ride = createSlideRide({ gl: sceneGl(), hex: SLIDES[i].hex, side: i % 2 ? -1 : 1, sfx });
+    // (le Mall : la fin de la descente de l'escalier de secours du Terror Hotel)
+    ride = i >= 0 ? createSlideRide({ gl: sceneGl(), hex: SLIDES[i].hex, side: i % 2 ? -1 : 1, sfx }) : createStairRide({ gl: sceneGl(), sfx });
     ride.hold(); // le noir, le temps que le niveau finisse de se charger
     document.body.classList.add('riding');
     if (hud) hud.blackNow();
@@ -2031,9 +2036,17 @@ function handleEvent(ev, me) {
         startRide(sim.map.slides[sim.slide]);
         break;
       }
+      // Level 5 : la porte coupe-feu passée, on dévale l'escalier de secours (view/stairwell.js) jusqu'au Level 17
+      if (ev.level === HOTEL_LEVEL && scene) {
+        endRide();
+        ride = createStairRide({ gl: sceneGl(), sfx });
+        ride.start();
+        document.body.classList.add('riding');
+        break;
+      }
       if (sfx && ev.level === 2) sfx.splashDown();
       else if (sfx && ev.level !== HOTEL_LEVEL) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
-      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : ev.level === HOTEL_LEVEL ? 'YOU RUN DOWN THE FIRE ESCAPE, FLOOR AFTER FLOOR…' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
+      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : ev.level === MALL_LEVEL ? 'THE STAGE FREIGHT ELEVATOR IS GOING DOWN… THE FILM KEEPS PLAYING ABOVE YOU' : ev.level === HOTEL_LEVEL ? 'YOU RUN DOWN THE FIRE ESCAPE, FLOOR AFTER FLOOR…' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
       break;
     case 'level':
       if (hud) hud.closeKeypad();

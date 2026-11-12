@@ -125,6 +125,7 @@ export const BLOW_DELAY = 2.2; // la vanne fermée, les néons de son secteur gr
 export const BURN_LOCK = 0.9; // brûlé par un jet de vapeur : repoussé, sonné un instant
 export const DEPART_T = 3; // secondes entre la fermeture des portes et l'arrivée
 export const SLIDE_T = 6.5; // Poolrooms : la descente dans le toboggan, avant l'écran de chargement (plus longue qu'un ascenseur)
+export const STAIRS_T = 7.5; // Level 5 : la descente de l'escalier de secours vers le Level 17, avant l'écran de chargement
 export const BOARD_T = 45; // Poolrooms : dès qu'un joueur est dans un toboggan, les autres ont ce temps pour le suivre
 export const LIFT_CLOSE_T = 2; // le bouton pressé dans la cabine : les portes mettent ce temps à se fermer
 export const LIFT_SHUT_T = 1.7; // … dont celui que mettent les vantaux à se rejoindre (à l'écran comme ici)
@@ -722,6 +723,11 @@ export class BackroomsSim {
     // Level 2 : le troupeau remplace l'entité (elle reste là pour relayer le son et l'image de la chèvre la plus proche)
     this.goats = level === PIPES_LEVEL && this.hasMonster ? createGoats(this.map, goatCount(this.roster.length, this.difficulty)) : null;
     this.herd = null;
+    // Level 17 : on sort de l'escalier de secours par la porte coupe-feu de la cour ouest, tourné vers la cour
+    if (level === MALL_LEVEL) for (const P of this.players) {
+      P.yaw = Math.PI + 0.49;
+      P.pitch = 0;
+    }
     // Level 17 : la grande poupée tient la place de l'entité (engine/doll.js)
     this.doll = level === MALL_LEVEL && this.hasMonster;
     if (this.doll) dollInit(this);
@@ -3837,7 +3843,7 @@ export class BackroomsSim {
     if (alive > 0) return;
     this.boardT = 0;
     if (inside > 0) {
-      this.departT = this.map.slides ? SLIDE_T : DEPART_T;
+      this.departT = this.map.slides ? SLIDE_T : this.level === HOTEL_LEVEL ? STAIRS_T : DEPART_T;
       this.emit({ type: 'depart', level: this.level, t: this.departT });
     } else {
       this.state = 'dead';
@@ -3853,7 +3859,13 @@ export class BackroomsSim {
       this.emit({ type: 'level', level: this.level });
       return;
     }
-    // les autres toboggans sortent des Backrooms ; les Tuyauteries sont le dernier niveau
+    // Level 5 : l'escalier de secours du Terror Hotel descend jusqu'au Level 17, le Mall
+    if (this.level === HOTEL_LEVEL) {
+      this.loadLevel(MALL_LEVEL);
+      this.emit({ type: 'level', level: this.level });
+      return;
+    }
+    // les autres toboggans sortent des Backrooms ; les Tuyauteries et le Mall sont des fins
     if (this.map.slides || this.level >= LAST_LEVEL) {
       this.state = 'won';
       this.emit({ type: 'win', time: this.time });

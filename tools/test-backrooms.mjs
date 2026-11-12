@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, SLIDE_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL, RELAY_ARM, RELAY_SYNC, LIFT_CALL_T, L1_CALM, L1_FIRST_BLACKOUT, SECTOR_STEP, REELS, FILM_LEAD_T, PICK_R, USE_R, SPRINT_SPEED } from '../backrooms/engine/sim.js';
+import { BackroomsSim, CALM_HOLD, HAUNT_COOLDOWN, DT, DEPART_T, SLIDE_T, BOARD_T, FUSES, WHISTLE_CD, GRAB_T, MONSTER_STUN_T, NOISE, PANEL_T, stairAt, stairLocal, feetY, mapPrint, LIFT_CLOSE_T, ARRIVE_T, FINALE_WAIT, HUNT_DELAY, WATER_DRAIN, WATER_RUN, THIRST_BLUR, ALMOND_WATER, WATER_LEVEL_MIN, LIFT_SHUT_T, LIFT_FACE, PLAYER_RADIUS, INV_SIZE, DROP_AHEAD, DOCK_OPEN_T, DOCK_CLOSE_T, DOCK_FORCE_T, ALARM_T, DUCT_LAND, HOTEL_LEVEL, RELAY_ARM, RELAY_SYNC, LIFT_CALL_T, L1_CALM, L1_FIRST_BLACKOUT, SECTOR_STEP, REELS, FILM_LEAD_T, PICK_R, USE_R, SPRINT_SPEED, STAIRS_T } from '../backrooms/engine/sim.js';
 import { hideFront } from '../backrooms/engine/hides.js';
 import { navOf, roamable } from '../backrooms/engine/gait.js';
 import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
@@ -3083,7 +3083,7 @@ test('Level 17 : la sortie reste fermée tant que le film ne passe pas ; les cin
   assert.ok(sim.inCabin(P), 'on entre dans le monte-charge');
   sim.step({ pick: true });
   for (let i = 0; i < (LIFT_CLOSE_T + DEPART_T) * 60 + 30 && sim.state === 'playing' && sim.level === MALL_LEVEL; i++) sim.step({});
-  assert.ok(sim.state === 'won' || sim.level !== MALL_LEVEL, 'le monte-charge emmène l\'équipe');
+  assert.equal(sim.state, 'won', 'le monte-charge emmène l\'équipe : la partie est gagnée');
 });
 
 test('Level 17 : les bobines, leur montage et le film arrivent chez un invité', () => {
@@ -3378,15 +3378,60 @@ test('Level 5 : lettres ramassées, postées dans les boîtes, code au plafond, 
   assert.equal(sim.codeShown, true);
   assert.equal(P.letters.length, 0);
   assert.ok(sim.drainEvents().some((e) => e.type === 'codeShown'));
-  // le bon code ouvre la porte ; on la passe : partie gagnée
+  // le bon code ouvre la porte ; on la passe : l'escalier de secours descend jusqu'au Level 17, le Mall
   sim.step({ code: m.code });
   assert.equal(sim.open, true);
   const E = m.elevator;
   goTo(sim, P, E.x, E.z);
+  P.inv[0] = 'battery';
+  sim.drainEvents();
   sim.step();
   assert.equal(P.status, 'elevator');
+  const dep = sim.drainEvents().find((e) => e.type === 'depart');
+  assert.ok(dep && dep.level === HOTEL_LEVEL && dep.t === STAIRS_T, 'la descente de l\'escalier dure plus qu\'un ascenseur');
   run(sim, DEPART_T + 0.2);
-  assert.equal(sim.state, 'won');
+  assert.equal(sim.level, HOTEL_LEVEL, 'on dévale encore l\'escalier');
+  run(sim, STAIRS_T - DEPART_T);
+  assert.equal(sim.state, 'playing');
+  assert.equal(sim.level, MALL_LEVEL, 'la porte de secours de l\'hôtel mène au Level 17');
+  assert.ok(sim.drainEvents().some((e) => e.type === 'level' && e.level === MALL_LEVEL));
+  // on arrive debout dans la cour ouest, devant la porte coupe-feu, tourné vers la cour ; la poupée est loin, endormie
+  const Q = sim.players[0];
+  const up = sim.floors[0];
+  assert.equal(Q.status, 'alive');
+  assert.equal(Q.inv[0], 'battery', 'on garde ce qu\'on avait en poche');
+  assert.equal(up.roomAt(Q.x, Q.z).name, 'West Court');
+  assert.ok(up.doors.some((d) => d.kind === 'fire' && Math.hypot((d.x + 0.5) * CELL_SIZE - Q.x, (d.z + 0.5) * CELL_SIZE - Q.z) < 8), 'la porte coupe-feu par où l\'on arrive est juste derrière');
+  assert.ok(Math.cos(Q.yaw) < -0.5, 'tourné vers la cour (le sud)');
+  assert.ok(!sim.open && sim.cassettes === 0 && sim.allCassettes.length === REELS);
+});
+
+test('Level 5 → Level 17 : avec la poupée, on arrive loin d\'elle et elle dort ; un invité suit ; la sortie du mall finit la partie', () => {
+  const players = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }];
+  const host = new BackroomsSim({ difficulty: 'normal', seed: 12, level: HOTEL_LEVEL, players, localId: 'a' });
+  const guest = new BackroomsSim({ difficulty: 'normal', seed: 12, level: HOTEL_LEVEL, players, localId: 'b' });
+  host.powered = true; // (la porte de secours déverrouillée)
+  const E = host.map.elevator;
+  for (const P of host.players) goTo(host, P, E.x, E.z);
+  host.step();
+  assert.ok(host.departT > 0);
+  for (let i = 0; i < STAIRS_T * 60 + 5 && host.level === HOTEL_LEVEL; i++) host.step();
+  assert.equal(host.level, MALL_LEVEL);
+  guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())), 0);
+  assert.equal(guest.level, MALL_LEVEL, 'l\'invité change de niveau avec l\'hôte');
+  assert.equal(guest.fp, host.fp);
+  const M = host.monster;
+  assert.ok(host.doll && M.dormantT > 60);
+  for (const P of host.players) assert.ok(P.status === 'alive' && Math.hypot(P.x - M.x, P.z - M.z) > 60, 'loin de la poupée');
+  assert.ok(Math.hypot(guest.monster.x - M.x, guest.monster.z - M.z) < 0.02);
+  // la sortie du Level 17 : ce que faisait jusqu'ici celle du Level 5 (la partie est gagnée)
+  host.film = FILM_LEAD_T + 1;
+  const L = host.map.elevator;
+  for (const P of host.players) goTo(host, P, L.x, L.z);
+  host.step({ pick: true });
+  for (let i = 0; i < (LIFT_CLOSE_T + DEPART_T) * 60 + 30 && host.state === 'playing'; i++) host.step({});
+  assert.equal(host.state, 'won');
+  assert.equal(host.level, MALL_LEVEL);
 });
 
 test('Level 5 : caché sous un lit, l\'entité perd sa trace ; elle tue si elle l\'a vu s\'y glisser', () => {
