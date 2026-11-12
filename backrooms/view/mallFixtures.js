@@ -39,6 +39,58 @@ export function createFixtures(K) {
   };
   const cyl = (k, r0, r1, h, x, y, z, seg = 10) => G.add(k, new THREE.CylinderGeometry(r0, r1, h, seg).translate(x, y + h / 2, z));
 
+  // --- un gros pot de terre cuite (la cour est) : tourné, sa terre, une plante dedans ---
+  if (!MATS.clay) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const g = c.getContext('2d');
+    g.fillStyle = '#b26a45';
+    g.fillRect(0, 0, 256, 256);
+    let sd = 7;
+    const R = () => ((sd = (sd * 16807) % 2147483647) - 1) / 2147483646;
+    // le grain de la terre, les traces du tour (des bandes à peine marquées), des auréoles de calcaire vers le bas
+    for (let i = 0; i < 5000; i++) {
+      g.fillStyle = R() < 0.5 ? 'rgba(70,32,16,0.10)' : 'rgba(232,170,128,0.10)';
+      g.fillRect(R() * 256, R() * 256, 1 + R() * 2, 1 + R() * 2);
+    }
+    for (let y = 0; y < 256; y += 3 + R() * 9) {
+      g.fillStyle = R() < 0.5 ? 'rgba(60,26,12,0.07)' : 'rgba(240,190,150,0.06)';
+      g.fillRect(0, y, 256, 1 + R() * 2);
+    }
+    for (let i = 0; i < 14; i++) {
+      const x = R() * 256;
+      const w = 14 + R() * 40;
+      const gr = g.createLinearGradient(0, 256, 0, 150 + R() * 60);
+      gr.addColorStop(0, 'rgba(236,224,206,0.34)');
+      gr.addColorStop(1, 'rgba(236,224,206,0)');
+      g.fillStyle = gr;
+      g.fillRect(x, 130, w, 126);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    MATS.clay = { m: baked(lam({ map: t })), S: 1 };
+  }
+  const claypot = (it) => {
+    const { x, z } = it;
+    const a = rand(it.id) * 6.28;
+    const g = new THREE.LatheGeometry(
+      [[0.0, 0.0], [0.27, 0.0], [0.29, 0.03], [0.37, 0.5], [0.385, 0.52], [0.43, 0.53], [0.45, 0.56], [0.45, 0.61], [0.43, 0.63], [0.395, 0.63], [0.375, 0.6], [0.37, 0.5]].map(([r, h]) => new THREE.Vector2(r, h)),
+      28,
+    );
+    // (la texture : un tour pour la circonférence, le bas de l'image au pied du pot)
+    const u = g.attributes.uv;
+    for (let i = 0; i < u.count; i++) u.setXY(i, u.getX(i) * 2, 1 - Math.min(1, u.getY(i) * 1.6));
+    G.add('clay', g.translate(x, 0, z));
+    G.add('soil', new THREE.CylinderGeometry(0.372, 0.372, 0.02, 20).translate(x, 0.535, z));
+    const k = it.plant % 3;
+    if (k === 0) model('potted_plant_04', x, 0.54 - 0.15 * 2.9, z, a, 2.9, 0, 0, 'potted_plant_04_plant+potted_plant_04_dirt');
+    else if (k === 1) {
+      model('fern_02', x - 0.05, 0.52, z, a, 2.4, 0, 0, 'fern_02_b');
+      model('fern_02', x + 0.08, 0.52, z + 0.05, a + 2, 2.0, 0, 0, 'fern_02_c');
+    } else model('potted_plant_04', x, 0.54 - 0.15 * 3.4, z, a + 1, 3.4, 0, 0, 'potted_plant_04_plant+potted_plant_04_dirt');
+  };
+
   // --- une fontaine à sec ---
   const fountain = (it) => {
     const R = it.w / 2;
@@ -401,5 +453,5 @@ export function createFixtures(K) {
     }
   };
 
-  return { fountain, kiosk, concession, stall, counter, diner };
+  return { fountain, kiosk, concession, stall, counter, diner, claypot };
 }

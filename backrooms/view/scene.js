@@ -313,6 +313,8 @@ const MALL_FP = {
   pendant: [7.0, 0.95, 2.0],
   sconce: [4.6, 0.5, 1.9],
   spot: [4.2, 1.0, 2.1],
+  down: [5.5, 1.05, 1.6], // les spots puissants du hall du cinéma (l.strong)
+  led: [0.5, 0, 2], // un ruban de LED n'éclaire pas le sol (sa couleur y tombe par les feux de couleur)
   panel: [5.5, 0.9, 2.2],
   tube: [5.75, 1.2, 2.2],
   aisle: [2.5, 0.35, 2.0],
@@ -331,6 +333,7 @@ const MALL_UP = {
   panel: [2.4, 0.3, 2.0],
   tube: [4.2, 0.75, 2.0],
   glow: [11.0, 1.5, 1.3],
+  led: [7.0, 1.2, 1.6], // le ruban de LED du cinéma : une nappe bleue sur le plafond (troisième canal)
 };
 
 export function createBackroomsScene(container, floors, lamps) {
@@ -585,6 +588,7 @@ export function createBackroomsScene(container, floors, lamps) {
     const liveU = MALL ? new Float32Array(BW * BH) : null;
     const baseUB = MALL ? new Float32Array(BW * BH) : null;
     const liveUB = MALL ? new Float32Array(BW * BH) : null;
+    const baseUG = MALL ? new Float32Array(BW * BH) : null; // (le troisième canal : le bleu des rubans de LED)
     // Poolrooms : la carte de l'eau, deux fois plus fine que la lumière cuite. Rouge : la présence de l'eau, floutée
     // sur deux mètres (les reflets de l'eau qui dansent sur les murs et les plafonds, la margelle et le sol mouillés,
     // la vapeur au-dessus des bassins) ; vert : la même, nette ; bleu : la profondeur (2 m pour 1)
@@ -865,7 +869,7 @@ float occVis(vec3 p, vec3 lp) {
       // (Level 1 : des réglettes de 2 × 36 W, qui portent plus loin qu'un pavé de néon)
       // Level 17 : chaque genre de lampe a sa portée, sa force et sa pente (voir MALL_FP)
       // (rad : une lampe qui porte où elle veut, la lumière des voûtes du haut tombée dans les vides)
-      const mk = MALL && !o ? (l.rad ? [l.rad, l.gain ?? 1, l.fall ?? 1.4] : l.kind === 'pendant' && l.big ? MALL_FP.big : MALL_FP[l.kind] || MALL_FP.spot) : null;
+      const mk = MALL && !o ? (l.rad ? [l.rad, l.gain ?? 1, l.fall ?? 1.4] : l.kind === 'pendant' && l.big ? MALL_FP.big : l.strong ? MALL_FP.down : MALL_FP[l.kind] || MALL_FP.spot) : null;
       const LR = o ? o.r : mk ? mk[0] : LB ? LIGHT_R * CELL_SIZE * 2.3 : l.bright ? LIGHT_R * CELL_SIZE * 1.55 : l.kind === 'bulb' ? 2.2 * CELL_SIZE : l.kind === 'tube' ? 2.3 * CELL_SIZE : LIGHT_R * CELL_SIZE * (L0 ? 1.15 : L1 ? 1.2 : 1);
       const gain = o ? o.gain : mk ? mk[1] : LB ? 1.42 : l.bright ? 1.3 : l.kind === 'bulb' ? 1.05 : l.kind === 'tube' ? 1.45 : L0 ? 0.97 : 1; // Level 0 : l'image environ 10 % moins lumineuse qu'au réglage du 7 novembre (la courbe du caméscope compresse : il faut baisser plus les néons)
       const fall = o ? o.fall : mk ? mk[2] : LB ? 1.5 : L1 ? 2.2 : 2.4;
@@ -890,7 +894,7 @@ float occVis(vec3 p, vec3 lp) {
     const addPrint = (arr, fp, k) => {
       for (let i = 0; i < fp.length; i += 2) arr[fp[i]] += fp[i + 1] * k;
     };
-    const chan = (l) => ((l.kind === 'tube' && PIPES) || (MALL && (l.kind === 'tube' || l.kind === 'panel')) ? 1 : 0); // 1 : le canal bleu (lumière froide)
+    const chan = (l) => ((l.kind === 'tube' && PIPES) || (MALL && (l.kind === 'tube' || l.kind === 'panel' || l.kind === 'glow')) ? 1 : 0); // 1 : le canal bleu (lumière froide)
     // l'empreinte de chaque lampe est gardée : au Level 2, un secteur qui saute ou se rallume refait la somme
     const fpOf = (l) => l.bakeFp || (l.bakeFp = footprint(l));
     // (Level 17 : l'empreinte au plafond ; aucune pour la lumière tombée d'un vide ou les veilleuses des allées)
@@ -910,7 +914,8 @@ float occVis(vec3 p, vec3 lp) {
       if (MALL) {
         baseU.fill(0);
         baseUB.fill(0);
-        for (const l of map.lights) if (l.state === 'on') addPrint(chan(l) ? baseUB : baseU, fpUOf(l), 1);
+        baseUG.fill(0);
+        for (const l of map.lights) if (l.state === 'on') addPrint(l.kind === 'led' ? baseUG : chan(l) ? baseUB : baseU, fpUOf(l), 1);
       }
       flickers = map.lights.filter((l) => l.state === 'flicker').map((l) => ({ l, k: 1, fp: fpOf(l), fpU: MALL ? fpUOf(l) : null, ch: chan(l), calm: Math.random() * 4, burst: 0 }));
     };
@@ -1065,6 +1070,7 @@ float occVis(vec3 p, vec3 lp) {
         if (!alarm && !casc) for (const f of flickers) if (f.k > 0 && f.fpU) addPrint(f.ch ? liveUB : liveU, f.fpU, f.k);
         for (let i = 0; i < BW * BH; i++) {
           bake2Data[i * 4] = Math.round(Math.min(1, 0.018 * (power ? 1 : 0.25) + liveU[i] * 0.3 * power) * 255);
+          bake2Data[i * 4 + 1] = Math.round(Math.min(1, baseUG[i] * 0.3 * power) * 255);
           bake2Data[i * 4 + 2] = Math.round(Math.min(1, liveUB[i] * 0.3 * power) * 255);
         }
         bake2Tex.needsUpdate = true;
@@ -1874,7 +1880,9 @@ float bkCaust(vec2 uv, float t) {
             vec4 up = texture2D(uBake2, bkUv) * 0.4 + (texture2D(uBake2, bkUv + vec2(u1.x, 0.0)) + texture2D(uBake2, bkUv - vec2(u1.x, 0.0)) + texture2D(uBake2, bkUv + vec2(0.0, u1.y)) + texture2D(uBake2, bkUv - vec2(0.0, u1.y))) * 0.15;
             float kUp = ny < -0.5 ? 1.0 : (ny > 0.5 ? 0.0 : smoothstep(1.0, 3.4, by));
             vec3 lo = (uBakeTint * bk.r + uBakeTint2 * bk.b) * shape;
-            vec3 hi = (uBakeTint * up.r + uBakeTint2 * up.b) * mix(0.8, 1.0, bk.g) * (ny < -0.5 ? 1.0 : 0.92);
+            vec3 hi = (uBakeTint * up.r + uBakeTint2 * up.b + vec3(0.34, 0.46, 1.6) * up.g) * mix(0.8, 1.0, bk.g) * (ny < -0.5 ? 1.0 : 0.92);
+            // un sol très éclairé (le hall du cinéma) renvoie de sa lumière vers le plafond et le haut des murs
+            hi += (uBakeTint * bk.r + uBakeTint2 * bk.b) * 1.1 * max(bk.r + bk.b - 0.22, 0.0);
             totalEmissiveRadiance += diffuseColor.rgb * mix(lo, hi, kUp) * 2.0;
           }
           #else
@@ -4738,7 +4746,7 @@ void main() {
           const cand = [];
           for (const l of map.lights) {
             const k = power && l.state !== 'off' && !(L3 && sim.blackout > 0) ? (l.k ?? 1) * (l.state === 'flicker' ? 0.6 : 1) : 0;
-            if (k <= 0 || (l.hidden && !L3) || (MALL && (l.kind === 'well' || l.kind === 'aisle'))) continue; // (l'hôtel : les appliques n'ont pas de plafonnier, mais brillent)
+            if (k <= 0 || (l.hidden && !L3) || (MALL && (l.kind === 'well' || l.kind === 'aisle' || l.kind === 'led'))) continue; // (l'hôtel : les appliques n'ont pas de plafonnier, mais brillent)
             const d = Math.abs(l.x - P.x) + Math.abs(l.z - P.z);
             if (d < (MALL ? 48 : 32)) cand.push([d, l, k]);
           }

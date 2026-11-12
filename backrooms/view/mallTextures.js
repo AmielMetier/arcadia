@@ -365,56 +365,60 @@ export function cinemaCarpet(w, h, discs, img) {
   const PX = 32;
   const [c, g] = canvas(Math.ceil(w * PX), Math.ceil(h * PX));
   seed = 1010;
-  g.fillStyle = '#6a2f8e';
+  // (comme au multiplexe de référence) un violet vif ; de grandes plages bleu canard ; autour d'un pilier sur deux, une
+  // île bordeaux cerclée d'orange ; des chemins orange qui relient les îles ; des formes rouge orangé sur les bords
+  g.fillStyle = '#8a3ec4';
   g.fillRect(0, 0, c.width, c.height);
-  // les grandes formes bleu canard (des polygones aux coins arrondis)
-  const shape = (pts, fill, stroke) => {
+  const poly = (pts, fill, round = 0.9) => {
     g.beginPath();
     pts.forEach(([x, y], i) => (i ? g.lineTo(x * PX, y * PX) : g.moveTo(x * PX, y * PX)));
     g.closePath();
     g.fillStyle = fill;
+    g.strokeStyle = fill;
+    g.lineJoin = 'round';
+    g.lineWidth = round * PX;
     g.fill();
-    if (stroke) {
-      g.strokeStyle = stroke;
-      g.lineWidth = 0.12 * PX;
-      g.lineJoin = 'round';
-      g.stroke();
-    }
-  };
-  for (let i = 0; i < Math.max(3, Math.round((w * h) / 260)); i++) {
-    const cx = R() * w;
-    const cy = R() * h;
-    const n = 4 + Math.floor(R() * 3);
-    const r = 3 + R() * 5;
-    const pts = Array.from({ length: n }, (_, k) => {
-      const a = (k / n) * Math.PI * 2 + R() * 0.6;
-      return [cx + Math.cos(a) * r * (0.6 + R() * 0.6), cy + Math.sin(a) * r * (0.6 + R() * 0.6)];
-    });
-    shape(pts, R() < 0.7 ? '#24808c' : '#b8451e', null);
-  }
-  // les filets orange : de longues lignes brisées qui traversent la salle
-  g.strokeStyle = '#e0641e';
-  g.lineWidth = 0.1 * PX;
-  for (let i = 0; i < Math.max(4, Math.round(w / 6)); i++) {
-    g.beginPath();
-    let x = R() * w;
-    let y = R() < 0.5 ? 0 : h;
-    g.moveTo(x * PX, y * PX);
-    for (let k = 0; k < 6; k++) {
-      x += (R() - 0.5) * 14;
-      y += (y > h / 2 ? -1 : 1) * (2 + R() * 6);
-      g.lineTo(x * PX, y * PX);
-    }
     g.stroke();
+  };
+  const isles = discs.filter((d, i) => d[0] > 0 && d[0] < w && d[1] > 0 && d[1] < h && i % 2 === 0);
+  const clear = (x, y, r) => isles.every((d) => Math.hypot(d[0] - x, d[1] - y) > d[2] + r);
+  // les plages bleu canard : des quadrilatères en biais, hors des îles
+  for (let i = 0, n = 0; i < 40 && n < 4; i++) {
+    const cx = 4 + R() * (w - 8);
+    const cy = 4 + R() * (h - 8);
+    const rx = 3.5 + R() * 3.5;
+    const ry = 2 + R() * 2;
+    if (!clear(cx, cy, Math.max(rx, ry) + 0.6)) continue;
+    const sk = (R() - 0.5) * 3;
+    poly([[cx - rx + sk, cy - ry], [cx + rx + sk, cy - ry + (R() - 0.5)], [cx + rx - sk, cy + ry], [cx - rx - sk, cy + ry + (R() - 0.5)]], '#1f8a96', 0.5);
+    n++;
   }
-  // un disque bordeaux cerclé d'orange autour des piliers
-  for (const [x, y, r] of discs) {
+  // les formes rouge orangé, à cheval sur les bords de la salle
+  for (const [cx, cy, rx, ry] of [[w * 0.22, h, 5.5, 2.6], [w * 0.8, 0, 4.5, 2.2], [0, h * 0.45, 2.4, 4.2]]) poly([[cx - rx, cy - ry], [cx + rx * 0.7, cy - ry], [cx + rx, cy + ry * 0.2], [cx + rx * 0.5, cy + ry], [cx - rx, cy + ry]], '#c8442a', 1.6);
+  // les chemins orange : d'une île à la suivante, et de chaque île vers le mur le plus proche
+  g.strokeStyle = '#e8762a';
+  g.lineWidth = 0.34 * PX;
+  g.lineCap = 'round';
+  const path = (ax, ay, bx, by, bend) => {
+    g.beginPath();
+    g.moveTo(ax * PX, ay * PX);
+    g.quadraticCurveTo(((ax + bx) / 2 - (by - ay) * bend) * PX, ((ay + by) / 2 + (bx - ax) * bend) * PX, bx * PX, by * PX);
+    g.stroke();
+  };
+  for (let i = 0; i < isles.length; i++) {
+    const a = isles[i];
+    const b = isles[(i + 1) % isles.length];
+    if (isles.length > 1 && i < isles.length - 1) path(a[0], a[1], b[0], b[1], (i % 2 ? 1 : -1) * 0.18);
+    path(a[0], a[1], a[0] + (R() - 0.5) * 8, a[1] < h / 2 ? 0 : h, 0.08);
+  }
+  // les îles : un disque bordeaux, son large cerne orange
+  for (const [x, y, r] of isles) {
     g.beginPath();
     g.arc(x * PX, y * PX, r * PX, 0, 7);
-    g.fillStyle = '#6e1a24';
+    g.fillStyle = '#7a1f2c';
     g.fill();
-    g.strokeStyle = '#e0641e';
-    g.lineWidth = 0.14 * PX;
+    g.strokeStyle = '#e8762a';
+    g.lineWidth = 0.34 * PX;
     g.stroke();
   }
   // les poils : la photo de moquette en surimpression, et l'usure des passages
@@ -507,6 +511,10 @@ export function createMallTextures() {
   const [ac, ag] = mk(512);
   drawPlaster(ag, 512, '58,59,64', null);
   out.paintDark = tex(ac);
+  // le plafond du hall du cinéma : un anthracite plus clair (il renvoie la lumière de la moquette)
+  const [hc, hg] = mk(512);
+  drawPlaster(hg, 512, '104,106,116', null);
+  out.paintChar = tex(hc);
   const [wc, wg] = mk(512);
   drawPlaster(wg, 512, '196,192,180', null);
   out.paintGrey = tex(wc);
@@ -603,7 +611,7 @@ export function createMallTextures() {
     out.terrazzo.needsUpdate = true;
     drawChecker(cg, S, mw, mb);
     out.checker.needsUpdate = true;
-    drawCarpet(vg, 512, moq, '#6a2f8e', '#9b4fc4');
+    drawCarpet(vg, 512, moq, '#7634aa', '#a055d0');
     out.carpetViolet.needsUpdate = true;
     drawCarpet(dg, 512, moq, '#2e2f35', '#5a5b63');
     out.carpetDark.needsUpdate = true;
@@ -611,6 +619,8 @@ export function createMallTextures() {
     out.plaster.needsUpdate = true;
     drawPlaster(ag, 512, '58,59,64', pap);
     out.paintDark.needsUpdate = true;
+    drawPlaster(hg, 512, '104,106,116', pap);
+    out.paintChar.needsUpdate = true;
     drawPlaster(wg, 512, '196,192,180', pap);
     out.paintGrey.needsUpdate = true;
     if (pla) {

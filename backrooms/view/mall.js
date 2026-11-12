@@ -16,7 +16,7 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
 import { CELL_SIZE as C, T, FLOOR_DY } from '../engine/map.js';
-import { MALL_CEIL, MALL_RAIL } from '../engine/mall.js';
+import { MALL_CEIL, MALL_RAIL, ledLoop } from '../engine/mall.js';
 import { cinemaCarpet } from './mallTextures.js';
 import { drawMallProps } from './mallProps.js';
 import { drawMallWalls } from './mallWalls.js';
@@ -321,10 +321,12 @@ function makeMaterials(tx, baked) {
     quarry: { m: baked(phong({ map: tx.quarry, specular: '#1c1a16', shininess: 30 }), { spec: 0.25, gloss: 70, mask: 0 }), S: 3.0 },
     concrete: { m: baked(lam({ map: tx.concrete })), S: 2.5 },
     wood: { m: baked(phong({ map: tx.wood, specular: '#241b12', shininess: 40 }), { spec: 0.3, gloss: 70, mask: 0 }), S: 2.0 },
+    woodFront: { m: baked(phong({ map: tx.wood, color: '#b06c40', specular: '#241b12', shininess: 40 }), { spec: 0.3, gloss: 70, mask: 0 }), S: 1.6 },
     faience: { m: baked(phong({ map: tx.faience, specular: '#3a3a3a', shininess: 80 }), { spec: 0.35, gloss: 140, mask: 0 }), S: 2.0 },
     plaster: { m: baked(lam({ map: tx.plaster })), S: 2.5 },
     paintGrey: { m: baked(lam({ map: tx.paintGrey })), S: 2.5 },
     paintDark: { m: baked(lam({ map: tx.paintDark })), S: 2.5 },
+    paintChar: { m: baked(lam({ map: tx.paintChar })), S: 2.5 },
     block: { m: baked(lam({ map: tx.block })), S: 2.5 },
     ceilTiles: { m: baked(lam({ map: tx.ceilTiles })), S: 2.5 },
     slab: { m: baked(lam({ map: tx.slab })), S: 2.5 },
@@ -349,7 +351,9 @@ function makeMaterials(tx, baked) {
     // les marches des escalators : de l'aluminium sombre, un liseré jaune
     escStep: { m: baked(phong({ color: '#303236', specular: '#8a8e94', shininess: 50 }), { spec: 0.4, gloss: 80, mask: 0 }), S: 1 },
     escYellow: { m: baked(lam({ color: '#c9a21e' })), S: 1 },
-    led: { m: new THREE.MeshBasicMaterial({ color: new THREE.Color('#3a74ff').multiplyScalar(2.6) }), S: 1 },
+    led: { m: new THREE.MeshBasicMaterial({ color: new THREE.Color('#86a8ff').multiplyScalar(3.0) }), S: 1 },
+    // les petits spots des gradins de la lanterne (cour est)
+    lampW: { m: new THREE.MeshBasicMaterial({ color: new THREE.Color('#fff0d4').multiplyScalar(3.2) }), S: 1 },
   };
 }
 
@@ -425,14 +429,14 @@ function wallKey(r) {
       return 'paintGrey';
   }
 }
-const CEIL_KEY = { greyc: 'paintGrey', coffer: 'plaster', soffit: 'plaster', vault: 'plaster', dome: 'plaster', grid: 'ceilTiles', slab: 'slab', black: 'paintDark', spots: 'paintDark', sky: 'sky', lantern: 'sky' };
+const CEIL_KEY = { char: 'paintChar', greyc: 'paintGrey', coffer: 'plaster', soffit: 'plaster', vault: 'plaster', dome: 'plaster', grid: 'ceilTiles', slab: 'slab', black: 'paintDark', spots: 'paintGrey', sky: 'sky', lantern: 'sky' };
 
 // Les couleurs des lampes du mall (plus fortes que le blanc : le caméscope sature)
 export const MALL_ON = {
   warm: new THREE.Color('#ffe2b4').multiplyScalar(3.0),
   spot: new THREE.Color('#fff0d4').multiplyScalar(3.4),
   cool: new THREE.Color('#e6f0ff').multiplyScalar(3.0),
-  glow: new THREE.Color('#ffe8c8').multiplyScalar(1.9),
+  glow: new THREE.Color('#f2f5ff').multiplyScalar(2.0),
 };
 export const MALL_OFF = new THREE.Color('#4a453c');
 export const mallOnCol = (l) => (l.kind === 'cove' || l.kind === 'pendant' || l.kind === 'sconce' ? MALL_ON.warm : l.kind === 'panel' || l.kind === 'tube' ? MALL_ON.cool : l.kind === 'glow' ? MALL_ON.glow : MALL_ON.spot);
@@ -464,7 +468,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     const h = (cine.z1 - cine.z0 + 1) * C;
     const discs = Object.values(map.pillars)
       .filter((p) => p.kind === 'cine')
-      .map((p) => [p.x - X0, p.z - Z0, 1.55]);
+      .map((p) => [p.x - X0, p.z - Z0, 4.4]);
     const m = baked(new THREE.MeshLambertMaterial({ map: cinemaCarpet(w, h, discs, null) }));
     MATS.cine = { m, uv: (p) => [(p[0] - X0) / w, 1 - (p[2] - Z0) / h] };
     tx.ready.then(() => {
@@ -485,6 +489,8 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     if (!r) return { h: 3.0, kind: 'slab', r: null };
     if (fi === 0 && r.kind === 'mail' && z >= VZ0 && z <= VZ1) return { h: LANTERN, kind: 'lantern', r };
     if (r.vault) return { h: r.vault.base, kind: r.kind === 'plaza' ? 'spots' : 'vault', r };
+    // (le hall du cinéma : un plateau surélevé au milieu de son plafond bas)
+    if (r.tray && x >= r.tray.x0 && x <= r.tray.x1 && z >= r.tray.z0 && z <= r.tray.z1) return { h: r.tray.h, kind: r.ceil, r };
     return { h: r.ceilH, kind: r.ceil, r };
   };
   const ceilH = new Float32Array(W * H);
@@ -556,7 +562,8 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
         const h1 = ce.h;
         if (Math.abs(h2 - h1) < 0.01) continue;
         const hi = h1 > h2 ? r : roomOf(nx, nz);
-        const k = ce.kind === 'lantern' || ceilAt(nx, nz).kind === 'lantern' ? 'plaster' : wallKey(hi);
+        // (les retombées d'un plateau, au milieu d'une salle : peintes comme son plafond)
+        const k = ce.kind === 'lantern' || ceilAt(nx, nz).kind === 'lantern' ? 'plaster' : r && r.tray && roomOf(nx, nz) === r ? CEIL_KEY[r.ceil] : wallKey(hi);
         // la face, sur le bord commun ; tournée vers la case la plus haute
         const s = h1 > h2 ? -1 : 1; // +1 : vers la voisine
         if (dx) G.vface(k, (x + 1) * C, z * C, (x + 1) * C, (z + 1) * C, Math.min(h1, h2), Math.max(h1, h2), s, 0);
@@ -683,17 +690,37 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       frame(O2, null, V.top, 0.22);
       for (const k of [0.4, 0.75]) hoop(scale(O2, k), V.top, 0.18, 0.1);
     } else if (V.glow) {
-      // la lanterne lumineuse : un tambour droit, un plafond diffusant (une lampe) dans un cadre noir
-      ring(O1, V.base, V.top, 'plaster');
+      // la lanterne à gradins de la cour est (comme au centre de référence) : des ressauts qui montent en se
+      // resserrant, piqués de petits spots, jusqu'au plafond lumineux (une lampe)
+      const n = V.steps || 3;
+      const tr = V.tread || 0.8;
+      const rise = (V.top - V.base) / n;
+      const prof = [];
+      for (let i = 0; i < n; i++) {
+        prof.push([i * tr, i * rise, i * tr, (i + 1) * rise, 1, 0]);
+        if (i < n - 1) prof.push([i * tr, (i + 1) * rise, (i + 1) * tr, (i + 1) * rise, 0, -1]);
+      }
+      molding(O1, V.base, prof, 'plaster');
+      for (let i = 1; i < n; i++) {
+        const A = offsetPoly(O1, (i - 0.5) * tr);
+        for (let e = 0; e < A.length; e++) {
+          const a2 = A[e];
+          const b2 = A[(e + 1) % A.length];
+          const m = Math.max(1, Math.round(Math.hypot(b2[0] - a2[0], b2[1] - a2[1]) / 1.7));
+          for (let j = 0; j < m; j++) G.add('lampW', new THREE.CylinderGeometry(0.05, 0.05, 0.012, 12).translate(a2[0] + ((b2[0] - a2[0]) * (j + 0.5)) / m, V.base + i * rise - 0.006, a2[1] + ((b2[1] - a2[1]) * (j + 0.5)) / m));
+        }
+      }
+      const In = offsetPoly(O1, (n - 1) * tr);
       const g = new THREE.BufferGeometry();
       const pos = [];
-      for (let i = 1; i < O1.length - 1; i++) pos.push(O1[0][0], V.top, O1[0][1], O1[i][0], V.top, O1[i][1], O1[i + 1][0], V.top, O1[i + 1][1]);
+      for (let i = 1; i < In.length - 1; i++) pos.push(In[0][0], V.top, In[0][1], In[i][0], V.top, In[i][1], In[i + 1][0], V.top, In[i + 1][1]);
       g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
       g.computeVertexNormals();
       glowGeos.push(g); // (dessiné des deux côtés)
-      // le quadrillage du diffuseur
-      const b = bbox(O1);
-      for (let x = Math.ceil(b.x0 / 1.2) * 1.2; x < b.x1; x += 1.2) G.beam('black', [x, V.top - 0.03, b.z0], [x, V.top - 0.03, b.z1], 0.04, 0.05);
+      // le cadre du diffuseur, ses traverses
+      hoop(In, V.top, 0.05, 0.1);
+      const b = bbox(In);
+      for (let x = b.x0 + (b.x1 - b.x0) / 4; x < b.x1 - 0.5; x += (b.x1 - b.x0) / 4) G.beam('trim', [x, V.top - 0.02, b.z0], [x, V.top - 0.02, b.z1], 0.05, 0.04);
     } else {
       // la cour ouest : le tambour, un plafond plat, sa charpente (huit rayons, un anneau à mi-portée), le lustre au moyeu
       ring(O1, V.base, V.top, 'plaster');
@@ -823,10 +850,15 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
         G.add('steel', new THREE.CylinderGeometry(h + 0.012, h + 0.012, 0.22, 28, 1, true).translate(p.x, 0.25, p.z));
       }
       if (p.kind === 'cine') {
-        // le disque blanc au plafond, cerclé dessous d'un ruban de LED bleues (une lumière du moteur, lights())
-        G.add('trim', new THREE.CylinderGeometry(1.55, 1.55, 0.32, 48).translate(p.x, top - 0.16, p.z));
-        G.add('led', new THREE.TorusGeometry(1.47, 0.022, 6, 64).rotateX(Math.PI / 2).translate(p.x, top - 0.33, p.z));
-        blues.push({ x: p.x, y: top - 0.5, z: p.z, rad: 5.2, k: 1 });
+        // (comme au multiplexe de référence) un grand disque blanc suspendu sous le plafond, un plus petit dessous
+        // contre le fût ; quatre spots sous le grand (des lampes), trois suspentes
+        const yd = Math.min(3.3, top - 0.6);
+        G.add('trim', new THREE.CylinderGeometry(2.7, 2.7, 0.3, 56).translate(p.x, yd + 0.15, p.z));
+        G.add('trim', new THREE.CylinderGeometry(1.2, 1.2, 0.2, 40).translate(p.x, yd - 0.1, p.z));
+        for (let i = 0; i < 3; i++) {
+          const a = i * 2.094 + 0.5;
+          G.add('black', new THREE.CylinderGeometry(0.012, 0.012, top - yd - 0.3, 6).translate(p.x + Math.cos(a) * 2.2, (top + yd + 0.3) / 2, p.z + Math.sin(a) * 2.2));
+        }
       }
       continue;
     }
@@ -851,17 +883,21 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     }
   }
 
-  // 6b. Le plafond noir du hall du cinéma : deux retombées en long, bordées en dessous de rubans de LED bleues
+  // 6b. Le hall du cinéma : le ruban de LED qui fait le tour du plateau de son plafond (un profilé d'aluminium, la
+  // bande lumineuse dessous). Sa lumière bleue : cuite sur le plafond (le troisième canal, view/scene.js), et des feux
+  // de couleur qui tombent sur les retombées, les murs et la moquette
   let cineBox = null;
-  if (cine) {
-    const X0 = cine.x0 * C;
-    const X1 = (cine.x1 + 1) * C;
-    const top = cine.ceilH;
-    cineBox = [X0 - 0.25, cine.z0 * C - 0.25, X1 + 0.25, (cine.z1 + 1) * C + 0.25];
-    for (const zc of [(cine.z0 + 2) * C, (cine.z0 + 7) * C]) {
-      G.box('paintDark', X0 + 1.2, X1 - 1.2, top - 0.34, top, zc - 0.7, zc + 0.7, '+y');
-      for (const e of [-0.7, 0.7]) G.box('led', X0 + 1.25, X1 - 1.25, top - 0.36, top - 0.33, zc + e - 0.018, zc + e + 0.018, '+y');
-      for (let x = X0 + 6; x < X1 - 3; x += 9) blues.push({ x, y: top - 0.5, z: zc, rad: 5.5, k: 0.8 });
+  if (cine && cine.tray) {
+    cineBox = [cine.x0 * C - 0.25, cine.z0 * C - 0.25, (cine.x1 + 1) * C + 0.25, (cine.z1 + 1) * C + 0.25];
+    const y = cine.tray.h;
+    const L = ledLoop(cine.tray, C);
+    for (let i = 0; i < L.length; i++) {
+      const a = L[i];
+      const b = L[(i + 1) % L.length];
+      G.beam('steel', [a[0], y - 0.015, a[1]], [b[0], y - 0.015, b[1]], 0.1, 0.03);
+      G.beam('led', [a[0], y - 0.04, a[1]], [b[0], y - 0.04, b[1]], 0.06, 0.022);
+      const m = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / 11));
+      for (let j = 0; j < m; j++) blues.push({ x: a[0] + ((b[0] - a[0]) * (j + 0.5)) / m, y: y - 0.45, z: a[1] + ((b[1] - a[1]) * (j + 0.5)) / m, rad: 13, k: 1.5 });
     }
   }
 
@@ -1052,32 +1088,50 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     const top = r.ceilH; // le plafond de la boutique
     const HEAD = top - 0.62; // le bas du bandeau d'enseigne
     const out = sh.dir; // vers le mail
-    // le bandeau d'enseigne (noir ou laiton), sur toute la largeur
-    G.box(sh.sign % 2 ? 'black' : 'marbleDark', xa, xb, HEAD, top, z - 0.14, z + 0.14, '+y');
-    G.box('brass', xa, xb, HEAD - 0.03, HEAD, z - 0.15, z + 0.15, '+y');
+    // quatre factures de devanture, comme au centre de référence : un encadrement de noyer (deux pilastres, un
+    // linteau), un bandeau noir, un enduit crème à menuiseries blanches, un bandeau de marbre sombre
+    const style = sh.id % 4;
+    const bandK = style === 0 ? 'woodFront' : style === 1 ? 'black' : style === 2 ? 'plaster' : 'marbleDark';
+    const lineK = style === 2 ? 'trim' : 'brass';
+    G.box(bandK, xa, xb, HEAD, top, z - 0.14, z + 0.14, '+y');
+    G.box(lineK, xa, xb, HEAD - 0.03, HEAD, z - 0.15, z + 0.15, '+y');
     if (sh.state === 'gutted') continue;
+    const PIL = style === 0 ? 0.55 : 0;
+    if (PIL)
+      for (const [p0, p1] of [[xa, xa + PIL], [xb - PIL, xb]]) {
+        G.box('woodFront', p0, p1, 0.16, HEAD - 0.03, z - 0.16, z + 0.16, '-y');
+        G.box('marbleDark', p0, p1, 0, 0.16, z - 0.175, z + 0.175, '-y');
+        G.box('brass', p0, p1, HEAD - 0.14, HEAD - 0.11, z - 0.165, z + 0.165);
+      }
+    const fa = xa + PIL;
+    const fb = xb - PIL;
     if (sh.state === 'grille' && sh.id % 2 === 1) continue; // (un rideau métallique, view/mallProps.js)
     if (sh.state === 'grille') {
       // le rideau à mailles, baissé ; ses coulisses de part et d'autre
-      G.vface('grille', xa + 0.06, z, xb - 0.06, z, 0, HEAD - 0.03, 0, out);
-      for (const x of [xa + 0.04, xb - 0.04]) G.box('steel', x - 0.04, x + 0.04, 0, HEAD, z - 0.06, z + 0.06, '+y-y');
+      G.vface('grille', fa + 0.06, z, fb - 0.06, z, 0, HEAD - 0.03, 0, out);
+      for (const x of [fa + 0.04, fb - 0.04]) G.box('steel', x - 0.04, x + 0.04, 0, HEAD, z - 0.06, z + 0.06, '+y-y');
       continue;
     }
-    // la vitrine : une allège de marbre noir, des glaces entre des montants de laiton, la porte au milieu (open)
+    // la vitrine : une allège (marbre noir, ou blanche), des glaces entre des montants (laiton, ou blancs), la porte
+    // au milieu (open)
     const gap = sh.state === 'open' && sh.gap ? sh.gap : null;
-    const spans = gap ? [[xa, gap[0]], [gap[1], xb]] : [[xa, xb]];
+    const spans = gap ? [[fa, gap[0]], [gap[1], fb]] : [[fa, fb]];
+    const sillK = style === 2 ? 'trim' : 'marbleDark';
     for (const [s0, s1] of spans) {
-      G.box('marbleDark', s0, s1, 0, 0.32, z - 0.06, z + 0.06, '-y');
+      if (s1 - s0 < 0.2) continue;
+      G.box(sillK, s0, s1, 0, 0.32, z - 0.06, z + 0.06, '-y');
       G.vface('glass', s0, z, s1, z, 0.32, HEAD - 0.03, 0, out);
       const m = Math.max(1, Math.round((s1 - s0) / 1.6));
       for (let j = 0; j <= m; j++) {
         const x = s0 + ((s1 - s0) * j) / m;
-        G.box('brass', x - 0.03, x + 0.03, 0.32, HEAD - 0.03, z - 0.04, z + 0.04, '+y-y');
+        G.box(lineK, x - 0.03, x + 0.03, 0.32, HEAD - 0.03, z - 0.04, z + 0.04, '+y-y');
       }
+      // (menuiseries blanches : une traverse à hauteur d'imposte)
+      if (style === 2) G.box('trim', s0, s1, HEAD - 0.62, HEAD - 0.57, z - 0.035, z + 0.035);
       // une vitrine sur deux, quand la boutique est fermée : du papier kraft collé derrière
       if (sh.state === 'glass' && sh.dark) G.vface('paper', s0 + 0.05, z - out * 0.06, s1 - 0.05, z - out * 0.06, 0.34, HEAD - 0.05, 0, out);
     }
-    if (gap) for (const x of gap) G.box('brass', x - 0.05, x + 0.05, 0, HEAD - 0.03, z - 0.06, z + 0.06, '+y-y');
+    if (gap) for (const x of gap) G.box(lineK, x - 0.05, x + 0.05, 0, HEAD - 0.03, z - 0.06, z + 0.06, '+y-y');
   }
   // la grille du grand magasin fermé, sur toute la hauteur du passage
   for (const o of map.solids || []) {

@@ -64,7 +64,7 @@ const CEILS = [
     store: [3.8, 'grid'],
     closed: [3.8, 'grid'],
     portal: [4.6, 'soffit'],
-    cine: [6.2, 'black'],
+    cine: [4.4, 'char'],
     cineHall: [3.6, 'greyc'],
     screen: [8.2, 'black'],
     wc: [2.8, 'grid'],
@@ -170,6 +170,16 @@ const segDist = (s, x, z) => {
 export const octagon = (cx, cz, r) => {
   const k = r * Math.tan(Math.PI / 8);
   return [[cx + r, cz - k], [cx + r, cz + k], [cx + k, cz + r], [cx - k, cz + r], [cx - r, cz + k], [cx - r, cz - k], [cx - k, cz - r], [cx + k, cz - r]];
+};
+// un rectangle aux coins coupés (demi-côtés rx et rz, pan coupé c), dans l'ordre des sommets d'octagon()
+const chamfRect = (cx, cz, rx, rz, c) => [[cx + rx, cz - rz + c], [cx + rx, cz + rz - c], [cx + rx - c, cz + rz], [cx - rx + c, cz + rz], [cx - rx, cz + rz - c], [cx - rx, cz - rz + c], [cx - rx + c, cz - rz], [cx + rx - c, cz - rz]];
+// le ruban de LED d'un plateau de plafond (t : ses cases) : un tour à 60 cm des bords, deux coins opposés coupés
+export const ledLoop = (t, C = 2.5) => {
+  const x0 = t.x0 * C + 0.6;
+  const x1 = (t.x1 + 1) * C - 0.6;
+  const z0 = t.z0 * C + 0.6;
+  const z1 = (t.z1 + 1) * C - 0.6;
+  return [[x0 + 6, z0], [x1, z0], [x1, z1 - 5], [x1 - 5, z1], [x0, z1], [x0, z0 + 6]];
 };
 // une ellipse en n segments
 const oval = (cx, cz, rx, rz, n = 28) => Array.from({ length: n }, (_, i) => [cx + rx * Math.cos((i / n) * Math.PI * 2), cz + rz * Math.sin((i / n) * Math.PI * 2)]);
@@ -310,7 +320,7 @@ export function createMallMap(seed = 17) {
   // (inner : le rayon du second) ; la place est, basse et noire, s'ouvre sur une lanterne ovale lumineuse (glow)
   both(RK.COURT, COURTS.west.x0, COURTS.west.z0, COURTS.west.x1, COURTS.west.z1, { up: { name: 'West Court', court: 'west', ceil: [10, 'vault'], vault: { base: 6.4, open: 1.2, top: 10 } }, down: { name: 'West Court', court: 'west' } });
   both(RK.COURT, COURTS.center.x0, COURTS.center.z0, COURTS.center.x1, COURTS.center.z1, { up: { name: 'Center Court', court: 'center', ceil: [11.5, 'dome'], vault: { base: 7.0, open: 1.6, ring: 10.0, inner: 8.0, top: 11.5 } }, down: { name: 'Center Court', court: 'center' } });
-  room(0, RK.PLAZA, COURTS.east.x0, COURTS.east.z0, COURTS.east.x1, COURTS.east.z1, { name: 'East Court', court: 'east', vault: { base: 2.9, open: 2.6, top: 5.8, glow: true } });
+  room(0, RK.PLAZA, COURTS.east.x0, COURTS.east.z0, COURTS.east.x1, COURTS.east.z1, { name: 'East Court', court: 'east', vault: { base: 2.9, open: 2.6, top: 4.9, glow: true, steps: 4, tread: 1.3 } });
   room(1, RK.COURT, COURTS.east.x0, COURTS.east.z0, COURTS.east.x1, COURTS.east.z1, { name: 'East Court', court: 'east' });
 
   // --- 2. Les couloirs de service, derrière les boutiques (les deux étages) ---
@@ -373,7 +383,8 @@ export function createMallMap(seed = 17) {
   room(1, RK.LOBBY, 44, 8, X.center[1], 17, { name: 'Parking lobby' });
   room(1, RK.PORTAL, CMID - 2, 18, CMID + 3, 21, { name: 'Parking entrance' });
   // en haut : le cinéma (hall, couloir des salles, deux salles ouvertes)
-  room(0, RK.CINE, 66, 3, X.east[1], 17, { name: 'Stardust 8 Cinemas' });
+  // (son plafond : bas et anthracite sur le pourtour, un plateau surélevé au milieu, bordé d'un ruban de LED)
+  room(0, RK.CINE, 66, 3, X.east[1], 17, { name: 'Stardust 8 Cinemas', tray: { x0: 69, z0: 5, x1: 89, z1: 13, h: 6.0 } });
   room(0, RK.PORTAL, EMID - 2, 18, EMID + 2, 21, { name: 'Cinema entrance', cine: true });
   room(0, RK.CINE_HALL, X.corr[0], 3, X.corr[1], 44, { name: 'Screens 1-8' });
   room(0, RK.PORTAL, 93, 6, 93, 9, { name: 'Ticket check', cine: true });
@@ -632,7 +643,7 @@ export function createMallMap(seed = 17) {
   const rC = 12.2;
   const voidW = voidAdd(octagon(WCX, MZ, rW), { kind: 'court', court: 'west' });
   const voidC = voidAdd(octagon(CCX, MZ, rC), { kind: 'court', court: 'center' });
-  const voidE = voidAdd(oval(ECX, MZ, 9.2, 6.2), { kind: 'oval', court: 'east' });
+  const voidE = voidAdd(chamfRect(ECX, MZ, 9.2, 6.2, 3.2), { kind: 'court', court: 'east' });
 
   // --- 6. Les escaliers (deux volées et un palier, comme au Level 0), ouverts sur les cours ---
   const stairs = [];
@@ -726,13 +737,16 @@ export function createMallMap(seed = 17) {
     for (let z = 7; z <= 57; z += 5) for (let x = 3; x <= 13; x += 5) pillar(fi, x, z, { kind: 'store' });
     // le grand magasin fermé
     for (let z = 48; z <= 58; z += 5) for (let x = 43; x <= 66; x += 5) pillar(fi, x, z, { kind: 'store' });
-    // la cour est : une couronne de piliers autour du vide ovale (en haut, sous le plafond bas)
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * Math.PI * 2;
-      const x = ECX + Math.cos(a) * 12.2;
-      const z = MZ + Math.sin(a) * 9.0;
-      pillar(fi, Math.floor(x / C), Math.floor(z / C), { x, z, kind: 'court' });
-    }
+    // la cour est : une couronne de piliers autour de l'ouverture de sa lanterne (un à chaque angle de l'octogone, un au
+    // milieu de chaque grand côté), sous le plafond bas
+    for (const [dx, dz] of [[12.6, 4.55], [8.26, 9.44], [0, 9.65]])
+      for (const sx of [-1, 1])
+        for (const sz of [-1, 1]) {
+          if (dx === 0 && sx > 0) continue;
+          const x = ECX + sx * dx;
+          const z = MZ + sz * dz;
+          pillar(fi, Math.floor(x / C), Math.floor(z / C), { x, z, kind: 'court' });
+        }
   }
   // l'aile sud : les grandes surfaces (une trame de 6 cases)
   for (const a of ANCHORS) for (let z = 86; z <= 95; z += 4) for (let x = a.x0 + 4; x <= a.x1 - 3; x += 6) pillar(0, x, z, { kind: 'store' });
@@ -858,7 +872,34 @@ export function createMallMap(seed = 17) {
       else if (r.kind === RK.GARDEN) grid(10, 'pendant', { y: 4.2, pOff: 0.45 });
       else if (r.kind === RK.FOOD) grid(7.5, 'pendant', { y: 4.6, pOff: 0.3 });
       else if (r.kind === RK.STORE || r.kind === RK.CLOSED) grid(r.kind === RK.CLOSED ? 10 : 7.5, 'panel', { y: r.ceilH, pOff: r.kind === RK.CLOSED ? 0.9 : 0.6 });
-      else if (r.kind === RK.CINE) grid(5, 'spot', { y: r.ceilH, pOff: 0.2 });
+      else if (r.kind === RK.CINE) {
+        // le hall du cinéma, bien éclairé : des spots puissants serrés dans le plafond bas (un sur deux dans le plateau)
+        const t = r.tray;
+        const inTray = (x, z) => x > t.x0 * C && x < (t.x1 + 1) * C && z > t.z0 * C && z < (t.z1 + 1) * C;
+        let n = 0;
+        for (let z = Z0 + 1.875; z < Z1; z += 3.75)
+          for (let x = X0 + 1.875; x < X1; x += 3.75, n++) {
+            const up2 = inTray(x, z);
+            if (up2 && n % 2) continue;
+            light(0, x, z, 'spot', { room: r.id, y: up2 ? t.h : r.ceilH, pOff: 0.07, strong: true });
+          }
+        // sous le grand disque blanc de chaque pilier : quatre spots, et une gorge (cachée) qui en lave le dessous
+        for (const k in f.pillars) {
+          const p = f.pillars[k];
+          if (p.kind !== 'cine' || p.x < X0 || p.x > X1 || p.z < Z0 || p.z > Z1) continue;
+          for (let i = 0; i < 4; i++) light(0, p.x + Math.cos(i * 1.5708 + 0.785) * 1.9, p.z + Math.sin(i * 1.5708 + 0.785) * 1.9, 'spot', { room: r.id, y: 3.3, pOff: 0.1, strong: true });
+          light(0, p.x + 1.3, p.z + 0.5, 'cove', { room: r.id, y: 3.2, ring: true, state: 'on' });
+        }
+        // le ruban de LED : il fait le tour du plateau, à 60 cm de ses bords (deux coins coupés) ; une lampe par 2,5 m
+        const L = ledLoop(t);
+        for (let i = 0; i < L.length; i++) {
+          const a = L[i];
+          const b = L[(i + 1) % L.length];
+          const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+          const m = Math.max(1, Math.round(len / 2.5));
+          for (let j = 0; j < m; j++) light(0, a[0] + ((b[0] - a[0]) * (j + 0.5)) / m, a[1] + ((b[1] - a[1]) * (j + 0.5)) / m, 'led', { room: r.id, y: t.h - 0.03, state: 'on' });
+        }
+      }
       else if (r.kind === RK.CINE_HALL) {
         grid(3.75, 'spot', { y: r.ceilH, pOff: 0.3 });
         // une gorge lumineuse autour du disque de plafond de chaque pilier
@@ -992,6 +1033,19 @@ export function createMallMap(seed = 17) {
     for (const key of ['west', 'center', 'east']) {
       const cr = COURTS[key];
       const cx = (cr.x0 + cr.x1 + 1) * C * 0.5;
+      if (key === 'east' && fi === 0) {
+        const v = up.voids.find((o) => o.court === 'east');
+        v.pts.forEach(([px, pz], i) => {
+          // (à 1,15 m du garde-corps, dans le prolongement de l'angle)
+          const l = Math.hypot(px - cx, pz - MZ);
+          furn(0, 'claypot', px + ((px - cx) / l) * 1.2, pz + ((pz - MZ) / l) * 1.2, 0.8, 0.8, { round: true, m: 0.1, plant: i });
+        });
+        for (const s of [-1, 1]) {
+          const bx = cx + s * 5.5;
+          const bz = MZ + s * 11.6;
+          if (furn(0, 'bench', bx, bz, 2.45, 0.7, { m: 0.1, face: -s })) for (const e of [-1, 1]) furn(0, 'claypot', bx + e * 2.0, bz, 0.8, 0.8, { round: true, m: 0.05, plant: e + s + 3 });
+        }
+      } else
       for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
         const x = cx + sx * ((cr.x1 - cr.x0 + 1) * C * 0.5 - 3.2);
         const z = MZ + sz * ((cr.z1 - cr.z0 + 1) * C * 0.5 - 3.2);

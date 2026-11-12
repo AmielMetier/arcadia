@@ -454,6 +454,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         model('CoffeeCart_01', it.x + 0.3, 0, it.z, (it.yaw || 0) + PI / 2, 1.05);
         break;
       case 'kiosk':
+      case 'claypot':
       case 'fountain':
       case 'counter':
       case 'concession':
