@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.84 — 13 novembre 2026
+- **Hub** — Nouveau : bandes-annonces des jeux dans la vitrine et au survol des cartes (Claude)
+
 ## 5.83 — 13 novembre 2026
 - **The Backrooms** — Au Level 1, l'entité imite vraiment vos voix :
   - Elle rejoue vos phrases telles que vous les avez dites, en entier, avec votre vraie voix : plus de voix ralentie, hachée ou grésillante. Elle sonne comme un joueur, de près, derrière un mur ou au talkie.
