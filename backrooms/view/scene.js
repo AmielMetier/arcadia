@@ -5443,8 +5443,8 @@ void main() {
   monsterGroup.add(face);
   // l'entité en 3D, animée (view/beast.js) ; mode VIP au Level 0 : le même corps, avec le visage de la photo de l'entité d'origine
   // Level 5 : l'entité de l'hôtel, un modèle humain animé os par os (view/hotelEntity.js)
-  // Level 1 et Poolrooms : la nouvelle entité, models/level1/entite.glb (view/creature.js), en mode VIP aussi
-  const beast = L3 ? createHotelEntity() : L1 || L2 ? createCreature({ height: 2.7 }) : !ENTITY_VIP ? createBeast({ wiry: true }) : createBeast({ wiry: true, photo: { url: VIP.img, crop: [490, 20, 300, 375] } });
+  // Level 1 : la nouvelle entité, models/level1/entite.glb (view/creature.js), en mode VIP aussi ; Poolrooms : la vidéo, à plat
+  const beast = L3 ? createHotelEntity() : L1 ? createCreature({ height: 2.7 }) : L2 ? null : !ENTITY_VIP ? createBeast({ wiry: true }) : createBeast({ wiry: true, photo: { url: VIP.img, crop: [490, 20, 300, 375] } });
   if (beast) {
     monsterGroup.add(beast.group);
     shadow.visible = false;

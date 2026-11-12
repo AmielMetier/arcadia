@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.80 — 12 novembre 2026
+- **The Backrooms** — Aux Poolrooms, l'entité redevient la silhouette vidéo qui gesticule, dans tous les modes ; la silhouette voilée reste au Level 1.
+
 ## 5.79 — 12 novembre 2026
 - **The Backrooms** — En mode VIP aussi, le monstre du Level 1 et des Poolrooms est la silhouette voilée, avec toutes ses animations (avant, c'était l'ancienne image plate).
 
