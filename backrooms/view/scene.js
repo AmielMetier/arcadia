@@ -173,7 +173,9 @@ export function onGlContext(fn) {
 }
 
 // Réglages d'image du joueur (view/../app.js) : champ de vision, mouvements de caméra, luminosité, flashs, qualité
-const OPTS = { fov: 72, motion: 1, brightness: 1, reduceFlashes: false, quality: 'auto' };
+const OPTS = { fov: 72, motion: 1, brightness: 1, reduceFlashes: false, quality: 'auto', tape: false };
+// « Tout au caméscope » : le champ vertical de l'objectif au grand angle (plus serré que l'œil : 72°)
+const TAPE_FOV = 56;
 let liveScene = null;
 export function setSceneOptions(o = {}) {
   Object.assign(OPTS, o);
@@ -5687,6 +5689,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   let exposure = 1.2; // exposition du caméscope : elle rattrape la lumière en une seconde environ
   let lightNow = 0.5; // lumière des néons là où l'on est (pour le grésillement)
   let camT = 0; // caméscope sorti (0 à 1, la transition vers le 4:3)
+  let tapeT = OPTS.tape ? 1 : 0; // « tout au caméscope » : l'image entière est celle de la bande (4:3), viseur sorti ou non
   let camZoomWant = 1.5; // zoom de l'objectif (molette), de 1,5 à 12
   let camZoomNow = 1.5;
   let nightT = 0; // son mode nuit (0 à 1)
@@ -5836,7 +5839,9 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     // le caméscope : où il en est (0 à 1), son mode nuit, et la largeur des bandes noires (px). Toujours le même
     // objet (lu par le HUD à chaque image) : le lire tout de suite, ne pas le garder
     get cam() {
-      camState.t = camT;
+      camState.t = Math.max(camT, tapeT); // l'image est en 4:3
+      camState.view = camT; // le viseur est sorti (zoom, mode nuit, signal dans les bandes noires)
+      camState.tape = tapeT;
       camState.night = nightT;
       camState.bars = vhs.bars || 0;
       return camState;
@@ -6113,12 +6118,17 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       const camWant = !cctvCam && P.cam && P.status === 'alive' ? 1 : 0;
       camT += (camWant - camT) * Math.min(1, dt * 9);
       if (camT < 0.002) camT = 0;
+      // « tout au caméscope » (réglages) : toute la partie est filmée, en 4:3, à l'objectif grand angle du caméscope ;
+      // V ne fait plus que sortir le viseur (zoom, mode nuit)
+      tapeT += ((OPTS.tape && !cctvCam ? 1 : 0) - tapeT) * Math.min(1, dt * 9);
+      if (tapeT < 0.002) tapeT = 0;
       const nightWant = cctvCam ? THREE.MathUtils.clamp((0.34 - cctvLight) / 0.22, 0, 1) : camWant && bat > 0 ? THREE.MathUtils.clamp((0.34 - lightNow - (lampOn ? 0.3 : 0)) / 0.22, 0, 1) : 0;
       nightT += (nightWant - nightT) * Math.min(1, dt * 3);
       flashSpill.intensity += nightT * 3.2 * cut;
       // le caméscope zoome (×1,3) : son objectif est plus serré que l'œil
       camZoomNow += (camZoomWant - camZoomNow) * Math.min(1, dt * 7); // l'objectif glisse, il ne saute pas
-      const camFov = cctvCam ? CCTV_FOV : (2 * Math.atan(Math.tan((OPTS.fov * Math.PI) / 360) / (1 + (camZoomNow - 1) * camT)) * 180) / Math.PI;
+      const eyeFov = OPTS.fov + (Math.min(OPTS.fov, TAPE_FOV) - OPTS.fov) * tapeT;
+      const camFov = cctvCam ? CCTV_FOV : (2 * Math.atan(Math.tan((eyeFov * Math.PI) / 360) / (1 + (camZoomNow - 1) * camT)) * 180) / Math.PI;
       if (Math.abs(camera.fov - camFov) > 0.01) {
         camera.fov = camFov;
         camera.updateProjectionMatrix();
@@ -6388,7 +6398,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         chroma: scareT > 0 ? 0.7 : grabbed ? 0.6 : 0,
         focus: cctvCam ? 0 : Math.min(1, focusT + (grabbed ? 0.35 : 0) + haze),
         white: cctvCam ? [1, 1, 1] : white,
-        cam: cctvCam ? 1 : camT,
+        cam: cctvCam ? 1 : Math.max(camT, tapeT),
         night: nightT,
         cctv: cctvCam ? 1 : 0,
       });

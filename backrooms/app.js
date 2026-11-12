@@ -157,6 +157,7 @@ let useRequested = null; // (tests) une case d'objet précise à utiliser
 const act = { use: false, pick: false, drop: false, whistle: false, jump: false, struggle: 0 };
 let crouchOn = false; // C : s'accroupir / se relever (bascule)
 let camOn = false; // V : sortir / ranger le caméscope
+let tapeShown = false; // « tout au caméscope » : ce qui a été dit à la scène
 let airborne = false; // en plein saut (pour le bruit de la réception)
 let selRequested = 0; // touches 2 et 3 : choisir la case d'objet (1 à INV_SIZE)
 let codeRequested = null; // Level 5 : le code tapé sur le clavier de la porte de secours
@@ -175,14 +176,17 @@ onGlContext((ok) => {
 });
 
 // Réglages du joueur (sur cet appareil) : souris, image, accessibilité
-const OPT_DEFAULT = { sens: 1, invertY: false, fov: 72, motion: 1, bright: 1, reduceFlashes: false, subs: false, layout: 'auto', quality: 'auto', mic: 'on', voiceVol: 1 };
+// (tape : « tout au caméscope », l'image entière en 4:3 avec la seule incrustation du caméscope : 'auto' = au Level 17
+// seulement, 'on' = partout, 'off' = jamais)
+const OPT_DEFAULT = { sens: 1, invertY: false, fov: 72, motion: 1, bright: 1, reduceFlashes: false, subs: false, layout: 'auto', quality: 'auto', mic: 'on', voiceVol: 1, tape: 'auto' };
 const OPTS = { ...OPT_DEFAULT, ...store.get('backrooms_opts', {}) };
 // anciens réglages : « appuyer pour parler » et « micro ouvert » ne font plus qu'un (la voix de proximité est toujours ouverte)
 if (OPTS.mic !== 'off') OPTS.mic = 'on';
 let detectedQwerty = false;
 const qwerty = () => OPTS.layout === 'qwerty' || (OPTS.layout === 'auto' && detectedQwerty);
+const tapeOn = () => OPTS.tape === 'on' || (OPTS.tape === 'auto' && !!sim && sim.level === MALL_LEVEL);
 function applyOpts() {
-  setSceneOptions({ fov: OPTS.fov, motion: OPTS.motion, brightness: OPTS.bright, reduceFlashes: OPTS.reduceFlashes, quality: OPTS.quality });
+  setSceneOptions({ fov: OPTS.fov, motion: OPTS.motion, brightness: OPTS.bright, reduceFlashes: OPTS.reduceFlashes, quality: OPTS.quality, tape: tapeOn() });
   if (hud) {
     hud.qwerty = qwerty();
     hud.reduceFlashes = OPTS.reduceFlashes;
@@ -2779,6 +2783,11 @@ function frame(currentTime) {
     hud.update(sim, sim.time, delta);
     if (scene && scene.cam) hud.camera(scene.cam, sim, delta);
   }
+  // « tout au caméscope » : selon le réglage et le niveau où l'on est (il change en cours de partie)
+  if (tapeOn() !== tapeShown) {
+    tapeShown = tapeOn();
+    setSceneOptions({ tape: tapeShown });
+  }
 }
 
 // ?debug : accès à la partie depuis la console (tests)
@@ -2807,11 +2816,12 @@ if (window.DDVolume && btnSet) {
         { label: 'Clavier', get: () => OPTS.layout, set: (v) => setOpt('layout', v), options: [['auto', 'Auto'], ['azerty', 'ZQSD'], ['qwerty', 'WASD']] },
       ] },
       { title: 'Image', items: [
+        { label: 'Tout au caméscope', get: () => OPTS.tape, set: (v) => setOpt('tape', v), options: [['auto', 'Level 17'], ['on', 'Partout'], ['off', 'Non']] },
         { label: 'Champ de vision', get: () => OPTS.fov, set: (v) => setOpt('fov', +v), range: [60, 100, 2], format: (v) => `${v}°` },
         { label: 'Luminosité', get: () => OPTS.bright, set: (v) => setOpt('bright', +v), range: [0.6, 1.6, 0.05], format: (v) => `${Math.round(v * 100)} %` },
         { label: 'Caméra à l\'épaule', get: () => OPTS.motion, set: (v) => setOpt('motion', +v), range: [0, 1, 0.1], format: (v) => (+v === 0 ? 'stable' : `${Math.round(v * 100)} %`) },
         { label: 'Qualité', get: () => OPTS.quality, set: (v) => setOpt('quality', v), options: [['auto', 'Auto'], ['low', 'Basse'], ['medium', 'Moyenne'], ['high', 'Haute']] },
-      ], hint: 'Luminosité : réglez-la pour que le carré de gauche soit à peine visible.' },
+      ], hint: 'Luminosité : réglez-la pour que le carré de gauche soit à peine visible. « Tout au caméscope » : toute la partie est filmée (image 4:3, champ plus serré), l\'interface s\'efface quand rien ne change ; V sort le viseur (zoom, mode nuit).' },
       { title: 'Voix', items: [
         { label: 'Micro', get: () => OPTS.mic, set: (v) => { setOpt('mic', v); if (v !== 'off' && started) askMic(true); }, options: [['on', 'Activé'], ['off', 'Coupé']] },
         { label: 'Volume des voix', get: () => OPTS.voiceVol, set: (v) => setOpt('voiceVol', +v), range: [0, 2, 0.1], format: (v) => `${Math.round(v * 100)} %` },
