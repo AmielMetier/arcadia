@@ -1,10 +1,8 @@
 # Journal des versions — Arcadia
 
-## 5.80 — 12 novembre 2026
-- **The Backrooms** — En mode VIP, aux Poolrooms, l'entité redevient la silhouette vidéo qui gesticule ; en mode normal, rien ne change.
-
-## 5.79 — 12 novembre 2026
-- **The Backrooms** — En mode VIP aussi, le monstre du Level 1 et des Poolrooms est la silhouette voilée, avec toutes ses animations (avant, c'était l'ancienne image plate).
+## 5.81 — 12 novembre 2026
+- **The Backrooms** — En mode normal, le même monstre te poursuit partout : celui du Level 0, aussi au Level 1, aux Poolrooms et à l'hôtel.
+- **The Backrooms** — En mode VIP, le monstre du Level 1 est la silhouette voilée, avec toutes ses animations.
 
 ## 5.78 — 12 novembre 2026
 - **The Backrooms** — L'intro du mode VIP reçoit la même nouvelle fin : le choc, la neige de la cassette, puis le caméscope qui se rallume au Level 0.

@@ -5441,11 +5441,11 @@ void main() {
   const anim = L1 || L2 || PIPES ? ENTITY_ANIM : null; // aux Poolrooms, la même entité qu'au Level 1
   face.visible = false;
   monsterGroup.add(face);
-  // l'entité en 3D, animée (view/beast.js) ; mode VIP au Level 0 : le même corps, avec le visage de la photo de l'entité d'origine
-  // Level 5 : l'entité de l'hôtel, un modèle humain animé os par os (view/hotelEntity.js)
-  // Level 1 et Poolrooms : la nouvelle entité, models/level1/entite.glb (view/creature.js) ; en mode VIP, au Level 1 aussi, mais
-  // aux Poolrooms la vidéo, à plat
-  const beast = L3 ? createHotelEntity() : L1 || (L2 && !ENTITY_VIP) ? createCreature({ height: 2.7 }) : L2 ? null : !ENTITY_VIP ? createBeast({ wiry: true }) : createBeast({ wiry: true, photo: { url: VIP.img, crop: [490, 20, 300, 375] } });
+  // mode normal : l'entité de base en 3D, animée (view/beast.js), à tous les niveaux
+  // mode VIP : au Level 0 et aux Tuyauteries le même corps, avec le visage de la photo de l'entité d'origine ; au Level 1 la
+  // silhouette voilée (models/level1/entite.glb, view/creature.js) ; aux Poolrooms la vidéo, à plat ; au Level 5 l'entité de
+  // l'hôtel, un modèle humain animé os par os (view/hotelEntity.js)
+  const beast = !ENTITY_VIP ? createBeast({ wiry: true }) : L3 ? createHotelEntity() : L1 ? createCreature({ height: 2.7 }) : L2 ? null : createBeast({ wiry: true, photo: { url: VIP.img, crop: [490, 20, 300, 375] } });
   if (beast) {
     monsterGroup.add(beast.group);
     shadow.visible = false;
@@ -5699,7 +5699,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       fallV = 0.01;
     },
     scare() {
-      if (!L3 || !beast || !beast.scarePose) return;
+      if (!L3) return;
+      if (!beast || !beast.scarePose) return this.jumpscare(); // (l'entité de base, en mode normal : son screamer habituel)
       scareFx = { t0: null, x: camera.position.x, y: camera.position.y, z: camera.position.z, yaw: camera.rotation.y };
     },
 
