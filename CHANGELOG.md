@@ -1,5 +1,19 @@
 # Journal des versions — Arcadia
 
+## 5.82 — 12 novembre 2026
+- **Odyssée** — Sur la carte :
+  - Chaque lieu a sa carte locale, et la carte de la région se dévoile à mesure qu'on explore.
+  - Les barrières bloquent exactement là où on les voit, et moins de sentiers sont fermés.
+- **Odyssée** — Dans l'équipe, on glisse un Pokémon sur un autre pour échanger leurs places, et on peut réordonner leurs attaques.
+- **Odyssée** — Dans les villes :
+  - Les portes s'ouvrent quand on arrive et se referment derrière soi.
+  - Terrasses et pieds des bâtiments dallés, pierre de taille redessinée, toits plus bas, ombres plus douces au pied des murs.
+  - Plus de tache bleue en passant derrière un bâtiment.
+  - Les habitants ne sont plus coincés dans les meubles, et on voit ses pieds sur les perrons et les marches des arènes.
+- **Odyssée** — La marche est un peu plus rapide, le HUD plus petit et plus transparent.
+- **Odyssée** — Nouvelle option dans Graphismes : un rendu net pour les grands écrans (4K).
+- **Odyssée** — Plus de pluie ni de cendres sous un toit, et plus de particules collées à l'écran dans les grottes.
+
 ## 5.81 — 12 novembre 2026
 - **The Backrooms** — Un nouveau niveau après le Terror Hotel : le Level 17, un centre commercial abandonné sur deux étages.
   - On y arrive par l'escalier de secours du Level 5 : la porte coupe-feu passée, on dévale les étages jusqu'au palier « 17 », qui s'ouvre sur le mall. Sortir du mall termine la partie.
