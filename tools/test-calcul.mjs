@@ -790,6 +790,47 @@ t('Préparation aux entretiens : rubrique Informatique et QCM avec du code à li
   for (const id of ['sql_tj_gain', 'sql_tj_perte', 'sql_tj_doublons']) assert.ok(SQL_QUESTIONS.find((q) => q.id === id), id);
 });
 
+t('The Candidate, mode entretien : que des questions d\'entretien, surtout la série de préparation', () => {
+  const players = [0, 1].map((id) => ({ id, name: 'P' + id }));
+  const g = createGame({ players, cfg: { mode: 'chartier', len: 20, interview: 1 }, seed: 7, now: 0 });
+  assert.ok(g.cfg.interview && !g.cfg.duel, 'pas de face-à-face (un sprint de calcul)');
+  assert.ok(!createGame({ players, cfg: { mode: 'chartier', len: 20 }, seed: 7, now: 0 }).cfg.interview, 'désactivé par défaut');
+  assert.ok(!createGame({ players, cfg: { mode: 'classic', interview: 1 }, seed: 7, now: 0 }).cfg.interview, 'seulement dans The Candidate');
+  for (let seed = 1; seed < 60; seed++) {
+    const cats = createGame({ players, cfg: { mode: 'chartier', len: 20, interview: 1 }, seed, now: 0 }).cats;
+    assert.ok(cats.every((c) => c === 'chartier' || c === 'code'), `ni relance, ni market making, ni cas pratique : ${cats}`);
+  }
+  assert.ok(g.cats.includes('code'), 'l\'épreuve de code reste (réglable à part)');
+  const src = new Map(CHARTIER_QUESTIONS.map((q) => [q.text, q.src]));
+  const rubrics = new Set(['Dérivés', 'Taux', 'Risques', 'Macro', 'Marchés', 'Probas', 'Stats', 'Maths', 'Corporate', 'Informatique', 'Java', 'Code']);
+  const from = { prepa: 0, emission: 0, quiz: 0 }, keys = new Set(), byTier = { 1: 0, 2: 0, 3: 0 };
+  for (const module of ['gen', 'trading', 'quant', 'risk', 'ma']) for (let i = 0; i < 1500; i++) {
+    const q = makeQuestion(i * 7919 + 13, i % 15, 'chartier', DIFFS[i % 3], 0, 15, module, { interview: true });
+    assert.ok(['chartier', 'chartier-num', 'chartier-multi', 'code-read'].includes(q.kind), `${module} : ${q.kind} ${q.text}`);
+    assert.ok(rubrics.has(q.rubric), `${module} : rubrique ${q.rubric} (${q.text})`);
+    if (src.has(q.text) && !q.key.startsWith('gen:')) from[src.get(q.text)]++; // (une question tirée à la volée peut avoir le texte d'une question de la banque)
+    keys.add(q.key); byTier[q.tier]++;
+  }
+  assert.equal(from.quiz, 0, 'rien de la banque de culture générale');
+  const share = from.prepa / (from.prepa + from.emission);
+  assert.ok(share > 0.6, `part de la série de préparation : ${Math.round(share * 100)} %`);
+  assert.ok(keys.size > 700, `questions différentes : ${keys.size} sur 7 500 tirages`);
+  assert.ok(Object.values(byTier).every((k) => k > 500), `les trois tours : ${JSON.stringify(byTier)}`);
+  console.log(`  mode entretien : ${keys.size} questions différentes sur 7 500 tirages, ${Math.round(share * 100)} % de la série de préparation`);
+  // une partie entière, jusqu'au bout, sans face-à-face
+  let s = createGame({ players, cfg: { mode: 'chartier', len: 15, interview: 1, cut: 0 }, seed: 12, now: 0 });
+  for (let i = 0; i < 15 && s.phase !== 'end'; i++) {
+    s = nextQuestion(s, i * 1e5);
+    const q = fullQuestion(s);
+    if (q.input === 'code') {
+      for (const p of players) { s = answer(s, { by: p.id, raw: 'def f(): pass', idx: i, now: i * 1e5 + 500 }).state; s = gradeCode(s, { by: p.id, idx: i, passed: q.tests.length, total: q.tests.length }).state; }
+    } else for (const p of players) s = answer(s, { by: p.id, raw: good(q), idx: i, now: i * 1e5 + 500 }).state;
+    s = reveal(s, i * 1e5 + 2000);
+    assert.ok(!s.duel, 'pas de face-à-face');
+  }
+  assert.ok(s.players.every((p) => p.right >= 14), JSON.stringify(s.players.map((p) => p.right)));
+});
+
 t('The Candidate : règles maison (vies, jokers, code, coupe, sabotage)', () => {
   const players = [0, 1, 2, 3].map((id) => ({ id, name: 'P' + id }));
   const def = createGame({ players, cfg: { mode: 'chartier', len: 15 }, seed: 1, now: 0 });

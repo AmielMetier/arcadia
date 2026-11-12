@@ -66,7 +66,9 @@ export function makeConfig(s = {}) {
     code: s.mode === 'chartier' && (s.code == null || Number(s.code) === 1),
     sql: s.mode === 'chartier' && (s.sql == null || Number(s.sql) === 1),
     cut: s.mode === 'chartier' && (s.cut == null || Number(s.cut) === 1),
-    duel: s.mode === 'chartier' && (s.duel == null || Number(s.duel) === 1),
+    // mode entretien : seulement des questions d'entretien d'embauche (le face-à-face final est un sprint de calcul : pas ici)
+    interview: s.mode === 'chartier' && Number(s.interview) === 1,
+    duel: s.mode === 'chartier' && Number(s.interview) !== 1 && (s.duel == null || Number(s.duel) === 1),
     module: s.mode === 'chartier' && MODULES[s.module] ? s.module : 'gen',
   };
 }
@@ -76,7 +78,7 @@ export function createGame({ players, cfg, seed, now }) {
   const c = makeConfig(cfg);
   return {
     v: 1, seed, cfg: c, startedAt: now,
-    cats: planCats(seed, c.len, c.theme, { code: c.code || c.sql, d: Math.max(0, DIFFS.indexOf(c.diff)) }),
+    cats: planCats(seed, c.len, c.theme, { code: c.code || c.sql, d: Math.max(0, DIFFS.indexOf(c.diff)), interview: c.interview }),
     players: players.map((p) => ({ id: p.id, name: p.name, color: p.color, bot: !!p.bot,
       score: 0, streak: 0, bestStreak: 0, right: 0, wrong: 0, silent: 0, fastest: null, totalMs: 0, firsts: 0, byCat: {},
       powers: [], sabSent: 0, sabTaken: 0,
@@ -97,7 +99,7 @@ export function fullQuestion(s, idx = s.idx) {
   if (BLOCK[cat] > 1) while (start > 0 && idx - start < BLOCK[cat] - 1 && s.cats[start - 1] === cat) start--;
   const block = BLOCK[cat] > 1 ? { step: idx - start, start } : {};
   let q;
-  for (let salt = 0; salt < 8; salt++) { q = makeQuestion(s.seed, idx, cat, s.cfg.diff, salt, s.cfg.len, s.cfg.module, { python: s.cfg.code !== false, sql: s.cfg.sql !== false, ...block }); if (!seen.has(q.key)) break; }
+  for (let salt = 0; salt < 8; salt++) { q = makeQuestion(s.seed, idx, cat, s.cfg.diff, salt, s.cfg.len, s.cfg.module, { python: s.cfg.code !== false, sql: s.cfg.sql !== false, interview: !!s.cfg.interview, ...block }); if (!seen.has(q.key)) break; }
   return q;
 }
 
