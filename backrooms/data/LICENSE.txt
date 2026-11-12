@@ -13,3 +13,5 @@ e5.bin  la voix qui appelle au Level 1 (mp3), fournie par Amiel pour le jeu
 e6.bin  l'intro du Level 0, version sous-titrée (mp4) ; ses sources sont dans video/LICENSE.txt
 
 Photos et voix fournies pour le jeu par l'équipe d'Arcadia : à ne pas sortir du jeu.
+
+Intro sous-titrée (e6.bin) : même nouvelle fin que la version standard (12 novembre 2026).

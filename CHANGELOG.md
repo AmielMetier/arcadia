@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.78 — 12 novembre 2026
+- **The Backrooms** — L'intro du mode VIP reçoit la même nouvelle fin : le choc, la neige de la cassette, puis le caméscope qui se rallume au Level 0.
+
 ## 5.77 — 12 novembre 2026
 - **The Backrooms** — L'intro a une vraie fin : après la chute dans la trappe, un choc, la neige d'une cassette abîmée, puis le caméscope se rallume dans les couloirs jaunes du Level 0, néons qui bourdonnent.
 
