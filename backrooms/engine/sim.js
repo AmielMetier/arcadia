@@ -282,6 +282,9 @@ const AMB_CUES = {
   // Level 5 (HOTEL_LEVEL) : craquements et boîte à musique, plus souvent ; un radiateur ; un téléphone, la sonnette de la
   // réception ou une porte ; rarement un gramophone
   4: { rec: [9, 27], a: [12, 28], b: [18, 40], c: [50, 110] },
+  // Level 17 (MALL_LEVEL) : un tube qui tinte tout près ; un rideau de fer ou une gaine ; le carillon d'une annonce au
+  // loin ; rarement un reste de musique d'ambiance
+  [MALL_LEVEL]: { rec: [16, 40], a: [22, 50], b: [40, 90], c: [70, 150] },
 };
 
 // un tirage qui ne dépend que de la graine (hôte et invités tirent pareil)

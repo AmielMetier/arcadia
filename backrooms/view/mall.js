@@ -360,8 +360,8 @@ function makeMaterials(tx, baked) {
   };
 }
 
-// le revêtement du sol d'une salle
-function floorKey(r, fi, shops, x, z) {
+// le revêtement du sol d'une salle (aussi pour le bruit des pas : app.js)
+export function floorKey(r, fi, shops, x, z) {
   if (!r) return 'concrete';
   // (un tapis de carrelage incrusté : une terre cuite, bordée d'un filet noir)
   if (r.rugs && r.rugs.some((q) => x >= q.x0 && x <= q.x1 && z >= q.z0 && z <= q.z1)) return 'quarry';

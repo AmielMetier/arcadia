@@ -1,6 +1,8 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
 import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE, HOTEL_LEVEL, MALL_LEVEL, DOCK_OPEN_T, DOCK_CLOSE_T, ALARM_T, DUCT_LAND, startLevel } from './engine/sim.js';
 import { createStairRide } from './view/stairwell.js';
+import { installMallSfx } from './view/mallAudio.js';
+import { floorKey as mallFloorKey } from './view/mall.js';
 import { hasLineOfSight } from './engine/nav.js';
 import { bfs, CELL_SIZE, cellsOnSeg, T } from './engine/map.js';
 import { createBackroomsScene, setMonsterMode, setSceneOptions, onGlContext, sceneGl } from './view/scene.js';
@@ -708,6 +710,12 @@ function stepKind(P) {
   }
   // Level 0 : dans la pellicule d'eau des grosses taches de la moquette, des pas mouillés
   if (sim.level === 0 && scene && scene.filmAt && scene.filmAt(P.x, P.z) > 0.35) return 'soak';
+  // Level 17 : le grès poli des mails qui sonne, la moquette du cinéma et des bureaux, le béton et le lino des coulisses
+  if (sim.level === MALL_LEVEL) {
+    const m = sim.fm(P.floor || 0);
+    const k = mallFloorKey(m.roomAt(P.x, P.z), P.floor || 0, m.shops, Math.floor(P.x / CELL_SIZE), Math.floor(P.z / CELL_SIZE));
+    return k === 'cine' ? 'hotelCarpet' : /carpet/.test(k) ? false : /terrazzo|checker|quarry|annexTile|faience/.test(k) ? 'marble' : true;
+  }
   // Level 5 : le marbre du hall, la moquette épaisse partout ailleurs
   if (sim.level === HOTEL_LEVEL) {
     const L = sim.fm(0).lobby;
@@ -1476,6 +1484,9 @@ function enterLevel() {
   whenReady(sc, () => NET.run === e.run && sim.level === e.level, () => arrive(e.level, sc));
 }
 
+// le son du Level 17 (view/mallAudio.js), posé une fois sur le son du jeu
+const mallAudio = () => sfx.mallAudio || (sfx.mallAudio = installMallSfx(sfx));
+
 // Événements de la partie : sons, messages, changement d'étage, fin
 function handleEvent(ev, me) {
   const mine = ev.by !== undefined ? ev.by === me : ev.id === undefined || ev.id === me;
@@ -1495,14 +1506,19 @@ function handleEvent(ev, me) {
     // Level 17 : une bobine du film trouvée ; les bobines montées sur le projecteur ; le journal du projectionniste (où
     // sont celles qui manquent) ; le film qui démarre
     case 'reel':
-      if (sfx) sfx.cassette('tape');
+      if (sfx) mallAudio().reel();
       if (hud) hud.toast(ev.by === me ? `Film reel ${ev.count}/${ev.total} · thread it in the projection booth, behind Screen 1` : `${who(ev.by)} found a film reel (${ev.count}/${ev.total})`, 4);
       break;
     case 'reelMount':
-      if (sfx) sfx.cassette('fuse');
+      if (sfx) mallAudio().thread(ev.count >= ev.total);
       if (hud) hud.toast(ev.count >= ev.total ? 'The last reel is threaded: the projector rattles to life' : `${ev.by === me ? 'You thread' : `${who(ev.by)} threads`} ${ev.n > 1 ? `${ev.n} reels` : 'a reel'} on the projector (${ev.count}/${ev.total})`, 4);
       break;
+    // la poupée s'est replacée ailleurs : quelques notes de boîte à musique, de là où elle est
+    case 'dollMoved':
+      if (sfx) mallAudio().chime(ev, sim.viewPlayer(sim.spectate || 0));
+      break;
     case 'benchEmpty':
+      if (ev.id === me && sfx) mallAudio().paper();
       if (ev.id === me && hud) hud.toast(ev.left.length ? `Projectionist's log · reels lent to: ${ev.left.map(([, fi, where]) => `${where} (${fi ? 'lower' : 'upper'} level)`).join(' · ')}` : 'Every reel is on the projector', 7);
       break;
     case 'filmStart':
@@ -2711,6 +2727,9 @@ function frame(currentTime) {
       const V = sim.viewPlayer(sim.spectate || 0);
       sfx.setListener(V.x, V.z, V.yaw);
       sfx.setRoom(sim.level);
+      // Level 17 : les roulettes de la poupée, le projecteur et la bande-son du film, l'écho de la salle où l'on est
+      // (installé dès que le son existe : la descente de l'escalier de secours s'en sert depuis le Level 5)
+      mallAudio().update(sim.level === MALL_LEVEL ? sim : null, V, delta, { occ: entEar.occ, paused });
       // Tuyauteries : les machines qui tournent autour de toi (brûleurs, pompes, armoires électriques)
       sfx.machines(sim.level === PIPES_LEVEL ? pipeMachines(V) : NO_MACHINES);
       // le final du Level 0 : toutes les cassettes trouvées, une alarme au loin jusqu'à l'ascenseur
