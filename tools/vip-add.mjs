@@ -1,6 +1,8 @@
 // Donne (ou retire) le grade VIP à un compte Arcadia : node tools/vip-add.mjs <identifiant> [--retirer]
 // L'identifiant est celui du compte en ligne (celui qu'on tape pour se connecter, en minuscules).
 // Seule son empreinte SHA-256 est écrite dans hub/vip.js : le dépôt ne dit pas qui est VIP.
+// Un VIP ajouté ainsi tape une fois la phrase du coffre des Backrooms (seuls les VIP d'origine, ACCOUNTS, la reçoivent
+// du relais sans la taper) ; son navigateur la garde ensuite.
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 const [user, flag] = process.argv.slice(2);

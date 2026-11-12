@@ -7,7 +7,8 @@
 // repeinte en jaune sous les bras et au bas des manches, où le scan n'avait vu que de l'ombre et de la crasse, les gants
 // sont débarrassés de leurs taches jaunes, et elle est agrandie en 4096 (nette de près, en vue subjective).
 //
-//   node tools/rig-hazmat.mjs <hazmat_suit.glb de Sketchfab> [backrooms/models/hazmat_suit.glb]
+//   node tools/rig-hazmat.mjs <hazmat_suit.glb de Sketchfab> [backrooms/models/commun/hazmat_suit.glb]
+//   puis : node tools/pack-glb.mjs backrooms/models/commun/hazmat_suit.glb (les sommets rangés plus serré, même forme)
 //
 // Les poids : chaque sommet va d'abord à une partie du corps (tronc, un bras, une jambe) selon sa distance à l'os
 // rapportée à l'épaisseur du membre, et selon le sens de sa surface (la face d'un bras tournée vers le torse n'est pas
@@ -18,7 +19,7 @@ import path from 'path';
 import { execFileSync } from 'child_process';
 
 const SRC = process.argv[2];
-const OUT = process.argv[3] || path.join(path.dirname(new URL(import.meta.url).pathname), '../backrooms/models/hazmat_suit.glb');
+const OUT = process.argv[3] || path.join(path.dirname(new URL(import.meta.url).pathname), '../backrooms/models/commun/hazmat_suit.glb');
 if (!SRC) {
   console.error('usage : node tools/rig-hazmat.mjs <source.glb> [sortie.glb]');
   process.exit(1);

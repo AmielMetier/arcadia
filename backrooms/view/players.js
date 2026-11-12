@@ -4,9 +4,10 @@
 // squelette et poids ajoutés par tools/rig-hazmat.mjs (models/hazmat_suit.glb) ; les mouvements sont calculés ici.
 // Leur lampe éclaire vraiment devant eux (un projecteur doux qui part de la main), sans cône dessiné dans l'air.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
-import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
+import { gltfLoader } from '../../shared/vendor/three/gltf-draco.js';
 
-const MODEL = new URL('../models/hazmat_suit.glb', import.meta.url).href;
+// (rangé plus serré par tools/pack-glb.mjs en 5.25 : 6,9 Mo au lieu de 8,4, même forme ; ?v : ne pas garder l'ancien)
+const MODEL = new URL('../models/commun/hazmat_suit.glb?v=525', import.meta.url).href;
 const HEIGHT = 1.78; // taille d'un explorateur, capuche comprise
 // le reflet des lampes sur la combinaison (couleur spéculaire) ; en vue subjective, sa propre lampe part de la caméra,
 // à quelques centimètres des bras : un reflet bien plus faible
@@ -41,7 +42,7 @@ function cloneSkinned(src) {
 
 let source = null;
 let scale = 1;
-const loading = new GLTFLoader().loadAsync(MODEL).then((g) => {
+const loading = gltfLoader().loadAsync(MODEL).then((g) => {
   g.scene.updateMatrixWorld(true);
   const box = new THREE.Box3();
   g.scene.traverse((o) => {
@@ -122,7 +123,7 @@ function suitMaterial(map) {
 
 // leur lampe : la torche jaune de Poly Haven (small_plastic_torch, CC0), la même que la nôtre
 let torchSrc = null;
-const torchLoading = new GLTFLoader().loadAsync(new URL('../models/small_plastic_torch.glb', import.meta.url).href).then((g) => {
+const torchLoading = gltfLoader().loadAsync(new URL('../models/commun/small_plastic_torch.glb', import.meta.url).href).then((g) => {
   const body = new THREE.MeshLambertMaterial({ color: '#ffffff', emissive: '#4a3a10', emissiveIntensity: 0.6 });
   g.scene.traverse((o) => {
     if (!o.isMesh) return;
@@ -134,6 +135,32 @@ const torchLoading = new GLTFLoader().loadAsync(new URL('../models/small_plastic
   });
   torchSrc = g.scene;
 }, () => {});
+
+// Les ombres de contact : une tache sombre et floue au sol, sous les joueurs et sous l'entité. Rien ne projette
+// d'ombre en temps réel (trop cher) ; sans elle, les corps semblaient flotter dans le faisceau de la lampe. Dans le
+// noir, elle ne se voit pas (elle assombrit du noir) : seulement là où la lumière tombe.
+let blobTex = null;
+const blobGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+export function contactBlob(w, d, k = 1) {
+  if (!blobTex) {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 64;
+    const c = cv.getContext('2d');
+    const gr = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(0,0,0,0.8)');
+    gr.addColorStop(0.4, 'rgba(0,0,0,0.5)');
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = gr;
+    c.fillRect(0, 0, 64, 64);
+    blobTex = new THREE.CanvasTexture(cv);
+  }
+  const m = new THREE.Mesh(blobGeo, new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, opacity: k, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  m.scale.set(w, 1, d);
+  m.position.y = 0.012;
+  m.renderOrder = 1;
+  m.name = 'contactBlob';
+  return m;
+}
 
 function makeTorch(mat) {
   const g = new THREE.Group();
@@ -457,6 +484,7 @@ export function createPlayerAvatars(scene, lamps = LAMPS) {
       a = { g: new THREE.Group() };
       scene.add(a.g);
       build(a);
+      a.g.add(contactBlob(0.95, 0.95, 0.85));
       avatars.set(P.id, a);
       if (!torchSrc) torchLoading.then(() => {
         // la torche vient d'arriver : on la met dans sa main
@@ -471,6 +499,7 @@ export function createPlayerAvatars(scene, lamps = LAMPS) {
         a.g.clear();
         a.mat.suit = null;
         build(a);
+        a.g.add(contactBlob(0.95, 0.95, 0.85));
       });
     }
     // sa lampe : une de celles posées d'avance (une nouvelle seulement si toutes sont prises : les matériaux se
@@ -767,7 +796,7 @@ export function createPlayerAvatars(scene, lamps = LAMPS) {
     // Ils se cachent et leur lampe retourne dans la réserve
     hideGone(players) {
       avatars.forEach((a, id) => {
-        if (!a.light) return;
+        if (!a.light || id === 'mimic') return; // (l'imposteur n'est pas un joueur de la liste)
         for (let i = 0; i < players.length; i++) if (players[i].id === id) return;
         a.g.visible = false;
         a.light.intensity = 0;

@@ -1,15 +1,15 @@
 // The Backrooms - Interface façon caméscope (REC, signal, bande), jumpscare et écran de fin
-import { ENTITY_IMG, ENTITY_ANIM } from './scene.js';
-import { DEPART_T, PIPES_LEVEL, CASSETTES, NOISE, VOICE_MIN, THIRST_BLUR, INV_SIZE, HOTEL_LEVEL } from '../engine/sim.js';
+import { ENTITY_IMG, ENTITY_ANIM, ENTITY_VIP } from './scene.js';
+import { DEPART_T, SLIDE_T, PIPES_LEVEL, CASSETTES, NOISE, VOICE_MIN, THIRST_BLUR, INV_SIZE, HOTEL_LEVEL, MALL_LEVEL, REELS } from '../engine/sim.js';
 
-const GOAT_DEATH_IMG = new URL('../img/bouc.jpg', import.meta.url).href;
+import { vault } from './vault.js';
 const GOAT_DEATH_FADE = 8; // secondes de montée de l'image
 
 // nom affiché d'un niveau : le troisième, ce sont les Poolrooms (Level 37) ; le quatrième, les Tuyauteries (Level 2)
-export const levelName = (lv) => (lv === 2 ? 37 : lv === PIPES_LEVEL ? 2 : lv === HOTEL_LEVEL ? 5 : lv);
+export const levelName = (lv) => (lv === 2 ? 37 : lv === PIPES_LEVEL ? 2 : lv === HOTEL_LEVEL ? 5 : lv === MALL_LEVEL ? 17 : lv);
 // Poolrooms : le toboggan pris par l'équipe (ou null)
 const slideOf = (sim) => (sim.map.slides && sim.slide >= 0 ? sim.map.slides[sim.slide] : null);
-export const levelSub = (lv) => (lv === HOTEL_LEVEL ? 'The Terror Hotel' : lv === PIPES_LEVEL ? 'Pipe Dreams · the service tunnels' : lv === 2 ? 'The Poolrooms' : lv === 1 ? 'The industrial basement' : 'The Lobby');
+export const levelSub = (lv) => (lv === MALL_LEVEL ? 'The Mall · after hours' : lv === HOTEL_LEVEL ? 'The Terror Hotel' : lv === PIPES_LEVEL ? 'Pipe Dreams · the service tunnels' : lv === 2 ? 'The Poolrooms' : lv === 1 ? 'The industrial basement' : 'The Lobby');
 
 // Les cassettes du Level 0 racontent une histoire : dix enregistrements, cinq par partie (toujours d'autres, selon la
 // graine). Ceux qu'on a déjà écoutés restent dans la collection (sur cet appareil).
@@ -52,8 +52,8 @@ export function hearTape(i) {
 }
 export { store };
 
-// Les écrits des autres niveaux : ce qu'on trouve avec les fusibles (Level 1, Khaoula), les volants de vanne
-// (Poolrooms, St Didier Auroux), les vannes (Pipe Dreams, Teo le bouc) et les lettres (Terror Hotel, le registre).
+// Les écrits des autres niveaux : ce qu'on trouve avec les fusibles (Level 1), dans les locaux techniques (Poolrooms), les
+// vannes (Pipe Dreams, le bouc) et les lettres (Terror Hotel, le registre).
 // Un par objet ramassé, dans un ordre qui dépend de la graine ; ceux qu'on a lus restent dans la collection.
 export const NOTES = {
   1: { tag: 'SCRAWLED NOTE', list: [
@@ -98,6 +98,20 @@ export function readNote(k, seed, i) {
 export const loreComplete = () => tapesHeard().length >= LORE.length && Object.keys(NOTES).every((k) => notesHeard(k).length >= NOTES[k].list.length);
 
 
+// Manette branchée et utilisée : les touches affichées deviennent les boutons de la manette (disposition Xbox,
+// comme readPad dans app.js). Les textes du jeu restent écrits avec les touches du clavier ; padify les traduit.
+const PAD_KEYS = {
+  E: 'X', F: 'A', R: 'RT', G: 'D-PAD ↓', C: 'R3', V: 'L3', T: 'B', 1: 'Y', SHIFT: 'LB', SPACE: 'D-PAD ↑', ESC: 'MENU', ENTER: 'A',
+};
+const padKey = (k) => PAD_KEYS[String(k).toUpperCase()];
+export function padify(s) {
+  if (typeof s !== 'string') return s;
+  return s
+    .replace(/\[([A-Za-z0-9]+)\]/g, (m, k) => (padKey(k) ? `[${padKey(k)}]` : m))
+    .replace(/\b(PRESS|HOLD|Press|Hold|press|hold) ([A-Z][A-Za-z]*|\d)\b/g, (m, w, k) => (padKey(k) ? `${w} ${padKey(k)}` : m))
+    .replace('MASH ANY KEY', 'MASH ANY BUTTON');
+}
+
 export class BackroomsHUD {
   constructor(container, actions = {}) {
     this.el = container;
@@ -106,9 +120,9 @@ export class BackroomsHUD {
       <div class="jumpscare-overlay" id="jumpscareOverlay" hidden><img id="scareImg" alt=""><div class="scare-anim" id="scareAnim" hidden></div></div>
       <div class="goat-death" id="goatDeath" hidden>
         <div class="gd-pic" id="gdImg">
-          <img class="gd-img" src="${GOAT_DEATH_IMG}" alt="">
-          <img class="gd-img gd-red" src="${GOAT_DEATH_IMG}" alt="">
-          <img class="gd-img gd-cyan" src="${GOAT_DEATH_IMG}" alt="">
+          <img class="gd-img" alt="" hidden>
+          <img class="gd-img gd-red" alt="" hidden>
+          <img class="gd-img gd-cyan" alt="" hidden>
           <div class="gd-grain" id="gdGrain"></div>
         </div>
         <div class="gd-vignette"></div>
@@ -174,9 +188,11 @@ export class BackroomsHUD {
       <div class="hide-view" id="hideView" hidden></div>
       <div class="keypad" id="keypad" hidden>
         <div class="keypad-box">
-          <div class="keypad-title">FIRE ESCAPE</div>
+          <div class="keypad-head"><span class="keypad-brand">SECURA<small>ACCESS 4</small></span><span class="keypad-leds"><i class="led-r"></i><i class="led-g"></i></span></div>
+          <div class="keypad-title">FIRE ESCAPE · STAFF ONLY</div>
           <div class="keypad-screen" id="keypadScreen">····</div>
-          <div class="keypad-keys">${['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'OK'].map((k) => `<button data-k="${k}">${k}</button>`).join('')}</div>
+          <div class="keypad-keys">${['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'OK'].map((k) => `<button data-k="${k}"${k === 'C' ? ' class="k-clear"' : k === 'OK' ? ' class="k-ok"' : ''}>${k}</button>`).join('')}</div>
+          <div class="keypad-grille"></div>
           <div class="keypad-help">Type the code · Enter to confirm · Esc to step back</div>
         </div>
       </div>
@@ -285,9 +301,8 @@ export class BackroomsHUD {
     });
     this.applyMonsters();
 
-    // date du caméscope, figée en 1996 comme une vieille cassette retrouvée
-    const d = new Date();
-    this.$('#tapeDate').textContent = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.1996`;
+    // date du caméscope : celle de l'intro (le vlog d'urbex filmé le 12 octobre 1996, le jour de la chute)
+    this.$('#tapeDate').textContent = 'OCT.12 1996';
     this.bannerT = 9;
     this.lastCount = -1;
     this.toastT = 0;
@@ -297,7 +312,7 @@ export class BackroomsHUD {
   text(id, v) {
     if (this.cache[id] === v) return;
     this.cache[id] = v;
-    this.E[id].textContent = v;
+    this.E[id].textContent = this.pad ? padify(v) : v;
   }
 
   // une classe d'un élément, seulement si elle change
@@ -332,16 +347,19 @@ export class BackroomsHUD {
     // 1 bis. L'équipe, en haut à gauche : réécrite seulement quand quelque chose change
     this.teamList(sim, P);
 
-    // 2. Objectif de l'étage : 5 cassettes (Level 0), 3 fusibles à rapporter au monte-charge (Level 1), 3 volants
-    // (Level 37), 4 vannes (Level 2), 6 lettres à poster (Level 5)
+    // 2. Objectif de l'étage : 5 cassettes (Level 0), 3 fusibles à rapporter au monte-charge (Level 1), un des 3
+    // toboggans à trouver (Level 37, rien à compter), 4 vannes (Level 2), 6 lettres à poster (Level 5)
     const L5 = sim.level === HOTEL_LEVEL;
     const L1 = sim.level === 1 || sim.level === 2;
     const L37 = sim.level === 2;
     const PIPES = sim.level === PIPES_LEVEL;
+    const MALL = sim.level === MALL_LEVEL; // Level 17 : 5 bobines à trouver, puis à monter dans la cabine de projection
     const got = L5 ? sim.posted : PIPES ? sim.valves : L1 ? sim.fuses : sim.cassettes;
-    const total = L5 ? 6 : PIPES ? 4 : L1 ? 3 : CASSETTES;
+    const total = L5 ? 6 : PIPES ? 4 : L1 ? 3 : MALL ? REELS : CASSETTES;
     const delivered = sim.delivered || 0;
-    const objKey = `${sim.level}:${got}:${delivered}:${sim.open}:${sim.slide}:${sim.codeShown}:${(P.letters || []).length}:${sim.word}`;
+    // (Level 1 : aussi les disjoncteurs, le courant au panneau, le monte-charge qui descend)
+    const L1call = L1 && sim.liftCallT > 0;
+    const objKey = `${sim.level}:${got}:${delivered}:${sim.open}:${sim.slide}:${sim.codeShown}:${(P.letters || []).length}:${sim.word}:${L1 ? `${sim.mains}:${sim.powered}:${L1call}` : ''}${MALL ? sim.film > 0 : ''}`;
     if (objKey !== this.lastCount) {
       this.lastCount = objKey;
       this.text('levelTag', `LEVEL ${levelName(sim.level)}`);
@@ -349,11 +367,12 @@ export class BackroomsHUD {
       // Level 5 : une case par lettre, dans l'ordre des chambres ; postée, sa lettre s'affiche
       E.cassetteIcons.innerHTML = L5
         ? (sim.map.letters || []).map((Lt) => `<i class="letter${Lt.posted ? ' on' : P.letters.includes(Lt.id) ? ' carry' : ''}">${Lt.posted ? sim.word[Lt.idx] || '?' : P.letters.includes(Lt.id) ? '✉' : ''}</i>`).join('')
-        : Array.from({ length: total }, (_, i) => `<i class="${i < (sim.level === 1 ? delivered : got) ? 'on' : i < got ? 'half' : ''}${L1 ? ' fuse' : ''}"></i>`).join('');
+        : Array.from({ length: total }, (_, i) => `<i class="${i < (sim.level === 1 || MALL ? delivered : got) ? 'on' : i < got ? 'half' : ''}${L1 ? ' fuse' : ''}${MALL ? ' reel' : ''}"></i>`).join('');
       this.text('cassetteText', `${sim.level === 1 ? delivered : got}/${total}`);
+      E.cassetteText.parentElement.style.display = L37 ? 'none' : '';
       this.bannerT = 6;
       const banner = E.objBanner;
-      banner.classList.toggle('unlocked', sim.open);
+      banner.classList.toggle('unlocked', sim.open && !(L37 && !slideOf(sim)));
       let b;
       if (L5) {
         const carry = (P.letters || []).length;
@@ -366,25 +385,46 @@ export class BackroomsHUD {
           : got === 0
           ? 'LEVEL 5 · 6 LETTERS ARE HIDDEN IN THE ROOMS · HIDE UNDER BEDS AND IN WARDROBES (E), CROUCH (C)'
           : `LETTER ${got}/6 POSTED`;
-      } else if (sim.open && L37) b = slideOf(sim) ? `EVERYONE INTO THE ${slideOf(sim).name} SLIDE · THE OTHERS ARE SHUT` : 'THE PUMPS STOPPED · THE SLIDES ARE OPEN: RED, YELLOW OR BLUE, EACH ONE LEADS SOMEWHERE ELSE';
+      } else if (MALL) {
+        b = sim.open
+          ? 'THE FREIGHT ELEVATOR IS OPEN BEHIND THE SCREEN · EVERYONE GET IN'
+          : sim.film > 0
+          ? 'THE FEATURE IS STARTING · SOMETHING IS WAKING UP BEHIND THE SCREEN'
+          : got >= total && delivered < total
+          ? 'ALL 5 REELS FOUND · THREAD THEM IN THE PROJECTION BOOTH, BEHIND SCREEN 1'
+          : got > delivered
+          ? `REEL ${got}/${total} FOUND · ${got - delivered} TO THREAD IN THE PROJECTION BOOTH (${delivered}/${total} ON THE PROJECTOR)`
+          : got === 0
+          ? 'LEVEL 17 · THE FEATURE IS MISSING ITS 5 REELS · THE PROJECTION BOOTH IS BEHIND SCREEN 1'
+          : `REEL ${delivered}/${total} ON THE PROJECTOR · FIND THE OTHERS`;
+      } else if (sim.open && L37) b = slideOf(sim) ? `EVERYONE INTO THE ${slideOf(sim).name} SLIDE · THE OTHERS ARE SHUT` : 'LEVEL 37 · FIND ONE OF THE 3 SLIDES AND GET IN · RED, YELLOW OR BLUE: EACH ONE LEADS SOMEWHERE ELSE';
       else if (sim.open) b = PIPES ? 'THE STEAM IS OFF: THE SERVICE ELEVATOR IS OPEN · EVERYONE GET IN' : L1 ? 'THE FREIGHT ELEVATOR HAS POWER: EVERYONE GET IN' : 'ONLY ONE OF THE TWO ELEVATORS OPENED… THE OTHER ONE IS JUST A WALL NOW · FOLLOW THE RED ARROW';
-      else if (L37) b = got === 0 ? 'LEVEL 37 · FIND THE 3 VALVE WHEELS IN THE PUMP ROOMS' : `VALVE WHEEL ${got}/3 RECOVERED`;
       else if (PIPES) {
         const dark = (sim.map.breakers || []).some((x) => !x.done && (sim.map.valves[x.sector] || {}).power === 2);
         b = got === 0 ? 'LEVEL 2 · CLOSE THE 4 STEAM VALVES IN THE BOILER ROOMS · STAY IN THE LIGHT' : `VALVE ${got}/4 CLOSED` + (dark ? ' · A SECTOR WENT DARK: RESET ITS BREAKER (ELECTRICAL)' : '');
-      } else if (L1 && delivered >= total) b = 'ALL FUSES IN · STAY AT THE PANEL TO RESTART THE FREIGHT ELEVATOR · IT WILL BE LOUD';
-      else if (L1 && got > delivered) b = `FUSE IN YOUR POCKET · BRING IT TO THE FREIGHT ELEVATOR PANEL (${delivered}/3 IN)`;
-      else if (L1) b = got === 0 ? 'LEVEL 1 · FIND THE 3 FUSES IN THE AISLES' : `FUSE ${got}/3 RECOVERED`;
+      } else if (L1call) b = 'IT KNOWS WHERE YOU ARE · LOCKERS, SHUTTERS AND FIRE ALARMS BUY TIME';
+      else if (L1 && sim.powered) b = 'THE FREIGHT ELEVATOR IS HERE: EVERYONE GET IN';
+      else if (L1 && delivered >= total && sim.mains) b = 'POWER IS BACK AT THE PANEL · STAY AT IT TO RESTART THE FREIGHT ELEVATOR';
+      else if (L1 && delivered >= total) {
+        const k = sim.relayNeed || 2;
+        const alive = sim.players.filter((q) => q.status === 'alive').length;
+        b = alive >= k ? `THE MAIN BREAKERS ARE OFF · ${k} MUST BE ON AT ONCE · SPLIT UP, COUNT DOWN` : 'THE MAIN BREAKERS ARE OFF · THROW ONE, RUN TO THE NEXT BEFORE IT TRIPS';
+      } else if (L1 && got > delivered) b = `FUSE IN YOUR POCKET · BRING IT TO THE FREIGHT ELEVATOR PANEL (${delivered}/3 IN)`;
+      else if (L1) b = got === 0 ? 'LEVEL 1 · FIND THE 3 FUSES · ONE OF THEM IS KEPT IN A STAFF LOCKER' : `FUSE ${got}/3 RECOVERED`;
       else b = got === 0 ? `FIND THE ${CASSETTES} VHS TAPES · THE SIGNAL GETS STRONGER AS YOU GET CLOSER` : `TAPE ${got}/${CASSETTES} RECOVERED`;
       banner.textContent = b;
     }
     this.bannerT -= dt;
     this.flag('objBanner', 'hide', this.bannerT <= 0);
-    this.show('blackoutTag', sim.blackout > 0);
+    // la coupure : le noir complet, la baisse de tension, le délestage d'un tiers de l'entrepôt
+    const cutK = sim.cut ? sim.cut.kind : '';
+    this.show('blackoutTag', sim.blackout > 0 || !!cutK);
+    this.text('blackoutTag', sim.blackout > 0 ? '⚠ POWER OUTAGE' : cutK === 'brown' ? '⚠ POWER FLUCTUATION' : cutK === 'sector' ? `⚠ LOAD SHEDDING · SECTOR ${'ABC'[Math.max(0, sim.cut.band)]}` : '');
     // compte à rebours de l'équipe : dehors, il faut courir ; dedans, on regarde les autres arriver
     const bt = sim.departT > 0 ? 0 : sim.boardT || 0;
-    this.show('boardTimer', bt > 0 && sim.state === 'playing');
-    if (bt > 0) {
+    this.show('boardTimer', (bt > 0 || L1call) && sim.state === 'playing');
+    if (L1call) E.boardTimer.textContent = `FREIGHT ELEVATOR ARRIVING IN ${Math.ceil(sim.liftCallT)}s · STAY ALIVE`;
+    else if (bt > 0) {
       const sec = Math.ceil(bt);
       const out = sim.players.filter((p) => p.status === 'alive').length;
       const sl = slideOf(sim);
@@ -395,7 +435,7 @@ export class BackroomsHUD {
 
     // 2a. Trajet en ascenseur : barre de chargement ; à l'arrivée, la carte de l'étage (même si l'annonce s'est perdue)
     if (this.fadeRide) {
-      const k = sim.departT > 0 ? 1 - sim.departT / DEPART_T : 1;
+      const k = sim.departT > 0 ? 1 - sim.departT / (sim.map.slides ? SLIDE_T : DEPART_T) : 1;
       E.fadeBar.style.width = `${Math.round(k * 100)}%`;
       if (!(sim.departT > 0)) {
         this.fadeRide = false;
@@ -439,11 +479,12 @@ export class BackroomsHUD {
       }
     }
     const noSig = !(P.signal > 0);
-    this.text('signalLabel', noSig ? 'NO SIGNAL' : L5 ? (sim.open ? 'FIRE ESCAPE' : P.sigTo === 'keypad' ? 'KEYPAD' : P.sigTo === 'mail' ? 'MAILBOXES' : 'LETTER') : P.sigTo === 'stairs' ? 'STAIRS' : P.sigTo === 'key' ? 'KEY' : P.sigTo === 'ladder' ? 'LADDER' : L37 && sim.open ? 'SLIDE' : sim.open || (sim.level === 1 && delivered >= total) || (sim.level === 1 && !(sim.map.fuses || []).some((f) => !f.taken)) ? (sim.level === 1 ? 'FREIGHT ELEVATOR' : 'ELEVATOR') : 'SIGNAL');
+    this.text('signalLabel', noSig ? 'NO SIGNAL' : L5 ? (sim.open ? 'FIRE ESCAPE' : P.sigTo === 'keypad' ? 'KEYPAD' : P.sigTo === 'mail' ? 'MAILBOXES' : 'LETTER') : P.sigTo === 'stairs' ? 'STAIRS' : P.sigTo === 'breaker' ? 'BREAKER' : P.sigTo === 'key' ? 'KEY' : P.sigTo === 'ladder' ? 'LADDER' : P.sigTo === 'booth' ? 'PROJECTION BOOTH' : L37 && sim.open ? 'SLIDE' : sim.open || (MALL && sim.film > 0) || (sim.level === 1 && delivered >= total) || (sim.level === 1 && !(sim.map.fuses || []).some((f) => !f.taken)) ? (sim.level === 1 || MALL ? 'FREIGHT ELEVATOR' : 'ELEVATOR') : MALL ? 'FILM REEL' : 'SIGNAL');
     this.flag('signal', 'none', noSig);
     if (this.camOn) this.text('camSigLbl', this.E.signalLabel.textContent.replace('FREIGHT ', ''));
     // Level 0, tout trouvé : une flèche montre la direction du vrai ascenseur (ou de l'escalier, de la clé qui y mène)
-    const arrow = sim.level === 0 && sim.open && P.status === 'alive' && P.sigX !== undefined && !noSig;
+    // (Level 17 : dès que le film passe, vers le monte-charge de scène)
+    const arrow = ((sim.level === 0 && sim.open) || (MALL && sim.film > 0)) && P.status === 'alive' && P.sigX !== undefined && !noSig;
     this.show('signalArrow', arrow);
     this.show('camArrow', arrow && this.camOn);
     if (arrow) {
@@ -551,7 +592,9 @@ export class BackroomsHUD {
     const sp = L5 && P.hidden >= 0 && sim.map.spots ? sim.map.spots[P.hidden] : null;
     hv.hidden = !sp || P.status !== 'alive';
     if (sp) hv.className = `hide-view ${sp.kind}`;
-    if (this.keypadOpen && (!L5 || P.status !== 'alive' || sim.open)) this.closeKeypad();
+    if (this.keypadOpen && (!L5 || P.status !== 'alive')) this.closeKeypad();
+    else if (this.keypadOpen && sim.open && !this.keypadOkAt) this.keypadOk();
+    if (this.keypadOpen && this.keypadOkAt && performance.now() - this.keypadOkAt > 1100) this.closeKeypad();
     // 4f. Au poste de garde : la caméra regardée (son numéro, son nom), l'heure qui défile, les touches
     const cams = sim.map.cams;
     const cctv = !!(P.desk && P.status === 'alive' && cams && cams.length);
@@ -568,7 +611,10 @@ export class BackroomsHUD {
       const t = Math.floor(time) + 3 * 3600 + 17 * 60;
       this.text('cctvClock', `${this.$('#tapeDate').textContent}  ${two(Math.floor(t / 3600) % 24)}:${two(Math.floor(t / 60) % 60)}:${two(t % 60)}`);
       const k = this.keyNames(this.qwerty);
-      this.text('cctvHint', document.body.classList.contains('touch') ? 'SLIDE ◄ ► TO SWITCH CAMERA · TAP F TO STAND UP' : `◄ ${k.l} / ${k.r} ► OR WHEEL · SWITCH CAMERA · F · STAND UP`);
+      // la console des disjoncteurs généraux : elle s'arme, puis tient tant qu'on reste assis
+      const desk = !sim.mains && (sim.relaysNeeded ? sim.relaysNeeded() : []).find((r) => r.desk);
+      const con = desk ? (desk.on > 0 ? 'MAIN BREAKER CONSOLE ON · STAY SEATED · ' : 'MAIN BREAKER CONSOLE ARMING… · ') : '';
+      this.text('cctvHint', con + (document.body.classList.contains('touch') ? 'SLIDE ◄ ► TO SWITCH CAMERA · TAP F TO STAND UP' : `◄ ${k.l} / ${k.r} ► OR WHEEL · SWITCH CAMERA · F · STAND UP`));
     }
 
     // 5. Messages passagers, sous-titres, enregistrement
@@ -596,7 +642,8 @@ export class BackroomsHUD {
     const el = document.createElement('div');
     el.dataset.text = text;
     const arrow = { left: '◀ ', right: '', behind: '▼ ', ahead: '▲ ' }[dir] || '';
-    el.textContent = `${arrow}[${text}]${dir === 'right' ? ' ▶' : ''}`;
+    // (la plupart des sous-titres arrivent déjà entre crochets : pas de « [[…]] »)
+    el.textContent = `${arrow}[${text.replace(/^\[+|\]+$/g, '')}]${dir === 'right' ? ' ▶' : ''}`;
     el.t = 2.6;
     box.appendChild(el);
     while (box.children.length > 3) box.firstChild.remove();
@@ -618,8 +665,10 @@ export class BackroomsHUD {
     const ps = [P, ...sim.players.filter((Q) => Q !== P)];
     const talk = this.talkIds || new Set();
     const selfTalk = (this.micRaw || 0) > VOICE_MIN;
+    // (Level 1 : celui dont l'entité porte l'apparence a l'air encore en vie, pour les vivants)
+    const worn = P.status === 'alive' && sim.hasMonster && sim.monster.mimic != null ? sim.monster.mimic : null;
     const row = (Q) => {
-      const st = Q.status === 'dead' ? 'dead' : Q.status === 'elevator' ? 'gone' : 'alive';
+      const st = Q.status === 'dead' && Q.id !== worn ? 'dead' : Q.status === 'elevator' ? 'gone' : 'alive';
       return [Q.id, Q.name, st, Q === P ? selfTalk : talk.has(Q.id)];
     };
     const rows = ps.map(row);
@@ -689,6 +738,7 @@ export class BackroomsHUD {
       this.el.style.setProperty('--bx', `${bx}px`);
       this.el.classList.toggle('cam-wide', bx >= 64);
     }
+    this.teamTags(c, sim, on);
     if (!on) return;
     this.intT = (this.intT || 0) - dt;
     if (this.intT > 0) return;
@@ -707,6 +757,38 @@ export class BackroomsHUD {
     this.flag('camNight', 'on', night === 'NIGHT');
   }
 
+  // Les coéquipiers dans le viseur du caméscope : un repère au-dessus de chacun (son nom, la distance) ; hors du
+  // cadre, collé au bord, une flèche de son côté. Rien pour les morts, ni hors du caméscope
+  teamTags(c, sim, on) {
+    const P = sim.player;
+    const mates = on && c.project && P.status === 'alive' ? sim.players.filter((q) => q !== P && q.status === 'alive') : [];
+    this.tagEls = this.tagEls || [];
+    while (this.tagEls.length < mates.length) {
+      const el = document.createElement('div');
+      el.className = 'cam-tag';
+      this.el.appendChild(el);
+      this.tagEls.push(el);
+    }
+    this.tagEls.forEach((el, i) => {
+      const Q = mates[i];
+      el.hidden = !Q;
+      if (!Q) return;
+      const y = 2.05 - (Q.floor || 0) * 6.4;
+      const p = c.project(Q.x, y, Q.z);
+      const d = Math.round(Math.hypot(Q.x - P.x, Q.z - P.z));
+      const other = (Q.floor || 0) !== (P.floor || 0);
+      let x = p.behind ? (p.x < 0.5 ? 1 : 0) : p.x;
+      const out = p.behind || x < 0.05 || x > 0.95 || p.y < 0.08 || p.y > 0.9;
+      x = Math.max(0.05, Math.min(0.95, x));
+      const top = out ? 0.5 : Math.max(0.1, Math.min(0.88, p.y));
+      const txt = `${out && x < 0.5 ? '◄ ' : ''}${(Q.name || 'PLAYER').toUpperCase()} · ${d}M${other ? ' · ' + ((Q.floor || 0) > (P.floor || 0) ? 'BELOW' : 'ABOVE') : ''}${out && x >= 0.5 ? ' ►' : ''}`;
+      if (el.textContent !== txt) el.textContent = txt;
+      el.style.left = `${(x * 100).toFixed(2)}%`;
+      el.style.top = `${(top * 100).toFixed(2)}%`;
+      el.classList.toggle('edge', out);
+    });
+  }
+
   // le zoom de l'objectif (molette) : la barre W ─── T et le grossissement, affichés le temps de zoomer
   camZoom(z, lo, hi) {
     const k = Math.max(0, Math.min(1, Math.log(z / lo) / Math.log(hi / lo)));
@@ -722,7 +804,25 @@ export class BackroomsHUD {
     if (!el) return;
     const P = sim.player;
     const on = !!P && P.status === 'alive' && P.hidden < 0 && !document.body.classList.contains('touch');
-    const k = on ? `${multi ? 1 : 0}` : '';
+    // le rappel des touches s'efface au bout de 45 s dans chaque niveau, et revient 12 s quand on reste une minute
+    // sans bouger (perdu, ou à chercher une touche)
+    const now = performance.now() / 1000;
+    if (sim.level !== this.keysLv) {
+      this.keysLv = sim.level;
+      this.keysUntil = now + 45;
+      this.keysMoved = now;
+    }
+    if (P && P.moving) this.keysMoved = now;
+    else if (now - (this.keysMoved || now) > 60) {
+      this.keysMoved = now;
+      this.keysUntil = now + 12;
+    }
+    const faded = now > (this.keysUntil || 0);
+    if (faded !== this.keysFaded) {
+      this.keysFaded = faded;
+      el.classList.toggle('faded', faded);
+    }
+    const k = on ? `${multi ? 1 : 0}${this.pad ? 'p' : ''}` : '';
     if (k === this.keysK) return;
     this.keysK = k;
     el.hidden = !on;
@@ -730,6 +830,10 @@ export class BackroomsHUD {
     // la lampe part éteinte : sa touche vient en premier
     const keys = [['1', 'LAMP'], ['F', 'INTERACT'], ['E', 'USE'], ['G', 'DROP'], ['SPACE', 'JUMP'], ['C', 'CROUCH'], ['V', 'CAMCORDER']];
     if (multi) keys.push(['R', 'RADIO']);
+    if (this.pad) {
+      keys.splice(0, keys.length, ['Y', 'LAMP'], ['A', 'INTERACT'], ['X', 'USE'], ['RB', 'NEXT ITEM'], ['D-PAD ↓', 'DROP'], ['D-PAD ↑', 'JUMP'], ['R3', 'CROUCH'], ['L3', 'CAMCORDER'], ['B', 'WHISTLE']);
+      if (multi) keys.push(['RT', 'RADIO']);
+    }
     el.innerHTML = keys.map(([key, what]) => `<span><kbd>${key}</kbd>${what}</span>`).join('');
   }
 
@@ -755,11 +859,13 @@ export class BackroomsHUD {
     const lv = Math.max(0, Math.min(1, v.raw || 0));
     const w = Math.round(lv * 40) * 2.5; // par pas de 2,5 % : assez fin, sans réécrire le style à chaque image
     const state = v.mode === 0 ? 'quiet' : lv >= 0.8 ? 'loud' : 'heard';
-    const k = `${w}|${state}`;
+    // la voix qui passe par le serveur (pas de liaison directe), ou qui ne passe pas du tout
+    const tr = v.trouble ? v.trouble() : '';
+    const k = `${w}|${state}|${tr}`;
     if (k === this.micK) return;
     this.micK = k;
     el.className = `mic-meter ${state}`;
-    this.$('#micTxt').textContent = 'MIC';
+    this.$('#micTxt').textContent = tr === 'relay' ? 'MIC · RELAY' : tr === 'failed' ? 'MIC · NO LINK' : 'MIC';
     this.$('#micFill').style.width = `${w}%`;
   }
 
@@ -788,6 +894,8 @@ export class BackroomsHUD {
   controlText(c) {
     if (c.kind === 'alarm') return 'PRESS F · BREAK THE GLASS · THE BELL WILL DRAW IT THERE';
     if (c.kind === 'desk') return 'PRESS F · SIT AT THE GUARD POST · WATCH THE CAMERAS';
+    if (c.kind === 'relay') return c.obj.on > 0 ? `MAIN BREAKER ON · ${Math.ceil(c.obj.on)}s · PRESS F TO RESET THE TIMER` : 'PRESS F · THROW THE MAIN BREAKER (LOUD)';
+    if (c.kind === 'safe') return c.obj.shut ? 'PRESS F · SLIDE THE BOLT BACK · OPEN THE DOOR' : 'PRESS F · BOLT THE DOOR SHUT';
     const d = c.obj;
     if (d.broken) return 'THE SHUTTER IS TORN OPEN · IT WILL NEVER CLOSE AGAIN';
     const up = d.dir < 0 || (d.dir === 0 && d.o < 1);
@@ -820,15 +928,24 @@ export class BackroomsHUD {
           // rien d'autre sur l'arête
         } else if (N && !N.ladder && sel === 'ladder' && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.2) text = 'PRESS E · PLACE THE LADDER UNDER THE TAPE';
         else if (sim.inCabin && sim.inCabin(P) && sim.fm(P.floor).elevator) text = sim.liftT > 0 ? 'THE DOORS ARE CLOSING…' : 'PRESS F · PRESS THE BUTTON TO GO DOWN';
-        else if (sim.nearCassette && sim.nearCassette(P)) text = 'PRESS F · TAKE THE TAPE';
+        else if (sim.nearCassette && sim.nearCassette(P)) text = sim.level === MALL_LEVEL ? 'PRESS F · TAKE THE FILM REEL' : 'PRESS F · TAKE THE TAPE';
+        else if (sim.nearBench && sim.nearBench(P)) {
+          const n = sim.cassettes - (sim.delivered || 0);
+          text = n > 0 ? `PRESS F · THREAD ${n > 1 ? `THE ${n} REELS` : 'THE REEL'} ON THE PROJECTOR (${sim.delivered || 0}/${REELS})` : "PRESS F · READ THE PROJECTIONIST'S LOG";
+        }
         else if (P.desk) {
           // au poste : l'incrustation de la caméra dit les touches
         } else if (ctl) text = this.controlText(ctl);
         else if (it) text = P.inv.includes(null) ? `PRESS F · PICK UP ${NAME[it.kind]}` : `PRESS F · SWAP ${NAME[sel || 'bottle']} (SLOT ${P.sel + 1}) FOR ${NAME[it.kind]}`;
-        else if (h) text = 'PRESS F · HIDE IN THE LOCKER';
+        else if (h) text = (sim.map.fuses || []).some((f) => !f.taken && f.locker === h.id) ? 'PRESS F · SEARCH THE LOCKER · THE FUSE IS INSIDE' : 'PRESS F · HIDE IN THE LOCKER';
         else if (sim.nearKey && sim.nearKey(P)) text = 'PRESS F · TAKE THE STAIRWELL KEY';
         else if (sim.lockedDoorNear && sim.lockedDoorNear(P)) text = 'LOCKED · FIND THE STAIRWELL KEY ON THIS FLOOR';
-        else if (atPanel) text = `RESTARTING THE FREIGHT ELEVATOR… ${Math.round((sim.panel || 0) * 100)}% · STAY HERE`;
+        else if (atPanel && sim.mains) {
+          // il faut plusieurs paires de mains (voir panelHands) : combien sont là
+          const hands = sim.panelHands ? sim.panelHands() : 1;
+          const here = sim.players.filter((q) => q.status === 'alive' && q.hidden < 0 && Math.hypot(E1.x - q.x, E1.z - q.z) < 2.6).length;
+          text = `RESTARTING THE FREIGHT ELEVATOR… ${Math.round((sim.panel || 0) * 100)}%` + (here < hands ? ` · NEEDS ${hands} PEOPLE AT THE PANEL (${here}/${hands})` : ' · STAY HERE');
+        } else if (atPanel) text = 'THE PANEL IS DEAD · THE MAIN BREAKERS ARE OFF';
         else if (N && !N.ladder && nicheCas && !nicheCas.collected && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.6) text = 'THE TAPE IS TOO HIGH: YOU NEED A LADDER';
         else if (sim.level === HOTEL_LEVEL) text = this.hotelPrompt(sim, P);
         // ce qu'on tient servirait maintenant : assoiffé avec de l'eau d'amande, la lampe presque vide avec des piles
@@ -869,7 +986,8 @@ export class BackroomsHUD {
     this.keypadBeep = onKey;
     const el = this.$('#keypad');
     el.hidden = false;
-    el.classList.remove('wrong');
+    el.classList.remove('wrong', 'ok');
+    this.keypadOkAt = 0;
     this.drawKeypad();
     if (!this.keypadBound) {
       this.keypadBound = true;
@@ -893,9 +1011,18 @@ export class BackroomsHUD {
   }
 
   keypadPress(k) {
-    if (!this.keypadOpen) return;
+    if (!this.keypadOpen || this.keypadOkAt) return;
     if (this.keypadBeep) this.keypadBeep();
     this.$('#keypad').classList.remove('wrong');
+    // la touche s'enfonce, même tapée au clavier de l'ordinateur
+    const b = this.$(`#keypad button[data-k="${k}"]`);
+    if (b) {
+      b.classList.remove('down');
+      void b.offsetWidth;
+      b.classList.add('down');
+      clearTimeout(this.keyDownT);
+      this.keyDownT = setTimeout(() => b.classList.remove('down'), 130);
+    }
     if (k === 'C') this.keypadCode = this.keypadCode.slice(0, -1);
     else if (k === 'OK') {
       if (this.keypadCode.length === 4 && this.keypadSubmit) this.keypadSubmit(this.keypadCode);
@@ -908,24 +1035,96 @@ export class BackroomsHUD {
     this.$('#keypadScreen').textContent = (this.keypadCode + '····').slice(0, 4);
   }
 
+  // le bon code : l'écran passe au vert, OPEN, le voyant vert s'allume ; le clavier se referme une seconde après
+  keypadOk() {
+    const el = this.$('#keypad');
+    el.classList.remove('wrong');
+    el.classList.add('ok');
+    this.$('#keypadScreen').textContent = 'OPEN';
+    this.keypadOkAt = performance.now();
+  }
+
   keypadWrong() {
     const el = this.$('#keypad');
+    el.classList.remove('wrong');
+    void el.offsetWidth;
     el.classList.add('wrong');
+    this.keypadWrongAt = performance.now();
     this.keypadCode = '';
-    this.$('#keypadScreen').textContent = 'ERR ';
+    this.$('#keypadScreen').textContent = 'DENIED';
   }
 
   closeKeypad() {
     if (!this.keypadOpen) return;
     this.keypadOpen = false;
+    this.keypadOkAt = 0;
     this.$('#keypad').hidden = true;
+  }
+
+  // la manette prend la main (ou le clavier la reprend) : les touches affichées suivent
+  setPad(on) {
+    on = !!on;
+    if (on === !!this.pad) return;
+    this.pad = on;
+    this.cache = {};
+    this.keysK = null;
+    document.body.classList.toggle('pad', on);
+    if (this.lastPause) this.showPause(...this.lastPause);
   }
 
   toast(text, secs = 2.5) {
     const t = this.$('#toast');
-    t.textContent = text;
+    t.textContent = this.pad ? padify(text) : text;
     t.hidden = false;
     this.toastT = secs;
+  }
+
+  // Mode VIP, avant la partie : la phrase secrète du coffre, demandée à l'hôte par-dessus le jeu. tryPhrase(phrase)
+  // rend true (coffre ouvert), false (pas la bonne phrase) ou null (coffre introuvable). Se résout en true (ouvert) ou
+  // false (l'hôte joue avec les monstres classiques).
+  // (sub, skip : la ligne d'explication et le bouton pour s'en passer, quand c'est le niveau de départ qui la demande)
+  askPhrase(tryPhrase, { sub = 'ENTER THE PASSPHRASE TO UNLOCK THE ORIGINAL MONSTERS', skip = 'PLAY CLASSIC' } = {}) {
+    return new Promise((resolve) => {
+      const el = document.createElement('div');
+      el.className = 'vip-gate';
+      el.innerHTML = `<form class="vip-box" autocomplete="off">
+          <div class="vip-title">⭐ VIP MODE</div>
+          <div class="vip-sub">${sub}</div>
+          <input class="vip-input" type="password" name="vip-phrase" autocomplete="off" spellcheck="false" aria-label="VIP passphrase">
+          <div class="vip-msg" role="status"></div>
+          <div class="vip-btns"><button type="submit" class="vip-go">UNLOCK</button><button type="button" class="vip-skip">${skip}</button></div>
+        </form>`;
+      document.body.appendChild(el);
+      const form = el.querySelector('form');
+      const input = el.querySelector('input');
+      const msg = el.querySelector('.vip-msg');
+      let busy = false;
+      const done = (ok) => {
+        el.remove();
+        resolve(ok);
+      };
+      // le jeu n'entend rien de ce qui se tape ou se clique ici
+      for (const t of ['keydown', 'keyup', 'pointerdown', 'click', 'wheel']) el.addEventListener(t, (e) => e.stopPropagation());
+      el.addEventListener('keydown', (e) => {
+        if (e.code === 'Escape' && !busy) done(false);
+      });
+      el.querySelector('.vip-skip').addEventListener('click', () => !busy && done(false));
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (busy || !input.value.trim()) return;
+        busy = true;
+        el.classList.add('busy');
+        msg.textContent = 'CHECKING…';
+        const r = await Promise.resolve(tryPhrase(input.value)).catch(() => null);
+        busy = false;
+        el.classList.remove('busy');
+        if (r) return done(true);
+        input.value = '';
+        input.focus();
+        msg.textContent = r === false ? 'WRONG PASSPHRASE' : "CAN'T REACH THE VAULT · TRY AGAIN";
+      });
+      setTimeout(() => input.focus(), 0);
+    });
   }
 
   // images du screamer selon le mode (normal / VIP) : à rappeler quand l'hôte lance une partie
@@ -938,6 +1137,13 @@ export class BackroomsHUD {
     anim.style.backgroundImage = `url("${A.url}")`;
     anim.style.backgroundSize = `${A.cols * 100}% ${A.rows * 100}%`;
     anim.style.aspectRatio = String(A.aspect);
+    // le bouc (Level 2) : sa photo en mode VIP (coffre ouvert) ; sinon le noir et le grain seuls
+    const bouc = ENTITY_VIP ? vault.bouc || '' : '';
+    for (const g of this.el.querySelectorAll('.gd-img')) {
+      if (bouc) g.src = bouc;
+      else g.removeAttribute('src');
+      g.hidden = !bouc;
+    }
   }
 
   // level : le screamer est celui de l'entité du level en cours
@@ -1087,34 +1293,47 @@ export class BackroomsHUD {
     const d = this.$('#tapeDate').textContent;
     if (sim.state === 'won') {
       const sl = slideOf(sim);
-      if (sim.level === HOTEL_LEVEL) {
+      // les niveaux traversés, depuis celui où la partie a commencé (un départ plus loin n'en compte pas d'autres) ;
+      // le mall vient après l'hôtel
+      const from = extra.from || 0;
+      const chain = (sim.level === MALL_LEVEL ? [0, 1, 2, HOTEL_LEVEL, MALL_LEVEL] : [0, 1, 2, sim.level]).filter((l, i, a) => a.indexOf(l) === i);
+      const done = chain.slice(chain.includes(from) ? chain.indexOf(from) : chain.length - 1).map(levelName);
+      const cleared = `Level ${done.length > 1 ? `${done.slice(0, -1).join(', ')} and ${done[done.length - 1]}` : done[0]} cleared`;
+      if (sim.level === MALL_LEVEL) {
+        // le Mall : par le monte-charge de scène, derrière l'écran de la salle 1
+        title.textContent = solo ? 'YOU ESCAPED' : 'YOU ALL ESCAPED';
+        title.style.color = '#22c55e';
+        sub.textContent = 'The stage elevator went down while the film kept flickering above you. The doors opened on an empty parking lot at dawn. Far behind, in the glass, something in a striped dress was still waving.';
+        stats.textContent = `MATINEE ENDING · ${formatTime(sim.time)} · ${cleared}`;
+        this.$('#endTape').textContent = `${d} · END OF REEL`;
+      } else if (sim.level === HOTEL_LEVEL) {
         // le Terror Hotel : par l'escalier de secours
         title.textContent = solo ? 'YOU ESCAPED' : 'YOU ALL ESCAPED';
         title.style.color = '#22c55e';
         sub.textContent = 'The fire escape spiralled down for hours, then opened onto daylight. The hotel let you go… this time.';
-        stats.textContent = `HOTEL ENDING · ${formatTime(sim.time)} · Level 0, 1, 37 and 5 cleared`;
+        stats.textContent = `HOTEL ENDING · ${formatTime(sim.time)} · ${cleared}`;
         this.$('#endTape').textContent = `${d} · CHECK-OUT`;
       } else if (sim.level === PIPES_LEVEL) {
         // la vraie fin : par le toboggan jaune et les tuyauteries
         title.textContent = solo ? 'YOU ESCAPED' : 'YOU ALL ESCAPED';
         title.style.color = '#22c55e';
         sub.textContent = 'The service elevator climbed for a long time. Then daylight, real daylight, through a crack in a door. Nobody is humming.';
-        stats.textContent = `TRUE ENDING · ${formatTime(sim.time)} · Level 0, 1, 37 and 2 cleared`;
+        stats.textContent = `TRUE ENDING · ${formatTime(sim.time)} · ${cleared}`;
         this.$('#endTape').textContent = `${d} · FINAL TAPE · DO NOT ERASE`;
       } else {
         // la fausse sortie : rouge ou bleu… on se réveille sur la moquette du Level 0
         title.textContent = 'YOU WOKE UP';
         title.style.color = '#ffcf3a';
         sub.textContent = `The ${sl ? sl.name.toLowerCase() : ''} slide spat you out onto wet carpet. The lights hum. The wallpaper is yellow. Level 0, again. Maybe the yellow slide…`.replace('The  slide', 'The slide');
-        stats.textContent = `LOOP ENDING · ${formatTime(sim.time)} · Level 0, 1 and 37 cleared`;
+        stats.textContent = `LOOP ENDING · ${formatTime(sim.time)} · ${cleared}`;
         this.$('#endTape').textContent = `${d} · TAPE ENDS · REWIND?`;
       }
     } else {
       title.textContent = solo ? 'YOU DIED' : 'NOBODY MADE IT OUT';
       title.style.color = '#ef4444';
       const PIPES = sim.level === PIPES_LEVEL;
-      sub.textContent = sim.level === HOTEL_LEVEL ? 'Room service never knocks…' : PIPES ? 'The herd found you in the dark…' : sim.level === 1 ? 'The entity was waiting at the end of the shelves…' : extra.abyss ? 'You fell, and you are still falling. Nobody heard you land…' : extra.thirst ? 'Your mouth went dry, then your eyes. The hum went on without you…' : 'The entity caught you in the endless hallways…';
-      stats.textContent = `Level ${levelName(sim.level)} · ${sim.level === HOTEL_LEVEL ? `letters ${sim.posted}/6` : PIPES ? `valves ${sim.valves}/4` : sim.level === 2 ? `valves ${sim.fuses}/3` : sim.level === 1 ? `fuses ${sim.delivered || 0}/3` : `tapes ${sim.cassettes}/${CASSETTES}`} · Survived for ${formatTime(sim.time)}`;
+      sub.textContent = sim.level === MALL_LEVEL && !extra.thirst ? 'You looked away. Miss Marigold never does…' : sim.level === HOTEL_LEVEL ? 'Room service never knocks…' : PIPES ? 'The herd found you in the dark…' : sim.level === 1 ? 'The entity was waiting at the end of the shelves…' : extra.abyss ? 'You fell, and you are still falling. Nobody heard you land…' : extra.thirst ? 'Your mouth went dry, then your eyes. The hum went on without you…' : 'The entity caught you in the endless hallways…';
+      stats.textContent = `Level ${levelName(sim.level)} · ${sim.level === HOTEL_LEVEL ? `letters ${sim.posted}/6` : PIPES ? `valves ${sim.valves}/4` : sim.level === 2 ? (sim.slide >= 0 ? `${sim.map.slides[sim.slide].name.toLowerCase()} slide` : 'no slide found') : sim.level === 1 ? `fuses ${sim.delivered || 0}/3` : sim.level === MALL_LEVEL ? `reels ${sim.cassettes}/${REELS}` : `tapes ${sim.cassettes}/${CASSETTES}`} · Survived for ${formatTime(sim.time)}`;
       this.$('#endTape').textContent = `${d} · RECORDING STOPPED`;
     }
 
@@ -1134,8 +1353,18 @@ export class BackroomsHUD {
   }
 
   // Fondu au noir : l'ascenseur descend, puis la carte de l'étage
-  fade(title, sub = '', hold = 0, ride = false) {
+  // l'écran de chargement d'un nouvel étage : le titre reste, « LOADING » clignote façon caméscope
+  // quiet : le noir seul (pas de titre), « LOADING » n'apparaît qu'au bout d'une seconde
+  loading(on, quiet = false) {
     const f = this.$('#fade');
+    f.classList.toggle('loading', !!on);
+    f.classList.toggle('quiet', !!on && quiet);
+  }
+
+  // clear : le titre seul, par-dessus l'image (l'arrivée par un toboggan : on voit déjà le niveau)
+  fade(title, sub = '', hold = 0, ride = false, clear = false) {
+    const f = this.$('#fade');
+    f.classList.toggle('clear', !!clear);
     this.fadeRide = ride;
     this.$('#fadeBarBox').hidden = !ride;
     if (ride) this.$('#fadeBar').style.width = '0%';
@@ -1146,22 +1375,48 @@ export class BackroomsHUD {
     if (hold > 0) this.fadeTimer = setTimeout(() => f.classList.remove('on'), hold * 1000);
   }
 
+  // le noir tout de suite, sans fondu (la descente en toboggan y est déjà plongée : rien ne doit transparaître du
+  // niveau qui se construit derrière)
+  blackNow() {
+    const f = this.$('#fade');
+    f.style.transition = 'none';
+    f.classList.add('on');
+    void f.offsetWidth;
+    f.style.transition = '';
+  }
+
+  // le fondu au noir s'efface (sans attendre)
+  unfade() {
+    clearTimeout(this.fadeTimer);
+    this.$('#fade').classList.remove('on');
+  }
+
   // pause ; avant la toute première prise en main, c'est l'écran titre (et « Continuer » si une partie s'est arrêtée
   // plus loin, en solo)
   showPause(visible, kb, title = false, resume = null) {
+    this.lastPause = [visible, kb, title, resume];
     this.$('#clickPrompt').style.display = visible ? 'block' : 'none';
     this.$('#clickPrompt').classList.toggle('title', !!title);
+    // derrière l'écran titre, ni bandeau d'objectif ni aide des touches (ils dépassaient de la carte) ; le bandeau
+    // revient en entier quand on prend la main (son temps s'écoulait pendant qu'on lisait l'écran titre)
+    const titled = !!(visible && title);
+    if (this.titled && !titled) this.bannerT = Math.max(this.bannerT || 0, 9);
+    this.titled = titled;
+    this.el.classList.toggle('titled', titled);
     this.$('#titleCard').hidden = !title;
     this.$('#pauseTitle').hidden = !!title;
     const btn = this.$('#btnContinue');
     btn.hidden = !(title && resume);
     if (resume) btn.textContent = `▶▶ CONTINUE FROM LEVEL ${levelName(resume)}`;
     const tactile = document.body.classList.contains('touch') || matchMedia('(pointer: coarse)').matches;
-    this.$('#pauseGo').textContent = tactile ? 'TAP THE SCREEN TO PLAY' : kb ? 'PRESS ENTER TO PLAY' : title ? 'CLICK TO PRESS PLAY' : 'CLICK TO TAKE CONTROL';
+    this.$('#pauseGo').textContent = this.pad ? 'PRESS A TO PLAY' : tactile ? 'TAP THE SCREEN TO PLAY' : kb ? 'PRESS ENTER TO PLAY' : title ? 'CLICK TO PRESS PLAY' : 'CLICK TO TAKE CONTROL';
     const mv = this.qwerty ? 'WASD' : 'ZQSD';
     this.$('#pauseKeys').textContent = kb
       ? `${mv} move · Arrows or trackpad (two-finger swipe) look · Shift run · Space jump · C crouch · V camcorder · 1 flashlight · 2–${INV_SIZE + 1} select · E use (hotel: hide) · G drop · F pick up / hide · T whistle · Esc pause`
       : `${mv} move · Mouse look · Shift run · Space jump · C crouch · V camcorder · 1 flashlight · 2–${INV_SIZE + 1} or wheel select · E use (hotel: hide) · G drop · F pick up / hide · T whistle · Esc pause`;
+    if (this.pad) {
+      this.$('#pauseKeys').textContent = `Left stick move · Right stick look · LB run · D-pad ↑ jump · R3 crouch · L3 camcorder · Y flashlight · RB or D-pad ←→ select · X use (hotel: hide) · D-pad ↓ drop · A pick up / hide · B whistle · RT (hold) radio · Menu pause`;
+    }
     for (const b of this.el.querySelectorAll('button[data-kb]')) b.classList.toggle('on', (b.dataset.kb === '1') === kb);
   }
 }

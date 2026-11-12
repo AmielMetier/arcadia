@@ -12,13 +12,22 @@
    nulle part. Si un VIP lance un jeu réservé dans son salon, ses invités y jouent avec lui (sans pouvoir le lancer eux-mêmes).
    Dans un jeu : HubBridge.info.vip vaut true quand le joueur est VIP (pour réserver un mode à l'intérieur du jeu).
 
-   C'est un site statique : ce tri cache l'accès, il ne le rend pas impossible à quelqu'un qui lit le code. */
+   Le grade ne se donne qu'en modifiant cette liste sur GitHub :
+     - la session est vérifiée par le relais à chaque visite (HubAccount.verify) : une session écrite à la main dans le
+       navigateur (identifiant d'un VIP sans son mot de passe) est oubliée et la page se recharge sans le grade ;
+     - le contenu réservé (les médias du mode VIP des Backrooms) est chiffré, et le relais n'en donne la clé qu'aux
+       comptes de ACCOUNTS (les VIP d'origine) qui prouvent leur mot de passe (server/vip.js) ; les VIP ajoutés depuis
+       (HASHES, tools/vip-add.mjs) ont le grade mais tapent la phrase du coffre une fois, puis leur navigateur la garde ;
+     - un navigateur qui n'est pas (ou plus) VIP oublie la clé des Backrooms qu'il gardait.
+   C'est un site statique : quelqu'un qui modifie le code dans son navigateur peut faire apparaître les menus chez lui,
+   mais pas déchiffrer le contenu réservé. */
 (function () {
   const HASHES = [
     // empreintes des identifiants VIP (tools/vip-add.mjs)
   ];
   // comptes en ligne VIP désignés par le nom de leur fichier sur GitHub (branche saves, accounts/<id>.json) :
-  // les 5 comptes inscrits le 4 novembre 2026
+  // les 5 comptes inscrits le 4 novembre 2026, les VIP d'origine, les seuls à qui le relais donne la clé du coffre des
+  // Backrooms sans qu'ils tapent la phrase
   const ACCOUNTS = [
     '171379463336fbba34735af308802c65',
     '24348069406b1041600ea8aed25ccf63',
@@ -69,4 +78,16 @@
       : g);
   }
   window.HubVIP = { is: () => vip, hash: (user) => sha256('arcadia-vip:' + String(user).toLowerCase()) };
+
+  // la clé du coffre VIP des Backrooms (même site) : seulement chez un VIP
+  const dropVaultKey = () => { try { localStorage.removeItem('backrooms_vip_key'); } catch (e) {} };
+  if (!vip) dropVaultKey();
+  // le relais confirme la session : une fausse est oubliée (rechargement sans le grade) ; un compte que le relais ne
+  // compte plus parmi les VIP perd la clé gardée
+  if (sess && window.HubAccount.verify) {
+    window.HubAccount.verify().then((r) => {
+      if (r === 'bad') location.reload();
+      else if (r === 'ok') dropVaultKey();
+    }, () => {});
+  }
 })();

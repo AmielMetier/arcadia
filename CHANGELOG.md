@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 5.27 — 12 novembre 2026
+## 5.82 — 12 novembre 2026
 - **Odyssée** — Sur la carte :
   - Chaque lieu a sa carte locale, et la carte de la région se dévoile à mesure qu'on explore.
   - Les barrières bloquent exactement là où on les voit, et moins de sentiers sont fermés.
@@ -13,6 +13,363 @@
 - **Odyssée** — La marche est un peu plus rapide, le HUD plus petit et plus transparent.
 - **Odyssée** — Nouvelle option dans Graphismes : un rendu net pour les grands écrans (4K).
 - **Odyssée** — Plus de pluie ni de cendres sous un toit, et plus de particules collées à l'écran dans les grottes.
+
+## 5.81 — 12 novembre 2026
+- **The Backrooms** — Un nouveau niveau après le Terror Hotel : le Level 17, un centre commercial abandonné sur deux étages.
+  - On y arrive par l'escalier de secours du Level 5 : la porte coupe-feu passée, on dévale les étages jusqu'au palier « 17 », qui s'ouvre sur le mall. Sortir du mall termine la partie.
+  - L'objectif : retrouver cinq bobines de film, dispersées sur les deux étages, et les monter sur le projecteur de la cabine, derrière la salle 1 du cinéma. Quand le film passe, le monte-charge s'ouvre derrière l'écran.
+  - Le caméscope capte la bobine la plus proche ; dans la cabine, le journal du projectionniste dit où elles sont parties.
+  - L'entité : une grande poupée de parade de près de quatre mètres, sur un socle à roulettes. Elle ne bouge jamais tant qu'on la regarde ; dès qu'on détourne les yeux, elle roule vers le joueur le plus proche, de plus en plus vite. On entend ses roulettes approcher.
+  - Elle ne passe pas sous les plafonds bas : les boutiques, les coulisses et la vieille galerie du sud sont des refuges… le temps qu'elle se replace ailleurs, hors de vue.
+  - Le décor : un mail et trois cours sous verrière, des boutiques ouvertes, fermées ou vidées, deux grands magasins, un food court, un cinéma, une salle de jeux, un parking, des quais et des bureaux ; au sud, une aile plus ancienne, et dessous un dédale de couloirs de service.
+  - Le son : la ventilation, le bourdonnement des tubes, un carillon d'annonce au loin, le projecteur et la musique du film, et des pas qui changent selon le sol.
+  - Les VIP peuvent toujours y commencer directement, par le ⭐ niveau de départ.
+
+## 5.80 — 12 novembre 2026
+- **Hub** — Correction : en mode VIP aussi, le Level 1 et les Poolrooms ont l'entité voilée animée (TahitoaSenis)
+- **Hub** — Correction : aux Poolrooms, l'entité redevient la silhouette vidéo (TahitoaSenis)
+- Correction : en mode normal, chaque niveau garde son monstre ; seul le Level 1 VIP prend l'entité voilée (TahitoaSenis)
+- **Hub** — Correction : en mode normal, le monstre de base à tous les niveaux ; le mode VIP garde les siens (TahitoaSenis)
+- Améliorations techniques sous le capot (1 modification).
+
+## 5.79 — 12 novembre 2026
+- **Tête de Calcul** — The Candidate a un mode entretien, à activer dans les réglages : il ne pose que des questions d'entretien d'embauche en finance (produits financiers, maths financières, économie, informatique).
+  - Plus de 230 nouvelles questions sur ces sujets, surtout pour le desk et le comité final : grecques, obligations, swaps, crédit, VaR, Black-Scholes, mouvement brownien, C++, SQL, VBA, Excel, Access et débogage.
+  - Dans ce mode, ni calcul mental, ni brainteaser, ni fat finger, ni relance, ni market making : l'épreuve de code reste au choix, et sans face-à-face final, c'est le score de l'entretien qui désigne la recrue.
+  - Les nouvelles questions sortent aussi dans les parties habituelles de The Candidate.
+
+## 5.78 — 12 novembre 2026
+- **The Backrooms** — L'intro du mode VIP reçoit la même nouvelle fin : le choc, la neige de la cassette, puis le caméscope qui se rallume au Level 0.
+
+## 5.77 — 12 novembre 2026
+- **The Backrooms** — L'intro a une vraie fin : après la chute dans la trappe, un choc, la neige d'une cassette abîmée, puis le caméscope se rallume dans les couloirs jaunes du Level 0, néons qui bourdonnent.
+
+## 5.76 — 12 novembre 2026
+- **The Backrooms** — Le jeu se charge bien plus vite : ses plus gros modèles (explorateur, entités, bouc, meubles) pèsent 4 Mo au lieu de 22.
+- **Dogfight 3D** — Le F-16 et le F-22 pèsent cinq fois moins lourd : le hangar s'ouvre plus vite.
+
+## 5.75 — 12 novembre 2026
+- **Bastion Clash** — Le jeu ne dépend plus d'un site extérieur pour s'afficher : il démarre même si ce site est en panne.
+- **The Backrooms** — Chargement allégé de près de 3 Mo (modèles de l'explorateur et de l'entité du Level 1).
+- **Arcadia** — Les rapports de plantage partent enfin au bon endroit depuis le site en ligne, et Fief Maudit y est reconnu.
+
+## 5.74 — 11 novembre 2026
+- **The Backrooms** — Tuyauteries : le jeu ne dessine plus les tuyaux, lampes et machines des galeries voisines, cachés derrière les murs. Même image, environ un tiers de travail en moins pour la carte graphique.
+
+## 5.73 — 11 novembre 2026
+- **The Backrooms** — Terror Hotel : le jeu ne dessine plus les meubles cachés derrière un mur. Même image, mais presque moitié moins de travail pour la carte graphique dans le hall, et bien moins encore dans les couloirs : le niveau est plus fluide sur un PC modeste.
+
+## 5.72 — 11 novembre 2026
+- **The Backrooms** — L'arrivée dans un niveau ne fige plus la page. Pendant le chargement, l'écran « LOADING » reste vivant, et le niveau n'apparaît qu'une fois prêt à être dessiné, sans saccades au premier regard. Sur un PC modeste, les Poolrooms s'affichent en quelques secondes au lieu de plusieurs dizaines.
+
+## 5.71 — 11 novembre 2026
+- **The Backrooms** — Un vrai réglage pour les PC modestes :
+  - en qualité « Basse », le carrelage des Poolrooms est dessiné intact (sans carreaux tombés ni fêlés) : c'était le plus lourd à calculer. Sur une puce graphique intégrée, le niveau passe d'environ 30 à plus de 50 images par seconde ;
+  - en qualité « Auto », le jeu passe de lui-même à ces effets allégés quand l'image peine encore à la définition la plus basse, au lieu de rester saccadé jusqu'à la fin du niveau.
+
+## 5.70 — 11 novembre 2026
+- **The Backrooms** — Poolrooms : l'image demande moins de calcul à la carte graphique, pour le même rendu. De quoi gagner un peu de fluidité sur un PC modeste.
+
+## 5.69 — 11 novembre 2026
+- **The Backrooms** — Level 1 : l'imposteur laisse deux indices à qui fait attention.
+  - Il marche sans faire le moindre bruit de pas.
+  - Si tu siffles près de lui, il se fige une seconde ou deux avant de repartir.
+
+## 5.68 — 11 novembre 2026
+- **The Backrooms** — Level 1, l'entité est mieux finie :
+  - elle se courbe pour passer la porte du poste de garde et celles des salles de sécurité, au lieu de traverser le mur du dessus avec la tête ;
+  - devant une porte blindée, chacun de ses coups tombe avec son bruit. Les coups sont aussi un peu plus réguliers.
+
+## 5.67 — 11 novembre 2026
+- **The Backrooms** — Level 0, étage du haut : les murs ne sont plus tout à fait neufs. Quelques auréoles pâles et un peu d'humidité au pied du papier peint, par endroits. L'étage du bas reste bien plus défraîchi.
+
+## 5.66 — 11 novembre 2026
+- **The Backrooms** — L'écran titre est plus net : le bandeau d'objectif, l'aide des touches et les cases d'objets ne dépassent plus derrière la carte. Le bandeau d'objectif s'affiche en entier quand tu prends la main, au lieu de s'écouler pendant que tu lis l'écran titre.
+
+## 5.65 — 11 novembre 2026
+- **The Backrooms** — Au début de chaque niveau, l'aide des touches en bas à gauche ne passe plus sous les cases d'objets : sur un écran de moins de 1540 px de large, elle revient à la ligne.
+
+## 5.64 — 11 novembre 2026
+- **The Backrooms** — L'écran de fin ne cite plus que les niveaux vraiment traversés : une partie commencée plus loin (« Continuer », ou le niveau de départ des VIP) n'annonce plus le Level 0 et le Level 1 comme réussis.
+
+## 5.63 — 11 novembre 2026
+- **The Backrooms** — Level 1 : après une poursuite, tu as vraiment le temps de souffler. Pendant le répit, l'imposteur garde ses distances et se tait, au lieu de revenir sous une autre apparence à peine semé.
+
+## 5.62 — 11 novembre 2026
+- **The Backrooms** — Level 5, le digicode de la porte de secours :
+  - il faut être devant le clavier pour que le code compte ;
+  - un code faux s'entend : l'entité vient voir ce qui se passe près de la porte. Fini de taper des codes au hasard.
+
+## 5.61 — 11 novembre 2026
+- **The Backrooms** — Level 1 : caché dans un casier, tu n'es plus pris au piège par l'imposteur. Il attend devant en t'appelant une dizaine de secondes, puis renonce et s'éloigne (avant, il campait là sans fin, et sortir, c'était mourir).
+- **The Backrooms** — En quittant les Tuyauteries, l'écran parle bien du monte-charge de service qui remonte, et plus d'un toboggan.
+
+## 5.60 — 11 novembre 2026
+- **The Backrooms** — Level 5 : on ne meurt plus en posant le pied dans l'hôtel.
+  - L'entité reste au loin pendant les 30 premières secondes (un peu moins en difficile) : le temps de repérer les chambres et les cachettes
+  - Ensuite, rien ne change : un seul contact reste mortel
+
+## 5.59 — 11 novembre 2026
+- **The Backrooms** — Level 1 à plusieurs : la porte du poste de garde s'affiche comme chez l'hôte pour un joueur qui arrive ou revient en cours de partie (il pouvait la voir fermée alors qu'elle était ouverte, et buter dessus).
+
+## 5.58 — 11 novembre 2026
+- **The Backrooms** — Level 1 : l'arrivée est vraiment calme.
+  - Déguisée en joueur, l'entité venait droit sur l'équipe dès la première seconde ; elle reste maintenant au loin pendant les 50 premières secondes, sans appeler ni forcer un rideau, et s'écarte de qui s'approche
+  - Passé ce répit, elle vient vous chercher comme avant
+
+## 5.57 — 11 novembre 2026
+- **Odyssée** — Graphismes « Noir & Blanc » : fini les textures découpées dehors.
+  - Les chemins de sable, les plages, les routes pavées et les rives de la mer ont maintenant leurs coins arrondis partout, même dans les virages et les recoins : plus de carrés coupés net.
+  - L'herbe garde son motif sous les bords des chemins, des étangs et des hautes herbes.
+  - Les routes des villes sont en pavés clairs, comme dans Noir & Blanc.
+  - Les falaises et les plateaux rocheux prennent le brun clair des montagnes de Noir & Blanc au lieu du gris.
+
+## 5.56 — 11 novembre 2026
+- **Odyssée** — Graphismes « Noir & Blanc » : les intérieurs s'y mettent.
+  - Le Centre Pokémon prend son sol crème, ses murs orangés, son comptoir bleu-vert, ses canapés, ses plantes et ses machines de Noir & Blanc ; la Boutique son carrelage bleu.
+  - Dehors : panneaux de bois des routes, rebords à sauter et bancs de Noir & Blanc.
+  - Un bâtiment s'estompe quand tu passes derrière lui : tu ne perds plus ton personnage de vue.
+- **Odyssée** — HUD replié (touche U) : la fiche du lieu redevient toute petite, la grille Habitat ne s'étale plus sur l'écran.
+
+## 5.55 — 11 novembre 2026
+- **Odyssée** — Les graphismes « Noir & Blanc » sont refaits de fond en comble pour ressembler à Pokémon Noir 2 & Blanc 2.
+  - Le sol : l'herbe turquoise du jeu, les chemins de sable et les routes pavées avec leurs vrais bords, la mer bordée de rochers, les hautes herbes sombres.
+  - Les arbres et les sapins de Noir & Blanc, à leur vraie taille, avec leurs versions d'automne, de cerisier et de neige ; haies fleuries et lampadaires.
+  - Les personnages : ton dresseur devient le héros ou l'héroïne de Noir 2 & Blanc 2, et les habitants, dresseurs, champions et sbires prennent leur allure de Noir & Blanc.
+  - Les maisons trop sombres sont retirées ; les intérieurs et les combats gardent leur dessin habituel.
+- **Odyssée** — Le HUD prend moins de place, dans les deux graphismes.
+  - La fiche du lieu est plus petite, tous les boutons tiennent sur une seule rangée et l'équipe est plus fine.
+  - Sur un écran étroit, tout rapetisse encore pour laisser voir le jeu.
+  - En Noir & Blanc, le HUD prend les gris et le rouge du menu de Noir 2 & Blanc 2.
+
+## 5.54 — 11 novembre 2026
+- **The Backrooms** — Le monstre du Level 1 change de corps : une silhouette voilée, avec ses propres animations (marche, course, prise, chute, cri). On la croise aussi aux Poolrooms.
+- **The Backrooms** — Au Level 1, l'entité est un imposteur dès le début :
+  - elle commence avec l'apparence d'un joueur, marche à sa vitesse et ne se dévoile que tout près (la lampe ne la trahit plus) ;
+  - sa transformation dure une seconde sur place, puis elle chasse un peu plus vite qu'un sprint ; loin de tous et hors de vue, elle reprend une apparence ;
+  - celui qu'elle imite peut être vivant, juste à côté.
+- **The Backrooms** — Le sprint dépend du sens : toute la vitesse droit devant, 72 % de côté, 60 % en arrière.
+- **The Backrooms** — Au Level 1, la prise du monstre devient une étreinte qui étouffe.
+
+## 5.53 — 11 novembre 2026
+- **The Backrooms** — Les joueurs VIP choisissent le niveau où commence la partie.
+  - Dans le salon, un réglage ⭐ « Niveau de départ » propose le Level 0, le Level 1, le Level 37 (Poolrooms), le Level 2 (Tuyauteries) et le Level 5 (Terror Hotel). Il n'apparaît que pour un compte VIP.
+  - À plusieurs, c'est l'hôte qui choisit : toute l'équipe part du même niveau.
+  - Il faut le mode VIP débloqué, comme pour les monstres d'origine : sans lui, la partie commence au Level 0.
+  - On arrive dans le niveau choisi comme en jouant : au bout du toboggan pour les Tuyauteries et le Terror Hotel, dans la cabine qui finit de descendre au Level 1, sur la bande qui saute aux Poolrooms. Le Level 0 garde son intro.
+  - Pour tous : « Continuer » depuis l'écran titre fait lui aussi arriver dans le niveau par son passage, au lieu d'y apparaître d'un coup.
+
+## 5.52 — 11 novembre 2026
+- **The Backrooms** — La sortie des Tuyauteries devient un vrai monte-charge de service :
+  - des chevrons jaunes et noirs autour des portes, des butoirs d'acier au pied des montants, une bande de danger en U au sol avec « KEEP CLEAR » peint au pochoir, la plaque « SERVICE LIFT » ;
+  - un voyant d'appel rouge qui clignote tant que la vapeur bloque l'accès, puis passe au vert ;
+  - une fois les 4 vannes fermées, un gyrophare orange se met à tourner et balaie les murs de la galerie ;
+  - la vapeur devant les portes forme un rideau sur toute la hauteur et s'étiole sous le plafond, au lieu d'un gros bloc blanc coupé net.
+
+## 5.51 — 11 novembre 2026
+- **The Backrooms** — De nouvelles salles aux Tuyauteries, à la place de réserves vides :
+  - une salle des pompes : une rangée de pompes sur leurs socles, une armoire de commande, la nourrice à volants au mur ;
+  - des locaux électriques : de gros transformateurs à ailettes avec leurs isolateurs et leurs câbles qui montent au plafond, un voyant vert « sous tension » qui s'éteint quand le disjoncteur saute, des armoires ; on les entend bourdonner de loin ;
+  - des vestiaires : des rangées de casiers métalliques, dont un entrouvert sur le noir de temps en temps, et des bancs en bois ;
+  - les salles des pompes et les locaux électriques ont toujours du courant : leurs réglettes ne meurent pas.
+
+## 5.50 — 11 novembre 2026
+- **The Backrooms** — Les Tuyauteries s'entendent :
+  - les chaudières grondent : le souffle de la flamme, son crépitement, la tôle qui vibre ; on les entend étouffées depuis la galerie, en plein en entrant dans la chaufferie ;
+  - fermer la vanne d'une chaufferie éteint ses brûleurs : le grondement se tait et la flamme retombe en braises derrière le judas ;
+  - les pompes ronronnent et chuintent, les armoires électriques bourdonnent ; plus de courant dans le secteur, elles se taisent ;
+  - de l'eau dévale parfois une conduite au-dessus de toi, en glouglous qui passent d'un bout de la galerie à l'autre ;
+  - un tuyau qui se dilate fait quelques tics secs tout près.
+
+## 5.49 — 11 novembre 2026
+- **The Backrooms** — Les galeries des Tuyauteries, plus vraies :
+  - les gros tuyaux portent leurs bandes de marquage, avec le nom du fluide et la flèche du sens d'écoulement : eau chaude, vapeur, eau froide, air comprimé, gaz ;
+  - l'eau froide perle sur le cuivre et l'acier : des gouttes tombent des tuyaux et font des ronds dans leur flaque, et on les entend tomber ;
+  - de loin en loin, un robinet d'incendie armé : un coffret rouge vitré, le dévidoir et son tuyau enroulé, la plaque « FIRE HOSE REEL » et sa conduite rouge.
+
+## 5.48 — 11 novembre 2026
+- **The Backrooms** — La lumière des Tuyauteries :
+  - les grandes halles à piliers ne sont plus plongées dans le noir : une suspension en tôle émaillée verte pend au milieu de chaque travée, et son ampoule se reflète dans le béton ciré ; une sur trois est morte ou grésille ;
+  - la bergerie reste presque toute noire ;
+  - plus de halo collé autour des lampes : seuls le verre des hublots et la brume brillent, comme en vrai.
+
+## 5.47 — 11 novembre 2026
+- **The Backrooms** — Les chaufferies des Tuyauteries ne sont plus de grandes salles vides :
+  - les grandes chaufferies alignent trois chaudières ; chacune a sa porte de foyer avec un judas où danse la flamme, un niveau d'eau en tube de verre, une soupape à contrepoids rouge, sa plaque en laiton et ses rangées de rivets ;
+  - au sol, des rayures jaunes et noires usées entourent chaque chaudière ;
+  - le long du grand mur court une nourrice rouge sur ses consoles, avec ses départs vers le plafond et vers le sol, leurs volants rouges ou bleus, un thermomètre et un grand manomètre ;
+  - des conduites calorifugées montent des chaudières, traversent la salle sous la dalle et plongent dans la nourrice ;
+  - une armoire de commande à cinq voyants (celui de la vanne passe au vert quand tu la fermes), deux cadrans et un arrêt d'urgence ; ses voyants teintent le mur autour ;
+  - une pompe sur son socle de béton : moteur à ailettes, carter jaune, volute rouge, clapet et manomètre ;
+  - une réglette éclaire le milieu des grandes chaufferies, et la flamme des brûleurs éclaire plus loin devant les chaudières.
+
+## 5.46 — 11 novembre 2026
+- **The Backrooms** — Le Terror Hotel n'est plus un hall avec une grande boucle autour :
+  - une galerie part du hall, traverse l'étage et mène au palier des ascenseurs, deux cabines dorées hors service (l'une entrouverte sur le noir de la gaine, l'autre avec un mot scotché « OUT OF ORDER ») ;
+  - deux boucles de couloirs autour d'îlots de chambres, pour semer l'entité au lieu de tourner en rond ;
+  - un salon d'étage au bout de l'aile ouest (canapé, fauteuils, table basse), un couloir de service à l'est ;
+  - 21 chambres réparties dans toutes les ailes, qui donnent sur la galerie et sur chaque couloir.
+- **The Backrooms** — La lumière colorée éclaire vraiment, à tous les levels :
+  - au-dessus de la sortie de l'hôtel, le boîtier EXIT luit pour de vrai : son vert se pose sur le papier peint, la corniche, l'huisserie, la porte et le sol, et s'arrête aux murs (fini le halo plaqué sur le mur) ;
+  - l'écran du digicode teinte le mur (rouge quand le code est faux), le voyant de la ventouse aussi, et la lumière de l'escalier entre dans le hall quand la porte s'ouvre ;
+  - aux Tuyauteries, la flamme des brûleurs lèche le sol devant les chaudières, et les voyants des vannes et des disjoncteurs colorent le mur autour d'eux ;
+  - partout, la cabine d'un ascenseur ouvert éclaire le couloir, et les reflets colorés luisent sur les surfaces vernies.
+
+## 5.45 — 11 novembre 2026
+- **The Backrooms** — La sortie du Terror Hotel, refaite pour de bon :
+  - une vraie porte coupe-feu en acier rouge, usée en bas, avec un hublot en verre armé, une barre anti-panique « PUSH TO OPEN » et l'étiquette « EMERGENCY EXIT ONLY » ;
+  - une ventouse magnétique tient la porte fermée : son voyant reste rouge tant que le code n'est pas bon ;
+  - au-dessus, un boîtier EXIT lumineux avec son petit bonhomme qui court ;
+  - le digicode est maintenant à droite de la porte, côté serrure : une plaque d'inox avec douze touches, un écran et deux voyants. Sur le mur, il affiche des étoiles quand tu tapes, « DENIED » sur un mauvais code et « OPEN » sur le bon ;
+  - à l'écran, le clavier ressemble au vrai : les touches s'enfoncent (même au clavier de l'ordinateur), il tremble sur une erreur et passe au vert quand ça s'ouvre ;
+  - le bon code fait claquer la ventouse, puis le lourd battant s'ouvre lentement en grinçant sur l'escalier.
+
+## 5.44 — 11 novembre 2026
+- **The Backrooms** — Le Terror Hotel, plus grand et plus habité :
+  - le hall monte à 4,40 m de plafond, avec une frise dorée tout autour et des lustres qui pendent de plus haut ; on tombe de plus haut en arrivant par la trappe ;
+  - beaucoup moins de papier peint décollé dans les couloirs ;
+  - les couloirs se meublent : tableaux entre les appliques, consoles avec un vase ou une lampe sous un miroir, plantes dans les angles, banquettes, extincteurs, une pendule arrêtée, un panneau « sol glissant » oublié ;
+  - dans les chambres, un pouf au pied du lit et une plante dans un coin.
+
+## 5.43 — 10 novembre 2026
+- **The Backrooms** — Le Terror Hotel s'entend enfin :
+  - les pas claquent sur le marbre du hall et s'étouffent dans la moquette épaisse des couloirs ;
+  - plus de grésillement de néons : c'est la vieille installation électrique qui ronfle dans les murs, un peu plus fort sous les appliques allumées ;
+  - un radiateur cogne et siffle derrière une porte ;
+  - un téléphone sonne dans une chambre… et se tait net quand tu arrives à la porte ;
+  - la sonnette de la réception tinte alors qu'il n'y a personne au comptoir ;
+  - une porte se referme quelque part, des pas passent au loin ;
+  - rarement, un gramophone joue une valse désaccordée derrière les murs, jusqu'à ce que son ressort lâche.
+
+## 5.42 — 10 novembre 2026
+- **The Backrooms** — Le hall du Terror Hotel en grand :
+  - Un sol en damier de marbre blanc et noir, poli, où brillent les reflets des lustres. La moquette s'arrête au seuil ; il reste un grand tapis d'Orient sous la banquette et un chemin rouge depuis l'entrée.
+  - Les colonnes sont en marbre noir veiné, avec une base et un chapiteau dorés.
+  - Un plafond à caissons, filets dorés et rosaces, avec un grand caisson au milieu, là où s'allume le code.
+  - Des portes vitrées à double battant, à côté des boîtes aux lettres, qui ne donnent que sur le noir. On y lit HOTEL à l’envers.
+  - On arrive du toboggan par une trappe ouverte au plafond : un drap pend du bord, et on atterrit sur un tas de linge.
+  - Le comptoir de la réception a sa barre de pied en laiton.
+  - La lueur au bout du toboggan prend la couleur ambrée des appliques.
+
+## 5.41 — 10 novembre 2026
+- **The Backrooms** — Les portes et les couloirs du Terror Hotel :
+  - Des portes des années 1930 : battant en noyer à quatre panneaux, bouton et serrure en laiton, judas, plaque de propreté ; un chambranle mouluré avec ses plinthes et sa corniche. Le papier peint continue autour de l'entrée, jusque dans la petite entrée de chaque chambre.
+  - La plinthe, la cimaise et la corniche sont en vrai relief, le long de tous les murs, et tournent aux angles.
+  - Devant certaines portes, ce que les clients ont laissé : un plateau de room service sous sa cloche, une paire de chaussures cirées, le journal du soir.
+  - Par endroits, le papier peint se décolle du haut et laisse voir le plâtre jauni. Les appliques mortes ont la tulipe cassée, et le verre est resté sur la moquette.
+  - Derrière la porte de secours, une vraie cage d'escalier : un palier, des marches de béton qui descendent vers une ampoule grillagée, une rampe, et un grand « 5 » peint au pochoir.
+
+## 5.40 — 10 novembre 2026
+- **The Backrooms** — Les chambres du Terror Hotel sont habitées :
+  - Un vrai lit : tête de lit sculptée et capitonnée de velours, matelas, draps, gros oreillers, couvre-lit de velours qui retombe sur les côtés. Caché dessous, on voit les lattes, les pieds du lit et la chambre par la fente.
+  - Une armoire à panneaux avec un miroir terni, un bureau à sous-main de cuir et sa lampe, une table de nuit de chaque côté du lit, avec un vieux téléphone sur l'une d'elles.
+  - Un tapis d'Orient sous le lit, un plafonnier en verre dépoli, des ombres sous les meubles.
+  - Une fenêtre aux lourds rideaux tirés, avec un filet de lumière froide entre eux, et un radiateur en fonte dessous.
+  - Selon la chambre : un fauteuil, une commode avec sa pendule ou son vase et un miroir, un tableau au-dessus du lit, une valise oubliée.
+  - Une chambre sur trois a été fouillée : lit défait, couvre-lit par terre, tiroir du bureau resté ouvert.
+
+## 5.39 — 10 novembre 2026
+- **The Backrooms** — La lumière du Terror Hotel :
+  - Chaque applique dessine son éventail de lumière sur le papier peint, qui monte de la tulipe en s'évasant, et une tache chaude au plafond au-dessus d'elle. Entre deux appliques, la pénombre.
+  - Les appliques sont refaites : platine et bras en laiton, tulipe en verre dépoli plus vive au fond, et un halo quand elles sont allumées. Celles qui grésillent ou sont mortes le montrent sur le mur.
+  - Les lampes de chevet éclairent le mur derrière elles.
+  - Le vernis du lambris renvoie la lueur des appliques les plus proches.
+
+## 5.38 — 10 novembre 2026
+- **The Backrooms** — Le Terror Hotel (Level 5) change de matières, dans les couloirs comme dans les chambres :
+  - Un vrai papier peint damassé lie-de-vin, ton sur ton et en léger relief, avec ses lés, son grain et ses taches ; plus sombre sous la corniche, patiné au-dessus de la cimaise.
+  - Un lambris en noyer verni à panneaux biseautés, qui brille sous les appliques et la lampe torche, avec sa cimaise et sa plinthe.
+  - Une corniche et un plafond en plâtre crème, jaunis par les années.
+  - Une moquette en velours rouge à motif Art déco (losanges et éventails or, pastilles vertes), usée et pâlie au milieu des couloirs, tachée par endroits.
+
+## 5.37 — 10 novembre 2026
+- **The Backrooms** — Les Poolrooms (Level 37) rattrapent le réalisme des Level 0 et 1.
+  - Plus rien à ramasser : les trois toboggans sont ouverts dès l'arrivée, il suffit d'en trouver un dans le dédale. L'entité, elle, s'enhardit à mesure qu'on erre.
+  - Les carreaux gravés de l'histoire se lisent en entrant dans les locaux techniques.
+  - Les toboggans sont refaits : un vrai départ de toboggan en polyester brillant, avec son pavillon, ses brides boulonnées, la barre d'appui en inox, une plaque émaillée à sa couleur et un tapis antidérapant devant. Par la bouche, on voit le tube continuer derrière le mur, puis plonger et tourner dans le noir.
+  - On descend vraiment le toboggan : on s'assoit au bord, on s'y laisse glisser, et on file dans un long tube qui tourne et plonge, de plus en plus vite, en montant sur la paroi dans les virages. La descente se poursuit après l'écran de chargement, jusqu'à la lumière du bout du tube, et on tombe dans le niveau suivant, son nom affiché par-dessus.
+  - Entre deux salles où l'eau n'a pas la même profondeur, une marche carrelée au pas de la porte : plus de bande blanche ni de trou sous l'eau, et l'eau ne se dédouble plus sur le seuil.
+  - Le carrelage émaillé a du relief : les joints se creusent, nets et réguliers, chaque carreau a sa nuance, la lumière des dalles brille dessus.
+  - Le sol mouillé reflète les plafonniers, surtout près des bassins et dans les flaques.
+  - L'eau est transparente : on voit le fond carrelé, les colonnes s'y reflètent et la lampe torche y fait un reflet.
+  - Le bord des bassins suit leur courbe, sans dents de scie, avec sa margelle.
+  - Les reflets de l'eau dansent sur les murs et les plafonds au-dessus des bassins.
+  - Une brume de vapeur flotte au ras de l'eau ; la bouche des toboggans éclaire de sa couleur autour d'elle.
+  - Par endroits, des carreaux tombés ou fêlés ; une bonde au fond des bassins, des skimmers au ras de l'eau, la profondeur peinte sur les margelles (« NO DIVING » là où c'est peu profond), des bouches d'aération au plafond.
+  - Les salles sous verrière ont de vraies vitres, inégales et sales, avec leurs petits bois, des feuilles mortes, quelques vitres fêlées et des fermes en acier.
+  - Une ambiance sonore à elles : des gouttelettes qui résonnent au bord des bassins, les skimmers qui glougloutent, et au loin une balle qui rebondit, un plongeon, une porte de cabine, une rampe qu'on heurte… Plus de grésillement de néons du Level 0, ni de grattement continu, ni de bruit de vagues : l'eau est immobile.
+  - Les pas sur le carrelage mouillé claquent doucement, à plat, au lieu de faire des clics.
+
+## 5.36 — 10 novembre 2026
+- **The Backrooms** — Les nouveaux comptes VIP tapent la phrase du mode VIP une fois pour débloquer les monstres d'origine ; leur navigateur s'en souvient ensuite. Les VIP actuels n'ont toujours rien à taper.
+
+## 5.35 — 10 novembre 2026
+- **The Backrooms** — La phrase du mode VIP revient, mais ne se tape qu'une seule fois : le premier hôte VIP qui la donne débloque les monstres d'origine pour tous les comptes VIP, qui n'ont ensuite plus rien à taper.
+
+## 5.34 — 10 novembre 2026
+- **The Backrooms** — Le mode VIP ne demande plus de phrase : le compte Arcadia VIP de l'hôte suffit pour débloquer les monstres d'origine, et ses invités les voient avec lui.
+  - Si l'hôte n'est pas connecté à son compte VIP, la partie se joue avec les monstres, la voix et l'intro classiques.
+- **Hub** — Le grade VIP est vérifié en ligne à chaque visite : impossible de se faire passer pour un compte VIP sans son mot de passe.
+
+## 5.33 — 10 novembre 2026
+- **The Backrooms** — À la manette, le talkie se prend en maintenant RT, comme R au clavier.
+
+## 5.32 — 10 novembre 2026
+- **The Backrooms** — À la manette, le jeu affiche les boutons de la manette au lieu des touches du clavier : les indications à l'écran (« PRESS A », « HOLD LB »…), la barre de commandes en bas et l'écran de pause. Toucher le clavier ou la souris remet les touches du clavier.
+
+## 5.31 — 10 novembre 2026
+- **The Backrooms** — Le mode VIP se déverrouille avec une phrase secrète :
+  - L'hôte la tape une fois en lançant une partie VIP ; son navigateur s'en souvient et ses invités n'ont rien à taper.
+  - Sans la phrase (ou avec « Play classic »), la partie se joue avec les monstres, la voix et l'intro classiques.
+  - La voix qui appelle au Level 1 et la photo du bouc sont désormais réservées au mode VIP.
+
+## 5.30 — 10 novembre 2026
+- **The Backrooms** — Nouvelle vidéo d'intro en mode VIP, avec le son.
+
+## 5.29 — 10 novembre 2026
+- **The Backrooms** — au Level 1, l'entrepôt devient un vrai niveau :
+  - On arrive au calme : l'entité reste au loin un moment, et la première coupure de courant attend deux minutes.
+  - Les coupures changent : vrai noir, micro-coupure, baisse de tension où tout grésille, délestage qui éteint l'entrepôt par morceaux. Jamais deux fois de suite la même.
+  - Un des trois fusibles est rangé dans un casier du personnel : il faut s'y enfermer pour le trouver.
+  - Les fusibles en place, il faut tenir les disjoncteurs généraux en même temps ; seul, chacun tient le temps de courir au suivant.
+  - Le courant revenu, le monte-charge met 40 à 60 secondes à descendre : les rideaux des quais retombent, le courant tremble et l'entité sait où tu es. Casiers, rideaux et alarmes font gagner du temps.
+  - Le plan de l'entrepôt change d'une partie à l'autre : travées, chambres froides, grande halle d'expédition, allées serrées.
+- **The Backrooms** — à plusieurs :
+  - Au Level 1, le panneau ne redémarre qu'à deux (à trois quand on est au moins quatre en vie) ; seul, il avance lentement.
+  - Plus on est nombreux, plus la pression monte : l'entité se repose moins et les coupures reviennent plus tôt. Les objets à trouver suivent le nombre de joueurs.
+  - Chacun part de son côté : hors de vue des autres, mais assez près pour s'entendre.
+  - Le caméscope montre le nom et la distance de chaque coéquipier, même hors du cadre.
+  - Le saut des invités se voit chez tout le monde, les portes de la cabine se ferment aussi chez eux, et le fauteuil du poste de garde se libère quand son occupant s'en va.
+- **The Backrooms** — l'entité :
+  - Elle ne se laisse plus berner : plus moyen de la semer sur un palier d'escalier ou au fond d'un puits.
+  - Elle n'attrape plus à travers la tôle du monte-charge ni derrière ses portes fermées ; celui qu'elle tient à travers la baie lui échappe quand les portes se ferment.
+  - Les règles s'apprennent en jouant : une ligne dit qu'elle a chargé parce que tu l'as fixée, ou qu'elle n'entre pas dans la lumière franche.
+- **The Backrooms** — le son :
+  - Plus aucune boucle audible : les souffles, le silence de la pièce et la voix du Level 1 ne repassent plus au même endroit.
+  - Le cri du Level 1 change à chaque fois, plus ou moins grave, parfois à deux gorges.
+  - L'entrepôt a ses bruits lointains : bip de chariot qui recule, annonce incompréhensible, chaînes, charge qui tombe. Disjoncteurs, délestage, baisse de tension et monte-charge s'entendent.
+  - La capture a plusieurs sursauts, jamais deux fois le même de suite.
+  - Le cœur et la musique de tension ne trahissent plus l'entité derrière un mur : ils suivent ce qu'on entend d'elle.
+  - Voix : si la liaison directe ne passe pas, la voix passe par le serveur (qualité talkie) et l'écran le dit.
+- **The Backrooms** — l'image :
+  - Le faisceau de la lampe s'éteint en douceur sur ses bords, avec le léger anneau du réflecteur.
+  - Les joueurs et l'entité ont une ombre au sol : ils ne flottent plus dans la lumière.
+  - Au Level 0, le papier peint gaufré et la moquette prennent du relief sous la lampe.
+  - Le caméscope règle son exposition d'après ce qu'il filme : il se referme face à une zone éclairée et s'ouvre un peu dans le noir.
+  - Le rappel des touches s'efface au bout de 45 secondes et revient quand on reste une minute sans bouger. La date du caméscope est celle de l'intro.
+  - La définition automatique remonte après un passage chargé, et une carte graphique qui décroche est annoncée : l'image revient seule.
+  - Le Level 1 demande moins à la carte graphique, et la combinaison se charge plus vite.
+
+## 5.28 — 10 novembre 2026
+- **The Backrooms** — au Level 1 :
+  - Des salles de sécurité, deux à quatre selon la taille de l'entrepôt, marquées SHELTER au-dessus de leur porte blindée. Dedans, F verrouille la porte (le voyant passe au rouge) ou la rouvre.
+  - Enfermé à temps, tu es hors de sa portée. L'entité frappe la porte une dizaine de secondes, hurle de rage, puis part rôder loin de là : on entend ses pas lourds s'éloigner.
+  - Quand l'entité tue quelqu'un, elle prend son apparence : même tenue, même démarche de joueur, lampe éteinte. Les vivants ne voient pas sa mort et il reste dans la liste de l'équipe.
+  - Elle vient vers vous en marchant et vous appelle avec sa voix, des bribes de ce qu'il a dit plus tôt, un peu ralenties et hachées, de vive voix ou au talkie. Pas de bourdonnement quand elle approche.
+  - Elle se démasque si tu la laisses arriver à deux pas, ou si tu la gardes dans ta lampe. Elle reprend alors sa forme dans un hurlement et fonce sur toi. Devant une salle verrouillée, elle frappe doucement et supplie qu'on lui ouvre, puis renonce.
+
+## 5.27 — 10 novembre 2026
+- **The Backrooms** — Le passage d'un niveau à l'autre ne donne plus l'impression d'un plantage : l'image ne fige plus, un écran noir « LOADING THE TAPE… » clignote pendant que le nouvel étage se prépare, et il n'apparaît qu'une fois prêt.
 
 ## 5.26 — 10 novembre 2026
 - **Odyssée** — Le relief façon HeartGold / SoulSilver : falaises en étages de pierres, roches en terrasses et en pentes arrondies, talus d'herbe, grottes en relief, et des ravins aux parois de roche qui plongent dans le noir.
@@ -76,12 +433,12 @@
   - Plus de rejeu de la mort : après l'attaque, l'image se perd tout de suite.
 
 ## 5.22 — 9 novembre 2026
-- **The Backrooms** — Une partie qui commence au Level 0 s'ouvre sur une vidéo filmée au caméscope : une soirée d'urbex dans une usine abandonnée, où Safia passe à travers une trappe du plancher… et le groupe saute pour la rejoindre. Espace ou Entrée pour la passer.
+- **The Backrooms** — Une partie qui commence au Level 0 s'ouvre sur une vidéo filmée au caméscope : une soirée d'urbex dans une usine abandonnée, où l'une d'entre vous passe à travers une trappe du plancher… et le groupe saute pour la rejoindre. Espace ou Entrée pour la passer.
   - En mode VIP, la vidéo est sous-titrée.
-  - La feuille scotchée au mur de l'arrivée est signée Safia.
+  - La feuille scotchée au mur de l'arrivée est signée.
 
 ## 5.21 — 9 novembre 2026
-- **The Backrooms** — Au Level 1, on entend maintenant Khaoula : sa voix résonne de temps en temps quand elle rôde près de toi, et bien plus souvent quand elle te poursuit. Plus elle est loin ou derrière les murs, plus elle est étouffée.
+- **The Backrooms** — Au Level 1, on entend maintenant l'entité : sa voix résonne de temps en temps quand elle rôde près de toi, et bien plus souvent quand elle te poursuit. Plus elle est loin ou derrière les murs, plus elle est étouffée.
 
 ## 5.2 — 9 novembre 2026
 - Fix typo in hud.js string (Metier Amiel)
@@ -89,15 +446,15 @@
 ## 5.1 — 9 novembre 2026
 - Modify NOTES entries in hud.js (Metier Amiel)
 
-## 5.00 — 9 novembre 2026
+## 5.0 — 9 novembre 2026
 - **The Backrooms** — Une voix sur le talkie : « The Old Timer », là depuis toujours, prend parfois la parole sur le canal 9. Tout le monde l'entend en même temps, deux ou trois fois par niveau, jamais pendant une poursuite. Il aide un peu… et il en sait beaucoup trop. Quand il ne reste qu'un survivant, il ne parle plus qu'à lui.
 
 ## 4.99 — 9 novembre 2026
 - **The Backrooms** — Du lore à chaque niveau : chaque monstre a une histoire, qu'on découvre en ramassant les objets.
-  - Level 0 : les cassettes sont celles de Safia, une exploratrice perdue dans le Lobby… qui n'en est jamais sortie.
-  - Level 1 : avec chaque fusible, un mot griffonné de Khaoula, qui s'est cachée au sous-sol pour fuir quelqu'un.
-  - Poolrooms : avec chaque volant de vanne, un carreau gravé à la gloire de St Didier Auroux, le père de toute chose.
-  - Pipe Dreams : à chaque vanne fermée, une trace à la craie sur Teo, l'élève de 1934 devenu le bouc à la cloche.
+  - Level 0 : les cassettes sont celles d'une exploratrice perdue dans le Lobby… qui n'en est jamais sortie.
+  - Level 1 : avec chaque fusible, un mot griffonné de l'entité du sous-sol, qui s'est cachée au sous-sol pour fuir quelqu'un.
+  - Poolrooms : avec chaque volant de vanne, un carreau gravé à la gloire du père de toute chose.
+  - Pipe Dreams : à chaque vanne fermée, une trace à la craie sur l'élève de 1934 devenu le bouc à la cloche.
   - Terror Hotel : avec chaque lettre, une ligne du registre de 1934… et ton nom y est déjà.
   - Tout trouver débloque un dernier message à la sortie.
 

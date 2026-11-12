@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Level 17 · plan du mall</title>
+<style>
+  body { margin: 0; background: #14110d; color: #e8dcc4; font: 13px/1.4 system-ui, sans-serif; }
+  header { padding: 10px 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .04em; }
+  .floors { display: flex; flex-direction: column; gap: 14px; padding: 0 16px 16px; }
+  figure { margin: 0; }
+  figcaption { margin: 0 0 4px; color: #b9a988; }
+  canvas { max-width: 100%; height: auto; background: #0b0907; border: 1px solid #2c261d; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; padding: 0 16px 16px; color: #b9a988; }
+  .legend i { display: inline-block; width: 12px; height: 12px; vertical-align: -2px; margin-right: 4px; border: 1px solid #0006; }
+  input { width: 80px; background: #221d16; color: inherit; border: 1px solid #3a3226; padding: 3px 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>LEVEL 17 · THE MALL — plan des deux étages</h1>
+  <label>graine <input id="seed" type="number" value="1"></label>
+  <span id="info"></span>
+</header>
+<div class="floors" id="floors"></div>
+<div class="legend" id="legend"></div>
+<script type="module">
+  import { createMallMap, polyDist } from './engine/mall.js';
+  import { T, CELL_SIZE as C } from './engine/map.js';
+  const COL = {
+    mail: '#cdbf9e', court: '#e6d6ad', plaza: '#7d7466', shop: '#a99a7c', service: '#6f6b63', food: '#cfb98a', store: '#b7ad98',
+    closed: '#4e473d', portal: '#d8c9a4', cine: '#7b4fa8', cineHall: '#4a4a52', screen: '#5a2830', wc: '#9fb3b5', office: '#a3a08f',
+    dock: '#76736c', lobby: '#b4ab97', fun: '#c0528e', parking: '#8f949b', annex: '#c9a676', market: '#b9c9a8', flea: '#a98a6a', garden: '#8fb58a', storage: '#7d776c',
+  };
+  const NAMES = { mail: 'mail', court: 'cour', plaza: 'place basse', shop: 'boutique', service: 'service', food: 'food court', store: 'grand magasin', closed: 'magasin fermé', portal: 'passage', cine: 'cinéma', cineHall: 'couloir des salles', screen: 'salle', wc: 'toilettes', office: 'bureaux', dock: 'quais', lobby: 'hall des parkings', fun: 'salle de jeux', parking: 'parking', annex: 'annexe (galerie, passages)', market: 'supermarché', flea: 'brocante', garden: 'jardinerie', storage: 'réserve' };
+  const S = 9; // pixels par case
+  const draw = (seed) => {
+    const m = createMallMap(seed * 17 + 3);
+    const root = document.getElementById('floors');
+    root.innerHTML = '';
+    m.floors.forEach((f, fi) => {
+      const fig = document.createElement('figure');
+      const cap = document.createElement('figcaption');
+      const shops = f.shops.map((s) => `${s.name} (${s.state})`).join(' · ');
+      cap.textContent = `${fi === 0 ? 'Étage du haut (arrivée)' : 'Étage du bas (−6,40 m)'} — ${f.rooms.length} salles, ${f.lights.length} lumières (${f.lights.filter((l) => l.state !== 'off').length} allumées), ${f.walkable.length} cases parcourues — ${shops}`;
+      const cv = document.createElement('canvas');
+      cv.width = f.W * S;
+      cv.height = f.H * S;
+      fig.append(cap, cv);
+      root.append(fig);
+      const g = cv.getContext('2d');
+      const px = (v) => (v / C) * S;
+      for (let z = 0; z < f.H; z++)
+        for (let x = 0; x < f.W; x++) {
+          const k = z * f.W + x;
+          const v = f.grid[k];
+          if (v === T.WALL) continue;
+          const r = f.zone[k] >= 0 ? f.rooms[f.zone[k]] : null;
+          g.fillStyle = v === T.EXIT ? '#2f8f4a' : r ? COL[r.kind] || '#999' : '#888';
+          if (r && r.kind === 'shop' && r.state !== 'open') g.fillStyle = r.state === 'gutted' ? '#8a7d66' : '#6d6150';
+          g.fillRect(x * S, z * S, S, S);
+          if (f.dist[k] < 0 && v === T.FLOOR) {
+            g.fillStyle = '#0008';
+            g.fillRect(x * S, z * S, S, S);
+          }
+        }
+      // les vides (étage du haut) et, en bas, leur ombre au plafond
+      for (const v of (fi === 0 ? f.voids : m.floors[0].voids)) {
+        g.beginPath();
+        v.pts.forEach(([x, z], i) => (i ? g.lineTo(px(x), px(z)) : g.moveTo(px(x), px(z))));
+        g.closePath();
+        if (fi === 0) {
+          g.fillStyle = '#0b0907';
+          g.fill();
+          g.strokeStyle = '#fff';
+          g.lineWidth = 1.5;
+          g.stroke();
+        } else {
+          g.setLineDash([4, 3]);
+          g.strokeStyle = '#0009';
+          g.lineWidth = 1;
+          g.stroke();
+          g.setLineDash([]);
+        }
+      }
+      // les formes de collision (vitrines, grilles, escalators)
+      for (const o of f.solids) {
+        if (o.void !== undefined) continue;
+        g.strokeStyle = o.gate ? '#d9d9d9' : o.esc !== undefined ? '#e0a040' : '#5ec8e8';
+        g.fillStyle = '#e0a04066';
+        g.lineWidth = 2;
+        if (o.pts) {
+          g.beginPath();
+          o.pts.forEach(([x, z], i) => (i ? g.lineTo(px(x), px(z)) : g.moveTo(px(x), px(z))));
+          g.closePath();
+          g.fill();
+          g.stroke();
+        } else if (o.ax !== undefined) {
+          g.beginPath();
+          g.moveTo(px(o.ax), px(o.az));
+          g.lineTo(px(o.bx), px(o.bz));
+          g.stroke();
+        }
+      }
+      // le mobilier (son emprise)
+      g.fillStyle = '#3a2c1c99';
+      for (const it of f.furn || []) {
+        const [w, d] = it.rot ? [it.d, it.w] : [it.w, it.d];
+        if (it.round) {
+          g.beginPath();
+          g.arc(px(it.x), px(it.z), Math.max(1, px(Math.max(it.w, it.d) / 2)), 0, 7);
+          g.fill();
+        } else g.fillRect(px(it.x - w / 2), px(it.z - d / 2), Math.max(1, px(w)), Math.max(1, px(d)));
+      }
+      // les escalators (tout le tracé)
+      for (const e of f.escalators) {
+        g.strokeStyle = '#e0a040';
+        g.lineWidth = 1;
+        g.strokeRect(px(Math.min(e.x, e.top)), px(e.z - e.w / 2), px(Math.abs(e.top - e.x)), px(e.w));
+      }
+      // les escaliers
+      for (const st of m.stairs) {
+        g.fillStyle = '#c0504d';
+        for (const c of st.cells) g.fillRect(c.gx * S + 1, c.gz * S + 1, S - 2, S - 2);
+        g.fillStyle = '#fff';
+        const d = fi === 0 ? st.up : st.down;
+        g.beginPath();
+        g.arc(px(d.x), px(d.z), 3, 0, 7);
+        g.fill();
+      }
+      // piliers
+      for (const k in f.pillars) {
+        const p = f.pillars[k];
+        g.fillStyle = '#f4ecd8';
+        if (p.round) {
+          g.beginPath();
+          g.arc(px(p.x), px(p.z), Math.max(2, px(p.h)), 0, 7);
+          g.fill();
+        } else g.fillRect(px(p.x - p.h), px(p.z - p.h), Math.max(3, px(p.h * 2)), Math.max(3, px(p.h * 2)));
+      }
+      // lumières
+      for (const l of f.lights) {
+        g.fillStyle = l.state === 'off' ? '#0000' : l.state === 'flicker' ? '#ff9a3c' : l.kind === 'pendant' ? '#fff3c0' : '#ffe08a';
+        g.beginPath();
+        g.arc(px(l.x), px(l.z), l.big ? 5 : 1.4, 0, 7);
+        g.fill();
+      }
+      // portes
+      for (const d of f.doors) {
+        g.strokeStyle = d.kind === 'fire' ? '#e33' : d.kind === 'screen' ? '#c9f' : '#222';
+        g.lineWidth = 1;
+        g.strokeRect(d.x * S + 1.5, d.z * S + 1.5, S - 3, S - 3);
+      }
+      // objets, départ, entité
+      for (const it of f.items) {
+        g.fillStyle = it.kind === 'bottle' ? '#4fb3ff' : '#8f8';
+        g.fillRect(px(it.x) - 2, px(it.z) - 2, 4, 4);
+      }
+      const mark = (p, c, t) => {
+        g.fillStyle = c;
+        g.beginPath();
+        g.arc(px(p.x), px(p.z), 5, 0, 7);
+        g.fill();
+        g.fillStyle = '#000';
+        g.font = 'bold 8px system-ui';
+        g.fillText(t, px(p.x) - 3, px(p.z) + 3);
+      };
+      if (fi === 0) mark(f.spawn, '#5f5', 'A');
+      if (f.monsterSpawn && fi === 0) mark(f.monsterSpawn, '#f55', 'M');
+      // noms des salles
+      g.font = '10px system-ui';
+      g.fillStyle = '#000c';
+      for (const r of f.rooms) {
+        if (!r.name || r.kind === 'service' || r.kind === 'portal') continue;
+        const w = (r.x1 - r.x0 + 1) * S;
+        if (r.kind === 'shop') {
+          g.save();
+          g.font = '8px system-ui';
+          g.fillText(r.name.slice(0, Math.floor(w / 4.4)), r.x0 * S + 2, r.z0 * S + 10);
+          g.restore();
+        } else g.fillText(r.name, r.x0 * S + 4, r.z0 * S + 12);
+      }
+    });
+    document.getElementById('info').textContent = `${m.stairs.length} escaliers · ${m.floors[0].voids.length} vides · ${m.floors.reduce((n, f) => n + f.escalators.length, 0)} escalators`;
+    const lg = document.getElementById('legend');
+    lg.innerHTML = Object.entries(NAMES).map(([k, n]) => `<span><i style="background:${COL[k]}"></i>${n}</span>`).join('') + '<span><i style="background:#c0504d"></i>escalier</span><span><i style="background:#e0a040"></i>escalator</span><span><i style="background:#5ec8e8"></i>vitrine</span><span><i style="background:#0b0907;border-color:#fff"></i>vide</span>';
+  };
+  const inp = document.getElementById('seed');
+  const q = +(new URLSearchParams(location.search).get('seed') || 1);
+  inp.value = q;
+  draw(q);
+  inp.addEventListener('change', () => draw(+inp.value || 1));
+</script>
+</body>
+</html>

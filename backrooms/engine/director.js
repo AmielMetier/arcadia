@@ -63,7 +63,8 @@ export function updateDirector(sim) {
   if (D.phase === 'build' && D.stress > 0.65) D.phase = 'peak';
   else if (D.phase === 'peak' && D.stress < 0.35 && !chasing) {
     D.phase = 'relax';
-    D.relaxT = (rand(...RELAX_T) * (sim.difficulty === 'hard' ? 0.65 : 1)) / (D.level === 0 ? L0_AGGRO : 1);
+    // (à plusieurs, à partir du Level 1, les répits raccourcissent : voir sim.crowd)
+    D.relaxT = (rand(...RELAX_T) * (sim.difficulty === 'hard' ? 0.65 : 1) * (1 - 0.35 * (sim.crowd || 0))) / (D.level === 0 ? L0_AGGRO : 1);
     sim.emit({ type: 'relief' });
   } else if (D.phase === 'relax') {
     D.relaxT -= DT;

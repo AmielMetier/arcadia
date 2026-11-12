@@ -370,13 +370,13 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     if (isChartier) { wallStreetMusic.setMode('lobby'); wallStreetMusic.start(); renderTicker(); }
 
     const briefingHtml = isChartier
-      ? `<p class="mdesc">Un entretien façon salle de marché. Finance, calcul mental, probabilités et brainteasers : ça commence gentiment, ça finit en comité.</p>
+      ? `<p class="mdesc">${c.interview ? 'Mode entretien : seulement des questions posées en entretien d\'embauche. Produits financiers, maths financières, économie et informatique (C++, SQL, VBA, Excel) : ça commence gentiment, ça finit en comité.' : 'Un entretien façon salle de marché. Finance, calcul mental, probabilités et brainteasers : ça commence gentiment, ça finit en comité.'}</p>
          <div class="rules tiers">
            ${[1, 2, 3].map((t, i) => `<div class="rule" style="--k:${i}"><i>${'★'.repeat(t)}</i><b>${TIER_LABEL[t]}</b><small>${t * 100} pts</small></div>`).join('')}
            ${c.finale ? '<div class="rule" style="--k:3"><i>×2</i><b>Finale</b><small>quitte ou double</small></div>' : ''}
          </div>
          <ul class="howto">
-           <li>QCM (<b>1 2 3 4</b> ou <b>A B C D</b>), calculs et estimations à taper, suites logiques, figures à compter${(c.code || c.sql) && c.len >= 8 ? `, et ${c.len >= 15 ? 'deux <b>épreuves de code</b>' : 'une <b>épreuve de code</b>'} de 2 minutes (${c.code && c.sql ? 'Python ou SQL' : c.sql ? 'SQL' : 'Python'})` : ''}.</li>
+           <li>QCM (<b>1 2 3 4</b> ou <b>A B C D</b>), ${c.interview ? 'questions à plusieurs réponses, calculs à taper, code à lire' : 'calculs et estimations à taper, suites logiques, figures à compter'}${(c.code || c.sql) && c.len >= 8 ? `, et ${c.len >= 15 ? 'deux <b>épreuves de code</b>' : 'une <b>épreuve de code</b>'} de 2 minutes (${c.code && c.sql ? 'Python ou SQL' : c.sql ? 'SQL' : 'Python'})` : ''}.</li>
            <li><b>${hearts(c.lives, c.lives)}</b> ${['', 'une vie', 'deux vies', 'trois vies', 'quatre vies', 'cinq vies'][c.lives]} : une erreur ou un silence en coûte une. <b>Le piège</b> 🪤 coûte de plus en plus cher : 1 vie au premier tour, 2 au desk, 2 et des points au comité. Une estimation presque juste ne coûte rien, et trois bonnes réponses d'affilée rendent une vie.</li>
            ${c.cut ? '<li>À la fin de chaque tour, le dernier du classement est <b>coupé</b> ✂️ (tant qu\'il reste trois candidats).</li>' : ''}
            ${c.jokers ? '<li>Deux jokers, une fois chacun : <b>✂️ 50/50</b> et <b>📞 Appel à un ami</b> (qui a souvent raison…).</li>' : ''}
@@ -403,6 +403,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
             <span class="chip strong">${esc(MODES[c.mode].label)}</span><span class="chip">${c.len} questions</span>
             <span class="chip">${esc(DIFF_LABEL[c.diff])}</span>
             ${!isChartier ? `<span class="chip">${esc(THEME_LABEL[c.theme] || c.theme)}</span>` : `<span class="chip gold">Poste : ${esc((MODULES[c.module] || MODULES.gen).job)}</span>`}
+            ${c.interview ? '<span class="chip gold">Mode entretien</span>' : ''}
             ${c.finale ? '<span class="chip gold">Finale quitte ou double</span>' : ''}
             ${c.sabotage ? '<span class="chip sab">Sabotage 🌫️⏱️🙃</span>' : ''}
             ${s.bots ? `<span class="chip">${s.bots} bot${s.bots > 1 ? 's' : ''} ${s.bots > 1 ? w[1] : w[0]}</span>` : ''}
@@ -935,7 +936,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
         <div class="op-pierre">${pcFace('pc-face huge')}<p class="op-say">${esc(speech)}</p></div>
         <div class="op-cands"><small>${esc(M.label === 'Généraliste' ? 'Poste d\'analyste' : 'Poste : ' + M.job)} · ${n > 1 ? 'les candidats' : 'le candidat'}</small>
           <div class="op-list">${S.players.map((p, k) => `<span class="cu-p" style="--k:${k};--pc:${esc(p.color)}"><i></i>${esc(p.name)}</span>`).join('')}</div>
-          <div class="op-rules"><span>${hearts(c.lives, c.lives)} ${c.lives} vies</span>${c.jokers ? '<span>✂️ 📞 2 jokers</span>' : ''}${c.cut ? '<span>✂️ coupe à chaque tour</span>' : ''}${c.duel ? '<span>⚔️ face-à-face final</span>' : ''}</div>
+          <div class="op-rules"><span>${hearts(c.lives, c.lives)} ${c.lives} vies</span>${c.interview ? '<span>💼 que des questions d\'entretien</span>' : ''}${c.jokers ? '<span>✂️ 📞 2 jokers</span>' : ''}${c.cut ? '<span>✂️ coupe à chaque tour</span>' : ''}${c.duel ? '<span>⚔️ face-à-face final</span>' : ''}</div>
         </div>
         <div class="count" id="count"></div>
       </div>`;

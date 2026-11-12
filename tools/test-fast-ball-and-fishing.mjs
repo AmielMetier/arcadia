@@ -1,3 +1,7 @@
+// les chemins du test partent de la racine du dépôt, d'où qu'on le lance
+import { fileURLToPath as __fichier } from 'node:url'; import __chemin from 'node:path';
+process.chdir(__chemin.resolve(__chemin.dirname(__fichier(import.meta.url)), '..'));
+
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -41,7 +45,7 @@ assert.equal(api1.bag['canne'], oldBagCount, 'Barnabé ne doit pas redonner une 
 console.log('✓ Barnabé dialogue normalement une fois la canne reçue !');
 
 // 2. Vérification de lieux.js pour le lac secret
-const lieuxSrc = fs.readFileSync(path.resolve('arcadia/odyssee/js/world/lieux.js'), 'utf8');
+const lieuxSrc = fs.readFileSync(path.resolve('odyssee/js/world/lieux.js'), 'utf8');
 assert.ok(lieuxSrc.includes("!A.has('canne')"), 'Le lac secret doit vérifier !A.has("canne")');
 assert.ok(lieuxSrc.includes("A.give('canne')"), 'Le lac secret doit donner la canne');
 console.log('✓ Pêcheur du lac secret configuré pour offrir la canne !');
@@ -108,7 +112,7 @@ console.log('✓ Fast Ball désactivé en combat de dresseur');
 
 console.log('\n=== TEST 4 : INTÉGRATION SOURCE & FICHIERS ===');
 // 1. battleView.js
-const bvSrc = fs.readFileSync(path.resolve('arcadia/odyssee/js/ui/battleView.js'), 'utf8');
+const bvSrc = fs.readFileSync(path.resolve('odyssee/js/ui/battleView.js'), 'utf8');
 assert.ok(bvSrc.includes('getFastBall()'), 'battleView.js doit contenir getFastBall()');
 assert.ok(bvSrc.includes('fast-ball-banner'), 'battleView.js doit afficher fast-ball-banner');
 assert.ok(bvSrc.includes("k === 'ball' && fastBall"), 'battleView.js doit écouter la touche ball');
@@ -116,18 +120,18 @@ assert.ok(bvSrc.includes('c.fastBall'), 'chooseAction doit gérer c.fastBall');
 console.log('✓ battleView.js intègre parfaitement le lancer rapide !');
 
 // 2. input.js
-const inputSrc = fs.readFileSync(path.resolve('arcadia/odyssee/js/input.js'), 'utf8');
+const inputSrc = fs.readFileSync(path.resolve('odyssee/js/input.js'), 'utf8');
 assert.ok(inputSrc.includes("KeyB: 'ball'") && inputSrc.includes("KeyY: 'ball'"), 'input.js doit mapper KeyB et KeyY à ball');
 console.log('✓ input.js a les touches B et Y mappées à ball !');
 
 // 3. 08-combat.css
-const cssSrc = fs.readFileSync(path.resolve('arcadia/odyssee/css/08-combat.css'), 'utf8');
+const cssSrc = fs.readFileSync(path.resolve('odyssee/css/08-combat.css'), 'utf8');
 assert.ok(cssSrc.includes('.fast-ball-banner'), '08-combat.css doit contenir .fast-ball-banner');
 assert.ok(cssSrc.includes('.fbb-key-pill'), '08-combat.css doit styliser .fbb-key-pill');
 console.log('✓ 08-combat.css contient tous les styles de la bannière Fast Ball !');
 
 // 4. game.js
-const gameSrc = fs.readFileSync(path.resolve('arcadia/odyssee/js/game.js'), 'utf8');
+const gameSrc = fs.readFileSync(path.resolve('odyssee/js/game.js'), 'utf8');
 assert.ok(gameSrc.includes('tryWaterInteraction(fx, fy)'), 'game.js doit appeler tryWaterInteraction face à l\'eau');
 assert.ok(gameSrc.includes('async pecher(fx, fy)'), 'game.js doit implémenter pecher(fx, fy)');
 assert.ok(gameSrc.includes("r.item === 'canne'"), 'game.js fieldBag doit gérer l\'utilisation de la canne');
@@ -135,7 +139,7 @@ assert.ok(gameSrc.includes("st.bag['canne'] > 0"), 'game.js doit vérifier la po
 console.log('✓ game.js intègre la mécanique de pêche et l\'interaction aquatique !');
 
 // 5. ui.js
-const uiSrc = fs.readFileSync(path.resolve('arcadia/odyssee/js/ui/ui.js'), 'utf8');
+const uiSrc = fs.readFileSync(path.resolve('odyssee/js/ui/ui.js'), 'utf8');
 assert.ok(uiSrc.includes('Pêche & Capacités'), 'ui.js doit documenter la pêche');
 assert.ok(uiSrc.includes('Lancer rapide de Ball'), 'ui.js doit documenter le lancer rapide');
 console.log('✓ ui.js panneau d\'aide à jour avec les commandes !');

@@ -1,6 +1,15 @@
 L'entité du Level 1 (l'entrepôt), reprise telle quelle aux Poolrooms (Level 37).
 
-Déposer ici le modèle .glb de la nouvelle entité (rigué si possible, avec ou sans animations).
+Déposer ici le modèle .glb de la nouvelle entité, sous le nom entite.glb (rigué si possible, avec ou sans animations).
+L'aperçu : backrooms/apercu-monstre.html (serveur local), chaque animation du jeu sur un bouton, et ce qui cloche.
+(?m=chemin/vers/un.glb pour en essayer un autre, ou glisser le fichier sur la page.)
+
+L'entité actuelle (entite.glb, 4,35 Mo) : une silhouette voilée en longue robe, mains sur les hanches au repos.
+65 508 triangles, texture WebP 2048 px, 26 os (Mixamo, plus « Skirt » qui tient le bas de la robe au sol),
+et ses 10 animations nommées comme les états du jeu (idle, walk, run, rush en boucle ; stun et bang en boucle,
+impact de bang à 0,56 s ; grab, unmask, drop, scare joués une fois). Animations sur place, à 30 images/s.
+Limites : les jambes bougent peu (la robe est une seule surface) ; les manches s'étirent un peu à l'épaule
+dans les poses bras levés ou tendus (rush, drop, scare).
 Elle remplacera, au Level 1 et au Level 37, l'entité actuelle de ces deux niveaux.
 
 Ses sons sont ceux de backrooms/sfx/level1/ (cris de poursuite, ambiances, son de la mort) :

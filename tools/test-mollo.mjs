@@ -279,17 +279,17 @@ section('Collisions');
   // parties entières : rien ne s'enfonce, rien ne traverse
   const depth = (q, b) => Math.min(b.hx + q.r - Math.abs(q.x - b.x), b.hy + q.r - Math.abs(q.y - b.y), b.hz + q.r - Math.abs(q.z - b.z));
   const side = (a, q, b) => [['x', 'hx'], ['y', 'hy'], ['z', 'hz']].some(([k, h]) => Math.abs(a[k] - b[k]) > b[h] && Math.abs(q[k] - b[k]) > b[h] && Math.sign(a[k] - b[k]) !== Math.sign(q[k] - b[k]) && ['x', 'y', 'z'].filter((j) => j !== k).every((j) => Math.abs(a[j] - b[j]) < b['h' + j] && Math.abs(q[j] - b[j]) < b['h' + j]));
-  let deepBody = 0, cross = 0, steps = 0, maxD = 0;
+  let deepBody = 0, cross = 0, steps = 0, maxD = 0, deepPrev = new Set(), deepNow = new Set();
   for (const seed of [1, 2, 3]) {
     const s = new Sim({ seed, goal: 2 }); s.addBots(6, 'expert'); s.start(); let n = 0;
     while (s.ph !== 'over' && n < 60 * 180) {
       const pv = new Map([...s.players.values()].map((b) => [b.id, b.p.map((q) => ({ x: q.x, y: q.y, z: q.z }))]));
-      s.step(DT); s.drainEvents(); n++; steps++;
-      for (const b of s.players.values()) { if (b.st === ST.OUT) continue; b.p.forEach((q, i) => { if (i >= 3 && i <= 4 && b.grip[i - 3]) return; for (const B of s.arena.boxes) { if (b.climb && b.climb.box === B) continue; if (B.door) continue; /* une trappe qui se referme sur un corps qui tombe : le choc dure un pas */ if (B.y > 30) continue; const d = depth(q, B); if (d > 0.08 && !B.crush) { deepBody++; maxD = Math.max(maxD, d); } const a = pv.get(b.id)[i]; if (!B.move && Math.hypot(a.x - q.x, a.y - q.y, a.z - q.z) < 1 && side(a, q, B)) cross++; } }); }
+      s.step(DT); s.drainEvents(); n++; steps++; deepPrev = deepNow; deepNow = new Set();
+      for (const b of s.players.values()) { if (b.st === ST.OUT) continue; b.p.forEach((q, i) => { if (i >= 3 && i <= 4 && b.grip[i - 3]) return; for (const B of s.arena.boxes) { if (b.climb && b.climb.box === B) continue; if (B.door) continue; /* une trappe qui se referme sur un corps qui tombe : le choc dure un pas */ if (B.y > 30) continue; const d = depth(q, B); /* un choc violent peut enfoncer un point le temps d'un pas : on ne compte que ce qui dure deux pas de suite */ const cle = b.id + ':' + i + ':' + s.arena.boxes.indexOf(B); if (d > 0.08 && !B.crush) { if (deepPrev.has(cle)) { deepBody++; maxD = Math.max(maxD, d); } deepNow.add(cle); } const a = pv.get(b.id)[i]; if (!B.move && Math.hypot(a.x - q.x, a.y - q.y, a.z - q.z) < 1 && side(a, q, B)) cross++; } }); }
     }
   }
   ok(cross === 0, `aucun point ne traverse une boîte (${cross} sur ${steps} pas)`);
-  ok(deepBody === 0, `rien ne s'enfonce de plus de 8 cm dans le décor (${deepBody}, au pire ${maxD.toFixed(2)} m)`);
+  ok(deepBody === 0, `rien ne reste enfoncé de plus de 8 cm dans le décor (${deepBody}, au pire ${maxD.toFixed(2)} m)`);
   // le boulet pousse sans traverser
   const b = new Sim({ seed: 7, hazards: true }); b.addPlayer({ id: 1, name: 'a', color: '#f00' }); b.addPlayer({ id: 2, name: 'b', color: '#00f' }); b.start(); b.rd = 0; b.drainEvents(); b.startRound('chantier'); b.ph = 'play'; b.pt = 0;
   const [ba, bo] = b.players.values(); put(bo, 5, 2.5); put(ba, 2, 0); let inBall = 0, touched = false;

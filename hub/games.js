@@ -71,6 +71,7 @@ window.HUB_GAMES = [
       { key: 'finale', label: 'Dernière question quitte ou double', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
       // règles de The Candidate (affichées seulement dans ce mode)
       { key: 'module', label: 'Poste à pourvoir', group: 'The Candidate', options: [['gen', 'Généraliste'], ['trading', 'Trading'], ['ma', 'M&A'], ['quant', 'Quant'], ['risk', 'Risques']], def: 'gen', onlyMode: 'chartier' },
+      { key: 'interview', label: 'Mode entretien (questions d\'embauche)', options: [[0, 'Non'], [1, 'Oui']], def: 0, onlyMode: 'chartier' },
       { key: 'lives', label: 'Vies par candidat', options: [[2, '2'], [3, '3'], [5, '5']], def: 3, onlyMode: 'chartier' },
       { key: 'jokers', label: 'Jokers (50/50, ami)', options: [[1, 'Oui'], [0, 'Non']], def: 1, onlyMode: 'chartier' },
       { key: 'code', label: 'Épreuve de code Python', options: [[1, 'Oui'], [0, 'Non']], def: 1, onlyMode: 'chartier' },
@@ -322,6 +323,9 @@ window.HUB_GAMES = [
     settings: [
       { key: 'difficulty', label: 'Difficulté de l\'entité', options: [['normal', 'Normale'], ['hard', 'Rapide & Agressive'], ['peaceful', 'Exploration (Sans monstre)']], def: 'normal' },
       { key: 'monsters', label: 'Monstres', options: [['normal', 'Normal'], ['vip', '⭐ VIP mode', { vip: true }]], def: 'normal' },
+      // VIP seulement (caché aux autres par hub/vip.js) : toute l'équipe part du level choisi par l'hôte
+      // (START_LEVELS dans backrooms/engine/sim.js : chaque level du moteur doit y être)
+      { key: 'start', label: '⭐ Niveau de départ', vip: true, options: [[0, 'Level 0'], [1, 'Level 1'], [37, 'Level 37 · Poolrooms'], [2, 'Level 2 · Tuyauteries'], [5, 'Level 5 · Terror Hotel'], [17, 'Level 17 · Mall']], def: 0 },
       { key: 'map', label: 'Carte', options: [['random', 'Au hasard'], ['daily', '🗓️ Carte du jour (la même pour tous)']], def: 'random' },
     ],
     cover: 'backrooms/img/affiche.jpg?v=3', // affiche 960 × 540 : le Level 0 du jeu, grand titre et bandeau caméscope
@@ -332,9 +336,9 @@ window.HUB_GAMES = [
    Affichée sur l'écran de chargement commun, dans le menu Arcadia en jeu et pour les filtres de l'accueil. */
 window.HUB_GAME_INFO = {
   backrooms: { genre: 'action', time: 'Plusieurs heures', // un niveau après l'autre : il y en a pour des heures
-    keys: [['ZQSD / Flèches', 'Se déplacer'], ['Souris', 'Regarder autour de soi'], ['Maj (Shift)', 'Courir (bruyant, et ça donne soif)'], ['1', 'Allumer / Éteindre la lampe torche'], ['2 3 puis E', 'Choisir une case, utiliser son objet'], ['F', 'Ramasser, actionner, se cacher (échange si l\'inventaire est plein)'], ['T', 'Siffler (trop, et l\'entité arrive)'], ['C (maintenu)', "S'accroupir : plus lent, mais silencieux"], ['Échap', 'Pause'], ['⚙ Réglages', 'Mode Sans souris : les flèches tournent la vue'], ['🎮 Manette', 'Stick gauche : bouger · stick droit : regarder · A : ramasser · X : utiliser · Y : lampe · RB : objet · B : siffler · LB : courir · Menu : pause']],
+    keys: [['ZQSD / Flèches', 'Se déplacer'], ['Souris', 'Regarder autour de soi'], ['Maj (Shift)', 'Courir (bruyant, et ça donne soif)'], ['1', 'Allumer / Éteindre la lampe torche'], ['2 3 puis E', 'Choisir une case, utiliser son objet'], ['F', 'Ramasser, actionner, se cacher (échange si l\'inventaire est plein)'], ['T', 'Siffler (trop, et l\'entité arrive)'], ['G', "Poser l'objet de la case choisie"], ['Espace', 'Sauter'], ['C', "S'accroupir / se relever : plus lent, mais silencieux"], ['V', 'Sortir / ranger le caméscope (molette : zoom)'], ['R (maintenu)', 'Radio : parler à ceux qui sont loin (à plusieurs)'], ['Échap', 'Pause'], ['⚙ Réglages', 'Mode Sans souris : les flèches tournent la vue'], ['🎮 Manette', 'Stick gauche : bouger · stick droit : regarder · A : ramasser · X : utiliser · Y : lampe · RB : objet · B : siffler · LB : courir · Menu : pause']],
     // astuces sans rien dévoiler de ce qui attend plus loin : la surprise fait partie du jeu
-    tips: ['Écoute attentivement : un bourdonnement qui enfle n\'annonce rien de bon.', "Casse sa ligne de vue : derrière quelques murs, ce qui te suit finit par te perdre.", 'Suis les barres de SIGNAL du caméscope : elles mènent à ce que tu cherches.', 'Ta lampe vide sa pile : éteins-la dans les zones éclairées et ramasse les piles que tu croises.', 'Courir s\'entend de loin et donne soif : garde un œil sur ta réserve d\'eau.', 'Accroupi, tu avances lentement, mais sans un bruit.', 'Siffle pour retrouver tes potes, mais pas trop : tu n\'es pas le seul à entendre.', 'Restez groupés : ici, on se perd très vite.'] },
+    tips: ['Rien n\'annonce ce qui rôde ici : jette souvent un œil derrière toi.', "Casse sa ligne de vue : derrière quelques murs, ce qui te suit finit par te perdre.", 'Suis les barres de SIGNAL du caméscope : elles mènent à ce que tu cherches.', 'Ta lampe vide sa pile : éteins-la dans les zones éclairées et ramasse les piles que tu croises.', 'Courir s\'entend de loin et donne soif : garde un œil sur ta réserve d\'eau.', 'Accroupi, tu avances lentement, mais sans un bruit.', 'Siffle pour retrouver tes potes, mais pas trop : tu n\'es pas le seul à entendre.', 'Restez groupés : ici, on se perd très vite.'] },
   dogfight: { genre: 'action', time: '5–10 min',
     keys: [['Souris', 'Viser, l\'avion suit'], ['ZQSD / flèches', 'Piloter soi-même'], ['Espace / clic', 'Canon'], ['E / clic droit', 'Missile'], ['F', 'Leurres'], ['Maj', 'Postcombustion'], ['C', 'Aérofrein'], ['🎮 Manette', 'Sticks pour piloter, gâchettes pour tirer']],
     tips: ['Place le réticule blanc sur le cercle vert : c\'est là que les balles rencontrent la cible.', 'Monter et serrer les virages coûte de la vitesse : garde de l\'énergie.', 'Un nuage te cache des missiles et des bots.', 'En Domination, vole bas : au-dessus du plafond de la zone, tu ne captures rien.', 'En Escorte, le transport est fragile face à plusieurs attaquants : reste près de lui.'] },

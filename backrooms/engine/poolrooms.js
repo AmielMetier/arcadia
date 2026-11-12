@@ -6,7 +6,7 @@
 //   tunnel  1 × n : un couloir inondé, voûté, rythmé d'arcs, sombre, éclairé à ses bouts (photo 2)
 //   gallery 1 × n : une galerie voûtée claire, à l'eau aux chevilles (photo 3)
 //   sky     2 × 1 : une halle sous verrière, un long bassin, des échelles, des hublots (photo 5)
-//   wade    1 × 1 : une pataugeoire à quatre colonnes ; tech 1 × 1 : un local technique au sec (un volant de vanne)
+//   wade    1 × 1 : une pataugeoire à quatre colonnes ; tech 1 × 1 : un local technique au sec (on y lit une note)
 // Le moteur garde sa grille de cases de 2,5 m (les cases hors des salles, et les flancs pleins des couloirs, sont des
 // murs) ; en plus : les cloisons minces entre deux salles (segments, avec leurs portes), les colonnes (cercles), et la
 // profondeur d'eau donnée en tout point par la forme du bassin de chaque salle.
@@ -22,15 +22,15 @@ export const POOL_CEIL = 4.5;
 export const WALL_T = 0.3; // épaisseur d'une cloison
 export const DOOR = { w: 3, h: 3.2 }; // une porte en plein cintre : 3 m de large, 3,20 m sous la clé
 export const DEPTH = { WADE: 0.2, GALLERY: 0.25, TUNNEL: 0.6 };
-// La sortie : trois toboggans colorés sortent des murs ; une fois les 3 volants de vanne trouvés, on se glisse dans
-// l'un d'eux. Chaque couleur mène ailleurs (to : le niveau d'arrivée ; null tant qu'il n'existe pas : on sort des
+// La sortie : trois toboggans colorés sortent des murs, ouverts dès l'arrivée : il suffit d'en trouver un et de s'y
+// glisser. Chaque couleur mène ailleurs (to : le niveau d'arrivée ; null tant qu'il n'existe pas : on sort des
 // Backrooms). MOUTH : le tube, au ras du sol (rayon et hauteur du centre), et la distance où l'on s'y glisse.
 export const SLIDES = [
   { color: 'red', name: 'RED', hex: '#e2402f', to: 4 }, // vers le Level 5, le Terror Hotel (HOTEL_LEVEL)
   { color: 'yellow', name: 'YELLOW', hex: '#f2bf1d', to: PIPES_LEVEL }, // les galeries de service (Level 2)
   { color: 'blue', name: 'BLUE', hex: '#2c7fe0', to: null },
 ];
-export const MOUTH = { r: 0.62, y: 0.72, enter: 1.15 };
+export const MOUTH = { r: 0.62, y: 0.92, enter: 1.15 }; // (à 92 cm : le bord du pavillon, plus large, reste au-dessus du sol)
 
 // objets abandonnés au bord des bassins (Poly Haven, CC0) ; face : dos au mur
 export const L37_PROPS = [
@@ -160,8 +160,8 @@ export function createPoolMap(seed = 37) {
     const r = place(type, mx, mz, mw, mh, extra);
     edgeDoor(R, r, sd);
   }
-  // les 3 locaux techniques (un volant de vanne chacun) : greffés le plus loin possible du lagon de départ et les uns
-  // des autres (à vol d'oiseau, en modules)
+  // les 3 locaux techniques (une note de l'histoire dans chacun) : greffés le plus loin possible du lagon de départ et
+  // les uns des autres (à vol d'oiseau, en modules)
   const slots = [];
   for (const R of rooms) for (const sd of sides(R)) if (free(sd.i + sd.dx, sd.j + sd.dz, 1, 1)) slots.push({ x: sd.i + sd.dx, z: sd.j + sd.dz, R, sd });
   const modDist = (p) => (c) => Math.hypot(c.x - p.x, c.z - p.z);
@@ -398,21 +398,12 @@ export function createPoolMap(seed = 37) {
 
   const cellPos = (c) => ({ x: (c.x + 0.5) * C, z: (c.z + 0.5) * C, gx: c.x, gz: c.z });
 
-  // 6. Les 3 volants de vanne : au milieu des locaux techniques
+  // 6. (plus d'objet à trouver aux Poolrooms : les toboggans sont ouverts dès l'arrivée)
   const fuses = [];
-  for (const r of rooms.filter((q) => q.type === 'tech')) {
-    if (fuses.length === 3) break;
-    const x = (r.x0 + r.x1) / 2;
-    const z = (r.z0 + r.z1) / 2;
-    const gx = Math.floor(x / C);
-    const gz = Math.floor(z / C);
-    if (D(gx, gz) < 0) continue;
-    fuses.push({ id: fuses.length, x, z, gx, gz, taken: false });
-  }
 
   // 7. Les 3 toboggans : dans un mur plein (une case de mur fermée sur les côtés et derrière, pour que le tube y
   // court), devant une case au sec ou presque d'un lagon, d'une pataugeoire ou d'une verrière (plafond haut), loin des
-  // portes ; le plus loin possible (en marche) du départ, des volants et les uns des autres
+  // portes ; le plus loin possible (en marche) du départ et les uns des autres
   const slideRoom = (r) => r && ['lagoon', 'wade', 'sky'].includes(r.type);
   const mouths = [];
   for (const c of walkable) {
@@ -435,7 +426,7 @@ export function createPoolMap(seed = 37) {
     const d = bfsFrom(p.x, p.z);
     return (c) => d[c.z * W + c.x];
   };
-  const fixed = [{ x: sgx, z: sgz }, ...fuses.map((f) => ({ x: f.gx, z: f.gz }))];
+  const fixed = [{ x: sgx, z: sgz }];
   // pas dans le lagon de départ, ni juste à côté (sauf s'il n'y a pas d'autre place)
   const farMouths = mouths.filter((m) => roomOf[m.z * W + m.x] !== start.id && D(m.x, m.z) >= 14);
   const slides = spreadOut(farMouths.length >= SLIDES.length * 3 ? farMouths : mouths, fixed, SLIDES.length, walkDist, rnd).map((m, i) => ({

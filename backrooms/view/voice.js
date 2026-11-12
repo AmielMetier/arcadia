@@ -10,14 +10,106 @@
 // grésillement et le « kshh » au début et à la fin. Les morts ne se font plus entendre des vivants (eux entendent tout).
 //
 // Le niveau du micro (0 à 1) part chez l'hôte : parler fait du bruit, et l'entité écoute.
+//
+// Quand la liaison directe ne s'établit pas (réseaux d'entreprise, certains partages de connexion), la voix passe par
+// le relais du salon (messages 'va') : 8 kHz en loi µ, par paquets de 100 ms, seulement quand on parle. On le dit à
+// l'écran (onTrouble). Un serveur TURN se règle sans toucher au code (iceServers, plus bas).
+//
+// La voix volée (Level 1) : chacun garde, dans un tampon circulaire, les dernières phrases de chaque coéquipier vivant
+// (seulement ce qui dépasse le souffle de la pièce, CLIP_KEEP secondes au plus). Quand l'entité a pris l'apparence d'un
+// joueur, l'hôte annonce ses appels ('mimicCall') : chaque client rejoue un morceau de ce qu'il a lui-même entendu de
+// cette voix, un peu ralenti et haché, placé là où est l'imposteur ou sorti du talkie. Sans enregistrement (le joueur
+// ne parlait pas, pas de micro), une voix de synthèse dit une phrase rassurante à sa place.
 
 import { hasLineOfSight } from '../engine/nav.js';
 
 export const VOICE_R = 22; // m : au-delà, on ne s'entend plus de vive voix
 const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
 const RETRY = 8; // s : une liaison qui ne s'établit pas est refaite
+const RELAY_AFTER = 18; // s sans liaison directe : la voix passe par le relais du salon
+const CLIP_KEEP = 24; // s de voix gardées par coéquipier
+const CLIP_RMS = 0.012; // en dessous : le souffle, la pièce (pas gardé)
+const MIMIC_LINES = ["I'm here.", 'Over here, come on.', "It's fine. I found the door.", 'Where are you guys?', 'Come to me. Quick.', 'I found a fuse. Come here.', "Guys? I'm hurt. Help me.", 'It went the other way. Come.'];
 
-export function createVoice({ send, myId, sfx }) {
+// Les serveurs ICE : les STUN publics, plus ceux qu'on ajoute sans toucher au code (un TURN, par exemple) :
+// ?ice=[...] dans l'adresse, la clé « backrooms.ice » du stockage local, ou window.BACKROOMS_ICE, au format
+// [{ "urls": "turn:turn.example.com:3478", "username": "u", "credential": "p" }]
+export function iceServers(search = typeof location !== 'undefined' ? location.search : '', store = null, extra = null) {
+  let raw = null;
+  try {
+    raw = new URLSearchParams(search || '').get('ice');
+    if (!raw) raw = (store || (typeof localStorage !== 'undefined' ? localStorage : null))?.getItem('backrooms.ice') || null;
+  } catch (e) {
+    raw = null;
+  }
+  let more = extra || (typeof window !== 'undefined' ? window.BACKROOMS_ICE : null) || [];
+  if (raw) {
+    try {
+      more = JSON.parse(raw);
+    } catch (e) {
+      more = [];
+    }
+  }
+  const ok = (Array.isArray(more) ? more : [more]).filter((s) => s && (typeof s.urls === 'string' || Array.isArray(s.urls)));
+  return [...ok, ...ICE];
+}
+
+// --- la voix par le relais : 8 kHz, loi µ (G.711), un octet par échantillon ---
+export function down8k(f32, sr) {
+  const f = sr / 8000;
+  const n = Math.floor(f32.length / f);
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const a = Math.floor(i * f);
+    const b = Math.min(f32.length, Math.floor((i + 1) * f));
+    let s = 0;
+    for (let j = a; j < b; j++) s += f32[j];
+    out[i] = s / Math.max(1, b - a);
+  }
+  return out;
+}
+
+export function mulawEncode(f32) {
+  const out = new Uint8Array(f32.length);
+  for (let i = 0; i < f32.length; i++) {
+    let x = Math.max(-1, Math.min(1, f32[i])) * 32635;
+    const sign = x < 0 ? 0x80 : 0;
+    x = (Math.abs(x) + 132) | 0;
+    let exp = 7;
+    for (let m = 0x4000; (x & m) === 0 && exp > 0; m >>= 1) exp--;
+    out[i] = ~(sign | (exp << 4) | ((x >> (exp + 3)) & 0x0f)) & 0xff;
+  }
+  return out;
+}
+
+export function mulawDecode(u8) {
+  const out = new Float32Array(u8.length);
+  for (let i = 0; i < u8.length; i++) {
+    const u = ~u8[i] & 0xff;
+    const x = (((u & 0x0f) << 3) + 132) << ((u >> 4) & 7);
+    out[i] = ((u & 0x80 ? -1 : 1) * (x - 132)) / 32635;
+  }
+  return out;
+}
+
+export const toB64 = (u8) => btoa(String.fromCharCode.apply(null, u8));
+export const fromB64 = (s) => Uint8Array.from(atob(s), (ch) => ch.charCodeAt(0));
+
+// le capteur du micro pour le relais (un AudioWorklet, chargé depuis ce texte) : des paquets de 100 ms
+const CAPTURE = `class BrCap extends AudioWorkletProcessor {
+  constructor() { super(); this.n = Math.round(sampleRate / 10); this.b = new Float32Array(this.n); this.k = 0; }
+  process(inputs) {
+    const ch = inputs[0] && inputs[0][0];
+    if (ch) for (let i = 0; i < ch.length; i++) {
+      this.b[this.k++] = ch[i];
+      if (this.k === this.n) { this.port.postMessage(this.b); this.b = new Float32Array(this.n); this.k = 0; }
+    }
+    return true;
+  }
+}
+registerProcessor('br-cap', BrCap);`;
+
+export function createVoice({ send, myId, sfx, onTrouble = null }) {
   const peers = new Map(); // id -> liaison
   let stream = null;
   let track = null;
@@ -157,19 +249,29 @@ export function createVoice({ send, myId, sfx }) {
     return Math.max(0, Math.min(1, (Math.log10(rms + 1e-5) + 2.2) / 1.8));
   }
 
-  function closePeer(p) {
-    try { p.pc.close(); } catch (e) {}
+  function setRelay(p, on) {
+    p.relay = on;
+    if (onTrouble) onTrouble(p.id, on ? 'relay' : 'direct');
+  }
+
+  // all : le joueur s'en va (sinon on refait seulement la liaison directe, et la voix du relais continue)
+  function closePeer(p, all = false) {
+    try { p.pc && p.pc.close(); } catch (e) {}
     if (p.el) { p.el.srcObject = null; p.el = null; }
-    if (p.chain) { try { p.chain.src.disconnect(); p.chain.wob.stop(); } catch (e) {} p.chain = null; }
+    if (p.chain && (all || !p.relayIn)) { try { p.chain.src.disconnect(); p.chain.wob.stop(); if (p.chain.rec) p.chain.rec.onaudioprocess = null; } catch (e) {} p.chain = null; p.relayIn = null; }
   }
 
   function makePc(p) {
-    const pc = new RTCPeerConnection({ iceServers: ICE });
+    const pc = new RTCPeerConnection({ iceServers: iceServers() });
     p.pc = pc;
     p.queue = [];
     p.born = performance.now() / 1000;
     pc.onicecandidate = ({ candidate }) => { if (candidate) send(p.id, { t: 'rtc', n: p.n, c: candidate.toJSON() }); };
-    pc.ontrack = (e) => wire(p, e.streams && e.streams[0] ? e.streams[0] : new MediaStream([e.track]));
+    pc.ontrack = (e) => {
+      // pendant le relais, on garde le flux pour plus tard (on le branche quand la liaison est établie)
+      p.rtcStream = e.streams && e.streams[0] ? e.streams[0] : new MediaStream([e.track]);
+      if (!p.relay) wire(p, p.rtcStream);
+    };
     return pc;
   }
 
@@ -231,13 +333,21 @@ export function createVoice({ send, myId, sfx }) {
     }
     p.pending = null;
     p.stream = ms;
-    if (p.chain) { try { p.chain.src.disconnect(); p.chain.wob.stop(); } catch (e) {} }
-    // Chrome ne fait couler une piste distante dans Web Audio que si un élément audio la lit (muet)
-    p.el = new Audio();
-    p.el.srcObject = ms;
-    p.el.muted = true;
-    p.el.play().catch(() => {});
-    const src = c.createMediaStreamSource(ms);
+    if (p.chain) { try { p.chain.src.disconnect(); p.chain.wob.stop(); if (p.chain.rec) p.chain.rec.onaudioprocess = null; } catch (e) {} }
+    let src;
+    if (ms === 'relay') {
+      // la voix arrive par le relais : des paquets qu'on enchaîne dans ce nœud (relayIn)
+      p.relayIn = src = c.createGain();
+      p.playAt = 0;
+    } else {
+      // Chrome ne fait couler une piste distante dans Web Audio que si un élément audio la lit (muet)
+      p.el = new Audio();
+      p.el.srcObject = ms;
+      p.el.muted = true;
+      p.el.play().catch(() => {});
+      p.relayIn = null;
+      src = c.createMediaStreamSource(ms);
+    }
     const lp = c.createBiquadFilter();
     lp.type = 'lowpass';
     lp.frequency.value = 18000;
@@ -289,7 +399,110 @@ export function createVoice({ send, myId, sfx }) {
     const rg = c.createGain();
     rg.gain.value = 0;
     src.connect(hp).connect(peak).connect(bp).connect(sh).connect(am).connect(rg).connect(o);
-    p.chain = { src, lp, pg, pan, rg, hp, vs, wob, drop: 0 };
+    // le tampon de la voix volée : des blocs de 4096 échantillons, gardés quand quelqu'un parle (gap : le premier
+    // bloc après un silence, le début d'une phrase)
+    let rec = null;
+    if (c.createScriptProcessor) {
+      rec = c.createScriptProcessor(4096, 1, 1);
+      const mute = c.createGain();
+      mute.gain.value = 0;
+      src.connect(rec).connect(mute).connect(c.destination);
+      if (!p.clips) p.clips = [];
+      rec.onaudioprocess = (e) => {
+        if (!p.recOn) return;
+        const d = e.inputBuffer.getChannelData(0);
+        let sum = 0;
+        for (let i = 0; i < d.length; i++) sum += d[i] * d[i];
+        if (Math.sqrt(sum / d.length) < CLIP_RMS) {
+          p.gap = true;
+          return;
+        }
+        p.clips.push({ d: Float32Array.from(d), gap: !!p.gap, sr: e.inputBuffer.sampleRate });
+        p.gap = false;
+        const max = Math.ceil((CLIP_KEEP * e.inputBuffer.sampleRate) / 4096);
+        if (p.clips.length > max) p.clips.splice(0, p.clips.length - max);
+      };
+    }
+    p.chain = { src, lp, pg, pan, rg, hp, vs, wob, rec, drop: 0 };
+  }
+
+  // un morceau de la voix volée : une phrase entière si possible (d'un début de phrase à un silence), entre 1 et 3 s
+  function stolenClip(p) {
+    const list = (p && p.clips) || [];
+    if (list.length < 8) return null;
+    const starts = [];
+    list.forEach((b, i) => b.gap && i < list.length - 6 && starts.push(i));
+    let i = starts.length ? starts[Math.floor(Math.random() * starts.length)] : Math.floor(Math.random() * Math.max(1, list.length - 12));
+    const sr = list[i].sr;
+    const want = Math.round(((1 + Math.random() * 2) * sr) / 4096);
+    const run = [];
+    for (; i < list.length && run.length < want; i++) {
+      if (run.length >= 10 && list[i].gap) break; // la phrase est finie
+      run.push(list[i].d);
+    }
+    return { run, sr };
+  }
+
+  // --- le relais ---
+  let cap = null; // { node } : le capteur du micro, prêt
+  let capTry = false;
+  let seq = 0;
+  async function relayCapture() {
+    const c = ctxOf();
+    if (cap || capTry || !stream || !c) return;
+    capTry = true;
+    try {
+      const url = URL.createObjectURL(new Blob([CAPTURE], { type: 'application/javascript' }));
+      await c.audioWorklet.addModule(url);
+      const node = new AudioWorkletNode(c, 'br-cap');
+      c.createMediaStreamSource(stream).connect(node);
+      const z = c.createGain();
+      z.gain.value = 0;
+      node.connect(z).connect(c.destination); // sinon le navigateur ne le fait pas tourner
+      node.port.onmessage = (e) => relaySend(e.data, c.sampleRate);
+      cap = { node };
+    } catch (e) {
+      cap = null;
+      if (onTrouble) for (const p of peers.values()) if (p.relay) onTrouble(p.id, 'failed');
+    }
+  }
+
+  // un paquet de 100 ms de micro : vers chaque joueur qu'on ne joint que par le relais, seulement quand on parle
+  function relaySend(f32, sr) {
+    if (!mode) return;
+    let d = null;
+    for (const p of peers.values()) {
+      if (!p.relay) continue;
+      d = d || toB64(mulawEncode(down8k(f32, sr)));
+      send(p.id, { t: 'va', q: seq++, m: mode, d }, true);
+    }
+  }
+
+  // un paquet reçu : décodé, remonté à 24 kHz, enchaîné derrière le précédent (150 ms de réserve contre les à-coups)
+  function relayPlay(p, b64) {
+    const c = ctxOf();
+    if (!c || !p.relayIn) return;
+    let x;
+    try {
+      x = mulawDecode(fromB64(b64));
+    } catch (e) {
+      return;
+    }
+    const n = x.length * 3;
+    const b = c.createBuffer(1, n, 24000);
+    const d = b.getChannelData(0);
+    for (let i = 0; i < n; i++) {
+      const k = i / 3;
+      const j = Math.floor(k);
+      d[i] = x[j] + (x[Math.min(x.length - 1, j + 1)] - x[j]) * (k - j);
+    }
+    const now = c.currentTime;
+    if (!(p.playAt > now) || p.playAt - now > 0.6) p.playAt = now + 0.15;
+    const src = c.createBufferSource();
+    src.buffer = b;
+    src.connect(p.relayIn);
+    src.start(p.playAt);
+    p.playAt += b.duration;
   }
 
   // le grésillement du talkie quand quelqu'un parle dedans (un seul, partagé)
@@ -326,6 +539,11 @@ export function createVoice({ send, myId, sfx }) {
     const o = fxOut();
     if (!c || !o) return null;
     if (fx && fx.context === c) return fx;
+    fx = radioIn(c, o, 0.45); // les parasites restent sous les voix : ils inquiètent, ils ne vrillent pas les oreilles
+    return fx;
+  }
+  // la bande étroite du talkie vers o, au volume vol ; renvoie son entrée
+  function radioIn(c, o, vol) {
     const hp = c.createBiquadFilter();
     hp.type = 'highpass';
     hp.frequency.value = 520;
@@ -342,10 +560,100 @@ export function createVoice({ send, myId, sfx }) {
     for (let i = 0; i < 1024; i++) k[i] = Math.round((Math.tanh(((i / 1023) * 2 - 1) * 5) / Math.tanh(5)) * 18) / 18;
     sh.curve = k;
     const g = c.createGain();
-    g.gain.value = 0.45; // les parasites restent sous les voix : ils inquiètent, ils ne vrillent pas les oreilles
+    g.gain.value = vol;
     hp.connect(pk).connect(lp).connect(sh).connect(g).connect(o);
-    fx = hp;
-    return fx;
+    return hp;
+  }
+
+  // La voix volée : l'imposteur appelle. id : le joueur dont il a pris la voix ; pos : où il est ; radio : par le
+  // talkie (sinon de vive voix, placée dans le monde) ; name : pour les sous-titres
+  let mimicNow = null; // { src, id, radio, end }
+  function stopMimic() {
+    if (mimicNow && mimicNow.src) try { mimicNow.src.stop(); } catch (e) {}
+    if (mimicNow && mimicNow.tts && window.speechSynthesis) try { speechSynthesis.cancel(); } catch (e) {}
+    mimicNow = null;
+  }
+  function playMimic(id, pos, radio, name) {
+    const c = ctxOf();
+    const o = out();
+    if (!c || !o) return;
+    stopMimic();
+    const t = c.currentTime + 0.05;
+    const clip = stolenClip(peers.get(id));
+    if (radio) squelch(true, 0.1);
+    if (!clip) {
+      // personne n'a jamais entendu sa voix : une voix de synthèse, grave et lente, dit une phrase rassurante
+      const line = MIMIC_LINES[Math.floor(Math.random() * MIMIC_LINES.length)];
+      if (window.speechSynthesis && window.SpeechSynthesisUtterance) {
+        try {
+          const u = new SpeechSynthesisUtterance(line);
+          const en = speechSynthesis.getVoices().filter((v) => /^en/i.test(v.lang));
+          if (en.length) u.voice = en[(id * 7) % en.length];
+          u.rate = 0.88;
+          u.pitch = 0.75;
+          u.volume = radio ? 0.75 : 0.9;
+          u.onend = () => {
+            if (radio) squelch(false, 0.1);
+            if (mimicNow && mimicNow.tts === u) mimicNow = null;
+          };
+          speechSynthesis.speak(u);
+          mimicNow = { tts: u, id, radio, end: c.currentTime + 4 };
+        } catch (e) {}
+      }
+      if (sfx && sfx.caption) sfx.caption(`${name}${radio ? ' (radio)' : ''}: "${line}"`, radio ? null : pos);
+      return;
+    }
+    const n = clip.run.reduce((a, d) => a + d.length, 0);
+    const buf = c.createBuffer(1, n, clip.sr);
+    const ch = buf.getChannelData(0);
+    let k = 0;
+    for (const d of clip.run) {
+      ch.set(d, k);
+      k += d.length;
+    }
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = 0.9 + Math.random() * 0.08; // un rien trop lente, trop grave
+    // haché : de petits trous dans la voix, comme une bande qui accroche
+    const chop = c.createGain();
+    chop.gain.setValueAtTime(1, t);
+    const len = buf.duration / src.playbackRate.value;
+    for (let x = t + 0.25; x < t + len - 0.1; x += 0.25 + Math.random() * 0.5) {
+      if (Math.random() < 0.45) {
+        chop.gain.setValueAtTime(0.05, x);
+        chop.gain.setValueAtTime(1, x + 0.03 + Math.random() * 0.06);
+      }
+    }
+    const grit = c.createWaveShaper();
+    const curve = new Float32Array(512);
+    for (let i = 0; i < 512; i++) curve[i] = Math.tanh(((i / 511) * 2 - 1) * 2.2) / Math.tanh(2.2);
+    grit.curve = curve;
+    src.connect(chop).connect(grit);
+    if (radio) grit.connect(radioIn(c, o, 1.1));
+    else {
+      const pan = c.createPanner();
+      pan.panningModel = 'HRTF';
+      pan.distanceModel = 'inverse';
+      pan.refDistance = 2;
+      pan.rolloffFactor = 1.3;
+      pan.maxDistance = VOICE_R * 2;
+      sfx.moveTo(pan, pos.x, pos.z, 0);
+      const g = c.createGain();
+      g.gain.value = 1.5;
+      grit.connect(g).connect(pan).connect(o);
+      if (verbIn) {
+        const wet = c.createGain();
+        wet.gain.value = 0.7;
+        grit.connect(wet).connect(verbIn);
+      }
+    }
+    src.start(t);
+    src.onended = () => {
+      if (radio) squelch(false, 0.1);
+      if (mimicNow && mimicNow.src === src) mimicNow = null;
+    };
+    mimicNow = { src, id, radio, end: t + len };
+    if (sfx && sfx.caption) sfx.caption(`[${name}'s voice${radio ? ' on the radio' : ''}]`, radio ? null : pos);
   }
   let nbuf = null;
   function noiseSrc(c) {
@@ -602,21 +910,28 @@ export function createVoice({ send, myId, sfx }) {
 
     // les joueurs de la partie (identifiants) : on appelle ceux qui ont un identifiant plus grand
     sync(ids) {
-      if (!window.RTCPeerConnection) return;
       const want = new Set(ids.filter((id) => id !== myId));
-      for (const [id, p] of peers) if (!want.has(id)) { closePeer(p); peers.delete(id); }
+      for (const [id, p] of peers) if (!want.has(id)) { closePeer(p, true); peers.delete(id); }
       for (const id of want) {
         let p = peers.get(id);
         if (!p) {
-          p = { id, mode: 0, pc: null };
+          p = { id, mode: 0, pc: null, since: performance.now() / 1000 };
           peers.set(id, p);
-          if (myId < id) call(p);
+          if (myId < id && window.RTCPeerConnection) call(p);
         }
       }
     },
 
     onMessage(from, m) {
       if (m.t === 'rtc') onSignal(from, m);
+      else if (m.t === 'va' && typeof m.d === 'string') {
+        // l'autre ne nous joint que par le relais : on lui répond par là aussi
+        const p = peers.get(from);
+        if (!p) return;
+        if (!p.relay) setRelay(p, true);
+        if (!p.relayIn && !p.pending) wire(p, 'relay');
+        relayPlay(p, m.d);
+      }
       else if (m.t === 'vx') {
         const p = peers.get(from);
         if (!p) return;
@@ -687,10 +1002,20 @@ export function createVoice({ send, myId, sfx }) {
       }
       for (const p of peers.values()) {
         if (p.pending) wire(p, p.pending);
-        // une liaison qui ne s'établit pas : on la refait
-        if (p.pc && myId < p.id && p.pc.connectionState !== 'connected' && now - p.born > RETRY) call(p);
+        // une liaison qui ne s'établit pas : on la refait ; au bout de RELAY_AFTER, la voix passe par le relais (et
+        // revient en direct si la liaison finit par s'établir)
+        const st = p.pc ? p.pc.connectionState : 'none';
+        if (st === 'connected') {
+          p.since = now;
+          if (p.relay) setRelay(p, false);
+          if (p.relayIn && p.rtcStream) wire(p, p.rtcStream);
+        } else if (!p.relay && now - (p.since || now) > (window.RTCPeerConnection ? RELAY_AFTER : 1)) setRelay(p, true);
+        if (p.relay && !p.relayIn && !p.pending && st !== 'connected') wire(p, 'relay');
+        if (p.relay && micState === 'on') relayCapture();
+        if (p.pc && myId < p.id && st !== 'connected' && now - p.born > RETRY) call(p);
         if (!p.chain) continue;
         const Q = sim && sim.players.find((q) => q.id === p.id);
+        p.recOn = !!Q && Q.status === 'alive'; // (la voix d'un vivant seulement : celle que l'entité volera)
         const t = c.currentTime;
         let near = 0;
         let rev = 0;
@@ -744,7 +1069,14 @@ export function createVoice({ send, myId, sfx }) {
 
     // (tests) l'état des liaisons
     links() {
-      return [...peers.values()].map((p) => ({ id: p.id, state: p.pc ? p.pc.connectionState : 'none', audio: !!p.chain, mode: p.mode }));
+      return [...peers.values()].map((p) => ({ id: p.id, state: p.pc ? p.pc.connectionState : 'none', audio: !!p.chain, mode: p.mode, relay: !!p.relay }));
+    },
+
+    // ce que le HUD affiche : 'relay' (au moins un joueur joint par le relais), 'failed' (le relais ne part pas), ''
+    trouble() {
+      const rel = [...peers.values()].some((p) => p.relay);
+      if (!rel) return '';
+      return capTry && !cap && micState === 'on' ? 'failed' : 'relay';
     },
 
     // la voix perdue sur le canal, en train de passer : { text, shown (caractères déjà « entendus ») } ou null
@@ -764,14 +1096,31 @@ export function createVoice({ send, myId, sfx }) {
       parasite(danger);
     },
 
-    // qui parle au talkie en ce moment (identifiants)
+    // qui parle au talkie en ce moment (identifiants) ; l'imposteur aussi, quand il y parle avec une voix volée
     talking() {
-      return [...peers.values()].filter((p) => p.mode === 2).map((p) => p.id);
+      const ids = [...peers.values()].filter((p) => p.mode === 2).map((p) => p.id);
+      const c = ctxOf();
+      if (mimicNow && mimicNow.radio && c && c.currentTime < mimicNow.end) ids.push(mimicNow.id);
+      return ids;
+    },
+
+    // Level 1 : l'imposteur appelle avec la voix de id (voir playMimic) ; mimicStop : il s'est démasqué
+    mimic(id, pos, radio, name) {
+      playMimic(id, pos, radio, name);
+    },
+    mimicStop() {
+      stopMimic();
+    },
+    // (tests) secondes de voix gardées pour un coéquipier
+    clipSeconds(id) {
+      const p = peers.get(id);
+      return p && p.clips ? p.clips.reduce((a, b) => a + b.d.length / b.sr, 0) : 0;
     },
 
     dispose() {
-      for (const p of peers.values()) closePeer(p);
+      for (const p of peers.values()) closePeer(p, true);
       peers.clear();
+      if (cap) { try { cap.node.disconnect(); } catch (e) {} cap = null; }
       if (stream) for (const tr of stream.getTracks()) tr.stop();
       stream = null;
       track = null;

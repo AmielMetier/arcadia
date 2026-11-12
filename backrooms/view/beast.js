@@ -10,9 +10,9 @@
 // penchée, trop rapide, bras en avant qui battent l'air ; et la ruée (M.rushT) : bouche béante, bras tendus, tout le
 // corps qui tremble.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
-import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
+import { gltfLoader } from '../../shared/vendor/three/gltf-draco.js';
 
-const MODEL = new URL('../models/hazmat.glb', import.meta.url).href;
+const MODEL = new URL('../models/commun/hazmat.glb', import.meta.url).href;
 const SCALE = 1.5; // l'explorateur fait 1,78 m : elle, plus de 3 m une fois le cou et les jambes allongés (voûtée sous le plafond)
 const LEG = 1.25; // jambes trop longues : tout le corps est soulevé d'autant
 // les instants où un pied touche le sol, en fraction du cycle de chaque clip (mesurés sur la hauteur des pieds)
@@ -352,7 +352,7 @@ function strands(len, r, n, rnd, zig = 1) {
 }
 
 let source = null;
-const loading = new GLTFLoader().loadAsync(MODEL).then((g) => {
+const loading = gltfLoader().loadAsync(MODEL).then((g) => {
   source = g;
 }, () => {});
 

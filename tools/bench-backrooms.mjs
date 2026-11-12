@@ -20,7 +20,7 @@
 //   etage_faux     : son étage ne correspond pas à là où elle est dans l'escalier
 // Options (variables d'environnement) : PRELUDE=1 garde le prélude (absente jusqu'à la première cassette) ;
 // VERBOSE=1 affiche chaque anomalie ; EX=n exemples par type (3 par défaut) ; DIFF=hard|normal.
-import { BackroomsSim, DT, stairAt, stairLocal, PLAYER_RADIUS } from '../backrooms/engine/sim.js';
+import { BackroomsSim, DT, stairAt, stairLocal, PLAYER_RADIUS, DUCT_SPEED } from '../backrooms/engine/sim.js';
 import { CELL_SIZE, PIT_HALF } from '../backrooms/engine/map.js';
 import { hasLineOfSight } from '../backrooms/engine/nav.js';
 import { clearAt, BODY_R } from '../backrooms/engine/gait.js';
@@ -456,7 +456,7 @@ function runGame(seed, budget) {
     const whyBefore = whoSees(sim, M);
     const seenBefore = !!whyBefore;
     const geoBefore = sim.players.some((Q) => seesMonster(sim, Q, M));
-    const before = { x: M.x, z: M.z, yaw: M.yaw, floor: M.floor || 0, mode: M.mode, speed: M.speed || 0, away: !!M.away, push: M.push ? M.push.v : 0, v: M.v || 0, falling: !!(M.trav && M.trav.kind === 'drop' && M.trav.phase !== 'peer') };
+    const before = { x: M.x, z: M.z, yaw: M.yaw, floor: M.floor || 0, mode: M.mode, speed: M.speed || 0, away: !!M.away, push: M.push ? M.push.v : 0, v: M.v || 0, falling: !!(M.trav && M.trav.kind === 'drop' && M.trav.phase !== 'peer'), duct: !!M.duct, crawl: !!M.inDuct, force: (sim.map.docks || []).reduce((a, d) => a + (d.force || 0), 0) };
     sim.step(inputs[0], others);
     const evs = sim.drainEvents ? sim.drainEvents() : [];
     for (const ev of evs) if (ev.type === 'lampCut') for (const Q of sim.players) if ((Q.floor || 0) === (ev.floor || 0) && Math.hypot(Q.x - ev.x, Q.z - ev.z) < (ev.r || 30)) lampCut.set(Q.id, sim.time + ev.t);
@@ -493,7 +493,8 @@ function runGame(seed, budget) {
     const d = Math.hypot(dx, dz);
     // sonnée, elle titube sous la poussée (plus vite qu'elle ne marche)
     // ou ralentit depuis une course (elle freine sur quelques pas, sans s'arrêter net)
-    const vmax = Math.max(before.speed, M.speed || 0, before.push, before.v, 0.5);
+    // dans les gaines du Level 1 elle rampe à DUCT_SPEED (sa vitesse de marche est mise à 0 pendant ce temps)
+    const vmax = Math.max(before.speed, M.speed || 0, before.push, before.v, before.duct || M.duct ? DUCT_SPEED : 0, 0.5);
     // changer d'étage dans l'escalier ou au bout d'une chute dans un trou n'est pas un saut
     const floorJump = (M.floor || 0) !== before.floor && !inStairs(sim, M.x, M.z) && !inStairs(sim, before.x, before.z) && !before.falling;
     const tele = d > Math.max(0.35, vmax * DT * 3) || floorJump;
@@ -503,12 +504,14 @@ function runGame(seed, budget) {
     else if (tele && geo) info.teleport_noir.push(`t=${sim.time.toFixed(1)}s ${M.mode} saut ${d.toFixed(2)} m (avant : ${before.mode})`);
     if (!tele && d / DT > vmax * 1.15 + 0.25) note('survitesse', sim, M, `${(d / DT).toFixed(2)} m/s pour ${vmax.toFixed(2)}`);
     if (TRACE && sim.time >= TRACE[0] && sim.time <= TRACE[1]) console.log(`    ${sim.time.toFixed(2)} ${M.mode} (${M.x.toFixed(2)}, ${M.z.toFixed(2)}) yaw ${(M.yaw || 0).toFixed(2)} v ${(M.v || 0).toFixed(2)} pas ${d.toFixed(4)} chemin ${M.pathIndex}/${(M.path || []).length} ${M.path && M.path[M.pathIndex] ? `→ (${M.path[M.pathIndex].x.toFixed(1)}, ${M.path[M.pathIndex].z.toFixed(1)})` : ''} repath ${(M.repathT || 0).toFixed(2)} arrivée ${M.arrived ? 1 : 0} place ${M.trav ? '-' : clearAt(sim, M.floor || 0, M.x, M.z).toFixed(3)}${M.trav ? ' passage' : ''}${M.push ? ' poussée' : ''}`);
-    const why = blockedAt(sim, M);
+    // au-dessus du plafond, dans une gaine, elle passe par-dessus les murs
+    const why = M.inDuct || before.crawl ? '' : blockedAt(sim, M);
     if (why && !ep.wall) note('dans_mur', sim, M, why);
     ep.wall = !!why;
     if (overPit(sim, M) && !(M.trav && M.trav.kind === 'drop')) note('sur_trou', sim, M);
     const dyaw = Math.abs(ang((M.yaw || 0) - before.yaw));
-    if (!tele && seen && dyaw > 0.35) note('demi_tour_vu', sim, M, `${((dyaw * 180) / Math.PI).toFixed(0)}° en une image (avant : ${before.mode})`);
+    // (au bout de la gaine, elle se tourne vers sa proie avant que la grille tombe : on ne la voit pas encore)
+    if (!tele && seen && dyaw > 0.35 && !before.crawl) note('demi_tour_vu', sim, M, `${((dyaw * 180) / Math.PI).toFixed(0)}° en une image (avant : ${before.mode})`);
     // de côté ou à reculons
     if (!tele && d > 0.01) {
       const mv = Math.atan2(dx, dz);
@@ -519,7 +522,9 @@ function runGame(seed, budget) {
       } else ep.back = 0;
     } else ep.back = 0;
     // piétine : elle devrait avancer
-    const wantsMove = (M.speed || 0) > 0.5 && ['chase', 'search', 'patrol', 'stalk', 'flee'].includes(M.mode) && !M.steamWait && !(M.stunT > 0) && !(M.trav && M.trav.kind === 'drop');
+    // (devant un rideau de quai baissé, elle cogne dedans jusqu'à ce qu'il cède : elle ne piétine pas)
+    const forcing = (sim.map.docks || []).reduce((a, d) => a + (d.force || 0), 0) > before.force;
+    const wantsMove = !forcing && (M.speed || 0) > 0.5 && ['chase', 'search', 'patrol', 'stalk', 'flee'].includes(M.mode) && !M.steamWait && !(M.stunT > 0) && !(M.trav && M.trav.kind === 'drop');
     // elle pivote sur place (pour repartir dans l'autre sens) : elle ne piétine pas
     const turning = Math.abs(ang((M.yaw || 0) - before.yaw)) > 0.01;
     if (wantsMove && d < 0.002 && !tele && !turning) {

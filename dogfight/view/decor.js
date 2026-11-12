@@ -2,7 +2,7 @@
 // (les mêmes boîtes servent aux collisions). Chaque objet a une maquette dessinée ici ; un vrai modèle 3D la remplace
 // quand il existe (MODELS), chargé à la demande.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
-import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
+import { gltfLoader } from '../../shared/vendor/three/gltf-draco.js';
 import { buildArchipel } from '../engine/archipel.js';
 
 // kind → fichier, longueur réelle à donner au modèle, cap du modèle (rad, son axe long vers +X), enfoncement dans l'eau
@@ -99,7 +99,7 @@ export function buildDecor(scene, env) {
   group.traverse((c) => { if (c.isMesh) for (const m of [].concat(c.material)) { m.envMap = env || null; m.needsUpdate = true; } });
   scene.add(group);
   // les vrais modèles, quand il y en a, remplacent les maquettes
-  const loader = new GLTFLoader(), base = new URL('../', import.meta.url);
+  const loader = gltfLoader(), base = new URL('../', import.meta.url);
   for (const [kind, M] of Object.entries(MODELS)) {
     loader.load(new URL(M.url, base).href, (gltf) => {
       const src = gltf.scene, bb = new THREE.Box3().setFromObject(src), size = bb.getSize(new THREE.Vector3()), k = M.len / Math.max(size.x, size.z);
