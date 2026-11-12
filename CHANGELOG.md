@@ -1,7 +1,10 @@
 # Journal des versions — Arcadia
 
-## 5.84 — 13 novembre 2026
-- **Hub** — Nouveau : bandes-annonces des jeux dans la vitrine et au survol des cartes (Claude)
+## 5.85 — 13 novembre 2026
+- **Arcadia** — Des bandes-annonces dans le Hub : la vitrine de l'accueil joue une courte vidéo du jeu à la place de l'affiche, et chaque carte de jeu lance la sienne quand tu passes la souris dessus.
+  - Douze jeux ont la leur pour l'instant : Mystère Mystère, Island Rush, Cyber Kart GP, Mini-Golf Party, Bastion Clash, Odyssée, Birdie Party, Outbreak, Duo Drift, Tête de Calcul, Mollo ! et The Backrooms.
+  - Les vidéos sont muettes, légères, et ne se chargent que pour le jeu que tu regardes.
+- **Arcadia** — La page d'accueil, abîmée quelques minutes par la mise en ligne précédente, est réparée.
 
 ## 5.83 — 13 novembre 2026
 - **The Backrooms** — Au Level 1, l'entité imite vraiment vos voix :
