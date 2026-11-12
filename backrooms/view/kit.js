@@ -3,10 +3,10 @@
 // la caméra, et pas dans son dos, sont dessinés à chaque image : des milliers de pièces pour le prix de quelques
 // centaines.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
-import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
+import { gltfLoader } from '../../shared/vendor/three/gltf-draco.js';
 
 const MODELS = new URL('../models/', import.meta.url).href;
-const loader = new GLTFLoader();
+const loader = gltfLoader();
 const cache = new Map();
 
 // name → Promise(Map(morceau → [{ geo, mat, m }])) ; m place le maillage dans le repère du morceau (son origine,

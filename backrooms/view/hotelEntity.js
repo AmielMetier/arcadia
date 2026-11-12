@@ -4,7 +4,7 @@
 // Les rotations sont données dans le repère du modèle (x : sa droite, y : le haut, z : là où il regarde) et appliquées
 // en espace monde, quel que soit le repère propre à chaque os : pas besoin de connaître les axes du squelette.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
-import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
+import { gltfLoader } from '../../shared/vendor/three/gltf-draco.js';
 
 const MODEL = new URL('../models/hotel_entite.glb', import.meta.url).href;
 const HEIGHT = 2.05; // un peu plus grand qu'un homme : il se baisse presque sous les lustres
@@ -85,7 +85,7 @@ export function createHotelEntity() {
     st.root = root;
     st.ready = true;
   };
-  if (!loading) loading = new GLTFLoader().loadAsync(MODEL);
+  if (!loading) loading = gltfLoader().loadAsync(MODEL);
   loading.then(build, () => {});
 
   return {

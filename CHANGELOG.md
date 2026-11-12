@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 5.76 — 12 novembre 2026
+- **The Backrooms** — Le jeu se charge bien plus vite : ses plus gros modèles (explorateur, entités, bouc, meubles) pèsent 4 Mo au lieu de 22.
+- **Dogfight 3D** — Le F-16 et le F-22 pèsent cinq fois moins lourd : le hangar s'ouvre plus vite.
+
 ## 5.75 — 12 novembre 2026
 - **Bastion Clash** — Le jeu ne dépend plus d'un site extérieur pour s'afficher : il démarre même si ce site est en panne.
 - **The Backrooms** — Chargement allégé de près de 3 Mo (modèles de l'explorateur et de l'entité du Level 1).
