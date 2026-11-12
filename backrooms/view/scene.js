@@ -22,6 +22,12 @@ import { createCreature } from './creature.js';
 import { modelUrl } from './models.js'; // modèles Poly Haven (CC0), voir models/LICENSE.txt
 import { buildWater } from './water.js';
 import { buildHotel } from './hotel.js';
+import { buildMall, mallOnCol, MALL_OFF } from './mall.js';
+import { createMallTextures } from './mallTextures.js';
+import { MALL_LEVEL } from '../engine/mall.js';
+import { reelCan } from './mallCinema.js';
+import { createMallDoll } from './mallDoll.js';
+import { dollSeenBy } from '../engine/doll.js';
 import { createHotelEntity } from './hotelEntity.js';
 import { createGoatHerd } from './goats.js';
 import { createPipesTextures } from './textures2.js';
@@ -301,6 +307,38 @@ function fogNoise() {
   return fogNoiseTex;
 }
 
+// Level 17 : la lumière cuite de chaque genre de lampe du mall : [portée (m), force, pente]. Les corniches lavent
+// largement, la grande suspension des cours porte loin, les appliques des piliers et les spots font des flaques
+// (au sol : les corniches n'y arrivent que par ricochet, faibles et larges ; les spots y font des flaques)
+const MALL_FP = {
+  cove: [9.0, 0.3, 1.3],
+  big: [16.0, 1.15, 1.5],
+  pendant: [7.0, 0.95, 2.0],
+  sconce: [4.6, 0.5, 1.9],
+  spot: [4.2, 1.0, 2.1],
+  down: [5.5, 1.05, 1.6], // les spots puissants du hall du cinéma (l.strong)
+  led: [0.5, 0, 2], // un ruban de LED n'éclaire pas le sol (sa couleur y tombe par les feux de couleur)
+  panel: [5.5, 0.9, 2.2],
+  tube: [5.75, 1.2, 2.2],
+  aisle: [2.5, 0.35, 2.0],
+  glow: [12.5, 1.6, 1.3],
+};
+// … et la lumière du haut (les plafonds, le haut des murs), cuite à part : les corniches lavent le plafond et les
+// retombées, les appliques y font une tache, une suspension l'éclaire de loin ; un spot encastré ou une dalle
+// lumineuse n'éclaire presque pas le plafond qui le porte
+const MALL_UP = {
+  cove: [5.6, 1.5, 1.9],
+  ring: [3.6, 1.7, 1.8], // la gorge d'un tambour de cour : elle lave ses parois et le bord de son plafond
+  big: [11.0, 1.2, 1.5],
+  pendant: [4.5, 0.7, 1.8],
+  sconce: [3.0, 0.85, 1.7],
+  spot: [1.1, 0.22, 2.0],
+  panel: [2.4, 0.3, 2.0],
+  tube: [4.2, 0.75, 2.0],
+  glow: [11.0, 1.5, 1.3],
+  led: [7.0, 1.2, 1.6], // le ruban de LED du cinéma : une nappe bleue sur le plafond (troisième canal)
+};
+
 export function createBackroomsScene(container, floors, lamps) {
   if (!Array.isArray(floors)) floors = [floors];
   const map0 = floors[0];
@@ -308,18 +346,19 @@ export function createBackroomsScene(container, floors, lamps) {
   const L2 = map0.level === 2; // Level 37, les Poolrooms : clair, laiteux, carrelé, inondé
   const PIPES = map0.level === PIPES_LEVEL; // le Level 2, les Tuyauteries
   const L3 = map0.level === HOTEL_LEVEL; // Level 5, le Terror Hotel : pénombre chaude, boiseries, moquette rouge
-  const L0 = !L1 && !L2 && !PIPES && !L3; // le Level 0 : la moquette, le papier peint jaune, les néons
+  const MALL = map0.level === MALL_LEVEL; // Level 17, le Mall : un centre commercial abandonné, immense, la nuit
+  const L0 = !L1 && !L2 && !PIPES && !L3 && !MALL; // le Level 0 : la moquette, le papier peint jaune, les néons
   const CEIL = map0.ceil || WALL_HEIGHT;
   const scene = new THREE.Scene();
   // Level 1 : un froid bleuté, un brouillard plus épais ; Level 2 : une moiteur brune, chaude
   // (Level 1 : le fond a la couleur du brouillard, si épais qu'à 65 m tout s'y est fondu, même un néon allumé — à un
   // millionième près : on ne dessine rien au-delà, l'image n'en change pas d'un pixel)
-  scene.background = new THREE.Color(L3 ? '#070403' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#080604' : '#0d0b06');
-  scene.fog = new THREE.FogExp2(L3 ? '#120a06' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#0a0705' : '#080604', L3 ? 0.022 : L2 ? 0.022 : L1 ? 0.058 : PIPES ? 0.033 : 0.05);
+  scene.background = new THREE.Color(MALL ? '#0a0806' : L3 ? '#070403' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#080604' : '#0d0b06');
+  scene.fog = new THREE.FogExp2(MALL ? '#0b0806' : L3 ? '#120a06' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#0a0705' : '#080604', MALL ? 0.017 : L3 ? 0.022 : L2 ? 0.022 : L1 ? 0.058 : PIPES ? 0.033 : 0.05);
 
   // Level 1 : le brouillard (0,058) ne laisse plus rien passer vers 40 m ; au-delà de 45 m, rien à dessiner (65 avant
   // la 5.25)
-  const camera = new THREE.PerspectiveCamera(OPTS.fov, window.innerWidth / window.innerHeight, 0.08, L1 ? 45 : 90);
+  const camera = new THREE.PerspectiveCamera(OPTS.fov, window.innerWidth / window.innerHeight, 0.08, L1 ? 45 : MALL ? 150 : 90); // (le mall : des cours de 35 m, des mails de 50 m)
   camera.position.set(map0.spawn.x, 1.6, map0.spawn.z);
 
   const renderer = getRenderer();
@@ -331,8 +370,9 @@ export function createBackroomsScene(container, floors, lamps) {
 
   const textures = createBackroomsTextures(PIPES ? 0 : map0.level || 0);
   const tx2 = PIPES ? createPipesTextures() : null;
-  const AMB = L2 ? 0.045 : L3 ? 0.06 : 0.012; // l'hôtel : une pénombre chaude, mais on y voit (entre deux appliques, plus sombre)
-  const ambient = new THREE.AmbientLight(L3 ? '#ffcf96' : L2 ? '#eaf7f6' : L1 ? '#c9d8ff' : PIPES ? '#ffd9a8' : '#fff3c4', AMB);
+  const mallTx = MALL ? createMallTextures() : null; // les sols, enduits et moquettes du mall (les deux étages)
+  const AMB = MALL ? 0.03 : L2 ? 0.045 : L3 ? 0.06 : 0.012; // l'hôtel : une pénombre chaude, mais on y voit (entre deux appliques, plus sombre)
+  const ambient = new THREE.AmbientLight(MALL ? '#ffe3bd' : L3 ? '#ffcf96' : L2 ? '#eaf7f6' : L1 ? '#c9d8ff' : PIPES ? '#ffd9a8' : '#fff3c4', AMB);
   scene.add(ambient);
   const dummy = new THREE.Object3D();
   const loader = gltfLoader();
@@ -486,7 +526,7 @@ export function createBackroomsScene(container, floors, lamps) {
     const BH = H * RB;
     const TX = CELL_SIZE / RB;
     // la cage d'escalier est fermée de murs : la lumière des néons n'y entre pas, elle éclaire ses murs du dehors
-    const stairSet = new Set((map.stairs || []).flatMap((st) => st.cells.map((k) => k.gz * W + k.gx)));
+    const stairSet = MALL ? new Set() : new Set((map.stairs || []).flatMap((st) => st.cells.map((k) => k.gz * W + k.gx)));
     const isWall = (x, z) => x < 0 || z < 0 || x >= W || z >= H || map.grid[z * W + x] === T.WALL || stairSet.has(z * W + x);
     // Level 0 : les cloisons fines (12 cm de plâtre sur l'axe de la case, voir la carte)
     const thinAt = (x, z) => {
@@ -546,6 +586,12 @@ export function createBackroomsScene(container, floors, lamps) {
     const live = new Float32Array(BW * BH);
     const baseB = new Float32Array(BW * BH);
     const liveB = new Float32Array(BW * BH);
+    // Level 17 : la lumière du haut (voir MALL_UP), ses deux canaux (chaud, froid)
+    const baseU = MALL ? new Float32Array(BW * BH) : null;
+    const liveU = MALL ? new Float32Array(BW * BH) : null;
+    const baseUB = MALL ? new Float32Array(BW * BH) : null;
+    const liveUB = MALL ? new Float32Array(BW * BH) : null;
+    const baseUG = MALL ? new Float32Array(BW * BH) : null; // (le troisième canal : le bleu des rubans de LED)
     // Poolrooms : la carte de l'eau, deux fois plus fine que la lumière cuite. Rouge : la présence de l'eau, floutée
     // sur deux mètres (les reflets de l'eau qui dansent sur les murs et les plafonds, la margelle et le sol mouillés,
     // la vapeur au-dessus des bassins) ; vert : la même, nette ; bleu : la profondeur (2 m pour 1)
@@ -598,16 +644,20 @@ export function createBackroomsScene(container, floors, lamps) {
     const bakeTex = new THREE.DataTexture(bakeData, BW, BH, THREE.RGBAFormat);
     bakeTex.magFilter = THREE.LinearFilter;
     bakeTex.minFilter = THREE.LinearFilter;
+    const bake2Data = MALL ? new Uint8Array(BW * BH * 4) : null;
+    const bake2Tex = MALL ? new THREE.DataTexture(bake2Data, BW, BH, THREE.RGBAFormat) : null;
+    if (bake2Tex) bake2Tex.magFilter = bake2Tex.minFilter = THREE.LinearFilter;
     const bakeUniforms = {
       uBake: { value: bakeTex },
+      uBake2: { value: bake2Tex }, // Level 17 : la lumière du haut
       uBakeScale: { value: new THREE.Vector2(1 / (W * CELL_SIZE), 1 / (H * CELL_SIZE)) },
       uBakeTX: { value: TX },
-      uBakeTint: { value: L3 ? new THREE.Color(1.2, 0.92, 0.62) : L2 ? new THREE.Color(1.0, 1.05, 1.07) : L1 ? new THREE.Color(0.86, 0.98, 1.12) : PIPES ? new THREE.Color(1.25, 0.98, 0.7) : LOW0 ? new THREE.Color(1.12, 1.04, 0.8) : new THREE.Color(1.05, 1.03, 0.83) }, // Level 0 : en haut une lumière blanche à peine chaude ; en bas, la lumière chaude d'avant
-      uBakeTint2: { value: PIPES ? new THREE.Color(0.78, 0.95, 1.08) : L0 ? new THREE.Color(1.2, 0.72, 0.38) : new THREE.Color(0, 0, 0) }, // Level 0 : les lampadaires des recoins calmes
+      uBakeTint: { value: MALL ? new THREE.Color(1.1, 0.99, 0.8) : L3 ? new THREE.Color(1.2, 0.92, 0.62) : L2 ? new THREE.Color(1.0, 1.05, 1.07) : L1 ? new THREE.Color(0.86, 0.98, 1.12) : PIPES ? new THREE.Color(1.25, 0.98, 0.7) : LOW0 ? new THREE.Color(1.12, 1.04, 0.8) : new THREE.Color(1.05, 1.03, 0.83) }, // Level 0 : en haut une lumière blanche à peine chaude ; en bas, la lumière chaude d'avant
+      uBakeTint2: { value: MALL ? new THREE.Color(0.8, 0.94, 1.08) : PIPES ? new THREE.Color(0.78, 0.95, 1.08) : L0 ? new THREE.Color(1.2, 0.72, 0.38) : new THREE.Color(0, 0, 0) }, // Level 0 : les lampadaires des recoins calmes
       uCeilB: { value: 1 }, // la part du second canal reçue par le plafond (la phase rouge : des feux qui éclairent vers le bas)
       uBakeY: { value: -fi * FLOOR_DY },
       uCeil: { value: CEIL },
-      uDamp: { value: L3 ? 0.35 : L2 ? 0 : L1 ? 0.6 : PIPES ? 0.5 : 1 },
+      uDamp: { value: MALL ? 0.12 : L3 ? 0.35 : L2 ? 0 : L1 ? 0.6 : PIPES ? 0.5 : 1 },
       uLowQ: { value: 0 }, // qualité basse : sans l'usure fine du carrelage des Poolrooms (voir lightQuality)
       // Poolrooms : sous la surface, le carrelage prend la teinte de l'eau et les caustiques dansent dessus
       uPool: { value: L2 ? 1 : 0 },
@@ -616,18 +666,18 @@ export function createBackroomsScene(container, floors, lamps) {
       uWallLamps: { value: PIPES ? 1 : 0 },
       uHaze: { value: PIPES ? 0.16 : 0 },
       // Level 0 : les néons éclairent le mur presque jusqu'au sol, et les auréoles du plafond restent discrètes
-      uSideLo: { value: L0 ? 0.8 : 0.5 },
-      uStain: { value: L0 ? 0.5 : 1 },
-      uCeilStain: { value: L0 ? 0.55 : L1 ? 0.3 : 1 }, // Level 0 : les auréoles du plafond, encore plus pâles ; Level 1 : à peine
+      uSideLo: { value: L0 ? 0.8 : MALL ? 0.62 : 0.5 },
+      uStain: { value: L0 ? 0.5 : MALL ? 0.4 : 1 },
+      uCeilStain: { value: MALL ? 0.22 : L0 ? 0.55 : L1 ? 0.3 : 1 }, // Level 0 : les auréoles du plafond, encore plus pâles ; Level 1 : à peine
       // Level 0, étage du haut : des murs peu marqués (quelques auréoles pâles, un peu d'humidité au pied : assez pour
       // casser l'uni du papier, sans l'air défraîchi de l'étage du bas)
       // Level 1 : des parpaings repeints, à peine marqués par l'humidité
-      uWallDecay: { value: L0 && !LOW0 ? 0.4 : L1 ? 0.3 : 1 },
+      uWallDecay: { value: MALL ? 0.22 : L0 && !LOW0 ? 0.4 : L1 ? 0.3 : 1 },
       uGlossH: { value: L1 ? CEIL - 0.45 : L2 ? CEIL - 0.03 : 3 }, // Level 1 : la hauteur des tubes, qui se reflètent dans le béton lissé ; Poolrooms : les dalles lumineuses
       uPoolMap: { value: poolTex }, // Poolrooms : la carte de l'eau (voir plus haut)
     };
     // reflets des lampes (Level 2) : les plus proches que la caméra voit, choisies à chaque image
-    const NLAMP = L3 ? 16 : 12; // (l'hôtel : on voit loin dans ses couloirs, et chaque applique dessine sur le mur)
+    const NLAMP = L3 || MALL ? 16 : 12; // (l'hôtel : on voit loin dans ses couloirs, et chaque applique dessine sur le mur)
     const lampU = {
       uLampPos: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3(0, -100, 0)) },
       uLampCol: { value: Array.from({ length: NLAMP }, () => new THREE.Vector3()) },
@@ -822,9 +872,12 @@ float occVis(vec3 p, vec3 lp) {
       // Level 0 : les zones claires baignent dans la lumière des néons (comme dans les vidéos), sans flaque ni trou noir
       const LB = L0 && l.bright;
       // (Level 1 : des réglettes de 2 × 36 W, qui portent plus loin qu'un pavé de néon)
-      const LR = o ? o.r : LB ? LIGHT_R * CELL_SIZE * 2.3 : l.bright ? LIGHT_R * CELL_SIZE * 1.55 : l.kind === 'bulb' ? 2.2 * CELL_SIZE : l.kind === 'tube' ? 2.3 * CELL_SIZE : LIGHT_R * CELL_SIZE * (L0 ? 1.15 : L1 ? 1.2 : 1);
-      const gain = o ? o.gain : LB ? 1.42 : l.bright ? 1.3 : l.kind === 'bulb' ? 1.05 : l.kind === 'tube' ? 1.45 : L0 ? 0.97 : 1; // Level 0 : l'image environ 10 % moins lumineuse qu'au réglage du 7 novembre (la courbe du caméscope compresse : il faut baisser plus les néons)
-      const fall = o ? o.fall : LB ? 1.5 : L1 ? 2.2 : 2.4;
+      // Level 17 : chaque genre de lampe a sa portée, sa force et sa pente (voir MALL_FP)
+      // (rad : une lampe qui porte où elle veut, la lumière des voûtes du haut tombée dans les vides)
+      const mk = MALL && !o ? (l.rad ? [l.rad, l.gain ?? 1, l.fall ?? 1.4] : l.kind === 'pendant' && l.big ? MALL_FP.big : l.strong ? MALL_FP.down : MALL_FP[l.kind] || MALL_FP.spot) : null;
+      const LR = o ? o.r : mk ? mk[0] : LB ? LIGHT_R * CELL_SIZE * 2.3 : l.bright ? LIGHT_R * CELL_SIZE * 1.55 : l.kind === 'bulb' ? 2.2 * CELL_SIZE : l.kind === 'tube' ? 2.3 * CELL_SIZE : LIGHT_R * CELL_SIZE * (L0 ? 1.15 : L1 ? 1.2 : 1);
+      const gain = o ? o.gain : mk ? mk[1] : LB ? 1.42 : l.bright ? 1.3 : l.kind === 'bulb' ? 1.05 : l.kind === 'tube' ? 1.45 : L0 ? 0.97 : 1; // Level 0 : l'image environ 10 % moins lumineuse qu'au réglage du 7 novembre (la courbe du caméscope compresse : il faut baisser plus les néons)
+      const fall = o ? o.fall : mk ? mk[2] : LB ? 1.5 : L1 ? 2.2 : 2.4;
       // Level 1 : la réglette n'est pas un point mais deux tubes de 1,5 m (le long de x) : sa flaque s'allonge d'autant
       const HX = L1 && !o ? 0.6 : 0;
       const r = Math.ceil(LR / TX);
@@ -846,15 +899,30 @@ float occVis(vec3 p, vec3 lp) {
     const addPrint = (arr, fp, k) => {
       for (let i = 0; i < fp.length; i += 2) arr[fp[i]] += fp[i + 1] * k;
     };
-    const chan = (l) => (l.kind === 'tube' && PIPES ? 1 : 0); // 1 : le canal bleu (lumière froide)
+    const chan = (l) => ((l.kind === 'tube' && PIPES) || (MALL && (l.kind === 'tube' || l.kind === 'panel' || l.kind === 'glow')) ? 1 : 0); // 1 : le canal bleu (lumière froide)
     // l'empreinte de chaque lampe est gardée : au Level 2, un secteur qui saute ou se rallume refait la somme
     const fpOf = (l) => l.bakeFp || (l.bakeFp = footprint(l));
+    // (Level 17 : l'empreinte au plafond ; aucune pour la lumière tombée d'un vide ou les veilleuses des allées)
+    const upOf = (l) => (l.rad || l.kind === 'aisle' || l.kind === 'well' ? null : l.ring ? MALL_UP.ring : l.kind === 'pendant' && l.big ? MALL_UP.big : MALL_UP[l.kind] || MALL_UP.spot);
+    const fpUOf = (l) => {
+      if (!l.bakeFpU) {
+        const u = upOf(l);
+        l.bakeFpU = u ? footprint(l, { r: u[0], gain: u[1], fall: u[2] }) : [];
+      }
+      return l.bakeFpU;
+    };
     let flickers = [];
     const sumLights = () => {
       base.fill(0);
       baseB.fill(0);
       for (const l of map.lights) if (l.state === 'on') addPrint(chan(l) ? baseB : base, fpOf(l), 1);
-      flickers = map.lights.filter((l) => l.state === 'flicker').map((l) => ({ l, k: 1, fp: fpOf(l), ch: chan(l), calm: Math.random() * 4, burst: 0 }));
+      if (MALL) {
+        baseU.fill(0);
+        baseUB.fill(0);
+        baseUG.fill(0);
+        for (const l of map.lights) if (l.state === 'on') addPrint(l.kind === 'led' ? baseUG : chan(l) ? baseUB : baseU, fpUOf(l), 1);
+      }
+      flickers = map.lights.filter((l) => l.state === 'flicker').map((l) => ({ l, k: 1, fp: fpOf(l), fpU: MALL ? fpUOf(l) : null, ch: chan(l), calm: Math.random() * 4, burst: 0 }));
     };
     sumLights();
     let lightGen = map.lightGen || 0;
@@ -991,15 +1059,27 @@ float occVis(vec3 p, vec3 lp) {
         for (const v of nookLamps) if (v.k > 0.01) addPrint(liveB, v.fp, v.k);
       }
       for (let i = 0; i < BW * BH; i++) {
-        const v = Math.min(1, (L2 || PIPES ? 0.03 : L3 ? 0.055 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
+        const v = Math.min(1, (L2 || PIPES ? 0.03 : L3 ? 0.055 : MALL ? 0.024 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
         bakeData[i * 4] = Math.round(v * 255);
-        if (PIPES || alarm || nookLamps.length) bakeData[i * 4 + 2] = Math.round(Math.min(1, liveB[i] * 0.3 * power) * 255);
+        if (PIPES || MALL || alarm || nookLamps.length) bakeData[i * 4 + 2] = Math.round(Math.min(1, liveB[i] * 0.3 * power) * 255);
       }
       for (let i = 0; i < chamfMirror.length; i += 2) {
         bakeData[chamfMirror[i] * 4] = bakeData[chamfMirror[i + 1] * 4];
         bakeData[chamfMirror[i] * 4 + 2] = bakeData[chamfMirror[i + 1] * 4 + 2];
       }
       bakeTex.needsUpdate = true;
+      if (MALL) {
+        // la lumière du haut : ce qui est allumé, plus ce qui grésille
+        liveU.set(baseU);
+        liveUB.set(baseUB);
+        if (!alarm && !casc) for (const f of flickers) if (f.k > 0 && f.fpU) addPrint(f.ch ? liveUB : liveU, f.fpU, f.k);
+        for (let i = 0; i < BW * BH; i++) {
+          bake2Data[i * 4] = Math.round(Math.min(1, 0.018 * (power ? 1 : 0.25) + liveU[i] * 0.3 * power) * 255);
+          bake2Data[i * 4 + 1] = Math.round(Math.min(1, baseUG[i] * 0.3 * power) * 255);
+          bake2Data[i * 4 + 2] = Math.round(Math.min(1, liveUB[i] * 0.3 * power) * 255);
+        }
+        bake2Tex.needsUpdate = true;
+      }
     };
     writeBake();
     // lumière reçue en un point (pour l'exposition automatique du caméscope)
@@ -1160,7 +1240,7 @@ float occVis(vec3 p, vec3 lp) {
     };
 
     const baked = (mat, opts = null) => {
-      const spec = (PIPES || L2 || L3) && opts && opts.spec > 0;
+      const spec = (PIPES || L2 || L3 || MALL) && opts && opts.spec > 0;
       const hotel = L3 && opts && opts.hotel; // Level 5 : le vernis du lambris (carte de brillance), l'usure de la moquette
       // Poolrooms : carrelage émaillé (joints, reflets de la salle, reflets de l'eau) ; pool : 'floor' (le sol, qui
       // reflète les dalles lumineuses), 'wall', 'ceil', 'bottom' (sous l'eau)
@@ -1176,7 +1256,7 @@ float occVis(vec3 p, vec3 lp) {
       const wall1 = L1 && opts && opts.wall1; // les murs du Level 1 : la poussière et la suie sous le plafond
       const marble = L3 && opts && opts.marble; // le hall de l'hôtel : un marbre poli, sans l'usure de la moquette
       const push = opts && opts.push; // les murs en biais : la lumière lue un peu devant eux, dans le couloir (pas au coin des cases)
-      if (spec || PIPES || base || EDGE || SEGS || film || gloss || DYN || push || pool || hotel) mat.customProgramCacheKey = () => 'bk' + (hotel ? '-hotel' : '') + (marble ? '-marble' : '') + (pool ? '-pool-' + pool : '') + (push ? '-push' : '') + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE || SEGS ? '-edge' : '') + (film ? '-film' : '') + (gloss ? '-gloss' : '') + (DYN ? '-dyn' : '') + (bump ? '-bump' : '') + (wall1 ? '-wall1' : '');
+      if (spec || PIPES || base || EDGE || SEGS || film || gloss || DYN || push || pool || hotel || MALL) mat.customProgramCacheKey = () => 'bk' + (MALL ? '-mall' : '') + (hotel ? '-hotel' : '') + (marble ? '-marble' : '') + (pool ? '-pool-' + pool : '') + (push ? '-push' : '') + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE || SEGS ? '-edge' : '') + (film ? '-film' : '') + (gloss ? '-gloss' : '') + (DYN ? '-dyn' : '') + (bump ? '-bump' : '') + (wall1 ? '-wall1' : '');
       mat.onBeforeCompile = (sh) => {
         Object.assign(sh.uniforms, bakeUniforms);
         if (DYN) {
@@ -1215,6 +1295,7 @@ float occVis(vec3 p, vec3 lp) {
           sh.defines = { ...(sh.defines || {}), BK_TILE: 1 };
         }
         if (PIPES) sh.defines = { ...(sh.defines || {}), BK_PIPES: 1 };
+        if (MALL) sh.defines = { ...(sh.defines || {}), BK_MALL: 1 };
         if (base) sh.defines = { ...(sh.defines || {}), BK_BASE: 1 };
         if (push) sh.defines = { ...(sh.defines || {}), BK_PUSH: push.toFixed(3) };
         if (EDGE || SEGS) sh.defines = { ...(sh.defines || {}), BK_EDGE: 1 };
@@ -1228,6 +1309,9 @@ float occVis(vec3 p, vec3 lp) {
           vBakeP = (modelMatrix * bakeWP).xyz;
           vBakeN = normalize(mat3(modelMatrix) * bakeN);`);
         sh.fragmentShader = `uniform sampler2D uBake;
+#ifdef BK_MALL
+uniform sampler2D uBake2;
+#endif
 uniform vec2 uBakeScale;
 uniform float uBakeTX;
 uniform vec3 uBakeTint;
@@ -1804,7 +1888,22 @@ float bkCaust(vec2 uv, float t) {
           }
           totalEmissiveRadiance += diffuseColor.rgb * hSc * (ny < -0.5 ? 0.7 : 1.0);
           #endif
+          #ifdef BK_MALL
+          {
+            // Level 17 : le plafond et le haut des murs prennent la lumière du haut (les corniches, les appliques, les
+            // suspensions), le sol et le bas des murs celle du bas (les flaques des spots) ; entre 1 m et 3,4 m, un fondu
+            vec2 u1 = uBakeScale * 0.9;
+            vec4 up = texture2D(uBake2, bkUv) * 0.4 + (texture2D(uBake2, bkUv + vec2(u1.x, 0.0)) + texture2D(uBake2, bkUv - vec2(u1.x, 0.0)) + texture2D(uBake2, bkUv + vec2(0.0, u1.y)) + texture2D(uBake2, bkUv - vec2(0.0, u1.y))) * 0.15;
+            float kUp = ny < -0.5 ? 1.0 : (ny > 0.5 ? 0.0 : smoothstep(1.0, 3.4, by));
+            vec3 lo = (uBakeTint * bk.r + uBakeTint2 * bk.b) * shape;
+            vec3 hi = (uBakeTint * up.r + uBakeTint2 * up.b + vec3(0.34, 0.46, 1.6) * up.g) * mix(0.8, 1.0, bk.g) * (ny < -0.5 ? 1.0 : 0.92);
+            // un sol très éclairé (le hall du cinéma) renvoie de sa lumière vers le plafond et le haut des murs
+            hi += (uBakeTint * bk.r + uBakeTint2 * bk.b) * 1.1 * max(bk.r + bk.b - 0.22, 0.0);
+            totalEmissiveRadiance += diffuseColor.rgb * mix(lo, hi, kUp) * 2.0;
+          }
+          #else
           totalEmissiveRadiance += diffuseColor.rgb * (uBakeTint * bk.r + uBakeTint2 * bk.b * (ny < -0.5 ? uCeilB : 1.0)) * 2.0 * shape;
+          #endif
           totalEmissiveRadiance += bkPoolAdd;
           #ifdef BK_DYN
           {
@@ -1892,7 +1991,7 @@ float bkCaust(vec2 uv, float t) {
     const floorMat = PIPES
       ? baked(new THREE.MeshPhongMaterial({ map: carpet, specular: '#3a342a', shininess: 70 }), { spec: 1.05, gloss: 1100 })
       : baked(new THREE.MeshLambertMaterial({ map: carpet, ...(L0 ? { bumpMap: relief(carpet), bumpScale: 1.4 } : L3 ? { bumpMap: relief(carpet), bumpScale: 1.1 } : null) }), L0 ? { film: 1 } : L1 ? { gloss: 1 } : L3 ? { hotel: 1 } : null);
-    const holes = holesOf(map);
+    const holes = MALL ? [] : holesOf(map); // (le mall dessine ses vides et ses trémies lui-même)
     if (holes.length) {
       floorMat.alphaMap = holeMask(W, H, holes, true);
       floorMat.alphaTest = 0.5;
@@ -1963,11 +2062,15 @@ float bkCaust(vec2 uv, float t) {
       }
     }
     let water = null;
+    let mall = null;
     const waterLampP = new THREE.Vector3();
     const waterLampT = new THREE.Vector3();
     if (L2) {
       // Poolrooms : sols, bassins, parois des bassins, margelles et la surface de l'eau (view/water.js)
       water = buildWater({ map, group, baked, textures, bake: bakeUniforms, fog: scene.fog, film: filmU, tileRelief });
+    } else if (MALL) {
+      // Level 17 : sols, plafonds, murs, vides, garde-corps, piliers, escaliers, escalators, devantures (view/mall.js)
+      mall = buildMall({ map, fi, floors, group, baked, tx: mallTx });
     } else {
       const floorGeo = new THREE.PlaneGeometry(W * CELL_SIZE, H * CELL_SIZE, L3 ? W : 1, L3 ? H : 1);
       if (L3 && map.elevator) {
@@ -2009,7 +2112,7 @@ float bkCaust(vec2 uv, float t) {
     const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(W * CELL_SIZE, H * CELL_SIZE), ceilMat);
     ceiling.rotation.x = Math.PI / 2;
     ceiling.position.set((W * CELL_SIZE) / 2, CEIL, (H * CELL_SIZE) / 2);
-    if (!L2) group.add(ceiling); // Poolrooms : chaque salle a son propre plafond (voir water.js)
+    if (!L2 && !MALL) group.add(ceiling); // Poolrooms : chaque salle a son propre plafond (voir water.js)
     // Level 0 : le long d'un couloir en diagonale, les dalles suivent le couloir. Une pièce de faux plafond couvre ses
     // cases pleines et la moitié libre de ses cases coupées, ses dalles tournées dans l'axe (la même texture, une
     // répétition par 2,5 m, calée sur la ligne médiane du couloir) ; le plafond droit y est découpé
@@ -2116,6 +2219,8 @@ float bkCaust(vec2 uv, float t) {
         inst.instanceMatrix.needsUpdate = true;
         group.add(inst);
       }
+    } else if (MALL) {
+      wallMat = mall.wallMat; // (les murs du mall sont faits avec le reste, view/mall.js)
     } else {
       // l'étage du bas du Level 0 : le même papier peint, délavé vers le gris
       // (Level 1 : le relief des parpaings, et la crasse du haut des murs)
@@ -2152,7 +2257,7 @@ float bkCaust(vec2 uv, float t) {
     }
 
     // 3b. Piliers plus fins que la case : carrés ou ronds, de tailles variées, au même papier peint (motif à l'échelle)
-    if (map.pillarAt) {
+    if (map.pillarAt && !MALL) {
       const kinds = new Map();
       for (let z = 0; z < H; z++) {
         for (let x = 0; x < W; x++) {
@@ -2313,8 +2418,8 @@ float bkCaust(vec2 uv, float t) {
       fixSets.push(mesh);
     };
     const ALARM = new THREE.Color('#ff2414').multiplyScalar(3.2);
-    const onCol = (l) => (l.kind === 'bulb' ? ON_BULB : l.kind === 'tube' ? ON_TUBE : ON);
-    const offCol = (l) => (l.kind === 'bulb' ? OFF_BULB : OFF);
+    const onCol = (l) => (MALL ? mallOnCol(l) : l.kind === 'bulb' ? ON_BULB : l.kind === 'tube' ? ON_TUBE : ON);
+    const offCol = (l) => (MALL ? MALL_OFF : l.kind === 'bulb' ? OFF_BULB : OFF);
     const fixTmp = new THREE.Color();
     const ALARM_OFF = new THREE.Color('#140807'); // dans le noir rouge, un diffuseur éteint ne se voit presque plus
     // pendant la phase rouge, un néon est éteint, ou rouge à la force de sa pulsation
@@ -2327,7 +2432,8 @@ float bkCaust(vec2 uv, float t) {
     const fixDirty = () => {
       for (const m of fixSets) if (m.instanceColor) m.instanceColor.needsUpdate = true;
     };
-    if (PIPES) {
+    if (MALL) mall.fixtures(fixSet, dummy);
+    else if (PIPES) {
       const bulbs = map.lights.filter((l) => l.kind === 'bulb');
       // l'ampoule, dans le hublot de verre de la lampe (pipes.js)
       fixSet(new THREE.SphereGeometry(0.045, 12, 10), new THREE.MeshBasicMaterial({ color: '#ffffff' }), bulbs, (l) => {
@@ -2531,7 +2637,7 @@ float bkCaust(vec2 uv, float t) {
         const k = l.fs || 1;
         return Math.abs(vx - l.x) >= 0.61 * k + 0.3 + 0.2 || Math.abs(vz - l.z) >= 0.31 * k + 0.3 + 0.2;
       });
-    const rates = L2 || L3
+    const rates = L2 || L3 || MALL
       ? { outlet: 0, fire_alarm: 0, power_box_01: 0, wall_clock: 0, drawing: 0 }
       : L1
       ? { outlet: 0.02, fire_alarm: 0.01, power_box_01: 0.012, wall_clock: 0, drawing: 0 }
@@ -2558,7 +2664,7 @@ float bkCaust(vec2 uv, float t) {
             break;
           }
         }
-        if (!L1 && !L2 && !L3 && !PIPES && drnd() < 0.045 && !holeAbove(x, z) && !diagAt.has(i)) {
+        if (L0 && drnd() < 0.045 && !holeAbove(x, z) && !diagAt.has(i)) {
           const ox = (drnd() - 0.5) * 1.2;
           const oz = (drnd() - 0.5) * 1.2;
           const rot = drnd() < 0.5 ? 0 : Math.PI / 2;
@@ -2820,9 +2926,22 @@ float bkCaust(vec2 uv, float t) {
     const cassetteMat = new THREE.MeshLambertMaterial({ map: textures.vhs, emissive: '#ffe2b8', emissiveMap: textures.vhs, emissiveIntensity: 0.42 });
     const flatMat = baked(new THREE.MeshLambertMaterial({ map: textures.vhs, emissive: '#ffe2b8', emissiveMap: textures.vhs, emissiveIntensity: 0.12 }));
     const cassetteMeshes = [];
+    // (Level 17 : des boîtes de film rondes, en métal, étiquetées ; même reflet dans le faisceau de la lampe)
+    const reelMat = MALL ? baked(new THREE.MeshPhongMaterial({ color: '#8b8f92', specular: '#d8dadc', shininess: 70, emissive: '#55585a', emissiveIntensity: 0.3 }), { spec: 0.6, gloss: 110, mask: 0 }) : null;
+    const reelLabels = new Map();
+    const reelLabel = (tex) => reelLabels.get(tex) || reelLabels.set(tex, baked(new THREE.MeshLambertMaterial({ map: tex, emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 0.16 }))).get(tex);
     for (const cas of map.cassettes || []) {
       const cg = new THREE.Group();
-      if (cas.high) {
+      if (cas.reel) {
+        cg.add(reelCan(cas.id + 1, reelMat, reelLabel));
+        const glint = new THREE.Sprite(glintMat());
+        glint.scale.setScalar(0.24);
+        glint.position.set(0.09, 0.09, -0.06);
+        cg.add(glint);
+        cg.userData.glint = glint;
+        cg.position.set(cas.x, 0, cas.z);
+        cg.rotation.y = ((cas.gx * 7 + cas.gz * 13 + cas.id * 5) % 12) * 0.52;
+      } else if (cas.high) {
         cg.add(new THREE.Mesh(cassetteGeo, cassetteMat));
         cg.add(new THREE.PointLight('#f5a524', 1.1, 3.5, 1.8));
         cg.position.set(cas.x, NICHE_Y, cas.z);
@@ -3124,7 +3243,7 @@ float bkCaust(vec2 uv, float t) {
       return g;
     };
     const STEP = { tread: '#7d725a', riser: '#9a8f72', nose: '#3d3a32', metal: '#4a4740', plate: '#2f2d29', casing: '#7a6640', sill: '#5b5a55', red: '#a8251c', black: '#1c1b19', sign: '#e9eae4' };
-    for (const st of map.stairs || []) {
+    for (const st of MALL ? [] : map.stairs || []) {
       // repère de la cage : u le long des volées, v en travers ; y depuis le sol de cet étage
       const wx = (u, v) => st.ox + st.dx * u + st.px * v;
       const wz = (u, v) => st.oz + st.dz * u + st.pz * v;
@@ -4446,6 +4565,7 @@ void main() {
       cull,
       lightAt,
       lightColorAt,
+      baked, // (Level 17 : la poupée prend la lumière cuite de l'étage où elle se tient)
       // la phase rouge est lancée à cet étage (après la vague d'extinction) : les alarmes peuvent hurler
       get redOn() {
         return !!alarm;
@@ -4502,6 +4622,7 @@ void main() {
         }
         if (pipesView) pipesView.lights(dynList, time);
         if (hotel) hotel.lights(dynList, time);
+        if (mall) mall.lights(dynList, time);
         // l'ascenseur d'arrivée, portes ouvertes : la lumière de sa cabine déborde sur le couloir
         if (arrivalLift && arrivalLift.open > 0.02) {
           const A = map.arrival;
@@ -4558,6 +4679,7 @@ void main() {
           bakeUniforms.uWaterY.value = water.level;
         }
         if (hotel) hotel.update(sim, P, time, dt);
+        if (mall) mall.update(camera, sim, time, dt);
 
         // Coupure de courant : les néons meurent d'un coup, puis reviennent en grésillant
         const want = !(sim.blackout > 0);
@@ -4627,12 +4749,12 @@ void main() {
         // Ascenseur : rouge verrouillé, vert ouvert ; le faux devient un mur (couleurs en nombres : à chaque image,
         // pas de texte à relire)
         const fake = !!(E && E.fake);
-        const open = sim.open && !fake;
+        const open = sim.open && !fake && !(E && E.dead); // (Level 17 : le monte-charge du quai est hors service)
         showGroup(exitGroup, !fake);
         if (fakeWall) fakeWall.visible = fake;
         exitLight.color.setHex(open ? 0x22c55e : 0xef4444);
-        exitLight.intensity = fake || !E ? 0 : open ? 3 : 1; // aux Poolrooms, pas d'ascenseur : les toboggans
-        signMat.color.setHex(open ? 0x4ade80 : 0xff3030);
+        exitLight.intensity = fake || !E || E.dead ? 0 : open ? 3 : 1; // aux Poolrooms, pas d'ascenseur : les toboggans
+        signMat.color.setHex(E && E.dead ? 0x2a0c0c : open ? 0x4ade80 : 0xff3030);
         callMat.color.setHex(open ? 0xf4f1e0 : 0xc2701c);
         // les portes s'ouvrent quand l'ascenseur est alimenté ; le bouton pressé dans la cabine, elles se referment
         // (en un peu moins de deux secondes) et l'ascenseur part
@@ -4667,13 +4789,13 @@ void main() {
         }
 
         // Level 2 : les lampes qui se reflètent dans le carrelage et le sol ciré (les plus proches que l'on voit)
-        if (PIPES || L2 || L3) {
+        if (PIPES || L2 || L3 || MALL) {
           const cand = [];
           for (const l of map.lights) {
             const k = power && l.state !== 'off' && !(L3 && sim.blackout > 0) ? (l.k ?? 1) * (l.state === 'flicker' ? 0.6 : 1) : 0;
-            if (k <= 0 || (l.hidden && !L3)) continue; // (l'hôtel : les appliques n'ont pas de plafonnier, mais brillent)
+            if (k <= 0 || (l.hidden && !L3) || (MALL && (l.kind === 'well' || l.kind === 'aisle' || l.kind === 'led'))) continue; // (l'hôtel : les appliques n'ont pas de plafonnier, mais brillent)
             const d = Math.abs(l.x - P.x) + Math.abs(l.z - P.z);
-            if (d < 32) cand.push([d, l, k]);
+            if (d < (MALL ? 48 : 32)) cand.push([d, l, k]);
           }
           cand.sort((a, b) => a[0] - b[0]);
           let n = 0;
@@ -4684,7 +4806,12 @@ void main() {
             if (L2) lampU.uLampCol.value[n].set(0.95, 1.0, 1.02).multiplyScalar(1.2 * k * (l.fs || 1));
             // (l'hôtel : les plus lointaines s'effacent en douceur au lieu de s'éteindre d'un coup)
             else if (L3) lampU.uLampCol.value[n].set(1.0, 0.68, 0.38).multiplyScalar((l.lamp ? 0.8 : 1.6) * k * Math.min(1, (32 - d) / 8));
-            else if (l.kind === 'tube') lampU.uLampCol.value[n].set(0.75, 0.88, 1.0).multiplyScalar(k);
+            // (le mall : le sol poli reflète tout, les plus lointaines s'effacent en douceur)
+            else if (MALL) {
+              const c = mallOnCol(l);
+              const far = Math.min(1, (48 - d) / 12);
+              lampU.uLampCol.value[n].set(c.r, c.g, c.b).multiplyScalar((l.kind === 'glow' || l.big ? 0.55 : l.kind === 'cove' ? 0.3 : 0.4) * k * far);
+            } else if (l.kind === 'tube') lampU.uLampCol.value[n].set(0.75, 0.88, 1.0).multiplyScalar(k);
             else lampU.uLampCol.value[n].set(1.0, 0.7, 0.4).multiplyScalar(1.5 * k);
             n++;
           }
@@ -5445,7 +5572,8 @@ void main() {
   // mode VIP : au Level 0 et aux Tuyauteries le même corps, avec le visage de la photo de l'entité d'origine ; au Level 1 la
   // silhouette voilée (models/level1/entite.glb, view/creature.js) ; aux Poolrooms la vidéo, à plat ; au Level 5 l'entité de
   // l'hôtel, un modèle humain animé os par os (view/hotelEntity.js)
-  const beast = !ENTITY_VIP ? createBeast({ wiry: true }) : L3 ? createHotelEntity() : L1 ? createCreature({ height: 2.7 }) : L2 ? null : createBeast({ wiry: true, photo: { url: VIP.img, crop: [490, 20, 300, 375] } });
+  // Level 17, dans les deux modes : la grande poupée (view/mallDoll.js), jamais animée : on ne la voit pas bouger
+  const beast = MALL ? createMallDoll({ bakedOf: (fi) => floorViews[fi].baked, floors: floors.length }) : !ENTITY_VIP ? createBeast({ wiry: true }) : L3 ? createHotelEntity() : L1 ? createCreature({ height: 2.7 }) : L2 ? null : createBeast({ wiry: true, photo: { url: VIP.img, crop: [490, 20, 300, 375] } });
   if (beast) {
     monsterGroup.add(beast.group);
     shadow.visible = false;
@@ -5495,6 +5623,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 
   monsterGroup.position.set(map0.monsterSpawn.x, 0, map0.monsterSpawn.z);
   scene.add(monsterGroup);
+  const dollAt = { on: false, x: 0, z: 0, f: 0, yaw: 0 }; // Level 17 : là où la poupée est montrée
   // l'événement rare : une silhouette immobile au bout du couloir, qui n'est plus là quand on s'approche
   const figure = new THREE.Group();
   const figMat = new THREE.MeshBasicMaterial({ color: '#030303', fog: true });
@@ -5997,6 +6126,28 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         monsterGroup.visible = false;
         const gv = floorViews[0];
         goatHerd.update(sim, P, camera, gv ? gv.lightAt : () => 0.3, lampOn, dt, time);
+      } else if (sim.hasMonster && MALL && beast) {
+        // Level 17 : la poupée. On ne la voit jamais bouger : tant que celui que suit la caméra l'a dans son cadre, elle
+        // reste où il l'a vue et dans la pose qu'elle avait (chez un invité, sa position arrive avec un temps de retard) ;
+        // hors de son regard, elle prend sa vraie place, et sa pose se règle sur la distance : au loin elle salue, de près
+        // elle tend les bras et tourne la tête vers lui
+        const M = sim.monster;
+        const held = dollAt.on && M.mode !== 'grab' && dollSeenBy(sim, P, dollAt.f, dollAt.x, dollAt.z, 0.12);
+        if (!held) {
+          dollAt.on = true;
+          dollAt.x = M.x;
+          dollAt.z = M.z;
+          dollAt.f = M.floor || 0;
+          dollAt.yaw = M.yaw || 0;
+          beast.setFloor(dollAt.f);
+          const dx = camera.position.x - M.x;
+          const dz = camera.position.z - M.z;
+          const a = Math.atan2(dx, dz) - dollAt.yaw;
+          beast.setPose((14 - Math.hypot(dx, dz)) / 10, Math.atan2(Math.sin(a), Math.cos(a)));
+        }
+        monsterGroup.visible = true;
+        monsterGroup.position.set(dollAt.x, -dollAt.f * FLOOR_DY, dollAt.z);
+        monsterGroup.rotation.set(0, dollAt.yaw, 0);
       } else if (sim.hasMonster) {
         const M = sim.monster;
         // (le prélude : elle n'est pas là ; dans les gaines non plus ; Level 1, sous l'apparence d'une victime : c'est le

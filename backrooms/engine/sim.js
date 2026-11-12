@@ -23,7 +23,9 @@ import { createWarehouseMap, DOCK_PASS, guardDoorWant, inSafe, SAFE_LEVER_R } fr
 import { createPoolMap, MOUTH } from './poolrooms.js';
 import { createHotelMap, WORDS, LETTERS, HIDE_R as SPOT_R, MAIL_R, KEYPAD_R, LETTER_R } from './hotel.js';
 import { createPipesMap, VALVES, PIPES_LEVEL, jetState, inJet, JET_HALF } from './level2.js';
+import { createMallMap, MALL_LEVEL, REELS, FILM_LEAD_T } from './mall.js';
 import { hasLineOfSight } from './nav.js';
+import { updateDoll, dollInit, dollOnFilm, DOLL_BODY } from './doll.js';
 import { planTo, move as gaitMove, faceTo, shove, stagger, feetOf, cageAt, BODY_R, roamable } from './gait.js';
 import { Track } from './interp.js';
 import { createGoats, updateGoats, senseGoats, alertGoats, goatSnapshot, applyGoatSnapshot, goatCount } from './goats.js';
@@ -93,11 +95,12 @@ export { CASSETTES };
 export const FUSES = 3;
 export { VALVES, PIPES_LEVEL };
 export const HOTEL_LEVEL = 4; // Level 5, le Terror Hotel (par le toboggan rouge des Poolrooms)
+export { MALL_LEVEL, REELS, FILM_LEAD_T }; // 5 : Level 17, le Mall (deux étages, engine/mall.js) ; ses 5 bobines de film, l'amorce du film
 export const LAST_LEVEL = PIPES_LEVEL; // 0 : Level 0, 1 : Level 1 (entrepôt), 2 : Level 37 (Poolrooms), 3 : Level 2 (Tuyauteries, toboggan jaune), 4 : Level 5 (Terror Hotel, toboggan rouge)
-// ⭐ Le niveau de départ d'un VIP (réglage « start » du salon, hub/games.js, ou ?level1, ?level37, ?level2, ?level5 seul) :
+// ⭐ Le niveau de départ d'un VIP (réglage « start » du salon, hub/games.js, ou ?level1, ?level37, ?level2, ?level5, ?level17 seul) :
 // le nom du level → son numéro dans le moteur. Il ne compte que pour un VIP (vip : compte VIP du Hub, ou hors du Hub) qui
 // a le coffre VIP ouvert (vault : le même test d'accès que le mode VIP) ; sinon, et pour un nom inconnu, le Level 0
-export const START_LEVELS = { 0: 0, 1: 1, 37: 2, 2: PIPES_LEVEL, 5: HOTEL_LEVEL };
+export const START_LEVELS = { 0: 0, 1: 1, 37: 2, 2: PIPES_LEVEL, 5: HOTEL_LEVEL, 17: MALL_LEVEL };
 export const startLevel = (name, { vip = false, vault = false } = {}) =>
   vip === true && vault === true && (typeof name === 'number' || typeof name === 'string') && Object.hasOwn(START_LEVELS, String(name)) ? START_LEVELS[String(name)] : 0;
 export const VALVE_T = 6.5; // secondes devant une vanne pour la fermer (elle revient doucement si on la lâche) : on s'expose
@@ -122,6 +125,7 @@ export const BLOW_DELAY = 2.2; // la vanne fermée, les néons de son secteur gr
 export const BURN_LOCK = 0.9; // brûlé par un jet de vapeur : repoussé, sonné un instant
 export const DEPART_T = 3; // secondes entre la fermeture des portes et l'arrivée
 export const SLIDE_T = 6.5; // Poolrooms : la descente dans le toboggan, avant l'écran de chargement (plus longue qu'un ascenseur)
+export const STAIRS_T = 7.5; // Level 5 : la descente de l'escalier de secours vers le Level 17, avant l'écran de chargement
 export const BOARD_T = 45; // Poolrooms : dès qu'un joueur est dans un toboggan, les autres ont ce temps pour le suivre
 export const LIFT_CLOSE_T = 2; // le bouton pressé dans la cabine : les portes mettent ce temps à se fermer
 export const LIFT_SHUT_T = 1.7; // … dont celui que mettent les vantaux à se rejoindre (à l'écran comme ici)
@@ -282,6 +286,9 @@ const AMB_CUES = {
   // Level 5 (HOTEL_LEVEL) : craquements et boîte à musique, plus souvent ; un radiateur ; un téléphone, la sonnette de la
   // réception ou une porte ; rarement un gramophone
   4: { rec: [9, 27], a: [12, 28], b: [18, 40], c: [50, 110] },
+  // Level 17 (MALL_LEVEL) : un tube qui tinte tout près ; un rideau de fer ou une gaine ; le carillon d'une annonce au
+  // loin ; rarement un reste de musique d'ambiance
+  [MALL_LEVEL]: { rec: [16, 40], a: [22, 50], b: [40, 90], c: [70, 150] },
 };
 
 // un tirage qui ne dépend que de la graine (hôte et invités tirent pareil)
@@ -296,6 +303,7 @@ const KEEP_ITEMS = [0.6, 0.6, 0.72, 0.82, 0.9, 0.95, 1];
 // les étages d'un niveau : même graine de partie, des cartes différentes par niveau
 export function makeLevelMap(level, seed) {
   if (level === HOTEL_LEVEL) return [createHotelMap(seed * 13 + 5)];
+  if (level === MALL_LEVEL) return createMallMap(seed * 17 + 3).floors;
   if (level === 2) return [createPoolMap(seed * 11 + 37)];
   if (level === PIPES_LEVEL) return [createPipesMap(seed * 11 + 29)];
   return level === 1 ? [createWarehouseMap(seed * 7 + 13)] : createLevel0(seed).floors;
@@ -594,8 +602,10 @@ export class BackroomsSim {
     this.valves = 0; // vannes fermées (Level 2)
     this.items0 = this.floors.map((f) => (f.items || []).length); // objets d'origine (les suivants ont été posés par des joueurs)
     // un seul vrai ascenseur : décidé quand tout se met en route, le plus loin de l'équipe (pickRealFloor)
-    this.realFloor = this.floors.length > 1 ? (hashRnd(this.seed, level, 7) < 0.5 ? 0 : 1) : 0;
+    // (Level 17 : la sortie est en haut, derrière l'écran de la salle 1)
+    this.realFloor = this.floors.length > 1 && level !== MALL_LEVEL ? (hashRnd(this.seed, level, 7) < 0.5 ? 0 : 1) : 0;
     this.unlocked = false;
+    this.film = 0; // Level 17 : depuis combien de temps le film passe (0 : le projecteur attend ses bobines)
     this.powered = false; // panneau du monte-charge réalimenté (Level 1)
     this.slide = -1; // Poolrooms : le toboggan pris par le premier qui s'y est glissé (les autres le suivent)
     // Level 5 : le mot des 6 lettres (même graine, même mot ; l'hôte l'envoie de toute façon), lettres postées, code
@@ -721,6 +731,14 @@ export class BackroomsSim {
     // Level 2 : le troupeau remplace l'entité (elle reste là pour relayer le son et l'image de la chèvre la plus proche)
     this.goats = level === PIPES_LEVEL && this.hasMonster ? createGoats(this.map, goatCount(this.roster.length, this.difficulty)) : null;
     this.herd = null;
+    // Level 17 : on sort de l'escalier de secours par la porte coupe-feu de la cour ouest, tourné vers la cour
+    if (level === MALL_LEVEL) for (const P of this.players) {
+      P.yaw = Math.PI + 0.49;
+      P.pitch = 0;
+    }
+    // Level 17 : la grande poupée tient la place de l'entité (engine/doll.js)
+    this.doll = level === MALL_LEVEL && this.hasMonster;
+    if (this.doll) dollInit(this);
   }
 
   // dans l'eau (Poolrooms) on avance moins vite : 90 % dans 20 cm d'eau, 70 % dans 60 cm, 40 % au plus profond
@@ -757,6 +775,7 @@ export class BackroomsSim {
   get open() {
     if (this.level === PIPES_LEVEL) return this.valves >= VALVES;
     if (this.level === 2) return true; // Poolrooms : les toboggans sont ouverts dès l'arrivée
+    if (this.level === MALL_LEVEL) return this.film >= FILM_LEAD_T; // Level 17 : le film passe, le monte-charge de scène s'ouvre
     // (Level 1 : le courant revenu, le monte-charge doit encore descendre jusqu'à l'équipe)
     if (this.level === 1) return this.powered && !(this.liftCallT > 0);
     return this.level === 0 ? this.cassettes >= CASSETTES && !(this.finaleT > 0) : this.powered;
@@ -807,7 +826,7 @@ export class BackroomsSim {
       return true;
     }
     const M = this.monster;
-    if (!this.hasMonster || M.mode === 'chase' || M.floor !== floor) return false;
+    if (!this.hasMonster || this.doll || M.mode === 'chase' || M.floor !== floor) return false; // (la poupée n'écoute pas : elle guette les regards)
     if (Math.hypot(M.x - x, M.z - z) > range) return false;
     M.mode = 'search';
     M.silent = false;
@@ -1204,6 +1223,8 @@ export class BackroomsSim {
       }
     }
     if (this.facadeHit(x, z, radius, floor)) return true;
+    // Level 17 : la poupée (on frôle sa jupe, on ne la traverse pas)
+    if (this.doll && (this.monster.floor || 0) === floor && Math.hypot(this.monster.x - x, this.monster.z - z) < radius + DOLL_BODY) return true;
     // caisses et meubles abandonnés (cercles)
     for (const pr of this.fm(floor).props || []) {
       if (pr.walk || !(pr.r > 0)) continue; // papiers, canettes : on marche dessus ; posé sur un meuble ou suspendu : rien à heurter
@@ -2077,6 +2098,7 @@ export class BackroomsSim {
     }
     const cas = this.nearCassette(P);
     if (cas) return this.takeCassette(P, cas);
+    if (this.nearBench(P)) return this.mountReels(P);
     if (P.desk) return this.leaveDesk(P);
     const it = this.nearItem(P);
     const h = this.nearHide(P);
@@ -2386,6 +2408,15 @@ export class BackroomsSim {
     }
     this.updateBoarding();
     this.updateLift();
+    // Level 17 : le film passe ; l'amorce finie, le monte-charge s'ouvre derrière l'écran
+    if (this.film > 0) {
+      const was = this.film;
+      this.film += DT;
+      if (was < FILM_LEAD_T && this.film >= FILM_LEAD_T) {
+        this.unlocked = true;
+        this.emit({ type: 'exitUnlocked', film: true });
+      }
+    }
     if (this.finaleT > 0) {
       this.finaleT = Math.max(0, this.finaleT - DT);
       if (this.finaleT === 0) this.startFinale();
@@ -2457,7 +2488,8 @@ export class BackroomsSim {
     if (this.goats) {
       updateGoats(this);
       senseGoats(this);
-    } else if (this.hasMonster) this.updateMonster(); // aux Poolrooms aussi : l'entité du Level 1 y chasse
+    } else if (this.doll) updateDoll(this);
+    else if (this.hasMonster) this.updateMonster(); // aux Poolrooms aussi : l'entité du Level 1 y chasse
     this.checkElevator();
   }
 
@@ -2478,8 +2510,39 @@ export class BackroomsSim {
     this.cassettes++;
     P.found++;
     this.makeNoise(P, NOISE.pick, 0.8);
+    // Level 17 : une bobine du film (elle reste à monter dans la cabine de projection)
+    if (cas.reel) return this.emit({ type: 'reel', id: cas.id, by: P.id, count: this.cassettes, total: REELS, x: cas.x, z: cas.z, floor: P.floor || 0 });
     this.emit({ type: 'cassette', id: cas.id, by: P.id, count: this.cassettes, total: CASSETTES, x: cas.x, z: cas.z, floor: P.floor || 0 });
     if (this.cassettes === CASSETTES && this.level === 0) this.finaleT = FINALE_WAIT;
+  }
+
+  // Level 17 : devant la table de montage de la cabine de projection (tant que le film ne passe pas)
+  nearBench(P) {
+    const b = this.level === MALL_LEVEL ? this.map.booth : null;
+    return !!b && !(this.film > 0) && (P.floor || 0) === 0 && Math.hypot(b.use.x - P.x, b.use.z - P.z) < USE_R;
+  }
+
+  // F devant la table : les bobines trouvées par l'équipe et pas encore montées le sont. À la cinquième, le
+  // projecteur démarre : l'amorce défile (FILM_LEAD_T), puis la sortie s'ouvre derrière l'écran
+  mountReels(P) {
+    const n = this.cassettes - this.delivered;
+    if (n <= 0) {
+      const left = this.allCassettes.filter((c) => !c.collected).map((c) => [c.id, c.fi, c.where]);
+      return this.emit({ type: 'benchEmpty', id: P.id, left });
+    }
+    this.delivered = this.cassettes;
+    this.makeNoise(P, NOISE.use, 1.2);
+    this.emit({ type: 'reelMount', by: P.id, name: P.name, n, count: this.delivered, total: REELS });
+    if (this.delivered >= REELS) this.startFilm();
+  }
+
+  startFilm() {
+    if (this.film > 0) return;
+    const b = this.map.booth;
+    this.film = DT;
+    this.powered = true;
+    this.emit({ type: 'filmStart', x: b.proj.x, z: b.proj.z });
+    dollOnFilm(this); // la poupée vient attendre devant l'écran
   }
 
   // la phase finale du Level 0 : le vrai ascenseur s'ouvre, les néons s'éteignent un à un ; HUNT_DELAY plus tard, les
@@ -2952,6 +3015,22 @@ export class BackroomsSim {
           P.sigTo = 'stairs';
         }
       }
+    } else if (this.level === MALL_LEVEL && !(this.film > 0)) {
+      // Level 17 : la bobine la plus proche à cet étage ; plus aucune ici : l'escalier ; toutes trouvées (ou déjà en
+      // main) : la cabine de projection
+      const left = (map.cassettes || []).filter((c) => !c.collected);
+      const fl = P.floor || 0;
+      const toStairs = () => {
+        best = this.stairs.reduce((b, st) => Math.min(b, Math.hypot((fl === 0 ? st.up : st.down).x - P.x, (fl === 0 ? st.up : st.down).z - P.z)), Infinity);
+        P.sigTo = 'stairs';
+      };
+      if (left.length) best = near(left);
+      else if (this.cassettes < REELS && this.cassettes <= this.delivered) toStairs();
+      else if (fl !== 0) toStairs();
+      else {
+        best = near([this.map.booth.use]);
+        P.sigTo = 'booth';
+      }
     } else if (this.level === 1 && (map.fuses || []).some((f) => !f.taken)) {
       best = near((map.fuses || []).filter((f) => !f.taken));
     } else if (this.level === 1 && !this.mains && (this.delivered || 0) >= FUSES) {
@@ -2976,8 +3055,9 @@ export class BackroomsSim {
       P.sigTo = 'exit';
     } else if (this.level === PIPES_LEVEL && !this.open) {
       best = (map.valves || []).filter((v) => !v.closed).reduce((b, v) => Math.min(b, Math.hypot(v.sx - P.x, v.sz - P.z)), Infinity);
-    } else if (this.level === 0 && this.floors.length > 1) {
+    } else if ((this.level === 0 || this.level === MALL_LEVEL) && this.floors.length > 1) {
       // tout est trouvé : le caméscope montre le vrai ascenseur, de partout (jamais tout à fait sans signal)
+      // (Level 17 : le film passe, la flèche mène au monte-charge de scène, derrière l'écran)
       const G = this.exitGoal(P);
       P.sigTo = G.sig;
       P.sigX = G.x;
@@ -3447,6 +3527,7 @@ export class BackroomsSim {
       fw: r2(this.finaleT),
       hu: this.hunt ? 1 : 0,
       sl: this.slide,
+      fm: this.film > 0 ? r2(this.film) : undefined, // Level 17 : le film qui passe
       wd: this.word,
       po: this.posted,
       cs: this.codeShown ? 1 : 0,
@@ -3551,6 +3632,7 @@ export class BackroomsSim {
     this.finaleT = snap.fw || 0;
     this.hunt = !!snap.hu;
     this.slide = snap.sl ?? -1;
+    this.film = snap.fm || 0;
     if (snap.wd) this.word = snap.wd;
     this.posted = snap.po || 0;
     this.codeShown = !!snap.cs;
@@ -3811,7 +3893,7 @@ export class BackroomsSim {
     if (alive > 0) return;
     this.boardT = 0;
     if (inside > 0) {
-      this.departT = this.map.slides ? SLIDE_T : DEPART_T;
+      this.departT = this.map.slides ? SLIDE_T : this.level === HOTEL_LEVEL ? STAIRS_T : DEPART_T;
       this.emit({ type: 'depart', level: this.level, t: this.departT });
     } else {
       this.state = 'dead';
@@ -3827,7 +3909,13 @@ export class BackroomsSim {
       this.emit({ type: 'level', level: this.level });
       return;
     }
-    // les autres toboggans sortent des Backrooms ; les Tuyauteries sont le dernier niveau
+    // Level 5 : l'escalier de secours du Terror Hotel descend jusqu'au Level 17, le Mall
+    if (this.level === HOTEL_LEVEL) {
+      this.loadLevel(MALL_LEVEL);
+      this.emit({ type: 'level', level: this.level });
+      return;
+    }
+    // les autres toboggans sortent des Backrooms ; les Tuyauteries et le Mall sont des fins
     if (this.map.slides || this.level >= LAST_LEVEL) {
       this.state = 'won';
       this.emit({ type: 'win', time: this.time });
@@ -4507,6 +4595,27 @@ export class BackroomsSim {
       M.v = 0;
       this.emit({ type: 'grab', id: P.id, name: P.name, x: M.x, z: M.z, floor: M.floor });
     }
+  }
+
+  // Level 17 : la poupée attrape (jamais sous un regard). La première fois elle agrippe, on peut se dégager ; la seconde
+  // est la fin, comme avec les entités des autres niveaux
+  dollCatch(M, P) {
+    if (P.grabs >= 1 || (this.difficulty === 'hard' && this.rage >= 1)) {
+      this.killPlayer(P, { x: M.x, z: M.z });
+      this.afterCatch(M, P);
+      return;
+    }
+    P.grabs++;
+    P.grabT = GRAB_T * (this.difficulty === 'hard' ? 0.8 : 1);
+    P.struggle = 0;
+    P.running = false;
+    P.crouch = false;
+    P.jy = P.jvy = 0;
+    M.mode = 'grab';
+    M.grabbing = P.id;
+    M.path = [];
+    M.v = 0;
+    this.emit({ type: 'grab', id: P.id, name: P.name, x: M.x, z: M.z, floor: M.floor });
   }
 
   // La prise : on se débat (n'importe quelle touche), ou un coéquipier l'aveugle avec sa lampe ; sinon c'est la fin

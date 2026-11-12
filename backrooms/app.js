@@ -1,5 +1,8 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
-import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE, HOTEL_LEVEL, DOCK_OPEN_T, DOCK_CLOSE_T, ALARM_T, DUCT_LAND, startLevel } from './engine/sim.js';
+import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE, HOTEL_LEVEL, MALL_LEVEL, DOCK_OPEN_T, DOCK_CLOSE_T, ALARM_T, DUCT_LAND, startLevel } from './engine/sim.js';
+import { createStairRide } from './view/stairwell.js';
+import { installMallSfx } from './view/mallAudio.js';
+import { floorKey as mallFloorKey } from './view/mall.js';
 import { hasLineOfSight } from './engine/nav.js';
 import { bfs, CELL_SIZE, cellsOnSeg, T } from './engine/map.js';
 import { createBackroomsScene, setMonsterMode, setSceneOptions, onGlContext, sceneGl } from './view/scene.js';
@@ -707,6 +710,12 @@ function stepKind(P) {
   }
   // Level 0 : dans la pellicule d'eau des grosses taches de la moquette, des pas mouillés
   if (sim.level === 0 && scene && scene.filmAt && scene.filmAt(P.x, P.z) > 0.35) return 'soak';
+  // Level 17 : le grès poli des mails qui sonne, la moquette du cinéma et des bureaux, le béton et le lino des coulisses
+  if (sim.level === MALL_LEVEL) {
+    const m = sim.fm(P.floor || 0);
+    const k = mallFloorKey(m.roomAt(P.x, P.z), P.floor || 0, m.shops, Math.floor(P.x / CELL_SIZE), Math.floor(P.z / CELL_SIZE));
+    return k === 'cine' ? 'hotelCarpet' : /carpet/.test(k) ? false : /terrazzo|checker|quarry|annexTile|faience/.test(k) ? 'marble' : true;
+  }
   // Level 5 : le marbre du hall, la moquette épaisse partout ailleurs
   if (sim.level === HOTEL_LEVEL) {
     const L = sim.fm(0).lobby;
@@ -846,9 +855,9 @@ function initGame(settings = lastSettings, forceLevel = null) {
   // ?vip (seul) : le mode VIP sans passer par le salon (la clé gardée par ce navigateur, sinon la phrase est demandée)
   if (NET.role === 'solo' && /[?&]vip(&|=|$)/.test(location.search)) settings = { ...settings, monsters: 'vip' };
   // ⭐ le niveau de départ : choisi au salon par un hôte VIP (réglage caché aux autres), ou ?level1, ?level37, ?level2,
-  // ?level5 (seul). Il ne compte que pour un compte VIP (hors du Hub : celui qui a la clé) qui a le coffre VIP ouvert :
+  // ?level5, ?level17 (seul). Il ne compte que pour un compte VIP (hors du Hub : celui qui a la clé) qui a le coffre VIP ouvert :
   // le même test que le mode VIP. Sinon (réglage glissé par un autre joueur, adresse tapée par un non-VIP), le Level 0
-  const lvm = NET.role === 'solo' && location.search.match(/[?&]level(1|2|37|5)(&|=|$)/);
+  const lvm = NET.role === 'solo' && location.search.match(/[?&]level(17|1|2|37|5)(&|=|$)/);
   const asked = forceLevel == null ? (lvm ? lvm[1] : settings.start) : null;
   const vipHere = !(H && H.embedded) || H.info.vip === true;
   const wants = !!startLevel(asked, { vip: vipHere, vault: true });
@@ -1285,6 +1294,12 @@ const OLD_TIMER = {
     "Room thirteen is yours. It's been yours for a long time. They kept it clean for you.",
     "If someone knocks on your door and says room service… there is no room service.",
   ],
+  mall: [
+    "A mall. Closed for years, and the lights are still on. They never finished the opening-day film. Five reels. Maybe you will.",
+    "The big doll in the court? Miss Marigold. She only moves when nobody is watching. So watch her. Take turns.",
+    "She can't follow you under a low ceiling. The shops, the back corridors… stay low when you need to breathe.",
+    "Hear little wheels on the tile? Turn around. Don't run. Look at her.",
+  ],
   rare: [
     "…sorry. Wrong channel. I wasn't talking to you. …Who were you talking to?",
     "How long have you been down there? …No. No, that's not possible. Check your watch again.",
@@ -1342,7 +1357,7 @@ function oldTimerVoice() {
 if (window.speechSynthesis) try { speechSynthesis.getVoices(); } catch (e) {} // lance le chargement de la liste
 function oldTimerTick() {
   if (!sim || sim.state !== 'playing' || paused) return;
-  const key = sim.level === PIPES_LEVEL ? 'pipes' : sim.level === HOTEL_LEVEL ? 'hotel' : sim.level;
+  const key = sim.level === PIPES_LEVEL ? 'pipes' : sim.level === HOTEL_LEVEL ? 'hotel' : sim.level === MALL_LEVEL ? 'mall' : sim.level;
   if (otState.level !== sim.level) {
     Object.assign(otState, { level: sim.level, t0: sim.time, said: 0, last: otState.last });
     otState.next = 25 + otRand(sim.seed, sim.level, 0) * 20;
@@ -1428,9 +1443,12 @@ function arrive(level, sc) {
       hud.loading(false);
       hud.unfade();
     }
-    ride.finish(level === HOTEL_LEVEL ? 'hotel' : 'pipes', () => {
+    // (Level 17 : arrivé par l'escalier de secours ; sa dernière porte s'ouvre sur la cour ouest du mall, où l'on est
+    // déjà debout : pas de chute)
+    const stairs = ride.kind === 'stairs';
+    ride.finish(stairs ? 'mall' : level === HOTEL_LEVEL ? 'hotel' : 'pipes', () => {
       endRide();
-      if (scene === sc) sc.dropIn(level === HOTEL_LEVEL ? 2.3 : 1.4); // (le hall de l'hôtel est haut de plafond)
+      if (scene === sc && !stairs) sc.dropIn(level === HOTEL_LEVEL ? 2.3 : 1.4); // (le hall de l'hôtel est haut de plafond)
       if (hud) hud.fade(`LEVEL ${levelName(level)}`, levelSub(level), 2.4, false, true);
     });
     return;
@@ -1458,15 +1476,19 @@ function enterLevel() {
   if (!e || !sim || !scene || e.run !== NET.run || sim.level !== e.level || sim.player.status !== 'alive') return;
   const sc = scene;
   const i = SLIDES.findIndex((s) => s.to === e.level);
-  if (i >= 0) {
+  if (i >= 0 || e.level === MALL_LEVEL) {
     endRide();
-    ride = createSlideRide({ gl: sceneGl(), hex: SLIDES[i].hex, side: i % 2 ? -1 : 1, sfx });
+    // (le Mall : la fin de la descente de l'escalier de secours du Terror Hotel)
+    ride = i >= 0 ? createSlideRide({ gl: sceneGl(), hex: SLIDES[i].hex, side: i % 2 ? -1 : 1, sfx }) : createStairRide({ gl: sceneGl(), sfx });
     ride.hold(); // le noir, le temps que le niveau finisse de se charger
     document.body.classList.add('riding');
     if (hud) hud.blackNow();
   }
   whenReady(sc, () => NET.run === e.run && sim.level === e.level, () => arrive(e.level, sc));
 }
+
+// le son du Level 17 (view/mallAudio.js), posé une fois sur le son du jeu
+const mallAudio = () => sfx.mallAudio || (sfx.mallAudio = installMallSfx(sfx));
 
 // Événements de la partie : sons, messages, changement d'étage, fin
 function handleEvent(ev, me) {
@@ -1484,6 +1506,27 @@ function handleEvent(ev, me) {
       if (sfx) setTimeout(() => sfx && sfx.loreTape(4 + LORE[n].length / 16), 700);
       break;
     }
+    // Level 17 : une bobine du film trouvée ; les bobines montées sur le projecteur ; le journal du projectionniste (où
+    // sont celles qui manquent) ; le film qui démarre
+    case 'reel':
+      if (sfx) mallAudio().reel();
+      if (hud) hud.toast(ev.by === me ? `Film reel ${ev.count}/${ev.total} · thread it in the projection booth, behind Screen 1` : `${who(ev.by)} found a film reel (${ev.count}/${ev.total})`, 4);
+      break;
+    case 'reelMount':
+      if (sfx) mallAudio().thread(ev.count >= ev.total);
+      if (hud) hud.toast(ev.count >= ev.total ? 'The last reel is threaded: the projector rattles to life' : `${ev.by === me ? 'You thread' : `${who(ev.by)} threads`} ${ev.n > 1 ? `${ev.n} reels` : 'a reel'} on the projector (${ev.count}/${ev.total})`, 4);
+      break;
+    // la poupée s'est replacée ailleurs : quelques notes de boîte à musique, de là où elle est
+    case 'dollMoved':
+      if (sfx) mallAudio().chime(ev, sim.viewPlayer(sim.spectate || 0));
+      break;
+    case 'benchEmpty':
+      if (ev.id === me && sfx) mallAudio().paper();
+      if (ev.id === me && hud) hud.toast(ev.left.length ? `Projectionist's log · reels lent to: ${ev.left.map(([, fi, where]) => `${where} (${fi ? 'lower' : 'upper'} level)`).join(' · ')}` : 'Every reel is on the projector', 7);
+      break;
+    case 'filmStart':
+      if (hud && sim.player.status === 'alive') setTimeout(() => hud && hud.toast('The feature is starting in Screen 1…', 4), 1500);
+      break;
     case 'letter':
       if (sfx) sfx.cassette();
       if (ev.by === me) showNote('hotel', (letterN = (letterN || 0) + 1) - 1);
@@ -2012,9 +2055,17 @@ function handleEvent(ev, me) {
         startRide(sim.map.slides[sim.slide]);
         break;
       }
+      // Level 5 : la porte coupe-feu passée, on dévale l'escalier de secours (view/stairwell.js) jusqu'au Level 17
+      if (ev.level === HOTEL_LEVEL && scene) {
+        endRide();
+        ride = createStairRide({ gl: sceneGl(), sfx });
+        ride.start();
+        document.body.classList.add('riding');
+        break;
+      }
       if (sfx && ev.level === 2) sfx.splashDown();
       else if (sfx && ev.level !== HOTEL_LEVEL) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
-      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : ev.level === HOTEL_LEVEL ? 'YOU RUN DOWN THE FIRE ESCAPE, FLOOR AFTER FLOOR…' : ev.level === PIPES_LEVEL ? 'THE SERVICE ELEVATOR IS CLIMBING… AND CLIMBING…' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
+      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : ev.level === MALL_LEVEL ? 'THE STAGE FREIGHT ELEVATOR IS GOING DOWN… THE FILM KEEPS PLAYING ABOVE YOU' : ev.level === HOTEL_LEVEL ? 'YOU RUN DOWN THE FIRE ESCAPE, FLOOR AFTER FLOOR…' : ev.level === PIPES_LEVEL ? 'THE SERVICE ELEVATOR IS CLIMBING… AND CLIMBING…' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
       break;
     case 'level':
       if (hud) hud.closeKeypad();
@@ -2189,8 +2240,8 @@ function handleEvent(ev, me) {
       if (H && H.embedded && NET.role !== 'guest') {
         const won = ev.type === 'win';
         // la vraie fin vaut bien plus qu'une fausse sortie, qui vaut plus que de mourir loin (Level 2 compris)
-        const trueEnd = won && (sim.level === PIPES_LEVEL || sim.level === HOTEL_LEVEL); // sortir par les Tuyauteries ou par l'hôtel
-        const depth = { 0: 0, 1: 1, 2: 2, [PIPES_LEVEL]: 3, [HOTEL_LEVEL]: 3 }[sim.level] || 0;
+        const trueEnd = won && (sim.level === PIPES_LEVEL || sim.level === HOTEL_LEVEL || sim.level === MALL_LEVEL); // sortir par les Tuyauteries, l'hôtel ou le mall
+        const depth = { 0: 0, 1: 1, 2: 2, [PIPES_LEVEL]: 3, [HOTEL_LEVEL]: 3, [MALL_LEVEL]: 4 }[sim.level] || 0;
         H.report({
           id: `backrooms-${Date.now()}`,
           mode: dailyLabel ? 'Carte du jour' : 'Survie',
@@ -2679,6 +2730,9 @@ function frame(currentTime) {
       const V = sim.viewPlayer(sim.spectate || 0);
       sfx.setListener(V.x, V.z, V.yaw);
       sfx.setRoom(sim.level);
+      // Level 17 : les roulettes de la poupée, le projecteur et la bande-son du film, l'écho de la salle où l'on est
+      // (installé dès que le son existe : la descente de l'escalier de secours s'en sert depuis le Level 5)
+      mallAudio().update(sim.level === MALL_LEVEL ? sim : null, V, delta, { occ: entEar.occ, paused });
       // Tuyauteries : les machines qui tournent autour de toi (brûleurs, pompes, armoires électriques)
       sfx.machines(sim.level === PIPES_LEVEL ? pipeMachines(V) : NO_MACHINES);
       // le final du Level 0 : toutes les cassettes trouvées, une alarme au loin jusqu'à l'ascenseur

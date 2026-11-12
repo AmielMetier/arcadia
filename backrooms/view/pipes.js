@@ -1480,7 +1480,7 @@ export function buildPipes({ map, group, baked, CEIL, tx, camera }) {
       camera.matrixWorld.extractBasis(rightV, upV, fwd);
       const fl = Math.hypot(fwd.x, fwd.z) || 1;
       seeCells(P.x, P.z);
-      kit.update(P.x, P.z, -fwd.x / fl, -fwd.z / fl, 38, seenCell);
+      kit.update(P.x, P.z, -fwd.x / fl, -fwd.z / fl, 38, -0.4, true, seenCell);
       // vannes : le volant tourne avec l'avancée, l'aiguille tombe quand la vanne est fermée
       for (const vv of valveViews) {
         const want = vv.v.closed ? 1 : vv.v.turn;

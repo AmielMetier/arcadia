@@ -24,6 +24,7 @@ const LEVEL_SFX = {
   2: null, // Poolrooms : la même entité qu'au Level 1, les mêmes sons (voir levelSfx)
   [PIPES_LEVEL]: { chase: [], ambient: [], death: null, entity: false }, // Tuyauteries : le troupeau, pas l'entité
   4: { chase: [], ambient: [], death: null }, // Terror Hotel (HOTEL_LEVEL) : pas encore de sons (des craquements synthétisés)
+  5: { chase: [], ambient: [], death: null, entity: false }, // le Mall (MALL_LEVEL) : la poupée, pas l'entité (ses roulettes : view/mallAudio.js)
 };
 const NO_SFX = { chase: [], ambient: [], death: null };
 // l'enregistrement commun à toutes les poursuites : un élan (ses 2,44 premières secondes, joué une fois quand la
@@ -291,15 +292,16 @@ export class BackroomsSfx {
     if (this.gramo) this.gramo.stop();
     const c = this.ctx;
     const pipes = level === PIPES_LEVEL;
+    const mall = level === 5; // le Mall : de grands volumes carrelés, une longue queue douce (la salle où l'on est la dose : view/mallAudio.js)
     // Poolrooms : salle carrelée immense et vide, une queue de 4,5 s et des échos plus francs
-    const len = level === 2 ? 4.5 : pipes ? 3.5 : level === 1 ? 3.4 : 2.3;
+    const len = level === 2 ? 4.5 : mall ? 3.9 : pipes ? 3.5 : level === 1 ? 3.4 : 2.3;
     const n = Math.floor(c.sampleRate * len);
     const ir = c.createBuffer(2, n, c.sampleRate);
     const sr = c.sampleRate;
     for (let ch = 0; ch < 2; ch++) {
       const d = ir.getChannelData(ch);
       const pre = Math.floor(sr * 0.018);
-      const curve = level === 2 ? 2.2 : pipes ? 2.4 : level === 1 ? 2.6 : 3.4;
+      const curve = level === 2 ? 2.2 : pipes ? 2.4 : mall ? 2.5 : level === 1 ? 2.6 : 3.4;
       for (let i = pre; i < n; i++) {
         const k = (i - pre) / (n - pre);
         d[i] = (Math.random() * 2 - 1) * Math.pow(1 - k, curve) * (pipes ? 0.5 : 0.6);
@@ -323,8 +325,8 @@ export class BackroomsSfx {
       }
     }
     this.verb.buffer = ir;
-    this.wet.gain.setTargetAtTime(level === 2 ? 0.62 : pipes ? 0.55 : level === 1 ? 0.5 : 0.38, c.currentTime, 0.2);
-    this.verbLp.frequency.value = level === 2 ? 7000 : pipes ? 6000 : level === 1 ? 5200 : 3600;
+    this.wet.gain.setTargetAtTime(level === 2 ? 0.62 : pipes ? 0.55 : level === 1 ? 0.5 : mall ? 0.46 : 0.38, c.currentTime, 0.2);
+    this.verbLp.frequency.value = level === 2 ? 7000 : pipes ? 6000 : level === 1 || mall ? 5200 : 3600;
     this.setPool(level === 2);
     this.levelBed(level);
     this.entRoom(level);
@@ -2942,6 +2944,11 @@ export class BackroomsSfx {
     };
     const vol = (v0, v1) => v0 + (v1 - v0) * v;
     const lv = this.roomLevel;
+    // Level 17 (le mall) : un tube qui tinte, un rideau de fer, une gaine, le carillon d'une annonce, un reste de musique
+    if (lv === 5) {
+      if (this.mallCue) this.mallCue(slot, pos, vol, w);
+      return;
+    }
     if (slot === 'rec' && lv === 4) {
       // Level 5 (l'hôtel) : un parquet qui craque quelque part, plus rarement une boîte à musique désaccordée au loin
       if (w < 0.25) this.musicBox();
@@ -3475,10 +3482,21 @@ export class BackroomsSfx {
       src(this.osc('sawtooth', 50)).connect(this.filt('lowpass', 165, 0.8)).connect(this.gainNode(0.32)).connect(swell);
       src(this.osc('square', 100)).connect(this.filt('bandpass', 1500, 7)).connect(this.gainNode(0.018)).connect(swell);
       vol = 0.07;
+    } else if (level === 5) {
+      // le Mall : la ventilation, loin dans les faux plafonds (un grave qui enfle et retombe, un peu d'air), et le ronflement
+      // à 60 Hz des ballasts ; plus présent dans les coulisses, mangé par la moquette du cinéma (view/mallAudio.js)
+      const am = this.gainNode(0.8);
+      const lfo = src(this.osc('sine', 0.045));
+      lfo.connect(this.gainNode(0.18)).connect(am.gain);
+      am.connect(g);
+      src(this.longNoise()).connect(this.filt('lowpass', 130, 0.6)).connect(this.gainNode(0.85)).connect(am);
+      src(this.longNoise()).connect(this.filt('bandpass', 560, 0.7)).connect(this.gainNode(0.07)).connect(am);
+      src(this.osc('sawtooth', 60)).connect(this.filt('lowpass', 190, 0.8)).connect(this.gainNode(0.07)).connect(g);
+      vol = 0.11;
     } else return;
     for (const s of srcs) s.start(t, s.buffer ? Math.random() * 4 : 0);
     g.gain.setTargetAtTime(vol, t, 2);
-    this.bed = { g, srcs, wire };
+    this.bed = { g, srcs, wire, vol, mall: level === 5 };
   }
 
   // Les bruits lointains de l'entrepôt (Level 1), joués au hasard toutes les 20 à 50 s : un bip de recul de chariot

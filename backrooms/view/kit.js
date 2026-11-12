@@ -30,6 +30,7 @@ export function loadKit(name) {
                 if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
                 parts.push({ geo: o.geometry, mat, m: back.clone().multiply(o.matrixWorld) });
               });
+              parts.at = root.position.clone(); // (sa place dans le modèle : pour poser le modèle entier, « * »)
               pieces.set(root.name, parts);
             }
             resolve(pieces);
@@ -46,7 +47,10 @@ export function loadKit(name) {
 // convert(mat, kitName, pieceName, variant) → { mat, glass } : la matière de la scène pour une matière du modèle ;
 // glass : une vitre qui s'allume (sa couleur vient de l'exemplaire : glow(item) → THREE.Color ou null). Un morceau
 // nommé "piece@variante" est le même maillage avec une autre matière (un tuyau peint en rouge, une tige rouillée…).
-export function createKitInstancer({ group, convert }) {
+// reach (facultatif) : chaque exemplaire n'est dessiné qu'à moins de reach.base + reach.k × (sa demi-diagonale) mètres :
+// une montre sur une table disparaît à 20 m, un banc reste visible au bout du mail ; reach.cap[modèle] borne la portée
+// d'un modèle très lourd (en mètres)
+export function createKitInstancer({ group, convert, reach }) {
   const lists = new Map(); // "kit|morceau" → exemplaires
   const sets = [];
   const add = (kit, piece, matrix, extra = {}) => {
@@ -72,38 +76,75 @@ export function createKitInstancer({ group, convert }) {
         for (const [key, items] of lists) {
           const [k, pv] = key.split('|');
           const [piece, variant = ''] = pv.split('@');
-          if (k !== kit || !pieces.has(piece)) continue;
-          for (const part of pieces.get(piece)) {
-            const { mat, glass } = convert(part.mat, kit, piece, variant);
-            const mesh = new THREE.InstancedMesh(part.geo, mat, items.length);
-            mesh.frustumCulled = false;
-            mesh.count = 0;
-            if (glass) mesh.setColorAt(0, new THREE.Color());
-            const mats = new Float32Array(items.length * 16);
-            const tmpM = new THREE.Matrix4();
-            items.forEach((it, i) => tmpM.copy(it.m).multiply(part.m).toArray(mats, i * 16));
-            group.add(mesh);
-            sets.push({ mesh, items, mats, glass, glow });
+          if (k !== kit) continue;
+          // « * » : le modèle entier, chaque morceau à sa place ; « a+b » : ces morceaux-là, à leur place
+          const whole = piece === '*' || piece.includes('+');
+          const names = piece === '*' ? [...pieces.keys()] : piece.split('+').filter((n) => pieces.has(n));
+          // la portée de chaque exemplaire, d'après la taille du modèle posé (tous ses morceaux) et son échelle
+          let far = null;
+          if (reach) {
+            const box = new THREE.Box3();
+            const pb = new THREE.Box3();
+            for (const pn of names)
+              for (const part of pieces.get(pn)) {
+                if (!part.geo.boundingBox) part.geo.computeBoundingBox();
+                pb.copy(part.geo.boundingBox).applyMatrix4(part.m);
+                if (whole) pb.translate(pieces.get(pn).at);
+                box.union(pb);
+              }
+            const rad = box.isEmpty() ? 1 : box.getSize(new THREE.Vector3()).length() / 2;
+            const sc = new THREE.Vector3();
+            far = new Float32Array(items.length);
+            items.forEach((it, i) => {
+              sc.setFromMatrixScale(it.m);
+              const r = Math.min(reach.cap?.[kit] ?? Infinity, reach.base + reach.k * rad * Math.max(sc.x, sc.y, sc.z));
+              far[i] = r * r;
+            });
+          }
+          for (const pn of names) {
+            const at = whole ? new THREE.Matrix4().makeTranslation(pieces.get(pn).at) : null;
+            for (const part of pieces.get(pn)) {
+              const { mat, glass } = convert(part.mat, kit, pn, variant);
+              const mesh = new THREE.InstancedMesh(part.geo, mat, items.length);
+              mesh.name = kit;
+              mesh.frustumCulled = false;
+              mesh.count = 0;
+              if (glass) mesh.setColorAt(0, new THREE.Color());
+              const mats = new Float32Array(items.length * 16);
+              const tmpM = new THREE.Matrix4();
+              items.forEach((it, i) => {
+                tmpM.copy(it.m);
+                if (at) tmpM.multiply(at);
+                tmpM.multiply(part.m).toArray(mats, i * 16);
+              });
+              group.add(mesh);
+              sets.push({ mesh, items, mats, glass, glow, far });
+            }
           }
         }
       });
     }
   };
-  // à chaque image : seuls les exemplaires à moins de R mètres, et pas loin derrière la caméra
+  // à chaque image : seuls les exemplaires à moins de R mètres, et pas loin derrière la caméra (cosMin : le cosinus de
+  // l'angle au-delà duquel on ne dessine plus, par rapport à l'axe du regard ; par défaut, un peu derrière les épaules)
+  // inner : faux quand la caméra est à un autre étage : les exemplaires marqués « inner » (loin de tout vide, donc
+  // invisibles de là) ne sont pas dessinés
   // seen(x, z) (facultatif) : faux pour un exemplaire caché par les murs (à plus de 6 m)
-  const update = (cx, cz, fx, fz, R = 38, seen = null) => {
+  const update = (cx, cz, fx, fz, R = 38, cosMin = -0.4, inner = true, seen = null) => {
     const R2 = R * R;
+    const near2 = cosMin > -0.4 ? 81 : 30;
     for (const s of sets) {
       const arr = s.mesh.instanceMatrix.array;
       const mats = s.mats;
       let n = 0;
       for (let i = 0; i < s.items.length; i++) {
         const it = s.items[i];
+        if (!inner && it.inner) continue;
         const dx = it.x - cx;
         const dz = it.z - cz;
         const d2 = dx * dx + dz * dz;
-        if (d2 > R2) continue;
-        if (d2 > 30 && dx * fx + dz * fz < -0.4 * Math.sqrt(d2)) continue;
+        if (d2 > R2 || (s.far && d2 > s.far[i])) continue;
+        if (d2 > near2 && dx * fx + dz * fz < cosMin * Math.sqrt(d2)) continue;
         if (seen && d2 > 36 && !seen(it.x, it.z)) continue;
         // sa matrice (16 nombres), recopiée à la main : subarray créerait une vue par exemplaire visible, à chaque
         // image (des milliers dans les Tuyauteries, autant de déchets pour le ramasse-miettes)
