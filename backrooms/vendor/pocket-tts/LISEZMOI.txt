@@ -1,0 +1,8 @@
+pocket-tts-js 0.1.0 (npm, licence MIT : voir LICENSE), copié tel quel : la synthèse vocale Pocket TTS de Kyutai dans le
+navigateur, avec clonage de voix, dans un Web Worker. Sert à la voix volée du Level 1 (view/clone.js) et à la page
+d'essai (essai-voix.html).
+
+Rien d'autre n'est dans le dépôt : à l'usage, le navigateur télécharge onnxruntime-web (jsDelivr) et les poids du modèle
+(Hugging Face, vlapky/pocket-tts-onnx, dossier french_24l ou english_2026-04, environ 150 Mo, gardés en cache).
+Poids : © Kyutai, CC BY 4.0 (https://huggingface.co/kyutai/pocket-tts). Leurs conditions demandent le consentement
+explicite de la personne dont on clone la voix : dans le jeu, chaque joueur l'autorise ou non (réglage « clone »).
