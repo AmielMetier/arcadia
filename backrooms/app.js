@@ -1299,10 +1299,11 @@ const OLD_TIMER = {
     "If someone knocks on your door and says room service… there is no room service.",
   ],
   mall: [
-    "A mall. Closed for years, and the lights are still on. They never finished the opening-day film. Five reels. Maybe you will.",
-    "The big doll in the court? Miss Marigold. She only moves when nobody is watching. So watch her. Take turns.",
-    "She can't follow you under a low ceiling. The shops, the back corridors… stay low when you need to breathe.",
-    "Hear little wheels on the tile? Turn around. Don't run. Look at her.",
+    // (il ne dit plus la règle : il se souvient mal, il met mal à l'aise ; le reste se comprend en jouant)
+    "A shopping mall. Closed for the night… it's been that night for a long time. There was a film they never got to show. Five reels.",
+    "I walked that place once. Kept feeling like something had just been moved. Never once saw it move.",
+    "They had a mascot. For the parades. Tall thing, big smile. I didn't like having my back to it. I couldn't tell you why.",
+    "When it went quiet I used to duck into the little shops. Felt better with a ceiling close over my head. Silly, isn't it.",
   ],
   rare: [
     "…sorry. Wrong channel. I wasn't talking to you. …Who were you talking to?",
@@ -1514,7 +1515,8 @@ function handleEvent(ev, me) {
     // sont celles qui manquent) ; le film qui démarre
     case 'reel':
       if (sfx) mallAudio().reel();
-      if (hud) hud.toast(ev.by === me ? `Film reel ${ev.count}/${ev.total} · thread it in the projection booth, behind Screen 1` : `${who(ev.by)} found a film reel (${ev.count}/${ev.total})`, 4);
+      // (ce que dit l'étiquette de la boîte, pas une consigne : le reste est dans le journal du projectionniste)
+      if (hud) hud.toast(ev.by === me ? `Film reel ${ev.count}/${ev.total} · the label reads “Stardust 8 · Screen 1 · return to projection”` : `${who(ev.by)} found a film reel (${ev.count}/${ev.total})`, 4);
       break;
     case 'reelMount':
       if (sfx) mallAudio().thread(ev.count >= ev.total);
@@ -1524,9 +1526,15 @@ function handleEvent(ev, me) {
     case 'dollMoved':
       if (sfx) mallAudio().chime(ev, sim.viewPlayer(sim.spectate || 0));
       break;
+    // … ou elle a changé d'étage : on entend le monte-charge (son moteur, puis ses portes)
+    case 'dollLift': {
+      const ear = sim.viewPlayer(sim.spectate || 0);
+      if (sfx && ear) mallAudio().lift(ev, ear, sim.fm(ear.floor || 0).elevator);
+      break;
+    }
     case 'benchEmpty':
       if (ev.id === me && sfx) mallAudio().paper();
-      if (ev.id === me && hud) hud.toast(ev.left.length ? `Projectionist's log · reels lent to: ${ev.left.map(([, fi, where]) => `${where} (${fi ? 'lower' : 'upper'} level)`).join(' · ')}` : 'Every reel is on the projector', 7);
+      if (ev.id === me && hud) hud.toast(ev.left.length ? `Projectionist's log · “bring all five back to this bench” · lent to: ${ev.left.map(([, fi, where]) => `${where} (${fi ? 'lower' : 'upper'} level)`).join(' · ')}` : 'Every reel is on the projector', 7);
       break;
     case 'filmStart':
       if (hud && sim.player.status === 'alive') setTimeout(() => hud && hud.toast('The feature is starting in Screen 1…', 4), 1500);

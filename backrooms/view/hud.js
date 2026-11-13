@@ -386,17 +386,19 @@ export class BackroomsHUD {
           ? 'LEVEL 5 · 6 LETTERS ARE HIDDEN IN THE ROOMS · HIDE UNDER BEDS AND IN WARDROBES (E), CROUCH (C)'
           : `LETTER ${got}/6 POSTED`;
       } else if (MALL) {
+        // (le bandeau ne dit plus quoi faire ni où : un compte, comme une étiquette de bande. La marche à suivre est
+        // dans le journal du projectionniste, sur le mur de la cabine ; la sortie, sur le dernier carton du film)
         b = sim.open
-          ? 'THE FREIGHT ELEVATOR IS OPEN BEHIND THE SCREEN · EVERYONE GET IN'
+          ? 'THE FEATURE IS PLAYING IN SCREEN 1'
           : sim.film > 0
-          ? 'THE FEATURE IS STARTING · SOMETHING IS WAKING UP BEHIND THE SCREEN'
+          ? 'THE FEATURE IS STARTING IN SCREEN 1'
           : got >= total && delivered < total
-          ? 'ALL 5 REELS FOUND · THREAD THEM IN THE PROJECTION BOOTH, BEHIND SCREEN 1'
+          ? `ALL ${total} REELS FOUND`
           : got > delivered
-          ? `REEL ${got}/${total} FOUND · ${got - delivered} TO THREAD IN THE PROJECTION BOOTH (${delivered}/${total} ON THE PROJECTOR)`
+          ? `REEL ${got}/${total} FOUND · ${delivered}/${total} ON THE PROJECTOR`
           : got === 0
-          ? 'LEVEL 17 · THE FEATURE IS MISSING ITS 5 REELS · THE PROJECTION BOOTH IS BEHIND SCREEN 1'
-          : `REEL ${delivered}/${total} ON THE PROJECTOR · FIND THE OTHERS`;
+          ? 'LEVEL 17 · HALCYON PARK MALL · CLOSED FOR THE NIGHT'
+          : `REEL ${delivered}/${total} ON THE PROJECTOR`;
       } else if (sim.open && L37) b = slideOf(sim) ? `EVERYONE INTO THE ${slideOf(sim).name} SLIDE · THE OTHERS ARE SHUT` : 'LEVEL 37 · FIND ONE OF THE 3 SLIDES AND GET IN · RED, YELLOW OR BLUE: EACH ONE LEADS SOMEWHERE ELSE';
       else if (sim.open) b = PIPES ? 'THE STEAM IS OFF: THE SERVICE ELEVATOR IS OPEN · EVERYONE GET IN' : L1 ? 'THE FREIGHT ELEVATOR HAS POWER: EVERYONE GET IN' : 'ONLY ONE OF THE TWO ELEVATORS OPENED… THE OTHER ONE IS JUST A WALL NOW · FOLLOW THE RED ARROW';
       else if (PIPES) {

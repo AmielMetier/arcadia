@@ -25,6 +25,7 @@ export const DOLL_DORMANT = 75; // à l'arrivée, elle reste à sa place (on la 
 export const DOLL_WAKE_R = 12; // … sauf si quelqu'un s'approche d'elle
 export const DOLL_RELOC_T = 14; // sa proie hors d'atteinte ce temps-là, et personne ne la regarde : elle se replace
 export const DOLL_BORED_T = 40; // plantée devant un refuge ce temps-là : elle va attendre ailleurs
+export const DOLL_LIFT_T = 7; // d'un étage à l'autre : le trajet du monte-charge (on l'entend dans tout le centre)
 export const DOLL_FRAME = 1.25; // demi-angle du cadre le plus large qu'un joueur puisse régler
 
 const cellOf = (v) => Math.floor(v / C);
@@ -245,8 +246,11 @@ export function dollRelocate(sim, M, P, o = {}) {
       const d = Math.hypot((gx + 0.5) * C - P.x, (gz + 0.5) * C - P.z);
       if (d >= rMin && d <= rMax) cells.push(k);
     }
-  for (let i = 0; i < 40 && cells.length; i++) {
-    const j = Math.floor(Math.random() * cells.length);
+  // (par le monte-charge : elle ressort de son côté, sur la case de son terrain la plus proche de lui d'abord)
+  const lift = o.lift && map.elevator ? map.elevator : null;
+  if (lift) cells.sort((a, b) => Math.hypot(((b % t.W) + 0.5) * C - lift.x, (Math.floor(b / t.W) + 0.5) * C - lift.z) - Math.hypot(((a % t.W) + 0.5) * C - lift.x, (Math.floor(a / t.W) + 0.5) * C - lift.z));
+  for (let i = 0; i < (lift ? 400 : 40) && cells.length; i++) {
+    const j = lift ? cells.length - 1 : Math.floor(Math.random() * cells.length);
     const k = cells[j];
     cells[j] = cells[cells.length - 1];
     cells.pop();
@@ -267,7 +271,8 @@ export function dollRelocate(sim, M, P, o = {}) {
     M.boredT = 0;
     M.unseenT = 0;
     M.mode = 'still';
-    sim.emit({ type: 'dollMoved', x, z, floor });
+    // (sortie du monte-charge : ses portes, pas la boîte à musique)
+    sim.emit(lift ? { type: 'dollLift', out: true, x, z, floor, lx: lift.x, lz: lift.z } : { type: 'dollMoved', x, z, floor });
     return true;
   }
   return false;
@@ -383,6 +388,25 @@ export function updateDoll(sim) {
   if (M.stageT > 0) {
     M.stageT -= DT;
     stop(M);
+    return;
+  }
+  // sa proie à l'autre étage : elle prend le monte-charge. On l'entend partir, monter ou descendre, puis ses portes ;
+  // elle en ressort du côté du monte-charge, jamais sous un regard (s'il est regardé, elle attend dedans)
+  if (M.lift) {
+    stop(M);
+    if ((P0.floor || 0) === floor) M.lift = null; // (sa proie est revenue : elle n'est pas partie)
+    else if ((M.lift.t -= DT) <= 0) {
+      const map2 = sim.fm(P0.floor || 0);
+      const far2 = map2.elevator ? Math.hypot(map2.elevator.x - P0.x, map2.elevator.z - P0.z) : 0;
+      if (dollRelocate(sim, M, P0, { lift: true, rMin: 14, rMax: Math.max(60, far2 + 30) })) M.lift = null;
+      else M.lift.t = 1;
+    }
+    return;
+  }
+  if (M.lostT >= DOLL_RELOC_T && (P0.floor || 0) !== floor) {
+    M.lift = { t: DOLL_LIFT_T, to: P0.floor || 0 };
+    M.lostT = 0;
+    sim.emit({ type: 'dollLift', from: floor, to: P0.floor || 0, t: DOLL_LIFT_T });
     return;
   }
   if (M.lostT >= DOLL_RELOC_T || M.boredT >= DOLL_BORED_T) {

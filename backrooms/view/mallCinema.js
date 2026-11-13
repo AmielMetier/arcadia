@@ -396,9 +396,12 @@ export function drawMallCinema({ map, fi, floors, G, MATS, baked, model, group, 
         g.stroke();
       }
     });
+    // (la marche à suivre, de la main du projectionniste : c'est le journal qui la donne, pas l'interface)
     g.fillStyle = '#1f2a44';
-    g.font = 'italic 19px Georgia, serif';
-    g.fillText('No show until all five are back.', 26, 518);
+    g.font = 'italic 17px Georgia, serif';
+    g.fillText('Bring them back to this bench, thread all five,', 26, 482);
+    g.fillText('and she runs by herself. No show until then.', 26, 503);
+    g.fillText('Seats are out of 1 & 2 till November. — R.', 26, 526);
     logTex.needsUpdate = true;
   };
   paintLog();

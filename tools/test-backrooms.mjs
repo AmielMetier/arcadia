@@ -31,7 +31,7 @@ import { createWarehouseMap, DOCK_PASS } from '../backrooms/engine/level1.js';
 import { createPoolMap } from '../backrooms/engine/poolrooms.js';
 import { createHotelMap, parseWords, WORDS } from '../backrooms/engine/hotel.js';
 import { createMallMap, MALL_LEVEL, polyDist as mallPolyDist } from '../backrooms/engine/mall.js';
-import { dollTerrain, dollCanStand, DOLL_R, DOLL_VMAX, DOLL_RELOC_T, DOLL_BORED_T } from '../backrooms/engine/doll.js';
+import { dollTerrain, dollCanStand, DOLL_R, DOLL_VMAX, DOLL_RELOC_T, DOLL_BORED_T, DOLL_LIFT_T } from '../backrooms/engine/doll.js';
 
 // avance la partie de n secondes
 const run = (sim, sec, input = {}, others = null) => {
@@ -3384,13 +3384,24 @@ test('Level 17 : un plafond bas est un refuge ; plantée devant trop longtemps, 
   P.z = (Math.floor(k / t1.W) + 0.5) * CELL_SIZE;
   P.yaw = 0;
   let down = -1;
-  for (let i = 0; i < (DOLL_RELOC_T + 30) * 60 && down < 0; i++) {
+  sim.drainEvents();
+  const evs = [];
+  for (let i = 0; i < (DOLL_RELOC_T + DOLL_LIFT_T + 30) * 60 && down < 0; i++) {
     sim.step({});
+    evs.push(...sim.drainEvents());
     if (M.floor === 1) down = i / 60;
   }
-  assert.ok(down >= DOLL_RELOC_T - 1, `elle a mis un moment à le rejoindre en bas (${down.toFixed(1)} s)`);
-  assert.ok(dollCanStand(dn, M.x, M.z) && Math.hypot(M.x - P.x, M.z - P.z) >= 14 && !dollInFrame(sim, P, 1, M.x, M.z), 'replacée hors champ, à distance');
-  for (let i = 0; i < 40 * 60 && !(P.grabT > 0); i++) sim.step({});
+  // elle a pris le monte-charge : on l'entend partir (d'un étage à l'autre), puis ses portes à l'arrivée ; pas de boîte à
+  // musique ; elle ressort de son côté, plus près de lui que ne l'est le joueur
+  assert.ok(down >= DOLL_RELOC_T + DOLL_LIFT_T - 1, `elle a mis le temps du trajet à le rejoindre en bas (${down.toFixed(1)} s)`);
+  const lifts = evs.filter((e) => e.type === 'dollLift');
+  assert.ok(lifts.length === 2 && lifts[0].from === 0 && lifts[0].to === 1 && lifts[1].out && lifts[1].floor === 1, 'le départ, puis la sortie du monte-charge');
+  assert.ok(!evs.some((e) => e.type === 'dollMoved'), 'pas de replacement silencieux');
+  const el = dn.elevator;
+  assert.ok(Math.hypot(M.x - el.x, M.z - el.z) < Math.hypot(P.x - el.x, P.z - el.z), 'elle ressort du côté du monte-charge');
+  assert.ok(dollCanStand(dn, M.x, M.z) && Math.hypot(M.x - P.x, M.z - P.z) >= 14 && !dollInFrame(sim, P, 1, M.x, M.z), 'hors champ, à distance');
+  // (le joueur regarde toujours le mur du nord : elle contourne son champ de vision et arrive dans son dos)
+  for (let i = 0; i < 90 * 60 && !(P.grabT > 0); i++) sim.step({});
   assert.ok(P.grabT > 0, 'et elle le rejoint');
 });
 
