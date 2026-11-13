@@ -1121,6 +1121,35 @@ export class BackroomsHUD {
   // rend true (coffre ouvert), false (pas la bonne phrase) ou null (coffre introuvable). Se résout en true (ouvert) ou
   // false (l'hôte joue avec les monstres classiques).
   // (sub, skip : la ligne d'explication et le bouton pour s'en passer, quand c'est le niveau de départ qui la demande)
+  // La question du clonage de voix, posée une fois : promesse de true (autorisé) ou false. Échap = non
+  askClone(lang = 'en') {
+    const fr = lang === 'fr';
+    return new Promise((resolve) => {
+      const el = document.createElement('div');
+      el.className = 'vip-gate';
+      el.innerHTML = `<div class="vip-box" role="dialog" aria-modal="true">
+          <div class="vip-title">${fr ? 'TA VOIX' : 'YOUR VOICE'}</div>
+          <div class="vip-sub">${fr
+            ? "Au Level 1, l'entité imite les joueurs. Autorises-tu une IA à cloner ta voix, pour qu'elle dise des phrases que tu n'as jamais dites ?<br><br>Ça se passe dans les navigateurs des joueurs de la partie : ta voix n'est envoyée à aucun serveur, rien n'est gardé ensuite. Ça ne marche qu'entre joueurs qui ont dit oui (environ 250 Mo à télécharger la première fois). Tu peux changer d'avis dans les réglages ⚙."
+            : "On Level 1, the entity imitates players. Do you allow an AI to clone your voice, so it can say things you never said?<br><br>It runs in the browsers of the players in your game: your voice is sent to no server and nothing is kept afterwards. It only works between players who said yes (about 250 MB to download the first time). You can change your mind in Settings ⚙."}</div>
+          <div class="vip-btns"><button type="button" class="vip-go">${fr ? "OUI, J'AUTORISE" : 'YES, I ALLOW IT'}</button><button type="button" class="vip-skip">${fr ? 'NON' : 'NO'}</button></div>
+        </div>`;
+      document.body.appendChild(el);
+      const done = (ok) => {
+        el.remove();
+        resolve(ok);
+      };
+      for (const t of ['keydown', 'keyup', 'pointerdown', 'click', 'wheel']) el.addEventListener(t, (e) => e.stopPropagation());
+      el.tabIndex = -1;
+      el.addEventListener('keydown', (e) => {
+        if (e.code === 'Escape') done(false);
+      });
+      el.querySelector('.vip-go').addEventListener('click', () => done(true));
+      el.querySelector('.vip-skip').addEventListener('click', () => done(false));
+      el.querySelector('.vip-skip').focus();
+    });
+  }
+
   askPhrase(tryPhrase, { sub = 'ENTER THE PASSPHRASE TO UNLOCK THE ORIGINAL MONSTERS', skip = 'PLAY CLASSIC' } = {}) {
     return new Promise((resolve) => {
       const el = document.createElement('div');

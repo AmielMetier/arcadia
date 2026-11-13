@@ -1,5 +1,52 @@
 # Journal des versions — Arcadia
 
+## 5.88 — 13 novembre 2026
+- **Hub** — Update vip.js (Tahitoa Senis)
+
+## 5.87 — 13 novembre 2026
+- **The Backrooms** — Au Level 1, l'entité est bien plus dure à démasquer :
+  - Elle répond quand on lui parle : dites-lui quelque chose de près, elle lâche un « ouais » ou un « quoi ? » avec la voix du joueur qu'elle imite.
+  - Elle vous appelle par votre prénom, et parle de ce qui se passe : le fusible qui manque, la coupure de courant, le monte-charge rallumé.
+  - Elle reprend les petits bruits de chacun (un souffle, un « euh », un rire bref) et ses mots préférés (« wesh », « frérot »…).
+  - Elle choisit mieux quoi répéter : une phrase qui appelle pour attirer, jamais une phrase où vous parliez d'elle.
+  - De près et en face, elle ne rejoue que vos vraies phrases. Les phrases inventées par l'IA, elle les garde pour le talkie, le lointain et les portes fermées, là où on n'entend pas la différence.
+  - La voix clonée se demande maintenant à l'écran, une fois, au début d'une partie à plusieurs : oui ou non.
+
+## 5.86 — 13 novembre 2026
+- **The Backrooms** — Au Level 1, l'entité peut maintenant inventer des phrases avec votre voix (à autoriser dans les réglages) :
+  - Une IA apprend votre voix pendant que vous parlez au Level 0, puis l'entité s'en sert pour dire des choses que vous n'avez jamais dites : « Hé, viens voir ! », « Ouvre, c'est moi »…
+  - Elle continue aussi de rejouer vos vraies phrases, et mélange les deux.
+  - C'est coupé au départ : Réglages ⚙ › Voix › « Voix clonée par l'entité (IA) ». Elle ne marche qu'entre joueurs qui l'ont tous autorisée.
+  - Tout se passe dans votre navigateur : votre voix n'est envoyée nulle part. Le premier chargement pèse environ 150 Mo, il se fait pendant le Level 0.
+
+## 5.85 — 13 novembre 2026
+- **Arcadia** — Des bandes-annonces dans le Hub : la vitrine de l'accueil joue une courte vidéo du jeu à la place de l'affiche, et chaque carte de jeu lance la sienne quand tu passes la souris dessus.
+  - Douze jeux ont la leur pour l'instant : Mystère Mystère, Island Rush, Cyber Kart GP, Mini-Golf Party, Bastion Clash, Odyssée, Birdie Party, Outbreak, Duo Drift, Tête de Calcul, Mollo ! et The Backrooms.
+  - Les vidéos sont muettes, légères, et ne se chargent que pour le jeu que tu regardes.
+- **Arcadia** — La page d'accueil, abîmée quelques minutes par la mise en ligne précédente, est réparée.
+
+## 5.83 — 13 novembre 2026
+- **The Backrooms** — Au Level 1, l'entité imite vraiment vos voix :
+  - Elle rejoue vos phrases telles que vous les avez dites, en entier, avec votre vraie voix : plus de voix ralentie, hachée ou grésillante. Elle sonne comme un joueur, de près, derrière un mur ou au talkie.
+  - Elle répète des choses que vous avez dites pendant la partie, surtout celles qui ont fait réagir les autres.
+  - Près de vous, elle bavarde pour passer pour l'un des vôtres ; de loin, elle appelle pour vous attirer.
+  - Elle choisit qui imiter : jamais la voix de quelqu'un qui est à côté de vous, et elle change d'apparence quand la sienne ne tient plus. Celui qu'elle imite ne l'entend pas.
+  - Si le joueur imité n'a encore rien dit, elle se tait comme lui.
+
+## 5.82 — 12 novembre 2026
+- **Odyssée** — Sur la carte :
+  - Chaque lieu a sa carte locale, et la carte de la région se dévoile à mesure qu'on explore.
+  - Les barrières bloquent exactement là où on les voit, et moins de sentiers sont fermés.
+- **Odyssée** — Dans l'équipe, on glisse un Pokémon sur un autre pour échanger leurs places, et on peut réordonner leurs attaques.
+- **Odyssée** — Dans les villes :
+  - Les portes s'ouvrent quand on arrive et se referment derrière soi.
+  - Terrasses et pieds des bâtiments dallés, pierre de taille redessinée, toits plus bas, ombres plus douces au pied des murs.
+  - Plus de tache bleue en passant derrière un bâtiment.
+  - Les habitants ne sont plus coincés dans les meubles, et on voit ses pieds sur les perrons et les marches des arènes.
+- **Odyssée** — La marche est un peu plus rapide, le HUD plus petit et plus transparent.
+- **Odyssée** — Nouvelle option dans Graphismes : un rendu net pour les grands écrans (4K).
+- **Odyssée** — Plus de pluie ni de cendres sous un toit, et plus de particules collées à l'écran dans les grottes.
+
 ## 5.81 — 12 novembre 2026
 - **The Backrooms** — Un nouveau niveau après le Terror Hotel : le Level 17, un centre commercial abandonné sur deux étages.
   - On y arrive par l'escalier de secours du Level 5 : la porte coupe-feu passée, on dévale les étages jusqu'au palier « 17 », qui s'ouvre sur le mall. Sortir du mall termine la partie.

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>The Backrooms · essai de la voix clonée</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; background: #14130f; color: #e8e2cf; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.3rem; } button { font: inherit; padding: .5rem .9rem; margin: .2rem .3rem .2rem 0; cursor: pointer; }
+  button:disabled { opacity: .45; cursor: default; } textarea, select { font: inherit; width: 100%; box-sizing: border-box; padding: .5rem; }
+  #log { white-space: pre-wrap; font: 13px/1.45 ui-monospace, monospace; background: #0c0b09; padding: .8rem; min-height: 6rem; margin-top: 1rem; }
+  .row { margin: .9rem 0; } small { color: #a39c86; }
+</style>
+<h1>Essai de la voix clonée (Level 1)</h1>
+<p><small>Tout se passe dans ce navigateur : ta voix n'est envoyée nulle part. Premier chargement : environ 150 Mo, gardés ensuite. N'enregistre que ta propre voix, ou celle de quelqu'un qui est d'accord.</small></p>
+<div class="row">
+  <select id="lang"><option value="french_24l">Français</option><option value="english_2026-04">English</option></select>
+  <div class="row"><small>Réglages à comparer (recharge la page pour en changer) :</small><br>
+  <select id="prec" style="width:auto"><option value="1">Modèle léger (150 Mo)</option><option value="0">Modèle complet (plus fidèle, plus lourd)</option></select>
+  <select id="refs" style="width:auto"><option>10</option><option>20</option><option selected>30</option></select> s d'échantillon ·
+  <select id="steps" style="width:auto"><option>1</option><option>2</option><option>4</option></select> pas ·
+  température <select id="temp" style="width:auto"><option>0.7</option><option>0.5</option><option>0.3</option></select></div>
+  <button id="load">1 · Charger le modèle</button>
+</div>
+<div class="row">
+  <button id="rec" disabled>2 · Enregistrer ma voix</button>
+  <button id="replay" disabled>Réécouter l'enregistrement</button>
+</div>
+<div class="row">
+  <textarea id="text" rows="2">Hé, viens voir, j'ai trouvé un fusible par ici.</textarea>
+  <button id="say" disabled>3 · Dire cette phrase avec ma voix</button>
+  <button id="again" disabled>Réécouter</button>
+</div>
+<div id="log"></div>
+<script type="module">
+import { PocketTTS } from './vendor/pocket-tts/index.js';
+const $ = (id) => document.getElementById(id);
+const log = (s) => { $('log').textContent += s + '\n'; };
+window.ESSAI = { log: [], state: 'idle', PocketTTS };
+const note = (s) => { window.ESSAI.log.push(s); log(s); };
+let tts = null, voice = null, ref = null, refRate = 0, last = null, ctx = null;
+const audio = () => (ctx = ctx || new AudioContext());
+const play = (data, rate) => { const c = audio(); const b = c.createBuffer(1, data.length, rate); b.getChannelData(0).set(data); const s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(); };
+// (pour les tests : une voix de référence donnée en échantillons)
+window.ESSAI.setRef = (data, rate) => { ref = Float32Array.from(data); refRate = rate; voice = null; $('say').disabled = !tts; };
+$('load').onclick = async () => {
+  $('load').disabled = true;
+  const t0 = performance.now();
+  try {
+    tts = new PocketTTS({ language: $('lang').value, voiceCloning: true, quantized: $('prec').value === '1', maxRefSeconds: +$('refs').value, lsdSteps: +$('steps').value, temperature: +$('temp').value });
+    let lastLabel = '';
+    await tts.load((p) => { if (p.label && p.label !== lastLabel) { lastLabel = p.label; note('  ' + p.label + (p.fromCache ? ' (cache)' : '') + '…'); } });
+    note(`Modèle prêt en ${((performance.now() - t0) / 1000).toFixed(1)} s (${self.crossOriginIsolated ? 'plusieurs fils' : 'un seul fil'}).`);
+    window.ESSAI.state = 'ready';
+    $('rec').disabled = false;
+    if (ref) $('say').disabled = false;
+  } catch (e) { note('ERREUR au chargement : ' + e.message); window.ESSAI.state = 'error'; $('load').disabled = false; }
+};
+$('rec').onclick = async () => {
+  $('rec').disabled = true;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    const c = audio(); await c.resume();
+    const src = c.createMediaStreamSource(stream); const sp = c.createScriptProcessor(4096, 1, 1); const mute = c.createGain(); mute.gain.value = 0;
+    const parts = []; sp.onaudioprocess = (e) => parts.push(Float32Array.from(e.inputBuffer.getChannelData(0)));
+    src.connect(sp).connect(mute).connect(c.destination);
+    const secs = +$('refs').value; note(`Parle normalement pendant ${secs} secondes…`);
+    await new Promise((r) => setTimeout(r, secs * 1000));
+    sp.onaudioprocess = null; src.disconnect(); stream.getTracks().forEach((t) => t.stop());
+    const n = parts.reduce((a, p) => a + p.length, 0); ref = new Float32Array(n); let o = 0; for (const p of parts) { ref.set(p, o); o += p.length; }
+    refRate = c.sampleRate; voice = null;
+    note('Enregistré.'); $('replay').disabled = false; $('say').disabled = false;
+  } catch (e) { note('ERREUR micro : ' + e.message); }
+  $('rec').disabled = false;
+};
+$('replay').onclick = () => ref && play(ref, refRate);
+$('say').onclick = async () => {
+  $('say').disabled = true;
+  try {
+    if (!voice) { const t0 = performance.now(); voice = await tts.cloneVoice(ref, { inputSampleRate: refRate }); note(`Voix clonée en ${((performance.now() - t0) / 1000).toFixed(1)} s.`); }
+    const chunks = []; const t0 = performance.now(); let first = 0;
+    const m = await tts.generate($('text').value, { voice, onChunk: (a) => { if (!first) first = performance.now() - t0; chunks.push(Float32Array.from(a)); } });
+    const n = chunks.reduce((a, p) => a + p.length, 0); last = new Float32Array(n); let o = 0; for (const p of chunks) { last.set(p, o); o += p.length; }
+    let pk = 0; for (const x of last) pk = Math.max(pk, Math.abs(x));
+    note(`Phrase de ${(n / tts.sampleRate).toFixed(1)} s générée en ${(m.genTime ?? (performance.now() - t0) / 1000).toFixed(1)} s (${m.rtfx.toFixed(2)} × le temps réel, premier son après ${(first / 1000).toFixed(1)} s, pic ${pk.toFixed(2)}).`);
+    window.ESSAI.last = { secs: n / tts.sampleRate, rtfx: m.rtfx, peak: pk };
+    play(last, tts.sampleRate); $('again').disabled = false;
+  } catch (e) { note('ERREUR : ' + e.message); }
+  $('say').disabled = false;
+};
+$('again').onclick = () => last && play(last, tts.sampleRate);
+</script>
+</html>
