@@ -364,7 +364,7 @@ function plateAtlas() {
     if (b) fitText(g, b, x + 128, y3 + 156, 230, 28);
     age(g, x + 4, y3 + 72, 248, 112, r, 0.5);
   };
-  way(0, '#1d2a44', '#e8e2d0', 'RESTROOMS  →', 'TELEPHONES');
+  way(0, '#1d2a44', '#e8e2d0', 'RESTROOMS  →', 'SECURITY');
   way(1, '#1d2a44', '#e8e2d0', '←  CINEMAS', 'STARDUST 8');
   way(2, '#1d2a44', '#e8e2d0', 'FOOD COURT  ↑', 'THE PAVILION');
   way(3, '#1f7a3a', '#ffffff', 'EXIT', null);

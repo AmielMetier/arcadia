@@ -609,7 +609,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   // Jamais dans une case qui porte une lampe, ni sous un vide, ni dans une trémie
   {
     const lit = new Set((map.lights || []).map((l) => l.gz * W + l.gx));
-    const TECH = { grid: 2, soffit: 1, spots: 1, greyc: 1, char: 1 };
+    const TECH = { grid: 2, soffit: 1, spots: 1, greyc: 3, char: 3 }; // (3 : un plafond sombre, des sprinklers seulement)
     // (une rosace et un corps conique : dix-huit triangles par tête, il y en a des milliers)
     const sprink = mergeGeometries([new THREE.CircleGeometry(0.04, 8).rotateX(Math.PI / 2).translate(0, -0.003, 0), new THREE.CylinderGeometry(0.01, 0.017, 0.045, 5, 1, true).translate(0, -0.025, 0)].map((g) => g.toNonIndexed()));
     const decal = (u0, x, y, z) => {
@@ -628,7 +628,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
         const cz = (z + 0.5) * C;
         if (up.inVoid && up.inVoid(cx, cz, 1.4)) continue;
         if ((x + z) % 2 === 0) G.add('steel', sprink.clone().translate(cx + 0.62, ce.h, cz + 0.62));
-        if (lit.has(z * W + x)) continue;
+        if (t === 3 || lit.has(z * W + x)) continue;
         // (au pas des dalles de 62,5 cm : une dalle entière)
         if (x % 3 === 1 && z % 3 === 1) decal(0, x * C + 0.9375, ce.h - 0.006, z * C + 0.9375);
         else if (t === 2 && x % 6 === 4 && z % 4 === 2) decal(0.5, x * C + 0.9375, ce.h - 0.006, z * C + 1.5625);
@@ -982,9 +982,9 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     }
   }
 
-  // 6b. Le hall du cinéma : le ruban de LED qui fait le tour du plateau de son plafond (un profilé d'aluminium, la
-  // bande lumineuse dessous). Sa lumière bleue : cuite sur le plafond (le troisième canal, view/scene.js), et des feux
-  // de couleur qui tombent sur les retombées, les murs et la moquette
+  // 6b. Le hall du cinéma : un tube néon fait le tour du plateau de son plafond (1996 : pas de ruban de LED), tenu
+  // par des pattes tous les 60 cm. Sa lumière bleue : cuite sur le plafond (le troisième canal, view/scene.js), et des
+  // feux de couleur qui tombent sur les retombées, les murs et la moquette
   let cineBox = null;
   if (cine && cine.tray) {
     cineBox = [cine.x0 * C - 0.25, cine.z0 * C - 0.25, (cine.x1 + 1) * C + 0.25, (cine.z1 + 1) * C + 0.25];
@@ -993,8 +993,14 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     for (let i = 0; i < L.length; i++) {
       const a = L[i];
       const b = L[(i + 1) % L.length];
-      G.beam('steel', [a[0], y - 0.015, a[1]], [b[0], y - 0.015, b[1]], 0.1, 0.03);
-      G.beam('led', [a[0], y - 0.04, a[1]], [b[0], y - 0.04, b[1]], 0.06, 0.022);
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const np = Math.max(1, Math.round(len / 0.6));
+      for (let j = 0; j < np; j++) {
+        const px = a[0] + ((b[0] - a[0]) * (j + 0.5)) / np;
+        const pz = a[1] + ((b[1] - a[1]) * (j + 0.5)) / np;
+        G.box('steel', px - 0.006, px + 0.006, y - 0.052, y, pz - 0.006, pz + 0.006, '+y');
+      }
+      G.tube('led', [a[0], y - 0.062, a[1]], [b[0], y - 0.062, b[1]], 0.011, 8);
       const m = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / 11));
       for (let j = 0; j < m; j++) blues.push({ x: a[0] + ((b[0] - a[0]) * (j + 0.5)) / m, y: y - 0.45, z: a[1] + ((b[1] - a[1]) * (j + 0.5)) / m, rad: 13, k: 1.5 });
     }
@@ -1264,7 +1270,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       base: 16,
       k: 40,
       cap: {
-        korean_public_payphone_01: 16, wheelchair_01: 18, old_gas_mask: 12, garden_hose_wall_mounted_01: 16, gamepad: 12, rubber_duck_toy: 18,
+        wheelchair_01: 18, old_gas_mask: 12, garden_hose_wall_mounted_01: 16, rubber_duck_toy: 18,
         desk_lamp_arm_01: 8, metal_office_desk: 25, cardboard_box_01: 11, SchoolChair_01: 21, modern_arm_chair_01: 18, GreenChair_01: 24, stationery_supplies: 8,
         Television_01: 26, wooden_broom: 12, plastic_broom: 12, modular_street_seating: 36, dead_quiver_trunk: 36, korean_fire_extinguisher_01: 14,
         modular_airduct_rectangular_01: 32, modular_electric_cables: 20,
@@ -1291,7 +1297,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   // (chaque modèle posé laisse sa place aux murs habillés : un rayon, plus grand pour les rideaux et les meubles hauts)
   const placed = [];
   let wasHere = true;
-  const WIDE = { rollershutter_door: 1.7, rollershutter_window_01: 2.7, korean_public_payphone_01: 0.6, drawer_cabinet: 0.7, wooden_bookshelf_worn: 0.8, exterior_aircon_unit: 1.0, utility_box_01: 0.4 };
+  const WIDE = { rollershutter_door: 1.7, rollershutter_window_01: 2.7, drawer_cabinet: 0.7, wooden_bookshelf_worn: 0.8, exterior_aircon_unit: 1.0, utility_box_01: 0.4 };
   const model = (name, x, y, z, ry = 0, s = 1, rx = 0, rz = 0, piece = '*') => {
     placed.push([x, z, WIDE[name] || 0.4]);
     const inner = (z < OPEN_Z0 || z > OPEN_Z1) && !wells.some(([wx, wz]) => Math.abs(x - wx) < WELL_R && Math.abs(z - wz) < WELL_R);

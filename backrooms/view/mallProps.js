@@ -325,11 +325,11 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
   // ce qu'on pose sur une table de présentation, selon le commerce
   // ce qu'on pose sur une table de présentation, selon le commerce : [modèle, échelle, morceaux, roulis x, hauteur]
   const SHOW = {
-    toys: [['rubber_duck_toy', 1.6], ['gamepad', 1], ['football', 1, 'football_inflated'], ['rubber_duck_toy', 1.6], ['concrete_cat_statue', 1]],
-    kids: [['rubber_duck_toy', 1.6], ['football', 1, 'football_inflated'], ['gamepad', 1]],
+    toys: [['rubber_duck_toy', 1.6], ['baseball_01', 1.4], ['football', 1, 'football_inflated'], ['rubber_duck_toy', 1.6], ['concrete_cat_statue', 1]],
+    kids: [['rubber_duck_toy', 1.6], ['football', 1, 'football_inflated'], ['american_football', 1]],
     music: [['boombox', 0.9], ['Ukulele_01', 1, '*', -PI / 2, 0.03], ['cassette_player', 1.4], ['portable_cassette_player', 1.3]],
     electronics: [['television_02', 1], ['boombox', 0.9], ['Television_01', 0.85], ['vintage_video_camera', 1.5], ['portable_cassette_player', 1.3]],
-    video: [['Television_01', 0.85], ['television_02', 1], ['gamepad', 1], ['vintage_video_camera', 1.5]],
+    video: [['Television_01', 0.85], ['television_02', 1], ['boombox', 1], ['vintage_video_camera', 1.5]],
     gifts: [['ceramic_vase_01', 1], ['antique_ceramic_vase_01', 1], ['marble_bust_01', 0.8], ['garden_gnome', 0.8], ['concrete_cat_statue', 1], ['ceramic_vase_02', 1]],
     jewelry: [['ceramic_vase_03', 0.8], ['vintage_pocket_watch', 2], ['brass_vase_03', 1]],
     watches: [['alarm_clock_01', 1], ['vintage_pocket_watch', 2], ['digital_wrist_watch', 1.5, '*', -PI / 2, 0.02]],
@@ -651,17 +651,8 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     const w = (xb - xa - 0.08) / n;
     for (let i = 0; i < n; i++) model('rollershutter_window_01', xa + 0.04 + w * (i + 0.5), 0, sh.frontZ - sh.dir * 0.15, sh.dir > 0 ? 0 : PI, [w / 2.1, head / 1.85, 1], 0, 0, 'rollershutter_window_01');
   }
-  // les cabines téléphoniques, de part et d'autre du passage des toilettes
-  for (const gx of [21, 24]) {
-    if (cell(gx, 42) !== 2 || cell(gx, 41) !== 1) continue;
-    const zf = 42 * C;
-    for (let k = 0; k < 2; k++) {
-      const x = gx * C + 0.75 + k * 1.0;
-      G.box('steel', x - 0.42, x + 0.42, 0.7, 2.0, zf - 0.04, zf, '+z');
-      G.box('black', x - 0.44, x + 0.44, 2.0, 2.1, zf - 0.36, zf, '+z');
-      model('korean_public_payphone_01', x + 0.06, 1.0, zf - 0.15, PI);
-    }
-  }
+  // (plus de cabines téléphoniques : le seul téléphone public scanné disponible est coréen, un centre américain de
+  // 1996 n'en a pas ; rien ne le remplace)
   // des caméras de surveillance sur un pilier sur quatre du mail et des cours, tournées vers les vitrines
   let ci = 0;
   for (const k in map.pillars) {
@@ -680,11 +671,10 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     const Z0 = r.z0 * C;
     const Z1 = (r.z1 + 1) * C;
     if (r.kind === 'service' && r.z0 === r.z1 && r.x1 - r.x0 > 6) {
-      // les couloirs de service : un extincteur et une alarme tous les 14 m, des sacs, un balai, un bidon
+      // les couloirs de service : une alarme tous les 14 m, des sacs, un balai, un bidon
       for (let x = X0 + 4; x < X1 - 2; x += 14) {
         const gx = Math.floor(x / C);
         if (cell(gx, r.z0 - 1) !== 2) continue;
-        model('korean_fire_extinguisher_01', x, 0, Z0 + 0.16, rand(gx) * 0.6 - 0.3);
         model('fire_alarm', x + 0.6, 1.45, Z0, 0);
       }
       for (let x = X0 + 9; x < X1 - 4; x += 23) {
@@ -800,37 +790,6 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
 
   // le cinéma : des affiches dans des caissons lumineux le long des murs du hall et du couloir des salles
   let pi = 0;
-  let wall3 = false;
-  // l'image du mur d'écrans : un bleu de glace, de grandes formes claires
-  const wall3Tex = () => {
-    const c = document.createElement('canvas');
-    c.width = 384;
-    c.height = 320;
-    const g = c.getContext('2d');
-    const gr = g.createLinearGradient(0, 0, 384, 320);
-    gr.addColorStop(0, '#0d3f8f');
-    gr.addColorStop(0.5, '#2f8fd6');
-    gr.addColorStop(1, '#0a2f6e');
-    g.fillStyle = gr;
-    g.fillRect(0, 0, 384, 320);
-    for (const [x, y, rx, ry, a, col] of [[120, 150, 150, 70, -0.5, 'rgba(210,240,255,0.75)'], [250, 210, 130, 60, -0.35, 'rgba(160,215,250,0.6)'], [300, 80, 110, 40, -0.6, 'rgba(235,250,255,0.55)'], [60, 280, 120, 40, -0.2, 'rgba(120,190,240,0.5)']]) {
-      g.save();
-      g.translate(x, y);
-      g.rotate(a);
-      const rg = g.createRadialGradient(0, 0, 4, 0, 0, rx);
-      rg.addColorStop(0, col);
-      rg.addColorStop(1, 'rgba(255,255,255,0)');
-      g.fillStyle = rg;
-      g.scale(1, ry / rx);
-      g.beginPath();
-      g.arc(0, 0, rx, 0, 7);
-      g.fill();
-      g.restore();
-    }
-    const t = new THREE.CanvasTexture(c);
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  };
   for (const r of rooms) {
     if (r.kind !== 'cine' && r.kind !== 'cineHall') continue;
     const X0 = r.x0 * C;
@@ -847,15 +806,6 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         if (furn.some((o) => Math.abs(o.x - w) < 2 && Math.abs(o.z - z) < 1.6)) continue; // (ni derrière une borne)
         const x = w + s * 0.06;
         const box = [X0 - 0.25, Z0 - 0.25, X1 + 0.25, Z1 + 0.25];
-        if (r.kind === 'cineHall' && s > 0 && !wall3) {
-          // (comme au multiplexe de référence) un mur de trois écrans en hauteur, une seule image d'un écran à l'autre
-          wall3 = true;
-          if (!MATS.wall3) MATS.wall3 = { m: lit(wall3Tex(), 1.2), S: 1 };
-          G.box('black', Math.min(w, w + s * 0.09), Math.max(w, w + s * 0.09), 0.78, 2.72, z - 1.14, z + 1.14);
-          for (let k = 0; k < 3; k++) panel('wall3', [k / 3 + 0.004, 0, (k + 1) / 3 - 0.004, 1], x + s * 0.035, 1.75, z + (k - 1) * 0.74, 0.7, 1.86, s, 0);
-          lights.push({ x: w + s * 0.7, y: 1.8, z, c: [0.25, 0.45, 0.8], rad: 4.6, nx: s, nz: 0, box });
-          continue;
-        }
         G.box('black', Math.min(w, w + s * 0.08), Math.max(w, w + s * 0.08), 0.9, 2.65, z - 0.62, z + 0.62);
         panel(pi % 4 === 3 ? 'postersOff' : 'posters', posters.uv(pi), x + s * 0.025, 1.78, z, 1.1, 1.65, s, 0);
         // un caisson allumé éclaire la moquette devant lui (un feu de couleur)

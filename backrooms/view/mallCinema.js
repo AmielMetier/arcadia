@@ -337,13 +337,12 @@ export function drawMallCinema({ map, fi, floors, G, MATS, baked, model, group, 
   for (const sx of [-1, 1]) Bn('cineAlu', rbox(0.1, 0.006, 0.09, 0.002).rotateZ(sx * 0.9), sx * 0.085, 0.07, -0.16);
   Bn('cineAlu', rbox(0.012, 0.012, 0.13, 0.003), 0, 0.034, -0.16);
   // des boîtes vides sur la tablette, un carton, la lampe d'architecte, un tabouret, un classeur à tiroirs contre le
-  // mur du nord, un extincteur près de la porte
+  // mur du nord
   for (const [x, n, r] of [[-0.6, 3, 0.2], [-0.12, 2, 1.1]]) for (let i = 0; i < n; i++) G.add('cineAlu', lathe(CAN, 22).rotateY(r + i).translate(bx + x + (i % 2) * 0.02, 0.265 + i * 0.046, bz + 0.05));
   model('cardboard_box_01', bx + 0.62, 0.265, bz + 0.03, 0.3, 0.9);
   model('desk_lamp_arm_01', bx + 0.98, top, bz + 0.24, -2.3);
   model('metal_stool_02', bx + 0.75, 0, bz - 0.9, 0.4, 1.05);
   model('drawer_cabinet', B.x0 + 1.5, 0, B.z0 + 0.27, 0);
-  model('korean_fire_extinguisher_01', B.x0 + 0.16, 0, B.z0 + 2.9, PI / 2);
   model('metal_trash_can', B.x0 + 0.35, 0, B.z1 - 1.25, 1, 1, 0, 0, 'metal_trash_can');
   if (placed) placed.push([bx, B.z1, 1.6]);
 
