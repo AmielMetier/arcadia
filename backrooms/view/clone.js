@@ -10,46 +10,85 @@
 // de réseau, navigateur trop ancien), l'entité se contente des vraies phrases.
 import { speechRms } from './voice.js';
 
-// Les phrases inventées, par usage (kind de l'appel) : 'call' attirer de loin, 'chat' se fondre dans le groupe,
-// 'door' devant une porte ou un casier, 'radio' au talkie. Courtes, banales : ce qu'un joueur dirait
+// Les phrases inventées. kind : l'usage ('call' attirer de loin, 'chat' se fondre dans le groupe, 'door' devant une
+// porte ou un casier, 'radio' au talkie, 'reply' répondre d'un mot à qui lui parle) ; ctx : seulement dans cette
+// circonstance ('dark' coupure, 'lift' monte-charge réalimenté, 'last' il manque un fusible, 'fuse' on en a trouvé) ;
+// {n} : le prénom du joueur visé (une phrase par coéquipier). Courtes, banales : ce qu'un joueur dirait. Dans l'ordre
+// où on les fabrique (une phrase coûte plusieurs secondes de calcul) : les plus utiles d'abord
 export const LINES = {
   fr: [
     ['call', 'Hé, viens voir !'],
+    ['reply', 'Ouais.'],
     ['radio', "T'es où ? Je te cherche."],
+    ['call', '{n}, viens voir !'],
     ['chat', "Attends, j'ai cru entendre un truc."],
     ['door', "Ouvre, c'est moi."],
-    ['call', "J'ai trouvé un truc, viens !"],
-    ['radio', "J'ai trouvé un fusible, viens me rejoindre."],
+    ['reply', 'Quoi ?'],
+    ['radio', "{n}, t'es où ?"],
+    ['call', "J'ai trouvé un fusible, viens !", 'fuse'],
+    ['radio', 'Il manque plus qu\'un fusible, je crois que je l\'ai vu. Viens.', 'last'],
+    ['call', "Y a plus de courant, t'es où ?", 'dark'],
+    ['radio', "Le monte-charge est rallumé, venez, je vous attends.", 'lift'],
+    ['reply', 'Attends.'],
     ['chat', "C'est par là, je crois."],
     ['call', 'Par ici, venez !'],
-    ['chat', "T'as trouvé un fusible, toi ?"],
-    ['door', 'Laisse-moi entrer, vite !'],
-    ['radio', "Revenez vers l'ascenseur, je vous attends."],
-    ['call', 'Attends-moi, je suis juste derrière !'],
+    ['radio', "J'ai trouvé un truc, viens me rejoindre."],
+    ['door', '{n}, ouvre, vite !'],
     ['chat', 'Reste avec moi, on se sépare pas.'],
+    ['reply', "J'arrive."],
+    ['call', 'Attends-moi, je suis juste derrière !'],
+    ['chat', "On a combien de fusibles, là ?", 'fuse'],
+    ['door', 'Laisse-moi entrer, vite !'],
   ],
   en: [
     ['call', 'Hey, come see this!'],
+    ['reply', 'Yeah.'],
     ['radio', "Where are you? I'm looking for you."],
+    ['call', '{n}, come here!'],
     ['chat', 'Wait, I think I heard something.'],
     ['door', "Open up, it's me."],
-    ['call', 'I found something, come here!'],
-    ['radio', 'I found a fuse, come and meet me.'],
+    ['reply', 'What?'],
+    ['radio', '{n}, where are you?'],
+    ['call', 'I found a fuse, come here!', 'fuse'],
+    ['radio', "We only need one more fuse, I think I saw it. Come.", 'last'],
+    ['call', "The power's out, where are you?", 'dark'],
+    ['radio', "The lift is back on, come on, I'm waiting.", 'lift'],
+    ['reply', 'Wait.'],
     ['chat', "It's this way, I think."],
     ['call', 'Over here, come on!'],
-    ['chat', 'Did you find a fuse?'],
-    ['door', 'Let me in, quick!'],
-    ['radio', "Come back to the elevator, I'm waiting."],
-    ['call', "Wait for me, I'm right behind you!"],
+    ['radio', 'I found something, come and meet me.'],
+    ['door', '{n}, open up, quick!'],
     ['chat', "Stay with me, let's not split up."],
+    ['reply', 'Coming.'],
+    ['call', "Wait for me, I'm right behind you!"],
+    ['chat', 'How many fuses do we have?', 'fuse'],
+    ['door', 'Let me in, quick!'],
   ],
 };
+// Un pseudo se dit-il ? Des lettres seulement, ni trop court ni trop long (« xX_Dark_Xx » ne se prononce pas)
+export const sayable = (name) => /^[A-Za-zÀ-ÿ]{3,12}$/.test(String(name || '').trim());
+// Les phrases à fabriquer pour la voix d'un joueur : others, les coéquipiers qu'elle peut nommer ({ id, name }) ;
+// tic, son mot d'appui (« wesh », « frérot »…), glissé devant les appels et le bavardage
+export function linesFor(lang, others = [], tic = '') {
+  const out = [];
+  const T = tic ? tic[0].toUpperCase() + tic.slice(1) : '';
+  (LINES[lang] || LINES.en).forEach(([kind, text, ctx], k) => {
+    if (text.includes('{n}')) {
+      for (const o of others) if (sayable(o.name)) {
+        const n = o.name.trim();
+        out.push({ i: `${k}:${o.id}`, kind, ctx, to: o.id, text: text.replace('{n}', n[0].toUpperCase() + n.slice(1).toLowerCase()) });
+      }
+    } else out.push({ i: `${k}${T && (kind === 'call' || kind === 'chat') ? ':' + tic : ''}`, kind, ctx, text: T && (kind === 'call' || kind === 'chat') ? `${T}, ${text[0].toLowerCase()}${text.slice(1)}` : text });
+  });
+  return out;
+}
 const BUNDLE = { fr: 'french_24l', en: 'english_2026-04' };
+const REF_S = 10; // s de voix écoutées pour cloner (voir les essais dans vendor/pocket-tts/LISEZMOI.txt)
 
 // voice : createVoice ; lang : 'fr' ou 'en' ; load : () => la classe PocketTTS (les tests en donnent une fausse) ;
-// onState : suivi ('loading', 'ready', 'error', 'off')
-export function createCloner({ voice, lang = 'fr', load = null, onState = null }) {
-  const lines = LINES[lang] || LINES.en;
+// onState : suivi ('loading', 'ready', 'error', 'off') ; names : () => les joueurs ({ id, name }), pour les prénoms
+export function createCloner({ voice, lang = 'fr', load = null, onState = null, names = () => [] }) {
+  const mine = (id) => linesFor(lang, names().filter((o) => o.id !== id), voice.tic ? voice.tic(id) : '');
   let tts = null;
   let state = 'off';
   let alive = true;
@@ -64,7 +103,7 @@ export function createCloner({ voice, lang = 'fr', load = null, onState = null }
   async function boot() {
     set('loading');
     const Cls = load ? await load() : (await import('../vendor/pocket-tts/index.js')).PocketTTS;
-    tts = new Cls({ language: BUNDLE[lang] || BUNDLE.en, voiceCloning: true });
+    tts = new Cls({ language: BUNDLE[lang] || BUNDLE.en, voiceCloning: true, maxRefSeconds: REF_S });
     await tts.load();
     if (!alive) return tts.destroy();
     set('ready');
@@ -106,23 +145,25 @@ export function createCloner({ voice, lang = 'fr', load = null, onState = null }
         let job = null;
         for (const id of ids) {
           const d = done.get(id);
-          const r = !d || d.n >= lines.length ? voice.cloneRef(id) : null;
+          const r = !d || !mine(id).some((l) => !d.made.has(l.i)) ? voice.cloneRef(id) : null;
           // (première fois, ou l'échantillon a bien grossi depuis : au moins 4 s de plus, tant qu'il n'était pas plein)
-          if (r && (!d || (d.secs < 10 && r.secs >= d.secs + 4))) { job = { id, r }; break; }
+          if (r && (!d || (d.secs < REF_S && r.secs >= d.secs + 4))) { job = { id, r }; break; }
         }
         if (job) {
           const ref = await tts.cloneVoice(job.r.data, { inputSampleRate: job.r.sr });
-          done.set(job.id, { secs: job.r.secs, ref, rms: job.r.rms, n: 0 });
+          done.set(job.id, { secs: job.r.secs, ref, rms: job.r.rms, made: new Set() });
           continue;
         }
-        const next = ids.map((id) => [id, done.get(id)]).filter(([, d]) => d && d.n < lines.length).sort((a, b) => a[1].n - b[1].n)[0];
+        // une phrase de plus, pour la voix qui en a le moins (les prénoms et le tic arrivent en cours de route : la liste
+        // est relue à chaque fois)
+        const next = ids.map((id) => [id, done.get(id), mine(id)]).filter(([, d, ls]) => d && ls.some((l) => !d.made.has(l.i))).sort((a, b) => a[1].made.size - b[1].made.size)[0];
         if (!next) break;
-        const [id, d] = next;
-        const [kind, text] = lines[d.n];
-        const f = await say(text, d.ref, d.rms);
+        const [id, d, ls] = next;
+        const line = ls.find((l) => !d.made.has(l.i));
+        const f = await say(line.text, d.ref, d.rms);
         if (!alive) break;
-        if (f.buf.length > f.sr * 0.3) voice.addFake(id, kind, d.n, f.buf, f.sr);
-        d.n++;
+        if (f.buf.length > f.sr * 0.2) voice.addFake(id, line, f.buf, f.sr);
+        d.made.add(line.i);
         await sleep(120); // (on laisse souffler la machine entre deux phrases)
       }
     } catch (e) {
@@ -144,7 +185,7 @@ export function createCloner({ voice, lang = 'fr', load = null, onState = null }
       while (busy) await sleep(30);
     },
     progress() {
-      return [...done].map(([id, d]) => ({ id, secs: +d.secs.toFixed(1), lines: d.n }));
+      return [...done].map(([id, d]) => ({ id, secs: +d.secs.toFixed(1), lines: d.made.size }));
     },
     dispose() {
       alive = false;

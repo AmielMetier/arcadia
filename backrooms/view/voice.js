@@ -47,7 +47,11 @@ const CLIP_RMS = 0.012; // en dessous : le souffle, la pièce
 const REF_KEEP = 30;
 const REF_MIN = 6;
 const REF_USE = 10;
-const FAKE_SHARE = 0.4; // part des phrases inventées quand on a aussi des vraies
+const FAKE_SHARE = 0.5; // part des phrases inventées, là où elles passent (voir masked dans playMimic)
+const SMALL_MIN = 0.15; // s : en dessous de UTT_MIN, un petit bruit de voix (un « hm », un souffle, un rire bref)
+const SMALLS = 6; // petits bruits gardés par coéquipier
+const REPLY_MAX = 1.4; // s : une réplique est courte
+const MASK_R = 12; // m : au-delà, ou sans se voir, ou au talkie, une voix clonée passe pour la vraie
 const MIMIC_LINES = ["I'm here.", 'Over here, come on.', "It's fine. I found the door.", 'Where are you guys?', 'Come to me. Quick.', 'I found a fuse. Come here.', "Guys? I'm hurt. Help me.", 'It went the other way. Come.'];
 
 // Les serveurs ICE : les STUN publics, plus ceux qu'on ajoute sans toucher au code (un TURN, par exemple) :
@@ -131,7 +135,7 @@ registerProcessor('br-cap', BrCap);`;
 // Dans une fenêtre d'échantillons, la phrase : les passages voisés (par tranches de 10 ms, au-dessus du souffle),
 // regroupés quand moins de gap secondes les séparent ; on rend le groupe dont la durée colle le mieux à want (s), avec
 // une petite marge avant et après (l'attaque et la fin des mots). [début, fin] en échantillons, ou null
-export function voicedSpan(d, sr, want, gap = 0.45) {
+export function voicedSpan(d, sr, want, gap = 0.45, minLen = 0.25) {
   const hop = Math.max(1, Math.round(sr / 100));
   const n = Math.floor(d.length / hop);
   if (n < 5) return null;
@@ -161,7 +165,7 @@ export function voicedSpan(d, sr, want, gap = 0.45) {
   let best = null;
   for (const g of groups) {
     const len = (g[1] - g[0] + 1) / 100;
-    if (len < 0.25) continue;
+    if (len < minLen) continue;
     const err = Math.abs(len - want);
     if (!best || err < best.err) best = { g, err };
   }
@@ -173,14 +177,48 @@ export function voicedSpan(d, sr, want, gap = 0.45) {
 // autres en s }) ; kind : 'chat' (se fondre dans le groupe : une phrase ordinaire, de préférence une qui a fait
 // réagir), 'call' (attirer de loin : courte, dite fort), 'door' (devant une porte : courte), 'radio' (dite au talkie
 // de préférence) ; seed : le tirage de l'hôte (le même chez tous) ; avoid : les numéros dits il y a peu
+// Le sens d'une phrase, quand on a son texte (transcrit chez celui qui l'a dite, view/hear.js) : à quoi elle peut
+// servir, et ce qui trahirait l'entité (parler d'elle, crier de fuir)
+const SENSE = {
+  call: /\b(viens|venez|ici|par l[aà]|regarde[zs]?|j'ai trouv[ée]|suis[- ]moi|suivez|come|over here|look|found|follow)\b/i,
+  door: /\b(ouvre[zs]?|entrer|laisse[- ]moi|c'est moi|open|let me in|it's me)\b/i,
+  radio: /\b(o[uù]|t'es|vous [êe]tes|rejoin|j'arrive|attend|where|wait|coming)\b/i,
+  reply: /^(ouais|oui|non|quoi|hein|ok|okay|attends?|j'arrive|vas-y|d'accord|yeah|yes|no|what|wait|sure)\b/i,
+};
+const GIVEAWAY = /\b(monstre|entit[ée]|cr[ée]ature|il est l[aà]|elle est l[aà]|cours|courez|fuis|fuyez|cache[- ]toi|c'est pas (moi|lui|elle)|imposteur|monster|entity|run|hide|it's here|not me|impostor)\b/i;
+export function senseOf(text, kind) {
+  if (!text) return 0;
+  if (GIVEAWAY.test(text)) return -6;
+  return SENSE[kind] && SENSE[kind].test(text) ? 3 : 0;
+}
+
+// Le tic de langage d'un joueur : parmi ces mots d'appui, celui qu'il dit le plus (au moins 3 fois), ou ''
+const TICS = ['wesh', 'frérot', 'frère', 'gros', 'mec', 'bah', 'ben', 'bon', 'putain', 'allez', 'vas-y', 'tiens', 'bro', 'dude', 'yo', 'man', 'guys', 'okay'];
+export function ticOf(texts) {
+  const n = {};
+  for (const t of texts) for (const w of String(t || '').toLowerCase().split(/[^a-zà-ÿ'-]+/)) if (TICS.includes(w)) n[w] = (n[w] || 0) + 1;
+  const best = Object.entries(n).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0];
+  return best && best[1] >= 3 ? best[0] : '';
+}
+
+// Quelle phrase dire ? list : les phrases gardées ({ n, d durée, l force 0 à 1, r dite au talkie, f réaction des
+// autres en s, x son texte s'il est connu }) ; kind : 'chat' (se fondre dans le groupe : une phrase ordinaire, de
+// préférence une qui a fait réagir), 'call' (attirer de loin : courte, dite fort), 'door' (devant une porte : courte),
+// 'radio' (dite au talkie de préférence), 'reply' (répondre à qui lui parle : très courte, sinon rien) ; seed : le
+// tirage de l'hôte (le même chez tous) ; avoid : les numéros dits il y a peu. Le texte, quand on l'a, départage : une
+// phrase qui dit ce qu'il faut passe devant, une phrase qui la trahirait passe derrière
 export function pickUtterance(list, kind, seed, avoid = []) {
   if (!list || !list.length) return null;
+  list = list.filter((u) => senseOf(u.x, kind) >= 0); // (jamais une phrase qui la trahirait : plutôt se taire)
+  if (kind === 'reply') list = list.filter((u) => u.d <= REPLY_MAX);
+  if (!list.length) return null;
   let pool = list.filter((u) => !avoid.includes(u.n));
   if (!pool.length) pool = list.slice();
   const score = (u) => {
-    let sc = 0;
+    let sc = senseOf(u.x, kind);
     if (kind === 'chat') sc += (u.f >= 0.4 ? 3 : 0) + (u.d >= 1 ? 1 : 0) + (u.l < 0.85 ? 1 : 0) + (u.r ? 0 : 1);
     else if (kind === 'radio') sc += (u.r ? 3 : 0) + (u.d <= 3 ? 1 : 0);
+    else if (kind === 'reply') sc += (u.d <= 0.9 ? 1 : 0) + (u.r ? 0 : 1);
     else sc += (u.d <= 2.2 ? 2 : 0) + (u.l >= 0.6 ? 2 : 0) + (u.r ? 0 : 1);
     return sc;
   };
@@ -234,6 +272,7 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
       hiss = null;
       analyser = null;
       ghost = null;
+      myRec = null;
       for (const p of peers.values()) if (p.chain) { p.pending = p.stream; p.chain = null; }
     }
     if (!bus) {
@@ -542,7 +581,8 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
   // l force, r au talkie, f réaction des autres) : on la taille dans son anneau, un instant plus tard (le son arrive
   // un peu après le message), on adoucit ses bords et on la range
   function onMark(p, m) {
-    if (!p.ring || !(m.d >= UTT_MIN && m.d <= UTT_MAX + 0.5) || !(m.a >= 0 && m.a < RING_S - UTT_MAX - 2)) return;
+    const small = !!m.s; // (un petit bruit de voix, pas une phrase : gardé à part)
+    if (!p.ring || !(m.d >= (small ? SMALL_MIN : UTT_MIN) && m.d <= UTT_MAX + 0.5) || !(m.a >= 0 && m.a < RING_S - UTT_MAX - 2)) return;
     const at = p.ringN;
     const tm = setTimeout(() => {
       p.cuts = (p.cuts || []).filter((x) => x !== tm);
@@ -556,22 +596,33 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
         w[i] = ring[k++];
         if (k === ring.length) k = 0;
       }
-      const span = voicedSpan(w, sr, m.d);
-      if (!span || (span[1] - span[0]) / sr < UTT_MIN * 0.7) return;
+      const span = voicedSpan(w, sr, m.d, 0.45, small ? 0.1 : 0.25);
+      if (!span || (span[1] - span[0]) / sr < (small ? SMALL_MIN * 0.7 : UTT_MIN * 0.7)) return;
       const d = w.slice(span[0], span[1]);
+      // (la propreté de la prise : la voix par rapport au fond, en dB, mesuré dans ce qui entoure la phrase)
+      let es = 0;
+      let en = 0;
+      for (let i = 0; i < w.length; i++) if (i >= span[0] && i < span[1]) es += w[i] * w[i]; else en += w[i] * w[i];
+      const nn = w.length - (span[1] - span[0]);
+      const snr = nn > sr * 0.2 ? Math.max(0, Math.min(40, 10 * Math.log10((es / (span[1] - span[0]) + 1e-12) / (en / nn + 1e-9)))) : 20;
       const fade = Math.min(Math.round(sr * 0.012), d.length >> 1);
       for (let i = 0; i < fade; i++) {
         d[i] *= i / fade;
         d[d.length - 1 - i] *= i / fade;
       }
+      if (small) {
+        p.smalls = [...(p.smalls || []), { n: m.n | 0, buf: d, sr }].slice(-SMALLS);
+        return;
+      }
       if (!p.bank) p.bank = [];
       p.bank = p.bank.filter((u) => u.n !== m.n);
-      p.bank.push({ n: m.n | 0, d: +m.d, l: +m.l || 0, r: m.r ? 1 : 0, f: +m.f || 0, buf: d, sr });
+      p.bank.push({ n: m.n | 0, d: +m.d, l: +m.l || 0, r: m.r ? 1 : 0, f: +m.f || 0, buf: d, sr, x: (p.texts && p.texts[m.n]) || '' });
       p.bank.sort((x, y) => x.n - y.n);
       if (p.bank.length > BANK) p.bank.splice(0, p.bank.length - BANK); // (les plus anciennes s'en vont : chez tous les mêmes)
-      // l'échantillon du clonage : les phrases dites sans crier d'abord, les plus longues ensuite
-      const rank = (u) => (u.l < 0.92 ? 10 : 0) + u.buf.length / u.sr;
-      p.refs = [...(p.refs || []).filter((u) => u.n !== m.n), { n: m.n | 0, l: +m.l || 0, buf: d, sr }].sort((x, y) => rank(y) - rank(x));
+      // l'échantillon du clonage : les phrases dites sans crier d'abord, puis les prises les plus propres (peu de fond,
+      // personne qui parle par-dessus juste après) et les plus longues
+      const rank = (u) => (u.l < 0.92 ? 10 : 0) + u.q / 5 - (u.f > 1 ? 2 : 0) + u.buf.length / u.sr;
+      p.refs = [...(p.refs || []).filter((u) => u.n !== m.n), { n: m.n | 0, l: +m.l || 0, f: +m.f || 0, q: snr, buf: d, sr }].sort((x, y) => rank(y) - rank(x));
       let secs = 0;
       p.refs = p.refs.filter((u) => (secs += u.buf.length / u.sr) <= REF_KEEP || secs === u.buf.length / u.sr);
       p.refSecs = p.refs.reduce((a, u) => a + u.buf.length / u.sr, 0);
@@ -582,6 +633,50 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
   // Ses propres phrases : du premier mot au silence. Annoncée UTT_WAIT plus tard, le temps d'entendre si les autres
   // réagissent (react : secondes pendant lesquelles au moins un autre parle)
   let cloneOn = false; // le joueur autorise le clonage de sa voix (setClone)
+  // Sa propre voix, pour la transcription (view/hear.js, seulement s'il a autorisé le clonage) : un anneau de son
+  // micro, où l'on taille chaque phrase qu'il vient de dire, ramenée à 16 kHz ; onSaid(n, échantillons) la reçoit
+  let onSaid = null;
+  let myRing = null;
+  let myRingN = 0;
+  let myRec = null;
+  function ownRing() {
+    const c = ctxOf();
+    if (myRec || !c || !stream || !c.createScriptProcessor) return;
+    myRing = new Float32Array(Math.round(c.sampleRate * 8));
+    myRingN = 0;
+    myRec = c.createScriptProcessor(4096, 1, 1);
+    const mute = c.createGain();
+    mute.gain.value = 0;
+    c.createMediaStreamSource(stream).connect(myRec).connect(mute).connect(c.destination);
+    myRec.onaudioprocess = (e) => {
+      const d = e.inputBuffer.getChannelData(0);
+      let k = myRingN % myRing.length;
+      for (let i = 0; i < d.length; i++) {
+        myRing[k++] = d[i];
+        if (k === myRing.length) k = 0;
+      }
+      myRingN += d.length;
+    };
+  }
+  function ownUtterance(n, d, sil) {
+    const c = ctxOf();
+    if (!myRing || !c) return;
+    const sr = c.sampleRate;
+    const end = Math.max(0, myRingN - Math.round((sil - 0.25) * sr));
+    const start = Math.max(0, myRingN - myRing.length, end - Math.round((d + 0.6) * sr));
+    if (end - start < sr * 0.4) return;
+    const step = sr / 16000;
+    const out = new Float32Array(Math.floor((end - start) / step));
+    for (let i = 0; i < out.length; i++) {
+      // (moyenne des échantillons de chaque pas : assez pour de la parole)
+      const a = start + Math.floor(i * step);
+      const b = Math.max(a + 1, start + Math.floor((i + 1) * step));
+      let v = 0;
+      for (let j = a; j < b; j++) v += myRing[j % myRing.length];
+      out[i] = v / (b - a);
+    }
+    try { onSaid(n, out); } catch (e) {}
+  }
   let utt = null; // la phrase en cours
   let uttN = 0;
   let myBank = 0; // phrases annoncées
@@ -602,7 +697,10 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
       } else utt.sil += dt;
       if (utt.sil >= UTT_SIL) {
         const d = utt.dur - utt.sil;
-        if (d >= UTT_MIN && d <= UTT_MAX) marks.push({ n: ++uttN, d, l: utt.peak, r: utt.radio ? 1 : 0, age: utt.sil, f: 0 });
+        if (d >= UTT_MIN && d <= UTT_MAX) {
+          marks.push({ n: ++uttN, d, l: utt.peak, r: utt.radio ? 1 : 0, age: utt.sil, f: 0 });
+          if (cloneOn && onSaid) ownUtterance(uttN, d, utt.sil);
+        } else if (d >= SMALL_MIN && d < UTT_MIN && !utt.radio) marks.push({ n: ++uttN, d, l: utt.peak, r: 0, age: utt.sil, f: 0, s: 1 });
         utt = null;
       }
     }
@@ -613,8 +711,8 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
       if (others) m.f += dt;
       if (m.age < UTT_WAIT) continue;
       marks.splice(i, 1);
-      myBank = Math.min(BANK, myBank + 1);
-      const msg = { t: 'vu', n: m.n, d: +m.d.toFixed(2), a: +m.age.toFixed(2), l: +m.l.toFixed(2), r: m.r, f: +m.f.toFixed(1) };
+      if (!m.s) myBank = Math.min(BANK, myBank + 1);
+      const msg = { t: 'vu', n: m.n, d: +m.d.toFixed(2), a: +m.age.toFixed(2), l: +m.l.toFixed(2), r: m.r, f: +m.f.toFixed(1), s: m.s };
       for (const id of peers.keys()) send(id, msg);
     }
   }
@@ -743,6 +841,9 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
 
   // La voix volée : l'entité parle. id : le joueur dont elle a la voix ; pos : où elle est ; radio : par le talkie
   // (sinon de vive voix, placée dans le monde) ; name : pour les sous-titres ; kind, seed : quelle phrase (pickUtterance)
+  let lastSim = null; // (la partie et le joueur qu'on suit, vus à la dernière image : pour savoir si l'entité est en vue)
+  let lastV = null;
+  let lastSaid = null; // (tests) la dernière phrase de l'entité : inventée (fake : sa clé) ou vraie (n)
   let mimicNow = null; // { src, id, radio, end, pos } ou { tts }
   let ghost = null; // la chaîne de la voix volée : celle d'un joueur de plus (buildChain)
   function stopMimic() {
@@ -751,7 +852,7 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
     if (mimicNow && mimicNow.tts && window.speechSynthesis) try { speechSynthesis.cancel(); } catch (e) {}
     mimicNow = null;
   }
-  function playMimic(id, pos, radio, name, kind = 'call', seed = 0) {
+  function playMimic(id, pos, radio, name, kind = 'call', seed = 0, to = -1, ctx = '') {
     const c = ctxOf();
     const o = out();
     if (!c || !o) return;
@@ -760,15 +861,36 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
     if (mimicNow && mimicNow.end > c0) return; // (elle ne se coupe pas la parole)
     stopMimic();
     let u = p ? pickUtterance(p.bank, kind, seed, p.said || []) : null;
-    // Une phrase inventée, dite par la voix clonée (view/clone.js) : quand il n'y a pas de vraie phrase à rejouer, et
-    // une partie du temps sinon (le tirage de l'hôte décide : la même phrase chez tous ceux qui l'ont). Pour le reste
-    // elle est jouée comme une vraie : même chaîne, même niveau
-    const fakes = p && p.cloneOk && cloneOn && p.fakes ? p.fakes.filter((f) => f.kind === kind) : [];
-    if (fakes.length && (!u || ((seed >> 3) % 100) / 100 < FAKE_SHARE)) {
-      const pool = fakes.filter((f) => f.i !== p.lastFake);
-      const f = (pool.length ? pool : fakes)[(seed >> 5) % (pool.length || fakes.length)];
+    // Une phrase inventée, dite par la voix clonée (view/clone.js). Un clone ressemble, sans être parfait : on ne le
+    // joue que là où ça passe (masked : au talkie, derrière une porte, hors de vue ou à plus de MASK_R m, et pour
+    // une réplique d'un mot), une fois sur deux ; de près et en vue, c'est une vraie phrase, sauf s'il n'y en a pas.
+    // Parmi les phrases inventées, celles qui nomment le joueur visé (to) ou collent à ce qui se passe (ctx) comptent
+    // triple. Le tirage de l'hôte décide : la même phrase chez tous ceux qui l'ont. Elle est jouée comme une vraie
+    const V = lastV;
+    const dist = V ? Math.hypot(pos.x - V.x, pos.z - V.z) : 99;
+    const seen = !!(V && lastSim && dist < VOICE_R && hasLineOfSight(lastSim.fm ? lastSim.fm(V.floor || 0) : lastSim.map, V.x, V.z, pos.x, pos.z));
+    const masked = radio || kind === 'door' || kind === 'reply' || !seen || dist > MASK_R;
+    const fakes = p && p.cloneOk && cloneOn && p.fakes ? p.fakes.filter((f) => f.kind === kind && (f.to == null || f.to === to) && (!f.ctx || f.ctx === ctx)) : [];
+    if (fakes.length && (!u || (masked && ((seed >> 3) % 100) / 100 < FAKE_SHARE))) {
+      const fresh = fakes.filter((f) => f.i !== p.lastFake);
+      const pool = [];
+      for (const f of fresh.length ? fresh : fakes) for (let k = f.to != null || f.ctx ? 3 : 1; k > 0; k--) pool.push(f);
+      const f = pool[(seed >> 5) % pool.length];
       p.lastFake = f.i;
-      u = { n: -1 - f.i, buf: f.buf, sr: f.sr };
+      u = { n: -1, buf: f.buf, sr: f.sr, fake: f.i };
+    }
+    // (répondre sans avoir de réplique : un petit bruit de sa voix, « hm »)
+    if (!u && kind === 'reply' && p && p.smalls && p.smalls.length) u = { n: -1, ...p.smalls[(seed >> 2) % p.smalls.length] };
+    // Avant une phrase dite de vive voix, une fois sur trois : un petit bruit de sa voix (un souffle, un « euh »)
+    if (u && !radio && kind !== 'reply' && p && p.smalls && p.smalls.length && (seed >> 9) % 3 === 0) {
+      const sm = p.smalls[(seed >> 11) % p.smalls.length];
+      const k = u.sr / sm.sr; // (la phrase peut être à une autre cadence que le petit bruit : on le ramène à la sienne)
+      const n0 = Math.floor(sm.buf.length * k);
+      const gap = Math.round(u.sr * 0.28);
+      const buf = new Float32Array(n0 + gap + u.buf.length);
+      for (let i = 0; i < n0; i++) buf[i] = sm.buf[Math.min(sm.buf.length - 1, Math.floor(i / k))];
+      buf.set(u.buf, n0 + gap);
+      u = { n: u.n, buf, sr: u.sr };
     }
     if (!u) {
       // Un joueur qu'on a déjà entendu, mais dont on n'a pas encore de phrase : elle se tait (une autre voix que la
@@ -810,6 +932,7 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
     if (radio) squelch(true); // (le « kshh » de quelqu'un qui appuie sur son talkie)
     src.start(t);
     const now = { src, id, radio, end: t + buf.duration, pos: { x: pos.x, z: pos.z }, fresh: true };
+    lastSaid = { id, kind, radio, fake: u.fake != null ? u.fake : null, n: u.n };
     src.onended = () => {
       if (radio) squelch(false);
       if (mimicNow === now) mimicNow = null;
@@ -1151,8 +1274,19 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
         const p = peers.get(from);
         if (p) {
           p.cloneOk = !!m.on;
-          if (!p.cloneOk) p.fakes = null;
+          if (!p.cloneOk) { p.fakes = null; p.texts = null; }
           if (m.ask && cloneOn) send(from, { t: 'vc', on: 1 });
+        }
+      }
+      else if (m.t === 'vt') {
+        // le texte d'une de ses phrases (transcrit chez lui)
+        const p = peers.get(from);
+        if (p && p.cloneOk && typeof m.x === 'string') {
+          const keys = Object.keys((p.texts = p.texts || {}));
+          if (keys.length > 60) delete p.texts[keys[0]];
+          p.texts[m.n | 0] = m.x.slice(0, 120);
+          const u = p.bank && p.bank.find((q) => q.n === (m.n | 0));
+          if (u) u.x = p.texts[m.n | 0];
         }
       }
       else if (m.t === 'vu') {
@@ -1192,6 +1326,9 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
       if (track) track.enabled = mode > 0 || (open && micState === 'on');
       // ses phrases, annoncées aux autres (vivant, micro ouvert : celles que l'entité pourra voler)
       trackSpeech(raw, dt, micState === 'on' && alive && (open || mode === 2));
+      if (cloneOn && onSaid && micState === 'on' && !myRec) ownRing();
+      lastSim = sim;
+      lastV = V;
 
       // les voix des autres
       const c = ctxOf();
@@ -1334,8 +1471,8 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
     },
 
     // Level 1 : l'imposteur appelle avec la voix de id (voir playMimic) ; mimicStop : il s'est démasqué
-    mimic(id, pos, radio, name, kind, seed) {
-      playMimic(id, pos, radio, name, kind, seed);
+    mimic(id, pos, radio, name, kind, seed, to, ctx) {
+      playMimic(id, pos, radio, name, kind, seed, to, ctx);
     },
     mimicStop() {
       stopMimic();
@@ -1376,10 +1513,28 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
       }
       return { data, sr, secs: p.refSecs, rms: speechRms(data, sr) };
     },
-    addFake(id, kind, i, buf, sr) {
+    // (line : { i clé, kind, to : le joueur qu'elle nomme ou rien, ctx : la circonstance ou rien })
+    addFake(id, line, buf, sr) {
       const p = peers.get(id);
       if (!p || !p.cloneOk || !cloneOn) return;
-      p.fakes = [...(p.fakes || []).filter((f) => f.i !== i), { kind, i, buf, sr }];
+      p.fakes = [...(p.fakes || []).filter((f) => f.i !== line.i), { kind: line.kind, i: line.i, to: line.to, ctx: line.ctx, buf, sr }];
+    },
+    // La transcription : onSaid(n, échantillons à 16 kHz) reçoit chaque phrase que le joueur vient de dire (s'il a
+    // autorisé le clonage) ; sendText(n, texte) l'envoie aux autres. tic(id) : le mot d'appui d'un coéquipier
+    setOnSaid(fn) {
+      onSaid = fn;
+    },
+    sendText(n, text) {
+      text = String(text || '').trim().slice(0, 120);
+      if (!cloneOn || !text) return;
+      for (const id of peers.keys()) send(id, { t: 'vt', n, x: text });
+    },
+    tic(id) {
+      const p = peers.get(id);
+      return p && p.cloneOk && p.texts ? ticOf(Object.values(p.texts)) : '';
+    },
+    lastMimic() {
+      return lastSaid;
     },
     fakeCount(id) {
       const p = peers.get(id);

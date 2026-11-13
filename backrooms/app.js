@@ -12,6 +12,7 @@ import { BackroomsSfx } from './view/sfx.js';
 import { hotelUi } from './view/hotelExit.js';
 import { createVoice } from './view/voice.js';
 import { createCloner } from './view/clone.js';
+import { createHearer } from './view/hear.js';
 import { BackroomsHUD, levelName, levelSub, LORE, loreOf, hearTape, tapesHeard, store, NOTES, readNote, loreComplete, FINAL_LORE } from './view/hud.js';
 import { parseWords } from './engine/hotel.js';
 import { vault, vaultOpen, vaultKey, openVault, storedKey, rememberKey, keyFromPhrase } from './view/vault.js';
@@ -176,7 +177,7 @@ onGlContext((ok) => {
 });
 
 // Réglages du joueur (sur cet appareil) : souris, image, accessibilité
-const OPT_DEFAULT = { sens: 1, invertY: false, fov: 72, motion: 1, bright: 1, reduceFlashes: false, subs: false, layout: 'auto', quality: 'auto', mic: 'on', voiceVol: 1, clone: 'off' };
+const OPT_DEFAULT = { sens: 1, invertY: false, fov: 72, motion: 1, bright: 1, reduceFlashes: false, subs: false, layout: 'auto', quality: 'auto', mic: 'on', voiceVol: 1, clone: 'off', cloneAsked: false };
 const OPTS = { ...OPT_DEFAULT, ...store.get('backrooms_opts', {}) };
 // anciens réglages : « appuyer pour parler » et « micro ouvert » ne font plus qu'un (la voix de proximité est toujours ouverte)
 if (OPTS.mic !== 'off') OPTS.mic = 'on';
@@ -246,20 +247,35 @@ function ensureVoice() {
 // début de la partie (tout le Level 0 pour télécharger et préparer les voix), à plusieurs seulement
 let cloner = null;
 let clonerT = 0;
+let hearer = null; // la transcription de ses propres phrases (view/hear.js)
+let cloneAsking = false;
+const cloneLang = () => (/^fr/i.test(navigator.language || '') ? 'fr' : 'en');
 function cloneStep(dt) {
+  // la question, une seule fois, à la première partie à plusieurs (sur l'écran titre si on y est encore)
+  if (multi() && !OPTS.cloneAsked && !cloneAsking && hud && hud.askClone && OPTS.mic !== 'off') {
+    cloneAsking = true;
+    if (document.pointerLockElement) document.exitPointerLock();
+    hud.askClone(cloneLang()).then((ok) => {
+      cloneAsking = false;
+      setOpt('cloneAsked', true);
+      setOpt('clone', ok ? 'on' : 'off');
+      if (voice) voice.setClone(ok);
+    });
+  }
   const on = OPTS.clone === 'on' && multi() && started;
   if (!on) {
     if (cloner) { cloner.dispose(); cloner = null; }
-    if (multi() && started && OPTS.clone !== 'on' && hud && !store.get('backrooms_clone_hint', false)) {
-      store.set('backrooms_clone_hint', true);
-      setTimeout(() => hud && hud.toast('New · the entity can learn to speak with your voice (AI, stays in your browser) · allow it in Settings ⚙ › Voix', 9), 6000);
-    }
+    if (hearer) { hearer.dispose(); hearer = null; voice.setOnSaid(null); }
     return;
   }
   clonerT -= dt;
   if (clonerT > 0) return;
   clonerT = 1;
-  if (!cloner) cloner = createCloner({ voice, lang: /^fr/i.test(navigator.language || '') ? 'fr' : 'en' });
+  if (!cloner) cloner = createCloner({ voice, lang: cloneLang(), names: () => (sim ? sim.players.map((q) => ({ id: q.id, name: q.name })) : []) });
+  if (!hearer) {
+    hearer = createHearer({ lang: cloneLang(), onText: (n, text) => voice && voice.sendText(n, text) });
+    voice.setOnSaid((n, audio) => hearer && hearer.push(n, audio));
+  }
   cloner.tick();
 }
 // le micro : demandé au lancement, même seul (la voix fait du bruit : l'entité l'entend), sinon à la première touche R
@@ -1936,7 +1952,7 @@ function handleEvent(ev, me) {
       // l'imposteur appelle avec la voix volée (de vive voix, là où il est, ou au talkie) ; chacun la rejoue chez soi
       // (au talkie : pas pendant une coupure, le talkie est mort)
       // (celui qu'elle imite ne l'entend pas : il est loin, et au talkie il se reconnaîtrait)
-      if (voice && sim.player.status === 'alive' && !(ev.radio && sim.radioDead) && (ev.id !== me || sim.players.length < 2)) voice.mimic(ev.id, { x: ev.x, z: ev.z }, !!ev.radio, who(ev.id), ev.kind, ev.seed);
+      if (voice && sim.player.status === 'alive' && !(ev.radio && sim.radioDead) && (ev.id !== me || sim.players.length < 2)) voice.mimic(ev.id, { x: ev.x, z: ev.z }, !!ev.radio, who(ev.id), ev.kind, ev.seed, ev.to, ev.ctx);
       break;
     case 'unmask':
       if (sfx) sfx.rush({ x: ev.x, z: ev.z });
@@ -2840,8 +2856,8 @@ if (window.DDVolume && btnSet) {
       { title: 'Voix', items: [
         { label: 'Micro', get: () => OPTS.mic, set: (v) => { setOpt('mic', v); if (v !== 'off' && started) askMic(true); }, options: [['on', 'Activé'], ['off', 'Coupé']] },
         { label: 'Volume des voix', get: () => OPTS.voiceVol, set: (v) => setOpt('voiceVol', +v), range: [0, 2, 0.1], format: (v) => `${Math.round(v * 100)} %` },
-        { label: 'Voix clonée par l\'entité (IA)', get: () => OPTS.clone, set: (v) => { setOpt('clone', v); if (voice) voice.setClone(v === 'on'); }, options: [['off', 'Refusée'], ['on', 'Autorisée']] },
-      ], hint: "Voix clonée : au Level 1, l'entité peut dire des phrases que vous n'avez jamais dites, avec votre voix, fabriquée par une IA à partir de ce que vous dites en partie. Seulement entre joueurs qui l'ont tous autorisé ; tout reste dans les navigateurs des joueurs, rien n'est envoyé ni gardé. Premier chargement : environ 150 Mo. Votre voix porte toute seule jusqu'aux joueurs proches (on vous entend à travers les murs, mal). R maintenu : parler dans le talkie, à toute l'équipe. Attention : l'entité entend aussi, et plus vous parlez, plus elle devient agressive. Le talkie grésille aussi chez ceux qui le reçoivent." },
+        { label: 'Voix clonée par l\'entité (IA)', get: () => OPTS.clone, set: (v) => { setOpt('clone', v); setOpt('cloneAsked', true); if (voice) voice.setClone(v === 'on'); }, options: [['off', 'Refusée'], ['on', 'Autorisée']] },
+      ], hint: "Voix clonée : au Level 1, l'entité peut dire des phrases que vous n'avez jamais dites, avec votre voix, fabriquée par une IA à partir de ce que vous dites en partie. Seulement entre joueurs qui l'ont tous autorisé. Votre voix n'est envoyée à aucun serveur : tout se calcule dans les navigateurs des joueurs, qui reçoivent aussi le texte de vos phrases, et rien n'est gardé après la partie. Premier chargement : environ 250 Mo. Votre voix porte toute seule jusqu'aux joueurs proches (on vous entend à travers les murs, mal). R maintenu : parler dans le talkie, à toute l'équipe. Attention : l'entité entend aussi, et plus vous parlez, plus elle devient agressive. Le talkie grésille aussi chez ceux qui le reçoivent." },
       { title: 'Accessibilité', items: [
         { label: 'Réduire les flashs', get: () => OPTS.reduceFlashes, set: (v) => setOpt('reduceFlashes', v), options: [[false, 'Non'], [true, 'Oui']] },
         { label: 'Sous-titres', get: () => OPTS.subs, set: (v) => setOpt('subs', v), options: [[false, 'Non'], [true, 'Oui']] },

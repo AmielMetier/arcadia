@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 5.87 — 13 novembre 2026
+- **The Backrooms** — Au Level 1, l'entité est bien plus dure à démasquer :
+  - Elle répond quand on lui parle : dites-lui quelque chose de près, elle lâche un « ouais » ou un « quoi ? » avec la voix du joueur qu'elle imite.
+  - Elle vous appelle par votre prénom, et parle de ce qui se passe : le fusible qui manque, la coupure de courant, le monte-charge rallumé.
+  - Elle reprend les petits bruits de chacun (un souffle, un « euh », un rire bref) et ses mots préférés (« wesh », « frérot »…).
+  - Elle choisit mieux quoi répéter : une phrase qui appelle pour attirer, jamais une phrase où vous parliez d'elle.
+  - De près et en face, elle ne rejoue que vos vraies phrases. Les phrases inventées par l'IA, elle les garde pour le talkie, le lointain et les portes fermées, là où on n'entend pas la différence.
+  - La voix clonée se demande maintenant à l'écran, une fois, au début d'une partie à plusieurs : oui ou non.
+
 ## 5.86 — 13 novembre 2026
 - **The Backrooms** — Au Level 1, l'entité peut maintenant inventer des phrases avec votre voix (à autoriser dans les réglages) :
   - Une IA apprend votre voix pendant que vous parlez au Level 0, puis l'entité s'en sert pour dire des choses que vous n'avez jamais dites : « Hé, viens voir ! », « Ouvre, c'est moi »…

@@ -5622,7 +5622,86 @@ test("Level 1 : l'imposteur se fige une seconde quand on siffle près de lui, pa
   }
 });
 
-import { voicedSpan, pickUtterance } from '../backrooms/view/voice.js';
+import { voicedSpan, pickUtterance, senseOf, ticOf } from '../backrooms/view/voice.js';
+import { linesFor, sayable, LINES } from '../backrooms/view/clone.js';
+import { cleanText } from '../backrooms/view/hear.js';
+test('voix volée : répliques, sens des phrases, tics, prénoms et phrases de circonstance', () => {
+  const bank = [
+    { n: 1, d: 0.7, l: 0.5, r: 0, f: 0, x: 'Ouais ouais.' },
+    { n: 2, d: 2.5, l: 0.5, r: 0, f: 1.2, x: 'Cours, le monstre est là !' },
+    { n: 3, d: 1.5, l: 0.6, r: 0, f: 0, x: "Viens voir, j'ai trouvé un truc." },
+    { n: 4, d: 3.0, l: 0.4, r: 0, f: 0, x: 'Je sais pas trop, on verra bien.' },
+    { n: 5, d: 1.2, l: 0.5, r: 0, f: 0, x: "Ouvre, c'est moi." },
+  ];
+  for (let seed = 0; seed < 30; seed++) {
+    assert.equal(pickUtterance(bank, 'call', seed * 4).n, 3, 'pour appeler : la phrase qui appelle');
+    assert.equal(pickUtterance(bank, 'door', seed * 4).n, 5, 'devant une porte : celle qui demande d\'ouvrir');
+    assert.notEqual(pickUtterance(bank, 'chat', seed).n, 2, 'jamais la phrase qui la trahirait');
+    assert.ok([1, 5].includes(pickUtterance(bank, 'reply', seed).n), 'une réplique est courte');
+  }
+  assert.equal(pickUtterance(bank, 'reply', 0).n, 1, 'et de préférence un « ouais »');
+  assert.equal(pickUtterance([bank[1]], 'chat', 0), null, 'que des phrases qui la trahiraient : elle se tait');
+  assert.equal(pickUtterance([bank[3]], 'reply', 0), null, 'pas de phrase courte : pas de réplique');
+  assert.ok(senseOf('It is here, run!', 'chat') < 0 && senseOf('come over here', 'call') > 0 && senseOf('', 'call') === 0);
+  assert.equal(ticOf(['Wesh viens', 'wesh t\'es où', 'bah wesh alors', 'bah non']), 'wesh');
+  assert.equal(ticOf(['wesh', 'bah', 'bon']), '', 'dit moins de trois fois : pas un tic');
+  // les phrases à fabriquer : un prénom par coéquipier qui se prononce, le tic devant les appels
+  assert.ok(sayable('Lucas') && sayable('ÉLODIE') && !sayable('xX_Dark_Xx') && !sayable('Jo') && !sayable('Player 2'));
+  const ls = linesFor('fr', [{ id: 2, name: 'LUCAS' }, { id: 3, name: 'xX_Dark_Xx' }], 'wesh');
+  assert.ok(ls.some((l) => l.to === 2 && l.text === 'Lucas, viens voir !' && l.kind === 'call'), 'le prénom, écrit comme un prénom');
+  assert.ok(!ls.some((l) => l.to === 3) && !ls.some((l) => l.text.includes('{n}')), 'un pseudo imprononçable n\'est pas dit');
+  assert.ok(ls.some((l) => l.text === 'Wesh, hé, viens voir !') && ls.some((l) => l.text === 'Ouais.' && l.kind === 'reply'), 'le tic devant un appel, pas devant une réplique');
+  assert.equal(new Set(ls.map((l) => l.i)).size, ls.length, 'une clé par phrase');
+  for (const lang of ['fr', 'en']) for (const ctx of ['dark', 'lift', 'last', 'fuse']) assert.ok(LINES[lang].some((l) => l[2] === ctx), `une phrase pour « ${ctx} » (${lang})`);
+  assert.equal(LINES.fr.length, LINES.en.length);
+  assert.equal(cleanText("  Sous-titres réalisés par la communauté d'Amara.org "), '');
+  assert.equal(cleanText(' Viens  voir ! '), 'Viens voir !');
+  assert.equal(cleanText('...'), '');
+});
+
+test("Level 1 : l'imposteur répond quand on lui parle, et sait ce qui se passe (coupure, fusibles)", () => {
+  BackroomsSim.DISGUISE = true;
+  try {
+    const players = [{ id: 0, name: 'A' }, { id: 1, name: 'B' }];
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 11, players, localId: 0, level: 1 });
+    sim.arriveT = 0;
+    const m = sim.map;
+    const M = sim.monster;
+    const [A, B] = sim.players;
+    M.dormantT = 0;
+    Object.assign(sim.director, { phase: 'build', relaxT: 0 });
+    const cells = m.walkable.map((q) => ({ x: (q.x + 0.5) * CELL_SIZE, z: (q.z + 0.5) * CELL_SIZE })).filter((q) => !m.safeAt(q.x, q.z) && !sim.isColliding(q.x, q.z, 0.4));
+    const D = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+    const b0 = cells.find((q) => cells.some((r) => D(q, r) > 60));
+    const a0 = cells.find((q) => D(q, b0) > 60);
+    const spot = cells.find((q) => D(q, b0) > 5 && D(q, b0) < 9);
+    Object.assign(B, b0); Object.assign(A, a0);
+    M.mimic = A.id;
+    sim.fuses = 2;
+    const calls = [];
+    const run = (n, voice) => {
+      for (let i = 0; i < n && M.mimic != null; i++) {
+        Object.assign(M, { x: spot.x, z: spot.z, mode: 'mimic', hesT: 99, restT: 0, coverT: 99, callT: Math.max(M.callT, 30) });
+        sim.step({}, { 1: { remote: true, voice, mx: 0, my: 0, yaw: 0, pitch: 0 } });
+        Object.assign(B, b0); Object.assign(A, a0);
+        calls.push(...sim.drainEvents().filter((e) => e.type === 'mimicCall'));
+      }
+    };
+    run(60, 0); // personne ne parle : pas de réplique
+    assert.equal(calls.length, 0);
+    run(60, 0.8); // B lui parle une seconde…
+    assert.equal(calls.length, 0, 'elle ne coupe pas la parole');
+    run(100, 0); // … puis se tait : elle répond
+    assert.ok(calls.length === 1 && calls[0].kind === 'reply' && !calls[0].radio && calls[0].id === A.id && calls[0].to === B.id, `une réplique, de vive voix (${JSON.stringify(calls.map((c) => c.kind))})`);
+    assert.equal(calls[0].ctx, 'last', 'il manque un fusible : elle le sait');
+    run(60, 0.8); run(100, 0);
+    assert.equal(calls.length, 1, 'pas deux répliques coup sur coup');
+  } finally {
+    BackroomsSim.DISGUISE = false;
+  }
+});
+
+
 test('voix volée : la phrase est taillée du premier mot au silence, et tous choisissent la même', () => {
   // une fenêtre : la fin d'une phrase d'avant, un silence, la phrase (1,4 s, avec une courte pause), un silence
   const sr = 48000;

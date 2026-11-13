@@ -212,6 +212,7 @@ export const MIMIC_FAR = 30;
 export const MIMIC_HEAR = 22; // m : jusqu'où porte sa voix (comme celle d'un joueur, VOICE_R de view/voice.js)
 export const MIMIC_CHAT_R = 11;
 export const MIMIC_CHAT = [5, 9]; // s entre deux phrases quand elle bavarde
+export const REPLY_CD = [6, 10]; // s entre deux répliques à qui lui parle
 // Level 1 : les salles de sécurité. L'entité qui bute sur une porte blindée fermée frappe BANG_T secondes, hurle de
 // rage et va rôder au moins RETREAT_R mètres plus loin
 export const BANG_T = [8, 12];
@@ -1653,24 +1654,46 @@ export class BackroomsSim {
     // une porte ou un casier, 'door' ; au talkie, 'radio'. Chaque client choisit la même phrase (seed). Elle se tait
     // plutôt que de se trahir : jamais la voix d'un vivant à portée d'oreille de ceux qui l'entendraient, jamais au
     // talkie s'il a quelqu'un près de lui (on le verrait se taire) ou s'il y parle lui-même
-    M.callT -= DT;
-    if (M.callT <= 0 && M.restT <= 0) { // (le talkie porte partout)
+    // Parler, si ça ne la trahit pas. kind : 'call', 'chat', 'door', 'radio', ou 'reply' (une réplique courte à qui
+    // vient de lui parler). ctx : ce qui se passe, pour une phrase de circonstance ('dark' coupure de courant, 'lift'
+    // le monte-charge est réalimenté, 'last' il ne manque qu'un fusible, 'fuse' on en a déjà trouvé)
+    const speak = (reply) => {
       const A = this.players.find((Q) => Q.id === M.mimic);
       const real = !!A && A.status === 'alive' && this.players.length > 1; // (celui qu'elle imite peut la contredire)
       const hear = alive.filter((Q) => Q !== A && Math.hypot(Q.x - M.x, Q.z - M.z) < MIMIC_HEAR);
       const los = hasLineOfSight(map, M.x, M.z, P.x, P.z);
       const near = dist < 16 && (locked ? Math.hypot(M.x - locked.x, M.z - locked.z) < 6 : los);
       const chat = !locked && !(P.hidden >= 0) && hear.some((Q) => Math.hypot(Q.x - M.x, Q.z - M.z) < MIMIC_CHAT_R);
-      const radio = !(near || chat);
+      const radio = !reply && !(near || chat);
       let ok;
       if (!radio) ok = (!real || Math.hypot(A.x - M.x, A.z - M.z) > MIMIC_HEAR || (A.floor || 0) !== (M.floor || 0)) && hear.every((Q) => this.mimicCover(M, Q));
       else ok = !this.radioDead && this.mimicCover(M, P) && (!real || (!A.radio && !this.players.some((Q) => Q !== A && Q.status === 'alive' && (Q.floor || 0) === (A.floor || 0) && Math.hypot(Q.x - A.x, Q.z - A.z) < MIMIC_HEAR)));
-      if (!ok) M.callT = rand(2, 4); // (elle se tait, et réessaie bientôt : les joueurs bougent)
-      else {
-        const kind = radio ? 'radio' : locked || P.hidden >= 0 ? 'door' : chat ? 'chat' : 'call';
-        M.callT = kind === 'chat' ? rand(MIMIC_CHAT[0], MIMIC_CHAT[1]) : rand(MIMIC_CALL[0], MIMIC_CALL[1]);
-        this.emit({ type: 'mimicCall', id: M.mimic, to: P.id, radio, kind, seed: Math.floor(Math.random() * 1e6), x: M.x, z: M.z });
+      if (!ok) return null;
+      const kind = reply ? 'reply' : radio ? 'radio' : locked || P.hidden >= 0 ? 'door' : chat ? 'chat' : 'call';
+      const ctx = this.level !== 1 ? undefined : this.blackout > 0 ? 'dark' : this.powered ? 'lift' : this.fuses === FUSES - 1 ? 'last' : this.fuses > 0 ? 'fuse' : undefined;
+      this.emit({ type: 'mimicCall', id: M.mimic, to: P.id, radio, kind, ctx, seed: Math.floor(Math.random() * 1e6), x: M.x, z: M.z });
+      return kind;
+    };
+    // On lui parle : un joueur tout près (pas au talkie) parlait et vient de se taire. Un humain répondrait : elle
+    // lâche une réplique courte, une seconde après (pas plus d'une toutes les REPLY_CD secondes)
+    M.replyCd = Math.max(0, (M.replyCd || 0) - DT);
+    if (alive.some((Q) => Q.id !== M.mimic && Q.voice > 0.3 && !Q.radio && Math.hypot(Q.x - M.x, Q.z - M.z) < MIMIC_CHAT_R)) M.heardT = (M.heardT || 0) + DT;
+    else {
+      if (M.heardT > 0.5 && M.replyCd <= 0 && !(M.replyT > 0) && !calm) M.replyT = rand(0.5, 1.1);
+      M.heardT = 0;
+    }
+    if (M.replyT > 0) {
+      M.replyT -= DT;
+      if (M.replyT <= 0 && speak(true)) {
+        M.replyCd = rand(REPLY_CD[0], REPLY_CD[1]);
+        M.callT = Math.max(M.callT, 3);
       }
+    }
+    M.callT -= DT;
+    if (M.callT <= 0 && M.restT <= 0) { // (le talkie porte partout)
+      const kind = speak(false);
+      if (!kind) M.callT = rand(2, 4); // (elle se tait, et réessaie bientôt : les joueurs bougent)
+      else M.callT = kind === 'chat' ? rand(MIMIC_CHAT[0], MIMIC_CHAT[1]) : rand(MIMIC_CALL[0], MIMIC_CALL[1]);
     }
     // une hésitation de temps en temps : il s'arrête, se tourne vers les pas les plus proches, et repart
     M.hesT -= DT;
