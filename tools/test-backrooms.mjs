@@ -3006,6 +3006,19 @@ test('Level 17 : des pièces aux proportions d\'un vrai lieu — salle 1 plus pr
       assert.equal(reach, free, `${r.name} : couloirs et pièces ouvertes tous accessibles`);
       assert.ok(up.fakeDoors.filter((d) => d.style === 'office').length >= 8, 'des portes fermées à clé le long des couloirs');
     }
+    // les pans coupés : dans l'angle de deux murs, une case que personne ne traverse en coin, sans meuble ni objet
+    for (const f of floors) {
+      assert.ok(f.cutCorners.length >= 4, 'des pans coupés dans les grands lieux');
+      for (const c of f.cutCorners) {
+        const cx = (c.x + 0.5) * C;
+        const cz = (c.z + 0.5) * C;
+        assert.ok(f.isWall(c.x + c.dx, c.z) && f.isWall(c.x, c.z + c.dz), 'dans un angle rentrant');
+        assert.ok(f.collide(cx + c.dx * 0.6, cz + c.dz * 0.6, 0.1), 'le coin est plein');
+        assert.ok(Math.abs(c.ax - c.bx) === C && Math.abs(c.az - c.bz) === C, 'le pan va d\'un coin de la case à l\'autre');
+        assert.ok(f.navBlock.has(c.z * f.W + c.x) && !(f.dist[c.z * f.W + c.x] >= 0), 'l\'entité l\'évite, rien n\'y est posé');
+        for (const it of [...f.furn, ...f.items, ...f.cassettes]) assert.ok(Math.floor(it.x / C) !== c.x || Math.floor(it.z / C) !== c.z, 'rien dans la case d\'un pan coupé');
+      }
+    }
     // les escalators : un coffrage à chaque bout, qu'on ne traverse pas
     for (const e of up.allEscalators) assert.ok(floors[e.fi].collide(e.x - e.dir * 0.5, e.z, 0.1), 'le pied de l\'escalator est coffré');
   }

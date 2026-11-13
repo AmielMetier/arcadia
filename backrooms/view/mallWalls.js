@@ -96,12 +96,12 @@ const SAFETY = [
   ['THIS DOOR', 'TO REMAIN CLOSED', '#1d4e9e'],
 ];
 const ADS = [
-  ['SUMMER', 'SALE', 'UP TO 70% OFF', 38, 30],
-  ['BACK TO', 'SCHOOL', 'EVERYTHING FOR THE NEW YEAR', 210, 45],
-  ['VISIT', 'SANTA', 'CENTER COURT • DEC 1–24', 0, 40],
-  ['NOW', 'LEASING', 'CALL 555-0170', 200, 10],
-  ['EVERYTHING', 'MUST GO', 'FINAL CLEARANCE', 52, 55],
-  ['GRAND', 'OPENING', 'COMING SOON TO THIS SPACE', 280, 35],
+  ['FALL', 'SALE', 'UP TO 40% OFF', 28, 38],
+  ['HALLOWEEN', 'PARADE', 'CENTER COURT • OCT 31 • 5 PM', 22, 42],
+  ['FALL', 'FASHION', 'NEW ARRIVALS IN EVERY STORE', 350, 36],
+  ['GIFT', 'CERTIFICATES', 'AT THE INFORMATION DESK', 200, 28],
+  ['LAYAWAY', 'NOW', 'FOR THE HOLIDAYS', 52, 48],
+  ['HOLIDAY', 'HOURS', 'OPEN UNTIL 9 PM FROM NOV 29', 280, 35],
   ['THANK YOU', 'FOR SHOPPING', 'HALCYON PARK MALL', 30, 25],
   ['SHOP • DINE', '• PLAY •', 'OPEN 7 DAYS A WEEK', 170, 30],
 ];
@@ -1112,4 +1112,16 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         G.add('lineW', g.rotateY(dir > 0 ? 0 : PI).translate(x, 0.005, z));
       }
   }
+  // une cellule vacante (sa vitrine tapissée de kraft) : une affichette « FOR LEASE » collée derrière la glace, à
+  // hauteur d'yeux. Nulle part ailleurs : le centre est en activité
+  for (const sh of map.shops || []) {
+    if (sh.state !== 'glass' || !sh.dark) continue;
+    const g = new THREE.PlaneGeometry(0.9, 0.4);
+    const uv = plateUV(28, ...CROP(28));
+    const a = g.attributes.uv;
+    for (let i = 0; i < a.count; i++) a.setXY(i, a.getX(i) > 0 ? uv[2] : uv[0], a.getY(i) > 0 ? uv[3] : uv[1]);
+    if (sh.dir < 0) g.rotateY(PI);
+    G.add('plates', g.translate(((sh.x0 + sh.x1 + 1) * C) / 2 + (sh.id % 2 ? 1.4 : -1.4), 1.55, sh.frontZ - sh.dir * 0.05));
+  }
+
 }

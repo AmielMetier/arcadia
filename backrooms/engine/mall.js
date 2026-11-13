@@ -1801,6 +1801,44 @@ export function createMallMap(seed = 17) {
       island(cx(102) + 1.5, cx(55) + 1.25);
     }
   }
+  // (d) Des pans coupés : dans les grands lieux publics, l'angle rentrant de deux murs est fermé par un pan à 45° (la
+  // case d'angle, coupée par sa diagonale) : le plan ne se lit plus comme un quadrillage. Jamais près d'une porte, d'un
+  // pilier, d'un vide, d'un meuble ni d'une lampe ; l'entité évite la case
+  const stairSet0 = new Set(stairs.flatMap((st) => st.cells.map((c) => c.gz * W + c.gx)));
+  const CHAMFER_IN = new Set([RK.FOOD, RK.CINE, RK.COURT, RK.PLAZA, RK.LOBBY, RK.ANNEX, RK.FUN, RK.PORTAL]);
+  for (const f of F) {
+    f.cutCorners = [];
+    const doorAt = new Set(f.doors.map((d) => d.z * W + d.x));
+    for (let z = 1; z < H - 1; z++)
+      for (let x = 1; x < W - 1; x++) {
+        const r = f.grid[z * W + x] === T.FLOOR ? f.rooms[f.zone[z * W + x]] : null;
+        if (!r || !CHAMFER_IN.has(r.kind)) continue;
+        for (const [dx, dz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+          if (get(f, x + dx, z) !== T.WALL || get(f, x, z + dz) !== T.WALL || get(f, x + dx, z + dz) !== T.WALL) continue;
+          let busy = false;
+          for (let b = -1; b <= 1 && !busy; b++) for (let a = -1; a <= 1 && !busy; a++) if (doorAt.has((z + b) * W + x + a) || get(f, x + a, z + b) === T.PILLAR || stairSet0.has((z + b) * W + x + a)) busy = true;
+          const X0 = x * C;
+          const Z0 = z * C;
+          if (busy || f.lights.some((l) => l.gx === x && l.gz === z)) continue;
+          if (f.fi === 0 && up.voids.some((v) => polyDist(v.pts, X0 + C / 2, Z0 + C / 2) < C * 1.5)) continue;
+          // (K : l'angle des deux murs ; le pan joint les deux autres coins de la case)
+          const K = [X0 + (dx > 0 ? C : 0), Z0 + (dz > 0 ? C : 0)];
+          const A = [K[0] - dx * C, K[1]];
+          const B = [K[0], K[1] - dz * C];
+          // (un pot ou une poubelle posés dans l'angle s'en vont ; un meuble plus gros qui déborde : pas de pan ici)
+          const small = f.furn.filter((it) => !it.gone && Math.floor(it.x / C) === x && Math.floor(it.z / C) === z && Math.max(it.w, it.d) <= 0.8);
+          const ids = new Set(small.map((it) => it.id));
+          const hits = (px, pz) => f.solids.list.some((o) => !(o.furn !== undefined && ids.has(o.furn)) && f.solids.dist(o, px, pz) < 0.25);
+          if ([0.2, 0.45].some((t) => hits(K[0] - dx * C * t * 1.6, K[1] - dz * C * t) || hits(K[0] - dx * C * t, K[1] - dz * C * t * 1.6))) continue;
+          for (const it of small) it.gone = true;
+          f.solids.remove((o) => o.furn !== undefined && ids.has(o.furn));
+          f.cutCorners.push({ x, z, dx, dz, ax: A[0], az: A[1], bx: B[0], bz: B[1], room: r.id });
+          f.solids.add({ pts: [K, A, B], chamfer: 1 });
+          f.navBlock.add(z * W + x);
+          navBase[f.fi].add(z * W + x);
+        }
+      }
+  }
   // une lumière n'est jamais dans un mur ; les lampes reprennent leur numéro
   for (const f of F) {
     f.lights = f.lights.filter((l) => {
@@ -1997,6 +2035,7 @@ export function createMallMap(seed = 17) {
       screens: f.fi === 0 ? screens : [],
       fakeScreens: f.fi === 0 ? fakeScreens : [],
       fakeDoors: f.fakeDoors || [],
+      cutCorners: f.cutCorners || [],
       courts: COURTS,
       mailZ: MZ,
       walkable: wk,

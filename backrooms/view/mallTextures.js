@@ -107,37 +107,25 @@ function drawCarpet(g, S, img, base, tint) {
 
 // 7. Le rideau à mailles (une répétition = 50 cm) : des maillons en quinconce, du vide entre eux (alpha)
 function drawGrille(g, S) {
+  // un rideau à mailles : des joncs d'aluminium horizontaux (tous les 8 cm sur un carreau d'un mètre), reliés par des
+  // maillons verticaux en quinconce (tous les 25 cm). Des traits épais : de loin, la grille se fond en un voile au lieu
+  // de scintiller
   g.clearRect(0, 0, S, S);
-  const nx = 10;
-  const ny = 6;
-  const w = S / nx;
-  const h = S / ny;
-  g.strokeStyle = '#d6d4cf';
-  g.lineWidth = S / 90;
-  g.lineCap = 'round';
-  for (let j = 0; j < ny; j++)
-    for (let i = 0; i <= nx; i++) {
-      const x = i * w + (j % 2 ? w / 2 : 0);
-      const y = j * h;
-      // un maillon : une barre courte, deux crochets
-      g.beginPath();
-      g.moveTo(x - w * 0.42, y + h * 0.5);
-      g.lineTo(x + w * 0.42, y + h * 0.5);
-      g.stroke();
-      g.beginPath();
-      g.moveTo(x - w * 0.42, y + h * 0.5);
-      g.lineTo(x - w * 0.5, y);
-      g.moveTo(x + w * 0.42, y + h * 0.5);
-      g.lineTo(x + w * 0.5, y + h);
-      g.stroke();
+  const rows = 12;
+  const h = S / rows;
+  const t = Math.max(3, S / 96);
+  for (let j = 0; j < rows; j++) {
+    const y = j * h + h / 2;
+    g.fillStyle = '#d2d0ca';
+    g.fillRect(0, y - t / 2, S, t);
+    g.fillStyle = 'rgba(255,255,255,0.35)';
+    g.fillRect(0, y - t / 2, S, t * 0.3);
+    g.fillStyle = '#b9b7b0';
+    for (let i = 0; i < 4; i++) {
+      const x = ((i + (j % 2 ? 0.5 : 0)) * S) / 4;
+      g.fillRect(x - t * 0.45, y, t * 0.9, h);
+      if (x < t) g.fillRect(x + S - t * 0.45, y, t * 0.9, h);
     }
-  // les tiges verticales
-  g.lineWidth = S / 70;
-  for (let i = 0; i <= nx; i += 2) {
-    g.beginPath();
-    g.moveTo(i * w, 0);
-    g.lineTo(i * w, S);
-    g.stroke();
   }
 }
 
@@ -439,9 +427,52 @@ export function createMallTextures() {
   const [laC, laG] = flat('168,138,100');
   out.laminate = tex(laC);
   out.laminateGloss = grey('l17_stratifie_lisse.jpg');
-  const [gc, gg] = mk(256);
-  drawGrille(gg, 256);
+  const [gc, gg] = mk(512);
+  drawGrille(gg, 512);
   out.grille = tex(gc);
+  // la couche technique des plafonds : à gauche une bouche de soufflage (quatre directions), à droite une grille de
+  // reprise (un nid d'abeilles carré)
+  {
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 128;
+    const g = c.getContext('2d');
+    g.fillStyle = '#e9e7e0';
+    g.fillRect(0, 0, 256, 128);
+    g.strokeStyle = '#8f8d86';
+    for (let k = 0; k < 5; k++) {
+      const m = 6 + k * 11;
+      g.lineWidth = 3;
+      g.strokeRect(m, m, 128 - 2 * m, 128 - 2 * m);
+    }
+    g.strokeStyle = '#c9c7c0';
+    g.lineWidth = 2;
+    for (const [x0, y0, x1, y1] of [[0, 0, 64, 64], [128, 0, 64, 64], [0, 128, 64, 64], [128, 128, 64, 64]]) {
+      g.beginPath();
+      g.moveTo(x0, y0);
+      g.lineTo(x1, y1);
+      g.stroke();
+    }
+    g.fillStyle = '#bdbbb4';
+    g.fillRect(56, 56, 16, 16);
+    g.fillStyle = '#34322e';
+    g.fillRect(134, 6, 116, 116);
+    g.strokeStyle = '#d8d6cf';
+    g.lineWidth = 2;
+    for (let k = 0; k <= 9; k++) {
+      const v = 134 + (116 * k) / 9;
+      g.beginPath();
+      g.moveTo(v, 6);
+      g.lineTo(v, 122);
+      g.moveTo(134, 6 + (116 * k) / 9);
+      g.lineTo(250, 6 + (116 * k) / 9);
+      g.stroke();
+    }
+    g.lineWidth = 5;
+    g.strokeStyle = '#e9e7e0';
+    g.strokeRect(131, 3, 122, 122);
+    out.ceilKit = tex(c);
+  }
   const [kc, kg] = mk(512);
   drawPaper(kg, 512);
   out.paper = tex(kc);

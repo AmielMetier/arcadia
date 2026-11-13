@@ -353,7 +353,9 @@ function makeMaterials(tx, baked) {
     steel: { m: baked(phong({ color: '#7f8286', specular: '#c4c8cc', shininess: 70 }), { spec: 0.6, gloss: 110, mask: 0 }), S: 1 },
     black: { m: baked(phong({ color: '#151515', specular: '#3a3a3a', shininess: 50 })), S: 1 },
     marbleDark: { m: baked(phong({ color: '#2a2521', specular: '#4a4540', shininess: 70 }), { spec: 0.45, gloss: 120, mask: 0 }), S: 1 },
-    grille: { m: baked(lam({ map: tx.grille, alphaTest: 0.45, side: THREE.DoubleSide, color: '#bdbbb4' })), S: 0.5 },
+    // (la couverture par l'alpha : avec l'anticrénelage de la cible de rendu, la grille lointaine devient un voile)
+    grille: { m: baked(lam({ map: tx.grille, alphaTest: 0.3, alphaToCoverage: true, side: THREE.DoubleSide, color: '#c4c2bb' })), S: 1.0 },
+    ceilKit: { m: baked(lam({ map: tx.ceilKit })), S: 1 },
     glass: { m: new THREE.MeshPhongMaterial({ color: '#0b1214', transparent: true, opacity: 0.2, specular: '#8fa6ae', shininess: 120, depthWrite: false, side: THREE.DoubleSide }), S: 1, order: 2 },
     // les rubans de LED bleues du cinéma (plus forts que le blanc : ils bavent dans le caméscope)
     velvet: { m: baked(lam({ map: tx.velvet })), S: 0.9 },
@@ -602,6 +604,37 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       for (const x of [x0, x1]) G.box('black', x - 0.04, x + 0.04, 0, 0.004, z0 + 0.04, z1 - 0.04, '-y');
     }
 
+  // 1c. La couche technique des plafonds bas : des têtes de sprinkler en quinconce (une case sur deux), des bouches de
+  // soufflage et des grilles de reprise dans les plafonds à dalles, des bouches seules dans les plafonds de plâtre.
+  // Jamais dans une case qui porte une lampe, ni sous un vide, ni dans une trémie
+  {
+    const lit = new Set((map.lights || []).map((l) => l.gz * W + l.gx));
+    const TECH = { grid: 2, soffit: 1, spots: 1, greyc: 1, char: 1 };
+    // (une rosace et un corps conique : dix-huit triangles par tête, il y en a des milliers)
+    const sprink = mergeGeometries([new THREE.CircleGeometry(0.04, 8).rotateX(Math.PI / 2).translate(0, -0.003, 0), new THREE.CylinderGeometry(0.01, 0.017, 0.045, 5, 1, true).translate(0, -0.025, 0)].map((g) => g.toNonIndexed()));
+    const decal = (u0, x, y, z) => {
+      const geo = new THREE.PlaneGeometry(0.6, 0.6);
+      const a = geo.attributes.uv;
+      for (let i = 0; i < a.count; i++) a.setX(i, u0 + a.getX(i) * 0.5);
+      G.add('ceilKit', geo.rotateX(Math.PI / 2).translate(x, y, z));
+    };
+    for (let z = 0; z < H; z++)
+      for (let x = 0; x < W; x++) {
+        if (!freeAt(x, z) || stairCell.has(z * W + x)) continue;
+        const ce = ceilAt(x, z);
+        const t = TECH[ce.kind];
+        if (!t || ce.h > 4.6) continue;
+        const cx = (x + 0.5) * C;
+        const cz = (z + 0.5) * C;
+        if (up.inVoid && up.inVoid(cx, cz, 1.4)) continue;
+        if ((x + z) % 2 === 0) G.add('steel', sprink.clone().translate(cx + 0.62, ce.h, cz + 0.62));
+        if (lit.has(z * W + x)) continue;
+        // (au pas des dalles de 62,5 cm : une dalle entière)
+        if (x % 3 === 1 && z % 3 === 1) decal(0, x * C + 0.9375, ce.h - 0.006, z * C + 0.9375);
+        else if (t === 2 && x % 6 === 4 && z % 4 === 2) decal(0.5, x * C + 0.9375, ce.h - 0.006, z * C + 1.5625);
+      }
+  }
+
   // 2. Les murs : une face par côté visible, à la hauteur du plafond de la case qu'elle regarde
   for (let z = 0; z < H; z++) {
     for (let x = 0; x < W; x++) {
@@ -630,6 +663,22 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
           else G.box(pk, x * C, (x + 1) * C, 0, ph, Math.min(ez, ez + dz * 0.018), Math.max(ez, ez + dz * 0.018), '-y');
         }
       }
+    }
+  }
+
+  // 2a. Les pans coupés : dans l'angle de deux murs, un pan à 45° (du même parement), sa plinthe
+  for (const c of map.cutCorners || []) {
+    const h = hAt(c.x, c.z);
+    const r = roomOf(c.x, c.z);
+    const k = wallKey(r);
+    const s = Math.SQRT1_2;
+    const n = [-c.dx * s, 0, -c.dz * s];
+    G.quad(k, [c.ax, 0, c.az], [c.bx, 0, c.bz], [c.bx, h, c.bz], [c.ax, h, c.az], n);
+    if (k !== 'block' && k !== 'faience') {
+      const pk = k === 'plaster' ? 'marbleDark' : r && (r.kind === 'cine' || r.kind === 'cineHall') ? 'steel' : 'black';
+      const ph = k === 'plaster' ? 0.16 : 0.1;
+      const o = 0.018;
+      G.quad(pk, [c.ax + n[0] * o, 0, c.az + n[2] * o], [c.bx + n[0] * o, 0, c.bz + n[2] * o], [c.bx + n[0] * o, ph, c.bz + n[2] * o], [c.ax + n[0] * o, ph, c.az + n[2] * o], n);
     }
   }
 

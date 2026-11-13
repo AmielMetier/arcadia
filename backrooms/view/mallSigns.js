@@ -129,6 +129,12 @@ export function drawMallSigns({ map, fi, G, MATS, rooms, goods, hAt, model, arca
     goods.sign(SIGN_EXIT, x + nx * 0.052, 2.62, z + nz * 0.052, 0.52, 0.196, nx, nz, lit, false, signUV(SIGN_EXIT, [0.004, 0.338, 0.668][variant], [0.33, 0.662, 0.996][variant]));
   };
 
+  const PUBLIC = new Set(['mail', 'court', 'plaza', 'annex', 'food', 'cine', 'cineHall', 'screen', 'portal', 'store', 'market', 'flea', 'garden', 'fun', 'lobby', 'parking']);
+  const kindAt = (gx, gz) => {
+    if (cell(gx, gz) === WALL) return null;
+    const r = rooms[map.zone[gz * W + gx]];
+    return r ? r.kind : null;
+  };
   const doors = new Map((map.doors || []).filter((d) => d.kind === 'service' || d.kind === 'fire' || d.kind === 'screen' || d.kind === 'office').map((d) => [d.z * W + d.x, d]));
   for (const d of doors.values()) {
     const alongZ = cell(d.x, d.z - 1) !== WALL && cell(d.x, d.z + 1) !== WALL; // on passe selon z (le mur court le long de x)
@@ -148,11 +154,18 @@ export function drawMallSigns({ map, fi, G, MATS, rooms, goods, hAt, model, arca
     leaf(style, half, -1, 1.12, hash(seed, 1) < 0.35 ? PI * 0.455 : PI / 2, -1);
     place(lx, lz, ax, az);
     if (d.kind === 'screen' || d.kind === 'office') continue; // (les salles : leur numéro, plus bas ; les bureaux : pas d'issue)
-    // « EXIT » des deux côtés, là où le mur monte assez haut
+    // « EXIT » : seulement sur un chemin d'évacuation, du côté d'où l'on fuit. Une issue de secours, vue du lieu
+    // public ou de la salle qu'elle dessert ; une porte de service qui mène d'un lieu public aux coulisses, vue du
+    // lieu public. Rien sur une réserve, un bureau, un local technique, ni dans les coulisses elles-mêmes
     for (const [x, z, s] of [[lx, lz, -1], [hx, hz, 1]]) {
       const inH = hAt(d.x + (s > 0 ? ax * (n - 1) : 0), d.z + (s > 0 ? az * (n - 1) : 0));
-      const outH = hAt(Math.floor((x + s * ax * 0.5) / C), Math.floor((z + s * az * 0.5) / C));
-      if (inH >= 2.85 && outH >= 2.85) exitSign(x, z, s * ax, s * az, seed + s);
+      const ox = Math.floor((x + s * ax * 0.5) / C);
+      const oz = Math.floor((z + s * az * 0.5) / C);
+      const outH = hAt(ox, oz);
+      const here = kindAt(ox, oz); // d'où on lit la plaque
+      const there = kindAt(Math.floor((x - s * ax * (n * C + 0.5)) / C), Math.floor((z - s * az * (n * C + 0.5)) / C)); // où mène la porte
+      const egress = PUBLIC.has(here) && (d.kind === 'fire' || there === 'service');
+      if (egress && inH >= 2.85 && outH >= 2.85) exitSign(x, z, s * ax, s * az, seed + s);
     }
   }
 
