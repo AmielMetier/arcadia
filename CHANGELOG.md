@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.88 — 13 novembre 2026
+- **Hub** — Update vip.js (Tahitoa Senis)
+
 ## 5.87 — 13 novembre 2026
 - **The Backrooms** — Au Level 1, l'entité est bien plus dure à démasquer :
   - Elle répond quand on lui parle : dites-lui quelque chose de près, elle lâche un « ouais » ou un « quoi ? » avec la voix du joueur qu'elle imite.
