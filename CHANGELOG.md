@@ -1,5 +1,17 @@
 # Journal des versions — Arcadia
 
+## 5.89 — 13 novembre 2026
+- **The Backrooms** — Le Level 17 (le centre commercial) ressemble enfin à un vrai lieu filmé au caméscope.
+  - Tout le niveau se joue « au caméscope » : image 4:3, champ plus serré, et l'interface s'efface quand rien ne change (réglage Image → « Tout au caméscope »).
+  - Le centre est fermé pour la nuit : presque toutes les boutiques ont leur rideau baissé, seul l'éclairage de veille reste allumé, et l'on y marche au pas d'un promeneur.
+  - Sols, murs et rideaux sont de vraies matières photographiées ; les meubles dessinés à la main ont disparu (kiosques, bornes d'arcade, fauteuils du cinéma, projecteur…).
+  - Les pièces ont de vraies proportions : la salle 1 est plus profonde que large, son écran large tient entre deux tentures, le faisceau passe au-dessus des têtes ; les toilettes sont deux blocs derrière un sas ; les bureaux sont des couloirs bordés de portes fermées.
+  - Les escalators sont condamnés derrière un coffrage de contreplaqué.
+  - Des détails de vrai bâtiment : des enseignes toutes différentes, des grilles lisibles de loin, des sprinklers et des bouches d'air aux plafonds, les plaques EXIT sur les seules issues, un plan du centre exact avec son « vous êtes ici », des angles en pan coupé.
+  - Tout est d'octobre 1996, comme la date de la bande : un tube néon au plafond du cinéma, des caissons d'affiches, les affiches de la saison.
+  - La radio ne vous dit plus comment échapper à la grande poupée : à vous de le comprendre. L'objectif se lit dans le journal du projectionniste, dans la cabine.
+  - Quand la grande poupée change d'étage, on entend le monte-charge démarrer, puis ses portes : elle arrive de ce côté-là.
+
 ## 5.88 — 13 novembre 2026
 - **Hub** — Update vip.js (Tahitoa Senis)
 
