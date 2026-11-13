@@ -11,6 +11,7 @@ import { MOUTH, SLIDES } from './engine/poolrooms.js';
 import { BackroomsSfx } from './view/sfx.js';
 import { hotelUi } from './view/hotelExit.js';
 import { createVoice } from './view/voice.js';
+import { createCloner } from './view/clone.js';
 import { BackroomsHUD, levelName, levelSub, LORE, loreOf, hearTape, tapesHeard, store, NOTES, readNote, loreComplete, FINAL_LORE } from './view/hud.js';
 import { parseWords } from './engine/hotel.js';
 import { vault, vaultOpen, vaultKey, openVault, storedKey, rememberKey, keyFromPhrase } from './view/vault.js';
@@ -175,7 +176,7 @@ onGlContext((ok) => {
 });
 
 // Réglages du joueur (sur cet appareil) : souris, image, accessibilité
-const OPT_DEFAULT = { sens: 1, invertY: false, fov: 72, motion: 1, bright: 1, reduceFlashes: false, subs: false, layout: 'auto', quality: 'auto', mic: 'on', voiceVol: 1 };
+const OPT_DEFAULT = { sens: 1, invertY: false, fov: 72, motion: 1, bright: 1, reduceFlashes: false, subs: false, layout: 'auto', quality: 'auto', mic: 'on', voiceVol: 1, clone: 'off' };
 const OPTS = { ...OPT_DEFAULT, ...store.get('backrooms_opts', {}) };
 // anciens réglages : « appuyer pour parler » et « micro ouvert » ne font plus qu'un (la voix de proximité est toujours ouverte)
 if (OPTS.mic !== 'off') OPTS.mic = 'on';
@@ -237,8 +238,29 @@ function ensureVoice() {
   if (!voice) {
     voice = createVoice({ send: (to, m, vol) => send(to, m, vol), myId: NET.myId, sfx: sfxRef, onTrouble: voiceTrouble });
     voice.setVolume(OPTS.voiceVol);
+    voice.setClone(OPTS.clone === 'on');
   }
   return voice;
+}
+// La voix clonée (view/clone.js) : seulement si le joueur l'a autorisée dans les réglages. Le modèle se charge dès le
+// début de la partie (tout le Level 0 pour télécharger et préparer les voix), à plusieurs seulement
+let cloner = null;
+let clonerT = 0;
+function cloneStep(dt) {
+  const on = OPTS.clone === 'on' && multi() && started;
+  if (!on) {
+    if (cloner) { cloner.dispose(); cloner = null; }
+    if (multi() && started && OPTS.clone !== 'on' && hud && !store.get('backrooms_clone_hint', false)) {
+      store.set('backrooms_clone_hint', true);
+      setTimeout(() => hud && hud.toast('New · the entity can learn to speak with your voice (AI, stays in your browser) · allow it in Settings ⚙ › Voix', 9), 6000);
+    }
+    return;
+  }
+  clonerT -= dt;
+  if (clonerT > 0) return;
+  clonerT = 1;
+  if (!cloner) cloner = createCloner({ voice, lang: /^fr/i.test(navigator.language || '') ? 'fr' : 'en' });
+  cloner.tick();
 }
 // le micro : demandé au lancement, même seul (la voix fait du bruit : l'entité l'entend), sinon à la première touche R
 function askMic(force = false) {
@@ -2775,6 +2797,7 @@ function frame(currentTime) {
     const radioOk = !sim.radioDead;
     voice.update(sim, sim.viewPlayer(sim.spectate || 0), delta, want, OPTS.mic !== 'off' && !paused, me.status === 'alive', { ok: radioOk, danger: me.danger || 0, live: !paused && sim.state === 'playing' && !sim.prelude });
     if (NET.role !== 'guest') sim.voiceBank = voice.bank(); // (l'entité imite de préférence quelqu'un dont on a des phrases)
+    cloneStep(delta);
     if (hud) hud.voice(voice, sim, multi(), !!(keys['KeyR'] || padRadio) && !radioOk && multi());
   }
   if (hud) {
@@ -2817,7 +2840,8 @@ if (window.DDVolume && btnSet) {
       { title: 'Voix', items: [
         { label: 'Micro', get: () => OPTS.mic, set: (v) => { setOpt('mic', v); if (v !== 'off' && started) askMic(true); }, options: [['on', 'Activé'], ['off', 'Coupé']] },
         { label: 'Volume des voix', get: () => OPTS.voiceVol, set: (v) => setOpt('voiceVol', +v), range: [0, 2, 0.1], format: (v) => `${Math.round(v * 100)} %` },
-      ], hint: "Votre voix porte toute seule jusqu'aux joueurs proches (on vous entend à travers les murs, mal). R maintenu : parler dans le talkie, à toute l'équipe. Attention : l'entité entend aussi, et plus vous parlez, plus elle devient agressive. Le talkie grésille aussi chez ceux qui le reçoivent." },
+        { label: 'Voix clonée par l\'entité (IA)', get: () => OPTS.clone, set: (v) => { setOpt('clone', v); if (voice) voice.setClone(v === 'on'); }, options: [['off', 'Refusée'], ['on', 'Autorisée']] },
+      ], hint: "Voix clonée : au Level 1, l'entité peut dire des phrases que vous n'avez jamais dites, avec votre voix, fabriquée par une IA à partir de ce que vous dites en partie. Seulement entre joueurs qui l'ont tous autorisé ; tout reste dans les navigateurs des joueurs, rien n'est envoyé ni gardé. Premier chargement : environ 150 Mo. Votre voix porte toute seule jusqu'aux joueurs proches (on vous entend à travers les murs, mal). R maintenu : parler dans le talkie, à toute l'équipe. Attention : l'entité entend aussi, et plus vous parlez, plus elle devient agressive. Le talkie grésille aussi chez ceux qui le reçoivent." },
       { title: 'Accessibilité', items: [
         { label: 'Réduire les flashs', get: () => OPTS.reduceFlashes, set: (v) => setOpt('reduceFlashes', v), options: [[false, 'Non'], [true, 'Oui']] },
         { label: 'Sous-titres', get: () => OPTS.subs, set: (v) => setOpt('subs', v), options: [[false, 'Non'], [true, 'Oui']] },

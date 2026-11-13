@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 5.86 — 13 novembre 2026
+- **The Backrooms** — Au Level 1, l'entité peut maintenant inventer des phrases avec votre voix (à autoriser dans les réglages) :
+  - Une IA apprend votre voix pendant que vous parlez au Level 0, puis l'entité s'en sert pour dire des choses que vous n'avez jamais dites : « Hé, viens voir ! », « Ouvre, c'est moi »…
+  - Elle continue aussi de rejouer vos vraies phrases, et mélange les deux.
+  - C'est coupé au départ : Réglages ⚙ › Voix › « Voix clonée par l'entité (IA) ». Elle ne marche qu'entre joueurs qui l'ont tous autorisée.
+  - Tout se passe dans votre navigateur : votre voix n'est envoyée nulle part. Le premier chargement pèse environ 150 Mo, il se fait pendant le Level 0.
+
 ## 5.85 — 13 novembre 2026
 - **Arcadia** — Des bandes-annonces dans le Hub : la vitrine de l'accueil joue une courte vidéo du jeu à la place de l'affiche, et chaque carte de jeu lance la sienne quand tu passes la souris dessus.
   - Douze jeux ont la leur pour l'instant : Mystère Mystère, Island Rush, Cyber Kart GP, Mini-Golf Party, Bastion Clash, Odyssée, Birdie Party, Outbreak, Duo Drift, Tête de Calcul, Mollo ! et The Backrooms.

@@ -41,6 +41,13 @@ const UTT_HOLD = 0.22; // en dessous : silence
 const UTT_SIL = 0.5; // s de silence : la phrase est finie
 const UTT_WAIT = 2.2; // s d'écoute après la phrase (les autres réagissent-ils ?) avant de l'annoncer
 const CLIP_RMS = 0.012; // en dessous : le souffle, la pièce
+// Le clonage (view/clone.js) : avec l'accord du joueur (réglage « clone », message 'vc'), ses phrases servent aussi
+// d'échantillon à une synthèse vocale qui dit des phrases qu'il n'a jamais dites. On garde jusqu'à REF_KEEP secondes
+// de sa voix (tout le Level 0 y passe : les plus propres restent), on clone dès REF_MIN, et le modèle en écoute REF_USE
+const REF_KEEP = 30;
+const REF_MIN = 6;
+const REF_USE = 10;
+const FAKE_SHARE = 0.4; // part des phrases inventées quand on a aussi des vraies
 const MIMIC_LINES = ["I'm here.", 'Over here, come on.', "It's fine. I found the door.", 'Where are you guys?', 'Come to me. Quick.', 'I found a fuse. Come here.', "Guys? I'm hurt. Help me.", 'It went the other way. Come.'];
 
 // Les serveurs ICE : les STUN publics, plus ceux qu'on ajoute sans toucher au code (un TURN, par exemple) :
@@ -180,6 +187,24 @@ export function pickUtterance(list, kind, seed, avoid = []) {
   pool = pool.map((u) => ({ u, sc: score(u) })).sort((a, b) => b.sc - a.sc || b.u.n - a.u.n);
   const top = pool.slice(0, Math.min(4, pool.length));
   return top[Math.abs(seed | 0) % top.length].u;
+}
+
+// Le niveau d'une voix hors des silences (par tranches de 20 ms au-dessus du souffle) : sert à mettre une phrase
+// inventée au niveau exact des vraies
+export function speechRms(d, sr) {
+  const hop = Math.max(1, Math.round(sr / 50));
+  let sum = 0;
+  let n = 0;
+  let peak = 0;
+  const fr = [];
+  for (let i = 0; i + hop <= d.length; i += hop) {
+    let s = 0;
+    for (let j = i; j < i + hop; j++) s += d[j] * d[j];
+    fr.push(s);
+    if (s > peak) peak = s;
+  }
+  for (const s of fr) if (s > peak * 0.01) { sum += s; n += hop; }
+  return n ? Math.sqrt(sum / n) : 0;
 }
 
 export function createVoice({ send, myId, sfx, onTrouble = null }) {
@@ -544,12 +569,19 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
       p.bank.push({ n: m.n | 0, d: +m.d, l: +m.l || 0, r: m.r ? 1 : 0, f: +m.f || 0, buf: d, sr });
       p.bank.sort((x, y) => x.n - y.n);
       if (p.bank.length > BANK) p.bank.splice(0, p.bank.length - BANK); // (les plus anciennes s'en vont : chez tous les mêmes)
+      // l'échantillon du clonage : les phrases dites sans crier d'abord, les plus longues ensuite
+      const rank = (u) => (u.l < 0.92 ? 10 : 0) + u.buf.length / u.sr;
+      p.refs = [...(p.refs || []).filter((u) => u.n !== m.n), { n: m.n | 0, l: +m.l || 0, buf: d, sr }].sort((x, y) => rank(y) - rank(x));
+      let secs = 0;
+      p.refs = p.refs.filter((u) => (secs += u.buf.length / u.sr) <= REF_KEEP || secs === u.buf.length / u.sr);
+      p.refSecs = p.refs.reduce((a, u) => a + u.buf.length / u.sr, 0);
     }, 700);
     (p.cuts = p.cuts || []).push(tm);
   }
 
   // Ses propres phrases : du premier mot au silence. Annoncée UTT_WAIT plus tard, le temps d'entendre si les autres
   // réagissent (react : secondes pendant lesquelles au moins un autre parle)
+  let cloneOn = false; // le joueur autorise le clonage de sa voix (setClone)
   let utt = null; // la phrase en cours
   let uttN = 0;
   let myBank = 0; // phrases annoncées
@@ -727,7 +759,17 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
     const c0 = c.currentTime;
     if (mimicNow && mimicNow.end > c0) return; // (elle ne se coupe pas la parole)
     stopMimic();
-    const u = p ? pickUtterance(p.bank, kind, seed, p.said || []) : null;
+    let u = p ? pickUtterance(p.bank, kind, seed, p.said || []) : null;
+    // Une phrase inventée, dite par la voix clonée (view/clone.js) : quand il n'y a pas de vraie phrase à rejouer, et
+    // une partie du temps sinon (le tirage de l'hôte décide : la même phrase chez tous ceux qui l'ont). Pour le reste
+    // elle est jouée comme une vraie : même chaîne, même niveau
+    const fakes = p && p.cloneOk && cloneOn && p.fakes ? p.fakes.filter((f) => f.kind === kind) : [];
+    if (fakes.length && (!u || ((seed >> 3) % 100) / 100 < FAKE_SHARE)) {
+      const pool = fakes.filter((f) => f.i !== p.lastFake);
+      const f = (pool.length ? pool : fakes)[(seed >> 5) % (pool.length || fakes.length)];
+      p.lastFake = f.i;
+      u = { n: -1 - f.i, buf: f.buf, sr: f.sr };
+    }
     if (!u) {
       // Un joueur qu'on a déjà entendu, mais dont on n'a pas encore de phrase : elle se tait (une autre voix que la
       // sienne la trahirait). Personne n'a jamais entendu sa voix (pas de micro) : une voix de synthèse
@@ -753,7 +795,7 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
       if (sfx && sfx.caption) sfx.caption(`${name}${radio ? ' (radio)' : ''}: "${line}"`, radio ? null : pos);
       return;
     }
-    p.said = [...(p.said || []), u.n].slice(-3); // (pas deux fois de suite la même phrase)
+    if (u.n >= 0) p.said = [...(p.said || []), u.n].slice(-3); // (pas deux fois de suite la même phrase)
     if (!ghost) {
       const gin = c.createGain();
       ghost = buildChain(c, o, gin);
@@ -1088,6 +1130,7 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
         if (!p) {
           p = { id, mode: 0, pc: null, since: performance.now() / 1000 };
           peers.set(id, p);
+          if (cloneOn) send(id, { t: 'vc', on: 1 });
           if (myId < id && window.RTCPeerConnection) call(p);
         }
       }
@@ -1102,6 +1145,15 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
         if (!p.relay) setRelay(p, true);
         if (!p.relayIn && !p.pending) wire(p, 'relay');
         relayPlay(p, m.d);
+      }
+      else if (m.t === 'vc') {
+        // ce joueur autorise (ou non) qu'on clone sa voix ; à qui vient d'arriver, on redit notre choix
+        const p = peers.get(from);
+        if (p) {
+          p.cloneOk = !!m.on;
+          if (!p.cloneOk) p.fakes = null;
+          if (m.ask && cloneOn) send(from, { t: 'vc', on: 1 });
+        }
       }
       else if (m.t === 'vu') {
         const p = peers.get(from);
@@ -1287,6 +1339,51 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
     },
     mimicStop() {
       stopMimic();
+    },
+    // Le clonage. setClone : le joueur autorise qu'on clone sa voix (et accepte de cloner celle des autres) ; on le dit
+    // à tous. cloneRef(id) : l'échantillon d'un coéquipier qui est d'accord, quand on en a assez ({ data, sr, secs,
+    // rms }, REF_USE secondes au plus, ses phrases mises bout à bout), sinon null. addFake : une phrase inventée prête
+    setClone(on) {
+      on = !!on;
+      if (on === cloneOn) return;
+      cloneOn = on;
+      for (const p of peers.values()) {
+        send(p.id, { t: 'vc', on: on ? 1 : 0, ask: on ? 1 : 0 });
+        if (!on) p.fakes = null;
+      }
+    },
+    cloneIds() {
+      return cloneOn ? [...peers.values()].filter((p) => p.cloneOk && (p.refSecs || 0) >= REF_MIN).map((p) => p.id) : [];
+    },
+    cloneRef(id) {
+      const p = peers.get(id);
+      if (!cloneOn || !p || !p.cloneOk || !(p.refSecs >= REF_MIN)) return null;
+      const use = [];
+      let secs = 0;
+      for (const u of p.refs) {
+        if (secs >= REF_USE) break;
+        use.push(u);
+        secs += u.buf.length / u.sr;
+      }
+      use.sort((x, y) => x.n - y.n);
+      const sr = use[0].sr;
+      const gap = Math.round(sr * 0.12);
+      const data = new Float32Array(use.reduce((a, u) => a + u.buf.length + gap, 0));
+      let o = 0;
+      for (const u of use) {
+        data.set(u.buf, o);
+        o += u.buf.length + gap;
+      }
+      return { data, sr, secs: p.refSecs, rms: speechRms(data, sr) };
+    },
+    addFake(id, kind, i, buf, sr) {
+      const p = peers.get(id);
+      if (!p || !p.cloneOk || !cloneOn) return;
+      p.fakes = [...(p.fakes || []).filter((f) => f.i !== i), { kind, i, buf, sr }];
+    },
+    fakeCount(id) {
+      const p = peers.get(id);
+      return p && p.fakes ? p.fakes.length : 0;
     },
     // secondes de phrases gardées pour un coéquipier
     clipSeconds(id) {
