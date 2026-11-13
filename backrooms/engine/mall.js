@@ -244,7 +244,7 @@ function solidSet(W, H) {
 
 // Le mobilier qu'on ne pose plus : il n'existe pas de modèle scanné de ces pièces, et celles qu'on avait modelées à
 // la main sentaient le jeu. Un centre plus vide, mais vrai (voir la section 15)
-const FURN_GONE = new Set(['kiosk', 'fountain', 'counter', 'concession', 'boxoffice', 'standee', 'stanchion', 'rack', 'mannequin', 'cosmetic', 'fitting', 'shoetable', 'roomset', 'tvwall', 'luggage', 'booth', 'partition', 'meeting', 'kitchenette', 'workbench', 'arcade', 'claw', 'prizes']);
+const FURN_GONE = new Set(['kiosk', 'fountain', 'counter', 'concession', 'boxoffice', 'standee', 'stanchion', 'rack', 'mannequin', 'cosmetic', 'fitting', 'shoetable', 'roomset', 'tvwall', 'luggage', 'booth', 'partition', 'meeting', 'kitchenette', 'workbench', 'arcade', 'claw', 'prizes', 'seats']);
 
 export function createMallMap(seed = 17) {
   const W = MALL_W;
@@ -407,7 +407,7 @@ export function createMallMap(seed = 17) {
   // la cabine de projection : au fond de la salle 1, dans l'axe de l'écran. Deux murs de refend la détachent de la
   // salle ; côté fauteuils, une cloison mince percée du hublot (une forme de collision, plus bas) ; on y entre par une
   // porte du personnel, depuis le couloir des salles
-  const BOOTH = { x0: 99, x1: 100, z0: 6, z1: 8 };
+  const BOOTH = { x0: 99, x1: 99, z0: 6, z1: 8 };
   for (const z of [BOOTH.z0 - 1, BOOTH.z1 + 1])
     for (let x = BOOTH.x0; x <= BOOTH.x1; x++) {
       F[0].grid[z * W + x] = T.WALL;
@@ -1679,6 +1679,137 @@ export function createMallMap(seed = 17) {
     }
   }
 
+  // --- 11c bis. Des pièces aux proportions d'un vrai lieu. Tout se fait ici, après les tirages du décor (lampes,
+  // mobilier) : on mure des cases, on retire ce qui s'y trouvait, on repose à la main ce qu'il faut (sans tirage).
+  // Le reste d'une graine ne bouge pas ---
+  const wallOff = (f, x, z) => {
+    f.grid[z * W + x] = T.WALL;
+    f.zone[z * W + x] = -1;
+  };
+  // le mobilier d'un rectangle de cases : sa collision part tout de suite, lui à la fin (section 15)
+  const clearFurn = (f, x0, z0, x1, z1) => {
+    const ids = new Set();
+    for (const it of f.furn) {
+      const gx = Math.floor(it.x / C);
+      const gz = Math.floor(it.z / C);
+      if (gx < x0 || gx > x1 || gz < z0 || gz > z1) continue;
+      it.gone = true;
+      ids.add(it.id);
+    }
+    f.solids.remove((o) => o.furn !== undefined && ids.has(o.furn));
+  };
+  const lamp = (f, x, z, kind, room, o = {}) => f.lights.push({ id: 0, x, z, gx: Math.floor(x / C), gz: Math.floor(z / C), kind, state: 'on', room, ...o });
+  // (a) Les salles de cinéma : plus profondes que larges (12,5 × 17,5 m au lieu de 25 × 15). On y entre par un sas, au
+  // fond, à côté de la cabine ; on en sort par un passage au pied de l'écran. Les balises d'allée longent les murs
+  const narrow = (sc, za, zb, keep) => {
+    for (let z = sc.z0; z <= sc.z1; z++)
+      for (let x = sc.x0; x <= sc.x1; x++) {
+        if (up.zone[z * W + x] !== sc.id) continue; // (la cabine et ses murs de refend)
+        if ((x >= sc.x0 + 1 && z >= za && z <= zb) || keep.some(([kx, kz]) => kx === x && kz === z)) continue;
+        wallOff(up, x, z);
+      }
+    clearFurn(up, sc.x0, sc.z0, sc.x1, sc.z1);
+    up.lights = up.lights.filter((l) => l.room !== sc.id);
+    sc.x0 += 1;
+    sc.z0 = za;
+    sc.z1 = zb;
+    sc.ceilH = 6.4;
+    for (let x = sc.x0 * C + 1.25; x < (sc.x1 + 1) * C - 2; x += 2.5) for (const z of [za * C + 0.1, (zb + 1) * C - 0.1]) lamp(up, x, z, 'aisle', sc.id, { y: 0.4 });
+  };
+  narrow(screens[0], 5, 9, [[99, 10], [100, 10], [106, 4], [106, 3]]);
+  narrow(screens[1], 16, 20, [[99, 21], [100, 21], [106, 21], [106, 22], [106, 23]]);
+  // (b) Les toilettes : un sas en travers, puis deux blocs de 75 m² (7,5 × 10 m) de part et d'autre d'une gaine, chacun
+  // derrière son mur de pudeur : lavabos contre le mur du sas, cabines au fond
+  for (const f of F) {
+    const r = f.rooms.find((o) => o.kind === RK.WC);
+    if (!r) continue;
+    clearFurn(f, r.x0, r.z0, r.x1, r.z1);
+    f.lights = f.lights.filter((l) => l.room !== r.id);
+    const xm = r.x0 + 3;
+    for (let z = r.z0 + 1; z <= r.z1; z++)
+      for (let x = r.x0; x <= r.x1; x++) if (!(z === r.z0 + 1 ? x === r.x0 || x === r.x1 : z <= r.z0 + 5 && x !== xm)) wallOff(f, x, z);
+    r.z1 = r.z0 + 5;
+    r.blocks = [];
+    const o = { room: r.id };
+    for (const [bx0, bx1, side] of [[r.x0, xm - 1, 1], [xm + 1, r.x1, -1]]) {
+      const X0 = bx0 * C;
+      const X1 = (bx1 + 1) * C;
+      const Z0 = (r.z0 + 2) * C;
+      const Z1 = (r.z0 + 6) * C;
+      furn(f.fi, 'wcwall', side > 0 ? X0 + 1.02 : X1 - 1.02, Z0 + 1.7, 2.0, 0.16, { m: 0.02, ...o });
+      furn(f.fi, 'sinks', side > 0 ? X1 - 2.5 : X0 + 2.5, Z0 + 0.32, 4.9, 0.6, { m: 0.02, ...o });
+      for (let x = X0 + 0.85; x < X1 - 0.8; x += 1.6) furn(f.fi, 'stall', x, Z1 - 0.82, 1.5, 1.6, { m: 0.02, pm: 0.1, toilet: true, ...o });
+      furn(f.fi, 'bin', side > 0 ? X1 - 0.5 : X0 + 0.5, Z0 + 4.2, 0.6, 0.6, { round: true, m: 0.05, rust: side < 0, ...o });
+      r.blocks.push({ x0: bx0, x1: bx1, z0: r.z0 + 2, z1: r.z0 + 5, door: side > 0 ? r.x0 : r.x1, who: side > 0 ? 'men' : 'women' });
+      // (une dalle sur deux en veille ; en bas, celle du premier bloc grésille)
+      [[X0 + 1.9, Z0 + 2.5], [X1 - 1.9, Z0 + 2.5], [X0 + 1.9, Z0 + 7.5], [X1 - 1.9, Z0 + 7.5]].forEach(([x, z], i) => lamp(f, x, z, 'panel', r.id, { y: r.ceilH, state: i === 0 || i === 3 ? (f.fi === 1 && side > 0 && i === 0 ? 'flicker' : 'on') : 'off' }));
+    }
+    for (const [k, on] of [[1.5, 0], [3.5, 1], [5.5, 0]]) lamp(f, (r.x0 + k) * C, (r.z0 + 0.5) * C, 'panel', r.id, { y: r.ceilH, state: on ? 'on' : 'off' });
+  }
+  // (c) Les bureaux : plus de plateau ouvert de 1 200 ou 1 900 m². Un hall, des couloirs d'une case, des pièces fermées
+  // (# : un mur, derrière lequel sont les bureaux fermés à clé, voir fakeDoors), quelques pièces ouvertes (o ; O :
+  // restée allumée) derrière leur porte (D)
+  const OFFICE_PLANS = {
+    'Mall management': ['............', '............', '######.#####', '#oooo#.#OOO#', '#ooooD.DOOO#', '######.#####', '............', '.#####.#####', '######.#ooo#', '######.Dooo#', '######.#ooo#', '######.#####', '#oooo#.#####', '#ooooD.#####', '######.#####', '######.#####'],
+    Administration: ['...................', '...................', '####.#######.######', '#oo#.#ooooo#.######', '#ooD.Dooooo#.......', '####.#######.######', '.............######', '########.##########', '#oooooo#.#OOOOOO###', '#ooooooD.DOOOOOO###', '#oooooo#.#OOOOOO###', '########.##########', '########.##########', '########.##########', '########.##########', '########.##########'],
+  };
+  const DOOR_NAMES = ['ACCOUNTS', 'LEASING', 'PAYROLL', 'RECORDS', 'MARKETING', 'PERSONNEL', 'GENERAL MANAGER', 'CONFERENCE B', 'MAIL ROOM', 'STORAGE', 'OPERATIONS', 'JANITOR', 'TENANT RELATIONS', 'SUPPLIES'];
+  for (const f of F) f.fakeDoors = [];
+  for (const r of up.rooms) {
+    const plan = r.kind === RK.OFFICE ? OFFICE_PLANS[r.name] : null;
+    if (!plan) continue;
+    clearFurn(up, r.x0, r.z0, r.x1, r.z1);
+    up.lights = up.lights.filter((l) => l.room !== r.id);
+    const at = (x, z) => (x < r.x0 || x > r.x1 || z < r.z0 || z > r.z1 ? '' : plan[z - r.z0][x - r.x0]);
+    for (let z = r.z0; z <= r.z1; z++)
+      for (let x = r.x0; x <= r.x1; x++) {
+        const ch = at(x, z);
+        if (ch === '#') {
+          wallOff(up, x, z);
+          // une porte fermée à clé sur le couloir, de loin en loin, jamais à côté d'une vraie porte
+          for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            if (at(x + dx, z + dz) !== '.' || z + dz < r.z0 + 2 || (x * 7 + z * 13 + dx + dz * 2) % 3 !== 0) continue;
+            if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([ex, ez]) => at(x + ex, z + ez) === 'D' || at(x + dx + ex, z + dz + ez) === 'D')) continue;
+            up.fakeDoors.push({ x: (x + 0.5 + dx * 0.5) * C, z: (z + 0.5 + dz * 0.5) * C, nx: dx, nz: dz, style: 'office', label: DOOR_NAMES[up.fakeDoors.length % DOOR_NAMES.length] });
+          }
+        } else if (ch === 'D') up.doors.push({ x, z, kind: 'office', room: r.id });
+        else if (ch === '.') {
+          if ((x + z) % 2 === 0) lamp(up, (x + 0.5) * C, (z + 0.5) * C, 'panel', r.id, { y: r.ceilH, state: (x + z) % 4 === 0 ? 'on' : 'off' });
+        } else if (x % 2 === 0 && z % 2 === 0) lamp(up, (x + 0.5) * C, (z + 0.5) * C, 'panel', r.id, { y: r.ceilH, state: ch === 'O' ? 'on' : 'off' });
+      }
+    const o = { room: r.id };
+    const cx = (x) => x * C;
+    const island = (x, z) => {
+      for (const [dx, dz, yaw] of [[-1.08, -0.56, Math.PI], [1.08, -0.56, Math.PI], [-1.08, 0.56, 0], [1.08, 0.56, 0]]) furn(0, 'desk', x + dx, z + dz, 2.0, 0.95, { m: 0.02, pm: 0.3, yaw, ...o });
+    };
+    if (r.name === 'Mall management') {
+      // (deux postes, un salon d'attente resté allumé, un îlot de quatre postes, les archives)
+      for (const x of [cx(72), cx(74)]) furn(0, 'desk', x, cx(49) + 1.6, 2.0, 0.95, { m: 0.3, pm: 0.3, yaw: 0, ...o });
+      furn(0, 'pot', cx(71) + 0.6, cx(51) - 0.6, 0.6, 0.6, { round: true, m: 0.1, plant: 2, ...o });
+      furn(0, 'sofa', cx(79) + 1.25, cx(49) + 0.6, 1.85, 0.85, { m: 0.05, face: 1, ...o });
+      furn(0, 'ctable', cx(79) + 1.25, cx(49) + 2.0, 1.2, 0.6, { m: 0.05, solid: false, ...o });
+      furn(0, 'pot', cx(81) - 0.6, cx(51) - 0.6, 0.6, 0.6, { round: true, m: 0.1, plant: 1, ...o });
+      island(cx(79) + 1.25, cx(55) + 1.25);
+      for (const z of [cx(58) + 1.1, cx(60) - 1.1]) furn(0, 'gondola', cx(73), z, 5.5, 1.0, { m: 0.3, pm: 0.3, goods: 'archive', empty: z > cx(59), ...o });
+    } else {
+      // (le bureau du chef, la salle de réunion, les archives, un plateau de huit postes resté allumé)
+      furn(0, 'desk', cx(90), cx(49) + 1.7, 2.0, 0.95, { m: 0.3, pm: 0.3, yaw: 0, ...o });
+      furn(0, 'pot', cx(89) + 0.6, cx(51) - 0.6, 0.6, 0.6, { round: true, m: 0.1, plant: 3, ...o });
+      for (const x of [cx(95) + 0.8, cx(98) - 0.3]) furn(0, 'diner', x, cx(50), 1.3, 1.3, { round: true, m: 0.5, pm: 0.5, chairs: 6, ...o });
+      for (const z of [cx(54) + 1.2, cx(55) + 1.25, cx(57) - 1.2]) for (const x of [cx(89) + 3.4, cx(92) + 2.6]) furn(0, 'gondola', x, z, 5.5, 1.0, { m: 0.25, pm: 0.3, goods: 'archive', empty: (x + z) % 3 < 1, ...o });
+      island(cx(100), cx(55) + 1.25);
+      island(cx(102) + 1.5, cx(55) + 1.25);
+    }
+  }
+  // une lumière n'est jamais dans un mur ; les lampes reprennent leur numéro
+  for (const f of F) {
+    f.lights = f.lights.filter((l) => {
+      const v = get(f, l.gx, l.gz);
+      return v === T.FLOOR || v === T.PILLAR;
+    });
+    f.lights.forEach((l, i) => (l.id = i));
+  }
+
   // --- 11c. La cabine de projection (étage du haut) : la cloison mince côté salle, le projecteur dans l'axe de l'écran,
   // la table de montage contre le mur du sud. Le moteur n'en retient que les formes de collision et les repères
   // (booth) ; le reste se dessine dans view/mallCinema.js ---
@@ -1689,11 +1820,13 @@ export function createMallMap(seed = 17) {
     const z1 = (BOOTH.z1 + 1) * C;
     const sc = screens[0];
     const axis = ((sc.z0 + sc.z1 + 1) * C) / 2; // l'axe de l'écran
-    // (le projecteur : son axe optique à 1,62 m, l'objectif à 45 cm du hublot ; de la lanterne à l'objectif, 1,60 m)
-    const proj = { x: x1 - 1.0, y: 1.62, z: axis };
-    const bench = { x: x0 + 1.8, z: z1 - 0.41, w: 2.2, d: 0.82 };
+    // (le projecteur est enfermé dans son armoire, contre la cloison : on n'en voit que le hublot, relevé à 2,45 m
+    // pour que le faisceau passe au-dessus des têtes)
+    const proj = { x: x1 - 0.75, y: 2.45, z: axis };
+    const closet = { x0: x1 - 0.12 - 1.2, x1: x1 - 0.12, z0: axis - 0.55, z1: axis + 0.55 };
+    const bench = { x: x0 + 1.14, z: z1 - 0.41, w: 2.2, d: 0.82 };
     up.solids.add({ pts: rect(x1 - 0.12, z0, x1, z1), booth: 1 });
-    up.solids.add({ pts: rect(proj.x - 1.08, proj.z - 0.34, proj.x + 0.56, proj.z + 0.34), booth: 1 });
+    up.solids.add({ pts: rect(closet.x0, closet.z0, closet.x1, closet.z1), booth: 1 });
     up.solids.add({ pts: rect(bench.x - bench.w / 2, bench.z - bench.d / 2, bench.x + bench.w / 2, z1), booth: 1 });
     return {
       room: boothRoom.id,
@@ -1703,11 +1836,13 @@ export function createMallMap(seed = 17) {
       z1,
       ceil: boothRoom.ceilH,
       proj,
+      closet,
       port: { x: x1, y: proj.y, z: axis },
       bench,
       use: { x: bench.x, z: bench.z - bench.d / 2 - 0.45 }, // là où l'on se tient pour monter les bobines
       // l'écran de la salle 1 (contre le mur est) : là où tombe l'image
-      screen: { x: (sc.x1 + 1) * C - 0.09, y0: 1.4, y1: sc.ceilH - 1.2, z0: sc.z0 * C + 3.0, z1: (sc.z1 + 1) * C - 3.0, room: sc.id },
+      // (un écran large, 2,39:1 : 9,6 × 4 m, entre deux tentures)
+      screen: { x: (sc.x1 + 1) * C - 0.09, y0: 1.45, y1: 1.45 + 9.6 / 2.39, z0: axis - 4.8, z1: axis + 4.8, room: sc.id },
     };
   })();
 
@@ -1739,6 +1874,36 @@ export function createMallMap(seed = 17) {
       }
       for (const k of f.shutNav) f.navBlock.add(k);
       for (const l of f.lights) if (l.room === sh.room) l.state = 'off';
+    }
+  }
+
+  // … et au fond de chaque boutique qu'on voit encore (ouverte, ou close derrière sa grille ou sa vitrine) et qui n'a
+  // pas de porte de service : une porte de réserve fermée à clé. Le magasin continue derrière : on n'en voit que la
+  // surface de vente
+  for (const f of F)
+    for (const sh of f.shops) {
+      if (sh.shut || sh.back) continue;
+      const bx = sh.x0 + Math.floor((sh.x1 - sh.x0 + 1) / 2);
+      f.fakeDoors.push({ x: (bx + 0.5) * C, z: sh.side === 'N' ? sh.z0 * C : (sh.z1 + 1) * C, nx: 0, nz: sh.side === 'N' ? 1 : -1, style: 'stock', label: 'STOCKROOM' });
+    }
+
+  // Les escalators sont condamnés : à chaque bout, un coffrage de contreplaqué (deux feuilles de 1,22 m de front, deux
+  // retours) qui enferme le tambour de la main courante. Sa forme de collision est posée ici, après le décor (rien ne
+  // bouge) ; l'entité l'évite
+  for (const e of escalators) {
+    e.hoard = { d: 0.9, hw: 1.22 };
+    const ends = [[e.fi, e.x, -e.dir]];
+    if (!e.nowhere) ends.push([0, e.top, e.dir]);
+    for (const [fi, x, out] of ends) {
+      const xa = Math.min(x, x + out * e.hoard.d);
+      const xb = Math.max(x, x + out * e.hoard.d);
+      F[fi].solids.add({ pts: rect(xa, e.z - e.hoard.hw, xb, e.z + e.hoard.hw), hoard: e.id });
+      for (let gz = Math.floor((e.z - e.hoard.hw) / C); gz <= Math.floor((e.z + e.hoard.hw) / C); gz++)
+        for (let gx = Math.floor(xa / C); gx <= Math.floor(xb / C); gx++)
+          if (F[fi].grid[gz * W + gx] === T.FLOOR) {
+            F[fi].navBlock.add(gz * W + gx);
+            navBase[fi].add(gz * W + gx);
+          }
     }
   }
 
@@ -1831,6 +1996,7 @@ export function createMallMap(seed = 17) {
       allEscalators: escalators,
       screens: f.fi === 0 ? screens : [],
       fakeScreens: f.fi === 0 ? fakeScreens : [],
+      fakeDoors: f.fakeDoors || [],
       courts: COURTS,
       mailZ: MZ,
       walkable: wk,
@@ -1976,9 +2142,9 @@ export function createMallMap(seed = 17) {
     // (… et tout ce qui meublait une boutique dont le rideau est baissé)
     const shutRooms = new Set(f.shops.filter((sh) => sh.shut).map((sh) => sh.room));
     const inShut = (it) => (it.shop !== undefined && f.shops[it.shop] && f.shops[it.shop].shut) || shutRooms.has(f.zone[Math.floor(it.z / C) * W + Math.floor(it.x / C)]);
-    const gone = new Set(f.furn.filter((it) => FURN_GONE.has(it.kind) || flat(it) || inShut(it)).map((it) => it.id));
+    const gone = new Set(f.furn.filter((it) => it.gone || FURN_GONE.has(it.kind) || flat(it) || inShut(it)).map((it) => it.id));
     f.solids.remove((o) => o.furn !== undefined && gone.has(o.furn));
-    const kept = f.furn.filter((it) => !gone.has(it.id) || flat(it));
+    const kept = f.furn.filter((it) => !gone.has(it.id) || (flat(it) && !it.gone));
     for (const it of kept) if (flat(it)) it.shut = true;
     f.furn.length = 0;
     f.furn.push(...kept);

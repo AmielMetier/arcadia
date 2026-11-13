@@ -207,44 +207,6 @@ function directoryTex(name) {
   return toTex(c);
 }
 
-// les fauteuils du cinéma : trois profils extrudés (le dossier, l'assise, l'accoudoir), dans le repère du fauteuil
-// (x : la rangée, z : vers l'écran)
-const SEAT = (() => {
-  const prof = (build, width, x0) => {
-    const sh = new THREE.Shape();
-    build(sh);
-    const g = new THREE.ExtrudeGeometry(sh, { depth: width, bevelEnabled: false, curveSegments: 4 }).rotateY(-Math.PI / 2).translate(x0 + width, 0, 0);
-    const u = g.attributes.uv;
-    for (let i = 0; i < u.count; i++) u.setXY(i, u.getX(i) * 2, u.getY(i) * 2);
-    return g;
-  };
-  const back = prof((s) => {
-    s.moveTo(-0.2, 0.36);
-    s.lineTo(-0.31, 0.98);
-    s.quadraticCurveTo(-0.325, 1.09, -0.25, 1.085);
-    s.quadraticCurveTo(-0.195, 1.07, -0.185, 0.98);
-    s.lineTo(-0.1, 0.44);
-    s.lineTo(-0.12, 0.36);
-  }, 0.5, -0.25);
-  const pan = prof((s) => {
-    s.moveTo(-0.16, 0.37);
-    s.lineTo(0.2, 0.37);
-    s.quadraticCurveTo(0.285, 0.39, 0.275, 0.46);
-    s.quadraticCurveTo(0.26, 0.515, 0.17, 0.51);
-    s.lineTo(-0.14, 0.49);
-  }, 0.48, -0.24);
-  const up = pan.clone().translate(0, -0.4, 0.16).rotateX(-1.2).translate(0, 0.4, -0.16);
-  const arm = prof((s) => {
-    s.moveTo(-0.3, 0);
-    s.lineTo(0.18, 0);
-    s.lineTo(0.23, 0.6);
-    s.quadraticCurveTo(0.245, 0.69, 0.16, 0.69);
-    s.lineTo(-0.27, 0.69);
-    s.quadraticCurveTo(-0.33, 0.69, -0.325, 0.62);
-  }, 0.06, 0.25);
-  return { back, pan, up, arm };
-})();
-
 // --- Le mobilier ---
 export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, placed = [] }) {
   const furn = map.furn || [];
@@ -555,24 +517,6 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
       case 'tyres':
         for (let k = 0; k < (it.n || 3); k++) model('old_tyre', it.x + (rand(it.id, k) - 0.5) * 0.12, 0.08 + k * 0.155, it.z + (rand(it.id, k + 5) - 0.5) * 0.12, 0, 1, PI / 2);
         break;
-      case 'seats': {
-        // une rangée de fauteuils de velours rouge (dossier galbé, assise arrondie, un sur onze relevé), accoudoirs noirs
-        const n = Math.floor(it.w / 0.56);
-        const th = yawZ(F);
-        const armLow = Math.cos(th) * (it.rot ? 0 : 1) - Math.sin(th) * (it.rot ? 1 : 0) < 0; // l'accoudoir est du côté des petits lx
-        const seat = (k, tpl, lx) => {
-          const [x, z] = P(lx, 0);
-          G.add(k, tpl.clone().rotateY(th).translate(x, 0, z));
-        };
-        for (let i = 0; i < n; i++) {
-          const lx = -hw + 0.28 + i * 0.56;
-          seat('velvet', SEAT.back, lx);
-          seat('velvet', (it.id * 7 + i * 3) % 11 === 0 ? SEAT.up : SEAT.pan, lx);
-          seat('black', SEAT.arm, lx);
-        }
-        seat('black', SEAT.arm, armLow ? -hw + 0.28 + n * 0.56 : -hw + 0.28 - 0.56);
-        break;
-      }
       case 'sinks': {
         // un plan de pierre sombre, creusé d'une auge d'inox sur toute sa longueur ; les miroirs au mur
         lbox('marbleDark', it, -hw, hw, 0.8, 0.88, -hd, -hd + 0.1);
@@ -767,17 +711,36 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
       panel('signs', signs.uv(si++), (xa + xb) / 2, y, z, Math.min(xb - xa - 0.6, 6.5), 0.44, 0, sh.dir);
     }
 
-  // les salles de projection : l'écran (une toile grise entre des caches noirs) contre le mur est ; dans les coins, de
-  // part et d'autre de la scène, les sorties de secours
+  // les salles de projection : contre le mur est, un écran large (2,39:1) dans son cache noir, entre deux tentures de
+  // velours à plis (des lés de 12 cm, un sur deux en retrait), une frise au-dessus, une scène basse au pied
   for (const r of rooms) {
     if (r.kind !== 'screen') continue;
     const X1 = (r.x1 + 1) * C;
     const Z0 = r.z0 * C;
     const Z1 = (r.z1 + 1) * C;
-    G.box('screenWhite', X1 - 0.08, X1 - 0.02, 1.4, r.ceilH - 1.2, Z0 + 3.0, Z1 - 3.0, '+x');
-    G.box('black', X1 - 0.1, X1 - 0.02, 1.2, r.ceilH - 1.0, Z0 + 2.6, Z0 + 3.0, '+x');
-    G.box('black', X1 - 0.1, X1 - 0.02, 1.2, r.ceilH - 1.0, Z1 - 3.0, Z1 - 2.6, '+x');
-    G.box('red', X1 - 1.2, X1 - 0.1, 0, 1.2, Z0 + 2.6, Z1 - 2.6, '-y');
+    const zc = (Z0 + Z1) / 2;
+    const sw = 9.6;
+    const y0 = 1.45;
+    const y1 = y0 + sw / 2.39;
+    const top = r.ceilH - 0.25;
+    G.box('screenWhite', X1 - 0.08, X1 - 0.02, y0, y1, zc - sw / 2, zc + sw / 2, '+x');
+    // le cache : un cadre de feutre noir autour de la toile, jusqu'aux tentures et à la frise
+    G.box('black', X1 - 0.1, X1 - 0.02, y0 - 0.5, y1 + 0.3, zc - sw / 2 - 0.3, zc - sw / 2, '+x');
+    G.box('black', X1 - 0.1, X1 - 0.02, y0 - 0.5, y1 + 0.3, zc + sw / 2, zc + sw / 2 + 0.3, '+x');
+    G.box('black', X1 - 0.1, X1 - 0.02, y0 - 0.5, y0, zc - sw / 2, zc + sw / 2, '+x');
+    G.box('black', X1 - 0.1, X1 - 0.02, y1, y1 + 0.3, zc - sw / 2, zc + sw / 2, '+x');
+    for (const [za, zb] of [[Z0 + 0.05, zc - sw / 2 - 0.3], [zc + sw / 2 + 0.3, Z1 - 0.05]]) {
+      const n = Math.max(1, Math.round((zb - za) / 0.12));
+      const w = (zb - za) / n;
+      for (let i = 0; i < n; i++) G.box('velvet', X1 - (i % 2 ? 0.2 : 0.26), X1 - 0.02, 0.92, top, za + i * w, za + (i + 1) * w, '+x-y');
+    }
+    {
+      const n = Math.round((Z1 - Z0 - 0.1) / 0.24);
+      const w = (Z1 - Z0 - 0.1) / n;
+      for (let i = 0; i < n; i++) G.box('velvet', X1 - (i % 2 ? 0.3 : 0.36), X1 - 0.02, y1 + 0.3, top + 0.1, Z0 + 0.05 + i * w, Z0 + 0.05 + (i + 1) * w, '+x');
+    }
+    G.box('paintDark', X1 - 1.3, X1 - 0.02, 0, 0.9, Z0, Z1, '-y+x');
+    G.box('black', X1 - 1.32, X1 - 1.3, 0, 0.92, Z0, Z1, '-y');
     // (la salle 1 : ce qui passe à l'écran, carton de l'entracte puis film, est dessiné par view/mallCinema.js)
   }
 
@@ -864,15 +827,26 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
       MATS.ooo = { m: baked(lam({ map: toTex(c) })), S: 1 };
     }
     for (const e of map.allEscalators || []) {
-      if (e.fi !== 1) continue;
-      // (x : le plan de la palissade ; out : de quel côté on arrive)
-      const out = fi === 0 ? e.dir : -e.dir;
-      const x = fi === 0 ? e.top + e.dir * 0.4 : e.x - e.dir * 0.4;
-      const hw = e.w / 2 + 0.3;
-      G.box('plywood', x - 0.012, x + 0.012, 0.04, 2.1, e.z - hw, e.z + hw);
-      for (const s of [-1, 1]) G.box('plywood', x - out * 0.012 - 0.045, x - out * 0.012 + 0.045, 0, 2.14, e.z + s * hw - 0.045, e.z + s * hw + 0.045);
-      G.box('plywood', x - out * 0.06 - 0.02, x - out * 0.06 + 0.02, 1.02, 1.11, e.z - hw, e.z + hw);
-      panel('ooo', [0, 0, 1, 1], x + out * 0.016, 1.45, e.z, 0.7, 0.26, out, 0);
+      const h = e.hoard;
+      if (!h) continue;
+      // (le bout de l'escalator qui est à cet étage : son pied, ou son palier d'arrivée ; out : de quel côté on arrive)
+      const ends = [];
+      if (e.fi === fi) ends.push([e.x, -e.dir]);
+      if (fi === 0 && e.fi === 1 && !e.nowhere) ends.push([e.top, e.dir]);
+      for (const [x0, out] of ends) {
+        const xf = x0 + out * h.d;
+        const xr = x0 - out * 0.2;
+        const HH = 2.44;
+        const xa = Math.min(xf, xr);
+        const xb = Math.max(xf, xr);
+        // de front : deux feuilles debout, un joint entre elles ; les retours ; un chevron de rive en tête
+        for (const s of [-1, 1]) G.box('plywood', xf - 0.009, xf + 0.009, 0.015, HH, s > 0 ? e.z + 0.004 : e.z - h.hw, s > 0 ? e.z + h.hw : e.z - 0.004);
+        for (const s of [-1, 1]) G.box('plywood', xa, xb, 0.015, HH, e.z + s * h.hw - 0.009, e.z + s * h.hw + 0.009);
+        G.box('plywood', xa - 0.02, xb + 0.02, HH, HH + 0.045, e.z - h.hw - 0.02, e.z + h.hw + 0.02);
+        // (les têtes de vis : une file en haut, une en bas, sur chaque feuille)
+        for (const s of [-1, 1]) for (const y of [0.22, 1.22, 2.22]) for (const dz of [0.12, 0.61, 1.1]) G.box('steel', xf + out * 0.009, xf + out * 0.011, y - 0.006, y + 0.006, e.z + s * dz - 0.006, e.z + s * dz + 0.006);
+        panel('ooo', [0, 0, 1, 1], xf + out * 0.012, 1.5, e.z - out * 0.61, 0.7, 0.26, out, 0);
+      }
     }
   }
 

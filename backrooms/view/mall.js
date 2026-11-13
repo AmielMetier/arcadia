@@ -1252,9 +1252,11 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   for (const d of map.fakeScreens || []) placed.push([d.x * C - 0.1, (d.z + 0.5) * C, 2.9]);
   // (ni autour des portes des deux salles ouvertes : leur portique blanc, leur grand chiffre)
   for (const d of map.doors || []) if (d.kind === 'screen') placed.push([d.x * C - 0.1, (d.z + 0.5) * C, 2.9]);
+  // (ni sur une porte fermée à clé : bureaux, réserves des boutiques)
+  for (const d of map.fakeDoors || []) placed.push([d.x, d.z, 0.9]);
   const props = drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, placed });
   drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed, show: props.show, arcade: props.arcade });
-  drawMallSigns({ map, fi, G, MATS, rooms, goods: props.goods, hAt, model, arcade: props.arcade });
+  drawMallSigns({ map, fi, G, MATS, rooms, goods: props.goods, hAt, model, arcade: props.arcade, baked });
   // la cabine de projection, l'écran de la salle 1 et son film (view/mallCinema.js) : à l'étage du haut
   const cinema = drawMallCinema({ map, fi, floors, G, MATS, baked, model, group, placed, art: marigoldFilmArt });
   kit.build();

@@ -235,10 +235,13 @@ export function dollRelocate(sim, M, P, o = {}) {
   const gx0 = cellOf(P.x);
   const gz0 = cellOf(P.z);
   const R = Math.ceil(rMax / C);
+  const fin = o.room != null ? map.rooms[o.room] : null;
   for (let gz = Math.max(0, gz0 - R); gz <= Math.min(t.H - 1, gz0 + R); gz++)
     for (let gx = Math.max(0, gx0 - R); gx <= Math.min(t.W - 1, gx0 + R); gx++) {
       const k = gz * t.W + gx;
       if (!t.ok[k] || t.comp[k] !== comp) continue;
+      // (le final : au pied de l'écran seulement, les deux dernières travées de la salle)
+      if (fin && (map.zone[k] !== fin.id || gx < fin.x1 - 1 || gz < fin.z0 || gz > fin.z1)) continue;
       const d = Math.hypot((gx + 0.5) * C - P.x, (gz + 0.5) * C - P.z);
       if (d >= rMin && d <= rMax) cells.push(k);
     }
@@ -371,10 +374,16 @@ export function updateDoll(sim) {
       const Pc = alive.reduce((a, q) => (near(q) < near(a) ? q : a));
       if ((Pc.floor || 0) === 0 && near(Pc) < 60 && dollRelocate(sim, M, Pc, { room: b.screen.room, rMin: 9, rMax: 34 })) {
         M.finale = false;
+        M.stageT = 12; // (elle y reste plantée le temps de l'amorce : la salle n'a plus de fauteuils pour la retenir)
         return;
       }
     }
     if (M.finaleT > 25) M.finale = false;
+  }
+  if (M.stageT > 0) {
+    M.stageT -= DT;
+    stop(M);
+    return;
   }
   if (M.lostT >= DOLL_RELOC_T || M.boredT >= DOLL_BORED_T) {
     if (dollRelocate(sim, M, P0)) return;

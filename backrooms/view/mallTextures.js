@@ -482,7 +482,7 @@ export function createMallTextures() {
   const files = ['moquette_rase.jpg', 'plafond.jpg', 'l17_parpaing.jpg', 'l17_beton.jpg', 'l17_faience.jpg', 'l5_noyer.jpg', 'l1_plafond.jpg', 'l17_lino.jpg', 'l5_velours.jpg', 'l17_rideau.jpg', 'l17_tole.jpg', 'l17_carrelage_brun.jpg', 'l17_carrelage_use.jpg', 'l17_dallage.jpg', 'l17_damier.jpg', 'l17_enduit.jpg', 'l17_stratifie.jpg', 'l17_rideau_beige.jpg', 'l17_contreplaque.jpg'];
   out.ready = Promise.all(files.map(loadImage)).then(([moq, pla, mur, sol, fai, noy, dal, lin, vel, rid, tol, cab, cau, mar, dam, end, str, rib, ply]) => {
     if (ply) {
-      photo(cpG, ply, S, S, 'rgb(240,228,206)');
+      retint(cpG, ply, S, S, [126, 97, 65], [196, 164, 118]); // (un contreplaqué de chantier : clair, blond)
       out.plywood.needsUpdate = true;
     }
     // le dallage crème du mail, posé en diagonale (éclairci : un ivoire), le damier des cours du bas

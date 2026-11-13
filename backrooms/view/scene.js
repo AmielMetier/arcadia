@@ -927,6 +927,21 @@ float occVis(vec3 p, vec3 lp) {
       flickers = map.lights.filter((l) => l.state === 'flicker').map((l) => ({ l, k: 1, fp: fpOf(l), fpU: MALL ? fpUOf(l) : null, ch: chan(l), calm: Math.random() * 4, burst: 0 }));
     };
     sumLights();
+    if (MALL && map.roomAt) {
+      // Level 17 : la hauteur du plafond de chaque point du plan (sur 12 m), dans le canal libre de la carte du haut :
+      // le fondu entre la lumière du sol et celle du haut se règle sur elle (un mur de 10 m n'est pas un mur de 3 m)
+      const hOf = (px, pz) => {
+        const r = map.roomAt(px, pz);
+        return r ? r.ceilH : 0;
+      };
+      for (let tz = 0; tz < BH; tz++)
+        for (let tx = 0; tx < BW; tx++) {
+          const px = (tx + 0.5) * TX;
+          const pz = (tz + 0.5) * TX;
+          const h = hOf(px, pz) || Math.max(hOf(px + 2.5, pz), hOf(px - 2.5, pz), hOf(px, pz + 2.5), hOf(px, pz - 2.5)) || 4.4;
+          bake2Data[(tz * BW + tx) * 4 + 3] = Math.round(Math.min(1, h / 12) * 255);
+        }
+    }
     let lightGen = map.lightGen || 0;
     // ombre de contact : plus sombre à moins de AO_R d'un mur
     for (let tz = 0; tz < BH; tz++) {
@@ -1924,10 +1939,11 @@ float bkCaust(vec2 uv, float t) {
           #ifdef BK_MALL
           {
             // Level 17 : le plafond et le haut des murs prennent la lumière du haut (les corniches, les appliques, les
-            // suspensions), le sol et le bas des murs celle du bas (les flaques des spots) ; entre 1 m et 3,4 m, un fondu
+            // suspensions), le sol et le bas des murs celle du bas (les flaques des spots) ; entre les deux, un fondu
             vec2 u1 = uBakeScale * 0.9;
             vec4 up = texture2D(uBake2, bkUv) * 0.4 + (texture2D(uBake2, bkUv + vec2(u1.x, 0.0)) + texture2D(uBake2, bkUv - vec2(u1.x, 0.0)) + texture2D(uBake2, bkUv + vec2(0.0, u1.y)) + texture2D(uBake2, bkUv - vec2(0.0, u1.y))) * 0.15;
-            float kUp = ny < -0.5 ? 1.0 : (ny > 0.5 ? 0.0 : smoothstep(1.0, 3.4, by));
+            // (jusqu'aux trois quarts de la hauteur du lieu, lue dans le canal alpha : 3,4 m sous un plafond ordinaire)
+            float kUp = ny < -0.5 ? 1.0 : (ny > 0.5 ? 0.0 : smoothstep(1.0, max(3.4, up.a * 12.0 * 0.78), by));
             vec3 lo = (uBakeTint * bk.r + uBakeTint2 * bk.b) * shape;
             vec3 hi = (uBakeTint * up.r + uBakeTint2 * up.b + vec3(0.34, 0.46, 1.6) * up.g) * mix(0.8, 1.0, bk.g) * (ny < -0.5 ? 1.0 : 0.92);
             // le sol renvoie de sa lumière vers le plafond et le haut des murs : sous une dalle lumineuse ou un spot

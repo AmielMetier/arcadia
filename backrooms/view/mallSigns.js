@@ -14,7 +14,7 @@ const hash = (a, b = 0) => {
   return v - Math.floor(v);
 };
 
-export function drawMallSigns({ map, fi, G, MATS, rooms, goods, hAt, model, arcade }) {
+export function drawMallSigns({ map, fi, G, MATS, rooms, goods, hAt, model, arcade, baked }) {
   const W = map.W;
   const cell = (x, z) => (x < 0 || z < 0 || x >= W || z >= map.H ? WALL : map.grid[z * W + x]);
   const byName = (n) => rooms.find((r) => r.name === n);
@@ -97,7 +97,7 @@ export function drawMallSigns({ map, fi, G, MATS, rooms, goods, hAt, model, arca
   // un vantail : sa charnière en (hx, 0.04), fermé il va vers +x (side = 1) ou -x (-1) ; phi : son ouverture ;
   // fit : le côté des ferrures (-1 : la face tournée vers le passage quand il est ouvert ; 1 : l'autre)
   const leaf = (style, hx, side, L, phi, fit) => {
-    const mat = style === 'screen' ? 'velvet' : style === 'fire' ? 'black' : 'paintGrey';
+    const mat = style === 'screen' ? 'velvet' : style === 'fire' ? 'black' : style === 'office' ? 'wood' : 'paintGrey';
     const trim = style === 'screen' ? 'brass' : 'steel';
     const P = [];
     P.push([mat, new THREE.BoxGeometry(L, 2.26, 0.045).translate((side * L) / 2, 1.15, 0)]);
@@ -107,6 +107,9 @@ export function drawMallSigns({ map, fi, G, MATS, rooms, goods, hAt, model, arca
       P.push(['glass', new THREE.CylinderGeometry(0.13, 0.13, 0.012, 18).rotateX(PI / 2).translate(side * L * 0.5, 1.55, fit * 0.024)]);
       P.push([trim, new THREE.TorusGeometry(0.135, 0.012, 5, 20).translate(side * L * 0.5, 1.55, fit * 0.028)]);
       P.push([trim, new THREE.BoxGeometry(0.1, 0.42, 0.006).translate(side * (L - 0.1), 1.12, fit * 0.026)]);
+    } else if (style === 'office') {
+      // une porte de bureau : une béquille des deux côtés
+      for (const f of [-1, 1]) P.push([trim, new THREE.BoxGeometry(0.13, 0.022, 0.05).translate(side * (L - 0.12), 1.03, f * 0.045)]);
     } else {
       // une porte de service : la barre de poussée, un petit vitrage armé
       P.push([trim, new THREE.BoxGeometry(L * 0.72, 0.05, 0.05).translate((side * L) / 2, 1.02, fit * 0.05)]);
@@ -126,7 +129,7 @@ export function drawMallSigns({ map, fi, G, MATS, rooms, goods, hAt, model, arca
     goods.sign(SIGN_EXIT, x + nx * 0.052, 2.62, z + nz * 0.052, 0.52, 0.196, nx, nz, lit, false, signUV(SIGN_EXIT, [0.004, 0.338, 0.668][variant], [0.33, 0.662, 0.996][variant]));
   };
 
-  const doors = new Map((map.doors || []).filter((d) => d.kind === 'service' || d.kind === 'fire' || d.kind === 'screen').map((d) => [d.z * W + d.x, d]));
+  const doors = new Map((map.doors || []).filter((d) => d.kind === 'service' || d.kind === 'fire' || d.kind === 'screen' || d.kind === 'office').map((d) => [d.z * W + d.x, d]));
   for (const d of doors.values()) {
     const alongZ = cell(d.x, d.z - 1) !== WALL && cell(d.x, d.z + 1) !== WALL; // on passe selon z (le mur court le long de x)
     const [ax, az] = alongZ ? [0, 1] : [1, 0];
@@ -139,12 +142,12 @@ export function drawMallSigns({ map, fi, G, MATS, rooms, goods, hAt, model, arca
     const hz = lz + az * n * C;
     const seed = d.x * 31 + d.z * 17 + fi * 7;
     // les vantaux, ouverts, rabattus dans l'embrasure (celui de droite parfois un peu moins)
-    const style = d.kind === 'service' ? 'service' : d.kind === 'screen' ? 'screen' : 'fire';
+    const style = d.kind === 'service' ? 'service' : d.kind === 'screen' ? 'screen' : d.kind === 'office' ? 'office' : 'fire';
     const half = C / 2 - 0.115;
     leaf(style, -half, 1, 1.12, PI / 2, -1);
     leaf(style, half, -1, 1.12, hash(seed, 1) < 0.35 ? PI * 0.455 : PI / 2, -1);
     place(lx, lz, ax, az);
-    if (d.kind === 'screen') continue; // (les salles : leur numéro, plus bas)
+    if (d.kind === 'screen' || d.kind === 'office') continue; // (les salles : leur numéro, plus bas ; les bureaux : pas d'issue)
     // « EXIT » des deux côtés, là où le mur monte assez haut
     for (const [x, z, s] of [[lx, lz, -1], [hx, hz, 1]]) {
       const inH = hAt(d.x + (s > 0 ? ax * (n - 1) : 0), d.z + (s > 0 ? az * (n - 1) : 0));
@@ -187,6 +190,69 @@ export function drawMallSigns({ map, fi, G, MATS, rooms, goods, hAt, model, arca
       const z = (hall.z1 - 2) * C;
       G.box('black', x, x + 0.04, 2.16, 2.44, z - 0.98, z + 0.98);
       goods.sign(SIGN_SCREENS78, x + 0.042, 2.3, z, 1.9, 0.24, 1, 0, true);
+    }
+  }
+
+  // --- 3b. Les portes fermées à clé (bureaux, réserves des boutiques) : un chambranle d'acier, un vantail, sa
+  // plaque ; et les plaques des deux blocs des toilettes, à côté de leur entrée ---
+  {
+    const fd = [...(map.fakeDoors || [])];
+    // (les toilettes : une plaque sur le mur du sas, à côté de l'entrée de chaque bloc)
+    const tags = [];
+    for (const r of rooms)
+      for (const b of r.blocks || []) {
+        const men = b.who === 'men';
+        tags.push({ x: men ? (b.door + 1) * C + 0.42 : b.door * C - 0.42, z: (r.z0 + 1) * C, nx: 0, nz: -1, label: men ? 'MEN' : 'WOMEN', y: 1.6, w: 0.36, h: 0.36 });
+      }
+    const labels = [...new Set([...fd, ...tags].map((d) => d.label))];
+    if (labels.length && baked) {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 64 * labels.length;
+      const g = c.getContext('2d');
+      labels.forEach((t, i) => {
+        const big = t === 'MEN' || t === 'WOMEN';
+        g.fillStyle = big ? '#1d2a4a' : '#2a2622';
+        g.fillRect(0, i * 64, 256, 64);
+        g.strokeStyle = big ? '#e8e2d0' : '#b9a878';
+        g.lineWidth = 2;
+        g.strokeRect(5, i * 64 + 5, 246, 54);
+        g.fillStyle = big ? '#f1ecdc' : '#e4d6b0';
+        g.textAlign = 'center';
+        g.font = `bold ${big ? 34 : t.length > 12 ? 20 : 26}px "Arial Narrow", Arial, sans-serif`;
+        g.fillText(t, 128, i * 64 + (big ? 44 : 41));
+      });
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 4;
+      MATS.doorPlates = { m: baked(new THREE.MeshLambertMaterial({ map: tex })), S: 1 };
+      const U = (t) => {
+        const i = labels.indexOf(t);
+        return [0, 1 - (i + 1) / labels.length, 1, 1 - i / labels.length];
+      };
+      for (const d of fd) {
+        const office = d.style === 'office';
+        const sx = d.nx ? 0 : 1; // le long du mur
+        const sz = d.nx ? 1 : 0;
+        const at = (s, dep) => [d.x + sx * s + d.nx * dep, d.z + sz * s + d.nz * dep];
+        const bx = (k, s0, s1, y0, y1, d0, d1) => {
+          const [ax, az] = at(s0, d0);
+          const [cx, cz] = at(s1, d1);
+          G.box(k, Math.min(ax, cx), Math.max(ax, cx), y0, y1, Math.min(az, cz), Math.max(az, cz), '-y');
+        };
+        const hw = 0.46;
+        for (const s of [-1, 1]) bx('steel', s * hw, s * (hw + 0.06), 0, 2.16, 0, 0.03);
+        bx('steel', -hw - 0.06, hw + 0.06, 2.1, 2.16, 0, 0.03);
+        bx(office ? 'wood' : 'paintGrey', -hw, hw, 0.01, 2.1, 0, 0.014);
+        if (office) bx('steel', hw - 0.19, hw - 0.06, 1.02, 1.045, 0.014, 0.06);
+        else {
+          bx('steel', -hw + 0.02, hw - 0.02, 0.03, 0.27, 0.014, 0.018);
+          bx('steel', hw - 0.1, hw - 0.06, 0.95, 1.13, 0.014, 0.05);
+        }
+        const [px, pz] = at(0, 0.017);
+        panel('doorPlates', U(d.label), px, office ? 1.62 : 1.7, pz, 0.34, 0.085, d.nx, d.nz);
+      }
+      for (const t of tags) panel('doorPlates', U(t.label), t.x + t.nx * 0.012, t.y, t.z + t.nz * 0.012, t.w, t.w / 4, t.nx, t.nz);
     }
   }
 

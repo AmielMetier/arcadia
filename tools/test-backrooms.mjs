@@ -2957,6 +2957,60 @@ test('Level 17 : fermé pour la nuit — peu de boutiques ouvertes, rien derriè
   }
 });
 
+test('Level 17 : des pièces aux proportions d\'un vrai lieu — salle 1 plus profonde que large, écran large, hublot au-dessus des têtes, toilettes en deux blocs derrière un sas, bureaux en couloirs', () => {
+  for (const sd of [1, 3, 17, 42, 99]) {
+    const { floors } = createMallMap(sd);
+    const up = floors[0];
+    const C = CELL_SIZE;
+    // les salles : plus profondes que larges, plus de fauteuils modelés ; l'écran en 2,39:1, dans l'axe de la cabine
+    for (const r of up.rooms.filter((o) => o.kind === 'screen')) assert.ok(r.x1 - r.x0 > r.z1 - r.z0, `${r.name} : plus profonde que large`);
+    assert.ok(!up.furn.some((it) => it.kind === 'seats'), 'plus de fauteuils');
+    const b = up.booth;
+    const S = b.screen;
+    assert.ok(Math.abs((S.z1 - S.z0) / (S.y1 - S.y0) - 2.39) < 0.01, 'un écran large');
+    assert.ok(Math.abs((S.z0 + S.z1) / 2 - b.port.z) < 0.01 && b.port.y >= 2.3, 'le hublot dans l\'axe, au-dessus des têtes');
+    assert.ok(S.y1 < up.rooms[S.room].ceilH, 'l\'écran tient sous le plafond');
+    // la cabine : on y tient debout à la table de montage, l'armoire du projecteur laisse le passage
+    assert.ok(!up.collide(b.use.x, b.use.z, 0.3) && up.roomAt(b.use.x, b.use.z).kind === 'booth');
+    assert.ok(up.collide((b.closet.x0 + b.closet.x1) / 2, b.port.z, 0.1) && !up.collide(b.x0 + 0.5, b.port.z, 0.3), 'on contourne l\'armoire');
+    for (const f of floors) {
+      // les toilettes : deux blocs de 60 à 80 m², chacun avec ses cabines et ses lavabos, au bout d'un sas
+      const wc = f.rooms.find((o) => o.kind === 'wc');
+      assert.equal(wc.blocks.length, 2);
+      for (const k of wc.blocks) {
+        const area = (k.x1 - k.x0 + 1) * (k.z1 - k.z0 + 1) * C * C;
+        assert.ok(area >= 60 && area <= 80, `un bloc de ${area} m²`);
+        const inBlock = (it) => it.x > k.x0 * C && it.x < (k.x1 + 1) * C && it.z > k.z0 * C && it.z < (k.z1 + 1) * C;
+        assert.ok(f.furn.filter((it) => it.kind === 'stall' && inBlock(it)).length >= 3 && f.furn.some((it) => it.kind === 'sinks' && inBlock(it)), 'cabines et lavabos');
+        assert.ok(f.dist[(k.z0 + 1) * f.W + k.x0 + 1] >= 0, 'on y entre');
+      }
+      // aucune lampe ni aucun meuble dans un mur
+      for (const l of f.lights) assert.ok(!f.isWall(l.gx, l.gz) || f.pillarAt(l.gx, l.gz), 'une lampe dans un mur');
+      for (const it of f.furn) assert.ok(!f.isWall(Math.floor(it.x / C), Math.floor(it.z / C)), `${it.kind} dans un mur`);
+      for (const d of f.fakeDoors) assert.ok(f.isWall(Math.floor((d.x - d.nx * 0.5) / C), Math.floor((d.z - d.nz * 0.5) / C)) && !f.isWall(Math.floor((d.x + d.nx * 0.5) / C), Math.floor((d.z + d.nz * 0.5) / C)), 'une porte fermée sur un mur, face au passage');
+    }
+    // les bureaux : plus de plateau ouvert (nulle part un carré libre de 10 m de côté), surtout des pièces fermées
+    for (const r of up.rooms.filter((o) => o.kind === 'office' && /management|Administration/.test(o.name))) {
+      let free = 0;
+      let reach = 0;
+      for (let z = r.z0; z <= r.z1; z++)
+        for (let x = r.x0; x <= r.x1; x++) {
+          if (up.isWall(x, z)) continue;
+          free++;
+          if (up.dist[z * up.W + x] >= 0) reach++;
+          let open = true;
+          for (let dz = 0; dz < 4 && open; dz++) for (let dx = 0; dx < 4 && open; dx++) if (up.isWall(x + dx, z + dz)) open = false;
+          assert.ok(!open, `${r.name} : un plateau ouvert en (${x}, ${z})`);
+        }
+      assert.ok(free < 0.5 * (r.x1 - r.x0 + 1) * (r.z1 - r.z0 + 1), `${r.name} : surtout des pièces fermées`);
+      assert.equal(reach, free, `${r.name} : couloirs et pièces ouvertes tous accessibles`);
+      assert.ok(up.fakeDoors.filter((d) => d.style === 'office').length >= 8, 'des portes fermées à clé le long des couloirs');
+    }
+    // les escalators : un coffrage à chaque bout, qu'on ne traverse pas
+    for (const e of up.allEscalators) assert.ok(floors[e.fi].collide(e.x - e.dir * 0.5, e.z, 0.1), 'le pied de l\'escalator est coffré');
+  }
+});
+
 test('Level 17 : on monte et on descend l\'escalier monumental, on bute sur le garde-corps du vide', () => {
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 4, level: MALL_LEVEL });
   const P = sim.players[0];

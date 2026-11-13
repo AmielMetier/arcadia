@@ -101,7 +101,8 @@ export function reelCan(n, canMat, labelMat) {
 
 // --- Ce qui passe à l'écran (un format très large, celui de l'écran : 19 m × 5,6 m) ---
 const SW = 1024;
-const SH = 302;
+const SH = 428; // (2,39:1)
+const OY = (SH - 302) / 2; // les cartons ont été composés pour une image de 302 px de haut : on les recentre
 // le carton de l'entracte : il reste à l'écran tant que le film attend ses bobines
 function paintIntermission(g) {
   const gr = g.createRadialGradient(SW / 2, SH / 2, 40, SW / 2, SH / 2, 600);
@@ -117,13 +118,13 @@ function paintIntermission(g) {
   g.textAlign = 'center';
   g.fillStyle = 'rgba(0,0,0,0.5)';
   g.font = 'italic 92px Georgia, "Times New Roman", serif';
-  g.fillText('Intermission', SW / 2 + 5, 152);
+  g.fillText('Intermission', SW / 2 + 5, 152 + OY);
   g.fillStyle = '#e9dcc0';
-  g.fillText('Intermission', SW / 2, 147);
+  g.fillText('Intermission', SW / 2, 147 + OY);
   g.font = 'bold 17px "Arial Narrow", Arial, sans-serif';
-  g.fillText('T H E   F E A T U R E   W I L L   R E S U M E   S H O R T L Y', SW / 2, 204);
+  g.fillText('T H E   F E A T U R E   W I L L   R E S U M E   S H O R T L Y', SW / 2, 204 + OY);
   g.font = '13px "Arial Narrow", Arial, sans-serif';
-  g.fillText('S T A R D U S T   8   C I N E M A S', SW / 2, 246);
+  g.fillText('S T A R D U S T   8   C I N E M A S', SW / 2, 246 + OY);
   for (let i = 0; i < 26; i++) {
     g.fillStyle = `rgba(255,255,255,${0.04 + ((i * 37) % 10) / 120})`;
     g.fillRect(((i * 197) % SW) + 0.5, 0, 1, SH);
@@ -143,11 +144,11 @@ function paintLeader(g, t) {
   g.textAlign = 'center';
   if (t < 1) {
     g.font = 'bold 30px "Arial Narrow", Arial, sans-serif';
-    g.fillText('HALCYON PARK MALL · GRAND OPENING FEATURE', SW / 2, 110);
+    g.fillText('HALCYON PARK MALL · GRAND OPENING FEATURE', SW / 2, 110 + OY);
     g.font = 'bold 64px "Arial Narrow", Arial, sans-serif';
-    g.fillText('PICTURE START', SW / 2, 196);
+    g.fillText('PICTURE START', SW / 2, 196 + OY);
     g.font = '20px "Arial Narrow", Arial, sans-serif';
-    g.fillText('REEL 1 OF 5 · 35 MM · SOUND', SW / 2, 240);
+    g.fillText('REEL 1 OF 5 · 35 MM · SOUND', SW / 2, 240 + OY);
     return;
   }
   const n = Math.max(2, 8 - Math.floor(t));
@@ -217,21 +218,21 @@ function paintCard(g, i, art) {
   g.textAlign = 'center';
   g.fillStyle = 'rgba(0,0,0,0.35)';
   g.font = `italic bold ${K.t[0].length > 17 ? 62 : 76}px Georgia, "Times New Roman", serif`;
-  g.fillText(K.t[0], cx + 4, 146);
+  g.fillText(K.t[0], cx + 4, 146 + OY);
   g.fillStyle = K.ink;
-  g.fillText(K.t[0], cx, 142);
+  g.fillText(K.t[0], cx, 142 + OY);
   g.font = 'bold 22px "Arial Narrow", Arial, sans-serif';
-  g.fillText(K.t[1].split('').join(' ').replace(/ {3}/g, '    '), cx, 200);
+  g.fillText(K.t[1].split('').join(' ').replace(/ {3}/g, '    '), cx, 200 + OY);
   if (K.arrow) {
     g.lineWidth = 12;
     g.strokeStyle = K.ink;
     g.lineJoin = 'round';
     g.beginPath();
-    g.moveTo(SW - 190, 60);
-    g.lineTo(SW - 90, 60);
-    g.moveTo(SW - 126, 30);
-    g.lineTo(SW - 90, 60);
-    g.lineTo(SW - 126, 90);
+    g.moveTo(SW - 190, 60 + OY);
+    g.lineTo(SW - 90, 60 + OY);
+    g.moveTo(SW - 126, 30 + OY);
+    g.lineTo(SW - 90, 60 + OY);
+    g.lineTo(SW - 126, 90 + OY);
     g.stroke();
   }
   // le cadre arrondi du projecteur, un vignettage
@@ -290,95 +291,26 @@ export function drawMallCinema({ map, fi, floors, G, MATS, baked, model, group, 
   G.box('black', wallX - 0.132, wallX - 0.12, 0, 0.1, B.z0, B.z1, '-y+x');
   G.box('black', wallX, wallX + 0.012, 0, 0.1, B.z0, B.z1, '-y-x');
 
-  // 2. Le projecteur (son repère : x vers l'écran, l'axe optique à B.proj.y)
+  // 2. Le projecteur : enfermé dans son armoire de tôle, contre la cloison (on n'en voit que le hublot, là-haut). Une
+  // porte à deux battants, des ouïes en haut et en bas, un voyant qui s'allume quand la lampe brûle
   const px = B.proj.x;
   const pz = B.proj.z;
   const oy = B.proj.y;
-  const P = (k, geo, x, y, z) => put(k, geo, px + x, y, pz + z);
-  // le socle de fonte, sa colonne, le plateau
-  P('cineWrinkle', rbox(0.72, 0.06, 0.56, 0.02), -0.57, 0.03, 0);
-  P('cineEnamel', lathe([[0.25, 0.06], [0.25, 0.09], [0.17, 0.13], [0.125, 0.24], [0.115, 1.04], [0.15, 1.13], [0.21, 1.18], [0.21, 1.19]], 24), -0.57, 0, 0);
-  P('cineEnamel', rbox(1.0, 0.06, 0.46, 0.02), -0.57, 1.22, 0);
-  // la lanterne : un caisson aux angles ronds, des ouïes, sa cheminée jusqu'au plafond
-  P('cineEnamel', rbox(0.8, 0.74, 0.5, 0.045), -0.62, oy, 0);
-  for (const sz of [-1, 1]) for (let i = 0; i < 5; i++) P('cineWrinkle', rbox(0.34, 0.016, 0.014, 0.004), -0.72, oy + 0.24 - i * 0.045, sz * 0.256);
-  P('cineWrinkle', lathe([[0.13, 0], [0.13, 0.03], [0.095, 0.05], [0.09, 0.1], [0.09, H - oy - 0.37 - 0.03], [0.12, H - oy - 0.37 - 0.03], [0.12, H - oy - 0.37]], 18), -0.72, oy + 0.37, 0);
-  // (côté opérateur : la porte de la lanterne, son regard de verre fumé cerclé d'acier, sa poignée)
-  P('cineWrinkle', rbox(0.56, 0.5, 0.02, 0.008), -0.62, oy - 0.02, 0.258);
-  P('steel', new THREE.TorusGeometry(0.062, 0.011, 8, 22), -0.62, oy + 0.06, 0.272);
-  P('steel', rbox(0.03, 0.16, 0.03, 0.01), -0.36, oy - 0.02, 0.28);
-  // le nez de la lanterne, la tête du projecteur, sa porte à hublot, ses molettes
-  P('cineEnamel', new THREE.CylinderGeometry(0.11, 0.13, 0.1, 20).rotateZ(PI / 2), -0.19, oy, 0);
-  P('cineEnamel', rbox(0.36, 0.8, 0.3, 0.03), 0.02, oy, 0);
-  P('cineWrinkle', rbox(0.3, 0.62, 0.016, 0.006), 0.02, oy + 0.02, 0.157);
-  P('steel', new THREE.TorusGeometry(0.058, 0.01, 8, 22), 0.02, oy + 0.16, 0.168);
-  for (const [kx, ky] of [[-0.07, -0.14], [0.08, -0.14], [0.005, -0.25]]) P('cineAlu', lathe([[0, 0], [0.026, 0], [0.03, 0.006], [0.03, 0.02], [0.022, 0.026], [0, 0.026]], 14).rotateX(PI / 2), 0.02 + kx, oy + ky, 0.166);
-  // le lecteur de son, sous la tête
-  P('cineWrinkle', rbox(0.3, 0.2, 0.26, 0.025), 0.02, oy - 0.49, 0);
-  // l'objectif : un fût d'aluminium, une bague, la lentille
-  P('cineAlu', lathe([[0.052, 0], [0.06, 0.012], [0.06, 0.2], [0.078, 0.215], [0.078, 0.3], [0.07, 0.315], [0.062, 0.315]], 22).rotateZ(-PI / 2), 0.2, oy, 0);
-  P('cineLens', new THREE.CircleGeometry(0.062, 22).rotateY(PI / 2), 0.508, oy, 0);
-  // les bras des bobines (derrière elles), les axes
-  P('cineEnamel', rbox(0.07, 0.42, 0.03, 0.01), -0.06, oy + 0.56, -0.05);
-  P('cineEnamel', rbox(0.07, 0.46, 0.03, 0.01), 0.02, oy - 0.62, -0.05);
-  // le boîtier de commande sur la colonne : deux boutons, un câble qui file au mur
-  P('cineWrinkle', rbox(0.1, 0.16, 0.06, 0.012), -0.57, 0.86, 0.15);
-  P('cineAlu', new THREE.CylinderGeometry(0.014, 0.014, 0.012, 10).rotateX(PI / 2), -0.57, 0.9, 0.186);
-  P('cineAlu', new THREE.CylinderGeometry(0.014, 0.014, 0.012, 10).rotateX(PI / 2), -0.57, 0.83, 0.186);
-  G.tube('black', [px - 0.57, 0.02, pz - 0.26], [px - 0.57, 0.02, B.z0 + 0.03], 0.012, 6);
-
-  // les deux bobines (elles tournent) : deux flasques ajourées, un moyeu ; le film qui les garnit et qui passe dans la
-  // tête n'apparaît qu'une fois les cinq bobines montées
-  const flange = (() => {
-    const s = new THREE.Shape();
-    s.absarc(0, 0, 0.3, 0, PI * 2, false);
-    const hub = new THREE.Path();
-    hub.absarc(0, 0, 0.014, 0, PI * 2, true);
-    s.holes.push(hub);
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * PI * 2;
-      const h = new THREE.Path();
-      h.absarc(Math.cos(a) * 0.175, Math.sin(a) * 0.175, 0.072, 0, PI * 2, true);
-      s.holes.push(h);
-    }
-    return new THREE.ExtrudeGeometry(s, { depth: 0.004, bevelEnabled: false, curveSegments: 22 });
-  })();
-  const reelGeo = mergeGeometries([flange.clone().translate(0, 0, 0.02), flange.clone().translate(0, 0, -0.024), new THREE.CylinderGeometry(0.058, 0.058, 0.044, 18).rotateX(PI / 2)].map((g) => (g.index ? g.toNonIndexed() : g)));
+  const K = B.closet;
+  G.box('paintGrey', K.x0, K.x1, 0, H, K.z0, K.z1, '-y+y+x');
+  G.box('black', K.x0 - 0.004, K.x0, 0, 0.1, K.z0, K.z1, '-y+x');
+  // (le joint des battants, les paumelles, la poignée, les ouïes)
+  G.box('black', K.x0 - 0.003, K.x0, 0.1, H - 0.05, pz - 0.004, pz + 0.004, '+x');
+  for (const sz of [-1, 1]) {
+    for (const y of [0.35, 1.3, 2.3]) G.box('steel', K.x0 - 0.012, K.x0, y, y + 0.09, pz + sz * 0.5 - 0.012, pz + sz * 0.5 + 0.012, '+x');
+    for (const [ya, yb] of [[0.22, 0.5], [2.2, 2.48]]) for (let y = ya; y < yb; y += 0.045) G.box('black', K.x0 - 0.004, K.x0, y, y + 0.02, pz + sz * 0.27 - 0.17, pz + sz * 0.27 + 0.17, '+x');
+  }
+  G.box('steel', K.x0 - 0.04, K.x0, 1.02, 1.16, pz + 0.03, pz + 0.055, '+x');
   const spin = [];
   const filmParts = [];
-  const mkReel = (x, y, s, pack) => {
-    const g = new THREE.Group();
-    g.position.set(px + x, y, pz);
-    g.scale.setScalar(s);
-    g.add(new THREE.Mesh(reelGeo, MATS.cineAlu.m));
-    const f = new THREE.Mesh(new THREE.CylinderGeometry(pack, pack, 0.037, 28).rotateX(PI / 2), MATS.cineFilm.m);
-    f.visible = false;
-    g.add(f);
-    filmParts.push(f);
-    group.add(g);
-    spin.push(g);
-    return g;
-  };
-  const upY = oy + 0.75;
-  const dnY = oy - 0.76;
-  mkReel(-0.06, upY, 1, 0.26);
-  mkReel(0.02, dnY, 1, 0.13);
-  {
-    // le film entre les bobines et la tête : deux brins
-    const strip = (A, Bq) => {
-      const L = Math.hypot(Bq[0] - A[0], Bq[1] - A[1]);
-      const g = new THREE.BoxGeometry(0.003, L, 0.035);
-      g.rotateZ(-Math.atan2(Bq[0] - A[0], Bq[1] - A[1]));
-      return g.translate(px + (A[0] + Bq[0]) / 2, (A[1] + Bq[1]) / 2, pz);
-    };
-    const m = new THREE.Mesh(mergeGeometries([strip([0.19, upY - 0.06], [0.13, oy + 0.4]), strip([0.13, oy - 0.59], [0.15, dnY + 0.02])]), MATS.cineFilm.m);
-    m.visible = false;
-    group.add(m);
-    filmParts.push(m);
-  }
-  // le regard de la lanterne : il s'allume quand la lampe brûle
-  const lampGlass = new THREE.Mesh(new THREE.CircleGeometry(0.056, 20), new THREE.MeshBasicMaterial({ color: '#0d0a08' }));
-  lampGlass.position.set(px - 0.62, oy + 0.06, pz + 0.27);
+  // le voyant de la lampe, sur la porte
+  const lampGlass = new THREE.Mesh(new THREE.CircleGeometry(0.022, 14).rotateY(-PI / 2), new THREE.MeshBasicMaterial({ color: '#0d0a08' }));
+  lampGlass.position.set(K.x0 - 0.006, 1.62, pz - 0.2);
   group.add(lampGlass);
 
   // 3. La table de montage, contre le mur du sud : plateau de bois, pieds d'acier, tablette ; deux enrouleuses (la
@@ -400,8 +332,6 @@ export function drawMallCinema({ map, fi, floors, G, MATS, baked, model, group, 
     Bn('cineAlu', rbox(0.022, 0.13, 0.008, 0.003), sx * 0.74, 0.34 - 0.055, 0.086);
     Bn('wood', new THREE.CylinderGeometry(0.013, 0.015, 0.07, 10).rotateX(PI / 2), sx * 0.74, 0.34 - 0.11, 0.125);
   }
-  // (l'enrouleuse de gauche porte une petite bobine vide)
-  G.add('cineAlu', reelGeo.clone().scale(0.62, 0.62, 1).translate(bx - 0.74, top + 0.34, bz - 0.12));
   // la colleuse : un socle, deux volets relevés, le couteau
   Bn('cineWrinkle', rbox(0.24, 0.028, 0.12, 0.008), 0, 0.014, -0.16);
   for (const sx of [-1, 1]) Bn('cineAlu', rbox(0.1, 0.006, 0.09, 0.002).rotateZ(sx * 0.9), sx * 0.085, 0.07, -0.16);
@@ -411,10 +341,10 @@ export function drawMallCinema({ map, fi, floors, G, MATS, baked, model, group, 
   for (const [x, n, r] of [[-0.6, 3, 0.2], [-0.12, 2, 1.1]]) for (let i = 0; i < n; i++) G.add('cineAlu', lathe(CAN, 22).rotateY(r + i).translate(bx + x + (i % 2) * 0.02, 0.265 + i * 0.046, bz + 0.05));
   model('cardboard_box_01', bx + 0.62, 0.265, bz + 0.03, 0.3, 0.9);
   model('desk_lamp_arm_01', bx + 0.98, top, bz + 0.24, -2.3);
-  model('metal_stool_02', bx + 0.95, 0, bz - 0.95, 0.4, 1.05);
-  model('drawer_cabinet', B.x0 + 1.9, 0, B.z0 + 0.27, 0);
+  model('metal_stool_02', bx + 0.75, 0, bz - 0.9, 0.4, 1.05);
+  model('drawer_cabinet', B.x0 + 1.5, 0, B.z0 + 0.27, 0);
   model('korean_fire_extinguisher_01', B.x0 + 0.16, 0, B.z0 + 2.9, PI / 2);
-  model('metal_trash_can', B.x0 + 0.4, 0, B.z1 - 0.4, 1, 1, 0, 0, 'metal_trash_can');
+  model('metal_trash_can', B.x0 + 0.35, 0, B.z1 - 1.25, 1, 1, 0, 0, 'metal_trash_can');
   if (placed) placed.push([bx, B.z1, 1.6]);
 
   // les boîtes rapportées s'empilent sur la table (une par bobine montée)
@@ -676,7 +606,7 @@ export function drawMallCinema({ map, fi, floors, G, MATS, baked, model, group, 
       out.push({ x: S.x - 3, y: 2.8, z: (S.z0 + S.z1) / 2, r: glow[0] * k, g: glow[1] * k, b: glow[2] * k, rad: running ? 15 : 12, nx: -1, ny: 0, nz: 0, w: -0.2, box: roomBox });
       if (running) {
         const f = 0.85 + 0.15 * Math.sin(time * 23) * Math.sin(time * 7.1);
-        out.push({ x: px - 0.62, y: oy + 0.06, z: pz + 0.5, r: 1.0 * f, g: 0.78 * f, b: 0.5 * f, rad: 3.4, nx: 0, ny: 0, nz: 1, w: -0.3, box: boothBox });
+        out.push({ x: K.x0 - 0.25, y: 2.3, z: pz, r: 1.0 * f, g: 0.78 * f, b: 0.5 * f, rad: 2.6, nx: -1, ny: 0, nz: 0, w: -0.3, box: boothBox });
       }
     },
   };
