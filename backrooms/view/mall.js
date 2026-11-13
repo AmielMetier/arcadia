@@ -309,29 +309,38 @@ function makeBuilder(MATS, wells = []) {
 function makeMaterials(tx, baked) {
   const lam = (o) => new THREE.MeshLambertMaterial(o);
   const phong = (o) => new THREE.MeshPhongMaterial(o);
-  // le sol poli : il reflète les lampes (spec), net comme une vitre sombre
-  const polish = (map) => baked(phong({ map, specular: '#3a352c', shininess: 90 }), { spec: 0.85, gloss: 320, mask: 0 });
+  // le sol poli : il reflète les lampes (spec), net comme une vitre sombre ; son poli vient de la matière scannée
+  // (les joints et les rayures ne brillent pas)
+  const polish = (map, gloss) => baked(phong({ map, specularMap: gloss, specular: '#3a352c', shininess: 90 }), { spec: 0.95, gloss: 320, mask: 0 });
+  // l'enduit peint des murs : le grain de la photo, en relief (la lumière qui tombe du plafond l'accroche)
+  const paint = (map) => baked(lam({ map, bumpMap: tx.plasterRelief, bumpScale: 0.7 }), { bump: true, fade: [1.0, 3.0] });
+  // un rideau métallique à lames : chaque lame prend la lumière du haut
+  const slats = (map, relief) => baked(phong({ map, bumpMap: relief, bumpScale: 3.2, specular: '#2c2c2c', shininess: 30 }), { spec: 0.3, gloss: 60, mask: 0, bump: true, fade: [1.3, 3.2] });
+  // S : la taille réelle d'une répétition de la matière scannée, en mètres (la même densité partout)
   return {
-    terrazzo: { m: polish(tx.terrazzo), S: 2.4 },
-    checker: { m: polish(tx.checker), S: 2.4 },
+    terrazzo: { m: polish(tx.terrazzo, tx.terrazzoGloss), S: 1.9 },
+    checker: { m: polish(tx.checker, tx.checkerGloss), S: 3.0 },
     carpetD: { m: baked(lam({ map: tx.carpetDark })), S: 1.5 },
     carpetFun: { m: baked(lam({ map: tx.carpetArcade })), S: 2.6 },
     carpetV: { m: baked(lam({ map: tx.carpetViolet })), S: 1.5 },
     // l'annexe : un grès brun des années 70 (une aile plus ancienne)
-    annexTile: { m: baked(phong({ map: tx.annexTile, specular: '#1c1a16', shininess: 30 }), { spec: 0.3, gloss: 80, mask: 0 }), S: 2.1 },
-    lino: { m: baked(phong({ map: tx.lino, specular: '#1c1a16', shininess: 30 }), { spec: 0.35, gloss: 90, mask: 0 }), S: 2.4 },
-    quarry: { m: baked(phong({ map: tx.quarry, specular: '#1c1a16', shininess: 30 }), { spec: 0.25, gloss: 70, mask: 0 }), S: 3.0 },
-    concrete: { m: baked(lam({ map: tx.concrete })), S: 2.5 },
+    annexTile: { m: baked(phong({ map: tx.annexTile, bumpMap: tx.annexRelief, bumpScale: 1.2, specularMap: tx.annexGloss, specular: '#1c1a16', shininess: 30 }), { spec: 0.4, gloss: 80, mask: 0 }), S: 1.7 },
+    lino: { m: baked(phong({ map: tx.lino, specularMap: tx.linoGloss, specular: '#1c1a16', shininess: 30 }), { spec: 0.4, gloss: 90, mask: 0 }), S: 2.0 },
+    quarry: { m: baked(phong({ map: tx.quarry, bumpMap: tx.quarryRelief, bumpScale: 1.2, specularMap: tx.quarryGloss, specular: '#1c1a16', shininess: 30 }), { spec: 0.35, gloss: 70, mask: 0 }), S: 2.26 },
+    concrete: { m: baked(lam({ map: tx.concrete })), S: 2.0 },
+    // le sol stratifié des boutiques
+    laminate: { m: baked(phong({ map: tx.laminate, specularMap: tx.laminateGloss, specular: '#241b12', shininess: 40 }), { spec: 0.35, gloss: 90, mask: 0 }), S: 1.7 },
     wood: { m: baked(phong({ map: tx.wood, specular: '#241b12', shininess: 40 }), { spec: 0.3, gloss: 70, mask: 0 }), S: 2.0 },
     woodFront: { m: baked(phong({ map: tx.wood, color: '#b06c40', specular: '#241b12', shininess: 40 }), { spec: 0.3, gloss: 70, mask: 0 }), S: 1.6 },
-    faience: { m: baked(phong({ map: tx.faience, specular: '#3a3a3a', shininess: 80 }), { spec: 0.35, gloss: 140, mask: 0 }), S: 2.0 },
-    plaster: { m: baked(lam({ map: tx.plaster })), S: 2.5 },
-    paintGrey: { m: baked(lam({ map: tx.paintGrey })), S: 2.5 },
-    paintDark: { m: baked(lam({ map: tx.paintDark })), S: 2.5 },
-    paintChar: { m: baked(lam({ map: tx.paintChar })), S: 2.5 },
-    block: { m: baked(lam({ map: tx.block })), S: 2.5 },
+    faience: { m: baked(phong({ map: tx.faience, bumpMap: tx.faienceRelief, bumpScale: 0.3, specular: '#3a3a3a', shininess: 80 }), { spec: 0.35, gloss: 140, mask: 0, bump: true, fade: [0.6, 1.8] }), S: 1.27 },
+    plaster: { m: paint(tx.plaster), S: 2.0 },
+    paintGrey: { m: paint(tx.paintGrey), S: 2.0 },
+    paintDark: { m: paint(tx.paintDark), S: 2.0 },
+    paintChar: { m: paint(tx.paintChar), S: 2.0 },
+    block: { m: baked(lam({ map: tx.block, bumpMap: tx.blockRelief, bumpScale: 1.6 }), { bump: true, fade: [1.0, 3.0] }), S: 2.0 },
+    // (le faux plafond : quatre dalles de 62,5 cm par répétition, calées sur la trame des luminaires)
     ceilTiles: { m: baked(lam({ map: tx.ceilTiles })), S: 2.5 },
-    slab: { m: baked(lam({ map: tx.slab })), S: 2.5 },
+    slab: { m: baked(lam({ map: tx.slab })), S: 2.0 },
     paper: { m: baked(lam({ map: tx.paper })), S: 2.5 },
     // la verrière la nuit : le ciel noir ne prend pas la lumière des lampes
     sky: { m: new THREE.MeshBasicMaterial({ map: tx.skyGlass, color: '#8f98a3' }), S: 3.0 },
@@ -344,14 +353,19 @@ function makeMaterials(tx, baked) {
     steel: { m: baked(phong({ color: '#7f8286', specular: '#c4c8cc', shininess: 70 }), { spec: 0.6, gloss: 110, mask: 0 }), S: 1 },
     black: { m: baked(phong({ color: '#151515', specular: '#3a3a3a', shininess: 50 })), S: 1 },
     marbleDark: { m: baked(phong({ color: '#2a2521', specular: '#4a4540', shininess: 70 }), { spec: 0.45, gloss: 120, mask: 0 }), S: 1 },
-    grille: { m: baked(lam({ map: tx.grille, alphaTest: 0.45, side: THREE.DoubleSide, color: '#bdbbb4' })), S: 0.5 },
+    // (la couverture par l'alpha : avec l'anticrénelage de la cible de rendu, la grille lointaine devient un voile)
+    grille: { m: baked(lam({ map: tx.grille, alphaTest: 0.3, alphaToCoverage: true, side: THREE.DoubleSide, color: '#c4c2bb' })), S: 1.0 },
+    ceilKit: { m: baked(lam({ map: tx.ceilKit })), S: 1 },
     glass: { m: new THREE.MeshPhongMaterial({ color: '#0b1214', transparent: true, opacity: 0.2, specular: '#8fa6ae', shininess: 120, depthWrite: false, side: THREE.DoubleSide }), S: 1, order: 2 },
     // les rubans de LED bleues du cinéma (plus forts que le blanc : ils bavent dans le caméscope)
     velvet: { m: baked(lam({ map: tx.velvet })), S: 0.9 },
-    shutter: { m: baked(phong({ map: tx.shutter, specular: '#2c2c2c', shininess: 30 }), { spec: 0.3, gloss: 60, mask: 0 }), S: 2.0 },
+    shutter: { m: slats(tx.shutter, tx.shutterRelief), S: 2.0 },
+    shutterBeige: { m: slats(tx.shutterBeige, tx.shutterBeigeRelief), S: 1.9 },
+    plywood: { m: baked(lam({ map: tx.plywood })), S: 1.0 },
     plate: { m: baked(phong({ map: tx.plate, specular: '#9a9ea4', shininess: 60 }), { spec: 0.55, gloss: 100, mask: 0 }), S: 1.2 },
     // les marches des escalators : de l'aluminium sombre, un liseré jaune
-    escStep: { m: baked(phong({ color: '#303236', specular: '#8a8e94', shininess: 50 }), { spec: 0.4, gloss: 80, mask: 0 }), S: 1 },
+    // (une marche : de l'aluminium rainuré dans le sens de la marche — les lames du rideau scanné, serrées à un centimètre)
+    escStep: { m: baked(phong({ map: tx.shutter, color: '#4c4e54', bumpMap: tx.shutterRelief, bumpScale: 2.4, specular: '#8a8e94', shininess: 50 }), { spec: 0.55, gloss: 60, mask: 0, bump: true, fade: [1.3, 3.2] }), S: 0.42 },
     escYellow: { m: baked(lam({ color: '#c9a21e' })), S: 1 },
     banner: { m: baked(lam({ map: tx.banner, side: THREE.DoubleSide })), S: 1 },
     led: { m: new THREE.MeshBasicMaterial({ color: new THREE.Color('#86a8ff').multiplyScalar(3.0) }), S: 1 },
@@ -453,7 +467,6 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   const H = map.H;
   const up = floors[0];
   const MATS = makeMaterials(tx, baked);
-  MATS.__tx = tx; // (les tissus des vêtements, view/mallProps.js)
   const rooms = map.rooms;
   const roomOf = (x, z) => {
     if (x < 0 || z < 0 || x >= W || z >= H) return null;
@@ -548,7 +561,8 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       if (!(fi === 0 && stairCell.has(i))) {
         // (la moquette à motif du hall du cinéma est peinte pour sa salle : dans le passage qui y mène, la même laine, unie)
         const fk0 = floorKey(r, fi, map.shops, x, z);
-        const fk = fk0 === 'cine' && (x < r.x0 || x > r.x1 || z < r.z0 || z > r.z1) ? 'carpetV' : fk0;
+        // (le plancher d'une boutique : un stratifié ; la clé « wood » reste celle du bruit des pas)
+        const fk = fk0 === 'cine' && (x < r.x0 || x > r.x1 || z < r.z0 || z > r.z1) ? 'carpetV' : fk0 === 'wood' ? 'laminate' : fk0;
         const pieces = fi === 0 ? cellPieces(x, z, voidBoxes) : [rectPts(x * C, z * C, (x + 1) * C, (z + 1) * C)];
         for (const p of pieces) G.hpoly(fk, p, 0, 1);
       }
@@ -590,6 +604,37 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       for (const x of [x0, x1]) G.box('black', x - 0.04, x + 0.04, 0, 0.004, z0 + 0.04, z1 - 0.04, '-y');
     }
 
+  // 1c. La couche technique des plafonds bas : des têtes de sprinkler en quinconce (une case sur deux), des bouches de
+  // soufflage et des grilles de reprise dans les plafonds à dalles, des bouches seules dans les plafonds de plâtre.
+  // Jamais dans une case qui porte une lampe, ni sous un vide, ni dans une trémie
+  {
+    const lit = new Set((map.lights || []).map((l) => l.gz * W + l.gx));
+    const TECH = { grid: 2, soffit: 1, spots: 1, greyc: 3, char: 3 }; // (3 : un plafond sombre, des sprinklers seulement)
+    // (une rosace et un corps conique : dix-huit triangles par tête, il y en a des milliers)
+    const sprink = mergeGeometries([new THREE.CircleGeometry(0.04, 8).rotateX(Math.PI / 2).translate(0, -0.003, 0), new THREE.CylinderGeometry(0.01, 0.017, 0.045, 5, 1, true).translate(0, -0.025, 0)].map((g) => g.toNonIndexed()));
+    const decal = (u0, x, y, z) => {
+      const geo = new THREE.PlaneGeometry(0.6, 0.6);
+      const a = geo.attributes.uv;
+      for (let i = 0; i < a.count; i++) a.setX(i, u0 + a.getX(i) * 0.5);
+      G.add('ceilKit', geo.rotateX(Math.PI / 2).translate(x, y, z));
+    };
+    for (let z = 0; z < H; z++)
+      for (let x = 0; x < W; x++) {
+        if (!freeAt(x, z) || stairCell.has(z * W + x)) continue;
+        const ce = ceilAt(x, z);
+        const t = TECH[ce.kind];
+        if (!t || ce.h > 4.6) continue;
+        const cx = (x + 0.5) * C;
+        const cz = (z + 0.5) * C;
+        if (up.inVoid && up.inVoid(cx, cz, 1.4)) continue;
+        if ((x + z) % 2 === 0) G.add('steel', sprink.clone().translate(cx + 0.62, ce.h, cz + 0.62));
+        if (t === 3 || lit.has(z * W + x)) continue;
+        // (au pas des dalles de 62,5 cm : une dalle entière)
+        if (x % 3 === 1 && z % 3 === 1) decal(0, x * C + 0.9375, ce.h - 0.006, z * C + 0.9375);
+        else if (t === 2 && x % 6 === 4 && z % 4 === 2) decal(0.5, x * C + 0.9375, ce.h - 0.006, z * C + 1.5625);
+      }
+  }
+
   // 2. Les murs : une face par côté visible, à la hauteur du plafond de la case qu'elle regarde
   for (let z = 0; z < H; z++) {
     for (let x = 0; x < W; x++) {
@@ -621,6 +666,22 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     }
   }
 
+  // 2a. Les pans coupés : dans l'angle de deux murs, un pan à 45° (du même parement), sa plinthe
+  for (const c of map.cutCorners || []) {
+    const h = hAt(c.x, c.z);
+    const r = roomOf(c.x, c.z);
+    const k = wallKey(r);
+    const s = Math.SQRT1_2;
+    const n = [-c.dx * s, 0, -c.dz * s];
+    G.quad(k, [c.ax, 0, c.az], [c.bx, 0, c.bz], [c.bx, h, c.bz], [c.ax, h, c.az], n);
+    if (k !== 'block' && k !== 'faience') {
+      const pk = k === 'plaster' ? 'marbleDark' : r && (r.kind === 'cine' || r.kind === 'cineHall') ? 'steel' : 'black';
+      const ph = k === 'plaster' ? 0.16 : 0.1;
+      const o = 0.018;
+      G.quad(pk, [c.ax + n[0] * o, 0, c.az + n[2] * o], [c.bx + n[0] * o, 0, c.bz + n[2] * o], [c.bx + n[0] * o, ph, c.bz + n[2] * o], [c.ax + n[0] * o, ph, c.az + n[2] * o], n);
+    }
+  }
+
   // 2b. Les portes de service, des coulisses, de secours et des salles : un linteau à 2,40 m (le mur reprend
   // au-dessus) et un chambranle d'acier de chaque côté de l'épaisseur du mur
   for (const d of map.doors || []) {
@@ -641,6 +702,12 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
         G.box(fk, x0 + e - 0.03, x0 + e + 0.03, DOOR_H - 0.06, DOOR_H, z0, z0 + C);
       }
     }
+    // (la porte de réserve d'une boutique fermée pour la nuit : deux vantaux d'acier tirés, de chaque côté du mur)
+    if (d.locked)
+      for (const e of [0.02, C - 0.06]) {
+        if (wallX) G.box('shutter', x0 + 0.08, x0 + C - 0.08, 0.01, DOOR_H - 0.06, z0 + e, z0 + e + 0.04);
+        else G.box('shutter', x0 + e, x0 + e + 0.04, 0.01, DOOR_H - 0.06, z0 + 0.08, z0 + C - 0.08);
+      }
   }
 
   // 3. Les plafonds des cours (étage du haut) : une corniche moulurée autour de l'ouverture (elle cache la gorge
@@ -915,9 +982,9 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     }
   }
 
-  // 6b. Le hall du cinéma : le ruban de LED qui fait le tour du plateau de son plafond (un profilé d'aluminium, la
-  // bande lumineuse dessous). Sa lumière bleue : cuite sur le plafond (le troisième canal, view/scene.js), et des feux
-  // de couleur qui tombent sur les retombées, les murs et la moquette
+  // 6b. Le hall du cinéma : un tube néon fait le tour du plateau de son plafond (1996 : pas de ruban de LED), tenu
+  // par des pattes tous les 60 cm. Sa lumière bleue : cuite sur le plafond (le troisième canal, view/scene.js), et des
+  // feux de couleur qui tombent sur les retombées, les murs et la moquette
   let cineBox = null;
   if (cine && cine.tray) {
     cineBox = [cine.x0 * C - 0.25, cine.z0 * C - 0.25, (cine.x1 + 1) * C + 0.25, (cine.z1 + 1) * C + 0.25];
@@ -926,8 +993,14 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     for (let i = 0; i < L.length; i++) {
       const a = L[i];
       const b = L[(i + 1) % L.length];
-      G.beam('steel', [a[0], y - 0.015, a[1]], [b[0], y - 0.015, b[1]], 0.1, 0.03);
-      G.beam('led', [a[0], y - 0.04, a[1]], [b[0], y - 0.04, b[1]], 0.06, 0.022);
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const np = Math.max(1, Math.round(len / 0.6));
+      for (let j = 0; j < np; j++) {
+        const px = a[0] + ((b[0] - a[0]) * (j + 0.5)) / np;
+        const pz = a[1] + ((b[1] - a[1]) * (j + 0.5)) / np;
+        G.box('steel', px - 0.006, px + 0.006, y - 0.052, y, pz - 0.006, pz + 0.006, '+y');
+      }
+      G.tube('led', [a[0], y - 0.062, a[1]], [b[0], y - 0.062, b[1]], 0.011, 8);
       const m = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / 11));
       for (let j = 0; j < m; j++) blues.push({ x: a[0] + ((b[0] - a[0]) * (j + 0.5)) / m, y: y - 0.45, z: a[1] + ((b[1] - a[1]) * (j + 0.5)) / m, rad: 13, k: 1.5 });
     }
@@ -1128,7 +1201,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     G.box(bandK, xa, xb, HEAD, top, z - 0.14, z + 0.14, '+y');
     G.box(lineK, xa, xb, HEAD - 0.03, HEAD, z - 0.15, z + 0.15, '+y');
     if (sh.state === 'gutted') continue;
-    const PIL = style === 0 ? 0.55 : 0;
+    const PIL = sh.state !== 'shut' && style === 0 ? 0.55 : 0;
     if (PIL)
       for (const [p0, p1] of [[xa, xa + PIL], [xb - PIL, xb]]) {
         G.box('woodFront', p0, p1, 0.16, HEAD - 0.03, z - 0.16, z + 0.16, '-y');
@@ -1137,6 +1210,18 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       }
     const fa = xa + PIL;
     const fb = xb - PIL;
+    if (sh.state === 'shut') {
+      // fermée pour la nuit : son rideau métallique à lames, baissé sur toute la devanture ; une coulisse tous les
+      // trois mètres environ, la lame finale au sol
+      const n = Math.max(1, Math.round((fb - fa) / 3.2));
+      G.vface(sh.id % 3 === 1 ? 'shutterBeige' : 'shutter', fa + 0.04, z, fb - 0.04, z, 0.06, HEAD - 0.03, 0, out);
+      G.box('steel', fa + 0.04, fb - 0.04, 0, 0.06, z - 0.035, z + 0.035, '-y');
+      for (let j = 0; j <= n; j++) {
+        const x = fa + 0.04 + ((fb - fa - 0.08) * j) / n;
+        G.box('steel', x - 0.04, x + 0.04, 0, HEAD - 0.03, z - 0.05, z + 0.05, '+y-y');
+      }
+      continue;
+    }
     if (sh.state === 'grille' && sh.id % 2 === 1) continue; // (un rideau métallique, view/mallProps.js)
     if (sh.state === 'grille') {
       // le rideau à mailles, baissé ; ses coulisses de part et d'autre
@@ -1185,7 +1270,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       base: 16,
       k: 40,
       cap: {
-        korean_public_payphone_01: 16, wheelchair_01: 18, old_gas_mask: 12, garden_hose_wall_mounted_01: 16, gamepad: 12, rubber_duck_toy: 18,
+        wheelchair_01: 18, old_gas_mask: 12, garden_hose_wall_mounted_01: 16, rubber_duck_toy: 18,
         desk_lamp_arm_01: 8, metal_office_desk: 25, cardboard_box_01: 11, SchoolChair_01: 21, modern_arm_chair_01: 18, GreenChair_01: 24, stationery_supplies: 8,
         Television_01: 26, wooden_broom: 12, plastic_broom: 12, modular_street_seating: 36, dead_quiver_trunk: 36, korean_fire_extinguisher_01: 14,
         modular_airduct_rectangular_01: 32, modular_electric_cables: 20,
@@ -1212,7 +1297,7 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   // (chaque modèle posé laisse sa place aux murs habillés : un rayon, plus grand pour les rideaux et les meubles hauts)
   const placed = [];
   let wasHere = true;
-  const WIDE = { rollershutter_door: 1.7, rollershutter_window_01: 2.7, korean_public_payphone_01: 0.6, drawer_cabinet: 0.7, wooden_bookshelf_worn: 0.8, exterior_aircon_unit: 1.0, utility_box_01: 0.4 };
+  const WIDE = { rollershutter_door: 1.7, rollershutter_window_01: 2.7, drawer_cabinet: 0.7, wooden_bookshelf_worn: 0.8, exterior_aircon_unit: 1.0, utility_box_01: 0.4 };
   const model = (name, x, y, z, ry = 0, s = 1, rx = 0, rz = 0, piece = '*') => {
     placed.push([x, z, WIDE[name] || 0.4]);
     const inner = (z < OPEN_Z0 || z > OPEN_Z1) && !wells.some(([wx, wz]) => Math.abs(x - wx) < WELL_R && Math.abs(z - wz) < WELL_R);
@@ -1222,12 +1307,13 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
   for (const d of map.fakeScreens || []) placed.push([d.x * C - 0.1, (d.z + 0.5) * C, 2.9]);
   // (ni autour des portes des deux salles ouvertes : leur portique blanc, leur grand chiffre)
   for (const d of map.doors || []) if (d.kind === 'screen') placed.push([d.x * C - 0.1, (d.z + 0.5) * C, 2.9]);
+  // (ni sur une porte fermée à clé : bureaux, réserves des boutiques)
+  for (const d of map.fakeDoors || []) placed.push([d.x, d.z, 0.9]);
   const props = drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, placed });
-  drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed, show: props.show, arcade: props.arcade, goods: props.goods });
-  drawMallSigns({ map, fi, G, MATS, rooms, goods: props.goods, hAt, model, arcade: props.arcade });
+  drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed, show: props.show, arcade: props.arcade });
+  drawMallSigns({ map, fi, G, MATS, rooms, goods: props.goods, hAt, model, arcade: props.arcade, baked });
   // la cabine de projection, l'écran de la salle 1 et son film (view/mallCinema.js) : à l'étage du haut
   const cinema = drawMallCinema({ map, fi, floors, G, MATS, baked, model, group, placed, art: marigoldFilmArt });
-  props.goods.flush();
   kit.build();
   G.build(group);
   // les barreaux : un seul maillage
@@ -1265,9 +1351,10 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
     });
     // les suspensions : la grande (cours) et celles du food court
     const pend = of('pendant');
-    fixSet(new THREE.CylinderGeometry(1, 1, 0.5, 40, 1), white(), pend.filter((l) => !l.big), (l) => {
+    // (un globe aplati de verre opale, 60 cm : c'est le caméscope qui bave autour, plus de grand disque lumineux)
+    fixSet(new THREE.SphereGeometry(0.3, 24, 14).scale(1, 0.5, 1), white(), pend.filter((l) => !l.big), (l) => {
       dummy.position.set(l.x, l.y, l.z);
-      dummy.scale.set(0.38, 0.4, 0.38);
+      dummy.scale.set(1, 1, 1);
     });
     // la grande suspension des cours : une vasque de verre dépoli, large et plate, qui éclaire vers le haut
     const dish = new THREE.LatheGeometry([[0, -0.3], [0.5, -0.27], [0.95, -0.17], [1.22, -0.02], [1.28, 0.06], [1.2, 0.07], [0.9, -0.06], [0, -0.14]].map(([r, y]) => new THREE.Vector2(r, y)), 40);
@@ -1300,8 +1387,8 @@ export function buildMall({ map, fi, floors, group, baked, tx }) {
       const room = rooms.find((r) => r.id === l.room);
       const ceil = (room && room.vault && room.vault.top) || hAt(l.gx, l.gz) || l.y + 1;
       if (!l.big) {
-        deco.push(['brass', new THREE.CylinderGeometry(0.44, 0.46, 0.36, 40, 1, true).translate(l.x, l.y + 0.1, l.z)]);
-        deco.push(['black', new THREE.CylinderGeometry(0.012, 0.012, ceil - l.y, 6).translate(l.x, (ceil + l.y) / 2, l.z)]);
+        deco.push(['brass', new THREE.CylinderGeometry(0.05, 0.1, 0.07, 14).translate(l.x, l.y + 0.165, l.z)]);
+        deco.push(['black', new THREE.CylinderGeometry(0.012, 0.012, ceil - l.y - 0.2, 6).translate(l.x, (ceil + l.y + 0.2) / 2, l.z)]);
         continue;
       }
       // la couronne de bronze autour de la vasque, ses trois tiges jusqu'au pavillon, la tige et la rosace au plafond

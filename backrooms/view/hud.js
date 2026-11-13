@@ -386,17 +386,19 @@ export class BackroomsHUD {
           ? 'LEVEL 5 · 6 LETTERS ARE HIDDEN IN THE ROOMS · HIDE UNDER BEDS AND IN WARDROBES (E), CROUCH (C)'
           : `LETTER ${got}/6 POSTED`;
       } else if (MALL) {
+        // (le bandeau ne dit plus quoi faire ni où : un compte, comme une étiquette de bande. La marche à suivre est
+        // dans le journal du projectionniste, sur le mur de la cabine ; la sortie, sur le dernier carton du film)
         b = sim.open
-          ? 'THE FREIGHT ELEVATOR IS OPEN BEHIND THE SCREEN · EVERYONE GET IN'
+          ? 'THE FEATURE IS PLAYING IN SCREEN 1'
           : sim.film > 0
-          ? 'THE FEATURE IS STARTING · SOMETHING IS WAKING UP BEHIND THE SCREEN'
+          ? 'THE FEATURE IS STARTING IN SCREEN 1'
           : got >= total && delivered < total
-          ? 'ALL 5 REELS FOUND · THREAD THEM IN THE PROJECTION BOOTH, BEHIND SCREEN 1'
+          ? `ALL ${total} REELS FOUND`
           : got > delivered
-          ? `REEL ${got}/${total} FOUND · ${got - delivered} TO THREAD IN THE PROJECTION BOOTH (${delivered}/${total} ON THE PROJECTOR)`
+          ? `REEL ${got}/${total} FOUND · ${delivered}/${total} ON THE PROJECTOR`
           : got === 0
-          ? 'LEVEL 17 · THE FEATURE IS MISSING ITS 5 REELS · THE PROJECTION BOOTH IS BEHIND SCREEN 1'
-          : `REEL ${delivered}/${total} ON THE PROJECTOR · FIND THE OTHERS`;
+          ? 'LEVEL 17 · HALCYON PARK MALL · CLOSED FOR THE NIGHT'
+          : `REEL ${delivered}/${total} ON THE PROJECTOR`;
       } else if (sim.open && L37) b = slideOf(sim) ? `EVERYONE INTO THE ${slideOf(sim).name} SLIDE · THE OTHERS ARE SHUT` : 'LEVEL 37 · FIND ONE OF THE 3 SLIDES AND GET IN · RED, YELLOW OR BLUE: EACH ONE LEADS SOMEWHERE ELSE';
       else if (sim.open) b = PIPES ? 'THE STEAM IS OFF: THE SERVICE ELEVATOR IS OPEN · EVERYONE GET IN' : L1 ? 'THE FREIGHT ELEVATOR HAS POWER: EVERYONE GET IN' : 'ONLY ONE OF THE TWO ELEVATORS OPENED… THE OTHER ONE IS JUST A WALL NOW · FOLLOW THE RED ARROW';
       else if (PIPES) {
@@ -553,6 +555,30 @@ export class BackroomsHUD {
     }
     this.invIdle += dt;
     this.flag('inv', 'idle', this.invIdle > 5 && !document.body.classList.contains('touch'));
+
+    // 4b bis. « Tout au caméscope » : l'incrustation de jeu ne se montre que lorsqu'elle a quelque chose à dire (le
+    // niveau à l'arrivée et quand on change d'étage, la gourde tous les dix points et quand elle est basse, le bruit
+    // quand il porte, le compteur quand il bouge, le signal quand il y en a un) ; le reste du temps, il ne reste que
+    // l'incrustation du caméscope : REC, compteur de bande, date, pile
+    if (this.quiet) {
+      const Q = this.q || (this.q = {});
+      const woke = (key, sig, hold) => {
+        const q = Q[key] || (Q[key] = { sig: null, t: 0 });
+        if (q.sig !== sig) {
+          q.sig = sig;
+          q.t = hold;
+        }
+        q.t -= dt;
+        return q.t > 0;
+      };
+      this.flag('levelTag', 'q-off', !woke('level', `${sim.level}:${P.floor || 0}`, 6));
+      this.flag('stamina', 'q-off', !(woke('water', Math.floor(wt / 10), 4) || wt < THIRST_BLUR));
+      this.flag('noise', 'q-off', !(this.noiseLv >= 0.4));
+      this.flag('signal', 'q-off', noSig);
+      this.flag('cassetteIcons', 'q-off', !woke('count', `${got}:${delivered}`, 7));
+      this.flag('cassetteText', 'q-off', !(Q.count.t > 0));
+      this.flag('team', 'solo', sim.players.length < 2);
+    }
 
     // 4c. Casier, prise, coup de chèvre
     const hidden = P.hidden >= 0 && P.status === 'alive';
@@ -732,14 +758,26 @@ export class BackroomsHUD {
       this.el.classList.toggle('camcorder', on);
       this.sigShown = -1;
     }
+    // (« tout au caméscope » : l'image est en 4:3 sans que le viseur soit sorti ; les jauges des bandes noires, le zoom
+    // et les repères des coéquipiers n'apparaissent qu'avec lui. L'incrustation de jeu s'efface alors d'elle-même)
+    const finder = (c.view ?? c.t) > 0.5;
+    if (finder !== this.finder) {
+      this.finder = finder;
+      this.el.classList.toggle('finder', finder);
+    }
+    const quiet = (c.tape || 0) > 0.5;
+    if (quiet !== this.quiet) {
+      this.quiet = quiet;
+      this.el.classList.toggle('quiet', quiet);
+    }
     const bx = Math.round(c.bars);
     if (bx !== this.camBx) {
       this.camBx = bx;
       this.el.style.setProperty('--bx', `${bx}px`);
       this.el.classList.toggle('cam-wide', bx >= 64);
     }
-    this.teamTags(c, sim, on);
-    if (!on) return;
+    this.teamTags(c, sim, finder);
+    if (!finder) return;
     this.intT = (this.intT || 0) - dt;
     if (this.intT > 0) return;
     this.intT = 0.12;

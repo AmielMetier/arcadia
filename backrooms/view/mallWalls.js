@@ -96,12 +96,12 @@ const SAFETY = [
   ['THIS DOOR', 'TO REMAIN CLOSED', '#1d4e9e'],
 ];
 const ADS = [
-  ['SUMMER', 'SALE', 'UP TO 70% OFF', 38, 30],
-  ['BACK TO', 'SCHOOL', 'EVERYTHING FOR THE NEW YEAR', 210, 45],
-  ['VISIT', 'SANTA', 'CENTER COURT • DEC 1–24', 0, 40],
-  ['NOW', 'LEASING', 'CALL 555-0170', 200, 10],
-  ['EVERYTHING', 'MUST GO', 'FINAL CLEARANCE', 52, 55],
-  ['GRAND', 'OPENING', 'COMING SOON TO THIS SPACE', 280, 35],
+  ['FALL', 'SALE', 'UP TO 40% OFF', 28, 38],
+  ['HALLOWEEN', 'PARADE', 'CENTER COURT • OCT 31 • 5 PM', 22, 42],
+  ['FALL', 'FASHION', 'NEW ARRIVALS IN EVERY STORE', 350, 36],
+  ['GIFT', 'CERTIFICATES', 'AT THE INFORMATION DESK', 200, 28],
+  ['LAYAWAY', 'NOW', 'FOR THE HOLIDAYS', 52, 48],
+  ['HOLIDAY', 'HOURS', 'OPEN UNTIL 9 PM FROM NOV 29', 280, 35],
   ['THANK YOU', 'FOR SHOPPING', 'HALCYON PARK MALL', 30, 25],
   ['SHOP • DINE', '• PLAY •', 'OPEN 7 DAYS A WEEK', 170, 30],
 ];
@@ -364,7 +364,7 @@ function plateAtlas() {
     if (b) fitText(g, b, x + 128, y3 + 156, 230, 28);
     age(g, x + 4, y3 + 72, 248, 112, r, 0.5);
   };
-  way(0, '#1d2a44', '#e8e2d0', 'RESTROOMS  →', 'TELEPHONES');
+  way(0, '#1d2a44', '#e8e2d0', 'RESTROOMS  →', 'SECURITY');
   way(1, '#1d2a44', '#e8e2d0', '←  CINEMAS', 'STARDUST 8');
   way(2, '#1d2a44', '#e8e2d0', 'FOOD COURT  ↑', 'THE PAVILION');
   way(3, '#1f7a3a', '#ffffff', 'EXIT', null);
@@ -662,7 +662,7 @@ const grimeUV = (i) => {
 
 let ATLAS = null; // les deux atlas, dessinés une fois (les deux étages s'en servent)
 
-export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed = [], show = {}, arcade = null, goods: packs = null }) {
+export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, placed = [], show = {}, arcade = null }) {
   const W = map.W;
   const H = map.H;
   const PI = Math.PI;
@@ -809,27 +809,13 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
   };
   // ce qu'on range sur une étagère quand les modèles seraient trop lourds : des vêtements pliés en piles (boutiques de
   // mode), des livres, des boîtes de produits
-  const FOLD = ['clothes', 'shoes', 'lingerie', 'kids', 'salon', 'luggage', 'outdoor', 'sports'];
-  // ce qu'on range sur une étagère murale, selon le commerce : des emballages imprimés par facings, des piles de
-  // vêtements pliés, des rangées de livres (view/mallGoods.js)
-  const SHELF_ROW = { toys: 'toys', kids: 'toys', electronics: 'electro', video: 'electro', music: 'electro', kitchen: 'kitchen', gifts: 'kitchen', florist: 'kitchen', candy: 'candy', sports: 'sport', outdoor: 'sport', shoes: 'shoes', luggage: 'sport' };
-  const goods = (R, s, y, w, trade, seed) => {
-    const P = (u, d) => at(R, u, d);
-    if (trade === 'books' || trade === 'cards') return packs.books(P, s - w / 2 + 0.04, s + w / 2 - 0.04, y, 0.02, 0.24, seed);
-    if (FOLD.includes(trade) && !SHELF_ROW[trade]) {
-      for (let i = 0; i < Math.floor(w / 0.36); i++) if (hash(seed, i, 5) >= 0.2) packs.folded(P, s - w / 2 + 0.2 + i * 0.36, 0.3, y, 0.03, 0.27, seed * 7 + i, trade === 'lingerie');
-      return;
-    }
-    packs.shelf(P, s - w / 2 + 0.04, s + w / 2 - 0.04, y, 0.03, 0.27, SHELF_ROW[trade] || 'stock', seed, 0.36, 0.2);
-  };
   // les objets assez légers pour être posés par dizaines sur des étagères (moins de 9 000 triangles)
   const LIGHT = new Set(['office_notepads', 'Television_01', 'croissant', 'television_02', 'brass_vase_03', 'baseball_bat', 'postcard_set_01', 'wooden_cutting_board', 'medical_box', 'bleach_bottle', 'rubber_duck_toy', 'football', 'brass_pan_01', 'american_football', 'all_purpose_cleaner', 'cassette_player', 'jug_01', 'multi_cleaner_bottle', 'food_apple_01', 'Ukulele_01', 'potted_plant_04', 'alarm_clock_01']);
   // une étagère murale et ce qu'on y range
-  const wallShelf = (R, s, y, w, all, seed, trade) => {
+  const wallShelf = (R, s, y, w, all, seed) => {
     wbox('wood', R, s, w, y - 0.03, y, 0, 0.3);
     for (const k of [-1, 1]) wbox('black', R, s + (k * w) / 2.6, 0.03, y - 0.2, y - 0.03, 0, 0.26);
     const items = all && all.filter((e) => LIGHT.has(e[0]));
-    if (trade && (!items || !items.length || FOLD.includes(trade) || hash(seed, 1, 1) < 0.35)) return goods(R, s, y, w, trade, seed);
     if (!items || !items.length) return;
     const n = Math.max(1, Math.floor(w / 0.42));
     for (let i = 0; i < n; i++) {
@@ -839,9 +825,6 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
       model(name, x, y + dy, z, yawOf(R) + (hash(seed, i) - 0.5) * 0.8, sc * 0.85, rx, rz, piece);
     }
   };
-  // une rangée de livres et de classeurs ; des cartons rangés sur une étagère (réserves, coulisses)
-  const books = (R, s, y, w, seed) => packs.books((u, d) => at(R, u, d), s - w / 2 + 0.04, s + w / 2 - 0.04, y, 0.02, 0.24, seed);
-  const cartons = (R, s, y, w, seed) => packs.shelf((u, d) => at(R, u, d), s - w / 2 + 0.05, s + w / 2 - 0.05, y, 0.02, 0.29, 'carton', seed, 0.4, 0.25);
   // un cadre (modèle) ou un tableau
   const frames = ['hanging_picture_frame_01', 'hanging_picture_frame_02', 'fancy_picture_frame_01'];
   // une prise, un interrupteur : de petites plaques blanches
@@ -922,6 +905,7 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     const len = R.s1 - R.s0;
     const seed = R.row * 131 + Math.floor(R.s0) * 7 + (R.nx + 2) * 3 + R.nz + fi * 977;
     const sh = shopOfRoom.get(R.room.id);
+    if (sh && sh.state === 'shut') continue; // (rideau baissé : on n'y entre pas, on n'y voit rien)
     // une prise de courant tous les 4 m environ, presque partout
     if (kind !== 'screen' && kind !== 'court' && kind !== 'plaza')
       for (let s = R.s0 + 1.2; s < R.s1 - 0.8; s += 3.5 + hash(seed, s) * 2) if (free(...at(R, s, 0.3), 0.2)) outlet(R, s, 0.32);
@@ -956,14 +940,11 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         } else if (h < 0.62) plate(R, s, 1.55, NOTE(i % 2 ? 2 : 0), 0.3, 0.4, null);
         else if (h < 0.74) {
           wallShelf(R, s, 1.45, 1.2, null, seed + i);
-          books(R, s, 1.45, 1.2, seed + i);
           wallShelf(R, s, 1.9, 1.2, null, seed + i + 1);
-          books(R, s, 1.9, 0.8, seed + i + 2);
           wmodel('office_notepads', R, s + 0.42, 1.9, 0.15, 1, 'office_notepads_a4_stack');
         }
         else if (h < 0.84) {
           wallShelf(R, s, 1.95, 1.2, null, seed + i);
-          cartons(R, s, 1.95, 1.2, seed + i);
         } else plate(R, s, 1.6, NOTE(4), 0.32, 0.42, null);
       }, seed);
       if (len > 4 && hash(seed, 5) < 0.5) wmodel('wall_clock', R, R.s0 + len * 0.5, 2.25, 0);
@@ -989,9 +970,9 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         }
         const items = show[trade];
         if (h < 0.5) {
-          wallShelf(R, s, 1.05, 1.4, items, seed + i * 3, trade);
-          wallShelf(R, s, 1.5, 1.4, items, seed + i * 3 + 1, trade);
-          wallShelf(R, s, 1.95, 1.4, items, seed + i * 3 + 2, trade);
+          wallShelf(R, s, 1.05, 1.4, items, seed + i * 3);
+          wallShelf(R, s, 1.5, 1.4, items, seed + i * 3 + 1);
+          wallShelf(R, s, 1.95, 1.4, items, seed + i * 3 + 2);
           if (R.ceil > 3.6) adBox(R, s, 2.95, i + seed + 3, false);
         } else if (h < 0.52 && ['clothes', 'shoes', 'lingerie', 'salon', 'optician', 'jewelry', 'perfume'].includes(trade)) mirror(R, s, 1.35, 0.6, 1.6, 'brass');
         else if (h < 0.7) adBox(R, s, 1.75, i + seed, false);
@@ -1009,7 +990,6 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         else if (h < 0.75) adBox(R, s, 1.8, i * 3 + seed, i % 3 === 0);
         else {
           wallShelf(R, s, 1.4, 2.0, null, seed + i);
-          cartons(R, s, 1.4, 2.0, seed + i);
         }
       }, seed);
       grimeRun(R, 5, [12, 3, 9, 0, 1], seed);
@@ -1132,4 +1112,16 @@ export function drawMallWalls({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         G.add('lineW', g.rotateY(dir > 0 ? 0 : PI).translate(x, 0.005, z));
       }
   }
+  // une cellule vacante (sa vitrine tapissée de kraft) : une affichette « FOR LEASE » collée derrière la glace, à
+  // hauteur d'yeux. Nulle part ailleurs : le centre est en activité
+  for (const sh of map.shops || []) {
+    if (sh.state !== 'glass' || !sh.dark) continue;
+    const g = new THREE.PlaneGeometry(0.9, 0.4);
+    const uv = plateUV(28, ...CROP(28));
+    const a = g.attributes.uv;
+    for (let i = 0; i < a.count; i++) a.setXY(i, a.getX(i) > 0 ? uv[2] : uv[0], a.getY(i) > 0 ? uv[3] : uv[1]);
+    if (sh.dir < 0) g.rotateY(PI);
+    G.add('plates', g.translate(((sh.x0 + sh.x1 + 1) * C) / 2 + (sh.id % 2 ? 1.4 : -1.4), 1.55, sh.frontZ - sh.dir * 0.05));
+  }
+
 }

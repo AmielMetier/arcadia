@@ -31,7 +31,7 @@ import { createWarehouseMap, DOCK_PASS } from '../backrooms/engine/level1.js';
 import { createPoolMap } from '../backrooms/engine/poolrooms.js';
 import { createHotelMap, parseWords, WORDS } from '../backrooms/engine/hotel.js';
 import { createMallMap, MALL_LEVEL, polyDist as mallPolyDist } from '../backrooms/engine/mall.js';
-import { dollTerrain, dollCanStand, DOLL_R, DOLL_VMAX, DOLL_RELOC_T, DOLL_BORED_T } from '../backrooms/engine/doll.js';
+import { dollTerrain, dollCanStand, DOLL_R, DOLL_VMAX, DOLL_RELOC_T, DOLL_BORED_T, DOLL_LIFT_T } from '../backrooms/engine/doll.js';
 
 // avance la partie de n secondes
 const run = (sim, sec, input = {}, others = null) => {
@@ -2902,13 +2902,13 @@ test('Level 17 : deux étages reliés par cinq escaliers, des vides bordés, tou
     }
     assert.ok(!up.collide(up.spawn.x, up.spawn.z, 0.38) && up.dist[up.spawn.gz * up.W + up.spawn.gx] === 0);
     // toutes les salles sont atteintes (le grand magasin fermé par sa porte de réserve), sauf les boutiques fermées sans
-    // porte de service
+    // porte de service et celles dont le rideau est baissé pour la nuit (porte de réserve verrouillée)
     for (const f of floors)
       for (const r of f.rooms) {
         let ok = false;
         for (let z = r.z0; z <= r.z1 && !ok; z++) for (let x = r.x0; x <= r.x1 && !ok; x++) ok = f.dist[z * f.W + x] >= 0;
         const sh = r.kind === 'shop' ? f.shops[r.shop] : null;
-        const shut = sh && (sh.state === 'grille' || sh.state === 'glass') && !sh.back;
+        const shut = sh && (sh.state === 'shut' || ((sh.state === 'grille' || sh.state === 'glass') && !sh.back));
         assert.equal(ok, !shut, `graine ${sd}, étage ${f.floor} : ${r.kind} ${r.name}`);
       }
     // les objets sont sur des cases parcourues, loin les uns des autres ; les escalators de la cour centrale montent
@@ -2920,6 +2920,107 @@ test('Level 17 : deux étages reliés par cinq escaliers, des vides bordés, tou
     }
     // les deux monte-charges ont une case libre devant eux
     for (const f of floors) assert.ok(f.dist[f.exit.gz * f.W + f.exit.gx] >= 0, `graine ${sd} : monte-charge de l'étage ${f.floor} atteint`);
+  }
+});
+
+test('Level 17 : fermé pour la nuit — peu de boutiques ouvertes, rien derrière un rideau baissé, plus de mobilier sans modèle, un éclairage de veille régulier', () => {
+  const GONE = ['kiosk', 'fountain', 'counter', 'concession', 'rack', 'mannequin', 'arcade', 'claw', 'partition', 'booth'];
+  for (const sd of [1, 3, 17, 42, 99, 1234]) {
+    const { floors } = createMallMap(sd);
+    let flick = 0;
+    for (const f of floors) {
+      // une à trois boutiques ouvertes par étage ; les autres boutiques ouvertes ou vidées ont le rideau baissé
+      const open = f.shops.filter((sh) => sh.state === 'open');
+      assert.ok(open.length >= 1 && open.length <= 3, `graine ${sd} : ${open.length} boutiques ouvertes`);
+      assert.ok(!f.shops.some((sh) => sh.state === 'gutted'), 'plus de boutique vidée ouverte à tous les vents');
+      const shut = new Set(f.shops.filter((sh) => sh.state === 'shut').map((sh) => sh.room));
+      assert.ok(shut.size >= 3, 'des rideaux baissés');
+      const roomOf = (x, z) => f.zone[Math.floor(z / CELL_SIZE) * f.W + Math.floor(x / CELL_SIZE)];
+      // derrière un rideau baissé : ni meuble, ni objet, ni bobine, ni lampe allumée ; on n'y entre pas
+      for (const it of f.furn) {
+        assert.ok(!GONE.includes(it.kind), `${it.kind} : plus posé`);
+        assert.ok(!shut.has(roomOf(it.x, it.z)), `${it.kind} dans une boutique fermée`);
+      }
+      for (const it of [...f.items, ...f.cassettes]) assert.ok(!shut.has(roomOf(it.x, it.z)), 'un objet dans une boutique fermée');
+      for (const l of f.lights) if (shut.has(l.room)) assert.equal(l.state, 'off');
+      for (const sh of f.shops) {
+        if (sh.state !== 'shut') continue;
+        const r = f.rooms[sh.room];
+        for (let z = r.z0; z <= r.z1; z++) for (let x = r.x0; x <= r.x1; x++) assert.ok(!(f.dist[z * f.W + x] >= 0), `${sh.name} : fermée, on n'y entre pas`);
+      }
+      // l'éclairage de veille : au moins quatre lampes sur dix restent allumées, presque aucune ne grésille
+      const on = f.lights.filter((l) => l.state === 'on').length;
+      assert.ok(on / f.lights.length > 0.4, `graine ${sd} : ${on}/${f.lights.length} lampes allumées`);
+      flick += f.lights.filter((l) => l.state === 'flicker').length;
+    }
+    assert.ok(flick <= 2, `graine ${sd} : ${flick} lampes grésillent`);
+  }
+});
+
+test('Level 17 : des pièces aux proportions d\'un vrai lieu — salle 1 plus profonde que large, écran large, hublot au-dessus des têtes, toilettes en deux blocs derrière un sas, bureaux en couloirs', () => {
+  for (const sd of [1, 3, 17, 42, 99]) {
+    const { floors } = createMallMap(sd);
+    const up = floors[0];
+    const C = CELL_SIZE;
+    // les salles : plus profondes que larges, plus de fauteuils modelés ; l'écran en 2,39:1, dans l'axe de la cabine
+    for (const r of up.rooms.filter((o) => o.kind === 'screen')) assert.ok(r.x1 - r.x0 > r.z1 - r.z0, `${r.name} : plus profonde que large`);
+    assert.ok(!up.furn.some((it) => it.kind === 'seats'), 'plus de fauteuils');
+    const b = up.booth;
+    const S = b.screen;
+    assert.ok(Math.abs((S.z1 - S.z0) / (S.y1 - S.y0) - 2.39) < 0.01, 'un écran large');
+    assert.ok(Math.abs((S.z0 + S.z1) / 2 - b.port.z) < 0.01 && b.port.y >= 2.3, 'le hublot dans l\'axe, au-dessus des têtes');
+    assert.ok(S.y1 < up.rooms[S.room].ceilH, 'l\'écran tient sous le plafond');
+    // la cabine : on y tient debout à la table de montage, l'armoire du projecteur laisse le passage
+    assert.ok(!up.collide(b.use.x, b.use.z, 0.3) && up.roomAt(b.use.x, b.use.z).kind === 'booth');
+    assert.ok(up.collide((b.closet.x0 + b.closet.x1) / 2, b.port.z, 0.1) && !up.collide(b.x0 + 0.5, b.port.z, 0.3), 'on contourne l\'armoire');
+    for (const f of floors) {
+      // les toilettes : deux blocs de 60 à 80 m², chacun avec ses cabines et ses lavabos, au bout d'un sas
+      const wc = f.rooms.find((o) => o.kind === 'wc');
+      assert.equal(wc.blocks.length, 2);
+      for (const k of wc.blocks) {
+        const area = (k.x1 - k.x0 + 1) * (k.z1 - k.z0 + 1) * C * C;
+        assert.ok(area >= 60 && area <= 80, `un bloc de ${area} m²`);
+        const inBlock = (it) => it.x > k.x0 * C && it.x < (k.x1 + 1) * C && it.z > k.z0 * C && it.z < (k.z1 + 1) * C;
+        assert.ok(f.furn.filter((it) => it.kind === 'stall' && inBlock(it)).length >= 3 && f.furn.some((it) => it.kind === 'sinks' && inBlock(it)), 'cabines et lavabos');
+        assert.ok(f.dist[(k.z0 + 1) * f.W + k.x0 + 1] >= 0, 'on y entre');
+      }
+      // aucune lampe ni aucun meuble dans un mur
+      for (const l of f.lights) assert.ok(!f.isWall(l.gx, l.gz) || f.pillarAt(l.gx, l.gz), 'une lampe dans un mur');
+      for (const it of f.furn) assert.ok(!f.isWall(Math.floor(it.x / C), Math.floor(it.z / C)), `${it.kind} dans un mur`);
+      for (const d of f.fakeDoors) assert.ok(f.isWall(Math.floor((d.x - d.nx * 0.5) / C), Math.floor((d.z - d.nz * 0.5) / C)) && !f.isWall(Math.floor((d.x + d.nx * 0.5) / C), Math.floor((d.z + d.nz * 0.5) / C)), 'une porte fermée sur un mur, face au passage');
+    }
+    // les bureaux : plus de plateau ouvert (nulle part un carré libre de 10 m de côté), surtout des pièces fermées
+    for (const r of up.rooms.filter((o) => o.kind === 'office' && /management|Administration/.test(o.name))) {
+      let free = 0;
+      let reach = 0;
+      for (let z = r.z0; z <= r.z1; z++)
+        for (let x = r.x0; x <= r.x1; x++) {
+          if (up.isWall(x, z)) continue;
+          free++;
+          if (up.dist[z * up.W + x] >= 0) reach++;
+          let open = true;
+          for (let dz = 0; dz < 4 && open; dz++) for (let dx = 0; dx < 4 && open; dx++) if (up.isWall(x + dx, z + dz)) open = false;
+          assert.ok(!open, `${r.name} : un plateau ouvert en (${x}, ${z})`);
+        }
+      assert.ok(free < 0.5 * (r.x1 - r.x0 + 1) * (r.z1 - r.z0 + 1), `${r.name} : surtout des pièces fermées`);
+      assert.equal(reach, free, `${r.name} : couloirs et pièces ouvertes tous accessibles`);
+      assert.ok(up.fakeDoors.filter((d) => d.style === 'office').length >= 8, 'des portes fermées à clé le long des couloirs');
+    }
+    // les pans coupés : dans l'angle de deux murs, une case que personne ne traverse en coin, sans meuble ni objet
+    for (const f of floors) {
+      assert.ok(f.cutCorners.length >= 4, 'des pans coupés dans les grands lieux');
+      for (const c of f.cutCorners) {
+        const cx = (c.x + 0.5) * C;
+        const cz = (c.z + 0.5) * C;
+        assert.ok(f.isWall(c.x + c.dx, c.z) && f.isWall(c.x, c.z + c.dz), 'dans un angle rentrant');
+        assert.ok(f.collide(cx + c.dx * 0.6, cz + c.dz * 0.6, 0.1), 'le coin est plein');
+        assert.ok(Math.abs(c.ax - c.bx) === C && Math.abs(c.az - c.bz) === C, 'le pan va d\'un coin de la case à l\'autre');
+        assert.ok(f.navBlock.has(c.z * f.W + c.x) && !(f.dist[c.z * f.W + c.x] >= 0), 'l\'entité l\'évite, rien n\'y est posé');
+        for (const it of [...f.furn, ...f.items, ...f.cassettes]) assert.ok(Math.floor(it.x / C) !== c.x || Math.floor(it.z / C) !== c.z, 'rien dans la case d\'un pan coupé');
+      }
+    }
+    // les escalators : un coffrage à chaque bout, qu'on ne traverse pas
+    for (const e of up.allEscalators) assert.ok(floors[e.fi].collide(e.x - e.dir * 0.5, e.z, 0.1), 'le pied de l\'escalator est coffré');
   }
 });
 
@@ -3283,13 +3384,24 @@ test('Level 17 : un plafond bas est un refuge ; plantée devant trop longtemps, 
   P.z = (Math.floor(k / t1.W) + 0.5) * CELL_SIZE;
   P.yaw = 0;
   let down = -1;
-  for (let i = 0; i < (DOLL_RELOC_T + 30) * 60 && down < 0; i++) {
+  sim.drainEvents();
+  const evs = [];
+  for (let i = 0; i < (DOLL_RELOC_T + DOLL_LIFT_T + 30) * 60 && down < 0; i++) {
     sim.step({});
+    evs.push(...sim.drainEvents());
     if (M.floor === 1) down = i / 60;
   }
-  assert.ok(down >= DOLL_RELOC_T - 1, `elle a mis un moment à le rejoindre en bas (${down.toFixed(1)} s)`);
-  assert.ok(dollCanStand(dn, M.x, M.z) && Math.hypot(M.x - P.x, M.z - P.z) >= 14 && !dollInFrame(sim, P, 1, M.x, M.z), 'replacée hors champ, à distance');
-  for (let i = 0; i < 40 * 60 && !(P.grabT > 0); i++) sim.step({});
+  // elle a pris le monte-charge : on l'entend partir (d'un étage à l'autre), puis ses portes à l'arrivée ; pas de boîte à
+  // musique ; elle ressort de son côté, plus près de lui que ne l'est le joueur
+  assert.ok(down >= DOLL_RELOC_T + DOLL_LIFT_T - 1, `elle a mis le temps du trajet à le rejoindre en bas (${down.toFixed(1)} s)`);
+  const lifts = evs.filter((e) => e.type === 'dollLift');
+  assert.ok(lifts.length === 2 && lifts[0].from === 0 && lifts[0].to === 1 && lifts[1].out && lifts[1].floor === 1, 'le départ, puis la sortie du monte-charge');
+  assert.ok(!evs.some((e) => e.type === 'dollMoved'), 'pas de replacement silencieux');
+  const el = dn.elevator;
+  assert.ok(Math.hypot(M.x - el.x, M.z - el.z) < Math.hypot(P.x - el.x, P.z - el.z), 'elle ressort du côté du monte-charge');
+  assert.ok(dollCanStand(dn, M.x, M.z) && Math.hypot(M.x - P.x, M.z - P.z) >= 14 && !dollInFrame(sim, P, 1, M.x, M.z), 'hors champ, à distance');
+  // (le joueur regarde toujours le mur du nord : elle contourne son champ de vision et arrive dans son dos)
+  for (let i = 0; i < 90 * 60 && !(P.grabT > 0); i++) sim.step({});
   assert.ok(P.grabT > 0, 'et elle le rejoint');
 });
 
