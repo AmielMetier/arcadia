@@ -47,6 +47,10 @@ export class PocketTTS {
             maxThreads: options.maxThreads || 8,
             cache: options.cache !== false,
             cacheName: options.cacheName || CACHE_NAME,
+            // (Arcadia) durée d'échantillon écoutée pour cloner, pas de décodage, température
+            maxRefSeconds: options.maxRefSeconds || 10,
+            lsdSteps: options.lsdSteps || 1,
+            temperature: options.temperature == null ? 0.7 : options.temperature,
         };
 
         this.worker = null;
@@ -156,7 +160,7 @@ export class PocketTTS {
             pcm = resampleLinear(audio, opts.inputSampleRate, target);
         }
         // Cap the reference to 10 s (matches model expectations).
-        const maxSamples = target * 10;
+        const maxSamples = target * this.options.maxRefSeconds;
         if (pcm.length > maxSamples) pcm = pcm.slice(0, maxSamples);
 
         const ref = opts.name || `clone:${++this._cloneCounter}`;

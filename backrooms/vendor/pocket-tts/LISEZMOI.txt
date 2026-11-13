@@ -1,4 +1,4 @@
-pocket-tts-js 0.1.0 (npm, licence MIT : voir LICENSE), copié tel quel : la synthèse vocale Pocket TTS de Kyutai dans le
+pocket-tts-js 0.1.0 (npm, licence MIT : voir LICENSE), copié avec trois réglages ajoutés (maxRefSeconds, lsdSteps, temperature) : la synthèse vocale Pocket TTS de Kyutai dans le
 navigateur, avec clonage de voix, dans un Web Worker. Sert à la voix volée du Level 1 (view/clone.js) et à la page
 d'essai (essai-voix.html).
 

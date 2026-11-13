@@ -17,8 +17,9 @@ const CACHE_NAME = "pocket-tts-js-v1";
 
 const CHUNK_GAP_SEC = 0.25;
 const MAX_FRAMES = 500;
-const LSD_STEPS = 1;
-const TEMPERATURE = 0.7;
+// (Arcadia : réglables à l'init, options lsdSteps et temperature)
+let LSD_STEPS = 1;
+let TEMPERATURE = 0.7;
 const EOS_THRESHOLD = -4.0;
 
 // ----- configurable state (set at init) -----
@@ -690,6 +691,8 @@ self.onmessage = async (e) => {
     const { id, type, payload } = e.data;
     try {
         if (type === "init") {
+            if (payload && payload.lsdSteps) LSD_STEPS = Math.max(1, Math.min(8, payload.lsdSteps | 0));
+            if (payload && payload.temperature != null) TEMPERATURE = Math.max(0, Math.min(1.5, +payload.temperature));
             await init(payload);
             post({ id, type: "result", result: { ok: true } });
         } else if (type === "cloneVoice") {
