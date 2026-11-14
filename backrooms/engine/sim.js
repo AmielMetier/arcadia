@@ -36,6 +36,7 @@ export const DT = 1 / 60;
 export const PLAYER_RADIUS = 0.38;
 // On avance lentement dans les Backrooms : la carte est immense et chaque pas compte
 export const WALK_SPEED = 2.1;
+export const MALL_PACE = 0.72; // Level 17 : on marche au pas d'un vrai promeneur (1,5 m/s), caméscope à l'épaule ; la course ne change pas
 export const SPRINT_SPEED = 4.4; // la course : nettement plus vite que la marche (l'entité en chasse reste en dessous)
 export const MONSTER_PATROL_SPEED = 1.8;
 export const MONSTER_CHASE_SPEED = 3.3; // plus vite qu'en marchant, un peu moins qu'en sprintant
@@ -205,6 +206,14 @@ export const SPRINT_SIDE = 0.72;
 export const SPRINT_BACK = 0.6;
 export const WHISTLE_FREEZE_R = 18; // m : un sifflet à moins de ça fige l'imposteur une seconde ou deux
 export const MIMIC_CALL = [7, 13]; // s entre deux appels (la voix volée, de vive voix ou au talkie)
+// La voix volée ne doit pas la trahir : elle ne parle avec la voix d'un vivant que s'il est à plus de MIMIC_FAR m de
+// ceux qui l'entendraient (plus loin que ne porte une voix), et au talkie que s'il est seul et se tait. Tout près d'un
+// joueur (MIMIC_CHAT_R), elle bavarde comme lui (des phrases qu'il a dites) au lieu d'appeler, un peu plus souvent
+export const MIMIC_FAR = 30;
+export const MIMIC_HEAR = 22; // m : jusqu'où porte sa voix (comme celle d'un joueur, VOICE_R de view/voice.js)
+export const MIMIC_CHAT_R = 11;
+export const MIMIC_CHAT = [5, 9]; // s entre deux phrases quand elle bavarde
+export const REPLY_CD = [6, 10]; // s entre deux répliques à qui lui parle
 // Level 1 : les salles de sécurité. L'entité qui bute sur une porte blindée fermée frappe BANG_T secondes, hurle de
 // rage et va rôder au moins RETREAT_R mètres plus loin
 export const BANG_T = [8, 12];
@@ -742,6 +751,11 @@ export class BackroomsSim {
   }
 
   // dans l'eau (Poolrooms) on avance moins vite : 90 % dans 20 cm d'eau, 70 % dans 60 cm, 40 % au plus profond
+  // la part de la vitesse de marche qu'on garde à ce niveau
+  get pace() {
+    return this.level === MALL_LEVEL ? MALL_PACE : 1;
+  }
+
   wade(P) {
     const m = this.fm(P.floor);
     const d = m.depthAt ? m.depthAt(P.x, P.z) : 0;
@@ -1483,11 +1497,44 @@ export class BackroomsSim {
     return c ? { x: at(c)[0], z: at(c)[1] } : null;
   }
 
-  // l'apparence d'un joueur, sans victime : celle d'un mort s'il y en a (personne ne fait double), sinon de n'importe qui
-  disguise(M) {
-    const dead = this.players.filter((Q) => Q.status === 'dead');
-    const pool = dead.length ? dead : this.players;
-    if (pool.length) this.startMimic(M, pool[Math.floor(Math.random() * pool.length)], false);
+  // l'apparence d'un joueur, sans victime : celle d'un mort s'il y en a (personne ne fait double), sinon celle du vivant
+  // le plus loin de sa proie (voir bestFace)
+  disguise(M, P = null) {
+    const V = this.bestFace(M, P);
+    if (V) this.startMimic(M, V.who, false);
+  }
+
+  // Quelle apparence (et quelle voix) la trahirait le moins devant sa proie P (sans P : le vivant le plus proche d'elle) ?
+  // Un mort ne viendra pas la contredire ; un vivant doit être loin de la proie (MIMIC_FAR), et de préférence quelqu'un
+  // qu'on a entendu parler (this.voiceBank, que l'hôte tient à jour : { id: nombre de phrases gardées }). ok : faux si
+  // aucune apparence ne tient (tout le monde est groupé) : elle en prend une quand même, mais se taira
+  bestFace(M, P = null) {
+    const alive = this.players.filter((Q) => Q.status === 'alive');
+    if (!P) for (const Q of alive) if (!P || Math.hypot(Q.x - M.x, Q.z - M.z) < Math.hypot(P.x - M.x, P.z - M.z)) P = Q;
+    const bank = this.voiceBank || {};
+    let best = null;
+    for (const Q of this.players) {
+      let sc;
+      if (Q.status === 'dead') sc = 100;
+      else if (Q.status !== 'alive') sc = 1; // (déjà parti dans la cabine : on le sait ailleurs)
+      else if (Q === P) sc = 0;
+      else {
+        const d = P && (Q.floor || 0) === (P.floor || 0) ? Math.hypot(Q.x - P.x, Q.z - P.z) : 99;
+        sc = d > MIMIC_FAR ? 50 + Math.min(d, 99) / 5 : 2;
+      }
+      if (sc >= 50 && bank[Q.id] > 0) sc += 15;
+      sc += Math.random();
+      if (!best || sc > best.sc) best = { who: Q, sc };
+    }
+    return best ? { who: best.who, ok: best.sc >= 50 } : null;
+  }
+
+  // Sa voix la trahirait-elle auprès de L ? Non si celui qu'elle imite est mort (ou si L joue seul), ou s'il est loin de L
+  mimicCover(M, L) {
+    const A = this.players.find((Q) => Q.id === M.mimic);
+    if (!A || A.status !== 'alive' || this.players.length < 2) return true;
+    if (A === L) return false;
+    return (A.floor || 0) !== (L.floor || 0) || Math.hypot(A.x - L.x, A.z - L.z) > MIMIC_FAR;
   }
 
   // Level 1 : elle prend l'apparence de V (sa tenue, sa voix) et part rejoindre les autres ; kill : elle vient de le tuer
@@ -1594,12 +1641,65 @@ export class BackroomsSim {
         }
       }
     }
-    // ses appels : de vive voix quand il est assez près (et le voit), sinon au talkie
+    // Son apparence ne tient plus devant sa proie (c'est elle, ou celui qu'elle imite marche à côté) : hors de vue de
+    // tous, elle en change pour quelqu'un qui est loin
+    M.coverT = (M.coverT || 0) - DT;
+    if (M.coverT <= 0 && !calm) {
+      M.coverT = 1.5;
+      if (!this.mimicCover(M, P) && dist > 8 && !this.inSomeView(M.floor || 0, M.x, M.z, 0.2)) {
+        const V = this.bestFace(M, P);
+        if (V && V.ok && V.who.id !== M.mimic) {
+          M.mimic = V.who.id;
+          M.callT = Math.max(M.callT, 2);
+          this.emit({ type: 'mimic', id: V.who.id, kill: false, x: M.x, z: M.z });
+        }
+      }
+    }
+    // Sa voix : de vive voix quand on peut l'entendre, sinon au talkie. Tout près, elle bavarde (kind 'chat' : une phrase
+    // ordinaire ou drôle du joueur imité, pour se fondre dans le groupe) ; plus loin, elle appelle ('call') ; devant
+    // une porte ou un casier, 'door' ; au talkie, 'radio'. Chaque client choisit la même phrase (seed). Elle se tait
+    // plutôt que de se trahir : jamais la voix d'un vivant à portée d'oreille de ceux qui l'entendraient, jamais au
+    // talkie s'il a quelqu'un près de lui (on le verrait se taire) ou s'il y parle lui-même
+    // Parler, si ça ne la trahit pas. kind : 'call', 'chat', 'door', 'radio', ou 'reply' (une réplique courte à qui
+    // vient de lui parler). ctx : ce qui se passe, pour une phrase de circonstance ('dark' coupure de courant, 'lift'
+    // le monte-charge est réalimenté, 'last' il ne manque qu'un fusible, 'fuse' on en a déjà trouvé)
+    const speak = (reply) => {
+      const A = this.players.find((Q) => Q.id === M.mimic);
+      const real = !!A && A.status === 'alive' && this.players.length > 1; // (celui qu'elle imite peut la contredire)
+      const hear = alive.filter((Q) => Q !== A && Math.hypot(Q.x - M.x, Q.z - M.z) < MIMIC_HEAR);
+      const los = hasLineOfSight(map, M.x, M.z, P.x, P.z);
+      const near = dist < 16 && (locked ? Math.hypot(M.x - locked.x, M.z - locked.z) < 6 : los);
+      const chat = !locked && !(P.hidden >= 0) && hear.some((Q) => Math.hypot(Q.x - M.x, Q.z - M.z) < MIMIC_CHAT_R);
+      const radio = !reply && !(near || chat);
+      let ok;
+      if (!radio) ok = (!real || Math.hypot(A.x - M.x, A.z - M.z) > MIMIC_HEAR || (A.floor || 0) !== (M.floor || 0)) && hear.every((Q) => this.mimicCover(M, Q));
+      else ok = !this.radioDead && this.mimicCover(M, P) && (!real || (!A.radio && !this.players.some((Q) => Q !== A && Q.status === 'alive' && (Q.floor || 0) === (A.floor || 0) && Math.hypot(Q.x - A.x, Q.z - A.z) < MIMIC_HEAR)));
+      if (!ok) return null;
+      const kind = reply ? 'reply' : radio ? 'radio' : locked || P.hidden >= 0 ? 'door' : chat ? 'chat' : 'call';
+      const ctx = this.level !== 1 ? undefined : this.blackout > 0 ? 'dark' : this.powered ? 'lift' : this.fuses === FUSES - 1 ? 'last' : this.fuses > 0 ? 'fuse' : undefined;
+      this.emit({ type: 'mimicCall', id: M.mimic, to: P.id, radio, kind, ctx, seed: Math.floor(Math.random() * 1e6), x: M.x, z: M.z });
+      return kind;
+    };
+    // On lui parle : un joueur tout près (pas au talkie) parlait et vient de se taire. Un humain répondrait : elle
+    // lâche une réplique courte, une seconde après (pas plus d'une toutes les REPLY_CD secondes)
+    M.replyCd = Math.max(0, (M.replyCd || 0) - DT);
+    if (alive.some((Q) => Q.id !== M.mimic && Q.voice > 0.3 && !Q.radio && Math.hypot(Q.x - M.x, Q.z - M.z) < MIMIC_CHAT_R)) M.heardT = (M.heardT || 0) + DT;
+    else {
+      if (M.heardT > 0.5 && M.replyCd <= 0 && !(M.replyT > 0) && !calm) M.replyT = rand(0.5, 1.1);
+      M.heardT = 0;
+    }
+    if (M.replyT > 0) {
+      M.replyT -= DT;
+      if (M.replyT <= 0 && speak(true)) {
+        M.replyCd = rand(REPLY_CD[0], REPLY_CD[1]);
+        M.callT = Math.max(M.callT, 3);
+      }
+    }
     M.callT -= DT;
     if (M.callT <= 0 && M.restT <= 0) { // (le talkie porte partout)
-      M.callT = rand(MIMIC_CALL[0], MIMIC_CALL[1]);
-      const near = dist < 16 && (locked ? Math.hypot(M.x - locked.x, M.z - locked.z) < 6 : hasLineOfSight(map, M.x, M.z, P.x, P.z));
-      this.emit({ type: 'mimicCall', id: M.mimic, to: P.id, radio: !near, x: M.x, z: M.z });
+      const kind = speak(false);
+      if (!kind) M.callT = rand(2, 4); // (elle se tait, et réessaie bientôt : les joueurs bougent)
+      else M.callT = kind === 'chat' ? rand(MIMIC_CHAT[0], MIMIC_CHAT[1]) : rand(MIMIC_CALL[0], MIMIC_CALL[1]);
     }
     // une hésitation de temps en temps : il s'arrête, se tourne vers les pas les plus proches, et repart
     M.hesT -= DT;
@@ -2713,7 +2813,7 @@ export class BackroomsSim {
     P.running = !!input.run && (mx !== 0 || my !== 0) && !P.onBeam && !P.crouch;
 
     // 3. Déplacement (un invité se déplace chez lui et annonce sa position : l'hôte la prend si elle est plausible)
-    const speed = (P.running ? SPRINT_SPEED : P.crouch ? WALK_SPEED * CROUCH_SPEED : WALK_SPEED) * this.wade(P);
+    const speed = (P.running ? SPRINT_SPEED : P.crouch ? WALK_SPEED * CROUCH_SPEED : WALK_SPEED * this.pace) * this.wade(P);
     P.moving = mx !== 0 || my !== 0;
     const pos = input.pos;
     // un invité a perdu l'équilibre chez lui : il bascule dans le trou de ce côté
@@ -3398,7 +3498,7 @@ export class BackroomsSim {
       return 0;
     }
     P.running = !!input.run && P.moving && !P.crouch;
-    const speed = (P.running ? SPRINT_SPEED : P.crouch ? WALK_SPEED * CROUCH_SPEED : WALK_SPEED) * this.wade(P);
+    const speed = (P.running ? SPRINT_SPEED : P.crouch ? WALK_SPEED * CROUCH_SPEED : WALK_SPEED * this.pace) * this.wade(P);
     const v = this.stride(P, this.wishVel(P, mx, my, speed));
     if (!v.x && !v.z) {
       // immobile dans un jet de vapeur : on se brûle aussi
@@ -4062,7 +4162,7 @@ export class BackroomsSim {
     // Level 1 : sous l'apparence d'un joueur ; ou devant une porte blindée fermée. Revenue en ronde, loin de tous et hors de
     // vue, elle en reprend une
     if (this.level === 1 && M.mimic == null && M.mode === 'patrol' && M.modeT > REDISGUISE_T && BackroomsSim.DISGUISE !== false &&
-      !this.players.some((Q) => Q.status === 'alive' && Math.hypot(Q.x - M.x, Q.z - M.z) < 18) && !this.inSomeView(M.floor || 0, M.x, M.z, 0.2)) this.disguise(M);
+      !this.players.some((Q) => Q.status === 'alive' && Math.hypot(Q.x - M.x, Q.z - M.z) < 18) && !this.inSomeView(M.floor || 0, M.x, M.z, 0.2)) this.disguise(M, P);
     if (M.mimic != null) return this.mimicStep(M, P);
     if (M.mode === 'bang') return this.bangStep(M, P);
     const map = this.fm(M.floor);

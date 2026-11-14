@@ -1,0 +1,16 @@
+pocket-tts-js 0.1.0 (npm, licence MIT : voir LICENSE), copié avec trois réglages ajoutés (maxRefSeconds, lsdSteps, temperature) : la synthèse vocale Pocket TTS de Kyutai dans le
+navigateur, avec clonage de voix, dans un Web Worker. Sert à la voix volée du Level 1 (view/clone.js) et à la page
+d'essai (essai-voix.html).
+
+Rien d'autre n'est dans le dépôt : à l'usage, le navigateur télécharge onnxruntime-web (jsDelivr) et les poids du modèle
+(Hugging Face, vlapky/pocket-tts-onnx, dossier french_24l ou english_2026-04, environ 150 Mo, gardés en cache).
+Poids : © Kyutai, CC BY 4.0 (https://huggingface.co/kyutai/pocket-tts). Leurs conditions demandent le consentement
+explicite de la personne dont on clone la voix : dans le jeu, chaque joueur l'autorise ou non (réglage « clone »).
+
+Essais du 13 novembre 2026 (Chrome, un seul fil : GitHub Pages ne permet pas l'isolation qui en donnerait plusieurs),
+sur des voix françaises de kyutai/tts-voices (cml-tts/fr), ressemblance mesurée grossièrement (spectre moyen, hauteur) :
+- le modèle léger (int8) va 3 à 4 fois moins vite que le temps réel : 8 à 10 s pour une phrase de 3 s, 4,5 s pour « Ouais. »,
+  3 à 5 s pour cloner une voix ; d'où les phrases fabriquées d'avance pendant le Level 0, les plus utiles d'abord ;
+- le clone est nettement plus proche de sa voix que des autres, et à moins de 3 demi-tons, mais pas identique ;
+- 4 pas de décodage ou une température plus basse : pas de gain mesurable ; modèle complet : 1,2 Go, écarté ;
+- un échantillon de 20 s au lieu de 10 : clonage et phrases 3 fois plus lents, écarté (on garde 30 s et on en choisit 10).

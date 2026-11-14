@@ -306,6 +306,31 @@ export function installMallSfx(sfx) {
       });
       sfx.caption('[a music box, far away]', ev);
     },
+    // le monte-charge, quand elle change d'étage : le contacteur, un moteur lourd qui ronfle le temps du trajet ; puis,
+    // à l'arrivée, le choc de l'arrêt et les portes qui roulent. Il s'entend de loin, du côté du monte-charge de
+    // l'étage où l'on est (at) ; à l'arrivée, seulement à l'étage où elle sort
+    lift(ev, ear, at) {
+      if (!ok() || !ear) return;
+      const t = sfx.ctx.currentTime + 0.05;
+      if (ev.out) {
+        if ((ev.floor || 0) !== (ear.floor || 0)) return;
+        const dest = sfx.at({ x: ev.lx, z: ev.lz, ref: 14, rolloff: 0.6 }, 0.9, 0.5, sfx.bedWet || sfx.out);
+        sfx.tone(dest, t, 'sine', 90, 48, 0.5, 0.5, 0.004);
+        sfx.burst(dest, t + 0.02, 0.18, 'lowpass', 500, 0.8, 0.3);
+        sfx.burst(dest, t + 0.7, 1.6, 'bandpass', 260, 0.9, 0.12);
+        sfx.tone(dest, t + 2.3, 'sine', 120, 60, 0.3, 0.35, 0.003);
+        sfx.caption('[freight elevator doors]', { x: ev.lx, z: ev.lz });
+        return;
+      }
+      if (!at) return;
+      const dest = sfx.at({ x: at.x, z: at.z, ref: 14, rolloff: 0.6 }, 0.8, 0.5, sfx.bedWet || sfx.out);
+      const T = ev.t || 7;
+      sfx.tone(dest, t, 'sine', 70, 40, 0.4, 0.45, 0.004);
+      sfx.tone(dest, t + 0.3, 'sawtooth', 38, 54, T - 0.6, 0.11, 0.6);
+      sfx.tone(dest, t + 0.3, 'sine', 76, 108, T - 0.6, 0.09, 0.8);
+      sfx.burst(dest, t + 0.3, T - 0.6, 'bandpass', 180, 0.7, 0.05);
+      sfx.caption('[a freight elevator, somewhere]', at);
+    },
     // une boîte de film ramassée : le métal mince qui sonne, la bobine qui bouge dedans
     reel() {
       if (!ok()) return;

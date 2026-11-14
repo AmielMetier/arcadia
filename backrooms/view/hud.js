@@ -386,17 +386,19 @@ export class BackroomsHUD {
           ? 'LEVEL 5 · 6 LETTERS ARE HIDDEN IN THE ROOMS · HIDE UNDER BEDS AND IN WARDROBES (E), CROUCH (C)'
           : `LETTER ${got}/6 POSTED`;
       } else if (MALL) {
+        // (le bandeau ne dit plus quoi faire ni où : un compte, comme une étiquette de bande. La marche à suivre est
+        // dans le journal du projectionniste, sur le mur de la cabine ; la sortie, sur le dernier carton du film)
         b = sim.open
-          ? 'THE FREIGHT ELEVATOR IS OPEN BEHIND THE SCREEN · EVERYONE GET IN'
+          ? 'THE FEATURE IS PLAYING IN SCREEN 1'
           : sim.film > 0
-          ? 'THE FEATURE IS STARTING · SOMETHING IS WAKING UP BEHIND THE SCREEN'
+          ? 'THE FEATURE IS STARTING IN SCREEN 1'
           : got >= total && delivered < total
-          ? 'ALL 5 REELS FOUND · THREAD THEM IN THE PROJECTION BOOTH, BEHIND SCREEN 1'
+          ? `ALL ${total} REELS FOUND`
           : got > delivered
-          ? `REEL ${got}/${total} FOUND · ${got - delivered} TO THREAD IN THE PROJECTION BOOTH (${delivered}/${total} ON THE PROJECTOR)`
+          ? `REEL ${got}/${total} FOUND · ${delivered}/${total} ON THE PROJECTOR`
           : got === 0
-          ? 'LEVEL 17 · THE FEATURE IS MISSING ITS 5 REELS · THE PROJECTION BOOTH IS BEHIND SCREEN 1'
-          : `REEL ${delivered}/${total} ON THE PROJECTOR · FIND THE OTHERS`;
+          ? 'LEVEL 17 · HALCYON PARK MALL · CLOSED FOR THE NIGHT'
+          : `REEL ${delivered}/${total} ON THE PROJECTOR`;
       } else if (sim.open && L37) b = slideOf(sim) ? `EVERYONE INTO THE ${slideOf(sim).name} SLIDE · THE OTHERS ARE SHUT` : 'LEVEL 37 · FIND ONE OF THE 3 SLIDES AND GET IN · RED, YELLOW OR BLUE: EACH ONE LEADS SOMEWHERE ELSE';
       else if (sim.open) b = PIPES ? 'THE STEAM IS OFF: THE SERVICE ELEVATOR IS OPEN · EVERYONE GET IN' : L1 ? 'THE FREIGHT ELEVATOR HAS POWER: EVERYONE GET IN' : 'ONLY ONE OF THE TWO ELEVATORS OPENED… THE OTHER ONE IS JUST A WALL NOW · FOLLOW THE RED ARROW';
       else if (PIPES) {
@@ -553,6 +555,30 @@ export class BackroomsHUD {
     }
     this.invIdle += dt;
     this.flag('inv', 'idle', this.invIdle > 5 && !document.body.classList.contains('touch'));
+
+    // 4b bis. « Tout au caméscope » : l'incrustation de jeu ne se montre que lorsqu'elle a quelque chose à dire (le
+    // niveau à l'arrivée et quand on change d'étage, la gourde tous les dix points et quand elle est basse, le bruit
+    // quand il porte, le compteur quand il bouge, le signal quand il y en a un) ; le reste du temps, il ne reste que
+    // l'incrustation du caméscope : REC, compteur de bande, date, pile
+    if (this.quiet) {
+      const Q = this.q || (this.q = {});
+      const woke = (key, sig, hold) => {
+        const q = Q[key] || (Q[key] = { sig: null, t: 0 });
+        if (q.sig !== sig) {
+          q.sig = sig;
+          q.t = hold;
+        }
+        q.t -= dt;
+        return q.t > 0;
+      };
+      this.flag('levelTag', 'q-off', !woke('level', `${sim.level}:${P.floor || 0}`, 6));
+      this.flag('stamina', 'q-off', !(woke('water', Math.floor(wt / 10), 4) || wt < THIRST_BLUR));
+      this.flag('noise', 'q-off', !(this.noiseLv >= 0.4));
+      this.flag('signal', 'q-off', noSig);
+      this.flag('cassetteIcons', 'q-off', !woke('count', `${got}:${delivered}`, 7));
+      this.flag('cassetteText', 'q-off', !(Q.count.t > 0));
+      this.flag('team', 'solo', sim.players.length < 2);
+    }
 
     // 4c. Casier, prise, coup de chèvre
     const hidden = P.hidden >= 0 && P.status === 'alive';
@@ -732,14 +758,26 @@ export class BackroomsHUD {
       this.el.classList.toggle('camcorder', on);
       this.sigShown = -1;
     }
+    // (« tout au caméscope » : l'image est en 4:3 sans que le viseur soit sorti ; les jauges des bandes noires, le zoom
+    // et les repères des coéquipiers n'apparaissent qu'avec lui. L'incrustation de jeu s'efface alors d'elle-même)
+    const finder = (c.view ?? c.t) > 0.5;
+    if (finder !== this.finder) {
+      this.finder = finder;
+      this.el.classList.toggle('finder', finder);
+    }
+    const quiet = (c.tape || 0) > 0.5;
+    if (quiet !== this.quiet) {
+      this.quiet = quiet;
+      this.el.classList.toggle('quiet', quiet);
+    }
     const bx = Math.round(c.bars);
     if (bx !== this.camBx) {
       this.camBx = bx;
       this.el.style.setProperty('--bx', `${bx}px`);
       this.el.classList.toggle('cam-wide', bx >= 64);
     }
-    this.teamTags(c, sim, on);
-    if (!on) return;
+    this.teamTags(c, sim, finder);
+    if (!finder) return;
     this.intT = (this.intT || 0) - dt;
     if (this.intT > 0) return;
     this.intT = 0.12;
@@ -1083,6 +1121,35 @@ export class BackroomsHUD {
   // rend true (coffre ouvert), false (pas la bonne phrase) ou null (coffre introuvable). Se résout en true (ouvert) ou
   // false (l'hôte joue avec les monstres classiques).
   // (sub, skip : la ligne d'explication et le bouton pour s'en passer, quand c'est le niveau de départ qui la demande)
+  // La question du clonage de voix, posée une fois : promesse de true (autorisé) ou false. Échap = non
+  askClone(lang = 'en') {
+    const fr = lang === 'fr';
+    return new Promise((resolve) => {
+      const el = document.createElement('div');
+      el.className = 'vip-gate';
+      el.innerHTML = `<div class="vip-box" role="dialog" aria-modal="true">
+          <div class="vip-title">${fr ? 'TA VOIX' : 'YOUR VOICE'}</div>
+          <div class="vip-sub">${fr
+            ? "Au Level 1, l'entité imite les joueurs. Autorises-tu une IA à cloner ta voix, pour qu'elle dise des phrases que tu n'as jamais dites ?<br><br>Ça se passe dans les navigateurs des joueurs de la partie : ta voix n'est envoyée à aucun serveur, rien n'est gardé ensuite. Ça ne marche qu'entre joueurs qui ont dit oui (environ 250 Mo à télécharger la première fois). Tu peux changer d'avis dans les réglages ⚙."
+            : "On Level 1, the entity imitates players. Do you allow an AI to clone your voice, so it can say things you never said?<br><br>It runs in the browsers of the players in your game: your voice is sent to no server and nothing is kept afterwards. It only works between players who said yes (about 250 MB to download the first time). You can change your mind in Settings ⚙."}</div>
+          <div class="vip-btns"><button type="button" class="vip-go">${fr ? "OUI, J'AUTORISE" : 'YES, I ALLOW IT'}</button><button type="button" class="vip-skip">${fr ? 'NON' : 'NO'}</button></div>
+        </div>`;
+      document.body.appendChild(el);
+      const done = (ok) => {
+        el.remove();
+        resolve(ok);
+      };
+      for (const t of ['keydown', 'keyup', 'pointerdown', 'click', 'wheel']) el.addEventListener(t, (e) => e.stopPropagation());
+      el.tabIndex = -1;
+      el.addEventListener('keydown', (e) => {
+        if (e.code === 'Escape') done(false);
+      });
+      el.querySelector('.vip-go').addEventListener('click', () => done(true));
+      el.querySelector('.vip-skip').addEventListener('click', () => done(false));
+      el.querySelector('.vip-skip').focus();
+    });
+  }
+
   askPhrase(tryPhrase, { sub = 'ENTER THE PASSPHRASE TO UNLOCK THE ORIGINAL MONSTERS', skip = 'PLAY CLASSIC' } = {}) {
     return new Promise((resolve) => {
       const el = document.createElement('div');

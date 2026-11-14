@@ -41,48 +41,58 @@ const slotUV = (i, cols, rows) => {
 
 // les enseignes des boutiques : une case de 512 × 64 par boutique (lettres crème, laiton, rouges… sur le noir du
 // bandeau) ; une lettre sur douze est tombée
+// la facture de l'enseigne d'une boutique : 0 des lettres découpées posées sur le bandeau (laiton, crème ou bronze
+// selon le bandeau), 1 un caisson lumineux éteint (un plexi ivoire, des lettres de couleur), 2 un panneau peint
+export const signStyle = (sh) => (sh.id * 7 + sh.sign * 3) % 3;
+const SIGN_BOX = ['#b3241b', '#1d4f91', '#1c6b45', '#6a2a7a', '#b8560f', '#23211e'];
+const SIGN_BOARD = ['#1f3d2c', '#5a1f24', '#1d2f55', '#3a2a1a', '#0f4a4a', '#2b2b2f'];
 function signAtlas(shops) {
   const cols = 2;
   const rows = Math.max(1, Math.ceil(shops.length / cols));
   const [c, g] = atlas(cols, rows, 512, 64);
-  g.fillStyle = '#0d0c0b';
-  g.fillRect(0, 0, c.width, c.height);
   shops.forEach((sh, i) => {
     const x = (i % cols) * 512;
     const y = Math.floor(i / cols) * 64;
+    const st = signStyle(sh);
     g.save();
     g.beginPath();
     g.rect(x, y, 512, 64);
     g.clip();
-    g.font = SIGN_FONTS[sh.sign % SIGN_FONTS.length];
+    let ink;
+    if (st === 1) {
+      // le caisson : un plexi ivoire dans un cadre d'aluminium
+      g.fillStyle = '#8d8b85';
+      g.fillRect(x, y, 512, 64);
+      g.fillStyle = '#e4dfd0';
+      g.fillRect(x + 4, y + 4, 504, 56);
+      ink = SIGN_BOX[(sh.sign + i) % SIGN_BOX.length];
+    } else if (st === 2) {
+      // le panneau peint : un fond sombre, un filet doré
+      g.fillStyle = SIGN_BOARD[(sh.sign + i) % SIGN_BOARD.length];
+      g.fillRect(x, y, 512, 64);
+      g.strokeStyle = '#c9a85a';
+      g.lineWidth = 2;
+      g.strokeRect(x + 5, y + 5, 502, 54);
+      ink = '#efe6cc';
+    } else {
+      // des lettres découpées : rien derrière elles (la matière est ajourée), une ombre portée sur le bandeau
+      const band = sh.id % 4;
+      ink = band === 2 ? '#3a2a1a' : band === 1 ? '#ece4cf' : '#d6b566';
+    }
+    g.font = SIGN_FONTS[sh.sign % SIGN_FONTS.length].replace(/(\d+)px/, (m, n) => `${Math.round(n * (st ? 0.72 : 0.86))}px`);
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     const name = sh.sign % 4 === 3 ? sh.name : sh.name.toUpperCase();
     // la largeur : on serre si le nom est long
-    const w = g.measureText(name).width;
-    const k = Math.min(1, 470 / w);
+    const k = Math.min(1, 460 / g.measureText(name).width);
     g.translate(x + 256, y + 34);
     g.scale(k, 1);
-    let s = 0;
-    for (const ch of name) s = (s * 31 + ch.charCodeAt(0)) % 9973;
-    const chars = [...name];
-    let px = -g.measureText(name).width / 2;
-    g.textAlign = 'left';
-    chars.forEach((ch, j) => {
-      const cw = g.measureText(ch).width;
-      const gone = ch !== ' ' && (s + j * 7) % 12 === 5;
-      if (!gone) {
-        g.fillStyle = SIGN_INK[(sh.sign + i) % SIGN_INK.length];
-        g.globalAlpha = 0.75 + ((s + j) % 5) * 0.05;
-        g.fillText(ch, px, 0);
-      } else {
-        // la trace plus claire de la lettre tombée
-        g.globalAlpha = 0.12;
-        g.fillStyle = '#d8ccb0';
-        g.fillText(ch, px, 0);
-      }
-      px += cw;
-    });
+    if (!st) {
+      g.fillStyle = 'rgba(0,0,0,0.55)';
+      g.fillText(name, 2.5 / k, 3);
+    }
+    g.fillStyle = ink;
+    g.fillText(name, 0, 0);
     g.restore();
   });
   return { tex: toTex(c), uv: (i) => slotUV(i, cols, rows) };
@@ -170,80 +180,74 @@ function posterAtlas() {
 }
 
 // le plan du centre (les deux étages schématisés), « YOU ARE HERE »
-function directoryTex(name) {
-  const [c, g] = atlas(1, 1, 256, 320);
+// le plan du centre : le vrai plan de l'étage (les lieux ouverts au public ; les coulisses n'y figurent pas), le nord
+// en haut. DIR : la place du plan dans l'image, pour y poser le « vous êtes ici » de chaque borne
+const DIR = { W: 512, H: 672, x0: 16, y0: 86, w: 480 };
+function directoryTex(name, map) {
+  const [c, g] = atlas(1, 1, DIR.W, DIR.H);
   g.fillStyle = '#1b2a33';
-  g.fillRect(0, 0, 256, 320);
+  g.fillRect(0, 0, DIR.W, DIR.H);
   g.fillStyle = '#e9dcc0';
-  g.font = 'bold 20px "Futura", Arial, sans-serif';
   g.textAlign = 'center';
-  g.fillText(name, 128, 30);
-  g.font = '11px Arial, sans-serif';
-  g.fillText('DIRECTORY · LEVEL 1 & 2', 128, 48);
-  const cols = ['#c9a45a', '#7da6b8', '#b86e5a', '#8fae7a', '#a58ac0'];
-  for (let k = 0; k < 2; k++) {
-    const y0 = 66 + k * 122;
-    g.strokeStyle = '#e9dcc0';
-    g.lineWidth = 1;
-    g.strokeRect(14, y0, 228, 108);
-    for (let i = 0; i < 18; i++) {
-      g.fillStyle = cols[(i * 3 + k) % cols.length];
-      g.globalAlpha = 0.75;
-      g.fillRect(18 + (i % 9) * 25, y0 + (i < 9 ? 6 : 70), 21, 30);
-    }
-    g.globalAlpha = 1;
-    g.fillStyle = '#e9dcc0';
-    g.fillRect(18, y0 + 44, 220, 18);
+  g.font = 'bold 34px "Futura", "Century Gothic", Arial, sans-serif';
+  g.fillText(name, DIR.W / 2, 44);
+  g.font = 'bold 15px Arial, sans-serif';
+  g.fillText(`D I R E C T O R Y   ·   ${map.floor ? 'L O W E R' : 'U P P E R'}   L E V E L`, DIR.W / 2, 70);
+  const k = DIR.w / map.W;
+  const hh = map.H * k;
+  g.fillStyle = '#23353f';
+  g.fillRect(DIR.x0, DIR.y0, DIR.w, hh);
+  const COL = { mail: '#e9e2cf', court: '#e9e2cf', plaza: '#e9e2cf', portal: '#e9e2cf', annex: '#e2d8be', food: '#d98a4a', cine: '#8a6ab0', cineHall: '#8a6ab0', screen: '#6f558f', store: '#c9a45a', closed: '#7a7468', market: '#8fae7a', flea: '#b89a6a', garden: '#6f9a62', fun: '#c95a6a', lobby: '#d6cfbc', parking: '#9aa3a8', wc: '#6a9ac0' };
+  const TRADE = ['#7da6b8', '#b86e5a', '#8fae7a', '#a58ac0', '#c9a45a', '#6fa69a'];
+  const big = [];
+  for (const r of map.rooms || []) {
+    const sh = r.shop !== undefined ? map.shops[r.shop] : null;
+    const col = sh ? (sh.state === 'shut' || sh.state === 'grille' || sh.state === 'glass' ? TRADE[sh.id % TRADE.length] : '#f0c85a') : COL[r.kind];
+    if (!col) continue;
+    const x = DIR.x0 + r.x0 * k;
+    const y = DIR.y0 + r.z0 * k;
+    const w = (r.x1 - r.x0 + 1) * k;
+    const h = (r.z1 - r.z0 + 1) * k;
+    g.fillStyle = col;
+    g.fillRect(x + (sh ? 0.6 : 0), y + (sh ? 0.6 : 0), w - (sh ? 1.2 : 0), h - (sh ? 1.2 : 0));
+    if (!sh && r.name && w * h > 900 && !['mail', 'court', 'portal', 'plaza', 'screen', 'cineHall'].includes(r.kind)) big.push([r.name, x + w / 2, y + h / 2, w]);
   }
+  // (en haut : les vides des cours, d'où l'on voit l'étage du bas)
+  g.fillStyle = '#23353f';
+  for (const v of map.floor ? [] : map.voids || []) {
+    g.beginPath();
+    v.pts.forEach(([px, pz], i) => (i ? g.lineTo(DIR.x0 + (px / 2.5) * k, DIR.y0 + (pz / 2.5) * k) : g.moveTo(DIR.x0 + (px / 2.5) * k, DIR.y0 + (pz / 2.5) * k)));
+    g.fill();
+  }
+  g.fillStyle = '#1b2a33';
+  g.textBaseline = 'middle';
+  for (const [nm, x, y, w] of big) {
+    g.font = `bold ${w > 70 ? 13 : 10}px "Arial Narrow", Arial, sans-serif`;
+    const words = nm.toUpperCase().split(' ');
+    const lines = words.length > 2 ? [words.slice(0, 2).join(' '), words.slice(2).join(' ')] : words.length === 2 && w < 80 ? words : [words.join(' ')];
+    lines.forEach((t, i) => g.fillText(t, x, y + (i - (lines.length - 1) / 2) * 13));
+  }
+  g.textBaseline = 'alphabetic';
+  // la légende
+  const ly = DIR.y0 + hh + 26;
+  g.textAlign = 'left';
+  g.font = 'bold 14px Arial, sans-serif';
+  [['#f0c85a', 'OPEN LATE'], ['#7da6b8', 'SHOPS'], ['#6a9ac0', 'RESTROOMS'], ['#d98a4a', 'FOOD'], ['#8a6ab0', 'CINEMA']].forEach(([col, t], i) => {
+    const x = 20 + (i % 3) * 165;
+    const y = ly + Math.floor(i / 3) * 26;
+    g.fillStyle = col;
+    g.fillRect(x, y - 12, 16, 14);
+    g.fillStyle = '#e9dcc0';
+    g.fillText(t, x + 24, y);
+  });
   g.fillStyle = '#e8402e';
   g.beginPath();
-  g.arc(86, 66 + 53, 6, 0, 7);
+  g.arc(20 + 2 * 165 + 8, ly + 26 - 5, 7, 0, 7);
   g.fill();
-  g.font = 'bold 10px Arial, sans-serif';
-  g.fillText('YOU ARE HERE', 86, 66 + 40);
   g.fillStyle = '#e9dcc0';
-  g.font = '10px Arial, sans-serif';
-  for (let i = 0; i < 4; i++) g.fillRect(20, 300 + i * 0, 216, 1);
+  g.fillText('YOU ARE HERE', 20 + 2 * 165 + 24, ly + 26);
   return toTex(c);
 }
-
-// les fauteuils du cinéma : trois profils extrudés (le dossier, l'assise, l'accoudoir), dans le repère du fauteuil
-// (x : la rangée, z : vers l'écran)
-const SEAT = (() => {
-  const prof = (build, width, x0) => {
-    const sh = new THREE.Shape();
-    build(sh);
-    const g = new THREE.ExtrudeGeometry(sh, { depth: width, bevelEnabled: false, curveSegments: 4 }).rotateY(-Math.PI / 2).translate(x0 + width, 0, 0);
-    const u = g.attributes.uv;
-    for (let i = 0; i < u.count; i++) u.setXY(i, u.getX(i) * 2, u.getY(i) * 2);
-    return g;
-  };
-  const back = prof((s) => {
-    s.moveTo(-0.2, 0.36);
-    s.lineTo(-0.31, 0.98);
-    s.quadraticCurveTo(-0.325, 1.09, -0.25, 1.085);
-    s.quadraticCurveTo(-0.195, 1.07, -0.185, 0.98);
-    s.lineTo(-0.1, 0.44);
-    s.lineTo(-0.12, 0.36);
-  }, 0.5, -0.25);
-  const pan = prof((s) => {
-    s.moveTo(-0.16, 0.37);
-    s.lineTo(0.2, 0.37);
-    s.quadraticCurveTo(0.285, 0.39, 0.275, 0.46);
-    s.quadraticCurveTo(0.26, 0.515, 0.17, 0.51);
-    s.lineTo(-0.14, 0.49);
-  }, 0.48, -0.24);
-  const up = pan.clone().translate(0, -0.4, 0.16).rotateX(-1.2).translate(0, 0.4, -0.16);
-  const arm = prof((s) => {
-    s.moveTo(-0.3, 0);
-    s.lineTo(0.18, 0);
-    s.lineTo(0.23, 0.6);
-    s.quadraticCurveTo(0.245, 0.69, 0.16, 0.69);
-    s.lineTo(-0.27, 0.69);
-    s.quadraticCurveTo(-0.33, 0.69, -0.325, 0.62);
-  }, 0.06, 0.25);
-  return { back, pan, up, arm };
-})();
 
 // --- Le mobilier ---
 export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, placed = [] }) {
@@ -254,23 +258,9 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
   MATS.red = MATS.red || { m: baked(lam({ color: '#6e1418' })), S: 1 };
   MATS.plastic = MATS.plastic || { m: baked(phong({ color: '#d9d3c4', specular: '#333', shininess: 40 })), S: 1 };
   MATS.soil = MATS.soil || { m: baked(lam({ color: '#2a2018' })), S: 1 };
-  MATS.frond = MATS.frond || { m: baked(lam({ color: '#4a3f26', side: THREE.DoubleSide })), S: 1 };
-  MATS.cloth = MATS.cloth || { m: baked(lam({ color: '#5b5560' })), S: 1 };
-  MATS.cloth2 = MATS.cloth2 || { m: baked(lam({ color: '#7d5a46' })), S: 1 };
-  MATS.carton = MATS.carton || { m: baked(lam({ color: '#8f7350' })), S: 1 };
-  // les vêtements : six étoffes (denim, jerseys de couleur, vichy, jacquard), sur les portants et les mannequins
   // une valise seule (le modèle en range deux côte à côte)
   const SUITCASE = ['01', '02'].map((k) => ['bottom', 'clasp', 'handle', 'top'].map((p) => `vintage_suitcase_${k}_${p}`).join('+'));
-  const FAB = MATS.__fabrics || [];
-  const fx = MATS.__tx && MATS.__tx.fabrics;
-  if (fx && !FAB.length) {
-    [[0, '#d8dce4'], [1, '#9c3a36'], [1, '#2e4466'], [2, '#d8c8c0'], [3, '#c9bba4'], [1, '#b08a3a']].forEach(([k, c], i) => {
-      MATS['fab' + i] = { m: baked(lam({ map: fx[k], color: c })), S: 1 };
-      FAB.push('fab' + i);
-    });
-    MATS.__fabrics = FAB;
-  }
-  const fab = (i) => (FAB.length ? FAB[((i % FAB.length) + FAB.length) % FAB.length] : i % 2 ? 'cloth' : 'cloth2');
+  MATS.mirror = MATS.mirror || { m: baked(phong({ color: '#1e272b', specular: '#b4c4cc', shininess: 150 }), { spec: 0.9, gloss: 160, mask: 0 }), S: 1 };
   MATS.screenWhite = MATS.screenWhite || { m: baked(lam({ color: '#b9b6ae' })), S: 1 };
   const lit = (map2, k = 1.25) => new THREE.MeshBasicMaterial({ map: map2, color: new THREE.Color(1, 1, 1).multiplyScalar(k) });
 
@@ -295,14 +285,13 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
   const signs = map.shops && map.shops.length ? signAtlas(map.shops) : null;
   const menus = menuAtlas();
   const posters = posterAtlas();
-  if (signs) MATS.signs = { m: baked(lam({ map: signs.tex })), S: 1 };
+  if (signs) MATS.signs = { m: baked(lam({ map: signs.tex, alphaTest: 0.4 })), S: 1 };
   MATS.menus = { m: lit(menus.tex, 1.1), S: 1 };
   MATS.menusOff = { m: baked(lam({ map: menus.tex, color: '#6a6a6a' })), S: 1 };
   MATS.posters = { m: lit(posters.tex, 1.15), S: 1 };
   MATS.postersOff = { m: baked(lam({ map: posters.tex, color: '#777' })), S: 1 };
-  MATS.directory = { m: lit(directoryTex('HALCYON PARK MALL'), 1.1), S: 1 };
-  MATS.arcadeGlow = { m: new THREE.MeshBasicMaterial({ color: new THREE.Color('#6f3cff').multiplyScalar(1.6) }), S: 1 };
-  MATS.arcadeGlow2 = { m: new THREE.MeshBasicMaterial({ color: new THREE.Color('#14c8b4').multiplyScalar(1.5) }), S: 1 };
+  MATS.directory = { m: lit(directoryTex('HALCYON PARK MALL', map), 1.1), S: 1 };
+  MATS.hereDot = MATS.hereDot || { m: new THREE.MeshBasicMaterial({ color: '#e8402e' }), S: 1 };
   // un panneau texturé (une case d'atlas) : une face de w × h, centrée en (x, y, z), tournée vers (nx, nz)
   const panel = (k, uv, x, y, z, w, h, nx, nz) => {
     placed.push([x, z, w / 2 + 0.2]); // (les murs habillés, view/mallWalls.js, laissent la place)
@@ -312,8 +301,8 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     g.rotateY(Math.atan2(nx, nz));
     G.add(k, g.translate(x, y, z));
   };
-  const lights = []; // les feux de couleur du mobilier (bornes d'arcade allumées)
-  const arcade = createArcade({ G, MATS, baked, model, placed, lights, rooms, C });
+  const lights = []; // les feux de couleur du mobilier (les caissons d'affiches allumés, les écrans)
+  const arcade = createArcade({ MATS, baked });
 
   // --- les modèles (Poly Haven, CC0) : leur avant est +z, sauf mention ---
   const PI = Math.PI;
@@ -336,11 +325,11 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
   // ce qu'on pose sur une table de présentation, selon le commerce
   // ce qu'on pose sur une table de présentation, selon le commerce : [modèle, échelle, morceaux, roulis x, hauteur]
   const SHOW = {
-    toys: [['rubber_duck_toy', 1.6], ['gamepad', 1], ['football', 1, 'football_inflated'], ['rubber_duck_toy', 1.6], ['concrete_cat_statue', 1]],
-    kids: [['rubber_duck_toy', 1.6], ['football', 1, 'football_inflated'], ['gamepad', 1]],
+    toys: [['rubber_duck_toy', 1.6], ['baseball_01', 1.4], ['football', 1, 'football_inflated'], ['rubber_duck_toy', 1.6], ['concrete_cat_statue', 1]],
+    kids: [['rubber_duck_toy', 1.6], ['football', 1, 'football_inflated'], ['american_football', 1]],
     music: [['boombox', 0.9], ['Ukulele_01', 1, '*', -PI / 2, 0.03], ['cassette_player', 1.4], ['portable_cassette_player', 1.3]],
     electronics: [['television_02', 1], ['boombox', 0.9], ['Television_01', 0.85], ['vintage_video_camera', 1.5], ['portable_cassette_player', 1.3]],
-    video: [['Television_01', 0.85], ['television_02', 1], ['gamepad', 1], ['vintage_video_camera', 1.5]],
+    video: [['Television_01', 0.85], ['television_02', 1], ['boombox', 1], ['vintage_video_camera', 1.5]],
     gifts: [['ceramic_vase_01', 1], ['antique_ceramic_vase_01', 1], ['marble_bust_01', 0.8], ['garden_gnome', 0.8], ['concrete_cat_statue', 1], ['ceramic_vase_02', 1]],
     jewelry: [['ceramic_vase_03', 0.8], ['vintage_pocket_watch', 2], ['brass_vase_03', 1]],
     watches: [['alarm_clock_01', 1], ['vintage_pocket_watch', 2], ['digital_wrist_watch', 1.5, '*', -PI / 2, 0.02]],
@@ -357,12 +346,12 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     candy: [['carrot_cake', 1], ['croissant', 1.2], ['food_apple_01', 1.4], ['jug_01', 1]],
   };
   const shopOf = (it) => (it.shop !== undefined && map.shops ? map.shops.find((s) => s.id === it.shop) : null);
-  // les marchandises (emballages imprimés) et le mobilier du grand magasin
+  // les panneaux imprimés (enseignes, plaques), ce qui reste des grandes surfaces et des locaux techniques
   const goods = createGoods({ G, MATS, baked });
-  const dept = createDept({ G, MATS, baked, model, placeAt, lbox, frame, front, yawZ, fab, rand, goods, rooms, C, hAt });
+  const dept = createDept({ G, model, lbox, frame, front, yawZ, rand, goods, rooms, C, hAt });
 
-  // les gros meubles fixes, modelés (fontaines, kiosques, comptoirs, stands, tables du food court)
-  const fixtures = createFixtures({ G, MATS, baked, model, lbox, frame, front, yawZ, rand, goods, rooms, map, C, panel, menus, shopOf });
+  // le gros mobilier fixe (jardinières, pots, tables du food court, stands fermés)
+  const fixtures = createFixtures({ G, MATS, model, lbox, frame, front, rand, panel, menus });
   for (const it of furn) {
     const hw = it.w / 2;
     const hd = it.d / 2;
@@ -371,27 +360,24 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     switch (it.kind) {
       case 'bench': {
         // un banc à lattes de bois sur pieds de fonte (le banc à dossier de « modular_street_seating »)
-        placeAt('modular_street_seating', it.x, 0, it.z, yawZ(F), -1.135, 0.03, 1, 0, 0, 'legs_single+seat+seat_back+back_support_r+back_support_l+crossbar+legs_double');
+        // (jamais tout à fait d'équerre : quelques degrés, quelques centimètres)
+        placeAt('modular_street_seating', it.x + (rand(it.id, 7) - 0.5) * 0.1, 0, it.z + (rand(it.id, 8) - 0.5) * 0.08, yawZ(F) + (rand(it.id, 9) - 0.5) * 0.14, -1.135, 0.03, 1, 0, 0, 'legs_single+seat+seat_back+back_support_r+back_support_l+crossbar+legs_double');
         if (it.id % 13 === 4) model('old_gas_mask', it.x + 0.4, 0.46, it.z + F[1] * 0.05, rand(it.id) * 6, 1, 0, PI / 2);
         else if (it.id % 11 === 6) model('vintage_suitcase', it.x - 0.5, 0.45, it.z, yawZ(F), 0.5, 0, 0, SUITCASE[it.id % 2]);
         break;
       }
       case 'bin':
-        model('metal_trash_can', it.x, 0, it.z, rand(it.id) * 6.28, 1, 0, 0, it.rust ? 'metal_trash_can_rust' : 'metal_trash_can');
+        model('metal_trash_can', it.x + (rand(it.id, 7) - 0.5) * 0.12, 0, it.z + (rand(it.id, 8) - 0.5) * 0.12, rand(it.id) * 6.28, 1, 0, 0, it.rust ? 'metal_trash_can_rust' : 'metal_trash_can');
         break;
       case 'planter': {
         lbox('marbleDark', it, -hw, hw, 0, 0.62, -hd, hd, '-y+y');
-        // la margelle : un cadre de pierre ; au milieu, la terre, en mottes
+        // la margelle : un cadre de pierre ; au milieu, la terre
         const cw = 0.17;
         lbox('trim', it, -hw - 0.04, hw + 0.04, 0.62, 0.68, -hd - 0.04, -hd + cw, '-y');
         lbox('trim', it, -hw - 0.04, hw + 0.04, 0.62, 0.68, hd - cw, hd + 0.04, '-y');
         lbox('trim', it, -hw - 0.04, -hw + cw, 0.62, 0.68, -hd + cw, hd - cw, '-y');
         lbox('trim', it, hw - cw, hw + 0.04, 0.62, 0.68, -hd + cw, hd - cw, '-y');
         lbox('soil', it, -hw + cw, hw - cw, 0.5, 0.635, -hd + cw, hd - cw, '-y');
-        for (let i = 0; i < 7; i++) {
-          const r = 0.16 + rand(it.id, i + 30) * 0.2;
-          put('soil', new THREE.SphereGeometry(r, 7, 5).scale(1, 0.28, 1), it.x + (rand(it.id, i + 40) - 0.5) * (it.w - 0.8), 0.632, it.z + (rand(it.id, i + 50) - 0.5) * (it.d - 0.8), rand(it.id, i) * 3);
-        }
         const a = rand(it.id) * 6.28;
         if (it.plant === 0) {
           // un arbre mort, debout, et un autre plus petit
@@ -418,12 +404,8 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         // un chariot à café, ses machines encore dessus
         model('CoffeeCart_01', it.x + 0.3, 0, it.z, (it.yaw || 0) + PI / 2, 1.05);
         break;
-      case 'kiosk':
       case 'terrace':
       case 'claypot':
-      case 'fountain':
-      case 'counter':
-      case 'concession':
       case 'diner':
         fixtures[it.kind](it);
         break;
@@ -433,7 +415,14 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         for (const s of [-1, 1]) {
           const [x, z] = P(0, s * (hd + 0.004));
           const n = P(0, s);
-          panel('directory', [0, 0, 1, 1], x, 1.28, z, it.w - 0.14, 1.52, n[0] - it.x, n[1] - it.z);
+          const pw = it.w - 0.14;
+          const ph = pw * (DIR.H / DIR.W);
+          panel('directory', [0, 0, 1, 1], x, 1.28, z, pw, ph, n[0] - it.x, n[1] - it.z);
+          // « vous êtes ici » : une pastille rouge, là où est la borne sur le plan
+          const u = (DIR.x0 + (it.x / C) * (DIR.w / map.W)) / DIR.W - 0.5;
+          const v = 0.5 - (DIR.y0 + (it.z / C) * (DIR.w / map.W)) / DIR.H;
+          const [dx2, dz2] = P(s * u * pw, s * (hd + 0.006));
+          put('hereDot', new THREE.CircleGeometry(0.016, 12).rotateY(Math.atan2(n[0] - it.x, n[1] - it.z)), dx2, 1.28 + v * ph, dz2);
         }
         break;
       }
@@ -444,7 +433,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         model('wheelchair_01', it.x, 0, it.z, it.yaw || 0);
         break;
       case 'sofa':
-        placeAt('sofa_02', it.x, 0, it.z, yawZ(F), 0, -0.07, 1.02);
+        placeAt('sofa_02', it.x, 0, it.z, yawZ(F) + (rand(it.id, 9) - 0.5) * 0.1, 0, -0.07, 1.02);
         break;
       case 'lounge':
         model('mid_century_lounge_chair', it.x, 0, it.z, it.yaw || 0);
@@ -492,9 +481,6 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         }
         break;
       }
-      case 'rack':
-        dept.rack(it);
-        break;
       case 'table': {
         // une vraie table (trois modèles, mis aux dimensions de l'emprise : le plateau à 84 cm) : une table de bois
         // brut, une table peinte, une table nappée
@@ -505,16 +491,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
           const [tn, tw, td, th] = TABLES[['candy', 'florist', 'gifts', 'fold'].includes(trade) ? 2 : it.id % 2];
           model(tn, it.x, 0, it.z, it.rot ? PI / 2 : 0, [it.w / tw, 0.84 / th, it.d / td]);
         }
-        if (trade === 'fold') {
-          // des piles de vêtements pliés, deux rangs
-          for (let j = 0; j < 2; j++)
-            for (let i = 0; i < Math.floor(it.w / 0.42); i++) {
-              const q = it.id * 11 + j * 5 + i;
-              if (rand(q) < 0.2) continue;
-              goods.folded(P, -hw + 0.24 + i * 0.42, 0.34, 0.84, (j - 0.5) * it.d * 0.48 - 0.14, (j - 0.5) * it.d * 0.48 + 0.14, q);
-            }
-          break;
-        }
+        if (trade === 'fold') break; // (une table restée vide)
         if (sh && sh.trade === 'salon') {
           // le salon de coiffure : des fauteuils de barbier à la place des tables
           model('BarberShopChair_01', it.x, 0, it.z, yawZ([0, -sh.dir]) + (rand(it.id) - 0.5) * 0.6);
@@ -552,21 +529,14 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         break;
       case 'stall':
         if (it.toilet) {
+          // une cabine : deux cloisons, sa façade, la porte tirée (on ne voit pas dedans)
           for (const lx of [-hw, hw - 0.03]) lbox('paintGrey', it, lx, lx + 0.03, 0.15, 2.0, -hd, hd);
           lbox('paintGrey', it, -hw, -hw + 0.5, 0.15, 2.0, -hd, -hd + 0.03);
-          // la façade de la cabine : deux montants, la porte (fermée, entrouverte ou grande ouverte)
           lbox('paintGrey', it, -hw + 0.5, -hw + 0.62, 0.15, 2.0, -hd, -hd + 0.03);
           lbox('paintGrey', it, hw - 0.14, hw, 0.15, 2.0, -hd, -hd + 0.03);
-          {
-            const [hx, hz] = P(-hw + 0.62, -hd + 0.015);
-            const open = [0, 0.5, 1.45, 0.15][it.id % 4];
-            G.add('paintGrey', new THREE.BoxGeometry(0.72, 1.8, 0.025).translate(0.36, 1.07, 0).rotateY(open).translate(hx, 0, hz));
-            G.add('steel', new THREE.BoxGeometry(0.03, 0.1, 0.05).translate(0.64, 1.05, 0).rotateY(open).translate(hx, 0, hz));
-          }
-          const [tx, tz] = P(0, hd - 0.4);
-          dept.toilet(tx, tz, it.id);
-          if (it.id % 3 === 0) model('plunger', tx + 0.4, 0, tz - 0.1, rand(it.id) * 6);
-        } else fixtures.stall(it);
+          lbox('paintGrey', it, -hw + 0.62, hw - 0.14, 0.17, 1.97, -hd + 0.002, -hd + 0.027);
+          lbox('steel', it, hw - 0.24, hw - 0.2, 1.0, 1.1, -hd - 0.02, -hd + 0.002);
+        } else if (it.shut) fixtures.stallShut(it);
         break;
       case 'gondola':
         dept.gondola(it);
@@ -575,59 +545,14 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         lbox('faience', it, -hw, hw, 0, 2.1, -hd, hd, '-y');
         lbox('steel', it, -hw - 0.01, hw + 0.01, 2.1, 2.13, -hd - 0.01, hd + 0.01);
         break;
-      case 'standee':
-      case 'boxoffice':
-        dept[it.kind](it, { posters, menus, panel });
-        break;
-      case 'cosmetic':
-      case 'booth':
       case 'pot':
-      case 'partition':
-      case 'meeting':
-      case 'kitchenette':
       case 'tanks':
       case 'panelbox':
       case 'genset':
-      case 'workbench':
         dept[it.kind](it);
-        break;
-      case 'fitting':
-        dept.fitting(it);
-        break;
-      case 'shoetable':
-        dept.shoetable(it);
         break;
       case 'ottoman':
         model('Ottoman_01', it.x, 0, it.z, rand(it.id) * 6.28);
-        break;
-      case 'roomset':
-        dept.roomset(it);
-        break;
-      case 'tvwall':
-        dept.tvwall(it);
-        break;
-      case 'luggage':
-        dept.luggage(it);
-        break;
-      case 'mannequin': {
-        const y = it.yaw || 0;
-        put('steel', new THREE.CylinderGeometry(0.22, 0.22, 0.03, 16), it.x, 0.015, it.z);
-        put('steel', new THREE.CylinderGeometry(0.015, 0.015, 0.25, 6), it.x, 0.14, it.z);
-        const body = new THREE.LatheGeometry([[0.0, 0], [0.11, 0.02], [0.13, 0.25], [0.16, 0.5], [0.13, 0.62], [0.17, 0.82], [0.2, 1.0], [0.12, 1.08], [0.05, 1.12], [0.05, 1.18], [0.0, 1.2]].map(([r, h]) => new THREE.Vector2(r, h)), 16).scale(1, 1, 0.7);
-        put(it.id % 2 ? fab(it.id) : 'plastic', body, it.x, 0.27, it.z, y);
-        // (un buste de couturière : pas de tête ni de bras, un bouton de bois tourné au col)
-        put('wood', new THREE.CylinderGeometry(0.05, 0.06, 0.035, 12), it.x, 1.485, it.z);
-        put('wood', new THREE.SphereGeometry(0.03, 8, 6), it.x, 1.52, it.z);
-        break;
-      }
-      case 'arcade':
-        arcade.cabinet(it);
-        break;
-      case 'claw':
-        arcade.claw(it);
-        break;
-      case 'prizes':
-        arcade.prizes(it);
         break;
       // le parking : une voiture sous sa bâche, des blocs de béton, des pneus en tas
       case 'car':
@@ -643,40 +568,16 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
       case 'tyres':
         for (let k = 0; k < (it.n || 3); k++) model('old_tyre', it.x + (rand(it.id, k) - 0.5) * 0.12, 0.08 + k * 0.155, it.z + (rand(it.id, k + 5) - 0.5) * 0.12, 0, 1, PI / 2);
         break;
-      case 'stanchion':
-        put('brass', new THREE.CylinderGeometry(0.025, 0.025, 0.95, 8), it.x, 0.48, it.z);
-        put('brass', new THREE.CylinderGeometry(0.16, 0.18, 0.03, 16), it.x, 0.015, it.z);
-        put('brass', new THREE.SphereGeometry(0.045, 10, 8), it.x, 0.97, it.z);
-        if (it.id < furn.length - 1 && furn[it.id + 1].kind === 'stanchion') {
-          const o = furn[it.id + 1];
-          G.beam('red', [it.x, 0.88, it.z], [(it.x + o.x) / 2, 0.72, (it.z + o.z) / 2], 0.035, 0.035);
-          G.beam('red', [(it.x + o.x) / 2, 0.72, (it.z + o.z) / 2], [o.x, 0.88, o.z], 0.035, 0.035);
-        }
-        break;
-      case 'seats': {
-        // une rangée de fauteuils de velours rouge (dossier galbé, assise arrondie, un sur onze relevé), accoudoirs noirs
-        const n = Math.floor(it.w / 0.56);
-        const th = yawZ(F);
-        const armLow = Math.cos(th) * (it.rot ? 0 : 1) - Math.sin(th) * (it.rot ? 1 : 0) < 0; // l'accoudoir est du côté des petits lx
-        const seat = (k, tpl, lx) => {
-          const [x, z] = P(lx, 0);
-          G.add(k, tpl.clone().rotateY(th).translate(x, 0, z));
-        };
-        for (let i = 0; i < n; i++) {
-          const lx = -hw + 0.28 + i * 0.56;
-          seat('velvet', SEAT.back, lx);
-          seat('velvet', (it.id * 7 + i * 3) % 11 === 0 ? SEAT.up : SEAT.pan, lx);
-          seat('black', SEAT.arm, lx);
-        }
-        seat('black', SEAT.arm, armLow ? -hw + 0.28 + n * 0.56 : -hw + 0.28 - 0.56);
-        break;
-      }
       case 'sinks': {
-        lbox('marbleDark', it, -hw, hw, 0.82, 0.88, -hd, hd);
-        lbox('paintGrey', it, -hw, hw, 0, 0.82, -hd + 0.05, -hd + 0.1);
+        // un plan de pierre sombre, creusé d'une auge d'inox sur toute sa longueur ; les miroirs au mur
+        lbox('marbleDark', it, -hw, hw, 0.8, 0.88, -hd, -hd + 0.1);
+        lbox('marbleDark', it, -hw, hw, 0.8, 0.88, hd - 0.07, hd);
+        for (const s of [-1, 1]) lbox('marbleDark', it, s > 0 ? hw - 0.12 : -hw, s > 0 ? hw : -hw + 0.12, 0.8, 0.88, -hd + 0.1, hd - 0.07);
+        lbox('steel', it, -hw + 0.12, hw - 0.12, 0.7, 0.72, -hd + 0.1, hd - 0.07, '-y');
+        lbox('steel', it, -hw + 0.12, hw - 0.12, 0.72, 0.87, -hd + 0.1, -hd + 0.11);
+        lbox('steel', it, -hw + 0.12, hw - 0.12, 0.72, 0.87, hd - 0.08, hd - 0.07);
+        lbox('paintGrey', it, -hw, hw, 0, 0.8, hd - 0.12, hd - 0.07);
         for (let i = 0; i < 3; i++) {
-          const [x, z] = P(-hw + 0.9 + i * 1.6, 0.05);
-          dept.basin(x, z);
           const [mx, mz] = P(-hw + 0.9 + i * 1.6, -hd + 0.02);
           lbox('steel', { ...it, x: mx, z: mz }, -0.48, 0.48, 1.12, 2.03, 0, 0.008);
           lbox('mirror', { ...it, x: mx, z: mz }, -0.45, 0.45, 1.15, 2.0, 0.008, 0.016);
@@ -736,7 +637,7 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     }
   }
 
-  dept.signs(furn);
+  dept.signs();
 
   // --- Les détails posés sur les murs et sous les plafonds (modèles) ---
   const cell = (gx, gz) => (gx < 0 || gz < 0 || gx >= map.W || gz >= map.H ? 2 : map.grid[gz * map.W + gx]);
@@ -748,19 +649,10 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     const head = rooms[sh.room].ceilH - 0.62;
     const n = Math.max(1, Math.round((xb - xa) / 3));
     const w = (xb - xa - 0.08) / n;
-    for (let i = 0; i < n; i++) model('rollershutter_window_01', xa + 0.04 + w * (i + 0.5), 0, sh.frontZ - sh.dir * 0.15, sh.dir > 0 ? 0 : PI, [w / 2.1, head / 1.85, 1], 0, 0, (sh.id + i) % 4 === 3 ? 'rollershutter_window_01_graffiti' : 'rollershutter_window_01');
+    for (let i = 0; i < n; i++) model('rollershutter_window_01', xa + 0.04 + w * (i + 0.5), 0, sh.frontZ - sh.dir * 0.15, sh.dir > 0 ? 0 : PI, [w / 2.1, head / 1.85, 1], 0, 0, 'rollershutter_window_01');
   }
-  // les cabines téléphoniques, de part et d'autre du passage des toilettes
-  for (const gx of [21, 24]) {
-    if (cell(gx, 42) !== 2 || cell(gx, 41) !== 1) continue;
-    const zf = 42 * C;
-    for (let k = 0; k < 2; k++) {
-      const x = gx * C + 0.75 + k * 1.0;
-      G.box('steel', x - 0.42, x + 0.42, 0.7, 2.0, zf - 0.04, zf, '+z');
-      G.box('black', x - 0.44, x + 0.44, 2.0, 2.1, zf - 0.36, zf, '+z');
-      model('korean_public_payphone_01', x + 0.06, 1.0, zf - 0.15, PI);
-    }
-  }
+  // (plus de cabines téléphoniques : le seul téléphone public scanné disponible est coréen, un centre américain de
+  // 1996 n'en a pas ; rien ne le remplace)
   // des caméras de surveillance sur un pilier sur quatre du mail et des cours, tournées vers les vitrines
   let ci = 0;
   for (const k in map.pillars) {
@@ -779,11 +671,10 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     const Z0 = r.z0 * C;
     const Z1 = (r.z1 + 1) * C;
     if (r.kind === 'service' && r.z0 === r.z1 && r.x1 - r.x0 > 6) {
-      // les couloirs de service : un extincteur et une alarme tous les 14 m, des sacs, un balai, un bidon
+      // les couloirs de service : une alarme tous les 14 m, des sacs, un balai, un bidon
       for (let x = X0 + 4; x < X1 - 2; x += 14) {
         const gx = Math.floor(x / C);
         if (cell(gx, r.z0 - 1) !== 2) continue;
-        model('korean_fire_extinguisher_01', x, 0, Z0 + 0.16, rand(gx) * 0.6 - 0.3);
         model('fire_alarm', x + 0.6, 1.45, Z0, 0);
       }
       for (let x = X0 + 9; x < X1 - 4; x += 23) {
@@ -858,56 +749,47 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
       const r = rooms[sh.room];
       const y = r.ceilH - 0.31;
       const z = sh.frontZ + sh.dir * 0.146;
-      panel('signs', signs.uv(si++), (xa + xb) / 2, y, z, Math.min(xb - xa - 0.6, 6.5), 0.44, 0, sh.dir);
+      // (à sa vraie proportion, 8:1 : des lettres découpées plus grandes qu'un caisson ou qu'un panneau peint)
+      const sw = Math.min(xb - xa - 0.6, signStyle(sh) ? 3.3 : 4.2);
+      panel('signs', signs.uv(si++), (xa + xb) / 2, y, z + (signStyle(sh) ? sh.dir * 0.03 : 0), sw, sw / 8, 0, sh.dir);
+      if (signStyle(sh)) G.box(signStyle(sh) === 1 ? 'steel' : 'black', (xa + xb) / 2 - sw / 2, (xa + xb) / 2 + sw / 2, y - sw / 16, y + sw / 16, Math.min(z, z + sh.dir * 0.028), Math.max(z, z + sh.dir * 0.028));
     }
 
-  // les salles de projection : l'écran (une toile grise entre des caches noirs) contre le mur est ; dans les coins, de
-  // part et d'autre de la scène, les sorties de secours
+  // les salles de projection : contre le mur est, un écran large (2,39:1) dans son cache noir, entre deux tentures de
+  // velours à plis (des lés de 12 cm, un sur deux en retrait), une frise au-dessus, une scène basse au pied
   for (const r of rooms) {
     if (r.kind !== 'screen') continue;
     const X1 = (r.x1 + 1) * C;
     const Z0 = r.z0 * C;
     const Z1 = (r.z1 + 1) * C;
-    G.box('screenWhite', X1 - 0.08, X1 - 0.02, 1.4, r.ceilH - 1.2, Z0 + 3.0, Z1 - 3.0, '+x');
-    G.box('black', X1 - 0.1, X1 - 0.02, 1.2, r.ceilH - 1.0, Z0 + 2.6, Z0 + 3.0, '+x');
-    G.box('black', X1 - 0.1, X1 - 0.02, 1.2, r.ceilH - 1.0, Z1 - 3.0, Z1 - 2.6, '+x');
-    G.box('red', X1 - 1.2, X1 - 0.1, 0, 1.2, Z0 + 2.6, Z1 - 2.6, '-y');
+    const zc = (Z0 + Z1) / 2;
+    const sw = 9.6;
+    const y0 = 1.45;
+    const y1 = y0 + sw / 2.39;
+    const top = r.ceilH - 0.25;
+    G.box('screenWhite', X1 - 0.08, X1 - 0.02, y0, y1, zc - sw / 2, zc + sw / 2, '+x');
+    // le cache : un cadre de feutre noir autour de la toile, jusqu'aux tentures et à la frise
+    G.box('black', X1 - 0.1, X1 - 0.02, y0 - 0.5, y1 + 0.3, zc - sw / 2 - 0.3, zc - sw / 2, '+x');
+    G.box('black', X1 - 0.1, X1 - 0.02, y0 - 0.5, y1 + 0.3, zc + sw / 2, zc + sw / 2 + 0.3, '+x');
+    G.box('black', X1 - 0.1, X1 - 0.02, y0 - 0.5, y0, zc - sw / 2, zc + sw / 2, '+x');
+    G.box('black', X1 - 0.1, X1 - 0.02, y1, y1 + 0.3, zc - sw / 2, zc + sw / 2, '+x');
+    for (const [za, zb] of [[Z0 + 0.05, zc - sw / 2 - 0.3], [zc + sw / 2 + 0.3, Z1 - 0.05]]) {
+      const n = Math.max(1, Math.round((zb - za) / 0.12));
+      const w = (zb - za) / n;
+      for (let i = 0; i < n; i++) G.box('velvet', X1 - (i % 2 ? 0.2 : 0.26), X1 - 0.02, 0.92, top, za + i * w, za + (i + 1) * w, '+x-y');
+    }
+    {
+      const n = Math.round((Z1 - Z0 - 0.1) / 0.24);
+      const w = (Z1 - Z0 - 0.1) / n;
+      for (let i = 0; i < n; i++) G.box('velvet', X1 - (i % 2 ? 0.3 : 0.36), X1 - 0.02, y1 + 0.3, top + 0.1, Z0 + 0.05 + i * w, Z0 + 0.05 + (i + 1) * w, '+x');
+    }
+    G.box('paintDark', X1 - 1.3, X1 - 0.02, 0, 0.9, Z0, Z1, '-y+x');
+    G.box('black', X1 - 1.32, X1 - 1.3, 0, 0.92, Z0, Z1, '-y');
     // (la salle 1 : ce qui passe à l'écran, carton de l'entracte puis film, est dessiné par view/mallCinema.js)
   }
 
   // le cinéma : des affiches dans des caissons lumineux le long des murs du hall et du couloir des salles
   let pi = 0;
-  let wall3 = false;
-  // l'image du mur d'écrans : un bleu de glace, de grandes formes claires
-  const wall3Tex = () => {
-    const c = document.createElement('canvas');
-    c.width = 384;
-    c.height = 320;
-    const g = c.getContext('2d');
-    const gr = g.createLinearGradient(0, 0, 384, 320);
-    gr.addColorStop(0, '#0d3f8f');
-    gr.addColorStop(0.5, '#2f8fd6');
-    gr.addColorStop(1, '#0a2f6e');
-    g.fillStyle = gr;
-    g.fillRect(0, 0, 384, 320);
-    for (const [x, y, rx, ry, a, col] of [[120, 150, 150, 70, -0.5, 'rgba(210,240,255,0.75)'], [250, 210, 130, 60, -0.35, 'rgba(160,215,250,0.6)'], [300, 80, 110, 40, -0.6, 'rgba(235,250,255,0.55)'], [60, 280, 120, 40, -0.2, 'rgba(120,190,240,0.5)']]) {
-      g.save();
-      g.translate(x, y);
-      g.rotate(a);
-      const rg = g.createRadialGradient(0, 0, 4, 0, 0, rx);
-      rg.addColorStop(0, col);
-      rg.addColorStop(1, 'rgba(255,255,255,0)');
-      g.fillStyle = rg;
-      g.scale(1, ry / rx);
-      g.beginPath();
-      g.arc(0, 0, rx, 0, 7);
-      g.fill();
-      g.restore();
-    }
-    const t = new THREE.CanvasTexture(c);
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  };
   for (const r of rooms) {
     if (r.kind !== 'cine' && r.kind !== 'cineHall') continue;
     const X0 = r.x0 * C;
@@ -924,15 +806,6 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
         if (furn.some((o) => Math.abs(o.x - w) < 2 && Math.abs(o.z - z) < 1.6)) continue; // (ni derrière une borne)
         const x = w + s * 0.06;
         const box = [X0 - 0.25, Z0 - 0.25, X1 + 0.25, Z1 + 0.25];
-        if (r.kind === 'cineHall' && s > 0 && !wall3) {
-          // (comme au multiplexe de référence) un mur de trois écrans en hauteur, une seule image d'un écran à l'autre
-          wall3 = true;
-          if (!MATS.wall3) MATS.wall3 = { m: lit(wall3Tex(), 1.2), S: 1 };
-          G.box('black', Math.min(w, w + s * 0.09), Math.max(w, w + s * 0.09), 0.78, 2.72, z - 1.14, z + 1.14);
-          for (let k = 0; k < 3; k++) panel('wall3', [k / 3 + 0.004, 0, (k + 1) / 3 - 0.004, 1], x + s * 0.035, 1.75, z + (k - 1) * 0.74, 0.7, 1.86, s, 0);
-          lights.push({ x: w + s * 0.7, y: 1.8, z, c: [0.25, 0.45, 0.8], rad: 4.6, nx: s, nz: 0, box });
-          continue;
-        }
         G.box('black', Math.min(w, w + s * 0.08), Math.max(w, w + s * 0.08), 0.9, 2.65, z - 0.62, z + 0.62);
         panel(pi % 4 === 3 ? 'postersOff' : 'posters', posters.uv(pi), x + s * 0.025, 1.78, z, 1.1, 1.65, s, 0);
         // un caisson allumé éclaire la moquette devant lui (un feu de couleur)
@@ -942,29 +815,42 @@ export function drawMallProps({ map, fi, G, MATS, hAt, baked, rooms, model, plac
     }
   }
 
-  // en haut des escalators croisés : des poteaux et une chaîne en travers, « OUT OF ORDER »
-  if (fi === 0) {
-    const [c, g] = atlas(1, 1, 256, 96);
-    g.fillStyle = '#e9e1cf';
-    g.fillRect(0, 0, 256, 96);
-    g.fillStyle = '#b3241b';
-    g.fillRect(6, 6, 244, 84);
-    g.fillStyle = '#f4ecdc';
-    g.font = 'bold 34px "Arial Narrow", Arial, sans-serif';
-    g.textAlign = 'center';
-    g.fillText('OUT OF ORDER', 128, 60);
-    MATS.ooo = { m: baked(lam({ map: toTex(c) })), S: 1 };
+  // les escalators, condamnés : à chaque bout, une palissade de contreplaqué sur deux chevrons (on ne voit plus les
+  // marches de près), un écriteau « OUT OF ORDER » ; en haut (fi 0) devant le palier d'arrivée, en bas devant le pied
+  {
+    if (!MATS.ooo) {
+      const [c, g] = atlas(1, 1, 256, 96);
+      g.fillStyle = '#e9e1cf';
+      g.fillRect(0, 0, 256, 96);
+      g.fillStyle = '#b3241b';
+      g.fillRect(6, 6, 244, 84);
+      g.fillStyle = '#f4ecdc';
+      g.font = 'bold 34px "Arial Narrow", Arial, sans-serif';
+      g.textAlign = 'center';
+      g.fillText('OUT OF ORDER', 128, 60);
+      MATS.ooo = { m: baked(lam({ map: toTex(c) })), S: 1 };
+    }
     for (const e of map.allEscalators || []) {
-      if (e.fi !== 1) continue;
-      const x = e.top + e.dir * 0.35;
-      for (const s of [-1, 1]) {
-        put('steel', new THREE.CylinderGeometry(0.03, 0.03, 1.0, 8), x, 0.5, e.z + s * (e.w / 2 + 0.15));
-        put('steel', new THREE.CylinderGeometry(0.17, 0.19, 0.04, 14), x, 0.02, e.z + s * (e.w / 2 + 0.15));
+      const h = e.hoard;
+      if (!h) continue;
+      // (le bout de l'escalator qui est à cet étage : son pied, ou son palier d'arrivée ; out : de quel côté on arrive)
+      const ends = [];
+      if (e.fi === fi) ends.push([e.x, -e.dir]);
+      if (fi === 0 && e.fi === 1 && !e.nowhere) ends.push([e.top, e.dir]);
+      for (const [x0, out] of ends) {
+        const xf = x0 + out * h.d;
+        const xr = x0 - out * 0.2;
+        const HH = 2.44;
+        const xa = Math.min(xf, xr);
+        const xb = Math.max(xf, xr);
+        // de front : deux feuilles debout, un joint entre elles ; les retours ; un chevron de rive en tête
+        for (const s of [-1, 1]) G.box('plywood', xf - 0.009, xf + 0.009, 0.015, HH, s > 0 ? e.z + 0.004 : e.z - h.hw, s > 0 ? e.z + h.hw : e.z - 0.004);
+        for (const s of [-1, 1]) G.box('plywood', xa, xb, 0.015, HH, e.z + s * h.hw - 0.009, e.z + s * h.hw + 0.009);
+        G.box('plywood', xa - 0.02, xb + 0.02, HH, HH + 0.045, e.z - h.hw - 0.02, e.z + h.hw + 0.02);
+        // (les têtes de vis : une file en haut, une en bas, sur chaque feuille)
+        for (const s of [-1, 1]) for (const y of [0.22, 1.22, 2.22]) for (const dz of [0.12, 0.61, 1.1]) G.box('steel', xf + out * 0.009, xf + out * 0.011, y - 0.006, y + 0.006, e.z + s * dz - 0.006, e.z + s * dz + 0.006);
+        panel('ooo', [0, 0, 1, 1], xf + out * 0.012, 1.5, e.z - out * 0.61, 0.7, 0.26, out, 0);
       }
-      G.beam('red', [x, 0.9, e.z - e.w / 2 - 0.15], [x, 0.78, e.z], 0.03, 0.03);
-      G.beam('red', [x, 0.78, e.z], [x, 0.9, e.z + e.w / 2 + 0.15], 0.03, 0.03);
-      panel('ooo', [0, 0, 1, 1], x - e.dir * 0.02, 0.62, e.z, 0.7, 0.26, -e.dir, 0);
-      panel('ooo', [0, 0, 1, 1], x + e.dir * 0.02, 0.62, e.z, 0.7, 0.26, e.dir, 0);
     }
   }
 

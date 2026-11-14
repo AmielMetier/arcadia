@@ -766,9 +766,20 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 #hud.camcorder .cam-tr, #hud.camcorder .cam-br { right: calc(48px + var(--bx, 0px)); }
 #hud.camcorder .c1, #hud.camcorder .c3 { left: calc(22px + var(--bx, 0px)); }
 #hud.camcorder .c2, #hud.camcorder .c4 { right: calc(22px + var(--bx, 0px)); }
-#hud.camcorder.cam-wide #signal,
+#hud.camcorder.finder.cam-wide #signal,
 #hud.camcorder #keysTag { display: none; }
 #hud.camcorder:not(.cam-wide) .cam-bar { display: none; }
+/* « Tout au caméscope », viseur rangé : pas de jauges dans les bandes noires, pas de barre de zoom */
+#hud.camcorder:not(.finder) .cam-bar,
+#hud.camcorder:not(.finder) .cam-zoom { display: none; }
+/* … et l'incrustation de jeu (niveau, équipe, jauges, compteur, objets, viseur) s'efface quand rien ne change : il ne
+   reste que celle du caméscope (REC, compteur de bande, date, pile) */
+#hud.quiet .vhs-level, #hud.quiet .stamina, #hud.quiet .noise, #hud.quiet .signal, #hud.quiet #cassetteIcons, #hud.quiet #cassetteText { transition: opacity 0.3s; }
+#hud.quiet .q-off { opacity: 0; transition: opacity 1.6s; }
+#hud.quiet .inv.idle { opacity: 0; }
+#hud.quiet .inv.idle:hover { opacity: 1; }
+#hud.quiet .crosshair, #hud.quiet .vhs-play { opacity: 0; }
+#hud.quiet .team.solo { opacity: 0; }
 
 /* Le zoom de l'objectif : W ─── T en haut de l'image, le temps de zoomer */
 .cam-zoom {

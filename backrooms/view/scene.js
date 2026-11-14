@@ -173,7 +173,9 @@ export function onGlContext(fn) {
 }
 
 // Réglages d'image du joueur (view/../app.js) : champ de vision, mouvements de caméra, luminosité, flashs, qualité
-const OPTS = { fov: 72, motion: 1, brightness: 1, reduceFlashes: false, quality: 'auto' };
+const OPTS = { fov: 72, motion: 1, brightness: 1, reduceFlashes: false, quality: 'auto', tape: false };
+// « Tout au caméscope » : le champ vertical de l'objectif au grand angle (plus serré que l'œil : 72°)
+const TAPE_FOV = 56;
 let liveScene = null;
 export function setSceneOptions(o = {}) {
   Object.assign(OPTS, o);
@@ -354,11 +356,11 @@ export function createBackroomsScene(container, floors, lamps) {
   // (Level 1 : le fond a la couleur du brouillard, si épais qu'à 65 m tout s'y est fondu, même un néon allumé — à un
   // millionième près : on ne dessine rien au-delà, l'image n'en change pas d'un pixel)
   scene.background = new THREE.Color(MALL ? '#0a0806' : L3 ? '#070403' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#080604' : '#0d0b06');
-  scene.fog = new THREE.FogExp2(MALL ? '#0b0806' : L3 ? '#120a06' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#0a0705' : '#080604', MALL ? 0.017 : L3 ? 0.022 : L2 ? 0.022 : L1 ? 0.058 : PIPES ? 0.033 : 0.05);
+  scene.fog = new THREE.FogExp2(MALL ? '#0b0806' : L3 ? '#120a06' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#0a0705' : '#080604', MALL ? 0.023 : L3 ? 0.022 : L2 ? 0.022 : L1 ? 0.058 : PIPES ? 0.033 : 0.05);
 
   // Level 1 : le brouillard (0,058) ne laisse plus rien passer vers 40 m ; au-delà de 45 m, rien à dessiner (65 avant
   // la 5.25)
-  const camera = new THREE.PerspectiveCamera(OPTS.fov, window.innerWidth / window.innerHeight, 0.08, L1 ? 45 : MALL ? 150 : 90); // (le mall : des cours de 35 m, des mails de 50 m)
+  const camera = new THREE.PerspectiveCamera(OPTS.fov, window.innerWidth / window.innerHeight, 0.08, L1 ? 45 : MALL ? 110 : 90); // (le mall : des cours de 35 m, des mails de 50 m ; au-delà de 90 m, l'air a tout mangé)
   camera.position.set(map0.spawn.x, 1.6, map0.spawn.z);
 
   const renderer = getRenderer();
@@ -925,6 +927,21 @@ float occVis(vec3 p, vec3 lp) {
       flickers = map.lights.filter((l) => l.state === 'flicker').map((l) => ({ l, k: 1, fp: fpOf(l), fpU: MALL ? fpUOf(l) : null, ch: chan(l), calm: Math.random() * 4, burst: 0 }));
     };
     sumLights();
+    if (MALL && map.roomAt) {
+      // Level 17 : la hauteur du plafond de chaque point du plan (sur 12 m), dans le canal libre de la carte du haut :
+      // le fondu entre la lumière du sol et celle du haut se règle sur elle (un mur de 10 m n'est pas un mur de 3 m)
+      const hOf = (px, pz) => {
+        const r = map.roomAt(px, pz);
+        return r ? r.ceilH : 0;
+      };
+      for (let tz = 0; tz < BH; tz++)
+        for (let tx = 0; tx < BW; tx++) {
+          const px = (tx + 0.5) * TX;
+          const pz = (tz + 0.5) * TX;
+          const h = hOf(px, pz) || Math.max(hOf(px + 2.5, pz), hOf(px - 2.5, pz), hOf(px, pz + 2.5), hOf(px, pz - 2.5)) || 4.4;
+          bake2Data[(tz * BW + tx) * 4 + 3] = Math.round(Math.min(1, h / 12) * 255);
+        }
+    }
     let lightGen = map.lightGen || 0;
     // ombre de contact : plus sombre à moins de AO_R d'un mur
     for (let tz = 0; tz < BH; tz++) {
@@ -960,6 +977,27 @@ float occVis(vec3 p, vec3 lp) {
         }
         const t = d / AO_R;
         bakeData[(tz * BW + tx) * 4 + 1] = Math.round((0.42 + 0.58 * t * t * (3 - 2 * t)) * 255);
+      }
+    }
+    // Level 17 : une ombre de contact sous le mobilier et à son pied (l'emprise de chaque meuble posé : un banc, une
+    // table, une travée de rayonnage), plus légère que celle des murs : sans elle, les meubles flottent sur le sol
+    if (MALL && map.solids) {
+      const FR = 0.7;
+      for (const o of map.solids) {
+        if (o.furn === undefined) continue;
+        const [x0, z0, x1, z1] = o.pts ? [Math.min(...o.pts.map((p) => p[0])), Math.min(...o.pts.map((p) => p[1])), Math.max(...o.pts.map((p) => p[0])), Math.max(...o.pts.map((p) => p[1]))] : [o.x, o.z, o.x, o.z];
+        const rad = o.pts ? 0 : o.r;
+        for (let tz = Math.max(0, Math.floor((z0 - rad - FR) / TX)); tz <= Math.min(BH - 1, Math.floor((z1 + rad + FR) / TX)); tz++)
+          for (let tx = Math.max(0, Math.floor((x0 - rad - FR) / TX)); tx <= Math.min(BW - 1, Math.floor((x1 + rad + FR) / TX)); tx++) {
+            const px = (tx + 0.5) * TX;
+            const pz = (tz + 0.5) * TX;
+            const d = Math.max(0, Math.hypot(Math.max(x0 - px, 0, px - x1), Math.max(z0 - pz, 0, pz - z1)) - rad);
+            if (d >= FR) continue;
+            const t = d / FR;
+            const v = Math.round((0.6 + 0.4 * t * t * (3 - 2 * t)) * 255);
+            const i = (tz * BW + tx) * 4 + 1;
+            if (v < bakeData[i]) bakeData[i] = v;
+          }
       }
     }
     for (let i = 0; i < chamfMirror.length; i += 2) bakeData[chamfMirror[i] * 4 + 1] = bakeData[chamfMirror[i + 1] * 4 + 1];
@@ -1252,11 +1290,11 @@ float occVis(vec3 p, vec3 lp) {
       const base = opts && opts.base; // une plinthe au pied du mur
       const film = L0 && opts && opts.film; // la pellicule d'eau au cœur des grosses taches (le sol du Level 0)
       const gloss = L1 && opts && opts.gloss; // le béton lissé du Level 1, où se reflètent les réglettes
-      const bump = L1 && opts && opts.bump; // Level 1 : un relief (les joints des parpaings) que prennent aussi les feux de couleur
+      const bump = (L1 || MALL) && opts && opts.bump; // Level 1, Level 17 : un relief (les joints des parpaings, les lames d'un rideau métallique) que prennent aussi les feux de couleur
       const wall1 = L1 && opts && opts.wall1; // les murs du Level 1 : la poussière et la suie sous le plafond
       const marble = L3 && opts && opts.marble; // le hall de l'hôtel : un marbre poli, sans l'usure de la moquette
       const push = opts && opts.push; // les murs en biais : la lumière lue un peu devant eux, dans le couloir (pas au coin des cases)
-      if (spec || PIPES || base || EDGE || SEGS || film || gloss || DYN || push || pool || hotel || MALL) mat.customProgramCacheKey = () => 'bk' + (MALL ? '-mall' : '') + (hotel ? '-hotel' : '') + (marble ? '-marble' : '') + (pool ? '-pool-' + pool : '') + (push ? '-push' : '') + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE || SEGS ? '-edge' : '') + (film ? '-film' : '') + (gloss ? '-gloss' : '') + (DYN ? '-dyn' : '') + (bump ? '-bump' : '') + (wall1 ? '-wall1' : '');
+      if (spec || PIPES || base || EDGE || SEGS || film || gloss || DYN || push || pool || hotel || MALL) mat.customProgramCacheKey = () => 'bk' + (MALL ? '-mall' : '') + (hotel ? '-hotel' : '') + (marble ? '-marble' : '') + (pool ? '-pool-' + pool : '') + (push ? '-push' : '') + (spec ? '-spec' : '') + (grime ? '-grime' : '') + (tile ? '-tile' : '') + (PIPES ? '-pipes' : '') + (base ? '-base' : '') + (EDGE || SEGS ? '-edge' : '') + (film ? '-film' : '') + (gloss ? '-gloss' : '') + (DYN ? '-dyn' : '') + (bump ? '-bump' + (MALL && opts.fade ? opts.fade.join('_') : '') : '') + (wall1 ? '-wall1' : '');
       mat.onBeforeCompile = (sh) => {
         Object.assign(sh.uniforms, bakeUniforms);
         if (DYN) {
@@ -1288,7 +1326,10 @@ float occVis(vec3 p, vec3 lp) {
         if (bump) sh.defines = { ...(sh.defines || {}), BK_BUMP: 1 };
         // Poolrooms : le relief des joints s'efface quand un carreau ne fait plus que quelques pixels (au loin, en
         // rasant) ; sinon sa pente, prise d'un pixel à l'autre, crénelle les joints en pointillés qui scintillent
-        if (pool && mat.bumpMap) sh.fragmentShader = sh.fragmentShader.replace('#include <bumpmap_pars_fragment>', THREE.ShaderChunk.bumpmap_pars_fragment.replace('return vec2( dBx, dBy );', 'return vec2( dBx, dBy ) * (1.0 - smoothstep(0.55, 1.6, max(length(dSTdx * vec2(textureSize(bumpMap, 0))), length(dSTdy * vec2(textureSize(bumpMap, 0))))));'));
+        // (Level 17 : chaque matière scannée dit quand son relief s'efface, en texels par pixel : les lames d'un rideau
+        // métallique tiennent plus loin que les joints d'une faïence ; sans cela, des moirés)
+        const fadeB = pool ? [0.55, 1.6] : MALL && bump && opts.fade;
+        if (fadeB && mat.bumpMap) sh.fragmentShader = sh.fragmentShader.replace('#include <bumpmap_pars_fragment>', THREE.ShaderChunk.bumpmap_pars_fragment.replace('return vec2( dBx, dBy );', `return vec2( dBx, dBy ) * (1.0 - smoothstep(${fadeB[0].toFixed(2)}, ${fadeB[1].toFixed(2)}, max(length(dSTdx * vec2(textureSize(bumpMap, 0))), length(dSTdy * vec2(textureSize(bumpMap, 0))))));`));
         if (wall1) sh.defines = { ...(sh.defines || {}), BK_WALL1: 1 };
         if (tile) {
           Object.assign(sh.uniforms, tileU);
@@ -1710,13 +1751,20 @@ float bkCaust(vec2 uv, float t) {
             diffuseColor.rgb *= 0.84 + 0.28 * bkFbm(vBakeP.xz * 0.3 + vBakeP.y * 0.7 + 3.0);
           }
           #endif
+          #ifdef BK_MALL
+          // Level 17 : un mur peint n'est jamais d'un seul ton sur vingt mètres : de larges nuances, à peine (reprises de
+          // peinture, poussière en hauteur) ; rien sur le sol, qu'on lave
+          if (ny < 0.5) diffuseColor.rgb *= 0.93 + 0.14 * bkFbm(vBakeP.xz * 0.23 + vBakeP.y * 0.41 + 7.0);
+          #endif
           #ifdef BK_BUMP
           // le relief (les joints des parpaings) : la lumière cuite vient d'en haut, la lèvre basse d'un joint, tournée
           // vers le haut, la prend, sa lèvre haute reste dans l'ombre
           vec3 bkNW = normalize((vec4(normal, 0.0) * viewMatrix).xyz);
-          if (abs(ny) < 0.5) shape *= 1.0 + clamp((bkNW.y - vBakeN.y) * 1.5, -0.4, 0.3);
+          float bkRel = abs(ny) < 0.5 ? 1.0 + clamp((bkNW.y - vBakeN.y) * 1.5, -0.4, 0.3) : 1.0;
+          shape *= bkRel;
           #else
           vec3 bkNW = vBakeN;
+          float bkRel = 1.0;
           #endif
           // sous l'eau (Poolrooms) : teinte cyan qui fonce avec la profondeur, et les caustiques
           float sub = uPool * smoothstep(0.0, 0.06, uWaterY - by);
@@ -1891,15 +1939,19 @@ float bkCaust(vec2 uv, float t) {
           #ifdef BK_MALL
           {
             // Level 17 : le plafond et le haut des murs prennent la lumière du haut (les corniches, les appliques, les
-            // suspensions), le sol et le bas des murs celle du bas (les flaques des spots) ; entre 1 m et 3,4 m, un fondu
+            // suspensions), le sol et le bas des murs celle du bas (les flaques des spots) ; entre les deux, un fondu
             vec2 u1 = uBakeScale * 0.9;
             vec4 up = texture2D(uBake2, bkUv) * 0.4 + (texture2D(uBake2, bkUv + vec2(u1.x, 0.0)) + texture2D(uBake2, bkUv - vec2(u1.x, 0.0)) + texture2D(uBake2, bkUv + vec2(0.0, u1.y)) + texture2D(uBake2, bkUv - vec2(0.0, u1.y))) * 0.15;
-            float kUp = ny < -0.5 ? 1.0 : (ny > 0.5 ? 0.0 : smoothstep(1.0, 3.4, by));
+            // (jusqu'aux trois quarts de la hauteur du lieu, lue dans le canal alpha : 3,4 m sous un plafond ordinaire)
+            float kUp = ny < -0.5 ? 1.0 : (ny > 0.5 ? 0.0 : smoothstep(1.0, max(3.4, up.a * 12.0 * 0.78), by));
             vec3 lo = (uBakeTint * bk.r + uBakeTint2 * bk.b) * shape;
             vec3 hi = (uBakeTint * up.r + uBakeTint2 * up.b + vec3(0.34, 0.46, 1.6) * up.g) * mix(0.8, 1.0, bk.g) * (ny < -0.5 ? 1.0 : 0.92);
-            // un sol très éclairé (le hall du cinéma) renvoie de sa lumière vers le plafond et le haut des murs
-            hi += (uBakeTint * bk.r + uBakeTint2 * bk.b) * 1.1 * max(bk.r + bk.b - 0.22, 0.0);
-            totalEmissiveRadiance += diffuseColor.rgb * mix(lo, hi, kUp) * 2.0;
+            // le sol renvoie de sa lumière vers le plafond et le haut des murs : sous une dalle lumineuse ou un spot
+            // encastré, qui n'éclairent pas le plafond qui les porte, on voit quand même sa trame (un sol très éclairé,
+            // comme celui du hall du cinéma, en renvoie davantage)
+            hi += (uBakeTint * bk.r + uBakeTint2 * bk.b) * (0.3 + 1.1 * max(bk.r + bk.b - 0.22, 0.0));
+            // (le relief d'une matière scannée : la lumière du haut le prend comme celle du bas)
+            totalEmissiveRadiance += diffuseColor.rgb * mix(lo, hi * bkRel, kUp) * 2.0;
           }
           #else
           totalEmissiveRadiance += diffuseColor.rgb * (uBakeTint * bk.r + uBakeTint2 * bk.b * (ny < -0.5 ? uCeilB : 1.0)) * 2.0 * shape;
@@ -1931,8 +1983,8 @@ float bkCaust(vec2 uv, float t) {
             #endif
             // le sol : plus luisant là où il est humide, mat là où la poussière s'est déposée
             if (ny > 0.5) sm *= 0.45 + wet * 1.3 + bkFbm(vBakeP.xz * 0.6 + 3.0) * 0.5;
-            #ifdef BK_HOTEL
-            sm *= specularStrength; // l'hôtel : le noyer verni brille, le papier peint presque pas
+            #if defined(BK_HOTEL) || defined(BK_MALL)
+            sm *= specularStrength; // l'hôtel : le noyer verni brille, le papier peint presque pas ; le mall : le poli de la matière scannée
             #endif
             // pas de reflet là où aucune lampe n'éclaire (un mur caché derrière un angle)
             sm *= mix(0.25, 1.0, smoothstep(0.0, 0.12, bk.r + bk.b));
@@ -5658,6 +5710,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
   let exposure = 1.2; // exposition du caméscope : elle rattrape la lumière en une seconde environ
   let lightNow = 0.5; // lumière des néons là où l'on est (pour le grésillement)
   let camT = 0; // caméscope sorti (0 à 1, la transition vers le 4:3)
+  let tapeT = OPTS.tape ? 1 : 0; // « tout au caméscope » : l'image entière est celle de la bande (4:3), viseur sorti ou non
   let camZoomWant = 1.5; // zoom de l'objectif (molette), de 1,5 à 12
   let camZoomNow = 1.5;
   let nightT = 0; // son mode nuit (0 à 1)
@@ -5807,7 +5860,9 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     // le caméscope : où il en est (0 à 1), son mode nuit, et la largeur des bandes noires (px). Toujours le même
     // objet (lu par le HUD à chaque image) : le lire tout de suite, ne pas le garder
     get cam() {
-      camState.t = camT;
+      camState.t = Math.max(camT, tapeT); // l'image est en 4:3
+      camState.view = camT; // le viseur est sorti (zoom, mode nuit, signal dans les bandes noires)
+      camState.tape = tapeT;
       camState.night = nightT;
       camState.bars = vhs.bars || 0;
       return camState;
@@ -6084,12 +6139,17 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       const camWant = !cctvCam && P.cam && P.status === 'alive' ? 1 : 0;
       camT += (camWant - camT) * Math.min(1, dt * 9);
       if (camT < 0.002) camT = 0;
+      // « tout au caméscope » (réglages) : toute la partie est filmée, en 4:3, à l'objectif grand angle du caméscope ;
+      // V ne fait plus que sortir le viseur (zoom, mode nuit)
+      tapeT += ((OPTS.tape && !cctvCam ? 1 : 0) - tapeT) * Math.min(1, dt * 9);
+      if (tapeT < 0.002) tapeT = 0;
       const nightWant = cctvCam ? THREE.MathUtils.clamp((0.34 - cctvLight) / 0.22, 0, 1) : camWant && bat > 0 ? THREE.MathUtils.clamp((0.34 - lightNow - (lampOn ? 0.3 : 0)) / 0.22, 0, 1) : 0;
       nightT += (nightWant - nightT) * Math.min(1, dt * 3);
       flashSpill.intensity += nightT * 3.2 * cut;
       // le caméscope zoome (×1,3) : son objectif est plus serré que l'œil
       camZoomNow += (camZoomWant - camZoomNow) * Math.min(1, dt * 7); // l'objectif glisse, il ne saute pas
-      const camFov = cctvCam ? CCTV_FOV : (2 * Math.atan(Math.tan((OPTS.fov * Math.PI) / 360) / (1 + (camZoomNow - 1) * camT)) * 180) / Math.PI;
+      const eyeFov = OPTS.fov + (Math.min(OPTS.fov, TAPE_FOV) - OPTS.fov) * tapeT;
+      const camFov = cctvCam ? CCTV_FOV : (2 * Math.atan(Math.tan((eyeFov * Math.PI) / 360) / (1 + (camZoomNow - 1) * camT)) * 180) / Math.PI;
       if (Math.abs(camera.fov - camFov) > 0.01) {
         camera.fov = camFov;
         camera.updateProjectionMatrix();
@@ -6359,7 +6419,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         chroma: scareT > 0 ? 0.7 : grabbed ? 0.6 : 0,
         focus: cctvCam ? 0 : Math.min(1, focusT + (grabbed ? 0.35 : 0) + haze),
         white: cctvCam ? [1, 1, 1] : white,
-        cam: cctvCam ? 1 : camT,
+        cam: cctvCam ? 1 : Math.max(camT, tapeT),
         night: nightT,
         cctv: cctvCam ? 1 : 0,
       });

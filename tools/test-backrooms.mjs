@@ -31,7 +31,7 @@ import { createWarehouseMap, DOCK_PASS } from '../backrooms/engine/level1.js';
 import { createPoolMap } from '../backrooms/engine/poolrooms.js';
 import { createHotelMap, parseWords, WORDS } from '../backrooms/engine/hotel.js';
 import { createMallMap, MALL_LEVEL, polyDist as mallPolyDist } from '../backrooms/engine/mall.js';
-import { dollTerrain, dollCanStand, DOLL_R, DOLL_VMAX, DOLL_RELOC_T, DOLL_BORED_T } from '../backrooms/engine/doll.js';
+import { dollTerrain, dollCanStand, DOLL_R, DOLL_VMAX, DOLL_RELOC_T, DOLL_BORED_T, DOLL_LIFT_T } from '../backrooms/engine/doll.js';
 
 // avance la partie de n secondes
 const run = (sim, sec, input = {}, others = null) => {
@@ -2902,13 +2902,13 @@ test('Level 17 : deux étages reliés par cinq escaliers, des vides bordés, tou
     }
     assert.ok(!up.collide(up.spawn.x, up.spawn.z, 0.38) && up.dist[up.spawn.gz * up.W + up.spawn.gx] === 0);
     // toutes les salles sont atteintes (le grand magasin fermé par sa porte de réserve), sauf les boutiques fermées sans
-    // porte de service
+    // porte de service et celles dont le rideau est baissé pour la nuit (porte de réserve verrouillée)
     for (const f of floors)
       for (const r of f.rooms) {
         let ok = false;
         for (let z = r.z0; z <= r.z1 && !ok; z++) for (let x = r.x0; x <= r.x1 && !ok; x++) ok = f.dist[z * f.W + x] >= 0;
         const sh = r.kind === 'shop' ? f.shops[r.shop] : null;
-        const shut = sh && (sh.state === 'grille' || sh.state === 'glass') && !sh.back;
+        const shut = sh && (sh.state === 'shut' || ((sh.state === 'grille' || sh.state === 'glass') && !sh.back));
         assert.equal(ok, !shut, `graine ${sd}, étage ${f.floor} : ${r.kind} ${r.name}`);
       }
     // les objets sont sur des cases parcourues, loin les uns des autres ; les escalators de la cour centrale montent
@@ -2920,6 +2920,107 @@ test('Level 17 : deux étages reliés par cinq escaliers, des vides bordés, tou
     }
     // les deux monte-charges ont une case libre devant eux
     for (const f of floors) assert.ok(f.dist[f.exit.gz * f.W + f.exit.gx] >= 0, `graine ${sd} : monte-charge de l'étage ${f.floor} atteint`);
+  }
+});
+
+test('Level 17 : fermé pour la nuit — peu de boutiques ouvertes, rien derrière un rideau baissé, plus de mobilier sans modèle, un éclairage de veille régulier', () => {
+  const GONE = ['kiosk', 'fountain', 'counter', 'concession', 'rack', 'mannequin', 'arcade', 'claw', 'partition', 'booth'];
+  for (const sd of [1, 3, 17, 42, 99, 1234]) {
+    const { floors } = createMallMap(sd);
+    let flick = 0;
+    for (const f of floors) {
+      // une à trois boutiques ouvertes par étage ; les autres boutiques ouvertes ou vidées ont le rideau baissé
+      const open = f.shops.filter((sh) => sh.state === 'open');
+      assert.ok(open.length >= 1 && open.length <= 3, `graine ${sd} : ${open.length} boutiques ouvertes`);
+      assert.ok(!f.shops.some((sh) => sh.state === 'gutted'), 'plus de boutique vidée ouverte à tous les vents');
+      const shut = new Set(f.shops.filter((sh) => sh.state === 'shut').map((sh) => sh.room));
+      assert.ok(shut.size >= 3, 'des rideaux baissés');
+      const roomOf = (x, z) => f.zone[Math.floor(z / CELL_SIZE) * f.W + Math.floor(x / CELL_SIZE)];
+      // derrière un rideau baissé : ni meuble, ni objet, ni bobine, ni lampe allumée ; on n'y entre pas
+      for (const it of f.furn) {
+        assert.ok(!GONE.includes(it.kind), `${it.kind} : plus posé`);
+        assert.ok(!shut.has(roomOf(it.x, it.z)), `${it.kind} dans une boutique fermée`);
+      }
+      for (const it of [...f.items, ...f.cassettes]) assert.ok(!shut.has(roomOf(it.x, it.z)), 'un objet dans une boutique fermée');
+      for (const l of f.lights) if (shut.has(l.room)) assert.equal(l.state, 'off');
+      for (const sh of f.shops) {
+        if (sh.state !== 'shut') continue;
+        const r = f.rooms[sh.room];
+        for (let z = r.z0; z <= r.z1; z++) for (let x = r.x0; x <= r.x1; x++) assert.ok(!(f.dist[z * f.W + x] >= 0), `${sh.name} : fermée, on n'y entre pas`);
+      }
+      // l'éclairage de veille : au moins quatre lampes sur dix restent allumées, presque aucune ne grésille
+      const on = f.lights.filter((l) => l.state === 'on').length;
+      assert.ok(on / f.lights.length > 0.4, `graine ${sd} : ${on}/${f.lights.length} lampes allumées`);
+      flick += f.lights.filter((l) => l.state === 'flicker').length;
+    }
+    assert.ok(flick <= 2, `graine ${sd} : ${flick} lampes grésillent`);
+  }
+});
+
+test('Level 17 : des pièces aux proportions d\'un vrai lieu — salle 1 plus profonde que large, écran large, hublot au-dessus des têtes, toilettes en deux blocs derrière un sas, bureaux en couloirs', () => {
+  for (const sd of [1, 3, 17, 42, 99]) {
+    const { floors } = createMallMap(sd);
+    const up = floors[0];
+    const C = CELL_SIZE;
+    // les salles : plus profondes que larges, plus de fauteuils modelés ; l'écran en 2,39:1, dans l'axe de la cabine
+    for (const r of up.rooms.filter((o) => o.kind === 'screen')) assert.ok(r.x1 - r.x0 > r.z1 - r.z0, `${r.name} : plus profonde que large`);
+    assert.ok(!up.furn.some((it) => it.kind === 'seats'), 'plus de fauteuils');
+    const b = up.booth;
+    const S = b.screen;
+    assert.ok(Math.abs((S.z1 - S.z0) / (S.y1 - S.y0) - 2.39) < 0.01, 'un écran large');
+    assert.ok(Math.abs((S.z0 + S.z1) / 2 - b.port.z) < 0.01 && b.port.y >= 2.3, 'le hublot dans l\'axe, au-dessus des têtes');
+    assert.ok(S.y1 < up.rooms[S.room].ceilH, 'l\'écran tient sous le plafond');
+    // la cabine : on y tient debout à la table de montage, l'armoire du projecteur laisse le passage
+    assert.ok(!up.collide(b.use.x, b.use.z, 0.3) && up.roomAt(b.use.x, b.use.z).kind === 'booth');
+    assert.ok(up.collide((b.closet.x0 + b.closet.x1) / 2, b.port.z, 0.1) && !up.collide(b.x0 + 0.5, b.port.z, 0.3), 'on contourne l\'armoire');
+    for (const f of floors) {
+      // les toilettes : deux blocs de 60 à 80 m², chacun avec ses cabines et ses lavabos, au bout d'un sas
+      const wc = f.rooms.find((o) => o.kind === 'wc');
+      assert.equal(wc.blocks.length, 2);
+      for (const k of wc.blocks) {
+        const area = (k.x1 - k.x0 + 1) * (k.z1 - k.z0 + 1) * C * C;
+        assert.ok(area >= 60 && area <= 80, `un bloc de ${area} m²`);
+        const inBlock = (it) => it.x > k.x0 * C && it.x < (k.x1 + 1) * C && it.z > k.z0 * C && it.z < (k.z1 + 1) * C;
+        assert.ok(f.furn.filter((it) => it.kind === 'stall' && inBlock(it)).length >= 3 && f.furn.some((it) => it.kind === 'sinks' && inBlock(it)), 'cabines et lavabos');
+        assert.ok(f.dist[(k.z0 + 1) * f.W + k.x0 + 1] >= 0, 'on y entre');
+      }
+      // aucune lampe ni aucun meuble dans un mur
+      for (const l of f.lights) assert.ok(!f.isWall(l.gx, l.gz) || f.pillarAt(l.gx, l.gz), 'une lampe dans un mur');
+      for (const it of f.furn) assert.ok(!f.isWall(Math.floor(it.x / C), Math.floor(it.z / C)), `${it.kind} dans un mur`);
+      for (const d of f.fakeDoors) assert.ok(f.isWall(Math.floor((d.x - d.nx * 0.5) / C), Math.floor((d.z - d.nz * 0.5) / C)) && !f.isWall(Math.floor((d.x + d.nx * 0.5) / C), Math.floor((d.z + d.nz * 0.5) / C)), 'une porte fermée sur un mur, face au passage');
+    }
+    // les bureaux : plus de plateau ouvert (nulle part un carré libre de 10 m de côté), surtout des pièces fermées
+    for (const r of up.rooms.filter((o) => o.kind === 'office' && /management|Administration/.test(o.name))) {
+      let free = 0;
+      let reach = 0;
+      for (let z = r.z0; z <= r.z1; z++)
+        for (let x = r.x0; x <= r.x1; x++) {
+          if (up.isWall(x, z)) continue;
+          free++;
+          if (up.dist[z * up.W + x] >= 0) reach++;
+          let open = true;
+          for (let dz = 0; dz < 4 && open; dz++) for (let dx = 0; dx < 4 && open; dx++) if (up.isWall(x + dx, z + dz)) open = false;
+          assert.ok(!open, `${r.name} : un plateau ouvert en (${x}, ${z})`);
+        }
+      assert.ok(free < 0.5 * (r.x1 - r.x0 + 1) * (r.z1 - r.z0 + 1), `${r.name} : surtout des pièces fermées`);
+      assert.equal(reach, free, `${r.name} : couloirs et pièces ouvertes tous accessibles`);
+      assert.ok(up.fakeDoors.filter((d) => d.style === 'office').length >= 8, 'des portes fermées à clé le long des couloirs');
+    }
+    // les pans coupés : dans l'angle de deux murs, une case que personne ne traverse en coin, sans meuble ni objet
+    for (const f of floors) {
+      assert.ok(f.cutCorners.length >= 4, 'des pans coupés dans les grands lieux');
+      for (const c of f.cutCorners) {
+        const cx = (c.x + 0.5) * C;
+        const cz = (c.z + 0.5) * C;
+        assert.ok(f.isWall(c.x + c.dx, c.z) && f.isWall(c.x, c.z + c.dz), 'dans un angle rentrant');
+        assert.ok(f.collide(cx + c.dx * 0.6, cz + c.dz * 0.6, 0.1), 'le coin est plein');
+        assert.ok(Math.abs(c.ax - c.bx) === C && Math.abs(c.az - c.bz) === C, 'le pan va d\'un coin de la case à l\'autre');
+        assert.ok(f.navBlock.has(c.z * f.W + c.x) && !(f.dist[c.z * f.W + c.x] >= 0), 'l\'entité l\'évite, rien n\'y est posé');
+        for (const it of [...f.furn, ...f.items, ...f.cassettes]) assert.ok(Math.floor(it.x / C) !== c.x || Math.floor(it.z / C) !== c.z, 'rien dans la case d\'un pan coupé');
+      }
+    }
+    // les escalators : un coffrage à chaque bout, qu'on ne traverse pas
+    for (const e of up.allEscalators) assert.ok(floors[e.fi].collide(e.x - e.dir * 0.5, e.z, 0.1), 'le pied de l\'escalator est coffré');
   }
 });
 
@@ -3283,13 +3384,24 @@ test('Level 17 : un plafond bas est un refuge ; plantée devant trop longtemps, 
   P.z = (Math.floor(k / t1.W) + 0.5) * CELL_SIZE;
   P.yaw = 0;
   let down = -1;
-  for (let i = 0; i < (DOLL_RELOC_T + 30) * 60 && down < 0; i++) {
+  sim.drainEvents();
+  const evs = [];
+  for (let i = 0; i < (DOLL_RELOC_T + DOLL_LIFT_T + 30) * 60 && down < 0; i++) {
     sim.step({});
+    evs.push(...sim.drainEvents());
     if (M.floor === 1) down = i / 60;
   }
-  assert.ok(down >= DOLL_RELOC_T - 1, `elle a mis un moment à le rejoindre en bas (${down.toFixed(1)} s)`);
-  assert.ok(dollCanStand(dn, M.x, M.z) && Math.hypot(M.x - P.x, M.z - P.z) >= 14 && !dollInFrame(sim, P, 1, M.x, M.z), 'replacée hors champ, à distance');
-  for (let i = 0; i < 40 * 60 && !(P.grabT > 0); i++) sim.step({});
+  // elle a pris le monte-charge : on l'entend partir (d'un étage à l'autre), puis ses portes à l'arrivée ; pas de boîte à
+  // musique ; elle ressort de son côté, plus près de lui que ne l'est le joueur
+  assert.ok(down >= DOLL_RELOC_T + DOLL_LIFT_T - 1, `elle a mis le temps du trajet à le rejoindre en bas (${down.toFixed(1)} s)`);
+  const lifts = evs.filter((e) => e.type === 'dollLift');
+  assert.ok(lifts.length === 2 && lifts[0].from === 0 && lifts[0].to === 1 && lifts[1].out && lifts[1].floor === 1, 'le départ, puis la sortie du monte-charge');
+  assert.ok(!evs.some((e) => e.type === 'dollMoved'), 'pas de replacement silencieux');
+  const el = dn.elevator;
+  assert.ok(Math.hypot(M.x - el.x, M.z - el.z) < Math.hypot(P.x - el.x, P.z - el.z), 'elle ressort du côté du monte-charge');
+  assert.ok(dollCanStand(dn, M.x, M.z) && Math.hypot(M.x - P.x, M.z - P.z) >= 14 && !dollInFrame(sim, P, 1, M.x, M.z), 'hors champ, à distance');
+  // (le joueur regarde toujours le mur du nord : elle contourne son champ de vision et arrive dans son dos)
+  for (let i = 0; i < 90 * 60 && !(P.grabT > 0); i++) sim.step({});
   assert.ok(P.grabT > 0, 'et elle le rejoint');
 });
 
@@ -5617,6 +5729,197 @@ test("Level 1 : l'imposteur se fige une seconde quand on siffle près de lui, pa
     assert.ok(M.mimic != null && near < 0.4, `sifflé de près, il se fige (${near.toFixed(2)} m en une seconde)`);
     const far = walked(SIMX.WHISTLE_FREEZE_R + 8, SIMX.WHISTLE_FREEZE_R + 16);
     assert.ok(far > 1, `sifflé de loin, il continue (${far.toFixed(2)} m en une seconde)`);
+  } finally {
+    BackroomsSim.DISGUISE = false;
+  }
+});
+
+import { voicedSpan, pickUtterance, senseOf, ticOf } from '../backrooms/view/voice.js';
+import { linesFor, sayable, LINES } from '../backrooms/view/clone.js';
+import { cleanText } from '../backrooms/view/hear.js';
+test('voix volée : répliques, sens des phrases, tics, prénoms et phrases de circonstance', () => {
+  const bank = [
+    { n: 1, d: 0.7, l: 0.5, r: 0, f: 0, x: 'Ouais ouais.' },
+    { n: 2, d: 2.5, l: 0.5, r: 0, f: 1.2, x: 'Cours, le monstre est là !' },
+    { n: 3, d: 1.5, l: 0.6, r: 0, f: 0, x: "Viens voir, j'ai trouvé un truc." },
+    { n: 4, d: 3.0, l: 0.4, r: 0, f: 0, x: 'Je sais pas trop, on verra bien.' },
+    { n: 5, d: 1.2, l: 0.5, r: 0, f: 0, x: "Ouvre, c'est moi." },
+  ];
+  for (let seed = 0; seed < 30; seed++) {
+    assert.equal(pickUtterance(bank, 'call', seed * 4).n, 3, 'pour appeler : la phrase qui appelle');
+    assert.equal(pickUtterance(bank, 'door', seed * 4).n, 5, 'devant une porte : celle qui demande d\'ouvrir');
+    assert.notEqual(pickUtterance(bank, 'chat', seed).n, 2, 'jamais la phrase qui la trahirait');
+    assert.ok([1, 5].includes(pickUtterance(bank, 'reply', seed).n), 'une réplique est courte');
+  }
+  assert.equal(pickUtterance(bank, 'reply', 0).n, 1, 'et de préférence un « ouais »');
+  assert.equal(pickUtterance([bank[1]], 'chat', 0), null, 'que des phrases qui la trahiraient : elle se tait');
+  assert.equal(pickUtterance([bank[3]], 'reply', 0), null, 'pas de phrase courte : pas de réplique');
+  assert.ok(senseOf('It is here, run!', 'chat') < 0 && senseOf('come over here', 'call') > 0 && senseOf('', 'call') === 0);
+  assert.equal(ticOf(['Wesh viens', 'wesh t\'es où', 'bah wesh alors', 'bah non']), 'wesh');
+  assert.equal(ticOf(['wesh', 'bah', 'bon']), '', 'dit moins de trois fois : pas un tic');
+  // les phrases à fabriquer : un prénom par coéquipier qui se prononce, le tic devant les appels
+  assert.ok(sayable('Lucas') && sayable('ÉLODIE') && !sayable('xX_Dark_Xx') && !sayable('Jo') && !sayable('Player 2'));
+  const ls = linesFor('fr', [{ id: 2, name: 'LUCAS' }, { id: 3, name: 'xX_Dark_Xx' }], 'wesh');
+  assert.ok(ls.some((l) => l.to === 2 && l.text === 'Lucas, viens voir !' && l.kind === 'call'), 'le prénom, écrit comme un prénom');
+  assert.ok(!ls.some((l) => l.to === 3) && !ls.some((l) => l.text.includes('{n}')), 'un pseudo imprononçable n\'est pas dit');
+  assert.ok(ls.some((l) => l.text === 'Wesh, hé, viens voir !') && ls.some((l) => l.text === 'Ouais.' && l.kind === 'reply'), 'le tic devant un appel, pas devant une réplique');
+  assert.equal(new Set(ls.map((l) => l.i)).size, ls.length, 'une clé par phrase');
+  for (const lang of ['fr', 'en']) for (const ctx of ['dark', 'lift', 'last', 'fuse']) assert.ok(LINES[lang].some((l) => l[2] === ctx), `une phrase pour « ${ctx} » (${lang})`);
+  assert.equal(LINES.fr.length, LINES.en.length);
+  assert.equal(cleanText("  Sous-titres réalisés par la communauté d'Amara.org "), '');
+  assert.equal(cleanText(' Viens  voir ! '), 'Viens voir !');
+  assert.equal(cleanText('...'), '');
+});
+
+test("Level 1 : l'imposteur répond quand on lui parle, et sait ce qui se passe (coupure, fusibles)", () => {
+  BackroomsSim.DISGUISE = true;
+  try {
+    const players = [{ id: 0, name: 'A' }, { id: 1, name: 'B' }];
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 11, players, localId: 0, level: 1 });
+    sim.arriveT = 0;
+    const m = sim.map;
+    const M = sim.monster;
+    const [A, B] = sim.players;
+    M.dormantT = 0;
+    Object.assign(sim.director, { phase: 'build', relaxT: 0 });
+    const cells = m.walkable.map((q) => ({ x: (q.x + 0.5) * CELL_SIZE, z: (q.z + 0.5) * CELL_SIZE })).filter((q) => !m.safeAt(q.x, q.z) && !sim.isColliding(q.x, q.z, 0.4));
+    const D = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+    const b0 = cells.find((q) => cells.some((r) => D(q, r) > 60));
+    const a0 = cells.find((q) => D(q, b0) > 60);
+    const spot = cells.find((q) => D(q, b0) > 5 && D(q, b0) < 9);
+    Object.assign(B, b0); Object.assign(A, a0);
+    M.mimic = A.id;
+    sim.fuses = 2;
+    const calls = [];
+    const run = (n, voice) => {
+      for (let i = 0; i < n && M.mimic != null; i++) {
+        Object.assign(M, { x: spot.x, z: spot.z, mode: 'mimic', hesT: 99, restT: 0, coverT: 99, callT: Math.max(M.callT, 30) });
+        sim.step({}, { 1: { remote: true, voice, mx: 0, my: 0, yaw: 0, pitch: 0 } });
+        Object.assign(B, b0); Object.assign(A, a0);
+        calls.push(...sim.drainEvents().filter((e) => e.type === 'mimicCall'));
+      }
+    };
+    run(60, 0); // personne ne parle : pas de réplique
+    assert.equal(calls.length, 0);
+    run(60, 0.8); // B lui parle une seconde…
+    assert.equal(calls.length, 0, 'elle ne coupe pas la parole');
+    run(100, 0); // … puis se tait : elle répond
+    assert.ok(calls.length === 1 && calls[0].kind === 'reply' && !calls[0].radio && calls[0].id === A.id && calls[0].to === B.id, `une réplique, de vive voix (${JSON.stringify(calls.map((c) => c.kind))})`);
+    assert.equal(calls[0].ctx, 'last', 'il manque un fusible : elle le sait');
+    run(60, 0.8); run(100, 0);
+    assert.equal(calls.length, 1, 'pas deux répliques coup sur coup');
+  } finally {
+    BackroomsSim.DISGUISE = false;
+  }
+});
+
+
+test('voix volée : la phrase est taillée du premier mot au silence, et tous choisissent la même', () => {
+  // une fenêtre : la fin d'une phrase d'avant, un silence, la phrase (1,4 s, avec une courte pause), un silence
+  const sr = 48000;
+  const w = new Float32Array(sr * 4);
+  const tone = (a, b, amp) => { for (let i = Math.round(a * sr); i < Math.round(b * sr); i++) w[i] = Math.sin(i * 0.05) * amp; };
+  tone(0, 0.3, 0.2);
+  tone(1.0, 1.6, 0.25);
+  tone(1.85, 2.4, 0.2);
+  for (let i = 0; i < w.length; i++) w[i] += (Math.random() - 0.5) * 0.002; // le souffle
+  const span = voicedSpan(w, sr, 1.4);
+  assert.ok(span && Math.abs(span[0] / sr - 0.94) < 0.05 && Math.abs(span[1] / sr - 2.53) < 0.06, `la phrase entière, avec sa marge (${span && span.map((x) => (x / sr).toFixed(2))})`);
+  assert.equal(voicedSpan(new Float32Array(sr), sr, 1), null, 'du silence : rien');
+  // le choix : pour bavarder, une phrase qui a fait réagir ; pour appeler, courte et dite fort ; au talkie, dite au talkie
+  const bank = [
+    { n: 1, d: 0.8, l: 0.9, r: 0, f: 0 },
+    { n: 2, d: 2.5, l: 0.5, r: 0, f: 1.2 },
+    { n: 3, d: 1.5, l: 0.6, r: 1, f: 0 },
+    { n: 4, d: 3.5, l: 0.4, r: 0, f: 0 },
+    { n: 5, d: 1.8, l: 0.5, r: 0, f: 0.9 },
+    { n: 6, d: 3.8, l: 0.95, r: 0, f: 0 },
+  ];
+  for (let seed = 0; seed < 40; seed++) {
+    assert.ok([2, 5, 4, 6].includes(pickUtterance(bank, 'chat', seed).n) && pickUtterance(bank, 'chat', seed * 4).n === 5, 'bavarder : la plus récente qui a fait réagir passe devant');
+    assert.ok(pickUtterance(bank, 'call', seed * 4).n === 1, 'appeler : la courte dite fort');
+    assert.ok(pickUtterance(bank, 'radio', seed * 4).n === 3, 'au talkie : celle dite au talkie');
+    assert.equal(pickUtterance(bank, 'chat', seed).n, pickUtterance(bank.slice(), 'chat', seed).n, 'même tirage, même phrase');
+  }
+  assert.notEqual(pickUtterance(bank, 'call', 0, [1]).n, 1, 'pas deux fois de suite la même');
+  assert.equal(pickUtterance([], 'chat', 3), null);
+});
+
+test("Level 1 : la voix volée ne trahit pas l'imposteur — il prend l'apparence d'un joueur loin de sa proie, se tait si celui qu'il imite est à portée d'oreille, bavarde de près", () => {
+  BackroomsSim.DISGUISE = true;
+  try {
+    const players = [{ id: 0, name: 'A' }, { id: 1, name: 'B' }, { id: 2, name: 'C' }];
+    const sim = new BackroomsSim({ difficulty: 'normal', seed: 11, players, localId: 0, level: 1 });
+    sim.arriveT = 0;
+    const m = sim.map;
+    const M = sim.monster;
+    const [A, B, C] = sim.players;
+    M.dormantT = 0;
+    Object.assign(sim.director, { phase: 'build', relaxT: 0 });
+    const cells = m.walkable.map((q) => ({ x: (q.x + 0.5) * CELL_SIZE, z: (q.z + 0.5) * CELL_SIZE })).filter((q) => !m.safeAt(q.x, q.z) && !sim.isColliding(q.x, q.z, 0.4));
+    const D = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+    const put = (Q, q) => { Q.x = q.x; Q.z = q.z; };
+    // B et C côte à côte, A très loin : devant B, la seule apparence qui tient est celle de A
+    const b0 = cells.find((q) => cells.some((r) => D(q, r) > 60));
+    const c0 = cells.find((q) => D(q, b0) > 3 && D(q, b0) < 7);
+    const a0 = cells.find((q) => D(q, b0) > 60);
+    put(B, b0); put(C, c0); put(A, a0);
+    for (let i = 0; i < 30; i++) {
+      const V = sim.bestFace(M, B);
+      assert.ok(V.ok && V.who === A, 'celle du joueur loin de la proie');
+    }
+    // elle imite C, à côté de B : à portée de voix de B, elle se tait ; hors de vue, elle change pour A
+    const spot = cells.find((q) => D(q, b0) > 12 && D(q, b0) < 18 && D(q, c0) > 10 && !hasLineOfSight(m, q.x, q.z, b0.x, b0.z) && !hasLineOfSight(m, q.x, q.z, c0.x, c0.z)) || cells.find((q) => D(q, b0) > 12 && D(q, b0) < 18);
+    M.mimic = C.id;
+    Object.assign(M, { x: spot.x, z: spot.z, mode: 'mimic', callT: 0.1, hesT: 99, restT: 0, coverT: 99, path: [], repathT: 0, silent: true });
+    let calls = [];
+    for (let i = 0; i < 60 * 3 && M.mimic != null; i++) {
+      Object.assign(M, { x: spot.x, z: spot.z });
+      sim.step({});
+      calls.push(...sim.drainEvents().filter((e) => e.type === 'mimicCall'));
+    }
+    assert.equal(calls.length, 0, 'la voix de C, alors que C est à côté de B : elle se tait');
+    assert.ok(!sim.mimicCover(M, B) && sim.mimicCover({ mimic: A.id }, B), 'C la trahirait, A non');
+    // avec la voix de A (loin, seul, muet) : elle parle ; jamais quand A est au talkie
+    M.mimic = A.id;
+    M.callT = 0.1;
+    calls = [];
+    for (let i = 0; i < 60 * 12 && M.mimic != null && !calls.length; i++) {
+      Object.assign(M, { x: spot.x, z: spot.z });
+      sim.step({});
+      calls.push(...sim.drainEvents().filter((e) => e.type === 'mimicCall'));
+    }
+    assert.ok(calls.length && calls[0].id === A.id && ['call', 'chat', 'radio'].includes(calls[0].kind) && Number.isInteger(calls[0].seed), `elle parle avec la voix de A (${calls[0] && calls[0].kind})`);
+    // tout près de B, en vue : elle bavarde
+    const close = cells.filter((q) => D(q, b0) > 5 && D(q, b0) < 9 && hasLineOfSight(m, q.x, q.z, b0.x, b0.z)).sort((p, q) => D(q, c0) - D(p, c0))[0];
+    if (close) {
+      M.callT = 0.05;
+      calls = [];
+      for (let i = 0; i < 20 && !calls.length && M.mimic != null; i++) {
+        Object.assign(M, { x: close.x, z: close.z });
+        sim.step({});
+        calls.push(...sim.drainEvents().filter((e) => e.type === 'mimicCall'));
+      }
+      assert.ok(calls.length && calls[0].kind === 'chat' && !calls[0].radio, 'près d\'un joueur, de vive voix : une phrase ordinaire');
+    }
+    // au talkie : pas si A a quelqu'un près de lui (on le verrait se taire)
+    const farM = cells.find((q) => D(q, b0) > 40 && D(q, a0) > 40 && D(q, c0) > 40);
+    put(C, cells.find((q) => D(q, a0) > 3 && D(q, a0) < 8));
+    M.mimic = A.id;
+    M.callT = 0.1;
+    calls = [];
+    for (let i = 0; i < 60 * 3 && M.mimic != null; i++) {
+      Object.assign(M, { x: farM.x, z: farM.z, coverT: 99 });
+      sim.step({});
+      calls.push(...sim.drainEvents().filter((e) => e.type === 'mimicCall'));
+    }
+    assert.equal(calls.length, 0, 'A a C près de lui : pas de fausse voix de A au talkie');
+    // la préférence va à quelqu'un qu'on a entendu parler
+    put(C, cells.find((q) => D(q, b0) > 60 && D(q, a0) > 20));
+    sim.voiceBank = { [C.id]: 6 };
+    let nC = 0;
+    for (let i = 0; i < 40; i++) if (sim.bestFace(M, B).who === C) nC++;
+    assert.ok(nC >= 30, `celui dont on a des phrases est préféré (${nC}/40)`);
   } finally {
     BackroomsSim.DISGUISE = false;
   }
