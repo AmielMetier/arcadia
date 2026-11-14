@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 5.90 — 14 novembre 2026
+- **Odyssée** — Plus aucun dresseur aux dessins provisoires en combat : montagnards, randonneuses, Top Dresseurs, karatékas, pêcheurs et les autres montrent enfin leur portrait.
+- **Odyssée** — Nouveaux dessins de combat pour le voleur, la fille en kimono, le moine, le vieil homme, Nox, Ariane, l'enfant, Pierre, et le héros et l'héroïne sur l'écran de départ et la Carte de Dresseur.
+
 ## 5.89 — 13 novembre 2026
 - **The Backrooms** — Le Level 17 (le centre commercial) ressemble enfin à un vrai lieu filmé au caméscope.
   - Tout le niveau se joue « au caméscope » : image 4:3, champ plus serré, et l'interface s'efface quand rien ne change (réglage Image → « Tout au caméscope »).
