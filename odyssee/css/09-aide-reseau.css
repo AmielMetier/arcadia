@@ -75,3 +75,13 @@ kbd { display: inline-block; font: inherit; font-size: .85em; min-width: 1.4em; 
 .tc-team { display: flex; gap: calc(var(--px) * 4); justify-content: center; margin-top: calc(var(--px) * 6); padding-top: calc(var(--px) * 5); border-top: var(--px) dashed #c8b88a; }
 .tc-mon { display: flex; flex-direction: column; align-items: center; font-size: .8em; color: #504030; }
 .tc-mon img { width: calc(var(--px) * 32); height: calc(var(--px) * 32); image-rendering: pixelated; object-fit: contain; }
+
+/* au doigt : les lettres du clavier n'ont pas de sens, et l'aide des touches non plus (croix, A, B et Menu sont à l'écran) */
+html.doigt .keyhint b, html.doigt .keyhint:first-child, html.doigt .title-foot { display: none; }
+@media (pointer: coarse) { .title-foot { display: none; } }
+/* téléphone tenu à la verticale : le jeu est fait pour un écran large, on demande de le tourner */
+#tourne { display: none; position: fixed; inset: 0; z-index: 1000; background: #0b0d14; color: #fff; align-items: center; justify-content: center; text-align: center; font: 700 22px/1.4 'Chakra Petch', system-ui, sans-serif; }
+#tourne b { display: block; font-size: 64px; line-height: 1; margin-bottom: 12px; animation: tourne 2.4s ease-in-out infinite; }
+#tourne small { display: block; margin-top: 6px; font-size: 14px; font-weight: 500; opacity: .75; }
+@keyframes tourne { 0%, 20% { transform: rotate(0); } 60%, 100% { transform: rotate(90deg); } }
+@media (orientation: portrait) and (pointer: coarse) and (max-width: 600px) { #tourne { display: flex; } }

@@ -4,46 +4,195 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Odyssée — Aventure façon DS</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/00-base.css?v=3.86">
-<link rel="stylesheet" href="css/01-equipe.css?v=3.86">
-<link rel="stylesheet" href="css/02-resume.css?v=3.86">
-<link rel="stylesheet" href="css/03-sac.css?v=3.86">
-<link rel="stylesheet" href="css/04-pokedex.css?v=3.86">
-<link rel="stylesheet" href="css/05-carte-region.css?v=3.86">
-<link rel="stylesheet" href="css/06-carte-dresseur.css?v=3.86">
-<link rel="stylesheet" href="css/07-divers.css?v=3.86">
-<link rel="stylesheet" href="css/08-combat.css?v=3.86">
-<link rel="stylesheet" href="css/09-aide-reseau.css?v=3.86">
-<link rel="stylesheet" href="css/10-hud.css?v=3.86">
-<link rel="stylesheet" href="css/11-intro.css?v=3.86">
-<link rel="stylesheet" href="css/12-quetes.css?v=3.86">
-<link rel="stylesheet" href="css/13-metropole.css?v=3.86">
-<link rel="stylesheet" href="css/14-pc.css?v=3.86">
-<link rel="stylesheet" href="css/15-capacites.css?v=3.86">
-<link rel="stylesheet" href="css/16-lugia.css?v=3.86">
-<link rel="stylesheet" href="css/17-terrain.css?v=3.86">
-<link rel="stylesheet" href="css/18-trophees.css?v=3.86">
-<link rel="stylesheet" href="css/19-spectateur.css?v=3.86">
-<link rel="stylesheet" href="css/20-pantheon.css?v=3.86">
-<link rel="stylesheet" href="css/21-amis.css?v=3.86">
-<link rel="stylesheet" href="css/22-meteo.css?v=3.86">
-<link rel="stylesheet" href="css/23-harmonie.css?v=3.86">
-<link rel="stylesheet" href="css/24-casino-arcade.css?v=3.86">
-<link rel="stylesheet" href="css/25-hud-compact.css?v=3.86">
+<link rel="icon" type="image/png" href="../assets/brand/icon-192.png">
+<link rel="stylesheet" href="css/00-base.css?v=5.93">
+<link rel="stylesheet" href="css/01-equipe.css?v=5.93">
+<link rel="stylesheet" href="css/02-resume.css?v=5.93">
+<link rel="stylesheet" href="css/03-sac.css?v=5.93">
+<link rel="stylesheet" href="css/04-pokedex.css?v=5.93">
+<link rel="stylesheet" href="css/05-carte-region.css?v=5.93">
+<link rel="stylesheet" href="css/06-carte-dresseur.css?v=5.93">
+<link rel="stylesheet" href="css/07-divers.css?v=5.93">
+<link rel="stylesheet" href="css/08-combat.css?v=5.93">
+<link rel="stylesheet" href="css/09-aide-reseau.css?v=5.93">
+<link rel="stylesheet" href="css/10-hud.css?v=5.93">
+<link rel="stylesheet" href="css/11-intro.css?v=5.93">
+<link rel="stylesheet" href="css/12-quetes.css?v=5.93">
+<link rel="stylesheet" href="css/13-metropole.css?v=5.93">
+<link rel="stylesheet" href="css/14-pc.css?v=5.93">
+<link rel="stylesheet" href="css/15-capacites.css?v=5.93">
+<link rel="stylesheet" href="css/16-lugia.css?v=5.93">
+<link rel="stylesheet" href="css/17-terrain.css?v=5.93">
+<link rel="stylesheet" href="css/18-trophees.css?v=5.93">
+<link rel="stylesheet" href="css/19-spectateur.css?v=5.93">
+<link rel="stylesheet" href="css/20-pantheon.css?v=5.93">
+<link rel="stylesheet" href="css/21-amis.css?v=5.93">
+<link rel="stylesheet" href="css/22-meteo.css?v=5.93">
+<link rel="stylesheet" href="css/23-harmonie.css?v=5.93">
+<link rel="stylesheet" href="css/24-casino-arcade.css?v=5.93">
+<link rel="stylesheet" href="css/25-hud-compact.css?v=5.93">
+<!-- la carte des imports doit précéder tout module, préchargé ou non -->
+<script type="importmap">
+  { "imports": { "three": "../shared/vendor/three/three.module.min.js" } }
+</script>
+<!-- modules préchargés (tools/odyssee-preload.mjs) -->
+<link rel="modulepreload" href="../shared/vendor/three/three.module.min.js">
+<link rel="modulepreload" href="js/render/world3d.js">
+<link rel="modulepreload" href="js/world/tiles.js">
+<link rel="modulepreload" href="js/render/murs-tex.js">
+<link rel="modulepreload" href="js/world/relief.js">
+<link rel="modulepreload" href="js/world/mapgen.js">
+<link rel="modulepreload" href="js/data/regles.js">
+<link rel="modulepreload" href="js/world/ponts.js">
+<link rel="modulepreload" href="js/render/textures.js">
+<link rel="modulepreload" href="js/data/sol16.js">
+<link rel="modulepreload" href="js/render/relief-tex.js">
+<link rel="modulepreload" href="js/render/serre-tex.js">
+<link rel="modulepreload" href="js/render/arenes-tex.js">
+<link rel="modulepreload" href="js/render/interieurs.js">
+<link rel="modulepreload" href="js/render/styles-villes.js">
+<link rel="modulepreload" href="js/data/sprites.js">
+<link rel="modulepreload" href="js/render/sol.js">
+<link rel="modulepreload" href="js/render/solgen.js">
+<link rel="modulepreload" href="js/render/relief3d.js">
+<link rel="modulepreload" href="js/gfx.js">
+<link rel="modulepreload" href="js/data/gfx-noirblanc.js">
+<link rel="modulepreload" href="js/render/falaises.js">
+<link rel="modulepreload" href="js/render/grottes.js">
+<link rel="modulepreload" href="js/render/weather3d.js">
+<link rel="modulepreload" href="js/render/ombres.js">
+<link rel="modulepreload" href="js/render/ambiance.js">
+<link rel="modulepreload" href="js/render/densite.js">
+<link rel="modulepreload" href="js/render/lumieres.js">
+<link rel="modulepreload" href="js/render/bati-jeu.js">
+<link rel="modulepreload" href="js/render/batiments3d.js">
+<link rel="modulepreload" href="js/render/statues-data.js">
+<link rel="modulepreload" href="js/render/maisons-villes.js">
+<link rel="modulepreload" href="js/render/desert3d.js">
+<link rel="modulepreload" href="js/render/arbres.js">
+<link rel="modulepreload" href="js/render/herbes.js">
+<link rel="modulepreload" href="js/world/region.js">
+<link rel="modulepreload" href="js/world/interiors.js">
+<link rel="modulepreload" href="js/data/creatures.js">
+<link rel="modulepreload" href="js/data/remplacants.js">
+<link rel="modulepreload" href="js/world/quetes.js">
+<link rel="modulepreload" href="js/core/items.js">
+<link rel="modulepreload" href="js/data/types.js">
+<link rel="modulepreload" href="js/data/moves.js">
+<link rel="modulepreload" href="js/core/mon.js">
+<link rel="modulepreload" href="js/data/species.js">
+<link rel="modulepreload" href="js/data/rencontres.js">
+<link rel="modulepreload" href="js/world/rencontres.js">
+<link rel="modulepreload" href="js/data/troncons.js">
+<link rel="modulepreload" href="js/world/cendree.js">
+<link rel="modulepreload" href="js/world/tourdoree.js">
+<link rel="modulepreload" href="js/world/story.js">
+<link rel="modulepreload" href="js/world/habitants.js">
+<link rel="modulepreload" href="js/world/retouches.js">
+<link rel="modulepreload" href="js/world/acces.js">
+<link rel="modulepreload" href="js/world/bareme.js">
+<link rel="modulepreload" href="js/world/arenes.js">
+<link rel="modulepreload" href="js/world/arenes-plan.js">
+<link rel="modulepreload" href="js/world/arenes-plans.js">
+<link rel="modulepreload" href="js/world/arene-sylve.js">
+<link rel="modulepreload" href="js/world/sud.js">
+<link rel="modulepreload" href="js/world/plan.js">
+<link rel="modulepreload" href="js/world/quartiers.js">
+<link rel="modulepreload" href="js/world/voix.js">
+<link rel="modulepreload" href="js/world/vehicules.js">
+<link rel="modulepreload" href="js/world/mine.js">
+<link rel="modulepreload" href="js/world/faune.js">
+<link rel="modulepreload" href="js/world/montagnes.js">
+<link rel="modulepreload" href="js/world/chemins.js">
+<link rel="modulepreload" href="js/world/atelier.js">
+<link rel="modulepreload" href="js/world/lieux.js">
+<link rel="modulepreload" href="js/world/ecrans.js">
+<link rel="modulepreload" href="js/world/rythme.js">
+<link rel="modulepreload" href="js/world/grottes.js">
+<link rel="modulepreload" href="js/world/volcan.js">
+<link rel="modulepreload" href="js/world/contreforts.js">
+<link rel="modulepreload" href="js/world/ocre.js">
+<link rel="modulepreload" href="js/world/anciens-objets.js">
+<link rel="modulepreload" href="js/input.js">
+<link rel="modulepreload" href="js/manette.js">
+<link rel="modulepreload" href="js/tactile.js">
+<link rel="modulepreload" href="js/audio.js">
+<link rel="modulepreload" href="js/ui/ui.js">
+<link rel="modulepreload" href="js/ui/screens.js">
+<link rel="modulepreload" href="js/ui/trophiesView.js">
+<link rel="modulepreload" href="js/core/trophies.js">
+<link rel="modulepreload" href="js/ui/screens/common.js">
+<link rel="modulepreload" href="js/assets.js">
+<link rel="modulepreload" href="js/ui/screens/party.js">
+<link rel="modulepreload" href="js/ui/glisser.js">
+<link rel="modulepreload" href="js/data/abilities.js">
+<link rel="modulepreload" href="js/data/talents.js">
+<link rel="modulepreload" href="js/ui/screens/pc.js">
+<link rel="modulepreload" href="js/data/moveDescriptions.js">
+<link rel="modulepreload" href="js/ui/screens/bag.js">
+<link rel="modulepreload" href="js/ui/screens/dex.js">
+<link rel="modulepreload" href="js/ui/screens/map.js">
+<link rel="modulepreload" href="js/ui/screens/carteLocale.js">
+<link rel="modulepreload" href="js/ui/screens/card.js">
+<link rel="modulepreload" href="js/ui/screens/hof.js">
+<link rel="modulepreload" href="js/ui/screens/shop.js">
+<link rel="modulepreload" href="js/ui/screens/options.js">
+<link rel="modulepreload" href="js/ui/screens/savecode.js">
+<link rel="modulepreload" href="js/ui/screens/quests.js">
+<link rel="modulepreload" href="js/core/questsData.js">
+<link rel="modulepreload" href="js/ui/screens/learnMove.js">
+<link rel="modulepreload" href="js/ui/screens/friends.js">
+<link rel="modulepreload" href="js/net/friends.js">
+<link rel="modulepreload" href="js/core/savecode.js">
+<link rel="modulepreload" href="js/net/cloud.js">
+<link rel="modulepreload" href="js/game.js">
+<link rel="modulepreload" href="js/core/mega.js">
+<link rel="modulepreload" href="js/data/megas.js">
+<link rel="modulepreload" href="js/data/megasFans.js">
+<link rel="modulepreload" href="js/core/battle.js">
+<link rel="modulepreload" href="js/world/migration.js">
+<link rel="modulepreload" href="js/ui/battleView.js">
+<link rel="modulepreload" href="js/render/shadow.js">
+<link rel="modulepreload" href="js/ui/hud.js">
+<link rel="modulepreload" href="js/ui/chatModal.js">
+<link rel="modulepreload" href="js/net/social.js">
+<link rel="modulepreload" href="js/net/link.js">
+<link rel="modulepreload" href="js/core/pvp.js">
+<link rel="modulepreload" href="js/render/tenue.js">
+<link rel="modulepreload" href="js/story.js">
+<link rel="modulepreload" href="js/ui/cinematic.js">
+<link rel="modulepreload" href="js/arenes-jeu.js">
+<link rel="modulepreload" href="js/ui/metropole.js">
+<link rel="modulepreload" href="js/core/bourse.js">
+<link rel="modulepreload" href="js/ui/casino/machine.js">
+<link rel="modulepreload" href="js/core/casino.js">
+<link rel="modulepreload" href="js/ui/pixel.js">
+<link rel="modulepreload" href="js/ui/casino/dessin.js">
+<link rel="modulepreload" href="js/ui/casino/commun.js">
+<link rel="modulepreload" href="js/ui/casino/blackjack.js">
+<link rel="modulepreload" href="js/ui/casino/poker.js">
+<link rel="modulepreload" href="js/core/holdem.js">
+<link rel="modulepreload" href="js/ui/casino/roulette.js">
+<link rel="modulepreload" href="js/ui/casino/belote.js">
+<link rel="modulepreload" href="js/ui/arcade.js">
+<link rel="modulepreload" href="js/core/arcade.js">
+<link rel="modulepreload" href="js/ui/apparence.js">
+<link rel="modulepreload" href="js/ui/domaine.js">
+<link rel="modulepreload" href="js/world/domaine.js">
+<link rel="modulepreload" href="js/world/rival.js">
+<link rel="modulepreload" href="js/vie.js">
+<link rel="modulepreload" href="js/vie-monde.js">
+<link rel="modulepreload" href="js/data/decor-plus.js">
+<!-- fin des modules préchargés -->
 </head>
 <body>
 <canvas id="gl"></canvas>
 <div id="ui"></div>
+<div id="tourne"><div><b>↻</b>Tourne ton téléphone<small>Odyssée se joue à l'horizontale.</small></div></div>
 <div id="loading"><div>Chargement de la région…<div class="charge"><i></i></div></div></div>
 <script src="../shared/logger.js"></script>
 <script src="../shared/bridge.js"></script>
 <script src="../shared/volume.js"></script>
-<script type="importmap">
-  { "imports": { "three": "../shared/vendor/three/three.module.min.js" } }
-</script>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>
