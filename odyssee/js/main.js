@@ -183,15 +183,16 @@ async function boot() {
   /* ---------------- écran titre ---------------- */
   for (;;) {
     sound.play('title');
-    const title = el('div', 'title-scr', `<canvas class="title-cv" width="256" height="192"></canvas><div class="logo"><div class="logo-main">ODYSSÉE</div></div><div class="press">Appuie sur F ou Entrée</div><div class="title-foot">H : aide des touches</div>`);
+    const title = el('div', 'title-scr', `<canvas class="title-cv" width="256" height="192"></canvas><div class="logo"><div class="logo-main">ODYSSÉE</div></div><div class="press">${matchMedia('(pointer: coarse)').matches ? 'Touche l\'écran' : 'Appuie sur F ou Entrée'}</div><div class="title-foot">H : aide des touches</div>`);
     uiRoot.appendChild(title);
     const stopSea = titleSea(title.querySelector('canvas'), art.title);
-    await new Promise((res) => { const pop = input.push((k) => { if (k === 'a') { pop(); sound.init(); sound.sfx('select'); res(); } }); });
+    // au clavier, à la manette, ou d'un simple toucher (ou clic) sur l'écran titre
+    await new Promise((res) => { let fini = false; const go = () => { if (fini) return; fini = true; pop(); removeEventListener('pointerdown', go); sound.init(); sound.sfx('select'); res(); }; const pop = input.push((k) => { if (k === 'a') go(); }); addEventListener('pointerdown', go); });
     title.querySelector('.press').remove();
     // la sauvegarde en ligne a quelques secondes pour répondre (le serveur peut être en train de se réveiller)
     if (cloud.on && cloud.remote === undefined) await Promise.race([cloud.fetch(), wait(2500)]);
     let info = null;
-    if (Game.hasSave()) { try { info = JSON.parse(localStorage.getItem(Game.SAVE_KEY)); } catch (e) {} }
+    if (Game.hasSave()) info = Game.lireSauvegarde();   // la sauvegarde, ou sa copie de secours si elle est abîmée
     const remote = cloud.remote?.state || null;
     const newer = remote && (!info || (remote.time || 0) > (info.time || 0) + 5);
     const has = !!info || !!remote;

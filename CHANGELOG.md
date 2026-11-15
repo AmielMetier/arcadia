@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 5.93 — 15 novembre 2026
+- **Odyssée** — Sur téléphone :
+  - Tenu à la verticale, le jeu demande de tourner le téléphone au lieu d'afficher un écran coupé.
+  - L'écran titre se lance d'un simple toucher, et les rappels de touches du clavier disparaissent quand on joue au doigt.
+- **Odyssée** — Le jeu démarre plus vite : tous ses fichiers de code sont demandés d'un coup au lieu de l'être en cascade.
+- **Odyssée** — Une copie de secours de la partie est gardée à chaque lancement : si la sauvegarde s'abîme, le jeu reprend sur la copie.
+- **Odyssée** — La police d'écriture est fournie par le jeu : elle s'affiche même sans accès à Google.
+
 ## 5.92 — 15 novembre 2026
 - **Odyssée** — Les Champions, la Ligue et les rivaux se battent mieux, sans que le jeu devienne plus facile :
   - Leurs Pokémon ont des attaques choisies (leurs meilleures attaques de type, une attaque de couverture, une danse ou un soin) au lieu des quatre dernières apprises.

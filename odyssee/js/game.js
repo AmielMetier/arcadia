@@ -183,7 +183,14 @@ export class Game {
   }
 
   /* ================= sauvegarde ================= */
-  static hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
+  static hasSave() { try { return !!(localStorage.getItem(SAVE_KEY) || localStorage.getItem(SAVE_KEY + '-secours')); } catch (e) { return false; } }
+  /** la sauvegarde de cet appareil ; si elle est illisible, sa copie de secours (celle du dernier lancement réussi) ; null sinon */
+  static lireSauvegarde() {
+    for (const k of [SAVE_KEY, SAVE_KEY + '-secours']) {
+      try { const s = JSON.parse(localStorage.getItem(k)); if (s && Array.isArray(s.party) && Array.isArray(s.badges)) return s; } catch (e) { /* abîmée : on essaie la suivante */ }
+    }
+    return null;
+  }
   newState(name, gender) {
     return {
       v: 2, name, gender, id: Math.floor(Math.random() * 65536), money: 3000, badges: Array(BADGES.length).fill(false), flags: {},
@@ -202,7 +209,9 @@ export class Game {
     return true;
   }
   load(from) {
-    const s = from ? JSON.parse(JSON.stringify(from)) : JSON.parse(localStorage.getItem(SAVE_KEY));
+    const s = from ? JSON.parse(JSON.stringify(from)) : Game.lireSauvegarde();
+    // copie de secours : la partie telle qu'elle était à ce lancement (récupérable si la sauvegarde s'abîme ensuite)
+    if (!from) { try { localStorage.setItem(SAVE_KEY + '-secours', JSON.stringify(s)); } catch (e) { /* plus de place : on s'en passe */ } }
     s.cleared ||= {}; s.explored ||= []; s.explores ||= {};
     s.dex ||= { seen: [], caught: [], seenCount: {} };
     s.dex.seenCount ||= {};

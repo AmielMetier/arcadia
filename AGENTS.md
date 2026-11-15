@@ -60,6 +60,7 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
 - Odyssée (`odyssee/`) : jeu à plusieurs par le Hub (`odyssee/js/net/` : positions, invitations, échanges, combats entre joueurs calculés
   à l'identique des deux côtés avec une graine commune, `odyssee/js/core/pvp.js`) et code de sauvegarde (`odyssee/js/core/savecode.js`) :
   `node tools/test-odyssee-link.mjs`, à lancer quand on touche au moteur de combat d'Odyssée (`odyssee/js/core/battle.js`).
+  Modules préchargés : `odyssee/index.html` liste tous les modules du jeu en `<link rel="modulepreload">` (la carte des imports doit rester avant eux) ; `node tools/odyssee-preload.mjs` réécrit la liste, à relancer quand on ajoute ou retire un fichier de `odyssee/js/` (`--check` pour vérifier).
   `node tools/test-odyssee-regles.mjs` vérifie les règles de combat une par une (Bluff, objets Choix, Vol interrompu, pièges, évolutions doubles…) : à lancer aussi, et à compléter à chaque bug de règle corrigé.
 - Mini-Golf Party, robustesse : `node tools/fuzz-minigolf.mjs [coups par trou]` tire au hasard sur chaque trou et compte les balles qui traversent un mur ou restent suspendues (doit afficher 0 et 0).
   Textures photo : celles de `kart/tex/` (Poly Haven, CC0), chargées par `dressPhoto` dans `minigolf/js/textures.js`.
