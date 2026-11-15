@@ -84,6 +84,50 @@ export function defaultMoves(sp, lvl) {
   return uniq.slice(-4).map((id) => ({ id, pp: MOVES[id].pp }));
 }
 
+/** attaques choisies pour un dresseur fort (Champions, Ligue, rivaux) : tirées de ce que l'espèce apprend jusqu'à ce niveau,
+ *  la meilleure attaque de chacun de ses types, une attaque d'un autre type, et une attaque de soutien (soin, sommeil, danse…) */
+export function movesChoisies(sp, lvl) {
+  sp = R(sp); const S = SPECIES[sp];
+  const ids = [...new Set(S.ls.filter(([l]) => l <= lvl).map(([, id]) => id))];
+  const phys = S.b[1] >= S.b[3];
+  const val = (id) => {
+    const M = MOVES[id], x = M.m || {};
+    if (M.c === 'status' || !M.p || x.boom || x.charge || x.recharge || x.cat === 9) return 0;
+    const hits = x.h0 ? (x.h0 === x.h1 ? x.h0 : 3) : 1;
+    let v = M.p * hits * (M.a || 100) / 100;
+    if (S.t.includes(M.t)) v *= 1.5;
+    if ((M.c === 'physical') !== phys) v *= Math.min(1, (phys ? S.b[3] : S.b[1]) / (phys ? S.b[1] : S.b[3]));
+    if (x.drain < 0) v *= 0.9;
+    return v;
+  };
+  const soutien = (id) => {
+    const M = MOVES[id], x = M.m || {}; if (M.c !== 'status') return 0;
+    if (x.heal > 0 || x.cat === 3) return 9;
+    if (x.ail === 'slp') return 8 * (M.a || 100) / 100;
+    // danse ou concentration : d'autant mieux notée qu'elle monte la stat d'attaque utile (×2) et la Vitesse
+    if (x.st && x.st.some(([s, c]) => c > 0 && (s === (phys ? 2 : 4) || s === 6))) return 6 + Math.min(1.9, 0.3 * x.st.reduce((t, [s, c]) => t + (c > 0 ? (s === (phys ? 2 : 4) ? 2 * c : s === 6 ? c : 0) : 0), 0));
+    if (x.ail === 'par') return 6 * (M.a || 100) / 100;
+    if (x.ail === 'psn' || x.ail === 'brn') return 5 * (M.a || 100) / 100;
+    if (x.u === 'protect' || x.u === 'detect') return 3;
+    if (x.ail === 'conf' || x.ail === 'seed') return 3;
+    if (x.st && x.st.some(([, c]) => c > 0)) return 2;
+    return 0;
+  };
+  const dmg = ids.filter((id) => val(id) > 0).sort((a, b) => val(b) - val(a));
+  const pris = [];
+  for (const t of S.t) { const id = dmg.find((q) => MOVES[q].t === t && !pris.includes(q)); if (id) pris.push(id); }
+  { const id = dmg.find((q) => !pris.includes(q) && !pris.some((p) => MOVES[p].t === MOVES[q].t)); if (id) pris.push(id); }
+  const sts = ids.filter((id) => soutien(id) > 0).sort((a, b) => soutien(b) - soutien(a));
+  if (sts[0]) pris.push(sts[0]);
+  for (const id of dmg) { if (pris.length >= 4) break; if (!pris.includes(id) && !pris.some((p) => MOVES[p].t === MOVES[id].t && MOVES[p].c !== 'status')) pris.push(id); }
+  if (pris.length < 4 && sts[1] && soutien(sts[1]) >= 5) pris.push(sts[1]);
+  for (const id of dmg) { if (pris.length >= 4) break; if (!pris.includes(id)) pris.push(id); }
+  for (const id of sts) { if (pris.length >= 4) break; if (!pris.includes(id)) pris.push(id); }
+  for (const id of [...ids].reverse()) { if (pris.length >= 4) break; if (!pris.includes(id)) pris.push(id); }
+  if (!pris.some((id) => MOVES[id].c !== 'status')) return null;   // rien pour attaquer : on garde les attaques ordinaires
+  return pris.slice(0, 4);
+}
+
 export function createMon(sp, lvl, o = {}) {
   sp = R(sp); // créature originale → son Pokémon remplaçant (data/remplacants.js)
   const r = o.rng || Math.random;
@@ -164,11 +208,8 @@ export function expProgress(m, maxLvl = 100) {
 /** évolution par niveau possible ? renvoie l'espèce cible */
 export function levelEvolution(m, hour = 12) {
   const S = SPECIES[m.sp]; if (!S) return null;
-  // Cas spécial Évoli : évolution temporelle (Mentali le jour, Noctali la nuit)
-  if (m.sp === 133 && m.lvl >= 25) {
-    const isNight = hour >= 20 || hour < 6;
-    return isNight ? 197 : 196; // 197 = Noctali, 196 = Mentali
-  }
+  // Évoli n'évolue plus tout seul avec le niveau : Mentali par la Pierre Soleil, Noctali par la Pierre Lune (itemEvolution),
+  // pour que le joueur choisisse sa forme
   const ev = S.ev; if (!ev) return null;
   // deux évolutions par niveau (Ramoloss, Chenipotte, Ningale, Coquiperl, Cheniti) : chaque Pokémon a la sienne,
   // toujours la même, tirée de son identifiant

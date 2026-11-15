@@ -71,5 +71,20 @@ let fails = 0; const ok = (c, msg) => { console.log((c ? '  ✓ ' : '  ✗ ') + 
   seed = 2; me = mk('Pikachu', 50, ['counter']); foe = mk('Ronflex', 50, ['splash']); b = wild(me, foe); const ev = b.playerAction({ type: 'move', idx: 0 });
   ok(texts(ev).some((t) => /échoue/.test(t)) && !ev.some((x) => x.t === 'hit'), 'Riposte sans coup reçu : échec, sans animation de coup');
 }
+{ // équilibrage : l'IA forte connaît Lévitation ; Évoli n'évolue plus par le niveau ; attaques choisies des Champions
+  const { getAbility } = await import('../odyssee/js/data/abilities.js'); const { movesChoisies } = await import('../odyssee/js/core/mon.js');
+  let me; for (let i = 0; i < 80 && !me; i++) { seed = 11 + i; const c = mk('Smogogo', 50, ['splash']); if (getAbility(c)?.id === 'levitate') me = c; }
+  const foe = mk('Rhinoféros', 50, ['earthquake', 'rock-slide', 'stomp']); me.stats[0] = me.hp = 9999;
+  const b = trainer(me, foe, { ai: 'smart' }); let seisme = 0;
+  for (let n = 0; n < 12 && b.state === 'choose'; n++) { if (texts(b.playerAction({ type: 'move', idx: 0 })).some((t) => /utilise Séisme/.test(t))) seisme++; me.moves[0].pp = 10; }
+  ok(!!me && seisme === 0, 'IA « smart » : jamais Séisme sur un Pokémon en Lévitation');
+  ok(levelEvolution({ sp: 133, lvl: 60, uid: 1 }, 12) == null, 'Évoli n\'évolue plus tout seul avec le niveau');
+  const ms = movesChoisies(sp('Dracolosse'), 81).map((id) => MOVES[id].key);
+  ok(ms.length === 4 && ms.includes('dragon-dance') && !ms.includes('hyper-beam'), 'attaques choisies : Dracolosse garde Danse Draco, sans Ultralaser');
+  seed = 5; const cap = mk('Pikachu', 13, ['thunder-shock']), cap2 = mk('Rattata', 13, ['tackle']);
+  const bc = new Battle({ rng, cap: 13, player: { name: 'A', party: [cap, cap2], bag: {} }, foe: { name: 'T', party: [mk('Chenipan', 2, ['tackle']), mk('Chenipan', 2, ['tackle']), mk('Chenipan', 2, ['tackle'])], trainer: { cls: 'D', name: 'B', prize: 1 } } }); bc.start();
+  let dits = 0; for (let n = 0; n < 8 && bc.state === 'choose'; n++) dits += texts(bc.playerAction({ type: 'move', idx: 0 })).filter((t) => /limite de niveau/.test(t)).length;
+  ok(dits === 1, 'limite de niveau : annoncée une seule fois par combat');
+}
 console.log(fails ? `\nRÈGLES DE COMBAT : ${fails} échec(s)` : '\nRÈGLES DE COMBAT : OK');
 process.exit(fails ? 1 : 0);
