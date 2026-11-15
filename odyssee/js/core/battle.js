@@ -54,6 +54,10 @@ export class Battle {
     this.weather = o.weather || 'none';
     this.weatherTurns = o.weatherTurns || 0;
     this.gymCrisisTriggered = false;
+    // météo de la zone : celle qui revient quand une météo de talent ou d'attaque s'arrête
+    this.baseWeather = this.weather; this.baseWeatherTurns = this.weatherTurns;
+    // un drapeau de K.O. resté d'un combat interrompu (sauvegarde prise en plein combat) bloquerait le prochain K.O.
+    for (const s of this.sides) for (const m of s.party) delete m._ko;
   }
   get me() { return this.sides[0].party[this.sides[0].active]; }
   get foe() { return this.sides[1].party[this.sides[1].active]; }
@@ -244,6 +248,11 @@ export class Battle {
       else if (!mv || mv.pp <= 0) { this.turn--; return [{ t: 'msg', text: 'Plus de PP pour cette attaque !' }]; }
       else a = { type: 'move', id: mv.id, slot: a.idx };
     }
+    if (!this.pvp && !forced) {
+      if (a.type === 'switch' && this.trapped(0)) { this.turn--; return [{ t: 'msg', text: `${monName(this.me)} est pris au piège et ne peut pas être rappelé !` }]; }
+      const lock = this.choiceLock(0);
+      if (a.type === 'move' && lock != null && a.id !== 165 && a.id !== lock) { this.turn--; return [{ t: 'msg', text: `${itemName(this.me.item)} ne laisse utiliser que ${MOVES[lock].n} !` }]; }
+    }
     const b = this.foeChoose();
     // Méga-Évolutions du tour, avant toute attaque (dans le même ordre sur les deux écrans en duel)
     const wants = [!!action.mega && a.type === 'move', this.foeWantsMega(b)];
@@ -274,6 +283,14 @@ export class Battle {
     this.state = 'choose';
     return this.flush();
   }
+  /** pris au piège (Ligotage, Danse Flamme…) : ni rappel ni fuite ; les Spectres s'en échappent */
+  trapped(i) { return this.sides[i].v.trap > 0 && !SPECIES[this.act(i).sp].t.includes('ghost'); }
+  /** objet Choix : l'attaque sur laquelle le Pokémon actif est bloqué (null s'il est libre ou si elle n'a plus de PP) */
+  choiceLock(i) {
+    const m = this.act(i), id = this.sides[i].v.choice;
+    if (id == null || !/^choice-/.test(m.item || '')) return null;
+    return m.moves.some((q) => q.id === id && q.pp > 0) ? id : null;
+  }
   canSwitchTo(idx) { const m = this.sides[0].party[idx]; return m && m.hp > 0 && idx !== this.sides[0].active; }
 
   /* ---------------- IA ---------------- */
@@ -282,6 +299,7 @@ export class Battle {
     const side = this.sides[1], m = this.foe, t = side.trainer;
     const usable = this.usableMoves(1);
     if (!usable.length) return { type: 'move', id: 165 };
+    { const lock = this.choiceLock(1); if (lock != null) { const k = m.moves.findIndex((q) => q.id === lock); return { type: 'move', id: lock, slot: k }; } }
     if (this.wild) { const k = usable[this.r(usable.length)]; return { type: 'move', id: m.moves[k].id, slot: k }; }
 
     const isSmart = t.ai === 'smart';
@@ -336,6 +354,8 @@ export class Battle {
 
         // Si l'attaque n'a AUCUN effet (immunité de type), ne JAMAIS la choisir
         if (eff === 0) return { k, s: 0.0001 };
+        // Bluff ne marche qu'au premier tour après l'entrée
+        if (mv.key === 'fake-out' && this.sides[1].v.turns > 0) return { k, s: 0.0001 };
 
         const d = this.estimate(1, 0, mv);
         const acc = (mv.a || 100) / 100;
@@ -456,7 +476,8 @@ export class Battle {
     const m = this.act(a);
     const fixed = u === 'dragon-rage' ? 40 : u === 'sonic-boom' ? 20 : u === 'seismic-toss' || u === 'night-shade' ? m.lvl : u === 'super-fang' ? Math.max(1, Math.floor(T.hp / 2)) : u === 'endeavor' ? Math.max(0, T.hp - m.hp) : null;
     if (u === 'psywave') return { ...pct(Math.floor(m.lvl * 0.5), Math.floor(m.lvl * 1.5)), eff: 1 };
-    if (u === 'counter' || u === 'mirror-coat' || u === 'splash' || mv.m?.cat === 9) return null;
+    if (u === 'counter' || u === 'mirror-coat' || u === 'splash' || mv.m?.cat === 9 || mv.key === 'metal-burst') return null;
+    if (mv.key === 'final-gambit') return { ...pct(m.hp, m.hp), eff: 1 };
     if (fixed != null) return { ...pct(fixed, fixed), eff: 1 };
     let p = u === 'magnitude' ? 70 : u === 'present' ? 40 : this.movePower(a, d, mv);
     if (!p) return null;
@@ -474,6 +495,11 @@ export class Battle {
   resolve(a, b) {
     const acts = [{ i: 0, a }, { i: 1, a: b }];
     for (const s of this.sides) { s.v.flinch = false; s.v.dmgTaken = null; }
+    for (const x of acts) {
+      if (x.a.type === 'switch' && this.trapped(x.i)) { this.say(`${this.Nm(x.i)} est pris au piège et ne peut pas être rappelé !`); x.a = { type: 'none' }; x.done = true; }
+      const lock = this.choiceLock(x.i);
+      if (x.a.type === 'move' && lock != null && x.a.id !== 165 && x.a.id !== lock) x.a = { type: 'move', id: lock, slot: this.act(x.i).moves.findIndex((q) => q.id === lock) };
+    }
     // actions sans attaque d'abord
     for (const x of acts) {
       if (this.state === 'over') return;
@@ -507,6 +533,7 @@ export class Battle {
   tryRun() {
     if (!this.wild) { this.say('Impossible de fuir un combat de Dresseur !'); return false; }
     this.runTries++;
+    if (this.trapped(0)) { this.say(`${monName(this.me)} est pris au piège : impossible de fuir !`); return false; }
     if (this.ab(0) === 'run-away') { this.ev.push({ t: 'sfx', k: 'run' }); this.say('Vous prenez la fuite !'); this.end('run'); return true; }
     if ((this.ab(1) === 'shadow-tag' && this.ab(0) !== 'shadow-tag') || (this.ab(1) === 'arena-trap' && !SPECIES[this.me.sp].t.includes('flying') && this.ab(0) !== 'levitate')) {
       this.say(`${this.Nm(1)} empêche la fuite !`); return false;
@@ -536,13 +563,16 @@ export class Battle {
   useItem(i, a) {
     if (i === 1) {
       const m = this.foe, t = this.sides[1].trainer, before = m.hp;
+      const st0 = m.status;
       applyItem(a.item, m);
       this.say(`${t.cls} ${t.name} utilise ${itemName(a.item)} !`);
       this.ev.push({ t: 'hp', side: 1, hp: m.hp, from: before });
+      if (st0 && !m.status) this.ev.push({ t: 'status', side: 1, status: null });
       return false;
     }
     const it = ITEMS[a.item];
-    this.bag[a.item] = (this.bag[a.item] || 0) - 1; if (this.bag[a.item] <= 0) delete this.bag[a.item];
+    // une Ball que le dresseur dévie n'est pas perdue
+    if (!(it.ball && !this.wild)) { this.bag[a.item] = (this.bag[a.item] || 0) - 1; if (this.bag[a.item] <= 0) delete this.bag[a.item]; }
     if (it.ball) return this.throwBall(a.item);
     const m = this.sides[0].party[a.target], before = m.hp;
     this.say(`Vous utilisez ${itemName(a.item)} !`);
@@ -582,6 +612,9 @@ export class Battle {
   movePower(i, d, mv) {
     const u = mv.m?.u, m = this.act(i), t = this.act(d);
     if (u === 'hidden-power') return hiddenPower(m).power;
+    // Boule Élek : selon le rapport des Vitesses ; Tacle Feu : selon le rapport des poids
+    if (mv.key === 'electro-ball') { const q = this.stat(i, 5) / this.stat(d, 5); return q >= 4 ? 150 : q >= 3 ? 120 : q >= 2 ? 80 : q >= 1 ? 60 : 40; }
+    if (mv.key === 'heat-crash') { const q = (SPECIES[m.sp].w || 100) / (SPECIES[t.sp].w || 100); return q >= 5 ? 120 : q >= 4 ? 100 : q >= 3 ? 80 : q >= 2 ? 60 : 40; }
     if (u === 'flail' || u === 'reversal') { const p = Math.floor(48 * m.hp / m.stats[0]); return p <= 1 ? 200 : p <= 4 ? 150 : p <= 9 ? 100 : p <= 16 ? 80 : p <= 32 ? 40 : 20; }
     if (u === 'low-kick') { const w = SPECIES[t.sp].w || 100; return w < 100 ? 20 : w < 250 ? 40 : w < 500 ? 60 : w < 1000 ? 80 : w < 2000 ? 100 : 120; }
     if (u === 'return') return 102;
@@ -684,17 +717,21 @@ export class Battle {
   useMove(i, a, first) {
     const d = 1 - i, side = this.sides[i], v = side.v, m = this.act(i), mv = MOVES[a.id], x = mv.m || {};
     v.turns++; this.lastUser = i;
+    // attaque empêchée (gel, sommeil, peur, confusion, paralysie) : la charge est perdue, et un Pokémon en vol ou sous terre revient
+    const stop = () => { v.charge = null; v.rampage = null; if (v.invuln) { v.invuln = null; this.ev.push({ t: 'hide', side: i, on: false }); } };
+    // Destruction, Explosion : le lanceur tombe même si l'attaque ne touche pas
+    const boomOut = () => { if (x.boom && !isFainted(m)) this.hp(i, -m.hp); };
     // statuts qui empêchent d'agir
     if (m.status === 'frz') {
       if (this.r(5) === 0) { m.status = null; this.ev.push({ t: 'status', side: i, status: null }); this.say(`${this.Nm(i)} n'est plus gelé !`); }
-      else { this.say(`${this.Nm(i)} est gelé !`); v.charge = null; v.rampage = null; return; }
+      else { this.say(`${this.Nm(i)} est gelé !`); stop(); return; }
     }
     if (m.status === 'slp') {
       m.slp -= this.ab(i) === 'early-bird' ? 2 : 1;
       if (m.slp <= 0) { m.status = null; this.ev.push({ t: 'status', side: i, status: null }); this.say(`${this.Nm(i)} se réveille !`); }
-      else { this.ev.push({ t: 'anim', side: i, k: 'sleep' }); this.say(`${this.Nm(i)} dort profondément.`); v.charge = null; v.rampage = null; return; }
+      else { this.ev.push({ t: 'anim', side: i, k: 'sleep' }); this.say(`${this.Nm(i)} dort profondément.`); stop(); return; }
     }
-    if (v.flinch && this.ab(i) !== 'inner-focus' && this.ab(i) !== 'coeur-vaillant') { this.say(`${this.Nm(i)} a peur ! Il ne peut pas attaquer !`); v.charge = null; return; }
+    if (v.flinch && this.ab(i) !== 'inner-focus' && this.ab(i) !== 'coeur-vaillant') { this.say(`${this.Nm(i)} a peur ! Il ne peut pas attaquer !`); stop(); return; }
     if (v.conf > 0) {
       v.conf--;
       if (v.conf === 0) this.say(`${this.Nm(i)} n'est plus confus !`);
@@ -706,14 +743,14 @@ export class Battle {
           const dmg = Math.max(1, Math.floor(Math.floor(Math.floor(2 * m.lvl / 5 + 2) * 40 * atk / def) / 50) + 2);
           this.say('Il se blesse dans sa confusion !');
           this.ev.push({ t: 'hit', side: i, eff: 1 });
-          this.hp(i, -dmg); v.charge = null; v.rampage = null; return;
+          this.hp(i, -dmg); stop(); return;
         }
       }
     }
-    if (m.status === 'par' && this.r(4) === 0) { this.ev.push({ t: 'anim', side: i, k: 'para' }); this.say(`${this.Nm(i)} est paralysé ! Il n'a pas pu attaquer !`); v.charge = null; v.rampage = null; return; }
+    if (m.status === 'par' && this.r(4) === 0) { this.ev.push({ t: 'anim', side: i, k: 'para' }); this.say(`${this.Nm(i)} est paralysé ! Il n'a pas pu attaquer !`); stop(); return; }
 
     // attaques en deux temps : premier tour
-    if (x.charge && v.charge !== mv.id) {
+    if (x.charge && v.charge !== mv.id && !(mv.key === 'solar-beam' && this.weather === 'sun')) {
       v.charge = mv.id;
       const slot = m.moves.findIndex((q) => q.id === mv.id); if (slot >= 0 && m.moves[slot].pp > 0) m.moves[slot].pp--;
       const txt = { 'solar-beam': 'absorbe la lumière !', 'razor-wind': 'se prépare !', 'sky-attack': 'est entouré d\'une lumière intense !', 'skull-bash': 'baisse la tête !', fly: 's\'envole !', dig: 's\'enfonce dans le sol !', dive: 'plonge !', bounce: 'saute très haut !' }[mv.key] || 'se concentre !';
@@ -730,7 +767,8 @@ export class Battle {
     // PP (Pression : deux PP)
     if (!charged && !v.rampage && mv.id !== 165) { const slot = a.slot ?? m.moves.findIndex((q) => q.id === mv.id); if (slot >= 0 && m.moves[slot]) m.moves[slot].pp = Math.max(0, m.moves[slot].pp - (this.ab(d) === 'pressure' ? 2 : 1)); }
     this.say(`${this.Nm(i)} utilise ${mv.n} !`);
-    if (mv.id === 165) { /* Lutte */ }
+    if (mv.id !== 165 && /^choice-/.test(m.item || '') && v.choice == null) v.choice = mv.id;
+    if (mv.key === 'fake-out' && v.turns > 1) { this.say('Mais cela échoue !'); return; }
     if (x.rampage && !v.rampage) v.rampage = { id: mv.id, turns: 2 + this.r(2) };
 
     const T = this.act(d), tv = this.sides[d].v;
@@ -743,12 +781,12 @@ export class Battle {
       return;
     }
     v.protChain = 0;
-    if (!selfTarget && tv.protect) { this.say(`${this.Nm(d)} se protège !`); v.rampage = null; return; }
+    if (!selfTarget && tv.protect) { this.say(`${this.Nm(d)} se protège !`); v.rampage = null; boomOut(); return; }
     if (!selfTarget && isFainted(T)) { this.say('Mais il n\'y a pas de cible...'); return; }
 
     // précision
     if (!selfTarget && !this.hits(i, d, mv)) {
-      this.say(`${this.Nm(i)} rate son attaque !`); v.rampage = null;
+      this.say(`${this.Nm(i)} rate son attaque !`); v.rampage = null; boomOut();
       if (['jump-kick', 'high-jump-kick'].includes(mv.key)) { this.say(`${this.Nm(i)} s'écrase au sol !`); this.hp(i, -Math.floor(m.stats[0] / 8)); }
       return;
     }
@@ -787,7 +825,9 @@ export class Battle {
     if (absorb && absorb[0] === type) { this.say(`${tAb.name} attire l'attaque vers ${this.nm(d)} !`); this.lastUser = d; this.boost(d, absorb[1], 1, true); v.rampage = null; return; }
     const eff = this.effOn(i, d, type);
     if (tAb?.id === 'wonder-guard' && eff <= 1 && this.fixedDamage(i, d, mv) == null) { this.say(`Garde Mystik protège ${this.nm(d)} !`); v.rampage = null; return; }
-    if (eff === 0) { this.say(`Ça n'affecte pas ${this.nm(d)}...`); v.rampage = null; return; }
+    if (eff === 0) { this.say(`Ça n'affecte pas ${this.nm(d)}...`); v.rampage = null; boomOut(); return; }
+    // Riposte, Voile Miroir, Fulmifer sans coup reçu, Effort sans écart de PV : l'attaque échoue, sans animation de coup
+    if (this.fixedDamage(i, d, mv) === 0) { this.say('Mais cela échoue !'); return; }
     if (x.cat === 9) {
       if (T.lvl > m.lvl || tAb?.id === 'sturdy') { this.say('Mais cela échoue !'); return; }
       this.ev.push({ t: 'hit', side: d, eff: 2 });
@@ -871,7 +911,7 @@ export class Battle {
     this.checkBerries(d);
     this.checkBerries(i);
     if (mv.id === 165) { this.hp(i, -Math.max(1, Math.floor(m.stats[0] / 4))); this.say(`${this.Nm(i)} est blessé par le contrecoup !`); }
-    if (x.boom) this.hp(i, -m.hp);
+    if (x.boom || mv.key === 'final-gambit') this.hp(i, -m.hp);
     if (x.recharge && !isFainted(T)) v.recharge = true;
     else if (x.recharge) v.recharge = true;
     // effets secondaires
@@ -921,6 +961,9 @@ export class Battle {
     if (u === 'psywave') return Math.max(1, Math.floor(m.lvl * (5 + this.r(11)) / 10));
     if (u === 'endeavor') return Math.max(0, T.hp - m.hp);
     if (u === 'counter' || u === 'mirror-coat') { const t = this.sides[i].v.dmgTaken; return t && t.c === (u === 'counter' ? 'physical' : 'special') ? t.amount * 2 : 0; }
+    // Fulmifer : rend une fois et demie les dégâts reçus pendant le tour ; Tout ou Rien : les PV du lanceur, qui tombe K.O.
+    if (mv.key === 'metal-burst') { const t = this.sides[i].v.dmgTaken; return t ? Math.floor(t.amount * 1.5) : 0; }
+    if (mv.key === 'final-gambit') return m.hp;
     return null;
   }
 
@@ -995,6 +1038,7 @@ export class Battle {
     if (scr.safeguard) return fail();
     if ((st === 'psn' || st === 'tox') && (types.includes('poison') || types.includes('steel'))) return fail();
     if (st === 'brn' && types.includes('fire')) return fail();
+    if (st === 'par' && types.includes('electric')) return fail();
     if (st === 'frz' && types.includes('ice')) return fail();
     const immune = { limber: ['par'], insomnia: ['slp'], 'vital-spirit': ['slp'], immunity: ['psn', 'tox'], 'water-veil': ['brn'], 'magma-armor': ['frz'] }[tid];
     if ((immune && immune.includes(st)) || (tid === 'leaf-guard' && this.weather === 'sun')) { if (!secondary) this.say(`${getAbility(T).name} protège ${this.nm(d)} !`); return false; }
@@ -1091,7 +1135,9 @@ export class Battle {
     if (this.weatherTurns > 0) {
       this.weatherTurns--;
       if (this.weatherTurns === 0 && this.weather !== 'none') {
-        this.setWeather('none', 0);
+        // la météo d'un talent s'arrête : celle de la zone (grêle des cimes, sable du désert) reprend
+        const back = this.baseWeather !== this.weather && !this.baseWeatherTurns ? this.baseWeather : 'none';
+        this.setWeather(back, 0);
       }
     }
     for (const s of this.sides) for (const k of Object.keys(s.screens)) { s.screens[k]--; if (s.screens[k] <= 0) { delete s.screens[k]; if (s.player || true) this.say(k === 'reflect' ? 'L\'effet de Protection prend fin.' : k === 'light' ? 'L\'effet de Mur Lumière prend fin.' : k === 'mist' ? 'La brume se dissipe.' : 'Le voile mystique disparaît.'); } }

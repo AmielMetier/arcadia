@@ -1,5 +1,20 @@
 # Journal des versions — Arcadia
 
+## 5.91 — 15 novembre 2026
+- **Odyssée** — Un combat ne peut plus rester bloqué après un K.O. quand on avait quitté le jeu en plein combat ; le jeu ne sauvegarde plus pendant un combat.
+- **Odyssée** — Des règles de combat remises d'aplomb :
+  - Bluff n'apeure plus qu'au premier tour.
+  - Un Pokémon en plein Vol ou Tunnel redescend s'il est paralysé, confus, gelé ou endormi au moment de frapper.
+  - Le Bandeau, les Lunettes et le Mouchoir Choix bloquent bien sur la première attaque utilisée.
+  - Boule Élek, Tacle Feu, Tout ou Rien et Fulmifer font enfin de vrais dégâts.
+  - Explosion et Destruction mettent le lanceur K.O. même si l'attaque ne touche pas ; Riposte et Voile Miroir échouent proprement sans coup reçu.
+  - Un Pokémon pris au piège (Ligotage, Danse Flamme) ne peut plus être rappelé ni fuir ; un type Électrik ne peut plus être paralysé ; Lance-Soleil part tout de suite au soleil.
+  - Quand une météo de talent s'arrête, celle du lieu reprend.
+- **Odyssée** — Une pierre d'évolution n'est plus perdue si on annule l'évolution, et une Ball déviée par un dresseur revient dans le sac.
+- **Odyssée** — Les Champions gardent leur dernier Pokémon : il n'est plus remplacé par une Méga sans rapport avec leur arène.
+- **Odyssée** — Ramoloss, Chenipotte, Ningale, Coquiperl et Cheniti peuvent maintenant prendre l'une ou l'autre de leurs deux évolutions, selon le Pokémon.
+- **Odyssée** — Les Pokémon de la nuit ne sortent plus que des hautes herbes (plus de Fantominus au bout de la canne à pêche), le statut d'un adversaire soigné disparaît bien de l'écran, et le Repousse laisse passer les Pokémon du même niveau que le vôtre.
+
 ## 5.90 — 14 novembre 2026
 - **Odyssée** — Plus aucun dresseur aux dessins provisoires en combat : montagnards, randonneuses, Top Dresseurs, karatékas, pêcheurs et les autres montrent enfin leur portrait.
 - **Odyssée** — Nouveaux dessins de combat pour le voleur, la fille en kimono, le moine, le vieil homme, Nox, Ariane, l'enfant, Pierre, et le héros et l'héroïne sur l'écran de départ et la Carte de Dresseur.

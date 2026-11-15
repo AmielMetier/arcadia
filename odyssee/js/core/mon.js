@@ -170,8 +170,11 @@ export function levelEvolution(m, hour = 12) {
     return isNight ? 197 : 196; // 197 = Noctali, 196 = Mentali
   }
   const ev = S.ev; if (!ev) return null;
-  const e = ev.find((x) => x.lvl && m.lvl >= x.lvl);
-  return e ? e.to : null;
+  // deux évolutions par niveau (Ramoloss, Chenipotte, Ningale, Coquiperl, Cheniti) : chaque Pokémon a la sienne,
+  // toujours la même, tirée de son identifiant
+  const lv = ev.filter((x) => x.lvl); if (!lv.length) return null;
+  const e = lv[lv.length > 1 ? (m.uid || 0) % lv.length : 0];
+  return m.lvl >= e.lvl ? e.to : null;
 }
 export function itemEvolution(m, item) {
   if (m.sp === 133) {

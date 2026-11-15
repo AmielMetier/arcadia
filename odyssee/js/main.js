@@ -136,7 +136,8 @@ async function boot() {
   // sauvegarde en ligne (compte du Hub) : chaque sauvegarde part aussi sur le serveur, regroupée
   const cloud = game.cloud = new Cloud();
   game.onSaved = (silent) => { if (silent) cloud.queue(game.state); };
-  const bye = () => { if (game.state && mode === 'game') { game.save(true); cloud.flush(); } };
+  // pas de sauvegarde en plein combat : elle garderait un état à moitié joué (PV, K.O., objets)
+  const bye = () => { if (game.state && mode === 'game' && !game.enCombat) { game.save(true); cloud.flush(); } };
   addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') bye(); });
   addEventListener('pagehide', bye);
   cloud.fetch();
