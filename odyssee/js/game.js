@@ -5,7 +5,7 @@ import { nearestWalkable } from './world/mapgen.js';
 import { encAt } from './world/rencontres.js';
 import { MEGAS_OF, MEGA_RING, LEGEND, STONE_FORM, revertMegas } from './core/mega.js';
 import { MEGA_FORMS } from './core/mega.js';
-import { createMon, monName, healFull, levelEvolution, itemEvolution, evolve, setUidBase, levelCap, ensureNature, apteCT } from './core/mon.js';
+import { createMon, movesChoisies, monName, healFull, levelEvolution, itemEvolution, evolve, setUidBase, levelCap, ensureNature, apteCT } from './core/mon.js';
 import { Battle } from './core/battle.js';
 import { ITEMS, itemName, applyItem, canUseOn, useCandy, formatFindItem, formatObtainItem, itemPocketName } from './core/items.js';
 import { SPECIES } from './data/species.js';
@@ -241,6 +241,12 @@ export class Game {
     this.link?.hello();
     this.view.update(0, this.player.x, this.player.y); await this.view.solPret?.();   // le sol généré est prêt avant d'ouvrir l'écran
     await this.ui.fade(false, 400);
+    // la partie a été quittée en plein combat de dresseur : il compte comme une défaite
+    if (state.combatEnCours) {
+      delete state.combatEnCours; this.busy = true;
+      await this.ui.say('Tu as quitté un combat de dresseur avant la fin : il compte comme une défaite.');
+      await this.whiteout(); this.busy = false; this.save(true);
+    }
     if (!state.flags.intro) { state.flags.intro = true; this.busy = true; await this.ui.say(['Une douce lumière filtre à travers les rideaux...', `Aujourd'hui, ${state.name}, ton aventure commence !`, 'Le Prof. Saule t\'attend à son laboratoire, le grand bâtiment blanc au cœur du village.', 'Appuie sur H à tout moment pour revoir les touches.']); this.busy = false; }
     else if (repriseVille) {
       this.busy = true;
@@ -1952,7 +1958,8 @@ export class Game {
       return createMon(sp, lvl, {
         iv: Array(6).fill(isBoss ? 31 : Math.min(31, 8 + lvl / 2 | 0)),
         item: heldItem || (isBoss ? leaderDefaultItem(sp, lvl) : null),
-        moves: customMoves || null,
+        // Champions, Ligue, rivaux (IA « smart ») : des attaques choisies plutôt que les quatre dernières apprises
+        moves: customMoves || (isBoss || tr.ai === 'smart' ? movesChoisies(sp, lvl) : null),
         ability: ability || null,
         shiny: false
       });
@@ -2121,7 +2128,7 @@ export class Game {
     this.enCombat = true;
     try { return await this.runBattleSafe(o); } catch (e) {
       console.error('combat interrompu', e);
-      try { revertMegas(this.state.party); for (const m of this.state.party) delete m._ko; } catch { /* rien à remettre */ }
+      try { revertMegas(this.state.party); for (const m of this.state.party) delete m._ko; delete this.state.combatEnCours; this.save(true); } catch { /* rien à remettre */ }
       document.querySelectorAll('.wipe, .battle-wipe').forEach((c) => c.remove());
       try { this.bv.close(); } catch { /* déjà fermé */ }
       this.sound.stopMusic?.(0.1); this.sound.current = null; this.musicLock = false;
@@ -2151,17 +2158,14 @@ export class Game {
         : o.trainer.megaSp === 'auto' ? [...o.party].sort((a, b) => b.lvl - a.lvl).find((q) => MEGAS_OF[q.sp])
           : o.party.find((q) => q.sp === o.trainer.megaSp);
       // personne dans l'équipe n'a de Méga : son dernier Pokémon laisse la place à un Pokémon qui en a une (toujours le même pour ce dresseur)
-      if (!target && o.trainer.megaSp === 'auto' && o.leader == null && !o.champion) {
-        const last = o.party[o.party.length - 1], pool = Object.keys(MEGAS_OF).map(Number).filter((sp) => !LEGEND.has(sp));
-        const sp = pool[(o.trainer.megaSeed || 0) % pool.length];
-        target = createMon(sp, last.lvl, { iv: last.iv, shiny: false });
-        o.party = [...o.party.slice(0, -1), target];
-      }
+      // personne dans l'équipe n'a de Méga : le dresseur s'en passe (on ne remplace plus son dernier Pokémon)
       const forms = target && MEGAS_OF[target.sp];
       const pid = forms && forms[(o.trainer.megaSeed || 0) % forms.length];
       if (pid) { target.item = MEGA_FORMS[pid].stone; o.trainer = { ...o.trainer, mega: true }; }
     }
-    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag, mega: (st.bag[MEGA_RING] || 0) > 0 }, foe: o.wild ? { name: 'sauvage', party: [o.wild] } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap(), weather: BATTLE_WEATHERS.includes(weather) ? weather : undefined });
+    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag, mega: (st.bag[MEGA_RING] || 0) > 0 }, foe: o.wild ? { name: 'sauvage', party: [o.wild] } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap(), weather: BATTLE_WEATHERS.includes(weather) ? weather : undefined, weatherTurns: o.weather ? 0 : 5 });
+    // combat de dresseur en cours : noté dans la sauvegarde, pour que recharger la page ne permette pas d'y échapper
+    if (o.trainer && !o.trainer.friendly && !o.noWhiteout) { st.combatEnCours = true; this.save(true); }
     const foeMons = o.wild ? [o.wild] : o.party;
     const h = this.hour();
     const result = await this.bv.run(battle, { bg, night: m.outdoor && (h >= 20 || h < 5.5), weather: BATTLE_WEATHERS.includes(weather) ? weather : 'none', curtain });
@@ -2188,6 +2192,7 @@ export class Game {
     else if (result === 'lose') await this.whiteout();
     this.sound.current = null;
     this.updateZone();
+    delete st.combatEnCours;
     this.save(true);
     return result;
   }

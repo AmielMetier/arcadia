@@ -1,5 +1,16 @@
 # Journal des versions — Arcadia
 
+## 5.92 — 15 novembre 2026
+- **Odyssée** — Les Champions, la Ligue et les rivaux se battent mieux, sans que le jeu devienne plus facile :
+  - Leurs Pokémon ont des attaques choisies (leurs meilleures attaques de type, une attaque de couverture, une danse ou un soin) au lieu des quatre dernières apprises.
+  - Ils ne lancent plus Séisme sur un Pokémon en Lévitation, ni une attaque Eau sur un Absorb-Eau : ils connaissent vos talents.
+  - Ils sont moins prévisibles, et ne se soignent plus deux tours de suite.
+- **Odyssée** — Les dresseurs ne sortent une Méga-Évolution que s'ils ont un Pokémon qui peut méga-évoluer : plus de Tyranocif chez un Insectomane.
+- **Odyssée** — La grêle des cimes et la tempête de sable du désert durent cinq tours au début du combat, plus tout le combat.
+- **Odyssée** — Évoli n'évolue plus tout seul au niveau 25 : Mentali vient avec la Pierre Soleil, Noctali avec la Pierre Lune.
+- **Odyssée** — Quitter le jeu en plein combat de dresseur compte maintenant comme une défaite.
+- **Odyssée** — « A atteint la limite de niveau » ne s'affiche plus qu'une fois par combat.
+
 ## 5.91 — 15 novembre 2026
 - **Odyssée** — Un combat ne peut plus rester bloqué après un K.O. quand on avait quitté le jeu en plein combat ; le jeu ne sauvegarde plus pendant un combat.
 - **Odyssée** — Des règles de combat remises d'aplomb :

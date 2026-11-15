@@ -305,7 +305,7 @@ export class Battle {
     const isSmart = t.ai === 'smart';
     const isRival = t.cls === 'Rival' || t.rival || this.rival;
     // 1. Utilisation stratégique des objets de soin par les Champions / Dresseurs
-    if (t.items) {
+    if (t.items && !(side.soinTour != null && this.turn - side.soinTour <= 1)) {
       const ratio = m.hp / m.stats[0];
       const hasStatus = !!m.status;
       const isAceOrLast = !side.party.some((p, idx) => idx !== side.active && p.hp > 0);
@@ -313,7 +313,7 @@ export class Battle {
 
       // Si altéré par un statut grave (sommeil, gel, poison, brûlure, paralysie) et qu'on a un Guérison
       if (hasStatus && t.items['full-restore'] > 0 && (ratio < 0.75 || this.rng() < 0.85)) {
-        t.items['full-restore']--;
+        t.items['full-restore']--; side.soinTour = this.turn;
         return { type: 'item', item: 'full-restore', foe: true };
       }
 
@@ -331,7 +331,7 @@ export class Battle {
           else if (t.items['full-restore'] > 0) chosen = 'full-restore';
 
           if (chosen) {
-            t.items[chosen]--;
+            t.items[chosen]--; side.soinTour = this.turn;
             return { type: 'item', item: chosen, foe: true };
           }
         }
@@ -354,6 +354,10 @@ export class Battle {
 
         // Si l'attaque n'a AUCUN effet (immunité de type), ne JAMAIS la choisir
         if (eff === 0) return { k, s: 0.0001 };
+        // talents du Pokémon du joueur qui annulent ou absorbent l'attaque (Lévitation, Absorb-Eau, Torche…)
+        { const pa = this.ab(1) === 'mold-breaker' ? null : this.ab(0);
+          const nul = { ground: ['levitate'], water: ['water-absorb', 'dry-skin', 'storm-drain'], electric: ['volt-absorb', 'lightning-rod', 'motor-drive'], fire: ['flash-fire'], grass: ['sap-sipper'] }[mvType];
+          if (pa && ((nul && nul.includes(pa)) || (pa === 'wonder-guard' && eff <= 1))) return { k, s: 0.0001 }; }
         // Bluff ne marche qu'au premier tour après l'entrée
         if (mv.key === 'fake-out' && this.sides[1].v.turns > 0) return { k, s: 0.0001 };
 
@@ -452,7 +456,10 @@ export class Battle {
     let pick;
     if (isSmart || isRival) {
       // Pour une IA très forte : prend TOUJOURS la décision la plus optimale
-      pick = scores.reduce((a, b) => (b.s > a.s ? b : a));
+      const tri = [...scores].sort((a, b) => b.s - a.s);
+      pick = tri[0];
+      const ko = MOVES[m.moves[pick.k].id].c !== 'status' && this.estimate(1, 0, MOVES[m.moves[pick.k].id]) >= playerMon.hp;
+      if (!ko && tri[1] && tri[1].s >= pick.s * 0.8 && this.rng() < 0.3) pick = tri[1];
     } else {
       const tot = scores.reduce((a, x) => a + x.s * x.s, 0);
       let r = this.rng() * tot;
@@ -1195,7 +1202,7 @@ export class Battle {
       gainEffort(m, foe.sp);
       if (m.lvl >= 100) continue;
       if (m.lvl >= this.cap) {
-        this.say(`${monName(m)} a atteint la limite de niveau actuelle (N.${this.cap}) !`);
+        if (!this.capDit) { this.capDit = true; this.say(`${monName(m)} a atteint la limite de niveau actuelle (N.${this.cap}) !`); }
         continue;
       }
       const amount = Math.max(1, base);
