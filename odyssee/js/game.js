@@ -206,7 +206,7 @@ export class Game {
     s.cleared ||= {}; s.explored ||= []; s.explores ||= {};
     s.dex ||= { seen: [], caught: [], seenCount: {} };
     s.dex.seenCount ||= {};
-    let maxUid = 0; for (const m of s.party.concat(s.box)) maxUid = Math.max(maxUid, m.uid || 0);
+    let maxUid = 0; for (const m of s.party.concat(s.box)) { maxUid = Math.max(maxUid, m.uid || 0); delete m._ko; }
     setUidBase(maxUid + 1);
     // Pokémon d'avant les natures : chacun reçoit la sienne (toujours la même), ses stats sont recalculées
     while (s.badges.length < BADGES.length) s.badges.push(false);   // anciennes parties : 8 badges → 15
@@ -778,7 +778,7 @@ export class Game {
       const rate = isGrassEnc(t) ? (t === T.DARKTALL ? 0.12 : 0.1) : 0.065;
       if (Math.random() < rate) {
         // le Pokémon est tiré d'abord : si un Repousse le fait fuir, le pas continue sans aucun arrêt
-        const tir = this.tirageSauvage(enc); if (!tir) return;
+        const tir = this.tirageSauvage(enc, { herbe: m.outdoor && isGrassEnc(t) }); if (!tir) return;
         // dans les grottes, il arrive qu'un Pokémon tombe du plafond
         if (!m.outdoor && t === T.CAVE && Math.random() < 0.3) await this.vie?.embuscade();
         await this.wildBattle(enc, { tirage: tir });
@@ -1807,7 +1807,8 @@ export class Game {
       const target = await partyScreen(this, { mode: 'pick', prompt: `Utiliser ${itemName(r.item)} sur quelle créature ?`, filter: (m) => (canUseOn(r.item, m, cap) ? null : it.candy && m.lvl >= cap && m.lvl < 100 ? `Niv. max (${cap})` : 'Pas d\'effet') });
       if (target < 0) continue;
       const m = st.party[target];
-      if (it.stone) { this.take(r.item); await this.evolveScene(m, itemEvolution(m, r.item)); return true; }
+      // la pierre n'est consommée que si l'évolution a bien lieu (elle peut être annulée)
+      if (it.stone) { if (await this.evolveScene(m, itemEvolution(m, r.item))) this.take(r.item); return true; }
       if (it.candy) {
         this.take(r.item); const steps = useCandy(m, cap); this.sound.sfx('levelup');
         await this.ui.say(`${monName(m)} monte au niveau ${m.lvl} !`);
@@ -1891,7 +1892,8 @@ export class Game {
     let pool = enc;
     const h = this.hour();
     const isNight = h >= 20 || h < 6;
-    if (!o.fixed && isNight && enc.length > 1) {
+    // les Pokémon de la nuit ne sortent que dans les hautes herbes du dehors (ni en surf, ni à la pêche, ni dans les grottes)
+    if (!o.fixed && o.herbe && isNight && enc.length > 1) {
       const avgLvl = Math.round(enc.reduce((a, x) => a + (x[1] + x[2]) / 2, 0) / enc.length);
       const minLvl = Math.max(2, avgLvl - 2), maxLvl = Math.max(minLvl, avgLvl + 2);
       const nightSp = avgLvl < 15 ? [92, 163, 167, 41] : avgLvl < 30 ? [92, 198, 41, 1039] : [93, 198, 42, 1040];
@@ -1902,7 +1904,7 @@ export class Game {
     if (!o.fixed) { const tot = pool.reduce((a, x) => a + x[3], 0); let r = Math.random() * tot; for (const x of pool) { r -= x[3]; if (r <= 0) { e = x; break; } } }
     const lvl = e[1] + Math.floor(Math.random() * (e[2] - e[1] + 1));
     const lead = this.lead(); if (!lead) return null;
-    if (!o.fixed && this.state.repel > 0 && lead.lvl >= lvl) return null;
+    if (!o.fixed && this.state.repel > 0 && lead.lvl > lvl) return null;
     return { e, lvl };
   }
 
@@ -2116,15 +2118,17 @@ export class Game {
 
   /** combat générique ; o.wild (créature) ou o.trainer + o.party. Si quelque chose casse, on ne reste jamais devant un écran noir. */
   async runBattle(o) {
+    this.enCombat = true;
     try { return await this.runBattleSafe(o); } catch (e) {
       console.error('combat interrompu', e);
+      try { revertMegas(this.state.party); for (const m of this.state.party) delete m._ko; } catch { /* rien à remettre */ }
       document.querySelectorAll('.wipe, .battle-wipe').forEach((c) => c.remove());
       try { this.bv.close(); } catch { /* déjà fermé */ }
       this.sound.stopMusic?.(0.1); this.sound.current = null; this.musicLock = false;
       await this.ui.say('Le combat a été interrompu. Réessaie !');
       this.updateZone();
       return 'flee';
-    }
+    } finally { this.enCombat = false; }
   }
   async runBattleSafe(o) {
     const st = this.state;
@@ -2147,7 +2151,7 @@ export class Game {
         : o.trainer.megaSp === 'auto' ? [...o.party].sort((a, b) => b.lvl - a.lvl).find((q) => MEGAS_OF[q.sp])
           : o.party.find((q) => q.sp === o.trainer.megaSp);
       // personne dans l'équipe n'a de Méga : son dernier Pokémon laisse la place à un Pokémon qui en a une (toujours le même pour ce dresseur)
-      if (!target && o.trainer.megaSp === 'auto') {
+      if (!target && o.trainer.megaSp === 'auto' && o.leader == null && !o.champion) {
         const last = o.party[o.party.length - 1], pool = Object.keys(MEGAS_OF).map(Number).filter((sp) => !LEGEND.has(sp));
         const sp = pool[(o.trainer.megaSeed || 0) % pool.length];
         target = createMon(sp, last.lvl, { iv: last.iv, shiny: false });
@@ -2263,6 +2267,7 @@ export class Game {
       for (const id of res.ask) await this.askLearn(m, id);
     }
     alive = false; s.remove(); this.sound.current = null; this.updateZone();
+    return !cancelled;
   }
 
   /** meubles et objets du décor : un petit texte, comme sur DS (le lit de la maison soigne l'équipe) */
