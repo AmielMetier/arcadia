@@ -1,5 +1,15 @@
 # Journal des versions — Arcadia
 
+## 5.96 — 16 novembre 2026
+- **Odyssée** — Les 781 espèces du Pokédex peuvent maintenant toutes être obtenues :
+  - 22 Pokémon qu'on ne trouvait nulle part apparaissent, rares, dans les hautes herbes qui leur vont : Togepi sur la route 2, Capumain et Ceribou dans le Bois, Zarbi dans les ruines du Sanctuaire des Marées, Pitrouille dans la Forêt des Torii…
+  - Les partenaires de départ de Sinnoh et d'Unys se croisent aussi à l'état sauvage.
+  - En pêchant, une prise sur dix est rare : Qwilfish, Venalgue, Flingouste, Opermine ou Moustillon.
+- **Odyssée** — Après la Ligue :
+  - 33 légendaires apparaissent au bord des routes, de Kyogre et Rayquaza à Reshiram, Zekrom et Xerneas. Certains attendent qu'on ait capturé ceux qui vont avec : les trois Regi pour Regigigas, Dialga, Palkia et Giratina pour Arceus. Et le gardien d'Odyssée se montre enfin…
+  - Les Champions, le Conseil 4 et Célestine acceptent une revanche par jour, avec des équipes entre les niveaux 70 et 86.
+  - La Tour de Combat ouvre dans le hall de la Ligue : des séries de sept combats contre des équipes tirées au sort. Les Points Combat gagnés s'échangent contre des Super Bonbons, des objets Choix, des Restes… et une Master Ball.
+
 ## 5.95 — 16 novembre 2026
 - **Odyssée** — 29 nouvelles baies :
   - Six qui guérissent une altération dès qu'elle survient (Baie Ceriz contre la paralysie, Baie Maron contre le sommeil…).

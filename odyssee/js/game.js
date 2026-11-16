@@ -39,6 +39,7 @@ import { preparerDomaine, frigo, architecte, recolter, allerDomaine, resident, a
 import { composer, tenueValide, tenueOrigine } from './render/tenue.js';
 import { buildRivalParty, getRivalItems } from './world/rival.js';
 import { Vie, parlerFaune, rentreLeSoir } from './vie.js';
+import { revancheBossPossible, revancheBoss, tourCombat } from './tour-combat.js';
 import { VieMonde, colporteur, marche, cueillir, fouiller, revanchePossible, revanche, noteCombat, ragot, echange, relais, concours, loterie, musicien } from './vie-monde.js';
 
 /** météos qui comptent en combat (brume et cendres ne sont que du décor, comme dans les jeux 5G) */
@@ -1171,6 +1172,7 @@ export class Game {
     try {
       if (d.trainer) {
         if (!st.flags['T:' + n.id]) await this.trainerBattle(n, false);
+        else if (revancheBossPossible(this, n)) await revancheBoss(this, n);
         else if (revanchePossible(this, n)) await revanche(this, n);
         else {
           await this.ui.say(d.trainer.after || 'Quel combat !', {
@@ -1553,6 +1555,11 @@ export class Game {
         [60, minL, maxL, 10],   // Ptitard
         [98, minL, maxL, 10],   // Krabby
       ];
+    }
+    // prises rares, partout où l'on pêche (une fois sur dix) : Qwilfish, Venalgue, Flingouste, Opermine, Moustillon
+    if (Math.random() < 0.1) {
+      const lv = pool.map((e) => e[1]), lo = Math.min(...lv), hi = Math.max(...pool.map((e) => e[2]));
+      pool = [[211, lo, hi, 25], [690, lo, hi, 20], [692, lo, hi, 20], [688, lo, hi, 20], [501, lo, hi, 15]];
     }
 
     const bite = Math.random() < 0.85;
@@ -1957,7 +1964,7 @@ export class Game {
       face: tr.bs || tr.ow || n.sprite
     });
     // le premier champion reste une marche d'apprentissage : IV ordinaires et pas d'objet tenu
-    const isBoss = (d.leader != null && d.leader !== 0) || d.champion;
+    const isBoss = (d.leader != null && d.leader !== 0) || d.champion || d.boss;
     const leaderDefaultItem = (sp, lvl) => {
       const S = SPECIES[sp]; if (!S) return 'sitrus-berry';
       const type = S.t[0] || 'normal';
@@ -1977,7 +1984,7 @@ export class Game {
         shiny: false
       });
     });
-    const res = await this.runBattle({ trainer: { ...tr, items: { ...(tr.items || {}) } }, party, music, id: n.id, leader: d.leader, champion: d.champion, rival: d.rival });
+    const res = await this.runBattle({ trainer: { ...tr, items: { ...(tr.items || {}) } }, party, music, id: n.id, leader: d.leader, champion: d.champion, rival: d.rival, noWhiteout: d.noWhiteout });
     this.musicLock = false;
     if (res === 'win') {
       st.flags['T:' + n.id] = true;
@@ -2461,6 +2468,7 @@ export class Game {
     if (name === 'resident') return resident(this, n);
     if (name === 'faune') return parlerFaune(this, n);
     if (name === 'colporteur') return colporteur(this, n);
+    if (name === 'tourCombat') return tourCombat(this, n);
     if (name === 'marche') return marche(this, n);
     if (name === 'echange') return echange(this, n);
     if (name === 'relais') return relais(this, n);

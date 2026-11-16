@@ -5,6 +5,30 @@ import { RENCONTRES, AVANT } from '../data/rencontres.js';
 import { TRONCONS } from '../data/troncons.js';
 import { walkable, surfable } from './tiles.js';
 
+/* ---------------- espèces ajoutées en 5.96 ----------------
+ * Des Pokémon qu'on ne trouvait nulle part : on les glisse, rares, dans un tronçon qui leur va (forêt, grotte, ruines,
+ * neige…), au niveau de ce tronçon. [clé du tronçon (data/troncons.js), indice du tronçon, espèce, chance en %] */
+const AJOUTS = [
+  ['r2', 1, 175, 2],            // Togepi
+  ['bois', 0, 190, 4], ['bois', 1, 420, 4], ['bois', 2, 387, 2],   // Capumain, Ceribou, Tortipouss
+  ['map:grotte', 1, 714, 3],    // Sonistrelle
+  ['r4', 2, 707, 3], ['r4', 3, 605, 3],   // Trousselin, Lewsor
+  ['r5', 5, 495, 2],            // Vipélierre
+  ['orage1', 1, 479, 3],        // Motisma
+  ['r6', 2, 237, 2], ['r6', 3, 107, 2],   // Kapoera, Tygnon
+  ['r7', 1, 390, 2],            // Ouisticram
+  ['map:marees', 0, 201, 6], ['map:marees', 1, 201, 6],   // Zarbi, dans les ruines du sanctuaire
+  ['torii', 0, 710, 5], ['torii', 1, 708, 4],             // Pitrouille, Brocélôme
+  ['map:victoire', 1, 703, 3],  // Strassie
+  ['givre1', 0, 238, 3], ['givre1', 1, 393, 2],           // Lippouti, Tiplouf
+  ['r11', 1, 562, 3],           // Tutafeh
+  ['r12', 1, 374, 3],           // Terhal
+];
+for (const [cle, i, sp, chance] of AJOUTS) {
+  const t = TRONCONS[cle]?.[i]; if (!t || t.some((e) => e[0] === sp)) continue;
+  t.push([sp, t[0][1], t[0][2], chance]);
+}
+
 /** part des rencontres laissée aux Pokémon des jeux officiels (le reste : la table faite main de la zone) */
 const PART_OFFICIELS = 0.6;
 
