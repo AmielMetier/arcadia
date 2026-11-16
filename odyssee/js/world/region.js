@@ -94,6 +94,19 @@ const STOCK = {
   6: ['great-ball', 'ultra-ball', 'hyper-potion', 'max-potion', 'full-heal', 'revive', 'max-repel', 'escape-rope', 'ether', 'elixir'],
   7: ['ultra-ball', 'hyper-potion', 'max-potion', 'full-restore', 'full-heal', 'revive', 'max-repel', 'escape-rope', 'elixir'],
 };
+// baies et objets tenus (5.95) : de plus en plus au fil des boutiques ; les grandes villes du Sud vendent les objets de
+// combat les plus forts (les baies de résistance poussent aussi sur les arbres à baies : world/faune.js)
+{ const plus = {
+    3: ['cheri-berry', 'pecha-berry', 'rawst-berry'],
+    4: ['cheri-berry', 'chesto-berry', 'pecha-berry', 'rawst-berry', 'aspear-berry', 'persim-berry', 'muscle-band', 'wise-glasses'],
+    5: ['cheri-berry', 'chesto-berry', 'pecha-berry', 'rawst-berry', 'aspear-berry', 'persim-berry', 'occa-berry', 'passho-berry', 'wacan-berry', 'rindo-berry', 'yache-berry', 'shuca-berry',
+      'muscle-band', 'wise-glasses', 'quick-claw', 'scope-lens', 'big-root', 'white-herb'],
+    6: ['occa-berry', 'passho-berry', 'wacan-berry', 'rindo-berry', 'yache-berry', 'chople-berry', 'shuca-berry', 'coba-berry', 'payapa-berry', 'kasib-berry', 'haban-berry', 'colbur-berry', 'roseli-berry',
+      'muscle-band', 'wise-glasses', 'quick-claw', 'scope-lens', 'expert-belt', 'white-herb', 'kings-rock', 'black-sludge', 'shell-bell', 'leftovers', 'focus-sash',
+      'charcoal', 'mystic-water', 'miracle-seed', 'magnet', 'never-melt-ice', 'black-belt', 'poison-barb', 'soft-sand', 'sharp-beak', 'twisted-spoon', 'silver-powder', 'hard-stone', 'spell-tag', 'dragon-fang', 'black-glasses', 'metal-coat', 'silk-scarf', 'fairy-feather'],
+    7: ['liechi-berry', 'ganlon-berry', 'petaya-berry', 'apicot-berry', 'salac-berry', 'assault-vest', 'expert-belt', 'life-orb', 'choice-band', 'choice-specs', 'choice-scarf', 'eviolite', 'rocky-helmet', 'leftovers', 'focus-sash'],
+  };
+  for (const [k, L] of Object.entries(plus)) STOCK[k] = STOCK[k].concat(L); }
 
 /* ---------------- rencontres sauvages : [espèce, niveau min, niveau max, poids] ---------------- */
 export const ENC = {

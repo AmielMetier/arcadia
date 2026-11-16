@@ -1,6 +1,10 @@
 // odyssee/js/world/faune.js — Pokémon en liberté dans les villes (posés à la création du monde ; leur comportement : vie.js)
 import { T, walkable } from './tiles.js';
 import { along, nearestWalkable } from './mapgen.js';
+// ce que donnent les arbres à baies : surtout des Baies Oran et Sitrus, et toutes les baies de soin et de résistance
+const BAIES_ARBRES = ['oran-berry', 'sitrus-berry', 'cheri-berry', 'oran-berry', 'pecha-berry', 'lum-berry', 'rawst-berry', 'sitrus-berry', 'chesto-berry', 'aspear-berry',
+  'persim-berry', 'oran-berry', 'occa-berry', 'passho-berry', 'wacan-berry', 'rindo-berry', 'sitrus-berry', 'yache-berry', 'chople-berry', 'kebia-berry', 'shuca-berry',
+  'coba-berry', 'oran-berry', 'payapa-berry', 'tanga-berry', 'charti-berry', 'kasib-berry', 'haban-berry', 'colbur-berry', 'sitrus-berry', 'babiri-berry', 'chilan-berry', 'roseli-berry'];
 import { ITEMS } from '../core/items.js';
 
 /* ================= fossiles (trouvés en fouillant les grottes, ranimés par le Dr Silex à Pierrefort) ================= */
@@ -98,7 +102,7 @@ export function addVieRoutes(W, routes) {
       for (let d = 1; d <= 4 && n < 2; d++) for (const s of [1, -1]) {
         const x = Math.round(cx + q.nx * d * s), y = Math.round(cy + q.ny * d * s);
         if (W.get(x, y) !== T.TREE || !walkable(W.get(x, y + 1)) || isGrass(W.get(x, y + 1)) || W.objectAt(x, y) || W.zoneAt(x, y)?.town) continue;
-        W.object(x, y, { type: 'baies', id: `baies:${r.id}:${n}`, baie: ['oran-berry', 'oran-berry', 'sitrus-berry', 'lum-berry'][(i + n) % 4] });
+        W.object(x, y, { type: 'baies', id: `baies:${r.id}:${n}`, baie: BAIES_ARBRES[(i * 7 + n) % BAIES_ARBRES.length] });
         n++; break;
       }
     }
