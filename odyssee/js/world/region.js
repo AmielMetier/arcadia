@@ -19,6 +19,7 @@ import { applyRetouches } from './retouches.js';
 import { redresserPonts } from './ponts.js';
 import { rangs, mers, tourbillonsDuBord, rendreALaForet, degager, oterDecorIsole } from './acces.js';
 import { appliquerBareme } from './bareme.js';
+import { poserCT } from './cts.js';
 import { buildArena } from './arenes.js';
 import { construireArene } from './arenes-plan.js';
 import { PLANS } from './arenes-plans.js';
@@ -1364,6 +1365,8 @@ export function buildWorld() {
     W.finitions.decor = oterDecorIsole(W, RG.get('monde'));
     W.finitions.degages = degager(W);
     W.finitions.bareme = appliquerBareme(maps, RG);
+    // les CT 16 à 62 : chacune à la place d'un objet ordinaire de son rang (world/cts.js)
+    W.finitions.cts = poserCT(maps, RG);
     // des objets cachés en ville : un tonneau, une caisse, un pot au bord d'une rue, au barème de l'endroit (rythme.js)
     W.cachettes = cachettesDesVilles(W, towns, RG.get('monde')); }
   // retouches faites dans l'éditeur de la version test et intégrées au jeu (world/retouches.js)
@@ -1375,7 +1378,7 @@ export function buildWorld() {
   if (W.anciensObjets.length) throw new Error('anciens objets jamais posés : ' + W.anciensObjets.map((q) => q.join(' ')).join(', '));
   // dernier filet : dans une maison, personne ne reste planté dans un meuble posé après lui (table, fossile, canapé)
   for (const m of Object.values(maps)) if (!m.outdoor && m.floor === 'wood') for (const n of m.npcs) if (!walkable(m.get(n.x, n.y))) { const [x, y] = caseLibreDedans(m, n.x, n.y); n.x = x; n.y = y; }
-  return { maps, towns, routes, legends, docks, quests, moved, start: { map: 'aube:maison', x: 4, y: 6, dir: 'up' }, carte: CARTE_VERSION };
+  return { maps, towns, routes, legends, docks, quests, moved, cts: W.finitions?.cts || [], start: { map: 'aube:maison', x: 4, y: 6, dir: 'up' }, carte: CARTE_VERSION };
 }
 
 

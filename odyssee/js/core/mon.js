@@ -262,7 +262,7 @@ export function gainEffort(m, foeSp) {
 export function apteCT(sp, it) {
   const S = SPECIES[sp]; if (!S || !it?.ct) return false;
   const types = it.types || [MOVES[it.ct]?.t];
-  if ((it.especes || []).includes(sp)) return true;
+  if (it.tous || (it.especes || []).includes(sp)) return true;
   if (S.t.some((t) => types.includes(t))) return true;
   return (S.ls || []).some(([, id]) => types.includes(MOVES[id]?.t));
 }

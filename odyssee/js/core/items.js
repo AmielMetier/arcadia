@@ -3,6 +3,7 @@ import { ITEM_NAMES } from '../data/types.js';
 import { MOVES } from '../data/moves.js';
 import { monName, healFull, gainExp, itemEvolution, expFor } from './mon.js';
 import { SPECIES } from '../data/species.js';
+import { CTS } from '../data/cts.js';
 
 // poche : 'soin' | 'balls' | 'objets'
 export const ITEMS = {
@@ -107,6 +108,17 @@ export const ITEMS = {
   'harnais-flottant': { pocket: 'cles', price: 0, key: true, field: 'surf', icon: 'harnais-flottant', name: 'Harnais Flottant', desc: 'Une selle nautique étanche avec flotteurs profilés. Permet de glisser sur l\'eau et la mer. Place-toi face à l\'eau et appuie sur F.' },
   'sifflet-celeste': { pocket: 'cles', price: 0, key: true, field: 'vol', icon: 'sifflet-celeste', name: 'Sifflet Céleste', desc: 'Un sifflet ouvragé en argent et ruban saphir. Il appelle un grand oiseau pour voyager en un instant vers une ville déjà visitée (depuis le menu ou le sac).' },
 };
+// les CT 02 à 62 (data/cts.js) : objets clés de la poche « CT & CS », qui ne s'usent pas
+{ const TY = { normal: 'Normal', fighting: 'Combat', flying: 'Vol', poison: 'Poison', ground: 'Sol', rock: 'Roche', bug: 'Insecte', ghost: 'Spectre', steel: 'Acier', fire: 'Feu', water: 'Eau', grass: 'Plante', electric: 'Électrik', psychic: 'Psy', ice: 'Glace', dragon: 'Dragon', dark: 'Ténèbres', fairy: 'Fée' };
+  const CAT = { physical: 'Physique', special: 'Spéciale', status: 'Statut' };
+  const parCle = Object.fromEntries(Object.values(MOVES).map((m) => [m.key, m]));
+  for (const [k, c] of Object.entries(CTS)) {
+    const M = parCle[c.move]; if (!M) throw new Error('CT sans attaque : ' + k + ' ' + c.move);
+    const chiffres = M.c === 'status' ? '' : ` · Puissance ${M.p || '—'} · Précision ${M.a || '—'}`;
+    ITEMS[k] = { pocket: 'ct', price: 0, key: true, ct: M.id, tous: c.tous || undefined, icon: 'notebook', name: `CT${String(c.n).padStart(2, '0')} ${M.n}`,
+      desc: `${TY[M.t]} · ${CAT[M.c]}${chiffres}. ${c.tous ? 'Presque tous les Pokémon peuvent l\'apprendre.' : `Pour les Pokémon de type ${TY[M.t]} et ceux qui maîtrisent déjà ce type.`} Elle ne s'use pas.` };
+  }
+}
 export const itemName = (k) => ITEMS[k]?.name || ITEM_NAMES[k] || k;
 export const POCKETS = [['objets', 'Objets'], ['soin', 'Soins'], ['balls', 'Poké Balls'], ['ct', 'CT & CS'], ['baies', 'Baies'], ['cles', 'Objets Rares']];
 
