@@ -86,5 +86,17 @@ let fails = 0; const ok = (c, msg) => { console.log((c ? '  ✓ ' : '  ✗ ') + 
   let dits = 0; for (let n = 0; n < 8 && bc.state === 'choose'; n++) dits += texts(bc.playerAction({ type: 'move', idx: 0 })).filter((t) => /limite de niveau/.test(t)).length;
   ok(dits === 1, 'limite de niveau : annoncée une seule fois par combat');
 }
+{ // CT : une par Champion, les autres posées une fois chacune dans le monde, rattrapage des anciennes parties
+  const { CTS, CT_DU_BADGE, CTS_POSEES } = await import('../odyssee/js/data/cts.js');
+  const { ITEMS } = await import('../odyssee/js/core/items.js'); const { apteCT } = await import('../odyssee/js/core/mon.js');
+  const { buildWorld } = await import('../odyssee/js/world/region.js'); const { rattraperCT } = await import('../odyssee/js/world/cts.js');
+  ok(Object.keys(CTS).every((k) => ITEMS[k]?.ct && MOVES[ITEMS[k].ct]), `${Object.keys(CTS).length + 1} CT, chacune avec son attaque`);
+  ok([...Array(15).keys()].every((g) => ITEMS[CT_DU_BADGE[g]]), 'une CT pour chacun des 15 Champions');
+  const w = buildWorld(); const poses = new Set(w.cts.map((c) => c[0]));
+  ok(CTS_POSEES.every((k) => poses.has(k)) && w.cts.length === CTS_POSEES.length, `les ${CTS_POSEES.length} CT du monde sont toutes posées, une fois chacune`);
+  ok(apteCT(sp('Ronflex'), ITEMS['ct-23']) && !apteCT(sp('Magicarpe'), ITEMS['ct-12']), 'Abri pour (presque) tous, Séisme pas pour Magicarpe');
+  const st = { flags: { ['I:' + w.cts[0][2]]: true }, bag: {} }; rattraperCT(st, w.cts);
+  ok(st.bag[w.cts[0][0]] === 1, 'objet déjà ramassé devenu CT : la CT est donnée au chargement');
+}
 console.log(fails ? `\nRÈGLES DE COMBAT : ${fails} échec(s)` : '\nRÈGLES DE COMBAT : OK');
 process.exit(fails ? 1 : 0);

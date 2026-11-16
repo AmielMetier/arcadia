@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.94 — 16 novembre 2026
+- **Odyssée** — 61 nouvelles CT, de la CT02 à la CT62 :
+  - Chaque Champion donne maintenant une CT de son type avec son badge (Vibraqua chez Marine, Lance-Flammes chez Pyros, Séisme chez Gaspard…).
+  - Les autres sont cachées dans le monde, de plus en plus fortes au fil des badges : Faux-Chage et Aéropique au début, Tonnerre, Laser Glace et Danse Lames au milieu, Déflagration, Blizzard et Ultralaser vers la fin.
+  - Une CT ne s'use pas. Si tu avais déjà ramassé l'objet qu'une CT a remplacé, tu la reçois au prochain lancement.
+
 ## 5.93 — 15 novembre 2026
 - **Odyssée** — Sur téléphone :
   - Tenu à la verticale, le jeu demande de tourner le téléphone au lieu d'afficher un écran coupé.

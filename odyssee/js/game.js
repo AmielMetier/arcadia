@@ -7,6 +7,8 @@ import { MEGAS_OF, MEGA_RING, LEGEND, STONE_FORM, revertMegas } from './core/meg
 import { MEGA_FORMS } from './core/mega.js';
 import { createMon, movesChoisies, monName, healFull, levelEvolution, itemEvolution, evolve, setUidBase, levelCap, ensureNature, apteCT } from './core/mon.js';
 import { Battle } from './core/battle.js';
+import { CT_DU_BADGE } from './data/cts.js';
+import { rattraperCT } from './world/cts.js';
 import { ITEMS, itemName, applyItem, canUseOn, useCandy, formatFindItem, formatObtainItem, itemPocketName } from './core/items.js';
 import { SPECIES } from './data/species.js';
 import { MOVES } from './data/moves.js';
@@ -215,6 +217,8 @@ export class Game {
     s.cleared ||= {}; s.explored ||= []; s.explores ||= {};
     s.dex ||= { seen: [], caught: [], seenCount: {} };
     s.dex.seenCount ||= {};
+    // CT posées à la place d'objets qu'une ancienne partie avait déjà ramassés : elle les reçoit
+    rattraperCT(s, this.world?.cts);
     let maxUid = 0; for (const m of s.party.concat(s.box)) { maxUid = Math.max(maxUid, m.uid || 0); delete m._ko; }
     setUidBase(maxUid + 1);
     // Pokémon d'avant les natures : chacun reçoit la sienne (toujours la même), ses stats sont recalculées
@@ -2034,11 +2038,14 @@ export class Game {
       this.give(itk); this.sound.sfx('item');
       await ui.say(formatObtainItem(st.name, itk, 1, FIELD[gift]));
     }
-    // CT01 Pollen Collant (Hector) : une attaque Insecte propre à Odyssée
-    if (g === 0 && !st.bag['ct-01']) {
-      this.give('ct-01'); this.sound.sfx('item');
-      await ui.say(formatObtainItem(st.name, 'ct-01'));
-      await ui.say(['La CT01 contient Pollen Collant : une attaque Insecte qui englue la cible et baisse sa Vitesse.', 'Une CT ne s\'use pas : tu peux l\'apprendre à autant de Pokémon que tu veux !'], { speaker: name });
+    // la CT du Champion, du type de son arène (CT01 Pollen Collant pour Hector : une attaque Insecte propre à Odyssée)
+    const ct = CT_DU_BADGE[g];
+    if (ct && !st.bag[ct]) {
+      this.give(ct); this.sound.sfx('item');
+      await ui.say(formatObtainItem(st.name, ct));
+      await ui.say(g === 0
+        ? ['La CT01 contient Pollen Collant : une attaque Insecte qui englue la cible et baisse sa Vitesse.', 'Une CT ne s\'use pas : tu peux l\'apprendre à autant de Pokémon que tu veux !']
+        : `Elle contient ${ITEMS[ct].name.replace(/^CT\d+ /, '')}. Une CT ne s'use pas : sers-t'en autant que tu veux.`, { speaker: name });
     }
     if (g === 7) { st.flags.drakos = true; this.give('town-map'); }
     this.refreshGates();

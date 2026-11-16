@@ -70,10 +70,11 @@ export const rangRoute = (id) => RANG_ROUTES[id] ?? 4;
  * à pousser sur la route 1, ou sur un îlot du port qu'on n'atteint qu'en surfant, reste un objet du début de l'aventure.
  * Renvoie la liste des changements [carte, id, avant, après, rang, zone].
  */
-export function appliquerBareme(maps, RG) {
-  const changes = [], parZone = new Map();
-  let total = { 'rare-candy': 0, pierre: 0 };
-  const lignes = [];
+export function appliquerBareme(maps, RG) { return retrograder(lignesObjets(maps, RG)); }
+
+/** les objets ordinaires posés (ceux du barème) avec le rang de l'endroit : { id: carte, m, it, propre, rang, zone } */
+export function lignesObjets(maps, RG) {
+  const lignes = [], parZone = new Map();
   for (const [id, m] of Object.entries(maps)) {
     const r = RG.get(id); if (!r || !m.items?.length) continue;
     let min = JAMAIS; if (id !== 'monde') for (let i = 0; i < r.length; i++) if (r[i] < min) min = r[i];
@@ -89,6 +90,12 @@ export function appliquerBareme(maps, RG) {
       lignes.push({ id, m, it, propre, rang: Math.min(propre, zr === JAMAIS ? propre : zr), zone: zn });
     }
   }
+  return lignes;
+}
+
+function retrograder(lignes) {
+  const changes = [];
+  let total = { 'rare-candy': 0, pierre: 0 };
   // les objets comptés des rangs 2 et 3 : du plus loin dans l'aventure au plus proche (puis du mieux caché), un par
   // zone, trois en tout
   lignes.sort((a, b) => b.rang - a.rang || b.propre - a.propre);
