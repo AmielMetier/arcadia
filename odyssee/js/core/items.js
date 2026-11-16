@@ -4,6 +4,7 @@ import { MOVES } from '../data/moves.js';
 import { monName, healFull, gainExp, itemEvolution, expFor } from './mon.js';
 import { SPECIES } from '../data/species.js';
 import { CTS } from '../data/cts.js';
+import { NOUVEAUX_OBJETS } from '../data/baies-objets.js';
 
 // poche : 'soin' | 'balls' | 'objets'
 export const ITEMS = {
@@ -108,6 +109,8 @@ export const ITEMS = {
   'harnais-flottant': { pocket: 'cles', price: 0, key: true, field: 'surf', icon: 'harnais-flottant', name: 'Harnais Flottant', desc: 'Une selle nautique étanche avec flotteurs profilés. Permet de glisser sur l\'eau et la mer. Place-toi face à l\'eau et appuie sur F.' },
   'sifflet-celeste': { pocket: 'cles', price: 0, key: true, field: 'vol', icon: 'sifflet-celeste', name: 'Sifflet Céleste', desc: 'Un sifflet ouvragé en argent et ruban saphir. Il appelle un grand oiseau pour voyager en un instant vers une ville déjà visitée (depuis le menu ou le sac).' },
 };
+// baies et objets tenus de la 5.95 (data/baies-objets.js)
+Object.assign(ITEMS, NOUVEAUX_OBJETS);
 // les CT 02 à 62 (data/cts.js) : objets clés de la poche « CT & CS », qui ne s'usent pas
 { const TY = { normal: 'Normal', fighting: 'Combat', flying: 'Vol', poison: 'Poison', ground: 'Sol', rock: 'Roche', bug: 'Insecte', ghost: 'Spectre', steel: 'Acier', fire: 'Feu', water: 'Eau', grass: 'Plante', electric: 'Électrik', psychic: 'Psy', ice: 'Glace', dragon: 'Dragon', dark: 'Ténèbres', fairy: 'Fée' };
   const CAT = { physical: 'Physique', special: 'Spéciale', status: 'Statut' };

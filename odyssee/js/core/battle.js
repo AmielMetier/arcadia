@@ -4,6 +4,7 @@ import { SPECIES } from '../data/species.js';
 import { MOVES } from '../data/moves.js';
 import { TYPE_CHART } from '../data/types.js';
 import { monName, gainExp, gainEffort, isFainted, expProgress } from './mon.js';
+import { RESIST, SOIN, STAT_BAIE } from '../data/baies-objets.js';
 import { ITEMS, itemName, applyItem } from './items.js';
 import { getAbility, abilityName } from '../data/abilities.js';
 import { megaFormOf, megaEvolve, revertMegas } from './mega.js';
@@ -159,6 +160,13 @@ export class Battle {
       this.hp(i, 10);
       this.ev.push({ t: 'sfx', k: 'heal' });
       this.say(`${this.Nm(i)} consomme sa Baie Oran et récupère des PV !`);
+    } else if (SOIN[m.item] && (SOIN[m.item] === 'conf' ? this.sides[i].v.conf > 0 : m.status === SOIN[m.item] || (SOIN[m.item] === 'psn' && m.status === 'tox'))) {
+      const k = m.item; m.item = null;
+      if (SOIN[k] === 'conf') { this.sides[i].v.conf = 0; this.say(`La ${itemName(k)} guérit la confusion de ${this.nm(i)} !`); }
+      else { m.status = null; m.slp = 0; m.tox = 0; this.ev.push({ t: 'status', side: i, status: null }); this.say(`La ${itemName(k)} guérit ${this.nm(i)} !`); }
+    } else if (STAT_BAIE[m.item] && m.hp <= m.stats[0] / 4) {
+      const k = m.item; m.item = null;
+      this.say(`${this.Nm(i)} mange sa ${itemName(k)} !`); this.lastUser = i; this.boost(i, STAT_BAIE[k], 1, true);
     } else if (m.item === 'lum-berry' && m.status) {
       m.item = null;
       m.status = null; m.slp = 0; m.tox = 0;
@@ -209,6 +217,7 @@ export class Battle {
       if (id === 'flare-boost' && m.status === 'brn') x = Math.floor(x * 1.5);
     } else if (k === 4) { // Déf Spé
       if (m.item === 'eviolite' && SPECIES[m.sp]?.ev?.length) x = Math.floor(x * 1.5);
+      if (m.item === 'assault-vest') x = Math.floor(x * 1.5);
       if (this.weather === 'sandstorm' && SPECIES[m.sp]?.t?.includes('rock')) x = Math.floor(x * 1.5);
     } else if (k === 5) { // Vitesse
       if (m.item === 'choice-scarf') x = Math.floor(x * 1.5);
@@ -358,7 +367,8 @@ export class Battle {
         { const pa = this.ab(1) === 'mold-breaker' ? null : this.ab(0);
           const nul = { ground: ['levitate'], water: ['water-absorb', 'dry-skin', 'storm-drain'], electric: ['volt-absorb', 'lightning-rod', 'motor-drive'], fire: ['flash-fire'], grass: ['sap-sipper'] }[mvType];
           if (pa && ((nul && nul.includes(pa)) || (pa === 'wonder-guard' && eff <= 1))) return { k, s: 0.0001 }; }
-        // Bluff ne marche qu'au premier tour après l'entrée
+        // Bluff ne marche qu'au premier tour après l'entrée ; pas d'attaque de statut avec une Veste de Combat
+        if (mv.c === 'status' && m.item === 'assault-vest') return { k, s: 0.0001 };
         if (mv.key === 'fake-out' && this.sides[1].v.turns > 0) return { k, s: 0.0001 };
 
         const d = this.estimate(1, 0, mv);
@@ -525,7 +535,9 @@ export class Battle {
       const mv = MOVES[x.a.id], id = this.ab(x.i);
       return mv.pr + ((id === 'prankster' && mv.c === 'status') || (id === 'gale-wings' && mv.t === 'flying') ? 1 : 0);
     };
-    movers.sort((p, q) => prio(q) - prio(p) || this.stat(q.i, 5) - this.stat(p.i, 5) || this.tie(p, q));
+    for (const x of movers) x.griffe = this.act(x.i).item === 'quick-claw' && x.a.type === 'move' && this.r(5) === 0;
+    movers.sort((p, q) => prio(q) - prio(p) || (q.griffe ? 1 : 0) - (p.griffe ? 1 : 0) || this.stat(q.i, 5) - this.stat(p.i, 5) || this.tie(p, q));
+    for (const x of movers) if (x.griffe && movers[0] === x && movers.length > 1) this.say(`La Vive Griffe de ${this.nm(x.i)} lui permet d'agir en premier !`);
     movers.forEach((x, n) => { x.first = n === 0 && movers.length === 2; });
     for (const x of movers) {
       if (this.state === 'over') return;
@@ -674,7 +686,7 @@ export class Battle {
       ground: 'soft-sand', flying: 'sharp-beak', fighting: 'black-belt',
       poison: 'poison-barb', psychic: 'twisted-spoon', bug: 'silver-powder',
       dragon: 'dragon-fang', ice: 'never-melt-ice', steel: 'metal-coat',
-      normal: 'silk-scarf'
+      normal: 'silk-scarf', ghost: 'spell-tag', fairy: 'fairy-feather'
     };
     if (typeBoosters[type] && A.item === typeBoosters[type]) {
       dmg = Math.floor(dmg * 1.2);
@@ -682,6 +694,7 @@ export class Battle {
     if (A.item === 'life-orb') {
       dmg = Math.floor(dmg * 1.3);
     }
+    if ((A.item === 'muscle-band' && phys) || (A.item === 'wise-glasses' && !phys)) dmg = Math.floor(dmg * 1.1);
     // Météo sur les dégâts
     if (this.weather === 'rain') {
       if (type === 'water') dmg = Math.floor(dmg * 1.5);
@@ -694,6 +707,7 @@ export class Battle {
     const eff = this.effOn(a, d, type);
     dmg = Math.floor(dmg * eff);
     if (aId === 'tinted-lens' && eff > 0 && eff < 1) dmg *= 2;
+    if (A.item === 'expert-belt' && eff > 1) dmg = Math.floor(dmg * 1.2);
     // Talents du défenseur
     if (dAb?.id === 'thick-fat' && (type === 'fire' || type === 'ice')) {
       dmg = Math.floor(dmg / 2);
@@ -776,6 +790,7 @@ export class Battle {
     this.say(`${this.Nm(i)} utilise ${mv.n} !`);
     if (mv.id !== 165 && /^choice-/.test(m.item || '') && v.choice == null) v.choice = mv.id;
     if (mv.key === 'fake-out' && v.turns > 1) { this.say('Mais cela échoue !'); return; }
+    if (mv.c === 'status' && m.item === 'assault-vest') { this.say(`La Veste de Combat empêche ${this.nm(i)} d'utiliser ${mv.n} !`); return; }
     if (x.rampage && !v.rampage) v.rampage = { id: mv.id, turns: 2 + this.r(2) };
 
     const T = this.act(d), tv = this.sides[d].v;
@@ -846,13 +861,18 @@ export class Battle {
     for (; n < hits; n++) {
       if (isFainted(T)) break;
       const noCrit = tAb?.id === 'battle-armor' || tAb?.id === 'shell-armor';
-      const crit = !noCrit && this.r(24) < [1, 3, 6, 8, 12][Math.min(4, (x.crit || 0) + (this.ab(i) === 'super-luck' ? 1 : 0))];
+      const crit = !noCrit && this.r(24) < [1, 3, 6, 8, 12][Math.min(4, (x.crit || 0) + (this.ab(i) === 'super-luck' ? 1 : 0) + (m.item === 'scope-lens' ? 1 : 0))];
       let p = this.movePower(i, d, mv);
       if (tv.invuln === 'dig' && ['earthquake', 'magnitude'].includes(mv.key)) p *= 2;
       let dmg = this.fixedDamage(i, d, mv);
       if (dmg == null) dmg = this.damageCore(i, d, mv, p, type, crit, (85 + this.r(16)) / 100);
       else if (eff === 0) dmg = 0;
       if (x.u === 'false-swipe' && dmg >= T.hp) dmg = T.hp - 1;
+      // baie de résistance : la moitié des dégâts d'une attaque super efficace de son type (Baie Zalis : toute attaque Normal)
+      if (dmg > 0 && RESIST[T.item] === type && (eff > 1 || type === 'normal') && this.fixedDamage(i, d, mv) == null && this.ab(i) !== 'unnerve') {
+        const k = T.item; T.item = null; dmg = Math.max(1, Math.floor(dmg / 2));
+        this.say(`${this.Nm(d)} mange sa ${itemName(k)} : elle affaiblit l'attaque !`);
+      }
       // Fermeté & Ceinture Force (survie à 1 PV si PV au max)
       if (dmg >= T.hp && T.hp === T.stats[0]) {
         if (T.item === 'focus-sash') {
@@ -876,7 +896,9 @@ export class Battle {
     }
     if (hits > 1) this.say(`Touché ${n} fois !`);
     // drain / recul
-    if (x.drain > 0 && total > 0 && !isFainted(m)) { const h = Math.max(1, Math.floor(total * x.drain / 100)); if (this.hp(i, h)) this.say(`${this.Nm(d)} a perdu de l'énergie !`); }
+    if (m.item === 'shell-bell' && total > 0 && !isFainted(m) && m.hp < m.stats[0]) { this.hp(i, Math.max(1, Math.floor(total / 8))); this.say(`${this.Nm(i)} récupère des PV grâce au Grelot Coque !`); }
+    if (m.item === 'kings-rock' && total > 0 && first && !x.flinch && !isFainted(T) && this.r(10) === 0 && tAb?.id !== 'inner-focus' && tAb?.id !== 'coeur-vaillant') tv.flinch = true;
+    if (x.drain > 0 && total > 0 && !isFainted(m)) { const h = Math.max(1, Math.floor(total * x.drain / 100 * (m.item === 'big-root' ? 1.3 : 1))); if (this.hp(i, h)) this.say(`${this.Nm(d)} a perdu de l'énergie !`); }
     if (x.drain < 0 && total > 0 && this.ab(i) !== 'rock-head' && this.ab(i) !== 'magic-guard') { this.hp(i, -Math.max(1, Math.floor(total * -x.drain / 100))); this.say(`${this.Nm(i)} est blessé par le contrecoup !`); }
     // Recul de l'Orbe Vie
     if (m.item === 'life-orb' && total > 0 && !isFainted(m) && this.ab(i) !== 'magic-guard') {
@@ -1078,6 +1100,12 @@ export class Battle {
     this.ev.push({ t: 'stat', side: i, up: c > 0, all: this.stages() });
     const amt = Math.abs(c) >= 2 ? (c > 0 ? 'beaucoup ' : 'beaucoup ') : '';
     this.say(`${name[0].toUpperCase() + name.slice(1)} de ${this.nm(i)} ${c > 0 ? 'augmente' : 'baisse'}${amt ? ' ' + amt.trim() : ''} !`);
+    // Herbe Blanche : annule les baisses de stats, une fois
+    if (c < 0 && this.act(i).item === 'white-herb') {
+      for (let k = 0; k < v.st.length; k++) if (v.st[k] < 0) v.st[k] = 0;
+      this.act(i).item = null; this.ev.push({ t: 'stat', side: i, up: true, all: this.stages() });
+      this.say(`${this.Nm(i)} utilise son Herbe Blanche : ses stats reviennent à la normale !`);
+    }
     if (byFoe && c < 0 && (id === 'defiant' || id === 'competitive') && !this._defiant) { this._defiant = true; this.say(`${getAbility(this.act(i)).name} de ${this.nm(i)} s'active !`); this.boost(i, id === 'defiant' ? 2 : 4, 2, true); this._defiant = false; }
     return true;
   }
@@ -1101,6 +1129,11 @@ export class Battle {
       if (isFainted(m)) continue;
       if (v.trap > 0) { v.trap--; this.say(`${this.Nm(i)} est blessé par le piège !`); this.hp(i, -Math.max(1, Math.floor(m.stats[0] / 16))); if (!v.trap) this.say(`${this.Nm(i)} est libéré !`); }
       if (isFainted(m)) continue;
+      // Boue Noire : soigne un Pokémon Poison, blesse les autres
+      if (m.item === 'black-sludge') {
+        if (SPECIES[m.sp].t.includes('poison')) { if (m.hp < m.stats[0]) { this.hp(i, Math.max(1, Math.floor(m.stats[0] / 16))); this.say(`${this.Nm(i)} récupère un peu de PV grâce à sa Boue Noire !`); } }
+        else if (this.ab(i) !== 'magic-guard') { this.hp(i, -Math.max(1, Math.floor(m.stats[0] / 8))); this.say(`${this.Nm(i)} est blessé par la Boue Noire !`); if (isFainted(m)) continue; }
+      }
       // Restes (Leftovers)
       if (m.item === 'leftovers' && m.hp < m.stats[0]) {
         const rec = Math.max(1, Math.floor(m.stats[0] / 16));

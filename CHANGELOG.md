@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 5.95 — 16 novembre 2026
+- **Odyssée** — 29 nouvelles baies :
+  - Six qui guérissent une altération dès qu'elle survient (Baie Ceriz contre la paralysie, Baie Maron contre le sommeil…).
+  - Dix-huit de résistance, qui divisent par deux une attaque super efficace de leur type (Baie Chocco contre le Feu, Baie Lampou contre les Ténèbres…).
+  - Cinq qui montent une stat quand les PV passent sous le quart.
+- **Odyssée** — 13 nouveaux objets à tenir : Veste de Combat, Ceinture Pro, Bandeau Muscle, Lunettes Sages, Vive Griffe, Lentilscope, Grosse Racine, Roche Royale, Herbe Blanche, Boue Noire, Grelot Coque, Rune Sort et Plume Fée.
+- **Odyssée** — Les boutiques vendent ces baies et objets au fil de l'aventure. Les grandes villes du Sud proposent les plus forts : Restes, Orbe Vie, objets Choix, Ceinture Force. Les arbres à baies donnent maintenant toutes les baies de soin et de résistance.
+
 ## 5.94 — 16 novembre 2026
 - **Odyssée** — 61 nouvelles CT, de la CT02 à la CT62 :
   - Chaque Champion donne maintenant une CT de son type avec son badge (Vibraqua chez Marine, Lance-Flammes chez Pyros, Séisme chez Gaspard…).

@@ -98,5 +98,23 @@ let fails = 0; const ok = (c, msg) => { console.log((c ? '  ✓ ' : '  ✗ ') + 
   const st = { flags: { ['I:' + w.cts[0][2]]: true }, bag: {} }; rattraperCT(st, w.cts);
   ok(st.bag[w.cts[0][0]] === 1, 'objet déjà ramassé devenu CT : la CT est donnée au chargement');
 }
+{ // baies et objets tenus (5.95)
+  const { ITEMS } = await import('../odyssee/js/core/items.js');
+  const hit = (k, item, foeName = 'Ronflex', lv = 50) => { seed = 3; const me = mk('Dracolosse', 60, [k]), foe = mk(foeName, lv, ['splash'], { item }); foe.stats[0] = foe.hp = 9999; const b = wild(me, foe); const ev = b.playerAction({ type: 'move', idx: 0 }); return [9999 - foe.hp, texts(ev), foe, me]; };
+  const [sansB] = hit('flamethrower', null, 'Florizarre'), [avecB, tb, f1] = hit('flamethrower', 'occa-berry', 'Florizarre');
+  ok(avecB < sansB * 0.6 && !f1.item && tb.some((t) => /Baie Chocco/.test(t)), `Baie Chocco : Lance-Flammes super efficace divisé par deux (${sansB} → ${avecB})`);
+  const [, , f2] = hit('dragon-claw', 'occa-berry', 'Florizarre'); ok(f2.item === 'occa-berry', 'Baie Chocco gardée face à une attaque d\'un autre type');
+  seed = 4; const p = mk('Pikachu', 50, ['thunder-wave']), foe = mk('Ronflex', 50, ['splash'], { item: 'cheri-berry' }); const b = wild(p, foe); b.playerAction({ type: 'move', idx: 0 });
+  ok(!foe.status && !foe.item, 'Baie Ceriz : la paralysie est guérie aussitôt');
+  const [avecV] = hit('flamethrower', 'assault-vest', 'Florizarre'); ok(avecV < sansB * 0.8, 'Veste de Combat : Déf. Spé. renforcée');
+  seed = 5; const v = mk('Ronflex', 50, ['rest', 'body-slam'], { item: 'assault-vest' }); const bv = wild(v, mk('Pikachu', 50, ['splash'])); v.hp = 10;
+  ok(texts(bv.playerAction({ type: 'move', idx: 0 })).some((t) => /Veste de Combat empêche/.test(t)) && v.hp <= 10, 'Veste de Combat : pas d\'attaque de statut');
+  seed = 6; const wh = mk('Florizarre', 50, ['splash'], { item: 'white-herb' }); const bw = wild(mk('Pikachu', 50, ['growl']), wh); bw.sides[1].v.st[1] = 0;
+  const bw2 = new Battle({ rng, player: { name: 'A', party: [mk('Pikachu', 50, ['growl'])], bag: {} }, foe: { name: 'w', party: [wh] } }); bw2.start(); bw2.playerAction({ type: 'move', idx: 0 });
+  ok(bw2.sides[1].v.st[1] === 0 && !wh.item, 'Herbe Blanche : la baisse d\'Attaque est annulée');
+  const icones = Object.keys(ITEMS).filter((k) => /berry|vest|belt|band|glasses|claw|lens|root|rock|herb|sludge|bell|tag|feather/.test(k));
+  const fs = await import('node:fs'); const manque = icones.filter((k) => !fs.existsSync(new URL(`../odyssee/img/pokeapi/items/${k}.png`, import.meta.url)) && !fs.existsSync(new URL(`../odyssee/img/items/${k}.png`, import.meta.url)));
+  ok(!manque.length, `toutes les baies et objets tenus ont leur icône${manque.length ? ' (manque : ' + manque.join(', ') + ')' : ''}`);
+}
 console.log(fails ? `\nRÈGLES DE COMBAT : ${fails} échec(s)` : '\nRÈGLES DE COMBAT : OK');
 process.exit(fails ? 1 : 0);
