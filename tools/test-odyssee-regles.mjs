@@ -116,5 +116,15 @@ let fails = 0; const ok = (c, msg) => { console.log((c ? '  ✓ ' : '  ✗ ') + 
   const fs = await import('node:fs'); const manque = icones.filter((k) => !fs.existsSync(new URL(`../odyssee/img/pokeapi/items/${k}.png`, import.meta.url)) && !fs.existsSync(new URL(`../odyssee/img/items/${k}.png`, import.meta.url)));
   ok(!manque.length, `toutes les baies et objets tenus ont leur icône${manque.length ? ' (manque : ' + manque.join(', ') + ')' : ''}`);
 }
+{ // après la Ligue : 33 légendaires au bord des routes, tous atteignables, seulement pour le Maître
+  const { buildWorld } = await import('../odyssee/js/world/region.js'); const { rangs, JAMAIS } = await import('../odyssee/js/world/acces.js');
+  const w = buildWorld(), m = w.maps.monde, apres = w.legends.filter((q) => q.apresLigue);
+  const r = rangs(w.maps, w.docks, { map: 'monde', x: w.towns.A.x + 5, y: w.towns.A.y + 7 }, { bloquants: false }).get('monde');
+  const loin = apres.filter((L) => ![[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => { const v = r[(L.y + dy) * m.w + L.x + dx]; return v != null && v !== JAMAIS; }));
+  ok(apres.length === 33 && !loin.length, `33 légendaires d'après la Ligue, tous atteignables${loin.length ? ' (sauf ' + loin.map((L) => L.id).join(', ') + ')' : ''}`);
+  ok(apres.every((L) => !L.cond({}) && (L.id === 'odyssor' || L.cond({ champion: true }) || ['regigigas', 'arceus', 'keldeo', 'demeteros', 'kyurem'].includes(L.id))), 'ils n\'apparaissent qu\'au Maître de la Ligue');
+  const { buildWorld: _ } = { buildWorld }; void _;
+  ok(!!w.maps['plateau:ligue'].npcs.find((n) => n.def?.script === 'tourCombat' || n.script === 'tourCombat'), 'le Maître de la Tour de Combat attend dans le hall de la Ligue');
+}
 console.log(fails ? `\nRÈGLES DE COMBAT : ${fails} échec(s)` : '\nRÈGLES DE COMBAT : OK');
 process.exit(fails ? 1 : 0);

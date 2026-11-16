@@ -1,0 +1,112 @@
+// odyssee/js/tour-combat.js — l'après-Ligue côté jeu :
+//   - les revanches des Champions, du Conseil 4 et de la Maître (une par jour, équipes au niveau 70 à 86) ;
+//   - la Tour de Combat (hall de la Ligue) : séries de 7 combats contre des équipes tirées au hasard, Pokémon soignés entre
+//     chaque combat ; chaque série gagnée rapporte des Points Combat (PCo), échangés contre des objets rares.
+import { SPECIES } from './data/species.js';
+import { LEGENDAIRES } from './data/rencontres.js';
+import { ITEMS, itemName } from './core/items.js';
+import { healFull } from './core/mon.js';
+
+const JOUR = 20 * 3600e3;
+const tour = (st) => (st.tour ||= { serie: 0, record: 0, pco: 0, revanches: {} });
+
+/* ================= revanches des Champions et de la Ligue ================= */
+const estBoss = (d) => d.leader != null || d.champion || d.trainer?.cls === 'Conseil 4';
+/** un Champion, un membre du Conseil 4 ou la Maître déjà battu, une fois Maître de la Ligue : une revanche par jour */
+export function revancheBossPossible(game, n) {
+  const d = n.def, st = game.state;
+  if (!d.trainer || !estBoss(d) || !st.flags.champion || !st.flags['T:' + n.id]) return false;
+  const t = tour(st).revanches[n.id];
+  return t == null || Date.now() - t >= JOUR;
+}
+export async function revancheBoss(game, n) {
+  const d = n.def, tr = d.trainer, st = game.state, ui = game.ui;
+  const who = { speaker: tr.cls ? `${tr.cls} ${tr.name}` : tr.name, face: tr.bs || tr.ow || n.sprite };
+  if (!(await ui.yesNo(['Le nouveau Maître de la Ligue en personne !', 'Mon équipe s\'est entraînée sans relâche depuis notre combat. Une revanche, à pleine puissance ?'], who))) { await ui.say('Quand tu veux. Je serai prêt.', who); return; }
+  // à pleine puissance : niveaux 70 à 86, attaques choisies, IA forte (trainerBattle : d.boss)
+  const team = tr.team.map((e) => { const [sp, lvl, item, moves, ab] = Array.isArray(e) ? e : [e.sp, e.lvl, e.item, e.moves, e.ability];
+    return [sp, Math.min(100, Math.max(lvl + 5, 70 + Math.round(lvl / 8))), item, null, ab]; });
+  const id = n.id + ':revanche';
+  const fake = { ...n, id, def: { ...d, id, leader: undefined, champion: undefined, boss: true, onWin: undefined, winScript: undefined, beatenPos: undefined, vanish: undefined,
+    trainer: { ...tr, team, ai: 'smart', prize: (tr.prize || 100) * 2, megaSp: tr.megaSp || 'auto', intro: ['Cette fois, je ne retiens rien !'] } } };
+  tour(st).revanches[n.id] = Date.now();
+  const res = await game.trainerBattle(fake, false);
+  delete st.flags['T:' + id];
+  if (res === 'win') {
+    await ui.say(['Tu restes le Maître. Ça ne fait aucun doute.', 'Prends ça : tu l\'as bien mérité.'], who);
+    await game.api().give(['rare-candy', 'full-restore', 'ultra-ball'][Math.floor(Math.random() * 3)], 1);
+  }
+}
+
+/* ================= Tour de Combat ================= */
+const CLASSES = [['Topdresseur', 'topdresseur'], ['Topdresseuse', 'topdresseuse'], ['Karatéka', 'karateka'], ['Médium', 'medium'], ['Montagnard', 'montagnard'], ['Scientifique', 'scientifique'], ['Dresseur Dragon', 'topdresseur'], ['Ninja', 'gamin']];
+const NOMS_F = ['Alix', 'Céleste', 'Élise', 'Gaëlle', 'Inès', 'Kenza', 'Maëlys', 'Olympe', 'Romane', 'Sacha', 'Théa', 'Wendy', 'Zoé'];
+const NOMS_M = ['Basile', 'Dorian', 'Fabien', 'Hugo', 'Jules', 'Lucien', 'Noé', 'Pablo', 'Sacha', 'Ugo', 'Valère', 'Yanis', 'Alix'];
+const OBJETS = ['leftovers', 'life-orb', 'choice-band', 'choice-specs', 'choice-scarf', 'focus-sash', 'assault-vest', 'expert-belt', 'sitrus-berry', 'lum-berry', 'rocky-helmet', 'white-herb', 'quick-claw', 'scope-lens'];
+/** les Pokémon de la Tour : formes finales (ou sans évolution), sans légendaires, assez costauds */
+let POOL = null;
+function pool() {
+  if (POOL) return POOL;
+  const LEG = new Set(LEGENDAIRES);
+  POOL = Object.entries(SPECIES).map(([id, S]) => [+id, S]).filter(([id, S]) => id < 10000 && !(id > 721 && id < 1001) && !LEG.has(id) && !S.legend && !(S.ev || []).length && S.b.reduce((a, b) => a + b, 0) >= 420).map(([id]) => id);
+  return POOL;
+}
+/** l'équipe du n-ième adversaire d'une série (3 Pokémon, plus forts au fil de la série) */
+function adversaire(n, niveau, r) {
+  const P = pool(), team = [];
+  while (team.length < 3) { const sp = P[Math.floor(r() * P.length)]; if (!team.some((e) => e[0] === sp)) team.push([sp, niveau, OBJETS[Math.floor(r() * OBJETS.length)]]); }
+  const [cls, ow] = CLASSES[Math.floor(r() * CLASSES.length)];
+  const noms = /euse$|Médium/.test(cls) ? NOMS_F : NOMS_M;
+  return { cls, name: noms[Math.floor(r() * noms.length)], team, ow, ai: n >= 3 ? 'smart' : 'normal', prize: 0, items: n >= 5 ? { 'hyper-potion': 1 } : {} };
+}
+/** la boutique des Points Combat : [objet, prix en PCo] */
+const BOUTIQUE = [['rare-candy', 3], ['pp-up', 3], ['max-revive', 2], ['full-restore', 2], ['leftovers', 8], ['life-orb', 8], ['choice-band', 8], ['choice-specs', 8], ['choice-scarf', 8],
+  ['assault-vest', 8], ['focus-sash', 6], ['expert-belt', 6], ['rocky-helmet', 6], ['eviolite', 6], ['master-ball', 30]].filter(([k]) => ITEMS[k]);
+
+export async function tourCombat(game, n) {
+  const st = game.state, ui = game.ui, T = tour(st), who = { speaker: 'Maître de la Tour', face: n.sprite };
+  if (!st.flags.champion) { await ui.say(['Ici se tiendra la Tour de Combat.', 'Elle n\'accueille que les Maîtres de la Ligue. Reviens quand tu auras battu Célestine.'], who); return; }
+  await ui.say([`Bienvenue à la Tour de Combat, ${st.name} !`, `Tu as ${T.pco} Point${T.pco > 1 ? 's' : ''} Combat. Ta meilleure série : ${T.record} victoire${T.record > 1 ? 's' : ''}.`], who);
+  const c = await ui.ask('Que veux-tu faire ?', ['Relever le défi', 'Échanger des PCo', 'Les règles', 'Rien'], who);
+  if (c === 2) { await ui.say(['Sept combats d\'affilée contre des dresseurs tirés au sort, avec trois Pokémon chacun.', 'Tes Pokémon sont soignés entre chaque combat. Une défaite, et la série s\'arrête.', 'Chaque série gagnée rapporte des Points Combat, d\'autant plus que ta série dure.', 'Tu ne perds ni argent ni rien d\'autre en cas de défaite.'], who); return; }
+  if (c === 1) { await boutique(game, who); return; }
+  if (c !== 0) return;
+  if (st.party.length < 3) { await ui.say('Il te faut au moins trois Pokémon.', who); return; }
+  // niveau des adversaires : celui du meilleur Pokémon de l'équipe, au moins 50
+  const niveau = Math.max(50, ...st.party.map((m) => m.lvl));
+  let graine = (Date.now() ^ (T.serie * 7919)) >>> 0; const r = () => { graine = (graine * 1103515245 + 12345) >>> 0; return (graine >>> 8) / 16777216; };
+  for (let k = 0; k < 7; k++) {
+    for (const m of st.party) healFull(m);
+    const adv = adversaire(k, niveau, r);
+    await ui.say(`Combat ${k + 1} sur 7. Série en cours : ${T.serie} victoire${T.serie > 1 ? 's' : ''}.`, who);
+    const fake = { id: 'tour:' + k, x: n.x, y: n.y, dir: n.dir, sprite: adv.ow, def: { id: 'tour:' + k, boss: true, sprite: adv.ow, noWhiteout: true,
+      trainer: { cls: adv.cls, name: adv.name, team: adv.team, ai: adv.ai, prize: 0, items: adv.items, intro: k === 6 ? 'Le dernier combat de la série. Donne tout !' : 'En garde !', lose: 'Bien joué…' } } };
+    const res = await game.trainerBattle(fake, false);
+    delete st.flags['T:tour:' + k];
+    if (res !== 'win') {
+      for (const m of st.party) healFull(m);
+      await ui.say([`La série s'arrête à ${T.serie} victoire${T.serie > 1 ? 's' : ''}.`, 'Reviens quand tu veux tenter ta chance à nouveau !'], who);
+      T.serie = 0; game.save(true); return;
+    }
+    T.serie++; T.record = Math.max(T.record, T.serie); game.save(true);
+    if (k < 6 && !(await ui.yesNo('Continuer la série ?'))) {
+      await ui.say('La série est mise en pause. Elle reprendra au prochain combat.', who); for (const m of st.party) healFull(m); return;
+    }
+  }
+  for (const m of st.party) healFull(m);
+  const gain = 3 + Math.min(7, Math.floor(T.serie / 7) - 1);
+  T.pco += gain; game.save(true);
+  await ui.say([`Sept victoires de suite ! Ta série en est à ${T.serie}.`, `Tu gagnes ${gain} Points Combat.`], who);
+}
+async function boutique(game, who) {
+  const st = game.state, ui = game.ui, T = tour(st);
+  for (;;) {
+    const i = await ui.list({ title: `Échanger des PCo (tu en as ${T.pco})`, items: BOUTIQUE.map(([k, p]) => ({ label: itemName(k), right: `${p} PCo` })).concat([{ label: 'Quitter' }]), cancel: BOUTIQUE.length });
+    if (i < 0 || i >= BOUTIQUE.length) return;
+    const [k, p] = BOUTIQUE[i];
+    if (T.pco < p) { await ui.say('Tu n\'as pas assez de Points Combat.', who); continue; }
+    if (!(await ui.yesNo(`Échanger ${p} PCo contre ${itemName(k)} ?`))) continue;
+    T.pco -= p; game.give(k, 1); game.sound.sfx('item'); game.save(true);
+    await ui.say(`Tu obtiens ${itemName(k)} !`);
+  }
+}

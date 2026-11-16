@@ -20,6 +20,7 @@ import { redresserPonts } from './ponts.js';
 import { rangs, mers, tourbillonsDuBord, rendreALaForet, degager, oterDecorIsole } from './acces.js';
 import { appliquerBareme } from './bareme.js';
 import { poserCT } from './cts.js';
+import { poserLegendairesApresLigue, poserTourDeCombat } from './apres-ligue.js';
 import { buildArena } from './arenes.js';
 import { construireArene } from './arenes-plan.js';
 import { PLANS } from './arenes-plans.js';
@@ -1311,6 +1312,7 @@ export function buildWorld() {
   // Ligue : la Maître
   const league = maps['plateau:ligue'];
   league.npc({ id: 'champion', x: 7, y: 3, dir: 'down', sprite: CHAMPION.ow, champion: true, trainer: { cls: 'Maître', name: CHAMPION.name, team: CHAMPION.team, prize: 200, bs: CHAMPION.ow, ai: 'smart', megaSp: 149, items: { 'full-restore': 3 }, intro: CHAMPION.intro, lose: CHAMPION.lose, sight: 0 } });
+  poserTourDeCombat(league);
   league.npc({ id: 'ligue-garde', x: 5, y: 15, sprite: 'garde', dir: 'right', text: ['Bienvenue à la Ligue Céleste.', 'La Maître t\'attend au bout du tapis. Bonne chance !'] });
 
   // Labo : professeur, assistant
@@ -1364,6 +1366,8 @@ export function buildWorld() {
   { const t0 = performance.now(); W.ecrans = ecrans(W); W.ecrans.ms = Math.round(performance.now() - t0); }
   // un panneau au départ du sentier de chaque lieu habité (hameau, ferme, verger)
   W.panneauxLieux = panneauxDesLieux(W);
+  // après la Ligue : les légendaires qu'on ne trouvait nulle part, au bord des routes (apres-ligue.js)
+  W.apresLigue = poserLegendairesApresLigue(W, routes, legends);
   // le rythme des routes (rythme.js) : raccourcis à sens unique et rebords à sauter, objets cachés, panneaux aux deux bouts
   { const t0 = performance.now(); W.rythme = rythme(W, routes, { trainerNpc }); W.rythme.ms = Math.round(performance.now() - t0); }
   // petites barrières de bois le long des chemins des routes (jamais là où elles couperaient un passage)
