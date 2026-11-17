@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.100 — 17 novembre 2026
+- Correction : ancrage au sol des personnages, objets et batiments Noir & Blanc (Amiel)
+
 ## 5.99 — 17 novembre 2026
 - Correction : crash chunks Noir & Blanc, projection orthographique et fondu tramé des bâtiments (Amiel)
 
