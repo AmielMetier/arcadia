@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.99 — 17 novembre 2026
+- Correction : crash chunks Noir & Blanc, projection orthographique et fondu tramé des bâtiments (Amiel)
+
 ## 5.98 — 17 novembre 2026
 - Correction : graphismes Noir & Blanc 2 complets et urbanisme des villes corrigé (Amiel)
 
