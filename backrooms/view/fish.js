@@ -88,9 +88,11 @@ export function createFishView({ map, scene, loader, camera, onSplash }) {
         if (Q === V) {
           camera.getWorldDirection(fwd);
           tx = camera.position.x + fwd.x * 0.42;
-          ty = camera.position.y + fwd.y * 0.42 - 0.13 + Math.sin(time * 19) * 0.015;
+          ty = camera.position.y + fwd.y * 0.42 - 0.04 + Math.sin(time * 19) * 0.015;
           tz = camera.position.z + fwd.z * 0.42;
-          o.rotation.set(0.25 + Math.sin(time * 13) * 0.2, Q.yaw + Math.PI / 2 + w, Math.sin(time * 31) * 0.3, 'YXZ');
+          // de face : le nez (+z du modèle) vers l'objectif, un peu de trois quarts pour qu'on voie ses yeux (sur les côtés de
+          // la tête), au-dessus du mini-jeu ; il se tortille moins de côté pour rester lisible
+          o.rotation.set(0.1 + Math.sin(time * 13) * 0.1, Q.yaw + 0.55 + w * 0.3, Math.sin(time * 31) * 0.25, 'YXZ');
         } else {
           tx = Q.x - Math.sin(Q.yaw) * 0.26;
           ty = 1.22;
