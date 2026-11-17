@@ -659,6 +659,17 @@ body.touch .click-prompt .ctrl-choice { display: none; }
 .grab { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); text-align: center; z-index: 14; }
 .grab b { display: block; font-weight: normal; font-size: 48px; color: #ff3b3b; letter-spacing: 6px; animation: grabShake 0.09s infinite; }
 .grab span { font-size: 24px; }
+/* Poolrooms : le poisson accroché, quatre flèches à taper dans l'ordre */
+.fishq { position: absolute; left: 50%; top: 70%; transform: translateX(-50%); text-align: center; z-index: 14; pointer-events: auto; }
+.fishq b { display: block; font-weight: normal; font-size: 44px; color: #ffcf3a; letter-spacing: 6px; animation: grabShake 0.12s infinite; }
+.fishq-keys { display: flex; justify-content: center; gap: 12px; margin-top: 8px; }
+.fishq-keys button { width: 64px; height: 64px; font: inherit; font-size: 40px; line-height: 1; color: #f2f0e6; background: rgba(0, 0, 0, 0.55); border: 3px solid rgba(242, 240, 230, 0.45); cursor: pointer; }
+.fishq-keys button.cur { color: #ffcf3a; border-color: #ffcf3a; box-shadow: 0 0 14px rgba(255, 207, 58, 0.45); transform: scale(1.12); }
+.fishq-keys button.done { color: #7dffa0; border-color: #7dffa0; opacity: 0.6; }
+.fishq .grab-bar { border-color: #ffcf3a; }
+.fishq .grab-bar i { background: #ffcf3a; }
+.fishq.bite { animation: fishBite 0.35s; }
+@keyframes fishBite { 0%, 100% { filter: none; } 30% { filter: drop-shadow(0 0 18px #ff3b3b) brightness(1.6); } }
 .grab-bar { width: 300px; height: 14px; margin: 10px auto 0; border: 2px solid #ff3b3b; padding: 2px; }
 .grab-bar i { display: block; height: 100%; width: 0; background: #ff3b3b; }
 @keyframes grabShake { 0% { translate: -3px 1px; } 50% { translate: 3px -2px; } 100% { translate: -1px 2px; } }

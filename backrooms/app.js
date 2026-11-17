@@ -156,7 +156,9 @@ let noLock = false;
 let toggleFlashlightRequested = false; // touche 1 : la lampe
 let useRequested = null; // (tests) une case d'objet précise à utiliser
 // actions du prochain pas : E utilise la case choisie, F ramasse, T siffle
-const act = { use: false, pick: false, drop: false, whistle: false, jump: false, struggle: 0 };
+const act = { use: false, pick: false, drop: false, whistle: false, jump: false, struggle: 0, qte: undefined };
+// Poolrooms : un poisson accroché, les quatre flèches du mini-jeu (0 gauche, 1 haut, 2 droite, 3 bas)
+const QTE_KEYS = { ArrowLeft: 0, ArrowUp: 1, ArrowRight: 2, ArrowDown: 3 };
 let crouchOn = false; // C : s'accroupir / se relever (bascule)
 let camOn = false; // V : sortir / ranger le caméscope
 let tapeShown = false; // « tout au caméscope » : ce qui a été dit à la scène
@@ -518,6 +520,12 @@ window.addEventListener('keydown', (e) => {
     hud.keypadKey(e);
     return;
   }
+  // un poisson accroché : les flèches servent au mini-jeu (et ne tournent pas la vue)
+  if (sim && sim.player.fishQ && e.code in QTE_KEYS) {
+    e.preventDefault();
+    if (!e.repeat) act.qte = QTE_KEYS[e.code];
+    return;
+  }
   keys[e.code] = true;
   // agrippé : n'importe quelle touche sert à se débattre
   if (sim && sim.player.grabT > 0 && !e.repeat) {
@@ -701,6 +709,13 @@ function dropSlot(i) {
 
 // le bruit d'un pas selon le sol : béton et carrelage (Level 1, Level 37 au sec), eau (Level 37), moquette (Level 0)
 // l'annonce de la phase rouge : le courant qui tombe, puis chaque néon qui s'éteint près de soi
+// Poolrooms : un poisson sort de l'eau ou y retombe, pas trop loin de nous
+function onFishSplash(pos) {
+  if (!sfx || !sim || paused) return;
+  const V = sim.viewPlayer(sim.spectate || 0);
+  if (Math.hypot(pos.x - V.x, pos.z - V.z) < 22) sfx.splashFar(pos, 0.45);
+}
+let fishHint = false;
 function onCascade(pos) {
   if (sfx) pos ? sfx.lightOff(pos) : sfx.powerDown();
 }
@@ -1064,6 +1079,7 @@ function startRun({ seed, difficulty, players, run, level, vip = false, from = l
   }
   scene = createBackroomsScene(stageEl, sim.floors, lampsFor());
   scene.onDrip = (pos) => sfx && sfx.drip(pos);
+  scene.onFishSplash = onFishSplash;
   scene.onRedCut = (on) => sfx && sfx.finCut(on);
   scene.onRedFlick = (pos, on) => sfx && sfx.redFlick(pos, on);
   scene.onCascade = onCascade;
@@ -1112,7 +1128,7 @@ function resumeRun() {
   initGame(lastSettings, lv);
   play();
 }
-const hudActions = { play, setKbMode, use: (i) => useSlot(i, true), drop: dropSlot, resume: resumeRun };
+const hudActions = { play, setKbMode, use: (i) => useSlot(i, true), drop: dropSlot, resume: resumeRun, qte: (i) => { act.qte = i; } };
 
 // Hôte : les commandes des invités pour ce pas (la lampe et les objets ne servent qu'une fois)
 function guestInputs() {
@@ -1133,7 +1149,7 @@ function guestInputs() {
     const q = NET.actions[id] || (NET.actions[id] = []);
     // une action par pas, dans l'ordre où l'invité les a faites (avec la case qu'il avait choisie)
     const a = q.shift() || {};
-    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, cam: !!i.cm, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', drop: a.k === 'd', pick: a.k === 'p', whistle: a.k === 't', jump: a.k === 'j', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, view: i.v, voice: i.vo, radio: i.ra, seq: i.seq, camSel: i.cs, code: a.k === 'c' ? a.v : undefined };
+    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, crouch: i.c, cam: !!i.cm, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', drop: a.k === 'd', pick: a.k === 'p', whistle: a.k === 't', jump: a.k === 'j', beamFall: a.k === 'b' ? a.side : 0, burn: a.k === 'h', struggle: a.k === 'g' ? a.n : 0, qte: a.k === 'q' ? a.n - 1 : undefined, view: i.v, voice: i.vo, radio: i.ra, seq: i.seq, camSel: i.cs, code: a.k === 'c' ? a.v : undefined };
     i.pos = null; // une position annoncée ne sert qu'une fois
   }
   return out;
@@ -1143,7 +1159,7 @@ const num = (v, a, b) => (Number.isFinite(+v) ? Math.max(a, Math.min(b, +v)) : 0
 // les actions qu'un invité envoie à l'hôte (t: 'a') : lampe, utiliser, poser, ramasser, siffler, sauter, tomber de la
 // barre, brûlure, se débattre, code. Une action absente d'ici est jetée par l'hôte (le saut l'a été jusqu'en 5.24 :
 // l'hôte voyait l'invité marcher dans le trou qu'il venait de sauter)
-const GUEST_ACTS = ['f', 'e', 'd', 'p', 't', 'j', 'b', 'h', 'g', 'c'];
+const GUEST_ACTS = ['f', 'e', 'd', 'p', 't', 'j', 'b', 'h', 'g', 'c', 'q'];
 const slotOf = (s) => (Number.isInteger(s) && s >= 1 && s <= INV_SIZE ? s : 1); // une case d'objet annoncée par un invité
 
 // Messages du réseau (from : l'identifiant donné par le salon, la seule identité fiable)
@@ -1455,6 +1471,7 @@ function buildLevel(level) {
     stageEl.innerHTML = '';
     const sc = createBackroomsScene(stageEl, sim.floors, lampsFor());
     sc.onDrip = (pos) => sfx && sfx.drip(pos);
+    sc.onFishSplash = onFishSplash;
     sc.onRedCut = (on) => sfx && sfx.finCut(on);
     sc.onRedFlick = (pos, on) => sfx && sfx.redFlick(pos, on);
     sc.onCascade = onCascade;
@@ -2197,6 +2214,26 @@ function handleEvent(ev, me) {
       if (sfx) sfx.breakerClunk({ x: ev.x, z: ev.z });
       if (hud) hud.toast(ev.by === me ? 'Breaker reset: the lights are back on' : `${who(ev.by)} reset a breaker: lights back on`);
       break;
+    case 'fishOn':
+      // Poolrooms : un poisson a sauté sur un joueur
+      if (sfx) sfx.splashFar({ x: ev.x, z: ev.z }, 1);
+      if (scene && scene.fishLeap) scene.fishLeap(ev);
+      if (hud && ev.id === me) {
+        for (const k in keys) keys[k] = false;
+        if (!fishHint) hud.toast('A fish! Press the arrows in order to shake it off');
+        fishHint = true;
+      } else if (hud) hud.toast(`A fish jumped on ${who(ev.id)}`);
+      break;
+    case 'fishMiss':
+      if (ev.id === me && sfx) sfx.buzz();
+      break;
+    case 'fishBite':
+      if (sfx) sfx.struggle();
+      if (ev.id === me && hud) hud.fishBite();
+      break;
+    case 'fishOff':
+      if (sfx) sfx.splashFar({ x: ev.px, z: ev.pz }, 0.8);
+      break;
     case 'burn':
       if (sfx) sfx.steamBurn({ x: ev.x, z: ev.z });
       if (ev.id === me && hud) hud.toast('Burned by the steam!');
@@ -2463,6 +2500,7 @@ function frame(currentTime) {
       jump: live && act.jump,
       cam: camOn && sim.player.status === 'alive',
       struggle: act.struggle,
+      qte: act.qte,
       toggleFlashlight: toggleFlashlightRequested,
       use: useRequested,
       sel: selRequested || undefined,
@@ -2501,6 +2539,7 @@ function frame(currentTime) {
       if (codeRequested) send('host', { t: 'a', k: 'c', v: codeRequested, s: sel, run: NET.run });
       for (const [k, on] of [['e', act.use], ['d', input.drop], ['p', act.pick], ['t', act.whistle], ['j', input.jump]]) if (on) send('host', { t: 'a', k, s: sel, run: NET.run });
       if (act.struggle) send('host', { t: 'a', k: 'g', n: act.struggle, run: NET.run });
+      if (act.qte !== undefined) send('host', { t: 'a', k: 'q', n: act.qte + 1, run: NET.run }); // (n de 1 à 4 : l'hôte borne n à partir de 1)
       if (NET.tick % 3 === 0) {
         const P = sim.player;
         send('host', { t: 'i', run: NET.run, n: NET.tick, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, c: input.crouch ? 1 : 0, cm: input.cam ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2), v: P.status !== 'alive' ? sim.viewPlayer(sim.spectate || 0).id : undefined, vo: input.voice ? +input.voice.toFixed(2) : undefined, ra: input.radio ? 1 : undefined, cs: P.desk ? deskCam : undefined }, true);
@@ -2528,6 +2567,7 @@ function frame(currentTime) {
     act.use = act.pick = act.drop = act.whistle = act.jump = false;
     codeRequested = null;
     act.struggle = 0;
+    act.qte = undefined;
 
     // Détection de pas pour le son de marche sur moquette
     if (sim.state === 'playing') {

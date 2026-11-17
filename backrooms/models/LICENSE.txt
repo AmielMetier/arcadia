@@ -214,3 +214,8 @@ Level 17 (le mall) : même source, même traitement (tools/polyhaven-glb.py puis
   WoodenTable_01.glb  https://polyhaven.com/a/WoodenTable_01
   dining_table.glb  https://polyhaven.com/a/dining_table
   painted_wooden_table.glb  https://polyhaven.com/a/painted_wooden_table
+
+Sketchfab, sous licence CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/) : l'auteur doit être cité.
+  poolrooms/fish.glb  « Fish » par ethem (https://sketchfab.com/ethem)
+    https://sketchfab.com/3d-models/fish-81d01e6ce8f745778e2629bca80724af
+    Modifié : texture réencodée en WebP 1024 px (tools/glb-webp.py), animé dans le code (view/fish.js).

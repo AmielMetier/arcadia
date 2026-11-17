@@ -204,6 +204,20 @@ export const REDISGUISE_T = 6; // s de ronde, hors de vue et loin de tous, avant
 // le sprint dépend du sens : droit devant, toute la vitesse ; de côté et en arrière, moins
 export const SPRINT_SIDE = 0.72;
 export const SPRINT_BACK = 0.6;
+// Poolrooms : les poissons des bassins. Trop de bruit à moins de FISH_R m de l'un d'eux (courir, retomber d'un saut,
+// siffler, parler fort : un bruit d'au moins FISH_NOISE), et il a FISH_CHANCE par seconde de sauter sur le joueur. Il
+// s'accroche : il faut taper les FISH_KEYS flèches affichées, dans l'ordre (une erreur, et on recommence) ; tant qu'il
+// tient, on ne bouge plus, on fait du vacarme (l'entité l'entend) et il mord toutes les FISH_BITE_T secondes (FISH_BITE
+// d'eau en moins). Ensuite, ce joueur est tranquille FISH_CD secondes, ce poisson FISH_REST
+export const FISH_R = 4.5;
+export const FISH_NOISE = 0.5;
+export const FISH_CHANCE = 0.45;
+export const FISH_KEYS = 4;
+export const FISH_BITE_T = 3.5;
+export const FISH_BITE = 8;
+export const FISH_FLOOR = 10; // ses morsures ne font pas descendre l'eau sous ce niveau
+export const FISH_CD = 25;
+export const FISH_REST = 40;
 export const WHISTLE_FREEZE_R = 18; // m : un sifflet à moins de ça fige l'imposteur une seconde ou deux
 export const MIMIC_CALL = [7, 13]; // s entre deux appels (la voix volée, de vive voix ou au talkie)
 // La voix volée ne doit pas la trahir : elle ne parle avec la voix d'un vivant que s'il est à plus de MIMIC_FAR m de
@@ -1259,9 +1273,59 @@ export class BackroomsSim {
   }
 
   // le joueur meurt : ce qu'il portait tombe là où il est (Level 1 : les fusibles), il sort de son casier
+  // Poolrooms : les poissons. Rend true tant qu'un poisson tient le joueur (il ne fait rien d'autre que le mini-jeu)
+  fishStep(P, input) {
+    const fish = this.map.fish;
+    if (!fish || !fish.length || BackroomsSim.FISH === false) return false; // (FISH = false : pas de poissons, pour les tests)
+    P.fishCd = Math.max(0, (P.fishCd || 0) - DT);
+    if (!P.fishQ) {
+      // au bord d'un bassin, en faisant du bruit, pas caché : le poisson le plus proche peut sauter
+      if (P.fishCd > 0 || (P.noise || 0) < FISH_NOISE || P.hidden >= 0 || this.arriveT > 0) return false;
+      let best = null;
+      let bd = FISH_R;
+      for (const f of fish) {
+        const d = Math.hypot(f.x - P.x, f.z - P.z);
+        if (d < bd && !(f.cd > 0)) [bd, best] = [d, f];
+      }
+      if (!best || Math.random() >= FISH_CHANCE * DT) return false;
+      best.cd = FISH_REST;
+      P.fishQ = Array.from({ length: FISH_KEYS }, () => Math.floor(Math.random() * 4)).join('');
+      P.fishI = 0;
+      P.fishT = FISH_BITE_T;
+      P.fishId = best.id;
+      this.emit({ type: 'fishOn', id: P.id, fish: best.id, x: best.x, z: best.z });
+    } else if (Number.isInteger(input.qte)) {
+      // une flèche tapée : la bonne fait avancer, une mauvaise fait tout recommencer
+      if (input.qte === +P.fishQ[P.fishI]) P.fishI++;
+      else {
+        P.fishI = 0;
+        this.emit({ type: 'fishMiss', id: P.id });
+      }
+      if (P.fishI >= P.fishQ.length) {
+        const f = fish[P.fishId] || fish[0];
+        P.fishQ = '';
+        P.fishI = 0;
+        P.fishCd = FISH_CD;
+        this.emit({ type: 'fishOff', id: P.id, fish: f.id, x: f.x, z: f.z, px: P.x, pz: P.z });
+        return false;
+      }
+    }
+    P.moving = false;
+    P.running = false;
+    P.noise = NOISE.run; // (il se débat à grand bruit : l'entité l'entend comme une course)
+    P.fishT -= DT;
+    if (P.fishT <= 0) {
+      P.fishT = FISH_BITE_T;
+      P.water = Math.max(Math.min(P.water, FISH_FLOOR), P.water - FISH_BITE); // (un poisson seul ne tue pas)
+      this.emit({ type: 'fishBite', id: P.id, x: P.x, z: P.z });
+    }
+    return true;
+  }
+
   killPlayer(P, extra = {}) {
     if (P.status !== 'alive') return;
     P.status = 'dead';
+    P.fishQ = '';
     P.cam = false;
     P.moving = false;
     P.grabT = 0;
@@ -2578,6 +2642,7 @@ export class BackroomsSim {
         gd.open = want;
       }
     }
+    for (const f of this.map.fish || []) f.cd = Math.max(0, (f.cd || 0) - DT); // (Poolrooms : les poissons se reposent)
     updateDirector(this);
     updateLightsOut(this);
     if (this.level === PIPES_LEVEL) {
@@ -2771,6 +2836,8 @@ export class BackroomsSim {
       P.noise = NOISE.panic;
       return;
     }
+    // Poolrooms : un poisson accroché, ou qui va sauter (voir fishStep)
+    if (this.fishStep(P, input)) return;
     // caché dans un casier : immobile, lampe éteinte ; Maj retient le souffle (trop longtemps, on suffoque)
     if (P.hidden >= 0) return this.stepHidden(P, input);
     // assis au poste de garde : on ne bouge plus, on passe d'une caméra à l'autre
@@ -3461,7 +3528,7 @@ export class BackroomsSim {
     if (input.cam !== undefined) P.cam = !!input.cam && P.status === 'alive';
     if (this.state !== 'playing' || P.status !== 'alive' || this.departT > 0 || this.arriveT > 0) return 0;
     // agrippé ou dans un casier : l'hôte décide de tout (on ne bouge pas, le regard suit l'instantané)
-    if (P.grabT > 0 || P.hidden >= 0 || P.desk) {
+    if (P.grabT > 0 || P.hidden >= 0 || P.desk || P.fishQ) {
       P.moving = false;
       P.running = false;
       if (P.hidden >= 0 && input.yaw !== undefined) P.yaw = input.yaw;
@@ -3634,7 +3701,7 @@ export class BackroomsSim {
       lt: (this.map.letters || []).map((L) => (L.posted ? 2 : L.taken ? 1 : 0)).join(''),
       // le vrai ascenseur ne se dévoile qu'une fois les cassettes trouvées
       rf: this.open ? this.realFloor : -1,
-      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.water * 10) / 10, P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.floor, P.sigTo, P.onLadder ? 1 : 0, r2(P.lockT), r2(P.tilt), P.onBeam ? 1 : 0, P.bottles, r2(P.grabT), P.hidden, P.crouch ? 1 : 0, P.carry.join('.'), P.hurt || 0, Math.round(P.breath), P.holding ? 1 : 0, P.grabs || 0, r2(P.struggle || 0), r2(P.jy || 0), P.cam ? 1 : 0, r2(P.noise || 0), P.letters.join('.'), r2(P.detect), P.desk ? 1 : 0, P.camSel || 0]),
+      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.water * 10) / 10, P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.floor, P.sigTo, P.onLadder ? 1 : 0, r2(P.lockT), r2(P.tilt), P.onBeam ? 1 : 0, P.bottles, r2(P.grabT), P.hidden, P.crouch ? 1 : 0, P.carry.join('.'), P.hurt || 0, Math.round(P.breath), P.holding ? 1 : 0, P.grabs || 0, r2(P.struggle || 0), r2(P.jy || 0), P.cam ? 1 : 0, r2(P.noise || 0), P.letters.join('.'), r2(P.detect), P.desk ? 1 : 0, P.camSel || 0, P.fishQ || '', P.fishI || 0, r2(P.fishT || 0)]),
       // l'entité : position, regard, mode, … et la hauteur de ses pieds (les marches, la chute dans un trou)
       // (et, pour un invité qui deviendrait l'hôte : sa minute de calme, et si la première rencontre a eu lieu)
       m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0, M.floor, M.grabbing ?? -1, r2(M.rushT || 0), M.away ? 1 : 0, r2(M.y ?? -(M.floor || 0) * FLOOR_DY), Math.round(M.dormantT || 0), this.glimpseAt === Infinity ? 1 : 0, M.inDuct ? 1 : 0, r2(M.duct && M.duct.landT > 0 ? M.duct.landT : 0), M.mimic ?? -1],
@@ -3747,7 +3814,7 @@ export class BackroomsSim {
     }
     const seen = new Set();
     for (const row of snap.p) {
-      const [id, x, z, yaw, pitch, status, fl, bat, water, inv, signal, running, moving, found, name, lamp, sel, floor, sigTo, onLadder, lockT, tilt, onBeam, bottles, grabT, hidden, crouch, carryN, hurt, breath, holding, grabs, struggle, jy, cam, noise, letters = '', detect = 0, desk = 0, camSel = 0] = row;
+      const [id, x, z, yaw, pitch, status, fl, bat, water, inv, signal, running, moving, found, name, lamp, sel, floor, sigTo, onLadder, lockT, tilt, onBeam, bottles, grabT, hidden, crouch, carryN, hurt, breath, holding, grabs, struggle, jy, cam, noise, letters = '', detect = 0, desk = 0, camSel = 0, fishQ = '', fishI = 0, fishT = 0] = row;
       seen.add(id);
       let P = this.players.find((q) => q.id === id);
       if (!P) {
@@ -3789,6 +3856,9 @@ export class BackroomsSim {
       } else if ((P.floor !== floor && !ownStairs) || (hideChange && hidden >= 0)) P.yaw = yaw;
       P.letters = letters ? String(letters).split('.').map(Number) : [];
       P.detect = detect;
+      P.fishQ = fishQ || '';
+      P.fishI = fishI || 0;
+      P.fishT = fishT || 0;
       if (!ownStairs) P.floor = floor || 0;
       P.status = status;
       P.flashlight = !!fl;

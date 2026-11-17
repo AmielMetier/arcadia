@@ -507,6 +507,21 @@ export function createPoolMap(seed = 37) {
     if (roomDepth(r, x, z) < 0.7 || collide(x, z, 0.3)) continue;
     props.push({ m: 'rubber_duck_toy', h: 0.12, r: 0.01, x, z, rot: rnd() * 6, tipped: false, float: true });
   }
+  // les poissons : deux ou trois par bassin, là où l'eau est profonde (ils sautent ; trop de bruit au bord, et l'un
+  // d'eux saute sur le joueur : voir fishStep dans sim.js). Tirés d'une suite à part : le reste de la carte ne bouge pas
+  const fish = [];
+  let fs = (seed * 9301 + 49297) >>> 0;
+  const frnd = () => ((fs = (fs * 1664525 + 1013904223) >>> 0) / 4294967296);
+  for (const r of basins) {
+    const want = r.blobs ? 3 : 2;
+    for (let i = 0, n = 0; i < 200 && n < want; i++) {
+      const x = r.x0 + frnd() * r.w;
+      const z = r.z0 + frnd() * r.h;
+      if (roomDepth(r, x, z) < 0.7 || collide(x, z, 0.5) || fish.some((f) => Math.hypot(f.x - x, f.z - z) < 3)) continue;
+      fish.push({ id: fish.length, x, z, dir: frnd() * 6.2832, cd: 0 });
+      n++;
+    }
+  }
   const scatter = (n) => {
     const out = [];
     for (let i = 0; i < 3000 && out.length < n; i++) {
@@ -566,6 +581,7 @@ export function createPoolMap(seed = 37) {
     niche: null,
     pitAt: () => -1,
     rooms,
+    fish,
     doors,
     edges,
     segs,
