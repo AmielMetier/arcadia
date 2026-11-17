@@ -6,6 +6,7 @@
   - Trop de bruit au bord d'un bassin (courir, retomber d'un saut, siffler, parler fort), et l'un d'eux peut te sauter dessus.
   - Pour t'en défaire, tape les quatre flèches affichées, dans l'ordre. Une erreur, et tout est à refaire. Au doigt : touche les flèches.
   - Tant qu'il s'accroche, tu ne bouges plus, il te mord (tu perds de l'eau) et il se débat à grand bruit : l'entité l'entend.
+  - En mode VIP, les poissons ont un visage que vous reconnaîtrez peut-être.
 
 ## 5.96 — 16 novembre 2026
 - **Odyssée** — Les 781 espèces du Pokédex peuvent maintenant toutes être obtenues :

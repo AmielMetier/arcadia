@@ -9,7 +9,8 @@ const JUMP_T = 0.9; // s : un saut hors de l'eau
 const LEAP_T = 0.4; // s : le bond du bassin jusqu'au joueur
 const WATER_Y = -0.03;
 
-export function createFishView({ map, scene, loader, camera, onSplash }) {
+// url : un autre modèle de la même forme (le poisson du mode VIP, déchiffré du coffre)
+export function createFishView({ map, scene, loader, camera, onSplash, url = null }) {
   const group = new THREE.Group();
   scene.add(group);
   let proto = null;
@@ -24,7 +25,7 @@ export function createFishView({ map, scene, loader, camera, onSplash }) {
     group.add(o);
     return o;
   };
-  loader.load(modelUrl('fish'), (g) => {
+  loader.load(url || modelUrl('fish'), (g) => {
     // mis aux normes : centré, long de LEN, le grand axe le long de z
     const box = new THREE.Box3().setFromObject(g.scene);
     const size = box.getSize(new THREE.Vector3());

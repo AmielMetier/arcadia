@@ -380,7 +380,7 @@ export function createBackroomsScene(container, floors, lamps) {
   const dummy = new THREE.Object3D();
   const loader = gltfLoader();
   // Poolrooms : les poissons des bassins (view/fish.js)
-  const fishView = L2 && map0.fish && map0.fish.length ? createFishView({ map: map0, scene, loader, camera, onSplash: (pos) => api.onFishSplash && api.onFishSplash(pos) }) : null;
+  const fishView = L2 && map0.fish && map0.fish.length ? createFishView({ map: map0, scene, loader, camera, url: ENTITY_VIP ? vault.poisson || null : null, onSplash: (pos) => api.onFishSplash && api.onFishSplash(pos) }) : null;
   // le cadenas de la porte de la cage d'escalier (Quaternius, CC0) : laiton patiné, anse d'acier, 10 cm de haut
   const padlockModel = new Promise((resolve) => {
     loader.load(modelUrl('padlock'), (g) => {
