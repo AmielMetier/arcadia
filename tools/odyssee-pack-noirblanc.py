@@ -7,8 +7,8 @@ pile une case du jeu à l'écran). Les planches utiles sont gardées dans assets
   volcan.png (lave, Phyromatical), persos/ (personnages du monde : trchar000, BW0xx…), objets (Object rock / tree).
 
 Sortie dans odyssee/img/gfx/noirblanc/ :
-  sol.png        une planche de tuiles de sol de 16 px (herbe, chemins et leurs bords, eau et rivages, hautes herbes…)
-  d_<nom>.png    décor (arbres, sapins, haies, lampadaires…), 32 px par case : dessiné pixel pour pixel
+  sol.png        une planche de tuiles de sol de 16 px (herbe, chemins et leurs bords, eau et rivages, hautes herbes, fleurs…)
+  d_<nom>.png    décor (arbres, sapins, haies, lampadaires, pots, barrières…), 32 px par case : dessiné pixel pour pixel
   b_<nom>.png    bâtiments entiers (positions et portes : kit_bw_batiments.json)
   chars.png      planche des personnages du jeu (même disposition) avec les personnages de Noir & Blanc 2
 et odyssee/js/data/gfx-noirblanc.js (liste des tuiles, du décor et des bâtiments), lu par odyssee/js/gfx.js.
@@ -37,11 +37,6 @@ def tone(t, b=1.0, s=1.0):
     r, g, bl, a = t.split(); rgb = Image.merge('RGB', (r, g, bl))
     rgb = ImageEnhance.Brightness(ImageEnhance.Color(rgb).enhance(s)).enhance(b)
     return Image.merge('RGBA', (*rgb.split(), a))
-
-
-def hue(t, dr, dg, db):
-    a = np.array(t).astype(float); a[..., 0] *= dr; a[..., 1] *= dg; a[..., 2] *= db
-    return Image.fromarray(a.clip(0, 255).astype('uint8'), 'RGBA')
 
 
 def over(base, sp):
@@ -77,8 +72,7 @@ def auto16(bloc, fond=None):
 
 
 # ------------------------------------------------------------------ sols
-T = {}   # nom → tuile de 16 px
-HERBE_UNIE = BW.getpixel((6 * 32 + 16, 4 * 32 + 16))   # l'herbe sans motif peinte autour des chemins du kit
+T = {}   # nom → tuile de 32 px (réduite à 16 px sur la planche sol.png)
 herbe = [[cell(i, j) for j in range(2)] for i in range(3)]   # l'herbe de Noir & Blanc : un motif de 3 × 2 cases
 for i in range(3):
     for j in range(2):
@@ -86,23 +80,88 @@ for i in range(3):
 G0 = herbe[0][0]
 T['grass0'] = T['grass1'] = T['grass2'] = G0
 T['forest0'] = T['forest1'] = G0
-def pieces(auto, cle=None):
-    """les cinq tuiles d'un terrain du kit (autotile de 96 × 128 : coins rentrants en haut à droite, bloc 3 × 3 dessous),
-    fond transparent : « 0 » coins sortants, « v » bords gauche et droit, « h » bords haut et bas, « f » plein,
-    « i » coins rentrants. Le jeu assemble chaque case par quarts selon ses huit voisins (groundCell de world3d.js)."""
-    if cle:
-        auto = sans(auto, cle)
-    # les pixels à moitié transparents de la frange : posés sur l'herbe unie du kit, puis opaques
-    a = np.array(auto).astype(float); al = a[..., 3:4] / 255.0; semi = (a[..., 3] > 0) & (a[..., 3] < 255)
-    mix = a[..., :3] * al + np.array(HERBE_UNIE[:3]) * (1 - al)
-    a[..., :3][semi] = mix[semi]; a[..., 3][semi] = 255
-    auto = Image.fromarray(a.astype('uint8'), 'RGBA')
+
+
+def pieces_eau(auto):
+    """les cinq tuiles d'eau (autotile de 96 × 128 : coins rentrants en haut à droite, bloc 3 × 3 dessous)"""
     m = auto16(auto.crop((0, 32, 96, 128)))
     return {'0': m[0], 'v': m[5], 'h': m[10], 'f': m[15], 'i': auto.crop((64, 0, 96, 32))}
 
 
-SABLE, PAVES = L('auto_sable.png'), L('auto_paves.png')
-for nom, P in [('path', pieces(SABLE)), ('sand', pieces(tone(SABLE, 1.12, 0.55))), ('pave', pieces(PAVES, PAVES.getpixel((2, 34))))]:
+def pieces_chemin(src_auto):
+    """les cinq tuiles d'un chemin ou du sable : la bordure du kit (16 px de large) est resserrée dans les 8 premiers
+    pixels du bord pour que la moitié intérieure de chaque quart rejoigne exactement la teinte pleine « f » (sans couture
+    entre les bords et le cœur du chemin, et sans frange verte sur la cendre ou la neige)."""
+    f = np.array(src_auto.crop((32, 64, 64, 96)))
+    bloc = np.array(src_auto.crop((0, 32, 96, 128)))
+    op_vert = (bloc[..., 1].astype(int) > bloc[..., 0].astype(int) + 18) & (bloc[..., 3] > 0)
+    bloc[op_vert, 3] = 0
+    bloc[bloc[..., 3] < 180, 3] = 0
+    out = {'f': Image.fromarray(f, 'RGBA')}
+    for st in ['0', 'v', 'h', 'i']:
+        tile = f.copy()
+        for qy in range(2):
+            for qx in range(2):
+                for py in range(0, 16, 2):
+                    for px in range(0, 16, 2):
+                        dx = px if qx == 0 else (14 - px)
+                        dy = py if qy == 0 else (14 - py)
+                        y, x = qy * 16 + py, qx * 16 + px
+                        if st == 'v':
+                            d_src = min(24, dx * 2 + 2)
+                            c = bloc[32 + y, d_src if qx == 0 else (94 - d_src)]
+                        elif st == 'h':
+                            d_src = min(24, dy * 2 + 2)
+                            c = bloc[d_src if qy == 0 else (94 - d_src), 32 + x]
+                        elif st == '0':
+                            sx = min(24, dx * 2 + 2) if qx == 0 else (94 - min(24, dx * 2 + 2))
+                            sy = min(24, dy * 2 + 2) if qy == 0 else (94 - min(24, dy * 2 + 2))
+                            c = bloc[sy, sx]
+                        elif st == 'i':
+                            if dx == 0 and dy == 0:
+                                c = [0, 0, 0, 0]
+                            elif dx <= 4 and dy <= 4 and (dx + dy) <= 6:
+                                d_in = 8 + (dx + dy) * 2
+                                c = bloc[32 + y, d_in if qx == 0 else (94 - d_in)]
+                            else:
+                                c = f[y, x]
+                        tile[y:y + 2, x:x + 2] = c
+        out[st] = Image.fromarray(tile, 'RGBA')
+    return out
+
+
+def pieces_pave():
+    """Pavés de pierre de Noir & Blanc (dalles carrées et bordures de pierre taillée du kit) : le centre plein f est
+    utilisé partout à l'intérieur, encadré sur ses bords et ses coins par la bordure de pierre."""
+    f = np.array(BW.crop((32, 20256, 64, 20288)))
+    bloc = np.array(BW.crop((0, 704, 96, 800)))
+    out = {'f': Image.fromarray(f, 'RGBA')}
+    for st in ['0', 'v', 'h', 'i']:
+        tile = f.copy()
+        for qy in range(2):
+            for qx in range(2):
+                for py in range(0, 16, 2):
+                    for px in range(0, 16, 2):
+                        dx = px if qx == 0 else (14 - px)
+                        dy = py if qy == 0 else (14 - py)
+                        y, x = qy * 16 + py, qx * 16 + px
+                        if st == 'v' and dx < 6:
+                            tile[y:y + 2, x:x + 2] = bloc[32 + y, dx if qx == 0 else (94 - dx)]
+                        elif st == 'h' and dy < 6:
+                            tile[y:y + 2, x:x + 2] = bloc[dy if qy == 0 else (94 - dy), 32 + x]
+                        elif st == '0' and (dx < 6 or dy < 6):
+                            sx = (dx if qx == 0 else 94 - dx) if dx < 6 else (32 + px)
+                            sy = (dy if qy == 0 else 94 - dy) if dy < 6 else (32 + py)
+                            tile[y:y + 2, x:x + 2] = bloc[sy, sx]
+                        elif st == 'i' and dx < 6 and dy < 6:
+                            d_max = max(dx, dy)
+                            tile[y:y + 2, x:x + 2] = bloc[32 + y, d_max if qx == 0 else (94 - d_max)]
+        out[st] = Image.fromarray(tile, 'RGBA')
+    return out
+
+
+SABLE = L('auto_sable.png')
+for nom, P in [('path', pieces_chemin(SABLE)), ('sand', pieces_chemin(tone(SABLE, 1.12, 0.55))), ('pave', pieces_pave())]:
     for k, t in P.items():
         T[f'q_{nom}_{k}'] = t
     T[nom + '0'] = P['f']
@@ -119,10 +178,37 @@ T['q_darktall0'], T['q_darktall1'] = touffe_s, flip(touffe_s)
 T['tall0'] = over(G0, touffe); T['tall1'] = over(G0, flip(touffe))
 T['darktall0'] = over(G0, touffe_s); T['darktall1'] = over(G0, flip(touffe_s))
 T['snowtall0'] = over(T['snow0'], touffe_s); T['snowtall1'] = over(T['snow1'], flip(touffe_s))
+
+# fleurs de Noir & Blanc (cell(6, 135) du kit : feuillage et trois fleurs, déclinées en 6 couleurs et 2 étapes d'animation)
+fleur_bw = net(cell(6, 135))
+FLEUR_COULS = [
+    (240, 80, 95),    # 0 : rouge / rose vif
+    (250, 215, 65),   # 1 : jaune
+    (95, 165, 250),   # 2 : bleu
+    (185, 115, 235),  # 3 : violet
+    (250, 145, 65),   # 4 : orange
+    (248, 248, 252),  # 5 : blanc
+]
+for k, (cr, cg, cb) in enumerate(FLEUR_COULS):
+    a = np.array(fleur_bw).astype(float)
+    r, g, b, al = a[..., 0], a[..., 1], a[..., 2], a[..., 3]
+    # pétales roses d'origine (r > g + 25) : reteints dans la couleur choisie en gardant le cœur jaune et les feuilles vertes
+    petale = (al > 0) & (r > g + 25)
+    lum = (r[petale] / 235.0).clip(0.55, 1.15)
+    a[..., 0][petale] = np.clip(lum * cr, 0, 255)
+    a[..., 1][petale] = np.clip(lum * cg, 0, 255)
+    a[..., 2][petale] = np.clip(lum * cb, 0, 255)
+    fl0 = Image.fromarray(a.astype('uint8'), 'RGBA')
+    # seconde image : les fleurs se balancent d'un cran (2 px) vers la droite
+    fl1 = Image.new('RGBA', (32, 32))
+    fl1.paste(fl0.crop((0, 0, 30, 32)), (2, 0))
+    T[f'q_flower{k}_f0'] = over(G0, fl0)
+    T[f'q_flower{k}_f1'] = over(G0, fl1)
+
 # mer : 4 images d'animation, rivage de rochers ; mêmes cinq tuiles que les chemins
 for f in range(4):
     fr = MER.crop((f * 192, 0, f * 192 + 96, 128))
-    for k, t in pieces(fr).items():
+    for k, t in pieces_eau(fr).items():
         T[f'q_water_{k}_f{f}'] = t
     T[f'water{f}'] = fr.crop((32, 64, 64, 96))
     T[f'deep{f}'] = MERP.crop((f * 192 + 32, 64, f * 192 + 64, 96))
@@ -145,6 +231,7 @@ for i, n in enumerate(noms):
     planche.paste(half(T[n]), ((i % COLS) * 16, (i // COLS) * 16))
 planche.save(os.path.join(OUT, 'sol.png'))
 
+
 # ------------------------------------------------------------------ décor (pixel pour pixel, ancré aux pieds)
 def trim(im):
     bb = im.getbbox(); return im.crop(bb) if bb else im
@@ -159,14 +246,15 @@ def arbre(x0, y0, x1, y1, pas=64):
     return trim(Image.fromarray(bas, 'RGBA'))
 
 
-feuillu = arbre(96, 848, 160, 968); sapin = arbre(136, 1836, 216, 1960)
+feuillu = arbre(96, 848, 160, 968).resize((52, 74), Image.NEAREST)
+sapin = arbre(136, 1836, 216, 1960).resize((54, 78), Image.NEAREST)
 
 
 def feuilles(im, coul):
     """le feuillage (pixels verts) reteint, tronc et ombre gardés"""
     a = np.array(im).astype(float); r, g, b = a[..., 0], a[..., 1], a[..., 2]
     vert = (g > r * 1.25) & (g > b * 1.02) & (a[..., 3] > 0)
-    vert[-30:] = False   # l'ombre au pied reste comme elle est
+    vert[-26:] = False   # l'ombre au pied reste comme elle est
     lum = g[vert] / 200.0
     for k in range(3):
         a[..., k][vert] = np.clip(lum * coul[k], 0, 255)
@@ -177,27 +265,102 @@ D = {
     'tree': feuillu, 'tree2': flip(feuillu), 'tree3': feuillu, 'pine': sapin,
     'snowpine': feuilles(sapin, (215, 235, 250)),
     'arbre_automne': feuilles(feuillu, (235, 150, 40)), 'erable': feuilles(feuillu, (220, 70, 45)), 'cerisier': feuilles(feuillu, (250, 165, 195)),
-    'bush': net(trim(BW.crop((0, 632, 32, 672)))), 'lamp': net(trim(BW.crop((224, 608, 256, 736)))),
+    'bush': net(trim(BW.crop((0, 632, 32, 672)))), 'lamp': net(trim(BW.crop((224, 608, 256, 736)))).resize((16, 60), Image.NEAREST),
     'rock': trim(L('objet_rocher.png').crop((0, 0, 32, 32))), 'cuttree': trim(L('objet_arbuste.png').crop((0, 0, 32, 32))),
+    'pot': net(trim(BW.crop((192, 21248, 224, 21310)))),
+    'mailbox': net(trim(BW.crop((160, 5632, 192, 5696)))),
+    'statue': net(trim(BW.crop((192, 21312, 224, 21376)))),
+    'gymstatue': net(trim(BW.crop((192, 21312, 224, 21376)))),
+    'banc': net(trim(BW.crop((0, 3200, 64, 3264)))),
+    'parasol': net(trim(BW.crop((144, 21056, 208, 21136)))).resize((48, 50), Image.NEAREST),
+    'fence': net(trim(BW.crop((32, 796, 64, 832)))),
+    'barriere': net(trim(BW.crop((32, 796, 64, 832)))),
+    'barriere_fin': net(trim(BW.crop((32, 796, 64, 832)))),
+    'barriere_v': net(trim(BW.crop((0, 824, 32, 864)))),
+    'barriere_v0': net(trim(BW.crop((0, 824, 32, 864)))),
 }
 # mobilier du Centre Pokémon et panneau de bois des routes
 D['plant'] = net(trim(CENTRE.crop((192, 1096, 224, 1170)))); D['pc'] = net(trim(CENTRE.crop((192, 1010, 224, 1090))))
-D['healer'] = net(trim(CENTRE.crop((130, 1012, 192, 1090)))); D['bench'] = net(trim(CENTRE.crop((64, 960, 160, 992))))
-D['sign'] = net(trim(BW.crop((176, 98 * 32, 256, 100 * 32))))
+D['healer'] = net(trim(CENTRE.crop((130, 1012, 192, 1082)))); D['bench'] = net(trim(CENTRE.crop((64, 960, 160, 992))))
+D['fontaine'] = trim(net(BW.crop((8, 11356, 152, 11570)))).resize((48, 68), Image.NEAREST)
+D['sign'] = net(trim(BW.crop((176, 98 * 32, 256, 100 * 32)))).resize((32, 28), Image.NEAREST)
 # devant les jambes de qui marche dans les hautes herbes : le bas de la touffe
 bas = lambda t: t.crop((0, 16, 32, 32))
 D['grassfront'], D['grassfront2'] = bas(touffe), bas(flip(touffe))
 D['darkfront'], D['darkfront2'] = bas(touffe_s), bas(flip(touffe_s))
 D['snowfront'], D['snowfront2'] = bas(touffe_s), bas(flip(touffe_s))
 for i, c in enumerate([(235, 150, 40), (220, 70, 45), (240, 190, 50), (200, 95, 40), (225, 120, 50), (190, 60, 50)]):
-    D[f'automne{i}'] = feuilles(feuillu if i % 2 == 0 else flip(feuillu), c)
+    D[f'automne{i}'] = feuilles(feuillu, c)
 for n, im in D.items():
     im.save(os.path.join(OUT, f'd_{n}.png'))
 
-# ------------------------------------------------------------------ bâtiments entiers
+# ------------------------------------------------------------------ bâtiments entiers (sans ombre noire, complets)
 BATS = json.load(open(os.path.join(SRC, 'kit_bw_batiments.json')))
 for nom, (x0, y0, x1, y1, porte) in BATS.items():
-    BW.crop((x0, y0, x1, y1)).save(os.path.join(OUT, f'b_{nom}.png'))
+    if nom == 'arene':
+        # l'aile droite de l'Arène (62 px) est rangée 320 px plus bas sur la planche du kit : recollée à droite
+        im = Image.new('RGBA', (x1 - x0, y1 - y0))
+        im.paste(BW.crop((34, 22698, 256, 22962)), (0, 0))
+        im.paste(BW.crop((0, 23018, 62, 23282)), (222, 0))
+        im = net(im)
+    elif nom == 'maison_orange':
+        # le débord droit du toit (4 px) est rangé 192 px plus bas à gauche de la planche : recollé à droite
+        im = Image.new('RGBA', (x1 - x0, y1 - y0))
+        im.paste(BW.crop((10, 5960, 256, 6192)), (0, 0))
+        im.paste(BW.crop((0, 6152, 4, 6384)), (246, 0))
+        im = net(im)
+    elif nom == 'boutique':
+        # boutique de 5 cases avec porte à droite (porte = 3) : store reteint en bleu Boutique Pokémon, toit raccourci
+        a = np.array(net(BW.crop((x0, y0, x1, y1))))
+        st = a[185:260, :, :]
+        rouge = (st[..., 3] > 0) & (st[..., 0].astype(int) > st[..., 1].astype(int) * 2) & (st[..., 0].astype(int) > st[..., 2].astype(int) * 2)
+        rv, gv = st[..., 0][rouge].astype(float), st[..., 1][rouge].astype(float)
+        st[..., 0][rouge] = np.clip(gv * 0.85 + 16, 0, 255).astype('uint8')
+        st[..., 1][rouge] = np.clip(rv * 0.55 + 24, 0, 255).astype('uint8')
+        st[..., 2][rouge] = np.clip(rv * 1.05 + 32, 0, 255).astype('uint8')
+        im = Image.fromarray(np.concatenate([a[0:22], a[126:300]], axis=0), 'RGBA')
+    elif nom == 'boutique_p':
+        # petite boutique de 4 cases avec porte à gauche (porte = 1) et faîtage complet
+        im = flip(net(BW.crop((x0, y0, x1, y1))))
+        a = np.array(im)
+        a[0:4, 10:138] = a[88:92, 10:138]
+        im = Image.fromarray(a, 'RGBA')
+    elif nom in ('boutique_b', 'maison_d', 'maison_e'):
+        # toit de tôle raccourci pour tenir dans les rangées de maisons sans déborder sur la rue du nord
+        a = np.array(net(BW.crop((x0, y0, x1, y1))))
+        im = Image.fromarray(np.concatenate([a[0:22], a[96:]], axis=0), 'RGBA')
+    elif nom == 'maison_f':
+        a = np.array(net(BW.crop((x0, y0, x1, y1))))
+        im = Image.fromarray(np.concatenate([a[0:96], a[172:]], axis=0), 'RGBA')
+    elif nom == 'maison_g':
+        a = np.array(net(BW.crop((x0, y0, x1, y1))))
+        im = Image.fromarray(np.concatenate([a[0:114], a[182:]], axis=0), 'RGBA')
+    elif nom in ('maison_b', 'maison_c'):
+        a = np.array(net(BW.crop((x0, y0, x1, y1))))
+        im = Image.fromarray(np.concatenate([a[0:24], a[48:]], axis=0), 'RGBA')
+    elif nom == 'maison_a_g':
+        # maison à toit orange avec porte à gauche (porte = 48 px = 1,5 case) pour les maisons de 4 cases de large
+        a = np.array(net(BW.crop((x0, y0, x1, y1))))
+        w_g, p_m = a[104:156, 30:64].copy(), a[104:156, 64:98].copy()
+        a[104:156, 30:64], a[104:156, 64:98] = p_m, w_g
+        im = Image.fromarray(a, 'RGBA')
+    elif nom in ('manoir', 'manoir_r'):
+        mr = np.array(net(BW.crop((12, 12224, 196, 12508))))
+        mb = np.array(net(BW.crop((12, 12512, 196, 12796))))
+        src = mr if nom == 'manoir_r' else mb
+        mr[:, 170:184] = mr[:, 13::-1]
+        src[:, 170:184] = src[:, 13::-1]
+        out_m = np.zeros((196, 184, 4), dtype='uint8')
+        out_m[16:, :] = np.concatenate([mr[38:70], src[136:]], axis=0)
+        peak = mb[0:56, 52:132]
+        m_pk = peak[..., 3] > 0
+        out_m[0:56, 52:132][m_pk] = peak[m_pk]
+        im = Image.fromarray(out_m, 'RGBA')
+    elif nom == 'fontaine':
+        im = trim(net(BW.crop((x0, y0, x1, y1)))).resize((96, 136), Image.NEAREST)
+    else:
+        im = net(BW.crop((x0, y0, x1, y1)))
+    im.save(os.path.join(OUT, f'b_{nom}.png'))
 
 # ------------------------------------------------------------------ personnages
 # planche du jeu : une rangée de 12 cases de 64 px par personnage (bas, gauche, droite, haut ; pas, arrêt, pas)
@@ -211,11 +374,32 @@ for nom, fichier in PERSOS.items():
     src = L(os.path.join('persos', fichier + '.png')); fw, fh = src.width // 4, src.height // 4
     y = rows[nom] * 64
     chars.paste((0, 0, 0, 0), (0, y, 768, y + 64))
+    # bornes sur toute la planche du personnage : on garde toute la coiffure et les côtés sans couper un seul pixel
+    ymin, ymax, xmin, xmax = fh, 0, fw, 0
+    for d in range(4):
+        for f in (1, 0, 3):
+            ys, xs = np.where(np.array(src.crop((f * fw, d * fh, f * fw + fw, d * fh + fh)))[..., 3] > 0)
+            if len(ys):
+                ymin, ymax = min(ymin, int(ys.min())), max(ymax, int(ys.max()) + 1)
+                xmin, xmax = min(xmin, int(xs.min())), max(xmax, int(xs.max()) + 1)
+    y_crop = max(0, min(ymin, ymax - 62)) if fh > 64 else 0
+    x_crop = max(0, min(xmin, min(fw - 64, (xmin + xmax - 64) // 2))) if fw > 64 else 0
     for d in range(4):
         for k, f in enumerate((1, 0, 3)):
             fr = src.crop((f * fw, d * fh, f * fw + fw, d * fh + fh))
-            # centrée, les pieds au même endroit que dans la planche du jeu (4 px au-dessus du bas de la case)
-            c = Image.new('RGBA', (64, 64)); c.alpha_composite(fr, ((64 - fw) // 2, 64 - fh - (4 if fh <= 60 else 0)) if fh <= 64 else (0, 0), (0, 0) if fh <= 64 else ((fw - 64) // 2, fh - 64))
+            ys, xs = np.where(np.array(fr)[..., 3] > 0)
+            xc = max(0, min(int(xs.min()), min(fw - 64, (int(xs.min()) + int(xs.max()) + 1 - 64) // 2))) if fw > 64 and len(xs) else x_crop
+            if fh > 64 and len(ys) and int(ys.max()) - int(ys.min()) + 1 > 64:
+                # cas unique où une pose dépasse 64 px (Célestine, 66 px) : on tasse 2 lignes unies au milieu de la robe
+                a_fr = np.array(fr)[int(ys.min()):int(ys.max()) + 1, xc:xc + 64]
+                keep = [i for i in range(a_fr.shape[0]) if i not in (44, 45)][:64]
+                c = Image.fromarray(a_fr[keep], 'RGBA')
+            elif fh > 64:
+                yc = max(0, min(int(ys.min()), y_crop)) if len(ys) and int(ys.max()) - y_crop < 64 else (max(0, int(ys.max()) - 63) if len(ys) else y_crop)
+                c = fr.crop((xc, yc, xc + 64, yc + 64))
+            else:
+                c = Image.new('RGBA', (64, 64))
+                c.alpha_composite(fr, ((64 - fw) // 2, 64 - fh - (4 if fh <= 60 else 0)))
             chars.alpha_composite(c, ((d * 3 + k) * 64, y))
     faits += 1
 chars.save(os.path.join(OUT, 'chars.png'))

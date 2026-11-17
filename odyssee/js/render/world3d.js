@@ -649,6 +649,7 @@ export class WorldView {
     this.rh = this.tiers && !this.A?.cells?.[`rp_${this.biome}_00`] ? caveHeights(map, this.tiers) : null;
     this.scene.background = new THREE.Color(map.outdoor ? '#1d4f2a' : '#0c0a10');
     if (map.id === 'monde') this.scene.background = new THREE.Color('#1d4f2a');
+    if (this.batPack && map.outdoor) this.adapterEmprisesPack(map.base || map);
     this.buildBuildings();
     this.buildSorties();
     this.buildWindowsGroup();
@@ -661,10 +662,11 @@ export class WorldView {
     const g4 = () => (pg ? `pg_${x % 3}_${y % 2}` : 'grass' + (v < 0.55 ? 0 : v < 0.8 ? 1 : v < 0.93 ? 2 : 3));
     const zone = m.outdoor ? m.zoneAt(x, y) : null, theme = zone?.theme;
     const grassKey = theme === 'volcanic' ? 'ash' + (v < 0.5 ? 0 : 1) : theme === 'snow' ? 'snow' + (v < 0.5 ? 0 : 1) : g4();
+    const groundAt = (ax, ay) => { const q = m.get(ax, ay); return q === T.SIGN || q === T.BLOCK ? m.underAt(ax, ay) ?? (m.outdoor ? T.GRASS : T.FLOOR) : q; };
     // pack de graphismes : un terrain en cinq tuiles (q_<nom>_<état>) posé par quarts sur l'herbe, selon les huit voisins
     // (coin sortant, bord, coin rentrant, plein) ; eau = planche animée
     const quarts = (nom, same, eau) => {
-      const C = eau ? this.N.cells : A, s = (dx, dy) => same(m.get(x + dx, y + dy)), q = [];
+      const C = eau ? this.N.cells : A, s = (dx, dy) => same(groundAt(x + dx, y + dy), x + dx, y + dy), q = [];
       let pleins = 0;
       for (let qy = 0; qy < 2; qy++) for (let qx = 0; qx < 2; qx++) {
         const dx = qx ? 1 : -1, dy = qy ? 1 : -1, H = s(dx, 0), V = s(0, dy);
@@ -676,11 +678,10 @@ export class WorldView {
       if (pleins === 4) return eau ? { anim: C[`q_${nom}_f`] } : { c: C[`q_${nom}_f`] };
       return { c: A[grassKey], q, qEau: eau };
     };
-    const mask = (same) => { let k = 0; if (same(m.get(x, y - 1))) k |= 1; if (same(m.get(x + 1, y))) k |= 2; if (same(m.get(x, y + 1))) k |= 4; if (same(m.get(x - 1, y))) k |= 8; return k; };
+    const mask = (same) => { let k = 0; if (same(groundAt(x, y - 1))) k |= 1; if (same(groundAt(x + 1, y))) k |= 2; if (same(groundAt(x, y + 1))) k |= 4; if (same(groundAt(x - 1, y))) k |= 8; return k; };
     // sur la neige, pas de bordure d'herbe autour des chemins : on prend la case pleine
     const edge = theme === 'snow' ? () => 15 : mask;
-    const groundOf = (tt) => (tt === T.SIGN || tt === T.BLOCK ? m.underAt(x, y) ?? (m.outdoor ? T.GRASS : T.FLOOR) : tt);
-    const tt = groundOf(t);
+    const tt = groundAt(x, y);
     const deco = this.decoAt.get(x + ',' + y);
     if (deco?.k === 'carpet') return { c: A.mat };
     if (deco?.k === 'glace') return { c: A.gl_ice };
@@ -698,7 +699,14 @@ export class WorldView {
       return { c: A[`ravin_${hash(x, y) < 0.5 ? 0 : 1}`], passerelle: A[`passerelle_${ew ? 'ew' : 'ns'}_${(a ? 1 : 0) | (b ? 2 : 0) | (d ? 4 : 0) | (f ? 8 : 0)}`] };
     }
     if (t === T.BARRIER_R || t === T.BARRIER_B) return { c: A['floor_' + m.floor] || A.floor_wood };
-    const isPathish = (q) => [T.PATH, T.PAVE, T.SAND, T.BUILD, T.DOOR, T.BRIDGE, T.SIGN, T.BLOCK, T.MAT].includes(q);
+    const isPathish = (q) => [T.PATH, T.PAVE, T.SAND, T.BUILD, T.DOOR, T.BRIDGE, T.SIGN, T.BLOCK, T.MAT, T.STAIRS, T.CAVEDOOR].includes(q);
+    const hasPave = (ax, ay) => {
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && groundAt(ax + dx, ay + dy) === T.PAVE && ++n >= 2) return true;
+      return false;
+    };
+    const isPathQ = (q) => [T.PATH, T.PAVE, T.DOOR, T.BRIDGE, T.MAT, T.STAIRS, T.CAVEDOOR].includes(q);
+    const isPaveQ = (q, ax, ay) => q === T.PAVE || q === T.DOOR || q === T.PATH || (q === T.BUILD && hasPave(ax, ay));
     if (SOL16 && m.outdoor) {
       if (tt === T.PATH || tt === T.PAVE || tt === T.DOOR || tt === T.BUILD || tt === T.SAND) return { c: A[grassKey] };
       if (tt === T.WATER) return { anim: this.N.cells.water15 };
@@ -719,15 +727,19 @@ export class WorldView {
         return { c: A[(theme === 'snow' && A.snowtall0 ? 'snowtall' : 'tall') + (v < 0.5 ? 0 : 1)] };
       }
       case T.TREE: case T.PINE: return { c: theme === 'volcanic' ? A.ash1 : theme === 'snow' ? A.snow1 : pg ? A[g4()] : A['forest' + (v < 0.5 ? 0 : 1)] };
-      case T.PATH: if (A.q_path_f && theme !== 'snow') return quarts('path', isPathish);
+      case T.PATH: if (A.q_path_f) return quarts('path', isPathQ);
         return { c: A['path' + edge(isPathish)] };
-      case T.PAVE: case T.DOOR: case T.BUILD: if (A.q_pave_f && theme !== 'snow') return quarts('pave', isPathish);
+      case T.PAVE: if (A.q_pave_f) return quarts('pave', (q, ax, ay) => isPaveQ(q, ax, ay));
         return { c: A['pave' + edge((q) => isPathish(q))] };
-      case T.SAND: if (A.q_sand_f && theme !== 'snow') return quarts('sand', (q) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.FLOWER && q !== T.PINE);
+      case T.DOOR: if (A.q_pave_f) return hasPave(x, y) ? quarts('pave', (q, ax, ay) => isPaveQ(q, ax, ay)) : quarts('path', isPathQ);
+        return { c: A['pave' + edge((q) => isPathish(q))] };
+      case T.BUILD: if (A.q_pave_f) return hasPave(x, y) ? quarts('pave', (q, ax, ay) => isPaveQ(q, ax, ay)) : { c: A[grassKey] };
+        return { c: A['pave' + edge((q) => isPathish(q))] };
+      case T.SAND: if (A.q_sand_f) return quarts('sand', (q) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.FLOWER && q !== T.PINE);
         return { c: A['sand' + edge((q) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.FLOWER && q !== T.PINE)] };
       case T.WATER: if (this.N.cells.q_water_f) return quarts('water', (q) => q === T.WATER || q === T.BRIDGE || q === T.WHIRL, true);
         return { anim: this.N.cells['water' + mask((q) => q === T.WATER || q === T.BRIDGE)] };
-      case T.BRIDGE: { const ns = sensPont(m, x, y) === 'ns'; return { anim: this.N.cells.water15, bridge: ns ? A.bridge : A.bridgeEW || A.bridge }; }
+      case T.BRIDGE: { const ns = sensPont(m, x, y) === 'ns'; return { anim: this.N.cells.q_water_f || this.N.cells.water15, bridge: ns ? A.bridge : A.bridgeEW || A.bridge }; }
       // une couleur par massif (par carré de 3 × 3 cases), avec parfois une fleur d'une autre couleur
       case T.FLOWER: { const nf = this.N.cells.flower5 ? 6 : 4, pv = hash(Math.floor(x / 3) + 101, Math.floor(y / 3) + 37), k = v < 0.85 ? Math.floor(pv * nf) : Math.floor(v * 97) % nf; return { anim: this.N.cells['flower' + k] || this.N.cells.flower0 }; }
       case T.LEDGE: return { c: A.ledge }; case T.LEDGE_E: return { c: A.ledgeE }; case T.LEDGE_W: return { c: A.ledgeW };
@@ -1053,7 +1065,7 @@ export class WorldView {
       if (g.passerelle) flat(r3d ? PB : G, x, y, x + 1, y + 1, 0.012 + (r3d ? r3d.Hmarche(x + 0.5, y + 0.5) : 0), g.passerelle);
       // détails de l'herbe (touffes, trèfles, cailloux, fleurettes…) : une case d'herbe sur six environ, jamais deux
       // fois le même détail côte à côte ; des feuilles mortes et des champignons en forêt
-      if (m.outdoor && !this.sol.couvre() && (t === T.GRASS || t === T.FENCE) && this.detailAt(x, y)) {
+      if (m.outdoor && !this.sol.couvre() && !A.pg_0_0 && (t === T.GRASS || t === T.FENCE) && this.detailAt(x, y)) {
         const k = this.detailAt(x, y); if (A['dec_' + k]) flat(O0, x, y, x + 1, y + 1, 0.004, A['dec_' + k]);
       }
       const zone = m.outdoor ? m.zoneAt(x, y) : null, theme = zone?.theme;
@@ -1465,6 +1477,36 @@ export class WorldView {
     return [hex(q(0.02).map((v) => v * 0.55)), hex(q(0.08)), hex(q(0.3)), hex(q(0.55)), hex(q(0.8)), hex(q(0.97))];
   }
 
+  /** pack de bâtiments 2D : libère les cases bloquées qui n'appartiennent qu'aux modèles 3D (étal devant la Boutique,
+   *  colonnes et arrière profond de l'Arène, aile de la serre du Laboratoire) pour éviter tout mur invisible */
+  adapterEmprisesPack(m) {
+    if (m._packAdapte) return; m._packAdapte = true;
+    const solAutour = (b) => {
+      let nPave = 0, nHerbe = 0;
+      for (let i = -1; i <= b.w; i++) for (const j of [-1, b.d]) if (m.in(b.x + i, b.y + j)) {
+        const q = m.get(b.x + i, b.y + j); if (q === T.PAVE) nPave++; else if (q === T.GRASS || q === T.TREE || q === T.FLOWER) nHerbe++;
+      }
+      return nPave > nHerbe ? T.PAVE : T.GRASS;
+    };
+    const liberer = (x, y, solDef, memePave = false) => {
+      if (!m.in(x, y)) return;
+      const t = m.get(x, y);
+      if (t === T.BLOCK || t === T.BUILD || (memePave && t === T.PAVE)) m.set(x, y, m.underAt(x, y) ?? solDef);
+    };
+    for (const b of m.buildings || []) {
+      if (b.modele || b.kit) continue;
+      const s = solAutour(b);
+      if (b.kind === 'mart' && b.w === 5 && b.d === 4) for (const [i, j] of [[0, 4], [1, 4], [2, 4]]) liberer(b.x + i, b.y + j, s);
+      else if (b.kind === 'gym' && b.w === 8 && b.d === 11) {
+        for (const [i, j] of [[0, 11], [7, 11]]) liberer(b.x + i, b.y + j, s);
+        for (let j = 0; j < 4; j++) for (let i = 0; i < b.w; i++) liberer(b.x + i, b.y + j, s, s === T.GRASS);
+      } else if (b.kind === 'lab' && b.w === 10 && b.d === 7) {
+        for (let j = 0; j < b.d; j++) for (let i = 6; i < b.w; i++) liberer(b.x + i, b.y + j, s, s === T.GRASS);
+        for (let j = 0; j < 2; j++) for (let i = 0; i < 6; i++) liberer(b.x + i, b.y + j, s, s === T.GRASS);
+        liberer(b.x, b.y + 6, s, s === T.GRASS); liberer(b.x + 5, b.y + 6, s, s === T.GRASS);
+      }
+    }
+  }
   /* ---------------- bâtiments ---------------- */
   /** les bâtiments de la carte : sur la grande carte, chacun n'est construit qu'au moment où le morceau de 16 cases qui
    *  le porte entre en vue (ensureChunks) ; les petites cartes (intérieurs, grottes) sont construites d'un coup */
@@ -1518,12 +1560,24 @@ export class WorldView {
       g.add(hole); this.root.add(g); return;
     }
     // pack de graphismes (Options → Graphismes) : une image d'un seul tenant, à 32 px par case comme l'écran (pixel pour
-    // pixel), dont la largeur colle à l'emprise ; sa porte tombe sur la porte du jeu, son pied sur le bord avant
-    const BP = this.batPack, choix = BP?.styles[b.style];
+    // pixel), dont la largeur et la porte collent à l'emprise ; les monuments 3D propres (b.modele, gratte-ciel…) sont gardés
+    const BP = this.batPack;
+    const estFontaine = b.modele === 'fontaine' && BP?.styles?.fontaine;
+    const estLogisPack = b.door === 1 && (b.modele === 'maisonHaute' || (b.modele === 'chalet' && z?.theme !== 'snow' && z?.theme !== 'cime'));
+    const eligiblePack = BP && (estFontaine || estLogisPack || (!b.modele && !b.kit && (!b.libres?.length || b.kind === 'lab') && !(b.style === 'tower' && (b.door >= 0 || /Phare|Mirage|Centrale/i.test(b.name || '')))));
+    const choix = eligiblePack ? (estFontaine ? BP.styles.fontaine : estLogisPack ? (BP.styles.house || []).filter((q) => ['maison_bleue', 'maison_a_g', 'maison_f', 'maison_g'].includes(q[0])) : BP.styles[b.style]) : null;
     if (choix) {
-      const ok = choix.filter(([n, w]) => BP.images[n] && Math.abs(w / 32 - b.w) <= 1.5);
-      const best = ok.length && Math.min(...ok.map(([, w]) => Math.abs(w / 32 - b.w)));
-      const pris = ok.filter(([, w]) => Math.abs(w / 32 - b.w) <= best + 0.35);
+      const wCible = b.kind === 'lab' ? 6 : b.w;
+      const doorRel = b.door < 0 ? null : b.door2X !== undefined ? (b.doorX + b.door2X + 1) / 2 - b.x : b.door + 0.5;
+      const score = ([n, w, porte]) => {
+        const W = w / 32, px = porte == null || doorRel == null ? null : porte / 32;
+        const l0 = px == null ? (wCible - W) / 2 : doorRel - px, r0 = l0 + W;
+        const manque = Math.max(0, l0, wCible - r0);
+        return Math.abs(W - wCible) + (px == null ? 0 : Math.abs(px - doorRel) * 1.4) + manque * 2.2;
+      };
+      const ok = choix.filter(([n, w]) => BP.images[n] && Math.abs(w / 32 - wCible) <= 1.6);
+      const best = ok.length && Math.min(...ok.map(score));
+      const pris = ok.filter((c) => score(c) <= best + 0.55);
       const pick = pris.length ? pris[(b.x * 7 + b.y * 3) % pris.length] : null;
       if (pick) {
         const [n, , porte] = pick, im = BP.images[n];
@@ -1531,12 +1585,12 @@ export class WorldView {
         const W = im.width * WPX / 2, H = im.height * HPX / 2;
         const geo = new THREE.PlaneGeometry(W, H); geo.translate(0, H / 2, 0);
         geo.setAttribute('anchor', new THREE.Float32BufferAttribute(new Array(12).fill(0), 3));
-        const px = porte == null || b.door < 0 ? null : porte / 32;
-        const left = px == null ? b.x + (b.w - W) / 2 : b.x + b.door + 0.5 - px;
+        const px = porte == null || doorRel == null ? null : porte / 32;
+        const left = px == null ? b.x + (wCible - W) / 2 : b.x + doorRel - px;
         const ax = Math.round((left + W / 2) * 32) / 32, az = b.y + b.d;
         const mat = screenSprite(new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide }));
         this.tinted.push(mat); mat.color.copy(this.tint);
-        const me = new THREE.Mesh(geo, mat); me.position.set(ax, hb, az); g.add(me); g.userData.b = b;
+        const me = new THREE.Mesh(geo, mat); me.position.set(ax, hb, az); g.add(me); g.userData.b = b; g.userData.pack = true;
         // le dessin dépasse l'emprise vers le nord : il s'estompe quand on passe derrière lui (toute sa hauteur, toute sa largeur)
         g.userData.ecran = { zN: b.d - im.height / 32, x0: ax - W / 2 - b.x, x1: ax + W / 2 - b.x };
         this.root.add(g); this.buildingMeshes.push(g); return;
@@ -1656,7 +1710,7 @@ export class WorldView {
     // sol de l'emprise : dalles (ou plancher) sous tout le bâtiment, juste au-dessus du sol généré. Les terrasses où
     // l'on marche ne montrent plus le pavé bruité de la rue, et là où le modèle est plus étroit que son emprise, on ne
     // voit plus l'ancienne tuile grise quadrillée
-    {
+    if (b.libres?.length || (!this.batPack && b.door >= 0)) {
       const pos = [], uv = [], col = [], y = 0.009;
       for (let j = 0; j < b.d; j++) for (let i = 0; i < b.w; i++) {
         const x0 = i / sx, x1 = (i + 1) / sx, z0 = j / sz, z1 = (j + 1) / sz;
@@ -1929,7 +1983,7 @@ export class WorldView {
     // rangée de l'écran où tombent les pieds du joueur (relief en 3D : un joueur en hauteur se voit plus au nord)
     const pied = fy + 0.55 - (this.r3d ? this.r3d.Hmarche(fx + 0.5, fy + 0.55) : 0) / tan;
     for (const g of this.buildingMeshes || []) {
-      const b = g.userData.b; if (!b) continue;
+      const b = g.userData.b; if (!b || g.userData.pack) continue;
       // derrière le bâtiment (au nord de son emprise), il le cache dès que ses pieds passent sous le haut du modèle à
       // l'écran (faîte, cheminée, statue, flèche…) et qu'il est dans sa largeur réelle (galeries et débords compris)
       const e = g.userData.ecran, hb = g.userData.hb || 0;
@@ -1947,7 +2001,7 @@ export class WorldView {
       for (const m of mats) {
         // trame : le bâtiment reste opaque (pas de faces cachées qui transparaissent), une part de ses pixels s'efface
         if (m.userData.uTrame) { m.userData.uTrame.value = n; continue; }
-        const o0 = m.userData.op0 ?? 1; m.transparent = n < 1 || o0 < 1; m.opacity = n * o0; m.depthWrite = n >= 1 && o0 >= 1; m.needsUpdate = true;
+        const o0 = m.userData.op0 ?? 1; m.transparent = n < 1 || o0 < 1; m.opacity = n * o0; if (m.alphaTest > 0) m.alphaTest = n < 1 ? 0.1 : 0.5; m.depthWrite = n >= 1 && o0 >= 1; m.needsUpdate = true;
       }
     }
   }

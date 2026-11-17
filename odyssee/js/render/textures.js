@@ -399,7 +399,7 @@ export const HERBE_PIECES = ['a', 'b', 'c', 't', 'tl', 'tr', 'l', 'r', 'bot', 'b
 /** rivage dessiné (32 px) : sable et écume sur les côtés de l'eau sans voisin d'eau */
 function shore32(water, mask, frame) {
   const c = canvas(C2, C2), x = c.getContext('2d'); x.drawImage(water, 0, 0);
-  const sand = SOL32.sand0, foam = frame % 2 ? '#eef6ff' : '#d4e8ff';
+  const sand = SOL32.sand0 ? (SOL32.sand0.width < C2 ? up2(SOL32.sand0) : SOL32.sand0) : null, foam = frame % 2 ? '#eef6ff' : '#d4e8ff';
   const side = (bit, rect) => {
     if (mask & bit) return;
     const [sx, sy, sw, sh, fx, fy, fw, fh] = rect;
@@ -456,10 +456,10 @@ export function buildAnimAtlas() {
   for (const st of ['0', 'v', 'h', 'f', 'i']) if (SOL32[`q_water_${st}_f0`]) keys.push([`q_water_${st}`, null, (f) => up2(SOL32[`q_water_${st}_f${(f >> 1) % 4}`])]);
   const FL = [SOL32.flowerR, SOL32.flowerW, SOL32.flowerR, SOL32.flowerW], HGF = ['fleur_r', 'fleur_y', 'fleur_b', 'fleur_p'];
   const F16 = ['fleur_r', 'fleur_y', 'fleur_w', 'fleur_p'].map((k) => SOL32['s16_' + k]);
-  // massifs de fleurs : les fleurs dessinées de HeartGold / SoulSilver (32 px, qui se balancent) posées sur l'herbe du jeu ;
-  // à défaut, les petites fleurs à 16 px ou celles du tileset
-  for (let k = 0; k < 4; k++) keys.push(['flower' + k, (P, f) => flowerCell(P, f >> 1, k % 3), HG[HGF[k]] ? ((f) => hgFlower(HGF[k], f, SOL32.grass0)) : F16[k] ? ((f) => { const c = up2(F16[k]); if ((f >> 2) & 1) { const x = c.getContext('2d'), t = canvas(C2, C2); t.getContext('2d').drawImage(c, 0, 0); x.clearRect(0, 0, C2, C2); x.drawImage(t, 0, 0, C2, C2, 0, -1, C2, C2); x.drawImage(t, 0, C2 - 1, C2, 1, 0, C2 - 1, C2, 1); } return c; }) : FL[k] && (() => up2(FL[k]))]);
-  for (const [k, hk] of [[4, 'fleur_o'], [5, 'fleur_w']]) if (HG[hk]) keys.push(['flower' + k, (P, f) => flowerCell(P, f >> 1, k % 3), (f) => hgFlower(hk, f, SOL32.grass0)]);
+  // massifs de fleurs : celles du pack de graphismes (Noir & Blanc), sinon les fleurs dessinées de HeartGold / SoulSilver
+  // (32 px, qui se balancent) posées sur l'herbe du jeu ; à défaut, les petites fleurs à 16 px ou celles du tileset
+  for (let k = 0; k < 4; k++) keys.push(['flower' + k, (P, f) => flowerCell(P, f >> 1, k % 3), SOL32[`q_flower${k}_f0`] ? ((f) => up2(SOL32[`q_flower${k}_f${(f >> 2) & 1}`])) : HG[HGF[k]] ? ((f) => hgFlower(HGF[k], f, SOL32.grass0)) : F16[k] ? ((f) => { const c = up2(F16[k]); if ((f >> 2) & 1) { const x = c.getContext('2d'), t = canvas(C2, C2); t.getContext('2d').drawImage(c, 0, 0); x.clearRect(0, 0, C2, C2); x.drawImage(t, 0, 0, C2, C2, 0, -1, C2, C2); x.drawImage(t, 0, C2 - 1, C2, 1, 0, C2 - 1, C2, 1); } return c; }) : FL[k] && (() => up2(FL[k]))]);
+  for (const [k, hk] of [[4, 'fleur_o'], [5, 'fleur_w']]) if (SOL32[`q_flower${k}_f0`] || HG[hk]) keys.push(['flower' + k, (P, f) => flowerCell(P, f >> 1, k % 3), SOL32[`q_flower${k}_f0`] ? ((f) => up2(SOL32[`q_flower${k}_f${(f >> 2) & 1}`])) : ((f) => hgFlower(hk, f, SOL32.grass0))]);
   keys.push(['lava', (P, f) => { P.fill('#e85a20'); for (let i = 0; i < 6; i++) { const x = (i * 5 + f * 3) % 16, y = (i * 7 + f) % 16; P.rect(x, y, 3, 1, '#ffb040'); P.p(x + 1, y + 1, '#ffe080'); } P.speck(5, '#b83a10'); }, SOL32.lava0 && ((f) => up2(SOL32['lava' + ((f >> 2) & 1)] || SOL32.lava0))]);
   keys.push(['deep', (P, f) => { const w = PAL.water; P.fill(w[4]); for (let k = 0; k < 3; k++) { const y = (k * 5 + 2) % 16, x0 = (k * 6 + f * 2) % 16; for (let i = 0; i < 3; i++) P.p((x0 + i) % 16, y, w[1]); } }, SOL32.deep0 && ((f) => up2(SOL32['deep' + ((f >> 2) & 1)] || SOL32.deep0))]);
   // tourbillons : grands (2 × 2 cases, deux sens de rotation), remous entre eux, carpes koï (render/relief-tex.js)

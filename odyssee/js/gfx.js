@@ -4,7 +4,7 @@
 
 import { NB_TUILES, NB_COLS, NB_DECOR, NB_BATIMENTS } from './data/gfx-noirblanc.js';
 
-const NB_MAISONS = ['maison_bleue', 'maison_a', 'maison_c', 'maison_brique', 'maison_b', 'maison_orange'];
+const NB_MAISONS = ['maison_bleue', 'maison_a', 'maison_a_g', 'maison_c', 'maison_brique', 'maison_b', 'maison_orange', 'maison_d', 'maison_e', 'maison_f', 'maison_g', 'manoir', 'manoir_r'];
 const lire = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } };
 const ecrire = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* navigation privée : le choix ne dure que le temps de la page */ } };
 
@@ -37,7 +37,7 @@ export const PACKS = {
     chars: 'chars',           // planche des personnages de Noir & Blanc 2 (même disposition que celle du jeu)
     // bâtiments entiers (b_<nom>.png) par style du jeu : le jeu prend celui dont la largeur colle à l'emprise
     batiments: Object.fromEntries(Object.entries({
-      center: ['centre'], mart: ['boutique'], gym: ['arene'], lab: ['labo'], tower: ['tour'],
+      center: ['centre'], mart: ['boutique', 'boutique_p', 'boutique_b'], gym: ['arene'], lab: ['labo'], tower: ['tour'], fontaine: ['fontaine'],
       house: NB_MAISONS, house2: NB_MAISONS, house3: NB_MAISONS, bighouse: NB_MAISONS,
     }).map(([st, L]) => [st, L.map((n) => [n, ...NB_BATIMENTS[n]])])),
   },
