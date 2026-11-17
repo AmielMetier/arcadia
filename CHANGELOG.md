@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.102 — 17 novembre 2026
+- Nouveau : boussole de ville et plan local cliquable pour trouver arènes et lieux clés (Amiel)
+
 ## 5.101 — 17 novembre 2026
 - Nouveau : variété maisons et PNJ Noir & Blanc + derniers correctifs d'ancrage (Amiel)
 
