@@ -127,8 +127,9 @@ const WIDE_DECO = new Set(['healer', 'sofa', 'bench', 'startertable', 'fireplace
 const OMBRE_DECO = new Set(['banc', 'parasol', 'tonneau', 'caisse', 'panneau_bois', 'borne', 'lanterne', 'stele']);
 /** avance : le sprite est rangé comme s'il se tenait `avance` case plus au sud (personnages : leurs pieds passent devant
  *  le perron, les marches et le socle du bâtiment qui dépassent sur leur case, sans changer l'ordre entre personnages) */
-function screenSprite(mat, avance = 0) {
+function screenSprite(mat, avance = 0, avecTrame = false) {
   mat.onBeforeCompile = (sh) => {
+    if (avecTrame) trame(mat, sh);
     sh.uniforms.uRes = SPRITE_UNIFORMS.uRes; sh.uniforms.uEch = SPRITE_UNIFORMS.uEch;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec3 anchor;\nuniform vec2 uRes;\nuniform float uEch;')
@@ -147,7 +148,7 @@ function screenSprite(mat, avance = 0) {
         ${avance ? `vec4 sAv = projectionMatrix * viewMatrix * ( sW + vec4( 0.0, 0.0, ${avance.toFixed(3)}, 0.0 ) ); sPC.z = sAv.z / sAv.w * sPC.w;` : ''}
         gl_Position = vec4( ( sPx / uRes * 2.0 - 1.0 ) * sPC.w, sPC.z + sBias * sPC.w, sPC.w );`);
   };
-  mat.customProgramCacheKey = () => 'screenSprite' + avance;
+  mat.customProgramCacheKey = () => 'screenSprite' + avance + (avecTrame ? 'T' : '');
   return mat;
 }
 /**
@@ -591,7 +592,8 @@ export class WorldView {
     // relief3d.js) ; ?relief=plat garde le relief peint à plat
     this.r3dHGSS = reliefHGSSActif() && !relief3dActif();
     this.r3dOn = (relief3dActif() || this.r3dHGSS) && this.sol.on; this.r3d = null;
-    this.r3dOrtho = this.r3dOn && !/[?&]r3persp\b/.test(globalThis.location?.search || '');
+    this.orthoPref = !/[?&]r3persp\b/.test(globalThis.location?.search || '');
+    this.r3dOrtho = this.r3dOn && this.orthoPref;
     if (this.r3dOn && !this.r3dHGSS) setRelief3dSol(true);
     if (this.r3dOn && this.r3dHGSS) setReliefHGSSSol(true);
     this.focus = new THREE.Vector3(); this.shake = 0;
@@ -1372,7 +1374,8 @@ export class WorldView {
     const ci = Math.floor(px / CH), cj = Math.floor(py / CH), k = ci + ',' + cj;
     if (k !== this.lastChunk) {
       this.lastChunk = k;
-      const R = this.rayon || 2;   // blocs autour du point de vue (l'éditeur de carte voit plus loin)
+      const demiL = (SPRITE_UNIFORMS.uRes.value.x || 640) / (this.kPx || 1) / TILE_PX / 2;
+      const R = Math.max(this.rayon || 2, Math.ceil(demiL / CH) + 1);   // blocs autour du point de vue (couvre aussi les écrans larges)
       // à l'écran : le bloc du joueur et ses voisins (R - 1) ; au-delà, des blocs d'avance, construits sur les images
       // suivantes (aBatir) : franchir un bloc demandait d'un coup une rangée de cinq blocs et leurs bâtiments (à-coup)
       const P = Math.max(1, R - 1), x0 = (ci - P) * CH, x1 = (ci + P + 1) * CH, y0 = (cj - P) * CH, y1 = (cj + P + 1) * CH;
@@ -1528,7 +1531,7 @@ export class WorldView {
   poserBatimentsBloc(i, j) {
     const k = i + ',' + j, L = this.batAttente?.get(k); if (!L) return; this.batAttente.delete(k);
     const n0 = this.buildingMeshes.length;
-    for (const b of L) this.poserBat(b);
+    for (const b of L) try { this.poserBat(b); } catch (e) { console.error('[poserBat]', b, e); }
     for (let n = n0; n < this.buildingMeshes.length; n++) this.buildingMeshes[n].userData.bloc = k;
     (this.batPoses ||= new Map()).set(k, L);
   }
@@ -1562,8 +1565,9 @@ export class WorldView {
     // pack de graphismes (Options → Graphismes) : une image d'un seul tenant, à 32 px par case comme l'écran (pixel pour
     // pixel), dont la largeur et la porte collent à l'emprise ; les monuments 3D propres (b.modele, gratte-ciel…) sont gardés
     const BP = this.batPack;
+    const z = this.map.zoneAt?.(b.x, b.y);
     const estFontaine = b.modele === 'fontaine' && BP?.styles?.fontaine;
-    const estLogisPack = b.door === 1 && (b.modele === 'maisonHaute' || (b.modele === 'chalet' && z?.theme !== 'snow' && z?.theme !== 'cime'));
+    const estLogisPack = b.door === 1 && b.modele === 'maisonHaute';
     const eligiblePack = BP && (estFontaine || estLogisPack || (!b.modele && !b.kit && (!b.libres?.length || b.kind === 'lab') && !(b.style === 'tower' && (b.door >= 0 || /Phare|Mirage|Centrale/i.test(b.name || '')))));
     const choix = eligiblePack ? (estFontaine ? BP.styles.fontaine : estLogisPack ? (BP.styles.house || []).filter((q) => ['maison_bleue', 'maison_a_g', 'maison_f', 'maison_g'].includes(q[0])) : BP.styles[b.style]) : null;
     if (choix) {
@@ -1588,9 +1592,9 @@ export class WorldView {
         const px = porte == null || doorRel == null ? null : porte / 32;
         const left = px == null ? b.x + (wCible - W) / 2 : b.x + doorRel - px;
         const ax = Math.round((left + W / 2) * 32) / 32, az = b.y + b.d;
-        const mat = screenSprite(new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide }));
-        this.tinted.push(mat); mat.color.copy(this.tint);
-        const me = new THREE.Mesh(geo, mat); me.position.set(ax, hb, az); g.add(me); g.userData.b = b; g.userData.pack = true;
+        const mat = screenSprite(new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide }), 0, true);
+        mat.userData.ownTint = true; this.tinted.push(mat); mat.color.copy(this.tint);
+        const me = new THREE.Mesh(geo, mat); me.position.set(ax, hb, az); me.frustumCulled = false; g.add(me); g.userData.b = b; g.userData.pack = true;
         // le dessin dépasse l'emprise vers le nord : il s'estompe quand on passe derrière lui (toute sa hauteur, toute sa largeur)
         g.userData.ecran = { zN: b.d - im.height / 32, x0: ax - W / 2 - b.x, x1: ax + W / 2 - b.x };
         this.root.add(g); this.buildingMeshes.push(g); return;
@@ -1598,7 +1602,6 @@ export class WorldView {
     }
     // bâtiment en fausse 3D (modèle de batiments3d.js) quand un modèle a la bonne emprise ; sinon l'ancienne façade
     if (!/[?&]bati=0/.test(globalThis.location?.search || '')) {
-      const z = this.map.zoneAt?.(b.x, b.y);
       const mod = choisirModele(b, { theme: z?.theme, ville: z?.town, typeArene: b.typeArene });
       if (mod) { const gm = this.batimentModele(b, mod); gm.position.y = hb; gm.userData.hb = hb; this.root.add(gm); this.buildingMeshes.push(gm); this.lumierePorte(gm, b, hb); this.cheminees(gm, b, hb); return; }
     }
@@ -1983,7 +1986,7 @@ export class WorldView {
     // rangée de l'écran où tombent les pieds du joueur (relief en 3D : un joueur en hauteur se voit plus au nord)
     const pied = fy + 0.55 - (this.r3d ? this.r3d.Hmarche(fx + 0.5, fy + 0.55) : 0) / tan;
     for (const g of this.buildingMeshes || []) {
-      const b = g.userData.b; if (!b || g.userData.pack) continue;
+      const b = g.userData.b; if (!b) continue;
       // derrière le bâtiment (au nord de son emprise), il le cache dès que ses pieds passent sous le haut du modèle à
       // l'écran (faîte, cheminée, statue, flèche…) et qu'il est dans sa largeur réelle (galeries et débords compris)
       const e = g.userData.ecran, hb = g.userData.hb || 0;
@@ -2016,12 +2019,15 @@ export class WorldView {
       this.animT = 0; this.animFrame = (this.animFrame + 1) % this.N.frames.length;
       const ctx = this.N.canvas.getContext('2d'); ctx.clearRect(0, 0, this.N.canvas.width, this.N.canvas.height); ctx.drawImage(this.N.frames[this.animFrame], 0, 0); this.texN.needsUpdate = true;
     }
+    const estOrtho = !!(this.r3d ? this.r3dOrtho : (this.batPack && this.map?.outdoor && this.orthoPref));
     this.focus.set(fx + 0.5, 0, fy + 0.5);
     if (this.r3d) {
       // relief en 3D : la caméra suit la hauteur du sol, calée sur la grille des pixels (rien ne « nage » en marchant)
       const fh = this.r3d.Hmarche(fx + 0.5, fy + 0.55), tan = Math.tan(EL);
       const s = Math.round((fy + 0.5 - fh / tan) * TILE_PX) / TILE_PX;
       this.focus.set(Math.round((fx + 0.5) * TILE_PX) / TILE_PX, fh, s + fh / tan);
+    } else if (estOrtho) {
+      this.focus.set(Math.round((fx + 0.5) * TILE_PX) / TILE_PX, 0, Math.round((fy + 0.5) * TILE_PX) / TILE_PX);
     }
     this.fadeBuildings(fx, fy, dt);
     if (this.portesAnim?.size) for (const t of this.portesAnim) {
@@ -2042,11 +2048,10 @@ export class WorldView {
       for (const me of this.glows.children) if (me.userData.phare) me.rotation.y = -t * 0.9;
       for (const me of this.glows.children) if (me.userData.feu !== undefined) { const f = me.userData.feu; me.scale.setScalar(me.userData.t0 * (1 + 0.06 * Math.sin(t * 9 + f) + 0.04 * Math.sin(t * 23 + f * 2))); }
     }
-    const d = this.r3d && this.r3dOrtho ? 400 : this.dist;
-    if (this.r3d && this.r3dOrtho) {
-      // relief en 3D : projection orthographique (32 px par case, comme la perspective au centre de l'écran) ; un pas
-      // de la caméra décale toute l'image d'un nombre entier de pixels, le sol ne « nage » pas en marchant
-      // (?r3zoom=Z : vue Z fois plus large, pour regarder une montagne entière ; les sprites rapetissent d'autant)
+    const d = estOrtho ? 400 : this.dist;
+    if (estOrtho) {
+      // projection orthographique (32 px par case, comme sur DS) ; un pas de la caméra décale toute l'image d'un nombre
+      // entier de pixels : ni zoom de perspective ni scintillement du sol en marchant
       const z = this.r3zoom ??= Math.max(1, +(new URLSearchParams(globalThis.location?.search || '').get('r3zoom')) || 1);
       const ze = z / (this.kPx || 1);
       if (z > 1) { SPRITE_UNIFORMS.uEch.value = ze; this.rayon = Math.max(this.rayon || 2, Math.ceil(2 * z + 1)); }

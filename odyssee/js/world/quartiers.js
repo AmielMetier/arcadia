@@ -1285,10 +1285,19 @@ function combler(W, X, Y, X1, Y1, o) {
     let wx = 0; while (wx < 14 && vide(x + wx, y)) wx++;
     let hy = 1;
     while (hy < 10) { let ok = true; for (let i = 0; i < wx; i++) if (!vide(x + i, y + hy)) { ok = false; break; } if (!ok) break; hy++; }
-    if (wx < 8 || hy < 6) { pris[at(x, y)] = 1; continue; }
+    const bande = (wx >= 4 && wx < 8 && hy >= 8) || (hy >= 4 && hy < 6 && wx >= 8);
+    if (!bande && (wx < 8 || hy < 6)) { pris[at(x, y)] = 1; continue; }
     for (let j = 0; j < hy; j++) for (let i = 0; i < wx; i++) pris[at(x + i, y + j)] = 1;
     // le square : on garde une case de bord (passage)
     const x0 = x + 1, y0 = y + 1, x1 = x + wx - 2, y1 = y + hy - 2, mx = Math.round((x0 + x1) / 2), my = Math.round((y0 + y1) / 2);
+    if (bande) {
+      for (let yy = y0; yy <= y1; yy += 4) {
+        if (yy + 1 <= y1) for (let xx = x0; xx <= x1 && xx < x0 + 2; xx++) for (let dy = 0; dy <= 1; dy++) if (W.get(xx, yy + dy) === T.GRASS || W.get(xx, yy + dy) === o.sol) W.set(xx, yy + dy, T.FLOWER);
+        if (yy + 2 <= y1) o.prop(o.arbres[Math.floor(o.r() * o.arbres.length)], mx, yy + 2);
+      }
+      o.prop('banc', mx, y1);
+      continue;
+    }
     const pave = o.ville && W.get(x, y) === T.PAVE;
     for (let yy = y0; yy <= y1; yy++) for (let xx = x0; xx <= x1; xx++) W.set(xx, yy, T.GRASS);
     const q = o.r();
