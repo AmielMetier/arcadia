@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.101 — 17 novembre 2026
+- Nouveau : variété maisons et PNJ Noir & Blanc + derniers correctifs d'ancrage (Amiel)
+
 ## 5.100 — 17 novembre 2026
 - Correction : ancrage au sol des personnages, objets et batiments Noir & Blanc (Amiel)
 
