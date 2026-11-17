@@ -265,25 +265,25 @@ D = {
     'tree': feuillu, 'tree2': flip(feuillu), 'tree3': feuillu, 'pine': sapin,
     'snowpine': feuilles(sapin, (215, 235, 250)),
     'arbre_automne': feuilles(feuillu, (235, 150, 40)), 'erable': feuilles(feuillu, (220, 70, 45)), 'cerisier': feuilles(feuillu, (250, 165, 195)),
-    'bush': net(trim(BW.crop((0, 632, 32, 672)))), 'lamp': net(trim(BW.crop((224, 608, 256, 736)))).resize((16, 60), Image.NEAREST),
+    'bush': trim(net(BW.crop((0, 632, 32, 672)))), 'lamp': trim(trim(net(BW.crop((224, 608, 256, 736)))).resize((16, 60), Image.NEAREST)),
     'rock': trim(L('objet_rocher.png').crop((0, 0, 32, 32))), 'cuttree': trim(L('objet_arbuste.png').crop((0, 0, 32, 32))),
-    'pot': net(trim(BW.crop((192, 21248, 224, 21310)))),
-    'mailbox': net(trim(BW.crop((160, 5632, 192, 5696)))),
-    'statue': net(trim(BW.crop((192, 21312, 224, 21376)))),
-    'gymstatue': net(trim(BW.crop((192, 21312, 224, 21376)))),
-    'banc': net(trim(BW.crop((0, 3200, 64, 3264)))),
-    'parasol': net(trim(BW.crop((144, 21056, 208, 21136)))).resize((48, 50), Image.NEAREST),
-    'fence': net(trim(BW.crop((32, 796, 64, 832)))),
-    'barriere': net(trim(BW.crop((32, 796, 64, 832)))),
-    'barriere_fin': net(trim(BW.crop((32, 796, 64, 832)))),
-    'barriere_v': net(trim(BW.crop((0, 824, 32, 864)))),
-    'barriere_v0': net(trim(BW.crop((0, 824, 32, 864)))),
+    'pot': trim(net(BW.crop((192, 21248, 224, 21310)))),
+    'mailbox': trim(net(BW.crop((160, 5632, 192, 5696)))),
+    'statue': trim(net(BW.crop((192, 21312, 224, 21376)))),
+    'gymstatue': trim(net(BW.crop((192, 21312, 224, 21376)))),
+    'banc': trim(net(BW.crop((0, 3200, 64, 3264)))),
+    'parasol': trim(trim(net(BW.crop((144, 21056, 208, 21136)))).resize((48, 50), Image.NEAREST)),
+    'fence': trim(net(BW.crop((32, 796, 64, 832)))),
+    'barriere': trim(net(BW.crop((32, 796, 64, 832)))),
+    'barriere_fin': trim(net(BW.crop((32, 796, 64, 832)))),
+    'barriere_v': trim(net(BW.crop((0, 824, 32, 864)))),
+    'barriere_v0': trim(net(BW.crop((0, 824, 32, 864)))),
 }
 # mobilier du Centre Pokémon et panneau de bois des routes
-D['plant'] = net(trim(CENTRE.crop((192, 1096, 224, 1170)))); D['pc'] = net(trim(CENTRE.crop((192, 1010, 224, 1090))))
-D['healer'] = net(trim(CENTRE.crop((130, 1012, 192, 1082)))); D['bench'] = net(trim(CENTRE.crop((64, 960, 160, 992))))
-D['fontaine'] = trim(net(BW.crop((8, 11356, 152, 11570)))).resize((48, 68), Image.NEAREST)
-D['sign'] = net(trim(BW.crop((176, 98 * 32, 256, 100 * 32)))).resize((32, 28), Image.NEAREST)
+D['plant'] = trim(net(CENTRE.crop((192, 1096, 224, 1170)))); D['pc'] = trim(net(CENTRE.crop((192, 1010, 224, 1090))))
+D['healer'] = trim(net(CENTRE.crop((130, 1012, 192, 1082)))); D['bench'] = trim(net(CENTRE.crop((64, 960, 160, 992))))
+D['fontaine'] = trim(trim(net(BW.crop((8, 11356, 152, 11570)))).resize((48, 68), Image.NEAREST))
+D['sign'] = trim(trim(net(BW.crop((176, 98 * 32, 256, 100 * 32)))).resize((32, 28), Image.NEAREST))
 # devant les jambes de qui marche dans les hautes herbes : le bas de la touffe
 bas = lambda t: t.crop((0, 16, 32, 32))
 D['grassfront'], D['grassfront2'] = bas(touffe), bas(flip(touffe))
@@ -360,6 +360,9 @@ for nom, (x0, y0, x1, y1, porte) in BATS.items():
         im = trim(net(BW.crop((x0, y0, x1, y1)))).resize((96, 136), Image.NEAREST)
     else:
         im = net(BW.crop((x0, y0, x1, y1)))
+    by = np.where(np.array(im)[..., 3] > 0)[0]
+    if len(by):
+        im = im.crop((0, 0, im.width, int(by.max()) + 1))
     im.save(os.path.join(OUT, f'b_{nom}.png'))
 
 # ------------------------------------------------------------------ personnages
@@ -374,32 +377,26 @@ for nom, fichier in PERSOS.items():
     src = L(os.path.join('persos', fichier + '.png')); fw, fh = src.width // 4, src.height // 4
     y = rows[nom] * 64
     chars.paste((0, 0, 0, 0), (0, y, 768, y + 64))
-    # bornes sur toute la planche du personnage : on garde toute la coiffure et les côtés sans couper un seul pixel
-    ymin, ymax, xmin, xmax = fh, 0, fw, 0
-    for d in range(4):
-        for f in (1, 0, 3):
-            ys, xs = np.where(np.array(src.crop((f * fw, d * fh, f * fw + fw, d * fh + fh)))[..., 3] > 0)
-            if len(ys):
-                ymin, ymax = min(ymin, int(ys.min())), max(ymax, int(ys.max()) + 1)
-                xmin, xmax = min(xmin, int(xs.min())), max(xmax, int(xs.max()) + 1)
-    y_crop = max(0, min(ymin, ymax - 62)) if fh > 64 else 0
-    x_crop = max(0, min(xmin, min(fw - 64, (xmin + xmax - 64) // 2))) if fw > 64 else 0
     for d in range(4):
         for k, f in enumerate((1, 0, 3)):
             fr = src.crop((f * fw, d * fh, f * fw + fw, d * fh + fh))
             ys, xs = np.where(np.array(fr)[..., 3] > 0)
-            xc = max(0, min(int(xs.min()), min(fw - 64, (int(xs.min()) + int(xs.max()) + 1 - 64) // 2))) if fw > 64 and len(xs) else x_crop
-            if fh > 64 and len(ys) and int(ys.max()) - int(ys.min()) + 1 > 64:
+            if not len(ys):
+                continue
+            ymin_f, ymax_f = int(ys.min()), int(ys.max()) + 1
+            xmin_f, xmax_f = int(xs.min()), int(xs.max()) + 1
+            xc = max(0, min(xmin_f, min(fw - 64, (xmin_f + xmax_f - 64) // 2))) if fw > 64 else 0
+            dx = 0 if fw > 64 else (64 - fw) // 2
+            if ymax_f - ymin_f > 64:
                 # cas unique où une pose dépasse 64 px (Célestine, 66 px) : on tasse 2 lignes unies au milieu de la robe
-                a_fr = np.array(fr)[int(ys.min()):int(ys.max()) + 1, xc:xc + 64]
+                a_fr = np.array(fr)[ymin_f:ymax_f, xc:xc + 64]
                 keep = [i for i in range(a_fr.shape[0]) if i not in (44, 45)][:64]
                 c = Image.fromarray(a_fr[keep], 'RGBA')
-            elif fh > 64:
-                yc = max(0, min(int(ys.min()), y_crop)) if len(ys) and int(ys.max()) - y_crop < 64 else (max(0, int(ys.max()) - 63) if len(ys) else y_crop)
-                c = fr.crop((xc, yc, xc + 64, yc + 64))
             else:
+                # pieds posés tout en bas de la case (y = 64) pour éviter que le sprite flotte au-dessus de son ombre
+                sub = fr.crop((xc, ymin_f, xc + min(64, fw), ymax_f))
                 c = Image.new('RGBA', (64, 64))
-                c.alpha_composite(fr, ((64 - fw) // 2, 64 - fh - (4 if fh <= 60 else 0)))
+                c.alpha_composite(sub, (dx, 64 - (ymax_f - ymin_f)))
             chars.alpha_composite(c, ((d * 3 + k) * 64, y))
     faits += 1
 chars.save(os.path.join(OUT, 'chars.png'))
