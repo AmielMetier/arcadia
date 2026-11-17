@@ -587,9 +587,9 @@ export function mapScreen(game, opts = {}) {
     const townBar = s.querySelector('.map-town-bar');
     const toggleCible = (b) => {
       const cur = st.villeCible;
-      st.villeCible = cur && cur.zone === L.nom && cur.key === b.key
+      st.villeCible = cur && (!cur.mapId || cur.mapId === L.id) && cur.zone === L.nom && cur.key === b.key
         ? null
-        : { zone: L.nom, key: b.key, txt: b.txt, ico: b.ico, col: b.col, x: b.px, y: b.py };
+        : { mapId: L.id, zone: L.nom, key: b.key, txt: b.txt, ico: b.ico, col: b.col, x: b.px, y: b.py };
       game.save?.(true);
       ui.sound.sfx(st.villeCible ? 'select' : 'cancel');
       showLocale();
@@ -599,7 +599,7 @@ export function mapScreen(game, opts = {}) {
       if (!townBar) return;
       const bats = L?.bats || [];
       if (!locale || !bats.length) { townBar.innerHTML = ''; return; }
-      const c = st.villeCible && st.villeCible.zone === L.nom ? st.villeCible : null;
+      const c = st.villeCible && (!st.villeCible.mapId || st.villeCible.mapId === L.id) && st.villeCible.zone === L.nom ? st.villeCible : null;
       townBar.innerHTML = `<span class="mtb-lbl">📍 Repères :</span>` + bats.map((b) => {
         const cap = capVers(b.px - (L.p.x + 0.5), b.py - (L.p.y + 0.5));
         const on = c && c.key === b.key;
@@ -621,7 +621,7 @@ export function mapScreen(game, opts = {}) {
       let n = 0, vus = 0;
       for (let by = Math.floor(L.y0 / B); by <= Math.floor(L.y1 / B); by++) for (let bx = Math.floor(L.x0 / B); bx <= Math.floor(L.x1 / B); bx++) { n++; if (FM.set.has(by * FM.cw + bx)) vus++; }
       const zKey = L.zone ? findZoneSpawnKey(L.zone) : null, zCatch = zKey ? getZoneCatchStats(st, zKey) : null;
-      const cible = st.villeCible && st.villeCible.zone === L.nom ? L.bats?.find((b) => b.key === st.villeCible.key) : null;
+      const cible = st.villeCible && (!st.villeCible.mapId || st.villeCible.mapId === L.id) && st.villeCible.zone === L.nom ? L.bats?.find((b) => b.key === st.villeCible.key) : null;
       if (cible) {
         const cap = capVers(cible.px - (L.p.x + 0.5), cible.py - (L.p.y + 0.5));
         subEl.innerHTML = `🧭 Guidage : <b>${esc(cible.ico)} ${esc(cible.txt)}</b>${cible.sub ? ` (${esc(cible.sub)})` : ''} <span class="map-sub-dist">· ${cap.arrow} ${cap.label} (${cap.dist} cases)</span>`;

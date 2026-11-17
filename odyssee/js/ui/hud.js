@@ -217,9 +217,9 @@ export class Hud {
         const b = batimentsImportants(g, V).find((q) => q.key === actEl.dataset.guideKey);
         if (!b) return;
         const cur = g.state.villeCible;
-        g.state.villeCible = cur && cur.zone === V.nom && cur.key === b.key
+        g.state.villeCible = cur && (!cur.mapId || cur.mapId === V.id) && cur.zone === V.nom && cur.key === b.key
           ? null
-          : { zone: V.nom, key: b.key, txt: b.txt, ico: b.ico, col: b.col, x: b.px, y: b.py };
+          : { mapId: V.id, zone: V.nom, key: b.key, txt: b.txt, ico: b.ico, col: b.col, x: b.px, y: b.py };
         g.sound.sfx(g.state.villeCible ? 'select' : 'cancel');
         this.update(true);
       }
@@ -256,9 +256,12 @@ export class Hud {
     }
     this.root.style.display = '';
     const loc = g.locationName();
-    if (g.mapObj.id === 'monde' && st.villeCible) {
-      const zNow = g.mapObj.zoneAt?.(g.player.x, g.player.y);
-      if (zNow && zNow.name !== st.villeCible.zone) st.villeCible = null;
+    if (st.villeCible) {
+      if (st.villeCible.mapId && st.villeCible.mapId !== g.mapObj.id) st.villeCible = null;
+      else if (g.mapObj.id === 'monde') {
+        const zNow = g.mapObj.zoneAt?.(g.player.x, g.player.y);
+        if (zNow && zNow.name !== st.villeCible.zone) st.villeCible = null;
+      }
     }
     const V = lieuxVille(g);
     const tracked = getTrackedQuest(g);
@@ -275,7 +278,7 @@ export class Hud {
     const partyKey = st.party
       .map((m) => `${m.uid}:${m.sp}:${m.nick || ''}:${m.lvl}:${m.hp}:${m.stats[0]}:${m.exp}:${m.status || ''}:${m.shadow ? 1 : 0}:${m.shiny ? 1 : 0}`)
       .join('|');
-    const guideSig = V ? `${V.nom}:${this.guideExpanded ? 1 : 0}:${st.villeCible?.key || ''}` : '';
+    const guideSig = V ? `${V.id}:${V.nom}:${!V.zone && V.id === 'monde' ? `${V.p.x >> 4},${V.p.y >> 4}` : ''}:${this.guideExpanded ? 1 : 0}:${st.villeCible?.key || ''}` : '';
     const sig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0}:${g.runSpeed ?? 1};${this.swapFrom};${loc};${guideSig};${zoneCatchKey};${st.money};${badgesKey};${trUnlocked};${st.trackedQuest || ''}:${tracked?.notes?.length || 0};${onlineCount};${partyKey}`;
     if (this.glisse) return;   // pas de redessin pendant qu'on glisse un Pokémon
     if (!force && sig === this._sig) { if (V && !this.collapsed) this.refreshGuide(V); return; }
@@ -363,17 +366,20 @@ export class Hud {
           if (!V) { this._guideBats = null; return ''; }
           const bats = this._guideBats = batimentsImportants(g, V);
           if (!bats.length) return '';
-          const ess = bats.filter((b) => b.ess), autres = bats.filter((b) => !b.ess);
-          const cible = st.villeCible && st.villeCible.zone === V.nom ? bats.find((b) => b.key === st.villeCible.key) : null;
-          const montres = this.guideExpanded ? bats : ess.length ? ess : bats.slice(0, 4);
+          const ess = bats.filter((b) => b.ess);
+          const baseMontres = ess.length ? ess.slice(0, V.ville ? 5 : 4) : bats.slice(0, 4);
+          const baseKeys = new Set(baseMontres.map((b) => b.key));
+          const autres = bats.filter((b) => !baseKeys.has(b.key));
+          const cible = st.villeCible && (!st.villeCible.mapId || st.villeCible.mapId === V.id) && st.villeCible.zone === V.nom ? bats.find((b) => b.key === st.villeCible.key) : null;
+          const montres = this.guideExpanded ? bats : baseMontres;
           const px = V.p.x + 0.5, py = V.p.y + 0.5;
           const capC = cible ? capVers(cible.px - px, cible.py - py) : null;
           return `<div class="hud-guide">
             <div class="hud-guide-head">
               <span class="hgd-title">🧭 REPÈRES</span>
               <div class="hgd-acts">
-                ${autres.length && ess.length ? `<button type="button" class="hgd-btn" data-act="guide-more" title="Afficher les autres bâtiments notables" tabindex="-1">${this.guideExpanded ? '▴ Réduire' : `▾ +${autres.length} lieux`}</button>` : ''}
-                <button type="button" class="hgd-btn map" data-act="local-map" title="Ouvrir le plan de la ville" tabindex="-1">🗺 Plan</button>
+                ${autres.length ? `<button type="button" class="hgd-btn" data-act="guide-more" title="Afficher tous les repères de la zone" tabindex="-1">${this.guideExpanded ? '▴ Réduire' : `▾ +${autres.length} lieux`}</button>` : ''}
+                <button type="button" class="hgd-btn map" data-act="local-map" title="Ouvrir le plan du lieu" tabindex="-1">🗺 Plan</button>
               </div>
             </div>
             <div class="hud-guide-chips">

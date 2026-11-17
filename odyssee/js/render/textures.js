@@ -226,7 +226,7 @@ export function buildAtlas() {
   putSol('ledge', 'ledge', (P) => ledgeCell(P, 's')); putSol('ledgeE', 'ledgeE', (P) => ledgeCell(P, 'e')); putSol('ledgeW', 'ledgeW', (P) => ledgeCell(P, 'w'));
   putSol('bridge', 'bridgeNS', bridgeCell); putSol('bridgeEW', 'bridgeEW', bridgeCell);
   putSol('stairs', 'stairs', (P) => { const c = PAL.rock; P.fill(c[0]); for (let y = 0; y < 16; y += 4) { P.rect(0, y, 16, 1, c[2]); P.rect(0, y + 3, 16, 1, c[3]); } });
-  put('cavestairs', (P) => { const c = PAL.cave; P.fill(c[0]); for (let y = 0; y < 16; y += 4) { P.rect(0, y, 16, 1, c[2]); P.rect(0, y + 3, 16, 1, c[3]); } });
+  putSol('cavestairs', 'cavestairs', (P) => { const c = PAL.cave; P.fill(c[0]); for (let y = 0; y < 16; y += 4) { P.rect(0, y, 16, 1, c[2]); P.rect(0, y + 3, 16, 1, c[3]); } });
   // sols d'intérieur : la tuile du tileset qui correspond à chaque salle
   const FLOOR32 = { base: 'floor_metal', temple: 'tatami', musee: 'floor_marble', wood: 'floor_wood', center: 'floor_pink', mart: 'floor_blue', lab: 'floor_white', league: 'carpet', cendre: 'floor_dark', gymBug: 'leaves0', gymRock: 'floor_stone', gymWater: 'floor_blue2', gymElec: 'floor_metal', gymGrass: 'tatami', gymPsy: 'floor_marble', gymFire: 'floor_dark2', gymDragon: 'floor_dark', cave: 'cave0' };
   for (const st of ['wood', 'center', 'mart', 'lab', 'league', 'gymBug', 'gymRock', 'gymWater', 'gymElec', 'gymGrass', 'gymPsy', 'gymFire', 'gymDragon', 'base', 'temple', 'musee']) putSol('floor_' + st, FLOOR32[st], (P) => floorCell(P, st));

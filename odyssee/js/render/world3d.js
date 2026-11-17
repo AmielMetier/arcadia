@@ -747,9 +747,19 @@ export class WorldView {
         return { anim: this.N.cells['water' + mask((q) => q === T.WATER || q === T.BRIDGE)] };
       case T.BRIDGE: { const ns = sensPont(m, x, y) === 'ns'; return { anim: this.N.cells.q_water_f || this.N.cells.water15, bridge: ns ? A.bridge : A.bridgeEW || A.bridge }; }
       // une couleur par massif (par carré de 3 × 3 cases), avec parfois une fleur d'une autre couleur
-      case T.FLOWER: { const nf = this.N.cells.flower5 ? 6 : 4, pv = hash(Math.floor(x / 3) + 101, Math.floor(y / 3) + 37), k = v < 0.85 ? Math.floor(pv * nf) : Math.floor(v * 97) % nf; return { anim: this.N.cells['flower' + k] || this.N.cells.flower0 }; }
+      case T.FLOWER: {
+        const nf = this.N.cells.flower5 ? 6 : 4, pv = hash(Math.floor(x / 3) + 101, Math.floor(y / 3) + 37), k = v < 0.85 ? Math.floor(pv * nf) : Math.floor(v * 97) % nf;
+        if (pg && A.sand0) {
+          const sandBg = theme === 'desert' && [groundAt(x + 1, y), groundAt(x - 1, y), groundAt(x, y + 1), groundAt(x, y - 1)].some((q) => q === T.SAND);
+          return { c: A[sandBg ? 'sand0' : grassKey], ovAnim: this.N.cells['flower' + k] || this.N.cells.flower0 };
+        }
+        return { anim: this.N.cells['flower' + k] || this.N.cells.flower0 };
+      }
       case T.LEDGE: return { c: A.ledge }; case T.LEDGE_E: return { c: A.ledgeE }; case T.LEDGE_W: return { c: A.ledgeW };
-      case T.CAVEWALL: if (m.outdoor) return { c: A[grassKey] };   // sous les montagnes du dehors
+      case T.CAVEWALL: if (m.outdoor) {
+        if (theme === 'desert' && A.sand0 && ![groundAt(x + 1, y), groundAt(x - 1, y), groundAt(x, y + 1), groundAt(x, y - 1)].some((q) => q === T.GRASS || q === T.TREE || q === T.FLOWER)) return { c: A.sand0 };
+        return { c: A[grassKey] };   // sous les montagnes du dehors
+      }
         if (this.tiers && A[`rp_${this.biome}_00`]) { const k = reliefKey(A, this.biome, 's', v); return { c: A[k] }; }
         if (this.tiers && A[`rt_${this.biome}_0`] && !this.tierAt(x, y)) return { c: A[`rt_${this.biome}_${v < 0.7 ? 0 : 1}`], shade: 0.95 };
       // falls through
@@ -1065,6 +1075,7 @@ export class WorldView {
       const t = m.get(x, y), g = this.groundCell(x, y), v = hash(x + 7, y + 3);
       if (g.c) flat(G, x, y, x + 1, y + 1, 0, g.c, g.shade);
       if (g.anim) flat(N, x, y, x + 1, y + 1, 0, g.anim);
+      if (g.ovAnim) flat(NO, x, y, x + 1, y + 1, 0.002, g.ovAnim);
       if (g.q) for (let i = 0; i < 4; i++) { const qx = i & 1, qy = i >> 1; flat(g.qEau ? NO : O0, x + qx / 2, y + qy / 2, x + (qx + 1) / 2, y + (qy + 1) / 2, 0.003, g.q[i]); }
       if (g.ov) flat(O0, x, y, x + 1, y + 1, 0.003, g.ov);
       if (g.bridge && !this.sol.couvre()) flat(G, x - 0.02, y, x + 1.02, y + 1, 0.012, g.bridge);   // le sol généré dessine ses pontons

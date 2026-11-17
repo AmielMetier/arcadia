@@ -27,6 +27,7 @@ OUT = os.path.join(ROOT, 'odyssee', 'img', 'gfx', 'noirblanc')
 os.makedirs(OUT, exist_ok=True)
 L = lambda n: Image.open(os.path.join(SRC, n)).convert('RGBA')
 BW, MER, MERP, GROTTE, VOLC = L('kit_bw_set.png'), L('mer.png'), L('mer_profonde.png'), L('grotte.png'), L('volcan.png')
+NEIGE, PONT_BW = L('neige.png'), L('pont_bw.png')
 
 half = lambda im: im.resize((im.width // 2, im.height // 2), Image.NEAREST)   # le kit est du pixel art doublé : sans perte
 cell = lambda cx, cy, im=BW: im.crop((cx * 32, cy * 32, cx * 32 + 32, cy * 32 + 32))
@@ -166,9 +167,12 @@ for nom, P in [('path', pieces_chemin(SABLE)), ('sand', pieces_chemin(tone(SABLE
         T[f'q_{nom}_{k}'] = t
     T[nom + '0'] = P['f']
 sable = T['sand0']
-T['snow0'] = tone(sable, 1.06, 0.12); T['snow1'] = flip(T['snow0'])
+T['snow0'] = NEIGE; T['snow1'] = flip(NEIGE)
 T['cave0'] = GROTTE.crop((32, 64, 64, 96)); T['cave1'] = flip(T['cave0'])
 T['ash0'] = tone(T['cave0'], 0.72, 0.25); T['ash1'] = flip(T['ash0'])
+T['bridgeEW'] = PONT_BW; T['bridgeNS'] = PONT_BW.transpose(Image.ROTATE_90)
+T['stairs'] = BW.crop((0, 19712, 32, 19744))
+T['cavestairs'] = tone(T['stairs'], 0.62, 1.15)
 lave = lambda cx, cy: VOLC.crop((cx * 16, cy * 16, cx * 16 + 16, cy * 16 + 16)).resize((32, 32), Image.NEAREST)
 T['lava0'], T['lava1'] = lave(5, 5), lave(4, 5)
 touffe, touffe_s = cell(4, 11), cell(5, 11)
@@ -202,8 +206,9 @@ for k, (cr, cg, cb) in enumerate(FLEUR_COULS):
     # seconde image : les fleurs se balancent d'un cran (2 px) vers la droite
     fl1 = Image.new('RGBA', (32, 32))
     fl1.paste(fl0.crop((0, 0, 30, 32)), (2, 0))
-    T[f'q_flower{k}_f0'] = over(G0, fl0)
-    T[f'q_flower{k}_f1'] = over(G0, fl1)
+    # fleurs transparentes : le jeu pose dessous l'herbe, le sable, la cendre ou la neige de la case
+    T[f'q_flower{k}_f0'] = fl0
+    T[f'q_flower{k}_f1'] = fl1
 
 # mer : 4 images d'animation, rivage de rochers ; mêmes cinq tuiles que les chemins
 for f in range(4):
@@ -212,8 +217,11 @@ for f in range(4):
         T[f'q_water_{k}_f{f}'] = t
     T[f'water{f}'] = fr.crop((32, 64, 64, 96))
     T[f'deep{f}'] = MERP.crop((f * 192 + 32, 64, f * 192 + 64, 96))
-# rebord à sauter (vers le sud) et intérieurs : sol du Centre Pokémon et de la Boutique, comptoirs aux couleurs du kit
-T['ledge'] = over(G0, BW.crop((112, 960, 144, 992)))
+# rebords à sauter (sud, est, ouest) et intérieurs : sol du Centre Pokémon et de la Boutique, comptoirs aux couleurs du kit
+ledge_s = BW.crop((112, 960, 144, 992))
+T['ledge'] = over(G0, ledge_s)
+T['ledgeE'] = over(G0, ledge_s.transpose(Image.ROTATE_90))
+T['ledgeW'] = over(G0, ledge_s.transpose(Image.ROTATE_270))
 CENTRE, BOUTIQUE = L('centre_interieur.png'), L('boutique_interieur.png')
 T['floor_pink'] = cell(1, 10, CENTRE); T['floor_blue'] = cell(0, 5, BOUTIQUE)
 
@@ -261,12 +269,34 @@ def feuilles(im, coul):
     return Image.fromarray(a.astype('uint8'), 'RGBA')
 
 
+def extraire_ilot(im, seed_xy, diag=True):
+    """Ne garde que la composante connexe contenant seed_xy (évite les pixels voisins collés dans la planche)."""
+    a = np.array(im); h, w = a.shape[:2]
+    vis = np.zeros((h, w), dtype=bool)
+    sx, sy = seed_xy
+    if a[sy, sx, 3] == 0:
+        raise ValueError(f'seed transparente: {seed_xy}')
+    q = [(sy, sx)]; vis[sy, sx] = True
+    nbrs = [(-1, 0), (1, 0), (0, -1), (0, 1)] + ([(-1, -1), (-1, 1), (1, -1), (1, 1)] if diag else [])
+    for cy, cx in q:
+        for dy, dx in nbrs:
+            ny, nx = cy + dy, cx + dx
+            if 0 <= ny < h and 0 <= nx < w and not vis[ny, nx] and a[ny, nx, 3] > 0:
+                vis[ny, nx] = True; q.append((ny, nx))
+    a[~vis] = 0
+    return trim(Image.fromarray(a, 'RGBA'))
+
+
+deadtree_nb = extraire_ilot(VOLC.crop((312, 0, 368, 70)), (32, 52))
+caverock_nb = extraire_ilot(VOLC.crop((256, 30, 288, 56)), (15, 16))
+
 D = {
     'tree': feuillu, 'tree2': flip(feuillu), 'tree3': feuillu, 'pine': sapin,
     'snowpine': feuilles(sapin, (215, 235, 250)),
+    'deadtree': deadtree_nb,
     'arbre_automne': feuilles(feuillu, (235, 150, 40)), 'erable': feuilles(feuillu, (220, 70, 45)), 'cerisier': feuilles(feuillu, (250, 165, 195)),
     'bush': trim(net(BW.crop((0, 632, 32, 672)))), 'lamp': trim(trim(net(BW.crop((224, 608, 256, 736)))).resize((16, 60), Image.NEAREST)),
-    'rock': trim(L('objet_rocher.png').crop((0, 0, 32, 32))), 'cuttree': trim(L('objet_arbuste.png').crop((0, 0, 32, 32))),
+    'rock': trim(L('objet_rocher.png').crop((0, 0, 32, 32))), 'caverock': caverock_nb, 'cuttree': trim(L('objet_arbuste.png').crop((0, 0, 32, 32))),
     'pot': trim(net(BW.crop((192, 21248, 224, 21310)))),
     'mailbox': trim(net(BW.crop((160, 5632, 192, 5696)))),
     'statue': trim(net(BW.crop((192, 21312, 224, 21376)))),

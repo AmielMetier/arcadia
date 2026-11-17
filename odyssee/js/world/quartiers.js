@@ -1261,6 +1261,14 @@ export function grandeVille(W, maps, def, V, { buildTown, poserBatiment }) {
   /* 13. tout relier : chaque porte, chaque habitant et chaque objet rejoint les rues ; les recoins isolés se referment */
   relier(W, TX, TY, TX1, TY1, sorties.length ? sorties.flatMap((q) => q.cells) : [[def.x, def.y]], rue, `${def.id}:h`);
   emonder(W, TX, TY, TX1, TY1, sorties.map((q) => q.poste), sol);
+  // retire les cases solitaires de chemin/pavé perdues au milieu de l'herbe ou devant une impasse d'arbres
+  const fondHerbe = sol === T.PAVE || sol === T.PATH || sol === T.SAND ? T.GRASS : sol;
+  for (let y = TY; y <= TY1; y++) for (let x = TX; x <= TX1; x++) {
+    const t = W.get(x, y);
+    if (t !== T.PATH && t !== T.PAVE) continue;
+    const rel = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => { const q = W.get(x + a, y + b); return q === T.PATH || q === T.PAVE || q === T.DOOR || q === T.BRIDGE || q === T.CAVEDOOR || q === T.STAIRS || q === T.SAND || !!W.warpAt(x + a, y + b); });
+    if (!rel && !W.warpAt(x, y) && !W.signs.has(x + ',' + y) && !W.deco.some((d) => d.x === x && d.y === y)) W.set(x, y, fondHerbe);
+  }
   return def;
 }
 
