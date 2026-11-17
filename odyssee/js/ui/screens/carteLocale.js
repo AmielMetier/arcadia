@@ -2,9 +2,99 @@
 // Elle s'ouvre depuis la carte de la région (onglet « Ici », touche Tab) ; comme la carte de la région, elle ne montre
 // que ce qu'on a déjà parcouru (le reste dort sous le brouillard) et se complète à chaque pas.
 import { T } from '../../world/tiles.js';
+import { LEADERS } from '../../world/region.js';
+import { TYPE_FR } from './common.js';
 import { seenMask, brouillard, caseVue, BLOC_LOCAL } from './map.js';
 
 const MAX_W = 200, MAX_H = 150;   // au-delà (mer, très grande zone) : un cadre autour du joueur
+const DIRS8 = [
+  ['→', 'Est'], ['↘', 'Sud-Est'], ['↓', 'Sud'], ['↙', 'Sud-Ouest'],
+  ['←', 'Ouest'], ['↖', 'Nord-Ouest'], ['↑', 'Nord'], ['↗', 'Nord-Est'],
+];
+const ESSENTIELS = {
+  gym: { txt: 'Arène', ico: '★', col: '#e0a020', prio: 0, ess: true },
+  league: { txt: 'Ligue', ico: '♛', col: '#9333ea', prio: 1, ess: true },
+  lab: { txt: 'Labo', ico: '⚗', col: '#0ea5e9', prio: 2, ess: true },
+  center: { txt: 'Centre', ico: '+', col: '#e04848', prio: 3, ess: true },
+  mart: { txt: 'Boutique', ico: '¤', col: '#3a78d8', prio: 4, ess: true },
+};
+const BATS_A_IGNORER = new Set([
+  'maison', 'house', 'etal', 'étal', 'fontaine', 'puits', 'tour',
+  'cabane à outils', 'cabanepecheur', 'cabanechasseur',
+]);
+
+/** direction (8 axes) et distance en cases entre le joueur et un point cible */
+export function capVers(dx, dy) {
+  const dist = Math.round(Math.hypot(dx, dy));
+  if (dist <= 2) return { dist, arrow: '✔', label: 'Juste devant' };
+  const idx = ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8;
+  return { dist, arrow: DIRS8[idx][0], label: DIRS8[idx][1] };
+}
+
+/** bornes d'une zone de ville à partir du nom de zone (sans peindre de canevas) */
+function empriseZone(W, z) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const q of W.zones) {
+    if (q.name !== z.name || (z.town && q.town !== z.town)) continue;
+    x0 = Math.min(x0, q.x0); y0 = Math.min(y0, q.y0); x1 = Math.max(x1, q.x1); y1 = Math.max(y1, q.y1);
+  }
+  return { x0, y0, x1, y1 };
+}
+
+/** descripteur léger de la ville actuelle (null hors des villes en extérieur) */
+export function lieuxVille(game) {
+  const m = game.mapObj;
+  if (!m || m.id !== 'monde') return null;
+  const p = game.worldPos ? game.worldPos() : { x: game.player.x, y: game.player.y };
+  const z = m.zoneAt(p.x, p.y);
+  if (!z?.town) return null;
+  const cache = (game._villeBoxes ||= {});
+  const box = (cache[z.name] ||= empriseZone(m, z));
+  return { id: 'monde', m, ...box, nom: z.name, p, zone: z, ville: true };
+}
+
+/** liste triée des bâtiments marquants d'une zone/ville (arène, centre, boutique, labo, ligue et lieux nommés) */
+export function batimentsImportants(game, L) {
+  const { m, x0, y0, x1, y1, nom, p } = L, out = [], vus = new Set();
+  const z0 = L.zone || (L.id === 'monde' ? m.zoneAt?.(Math.floor((x0 + x1) / 2), Math.floor((y0 + y1) / 2)) : null);
+  for (const b of m.buildings || []) {
+    if (b.x + b.w < x0 || b.x > x1 || b.y + b.d < y0 || b.y > y1 || b.kind === 'cave') continue;
+    if (L.ville && m.zoneAt) {
+      const bz = m.zoneAt(Math.floor(b.x + b.w / 2), Math.floor(b.y + b.d / 2));
+      if (bz && bz.name !== nom) continue;
+    }
+    const ess = ESSENTIELS[b.kind];
+    const brut = (b.name || b.label || '').trim();
+    if (!ess && (!brut || BATS_A_IGNORER.has(brut.toLowerCase()))) continue;
+    const txt = ess ? ess.txt : brut[0].toUpperCase() + brut.slice(1);
+    const px = b.doorX != null ? b.doorX + 0.5 : b.x + b.w / 2;
+    const py = b.doorY != null ? b.doorY + 0.5 : b.y + b.d;
+    // évite les doublons portant exactement le même nom tout près dans la même ville
+    const dedup = `${b.kind}:${txt}`;
+    if (vus.has(dedup)) continue;
+    vus.add(dedup);
+    let sub = '';
+    if (b.kind === 'gym' && z0?.gym != null && LEADERS[z0.gym]) {
+      const ch = LEADERS[z0.gym];
+      sub = `Champion ${ch.name} · ${TYPE_FR[ch.type] || ch.type}`;
+    } else if (ess) {
+      sub = b.kind === 'center' ? 'Soin de l\'équipe et PC' : b.kind === 'mart' ? 'Objets et Poké Balls' : b.kind === 'lab' ? 'Laboratoire du Professeur' : 'Conseil 4 & Maître';
+    } else {
+      sub = 'Bâtiment notable';
+    }
+    const base = ess || { txt, ico: '◈', col: '#10b981', prio: 5, ess: false };
+    out.push({
+      key: `${txt}@${Math.round(px)},${Math.round(py)}`,
+      txt, ico: base.ico, col: base.col, prio: base.prio, ess: base.ess, kind: b.kind, sub,
+      x: b.x + b.w / 2, y: b.y + b.d / 2, px, py,
+      d: Math.hypot(px - p.x, py - p.y),
+      vu: typeof document !== 'undefined' ? caseVue(game, L.id, Math.floor(px), Math.floor(py)) : true,
+      toujoursVisible: !!L.ville,
+    });
+  }
+  out.sort((a, b) => (a.prio - b.prio) || (a.d - b.d) || a.txt.localeCompare(b.txt, 'fr'));
+  return out;
+}
 
 /** le lieu à montrer : la grotte (ou carte annexe) entière, sinon la zone de la région où l'on est (toutes ses parties) */
 export function zoneLocale(game) {
@@ -112,13 +202,10 @@ function peindre(L) {
 
 /** repères à écrire par-dessus : bâtiments utiles et sorties vers les lieux voisins */
 function reperes(game, L) {
-  const { m, x0, y0, x1, y1 } = L, out = [];
-  const NOMS = { center: ['Centre', '+', '#e04848'], mart: ['Boutique', '¤', '#3a78d8'], gym: ['Arène', '★', '#e0a020'], league: ['Ligue', '♛', '#9333ea'], lab: ['Labo', '⚗', '#8a96a8'] };
+  const { m, x0, y0, x1, y1 } = L, out = batimentsImportants(game, L);
   for (const b of m.buildings || []) {
-    if (b.x + b.w < x0 || b.x > x1 || b.y + b.d < y0 || b.y > y1) continue;
-    if (b.kind === 'cave') { out.push({ x: b.doorX ?? b.x + b.w / 2, y: (b.doorY ?? b.y + b.d) + 0.5, txt: 'Grotte', ico: '◖', col: '#5a4636', vu: caseVue(game, L.id, b.doorX ?? b.x, b.doorY ?? b.y) }); continue; }
-    const n = NOMS[b.kind]; if (!n) continue;
-    out.push({ x: b.x + b.w / 2, y: b.y + b.d / 2, txt: n[0], ico: n[1], col: n[2], vu: caseVue(game, L.id, Math.floor(b.x + b.w / 2), Math.floor(b.y + b.d / 2)) });
+    if (b.kind !== 'cave' || b.x + b.w < x0 || b.x > x1 || b.y + b.d < y0 || b.y > y1) continue;
+    out.push({ x: b.doorX ?? b.x + b.w / 2, y: (b.doorY ?? b.y + b.d) + 0.5, px: (b.doorX ?? b.x + b.w / 2), py: (b.doorY ?? b.y + b.d) + 0.5, txt: 'Grotte', ico: '◖', col: '#5a4636', vu: caseVue(game, L.id, b.doorX ?? b.x, b.doorY ?? b.y) });
   }
   if (L.id === 'monde') {
     // sorties : un chemin praticable qui franchit le bord du lieu vers une autre zone
@@ -155,6 +242,7 @@ export function vueLocale(L, ar) {
 export function preparerLocale(game) {
   const L = zoneLocale(game);
   L.img = peindre(L); L.reperes = reperes(game, L);
+  L.bats = L.reperes.filter((r) => r.key);
   return L;
 }
 
@@ -173,31 +261,49 @@ export function dessinerLocale(game, cv, L, v) {
   ctx.save(); ctx.beginPath(); ctx.rect(X(L.x0), Y(L.y0), (L.x1 - L.x0 + 1) * sx, (L.y1 - L.y0 + 1) * sy); ctx.clip();
   brouillard(ctx, cv, seenMask(game, L.id), B, v);
   ctx.restore();
-  // repères (seulement ceux qu'on a déjà vus)
-  const f = Math.max(11, Math.min(16, sx * 2.6)) * (window.devicePixelRatio || 1) / (window.devicePixelRatio || 1);
+  // cap pointillé vers le bâtiment ciblé par la boussole
+  const cible = game.state?.villeCible;
+  const cibleRep = cible && cible.zone === L.nom ? L.bats?.find((b) => b.key === cible.key) : null;
+  if (cibleRep) {
+    const x1 = X(L.p.x + 0.5), y1 = Y(L.p.y + 0.5), x2 = X(cibleRep.x), y2 = Y(cibleRep.y);
+    ctx.save();
+    ctx.setLineDash([7, 5]); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(251, 191, 36, .95)';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.setLineDash([]);
+    const ring = Math.max(12, sx * 2.2);
+    ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x2, y2, ring, 0, 7); ctx.stroke();
+    ctx.restore();
+  }
+  // repères : les bâtiments importants d'une ville restent visibles pour s'orienter même avant d'avoir parcouru chaque rue
+  const f = Math.max(11, Math.min(16, sx * 2.6));
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const r of L.reperes) {
-    if (!r.vu) continue;
+    if (!r.vu && !r.toujoursVisible) continue;
     const cx = X(r.x), cy = Y(r.y);
+    ctx.save();
+    if (!r.vu) ctx.globalAlpha = 0.85;
     if (r.sortie) {
       const a = { n: -Math.PI / 2, s: Math.PI / 2, o: Math.PI, e: 0 }[r.sortie], s = Math.max(7, f * 0.7);
       ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
       ctx.fillStyle = '#00e0ff'; ctx.strokeStyle = '#0b1c2d'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(s, 0); ctx.lineTo(-s * 0.6, -s * 0.7); ctx.lineTo(-s * 0.6, s * 0.7); ctx.closePath(); ctx.stroke(); ctx.fill();
       ctx.restore();
-      // le nom du lieu voisin, dehors, au-delà de la flèche
       const dx = r.sortie === 'e' ? 1 : r.sortie === 'o' ? -1 : 0, dy = r.sortie === 's' ? 1 : r.sortie === 'n' ? -1 : 0;
       const tx = cx + dx * f * 1.3, ty = cy + dy * f * 1.4;
       ctx.font = `700 ${Math.round(f)}px system-ui, sans-serif`;
       const lw = ctx.measureText(r.txt).width, al = dx > 0 ? (tx + lw > cv.width - 4 ? 'right' : 'left') : dx < 0 ? (tx - lw < 4 ? 'left' : 'right') : 'center';
       etiquette(ctx, al === 'right' && dx > 0 ? cx - f : al === 'left' && dx < 0 ? cx + f : tx, ty, r.txt, f, al);
+      ctx.restore();
       continue;
     }
-    const rr = Math.max(7, f * 0.62);
-    ctx.fillStyle = '#0b1c2d'; ctx.beginPath(); ctx.arc(cx, cy, rr + 2, 0, 7); ctx.fill();
+    const sel = cibleRep && r.key === cibleRep.key;
+    const rr = Math.max(7, f * (sel ? 0.78 : r.ess ? 0.68 : 0.56));
+    ctx.fillStyle = sel ? '#fbbf24' : '#0b1c2d'; ctx.beginPath(); ctx.arc(cx, cy, rr + 2.5, 0, 7); ctx.fill();
     ctx.fillStyle = r.col; ctx.beginPath(); ctx.arc(cx, cy, rr, 0, 7); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = `800 ${Math.round(rr * 1.3)}px system-ui, sans-serif`; ctx.fillText(r.ico, cx, cy + 1);
-    etiquette(ctx, cx, cy + rr + f * 0.75, r.txt, f, 'center');
+    ctx.fillStyle = '#fff'; ctx.font = `800 ${Math.round(rr * 1.25)}px system-ui, sans-serif`; ctx.fillText(r.ico, cx, cy + 1);
+    etiquette(ctx, cx, cy + rr + f * 0.75, r.txt, sel ? f + 1 : f, 'center');
+    ctx.restore();
   }
 }
 

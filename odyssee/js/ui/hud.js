@@ -13,6 +13,7 @@ import { getTrackedQuest } from '../core/questsData.js';
 import { itemName } from '../core/items.js';
 import { SPECIES } from '../data/species.js';
 import { glisserPourRanger } from './glisser.js';
+import { lieuxVille, batimentsImportants, capVers } from './screens/carteLocale.js';
 
 const gender = (m) => (m.gender === 'm' ? '<span class="g m">♂</span>' : m.gender === 'f' ? '<span class="g f">♀</span>' : '');
 
@@ -24,6 +25,8 @@ export class Hud {
     this.swapFrom = -1;
     this.collapsed = false;
     this.dexnavCollapsed = false;
+    this.guideExpanded = false;
+    this._guidePos = '';
     try { this.collapsed = localStorage.getItem('odyssee-hud-collapsed') === '1'; } catch (e) {}
     try { this.dexnavCollapsed = localStorage.getItem('odyssee-dexnav-collapsed') === '1'; } catch (e) {}
     this.dexnavHidden = false;
@@ -176,6 +179,17 @@ export class Hud {
       } else if (act === 'map') {
         g.busy = true; g.sound.sfx('select');
         try { await mapScreen(g); } finally { g.busy = false; this.update(true); }
+      } else if (act === 'local-map') {
+        g.busy = true; g.sound.sfx('select');
+        try { await mapScreen(g, { locale: true }); } finally { g.busy = false; this.update(true); }
+      } else if (act === 'guide-more') {
+        this.guideExpanded = !this.guideExpanded;
+        g.sound.sfx('blip');
+        this.update(true);
+      } else if (act === 'guide-clear') {
+        if (g.state) g.state.villeCible = null;
+        g.sound.sfx('cancel');
+        this.update(true);
       } else if (act === 'quests') {
         g.busy = true; g.sound.sfx('select');
         try { await questsScreen(g); } finally { g.busy = false; this.update(true); }
@@ -198,8 +212,40 @@ export class Hud {
         try { localStorage.setItem('odyssee-dexnav-collapsed', this.dexnavCollapsed ? '1' : '0'); } catch (e) {}
         this.game.sound.sfx('blip');
         this.update(true);
+      } else if (act === 'guide-pick') {
+        const V = lieuxVille(g); if (!V) return;
+        const b = batimentsImportants(g, V).find((q) => q.key === actEl.dataset.guideKey);
+        if (!b) return;
+        const cur = g.state.villeCible;
+        g.state.villeCible = cur && cur.zone === V.nom && cur.key === b.key
+          ? null
+          : { zone: V.nom, key: b.key, txt: b.txt, ico: b.ico, col: b.col, x: b.px, y: b.py };
+        g.sound.sfx(g.state.villeCible ? 'select' : 'cancel');
+        this.update(true);
       }
     });
+  }
+
+  /** met à jour flèches et distances de la boussole sans reconstruire le DOM du HUD */
+  refreshGuide(V) {
+    if (!V || !this._guideBats?.length) return;
+    const pos = `${Math.round(V.p.x)},${Math.round(V.p.y)}`;
+    if (pos === this._guidePos) return;
+    this._guidePos = pos;
+    const px = V.p.x + 0.5, py = V.p.y + 0.5;
+    for (const elChip of this.gearEl.querySelectorAll('.hgd-chip[data-guide-key]')) {
+      const b = this._guideBats.find((q) => q.key === elChip.dataset.guideKey); if (!b) continue;
+      const cap = capVers(b.px - px, b.py - py);
+      const bEl = elChip.querySelector('b');
+      if (bEl) bEl.textContent = cap.dist <= 2 ? '✔' : `${cap.arrow}${cap.dist}m`;
+    }
+    const tEl = this.gearEl.querySelector('.hgd-target');
+    const c = this.game.state?.villeCible;
+    if (tEl && c) {
+      const cap = capVers(c.x - px, c.y - py);
+      const dirEl = tEl.querySelector('.hgd-tdir');
+      if (dirEl) dirEl.textContent = cap.dist <= 2 ? '✔ Tu es devant !' : `${cap.arrow} ${cap.label} · ${cap.dist}m`;
+    }
   }
 
   update(force = false) {
@@ -210,6 +256,11 @@ export class Hud {
     }
     this.root.style.display = '';
     const loc = g.locationName();
+    if (g.mapObj.id === 'monde' && st.villeCible) {
+      const zNow = g.mapObj.zoneAt?.(g.player.x, g.player.y);
+      if (zNow && zNow.name !== st.villeCible.zone) st.villeCible = null;
+    }
+    const V = lieuxVille(g);
     const tracked = getTrackedQuest(g);
     const bCount = g.badgeCount();
     const pvpSummary = getPvpSummary(st);
@@ -224,10 +275,12 @@ export class Hud {
     const partyKey = st.party
       .map((m) => `${m.uid}:${m.sp}:${m.nick || ''}:${m.lvl}:${m.hp}:${m.stats[0]}:${m.exp}:${m.status || ''}:${m.shadow ? 1 : 0}:${m.shiny ? 1 : 0}`)
       .join('|');
-    const sig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0}:${g.runSpeed ?? 1};${this.swapFrom};${loc};${zoneCatchKey};${st.money};${badgesKey};${trUnlocked};${st.trackedQuest || ''}:${tracked?.notes?.length || 0};${onlineCount};${partyKey}`;
+    const guideSig = V ? `${V.nom}:${this.guideExpanded ? 1 : 0}:${st.villeCible?.key || ''}` : '';
+    const sig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0}:${g.runSpeed ?? 1};${this.swapFrom};${loc};${guideSig};${zoneCatchKey};${st.money};${badgesKey};${trUnlocked};${st.trackedQuest || ''}:${tracked?.notes?.length || 0};${onlineCount};${partyKey}`;
     if (this.glisse) return;   // pas de redessin pendant qu'on glisse un Pokémon
-    if (!force && sig === this._sig) return;
+    if (!force && sig === this._sig) { if (V && !this.collapsed) this.refreshGuide(V); return; }
     this._sig = sig;
+    this._guidePos = V ? `${Math.round(V.p.x)},${Math.round(V.p.y)}` : '';
 
     this.root.classList.toggle('collapsed', this.collapsed);
 
@@ -307,7 +360,38 @@ export class Hud {
           </div>`;
         })()}
         ${(() => {
-          if (!zoneCatch || this.dexnavHidden) return '';
+          if (!V) { this._guideBats = null; return ''; }
+          const bats = this._guideBats = batimentsImportants(g, V);
+          if (!bats.length) return '';
+          const ess = bats.filter((b) => b.ess), autres = bats.filter((b) => !b.ess);
+          const cible = st.villeCible && st.villeCible.zone === V.nom ? bats.find((b) => b.key === st.villeCible.key) : null;
+          const montres = this.guideExpanded ? bats : ess.length ? ess : bats.slice(0, 4);
+          const px = V.p.x + 0.5, py = V.p.y + 0.5;
+          const capC = cible ? capVers(cible.px - px, cible.py - py) : null;
+          return `<div class="hud-guide">
+            <div class="hud-guide-head">
+              <span class="hgd-title">🧭 REPÈRES</span>
+              <div class="hgd-acts">
+                ${autres.length && ess.length ? `<button type="button" class="hgd-btn" data-act="guide-more" title="Afficher les autres bâtiments notables" tabindex="-1">${this.guideExpanded ? '▴ Réduire' : `▾ +${autres.length} lieux`}</button>` : ''}
+                <button type="button" class="hgd-btn map" data-act="local-map" title="Ouvrir le plan de la ville" tabindex="-1">🗺 Plan</button>
+              </div>
+            </div>
+            <div class="hud-guide-chips">
+              ${montres.map((b) => {
+                const cap = capVers(b.px - px, b.py - py);
+                const on = cible && cible.key === b.key;
+                return `<button type="button" class="hgd-chip${on ? ' on' : ''}" data-act="guide-pick" data-guide-key="${esc(b.key)}" style="--gc:${b.col}" title="${esc(b.sub || b.txt)} (${cap.label})" tabindex="-1"><i>${esc(b.ico)}</i><span>${esc(b.txt)}</span><b>${cap.dist <= 2 ? '✔' : `${cap.arrow}${cap.dist}m`}</b></button>`;
+              }).join('')}
+            </div>
+            ${cible && capC ? `<div class="hgd-target">
+              <span class="hgd-tlbl">${esc(cible.ico)} ${esc(cible.txt)}</span>
+              <span class="hgd-tdir">${capC.dist <= 2 ? '✔ Tu es devant !' : `${capC.arrow} ${capC.label} · ${capC.dist}m`}</span>
+              <button type="button" class="hgd-clear" data-act="guide-clear" title="Arrêter le guidage" tabindex="-1">✕</button>
+            </div>` : ''}
+          </div>`;
+        })()}
+        ${(() => {
+          if (!zoneCatch || this.dexnavHidden || (V && this._guideBats?.length && zoneCatch.isTown)) return '';
           if (zoneCatch.isTown) {
             return `<div class="hud-dexnav town">
               <div class="hud-dexnav-head" title="Zone urbaine ou abritée : aucun Pokémon sauvage à proximité">

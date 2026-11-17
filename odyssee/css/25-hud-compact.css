@@ -31,3 +31,6 @@
   box-shadow: inset 0 0 0 calc(var(--px) * 1) #e4e7ee, 0 calc(var(--px) * 1.5) 0 rgba(0,0,0,.45); text-shadow: var(--px) var(--px) 0 #16171c; }
 .gfx-noirblanc .hud-btn:hover { background: linear-gradient(180deg, #e8514c 0%, #a82a26 100%); }
 .gfx-noirblanc .hud-toggle { background: rgba(255,255,255,.18); }
+.gfx-noirblanc .hud-guide { background: rgba(24, 26, 32, .82); border-color: rgba(232, 65, 60, .6); }
+.gfx-noirblanc .hgd-title { color: #f8fafc; }
+.gfx-noirblanc .hgd-chip { background: rgba(42, 46, 56, .92); }
