@@ -527,6 +527,10 @@ export class WorldView {
   constructor(renderer, charsImg, art = {}) {
     this.renderer = renderer;
     this.batPack = art.batiments || null;   // pack de graphismes : bâtiments dessinés d'un seul tenant (gfx.js)
+    const baseCharRows = charsImg ? Math.round(charsImg.height / CHH) : 0;
+    this.packCharRows = {};
+    if (art.charRows) for (const [k, r] of Object.entries(art.charRows)) if (r < baseCharRows) this.packCharRows[k] = r;
+    this.packCharVariants = art.charVariants ? Object.fromEntries(Object.entries(art.charVariants).map(([k, L]) => [k, L.filter((n) => n in this.packCharRows || n in CHAR_ROWS)]).filter(([, L]) => L.length > 1)) : null;
     // Pokémon qui suivent le dresseur (img/suiveurs.png) : leurs lignes s'ajoutent sous celles des personnages
     if (charsImg && art.suiveurs && SPRITES.suiveurs) {
       const c = document.createElement('canvas'); c.width = charsImg.width; c.height = charsImg.height + art.suiveurs.height;
@@ -1112,8 +1116,9 @@ export class WorldView {
           // pieds des poteaux au bas de la case ; une ombre au sol en marque l'emprise
           if (vert) {
             const r = m.get(x, y - 1) === T.FENCE ? S.barriere_v : S.barriere_v0, px = BARR_POT[coteBarriere(m, x, y)];
-            billboard(P, x + px / 32 + SW(r) / 2, y + 0.94, SW(r), SH(r), r);
-            this.ombreSol(Sh, x + px / 32 - 0.08, y + 0.8, x + px / 32 + 0.24, y + 1.0);
+            const sw = SW(r), bx = Math.max(x + sw / 2, Math.min(x + 1 - sw / 2, x + px / 32 + sw / 2));
+            billboard(P, bx, y + 0.94, sw, SH(r), r);
+            this.ombreSol(Sh, bx - sw / 2 - 0.04, y + 0.8, bx + sw / 2 + 0.04, y + 1.0);
           } else {
             const r = m.get(x + 1, y) === T.FENCE ? S.barriere : S.barriere_fin;
             billboard(P, x + 0.5, y + 0.94, SW(r), SH(r), r);
@@ -1569,20 +1574,24 @@ export class WorldView {
     const estFontaine = b.modele === 'fontaine' && BP?.styles?.fontaine;
     const estLogisPack = b.door === 1 && b.modele === 'maisonHaute';
     const eligiblePack = BP && (estFontaine || estLogisPack || (!b.modele && !b.kit && (!b.libres?.length || b.kind === 'lab') && !(b.style === 'tower' && (b.door >= 0 || /Phare|Mirage|Centrale/i.test(b.name || '')))));
-    const choix = eligiblePack ? (estFontaine ? BP.styles.fontaine : estLogisPack ? (BP.styles.house || []).filter((q) => ['maison_bleue', 'maison_a_g', 'maison_f', 'maison_g'].includes(q[0])) : BP.styles[b.style]) : null;
+    const choix = eligiblePack ? (estFontaine ? BP.styles.fontaine : estLogisPack ? BP.styles.house : BP.styles[b.style]) : null;
     if (choix) {
       const wCible = b.kind === 'lab' ? 6 : b.w;
       const doorRel = b.door < 0 ? null : b.door2X !== undefined ? (b.doorX + b.door2X + 1) / 2 - b.x : b.door + 0.5;
-      const score = ([n, w, porte]) => {
+      const depasse = ([n, w, porte]) => {
         const W = w / 32, px = porte == null || doorRel == null ? null : porte / 32;
-        const l0 = px == null ? (wCible - W) / 2 : doorRel - px, r0 = l0 + W;
-        const manque = Math.max(0, l0, wCible - r0);
-        return Math.abs(W - wCible) + (px == null ? 0 : Math.abs(px - doorRel) * 1.4) + manque * 2.2;
+        const l0 = px == null ? (wCible - W) / 2 : doorRel - px;
+        return Math.max(0, l0, wCible - (l0 + W));
       };
-      const ok = choix.filter(([n, w]) => BP.images[n] && Math.abs(w / 32 - wCible) <= 1.6);
+      const score = (c) => {
+        const [, w, porte] = c, W = w / 32, px = porte == null || doorRel == null ? null : porte / 32;
+        return Math.abs(W - wCible) + (px == null ? 0 : Math.abs(px - doorRel) * 1.4) + depasse(c) * 2.2;
+      };
+      const ok = choix.filter((c) => BP.images[c[0]] && Math.abs(c[1] / 32 - wCible) <= 1.6 && (doorRel == null || depasse(c) <= 0.65));
       const best = ok.length && Math.min(...ok.map(score));
-      const pris = ok.filter((c) => score(c) <= best + 0.55);
-      const pick = pris.length ? pris[(b.x * 7 + b.y * 3) % pris.length] : null;
+      const pris = ok.filter((c) => score(c) <= best + 1.15);
+      const graine = (b.x * 13 + b.y * 29 + b.w * 7 + (b.roof ? b.roof.charCodeAt(0) * 5 : 0)) >>> 0;
+      const pick = pris.length ? pris[graine % pris.length] : null;
       if (pick) {
         const [n, , porte] = pick, im = BP.images[n];
         const t = T3('pack_' + n, () => im); t.flipY = true; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.needsUpdate = true;
@@ -1785,12 +1794,15 @@ export class WorldView {
     pos.needsUpdate = uv.needsUpdate = true; g.computeBoundingSphere();
   }
   /** cadre d'animation : sprite (ligne), direction, pas (0 = immobile) */
-  setFrame(a, sprite, dir, step) {
-    const row = CHAR_ROWS[sprite] ?? CHAR_ROWS[CHAR_ALIAS[sprite]] ?? 0, col = DIR_COL[dir] * 3 + (step === 0 ? 1 : step === 1 ? 0 : 2);
+  setFrame(a, sprite, dir, step, variantSeed = null) {
+    const pool = variantSeed != null ? this.packCharVariants?.[sprite] : null;
+    const nom = pool ? pool[variantSeed % pool.length] : sprite;
+    const row = this.packCharRows?.[nom] ?? CHAR_ROWS[nom] ?? CHAR_ROWS[CHAR_ALIAS[nom]] ?? 0;
+    const cols = this.charCols || 2, col = DIR_COL[dir] * 3 + (step === 0 ? 1 : step === 1 ? 0 : 2);
     const k = row * 100 + col; if (a.frame === k) return; a.frame = k;
-    // la planche est rangée en deux colonnes (texture moins haute : les téléphones plafonnent souvent à 4096 px)
-    const half = this.charHalf, blk = row >= half ? 1 : 0, pr = row - blk * half;
-    const u0 = (blk * 12 + col) / 24, u1 = (blk * 12 + col + 1) / 24, v0 = pr / half, v1 = (pr + 1) / half;
+    // la planche est rangée en colonnes côte à côte (texture moins haute : les téléphones plafonnent souvent à 4096 px)
+    const half = this.charHalf, blk = Math.floor(row / half), pr = row - blk * half;
+    const u0 = (blk * 12 + col) / (cols * 12), u1 = (blk * 12 + col + 1) / (cols * 12), v0 = pr / half, v1 = (pr + 1) / half;
     const uv = a.mesh.geometry.attributes.uv; uv.setXY(0, u0, v0); uv.setXY(1, u1, v0); uv.setXY(2, u0, v1); uv.setXY(3, u1, v1); uv.needsUpdate = true;
   }
   place(a, x, y, hop = 0, inGrass = false) {
@@ -1887,18 +1899,22 @@ export class WorldView {
     this.root.add(mesh); this.root.add(shadow); this.actors.set(id, a);
     return a;
   }
-  /** planche des personnages pour la carte graphique : les rangées en deux colonnes côte à côte */
+  /** planche des personnages pour la carte graphique : les rangées en colonnes côte à côte (hauteur ≤ 4096 px) */
   packChars() {
-    const L = this.charsCanvas; if (!L) { this.charHalf = Math.ceil(this.charRows / 2); return L; }
-    const half = this.charHalf = Math.ceil(this.charRows / 2);
-    const c = this.charsPacked = document.createElement('canvas'); c.width = L.width * 2; c.height = half * CHH;
-    const x = c.getContext('2d'); x.drawImage(L, 0, 0, L.width, half * CHH, 0, 0, L.width, half * CHH);
-    x.drawImage(L, 0, half * CHH, L.width, L.height - half * CHH, L.width, 0, L.width, L.height - half * CHH);
+    const L = this.charsCanvas, cols = this.charCols = Math.max(2, Math.ceil(this.charRows / 64));
+    const half = this.charHalf = Math.ceil(this.charRows / cols);
+    if (!L) return L;
+    const c = this.charsPacked = document.createElement('canvas'); c.width = L.width * cols; c.height = half * CHH;
+    const x = c.getContext('2d');
+    for (let b = 0; b < cols; b++) {
+      const sy = b * half * CHH, sh = Math.min(half * CHH, L.height - sy);
+      if (sh > 0) x.drawImage(L, 0, sy, L.width, sh, b * L.width, 0, L.width, sh);
+    }
     return c;
   }
   /** recopie une rangée de la planche dans la texture */
   packRow(r) {
-    const L = this.charsCanvas, c = this.charsPacked, half = this.charHalf, blk = r >= half ? 1 : 0, x = c.getContext('2d');
+    const L = this.charsCanvas, c = this.charsPacked, half = this.charHalf, blk = Math.floor(r / half), x = c.getContext('2d');
     x.clearRect(blk * L.width, (r - blk * half) * CHH, L.width, CHH);
     x.drawImage(L, 0, r * CHH, L.width, CHH, blk * L.width, (r - blk * half) * CHH, L.width, CHH);
     this.texC.needsUpdate = true;

@@ -2,9 +2,17 @@
 // Les choix sont gardés dans le navigateur (localStorage). Le sol se charge au lancement du jeu (il faut relancer pour
 // le changer) ; les sprites se lisent à chaque image demandée (assets.js) et changent tout de suite pour les nouveaux écrans.
 
-import { NB_TUILES, NB_COLS, NB_DECOR, NB_BATIMENTS } from './data/gfx-noirblanc.js';
+import { NB_TUILES, NB_COLS, NB_DECOR, NB_BATIMENTS, NB_CHAR_ROWS, NB_CHAR_VARIANTS } from './data/gfx-noirblanc.js';
 
-const NB_MAISONS = ['maison_bleue', 'maison_a', 'maison_a_g', 'maison_c', 'maison_brique', 'maison_b', 'maison_orange', 'maison_d', 'maison_e', 'maison_f', 'maison_g', 'manoir', 'manoir_r'];
+const NB_MAISONS = [
+  'maison_bleue', 'maison_verte', 'maison_rouge', 'maison_jaune',
+  'maison_a', 'maison_a_bl', 'maison_a_g', 'maison_a_g_bl',
+  'maison_c', 'maison_c_ve', 'maison_brique', 'maison_brique_r',
+  'maison_b', 'maison_orange', 'maison_d', 'maison_e', 'maison_e_bl',
+  'maison_f', 'maison_f_bleue', 'maison_g', 'maison_g_ocre',
+  'maison_ville_rg', 'maison_ville_bl', 'maison_ville_ve',
+  'manoir', 'manoir_r', 'manoir_v',
+];
 const lire = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } };
 const ecrire = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* navigation privée : le choix ne dure que le temps de la page */ } };
 
@@ -35,6 +43,8 @@ export const PACKS = {
     // murs des intérieurs aux couleurs de Noir & Blanc (render/murs-tex.js) : le Centre Pokémon crème et orange
     murs: { center: { fond: '#f6eab4', motif: '#eedd98', bande: '#f09a52', bandeS: '#c8692c', lam: '#f2d68a', lamC: '#faeab0', lamS: '#d2a85c', cim: '#fffdf2', pl: '#a8602c', cap: '#b06830', capC: '#f0b070' } },
     chars: 'chars',           // planche des personnages de Noir & Blanc 2 (même disposition que celle du jeu)
+    charRows: NB_CHAR_ROWS,   // rangées supplémentaires (au-delà des 73 de base) propres au pack Noir & Blanc
+    charVariants: NB_CHAR_VARIANTS,
     // bâtiments entiers (b_<nom>.png) par style du jeu : le jeu prend celui dont la largeur colle à l'emprise
     batiments: Object.fromEntries(Object.entries({
       center: ['centre'], mart: ['boutique', 'boutique_p', 'boutique_b'], gym: ['arene'], lab: ['labo'], tower: ['tour'], fontaine: ['fontaine'],
@@ -59,7 +69,7 @@ export function choisirSprites(id) { if (SPRITES_CHOIX.some((s) => s.id === id))
 /** crédits affichés dans Options → Crédits graphismes */
 export const CREDITS = [
   ['Sol « Pokémon Lumineux »', 'Tuiles de Flurmimon (planche « Bright »), adaptées par Bivurnum — Team Aqua\'s Asset Repo.'],
-  ['Graphismes « Noir & Blanc »', 'Sol, mer, arbres, bâtiments et personnages : kit « Pokémon Essentials BW » de KleinStudio (graphismes de Pokémon Noir & Blanc 2 © Nintendo / Game Freak / Creatures). Lave : Phyromatical.'],
+  ['Graphismes « Noir & Blanc »', 'Sol, mer, arbres, bâtiments et personnages : kit « Pokémon Essentials BW » de KleinStudio et ressources Pokémon Essentials Gen 5 (FloofyPanthar ; © Nintendo / Game Freak / Creatures). Lave : Phyromatical.'],
   ['Sprites Noir & Blanc', 'Sprites des jeux Pokémon © Nintendo / Game Freak / Creatures, récupérés par PokeAPI (projet PokeAPI/sprites).'],
   ['Sprites HeartGold / SoulSilver', 'Même source : PokeAPI/sprites.'],
   ['Utilisation', 'Projet de fans sans but lucratif. Les artistes restent propriétaires de leurs créations.'],

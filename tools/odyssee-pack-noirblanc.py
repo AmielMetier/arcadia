@@ -276,8 +276,8 @@ D = {
     'fence': trim(net(BW.crop((32, 796, 64, 832)))),
     'barriere': trim(net(BW.crop((32, 796, 64, 832)))),
     'barriere_fin': trim(net(BW.crop((32, 796, 64, 832)))),
-    'barriere_v': trim(net(BW.crop((0, 824, 32, 864)))),
-    'barriere_v0': trim(net(BW.crop((0, 824, 32, 864)))),
+    'barriere_v': trim(net(BW.crop((12, 830, 20, 864)))),
+    'barriere_v0': trim(net(BW.crop((12, 830, 20, 864)))),
 }
 # mobilier du Centre Pokémon et panneau de bois des routes
 D['plant'] = trim(net(CENTRE.crop((192, 1096, 224, 1170)))); D['pc'] = trim(net(CENTRE.crop((192, 1010, 224, 1090))))
@@ -295,7 +295,29 @@ for n, im in D.items():
     im.save(os.path.join(OUT, f'd_{n}.png'))
 
 # ------------------------------------------------------------------ bâtiments entiers (sans ombre noire, complets)
+def recolor_roi(im, mask_fn, y_max, mat_rgb):
+    """Teinte une zone de toit ou façade en préservant les contrastes DS."""
+    a = np.array(im.convert('RGBA')).copy()
+    yy = np.arange(a.shape[0])[:, None]
+    r, g, b, al = a[..., 0].astype(float), a[..., 1].astype(float), a[..., 2].astype(float), a[..., 3]
+    m = (al > 0) & (yy < y_max) & mask_fn(r, g, b)
+    rm, gm, bm = r[m], g[m], b[m]
+    (m00, m01, m02), (m10, m11, m12), (m20, m21, m22) = mat_rgb
+    a[..., 0][m] = np.clip(rm * m00 + gm * m01 + bm * m02, 0, 255).astype('uint8')
+    a[..., 1][m] = np.clip(rm * m10 + gm * m11 + bm * m12, 0, 255).astype('uint8')
+    a[..., 2][m] = np.clip(rm * m20 + gm * m21 + bm * m22, 0, 255).astype('uint8')
+    return Image.fromarray(a, 'RGBA')
+
+def sauver_bat(nom, im, porte):
+    by = np.where(np.array(im)[..., 3] > 0)[0]
+    if len(by):
+        im = im.crop((0, 0, im.width, int(by.max()) + 1))
+    im.save(os.path.join(OUT, f'b_{nom}.png'))
+    bat_dims[nom] = [im.width, porte]
+    return im
+
 BATS = json.load(open(os.path.join(SRC, 'kit_bw_batiments.json')))
+bat_imgs, bat_dims = {}, {}
 for nom, (x0, y0, x1, y1, porte) in BATS.items():
     if nom == 'arene':
         # l'aile droite de l'Arène (62 px) est rangée 320 px plus bas sur la planche du kit : recollée à droite
@@ -344,6 +366,10 @@ for nom, (x0, y0, x1, y1, porte) in BATS.items():
         w_g, p_m = a[104:156, 30:64].copy(), a[104:156, 64:98].copy()
         a[104:156, 30:64], a[104:156, 64:98] = p_m, w_g
         im = Image.fromarray(a, 'RGBA')
+    elif nom == 'maison_ville_rg':
+        # immeuble de briques européennes à 2 étages + mansarde (raccourci proprement d'un étage pour l'alignement des rues)
+        a = np.array(net(BW.crop((x0, y0, x1, y1))))
+        im = Image.fromarray(np.concatenate([a[0:124], a[172:]], axis=0), 'RGBA')
     elif nom in ('manoir', 'manoir_r'):
         mr = np.array(net(BW.crop((12, 12224, 196, 12508))))
         mb = np.array(net(BW.crop((12, 12512, 196, 12796))))
@@ -360,52 +386,111 @@ for nom, (x0, y0, x1, y1, porte) in BATS.items():
         im = trim(net(BW.crop((x0, y0, x1, y1)))).resize((96, 136), Image.NEAREST)
     else:
         im = net(BW.crop((x0, y0, x1, y1)))
-    by = np.where(np.array(im)[..., 3] > 0)[0]
-    if len(by):
-        im = im.crop((0, 0, im.width, int(by.max()) + 1))
-    im.save(os.path.join(OUT, f'b_{nom}.png'))
+    bat_imgs[nom] = sauver_bat(nom, im, porte)
+
+# Variantes de toits et façades DS pour diversifier les quartiers tout en gardant la géométrie exacte des portes
+bleu_m = lambda r, g, b: (b > r + 24) & (b > g + 8)
+rouge_m = lambda r, g, b: (r > b + 20) & (r > g + 14)
+orange_m = lambda r, g, b: (r > b + 28) & (g >= b + 4)
+MAT_SAGE = ((0.65, 0.20, 0.14), (0.15, 0.55, 0.34), (0.30, 0.40, 0.16))
+MAT_TERRA = ((0.18, 0.22, 0.62), (0.35, 0.42, 0.12), (0.45, 0.28, 0.14))
+MAT_OCRE = ((0.15, 0.25, 0.65), (0.20, 0.35, 0.42), (0.50, 0.32, 0.10))
+MAT_BLEU = ((0.20, 0.35, 0.35), (0.22, 0.52, 0.28), (0.68, 0.18, 0.22))
+MAT_TEAL = ((0.22, 0.52, 0.18), (0.48, 0.45, 0.18), (0.18, 0.45, 0.30))
+MAT_O2BL = ((0.18, 0.22, 0.55), (0.16, 0.56, 0.32), (0.58, 0.28, 0.22))
+BAT_VARIANTES = [
+    ('maison_verte', 'maison_bleue', bleu_m, 144, MAT_SAGE),
+    ('maison_rouge', 'maison_bleue', bleu_m, 144, MAT_TERRA),
+    ('maison_jaune', 'maison_bleue', bleu_m, 144, MAT_OCRE),
+    ('maison_a_bl', 'maison_a', orange_m, 110, MAT_O2BL),
+    ('maison_a_g_bl', 'maison_a_g', orange_m, 110, MAT_O2BL),
+    ('maison_f_bleue', 'maison_f', lambda r, g, b: (r > b + 35) & (r > g * 1.4), 170, MAT_BLEU),
+    ('maison_g_ocre', 'maison_g', lambda r, g, b: (np.maximum(np.maximum(r, g), b) - np.minimum(np.minimum(r, g), b) > 10) | ((r < 120) & (g > r)), 184, ((0.35, 0.45, 0.25), (0.30, 0.45, 0.22), (0.22, 0.30, 0.28))),
+    ('maison_brique_r', 'maison_brique', lambda r, g, b: (b > r + 20) & (b > g + 5), 115, MAT_TERRA),
+    ('maison_c_ve', 'maison_c', orange_m, 120, MAT_TEAL),
+    ('maison_e_bl', 'maison_e', lambda r, g, b: (np.abs(r - g) < 18) & (np.abs(g - b) < 18) & (r < 140), 95, ((0.55, 0.20, 0.25), (0.22, 0.55, 0.35), (0.25, 0.28, 0.65))),
+    ('maison_ville_bl', 'maison_ville_rg', rouge_m, 145, MAT_BLEU),
+    ('maison_ville_ve', 'maison_ville_rg', rouge_m, 145, MAT_TEAL),
+    ('manoir_v', 'manoir', lambda r, g, b: (b > r + 18) & (b > g + 4), 115, ((0.45, 0.25, 0.22), (0.12, 0.48, 0.40), (0.28, 0.36, 0.26))),
+]
+for vnom, src_nom, mask_fn, ymax_r, mat_r in BAT_VARIANTES:
+    bat_imgs[vnom] = sauver_bat(vnom, recolor_roi(bat_imgs[src_nom], mask_fn, ymax_r, mat_r), bat_dims[src_nom][1])
 
 # ------------------------------------------------------------------ personnages
 # planche du jeu : une rangée de 12 cases de 64 px par personnage (bas, gauche, droite, haut ; pas, arrêt, pas)
+def cadrer_pose(fr):
+    """Ancre une pose 64×64 ou 68×72 tout en bas de la case (y = 64) sans rogner la coiffure."""
+    ys, xs = np.where(np.array(fr)[..., 3] > 0)
+    if not len(ys):
+        return Image.new('RGBA', (64, 64))
+    fw = fr.width
+    ymin_f, ymax_f = int(ys.min()), int(ys.max()) + 1
+    xmin_f, xmax_f = int(xs.min()), int(xs.max()) + 1
+    xc = max(0, min(xmin_f, min(fw - 64, (xmin_f + xmax_f - 64) // 2))) if fw > 64 else 0
+    dx = 0 if fw > 64 else (64 - fw) // 2
+    if ymax_f - ymin_f > 64:
+        # cas unique où une pose dépasse 64 px (Célestine, 66 px) : on tasse 2 lignes unies au milieu de la robe
+        a_fr = np.array(fr)[ymin_f:ymax_f, xc:xc + 64]
+        keep = [i for i in range(a_fr.shape[0]) if i not in (44, 45)][:64]
+        return Image.fromarray(a_fr[keep], 'RGBA')
+    sub = fr.crop((xc, ymin_f, xc + min(64, fw), ymax_f))
+    c = Image.new('RGBA', (64, 64))
+    c.alpha_composite(sub, (dx, 64 - (ymax_f - ymin_f)))
+    return c
+
 PERSOS = json.load(open(os.path.join(SRC, 'persos.json')))
-chars = Image.open(os.path.join(ROOT, 'odyssee', 'img', 'chars.png')).convert('RGBA')
+orig_chars = Image.open(os.path.join(ROOT, 'odyssee', 'img', 'chars.png')).convert('RGBA')
 rows = json.load(open(os.path.join(SRC, 'rangees.json')))   # nom → rangée (odyssee/js/data/sprites.js, SPRITES.chars.rows)
+extras = [nom for nom in PERSOS if nom not in rows]
+nb_char_rows = {nom: orig_chars.height // 64 + i for i, nom in enumerate(extras)}
+chars = Image.new('RGBA', (768, orig_chars.height + len(extras) * 64))
+# Les rangées de secours (momie, goule, pharaon) gardent l'apparence d'origine mais avec les pieds collés au sol
+for r in range(orig_chars.height // 64):
+    for col in range(12):
+        chars.alpha_composite(cadrer_pose(orig_chars.crop((col * 64, r * 64, (col + 1) * 64, (r + 1) * 64))), (col * 64, r * 64))
+
+all_rows = {**rows, **nb_char_rows}
 faits = 0
 for nom, fichier in PERSOS.items():
-    if nom not in rows:
+    if nom not in all_rows:
         continue
     src = L(os.path.join('persos', fichier + '.png')); fw, fh = src.width // 4, src.height // 4
-    y = rows[nom] * 64
+    y = all_rows[nom] * 64
     chars.paste((0, 0, 0, 0), (0, y, 768, y + 64))
     for d in range(4):
         for k, f in enumerate((1, 0, 3)):
             fr = src.crop((f * fw, d * fh, f * fw + fw, d * fh + fh))
-            ys, xs = np.where(np.array(fr)[..., 3] > 0)
-            if not len(ys):
-                continue
-            ymin_f, ymax_f = int(ys.min()), int(ys.max()) + 1
-            xmin_f, xmax_f = int(xs.min()), int(xs.max()) + 1
-            xc = max(0, min(xmin_f, min(fw - 64, (xmin_f + xmax_f - 64) // 2))) if fw > 64 else 0
-            dx = 0 if fw > 64 else (64 - fw) // 2
-            if ymax_f - ymin_f > 64:
-                # cas unique où une pose dépasse 64 px (Célestine, 66 px) : on tasse 2 lignes unies au milieu de la robe
-                a_fr = np.array(fr)[ymin_f:ymax_f, xc:xc + 64]
-                keep = [i for i in range(a_fr.shape[0]) if i not in (44, 45)][:64]
-                c = Image.fromarray(a_fr[keep], 'RGBA')
-            else:
-                # pieds posés tout en bas de la case (y = 64) pour éviter que le sprite flotte au-dessus de son ombre
-                sub = fr.crop((xc, ymin_f, xc + min(64, fw), ymax_f))
-                c = Image.new('RGBA', (64, 64))
-                c.alpha_composite(sub, (dx, 64 - (ymax_f - ymin_f)))
-            chars.alpha_composite(c, ((d * 3 + k) * 64, y))
+            chars.alpha_composite(cadrer_pose(fr), ((d * 3 + k) * 64, y))
     faits += 1
 chars.save(os.path.join(OUT, 'chars.png'))
+
+NB_CHAR_VARIANTS = {
+    'habitant': ['habitant', 'nb_cheren', 'nb_voyageur', 'nb_costard', 'nb_fermier', 'nb_boulanger', 'nb_clerk', 'nb_preppy', 'nb_sportif', 'nb_musicien', 'nb_majordome'],
+    'habitante': ['habitante', 'nb_citadine', 'nb_secretaire', 'nb_servante', 'nb_cafe', 'nb_tablier', 'nb_rockeuse', 'nb_demoiselle', 'nb_violette'],
+    'gamin': ['gamin', 'nb_tate', 'nb_garcon_r', 'nb_vert'],
+    'fillette': ['fillette', 'nb_liza'],
+    'vieil_homme': ['vieil_homme', 'nb_sage', 'nb_grandmere'],
+    'dame': ['dame', 'nb_grandmere', 'nb_citadine', 'nb_secretaire'],
+    'topdresseur': ['topdresseur', 'nb_ranger', 'nb_voyageur_n', 'nb_sportif', 'nb_colosse'],
+    'topdresseuse': ['topdresseuse', 'nb_cowgirl', 'nb_rockeuse', 'nb_liza'],
+    'montagnard': ['montagnard', 'nb_skieur', 'nb_cowboy', 'nb_sheriff'],
+    'randonneuse': ['randonneuse', 'nb_cowgirl', 'nb_vet'],
+    'scientifique': ['scientifique', 'nb_vet', 'nb_clerk'],
+    'jardinier': ['jardinier', 'nb_fermier', 'nb_vert'],
+    'garde': ['garde', 'nb_policier', 'nb_agent'],
+    'vendeur': ['vendeur', 'nb_guichet', 'nb_clerk', 'nb_boulanger'],
+    'marin': ['marin', 'nb_amiral'],
+    'karateka': ['karateka', 'nb_linebacker', 'nb_colosse'],
+    'voleur': ['voleur', 'nb_agent', 'nb_colosse'],
+}
 
 # ------------------------------------------------------------------ liste pour le jeu
 js = ("// odyssee/js/data/gfx-noirblanc.js — écrit par tools/odyssee-pack-noirblanc.py (ne pas modifier à la main)\n"
       f"export const NB_TUILES = {json.dumps(noms)};\nexport const NB_COLS = {COLS};\n"
       f"export const NB_DECOR = {json.dumps(sorted(D))};\n"
-      "// bâtiments : nom → [largeur en px, colonne du milieu de la porte (ou null)]\n"
-      f"export const NB_BATIMENTS = {json.dumps({n: [v[2] - v[0], v[4]] for n, v in BATS.items()})};\n")
+      "// bâtiments : nom → [largeur réelle en px, colonne du milieu de la porte (ou null)]\n"
+      f"export const NB_BATIMENTS = {json.dumps(bat_dims)};\n"
+      f"export const NB_CHAR_ROWS = {json.dumps(nb_char_rows)};\n"
+      f"export const NB_CHAR_VARIANTS = {json.dumps(NB_CHAR_VARIANTS)};\n")
 open(os.path.join(ROOT, 'odyssee', 'js', 'data', 'gfx-noirblanc.js'), 'w', encoding='utf-8').write(js)
-print(len(noms), 'tuiles,', len(D), 'décors,', len(BATS), 'bâtiments,', faits, 'personnages →', os.path.normpath(OUT))
+print(len(noms), 'tuiles,', len(D), 'décors,', len(bat_dims), 'bâtiments,', faits, 'personnages →', os.path.normpath(OUT))

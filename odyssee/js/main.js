@@ -130,7 +130,7 @@ async function boot() {
   etape('images');
   for (const [nom, pal] of Object.entries(packActif()?.murs || {})) paletteMurs(nom, pal);
   setArt({ kits: art.kits, sols: art.sols, sol32: art.sol32, hgss: art.hgss, relief: art.relief, pack: art.pack });
-  const view = new WorldView(renderer, art.chars, { sprites: art.sprites, dens: art.dens, suiveurs: art.suiveurs, batiments: art.batiments, packDecor: !!packActif()?.decor });
+  const view = new WorldView(renderer, art.chars, { sprites: art.sprites, dens: art.dens, suiveurs: art.suiveurs, batiments: art.batiments, packDecor: !!packActif()?.decor, charRows: packActif()?.charRows || null, charVariants: packActif()?.charVariants || null });
   etape('vue');
   const game = new Game({ view, ui, input, sound, world });
   // sauvegarde en ligne (compte du Hub) : chaque sauvegarde part aussi sur le serveur, regroupée
