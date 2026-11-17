@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.98 — 17 novembre 2026
+- Correction : graphismes Noir & Blanc 2 complets et urbanisme des villes corrigé (Amiel)
+
 ## 5.97 — 17 novembre 2026
 - **The Backrooms** — Des poissons dans les bassins des Poolrooms.
   - Ils sautent hors de l'eau de temps en temps : on les voit, on les entend retomber.
