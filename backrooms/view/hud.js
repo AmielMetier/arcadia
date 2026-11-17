@@ -169,6 +169,7 @@ export class BackroomsHUD {
       <!-- Dans un casier : les fentes de la porte, et le souffle retenu -->
       <div class="locker" id="locker" hidden><div class="locker-slits"></div><div class="locker-ui"><span id="lockerText">HOLD SHIFT TO HOLD YOUR BREATH · PRESS F TO GET OUT</span><div class="breath"><i id="breathBar"></i></div></div></div>
       <!-- Agrippé : se débattre -->
+      <div class="fishq" id="fishq" hidden><b>GET IT OFF!</b><div class="fishq-keys" id="fishqKeys"></div><div class="grab-bar"><i id="fishqBar"></i></div></div>
       <div class="grab" id="grab" hidden><b>BREAK FREE!</b><span id="grabText">MASH ANY KEY</span><div class="grab-bar"><i id="grabBar"></i></div></div>
       <div class="hurt" id="hurt"></div>
       <!-- Sous-titres (réglages) et enregistrements des cassettes -->
@@ -245,7 +246,7 @@ export class BackroomsHUD {
     this.$ = (s) => this.el.querySelector(s);
     // les éléments mis à jour à chaque image (on ne les recherche pas à chaque fois)
     this.E = {};
-    for (const id of ['vhsTimer', 'battery', 'levelTag', 'cassetteIcons', 'cassetteText', 'objBanner', 'blackoutTag', 'fadeBar', 'spectate', 'specTitle', 'specSub', 'specHaunt', 'signal', 'signalBars', 'signalLabel', 'stamina', 'staminaBar', 'noise', 'noiseBar', 'crouchTag', 'carryTag', 'inv', 'toast', 'locker', 'lockerText', 'breathBar', 'grab', 'grabBar', 'grabText', 'hurt', 'captions', 'lore', 'loreText', 'loreTag', 'prompt', 'promptText', 'beamBar', 'camSigLbl', 'signalArrow', 'camArrow', 'camNight', 'boardTimer', 'camZoom', 'camZoomBar', 'camZoomX', 'team', 'cctv', 'cctvCam', 'cctvName', 'cctvClock', 'cctvHint']) this.E[id] = this.$('#' + id);
+    for (const id of ['vhsTimer', 'battery', 'levelTag', 'cassetteIcons', 'cassetteText', 'objBanner', 'blackoutTag', 'fadeBar', 'spectate', 'specTitle', 'specSub', 'specHaunt', 'signal', 'signalBars', 'signalLabel', 'stamina', 'staminaBar', 'noise', 'noiseBar', 'crouchTag', 'carryTag', 'inv', 'toast', 'locker', 'lockerText', 'breathBar', 'grab', 'grabBar', 'grabText', 'fishq', 'fishqKeys', 'fishqBar', 'hurt', 'captions', 'lore', 'loreText', 'loreTag', 'prompt', 'promptText', 'beamBar', 'camSigLbl', 'signalArrow', 'camArrow', 'camNight', 'boardTimer', 'camZoom', 'camZoomBar', 'camZoomX', 'team', 'cctv', 'cctvCam', 'cctvName', 'cctvClock', 'cctvHint']) this.E[id] = this.$('#' + id);
     this.barEls = [...this.E.signalBars.children];
     this.camSigEls = [...this.$('#camSig').children];
     this.camIntEls = [...this.$('#camInt').children];
@@ -290,6 +291,11 @@ export class BackroomsHUD {
     for (const ev of ['pointercancel', 'pointerleave']) inv.addEventListener(ev, () => {
       if (hold) clearTimeout(hold.t);
       hold = null;
+    });
+    // Poolrooms : le mini-jeu du poisson, au doigt (ou à la souris hors capture) : toucher une flèche la tape
+    this.$('#fishqKeys').addEventListener('pointerdown', (e) => {
+      const b = e.target.closest('button');
+      if (b && this.actions.qte) this.actions.qte(+b.dataset.q);
     });
     this.$('#clickPrompt').addEventListener('click', (e) => {
       const b = e.target.closest('button[data-kb]');
@@ -592,6 +598,18 @@ export class BackroomsHUD {
       this.flag('locker', 'holding', !!P.holding);
       this.text('lockerText', P.holding ? (br < 30 ? "YOU CAN'T HOLD IT MUCH LONGER…" : 'HOLDING YOUR BREATH…') : 'HOLD SHIFT TO HOLD YOUR BREATH · PRESS F TO GET OUT');
     }
+    // Poolrooms : le poisson accroché. Les quatre flèches à taper dans l'ordre (ou à toucher), celles déjà faites en
+    // vert, la prochaine en jaune ; la barre : le temps avant la prochaine morsure
+    const fishOn = !!P.fishQ && P.status === 'alive';
+    this.show('fishq', fishOn);
+    if (fishOn) {
+      const key = P.fishQ + P.fishI;
+      if (key !== this.fishKey) {
+        this.fishKey = key;
+        E.fishqKeys.innerHTML = [...P.fishQ].map((d, i) => `<button type="button" data-q="${d}" class="${i < P.fishI ? 'done' : i === P.fishI ? 'cur' : ''}">${'←↑→↓'[d]}</button>`).join('');
+      }
+      E.fishqBar.style.width = `${Math.max(0, Math.min(100, ((P.fishT || 0) / 3.5) * 100))}%`;
+    } else this.fishKey = '';
     const grabbed = P.grabT > 0 && P.status === 'alive';
     this.show('grab', grabbed);
     if (grabbed) {
@@ -1080,6 +1098,14 @@ export class BackroomsHUD {
     el.classList.add('ok');
     this.$('#keypadScreen').textContent = 'OPEN';
     this.keypadOkAt = performance.now();
+  }
+
+  // Poolrooms : le poisson vient de mordre (le panneau tressaute)
+  fishBite() {
+    const el = this.$('#fishq');
+    el.classList.remove('bite');
+    void el.offsetWidth;
+    el.classList.add('bite');
   }
 
   keypadWrong() {

@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 5.97 — 17 novembre 2026
+- **The Backrooms** — Des poissons dans les bassins des Poolrooms.
+  - Ils sautent hors de l'eau de temps en temps : on les voit, on les entend retomber.
+  - Trop de bruit au bord d'un bassin (courir, retomber d'un saut, siffler, parler fort), et l'un d'eux peut te sauter dessus.
+  - Pour t'en défaire, tape les quatre flèches affichées, dans l'ordre. Une erreur, et tout est à refaire. Au doigt : touche les flèches.
+  - Tant qu'il s'accroche, tu ne bouges plus, il te mord (tu perds de l'eau) et il se débat à grand bruit : l'entité l'entend.
+  - En mode VIP, les poissons ont un visage que vous reconnaîtrez peut-être.
+
 ## 5.96 — 16 novembre 2026
 - **Odyssée** — Les 781 espèces du Pokédex peuvent maintenant toutes être obtenues :
   - 22 Pokémon qu'on ne trouvait nulle part apparaissent, rares, dans les hautes herbes qui leur vont : Togepi sur la route 2, Capumain et Ceribou dans le Bois, Zarbi dans les ruines du Sanctuaire des Marées, Pitrouille dans la Forêt des Torii…

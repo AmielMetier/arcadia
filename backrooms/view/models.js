@@ -40,7 +40,7 @@ const FOLDER = {
   vintage_video_camera: 'mall', wheelchair_01: 'mall', wooden_bookshelf_worn: 'mall', wooden_broom: 'mall',
   wooden_cutting_board: 'mall', wooden_display_shelves_01: 'mall', WoodenTable_01: 'mall',
   // poolrooms
-  lifebuoy: 'poolrooms', rubber_duck_toy: 'poolrooms',
+  fish: 'poolrooms', lifebuoy: 'poolrooms', rubber_duck_toy: 'poolrooms',
   // tuyauteries
   can_rusted: 'tuyauteries', chevre: 'tuyauteries', industrial_wall_lamp: 'tuyauteries', metal_trash_can: 'tuyauteries',
   modular_industrial_pipes_01: 'tuyauteries', mounted_fluorescent_lights: 'tuyauteries', multi_cleaner_5_litre: 'tuyauteries',

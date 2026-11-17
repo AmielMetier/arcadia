@@ -11,6 +11,8 @@ e3.bin  l'entité du Level 1 : planche d'images de sa vidéo détourée (webp)
 e4.bin  la voix d'origine de l'entité (mp3)
 e5.bin  la voix qui appelle au Level 1 (mp3), fournie par Amiel pour le jeu
 e6.bin  l'intro du Level 0, version sous-titrée (mp4) ; ses sources sont dans video/LICENSE.txt
+e7.bin  le poisson des Poolrooms au visage d'une personne de l'équipe, qui a donné son accord (glb entier) ; modèle
+        « Fish » d'ethem (Sketchfab, CC-BY 4.0, voir models/LICENSE.txt), texture retouchée
 
 Photos et voix fournies pour le jeu par l'équipe d'Arcadia : à ne pas sortir du jeu.
 

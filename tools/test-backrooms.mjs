@@ -13,6 +13,8 @@ import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.j
 BackroomsSim.PRELUDE = false;
 // (de même, au Level 1, l'entité commence sous sa vraie forme : son déguisement a ses propres tests)
 BackroomsSim.DISGUISE = false;
+// (les poissons des Poolrooms sautent au hasard : seulement dans leur test)
+BackroomsSim.FISH = false;
 const bfsDist = (m, ax, az, bx, bz) => bfs(m.grid, m.W, m.H, ax, az)[bz * m.W + bx];
 
 // amène un joueur sur une cassette, à son étage (celle du renfoncement : échelle posée, au pied de l'échelle)
@@ -5922,6 +5924,62 @@ test("Level 1 : la voix volée ne trahit pas l'imposteur — il prend l'apparenc
     assert.ok(nC >= 30, `celui dont on a des phrases est préféré (${nC}/40)`);
   } finally {
     BackroomsSim.DISGUISE = false;
+  }
+});
+
+test("Poolrooms : des poissons dans l'eau profonde ; trop de bruit au bord et l'un d'eux saute sur le joueur, qui s'en défait en tapant les flèches dans l'ordre", () => {
+  BackroomsSim.FISH = true;
+  const rnd = Math.random;
+  try {
+    for (const sd of [5, 9, 12]) {
+      const m = new BackroomsSim({ difficulty: 'peaceful', seed: sd, level: 2 }).map;
+      assert.ok(m.fish.length >= 2, `graine ${sd} : des poissons (${m.fish.length})`);
+      for (const f of m.fish) assert.ok(m.depthAt(f.x, f.z) >= 0.7, `graine ${sd} : un poisson en eau profonde`);
+    }
+    const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
+    const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 11, players, localId: 1, level: 2 });
+    sim.arriveT = 0;
+    const P = sim.player;
+    const f = sim.map.fish[0];
+    Math.random = () => 0; // (le poisson saute dès qu'il le peut)
+    // sans bruit, au bord : rien
+    P.x = f.x + 2;
+    P.z = f.z;
+    for (let i = 0; i < 60 * 5; i++) sim.step({});
+    assert.ok(!P.fishQ, "immobile et silencieux, le poisson reste dans l'eau");
+    // au bord, du bruit : il saute
+    sim.makeNoise(P, 1, 3);
+    sim.drainEvents();
+    for (let i = 0; i < 10 && !P.fishQ; i++) sim.step({});
+    assert.ok(/^[0-3]{4}$/.test(P.fishQ), `le poisson a sauté, quatre flèches à taper (${P.fishQ})`);
+    assert.ok(sim.drainEvents().some((e) => e.type === 'fishOn' && e.id === 1));
+    // on ne bouge plus, et ça fait du vacarme
+    const x0 = P.x;
+    sim.step({ my: 1, run: true });
+    assert.ok(P.x === x0 && P.noise === SIMX.NOISE.run, 'tenu par le poisson : immobile, et bruyant');
+    // une mauvaise flèche : on recommence ; il mord toutes les FISH_BITE_T secondes
+    const q = P.fishQ;
+    sim.step({ qte: +q[0] });
+    assert.equal(P.fishI, 1);
+    sim.step({ qte: (+q[1] + 1) % 4 });
+    assert.equal(P.fishI, 0, 'une erreur : tout est à refaire');
+    const w0 = P.water;
+    for (let i = 0; i < Math.round(SIMX.FISH_BITE_T * 60) + 2; i++) sim.step({});
+    assert.ok(P.water < w0 - SIMX.FISH_BITE + 1, "il a mordu (de l'eau en moins)");
+    // l'instantané le dit à l'invité
+    const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 11, players, localId: 2, level: 2 });
+    guest.applySnapshot(JSON.parse(JSON.stringify(sim.snapshot())), 0);
+    assert.equal(guest.players.find((g) => g.id === 1).fishQ, q, "la suite de flèches arrive chez l'invité");
+    // les quatre bonnes flèches : libéré, et tranquille un moment
+    for (const k of q) sim.step({ qte: +k });
+    assert.ok(!P.fishQ && P.fishCd > 20, "les quatre flèches dans l'ordre : le poisson lâche prise");
+    assert.ok(sim.drainEvents().some((e) => e.type === 'fishOff'));
+    sim.makeNoise(P, 1, 3);
+    for (let i = 0; i < 60; i++) sim.step({});
+    assert.ok(!P.fishQ, 'pas de second poisson tout de suite');
+  } finally {
+    Math.random = rnd;
+    BackroomsSim.FISH = false;
   }
 });
 

@@ -6,6 +6,7 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { classicEntity } from './entity.js';
 import { gltfLoader } from '../../shared/vendor/three/gltf-draco.js';
+import { createFishView } from './fish.js';
 import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
 import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, NICHE_LO, NICHE_SIZE, NICHE_DEPTH, FLOOR_DY, DEEP_DEPTH, pillarDist, isChamfer, chamferSide } from '../engine/map.js';
 import { FUSES, feetY, stairAt, PIPES_LEVEL, THIRST_BLUR, LIFT_SHUT_T, HOTEL_LEVEL, CCTV_FOV, DUCT_LAND } from '../engine/sim.js';
@@ -378,6 +379,8 @@ export function createBackroomsScene(container, floors, lamps) {
   scene.add(ambient);
   const dummy = new THREE.Object3D();
   const loader = gltfLoader();
+  // Poolrooms : les poissons des bassins (view/fish.js)
+  const fishView = L2 && map0.fish && map0.fish.length ? createFishView({ map: map0, scene, loader, camera, url: ENTITY_VIP ? vault.poisson || null : null, onSplash: (pos) => api.onFishSplash && api.onFishSplash(pos) }) : null;
   // le cadenas de la porte de la cage d'escalier (Quaternius, CC0) : laiton patiné, anse d'acier, 10 cm de haut
   const padlockModel = new Promise((resolve) => {
     loader.load(modelUrl('padlock'), (g) => {
@@ -5837,6 +5840,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     get lightHere() {
       return lightNow;
     },
+    onFishSplash: null, // Poolrooms : un poisson sort de l'eau ou y retombe ({ x, z })
     onDrip: null, // une goutte tombe dans une flaque près du joueur ({ x, z }) : l'application la fait entendre
     onCascade: null, // l'annonce de la phase rouge : null quand le courant commence à tomber, puis { x, z } pour chaque néon qui s'éteint près du joueur
     onRedStart: null, // les feux rouges s'allument d'un coup, après le noir (l'application fait le bruit qui surprend)
@@ -5939,6 +5943,10 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 
     // Level 1 : un événement du matériel (un rideau qui encaisse, une cloche fracassée) ; l'entité qui sort d'une gaine
     // se laisse tomber de la bouche
+    // Poolrooms : un poisson saute sur un joueur (son bond part du bassin)
+    fishLeap(ev) {
+      if (fishView) fishView.leap(ev.id, ev.x, ev.z);
+    },
     gearEvent(ev) {
       for (const fv of floorViews) if (fv.gear) fv.gear.event(ev);
       if (ev.type === 'ductOut') ductDrop = DUCT_LAND;
@@ -5992,6 +6000,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       const P = plunge ? plunge.P : entry ? sim.player : sim.viewPlayer(sim.spectate || 0);
       viewFloor = P.floor || 0;
       for (const fv of floorViews) fv.update(sim, P, time, dt);
+      if (fishView) fishView.update(sim, P, time, dt);
 
       // 1. Caméra : balancement lent de la marche, plus marqué en courant ; une chute la fait plonger d'un étage
       if (P.moving) bob += dt * (P.running ? 9 : 5.5);

@@ -30,6 +30,7 @@ export const VAULT_FILES = {
   voix: ['e4', 'audio/mpeg'], // la voix d'origine de l'entité (Level 1 et Poolrooms)
   appel: ['e5', 'audio/mpeg'], // la voix qui appelle au Level 1, quand l'entité rôde près de toi ou te poursuit
   intro: ['e6', 'video/mp4'], // l'intro du Level 0, version sous-titrée
+  poisson: ['e7', 'model/gltf-binary'], // le poisson des Poolrooms, au visage d'une personne de l'équipe (modèle entier)
 };
 // nom → URL blob du média déchiffré (vide tant que le coffre est fermé)
 export const vault = {};
