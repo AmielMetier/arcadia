@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.103 — 17 novembre 2026
+- Odyssée : boussole/repères sur toute la carte et correctifs Noir & Blanc multi-biomes (Amiel)
+
 ## 5.102 — 17 novembre 2026
 - Nouveau : boussole de ville et plan local cliquable pour trouver arènes et lieux clés (Amiel)
 
