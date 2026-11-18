@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.105 — 18 novembre 2026
+- Odyssée : finition chef-d'oeuvre Noir & Blanc (biomes, rivages, mobilier, monuments Gen 5) (Amiel)
+
 ## 5.104 — 18 novembre 2026
 - Odyssée : finition Noir & Blanc fin de jeu (asphalte BW2, décors désert/sanctuaires/mines, correctifs sable/lave/socles d'arbres) (Amiel)
 
