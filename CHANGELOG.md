@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.117 — 18 novembre 2026
+- Correction : correctifs audit graphismes 5G (biomes, 20 batiments, arbres, tenues, variants) (Amiel)
+
 ## 5.116 — 18 novembre 2026
 - **Odyssée** — Déploiement général des **cinématiques d’introduction en 3D temps réel** et des **musiques épiques dédiées** pour chaque Pokémon légendaire et boss majeur du jeu :
   - **Cinématiques 3D thématiques** : chaque légendaire (Groudon, Kyogre, Rayquaza, Arceus, Ho-Oh, Odyssor, les Oiseaux et Bêtes légendaires, le trio des Lacs, Dialga, Palkia, Giratina, Darkrai, les Régis et les gardiens d’après-Ligue) ainsi que chaque grand adversaire (les 15 Champions d’Arène, le Conseil 4, Maître Célestine, les chefs et admins des Teams Éclipse et Brume, les combats décisifs face aux Rivaux, les boss des Raids Co-op, la Finale du Dojo de Mamadou et le sommet de la Tour de Combat) disposent désormais d’un sanctuaire, d’un sceau fracturable et d’effets élémentaires 3D propres à leur thème (volcan, glace, foudre, cosmos, abysse, forêt, torii dojo, faille de raid, Ligue Céleste).
