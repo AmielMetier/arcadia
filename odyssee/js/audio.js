@@ -1904,6 +1904,13 @@ export class Sound {
     return { stop };
   }
 
+  /** bande-son de l'éveil de Lugia Obscur (audio-lugia.js), chargée à la demande */
+  playShadowLugiaEpic(opts = {}) {
+    let ctrl = null, stopped = false;
+    import('./audio-lugia.js').then((m) => { if (!stopped) ctrl = m.playShadowLugiaEpic(this, opts); }).catch(() => {});
+    return { stop: () => { stopped = true; ctrl?.stop?.(); } };
+  }
+
   /** Alias rétrocompatible pour Shadow Lugia */
   playLugiaCinematicAudio() {
     return this.playBossCinematicAudio('shadow', 14.8, {

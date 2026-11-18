@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 5.120 — 18 novembre 2026
+- **Odyssée** — L'éveil de Lugia Obscur devient une vraie cinématique de jeu, en sept plans et format cinéma (on peut toujours la passer) :
+  - la mer déchaînée sous l'éclipse, la pluie, la foudre, le Sanctuaire des Marées sur son rocher ;
+  - le Prisme Noir qui se fissure au rythme d'un cœur qui s'emballe, puis vole en éclats au ralenti, et l'onde de choc qui court sur la mer ;
+  - la mer qui tourbillonne, une colonne d'eau noire qui jaillit, une silhouette qui s'y élève… et un œil rouge qui s'allume ;
+  - la colonne qui éclate, Lugia Obscur qui se révèle et pousse son cri sous une tornade d'ombre ;
+  - l'Aéroblast chargé face à toi et tiré droit sur l'écran, puis Lugia devant l'éclipse avec son titre ;
+  - une bande-son écrite pour la scène : orage, tonnerre à chaque éclair, battements de cœur, verre brisé, chœur, tambours, cuivres et grand accord final.
+
 ## 5.119 — 18 novembre 2026
 - **Odyssée** — Cinématiques des légendaires et des boss retravaillées :
   - le légendaire s'élève d'abord en silhouette noire, puis se révèle en couleur dans un éclair blanc ;

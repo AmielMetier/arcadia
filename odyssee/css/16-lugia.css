@@ -209,6 +209,35 @@
   transform: translateY(calc(var(--px) * -1));
 }
 
+/* éveil de Lugia Obscur (cine-lugia.js) : format cinéma, carton du lieu */
+.lugia-cine-scr.epic .lugia-cine-bar { height: 11.5%; transition-duration: 1.1s; }
+.lugia-cine-scr.epic .lugia-cine-aura,
+.lugia-cine-scr.epic .lugia-cine-vignette { display: none; }
+.lugia-cine-scr.epic .lugia-cine-hud { padding-bottom: calc(11.5% + var(--px) * 10); }
+.lugia-cine-scr.epic .lugia-cine-title { font-size: calc(var(--px) * 24); letter-spacing: calc(var(--px) * 6); }
+.lugia-cine-scr.epic .lugia-cine-title-wrap { transition-duration: 1.4s; }
+.lugia-cine-loc {
+  position: absolute;
+  left: calc(var(--px) * 16);
+  top: calc(11.5% + var(--px) * 9);
+  z-index: 16;
+  display: none;
+  flex-direction: column;
+  gap: calc(var(--px) * 1.5);
+  padding-left: calc(var(--px) * 5);
+  border-left: calc(var(--px) * 1) solid rgba(216, 180, 254, 0.85);
+  color: #f5f0ff;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(calc(var(--px) * -8));
+  transition: opacity 1.1s ease, transform 1.4s cubic-bezier(0.16, 1, 0.3, 1);
+  text-shadow: 0 0 calc(var(--px) * 6) rgba(0, 0, 0, 0.9);
+}
+.lugia-cine-scr.epic .lugia-cine-loc { display: flex; }
+.lugia-cine-loc.in { opacity: 1; transform: none; }
+.lugia-cine-loc b { font-size: calc(var(--px) * 7.5); font-weight: 800; letter-spacing: calc(var(--px) * 3.2); }
+.lugia-cine-loc span { font-size: calc(var(--px) * 5); letter-spacing: calc(var(--px) * 1.6); opacity: 0.8; text-transform: uppercase; }
+
 /* crans de stats (Atq +2, Vit −1…) sous la jauge de l'adversaire, au-dessus de la nôtre */
 .bh-boosts { position: absolute; display: flex; flex-wrap: wrap; gap: calc(var(--bp) * 1.2); pointer-events: none; max-width: 100%; }
 .bhud.foe .bh-boosts { top: calc(100% + var(--bp) * 1); left: calc(var(--bp) * 6); }

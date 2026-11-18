@@ -1133,6 +1133,7 @@ export async function playBossCinematic(game, opts = {}) {
         <div class="lugia-cine-bar bot"></div>
       </div>
       <div class="lugia-cine-flash"></div>
+      <div class="lugia-cine-loc"><b>SANCTUAIRE DES MARÉES</b><span>Nuit de l'Éclipse · 23 h 58</span></div>
       <div class="lugia-cine-hud">
         <div class="lugia-cine-title-wrap">
           <div class="lugia-cine-badge"><span class="lugia-badge-dot"></span> ${cfg.badge}</div>
@@ -1178,16 +1179,27 @@ export async function playBossCinematic(game, opts = {}) {
   } catch (e) {}
 
   let hasWebGL = false;
+  // l'éveil de Lugia Obscur a sa propre mise en scène (cine-lugia.js : sept plans, bande-son écrite pour eux)
+  let epic = null;
   if (host3D) {
     try {
       const THREE = await import('three');
       let fx = null;
       try {
         const base = '../../../shared/vendor/three/jsm/postprocessing/';
-        const [ec, rp, ub, op] = await Promise.all([import(base + 'EffectComposer.js'), import(base + 'RenderPass.js'), import(base + 'UnrealBloomPass.js'), import(base + 'OutputPass.js')]);
-        fx = { EffectComposer: ec.EffectComposer, RenderPass: rp.RenderPass, UnrealBloomPass: ub.UnrealBloomPass, OutputPass: op.OutputPass };
+        const [ec, rp, ub, op, sp] = await Promise.all([import(base + 'EffectComposer.js'), import(base + 'RenderPass.js'), import(base + 'UnrealBloomPass.js'), import(base + 'OutputPass.js'), import(base + 'ShaderPass.js')]);
+        fx = { EffectComposer: ec.EffectComposer, RenderPass: rp.RenderPass, UnrealBloomPass: ub.UnrealBloomPass, OutputPass: op.OutputPass, ShaderPass: sp.ShaderPass };
       } catch (e) { fx = null; }
-      sceneCtrl = createBoss3DScene(THREE, host3D, spriteImg, cfg, fx);
+      if (cfg.isShadowFull) {
+        try {
+          const { createShadowLugiaEpic } = await import('./cine-lugia.js');
+          await import('../audio-lugia.js').catch(() => null);   // la partition démarre en même temps que l'image
+          sceneCtrl = epic = createShadowLugiaEpic(THREE, host3D, spriteImg, fx);
+          cfg.duration = epic.duration;
+          wrap.classList.add('epic');
+        } catch (e) { console.error('[cinématique Lugia]', e); epic = null; }
+      }
+      if (!epic) sceneCtrl = createBoss3DScene(THREE, host3D, spriteImg, cfg, fx);
       hasWebGL = true;
     } catch (e) { hasWebGL = false; }
   }
@@ -1202,7 +1214,9 @@ export async function playBossCinematic(game, opts = {}) {
   };
 
   try {
-    if (sound?.playBossCinematicAudio) {
+    if (epic && sound?.playShadowLugiaEpic) {
+      audioCtrl = sound.playShadowLugiaEpic({ cryUrl });
+    } else if (sound?.playBossCinematicAudio) {
       audioCtrl = sound.playBossCinematicAudio(cfg.audio || cfg.presetKey, cfg.duration, { cryUrl });
     } else if (sound?.playLugiaCinematicAudio && cfg.presetKey === 'shadow') {
       audioCtrl = sound.playLugiaCinematicAudio();
@@ -1239,9 +1253,31 @@ export async function playBossCinematic(game, opts = {}) {
       window.addEventListener?.('resize', sceneCtrl.resize);
     }
 
-    const shatterTime = cfg.isShadowFull ? 2.85 : dur * 0.34;
-    const titleInTime = cfg.isShadowFull ? 4.2 : dur * 0.42;
-    const titleOutTime = cfg.isShadowFull ? 13.4 : dur * 0.88;
+    const shatterTime = epic ? Infinity : cfg.isShadowFull ? 2.85 : dur * 0.34;
+    const titleInTime = epic ? Infinity : cfg.isShadowFull ? 4.2 : dur * 0.42;
+    const titleOutTime = epic ? Infinity : cfg.isShadowFull ? 13.4 : dur * 0.88;
+    const locEl = wrap.querySelector('.lugia-cine-loc');
+    const cuesFaits = new Set();
+    const jouerCues = (t) => {
+      for (const c of epic?.cues || []) {
+        if (cuesFaits.has(c) || t < c.t) continue;
+        cuesFaits.add(c);
+        if (c.loc) locEl?.classList?.toggle('in', c.loc === 'in');
+        if (c.title === 'in') titleWrap?.classList?.add('in');
+        if (c.title === 'out') { titleWrap?.classList?.remove('in'); titleWrap?.classList?.add('out'); }
+        if (c.flash && flashEl) {
+          flashEl.style.transition = 'opacity 0.08s ease-out';
+          flashEl.style.background = c.flash; flashEl.style.opacity = String(c.o);
+          setTimeout(() => { if (flashEl) flashEl.style.opacity = '0'; }, c.ms);
+        }
+        if (c.blanc === true && flashEl) {
+          flashEl.style.transition = 'opacity 0.35s ease-in';
+          flashEl.style.background = 'radial-gradient(circle at 50% 45%, #ffffff 0%, #f3e8ff 45%, #c084fc 100%)';
+          flashEl.style.opacity = '1';
+        }
+        if (c.blanc === false && flashEl) { flashEl.style.transition = 'opacity 0.9s ease-out'; flashEl.style.opacity = '0'; }
+      }
+    };
 
     const tick = (now) => {
       if (done) return;
@@ -1250,8 +1286,9 @@ export async function playBossCinematic(game, opts = {}) {
       prevT = now;
 
       if (sceneCtrl) {
-        try { sceneCtrl.update(t, dt); } catch (e) {}
+        try { sceneCtrl.update(t, dt); } catch (e) { if (!tick.err) { tick.err = true; console.error('[cinématique]', e); } }
       }
+      if (epic) jouerCues(t);
       if (!flashed && t >= shatterTime) {
         flashed = true;
         if (flashEl) {
