@@ -36,6 +36,12 @@ export const THEMES = {
   legend: { custom: 'legend', key: 'B2', scale: 'harm', bpm: 164, prog: ['i'], seed: 250, style: 'battle', big: 1 },
   eclipse: { custom: 'eclipse', key: 'F3', scale: 'harm', bpm: 170, prog: ['i'], seed: 191, style: 'battle' },
   rival: { custom: 'rival', key: 'D3', scale: 'harm', bpm: 172, prog: ['i'], seed: 161, style: 'battle' },
+  elite4: { custom: 'elite4', key: 'C#3', scale: 'harm', bpm: 180, prog: ['i'], seed: 221, style: 'battle', big: 1 },
+  legendCosmic: { custom: 'legendCosmic', key: 'F#3', scale: 'harm', bpm: 168, prog: ['i'], seed: 251, style: 'battle', big: 1 },
+  legendElemental: { custom: 'legendElemental', key: 'D3', scale: 'dor', bpm: 176, prog: ['i'], seed: 252, style: 'battle', big: 1 },
+  legendAbyss: { custom: 'legendAbyss', key: 'E3', scale: 'min', bpm: 166, prog: ['i'], seed: 253, style: 'battle', big: 1 },
+  raidBoss: { custom: 'raidBoss', key: 'G3', scale: 'min', bpm: 184, prog: ['i'], seed: 261, style: 'battle', big: 1 },
+  dojoBoss: { custom: 'dojoBoss', key: 'A3', scale: 'min', bpm: 178, prog: ['i'], seed: 262, style: 'battle', big: 1 },
   tower: { key: 'A2', scale: 'dor', bpm: 88, prog: ['i', 'IV', 'i', 'VII', 'i', 'IV', 'VI', 'V'], seed: 77, style: 'mystery' },
   snow: { key: 'F3', scale: 'min', bpm: 100, prog: ['i', 'VI', 'III', 'VII', 'i', 'iv', 'VI', 'V'], seed: 144, style: 'mystery' },
   island: { key: 'A3', scale: 'maj', bpm: 124, prog: ['I', 'IV', 'V', 'vi', 'I', 'IV', 'ii', 'V'], seed: 91, style: 'march' },
@@ -1039,6 +1045,227 @@ function composeRival() {
   };
 }
 
+const COSMIC_LEGENDS = new Set([150, 151, 380, 381, 385, 386, 480, 481, 482, 483, 484, 486, 487, 488, 493, 648, 719, 720]);
+const ABYSS_LEGENDS = new Set([249, 382, 489, 490, 491, 647, 717, 1052]);
+
+/** Choisit le thème musical de combat adapté à un Pokémon légendaire donné */
+export function battleMusicForLegend(sp, shadow = false) {
+  if (shadow && sp === 249) return 'legend';
+  if (ABYSS_LEGENDS.has(sp)) return 'legendAbyss';
+  if (COSMIC_LEGENDS.has(sp)) return 'legendCosmic';
+  return 'legendElemental';
+}
+
+/**
+ * Générateur paramétrique de thèmes épiques de boss et légendaires (4 mesures d'intro + 16 mesures en boucle).
+ */
+function composeEpicTrack(cfg) {
+  const B = midiOf(cfg.root);
+  const tracks = { pad: [], arp: [], gtr: [], bass: [], lead: [], harm: [], drum: [] };
+  const chords = cfg.chords;
+
+  // Intro dramatique (mesures 0..3 = 64 pas)
+  for (let b = 0; b < 4; b++) {
+    const ch = chords[b % chords.length];
+    for (const iv of ch.tones) tracks.pad.push({ s: at(b, 0), d: 16, m: B - 12 + ch.root + iv, v: 0.45 + b * 0.14 });
+    tracks.bass.push({ s: at(b, 0), d: 16, m: Math.max(22, B - 24 + ch.root), v: 1.05 });
+    for (let s = 0; s < 16; s += cfg.introArpStep || 4) {
+      tracks.arp.push({ s: at(b, s), d: cfg.introArpStep || 4, m: B + 12 + ch.root + ch.tones[(s / 2) % ch.tones.length], v: 0.45 + b * 0.12 });
+    }
+    if (b < 2) {
+      tracks.drum.push({ s: at(b, 0), k: 'k', v: 1.25 });
+      tracks.drum.push({ s: at(b, 8), k: 'k', v: 1.1 });
+    } else {
+      for (let s = 0; s < 16; s += 2) {
+        tracks.drum.push({ s: at(b, s), k: s % 4 === 0 ? 'k' : 't', m: 54 - (s % 8), v: 0.6 + (s / 16) * 0.45 });
+        if (s === 4 || s === 12) tracks.drum.push({ s: at(b, s), k: 's', v: 0.85 });
+      }
+      if (b === 3) for (let s = 12; s < 16; s++) tracks.drum.push({ s: at(b, s), k: 's', v: 0.85 + (s - 12) * 0.08 });
+      tracks.gtr.push({ s: at(b, 0), d: 16, m: B - 12 + ch.root, v: 0.8 + (b - 2) * 0.18 });
+      tracks.gtr.push({ s: at(b, 0), d: 16, m: B - 12 + ch.root + (ch.fifth || 7), v: 0.72 + (b - 2) * 0.18 });
+    }
+  }
+
+  // Boucle principale (mesures 4..19 = 16 mesures, loopStart: 64)
+  for (let b = 4; b < 20; b++) {
+    const idx = b - 4;
+    const ch = chords[idx % chords.length];
+    const base = B - 12 + ch.root;
+
+    // Nappe d'accords riche
+    for (const iv of ch.tones) tracks.pad.push({ s: at(b, 0), d: 16, m: base + iv, v: 0.62 });
+
+    // Arpège / riff rapide caractéristique
+    const arpStep = cfg.arpStep || 2;
+    for (let s = 0; s < 16; s += arpStep) {
+      const iv = ch.tones[Math.floor(s / arpStep) % ch.tones.length];
+      const oct = (s % 8 === 4 || s % 8 === 6) ? 12 : 0;
+      tracks.arp.push({ s: at(b, s), d: arpStep, m: B + ch.root + iv + oct + (cfg.arpOct || 12), v: 0.78 });
+    }
+
+    // Guitare saturée
+    const gtrHits = cfg.gtrHits || [0, 3, 6, 8, 11, 14];
+    gtrHits.forEach((st, hi) => {
+      const d = gtrHits[hi + 1] ? Math.min(3, gtrHits[hi + 1] - st) : 2;
+      tracks.gtr.push({ s: at(b, st), d: Math.max(1, d), m: base, v: 0.98 });
+      tracks.gtr.push({ s: at(b, st), d: Math.max(1, d), m: base + (ch.fifth || 7), v: 0.88 });
+    });
+
+    // Basse motrice
+    const bassRoot = Math.max(22, B - 24 + ch.root);
+    for (let s = 0; s < 16; s += 2) {
+      tracks.bass.push({ s: at(b, s), d: 2, m: bassRoot + (s % 4 === 2 ? 12 : 0), v: 1.05 });
+    }
+
+    // Batterie épique (avec crashs & fills)
+    for (let s = 0; s < 16; s++) {
+      if ((cfg.kicks || [0, 6, 8, 10]).includes(s)) tracks.drum.push({ s: at(b, s), k: 'k', v: s === 0 ? 1.25 : 1.0 });
+      if (s === 4 || s === 12) tracks.drum.push({ s: at(b, s), k: 's', v: 1.12 });
+      if (s % 2 === 0) tracks.drum.push({ s: at(b, s), k: 'h', v: 0.58 });
+    }
+    if (idx % 4 === 0) tracks.drum.push({ s: at(b, 0), k: 'c', v: 1.2 });
+    if (idx % 4 === 3) {
+      tracks.drum.push({ s: at(b, 13), k: 't', m: 54, v: 0.9 });
+      tracks.drum.push({ s: at(b, 14), k: 't', m: 49, v: 0.95 });
+      tracks.drum.push({ s: at(b, 15), k: 's', v: 1.05 });
+    }
+  }
+
+  // Mélodie et harmonie tierce/sixte sur les 16 mesures de boucle
+  cfg.melody.forEach(([st, d, iv]) => {
+    const m = Math.max(24, Math.min(106, B + iv));
+    const h = Math.max(24, Math.min(104, m - (cfg.harmOffset ?? 4)));
+    tracks.lead.push({ s: at(4, st), d, m, v: 1 });
+    tracks.harm.push({ s: at(4, st), d, m: h, v: 0.65 });
+  });
+
+  return {
+    steps: 20 * 16,
+    loopStart: 4 * 16,
+    bpm: cfg.bpm,
+    tracks: [
+      { type: cfg.padWave || 'triangle', vol: 0.085, notes: tracks.pad, attack: 0.25 },
+      { type: cfg.arpWave || 'pulse12', vol: 0.065, notes: tracks.arp },
+      { type: 'sawtooth', vol: 0.042, notes: tracks.gtr, dist: true },
+      { type: 'triangle', vol: 0.16, notes: tracks.bass },
+      { type: cfg.leadWave || 'pulse50', vol: 0.085, notes: tracks.lead },
+      { type: 'pulse25', vol: 0.05, notes: tracks.harm },
+      { type: 'drum', vol: 0.11, notes: tracks.drum },
+    ],
+  };
+}
+
+const EPIC_TRACK_SPECS = {
+  elite4: {
+    root: 'C#3', bpm: 180, padWave: 'sawtooth', arpWave: 'pulse12', leadWave: 'pulse25', harmOffset: 4,
+    chords: [
+      { root: 0, tones: [0, 3, 7] }, { root: 5, tones: [0, 3, 7] }, { root: -2, tones: [0, 4, 7] }, { root: 3, tones: [0, 4, 7] },
+      { root: 8, tones: [0, 4, 7] }, { root: 2, tones: [0, 3, 6], fifth: 6 }, { root: 7, tones: [0, 4, 7] }, { root: 0, tones: [0, 3, 7] },
+    ],
+    melody: [
+      [0, 4, 12], [4, 2, 15], [6, 2, 19], [8, 6, 20], [14, 2, 19], [16, 4, 17], [20, 4, 15], [24, 8, 14],
+      [32, 4, 15], [36, 2, 19], [38, 2, 20], [40, 6, 23], [46, 2, 24], [48, 4, 23], [52, 4, 19], [56, 8, 19],
+      [64, 4, 24], [68, 2, 23], [70, 2, 20], [72, 6, 19], [78, 2, 17], [80, 4, 15], [84, 4, 14], [88, 8, 15],
+      [96, 4, 17], [100, 4, 19], [104, 4, 20], [108, 4, 23], [112, 8, 24], [120, 8, 23],
+      [128, 4, 24], [132, 2, 27], [134, 2, 26], [136, 8, 24], [144, 4, 20], [148, 4, 19], [152, 8, 17],
+      [160, 4, 15], [164, 4, 19], [168, 4, 23], [172, 4, 24], [176, 8, 26], [184, 8, 24],
+      [192, 4, 23], [196, 2, 24], [198, 2, 23], [200, 8, 19], [208, 4, 17], [212, 4, 15], [216, 8, 14],
+      [224, 4, 15], [228, 4, 17], [232, 4, 19], [236, 4, 23], [240, 8, 24], [248, 8, 19],
+    ],
+  },
+  legendCosmic: {
+    root: 'F#3', bpm: 168, padWave: 'triangle', arpWave: 'pulse12', arpStep: 1, arpOct: 12, leadWave: 'sawtooth', harmOffset: 5,
+    kicks: [0, 4, 8, 10, 14], gtrHits: [0, 4, 8, 12],
+    chords: [
+      { root: 0, tones: [0, 4, 7, 11] }, { root: 2, tones: [0, 4, 7] }, { root: -1, tones: [0, 3, 7] }, { root: 4, tones: [0, 3, 7] },
+      { root: -3, tones: [0, 4, 7] }, { root: 2, tones: [0, 4, 7] }, { root: 7, tones: [0, 4, 7] }, { root: 0, tones: [0, 3, 7] },
+    ],
+    melody: [
+      [0, 6, 12], [6, 2, 18], [8, 4, 19], [12, 4, 23], [16, 6, 24], [22, 2, 23], [24, 8, 19],
+      [32, 4, 18], [36, 4, 16], [40, 4, 19], [44, 4, 23], [48, 8, 26], [56, 8, 24],
+      [64, 4, 23], [68, 4, 19], [72, 4, 18], [76, 4, 15], [80, 6, 19], [86, 2, 21], [88, 8, 23],
+      [96, 4, 24], [100, 4, 26], [104, 4, 28], [108, 4, 26], [112, 8, 24], [120, 8, 23],
+      [128, 6, 19], [134, 2, 23], [136, 4, 24], [140, 4, 26], [144, 8, 30], [152, 8, 28],
+      [160, 4, 26], [164, 4, 24], [168, 4, 23], [172, 4, 19], [176, 8, 18], [184, 8, 19],
+      [192, 4, 16], [196, 4, 19], [200, 4, 23], [204, 4, 24], [208, 8, 26], [216, 8, 23],
+      [224, 4, 19], [228, 4, 18], [232, 4, 15], [236, 4, 18], [240, 16, 24],
+    ],
+  },
+  legendElemental: {
+    root: 'D3', bpm: 176, padWave: 'sawtooth', arpWave: 'pulse25', leadWave: 'pulse50', harmOffset: 3,
+    kicks: [0, 3, 6, 8, 12, 14], gtrHits: [0, 2, 4, 6, 8, 10, 12, 14],
+    chords: [
+      { root: 0, tones: [0, 3, 7] }, { root: 8, tones: [0, 4, 7] }, { root: 10, tones: [0, 4, 7] }, { root: 0, tones: [0, 3, 7] },
+      { root: 3, tones: [0, 4, 7] }, { root: 10, tones: [0, 4, 7] }, { root: 5, tones: [0, 3, 7] }, { root: 7, tones: [0, 4, 7] },
+    ],
+    melody: [
+      [0, 3, 12], [3, 3, 15], [6, 2, 19], [8, 4, 22], [12, 4, 19], [16, 4, 20], [20, 4, 19], [24, 8, 17],
+      [32, 3, 19], [35, 3, 22], [38, 2, 24], [40, 8, 26], [48, 4, 24], [52, 4, 22], [56, 8, 19],
+      [64, 4, 24], [68, 4, 22], [72, 4, 20], [76, 4, 19], [80, 6, 17], [86, 2, 19], [88, 8, 15],
+      [96, 4, 19], [100, 4, 20], [104, 4, 22], [108, 4, 24], [112, 8, 26], [120, 8, 27],
+      [128, 3, 24], [131, 3, 22], [134, 2, 19], [136, 4, 24], [140, 4, 26], [144, 8, 29], [152, 8, 26],
+      [160, 4, 24], [164, 4, 22], [168, 4, 19], [172, 4, 17], [176, 8, 19], [184, 8, 15],
+      [192, 4, 17], [196, 4, 19], [200, 4, 22], [204, 4, 24], [208, 8, 26], [216, 8, 24],
+      [224, 4, 22], [228, 4, 19], [232, 4, 17], [236, 4, 19], [240, 16, 24],
+    ],
+  },
+  legendAbyss: {
+    root: 'E3', bpm: 166, padWave: 'triangle', arpWave: 'pulse12', arpStep: 2, arpOct: 12, leadWave: 'pulse25', harmOffset: 4,
+    kicks: [0, 6, 8, 12], gtrHits: [0, 3, 6, 10, 14],
+    chords: [
+      { root: 0, tones: [0, 3, 7] }, { root: 1, tones: [0, 4, 7] }, { root: -2, tones: [0, 3, 7] }, { root: 0, tones: [0, 3, 7] },
+      { root: 5, tones: [0, 3, 7] }, { root: 1, tones: [0, 4, 7] }, { root: 7, tones: [0, 4, 7] }, { root: 0, tones: [0, 3, 7] },
+    ],
+    melody: [
+      [0, 6, 12], [6, 2, 13], [8, 4, 19], [12, 4, 15], [16, 6, 13], [22, 2, 12], [24, 8, 10],
+      [32, 4, 12], [36, 4, 15], [40, 4, 19], [44, 4, 20], [48, 8, 19], [56, 8, 15],
+      [64, 4, 17], [68, 4, 19], [72, 4, 20], [76, 4, 24], [80, 6, 25], [86, 2, 24], [88, 8, 20],
+      [96, 4, 19], [100, 4, 15], [104, 4, 13], [108, 4, 15], [112, 8, 19], [120, 8, 12],
+      [128, 4, 24], [132, 4, 25], [136, 4, 24], [140, 4, 20], [144, 8, 19], [152, 8, 17],
+      [160, 4, 15], [164, 4, 13], [168, 4, 12], [172, 4, 15], [176, 8, 19], [184, 8, 20],
+      [192, 4, 24], [196, 4, 25], [200, 4, 27], [204, 4, 25], [208, 8, 24], [216, 8, 19],
+      [224, 4, 17], [228, 4, 15], [232, 4, 13], [236, 4, 19], [240, 16, 24],
+    ],
+  },
+  raidBoss: {
+    root: 'G3', bpm: 184, padWave: 'sawtooth', arpWave: 'pulse25', arpStep: 2, leadWave: 'pulse50', harmOffset: 5,
+    kicks: [0, 2, 6, 8, 10, 14], gtrHits: [0, 2, 4, 8, 10, 12, 14],
+    chords: [
+      { root: 0, tones: [0, 3, 7] }, { root: 8, tones: [0, 4, 7] }, { root: 10, tones: [0, 4, 7] }, { root: 0, tones: [0, 3, 7] },
+      { root: 5, tones: [0, 3, 7] }, { root: 3, tones: [0, 4, 7] }, { root: 7, tones: [0, 4, 7] }, { root: 0, tones: [0, 3, 7] },
+    ],
+    melody: [
+      [0, 2, 12], [2, 2, 19], [4, 2, 12], [6, 2, 19], [8, 4, 22], [12, 4, 19], [16, 4, 20], [20, 4, 19], [24, 8, 15],
+      [32, 4, 17], [36, 4, 19], [40, 4, 22], [44, 4, 24], [48, 8, 26], [56, 8, 24],
+      [64, 4, 22], [68, 4, 19], [72, 4, 20], [76, 4, 19], [80, 4, 17], [84, 4, 15], [88, 8, 14],
+      [96, 4, 15], [100, 4, 19], [104, 4, 22], [108, 4, 24], [112, 8, 26], [120, 8, 24],
+      [128, 3, 24], [131, 3, 22], [134, 2, 19], [136, 4, 24], [140, 4, 26], [144, 8, 27], [152, 8, 26],
+      [160, 4, 24], [164, 4, 22], [168, 4, 19], [172, 4, 17], [176, 8, 19], [184, 8, 22],
+      [192, 4, 24], [196, 2, 27], [198, 2, 26], [200, 8, 24], [208, 4, 22], [212, 4, 19], [216, 8, 17],
+      [224, 4, 19], [228, 4, 22], [232, 4, 24], [236, 4, 26], [240, 16, 24],
+    ],
+  },
+  dojoBoss: {
+    root: 'A3', bpm: 178, padWave: 'triangle', arpWave: 'pulse12', arpStep: 1, arpOct: 0, leadWave: 'pulse25', harmOffset: 5,
+    kicks: [0, 3, 8, 11, 14], gtrHits: [0, 3, 6, 8, 11, 14],
+    chords: [
+      { root: 0, tones: [0, 2, 7] }, { root: 8, tones: [0, 4, 7] }, { root: 10, tones: [0, 2, 7] }, { root: 7, tones: [0, 4, 7] },
+      { root: 0, tones: [0, 2, 7] }, { root: 5, tones: [0, 3, 7] }, { root: 8, tones: [0, 4, 7] }, { root: 7, tones: [0, 4, 7] },
+    ],
+    // Gamme martiale Hirajoshi / mineure (0, 2, 3, 7, 8, 12)
+    melody: [
+      [0, 3, 12], [3, 3, 14], [6, 2, 15], [8, 4, 19], [12, 4, 20], [16, 6, 19], [22, 2, 15], [24, 8, 14],
+      [32, 4, 15], [36, 4, 19], [40, 4, 20], [44, 4, 24], [48, 8, 26], [56, 8, 24],
+      [64, 4, 20], [68, 4, 19], [72, 4, 15], [76, 4, 14], [80, 6, 12], [86, 2, 15], [88, 8, 19],
+      [96, 4, 15], [100, 4, 19], [104, 4, 20], [108, 4, 24], [112, 8, 26], [120, 8, 27],
+      [128, 3, 24], [131, 3, 26], [134, 2, 27], [136, 4, 24], [140, 4, 20], [144, 8, 19], [152, 8, 15],
+      [160, 4, 19], [164, 4, 20], [168, 4, 24], [172, 4, 20], [176, 8, 19], [184, 8, 14],
+      [192, 4, 15], [196, 4, 19], [200, 4, 20], [204, 4, 24], [208, 8, 26], [216, 8, 24],
+      [224, 4, 20], [228, 4, 19], [232, 4, 15], [236, 4, 19], [240, 16, 24],
+    ],
+  },
+};
+
 export const CUSTOM_COMPOSERS = {
   title: composeTitle,
   leader: composeLeader,
@@ -1047,7 +1274,138 @@ export const CUSTOM_COMPOSERS = {
   legend: composeLegend,
   eclipse: composeEclipse,
   rival: composeRival,
+  elite4: () => composeEpicTrack(EPIC_TRACK_SPECS.elite4),
+  legendCosmic: () => composeEpicTrack(EPIC_TRACK_SPECS.legendCosmic),
+  legendElemental: () => composeEpicTrack(EPIC_TRACK_SPECS.legendElemental),
+  legendAbyss: () => composeEpicTrack(EPIC_TRACK_SPECS.legendAbyss),
+  raidBoss: () => composeEpicTrack(EPIC_TRACK_SPECS.raidBoss),
+  dojoBoss: () => composeEpicTrack(EPIC_TRACK_SPECS.dojoBoss),
 };
+
+const CINE_AUDIO_PROFILES = {
+  shadow: {
+    dur: 14.8, root: 'B1', padWave: 'sawtooth', arpWave: 'pulse12', drum: 'heavy',
+    chord1: [0, 6, 9, 14], chord2: [0, 7, 12, 15], filterRange: [220, 900], noiseRange: [140, 380],
+    arp: [0, 6, 12, 15, 18, 15, 12, 6],
+    fanfare: [[0.44, 0.08, 12], [0.52, 0.08, 15], [0.60, 0.14, 18], [0.74, 0.18, 24]],
+  },
+  fire: {
+    dur: 6.8, root: 'D2', padWave: 'sawtooth', arpWave: 'pulse25', drum: 'taiko',
+    chord1: [0, 1, 7, 12], chord2: [0, 7, 12, 16, 19], filterRange: [260, 1400], noiseRange: [180, 620],
+    arp: [0, 1, 7, 12, 13, 19, 13, 7],
+    fanfare: [[0.42, 0.10, 12], [0.52, 0.08, 13], [0.60, 0.14, 19], [0.74, 0.20, 24]],
+  },
+  phoenix: {
+    dur: 7.8, root: 'E2', padWave: 'sawtooth', arpWave: 'triangle', drum: 'taiko',
+    chord1: [0, 5, 7, 12], chord2: [0, 7, 12, 16, 21], filterRange: [340, 1800], noiseRange: [260, 760],
+    arp: [12, 16, 19, 24, 28, 24, 19, 16],
+    fanfare: [[0.40, 0.10, 12], [0.50, 0.08, 16], [0.58, 0.12, 19], [0.70, 0.24, 24]],
+  },
+  water: {
+    dur: 6.4, root: 'E2', padWave: 'triangle', arpWave: 'sine', drum: 'chime',
+    chord1: [0, 3, 7, 14], chord2: [0, 7, 12, 15, 19], filterRange: [300, 1200], noiseRange: [240, 820],
+    arp: [12, 15, 19, 26, 24, 19, 15, 12],
+    fanfare: [[0.42, 0.12, 19], [0.54, 0.10, 22], [0.64, 0.14, 24], [0.78, 0.20, 26]],
+  },
+  abyssal: {
+    dur: 7.8, root: 'E2', padWave: 'triangle', arpWave: 'pulse12', drum: 'heavy',
+    chord1: [0, 1, 7, 10], chord2: [0, 7, 12, 15, 22], filterRange: [200, 1100], noiseRange: [150, 680],
+    arp: [12, 13, 19, 24, 25, 24, 19, 13],
+    fanfare: [[0.42, 0.12, 12], [0.54, 0.10, 15], [0.64, 0.14, 19], [0.78, 0.20, 24]],
+  },
+  thunder: {
+    dur: 6.4, root: 'E2', padWave: 'sawtooth', arpWave: 'pulse25', drum: 'thunder',
+    chord1: [0, 7, 10, 15], chord2: [0, 7, 12, 19, 24], filterRange: [420, 2200], noiseRange: [600, 2400],
+    arp: [0, 12, 7, 15, 12, 19, 15, 24],
+    fanfare: [[0.40, 0.06, 19], [0.46, 0.06, 22], [0.52, 0.12, 24], [0.66, 0.22, 27]],
+  },
+  ice: {
+    dur: 6.4, root: 'A2', padWave: 'triangle', arpWave: 'sine', drum: 'chime',
+    chord1: [0, 7, 11, 15], chord2: [0, 7, 12, 15, 23], filterRange: [520, 2400], noiseRange: [800, 2600],
+    arp: [24, 27, 31, 35, 31, 27, 24, 19],
+    fanfare: [[0.42, 0.10, 24], [0.52, 0.10, 23], [0.62, 0.14, 19], [0.76, 0.20, 24]],
+  },
+  cosmic: {
+    dur: 7.2, root: 'F#2', padWave: 'triangle', arpWave: 'pulse12', drum: 'chime',
+    chord1: [0, 6, 11, 18], chord2: [0, 7, 11, 16, 23], filterRange: [380, 2000], noiseRange: [320, 1500],
+    arp: [12, 18, 19, 23, 24, 23, 19, 18],
+    fanfare: [[0.42, 0.10, 18], [0.52, 0.10, 19], [0.62, 0.14, 23], [0.76, 0.22, 24]],
+  },
+  celestial: {
+    dur: 8.2, root: 'C2', padWave: 'sawtooth', arpWave: 'sine', drum: 'taiko',
+    chord1: [0, 7, 14, 16], chord2: [0, 7, 12, 16, 24], filterRange: [400, 2400], noiseRange: [350, 1800],
+    arp: [12, 16, 19, 24, 28, 31, 28, 24],
+    fanfare: [[0.40, 0.10, 19], [0.50, 0.10, 24], [0.60, 0.14, 28], [0.74, 0.24, 31]],
+  },
+  nature: {
+    dur: 6.2, root: 'G2', padWave: 'triangle', arpWave: 'sine', drum: 'chime',
+    chord1: [0, 7, 11, 14], chord2: [0, 7, 12, 16, 19], filterRange: [340, 1600], noiseRange: [300, 1100],
+    arp: [12, 16, 19, 23, 26, 23, 19, 16],
+    fanfare: [[0.42, 0.10, 16], [0.52, 0.10, 19], [0.62, 0.12, 23], [0.74, 0.22, 24]],
+  },
+  fairy: {
+    dur: 6.2, root: 'F2', padWave: 'triangle', arpWave: 'sine', drum: 'chime',
+    chord1: [0, 4, 11, 14], chord2: [0, 7, 12, 16, 23], filterRange: [440, 2100], noiseRange: [450, 1700],
+    arp: [12, 19, 23, 28, 23, 19, 24, 31],
+    fanfare: [[0.42, 0.08, 19], [0.50, 0.08, 23], [0.58, 0.12, 24], [0.70, 0.22, 28]],
+  },
+  titan: {
+    dur: 6.2, root: 'A1', padWave: 'sawtooth', arpWave: 'pulse25', drum: 'taiko',
+    chord1: [0, 5, 7, 12], chord2: [0, 7, 12, 15, 19], filterRange: [180, 950], noiseRange: [120, 450],
+    arp: [0, 7, 12, 15, 12, 7, 19, 12],
+    fanfare: [[0.42, 0.12, 12], [0.54, 0.10, 15], [0.64, 0.14, 19], [0.78, 0.20, 24]],
+  },
+  dragon: {
+    dur: 6.8, root: 'D2', padWave: 'sawtooth', arpWave: 'pulse25', drum: 'heavy',
+    chord1: [0, 7, 10, 14], chord2: [0, 7, 12, 15, 22], filterRange: [280, 1600], noiseRange: [200, 780],
+    arp: [12, 15, 19, 22, 24, 22, 19, 15],
+    fanfare: [[0.42, 0.10, 12], [0.52, 0.08, 15], [0.60, 0.12, 19], [0.72, 0.24, 24]],
+  },
+  eclipse: {
+    dur: 6.6, root: 'F2', padWave: 'sawtooth', arpWave: 'pulse12', drum: 'industrial',
+    chord1: [0, 6, 10, 13], chord2: [0, 7, 12, 13, 19], filterRange: [220, 1300], noiseRange: [160, 620],
+    arp: [12, 13, 18, 24, 19, 18, 13, 12],
+    fanfare: [[0.42, 0.10, 12], [0.52, 0.10, 13], [0.62, 0.12, 19], [0.74, 0.22, 24]],
+  },
+  champion: {
+    dur: 8.0, root: 'C2', padWave: 'sawtooth', arpWave: 'pulse50', drum: 'taiko',
+    chord1: [0, 7, 10, 15], chord2: [0, 7, 12, 16, 24], filterRange: [340, 2100], noiseRange: [250, 950],
+    arp: [12, 15, 19, 24, 19, 22, 24, 28],
+    fanfare: [[0.40, 0.10, 19], [0.50, 0.08, 22], [0.58, 0.12, 24], [0.70, 0.25, 28]],
+  },
+  elite4: {
+    dur: 6.2, root: 'C#2', padWave: 'sawtooth', arpWave: 'pulse12', drum: 'heavy',
+    chord1: [0, 3, 7, 11], chord2: [0, 7, 12, 15, 23], filterRange: [280, 1650], noiseRange: [200, 750],
+    arp: [12, 15, 19, 23, 24, 23, 19, 15],
+    fanfare: [[0.42, 0.10, 12], [0.52, 0.08, 15], [0.60, 0.12, 23], [0.72, 0.24, 24]],
+  },
+  dojo: {
+    dur: 6.0, root: 'A2', padWave: 'triangle', arpWave: 'pulse12', drum: 'taiko',
+    chord1: [0, 2, 7, 8], chord2: [0, 7, 12, 14, 19], filterRange: [300, 1750], noiseRange: [240, 900],
+    arp: [12, 14, 15, 19, 20, 19, 15, 14],
+    fanfare: [[0.40, 0.08, 12], [0.48, 0.08, 15], [0.56, 0.12, 19], [0.68, 0.24, 24]],
+  },
+  raid: {
+    dur: 5.6, root: 'G2', padWave: 'sawtooth', arpWave: 'pulse25', drum: 'industrial',
+    chord1: [0, 6, 10, 12], chord2: [0, 7, 12, 15, 22], filterRange: [320, 2200], noiseRange: [280, 1400],
+    arp: [12, 19, 12, 22, 12, 24, 22, 19],
+    fanfare: [[0.40, 0.08, 12], [0.48, 0.08, 19], [0.56, 0.12, 22], [0.68, 0.24, 24]],
+  },
+  rival: {
+    dur: 5.8, root: 'D2', padWave: 'sawtooth', arpWave: 'pulse25', drum: 'heavy',
+    chord1: [0, 5, 7, 10], chord2: [0, 7, 12, 16, 19], filterRange: [320, 1850], noiseRange: [240, 920],
+    arp: [12, 16, 19, 24, 19, 16, 19, 24],
+    fanfare: [[0.42, 0.08, 16], [0.50, 0.08, 19], [0.58, 0.12, 22], [0.70, 0.22, 24]],
+  },
+  gym: {
+    dur: 5.6, root: 'E2', padWave: 'sawtooth', arpWave: 'pulse25', drum: 'taiko',
+    chord1: [0, 5, 7, 12], chord2: [0, 7, 12, 16, 24], filterRange: [340, 1950], noiseRange: [260, 1000],
+    arp: [12, 16, 19, 24, 19, 16, 24, 28],
+    fanfare: [[0.42, 0.08, 12], [0.50, 0.08, 16], [0.58, 0.12, 19], [0.70, 0.22, 24]],
+  },
+};
+
+export const CINE_AUDIO_KEYS = Object.keys(CINE_AUDIO_PROFILES);
 
 export class Sound {
   constructor() {
@@ -1308,15 +1666,22 @@ export class Sound {
     this.tone('pulse50', f * 0.5, t, 0.22, 0.07, this.sfxBus, { release: 0.16 });
   }
 
-  /* ---------------- cinématique Lugia Obscur : sound design complet ---------------- */
-  playLugiaCinematicAudio() {
+  /* ---------------- cinématiques 3D boss & légendaires : sound design complet ---------------- */
+  /**
+   * Bruitage et musique WebAudio en temps réel pour toute cinématique 3D de boss / légendaire.
+   * Synchronisé avec les phases d'apparition du sceau, éclatement et envol du boss/légendaire.
+   */
+  playBossCinematicAudio(preset = 'shadow', durationSec = null, opts = {}) {
     if (!this.ctx && typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)) {
       try { this.unlock?.(); } catch (e) {}
     }
     if (!this.ctx || this.muted || (this.vol ?? 0.7) <= 0) return { stop: () => {} };
+    const prof = CINE_AUDIO_PROFILES[preset] || CINE_AUDIO_PROFILES.shadow;
+    const dur = Math.max(3.0, Number(durationSec) || prof.dur || 6.4);
+    const isShadowFull = preset === 'shadow' && dur >= 12;
     const c = this.ctx;
     const bus = c.createGain();
-    const masterVol = Math.max(0, Math.min(1.4, (this.vol ?? 0.7) * 1.3));
+    const masterVol = Math.max(0, Math.min(1.35, (this.vol ?? 0.7) * 1.25));
     bus.gain.value = masterVol;
     bus.connect(this.master || c.destination);
 
@@ -1346,256 +1711,204 @@ export class Sound {
     };
 
     const t0 = c.currentTime + 0.05;
+    const baseMidi = midiOf(prof.root || 'D2');
+    const [fMin, fMax] = prof.filterRange || [240, 1500];
+    const [nMin, nMax] = prof.noiseRange || [180, 700];
 
-    // Distorsion WaveShaper (harmoniques démoniaques)
-    const makeDistortion = (k = 10) => {
+    const makeDistortion = (k = 9) => {
       const n = 1024, curve = new Float32Array(n);
-      for (let i = 0; i < n; i++) {
-        const x = (i / (n - 1)) * 2 - 1;
-        curve[i] = Math.tanh(x * k);
-      }
+      for (let i = 0; i < n; i++) curve[i] = Math.tanh(((i / (n - 1)) * 2 - 1) * k);
       const ws = c.createWaveShaper();
       ws.curve = curve;
       ws.oversample = '2x';
       return ws;
     };
-    const dist = makeDistortion(10);
-    const distGain = c.createGain();
-    distGain.gain.value = 0.85;
-    dist.connect(distGain);
-    distGain.connect(bus);
 
-    // 1. Sub-bass Drone & Rumble sous-marin (0s -> 15s)
+    // 1. Sub-bass Drone & Ambiance élémentaire (0 -> dur)
     try {
       const sub = c.createOscillator();
       sub.type = 'sine';
-      sub.frequency.setValueAtTime(38, t0);
-      sub.frequency.exponentialRampToValueAtTime(55, t0 + 2.5);
-      sub.frequency.exponentialRampToValueAtTime(32, t0 + 3.5);
-      sub.frequency.exponentialRampToValueAtTime(48, t0 + 10.5);
-      sub.frequency.exponentialRampToValueAtTime(25, t0 + 14.5);
+      const subHz = freq(baseMidi - 12);
+      sub.frequency.setValueAtTime(Math.max(30, subHz), t0);
+      sub.frequency.exponentialRampToValueAtTime(Math.max(34, subHz * 1.35), t0 + dur * 0.25);
+      sub.frequency.exponentialRampToValueAtTime(Math.max(28, subHz * 0.9), t0 + dur * 0.42);
+      sub.frequency.exponentialRampToValueAtTime(Math.max(32, subHz * 1.15), t0 + dur * 0.78);
+      sub.frequency.exponentialRampToValueAtTime(Math.max(25, subHz * 0.8), t0 + dur);
 
       const subGain = c.createGain();
       subGain.gain.setValueAtTime(0.0001, t0);
-      subGain.gain.exponentialRampToValueAtTime(0.48, t0 + 0.8);
-      subGain.gain.setValueAtTime(0.48, t0 + 13.5);
-      subGain.gain.linearRampToValueAtTime(0.0001, t0 + 15.0);
-
+      subGain.gain.exponentialRampToValueAtTime(0.42, t0 + Math.min(0.6, dur * 0.1));
+      subGain.gain.setValueAtTime(0.42, t0 + Math.max(0.7, dur - 0.8));
+      subGain.gain.linearRampToValueAtTime(0.0001, t0 + dur + 0.1);
       sub.connect(subGain);
       subGain.connect(bus);
       sub.start(t0);
-      sub.stop(t0 + 15.2);
+      sub.stop(t0 + dur + 0.2);
       nodes.push(sub);
 
-      // Bruit de grondement et bouillonnement de l'eau
       if (this.noise) {
         const nSrc = c.createBufferSource();
         nSrc.buffer = this.noise;
         nSrc.loop = true;
         const lp = c.createBiquadFilter();
         lp.type = 'lowpass';
-        lp.frequency.setValueAtTime(140, t0);
-        lp.frequency.exponentialRampToValueAtTime(280, t0 + 3.0);
-        lp.frequency.exponentialRampToValueAtTime(180, t0 + 7.0);
-        lp.frequency.exponentialRampToValueAtTime(380, t0 + 11.0);
-        lp.frequency.exponentialRampToValueAtTime(90, t0 + 14.8);
+        lp.frequency.setValueAtTime(nMin, t0);
+        lp.frequency.exponentialRampToValueAtTime(nMax, t0 + dur * 0.36);
+        lp.frequency.exponentialRampToValueAtTime(Math.max(120, nMin * 1.2), t0 + dur * 0.65);
+        lp.frequency.exponentialRampToValueAtTime(nMax, t0 + dur * 0.86);
+        lp.frequency.exponentialRampToValueAtTime(90, t0 + dur);
 
         const nGain = c.createGain();
         nGain.gain.setValueAtTime(0.0001, t0);
-        nGain.gain.exponentialRampToValueAtTime(0.35, t0 + 0.6);
-        nGain.gain.setValueAtTime(0.35, t0 + 13.5);
-        nGain.gain.linearRampToValueAtTime(0.0001, t0 + 15.0);
-
+        nGain.gain.exponentialRampToValueAtTime(0.28, t0 + Math.min(0.5, dur * 0.1));
+        nGain.gain.setValueAtTime(0.28, t0 + Math.max(0.6, dur - 0.8));
+        nGain.gain.linearRampToValueAtTime(0.0001, t0 + dur + 0.1);
         nSrc.connect(lp);
         lp.connect(nGain);
         nGain.connect(bus);
         nSrc.start(t0);
-        nSrc.stop(t0 + 15.2);
+        nSrc.stop(t0 + dur + 0.2);
         nodes.push(nSrc);
       }
     } catch (e) {}
 
-    // 2. Accords dissonants sinistres (Chœur des Ténèbres / Cuivres apocalyptiques)
+    // 2. Nappe harmonique bi-phase (Tension -> Climax glorieux / dramatique)
+    const shatterFrac = isShadowFull ? (2.8 / dur) : 0.36;
+    const tShatter = dur * shatterFrac;
     try {
-      const chordNotes = [61.74, 87.31, 103.83, 146.83]; // B1, F2, G#2, D3
-      chordNotes.forEach((fVal, idx) => {
-        const osc = c.createOscillator();
-        osc.type = idx % 2 === 0 ? 'sawtooth' : 'triangle';
-        osc.frequency.setValueAtTime(fVal, t0);
-        osc.detune.setValueAtTime((idx - 1.5) * 8, t0);
+      const playChordBand = (offsets, startOff, span, volScale) => {
+        offsets.forEach((iv, idx) => {
+          const osc = c.createOscillator();
+          osc.type = idx % 2 === 0 ? prof.padWave : 'triangle';
+          osc.frequency.setValueAtTime(freq(baseMidi + iv), t0 + startOff);
+          osc.detune.setValueAtTime((idx - 1.5) * 7, t0 + startOff);
 
-        const flt = c.createBiquadFilter();
-        flt.type = 'lowpass';
-        flt.frequency.setValueAtTime(220, t0);
-        flt.frequency.exponentialRampToValueAtTime(650, t0 + 3.0);
-        flt.frequency.exponentialRampToValueAtTime(320, t0 + 7.0);
-        flt.frequency.exponentialRampToValueAtTime(900, t0 + 11.5);
-        flt.frequency.exponentialRampToValueAtTime(200, t0 + 14.8);
+          const flt = c.createBiquadFilter();
+          flt.type = 'lowpass';
+          flt.frequency.setValueAtTime(fMin, t0 + startOff);
+          flt.frequency.exponentialRampToValueAtTime(fMax, t0 + startOff + span * 0.65);
+          flt.frequency.exponentialRampToValueAtTime(Math.max(180, fMin * 0.9), t0 + startOff + span);
 
-        const cGain = c.createGain();
-        cGain.gain.setValueAtTime(0.0001, t0);
-        cGain.gain.exponentialRampToValueAtTime(0.14, t0 + 1.0);
-        cGain.gain.setValueAtTime(0.14, t0 + 13.5);
-        cGain.gain.linearRampToValueAtTime(0.0001, t0 + 15.0);
+          const cGain = c.createGain();
+          cGain.gain.setValueAtTime(0.0001, t0 + startOff);
+          cGain.gain.exponentialRampToValueAtTime(volScale, t0 + startOff + Math.min(0.55, span * 0.2));
+          cGain.gain.setValueAtTime(volScale, t0 + startOff + Math.max(0.25, span - 0.45));
+          cGain.gain.linearRampToValueAtTime(0.0001, t0 + startOff + span + 0.08);
 
-        osc.connect(flt);
-        flt.connect(cGain);
-        cGain.connect(bus);
-        osc.start(t0);
-        osc.stop(t0 + 15.2);
-        nodes.push(osc);
-      });
+          osc.connect(flt);
+          flt.connect(cGain);
+          cGain.connect(bus);
+          osc.start(t0 + startOff);
+          osc.stop(t0 + startOff + span + 0.15);
+          nodes.push(osc);
+        });
+      };
+      playChordBand(prof.chord1, 0, Math.max(1.0, tShatter + 0.25), 0.11);
+      playChordBand(prof.chord2, Math.max(0.5, tShatter - 0.08), Math.max(1.2, dur - tShatter + 0.1), 0.13);
     } catch (e) {}
 
-    // 3. Rugissement monstrueux de Lugia Obscur (à 2.8s)
-    timers.push(setTimeout(() => {
-      if (stopped) return;
-      const tRoar = c.currentTime;
-
-      // Déflagration d'impact
-      this.tone('noise', 400, tRoar, 0.45, 0.55, bus, { filter: 'lowpass' });
-      this.tone('triangle', 95, tRoar, 0.5, 0.45, bus, { slide: 25 });
-
-      // Cri de Lugia officiel (PokeAPI)
-      try {
-        const cryUrl = 'https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/249.ogg';
-        const a = new window.Audio(cryUrl);
-        a.volume = this.muted ? 0 : Math.min(1, (this.vol ?? 0.7) * 0.95);
-        a.playbackRate = 0.85;
-        cryEls.push(a);
-        a.play().catch(() => {});
-      } catch (e) {}
-
-      // Couche gutturale démoniaque synthétisée
-      try {
-        const r1 = c.createOscillator();
-        r1.type = 'sawtooth';
-        r1.frequency.setValueAtTime(240, tRoar);
-        r1.frequency.exponentialRampToValueAtTime(85, tRoar + 1.8);
-
-        const r2 = c.createOscillator();
-        r2.type = 'sawtooth';
-        r2.frequency.setValueAtTime(160, tRoar);
-        r2.frequency.exponentialRampToValueAtTime(55, tRoar + 1.9);
-
-        // LFO vibrato sur le rugissement
-        const lfo = c.createOscillator();
-        lfo.frequency.value = 9;
-        const lfoGain = c.createGain();
-        lfoGain.gain.value = 25;
-        lfo.connect(lfoGain);
-        lfoGain.connect(r1.frequency);
-        lfoGain.connect(r2.frequency);
-        lfo.start(tRoar);
-        lfo.stop(tRoar + 2.0);
-        nodes.push(lfo);
-
-        const rGain = c.createGain();
-        rGain.gain.setValueAtTime(0.0001, tRoar);
-        rGain.gain.exponentialRampToValueAtTime(0.5, tRoar + 0.15);
-        rGain.gain.setValueAtTime(0.5, tRoar + 1.2);
-        rGain.gain.exponentialRampToValueAtTime(0.0001, tRoar + 2.0);
-
-        r1.connect(dist);
-        r2.connect(dist);
-        distGain.connect(rGain);
-        rGain.connect(bus);
-
-        r1.start(tRoar);
-        r1.stop(tRoar + 2.05);
-        r2.start(tRoar);
-        r2.stop(tRoar + 2.05);
-        nodes.push(r1, r2);
-
-        // Cri strident métallique aigu
-        const scream = c.createOscillator();
-        scream.type = 'sawtooth';
-        scream.frequency.setValueAtTime(1400, tRoar + 0.05);
-        scream.frequency.exponentialRampToValueAtTime(550, tRoar + 1.4);
-        const sGain = c.createGain();
-        sGain.gain.setValueAtTime(0.0001, tRoar);
-        sGain.gain.exponentialRampToValueAtTime(0.18, tRoar + 0.12);
-        sGain.gain.exponentialRampToValueAtTime(0.0001, tRoar + 1.5);
-        scream.connect(sGain);
-        sGain.connect(bus);
-        scream.start(tRoar);
-        scream.stop(tRoar + 1.55);
-        nodes.push(scream);
-      } catch (e) {}
-    }, 2800));
-
-    // 4. Déchaînement de la Tornade Obscure (6.5s -> 14.5s)
-    timers.push(setTimeout(() => {
-      if (stopped) return;
-      const tWind = c.currentTime;
-      if (this.noise) {
-        const wSrc = c.createBufferSource();
-        wSrc.buffer = this.noise;
-        wSrc.loop = true;
-
-        const bp = c.createBiquadFilter();
-        bp.type = 'bandpass';
-        bp.Q.value = 2.4;
-        bp.frequency.setValueAtTime(450, tWind);
-        bp.frequency.exponentialRampToValueAtTime(2200, tWind + 1.5);
-        bp.frequency.exponentialRampToValueAtTime(650, tWind + 3.0);
-        bp.frequency.exponentialRampToValueAtTime(2900, tWind + 4.5);
-        bp.frequency.exponentialRampToValueAtTime(500, tWind + 7.5);
-
-        const wGain = c.createGain();
-        wGain.gain.setValueAtTime(0.0001, tWind);
-        wGain.gain.exponentialRampToValueAtTime(0.48, tWind + 0.8);
-        wGain.gain.setValueAtTime(0.48, tWind + 5.5);
-        wGain.gain.linearRampToValueAtTime(0.0001, tWind + 8.0);
-
-        wSrc.connect(bp);
-        bp.connect(wGain);
-        wGain.connect(bus);
-        wSrc.start(tWind);
-        wSrc.stop(tWind + 8.2);
-        nodes.push(wSrc);
+    // 3. Arpège signature & montée percussive pré-impact
+    try {
+      const stepDt = isShadowFull ? 0.28 : 0.16;
+      const totalSteps = Math.floor((dur - 0.5) / stepDt);
+      for (let i = 0; i < totalSteps; i++) {
+        const atT = t0 + 0.18 + i * stepDt;
+        if (atT > t0 + dur - 0.25) break;
+        const iv = prof.arp[i % prof.arp.length];
+        const m = Math.max(28, Math.min(104, baseMidi + 12 + iv));
+        const inBuild = (atT - t0) < tShatter;
+        const v = inBuild ? 0.10 + 0.06 * ((atT - t0) / Math.max(0.5, tShatter)) : 0.14;
+        this.tone(prof.arpWave || 'pulse12', freq(m), atT, stepDt * 0.85, v, bus, { attack: 0.01 });
+        if (inBuild && i % 2 === 0) {
+          if (prof.drum === 'taiko') this.tone('sine', 120, atT, 0.2, 0.26, bus, { slide: 46 });
+          else if (prof.drum === 'thunder' && i % 4 === 0) this.tone('pulse25', 1400, atT, 0.09, 0.12, bus, { slide: 280 });
+          else if (prof.drum === 'industrial') this.tone('noise', 1800, atT, 0.06, 0.14, bus, { filter: 'bandpass' });
+        }
       }
+    } catch (e) {}
 
-      // Pulsations rythmiques de tonnerre / tambours de guerre
-      for (let i = 0; i < 6; i++) {
-        const beatT = tWind + i * 0.75;
-        this.tone('triangle', 130, beatT, 0.18, 0.42, bus, { slide: 40 });
-        this.tone('noise', 1200, beatT, 0.12, 0.22, bus, { filter: 'lowpass' });
-      }
-    }, 6500));
-
-    // 5. Impact Cataclysmique & Crash de la Tornade (à 10.8s)
+    // 4. Éclatement du Sceau / Rugissement & Cri à tShatter
+    const cryUrl = opts.cryUrl || (isShadowFull ? 'https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/249.ogg' : null);
     timers.push(setTimeout(() => {
       if (stopped) return;
       const tHit = c.currentTime;
+      this.tone('noise', prof.drum === 'chime' ? 2200 : 420, tHit, 0.42, 0.52, bus, { filter: 'lowpass' });
+      this.tone('triangle', prof.drum === 'thunder' ? 190 : 105, tHit, 0.48, 0.48, bus, { slide: 28 });
+      if (preset === 'ice' || preset === 'fairy' || preset === 'cosmic' || preset === 'celestial') {
+        [1567, 2093, 2637].forEach((f, idx) => this.tone('sine', f, tHit + idx * 0.05, 0.55, 0.16, bus, { release: 0.45 }));
+      } else if (preset === 'thunder') {
+        this.tone('pulse25', 1900, tHit, 0.14, 0.24, bus, { slide: 210 });
+      }
+      if (cryUrl && typeof window !== 'undefined' && typeof window.Audio === 'function') {
+        try {
+          const a = new window.Audio(cryUrl);
+          a.volume = this.muted ? 0 : Math.min(1, (this.vol ?? 0.7) * 0.92);
+          if (isShadowFull) a.playbackRate = 0.85;
+          cryEls.push(a);
+          a.play().catch(() => {});
+        } catch (e) {}
+      }
+      if (isShadowFull) {
+        try {
+          const dist = makeDistortion(10);
+          const rGain = c.createGain();
+          rGain.gain.setValueAtTime(0.0001, tHit);
+          rGain.gain.exponentialRampToValueAtTime(0.45, tHit + 0.15);
+          rGain.gain.setValueAtTime(0.45, tHit + 1.2);
+          rGain.gain.exponentialRampToValueAtTime(0.0001, tHit + 2.0);
+          const r1 = c.createOscillator(), r2 = c.createOscillator();
+          r1.type = 'sawtooth'; r1.frequency.setValueAtTime(240, tHit); r1.frequency.exponentialRampToValueAtTime(85, tHit + 1.8);
+          r2.type = 'sawtooth'; r2.frequency.setValueAtTime(160, tHit); r2.frequency.exponentialRampToValueAtTime(55, tHit + 1.9);
+          const lfo = c.createOscillator(), lfoG = c.createGain();
+          lfo.frequency.value = 9; lfoG.gain.value = 25;
+          lfo.connect(lfoG); lfoG.connect(r1.frequency); lfoG.connect(r2.frequency);
+          r1.connect(dist); r2.connect(dist); dist.connect(rGain); rGain.connect(bus);
+          lfo.start(tHit); lfo.stop(tHit + 2.0);
+          r1.start(tHit); r1.stop(tHit + 2.05);
+          r2.start(tHit); r2.stop(tHit + 2.05);
+          nodes.push(lfo, r1, r2);
+        } catch (e) {}
+      }
+    }, Math.round(tShatter * 1000)));
 
-      // Explosion gigantesque
-      this.tone('noise', 250, tHit, 0.7, 0.7, bus, { filter: 'lowpass' });
-      this.tone('triangle', 180, tHit, 0.6, 0.58, bus, { slide: 30 });
-      this.tone('pulse25', 1800, tHit, 0.15, 0.28, bus, { slide: 200 });
+    // 5. Motif héroïque de révélation & pulsations rythmiques finales
+    timers.push(setTimeout(() => {
+      if (stopped) return;
+      const tAct3 = c.currentTime;
+      const span = Math.max(1.2, dur - tShatter);
+      (prof.fanfare || []).forEach(([rel, dFrac, iv]) => {
+        const offset = Math.max(0, (rel - shatterFrac)) * dur;
+        const m = Math.max(30, Math.min(104, baseMidi + iv));
+        this.tone(prof.padWave === 'triangle' ? 'pulse25' : 'sawtooth', freq(m), tAct3 + offset, Math.max(0.22, dFrac * dur), 0.16, bus, { attack: 0.02, release: 0.18 });
+        this.tone('triangle', freq(m + 12), tAct3 + offset, Math.max(0.22, dFrac * dur), 0.10, bus, { attack: 0.02, release: 0.18 });
+      });
+      const beats = isShadowFull ? 6 : 4;
+      const beatDt = (span * 0.85) / beats;
+      for (let i = 0; i < beats; i++) {
+        const bT = tAct3 + i * beatDt;
+        this.tone('triangle', prof.drum === 'taiko' ? 145 : 130, bT, 0.2, 0.36, bus, { slide: 38 });
+        this.tone('noise', 1400, bT + beatDt * 0.5, 0.08, 0.18, bus, { filter: 'bandpass' });
+      }
+    }, Math.round((tShatter + 0.18) * 1000)));
 
-      // Onde de choc gutturale finale
-      try {
-        const bOsc = c.createOscillator();
-        bOsc.type = 'sawtooth';
-        bOsc.frequency.setValueAtTime(110, tHit);
-        bOsc.frequency.exponentialRampToValueAtTime(35, tHit + 2.0);
-
-        const bGain = c.createGain();
-        bGain.gain.setValueAtTime(0.0001, tHit);
-        bGain.gain.exponentialRampToValueAtTime(0.38, tHit + 0.08);
-        bGain.gain.exponentialRampToValueAtTime(0.0001, tHit + 2.2);
-
-        bOsc.connect(dist);
-        distGain.connect(bGain);
-        bGain.connect(bus);
-        bOsc.start(tHit);
-        bOsc.stop(tHit + 2.25);
-        nodes.push(bOsc);
-      } catch (e) {}
-    }, 10800));
+    // 6. Climax / Plongée finale
+    const tClimax = isShadowFull ? 10.8 : dur * 0.78;
+    timers.push(setTimeout(() => {
+      if (stopped) return;
+      const tHit = c.currentTime;
+      this.tone('noise', 280, tHit, 0.55, 0.55, bus, { filter: 'lowpass' });
+      this.tone('triangle', 175, tHit, 0.5, 0.5, bus, { slide: 32 });
+      this.tone('pulse25', 1650, tHit, 0.14, 0.22, bus, { slide: 210 });
+    }, Math.round(tClimax * 1000)));
 
     return { stop };
+  }
+
+  /** Alias rétrocompatible pour Shadow Lugia */
+  playLugiaCinematicAudio() {
+    return this.playBossCinematicAudio('shadow', 14.8, {
+      cryUrl: 'https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/249.ogg',
+    });
   }
 
 }

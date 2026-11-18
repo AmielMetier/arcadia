@@ -15,6 +15,7 @@ import { ASSETS } from './assets.js';
 import { el, esc, wait } from './ui/ui.js';
 import { partyScreen, TYPE_FR } from './ui/screens.js';
 import { LEADERS } from './world/region.js';
+import { playBossCinematic } from './ui/cinematic.js';
 import {
   ensureDojo,
   CoopDojoBattle,
@@ -260,9 +261,18 @@ async function runRaidBattleSession(game, { rid, bossIdx, format, rosters, mySlo
   });
 
   const realParty = st.party;
-  const curtain = await game.encounterIntro('trainer');
+  await playBossCinematic(game, {
+    sp: bossData.boss.sp,
+    raid: true,
+    preset: 'raid',
+    title: bossData.boss.title,
+    sub: `Antre Dimensionnelle · N.${bossData.bossLvl}`,
+    badge: `RAID CO-OP · PV ×${bossData.hpMult}`,
+    duration: 5.6,
+  });
+  const curtain = await game.encounterIntro('raidBoss');
   game.musicLock = true;
-  game.sound.play('champion');
+  game.sound.play('raidBoss');
   curtain.remove();
   game.bv.pvp = true;
   st.party = battle.sides[0].party;
@@ -789,9 +799,9 @@ async function runMulti4pSession(game, { rid, rosters, myKey, hostId, peerIds, s
   const net4p = create4pNet(game, { rid, isHost, hostId, peerIds, teamIdx, mySlot, allNames, foeName: foeTeam.name });
 
   const realParty = st.party;
-  const curtain = await game.encounterIntro('trainer');
+  const curtain = await game.encounterIntro('dojoBoss');
   game.musicLock = true;
-  game.sound.play('leader');
+  game.sound.play('dojoBoss');
   curtain.remove();
   game.bv.pvp = true;
   st.party = battle.sides[0].party;
@@ -1120,9 +1130,9 @@ async function playHumanVsBotTournoi(game, botSeat, lvl, format, seed, matchRid)
   };
 
   const realParty = st.party;
-  const curtain = await game.encounterIntro('trainer');
+  const curtain = await game.encounterIntro('elite4');
   game.musicLock = true;
-  game.sound.play('leader');
+  game.sound.play('elite4');
   curtain.remove();
   st.party = battle.sides[0].party;
   try {

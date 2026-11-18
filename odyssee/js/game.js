@@ -28,6 +28,8 @@ import { saveCodeScreen } from './ui/screens.js';
 import { encodeSave, saveSummary } from './core/savecode.js';
 import { installSocial, talkToPeer } from './net/social.js';
 import { storyTalk, storyTrigger, storyWin, lugiaBattle, placeLugia, purify, overlay } from './story.js';
+import { battleMusicForLegend } from './audio.js';
+import { playBossCinematic, isLegendarySpecies } from './ui/cinematic.js';
 import { syncJournal } from './core/questsData.js';
 import { QUIZ } from './world/arenes.js';
 import { souffle, stelesPleines, moitieDe } from './world/arene-sylve.js';
@@ -1231,7 +1233,8 @@ export class Game {
     await ui.say(L.intro);
     if (!(await ui.yesNo(`${name} te fixe du regard.\nL'affronter ?`))) return;
     if (!st.flags['L:' + L.id]) st.flags['L:' + L.id] = 'met';
-    const res = await this.wildBattle([[L.sp, L.lvl, L.lvl, 1]], { fixed: true, music: 'legend' });
+    await playBossCinematic(this, { sp: L.sp, id: L.id, title: name, shadow: !!L.shadow });
+    const res = await this.wildBattle([[L.sp, L.lvl, L.lvl, 1]], { fixed: true, music: battleMusicForLegend(L.sp, !!L.shadow) });
     if (L.id === 'hooh') st.flags.hoohDone = true;
     if (L.after) await L.after(this.api(), res);
     if (res === 'caught' || res === 'win') {
@@ -1961,7 +1964,16 @@ export class Game {
     const d = n.def, tr = d.trainer, st = this.state;
     if (this.noTrainers) { await this.ui.say(`${tr.cls || 'Dresseur'} ${tr.name} : (version de test, combats de dresseurs désactivés)`); return 'skip'; }
     this.busy = true;
-    const music = d.leader != null ? 'leader' : d.champion ? 'champion' : d.rival ? 'rival' : 'trainer';
+    const isElite = tr.cls === 'Conseil 4';
+    const isChampion = !!d.champion || tr.cls === 'Maître';
+    const leaderObj = d.leader != null
+      ? LEADERS[d.leader]
+      : ((tr.cls === 'Champion' || tr.cls === 'Championne') ? LEADERS.find((L) => L.name === tr.name) : null);
+    const isEclipseBoss = d.winScript === 'boss1' || d.winScript === 'boss2' || tr.cls === 'Chef Éclipse' || tr.cls === 'Admin Éclipse';
+    const isTourFinale = n.id === 'tour:6';
+    const isBossRematch = !!d.boss && !String(n.id || '').startsWith('tour:');
+    const dMusic = (d.music === 'leader' && isElite) ? 'elite4' : d.music;
+    const music = dMusic || (isChampion ? 'champion' : isElite ? 'elite4' : (d.leader != null || leaderObj) ? 'leader' : d.rival ? 'rival' : isTourFinale ? 'champion' : d.boss ? 'leader' : 'trainer');
     if (spotted) {
       this.musicLock = true; this.sound.play(music === 'trainer' ? 'trainer' : music);
       n.bang = true; this.sound.sfx('bang'); await wait(650); n.bang = false;
@@ -1997,6 +2009,20 @@ export class Game {
         shiny: false
       });
     });
+    if (d.leader != null || isChampion || isElite || isEclipseBoss || isTourFinale || isBossRematch) {
+      await playBossCinematic(this, {
+        trainer: tr,
+        cls: tr.cls,
+        bs: tr.bs || tr.ow || n.sprite,
+        leader: d.leader,
+        champion: isChampion,
+        elite: isElite,
+        eclipse: isEclipseBoss,
+        gymType: leaderObj?.type,
+        sub: isTourFinale ? 'Combat 7/7 · Sommet de la Tour' : undefined,
+        badge: isTourFinale ? 'TOUR DE COMBAT · FINALE' : undefined,
+      });
+    }
     const res = await this.runBattle({ trainer: { ...tr, items: { ...(tr.items || {}) } }, party, music, id: n.id, leader: d.leader, champion: d.champion, rival: d.rival, noWhiteout: d.noWhiteout, format: tr.format || d.format, slots: tr.slots || d.slots });
     this.musicLock = false;
     if (res === 'win') {
@@ -2413,16 +2439,36 @@ export class Game {
         const t = { cls: 'Dresseur', prize: 40, ai: 'smart', ...tr, bs: tr.bs || tr.ow || 'garde' };
         if (t.intro) await ui().say(t.intro, { speaker: t.cls ? `${t.cls} ${t.name}` : t.name, face: t.bs || t.ow });
         const isRival = t.cls === 'Rival' || t.name === RIVAL_NAME || t.rival;
+        const isBrumeBoss = t.cls === 'Chef de la Brume' || t.cls === 'Admin de la Brume' || t.cls === 'Chef Éclipse' || t.cls === 'Admin Éclipse';
+        const leaderMatch = (t.cls === 'Champion' || t.cls === 'Championne') ? LEADERS.find((L) => L.name === t.name) : null;
+        if (isBrumeBoss || leaderMatch || (t.cls === 'Rival' && t.name === RIVAL_NAME) || t.boss || t.cls === 'Maître') {
+          await playBossCinematic(g, {
+            trainer: t,
+            cls: t.cls,
+            bs: t.bs || t.ow,
+            gymType: leaderMatch?.type,
+            eclipse: isBrumeBoss,
+            rival: isRival,
+            sub: t.name === 'Nox' ? 'Chef de la Brume · Orbe Rouge' : isBrumeBoss ? t.cls : (t.name === RIVAL_NAME ? 'Dernier Duel · Bourg-Aube' : undefined),
+          });
+        }
         const party = isRival ? buildRivalParty(g, t.team) : t.team.map(([sp, lvl]) => createMon(sp, lvl, { iv: Array(6).fill(Math.min(31, 10 + lvl / 2 | 0)), shiny: false }));
         g.musicLock = true;
         const items = isRival ? getRivalItems(g) : { ...(t.items || {}) };
-        const res = await g.runBattle({ trainer: { ...t, items }, party, music: t.music || (isRival ? 'rival' : 'trainer'), rival: isRival, noWhiteout: t.noWhiteout, format: t.format, slots: t.slots });
+        const fightMusic = t.music || (t.name === 'Nox' ? 'legendElemental' : isBrumeBoss ? 'eclipse' : leaderMatch ? 'leader' : isRival ? 'rival' : t.boss ? 'champion' : 'trainer');
+        const res = await g.runBattle({ trainer: { ...t, items }, party, music: fightMusic, rival: isRival, noWhiteout: t.noWhiteout, format: t.format, slots: t.slots });
         g.musicLock = false; g.updateZone();
         if (res === 'win' && t.after) await ui().say(t.after, { speaker: t.cls ? `${t.cls} ${t.name}` : t.name, face: t.bs || t.ow });
         return res;
       },
       /** rencontre d'un Pokémon (sauvage ou légendaire) */
-      wild: async (sp, lvl, o = {}) => { g.sound.cry(ASSETS.cry(sp)); return g.wildBattle([[sp, lvl, lvl, 1]], { fixed: true, music: o.music || 'legend' }); },
+      wild: async (sp, lvl, o = {}) => {
+        g.sound.cry(ASSETS.cry(sp));
+        if (o.cinematic === true || (o.cinematic !== false && isLegendarySpecies(sp))) {
+          await playBossCinematic(g, { sp, title: SPECIES[sp]?.n, shadow: !!o.shadow, preset: o.preset, duration: o.duration });
+        }
+        return g.wildBattle([[sp, lvl, lvl, 1]], { fixed: true, music: o.music || battleMusicForLegend(sp, !!o.shadow) });
+      },
       /** Pokémon offert (équipe, sinon PC) */
       giveMon: async (sp, lvl, o = {}) => {
         const mon = createMon(sp, lvl, { ot: o.ot || st().name, met: o.met || g.locationName(), shiny: false });
@@ -2798,6 +2844,22 @@ async chooseStarter(sp, cap) {
       if (n > 1) await this.npcWalk(rival, OPP[dir], n - 1);
       rival.dir = OPP[dir];
       await ui.say(lines, { speaker: W.name });
+      if (flag === 'rivalB3' || flag === 'rivalB4' || flag === 'rival4' || flag === 'rival5') {
+        const subMap = {
+          rivalB3: 'Dernier Rempart · Fort-Écaille',
+          rivalB4: 'Duel au Sommet · Cap des Étoiles',
+          rival4: 'Aux Portes de l\'Archipel',
+          rival5: 'Combat Ultime avant la Ligue',
+        };
+        await playBossCinematic(this, {
+          preset: flag === 'rivalB3' ? 'eclipse' : 'rival',
+          title: W.name,
+          sub: subMap[flag],
+          badge: flag === 'rivalB3' ? 'GARDE D\'ÉCAILLE · DERNIER REMPART' : 'AFFRONTEMENT RIVAL',
+          bs: W.bs || W.sprite,
+          trainer: { cls: W.cls || 'Rival', name: W.name, bs: W.bs },
+        });
+      }
       const party = buildRivalParty(this, team(R));
       const res = await this.runBattle({ trainer: { cls: W.cls || 'Rival', name: W.name, prize: 40, bs: W.bs, ai: st.badges.some(Boolean) ? 'smart' : 'normal', items: getRivalItems(this), lose: lvlText, megaSp: st.badges.filter(Boolean).length >= 8 ? 'ace' : undefined }, party, music: 'rival', rival: true });
       this.musicLock = false;
@@ -2843,7 +2905,16 @@ async chooseStarter(sp, cap) {
       await ui.say(['La mer se met à scintiller...', 'Une immense silhouette bleue glisse entre les vagues.', 'C\'est Odyssor, le géant des océans !']);
       if (st.flags.rivalB4) await ui.say(['... Il est magnifique.', 'Les anciens disent que Odyssor a guidé les premiers marins jusqu\'aux îles, avant même la Ligue.', 'Vas-y. C\'est toi qu\'il est venu voir.'], { speaker: this.rivalB().name });
       await ui.flash(4, '#cfe4ff', 90);
-      const res = await this.wildBattle([[1052, 50, 50, 1]], { fixed: true, music: 'champion' });
+      await playBossCinematic(this, {
+      sp: 1052,
+      id: 'odyssor',
+      title: 'Odyssor',
+      sub: 'Gardien des Étoiles et des Marées',
+      badge: 'LÉGENDAIRE MYTHIQUE · CAP DES ÉTOILES',
+      preset: 'abyssal',
+      duration: 8.0,
+    });
+    const res = await this.wildBattle([[1052, 50, 50, 1]], { fixed: true, music: battleMusicForLegend(1052) });
       if (res === 'caught') { st.flags.odyssor = 'caught'; await ui.say(['Odyssor a rejoint ton équipe.', 'Les marins d\'Odyssée raconteront longtemps cette nuit-là.']); }
       else await ui.say(['Odyssor replonge et disparaît vers le large...', 'Peut-être reviendra-t-il un autre jour.']);
     } finally {

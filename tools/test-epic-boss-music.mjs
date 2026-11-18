@@ -48,18 +48,31 @@ globalThis.window = {
 };
 
 // Importer le moteur audio mis à jour
-import { Sound, THEMES, CUSTOM_COMPOSERS } from '../odyssee/js/audio.js';
+import { Sound, THEMES, CUSTOM_COMPOSERS, battleMusicForLegend, CINE_AUDIO_KEYS } from '../odyssee/js/audio.js';
 
-console.log('Testing Odyssée Epic Boss Battle Music System (v3.99)...');
+console.log('Testing Odyssée Epic Boss Battle Music System (v5.116)...');
 
 // 1. Vérification des définitions THEMES
-const bossThemes = ['leader', 'gymTension', 'champion', 'legend', 'eclipse', 'rival'];
+const bossThemes = [
+  'leader', 'gymTension', 'champion', 'legend', 'eclipse', 'rival',
+  'elite4', 'legendCosmic', 'legendElemental', 'legendAbyss', 'raidBoss', 'dojoBoss',
+];
 for (const name of bossThemes) {
   assert(THEMES[name], `Thème manquant : ${name}`);
   assert.strictEqual(THEMES[name].custom, name, `THEMES[${name}].custom doit être "${name}"`);
   assert(typeof CUSTOM_COMPOSERS[name] === 'function', `CUSTOM_COMPOSERS[${name}] doit être une fonction`);
 }
-console.log('✔ All 6 boss themes registered in THEMES and CUSTOM_COMPOSERS!');
+console.log(`✔ All ${bossThemes.length} boss & legendary themes registered in THEMES and CUSTOM_COMPOSERS!`);
+
+// 1b. Vérification du mapping légendaire -> musique de combat
+assert.strictEqual(battleMusicForLegend(249, true), 'legend');
+assert.strictEqual(battleMusicForLegend(249, false), 'legendAbyss');
+assert.strictEqual(battleMusicForLegend(1052, false), 'legendAbyss');
+assert.strictEqual(battleMusicForLegend(493, false), 'legendCosmic');
+assert.strictEqual(battleMusicForLegend(483, false), 'legendCosmic');
+assert.strictEqual(battleMusicForLegend(383, false), 'legendElemental');
+assert.strictEqual(battleMusicForLegend(250, false), 'legendElemental');
+console.log('✔ battleMusicForLegend routes Shadow/Abyss/Cosmic/Elemental legends properly!');
 
 // 2. Vérification des propriétés musicales de chaque morceau
 for (const name of bossThemes) {
@@ -113,4 +126,13 @@ assert.strictEqual(sound.current, 'gymTension');
 sound.stopMusic(0.1);
 assert.strictEqual(sound.music, null);
 
-console.log('🎉 ALL EPIC BOSS BATTLE MUSIC TESTS PASSED 100%!');
+// 4. Vérification de playBossCinematicAudio pour tous les profils cinématiques
+assert(CINE_AUDIO_KEYS.length >= 16, 'Au moins 16 profils audio de cinématique doivent exister');
+for (const key of CINE_AUDIO_KEYS) {
+  const ctrl = sound.playBossCinematicAudio(key, 5.5);
+  assert(ctrl && typeof ctrl.stop === 'function', `playBossCinematicAudio(${key}) doit retourner { stop }`);
+  ctrl.stop();
+}
+console.log(`✔ All ${CINE_AUDIO_KEYS.length} 3D boss cinematic audio profiles verified cleanly!`);
+
+console.log('🎉 ALL EPIC BOSS BATTLE & CINEMATIC MUSIC TESTS PASSED 100%!');

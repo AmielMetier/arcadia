@@ -12,6 +12,7 @@ import { partyScreen } from './ui/screens.js';
 import { seededRng, newId } from './net/link.js';
 import { MEGA_RING } from './core/mega.js';
 import { wait } from './ui/ui.js';
+import { playBossCinematic } from './ui/cinematic.js';
 
 /** État persistant du Dojo sur la sauvegarde du joueur */
 export function ensureDojo(st) {
@@ -622,9 +623,21 @@ async function runDojoSeries(game, { rid, format, rosters, mySlot, hostId, peerI
     });
 
     const realParty = st.party;
-    const curtain = await game.encounterIntro('trainer');
+    if (stage >= 4) {
+      await playBossCinematic(game, {
+        preset: 'dojo',
+        title: 'MAÎTRE MAMADOU',
+        sub: 'Finale du Dojo · Harmonie Suprême',
+        badge: 'FINALE DU DOJO · PALIER 5/5',
+        bs: 'karateka',
+        trainer: foeChallenge.trainer,
+        duration: 6.0,
+      });
+    }
+    const dojoMusic = stage >= 4 ? 'dojoBoss' : 'leader';
+    const curtain = await game.encounterIntro(dojoMusic);
     game.musicLock = true;
-    game.sound.play(stage >= 4 ? 'champion' : 'leader');
+    game.sound.play(dojoMusic);
     curtain.remove();
     game.bv.pvp = true;
     st.party = battle.sides[0].party;
