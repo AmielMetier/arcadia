@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 5.114 — 18 novembre 2026
+- **Odyssée** — Cinématique d’éveil de **Lugia Obscur** entièrement recréée en **3D temps réel** :
+  - Scène 3D interactive du Sanctuaire des Marées (océan agité animé par vagues sous l’éclipse, autel octogonal et huit piliers runiques illuminés, éclairs et nuées de particules tourbillonnantes).
+  - Animation du **Prisme Noir** qui se fissure puis explose en éclats cristallins, suivie de l’envol et du plongeon de Lugia Obscur entouré d’ailes et de rubans d’énergie obscure en 3D, sans chargement vidéo externe.
+
 ## 5.113 — 18 novembre 2026
 - **Odyssée & Hub** — Correctifs multijoueur, HUD et cinématiques suite à un audit complet :
   - **Multijoueur & Amis** : rejoindre le salon d'un ami depuis le jeu ramène désormais directement dans son salon Arcadia sans perdre l'identité de compte ami ; la navigation au clavier (`↑` / `↓` puis `Entrée` / `Espace`) fonctionne sur toutes les actions du menu Amis, les statuts de duel et de tenue s'actualisent sans délai, et quitter ou interrompre un combat en mode Spectateur rend toujours les commandes normalement.
