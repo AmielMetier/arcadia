@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.104 — 18 novembre 2026
+- Odyssée : finition Noir & Blanc fin de jeu (asphalte BW2, décors désert/sanctuaires/mines, correctifs sable/lave/socles d'arbres) (Amiel)
+
 ## 5.103 — 17 novembre 2026
 - Odyssée : boussole/repères sur toute la carte et correctifs Noir & Blanc multi-biomes (Amiel)
 
