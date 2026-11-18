@@ -11,8 +11,9 @@ import { Battle } from './core/battle.js';
 import { battleCopy, validMon } from './core/pvp.js';
 import { MEGA_RING } from './core/mega.js';
 import { seededRng, newId } from './net/link.js';
+import { ASSETS } from './assets.js';
 import { el, esc, wait } from './ui/ui.js';
-import { partyScreen } from './ui/screens.js';
+import { partyScreen, TYPE_FR } from './ui/screens.js';
 import { LEADERS } from './world/region.js';
 import {
   ensureDojo,
@@ -319,8 +320,14 @@ export async function lancerRaidCoop(game, prePeer = null) {
   }
 
   const bossIdx = await ui.list({
-    title: 'Choisir le Boss du Raid',
-    items: RAID_BOSSES.map((b) => ({ label: b.title, right: b.legend ? 'Légendaire' : 'Alpha' })).concat([{ label: 'Annuler' }]),
+    title: 'Choisir le Boss du Raid Co-op',
+    items: RAID_BOSSES.map((b) => {
+      const sp = SPECIES[b.sp];
+      const typesTxt = (sp?.t || []).map((t) => TYPE_FR[t] || t).join(' / ');
+      const caught = st.dex?.caught?.includes(b.sp) ? '✓ ' : '';
+      return { label: `${caught}${b.title}`, right: `${typesTxt} · ${b.legend ? 'Légendaire' : 'Alpha'}` };
+    }).concat([{ label: 'Annuler' }]),
+    cls: 'shop',
     cancel: RAID_BOSSES.length,
   });
   if (bossIdx < 0 || bossIdx >= RAID_BOSSES.length) return;
@@ -985,33 +992,65 @@ export function buildTournoiBracket(humanSeats, championsPool = TOURNOI_CHAMPION
   };
 }
 
-/** Affiche l'arbre du tournoi en surimpression (se ferme au clic ou après un court délai) */
+/** Affiche l'arbre visuel B2W2 du tournoi en surimpression (clic ou touche A/B/Entrée pour fermer) */
 export async function showBracketModal(game, bracket, title = '🏆 TOURNOI DU COLISÉE', autoMs = 2600) {
   const ui = game.ui;
-  const nameOf = (idx) => idx == null ? 'À déterminer' : esc(bracket.seats[idx]?.name || '?');
-  const markWin = (m, idx) => m.winner === idx ? ' style="color:#ffd84a;font-weight:900"' : '';
-  const card = (m) => `
-    <div style="background:#1c2538;border:2px solid #4a6394;border-radius:8px;padding:8px 12px;margin:6px 0">
-      <div style="font-size:11px;color:#8bb4ff;text-transform:uppercase;letter-spacing:.05em">${esc(m.label)}</div>
-      <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px;margin-top:4px">
-        <span${markWin(m, m.a)}>${nameOf(m.a)}</span>
-        <span style="color:#7890b8">vs</span>
-        <span${markWin(m, m.b)}>${nameOf(m.b)}</span>
-      </div>
+  const seatRow = (match, idx) => {
+    const s = idx != null ? bracket.seats[idx] : null;
+    if (!s) {
+      return `<div class="tournoi-seat"><span class="tournoi-name" style="color:#64748b">À déterminer…</span></div>`;
+    }
+    const isWin = match.winner === idx;
+    const isLose = match.loser === idx;
+    const spr = ASSETS.trainer(s.ow || (s.gender === 'f' ? 'serena' : 'calem'));
+    const tagCls = s.bot ? 'tournoi-tag bot' : 'tournoi-tag';
+    const tagTxt = s.bot ? 'CHAMPION' : 'HUMAIN';
+    return `<div class="tournoi-seat${isWin ? ' is-win' : isLose ? ' is-lose' : ''}">
+      <img class="tournoi-avatar" src="${spr}" alt="" onerror="this.style.display='none'">
+      <span class="tournoi-name">${isWin ? '👑 ' : ''}${esc(s.name)}</span>
+      <span class="${tagCls}">${tagTxt}</span>
     </div>`;
-  const s = el('div', 'screen');
-  s.style.cssText = 'position:fixed;inset:0;background:rgba(8,12,24,0.86);z-index:900;display:flex;align-items:center;justify-content:center;padding:16px;';
-  s.innerHTML = `<div class="box" style="max-width:420px;width:100%;padding:16px 20px;background:#121826;color:#f1f5ff;border:3px solid #e2b846;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.65)">
-    <div class="scr-title" style="text-align:center;color:#ffd84a;margin-bottom:10px">${esc(title)}</div>
-    ${bracket.matches.map(card).join('')}
-    <div style="text-align:center;margin-top:12px"><button type="button" class="btn-ok" style="padding:6px 18px;border-radius:6px;background:#e2b846;color:#111;font-weight:bold;border:none;cursor:pointer">Continuer</button></div>
+  };
+  const matchCard = (m, isFinal = false) => {
+    const ready = m.a != null && m.b != null && m.winner == null;
+    const stateTxt = m.winner != null ? '✓ TERMINÉ' : ready ? '⚔️ EN COURS' : 'EN ATTENTE';
+    return `<div class="tournoi-match${isFinal ? ' is-final' : ''}${ready ? ' is-active' : ''}">
+      <div class="tournoi-match-top"><span>${esc(m.label)}</span><span>${stateTxt}</span></div>
+      ${seatRow(m, m.a)}
+      ${seatRow(m, m.b)}
+    </div>`;
+  };
+  const finalMatch = bracket.matches[2];
+  const champ = finalMatch?.winner != null ? bracket.seats[finalMatch.winner] : null;
+  const champBox = champ
+    ? `<div class="tournoi-champ">🏆 Vainqueur : ${esc(champ.name)}</div>`
+    : `<div class="tournoi-champ" style="opacity:.7">🥇 En attente du Champion</div>`;
+
+  const s = el('div', 'screen tournoi-modal');
+  s.innerHTML = `<div class="tournoi-casing">
+    <div class="tournoi-hdr">
+      <div class="tournoi-title">${esc(title)}</div>
+      <div class="tournoi-sub">4 PARTICIPANTS · ÉLIMINATION DIRECTE</div>
+    </div>
+    <div class="tournoi-grid">
+      <div class="tournoi-col">
+        ${matchCard(bracket.matches[0])}
+        ${matchCard(bracket.matches[1])}
+      </div>
+      <div class="tournoi-col">
+        ${matchCard(finalMatch, true)}
+        ${champBox}
+      </div>
+    </div>
+    <div class="tournoi-foot"><button type="button" class="tournoi-ok">Continuer</button></div>
   </div>`;
   ui.root.appendChild(s);
   await new Promise((res) => {
     let done = false;
-    const finish = () => { if (done) return; done = true; clearTimeout(t); s.remove(); res(); };
+    const pop = game.input?.push ? game.input.push((k) => { if (k === 'a' || k === 'b' || k === 'start') finish(); }) : () => {};
+    const finish = () => { if (done) return; done = true; clearTimeout(t); pop(); s.remove(); res(); };
     const t = autoMs > 0 ? setTimeout(finish, autoMs) : 0;
-    s.querySelector('.btn-ok').onclick = finish;
+    s.querySelector('.tournoi-ok').onclick = finish;
   });
 }
 

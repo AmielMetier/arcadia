@@ -124,7 +124,20 @@ export async function tourCombat(game, n) {
 export async function clubCombat(game, n) {
   const st = game.state, ui = game.ui, who = { speaker: 'Coach Tactique', face: n.sprite };
   await ui.say(['Bienvenue au Club Tactique Duo & Trio !', 'Ici, tu peux t\'entraîner en combat Duo (2v2) ou Trio (3v3) face à des équipes adaptées à ton niveau, sans risque.'], who);
-  const choice = await ui.ask('Quel entraînement ou événement veux-tu lancer ?', ['Duo (2v2)', 'Trio (3v3)', 'Solo (1v1)', 'Tournoi en direct (4p)', 'Multi 2v2 (4 joueurs)', 'Règles Duo/Trio', 'Plus tard'], who);
+  const choice = await ui.list({
+    title: 'Club Tactique',
+    items: [
+      { label: '⚔️ Duo (2v2)', right: 'Entraînement' },
+      { label: '⚔️ Trio (3v3)', right: 'Entraînement' },
+      { label: '⚔️ Solo (1v1)', right: 'Entraînement' },
+      { label: '🏆 Tournoi en direct', right: '4 places' },
+      { label: '🎮 Multi 2v2', right: '4 joueurs' },
+      { label: '📖 Règles Duo / Trio' },
+      { label: 'Plus tard' },
+    ],
+    cls: 'shop',
+    cancel: 6,
+  });
   if (choice === 3) { const m = await import('./multi-events.js'); return m.lancerTournoiSalon(game); }
   if (choice === 4) { const m = await import('./multi-events.js'); return m.lancerMulti4p(game); }
   if (choice === 5) {

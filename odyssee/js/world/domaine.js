@@ -252,7 +252,30 @@ export function batirDomaineAmi(maps, info, retour) {
     m.warp(ENTREE.x, ENTREE.y + 1, retour);
   }
   m.sign(ENTREE.x - 2, ENTREE.y - 2, `${nom.toUpperCase()}\nDomaine de ${ownerName}.\nParle au Gardien pour récupérer ton panier d'accueil ou relever un défi !`);
+  m.prop('caisse', ENTREE.x - 1, ENTREE.y - 2, true);
   m.npcs = m.npcs.filter((q) => q.id !== 'domaine:architecte');
+  // Fait apparaître les Pokémon résidents de l'ami autour de l'entrée
+  const resList = Array.isArray(info?.res) ? info.res : [];
+  if (resList.length) {
+    const libres = [];
+    for (let y = 4; y < m.h - 4; y++) for (let x = 4; x < m.w - 4; x++) if ([T.GRASS, T.ASH, T.PATH, T.PAVE, T.FLOWER, T.SAND].includes(m.get(x, y)) && !m.objectAt(x, y)) libres.push([x, y]);
+    libres.sort((a, b) => Math.hypot(a[0] - ENTREE.x, a[1] - ENTREE.y + 8) - Math.hypot(b[0] - ENTREE.x, b[1] - ENTREE.y + 8));
+    resList.forEach((sp, i) => {
+      const r = RESIDENT[sp];
+      const p = libres[Math.min(libres.length - 1, i * 7 + 3)];
+      if (!r || !p) return;
+      m.npc({
+        id: 'domaine:ami:poke' + sp,
+        x: p[0],
+        y: p[1],
+        sprite: 'poke:' + sp,
+        dir: 'down',
+        move: 'wander',
+        text: [r.dit, `(${r.nom} vit heureux ici dans le domaine de ${ownerName} !)`],
+      });
+    });
+  }
+  const rangText = rang({ res: resList }, compter(m));
   m.npc({
     id: 'domaine:ami:gardien',
     x: ENTREE.x + 2,
@@ -267,6 +290,8 @@ export function batirDomaineAmi(maps, info, retour) {
       nom,
       gender: info?.gender === 'f' ? 'f' : 'm',
       party: Array.isArray(info?.party) ? info.party : [],
+      resCount: resList.length,
+      rangText,
     },
   });
   maps[DOMAINE_AMI] = m;

@@ -698,7 +698,19 @@ export async function dojoMamadou(game, n) {
     `Bienvenue dans mon Dojo, ${st.name} ! Ici, la stratégie collective prime sur la force brute.`,
     `Tu as ${D.pdj} Point${D.pdj > 1 ? 's' : ''} du Dojo (PDj). Records — Duo 2v2 : ${D.record2} · Trio 3v3 : ${D.record3}.`,
   ], who);
-  const choice = await ui.ask('Que souhaites-tu faire ?', ['Relever un défi Co-op (2v2 / 3v3)', 'Raids de Boss Co-op (2-3j)', 'Tournoi en direct (4p)', 'Échanger des PDj', 'Règles du Dojo', 'Plus tard'], who);
+  const choice = await ui.list({
+    title: `Dojo de Mamadou · ${D.pdj} PDj`,
+    items: [
+      { label: '🥋 Défi Co-op (2v2 / 3v3)', right: '2-3 joueurs' },
+      { label: '🐉 Raid de Boss Co-op', right: '2-3 joueurs' },
+      { label: '🏆 Tournoi en direct', right: '4 places' },
+      { label: '🎁 Boutique PDj', right: `${D.pdj} PDj` },
+      { label: '📖 Règles du Dojo' },
+      { label: 'Plus tard' },
+    ],
+    cls: 'shop',
+    cancel: 5,
+  });
   if (choice === 1) { const m = await import('./multi-events.js'); return m.lancerRaidCoop(game); }
   if (choice === 2) { const m = await import('./multi-events.js'); return m.lancerTournoiSalon(game); }
   if (choice === 3) { await dojoBoutique(game, n); return; }
@@ -712,6 +724,13 @@ export async function dojoMamadou(game, n) {
     return;
   }
   if (choice !== 0) return;
+  return lancerDefiDojoCoop(game, n);
+}
+
+/** Lance un défi Co-op du Dojo (Duo 2v2 ou Trio 3v3) depuis Maître Mamadou ou le C-Gear */
+export async function lancerDefiDojoCoop(game, n = null) {
+  const st = game.state, ui = game.ui;
+  const who = { speaker: 'Maître Mamadou', face: n?.sprite || 'karateka' };
 
   if (game.badgeCount() < 5) {
     await ui.say('Le Dojo accueille uniquement les dresseurs confirmés à partir du 6e Badge (au moins 5 badges en main) !', who);

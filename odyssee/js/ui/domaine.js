@@ -186,7 +186,7 @@ export async function visiterDomaineAmi(game, peerArg = null) {
 /** Gardien du Domaine ami : offre le Panier de bienvenue (1 fois par ami) et propose un combat amical contre son équipe */
 export async function gardienDomaine(game, n) {
   const st = game.state, ui = game.ui;
-  const g = n?.gardien || { id: 'ami', ownerName: 'Ami', nom: 'Domaine ami', gender: 'm', party: [] };
+  const g = n?.def?.gardien || n?.gardien || { id: 'ami', ownerName: 'Ami', nom: 'Domaine ami', gender: 'm', party: [] };
   const who = { speaker: `Gardien · ${g.ownerName}`, face: g.gender === 'f' ? 'serena' : 'calem' };
   const fKey = `panierAmi:${g.id}`;
 
@@ -203,18 +203,34 @@ export async function gardienDomaine(game, n) {
     game.sound.sfx('item');
     game.save(true);
     await ui.say([
-      `Bienvenue au « ${g.nom} » ! ${g.ownerName} m'a chargé de t'accueillir comme il se doit.`,
+      `Bienvenue au « ${g.nom} » ! ${g.rangText ? `Ce lieu a atteint le rang : ${g.rangText} (${g.resCount || 0} Pokémon installé${(g.resCount || 0) > 1 ? 's' : ''}).` : `${g.ownerName} m'a chargé de t'accueillir comme il se doit.`}`,
       `🎁 Panier d'accueil obtenu : 2 Baies Sitrus${extra} !`,
     ], who);
   }
 
   const teamMons = (g.party || []).filter(validMon).map((m) => battleCopy([m])[0]);
+  const rentre = async () => {
+    const r = game.mapObj?.warpAt?.(ENTREE.x, ENTREE.y);
+    if (r?.map && game.warp) await game.warp(r, 'select');
+  };
   if (!teamMons.length) {
-    await ui.say(`Promène-toi librement dans le ${g.nom} ! ${g.ownerName} n'a pas encore laissé d'équipe Gardienne.`, who);
+    const leave = await ui.ask(`Promène-toi librement dans le ${g.nom} ! ${g.ownerName} n'a pas encore laissé d'équipe Gardienne.`, ['Rester visiter', '🚪 Quitter le Domaine et rentrer'], who);
+    if (leave === 1) await rentre();
     return;
   }
 
-  const c = await ui.ask(`Défier l'équipe Gardienne de ${g.ownerName} (${teamMons.length} Pokémon) ?`, ['Duel (1v1)', 'Duo (2v2)', 'Plus tard'], who);
+  const c = await ui.list({
+    title: `${g.nom}${g.rangText ? ' · ' + g.rangText : ''}`,
+    items: [
+      { label: '⚔️ Duel amical (1v1)', right: `${teamMons.length} Pokémon` },
+      { label: '⚔️ Duo amical (2v2)', right: `${teamMons.length} Pokémon` },
+      { label: '🚪 Quitter le Domaine et rentrer' },
+      { label: 'Continuer la visite' },
+    ],
+    cls: 'shop',
+    cancel: 3,
+  });
+  if (c === 2) { await rentre(); return; }
   if (c !== 0 && c !== 1) return;
   const format = c === 1 ? 'double' : 'single';
   const minNeed = c === 1 ? 2 : 1;

@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.111 — 18 novembre 2026
+- **Odyssée** — Finition et présentation enrichie du multijoueur :
+  - **Nouvel onglet Salon Multi** dans l'écran Amis & Connexion (accolé aux actions directes **Combat**, **Raid Co-op**, **Échange**, **Domaine** et **Observer** sur chaque dresseur en ligne) pour lancer en un clic Raids Co-op, Multi 2v2 à 4 joueurs, Tournoi, Dojo de Mamadou, Poker Multijoueur ou visite de Domaine.
+  - **Menus unifiés et lisibles** auprès des joueurs sur la carte, de Maître Mamadou et du Club Tactique, avec indication du type et du statut Pokédex des Boss de Raid.
+  - **Visuels enrichis en combat et en tournoi** : aura et segments visuels pour le Bouclier Mystique des Boss de Raid, bannières de format dédiées, arbre de tournoi éliminatoire en deux colonnes avec portraits des participants, distinction humain/IA au Poker Hold'em et présence des Pokémon résidents avec sortie rapide chez le Gardien du Domaine.
+
 ## 5.110 — 18 novembre 2026
 - **Odyssée** — Cinq nouvelles activités multijoueurs dans la région et au Dojo :
   - **Raids de Boss Co-op** (exclusivement à 2 ou 3 joueurs) face à un Boss géant doté d'un Bouclier Mystique et de 2 actions par tour, avec Points du Dojo, Super Bonbons et possibilité de capturer le Boss après la victoire.

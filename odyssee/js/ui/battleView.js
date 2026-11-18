@@ -243,6 +243,26 @@ export class BattleView {
     const eMain = this.posFor(1, this.slots > 1 ? 1 : 0);
     drawSpr(s.trainer, eMain.x + s.eSlide, eMain.y + 6, 1, null, 0, false);
 
+    // Aura mystique et Bouclier du Boss de Raid Co-op
+    if (this.battle?.isRaid && this.spriteObj(1, 0)?.visible) {
+      const rp = this.posFor(1, 0);
+      const pulse = 1 + Math.sin(now * 0.005) * 0.08;
+      x.save();
+      x.strokeStyle = this.battle.shield?.active ? 'rgba(217, 70, 239, 0.72)' : 'rgba(250, 204, 21, 0.42)';
+      x.lineWidth = this.battle.shield?.active ? 2.4 : 1.5;
+      x.beginPath();
+      x.ellipse(rp.x + s.eSlide, rp.y + 5, 42 * pulse, 12 * pulse, 0, 0, Math.PI * 2);
+      x.stroke();
+      if (this.battle.shield?.active) {
+        x.strokeStyle = 'rgba(192, 132, 252, 0.38)';
+        x.lineWidth = 2;
+        x.beginPath();
+        x.arc(rp.x + s.eSlide, rp.y - 26, 36 * pulse, 0, Math.PI * 2);
+        x.stroke();
+      }
+      x.restore();
+    }
+
     // Pokémon ennemis puis joueurs (ordre de profondeur)
     for (let slot = 0; slot < (this.slots || 1); slot++) {
       const p = this.posFor(1, slot), hl = this.targetHint && this.targetHint.side === 1 && this.targetHint.slot === slot;
@@ -408,8 +428,10 @@ export class BattleView {
             <div class="bh-bot"><div class="bh-exp-wrap"><div class="bh-exp"><i><u></u></i></div></div><div class="bh-hpn"></div></div>
             <div class="bh-boosts"></div>
           </div>`;
+      const fmtCls = this.battle?.isRaid ? ' raid' : this.battle?.is4p ? ' multi4p' : '';
+      const fmtTxt = this.battle?.isRaid ? '🐉 RAID CO-OP · BOSS' : this.battle?.is4p ? '⚔️ MULTI 2V2 · 4 JOUEURS' : sl === 3 ? 'TRIO · 3V3' : 'DUO · 2V2';
       r.insertAdjacentHTML('beforeend', `
-        <div class="battle-format-badge">${sl === 3 ? 'TRIO · 3V3' : 'DUO · 2V2'}</div>
+        <div class="battle-format-badge${fmtCls}">${fmtTxt}</div>
         <div class="bhud-stack foe">
           <div class="bhud-party-strip foe"><div class="bh-balls"></div></div>
           ${Array.from({ length: sl }, (_, k) => cardHtml(1, k)).join('')}
@@ -1237,15 +1259,21 @@ export class BattleView {
         case 'raid-shield': {
           const h = this.hudFor(1, 0);
           if (h) {
-            let b = h.querySelector('.raid-shield-pill');
+            let b = h.querySelector('.raid-shield-bar');
             if (e.active) {
               if (!b) {
-                b = el('span', 'raid-shield-pill');
-                b.style.cssText = 'display:inline-block;margin-left:4px;padding:0 5px;border-radius:4px;background:#7c3aed;color:#fff;font-size:10px;font-weight:bold;border:1px solid #080a10;';
-                h.querySelector('.bh-top')?.appendChild(b);
+                b = el('div', 'raid-shield-bar');
+                h.appendChild(b);
               }
-              b.textContent = `🛡️ ${e.hp}/${e.max}`;
-            } else if (b) b.remove();
+              const max = Math.max(1, e.max | 0), cur = Math.max(0, e.hp | 0);
+              const segs = Array.from({ length: max }, (_, idx) => `<i class="raid-shield-seg ${idx < cur ? 'on' : 'off'}"></i>`).join('');
+              b.innerHTML = `<span>🛡️</span><span class="raid-shield-segs">${segs}</span><span>${cur}/${max}</span>`;
+            } else if (b) {
+              b.remove();
+              const c = this.sprCenter(1, 0);
+              this.sound.sfx('hitstrong');
+              this.burst(c.x, c.y, ['#e879f9', '#fde047', '#ffffff'], 24, { speed: 2.6 });
+            }
           }
           break;
         }

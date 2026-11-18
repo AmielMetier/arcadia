@@ -657,6 +657,48 @@
   text-shadow: calc(var(--bp) * 0.7) calc(var(--bp) * 0.7) 0 #080a10;
   pointer-events: none;
 }
+.battle-format-badge.raid {
+  color: #fde68a;
+  background: linear-gradient(180deg, rgba(64, 24, 96, 0.94) 0%, rgba(28, 12, 46, 0.95) 100%);
+  border-color: #a855f7;
+  box-shadow: 0 0 calc(var(--bp) * 4) rgba(168, 85, 247, 0.45);
+}
+.battle-format-badge.multi4p {
+  color: #7dd3fc;
+  background: linear-gradient(180deg, rgba(16, 44, 82, 0.94) 0%, rgba(10, 22, 44, 0.95) 100%);
+  border-color: #38bdf8;
+}
+.raid-shield-bar {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--bp) * 1.4);
+  margin-top: calc(var(--bp) * 1.2);
+  padding: calc(var(--bp) * 0.7) calc(var(--bp) * 1.8);
+  border-radius: calc(var(--bp) * 1.4);
+  background: rgba(88, 28, 135, 0.48);
+  border: calc(var(--bp) * 0.6) solid #a855f7;
+  font-size: calc(var(--bp) * 3.2);
+  font-weight: 800;
+  color: #f3e8ff;
+}
+.raid-shield-segs {
+  display: inline-flex;
+  gap: calc(var(--bp) * 0.8);
+  flex: 1;
+}
+.raid-shield-seg {
+  height: calc(var(--bp) * 2.2);
+  flex: 1;
+  border-radius: calc(var(--bp) * 0.5);
+  border: calc(var(--bp) * 0.4) solid #080a10;
+}
+.raid-shield-seg.on {
+  background: linear-gradient(180deg, #e879f9 0%, #9333ea 100%);
+  box-shadow: 0 0 calc(var(--bp) * 1.6) rgba(217, 70, 239, 0.7);
+}
+.raid-shield-seg.off {
+  background: rgba(30, 20, 48, 0.75);
+}
 .battle.slots-2 .battle-weather-badge,
 .battle.slots-3 .battle-weather-badge {
   top: calc(var(--bp) * 2.5);

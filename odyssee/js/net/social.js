@@ -12,8 +12,8 @@ import { BADGES } from '../world/region.js';
 import { el, esc, wait } from '../ui/ui.js';
 import { tenueCode, tenueDecode, tenueValide, tenueOrigine, composer } from '../render/tenue.js';
 import { onDojoInvite } from '../dojo-mamadou.js';
-import { lancerRaidCoop, onRaidInvite, lancerMulti4p, onMulti4pInvite, onTournoiInvite } from '../multi-events.js';
-import { onPokerInvite } from '../ui/casino/poker.js';
+import { lancerRaidCoop, onRaidInvite, lancerMulti4p, onMulti4pInvite, lancerTournoiSalon, onTournoiInvite } from '../multi-events.js';
+import { pokerTableMulti, onPokerInvite } from '../ui/casino/poker.js';
 import { visiterDomaineAmi } from '../ui/domaine.js';
 
 const WALK = 0.27, RUN = 0.068;
@@ -78,10 +78,12 @@ export function installSocial(game) {
       gender: st.gender === 'f' ? 'f' : 'm',
       nom: st.domaine?.nom || `Domaine de ${st.name || 'Dresseur'}`,
       travaux: st.domaine?.travaux || [],
+      res: st.domaine?.res || [],
+      talents: st.domaine?.talents || [],
       party: battleCopy((st.party || []).slice(0, 4)),
     };
   };
-  game.talkToPeer = (peer) => talkToPeer(game, peer);
+  game.talkToPeer = (peer, directAction = null) => talkToPeer(game, peer, directAction);
   game.showPeerCard = (peer) => showCard(game, peer);
 
   /* ---------------- affichage ---------------- */
@@ -192,11 +194,11 @@ export function installSocial(game) {
 /* ======================================================================
    Parler à un joueur : choisir, envoyer l'invitation, attendre la réponse
    ====================================================================== */
-export async function talkToPeer(game, peer) {
+export async function talkToPeer(game, peer, directAction = null) {
   const ui = game.ui, link = game.link, st = game.state;
   if (peer.pvp) {
     const foeName = peer.pvp.foeName || 'un autre dresseur';
-    const c = await ui.ask(`${peer.name} affronte ${foeName} en combat ! Que veux-tu faire ?`, ['Regarder le combat', 'Sa fiche', 'Rien'], { speaker: peer.name });
+    const c = await ui.ask(`${peer.name} affronte ${foeName} en combat ! Que veux-tu faire ?`, ['👁️ Observer le combat', 'Sa fiche', 'Rien'], { speaker: peer.name });
     if (c === 0) {
       await spectateSession(game, peer.pvp.hostId || peer.id, peer.pvp.rid, peer.name, foeName);
       return;
@@ -205,13 +207,40 @@ export async function talkToPeer(game, peer) {
     return;
   }
   if (peer.busy) { await ui.say(`${peer.name} est occupé${peer.gender === 'f' ? 'e' : ''} pour le moment.`); return; }
-  const c = await ui.ask(`${peer.name} est là. Que veux-tu faire ?`, ['Échanger', 'Combattre', 'Raid Co-op', 'Visiter son Domaine', 'Sa fiche', 'Rien'], { speaker: peer.name });
-  if (c === 2) return lancerRaidCoop(game, peer);
-  if (c === 3) return visiterDomaineAmi(game, peer);
-  if (c === 4) { await showCard(game, peer); return; }
-  if (c !== 0 && c !== 1) return;
+  if (directAction === 'raid') return lancerRaidCoop(game, peer);
+  if (directAction === 'domaine') return visiterDomaineAmi(game, peer);
+
+  let action = directAction;
+  if (!action) {
+    const pick = await ui.list({
+      title: `${peer.name}`,
+      items: [
+        { label: '⚔️ Combattre', right: '1v1 · 2v2 · 3v3 · 4J' },
+        { label: '🐉 Raid de Boss Co-op', right: '2-3 joueurs' },
+        { label: '🏆 Tournoi / 🃏 Poker Multi', right: 'Salon' },
+        { label: '🔄 Échanger un Pokémon', right: '4e Badge' },
+        { label: '🏡 Visiter son Domaine', right: 'Panier & Gardien' },
+        { label: '🪪 Carte de Dresseur' },
+        { label: 'Rien' },
+      ],
+      cls: 'shop',
+      cancel: 6,
+    });
+    if (pick === 0) action = 'battle';
+    else if (pick === 1) return lancerRaidCoop(game, peer);
+    else if (pick === 2) {
+      const s = await ui.ask('Quel événement lancer dans le salon ?', ['🏆 Tournoi en direct (4 places)', '🃏 Poker Texas Hold\'em Multi', 'Annuler'], { speaker: peer.name });
+      if (s === 0) return lancerTournoiSalon(game);
+      if (s === 1) return pokerTableMulti(game);
+      return;
+    } else if (pick === 3) action = 'trade';
+    else if (pick === 4) return visiterDomaineAmi(game, peer);
+    else if (pick === 5) { await showCard(game, peer); return; }
+    else return;
+  }
+
   if (!st.party.length) { await ui.say('Il te faut d\'abord un Pokémon !'); return; }
-  const kind = c === 0 ? 'trade' : 'battle';
+  const kind = action === 'trade' ? 'trade' : 'battle';
   let format = 'single';
   if (kind === 'battle') {
     const alive = st.party.filter((m) => m && m.hp > 0).length;

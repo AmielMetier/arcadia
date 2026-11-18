@@ -27,7 +27,7 @@ const BOARD = [0, 1, 2, 3, 4].map((k) => [138 + k * 25, 96]), PAQUET = [200, 70]
 export const rotateVisSeat = (canonSeat, mySeat = 0) => (canonSeat - mySeat + 4) % 4;
 export const rotateCanonSeat = (visSeat, mySeat = 0) => (visSeat + mySeat) % 4;
 
-function fondPoker(seatSprites = null) {
+function fondPoker(seatSprites = null, multi = false) {
   const sp = seatSprites || [ADVERSAIRES[1].sprite, ADVERSAIRES[2].sprite, ADVERSAIRES[0].sprite];
   const c = document.createElement('canvas'); c.width = 400; c.height = 240; const g = c.getContext('2d');
   moquette(g, 0, 0, 400, 240);
@@ -36,14 +36,14 @@ function fondPoker(seatSprites = null) {
   perso(g, sp[1], 'down', 200, 64);
   perso(g, sp[2], 'left', 376, 136);
   tableOvale(g, 200, 118, 156, 64);
-  texte(g, 'TEXAS HOLD\'EM', 200, 136, '#2f9a58', { a: 'c' });
+  texte(g, multi ? 'TEXAS HOLD\'EM · MULTI' : 'TEXAS HOLD\'EM', 200, 136, multi ? '#ffe070' : '#2f9a58', { a: 'c' });
   BOARD.forEach(([x, y]) => emplacement(g, x, y));
   return c;
 }
 
 /** Boucle partagée d'une table de Texas Hold'em (Solo ou Multijoueur à places tournantes) */
 async function runPokerTableLoop(game, T, { mySeat = 0, joueurs, bouton = 0, rngFn, net = null, courtoisie = 0, seatSprites = null }) {
-  const st = T.st, g = T.g, fond = fondPoker(seatSprites);
+  const st = T.st, g = T.g, fond = fondPoker(seatSprites, !!net);
   const vis = (canon) => rotateVisSeat(canon, mySeat);
   const t = H.creerTable({ joueurs, petite: PETITE, grosse: GROSSE, bouton });
   const cartes = new Cartes();
@@ -61,7 +61,8 @@ async function runPokerTableLoop(game, T, { mySeat = 0, joueurs, bouton = 0, rng
     b.texte(esc(txt)); b.classList.add('on'); clearTimeout(b._t); b._t = setTimeout(() => b.classList.remove('on'), 1500);
   };
   const majPlaques = () => t.joueurs.forEach((p, i) => {
-    plaques[i].texte(`${esc(i === mySeat ? 'Toi' : p.nom)}<b>${fr(p.jetons)}</b>`);
+    const tag = net && !p.ia && i !== mySeat ? '🟢 ' : net && p.ia ? '🤖 ' : '';
+    plaques[i].texte(`${tag}${esc(i === mySeat ? 'Toi' : p.nom)}<b>${fr(p.jetons)}</b>`);
     plaques[i].classList.toggle('actif', t.courant === i && !t.fini);
     plaques[i].classList.toggle('couche', p.couche && p.assis && !t.fini);
   });
