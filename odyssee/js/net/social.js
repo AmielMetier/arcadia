@@ -428,6 +428,17 @@ async function tradeSession(game, from, name, rid, peerCap = 100) {
   game.save(true);
 }
 
+/** Vide les messages spec_join arrivés en avance dans link.inbox avant que onSpectate soit branché */
+export function drainPendingSpecJoins(link) {
+  if (!link?.inbox?.length || !link.onSpectate) return;
+  const keep = [];
+  for (const item of link.inbox) {
+    if (item?.m?.t === 'spec_join' && link.onSpectate(item.from, item.m)) continue;
+    keep.push(item);
+  }
+  link.inbox = keep;
+}
+
 /* ======================================================================
    Combat
    ====================================================================== */
@@ -506,6 +517,7 @@ export async function battleSession(game, from, name, gender, rid, challenger, f
       }
       return false;
     };
+    drainPendingSpecJoins(link);
   }
 
   const battle = new PvpBattle({

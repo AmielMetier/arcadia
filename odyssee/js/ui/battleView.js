@@ -833,14 +833,15 @@ export class BattleView {
 
     const mySlot = battle.mySlot ?? 0;
     const waiting = () => (coopNet.waitUiHint ? coopNet.waitUiHint(this.textBox) : this.ui.typePage(this.textBox, 'En attente de ton escouade…', { last: true }));
+    const quitMsg = battle.isRaid ? 'Vous abandonnez le Raid Co-op…' : battle.is4p ? 'Vous déclarez forfait…' : 'Vous abandonnez le défi du Dojo…';
     const aborted = async (r) => {
-      if (r.mine) { coopNet.sendQuit?.(); await this.play(battle.stop('lose', 'Vous abandonnez le défi du Dojo…')); return; }
-      const who = r.who || 'Un coéquipier';
-      const why = r.desync ? 'Désynchronisation réseau détectée : le combat Co-op est interrompu.'
+      if (r.mine) { coopNet.sendQuit?.(); await this.play(battle.stop('lose', quitMsg)); return; }
+      const who = r.who || 'Un participant';
+      const why = r.desync ? 'Désynchronisation réseau détectée : le combat est interrompu.'
         : r.left ? `${who} a quitté la partie.`
-        : r.quit ? `${who} a abandonné le défi Co-op.`
+        : r.quit ? `${who} a abandonné le combat.`
         : r.timeout ? `${who} ne répond plus.`
-        : 'La session Co-op a été interrompue.';
+        : 'La session multijoueur a été interrompue.';
       await this.play(battle.stop('lose', why));
     };
 
@@ -868,7 +869,7 @@ export class BattleView {
       const myAction = myAlive ? await this.chooseCoopSlotAction(mySlot) : { slot: mySlot, type: 'none' };
       if (myAction.type === 'forfeit') {
         coopNet.sendQuit?.();
-        await this.play(battle.stop('lose', 'Vous abandonnez le défi du Dojo…'));
+        await this.play(battle.stop('lose', quitMsg));
         break;
       }
       const n = battle.turn + 1, sum = battle.checksum();

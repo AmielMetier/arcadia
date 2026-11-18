@@ -221,10 +221,16 @@ async function runPokerTableLoop(game, T, { mySeat = 0, joueurs, bouton = 0, rng
           a = await choixJoueur();
           const wantLeave = !a;
           if (wantLeave) {
-            a = { type: H.actionsPossibles(t).parole ? 'parole' : 'coucher' };
+            a = { type: 'coucher' };
             quitter = true;
           }
           await net.broadcastMyAction(handNo, stepSeq, i, a, wantLeave);
+          if (wantLeave) {
+            t.joueurs[mySeat].ia = true;
+            H.agir(t, a);
+            lireJournal(); enJetonsTable();
+            break;
+          }
         } else {
           T.msg(`En attente de <b>${esc(p.nom)}</b>…`);
           const res = await net.waitSeatAction(handNo, stepSeq, i);
@@ -327,16 +333,20 @@ function buildPokerSeatSprites(seats, mySeat) {
   });
 }
 
-function createPokerNet(game, { rid, isHost, hostId, peerIds, peerSeats, mySeat, seedBase }) {
+export function createPokerNet(game, { rid, isHost, hostId, peerIds, peerSeats, mySeat, seedBase }) {
   const link = game.link;
   const handRng = (handNo) => seededRng((seedBase ^ ((handNo + 1) * 0x9e3779b9)) >>> 0);
+  let peers = peerIds.map((pid, idx) => ({ pid, seat: peerSeats[idx] }));
+  const dropSeat = (seat) => { peers = peers.filter((q) => q.seat !== seat); };
 
   return {
     handRng,
+    get activeCount() { return peers.length; },
     async syncStartHand(handNo, joueurs) {
       if (isHost) {
+        if (!peers.length) return false;
         const stacks = joueurs.map((j) => j.jetons);
-        for (const pid of peerIds) link.send(pid, { t: 'poker', rid, step: 'hand', handNo, stacks });
+        for (const q of peers) link.send(q.pid, { t: 'poker', rid, step: 'hand', handNo, stacks });
         return true;
       }
       const msg = await link.wait(hostId, (q) => q.t === 'poker' && q.rid === rid && ((q.step === 'hand' && q.handNo === handNo) || q.step === 'close'), 60000);
@@ -346,20 +356,20 @@ function createPokerNet(game, { rid, isHost, hostId, peerIds, peerSeats, mySeat,
     },
     async broadcastMyAction(handNo, seq, seat, act, leave = false) {
       if (isHost) {
-        for (const pid of peerIds) link.send(pid, { t: 'poker', rid, step: 'act-go', handNo, seq, seat, act, seatLeft: leave });
+        for (const q of peers) link.send(q.pid, { t: 'poker', rid, step: 'act-go', handNo, seq, seat, act, seatLeft: leave });
       } else {
         link.send(hostId, { t: 'poker', rid, step: 'act', handNo, seq, seat, act, leave });
-        await link.wait(hostId, (q) => q.t === 'poker' && q.rid === rid && q.step === 'act-go' && q.handNo === handNo && q.seq === seq, 30000);
+        if (!leave) await link.wait(hostId, (q) => q.t === 'poker' && q.rid === rid && q.step === 'act-go' && q.handNo === handNo && q.seq === seq, 30000);
       }
     },
     async waitSeatAction(handNo, seq, seat) {
       if (isHost) {
-        const idx = peerSeats.indexOf(seat);
-        const pid = peerIds[idx];
-        const msg = pid ? await link.wait(pid, (q) => q.t === 'poker' && q.rid === rid && q.step === 'act' && q.handNo === handNo && q.seq === seq, 90000) : { t: 'left' };
+        const entry = peers.find((q) => q.seat === seat);
+        const msg = entry ? await link.wait(entry.pid, (q) => q.t === 'poker' && q.rid === rid && q.step === 'act' && q.handNo === handNo && q.seq === seq, 90000) : { t: 'left' };
         const seatLeft = msg.t !== 'poker' || !!msg.leave;
         const act = msg.t === 'poker' ? msg.act : null;
-        for (const opid of peerIds) link.send(opid, { t: 'poker', rid, step: 'act-go', handNo, seq, seat, act, seatLeft });
+        if (seatLeft) dropSeat(seat);
+        for (const q of peers) link.send(q.pid, { t: 'poker', rid, step: 'act-go', handNo, seq, seat, act, seatLeft });
         return { act, seatLeft };
       }
       const msg = await link.wait(hostId, (q) => q.t === 'poker' && q.rid === rid && ((q.step === 'act-go' && q.handNo === handNo && q.seq === seq) || q.step === 'close'), 120000);
@@ -368,7 +378,8 @@ function createPokerNet(game, { rid, isHost, hostId, peerIds, peerSeats, mySeat,
     },
     async syncNextHand(handNo, wantStay, seat) {
       if (isHost) {
-        const res = await Promise.all(peerIds.map((pid, idx) => link.wait(pid, (q) => q.t === 'poker' && q.rid === rid && q.step === 'next' && q.handNo === handNo, 60000).then((q) => ({ seat: peerSeats[idx], q }))));
+        const snapshot = [...peers];
+        const res = await Promise.all(snapshot.map((entry) => link.wait(entry.pid, (q) => q.t === 'poker' && q.rid === rid && q.step === 'next' && q.handNo === handNo, 60000).then((q) => ({ seat: entry.seat, pid: entry.pid, q }))));
         const leftSeats = [];
         let humanStayers = wantStay ? 1 : 0;
         for (const { seat: sl, q } of res) {
@@ -376,16 +387,18 @@ function createPokerNet(game, { rid, isHost, hostId, peerIds, peerSeats, mySeat,
           else leftSeats.push(sl);
         }
         const ok = wantStay && humanStayers >= 2;
-        for (const pid of peerIds) link.send(pid, { t: 'poker', rid, step: 'next-go', handNo, ok, leftSeats });
+        for (const entry of snapshot) link.send(entry.pid, { t: 'poker', rid, step: 'next-go', handNo, ok, leftSeats });
+        for (const sl of leftSeats) dropSeat(sl);
         return { ok, leftSeats };
       }
       link.send(hostId, { t: 'poker', rid, step: 'next', handNo, seat, stay: wantStay });
+      if (!wantStay) return { ok: false, leftSeats: [] };
       const msg = await link.wait(hostId, (q) => q.t === 'poker' && q.rid === rid && ((q.step === 'next-go' && q.handNo === handNo) || q.step === 'close'), 65000);
       if (msg.t !== 'poker' || msg.step !== 'next-go') return { ok: false };
       return { ok: !!msg.ok && wantStay, leftSeats: msg.leftSeats || [] };
     },
     closeTable() {
-      if (isHost) for (const pid of peerIds) link.send(pid, { t: 'poker', rid, step: 'close' });
+      if (isHost) for (const q of peers) link.send(q.pid, { t: 'poker', rid, step: 'close' });
     },
   };
 }

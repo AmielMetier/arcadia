@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.112 — 18 novembre 2026
+- **Odyssée** — Correctifs de fiabilité multijoueur suite à audit :
+  - Correction du rôle d'hôte en **Tournoi en direct** lorsque l'organisateur joue côté droit d'un duel contre un autre joueur humain, et ouverture instantanée du **Mode Spectateur** même si la demande arrive pendant l'introduction du combat.
+  - Gestion propre des départs en **Poker Texas Hold'em multijoueur** (sortie immédiate d'un joueur qui abandonne et mise à jour de la table pour les mains suivantes).
+  - Contrôle de propriété du remplaçant adverse en **Multi 2v2 à 4 joueurs** et messages d'abandon adaptés à chaque mode.
+
 ## 5.111 — 18 novembre 2026
 - **Odyssée** — Finition et présentation enrichie du multijoueur :
   - **Nouvel onglet Salon Multi** dans l'écran Amis & Connexion (accolé aux actions directes **Combat**, **Raid Co-op**, **Échange**, **Domaine** et **Observer** sur chaque dresseur en ligne) pour lancer en un clic Raids Co-op, Multi 2v2 à 4 joueurs, Tournoi, Dojo de Mamadou, Poker Multijoueur ou visite de Domaine.

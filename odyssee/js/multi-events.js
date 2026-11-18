@@ -521,7 +521,7 @@ export class Multi4pBattle extends Battle {
     const forced = this.forcedAction(ref); if (forced) return forced;
     const a = this._remoteFor(slot);
     const m = this.act(ref);
-    if (a.type === 'switch' && this.sides[1].party[a.idx] && this.sides[1].party[a.idx].hp > 0 && !this.sides[1].activeSlots.includes(a.idx)) {
+    if (a.type === 'switch' && this.sideOwners[1][a.idx] === slot && this.sides[1].party[a.idx] && this.sides[1].party[a.idx].hp > 0 && !this.sides[1].activeSlots.includes(a.idx)) {
       return { type: 'switch', idx: a.idx };
     }
     if (!this.usableMoves(ref).length) return { type: 'move', id: 165 };
@@ -1112,6 +1112,8 @@ async function playHumanVsBotTournoi(game, botSeat, lvl, format, seed, matchRid)
     if (msg.t === 'spec_leave') { spectators.delete(fid); return true; }
     return false;
   };
+  const { drainPendingSpecJoins } = await import('./net/social.js');
+  drainPendingSpecJoins(link);
   const bcast = (events) => {
     if (!events?.length || !spectators.size) return;
     for (const sid of spectators) link.send(sid, { t: 'spec_ev', rid: matchRid, turn: battle.turn, events });
@@ -1238,7 +1240,7 @@ async function runGuestTournoiLoop(game, { rid, hostId, format, bracket, lvl }) 
     } else if (!sA.bot || !sB.bot) {
       const hostSpec = !sA.bot ? sA : sB;
       const mRid = `${rid}:m${sync.matchIdx}`;
-      await ui.say(`Match en direct : ${sA.name} vs ${sB.name} ! Ouverture du mode Spectateur…`);
+      ui.toast(`Match en direct : ${sA.name} vs ${sB.name} ! Ouverture du mode Spectateur…`, 2200);
       game.busy = false; game.session = null;
       try {
         await spectateSession(game, hostSpec.id, mRid, sA.name, sB.name);
@@ -1362,7 +1364,8 @@ export async function lancerTournoiSalon(game) {
         if (opp.bot) {
           myWin = (await playHumanVsBotTournoi(game, opp, tourLvl, format, seed, mRid)) === 'win';
         } else {
-          const outcome = await battleSession(game, opp.id, opp.name, opp.gender || 'm', mRid, true, format);
+          const amChallenger = sA.id === link.myId;
+          const outcome = await battleSession(game, opp.id, opp.name, opp.gender || 'm', mRid, amChallenger, format);
           myWin = outcome === 'win';
         }
         winnerSeatIdx = (myWin && sA.id === link.myId) || (!myWin && sB.id === link.myId) ? m.a : m.b;
@@ -1371,7 +1374,7 @@ export async function lancerTournoiSalon(game) {
         const driverSeat = !sA.bot ? sA : sB;
         const mRid = `${rid}:m${matchIdx}`;
         const waitProm = link.wait(driverSeat.id, (q) => q.t === 'tournoi' && q.rid === rid && q.step === 'match-res' && q.matchIdx === matchIdx, 300000);
-        await ui.say(`Match en direct : ${sA.name} vs ${sB.name} ! Ouverture du mode Spectateur…`, who);
+        ui.toast(`Match en direct : ${sA.name} vs ${sB.name} ! Ouverture du mode Spectateur…`, 2200);
         game.busy = false; game.session = null;
         try {
           await spectateSession(game, driverSeat.id, mRid, sA.name, sB.name);
