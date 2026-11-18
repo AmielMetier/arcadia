@@ -590,6 +590,9 @@ for nom, fichier in PERSOS.items():
     faits += 1
 chars.save(os.path.join(OUT, 'chars.png'))
 
+from noirblanc_masterpiece import appliquer_masterpiece
+appliquer_masterpiece(ROOT, OUT, COLS, noms, D, bat_dims)
+
 NB_CHAR_VARIANTS = {
     'habitant': ['habitant', 'nb_cheren', 'nb_voyageur', 'nb_costard', 'nb_fermier', 'nb_boulanger', 'nb_clerk', 'nb_preppy', 'nb_sportif', 'nb_musicien', 'nb_majordome'],
     'habitante': ['habitante', 'nb_citadine', 'nb_secretaire', 'nb_servante', 'nb_cafe', 'nb_tablier', 'nb_rockeuse', 'nb_demoiselle', 'nb_violette'],

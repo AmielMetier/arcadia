@@ -454,6 +454,8 @@ export function buildAnimAtlas() {
   const E16 = [0, 1, 2, 3].map((f) => SOL32['s16_eau' + f]);
   for (let m = 0; m < 16; m++) keys.push(['water' + m, (P, f) => waterCell(P, m, f), SOL32[`water_m${m}_f0`] ? ((f) => up2(SOL32[`water_m${m}_f${(f >> 1) % 4}`])) : E16[0] ? ((f) => up2(E16[(f >> 1) % 4])) : HG.mer ? ((f) => hgWater(m, f)) : W[0] && ((f) => shore32(up2(W[f % 4] || W[0]), m, f))]);
   for (const st of ['0', 'v', 'h', 'f', 'i']) if (SOL32[`q_water_${st}_f0`]) keys.push([`q_water_${st}`, null, (f) => up2(SOL32[`q_water_${st}_f${(f >> 1) % 4}`])]);
+  for (const st of ['0', 'v', 'h', 'f', 'i']) if (SOL32[`q_swater_${st}_f0`]) keys.push([`q_swater_${st}`, null, (f) => up2(SOL32[`q_swater_${st}_f${(f >> 1) % 4}`])]);
+  for (const st of ['0', 'v', 'h', 'f', 'i']) if (SOL32[`q_lava_${st}_f0`]) keys.push([`q_lava_${st}`, null, (f) => up2(SOL32[`q_lava_${st}_f${(f >> 2) & 1}`])]);
   const FL = [SOL32.flowerR, SOL32.flowerW, SOL32.flowerR, SOL32.flowerW], HGF = ['fleur_r', 'fleur_y', 'fleur_b', 'fleur_p'];
   const F16 = ['fleur_r', 'fleur_y', 'fleur_w', 'fleur_p'].map((k) => SOL32['s16_' + k]);
   // massifs de fleurs : celles du pack de graphismes (Noir & Blanc), sinon les fleurs dessinées de HeartGold / SoulSilver

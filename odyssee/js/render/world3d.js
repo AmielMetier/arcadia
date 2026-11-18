@@ -706,7 +706,7 @@ export class WorldView {
     if (deco?.k === 'asph') return { c: A['asph' + (deco.v ? '_' + deco.v : '')] || A.asph };
     if (deco?.k === 'sable') return { c: A.gl_sable };
     if (deco?.k === 'eau') return { anim: this.N.cells.water15 };
-    if (t === T.LAVA) return { anim: this.N.cells.lava };
+    if (t === T.LAVA) return this.N.cells.q_lava_f ? quarts('lava', (q) => q === T.LAVA, true) : { anim: this.N.cells.lava };
     // passerelle de bois au-dessus d'un ravin (montagne) : le vide dessous, planches et cordes dans le sens de la traversée
     if (t === T.BRIDGE && ravin(m, x, y)) {
       // sens de la traversée : vers les sentiers que la passerelle relie (ou le long de la passerelle)
@@ -755,7 +755,25 @@ export class WorldView {
         return { c: A['pave' + edge((q) => isPathish(q))] };
       case T.SAND: if (A.q_sand_f) return quarts('sand', (q, ax, ay) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.PINE && (q !== T.FLOWER || sandFlower(ax, ay)));
         return { c: A['sand' + edge((q) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.FLOWER && q !== T.PINE)] };
-      case T.WATER: if (this.N.cells.q_water_f) return quarts('water', (q) => q === T.WATER || q === T.BRIDGE || q === T.WHIRL, true);
+      case T.WATER: if (this.N.cells.q_water_f) {
+        const qw = quarts('water', (q) => q === T.WATER || q === T.BRIDGE || q === T.WHIRL, true);
+        if (qw.q && this.N.cells.q_swater_f) {
+          const sb = (ax, ay) => m.in(ax, ay) && (groundAt(ax, ay) === T.SAND || (desertAt(ax, ay) && groundAt(ax, ay) !== T.GRASS && groundAt(ax, ay) !== T.TALL));
+          if (sb(x - 1, y) || sb(x + 1, y) || sb(x, y - 1) || sb(x, y + 1) || sb(x - 1, y - 1) || sb(x + 1, y - 1) || sb(x - 1, y + 1) || sb(x + 1, y + 1)) {
+            const qs = quarts('swater', (q) => q === T.WATER || q === T.BRIDGE || q === T.WHIRL, true);
+            if (qs.q) return {
+              ...qw,
+              q: [
+                sb(x - 1, y) || sb(x, y - 1) || sb(x - 1, y - 1) ? qs.q[0] : qw.q[0],
+                sb(x + 1, y) || sb(x, y - 1) || sb(x + 1, y - 1) ? qs.q[1] : qw.q[1],
+                sb(x - 1, y) || sb(x, y + 1) || sb(x - 1, y + 1) ? qs.q[2] : qw.q[2],
+                sb(x + 1, y) || sb(x, y + 1) || sb(x + 1, y + 1) ? qs.q[3] : qw.q[3],
+              ],
+            };
+          }
+        }
+        return qw;
+      }
         return { anim: this.N.cells['water' + mask((q) => q === T.WATER || q === T.BRIDGE)] };
       case T.BRIDGE: { const ns = sensPont(m, x, y) === 'ns'; return { anim: this.N.cells.q_water_f || this.N.cells.water15, bridge: ns ? A.bridge : A.bridgeEW || A.bridge }; }
       // une couleur par massif (par carré de 3 × 3 cases), avec parfois une fleur d'une autre couleur
@@ -1098,11 +1116,12 @@ export class WorldView {
       const zone = m.outdoor ? m.zoneAt(x, y) : null, theme = zone?.theme;
       if (this.relief) this.reliefDehors(O0, x, y, t, zone);
       if (m.outdoor && base.get(x, y) === T.WHIRL) this.tourbillonCell(NO, base, x, y);
-      if (m.outdoor && t === T.BRIDGE && theme === 'automne') {
-        // garde-corps vermillon le long du pont, seulement sur ses bords (pas entre deux voies du même pont)
+      if (m.outdoor && t === T.BRIDGE && !ravin(m, x, y)) {
+        // garde-corps le long du pont (vermillon en automne, chêne ailleurs), seulement sur les bords extérieurs
         const ns = sensPont(m, x, y) === 'ns', pt = (a, b) => m.get(a, b) === T.BRIDGE;
-        const ha = ns ? !pt(x - 1, y) : !pt(x, y - 1), ba = ns ? !pt(x + 1, y) : !pt(x, y + 1), tex = A[`pont_rouge_${ns ? 'ns' : 'ew'}_${(ha ? 1 : 0) | (ba ? 2 : 0)}`];
-        if (tex && (ha || ba)) flat(O0, x - (ns ? 0 : 0.02), y - (ns ? 0.02 : 0), x + 1 + (ns ? 0 : 0.02), y + 1 + (ns ? 0.02 : 0), 0.0051, tex);
+        const ha = ns ? !pt(x - 1, y) : !pt(x, y - 1), ba = ns ? !pt(x + 1, y) : !pt(x, y + 1);
+        const pref = theme === 'automne' ? 'pont_rouge' : 'pont_bois', tex = A[`${pref}_${ns ? 'ns' : 'ew'}_${(ha ? 1 : 0) | (ba ? 2 : 0)}`];
+        if (tex && (ha || ba)) flat(O0, x - (ns ? 0 : 0.02), y - (ns ? 0.02 : 0), x + 1 + (ns ? 0 : 0.02), y + 1 + (ns ? 0.02 : 0), 0.015, tex);
       }
       // carpes koï : chaque case du bassin tourne et retourne le dessin (les carpes ne nagent plus toutes en rang, au pas)
       if (this.decoAt.get(x + ',' + y)?.k === 'koi') { const c = this.N.cells.koi, q = Math.floor(hash(x * 5 + 1, y * 9 + 4) * 8); flatTourne(NO, x + (hash(x * 3 + 7, y) - 0.5) * 0.6, y + (hash(x, y * 3 + 5) - 0.5) * 0.6, 0.0055, c, q & 3, q >> 2); }
@@ -1594,12 +1613,17 @@ export class WorldView {
     const z = this.map.zoneAt?.(b.x, b.y);
     const estFontaine = b.modele === 'fontaine' && BP?.styles?.fontaine;
     const estLogisPack = b.door === 1 && b.modele === 'maisonHaute';
-    const eligiblePack = BP && (estFontaine || estLogisPack || (!b.modele && !b.kit && (!b.libres?.length || b.kind === 'lab') && !(b.style === 'tower' && (b.door >= 0 || /Phare|Mirage|Centrale/i.test(b.name || '')))));
-    const choix = eligiblePack ? (estFontaine ? BP.styles.fontaine : estLogisPack ? BP.styles.house : BP.styles[b.style]) : null;
+    const specKey = b.modele && /^(chapelle|gare|mairie|bourse|casino)$/.test(b.modele) && BP?.styles?.[b.modele] ? b.modele
+      : /Centrale/i.test(b.name || '') && BP?.styles?.centrale ? 'centrale'
+      : /Serre/i.test(b.name || '') && BP?.styles?.serre ? 'serre'
+      : /Fonderie/i.test(b.name || '') && BP?.styles?.fonderie ? 'fonderie' : null;
+    const estGratteCiel = !!(b.kit?.startsWith('gc') && BP?.styles?.tower?.some((c) => BP.images[c[0]]));
+    const eligiblePack = BP && (estFontaine || estLogisPack || !!specKey || estGratteCiel || (!b.modele && !b.kit && (!b.libres?.length || b.kind === 'lab') && !(b.style === 'tower' && (b.door >= 0 || /Phare|Mirage|Centrale/i.test(b.name || '')))));
+    const choix = eligiblePack ? (specKey ? BP.styles[specKey] : estFontaine ? BP.styles.fontaine : estLogisPack ? BP.styles.house : BP.styles[b.style]) : null;
     if (choix) {
       const wCible = b.kind === 'lab' ? 6 : b.w;
       const doorRel = b.door < 0 ? null : b.door2X !== undefined ? (b.doorX + b.door2X + 1) / 2 - b.x : b.door + 0.5;
-      const depasse = ([n, w, porte]) => {
+      const depasse = ([, w, porte]) => {
         const W = w / 32, px = porte == null || doorRel == null ? null : porte / 32;
         const l0 = px == null ? (wCible - W) / 2 : doorRel - px;
         return Math.max(0, l0, wCible - (l0 + W));
@@ -1608,9 +1632,13 @@ export class WorldView {
         const [, w, porte] = c, W = w / 32, px = porte == null || doorRel == null ? null : porte / 32;
         return Math.abs(W - wCible) + (px == null ? 0 : Math.abs(px - doorRel) * 1.4) + depasse(c) * 2.2;
       };
-      const ok = choix.filter((c) => BP.images[c[0]] && Math.abs(c[1] / 32 - wCible) <= 1.6 && (doorRel == null || depasse(c) <= 0.65));
-      const best = ok.length && Math.min(...ok.map(score));
-      const pris = ok.filter((c) => score(c) <= best + 1.15);
+      const okAll = choix.filter((c) => BP.images[c[0]] && (specKey || (Math.abs(c[1] / 32 - wCible) <= 1.6 && (doorRel == null || depasse(c) <= 0.65))));
+      const tags = new Set([z?.theme, z?.town].filter(Boolean));
+      const okBio = tags.size ? okAll.filter((c) => Array.isArray(c[3]) && c[3].some((t) => tags.has(t))) : [];
+      const ok = okBio.length ? okBio : okAll.filter((c) => !c[3]);
+      const finalOk = ok.length ? ok : okAll;
+      const best = finalOk.length && Math.min(...finalOk.map(score));
+      const pris = finalOk.filter((c) => score(c) <= best + 1.15);
       const graine = (b.x * 13 + b.y * 29 + b.w * 7 + (b.roof ? b.roof.charCodeAt(0) * 5 : 0)) >>> 0;
       const pick = pris.length ? pris[graine % pris.length] : null;
       if (pick) {

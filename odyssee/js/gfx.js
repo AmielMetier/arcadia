@@ -45,11 +45,29 @@ export const PACKS = {
     chars: 'chars',           // planche des personnages de Noir & Blanc 2 (même disposition que celle du jeu)
     charRows: NB_CHAR_ROWS,   // rangées supplémentaires (au-delà des 73 de base) propres au pack Noir & Blanc
     charVariants: NB_CHAR_VARIANTS,
-    // bâtiments entiers (b_<nom>.png) par style du jeu : le jeu prend celui dont la largeur colle à l'emprise
-    batiments: Object.fromEntries(Object.entries({
-      center: ['centre'], mart: ['boutique', 'boutique_p', 'boutique_b'], gym: ['arene'], lab: ['labo'], tower: ['tour'], fontaine: ['fontaine'],
-      house: NB_MAISONS, house2: NB_MAISONS, house3: NB_MAISONS, bighouse: NB_MAISONS,
-    }).map(([st, L]) => [st, L.map((n) => [n, ...NB_BATIMENTS[n]])])),
+    // bâtiments entiers (b_<nom>.png) par style du jeu : le jeu prend celui dont la largeur colle à l'emprise (+ filtre biome)
+    batiments: (() => {
+      const m = (n, biomes = null) => (NB_BATIMENTS[n] ? [[n, ...NB_BATIMENTS[n], ...(biomes ? [biomes] : [])]] : []);
+      const mapList = (specs) => specs.flatMap((s) => (Array.isArray(s) ? m(s[0], s[1]) : m(s)));
+      const MAISONS_BIO = [
+        ['maison_desert_1', ['desert', 'dunes']], ['maison_desert_2', ['desert', 'dunes']], ['maison_desert_3', ['desert', 'dunes']], ['maison_desert_4', ['desert', 'dunes']],
+        ['maison_hiver', ['snow', 'givre', 'cime']], ['maison_neige_bl', ['snow', 'givre', 'cime']], ['maison_neige_rg', ['snow', 'givre', 'cime']], ['maison_neige_b', ['snow', 'givre', 'cime']], ['manoir_neige', ['snow', 'givre', 'cime']],
+        ['maison_mirage_1', ['mirage', 'kagura']], ['maison_mirage_2', ['mirage', 'kagura']],
+        ['maison_ombre_2', ['ombre']], ['manoir_ombre', ['ombre']], ['maison_ombre', ['ombre']],
+        ['maison_brique', ['forge']], ['maison_brique_r', ['forge']], ['atelier_brique', ['forge']], ['maison_forge_1', ['forge', 'metro', 'volta']], ['maison_forge_2', ['forge', 'metro', 'volta']],
+        ['maison_ville_rg', ['metro', 'volta']], ['maison_ville_bl', ['metro', 'volta']], ['maison_ville_ve', ['metro', 'volta']], ['maison_a_bl', ['metro', 'volta']], ['maison_f_bleue', ['metro', 'volta']], ['maison_bleue', ['metro', 'volta']], ['maison_c_ve', ['metro', 'volta']], ['maison_g', ['metro', 'volta']], ['maison_g_ocre', ['metro', 'volta']], ['manoir', ['metro', 'volta']],
+        ...NB_MAISONS,
+      ];
+      return {
+        center: mapList([['centre_desert', ['desert', 'dunes']], ['centre_neige', ['snow', 'givre', 'cime']], ['centre_mirage', ['mirage', 'kagura']], 'centre']),
+        mart: mapList([['boutique_desert', ['desert', 'dunes']], ['boutique_neige', ['snow', 'givre', 'cime']], ['boutique_neige_b', ['snow', 'givre', 'cime']], 'boutique', 'boutique_p', 'boutique_b']),
+        gym: mapList(['arene']), lab: mapList(['labo']), fontaine: mapList(['fontaine']),
+        tower: mapList([['fonderie', ['forge']], ['fonderie_b', ['forge']], ['tour_brique', ['forge', 'metro', 'volta']], ['atelier_brique', ['forge', 'metro', 'volta']], ['tour_jaune', ['metro', 'volta']], ['tour_vitre', ['metro', 'volta']], 'tour', 'tour_jaune', 'tour_vitre', 'tour_brique']),
+        house: mapList(MAISONS_BIO), house2: mapList(MAISONS_BIO), house3: mapList(MAISONS_BIO), bighouse: mapList(MAISONS_BIO),
+        chapelle: mapList(['chapelle']), gare: mapList(['gare']), mairie: mapList(['mairie']), bourse: mapList(['bourse']), casino: mapList(['casino']),
+        centrale: mapList(['centrale']), serre: mapList(['serre']), fonderie: mapList(['fonderie', 'fonderie_b']),
+      };
+    })(),
   },
 };
 
@@ -69,7 +87,7 @@ export function choisirSprites(id) { if (SPRITES_CHOIX.some((s) => s.id === id))
 /** crédits affichés dans Options → Crédits graphismes */
 export const CREDITS = [
   ['Sol « Pokémon Lumineux »', 'Tuiles de Flurmimon (planche « Bright »), adaptées par Bivurnum — Team Aqua\'s Asset Repo.'],
-  ['Graphismes « Noir & Blanc »', 'Sol, mer, arbres, bâtiments et personnages : kit « Pokémon Essentials BW » de KleinStudio et ressources Pokémon Essentials Gen 5 (FloofyPanthar ; © Nintendo / Game Freak / Creatures). Lave : Phyromatical. Compléments désert, grottes et sanctuaires : Magiscarf, J-Treecko252, TerribleJared, RisingTempest3.'],
+  ['Graphismes « Noir & Blanc »', 'Sol, mer, arbres, bâtiments, intérieurs et personnages : kit « Pokémon Essentials BW » de KleinStudio et ressources Pokémon Essentials Gen 5 (FloofyPanthar ; © Nintendo / Game Freak / Creatures). Lave : Phyromatical. Compléments désert, grottes et sanctuaires : Magiscarf, J-Treecko252, TerribleJared, Anarlaurendil, RisingTempest3, JavaPlume.'],
   ['Sprites Noir & Blanc', 'Sprites des jeux Pokémon © Nintendo / Game Freak / Creatures, récupérés par PokeAPI (projet PokeAPI/sprites).'],
   ['Sprites HeartGold / SoulSilver', 'Même source : PokeAPI/sprites.'],
   ['Utilisation', 'Projet de fans sans but lucratif. Les artistes restent propriétaires de leurs créations.'],
