@@ -127,12 +127,36 @@ const WIDE_DECO = new Set(['healer', 'sofa', 'bench', 'startertable', 'fireplace
 const OMBRE_DECO = new Set(['banc', 'parasol', 'tonneau', 'caisse', 'caisses', 'panneau_bois', 'borne', 'lanterne', 'stele', 'palm', 'cactus', 'cactus2', 'cerisier', 'erable', 'arbre_automne', 'deadtree', 'gargouille', 'rocher_grand', 'statue_dragon', 'colonne']);
 /** avance : le sprite est rangé comme s'il se tenait `avance` case plus au sud (personnages : leurs pieds passent devant
  *  le perron, les marches et le socle du bâtiment qui dépassent sur leur case, sans changer l'ordre entre personnages) */
-function screenSprite(mat, avance = 0, avecTrame = false) {
+/** dessin d'un bâtiment du pack en trois bandes verticales (débord gauche, emprise, débord droit), une seule image :
+ *  mêmes sommets à l'écran, seule la profondeur des débords change (attribut aAvance). x0 : bord gauche du dessin (monde),
+ *  e0 / e1 : bords de l'emprise, recul : décalage de profondeur des débords (vers le nord, négatif) */
+function bandesPack(W, H, largeurPx, x0, e0, e1, recul) {
+  const cols = [0, 1];
+  for (const e of [e0, e1]) { const u = Math.round(((e - x0) / W) * largeurPx) / largeurPx; if (u > 0.002 && u < 0.998) cols.push(u); }
+  cols.sort((a, b) => a - b);
+  const pos = [], uv = [], av = [], idx = [];
+  for (let k = 0; k + 1 < cols.length; k++) {
+    const u0 = cols[k], u1 = cols[k + 1], milieu = x0 + ((u0 + u1) / 2) * W, dedans = milieu > e0 && milieu < e1;
+    const xa = (u0 - 0.5) * W, xb = (u1 - 0.5) * W, n = pos.length / 3;
+    pos.push(xa, H, 0, xb, H, 0, xa, 0, 0, xb, 0, 0);
+    uv.push(u0, 1, u1, 1, u0, 0, u1, 0);
+    for (let q = 0; q < 4; q++) av.push(dedans ? 0 : recul);
+    idx.push(n, n + 2, n + 1, n + 2, n + 3, n + 1);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('aAvance', new THREE.Float32BufferAttribute(av, 1));
+  g.setAttribute('anchor', new THREE.Float32BufferAttribute(new Array(pos.length).fill(0), 3));
+  g.setIndex(idx);
+  return g;
+}
+function screenSprite(mat, avance = 0, avecTrame = false, avanceParSommet = false) {
   mat.onBeforeCompile = (sh) => {
     if (avecTrame) trame(mat, sh);
     sh.uniforms.uRes = SPRITE_UNIFORMS.uRes; sh.uniforms.uEch = SPRITE_UNIFORMS.uEch;
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec3 anchor;\nuniform vec2 uRes;\nuniform float uEch;')
+      .replace('#include <common>', '#include <common>\nattribute vec3 anchor;\nuniform vec2 uRes;\nuniform float uEch;' + (avanceParSommet ? '\nattribute float aAvance;' : ''))
       .replace('#include <project_vertex>', `
         vec4 sW = modelMatrix * vec4( transformed, 1.0 );
         vec4 sA = modelMatrix * vec4( anchor, 1.0 );
@@ -146,9 +170,10 @@ function screenSprite(mat, avance = 0, avecTrame = false) {
         // Le décalage rapproche le sprite de la caméra : s'il l'éloignait, le sol passerait devant le bas du dessin (les pieds)
         float sBias = - ( 64.0 - mod( sA.x, 64.0 ) ) * 2.0e-6;
         ${avance ? `vec4 sAv = projectionMatrix * viewMatrix * ( sW + vec4( 0.0, 0.0, ${avance.toFixed(3)}, 0.0 ) ); sPC.z = sAv.z / sAv.w * sPC.w;` : ''}
+        ${avanceParSommet ? 'vec4 sAvS = projectionMatrix * viewMatrix * ( sW + vec4( 0.0, 0.0, aAvance, 0.0 ) ); sPC.z = sAvS.z / sAvS.w * sPC.w;' : ''}
         gl_Position = vec4( ( sPx / uRes * 2.0 - 1.0 ) * sPC.w, sPC.z + sBias * sPC.w, sPC.w );`);
   };
-  mat.customProgramCacheKey = () => 'screenSprite' + avance + (avecTrame ? 'T' : '');
+  mat.customProgramCacheKey = () => 'screenSprite' + avance + (avecTrame ? 'T' : '') + (avanceParSommet ? 'V' : '');
   return mat;
 }
 /**
@@ -1680,9 +1705,10 @@ export class WorldView {
         const W = im.width * WPX / 2, H = im.height * HPX / 2;
         const px = porte == null || doorRel == null ? null : porte / 32;
         const left = px == null ? b.x + (wCible - W) / 2 : b.x + doorRel - px;
-        const mat = screenSprite(new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide }), 0, true);
+        const enBandes = !(b.modele === 'maisonL' && n === 'maison_l');
+        const mat = screenSprite(new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide }), 0, true, enBandes);
         mat.userData.ownTint = true; this.tinted.push(mat); mat.color.copy(this.tint);
-        if (b.modele === 'maisonL' && n === 'maison_l') {
+        if (!enBandes) {
           const wingGeo = (w, h, u0, u1, v0, v1) => {
             const gg = new THREE.PlaneGeometry(w, h); gg.translate(0, h / 2, 0);
             gg.setAttribute('anchor', new THREE.Float32BufferAttribute(new Array(12).fill(0), 3));
@@ -1697,10 +1723,11 @@ export class WorldView {
           g.userData.ecran = { zN: -im.height / 32, x0: left - b.x, x1: left + wl - b.x };
           this.root.add(g); this.buildingMeshes.push(g); return;
         }
-        const geo = new THREE.PlaneGeometry(W, H); geo.translate(0, H / 2, 0);
-        geo.setAttribute('anchor', new THREE.Float32BufferAttribute(new Array(12).fill(0), 3));
         const az = b.door >= 0 && b.doorY != null ? b.doorY + 1 : b.y + b.d;
         const ax = Math.round((left + W / 2) * 32) / 32;
+        // le dessin déborde parfois un peu de l'emprise (avant-toit, gouttière, perron) : ces colonnes prennent la profondeur
+        // de l'arrière du bâtiment, pour qu'un personnage qui se tient juste à côté passe devant (et pas à moitié derrière)
+        const geo = bandesPack(W, H, im.width, ax - W / 2, b.x, b.x + wCible, b.y - az - 0.05);
         const me = new THREE.Mesh(geo, mat); me.position.set(ax, hb, az); me.frustumCulled = false; g.add(me); g.userData.b = b; g.userData.pack = true;
         // le dessin dépasse l'emprise vers le nord : il s'estompe quand on passe derrière lui (toute sa hauteur, toute sa largeur)
         g.userData.ecran = { zN: (az - b.y) - im.height / 32, x0: ax - W / 2 - b.x, x1: ax + W / 2 - b.x };

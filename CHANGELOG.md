@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 5.119 — 18 novembre 2026
+- **Odyssée** — Cinématiques des légendaires et des boss retravaillées :
+  - le légendaire s'élève d'abord en silhouette noire, puis se révèle en couleur dans un éclair blanc ;
+  - les auras, les éclairs, les rubans d'énergie et le sceau rayonnent d'une vraie lueur, qui s'emballe au bris du sceau et à l'apogée ;
+  - la caméra glisse sans à-coup d'un plan à l'autre et se resserre sur l'adversaire juste avant le combat ;
+  - chaque éclair illumine toute la scène, et le Pokémon ou le dresseur reste net au milieu de son aura.
+- **Odyssée** — Poker multijoueur : la table ne se fige plus quand l'hôte la ferme ou qu'un joueur n'a plus de jetons. Sans jetons, on reste à table pour regarder la main et on peut partir à la fin de chaque main.
+- **Odyssée** — Graphismes Noir & Blanc : un personnage qui se tient juste à côté d'un bâtiment n'est plus à moitié caché par le bord du toit.
+
 ## 5.118 — 18 novembre 2026
 - **Odyssée** — Combats Duo (2v2) et Trio (3v3) plus solides :
   - un combat ne s'interrompt plus (« Le combat a été interrompu ») quand un Pokémon est mis K.O. alors que son dresseur n'a plus de remplaçant ;

@@ -179,11 +179,9 @@ async function runPokerTableLoop(game, T, { mySeat = 0, joueurs, bouton = 0, rng
       if (net) {
         const okHand = await net.syncStartHand(handNo, t.joueurs);
         if (!okHand) break;
-        if (t.joueurs[mySeat].jetons < GROSSE) {
-          T.msg('Tu n\'as plus assez de jetons pour payer la blinde.');
-          await T.pause(1100);
-          break;
-        }
+        // plus un jeton : on reste à table pour regarder (on peut partir à la fin de chaque main) ;
+        // une petite pile paie ce qu'elle peut de la blinde et joue à tapis
+        if (t.joueurs[mySeat].jetons <= 0) { T.msg('Tu n\'as plus de jetons : tu regardes cette main.'); await T.pause(900); }
       }
       if (t.joueurs.filter((p) => p.jetons > 0).length < 2) {
         T.msg('Plus assez de joueurs avec des jetons.');
@@ -224,7 +222,8 @@ async function runPokerTableLoop(game, T, { mySeat = 0, joueurs, bouton = 0, rng
             a = { type: 'coucher' };
             quitter = true;
           }
-          await net.broadcastMyAction(handNo, stepSeq, i, a, wantLeave);
+          const relaye = await net.broadcastMyAction(handNo, stepSeq, i, a, wantLeave);
+          if (!relaye && !wantLeave) { T.msg('La table a été fermée.'); await T.pause(900); quitter = true; break; }
           if (wantLeave) {
             t.joueurs[mySeat].ia = true;
             H.agir(t, a);
@@ -338,6 +337,7 @@ export function createPokerNet(game, { rid, isHost, hostId, peerIds, peerSeats, 
   const handRng = (handNo) => seededRng((seedBase ^ ((handNo + 1) * 0x9e3779b9)) >>> 0);
   let peers = peerIds.map((pid, idx) => ({ pid, seat: peerSeats[idx] }));
   const dropSeat = (seat) => { peers = peers.filter((q) => q.seat !== seat); };
+  let quitte = false;   // départ déjà annoncé à l'hôte
 
   return {
     handRng,
@@ -359,15 +359,19 @@ export function createPokerNet(game, { rid, isHost, hostId, peerIds, peerSeats, 
         for (const q of peers) link.send(q.pid, { t: 'poker', rid, step: 'act-go', handNo, seq, seat, act, seatLeft: leave });
       } else {
         link.send(hostId, { t: 'poker', rid, step: 'act', handNo, seq, seat, act, leave });
-        if (!leave) await link.wait(hostId, (q) => q.t === 'poker' && q.rid === rid && q.step === 'act-go' && q.handNo === handNo && q.seq === seq, 30000);
+        if (leave) { quitte = true; return true; }
+        // l'hôte relaie le coup à toute la table ; s'il ferme la table entre-temps, on ne l'attend pas
+        const go = await link.wait(hostId, (q) => q.t === 'poker' && q.rid === rid && ((q.step === 'act-go' && q.handNo === handNo && q.seq === seq) || q.step === 'close'), 30000);
+        return go.t === 'poker' && go.step === 'act-go';
       }
+      return true;
     },
     async waitSeatAction(handNo, seq, seat) {
       if (isHost) {
         const entry = peers.find((q) => q.seat === seat);
-        const msg = entry ? await link.wait(entry.pid, (q) => q.t === 'poker' && q.rid === rid && q.step === 'act' && q.handNo === handNo && q.seq === seq, 90000) : { t: 'left' };
-        const seatLeft = msg.t !== 'poker' || !!msg.leave;
-        const act = msg.t === 'poker' ? msg.act : null;
+        const msg = entry ? await link.wait(entry.pid, (q) => q.t === 'poker' && q.rid === rid && ((q.step === 'act' && q.handNo === handNo && q.seq === seq) || q.step === 'leave'), 90000) : { t: 'left' };
+        const seatLeft = msg.t !== 'poker' || msg.step === 'leave' || !!msg.leave;
+        const act = msg.t === 'poker' && msg.step === 'act' ? msg.act : null;
         if (seatLeft) dropSeat(seat);
         for (const q of peers) link.send(q.pid, { t: 'poker', rid, step: 'act-go', handNo, seq, seat, act, seatLeft });
         return { act, seatLeft };
@@ -379,11 +383,11 @@ export function createPokerNet(game, { rid, isHost, hostId, peerIds, peerSeats, 
     async syncNextHand(handNo, wantStay, seat) {
       if (isHost) {
         const snapshot = [...peers];
-        const res = await Promise.all(snapshot.map((entry) => link.wait(entry.pid, (q) => q.t === 'poker' && q.rid === rid && q.step === 'next' && q.handNo === handNo, 60000).then((q) => ({ seat: entry.seat, pid: entry.pid, q }))));
+        const res = await Promise.all(snapshot.map((entry) => link.wait(entry.pid, (q) => q.t === 'poker' && q.rid === rid && ((q.step === 'next' && q.handNo === handNo) || q.step === 'leave'), 60000).then((q) => ({ seat: entry.seat, pid: entry.pid, q }))));
         const leftSeats = [];
         let humanStayers = wantStay ? 1 : 0;
         for (const { seat: sl, q } of res) {
-          if (q.t === 'poker' && q.stay) humanStayers++;
+          if (q.t === 'poker' && q.step === 'next' && q.stay) humanStayers++;
           else leftSeats.push(sl);
         }
         const ok = wantStay && humanStayers >= 2;
@@ -392,13 +396,15 @@ export function createPokerNet(game, { rid, isHost, hostId, peerIds, peerSeats, 
         return { ok, leftSeats };
       }
       link.send(hostId, { t: 'poker', rid, step: 'next', handNo, seat, stay: wantStay });
-      if (!wantStay) return { ok: false, leftSeats: [] };
+      if (!wantStay) { quitte = true; return { ok: false, leftSeats: [] }; }
       const msg = await link.wait(hostId, (q) => q.t === 'poker' && q.rid === rid && ((q.step === 'next-go' && q.handNo === handNo) || q.step === 'close'), 65000);
       if (msg.t !== 'poker' || msg.step !== 'next-go') return { ok: false };
       return { ok: !!msg.ok && wantStay, leftSeats: msg.leftSeats || [] };
     },
     closeTable() {
       if (isHost) for (const q of peers) link.send(q.pid, { t: 'poker', rid, step: 'close' });
+      // un invité qui part sans l'avoir annoncé (table fermée, erreur…) prévient l'hôte, qui ne l'attend plus
+      else if (!quitte) { quitte = true; link.send(hostId, { t: 'poker', rid, step: 'leave', seat: mySeat }); }
     },
   };
 }

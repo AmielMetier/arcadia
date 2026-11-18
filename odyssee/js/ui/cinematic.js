@@ -664,7 +664,7 @@ export function buildShadowLugia3D(THREE, spriteImg, cfg = PRESET_DEFS.shadow) {
 /**
  * Moteur de scène 3D Three.js unifié pour tout boss et légendaire d'Odyssée.
  */
-export function createBoss3DScene(THREE, container, spriteImg, cfgInput = PRESET_DEFS.shadow) {
+export function createBoss3DScene(THREE, container, spriteImg, cfgInput = PRESET_DEFS.shadow, fx = null) {
   const cfg = { ...PRESET_DEFS.shadow, ...cfgInput };
   const dur = cfg.duration || 6.4;
   const isShadowFull = !!cfg.isShadowFull;
@@ -697,6 +697,22 @@ export function createBoss3DScene(THREE, container, spriteImg, cfgInput = PRESET
   const coreLight = new THREE.PointLight(cfg.pillarGlow, 3.8, 34);
   coreLight.position.set(0, 1.5, 0);
   scene.add(hemiLight, rimLight, fillLight, coreLight);
+  const hemiBase = hemiLight.intensity;
+
+  // lueur (bloom) : les auras, éclairs, rubans et le sceau rayonnent ; sans les modules de post-traitement, rendu direct
+  let composer = null, bloom = null;
+  if (fx?.EffectComposer) {
+    try {
+      composer = new fx.EffectComposer(renderer);
+      composer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+      composer.setSize(initW, initH);
+      composer.addPass(new fx.RenderPass(scene, camera));
+      bloom = new fx.UnrealBloomPass(new THREE.Vector2(initW / 2, initH / 2), 0.3, 0.42, 0.86);
+      composer.addPass(bloom);
+      composer.addPass(new fx.OutputPass());
+    } catch (e) { composer = null; bloom = null; }
+  }
+  let bloomKick = 0, eclairLum = 0;
 
   // Corps céleste (Éclipse / Soleil / Aurore / Galaxie)
   const skyGroup = new THREE.Group();
@@ -814,14 +830,46 @@ export function createBoss3DScene(THREE, container, spriteImg, cfgInput = PRESET
     }
     b.line.geometry.attributes.position.needsUpdate = true;
     b.life = 0.2;
+    eclairLum = Math.max(eclairLum, 0.7 + Math.random() * 0.5);   // l'éclair illumine toute la scène un instant
   };
 
   let prismBroken = false;
+  let climaxDone = false, vague2 = false;
   let burstAt = -1;
   let waveIdx = 0;
   let shockwave = 0;
+  // avec la lueur, le Pokémon (ou le dresseur) est dessiné après elle : net et éclatant au milieu de son aura
+  if (composer) subject.sprite.layers.set(1);
   const baseScaleX = subject.sprite.scale.x;
   const baseScaleY = subject.sprite.scale.y;
+  // apparition en silhouette (légendaires et boss Pokémon) : il monte en ombre, puis se révèle en couleur dans un éclair
+  const silhouette = cfg.kind !== 'trainer';
+  const ascentSpanR = isShadowFull ? 1.5 : Math.max(0.75, dur * 0.2);
+  const revealAt = silhouette ? awakenAt + ascentSpanR * 0.9 : -1;
+  let revealed = !silhouette;
+  if (silhouette) subject.sprite.material.color.setRGB(0.04, 0.03, 0.08);
+
+  // caméra : positions clés reliées par une courbe (Catmull-Rom), sans à-coup d'une phase à l'autre
+  // [instant, angle, rayon, hauteur, hauteur visée]
+  const camKeys = [
+    [0, -0.42, 11.4, 2.6, 0.6],
+    [shatterAt, 0.23, 9.2, 2.2, 0.8],
+    [(shatterAt + climaxAt) / 2, 0.62, 10.3, 2.6, 1.05],
+    [climaxAt, 0.96, 9.0, 3.2, 1.15],
+    [dur, 0.48, 6.9, 2.5, 1.25],
+  ];
+  const camAt = (t) => {
+    const K = camKeys, n = K.length;
+    let i = 0; while (i < n - 2 && t > K[i + 1][0]) i++;
+    const u = Math.max(0, Math.min(1, (t - K[i][0]) / Math.max(0.001, K[i + 1][0] - K[i][0])));
+    const p0 = K[Math.max(0, i - 1)], p1 = K[i], p2 = K[i + 1], p3 = K[Math.min(n - 1, i + 2)];
+    const out = [];
+    for (let c = 1; c < 5; c++) {
+      const a = p0[c], b = p1[c], d = p2[c], e = p3[c];
+      out.push(0.5 * ((2 * b) + (-a + d) * u + (2 * a - 5 * b + 4 * d - e) * u * u + (-a + 3 * b - 3 * d + e) * u * u * u));
+    }
+    return out;
+  };
 
   const resize = () => {
     const w = Math.max(320, container.clientWidth || 800);
@@ -829,6 +877,7 @@ export function createBoss3DScene(THREE, container, spriteImg, cfgInput = PRESET
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
+    if (composer) { composer.setSize(w, h); bloom?.resolution?.set(w / 2, h / 2); }
   };
 
   const update = (t, dt) => {
@@ -865,6 +914,7 @@ export function createBoss3DScene(THREE, container, spriteImg, cfgInput = PRESET
       });
       shockRings[waveIdx++ % 3].age = 0;
       shockwave = 0.85;
+      bloomKick = 0.75;
       coreLight.intensity = 10;
     }
 
@@ -910,6 +960,13 @@ export function createBoss3DScene(THREE, container, spriteImg, cfgInput = PRESET
         subject.root.position.set(0, bobY, 0);
       }
       subject.sprite.scale.set(baseScaleX * sc, baseScaleY * sc, 1);
+      // révélation : l'ombre prend ses couleurs dans un éclair blanc (la lueur et le halo s'emballent un instant)
+      if (!revealed && t >= revealAt) { revealed = true; bloomKick = Math.max(bloomKick, 0.6); shockRings[waveIdx++ % 3].age = 0; shockwave = Math.max(shockwave, 0.4); }
+      if (silhouette) {
+        const k = revealed ? Math.min(1, (t - revealAt) / 0.35) : 0;
+        const kk = k * k * (3 - 2 * k);
+        subject.sprite.material.color.setRGB(0.04 + 0.96 * kk, 0.03 + 0.97 * kk, 0.08 + 0.92 * kk);
+      }
       const glowPulse = 1 + Math.sin(t * 7.2) * 0.08 + (t >= surgeAt ? 0.14 : 0);
       subject.glowBack.scale.set(7.4 * sc * glowPulse, 7.4 * sc * glowPulse, 1);
       subject.auraOuter.scale.set(6.4 * sc * glowPulse, 6.4 * sc * glowPulse, 1);
@@ -925,8 +982,8 @@ export function createBoss3DScene(THREE, container, spriteImg, cfgInput = PRESET
     });
 
     // Ondes de choc
-    if (isShadowFull && Math.abs(t - 6.4) < 0.06 && waveIdx < 2) { shockRings[1].age = 0; waveIdx = 2; }
-    if (Math.abs(t - climaxAt) < 0.06 && waveIdx < 3) { shockRings[2].age = 0; waveIdx = 3; shockwave = 0.55; }
+    if (isShadowFull && t >= 6.4 && !vague2) { vague2 = true; shockRings[waveIdx++ % 3].age = 0; }
+    if (t >= climaxAt && !climaxDone) { climaxDone = true; shockRings[waveIdx++ % 3].age = 0; shockwave = 0.55; bloomKick = Math.max(bloomKick, 0.5); }
     shockRings.forEach((sr) => {
       if (sr.age < 0) return;
       sr.age += clampedDt;
@@ -969,43 +1026,45 @@ export function createBoss3DScene(THREE, container, spriteImg, cfgInput = PRESET
       else b.line.material.opacity = 0;
     });
 
-    // Caméra dynamique contenue dans rad = 14.2 (<= 11.8)
-    let angle = -0.3 + t * 0.24, radius = 11.4, camY = 2.5, targetY = 1.0;
-    if (t < shatterAt) {
-      const f = t / shatterAt;
-      angle = -0.42 + f * 0.65;
-      radius = 11.4 - f * 2.2;
-      camY = 2.6 - f * 0.4;
-      targetY = 0.6;
-    } else if (t < climaxAt) {
-      const f = (t - shatterAt) / Math.max(0.8, climaxAt - shatterAt);
-      angle = 0.24 + f * 0.72;
-      radius = 9.0 + Math.sin(f * Math.PI) * 1.4;
-      camY = 1.9 + f * 1.3;
-      targetY = 1.1;
-    } else {
-      const f = Math.min(1, (t - climaxAt) / Math.max(0.8, dur - climaxAt));
-      angle = 0.96 - f * 0.48;
-      radius = 8.4 - f * 1.7;
-      camY = 3.2 - f * 0.7;
-      targetY = 1.25;
-    }
+    // Caméra : trajet continu entre les positions clés, tremblement doux (somme de sinus plutôt que du bruit image par image)
+    const [angle, radius, camY, targetY] = camAt(t);
     if (shockwave > 0) shockwave = Math.max(0, shockwave - clampedDt * 1.6);
+    const sx = (Math.sin(t * 47.0) + Math.sin(t * 29.3 + 1.7)) * 0.5, sy = (Math.sin(t * 41.0 + 0.6) + Math.sin(t * 23.9 + 2.9)) * 0.5;
     camera.position.set(
-      Math.sin(angle) * radius + (Math.random() - 0.5) * shockwave * 0.6,
-      camY + (Math.random() - 0.5) * shockwave * 0.6,
+      Math.sin(angle) * radius + sx * shockwave * 0.32,
+      camY + sy * shockwave * 0.32,
       Math.cos(angle) * radius
     );
+    // dernière demi-seconde : le cadre se resserre sur le Pokémon (passage au combat)
+    const punch = Math.max(0, Math.min(1, (t - (dur - 0.55)) / 0.55));
+    const fov = 52 - punch * punch * 9;
+    if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
     camera.lookAt(0, targetY, 0);
-    renderer.render(scene, camera);
+    // éclairs qui illuminent la scène, lueur qui respire et s'emballe aux grands moments
+    eclairLum = Math.max(0, eclairLum - clampedDt * 6);
+    hemiLight.intensity = hemiBase * (1 + eclairLum * 2.2);
+    bloomKick = Math.max(0, bloomKick - clampedDt * 1.9);
+    if (bloom) {
+      bloom.strength = 0.28 + (t >= surgeAt ? 0.08 : 0) + Math.sin(t * 3.1) * 0.03 + bloomKick + eclairLum * 0.2;
+      composer.render(clampedDt);
+      renderer.autoClear = false;
+      renderer.clearDepth();
+      const fond = scene.background; scene.background = null;   // sinon le fond repeint toute l'image
+      camera.layers.set(1);
+      renderer.render(scene, camera);
+      camera.layers.set(0);
+      scene.background = fond;
+      renderer.autoClear = true;
+    } else renderer.render(scene, camera);
   };
 
   const dispose = () => {
+    try { bloom?.dispose?.(); composer?.dispose?.(); } catch (e) {}
     try { renderer.dispose(); } catch (e) {}
     try { if (renderer.domElement?.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement); } catch (e) {}
   };
 
-  return { update, resize, dispose };
+  return { update, resize, dispose, revealAt };
 }
 
 /** Alias rétrocompatible pour Shadow Lugia */
@@ -1122,7 +1181,13 @@ export async function playBossCinematic(game, opts = {}) {
   if (host3D) {
     try {
       const THREE = await import('three');
-      sceneCtrl = createBoss3DScene(THREE, host3D, spriteImg, cfg);
+      let fx = null;
+      try {
+        const base = '../../../shared/vendor/three/jsm/postprocessing/';
+        const [ec, rp, ub, op] = await Promise.all([import(base + 'EffectComposer.js'), import(base + 'RenderPass.js'), import(base + 'UnrealBloomPass.js'), import(base + 'OutputPass.js')]);
+        fx = { EffectComposer: ec.EffectComposer, RenderPass: rp.RenderPass, UnrealBloomPass: ub.UnrealBloomPass, OutputPass: op.OutputPass };
+      } catch (e) { fx = null; }
+      sceneCtrl = createBoss3DScene(THREE, host3D, spriteImg, cfg, fx);
       hasWebGL = true;
     } catch (e) { hasWebGL = false; }
   }
@@ -1151,6 +1216,7 @@ export async function playBossCinematic(game, opts = {}) {
     let flashed = false;
     let titleIn = false;
     let titleOut = false;
+    let revealFlashed = false;
 
     const finish = () => {
       cleanupAll();
@@ -1193,6 +1259,12 @@ export async function playBossCinematic(game, opts = {}) {
           flashEl.style.opacity = '0.92';
           setTimeout(() => { if (flashEl) flashEl.style.opacity = '0'; }, 120);
         }
+      }
+      if (!revealFlashed && sceneCtrl?.revealAt > 0 && t >= sceneCtrl.revealAt && flashEl) {
+        revealFlashed = true;
+        flashEl.style.background = '#ffffff';
+        flashEl.style.opacity = '0.75';
+        setTimeout(() => { if (flashEl) flashEl.style.opacity = '0'; }, 90);
       }
       if (!titleIn && t >= titleInTime) {
         titleIn = true;
