@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 5.110 — 18 novembre 2026
+- **Odyssée** — Cinq nouvelles activités multijoueurs dans la région et au Dojo :
+  - **Raids de Boss Co-op** (exclusivement à 2 ou 3 joueurs) face à un Boss géant doté d'un Bouclier Mystique et de 2 actions par tour, avec Points du Dojo, Super Bonbons et possibilité de capturer le Boss après la victoire.
+  - **Combat Multi 2v2 à 4 joueurs** : deux équipes de deux dresseurs humains s'affrontent en direct (1 Pokémon actif et 1 remplaçant chacun).
+  - **Tournoi en direct à 4 places** au Dojo et au Club Tactique : tableau éliminatoire complété au besoin par les Champions de la région, suivi des matchs en cours en mode Spectateur et récompenses pour le vainqueur et le finaliste.
+  - **Tables de Poker Texas Hold'em multijoueurs** au Casino de Métropole (2 à 4 joueurs humains autour du tapis, avec place tournante et jetons de courtoisie).
+  - **Visite du Domaine des amis & Dresseur Gardien** : visite le Domaine bâti d'un ami connecté, récupère son panier d'accueil (Baies Sitrus et matériaux) et défie son équipe Gardienne en Duel ou en Duo.
+
 ## 5.109 — 18 novembre 2026
 - **Odyssée & Poké Duel** — Intelligence artificielle de combat nettement renforcée en Solo (1v1), Duo (2v2) et Trio (3v3) : les dresseurs et bots envoient désormais le meilleur remplaçant disponible après un K.O. (selon les résistances de types, talents et contre-attaques), savent rappeler un Pokémon bloqué sur une immunité ou totalement contré, réagissent aux menaces de K.O. rapide avec leurs attaques prioritaires ou `Abri`, exploitent les capacités multi-coups et à dégâts fixes avec précision, évitent les altérations d'état et baisses de stats inutiles face aux talents ou écrans protecteurs, et coordonnent leurs cibles ainsi que leur contrôle de vitesse en combats à plusieurs.
 

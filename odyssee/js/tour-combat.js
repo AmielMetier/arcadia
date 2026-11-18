@@ -124,8 +124,10 @@ export async function tourCombat(game, n) {
 export async function clubCombat(game, n) {
   const st = game.state, ui = game.ui, who = { speaker: 'Coach Tactique', face: n.sprite };
   await ui.say(['Bienvenue au Club Tactique Duo & Trio !', 'Ici, tu peux t\'entraîner en combat Duo (2v2) ou Trio (3v3) face à des équipes adaptées à ton niveau, sans risque.'], who);
-  const choice = await ui.ask('Quel entraînement veux-tu lancer ?', ['Duo (2v2)', 'Trio (3v3)', 'Solo (1v1)', 'Règles Duo/Trio', 'Plus tard'], who);
-  if (choice === 3) {
+  const choice = await ui.ask('Quel entraînement ou événement veux-tu lancer ?', ['Duo (2v2)', 'Trio (3v3)', 'Solo (1v1)', 'Tournoi en direct (4p)', 'Multi 2v2 (4 joueurs)', 'Règles Duo/Trio', 'Plus tard'], who);
+  if (choice === 3) { const m = await import('./multi-events.js'); return m.lancerTournoiSalon(game); }
+  if (choice === 4) { const m = await import('./multi-events.js'); return m.lancerMulti4p(game); }
+  if (choice === 5) {
     await ui.say([
       'En Duo (2v2), deux Pokémon combattent côte à côte : attention aux capacités de zone comme Séisme ou Surf qui peuvent toucher ton allié !',
       'En Trio (3v3), trois Pokémon entrent en scène. Les attaques de mêlée ne visent que les adversaires en face ou voisins ; les capacités spéciales, de type Vol ou les rayons atteignent tout le terrain.',

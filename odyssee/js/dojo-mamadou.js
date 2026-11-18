@@ -424,7 +424,7 @@ export async function dojoBoutique(game, n) {
 /* ======================================================================
    Sélection des 2 Pokémon du joueur (1 Titulaire sur le terrain + 1 Réserve)
    ====================================================================== */
-async function pickDojoPair(game, who) {
+export async function pickDojoPair(game, who) {
   const lead = await partyScreen(game, {
     mode: 'pick',
     prompt: 'Choisis ton Pokémon titulaire (sur le terrain) :',
@@ -444,9 +444,9 @@ async function pickDojoPair(game, who) {
 }
 
 /* ======================================================================
-   Attente multijoueur multi-pairs coordonnée par l'hôte (2 ou 3 joueurs)
+   Attente multijoueur multi-pairs coordonnée par l'hôte (2 à 4 joueurs)
    ====================================================================== */
-async function hostWaitAll(game, peerIds, predFn, waitText, allowAbort = true) {
+export async function hostWaitAll(game, peerIds, predFn, waitText, allowAbort = true) {
   const link = game.link, ui = game.ui;
   const box = ui.dialogBox();
   ui.typePage(box, `${waitText}${allowAbort ? ' (Échap : annuler)' : ''}`, { last: true });
@@ -461,7 +461,7 @@ async function hostWaitAll(game, peerIds, predFn, waitText, allowAbort = true) {
   }
 }
 
-async function guestWaitHost(game, hostId, pred, waitText, allowAbort = true) {
+export async function guestWaitHost(game, hostId, pred, waitText, allowAbort = true) {
   const link = game.link, ui = game.ui;
   const box = ui.dialogBox();
   ui.typePage(box, `${waitText}${allowAbort ? ' (Échap : annuler)' : ''}`, { last: true });
@@ -476,6 +476,115 @@ async function guestWaitHost(game, hostId, pred, waitText, allowAbort = true) {
 }
 
 /**
+ * Fabrique l'adaptateur réseau lockstep pour `BattleView.runCoopDojo`.
+ * Partagé par le Dojo de Mamadou, les Raids Co-op et le Multi 2v2 à 4 joueurs.
+ */
+export function createCoopNet(game, { rid, isHost, hostId, peerIds = [], ownerNames = [], mySlot = 0, foeName = '', msgTag = 'dojo', slotOfPeer = null }) {
+  const link = game.link, ui = game.ui, st = game.state;
+  const peerSlot = (idx) => (slotOfPeer ? slotOfPeer(idx) : idx + 1);
+  const peerNameBySlot = (sl) => ownerNames[sl] || `Dresseur ${Number(sl) + 1}`;
+  const sendQuitToRoom = (why = 'quit') => {
+    if (isHost) {
+      for (const pid of peerIds) link.send(pid, { t: msgTag, rid, step: 'quit', who: st.name, why });
+    } else {
+      link.send(hostId, { t: msgTag, rid, step: 'quit', slot: mySlot, who: st.name, why });
+    }
+  };
+  return {
+    foeName,
+    sendQuitToRoom,
+    sendAct: async (n, action, sum) => {
+      if (!isHost) link.send(hostId, { t: msgTag, rid, step: 'act', n, slot: mySlot, action, sum });
+    },
+    waitAllActs: async (n, myAction, mySum, onWaitUi) => {
+      if (isHost) {
+        onWaitUi?.();
+        const allActs = [{ ...myAction, slot: mySlot }];
+        let failed = null;
+        const res = await Promise.all(peerIds.map((pid, idx) => link.wait(pid, (q) => q.t === msgTag && q.rid === rid && ((q.step === 'act' && q.n === n) || q.step === 'quit'), 300000).then((q) => ({ pid, sl: peerSlot(idx), q }))));
+        for (const { sl, q } of res) {
+          if (q.t !== msgTag || q.step === 'quit') {
+            failed = { left: q.t === 'left', timeout: q.t === 'timeout', abort: q.t === 'abort', quit: q.step === 'quit', who: q.who || peerNameBySlot(sl) };
+            break;
+          }
+          if (q.sum !== mySum) {
+            failed = { desync: true };
+            break;
+          }
+          allActs.push({ ...q.action, slot: sl });
+        }
+        if (failed) {
+          for (const pid of peerIds) link.send(pid, { t: msgTag, rid, step: 'turn-abort', n, ...failed });
+          return failed;
+        }
+        allActs.sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
+        for (const pid of peerIds) link.send(pid, { t: msgTag, rid, step: 'turn', n, acts: allActs, sum: mySum });
+        return { acts: allActs };
+      }
+      onWaitUi?.();
+      const msg = await link.wait(hostId, (q) => q.t === msgTag && q.rid === rid && (((q.step === 'turn' || q.step === 'turn-abort') && q.n === n) || q.step === 'quit'), 300000);
+      if (msg.t !== msgTag) return { left: msg.t === 'left', timeout: msg.t === 'timeout', abort: msg.t === 'abort', who: ownerNames[0] };
+      if (msg.step === 'quit' || msg.step === 'turn-abort') return { quit: true, desync: !!msg.desync, left: !!msg.left, who: msg.who || ownerNames[0] };
+      if (msg.sum !== mySum) return { desync: true };
+      return { acts: msg.acts };
+    },
+    sendSwitch: async (n, idxOrNull) => {
+      if (!isHost) link.send(hostId, { t: msgTag, rid, step: 'sw', n, slot: mySlot, idx: idxOrNull });
+    },
+    waitAllSwitches: async (n, neededKeys, myPickKey, myPickIdx, onWaitUi) => {
+      // Compatible appel dojo 4 args (n, neededSlots, myPickIdx, onWaitUi) ET appel 5 args avec clé explicite
+      let needed = neededKeys;
+      let myKey = mySlot;
+      let pick = myPickKey;
+      let waitCb = myPickIdx;
+      if (typeof myPickIdx !== 'function' && myPickIdx !== undefined) {
+        myKey = myPickKey;
+        pick = myPickIdx;
+        waitCb = onWaitUi;
+      }
+      if (isHost) {
+        waitCb?.();
+        const needGuests = [];
+        peerIds.forEach((pid, idx) => {
+          const sl = peerSlot(idx);
+          if (needed.includes(sl)) needGuests.push({ pid, sl });
+        });
+        const picks = {};
+        if (needed.includes(myKey) && pick != null) picks[myKey] = pick;
+        let failed = null;
+        if (needGuests.length) {
+          const res = await Promise.all(needGuests.map(({ pid, sl }) => link.wait(pid, (q) => q.t === msgTag && q.rid === rid && ((q.step === 'sw' && q.n === n) || q.step === 'quit'), 300000).then((q) => ({ sl, q }))));
+          for (const { sl, q } of res) {
+            if (q.t !== msgTag || q.step === 'quit') {
+              failed = { left: q.t === 'left', timeout: q.t === 'timeout', abort: q.t === 'abort', quit: q.step === 'quit', who: q.who || peerNameBySlot(sl) };
+              break;
+            }
+            picks[sl] = q.idx;
+          }
+        }
+        if (failed) {
+          for (const pid of peerIds) link.send(pid, { t: msgTag, rid, step: 'sw-abort', n, ...failed });
+          return failed;
+        }
+        for (const pid of peerIds) link.send(pid, { t: msgTag, rid, step: 'sw-go', n, picks });
+        return { picks };
+      }
+      waitCb?.();
+      const msg = await link.wait(hostId, (q) => q.t === msgTag && q.rid === rid && (((q.step === 'sw-go' || q.step === 'sw-abort') && q.n === n) || q.step === 'quit'), 300000);
+      if (msg.t !== msgTag) return { left: msg.t === 'left', timeout: msg.t === 'timeout', abort: msg.t === 'abort', who: ownerNames[0] };
+      if (msg.step === 'quit' || msg.step === 'sw-abort') return { quit: true, left: !!msg.left, who: msg.who || ownerNames[0] };
+      return { picks: msg.picks };
+    },
+    sendQuit: () => sendQuitToRoom('forfeit'),
+    abortAllWaiters: () => {
+      if (isHost) for (const pid of peerIds) link.abort(pid);
+      else link.abort(hostId);
+    },
+    waitUiHint: (box) => ui.typePage(box, 'En attente des choix de ton escouade…', { last: true }),
+  };
+}
+
+/**
  * Exécute la série de 5 combats Co-op sur un client (hôte mySlot===0, ou invité mySlot===1|2)
  */
 async function runDojoSeries(game, { rid, format, rosters, mySlot, hostId, peerIds, lvl, seedBase }) {
@@ -486,14 +595,6 @@ async function runDojoSeries(game, { rid, format, rosters, mySlot, hostId, peerI
   const playerMega = rosters.some((r) => !!r.hasMega);
   const rosterMega = rosters.map((r) => !!r.hasMega);
   const ownerNames = rosters.map((r) => String(r.name || 'Dresseur').slice(0, 12));
-
-  const sendQuitToRoom = (why = 'quit') => {
-    if (isHost) {
-      for (const pid of peerIds) link.send(pid, { t: 'dojo', rid, step: 'quit', who: st.name, why });
-    } else {
-      link.send(hostId, { t: 'dojo', rid, step: 'quit', slot: mySlot, who: st.name, why });
-    }
-  };
 
   for (let stage = 0; stage < 5; stage++) {
     const { party: freshParty, owners: stageOwners, ownerNames: stageNames } = buildCoopSquadParty(rosters);
@@ -516,90 +617,9 @@ async function runDojoSeries(game, { rid, format, rosters, mySlot, hostId, peerI
       seed: stageSeed,
     });
 
-    const peerNameBySlot = (sl) => ownerNames[sl] || `Dresseur ${sl + 1}`;
-    const waitTurnMsg = (box) => ui.typePage(box, 'En attente des choix de ton escouade…', { last: true });
-
-    const coopNet = {
-      foeName: foeChallenge.name,
-      sendAct: async (n, action, sum) => {
-        if (!isHost) link.send(hostId, { t: 'dojo', rid, step: 'act', n, slot: mySlot, action, sum });
-      },
-      waitAllActs: async (n, myAction, mySum, onWaitUi) => {
-        if (isHost) {
-          onWaitUi?.();
-          const allActs = [{ ...myAction, slot: 0 }];
-          let failed = null;
-          const res = await Promise.all(peerIds.map((pid, idx) => link.wait(pid, (q) => q.t === 'dojo' && q.rid === rid && ((q.step === 'act' && q.n === n) || q.step === 'quit'), 300000).then((q) => ({ pid, sl: idx + 1, q }))));
-          for (const { pid, sl, q } of res) {
-            if (q.t !== 'dojo' || q.step === 'quit') {
-              failed = { left: q.t === 'left', timeout: q.t === 'timeout', abort: q.t === 'abort', quit: q.step === 'quit', who: q.who || peerNameBySlot(sl) };
-              break;
-            }
-            if (q.sum !== mySum) {
-              failed = { desync: true };
-              break;
-            }
-            allActs.push({ ...q.action, slot: sl });
-          }
-          if (failed) {
-            for (const pid of peerIds) link.send(pid, { t: 'dojo', rid, step: 'turn-abort', n, ...failed });
-            return failed;
-          }
-          allActs.sort((a, b) => a.slot - b.slot);
-          for (const pid of peerIds) link.send(pid, { t: 'dojo', rid, step: 'turn', n, acts: allActs, sum: mySum });
-          return { acts: allActs };
-        }
-        onWaitUi?.();
-        const msg = await link.wait(hostId, (q) => q.t === 'dojo' && q.rid === rid && (((q.step === 'turn' || q.step === 'turn-abort') && q.n === n) || q.step === 'quit'), 300000);
-        if (msg.t !== 'dojo') return { left: msg.t === 'left', timeout: msg.t === 'timeout', abort: msg.t === 'abort', who: ownerNames[0] };
-        if (msg.step === 'quit' || msg.step === 'turn-abort') return { quit: true, desync: !!msg.desync, left: !!msg.left, who: msg.who || ownerNames[0] };
-        if (msg.sum !== mySum) return { desync: true };
-        return { acts: msg.acts };
-      },
-      sendSwitch: async (n, idxOrNull) => {
-        if (!isHost) link.send(hostId, { t: 'dojo', rid, step: 'sw', n, slot: mySlot, idx: idxOrNull });
-      },
-      waitAllSwitches: async (n, neededSlots, myPickIdx, onWaitUi) => {
-        if (isHost) {
-          onWaitUi?.();
-          const needGuests = [];
-          peerIds.forEach((pid, idx) => {
-            const sl = idx + 1;
-            if (neededSlots.includes(sl)) needGuests.push({ pid, sl });
-          });
-          const picks = {};
-          if (neededSlots.includes(0) && myPickIdx != null) picks[0] = myPickIdx;
-          let failed = null;
-          if (needGuests.length) {
-            const res = await Promise.all(needGuests.map(({ pid, sl }) => link.wait(pid, (q) => q.t === 'dojo' && q.rid === rid && ((q.step === 'sw' && q.n === n) || q.step === 'quit'), 300000).then((q) => ({ sl, q }))));
-            for (const { sl, q } of res) {
-              if (q.t !== 'dojo' || q.step === 'quit') {
-                failed = { left: q.t === 'left', timeout: q.t === 'timeout', abort: q.t === 'abort', quit: q.step === 'quit', who: q.who || peerNameBySlot(sl) };
-                break;
-              }
-              picks[sl] = q.idx;
-            }
-          }
-          if (failed) {
-            for (const pid of peerIds) link.send(pid, { t: 'dojo', rid, step: 'sw-abort', n, ...failed });
-            return failed;
-          }
-          for (const pid of peerIds) link.send(pid, { t: 'dojo', rid, step: 'sw-go', n, picks });
-          return { picks };
-        }
-        onWaitUi?.();
-        const msg = await link.wait(hostId, (q) => q.t === 'dojo' && q.rid === rid && (((q.step === 'sw-go' || q.step === 'sw-abort') && q.n === n) || q.step === 'quit'), 300000);
-        if (msg.t !== 'dojo') return { left: msg.t === 'left', timeout: msg.t === 'timeout', abort: msg.t === 'abort', who: ownerNames[0] };
-        if (msg.step === 'quit' || msg.step === 'sw-abort') return { quit: true, left: !!msg.left, who: msg.who || ownerNames[0] };
-        return { picks: msg.picks };
-      },
-      sendQuit: () => sendQuitToRoom('forfeit'),
-      abortAllWaiters: () => {
-        if (isHost) for (const pid of peerIds) link.abort(pid);
-        else link.abort(hostId);
-      },
-      waitUiHint: waitTurnMsg,
-    };
+    const coopNet = createCoopNet(game, {
+      rid, isHost, hostId, peerIds, ownerNames, mySlot, foeName: foeChallenge.name, msgTag: 'dojo',
+    });
 
     const realParty = st.party;
     const curtain = await game.encounterIntro('trainer');
@@ -678,9 +698,11 @@ export async function dojoMamadou(game, n) {
     `Bienvenue dans mon Dojo, ${st.name} ! Ici, la stratégie collective prime sur la force brute.`,
     `Tu as ${D.pdj} Point${D.pdj > 1 ? 's' : ''} du Dojo (PDj). Records — Duo 2v2 : ${D.record2} · Trio 3v3 : ${D.record3}.`,
   ], who);
-  const choice = await ui.ask('Que souhaites-tu faire ?', ['Relever un défi Co-op (2v2 / 3v3)', 'Échanger des PDj', 'Règles du Dojo', 'Plus tard'], who);
-  if (choice === 1) { await dojoBoutique(game, n); return; }
-  if (choice === 2) {
+  const choice = await ui.ask('Que souhaites-tu faire ?', ['Relever un défi Co-op (2v2 / 3v3)', 'Raids de Boss Co-op (2-3j)', 'Tournoi en direct (4p)', 'Échanger des PDj', 'Règles du Dojo', 'Plus tard'], who);
+  if (choice === 1) { const m = await import('./multi-events.js'); return m.lancerRaidCoop(game); }
+  if (choice === 2) { const m = await import('./multi-events.js'); return m.lancerTournoiSalon(game); }
+  if (choice === 3) { await dojoBoutique(game, n); return; }
+  if (choice === 4) {
     await ui.say([
       'Le Dojo de Mamadou propose des combats **exclusivement multijoueurs** à haute intensité stratégique !',
       'En Duo Co-op (2v2), 2 dresseurs humains s\'allient (1 Pokémon actif + 1 remplaçant chacun) face à 2 bots coordinateurs.',

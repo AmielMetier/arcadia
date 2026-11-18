@@ -113,6 +113,7 @@ export class BattleView {
   /* ---------------- positions par format (1v1, 2v2, 3v3) ---------------- */
   posFor(side, slot = 0) {
     const W = this.W, sl = this.slots || 1;
+    if (this.battle?.isRaid && side === 1 && slot === 0) return { x: Math.round(W * 0.67), y: 74 };
     if (sl === 1) return side === 1 ? { x: Math.round(W * 0.71), y: 86 } : { x: Math.round(W * 0.26), y: 140 };
     if (sl === 2) {
       const fx = [0.50, 0.74], fy = [65, 74], px = [0.16, 0.39], py = [118, 126];
@@ -123,6 +124,7 @@ export class BattleView {
   }
   scaleFor(side, slot = 0) {
     const sl = this.slots || 1;
+    if (this.battle?.isRaid && side === 1 && slot === 0) return 1.22;
     if (sl === 1) return 1;
     if (sl === 2) return side === 1 ? (slot === 0 ? 0.80 : 0.86) : (slot === 0 ? 0.86 : 0.80);
     return side === 1 ? [0.68, 0.73, 0.78][slot] : [0.78, 0.73, 0.68][slot];
@@ -147,6 +149,7 @@ export class BattleView {
 
     // Socles de combat (par emplacement)
     for (let slot = 0; slot < (this.slots || 1); slot++) {
+      if (this.battle?.isRaid && slot > 0) continue;
       const eP = this.posFor(1, slot), bsE = this.scaleFor(1, slot) * (this.slots > 1 ? 0.85 : 1);
       if (this.platE) {
         const pw = this.platE.width * bsE, ph = this.platE.height * bsE;
@@ -473,10 +476,11 @@ export class BattleView {
     if (side === 1 && !this.seenInBattle?.has(m.uid || m.sp)) { this.seenInBattle?.add(m.uid || m.sp); this.game.markSeen(m.sp); }
     h.style.visibility = '';
     const g = m.gender === 'm' ? '<span class="g m">♂</span>' : m.gender === 'f' ? '<span class="g f">♀</span>' : '';
+    const coopOwner = this.battle?.sideOwnerNames?.[side]?.[slot] || (side === 0 && this.battle?.coop ? this.battle.ownerNames?.[slot] : null);
     const trainerTag = this.spectator && slot === 0 && this.battle?.sides?.[side]?.name
       ? `<span class="bh-trainer-tag">${esc(this.battle.sides[side].name)} :</span> `
-      : side === 0 && this.battle?.coop && this.battle.ownerNames?.[slot]
-        ? `<span class="bh-trainer-tag">${esc(this.battle.ownerNames[slot])} ·</span> `
+      : coopOwner
+        ? `<span class="bh-trainer-tag">${esc(coopOwner)} ·</span> `
         : '';
     h.querySelector('.bh-name').innerHTML = trainerTag + esc(monName(m)) + g;
     h.querySelector('.bh-lv').textContent = 'N.' + m.lvl;
@@ -826,9 +830,12 @@ export class BattleView {
         if (needed.includes(mySlot)) {
           myPick = await this.pickCoopReplacement(mySlot);
         }
+        const needKeys = battle.is4p
+          ? [...(battle.needSlots?.[0] || []).map((s) => `${battle.teamIdx}:${s}`), ...(battle.needSlots?.[1] || []).map((s) => `${1 - battle.teamIdx}:${s}`)]
+          : needed;
         await coopNet.sendSwitch(n, myPick);
         const popSw = this.ui.input.push((k) => { if (k === 'b' || k === 'cancel') coopNet.abortAllWaiters?.(); });
-        const r = await coopNet.waitAllSwitches(n, needed, myPick, waiting);
+        const r = await coopNet.waitAllSwitches(n, needKeys, myPick, waiting);
         popSw();
         if (!r.picks) { await aborted(r); break; }
         await this.play(battle.switchCoop(r.picks));
@@ -848,6 +855,7 @@ export class BattleView {
       const r = await coopNet.waitAllActs(n, myAction, sum, waiting);
       popAct();
       if (!r.acts) { await aborted(r); break; }
+      if (r.foeActs) battle.remote = r.foeActs;
       await this.play(battle.playerAction(r.acts));
     }
     await wait(300);
@@ -1226,6 +1234,21 @@ export class BattleView {
         case 'hide': { const o = this.spriteObj(e.side, sl); if (o) o.visible = !e.on; break; }
         case 'trainer-back': { this.st.trainer.visible = true; this.st.trainer.dx = 120; await this.tween(400, (u) => { this.st.trainer.dx = 120 * (1 - ease(u)); }); break; }
         case 'sfx': this.sound.sfx(e.k); break;
+        case 'raid-shield': {
+          const h = this.hudFor(1, 0);
+          if (h) {
+            let b = h.querySelector('.raid-shield-pill');
+            if (e.active) {
+              if (!b) {
+                b = el('span', 'raid-shield-pill');
+                b.style.cssText = 'display:inline-block;margin-left:4px;padding:0 5px;border-radius:4px;background:#7c3aed;color:#fff;font-size:10px;font-weight:bold;border:1px solid #080a10;';
+                h.querySelector('.bh-top')?.appendChild(b);
+              }
+              b.textContent = `🛡️ ${e.hp}/${e.max}`;
+            } else if (b) b.remove();
+          }
+          break;
+        }
         case 'switch-prompt': case 'end': default: break;
       }
     }

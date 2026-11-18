@@ -1,0 +1,1407 @@
+// odyssee/js/multi-events.js — Nouvelles fonctionnalités multijoueurs d'Odyssée :
+// 1. Raids de Boss / Antres Légendaires Co-op (2 ou 3 joueurs humains vs 1 Boss géant à Bouclier Mystique & 2 actions/tour)
+// 2. Vrai 2v2 à 4 joueurs humains (Équipe A [J0, J1] vs Équipe B [J2, J3], 1 actif + 1 réserve chacun)
+// 4. Tournoi en direct dans le Salon / Colisée (arbre à 4 places avec Champions IA et mode Spectateur auto)
+
+import { SPECIES } from './data/species.js';
+import { MOVES } from './data/moves.js';
+import { ITEMS } from './core/items.js';
+import { createMon, monName, isFainted, healFull } from './core/mon.js';
+import { Battle } from './core/battle.js';
+import { battleCopy, validMon } from './core/pvp.js';
+import { MEGA_RING } from './core/mega.js';
+import { seededRng, newId } from './net/link.js';
+import { el, esc, wait } from './ui/ui.js';
+import { partyScreen } from './ui/screens.js';
+import { LEADERS } from './world/region.js';
+import {
+  ensureDojo,
+  CoopDojoBattle,
+  buildCoopSquadParty,
+  pickDojoPair,
+  hostWaitAll,
+  guestWaitHost,
+  createCoopNet,
+} from './dojo-mamadou.js';
+
+/* ======================================================================
+   1. RAIDS DE BOSS / ANTRES LÉGENDAIRES CO-OP (2 OU 3 JOUEURS VS BOSS)
+   ====================================================================== */
+
+export const RAID_BOSSES = [
+  { id: 'tyranocif', sp: 248, title: 'Tyranocif Alpha', ability: 'sand-stream', moves: [444, 242, 89, 157], bg: 'cave', legend: false },
+  { id: 'metalosse', sp: 376, title: 'Métalosse Titan', ability: 'clear-body', moves: [442, 428, 418, 89], bg: 'gym', legend: false },
+  { id: 'carchacrok', sp: 445, title: 'Carchacrok Tempête', ability: 'rough-skin', moves: [337, 89, 157, 242], bg: 'cave', legend: false },
+  { id: 'dracolosse', sp: 149, title: 'Dracolosse Ancien', ability: 'multiscale', moves: [337, 542, 245, 89], bg: 'volcanic', legend: false },
+  { id: 'lugia', sp: 249, title: 'Lugia des Abysses', ability: 'pressure', moves: [94, 403, 56, 58], bg: 'water', legend: true },
+  { id: 'mewtwo', sp: 150, title: 'Mewtwo Originel', ability: 'pressure', moves: [94, 247, 85, 58], bg: 'league', legend: true },
+];
+
+/** Construit un Boss de Raid géant avec PV x3 (Duo) ou x4 (Trio) */
+export function buildRaidBossChallenge(bossIdx = 0, slots = 2, lvl = 55, seed = 1) {
+  const boss = RAID_BOSSES[bossIdx % RAID_BOSSES.length] || RAID_BOSSES[0];
+  const r = seededRng(seed >>> 0);
+  const bossLvl = Math.max(55, Math.min(95, (lvl | 0) + 4));
+  const validMoves = boss.moves.filter((id) => MOVES[id]);
+  const mon = createMon(boss.sp, bossLvl, {
+    iv: [31, 31, 31, 31, 31, 31],
+    nat: 0,
+    moves: validMoves,
+    item: null,
+    ability: boss.ability || null,
+    shiny: false,
+    rng: r,
+  });
+  const hpMult = slots >= 3 ? 4 : 3;
+  mon.stats[0] = Math.max(mon.stats[0], mon.stats[0] * hpMult);
+  mon.hp = mon.stats[0];
+  return {
+    boss,
+    bossLvl,
+    hpMult,
+    name: boss.title,
+    party: [mon],
+    trainer: {
+      cls: 'Boss Antre',
+      name: boss.title,
+      ow: 'drakos',
+      bs: 'drakos',
+      ai: 'smart',
+      strategic: true,
+      friendly: true,
+      mega: false,
+      prize: 0,
+      items: {},
+      intro: `${boss.title} émerge de la faille avec une aura monumentale !`,
+      lose: `${boss.title} vacille et retrouve son calme sous vos assauts coordonnés !`,
+    },
+  };
+}
+
+/**
+ * Moteur de Raid Co-op : 2 ou 3 joueurs sur `side 0` vs 1 Boss géant unique sur `side 1` (`slot 0`).
+ * Le Boss agit deux fois par tour et lève un Bouclier Mystique à <= 60% PV.
+ */
+export class RaidCoopBattle extends CoopDojoBattle {
+  constructor(o) {
+    super(o);
+    this.isRaid = true;
+    this.shieldMax = this.slots >= 3 ? 6 : 4;
+    this.shield = {
+      active: false,
+      triggered: false,
+      hp: 0,
+      max: this.shieldMax,
+    };
+    this.sides[1].activeSlots = Array(this.slots).fill(-1);
+    this.sides[1].activeSlots[0] = 0;
+  }
+
+  hp(ref, delta, cause) {
+    const r = this.norm(ref);
+    if (r.side === 1 && delta < 0) {
+      const boss = this.monAt(1, 0);
+      if (boss && boss.hp > 0) {
+        // Empêche un OHKO (ex: Glaciation) de liquider un Boss de Raid d'un coup
+        if (-delta >= boss.hp && boss.hp > boss.stats[0] * 0.35) {
+          delta = -Math.floor(boss.stats[0] * 0.30);
+        }
+        if (this.shield.active) {
+          delta = Math.min(-1, Math.round(delta * 0.35));
+        }
+      }
+      const dealt = super.hp(r, delta, cause);
+      const after = this.monAt(1, 0);
+      if (this.shield.active && !cause && after && after.hp > 0) {
+        this.shield.hp = Math.max(0, this.shield.hp - 1);
+        if (this.shield.hp === 0) {
+          this.shield.active = false;
+          const st = this.sides[1].vs[0].st;
+          st[2] = Math.max(-6, st[2] - 2);
+          st[4] = Math.max(-6, st[4] - 2);
+          this.ev.push({ t: 'stat', side: 1, slot: 0, up: false, all: this.stages(), slots: this.allStages() });
+          this.say(`💥 Le Bouclier Mystique de ${monName(after)} se brise ! Sa Défense s'effondre !`);
+        } else {
+          this.say(`🛡️ Le Bouclier Mystique fissure ! (${this.shield.hp}/${this.shield.max} restant${this.shield.hp > 1 ? 's' : ''})`);
+        }
+        this.ev.push({ t: 'raid-shield', active: this.shield.active, hp: this.shield.hp, max: this.shield.max });
+      }
+      if (!this.shield.triggered && after && after.hp > 0 && after.hp <= after.stats[0] * 0.6) {
+        this.shield.triggered = true;
+        this.shield.active = true;
+        this.shield.hp = this.shield.max;
+        this.ev.push({ t: 'stat', side: 1, slot: 0, up: true, all: this.stages(), slots: this.allStages() });
+        this.ev.push({ t: 'raid-shield', active: true, hp: this.shield.hp, max: this.shield.max });
+        this.say(`🛡️ ${monName(after)} libère un Bouclier Mystique (${this.shield.hp} charges) !`);
+      }
+      return dealt;
+    }
+    return super.hp(ref, delta, cause);
+  }
+
+  /** Le Boss joue deux actions distinctes par tour (visant si possible deux alliés différents) */
+  foeChooseAll() {
+    const aliveFoe = this.aliveSlots(1);
+    if (!aliveFoe.length) return [];
+    const sl = aliveFoe[0];
+    const boss = this.monAt(1, sl);
+    if (!boss || isFainted(boss)) return [];
+    const first = this.foeChooseSlot(sl);
+    const out = [{ i: 1, side: 1, slot: sl, a: first }];
+
+    const pAlive = this.aliveSlots(0);
+    if (!pAlive.length) return out;
+    const forced = this.forcedAction({ side: 1, slot: sl });
+    if (forced) return out;
+
+    const firstTarget = first?.targetSlot ?? pAlive[0];
+    const altTargets = pAlive.filter((s) => s !== firstTarget);
+    const targetSlot = altTargets.length ? altTargets[0] : pAlive[0];
+    const usable = this.usableMoves({ side: 1, slot: sl });
+    if (!usable.length) return out;
+
+    // Choisit la meilleure capacité offensive pour la 2e frappe du Boss
+    let bestMvIdx = usable[0];
+    let bestScore = -1e9;
+    const defMon = this.monAt(0, targetSlot);
+    for (const k of usable) {
+      const mId = boss.moves[k]?.id;
+      const mv = MOVES[mId];
+      if (!mv || mv.c === 'status') continue;
+      let sc = (mv.p || 50) * (this.effOn({ side: 1, slot: sl }, { side: 0, slot: targetSlot }, mv.t) || 1);
+      if (k !== first?.slot && first?.type === 'move') sc += 8;
+      if (defMon && SPECIES[boss.sp]?.t?.includes(mv.t)) sc *= 1.35;
+      if (sc > bestScore) { bestScore = sc; bestMvIdx = k; }
+    }
+    const chosenMove = boss.moves[bestMvIdx];
+    const second = { type: 'move', id: chosenMove.id, slot: bestMvIdx, targetSide: 0, targetSlot };
+    out.push({ i: 1, side: 1, slot: sl, a: second });
+    return out;
+  }
+
+  checksum() {
+    const base = super.checksum();
+    const sh = `${this.shield.active ? 1 : 0}:${this.shield.hp}:${this.shield.triggered ? 1 : 0}`;
+    let h = 0x811c9dc5;
+    const str = `${base}|${sh}`;
+    for (let k = 0; k < str.length; k++) { h ^= str.charCodeAt(k); h = Math.imul(h, 0x01000193) >>> 0; }
+    return h.toString(16);
+  }
+}
+
+async function selectPeersForRoom(ui, freePeers, neededPeers, labelPrefix) {
+  const selected = [];
+  let remaining = [...freePeers];
+  for (let k = 0; k < neededPeers; k++) {
+    if (remaining.length === 1 && selected.length + remaining.length === neededPeers) {
+      selected.push(remaining[0]);
+      break;
+    }
+    const items = remaining.map((p) => ({ label: p.name || 'Dresseur', right: p.zone || '' })).concat([{ label: 'Annuler' }]);
+    const idx = await ui.list({ title: `${labelPrefix} (${k + 1}/${neededPeers})`, items, cancel: remaining.length });
+    if (idx < 0 || idx >= remaining.length) return null;
+    selected.push(remaining[idx]);
+    remaining.splice(idx, 1);
+  }
+  return selected;
+}
+
+async function offerRaidCapture(game, bossData) {
+  const st = game.state, ui = game.ui;
+  const want = await ui.yesNo(`${bossData.boss.title} est affaibli ! Lancer une Hyper Ball pour le capturer ?`);
+  if (!want) return;
+  const caught = createMon(bossData.boss.sp, bossData.bossLvl, { iv: [31, 31, 31, 31, 31, 31], shiny: false });
+  caught.moves = bossData.boss.moves.filter((id) => MOVES[id]).map((id) => ({ id, pp: MOVES[id].pp, maxPp: MOVES[id].pp }));
+  caught.ability = bossData.boss.ability || null;
+  caught.ball = 'ultra-ball';
+  caught.ot = st.name;
+  caught.met = 'Antre de Raid';
+  healFull(caught);
+  game.markCaught(caught.sp);
+  game.sound.sfx('item');
+  if (st.party.length < 6) {
+    st.party.push(caught);
+    await ui.say(`${monName(caught)} rejoint ton équipe !`);
+  } else {
+    st.box.push(caught);
+    await ui.say(`${monName(caught)} a été transféré dans ton PC !`);
+  }
+  game.save(true);
+}
+
+async function runRaidBattleSession(game, { rid, bossIdx, format, rosters, mySlot, hostId, peerIds, lvl, seed }) {
+  const ui = game.ui, st = game.state, D = ensureDojo(st);
+  const slots = format === 'triple' ? 3 : 2;
+  const isHost = mySlot === 0;
+  const ownerNames = rosters.map((r) => String(r.name || 'Dresseur').slice(0, 12));
+  const { party, owners, ownerNames: sqNames } = buildCoopSquadParty(rosters);
+  const bossData = buildRaidBossChallenge(bossIdx, slots, lvl, seed);
+  const who = { speaker: 'Raid Co-op', face: 'drakos' };
+
+  await ui.say(`Alerte Antre ! ${ownerNames.join(', ')} affrontent ${bossData.name} (N.${bossData.bossLvl} · PV ×${bossData.hpMult}) !`, who);
+
+  const battle = new RaidCoopBattle({
+    squadName: ownerNames.join(' & '),
+    party,
+    owners,
+    ownerNames: sqNames,
+    rosterMega: rosters.map((r) => !!r.hasMega),
+    mySlot,
+    playerMega: rosters.some((r) => !!r.hasMega),
+    foe: bossData,
+    format,
+    slots,
+    seed,
+  });
+
+  const coopNet = createCoopNet(game, {
+    rid, isHost, hostId, peerIds, ownerNames, mySlot, foeName: bossData.name, msgTag: 'raid',
+  });
+
+  const realParty = st.party;
+  const curtain = await game.encounterIntro('trainer');
+  game.musicLock = true;
+  game.sound.play('champion');
+  curtain.remove();
+  game.bv.pvp = true;
+  st.party = battle.sides[0].party;
+  let res;
+  try {
+    res = await game.bv.runCoopDojo(battle, coopNet, { bg: bossData.boss.bg || 'cave', night: true });
+  } finally {
+    st.party = realParty;
+    game.bv.pvp = false;
+    game.bv.close();
+    game.musicLock = false;
+  }
+  game.sound.stopMusic(0.1);
+  game.sound.current = null;
+  game.updateZone();
+
+  if (res === 'win') {
+    D.pdj += 5;
+    game.give('rare-candy', 2);
+    game.sound.sfx('item');
+    game.save(true);
+    await ui.say([
+      `Victoire éclatante contre ${bossData.name} !`,
+      `Tu remportes 5 PDj (total : ${D.pdj} PDj) et 2 Super Bonbons !`,
+    ], who);
+    await offerRaidCapture(game, bossData);
+  } else {
+    await ui.say(`${bossData.name} s'est échappé dans la faille… Revenez mieux préparés !`, who);
+  }
+}
+
+/** Lance un Raid de Boss Co-op (strictement multijoueur : 2 ou 3 joueurs) */
+export async function lancerRaidCoop(game, prePeer = null) {
+  const st = game.state, ui = game.ui, link = game.link;
+  const who = { speaker: 'Antre de Raid', face: 'drakos' };
+  const healthy = st.party.filter((m) => m && m.hp > 0).length;
+  if (healthy < 2) {
+    await ui.say('Il te faut au moins 2 Pokémon en forme (1 titulaire + 1 remplaçant) pour entrer dans un Raid !', who);
+    return;
+  }
+  const allConnected = link?.enabled ? [...link.others.values()] : [];
+  const freePeers = allConnected.filter((p) => !p.busy && !p.pvp);
+  if (freePeers.length < 1) {
+    await ui.say(['Les Raids de Boss sont exclusivement multijoueurs !', 'Connecte 1 ou 2 amis via Amis / Connexion (F3) avant de lancer l\'assaut.'], who);
+    return;
+  }
+
+  const fmtChoice = await ui.ask('Quel format de Raid Co-op lancer ?', ['Raid Duo (2 joueurs vs Boss)', 'Raid Trio (3 joueurs vs Boss)', 'Annuler'], who);
+  if (fmtChoice !== 0 && fmtChoice !== 1) return;
+  const format = fmtChoice === 1 ? 'triple' : 'double';
+  const neededPeers = format === 'triple' ? 2 : 1;
+  if (freePeers.length < neededPeers) {
+    await ui.say(`Il faut ${neededPeers} allié${neededPeers > 1 ? 's' : ''} libre${neededPeers > 1 ? 's' : ''} connecté${neededPeers > 1 ? 's' : ''} pour ce format (${freePeers.length} disponible${freePeers.length > 1 ? 's' : ''}).`, who);
+    return;
+  }
+
+  const bossIdx = await ui.list({
+    title: 'Choisir le Boss du Raid',
+    items: RAID_BOSSES.map((b) => ({ label: b.title, right: b.legend ? 'Légendaire' : 'Alpha' })).concat([{ label: 'Annuler' }]),
+    cancel: RAID_BOSSES.length,
+  });
+  if (bossIdx < 0 || bossIdx >= RAID_BOSSES.length) return;
+
+  let selectedPeers;
+  if (prePeer && neededPeers === 1 && !prePeer.busy && !prePeer.pvp) {
+    selectedPeers = [prePeer];
+  } else {
+    selectedPeers = await selectPeersForRoom(ui, freePeers, neededPeers, 'Choisir l\'allié de Raid');
+  }
+  if (!selectedPeers) return;
+
+  const rid = newId();
+  const lvl = Math.max(55, ...st.party.map((m) => m.lvl || 55));
+  const peerIds = selectedPeers.map((p) => p.id);
+  for (const p of selectedPeers) {
+    link.send(p.id, { t: 'req', rid, kind: 'raid', format, bossIdx, name: st.name, lvl });
+  }
+
+  const box = ui.dialogBox();
+  ui.typePage(box, `Invitation Raid envoyée à ${selectedPeers.map((p) => p.name).join(' et ')}… (Échap : annuler)`, { last: true });
+  await wait(30);
+  const pop = game.input.push((k) => { if (k === 'b' || k === 'cancel') for (const pid of peerIds) link.abort(pid); });
+  const reps = await Promise.all(selectedPeers.map((p) => link.wait(p.id, (m) => m.t === 'raid-rep' && m.rid === rid, 30000).then((m) => ({ peer: p, m }))));
+  pop();
+  ui.closeDialog();
+
+  if (!reps.every(({ m }) => m.t === 'raid-rep' && m.ok)) {
+    for (const pid of peerIds) link.send(pid, { t: 'raid-cancel', rid });
+    await ui.say('Un allié n\'a pas pu rejoindre le Raid Co-op.', who);
+    return;
+  }
+
+  game.busy = true;
+  game.session = rid;
+  try {
+    const myMons = await pickDojoPair(game, who);
+    if (!myMons) {
+      for (const pid of peerIds) link.send(pid, { t: 'raid-cancel', rid });
+      await ui.say('Raid annulé.', who);
+      return;
+    }
+    const peerRes = await hostWaitAll(
+      game, peerIds,
+      (pid) => (q) => q.t === 'raid' && q.rid === rid && (q.step === 'roster' || q.step === 'quit'),
+      `En attente de l'équipe de ${selectedPeers.map((p) => p.name).join(' et ')}…`
+    );
+    if (peerRes.some(({ m }) => m.t !== 'raid' || m.step !== 'roster' || !Array.isArray(m.mons) || m.mons.length < 2 || !m.mons.every(validMon))) {
+      for (const pid of peerIds) link.send(pid, { t: 'raid-cancel', rid });
+      await ui.say('Le Raid a été annulé avant le début.', who);
+      return;
+    }
+    const finalLvl = Math.max(lvl, ...reps.map(({ m }) => m.lvl || 55));
+    const rosters = [
+      { slot: 0, id: link.myId, name: st.name, hasMega: !!st.bag[MEGA_RING], mons: myMons },
+      ...peerRes.map(({ pid, m }, idx) => ({
+        slot: idx + 1, id: pid, name: String(m.name || selectedPeers[idx].name).slice(0, 12), hasMega: !!m.hasMega, mons: m.mons.slice(0, 2),
+      })),
+    ];
+    const seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
+    peerIds.forEach((pid, idx) => {
+      link.send(pid, { t: 'raid', rid, step: 'start', bossIdx, format, rosters, mySlot: idx + 1, hostId: link.myId, lvl: finalLvl, seed });
+    });
+    await runRaidBattleSession(game, { rid, bossIdx, format, rosters, mySlot: 0, hostId: link.myId, peerIds, lvl: finalLvl, seed });
+  } finally {
+    game.busy = false;
+    game.session = null;
+  }
+}
+
+export async function onRaidInvite(game, from, m) {
+  const link = game.link, st = game.state, ui = game.ui;
+  const free = st && game.player && !game.busy && game.input.free && !game.bv.alive && !game.session && !game.player.move;
+  if (!free) { link.send(from, { t: 'raid-rep', rid: m.rid, ok: false, why: 'busy' }); return; }
+  const healthy = st.party.filter((p) => p && p.hp > 0).length;
+  if (healthy < 2) { link.send(from, { t: 'raid-rep', rid: m.rid, ok: false, why: 'nomon' }); return; }
+
+  const name = String(m.name || link.nameOf(from)).slice(0, 12);
+  const boss = RAID_BOSSES[(m.bossIdx | 0) % RAID_BOSSES.length] || RAID_BOSSES[0];
+  game.busy = true;
+  game.session = m.rid;
+  try {
+    let gone = false;
+    void link.wait(from, (q) => q.t === 'raid-cancel' && q.rid === m.rid, 30000).then((r) => {
+      gone = true;
+      const open = ui.root.querySelector('.list.choice');
+      if (open && open._close) open._close(1);
+      return r;
+    });
+    ui.sound.sfx('bang');
+    const yes = await ui.yesNo(`${name} t'invite dans un Raid Co-op contre ${boss.title} (${m.format === 'triple' ? '3j' : '2j'}) ! Rejoindre ?`, { speaker: name });
+    if (gone) { ui.closeDialog(); await ui.say(`${name} a annulé le Raid.`); return; }
+    link.abort(from);
+    const myLvl = Math.max(55, ...st.party.map((p) => p.lvl || 55));
+    link.send(from, { t: 'raid-rep', rid: m.rid, ok: yes, lvl: myLvl });
+    if (!yes) return;
+
+    const myMons = await pickDojoPair(game, { speaker: 'Antre de Raid', face: 'drakos' });
+    if (!myMons) { link.send(from, { t: 'raid', rid: m.rid, step: 'quit', who: st.name }); return; }
+    link.send(from, { t: 'raid', rid: m.rid, step: 'roster', name: st.name, hasMega: !!st.bag[MEGA_RING], mons: myMons });
+
+    const startMsg = await guestWaitHost(
+      game, from,
+      (q) => (q.t === 'raid' && q.rid === m.rid && q.step === 'start') || (q.t === 'raid-cancel' && q.rid === m.rid),
+      `En attente du lancement du Raid par ${name}…`
+    );
+    if (startMsg.t !== 'raid' || startMsg.step !== 'start') {
+      if (startMsg.t === 'abort') link.send(from, { t: 'raid', rid: m.rid, step: 'quit', who: st.name });
+      await ui.say('Le Raid Co-op n\'a pas démarré.');
+      return;
+    }
+    await runRaidBattleSession(game, { ...startMsg, rid: m.rid, hostId: from, peerIds: [] });
+  } finally {
+    game.busy = false;
+    game.session = null;
+  }
+}
+
+/* ======================================================================
+   2. VRAI 2V2 À 4 JOUEURS HUMAINS (ÉQUIPE A [J0,J1] VS ÉQUIPE B [J2,J3])
+   ====================================================================== */
+
+export class Multi4pBattle extends Battle {
+  constructor(o) {
+    super({
+      player: { name: o.meTeam.name, party: o.meTeam.party, bag: {} },
+      foe: {
+        name: o.foeTeam.name,
+        party: o.foeTeam.party,
+        trainer: { cls: 'Duo adverse', name: o.foeTeam.name, bs: o.foeTeam.bs || 'calem', prize: 0 },
+      },
+      rng: seededRng(o.seed >>> 0),
+      format: 'double',
+      slots: 2,
+    });
+    this.coop = true;
+    this.pvp = true;
+    this.is4p = true;
+    this.teamIdx = o.teamIdx | 0; // 0 = Équipe A, 1 = Équipe B
+    this.canon = this.teamIdx;
+    this.mySlot = o.mySlot | 0;   // 0 ou 1 dans son équipe
+    this.owners = o.meTeam.owners;
+    this.ownerNames = o.meTeam.ownerNames;
+    this.sideOwners = [o.meTeam.owners, o.foeTeam.owners];
+    this.sideOwnerNames = [o.meTeam.ownerNames, o.foeTeam.ownerNames];
+    // Ordre canonique [Équipe A, Équipe B] pour canMega
+    this.teamRosterMega = o.teamIdx === 0
+      ? [o.meTeam.hasMega, o.foeTeam.hasMega]
+      : [o.foeTeam.hasMega, o.meTeam.hasMega];
+    this.sides[0].mega = o.meTeam.hasMega.some(Boolean);
+    this.sides[1].mega = o.foeTeam.hasMega.some(Boolean);
+    this.remote = null;
+    this.need = [false, false];
+    this.needSlots = [[], []];
+  }
+
+  eotOrder() { return [this.canon, 1 - this.canon]; }
+  tie(p, q) {
+    const ps = p.i ?? p.side, qs = q?.i ?? q?.side;
+    if (qs != null && ps === qs) return (p.slot ?? 0) - (q.slot ?? 0);
+    const first = this.rng() < 0.5 ? this.canon : 1 - this.canon;
+    return ps === first ? -1 : 1;
+  }
+  awardExp() { /* combat amical à 4 joueurs */ }
+
+  canMega(ref) {
+    const r = this.norm(ref);
+    const canonTeam = r.side === 0 ? this.teamIdx : 1 - this.teamIdx;
+    if (this.teamRosterMega[canonTeam] && !this.teamRosterMega[canonTeam][r.slot]) return false;
+    return super.canMega(r);
+  }
+
+  canSwitchTo(partyIdx, slot = this.mySlot) {
+    const m = this.sides[0].party[partyIdx];
+    return this.sideOwners[0][partyIdx] === slot && !!m && m.hp > 0 && !this.sides[0].activeSlots.includes(partyIdx);
+  }
+
+  _remoteFor(slot = 0) {
+    if (Array.isArray(this.remote)) return this.remote.find((x) => x && x.slot === slot) ?? this.remote[slot] ?? { type: 'move', idx: 0 };
+    return this.remote || { type: 'move', idx: 0 };
+  }
+  foeWantsMega(a, slot = 0) {
+    const r = this._remoteFor(slot);
+    return a?.type === 'move' && !!r?.mega && this.canMega({ side: 1, slot });
+  }
+  foeChooseAll() {
+    return this.aliveSlots(1).map((sl) => ({ i: 1, side: 1, slot: sl, a: this.foeChooseSlot(sl) }));
+  }
+  foeChooseSlot(slot = 0) {
+    const ref = { side: 1, slot };
+    const forced = this.forcedAction(ref); if (forced) return forced;
+    const a = this._remoteFor(slot);
+    const m = this.act(ref);
+    if (a.type === 'switch' && this.sides[1].party[a.idx] && this.sides[1].party[a.idx].hp > 0 && !this.sides[1].activeSlots.includes(a.idx)) {
+      return { type: 'switch', idx: a.idx };
+    }
+    if (!this.usableMoves(ref).length) return { type: 'move', id: 165 };
+    const k = Number.isInteger(a.idx) && m.moves[a.idx]?.pp > 0 ? a.idx : this.usableMoves(ref)[0];
+    const targetSide = a.targetSide != null ? (1 - a.targetSide) : 0;
+    const targetSlot = Number.isInteger(a.targetSlot) ? a.targetSlot : 0;
+    return { type: 'move', id: m.moves[k].id, slot: k, targetSide, targetSlot };
+  }
+
+  checkFaints(midTurn = false) {
+    let stop = false;
+    for (const i of [1 - this.canon, this.canon]) {
+      for (let slot = 0; slot < this.slots; slot++) {
+        const m = this.monAt(i, slot);
+        if (m && isFainted(m) && !m._ko) {
+          m._ko = true;
+          this.ev.push({ t: 'faint', side: i, slot });
+          this.say(`${i === 1 ? this.Nm({ side: 1, slot }) : monName(m)} est K.O. !`);
+          stop = true;
+        }
+      }
+    }
+    const left = (i) => this.sides[i].party.some((m) => m && m.hp > 0);
+    if (!left(0) && !left(1)) { this.say('Égalité parfaite entre les deux équipes !'); this.end('draw'); return true; }
+    if (!left(0)) { this.loseBattle(); return true; }
+    if (!left(1)) { this.winBattle(); return true; }
+    if (midTurn) return false;
+
+    const ns = [[], []];
+    for (const i of [0, 1]) {
+      const party = this.sides[i].party;
+      const owners = this.sideOwners[i];
+      for (let sl = 0; sl < this.slots; sl++) {
+        const m = this.monAt(i, sl);
+        if (m && isFainted(m)) {
+          const hasOwnBench = party.some((bm, idx) => owners[idx] === sl && bm && bm.hp > 0 && !this.sides[i].activeSlots.includes(idx));
+          if (hasOwnBench) ns[i].push(sl);
+          else this.sides[i].activeSlots[sl] = -1;
+        }
+      }
+    }
+    if (!ns[0].length && !ns[1].length) return false;
+    this.needSlots = ns;
+    this.needPlayerSlots = ns[0];
+    this.need = [ns[0].length > 0, ns[1].length > 0];
+    this.state = 'switch';
+    this.ev.push({ t: 'switch-prompt', slots: ns[0] });
+    return true;
+  }
+
+  switchCoop(picksObj = {}) {
+    if (this.state !== 'switch') return [];
+    this.ev = [];
+    const pick = picksObj.picks0 ? { 0: picksObj.picks0, 1: picksObj.picks1 || {} } : { 0: picksObj, 1: {} };
+    const switched = [];
+    for (const i of [this.canon, 1 - this.canon]) {
+      const slotsNeed = this.needSlots[i] || [];
+      if (!slotsNeed.length) continue;
+      const party = this.sides[i].party;
+      const owners = this.sideOwners[i];
+      for (const sl of slotsNeed) {
+        let idx = pick[i]?.[sl];
+        if (idx == null || owners[idx] !== sl || !party[idx] || party[idx].hp <= 0 || this.sides[i].activeSlots.includes(idx)) {
+          idx = party.findIndex((m, j) => owners[j] === sl && m && m.hp > 0 && !this.sides[i].activeSlots.includes(j));
+        }
+        if (idx >= 0) {
+          this.doSwitchSlot(i, sl, idx, true, false);
+          switched.push({ side: i, slot: sl });
+        } else {
+          this.sides[i].activeSlots[sl] = -1;
+        }
+      }
+    }
+    this.need = [false, false];
+    this.needSlots = [[], []];
+    this.needPlayerSlots = [];
+    if (switched.length) {
+      for (const r of this.sortBySpeed(switched)) this.triggerEntry(r);
+    }
+    this.state = 'choose';
+    return this.flush();
+  }
+
+  winBattle() {
+    this.ev.push({ t: 'trainer-back' });
+    this.say(`Votre duo bat ${this.sides[1].name} !`);
+    this.end('win');
+  }
+  loseBattle() {
+    this.say('Votre équipe n\'a plus de Pokémon en forme !');
+    this.say(`${this.sides[1].name} remporte ce 2v2 à 4 joueurs !`);
+    this.end('lose');
+  }
+  stop(result, text) {
+    this.ev = [];
+    if (text) this.say(text);
+    this.end(result);
+    return this.flush();
+  }
+
+  checksum() {
+    const parts = [];
+    for (const i of [this.canon, 1 - this.canon]) {
+      const s = this.sides[i];
+      parts.push(...s.activeSlots, ...s.party.map((m) => `${m.hp}${(m.status === 'tox' ? 'psn' : m.status) || ''}`), ...s.vs.map((v) => v.st.join('')));
+    }
+    parts.push(this.turn, this.state);
+    let h = 0x811c9dc5;
+    const str = parts.join('|');
+    for (let k = 0; k < str.length; k++) { h ^= str.charCodeAt(k); h = Math.imul(h, 0x01000193) >>> 0; }
+    return h.toString(16);
+  }
+}
+
+function create4pNet(game, { rid, isHost, hostId, peerIds, teamIdx, mySlot, allNames, foeName }) {
+  const link = game.link, ui = game.ui, st = game.state;
+  const myKey = `${teamIdx}:${mySlot}`;
+  // Ordre fixe des invités chez l'hôte : [A:1 (allie), B:0 (adv1), B:1 (adv2)]
+  const guestKeys = ['0:1', '1:0', '1:1'];
+  const sendQuitToRoom = (why = 'quit') => {
+    if (isHost) {
+      for (const pid of peerIds) link.send(pid, { t: 'm4p', rid, step: 'quit', who: st.name, why });
+    } else {
+      link.send(hostId, { t: 'm4p', rid, step: 'quit', key: myKey, who: st.name, why });
+    }
+  };
+  return {
+    foeName,
+    sendQuitToRoom,
+    sendAct: async (n, action, sum) => {
+      if (!isHost) link.send(hostId, { t: 'm4p', rid, step: 'act', n, key: myKey, action, sum });
+    },
+    waitAllActs: async (n, myAction, mySum, onWaitUi) => {
+      if (isHost) {
+        onWaitUi?.();
+        const byKey = { [myKey]: { ...myAction, slot: mySlot } };
+        let failed = null;
+        const res = await Promise.all(peerIds.map((pid, idx) => link.wait(pid, (q) => q.t === 'm4p' && q.rid === rid && ((q.step === 'act' && q.n === n) || q.step === 'quit'), 300000).then((q) => ({ key: guestKeys[idx], q }))));
+        for (const { key, q } of res) {
+          if (q.t !== 'm4p' || q.step === 'quit') {
+            failed = { left: q.t === 'left', timeout: q.t === 'timeout', abort: q.t === 'abort', quit: q.step === 'quit', who: q.who || allNames[key] || 'Dresseur' };
+            break;
+          }
+          if (q.sum !== mySum) {
+            failed = { desync: true };
+            break;
+          }
+          byKey[key] = { ...q.action, slot: Number(key.split(':')[1]) };
+        }
+        if (failed) {
+          for (const pid of peerIds) link.send(pid, { t: 'm4p', rid, step: 'turn-abort', n, ...failed });
+          return failed;
+        }
+        for (const pid of peerIds) link.send(pid, { t: 'm4p', rid, step: 'turn', n, byKey, sum: mySum });
+        return {
+          acts: [byKey['0:0'], byKey['0:1']].filter(Boolean),
+          foeActs: [byKey['1:0'], byKey['1:1']].filter(Boolean),
+        };
+      }
+      onWaitUi?.();
+      const msg = await link.wait(hostId, (q) => q.t === 'm4p' && q.rid === rid && (((q.step === 'turn' || q.step === 'turn-abort') && q.n === n) || q.step === 'quit'), 300000);
+      if (msg.t !== 'm4p') return { left: msg.t === 'left', timeout: msg.t === 'timeout', abort: msg.t === 'abort', who: allNames['0:0'] };
+      if (msg.step === 'quit' || msg.step === 'turn-abort') return { quit: true, desync: !!msg.desync, left: !!msg.left, who: msg.who || allNames['0:0'] };
+      if (msg.sum !== mySum) return { desync: true };
+      const byKey = msg.byKey || {};
+      return {
+        acts: [byKey[`${teamIdx}:0`], byKey[`${teamIdx}:1`]].filter(Boolean),
+        foeActs: [byKey[`${1 - teamIdx}:0`], byKey[`${1 - teamIdx}:1`]].filter(Boolean),
+      };
+    },
+    sendSwitch: async (n, idxOrNull) => {
+      if (!isHost) link.send(hostId, { t: 'm4p', rid, step: 'sw', n, key: myKey, idx: idxOrNull });
+    },
+    waitAllSwitches: async (n, neededCanonKeys, myPickIdx, onWaitUi) => {
+      if (isHost) {
+        onWaitUi?.();
+        const needGuests = [];
+        peerIds.forEach((pid, idx) => {
+          const gk = guestKeys[idx];
+          if (neededCanonKeys.includes(gk)) needGuests.push({ pid, gk });
+        });
+        const byKey = {};
+        if (neededCanonKeys.includes(myKey) && myPickIdx != null) byKey[myKey] = myPickIdx;
+        let failed = null;
+        if (needGuests.length) {
+          const res = await Promise.all(needGuests.map(({ pid, gk }) => link.wait(pid, (q) => q.t === 'm4p' && q.rid === rid && ((q.step === 'sw' && q.n === n) || q.step === 'quit'), 300000).then((q) => ({ gk, q }))));
+          for (const { gk, q } of res) {
+            if (q.t !== 'm4p' || q.step === 'quit') {
+              failed = { left: q.t === 'left', timeout: q.t === 'timeout', abort: q.t === 'abort', quit: q.step === 'quit', who: q.who || allNames[gk] };
+              break;
+            }
+            byKey[gk] = q.idx;
+          }
+        }
+        if (failed) {
+          for (const pid of peerIds) link.send(pid, { t: 'm4p', rid, step: 'sw-abort', n, ...failed });
+          return failed;
+        }
+        for (const pid of peerIds) link.send(pid, { t: 'm4p', rid, step: 'sw-go', n, byKey });
+        return {
+          picks: {
+            picks0: { 0: byKey['0:0'], 1: byKey['0:1'] },
+            picks1: { 0: byKey['1:0'], 1: byKey['1:1'] },
+          },
+        };
+      }
+      onWaitUi?.();
+      const msg = await link.wait(hostId, (q) => q.t === 'm4p' && q.rid === rid && (((q.step === 'sw-go' || q.step === 'sw-abort') && q.n === n) || q.step === 'quit'), 300000);
+      if (msg.t !== 'm4p') return { left: msg.t === 'left', timeout: msg.t === 'timeout', abort: msg.t === 'abort', who: allNames['0:0'] };
+      if (msg.step === 'quit' || msg.step === 'sw-abort') return { quit: true, left: !!msg.left, who: msg.who || allNames['0:0'] };
+      const byKey = msg.byKey || {};
+      return {
+        picks: {
+          picks0: { 0: byKey[`${teamIdx}:0`], 1: byKey[`${teamIdx}:1`] },
+          picks1: { 0: byKey[`${1 - teamIdx}:0`], 1: byKey[`${1 - teamIdx}:1`] },
+        },
+      };
+    },
+    sendQuit: () => sendQuitToRoom('forfeit'),
+    abortAllWaiters: () => {
+      if (isHost) for (const pid of peerIds) link.abort(pid);
+      else link.abort(hostId);
+    },
+    waitUiHint: (box) => ui.typePage(box, 'En attente des 4 dresseurs…', { last: true }),
+  };
+}
+
+async function runMulti4pSession(game, { rid, rosters, myKey, hostId, peerIds, seed }) {
+  const ui = game.ui, st = game.state;
+  const [teamStr, slotStr] = myKey.split(':');
+  const teamIdx = Number(teamStr);
+  const mySlot = Number(slotStr);
+  const isHost = myKey === '0:0';
+
+  const teamARosters = [rosters['0:0'], rosters['0:1']];
+  const teamBRosters = [rosters['1:0'], rosters['1:1']];
+  const sqA = buildCoopSquadParty(teamARosters);
+  const sqB = buildCoopSquadParty(teamBRosters);
+  const teamAData = {
+    name: sqA.ownerNames.join(' & '),
+    party: sqA.party,
+    owners: sqA.owners,
+    ownerNames: sqA.ownerNames,
+    hasMega: teamARosters.map((r) => !!r.hasMega),
+    bs: teamARosters[0].gender === 'f' ? 'serena' : 'calem',
+  };
+  const teamBData = {
+    name: sqB.ownerNames.join(' & '),
+    party: sqB.party,
+    owners: sqB.owners,
+    ownerNames: sqB.ownerNames,
+    hasMega: teamBRosters.map((r) => !!r.hasMega),
+    bs: teamBRosters[0].gender === 'f' ? 'serena' : 'calem',
+  };
+  const meTeam = teamIdx === 0 ? teamAData : teamBData;
+  const foeTeam = teamIdx === 0 ? teamBData : teamAData;
+  const allNames = {
+    '0:0': rosters['0:0'].name,
+    '0:1': rosters['0:1'].name,
+    '1:0': rosters['1:0'].name,
+    '1:1': rosters['1:1'].name,
+  };
+
+  const battle = new Multi4pBattle({ meTeam, foeTeam, teamIdx, mySlot, seed });
+  const net4p = create4pNet(game, { rid, isHost, hostId, peerIds, teamIdx, mySlot, allNames, foeName: foeTeam.name });
+
+  const realParty = st.party;
+  const curtain = await game.encounterIntro('trainer');
+  game.musicLock = true;
+  game.sound.play('leader');
+  curtain.remove();
+  game.bv.pvp = true;
+  st.party = battle.sides[0].party;
+  let res;
+  try {
+    res = await game.bv.runCoopDojo(battle, net4p, { bg: 'gym', night: false });
+  } finally {
+    st.party = realParty;
+    game.bv.pvp = false;
+    game.bv.close();
+    game.musicLock = false;
+  }
+  game.sound.stopMusic(0.1);
+  game.sound.current = null;
+  game.updateZone();
+
+  if (res === 'win') {
+    await ui.say(`Victoire en 2v2 à 4 joueurs contre ${foeTeam.name} !`);
+  } else {
+    await ui.say(`${foeTeam.name} remporte ce duel 2v2 à 4 dresseurs !`);
+  }
+}
+
+/** Lance un vrai combat 2v2 avec 4 joueurs humains connectés (Équipe A [J0,J1] vs Équipe B [J2,J3]) */
+export async function lancerMulti4p(game, preOpp = null) {
+  const st = game.state, ui = game.ui, link = game.link;
+  const who = { speaker: 'Multi 2v2 (4j)', face: 'topdresseur' };
+  const healthy = st.party.filter((m) => m && m.hp > 0).length;
+  if (healthy < 2) {
+    await ui.say('Il te faut au moins 2 Pokémon en forme (1 actif + 1 remplaçant) pour le Multi 2v2 !', who);
+    return;
+  }
+  const allConnected = link?.enabled ? [...link.others.values()] : [];
+  const freePeers = allConnected.filter((p) => !p.busy && !p.pvp);
+  if (freePeers.length < 3) {
+    await ui.say([
+      'Le Multi 2v2 à 4 joueurs nécessite 4 dresseurs humains connectés (2 équipes de 2) !',
+      `Connecte 3 autres dresseurs via Amis / Connexion (F3) (${freePeers.length} disponible${freePeers.length > 1 ? 's' : ''}).`,
+    ], who);
+    return;
+  }
+
+  let selected = [];
+  if (preOpp && !preOpp.busy && !preOpp.pvp) {
+    const others = freePeers.filter((p) => p.id !== preOpp.id);
+    const partnerAndOne = await selectPeersForRoom(ui, others, 2, 'Choisir ton allié puis le 2e adversaire');
+    if (!partnerAndOne) return;
+    selected = [partnerAndOne[0], preOpp, partnerAndOne[1]];
+  } else {
+    const ally = await selectPeersForRoom(ui, freePeers, 1, 'Choisir TON ALLIÉ (Équipe A)');
+    if (!ally) return;
+    const opps = await selectPeersForRoom(ui, freePeers.filter((p) => p.id !== ally[0].id), 2, 'Choisir les 2 ADVERSAIRES (Équipe B)');
+    if (!opps) return;
+    selected = [ally[0], opps[0], opps[1]];
+  }
+
+  const rid = newId();
+  const peerIds = selected.map((p) => p.id);
+  const roles = ['Allié (Équipe A)', 'Adversaire 1 (Équipe B)', 'Adversaire 2 (Équipe B)'];
+  const summaryNames = `${st.name} & ${selected[0].name} vs ${selected[1].name} & ${selected[2].name}`;
+  selected.forEach((p, idx) => {
+    link.send(p.id, { t: 'req', rid, kind: 'multi4p', name: st.name, role: roles[idx], summary: summaryNames });
+  });
+
+  const box = ui.dialogBox();
+  ui.typePage(box, `Invitation Multi 2v2 envoyée aux 3 dresseurs… (Échap : annuler)`, { last: true });
+  await wait(30);
+  const pop = game.input.push((k) => { if (k === 'b' || k === 'cancel') for (const pid of peerIds) link.abort(pid); });
+  const reps = await Promise.all(selected.map((p) => link.wait(p.id, (m) => m.t === 'm4p-rep' && m.rid === rid, 30000).then((m) => ({ peer: p, m }))));
+  pop();
+  ui.closeDialog();
+
+  if (!reps.every(({ m }) => m.t === 'm4p-rep' && m.ok)) {
+    for (const pid of peerIds) link.send(pid, { t: 'm4p-cancel', rid });
+    await ui.say('Un des 4 dresseurs n\'a pas confirmé le combat.', who);
+    return;
+  }
+
+  game.busy = true;
+  game.session = rid;
+  try {
+    const myMons = await pickDojoPair(game, who);
+    if (!myMons) {
+      for (const pid of peerIds) link.send(pid, { t: 'm4p-cancel', rid });
+      await ui.say('Combat 2v2 à 4 joueurs annulé.', who);
+      return;
+    }
+    const peerRes = await hostWaitAll(
+      game, peerIds,
+      (pid) => (q) => q.t === 'm4p' && q.rid === rid && (q.step === 'roster' || q.step === 'quit'),
+      'En attente de la sélection des 3 autres joueurs…'
+    );
+    if (peerRes.some(({ m }) => m.t !== 'm4p' || m.step !== 'roster' || !Array.isArray(m.mons) || m.mons.length < 2 || !m.mons.every(validMon))) {
+      for (const pid of peerIds) link.send(pid, { t: 'm4p-cancel', rid });
+      await ui.say('Le Multi 2v2 a été annulé avant le coup d\'envoi.', who);
+      return;
+    }
+    const keys = ['0:1', '1:0', '1:1'];
+    const rosters = {
+      '0:0': { id: link.myId, name: st.name, gender: st.gender, hasMega: !!st.bag[MEGA_RING], mons: myMons },
+    };
+    peerRes.forEach(({ pid, m }, idx) => {
+      rosters[keys[idx]] = {
+        id: pid,
+        name: String(m.name || selected[idx].name).slice(0, 12),
+        gender: m.gender === 'f' ? 'f' : 'm',
+        hasMega: !!m.hasMega,
+        mons: m.mons.slice(0, 2),
+      };
+    });
+    const seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
+    peerIds.forEach((pid, idx) => {
+      link.send(pid, { t: 'm4p', rid, step: 'start', rosters, myKey: keys[idx], hostId: link.myId, seed });
+    });
+    await runMulti4pSession(game, { rid, rosters, myKey: '0:0', hostId: link.myId, peerIds, seed });
+  } finally {
+    game.busy = false;
+    game.session = null;
+  }
+}
+
+export async function onMulti4pInvite(game, from, m) {
+  const link = game.link, st = game.state, ui = game.ui;
+  const free = st && game.player && !game.busy && game.input.free && !game.bv.alive && !game.session && !game.player.move;
+  if (!free) { link.send(from, { t: 'm4p-rep', rid: m.rid, ok: false, why: 'busy' }); return; }
+  if (st.party.filter((p) => p && p.hp > 0).length < 2) {
+    link.send(from, { t: 'm4p-rep', rid: m.rid, ok: false, why: 'nomon' });
+    return;
+  }
+
+  const name = String(m.name || link.nameOf(from)).slice(0, 12);
+  game.busy = true;
+  game.session = m.rid;
+  try {
+    let gone = false;
+    void link.wait(from, (q) => q.t === 'm4p-cancel' && q.rid === m.rid, 30000).then((r) => {
+      gone = true;
+      const open = ui.root.querySelector('.list.choice');
+      if (open && open._close) open._close(1);
+      return r;
+    });
+    ui.sound.sfx('bang');
+    const yes = await ui.yesNo(`${name} t'invite en Multi 2v2 (4 joueurs · ${m.summary || ''}) comme ${m.role || 'participant'} ! Accepter ?`, { speaker: name });
+    if (gone) { ui.closeDialog(); await ui.say(`${name} a annulé le combat 2v2.`); return; }
+    link.abort(from);
+    link.send(from, { t: 'm4p-rep', rid: m.rid, ok: yes });
+    if (!yes) return;
+
+    const myMons = await pickDojoPair(game, { speaker: 'Multi 2v2 (4j)', face: 'topdresseur' });
+    if (!myMons) { link.send(from, { t: 'm4p', rid: m.rid, step: 'quit', who: st.name }); return; }
+    link.send(from, { t: 'm4p', rid: m.rid, step: 'roster', name: st.name, gender: st.gender, hasMega: !!st.bag[MEGA_RING], mons: myMons });
+
+    const startMsg = await guestWaitHost(
+      game, from,
+      (q) => (q.t === 'm4p' && q.rid === m.rid && q.step === 'start') || (q.t === 'm4p-cancel' && q.rid === m.rid),
+      `En attente du lancement du Multi 2v2 par ${name}…`
+    );
+    if (startMsg.t !== 'm4p' || startMsg.step !== 'start') {
+      if (startMsg.t === 'abort') link.send(from, { t: 'm4p', rid: m.rid, step: 'quit', who: st.name });
+      await ui.say('Le Multi 2v2 n\'a pas commencé.');
+      return;
+    }
+    await runMulti4pSession(game, { ...startMsg, rid: m.rid, hostId: from, peerIds: [] });
+  } finally {
+    game.busy = false;
+    game.session = null;
+  }
+}
+
+/* ======================================================================
+   4. TOURNOI EN DIRECT DANS LE SALON / COLISÉE (ARBRE À 4 PLACES)
+   ====================================================================== */
+
+export const TOURNOI_CHAMPIONS = [
+  { id: 'bot:basalte', name: 'Basalte', ow: 'basalte', team: [[1026, 40], [111, 41], [1028, 42], [95, 42], [1027, 44]] },
+  { id: 'bot:pyros', name: 'Pyros', ow: 'pyros', team: [[1041, 45], [78, 46], [1005, 46], [126, 47], [1042, 49]] },
+  { id: 'bot:drakos', name: 'Drakos', ow: 'drakos', team: [[1049, 50], [1044, 52], [148, 52], [1050, 53], [149, 54], [1051, 56]] },
+  { id: 'bot:celestine', name: 'Célestine', ow: 'celestine', team: [[1016, 77], [1046, 78], [1035, 78], [1040, 79], [248, 79], [149, 81]] },
+];
+
+/** Construit un arbre de tournoi à 4 places en complétant les places manquantes par des Champions IA */
+export function buildTournoiBracket(humanSeats, championsPool = TOURNOI_CHAMPIONS, lvl = 55) {
+  const seats = humanSeats.map((h) => ({ ...h, bot: false }));
+  let cIdx = 0;
+  while (seats.length < 4) {
+    const ch = championsPool[cIdx % championsPool.length];
+    const scaled = ch.team.slice(0, 4).map(([sp, baseLvl]) => [sp, Math.max(40, Math.min(85, Math.round((lvl + baseLvl) / 2)))]);
+    seats.push({ id: `${ch.id}:${cIdx}`, name: ch.name, ow: ch.ow, bot: true, team: scaled });
+    cIdx++;
+  }
+  return {
+    seats: seats.slice(0, 4),
+    matches: [
+      { id: 'D1', label: 'Demi-finale 1', a: 0, b: 3, winner: null, loser: null },
+      { id: 'D2', label: 'Demi-finale 2', a: 1, b: 2, winner: null, loser: null },
+      { id: 'F', label: 'Finale', a: null, b: null, winner: null, loser: null },
+    ],
+  };
+}
+
+/** Affiche l'arbre du tournoi en surimpression (se ferme au clic ou après un court délai) */
+export async function showBracketModal(game, bracket, title = '🏆 TOURNOI DU COLISÉE', autoMs = 2600) {
+  const ui = game.ui;
+  const nameOf = (idx) => idx == null ? 'À déterminer' : esc(bracket.seats[idx]?.name || '?');
+  const markWin = (m, idx) => m.winner === idx ? ' style="color:#ffd84a;font-weight:900"' : '';
+  const card = (m) => `
+    <div style="background:#1c2538;border:2px solid #4a6394;border-radius:8px;padding:8px 12px;margin:6px 0">
+      <div style="font-size:11px;color:#8bb4ff;text-transform:uppercase;letter-spacing:.05em">${esc(m.label)}</div>
+      <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px;margin-top:4px">
+        <span${markWin(m, m.a)}>${nameOf(m.a)}</span>
+        <span style="color:#7890b8">vs</span>
+        <span${markWin(m, m.b)}>${nameOf(m.b)}</span>
+      </div>
+    </div>`;
+  const s = el('div', 'screen');
+  s.style.cssText = 'position:fixed;inset:0;background:rgba(8,12,24,0.86);z-index:900;display:flex;align-items:center;justify-content:center;padding:16px;';
+  s.innerHTML = `<div class="box" style="max-width:420px;width:100%;padding:16px 20px;background:#121826;color:#f1f5ff;border:3px solid #e2b846;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.65)">
+    <div class="scr-title" style="text-align:center;color:#ffd84a;margin-bottom:10px">${esc(title)}</div>
+    ${bracket.matches.map(card).join('')}
+    <div style="text-align:center;margin-top:12px"><button type="button" class="btn-ok" style="padding:6px 18px;border-radius:6px;background:#e2b846;color:#111;font-weight:bold;border:none;cursor:pointer">Continuer</button></div>
+  </div>`;
+  ui.root.appendChild(s);
+  await new Promise((res) => {
+    let done = false;
+    const finish = () => { if (done) return; done = true; clearTimeout(t); s.remove(); res(); };
+    const t = autoMs > 0 ? setTimeout(finish, autoMs) : 0;
+    s.querySelector('.btn-ok').onclick = finish;
+  });
+}
+
+function buildTournoiBotParty(seat, lvl, seed) {
+  const r = seededRng(seed >>> 0);
+  const src = LEADERS.find((l) => l.name === seat.name)?.team || seat.team;
+  return src.slice(0, 4).map(([sp]) => createMon(sp, Math.max(45, lvl), { iv: [24, 24, 24, 24, 24, 24], rng: r }));
+}
+
+function simBotMatch(seatA, seatB, lvl, format, seed) {
+  const partyA = buildTournoiBotParty(seatA, lvl, seed ^ 0x1111);
+  const partyB = buildTournoiBotParty(seatB, lvl, seed ^ 0x2222);
+  const b = new Battle({
+    player: { name: seatA.name, party: partyA, bag: {} },
+    foe: { name: seatB.name, party: partyB, trainer: { cls: 'Champion', name: seatB.name, bs: seatB.ow, ai: 'smart', prize: 0 } },
+    rng: seededRng(seed >>> 0),
+    format,
+  });
+  // Simulation rapide en boucle IA
+  let guard = 0;
+  while (b.state !== 'over' && guard++ < 80) {
+    if (b.state === 'switch') {
+      const need = b.needPlayerSlots?.length ? b.needPlayerSlots : [0];
+      const picks = need.map(() => partyA.findIndex((m, idx) => m && m.hp > 0 && !b.sides[0].activeSlots.includes(idx)));
+      b.playerSwitch(picks);
+      continue;
+    }
+    const acts = b.aliveSlots(0).map((sl) => {
+      const usable = b.usableMoves({ side: 0, slot: sl });
+      const mvIdx = usable.length ? usable[Math.floor(b.rng() * usable.length)] : 0;
+      const foes = b.aliveSlots(1);
+      return { slot: sl, type: 'move', idx: mvIdx, targetSide: 1, targetSlot: foes[0] ?? 0 };
+    });
+    b.playerAction(format === 'single' ? acts[0] : acts);
+  }
+  return b.result === 'win' ? 'A' : 'B';
+}
+
+/** Exécute un match Joueur vs Champion IA en diffusant les événements en direct aux spectateurs du tournoi */
+async function playHumanVsBotTournoi(game, botSeat, lvl, format, seed, matchRid) {
+  const st = game.state, link = game.link;
+  const party = battleCopy(st.party);
+  const botParty = buildTournoiBotParty(botSeat, lvl, seed);
+  const battle = new Battle({
+    player: { name: st.name, party, bag: {} },
+    foe: { name: botSeat.name, party: botParty, trainer: { cls: 'Champion', name: botSeat.name, bs: botSeat.ow || 'drakos', ai: 'smart', prize: 0 } },
+    rng: seededRng(seed >>> 0),
+    format,
+  });
+  const spectators = new Set();
+  const prevSpec = link.onSpectate;
+  const exportSnap = () => ({
+    turn: battle.turn, slots: battle.slots, weather: battle.weather, weatherTurns: battle.weatherTurns, bg: 'league', night: false,
+    p0: { name: st.name, bs: st.gender === 'f' ? 'serena' : 'calem', active: battle.sides[0].active, activeSlots: [...battle.sides[0].activeSlots], st: [...battle.sides[0].v.st], party: battle.sides[0].party.map((m) => ({ sp: m.sp, lvl: m.lvl, hp: m.hp, stats: m.stats, status: m.status, shiny: !!m.shiny, shadow: !!m.shadow, nick: m.nick || null })) },
+    p1: { name: botSeat.name, bs: botSeat.ow || 'drakos', active: battle.sides[1].active, activeSlots: [...battle.sides[1].activeSlots], st: [...battle.sides[1].v.st], party: battle.sides[1].party.map((m) => ({ sp: m.sp, lvl: m.lvl, hp: m.hp, stats: m.stats, status: m.status, shiny: !!m.shiny, shadow: !!m.shadow, nick: m.nick || null })) },
+  });
+  link.onSpectate = (fid, msg) => {
+    if (msg.t === 'spec_join') { spectators.add(fid); link.send(fid, { t: 'spec_init', rid: msg.rid || matchRid, ...exportSnap() }); return true; }
+    if (msg.t === 'spec_leave') { spectators.delete(fid); return true; }
+    return false;
+  };
+  const bcast = (events) => {
+    if (!events?.length || !spectators.size) return;
+    for (const sid of spectators) link.send(sid, { t: 'spec_ev', rid: matchRid, turn: battle.turn, events });
+  };
+
+  const realParty = st.party;
+  const curtain = await game.encounterIntro('trainer');
+  game.musicLock = true;
+  game.sound.play('leader');
+  curtain.remove();
+  st.party = battle.sides[0].party;
+  try {
+    const bv = game.bv;
+    bv.battle = battle; bv.slots = battle.slots || 1; bv.kind = 'league'; bv.alive = true;
+    bv.lastMove = 0; bv.lastMoveMon = null; bv.seenInBattle = new Set();
+    bv.initState(); bv.buildDom();
+    bv.root.style.setProperty('--bp', (innerHeight / 200) + 'px');
+    bv.updateWeather(battle.weather);
+    for (let sl = 0; sl < bv.slots; sl++) { bv.setHud(1, null, 0, sl); bv.setHud(0, null, 0, sl); }
+    const jobs = [bv.loadBattleDecor('league', false)];
+    for (let sl = 0; sl < bv.slots; sl++) jobs.push(bv.loadSide(1, sl), bv.loadSide(0, sl));
+    await Promise.all(jobs);
+    if (battle.sides[1].trainer) bv.st.trainer.img = await (await import('./assets.js')).loadImg((await import('./assets.js')).ASSETS.trainer(battle.sides[1].trainer.bs));
+    requestAnimationFrame(bv.frame);
+    bv.st.screenFlash = 0; bv.st.trainer.visible = true;
+    await bv.tween(550, (u) => { const e = 1 - (1 - u) * (1 - u); bv.st.eSlide = -bv.W * (1 - e); bv.st.pSlide = bv.W * (1 - e); });
+    const evStart = battle.start();
+    bcast(evStart);
+    await bv.play(evStart);
+    while (battle.state !== 'over') {
+      if (battle.state === 'switch') {
+        const need = battle.needPlayerSlots?.length ? battle.needPlayerSlots : [0];
+        const picks = bv.slots === 1
+          ? await partyScreen(game, { mode: 'pick', pickLabel: 'Envoyer', prompt: 'Envoyer quelle créature ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === battle.sides[0].active ? 'Au combat' : null) })
+          : await bv.pickReplacementList(need);
+        if (bv.slots === 1 && picks < 0) continue;
+        const evSw = battle.playerSwitch(picks);
+        bcast(evSw);
+        await bv.play(evSw);
+        continue;
+      }
+      const action = await bv.chooseAction();
+      if (!action) continue;
+      const evAct = battle.playerAction(action);
+      bcast(evAct);
+      await bv.play(evAct);
+    }
+    const winnerName = battle.result === 'win' ? st.name : botSeat.name;
+    for (const sid of spectators) link.send(sid, { t: 'spec_end', rid: matchRid, winner: winnerName });
+    await wait(400);
+  } finally {
+    st.party = realParty;
+    game.bv.close();
+    game.musicLock = false;
+    link.onSpectate = prevSpec;
+  }
+  game.sound.stopMusic(0.1);
+  game.sound.current = null;
+  game.updateZone();
+  return battle.result === 'win' ? 'win' : 'lose';
+}
+
+async function grantTournoiRewards(game, bracket, myId, isSingleHuman) {
+  const ui = game.ui, st = game.state, D = ensureDojo(st);
+  const f = bracket.matches[2];
+  const winnerSeat = bracket.seats[f.winner];
+  const finalistSeat = bracket.seats[f.loser];
+  const won = winnerSeat?.id === myId;
+  const second = !won && finalistSeat?.id === myId;
+
+  if (won) {
+    D.pdj += 10;
+    st.money += 15000;
+    game.sound.sfx('item');
+    game.save(true);
+    await ui.say(`🏆 Champion du Tournoi ${winnerSeat.name} ! Tu remportes 10 PDj et 15 000 ₽ !`);
+  } else if (second) {
+    D.pdj += 5;
+    st.money += 5000;
+    game.sound.sfx('item');
+    game.save(true);
+    await ui.say(`🥈 Beau parcours jusqu'en Finale ! Tu gagnes 5 PDj et 5 000 ₽ !`);
+  } else {
+    D.pdj += 2;
+    game.save(true);
+    await ui.say(`🥉 Merci pour ta participation au Tournoi ! Tu reçois 2 PDj.${isSingleHuman ? '' : ''}`);
+  }
+}
+
+async function runGuestTournoiLoop(game, { rid, hostId, format, bracket, lvl }) {
+  const st = game.state, ui = game.ui, link = game.link;
+  const myId = link.myId;
+  const { battleSession, spectateSession } = await import('./net/social.js');
+
+  for (const mIdx of [0, 1, 2]) {
+    const sync = await guestWaitHost(
+      game, hostId,
+      (q) => q.t === 'tournoi' && q.rid === rid && (q.step === 'match' || q.step === 'done' || q.step === 'cancel'),
+      'En attente du prochain match du Tournoi…'
+    );
+    if (sync.t !== 'tournoi' || sync.step !== 'match') {
+      if (sync.step === 'done' && sync.bracket) await showBracketModal(game, sync.bracket, '🏆 RÉSULTAT DU TOURNOI');
+      return;
+    }
+    bracket = sync.bracket;
+    const match = bracket.matches[sync.matchIdx];
+    await showBracketModal(game, bracket, `${match.label} · ${format === 'double' ? '2v2' : '1v1'}`, 2200);
+    const sA = bracket.seats[match.a];
+    const sB = bracket.seats[match.b];
+
+    if (sA.id === myId || sB.id === myId) {
+      const opp = sA.id === myId ? sB : sA;
+      let won = false;
+      const mRid = `${rid}:m${sync.matchIdx}`;
+      if (opp.bot) {
+        const res = await playHumanVsBotTournoi(game, opp, lvl, format, sync.seed, mRid);
+        won = res === 'win';
+      } else {
+        const amChallenger = sA.id === myId;
+        const outcome = await battleSession(game, opp.id, opp.name, opp.gender || 'm', mRid, amChallenger, format);
+        won = outcome === 'win';
+      }
+      link.send(hostId, { t: 'tournoi', rid, step: 'match-res', matchIdx: sync.matchIdx, winnerId: won ? myId : opp.id });
+    } else if (!sA.bot || !sB.bot) {
+      const hostSpec = !sA.bot ? sA : sB;
+      const mRid = `${rid}:m${sync.matchIdx}`;
+      await ui.say(`Match en direct : ${sA.name} vs ${sB.name} ! Ouverture du mode Spectateur…`);
+      game.busy = false; game.session = null;
+      try {
+        await spectateSession(game, hostSpec.id, mRid, sA.name, sB.name);
+      } finally {
+        game.busy = true; game.session = rid;
+      }
+    } else {
+      await ui.say(`Simulation de ${sA.name} vs ${sB.name}…`);
+    }
+
+    const upd = await guestWaitHost(
+      game, hostId,
+      (q) => q.t === 'tournoi' && q.rid === rid && q.step === 'match-upd' && q.matchIdx === sync.matchIdx,
+      'Mise à jour du tableau du Tournoi…', false
+    );
+    if (upd.bracket) bracket = upd.bracket;
+  }
+
+  const endMsg = await guestWaitHost(
+    game, hostId,
+    (q) => q.t === 'tournoi' && q.rid === rid && q.step === 'done',
+    'Clôture du Tournoi…', false
+  );
+  if (endMsg.bracket) {
+    await showBracketModal(game, endMsg.bracket, '🏆 FIN DU TOURNOI', 3500);
+    await grantTournoiRewards(game, endMsg.bracket, myId, false);
+  }
+}
+
+/** Lance un Tournoi en direct à 4 places (humains connectés + Champions IA si < 4 humains) */
+export async function lancerTournoiSalon(game) {
+  const st = game.state, ui = game.ui, link = game.link;
+  const who = { speaker: 'Arbitre du Colisée', face: 'celestine' };
+  const healthy = st.party.filter((m) => m && m.hp > 0).length;
+  if (healthy < 1) {
+    await ui.say('Il te faut au moins 1 Pokémon en forme pour participer au Tournoi !', who);
+    return;
+  }
+
+  const fmtPick = await ui.ask('Quel format pour le Tournoi à 4 places ?', ['Solo (1v1)', 'Duo (2v2)', 'Annuler'], who);
+  if (fmtPick !== 0 && fmtPick !== 1) return;
+  const format = fmtPick === 1 ? 'double' : 'single';
+  if (format === 'double' && healthy < 2) {
+    await ui.say('Il te faut au moins 2 Pokémon en forme pour un Tournoi Duo (2v2) !', who);
+    return;
+  }
+
+  const freePeers = (link?.enabled ? [...link.others.values()] : []).filter((p) => !p.busy && !p.pvp);
+  let invitedPeers = [];
+  if (freePeers.length > 0) {
+    const inviteMode = await ui.ask(`Inviter des amis connectés (${freePeers.length} dispo) ? Les places libres seront tenues par des Champions.`, ['Inviter tous les amis libres (max 3)', 'Choisir les amis', 'Tournoi solo vs 3 Champions', 'Annuler'], who);
+    if (inviteMode === 3 || inviteMode < 0) return;
+    if (inviteMode === 0) invitedPeers = freePeers.slice(0, 3);
+    else if (inviteMode === 1) {
+      const k = await ui.list({ title: 'Combien d\'amis inviter ?', items: freePeers.slice(0, 3).map((_, i) => ({ label: `${i + 1} ami${i > 0 ? 's' : ''}` })).concat([{ label: 'Annuler' }]), cancel: Math.min(3, freePeers.length) });
+      if (k < 0 || k >= Math.min(3, freePeers.length)) return;
+      invitedPeers = await selectPeersForRoom(ui, freePeers, k + 1, 'Inviter au Tournoi') || [];
+      if (!invitedPeers.length) return;
+    }
+  } else {
+    const goSolo = await ui.yesNo('Aucun ami connecté pour l\'instant : lancer un Tournoi à 4 places contre 3 Champions du Colisée ?', who);
+    if (!goSolo) return;
+  }
+
+  const rid = newId();
+  const lvl = Math.max(50, ...st.party.map((m) => m.lvl || 50));
+  let confirmedPeers = [];
+  if (invitedPeers.length) {
+    for (const p of invitedPeers) {
+      link.send(p.id, { t: 'req', rid, kind: 'tournoi', format, name: st.name, lvl });
+    }
+    const box = ui.dialogBox();
+    ui.typePage(box, `Inscription au Tournoi envoyée à ${invitedPeers.map((p) => p.name).join(', ')}…`, { last: true });
+    await wait(30);
+    const reps = await Promise.all(invitedPeers.map((p) => link.wait(p.id, (m) => m.t === 'tournoi-rep' && m.rid === rid, 25000).then((m) => ({ peer: p, m }))));
+    ui.closeDialog();
+    confirmedPeers = reps.filter(({ m }) => m.t === 'tournoi-rep' && m.ok).map(({ peer, m }) => ({ peer, lvl: m.lvl || 50 }));
+    for (const { peer, m } of reps) {
+      if (!(m.t === 'tournoi-rep' && m.ok)) link.send(peer.id, { t: 'tournoi-cancel', rid });
+    }
+  }
+
+  const peerIds = confirmedPeers.map(({ peer }) => peer.id);
+  const humanSeats = [
+    { id: link.myId, name: st.name, ow: st.gender === 'f' ? 'serena' : 'calem', gender: st.gender },
+    ...confirmedPeers.map(({ peer }) => ({ id: peer.id, name: peer.name, ow: peer.gender === 'f' ? 'serena' : 'calem', gender: peer.gender })),
+  ];
+  const tourLvl = Math.max(lvl, ...confirmedPeers.map((c) => c.lvl));
+  const bracket = buildTournoiBracket(humanSeats, TOURNOI_CHAMPIONS, tourLvl);
+
+  const { battleSession, spectateSession } = await import('./net/social.js');
+  game.busy = true;
+  game.session = rid;
+  try {
+    for (const pid of peerIds) {
+      link.send(pid, { t: 'tournoi', rid, step: 'start', format, bracket, lvl: tourLvl });
+    }
+
+    const humanIds = new Set(humanSeats.map((h) => h.id));
+    for (const matchIdx of [0, 1, 2]) {
+      const m = bracket.matches[matchIdx];
+      const sA = bracket.seats[m.a];
+      const sB = bracket.seats[m.b];
+      const spectIds = [...humanIds].filter((id) => id !== sA.id && id !== sB.id && id !== link.myId);
+      const seed = ((Date.now() ^ (matchIdx * 7919)) >>> 0);
+
+      for (const pid of peerIds) {
+        link.send(pid, { t: 'tournoi', rid, step: 'match', matchIdx, bracket, seed, spectators: spectIds });
+      }
+      await showBracketModal(game, bracket, `${m.label} · ${format === 'double' ? '2v2' : '1v1'}`, 2400);
+
+      let winnerSeatIdx = m.a;
+      if (sA.bot && sB.bot) {
+        const res = simBotMatch(sA, sB, tourLvl, format, seed);
+        winnerSeatIdx = res === 'A' ? m.a : m.b;
+        await ui.say(`${m.label} : ${bracket.seats[winnerSeatIdx].name} bat ${bracket.seats[winnerSeatIdx === m.a ? m.b : m.a].name} !`, who);
+      } else if (sA.id === link.myId || sB.id === link.myId) {
+        const opp = sA.id === link.myId ? sB : sA;
+        const mRid = `${rid}:m${matchIdx}`;
+        let myWin = false;
+        if (opp.bot) {
+          myWin = (await playHumanVsBotTournoi(game, opp, tourLvl, format, seed, mRid)) === 'win';
+        } else {
+          const outcome = await battleSession(game, opp.id, opp.name, opp.gender || 'm', mRid, true, format);
+          myWin = outcome === 'win';
+        }
+        winnerSeatIdx = (myWin && sA.id === link.myId) || (!myWin && sB.id === link.myId) ? m.a : m.b;
+      } else {
+        // Ni l'hôte ni pure IA : un autre humain joue le match -> l'hôte regarde en spectateur et attend son rapport
+        const driverSeat = !sA.bot ? sA : sB;
+        const mRid = `${rid}:m${matchIdx}`;
+        const waitProm = link.wait(driverSeat.id, (q) => q.t === 'tournoi' && q.rid === rid && q.step === 'match-res' && q.matchIdx === matchIdx, 300000);
+        await ui.say(`Match en direct : ${sA.name} vs ${sB.name} ! Ouverture du mode Spectateur…`, who);
+        game.busy = false; game.session = null;
+        try {
+          await spectateSession(game, driverSeat.id, mRid, sA.name, sB.name);
+        } finally {
+          game.busy = true; game.session = rid;
+        }
+        const rep = await waitProm;
+        winnerSeatIdx = rep?.winnerId === sB.id ? m.b : m.a;
+      }
+
+      m.winner = winnerSeatIdx;
+      m.loser = winnerSeatIdx === m.a ? m.b : m.a;
+      if (matchIdx === 0) bracket.matches[2].a = m.winner;
+      if (matchIdx === 1) bracket.matches[2].b = m.winner;
+      for (const pid of peerIds) {
+        link.send(pid, { t: 'tournoi', rid, step: 'match-upd', matchIdx, bracket });
+      }
+    }
+
+    for (const pid of peerIds) link.send(pid, { t: 'tournoi', rid, step: 'done', bracket });
+    await showBracketModal(game, bracket, '🏆 FIN DU TOURNOI', 3600);
+    await grantTournoiRewards(game, bracket, link.myId, peerIds.length === 0);
+  } finally {
+    game.busy = false;
+    game.session = null;
+  }
+}
+
+export async function onTournoiInvite(game, from, m) {
+  const link = game.link, st = game.state, ui = game.ui;
+  const free = st && game.player && !game.busy && game.input.free && !game.bv.alive && !game.session && !game.player.move;
+  if (!free) { link.send(from, { t: 'tournoi-rep', rid: m.rid, ok: false, why: 'busy' }); return; }
+  const minMon = m.format === 'double' ? 2 : 1;
+  if (st.party.filter((p) => p && p.hp > 0).length < minMon) {
+    link.send(from, { t: 'tournoi-rep', rid: m.rid, ok: false, why: 'nomon' });
+    return;
+  }
+
+  const name = String(m.name || link.nameOf(from)).slice(0, 12);
+  game.busy = true;
+  game.session = m.rid;
+  try {
+    let gone = false;
+    void link.wait(from, (q) => q.t === 'tournoi-cancel' && q.rid === m.rid, 25000).then((r) => {
+      gone = true;
+      const open = ui.root.querySelector('.list.choice');
+      if (open && open._close) open._close(1);
+      return r;
+    });
+    ui.sound.sfx('bang');
+    const yes = await ui.yesNo(`${name} t'invite au Tournoi en direct (${m.format === 'double' ? 'Duo 2v2' : 'Solo 1v1'}, 4 places) ! Participer ?`, { speaker: name });
+    if (gone) { ui.closeDialog(); await ui.say(`${name} a lancé le Tournoi sans toi.`); return; }
+    link.abort(from);
+    const myLvl = Math.max(50, ...st.party.map((p) => p.lvl || 50));
+    link.send(from, { t: 'tournoi-rep', rid: m.rid, ok: yes, lvl: myLvl });
+    if (!yes) return;
+
+    const startMsg = await guestWaitHost(
+      game, from,
+      (q) => (q.t === 'tournoi' && q.rid === m.rid && q.step === 'start') || (q.t === 'tournoi-cancel' && q.rid === m.rid),
+      `En attente du tirage au sort du Tournoi par ${name}…`
+    );
+    if (startMsg.t !== 'tournoi' || startMsg.step !== 'start') {
+      await ui.say('Le Tournoi n\'a pas démarré.');
+      return;
+    }
+    await runGuestTournoiLoop(game, { rid: m.rid, hostId: from, format: startMsg.format, bracket: startMsg.bracket, lvl: startMsg.lvl });
+  } finally {
+    game.busy = false;
+    game.session = null;
+  }
+}

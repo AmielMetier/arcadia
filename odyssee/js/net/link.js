@@ -16,6 +16,7 @@ export class Link {
     this.inbox = [];         // messages de session arrivés avant qu'on les attende
     this.onRequest = null;   // (from, msg) → appelé à la réception d'une invitation
     this.onCard = null;      // () → fiche dresseur envoyée à qui la demande
+    this.onDomaine = null;   // () → aperçu du Domaine envoyé à un ami qui le visite
     this.onSpectate = null;  // (from, msg) → gestion des spectateurs d'un combat en cours
     this.onChat = null;      // (from, msg) → bulles de dialogue / chat multijoueur
     this.lastSent = '';
@@ -73,6 +74,7 @@ export class Link {
     if (m.t === 'hello') { this.lastSent = ''; return; }
     if (m.t === 'bye') { this.drop(from); return; }
     if (m.t === 'card?') { const c = this.onCard?.(); this.send(from, { t: 'card', rid: m.rid, card: c }); return; }
+    if (m.t === 'domaine?') { const info = this.onDomaine?.(); this.send(from, { t: 'domaine', rid: m.rid, info }); return; }
     if (m.t === 'chat') { if (this.onChat) this.onChat(from, m); return; }
     if (m.t === 'spec_join' || m.t === 'spec_leave') { if (this.onSpectate && this.onSpectate(from, m)) return; }
     if (m.t === 'req') {

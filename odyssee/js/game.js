@@ -35,7 +35,7 @@ import { preparerArene, surCaseArene, actionnerArene, remettreArene, pasArene, r
 import { casinoScreen, bourseScreen, entretienPierre } from './ui/metropole.js';
 import { arcadeScreen } from './ui/arcade.js';
 import { apparenceScreen } from './ui/apparence.js';
-import { preparerDomaine, frigo, architecte, recolter, allerDomaine, resident, arrivees } from './ui/domaine.js';
+import { preparerDomaine, frigo, architecte, recolter, allerDomaine, resident, arrivees, gardienDomaine } from './ui/domaine.js';
 import { composer, tenueValide, tenueOrigine } from './render/tenue.js';
 import { buildRivalParty, getRivalItems } from './world/rival.js';
 import { Vie, parlerFaune, rentreLeSoir } from './vie.js';
@@ -2482,6 +2482,7 @@ export class Game {
     if (name === 'pierre') return entretienPierre(this);
     if (name === 'apparence') return this.apparence();
     if (name === 'architecte') return architecte(this);
+    if (name === 'gardienDomaine') return gardienDomaine(this, n);
     if (name === 'resident') return resident(this, n);
     if (name === 'faune') return parlerFaune(this, n);
     if (name === 'colporteur') return colporteur(this, n);
