@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.107 — 18 novembre 2026
+- **Odyssée** — Combats Duo (2v2) et Trio (3v3) complets (stratégies d'équipe, capacités de zone, portée des attaques en Trio, sélection de cible avec efficacité affichée et bouton Retour pour corriger son choix), jouables dès les Centres Pokémon auprès du Coach Tactique, dans les arènes et la Route Victoire, à la Tour de Combat et en PvP entre joueurs. Animations de combat enrichies sur tous les formats (animations d'attente, charges avec images rémanentes, effets spéciaux sur-mesure pour les attaques signatures et les 18 types, et particules météo).
+
 ## 5.106 — 18 novembre 2026
 - **Odyssée** — Choix du style de graphismes dès le lancement d'une nouvelle aventure (Odyssée d'origine ou Noir & Blanc, ainsi que les sprites Pokémon), modifiable plus tard à tout moment dans les Options avec application immédiate en jeu, et un clin d'œil dans l'introduction du Professeur Saule.
 

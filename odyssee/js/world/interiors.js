@@ -27,6 +27,7 @@ export function centerInterior(id, name) {
   furn(m, 'plant', 1, 2); furn(m, 'plant', 1, 8);
   furn(m, 'bench', 1, 6); m.set(2, 6, T.BLOCK); furn(m, 'bench', 10, 6); m.set(11, 6, T.BLOCK);
   furn(m, 'vase', 11, 8);
+  m.npc({ id: id + ':club', x: 10, y: 8, sprite: 'topdresseur', dir: 'left', script: 'clubCombat' });
   return m;
 }
 export function martInterior(id, name, stock) {

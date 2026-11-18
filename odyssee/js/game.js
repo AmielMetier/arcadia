@@ -39,7 +39,7 @@ import { preparerDomaine, frigo, architecte, recolter, allerDomaine, resident, a
 import { composer, tenueValide, tenueOrigine } from './render/tenue.js';
 import { buildRivalParty, getRivalItems } from './world/rival.js';
 import { Vie, parlerFaune, rentreLeSoir } from './vie.js';
-import { revancheBossPossible, revancheBoss, tourCombat } from './tour-combat.js';
+import { revancheBossPossible, revancheBoss, tourCombat, clubCombat } from './tour-combat.js';
 import { VieMonde, colporteur, marche, cueillir, fouiller, revanchePossible, revanche, noteCombat, ragot, echange, relais, concours, loterie, musicien } from './vie-monde.js';
 
 /** météos qui comptent en combat (brume et cendres ne sont que du décor, comme dans les jeux 5G) */
@@ -1997,7 +1997,7 @@ export class Game {
         shiny: false
       });
     });
-    const res = await this.runBattle({ trainer: { ...tr, items: { ...(tr.items || {}) } }, party, music, id: n.id, leader: d.leader, champion: d.champion, rival: d.rival, noWhiteout: d.noWhiteout });
+    const res = await this.runBattle({ trainer: { ...tr, items: { ...(tr.items || {}) } }, party, music, id: n.id, leader: d.leader, champion: d.champion, rival: d.rival, noWhiteout: d.noWhiteout, format: tr.format || d.format, slots: tr.slots || d.slots });
     this.musicLock = false;
     if (res === 'win') {
       st.flags['T:' + n.id] = true;
@@ -2175,8 +2175,9 @@ export class Game {
   }
   async runBattleSafe(o) {
     const st = this.state;
-    const kind = o.wild ? o.music || 'wild' : o.music || 'trainer';
-    const curtain = await this.encounterIntro(kind, !!o.wild);
+    const isWild = !!(o.wild || o.wildParty);
+    const kind = isWild ? o.music || 'wild' : o.music || 'trainer';
+    const curtain = await this.encounterIntro(kind, isWild);
     const m = this.mapObj, z = this.zone;
     const isVillage = z?.town === 'aube' || z?.town === 'sylve' || z?.theme === 'village';
     const isCity = !!z?.town || z?.name?.includes('Cité') || z?.name?.includes('Port-');
@@ -2199,17 +2200,19 @@ export class Game {
       const pid = forms && forms[(o.trainer.megaSeed || 0) % forms.length];
       if (pid) { target.item = MEGA_FORMS[pid].stone; o.trainer = { ...o.trainer, mega: true }; }
     }
-    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag, mega: (st.bag[MEGA_RING] || 0) > 0 }, foe: o.wild ? { name: 'sauvage', party: [o.wild] } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap(), weather: BATTLE_WEATHERS.includes(weather) ? weather : undefined, weatherTurns: o.weather ? 0 : 5 });
+    const format = o.format || o.trainer?.format, slots = o.slots || o.trainer?.slots;
+    const wildParty = o.wildParty || (o.wild ? [o.wild] : null);
+    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag, mega: (st.bag[MEGA_RING] || 0) > 0 }, foe: wildParty ? { name: 'sauvage', party: wildParty } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap(), weather: BATTLE_WEATHERS.includes(weather) ? weather : undefined, weatherTurns: o.weather ? 0 : 5, format, slots });
     // combat de dresseur en cours : noté dans la sauvegarde, pour que recharger la page ne permette pas d'y échapper
     if (o.trainer && !o.trainer.friendly && !o.noWhiteout) { st.combatEnCours = true; this.save(true); }
-    const foeMons = o.wild ? [o.wild] : o.party;
+    const foeMons = wildParty || o.party;
     const h = this.hour();
     const result = await this.bv.run(battle, { bg, night: m.outdoor && (h >= 20 || h < 5.5), weather: BATTLE_WEATHERS.includes(weather) ? weather : 'none', curtain });
     // argent
     if (result === 'win' && battle.prizeMoney) st.money += battle.prizeMoney;
     try { this.checkTrophies?.(true); } catch (e) {}
     if (result === 'caught') {
-      const mon = foeMons[0]; mon.ot = st.name; mon.met = this.locationName();
+      const mon = battle.caughtMon || foeMons[0]; mon.ot = st.name; mon.met = this.locationName();
       const isNew = !st.dex.caught.includes(mon.sp);
       this.markCaught(mon.sp);
       this.bv.close();
@@ -2413,7 +2416,7 @@ export class Game {
         const party = isRival ? buildRivalParty(g, t.team) : t.team.map(([sp, lvl]) => createMon(sp, lvl, { iv: Array(6).fill(Math.min(31, 10 + lvl / 2 | 0)), shiny: false }));
         g.musicLock = true;
         const items = isRival ? getRivalItems(g) : { ...(t.items || {}) };
-        const res = await g.runBattle({ trainer: { ...t, items }, party, music: t.music || (isRival ? 'rival' : 'trainer'), rival: isRival, noWhiteout: t.noWhiteout });
+        const res = await g.runBattle({ trainer: { ...t, items }, party, music: t.music || (isRival ? 'rival' : 'trainer'), rival: isRival, noWhiteout: t.noWhiteout, format: t.format, slots: t.slots });
         g.musicLock = false; g.updateZone();
         if (res === 'win' && t.after) await ui().say(t.after, { speaker: t.cls ? `${t.cls} ${t.name}` : t.name, face: t.bs || t.ow });
         return res;
@@ -2482,6 +2485,7 @@ export class Game {
     if (name === 'faune') return parlerFaune(this, n);
     if (name === 'colporteur') return colporteur(this, n);
     if (name === 'tourCombat') return tourCombat(this, n);
+    if (name === 'clubCombat') return clubCombat(this, n);
     if (name === 'marche') return marche(this, n);
     if (name === 'echange') return echange(this, n);
     if (name === 'relais') return relais(this, n);

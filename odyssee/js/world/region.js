@@ -176,7 +176,7 @@ export function trainerNpc(map, x, y, dir, cls, name, team, o = {}) {
   const [ow, prize, bs] = CLS[cls] || ['gamin', 20];
   return map.npc({
     id: o.id || `${map.id}:t${tCount++}`, x, y, dir, sprite: o.ow || ow, move: 'static', onWin: o.onWin,
-    trainer: { cls, name, team, prize: o.prize || prize, sight: o.sight ?? 4, bs: o.bs || bs || ow, ai: o.ai || 'normal', items: o.items, megaSp: o.megaSp, intro: o.intro || 'Nos regards se sont croisés : c\'est l\'heure du combat !', lose: o.lose || 'J\'ai perdu...', after: o.after || 'Tu es vraiment fort !' },
+    trainer: { cls, name, team, prize: o.prize || prize, sight: o.sight ?? 4, bs: o.bs || bs || ow, ai: o.ai || 'normal', items: o.items, megaSp: o.megaSp, format: o.format, slots: o.slots, intro: o.intro || 'Nos regards se sont croisés : c\'est l\'heure du combat !', lose: o.lose || 'J\'ai perdu...', after: o.after || 'Tu es vraiment fort !' },
   });
 }
 /** dresseur posé le long d'une route : t sur la ligne, côté ±1, distance au sentier */
@@ -1234,7 +1234,7 @@ export function buildWorld() {
     W.warp(out.doorX, out.doorY, { map: 'victoire', x: cx, y: cy, dir: 'up' });
     victoire.deco.push({ k: 'exitlight', x: cx, y: cy + 1 });
   }
-  caveTrainers(victoire, [['Topdresseur', 'Dimitri', [[67, 40], [1044, 40], [130, 41]]], ['Topdresseuse', 'Sofia', [[148, 41], [1040, 40], [1035, 40]]], ['Karatéka', 'Takeshi', [[68, 42], [1033, 41], [106, 41]]], ['Médium', 'Iris', [[94, 41], [1023, 41]]], ['Montagnard', 'Hubert', [[76, 42], [1028, 42], [112, 42]]]], 41);
+  caveTrainers(victoire, [['Topdresseur', 'Dimitri', [[67, 40], [1044, 40], [130, 41]], { format: 'triple', intro: 'Route Victoire, format Trio 3v3 ! Montre-moi ce que tu vaux !' }], ['Topdresseuse', 'Sofia', [[148, 41], [1040, 40], [1035, 40]], { format: 'double', intro: 'Un combat Duo avant la Ligue, ça te tente ?' }], ['Karatéka', 'Takeshi', [[68, 42], [1033, 41], [106, 41]]], ['Médium', 'Iris', [[94, 41], [1023, 41]]], ['Montagnard', 'Hubert', [[76, 42], [1028, 42], [112, 42]]]], 41);
   caveItems(victoire, ['full-restore', 'max-repel', 'rare-candy', 'ultra-ball', 'revive', 'max-potion'], 43);
   smashOnPath(victoire, { x: 50, y: 34 }, 3, 991);
 
@@ -1301,8 +1301,15 @@ export function buildWorld() {
     }
     list.slice(0, spots.length).forEach(([cls, name, team], i) => {
       const lvl = Math.max(...team.map((m) => m[1]));
-      const more = equipeDeType(L2.type, lvl, team.length >= 3 ? 1 : 2, t.gym * 31 + i * 7 + 3).filter(([sp]) => !team.some((m) => m[0] === sp));
-      const [x, y, dir, vue] = spots[i]; trainerNpc(g, x, y, dir, cls, name, team.concat(more).slice(0, 4), { sight: vue ?? 3, intro: 'Tu veux défier notre Champion ? Passe d\'abord par moi !', after: 'Notre Champion est bien plus fort que moi.' });
+      const format = t.gym >= 4 && i === 2 ? 'triple' : t.gym >= 1 && i === 1 ? 'double' : undefined;
+      const needMore = format === 'triple' ? Math.max(2, 3 - team.length) : (team.length >= 3 ? 1 : 2);
+      const more = equipeDeType(L2.type, lvl, needMore, t.gym * 31 + i * 7 + 3).filter(([sp]) => !team.some((m) => m[0] === sp));
+      const fullTeam = team.concat(more).slice(0, 4);
+      const [x, y, dir, vue] = spots[i];
+      const intro = format === 'triple' ? 'Place au combat Trio (3v3) ! Montre-moi comment ton équipe se coordonne !'
+        : format === 'double' ? 'Place au combat Duo (2v2) ! Tu veux défier notre Champion ? Passe d\'abord par moi !'
+          : 'Tu veux défier notre Champion ? Passe d\'abord par moi !';
+      trainerNpc(g, x, y, dir, cls, name, fullTeam, { sight: vue ?? 3, format: fullTeam.length >= (format === 'triple' ? 3 : 2) ? format : undefined, intro, after: 'Notre Champion est bien plus fort que moi.' });
     });
     // objets posés dans les recoins des arènes dessinées
     (ar.objets || []).forEach(([x, y], i) => g.item(x, y, OBJETS_ARENE[t.gym]?.[i] || 'super-potion', 1, `${g.id}:objet${i}`));
@@ -1674,9 +1681,9 @@ function fenceRoutes(W, legends = []) {
 function caveTrainers(m, list, seed) {
   const r = rng(seed); const floors = [];
   for (let y = 3; y < m.h - 3; y++) for (let x = 3; x < m.w - 3; x++) if (m.get(x, y) === T.CAVE && m.get(x + 1, y) === T.CAVE && m.get(x - 1, y) === T.CAVE) floors.push([x, y]);
-  list.forEach(([cls, name, team], i) => {
+  list.forEach(([cls, name, team, extra], i) => {
     const [x, y] = floors[Math.floor(((i + 0.5) / list.length) * floors.length * 0.9 + r() * floors.length * 0.08)];
-    trainerNpc(m, x, y, ['left', 'right', 'down', 'up'][Math.floor(r() * 4)], cls, name, team, { sight: 3 });
+    trainerNpc(m, x, y, ['left', 'right', 'down', 'up'][Math.floor(r() * 4)], cls, name, team, { sight: 3, ...(extra || {}) });
   });
 }
 function caveItems(m, items, seed) {
