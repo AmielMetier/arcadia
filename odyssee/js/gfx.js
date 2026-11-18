@@ -46,7 +46,7 @@ export const PACKS = {
       mart: { fond: '#eef4fa', motif: '#dce8f6', motifK: 'carreaux', bande: '#3b82d6', bandeS: '#2258a4', lam: '#d2e2f2', lamC: '#f2f7fc', lamS: '#8fb2d8', cim: '#ffffff', pl: '#244e8c', cap: '#1e3e72', capC: '#78b0ec' },
     },
     chars: 'chars',           // planche des personnages de Noir & Blanc 2 (même disposition que celle du jeu)
-    charRows: NB_CHAR_ROWS,   // rangées supplémentaires (au-delà des 73 de base) propres au pack Noir & Blanc
+    charRows: NB_CHAR_ROWS,   // rangées supplémentaires (au-delà des 75 de base) propres au pack Noir & Blanc
     charVariants: NB_CHAR_VARIANTS,
     // bâtiments entiers (b_<nom>.png) par style du jeu : le jeu prend celui dont la largeur colle à l'emprise (+ filtre biome)
     batiments: (() => {

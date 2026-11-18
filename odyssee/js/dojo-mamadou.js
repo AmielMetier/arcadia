@@ -138,8 +138,8 @@ export const DOJO_ARCHETYPES = [
     id: 'mamadou',
     cls: 'Maître du Dojo',
     name: 'Mamadou',
-    ow: 'karateka',
-    bs: 'karateka',
+    ow: 'mamadou',
+    bs: 'mamadou',
     intro: 'Vous avez atteint le sommet de mon Dojo ! Montrez-moi l\'harmonie parfaite entre vos Pokémon et votre escouade !',
     lose: 'Magnifique ! Vous avez compris la vraie voie du combat en équipe !',
     team: [
@@ -592,7 +592,7 @@ async function runDojoSeries(game, { rid, format, rosters, mySlot, hostId, peerI
   const ui = game.ui, link = game.link, st = game.state, D = ensureDojo(st);
   const slots = format === 'triple' ? 3 : 2;
   const isHost = mySlot === 0;
-  const who = { speaker: 'Maître Mamadou', face: 'karateka' };
+  const who = { speaker: 'Maître Mamadou', face: 'mamadou' };
   const playerMega = rosters.some((r) => !!r.hasMega);
   const rosterMega = rosters.map((r) => !!r.hasMega);
   const ownerNames = rosters.map((r) => String(r.name || 'Dresseur').slice(0, 12));
@@ -629,7 +629,7 @@ async function runDojoSeries(game, { rid, format, rosters, mySlot, hostId, peerI
         title: 'MAÎTRE MAMADOU',
         sub: 'Finale du Dojo · Harmonie Suprême',
         badge: 'FINALE DU DOJO · PALIER 5/5',
-        bs: 'karateka',
+        bs: 'mamadou',
         trainer: foeChallenge.trainer,
         duration: 6.0,
       });
@@ -702,11 +702,31 @@ async function runDojoSeries(game, { rid, format, rosters, mySlot, hostId, peerI
 }
 
 /* ======================================================================
+   Mascotte du Dojo : Bouc noir en veste en cuir (script 'dojoMascotte')
+   ====================================================================== */
+export async function dojoMascotte(game, n) {
+  const st = game.state, ui = game.ui, D = ensureDojo(st);
+  const who = { speaker: 'Mascotte du Dojo', face: n?.sprite || 'bouc' };
+  const tips = [
+    'Astuce du Bouc : associe Lévitation ou le type Vol à Séisme pour balayer l\'équipe adverse sans toucher ton coéquipier !',
+    'Astuce du Bouc : Abri au bon tour ruine les double-focus et laisse ton allié placer un boost ou briser le camp d\'en face.',
+    'Astuce du Bouc : Maître Mamadou garde un Méga-Lucario redoutable au 5e palier… garde ta Méga-Évolution ou une attaque de priorité !',
+  ];
+  const tip = tips[(D.wins + D.pdj) % tips.length];
+  await ui.say([
+    'Bêêêh ! Je suis la mascotte du Dojo de Mamadou ! Cette veste en cuir me donne au moins +100 de charisme sur le tatami, non ?',
+    D.wins > 0
+      ? `Bravo pour ${D.wins > 1 ? `tes ${D.wins} victoires` : 'ta victoire'} au Dojo ! ${tip}`
+      : tip,
+  ], who);
+}
+
+/* ======================================================================
    PNJ Principal : Maître Mamadou (script 'dojoMamadou')
    ====================================================================== */
 export async function dojoMamadou(game, n) {
   const st = game.state, ui = game.ui, D = ensureDojo(st);
-  const who = { speaker: 'Maître Mamadou', face: n?.sprite || 'karateka' };
+  const who = { speaker: 'Maître Mamadou', face: n?.sprite || 'mamadou' };
   await ui.say([
     `Bienvenue dans mon Dojo, ${st.name} ! Ici, la stratégie collective prime sur la force brute.`,
     `Tu as ${D.pdj} Point${D.pdj > 1 ? 's' : ''} du Dojo (PDj). Records — Duo 2v2 : ${D.record2} · Trio 3v3 : ${D.record3}.`,
@@ -743,7 +763,7 @@ export async function dojoMamadou(game, n) {
 /** Lance un défi Co-op du Dojo (Duo 2v2 ou Trio 3v3) depuis Maître Mamadou ou le C-Gear */
 export async function lancerDefiDojoCoop(game, n = null) {
   const st = game.state, ui = game.ui;
-  const who = { speaker: 'Maître Mamadou', face: n?.sprite || 'karateka' };
+  const who = { speaker: 'Maître Mamadou', face: n?.sprite || 'mamadou' };
 
   if (game.badgeCount() < 5) {
     await ui.say('Le Dojo accueille uniquement les dresseurs confirmés à partir du 6e Badge (au moins 5 badges en main) !', who);
@@ -908,7 +928,7 @@ export async function onDojoInvite(game, from, m) {
     link.send(from, { t: 'dojo-rep', rid: m.rid, ok: yes, why: yes ? null : 'no', lvl: myMaxLvl });
     if (!yes) return;
 
-    const myMons = await pickDojoPair(game, { speaker: 'Maître Mamadou', face: 'karateka' });
+    const myMons = await pickDojoPair(game, { speaker: 'Maître Mamadou', face: 'mamadou' });
     if (!myMons) {
       link.send(from, { t: 'dojo', rid: m.rid, step: 'quit', who: st.name });
       return;

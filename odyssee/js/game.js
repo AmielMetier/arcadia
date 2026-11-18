@@ -42,7 +42,7 @@ import { composer, tenueValide, tenueOrigine } from './render/tenue.js';
 import { buildRivalParty, getRivalItems } from './world/rival.js';
 import { Vie, parlerFaune, rentreLeSoir } from './vie.js';
 import { revancheBossPossible, revancheBoss, tourCombat, clubCombat } from './tour-combat.js';
-import { dojoMamadou, dojoBoutique } from './dojo-mamadou.js';
+import { dojoMamadou, dojoBoutique, dojoMascotte } from './dojo-mamadou.js';
 import { VieMonde, colporteur, marche, cueillir, fouiller, revanchePossible, revanche, noteCombat, ragot, echange, relais, concours, loterie, musicien } from './vie-monde.js';
 
 /** météos qui comptent en combat (brume et cendres ne sont que du décor, comme dans les jeux 5G) */
@@ -89,6 +89,8 @@ const FACES = {
   'Nyx': 'nyx', 'Érèbe': 'erebe', 'Erebe': 'erebe', 'Nocturne': 'nocturne',
   'Frimas': 'frimas', 'Spectrel': 'spectrel', 'Brutus': 'brutus', 'Sylas': 'sylas',
   'Ariane': 'ariane', 'Nox': 'nox', 'Sbire': 'brume_f', 'Sbire de la Brume': 'brume', 'Sbire Éclipse': 'eclipse_m',
+  'Mamadou': 'mamadou', 'Maître Mamadou': 'mamadou',
+  'Mascotte du Dojo': 'bouc', 'Le Bouc du Dojo': 'bouc', 'Bouc': 'bouc',
 };
 
 const TRAINER_NAME_TO_SPRITE = {
@@ -2535,6 +2537,7 @@ export class Game {
     if (name === 'clubCombat') return clubCombat(this, n);
     if (name === 'dojoMamadou') return dojoMamadou(this, n);
     if (name === 'dojoBoutique') return dojoBoutique(this, n);
+    if (name === 'dojoMascotte') return dojoMascotte(this, n);
     if (name === 'marche') return marche(this, n);
     if (name === 'echange') return echange(this, n);
     if (name === 'relais') return relais(this, n);
