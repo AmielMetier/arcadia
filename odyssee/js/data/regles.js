@@ -46,6 +46,7 @@ export const REGLES = {
       "port": { "faite":  "toit", "linteau": null },
       "phare": { "faite":  "toit", "linteau": null },
       "pagode": { "faite":  "toit" },
+        "dojo": { "faite": "toit" },
       "mirage": { "faite":  "toit" },
       "grotte": { }
     }

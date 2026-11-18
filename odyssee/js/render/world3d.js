@@ -515,6 +515,7 @@ function kitStyle(b, map) {
   if (/Tour de la Grue/.test(name)) return 'pagode';
   if (/Centrale/.test(name)) return 'lab';
   if (/Temple/.test(name)) return 'pagode';
+  if (/Dojo/.test(name)) return 'dojo';
   if (/Brume/.test(name)) return 'base';
   if (/Phare|Capitainerie/.test(name)) return /Phare/.test(name) ? 'phare' : 'port';
   const z = map.outdoor ? map.zoneAt(b.x, b.y) : null;
@@ -1613,7 +1614,7 @@ export class WorldView {
     const z = this.map.zoneAt?.(b.x, b.y);
     const estFontaine = b.modele === 'fontaine' && BP?.styles?.fontaine;
     const estLogisPack = b.door === 1 && b.modele === 'maisonHaute';
-    const specKey = b.modele && /^(chapelle|gare|mairie|bourse|casino)$/.test(b.modele) && BP?.styles?.[b.modele] ? b.modele
+    const specKey = b.modele && /^(chapelle|gare|mairie|bourse|casino|dojo)$/.test(b.modele) && BP?.styles?.[b.modele] ? b.modele
       : /Centrale/i.test(b.name || '') && BP?.styles?.centrale ? 'centrale'
       : /Serre/i.test(b.name || '') && BP?.styles?.serre ? 'serre'
       : /Fonderie/i.test(b.name || '') && BP?.styles?.fonderie ? 'fonderie' : null;

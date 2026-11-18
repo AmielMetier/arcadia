@@ -658,7 +658,7 @@ export function setArt({ kits = {}, sols = {}, sol32 = {}, hgss = {}, relief = n
 
 /** les sols à 16 px sont-ils là (pièces de transition posées sur la grille décalée) ? */
 export let SOL16 = false;
-const KIT_OF = { house: 'maison', house2: 'maison', house3: 'maison', bighouse: 'maison', tower: 'maison', gate: 'maison', center: 'centre', mart: 'boutique', gym: 'arene', lab: 'labo', league: 'ligue', chalet: 'chalet', pecheur: 'pecheur', port: 'port', musee: 'musee', base: 'base', mirage: 'mirage', phare: 'phare', pagode: 'pagode' };
+const KIT_OF = { house: 'maison', house2: 'maison', house3: 'maison', bighouse: 'maison', tower: 'maison', gate: 'maison', center: 'centre', mart: 'boutique', gym: 'arene', lab: 'labo', league: 'ligue', chalet: 'chalet', pecheur: 'pecheur', port: 'port', musee: 'musee', base: 'base', mirage: 'mirage', phare: 'phare', pagode: 'pagode', dojo: 'dojo' };
 // Les bâtiments sont assemblés à partir d'un kit de 4 × 4 cellules (docs/ODYSSEE-GRAPHISME.md) : le rôle de chaque
 // cellule (mur, fenêtre, porte, toit, rebord…) est donné par REGLES.kits ; le jeu place porte, fenêtres, linteau,
 // enseigne, lampe et jardinières, et compose le toit (faîte en haut, rebord en bas).

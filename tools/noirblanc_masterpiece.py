@@ -300,3 +300,7 @@ def appliquer_masterpiece(root, out_dir, cols, noms, decos, bat_dims):
             sub.save(os.path.join(out_dir, f'{k}.png'))
             door_col = door_overrides[name] if name in door_overrides else (w // 2)
             bat_dims[name] = [w, door_col]
+
+    dojo_path = os.path.join(out_dir, 'b_dojo.png')
+    if os.path.exists(dojo_path):
+        bat_dims['dojo'] = [192, 96]

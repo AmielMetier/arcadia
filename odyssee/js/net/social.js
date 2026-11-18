@@ -11,6 +11,7 @@ import { partyScreen, cardScreen, trainerCard, TYPE_FR } from '../ui/screens.js'
 import { BADGES } from '../world/region.js';
 import { el, esc, wait } from '../ui/ui.js';
 import { tenueCode, tenueDecode, tenueValide, tenueOrigine, composer } from '../render/tenue.js';
+import { onDojoInvite } from '../dojo-mamadou.js';
 
 const WALK = 0.27, RUN = 0.068;
 const trainerSprite = (gender) => (gender === 'f' ? 'serena' : 'calem');
@@ -265,6 +266,7 @@ export async function showCard(game, peer) {
 
 /** invitation reçue */
 async function onRequest(game, from, m) {
+  if (m.kind === 'dojo') return onDojoInvite(game, from, m);
   const link = game.link, st = game.state, ui = game.ui;
   const free = st && game.player && !game.busy && game.input.free && !game.bv.alive && !game.session && !game.player.move;
   if (!free) { link.send(from, { t: 'rep', rid: m.rid, ok: false, why: 'busy' }); return; }

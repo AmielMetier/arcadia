@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.108 — 18 novembre 2026
+- **Odyssée** — Nouveau donjon multijoueur : le **Dojo de Mamadou** ouvre ses portes à Port-Granit (accessible dès le 6e Badge), avec un bâtiment inédit dessiné dans les deux styles graphiques (**Odyssée** en 3D et **Noir & Blanc**), un repère sur la boussole locale et son grand hall intérieur complet. Les défis se disputent **exclusivement en coopération multijoueur** : **Duo Co-op (2v2)** à 2 joueurs humains contre 2 stratèges, ou **Trio Co-op (3v3)** à 3 joueurs humains contre 3 stratèges (1 Pokémon actif sur le terrain par joueur + 1 remplaçant). Séries de 5 paliers contre des équipes coordonnées et tactiques (jusqu'au combat final contre Maître Mamadou), avec gain de Points du Dojo (PDj) et une boutique dédiée proposant objets compétitifs tenus, Méga-Gemmes et Master Ball.
+
 ## 5.107 — 18 novembre 2026
 - **Odyssée** — Combats Duo (2v2) et Trio (3v3) complets (stratégies d'équipe, capacités de zone, portée des attaques en Trio, sélection de cible avec efficacité affichée et bouton Retour pour corriger son choix), jouables dès les Centres Pokémon auprès du Coach Tactique, dans les arènes et la Route Victoire, à la Tour de Combat et en PvP entre joueurs. Animations de combat enrichies sur tous les formats (animations d'attente, charges avec images rémanentes, effets spéciaux sur-mesure pour les attaques signatures et les 18 types, et particules météo).
 

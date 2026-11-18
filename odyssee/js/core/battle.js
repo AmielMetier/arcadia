@@ -458,15 +458,19 @@ export class Battle {
   foeChooseAll() {
     const out = [];
     let itemUsed = false;
-    for (const sl of this.aliveSlots(1)) {
-      const a = this.foeChooseSlot(sl, itemUsed);
+    const isStrat = !!this.sides[1]?.trainer?.strategic || this.sides[1]?.trainer?.ai === 'strategic';
+    const ctx = isStrat ? { plannedDmg: new Map(), protectedAlly: new Set(), usedUtility: new Set(), statusedTarget: new Set() } : null;
+    const slots = this.aliveSlots(1);
+    const evalOrder = isStrat ? [...slots].sort((a, b) => this.stat({ side: 1, slot: b }, 5) - this.stat({ side: 1, slot: a }, 5)) : slots;
+    for (const sl of evalOrder) {
+      const a = this.foeChooseSlot(sl, itemUsed, ctx);
       if (a.type === 'item') itemUsed = true;
       out.push({ i: 1, side: 1, slot: sl, a });
     }
-    return out;
+    return isStrat ? out.sort((a, b) => a.slot - b.slot) : out;
   }
-  foeChoose() { return this.foeChooseSlot(0, false); }
-  foeChooseSlot(slot = 0, itemUsed = false) {
+  foeChoose() { return this.foeChooseSlot(0, false, null); }
+  foeChooseSlot(slot = 0, itemUsed = false, ctx = null) {
     const ref = { side: 1, slot };
     const forced = this.forcedAction(ref); if (forced) return forced;
     const side = this.sides[1], m = this.act(ref), t = side.trainer, v = this.vol(ref);
@@ -483,7 +487,8 @@ export class Battle {
       return { type: 'move', id: mv.id, slot: k, targetSide: tgt.side, targetSlot: tgt.slot };
     }
 
-    const isSmart = t.ai === 'smart';
+    const isStrategic = !!t.strategic || t.ai === 'strategic';
+    const isSmart = t.ai === 'smart' || isStrategic;
     const isRival = t.cls === 'Rival' || t.rival || this.rival;
     if (!itemUsed && t.items && !(side.soinTour != null && this.turn - side.soinTour <= 1)) {
       const ratio = m.hp / m.stats[0];
@@ -538,41 +543,61 @@ export class Battle {
             if (pa && ((nul && nul.includes(pa)) || (pa === 'wonder-guard' && eff <= 1))) return 0;
             const d = this.estimate(ref, tr, mv) * (isSpreadMove && tgtPool.length > 1 ? 0.75 : 1);
             let sc = d * ((mv.a || 100) / 100);
+            if (isStrategic && ctx && tr.side === 0) {
+              const queued = ctx.plannedDmg.get(tr.slot) || 0;
+              const remHp = Math.max(1, pm.hp - queued);
+              if (queued >= pm.hp) sc *= 0.12;
+              else if (d >= remHp) { sc *= 3.2; if (mv.pr && mv.pr > 0) sc *= 4.0; }
+            }
             if (d >= pm.hp) { sc *= 3.8; if (mv.pr && mv.pr > 0) sc *= 5.0; }
             if (eff >= 2) sc *= (eff >= 4 ? 1.75 : 1.35);
             if (mv.m?.recharge) sc *= 0.5;
             if (mv.m?.boom) sc = (m.hp < m.stats[0] * 0.22 && d >= pm.hp) ? sc * 1.5 : sc * 0.04;
             if (myTypes.includes(mvType)) sc *= 1.3;
-            if (mv.m?.flinch && amFaster) sc *= 1.25;
+            if (mv.m?.flinch && amFaster) sc *= isStrategic && mv.key === 'fake-out' ? 2.1 : 1.25;
             if (mv.m?.crit) sc *= 1.15;
             return sc;
           };
           if (isSpreadMove && this.slots > 1) {
             s = 0;
             for (const f of tgtPool) s += scoreVs(f);
-            // Pénalité si l'attaque touche aussi nos alliés (Séisme, Explosion…)
+            let dangerousFriendly = false;
+            // Pénalité si l'attaque touche aussi nos alliés (Séisme, Surf, Coup d'Jus…)
             if (mv.tg === 9) {
               for (const alSl of this.aliveSlots(1)) if (alSl !== slot && this.isAdjacent(ref, { side: 1, slot: alSl })) {
-                const allyPenalty = scoreVs({ side: 1, slot: alSl });
-                s -= allyPenalty * 1.1;
+                if (isStrategic && ctx?.protectedAlly?.has(alSl)) continue;
+                const alRef = { side: 1, slot: alSl }, alMon = this.act(alRef);
+                const allyPenalty = scoreVs(alRef);
+                if (isStrategic && allyPenalty > 0 && alMon) {
+                  if (this.estimate(ref, alRef, mv) >= alMon.hp * 0.45) dangerousFriendly = true;
+                  s -= allyPenalty * 2.6;
+                } else {
+                  s -= allyPenalty * 1.1;
+                }
               }
             }
-            s = Math.max(0.0001, s);
+            if (isStrategic && !dangerousFriendly && tgtPool.length >= 2 && s > 0) s *= 1.15;
+            s = dangerousFriendly ? 0.0001 : Math.max(0.0001, s);
           } else {
             s = Math.max(0.0001, scoreVs(tgtRef));
           }
         } else {
           const x = mv.m || {};
           if (x.heal || x.u === 'rest') {
-            if (m.hp < m.stats[0] * 0.45) s = pMon.stats[0] * 1.4;
+            if (m.hp < m.stats[0] * (isStrategic ? 0.50 : 0.45)) s = pMon.stats[0] * (isStrategic ? 1.65 : 1.4);
             else if (m.hp < m.stats[0] * 0.65) s = pMon.stats[0] * 0.55;
             else s = 0.001;
+          } else if (x.u === 'reflect' || x.u === 'light-screen' || x.u === 'mist' || x.u === 'safeguard') {
+            const scrKey = x.u === 'light-screen' ? 'light' : x.u;
+            if (side.screens[scrKey] || ctx?.usedUtility?.has(x.u)) s = 0.0001;
+            else s = pMon.stats[0] * (isStrategic ? 1.45 : 0.6);
           } else if (x.ail && !['conf', 'seed', 'trap'].includes(x.ail)) {
-            if (pMon.status) s = 0.001;
+            if (pMon.status || (isStrategic && ctx?.statusedTarget?.has(tgtRef.slot))) s = 0.001;
             else {
               const cannot = (x.ail === 'psn' && (pType.includes('poison') || pType.includes('steel'))) ||
                 (x.ail === 'brn' && pType.includes('fire')) || (x.ail === 'par' && pType.includes('electric'));
-              s = cannot ? 0.001 : pMon.stats[0] * (x.ail === 'slp' ? 1.85 : 1.4);
+              const brnBoost = isStrategic && x.ail === 'brn' && this.stat(tgtRef, 1) >= this.stat(tgtRef, 3) ? 1.65 : 1.4;
+              s = cannot ? 0.001 : pMon.stats[0] * (x.ail === 'slp' ? 1.85 : brnBoost);
             }
           } else if (x.ail === 'conf') s = pVol.conf ? 0.001 : pMon.stats[0] * 0.7;
           else if (x.ail === 'seed') s = (pVol.seed || pType.includes('grass')) ? 0.001 : pMon.stats[0] * 0.95;
@@ -588,7 +613,9 @@ export class Battle {
             }
           } else if (mv.key === 'protect' || mv.key === 'detect') {
             if (v.protChain > 0) s = 0.001;
-            else if (pVol.seed || pMon.status === 'tox') s = pMon.stats[0] * 1.0;
+            else if (pVol.seed || pMon.status === 'tox') s = pMon.stats[0] * 1.15;
+            else if (isStrategic && m.item === 'leftovers' && m.hp < m.stats[0] * 0.45) s = pMon.stats[0] * 1.1;
+            else if (isStrategic && this.aliveSlots(1).some((alSl) => alSl !== slot && this.isAdjacent(ref, { side: 1, slot: alSl }) && this.act({ side: 1, slot: alSl })?.moves?.some((amv) => { const mm = MOVES[amv.id]; return amv.pp > 0 && mm?.tg === 9 && this.estimate({ side: 1, slot: alSl }, ref, mm) >= m.hp * 0.35; }))) s = pMon.stats[0] * 1.35;
             else s = pMon.stats[0] * 0.35;
           } else s = pMon.stats[0] * 0.2;
         }
@@ -601,12 +628,25 @@ export class Battle {
       const tri = [...options].sort((a, b) => b.s - a.s);
       pick = tri[0];
       const ko = pick.mv.c !== 'status' && pick.d >= pick.pHp;
-      if (!ko && tri[1] && tri[1].s >= pick.s * 0.8 && this.rng() < 0.3) pick = tri[1];
+      if (!isStrategic && !ko && tri[1] && tri[1].s >= pick.s * 0.8 && this.rng() < 0.3) pick = tri[1];
     } else {
       const tot = options.reduce((acc, x) => acc + x.s * x.s, 0);
       let r = this.rng() * tot;
       pick = options[0];
       for (const x of options) { r -= x.s * x.s; if (r <= 0) { pick = x; break; } }
+    }
+    if (isStrategic && ctx) {
+      if (pick.mv.key === 'protect' || pick.mv.key === 'detect') ctx.protectedAlly.add(slot);
+      if (pick.mv.m?.u) ctx.usedUtility.add(pick.mv.m.u);
+      if (pick.mv.m?.ail && !['conf', 'seed', 'trap'].includes(pick.mv.m.ail)) ctx.statusedTarget.add(pick.tgtRef.slot);
+      if (pick.mv.c !== 'status') {
+        const hitTgts = (pick.mv.tg === 9 || pick.mv.tg === 11) ? this.validFoeTargets(ref, pick.mv) : [pick.tgtRef];
+        const mul = (pick.mv.tg === 9 || pick.mv.tg === 11) && hitTgts.length > 1 ? 0.75 : 1;
+        for (const f of hitTgts) {
+          if (f.side !== 0) continue;
+          ctx.plannedDmg.set(f.slot, (ctx.plannedDmg.get(f.slot) || 0) + this.estimate(ref, f, pick.mv) * mul);
+        }
+      }
     }
     return { type: 'move', id: pick.mv.id, slot: pick.k, targetSide: pick.tgtRef.side, targetSlot: pick.tgtRef.slot };
   }

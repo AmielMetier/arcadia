@@ -92,6 +92,29 @@ export function leagueInterior(id) {
   return m;
 }
 
+export function dojoInterior(id, name = 'Dojo de Mamadou') {
+  const m = room(id, 15, 15, { floor: 'temple', music: 'tower', wall: 'wall_league', name, battleBg: 'gym', wide: true });
+  for (let y = 4; y < 14; y++) for (const x of [6, 7, 8]) m.deco.push({ k: 'carpet', x, y });
+  furn(m, 'statue_dragon', 3, 4); furn(m, 'statue_dragon', 11, 4);
+  for (const y of [8, 12]) { furn(m, 'statue', 3, y); furn(m, 'statue', 11, y); }
+  for (const [x, y] of [[5, 3], [9, 3], [5, 13], [9, 13]]) furn(m, 'brasero', x, y);
+  furn(m, 'pot', 1, 13); furn(m, 'pot', 13, 13);
+  furn(m, 'healer', 1, 2);
+  furn(m, 'pc', 13, 2); m.object(13, 2, { type: 'pc' });
+  m.npc({ id: id + ':mamadou', x: 7, y: 3, dir: 'down', sprite: 'karateka', script: 'dojoMamadou' });
+  m.npc({ id: id + ':intendant', x: 11, y: 6, dir: 'left', sprite: 'vendeur', script: 'dojoBoutique' });
+  m.npc({ id: id + ':infirmiere', x: 1, y: 4, dir: 'down', sprite: 'nurse', role: 'nurse' });
+  m.npc({
+    id: id + ':disciple', x: 3, y: 10, dir: 'right', sprite: 'kimono',
+    text: [
+      'Bienvenue au Dojo de Mamadou ! Ici, personne ne combat jamais seul.',
+      'En Duo Co-op (2v2), 2 joueurs s\'unissent avec 1 Pokémon actif chacun (+ 1 remplaçant) contre deux tacticiens redoutables.',
+      'En Trio Co-op (3v3), vous devez être 3 dresseurs connectés en ligne ! Ouvrez la Connexion (F3 ou Amis) pour vous retrouver dans la même salle.',
+    ],
+  });
+  return m;
+}
+
 /* ---------------- grottes ---------------- */
 /**
  * Grotte procédurale : automate cellulaire + galeries garanties entre les entrées.

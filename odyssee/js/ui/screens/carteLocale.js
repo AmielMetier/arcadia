@@ -14,9 +14,10 @@ const DIRS8 = [
 const ESSENTIELS = {
   gym: { txt: 'Arène', ico: '★', col: '#e0a020', prio: 0, ess: true },
   league: { txt: 'Ligue', ico: '♛', col: '#9333ea', prio: 1, ess: true },
-  lab: { txt: 'Labo', ico: '⚗', col: '#0ea5e9', prio: 2, ess: true },
-  center: { txt: 'Centre', ico: '+', col: '#e04848', prio: 3, ess: true },
-  mart: { txt: 'Boutique', ico: '¤', col: '#3a78d8', prio: 4, ess: true },
+  dojo: { txt: 'Dojo', ico: '⛩', col: '#dc2626', prio: 2, ess: true },
+  lab: { txt: 'Labo', ico: '⚗', col: '#0ea5e9', prio: 3, ess: true },
+  center: { txt: 'Centre', ico: '+', col: '#e04848', prio: 4, ess: true },
+  mart: { txt: 'Boutique', ico: '¤', col: '#3a78d8', prio: 5, ess: true },
 };
 const BATS_A_IGNORER = new Set([
   'maison', 'house', 'etal', 'étal', 'fontaine', 'puits', 'tour',
@@ -209,7 +210,7 @@ export function batimentsImportants(game, L) {
       const ch = LEADERS[z0.gym];
       sub = `Champion ${ch.name} · ${TYPE_FR[ch.type] || ch.type}`;
     } else if (ess) {
-      sub = b.kind === 'center' ? 'Soin de l\'équipe et PC' : b.kind === 'mart' ? 'Objets et Poké Balls' : b.kind === 'lab' ? 'Laboratoire du Professeur' : 'Conseil 4 & Maître';
+      sub = b.kind === 'center' ? 'Soin de l\'équipe et PC' : b.kind === 'mart' ? 'Objets et Poké Balls' : b.kind === 'dojo' ? 'Combats Co-op 2v2 & 3v3 de Maître Mamadou' : b.kind === 'lab' ? 'Laboratoire du Professeur' : 'Conseil 4 & Maître';
     } else {
       sub = 'Lieu notable';
     }

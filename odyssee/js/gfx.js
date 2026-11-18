@@ -66,6 +66,7 @@ export const PACKS = {
         house: mapList(MAISONS_BIO), house2: mapList(MAISONS_BIO), house3: mapList(MAISONS_BIO), bighouse: mapList(MAISONS_BIO),
         chapelle: mapList(['chapelle']), gare: mapList(['gare']), mairie: mapList(['mairie']), bourse: mapList(['bourse']), casino: mapList(['casino']),
         centrale: mapList(['centrale']), serre: mapList(['serre']), fonderie: mapList(['fonderie', 'fonderie_b']),
+        dojo: mapList(['dojo']),
       };
     })(),
   },

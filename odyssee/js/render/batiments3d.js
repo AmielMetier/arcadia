@@ -663,6 +663,33 @@ export function atelier(D) {
     return G;
   };
 
+  /** Dojo de Mamadou (6 × 5) : estrade de pierre, colonnade vermillon, frise jade, double toit de tuiles ardoise à pointes dorées */
+  B.dojo = ({ toit = '#344664', rive = '#9e241c', bord = '#e8c058', bois = '#8e1e18' } = {}) => {
+    const G = new THREE.Group(), cx = 3, cz = 2.4, d = 5;
+    const OR = LUM('#f0c840', '#604000');
+    reperePorte(G, cx, 0.35, 4.5, 1.5, 1.5);
+    socle(G, 0.1, 0.2, 5.8, 4.3, 0.35, '#9e9a90');
+    G.add(at(boite(4.8, 1.9, 3.6, M({ map: TX.shoji() })), cx, 0.35 + 0.95, cz));
+    G.add(at(boite(4.95, 0.22, 3.72, COL('#1f6a5a')), cx, 2.15, cz));
+    for (const px of [0.6, 1.75, 4.25, 5.4]) {
+      G.add(at(cyl(0.11, 0.12, 1.95, COL(bois), 8), px, 1.32, 4.28));
+      G.add(at(boite(0.22, 1.95, 0.22, COL(bois)), px, 1.32, 0.62));
+    }
+    G.add(at(boite(1.65, 1.5, 0.06, M({ map: TX.treillis('#5a1a0a') })), cx, 1.1, 4.22));
+    for (let k = 0; k < 3; k++) G.add(at(boite(0.32, 0.36, 0.05, COL('#9e241c')), cx - 0.45 + k * 0.45, 1.72, 4.27));
+    toitChinois(G, cx, cz, 2.25, 3.2, 2.45, 0.72, { col: toit, rive, bord, xt: 1.9, zt: 1.3, lift: 0.38, flare: 0.14, ornement: false, uvk: 0.7 });
+    G.add(at(boite(3.6, 0.85, 2.4, M({ map: TX.shoji() })), cx, 3.12, 2.2));
+    for (const s of [-1, 1]) G.add(at(boite(0.18, 0.85, 2.44, COL(bois)), cx + s * 1.82, 3.12, 2.2));
+    toitChinois(G, cx, 2.2, 3.55, 2.45, 1.85, 0.95, { col: toit, rive, bord, xt: 1.15, zt: 0.14, lift: 0.42, flare: 0.14, ornement: true, uvk: 0.7 });
+    G.add(at(boite(0.24, 0.24, 0.08, OR), cx, 2.68, 4.32));
+    for (let k = 0; k < 3; k++) G.add(at(boite(2.1 + k * 0.25, 0.12, 0.28, M({ map: TX.pierre('#c8c2b4') })), cx, 0.06 + (2 - k) * 0.12, 4.45 + k * 0.22));
+    for (const s of [-1, 1]) {
+      G.add(at(boite(0.28, 0.55, 0.28, M({ map: TX.pierre('#9a948a') })), cx + s * 2.35, 0.62, d - 0.32));
+      G.add(at(boite(0.24, 0.24, 0.24, LUM('#fff0b0', '#806020')), cx + s * 2.35, 1.02, d - 0.32));
+    }
+    return G;
+  };
+
 
   /* -------------------------------------------------------------- Tour Cendrée ---------------------------------------- */
   /** bois carbonisé : planches verticales, craquelures en écailles (« peau de crocodile »), suie plus noire en haut */
@@ -2952,7 +2979,7 @@ export const EMPRISES = {
   cabaneChasseur: [4, 3], cabanePecheur: [5, 4], grange: [6, 5], moulin: [4, 4], phare: [3, 3], auberge: [6, 5], chapelle: [4, 7],
   boulangerie: [4, 4], maisonThe: [5, 5], gare: [8, 4], kiosque: [4, 5], puits: [2, 2], etal: [2, 2],
   mairie: [9, 5], fontaine: [3, 3], centre: [7, 5], boutique: [5, 4], arene: [12, 11], areneFeu: [12, 11], pavillonFeu: [12, 11], areneCour: [18, 14], areneBloc: [9, 6], areneRonde: [9, 9], areneVoute: [8, 11], statueChampion: [2, 2], labo: [10, 7],
-  pagode: [11, 11], tourCendree: [11, 11], pavillon: [8, 7], tour: [8, 5], tourVerre: [10, 7], tourDeco: [8, 8], bourse: [12, 8], casino: [14, 8], ligue: [30, 14], usinePokeball: [32, 10],
+  pagode: [11, 11], tourCendree: [11, 11], pavillon: [8, 7], dojo: [6, 5], tour: [8, 5], tourVerre: [10, 7], tourDeco: [8, 8], bourse: [12, 8], casino: [14, 8], ligue: [30, 14], usinePokeball: [32, 10],
   escalierMontant: [1, 2], escalierDescendant: [1, 2],
   pyramide: [12, 12], temple: [11, 8],
 };

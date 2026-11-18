@@ -8,7 +8,7 @@
 // Noms de lieux et personnages originaux ; les créatures du jeu côtoient les Pokémon du prototype.
 import { T, DIRS, walkable, isGrassEnc } from './tiles.js';
 import { GameMap, carveRoute, carveTown, ledges, along, nearestWalkable, caseLibre, rng, GRAND, sin, cos, hauteurVue } from './mapgen.js';
-import { centerInterior, martInterior, houseInterior, labInterior, gymInterior, leagueInterior, caveMap } from './interiors.js';
+import { centerInterior, martInterior, houseInterior, labInterior, gymInterior, leagueInterior, dojoInterior, caveMap } from './interiors.js';
 import { NEW_STARTERS } from '../data/creatures.js';
 import { R } from '../data/remplacants.js';
 import { buildQuests } from './quetes.js';
@@ -298,6 +298,7 @@ export function poserBatiment(W, maps, def, b) {
   }
   else if (b.kind === 'lab') inside = labInterior(id);
   else if (b.kind === 'league') inside = leagueInterior(id);
+  else if (b.kind === 'dojo') inside = dojoInterior(id, b.name || 'Dojo de Mamadou');
   else inside = houseInterior(id, b.name || 'Maison', { w: b.kind === 'bighouse' || b.kind === 'tower' ? 11 : 9, h: b.kind === 'bighouse' || b.kind === 'tower' ? 9 : 8, bed: b.bed, extraBooks: b.kind === 'tower', kitchen: b.kitchen });
   inside.townId = def.id; inside.outside = { map: W.id, x: B.doorX, y: B.doorY + 1, dir: 'down' };
   inside.warp(inside.exitX, inside.exitY, inside.outside);
@@ -650,15 +651,16 @@ export function buildWorld() {
   const K = towns.K = {
     id: 'granit', name: 'Port-Granit', x: 302, y: 198, w: 30, h: 30, exits: [['n', 20]], gym: 5, stock: 6, music: 'port', island: true,
     roads: [[20, 0, 21, 26, T.PATH], [2, 18, 27, 18, T.PATH], [2, 26, 27, 26, T.PATH]],
-    deco: [['rock', 26, 13], ['rock', 27, 17], ['rock', 2, 27], ['rock', 17, 21], ['rock', 25, 24], ['lamp', 22, 12], ['lamp', 22, 17], ['lamp', 19, 19], ['lamp', 22, 25],
-      ['flowers', 23, 20, 27, 23], ['flowers', 25, 15, 27, 16], ['flowers', 11, 19, 16, 20],
-      ['sign', 22, 5, 'PORT-GRANIT\nÎle de Granit — sous la protection de Drakos.'], ['sign', 12, 17, 'ARÈNE DE GRANIT\nChampion : Basalte\nLe frère cadet.']],
+    deco: [['rock', 26, 13], ['rock', 27, 17], ['rock', 2, 27], ['rock', 17, 21], ['lamp', 22, 12], ['lamp', 22, 17], ['lamp', 19, 19], ['lamp', 22, 25],
+      ['flowers', 25, 15, 27, 16], ['flowers', 11, 19, 16, 20],
+      ['sign', 22, 5, 'PORT-GRANIT\nÎle de Granit — sous la protection de Drakos.'], ['sign', 12, 17, 'ARÈNE DE GRANIT\nChampion : Basalte\nLe frère cadet.'], ['sign', 24, 25, 'DOJO DE MAMADOU\nCombats Co-op 2v2 & 3v3\nRéservé aux escouades de 2 ou 3 dresseurs !']],
     buildings: [
       // mapId : les identifiants des intérieurs d'avant l'agrandissement (parties arrêtées dedans, dresseurs de l'arène)
       { kind: 'gym', ...GRAND.gym, x: 2, y: 2, roof: 'brown', mapId: 'granit:gym3' },
       { kind: 'mart', ...GRAND.mart, x: 23, y: 3, mapId: 'granit:mart18' },
       { kind: 'house', x: 23, y: 9, roof: 'gray', mapId: 'granit:house15', npcs: [{ x: 4, y: 4, sprite: 'pecheur', text: ['Drakos nous prend la moitié de chaque pêche.', '« Pour protéger les îles », qu\'il dit.', 'Basalte ferme les yeux... c\'est son frère, après tout.'] }] },
       { kind: 'center', ...GRAND.center, x: 3, y: 21, mapId: 'granit:center2' },
+      { kind: 'dojo', ...GRAND.dojo, x: 23, y: 20, roof: 'red', mapId: 'granit:dojo', name: 'Dojo de Mamadou' },
       { kind: 'house', x: 12, y: 23, roof: 'brown', mapId: 'granit:house20', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Les trois frères sont nés ici, sur Granit.', 'Basalte est le plus jeune. Pyros garde le volcan, et Drakos... la Grande Île.'] }] },
     ],
     npcs: [

@@ -473,7 +473,11 @@ export class BattleView {
     if (side === 1 && !this.seenInBattle?.has(m.uid || m.sp)) { this.seenInBattle?.add(m.uid || m.sp); this.game.markSeen(m.sp); }
     h.style.visibility = '';
     const g = m.gender === 'm' ? '<span class="g m">♂</span>' : m.gender === 'f' ? '<span class="g f">♀</span>' : '';
-    const trainerTag = this.spectator && slot === 0 && this.battle?.sides?.[side]?.name ? `<span class="bh-trainer-tag">${esc(this.battle.sides[side].name)} :</span> ` : '';
+    const trainerTag = this.spectator && slot === 0 && this.battle?.sides?.[side]?.name
+      ? `<span class="bh-trainer-tag">${esc(this.battle.sides[side].name)} :</span> `
+      : side === 0 && this.battle?.coop && this.battle.ownerNames?.[slot]
+        ? `<span class="bh-trainer-tag">${esc(this.battle.ownerNames[slot])} ·</span> `
+        : '';
     h.querySelector('.bh-name').innerHTML = trainerTag + esc(monName(m)) + g;
     h.querySelector('.bh-lv').textContent = 'N.' + m.lvl;
     const typesEl = h.querySelector('.bh-types');
@@ -691,6 +695,165 @@ export class BattleView {
     return battle.result;
   }
 
+  /** Sélectionne la cible d'une capacité en Duo / Trio (renvoie `null` si l'utilisateur annule) */
+  async _pickMoveTarget(ref, M) {
+    const b = this.battle;
+    let targetSide = 1, targetSlot = b.aliveSlots(1)[0] ?? 0;
+    if (this.slots <= 1) return { targetSide, targetSlot };
+    if (M?.tg === 3) {
+      const allies = b.validAllyTargets(ref);
+      if (allies.length > 1) {
+        const p = await this.targetMenu(ref, M, allies, true);
+        return p ? { targetSide: p.side, targetSlot: p.slot } : null;
+      }
+      if (allies.length === 1) return { targetSide: allies[0].side, targetSlot: allies[0].slot };
+    } else if (M && M.tg !== 7 && M.tg !== 4 && M.tg !== 13 && M.tg !== 12 && M.tg !== 14 && M.tg !== 9 && M.tg !== 11 && M.tg !== 8) {
+      const foes = b.validFoeTargets(ref, M);
+      if (foes.length > 1) {
+        const p = await this.targetMenu(ref, M, foes, false);
+        return p ? { targetSide: p.side, targetSlot: p.slot } : null;
+      }
+      if (foes.length === 1) return { targetSide: foes[0].side, targetSlot: foes[0].slot };
+    }
+    return { targetSide, targetSlot };
+  }
+
+  /** Choix du Pokémon de remplacement limité aux Pokémon possédés par le joueur (`owners[i] === mySlot`) */
+  async pickCoopReplacement(mySlot) {
+    const b = this.battle;
+    const ownerOf = (i) => b.owners?.[i];
+    const k = await partyScreen(this.game, {
+      mode: 'pick',
+      pickLabel: 'Envoyer',
+      prompt: 'Remplacer ton Pokémon K.O. :',
+      filter: (m, i) => (
+        ownerOf(i) !== mySlot ? (b.ownerNames?.[ownerOf(i)] || 'Allié')
+          : m.hp <= 0 ? 'K.O.'
+          : b.sides[0].activeSlots.includes(i) ? 'Au combat'
+          : null
+      ),
+    });
+    if (k >= 0 && ownerOf(k) === mySlot) return k;
+    return b.sides[0].party.findIndex((m, j) => ownerOf(j) === mySlot && m && m.hp > 0 && !b.sides[0].activeSlots.includes(j));
+  }
+
+  /** Menu d'ordre restreint au seul emplacement du joueur en Co-op (`mySlot`) */
+  async chooseCoopSlotAction(mySlot) {
+    const b = this.battle, ref = { side: 0, slot: mySlot }, me = b.act(ref);
+    if (!me || me.hp <= 0) return { slot: mySlot, type: 'none' };
+    const forced = b.forcedAction(ref);
+    if (forced) return { slot: mySlot, type: 'move', idx: 0 };
+    this.highlightActor(mySlot);
+    try {
+      for (;;) {
+        this.ui.typePage(this.textBox, `${me ? monName(me) : 'À toi'} — choisis ton action !`, { last: true });
+        const c = await this.commandMenu(false);
+        if (c === 0) {
+          this.megaArmed = false;
+          const mvIdx = await this.moveMenu(mySlot, false);
+          if (mvIdx < 0) continue;
+          const mvObj = me.moves[mvIdx];
+          const M = mvObj ? MOVES[mvObj.id] : MOVES[165];
+          const tgt = await this._pickMoveTarget(ref, M);
+          if (!tgt) continue;
+          const { targetSide, targetSlot } = tgt;
+          const mega = !!this.megaArmed && b.canMega(ref);
+          this.megaArmed = false;
+          return { slot: mySlot, type: 'move', idx: mvIdx, targetSide, targetSlot, ...(mega ? { mega: true } : {}) };
+        }
+        if (c === 1) { await this.msg('Pas d\'objets du sac autorisés dans le Dojo !', { wait: true }); continue; }
+        if (c === 3) { if (await this.ui.yesNo('Abandonner le défi Co-op avec ton escouade ?')) return { slot: mySlot, type: 'forfeit' }; continue; }
+        if (c === 2) {
+          const k = await partyScreen(this.game, {
+            mode: 'battle',
+            prompt: 'Choisis ton remplaçant.',
+            filter: (m, i) => (
+              b.owners?.[i] !== mySlot ? (b.ownerNames?.[b.owners[i]] || 'Allié')
+                : m.hp <= 0 ? `${monName(m)} est K.O.`
+                : b.sides[0].activeSlots.includes(i) ? 'Déjà sur le terrain'
+                : null
+            ),
+          });
+          if (k < 0 || b.owners?.[k] !== mySlot) continue;
+          return { slot: mySlot, type: 'switch', idx: k };
+        }
+      }
+    } finally {
+      this.highlightActor(-1);
+    }
+  }
+
+  /** Boucle de combat lockstep pour le Dojo Co-op (2 ou 3 joueurs vs IA hyperstratégique) */
+  async runCoopDojo(battle, coopNet, o = {}) {
+    this.battle = battle; this.slots = battle.slots || 2; this.kind = o.bg || 'gym'; this.alive = true;
+    this.lastMove = 0; this.lastMoveMon = null;
+    this.seenInBattle = new Set();
+    this.W = Math.max(256, Math.min(420, Math.round(BH * innerWidth / innerHeight)));
+    this.bg = this.makeBg(this.kind, o.night);
+    this.boosts = null; this.boostSlots = null;
+    this.initState();
+    this.buildDom();
+    this.root.style.setProperty('--bp', (innerHeight / BH) + 'px');
+    this.updateWeather(battle.weather);
+    for (let sl = 0; sl < this.slots; sl++) { this.setHud(1, null, 0, sl); this.setHud(0, null, 0, sl); }
+    const jobs = [this.loadBattleDecor(this.kind, o.night)];
+    for (let sl = 0; sl < this.slots; sl++) jobs.push(this.loadSide(1, sl), this.loadSide(0, sl));
+    await Promise.all(jobs);
+    this.st.trainer.img = await loadImg(ASSETS.trainer(battle.sides[1].trainer.bs));
+    requestAnimationFrame(this.frame);
+    this.st.trainer.visible = true;
+    await this.tween(700, (u) => { const e = ease(u); this.st.eSlide = -this.W * (1 - e); this.st.pSlide = this.W * (1 - e); });
+    await this.play(battle.start());
+
+    const mySlot = battle.mySlot ?? 0;
+    const waiting = () => (coopNet.waitUiHint ? coopNet.waitUiHint(this.textBox) : this.ui.typePage(this.textBox, 'En attente de ton escouade…', { last: true }));
+    const aborted = async (r) => {
+      if (r.mine) { coopNet.sendQuit?.(); await this.play(battle.stop('lose', 'Vous abandonnez le défi du Dojo…')); return; }
+      const who = r.who || 'Un coéquipier';
+      const why = r.desync ? 'Désynchronisation réseau détectée : le combat Co-op est interrompu.'
+        : r.left ? `${who} a quitté la partie.`
+        : r.quit ? `${who} a abandonné le défi Co-op.`
+        : r.timeout ? `${who} ne répond plus.`
+        : 'La session Co-op a été interrompue.';
+      await this.play(battle.stop('lose', why));
+    };
+
+    while (battle.state !== 'over') {
+      if (battle.state === 'switch') {
+        const n = battle.turn;
+        const needed = battle.needPlayerSlots?.length ? battle.needPlayerSlots : [];
+        let myPick = null;
+        if (needed.includes(mySlot)) {
+          myPick = await this.pickCoopReplacement(mySlot);
+        }
+        await coopNet.sendSwitch(n, myPick);
+        const popSw = this.ui.input.push((k) => { if (k === 'b' || k === 'cancel') coopNet.abortAllWaiters?.(); });
+        const r = await coopNet.waitAllSwitches(n, needed, myPick, waiting);
+        popSw();
+        if (!r.picks) { await aborted(r); break; }
+        await this.play(battle.switchCoop(r.picks));
+        continue;
+      }
+
+      const myAlive = battle.monAt(0, mySlot) && battle.monAt(0, mySlot).hp > 0;
+      const myAction = myAlive ? await this.chooseCoopSlotAction(mySlot) : { slot: mySlot, type: 'none' };
+      if (myAction.type === 'forfeit') {
+        coopNet.sendQuit?.();
+        await this.play(battle.stop('lose', 'Vous abandonnez le défi du Dojo…'));
+        break;
+      }
+      const n = battle.turn + 1, sum = battle.checksum();
+      await coopNet.sendAct(n, myAction, sum);
+      const popAct = this.ui.input.push((k) => { if (k === 'b' || k === 'cancel') coopNet.abortAllWaiters?.(); });
+      const r = await coopNet.waitAllActs(n, myAction, sum, waiting);
+      popAct();
+      if (!r.acts) { await aborted(r); break; }
+      await this.play(battle.playerAction(r.acts));
+    }
+    await wait(300);
+    return battle.result;
+  }
+
   async loadSide(side, slot = 0) {
     const m = this.battle.act(side, slot), o = this.spriteObj(side, slot);
     if (!o) return;
@@ -723,24 +886,9 @@ export class BattleView {
         if (mvIdx < 0) continue;
         const mvObj = me.moves[mvIdx];
         const M = mvObj ? MOVES[mvObj.id] : MOVES[165];
-        let targetSide = 1, targetSlot = b.aliveSlots(1)[0] ?? 0;
-        if (this.slots > 1) {
-          if (M?.tg === 3) {
-            const allies = b.validAllyTargets(ref);
-            if (allies.length > 1) {
-              const tPick = await this.targetMenu(ref, M, allies, true);
-              if (!tPick) continue;
-              targetSide = tPick.side; targetSlot = tPick.slot;
-            } else if (allies.length === 1) { targetSide = allies[0].side; targetSlot = allies[0].slot; }
-          } else if (M && M.tg !== 7 && M.tg !== 4 && M.tg !== 13 && M.tg !== 12 && M.tg !== 14 && M.tg !== 9 && M.tg !== 11 && M.tg !== 8) {
-            const foes = b.validFoeTargets(ref, M);
-            if (foes.length > 1) {
-              const tPick = await this.targetMenu(ref, M, foes, false);
-              if (!tPick) continue;
-              targetSide = tPick.side; targetSlot = tPick.slot;
-            } else if (foes.length === 1) { targetSide = foes[0].side; targetSlot = foes[0].slot; }
-          }
-        }
+        const tgt = await this._pickMoveTarget(ref, M);
+        if (!tgt) continue;
+        const { targetSide, targetSlot } = tgt;
         const mega = !megaAlreadyArmed && !!this.megaArmed && b.canMega(ref);
         this.megaArmed = false;
         return { slot: sl, type: 'move', idx: mvIdx, targetSide, targetSlot, ...(mega ? { mega: true } : {}) };
