@@ -631,18 +631,22 @@ export class BattleView {
     const leave = () => { if (!spectatorQuit) { spectatorQuit = true; specSession.leave?.(); } };
     banner.querySelector('.spec-leave-btn').onclick = leave;
     const popInput = this.game.input.push((k) => { if (k === 'b' || k === 'cancel') leave(); });
-    this.cmd.innerHTML = `<div class="spec-cmd-box"><div class="spec-cmd-title">👁️ MODE SPECTATEUR</div><div class="spec-cmd-status">Combat entre ${esc(p0.name)} et ${esc(p1.name)}</div><button type="button" class="spec-cmd-quit-btn">Quitter le combat</button></div>`;
-    this.cmd.querySelector('.spec-cmd-quit-btn').onclick = leave;
-    await this.msg(`Tu observes le combat en direct entre ${p0.name} et ${p1.name} !`);
-    while (!spectatorQuit && b.state !== 'over') {
-      this.ui.typePage(this.textBox, `En attente du tour ${b.turn + 1} de ${p0.name} et ${p1.name}…`, { last: true });
-      const msg = await specSession.waitNext();
-      if (spectatorQuit) break;
-      if (!msg || msg.t === 'left' || msg.t === 'timeout') { await this.msg("Le combat s'est arrêté ou la connexion avec l'hôte a été interrompue."); await wait(1200); break; }
-      if (msg.t === 'spec_ev') { b.turn = msg.turn ?? (b.turn + 1); await this.playSpecEvs(msg.events); }
-      if (msg.t === 'spec_end') { if (msg.events?.length) await this.playSpecEvs(msg.events); b.state = 'over'; await this.msg(msg.winner ? `${msg.winner} remporte le combat !` : "Le combat est terminé !", { wait: true }); await wait(1800); break; }
+    try {
+      this.cmd.innerHTML = `<div class="spec-cmd-box"><div class="spec-cmd-title">👁️ MODE SPECTATEUR</div><div class="spec-cmd-status">Combat entre ${esc(p0.name)} et ${esc(p1.name)}</div><button type="button" class="spec-cmd-quit-btn">Quitter le combat</button></div>`;
+      this.cmd.querySelector('.spec-cmd-quit-btn').onclick = leave;
+      await this.msg(`Tu observes le combat en direct entre ${p0.name} et ${p1.name} !`);
+      while (!spectatorQuit && b.state !== 'over') {
+        this.ui.typePage(this.textBox, `En attente du tour ${b.turn + 1} de ${p0.name} et ${p1.name}…`, { last: true });
+        const msg = await specSession.waitNext();
+        if (spectatorQuit) break;
+        if (!msg || msg.t === 'left' || msg.t === 'timeout') { await this.msg("Le combat s'est arrêté ou la connexion avec l'hôte a été interrompue."); await wait(1200); break; }
+        if (msg.t === 'spec_ev') { b.turn = msg.turn ?? (b.turn + 1); await this.playSpecEvs(msg.events); }
+        if (msg.t === 'spec_end') { if (msg.events?.length) await this.playSpecEvs(msg.events); b.state = 'over'; await this.msg(msg.winner ? `${msg.winner} remporte le combat !` : "Le combat est terminé !", { wait: true }); await wait(1800); break; }
+      }
+    } finally {
+      popInput();
+      this.spectator = false;
     }
-    popInput(); this.spectator = false;
   }
 
   async playSpecEvs(evs) {

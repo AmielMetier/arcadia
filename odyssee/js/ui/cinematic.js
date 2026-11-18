@@ -16,6 +16,7 @@ export async function playLugiaCinematic(game) {
   const sound = game.sound;
   const input = ui.input;
 
+  const prevBusy = !!game.busy;
   game.busy = true;
   sound.stopMusic(0.25);
   await ui.fade(true, 280);
@@ -56,8 +57,9 @@ export async function playLugiaCinematic(game) {
   const titleWrap = scr.querySelector('.lugia-cine-title-wrap');
   const skipBtn = scr.querySelector('.lugia-cine-skip');
 
-  // Configuration du volume vidéo (si audio présent, sinon géré par le synthétiseur audio)
-  vid.volume = Math.max(0, Math.min(1, sound.vol ?? 0.7));
+  // Configuration du volume vidéo (respecte mute / volume ; complété par le synthétiseur audio)
+  vid.muted = !!sound.muted || (sound.vol ?? 0.7) <= 0;
+  vid.volume = vid.muted ? 0 : Math.max(0, Math.min(1, sound.vol ?? 0.7));
 
   // Canvas & système de particules obscures
   const ctx = canvas.getContext('2d');
@@ -167,108 +169,125 @@ export async function playLugiaCinematic(game) {
     flashEl.style.opacity = '0';
   };
 
-  // Apparition des barres de cinéma
-  setTimeout(() => scr.classList.add('in'), 40);
-  await ui.fade(false, 300);
-
-  // Démarrage du design sonore et de la vidéo
-  const audioCtrl = sound.playLugiaCinematicAudio ? sound.playLugiaCinematicAudio() : { stop: () => {} };
-
   // Timers d'effets synchronisés avec la vidéo (durée totale ~14.9s)
   const timeouts = [];
   const at = (ms, fn) => timeouts.push(setTimeout(() => { if (animRunning) fn(); }, ms));
+  let audioCtrl = { stop: () => {} };
 
-  // 1. Début : tremblement sourd
-  at(500, () => shake(3, 800));
+  const stopEffects = () => {
+    animRunning = false;
+    timeouts.forEach((id) => clearTimeout(id));
+    timeouts.length = 0;
+    if (shakeTimer) { cancelAnimationFrame(shakeTimer); shakeTimer = null; }
+    window.removeEventListener('resize', onResize);
+    try { audioCtrl.stop(); } catch (e) {}
+    try { vid.pause(); } catch (e) {}
+  };
 
-  // 2. Réveil de Lugia & Rugissement (2.8s)
-  at(2800, () => {
-    flash('#d8b4fe', 160);
-    shake(16, 1500);
-    addShockwave(cw / 2, ch / 2, Math.max(cw, ch) * 0.9, 'rgba(192, 132, 252, ');
-  });
+  try {
+    // Apparition des barres de cinéma
+    timeouts.push(setTimeout(() => { if (animRunning) scr.classList.add('in'); }, 40));
+    await ui.fade(false, 300);
 
-  // 3. Titre cinématographique (3.3s)
-  at(3300, () => {
-    titleWrap.classList.add('in');
-  });
+    // Démarrage du design sonore
+    audioCtrl = sound.playLugiaCinematicAudio ? sound.playLugiaCinematicAudio() : { stop: () => {} };
 
-  // 4. Déchaînement de la Tornade Obscure (6.8s)
-  at(6800, () => {
-    shake(6, 2800);
-    addShockwave(cw / 2, ch / 2, cw * 0.7, 'rgba(147, 51, 234, ');
-  });
+    // 1. Début : tremblement sourd
+    at(500, () => shake(3, 800));
 
-  // 5. Impact Cataclysmique & Plongeon Final (10.8s)
-  at(10800, () => {
-    flash('#ffffff', 140);
-    setTimeout(() => flash('#7e22ce', 220), 160);
-    shake(22, 1800);
-    addShockwave(cw / 2, ch / 2, Math.max(cw, ch) * 1.1, 'rgba(255, 255, 255, ');
-  });
+    // 2. Réveil de Lugia & Rugissement (2.8s)
+    at(2800, () => {
+      flash('#d8b4fe', 160);
+      shake(16, 1500);
+      addShockwave(cw / 2, ch / 2, Math.max(cw, ch) * 0.9, 'rgba(192, 132, 252, ');
+    });
 
-  // 6. Retrait du titre avant la fin (12.2s)
-  at(12200, () => {
-    titleWrap.classList.remove('in');
-    titleWrap.classList.add('out');
-  });
+    // 3. Titre cinématographique (3.3s)
+    at(3300, () => {
+      titleWrap.classList.add('in');
+    });
 
-  // Attente de la fin de la vidéo ou de l'annulation
-  await new Promise((resolve) => {
-    let finished = false;
-    const end = () => {
-      if (finished) return;
-      finished = true;
-      pop();
-      resolve();
-    };
+    // 4. Déchaînement de la Tornade Obscure (6.8s)
+    at(6800, () => {
+      shake(6, 2800);
+      addShockwave(cw / 2, ch / 2, cw * 0.7, 'rgba(147, 51, 234, ');
+    });
 
-    const pop = input.push((k) => {
-      if (k === 'a' || k === 'b' || k === 'menu') {
+    // 5. Impact Cataclysmique & Plongeon Final (10.8s)
+    at(10800, () => {
+      flash('#ffffff', 140);
+      shake(22, 1800);
+      addShockwave(cw / 2, ch / 2, Math.max(cw, ch) * 1.1, 'rgba(255, 255, 255, ');
+    });
+    at(10960, () => flash('#7e22ce', 220));
+
+    // 6. Retrait du titre avant la fin (12.2s)
+    at(12200, () => {
+      titleWrap.classList.remove('in');
+      titleWrap.classList.add('out');
+    });
+
+    // Attente de la fin de la vidéo ou de l'annulation
+    await new Promise((resolve) => {
+      let finished = false;
+      const end = () => {
+        if (finished) return;
+        finished = true;
+        pop();
+        resolve();
+      };
+
+      const pop = input.push((k) => {
+        if (k === 'a' || k === 'b' || k === 'menu') {
+          sound.sfx('select');
+          end();
+        }
+      });
+
+      skipBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         sound.sfx('select');
         end();
-      }
-    });
-
-    skipBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      sound.sfx('select');
-      end();
-    });
-
-    vid.addEventListener('ended', end, { once: true });
-    vid.addEventListener('error', end, { once: true });
-
-    // Lancer la lecture
-    const p = vid.play();
-    if (p && typeof p.catch === 'function') {
-      p.catch(() => {
-        // En cas de politique autoplay restrictive, on coupe le flux natif et relance
-        vid.muted = true;
-        vid.play().catch(end);
       });
+
+      const fallbackProcedural = () => {
+        try { vid.pause(); } catch (e) {}
+        vid.style.display = 'none';
+      };
+
+      vid.addEventListener('ended', end, { once: true });
+      vid.addEventListener('error', fallbackProcedural, { once: true });
+
+      // Lancer la lecture
+      const p = vid.play();
+      if (p && typeof p.catch === 'function') {
+        p.catch(() => {
+          // En cas de politique autoplay restrictive, on coupe le flux natif et relance
+          vid.muted = true;
+          vid.play().catch(fallbackProcedural);
+        });
+      }
+
+      // Sécurité timeout à 16.5 secondes
+      timeouts.push(setTimeout(end, 16500));
+    });
+
+    // Nettoyage et fin
+    stopEffects();
+
+    await ui.fade(true, 300);
+    scr.remove();
+
+    // Enregistrer le flag d'histoire
+    if (game.state?.flags) {
+      game.state.flags.seenLugiaCinematic = true;
+      game.save?.(true);
     }
 
-    // Sécurité timeout à 16.5 secondes
-    timeouts.push(setTimeout(end, 16500));
-  });
-
-  // Nettoyage et fin
-  animRunning = false;
-  timeouts.forEach((id) => clearTimeout(id));
-  window.removeEventListener('resize', onResize);
-  audioCtrl.stop();
-
-  try { vid.pause(); } catch (e) {}
-
-  await ui.fade(true, 300);
-  scr.remove();
-
-  // Enregistrer le flag d'histoire
-  if (game.state?.flags) {
-    game.state.flags.seenLugiaCinematic = true;
-    game.save?.(true);
+    await ui.fade(false, 250);
+  } finally {
+    stopEffects();
+    if (scr.isConnected) scr.remove();
+    game.busy = prevBusy;
   }
-
-  await ui.fade(false, 250);
 }

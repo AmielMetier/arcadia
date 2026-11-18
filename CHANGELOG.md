@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.113 — 18 novembre 2026
+- **Odyssée & Hub** — Correctifs multijoueur, HUD et cinématiques suite à un audit complet :
+  - **Multijoueur & Amis** : rejoindre le salon d'un ami depuis le jeu ramène désormais directement dans son salon Arcadia sans perdre l'identité de compte ami ; la navigation au clavier (`↑` / `↓` puis `Entrée` / `Espace`) fonctionne sur toutes les actions du menu Amis, les statuts de duel et de tenue s'actualisent sans délai, et quitter ou interrompre un combat en mode Spectateur rend toujours les commandes normalement.
+  - **HUD** : mise à jour immédiate de l'objet rapide `[Y]` (avec prise en charge directe du Vélo par défaut et disparition dès épuisement), du niveau maximal affiché et des objectifs de quêtes suivies ; masquage propre des étiquettes des joueurs pendant les transitions d'écran.
+  - **Cinématiques & dialogues** : les cinématiques respectent le mode muet et le volume choisi ; si une vidéo est bloquée ou indisponible, la scène d'éveil animée de Lugia Obscur continue sans se couper prématurément et ne bloque plus l'état du jeu ni aucun effet visuel après avoir été passée ; sur mobile, les boutons tactiles ne recouvrent plus la cinématique d'ouverture.
+
 ## 5.112 — 18 novembre 2026
 - **Odyssée** — Correctifs de fiabilité multijoueur suite à audit :
   - Correction du rôle d'hôte en **Tournoi en direct** lorsque l'organisateur joue côté droit d'un duel contre un autre joueur humain, et ouverture instantanée du **Mode Spectateur** même si la demande arrive pendant l'introduction du combat.

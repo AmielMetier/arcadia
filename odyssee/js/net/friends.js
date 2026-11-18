@@ -3,6 +3,16 @@
 
 const FID_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
+function storeKey(base) {
+  try {
+    const qs = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
+    const as = (qs.get('as') || '').replace(/[^a-z0-9]/gi, '').slice(0, 12);
+    return base + (as ? '_' + as : '');
+  } catch (e) {
+    return base;
+  }
+}
+
 function getHubFriends() {
   try {
     if (typeof window !== 'undefined') {
@@ -16,8 +26,13 @@ function getHubFriends() {
 }
 
 function getLocalSecretKey() {
+  const keyName = storeKey('hub_fkey');
   try {
-    let k = localStorage.getItem('hub_fkey');
+    const raw = localStorage.getItem(keyName);
+    let k = null;
+    if (raw) {
+      try { k = JSON.parse(raw); } catch (e) { k = raw; }
+    }
     if (!k || typeof k !== 'string' || k.length < 16) {
       const arr = new Uint8Array(16);
       if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
@@ -26,7 +41,10 @@ function getLocalSecretKey() {
         for (let i = 0; i < 16; i++) arr[i] = Math.floor(Math.random() * 256);
       }
       k = Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
-      localStorage.setItem('hub_fkey', k);
+      localStorage.setItem(keyName, JSON.stringify(k));
+    } else if (raw && raw[0] !== '"') {
+      // Migration douce : aligner le format JSON sur DDProfile / Cloud
+      localStorage.setItem(keyName, JSON.stringify(k));
     }
     return k;
   } catch (e) {
@@ -180,9 +198,9 @@ export class FriendsManager {
       });
     }
 
-    // Fallback localStorage
+    // Fallback localStorage (clé partagée avec le Hub)
     try {
-      const raw = localStorage.getItem('hub_friends');
+      const raw = localStorage.getItem(storeKey('hub_friends'));
       const list = raw ? JSON.parse(raw) : [];
       if (Array.isArray(list)) {
         return list.map((f) => ({
@@ -238,7 +256,7 @@ export class FriendsManager {
       const list = this.getFriendsList();
       if (!list.some((f) => f.fid === clean)) {
         list.push({ fid: clean, name: 'Dresseur ' + clean.slice(0, 4), color: '#3b82f6' });
-        localStorage.setItem('hub_friends', JSON.stringify(list));
+        localStorage.setItem(storeKey('hub_friends'), JSON.stringify(list));
         this.emit('change');
       }
       return true;
@@ -276,7 +294,7 @@ export class FriendsManager {
     try {
       let list = this.getFriendsList();
       list = list.filter((f) => f.fid !== clean);
-      localStorage.setItem('hub_friends', JSON.stringify(list));
+      localStorage.setItem(storeKey('hub_friends'), JSON.stringify(list));
       this.emit('change');
       return true;
     } catch (e) {
@@ -294,12 +312,17 @@ export class FriendsManager {
   }
 
   joinRoom(code) {
-    if (!code) return;
-    if (typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      url.searchParams.set('code', code);
-      window.location.href = url.toString();
+    const clean = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+    if (!clean || typeof window === 'undefined') return;
+    if (window.HubBridge?.embedded && typeof window.HubBridge.join === 'function') {
+      window.HubBridge.join(clean);
+      return;
     }
+    const url = new URL('../', window.location.href);
+    const curQs = new URLSearchParams(window.location.search);
+    for (const k of ['local', 'ws', 'as', 'debug', 'mute']) if (curQs.has(k)) url.searchParams.set(k, curQs.get(k));
+    url.searchParams.set('join', clean);
+    window.location.href = url.toString();
   }
 }
 

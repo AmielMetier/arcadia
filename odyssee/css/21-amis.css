@@ -980,3 +980,9 @@
   background: #334155;
   color: #ffffff;
 }
+.fr-kb-focus {
+  outline: calc(var(--px) * 1.2) solid #fbbf24 !important;
+  outline-offset: calc(var(--px) * 0.6);
+  box-shadow: 0 0 calc(var(--px) * 4) rgba(251, 191, 36, 0.55) !important;
+  transform: translateY(calc(var(--px) * -0.5));
+}

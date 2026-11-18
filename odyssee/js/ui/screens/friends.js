@@ -421,21 +421,25 @@ export function friendsScreen(game) {
 
       s.querySelector('[data-act="tab-online"]')?.addEventListener('click', () => {
         tab = 'online';
+        focusIdx = -1;
         ui.sound?.sfx('select');
         render();
       });
       s.querySelector('[data-act="tab-hub"]')?.addEventListener('click', () => {
         tab = 'hub';
+        focusIdx = -1;
         ui.sound?.sfx('select');
         render();
       });
       s.querySelector('[data-act="tab-friends"]')?.addEventListener('click', () => {
         tab = 'friends';
+        focusIdx = -1;
         ui.sound?.sfx('select');
         render();
       });
       s.querySelector('[data-act="tab-add"]')?.addEventListener('click', () => {
         tab = 'add';
+        focusIdx = -1;
         ui.sound?.sfx('select');
         render();
       });
@@ -620,21 +624,53 @@ export function friendsScreen(game) {
       render();
     }, 3000);
 
+    let focusIdx = -1;
+    const focusables = () => [...s.querySelectorAll('.fr-hub-btn, .fr-act-btn, .fr-submit-btn, .fr-copy-btn')].filter((b) => !b.disabled);
+    const syncFocus = () => {
+      const items = focusables();
+      items.forEach((b) => b.classList?.remove('fr-kb-focus'));
+      if (!items.length) { focusIdx = -1; return null; }
+      if (focusIdx >= items.length) focusIdx = items.length - 1;
+      if (focusIdx < 0) return null;
+      const cur = items[focusIdx];
+      cur.classList?.add('fr-kb-focus');
+      cur.scrollIntoView?.({ block: 'nearest' });
+      return cur;
+    };
+
     const tabsOrder = ['online', 'hub', 'friends', 'add'];
+    const switchTab = (nextTab) => {
+      tab = nextTab;
+      focusIdx = -1;
+      ui.sound?.sfx('select');
+      render();
+    };
     const pop = ui.input.push((k) => {
       if (k === 'b') {
         close();
       } else if (k === 'left') {
         const i = tabsOrder.indexOf(tab);
-        if (i > 0) { tab = tabsOrder[i - 1]; ui.sound?.sfx('select'); render(); }
+        if (i > 0) switchTab(tabsOrder[i - 1]);
       } else if (k === 'right') {
         const i = tabsOrder.indexOf(tab);
-        if (i < tabsOrder.length - 1) { tab = tabsOrder[i + 1]; ui.sound?.sfx('select'); render(); }
+        if (i < tabsOrder.length - 1) switchTab(tabsOrder[i + 1]);
+      } else if (k === 'up' || k === 'down') {
+        const items = focusables();
+        if (!items.length) return;
+        focusIdx = focusIdx < 0
+          ? (k === 'down' ? 0 : items.length - 1)
+          : (focusIdx + (k === 'down' ? 1 : -1) + items.length) % items.length;
+        ui.sound?.sfx('blip');
+        syncFocus();
       } else if (k === 'a') {
-        // NON-DESTRUCTIF : Espace / Entrée ne ferme pas l'écran
-        const activeBtn = s.querySelector('.fr-tab.active') || s.querySelector('.fr-act-btn');
-        if (activeBtn) {
+        // NON-DESTRUCTIF : Espace / Entrée active l'élément ciblé sans fermer l'écran
+        const items = focusables();
+        const target = (focusIdx >= 0 && items[focusIdx]) || items[0] || s.querySelector('.fr-tab.active');
+        if (target && target.dataset?.act !== 'close') {
           ui.sound?.sfx('select');
+          if (items.length && (focusIdx >= 0 || target.dataset?.act !== 'copy-code')) {
+            target.click?.();
+          }
         }
       }
     });

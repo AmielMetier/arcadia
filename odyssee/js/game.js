@@ -626,8 +626,8 @@ export class Game {
     this.vie?.tick(dt);
     this.vieMonde?.tick(dt);
     this.peersTick?.(dt);
-    // la carte n'est pas redessinée sous un combat ou un écran plein cadre
-    if (this.bv.alive || this.ui.root.querySelector('.screen')) { this.drawTags?.(false); return; }
+    // la carte n'est pas redessinée sous un combat, cinématique ou écran plein cadre
+    if (this.bv.alive || this.ui.root.querySelector('.screen, .wipe, .door-iris.on')) { this.drawTags?.(false); return; }
     this.hud?.update();
     this.draw(dt);
   }
@@ -1121,12 +1121,11 @@ export class Game {
     if (k === 'a') await this.interact();
     else if (k === 'b' || k === 'menu') await this.startMenu();
     else if (k === 'bag') { this.busy = true; try { if (await this.fieldBag()) return; } finally { this.busy = false; } }
-    else if (k === 'map') { this.busy = true; await mapScreen(this); this.busy = false; }
+    else if (k === 'map') { this.busy = true; try { await mapScreen(this); } finally { this.busy = false; } }
     else if (k === 'velo') { this.busy = true; try { await this.toggleVelo(); } finally { this.busy = false; } }
-    else if (k === 'quests') { this.busy = true; await questsScreen(this); this.busy = false; }
-    else if (k === 'trophies') { this.busy = true; await trophiesScreen(this); this.busy = false; }
-    else if (k === 'friends') { this.busy = true; await friendsScreen(this); this.busy = false; }
-    else if (k === 'hud') this.hud?.toggle();
+    else if (k === 'quests') { this.busy = true; try { await questsScreen(this); } finally { this.busy = false; } }
+    else if (k === 'trophies') await this.openTrophies();
+    else if (k === 'friends') { this.busy = true; try { await friendsScreen(this); } finally { this.busy = false; } }
   }
   async interact() {
     const p = this.player, m = this.mapObj, [dx, dy] = DIRS[p.dir], st0 = this.state;

@@ -45,22 +45,24 @@ export class UI {
     this.dlg.classList.toggle('has-face', !!src);
     return this.dlg;
   }
-  closeDialog() { if (this.dlg) { this.dlg.remove(); this.dlg = null; } }
+  closeDialog() { if (this.dlg) { this.dlg._stopTyping?.(); this.dlg.remove(); this.dlg = null; } }
   typePage(box, text, o = {}) {
     return new Promise((resolve) => {
       const txt = box.querySelector('.dlg-txt'), arrow = box.querySelector('.dlg-arrow');
       txt.textContent = ''; arrow.style.visibility = 'hidden';
-      let i = 0, done = false, closed = false;
+      let i = 0, done = false, closed = false, autoT = null;
       const speed = [1, 2, 4, 99][this.textSpeed] ?? 2;
       const finish = () => { done = true; txt.textContent = text; if (!o.last) arrow.style.visibility = 'visible'; };
+      const end = () => { if (closed) return; closed = true; clearInterval(iv); clearTimeout(autoT); if (box._stopTyping === end) box._stopTyping = null; box.removeEventListener('click', onBoxClick); pop(); resolve(); };
+      box._stopTyping = end;
       const iv = setInterval(() => {
         if (done) return;
+        if (box.isConnected === false) { end(); return; }
         i += speed; txt.textContent = text.slice(0, i);
-        if (i >= text.length) { clearInterval(iv); finish(); if (o.auto) setTimeout(end, o.auto); if (o.last) end(); }
+        if (i >= text.length) { clearInterval(iv); finish(); if (o.auto) autoT = setTimeout(end, o.auto); if (o.last) end(); }
       }, 16);
-      const end = () => { if (closed) return; closed = true; clearInterval(iv); box.removeEventListener('click', onBoxClick); pop(); resolve(); };
       const advance = () => {
-        if (!done) { clearInterval(iv); finish(); if (o.last) end(); else if (o.auto) setTimeout(end, Math.min(o.auto, 400)); return; }
+        if (!done) { clearInterval(iv); finish(); if (o.last) end(); else if (o.auto) { clearTimeout(autoT); autoT = setTimeout(end, Math.min(o.auto, 400)); } return; }
         if (!o.auto) this.sound.sfx('blip');
         end();
       };

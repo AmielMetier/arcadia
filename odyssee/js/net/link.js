@@ -47,7 +47,7 @@ export class Link {
     const p = this.me();
     if (!p) return;
     for (const [id, o] of this.others) if (now - o.t > STALE_MS) this.others.delete(id);
-    const key = `${p.map}|${p.x}|${p.y}|${p.dir}|${p.run ? 1 : 0}|${p.busy ? 1 : 0}`;
+    const key = `${p.map}|${p.x}|${p.y}|${p.dir}|${p.run ? 1 : 0}|${p.busy ? 1 : 0}|${p.pvp?.rid || ''}|${p.tn || ''}`;
     if (key === this.lastSent && now - this.lastSentAt < HEARTBEAT_MS) return;
     this.lastSent = key; this.lastSentAt = now;
     this.H.send('all', { t: 'pos', ...p }, { volatile: true });

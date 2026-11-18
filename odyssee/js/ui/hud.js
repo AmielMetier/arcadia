@@ -278,8 +278,13 @@ export class Hud {
     const partyKey = st.party
       .map((m) => `${m.uid}:${m.sp}:${m.nick || ''}:${m.lvl}:${m.hp}:${m.stats[0]}:${m.exp}:${m.status || ''}:${m.shadow ? 1 : 0}:${m.shiny ? 1 : 0}`)
       .join('|');
+    const reg = st.registeredItem || (st.bag?.['running-shoes'] ? 'running-shoes' : null) || (st.bag?.['canne'] ? 'canne' : null) || (st.bag?.['velo'] ? 'velo' : null);
+    const regQty = reg ? (st.bag?.[reg] || 0) : 0;
+    const quickKey = `${reg || ''}:${regQty}`;
+    const cap = g.levelCap ? g.levelCap() : 100;
+    const questSig = `${st.trackedQuest || ''}:${tracked?.note || ''}:${tracked?.since || ''}`;
     const guideSig = V ? `${V.id}:${V.nom}:${!V.zone && V.id === 'monde' ? `${V.p.x >> 4},${V.p.y >> 4}` : ''}:${this.guideExpanded ? 1 : 0}:${st.villeCible?.key || ''}` : '';
-    const sig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0}:${g.runSpeed ?? 1};${this.swapFrom};${loc};${guideSig};${zoneCatchKey};${st.money};${badgesKey};${trUnlocked};${st.trackedQuest || ''}:${tracked?.notes?.length || 0};${onlineCount};${partyKey}`;
+    const sig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0}:${g.runSpeed ?? 1};${this.swapFrom};${loc};${guideSig};${zoneCatchKey};${st.money};${badgesKey};${cap};${trUnlocked};${questSig};${quickKey};${onlineCount};${partyKey}`;
     if (this.glisse) return;   // pas de redessin pendant qu'on glisse un Pokémon
     if (!force && sig === this._sig) { if (V && !this.collapsed) this.refreshGuide(V); return; }
     this._sig = sig;
@@ -354,8 +359,7 @@ export class Hud {
           </div>
         </div>
         ${(() => {
-          const reg = st.registeredItem || (st.bag?.['running-shoes'] ? 'running-shoes' : null) || (st.bag?.['canne'] ? 'canne' : null);
-          if (!reg || (st.bag?.[reg] || 0) <= 0) return '';
+          if (!reg || (regQty <= 0 && reg !== 'running-shoes')) return '';
           return `<div class="hud-quick-item" data-act="quick-item" title="Objet Rapide (Touche Y ou Clic) : ${esc(itemName(reg))}">
             <span class="hqi-key">Y</span>
             <img class="hqi-ico" src="${ASSETS.item(reg)}" alt="">

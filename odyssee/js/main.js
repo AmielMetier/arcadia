@@ -362,12 +362,14 @@ async function playIntroVideo(ui, input, sound) {
   const s = el('div', 'screen cine-scr', '<video class="cine-vid" src="img/intro.mp4" playsinline preload="auto"></video><button type="button" class="cine-skip">Passer la cinématique (Entrée / Échap)</button>');
   uiRoot.appendChild(s);
   const vid = s.querySelector('.cine-vid'), skipBtn = s.querySelector('.cine-skip');
-  vid.volume = Math.max(0, Math.min(1, sound.vol ?? 0.7));
+  vid.muted = !!sound.muted || (sound.vol ?? 0.7) <= 0;
+  vid.volume = vid.muted ? 0 : Math.max(0, Math.min(1, sound.vol ?? 0.7));
   await new Promise((res) => {
-    let done = false;
+    let done = false, loadTimer = null;
     const finish = () => {
       if (done) return;
       done = true;
+      clearTimeout(loadTimer);
       pop();
       try { vid.pause(); } catch (e) {}
       res();
@@ -376,8 +378,11 @@ async function playIntroVideo(ui, input, sound) {
       if (k === 'a' || k === 'b' || k === 'menu') { sound.sfx('select'); finish(); }
     });
     skipBtn.addEventListener('click', (e) => { e.stopPropagation(); sound.sfx('select'); finish(); });
+    vid.addEventListener('playing', () => clearTimeout(loadTimer), { once: true });
     vid.addEventListener('ended', finish, { once: true });
     vid.addEventListener('error', finish, { once: true });
+    // Filet de sécurité si la vidéo ne démarre jamais (réseau ou codec indisponible)
+    loadTimer = setTimeout(finish, 8000);
     ui.fade(false, 300);
     const p = vid.play();
     if (p && typeof p.catch === 'function') {

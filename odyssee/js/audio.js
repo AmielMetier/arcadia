@@ -1310,14 +1310,18 @@ export class Sound {
 
   /* ---------------- cinématique Lugia Obscur : sound design complet ---------------- */
   playLugiaCinematicAudio() {
-    if (!this.ctx) return { stop: () => {} };
+    if (!this.ctx && typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)) {
+      try { this.unlock?.(); } catch (e) {}
+    }
+    if (!this.ctx || this.muted || (this.vol ?? 0.7) <= 0) return { stop: () => {} };
     const c = this.ctx;
     const bus = c.createGain();
-    const masterVol = Math.max(0.1, Math.min(1.4, (this.vol ?? 0.7) * 1.3));
+    const masterVol = Math.max(0, Math.min(1.4, (this.vol ?? 0.7) * 1.3));
     bus.gain.value = masterVol;
     bus.connect(this.master || c.destination);
 
     const nodes = [];
+    const cryEls = [];
     const timers = [];
     let stopped = false;
 
@@ -1325,6 +1329,7 @@ export class Sound {
       if (stopped) return;
       stopped = true;
       timers.forEach((id) => clearTimeout(id));
+      cryEls.forEach((a) => { try { a.pause(); a.src = ''; } catch (e) {} });
       const now = c.currentTime;
       try {
         bus.gain.cancelScheduledValues(now);
@@ -1455,8 +1460,9 @@ export class Sound {
       try {
         const cryUrl = 'https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/249.ogg';
         const a = new window.Audio(cryUrl);
-        a.volume = Math.min(1, this.vol * 0.95);
+        a.volume = this.muted ? 0 : Math.min(1, (this.vol ?? 0.7) * 0.95);
         a.playbackRate = 0.85;
+        cryEls.push(a);
         a.play().catch(() => {});
       } catch (e) {}
 
