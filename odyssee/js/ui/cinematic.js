@@ -101,7 +101,7 @@ function buildSanctuary(THREE, scene) {
 
   for (let i = 0; i < count; i++) {
     const a = (i / count) * Math.PI * 2 + Math.PI / 8;
-    const rad = 11.2;
+    const rad = 14.2;
     const pg = new THREE.Group();
     pg.position.set(Math.cos(a) * rad, 0, Math.sin(a) * rad);
     pg.lookAt(0, 0, 0);
@@ -575,7 +575,7 @@ function createLugia3DScene(THREE, glCanvas, viewport, lugiaImg) {
     if (t < 2.8) {
       const u = t / 2.8;
       const ang = -0.35 + u * 0.55;
-      const dist = 14.2 - u * 5.4;
+      const dist = 12.2 - u * 4.2;
       camera.position.set(Math.sin(ang) * dist, 2.6 + u * 0.7, Math.cos(ang) * dist);
       camera.lookAt(0, 2.25, 0);
       camera.fov = 50 - u * 6;

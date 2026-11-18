@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.115 — 18 novembre 2026
+- **Odyssée** — Cadrage affiné de la cinématique 3D de **Lugia Obscur** : la caméra reste à l’intérieur du cercle des piliers du Sanctuaire dès les premières images et le bouton Passer reste dégagé du sous-titre sur les écrans compacts.
+
 ## 5.114 — 18 novembre 2026
 - **Odyssée** — Cinématique d’éveil de **Lugia Obscur** entièrement recréée en **3D temps réel** :
   - Scène 3D interactive du Sanctuaire des Marées (océan agité animé par vagues sous l’éclipse, autel octogonal et huit piliers runiques illuminés, éclairs et nuées de particules tourbillonnantes).
