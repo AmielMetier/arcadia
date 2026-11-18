@@ -5,6 +5,8 @@ import { MOVES_GEN } from './roster-gen.js';
 
 export const MOVES = {
   // --- NORMAL ---
+  // Lutte : quand il ne reste plus aucun PP. Sans type (rien ne l'esquive par le type), contrecoup d'1/4 des PV max.
+  struggle: { name: 'Lutte', type: 'normal', typeless: true, cat: 'physical', power: 50, acc: 100, pp: 1, recoilMax: 0.25 },
   tackle: { name: 'Charge', type: 'normal', cat: 'physical', power: 40, acc: 100, pp: 35 },
   scratch: { name: 'Griffe', type: 'normal', cat: 'physical', power: 40, acc: 100, pp: 35 },
   splash: { name: 'Trempette', type: 'normal', cat: 'status', power: 0, acc: 100, pp: 40 },

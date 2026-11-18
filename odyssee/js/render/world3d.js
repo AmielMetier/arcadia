@@ -1554,12 +1554,16 @@ export class WorldView {
    *  colonnes et arrière profond de l'Arène, aile de la serre du Laboratoire) pour éviter tout mur invisible */
   adapterEmprisesPack(m) {
     if (m._packAdapte) return; m._packAdapte = true;
+    // sol qui remplace la place libérée : celui qui entoure le bâtiment (pavés en ville, sable au désert, cendre au volcan,
+    // neige en montagne), l'herbe sinon
     const solAutour = (b) => {
-      let nPave = 0, nHerbe = 0;
+      const n = new Map([[T.PAVE, 0], [T.SAND, 0], [T.ASH, 0], [T.SNOW, 0], [T.GRASS, 0]]);
       for (let i = -1; i <= b.w; i++) for (const j of [-1, b.d]) if (m.in(b.x + i, b.y + j)) {
-        const q = m.get(b.x + i, b.y + j); if (q === T.PAVE) nPave++; else if (q === T.GRASS || q === T.TREE || q === T.FLOWER) nHerbe++;
+        let q = m.get(b.x + i, b.y + j); if (q === T.TREE || q === T.FLOWER || q === T.PINE) q = T.GRASS;
+        if (n.has(q)) n.set(q, n.get(q) + 1);
       }
-      return nPave > nHerbe ? T.PAVE : T.GRASS;
+      let best = T.GRASS; for (const [q, k] of n) if (k > n.get(best)) best = q;
+      return best;
     };
     const liberer = (x, y, solDef, memePave = false) => {
       if (!m.in(x, y)) return;
@@ -1572,11 +1576,11 @@ export class WorldView {
       if (b.kind === 'mart' && b.w === 5 && b.d === 4) for (const [i, j] of [[0, 4], [1, 4], [2, 4]]) liberer(b.x + i, b.y + j, s);
       else if (b.kind === 'gym' && b.w === 8 && b.d === 11) {
         for (const [i, j] of [[0, 11], [7, 11]]) liberer(b.x + i, b.y + j, s);
-        for (let j = 0; j < 4; j++) for (let i = 0; i < b.w; i++) liberer(b.x + i, b.y + j, s, s === T.GRASS);
+        for (let j = 0; j < 4; j++) for (let i = 0; i < b.w; i++) liberer(b.x + i, b.y + j, s, s !== T.PAVE);
       } else if (b.kind === 'lab' && b.w === 10 && b.d === 7) {
-        for (let j = 0; j < b.d; j++) for (let i = 6; i < b.w; i++) liberer(b.x + i, b.y + j, s, s === T.GRASS);
-        for (let j = 0; j < 2; j++) for (let i = 0; i < 6; i++) liberer(b.x + i, b.y + j, s, s === T.GRASS);
-        liberer(b.x, b.y + 6, s, s === T.GRASS); liberer(b.x + 5, b.y + 6, s, s === T.GRASS);
+        for (let j = 0; j < b.d; j++) for (let i = 6; i < b.w; i++) liberer(b.x + i, b.y + j, s, s !== T.PAVE);
+        for (let j = 0; j < 2; j++) for (let i = 0; i < 6; i++) liberer(b.x + i, b.y + j, s, s !== T.PAVE);
+        liberer(b.x, b.y + 6, s, s !== T.PAVE); liberer(b.x + 5, b.y + 6, s, s !== T.PAVE);
       }
     }
   }

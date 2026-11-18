@@ -479,6 +479,13 @@ export function resolveActions(state, acts) {
     const pp = poke.ppMap ? poke.ppMap[poke.choiceLock] : 1;
     if (poke.moves.includes(poke.choiceLock) && pp > 0) acts[side] = { ...act, moveId: poke.choiceLock };
   }
+  // plus de PP pour l'attaque choisie (ou plus aucun PP) : Lutte
+  for (const side of SIDES) {
+    const act = acts[side], poke = P(side);
+    if (!act || act.type !== 'move' || !poke || poke.fainted || poke.rampage || poke.charging || act.moveId === 'struggle' || !poke.ppMap) continue;
+    const left = (k) => (poke.ppMap[k] !== undefined ? poke.ppMap[k] : 1);
+    if (!MOVES[act.moveId] || left(act.moveId) <= 0 || !poke.moves.some((k) => left(k) > 0)) acts[side] = { ...act, moveId: 'struggle' };
+  }
   state.pivot = {};
   // Farceur : attaques de statut en priorité ; Ailes Bourrasque : attaques Vol en priorité
   const prio = (m, p) => (m.priority || 0) + (p.ability === 'prankster' && m.cat === 'status' ? 1 : 0) + (p.ability === 'gale-wings' && m.type === 'flying' ? 1 : 0);
@@ -578,7 +585,7 @@ export function resolveActions(state, acts) {
       const cost = defPoke.ability === 'pressure' && !(attMove.effect && attMove.effect.target === 'self' && attMove.cat === 'status') ? 2 : 1;
       attPoke.ppMap[moveId] = Math.max(0, attPoke.ppMap[moveId] - cost);
     }
-    if (CHOICE.has(attPoke.item) && !attPoke.choiceLock) attPoke.choiceLock = moveId;
+    if (CHOICE.has(attPoke.item) && !attPoke.choiceLock && moveId !== 'struggle') attPoke.choiceLock = moveId;
     // Lance-Soleil : un tour pour absorber la lumière (sauf au soleil)
     if (attMove.charge && !attPoke.charging && weatherOf(state) !== 'sun' && attPoke.ability !== 'mega-sol') {
       attPoke.charging = { move: moveId };
@@ -780,6 +787,14 @@ export function resolveActions(state, acts) {
     if (attMove.recoil && res.damage > 0 && attPoke.ability !== 'rock-head') {
       const recoilDmg = Math.max(1, Math.floor(res.damage * attMove.recoil));
       indirect(attPoke, attSide, recoilDmg, `${attPoke.name} subit ${recoilDmg} PV de contrecoup !`, logEvent);
+    }
+
+    // Lutte : 1/4 des PV max en contrecoup, même avec Tête de Roc ou Garde Magik
+    if (attMove.recoilMax && !attPoke.fainted) {
+      const rc = Math.max(1, Math.floor(attPoke.maxHp * attMove.recoilMax));
+      attPoke.hp = Math.max(0, attPoke.hp - rc);
+      logEvent({ type: 'recoil', side: attSide, damage: rc, hp: attPoke.hp, maxHp: attPoke.maxHp, msg: `${attPoke.name} est blessé par le contrecoup !` });
+      if (attPoke.hp === 0) { attPoke.fainted = true; logEvent({ type: 'faint', side: attSide, pokemonId: attPoke.id, name: attPoke.name, msg: `${attPoke.name} est K.O. !` }); }
     }
 
     // Orbe Vie : 1/10 des PV du lanceur à chaque coup porté (pas avec Sans Limite ni Garde Magik)

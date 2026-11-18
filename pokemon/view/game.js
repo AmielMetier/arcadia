@@ -806,6 +806,11 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
                     ${effTag(m)}
                   </button>`;
               }).join('')}
+              ${!isSubmitted && !notYet && !(pBottom.rampage || pBottom.charging) && pBottom.moves.every((k) => (pBottom.ppMap && pBottom.ppMap[k] !== undefined ? pBottom.ppMap[k] : 1) <= 0 || choiceBlocked(pBottom, k) || (pBottom.disabled && pBottom.disabled.move === k))
+                ? `<button class="bw-move" data-move="struggle" style="--tc:${TYPES.normal.color}" ${tipAttr('Plus aucune attaque utilisable : Lutte (50 de puissance, sans type, contrecoup d\'un quart des PV max).')}>
+                    <span class="pm-key">!</span><span class="bw-move-name">Lutte</span>
+                    <span class="bw-move-meta"><span class="bw-pp">Plus de PP</span></span>
+                  </button>` : ''}
             </div></div>
           ` : `
             <div class="switch-grid">

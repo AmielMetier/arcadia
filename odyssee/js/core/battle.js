@@ -1014,7 +1014,7 @@ export class Battle {
   doSwitchSlot(i, slot, idx, afterFaint, trigger = true) {
     const side = this.sides[i], ref = { side: i, slot }, cur = this.act(ref);
     if (!afterFaint && cur) {
-      this.say(i === 0 ? `${monName(cur)}, reviens !` : `${side.trainer.cls} ${side.trainer.name} rappelle ${monName(cur)} !`);
+      this.say(i === 0 ? `${monName(cur)}, reviens !` : `${side.trainer ? `${side.trainer.cls} ${side.trainer.name}` : side.name} rappelle ${monName(cur)} !`);
       this.ev.push({ t: 'recall', side: i, slot });
     }
     if (cur && !isFainted(cur)) {
@@ -1030,7 +1030,7 @@ export class Battle {
       this.say(`En avant ! ${monName(sent)} !`);
       this.participants.add(sent.uid);
     } else if (sent) {
-      this.say(`${side.trainer.cls} ${side.trainer.name} envoie ${monName(sent)} !`);
+      this.say(side.trainer ? `${side.trainer.cls} ${side.trainer.name} envoie ${monName(sent)} !` : `${monName(sent)} sauvage apparaît !`);
       if (this.slots === 1) this.participants = new Set(this.aliveSlots(0).map((s0) => this.monAt(0, s0).uid));
     }
     for (const vOpp of this.sides[1 - i].vs) if (vOpp.trap && vOpp.trap.by === refKey(ref)) vOpp.trap = 0;
@@ -1045,7 +1045,7 @@ export class Battle {
       const before = m.hp, st0 = m.status;
       applyItem(a.item, m);
       this.say(`${t.cls} ${t.name} utilise ${itemName(a.item)} !`);
-      this.ev.push({ t: 'hp', side: 1, slot: ref.slot, hp: m.hp, from: before });
+      this.ev.push({ t: 'hp', side: 1, slot: ref.slot, hp: m.hp, from: before, max: m.stats[0] });
       if (st0 && !m.status) this.ev.push({ t: 'status', side: 1, slot: ref.slot, status: null });
       return false;
     }
@@ -1057,7 +1057,7 @@ export class Battle {
     const msg = applyItem(a.item, m, a.moveIdx ?? -1);
     if (m.hp > 0) delete m._ko;
     const onSlot = this.sides[0].activeSlots.indexOf(a.target);
-    if (onSlot >= 0) this.ev.push({ t: 'hp', side: 0, slot: onSlot, hp: m.hp, from: before, status: m.status });
+    if (onSlot >= 0) this.ev.push({ t: 'hp', side: 0, slot: onSlot, hp: m.hp, from: before, status: m.status, max: m.stats[0] });
     this.ev.push({ t: 'sfx', k: 'heal' });
     this.say(msg || 'Mais cela n\'a aucun effet...');
     return false;
@@ -1160,7 +1160,7 @@ export class Battle {
     if (!m) return 0;
     const before = m.hp;
     m.hp = Math.max(0, Math.min(m.stats[0], m.hp + delta));
-    if (m.hp !== before) this.ev.push({ t: 'hp', side: r.side, slot: r.slot, hp: m.hp, from: before, cause });
+    if (m.hp !== before) this.ev.push({ t: 'hp', side: r.side, slot: r.slot, hp: m.hp, from: before, cause, max: m.stats[0] });
     const half = m.stats[0] / 2;
     if (m.hp > 0 && m.hp <= half && before > half && this.ab(r) === 'sacoches-pollen' && !(this.sacoches ||= new Set()).has(m.uid)) {
       this.sacoches.add(m.uid);

@@ -193,7 +193,7 @@ function chooseBotActionRaw(battle, side, difficulty = 'normal') {
   // Tri par score décroissant
   scoredMoves.sort((a, b) => b.score - a.score);
 
-  const chosenMoveId = scoredMoves[0] ? scoredMoves[0].moveId : myPoke.moves[0];
+  const chosenMoveId = scoredMoves[0] ? scoredMoves[0].moveId : 'struggle';   // plus aucun PP : Lutte
   return { type: 'move', moveId: chosenMoveId };
 }
 
@@ -227,7 +227,7 @@ export function chooseDoublesAction(battle, side, difficulty = 'normal') {
     const move = MOVES[moveId];
     if (!move || (me.ppMap && me.ppMap[moveId] <= 0)) continue;
     if (me.disabled && me.disabled.move === moveId) continue;
-    if (CHOICE.has(me.item) && me.choiceLock && me.choiceLock !== moveId) continue;
+    if (CHOICE.has(me.item) && me.choiceLock && me.choiceLock !== moveId && me.moves.includes(me.choiceLock) && (me.ppMap ? me.ppMap[me.choiceLock] ?? 1 : 1) > 0) continue;
     if (move.effect && move.effect.type === 'protect') {
       // Abri : quand on est menacé (notamment K.O. rapide), jamais deux fois de suite
       if (!me.protectChain) consider({ type: 'move', moveId }, threat.threatenedKO ? 95 : me.hp < me.maxHp * 0.5 ? 70 : 25);
@@ -280,7 +280,7 @@ export function chooseDoublesAction(battle, side, difficulty = 'normal') {
       }
     }
   }
-  const act = best ? best.act : { type: 'move', moveId: me.moves[0], target: foes[0] && foes[0][0] };
+  const act = best ? best.act : { type: 'move', moveId: 'struggle', target: foes[0] && foes[0][0] };   // plus rien d'utilisable : Lutte
   if (canMega(battle, side, me) && (difficulty !== 'facile' || Math.random() < 0.5)) act.mega = true;
   return act;
 }

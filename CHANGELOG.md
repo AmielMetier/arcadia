@@ -1,7 +1,16 @@
 # Journal des versions — Arcadia
 
+## 5.118 — 18 novembre 2026
+- **Odyssée** — Combats Duo (2v2) et Trio (3v3) plus solides :
+  - un combat ne s'interrompt plus (« Le combat a été interrompu ») quand un Pokémon est mis K.O. alors que son dresseur n'a plus de remplaçant ;
+  - Vampigraine ne fait plus planter le combat quand celui qui l'a lancée a quitté le terrain ;
+  - les combats en double contre des Pokémon sauvages tournent sans erreur ;
+  - au Club Tactique, le dresseur adverse apparaît bien en début de combat.
+- **Odyssée** — Graphismes Noir & Blanc : derrière l'Arène des Dunes d'Ocre et celle de Cendrelune, le sol redevient du sable et de la cendre (au lieu d'un carré d'herbe verte).
+- **Poké Duel** — **Lutte** fait son apparition : un Pokémon qui n'a plus aucun PP (ou bloqué par un objet Choix sur une attaque vide) lutte (50 de puissance, sans type, contrecoup d'un quart de ses PV). Un bouton « Lutte » s'affiche quand plus rien d'autre n'est possible, et les combats en double ne peuvent plus tourner sans fin.
+
 ## 5.117 — 18 novembre 2026
-- Correction : correctifs audit graphismes 5G (biomes, 20 batiments, arbres, tenues, variants) (Amiel)
+- **Odyssée** — Graphismes Noir & Blanc revus de fond en comble : 20 nouveaux bâtiments dans le style Noir 2 & Blanc 2 (toutes les villes sont maintenant en 2D), pavés sous les gratte-ciel de Métropole et Voltacité, rochers du désert ensablés, sapins enneigés sur la côte de Givrebourg, arbres posés proprement sur l'herbe, hautes herbes givrées, tenues du garçon et de la fille corrigées.
 
 ## 5.116 — 18 novembre 2026
 - **Odyssée** — Déploiement général des **cinématiques d’introduction en 3D temps réel** et des **musiques épiques dédiées** pour chaque Pokémon légendaire et boss majeur du jeu :

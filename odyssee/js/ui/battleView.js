@@ -1236,7 +1236,7 @@ export class BattleView {
         case 'mega': await this.animMega(e.side, sl); break;
         case 'move': await playMoveVfx(this, { side: e.side, slot: sl, moveId: e.move, type: e.type, targets: e.targets }); break;
         case 'hit': await this.animHit(e.side, sl, e.eff, e.crit); break;
-        case 'hp': await this.animHp(e.side, sl, e.from, e.hp, e.status); break;
+        case 'hp': await this.animHp(e.side, sl, e.from, e.hp, e.status, e.max); break;
         case 'status': {
           const m = this.battle.act(e.side, sl); this.setHud(e.side, m, null, sl);
           if (e.status) { this.sound.sfx('status'); const c = this.sprCenter(e.side, sl); this.burst(c.x, c.y, [STATUS_FR[e.status]?.[1] || '#fff', '#ffffff'], 12, { r: 2 }); await wait(250); }
@@ -1337,10 +1337,13 @@ export class BattleView {
     });
     o.blink = false; o.dx = 0; o.sx = 1; o.sy = 1; o.white = 0;
   }
-  async animHp(side, slot = 0, from, to, status) {
-    const m = this.battle.act(side, slot), max = m.stats[0];
+  async animHp(side, slot = 0, from, to, status, maxEv) {
+    // en Duo / Trio, l'emplacement peut déjà être vide (plus de remplaçant) ou repris quand l'animation se joue :
+    // la barre garde les PV max du Pokémon touché, donnés par l'événement
+    const m = this.battle.act(side, slot), max = maxEv || m?.stats?.[0];
+    if (!max) return;
     const d = Math.abs(to - from), dur = Math.min(1000, 260 + d / max * 850);
-    if (status !== undefined && side === 0) this.setHud(0, m, from, slot);
+    if (status !== undefined && side === 0 && m) this.setHud(0, m, from, slot);
     await this.tween(dur, (u) => this.setHp(side, from + (to - from) * u, max, slot));
     this.setHp(side, to, max, slot);
     if (side === 0 && to > 0 && to / max <= 0.2 && from / max > 0.2) this.sound.sfx('status');

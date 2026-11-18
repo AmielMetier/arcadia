@@ -430,6 +430,7 @@ export function weatherOf(state) {
 
 /** Type réel d'une attaque (Peau Féérique, Peau Céleste, Peau Draconique) */
 export function moveTypeFor(attacker, move) {
+  if (move && move.typeless) return 'typeless';   // Lutte : aucune efficacité, aucun talent de type
   const s = SKIN[attacker && attacker.ability];
   return s && move.type === 'normal' ? s : move.type;
 }

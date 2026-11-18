@@ -152,7 +152,7 @@ export function createMon(sp, lvl, o = {}) {
 
 export const monName = (m) => m.nick || SPECIES[m.sp].n;
 export const species = (m) => SPECIES[m.sp];
-export const isFainted = (m) => m.hp <= 0;
+export const isFainted = (m) => !m || m.hp <= 0;   // emplacement vide (2v2 / 3v3) : personne à cet endroit
 
 export function healFull(m) {
   refreshStats(m, true);

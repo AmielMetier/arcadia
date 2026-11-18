@@ -2023,7 +2023,7 @@ export class Game {
         badge: isTourFinale ? 'TOUR DE COMBAT · FINALE' : undefined,
       });
     }
-    const res = await this.runBattle({ trainer: { ...tr, items: { ...(tr.items || {}) } }, party, music, id: n.id, leader: d.leader, champion: d.champion, rival: d.rival, noWhiteout: d.noWhiteout, format: tr.format || d.format, slots: tr.slots || d.slots });
+    const res = await this.runBattle({ trainer: { ...tr, bs: tr.bs || tr.ow || n.sprite, items: { ...(tr.items || {}) } }, party, music, id: n.id, leader: d.leader, champion: d.champion, rival: d.rival, noWhiteout: d.noWhiteout, format: tr.format || d.format, slots: tr.slots || d.slots });
     this.musicLock = false;
     if (res === 'win') {
       st.flags['T:' + n.id] = true;

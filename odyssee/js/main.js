@@ -205,7 +205,8 @@ async function boot() {
     uiRoot.appendChild(title);
     const stopSea = titleSea(title.querySelector('canvas'), art.title);
     // au clavier, à la manette, ou d'un simple toucher (ou clic) sur l'écran titre
-    await new Promise((res) => { let fini = false; const go = () => { if (fini) return; fini = true; pop(); removeEventListener('pointerdown', go); sound.init(); sound.sfx('select'); res(); }; const pop = input.push((k) => { if (k === 'a') go(); }); addEventListener('pointerdown', go); });
+    await new Promise((res) => { let fini = false; const go = () => { if (fini) return; if (mode === 'game') { fini = true; pop(); removeEventListener('pointerdown', go); return; }   // partie lancée par l'outil de test : l'écran titre ne revient pas
+      fini = true; pop(); removeEventListener('pointerdown', go); sound.init(); sound.sfx('select'); res(); }; const pop = input.push((k) => { if (k === 'a') go(); }); addEventListener('pointerdown', go); });
     title.querySelector('.press').remove();
     // la sauvegarde en ligne a quelques secondes pour répondre (le serveur peut être en train de se réveiller)
     if (cloud.on && cloud.remote === undefined) await Promise.race([cloud.fetch(), wait(2500)]);
