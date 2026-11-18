@@ -81,7 +81,9 @@ export function solChoix() {
 export const spritesChoix = () => (lire('odyssee-gfx-sprites', 'hgss') === 'bw' ? 'bw' : 'hgss');
 export const packActif = () => PACKS[solChoix()] || null;
 
-export function choisirSol(id) { if (SOLS_CHOIX.some((s) => s.id === id)) { ecrire('odyssee-gfx-sol', id); ecrire('odyssee-sol', id === 'odyssee' ? '1' : '0'); } }
+export const aChoisiGfx = () => lire('odyssee-gfx-asked', null) === '1' || lire('odyssee-gfx-sol', null) !== null;
+export function marquerGfxChoisi() { ecrire('odyssee-gfx-asked', '1'); }
+export function choisirSol(id) { if (SOLS_CHOIX.some((s) => s.id === id)) { ecrire('odyssee-gfx-sol', id); ecrire('odyssee-sol', id === 'odyssee' ? '1' : '0'); marquerGfxChoisi(); } }
 export function choisirSprites(id) { if (SPRITES_CHOIX.some((s) => s.id === id)) ecrire('odyssee-gfx-sprites', id); }
 
 /** crédits affichés dans Options → Crédits graphismes */

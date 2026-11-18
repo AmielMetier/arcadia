@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.106 — 18 novembre 2026
+- **Odyssée** — Choix du style de graphismes dès le lancement d'une nouvelle aventure (Odyssée d'origine ou Noir & Blanc, ainsi que les sprites Pokémon), modifiable plus tard à tout moment dans les Options avec application immédiate en jeu, et un clin d'œil dans l'introduction du Professeur Saule.
+
 ## 5.105 — 18 novembre 2026
 - Odyssée : finition chef-d'oeuvre Noir & Blanc (biomes, rivages, mobilier, monuments Gen 5) (Amiel)
 

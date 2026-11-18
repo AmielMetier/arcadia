@@ -1658,7 +1658,19 @@ export class Game {
       else if (k === 'trophies') await trophiesScreen(this);
       else if (k === 'chat') { openChatAfter = true; break; }
       else if (k === 'domaine') { this.busy = false; if (await allerDomaine(this)) break; this.busy = true; }
-      else if (k === 'opt') await optionsScreen(this);
+      else if (k === 'opt') {
+        const res = await optionsScreen(this);
+        if (res && res.reload) {
+          const ok = await this.ui.yesNo('Les graphismes ont changé ! Sauvegarder et relancer maintenant pour les appliquer ?');
+          if (ok) {
+            if (this.state && !this.enCombat) this.save(true);
+            try { sessionStorage.setItem('odyssee-auto-action', 'continue'); } catch (e) {}
+            await this.ui.fade(true, 250);
+            location.reload();
+            return;
+          }
+        }
+      }
       else if (k === 'code') {
         // le code reprend la partie telle qu'elle est maintenant : on sauvegarde d'abord
         this.save(true);
