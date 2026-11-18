@@ -295,7 +295,9 @@ export class CoopDojoBattle extends Battle {
       const m = this.monAt(1, sl);
       if (m && isFainted(m)) {
         if (foeBench.length) {
-          const idx = foeBench.shift();
+          const idx = this.foePickBestReplacement(sl, foeBench);
+          const k = foeBench.indexOf(idx);
+          if (k >= 0) foeBench.splice(k, 1); else foeBench.shift();
           this.doSwitchSlot(1, sl, idx, true, false);
           pendingFoe.push({ side: 1, slot: sl });
         } else {
