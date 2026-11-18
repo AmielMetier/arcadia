@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.121 — 18 novembre 2026
+- Nouveau : sprite sur mesure de Maitre Mamadou et mascotte bouc noir en veste en cuir du Dojo (Amiel)
+
 ## 5.120 — 18 novembre 2026
 - **Odyssée** — L'éveil de Lugia Obscur devient une vraie cinématique de jeu, en sept plans et format cinéma (on peut toujours la passer) :
   - la mer déchaînée sous l'éclipse, la pluie, la foudre, le Sanctuaire des Marées sur son rocher ;
