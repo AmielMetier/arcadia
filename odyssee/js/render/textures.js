@@ -314,12 +314,12 @@ export function buildAtlas() {
   texturesMurs(putImg);
   // chaussées de Métropole : asphalte, avec la ligne pointillée du milieu sur le bord commun des deux voies
   const asph = (P) => { P.fill('#5a5c64'); P.speck(18, '#64666e'); P.speck(10, '#4e5058'); };
-  put('asph', asph);
-  put('asph_n', (P) => { asph(P); P.rect(2, 0, 5, 1, '#f0e8c0'); P.rect(10, 0, 5, 1, '#f0e8c0'); });
-  put('asph_s', (P) => { asph(P); P.rect(2, 15, 5, 1, '#f0e8c0'); P.rect(10, 15, 5, 1, '#f0e8c0'); });
-  put('asph_w', (P) => { asph(P); P.rect(0, 2, 1, 5, '#f0e8c0'); P.rect(0, 10, 1, 5, '#f0e8c0'); });
-  put('asph_e', (P) => { asph(P); P.rect(15, 2, 1, 5, '#f0e8c0'); P.rect(15, 10, 1, 5, '#f0e8c0'); });
-  put('asph_x', (P) => { asph(P); for (let x = 1; x < 16; x += 4) P.rect(x, 2, 2, 12, '#e8e8e8'); });   // passage piéton
+  putSol('asph', 'asph', asph);
+  putSol('asph_n', 'asph_n', (P) => { asph(P); P.rect(2, 0, 5, 1, '#f0e8c0'); P.rect(10, 0, 5, 1, '#f0e8c0'); });
+  putSol('asph_s', 'asph_s', (P) => { asph(P); P.rect(2, 15, 5, 1, '#f0e8c0'); P.rect(10, 15, 5, 1, '#f0e8c0'); });
+  putSol('asph_w', 'asph_w', (P) => { asph(P); P.rect(0, 2, 1, 5, '#f0e8c0'); P.rect(0, 10, 1, 5, '#f0e8c0'); });
+  putSol('asph_e', 'asph_e', (P) => { asph(P); P.rect(15, 2, 1, 5, '#f0e8c0'); P.rect(15, 10, 1, 5, '#f0e8c0'); });
+  putSol('asph_x', 'asph_x', (P) => { asph(P); for (let x = 1; x < 16; x += 4) P.rect(x, 2, 2, 12, '#e8e8e8'); });   // passage piéton
   // petits détails posés sur l'herbe (touffes, trèfles, cailloux, pâquerettes, feuilles, champignons) : dessinés à 32 px
   DETAILS.forEach((k, i) => putImg('dec_' + k, detailDecal(k, i * 7919 + 13)));
   // grottes en relief (tools/odyssee-relief.py) : une rangée par biome, sols / faces de paroi / dessus des gradins

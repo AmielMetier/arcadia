@@ -175,6 +175,40 @@ T['stairs'] = BW.crop((0, 19712, 32, 19744))
 T['cavestairs'] = tone(T['stairs'], 0.62, 1.15)
 lave = lambda cx, cy: VOLC.crop((cx * 16, cy * 16, cx * 16 + 16, cy * 16 + 16)).resize((32, 32), Image.NEAREST)
 T['lava0'], T['lava1'] = lave(5, 5), lave(4, 5)
+# Chaussées d'asphalte de Métropole / Voltacité / Forge-Acier : grain de bitume BW2 + pointillés + passage piéton
+asph_src = BW.crop((68, 26144, 84, 26160)).convert('RGBA')
+asph_base = Image.new('RGBA', (32, 32))
+for _iy in (0, 16):
+    for _ix in (0, 16):
+        asph_base.paste(asph_src, (_ix, _iy))
+
+
+def asph_tuile(mode=''):
+    t = asph_base.copy()
+    from PIL import ImageDraw
+    dr = ImageDraw.Draw(t)
+    dash, sh = (224, 222, 214, 255), (118, 120, 126, 255)
+    if mode == 'n':
+        for x0 in (4, 20):
+            dr.rectangle([x0, 0, x0 + 9, 1], fill=dash); dr.rectangle([x0, 2, x0 + 9, 2], fill=sh)
+    elif mode == 's':
+        for x0 in (4, 20):
+            dr.rectangle([x0, 29, x0 + 9, 29], fill=sh); dr.rectangle([x0, 30, x0 + 9, 31], fill=dash)
+    elif mode == 'w':
+        for y0 in (4, 20):
+            dr.rectangle([0, y0, 1, y0 + 9], fill=dash); dr.rectangle([2, y0, 2, y0 + 9], fill=sh)
+    elif mode == 'e':
+        for y0 in (4, 20):
+            dr.rectangle([29, y0, 29, y0 + 9], fill=sh); dr.rectangle([30, y0, 31, y0 + 9], fill=dash)
+    elif mode == 'x':
+        for x0 in (2, 10, 18, 26):
+            dr.rectangle([x0, 4, x0 + 3, 27], fill=dash); dr.rectangle([x0, 28, x0 + 3, 28], fill=sh); dr.rectangle([x0 + 4, 4, x0 + 4, 27], fill=sh)
+    return t
+
+
+T['asph'] = asph_tuile('')
+for _dir in ('n', 's', 'w', 'e', 'x'):
+    T['asph_' + _dir] = asph_tuile(_dir)
 touffe, touffe_s = cell(4, 11), cell(5, 11)
 # hautes herbes : la touffe seule, posée par le jeu sur l'herbe de la case
 T['q_tall0'], T['q_tall1'] = touffe, flip(touffe)
@@ -254,15 +288,33 @@ def arbre(x0, y0, x1, y1, pas=64):
     return trim(Image.fromarray(bas, 'RGBA'))
 
 
-feuillu = arbre(96, 848, 160, 968).resize((52, 74), Image.NEAREST)
-sapin = arbre(136, 1836, 216, 1960).resize((54, 78), Image.NEAREST)
+def sans_herbe_base(im, mode='tree'):
+    """Retire la pastille d'herbe verte ou de terre beige au pied de l'arbre pour qu'il pose proprement sur pavés, sable, cendre et neige."""
+    a = np.array(im.convert('RGBA')).copy()
+    h = a.shape[0]
+    for y in range(max(0, h - 25), h):
+        for x in range(a.shape[1]):
+            r, g, b, al = [int(v) for v in a[y, x]]
+            if al == 0:
+                continue
+            if mode == 'deadtree':
+                if y >= h - 10 and not (r < 145 and (r - b) > 30):
+                    a[y, x, 3] = 0
+            else:
+                if (g > r + 10 and b >= r - 6) or (y >= h - 24 and g > r + 4 and b > 105) or (y >= h - 14 and g > r + 3):
+                    a[y, x, 3] = 0
+    return trim(Image.fromarray(a, 'RGBA'))
+
+
+feuillu = sans_herbe_base(arbre(96, 848, 160, 968).resize((52, 74), Image.NEAREST))
+sapin = sans_herbe_base(arbre(136, 1836, 216, 1960).resize((54, 78), Image.NEAREST))
 
 
 def feuilles(im, coul):
-    """le feuillage (pixels verts) reteint, tronc et ombre gardés"""
+    """le feuillage (pixels verts) reteint en gardant le tronc intact"""
     a = np.array(im).astype(float); r, g, b = a[..., 0], a[..., 1], a[..., 2]
     vert = (g > r * 1.25) & (g > b * 1.02) & (a[..., 3] > 0)
-    vert[-26:] = False   # l'ombre au pied reste comme elle est
+    vert[-10:] = False
     lum = g[vert] / 200.0
     for k in range(3):
         a[..., k][vert] = np.clip(lum * coul[k], 0, 255)
@@ -287,16 +339,60 @@ def extraire_ilot(im, seed_xy, diag=True):
     return trim(Image.fromarray(a, 'RGBA'))
 
 
-deadtree_nb = extraire_ilot(VOLC.crop((312, 0, 368, 70)), (32, 52))
+deadtree_nb = sans_herbe_base(extraire_ilot(VOLC.crop((312, 0, 368, 70)), (32, 52)), 'deadtree')
 caverock_nb = extraire_ilot(VOLC.crop((256, 30, 288, 56)), (15, 16))
+stalag_nb = tone(trim(net(VOLC.crop((290, 0, 316, 30)))), 0.92, 0.55).resize((26, 40), Image.NEAREST)
+rocher_grand_nb = extraire_ilot(net(VOLC.crop((282, 28, 316, 64))), (16, 16)).resize((38, 39), Image.NEAREST)
+_m_src = net(VOLC.crop((274, 12, 287, 29)))
+minerai_nb = tone(extraire_ilot(_m_src, (7, 9)), 0.85, 0.45).resize((30, 28), Image.NEAREST)
+_ma = np.array(minerai_nb)
+for mx, my, mc in ((8, 12, (240, 200, 72, 255)), (19, 10, (96, 208, 240, 255)), (14, 18, (240, 200, 72, 255)), (21, 17, (240, 200, 72, 255))):
+    if mx + 2 < _ma.shape[1] and my + 2 < _ma.shape[0] and _ma[my, mx, 3] > 0:
+        _ma[my:my + 2, mx:mx + 2] = mc
+minerai_nb = Image.fromarray(_ma, 'RGBA')
+
+caisses_nb = net(BW.crop((96, 1024, 128, 1080))).resize((30, 54), Image.NEAREST)
+# Caisse carrée à mi-hauteur tirée du haut + du bas de la caisse BW
+_c_top = net(BW.crop((96, 1024, 128, 1034)))
+_c_bot = net(BW.crop((96, 1060, 128, 1080)))
+_c_sq = Image.new('RGBA', (32, 30))
+_c_sq.paste(_c_top, (0, 0)); _c_sq.paste(_c_bot, (0, 10))
+caisse_nb = trim(_c_sq).resize((26, 26), Image.NEAREST)
+
+# Colonne, borne et statue de dragon du kit BW
+_col_a = np.array(net(BW.crop((12, 14228, 52, 14388))))
+_crgb = _col_a[..., :3].astype(int)
+_col_a[(np.abs(_crgb[..., 0] - _crgb[..., 1]) <= 3) & (np.abs(_crgb[..., 1] - _crgb[..., 2]) <= 3) & (_crgb[..., 0] < 160), 3] = 0
+colonne_nb = extraire_ilot(Image.fromarray(_col_a, 'RGBA'), (18, 80)).resize((24, 78), Image.NEAREST)
+
+_br_a = np.array(extraire_ilot(net(BW.crop((0, 27360, 48, 27430))), (20, 20)))
+_brgb = _br_a[..., :3].astype(int)
+_br_a[(np.abs(_brgb[..., 0] - _brgb[..., 1]) <= 3) & (np.abs(_brgb[..., 1] - _brgb[..., 2]) <= 3) & (_brgb[..., 0] >= 120), 3] = 0
+borne_nb = trim(Image.fromarray(_br_a, 'RGBA'))
+borne_nb = borne_nb.resize((22, round(borne_nb.height * 22 / borne_nb.width)), Image.NEAREST)
+
+_dr_a = np.array(net(BW.crop((24, 27146, 140, 27344))))
+_drgb = _dr_a[..., :3].astype(int)
+_dr_a[(_dr_a[..., 3] > 0) & (_drgb[..., 1] > _drgb[..., 0] + 15), 3] = 0
+_dr_clean = trim(Image.fromarray(_dr_a, 'RGBA'))
+statue_dragon_nb = _dr_clean.resize((44, round(_dr_clean.height * 44 / _dr_clean.width)), Image.NEAREST)
+
+EXT_IMG = L('ext_decors.png')
+EXT_BOXES = json.load(open(os.path.join(SRC, 'ext_decors.json')))
+EXT = {k: EXT_IMG.crop(tuple(b)) for k, b in EXT_BOXES.items()}
 
 D = {
     'tree': feuillu, 'tree2': flip(feuillu), 'tree3': feuillu, 'pine': sapin,
     'snowpine': feuilles(sapin, (215, 235, 250)),
     'deadtree': deadtree_nb,
     'arbre_automne': feuilles(feuillu, (235, 150, 40)), 'erable': feuilles(feuillu, (220, 70, 45)), 'cerisier': feuilles(feuillu, (250, 165, 195)),
-    'bush': trim(net(BW.crop((0, 632, 32, 672)))), 'lamp': trim(trim(net(BW.crop((224, 608, 256, 736)))).resize((16, 60), Image.NEAREST)),
-    'rock': trim(L('objet_rocher.png').crop((0, 0, 32, 32))), 'caverock': caverock_nb, 'cuttree': trim(L('objet_arbuste.png').crop((0, 0, 32, 32))),
+    'bush': trim(net(BW.crop((0, 632, 32, 672)))), 'lamp': EXT['lamp'],
+    'rock': trim(L('objet_rocher.png').crop((0, 0, 32, 32))), 'caverock': caverock_nb, 'stalag': stalag_nb,
+    'rocher_grand': rocher_grand_nb, 'minerai': minerai_nb, 'cuttree': trim(L('objet_arbuste.png').crop((0, 0, 32, 32))),
+    'palm': EXT['palm'], 'cactus': EXT['cactus'], 'cactus2': EXT['cactus2'],
+    'torii': EXT['torii'], 'lanterne': EXT['lanterne'], 'stele': EXT['stele'], 'gargouille': EXT['gargouille'],
+    'bateau': EXT['bateau'], 'tonneau': EXT['tonneau'],
+    'caisses': caisses_nb, 'caisse': caisse_nb, 'colonne': colonne_nb, 'borne': borne_nb, 'statue_dragon': statue_dragon_nb,
     'pot': trim(net(BW.crop((192, 21248, 224, 21310)))),
     'mailbox': trim(net(BW.crop((160, 5632, 192, 5696)))),
     'statue': trim(net(BW.crop((192, 21312, 224, 21376)))),

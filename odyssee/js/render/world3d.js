@@ -124,7 +124,7 @@ const DECALS = new Set(['fleche', 'vent', 'courant', 'dalle', 'tp', 'socle', 'po
 const AVANCE_PERSO = 0.38;
 const WIDE_DECO = new Set(['healer', 'sofa', 'bench', 'startertable', 'fireplace', 'rug']);
 /** décor du dehors posé avec une ombre au sol (leur ombre violette, dessinée dans le sprite, a été retirée) */
-const OMBRE_DECO = new Set(['banc', 'parasol', 'tonneau', 'caisse', 'panneau_bois', 'borne', 'lanterne', 'stele']);
+const OMBRE_DECO = new Set(['banc', 'parasol', 'tonneau', 'caisse', 'caisses', 'panneau_bois', 'borne', 'lanterne', 'stele', 'palm', 'cactus', 'cactus2', 'cerisier', 'erable', 'arbre_automne', 'deadtree', 'gargouille', 'rocher_grand', 'statue_dragon', 'colonne']);
 /** avance : le sprite est rangé comme s'il se tenait `avance` case plus au sud (personnages : leurs pieds passent devant
  *  le perron, les marches et le socle du bâtiment qui dépassent sur leur case, sans changer l'ordre entre personnages) */
 function screenSprite(mat, avance = 0, avecTrame = false) {
@@ -669,6 +669,17 @@ export class WorldView {
     const zone = m.outdoor ? m.zoneAt(x, y) : null, theme = zone?.theme;
     const grassKey = theme === 'volcanic' ? 'ash' + (v < 0.5 ? 0 : 1) : theme === 'snow' ? 'snow' + (v < 0.5 ? 0 : 1) : g4();
     const groundAt = (ax, ay) => { const q = m.get(ax, ay); return q === T.SIGN || q === T.BLOCK ? m.underAt(ax, ay) ?? (m.outdoor ? T.GRASS : T.FLOOR) : q; };
+    const sandFull = A.q_sand_f || A.sand15 || A.sand0;
+    const desertAt = (ax, ay) => { const z = m.outdoor ? m.zoneAt(ax, ay) : null; return z?.theme === 'desert' || z?.theme === 'canyon' || z?.town === 'dunes'; };
+    const estHerbe = (q) => q === T.GRASS || q === T.TALL || q === T.TREE || q === T.PINE;
+    const hasNbr8 = (ax, ay, pred) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && pred(groundAt(ax + dx, ay + dy))) return true; return false; };
+    const hasNbr4 = (ax, ay, pred) => [groundAt(ax + 1, ay), groundAt(ax - 1, ay), groundAt(ax, ay + 1), groundAt(ax, ay - 1)].some(pred);
+    const sandFlower = (ax, ay) => {
+      if (groundAt(ax, ay) !== T.FLOWER || !sandFull) return false;
+      if (hasNbr4(ax, ay, estHerbe)) return false;
+      if (desertAt(ax, ay)) return !hasNbr8(ax, ay, (q) => q === T.GRASS);
+      return hasNbr4(ax, ay, (q) => q === T.SAND) && !hasNbr8(ax, ay, estHerbe);
+    };
     // pack de graphismes : un terrain en cinq tuiles (q_<nom>_<état>) posé par quarts sur l'herbe, selon les huit voisins
     // (coin sortant, bord, coin rentrant, plein) ; eau = planche animée
     const quarts = (nom, same, eau) => {
@@ -682,7 +693,8 @@ export class WorldView {
         q.push([c[0] + qx * hu, c[1] + qy * hv, c[0] + (qx + 1) * hu, c[1] + (qy + 1) * hv]);
       }
       if (pleins === 4) return eau ? { anim: C[`q_${nom}_f`] } : { c: C[`q_${nom}_f`] };
-      return { c: A[grassKey], q, qEau: eau };
+      const bg = (nom === 'path' || nom === 'pave') && sandFull && !hasNbr8(x, y, estHerbe) && (hasNbr8(x, y, (g) => g === T.SAND) || desertAt(x, y)) ? sandFull : A[grassKey];
+      return { c: bg, q, qEau: eau };
     };
     const mask = (same) => { let k = 0; if (same(groundAt(x, y - 1))) k |= 1; if (same(groundAt(x + 1, y))) k |= 2; if (same(groundAt(x, y + 1))) k |= 4; if (same(groundAt(x - 1, y))) k |= 8; return k; };
     // sur la neige, pas de bordure d'herbe autour des chemins : on prend la case pleine
@@ -739,9 +751,9 @@ export class WorldView {
         return { c: A['pave' + edge((q) => isPathish(q))] };
       case T.DOOR: if (A.q_pave_f) return hasPave(x, y) ? quarts('pave', (q, ax, ay) => isPaveQ(q, ax, ay)) : quarts('path', isPathQ);
         return { c: A['pave' + edge((q) => isPathish(q))] };
-      case T.BUILD: if (A.q_pave_f) return hasPave(x, y) ? quarts('pave', (q, ax, ay) => isPaveQ(q, ax, ay)) : { c: A[grassKey] };
+      case T.BUILD: if (A.q_pave_f) return hasPave(x, y) ? quarts('pave', (q, ax, ay) => isPaveQ(q, ax, ay)) : { c: (desertAt(x, y) || hasNbr4(x, y, (g) => g === T.SAND)) && !hasNbr4(x, y, (g) => g === T.GRASS) && sandFull ? sandFull : A[grassKey] };
         return { c: A['pave' + edge((q) => isPathish(q))] };
-      case T.SAND: if (A.q_sand_f) return quarts('sand', (q) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.FLOWER && q !== T.PINE);
+      case T.SAND: if (A.q_sand_f) return quarts('sand', (q, ax, ay) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.PINE && (q !== T.FLOWER || sandFlower(ax, ay)));
         return { c: A['sand' + edge((q) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.FLOWER && q !== T.PINE)] };
       case T.WATER: if (this.N.cells.q_water_f) return quarts('water', (q) => q === T.WATER || q === T.BRIDGE || q === T.WHIRL, true);
         return { anim: this.N.cells['water' + mask((q) => q === T.WATER || q === T.BRIDGE)] };
@@ -749,15 +761,13 @@ export class WorldView {
       // une couleur par massif (par carré de 3 × 3 cases), avec parfois une fleur d'une autre couleur
       case T.FLOWER: {
         const nf = this.N.cells.flower5 ? 6 : 4, pv = hash(Math.floor(x / 3) + 101, Math.floor(y / 3) + 37), k = v < 0.85 ? Math.floor(pv * nf) : Math.floor(v * 97) % nf;
-        if (pg && A.sand0) {
-          const sandBg = theme === 'desert' && [groundAt(x + 1, y), groundAt(x - 1, y), groundAt(x, y + 1), groundAt(x, y - 1)].some((q) => q === T.SAND);
-          return { c: A[sandBg ? 'sand0' : grassKey], ovAnim: this.N.cells['flower' + k] || this.N.cells.flower0 };
-        }
+        if (pg && sandFull) return { c: sandFlower(x, y) ? sandFull : A[grassKey], ovAnim: this.N.cells['flower' + k] || this.N.cells.flower0 };
         return { anim: this.N.cells['flower' + k] || this.N.cells.flower0 };
       }
       case T.LEDGE: return { c: A.ledge }; case T.LEDGE_E: return { c: A.ledgeE }; case T.LEDGE_W: return { c: A.ledgeW };
       case T.CAVEWALL: if (m.outdoor) {
-        if (theme === 'desert' && A.sand0 && ![groundAt(x + 1, y), groundAt(x - 1, y), groundAt(x, y + 1), groundAt(x, y - 1)].some((q) => q === T.GRASS || q === T.TREE || q === T.FLOWER)) return { c: A.sand0 };
+        if (sandFull && (desertAt(x, y) || hasNbr4(x, y, (g) => g === T.SAND)) && !hasNbr8(x, y, (g) => g === T.GRASS || g === T.TREE || g === T.PINE || (g === T.FLOWER && !sandFlower(x, y)))) return { c: sandFull };
+        if (theme === 'volcanic' && this.N.cells.lava && hasNbr4(x, y, (g) => g === T.LAVA) && !hasNbr4(x, y, (g) => g === T.ASH || g === T.PATH || g === T.CAVE || g === T.STAIRS)) return { anim: this.N.cells.lava };
         return { c: A[grassKey] };   // sous les montagnes du dehors
       }
         if (this.tiers && A[`rp_${this.biome}_00`]) { const k = reliefKey(A, this.biome, 's', v); return { c: A[k] }; }
@@ -1117,7 +1127,7 @@ export class WorldView {
           if (!this.arbresUnis) key = variante(S, key, x, y);
           const r = S[key], cx = x + 0.5 + (v - 0.5) * 0.2, cz = y + 0.7;
           billboard(P, cx, cz, SW(r), SH(r), r, 0, this.arbresUnis ? vb > 0.5 : miroir(x, y), this.arbresUnis ? 1 : teinte(x, y, key.startsWith('snowpine') || key.startsWith('deadtree')));
-          if (!this.packDecor) this.ombreSol(Sh, cx - 0.75, cz - 0.3, cx + 0.75, cz + 0.3);
+          this.ombreSol(Sh, cx - 0.75, cz - 0.3, cx + 0.75, cz + 0.3);
         }
       } else if (t === T.FENCE) {
         // barrière : de face (rangée horizontale) ou vue dans l'axe (colonne nord-sud, le long d'un chemin vertical)
