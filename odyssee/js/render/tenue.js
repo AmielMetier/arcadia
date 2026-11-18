@@ -75,27 +75,30 @@ const REGLES = {
 
 // les teintes des dresseurs de Noir & Blanc (trchar000 / trchar001) quand le pack Noir & Blanc est actif
 const REGLES_NB = {
-  // garçon (Noir & Blanc 2) : visière rouge-orangé, veste bleue, pantalon sombre, baskets rouges, sacoche brune
+  // garçon (Noir & Blanc 2) : visière rouge-orangé, veste bleue, pantalon/short bleu sombre, baskets rouges, sacoche brune
   m: {
     zone(h, s, v, y, L) {
       const m = L.top + (L.bot - L.top) * 0.48;
       if (y < m) return (h < 0.075 || h > 0.96) && s >= 0.6 && v >= 0.55 ? CHAP : 0;
       if (y >= L.pied && (h < 0.055 || h > 0.96) && s >= 0.6 && v >= 0.45) return PIED;
-      if (y < L.pied && entre(h, 0.58, 0.66) && s >= 0.45 && v >= 0.3) return HAUT;
-      if (y >= L.bot - 11 && y < L.bot - 3 && entre(h, 0.66, 0.76) && s >= 0.35 && v <= 0.42) return BAS;
-      if (y >= m && y < L.pied && (h < 0.04 || h > 0.95) && s >= 0.35 && v < 0.45) return SAC;
+      if (y >= L.bot - 11 && y < L.bot - 3 && entre(h, 0.58, 0.76) && s >= 0.35 && v <= 0.88) return BAS;
+      if (y < L.bot - 11 && entre(h, 0.58, 0.66) && s >= 0.45 && v >= 0.3) return HAUT;
+      if (y >= L.top + 36 && y < L.pied && (h < 0.04 || h > 0.95) && s >= 0.35 && v >= 0.24 && v < 0.45) return SAC;
       return 0;
     },
   },
-  // fille (Noir & Blanc 2) : visière rose (sans toucher aux macarons bruns), haut rose, jupe jaune, bottines roses
+  // fille (Noir & Blanc 2) : visière rose (sans toucher aux macarons bruns), haut rose, jupe jaune / short prune, sac rose, bottines roses
   f: {
     zone(h, s, v, y, L) {
       const m = L.top + (L.bot - L.top) * 0.44;
-      if (y < m) return h >= 0.93 && s >= 0.25 && v >= 0.35 ? CHAP : 0;
-      if (y >= L.bot - 8 && h >= 0.92 && s >= 0.35 && v >= 0.35) return PIED;
-      if (y >= L.bot - 14 && y < L.bot - 5 && entre(h, 0.10, 0.16) && s >= 0.4 && v >= 0.65) return BAS;
-      if (y >= L.bot - 15 && y < L.bot - 7 && h >= 0.94 && s >= 0.48 && v >= 0.6) return SAC;
-      if (y >= m && y < L.bot - 11 && h >= 0.93 && s >= 0.35 && v >= 0.35) return HAUT;
+      if (y < m) return h >= 0.93 && s >= 0.25 && v >= 0.42 ? CHAP : 0;
+      if (y >= L.bot - 8 && h >= 0.88 && s >= 0.32 && v >= 0.24) return PIED;
+      if (y >= L.bot - 14 && y < L.bot - 5) {
+        if (entre(h, 0.10, 0.16) && s >= 0.4 && v >= 0.65) return BAS;
+        if (entre(h, 0.85, 0.94) && s >= 0.35 && v >= 0.22 && v <= 0.55) return BAS;
+      }
+      if (y >= L.bot - 15 && y < L.bot - 8 && h >= 0.94 && s >= 0.48 && v >= 0.6) return SAC;
+      if (y >= m && y < L.bot - 15 && h >= 0.93 && s >= 0.35 && v >= 0.35) return HAUT;
       return 0;
     },
   },

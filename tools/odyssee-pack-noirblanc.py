@@ -210,12 +210,22 @@ T['asph'] = asph_tuile('')
 for _dir in ('n', 's', 'w', 'e', 'x'):
     T['asph_' + _dir] = asph_tuile(_dir)
 touffe, touffe_s = cell(4, 11), cell(5, 11)
+# touffe enneigée : pointes givrées blanches/glace sur tiges bleu-ardoise pour s'accorder aux tuiles de neige
+_tn = np.array(touffe_s.copy())
+_ty = np.arange(_tn.shape[0])[:, None]
+_tal = _tn[..., 3] > 0
+_dark_tip = _tal & (_ty < 18) & ((_tn[..., 1].astype(int) >= 100) | (_ty < 12))
+_tn[_tal & ~_dark_tip, :3] = np.clip(_tn[_tal & ~_dark_tip, :3] * [0.85, 0.85, 1.08], 0, 255).astype('uint8')
+_tn[_dark_tip & (_ty < 10)] = [238, 246, 255, 255]
+_tn[_dark_tip & (_ty >= 10) & (_ty < 14)] = [208, 228, 246, 255]
+_tn[_dark_tip & (_ty >= 14)] = [156, 192, 224, 255]
+touffe_neige = Image.fromarray(_tn, 'RGBA')
 # hautes herbes : la touffe seule, posée par le jeu sur l'herbe de la case
 T['q_tall0'], T['q_tall1'] = touffe, flip(touffe)
 T['q_darktall0'], T['q_darktall1'] = touffe_s, flip(touffe_s)
 T['tall0'] = over(G0, touffe); T['tall1'] = over(G0, flip(touffe))
 T['darktall0'] = over(G0, touffe_s); T['darktall1'] = over(G0, flip(touffe_s))
-T['snowtall0'] = over(T['snow0'], touffe_s); T['snowtall1'] = over(T['snow1'], flip(touffe_s))
+T['snowtall0'] = over(T['snow0'], touffe_neige); T['snowtall1'] = over(T['snow1'], flip(touffe_neige))
 
 # fleurs de Noir & Blanc (cell(6, 135) du kit : feuillage et trois fleurs, déclinées en 6 couleurs et 2 étapes d'animation)
 fleur_bw = net(cell(6, 135))
@@ -289,7 +299,7 @@ def arbre(x0, y0, x1, y1, pas=64):
 
 
 def sans_herbe_base(im, mode='tree'):
-    """Retire la pastille d'herbe verte ou de terre beige au pied de l'arbre pour qu'il pose proprement sur pavés, sable, cendre et neige."""
+    """Retire la pastille d'herbe verte ou de terre beige au pied de l'arbre sans couper la base du feuillage."""
     a = np.array(im.convert('RGBA')).copy()
     h = a.shape[0]
     for y in range(max(0, h - 25), h):
@@ -301,7 +311,9 @@ def sans_herbe_base(im, mode='tree'):
                 if y >= h - 10 and not (r < 145 and (r - b) > 30):
                     a[y, x, 3] = 0
             else:
-                if (g > r + 10 and b >= r - 6) or (y >= h - 24 and g > r + 4 and b > 105) or (y >= h - 14 and g > r + 3):
+                est_fond_herbe = b >= 115 and g >= b - 10 and g > r + 45
+                est_pied_bas = y >= h - 18 and ((g > r + 10 and b >= r - 6) or g > r + 3)
+                if est_fond_herbe or est_pied_bas:
                     a[y, x, 3] = 0
     return trim(Image.fromarray(a, 'RGBA'))
 
@@ -414,7 +426,7 @@ D['sign'] = trim(trim(net(BW.crop((176, 98 * 32, 256, 100 * 32)))).resize((32, 2
 bas = lambda t: t.crop((0, 16, 32, 32))
 D['grassfront'], D['grassfront2'] = bas(touffe), bas(flip(touffe))
 D['darkfront'], D['darkfront2'] = bas(touffe_s), bas(flip(touffe_s))
-D['snowfront'], D['snowfront2'] = bas(touffe_s), bas(flip(touffe_s))
+D['snowfront'], D['snowfront2'] = bas(touffe_neige), bas(flip(touffe_neige))
 for i, c in enumerate([(235, 150, 40), (220, 70, 45), (240, 190, 50), (200, 95, 40), (225, 120, 50), (190, 60, 50)]):
     D[f'automne{i}'] = feuilles(feuillu, c)
 for n, im in D.items():
@@ -592,17 +604,19 @@ chars.save(os.path.join(OUT, 'chars.png'))
 
 from noirblanc_masterpiece import appliquer_masterpiece
 appliquer_masterpiece(ROOT, OUT, COLS, noms, D, bat_dims)
+from noirblanc_extras import ajouter_batiments_sup
+ajouter_batiments_sup(OUT, BW, bat_imgs, bat_dims)
 
 NB_CHAR_VARIANTS = {
-    'habitant': ['habitant', 'nb_cheren', 'nb_voyageur', 'nb_costard', 'nb_fermier', 'nb_boulanger', 'nb_clerk', 'nb_preppy', 'nb_sportif', 'nb_musicien', 'nb_majordome'],
+    'habitant': ['habitant', 'nb_cheren', 'nb_voyageur_n', 'nb_costard', 'nb_fermier', 'nb_boulanger', 'nb_clerk', 'nb_preppy', 'nb_sportif', 'nb_musicien', 'nb_majordome'],
     'habitante': ['habitante', 'nb_citadine', 'nb_secretaire', 'nb_servante', 'nb_cafe', 'nb_tablier', 'nb_rockeuse', 'nb_demoiselle', 'nb_violette'],
     'gamin': ['gamin', 'nb_tate', 'nb_garcon_r', 'nb_vert'],
     'fillette': ['fillette', 'nb_liza'],
-    'vieil_homme': ['vieil_homme', 'nb_sage', 'nb_grandmere'],
+    'vieil_homme': ['vieil_homme', 'nb_sage'],
     'dame': ['dame', 'nb_grandmere', 'nb_citadine', 'nb_secretaire'],
     'topdresseur': ['topdresseur', 'nb_ranger', 'nb_voyageur_n', 'nb_sportif', 'nb_colosse'],
     'topdresseuse': ['topdresseuse', 'nb_cowgirl', 'nb_rockeuse', 'nb_liza'],
-    'montagnard': ['montagnard', 'nb_skieur', 'nb_cowboy', 'nb_sheriff'],
+    'montagnard': ['montagnard', 'nb_cowboy', 'nb_sheriff', 'nb_linebacker'],
     'randonneuse': ['randonneuse', 'nb_cowgirl', 'nb_vet'],
     'scientifique': ['scientifique', 'nb_vet', 'nb_clerk'],
     'jardinier': ['jardinier', 'nb_fermier', 'nb_vert'],

@@ -13,6 +13,51 @@ import os
 from PIL import Image
 
 
+def _snow_centre(im):
+    """Couvre généreusement le dôme et les pans du toit rouge du Centre Pokémon de congères bleu-glace B2W2."""
+    im = im.convert('RGBA').copy()
+    px = im.load()
+    w, h = im.size
+    top_ys = [next((y for y in range(h) if px[x, y][3] > 200), None) for x in range(w)]
+    for x in range(w):
+        ty = top_ys[x]
+        if ty is None or ty > 125:
+            continue
+        wave = round(3.0 * math.sin(x * 0.22) + 2.0 * math.cos(x * 0.47))
+        depth = (24 if ty < 40 else 15) + wave
+        for dy in range(depth):
+            y = ty + dy
+            if y >= h:
+                break
+            r, g, b, a = px[x, y]
+            if a < 128:
+                continue
+            est_bord = dy == 0 or (y < 60 and r < 80 and g < 80 and b < 90)
+            est_toit_rouge = (r > 130 and r > g * 1.3 and r > b * 1.7) or (r > 180 and g > 190 and b > 200)
+            if not (est_bord or est_toit_rouge):
+                continue
+            if dy == 0:
+                px[x, y] = (54, 64, 88, a)
+            elif dy == depth - 1:
+                px[x, y] = (146, 174, 210, a)
+            elif dy >= depth - 3:
+                px[x, y] = (196, 218, 240, a)
+            elif dy == 1:
+                px[x, y] = (246, 250, 255, a)
+            else:
+                px[x, y] = (228, 240, 252, a)
+    # Liseré de neige sur l'auvent d'entrée (y ~ 168..184, centre x ~ 64..136)
+    for x in range(64, min(w, 136)):
+        for y in range(166, min(h, 184)):
+            r, g, b, a = px[x, y]
+            if a > 128 and r > 140 and r > g * 1.3 and r > b * 1.8:
+                px[x, y] = (232, 242, 252, a) if y < 176 else (188, 212, 236, a)
+                if y + 1 < h and px[x, y + 1][0] > 140:
+                    px[x, y + 1] = (152, 180, 214, a)
+                break
+    return im
+
+
 def _make_snow_variant(im):
     im = im.convert('RGBA').copy()
     px = im.load()
@@ -297,6 +342,8 @@ def appliquer_masterpiece(root, out_dir, cols, noms, decos, bat_dims):
             decos[name] = sub
         elif k.startswith('b_'):
             name = k[2:]
+            if name == 'centre_neige':
+                sub = _snow_centre(sub)
             sub.save(os.path.join(out_dir, f'{k}.png'))
             door_col = door_overrides[name] if name in door_overrides else (w // 2)
             bat_dims[name] = [w, door_col]

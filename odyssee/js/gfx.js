@@ -40,8 +40,11 @@ export const PACKS = {
     dossier: 'gfx/noirblanc',
     planche: { fichier: 'sol', tuiles: NB_TUILES, cols: NB_COLS },   // tuiles de sol de 16 px sur une seule image
     decor: NB_DECOR,          // d_<nom>.png, 32 px par case : dessiné pixel pour pixel
-    // murs des intérieurs aux couleurs de Noir & Blanc (render/murs-tex.js) : le Centre Pokémon crème et orange
-    murs: { center: { fond: '#f6eab4', motif: '#eedd98', bande: '#f09a52', bandeS: '#c8692c', lam: '#f2d68a', lamC: '#faeab0', lamS: '#d2a85c', cim: '#fffdf2', pl: '#a8602c', cap: '#b06830', capC: '#f0b070' } },
+    // murs des intérieurs aux couleurs de Noir & Blanc (render/murs-tex.js) : Centre crème/orange et Boutique bleu acier/glace 5G
+    murs: {
+      center: { fond: '#f6eab4', motif: '#eedd98', bande: '#f09a52', bandeS: '#c8692c', lam: '#f2d68a', lamC: '#faeab0', lamS: '#d2a85c', cim: '#fffdf2', pl: '#a8602c', cap: '#b06830', capC: '#f0b070' },
+      mart: { fond: '#eef4fa', motif: '#dce8f6', motifK: 'carreaux', bande: '#3b82d6', bandeS: '#2258a4', lam: '#d2e2f2', lamC: '#f2f7fc', lamS: '#8fb2d8', cim: '#ffffff', pl: '#244e8c', cap: '#1e3e72', capC: '#78b0ec' },
+    },
     chars: 'chars',           // planche des personnages de Noir & Blanc 2 (même disposition que celle du jeu)
     charRows: NB_CHAR_ROWS,   // rangées supplémentaires (au-delà des 73 de base) propres au pack Noir & Blanc
     charVariants: NB_CHAR_VARIANTS,
@@ -62,11 +65,21 @@ export const PACKS = {
         center: mapList([['centre_desert', ['desert', 'dunes']], ['centre_neige', ['snow', 'givre', 'cime']], ['centre_mirage', ['mirage', 'kagura']], 'centre']),
         mart: mapList([['boutique_desert', ['desert', 'dunes']], ['boutique_neige', ['snow', 'givre', 'cime']], ['boutique_neige_b', ['snow', 'givre', 'cime']], 'boutique', 'boutique_p', 'boutique_b']),
         gym: mapList(['arene']), lab: mapList(['labo']), fontaine: mapList(['fontaine']),
-        tower: mapList([['fonderie', ['forge']], ['fonderie_b', ['forge']], ['tour_brique', ['forge', 'metro', 'volta']], ['atelier_brique', ['forge', 'metro', 'volta']], ['tour_jaune', ['metro', 'volta']], ['tour_vitre', ['metro', 'volta']], 'tour', 'tour_jaune', 'tour_vitre', 'tour_brique']),
+        tower: mapList([['fonderie', ['forge']], ['fonderie_b', ['forge']], ['tour_brique', ['forge', 'metro', 'volta']], ['atelier_brique', ['forge', 'metro', 'volta']], ['tour_jaune', ['metro', 'volta']], ['tour_vitre', ['metro', 'volta']], 'tour']),
         house: mapList(MAISONS_BIO), house2: mapList(MAISONS_BIO), house3: mapList(MAISONS_BIO), bighouse: mapList(MAISONS_BIO),
         chapelle: mapList(['chapelle']), gare: mapList(['gare']), mairie: mapList(['mairie']), bourse: mapList(['bourse']), casino: mapList(['casino']),
         centrale: mapList(['centrale']), serre: mapList(['serre']), fonderie: mapList(['fonderie', 'fonderie_b']),
         dojo: mapList(['dojo']),
+        etal: mapList(['etal']), puits: mapList(['puits']),
+        chalet: mapList(['chalet']), auberge: mapList(['auberge']),
+        maisonL: mapList(['maison_l']), maisonExt: mapList(['maison_ext']),
+        boulangerie: mapList(['boulangerie']), maisonThe: mapList(['maison_the']),
+        cabaneChasseur: mapList(['cabane_chasseur']), cabanePecheur: mapList(['cabane_pecheur']),
+        grange: mapList(['grange']), moulin: mapList(['moulin']),
+        phare: mapList(['phare']), kiosque: mapList(['kiosque']),
+        tour_mirage: mapList(['tour_mirage']), usinePokeball: mapList(['usine_pokeball']),
+        league: mapList(['ligue']), pagode: mapList(['pagode']),
+        pavillon: mapList(['pavillon']), tourCendree: mapList(['tour_cendree']),
       };
     })(),
   },
