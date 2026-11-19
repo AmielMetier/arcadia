@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.122 — 19 novembre 2026
+- Correction : corrections d'audit (icones objets/HUD, audio/cinematiques, sauvegardes, habitants, tests) (Amiel)
+- Correction : corrections critiques (PNJ nb_sportif/nb_linebacker, batiments troues/coupes, decors healer/vase/caisses/squelette) (Amiel)
+- Correction : corrections haute priorite (desert, monuments 2x2, lumieres nocturnes, emprises/tours, tenue sac, persos) (Amiel)
+- Nouveau : interieurs, comptoirs, mobilier Gen 5 et neige boutiques (#10-#11) (Amiel)
+
 ## 5.121 — 18 novembre 2026
 - Nouveau : sprite sur mesure de Maitre Mamadou et mascotte bouc noir en veste en cuir du Dojo (Amiel)
 
