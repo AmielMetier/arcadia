@@ -257,10 +257,7 @@ export function buildAtlas() {
     const [u0, v0] = cells[k], cx = Math.round(u0 * SIZE) - 1, cy = Math.round(v0 * SIZE) - 1;
     blit(ctx, up2(im), cx, cy);
   }
-  // pack de graphismes : une tuile « x_<clé> » remplace telle quelle la tuile <clé> dessinée par le code (comptoirs…)
-  for (const k of Object.keys(SOL32)) if (k.startsWith('x_') && cells[k.slice(2)]) {
-    const [u0, v0] = cells[k.slice(2)]; blit(ctx, up2(SOL32[k]), Math.round(u0 * SIZE) - 1, Math.round(v0 * SIZE) - 1);
-  }
+  // (les remplacements x_<clé> du pack sont appliqués juste après texturesMurs pour pouvoir aussi couvrir murh_/murb_)
   // hautes herbes du tileset : chaque pièce (bords, coins, pleines) posée sur le sol qui l'entoure
   const HERBE_GROUND = { prairie: img.grass0, bois: img.grass0, neige: img.snow0 };
   for (const theme of ['prairie', 'bois', 'neige']) for (const k of HERBE_PIECES) {
@@ -312,6 +309,12 @@ export function buildAtlas() {
   texturesArenes(putImg);
   // murs des intérieurs façon HeartGold / SoulSilver (haut et bas du mur du fond, chaperons, fenêtres, ombres)
   texturesMurs(putImg);
+  // pack de graphismes : une tuile « x_<clé> » remplace (ou ajoute) telle quelle la tuile <clé> dans l'atlas (comptoirs, murs, lounge 5G…)
+  for (const k of Object.keys(SOL32)) if (k.startsWith('x_')) {
+    const key = k.slice(2);
+    if (cells[key]) { const [u0, v0] = cells[key]; blit(ctx, up2(SOL32[k]), Math.round(u0 * SIZE) - 1, Math.round(v0 * SIZE) - 1); }
+    else putImg(key, up2(SOL32[k]));
+  }
   // chaussées de Métropole : asphalte, avec la ligne pointillée du milieu sur le bord commun des deux voies
   const asph = (P) => { P.fill('#5a5c64'); P.speck(18, '#64666e'); P.speck(10, '#4e5058'); };
   putSol('asph', 'asph', asph);

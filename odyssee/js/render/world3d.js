@@ -670,7 +670,7 @@ export class WorldView {
     const anciens = typeof location !== 'undefined' && /[?&]anciensmurs/.test(location.search);   // comparaison avant / après
     this.murStyle = sm && !anciens && this.A?.cells?.['murh_' + sm] ? sm : null;
     this.fenetres = new Set();
-    if (this.murStyle && map.w > 6) {
+    if (this.murStyle && map.w > 6 && !(this.murStyle === 'center' && this.A?.cells?.clounge)) {
       // fenêtres sur le haut du mur du fond, là où rien ne s'adosse au mur
       const libres = []; for (let x = 2; x < map.w - 2; x++) if (map.get(x, 1) === T.WALL && map.get(x, 2) === T.FLOOR && !map.deco.some((d) => d.x === x && d.y === 2)) libres.push(x);
       const n = map.w >= 12 ? 3 : 2;
@@ -1280,6 +1280,10 @@ export class WorldView {
         // tapis des maisons, sous la table (3 × 2 cases au milieu de la pièce)
         if (this.murStyle.startsWith('in') && A['tapis_' + this.murStyle] && x === (m.w >> 1) - 1 && y === 4 && m.h >= 8) flat(O0, x, y, x + 3, y + 2, 0.0043, A['tapis_' + this.murStyle]);
       }
+      // Centre Pokémon 5G (Noir & Blanc) : coins lounge gris clair losanges complets (3×3) à gauche et à droite
+      if (!m.outdoor && m.floor === 'center' && m.music === 'center' && (t === T.FLOOR || t === T.BLOCK) && A.clounge && y >= 6 && y <= m.h - 2 && (x >= 1 && x <= 3 || x >= m.w - 4 && x <= m.w - 2)) {
+        flat(O0, x, y, x + 1, y + 1, 0.0038, A.clounge);
+      }
       let d = this.decoAt.get(x + ',' + y);
       // arènes dessinées dans un plan : plusieurs décors par case, selon l'état de l'arène (portes, fleurs, miroirs…)
       if (m.etat) { this.celluleArene(O0, P, Sh, x, y, Wl); d = null; }
@@ -1296,7 +1300,9 @@ export class WorldView {
       if (d && DECALS.has(d.k)) { const k = 'dec_' + d.k + (d.dir ? '_' + d.dir : d.g ? '_' + d.g : ''); if (A[k]) flat(O0, x, y, x + 1, y + 1, 0.005, A[k]); }
       if (d) {
         if (d.k === 'counter') {
-          box(Wl, x, y + 0.1, x + 1, y + 1, 0.75 * Math.tan(EL), A[d.front] || A.counterfront, A.counter, A.counter, { east: m.get(x + 1, y) !== T.BLOCK, west: m.get(x - 1, y) !== T.BLOCK });
+          const isCC = m.floor === 'center' && !d.top && (!d.front || d.front === 'counterfront') && A.ccounter && A.ccounterfront;
+          const cFront = isCC ? A.ccounterfront : (A[d.front] || A.counterfront), cTop = isCC ? A.ccounter : A.counter;
+          box(Wl, x, y + 0.1, x + 1, y + 1, 0.75 * Math.tan(EL), cFront, cTop, cTop, { east: m.get(x + 1, y) !== T.BLOCK, west: m.get(x - 1, y) !== T.BLOCK });
           // capsule posée sur le comptoir (starters du labo)
           if (d.ball && S.itemball) { const r = S.itemball; billboard(P, x + 0.5, y + 0.55, SW(r), SH(r), r, 0.75 * Math.tan(EL) - 0.05); }
         }
@@ -1334,6 +1340,12 @@ export class WorldView {
     // relief en 3D : l'ancien sol (sous le sol généré) n'écrit pas la profondeur, le sol généré le recouvre toujours
     const M3 = r3d ? this.r3dMats() : this.mat;
     add(G, M3.ground, sous); add(N, M3.anim, sous); add(O, M3.overlay, sous); add(O0, this.mat.overlay); add(Sh, this.mat.shadow, 1); add(P, this.mat.sprite); add(Wl, this.mat.walls); add(NO, this.mat.animOver); add(PB, this.mat.overlay, 1);
+    // Centre Pokémon 5G (Noir & Blanc) : grande allée centrale abricot + emblème Poké Ball au sol
+    if (!m.outdoor && m.floor === 'center' && m.music === 'center' && S.center_runner && x0 === 0 && y0 === 0) {
+      const Fl = new Geo(), r = S.center_runner, rx0 = (m.w - 3) / 2;
+      flat(Fl, rx0, 4.98, rx0 + 3, m.h - 0.85, 0.0046, [r.u0, r.v0, r.u1, r.v1]);
+      add(Fl, this.mat.flatSprite, 0);
+    }
     if (r3d) {
       // parois de la couche du dessus (texture vue de la caméra), dessinées juste après le sol généré
       const bw = m.ext ? CH : Math.min(CH, m.w - x0), bh = m.ext ? CH : Math.min(CH, m.h - y0), pg = bw > 0 && bh > 0 ? r3d.geoParois(ci, cj, bw, bh) : null;
