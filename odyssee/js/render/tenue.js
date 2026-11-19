@@ -83,7 +83,7 @@ const REGLES_NB = {
       if (y >= L.pied && (h < 0.055 || h > 0.96) && s >= 0.6 && v >= 0.45) return PIED;
       if (y >= L.bot - 11 && y < L.bot - 3 && entre(h, 0.58, 0.76) && s >= 0.35 && v <= 0.88) return BAS;
       if (y < L.bot - 11 && entre(h, 0.58, 0.66) && s >= 0.45 && v >= 0.3) return HAUT;
-      if (y >= L.top + 36 && y < L.pied && (h < 0.04 || h > 0.95) && s >= 0.35 && v >= 0.24 && v < 0.45) return SAC;
+      if (y >= m && y < L.bot - 6 && s <= 0.22 && v >= 0.72) return SAC;
       return 0;
     },
   },

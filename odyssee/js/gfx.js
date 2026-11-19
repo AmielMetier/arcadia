@@ -57,7 +57,7 @@ export const PACKS = {
         ['maison_hiver', ['snow', 'givre', 'cime']], ['maison_neige_bl', ['snow', 'givre', 'cime']], ['maison_neige_rg', ['snow', 'givre', 'cime']], ['maison_neige_b', ['snow', 'givre', 'cime']], ['manoir_neige', ['snow', 'givre', 'cime']],
         ['maison_mirage_1', ['mirage', 'kagura']], ['maison_mirage_2', ['mirage', 'kagura']],
         ['maison_ombre_2', ['ombre']], ['manoir_ombre', ['ombre']], ['maison_ombre', ['ombre']],
-        ['maison_brique', ['forge']], ['maison_brique_r', ['forge']], ['atelier_brique', ['forge']], ['maison_forge_1', ['forge', 'metro', 'volta']], ['maison_forge_2', ['forge', 'metro', 'volta']],
+        ['maison_brique', ['forge']], ['maison_brique_r', ['forge']], ['atelier_brique', ['forge']], ['maison_forge_p1', ['forge']], ['maison_forge_p2', ['forge']], ['maison_forge_1', ['forge', 'metro', 'volta']], ['maison_forge_2', ['forge', 'metro', 'volta']],
         ['maison_ville_rg', ['metro', 'volta']], ['maison_ville_bl', ['metro', 'volta']], ['maison_ville_ve', ['metro', 'volta']], ['maison_a_bl', ['metro', 'volta']], ['maison_f_bleue', ['metro', 'volta']], ['maison_bleue', ['metro', 'volta']], ['maison_c_ve', ['metro', 'volta']], ['maison_g', ['metro', 'volta']], ['maison_g_ocre', ['metro', 'volta']], ['manoir', ['metro', 'volta']],
         ...NB_MAISONS,
       ];
@@ -65,7 +65,7 @@ export const PACKS = {
         center: mapList([['centre_desert', ['desert', 'dunes']], ['centre_neige', ['snow', 'givre', 'cime']], ['centre_mirage', ['mirage', 'kagura']], 'centre']),
         mart: mapList([['boutique_desert', ['desert', 'dunes']], ['boutique_neige', ['snow', 'givre', 'cime']], ['boutique_neige_b', ['snow', 'givre', 'cime']], 'boutique', 'boutique_p', 'boutique_b']),
         gym: mapList(['arene']), lab: mapList(['labo']), fontaine: mapList(['fontaine']),
-        tower: mapList([['fonderie', ['forge']], ['fonderie_b', ['forge']], ['tour_brique', ['forge', 'metro', 'volta']], ['atelier_brique', ['forge', 'metro', 'volta']], ['tour_jaune', ['metro', 'volta']], ['tour_vitre', ['metro', 'volta']], 'tour']),
+        tower: mapList([['fonderie', ['forge']], ['fonderie_b', ['forge']], ['tour_brique', ['forge', 'metro', 'volta']], ['atelier_brique', ['forge', 'metro', 'volta']], ['tour_metro', ['metro', 'volta']], ['tour_jaune', ['metro', 'volta']], ['tour_vitre', ['metro', 'volta']], 'tour']),
         house: mapList(MAISONS_BIO), house2: mapList(MAISONS_BIO), house3: mapList(MAISONS_BIO), bighouse: mapList(MAISONS_BIO),
         chapelle: mapList(['chapelle']), gare: mapList(['gare']), mairie: mapList(['mairie']), bourse: mapList(['bourse']), casino: mapList(['casino']),
         centrale: mapList(['centrale']), serre: mapList(['serre']), fonderie: mapList(['fonderie', 'fonderie_b']),

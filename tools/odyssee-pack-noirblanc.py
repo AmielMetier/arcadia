@@ -98,6 +98,14 @@ def pieces_chemin(src_auto):
     op_vert = (bloc[..., 1].astype(int) > bloc[..., 0].astype(int) + 18) & (bloc[..., 3] > 0)
     bloc[op_vert, 3] = 0
     bloc[bloc[..., 3] < 180, 3] = 0
+    # Réchauffe les pixels de bordure gris-olive (r ≈ g, r - b < 32) hérités du kit herbe pour qu'ils fondent proprement sur le sable du désert
+    br, bg, bb, ba = bloc[..., 0].astype(int), bloc[..., 1].astype(int), bloc[..., 2].astype(int), bloc[..., 3]
+    bord_gris = (ba > 0) & (np.abs(br - bg) <= 10) & ((br - bb) <= 30) & (br < 210)
+    if np.any(bord_gris):
+        lum = (br[bord_gris] / 180.0).clip(0.75, 1.12)
+        bloc[bord_gris, 0] = np.clip(lum * 204, 0, 245).astype('uint8')
+        bloc[bord_gris, 1] = np.clip(lum * 184, 0, 232).astype('uint8')
+        bloc[bord_gris, 2] = np.clip(lum * 134, 0, 188).astype('uint8')
     out = {'f': Image.fromarray(f, 'RGBA')}
     for st in ['0', 'v', 'h', 'i']:
         tile = f.copy()
@@ -609,25 +617,29 @@ from noirblanc_extras import ajouter_batiments_sup
 ajouter_batiments_sup(OUT, BW, bat_imgs, bat_dims)
 from noirblanc_critiques import appliquer_critiques
 appliquer_critiques(ROOT, OUT, D, bat_dims)
+from noirblanc_hauts import appliquer_hauts
+appliquer_hauts(ROOT, OUT, D, bat_dims)
 
+# Variantes PNJ dédoublonnées : aucun Champion / Conseil 4 (Basalte, Frimas, Margot, Aurèle, Morgane, Ferdinand, Corbin)
+# ni doublon exact de classe ne se retrouve parmi les passants génériques.
 NB_CHAR_VARIANTS = {
-    'habitant': ['habitant', 'nb_cheren', 'nb_voyageur_n', 'nb_costard', 'nb_fermier', 'nb_boulanger', 'nb_clerk', 'nb_preppy', 'nb_sportif', 'nb_musicien', 'nb_majordome'],
-    'habitante': ['habitante', 'nb_citadine', 'nb_secretaire', 'nb_servante', 'nb_cafe', 'nb_tablier', 'nb_rockeuse', 'nb_demoiselle', 'nb_violette'],
-    'gamin': ['gamin', 'nb_tate', 'nb_garcon_r', 'nb_vert'],
-    'fillette': ['fillette', 'nb_liza'],
+    'habitant': ['habitant', 'nb_cheren', 'nb_voyageur_n', 'nb_fermier', 'nb_boulanger', 'nb_clerk', 'nb_sportif', 'nb_musicien', 'nb_majordome'],
+    'habitante': ['habitante', 'nb_citadine', 'nb_servante', 'nb_tablier', 'nb_rockeuse', 'nb_demoiselle', 'nb_violette'],
+    'gamin': ['gamin', 'nb_tate'],
+    'fillette': ['fillette'],
     'vieil_homme': ['vieil_homme', 'nb_sage'],
-    'dame': ['dame', 'nb_grandmere', 'nb_citadine', 'nb_secretaire'],
-    'topdresseur': ['topdresseur', 'nb_ranger', 'nb_voyageur_n', 'nb_sportif', 'nb_colosse'],
-    'topdresseuse': ['topdresseuse', 'nb_cowgirl', 'nb_rockeuse', 'nb_liza'],
-    'montagnard': ['montagnard', 'nb_cowboy', 'nb_sheriff', 'nb_linebacker'],
+    'dame': ['dame', 'nb_grandmere', 'nb_citadine'],
+    'topdresseur': ['topdresseur', 'nb_ranger', 'nb_voyageur_n', 'nb_sportif'],
+    'topdresseuse': ['topdresseuse', 'nb_cowgirl', 'nb_rockeuse'],
+    'montagnard': ['montagnard', 'nb_cowboy', 'nb_linebacker'],
     'randonneuse': ['randonneuse', 'nb_cowgirl', 'nb_vet'],
     'scientifique': ['scientifique', 'nb_vet', 'nb_clerk'],
-    'jardinier': ['jardinier', 'nb_fermier', 'nb_vert'],
+    'jardinier': ['jardinier', 'nb_fermier'],
     'garde': ['garde', 'nb_policier', 'nb_agent'],
-    'vendeur': ['vendeur', 'nb_guichet', 'nb_clerk', 'nb_boulanger'],
+    'vendeur': ['vendeur', 'nb_clerk', 'nb_boulanger'],
     'marin': ['marin', 'nb_amiral'],
-    'karateka': ['karateka', 'nb_linebacker', 'nb_colosse'],
-    'voleur': ['voleur', 'nb_agent', 'nb_colosse'],
+    'karateka': ['karateka', 'nb_linebacker'],
+    'voleur': ['voleur', 'nb_agent'],
 }
 
 # ------------------------------------------------------------------ liste pour le jeu

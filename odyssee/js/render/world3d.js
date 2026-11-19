@@ -1614,7 +1614,7 @@ export class WorldView {
    *  le porte entre en vue (ensureChunks) ; les petites cartes (intérieurs, grottes) sont construites d'un coup */
   buildBuildings() {
     this.buildingMeshes = [];
-    this._texBat = new Map(); this._fenetres = new Map();
+    this._texBat = new Map(); this._fenetres = new Map(); this._fenetresVides = new Set();
     this.nightGroup = new THREE.Group(); this.root.add(this.nightGroup); this.nightGroup.visible = false;
     this.batAttente = new Map();
     for (const b of this.map.buildings) { const k = Math.floor(b.x / CH) + ',' + Math.floor(b.y / CH); if (!this.batAttente.has(k)) this.batAttente.set(k, []); this.batAttente.get(k).push(b); }
@@ -1720,19 +1720,30 @@ export class WorldView {
           const wl = W * 0.4, wr = W * 0.6, hr = H * (128 / im.height);
           const ml = new THREE.Mesh(wingGeo(wl, H, 0, 0.4, 0, 1), mat); ml.position.set(Math.round((left + wl / 2) * 32) / 32, hb, b.y + b.d); ml.frustumCulled = false;
           const mr = new THREE.Mesh(wingGeo(wr, hr, 0.4, 1, (im.height - 128) / im.height, 1), mat); mr.position.set(Math.round((left + wl + wr / 2) * 32) / 32, hb, (b.doorY ?? b.y + 2) + 1); mr.frustumCulled = false;
-          g.add(ml, mr); g.userData.b = b; g.userData.pack = true;
+          const shL = new Geo();
+          this.ombreSol(shL, left - 0.06, b.y + b.d - 0.22, left + wl + 0.06, b.y + b.d + 0.22, 0.012, 'bande');
+          this.ombreSol(shL, left + wl - 0.06, (b.doorY ?? b.y + 2) + 0.78, left + W + 0.06, (b.doorY ?? b.y + 2) + 1.22, 0.012, 'bande');
+          g.add(ml, mr, new THREE.Mesh(shL.build(), this.mat.shadow)); g.userData.b = b; g.userData.pack = true;
           g.userData.ecran = { zN: -im.height / 32, x0: left - b.x, x1: left + wl - b.x };
-          this.root.add(g); this.buildingMeshes.push(g); return;
+          this.root.add(g); this.buildingMeshes.push(g);
+          this.lumierePorte(g, b, hb); return;
         }
         const az = b.door >= 0 && b.doorY != null ? b.doorY + 1 : b.y + b.d;
         const ax = Math.round((left + W / 2) * 32) / 32;
         // le dessin déborde parfois un peu de l'emprise (avant-toit, gouttière, perron) : ces colonnes prennent la profondeur
         // de l'arrière du bâtiment, pour qu'un personnage qui se tient juste à côté passe devant (et pas à moitié derrière)
         const geo = bandesPack(W, H, im.width, ax - W / 2, b.x, b.x + wCible, b.y - az - 0.05);
-        const me = new THREE.Mesh(geo, mat); me.position.set(ax, hb, az); me.frustumCulled = false; g.add(me); g.userData.b = b; g.userData.pack = true;
+        const me = new THREE.Mesh(geo, mat); me.position.set(ax, hb, az); me.frustumCulled = false; g.add(me);
+        // ombre portée douce au pied du bâtiment pour l'ancrer sur le sol
+        const shP = new Geo();
+        this.ombreSol(shP, Math.max(b.x, ax - W / 2) - 0.08, az - 0.22, Math.min(b.x + wCible, ax + W / 2) + 0.08, az + 0.22, 0.012, 'bande');
+        const omP = new THREE.Mesh(shP.build(), this.mat.shadow); omP.position.y = hb; g.add(omP);
+        g.userData.b = b; g.userData.pack = true;
         // le dessin dépasse l'emprise vers le nord : il s'estompe quand on passe derrière lui (toute sa hauteur, toute sa largeur)
         g.userData.ecran = { zN: (az - b.y) - im.height / 32, x0: ax - W / 2 - b.x, x1: ax + W / 2 - b.x };
-        this.root.add(g); this.buildingMeshes.push(g); return;
+        this.root.add(g); this.buildingMeshes.push(g);
+        this.fenetresPack(g, n, im, geo, ax, hb, az);
+        this.lumierePorte(g, b, hb); return;
       }
     }
     // bâtiment en fausse 3D (modèle de batiments3d.js) quand un modèle a la bonne emprise ; sinon l'ancienne façade
@@ -1811,7 +1822,7 @@ export class WorldView {
   }
   /** la nuit, la lumière de l'entrée se pose sur le seuil (bâtiments habités du dehors) */
   lumierePorte(g, b, hb) {
-    if (!this.map.outdoor || !(b.door >= 0) || b.doorX == null || !['house', 'house2', 'bighouse', 'center', 'mart', 'gym', 'lab', 'league'].includes(b.kind)) return;
+    if (!this.map.outdoor || !(b.door >= 0) || b.doorX == null || !['house', 'house2', 'bighouse', 'center', 'mart', 'gym', 'lab', 'league', 'tower'].includes(b.kind)) return;
     const fl = this.lum.porte(b.doorX, hb, b.doorY); this.glows.add(fl); g.userData.lum = [fl];
   }
   /** pose un bâtiment en fausse 3D : géométries fusionnées du modèle, matériaux sans lumière (éclairage cuit),
@@ -1888,6 +1899,69 @@ export class WorldView {
     const wallH = b.h * Math.tan(EL);
     const geo = new Geo(); geo.quad([b.x, 0, b.y + b.d + 0.01], [b.x + b.w, 0, b.y + b.d + 0.01], [b.x + b.w, wallH, b.y + b.d + 0.01], [b.x, wallH, b.y + b.d + 0.01], 0, 0, 1, 1, 1);
     const wm = new THREE.Mesh(geo.build(), cache.get(key).clone()); wm.position.y = g.userData.hb || 0; g.userData.win = wm; this.nightGroup.add(wm);
+  }
+  /** pack Noir & Blanc : masque de fenêtres chaudes allumées la nuit (détection encadrée mise en cache par modèle) */
+  fenetresPack(g, nom, im, geo, ax, hb, az) {
+    if (!this.map?.outdoor || /^(fontaine|puits|etal|kiosque|tour_cendree)$/.test(nom)) return;
+    const cache = this._fenetres, key = 'packwin_' + nom;
+    const vides = (this._fenetresVides ||= new Set());
+    if (vides.has(key)) return;
+    if (!cache.has(key)) {
+      const w = im.width, h = im.height;
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const ctx = c.getContext('2d', { willReadFrequently: true }); ctx.drawImage(im, 0, 0);
+      const src = ctx.getImageData(0, 0, w, h).data;
+      const isTall = nom.startsWith('tour') || /^(centrale|casino|maison_ville_|maison_forge_1|maison_forge_2)/.test(nom);
+      const yMin = Math.floor(h * (isTall ? 0.22 : /^(bourse|mairie|ligue|usine_pokeball|boutique_mode)$/.test(nom) ? 0.36 : 0.48));
+      const yMax = Math.max(yMin + 4, h - 10);
+      const cand = new Uint8Array(w * h), bright = new Uint8Array(w * h);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const o = (y * w + x) * 4, r = src[o], gg = src[o + 1], b = src[o + 2], al = src[o + 3];
+        bright[y * w + x] = (r * 3 + gg * 5 + b * 2) / 10;
+        if (y >= yMin && y < yMax && x >= 3 && x < w - 3 && al > 200 && b >= r + 18 && b >= 84 && r <= 180 && gg >= 55) cand[y * w + x] = 1;
+      }
+      const vis = new Uint8Array(w * h), outImg = ctx.createImageData(w, h), od = outImg.data;
+      let litAny = false;
+      for (let sy = yMin; sy < yMax; sy++) for (let sx = 3; sx < w - 3; sx++) {
+        const si = sy * w + sx; if (!cand[si] || vis[si]) continue;
+        const st = [si], pts = []; vis[si] = 1;
+        let minx = sx, maxx = sx, miny = sy, maxy = sy;
+        while (st.length) {
+          const ci = st.pop(); pts.push(ci);
+          const cx = ci % w, cy = (ci - cx) / w;
+          if (cx < minx) minx = cx; if (cx > maxx) maxx = cx; if (cy < miny) miny = cy; if (cy > maxy) maxy = cy;
+          if (cx > 0 && cand[ci - 1] && !vis[ci - 1]) { vis[ci - 1] = 1; st.push(ci - 1); }
+          if (cx + 1 < w && cand[ci + 1] && !vis[ci + 1]) { vis[ci + 1] = 1; st.push(ci + 1); }
+          if (cy > 0 && cand[ci - w] && !vis[ci - w]) { vis[ci - w] = 1; st.push(ci - w); }
+          if (cy + 1 < h && cand[ci + w] && !vis[ci + w]) { vis[ci + w] = 1; st.push(ci + w); }
+        }
+        const area = pts.length, bw = maxx - minx + 1, bh = maxy - miny + 1, asp = bw / bh;
+        if (area < 14 || area > 1500 || bw > 44 || bh > 48 || asp < 0.36 || asp > 2.4 || area / (bw * bh) < 0.42) continue;
+        if (minx <= 3 || maxx >= w - 4 || miny <= 2) continue;
+        let pd = 0, pt = 0, tt = 0;
+        const checkP = (px, py) => { pt++; const i = py * w + px; if (src[i * 4 + 3] < 180) tt++; else if (bright[i] < 135) pd++; };
+        const xA = Math.max(0, minx - 2), xB = Math.min(w - 1, maxx + 2), yA = Math.max(0, miny - 2), yB = Math.min(h - 1, maxy + 2);
+        for (let px = xA; px <= xB; px++) { checkP(px, yA); checkP(px, yB); }
+        for (let py = yA; py <= yB; py++) { checkP(xA, py); checkP(xB, py); }
+        if (tt > 0 || pd / Math.max(1, pt) < 0.42) continue;
+        litAny = true;
+        for (let k = 0; k < pts.length; k++) {
+          const o = pts[k] * 4, lum = Math.max(0.55, Math.min(1.15, src[o + 2] / 220));
+          od[o] = Math.min(255, Math.max(215, Math.round(lum * 255)));
+          od[o + 1] = Math.min(244, Math.max(178, Math.round(lum * 224)));
+          od[o + 2] = Math.min(152, Math.max(72, Math.round(lum * 114)));
+          od[o + 3] = 255;
+        }
+      }
+      if (!litAny) { vides.add(key); return; }
+      ctx.clearRect(0, 0, w, h); ctx.putImageData(outImg, 0, 0);
+      const wt = tex(c); wt.flipY = true; wt.magFilter = THREE.NearestFilter; wt.minFilter = THREE.NearestFilter; wt.needsUpdate = true;
+      cache.set(key, new THREE.MeshBasicMaterial({ map: wt, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide }));
+    }
+    const baseMat = cache.get(key); if (!baseMat) return;
+    const mat = screenSprite(baseMat.clone(), 0, true, true);
+    const wm = new THREE.Mesh(geo.clone(), mat); wm.position.set(ax, hb, az + 0.015); wm.frustumCulled = false;
+    g.userData.win = wm; this.nightGroup.add(wm);
   }
 
 
