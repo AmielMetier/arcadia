@@ -60,9 +60,7 @@ function loudPart(buf) {
   LOUD.set(buf, out);
   return out;
 }
-// le Level 26 (le Bassin de rétention, numéro 6) sonne comme les Poolrooms : de l'eau, une grande salle, la même entité
-const WET = (level) => (level === 6 ? 2 : level);
-const levelSfx = (level) => LEVEL_SFX[level === 2 || level === 6 ? 1 : level] || NO_SFX; // Poolrooms : les sons du Level 1
+const levelSfx = (level) => LEVEL_SFX[level === 2 ? 1 : level] || NO_SFX; // Poolrooms : les sons du Level 1
 const hasEntity = (level) => levelSfx(level).entity !== false;
 
 const clamp01 = (v) => Math.max(0, Math.min(1, +v || 0));
@@ -284,7 +282,6 @@ export class BackroomsSfx {
   // longue queue qui s'éteint). Level 0 : moquette et faux plafond, un écho moyen ; Level 1 : béton, il traîne ;
   // Tuyauteries : une galerie carrelée sous des tuyaux, qui sonne comme une cloche.
   setRoom(level = 0) {
-    level = WET(level);
     if (!this.ctx || this.roomLevel === level) return;
     this.roomLevel = level;
     // ce qui tient d'un niveau à l'autre se tait : le monte-charge qui descend, les relais qui tiquent
@@ -1543,7 +1540,6 @@ export class BackroomsSfx {
   // Jumpscare / cri violent lors de la capture : 200 ms de silence total, puis le coup (un impact grave, un cri
   // formanté et saturé) et la bande qui se froisse. L'ambiance est baissée pendant quelques secondes.
   jumpscare(level = 0) {
-    level = WET(level);
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
     const t = c.currentTime;
@@ -3435,7 +3431,6 @@ export class BackroomsSfx {
   }
 
   levelBed(level) {
-    level = WET(level);
     const c = this.ctx;
     const t = c.currentTime;
     if (this.bed) {

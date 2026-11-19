@@ -13,7 +13,6 @@
 // Bible de conception : « Bible de conception — Les Poolrooms (Level 37) ».
 import { CELL_SIZE, T, itemList, spreadOut } from './map.js';
 import { PIPES_LEVEL } from './level2.js';
-import { RESERVOIR_LEVEL } from './reservoir.js';
 
 const C = CELL_SIZE;
 export const MOD = 4; // un module = 4 cases = 10 m
@@ -29,7 +28,7 @@ export const DEPTH = { WADE: 0.2, GALLERY: 0.25, TUNNEL: 0.6 };
 export const SLIDES = [
   { color: 'red', name: 'RED', hex: '#e2402f', to: 4 }, // vers le Level 5, le Terror Hotel (HOTEL_LEVEL)
   { color: 'yellow', name: 'YELLOW', hex: '#f2bf1d', to: PIPES_LEVEL }, // les galeries de service (Level 2)
-  { color: 'blue', name: 'BLUE', hex: '#2c7fe0', to: RESERVOIR_LEVEL }, // le Level 26, le Bassin de rétention
+  { color: 'blue', name: 'BLUE', hex: '#2c7fe0', to: null },
 ];
 export const MOUTH = { r: 0.62, y: 0.92, enter: 1.15 }; // (à 92 cm : le bord du pavillon, plus large, reste au-dessus du sol)
 
