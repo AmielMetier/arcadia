@@ -1282,7 +1282,9 @@ export class WorldView {
       }
       // Centre Pokémon 5G (Noir & Blanc) : coins lounge gris clair losanges complets (3×3) à gauche et à droite
       if (!m.outdoor && m.floor === 'center' && m.music === 'center' && (t === T.FLOOR || t === T.BLOCK) && A.clounge && y >= 6 && y <= m.h - 2 && (x >= 1 && x <= 3 || x >= m.w - 4 && x <= m.w - 2)) {
-        flat(O0, x, y, x + 1, y + 1, 0.0038, A.clounge);
+        // 0,0024 : bien sous l'ombre des murs (0,0041) qu'il croise contre les murs latéraux, bien au-dessus du sol (0) ; à 0,0038 les deux
+        // couches n'étaient séparées que de 0,0003, sous la précision de profondeur d'un vrai GPU à cette distance de caméra (scintillement)
+        flat(O0, x, y, x + 1, y + 1, 0.0024, A.clounge);
       }
       let d = this.decoAt.get(x + ',' + y);
       // arènes dessinées dans un plan : plusieurs décors par case, selon l'état de l'arène (portes, fleurs, miroirs…)
@@ -1301,10 +1303,21 @@ export class WorldView {
       if (d) {
         if (d.k === 'counter') {
           const isCC = m.floor === 'center' && !d.top && (!d.front || d.front === 'counterfront') && A.ccounter && A.ccounterfront;
-          const cFront = isCC ? A.ccounterfront : (A[d.front] || A.counterfront), cTop = isCC ? A.ccounter : A.counter;
+          // Boutique 5G (Noir & Blanc) : comptoir bleu-turquoise à façade argentée, caisse enregistreuse au bout du comptoir
+          const isMC = m.floor === 'mart' && d.front === 'martfront' && A.mcounter && A.mcounterfront;
+          const cFront = isCC ? A.ccounterfront : isMC ? A.mcounterfront : (A[d.front] || A.counterfront), cTop = isCC ? A.ccounter : isMC ? A.mcounter : A.counter;
           box(Wl, x, y + 0.1, x + 1, y + 1, 0.75 * Math.tan(EL), cFront, cTop, cTop, { east: m.get(x + 1, y) !== T.BLOCK, west: m.get(x - 1, y) !== T.BLOCK });
           // capsule posée sur le comptoir (starters du labo)
           if (d.ball && S.itemball) { const r = S.itemball; billboard(P, x + 0.5, y + 0.55, SW(r), SH(r), r, 0.75 * Math.tan(EL) - 0.05); }
+          if (isMC && S.mregister && m.get(x + 1, y) !== T.BLOCK) { const r = S.mregister; billboard(P, x + 0.5, y + 0.55, SW(r), SH(r), r, 0.75 * Math.tan(EL) - 0.05); }
+        }
+        // Boutique 5G : un présentoir blanc garni par rangée de rayons (dessiné une fois, centré sur la rangée)
+        else if (d.k === 'shelf' && m.floor === 'mart' && S.martshelf) {
+          if (this.decoAt.get((x - 1) + ',' + y)?.k !== 'shelf') {
+            let n = 1; while (this.decoAt.get((x + n) + ',' + y)?.k === 'shelf') n++;
+            const r = S.martshelf; billboard(P, x + n / 2, y + 0.75, SW(r), SH(r), r);
+            this.ombreSol(Sh, x + 0.05, y + 0.45, x + n - 0.05, y + 0.95, 0.015, 'bande');
+          }
         }
         else if (d.k === 'shelf') box(Wl, x + 0.05, y + 0.2, x + 0.95, y + 0.95, 1.5 * Math.tan(EL), A.shelf, A.roof_flat, A.shelf);
         else if (d.k === 'carpet' || d.k === 'exitlight') { /* sol */ }

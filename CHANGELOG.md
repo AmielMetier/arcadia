@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 5.124 — 19 novembre 2026
+- **Odyssée** — Graphismes Noir & Blanc :
+  - la Boutique passe aussi en vrai style Noir 2 & Blanc 2 : carrelage gris à losanges, comptoir bleu à façade argentée avec sa caisse enregistreuse, présentoirs blancs garnis ;
+  - au Dojo de Mamadou, on ne peut plus marcher à travers l'appareil de soin ;
+  - le sol du coin salon des Centres Pokémon ne risque plus de scintiller contre l'ombre des murs ;
+  - crédits complétés (planches d'UltimoSpriter et de ditto209).
+
 ## 5.123 — 19 novembre 2026
 - Correction : restauration sprites authentiques Gen 5 + interieur Centre Pokemon 5G (Amiel)
 

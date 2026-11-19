@@ -515,6 +515,40 @@ def _extraire_centre_gen5(src_dir, out_dir, decos, extra_sol):
     decos['vase'] = rack
 
 
+def _extraire_boutique_gen5(src_dir, out_dir, decos, extra_sol):
+    """Boutique Pokémon 5G depuis centre_bw_ditto.png (ditto209) : carrelage gris à losanges, comptoir bleu-turquoise à façade
+    argentée, caisse enregistreuse, présentoirs blancs garnis (trois cases de large, comme les rayons de la boutique)."""
+    d_path = os.path.join(src_dir, 'centre_bw_ditto.png')
+    if not os.path.exists(d_path):
+        return
+    d = Image.open(d_path).convert('RGBA')
+    # sol : le carrelage gris clair à losanges du coin salon des Centres Unys (même tuile que x_clounge)
+    if 'x_clounge' in extra_sol:
+        extra_sol['floor_blue'] = extra_sol['x_clounge'].copy()
+    # comptoir : dessus bleu-turquoise uni, façade = liseré bleu foncé + plinthe argentée (portion droite du comptoir)
+    extra_sol['x_mcounter'] = d.crop((224, 832, 240, 848))
+    extra_sol['x_mcounterfront'] = d.crop((224, 850, 240, 866))
+    # caisse enregistreuse beige posée sur le comptoir
+    caisse = d.crop((194, 894, 224, 938))
+    a = np.array(caisse); ys, xs = np.where(a[..., 3] > 0)
+    if len(ys):
+        caisse = Image.fromarray(a[ys.min():ys.max() + 1, xs.min():xs.max() + 1], 'RGBA')
+    caisse.save(os.path.join(out_dir, 'd_mregister.png'))
+    decos['mregister'] = caisse
+    # présentoir blanc garni : 64 px de large dans la planche, élargi à 96 px (trois cases) en répétant son milieu
+    pr = d.crop((128, 550, 192, 608))
+    a = np.array(pr); ys, xs = np.where(a[..., 3] > 0)
+    if len(ys):
+        pr = Image.fromarray(a[ys.min():ys.max() + 1, xs.min():xs.max() + 1], 'RGBA')
+    w, h = pr.size
+    trois = Image.new('RGBA', (w + 32, h), (0, 0, 0, 0))
+    trois.paste(pr.crop((0, 0, w // 2, h)), (0, 0))
+    trois.paste(pr.crop((w // 2 - 16, 0, w // 2 + 16, h)), (w // 2, 0))
+    trois.paste(pr.crop((w // 2, 0, w, h)), (w // 2 + 32, 0))
+    trois.save(os.path.join(out_dir, 'd_martshelf.png'))
+    decos['martshelf'] = trois
+
+
 def appliquer_critiques(root, out_dir, cols, noms, decos, bat_imgs, bat_dims):
     """Applique UNIQUEMENT les correctifs chirurgicaux 100 % authentiques Gen 5."""
     src_dir = os.path.join(root, 'assets', 'graphics', 'noirblanc')
@@ -564,6 +598,7 @@ def appliquer_critiques(root, out_dir, cols, noms, decos, bat_imgs, bat_dims):
         'x_shelf': centre_int.crop((130, 1020, 190, 1080)).resize((16, 16), Image.NEAREST),
     }
     _extraire_centre_gen5(src_dir, out_dir, decos, extra_sol)
+    _extraire_boutique_gen5(src_dir, out_dir, decos, extra_sol)
     for k in sorted(extra_sol):
         if k not in idx_of:
             idx_of[k] = len(noms)

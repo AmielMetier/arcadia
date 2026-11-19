@@ -104,7 +104,7 @@ export function choisirSprites(id) { if (SPRITES_CHOIX.some((s) => s.id === id))
 /** crédits affichés dans Options → Crédits graphismes */
 export const CREDITS = [
   ['Sol « Pokémon Lumineux »', 'Tuiles de Flurmimon (planche « Bright »), adaptées par Bivurnum — Team Aqua\'s Asset Repo.'],
-  ['Graphismes « Noir & Blanc »', 'Sol, mer, arbres, bâtiments, intérieurs et personnages : kit « Pokémon Essentials BW » de KleinStudio et ressources Pokémon Essentials Gen 5 (FloofyPanthar ; © Nintendo / Game Freak / Creatures). Lave : Phyromatical. Compléments désert, grottes et sanctuaires : Magiscarf, J-Treecko252, TerribleJared, Anarlaurendil, RisingTempest3, JavaPlume.'],
+  ['Graphismes « Noir & Blanc »', 'Sol, mer, arbres, bâtiments, intérieurs et personnages : kit « Pokémon Essentials BW » de KleinStudio et ressources Pokémon Essentials Gen 5 (FloofyPanthar ; © Nintendo / Game Freak / Creatures). Lave : Phyromatical. Compléments désert, grottes et sanctuaires : Magiscarf, J-Treecko252, TerribleJared, Anarlaurendil, RisingTempest3, JavaPlume. Intérieurs du Centre Pokémon et de la Boutique : planches Gen 5 d\'UltimoSpriter et de ditto209.'],
   ['Sprites Noir & Blanc', 'Sprites des jeux Pokémon © Nintendo / Game Freak / Creatures, récupérés par PokeAPI (projet PokeAPI/sprites).'],
   ['Sprites HeartGold / SoulSilver', 'Même source : PokeAPI/sprites.'],
   ['Utilisation', 'Projet de fans sans but lucratif. Les artistes restent propriétaires de leurs créations.'],

@@ -333,7 +333,11 @@ def appliquer_masterpiece(root, out_dir, cols, noms, decos, bat_dims):
         'tour_brique': None, 'tour_jaune': None, 'tour_vitre': None,
     }
 
+    # bâtiments de l'atlas qu'aucun style n'emploie plus (gfx.js) : ni découpés ni listés dans NB_BATIMENTS
+    RETIRES = {'b_atelier_brique', 'b_tour_brique', 'b_fonderie_b'}
     for k, box in coords.items():
+        if k in RETIRES:
+            continue
         x, y, w, h = box
         sub = atlas.crop((x, y, x + w, y + h))
         if k.startswith('d_'):
