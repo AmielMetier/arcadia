@@ -44,6 +44,10 @@ export const PACKS = {
     murs: {
       center: { fond: '#f6eab4', motif: '#eedd98', bande: '#f09a52', bandeS: '#c8692c', lam: '#f2d68a', lamC: '#faeab0', lamS: '#d2a85c', cim: '#fffdf2', pl: '#a8602c', cap: '#b06830', capC: '#f0b070' },
       mart: { fond: '#eef4fa', motif: '#dce8f6', motifK: 'carreaux', bande: '#3b82d6', bandeS: '#2258a4', lam: '#d2e2f2', lamC: '#f2f7fc', lamS: '#8fb2d8', cim: '#ffffff', pl: '#244e8c', cap: '#1e3e72', capC: '#78b0ec' },
+      lab: { fond: '#f0f5fa', motif: '#dfe8f2', motifK: 'carreaux', bande: '#5c8ec4', bandeS: '#3c6898', lam: '#cdd9e6', lamC: '#e8f0f8', lamS: '#92a8be', cim: '#ffffff', pl: '#425870', cap: '#3a4e64', capC: '#98b4d0' },
+      gym: { fond: '#e6e8f0', motif: '#d2d6e4', motifK: 'pierres', lam: '#9ca4b8', lamC: '#c2c8d8', lamS: '#6e768c', cim: '#f4f6fc', pl: '#464e62', cap: '#3c4458', capC: '#9ea8c0' },
+      league: { fond: '#584e8c', motif: '#6a60a4', motifK: 'losanges', lam: '#3e346c', lamC: '#64589c', lamS: '#28204c', cim: '#ecc85e', pl: '#20183c', cap: '#2e2454', capC: '#a89ae0' },
+      cendre: { fond: '#524646', motif: '#443838', motifK: 'pierres', lam: '#382e30', lamC: '#544648', lamS: '#261e20', cim: '#8c6e58', pl: '#1c1618', cap: '#282022', capC: '#6c5852' },
     },
     chars: 'chars',           // planche des personnages de Noir & Blanc 2 (même disposition que celle du jeu)
     charRows: NB_CHAR_ROWS,   // rangées supplémentaires (au-delà des 75 de base) propres au pack Noir & Blanc

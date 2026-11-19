@@ -619,6 +619,8 @@ from noirblanc_critiques import appliquer_critiques
 appliquer_critiques(ROOT, OUT, D, bat_dims)
 from noirblanc_hauts import appliquer_hauts
 appliquer_hauts(ROOT, OUT, D, bat_dims)
+from noirblanc_moyens import appliquer_moyens
+appliquer_moyens(ROOT, OUT, COLS, noms, D, bat_dims)
 
 # Variantes PNJ dédoublonnées : aucun Champion / Conseil 4 (Basalte, Frimas, Margot, Aurèle, Morgane, Ferdinand, Corbin)
 # ni doublon exact de classe ne se retrouve parmi les passants génériques.
