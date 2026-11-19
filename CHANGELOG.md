@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 5.125 — 19 novembre 2026
+- **The Backrooms** — Un nouveau niveau : le Level 26, le Bassin de rétention, au bout du toboggan bleu des Poolrooms.
+  - Un immense réservoir souterrain plongé dans le noir : une forêt de piliers de béton, et de l'eau noire jusqu'à la taille qui ralentit chaque pas.
+  - Quatre pompes à relancer, chacune dans sa salle au sec. À chaque pompe, l'eau du bassin baisse d'un quart.
+  - L'entité chasse au bruit : dans l'eau, chaque pas s'entend, même accroupi, et courir fait un vacarme. Tant que l'eau est haute, on ne voit d'elle que ce qui dépasse de la surface.
+  - Les quatre pompes lancées, le bassin est vide : l'ascenseur de maintenance, tout au fond, vous sort des Backrooms.
+
 ## 5.124 — 19 novembre 2026
 - **Odyssée** — Graphismes Noir & Blanc :
   - la Boutique passe aussi en vrai style Noir 2 & Blanc 2 : carrelage gris à losanges, comptoir bleu à façade argentée avec sa caisse enregistreuse, présentoirs blancs garnis ;
