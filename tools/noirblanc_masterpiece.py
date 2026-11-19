@@ -338,6 +338,8 @@ def appliquer_masterpiece(root, out_dir, cols, noms, decos, bat_dims):
         sub = atlas.crop((x, y, x + w, y + h))
         if k.startswith('d_'):
             name = k[2:]
+            if name in ('vase', 'squelette'):
+                continue
             sub.save(os.path.join(out_dir, f'{k}.png'))
             decos[name] = sub
         elif k.startswith('b_'):

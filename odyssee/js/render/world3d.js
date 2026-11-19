@@ -1674,7 +1674,8 @@ export class WorldView {
       : /Phare/i.test(b.name || '') && BP?.styles?.phare ? 'phare'
       : /Centrale/i.test(b.name || '') && BP?.styles?.centrale ? 'centrale'
       : /Serre/i.test(b.name || '') && BP?.styles?.serre ? 'serre'
-      : /Fonderie/i.test(b.name || '') && BP?.styles?.fonderie ? 'fonderie' : null;
+      : /Fonderie/i.test(b.name || '') && BP?.styles?.fonderie ? 'fonderie'
+      : /Boutique de mode/i.test(b.name || '') && BP?.styles?.boutique_mode ? 'boutique_mode' : null;
     const estGratteCiel = !!(b.kit?.startsWith('gc') && BP?.styles?.tower?.some((c) => BP.images[c[0]]));
     const eligiblePack = BP && (estFontaine || estLogisPack || !!specKey || estGratteCiel || (!b.modele && !b.kit && (!b.libres?.length || b.kind === 'lab') && !(b.style === 'tower' && (b.door >= 0 || /Phare|Mirage|Centrale/i.test(b.name || '')))));
     const choix = eligiblePack ? (specKey ? BP.styles[specKey] : estFontaine ? BP.styles.fontaine : estLogisPack ? BP.styles.house : BP.styles[b.style]) : null;

@@ -538,7 +538,7 @@ def ajouter_batiments_sup(out_dir, bw, bat_imgs, bat_dims):
         'cabane_pecheur': (_cabane(160, 136, fisher=True), None),
         'grange': (_grange(bw), None),
         'moulin': (_moulin(), None),
-        'phare': (_phare(), None),
+        'phare': (_phare(), 48),
         'kiosque': (_kiosque(bw), None),
         'tour_mirage': (_tour_mirage(bat_imgs), 48),
         'usine_pokeball': (_usine_pokeball(bw), 512),

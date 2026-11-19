@@ -419,7 +419,8 @@ D = {
 }
 # mobilier du Centre Pokémon et panneau de bois des routes
 D['plant'] = trim(net(CENTRE.crop((192, 1096, 224, 1170)))); D['pc'] = trim(net(CENTRE.crop((192, 1010, 224, 1090))))
-D['healer'] = trim(net(CENTRE.crop((130, 1012, 192, 1082)))); D['bench'] = trim(net(CENTRE.crop((64, 960, 160, 992))))
+D['healer'] = trim(net(CENTRE.crop((160, 768, 224, 824)))); D['bench'] = trim(net(CENTRE.crop((64, 960, 160, 992))))
+D['vase'] = trim(net(CENTRE.crop((192, 864, 224, 920))))
 D['fontaine'] = trim(trim(net(BW.crop((8, 11356, 152, 11570)))).resize((48, 68), Image.NEAREST))
 D['sign'] = trim(trim(net(BW.crop((176, 98 * 32, 256, 100 * 32)))).resize((32, 28), Image.NEAREST))
 # devant les jambes de qui marche dans les hautes herbes : le bas de la touffe
@@ -606,6 +607,8 @@ from noirblanc_masterpiece import appliquer_masterpiece
 appliquer_masterpiece(ROOT, OUT, COLS, noms, D, bat_dims)
 from noirblanc_extras import ajouter_batiments_sup
 ajouter_batiments_sup(OUT, BW, bat_imgs, bat_dims)
+from noirblanc_critiques import appliquer_critiques
+appliquer_critiques(ROOT, OUT, D, bat_dims)
 
 NB_CHAR_VARIANTS = {
     'habitant': ['habitant', 'nb_cheren', 'nb_voyageur_n', 'nb_costard', 'nb_fermier', 'nb_boulanger', 'nb_clerk', 'nb_preppy', 'nb_sportif', 'nb_musicien', 'nb_majordome'],
