@@ -22,6 +22,9 @@
   top: calc(var(--bp) * 4);
   left: 50%;
   transform: translateX(-50%);
+  max-width: 92%;
+  flex-wrap: wrap;
+  justify-content: center;
   display: flex;
   align-items: center;
   gap: calc(var(--bp) * 6);

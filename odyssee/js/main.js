@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { WorldView } from './render/world3d.js';
 import { setArt } from './render/textures.js';
-import { packActif, solChoix } from './gfx.js';
+import { packActif, solChoix, choisirSol, choisirSprites, aChoisiGfx, marquerGfxChoisi } from './gfx.js';
 import { paletteMurs } from './render/murs-tex.js';
 try { document.documentElement.classList.add('gfx-' + solChoix()); } catch (e) { /* hors navigateur */ }
 import { buildWorld } from './world/region.js';
@@ -12,7 +12,7 @@ import { brancherManette } from './manette.js';
 import { brancherTactile } from './tactile.js';
 import { Sound } from './audio.js';
 import { UI, el, esc, wait } from './ui/ui.js';
-import { optionsScreen, loadCodeScreen } from './ui/screens.js';
+import { optionsScreen, loadCodeScreen, gfxPickerScreen } from './ui/screens.js';
 import { decodeSave, saveSummary } from './core/savecode.js';
 import { Cloud } from './net/cloud.js';
 import { Game } from './game.js';
@@ -95,7 +95,7 @@ async function loadArt(prechauffe = false) {
   const hg = {}; for (const k of Object.keys(SPRITES.hgss || {})) hg[k] = ASSETS.hgss(k);
   if (prechauffe) {
     // même requête que loadImg (crossOrigin), pour que le cache des images du navigateur la resserve telle quelle
-    const L = [sprites, kits, sols, sol32, hg, tuilesPack, batsPack].flatMap(Object.values).concat([ASSETS.chars, ASSETS.title, SPRITES.suiveurs && ASSETS.suiveurs, ASSETS.relief]);
+    const L = [sprites, kits, sols, sol32, hg, tuilesPack, batsPack].flatMap(Object.values).concat([pack?.chars ? ASSETS.gfx(pack.dossier, pack.chars) : ASSETS.chars, ASSETS.title, SPRITES.suiveurs && ASSETS.suiveurs, ASSETS.relief]);
     return L.filter(Boolean).map((src) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.src = src; return im; });
   }
   const [S, K, L, L32, HGI, chars, title, suiveurs, relief, PK, PB] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(pack?.chars ? ASSETS.gfx(pack.dossier, pack.chars) : ASSETS.chars), loadImg(ASSETS.title), SPRITES.suiveurs ? loadImg(ASSETS.suiveurs) : null, loadImg(ASSETS.relief).catch(() => null), loadAll(tuilesPack), loadAll(batsPack)]);
@@ -114,6 +114,7 @@ function renduNatif() {
   try { return localStorage.getItem('odyssee-natif') === '1'; } catch (e) { return false; }
 }
 async function boot() {
+  const bootSol = solChoix();
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, stencil: true, powerPreference: 'high-performance' });   // stencil : ombres au sol sans double couche (render/ombres.js)
   renderer.setPixelRatio(1); renderer.outputColorSpace = THREE.SRGBColorSpace;
   const input = new Input(), sound = new Sound(), ui = new UI(uiRoot, input, sound);
@@ -130,7 +131,7 @@ async function boot() {
   etape('images');
   for (const [nom, pal] of Object.entries(packActif()?.murs || {})) paletteMurs(nom, pal);
   setArt({ kits: art.kits, sols: art.sols, sol32: art.sol32, hgss: art.hgss, relief: art.relief, pack: art.pack });
-  const view = new WorldView(renderer, art.chars, { sprites: art.sprites, dens: art.dens, suiveurs: art.suiveurs, batiments: art.batiments, packDecor: !!packActif()?.decor });
+  const view = new WorldView(renderer, art.chars, { sprites: art.sprites, dens: art.dens, suiveurs: art.suiveurs, batiments: art.batiments, packDecor: !!packActif()?.decor, charRows: packActif()?.charRows || null, charVariants: packActif()?.charVariants || null });
   etape('vue');
   const game = new Game({ view, ui, input, sound, world });
   // sauvegarde en ligne (compte du Hub) : chaque sauvegarde part aussi sur le serveur, regroupée
@@ -141,7 +142,7 @@ async function boot() {
   addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') bye(); });
   addEventListener('pagehide', bye);
   cloud.fetch();
-  window.__ody = { game, world, view, ui, sound, cloud, mon: (sp, lvl) => createMon(sp, lvl), playIntroVideo: () => playIntroVideo(ui, input, sound), testIntro: () => intro(game, ui, sound) };
+  window.__ody = { game, world, view, ui, sound, cloud, mon: (sp, lvl) => createMon(sp, lvl), playIntroVideo: () => playIntroVideo(ui, input, sound), testIntro: () => intro(game, ui, sound), testGfxPicker: () => gfxPickerScreen(ui, { allowCancel: true }) };
 
   // rendu en basse résolution, agrandi sans lissage : chaque « pixel » du jeu fait --px pixels d'écran
   const resize = () => {
@@ -179,6 +180,23 @@ async function boot() {
   // outil de test : démarrer directement une partie depuis la console
   window.__ody.play = async (state) => { document.querySelector('.title-scr')?.remove(); input.handlers.length = 0; ui.closeDialog(); mode = 'game'; await game.start(state); };
 
+  // reprise automatique juste après un rechargement déclenché par le choix des graphismes
+  let autoAction = null;
+  try { autoAction = sessionStorage.getItem('odyssee-auto-action'); sessionStorage.removeItem('odyssee-auto-action'); } catch (e) {}
+  if (autoAction === 'newgame') {
+    await playIntroVideo(ui, input, sound);
+    const state = await intro(game, ui, sound);
+    await ui.fade(true, 300);
+    mode = 'game';
+    await game.start(state);
+    return;
+  }
+  if (autoAction === 'continue' && Game.hasSave()) {
+    const state = game.load();
+    mode = 'game';
+    await game.start(state);
+    return;
+  }
 
   /* ---------------- écran titre ---------------- */
   for (;;) {
@@ -187,7 +205,8 @@ async function boot() {
     uiRoot.appendChild(title);
     const stopSea = titleSea(title.querySelector('canvas'), art.title);
     // au clavier, à la manette, ou d'un simple toucher (ou clic) sur l'écran titre
-    await new Promise((res) => { let fini = false; const go = () => { if (fini) return; fini = true; pop(); removeEventListener('pointerdown', go); sound.init(); sound.sfx('select'); res(); }; const pop = input.push((k) => { if (k === 'a') go(); }); addEventListener('pointerdown', go); });
+    await new Promise((res) => { let fini = false; const go = () => { if (fini) return; if (mode === 'game') { fini = true; pop(); removeEventListener('pointerdown', go); return; }   // partie lancée par l'outil de test : l'écran titre ne revient pas
+      fini = true; pop(); removeEventListener('pointerdown', go); sound.init(); sound.sfx('select'); res(); }; const pop = input.push((k) => { if (k === 'a') go(); }); addEventListener('pointerdown', go); });
     title.querySelector('.press').remove();
     // la sauvegarde en ligne a quelques secondes pour répondre (le serveur peut être en train de se réveiller)
     if (cloud.on && cloud.remote === undefined) await Promise.race([cloud.fetch(), wait(2500)]);
@@ -224,15 +243,36 @@ async function boot() {
     }
     if (pick === 'Nouvelle partie' && has && !(await ui.yesNo(remote ? 'Une partie existe déjà (sur cet appareil ou en ligne). La nouvelle la remplacera à la première sauvegarde. Continuer ?' : 'Une sauvegarde existe déjà. Commencer une nouvelle partie l\'effacera. Continuer ?'))) { stopSea(); title.remove(); continue; }
     stopSea(); title.remove();
+    const pickGfx = async (autoAct) => {
+      const picked = await gfxPickerScreen(ui, { allowCancel: true });
+      if (!picked) return 'cancel';
+      choisirSol(picked.sol); choisirSprites(picked.sprites); marquerGfxChoisi();
+      if (picked.sol !== bootSol) {
+        try { sessionStorage.setItem('odyssee-auto-action', autoAct); } catch (e) {}
+        await ui.fade(true, 250);
+        location.reload();
+        return 'reloading';
+      }
+      return 'ok';
+    };
     let state;
     if (pick === 'Continuer') {
       // la partie la plus avancée l'emporte : celle de cet appareil, ou celle du compte en ligne
       let useRemote = newer && !info;
       if (newer && info) useRemote = await ui.yesNo(`Ta partie en ligne est plus récente (${saveSummary(remote)}). La reprendre ?`);
       if (useRemote) { try { localStorage.setItem(Game.SAVE_KEY, JSON.stringify(remote)); } catch (e) {} }
+      if (!aChoisiGfx()) {
+        const g = await pickGfx('continue');
+        if (g === 'reloading') return;
+        if (g === 'cancel') continue;
+      }
       state = useRemote ? game.load(remote) : game.load();
+    } else {
+      const g = await pickGfx('newgame');
+      if (g === 'reloading') return;
+      if (g === 'cancel') continue;
+      await playIntroVideo(ui, input, sound); state = await intro(game, ui, sound);
     }
-    else { await playIntroVideo(ui, input, sound); state = await intro(game, ui, sound); }
     await ui.fade(true, 300);
     mode = 'game';
     await game.start(state);
@@ -323,13 +363,14 @@ async function playIntroVideo(ui, input, sound) {
   const s = el('div', 'screen cine-scr', '<video class="cine-vid" src="img/intro.mp4" playsinline preload="auto"></video><button type="button" class="cine-skip">Passer la cinématique (Entrée / Échap)</button>');
   uiRoot.appendChild(s);
   const vid = s.querySelector('.cine-vid'), skipBtn = s.querySelector('.cine-skip');
-  vid.volume = Math.max(0, Math.min(1, sound.vol ?? 0.7));
-  await ui.fade(false, 300);
+  vid.muted = !!sound.muted || (sound.vol ?? 0.7) <= 0;
+  vid.volume = vid.muted ? 0 : Math.max(0, Math.min(1, sound.vol ?? 0.7));
   await new Promise((res) => {
-    let done = false;
+    let done = false, loadTimer = null;
     const finish = () => {
       if (done) return;
       done = true;
+      clearTimeout(loadTimer);
       pop();
       try { vid.pause(); } catch (e) {}
       res();
@@ -338,8 +379,12 @@ async function playIntroVideo(ui, input, sound) {
       if (k === 'a' || k === 'b' || k === 'menu') { sound.sfx('select'); finish(); }
     });
     skipBtn.addEventListener('click', (e) => { e.stopPropagation(); sound.sfx('select'); finish(); });
+    vid.addEventListener('playing', () => clearTimeout(loadTimer), { once: true });
     vid.addEventListener('ended', finish, { once: true });
     vid.addEventListener('error', finish, { once: true });
+    // Filet de sécurité si la vidéo ne démarre jamais (réseau ou codec indisponible)
+    loadTimer = setTimeout(finish, 8000);
+    ui.fade(false, 300);
     const p = vid.play();
     if (p && typeof p.catch === 'function') {
       p.catch(() => {
@@ -493,7 +538,8 @@ async function intro(game, ui, sound) {
   prof.classList.add('in');
   await ui.say([
     'Bonjour ! Bienvenue dans la région d\'Odyssée !',
-    'Je m\'appelle Saule. Depuis mon laboratoire de Bourg-Aube, j\'étudie les liens qui unissent les humains et les créatures de cet archipel.'
+    'Je m\'appelle Saule. Depuis mon laboratoire de Bourg-Aube, j\'étudie les liens qui unissent les humains et les créatures de cet archipel.',
+    'Au fait, information officielle inscrite dans les archives du laboratoire : Gabriel est gay !'
   ], { speaker: 'Prof. Saule' });
 
   chap.textContent = 'LES CRÉATURES D\'ODYSSÉE';

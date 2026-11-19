@@ -47,6 +47,39 @@ for (let k = 0; k < 600; k++) {
 }
 console.log('fins de combat', ends, 'tours moyens', (turns / 600).toFixed(1));
 
+// combats Duo (2v2) et Trio (3v3) : objets Choix, emplacements qui se vident, sauvages et dresseurs ; jamais d'exception, toujours une fin
+for (let k = 0; k < 400; k++) {
+  const R = rng(k * 7 + 3), slots = 2 + (k % 2), wild = k % 5 === 0;
+  const ids = Object.keys(SPECIES).map(Number), pick = () => ids[Math.floor(R() * ids.length)];
+  const mk = (n) => Array.from({ length: n }, () => { const m = createMon(pick(), 20 + Math.floor(R() * 50), { rng: R }); m.item = ['choice-band', 'choice-scarf', 'leftovers', 'life-orb', null][Math.floor(R() * 5)]; return m; });
+  const party = mk(slots + Math.floor(R() * 3)), foeParty = mk(slots + Math.floor(R() * 3));
+  const b = new Battle({ rng: R, slots, player: { name: 'Test', party, bag: { potion: 3, 'poke-ball': 3 }, mega: true }, foe: { name: 'X', party: foeParty, trainer: wild ? null : { cls: 'Champion', name: 'Léo', prize: 16, leader: 1, ai: ['smart', 'normal', 'strat'][k % 3], items: { potion: 1 } } } });
+  b.start();
+  let n = 0;
+  try {
+    while (b.state !== 'over' && n++ < 500) {
+      if (b.state === 'switch') {
+        const used = new Set(b.sides[0].activeSlots);
+        b.playerSwitch(b.needPlayerSlots.map((sl) => { const i = party.findIndex((m, j) => m.hp > 0 && !used.has(j)); used.add(i); return { slot: sl, idx: i }; }));
+        continue;
+      }
+      const acts = b.aliveSlots(0).map((sl) => {
+        const r = R(), ref = { side: 0, slot: sl };
+        if (r < 0.06) { const j = party.findIndex((m, jj) => m.hp > 0 && !b.sides[0].activeSlots.includes(jj)); if (j >= 0) return { slot: sl, type: 'switch', idx: j }; }
+        if (wild && r < 0.1) return { slot: sl, type: 'item', item: 'poke-ball' };
+        const u = b.usableMoves(ref), lock = b.choiceLock(ref);
+        const idx = lock != null ? b.act(ref).moves.findIndex((q) => q.id === lock) : u.length ? u[Math.floor(R() * u.length)] : 0;
+        const foes = b.aliveSlots(1);
+        return { slot: sl, type: 'move', idx, targetSide: 1, targetSlot: foes[Math.floor(R() * foes.length)], mega: R() < 0.2 };
+      });
+      for (const e of b.playerAction(acts)) if (e.t === 'msg') ok(!/undefined|NaN/.test(e.text), 'texte : ' + e.text);
+    }
+  } catch (e) { fails++; console.log('EXCEPTION combat', slots + 'v' + slots, k, e.stack); }
+  ok(b.state === 'over', `combat ${slots}v${slots} ${k} terminé`);
+  for (const m of party.concat(foeParty)) ok(m.hp >= 0 && m.hp <= m.stats[0] && Number.isFinite(m.hp), 'PV valides');
+}
+console.log('400 combats Duo / Trio : OK');
+
 // ---------------- la région : tout est atteignable depuis Bourg-Aube ----------------
 const { buildWorld } = await import('../odyssee/js/world/region.js');
 const { T, walkable } = await import('../odyssee/js/world/tiles.js');

@@ -165,18 +165,44 @@ await screenPromise;
 assert.equal(mockGame.ui.input.handlers.length, 0, 'Escape cleanly resolves and pops friendsScreen');
 console.log('✓ friendsScreen lifecycle & controls tests passed');
 
-// 4. Test startMenu inclusion in game.js
+// 4. Test startMenu inclusion in game.js (CWD-independent)
 console.log('--- Testing startMenu option in game.js ---');
-const gameSrc = fs.readFileSync('odyssee/js/game.js', 'utf8');
+const gameSrc = fs.readFileSync(new URL('../odyssee/js/game.js', import.meta.url), 'utf8');
 assert.ok(gameSrc.includes("'friends']") && gameSrc.includes('en ligne'), 'game.js startMenu includes the Amis option (with the number of other players online)');
 assert.ok(gameSrc.includes("else if (k === 'friends') await friendsScreen(this);"), 'game.js handles friends menu action');
 
 // 5. Test HUD online pill in hud.js
 console.log('--- Testing HUD integration in hud.js ---');
-const hudSrc = fs.readFileSync('odyssee/js/ui/hud.js', 'utf8');
+const hudSrc = fs.readFileSync(new URL('../odyssee/js/ui/hud.js', import.meta.url), 'utf8');
 assert.ok(hudSrc.includes("hud-online-badge"), 'hud.js includes hud-online-badge in location row');
 assert.ok(hudSrc.includes("hud-friends-btn"), 'hud.js includes hud-friends-btn in actions');
 assert.ok(hudSrc.includes("else if (act === 'friends')"), 'hud.js handles friends action click');
+
+// 6. Test hub_fkey JSON compatibility & joinRoom via HubBridge
+console.log('--- Testing hub_fkey JSON compat, keyboard nav & joinRoom ---');
+{
+  localStorage.clear();
+  localStorage.setItem('hub_fkey', JSON.stringify('abcdef0123456789'));
+  const m2 = new FriendsManager(mockGame);
+  assert.equal(m2.getMyCode(), deriveFid('abcdef0123456789'), 'FriendsManager parses JSON-encoded hub_fkey cleanly');
+
+  let joinedRoom = null;
+  globalThis.window.HubBridge = { embedded: true, join: (c) => { joinedRoom = c; } };
+  mgr.joinRoom('ab-12');
+  assert.equal(joinedRoom, 'AB12', 'joinRoom delegates via HubBridge.join when embedded');
+  delete globalThis.window.HubBridge;
+
+  // Test up/down navigation in friendsScreen doesn't crash or close
+  const p2 = friendsScreen(mockGame);
+  const h2 = mockGame.ui.input.handlers[0];
+  h2('down');
+  h2('up');
+  h2('a');
+  assert.equal(mockGame.ui.input.handlers.length, 1, 'up/down/a stay inside friendsScreen');
+  h2('b');
+  await p2;
+  assert.equal(mockGame.ui.input.handlers.length, 0, 'Escape cleanly closes friendsScreen after up/down/a');
+}
 
 // 6. Test Input shortcut in input.js
 console.log('--- Testing Input mapping in input.js ---');

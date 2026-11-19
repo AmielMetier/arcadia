@@ -1,5 +1,129 @@
 # Journal des versions — Arcadia
 
+## 5.124 — 19 novembre 2026
+- **Odyssée** — Graphismes Noir & Blanc :
+  - la Boutique passe aussi en vrai style Noir 2 & Blanc 2 : carrelage gris à losanges, comptoir bleu à façade argentée avec sa caisse enregistreuse, présentoirs blancs garnis ;
+  - au Dojo de Mamadou, on ne peut plus marcher à travers l'appareil de soin ;
+  - le sol du coin salon des Centres Pokémon ne risque plus de scintiller contre l'ombre des murs ;
+  - crédits complétés (planches d'UltimoSpriter et de ditto209).
+
+## 5.123 — 19 novembre 2026
+- Correction : restauration sprites authentiques Gen 5 + interieur Centre Pokemon 5G (Amiel)
+
+## 5.122 — 19 novembre 2026
+- Correction : corrections d'audit (icones objets/HUD, audio/cinematiques, sauvegardes, habitants, tests) (Amiel)
+- Correction : corrections critiques (PNJ nb_sportif/nb_linebacker, batiments troues/coupes, decors healer/vase/caisses/squelette) (Amiel)
+- Correction : corrections haute priorite (desert, monuments 2x2, lumieres nocturnes, emprises/tours, tenue sac, persos) (Amiel)
+- Nouveau : interieurs, comptoirs, mobilier Gen 5 et neige boutiques (#10-#11) (Amiel)
+
+## 5.121 — 18 novembre 2026
+- Nouveau : sprite sur mesure de Maitre Mamadou et mascotte bouc noir en veste en cuir du Dojo (Amiel)
+
+## 5.120 — 18 novembre 2026
+- **Odyssée** — L'éveil de Lugia Obscur devient une vraie cinématique de jeu, en sept plans et format cinéma (on peut toujours la passer) :
+  - la mer déchaînée sous l'éclipse, la pluie, la foudre, le Sanctuaire des Marées sur son rocher ;
+  - le Prisme Noir qui se fissure au rythme d'un cœur qui s'emballe, puis vole en éclats au ralenti, et l'onde de choc qui court sur la mer ;
+  - la mer qui tourbillonne, une colonne d'eau noire qui jaillit, une silhouette qui s'y élève… et un œil rouge qui s'allume ;
+  - la colonne qui éclate, Lugia Obscur qui se révèle et pousse son cri sous une tornade d'ombre ;
+  - l'Aéroblast chargé face à toi et tiré droit sur l'écran, puis Lugia devant l'éclipse avec son titre ;
+  - une bande-son écrite pour la scène : orage, tonnerre à chaque éclair, battements de cœur, verre brisé, chœur, tambours, cuivres et grand accord final.
+
+## 5.119 — 18 novembre 2026
+- **Odyssée** — Cinématiques des légendaires et des boss retravaillées :
+  - le légendaire s'élève d'abord en silhouette noire, puis se révèle en couleur dans un éclair blanc ;
+  - les auras, les éclairs, les rubans d'énergie et le sceau rayonnent d'une vraie lueur, qui s'emballe au bris du sceau et à l'apogée ;
+  - la caméra glisse sans à-coup d'un plan à l'autre et se resserre sur l'adversaire juste avant le combat ;
+  - chaque éclair illumine toute la scène, et le Pokémon ou le dresseur reste net au milieu de son aura.
+- **Odyssée** — Poker multijoueur : la table ne se fige plus quand l'hôte la ferme ou qu'un joueur n'a plus de jetons. Sans jetons, on reste à table pour regarder la main et on peut partir à la fin de chaque main.
+- **Odyssée** — Graphismes Noir & Blanc : un personnage qui se tient juste à côté d'un bâtiment n'est plus à moitié caché par le bord du toit.
+
+## 5.118 — 18 novembre 2026
+- **Odyssée** — Combats Duo (2v2) et Trio (3v3) plus solides :
+  - un combat ne s'interrompt plus (« Le combat a été interrompu ») quand un Pokémon est mis K.O. alors que son dresseur n'a plus de remplaçant ;
+  - Vampigraine ne fait plus planter le combat quand celui qui l'a lancée a quitté le terrain ;
+  - les combats en double contre des Pokémon sauvages tournent sans erreur ;
+  - au Club Tactique, le dresseur adverse apparaît bien en début de combat.
+- **Odyssée** — Graphismes Noir & Blanc : derrière l'Arène des Dunes d'Ocre et celle de Cendrelune, le sol redevient du sable et de la cendre (au lieu d'un carré d'herbe verte).
+- **Poké Duel** — **Lutte** fait son apparition : un Pokémon qui n'a plus aucun PP (ou bloqué par un objet Choix sur une attaque vide) lutte (50 de puissance, sans type, contrecoup d'un quart de ses PV). Un bouton « Lutte » s'affiche quand plus rien d'autre n'est possible, et les combats en double ne peuvent plus tourner sans fin.
+
+## 5.117 — 18 novembre 2026
+- **Odyssée** — Graphismes Noir & Blanc revus de fond en comble : 20 nouveaux bâtiments dans le style Noir 2 & Blanc 2 (toutes les villes sont maintenant en 2D), pavés sous les gratte-ciel de Métropole et Voltacité, rochers du désert ensablés, sapins enneigés sur la côte de Givrebourg, arbres posés proprement sur l'herbe, hautes herbes givrées, tenues du garçon et de la fille corrigées.
+
+## 5.116 — 18 novembre 2026
+- **Odyssée** — Déploiement général des **cinématiques d’introduction en 3D temps réel** et des **musiques épiques dédiées** pour chaque Pokémon légendaire et boss majeur du jeu :
+  - **Cinématiques 3D thématiques** : chaque légendaire (Groudon, Kyogre, Rayquaza, Arceus, Ho-Oh, Odyssor, les Oiseaux et Bêtes légendaires, le trio des Lacs, Dialga, Palkia, Giratina, Darkrai, les Régis et les gardiens d’après-Ligue) ainsi que chaque grand adversaire (les 15 Champions d’Arène, le Conseil 4, Maître Célestine, les chefs et admins des Teams Éclipse et Brume, les combats décisifs face aux Rivaux, les boss des Raids Co-op, la Finale du Dojo de Mamadou et le sommet de la Tour de Combat) disposent désormais d’un sanctuaire, d’un sceau fracturable et d’effets élémentaires 3D propres à leur thème (volcan, glace, foudre, cosmos, abysse, forêt, torii dojo, faille de raid, Ligue Céleste).
+  - **Bandes-son sur mesure pendant l’animation et le combat** : musiques synthétisées dynamiques synchronisées à chaque cinématique, suivies de six nouveaux thèmes de combat exclusifs (Conseil 4, Légendaires cosmiques, Légendaires élémentaires, Abysses et Odyssor, Raids Co-op et Finale du Dojo de Mamadou) et de la correction du thème musical de la Team Éclipse et de son chef Nocturne en combat.
+
+## 5.115 — 18 novembre 2026
+- **Odyssée** — Cadrage affiné de la cinématique 3D de **Lugia Obscur** : la caméra reste à l’intérieur du cercle des piliers du Sanctuaire dès les premières images et le bouton Passer reste dégagé du sous-titre sur les écrans compacts.
+
+## 5.114 — 18 novembre 2026
+- **Odyssée** — Cinématique d’éveil de **Lugia Obscur** entièrement recréée en **3D temps réel** :
+  - Scène 3D interactive du Sanctuaire des Marées (océan agité animé par vagues sous l’éclipse, autel octogonal et huit piliers runiques illuminés, éclairs et nuées de particules tourbillonnantes).
+  - Animation du **Prisme Noir** qui se fissure puis explose en éclats cristallins, suivie de l’envol et du plongeon de Lugia Obscur entouré d’ailes et de rubans d’énergie obscure en 3D, sans chargement vidéo externe.
+
+## 5.113 — 18 novembre 2026
+- **Odyssée & Hub** — Correctifs multijoueur, HUD et cinématiques suite à un audit complet :
+  - **Multijoueur & Amis** : rejoindre le salon d'un ami depuis le jeu ramène désormais directement dans son salon Arcadia sans perdre l'identité de compte ami ; la navigation au clavier (`↑` / `↓` puis `Entrée` / `Espace`) fonctionne sur toutes les actions du menu Amis, les statuts de duel et de tenue s'actualisent sans délai, et quitter ou interrompre un combat en mode Spectateur rend toujours les commandes normalement.
+  - **HUD** : mise à jour immédiate de l'objet rapide `[Y]` (avec prise en charge directe du Vélo par défaut et disparition dès épuisement), du niveau maximal affiché et des objectifs de quêtes suivies ; masquage propre des étiquettes des joueurs pendant les transitions d'écran.
+  - **Cinématiques & dialogues** : les cinématiques respectent le mode muet et le volume choisi ; si une vidéo est bloquée ou indisponible, la scène d'éveil animée de Lugia Obscur continue sans se couper prématurément et ne bloque plus l'état du jeu ni aucun effet visuel après avoir été passée ; sur mobile, les boutons tactiles ne recouvrent plus la cinématique d'ouverture.
+
+## 5.112 — 18 novembre 2026
+- **Odyssée** — Correctifs de fiabilité multijoueur suite à audit :
+  - Correction du rôle d'hôte en **Tournoi en direct** lorsque l'organisateur joue côté droit d'un duel contre un autre joueur humain, et ouverture instantanée du **Mode Spectateur** même si la demande arrive pendant l'introduction du combat.
+  - Gestion propre des départs en **Poker Texas Hold'em multijoueur** (sortie immédiate d'un joueur qui abandonne et mise à jour de la table pour les mains suivantes).
+  - Contrôle de propriété du remplaçant adverse en **Multi 2v2 à 4 joueurs** et messages d'abandon adaptés à chaque mode.
+
+## 5.111 — 18 novembre 2026
+- **Odyssée** — Finition et présentation enrichie du multijoueur :
+  - **Nouvel onglet Salon Multi** dans l'écran Amis & Connexion (accolé aux actions directes **Combat**, **Raid Co-op**, **Échange**, **Domaine** et **Observer** sur chaque dresseur en ligne) pour lancer en un clic Raids Co-op, Multi 2v2 à 4 joueurs, Tournoi, Dojo de Mamadou, Poker Multijoueur ou visite de Domaine.
+  - **Menus unifiés et lisibles** auprès des joueurs sur la carte, de Maître Mamadou et du Club Tactique, avec indication du type et du statut Pokédex des Boss de Raid.
+  - **Visuels enrichis en combat et en tournoi** : aura et segments visuels pour le Bouclier Mystique des Boss de Raid, bannières de format dédiées, arbre de tournoi éliminatoire en deux colonnes avec portraits des participants, distinction humain/IA au Poker Hold'em et présence des Pokémon résidents avec sortie rapide chez le Gardien du Domaine.
+
+## 5.110 — 18 novembre 2026
+- **Odyssée** — Cinq nouvelles activités multijoueurs dans la région et au Dojo :
+  - **Raids de Boss Co-op** (exclusivement à 2 ou 3 joueurs) face à un Boss géant doté d'un Bouclier Mystique et de 2 actions par tour, avec Points du Dojo, Super Bonbons et possibilité de capturer le Boss après la victoire.
+  - **Combat Multi 2v2 à 4 joueurs** : deux équipes de deux dresseurs humains s'affrontent en direct (1 Pokémon actif et 1 remplaçant chacun).
+  - **Tournoi en direct à 4 places** au Dojo et au Club Tactique : tableau éliminatoire complété au besoin par les Champions de la région, suivi des matchs en cours en mode Spectateur et récompenses pour le vainqueur et le finaliste.
+  - **Tables de Poker Texas Hold'em multijoueurs** au Casino de Métropole (2 à 4 joueurs humains autour du tapis, avec place tournante et jetons de courtoisie).
+  - **Visite du Domaine des amis & Dresseur Gardien** : visite le Domaine bâti d'un ami connecté, récupère son panier d'accueil (Baies Sitrus et matériaux) et défie son équipe Gardienne en Duel ou en Duo.
+
+## 5.109 — 18 novembre 2026
+- **Odyssée & Poké Duel** — Intelligence artificielle de combat nettement renforcée en Solo (1v1), Duo (2v2) et Trio (3v3) : les dresseurs et bots envoient désormais le meilleur remplaçant disponible après un K.O. (selon les résistances de types, talents et contre-attaques), savent rappeler un Pokémon bloqué sur une immunité ou totalement contré, réagissent aux menaces de K.O. rapide avec leurs attaques prioritaires ou `Abri`, exploitent les capacités multi-coups et à dégâts fixes avec précision, évitent les altérations d'état et baisses de stats inutiles face aux talents ou écrans protecteurs, et coordonnent leurs cibles ainsi que leur contrôle de vitesse en combats à plusieurs.
+
+## 5.108 — 18 novembre 2026
+- **Odyssée** — Nouveau donjon multijoueur : le **Dojo de Mamadou** ouvre ses portes à Port-Granit (accessible dès le 6e Badge), avec un bâtiment inédit dessiné dans les deux styles graphiques (**Odyssée** en 3D et **Noir & Blanc**), un repère sur la boussole locale et son grand hall intérieur complet. Les défis se disputent **exclusivement en coopération multijoueur** : **Duo Co-op (2v2)** à 2 joueurs humains contre 2 stratèges, ou **Trio Co-op (3v3)** à 3 joueurs humains contre 3 stratèges (1 Pokémon actif sur le terrain par joueur + 1 remplaçant). Séries de 5 paliers contre des équipes coordonnées et tactiques (jusqu'au combat final contre Maître Mamadou), avec gain de Points du Dojo (PDj) et une boutique dédiée proposant objets compétitifs tenus, Méga-Gemmes et Master Ball.
+
+## 5.107 — 18 novembre 2026
+- **Odyssée** — Combats Duo (2v2) et Trio (3v3) complets (stratégies d'équipe, capacités de zone, portée des attaques en Trio, sélection de cible avec efficacité affichée et bouton Retour pour corriger son choix), jouables dès les Centres Pokémon auprès du Coach Tactique, dans les arènes et la Route Victoire, à la Tour de Combat et en PvP entre joueurs. Animations de combat enrichies sur tous les formats (animations d'attente, charges avec images rémanentes, effets spéciaux sur-mesure pour les attaques signatures et les 18 types, et particules météo).
+
+## 5.106 — 18 novembre 2026
+- **Odyssée** — Choix du style de graphismes dès le lancement d'une nouvelle aventure (Odyssée d'origine ou Noir & Blanc, ainsi que les sprites Pokémon), modifiable plus tard à tout moment dans les Options avec application immédiate en jeu, et un clin d'œil dans l'introduction du Professeur Saule.
+
+## 5.105 — 18 novembre 2026
+- Odyssée : finition chef-d'oeuvre Noir & Blanc (biomes, rivages, mobilier, monuments Gen 5) (Amiel)
+
+## 5.104 — 18 novembre 2026
+- Odyssée : finition Noir & Blanc fin de jeu (asphalte BW2, décors désert/sanctuaires/mines, correctifs sable/lave/socles d'arbres) (Amiel)
+
+## 5.103 — 17 novembre 2026
+- Odyssée : boussole/repères sur toute la carte et correctifs Noir & Blanc multi-biomes (Amiel)
+
+## 5.102 — 17 novembre 2026
+- Nouveau : boussole de ville et plan local cliquable pour trouver arènes et lieux clés (Amiel)
+
+## 5.101 — 17 novembre 2026
+- Nouveau : variété maisons et PNJ Noir & Blanc + derniers correctifs d'ancrage (Amiel)
+
+## 5.100 — 17 novembre 2026
+- Correction : ancrage au sol des personnages, objets et batiments Noir & Blanc (Amiel)
+
+## 5.99 — 17 novembre 2026
+- Correction : crash chunks Noir & Blanc, projection orthographique et fondu tramé des bâtiments (Amiel)
+
+## 5.98 — 17 novembre 2026
+- Correction : graphismes Noir & Blanc 2 complets et urbanisme des villes corrigé (Amiel)
+
 ## 5.97 — 17 novembre 2026
 - **The Backrooms** — Des poissons dans les bassins des Poolrooms.
   - Ils sautent hors de l'eau de temps en temps : on les voit, on les entend retomber.

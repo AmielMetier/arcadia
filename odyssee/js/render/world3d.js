@@ -124,14 +124,39 @@ const DECALS = new Set(['fleche', 'vent', 'courant', 'dalle', 'tp', 'socle', 'po
 const AVANCE_PERSO = 0.38;
 const WIDE_DECO = new Set(['healer', 'sofa', 'bench', 'startertable', 'fireplace', 'rug']);
 /** décor du dehors posé avec une ombre au sol (leur ombre violette, dessinée dans le sprite, a été retirée) */
-const OMBRE_DECO = new Set(['banc', 'parasol', 'tonneau', 'caisse', 'panneau_bois', 'borne', 'lanterne', 'stele']);
+const OMBRE_DECO = new Set(['banc', 'parasol', 'tonneau', 'caisse', 'caisses', 'panneau_bois', 'borne', 'lanterne', 'stele', 'palm', 'cactus', 'cactus2', 'cerisier', 'erable', 'arbre_automne', 'deadtree', 'gargouille', 'rocher_grand', 'statue_dragon', 'colonne']);
 /** avance : le sprite est rangé comme s'il se tenait `avance` case plus au sud (personnages : leurs pieds passent devant
  *  le perron, les marches et le socle du bâtiment qui dépassent sur leur case, sans changer l'ordre entre personnages) */
-function screenSprite(mat, avance = 0) {
+/** dessin d'un bâtiment du pack en trois bandes verticales (débord gauche, emprise, débord droit), une seule image :
+ *  mêmes sommets à l'écran, seule la profondeur des débords change (attribut aAvance). x0 : bord gauche du dessin (monde),
+ *  e0 / e1 : bords de l'emprise, recul : décalage de profondeur des débords (vers le nord, négatif) */
+function bandesPack(W, H, largeurPx, x0, e0, e1, recul) {
+  const cols = [0, 1];
+  for (const e of [e0, e1]) { const u = Math.round(((e - x0) / W) * largeurPx) / largeurPx; if (u > 0.002 && u < 0.998) cols.push(u); }
+  cols.sort((a, b) => a - b);
+  const pos = [], uv = [], av = [], idx = [];
+  for (let k = 0; k + 1 < cols.length; k++) {
+    const u0 = cols[k], u1 = cols[k + 1], milieu = x0 + ((u0 + u1) / 2) * W, dedans = milieu > e0 && milieu < e1;
+    const xa = (u0 - 0.5) * W, xb = (u1 - 0.5) * W, n = pos.length / 3;
+    pos.push(xa, H, 0, xb, H, 0, xa, 0, 0, xb, 0, 0);
+    uv.push(u0, 1, u1, 1, u0, 0, u1, 0);
+    for (let q = 0; q < 4; q++) av.push(dedans ? 0 : recul);
+    idx.push(n, n + 2, n + 1, n + 2, n + 3, n + 1);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('aAvance', new THREE.Float32BufferAttribute(av, 1));
+  g.setAttribute('anchor', new THREE.Float32BufferAttribute(new Array(pos.length).fill(0), 3));
+  g.setIndex(idx);
+  return g;
+}
+function screenSprite(mat, avance = 0, avecTrame = false, avanceParSommet = false) {
   mat.onBeforeCompile = (sh) => {
+    if (avecTrame) trame(mat, sh);
     sh.uniforms.uRes = SPRITE_UNIFORMS.uRes; sh.uniforms.uEch = SPRITE_UNIFORMS.uEch;
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec3 anchor;\nuniform vec2 uRes;\nuniform float uEch;')
+      .replace('#include <common>', '#include <common>\nattribute vec3 anchor;\nuniform vec2 uRes;\nuniform float uEch;' + (avanceParSommet ? '\nattribute float aAvance;' : ''))
       .replace('#include <project_vertex>', `
         vec4 sW = modelMatrix * vec4( transformed, 1.0 );
         vec4 sA = modelMatrix * vec4( anchor, 1.0 );
@@ -145,9 +170,10 @@ function screenSprite(mat, avance = 0) {
         // Le décalage rapproche le sprite de la caméra : s'il l'éloignait, le sol passerait devant le bas du dessin (les pieds)
         float sBias = - ( 64.0 - mod( sA.x, 64.0 ) ) * 2.0e-6;
         ${avance ? `vec4 sAv = projectionMatrix * viewMatrix * ( sW + vec4( 0.0, 0.0, ${avance.toFixed(3)}, 0.0 ) ); sPC.z = sAv.z / sAv.w * sPC.w;` : ''}
+        ${avanceParSommet ? 'vec4 sAvS = projectionMatrix * viewMatrix * ( sW + vec4( 0.0, 0.0, aAvance, 0.0 ) ); sPC.z = sAvS.z / sAvS.w * sPC.w;' : ''}
         gl_Position = vec4( ( sPx / uRes * 2.0 - 1.0 ) * sPC.w, sPC.z + sBias * sPC.w, sPC.w );`);
   };
-  mat.customProgramCacheKey = () => 'screenSprite' + avance;
+  mat.customProgramCacheKey = () => 'screenSprite' + avance + (avecTrame ? 'T' : '') + (avanceParSommet ? 'V' : '');
   return mat;
 }
 /**
@@ -514,6 +540,7 @@ function kitStyle(b, map) {
   if (/Tour de la Grue/.test(name)) return 'pagode';
   if (/Centrale/.test(name)) return 'lab';
   if (/Temple/.test(name)) return 'pagode';
+  if (/Dojo/.test(name)) return 'dojo';
   if (/Brume/.test(name)) return 'base';
   if (/Phare|Capitainerie/.test(name)) return /Phare/.test(name) ? 'phare' : 'port';
   const z = map.outdoor ? map.zoneAt(b.x, b.y) : null;
@@ -526,6 +553,10 @@ export class WorldView {
   constructor(renderer, charsImg, art = {}) {
     this.renderer = renderer;
     this.batPack = art.batiments || null;   // pack de graphismes : bâtiments dessinés d'un seul tenant (gfx.js)
+    const baseCharRows = charsImg ? Math.round(charsImg.height / CHH) : 0;
+    this.packCharRows = {};
+    if (art.charRows) for (const [k, r] of Object.entries(art.charRows)) if (r < baseCharRows) this.packCharRows[k] = r;
+    this.packCharVariants = art.charVariants ? Object.fromEntries(Object.entries(art.charVariants).map(([k, L]) => [k, L.filter((n) => n in this.packCharRows || n in CHAR_ROWS)]).filter(([, L]) => L.length > 1)) : null;
     // Pokémon qui suivent le dresseur (img/suiveurs.png) : leurs lignes s'ajoutent sous celles des personnages
     if (charsImg && art.suiveurs && SPRITES.suiveurs) {
       const c = document.createElement('canvas'); c.width = charsImg.width; c.height = charsImg.height + art.suiveurs.height;
@@ -591,7 +622,8 @@ export class WorldView {
     // relief3d.js) ; ?relief=plat garde le relief peint à plat
     this.r3dHGSS = reliefHGSSActif() && !relief3dActif();
     this.r3dOn = (relief3dActif() || this.r3dHGSS) && this.sol.on; this.r3d = null;
-    this.r3dOrtho = this.r3dOn && !/[?&]r3persp\b/.test(globalThis.location?.search || '');
+    this.orthoPref = !/[?&]r3persp\b/.test(globalThis.location?.search || '');
+    this.r3dOrtho = this.r3dOn && this.orthoPref;
     if (this.r3dOn && !this.r3dHGSS) setRelief3dSol(true);
     if (this.r3dOn && this.r3dHGSS) setReliefHGSSSol(true);
     this.focus = new THREE.Vector3(); this.shake = 0;
@@ -638,7 +670,7 @@ export class WorldView {
     const anciens = typeof location !== 'undefined' && /[?&]anciensmurs/.test(location.search);   // comparaison avant / après
     this.murStyle = sm && !anciens && this.A?.cells?.['murh_' + sm] ? sm : null;
     this.fenetres = new Set();
-    if (this.murStyle && map.w > 6) {
+    if (this.murStyle && map.w > 6 && !(this.murStyle === 'center' && this.A?.cells?.clounge)) {
       // fenêtres sur le haut du mur du fond, là où rien ne s'adosse au mur
       const libres = []; for (let x = 2; x < map.w - 2; x++) if (map.get(x, 1) === T.WALL && map.get(x, 2) === T.FLOOR && !map.deco.some((d) => d.x === x && d.y === 2)) libres.push(x);
       const n = map.w >= 12 ? 3 : 2;
@@ -649,6 +681,25 @@ export class WorldView {
     this.rh = this.tiers && !this.A?.cells?.[`rp_${this.biome}_00`] ? caveHeights(map, this.tiers) : null;
     this.scene.background = new THREE.Color(map.outdoor ? '#1d4f2a' : '#0c0a10');
     if (map.id === 'monde') this.scene.background = new THREE.Color('#1d4f2a');
+    if (this.batPack && map.outdoor) this.adapterEmprisesPack(map.base || map);
+    this._buildOnPave = new Set();
+    if (map.outdoor) {
+      for (const b of map.buildings || []) {
+        const z = map.zoneAt?.(b.x, b.y);
+        let onPave = z?.town === 'metro' || z?.town === 'volta';
+        if (!onPave) {
+          let np = 0, ng = 0;
+          for (let i = -1; i <= b.w; i++) for (const j of [-1, b.d]) if (map.in(b.x + i, b.y + j)) {
+            const q = map.get(b.x + i, b.y + j); if (q === T.PAVE) np++; else if (q === T.GRASS || q === T.TREE) ng++;
+          }
+          for (let j = 0; j < b.d; j++) for (const i of [-1, b.w]) if (map.in(b.x + i, b.y + j)) {
+            const q = map.get(b.x + i, b.y + j); if (q === T.PAVE) np++; else if (q === T.GRASS || q === T.TREE) ng++;
+          }
+          onPave = np > ng;
+        }
+        if (onPave) for (let j = 0; j < b.d; j++) for (let i = 0; i < b.w; i++) this._buildOnPave.add((b.x + i) + ',' + (b.y + j));
+      }
+    }
     this.buildBuildings();
     this.buildSorties();
     this.buildWindowsGroup();
@@ -659,12 +710,27 @@ export class WorldView {
     const m = this.map, t = m.get(x, y), A = this.A.cells, v = hash(x, y);
     const pg = A.pg_0_0;   // pack de graphismes : herbe à motif de 3 × 2 cases, la même partout (sous les arbres aussi)
     const g4 = () => (pg ? `pg_${x % 3}_${y % 2}` : 'grass' + (v < 0.55 ? 0 : v < 0.8 ? 1 : v < 0.93 ? 2 : 3));
-    const zone = m.outdoor ? m.zoneAt(x, y) : null, theme = zone?.theme;
+    const rawZone = m.outdoor ? m.zoneAt(x, y) : null;
+    const desertAt = (ax, ay) => { const z = m.outdoor ? m.zoneAt(ax, ay) : null; return z?.theme === 'desert' || z?.theme === 'canyon' || z?.town === 'dunes'; };
+    const estHerbe = (q) => q === T.GRASS || q === T.TALL || q === T.TREE || q === T.PINE;
+    const groundAt = (ax, ay) => { const q = m.get(ax, ay); return q === T.SIGN || q === T.BLOCK ? m.underAt(ax, ay) ?? (m.outdoor ? T.GRASS : T.FLOOR) : q; };
+    const hasNbr8 = (ax, ay, pred) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && pred(groundAt(ax + dx, ay + dy))) return true; return false; };
+    const hasNbr4 = (ax, ay, pred) => [groundAt(ax + 1, ay), groundAt(ax - 1, ay), groundAt(ax, ay + 1), groundAt(ax, ay - 1)].some(pred);
+    const snowEdge = m.outdoor && !rawZone?.theme && [m.zoneAt(x + 5, y), m.zoneAt(x - 5, y), m.zoneAt(x, y + 5), m.zoneAt(x, y - 5)].some((z) => z?.theme === 'snow') && (t === T.PINE || hasNbr8(x, y, (q) => q === T.SNOW));
+    const theme = rawZone?.theme || (snowEdge ? 'snow' : undefined);
     const grassKey = theme === 'volcanic' ? 'ash' + (v < 0.5 ? 0 : 1) : theme === 'snow' ? 'snow' + (v < 0.5 ? 0 : 1) : g4();
+    const sandFull = A.q_sand_f || A.sand15 || A.sand0;
+    const desertCell = !!(sandFull && m.outdoor && desertAt(x, y) && !hasNbr4(x, y, (q) => q === T.GRASS || q === T.TALL));
+    const sandFlower = (ax, ay) => {
+      if (groundAt(ax, ay) !== T.FLOWER || !sandFull) return false;
+      if (desertAt(ax, ay)) return !hasNbr4(ax, ay, (q) => q === T.GRASS || q === T.TALL);
+      if (hasNbr4(ax, ay, estHerbe)) return false;
+      return hasNbr4(ax, ay, (q) => q === T.SAND) && !hasNbr8(ax, ay, estHerbe);
+    };
     // pack de graphismes : un terrain en cinq tuiles (q_<nom>_<état>) posé par quarts sur l'herbe, selon les huit voisins
     // (coin sortant, bord, coin rentrant, plein) ; eau = planche animée
     const quarts = (nom, same, eau) => {
-      const C = eau ? this.N.cells : A, s = (dx, dy) => same(m.get(x + dx, y + dy)), q = [];
+      const C = eau ? this.N.cells : A, s = (dx, dy) => same(groundAt(x + dx, y + dy), x + dx, y + dy), q = [];
       let pleins = 0;
       for (let qy = 0; qy < 2; qy++) for (let qx = 0; qx < 2; qx++) {
         const dx = qx ? 1 : -1, dy = qy ? 1 : -1, H = s(dx, 0), V = s(0, dy);
@@ -674,20 +740,20 @@ export class WorldView {
         q.push([c[0] + qx * hu, c[1] + qy * hv, c[0] + (qx + 1) * hu, c[1] + (qy + 1) * hv]);
       }
       if (pleins === 4) return eau ? { anim: C[`q_${nom}_f`] } : { c: C[`q_${nom}_f`] };
-      return { c: A[grassKey], q, qEau: eau };
+      const bg = (nom === 'path' || nom === 'pave') && sandFull && !hasNbr8(x, y, estHerbe) && (hasNbr8(x, y, (g) => g === T.SAND) || desertAt(x, y)) ? sandFull : A[grassKey];
+      return { c: bg, q, qEau: eau };
     };
-    const mask = (same) => { let k = 0; if (same(m.get(x, y - 1))) k |= 1; if (same(m.get(x + 1, y))) k |= 2; if (same(m.get(x, y + 1))) k |= 4; if (same(m.get(x - 1, y))) k |= 8; return k; };
+    const mask = (same) => { let k = 0; if (same(groundAt(x, y - 1))) k |= 1; if (same(groundAt(x + 1, y))) k |= 2; if (same(groundAt(x, y + 1))) k |= 4; if (same(groundAt(x - 1, y))) k |= 8; return k; };
     // sur la neige, pas de bordure d'herbe autour des chemins : on prend la case pleine
     const edge = theme === 'snow' ? () => 15 : mask;
-    const groundOf = (tt) => (tt === T.SIGN || tt === T.BLOCK ? m.underAt(x, y) ?? (m.outdoor ? T.GRASS : T.FLOOR) : tt);
-    const tt = groundOf(t);
+    const tt = groundAt(x, y);
     const deco = this.decoAt.get(x + ',' + y);
     if (deco?.k === 'carpet') return { c: A.mat };
     if (deco?.k === 'glace') return { c: A.gl_ice };
     if (deco?.k === 'asph') return { c: A['asph' + (deco.v ? '_' + deco.v : '')] || A.asph };
     if (deco?.k === 'sable') return { c: A.gl_sable };
     if (deco?.k === 'eau') return { anim: this.N.cells.water15 };
-    if (t === T.LAVA) return { anim: this.N.cells.lava };
+    if (t === T.LAVA) return this.N.cells.q_lava_f ? quarts('lava', (q) => q === T.LAVA, true) : { anim: this.N.cells.lava };
     // passerelle de bois au-dessus d'un ravin (montagne) : le vide dessous, planches et cordes dans le sens de la traversée
     if (t === T.BRIDGE && ravin(m, x, y)) {
       // sens de la traversée : vers les sentiers que la passerelle relie (ou le long de la passerelle)
@@ -698,7 +764,14 @@ export class WorldView {
       return { c: A[`ravin_${hash(x, y) < 0.5 ? 0 : 1}`], passerelle: A[`passerelle_${ew ? 'ew' : 'ns'}_${(a ? 1 : 0) | (b ? 2 : 0) | (d ? 4 : 0) | (f ? 8 : 0)}`] };
     }
     if (t === T.BARRIER_R || t === T.BARRIER_B) return { c: A['floor_' + m.floor] || A.floor_wood };
-    const isPathish = (q) => [T.PATH, T.PAVE, T.SAND, T.BUILD, T.DOOR, T.BRIDGE, T.SIGN, T.BLOCK, T.MAT].includes(q);
+    const isPathish = (q) => [T.PATH, T.PAVE, T.SAND, T.BUILD, T.DOOR, T.BRIDGE, T.SIGN, T.BLOCK, T.MAT, T.STAIRS, T.CAVEDOOR].includes(q);
+    const hasPave = (ax, ay) => {
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && groundAt(ax + dx, ay + dy) === T.PAVE && ++n >= 2) return true;
+      return false;
+    };
+    const isPathQ = (q) => [T.PATH, T.PAVE, T.DOOR, T.BRIDGE, T.MAT, T.STAIRS, T.CAVEDOOR].includes(q);
+    const isPaveQ = (q, ax, ay) => q === T.PAVE || q === T.DOOR || q === T.PATH || (q === T.BUILD && (hasPave(ax, ay) || this._buildOnPave?.has(ax + ',' + ay)));
     if (SOL16 && m.outdoor) {
       if (tt === T.PATH || tt === T.PAVE || tt === T.DOOR || tt === T.BUILD || tt === T.SAND) return { c: A[grassKey] };
       if (tt === T.WATER) return { anim: this.N.cells.water15 };
@@ -707,8 +780,9 @@ export class WorldView {
       if (tt === T.TALL && A.hautes_herbes0) return { c: A['hautes_herbes' + (v < 0.5 ? 0 : 1)] };
     }
     switch (tt) {
-      case T.GRASS: case T.FENCE: case T.ROCK: case T.BUSH: case T.CUT: return { c: A[grassKey] };
-      case T.SMASH: case T.BOULDER: return { c: m.outdoor ? A[grassKey] : A['cave' + (v < 0.5 ? 0 : 1)] };
+      case T.GRASS: case T.FENCE: return { c: A[grassKey] };
+      case T.ROCK: case T.BUSH: case T.CUT: return { c: desertCell ? sandFull : A[grassKey] };
+      case T.SMASH: case T.BOULDER: return { c: m.outdoor ? (desertCell ? sandFull : A[grassKey]) : A['cave' + (v < 0.5 ? 0 : 1)] };
       // hautes herbes : un tapis dessiné au sol, comme sur DS (les jambes de qui s'y tient sont cachées par view.cover)
       case T.TALL: case T.DARKTALL: {
         if (A.q_tall0 && theme !== 'snow') return { c: A[grassKey], ov: A[(tt === T.DARKTALL ? 'q_darktall' : 'q_tall') + (v < 0.5 ? 0 : 1)] };
@@ -718,20 +792,50 @@ export class WorldView {
         if (tt === T.DARKTALL) return { c: A['darktall' + (v < 0.5 ? 0 : 1)] };
         return { c: A[(theme === 'snow' && A.snowtall0 ? 'snowtall' : 'tall') + (v < 0.5 ? 0 : 1)] };
       }
-      case T.TREE: case T.PINE: return { c: theme === 'volcanic' ? A.ash1 : theme === 'snow' ? A.snow1 : pg ? A[g4()] : A['forest' + (v < 0.5 ? 0 : 1)] };
-      case T.PATH: if (A.q_path_f && theme !== 'snow') return quarts('path', isPathish);
+      case T.TREE: case T.PINE: return { c: theme === 'volcanic' ? A.ash1 : theme === 'snow' ? A.snow1 : desertCell ? sandFull : pg ? A[g4()] : A['forest' + (v < 0.5 ? 0 : 1)] };
+      case T.PATH: if (A.q_path_f) return quarts('path', isPathQ);
         return { c: A['path' + edge(isPathish)] };
-      case T.PAVE: case T.DOOR: case T.BUILD: if (A.q_pave_f && theme !== 'snow') return quarts('pave', isPathish);
+      case T.PAVE: if (A.q_pave_f) return quarts('pave', (q, ax, ay) => isPaveQ(q, ax, ay));
         return { c: A['pave' + edge((q) => isPathish(q))] };
-      case T.SAND: if (A.q_sand_f && theme !== 'snow') return quarts('sand', (q) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.FLOWER && q !== T.PINE);
+      case T.DOOR: if (A.q_pave_f) return hasPave(x, y) ? quarts('pave', (q, ax, ay) => isPaveQ(q, ax, ay)) : quarts('path', isPathQ);
+        return { c: A['pave' + edge((q) => isPathish(q))] };
+      case T.BUILD: if (A.q_pave_f) return hasPave(x, y) ? quarts('pave', (q, ax, ay) => isPaveQ(q, ax, ay)) : this._buildOnPave?.has(x + ',' + y) ? { c: A.q_pave_f } : { c: (desertAt(x, y) || hasNbr4(x, y, (g) => g === T.SAND)) && !hasNbr4(x, y, (g) => g === T.GRASS) && sandFull ? sandFull : A[grassKey] };
+        return { c: A['pave' + edge((q) => isPathish(q))] };
+      case T.SAND: if (A.q_sand_f) return quarts('sand', (q, ax, ay) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.PINE && (q !== T.FLOWER || sandFlower(ax, ay)));
         return { c: A['sand' + edge((q) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.FLOWER && q !== T.PINE)] };
-      case T.WATER: if (this.N.cells.q_water_f) return quarts('water', (q) => q === T.WATER || q === T.BRIDGE || q === T.WHIRL, true);
+      case T.WATER: if (this.N.cells.q_water_f) {
+        const qw = quarts('water', (q) => q === T.WATER || q === T.BRIDGE || q === T.WHIRL, true);
+        if (qw.q && this.N.cells.q_swater_f) {
+          const sb = (ax, ay) => m.in(ax, ay) && (groundAt(ax, ay) === T.SAND || (desertAt(ax, ay) && groundAt(ax, ay) !== T.GRASS && groundAt(ax, ay) !== T.TALL));
+          if (sb(x - 1, y) || sb(x + 1, y) || sb(x, y - 1) || sb(x, y + 1) || sb(x - 1, y - 1) || sb(x + 1, y - 1) || sb(x - 1, y + 1) || sb(x + 1, y + 1)) {
+            const qs = quarts('swater', (q) => q === T.WATER || q === T.BRIDGE || q === T.WHIRL, true);
+            if (qs.q) return {
+              ...qw,
+              q: [
+                sb(x - 1, y) || sb(x, y - 1) || sb(x - 1, y - 1) ? qs.q[0] : qw.q[0],
+                sb(x + 1, y) || sb(x, y - 1) || sb(x + 1, y - 1) ? qs.q[1] : qw.q[1],
+                sb(x - 1, y) || sb(x, y + 1) || sb(x - 1, y + 1) ? qs.q[2] : qw.q[2],
+                sb(x + 1, y) || sb(x, y + 1) || sb(x + 1, y + 1) ? qs.q[3] : qw.q[3],
+              ],
+            };
+          }
+        }
+        return qw;
+      }
         return { anim: this.N.cells['water' + mask((q) => q === T.WATER || q === T.BRIDGE)] };
-      case T.BRIDGE: { const ns = sensPont(m, x, y) === 'ns'; return { anim: this.N.cells.water15, bridge: ns ? A.bridge : A.bridgeEW || A.bridge }; }
+      case T.BRIDGE: { const ns = sensPont(m, x, y) === 'ns'; return { anim: this.N.cells.q_water_f || this.N.cells.water15, bridge: ns ? A.bridge : A.bridgeEW || A.bridge }; }
       // une couleur par massif (par carré de 3 × 3 cases), avec parfois une fleur d'une autre couleur
-      case T.FLOWER: { const nf = this.N.cells.flower5 ? 6 : 4, pv = hash(Math.floor(x / 3) + 101, Math.floor(y / 3) + 37), k = v < 0.85 ? Math.floor(pv * nf) : Math.floor(v * 97) % nf; return { anim: this.N.cells['flower' + k] || this.N.cells.flower0 }; }
+      case T.FLOWER: {
+        const nf = this.N.cells.flower5 ? 6 : 4, pv = hash(Math.floor(x / 3) + 101, Math.floor(y / 3) + 37), k = v < 0.85 ? Math.floor(pv * nf) : Math.floor(v * 97) % nf;
+        if (pg && sandFull) return { c: sandFlower(x, y) ? sandFull : A[grassKey], ovAnim: this.N.cells['flower' + k] || this.N.cells.flower0 };
+        return { anim: this.N.cells['flower' + k] || this.N.cells.flower0 };
+      }
       case T.LEDGE: return { c: A.ledge }; case T.LEDGE_E: return { c: A.ledgeE }; case T.LEDGE_W: return { c: A.ledgeW };
-      case T.CAVEWALL: if (m.outdoor) return { c: A[grassKey] };   // sous les montagnes du dehors
+      case T.CAVEWALL: if (m.outdoor) {
+        if (sandFull && (desertCell || (hasNbr4(x, y, (g) => g === T.SAND) && !hasNbr8(x, y, (g) => g === T.GRASS || g === T.TREE || g === T.PINE || (g === T.FLOWER && !sandFlower(x, y)))))) return { c: sandFull };
+        if (theme === 'volcanic' && this.N.cells.lava && hasNbr4(x, y, (g) => g === T.LAVA) && !hasNbr4(x, y, (g) => g === T.ASH || g === T.PATH || g === T.CAVE || T.STAIRS)) return { anim: this.N.cells.lava };
+        return { c: A[grassKey] };   // sous les montagnes du dehors
+      }
         if (this.tiers && A[`rp_${this.biome}_00`]) { const k = reliefKey(A, this.biome, 's', v); return { c: A[k] }; }
         if (this.tiers && A[`rt_${this.biome}_0`] && !this.tierAt(x, y)) return { c: A[`rt_${this.biome}_${v < 0.7 ? 0 : 1}`], shade: 0.95 };
       // falls through
@@ -1047,23 +1151,27 @@ export class WorldView {
       const t = m.get(x, y), g = this.groundCell(x, y), v = hash(x + 7, y + 3);
       if (g.c) flat(G, x, y, x + 1, y + 1, 0, g.c, g.shade);
       if (g.anim) flat(N, x, y, x + 1, y + 1, 0, g.anim);
+      if (g.ovAnim) flat(NO, x, y, x + 1, y + 1, 0.002, g.ovAnim);
       if (g.q) for (let i = 0; i < 4; i++) { const qx = i & 1, qy = i >> 1; flat(g.qEau ? NO : O0, x + qx / 2, y + qy / 2, x + (qx + 1) / 2, y + (qy + 1) / 2, 0.003, g.q[i]); }
       if (g.ov) flat(O0, x, y, x + 1, y + 1, 0.003, g.ov);
       if (g.bridge && !this.sol.couvre()) flat(G, x - 0.02, y, x + 1.02, y + 1, 0.012, g.bridge);   // le sol généré dessine ses pontons
       if (g.passerelle) flat(r3d ? PB : G, x, y, x + 1, y + 1, 0.012 + (r3d ? r3d.Hmarche(x + 0.5, y + 0.5) : 0), g.passerelle);
       // détails de l'herbe (touffes, trèfles, cailloux, fleurettes…) : une case d'herbe sur six environ, jamais deux
       // fois le même détail côte à côte ; des feuilles mortes et des champignons en forêt
-      if (m.outdoor && !this.sol.couvre() && (t === T.GRASS || t === T.FENCE) && this.detailAt(x, y)) {
+      if (m.outdoor && !this.sol.couvre() && !A.pg_0_0 && (t === T.GRASS || t === T.FENCE) && this.detailAt(x, y)) {
         const k = this.detailAt(x, y); if (A['dec_' + k]) flat(O0, x, y, x + 1, y + 1, 0.004, A['dec_' + k]);
       }
-      const zone = m.outdoor ? m.zoneAt(x, y) : null, theme = zone?.theme;
+      const zone = m.outdoor ? m.zoneAt(x, y) : null;
+      const snowCoast = m.outdoor && !zone?.theme && t === T.PINE && [m.zoneAt(x + 5, y), m.zoneAt(x - 5, y), m.zoneAt(x, y + 5), m.zoneAt(x, y - 5)].some((z) => z?.theme === 'snow');
+      const theme = zone?.theme || (snowCoast ? 'snow' : undefined);
       if (this.relief) this.reliefDehors(O0, x, y, t, zone);
       if (m.outdoor && base.get(x, y) === T.WHIRL) this.tourbillonCell(NO, base, x, y);
-      if (m.outdoor && t === T.BRIDGE && theme === 'automne') {
-        // garde-corps vermillon le long du pont, seulement sur ses bords (pas entre deux voies du même pont)
+      if (m.outdoor && t === T.BRIDGE && !ravin(m, x, y)) {
+        // garde-corps le long du pont (vermillon en automne, chêne ailleurs), seulement sur les bords extérieurs
         const ns = sensPont(m, x, y) === 'ns', pt = (a, b) => m.get(a, b) === T.BRIDGE;
-        const ha = ns ? !pt(x - 1, y) : !pt(x, y - 1), ba = ns ? !pt(x + 1, y) : !pt(x, y + 1), tex = A[`pont_rouge_${ns ? 'ns' : 'ew'}_${(ha ? 1 : 0) | (ba ? 2 : 0)}`];
-        if (tex && (ha || ba)) flat(O0, x - (ns ? 0 : 0.02), y - (ns ? 0.02 : 0), x + 1 + (ns ? 0 : 0.02), y + 1 + (ns ? 0.02 : 0), 0.0051, tex);
+        const ha = ns ? !pt(x - 1, y) : !pt(x, y - 1), ba = ns ? !pt(x + 1, y) : !pt(x, y + 1);
+        const pref = theme === 'automne' ? 'pont_rouge' : 'pont_bois', tex = A[`${pref}_${ns ? 'ns' : 'ew'}_${(ha ? 1 : 0) | (ba ? 2 : 0)}`];
+        if (tex && (ha || ba)) flat(O0, x - (ns ? 0 : 0.02), y - (ns ? 0.02 : 0), x + 1 + (ns ? 0 : 0.02), y + 1 + (ns ? 0.02 : 0), 0.015, tex);
       }
       // carpes koï : chaque case du bassin tourne et retourne le dessin (les carpes ne nagent plus toutes en rang, au pas)
       if (this.decoAt.get(x + ',' + y)?.k === 'koi') { const c = this.N.cells.koi, q = Math.floor(hash(x * 5 + 1, y * 9 + 4) * 8); flatTourne(NO, x + (hash(x * 3 + 7, y) - 0.5) * 0.6, y + (hash(x, y * 3 + 5) - 0.5) * 0.6, 0.0055, c, q & 3, q >> 2); }
@@ -1088,7 +1196,7 @@ export class WorldView {
           if (!this.arbresUnis) key = variante(S, key, x, y);
           const r = S[key], cx = x + 0.5 + (v - 0.5) * 0.2, cz = y + 0.7;
           billboard(P, cx, cz, SW(r), SH(r), r, 0, this.arbresUnis ? vb > 0.5 : miroir(x, y), this.arbresUnis ? 1 : teinte(x, y, key.startsWith('snowpine') || key.startsWith('deadtree')));
-          if (!this.packDecor) this.ombreSol(Sh, cx - 0.75, cz - 0.3, cx + 0.75, cz + 0.3);
+          this.ombreSol(Sh, cx - 0.75, cz - 0.3, cx + 0.75, cz + 0.3);
         }
       } else if (t === T.FENCE) {
         // barrière : de face (rangée horizontale) ou vue dans l'axe (colonne nord-sud, le long d'un chemin vertical)
@@ -1098,8 +1206,9 @@ export class WorldView {
           // pieds des poteaux au bas de la case ; une ombre au sol en marque l'emprise
           if (vert) {
             const r = m.get(x, y - 1) === T.FENCE ? S.barriere_v : S.barriere_v0, px = BARR_POT[coteBarriere(m, x, y)];
-            billboard(P, x + px / 32 + SW(r) / 2, y + 0.94, SW(r), SH(r), r);
-            this.ombreSol(Sh, x + px / 32 - 0.08, y + 0.8, x + px / 32 + 0.24, y + 1.0);
+            const sw = SW(r), bx = Math.max(x + sw / 2, Math.min(x + 1 - sw / 2, x + px / 32 + sw / 2));
+            billboard(P, bx, y + 0.94, sw, SH(r), r);
+            this.ombreSol(Sh, bx - sw / 2 - 0.04, y + 0.8, bx + sw / 2 + 0.04, y + 1.0);
           } else {
             const r = m.get(x + 1, y) === T.FENCE ? S.barriere : S.barriere_fin;
             billboard(P, x + 0.5, y + 0.94, SW(r), SH(r), r);
@@ -1171,6 +1280,12 @@ export class WorldView {
         // tapis des maisons, sous la table (3 × 2 cases au milieu de la pièce)
         if (this.murStyle.startsWith('in') && A['tapis_' + this.murStyle] && x === (m.w >> 1) - 1 && y === 4 && m.h >= 8) flat(O0, x, y, x + 3, y + 2, 0.0043, A['tapis_' + this.murStyle]);
       }
+      // Centre Pokémon 5G (Noir & Blanc) : coins lounge gris clair losanges complets (3×3) à gauche et à droite
+      if (!m.outdoor && m.floor === 'center' && m.music === 'center' && (t === T.FLOOR || t === T.BLOCK) && A.clounge && y >= 6 && y <= m.h - 2 && (x >= 1 && x <= 3 || x >= m.w - 4 && x <= m.w - 2)) {
+        // 0,0024 : bien sous l'ombre des murs (0,0041) qu'il croise contre les murs latéraux, bien au-dessus du sol (0) ; à 0,0038 les deux
+        // couches n'étaient séparées que de 0,0003, sous la précision de profondeur d'un vrai GPU à cette distance de caméra (scintillement)
+        flat(O0, x, y, x + 1, y + 1, 0.0024, A.clounge);
+      }
       let d = this.decoAt.get(x + ',' + y);
       // arènes dessinées dans un plan : plusieurs décors par case, selon l'état de l'arène (portes, fleurs, miroirs…)
       if (m.etat) { this.celluleArene(O0, P, Sh, x, y, Wl); d = null; }
@@ -1187,9 +1302,22 @@ export class WorldView {
       if (d && DECALS.has(d.k)) { const k = 'dec_' + d.k + (d.dir ? '_' + d.dir : d.g ? '_' + d.g : ''); if (A[k]) flat(O0, x, y, x + 1, y + 1, 0.005, A[k]); }
       if (d) {
         if (d.k === 'counter') {
-          box(Wl, x, y + 0.1, x + 1, y + 1, 0.75 * Math.tan(EL), A[d.front] || A.counterfront, A.counter, A.counter, { east: m.get(x + 1, y) !== T.BLOCK, west: m.get(x - 1, y) !== T.BLOCK });
+          const isCC = m.floor === 'center' && !d.top && (!d.front || d.front === 'counterfront') && A.ccounter && A.ccounterfront;
+          // Boutique 5G (Noir & Blanc) : comptoir bleu-turquoise à façade argentée, caisse enregistreuse au bout du comptoir
+          const isMC = m.floor === 'mart' && d.front === 'martfront' && A.mcounter && A.mcounterfront;
+          const cFront = isCC ? A.ccounterfront : isMC ? A.mcounterfront : (A[d.front] || A.counterfront), cTop = isCC ? A.ccounter : isMC ? A.mcounter : A.counter;
+          box(Wl, x, y + 0.1, x + 1, y + 1, 0.75 * Math.tan(EL), cFront, cTop, cTop, { east: m.get(x + 1, y) !== T.BLOCK, west: m.get(x - 1, y) !== T.BLOCK });
           // capsule posée sur le comptoir (starters du labo)
           if (d.ball && S.itemball) { const r = S.itemball; billboard(P, x + 0.5, y + 0.55, SW(r), SH(r), r, 0.75 * Math.tan(EL) - 0.05); }
+          if (isMC && S.mregister && m.get(x + 1, y) !== T.BLOCK) { const r = S.mregister; billboard(P, x + 0.5, y + 0.55, SW(r), SH(r), r, 0.75 * Math.tan(EL) - 0.05); }
+        }
+        // Boutique 5G : un présentoir blanc garni par rangée de rayons (dessiné une fois, centré sur la rangée)
+        else if (d.k === 'shelf' && m.floor === 'mart' && S.martshelf) {
+          if (this.decoAt.get((x - 1) + ',' + y)?.k !== 'shelf') {
+            let n = 1; while (this.decoAt.get((x + n) + ',' + y)?.k === 'shelf') n++;
+            const r = S.martshelf; billboard(P, x + n / 2, y + 0.75, SW(r), SH(r), r);
+            this.ombreSol(Sh, x + 0.05, y + 0.45, x + n - 0.05, y + 0.95, 0.015, 'bande');
+          }
         }
         else if (d.k === 'shelf') box(Wl, x + 0.05, y + 0.2, x + 0.95, y + 0.95, 1.5 * Math.tan(EL), A.shelf, A.roof_flat, A.shelf);
         else if (d.k === 'carpet' || d.k === 'exitlight') { /* sol */ }
@@ -1225,6 +1353,12 @@ export class WorldView {
     // relief en 3D : l'ancien sol (sous le sol généré) n'écrit pas la profondeur, le sol généré le recouvre toujours
     const M3 = r3d ? this.r3dMats() : this.mat;
     add(G, M3.ground, sous); add(N, M3.anim, sous); add(O, M3.overlay, sous); add(O0, this.mat.overlay); add(Sh, this.mat.shadow, 1); add(P, this.mat.sprite); add(Wl, this.mat.walls); add(NO, this.mat.animOver); add(PB, this.mat.overlay, 1);
+    // Centre Pokémon 5G (Noir & Blanc) : grande allée centrale abricot + emblème Poké Ball au sol
+    if (!m.outdoor && m.floor === 'center' && m.music === 'center' && S.center_runner && x0 === 0 && y0 === 0) {
+      const Fl = new Geo(), r = S.center_runner, rx0 = (m.w - 3) / 2;
+      flat(Fl, rx0, 4.98, rx0 + 3, m.h - 0.85, 0.0046, [r.u0, r.v0, r.u1, r.v1]);
+      add(Fl, this.mat.flatSprite, 0);
+    }
     if (r3d) {
       // parois de la couche du dessus (texture vue de la caméra), dessinées juste après le sol généré
       const bw = m.ext ? CH : Math.min(CH, m.w - x0), bh = m.ext ? CH : Math.min(CH, m.h - y0), pg = bw > 0 && bh > 0 ? r3d.geoParois(ci, cj, bw, bh) : null;
@@ -1360,7 +1494,8 @@ export class WorldView {
     const ci = Math.floor(px / CH), cj = Math.floor(py / CH), k = ci + ',' + cj;
     if (k !== this.lastChunk) {
       this.lastChunk = k;
-      const R = this.rayon || 2;   // blocs autour du point de vue (l'éditeur de carte voit plus loin)
+      const demiL = (SPRITE_UNIFORMS.uRes.value.x || 640) / (this.kPx || 1) / TILE_PX / 2;
+      const R = Math.max(this.rayon || 2, Math.ceil(demiL / CH) + 1);   // blocs autour du point de vue (couvre aussi les écrans larges)
       // à l'écran : le bloc du joueur et ses voisins (R - 1) ; au-delà, des blocs d'avance, construits sur les images
       // suivantes (aBatir) : franchir un bloc demandait d'un coup une rangée de cinq blocs et leurs bâtiments (à-coup)
       const P = Math.max(1, R - 1), x0 = (ci - P) * CH, x1 = (ci + P + 1) * CH, y0 = (cj - P) * CH, y1 = (cj + P + 1) * CH;
@@ -1465,12 +1600,46 @@ export class WorldView {
     return [hex(q(0.02).map((v) => v * 0.55)), hex(q(0.08)), hex(q(0.3)), hex(q(0.55)), hex(q(0.8)), hex(q(0.97))];
   }
 
+  /** pack de bâtiments 2D : libère les cases bloquées qui n'appartiennent qu'aux modèles 3D (étal devant la Boutique,
+   *  colonnes et arrière profond de l'Arène, aile de la serre du Laboratoire) pour éviter tout mur invisible */
+  adapterEmprisesPack(m) {
+    if (m._packAdapte) return; m._packAdapte = true;
+    // sol qui remplace la place libérée : celui qui entoure le bâtiment (pavés en ville, sable au désert, cendre au volcan,
+    // neige en montagne), l'herbe sinon
+    const solAutour = (b) => {
+      const n = new Map([[T.PAVE, 0], [T.SAND, 0], [T.ASH, 0], [T.SNOW, 0], [T.GRASS, 0]]);
+      for (let i = -1; i <= b.w; i++) for (const j of [-1, b.d]) if (m.in(b.x + i, b.y + j)) {
+        let q = m.get(b.x + i, b.y + j); if (q === T.TREE || q === T.FLOWER || q === T.PINE) q = T.GRASS;
+        if (n.has(q)) n.set(q, n.get(q) + 1);
+      }
+      let best = T.GRASS; for (const [q, k] of n) if (k > n.get(best)) best = q;
+      return best;
+    };
+    const liberer = (x, y, solDef, memePave = false) => {
+      if (!m.in(x, y)) return;
+      const t = m.get(x, y);
+      if (t === T.BLOCK || t === T.BUILD || (memePave && t === T.PAVE)) m.set(x, y, m.underAt(x, y) ?? solDef);
+    };
+    for (const b of m.buildings || []) {
+      if (b.modele || b.kit) continue;
+      const s = solAutour(b);
+      if (b.kind === 'mart' && b.w === 5 && b.d === 4) for (const [i, j] of [[0, 4], [1, 4], [2, 4]]) liberer(b.x + i, b.y + j, s);
+      else if (b.kind === 'gym' && b.w === 8 && b.d === 11) {
+        for (const [i, j] of [[0, 11], [7, 11]]) liberer(b.x + i, b.y + j, s);
+        for (let j = 0; j < 4; j++) for (let i = 0; i < b.w; i++) liberer(b.x + i, b.y + j, s, s !== T.PAVE);
+      } else if (b.kind === 'lab' && b.w === 10 && b.d === 7) {
+        for (let j = 0; j < b.d; j++) for (let i = 6; i < b.w; i++) liberer(b.x + i, b.y + j, s, s !== T.PAVE);
+        for (let j = 0; j < 2; j++) for (let i = 0; i < 6; i++) liberer(b.x + i, b.y + j, s, s !== T.PAVE);
+        liberer(b.x, b.y + 6, s, s !== T.PAVE); liberer(b.x + 5, b.y + 6, s, s !== T.PAVE);
+      }
+    }
+  }
   /* ---------------- bâtiments ---------------- */
   /** les bâtiments de la carte : sur la grande carte, chacun n'est construit qu'au moment où le morceau de 16 cases qui
    *  le porte entre en vue (ensureChunks) ; les petites cartes (intérieurs, grottes) sont construites d'un coup */
   buildBuildings() {
     this.buildingMeshes = [];
-    this._texBat = new Map(); this._fenetres = new Map();
+    this._texBat = new Map(); this._fenetres = new Map(); this._fenetresVides = new Set();
     this.nightGroup = new THREE.Group(); this.root.add(this.nightGroup); this.nightGroup.visible = false;
     this.batAttente = new Map();
     for (const b of this.map.buildings) { const k = Math.floor(b.x / CH) + ',' + Math.floor(b.y / CH); if (!this.batAttente.has(k)) this.batAttente.set(k, []); this.batAttente.get(k).push(b); }
@@ -1486,7 +1655,7 @@ export class WorldView {
   poserBatimentsBloc(i, j) {
     const k = i + ',' + j, L = this.batAttente?.get(k); if (!L) return; this.batAttente.delete(k);
     const n0 = this.buildingMeshes.length;
-    for (const b of L) this.poserBat(b);
+    for (const b of L) try { this.poserBat(b); } catch (e) { console.error('[poserBat]', b, e); }
     for (let n = n0; n < this.buildingMeshes.length; n++) this.buildingMeshes[n].userData.bloc = k;
     (this.batPoses ||= new Map()).set(k, L);
   }
@@ -1518,33 +1687,92 @@ export class WorldView {
       g.add(hole); this.root.add(g); return;
     }
     // pack de graphismes (Options → Graphismes) : une image d'un seul tenant, à 32 px par case comme l'écran (pixel pour
-    // pixel), dont la largeur colle à l'emprise ; sa porte tombe sur la porte du jeu, son pied sur le bord avant
-    const BP = this.batPack, choix = BP?.styles[b.style];
+    // pixel), dont la largeur et la porte collent à l'emprise ; les monuments 3D propres (b.modele, gratte-ciel…) sont gardés
+    const BP = this.batPack;
+    const z = this.map.zoneAt?.(b.x, b.y);
+    const estFontaine = b.modele === 'fontaine' && BP?.styles?.fontaine;
+    const estLogisPack = b.door === 1 && b.modele === 'maisonHaute';
+    const specKey = b.kind === 'league' && BP?.styles?.league ? 'league'
+      : b.kit === 'chalet' && BP?.styles?.chalet ? 'chalet'
+      : b.modele && /^(chapelle|gare|mairie|bourse|casino|dojo|etal|puits|chalet|auberge|maisonL|maisonExt|boulangerie|maisonThe|cabaneChasseur|cabanePecheur|grange|moulin|phare|kiosque|usinePokeball|pagode|pavillon|tourCendree)$/.test(b.modele) && BP?.styles?.[b.modele] ? b.modele
+      : /Tour Mirage/i.test(b.name || '') && BP?.styles?.tour_mirage ? 'tour_mirage'
+      : /Phare/i.test(b.name || '') && BP?.styles?.phare ? 'phare'
+      : /Centrale/i.test(b.name || '') && BP?.styles?.centrale ? 'centrale'
+      : /Serre/i.test(b.name || '') && BP?.styles?.serre ? 'serre'
+      : /Fonderie/i.test(b.name || '') && BP?.styles?.fonderie ? 'fonderie'
+      : /Boutique de mode/i.test(b.name || '') && BP?.styles?.boutique_mode ? 'boutique_mode' : null;
+    const estGratteCiel = !!(b.kit?.startsWith('gc') && BP?.styles?.tower?.some((c) => BP.images[c[0]]));
+    const eligiblePack = BP && (estFontaine || estLogisPack || !!specKey || estGratteCiel || (!b.modele && !b.kit && (!b.libres?.length || b.kind === 'lab') && !(b.style === 'tower' && (b.door >= 0 || /Phare|Mirage|Centrale/i.test(b.name || '')))));
+    const choix = eligiblePack ? (specKey ? BP.styles[specKey] : estFontaine ? BP.styles.fontaine : estLogisPack ? BP.styles.house : BP.styles[b.style]) : null;
     if (choix) {
-      const ok = choix.filter(([n, w]) => BP.images[n] && Math.abs(w / 32 - b.w) <= 1.5);
-      const best = ok.length && Math.min(...ok.map(([, w]) => Math.abs(w / 32 - b.w)));
-      const pris = ok.filter(([, w]) => Math.abs(w / 32 - b.w) <= best + 0.35);
-      const pick = pris.length ? pris[(b.x * 7 + b.y * 3) % pris.length] : null;
+      const wCible = b.kind === 'lab' ? 6 : b.w;
+      const doorRel = b.door < 0 ? null : b.door2X !== undefined ? (b.doorX + b.door2X + 1) / 2 - b.x : b.door + 0.5;
+      const depasse = ([, w, porte]) => {
+        const W = w / 32, px = porte == null || doorRel == null ? null : porte / 32;
+        const l0 = px == null ? (wCible - W) / 2 : doorRel - px;
+        return Math.max(0, l0, wCible - (l0 + W));
+      };
+      const score = (c) => {
+        const [, w, porte] = c, W = w / 32, px = porte == null || doorRel == null ? null : porte / 32;
+        return Math.abs(W - wCible) + (px == null ? 0 : Math.abs(px - doorRel) * 1.4) + depasse(c) * 2.2;
+      };
+      const okAll = choix.filter((c) => BP.images[c[0]] && (specKey || (Math.abs(c[1] / 32 - wCible) <= 1.6 && (doorRel == null || depasse(c) <= 0.65))));
+      const tags = new Set([z?.theme, z?.town].filter(Boolean));
+      const okBio = tags.size ? okAll.filter((c) => Array.isArray(c[3]) && c[3].some((t) => tags.has(t))) : [];
+      const ok = okBio.length ? okBio : okAll.filter((c) => !c[3]);
+      const finalOk = ok.length ? ok : okAll;
+      const best = finalOk.length && Math.min(...finalOk.map(score));
+      const pris = finalOk.filter((c) => score(c) <= best + 1.15);
+      const graine = (b.x * 13 + b.y * 29 + b.w * 7 + (b.roof ? b.roof.charCodeAt(0) * 5 : 0)) >>> 0;
+      const pick = pris.length ? pris[graine % pris.length] : null;
       if (pick) {
         const [n, , porte] = pick, im = BP.images[n];
         const t = T3('pack_' + n, () => im); t.flipY = true; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.needsUpdate = true;
         const W = im.width * WPX / 2, H = im.height * HPX / 2;
-        const geo = new THREE.PlaneGeometry(W, H); geo.translate(0, H / 2, 0);
-        geo.setAttribute('anchor', new THREE.Float32BufferAttribute(new Array(12).fill(0), 3));
-        const px = porte == null || b.door < 0 ? null : porte / 32;
-        const left = px == null ? b.x + (b.w - W) / 2 : b.x + b.door + 0.5 - px;
-        const ax = Math.round((left + W / 2) * 32) / 32, az = b.y + b.d;
-        const mat = screenSprite(new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide }));
-        this.tinted.push(mat); mat.color.copy(this.tint);
-        const me = new THREE.Mesh(geo, mat); me.position.set(ax, hb, az); g.add(me); g.userData.b = b;
+        const px = porte == null || doorRel == null ? null : porte / 32;
+        const left = px == null ? b.x + (wCible - W) / 2 : b.x + doorRel - px;
+        const enBandes = !(b.modele === 'maisonL' && n === 'maison_l');
+        const mat = screenSprite(new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide }), 0, true, enBandes);
+        mat.userData.ownTint = true; this.tinted.push(mat); mat.color.copy(this.tint);
+        if (!enBandes) {
+          const wingGeo = (w, h, u0, u1, v0, v1) => {
+            const gg = new THREE.PlaneGeometry(w, h); gg.translate(0, h / 2, 0);
+            gg.setAttribute('anchor', new THREE.Float32BufferAttribute(new Array(12).fill(0), 3));
+            const uv = gg.attributes.uv;
+            uv.setXY(0, u0, v1); uv.setXY(1, u1, v1); uv.setXY(2, u0, v0); uv.setXY(3, u1, v0);
+            return gg;
+          };
+          const wl = W * 0.4, wr = W * 0.6, hr = H * (128 / im.height);
+          const ml = new THREE.Mesh(wingGeo(wl, H, 0, 0.4, 0, 1), mat); ml.position.set(Math.round((left + wl / 2) * 32) / 32, hb, b.y + b.d); ml.frustumCulled = false;
+          const mr = new THREE.Mesh(wingGeo(wr, hr, 0.4, 1, (im.height - 128) / im.height, 1), mat); mr.position.set(Math.round((left + wl + wr / 2) * 32) / 32, hb, (b.doorY ?? b.y + 2) + 1); mr.frustumCulled = false;
+          const shL = new Geo();
+          this.ombreSol(shL, left - 0.06, b.y + b.d - 0.22, left + wl + 0.06, b.y + b.d + 0.22, 0.012, 'bande');
+          this.ombreSol(shL, left + wl - 0.06, (b.doorY ?? b.y + 2) + 0.78, left + W + 0.06, (b.doorY ?? b.y + 2) + 1.22, 0.012, 'bande');
+          g.add(ml, mr, new THREE.Mesh(shL.build(), this.mat.shadow)); g.userData.b = b; g.userData.pack = true;
+          g.userData.ecran = { zN: -im.height / 32, x0: left - b.x, x1: left + wl - b.x };
+          this.root.add(g); this.buildingMeshes.push(g);
+          this.lumierePorte(g, b, hb); return;
+        }
+        const az = b.door >= 0 && b.doorY != null ? b.doorY + 1 : b.y + b.d;
+        const ax = Math.round((left + W / 2) * 32) / 32;
+        // le dessin déborde parfois un peu de l'emprise (avant-toit, gouttière, perron) : ces colonnes prennent la profondeur
+        // de l'arrière du bâtiment, pour qu'un personnage qui se tient juste à côté passe devant (et pas à moitié derrière)
+        const geo = bandesPack(W, H, im.width, ax - W / 2, b.x, b.x + wCible, b.y - az - 0.05);
+        const me = new THREE.Mesh(geo, mat); me.position.set(ax, hb, az); me.frustumCulled = false; g.add(me);
+        // ombre portée douce au pied du bâtiment pour l'ancrer sur le sol
+        const shP = new Geo();
+        this.ombreSol(shP, Math.max(b.x, ax - W / 2) - 0.08, az - 0.22, Math.min(b.x + wCible, ax + W / 2) + 0.08, az + 0.22, 0.012, 'bande');
+        const omP = new THREE.Mesh(shP.build(), this.mat.shadow); omP.position.y = hb; g.add(omP);
+        g.userData.b = b; g.userData.pack = true;
         // le dessin dépasse l'emprise vers le nord : il s'estompe quand on passe derrière lui (toute sa hauteur, toute sa largeur)
-        g.userData.ecran = { zN: b.d - im.height / 32, x0: ax - W / 2 - b.x, x1: ax + W / 2 - b.x };
-        this.root.add(g); this.buildingMeshes.push(g); return;
+        g.userData.ecran = { zN: (az - b.y) - im.height / 32, x0: ax - W / 2 - b.x, x1: ax + W / 2 - b.x };
+        this.root.add(g); this.buildingMeshes.push(g);
+        this.fenetresPack(g, n, im, geo, ax, hb, az);
+        this.lumierePorte(g, b, hb); return;
       }
     }
     // bâtiment en fausse 3D (modèle de batiments3d.js) quand un modèle a la bonne emprise ; sinon l'ancienne façade
     if (!/[?&]bati=0/.test(globalThis.location?.search || '')) {
-      const z = this.map.zoneAt?.(b.x, b.y);
       const mod = choisirModele(b, { theme: z?.theme, ville: z?.town, typeArene: b.typeArene });
       if (mod) { const gm = this.batimentModele(b, mod); gm.position.y = hb; gm.userData.hb = hb; this.root.add(gm); this.buildingMeshes.push(gm); this.lumierePorte(gm, b, hb); this.cheminees(gm, b, hb); return; }
     }
@@ -1619,7 +1847,7 @@ export class WorldView {
   }
   /** la nuit, la lumière de l'entrée se pose sur le seuil (bâtiments habités du dehors) */
   lumierePorte(g, b, hb) {
-    if (!this.map.outdoor || !(b.door >= 0) || b.doorX == null || !['house', 'house2', 'bighouse', 'center', 'mart', 'gym', 'lab', 'league'].includes(b.kind)) return;
+    if (!this.map.outdoor || !(b.door >= 0) || b.doorX == null || !['house', 'house2', 'bighouse', 'center', 'mart', 'gym', 'lab', 'league', 'tower'].includes(b.kind)) return;
     const fl = this.lum.porte(b.doorX, hb, b.doorY); this.glows.add(fl); g.userData.lum = [fl];
   }
   /** pose un bâtiment en fausse 3D : géométries fusionnées du modèle, matériaux sans lumière (éclairage cuit),
@@ -1656,7 +1884,7 @@ export class WorldView {
     // sol de l'emprise : dalles (ou plancher) sous tout le bâtiment, juste au-dessus du sol généré. Les terrasses où
     // l'on marche ne montrent plus le pavé bruité de la rue, et là où le modèle est plus étroit que son emprise, on ne
     // voit plus l'ancienne tuile grise quadrillée
-    {
+    if (b.libres?.length || (!this.batPack && b.door >= 0)) {
       const pos = [], uv = [], col = [], y = 0.009;
       for (let j = 0; j < b.d; j++) for (let i = 0; i < b.w; i++) {
         const x0 = i / sx, x1 = (i + 1) / sx, z0 = j / sz, z1 = (j + 1) / sz;
@@ -1697,6 +1925,69 @@ export class WorldView {
     const geo = new Geo(); geo.quad([b.x, 0, b.y + b.d + 0.01], [b.x + b.w, 0, b.y + b.d + 0.01], [b.x + b.w, wallH, b.y + b.d + 0.01], [b.x, wallH, b.y + b.d + 0.01], 0, 0, 1, 1, 1);
     const wm = new THREE.Mesh(geo.build(), cache.get(key).clone()); wm.position.y = g.userData.hb || 0; g.userData.win = wm; this.nightGroup.add(wm);
   }
+  /** pack Noir & Blanc : masque de fenêtres chaudes allumées la nuit (détection encadrée mise en cache par modèle) */
+  fenetresPack(g, nom, im, geo, ax, hb, az) {
+    if (!this.map?.outdoor || /^(fontaine|puits|etal|kiosque|tour_cendree)$/.test(nom)) return;
+    const cache = this._fenetres, key = 'packwin_' + nom;
+    const vides = (this._fenetresVides ||= new Set());
+    if (vides.has(key)) return;
+    if (!cache.has(key)) {
+      const w = im.width, h = im.height;
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const ctx = c.getContext('2d', { willReadFrequently: true }); ctx.drawImage(im, 0, 0);
+      const src = ctx.getImageData(0, 0, w, h).data;
+      const isTall = nom.startsWith('tour') || /^(centrale|casino|maison_ville_|maison_forge_1|maison_forge_2)/.test(nom);
+      const yMin = Math.floor(h * (isTall ? 0.22 : /^(bourse|mairie|ligue|usine_pokeball|boutique_mode)$/.test(nom) ? 0.36 : 0.48));
+      const yMax = Math.max(yMin + 4, h - 10);
+      const cand = new Uint8Array(w * h), bright = new Uint8Array(w * h);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const o = (y * w + x) * 4, r = src[o], gg = src[o + 1], b = src[o + 2], al = src[o + 3];
+        bright[y * w + x] = (r * 3 + gg * 5 + b * 2) / 10;
+        if (y >= yMin && y < yMax && x >= 3 && x < w - 3 && al > 200 && b >= r + 18 && b >= 84 && r <= 180 && gg >= 55) cand[y * w + x] = 1;
+      }
+      const vis = new Uint8Array(w * h), outImg = ctx.createImageData(w, h), od = outImg.data;
+      let litAny = false;
+      for (let sy = yMin; sy < yMax; sy++) for (let sx = 3; sx < w - 3; sx++) {
+        const si = sy * w + sx; if (!cand[si] || vis[si]) continue;
+        const st = [si], pts = []; vis[si] = 1;
+        let minx = sx, maxx = sx, miny = sy, maxy = sy;
+        while (st.length) {
+          const ci = st.pop(); pts.push(ci);
+          const cx = ci % w, cy = (ci - cx) / w;
+          if (cx < minx) minx = cx; if (cx > maxx) maxx = cx; if (cy < miny) miny = cy; if (cy > maxy) maxy = cy;
+          if (cx > 0 && cand[ci - 1] && !vis[ci - 1]) { vis[ci - 1] = 1; st.push(ci - 1); }
+          if (cx + 1 < w && cand[ci + 1] && !vis[ci + 1]) { vis[ci + 1] = 1; st.push(ci + 1); }
+          if (cy > 0 && cand[ci - w] && !vis[ci - w]) { vis[ci - w] = 1; st.push(ci - w); }
+          if (cy + 1 < h && cand[ci + w] && !vis[ci + w]) { vis[ci + w] = 1; st.push(ci + w); }
+        }
+        const area = pts.length, bw = maxx - minx + 1, bh = maxy - miny + 1, asp = bw / bh;
+        if (area < 14 || area > 1500 || bw > 44 || bh > 48 || asp < 0.36 || asp > 2.4 || area / (bw * bh) < 0.42) continue;
+        if (minx <= 3 || maxx >= w - 4 || miny <= 2) continue;
+        let pd = 0, pt = 0, tt = 0;
+        const checkP = (px, py) => { pt++; const i = py * w + px; if (src[i * 4 + 3] < 180) tt++; else if (bright[i] < 135) pd++; };
+        const xA = Math.max(0, minx - 2), xB = Math.min(w - 1, maxx + 2), yA = Math.max(0, miny - 2), yB = Math.min(h - 1, maxy + 2);
+        for (let px = xA; px <= xB; px++) { checkP(px, yA); checkP(px, yB); }
+        for (let py = yA; py <= yB; py++) { checkP(xA, py); checkP(xB, py); }
+        if (tt > 0 || pd / Math.max(1, pt) < 0.42) continue;
+        litAny = true;
+        for (let k = 0; k < pts.length; k++) {
+          const o = pts[k] * 4, lum = Math.max(0.55, Math.min(1.15, src[o + 2] / 220));
+          od[o] = Math.min(255, Math.max(215, Math.round(lum * 255)));
+          od[o + 1] = Math.min(244, Math.max(178, Math.round(lum * 224)));
+          od[o + 2] = Math.min(152, Math.max(72, Math.round(lum * 114)));
+          od[o + 3] = 255;
+        }
+      }
+      if (!litAny) { vides.add(key); return; }
+      ctx.clearRect(0, 0, w, h); ctx.putImageData(outImg, 0, 0);
+      const wt = tex(c); wt.flipY = true; wt.magFilter = THREE.NearestFilter; wt.minFilter = THREE.NearestFilter; wt.needsUpdate = true;
+      cache.set(key, new THREE.MeshBasicMaterial({ map: wt, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide }));
+    }
+    const baseMat = cache.get(key); if (!baseMat) return;
+    const mat = screenSprite(baseMat.clone(), 0, true, true);
+    const wm = new THREE.Mesh(geo.clone(), mat); wm.position.set(ax, hb, az + 0.015); wm.frustumCulled = false;
+    g.userData.win = wm; this.nightGroup.add(wm);
+  }
 
 
   /* ---------------- personnages, objets ---------------- */
@@ -1728,12 +2019,15 @@ export class WorldView {
     pos.needsUpdate = uv.needsUpdate = true; g.computeBoundingSphere();
   }
   /** cadre d'animation : sprite (ligne), direction, pas (0 = immobile) */
-  setFrame(a, sprite, dir, step) {
-    const row = CHAR_ROWS[sprite] ?? CHAR_ROWS[CHAR_ALIAS[sprite]] ?? 0, col = DIR_COL[dir] * 3 + (step === 0 ? 1 : step === 1 ? 0 : 2);
+  setFrame(a, sprite, dir, step, variantSeed = null) {
+    const pool = variantSeed != null ? this.packCharVariants?.[sprite] : null;
+    const nom = pool ? pool[variantSeed % pool.length] : sprite;
+    const row = this.packCharRows?.[nom] ?? CHAR_ROWS[nom] ?? CHAR_ROWS[CHAR_ALIAS[nom]] ?? 0;
+    const cols = this.charCols || 2, col = DIR_COL[dir] * 3 + (step === 0 ? 1 : step === 1 ? 0 : 2);
     const k = row * 100 + col; if (a.frame === k) return; a.frame = k;
-    // la planche est rangée en deux colonnes (texture moins haute : les téléphones plafonnent souvent à 4096 px)
-    const half = this.charHalf, blk = row >= half ? 1 : 0, pr = row - blk * half;
-    const u0 = (blk * 12 + col) / 24, u1 = (blk * 12 + col + 1) / 24, v0 = pr / half, v1 = (pr + 1) / half;
+    // la planche est rangée en colonnes côte à côte (texture moins haute : les téléphones plafonnent souvent à 4096 px)
+    const half = this.charHalf, blk = Math.floor(row / half), pr = row - blk * half;
+    const u0 = (blk * 12 + col) / (cols * 12), u1 = (blk * 12 + col + 1) / (cols * 12), v0 = pr / half, v1 = (pr + 1) / half;
     const uv = a.mesh.geometry.attributes.uv; uv.setXY(0, u0, v0); uv.setXY(1, u1, v0); uv.setXY(2, u0, v1); uv.setXY(3, u1, v1); uv.needsUpdate = true;
   }
   place(a, x, y, hop = 0, inGrass = false) {
@@ -1830,18 +2124,22 @@ export class WorldView {
     this.root.add(mesh); this.root.add(shadow); this.actors.set(id, a);
     return a;
   }
-  /** planche des personnages pour la carte graphique : les rangées en deux colonnes côte à côte */
+  /** planche des personnages pour la carte graphique : les rangées en colonnes côte à côte (hauteur ≤ 4096 px) */
   packChars() {
-    const L = this.charsCanvas; if (!L) { this.charHalf = Math.ceil(this.charRows / 2); return L; }
-    const half = this.charHalf = Math.ceil(this.charRows / 2);
-    const c = this.charsPacked = document.createElement('canvas'); c.width = L.width * 2; c.height = half * CHH;
-    const x = c.getContext('2d'); x.drawImage(L, 0, 0, L.width, half * CHH, 0, 0, L.width, half * CHH);
-    x.drawImage(L, 0, half * CHH, L.width, L.height - half * CHH, L.width, 0, L.width, L.height - half * CHH);
+    const L = this.charsCanvas, cols = this.charCols = Math.max(2, Math.ceil(this.charRows / 64));
+    const half = this.charHalf = Math.ceil(this.charRows / cols);
+    if (!L) return L;
+    const c = this.charsPacked = document.createElement('canvas'); c.width = L.width * cols; c.height = half * CHH;
+    const x = c.getContext('2d');
+    for (let b = 0; b < cols; b++) {
+      const sy = b * half * CHH, sh = Math.min(half * CHH, L.height - sy);
+      if (sh > 0) x.drawImage(L, 0, sy, L.width, sh, b * L.width, 0, L.width, sh);
+    }
     return c;
   }
   /** recopie une rangée de la planche dans la texture */
   packRow(r) {
-    const L = this.charsCanvas, c = this.charsPacked, half = this.charHalf, blk = r >= half ? 1 : 0, x = c.getContext('2d');
+    const L = this.charsCanvas, c = this.charsPacked, half = this.charHalf, blk = Math.floor(r / half), x = c.getContext('2d');
     x.clearRect(blk * L.width, (r - blk * half) * CHH, L.width, CHH);
     x.drawImage(L, 0, r * CHH, L.width, CHH, blk * L.width, (r - blk * half) * CHH, L.width, CHH);
     this.texC.needsUpdate = true;
@@ -1947,7 +2245,7 @@ export class WorldView {
       for (const m of mats) {
         // trame : le bâtiment reste opaque (pas de faces cachées qui transparaissent), une part de ses pixels s'efface
         if (m.userData.uTrame) { m.userData.uTrame.value = n; continue; }
-        const o0 = m.userData.op0 ?? 1; m.transparent = n < 1 || o0 < 1; m.opacity = n * o0; m.depthWrite = n >= 1 && o0 >= 1; m.needsUpdate = true;
+        const o0 = m.userData.op0 ?? 1; m.transparent = n < 1 || o0 < 1; m.opacity = n * o0; if (m.alphaTest > 0) m.alphaTest = n < 1 ? 0.1 : 0.5; m.depthWrite = n >= 1 && o0 >= 1; m.needsUpdate = true;
       }
     }
   }
@@ -1962,12 +2260,15 @@ export class WorldView {
       this.animT = 0; this.animFrame = (this.animFrame + 1) % this.N.frames.length;
       const ctx = this.N.canvas.getContext('2d'); ctx.clearRect(0, 0, this.N.canvas.width, this.N.canvas.height); ctx.drawImage(this.N.frames[this.animFrame], 0, 0); this.texN.needsUpdate = true;
     }
+    const estOrtho = !!(this.r3d ? this.r3dOrtho : (this.batPack && this.map?.outdoor && this.orthoPref));
     this.focus.set(fx + 0.5, 0, fy + 0.5);
     if (this.r3d) {
       // relief en 3D : la caméra suit la hauteur du sol, calée sur la grille des pixels (rien ne « nage » en marchant)
       const fh = this.r3d.Hmarche(fx + 0.5, fy + 0.55), tan = Math.tan(EL);
       const s = Math.round((fy + 0.5 - fh / tan) * TILE_PX) / TILE_PX;
       this.focus.set(Math.round((fx + 0.5) * TILE_PX) / TILE_PX, fh, s + fh / tan);
+    } else if (estOrtho) {
+      this.focus.set(Math.round((fx + 0.5) * TILE_PX) / TILE_PX, 0, Math.round((fy + 0.5) * TILE_PX) / TILE_PX);
     }
     this.fadeBuildings(fx, fy, dt);
     if (this.portesAnim?.size) for (const t of this.portesAnim) {
@@ -1988,11 +2289,10 @@ export class WorldView {
       for (const me of this.glows.children) if (me.userData.phare) me.rotation.y = -t * 0.9;
       for (const me of this.glows.children) if (me.userData.feu !== undefined) { const f = me.userData.feu; me.scale.setScalar(me.userData.t0 * (1 + 0.06 * Math.sin(t * 9 + f) + 0.04 * Math.sin(t * 23 + f * 2))); }
     }
-    const d = this.r3d && this.r3dOrtho ? 400 : this.dist;
-    if (this.r3d && this.r3dOrtho) {
-      // relief en 3D : projection orthographique (32 px par case, comme la perspective au centre de l'écran) ; un pas
-      // de la caméra décale toute l'image d'un nombre entier de pixels, le sol ne « nage » pas en marchant
-      // (?r3zoom=Z : vue Z fois plus large, pour regarder une montagne entière ; les sprites rapetissent d'autant)
+    const d = estOrtho ? 400 : this.dist;
+    if (estOrtho) {
+      // projection orthographique (32 px par case, comme sur DS) ; un pas de la caméra décale toute l'image d'un nombre
+      // entier de pixels : ni zoom de perspective ni scintillement du sol en marchant
       const z = this.r3zoom ??= Math.max(1, +(new URLSearchParams(globalThis.location?.search || '').get('r3zoom')) || 1);
       const ze = z / (this.kPx || 1);
       if (z > 1) { SPRITE_UNIFORMS.uEch.value = ze; this.rayon = Math.max(this.rayon || 2, Math.ceil(2 * z + 1)); }

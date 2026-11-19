@@ -27,6 +27,7 @@ export function centerInterior(id, name) {
   furn(m, 'plant', 1, 2); furn(m, 'plant', 1, 8);
   furn(m, 'bench', 1, 6); m.set(2, 6, T.BLOCK); furn(m, 'bench', 10, 6); m.set(11, 6, T.BLOCK);
   furn(m, 'vase', 11, 8);
+  m.npc({ id: id + ':club', x: 10, y: 8, sprite: 'topdresseur', dir: 'left', script: 'clubCombat' });
   return m;
 }
 export function martInterior(id, name, stock) {
@@ -88,6 +89,30 @@ export function leagueInterior(id) {
   const m = room(id, 15, 18, { floor: 'league', music: 'league', wall: 'wall_league', name: 'Ligue Céleste', battleBg: 'league' });
   for (let y = 4; y < 17; y++) for (const x of [6, 8]) m.deco.push({ k: 'carpet', x, y });
   for (const y of [5, 9, 13]) { furn(m, 'gymstatue', 3, y); furn(m, 'gymstatue', 11, y); }
+  return m;
+}
+
+export function dojoInterior(id, name = 'Dojo de Mamadou') {
+  const m = room(id, 15, 15, { floor: 'temple', music: 'tower', wall: 'wall_league', name, battleBg: 'gym', wide: true });
+  for (let y = 4; y < 14; y++) for (const x of [6, 7, 8]) m.deco.push({ k: 'carpet', x, y });
+  furn(m, 'statue_dragon', 3, 4); furn(m, 'statue_dragon', 11, 4);
+  for (const y of [8, 12]) { furn(m, 'statue', 3, y); furn(m, 'statue', 11, y); }
+  for (const [x, y] of [[4, 3], [10, 3], [5, 13], [9, 13]]) furn(m, 'brasero', x, y);
+  furn(m, 'pot', 1, 13); furn(m, 'pot', 13, 13);
+  furn(m, 'healer', 1, 2); m.set(2, 2, T.BLOCK);   // l'appareil de soin occupe deux cases, comme au Centre
+  furn(m, 'pc', 13, 2); m.object(13, 2, { type: 'pc' });
+  m.npc({ id: id + ':mamadou', x: 7, y: 3, dir: 'down', sprite: 'mamadou', script: 'dojoMamadou' });
+  m.npc({ id: id + ':mascotte', x: 9, y: 3, dir: 'down', sprite: 'bouc', script: 'dojoMascotte' });
+  m.npc({ id: id + ':intendant', x: 11, y: 6, dir: 'left', sprite: 'vendeur', script: 'dojoBoutique' });
+  m.npc({ id: id + ':infirmiere', x: 1, y: 4, dir: 'down', sprite: 'nurse', role: 'nurse' });
+  m.npc({
+    id: id + ':disciple', x: 3, y: 10, dir: 'right', sprite: 'kimono',
+    text: [
+      'Bienvenue au Dojo de Mamadou ! Ici, personne ne combat jamais seul.',
+      'En Duo Co-op (2v2), 2 joueurs s\'unissent avec 1 Pokémon actif chacun (+ 1 remplaçant) contre deux tacticiens redoutables.',
+      'En Trio Co-op (3v3), vous devez être 3 dresseurs connectés en ligne ! Ouvrez la Connexion (F3 ou Amis) pour vous retrouver dans la même salle.',
+    ],
+  });
   return m;
 }
 

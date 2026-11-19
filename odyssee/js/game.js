@@ -28,6 +28,8 @@ import { saveCodeScreen } from './ui/screens.js';
 import { encodeSave, saveSummary } from './core/savecode.js';
 import { installSocial, talkToPeer } from './net/social.js';
 import { storyTalk, storyTrigger, storyWin, lugiaBattle, placeLugia, purify, overlay } from './story.js';
+import { battleMusicForLegend } from './audio.js';
+import { playBossCinematic, isLegendarySpecies } from './ui/cinematic.js';
 import { syncJournal } from './core/questsData.js';
 import { QUIZ } from './world/arenes.js';
 import { souffle, stelesPleines, moitieDe } from './world/arene-sylve.js';
@@ -35,11 +37,12 @@ import { preparerArene, surCaseArene, actionnerArene, remettreArene, pasArene, r
 import { casinoScreen, bourseScreen, entretienPierre } from './ui/metropole.js';
 import { arcadeScreen } from './ui/arcade.js';
 import { apparenceScreen } from './ui/apparence.js';
-import { preparerDomaine, frigo, architecte, recolter, allerDomaine, resident, arrivees } from './ui/domaine.js';
+import { preparerDomaine, frigo, architecte, recolter, allerDomaine, resident, arrivees, gardienDomaine } from './ui/domaine.js';
 import { composer, tenueValide, tenueOrigine } from './render/tenue.js';
 import { buildRivalParty, getRivalItems } from './world/rival.js';
 import { Vie, parlerFaune, rentreLeSoir } from './vie.js';
-import { revancheBossPossible, revancheBoss, tourCombat } from './tour-combat.js';
+import { revancheBossPossible, revancheBoss, tourCombat, clubCombat } from './tour-combat.js';
+import { dojoMamadou, dojoBoutique, dojoMascotte } from './dojo-mamadou.js';
 import { VieMonde, colporteur, marche, cueillir, fouiller, revanchePossible, revanche, noteCombat, ragot, echange, relais, concours, loterie, musicien } from './vie-monde.js';
 
 /** météos qui comptent en combat (brume et cendres ne sont que du décor, comme dans les jeux 5G) */
@@ -86,6 +89,8 @@ const FACES = {
   'Nyx': 'nyx', 'Érèbe': 'erebe', 'Erebe': 'erebe', 'Nocturne': 'nocturne',
   'Frimas': 'frimas', 'Spectrel': 'spectrel', 'Brutus': 'brutus', 'Sylas': 'sylas',
   'Ariane': 'ariane', 'Nox': 'nox', 'Sbire': 'brume_f', 'Sbire de la Brume': 'brume', 'Sbire Éclipse': 'eclipse_m',
+  'Mamadou': 'mamadou', 'Maître Mamadou': 'mamadou',
+  'Mascotte du Dojo': 'bouc', 'Le Bouc du Dojo': 'bouc', 'Bouc': 'bouc',
 };
 
 const TRAINER_NAME_TO_SPRITE = {
@@ -625,8 +630,8 @@ export class Game {
     this.vie?.tick(dt);
     this.vieMonde?.tick(dt);
     this.peersTick?.(dt);
-    // la carte n'est pas redessinée sous un combat ou un écran plein cadre
-    if (this.bv.alive || this.ui.root.querySelector('.screen')) { this.drawTags?.(false); return; }
+    // la carte n'est pas redessinée sous un combat, cinématique ou écran plein cadre
+    if (this.bv.alive || this.ui.root.querySelector('.screen, .wipe, .door-iris.on')) { this.drawTags?.(false); return; }
     this.hud?.update();
     this.draw(dt);
   }
@@ -671,7 +676,8 @@ export class Game {
       let nx = n.x, ny = n.y, sf = 0;
       if (n.move) { const u = Math.min(1, n.move.t); nx = n.move.fx + (n.x - n.move.fx) * u; ny = n.move.fy + (n.y - n.move.fy) * u; sf = u < 0.5 ? (n.step % 2 ? 1 : 2) : 0; }
       const na = v.actor('npc:' + n.id, {});
-      v.setFrame(na, n.sprite, n.dir, sf); v.place(na, nx, ny, 0, isGrassEnc(this.mapObj.get(n.x, n.y)) && !n.move);
+      const seed = ((n.home?.[0] ?? n.x) * 73 + (n.home?.[1] ?? n.y) * 137) >>> 0;
+      v.setFrame(na, n.sprite, n.dir, sf, seed); v.place(na, nx, ny, 0, isGrassEnc(this.mapObj.get(n.x, n.y)) && !n.move);
       { const gx = Math.round(nx), gy = Math.round(ny); v.cover(na, ...(isGrassEnc(this.mapObj.get(gx, gy)) ? [gx, gy] : [null])); }
       if (n.bang) { const b = v.actor('bang:' + n.id, { kind: 'bang' }); b.mesh.position.set(nx + 0.5, 34 * HPX + v.hAt(nx + 0.5, ny + 0.55), ny + 0.56); }
       else if (v.actors.has('bang:' + n.id)) v.removeActor('bang:' + n.id);
@@ -1119,12 +1125,11 @@ export class Game {
     if (k === 'a') await this.interact();
     else if (k === 'b' || k === 'menu') await this.startMenu();
     else if (k === 'bag') { this.busy = true; try { if (await this.fieldBag()) return; } finally { this.busy = false; } }
-    else if (k === 'map') { this.busy = true; await mapScreen(this); this.busy = false; }
+    else if (k === 'map') { this.busy = true; try { await mapScreen(this); } finally { this.busy = false; } }
     else if (k === 'velo') { this.busy = true; try { await this.toggleVelo(); } finally { this.busy = false; } }
-    else if (k === 'quests') { this.busy = true; await questsScreen(this); this.busy = false; }
-    else if (k === 'trophies') { this.busy = true; await trophiesScreen(this); this.busy = false; }
-    else if (k === 'friends') { this.busy = true; await friendsScreen(this); this.busy = false; }
-    else if (k === 'hud') this.hud?.toggle();
+    else if (k === 'quests') { this.busy = true; try { await questsScreen(this); } finally { this.busy = false; } }
+    else if (k === 'trophies') await this.openTrophies();
+    else if (k === 'friends') { this.busy = true; try { await friendsScreen(this); } finally { this.busy = false; } }
   }
   async interact() {
     const p = this.player, m = this.mapObj, [dx, dy] = DIRS[p.dir], st0 = this.state;
@@ -1230,7 +1235,8 @@ export class Game {
     await ui.say(L.intro);
     if (!(await ui.yesNo(`${name} te fixe du regard.\nL'affronter ?`))) return;
     if (!st.flags['L:' + L.id]) st.flags['L:' + L.id] = 'met';
-    const res = await this.wildBattle([[L.sp, L.lvl, L.lvl, 1]], { fixed: true, music: 'legend' });
+    await playBossCinematic(this, { sp: L.sp, id: L.id, title: name, shadow: !!L.shadow });
+    const res = await this.wildBattle([[L.sp, L.lvl, L.lvl, 1]], { fixed: true, music: battleMusicForLegend(L.sp, !!L.shadow) });
     if (L.id === 'hooh') st.flags.hoohDone = true;
     if (L.after) await L.after(this.api(), res);
     if (res === 'caught' || res === 'win') {
@@ -1657,7 +1663,19 @@ export class Game {
       else if (k === 'trophies') await trophiesScreen(this);
       else if (k === 'chat') { openChatAfter = true; break; }
       else if (k === 'domaine') { this.busy = false; if (await allerDomaine(this)) break; this.busy = true; }
-      else if (k === 'opt') await optionsScreen(this);
+      else if (k === 'opt') {
+        const res = await optionsScreen(this);
+        if (res && res.reload) {
+          const ok = await this.ui.yesNo('Les graphismes ont changé ! Sauvegarder et relancer maintenant pour les appliquer ?');
+          if (ok) {
+            if (this.state && !this.enCombat) this.save(true);
+            try { sessionStorage.setItem('odyssee-auto-action', 'continue'); } catch (e) {}
+            await this.ui.fade(true, 250);
+            location.reload();
+            return;
+          }
+        }
+      }
       else if (k === 'code') {
         // le code reprend la partie telle qu'elle est maintenant : on sauvegarde d'abord
         this.save(true);
@@ -1948,7 +1966,16 @@ export class Game {
     const d = n.def, tr = d.trainer, st = this.state;
     if (this.noTrainers) { await this.ui.say(`${tr.cls || 'Dresseur'} ${tr.name} : (version de test, combats de dresseurs désactivés)`); return 'skip'; }
     this.busy = true;
-    const music = d.leader != null ? 'leader' : d.champion ? 'champion' : d.rival ? 'rival' : 'trainer';
+    const isElite = tr.cls === 'Conseil 4';
+    const isChampion = !!d.champion || tr.cls === 'Maître';
+    const leaderObj = d.leader != null
+      ? LEADERS[d.leader]
+      : ((tr.cls === 'Champion' || tr.cls === 'Championne') ? LEADERS.find((L) => L.name === tr.name) : null);
+    const isEclipseBoss = d.winScript === 'boss1' || d.winScript === 'boss2' || tr.cls === 'Chef Éclipse' || tr.cls === 'Admin Éclipse';
+    const isTourFinale = n.id === 'tour:6';
+    const isBossRematch = !!d.boss && !String(n.id || '').startsWith('tour:');
+    const dMusic = (d.music === 'leader' && isElite) ? 'elite4' : d.music;
+    const music = dMusic || (isChampion ? 'champion' : isElite ? 'elite4' : (d.leader != null || leaderObj) ? 'leader' : d.rival ? 'rival' : isTourFinale ? 'champion' : d.boss ? 'leader' : 'trainer');
     if (spotted) {
       this.musicLock = true; this.sound.play(music === 'trainer' ? 'trainer' : music);
       n.bang = true; this.sound.sfx('bang'); await wait(650); n.bang = false;
@@ -1984,7 +2011,21 @@ export class Game {
         shiny: false
       });
     });
-    const res = await this.runBattle({ trainer: { ...tr, items: { ...(tr.items || {}) } }, party, music, id: n.id, leader: d.leader, champion: d.champion, rival: d.rival, noWhiteout: d.noWhiteout });
+    if (d.leader != null || isChampion || isElite || isEclipseBoss || isTourFinale || isBossRematch) {
+      await playBossCinematic(this, {
+        trainer: tr,
+        cls: tr.cls,
+        bs: tr.bs || tr.ow || n.sprite,
+        leader: d.leader,
+        champion: isChampion,
+        elite: isElite,
+        eclipse: isEclipseBoss,
+        gymType: leaderObj?.type,
+        sub: isTourFinale ? 'Combat 7/7 · Sommet de la Tour' : undefined,
+        badge: isTourFinale ? 'TOUR DE COMBAT · FINALE' : undefined,
+      });
+    }
+    const res = await this.runBattle({ trainer: { ...tr, bs: tr.bs || tr.ow || n.sprite, items: { ...(tr.items || {}) } }, party, music, id: n.id, leader: d.leader, champion: d.champion, rival: d.rival, noWhiteout: d.noWhiteout, format: tr.format || d.format, slots: tr.slots || d.slots });
     this.musicLock = false;
     if (res === 'win') {
       st.flags['T:' + n.id] = true;
@@ -2162,8 +2203,9 @@ export class Game {
   }
   async runBattleSafe(o) {
     const st = this.state;
-    const kind = o.wild ? o.music || 'wild' : o.music || 'trainer';
-    const curtain = await this.encounterIntro(kind, !!o.wild);
+    const isWild = !!(o.wild || o.wildParty);
+    const kind = isWild ? o.music || 'wild' : o.music || 'trainer';
+    const curtain = await this.encounterIntro(kind, isWild);
     const m = this.mapObj, z = this.zone;
     const isVillage = z?.town === 'aube' || z?.town === 'sylve' || z?.theme === 'village';
     const isCity = !!z?.town || z?.name?.includes('Cité') || z?.name?.includes('Port-');
@@ -2186,17 +2228,19 @@ export class Game {
       const pid = forms && forms[(o.trainer.megaSeed || 0) % forms.length];
       if (pid) { target.item = MEGA_FORMS[pid].stone; o.trainer = { ...o.trainer, mega: true }; }
     }
-    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag, mega: (st.bag[MEGA_RING] || 0) > 0 }, foe: o.wild ? { name: 'sauvage', party: [o.wild] } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap(), weather: BATTLE_WEATHERS.includes(weather) ? weather : undefined, weatherTurns: o.weather ? 0 : 5 });
+    const format = o.format || o.trainer?.format, slots = o.slots || o.trainer?.slots;
+    const wildParty = o.wildParty || (o.wild ? [o.wild] : null);
+    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag, mega: (st.bag[MEGA_RING] || 0) > 0 }, foe: wildParty ? { name: 'sauvage', party: wildParty } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap(), weather: BATTLE_WEATHERS.includes(weather) ? weather : undefined, weatherTurns: o.weather ? 0 : 5, format, slots });
     // combat de dresseur en cours : noté dans la sauvegarde, pour que recharger la page ne permette pas d'y échapper
     if (o.trainer && !o.trainer.friendly && !o.noWhiteout) { st.combatEnCours = true; this.save(true); }
-    const foeMons = o.wild ? [o.wild] : o.party;
+    const foeMons = wildParty || o.party;
     const h = this.hour();
     const result = await this.bv.run(battle, { bg, night: m.outdoor && (h >= 20 || h < 5.5), weather: BATTLE_WEATHERS.includes(weather) ? weather : 'none', curtain });
     // argent
     if (result === 'win' && battle.prizeMoney) st.money += battle.prizeMoney;
     try { this.checkTrophies?.(true); } catch (e) {}
     if (result === 'caught') {
-      const mon = foeMons[0]; mon.ot = st.name; mon.met = this.locationName();
+      const mon = battle.caughtMon || foeMons[0]; mon.ot = st.name; mon.met = this.locationName();
       const isNew = !st.dex.caught.includes(mon.sp);
       this.markCaught(mon.sp);
       this.bv.close();
@@ -2397,16 +2441,36 @@ export class Game {
         const t = { cls: 'Dresseur', prize: 40, ai: 'smart', ...tr, bs: tr.bs || tr.ow || 'garde' };
         if (t.intro) await ui().say(t.intro, { speaker: t.cls ? `${t.cls} ${t.name}` : t.name, face: t.bs || t.ow });
         const isRival = t.cls === 'Rival' || t.name === RIVAL_NAME || t.rival;
+        const isBrumeBoss = t.cls === 'Chef de la Brume' || t.cls === 'Admin de la Brume' || t.cls === 'Chef Éclipse' || t.cls === 'Admin Éclipse';
+        const leaderMatch = (t.cls === 'Champion' || t.cls === 'Championne') ? LEADERS.find((L) => L.name === t.name) : null;
+        if (isBrumeBoss || leaderMatch || (t.cls === 'Rival' && t.name === RIVAL_NAME) || t.boss || t.cls === 'Maître') {
+          await playBossCinematic(g, {
+            trainer: t,
+            cls: t.cls,
+            bs: t.bs || t.ow,
+            gymType: leaderMatch?.type,
+            eclipse: isBrumeBoss,
+            rival: isRival,
+            sub: t.name === 'Nox' ? 'Chef de la Brume · Orbe Rouge' : isBrumeBoss ? t.cls : (t.name === RIVAL_NAME ? 'Dernier Duel · Bourg-Aube' : undefined),
+          });
+        }
         const party = isRival ? buildRivalParty(g, t.team) : t.team.map(([sp, lvl]) => createMon(sp, lvl, { iv: Array(6).fill(Math.min(31, 10 + lvl / 2 | 0)), shiny: false }));
         g.musicLock = true;
         const items = isRival ? getRivalItems(g) : { ...(t.items || {}) };
-        const res = await g.runBattle({ trainer: { ...t, items }, party, music: t.music || (isRival ? 'rival' : 'trainer'), rival: isRival, noWhiteout: t.noWhiteout });
+        const fightMusic = t.music || (t.name === 'Nox' ? 'legendElemental' : isBrumeBoss ? 'eclipse' : leaderMatch ? 'leader' : isRival ? 'rival' : t.boss ? 'champion' : 'trainer');
+        const res = await g.runBattle({ trainer: { ...t, items }, party, music: fightMusic, rival: isRival, noWhiteout: t.noWhiteout, format: t.format, slots: t.slots });
         g.musicLock = false; g.updateZone();
         if (res === 'win' && t.after) await ui().say(t.after, { speaker: t.cls ? `${t.cls} ${t.name}` : t.name, face: t.bs || t.ow });
         return res;
       },
       /** rencontre d'un Pokémon (sauvage ou légendaire) */
-      wild: async (sp, lvl, o = {}) => { g.sound.cry(ASSETS.cry(sp)); return g.wildBattle([[sp, lvl, lvl, 1]], { fixed: true, music: o.music || 'legend' }); },
+      wild: async (sp, lvl, o = {}) => {
+        g.sound.cry(ASSETS.cry(sp));
+        if (o.cinematic === true || (o.cinematic !== false && isLegendarySpecies(sp))) {
+          await playBossCinematic(g, { sp, title: SPECIES[sp]?.n, shadow: !!o.shadow, preset: o.preset, duration: o.duration });
+        }
+        return g.wildBattle([[sp, lvl, lvl, 1]], { fixed: true, music: o.music || battleMusicForLegend(sp, !!o.shadow) });
+      },
       /** Pokémon offert (équipe, sinon PC) */
       giveMon: async (sp, lvl, o = {}) => {
         const mon = createMon(sp, lvl, { ot: o.ot || st().name, met: o.met || g.locationName(), shiny: false });
@@ -2465,10 +2529,15 @@ export class Game {
     if (name === 'pierre') return entretienPierre(this);
     if (name === 'apparence') return this.apparence();
     if (name === 'architecte') return architecte(this);
+    if (name === 'gardienDomaine') return gardienDomaine(this, n);
     if (name === 'resident') return resident(this, n);
     if (name === 'faune') return parlerFaune(this, n);
     if (name === 'colporteur') return colporteur(this, n);
     if (name === 'tourCombat') return tourCombat(this, n);
+    if (name === 'clubCombat') return clubCombat(this, n);
+    if (name === 'dojoMamadou') return dojoMamadou(this, n);
+    if (name === 'dojoBoutique') return dojoBoutique(this, n);
+    if (name === 'dojoMascotte') return dojoMascotte(this, n);
     if (name === 'marche') return marche(this, n);
     if (name === 'echange') return echange(this, n);
     if (name === 'relais') return relais(this, n);
@@ -2778,6 +2847,22 @@ async chooseStarter(sp, cap) {
       if (n > 1) await this.npcWalk(rival, OPP[dir], n - 1);
       rival.dir = OPP[dir];
       await ui.say(lines, { speaker: W.name });
+      if (flag === 'rivalB3' || flag === 'rivalB4' || flag === 'rival4' || flag === 'rival5') {
+        const subMap = {
+          rivalB3: 'Dernier Rempart · Fort-Écaille',
+          rivalB4: 'Duel au Sommet · Cap des Étoiles',
+          rival4: 'Aux Portes de l\'Archipel',
+          rival5: 'Combat Ultime avant la Ligue',
+        };
+        await playBossCinematic(this, {
+          preset: flag === 'rivalB3' ? 'eclipse' : 'rival',
+          title: W.name,
+          sub: subMap[flag],
+          badge: flag === 'rivalB3' ? 'GARDE D\'ÉCAILLE · DERNIER REMPART' : 'AFFRONTEMENT RIVAL',
+          bs: W.bs || W.sprite,
+          trainer: { cls: W.cls || 'Rival', name: W.name, bs: W.bs },
+        });
+      }
       const party = buildRivalParty(this, team(R));
       const res = await this.runBattle({ trainer: { cls: W.cls || 'Rival', name: W.name, prize: 40, bs: W.bs, ai: st.badges.some(Boolean) ? 'smart' : 'normal', items: getRivalItems(this), lose: lvlText, megaSp: st.badges.filter(Boolean).length >= 8 ? 'ace' : undefined }, party, music: 'rival', rival: true });
       this.musicLock = false;
@@ -2823,7 +2908,16 @@ async chooseStarter(sp, cap) {
       await ui.say(['La mer se met à scintiller...', 'Une immense silhouette bleue glisse entre les vagues.', 'C\'est Odyssor, le géant des océans !']);
       if (st.flags.rivalB4) await ui.say(['... Il est magnifique.', 'Les anciens disent que Odyssor a guidé les premiers marins jusqu\'aux îles, avant même la Ligue.', 'Vas-y. C\'est toi qu\'il est venu voir.'], { speaker: this.rivalB().name });
       await ui.flash(4, '#cfe4ff', 90);
-      const res = await this.wildBattle([[1052, 50, 50, 1]], { fixed: true, music: 'champion' });
+      await playBossCinematic(this, {
+      sp: 1052,
+      id: 'odyssor',
+      title: 'Odyssor',
+      sub: 'Gardien des Étoiles et des Marées',
+      badge: 'LÉGENDAIRE MYTHIQUE · CAP DES ÉTOILES',
+      preset: 'abyssal',
+      duration: 8.0,
+    });
+    const res = await this.wildBattle([[1052, 50, 50, 1]], { fixed: true, music: battleMusicForLegend(1052) });
       if (res === 'caught') { st.flags.odyssor = 'caught'; await ui.say(['Odyssor a rejoint ton équipe.', 'Les marins d\'Odyssée raconteront longtemps cette nuit-là.']); }
       else await ui.say(['Odyssor replonge et disparaît vers le large...', 'Peut-être reviendra-t-il un autre jour.']);
     } finally {

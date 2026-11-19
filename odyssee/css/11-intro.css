@@ -1,7 +1,7 @@
 /* ---------------- cinématique d'ouverture (Nouvelle partie) ---------------- */
-.cine-scr { background: #000; display: flex; align-items: center; justify-content: center; z-index: 30; overflow: hidden; }
+.cine-scr { background: #000; display: flex; align-items: center; justify-content: center; z-index: 45; overflow: hidden; }
 .cine-vid { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
-.cine-skip { position: absolute; right: calc(var(--px) * 10); bottom: calc(var(--px) * 8); z-index: 32;
+.cine-skip { position: absolute; right: calc(var(--px) * 10); bottom: calc(var(--px) * 8); z-index: 46;
   font: inherit; font-size: calc(var(--px) * 7.5); font-weight: 600; color: rgba(255, 250, 232, .92);
   background: rgba(14, 22, 38, .72); border: calc(var(--px) * 1) solid rgba(184, 210, 244, .55);
   border-radius: calc(var(--px) * 4); padding: calc(var(--px) * 3) calc(var(--px) * 6);
@@ -173,3 +173,80 @@
   background: rgba(34, 52, 92, .9); color: #fff4c2; font-size: calc(var(--px) * 5.4);
   padding: calc(var(--px) * .6) calc(var(--px) * 4); border-radius: calc(var(--px) * 4);
   border: calc(var(--px) * .8) solid rgba(190, 216, 255, .6); text-shadow: none; }
+
+/* ---------------- sélecteur de graphismes au premier lancement ---------------- */
+.gfx-pick-scr { display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 34; pointer-events: auto; }
+.gfx-pick-wrap { position: relative; z-index: 6; width: min(94vw, calc(var(--px) * 320)); display: flex; flex-direction: column;
+  align-items: center; gap: calc(var(--px) * 4.5); padding-top: calc(var(--px) * 14); }
+.gfx-pick-title { font-size: calc(var(--px) * 10.5); font-weight: 700; color: #fff4c2; text-align: center;
+  letter-spacing: .5px; text-shadow: 0 calc(var(--px) * 1.4) calc(var(--px) * 4) rgba(12, 20, 38, .85), var(--px) var(--px) 0 #0c1424; }
+.gfx-pick-sub { font-size: calc(var(--px) * 5.8); color: #f0f6ff; text-align: center; max-width: calc(var(--px) * 316);
+  background: rgba(18, 30, 58, .72); border: calc(var(--px) * .8) solid rgba(180, 210, 250, .35); border-radius: calc(var(--px) * 4);
+  padding: calc(var(--px) * 1.6) calc(var(--px) * 6); line-height: 1.3; text-shadow: var(--px) var(--px) 0 #0c1424; }
+.gfx-pick-sub b { color: #ffe28a; }
+.gfx-pick-cards { display: flex; gap: calc(var(--px) * 8); width: 100%; justify-content: center; align-items: stretch; }
+.gfx-pick-card { flex: 1; max-width: calc(var(--px) * 150); display: flex; flex-direction: column; align-items: center;
+  padding: calc(var(--px) * 4.5) calc(var(--px) * 5); text-align: center; cursor: pointer;
+  background: linear-gradient(180deg, rgba(40, 62, 108, .94) 0%, rgba(22, 36, 66, .97) 100%);
+  border: calc(var(--px) * 1.4) solid #162442; border-radius: calc(var(--px) * 6);
+  box-shadow: inset 0 0 0 calc(var(--px) * 1.2) #8aa8dc, 0 calc(var(--px) * 4) calc(var(--px) * 10) rgba(12, 22, 46, .55);
+  transition: transform .18s cubic-bezier(.22, 1, .36, 1), box-shadow .18s ease, background .18s ease; }
+.gfx-pick-card:hover { transform: translateY(calc(var(--px) * -2)); }
+.gfx-pick-card.on { transform: translateY(calc(var(--px) * -3)) scale(1.025);
+  background: linear-gradient(180deg, rgba(56, 86, 144, .98) 0%, rgba(28, 46, 84, .99) 100%);
+  box-shadow: inset 0 0 0 calc(var(--px) * 1.6) #ffd860, 0 0 calc(var(--px) * 9) rgba(255, 216, 88, .45), 0 calc(var(--px) * 5) calc(var(--px) * 11) rgba(12, 22, 46, .65); }
+.gfx-pick-badge { display: inline-block; font-size: calc(var(--px) * 5); font-weight: 700; color: #162238;
+  background: linear-gradient(180deg, #ffe888, #f0b838); padding: calc(var(--px) * .6) calc(var(--px) * 4);
+  border-radius: calc(var(--px) * 3.5); margin-bottom: calc(var(--px) * 2.5); }
+.gfx-pick-stage { position: relative; width: 100%; height: calc(var(--px) * 66); overflow: hidden;
+  border-radius: calc(var(--px) * 4.5); border: calc(var(--px) * .8) solid rgba(190, 216, 255, .36);
+  background: linear-gradient(180deg, #74b4f0 0%, #9cd4ff 52%, #6ec464 53%, #4d9e48 100%); }
+.gfx-pick-card[data-sol="noirblanc"] .gfx-pick-stage {
+  background: linear-gradient(180deg, #8cc8f8 0%, #bae0fc 52%, #7cc864 53%, #589c46 100%); }
+.gfx-prev-tree, .gfx-prev-bld, .gfx-prev-mon { position: absolute; image-rendering: pixelated; object-fit: contain; pointer-events: none; }
+.gfx-prev-tree { left: calc(var(--px) * 6); bottom: calc(var(--px) * 8); height: calc(var(--px) * 42); width: auto;
+  filter: drop-shadow(0 calc(var(--px) * 1.5) calc(var(--px) * 1.5) rgba(0, 0, 0, .35)); }
+.gfx-prev-bld { left: 48%; bottom: calc(var(--px) * 8); transform: translateX(-50%); height: calc(var(--px) * 50); max-width: calc(var(--px) * 70);
+  filter: drop-shadow(0 calc(var(--px) * 2) calc(var(--px) * 2) rgba(0, 0, 0, .4)); }
+.gfx-prev-mon { right: calc(var(--px) * 5); bottom: calc(var(--px) * 5); height: calc(var(--px) * 38); width: auto;
+  filter: drop-shadow(0 calc(var(--px) * 1.5) calc(var(--px) * 1.5) rgba(0, 0, 0, .45)); }
+.gfx-prev-spr { position: absolute; left: 26%; bottom: calc(var(--px) * 4); width: 64px; height: 64px;
+  background: url(../img/chars.png) -64px 0 no-repeat; transform: translateX(-50%) scale(calc(var(--px) * 0.44 / 1px));
+  transform-origin: 50% 100%; image-rendering: pixelated; pointer-events: none; }
+.gfx-prev-spr.bw { background-image: url(../img/gfx/noirblanc/chars.png); }
+.gfx-pick-name { font-size: calc(var(--px) * 8.5); font-weight: 700; color: #fff8d8; margin-top: calc(var(--px) * 2.5);
+  text-shadow: var(--px) var(--px) 0 #0c1424; }
+.gfx-pick-desc { font-size: calc(var(--px) * 5.2); color: #cde0ff; line-height: 1.28; margin-top: calc(var(--px) * 1); flex: 1; }
+.gfx-pick-check { margin-top: calc(var(--px) * 2.5); font-size: calc(var(--px) * 5.4); font-weight: 700;
+  color: #90f0a8; opacity: 0; transition: opacity .15s ease; text-shadow: var(--px) var(--px) 0 #0c1424; }
+.gfx-pick-card.on .gfx-pick-check { opacity: 1; }
+
+.gfx-pick-sprites { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: calc(var(--px) * 3);
+  background: rgba(20, 32, 60, .82); border: calc(var(--px) * 1) solid rgba(170, 200, 245, .36);
+  border-radius: calc(var(--px) * 4.5); padding: calc(var(--px) * 2.2) calc(var(--px) * 5); transition: border-color .15s ease, box-shadow .15s ease; }
+.gfx-pick-sprites.focus { border-color: #ffd860; box-shadow: 0 0 calc(var(--px) * 5) rgba(255, 216, 88, .3); }
+.gfx-pick-sp-lbl { font-size: calc(var(--px) * 5.8); color: #e6f0ff; font-weight: 600; }
+.gfx-pick-sp-pills { display: flex; gap: calc(var(--px) * 2.5); }
+.gfx-pick-sp-btn { font: inherit; font-size: calc(var(--px) * 5.5); font-weight: 600; color: #dce8ff;
+  background: rgba(255, 255, 255, .1); border: calc(var(--px) * .9) solid rgba(180, 208, 250, .4);
+  border-radius: calc(var(--px) * 3.5); padding: calc(var(--px) * 1.3) calc(var(--px) * 4); cursor: pointer; transition: all .14s ease; }
+.gfx-pick-sp-btn small { opacity: .8; font-weight: 400; }
+.gfx-pick-sp-btn:hover { background: rgba(255, 255, 255, .2); }
+.gfx-pick-sp-btn.on { background: linear-gradient(180deg, #ffe888, #f0b838); color: #162238; border-color: #121c30; }
+
+.gfx-pick-foot { display: flex; align-items: center; justify-content: center; gap: calc(var(--px) * 6); margin-top: calc(var(--px) * .5); }
+.gfx-pick-hint { font-size: calc(var(--px) * 5.4); color: #c4daf8; }
+.gfx-pick-back { font: inherit; font-size: calc(var(--px) * 6.8); font-weight: 600; color: #e8f2ff;
+  background: rgba(34, 52, 90, .88); border: calc(var(--px) * 1) solid rgba(184, 210, 248, .55);
+  border-radius: calc(var(--px) * 4); padding: calc(var(--px) * 2) calc(var(--px) * 6); cursor: pointer; }
+.gfx-pick-back:hover { background: rgba(52, 76, 128, .95); }
+.gfx-pick-ok { font: inherit; font-size: calc(var(--px) * 7.5); font-weight: 700; color: #142416;
+  background: linear-gradient(180deg, #9cf4b4 0%, #48c070 100%); border: calc(var(--px) * 1.1) solid #0e2818;
+  border-radius: calc(var(--px) * 4.5); padding: calc(var(--px) * 2.2) calc(var(--px) * 8); cursor: pointer;
+  box-shadow: 0 calc(var(--px) * 2) 0 rgba(0, 0, 0, .4); transition: transform .12s ease, filter .12s ease; }
+.gfx-pick-ok:hover { filter: brightness(1.07); transform: translateY(calc(var(--px) * -1)); }
+
+@media (max-aspect-ratio: 4/3) {
+  .gfx-pick-stage { height: calc(var(--px) * 52); }
+  .gfx-pick-desc { display: none; }
+}

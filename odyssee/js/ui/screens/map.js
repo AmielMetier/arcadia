@@ -19,7 +19,7 @@ import { ASSETS } from '../../assets.js';
 import { SPRITES } from '../../data/sprites.js';
 import { T, walkable } from '../../world/tiles.js';
 import { TYPE_FR, screen, closer } from './common.js';
-import { preparerLocale, dessinerLocale, vueLocale } from './carteLocale.js';
+import { preparerLocale, dessinerLocale, vueLocale, capVers } from './carteLocale.js';
 
 /* ================= CARTE DE LA RÉGION ================= */
 // La carte se dévoile au fil du voyage : seules les zones parcourues sont dessinées, le reste n'est qu'une étendue
@@ -361,7 +361,7 @@ function playerAspect(v, ar) {
   return { x: v.x + (v.w - w) / 2, y: v.y + (v.h - h) / 2, w, h };
 }
 
-export function mapScreen(game) {
+export function mapScreen(game, opts = {}) {
   const ui = game.ui, W = game.world.maps.monde, towns = game.world.towns, st = game.state;
   const allTowns = Object.values(towns);
   const visited = new Set(st.visited || []);
@@ -447,6 +447,7 @@ export function mapScreen(game) {
           <div class="map-corner tl"></div><div class="map-corner tr"></div>
           <div class="map-corner bl"></div><div class="map-corner br"></div>
         </div>
+        <div class="map-town-bar"></div>
       </div>
 
       <!-- Panneau Inférieur Tactile B2W2 -->
@@ -491,7 +492,7 @@ export function mapScreen(game) {
       }
     };
     // carte locale (le lieu où l'on est, case par case) : préparée au premier passage sur l'onglet
-    let locale = game.mapObj?.floor === 'cave' ? true : st.mapMode === 'locale', L = null, viewL = null;
+    let locale = opts.locale !== undefined ? !!opts.locale : (game.mapObj?.floor === 'cave' ? true : st.mapMode === 'locale'), L = null, viewL = null;
     const place = (node, x, y) => {
       const view0 = view; { const view = locale && node === me ? viewL : view0;
       node.style.left = ((x - view.x) / view.w * 100) + '%';
@@ -583,25 +584,59 @@ export function mapScreen(game) {
 
     let k = 0;
     const titre = s.querySelector('.map-hdr-main');
+    const townBar = s.querySelector('.map-town-bar');
+    const toggleCible = (b) => {
+      const cur = st.villeCible;
+      st.villeCible = cur && (!cur.mapId || cur.mapId === L.id) && cur.zone === L.nom && cur.key === b.key
+        ? null
+        : { mapId: L.id, zone: L.nom, key: b.key, txt: b.txt, ico: b.ico, col: b.col, x: b.px, y: b.py };
+      game.save?.(true);
+      ui.sound.sfx(st.villeCible ? 'select' : 'cancel');
+      showLocale();
+      draw();
+    };
+    const renderTownBar = () => {
+      if (!townBar) return;
+      const bats = L?.bats || [];
+      if (!locale || !bats.length) { townBar.innerHTML = ''; return; }
+      const c = st.villeCible && (!st.villeCible.mapId || st.villeCible.mapId === L.id) && st.villeCible.zone === L.nom ? st.villeCible : null;
+      townBar.innerHTML = `<span class="mtb-lbl">📍 Repères :</span>` + bats.map((b) => {
+        const cap = capVers(b.px - (L.p.x + 0.5), b.py - (L.p.y + 0.5));
+        const on = c && c.key === b.key;
+        return `<button type="button" class="mtb-chip${on ? ' on' : ''}${b.ess ? ' ess' : ''}" data-bat="${esc(b.key)}" style="--mc:${b.col}" title="${esc(b.sub || b.txt)} (${cap.label})"><i>${esc(b.ico)}</i><span>${esc(b.txt)}</span><b>${cap.arrow} ${cap.dist}m</b></button>`;
+      }).join('') + (c ? `<button type="button" class="mtb-clear" data-bat-clear="1" title="Arrêter le guidage">✕</button>` : '');
+      townBar.querySelectorAll('[data-bat]').forEach((btn) => btn.addEventListener('click', () => {
+        const b = bats.find((q) => q.key === btn.dataset.bat); if (b) toggleCible(b);
+      }));
+      townBar.querySelector('[data-bat-clear]')?.addEventListener('click', () => {
+        st.villeCible = null; game.save?.(true); ui.sound.sfx('cancel'); showLocale(); draw();
+      });
+    };
     const showLocale = () => {
       L ||= preparerLocale(game);
       whereEl.textContent = L.nom;
       tagEl.textContent = L.grotte ? 'Grotte' : L.ville ? 'Ville' : L.id === 'monde' ? 'Route' : 'Lieu';
       tagEl.className = 'map-tag ' + (L.ville ? 'town' : 'here');
-      // part du lieu déjà parcourue
       const FM = seenMask(game, L.id), B = L.id === 'monde' ? 8 : BLOC_LOCAL;
       let n = 0, vus = 0;
       for (let by = Math.floor(L.y0 / B); by <= Math.floor(L.y1 / B); by++) for (let bx = Math.floor(L.x0 / B); bx <= Math.floor(L.x1 / B); bx++) { n++; if (FM.set.has(by * FM.cw + bx)) vus++; }
       const zKey = L.zone ? findZoneSpawnKey(L.zone) : null, zCatch = zKey ? getZoneCatchStats(st, zKey) : null;
-      subEl.innerHTML = `Carte locale · <b>${Math.round(vus / Math.max(1, n) * 100)} %</b> exploré` + (zCatch ? ` <span class="map-route-catch-badge${zCatch.complete ? ' complete' : ''}">· 🐾 Pokédex Zone : <b>${zCatch.caught} / ${zCatch.total}</b> capturés${zCatch.complete ? ' ★' : ''}</span>` : '');
+      const cible = st.villeCible && (!st.villeCible.mapId || st.villeCible.mapId === L.id) && st.villeCible.zone === L.nom ? L.bats?.find((b) => b.key === st.villeCible.key) : null;
+      if (cible) {
+        const cap = capVers(cible.px - (L.p.x + 0.5), cible.py - (L.p.y + 0.5));
+        subEl.innerHTML = `🧭 Guidage : <b>${esc(cible.ico)} ${esc(cible.txt)}</b>${cible.sub ? ` (${esc(cible.sub)})` : ''} <span class="map-sub-dist">· ${cap.arrow} ${cap.label} (${cap.dist} cases)</span>`;
+      } else {
+        subEl.innerHTML = `Carte locale · <b>${Math.round(vus / Math.max(1, n) * 100)} %</b> exploré` + (L.bats?.length ? ' · Clique un repère ci-dessus pour l\'épingler sur ta boussole' : '') + (zCatch ? ` <span class="map-route-catch-badge${zCatch.complete ? ' complete' : ''}">· 🐾 Pokédex Zone : <b>${zCatch.caught} / ${zCatch.total}</b> capturés${zCatch.complete ? ' ★' : ''}</span>` : '');
+      }
+      renderTownBar();
     };
     const setMode = (loc, son = true) => {
-      locale = loc; st.mapMode = loc ? 'locale' : 'region';
+      locale = loc; if (opts.locale === undefined) st.mapMode = loc ? 'locale' : 'region';
       s.classList.toggle('mode-locale', loc);
       s.querySelectorAll('.map-onglet').forEach((b) => b.classList.toggle('on', (b.dataset.mode === 'locale') === loc));
       titre.textContent = loc ? `CARTE LOCALE — ${(L ||= preparerLocale(game)).nom.toUpperCase()}` : 'CARTE DE LA RÉGION D\'ODYSSÉE';
       if (son) ui.sound.sfx('blip');
-      if (loc) showLocale(); else show();
+      if (loc) showLocale(); else { renderTownBar(); show(); }
       draw();
     };
     const show = () => {
@@ -627,9 +662,21 @@ export function mapScreen(game) {
     };
     setMode(locale, false);
 
-    // Clic n'importe où sur la carte : Waypoint GPS interactif
+    // Clic n'importe où sur la carte : Waypoint GPS interactif (ou ciblage d'un bâtiment sur la carte locale)
     c.addEventListener('click', (e) => {
-      if (locale) return;
+      if (locale) {
+        if (!L?.bats?.length || !viewL) return;
+        const rect = c.getBoundingClientRect();
+        const wx = viewL.x + ((e.clientX - rect.left) / rect.width) * viewL.w;
+        const wy = viewL.y + ((e.clientY - rect.top) / rect.height) * viewL.h;
+        let near = null, bd = Math.max(4, 24 / rect.width * viewL.w);
+        for (const b of L.bats) {
+          const d = Math.hypot(b.x - wx, b.y - wy);
+          if (d < bd) { bd = d; near = b; }
+        }
+        if (near) toggleCible(near);
+        return;
+      }
       const rect = c.getBoundingClientRect();
       const clickX = (e.clientX - rect.left) / rect.width;
       const clickY = (e.clientY - rect.top) / rect.height;

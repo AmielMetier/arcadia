@@ -2,30 +2,257 @@
 // Elle s'ouvre depuis la carte de la région (onglet « Ici », touche Tab) ; comme la carte de la région, elle ne montre
 // que ce qu'on a déjà parcouru (le reste dort sous le brouillard) et se complète à chaque pas.
 import { T } from '../../world/tiles.js';
+import { LEADERS } from '../../world/region.js';
+import { TYPE_FR } from './common.js';
 import { seenMask, brouillard, caseVue, BLOC_LOCAL } from './map.js';
 
 const MAX_W = 200, MAX_H = 150;   // au-delà (mer, très grande zone) : un cadre autour du joueur
+const DIRS8 = [
+  ['→', 'Est'], ['↘', 'Sud-Est'], ['↓', 'Sud'], ['↙', 'Sud-Ouest'],
+  ['←', 'Ouest'], ['↖', 'Nord-Ouest'], ['↑', 'Nord'], ['↗', 'Nord-Est'],
+];
+const ESSENTIELS = {
+  gym: { txt: 'Arène', ico: '★', col: '#e0a020', prio: 0, ess: true },
+  league: { txt: 'Ligue', ico: '♛', col: '#9333ea', prio: 1, ess: true },
+  dojo: { txt: 'Dojo', ico: '⛩', col: '#dc2626', prio: 2, ess: true },
+  lab: { txt: 'Labo', ico: '⚗', col: '#0ea5e9', prio: 3, ess: true },
+  center: { txt: 'Centre', ico: '+', col: '#e04848', prio: 4, ess: true },
+  mart: { txt: 'Boutique', ico: '¤', col: '#3a78d8', prio: 5, ess: true },
+};
+const BATS_A_IGNORER = new Set([
+  'maison', 'house', 'etal', 'étal', 'fontaine', 'puits', 'tour',
+  'cabane à outils', 'cabanepecheur', 'cabanechasseur',
+]);
+
+/** direction (8 axes) et distance en cases entre le joueur et un point cible */
+export function capVers(dx, dy) {
+  const dist = Math.round(Math.hypot(dx, dy));
+  if (dist <= 2) return { dist, arrow: '✔', label: 'Juste devant' };
+  const idx = ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8;
+  return { dist, arrow: DIRS8[idx][0], label: DIRS8[idx][1] };
+}
+
+/** bornes d'une zone de ville à partir du nom de zone (sans peindre de canevas) */
+function empriseZone(W, z) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const q of W.zones) {
+    if (q.name !== z.name || (z.town && q.town !== z.town)) continue;
+    x0 = Math.min(x0, q.x0); y0 = Math.min(y0, q.y0); x1 = Math.max(x1, q.x1); y1 = Math.max(y1, q.y1);
+  }
+  return { x0, y0, x1, y1 };
+}
+
+/** descripteur léger du lieu actuel (villes, routes, zones sauvages, annexes extérieures, grottes — null en intérieur) */
+export function lieuxVille(game) {
+  const m = game.mapObj;
+  if (!m) return null;
+  const p = game.worldPos ? game.worldPos() : (game.player ? { x: game.player.x, y: game.player.y } : null);
+  if (!p) return null;
+  if (m.id !== 'monde') {
+    if (!m.outdoor && m.floor !== 'cave') return null;
+    return { id: m.id, m, x0: 0, y0: 0, x1: m.w - 1, y1: m.h - 1, nom: m.name || 'Grotte', p, grotte: m.floor === 'cave', ville: false };
+  }
+  const z = m.zoneAt(p.x, p.y);
+  if (!z || z.sea) {
+    const x0 = Math.max(0, Math.round(p.x) - 45), x1 = Math.min(m.w - 1, Math.round(p.x) + 45);
+    const y0 = Math.max(0, Math.round(p.y) - 30), y1 = Math.min(m.h - 1, Math.round(p.y) + 30);
+    return { id: 'monde', m, x0, y0, x1, y1, nom: z?.name || 'En mer', p, zone: null, ville: false };
+  }
+  const cache = (game._villeBoxes ||= {});
+  const fullBox = (cache[z.name] ||= empriseZone(m, z));
+  let box = fullBox;
+  if (box.x1 - box.x0 > MAX_W || box.y1 - box.y0 > MAX_H) {
+    const hw = MAX_W >> 1, hh = MAX_H >> 1;
+    box = {
+      x0: Math.max(box.x0, Math.round(p.x) - hw), y0: Math.max(box.y0, Math.round(p.y) - hh),
+      x1: Math.min(box.x1, Math.round(p.x) + hw), y1: Math.min(box.y1, Math.round(p.y) + hh),
+    };
+  }
+  return { id: 'monde', m, ...box, fullBox, nom: z.name, p, zone: z, ville: !!z.town };
+}
+
+const SOL_SORTIE = new Set([T.PATH, T.PAVE, T.BRIDGE, T.STAIRS]);
+const SOL_MARCHE = new Set([T.PATH, T.PAVE, T.BRIDGE, T.STAIRS, T.GRASS, T.TALL, T.DARKTALL, T.FLOWER, T.SAND, T.SNOW, T.ASH, T.CAVEDOOR]);
+const SOL_VOISIN = new Set([...SOL_MARCHE, T.CUT, T.SMASH, T.BOULDER]);
+const DIR_FR = { n: 'Nord', s: 'Sud', o: 'Ouest', e: 'Est' };
+
+function sortiesZone(game, L) {
+  const { m, nom, fullBox } = L;
+  if (L.id !== 'monde') {
+    const out = [], monWarps = [];
+    for (const [k, w] of m.warps || []) {
+      const [x, y] = k.split(',').map(Number);
+      if (m.buildings?.some((b) => (b.doorX === x || b.door2X === x) && b.doorY === y)) continue;
+      const dest = game.world?.maps?.[w.map];
+      const dz = w.map === 'monde' ? game.world?.maps?.monde?.zoneAt?.(w.x, w.y)?.name : null;
+      const grotte = dest?.floor === 'cave';
+      const label = w.map === 'monde' ? 'Sortie' : grotte ? (dest?.name === nom ? 'Passage' : (dest?.name || 'Passage')) : (dest?.name || 'Sortie');
+      if (out.some((q) => q.wmap === w.map && Math.abs(q.px - (x + 0.5)) + Math.abs(q.py - (y + 0.5)) < 4)) continue;
+      if (w.map === 'monde') monWarps.push(out.length);
+      out.push({
+        key: `warp:${w.map}@${x},${y}`, wmap: w.map, dz,
+        txt: label, ico: w.map === 'monde' ? '⇱' : (grotte ? '↦' : '◖'),
+        col: w.map === 'monde' ? '#06b6d4' : (grotte ? '#f59e0b' : '#10b981'),
+        prio: w.map === 'monde' ? 1 : 2, ess: true, kind: w.map === 'monde' ? 'exit' : 'warp',
+        sub: w.map === 'monde' ? (dz ? `Vers ${dz}` : 'Extérieur') : (grotte ? 'Galerie / Niveau' : 'Lieu'),
+        x: x + 0.5, y: y + 0.5, px: x + 0.5, py: y + 0.5, toujoursVisible: true,
+      });
+    }
+    if (monWarps.length > 1) for (const idx of monWarps) if (out[idx].dz) out[idx].txt = `Vers ${out[idx].dz}`;
+    return out;
+  }
+  const cache = (game._sortiesCache ||= {});
+  if (L.zone && cache[nom]) return cache[nom];
+  const bx = fullBox || L, rx0 = Math.max(1, bx.x0), ry0 = Math.max(1, bx.y0), rx1 = Math.min(m.w - 2, bx.x1), ry1 = Math.min(m.h - 2, bx.y1);
+  const groupes = [];
+  const pousse = (x, y, ox, oy, dir, viaRoute) => {
+    const t = m.get(ox, oy);
+    if (!SOL_VOISIN.has(t)) return;
+    let z = m.zoneAt(ox, oy);
+    if (!z && viaRoute) {
+      const dx = ox - x, dy = oy - y;
+      for (let s = 2; s <= 12 && !z; s++) {
+        const sx = x + dx * s, sy = y + dy * s;
+        if (!m.in(sx, sy) || !SOL_VOISIN.has(m.get(sx, sy))) break;
+        const cand = m.zoneAt(sx, sy);
+        if (cand && cand.name !== nom) z = cand;
+      }
+    }
+    const n = z?.name;
+    if (!n || n === nom) return;
+    if (z.sea && !viaRoute && m.get(x, y) !== T.SAND) return;
+    const g = groupes.find((q) => q.n === n && Math.abs(q.x - x) + Math.abs(q.y - y) < 12);
+    if (g) {
+      if (viaRoute && !g.route) { g.x = x; g.y = y; g.dir = dir; g.k = 1; g.route = true; }
+      else if (viaRoute === g.route) { g.k++; g.x += (x - g.x) / g.k; g.y += (y - g.y) / g.k; }
+    } else {
+      groupes.push({ n, town: !!z.town, sea: !!z.sea, dir, x, y, k: 1, route: viaRoute });
+    }
+  };
+  if (L.zone) {
+    for (let y = ry0; y <= ry1; y++) for (let x = rx0; x <= rx1; x++) {
+      const t = m.get(x, y);
+      if (!SOL_MARCHE.has(t)) continue;
+      if (m.zoneAt(x, y)?.name !== nom) continue;
+      const viaRoute = SOL_SORTIE.has(t);
+      if (m.zoneAt(x, y - 1)?.name !== nom) pousse(x, y, x, y - 1, 'n', viaRoute);
+      if (m.zoneAt(x, y + 1)?.name !== nom) pousse(x, y, x, y + 1, 's', viaRoute);
+      if (m.zoneAt(x - 1, y)?.name !== nom) pousse(x, y, x - 1, y, 'o', viaRoute);
+      if (m.zoneAt(x + 1, y)?.name !== nom) pousse(x, y, x + 1, y, 'e', viaRoute);
+    }
+  } else {
+    for (let x = rx0; x <= rx1; x++) {
+      if (SOL_MARCHE.has(m.get(x, ry0))) pousse(x, ry0, x, ry0 - 1, 'n', SOL_SORTIE.has(m.get(x, ry0)));
+      if (SOL_MARCHE.has(m.get(x, ry1))) pousse(x, ry1, x, ry1 + 1, 's', SOL_SORTIE.has(m.get(x, ry1)));
+    }
+    for (let y = ry0; y <= ry1; y++) {
+      if (SOL_MARCHE.has(m.get(rx0, y))) pousse(rx0, y, rx0 - 1, y, 'o', SOL_SORTIE.has(m.get(rx0, y)));
+      if (SOL_MARCHE.has(m.get(rx1, y))) pousse(rx1, y, rx1 + 1, y, 'e', SOL_SORTIE.has(m.get(rx1, y)));
+    }
+  }
+  // si une destination a une vraie route/pont/escalier, on écarte les passages de pelouse/plage secondaires vers cette même zone
+  const avecRoute = new Set(groupes.filter((g) => g.route).map((g) => g.n));
+  const filtres = groupes.filter((g) => g.route || !avecRoute.has(g.n));
+  const out = filtres.map((g) => {
+    const px = g.x + 0.5, py = g.y + 0.5;
+    return {
+      key: `exit:${g.n}:${g.dir}@${Math.round(px)},${Math.round(py)}`,
+      txt: `→ ${g.n}`, label: g.n, ico: '➜', col: g.town ? '#0ea5e9' : '#06b6d4',
+      prio: L.ville ? 7 : (g.town ? 1 : 3), ess: !L.ville, kind: 'exit',
+      sub: `${g.town ? 'Ville' : g.sea ? 'Littoral' : 'Zone voisine'} · ${DIR_FR[g.dir]}`,
+      x: px, y: py, px, py, sortie: g.dir, toujoursVisible: true,
+    };
+  });
+  if (L.zone) cache[nom] = out;
+  return out;
+}
+
+/** liste triée des repères d'un lieu (bâtiments importants, grottes et sorties vers les zones voisines) */
+export function batimentsImportants(game, L) {
+  const { m, x0, y0, x1, y1, nom, p } = L, out = [], vus = new Set();
+  const z0 = L.zone || (L.id === 'monde' ? m.zoneAt?.(Math.floor((x0 + x1) / 2), Math.floor((y0 + y1) / 2)) : null);
+  const bx = L.fullBox || L;
+  for (const b of m.buildings || []) {
+    if (b.x + b.w < bx.x0 - 3 || b.x > bx.x1 + 3 || b.y + b.d < bx.y0 - 3 || b.y > bx.y1 + 3) continue;
+    if (b.kind === 'cave') {
+      const wx = b.doorX ?? Math.floor(b.x + b.w / 2), wy = b.doorY ?? (b.y + b.d - 1);
+      if (L.zone && m.zoneAt) { const cz = m.zoneAt(wx, wy); if (cz && cz.name !== nom) continue; }
+      const w = m.warpAt?.(wx, wy);
+      const dest = w ? game.world?.maps?.[w.map] : null;
+      const gtxt = dest?.name || 'Grotte';
+      const px = (b.doorX ?? b.x + b.w / 2) + 0.5, py = (b.doorY ?? b.y + b.d) + 0.5;
+      out.push({
+        key: `cave:${gtxt}@${Math.round(px)},${Math.round(py)}`,
+        txt: gtxt, ico: '◖', col: '#f59e0b', prio: 2, ess: true, kind: 'cave',
+        sub: 'Entrée de grotte', x: px, y: py, px, py,
+        d: Math.hypot(px - p.x, py - p.y),
+        vu: typeof document !== 'undefined' ? caseVue(game, L.id, Math.floor(px), Math.floor(py)) : true,
+        toujoursVisible: true,
+      });
+      continue;
+    }
+    if (b.x + b.w < bx.x0 || b.x > bx.x1 || b.y + b.d < bx.y0 || b.y > bx.y1) continue;
+    if (L.id === 'monde' && m.zoneAt && L.zone) {
+      const bz = m.zoneAt(Math.floor(b.x + b.w / 2), Math.floor(b.y + b.d / 2));
+      if (bz && bz.name !== nom) continue;
+    }
+    const ess = ESSENTIELS[b.kind];
+    const brut = (b.name || b.label || '').trim();
+    if (!ess && (!brut || BATS_A_IGNORER.has(brut.toLowerCase()))) continue;
+    const txt = ess ? ess.txt : brut[0].toUpperCase() + brut.slice(1);
+    const px = b.doorX != null ? b.doorX + 0.5 : b.x + b.w / 2;
+    const py = b.doorY != null ? b.doorY + 0.5 : b.y + b.d;
+    const dedup = `${b.kind}:${txt}`;
+    if (vus.has(dedup)) continue;
+    vus.add(dedup);
+    let sub = '';
+    if (b.kind === 'gym' && z0?.gym != null && LEADERS[z0.gym]) {
+      const ch = LEADERS[z0.gym];
+      sub = `Champion ${ch.name} · ${TYPE_FR[ch.type] || ch.type}`;
+    } else if (ess) {
+      sub = b.kind === 'center' ? 'Soin de l\'équipe et PC' : b.kind === 'mart' ? 'Objets et Poké Balls' : b.kind === 'dojo' ? 'Combats Co-op 2v2 & 3v3 de Maître Mamadou' : b.kind === 'lab' ? 'Laboratoire du Professeur' : 'Conseil 4 & Maître';
+    } else {
+      sub = 'Lieu notable';
+    }
+    const base = ess || { txt, ico: '◈', col: '#10b981', prio: L.ville ? 5 : 2, ess: !L.ville };
+    out.push({
+      key: `${txt}@${Math.round(px)},${Math.round(py)}`,
+      txt, ico: base.ico, col: base.col, prio: base.prio, ess: base.ess, kind: b.kind, sub,
+      x: b.x + b.w / 2, y: b.y + b.d / 2, px, py,
+      d: Math.hypot(px - p.x, py - p.y),
+      vu: typeof document !== 'undefined' ? caseVue(game, L.id, Math.floor(px), Math.floor(py)) : true,
+      toujoursVisible: true,
+    });
+  }
+  for (const s of sortiesZone(game, L)) {
+    const inside = s.px >= x0 && s.px <= x1 && s.py >= y0 && s.py <= y1;
+    out.push({
+      ...s,
+      d: Math.hypot(s.px - p.x, s.py - p.y),
+      vu: inside && typeof document !== 'undefined' ? caseVue(game, L.id, Math.floor(s.px), Math.floor(s.py)) : true,
+    });
+  }
+  out.sort((a, b) => (a.prio - b.prio) || (a.d - b.d) || a.txt.localeCompare(b.txt, 'fr'));
+  return out;
+}
 
 /** le lieu à montrer : la grotte (ou carte annexe) entière, sinon la zone de la région où l'on est (toutes ses parties) */
 export function zoneLocale(game) {
   const m = game.mapObj;
   if (m.id !== 'monde' && (m.floor === 'cave' || m.outdoor)) {
-    return { id: m.id, m, x0: 0, y0: 0, x1: m.w - 1, y1: m.h - 1, nom: m.name || 'Grotte', p: { x: game.player.x, y: game.player.y }, grotte: m.floor === 'cave' };
+    return { id: m.id, m, x0: 0, y0: 0, x1: m.w - 1, y1: m.h - 1, nom: m.name || 'Grotte', p: { x: game.player.x, y: game.player.y }, grotte: m.floor === 'cave', ville: false };
   }
   const W = game.world.maps.monde, p = game.worldPos(), z = W.zoneAt(p.x, p.y);
-  let x0, y0, x1, y1, nom = z?.name || 'Environs';
+  let x0, y0, x1, y1, nom = z?.name || 'Environs', fullBox = null;
   if (z?.name && !z.sea) {
-    x0 = Infinity; y0 = Infinity; x1 = -Infinity; y1 = -Infinity;
-    for (const q of W.zones) {
-      if (q.name !== z.name || (z.town && q.town !== z.town)) continue;
-      x0 = Math.min(x0, q.x0); y0 = Math.min(y0, q.y0); x1 = Math.max(x1, q.x1); y1 = Math.max(y1, q.y1);
-    }
-  } else { x0 = p.x - 45; x1 = p.x + 45; y0 = p.y - 30; y1 = p.y + 30; }
+    fullBox = (game._villeBoxes ||= {})[z.name] ||= empriseZone(W, z);
+    ({ x0, y0, x1, y1 } = fullBox);
+  } else { x0 = Math.max(0, Math.round(p.x) - 45); x1 = Math.min(W.w - 1, Math.round(p.x) + 45); y0 = Math.max(0, Math.round(p.y) - 30); y1 = Math.min(W.h - 1, Math.round(p.y) + 30); }
   // trop grand : un cadre autour du joueur
   if (x1 - x0 > MAX_W) { x0 = Math.max(x0, Math.min(x1 - MAX_W, p.x - MAX_W / 2)); x1 = x0 + MAX_W; }
   if (y1 - y0 > MAX_H) { y0 = Math.max(y0, Math.min(y1 - MAX_H, p.y - MAX_H / 2)); y1 = y0 + MAX_H; }
   x0 = Math.max(0, x0 - 1); y0 = Math.max(0, y0 - 1); x1 = Math.min(W.w - 1, x1 + 1); y1 = Math.min(W.h - 1, y1 + 1);
-  return { id: 'monde', m: W, x0, y0, x1, y1, nom, p, zone: z, ville: !!z?.town };
+  return { id: 'monde', m: W, x0, y0, x1, y1, fullBox, nom, p, zone: z?.sea ? null : z, ville: !!z?.town };
 }
 
 /* ---------------- dessin des cases (4 pixels par case, gardé pour la durée de l'écran) ---------------- */
@@ -110,37 +337,9 @@ function peindre(L) {
   return c;
 }
 
-/** repères à écrire par-dessus : bâtiments utiles et sorties vers les lieux voisins */
+/** repères à écrire par-dessus : bâtiments utiles, grottes et sorties vers les lieux voisins */
 function reperes(game, L) {
-  const { m, x0, y0, x1, y1 } = L, out = [];
-  const NOMS = { center: ['Centre', '+', '#e04848'], mart: ['Boutique', '¤', '#3a78d8'], gym: ['Arène', '★', '#e0a020'], league: ['Ligue', '♛', '#9333ea'], lab: ['Labo', '⚗', '#8a96a8'] };
-  for (const b of m.buildings || []) {
-    if (b.x + b.w < x0 || b.x > x1 || b.y + b.d < y0 || b.y > y1) continue;
-    if (b.kind === 'cave') { out.push({ x: b.doorX ?? b.x + b.w / 2, y: (b.doorY ?? b.y + b.d) + 0.5, txt: 'Grotte', ico: '◖', col: '#5a4636', vu: caseVue(game, L.id, b.doorX ?? b.x, b.doorY ?? b.y) }); continue; }
-    const n = NOMS[b.kind]; if (!n) continue;
-    out.push({ x: b.x + b.w / 2, y: b.y + b.d / 2, txt: n[0], ico: n[1], col: n[2], vu: caseVue(game, L.id, Math.floor(b.x + b.w / 2), Math.floor(b.y + b.d / 2)) });
-  }
-  if (L.id === 'monde') {
-    // sorties : un chemin praticable qui franchit le bord du lieu vers une autre zone
-    const W = m, groupes = [];
-    const pousse = (x, y, ox, oy, dir) => {
-      const t = W.get(ox, oy); if (![T.PATH, T.GRASS, T.TALL, T.PAVE, T.BRIDGE, T.SAND, T.SNOW, T.FLOWER, T.STAIRS, T.ASH, T.DARKTALL].includes(t) || ![T.PATH, T.PAVE, T.BRIDGE, T.STAIRS].includes(W.get(x, y))) return;
-      const z = W.zoneAt(ox, oy), n = z?.name; if (!n || n === L.nom || z.sea) return;
-      const g = groupes.find((q) => q.n === n && q.dir === dir && Math.abs(q.x - x) + Math.abs(q.y - y) < 10);
-      if (g) { g.k++; g.x += (x - g.x) / g.k; g.y += (y - g.y) / g.k; } else groupes.push({ n, dir, x, y, k: 1, ox, oy, vu: caseVue(game, 'monde', x, y), loin: caseVue(game, 'monde', ox, oy) });
-    };
-    for (let x = x0; x <= x1; x++) { pousse(x, y0, x, y0 - 1, 'n'); pousse(x, y1, x, y1 + 1, 's'); }
-    for (let y = y0; y <= y1; y++) { pousse(x0, y, x0 - 1, y, 'o'); pousse(x1, y, x1 + 1, y, 'e'); }
-    for (const g of groupes) out.push({ x: g.x + 0.5, y: g.y + 0.5, txt: g.loin ? g.n : '???', sortie: g.dir, vu: g.vu });
-  } else {
-    for (const [k, w] of m.warps || []) {
-      const [x, y] = k.split(',').map(Number);
-      const vers = w.map === 'monde' ? 'Sortie' : game.world.maps[w.map]?.floor === 'cave' ? (game.world.maps[w.map]?.name === m.name ? 'Passage' : game.world.maps[w.map]?.name || 'Passage') : 'Sortie';
-      if (out.some((q) => q.txt === vers && Math.abs(q.x - x) + Math.abs(q.y - y) < 4)) continue;
-      out.push({ x: x + 0.5, y: y + 0.5, txt: vers, ico: '⇱', col: '#2a2420', vu: caseVue(game, m.id, x, y) });
-    }
-  }
-  return out;
+  return batimentsImportants(game, L);
 }
 
 /** cadre (en cases) qui montre tout le lieu au ratio du canvas */
@@ -155,6 +354,7 @@ export function vueLocale(L, ar) {
 export function preparerLocale(game) {
   const L = zoneLocale(game);
   L.img = peindre(L); L.reperes = reperes(game, L);
+  L.bats = L.reperes.filter((r) => r.key);
   return L;
 }
 
@@ -173,31 +373,49 @@ export function dessinerLocale(game, cv, L, v) {
   ctx.save(); ctx.beginPath(); ctx.rect(X(L.x0), Y(L.y0), (L.x1 - L.x0 + 1) * sx, (L.y1 - L.y0 + 1) * sy); ctx.clip();
   brouillard(ctx, cv, seenMask(game, L.id), B, v);
   ctx.restore();
-  // repères (seulement ceux qu'on a déjà vus)
-  const f = Math.max(11, Math.min(16, sx * 2.6)) * (window.devicePixelRatio || 1) / (window.devicePixelRatio || 1);
+  // cap pointillé vers le repère ciblé par la boussole
+  const cible = game.state?.villeCible;
+  const cibleRep = cible && (!cible.mapId || cible.mapId === L.id) && cible.zone === L.nom ? L.bats?.find((b) => b.key === cible.key) : null;
+  if (cibleRep) {
+    const x1 = X(L.p.x + 0.5), y1 = Y(L.p.y + 0.5), x2 = X(cibleRep.x), y2 = Y(cibleRep.y);
+    ctx.save();
+    ctx.setLineDash([7, 5]); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(251, 191, 36, .95)';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.setLineDash([]);
+    const ring = Math.max(12, sx * 2.2);
+    ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x2, y2, ring, 0, 7); ctx.stroke();
+    ctx.restore();
+  }
+  // repères : les bâtiments importants d'une ville restent visibles pour s'orienter même avant d'avoir parcouru chaque rue
+  const f = Math.max(11, Math.min(16, sx * 2.6));
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const r of L.reperes) {
-    if (!r.vu) continue;
+    if (!r.vu && !r.toujoursVisible) continue;
     const cx = X(r.x), cy = Y(r.y);
+    ctx.save();
+    if (!r.vu) ctx.globalAlpha = 0.85;
+    const sel = !!(cibleRep && r.key === cibleRep.key);
     if (r.sortie) {
-      const a = { n: -Math.PI / 2, s: Math.PI / 2, o: Math.PI, e: 0 }[r.sortie], s = Math.max(7, f * 0.7);
+      const a = { n: -Math.PI / 2, s: Math.PI / 2, o: Math.PI, e: 0 }[r.sortie], s = Math.max(7, f * (sel ? 0.85 : 0.7));
       ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
-      ctx.fillStyle = '#00e0ff'; ctx.strokeStyle = '#0b1c2d'; ctx.lineWidth = 2;
+      ctx.fillStyle = sel ? '#fbbf24' : '#00e0ff'; ctx.strokeStyle = '#0b1c2d'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(s, 0); ctx.lineTo(-s * 0.6, -s * 0.7); ctx.lineTo(-s * 0.6, s * 0.7); ctx.closePath(); ctx.stroke(); ctx.fill();
       ctx.restore();
-      // le nom du lieu voisin, dehors, au-delà de la flèche
       const dx = r.sortie === 'e' ? 1 : r.sortie === 'o' ? -1 : 0, dy = r.sortie === 's' ? 1 : r.sortie === 'n' ? -1 : 0;
-      const tx = cx + dx * f * 1.3, ty = cy + dy * f * 1.4;
+      const tx = cx + dx * f * 1.3, ty = cy + dy * f * 1.4, lbl = r.label || r.txt;
       ctx.font = `700 ${Math.round(f)}px system-ui, sans-serif`;
-      const lw = ctx.measureText(r.txt).width, al = dx > 0 ? (tx + lw > cv.width - 4 ? 'right' : 'left') : dx < 0 ? (tx - lw < 4 ? 'left' : 'right') : 'center';
-      etiquette(ctx, al === 'right' && dx > 0 ? cx - f : al === 'left' && dx < 0 ? cx + f : tx, ty, r.txt, f, al);
+      const lw = ctx.measureText(lbl).width, al = dx > 0 ? (tx + lw > cv.width - 4 ? 'right' : 'left') : dx < 0 ? (tx - lw < 4 ? 'left' : 'right') : 'center';
+      etiquette(ctx, al === 'right' && dx > 0 ? cx - f : al === 'left' && dx < 0 ? cx + f : tx, ty, lbl, sel ? f + 1 : f, al);
+      ctx.restore();
       continue;
     }
-    const rr = Math.max(7, f * 0.62);
-    ctx.fillStyle = '#0b1c2d'; ctx.beginPath(); ctx.arc(cx, cy, rr + 2, 0, 7); ctx.fill();
+    const rr = Math.max(7, f * (sel ? 0.78 : r.ess ? 0.68 : 0.56));
+    ctx.fillStyle = sel ? '#fbbf24' : '#0b1c2d'; ctx.beginPath(); ctx.arc(cx, cy, rr + 2.5, 0, 7); ctx.fill();
     ctx.fillStyle = r.col; ctx.beginPath(); ctx.arc(cx, cy, rr, 0, 7); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = `800 ${Math.round(rr * 1.3)}px system-ui, sans-serif`; ctx.fillText(r.ico, cx, cy + 1);
-    etiquette(ctx, cx, cy + rr + f * 0.75, r.txt, f, 'center');
+    ctx.fillStyle = '#fff'; ctx.font = `800 ${Math.round(rr * 1.25)}px system-ui, sans-serif`; ctx.fillText(r.ico, cx, cy + 1);
+    etiquette(ctx, cx, cy + rr + f * 0.75, r.txt, sel ? f + 1 : f, 'center');
+    ctx.restore();
   }
 }
 

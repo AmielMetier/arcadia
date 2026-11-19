@@ -142,7 +142,7 @@ function handle(req, res, route) {
       const clean = (s, n) => String(s || '').replace(/[<>&"\n\r]/g, '').slice(0, n);
       const data = {
         v: 1, game: m[1], fid, updated: new Date().toISOString(),
-        name: clean(meta.name, 12), badges: Math.max(0, Math.min(8, meta.badges | 0)), dex: Math.max(0, Math.min(999, meta.dex | 0)), time: Math.max(0, Number(meta.time) || 0),
+        name: clean(meta.name, 12), badges: Math.max(0, Math.min(15, meta.badges | 0)), dex: Math.max(0, Math.min(999, meta.dex | 0)), time: Math.max(0, Number(meta.time) || 0),
         code: q.code,
       };
       const msg = `Sauvegarde ${m[1]} · ${fid} · ${data.name} (${data.badges} badges)`;

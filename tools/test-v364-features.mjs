@@ -1,6 +1,6 @@
 // tools/test-v364-features.mjs — tests unitaires des fonctionnalités v3.64 d'Odyssée
 import assert from 'node:assert/strict';
-import { createMon, levelEvolution } from '../odyssee/js/core/mon.js';
+import { createMon, levelEvolution, itemEvolution } from '../odyssee/js/core/mon.js';
 import { Battle, typeEff } from '../odyssee/js/core/battle.js';
 import { getAbility, abilityName } from '../odyssee/js/data/abilities.js';
 import { ITEMS, giveHeldItem, takeHeldItem } from '../odyssee/js/core/items.js';
@@ -33,7 +33,9 @@ assert.equal(bag['leftovers'], 2);
 console.log('✓ Gestion des objets tenus (donner / retirer) validée');
 
 console.log('--- Test v3.64 : Talents Passifs ---');
-const dracaufeu = createMon(6, 36);
+const dracaufeuRand = createMon(6, 36);
+assert.ok(['blaze', 'solar-power'].includes(getAbility(dracaufeuRand).id), 'Dracaufeu doit tirer un talent valide');
+const dracaufeu = createMon(6, 36, { ability: 'blaze' });
 assert.equal(getAbility(dracaufeu).id, 'blaze');
 assert.equal(abilityName(getAbility(dracaufeu)), 'Brasier');
 
@@ -45,17 +47,16 @@ const ectoplasma = createMon(94, 35);
 assert.equal(getAbility(ectoplasma).id, 'cursed-body');
 console.log('✓ Attribution et lecture des talents passifs validées');
 
-console.log('--- Test v3.64 : Évolution Jour / Nuit d\'Évoli ---');
+console.log('--- Test v3.64 : Évolution d\'Évoli par Pierre (Mentali / Noctali) ---');
 const eevee = createMon(133, 25);
-// Jour (12h) -> Mentali (196)
-assert.equal(levelEvolution(eevee, 12), 196);
-// Nuit (23h) -> Noctali (197)
-assert.equal(levelEvolution(eevee, 23), 197);
-// Matin (8h) -> Mentali (196)
-assert.equal(levelEvolution(eevee, 8), 196);
-// Nuit (3h) -> Noctali (197)
-assert.equal(levelEvolution(eevee, 3), 197);
-console.log('✓ Évolution temporelle d\'Évoli (Mentali jour / Noctali nuit) validée');
+// Évoli n'évolue plus automatiquement par niveau pour laisser le joueur choisir sa forme
+assert.equal(levelEvolution(eevee, 12), null);
+assert.equal(levelEvolution(eevee, 23), null);
+// Pierre Soleil -> Mentali (196), Pierre Lune / Pierre Nuit -> Noctali (197)
+assert.equal(itemEvolution(eevee, 'sun-stone'), 196);
+assert.equal(itemEvolution(eevee, 'moon-stone'), 197);
+assert.equal(itemEvolution(eevee, 'dusk-stone'), 197);
+console.log('✓ Évolution d\'Évoli (Mentali par Pierre Soleil / Noctali par Pierre Lune ou Nuit) validée');
 
 console.log('--- Test v3.64 : Météo & Talents d\'entrée en Combat ---');
 // Combat avec Météo Pluie
@@ -70,7 +71,7 @@ assert.ok(startEvs.some(e => e.t === 'weather' && e.weather === 'rain'));
 
 // Combat avec Intimidation (Léviator)
 const bIntimidate = new Battle({
-  player: { name: 'Sacha', party: [createMon(130, 25)], bag: {} },
+  player: { name: 'Sacha', party: [createMon(130, 25, { ability: 'intimidate' })], bag: {} },
   foe: { name: 'Sauvage', party: [createMon(19, 15)] }
 });
 const evsIntim = bIntimidate.start();

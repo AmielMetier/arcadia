@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
+import os from 'node:os';
+import path from 'node:path';
 
 let fails = 0;
 const ok = (c, msg) => { if (!c) { fails++; console.error('ÉCHEC :', msg); } else console.log('ok -', msg); };
@@ -39,14 +41,15 @@ const api = http.createServer((req, res) => {
 await new Promise((r) => api.listen(0, r));
 const apiPort = api.address().port;
 
+const TMP_DIR = os.tmpdir();
 const start = (port, env) => {
-  const p = spawn('node', [fileURLToPath(new URL('../server/server.js', import.meta.url))], { env: { ...process.env, PORT: String(port), RELAY_LOG_DIR: '/tmp/ddtest-accounts-logs', ...env }, stdio: ['ignore', 'ignore', 'inherit'] });
+  const p = spawn('node', [fileURLToPath(new URL('../server/server.js', import.meta.url))], { env: { ...process.env, PORT: String(port), RELAY_LOG_DIR: path.join(TMP_DIR, 'ddtest-accounts-logs'), ...env }, stdio: ['ignore', 'ignore', 'inherit'] });
   return p;
 };
 // coffre VIP des Backrooms : une clé de test, son témoin (même format que backrooms/data/e0.bin) et une liste VIP de
 // test (comme hub/vip.js) : « amiel » VIP d'origine (ACCOUNTS), « carla » VIP ajoutée depuis (HASHES, tools/vip-add.mjs)
 const VIP_KEY = crypto.randomBytes(32).toString('base64');
-const VIP_FILE = '/tmp/ddtest-accounts-vip.js', VIP_CHECK_FILE = '/tmp/ddtest-accounts-e0.bin';
+const VIP_FILE = path.join(TMP_DIR, 'ddtest-accounts-vip.js'), VIP_CHECK_FILE = path.join(TMP_DIR, 'ddtest-accounts-e0.bin');
 (await import('node:fs')).writeFileSync(VIP_FILE, `const HASHES = [\n    '${crypto.createHash('sha256').update('arcadia-vip:carla').digest('hex')}', // ca…\n  ];\n  const ACCOUNTS = [\n    '${crypto.createHash('sha256').update('arcadia-account:amiel').digest('hex').slice(0, 32)}',\n  ];\n`);
 {
   const iv = crypto.randomBytes(12), c = crypto.createCipheriv('aes-256-gcm', Buffer.from(VIP_KEY, 'base64'), iv);

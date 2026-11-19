@@ -11,6 +11,10 @@ import { partyScreen, cardScreen, trainerCard, TYPE_FR } from '../ui/screens.js'
 import { BADGES } from '../world/region.js';
 import { el, esc, wait } from '../ui/ui.js';
 import { tenueCode, tenueDecode, tenueValide, tenueOrigine, composer } from '../render/tenue.js';
+import { onDojoInvite } from '../dojo-mamadou.js';
+import { lancerRaidCoop, onRaidInvite, lancerMulti4p, onMulti4pInvite, lancerTournoiSalon, onTournoiInvite } from '../multi-events.js';
+import { pokerTableMulti, onPokerInvite } from '../ui/casino/poker.js';
+import { visiterDomaineAmi } from '../ui/domaine.js';
 
 const WALK = 0.27, RUN = 0.068;
 const trainerSprite = (gender) => (gender === 'f' ? 'serena' : 'calem');
@@ -65,7 +69,21 @@ export function installSocial(game) {
   };
   // fiche demandée par un autre joueur : réponse automatique, sans interrompre la partie
   link.onCard = () => (game.state ? trainerCard(game.state) : null);
-  game.talkToPeer = (peer) => talkToPeer(game, peer);
+  link.onDomaine = () => {
+    const st = game.state;
+    if (!st) return null;
+    return {
+      id: link.myId,
+      ownerName: st.name || 'Dresseur',
+      gender: st.gender === 'f' ? 'f' : 'm',
+      nom: st.domaine?.nom || `Domaine de ${st.name || 'Dresseur'}`,
+      travaux: st.domaine?.travaux || [],
+      res: st.domaine?.res || [],
+      talents: st.domaine?.talents || [],
+      party: battleCopy((st.party || []).slice(0, 4)),
+    };
+  };
+  game.talkToPeer = (peer, directAction = null) => talkToPeer(game, peer, directAction);
   game.showPeerCard = (peer) => showCard(game, peer);
 
   /* ---------------- affichage ---------------- */
@@ -176,11 +194,11 @@ export function installSocial(game) {
 /* ======================================================================
    Parler à un joueur : choisir, envoyer l'invitation, attendre la réponse
    ====================================================================== */
-export async function talkToPeer(game, peer) {
+export async function talkToPeer(game, peer, directAction = null) {
   const ui = game.ui, link = game.link, st = game.state;
   if (peer.pvp) {
     const foeName = peer.pvp.foeName || 'un autre dresseur';
-    const c = await ui.ask(`${peer.name} affronte ${foeName} en combat ! Que veux-tu faire ?`, ['Regarder le combat', 'Sa fiche', 'Rien'], { speaker: peer.name });
+    const c = await ui.ask(`${peer.name} affronte ${foeName} en combat ! Que veux-tu faire ?`, ['👁️ Observer le combat', 'Sa fiche', 'Rien'], { speaker: peer.name });
     if (c === 0) {
       await spectateSession(game, peer.pvp.hostId || peer.id, peer.pvp.rid, peer.name, foeName);
       return;
@@ -189,11 +207,50 @@ export async function talkToPeer(game, peer) {
     return;
   }
   if (peer.busy) { await ui.say(`${peer.name} est occupé${peer.gender === 'f' ? 'e' : ''} pour le moment.`); return; }
-  const c = await ui.ask(`${peer.name} est là. Que veux-tu faire ?`, ['Échanger', 'Combattre', 'Sa fiche', 'Rien'], { speaker: peer.name });
-  if (c === 2) { await showCard(game, peer); return; }
-  if (c !== 0 && c !== 1) return;
+  if (directAction === 'raid') return lancerRaidCoop(game, peer);
+  if (directAction === 'domaine') return visiterDomaineAmi(game, peer);
+
+  let action = directAction;
+  if (!action) {
+    const pick = await ui.list({
+      title: `${peer.name}`,
+      items: [
+        { label: '⚔️ Combattre', right: '1v1 · 2v2 · 3v3 · 4J' },
+        { label: '🐉 Raid de Boss Co-op', right: '2-3 joueurs' },
+        { label: '🏆 Tournoi / 🃏 Poker Multi', right: 'Salon' },
+        { label: '🔄 Échanger un Pokémon', right: '4e Badge' },
+        { label: '🏡 Visiter son Domaine', right: 'Panier & Gardien' },
+        { label: '🪪 Carte de Dresseur' },
+        { label: 'Rien' },
+      ],
+      cls: 'shop',
+      cancel: 6,
+    });
+    if (pick === 0) action = 'battle';
+    else if (pick === 1) return lancerRaidCoop(game, peer);
+    else if (pick === 2) {
+      const s = await ui.ask('Quel événement lancer dans le salon ?', ['🏆 Tournoi en direct (4 places)', '🃏 Poker Texas Hold\'em Multi', 'Annuler'], { speaker: peer.name });
+      if (s === 0) return lancerTournoiSalon(game);
+      if (s === 1) return pokerTableMulti(game);
+      return;
+    } else if (pick === 3) action = 'trade';
+    else if (pick === 4) return visiterDomaineAmi(game, peer);
+    else if (pick === 5) { await showCard(game, peer); return; }
+    else return;
+  }
+
   if (!st.party.length) { await ui.say('Il te faut d\'abord un Pokémon !'); return; }
-  const kind = c === 0 ? 'trade' : 'battle';
+  const kind = action === 'trade' ? 'trade' : 'battle';
+  let format = 'single';
+  if (kind === 'battle') {
+    const alive = st.party.filter((m) => m && m.hp > 0).length;
+    const fc = await ui.ask('Quel format de combat ?', ['Duel (1v1)', 'Duo (2v2)', 'Trio (3v3)', 'Multi 2v2 (4 joueurs)', 'Annuler'], { speaker: peer.name });
+    if (fc === 3) return lancerMulti4p(game, peer);
+    if (fc < 0 || fc > 2) return;
+    format = ['single', 'double', 'triple'][fc];
+    const minP = fc === 2 ? 3 : fc === 1 ? 2 : 1;
+    if (alive < minP) { await ui.say(`Il te faut au moins ${minP} Pokémon en forme pour ce format.`); return; }
+  }
   if (kind === 'trade' && !st.badges?.[3]) {
     await ui.say('Les échanges sont bloqués tant que tu n\'as pas obtenu le 4e Badge (Badge Pétale de l\'Arène de Floralia) !');
     return;
@@ -204,9 +261,10 @@ export async function talkToPeer(game, peer) {
     return;
   }
   const rid = newId();
-  link.send(peer.id, { t: 'req', kind, rid, name: st.name, gender: st.gender, cap: myCap });
+  link.send(peer.id, { t: 'req', kind, rid, name: st.name, gender: st.gender, cap: myCap, format });
   const box = ui.dialogBox();
-  ui.typePage(box, `Tu proposes ${kind === 'trade' ? 'un échange' : 'un combat'} à ${peer.name}… (Échap : annuler)`, { last: true });
+  const fmtTxt = format === 'triple' ? ' (Trio 3v3)' : format === 'double' ? ' (Duo 2v2)' : '';
+  ui.typePage(box, `Tu proposes ${kind === 'trade' ? 'un échange' : `un combat${fmtTxt}`} à ${peer.name}… (Échap : annuler)`, { last: true });
   await wait(30);
   const pop = game.input.push((k) => { if (k === 'b') link.abort(peer.id); });
   const r = await link.wait(peer.id, (m) => m.t === 'rep' && m.rid === rid, 30000);
@@ -221,6 +279,7 @@ export async function talkToPeer(game, peer) {
     const why = {
       busy: `${peer.name} est occupé${peer.gender === 'f' ? 'e' : ''} pour le moment.`,
       nomon: `${peer.name} n'a pas encore de Pokémon.`,
+      nomon_multi: `${peer.name} n'a pas assez de Pokémon en forme pour ce format.`,
       nobadge: `${peer.name} n'a pas encore le 4e Badge (Badge Pétale) pour pouvoir échanger.`,
     }[r.why] || `${peer.name} refuse.`;
     await ui.say(why); return;
@@ -228,7 +287,7 @@ export async function talkToPeer(game, peer) {
   game.session = rid;
   try {
     if (kind === 'trade') await tradeSession(game, peer.id, peer.name, rid, r.cap || 100);
-    else await battleSession(game, peer.id, peer.name, peer.gender, rid, true);
+    else await battleSession(game, peer.id, peer.name, peer.gender, rid, true, format);
   } finally { game.session = null; }
 }
 
@@ -254,10 +313,18 @@ export async function showCard(game, peer) {
 
 /** invitation reçue */
 async function onRequest(game, from, m) {
+  if (m.kind === 'dojo') return onDojoInvite(game, from, m);
+  if (m.kind === 'raid') return onRaidInvite(game, from, m);
+  if (m.kind === 'multi4p') return onMulti4pInvite(game, from, m);
+  if (m.kind === 'tournoi') return onTournoiInvite(game, from, m);
+  if (m.kind === 'poker') return onPokerInvite(game, from, m);
   const link = game.link, st = game.state, ui = game.ui;
   const free = st && game.player && !game.busy && game.input.free && !game.bv.alive && !game.session && !game.player.move;
   if (!free) { link.send(from, { t: 'rep', rid: m.rid, ok: false, why: 'busy' }); return; }
   if (!st.party.length) { link.send(from, { t: 'rep', rid: m.rid, ok: false, why: 'nomon' }); return; }
+  const fmt = m.format === 'triple' ? 'triple' : m.format === 'double' ? 'double' : 'single';
+  const minP = fmt === 'triple' ? 3 : fmt === 'double' ? 2 : 1;
+  if (m.kind === 'battle' && st.party.filter((x) => x && x.hp > 0).length < minP) { link.send(from, { t: 'rep', rid: m.rid, ok: false, why: 'nomon_multi' }); return; }
   if (m.kind === 'trade' && !st.badges?.[3]) { link.send(from, { t: 'rep', rid: m.rid, ok: false, why: 'nobadge' }); return; }
   const myCap = game.levelCap ? game.levelCap() : 100;
   const name = String(m.name || link.nameOf(from)).slice(0, 12);
@@ -272,14 +339,15 @@ async function onRequest(game, from, m) {
       return r;
     });
     ui.sound.sfx('bang');
-    const yes = await ui.yesNo(m.kind === 'trade' ? `${name} te propose un échange de Pokémon. Accepter ?` : `${name} te défie en combat ! Accepter ?`, { speaker: name });
+    const fmtTag = fmt === 'triple' ? ' en Trio (3v3)' : fmt === 'double' ? ' en Duo (2v2)' : '';
+    const yes = await ui.yesNo(m.kind === 'trade' ? `${name} te propose un échange de Pokémon. Accepter ?` : `${name} te défie en combat${fmtTag} ! Accepter ?`, { speaker: name });
     if (gone) { ui.closeDialog(); await ui.say(`${name} a retiré sa proposition.`); return; }
     link.abort(from); void cancel;
     link.send(from, { t: 'rep', rid: m.rid, ok: yes, why: yes ? null : 'no', cap: myCap });
     if (!yes) return;
     const peer = link.others.get(String(from));
     if (m.kind === 'trade') await tradeSession(game, from, name, m.rid, m.cap || 100);
-    else await battleSession(game, from, name, m.gender || peer?.gender, m.rid, false);
+    else await battleSession(game, from, name, m.gender || peer?.gender, m.rid, false, fmt);
   } finally { game.busy = false; game.session = null; }
 }
 
@@ -360,10 +428,21 @@ async function tradeSession(game, from, name, rid, peerCap = 100) {
   game.save(true);
 }
 
+/** Vide les messages spec_join arrivés en avance dans link.inbox avant que onSpectate soit branché */
+export function drainPendingSpecJoins(link) {
+  if (!link?.inbox?.length || !link.onSpectate) return;
+  const keep = [];
+  for (const item of link.inbox) {
+    if (item?.m?.t === 'spec_join' && link.onSpectate(item.from, item.m)) continue;
+    keep.push(item);
+  }
+  link.inbox = keep;
+}
+
 /* ======================================================================
    Combat
    ====================================================================== */
-async function battleSession(game, from, name, gender, rid, challenger) {
+export async function battleSession(game, from, name, gender, rid, challenger, format = 'single') {
   const ui = game.ui, link = game.link, st = game.state;
   const mine = battleCopy(st.party);
   const seed = challenger ? (Math.random() * 2 ** 32) >>> 0 : 0;
@@ -389,6 +468,7 @@ async function battleSession(game, from, name, gender, rid, challenger) {
   const spectators = new Set();
   const exportBattleSnapshot = () => ({
     turn: battle.turn,
+    slots: battle.slots,
     weather: battle.weather,
     weatherTurns: battle.weatherTurns,
     state: battle.state,
@@ -398,6 +478,7 @@ async function battleSession(game, from, name, gender, rid, challenger) {
       name: battle.sides[0].name,
       bs: battle.sides[0].trainer?.bs || trainerSprite(st.gender),
       active: battle.sides[0].active,
+      activeSlots: [...battle.sides[0].activeSlots],
       st: battle.sides[0].v.st,
       party: battle.sides[0].party.map(exportMonForSpectator),
     },
@@ -405,6 +486,7 @@ async function battleSession(game, from, name, gender, rid, challenger) {
       name: battle.sides[1].name,
       bs: battle.sides[1].trainer?.bs || trainerSprite(r.gender || gender),
       active: battle.sides[1].active,
+      activeSlots: [...battle.sides[1].activeSlots],
       st: battle.sides[1].v.st,
       party: battle.sides[1].party.map(exportMonForSpectator),
     },
@@ -435,6 +517,7 @@ async function battleSession(game, from, name, gender, rid, challenger) {
       }
       return false;
     };
+    drainPendingSpecJoins(link);
   }
 
   const battle = new PvpBattle({
@@ -442,6 +525,7 @@ async function battleSession(game, from, name, gender, rid, challenger) {
     foe: { name: foeName, party: r.party, bs: trainerSprite(r.gender || gender) },
     seed: challenger ? seed : r.seed >>> 0,
     canon: challenger ? 0 : 1,
+    format,
   });
   const B = (step, n) => (m) => m.t === 'bt' && m.rid === rid && ((m.step === step && m.n === n) || m.step === 'quit');
   // pendant l'attente, Échap propose d'abandonner
@@ -503,6 +587,7 @@ async function battleSession(game, from, name, gender, rid, challenger) {
     try { game.recordPvpResult?.(foeName, result); } catch (e) { console.error('PvP record error:', e); }
   }
   await ui.say(result === 'win' ? `Tu as battu ${foeName} !` : result === 'lose' ? `${foeName} a gagné ce combat. La revanche t'attend !` : 'Le combat se termine sans vainqueur.');
+  return result;
 }
 
 
@@ -565,6 +650,7 @@ export async function spectateSession(game, hostId, rid, p0Name, p1Name) {
   const specSession = {
     hostId,
     rid,
+    slots: init.slots || 1,
     turn: init.turn || 0,
     weather: init.weather || 'none',
     weatherTurns: init.weatherTurns || 0,

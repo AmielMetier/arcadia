@@ -8,7 +8,7 @@
 // Noms de lieux et personnages originaux ; les créatures du jeu côtoient les Pokémon du prototype.
 import { T, DIRS, walkable, isGrassEnc } from './tiles.js';
 import { GameMap, carveRoute, carveTown, ledges, along, nearestWalkable, caseLibre, rng, GRAND, sin, cos, hauteurVue } from './mapgen.js';
-import { centerInterior, martInterior, houseInterior, labInterior, gymInterior, leagueInterior, caveMap } from './interiors.js';
+import { centerInterior, martInterior, houseInterior, labInterior, gymInterior, leagueInterior, dojoInterior, caveMap } from './interiors.js';
 import { NEW_STARTERS } from '../data/creatures.js';
 import { R } from '../data/remplacants.js';
 import { buildQuests } from './quetes.js';
@@ -176,7 +176,7 @@ export function trainerNpc(map, x, y, dir, cls, name, team, o = {}) {
   const [ow, prize, bs] = CLS[cls] || ['gamin', 20];
   return map.npc({
     id: o.id || `${map.id}:t${tCount++}`, x, y, dir, sprite: o.ow || ow, move: 'static', onWin: o.onWin,
-    trainer: { cls, name, team, prize: o.prize || prize, sight: o.sight ?? 4, bs: o.bs || bs || ow, ai: o.ai || 'normal', items: o.items, megaSp: o.megaSp, intro: o.intro || 'Nos regards se sont croisés : c\'est l\'heure du combat !', lose: o.lose || 'J\'ai perdu...', after: o.after || 'Tu es vraiment fort !' },
+    trainer: { cls, name, team, prize: o.prize || prize, sight: o.sight ?? 4, bs: o.bs || bs || ow, ai: o.ai || 'normal', items: o.items, megaSp: o.megaSp, format: o.format, slots: o.slots, intro: o.intro || 'Nos regards se sont croisés : c\'est l\'heure du combat !', lose: o.lose || 'J\'ai perdu...', after: o.after || 'Tu es vraiment fort !' },
   });
 }
 /** dresseur posé le long d'une route : t sur la ligne, côté ±1, distance au sentier */
@@ -298,6 +298,7 @@ export function poserBatiment(W, maps, def, b) {
   }
   else if (b.kind === 'lab') inside = labInterior(id);
   else if (b.kind === 'league') inside = leagueInterior(id);
+  else if (b.kind === 'dojo') inside = dojoInterior(id, b.name || 'Dojo de Mamadou');
   else inside = houseInterior(id, b.name || 'Maison', { w: b.kind === 'bighouse' || b.kind === 'tower' ? 11 : 9, h: b.kind === 'bighouse' || b.kind === 'tower' ? 9 : 8, bed: b.bed, extraBooks: b.kind === 'tower', kitchen: b.kitchen });
   inside.townId = def.id; inside.outside = { map: W.id, x: B.doorX, y: B.doorY + 1, dir: 'down' };
   inside.warp(inside.exitX, inside.exitY, inside.outside);
@@ -464,7 +465,7 @@ export function buildWorld() {
   /* ---------- A · Bourg-Aube ---------- */
   const A = towns.A = {
     id: 'aube', name: 'Bourg-Aube', x: 20, y: 238, w: 40, h: 30, exits: [['n', 14], ['e', 10]], fermer: true, lotir: false,
-    roads: [[14, 2, 15, 23, T.PATH], [4, 10, 39, 11, T.PATH], [14, 19, 22, 19, T.PATH], [4, 23, 35, 23, T.PATH], [30, 11, 31, 27, T.PATH], [3, 27, 36, 27, T.PATH]],
+    roads: [[14, 0, 15, 29, T.PATH], [0, 10, 39, 11, T.PATH], [14, 18, 20, 19, T.PATH]],
     deco: [['flowers', 9, 3, 11, 5], ['flowers', 26, 13, 27, 17], ['water', 6, 15, 3.2, 2.2], ['fence', 2, 8, 4, 8], ['fence', 24, 8, 27, 8],
       ['sign', 12, 8, 'BOURG-AUBE\nLà où chaque aventure commence.'], ['sign', 13, 17, 'LABORATOIRE\nProf. Saule'], ['lamp', 13, 9], ['lamp', 16, 9]],
     buildings: [
@@ -484,7 +485,7 @@ export function buildWorld() {
   /* ---------- B · Sylvebourg (Hector, Insecte) ---------- */
   const B = towns.B = {
     id: 'sylve', name: 'Sylvebourg', x: 18, y: 138, w: 54, h: 44, exits: [['s', 16], ['n', 16]], gym: 0, stock: 1, fermer: true, lotir: { n: 3, seed: 21 },
-    roads: [[16, 0, 17, 43, T.PATH], [4, 11, 49, 12], [4, 20, 15, 21], [4, 36, 49, 37], [46, 12, 47, 36], [18, 28, 27, 28]],
+    roads: [[16, 0, 17, 43, T.PATH], [0, 11, 53, 12, T.PATH], [0, 20, 17, 21, T.PATH], [0, 36, 53, 37, T.PATH], [46, 11, 47, 37, T.PATH]],
     deco: [['flowers', 11, 4, 14, 7], ['flowers', 19, 4, 21, 7], ['lamp', 14, 10], ['lamp', 19, 10], ['lamp', 14, 13], ['lamp', 19, 13], ['lamp', 14, 35], ['lamp', 19, 35],
       ['sign', 14, 9, 'SYLVEBOURG\nLa ville où murmurent les feuilles.'], ['sign', 39, 38, 'ARÈNE DE SYLVEBOURG\nChampion : Hector\nL\'observateur des insectes.'],
       ['trees', 2, 23, 3, 25], ['tall', 28, 2, 31, 5], ['water', 8, 30, 3.4, 2.2], ['flowers', 19, 29, 26, 33], ['trees', 49, 2, 51, 8], ['trees', 2, 39, 6, 41]],
@@ -503,7 +504,7 @@ export function buildWorld() {
   /* ---------- C · Pierrefort (ville minière, sans arène) ---------- */
   const C = towns.C = {
     id: 'pierre', name: 'Pierrefort', x: 62, y: 30, w: 60, h: 34, decal: [28, 0], exits: [['s', 43], ['e', 10], ['n', 45]], stock: 2, fermer: true, lotir: { n: 6, seed: 83 },
-    roads: [[43, 10, 44, 33], [36, 10, 59, 11], [45, 18, 55, 19], [4, 26, 57, 27], [19, 18, 20, 26], [36, 11, 37, 26]],
+    roads: [[43, 10, 44, 33, T.PATH], [36, 10, 59, 11, T.PATH], [43, 18, 59, 19, T.PATH], [0, 26, 59, 27, T.PATH], [19, 18, 20, 26, T.PATH], [36, 11, 37, 26, T.PATH]],
     deco: [['rock', 56, 20], ['rock', 38, 23], ['rock', 3, 23], ['lamp', 42, 12], ['lamp', 45, 12], ['trees', 54, 3, 57, 6, T.PINE],
       ['sign', 41, 12, 'PIERREFORT\nUne ville taillée dans la montagne.'], ['sign', 54, 8, 'MAISON DES MINEURS\nAncien atelier de Basalte.'], ['flowers', 46, 21, 46, 24],
       // l'usine Poké Ball, derrière sa clôture : un portail gardé sur l'allée
@@ -530,7 +531,7 @@ export function buildWorld() {
   /* ---------- D · Port-Azur (Marine, Eau) ---------- */
   const D = towns.D = {
     id: 'azur', name: 'Port-Azur', x: 185, y: 22, w: 37, h: 46, exits: [['w', 11], ['e', 19]], gym: 1, stock: 3, music: 'port', fermer: true, lotir: { n: 6, seed: 33 },
-    roads: [[2, 11, 31, 12], [2, 19, 36, 20], [15, 7, 16, 42], [30, 11, 31, 42], [2, 42, 34, 43], [2, 20, 3, 42], [17, 30, 29, 30]],
+    roads: [[0, 11, 36, 12], [0, 19, 36, 20], [15, 7, 16, 45], [30, 11, 31, 45], [0, 42, 36, 43], [2, 19, 3, 45], [16, 30, 31, 31]],
     deco: [['waterRect', 2, 0, 31, 3], ['sand', 2, 4, 31, 6], ['bridge', 15, 0, 16, 6], ['lamp', 14, 13], ['lamp', 17, 13], ['lamp', 14, 21], ['lamp', 17, 21],
       ['sign', 13, 8, 'PORT-AZUR\nLe parfum des embruns et des voyages.'], ['sign', 21, 41, 'ARÈNE DE PORT-AZUR\nChampionne : Marine\nLa vague déferlante.'], ['flowers', 19, 21, 28, 23], ['lamp', 14, 41], ['lamp', 17, 41], ['water', 30, 36, 2.6, 1.6]],
     buildings: [
@@ -603,7 +604,7 @@ export function buildWorld() {
   /* ---------- F · Floralia (Flora, Plante) ---------- */
   const F = towns.F = {
     id: 'flora', name: 'Floralia', x: 165, y: 112, w: 50, h: 40, exits: [['n', 17], ['e', 19]], gym: 3, stock: 5, music: 'city', fermer: true, lotir: { n: 6, seed: 45 },
-    roads: [[17, 0, 18, 37], [2, 9, 33, 10], [2, 19, 49, 20], [2, 9, 3, 37], [32, 9, 33, 20], [2, 37, 47, 37], [46, 20, 47, 37]],
+    roads: [[17, 0, 18, 39, T.PATH], [0, 9, 33, 10, T.PATH], [0, 19, 49, 20, T.PATH], [2, 9, 3, 39, T.PATH], [32, 9, 33, 20, T.PATH], [0, 37, 49, 38, T.PATH], [46, 20, 47, 38, T.PATH]],
     deco: [['flowers', 5, 11, 15, 12], ['flowers', 20, 11, 30, 12], ['flowers', 5, 22, 14, 24], ['water', 9, 30, 3.4, 1.8], ['flowers', 19, 22, 23, 26], ['flowers', 36, 6, 44, 8],
       ['lamp', 16, 7], ['lamp', 19, 7], ['lamp', 16, 21], ['lamp', 19, 21], ['pot', 8, 13], ['pot', 28, 13],
       ['sign', 15, 3, 'FLORALIA\nLa cité aux mille couleurs.'], ['sign', 24, 36, 'ARÈNE DE FLORALIA\nChampionne : Flora\nLa beauté épineuse.'],
@@ -650,15 +651,16 @@ export function buildWorld() {
   const K = towns.K = {
     id: 'granit', name: 'Port-Granit', x: 302, y: 198, w: 30, h: 30, exits: [['n', 20]], gym: 5, stock: 6, music: 'port', island: true,
     roads: [[20, 0, 21, 26, T.PATH], [2, 18, 27, 18, T.PATH], [2, 26, 27, 26, T.PATH]],
-    deco: [['rock', 26, 13], ['rock', 27, 17], ['rock', 2, 27], ['rock', 17, 21], ['rock', 25, 24], ['lamp', 22, 12], ['lamp', 22, 17], ['lamp', 19, 19], ['lamp', 22, 25],
-      ['flowers', 23, 20, 27, 23], ['flowers', 25, 15, 27, 16], ['flowers', 11, 19, 16, 20],
-      ['sign', 22, 5, 'PORT-GRANIT\nÎle de Granit — sous la protection de Drakos.'], ['sign', 12, 17, 'ARÈNE DE GRANIT\nChampion : Basalte\nLe frère cadet.']],
+    deco: [['rock', 26, 13], ['rock', 27, 17], ['rock', 2, 27], ['rock', 17, 21], ['lamp', 22, 12], ['lamp', 22, 17], ['lamp', 19, 19], ['lamp', 22, 25],
+      ['flowers', 25, 15, 27, 16], ['flowers', 11, 19, 16, 20],
+      ['sign', 22, 5, 'PORT-GRANIT\nÎle de Granit — sous la protection de Drakos.'], ['sign', 12, 17, 'ARÈNE DE GRANIT\nChampion : Basalte\nLe frère cadet.'], ['sign', 24, 25, 'DOJO DE MAMADOU\nCombats Co-op 2v2 & 3v3\nRéservé aux escouades de 2 ou 3 dresseurs !']],
     buildings: [
       // mapId : les identifiants des intérieurs d'avant l'agrandissement (parties arrêtées dedans, dresseurs de l'arène)
       { kind: 'gym', ...GRAND.gym, x: 2, y: 2, roof: 'brown', mapId: 'granit:gym3' },
       { kind: 'mart', ...GRAND.mart, x: 23, y: 3, mapId: 'granit:mart18' },
       { kind: 'house', x: 23, y: 9, roof: 'gray', mapId: 'granit:house15', npcs: [{ x: 4, y: 4, sprite: 'pecheur', text: ['Drakos nous prend la moitié de chaque pêche.', '« Pour protéger les îles », qu\'il dit.', 'Basalte ferme les yeux... c\'est son frère, après tout.'] }] },
       { kind: 'center', ...GRAND.center, x: 3, y: 21, mapId: 'granit:center2' },
+      { kind: 'dojo', ...GRAND.dojo, x: 23, y: 20, roof: 'red', mapId: 'granit:dojo', name: 'Dojo de Mamadou' },
       { kind: 'house', x: 12, y: 23, roof: 'brown', mapId: 'granit:house20', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Les trois frères sont nés ici, sur Granit.', 'Basalte est le plus jeune. Pyros garde le volcan, et Drakos... la Grande Île.'] }] },
     ],
     npcs: [
@@ -1234,7 +1236,7 @@ export function buildWorld() {
     W.warp(out.doorX, out.doorY, { map: 'victoire', x: cx, y: cy, dir: 'up' });
     victoire.deco.push({ k: 'exitlight', x: cx, y: cy + 1 });
   }
-  caveTrainers(victoire, [['Topdresseur', 'Dimitri', [[67, 40], [1044, 40], [130, 41]]], ['Topdresseuse', 'Sofia', [[148, 41], [1040, 40], [1035, 40]]], ['Karatéka', 'Takeshi', [[68, 42], [1033, 41], [106, 41]]], ['Médium', 'Iris', [[94, 41], [1023, 41]]], ['Montagnard', 'Hubert', [[76, 42], [1028, 42], [112, 42]]]], 41);
+  caveTrainers(victoire, [['Topdresseur', 'Dimitri', [[67, 40], [1044, 40], [130, 41]], { format: 'triple', intro: 'Route Victoire, format Trio 3v3 ! Montre-moi ce que tu vaux !' }], ['Topdresseuse', 'Sofia', [[148, 41], [1040, 40], [1035, 40]], { format: 'double', intro: 'Un combat Duo avant la Ligue, ça te tente ?' }], ['Karatéka', 'Takeshi', [[68, 42], [1033, 41], [106, 41]]], ['Médium', 'Iris', [[94, 41], [1023, 41]]], ['Montagnard', 'Hubert', [[76, 42], [1028, 42], [112, 42]]]], 41);
   caveItems(victoire, ['full-restore', 'max-repel', 'rare-candy', 'ultra-ball', 'revive', 'max-potion'], 43);
   smashOnPath(victoire, { x: 50, y: 34 }, 3, 991);
 
@@ -1301,8 +1303,15 @@ export function buildWorld() {
     }
     list.slice(0, spots.length).forEach(([cls, name, team], i) => {
       const lvl = Math.max(...team.map((m) => m[1]));
-      const more = equipeDeType(L2.type, lvl, team.length >= 3 ? 1 : 2, t.gym * 31 + i * 7 + 3).filter(([sp]) => !team.some((m) => m[0] === sp));
-      const [x, y, dir, vue] = spots[i]; trainerNpc(g, x, y, dir, cls, name, team.concat(more).slice(0, 4), { sight: vue ?? 3, intro: 'Tu veux défier notre Champion ? Passe d\'abord par moi !', after: 'Notre Champion est bien plus fort que moi.' });
+      const format = t.gym >= 4 && i === 2 ? 'triple' : t.gym >= 1 && i === 1 ? 'double' : undefined;
+      const needMore = format === 'triple' ? Math.max(2, 3 - team.length) : (team.length >= 3 ? 1 : 2);
+      const more = equipeDeType(L2.type, lvl, needMore, t.gym * 31 + i * 7 + 3).filter(([sp]) => !team.some((m) => m[0] === sp));
+      const fullTeam = team.concat(more).slice(0, 4);
+      const [x, y, dir, vue] = spots[i];
+      const intro = format === 'triple' ? 'Place au combat Trio (3v3) ! Montre-moi comment ton équipe se coordonne !'
+        : format === 'double' ? 'Place au combat Duo (2v2) ! Tu veux défier notre Champion ? Passe d\'abord par moi !'
+          : 'Tu veux défier notre Champion ? Passe d\'abord par moi !';
+      trainerNpc(g, x, y, dir, cls, name, fullTeam, { sight: vue ?? 3, format: fullTeam.length >= (format === 'triple' ? 3 : 2) ? format : undefined, intro, after: 'Notre Champion est bien plus fort que moi.' });
     });
     // objets posés dans les recoins des arènes dessinées
     (ar.objets || []).forEach(([x, y], i) => g.item(x, y, OBJETS_ARENE[t.gym]?.[i] || 'super-potion', 1, `${g.id}:objet${i}`));
@@ -1674,9 +1683,9 @@ function fenceRoutes(W, legends = []) {
 function caveTrainers(m, list, seed) {
   const r = rng(seed); const floors = [];
   for (let y = 3; y < m.h - 3; y++) for (let x = 3; x < m.w - 3; x++) if (m.get(x, y) === T.CAVE && m.get(x + 1, y) === T.CAVE && m.get(x - 1, y) === T.CAVE) floors.push([x, y]);
-  list.forEach(([cls, name, team], i) => {
+  list.forEach(([cls, name, team, extra], i) => {
     const [x, y] = floors[Math.floor(((i + 0.5) / list.length) * floors.length * 0.9 + r() * floors.length * 0.08)];
-    trainerNpc(m, x, y, ['left', 'right', 'down', 'up'][Math.floor(r() * 4)], cls, name, team, { sight: 3 });
+    trainerNpc(m, x, y, ['left', 'right', 'down', 'up'][Math.floor(r() * 4)], cls, name, team, { sight: 3, ...(extra || {}) });
   });
 }
 function caveItems(m, items, seed) {

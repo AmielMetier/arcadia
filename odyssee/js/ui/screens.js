@@ -10,6 +10,7 @@ export { BADGE_SPECS, getCardRank, trainerCard, cardScreen } from './screens/car
 export { shopScreen } from './screens/shop.js';
 export { pcScreen, moveRelearnerScreen, naturePcScreen } from './screens/pc.js';
 export { optionsScreen } from './screens/options.js';
+export { gfxPickerScreen } from './screens/gfxPicker.js';
 export { saveCodeScreen, loadCodeScreen } from './screens/savecode.js';
 export { questsScreen } from './screens/quests.js';
 export { learnMoveScreen } from './screens/learnMove.js';

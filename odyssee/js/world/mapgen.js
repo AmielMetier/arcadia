@@ -63,6 +63,7 @@ export const GRAND = {
   // pavillon de temple (Temple Kagura) : estrade, colonnade rouge, double toit ; la rangée du bas porte l'escalier
   // (porte de 2 cases au milieu), ses coins restent libres
   pavillon: { w: 8, d: 7, h: 4, door: 3, door2: 4, libres: [[0, 6], [1, 6], [6, 6], [7, 6]], modele: 'pavillon' },
+  dojo: { w: 6, d: 5, h: 4, door: 2, door2: 3, modele: 'dojo' },
   // la Tour Cendrée (Forêt des Torii) : pagode de bois brûlée, étages effondrés
   tourCendree: { w: 11, d: 11, h: 8, door: 5, modele: 'tourCendree' },
   casino: { w: 14, d: 8, h: 6, door: 6, door2: 7, blocs: [[2, 8], [5, 8], [8, 8], [11, 8], [0, 8], [13, 8]], modele: 'casino' },

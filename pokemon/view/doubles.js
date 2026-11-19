@@ -178,7 +178,8 @@ export function createDoublesView({ stage, me, submitAction, sfx, now }) {
           <span class="bw-move-name">${esc(m.name)}</span>
           <span class="bw-move-meta"><span class="tz-type" style="--tc:${TYPES[m.type].color}">${TYPES[m.type].name}</span>${zone ? `<span class="vgc-zone">${zone}</span>` : ''}<span class="bw-pp">PP ${cur}/${max}</span></span>
         </button>`;
-      }).join('')}</div>`;
+      }).join('')}${p.moves.every((k) => moveBlocked(p, k)) && !(p.rampage || p.charging)
+        ? `<button class="bw-move vgc-move" data-move="struggle" style="--tc:${TYPES.normal.color}" ${tipAttr('Plus aucune attaque utilisable : Lutte (50 de puissance, sans type, contrecoup d\'un quart des PV max).')}><span class="bw-move-name">Lutte</span><span class="bw-move-meta"><span class="bw-pp">Plus de PP</span></span></button>` : ''}</div>`;
     } else {
       const taken = Object.values(plan).filter((a) => a && a.type === 'switch').map((a) => a.targetIndex);
       body = benchHtml(b, slot, taken, 'data-sw');

@@ -1,7 +1,7 @@
 // odyssee/js/ui/screens/options.js — options
 import { el } from '../ui.js';
 import { screen } from './common.js';
-import { SOLS_CHOIX, SPRITES_CHOIX, CREDITS, solChoix, spritesChoix, choisirSol, choisirSprites } from '../../gfx.js';
+import { SOLS_CHOIX, SPRITES_CHOIX, CREDITS, solChoix, spritesChoix, choisirSol, choisirSprites, marquerGfxChoisi } from '../../gfx.js';
 
 /* ================= OPTIONS ================= */
 export function optionsScreen(game) {
@@ -11,6 +11,7 @@ export function optionsScreen(game) {
     const box = el('div', 'box opts'); s.appendChild(box);
     const speeds = ['Lente', 'Normale', 'Rapide', 'Instantanée'];
     const runSpeeds = ['Normale (1×)', 'Rapide (1.7×)', 'Turbo (2.5×)'];
+    const solInitial = solChoix();
     let i = 0, solChange = false;
     const natif = () => { try { return localStorage.getItem('odyssee-natif') === '1'; } catch (e) { return false; } };
     const nom = (liste, id) => liste.find((c) => c.id === id)?.nom || id;
@@ -28,7 +29,12 @@ export function optionsScreen(game) {
       ['Crédits graphismes', ''],
       ['Retour', ''],
     ];
-    const draw = () => { box.innerHTML = rows().map(([a, b], k) => `<div class="list-row ${k === i ? 'on' : ''}"><span class="cur">▶</span><span class="lbl">${a}</span><span class="rgt">${b ? '◀ ' + b + ' ▶' : ''}</span></div>`).join('') + '<div class="keys">' + (solChange ? '<b>Les graphismes changent au prochain lancement d\'Odyssée.</b><br>' : '') + '<b>Commandes</b><br>Flèches ou ZQSD : se déplacer · Espace / Entrée : valider, parler<br>Échap : annuler, menu · Maj : sprint · R : basculer course rapide/turbo · C : carte</div>'; };
+    const draw = () => {
+      const msgReload = solChange
+        ? (game?.state ? '<b>Graphismes modifiés : tu pourras les appliquer immédiatement en fermant les Options.</b><br>' : '<b>Les graphismes s\'appliquent dès la fermeture des Options.</b><br>')
+        : '';
+      box.innerHTML = rows().map(([a, b], k) => `<div class="list-row ${k === i ? 'on' : ''}"><span class="cur">▶</span><span class="lbl">${a}</span><span class="rgt">${b ? '◀ ' + b + ' ▶' : ''}</span></div>`).join('') + '<div class="keys">' + msgReload + '<b>Commandes</b><br>Flèches ou ZQSD : se déplacer · Espace / Entrée : valider, parler<br>Échap : annuler, menu · Maj : sprint · R : basculer course rapide/turbo · C : carte</div>';
+    };
     draw();
     const pop = ui.input.push((k) => {
       const nRows = 12;
@@ -46,7 +52,7 @@ export function optionsScreen(game) {
         if (i === 4) snd.setStyle?.(snd.style === 'retro' ? 'moderne' : 'retro');
         if (i === 5) game.hud?.setDexnavHidden?.(!game.hud.dexnavHidden);
         if (i === 6) game.hud?.changerTaille?.(d);
-        if (i === 7) { const L = SOLS_CHOIX, j = (L.findIndex((c) => c.id === solChoix()) + d + L.length) % L.length; choisirSol(L[j].id); solChange = true; }
+        if (i === 7) { const L = SOLS_CHOIX, j = (L.findIndex((c) => c.id === solChoix()) + d + L.length) % L.length; choisirSol(L[j].id); marquerGfxChoisi(); solChange = solChoix() !== solInitial; }
         if (i === 8) { const L = SPRITES_CHOIX, j = (L.findIndex((c) => c.id === spritesChoix()) + d + L.length) % L.length; choisirSprites(L[j].id); }
         // rendu net : la géométrie (bâtiments, relief) est tracée à la résolution de l'écran ; appliqué tout de suite
         if (i === 9) { try { localStorage.setItem('odyssee-natif', natif() ? '0' : '1'); } catch (e) {} dispatchEvent(new Event('resize')); }

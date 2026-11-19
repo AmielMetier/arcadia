@@ -1,4 +1,4 @@
-// odyssee/js/core/pvp.js — combat entre deux joueurs, et échanges.
+// odyssee/js/core/pvp.js — combat entre deux joueurs (1v1, 2v2, 3v3), et échanges.
 //
 // Combat : les deux joueurs font tourner exactement le même combat, chacun de son point de vue
 // (lui en côté 0, l'adversaire en côté 1), avec le même générateur aléatoire à graine. Ils ne s'envoient
@@ -38,86 +38,140 @@ export const TRADE_EVO = { 64: 65, 67: 68, 75: 76, 93: 94 };
 
 export class PvpBattle extends Battle {
   /**
-   * @param o.me    { name, party }               son équipe (copie)
-   * @param o.foe   { name, party, bs }           l'équipe de l'adversaire (copie reçue), bs = sprite de dresseur
-   * @param o.seed  graine commune
-   * @param o.canon index local du côté de celui qui a lancé le défi (0 pour lui, 1 pour l'autre)
+   * @param o.me     { name, party }               son équipe (copie)
+   * @param o.foe    { name, party, bs }           l'équipe de l'adversaire (copie reçue), bs = sprite de dresseur
+   * @param o.seed   graine commune
+   * @param o.canon  index local du côté de celui qui a lancé le défi (0 pour lui, 1 pour l'autre)
+   * @param o.format 'single' | 'double' | 'triple'
    */
   constructor(o) {
     super({
       player: { name: o.me.name, party: o.me.party, bag: {} },
       foe: { name: o.foe.name, party: o.foe.party, trainer: { cls: 'Dresseur', name: o.foe.name, bs: o.foe.bs, prize: 0 } },
       rng: seededRng(o.seed),
+      format: o.format,
+      slots: o.slots,
     });
     this.pvp = true;
-    // duel entre amis : chaque dresseur peut méga-évoluer un Pokémon qui tient sa gemme ; le choix de l'autre arrive avec son action
     this.sides[0].mega = this.sides[1].mega = true;
     this.canon = o.canon;
-    this.remote = null;        // choix de l'adversaire pour le tour en cours
-    this.need = [false, false]; // qui doit envoyer un Pokémon après un K.O.
+    this.remote = null;
+    this.need = [false, false];
+    this.needSlots = [[], []];
   }
 
-  /** fin de tour dans le même ordre sur les deux écrans : d'abord le côté de celui qui a lancé le défi */
   eotOrder() { return [this.canon, 1 - this.canon]; }
-  /** même tirage des deux côtés : on désigne le premier par son côté « canonique » */
-  tie(p) {
+  tie(p, q) {
+    const ps = p.i ?? p.side, qs = q?.i ?? q?.side;
+    if (qs != null && ps === qs) return (p.slot ?? 0) - (q.slot ?? 0);
     const first = this.rng() < 0.5 ? this.canon : 1 - this.canon;
-    return p.i === first ? -1 : 1;
+    return ps === first ? -1 : 1;
   }
 
-  foeWantsMega(b) { return b?.type === 'move' && !!this.remote?.mega && this.canMega(1); }
-  /** l'adversaire ne réfléchit pas ici : c'est le choix reçu de son écran */
-  foeChoose() {
-    const forced = this.forcedAction(1); if (forced) return forced;
-    const a = this.remote || { type: 'move', idx: 0 };
-    if (a.type === 'switch' && this.sides[1].party[a.idx] && this.sides[1].party[a.idx].hp > 0 && a.idx !== this.sides[1].active) return { type: 'switch', idx: a.idx };
-    if (!this.usableMoves(1).length) return { type: 'move', id: 165 };
-    const k = Number.isInteger(a.idx) && this.foe.moves[a.idx]?.pp > 0 ? a.idx : this.usableMoves(1)[0];
-    return { type: 'move', id: this.foe.moves[k].id, slot: k };
+  _remoteFor(slot = 0) {
+    if (Array.isArray(this.remote)) return this.remote.find((x) => x && x.slot === slot) ?? this.remote[slot] ?? { type: 'move', idx: 0 };
+    return this.remote || { type: 'move', idx: 0 };
+  }
+  foeWantsMega(b, slot = 0) {
+    const r = this._remoteFor(slot);
+    return b?.type === 'move' && !!r?.mega && this.canMega({ side: 1, slot });
+  }
+  foeChoose() { return this.foeChooseSlot(0); }
+  foeChooseAll() {
+    return this.aliveSlots(1).map((sl) => ({ i: 1, side: 1, slot: sl, a: this.foeChooseSlot(sl) }));
+  }
+  foeChooseSlot(slot = 0) {
+    const ref = { side: 1, slot };
+    const forced = this.forcedAction(ref); if (forced) return forced;
+    const a = this._remoteFor(slot);
+    const m = this.act(ref);
+    if (a.type === 'switch' && this.sides[1].party[a.idx] && this.sides[1].party[a.idx].hp > 0 && !this.sides[1].activeSlots.includes(a.idx)) {
+      return { type: 'switch', idx: a.idx };
+    }
+    if (!this.usableMoves(ref).length) return { type: 'move', id: 165 };
+    const k = Number.isInteger(a.idx) && m.moves[a.idx]?.pp > 0 ? a.idx : this.usableMoves(ref)[0];
+    // côté distant : side 1 pour lui correspond au côté joueur local (0) et vice versa
+    const targetSide = a.targetSide != null ? (1 - a.targetSide) : 0;
+    const targetSlot = Number.isInteger(a.targetSlot) ? a.targetSlot : 0;
+    return { type: 'move', id: m.moves[k].id, slot: k, targetSide, targetSlot };
   }
 
   awardExp() { /* combat amical : pas d'expérience */ }
 
-  checkFaints() {
+  checkFaints(midTurn = false) {
     let stop = false;
     for (const i of [1, 0]) {
-      const m = this.act(i);
-      if (isFainted(m) && !m._ko) {
-        m._ko = true;
-        this.ev.push({ t: 'faint', side: i });
-        this.say(`${i === 1 ? this.Nm(1) : monName(m)} est K.O. !`);
-        stop = true;
+      for (let slot = 0; slot < this.slots; slot++) {
+        const m = this.monAt(i, slot);
+        if (m && isFainted(m) && !m._ko) {
+          m._ko = true;
+          this.ev.push({ t: 'faint', side: i, slot });
+          this.say(`${i === 1 ? this.Nm({ side: 1, slot }) : monName(m)} est K.O. !`);
+          stop = true;
+        }
       }
     }
-    if (!stop) return false;
     const left = (i) => this.sides[i].party.some((m) => m.hp > 0);
     if (!left(0) && !left(1)) { this.say('Les deux dresseurs n\'ont plus de Pokémon en forme !'); this.end('draw'); return true; }
     if (!left(0)) { this.loseBattle(); return true; }
     if (!left(1)) { this.winBattle(); return true; }
-    this.need = [isFainted(this.act(0)), isFainted(this.act(1))];
+
+    if (this.slots === 1) {
+      if (!stop) return false;
+      this.need = [isFainted(this.act(0)), isFainted(this.act(1))];
+      this.needSlots = [this.need[0] ? [0] : [], this.need[1] ? [0] : []];
+      this.state = 'switch';
+      this.ev.push({ t: 'switch-prompt' });
+      return true;
+    }
+
+    if (midTurn) return false;
+    const ns = [[], []];
+    for (const i of [0, 1]) {
+      const benchCount = this.sides[i].party.filter((m, idx) => m && m.hp > 0 && !this.sides[i].activeSlots.includes(idx)).length;
+      for (let sl = 0; sl < this.slots; sl++) {
+        const m = this.monAt(i, sl);
+        if (m && isFainted(m)) {
+          if (ns[i].length < benchCount) ns[i].push(sl);
+          else this.sides[i].activeSlots[sl] = -1;
+        }
+      }
+    }
+    if (!ns[0].length && !ns[1].length) return false;
+    this.needSlots = ns;
+    this.need = [ns[0].length > 0, ns[1].length > 0];
     this.state = 'switch';
-    this.ev.push({ t: 'switch-prompt' });
+    this.ev.push({ t: 'switch-prompt', slots: ns[0] });
     return true;
   }
 
-  /** les deux joueurs ont choisi qui envoyer : on applique dans le même ordre des deux côtés */
   switchBoth(mine, theirs) {
     if (this.state !== 'switch') return [];
     this.ev = [];
-    const pick = { 0: mine, 1: theirs };
+    const pick = { 0: Array.isArray(mine) ? mine : [mine], 1: Array.isArray(theirs) ? theirs : [theirs] };
     const switched = [];
     for (const i of [this.canon, 1 - this.canon]) {
-      if (!this.need[i]) continue;
+      const slotsNeed = this.needSlots[i].length ? this.needSlots[i] : (this.need[i] ? [0] : []);
+      if (!slotsNeed.length) continue;
       const party = this.sides[i].party;
-      let idx = pick[i];
-      if (!party[idx] || party[idx].hp <= 0) idx = party.findIndex((m) => m.hp > 0);
-      this.doSwitch(i, idx, true, false);
-      switched.push(i);
+      for (let k = 0; k < slotsNeed.length; k++) {
+        const sl = slotsNeed[k];
+        let idx = pick[i][k];
+        if (idx == null || !party[idx] || party[idx].hp <= 0 || this.sides[i].activeSlots.includes(idx)) {
+          idx = party.findIndex((m, j) => m && m.hp > 0 && !this.sides[i].activeSlots.includes(j));
+        }
+        if (idx >= 0) {
+          this.doSwitchSlot(i, sl, idx, true, false);
+          switched.push({ side: i, slot: sl });
+        } else {
+          this.sides[i].activeSlots[sl] = -1;
+        }
+      }
     }
     this.need = [false, false];
+    this.needSlots = [[], []];
     if (switched.length) {
-      switched.sort((p, q) => this.stat(q, 5) - this.stat(p, 5) || this.tie({ i: p }, { i: q }));
-      for (const s of switched) this.triggerEntry(s);
+      for (const s of this.sortBySpeed(switched)) this.triggerEntry(s);
     }
     this.state = 'choose';
     return this.flush();
@@ -133,7 +187,6 @@ export class PvpBattle extends Battle {
     this.say(`${this.sides[1].name} remporte le combat !`);
     this.end('lose');
   }
-  /** fin anticipée : abandon d'un joueur, départ, ou combats qui ne concordent plus */
   stop(result, text) {
     this.ev = [];
     if (text) this.say(text);
@@ -141,13 +194,11 @@ export class PvpBattle extends Battle {
     return this.flush();
   }
 
-  /** empreinte de l'état, indépendante du point de vue */
   checksum() {
     const parts = [];
     for (const i of [this.canon, 1 - this.canon]) {
       const s = this.sides[i];
-      // le poison grave redevient un poison simple pour son dresseur à la fin du combat : on les compte pareil
-      parts.push(s.active, ...s.party.map((m) => `${m.hp}${(m.status === 'tox' ? 'psn' : m.status) || ''}`), s.v.st.join(''));
+      parts.push(...s.activeSlots, ...s.party.map((m) => `${m.hp}${(m.status === 'tox' ? 'psn' : m.status) || ''}`), ...s.vs.map((v) => v.st.join('')));
     }
     parts.push(this.turn);
     let h = 0x811c9dc5;

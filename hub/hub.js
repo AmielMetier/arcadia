@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '5.97';
+  const VERSION = '5.124';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -789,6 +789,7 @@ const watchdog = setTimeout(() => {
       case 'result': recordResult(frame.game, d.r); break;
       case 'log': if (window.DDLogger && d.entry) window.DDLogger.receiveFromChild(d.entry); break;
       case 'shown': if (window.HubInGame) window.HubInGame.shown(); break;
+      case 'join': if (d.code) joinCode(String(d.code).toUpperCase().slice(0, 4)); break;
       case 'exit': leaveGame(); break;
       case 'outdated': {
         // en pleine partie, le jeu a vu que sa carte n'est pas celle de l'hôte (une autre version, ou des fichiers

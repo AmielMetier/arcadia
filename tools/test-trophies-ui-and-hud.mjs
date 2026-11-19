@@ -42,7 +42,7 @@ console.log('✔ KeyT mapped to trophies in input.js');
 // 3. Check game.js
 const gameJs = fs.readFileSync(path.join(ROOT, 'odyssee/js/game.js'), 'utf8');
 assert(
-  gameJs.includes("else if (k === 'trophies') { this.busy = true; await trophiesScreen(this); this.busy = false; }"),
+  gameJs.includes("else if (k === 'trophies')") && (gameJs.includes('await this.openTrophies()') || gameJs.includes('await trophiesScreen(this)')),
   'game.js must handle k === trophies in onKey'
 );
 assert(

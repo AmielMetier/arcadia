@@ -314,14 +314,19 @@ export function koi(f) {
 /** garde-corps du pont rouge (vu d'en haut) : 'ew', on le traverse d'ouest en est (garde-corps au nord et au sud), 'ns',
  *  du nord au sud (à l'ouest et à l'est) ; haut / bas : garde-corps du premier / du second côté (un pont de deux voies
  *  n'en a pas au milieu) */
-function pontRouge(sens = 'ew', haut = true, bas = true) {
+const PONTS_PAL = {
+  rouge: ['#3a0c04', '#f05a3a', '#c8301e', '#4a2410', '#7a1408', '#8a1a0c', '#2a0802'],
+  bois: ['#3a2210', '#dba86e', '#a8703c', '#58341c', '#6e4422', '#7a4d28', '#2c180c'],
+};
+function pontGardeCorps(palKey, sens = 'ew', haut = true, bas = true) {
+  const [bd, hi, md, sd, ph, pl, dk] = PONTS_PAL[palKey] || PONTS_PAL.rouge;
   return toile((p0) => {
     const p = sens === 'ns' ? (i, j, c) => p0(j, i, c) : p0;
     for (let i = 0; i < C; i++) {
       const poteau = i % 10 === 4 || i % 10 === 5;
-      // garde-corps du haut (vu de dessus : main courante claire, ombre dessous) et du bas (face vermillon)
-      if (haut) for (let j = 0; j < 5; j++) p(i, j, poteau ? (j < 4 ? '#7a1408' : '#3a0c04') : j === 0 ? '#3a0c04' : j === 1 ? '#f05a3a' : j < 4 ? '#c8301e' : '#4a2410');
-      if (bas) for (let j = C - 7; j < C; j++) p(i, j, poteau ? (j === C - 7 ? '#f05a3a' : '#8a1a0c') : j === C - 7 ? '#3a0c04' : j === C - 6 ? '#f05a3a' : j < C - 2 ? '#c8301e' : j === C - 2 ? '#8a1a0c' : '#2a0802');
+      // garde-corps du haut (vu de dessus : main courante claire, ombre dessous) et du bas (face)
+      if (haut) for (let j = 0; j < 5; j++) p(i, j, poteau ? (j < 4 ? ph : bd) : j === 0 ? bd : j === 1 ? hi : j < 4 ? md : sd);
+      if (bas) for (let j = C - 7; j < C; j++) p(i, j, poteau ? (j === C - 7 ? hi : pl) : j === C - 7 ? bd : j === C - 6 ? hi : j < C - 2 ? md : j === C - 2 ? pl : dk);
     }
   });
 }
@@ -393,8 +398,11 @@ export function texturesRelief(putImg, img) {
   for (const k of Object.keys(img)) { const m = /^r(.)_terre_(.+)$/.exec(k); if (m) putImg(`r${m[1]}_ocre_${m[2]}`, ocre(img[k])); }
   Object.entries(LEVRES).forEach(([k, pal], i) => { for (let v = 0; v < 2; v++) putImg(`fal_levre_${k}_${v}`, levre(pal, 31 + i * 7 + v * 101)); });
   putImg('fal_pied', pied());
-  putImg('pont_rouge', pontRouge());
-  for (const d of ['ew', 'ns']) for (let k = 1; k < 4; k++) putImg(`pont_rouge_${d}_${k}`, pontRouge(d, !!(k & 1), !!(k & 2)));
+  putImg('pont_rouge', pontGardeCorps('rouge'));
+  for (const d of ['ew', 'ns']) for (let k = 1; k < 4; k++) {
+    putImg(`pont_rouge_${d}_${k}`, pontGardeCorps('rouge', d, !!(k & 1), !!(k & 2)));
+    putImg(`pont_bois_${d}_${k}`, pontGardeCorps('bois', d, !!(k & 1), !!(k & 2)));
+  }
   for (const m of ['ns', 'ew', 'ne', 'es', 'sw', 'nw']) putImg('rail_' + m, rails(m));
   putImg('echelle', echelle(false)); putImg('echelle_jour', echelle(true));
   for (const [bio, R] of Object.entries(ROCHES)) {

@@ -55,6 +55,19 @@ const mv = (moveId, target) => ({ type: 'move', moveId, target });
   ok(forceSwitch(b, 'C', 4) && getActivePokemon(b, 'C').id === 9, 'C envoie un des siens');
 }
 
+{ // plus de PP (ou objet Choix bloqué sur une attaque vide) : Lutte, sans type, contrecoup d'1/4 des PV max
+  const b = battle([mon(143, { ability: null }), mon(25, { ability: null })], [mon(94, { ability: null, item: 'choiceband', choiceLock: 'protect', hp: 999, maxHp: 999 }), mon(9, { ability: null })]);
+  for (const k of b.teamA[0].moves) b.teamA[0].ppMap[k] = 0;
+  b.teamB[0].ppMap.protect = 0;
+  ok(chooseDoublesAction(b, 'A', 'expert').moveId === 'struggle', 'le bot lutte quand il n\'a plus de PP');
+  ok(chooseDoublesAction(b, 'B', 'expert').moveId !== 'struggle', 'objet Choix bloqué sur une attaque vide : les autres attaques redeviennent possibles');
+  const before = b.teamA[0].hp;
+  const { events } = resolveActions(b, { A: mv(b.teamA[0].moves[0], 'B'), C: mv('protect'), B: null, D: mv('protect') });
+  ok(events.some((e) => e.type === 'attack_start' && e.side === 'A' && e.moveName === 'Lutte'), 'Lutte remplace une attaque sans PP');
+  ok(events.some((e) => e.type === 'damage' && e.attSide === 'A' && e.defSide === 'B'), 'Lutte touche un Spectre (sans type)');
+  ok(before - b.teamA[0].hp === Math.floor(b.teamA[0].maxHp / 4), 'contrecoup d\'un quart des PV max');
+}
+
 // combats complets entre bots
 const ids = POKEMON_ROSTER.map((p) => p.id);
 let turnsTotal = 0, spreadSeen = 0, protectSeen = 0;

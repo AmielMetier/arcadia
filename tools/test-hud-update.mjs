@@ -8,7 +8,7 @@ globalThis.document = {
     append() {},
     appendChild() {},
     setAttribute() {},
-    style: {},
+    style: { setProperty() {}, removeProperty() {} },
     addEventListener() {},
     innerHTML: ''
   }),
@@ -83,6 +83,23 @@ const { createMon } = await import('../odyssee/js/core/mon.js');
   hud.update(true);
   // le compteur de trophées n'est plus écrit dans le HUD (il est dans l'écran Trophées) : seul le bouton est vérifié
   console.log('✔ Test Case 2 (State with unlocked trophies) passed');
+
+  // Test Case 3: sig cache invalidation on quick-item & bag depletion & velo fallback
+  mockGame.state.bag = { 'repel': 2, 'velo': 1 };
+  mockGame.state.registeredItem = 'repel';
+  hud.update();
+  if (!hud.gearEl.innerHTML.includes('hud-quick-item')) throw new Error('Expected hud-quick-item for registered repel');
+
+  mockGame.state.bag.repel = 0;
+  hud.update();
+  if (hud.gearEl.innerHTML.includes('hud-quick-item')) throw new Error('Quick item should disappear once quantity reaches 0');
+
+  mockGame.state.registeredItem = null;
+  hud.update();
+  if (!hud.gearEl.innerHTML.includes('Vélo') && !hud.gearEl.innerHTML.includes('hud-quick-item')) {
+    throw new Error('Expected velo fallback in quick-item when registeredItem is unset');
+  }
+  console.log('✔ Test Case 3 (Quick-item sig invalidation & velo fallback) passed');
 }
 
 console.log('\n🎉 ALL HUD UPDATE TESTS PASSED SUCCESSFULLY!');

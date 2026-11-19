@@ -184,9 +184,11 @@ export function etatDomaine(d) {
   for (const sp of d.res) { const t = RESIDENT[sp]?.talent; if (t && !d.talents.includes(t)) d.talents.push(t); }
   return d;
 }
+export const DOMAINE_AMI = 'domaine:ami';
+
 /** reconstruit le Domaine : la terre desséchée, les travaux dans l'ordre, puis les Pokémon installés ; renvoie la carte */
 export function batirDomaine(maps, domaine, now = Date.now()) {
-  for (const id of Object.keys(maps)) if (id.startsWith(DOMAINE + ':')) delete maps[id];
+  for (const id of Object.keys(maps)) if (id.startsWith(DOMAINE + ':') && id !== DOMAINE_AMI && !id.startsWith(DOMAINE_AMI + ':')) delete maps[id];
   const d = etatDomaine(domaine) || {};
   const m = domaineVierge(d.nom, d.recolte, now);
   const ops = [];
@@ -208,5 +210,90 @@ export function batirDomaine(maps, domaine, now = Date.now()) {
     m.npc({ id: 'domaine:poke' + sp, x: p[0], y: p[1], sprite: 'poke:' + sp, dir: 'down', move: 'wander', script: 'resident', sp });
   });
   maps[DOMAINE] = m;
+  return m;
+}
+
+/** Construit la carte en lecture seule du Domaine d'un ami (`DOMAINE_AMI`) avec son Gardien et son Panier d'accueil */
+export function batirDomaineAmi(maps, info, retour) {
+  for (const id of Object.keys(maps)) if (id === DOMAINE_AMI || id.startsWith(DOMAINE_AMI + ':')) delete maps[id];
+  const ownerName = String(info?.ownerName || 'Ami').slice(0, 14);
+  const nom = String(info?.nom || `Domaine de ${ownerName}`).slice(0, 28);
+  const m = domaineVierge(nom, {}, Date.now());
+  m.id = DOMAINE_AMI;
+  const ops = [];
+  for (const t of info?.travaux || []) {
+    const art = ARTICLE[t.a];
+    const op = art && opPour(art, t.x, t.y, t);
+    if (op) ops.push(op);
+  }
+  const amiSub = {};
+  applyOps(m, ops, amiSub);
+  // Redirige les portails intérieurs des maisons d'amis vers DOMAINE_AMI:* pour ne pas écraser le Domaine local
+  for (const [wk, wv] of [...m.warps]) {
+    if (wv?.map?.startsWith(DOMAINE + ':')) {
+      const suffix = wv.map.slice(DOMAINE.length + 1);
+      m.warps.set(wk, { ...wv, map: DOMAINE_AMI + ':' + suffix });
+    }
+  }
+  for (const [sk, sm] of Object.entries(amiSub)) {
+    const suffix = sk.startsWith(DOMAINE + ':') ? sk.slice(DOMAINE.length + 1) : sk;
+    const newId = DOMAINE_AMI + ':' + suffix;
+    sm.id = newId;
+    for (const [iwk, iwv] of [...sm.warps]) {
+      if (iwv?.map === DOMAINE) sm.warps.set(iwk, { ...iwv, map: DOMAINE_AMI });
+    }
+    if (sm.outside?.map === DOMAINE) sm.outside = { ...sm.outside, map: DOMAINE_AMI };
+    maps[newId] = sm;
+  }
+  // Enlève la récolte sauvage du domaine ami (visite amicale uniquement)
+  for (const [k, o] of [...m.objects]) if (o?.recolte) m.objects.delete(k);
+  if (retour?.map) {
+    m.warp(ENTREE.x, ENTREE.y, retour);
+    m.warp(ENTREE.x, ENTREE.y + 1, retour);
+  }
+  m.sign(ENTREE.x - 2, ENTREE.y - 2, `${nom.toUpperCase()}\nDomaine de ${ownerName}.\nParle au Gardien pour récupérer ton panier d'accueil ou relever un défi !`);
+  m.prop('caisse', ENTREE.x - 1, ENTREE.y - 2, true);
+  m.npcs = m.npcs.filter((q) => q.id !== 'domaine:architecte');
+  // Fait apparaître les Pokémon résidents de l'ami autour de l'entrée
+  const resList = Array.isArray(info?.res) ? info.res : [];
+  if (resList.length) {
+    const libres = [];
+    for (let y = 4; y < m.h - 4; y++) for (let x = 4; x < m.w - 4; x++) if ([T.GRASS, T.ASH, T.PATH, T.PAVE, T.FLOWER, T.SAND].includes(m.get(x, y)) && !m.objectAt(x, y)) libres.push([x, y]);
+    libres.sort((a, b) => Math.hypot(a[0] - ENTREE.x, a[1] - ENTREE.y + 8) - Math.hypot(b[0] - ENTREE.x, b[1] - ENTREE.y + 8));
+    resList.forEach((sp, i) => {
+      const r = RESIDENT[sp];
+      const p = libres[Math.min(libres.length - 1, i * 7 + 3)];
+      if (!r || !p) return;
+      m.npc({
+        id: 'domaine:ami:poke' + sp,
+        x: p[0],
+        y: p[1],
+        sprite: 'poke:' + sp,
+        dir: 'down',
+        move: 'wander',
+        text: [r.dit, `(${r.nom} vit heureux ici dans le domaine de ${ownerName} !)`],
+      });
+    });
+  }
+  const rangText = rang({ res: resList }, compter(m));
+  m.npc({
+    id: 'domaine:ami:gardien',
+    x: ENTREE.x + 2,
+    y: ENTREE.y - 2,
+    sprite: info?.gender === 'f' ? 'player_f' : 'player_m',
+    dir: 'down',
+    move: 'turn',
+    script: 'gardienDomaine',
+    gardien: {
+      id: String(info?.id || ownerName),
+      ownerName,
+      nom,
+      gender: info?.gender === 'f' ? 'f' : 'm',
+      party: Array.isArray(info?.party) ? info.party : [],
+      resCount: resList.length,
+      rangText,
+    },
+  });
+  maps[DOMAINE_AMI] = m;
   return m;
 }

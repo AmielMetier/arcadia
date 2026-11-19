@@ -49,7 +49,7 @@
   color: #fff; text-shadow: var(--px) var(--px) 0 #0c1424; display: flex; flex-direction: column; gap: calc(var(--px) * 2); }
 .hud.collapsed .hud-gear { width: auto; }
 .hud.collapsed .hud-gear-card { border-radius: calc(var(--px) * 8); padding: calc(var(--px) * 2.5) calc(var(--px) * 4.5); }
-.hud.collapsed .hud-stats, .hud.collapsed .hud-bdots-row, .hud.collapsed .hud-actions { display: none; }
+.hud.collapsed .hud-stats, .hud.collapsed .hud-bdots-row, .hud.collapsed .hud-guide, .hud.collapsed .hud-actions { display: none; }
 .hud-loc-row { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--px) * 3); border-bottom: calc(var(--px) * .8) solid rgba(168, 200, 240, .28); padding-bottom: calc(var(--px) * 1.5); }
 .hud.collapsed .hud-loc-row { border-bottom: none; padding-bottom: 0; }
 .hud-loc { font-size: calc(var(--px) * 8.6); font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .3px; }
@@ -372,6 +372,44 @@
 .hud-dexnav { background: rgba(14, 22, 34, .66) !important; -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
 .hud-slot { opacity: .94; }
 .hud-slot:hover, .hud-slot.swap { opacity: 1; }
+
+/* Aide à l'orientation dans les villes : boussole + puces Arène / Centre / Boutique / lieux clés */
+.hud-guide {
+  display: flex; flex-direction: column; gap: calc(var(--px) * 1.4);
+  background: rgba(10, 18, 30, 0.72); border: calc(var(--px) * .8) solid rgba(96, 165, 250, 0.4);
+  border-radius: calc(var(--px) * 4); padding: calc(var(--px) * 1.8) calc(var(--px) * 2.4);
+}
+.hud-guide-head { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--px) * 2); }
+.hgd-title { font-size: calc(var(--px) * 5.2); font-weight: 800; color: #7dd3fc; letter-spacing: .04em; }
+.hgd-acts { display: flex; align-items: center; gap: calc(var(--px) * 1.4); }
+.hgd-btn {
+  font: inherit; font-size: calc(var(--px) * 4.8); font-weight: 700; color: #dbeafe;
+  background: rgba(30, 58, 95, 0.78); border: calc(var(--px) * .7) solid rgba(125, 211, 252, 0.45);
+  border-radius: calc(var(--px) * 2.4); padding: calc(var(--px) * .6) calc(var(--px) * 2); cursor: pointer; text-shadow: none;
+}
+.hgd-btn:hover { background: rgba(37, 99, 235, 0.85); color: #fff; }
+.hgd-btn.map { border-color: rgba(251, 191, 36, 0.6); color: #fde68a; background: rgba(68, 44, 10, 0.65); }
+.hgd-btn.map:hover { background: rgba(180, 100, 12, 0.85); color: #fff; }
+.hud-guide-chips { display: flex; flex-wrap: wrap; gap: calc(var(--px) * 1.2); max-height: calc(var(--px) * 44); overflow-y: auto; }
+.hgd-chip {
+  font: inherit; display: inline-flex; align-items: center; gap: calc(var(--px) * 1);
+  padding: calc(var(--px) * .7) calc(var(--px) * 1.8); font-size: calc(var(--px) * 4.8); font-weight: 700; color: #f1f5f9;
+  background: rgba(18, 28, 44, 0.88); border: calc(var(--px) * .7) solid var(--gc, #38bdf8);
+  border-radius: calc(var(--px) * 2.5); cursor: pointer; text-shadow: none; transition: filter .1s, transform .08s;
+}
+.hgd-chip i { font-style: normal; color: var(--gc, #fbbf24); font-weight: 900; }
+.hgd-chip b { color: #7dd3fc; font-weight: 800; }
+.hgd-chip:hover { filter: brightness(1.22); transform: translateY(calc(var(--px) * -.5)); }
+.hgd-chip.on { background: linear-gradient(180deg, #92400e 0%, #451a03 100%); border-color: #fbbf24; color: #fef08a; box-shadow: 0 0 calc(var(--px) * 2) rgba(251, 191, 36, 0.5); }
+.hgd-target {
+  display: flex; align-items: center; justify-content: space-between; gap: calc(var(--px) * 1.5);
+  background: rgba(68, 38, 6, 0.72); border: calc(var(--px) * .7) solid #fbbf24; border-radius: calc(var(--px) * 2.5);
+  padding: calc(var(--px) * .8) calc(var(--px) * 2); font-size: calc(var(--px) * 5);
+}
+.hgd-tlbl { font-weight: 800; color: #fde68a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hgd-tdir { font-weight: 800; color: #7dd3fc; white-space: nowrap; margin-left: auto; }
+.hgd-clear { font: inherit; border: 0; background: rgba(0, 0, 0, .35); color: #fca5a5; border-radius: calc(var(--px) * 1.5); padding: 0 calc(var(--px) * 1.5); cursor: pointer; font-weight: 900; }
+.hgd-clear:hover { background: #dc2626; color: #fff; }
 
 /* glisser un Pokémon de l'équipe sur un autre pour échanger leurs places (HUD et écran Équipe) */
 .hud-slot[data-idx], .pslot-lead-card[data-idx], .pslot-sub[data-idx] { touch-action: none; }

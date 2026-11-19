@@ -125,6 +125,7 @@
   }
   H.signalReady = () => { post({ k: 'ready' }); if (!readyAt && embedded) { readyAt = performance.now(); watchShown(); } };
   H.send = (to, m, opts) => post(opts && opts.volatile ? { k: 'send', to, m, v: 1 } : { k: 'send', to, m });
+  H.join = (code) => post({ k: 'join', code: String(code || '').toUpperCase().slice(0, 8) });
   H.exit = () => post({ k: 'exit' });
   H.outdated = (v, files) => post({ k: 'outdated', v: String(v || ''), files: Array.isArray(files) ? files : [] });
   // Fin de partie : le jeu de l'hôte transmet le classement au Hub (historique et classement entre potes)

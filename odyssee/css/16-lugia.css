@@ -2,6 +2,17 @@
    CINÉMATIQUE LUGIA OBSCUR (Éveil Obscur & Tornade Obscure)
    ========================================================================== */
 .lugia-cine-scr {
+  --cine-accent: #c084fc;
+  --cine-dot: #f43f5e;
+  --cine-glow: rgba(168, 85, 247, 0.88);
+  --cine-aura: rgba(120, 20, 200, 0.45);
+  --cine-aura-hi: rgba(160, 30, 255, 0.65);
+  --cine-badge-bg: rgba(35, 10, 65, 0.8);
+  --cine-badge-txt: #e9d5ff;
+  --cine-badge-bd: rgba(192, 132, 252, 0.55);
+  --cine-grad-mid: #f3e8ff;
+  --cine-grad-end: #7e22ce;
+  --cine-sky-bg: #05020e;
   position: absolute;
   inset: 0;
   background: #000;
@@ -21,12 +32,21 @@
   justify-content: center;
   overflow: hidden;
 }
+.lugia-cine-3d,
 .lugia-cine-video {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
+  display: block;
+}
+.lugia-cine-3d {
+  z-index: 2;
+  background: var(--cine-sky-bg);
+}
+.lugia-cine-video {
   object-fit: contain;
   background: #000;
-  display: block;
   filter: contrast(1.1) brightness(1.04) saturate(1.2);
 }
 .lugia-cine-bars {
@@ -62,14 +82,14 @@
   inset: 0;
   pointer-events: none;
   z-index: 6;
-  box-shadow: inset 0 0 calc(var(--px) * 60) rgba(120, 20, 200, 0.45);
+  box-shadow: inset 0 0 calc(var(--px) * 60) var(--cine-aura);
   mix-blend-mode: screen;
   opacity: 0.8;
   animation: lugiaAuraPulse 3s ease-in-out infinite alternate;
 }
 @keyframes lugiaAuraPulse {
-  0% { opacity: 0.5; box-shadow: inset 0 0 calc(var(--px) * 40) rgba(80, 0, 140, 0.35); }
-  100% { opacity: 0.95; box-shadow: inset 0 0 calc(var(--px) * 80) rgba(160, 30, 255, 0.65); }
+  0% { opacity: 0.5; box-shadow: inset 0 0 calc(var(--px) * 40) var(--cine-aura); }
+  100% { opacity: 0.95; box-shadow: inset 0 0 calc(var(--px) * 80) var(--cine-aura-hi); }
 }
 .lugia-cine-vignette {
   position: absolute;
@@ -95,7 +115,7 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: calc(var(--px) * 14) calc(var(--px) * 16);
+  padding: calc(var(--px) * 14) calc(var(--px) * 16) calc(var(--px) * 24);
 }
 .lugia-cine-title-wrap {
   opacity: 0;
@@ -119,26 +139,26 @@
   font-size: calc(var(--px) * 5.6);
   font-weight: 700;
   letter-spacing: calc(var(--px) * 1.5);
-  color: #e9d5ff;
-  background: rgba(35, 10, 65, 0.8);
-  border: calc(var(--px) * 1) solid rgba(192, 132, 252, 0.55);
+  color: var(--cine-badge-txt);
+  background: var(--cine-badge-bg);
+  border: calc(var(--px) * 1) solid var(--cine-badge-bd);
   border-radius: calc(var(--px) * 12);
   padding: calc(var(--px) * 2) calc(var(--px) * 5);
   margin-bottom: calc(var(--px) * 3);
   backdrop-filter: blur(4px);
-  box-shadow: 0 calc(var(--px) * 2) calc(var(--px) * 8) rgba(120, 20, 200, 0.5);
+  box-shadow: 0 calc(var(--px) * 2) calc(var(--px) * 8) var(--cine-aura);
 }
 .lugia-badge-dot {
   width: calc(var(--px) * 3);
   height: calc(var(--px) * 3);
   border-radius: 50%;
-  background: #f43f5e;
-  box-shadow: 0 0 calc(var(--px) * 4) #f43f5e;
+  background: var(--cine-dot);
+  box-shadow: 0 0 calc(var(--px) * 4) var(--cine-dot);
   animation: lugiaDotGlow 1s ease-in-out infinite alternate;
 }
 @keyframes lugiaDotGlow {
   0% { transform: scale(0.85); opacity: 0.65; }
-  100% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 calc(var(--px) * 7) #ff2a55; }
+  100% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 calc(var(--px) * 7) var(--cine-dot); }
 }
 .lugia-cine-title {
   margin: 0;
@@ -148,10 +168,10 @@
   line-height: 1.05;
   color: #fff;
   text-transform: uppercase;
-  background: linear-gradient(180deg, #ffffff 0%, #f3e8ff 40%, #c084fc 75%, #7e22ce 100%);
+  background: linear-gradient(180deg, #ffffff 0%, var(--cine-grad-mid) 40%, var(--cine-accent) 75%, var(--cine-grad-end) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 calc(var(--px) * 14) rgba(168, 85, 247, 0.9));
+  filter: drop-shadow(0 0 calc(var(--px) * 14) var(--cine-glow));
 }
 .lugia-cine-sub {
   font-size: calc(var(--px) * 6.8);
@@ -161,7 +181,7 @@
   margin-top: calc(var(--px) * 2);
   text-transform: uppercase;
   opacity: 0.92;
-  text-shadow: 0 0 calc(var(--px) * 6) rgba(147, 51, 234, 0.85);
+  text-shadow: 0 0 calc(var(--px) * 6) var(--cine-glow);
 }
 .lugia-cine-skip {
   position: absolute;
@@ -172,8 +192,8 @@
   font-size: calc(var(--px) * 6.2);
   font-weight: 600;
   color: #e2e8f0;
-  background: rgba(20, 10, 35, 0.78);
-  border: calc(var(--px) * 1) solid rgba(168, 85, 247, 0.5);
+  background: rgba(15, 12, 26, 0.8);
+  border: calc(var(--px) * 1) solid var(--cine-badge-bd);
   border-radius: calc(var(--px) * 10);
   padding: calc(var(--px) * 2.5) calc(var(--px) * 5.5);
   backdrop-filter: blur(6px);
@@ -182,12 +202,41 @@
   transition: all 0.2s ease;
 }
 .lugia-cine-skip:hover {
-  background: rgba(50, 15, 90, 0.92);
+  background: var(--cine-badge-bg);
   color: #fff;
-  border-color: #c084fc;
-  box-shadow: 0 0 calc(var(--px) * 10) rgba(192, 132, 252, 0.65);
+  border-color: var(--cine-accent);
+  box-shadow: 0 0 calc(var(--px) * 10) var(--cine-glow);
   transform: translateY(calc(var(--px) * -1));
 }
+
+/* éveil de Lugia Obscur (cine-lugia.js) : format cinéma, carton du lieu */
+.lugia-cine-scr.epic .lugia-cine-bar { height: 11.5%; transition-duration: 1.1s; }
+.lugia-cine-scr.epic .lugia-cine-aura,
+.lugia-cine-scr.epic .lugia-cine-vignette { display: none; }
+.lugia-cine-scr.epic .lugia-cine-hud { padding-bottom: calc(11.5% + var(--px) * 10); }
+.lugia-cine-scr.epic .lugia-cine-title { font-size: calc(var(--px) * 24); letter-spacing: calc(var(--px) * 6); }
+.lugia-cine-scr.epic .lugia-cine-title-wrap { transition-duration: 1.4s; }
+.lugia-cine-loc {
+  position: absolute;
+  left: calc(var(--px) * 16);
+  top: calc(11.5% + var(--px) * 9);
+  z-index: 16;
+  display: none;
+  flex-direction: column;
+  gap: calc(var(--px) * 1.5);
+  padding-left: calc(var(--px) * 5);
+  border-left: calc(var(--px) * 1) solid rgba(216, 180, 254, 0.85);
+  color: #f5f0ff;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(calc(var(--px) * -8));
+  transition: opacity 1.1s ease, transform 1.4s cubic-bezier(0.16, 1, 0.3, 1);
+  text-shadow: 0 0 calc(var(--px) * 6) rgba(0, 0, 0, 0.9);
+}
+.lugia-cine-scr.epic .lugia-cine-loc { display: flex; }
+.lugia-cine-loc.in { opacity: 1; transform: none; }
+.lugia-cine-loc b { font-size: calc(var(--px) * 7.5); font-weight: 800; letter-spacing: calc(var(--px) * 3.2); }
+.lugia-cine-loc span { font-size: calc(var(--px) * 5); letter-spacing: calc(var(--px) * 1.6); opacity: 0.8; text-transform: uppercase; }
 
 /* crans de stats (Atq +2, Vit −1…) sous la jauge de l'adversaire, au-dessus de la nôtre */
 .bh-boosts { position: absolute; display: flex; flex-wrap: wrap; gap: calc(var(--bp) * 1.2); pointer-events: none; max-width: 100%; }
