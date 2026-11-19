@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 5.123 — 19 novembre 2026
+- **Tête de Calcul** — The Candidate : 31 nouvelles questions, celles de l'émission tournée en amphi devant le public.
+  - produits structurés : Athena ou Phoenix, capital garanti ou non, comment grossir un coupon, pourquoi le prix baisse alors que le sous-jacent monte ;
+  - options : option digitale, collar à coût nul, skew, put worst-of, gamma, et la nuit où une OPA tombe ;
+  - taux et macro : zéro coupon, taux forward, critères de Maastricht, l'Italie qui emprunte moins cher que la France ;
+  - trois casse-têtes : le premier as du paquet, le jeu des cartes rouges et noires, le sac de boules.
+
 ## 5.122 — 19 novembre 2026
 - Correction : corrections d'audit (icones objets/HUD, audio/cinematiques, sauvegardes, habitants, tests) (Amiel)
 - Correction : corrections critiques (PNJ nb_sportif/nb_linebacker, batiments troues/coupes, decors healer/vase/caisses/squelette) (Amiel)
