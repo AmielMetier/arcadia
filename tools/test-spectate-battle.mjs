@@ -1,4 +1,19 @@
 import assert from 'node:assert/strict';
+import moduleApi from 'node:module';
+
+// Reproduire l'importmap d'odyssee/index.html ("three" -> shared/vendor/three/three.module.min.js) sous Node
+const threeUrl = new URL('../shared/vendor/three/three.module.min.js', import.meta.url).href;
+if (typeof moduleApi.registerHooks === 'function') {
+  moduleApi.registerHooks({
+    resolve(specifier, context, nextResolve) {
+      if (specifier === 'three') return { url: threeUrl, shortCircuit: true };
+      return nextResolve(specifier, context);
+    }
+  });
+} else if (typeof moduleApi.register === 'function') {
+  const hook = `export async function resolve(s, c, n) { return s === 'three' ? { url: ${JSON.stringify(threeUrl)}, shortCircuit: true } : n(s, c); }`;
+  moduleApi.register('data:text/javascript,' + encodeURIComponent(hook));
+}
 
 // Setup minimal browser mocks for node environment before loading game modules
 globalThis.location = new URL('http://localhost:3000/index.html');
@@ -204,7 +219,10 @@ console.log('Testing Odyssée Live Battle Spectating System (v3.97)...');
 
   const bv = {
     spectator: true,
+    slots: 1,
     hud: { me: hudMe, foe: hudFoe },
+    hudFor: (side) => (side === 0 ? hudMe : hudFoe),
+    refreshBalls: () => {},
     battle: {
       sides: [
         { name: 'Alice' },

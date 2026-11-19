@@ -12,6 +12,7 @@ export const ITEMS = {
     pocket: 'cles',
     price: 0,
     key: true,
+    icon: 'running-shoes',
     name: 'Chaussures de Course',
     desc: 'Des baskets ultra-légères offertes par Maman. Maintiens Maj ou appuie sur R (ou sur le bouton du Pokégear) pour courir à vive allure.'
   },
@@ -104,7 +105,7 @@ export const ITEMS = {
   'chambre-air': { pocket: 'cles', price: 0, key: true, name: 'Chambre à Air', desc: 'Une chambre à air robuste pour assembler le vélo.' },
   derailleur: { pocket: 'cles', price: 0, key: true, name: 'Dérailleur', desc: 'Un dérailleur forgé avec soin pour assembler le vélo.' },
   'permis-bateau': { pocket: 'cles', price: 0, key: true, name: 'Permis Bateau', desc: 'Un permis officiel autorisant la navigation vers les îles.' },
-  canne: { pocket: 'cles', price: 0, key: true, name: 'Canne à Pêche', desc: 'Une canne à pêche solide et maniable. Permet de ferrer des Pokémon aquatiques depuis la rive.' },
+  canne: { pocket: 'cles', price: 0, key: true, icon: 'good-rod', name: 'Canne à Pêche', desc: 'Une canne à pêche solide et maniable. Permet de ferrer des Pokémon aquatiques depuis la rive.' },
   'secateur-sylvestre': { pocket: 'cles', price: 0, key: true, field: 'coupe', icon: 'secateur-sylvestre', name: 'Sécateur Sylvestre', desc: 'Des cisailles horticoles ouvragées en acier ciselé et or. Elles tranchent net les arbustes épineux. Place-toi face au buisson et appuie sur F.' },
   'harnais-flottant': { pocket: 'cles', price: 0, key: true, field: 'surf', icon: 'harnais-flottant', name: 'Harnais Flottant', desc: 'Une selle nautique étanche avec flotteurs profilés. Permet de glisser sur l\'eau et la mer. Place-toi face à l\'eau et appuie sur F.' },
   'sifflet-celeste': { pocket: 'cles', price: 0, key: true, field: 'vol', icon: 'sifflet-celeste', name: 'Sifflet Céleste', desc: 'Un sifflet ouvragé en argent et ruban saphir. Il appelle un grand oiseau pour voyager en un instant vers une ville déjà visitée (depuis le menu ou le sac).' },

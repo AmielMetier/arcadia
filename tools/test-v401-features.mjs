@@ -65,40 +65,45 @@ const resolvePath = (p) => {
 };
 
 // ============================================================================
-// 1. Test Feature 1: Advanced Major Move Animations (BattleView)
+// 1. Test Feature 1: Advanced Major Move Animations (BattleView + battleVfx)
 // ============================================================================
 {
   const bvSrc = fs.readFileSync(resolvePath('odyssee/js/ui/battleView.js'), 'utf8');
+  const vfxSrc = fs.readFileSync(resolvePath('odyssee/js/ui/battleVfx.js'), 'utf8');
 
-  // Verify all 8 methods exist
-  const requiredMethods = [
-    'animFlamethrower',
-    'animHydroPump',
-    'animThunderbolt',
-    'animEarthquake',
-    'animIceBeam',
-    'animPsychicShadow',
-    'animLeafBlade',
-    'animHyperBeam'
+  // Verify BattleView delegates move animations to battleVfx.js
+  assert.ok(bvSrc.includes("import { playMoveVfx, TYPE_FX } from './battleVfx.js'"), 'BattleView must import playMoveVfx from battleVfx.js');
+  assert.ok(bvSrc.includes('await playMoveVfx(this,'), 'BattleView must dispatch move events to playMoveVfx');
+
+  // Verify all 8 major move animation handlers exist in battleVfx.js
+  const requiredHandlers = [
+    'animFireWave',
+    'animHydroSurf',
+    'animThunder',
+    'animQuake',
+    'animIceStorm',
+    'animEnergySphere',
+    'animSlashStorm',
+    'animMegaBeam'
   ];
 
-  for (const m of requiredMethods) {
-    assert.ok(bvSrc.includes(`async ${m}(`), `BattleView must implement ${m}`);
+  for (const m of requiredHandlers) {
+    assert.ok(vfxSrc.includes(`async function ${m}(`), `battleVfx.js must implement ${m}`);
   }
-  console.log('✔ All 8 major move animation methods exist in BattleView');
+  console.log('✔ All 8 major move animation handlers exist in battleVfx.js');
 
-  // Verify dispatch in animMove
-  assert.ok(bvSrc.includes("['flamethrower', 'fire-blast'"), 'animMove must detect flame moves');
-  assert.ok(bvSrc.includes("['hydro-pump', 'surf'"), 'animMove must detect water moves');
-  assert.ok(bvSrc.includes("['thunderbolt', 'thunder'"), 'animMove must detect electric moves');
-  assert.ok(bvSrc.includes("['earthquake', 'earth-power'"), 'animMove must detect ground moves');
-  assert.ok(bvSrc.includes("['ice-beam', 'blizzard'"), 'animMove must detect ice moves');
-  assert.ok(bvSrc.includes("['psychic', 'psyshock'"), 'animMove must detect psychic/shadow moves');
-  assert.ok(bvSrc.includes("['razor-leaf', 'leaf-blade'"), 'animMove must detect grass/leaf moves');
-  assert.ok(bvSrc.includes("['hyper-beam', 'solar-beam'"), 'animMove must detect hyper/beam moves');
-  console.log('✔ animMove correctly routes all 8 categories of major iconic moves');
+  // Verify dispatch in playMoveVfx
+  assert.ok(vfxSrc.includes("['flamethrower', 'fire-blast'"), 'playMoveVfx must detect flame moves');
+  assert.ok(vfxSrc.includes("['hydro-pump', 'surf'"), 'playMoveVfx must detect water moves');
+  assert.ok(vfxSrc.includes("['thunderbolt', 'thunder'"), 'playMoveVfx must detect electric moves');
+  assert.ok(vfxSrc.includes("['earthquake', 'earth-power'"), 'playMoveVfx must detect ground moves');
+  assert.ok(vfxSrc.includes("['ice-beam', 'blizzard'"), 'playMoveVfx must detect ice moves');
+  assert.ok(vfxSrc.includes("['psychic', 'psyshock'"), 'playMoveVfx must detect psychic/shadow moves');
+  assert.ok(vfxSrc.includes("['razor-leaf', 'leaf-blade'"), 'playMoveVfx must detect grass/leaf moves');
+  assert.ok(vfxSrc.includes("['hyper-beam', 'solar-beam'"), 'playMoveVfx must detect hyper/beam moves');
+  console.log('✔ playMoveVfx correctly routes all 8 categories of major iconic moves');
 
-  // Verify new particle shapes in draw()
+  // Verify particle shapes in draw()
   assert.ok(bvSrc.includes("p.shape === 'slash'"), 'BattleView draw loop must support slash shape');
   assert.ok(bvSrc.includes("p.shape === 'crystal'"), 'BattleView draw loop must support crystal shape');
   assert.ok(bvSrc.includes("p.shape === 'flame'"), 'BattleView draw loop must support flame shape');

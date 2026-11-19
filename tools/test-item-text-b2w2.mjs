@@ -77,7 +77,13 @@ console.log('=== Test 3 : Messages de trouvaille au sol (Poké Ball sur la carte
   const msg6 = formatFindItem('Sacha', 'ct-10');
   assert.strictEqual(
     msg6,
-    "Sacha trouve la CT10 ct-10 !\nSacha met la CT10 dans la Poche CT & CS."
+    "Sacha trouve la CT10 Lame d’Air !\nSacha met la CT10 dans la Poche CT & CS."
+  );
+
+  const msg7 = formatFindItem('Sacha', 'ct-99');
+  assert.strictEqual(
+    msg7,
+    "Sacha trouve la CT99 ct-99 !\nSacha met la CT99 dans la Poche CT & CS."
   );
 }
 console.log('✓ Format de trouvaille B2W2 (verbe "trouve" + "met dans la Poche") validé');

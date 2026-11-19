@@ -127,7 +127,7 @@ export function bagScreen(game, o = {}) {
       <div class="b2w2-bag-inspector">
         <div class="b2w2-insp-left">
           <div class="b2w2-insp-frame">
-            <img class="b2w2-insp-img" src="img/items/potion.png" alt="">
+            <img class="b2w2-insp-img" src="img/items/potion.png" alt="" onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='img/items/gift.png'}">
           </div>
         </div>
         <div class="b2w2-insp-mid">
@@ -223,6 +223,7 @@ export function bagScreen(game, o = {}) {
       const sel = es[i];
       if (sel) {
         const it = ITEMS[sel];
+        delete inspSpriteEl.dataset.fb;
         inspSpriteEl.src = ASSETS.item(sel);
         inspSpriteEl.style.display = '';
         inspNameEl.textContent = itemName(sel);
@@ -290,7 +291,7 @@ export function bagScreen(game, o = {}) {
           return `<div class="list-row b2w2-item-row ${n === i ? 'on' : ''}" data-row="${n}">
             <span class="cur">${n === i ? '▶' : ''}</span>
             <div class="b2w2-item-ico-wrap">
-              <img class="b2w2-item-ico" src="${ASSETS.item(k)}" alt="">
+              <img class="b2w2-item-ico" src="${ASSETS.item(k)}" alt="" onerror="this.onerror=null;this.src='img/items/gift.png'">
             </div>
             <span class="b2w2-item-name">${esc(itemName(k))}</span>
             ${regTag}${heldTag}

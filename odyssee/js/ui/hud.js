@@ -362,7 +362,7 @@ export class Hud {
           if (!reg || (regQty <= 0 && reg !== 'running-shoes')) return '';
           return `<div class="hud-quick-item" data-act="quick-item" title="Objet Rapide (Touche Y ou Clic) : ${esc(itemName(reg))}">
             <span class="hqi-key">Y</span>
-            <img class="hqi-ico" src="${ASSETS.item(reg)}" alt="">
+            <img class="hqi-ico" src="${ASSETS.item(reg)}" alt="" onerror="this.onerror=null;this.src='img/items/gift.png'">
             <span class="hqi-lbl">${esc(itemName(reg))}</span>
           </div>`;
         })()}

@@ -1828,7 +1828,7 @@ export class Sound {
     } catch (e) {}
 
     // 4. Éclatement du Sceau / Rugissement & Cri à tShatter
-    const cryUrl = opts.cryUrl || (isShadowFull ? 'https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/249.ogg' : null);
+    const cryUrl = opts.cryUrl || (isShadowFull ? new URL('../snd/cris/249.ogg', import.meta.url).href : null);
     timers.push(setTimeout(() => {
       if (stopped) return;
       const tHit = c.currentTime;
@@ -1914,7 +1914,7 @@ export class Sound {
   /** Alias rétrocompatible pour Shadow Lugia */
   playLugiaCinematicAudio() {
     return this.playBossCinematicAudio('shadow', 14.8, {
-      cryUrl: 'https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/249.ogg',
+      cryUrl: new URL('../snd/cris/249.ogg', import.meta.url).href,
     });
   }
 

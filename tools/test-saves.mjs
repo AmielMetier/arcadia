@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
+import os from 'node:os';
+import path from 'node:path';
 
 let fails = 0;
 const ok = (c, msg) => { if (!c) { fails++; console.error('ÉCHEC :', msg); } else console.log('ok -', msg); };
@@ -39,7 +41,7 @@ await new Promise((r) => api.listen(0, r));
 const apiPort = api.address().port;
 
 const start = (port, env) => {
-  const p = spawn('node', [fileURLToPath(new URL('../server/server.js', import.meta.url))], { env: { ...process.env, PORT: String(port), RELAY_LOG_DIR: '/tmp/ddtest-saves-logs', ...env }, stdio: ['ignore', 'ignore', 'inherit'] });
+  const p = spawn('node', [fileURLToPath(new URL('../server/server.js', import.meta.url))], { env: { ...process.env, PORT: String(port), RELAY_LOG_DIR: path.join(os.tmpdir(), 'ddtest-saves-logs'), ...env }, stdio: ['ignore', 'ignore', 'inherit'] });
   return p;
 };
 const srv = start(8131, { GITHUB_TOKEN: 'jeton-test', SAVES_REPO: 'o/r', SAVES_API: `http://127.0.0.1:${apiPort}`, SAVES_GAP_MS: '400' });
@@ -60,13 +62,13 @@ try {
   ok(r.cors === '*', 'en-tête CORS présent');
   ok(refs.saves === undefined, 'la branche n\'est pas créée pour une simple lecture');
 
-  r = await post(8131, '/save/odyssee/put', { key, code: 'ODY1.abc.def', meta: { name: 'Amiel<b>', badges: 3, dex: 40, time: 3600 } });
+  r = await post(8131, '/save/odyssee/put', { key, code: 'ODY1.abc.def', meta: { name: 'Amiel<b>', badges: 12, dex: 40, time: 3600 } });
   ok(r.status === 200 && r.json.saved, 'première sauvegarde écrite');
   ok(refs.saves === 'abc', 'branche saves créée depuis main');
   const file = [...store.keys()][0];
   ok(file === `saves/odyssee/${r.json.fid}.json`, 'fichier rangé sous le code ami : ' + file);
   const data = JSON.parse(Buffer.from(store.get(file).content, 'base64').toString());
-  ok(data.name === 'Amielb' && data.badges === 3 && data.code === 'ODY1.abc.def' && !JSON.stringify(data).includes(key), 'contenu nettoyé, clé jamais écrite');
+  ok(data.name === 'Amielb' && data.badges === 12 && data.code === 'ODY1.abc.def' && !JSON.stringify(data).includes(key), 'contenu nettoyé, 12/15 badges conservés, clé jamais écrite');
 
   r = await post(8131, '/save/odyssee/get', { key });
   ok(r.json.save && r.json.save.code === 'ODY1.abc.def', 'relecture de la sauvegarde');

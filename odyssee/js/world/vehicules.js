@@ -6,9 +6,9 @@ import { ITEMS } from '../core/items.js';
 
 Object.assign(ITEMS, {
   velo: { pocket: 'cles', price: 0, key: true, icon: 'bicycle', name: 'Vélo', desc: 'Un vélo rouge assemblé par Lucien, de Voltacité. Touche V (ou depuis le Sac) pour monter dessus ou en descendre, en extérieur.' },
-  'chambre-air': { pocket: 'cles', price: 0, key: true, icon: 'tm-normal', name: 'Chambre à air', desc: 'Une chambre à air neuve, offerte par Yves, le marin de Port-Azur.' },
+  'chambre-air': { pocket: 'cles', price: 0, key: true, icon: 'chambre-air', name: 'Chambre à air', desc: 'Une chambre à air neuve, offerte par Yves, le marin de Port-Azur.' },
   derailleur: { pocket: 'cles', price: 0, key: true, icon: 'metal-coat', name: 'Dérailleur', desc: 'Un dérailleur forgé par les mineurs de Pierrefort, solide comme le roc.' },
-  'permis-bateau': { pocket: 'cles', price: 0, key: true, icon: 'pass', name: 'Permis bateau', desc: 'Délivré par la Capitainerie de Port-Azur. Le capitaine de l\'Embarcadère de l\'Aube le demande à l\'embarquement.' },
+  'permis-bateau': { pocket: 'cles', price: 0, key: true, icon: 'ss-ticket', name: 'Permis bateau', desc: 'Délivré par la Capitainerie de Port-Azur. Le capitaine de l\'Embarcadère de l\'Aube le demande à l\'embarquement.' },
 });
 
 /** questions de l'examen du permis bateau */

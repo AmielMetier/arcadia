@@ -16,9 +16,16 @@ const GAP = 45000; // au plus une sauvegarde automatique envoyée toutes les 45 
 /** clé du compte Hub (créée comme le fait le Hub si ce navigateur n'en a pas encore) */
 function accountKey() {
   try {
-    let k = JSON.parse(localStorage.getItem(KEY_K) || 'null');
+    const raw = localStorage.getItem(KEY_K);
+    let k = null;
+    if (raw) {
+      try { k = JSON.parse(raw); } catch (e) { k = raw; }
+    }
     if (typeof k !== 'string' || k.length < 16) {
       k = Array.from(crypto.getRandomValues(new Uint8Array(18)), (b) => b.toString(16).padStart(2, '0')).join('');
+      localStorage.setItem(KEY_K, JSON.stringify(k));
+    } else if (raw && raw[0] !== '"') {
+      // Migration douce : une ancienne clé brute (non JSON) est normalisée comme dans friends.js / DDProfile
       localStorage.setItem(KEY_K, JSON.stringify(k));
     }
     return k;

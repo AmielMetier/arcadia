@@ -25,7 +25,7 @@ Object.assign(ITEMS, {
   'flacon-parfum': { pocket: 'cles', price: 0, key: true, icon: 'gift', name: 'Flacon de parfum', desc: 'Un parfum de fleurs de Floralia, pour Madame Opaline, à Mirage.' },
   'collier-miaouss': { pocket: 'cles', price: 0, key: true, icon: 'soothe-bell', name: 'Collier à clochette', desc: 'Un petit collier rouge avec une clochette. Celui d\'un Miaouss ?' },
   'colis-postal': { pocket: 'cles', price: 0, key: true, icon: 'gift', name: 'Colis', desc: 'Un colis bien ficelé, adressé à Mme Léonie, Port-Granit. Il est tout mou.' },
-  clochette: { pocket: 'cles', price: 0, key: true, icon: 'cleanse-tag', name: 'Clochette de vent', desc: 'Une clochette du Jardin de la Grue, emportée par la tempête. Il y en a trois.' },
+  clochette: { pocket: 'cles', price: 0, key: true, icon: 'clear-bell', name: 'Clochette de vent', desc: 'Une clochette du Jardin de la Grue, emportée par la tempête. Il y en a trois.' },
 });
 
 // la Master Ball (donnée par le Dr Lumen, le chercheur de Mirage, l'Ancien de Fumerolle et Drakos) : connue dès le départ

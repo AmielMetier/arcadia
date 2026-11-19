@@ -1,5 +1,6 @@
 // odyssee/js/ui/cinematic.js — Cinématiques 3D temps réel (Three.js + HD-2D) pour chaque Boss & Légendaire
 import { SPECIES } from '../data/species.js';
+import { esc } from './ui.js';
 
 const PRESET_DEFS = {
   shadow: {
@@ -1136,199 +1137,212 @@ export async function playBossCinematic(game, opts = {}) {
       <div class="lugia-cine-loc"><b>SANCTUAIRE DES MARÉES</b><span>Nuit de l'Éclipse · 23 h 58</span></div>
       <div class="lugia-cine-hud">
         <div class="lugia-cine-title-wrap">
-          <div class="lugia-cine-badge"><span class="lugia-badge-dot"></span> ${cfg.badge}</div>
-          <h1 class="lugia-cine-title">${cfg.title}</h1>
-          <div class="lugia-cine-sub">${cfg.sub}</div>
+          <div class="lugia-cine-badge"><span class="lugia-badge-dot"></span> ${esc(cfg.badge)}</div>
+          <h1 class="lugia-cine-title">${esc(cfg.title)}</h1>
+          <div class="lugia-cine-sub">${esc(cfg.sub)}</div>
         </div>
       </div>
       <button type="button" class="lugia-cine-skip">Passer ▶</button>
     </div>
   `;
-  ui.root.appendChild(wrap);
-  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => wrap.classList.add('in'));
-
-  const host3D = wrap.querySelector('.lugia-cine-3d');
-  const cv2D = wrap.querySelector('.lugia-cine-canvas');
-  const flashEl = wrap.querySelector('.lugia-cine-flash');
-  const titleWrap = wrap.querySelector('.lugia-cine-title-wrap');
-  const skipBtn = wrap.querySelector('.lugia-cine-skip');
 
   let done = false;
   let audioCtrl = { stop: () => {} };
   let sceneCtrl = null;
   let spriteImg = null;
   let cryUrl = null;
-
-  try {
-    const { ASSETS, loadImg } = await import('../assets.js');
-    const candidateUrls = [];
-    if (cfg.kind === 'trainer' && cfg.bs) {
-      candidateUrls.push(ASSETS.trainer(cfg.bs));
-      if (ASSETS.portrait) candidateUrls.push(ASSETS.portrait(cfg.bs));
-    } else if (cfg.sp) {
-      if (cfg.shadow && cfg.sp === 249 && ASSETS.shadowFront) candidateUrls.push(ASSETS.shadowFront(249));
-      candidateUrls.push(ASSETS.front(cfg.sp, cfg.shiny, cfg.shadow));
-      if (ASSETS.front) candidateUrls.push(ASSETS.front(cfg.sp, false, false));
-      cryUrl = ASSETS.cry?.(cfg.sp) || null;
-    }
-    for (const url of candidateUrls) {
-      if (!url) continue;
-      spriteImg = await loadImg(url).catch(() => null);
-      if (spriteImg) break;
-    }
-  } catch (e) {}
-
-  let hasWebGL = false;
-  // l'éveil de Lugia Obscur a sa propre mise en scène (cine-lugia.js : sept plans, bande-son écrite pour eux)
-  let epic = null;
-  if (host3D) {
-    try {
-      const THREE = await import('three');
-      let fx = null;
-      try {
-        const base = '../../../shared/vendor/three/jsm/postprocessing/';
-        const [ec, rp, ub, op, sp] = await Promise.all([import(base + 'EffectComposer.js'), import(base + 'RenderPass.js'), import(base + 'UnrealBloomPass.js'), import(base + 'OutputPass.js'), import(base + 'ShaderPass.js')]);
-        fx = { EffectComposer: ec.EffectComposer, RenderPass: rp.RenderPass, UnrealBloomPass: ub.UnrealBloomPass, OutputPass: op.OutputPass, ShaderPass: sp.ShaderPass };
-      } catch (e) { fx = null; }
-      if (cfg.isShadowFull) {
-        try {
-          const { createShadowLugiaEpic } = await import('./cine-lugia.js');
-          await import('../audio-lugia.js').catch(() => null);   // la partition démarre en même temps que l'image
-          sceneCtrl = epic = createShadowLugiaEpic(THREE, host3D, spriteImg, fx);
-          cfg.duration = epic.duration;
-          wrap.classList.add('epic');
-        } catch (e) { console.error('[cinématique Lugia]', e); epic = null; }
-      }
-      if (!epic) sceneCtrl = createBoss3DScene(THREE, host3D, spriteImg, cfg, fx);
-      hasWebGL = true;
-    } catch (e) { hasWebGL = false; }
-  }
-
   let pop = null;
+  const flashTimers = [];
+  const scheduleFlashReset = (ms) => {
+    const id = setTimeout(() => { if (!done && flashEl) flashEl.style.opacity = '0'; }, ms);
+    flashTimers.push(id);
+  };
+  let flashEl = null;
+
   const cleanupAll = () => {
     if (done) return;
     done = true;
+    for (const id of flashTimers) clearTimeout(id);
+    flashTimers.length = 0;
     try { pop?.(); } catch (e) {}
     try { audioCtrl?.stop?.(); } catch (e) {}
     try { sceneCtrl?.dispose?.(); } catch (e) {}
   };
 
   try {
-    if (epic && sound?.playShadowLugiaEpic) {
-      audioCtrl = sound.playShadowLugiaEpic({ cryUrl });
-    } else if (sound?.playBossCinematicAudio) {
-      audioCtrl = sound.playBossCinematicAudio(cfg.audio || cfg.presetKey, cfg.duration, { cryUrl });
-    } else if (sound?.playLugiaCinematicAudio && cfg.presetKey === 'shadow') {
-      audioCtrl = sound.playLugiaCinematicAudio();
-    }
-  } catch (e) {}
+    ui.root.appendChild(wrap);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => wrap.classList.add('in'));
 
-  await new Promise((resolve) => {
-    const dur = cfg.duration || 6.4;
-    const tStart = performance.now();
-    let prevT = tStart;
-    let flashed = false;
-    let titleIn = false;
-    let titleOut = false;
-    let revealFlashed = false;
+    const host3D = wrap.querySelector('.lugia-cine-3d');
+    const cv2D = wrap.querySelector('.lugia-cine-canvas');
+    flashEl = wrap.querySelector('.lugia-cine-flash');
+    const titleWrap = wrap.querySelector('.lugia-cine-title-wrap');
+    const skipBtn = wrap.querySelector('.lugia-cine-skip');
 
-    const finish = () => {
-      cleanupAll();
-      resolve();
-    };
-
-    pop = ui.input?.push?.((k) => {
-      if (k === 'a' || k === 'b' || k === 'start') {
-        sound?.sfx?.('select');
-        finish();
+    try {
+      const { ASSETS, loadImg } = await import('../assets.js');
+      const candidateUrls = [];
+      if (cfg.kind === 'trainer' && cfg.bs) {
+        candidateUrls.push(ASSETS.trainer(cfg.bs));
+        if (ASSETS.portrait) candidateUrls.push(ASSETS.portrait(cfg.bs));
+      } else if (cfg.sp) {
+        if (cfg.shadow && cfg.sp === 249 && ASSETS.shadowFront) candidateUrls.push(ASSETS.shadowFront(249));
+        candidateUrls.push(ASSETS.front(cfg.sp, cfg.shiny, cfg.shadow));
+        if (ASSETS.front) candidateUrls.push(ASSETS.front(cfg.sp, false, false));
+        cryUrl = ASSETS.cry?.(cfg.sp) || null;
       }
-    });
-    skipBtn?.addEventListener?.('click', () => { sound?.sfx?.('select'); finish(); });
+      for (const url of candidateUrls) {
+        if (!url) continue;
+        spriteImg = await loadImg(url).catch(() => null);
+        if (spriteImg) break;
+      }
+    } catch (e) {}
 
-    if (!hasWebGL && cv2D) {
-      cv2D.style.zIndex = '4';
-      run2DFallback(cv2D, cfg, spriteImg, () => (performance.now() - tStart) / 1000, () => done);
-    }
-    if (typeof window !== 'undefined' && sceneCtrl?.resize) {
-      window.addEventListener?.('resize', sceneCtrl.resize);
-    }
-
-    const shatterTime = epic ? Infinity : cfg.isShadowFull ? 2.85 : dur * 0.34;
-    const titleInTime = epic ? Infinity : cfg.isShadowFull ? 4.2 : dur * 0.42;
-    const titleOutTime = epic ? Infinity : cfg.isShadowFull ? 13.4 : dur * 0.88;
-    const locEl = wrap.querySelector('.lugia-cine-loc');
-    const cuesFaits = new Set();
-    const jouerCues = (t) => {
-      for (const c of epic?.cues || []) {
-        if (cuesFaits.has(c) || t < c.t) continue;
-        cuesFaits.add(c);
-        if (c.loc) locEl?.classList?.toggle('in', c.loc === 'in');
-        if (c.title === 'in') titleWrap?.classList?.add('in');
-        if (c.title === 'out') { titleWrap?.classList?.remove('in'); titleWrap?.classList?.add('out'); }
-        if (c.flash && flashEl) {
-          flashEl.style.transition = 'opacity 0.08s ease-out';
-          flashEl.style.background = c.flash; flashEl.style.opacity = String(c.o);
-          setTimeout(() => { if (flashEl) flashEl.style.opacity = '0'; }, c.ms);
+    let hasWebGL = false;
+    // l'éveil de Lugia Obscur a sa propre mise en scène (cine-lugia.js : sept plans, bande-son écrite pour eux)
+    let epic = null;
+    if (host3D) {
+      try {
+        const THREE = await import('three');
+        let fx = null;
+        try {
+          const base = '../../../shared/vendor/three/jsm/postprocessing/';
+          const [ec, rp, ub, op, sp] = await Promise.all([import(base + 'EffectComposer.js'), import(base + 'RenderPass.js'), import(base + 'UnrealBloomPass.js'), import(base + 'OutputPass.js'), import(base + 'ShaderPass.js')]);
+          fx = { EffectComposer: ec.EffectComposer, RenderPass: rp.RenderPass, UnrealBloomPass: ub.UnrealBloomPass, OutputPass: op.OutputPass, ShaderPass: sp.ShaderPass };
+        } catch (e) { fx = null; }
+        if (cfg.isShadowFull) {
+          try {
+            const { createShadowLugiaEpic } = await import('./cine-lugia.js');
+            await import('../audio-lugia.js').catch(() => null);   // la partition démarre en même temps que l'image
+            sceneCtrl = epic = createShadowLugiaEpic(THREE, host3D, spriteImg, fx);
+            cfg.duration = epic.duration;
+            wrap.classList.add('epic');
+          } catch (e) { console.error('[cinématique Lugia]', e); epic = null; }
         }
-        if (c.blanc === true && flashEl) {
-          flashEl.style.transition = 'opacity 0.35s ease-in';
-          flashEl.style.background = 'radial-gradient(circle at 50% 45%, #ffffff 0%, #f3e8ff 45%, #c084fc 100%)';
-          flashEl.style.opacity = '1';
-        }
-        if (c.blanc === false && flashEl) { flashEl.style.transition = 'opacity 0.9s ease-out'; flashEl.style.opacity = '0'; }
-      }
-    };
+        if (!epic) sceneCtrl = createBoss3DScene(THREE, host3D, spriteImg, cfg, fx);
+        hasWebGL = true;
+      } catch (e) { hasWebGL = false; }
+    }
 
-    const tick = (now) => {
-      if (done) return;
-      const t = (now - tStart) / 1000;
-      const dt = (now - prevT) / 1000;
-      prevT = now;
+    try {
+      if (epic && sound?.playShadowLugiaEpic) {
+        audioCtrl = sound.playShadowLugiaEpic({ cryUrl });
+      } else if (sound?.playBossCinematicAudio) {
+        audioCtrl = sound.playBossCinematicAudio(cfg.audio || cfg.presetKey, cfg.duration, { cryUrl });
+      } else if (sound?.playLugiaCinematicAudio && cfg.presetKey === 'shadow') {
+        audioCtrl = sound.playLugiaCinematicAudio();
+      }
+    } catch (e) {}
 
-      if (sceneCtrl) {
-        try { sceneCtrl.update(t, dt); } catch (e) { if (!tick.err) { tick.err = true; console.error('[cinématique]', e); } }
-      }
-      if (epic) jouerCues(t);
-      if (!flashed && t >= shatterTime) {
-        flashed = true;
-        if (flashEl) {
-          flashEl.style.background = cfg.flashHex || '#fff';
-          flashEl.style.opacity = '0.92';
-          setTimeout(() => { if (flashEl) flashEl.style.opacity = '0'; }, 120);
+    await new Promise((resolve) => {
+      const dur = cfg.duration || 6.4;
+      const tStart = performance.now();
+      let prevT = tStart;
+      let flashed = false;
+      let titleIn = false;
+      let titleOut = false;
+      let revealFlashed = false;
+
+      const finish = () => {
+        cleanupAll();
+        resolve();
+      };
+
+      pop = ui.input?.push?.((k) => {
+        if (k === 'a' || k === 'b' || k === 'start') {
+          sound?.sfx?.('select');
+          finish();
         }
+      });
+      skipBtn?.addEventListener?.('click', () => { sound?.sfx?.('select'); finish(); });
+
+      if (!hasWebGL && cv2D) {
+        cv2D.style.zIndex = '4';
+        run2DFallback(cv2D, cfg, spriteImg, () => (performance.now() - tStart) / 1000, () => done);
       }
-      if (!revealFlashed && sceneCtrl?.revealAt > 0 && t >= sceneCtrl.revealAt && flashEl) {
-        revealFlashed = true;
-        flashEl.style.background = '#ffffff';
-        flashEl.style.opacity = '0.75';
-        setTimeout(() => { if (flashEl) flashEl.style.opacity = '0'; }, 90);
+      if (typeof window !== 'undefined' && sceneCtrl?.resize) {
+        window.addEventListener?.('resize', sceneCtrl.resize);
       }
-      if (!titleIn && t >= titleInTime) {
-        titleIn = true;
-        titleWrap?.classList?.add('in');
-      }
-      if (!titleOut && t >= titleOutTime) {
-        titleOut = true;
-        titleWrap?.classList?.remove('in');
-        titleWrap?.classList?.add('out');
-      }
-      if (t >= dur) {
-        finish();
-        return;
-      }
+
+      const shatterTime = epic ? Infinity : cfg.isShadowFull ? 2.85 : dur * 0.34;
+      const titleInTime = epic ? Infinity : cfg.isShadowFull ? 4.2 : dur * 0.42;
+      const titleOutTime = epic ? Infinity : cfg.isShadowFull ? 13.4 : dur * 0.88;
+      const locEl = wrap.querySelector('.lugia-cine-loc');
+      const cuesFaits = new Set();
+      const jouerCues = (t) => {
+        for (const c of epic?.cues || []) {
+          if (cuesFaits.has(c) || t < c.t) continue;
+          cuesFaits.add(c);
+          if (c.loc) locEl?.classList?.toggle('in', c.loc === 'in');
+          if (c.title === 'in') titleWrap?.classList?.add('in');
+          if (c.title === 'out') { titleWrap?.classList?.remove('in'); titleWrap?.classList?.add('out'); }
+          if (c.flash && flashEl) {
+            flashEl.style.transition = 'opacity 0.08s ease-out';
+            flashEl.style.background = c.flash; flashEl.style.opacity = String(c.o);
+            scheduleFlashReset(c.ms);
+          }
+          if (c.blanc === true && flashEl) {
+            flashEl.style.transition = 'opacity 0.35s ease-in';
+            flashEl.style.background = 'radial-gradient(circle at 50% 45%, #ffffff 0%, #f3e8ff 45%, #c084fc 100%)';
+            flashEl.style.opacity = '1';
+          }
+          if (c.blanc === false && flashEl) { flashEl.style.transition = 'opacity 0.9s ease-out'; flashEl.style.opacity = '0'; }
+        }
+      };
+
+      const tick = (now) => {
+        if (done) return;
+        const t = (now - tStart) / 1000;
+        const dt = (now - prevT) / 1000;
+        prevT = now;
+
+        if (sceneCtrl) {
+          try { sceneCtrl.update(t, dt); } catch (e) { if (!tick.err) { tick.err = true; console.error('[cinématique]', e); } }
+        }
+        if (epic) jouerCues(t);
+        if (!flashed && t >= shatterTime) {
+          flashed = true;
+          if (flashEl) {
+            flashEl.style.background = cfg.flashHex || '#fff';
+            flashEl.style.opacity = '0.92';
+            scheduleFlashReset(120);
+          }
+        }
+        if (!revealFlashed && sceneCtrl?.revealAt > 0 && t >= sceneCtrl.revealAt && flashEl) {
+          revealFlashed = true;
+          flashEl.style.background = '#ffffff';
+          flashEl.style.opacity = '0.75';
+          scheduleFlashReset(90);
+        }
+        if (!titleIn && t >= titleInTime) {
+          titleIn = true;
+          titleWrap?.classList?.add('in');
+        }
+        if (!titleOut && t >= titleOutTime) {
+          titleOut = true;
+          titleWrap?.classList?.remove('in');
+          titleWrap?.classList?.add('out');
+        }
+        if (t >= dur) {
+          finish();
+          return;
+        }
+        requestAnimationFrame(tick);
+      };
       requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  });
+    });
 
-  if (typeof window !== 'undefined' && sceneCtrl?.resize) {
-    window.removeEventListener?.('resize', sceneCtrl.resize);
+    try { await ui.fade?.(240); } catch (e) {}
+    if (cfg.presetKey === 'shadow' && st?.flags) st.flags.seenLugiaCinematic = true;
+  } finally {
+    cleanupAll();
+    if (typeof window !== 'undefined' && sceneCtrl?.resize) {
+      window.removeEventListener?.('resize', sceneCtrl.resize);
+    }
+    try { wrap.remove(); } catch (e) {}
+    if (sound) sound.current = null;
+    game.busy = prevBusy;
   }
-  try { await ui.fade?.(240); } catch (e) {}
-  try { wrap.remove(); } catch (e) {}
-  if (cfg.presetKey === 'shadow' && st?.flags) st.flags.seenLugiaCinematic = true;
-  if (sound) sound.current = null;
-  game.busy = prevBusy;
 }
 
 /**

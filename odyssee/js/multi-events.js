@@ -1012,7 +1012,7 @@ export async function showBracketModal(game, bracket, title = '🏆 TOURNOI DU C
     }
     const isWin = match.winner === idx;
     const isLose = match.loser === idx;
-    const spr = ASSETS.trainer(s.ow || (s.gender === 'f' ? 'serena' : 'calem'));
+    const spr = ASSETS.trainer(s.ow || (s.gender === 'f' ? 'player_f' : 'player_m'));
     const tagCls = s.bot ? 'tournoi-tag bot' : 'tournoi-tag';
     const tagTxt = s.bot ? 'CHAMPION' : 'HUMAIN';
     return `<div class="tournoi-seat${isWin ? ' is-win' : isLose ? ' is-lose' : ''}">
