@@ -31,6 +31,7 @@ const putOn = (sim, P, cas) => {
 };
 import { createWarehouseMap, DOCK_PASS } from '../backrooms/engine/level1.js';
 import { createPoolMap } from '../backrooms/engine/poolrooms.js';
+import { createReservoirMap, RESERVOIR_LEVEL, WATER_MAX } from '../backrooms/engine/reservoir.js';
 import { createHotelMap, parseWords, WORDS } from '../backrooms/engine/hotel.js';
 import { createMallMap, MALL_LEVEL, polyDist as mallPolyDist } from '../backrooms/engine/mall.js';
 import { dollTerrain, dollCanStand, DOLL_R, DOLL_VMAX, DOLL_RELOC_T, DOLL_BORED_T, DOLL_LIFT_T } from '../backrooms/engine/doll.js';
@@ -1517,8 +1518,8 @@ test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui 
   assert.equal(sim.state, 'playing');
   assert.equal(sim.level, 2, 'on arrive aux Poolrooms');
   assert.ok(sim.drainEvents().some((e) => e.type === 'level' && e.level === 2));
-  // rien à ramasser : les toboggans sont ouverts dès l'arrivée ; on se glisse dans l'un d'eux : la partie est gagnée
-  const sl = sim.map.slides[2]; // le bleu (le rouge mène au Terror Hotel, le jaune aux Tuyauteries)
+  // rien à ramasser : les toboggans sont ouverts dès l'arrivée ; on se glisse dans l'un d'eux
+  const sl = sim.map.slides[2]; // le bleu (le rouge mène au Terror Hotel, le jaune aux Tuyauteries, le bleu au Bassin de rétention)
   assert.equal(sim.map.fuses.length, 0, 'aucun objet à trouver aux Poolrooms');
   assert.equal(sim.open, true, 'les toboggans sont ouverts dès l\'arrivée');
   sim.player.x = sl.x - sl.dx * 0.6;
@@ -1527,7 +1528,59 @@ test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui 
   assert.equal(sim.player.status, 'elevator');
   assert.equal(sim.slide, 2, 'le toboggan bleu est pris');
   run(sim, SLIDE_T + 0.2);
-  assert.equal(sim.state, 'won', 'le toboggan bleu sort des Poolrooms : partie gagnée');
+  assert.equal(sim.state, 'playing');
+  assert.equal(sim.level, RESERVOIR_LEVEL, 'le toboggan bleu mène au Level 26, le Bassin de rétention');
+});
+
+test("Level 26 : le Bassin de rétention, ses quatre pompes, l'eau qui baisse et l'ascenseur au fond", () => {
+  // la carte, sur plusieurs graines : tout est atteignable, l'eau ne couvre que le bassin
+  for (const seed of [1, 7, 26, 4242]) {
+    const m = createReservoirMap(seed);
+    const reach = (gx, gz) => m.dist[gz * m.W + gx] >= 0;
+    assert.equal(m.valves.length, 4, 'quatre pompes');
+    assert.ok(m.valves.every((v) => reach(v.gx, v.gz)), 'chaque pompe est atteignable');
+    assert.ok(m.elevator && reach(m.exit.gx, m.exit.gz), "l'ascenseur de maintenance est atteignable");
+    assert.equal(m.wetAt(m.spawn.x, m.spawn.z), 0, "on arrive au sec");
+    assert.ok(m.valves.every((v) => m.wetAt(v.sx, v.sz) === 0), 'les salles des pompes sont au sec');
+    assert.equal(m.wetAt(m.exit.x, m.exit.z), WATER_MAX, "l'ascenseur est au fond du bassin, sous l'eau");
+  }
+  const players = [{ id: 0, name: 'A' }];
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 3, players, localId: 0, level: RESERVOIR_LEVEL });
+  sim.arriveT = 0;
+  sim.monster.dormantT = 9999;
+  const m = sim.map;
+  const P = sim.player;
+  // dans l'eau, on avance moins vite et chaque pas s'entend
+  const inBasin = m.walkable.find((c) => m.wetAt((c.x + 0.5) * CELL_SIZE, (c.z + 0.5) * CELL_SIZE) > 0);
+  P.x = (inBasin.x + 0.5) * CELL_SIZE;
+  P.z = (inBasin.z + 0.5) * CELL_SIZE;
+  assert.ok(sim.wade(P) < 0.6, "l'eau à la taille ralentit");
+  P.moving = true;
+  P.crouch = true;
+  sim.step({ mx: 0, my: 1, crouch: true });
+  assert.ok(P.noise >= NOISE.walk, 'même accroupi, on clapote dans le bassin');
+  // les pompes : chacune fait baisser l'eau d'un quart ; les quatre lancées, l'ascenseur s'ouvre
+  assert.equal(sim.open, false);
+  m.valves.forEach((v, i) => {
+    P.x = v.sx;
+    P.z = v.sz;
+    run(sim, VALVE_T + 0.5);
+    assert.ok(v.closed, `la pompe ${i + 1} repart`);
+    run(sim, 6);
+    assert.ok(Math.abs(m.water - (1 - (i + 1) / 4)) < 0.02, `l'eau a baissé d'un quart (${m.water.toFixed(2)})`);
+  });
+  assert.equal(sim.open, true, "les quatre pompes lancées : l'ascenseur s'ouvre");
+  assert.equal(m.wetAt(m.exit.x, m.exit.z), 0, 'le bassin est vide');
+  // dans la cabine, F : les portes se ferment, et le niveau est fini (une fin de partie)
+  P.x = m.elevator.x;
+  P.z = m.elevator.z;
+  sim.step();
+  assert.ok(sim.inCabin(P), 'dans la cabine');
+  sim.step({ pick: true });
+  run(sim, LIFT_CLOSE_T + 0.1);
+  assert.equal(P.status, 'elevator');
+  run(sim, DEPART_T + 0.5);
+  assert.equal(sim.state, 'won', "l'ascenseur de maintenance sort des Backrooms");
 });
 
 test('Level 1 : la première coupure est un vrai noir de 15 à 20 s, au bout de deux minutes environ', () => {
@@ -6179,7 +6232,7 @@ test('⭐ niveau de départ : chaque level du moteur est au choix, sous son nom 
   // les levels que le moteur sait construire (makeLevelMap : « level === X », et le Level 0 par défaut)
   const src = fs.readFileSync(new URL('../backrooms/engine/sim.js', import.meta.url), 'utf8');
   const body = /export function makeLevelMap\(level, seed\) \{([\s\S]*?)\n\}/.exec(src)[1];
-  const consts = { HOTEL_LEVEL, PIPES_LEVEL, MALL_LEVEL };
+  const consts = { HOTEL_LEVEL, PIPES_LEVEL, MALL_LEVEL, RESERVOIR_LEVEL };
   const built = new Set([0, ...[...body.matchAll(/level === (\w+)/g)].map((m) => (m[1] in consts ? consts[m[1]] : +m[1]))]);
   assert.ok(built.size >= 5 && [...built].every(Number.isInteger), `levels du moteur : ${[...built]}`);
   const levels = Object.values(START_LEVELS);
@@ -6193,7 +6246,7 @@ test('⭐ niveau de départ : chaque level du moteur est au choix, sous son nom 
     assert.equal(sim.level, lv);
     assert.ok(sim.players.length === 2 && sim.players.every((P) => P.status === 'alive'), `Level ${name} : tout le monde au départ`);
     if (lv === 1) assert.ok(sim.arriveT > 0, 'Level 1 : on arrive dans la cabine qui descend');
-    if (lv === PIPES_LEVEL || lv === HOTEL_LEVEL) assert.equal(SLIDES.filter((sl) => sl.to === lv).length, 1, `Level ${name} : un toboggan des Poolrooms y mène`);
+    if (lv === PIPES_LEVEL || lv === HOTEL_LEVEL || lv === RESERVOIR_LEVEL) assert.equal(SLIDES.filter((sl) => sl.to === lv).length, 1, `Level ${name} : un toboggan des Poolrooms y mène`);
   }
 });
 

@@ -24,6 +24,7 @@ import { createPoolMap, MOUTH } from './poolrooms.js';
 import { createHotelMap, WORDS, LETTERS, HIDE_R as SPOT_R, MAIL_R, KEYPAD_R, LETTER_R } from './hotel.js';
 import { createPipesMap, VALVES, PIPES_LEVEL, jetState, inJet, JET_HALF } from './level2.js';
 import { createMallMap, MALL_LEVEL, REELS, FILM_LEAD_T } from './mall.js';
+import { createReservoirMap, RESERVOIR_LEVEL, DRAIN_RATE } from './reservoir.js';
 import { hasLineOfSight } from './nav.js';
 import { updateDoll, dollInit, dollOnFilm, DOLL_BODY } from './doll.js';
 import { planTo, move as gaitMove, faceTo, shove, stagger, feetOf, cageAt, BODY_R, roamable } from './gait.js';
@@ -94,14 +95,14 @@ export const WHISTLE_CD = 1.2;
 export const WHISTLE_HEAT = 2.5; // chaque coup compte 1 et s'oublie en 20 s : au 3e coup rapproché, l'entité vient à coup sûr
 export { CASSETTES };
 export const FUSES = 3;
-export { VALVES, PIPES_LEVEL };
+export { VALVES, PIPES_LEVEL, RESERVOIR_LEVEL };
 export const HOTEL_LEVEL = 4; // Level 5, le Terror Hotel (par le toboggan rouge des Poolrooms)
 export { MALL_LEVEL, REELS, FILM_LEAD_T }; // 5 : Level 17, le Mall (deux étages, engine/mall.js) ; ses 5 bobines de film, l'amorce du film
 export const LAST_LEVEL = PIPES_LEVEL; // 0 : Level 0, 1 : Level 1 (entrepôt), 2 : Level 37 (Poolrooms), 3 : Level 2 (Tuyauteries, toboggan jaune), 4 : Level 5 (Terror Hotel, toboggan rouge)
 // ⭐ Le niveau de départ d'un VIP (réglage « start » du salon, hub/games.js, ou ?level1, ?level37, ?level2, ?level5, ?level17 seul) :
 // le nom du level → son numéro dans le moteur. Il ne compte que pour un VIP (vip : compte VIP du Hub, ou hors du Hub) qui
 // a le coffre VIP ouvert (vault : le même test d'accès que le mode VIP) ; sinon, et pour un nom inconnu, le Level 0
-export const START_LEVELS = { 0: 0, 1: 1, 37: 2, 2: PIPES_LEVEL, 5: HOTEL_LEVEL, 17: MALL_LEVEL };
+export const START_LEVELS = { 0: 0, 1: 1, 37: 2, 2: PIPES_LEVEL, 5: HOTEL_LEVEL, 17: MALL_LEVEL, 26: RESERVOIR_LEVEL };
 export const startLevel = (name, { vip = false, vault = false } = {}) =>
   vip === true && vault === true && (typeof name === 'number' || typeof name === 'string') && Object.hasOwn(START_LEVELS, String(name)) ? START_LEVELS[String(name)] : 0;
 export const VALVE_T = 6.5; // secondes devant une vanne pour la fermer (elle revient doucement si on la lâche) : on s'expose
@@ -312,6 +313,8 @@ const AMB_CUES = {
   // Level 17 (MALL_LEVEL) : un tube qui tinte tout près ; un rideau de fer ou une gaine ; le carillon d'une annonce au
   // loin ; rarement un reste de musique d'ambiance
   [MALL_LEVEL]: { rec: [16, 40], a: [22, 50], b: [40, 90], c: [70, 150] },
+  // Level 26 (RESERVOIR_LEVEL) : les bruits d'eau des Poolrooms
+  [RESERVOIR_LEVEL]: { rec: [20, 50], a: [5, 12], b: [14, 30], c: [24, 50] },
 };
 
 // un tirage qui ne dépend que de la graine (hôte et invités tirent pareil)
@@ -329,6 +332,7 @@ export function makeLevelMap(level, seed) {
   if (level === MALL_LEVEL) return createMallMap(seed * 17 + 3).floors;
   if (level === 2) return [createPoolMap(seed * 11 + 37)];
   if (level === PIPES_LEVEL) return [createPipesMap(seed * 11 + 29)];
+  if (level === RESERVOIR_LEVEL) return [createReservoirMap(seed * 19 + 26)];
   return level === 1 ? [createWarehouseMap(seed * 7 + 13)] : createLevel0(seed).floors;
 }
 
@@ -580,7 +584,7 @@ export class BackroomsSim {
       });
     }
     // des casiers où se cacher (entrepôt, galeries de service)
-    if ((level === 1 || level === PIPES_LEVEL) && !this.map.hides) this.map.hides = placeHides(this.map, level === 1 ? 5 : 6, this.seed * 31 + level);
+    if ((level === 1 || level === PIPES_LEVEL || level === RESERVOIR_LEVEL) && !this.map.hides) this.map.hides = placeHides(this.map, level === 1 ? 5 : level === RESERVOIR_LEVEL ? 4 : 6, this.seed * 31 + level);
     if (level === 1) stashFuse(this.map);
     this.stairs = this.map.stairs || [];
     // au début de la partie, chacun part de son côté ; aux étages suivants, tout le monde sort ensemble de l'ascenseur
@@ -772,8 +776,16 @@ export class BackroomsSim {
 
   wade(P) {
     const m = this.fm(P.floor);
-    const d = m.depthAt ? m.depthAt(P.x, P.z) : 0;
+    const d = m.depthAt ? m.depthAt(P.x, P.z) : m.wetAt ? m.wetAt(P.x, P.z) : 0;
     return d > 0 ? Math.max(0.4, 1 - d * 0.55) : 1;
+  }
+
+  // Level 26 : l'eau du bassin baisse d'un quart à chaque pompe remise en route (elle se vide en une quinzaine de
+  // secondes). Elle ne dépend que des vannes : l'hôte et les invités la calculent pareil, sans rien envoyer
+  drainStep() {
+    const m = this.map;
+    const d = 1 - this.valves / VALVES - m.water;
+    m.water += Math.sign(d) * Math.min(Math.abs(d), DRAIN_RATE * DT);
   }
 
   // la carte d'un étage
@@ -801,7 +813,7 @@ export class BackroomsSim {
   }
 
   get open() {
-    if (this.level === PIPES_LEVEL) return this.valves >= VALVES;
+    if (this.level === PIPES_LEVEL || this.level === RESERVOIR_LEVEL) return this.valves >= VALVES; // (Level 26 : les quatre pompes)
     if (this.level === 2) return true; // Poolrooms : les toboggans sont ouverts dès l'arrivée
     if (this.level === MALL_LEVEL) return this.film >= FILM_LEAD_T; // Level 17 : le film passe, le monte-charge de scène s'ouvre
     // (Level 1 : le courant revenu, le monte-charge doit encore descendre jusqu'à l'équipe)
@@ -1064,7 +1076,7 @@ export class BackroomsSim {
     const loud = (this.din || 0) * 0.45;
     if (this.level === 0) return Math.min(1, this.cassettes / CASSETTES + loud) * L0_AGGRO;
     if (this.level === HOTEL_LEVEL) return Math.min(1, 0.5 + (0.4 * this.posted) / LETTERS + loud);
-    if (this.level === PIPES_LEVEL) return Math.min(1, 0.3 + (0.7 * this.valves) / VALVES + loud);
+    if (this.level === PIPES_LEVEL || this.level === RESERVOIR_LEVEL) return Math.min(1, 0.3 + (0.7 * this.valves) / VALVES + loud);
     // Poolrooms : rien à ramasser, elle s'enhardit avec le temps passé à errer (de 0,3 à 0,85 en cinq minutes)
     if (this.level === 2) return Math.min(1, 0.3 + 0.55 * Math.min(1, this.time / 300) + loud);
     return Math.min(1, 0.25 + (0.75 * (this.fuses + (this.powered ? FUSES : 0))) / FUSES + loud);
@@ -2649,6 +2661,10 @@ export class BackroomsSim {
       this.updateValves();
       this.updateBreakers();
     }
+    if (this.level === RESERVOIR_LEVEL) {
+      this.updateValves();
+      this.drainStep();
+    }
 
     if (this.goats) {
       updateGoats(this);
@@ -2927,6 +2943,9 @@ export class BackroomsSim {
 
     // le bruit qu'on fait : ce que l'entité peut entendre (la course s'entend loin, accroupi presque rien)
     let noise = !P.moving ? 0 : P.running ? NOISE.run : P.crouch ? NOISE.crouch : NOISE.walk;
+    // Level 26 : dans l'eau du bassin, chaque pas clapote (même accroupi) ; courir y fait un vacarme
+    const wet = P.moving && this.map.wetAt ? this.map.wetAt(P.x, P.z) : 0;
+    if (wet > 0.1) noise = Math.max(noise * (1 + wet * 0.6), NOISE.walk * 1.5);
     if (P.bumpT > 0) noise = Math.max(noise, P.bumpV || 0);
     if (landed) P.landT = 0.25;
     P.landT = Math.max(0, (P.landT || 0) - DT);
@@ -3220,7 +3239,7 @@ export class BackroomsSim {
     } else if (map.slides && map.slides.length) {
       best = near(this.slide >= 0 ? [map.slides[this.slide]] : map.slides);
       P.sigTo = 'exit';
-    } else if (this.level === PIPES_LEVEL && !this.open) {
+    } else if ((this.level === PIPES_LEVEL || this.level === RESERVOIR_LEVEL) && !this.open) {
       best = (map.valves || []).filter((v) => !v.closed).reduce((b, v) => Math.min(b, Math.hypot(v.sx - P.x, v.sz - P.z)), Infinity);
     } else if ((this.level === 0 || this.level === MALL_LEVEL) && this.floors.length > 1) {
       // tout est trouvé : le caméscope montre le vrai ascenseur, de partout (jamais tout à fait sans signal)
@@ -4514,6 +4533,8 @@ export class BackroomsSim {
     else if (M.mode === 'patrol' && !calm) M.silent = false;
     // Poolrooms : l'eau la freine aussi (un peu moins que les joueurs)
     if (map.depthAt) M.speed *= Math.max(0.55, 1 - map.depthAt(M.x, M.z) * 0.4);
+    // Level 26 : chez elle, dans l'eau du bassin, elle avance presque sans peine
+    else if (map.wetAt) M.speed *= Math.max(0.8, 1 - map.wetAt(M.x, M.z) * 0.15);
 
     // En ronde, elle va souvent se tapir dans un coin sombre pour observer les joueurs de loin (de moins en moins à
     // mesure qu'elle s'énerve)

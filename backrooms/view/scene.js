@@ -7,9 +7,10 @@ import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { classicEntity } from './entity.js';
 import { gltfLoader } from '../../shared/vendor/three/gltf-draco.js';
 import { createFishView } from './fish.js';
+import { createBasinWater } from './basin.js';
 import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
 import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, NICHE_LO, NICHE_SIZE, NICHE_DEPTH, FLOOR_DY, DEEP_DEPTH, pillarDist, isChamfer, chamferSide } from '../engine/map.js';
-import { FUSES, feetY, stairAt, PIPES_LEVEL, THIRST_BLUR, LIFT_SHUT_T, HOTEL_LEVEL, CCTV_FOV, DUCT_LAND } from '../engine/sim.js';
+import { FUSES, feetY, stairAt, PIPES_LEVEL, RESERVOIR_LEVEL, THIRST_BLUR, LIFT_SHUT_T, HOTEL_LEVEL, CCTV_FOV, DUCT_LAND } from '../engine/sim.js';
 import { DUCT_LOW, DOCK_H, GUARD_T } from '../engine/level1.js';
 import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
@@ -347,7 +348,10 @@ export function createBackroomsScene(container, floors, lamps) {
   const map0 = floors[0];
   const L1 = map0.level === 1;
   const L2 = map0.level === 2; // Level 37, les Poolrooms : clair, laiteux, carrelé, inondé
-  const PIPES = map0.level === PIPES_LEVEL; // le Level 2, les Tuyauteries
+  // Level 26, le Bassin de rétention : bâti comme les Tuyauteries (les mêmes murs, piliers, salles et vannes : view/pipes.js),
+  // sous une nappe d'eau noire (view/basin.js) et dans une lumière froide
+  const RES = map0.level === RESERVOIR_LEVEL;
+  const PIPES = map0.level === PIPES_LEVEL || RES; // le Level 2, les Tuyauteries (et le bassin)
   const L3 = map0.level === HOTEL_LEVEL; // Level 5, le Terror Hotel : pénombre chaude, boiseries, moquette rouge
   const MALL = map0.level === MALL_LEVEL; // Level 17, le Mall : un centre commercial abandonné, immense, la nuit
   const L0 = !L1 && !L2 && !PIPES && !L3 && !MALL; // le Level 0 : la moquette, le papier peint jaune, les néons
@@ -356,8 +360,8 @@ export function createBackroomsScene(container, floors, lamps) {
   // Level 1 : un froid bleuté, un brouillard plus épais ; Level 2 : une moiteur brune, chaude
   // (Level 1 : le fond a la couleur du brouillard, si épais qu'à 65 m tout s'y est fondu, même un néon allumé — à un
   // millionième près : on ne dessine rien au-delà, l'image n'en change pas d'un pixel)
-  scene.background = new THREE.Color(MALL ? '#0a0806' : L3 ? '#070403' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#080604' : '#0d0b06');
-  scene.fog = new THREE.FogExp2(MALL ? '#0b0806' : L3 ? '#120a06' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#0a0705' : '#080604', MALL ? 0.023 : L3 ? 0.022 : L2 ? 0.022 : L1 ? 0.058 : PIPES ? 0.033 : 0.05);
+  scene.background = new THREE.Color(RES ? '#04070a' : MALL ? '#0a0806' : L3 ? '#070403' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#080604' : '#0d0b06');
+  scene.fog = new THREE.FogExp2(RES ? '#05090c' : MALL ? '#0b0806' : L3 ? '#120a06' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#0a0705' : '#080604', RES ? 0.036 : MALL ? 0.023 : L3 ? 0.022 : L2 ? 0.022 : L1 ? 0.058 : PIPES ? 0.033 : 0.05);
 
   // Level 1 : le brouillard (0,058) ne laisse plus rien passer vers 40 m ; au-delà de 45 m, rien à dessiner (65 avant
   // la 5.25)
@@ -375,11 +379,12 @@ export function createBackroomsScene(container, floors, lamps) {
   const tx2 = PIPES ? createPipesTextures() : null;
   const mallTx = MALL ? createMallTextures() : null; // les sols, enduits et moquettes du mall (les deux étages)
   const AMB = MALL ? 0.03 : L2 ? 0.045 : L3 ? 0.06 : 0.012; // l'hôtel : une pénombre chaude, mais on y voit (entre deux appliques, plus sombre)
-  const ambient = new THREE.AmbientLight(MALL ? '#ffe3bd' : L3 ? '#ffcf96' : L2 ? '#eaf7f6' : L1 ? '#c9d8ff' : PIPES ? '#ffd9a8' : '#fff3c4', AMB);
+  const ambient = new THREE.AmbientLight(RES ? '#bcd5e2' : MALL ? '#ffe3bd' : L3 ? '#ffcf96' : L2 ? '#eaf7f6' : L1 ? '#c9d8ff' : PIPES ? '#ffd9a8' : '#fff3c4', AMB);
   scene.add(ambient);
   const dummy = new THREE.Object3D();
   const loader = gltfLoader();
   // Poolrooms : les poissons des bassins (view/fish.js)
+  const basinWater = RES ? createBasinWater(map0, scene) : null; // Level 26 : la nappe du bassin
   const fishView = L2 && map0.fish && map0.fish.length ? createFishView({ map: map0, scene, loader, camera, url: ENTITY_VIP ? vault.poisson || null : null, onSplash: (pos) => api.onFishSplash && api.onFishSplash(pos) }) : null;
   // le cadenas de la porte de la cage d'escalier (Quaternius, CC0) : laiton patiné, anse d'acier, 10 cm de haut
   const padlockModel = new Promise((resolve) => {
@@ -6001,6 +6006,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       viewFloor = P.floor || 0;
       for (const fv of floorViews) fv.update(sim, P, time, dt);
       if (fishView) fishView.update(sim, P, time, dt);
+      if (basinWater) basinWater.update(time);
 
       // 1. Caméra : balancement lent de la marche, plus marqué en courant ; une chute la fait plonger d'un étage
       if (P.moving) bob += dt * (P.running ? 9 : 5.5);
@@ -6238,6 +6244,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         // sortie d'une gaine, elle se laisse tomber de la bouche (les jambes d'abord : le reste est encore au-dessus du plafond)
         const mm = sim.fm(M.floor || 0);
         let my = (M.y ?? -(M.floor || 0) * FLOOR_DY) - (mm.depthAt ? mm.depthAt(M.x, M.z) : 0);
+        // Level 26 : dans le bassin, elle avance enfoncée dans l'eau : on n'en voit qu'un dos qui affleure, tant que l'eau est haute
+        if (mm.wetAt) my -= mm.wetAt(M.x, M.z) * 0.85;
         if (ductDrop > 0) {
           ductDrop = Math.max(0, ductDrop - dt);
           const t = 1 - ductDrop / DUCT_LAND;

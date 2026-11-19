@@ -1,5 +1,5 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
-import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE, HOTEL_LEVEL, MALL_LEVEL, DOCK_OPEN_T, DOCK_CLOSE_T, ALARM_T, DUCT_LAND, startLevel } from './engine/sim.js';
+import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, RESERVOIR_LEVEL, ARRIVE_T, INV_SIZE, HOTEL_LEVEL, MALL_LEVEL, DOCK_OPEN_T, DOCK_CLOSE_T, ALARM_T, DUCT_LAND, startLevel } from './engine/sim.js';
 import { createStairRide } from './view/stairwell.js';
 import { installMallSfx } from './view/mallAudio.js';
 import { floorKey as mallFloorKey } from './view/mall.js';
@@ -914,7 +914,7 @@ function initGame(settings = lastSettings, forceLevel = null) {
   // ⭐ le niveau de départ : choisi au salon par un hôte VIP (réglage caché aux autres), ou ?level1, ?level37, ?level2,
   // ?level5, ?level17 (seul). Il ne compte que pour un compte VIP (hors du Hub : celui qui a la clé) qui a le coffre VIP ouvert :
   // le même test que le mode VIP. Sinon (réglage glissé par un autre joueur, adresse tapée par un non-VIP), le Level 0
-  const lvm = NET.role === 'solo' && location.search.match(/[?&]level(17|1|2|37|5)(&|=|$)/);
+  const lvm = NET.role === 'solo' && location.search.match(/[?&]level(17|1|26|2|37|5)(&|=|$)/);
   const asked = forceLevel == null ? (lvm ? lvm[1] : settings.start) : null;
   const vipHere = !(H && H.embedded) || H.info.vip === true;
   const wants = !!startLevel(asked, { vip: vipHere, vault: true });
@@ -1352,6 +1352,11 @@ const OLD_TIMER = {
     "Room thirteen is yours. It's been yours for a long time. They kept it clean for you.",
     "If someone knocks on your door and says room service… there is no room service.",
   ],
+  basin: [
+    "A retention basin. The pumps stopped years ago. Start them and the water goes down. You'll see the floor. You'll see what walks on it.",
+    "Every step in that water carries. It doesn't need to see you. It feels the ripples.",
+    "If the water moves and you didn't… get out of the water.",
+  ],
   mall: [
     // (il ne dit plus la règle : il se souvient mal, il met mal à l'aise ; le reste se comprend en jouant)
     "A shopping mall. Closed for the night… it's been that night for a long time. There was a film they never got to show. Five reels.",
@@ -1416,7 +1421,7 @@ function oldTimerVoice() {
 if (window.speechSynthesis) try { speechSynthesis.getVoices(); } catch (e) {} // lance le chargement de la liste
 function oldTimerTick() {
   if (!sim || sim.state !== 'playing' || paused) return;
-  const key = sim.level === PIPES_LEVEL ? 'pipes' : sim.level === HOTEL_LEVEL ? 'hotel' : sim.level === MALL_LEVEL ? 'mall' : sim.level;
+  const key = sim.level === PIPES_LEVEL ? 'pipes' : sim.level === RESERVOIR_LEVEL ? 'basin' : sim.level === HOTEL_LEVEL ? 'hotel' : sim.level === MALL_LEVEL ? 'mall' : sim.level;
   if (otState.level !== sim.level) {
     Object.assign(otState, { level: sim.level, t0: sim.time, said: 0, last: otState.last });
     otState.next = 25 + otRand(sim.seed, sim.level, 0) * 20;
@@ -1724,6 +1729,7 @@ function handleEvent(ev, me) {
       const X = sim.map.exit;
       const pos = X ? { x: X.x, z: X.z } : null;
       if (sfx) { sfx.exitUnlocked(pos); setTimeout(() => sfx && sfx.ding(pos), 900); }
+      if (hud && sim.level === RESERVOIR_LEVEL) hud.toast('The basin is draining: the maintenance elevator answers, at the far end');
       break;
     }
     case 'pickup':
@@ -2133,7 +2139,7 @@ function handleEvent(ev, me) {
       }
       if (sfx && ev.level === 2) sfx.splashDown();
       else if (sfx && ev.level !== HOTEL_LEVEL) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
-      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : ev.level === MALL_LEVEL ? 'THE STAGE FREIGHT ELEVATOR IS GOING DOWN… THE FILM KEEPS PLAYING ABOVE YOU' : ev.level === HOTEL_LEVEL ? 'YOU RUN DOWN THE FIRE ESCAPE, FLOOR AFTER FLOOR…' : ev.level === PIPES_LEVEL ? 'THE SERVICE ELEVATOR IS CLIMBING… AND CLIMBING…' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
+      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : ev.level === MALL_LEVEL ? 'THE STAGE FREIGHT ELEVATOR IS GOING DOWN… THE FILM KEEPS PLAYING ABOVE YOU' : ev.level === HOTEL_LEVEL ? 'YOU RUN DOWN THE FIRE ESCAPE, FLOOR AFTER FLOOR…' : ev.level === PIPES_LEVEL ? 'THE SERVICE ELEVATOR IS CLIMBING… AND CLIMBING…' : ev.level === RESERVOIR_LEVEL ? 'THE MAINTENANCE ELEVATOR CLIMBS OUT OF THE BASIN… STILL DRIPPING' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
       break;
     case 'level':
       if (hud) hud.closeKeypad();
@@ -2196,11 +2202,16 @@ function handleEvent(ev, me) {
       break;
     case 'valve':
       if (sfx) sfx.cassette('valve');
+      // (Level 26 : une pompe repart, l'eau du bassin baisse d'un quart)
+      if (sim.level === RESERVOIR_LEVEL) {
+        if (hud) hud.toast(ev.by === me ? `The pump kicks in: the water is going down · ${ev.count}/${ev.total}` : `Somewhere a pump started up · the water is going down · ${ev.count}/${ev.total}`);
+        break;
+      }
       if (hud) hud.toast(ev.by === me ? `Valve closed · ${ev.count}/${ev.total}` : `A valve slammed shut somewhere · ${ev.count}/${ev.total}`);
       if (ev.by === me) showNote('pipes', (ev.count || 1) - 1);
       break;
     case 'valveStart':
-      if (ev.by === me && hud) hud.toast('Turning the valve… stay in front of it');
+      if (ev.by === me && hud) hud.toast(sim.level === RESERVOIR_LEVEL ? 'Cranking the pump… stay at the wheel' : 'Turning the valve… stay in front of it');
       break;
     case 'blowout':
       // la vanne fermée a fait sauter les néons de son secteur
@@ -2328,8 +2339,8 @@ function handleEvent(ev, me) {
       if (H && H.embedded && NET.role !== 'guest') {
         const won = ev.type === 'win';
         // la vraie fin vaut bien plus qu'une fausse sortie, qui vaut plus que de mourir loin (Level 2 compris)
-        const trueEnd = won && (sim.level === PIPES_LEVEL || sim.level === HOTEL_LEVEL || sim.level === MALL_LEVEL); // sortir par les Tuyauteries, l'hôtel ou le mall
-        const depth = { 0: 0, 1: 1, 2: 2, [PIPES_LEVEL]: 3, [HOTEL_LEVEL]: 3, [MALL_LEVEL]: 4 }[sim.level] || 0;
+        const trueEnd = won && (sim.level === PIPES_LEVEL || sim.level === RESERVOIR_LEVEL || sim.level === HOTEL_LEVEL || sim.level === MALL_LEVEL); // sortir par les Tuyauteries, le bassin, l'hôtel ou le mall
+        const depth = { 0: 0, 1: 1, 2: 2, [PIPES_LEVEL]: 3, [RESERVOIR_LEVEL]: 3, [HOTEL_LEVEL]: 3, [MALL_LEVEL]: 4 }[sim.level] || 0;
         H.report({
           id: `backrooms-${Date.now()}`,
           mode: dailyLabel ? 'Carte du jour' : 'Survie',
@@ -2742,7 +2753,7 @@ function frame(currentTime) {
   if (sfx && sim.state === 'playing') {
     // la vanne qu'on tourne grince de plus en plus
     const me = sim.player;
-    const v = sim.level === PIPES_LEVEL && me.status === 'alive' ? (sim.map.valves || []).find((x) => !x.closed && x.turn > 0 && Math.hypot(x.sx - me.x, x.sz - me.z) < 1.6) : null;
+    const v = (sim.level === PIPES_LEVEL || sim.level === RESERVOIR_LEVEL) && me.status === 'alive' ? (sim.map.valves || []).find((x) => !x.closed && x.turn > 0 && Math.hypot(x.sx - me.x, x.sz - me.z) < 1.6) : null;
     if (v) {
       sfx.valveTurn(v.turn, { x: v.x, z: v.z });
       valveSound = true;

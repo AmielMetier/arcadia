@@ -1,15 +1,15 @@
 // The Backrooms - Interface façon caméscope (REC, signal, bande), jumpscare et écran de fin
 import { ENTITY_IMG, ENTITY_ANIM, ENTITY_VIP } from './scene.js';
-import { DEPART_T, SLIDE_T, PIPES_LEVEL, CASSETTES, NOISE, VOICE_MIN, THIRST_BLUR, INV_SIZE, HOTEL_LEVEL, MALL_LEVEL, REELS } from '../engine/sim.js';
+import { DEPART_T, SLIDE_T, PIPES_LEVEL, RESERVOIR_LEVEL, CASSETTES, NOISE, VOICE_MIN, THIRST_BLUR, INV_SIZE, HOTEL_LEVEL, MALL_LEVEL, REELS } from '../engine/sim.js';
 
 import { vault } from './vault.js';
 const GOAT_DEATH_FADE = 8; // secondes de montée de l'image
 
 // nom affiché d'un niveau : le troisième, ce sont les Poolrooms (Level 37) ; le quatrième, les Tuyauteries (Level 2)
-export const levelName = (lv) => (lv === 2 ? 37 : lv === PIPES_LEVEL ? 2 : lv === HOTEL_LEVEL ? 5 : lv === MALL_LEVEL ? 17 : lv);
+export const levelName = (lv) => (lv === 2 ? 37 : lv === PIPES_LEVEL ? 2 : lv === RESERVOIR_LEVEL ? 26 : lv === HOTEL_LEVEL ? 5 : lv === MALL_LEVEL ? 17 : lv);
 // Poolrooms : le toboggan pris par l'équipe (ou null)
 const slideOf = (sim) => (sim.map.slides && sim.slide >= 0 ? sim.map.slides[sim.slide] : null);
-export const levelSub = (lv) => (lv === MALL_LEVEL ? 'The Mall · after hours' : lv === HOTEL_LEVEL ? 'The Terror Hotel' : lv === PIPES_LEVEL ? 'Pipe Dreams · the service tunnels' : lv === 2 ? 'The Poolrooms' : lv === 1 ? 'The industrial basement' : 'The Lobby');
+export const levelSub = (lv) => (lv === MALL_LEVEL ? 'The Mall · after hours' : lv === RESERVOIR_LEVEL ? 'The Retention Basin' : lv === HOTEL_LEVEL ? 'The Terror Hotel' : lv === PIPES_LEVEL ? 'Pipe Dreams · the service tunnels' : lv === 2 ? 'The Poolrooms' : lv === 1 ? 'The industrial basement' : 'The Lobby');
 
 // Les cassettes du Level 0 racontent une histoire : dix enregistrements, cinq par partie (toujours d'autres, selon la
 // graine). Ceux qu'on a déjà écoutés restent dans la collection (sur cet appareil).
@@ -359,9 +359,10 @@ export class BackroomsHUD {
     const L1 = sim.level === 1 || sim.level === 2;
     const L37 = sim.level === 2;
     const PIPES = sim.level === PIPES_LEVEL;
+    const BASIN = sim.level === RESERVOIR_LEVEL; // Level 26 : 4 pompes à relancer (les vannes du moteur)
     const MALL = sim.level === MALL_LEVEL; // Level 17 : 5 bobines à trouver, puis à monter dans la cabine de projection
-    const got = L5 ? sim.posted : PIPES ? sim.valves : L1 ? sim.fuses : sim.cassettes;
-    const total = L5 ? 6 : PIPES ? 4 : L1 ? 3 : MALL ? REELS : CASSETTES;
+    const got = L5 ? sim.posted : PIPES || BASIN ? sim.valves : L1 ? sim.fuses : sim.cassettes;
+    const total = L5 ? 6 : PIPES || BASIN ? 4 : L1 ? 3 : MALL ? REELS : CASSETTES;
     const delivered = sim.delivered || 0;
     // (Level 1 : aussi les disjoncteurs, le courant au panneau, le monte-charge qui descend)
     const L1call = L1 && sim.liftCallT > 0;
@@ -406,6 +407,8 @@ export class BackroomsHUD {
           ? 'LEVEL 17 · HALCYON PARK MALL · CLOSED FOR THE NIGHT'
           : `REEL ${delivered}/${total} ON THE PROJECTOR`;
       } else if (sim.open && L37) b = slideOf(sim) ? `EVERYONE INTO THE ${slideOf(sim).name} SLIDE · THE OTHERS ARE SHUT` : 'LEVEL 37 · FIND ONE OF THE 3 SLIDES AND GET IN · RED, YELLOW OR BLUE: EACH ONE LEADS SOMEWHERE ELSE';
+      else if (sim.open && BASIN) b = 'THE BASIN IS DRAINED: THE MAINTENANCE ELEVATOR IS OPEN AT THE FAR END · EVERYONE GET IN';
+      else if (BASIN) b = got === 0 ? 'LEVEL 26 · RESTART THE 4 PUMPS IN THE PUMP ROOMS · THE WATER CARRIES EVERY STEP' : `PUMP ${got}/4 RUNNING · THE WATER IS GOING DOWN`;
       else if (sim.open) b = PIPES ? 'THE STEAM IS OFF: THE SERVICE ELEVATOR IS OPEN · EVERYONE GET IN' : L1 ? 'THE FREIGHT ELEVATOR HAS POWER: EVERYONE GET IN' : 'ONLY ONE OF THE TWO ELEVATORS OPENED… THE OTHER ONE IS JUST A WALL NOW · FOLLOW THE RED ARROW';
       else if (PIPES) {
         const dark = (sim.map.breakers || []).some((x) => !x.done && (sim.map.valves[x.sector] || {}).power === 2);
@@ -1406,6 +1409,13 @@ export class BackroomsHUD {
         sub.textContent = 'The fire escape spiralled down for hours, then opened onto daylight. The hotel let you go… this time.';
         stats.textContent = `HOTEL ENDING · ${formatTime(sim.time)} · ${cleared}`;
         this.$('#endTape').textContent = `${d} · CHECK-OUT`;
+      } else if (sim.level === RESERVOIR_LEVEL) {
+        // le Bassin de rétention : par le toboggan bleu, puis l'ascenseur de maintenance au fond du bassin vidé
+        title.textContent = solo ? 'YOU ESCAPED' : 'YOU ALL ESCAPED';
+        title.style.color = '#22c55e';
+        sub.textContent = 'The maintenance elevator rose out of the empty basin and opened on a storm drain, in the rain. Behind you, far below, the pumps stopped one by one. The water is coming back up.';
+        stats.textContent = `BASIN ENDING · ${formatTime(sim.time)} · ${cleared}`;
+        this.$('#endTape').textContent = `${d} · TAPE WATER-DAMAGED`;
       } else if (sim.level === PIPES_LEVEL) {
         // la vraie fin : par le toboggan jaune et les tuyauteries
         title.textContent = solo ? 'YOU ESCAPED' : 'YOU ALL ESCAPED';
@@ -1425,8 +1435,8 @@ export class BackroomsHUD {
       title.textContent = solo ? 'YOU DIED' : 'NOBODY MADE IT OUT';
       title.style.color = '#ef4444';
       const PIPES = sim.level === PIPES_LEVEL;
-      sub.textContent = sim.level === MALL_LEVEL && !extra.thirst ? 'You looked away. Miss Marigold never does…' : sim.level === HOTEL_LEVEL ? 'Room service never knocks…' : PIPES ? 'The herd found you in the dark…' : sim.level === 1 ? 'The entity was waiting at the end of the shelves…' : extra.abyss ? 'You fell, and you are still falling. Nobody heard you land…' : extra.thirst ? 'Your mouth went dry, then your eyes. The hum went on without you…' : 'The entity caught you in the endless hallways…';
-      stats.textContent = `Level ${levelName(sim.level)} · ${sim.level === HOTEL_LEVEL ? `letters ${sim.posted}/6` : PIPES ? `valves ${sim.valves}/4` : sim.level === 2 ? (sim.slide >= 0 ? `${sim.map.slides[sim.slide].name.toLowerCase()} slide` : 'no slide found') : sim.level === 1 ? `fuses ${sim.delivered || 0}/3` : sim.level === MALL_LEVEL ? `reels ${sim.cassettes}/${REELS}` : `tapes ${sim.cassettes}/${CASSETTES}`} · Survived for ${formatTime(sim.time)}`;
+      sub.textContent = sim.level === MALL_LEVEL && !extra.thirst ? 'You looked away. Miss Marigold never does…' : sim.level === HOTEL_LEVEL ? 'Room service never knocks…' : PIPES ? 'The herd found you in the dark…' : sim.level === RESERVOIR_LEVEL ? 'It was under the water the whole time…' : sim.level === 1 ? 'The entity was waiting at the end of the shelves…' : extra.abyss ? 'You fell, and you are still falling. Nobody heard you land…' : extra.thirst ? 'Your mouth went dry, then your eyes. The hum went on without you…' : 'The entity caught you in the endless hallways…';
+      stats.textContent = `Level ${levelName(sim.level)} · ${sim.level === HOTEL_LEVEL ? `letters ${sim.posted}/6` : PIPES ? `valves ${sim.valves}/4` : sim.level === RESERVOIR_LEVEL ? `pumps ${sim.valves}/4` : sim.level === 2 ? (sim.slide >= 0 ? `${sim.map.slides[sim.slide].name.toLowerCase()} slide` : 'no slide found') : sim.level === 1 ? `fuses ${sim.delivered || 0}/3` : sim.level === MALL_LEVEL ? `reels ${sim.cassettes}/${REELS}` : `tapes ${sim.cassettes}/${CASSETTES}`} · Survived for ${formatTime(sim.time)}`;
       this.$('#endTape').textContent = `${d} · RECORDING STOPPED`;
     }
 
