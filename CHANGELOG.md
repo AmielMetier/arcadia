@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.123 — 19 novembre 2026
+- Correction : restauration sprites authentiques Gen 5 + interieur Centre Pokemon 5G (Amiel)
+
 ## 5.122 — 19 novembre 2026
 - Correction : corrections d'audit (icones objets/HUD, audio/cinematiques, sauvegardes, habitants, tests) (Amiel)
 - Correction : corrections critiques (PNJ nb_sportif/nb_linebacker, batiments troues/coupes, decors healer/vase/caisses/squelette) (Amiel)
