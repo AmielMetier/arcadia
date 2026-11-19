@@ -1,5 +1,5 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
-import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, ARRIVE_T, INV_SIZE, HOTEL_LEVEL, MALL_LEVEL, DOCK_OPEN_T, DOCK_CLOSE_T, ALARM_T, DUCT_LAND, startLevel } from './engine/sim.js';
+import { BackroomsSim, DT, DEPART_T, PIPES_LEVEL, OCEAN_LEVEL, ARRIVE_T, INV_SIZE, HOTEL_LEVEL, MALL_LEVEL, DOCK_OPEN_T, DOCK_CLOSE_T, ALARM_T, DUCT_LAND, startLevel } from './engine/sim.js';
 import { createStairRide } from './view/stairwell.js';
 import { installMallSfx } from './view/mallAudio.js';
 import { floorKey as mallFloorKey } from './view/mall.js';
@@ -914,7 +914,7 @@ function initGame(settings = lastSettings, forceLevel = null) {
   // ⭐ le niveau de départ : choisi au salon par un hôte VIP (réglage caché aux autres), ou ?level1, ?level37, ?level2,
   // ?level5, ?level17 (seul). Il ne compte que pour un compte VIP (hors du Hub : celui qui a la clé) qui a le coffre VIP ouvert :
   // le même test que le mode VIP. Sinon (réglage glissé par un autre joueur, adresse tapée par un non-VIP), le Level 0
-  const lvm = NET.role === 'solo' && location.search.match(/[?&]level(17|1|2|37|5)(&|=|$)/);
+  const lvm = NET.role === 'solo' && location.search.match(/[?&]level(17|1|2|37|5|7)(&|=|$)/);
   const asked = forceLevel == null ? (lvm ? lvm[1] : settings.start) : null;
   const vipHere = !(H && H.embedded) || H.info.vip === true;
   const wants = !!startLevel(asked, { vip: vipHere, vault: true });
@@ -1352,6 +1352,11 @@ const OLD_TIMER = {
     "Room thirteen is yours. It's been yours for a long time. They kept it clean for you.",
     "If someone knocks on your door and says room service… there is no room service.",
   ],
+  ocean: [
+    "Water as far as the light goes, and a ceiling over all of it. Don't ask what holds it up. Don't ask what's under it.",
+    "The engine is loud. Down there, loud is a dinner bell. When the sonar starts counting down… let go of the throttle.",
+    "There's a door out there. Just a door, standing in the water. I've seen it. I never had enough fuel.",
+  ],
   mall: [
     // (il ne dit plus la règle : il se souvient mal, il met mal à l'aise ; le reste se comprend en jouant)
     "A shopping mall. Closed for the night… it's been that night for a long time. There was a film they never got to show. Five reels.",
@@ -1416,7 +1421,7 @@ function oldTimerVoice() {
 if (window.speechSynthesis) try { speechSynthesis.getVoices(); } catch (e) {} // lance le chargement de la liste
 function oldTimerTick() {
   if (!sim || sim.state !== 'playing' || paused) return;
-  const key = sim.level === PIPES_LEVEL ? 'pipes' : sim.level === HOTEL_LEVEL ? 'hotel' : sim.level === MALL_LEVEL ? 'mall' : sim.level;
+  const key = sim.level === PIPES_LEVEL ? 'pipes' : sim.level === OCEAN_LEVEL ? 'ocean' : sim.level === HOTEL_LEVEL ? 'hotel' : sim.level === MALL_LEVEL ? 'mall' : sim.level;
   if (otState.level !== sim.level) {
     Object.assign(otState, { level: sim.level, t0: sim.time, said: 0, last: otState.last });
     otState.next = 25 + otRand(sim.seed, sim.level, 0) * 20;
@@ -1568,6 +1573,36 @@ function handleEvent(ev, me) {
     }
     // Level 17 : une bobine du film trouvée ; les bobines montées sur le projecteur ; le journal du projectionniste (où
     // sont celles qui manquent) ; le film qui démarre
+    // Level 7 : les bidons, le radeau, la chose sous l'eau (engine/ocean.js)
+    case 'can':
+      if (sfx) sfx.cassette('valve');
+      if (hud) hud.toast(ev.by === me ? `Fuel can ${ev.count}/${ev.total} · poured into the raft's tank` : `${who(ev.by)} found a fuel can (${ev.count}/${ev.total})`, 4);
+      break;
+    case 'raftBoard':
+      if (hud && ev.id === me) hud.toast(ev.helm ? 'You take the helm · Z / S for the engine, Q / D to steer' : 'You climb aboard');
+      break;
+    case 'raftNoLand':
+      if (hud && ev.id === me) hud.toast('Too far from land · bring the raft alongside an island first');
+      break;
+    case 'raftFull':
+      if (hud && ev.id === me) hud.toast('The raft is full');
+      break;
+    case 'raftDry':
+      if (hud) hud.toast('The engine coughs and dies · no fuel left');
+      break;
+    case 'raftBump':
+      if (sfx) sfx.distant('door', { x: ev.x, z: ev.z }, 0.6);
+      break;
+    case 'leviHunt':
+      if (sfx) sfx.splashFar({ x: ev.x, z: ev.z }, 1);
+      if (hud) hud.toast('The sonar picked something up · it is coming toward the engine', 4);
+      break;
+    case 'leviLost':
+      if (hud) hud.toast('The sonar trace drifts away…', 3);
+      break;
+    case 'leviTake':
+      if (ev.id !== me && hud) hud.toast(ev.how === 'shore' ? `${ev.name} was dragged off the edge of the island…` : `${ev.name} was pulled off the raft…`, 4);
+      break;
     case 'reel':
       if (sfx) mallAudio().reel();
       // (ce que dit l'étiquette de la boîte, pas une consigne : le reste est dans le journal du projectionniste)
@@ -2133,7 +2168,7 @@ function handleEvent(ev, me) {
       }
       if (sfx && ev.level === 2) sfx.splashDown();
       else if (sfx && ev.level !== HOTEL_LEVEL) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
-      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : ev.level === MALL_LEVEL ? 'THE STAGE FREIGHT ELEVATOR IS GOING DOWN… THE FILM KEEPS PLAYING ABOVE YOU' : ev.level === HOTEL_LEVEL ? 'YOU RUN DOWN THE FIRE ESCAPE, FLOOR AFTER FLOOR…' : ev.level === PIPES_LEVEL ? 'THE SERVICE ELEVATOR IS CLIMBING… AND CLIMBING…' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
+      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? 'THE ELEVATOR IS GOING DOWN…' : ev.level === 1 ? 'THE FREIGHT ELEVATOR IS GOING DOWN… THE AIR SMELLS OF CHLORINE' : ev.level === MALL_LEVEL ? 'THE STAGE FREIGHT ELEVATOR IS GOING DOWN… THE FILM KEEPS PLAYING ABOVE YOU' : ev.level === HOTEL_LEVEL ? 'YOU RUN DOWN THE FIRE ESCAPE, FLOOR AFTER FLOOR…' : ev.level === PIPES_LEVEL ? 'THE SERVICE ELEVATOR IS CLIMBING… AND CLIMBING…' : ev.level === OCEAN_LEVEL ? 'YOU STEP THROUGH THE DOOR AND PULL IT SHUT BEHIND YOU…' : 'YOU SLIDE DOWN INTO THE DARK, FASTER AND FASTER…', '', 0, true), 700);
       break;
     case 'level':
       if (hud) hud.closeKeypad();
@@ -2289,7 +2324,7 @@ function handleEvent(ev, me) {
           if (sfx) sfx.noSignal(true);
           setTimeout(() => sfx && sfx.noSignal(false), 2400);
         }, 3000);
-      } else if (hud) hud.toast(`${ev.name} fell into a bottomless pit…`);
+      } else if (hud && !ev.sea) hud.toast(`${ev.name} fell into a bottomless pit…`);
       break;
     case 'gameover':
     case 'win':
@@ -2328,8 +2363,8 @@ function handleEvent(ev, me) {
       if (H && H.embedded && NET.role !== 'guest') {
         const won = ev.type === 'win';
         // la vraie fin vaut bien plus qu'une fausse sortie, qui vaut plus que de mourir loin (Level 2 compris)
-        const trueEnd = won && (sim.level === PIPES_LEVEL || sim.level === HOTEL_LEVEL || sim.level === MALL_LEVEL); // sortir par les Tuyauteries, l'hôtel ou le mall
-        const depth = { 0: 0, 1: 1, 2: 2, [PIPES_LEVEL]: 3, [HOTEL_LEVEL]: 3, [MALL_LEVEL]: 4 }[sim.level] || 0;
+        const trueEnd = won && (sim.level === PIPES_LEVEL || sim.level === OCEAN_LEVEL || sim.level === HOTEL_LEVEL || sim.level === MALL_LEVEL); // sortir par les Tuyauteries, l'hôtel ou le mall
+        const depth = { 0: 0, 1: 1, 2: 2, [PIPES_LEVEL]: 3, [OCEAN_LEVEL]: 3, [HOTEL_LEVEL]: 3, [MALL_LEVEL]: 4 }[sim.level] || 0;
         H.report({
           id: `backrooms-${Date.now()}`,
           mode: dailyLabel ? 'Carte du jour' : 'Survie',
@@ -2825,7 +2860,8 @@ function frame(currentTime) {
       // (installé dès que le son existe : la descente de l'escalier de secours s'en sert depuis le Level 5)
       mallAudio().update(sim.level === MALL_LEVEL ? sim : null, V, delta, { occ: entEar.occ, paused });
       // Tuyauteries : les machines qui tournent autour de toi (brûleurs, pompes, armoires électriques)
-      sfx.machines(sim.level === PIPES_LEVEL ? pipeMachines(V) : NO_MACHINES);
+      // (Level 7 : le moteur du radeau, qui tourne quand on tient la barre)
+      sfx.machines(sim.level === PIPES_LEVEL ? pipeMachines(V) : sim.raft ? [{ key: 'raft', kind: 'outboard', x: sim.raft.x, z: sim.raft.z, on: !!sim.raft.motor, occ: false }] : NO_MACHINES);
       // le final du Level 0 : toutes les cassettes trouvées, une alarme au loin jusqu'à l'ascenseur
       sfx.finale(sim.level === 0 && !!sim.open && sim.state === 'playing' && (!scene || scene.redOn));
       // les pas des autres joueurs, là où ils marchent (plus rapprochés quand ils courent)

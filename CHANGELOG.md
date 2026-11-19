@@ -1,11 +1,11 @@
 # Journal des versions — Arcadia
 
 ## 5.125 — 19 novembre 2026
-- **The Backrooms** — Un nouveau niveau : le Level 26, le Bassin de rétention, au bout du toboggan bleu des Poolrooms.
-  - Un immense réservoir souterrain plongé dans le noir : une forêt de piliers de béton, et de l'eau noire jusqu'à la taille qui ralentit chaque pas.
-  - Quatre pompes à relancer, chacune dans sa salle au sec. À chaque pompe, l'eau du bassin baisse d'un quart.
-  - L'entité chasse au bruit : dans l'eau, chaque pas s'entend, même accroupi, et courir fait un vacarme. Tant que l'eau est haute, on ne voit d'elle que ce qui dépasse de la surface.
-  - Les quatre pompes lancées, le bassin est vide : l'ascenseur de maintenance, tout au fond, vous sort des Backrooms.
+- **The Backrooms** — Un nouveau niveau : le Level 7, Thalassophobia, au bout du toboggan bleu des Poolrooms.
+  - Un océan noir à perte de vue, sous un plafond de bureau qui ne finit jamais. Quelques îlots de bureaux à moitié engloutis dépassent de l'eau.
+  - Un radeau à moteur attend au bord. Monte dessus avec F : le premier tient la barre (Z / S pour le moteur, Q / D pour tourner). Pour descendre, il faut accoster un îlot.
+  - Trois bidons d'essence sont cachés sur les îlots : le moteur en boit, et sans eux on n'ira pas loin. Tout au bout, une simple porte plantée sur un dernier îlot : la sortie.
+  - Quelque chose d'immense vit sous la surface et entend le moteur. Le sonar dit quand ça approche : coupe le moteur et laisse-le passer. S'il atteint le radeau en marche, il emporte quelqu'un. Et ne traîne pas au bord de l'eau.
 
 ## 5.124 — 19 novembre 2026
 - **Odyssée** — Graphismes Noir & Blanc :

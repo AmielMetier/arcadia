@@ -31,6 +31,7 @@ const putOn = (sim, P, cas) => {
 };
 import { createWarehouseMap, DOCK_PASS } from '../backrooms/engine/level1.js';
 import { createPoolMap } from '../backrooms/engine/poolrooms.js';
+import { createOceanMap, OCEAN_LEVEL, RAFT, CANS, FUEL_START, seatPos } from '../backrooms/engine/ocean.js';
 import { createHotelMap, parseWords, WORDS } from '../backrooms/engine/hotel.js';
 import { createMallMap, MALL_LEVEL, polyDist as mallPolyDist } from '../backrooms/engine/mall.js';
 import { dollTerrain, dollCanStand, DOLL_R, DOLL_VMAX, DOLL_RELOC_T, DOLL_BORED_T, DOLL_LIFT_T } from '../backrooms/engine/doll.js';
@@ -1517,8 +1518,8 @@ test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui 
   assert.equal(sim.state, 'playing');
   assert.equal(sim.level, 2, 'on arrive aux Poolrooms');
   assert.ok(sim.drainEvents().some((e) => e.type === 'level' && e.level === 2));
-  // rien à ramasser : les toboggans sont ouverts dès l'arrivée ; on se glisse dans l'un d'eux : la partie est gagnée
-  const sl = sim.map.slides[2]; // le bleu (le rouge mène au Terror Hotel, le jaune aux Tuyauteries)
+  // rien à ramasser : les toboggans sont ouverts dès l'arrivée ; on se glisse dans l'un d'eux
+  const sl = sim.map.slides[2]; // le bleu (le rouge mène au Terror Hotel, le jaune aux Tuyauteries, le bleu au Level 7)
   assert.equal(sim.map.fuses.length, 0, 'aucun objet à trouver aux Poolrooms');
   assert.equal(sim.open, true, 'les toboggans sont ouverts dès l\'arrivée');
   sim.player.x = sl.x - sl.dx * 0.6;
@@ -1527,7 +1528,72 @@ test('Level 1 : les fusibles rapportés au panneau ouvrent le monte-charge, qui 
   assert.equal(sim.player.status, 'elevator');
   assert.equal(sim.slide, 2, 'le toboggan bleu est pris');
   run(sim, SLIDE_T + 0.2);
-  assert.equal(sim.state, 'won', 'le toboggan bleu sort des Poolrooms : partie gagnée');
+  assert.equal(sim.state, 'playing');
+  assert.equal(sim.level, OCEAN_LEVEL, "le toboggan bleu mène au Level 7, l'océan");
+});
+
+test("Level 7 : l'océan, le radeau (monter, mener, descendre), les bidons, la chose sous l'eau et la porte", () => {
+  // la carte, sur plusieurs graines : on part au sec, le radeau flotte, la porte et les bidons sont sur la terre
+  for (const seed of [1, 7, 77, 4242]) {
+    const m = createOceanMap(seed);
+    assert.equal(m.cassettes.length, CANS, 'trois bidons');
+    assert.ok(!m.inSea(m.spawn.x, m.spawn.z) && !m.inSea(m.exit.x, m.exit.z), 'départ et porte au sec');
+    assert.ok(m.cassettes.every((c) => !m.inSea(c.x, c.z)), 'bidons au sec');
+    assert.ok(m.inSea(m.raft0.x, m.raft0.z) && m.inSea(m.monsterSpawn.x, m.monsterSpawn.z), "le radeau et la chose sont dans l'eau");
+    assert.ok(m.collide(m.raft0.x, m.raft0.z, 0.3), "à pied, on ne va pas dans l'eau");
+  }
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 5, players: [{ id: 0, name: 'A' }, { id: 1, name: 'B' }], localId: 0, level: OCEAN_LEVEL });
+  sim.arriveT = 0;
+  const m = sim.map;
+  const R = sim.raft;
+  const M = sim.monster;
+  const [A, B] = sim.players;
+  M.restT = 9999; // (la chose dort pendant qu'on apprend à mener)
+  // monter : le premier tient la barre
+  A.x = R.x;
+  A.z = m.raft0.z + RAFT.hl + 0.8;
+  B.x = A.x + 0.5;
+  B.z = A.z;
+  sim.step({ pick: true }, { 1: { pick: true } });
+  assert.deepEqual(R.seats.slice(0, 2), [0, 1], 'A à la barre, B passager');
+  // mener : en avant, le radeau avance et boit l'essence ; ceux qui sont à bord suivent
+  run(sim, 4, { my: 1 }, { 1: {} });
+  assert.ok(R.v > RAFT.speed * 0.8 && R.fuel < FUEL_START, `il avance (${R.v.toFixed(1)} m/s) et consomme`);
+  const p = seatPos(R, 1);
+  assert.ok(Math.hypot(B.x - p.x, B.z - p.z) < 1e-6, 'le passager suit le radeau');
+  // descendre au large : impossible
+  sim.step({}, { 1: { pick: true } });
+  assert.ok(sim.drainEvents().some((e) => e.type === 'raftNoLand'), 'pas de terre à portée');
+  // la chose entend le moteur et fond sur le radeau ; en marche, elle emporte le passager
+  M.restT = 0;
+  M.x = R.x + 25;
+  M.z = R.z;
+  M.mode = 'patrol';
+  let took = null;
+  for (let i = 0; i < 60 * 15 && !took; i++) {
+    sim.step({ my: 1, mx: 0.3 }, { 1: {} });
+    took = sim.drainEvents().find((e) => e.type === 'leviTake');
+  }
+  assert.ok(took && took.id === 1 && B.status === 'dead', 'le passager a été emporté');
+  // moteur coupé : elle perd la trace
+  M.restT = 0;
+  M.mode = 'chase';
+  run(sim, 6, {}, { 1: {} });
+  assert.notEqual(M.mode, 'chase', 'moteur coupé, elle abandonne');
+  // un bidon : de l'essence en plus ; la porte : la fin
+  const s2 = new BackroomsSim({ difficulty: 'normal', seed: 5, players: [{ id: 0, name: 'A' }], localId: 0, level: OCEAN_LEVEL });
+  s2.arriveT = 0;
+  s2.monster.restT = 9999;
+  const P = s2.player;
+  const c = s2.map.cassettes[0];
+  P.x = c.x;
+  P.z = c.z;
+  s2.step({ pick: true });
+  assert.ok(Math.abs(s2.raft.fuel - (FUEL_START + 0.38)) < 1e-6, 'le bidon remplit le réservoir');
+  P.x = s2.map.exit.x;
+  P.z = s2.map.exit.z;
+  run(s2, DEPART_T + 2);
+  assert.equal(s2.state, 'won', 'la porte sort des Backrooms');
 });
 
 test('Level 1 : la première coupure est un vrai noir de 15 à 20 s, au bout de deux minutes environ', () => {
@@ -6179,7 +6245,7 @@ test('⭐ niveau de départ : chaque level du moteur est au choix, sous son nom 
   // les levels que le moteur sait construire (makeLevelMap : « level === X », et le Level 0 par défaut)
   const src = fs.readFileSync(new URL('../backrooms/engine/sim.js', import.meta.url), 'utf8');
   const body = /export function makeLevelMap\(level, seed\) \{([\s\S]*?)\n\}/.exec(src)[1];
-  const consts = { HOTEL_LEVEL, PIPES_LEVEL, MALL_LEVEL };
+  const consts = { HOTEL_LEVEL, PIPES_LEVEL, MALL_LEVEL, OCEAN_LEVEL };
   const built = new Set([0, ...[...body.matchAll(/level === (\w+)/g)].map((m) => (m[1] in consts ? consts[m[1]] : +m[1]))]);
   assert.ok(built.size >= 5 && [...built].every(Number.isInteger), `levels du moteur : ${[...built]}`);
   const levels = Object.values(START_LEVELS);
@@ -6193,7 +6259,7 @@ test('⭐ niveau de départ : chaque level du moteur est au choix, sous son nom 
     assert.equal(sim.level, lv);
     assert.ok(sim.players.length === 2 && sim.players.every((P) => P.status === 'alive'), `Level ${name} : tout le monde au départ`);
     if (lv === 1) assert.ok(sim.arriveT > 0, 'Level 1 : on arrive dans la cabine qui descend');
-    if (lv === PIPES_LEVEL || lv === HOTEL_LEVEL) assert.equal(SLIDES.filter((sl) => sl.to === lv).length, 1, `Level ${name} : un toboggan des Poolrooms y mène`);
+    if (lv === PIPES_LEVEL || lv === HOTEL_LEVEL || lv === OCEAN_LEVEL) assert.equal(SLIDES.filter((sl) => sl.to === lv).length, 1, `Level ${name} : un toboggan des Poolrooms y mène`);
   }
 });
 

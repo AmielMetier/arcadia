@@ -7,9 +7,10 @@ import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { classicEntity } from './entity.js';
 import { gltfLoader } from '../../shared/vendor/three/gltf-draco.js';
 import { createFishView } from './fish.js';
+import { buildOcean } from './ocean.js';
 import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
 import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, NICHE_LO, NICHE_SIZE, NICHE_DEPTH, FLOOR_DY, DEEP_DEPTH, pillarDist, isChamfer, chamferSide } from '../engine/map.js';
-import { FUSES, feetY, stairAt, PIPES_LEVEL, THIRST_BLUR, LIFT_SHUT_T, HOTEL_LEVEL, CCTV_FOV, DUCT_LAND } from '../engine/sim.js';
+import { FUSES, feetY, stairAt, PIPES_LEVEL, OCEAN_LEVEL, THIRST_BLUR, LIFT_SHUT_T, HOTEL_LEVEL, CCTV_FOV, DUCT_LAND } from '../engine/sim.js';
 import { DUCT_LOW, DOCK_H, GUARD_T } from '../engine/level1.js';
 import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
@@ -350,14 +351,16 @@ export function createBackroomsScene(container, floors, lamps) {
   const PIPES = map0.level === PIPES_LEVEL; // le Level 2, les Tuyauteries
   const L3 = map0.level === HOTEL_LEVEL; // Level 5, le Terror Hotel : pénombre chaude, boiseries, moquette rouge
   const MALL = map0.level === MALL_LEVEL; // Level 17, le Mall : un centre commercial abandonné, immense, la nuit
+  // Level 7, Thalassophobia : dessiné comme les bureaux du Level 0 (L0 reste vrai), plus l'océan de view/ocean.js
+  const OCEAN = map0.level === OCEAN_LEVEL;
   const L0 = !L1 && !L2 && !PIPES && !L3 && !MALL; // le Level 0 : la moquette, le papier peint jaune, les néons
   const CEIL = map0.ceil || WALL_HEIGHT;
   const scene = new THREE.Scene();
   // Level 1 : un froid bleuté, un brouillard plus épais ; Level 2 : une moiteur brune, chaude
   // (Level 1 : le fond a la couleur du brouillard, si épais qu'à 65 m tout s'y est fondu, même un néon allumé — à un
   // millionième près : on ne dessine rien au-delà, l'image n'en change pas d'un pixel)
-  scene.background = new THREE.Color(MALL ? '#0a0806' : L3 ? '#070403' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#080604' : '#0d0b06');
-  scene.fog = new THREE.FogExp2(MALL ? '#0b0806' : L3 ? '#120a06' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#0a0705' : '#080604', MALL ? 0.023 : L3 ? 0.022 : L2 ? 0.022 : L1 ? 0.058 : PIPES ? 0.033 : 0.05);
+  scene.background = new THREE.Color(OCEAN ? '#04080a' : MALL ? '#0a0806' : L3 ? '#070403' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#080604' : '#0d0b06');
+  scene.fog = new THREE.FogExp2(OCEAN ? '#060b0d' : MALL ? '#0b0806' : L3 ? '#120a06' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#0a0705' : '#080604', OCEAN ? 0.03 : MALL ? 0.023 : L3 ? 0.022 : L2 ? 0.022 : L1 ? 0.058 : PIPES ? 0.033 : 0.05);
 
   // Level 1 : le brouillard (0,058) ne laisse plus rien passer vers 40 m ; au-delà de 45 m, rien à dessiner (65 avant
   // la 5.25)
@@ -380,6 +383,7 @@ export function createBackroomsScene(container, floors, lamps) {
   const dummy = new THREE.Object3D();
   const loader = gltfLoader();
   // Poolrooms : les poissons des bassins (view/fish.js)
+  const oceanView = OCEAN ? buildOcean({ map: map0, scene }) : null; // Level 7 : l'océan, le radeau, la porte, l'ombre
   const fishView = L2 && map0.fish && map0.fish.length ? createFishView({ map: map0, scene, loader, camera, url: ENTITY_VIP ? vault.poisson || null : null, onSplash: (pos) => api.onFishSplash && api.onFishSplash(pos) }) : null;
   // le cadenas de la porte de la cage d'escalier (Quaternius, CC0) : laiton patiné, anse d'acier, 10 cm de haut
   const padlockModel = new Promise((resolve) => {
@@ -2047,6 +2051,11 @@ float bkCaust(vec2 uv, float t) {
       ? baked(new THREE.MeshPhongMaterial({ map: carpet, specular: '#3a342a', shininess: 70 }), { spec: 1.05, gloss: 1100 })
       : baked(new THREE.MeshLambertMaterial({ map: carpet, ...(L0 ? { bumpMap: relief(carpet), bumpScale: 1.4 } : L3 ? { bumpMap: relief(carpet), bumpScale: 1.1 } : null) }), L0 ? { film: 1 } : L1 ? { gloss: 1 } : L3 ? { hotel: 1 } : null);
     const holes = MALL ? [] : holesOf(map); // (le mall dessine ses vides et ses trémies lui-même)
+    // Level 7 : pas de moquette sur l'eau (l'océan est dessous, view/ocean.js)
+    if (map.seaHoles) {
+      floorMat.alphaMap = holeMask(W, H, map.seaHoles, true);
+      floorMat.alphaTest = 0.5;
+    }
     if (holes.length) {
       floorMat.alphaMap = holeMask(W, H, holes, true);
       floorMat.alphaTest = 0.5;
@@ -6001,6 +6010,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       viewFloor = P.floor || 0;
       for (const fv of floorViews) fv.update(sim, P, time, dt);
       if (fishView) fishView.update(sim, P, time, dt);
+      if (oceanView) oceanView.update(sim, time, dt);
 
       // 1. Caméra : balancement lent de la marche, plus marqué en courant ; une chute la fait plonger d'un étage
       if (P.moving) bob += dt * (P.running ? 9 : 5.5);
@@ -6221,7 +6231,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         const M = sim.monster;
         // (le prélude : elle n'est pas là ; dans les gaines non plus ; Level 1, sous l'apparence d'une victime : c'est le
         // corps du joueur qu'on voit, plus bas)
-        monsterGroup.visible = !M.away && !M.inDuct && M.mimic == null;
+        monsterGroup.visible = !M.away && !M.inDuct && M.mimic == null && !OCEAN; // (Level 7 : on n'en voit que l'ombre, view/ocean.js)
         const chase = M.mode === 'chase';
         // plus elle est proche, moins elle est brouillée : nette à moins de 2,5 m
         const g = THREE.MathUtils.clamp((Math.hypot(P.x - M.x, P.z - M.z) - 2.5) / 14, 0, 1);

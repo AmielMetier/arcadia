@@ -27,6 +27,7 @@ const LEVEL_SFX = {
   5: { chase: [], ambient: [], death: null, entity: false }, // le Mall (MALL_LEVEL) : la poupée, pas l'entité (ses roulettes : view/mallAudio.js)
 };
 const NO_SFX = { chase: [], ambient: [], death: null };
+const NO_ENTITY = { chase: [], ambient: [], death: null, entity: false };
 // l'enregistrement commun à toutes les poursuites : un élan (ses 2,44 premières secondes, joué une fois quand la
 // traque commence), puis une course dont on découpe les pas un par un (STEP_ON : le début de chacun, en secondes),
 // joués au moment où le pied de l'entité touche le sol dans son animation
@@ -60,7 +61,9 @@ function loudPart(buf) {
   LOUD.set(buf, out);
   return out;
 }
-const levelSfx = (level) => LEVEL_SFX[level === 2 ? 1 : level] || NO_SFX; // Poolrooms : les sons du Level 1
+// le Level 7 (l'océan, numéro 6) sonne comme les Poolrooms : de l'eau, de grands volumes ; pas l'entité (une chose sous l'eau)
+const WET = (level) => (level === 6 ? 2 : level);
+const levelSfx = (level) => (level === 6 ? NO_ENTITY : LEVEL_SFX[level === 2 ? 1 : level] || NO_SFX); // Poolrooms : les sons du Level 1
 const hasEntity = (level) => levelSfx(level).entity !== false;
 
 const clamp01 = (v) => Math.max(0, Math.min(1, +v || 0));
@@ -284,6 +287,7 @@ export class BackroomsSfx {
   setRoom(level = 0) {
     if (!this.ctx || this.roomLevel === level) return;
     this.roomLevel = level;
+    level = WET(level); // (la salle et ses échos : l'océan sonne comme les Poolrooms)
     // ce qui tient d'un niveau à l'autre se tait : le monte-charge qui descend, les relais qui tiquent
     if (this.lift) this.lift.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1), (this.lift = null);
     for (const id of Object.keys(this.relayGs || {})) this.relayStop(id);
@@ -2943,7 +2947,7 @@ export class BackroomsSfx {
       return { x: anchor.x + Math.cos(a) * r, z: anchor.z + Math.sin(a) * r };
     };
     const vol = (v0, v1) => v0 + (v1 - v0) * v;
-    const lv = this.roomLevel;
+    const lv = WET(this.roomLevel);
     // Level 17 (le mall) : un tube qui tinte, un rideau de fer, une gaine, le carillon d'une annonce, un reste de musique
     if (lv === 5) {
       if (this.mallCue) this.mallCue(slot, pos, vol, w);
@@ -3431,6 +3435,7 @@ export class BackroomsSfx {
   }
 
   levelBed(level) {
+    level = WET(level);
     const c = this.ctx;
     const t = c.currentTime;
     if (this.bed) {
@@ -3936,7 +3941,7 @@ export class BackroomsSfx {
         L = this.machineLoop(m.kind);
         this.mach.set(m.key, L);
         this.moveTo(L.p, m.x, m.z);
-      }
+      } else if (m.kind === 'outboard') this.moveTo(L.p, m.x, m.z); // (le moteur du radeau se déplace avec lui)
       L.g.gain.setTargetAtTime(m.on ? L.vol : 0.0001, t, m.on ? 0.5 : 1.5);
       L.lp.frequency.setTargetAtTime(m.occ ? 600 : 9000, t, 0.25);
     }
@@ -3965,7 +3970,15 @@ export class BackroomsSfx {
     am.connect(g);
     const wobble = (f, depth) => go(this.osc('sine', f)).connect(this.gainNode(depth)).connect(am.gain);
     let vol;
-    if (kind === 'burner') {
+    if (kind === 'outboard') {
+      // Level 7 : le petit moteur hors-bord du radeau : un deux-temps qui pétarade, l'hélice qui brasse l'eau
+      go(this.osc('sawtooth', 42)).connect(this.filt('lowpass', 260, 0.9)).connect(this.gainNode(0.7)).connect(am);
+      go(this.osc('square', 84)).connect(this.filt('lowpass', 500, 0.8)).connect(this.gainNode(0.12)).connect(am);
+      go(this.longNoise()).connect(this.filt('bandpass', 700, 0.9)).connect(this.gainNode(0.3)).connect(am);
+      wobble(14, 0.35);
+      wobble(2.1, 0.1);
+      vol = 0.55;
+    } else if (kind === 'burner') {
       // le brûleur : le souffle grave de la flamme, son crépitement, le grondement de la chaudière
       go(this.longNoise()).connect(this.filt('lowpass', 150, 0.7)).connect(this.gainNode(1.0)).connect(am);
       go(this.longNoise()).connect(this.filt('bandpass', 480, 0.9)).connect(this.gainNode(0.22)).connect(am);
