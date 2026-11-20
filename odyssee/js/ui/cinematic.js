@@ -1332,7 +1332,8 @@ export async function playBossCinematic(game, opts = {}) {
       requestAnimationFrame(tick);
     });
 
-    try { await ui.fade?.(240); } catch (e) {}
+    // fondu au noir pour cacher la fin de la cinématique ; l'écran se rouvre une fois la scène retirée (finally)
+    try { await ui.fade?.(true, 240); } catch (e) {}
     if (cfg.presetKey === 'shadow' && st?.flags) st.flags.seenLugiaCinematic = true;
   } finally {
     cleanupAll();
@@ -1340,6 +1341,7 @@ export async function playBossCinematic(game, opts = {}) {
       window.removeEventListener?.('resize', sceneCtrl.resize);
     }
     try { wrap.remove(); } catch (e) {}
+    try { await ui.fade?.(false, 160); } catch (e) {}
     if (sound) sound.current = null;
     game.busy = prevBusy;
   }

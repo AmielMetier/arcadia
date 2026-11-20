@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 5.140 — 20 novembre 2026
+- **Odyssée** — Une vraie entrée en scène pour les boss de raid (Odyssée 1.3).
+  - Avant le combat, l'escouade se présente : le portrait et le nom de chaque joueur, chacun avec sa couleur, face au boss dans son aura.
+  - Plus de dresseur en face : le boss sort de l'ombre en rugissant, puis chaque joueur envoie son Pokémon à son tour (« J1 envoie Dracaufeu ! »).
+  - Écran de combat plus propre : les Pokémon de l'escouade restent dans le cadre, les fiches des joueurs sont regroupées à droite et ne cachent plus le boss.
+  - Le bandeau d'annonce disparaît quand le raid commence.
+  - Correction : après une cinématique de boss (champion, légendaire, raid), l'écran ne reste plus noir pendant le combat.
+
 ## 5.139 — 20 novembre 2026
 - **Odyssée** — Les boss de raid se jouent vraiment en coop, et les légendaires sont nouveaux (Odyssée 1.2).
   - Combat double, triple ou quadruple : de 2 à 4 joueurs contre le boss, tous les joueurs connectés devant être là. Face à quatre joueurs, il frappe trois fois par tour.

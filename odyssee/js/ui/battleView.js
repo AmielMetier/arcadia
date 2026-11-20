@@ -114,8 +114,13 @@ export class BattleView {
   /* ---------------- positions par format (1v1, 2v2, 3v3) ---------------- */
   posFor(side, slot = 0) {
     const W = this.W, sl = this.slots || 1;
+    if (this.battle?.isRaid && side === 0 && sl >= 2) {   // l'escouade en arc devant le boss
+      const P = { 2: [[0.2, 106], [0.42, 112]], 3: [[0.12, 100], [0.29, 106], [0.46, 112]], 4: [[0.1, 96], [0.24, 101], [0.38, 106], [0.52, 111]] }[Math.min(4, sl)];
+      const [fx, y] = P[slot] || P[0];
+      return { x: Math.round(W * fx), y };
+    }
     // boss de raid : plus bas qu'un adversaire ordinaire, pour que sa tête (et son aura) restent dans le cadre
-    if (this.battle?.isRaid && side === 1 && slot === 0) return { x: Math.round(W * 0.68), y: 92 };
+    if (this.battle?.isRaid && side === 1 && slot === 0) return { x: Math.round(W * (this.battle.monde ? 0.6 : 0.68)), y: 92 };
     if (sl === 1) return side === 1 ? { x: Math.round(W * 0.71), y: 86 } : { x: Math.round(W * 0.26), y: 140 };
     if (sl === 2) {
       const fx = [0.50, 0.74], fy = [65, 74], px = [0.16, 0.39], py = [118, 126];
@@ -130,6 +135,7 @@ export class BattleView {
   }
   scaleFor(side, slot = 0) {
     const sl = this.slots || 1;
+    if (this.battle?.isRaid && side === 0 && sl >= 2) return { 2: [0.74, 0.7], 3: [0.66, 0.62, 0.58], 4: [0.6, 0.57, 0.54, 0.51] }[Math.min(4, sl)][slot] ?? 0.6;
     if (this.battle?.isRaid && side === 1 && slot === 0) return 1.0;
     if (sl === 1) return 1;
     if (sl === 2) return side === 1 ? (slot === 0 ? 0.80 : 0.86) : (slot === 0 ? 0.86 : 0.80);
@@ -406,7 +412,7 @@ export class BattleView {
   /* ---------------- interface HTML ---------------- */
   buildDom() {
     const sl = this.slots || 1;
-    const r = el('div', `battle slots-${sl}${sl > 1 ? ' multi' : ''}`); this.root = r;
+    const r = el('div', `battle slots-${sl}${sl > 1 ? ' multi' : ''}${this.battle?.monde ? ' raid-monde' : ''}`); this.root = r;
     const cv = el('canvas', 'bcv'); cv.width = this.W; cv.height = BH; r.appendChild(cv);
     this.ctx = cv.getContext('2d');
     if (sl === 1) {
@@ -840,10 +846,23 @@ export class BattleView {
     const jobs = [this.loadBattleDecor(this.kind, o.night)];
     for (let sl = 0; sl < this.slots; sl++) jobs.push(this.loadSide(1, sl), this.loadSide(0, sl));
     await Promise.all(jobs);
-    this.st.trainer.img = await loadImg(ASSETS.trainer(battle.sides[1].trainer.bs));
+    const L = o.lineup;   // boss de raid : pas de dresseur en face, le boss est là d'emblée
+    if (!L) this.st.trainer.img = await loadImg(ASSETS.trainer(battle.sides[1].trainer.bs));
     requestAnimationFrame(this.frame);
-    this.st.trainer.visible = true;
+    const oB = this.spriteObj(1, 0);
+    if (L) { oB.visible = true; oB.dark = true; } else this.st.trainer.visible = true;
     await this.tween(700, (u) => { const e = ease(u); this.st.eSlide = -this.W * (1 - e); this.st.pSlide = this.W * (1 - e); });
+    if (L) {
+      await this.raidLineup(L);
+      // le boss sort de l'ombre : rugissement, éclats aux couleurs de son aura
+      const boss = battle.monAt(1, 0), c = this.sprCenter(1, 0);
+      oB.dark = false; oB.white = 1; this.setHud(1, boss, boss.hp, 0);
+      this.sound.cry(ASSETS.cry(boss.sp));
+      const teinte = { bleu: ['#7fd0ff', '#2a6fe0', '#ffffff'], rouge: ['#ff7a6a', '#c0101e', '#ffffff'], or: ['#ffe680', '#e09a00', '#ffffff'] }[L.boss.aura] || ['#ffffff'];
+      this.burst(c.x, c.y, teinte, 34, { speed: 3 });
+      await this.tween(380, (u) => { oB.white = 1 - u; oB.dx = Math.sin(u * 40) * 3 * (1 - u); });
+      oB.white = 0; oB.dx = 0;
+    }
     await this.play(battle.start());
 
     const mySlot = battle.mySlot ?? 0;
@@ -909,6 +928,43 @@ export class BattleView {
     // boss de raid : son aura (bleue, rouge ou or) ondule derrière lui
     o.aura = side === 1 && this.battle.aura && o.img ? auraFrames(o.img, this.battle.aura).frames : null;
     if (!o.img) { const c = document.createElement('canvas'); c.width = c.height = 80; const x = c.getContext('2d'); x.fillStyle = TYPE_COL[SPECIES[m.sp].t[0]]; x.beginPath(); x.arc(40, 50, 24, 0, 7); x.fill(); x.fillStyle = '#fff'; x.font = '20px sans-serif'; x.fillText('?', 34, 58); o.img = c; }
+  }
+  /** boss de raid : l'escouade se présente (portrait et nom de chaque joueur) face au boss, puis s'efface */
+  async raidLineup(L) {
+    const n = L.joueurs.length;
+    const ov = el('div', `raid-lineup aura-${L.boss.aura || 'or'} n${n}`);
+    ov.innerHTML = `
+      <div class="rl-bande"></div>
+      <div class="rl-titre">ESCOUADE DE RAID</div>
+      <div class="rl-equipe">${L.joueurs.map((j, k) => `
+        <div class="rl-joueur${j.moi ? ' moi' : ''}" style="--k:${k}">
+          <div class="rl-portrait"><img src="${ASSETS.trainer(j.bs)}" alt=""></div>
+          <div class="rl-nom">${esc(j.name)}${j.moi ? '<i>toi</i>' : ''}</div>
+        </div>`).join('')}</div>
+      <div class="rl-vs">VS</div>
+      <div class="rl-boss">
+        <div class="rl-boss-img"><img src="${ASSETS.front(L.boss.sp)}" alt=""></div>
+        <div class="rl-boss-nom">${esc(L.boss.title)}</div>
+        <div class="rl-boss-sous">${esc(L.boss.rang)} · N.${L.boss.lvl}</div>
+      </div>`;
+    this.root.appendChild(ov);
+    let passe = false;
+    const pop = this.ui.input.push((k) => { if (k === 'a' || k === 'b') passe = true; });
+    const attendre = async (ms) => { for (let t = 0; t < ms && !passe; t += 40) await wait(40); };
+    try {
+      await wait(30); ov.classList.add('in');
+      await attendre(260);
+      for (let k = 0; k < n && !passe; k++) { this.sound.sfx('select'); await attendre(200); }
+      if (!passe) { this.sound.sfx('bang'); ov.classList.add('vs'); }
+      await attendre(380);
+      ov.classList.add('boss');
+      await attendre(1500);
+    } finally {
+      pop();
+      ov.classList.add('out');
+      await wait(320);
+      ov.remove();
+    }
   }
   close() { this.alive = false; this.targetHint = null; this.root?.remove(); this.ui.closeDialog(); this.game.input.clearDirs?.(); }
 

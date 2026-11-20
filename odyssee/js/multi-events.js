@@ -148,6 +148,21 @@ export class RaidCoopBattle extends CoopDojoBattle {
     return super.hp(ref, delta, cause);
   }
 
+  /** ouverture d'un boss de la région : pas de dresseur ; le boss est déjà là, puis chaque joueur envoie son Pokémon */
+  start() {
+    if (!this.monde) return super.start();
+    const t = this.sides[1].trainer;
+    const evs = super.start().filter((e) => !(e.t === 'send'
+      || (e.t === 'msg' && (/lance un combat/.test(e.text) || e.text.startsWith(`${t.cls} ${t.name} envoie`) || e.text.startsWith('En avant !')))));
+    const out = [{ t: 'msg', text: `${this.sides[1].name} surgit, entouré d'une aura ${{ bleu: 'bleue', rouge: 'rouge', or: 'dorée' }[this.aura] || 'mystérieuse'} !` }];
+    for (const sl of this.aliveSlots(0)) {
+      const idx = this.sides[0].activeSlots[sl];
+      out.push({ t: 'msg', text: `${this.ownerNames[this.owners[idx]] || 'Un allié'} envoie ${monName(this.monAt(0, sl))} !` });
+      out.push({ t: 'send', side: 0, slot: sl, idx });
+    }
+    return out.concat(evs);
+  }
+
   /** un boss géant : tous les joueurs l'atteignent, et il les atteint tous (pas de distance en combat triple ou quadruple) */
   isAdjacent() { return true; }
   validFoeTargets(attRef) {
@@ -274,6 +289,8 @@ async function runRaidBattleSession(game, { rid, bossIdx, format, rosters, mySlo
   const who = { speaker: monde ? 'Boss de raid' : 'Raid Co-op', face: 'drakos' };
   const RM = game.raidMonde;
   if (monde && RM) { RM.compterEssai(k); game.save(true); }
+  // le bandeau d'annonce ne doit pas rester par-dessus la rencontre
+  document.querySelectorAll('.raid-monde-annonce').forEach((b) => b.remove());
 
   await ui.say(monde
     ? `${ownerNames.join(', ')} affrontent ${bossData.name} (N.${bossData.bossLvl} · PV ×${bossData.hpMult}) ! Essai ${RM ? RM.suivi(k).essais : 1} sur ${RAID_ESSAIS}.`
@@ -315,7 +332,14 @@ async function runRaidBattleSession(game, { rid, bossIdx, format, rosters, mySlo
   st.party = battle.sides[0].party;
   let res;
   try {
-    res = await game.bv.runCoopDojo(battle, coopNet, { bg: bossData.boss.bg || 'cave', night: true });
+    res = await game.bv.runCoopDojo(battle, coopNet, {
+      bg: bossData.boss.bg || 'cave', night: true,
+      // présentation de l'escouade avant que chacun envoie son Pokémon
+      lineup: monde ? {
+        joueurs: rosters.map((r) => ({ name: String(r.name || 'Dresseur').slice(0, 12), bs: r.bs === 'player_f' ? 'player_f' : 'player_m', moi: r.slot === mySlot })),
+        boss: { sp: bossData.boss.sp, title: bossData.boss.title, lvl: bossData.bossLvl, rang: rangDe(def).nom, aura: bossData.aura },
+      } : null,
+    });
   } finally {
     st.party = realParty;
     game.bv.pvp = false;
@@ -424,8 +448,8 @@ export async function lancerRaidMonde(game, R) {
     }
     const lvl = niveauBoss([game.levelCap(), ...reps.map(({ m }) => Math.max(5, Math.min(100, m.cap | 0 || game.levelCap())))], def);
     const rosters = [
-      { slot: 0, id: link.myId, name: st.name, hasMega: !!st.bag[MEGA_RING], mons: myMons },
-      ...peerRes.map(({ pid, m }, idx) => ({ slot: idx + 1, id: pid, name: String(m.name || choisis[idx].name).slice(0, 12), hasMega: !!m.hasMega, mons: m.mons.slice(0, 2) })),
+      { slot: 0, id: link.myId, name: st.name, bs: st.gender === 'f' ? 'player_f' : 'player_m', hasMega: !!st.bag[MEGA_RING], mons: myMons },
+      ...peerRes.map(({ pid, m }, idx) => ({ slot: idx + 1, id: pid, name: String(m.name || choisis[idx].name).slice(0, 12), bs: m.gender === 'f' ? 'player_f' : 'player_m', hasMega: !!m.hasMega, mons: m.mons.slice(0, 2) })),
     ];
     const seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
     peerIds.forEach((pid, idx) => link.send(pid, { t: 'raid', rid, step: 'start', bossIdx: 0, format, rosters, mySlot: idx + 1, hostId: link.myId, lvl, seed, monde: true, k: R.k, bossKey: def.id }));
@@ -469,7 +493,7 @@ export async function onRaidInvite(game, from, m) {
 
     const myMons = await pickDojoPair(game, { speaker: 'Boss de raid', face: 'drakos' });
     if (!myMons) { link.send(from, { t: 'raid', rid: m.rid, step: 'quit', who: st.name }); return; }
-    link.send(from, { t: 'raid', rid: m.rid, step: 'roster', name: st.name, hasMega: !!st.bag[MEGA_RING], mons: myMons });
+    link.send(from, { t: 'raid', rid: m.rid, step: 'roster', name: st.name, gender: st.gender, hasMega: !!st.bag[MEGA_RING], mons: myMons });
 
     const startMsg = await guestWaitHost(
       game, from,
