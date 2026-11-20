@@ -1541,6 +1541,33 @@ test("Level 7 : l'océan, le radeau (monter, mener, descendre), les bidons, la c
     assert.ok(m.cassettes.every((c) => !m.inSea(c.x, c.z)), 'bidons au sec');
     assert.ok(m.inSea(m.raft0.x, m.raft0.z) && m.inSea(m.monsterSpawn.x, m.monsterSpawn.z), "le radeau et la chose sont dans l'eau");
     assert.ok(m.collide(m.raft0.x, m.raft0.z, 0.3), "à pied, on ne va pas dans l'eau");
+    // les maisons : de leur ponton, on va à pied jusqu'au bidon (portes de la façade et de la cloison) ; de la maison du
+    // départ, jusqu'au ponton où attend la barque
+    const reach = (from, to) => {
+      const S = 0.25;
+      const k = (x, z) => Math.round(x / S) + ',' + Math.round(z / S);
+      const seen = new Set([k(from.x, from.z)]);
+      const q = [[from.x, from.z]];
+      while (q.length) {
+        const [x, z] = q.shift();
+        if (Math.hypot(x - to.x, z - to.z) < 0.5) return true;
+        for (const [dx, dz] of [[S, 0], [-S, 0], [0, S], [0, -S]]) {
+          const nx = x + dx;
+          const nz = z + dz;
+          if (seen.has(k(nx, nz)) || m.collide(nx, nz, 0.3)) continue;
+          seen.add(k(nx, nz));
+          q.push([nx, nz]);
+        }
+      }
+      return false;
+    };
+    assert.equal(m.houses.length, 4, 'la maison du départ et trois maisons à bidon');
+    for (const hs of m.houses) {
+      const P = hs.porch;
+      const porch = { x: P.side === 'w' ? P.x0 + 1.25 : P.side === 'e' ? P.x1 - 1.25 : (P.x0 + P.x1) / 2, z: P.side === 'n' ? P.z0 + 1.25 : P.side === 's' ? P.z1 - 1.25 : (P.z0 + P.z1) / 2 };
+      const can = m.cassettes.find((c) => c.x > P.x0 && c.x < P.x1 && c.z > P.z0 && c.z < P.z1);
+      assert.ok(hs.o.kind === 'start' ? reach(m.spawn, porch) : reach(porch, can), `maison ${hs.o.id} (${hs.o.kind}) : on y circule`);
+    }
   }
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 5, players: [{ id: 0, name: 'A' }, { id: 1, name: 'B' }], localId: 0, level: OCEAN_LEVEL });
   sim.arriveT = 0;

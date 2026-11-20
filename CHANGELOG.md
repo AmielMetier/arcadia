@@ -2,9 +2,9 @@
 
 ## 5.125 — 19 novembre 2026
 - **The Backrooms** — Un nouveau niveau : le Level 7, Thalassophobia, au bout du toboggan bleu des Poolrooms.
-  - Une mer sans fin dans la brume du soir, qui reflète le ciel. Quelques îlots de sable et de rochers en sortent ; sur l'un d'eux, l'épave d'un grand voilier échoué.
+  - Une mer sans fin dans la brume du soir, qui reflète le ciel. Des maisons à moitié englouties en sortent : le rez-de-chaussée sous l'eau, l'étage et le toit au-dessus. D'autres sombrent de travers, et l'épave d'un grand voilier s'est échouée sur un rocher.
   - Une barque en bois à moteur attend au ponton. Monte dedans avec F : le premier tient la barre (Z / S pour le moteur, Q / D pour tourner). Pour descendre, il faut accoster un îlot.
-  - Trois bidons d'essence sont cachés sur les îlots : le moteur en boit, et sans eux on n'ira pas loin. Tout au bout, une simple porte plantée sur un dernier îlot : la sortie.
+  - Trois bidons d'essence sont cachés au fond de trois de ces maisons : accoste à leur ponton, entre, fouille les pièces. Le moteur en boit, et sans eux on n'ira pas loin. Tout au bout, une simple porte plantée sur un dernier îlot : la sortie.
   - Quelque chose d'immense vit sous la surface et entend le moteur. Le sonar dit quand ça approche : coupe le moteur et laisse-le passer. S'il atteint la barque en marche, il emporte quelqu'un. Et ne traîne pas au bord de l'eau.
 
 ## 5.124 — 19 novembre 2026

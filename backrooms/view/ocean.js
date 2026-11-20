@@ -4,7 +4,7 @@
 // plafond, ni néons). Modèles et textures Poly Haven (CC0) : models/ocean/, tex/l7_*.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL_SIZE } from '../engine/map.js';
-import { SEA_Y, RAFT, DECK } from '../engine/ocean.js';
+import { SEA_Y, RAFT, DECK, WALL_T, HOUSE_H } from '../engine/ocean.js';
 import { modelUrl } from './models.js';
 
 const C = CELL_SIZE;
@@ -183,6 +183,139 @@ function buildBoat() {
   return { boat, motor, prop };
 }
 
+// une boîte dont la texture se répète à la taille réelle (tile : mètres par répétition), au lieu d'être étirée
+function box(w, h, d, mat, tile = 2) {
+  const g = new THREE.BoxGeometry(w, h, d);
+  const uv = g.attributes.uv;
+  // l'ordre des faces de BoxGeometry : +x, -x, +y, -y, +z, -z (4 sommets chacune)
+  const dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+  for (let f = 0; f < 6; f++) for (let i = 0; i < 4; i++) uv.setXY(f * 4 + i, uv.getX(f * 4 + i) * (dims[f][0] / tile), uv.getY(f * 4 + i) * (dims[f][1] / tile));
+  return new THREE.Mesh(g, mat);
+}
+
+// Une maison à moitié engloutie : l'étage (sol à 0, plafond à HOUSE_H), son toit à deux pentes, et dessous le
+// rez-de-chaussée noyé (son bardage descend dans l'eau). hs : le plan du moteur (murs, ouvertures, pièces, ponton).
+// Les murs de façade ont deux peaux : le bardage dehors, la peinture qui s'écaille dedans
+function buildHouse(hs, M) {
+  const g = new THREE.Group();
+  const { X0, Z0, X1, Z1 } = hs;
+  const cx = (X0 + X1) / 2;
+  const cz = (Z0 + Z1) / 2;
+  const T = WALL_T;
+  const HH = HOUSE_H;
+  for (const sg of hs.segs) {
+    const len = Math.hypot(sg.bx - sg.ax, sg.bz - sg.az);
+    const ux = (sg.bx - sg.ax) / len;
+    const uz = (sg.bz - sg.az) / len;
+    // le côté dehors (loin du milieu de la maison)
+    let nx = -uz;
+    let nz = ux;
+    if ((sg.ax - cx) * nx + (sg.az - cz) * nz < 0) {
+      nx = -nx;
+      nz = -nz;
+    }
+    const pieces = [];
+    let a = 0;
+    for (const o of [...sg.open].sort((p, q) => p.at - q.at)) {
+      const s0 = o.at - o.w / 2;
+      const s1 = o.at + o.w / 2;
+      if (s0 > a) pieces.push([a, s0, 0, HH]);
+      if (o.kind === 'door') pieces.push([s0, s1, 2.1, HH]);
+      else {
+        pieces.push([s0, s1, 0, 0.95], [s0, s1, 2.0, HH]);
+        // le cadre de la fenêtre (sans vitre : elles ont toutes sauté)
+        for (const [y, hgt] of [[0.95, 0.06], [2.0, 0.06]]) {
+          const f = box(o.w, hgt, T + 0.04, M.frame, 1);
+          f.position.set(sg.ax + ux * o.at, y, sg.az + uz * o.at);
+          f.rotation.y = Math.atan2(ux, uz) + Math.PI / 2;
+          g.add(f);
+        }
+      }
+      a = s1;
+    }
+    if (a < len) pieces.push([a, len, 0, HH]);
+    const rot = Math.atan2(ux, uz) + Math.PI / 2;
+    for (const [s0, s1, y0, y1] of pieces) {
+      const mx = sg.ax + ux * (s0 + s1) / 2;
+      const mz = sg.az + uz * (s0 + s1) / 2;
+      const skins = sg.ext ? [[M.siding, T / 4], [M.paint, -T / 4]] : [[M.paint, 0]];
+      for (const [mat, off] of skins) {
+        const b = box(s1 - s0, y1 - y0, sg.ext ? T / 2 : T, mat, 2);
+        b.position.set(mx + nx * off, (y0 + y1) / 2, mz + nz * off);
+        b.rotation.y = rot;
+        g.add(b);
+      }
+    }
+  }
+  // le sol de l'étage, le plafond
+  const floor = box(X1 - X0 + T, 0.2, Z1 - Z0 + T, M.floor, 2);
+  floor.position.set(cx, -0.1, cz);
+  g.add(floor);
+  const ceil = box(X1 - X0, 0.08, Z1 - Z0, M.paint, 2);
+  ceil.position.set(cx, HH + 0.04, cz);
+  g.add(ceil);
+  // le rez-de-chaussée noyé : son bardage plonge dans l'eau ; le haut de ses fenêtres affleure encore
+  const low = box(X1 - X0 + T, 3.2, Z1 - Z0 + T, M.siding, 2);
+  low.position.set(cx, -1.8, cz);
+  g.add(low);
+  for (const sg of hs.segs) {
+    if (!sg.ext) continue;
+    const len = Math.hypot(sg.bx - sg.ax, sg.bz - sg.az);
+    const ux = (sg.bx - sg.ax) / len;
+    const uz = (sg.bz - sg.az) / len;
+    let nx = -uz;
+    let nz = ux;
+    if ((sg.ax - cx) * nx + (sg.az - cz) * nz < 0) {
+      nx = -nx;
+      nz = -nz;
+    }
+    for (const o of sg.open) {
+      if (o.kind !== 'window') continue;
+      const w = box(o.w, 0.7, 0.04, M.drowned, 1);
+      w.position.set(sg.ax + ux * o.at + nx * (T / 2 + 0.03), SEA_Y - 0.12, sg.az + uz * o.at + nz * (T / 2 + 0.03));
+      w.rotation.y = Math.atan2(ux, uz) + Math.PI / 2;
+      g.add(w);
+    }
+  }
+  // le toit à deux pentes, le faîte le long du grand côté, et ses deux pignons
+  const alongX = X1 - X0 >= Z1 - Z0;
+  const ov = 0.45;
+  const R = 1.5;
+  const hd = (alongX ? Z1 - Z0 : X1 - X0) / 2 + ov;
+  const slope = Math.hypot(hd, R);
+  const ang = Math.atan2(R, hd);
+  const L = (alongX ? X1 - X0 : Z1 - Z0) + ov * 2;
+  for (const s of [-1, 1]) {
+    const p = alongX ? box(L, 0.09, slope, M.roof, 2) : box(slope, 0.09, L, M.roof, 2);
+    if (alongX) {
+      p.position.set(cx, HH + R / 2, cz + (s * hd) / 2);
+      p.rotation.x = s * ang;
+    } else {
+      p.position.set(cx + (s * hd) / 2, HH + R / 2, cz);
+      p.rotation.z = -s * ang;
+    }
+    g.add(p);
+  }
+  const gh = (alongX ? Z1 - Z0 : X1 - X0) / 2;
+  for (const s of [-1, 1]) {
+    const sh = new THREE.Shape();
+    sh.moveTo(-gh, 0);
+    sh.lineTo(gh, 0);
+    sh.lineTo(0, R - 0.05);
+    sh.closePath();
+    const tri = new THREE.Mesh(new THREE.ShapeGeometry(sh), M.sidingFlat);
+    if (alongX) {
+      tri.position.set(s > 0 ? X1 : X0, HH, cz);
+      tri.rotation.y = s > 0 ? Math.PI / 2 : -Math.PI / 2;
+    } else {
+      tri.position.set(cx, HH, s > 0 ? Z1 : Z0);
+      tri.rotation.y = s > 0 ? 0 : Math.PI;
+    }
+    g.add(tri);
+  }
+  return g;
+}
+
 export function buildOcean({ map, scene, loader }) {
   const root = new THREE.Group();
   scene.add(root);
@@ -214,8 +347,8 @@ export function buildOcean({ map, scene, loader }) {
   sea.position.set(W / 2, SEA_Y, H / 2);
   root.add(sea);
 
-  // 3. Les îlots : une dalle de sable et de cailloux (son dessus est le sol où l'on marche), ses flancs plongent dans
-  // l'eau ; des rochers aux coins, et une falaise sur les plus grands
+  // 3. Les îlots : les maisons à moitié englouties (on entre dans celles du départ et des bidons ; les autres
+  // sombrent, de travers), le rocher de la porte, l'îlot de l'épave
   const sand = tiled('l7_sable.webp', 1, 1, true);
   const sandN = tiled('l7_sable_relief.webp', 1, 1, false);
   const sandMat = (w, h) => {
@@ -225,6 +358,20 @@ export function buildOcean({ map, scene, loader }) {
     m.map.needsUpdate = m.normalMap.needsUpdate = true;
     return m;
   };
+  const std = (file, color, rough = 0.9) => new THREE.MeshStandardMaterial({ map: tiled(file + '.webp', 1, 1, true), normalMap: tiled(file + '_relief.webp', 1, 1, false), color, roughness: rough });
+  const M = {
+    siding: std('l7_bardage', '#d2d8d7'),
+    paint: std('l7_cloison', '#f2ece0', 0.95),
+    floor: std('l7_plancher', '#d2c4ac'),
+    roof: std('l7_toit', '#8e877e'),
+    deck: std('l7_planches', '#a08a70'),
+    frame: new THREE.MeshStandardMaterial({ color: '#3b3630', roughness: 0.8 }),
+    drowned: new THREE.MeshStandardMaterial({ color: '#0a1013', roughness: 0.2, metalness: 0.3 }), // une vitre du bas, noire d'eau
+  };
+  M.sidingFlat = std('l7_bardage', '#d2d8d7');
+  M.sidingFlat.map.repeat.set(0.5, 0.5);
+  M.sidingFlat.normalMap.repeat.set(0.5, 0.5);
+  M.sidingFlat.side = THREE.DoubleSide;
   const rockKinds = ['coast_rocks_01', 'coast_rocks_03'];
   const rocks = {};
   const place = (name, size, set) => {
@@ -242,16 +389,58 @@ export function buildOcean({ map, scene, loader }) {
   };
   let seed = 7;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const pile = (x, z) => {
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 3.2, 8), M.frame);
+    p.position.set(x, -1.5, z);
+    root.add(p);
+  };
   for (const o of map.islets) {
     const w = o.w * C;
     const h = o.h * C;
     const x0 = o.x0 * C;
     const z0 = o.z0 * C;
+    if (o.house) {
+      // la maison, et son ponton de planches sur pilotis devant l'entrée
+      root.add(buildHouse(o.house, M));
+      const P = o.house.porch;
+      const along = P.side === 'n' || P.side === 's';
+      const px0 = along ? P.x0 : P.side === 'w' ? P.x0 : P.x1 - C;
+      const px1 = along ? P.x1 : P.side === 'w' ? P.x0 + C : P.x1;
+      const pz0 = along ? (P.side === 'n' ? P.z0 : P.z1 - C) : P.z0;
+      const pz1 = along ? (P.side === 'n' ? P.z0 + C : P.z1) : P.z1;
+      const deck = box(px1 - px0, 0.14, pz1 - pz0, M.deck, 1.5);
+      deck.position.set((px0 + px1) / 2, -0.07, (pz0 + pz1) / 2);
+      root.add(deck);
+      for (const [x, z] of [[px0 + 0.15, pz0 + 0.15], [px1 - 0.15, pz0 + 0.15], [px0 + 0.15, pz1 - 0.15], [px1 - 0.15, pz1 - 0.15]]) pile(x, z);
+      continue;
+    }
+    if (o.kind === 'sunk') {
+      // une maison qui sombre : la même, sans cloison, penchée et enfoncée dans l'eau ; on n'y entre pas
+      const X0 = x0 + WALL_T / 2;
+      const Z0 = z0 + WALL_T / 2;
+      const X1 = x0 + w - WALL_T / 2;
+      const Z1 = z0 + h - WALL_T / 2;
+      const win = (len) => [{ at: len * 0.3, w: 1.0, kind: 'window' }, { at: len * 0.72, w: 1.0, kind: 'window' }];
+      const hs = { X0, Z0, X1, Z1, segs: [
+        { ax: X0, az: Z0, bx: X1, bz: Z0, ext: true, open: [{ at: (X1 - X0) / 2, w: 1.1, kind: 'door' }] },
+        { ax: X0, az: Z1, bx: X1, bz: Z1, ext: true, open: win(X1 - X0) },
+        { ax: X0, az: Z0, bx: X0, bz: Z1, ext: true, open: win(Z1 - Z0) },
+        { ax: X1, az: Z0, bx: X1, bz: Z1, ext: true, open: win(Z1 - Z0) },
+      ] };
+      const inner = buildHouse(hs, M);
+      inner.position.set(-o.cx, 0, -o.cz);
+      const pivot = new THREE.Group();
+      pivot.add(inner);
+      pivot.position.set(o.cx, -o.tilt.sink, o.cz);
+      pivot.rotation.set(o.tilt.x, o.tilt.yaw, o.tilt.z, 'YXZ');
+      root.add(pivot);
+      continue;
+    }
+    // le rocher de la porte, l'îlot de l'épave : du sable, des rochers aux coins
     const slab = new THREE.Mesh(new THREE.BoxGeometry(w, 2.4, h), sandMat(w, h));
     slab.position.set(x0 + w / 2, -1.2, z0 + h / 2);
     root.add(slab);
     if (o.kind === 'wreck') continue;
-    // des rochers aux coins, un peu dans l'eau
     for (const [cx, cz] of [[x0, z0], [x0 + w, z0], [x0, z0 + h], [x0 + w, z0 + h]]) {
       if (rnd() < 0.3) continue;
       const sz = 2.2 + rnd() * 2.2;
@@ -264,24 +453,13 @@ export function buildOcean({ map, scene, loader }) {
         g.rotation.y = ry;
       });
     }
-    // une falaise sur le côté le plus loin du départ, pour les grands îlots
-    if (o.w * o.h >= 24 && o.kind !== 'start') {
-      const north = o.cz < map.spawn.z;
-      place('coastal_cliff_01', Math.min(w, h) * 0.9, (g) => {
-        g.position.set(o.cx, SEA_Y - 1.2, north ? z0 - 0.4 : z0 + h + 0.4);
-        g.rotation.y = north ? Math.PI : 0;
-      });
-    }
   }
 
-  // 4. Le ponton du départ, le long de la barque, et celui de la porte
-  const start = map.islets.find((o) => o.kind === 'start');
+  // 4. La jetée de la porte
   const door = map.islets.find((o) => o.kind === 'door');
-  // (une jetée perpendiculaire au rivage, qui avance dans l'eau : celle du départ à côté de la barque, pas dessous)
-  for (const [o, side] of [[start, -1], [door, 1]]) {
-    if (!o) continue;
+  if (door) {
     place('modular_wooden_pier', 6, (g) => {
-      g.position.set(o === start ? map.raft0.x + RAFT.hw + 1.9 : o.cx, SEA_Y - 1.4, side < 0 ? o.z0 * C - 2.6 : (o.z0 + o.h) * C + 2.6);
+      g.position.set(door.cx, SEA_Y - 1.4, (door.z0 + door.h) * C + 2.6);
     });
   }
 
