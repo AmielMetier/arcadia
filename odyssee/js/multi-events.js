@@ -105,10 +105,36 @@ export class RaidCoopBattle extends CoopDojoBattle {
     };
     this.sides[1].activeSlots = Array(this.slots).fill(-1);
     this.sides[1].activeSlots[0] = 0;
+    // récap de fin de combat, par joueur : dégâts infligés au boss, subis, soins, K.O., plus gros coup, attaques lancées
+    const n = Math.max(1, this.ownerNames.length);
+    this.recap = Array.from({ length: n }, () => ({ inflige: 0, subi: 0, soin: 0, ko: 0, max: 0, attaques: 0 }));
+  }
+
+  /** joueur à qui appartient le Pokémon de l'escouade à cet emplacement */
+  ownerAt(slot) { const idx = this.sides[0].activeSlots[slot]; return idx >= 0 ? this.owners[idx] : null; }
+
+  useMoveRef(attRef, a, actedSet) {
+    if (attRef.side === 0) { const o = this.ownerAt(attRef.slot); if (o != null && this.recap[o]) this.recap[o].attaques++; }
+    return super.useMoveRef(attRef, a, actedSet);
   }
 
   hp(ref, delta, cause) {
     const r = this.norm(ref);
+    // l'escouade : ce qu'encaisse ou regagne chaque joueur (et ses K.O.)
+    if (r.side === 0) {
+      const o = this.ownerAt(r.slot), m = this.act(r), avant = m?.hp ?? 0;
+      const fait = super.hp(r, delta, cause);
+      const R = o != null && this.recap[o];
+      if (R && m) {
+        if (fait > 0) R.subi += fait;
+        else if (fait < 0) {   // un soin : compté pour le joueur qui l'a lancé (lui-même ou un allié)
+          const l = this.lastUser, ol = l && l.side === 0 && !cause ? this.ownerAt(l.slot) : o;
+          if (this.recap[ol ?? o]) this.recap[ol ?? o].soin -= fait;
+        }
+        if (avant > 0 && m.hp <= 0) R.ko++;
+      }
+      return fait;
+    }
     if (r.side === 1 && delta < 0) {
       const boss = this.monAt(1, 0);
       if (boss && boss.hp > 0) {
@@ -121,6 +147,9 @@ export class RaidCoopBattle extends CoopDojoBattle {
         }
       }
       const dealt = super.hp(r, delta, cause);
+      // dégâts au boss : au joueur dont le Pokémon vient d'attaquer (les dégâts indirects, météo ou poison, ne comptent pas)
+      const l = this.lastUser, ol = l && l.side === 0 && !cause ? this.ownerAt(l.slot) : null;
+      if (ol != null && this.recap[ol] && dealt > 0) { this.recap[ol].inflige += dealt; this.recap[ol].max = Math.max(this.recap[ol].max, dealt); }
       const after = this.monAt(1, 0);
       if (this.shield.active && !cause && after && after.hp > 0) {
         this.shield.hp = Math.max(0, this.shield.hp - 1);
@@ -267,6 +296,62 @@ function portraitJoueur(game, genre, tn) {
   } catch (e) { return null; }
 }
 
+/** fin d'un raid : le classement de l'escouade (dégâts infligés au boss, encaissés, soins, K.O., plus gros coup)
+ *  et les titres du combat ; A pour continuer */
+async function recapRaid(game, battle, { victoire, boss, rosters, mySlot, aura }) {
+  const ui = game.ui, R = battle.recap, total = Math.max(1, R.reduce((a, x) => a + x.inflige, 0));
+  const COUL = ['#4aa8ff', '#ff5a5a', '#4ade80', '#ffd23a'];
+  const fmt = (n) => Math.round(n).toLocaleString('fr-FR');
+  const joueurs = rosters.map((r, k) => ({ k, name: String(r.name || 'Dresseur').slice(0, 12), moi: r.slot === mySlot, ...(R[k] || { inflige: 0, subi: 0, soin: 0, ko: 0, max: 0, attaques: 0 }) }));
+  const classes = [...joueurs].sort((a, b) => b.inflige - a.inflige || a.ko - b.ko);
+  // les titres : chacun au meilleur dans sa catégorie (seulement s'il y a quelque chose à saluer)
+  const UNITE = { inflige: ' dégâts', max: ' en un seul coup', subi: ' encaissés', soin: ' PV soignés' };
+  const titre = (cle, ico, nom, mieux = 'max') => {
+    const v = joueurs.map((j) => j[cle]); const best = mieux === 'max' ? Math.max(...v) : Math.min(...v);
+    if (mieux === 'max' && best <= 0) return null;
+    const qui = joueurs.filter((j) => j[cle] === best); if (qui.length === joueurs.length && joueurs.length > 1) return null;
+    return { ico, nom, qui: qui.map((j) => j.name).join(' et '), val: cle === 'ko' && mieux === 'min' ? (best === 0 ? 'jamais K.O.' : `${best} K.O.`) : fmt(best) + (UNITE[cle] || '') };
+  };
+  const titres = [
+    titre('inflige', '💥', 'Plus gros frappeur'),
+    titre('max', '⚡', 'Coup le plus fort'),
+    titre('subi', '🛡️', 'Le mur de l\'escouade'),
+    titre('soin', '💚', 'Le soigneur'),
+    titre('ko', '🌟', 'Toujours debout', 'min'),
+  ].filter(Boolean);
+  const ov = document.createElement('div');
+  ov.className = `raid-recap aura-${aura || 'or'}${victoire ? ' gagne' : ' perdu'}`;
+  ov.innerHTML = `
+    <div class="rr-panneau">
+      <div class="rr-tete"><b>${victoire ? 'VICTOIRE !' : 'LE BOSS TIENT BON…'}</b><span>${esc(boss)} · ${battle.turn} tour${battle.turn > 1 ? 's' : ''}</span></div>
+      <div class="rr-liste">
+        <div class="rr-ligne rr-entete"><span></span><span>Joueur</span><span>Dégâts au boss</span><span>Subis</span><span>Soins</span><span>K.O.</span></div>
+        ${classes.map((j, rang) => `
+          <div class="rr-ligne${j.moi ? ' moi' : ''}" style="--c:${COUL[j.k % 4]};--d:${rang * 0.12}s">
+            <span class="rr-rang">${['🥇', '🥈', '🥉'][rang] || rang + 1}</span>
+            <span class="rr-nom">${esc(j.name)}${j.moi ? ' <i>toi</i>' : ''}</span>
+            <span class="rr-deg"><i style="width:${Math.round(100 * j.inflige / total)}%"></i><b>${fmt(j.inflige)}</b><small>${Math.round(100 * j.inflige / total)} %</small></span>
+            <span>${fmt(j.subi)}</span><span>${fmt(j.soin)}</span><span>${j.ko}</span>
+          </div>`).join('')}
+      </div>
+      ${titres.length ? `<div class="rr-titres">${titres.map((t, i) => `<div class="rr-titre" style="--d:${0.5 + i * 0.12}s"><span>${t.ico}</span><b>${t.nom}</b><em>${esc(t.qui)}</em><small>${t.val}</small></div>`).join('')}</div>` : ''}
+      <div class="rr-pied">A : continuer</div>
+    </div>`;
+  ui.root.appendChild(ov);
+  game.sound.sfx(victoire ? 'medal' : 'select');
+  requestAnimationFrame(() => ov.classList.add('in'));
+  await wait(500);
+  await new Promise((res) => {
+    let fini = false;
+    const fin = () => { if (fini) return; fini = true; pop(); res(); };
+    const pop = game.input.push((k) => { if (k === 'a' || k === 'b' || k === 'cancel') fin(); });
+    ov.addEventListener('click', fin, { once: true });
+  });
+  ov.classList.remove('in');
+  await wait(250);
+  ov.remove();
+}
+
 async function offerRaidCapture(game, bossData, def) {
   const st = game.state, ui = game.ui, rang = rangDe(def);
   const who = { speaker: 'Boss de raid', face: 'drakos' };
@@ -372,6 +457,9 @@ async function runRaidBattleSession(game, { rid, bossIdx, format, rosters, mySlo
   game.sound.stopMusic(0.1);
   game.sound.current = null;
   game.updateZone();
+
+  // le récap : qui a fait quoi pendant le combat (calculé à l'identique chez tous les joueurs)
+  if (monde && battle.recap) await recapRaid(game, battle, { victoire: res === 'win', boss: bossData.boss.title, rosters, mySlot, aura: bossData.aura });
 
   if (res === 'win' && monde) {
     const rang = rangDe(def);

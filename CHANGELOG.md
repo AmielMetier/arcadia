@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.142 — 20 novembre 2026
+- **Odyssée** — Récap à la fin de chaque raid (Odyssée 1.5).
+  - Classement de l'escouade par dégâts infligés au boss, avec la part de chacun, les dégâts encaissés, les soins et les K.O.
+  - Des titres pour le combat : plus gros frappeur, coup le plus fort, mur de l'escouade, soigneur, toujours debout.
+  - Le même récap s'affiche chez tous les joueurs, en cas de victoire comme de défaite.
+
 ## 5.141 — 20 novembre 2026
 - **Odyssée** — Boss de raid : l'escouade apparaît dans sa tenue, et les Pokémon sont bien posés (Odyssée 1.4).
   - Dans la présentation avant le combat, chaque joueur apparaît avec les couleurs de sa tenue, et avec les graphismes choisis (Odyssée ou Noir & Blanc).

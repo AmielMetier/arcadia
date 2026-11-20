@@ -894,3 +894,42 @@
   text-shadow: calc(var(--bp) * 0.6) calc(var(--bp) * 0.6) 0 #000, 0 0 calc(var(--bp) * 2) var(--aura2); }
 .raid-lineup .rl-boss-sous { color: var(--aura); font-weight: 800; font-size: calc(var(--bp) * 3.8); text-shadow: calc(var(--bp) * 0.5) calc(var(--bp) * 0.5) 0 #000; }
 .raid-lineup.out { opacity: 0; transition: opacity 0.3s; }
+
+/* ---------- boss de raid : le récap de fin de combat ---------- */
+.raid-recap { position: absolute; inset: 0; z-index: 70; display: grid; place-items: center; background: rgba(4, 8, 18, 0.72);
+  --aura: #ffd23a; opacity: 0; transition: opacity 0.25s; font-size: clamp(11px, 2.3vmin, 18px); }
+.raid-recap.aura-rouge { --aura: #ff5a4a; }
+.raid-recap.aura-bleu { --aura: #6cc4ff; }
+.raid-recap.in { opacity: 1; }
+.raid-recap .rr-panneau { width: min(92vw, 62em); background: linear-gradient(180deg, #1c2438, #10141f); color: #eef3ff;
+  border: 0.25em solid #8898b8; outline: 0.2em solid #05070c; box-shadow: 0 0 2.5em rgba(0, 0, 0, 0.7), 0 0 1.2em color-mix(in srgb, var(--aura) 35%, transparent);
+  padding: 1em 1.2em 0.8em; transform: translateY(1.5em) scale(0.96); transition: transform 0.3s cubic-bezier(.2, 1.3, .4, 1); }
+.raid-recap.in .rr-panneau { transform: none; }
+.raid-recap .rr-tete { display: flex; align-items: baseline; gap: 0.8em; border-bottom: 0.15em solid var(--aura); padding-bottom: 0.4em; margin-bottom: 0.6em; }
+.raid-recap .rr-tete b { font-size: 1.7em; font-weight: 900; letter-spacing: 0.04em; color: var(--aura); text-shadow: 0.08em 0.08em 0 #000; }
+.raid-recap.perdu .rr-tete b { color: #c8d2e8; }
+.raid-recap .rr-tete span { opacity: 0.75; }
+.raid-recap .rr-ligne { display: grid; grid-template-columns: 2.2em minmax(6em, 1.1fr) 2.2fr 0.7fr 0.7fr 0.5fr; gap: 0.6em; align-items: center;
+  padding: 0.35em 0.5em; margin-bottom: 0.3em; background: rgba(255, 255, 255, 0.05); border-left: 0.3em solid var(--c, transparent);
+  opacity: 0; transform: translateX(-1.5em); transition: opacity 0.25s var(--d, 0s), transform 0.3s var(--d, 0s); }
+.raid-recap.in .rr-ligne { opacity: 1; transform: none; }
+.raid-recap .rr-ligne > span:nth-child(n+4) { text-align: right; font-variant-numeric: tabular-nums; }
+.raid-recap .rr-entete { background: none; border: 0; font-size: 0.75em; opacity: 0.6 !important; text-transform: uppercase; letter-spacing: 0.06em; padding-top: 0; }
+.raid-recap .rr-ligne.moi { background: rgba(255, 225, 74, 0.1); }
+.raid-recap .rr-rang { font-size: 1.3em; text-align: center; }
+.raid-recap .rr-nom { font-weight: 800; color: var(--c); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.raid-recap .rr-nom i { font-style: normal; font-size: 0.7em; color: #08142c; background: var(--c); padding: 0 0.35em; border-radius: 0.3em; }
+.raid-recap .rr-deg { position: relative; display: flex; align-items: center; gap: 0.5em; height: 1.5em; background: rgba(0, 0, 0, 0.35); padding: 0 0.4em; }
+.raid-recap .rr-deg i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--c) 70%, transparent), color-mix(in srgb, var(--c) 35%, transparent)); }
+.raid-recap .rr-deg b, .raid-recap .rr-deg small { position: relative; }
+.raid-recap .rr-deg small { margin-left: auto; opacity: 0.8; }
+.raid-recap .rr-titres { display: flex; flex-wrap: wrap; gap: 0.5em; margin-top: 0.7em; }
+.raid-recap .rr-titre { flex: 1 1 10em; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 0.5em; align-items: center;
+  background: rgba(255, 255, 255, 0.06); border: 0.1em solid rgba(255, 255, 255, 0.12); padding: 0.35em 0.6em; grid-template-rows: auto auto auto;
+  opacity: 0; transition: opacity 0.3s var(--d, 0s); }
+.raid-recap.in .rr-titre { opacity: 1; }
+.raid-recap .rr-titre span { grid-row: span 3; font-size: 1.5em; }
+.raid-recap .rr-titre b { font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--aura); }
+.raid-recap .rr-titre em { font-style: normal; font-weight: 800; }
+.raid-recap .rr-titre small { grid-column: 2; opacity: 0.7; }
+.raid-recap .rr-pied { text-align: right; margin-top: 0.6em; font-size: 0.8em; opacity: 0.65; }
