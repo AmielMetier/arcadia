@@ -5,6 +5,7 @@ import { ASSETS } from '../../assets.js';
 import { getFriendsManager, formatFid } from '../../net/friends.js';
 import { screen, closer } from './common.js';
 import { cardScreen } from './card.js';
+import { creneau, RAID_PERIODE } from '../../raid-monde.js';
 
 /* ================= REGISTRE AMI & CONNEXIONS C-GEAR 5G ================= */
 export function friendsScreen(game) {
@@ -158,7 +159,6 @@ export function friendsScreen(game) {
                 ` : `
                   <button type="button" class="fr-act-btn fr-btn-card" data-act="peer-card" data-peerid="${p.id}" title="Consulter la Carte de Dresseur de ${esc(p.name)}">👁 CARTE</button>
                   <button type="button" class="fr-act-btn fr-btn-battle" data-act="peer-battle" data-peerid="${p.id}" title="Défier ${esc(p.name)} (1v1, 2v2, 3v3 ou 4J)">⚔️ COMBAT</button>
-                  <button type="button" class="fr-act-btn fr-btn-raid" data-act="peer-raid" data-peerid="${p.id}" title="Lancer un Raid Co-op avec ${esc(p.name)}">🐉 RAID</button>
                   <button type="button" class="fr-act-btn fr-btn-trade" data-act="peer-trade" data-peerid="${p.id}" title="Proposer un échange Pokémon à ${esc(p.name)}">🔄 ÉCHANGE</button>
                   <button type="button" class="fr-act-btn fr-btn-domaine" data-act="peer-domaine" data-peerid="${p.id}" title="Visiter le Domaine de ${esc(p.name)}">🏡 DOMAINE</button>
                   ${p.isFriend ? '' : `
@@ -194,17 +194,25 @@ export function friendsScreen(game) {
         const freePeers = onlinePeers.filter((p) => !p.isSelf && !p.busy && !p.pvp).length;
         const allOthers = onlinePeers.filter((p) => !p.isSelf).length;
         const cards = [
-          {
-            id: 'raid',
-            icon: '🐉',
-            title: 'Raid de Boss Co-op',
-            req: 1,
-            avail: freePeers,
-            badge: freePeers >= 1 ? `✓ ${freePeers} dispo` : '1-2 alliés requis',
-            desc: 'Affrontez un Boss géant (PV ×3/×4, Bouclier Mystique, 2 frappes/tour) puis capturez-le !',
-            reward: '+5 PDj · 2 Super Bonbons',
-            btn: 'Lancer un Raid',
-          },
+          (() => {
+            // le boss de raid de la région : rien à lancer d'ici, on va le trouver sur sa route
+            const R = game.raidMonde?.courant;
+            const c = creneau(), prochain = c.actif || Date.now() > c.fin ? creneau(c.k * RAID_PERIODE + RAID_PERIODE) : c;
+            const h = new Date(prochain.debut).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            return {
+              id: 'raid',
+              icon: '💥',
+              title: 'Boss de raid',
+              req: 1,
+              avail: R ? 1 : 0,
+              badge: R ? `Là ! ${Math.max(1, Math.round((R.fin - Date.now()) / 60e3))} min` : `Prochain vers ${h}`,
+              desc: R
+                ? `${R.boss.title} est sur ${R.nom} ! Allez-y tous ensemble et parlez-lui pour lancer le raid (5 essais).`
+                : 'Un boss très fort surgit sur une route toutes les heures et demie quand des joueurs sont connectés, et repart au bout de 15 minutes.',
+              reward: 'PDj · Super Bonbons · capture',
+              btn: R ? 'Où est-il ?' : 'En attente',
+            };
+          })(),
           {
             id: 'multi4p',
             icon: '⚔️',
@@ -265,7 +273,7 @@ export function friendsScreen(game) {
           <div class="fr-tab-pane fr-pane-hub">
             <div class="fr-pane-hdr">
               <span class="fr-pane-title">SALON DES ACTIVITÉS MULTIJOUEURS (${freePeers} DRESSEUR${freePeers > 1 ? 'S' : ''} LIBRE${freePeers > 1 ? 'S' : ''})</span>
-              <span class="fr-pane-sub">Lancez directement un Raid, un 2v2 à 4 joueurs, un Tournoi, une partie de Poker ou une visite de Domaine.</span>
+              <span class="fr-pane-sub">Lancez directement un 2v2 à 4 joueurs, un Tournoi, une partie de Poker ou une visite de Domaine.</span>
             </div>
             <div class="fr-hub-grid">
               ${cards.map((c) => {
@@ -487,7 +495,7 @@ export function friendsScreen(game) {
         };
       });
 
-      s.querySelectorAll('[data-act="peer-battle"], [data-act="peer-trade"], [data-act="peer-raid"], [data-act="peer-domaine"]').forEach((b) => {
+      s.querySelectorAll('[data-act="peer-battle"], [data-act="peer-trade"], [data-act="peer-domaine"]').forEach((b) => {
         b.onclick = async () => {
           const pid = b.dataset.peerid;
           const act = b.dataset.act;
@@ -496,9 +504,7 @@ export function friendsScreen(game) {
             setNotice('Dresseur introuvable ou déconnecté.', 'err');
             return;
           }
-          if (act === 'peer-raid') {
-            await launchDirect(async () => (await import('../../multi-events.js')).lancerRaidCoop(game, peer.peerObj));
-          } else if (act === 'peer-domaine') {
+          if (act === 'peer-domaine') {
             await launchDirect(async () => (await import('../domaine.js')).visiterDomaineAmi(game, peer.peerObj));
           } else if (game.talkToPeer) {
             await launchDirect(async () => game.talkToPeer(peer.peerObj, act === 'peer-trade' ? 'trade' : 'battle'));
@@ -509,7 +515,7 @@ export function friendsScreen(game) {
       });
 
       const hubActions = {
-        'hub-raid': async () => (await import('../../multi-events.js')).lancerRaidCoop(game),
+        'hub-raid': async () => { const R = game.raidMonde?.courant; if (R) await game.ui.say(`${R.boss.title} attend sur ${R.nom}. Il faut que tous les joueurs connectés le rejoignent pour lancer le raid !`); },
         'hub-multi4p': async () => (await import('../../multi-events.js')).lancerMulti4p(game),
         'hub-tournoi': async () => (await import('../../multi-events.js')).lancerTournoiSalon(game),
         'hub-dojo': async () => (await import('../../dojo-mamadou.js')).lancerDefiDojoCoop(game),

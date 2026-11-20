@@ -27,6 +27,7 @@ import { HPX, CHAR_ROWS } from './render/world3d.js';
 import { saveCodeScreen } from './ui/screens.js';
 import { encodeSave, saveSummary } from './core/savecode.js';
 import { installSocial, talkToPeer } from './net/social.js';
+import { RaidMonde } from './raid-monde.js';
 import { Donjons } from './donjons/jeu.js';
 import { storyTalk, storyTrigger, storyWin, lugiaBattle, placeLugia, purify, overlay } from './story.js';
 import { battleMusicForLegend } from './audio.js';
@@ -148,6 +149,7 @@ export class Game {
     this.hud = new Hud(this);
     this.session = null; // échange ou combat en cours avec un autre joueur
     installSocial(this);
+    this.raidMonde = new RaidMonde(this);   // boss de raid qui surgissent sur les routes
     // les donjons à plusieurs (la Crypte des Murmures) : état partagé par le salon, encadré d'avancement
     this.donjons = new Donjons(this, undefined, window.HubBridge);
     input.onFree = (k) => this.onKey(k);
@@ -597,6 +599,7 @@ export class Game {
   tick(dt) {
     const st = this.state; if (!st) return;
     this.donjons?.tick(dt);
+    this.raidMonde?.tick(dt);
     st.time += dt;
     const p = this.player;
     // déplacement du joueur
@@ -700,6 +703,7 @@ export class Game {
 
   occupied(x, y, except) {
     if (this.donjons?.occupe(x, y)) return true;   // le reflet du joueur (Donjon des Miroirs)
+    if (this.raidMonde?.occupe(x, y)) return true;   // le boss de raid de la région
     if (this.player && this.player.x === x && this.player.y === y && except !== this.player) return true;
     for (const n of this.npcs) if (n !== except && ((n.x === x && n.y === y) || (n.move && n.move.fx === x && n.move.fy === y))) return true;
     for (const it of this.items) if (it.x === x && it.y === y) return true;
@@ -1154,6 +1158,7 @@ export class Game {
   async interact() {
     // donjons à plusieurs : miroirs, socles, brasier, coffres, statues…
     if (this.donjons && !this.busy && await this.donjons.interagir()) return;
+    if (this.raidMonde && !this.busy && await this.raidMonde.interagir()) return;
     return this.interactJeu();
   }
   async interactJeu() {

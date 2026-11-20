@@ -735,24 +735,23 @@ export async function dojoMamadou(game, n) {
     title: `Dojo de Mamadou · ${D.pdj} PDj`,
     items: [
       { label: '🥋 Défi Co-op (2v2 / 3v3)', right: '2-3 joueurs' },
-      { label: '🐉 Raid de Boss Co-op', right: '2-3 joueurs' },
       { label: '🏆 Tournoi en direct', right: '4 places' },
       { label: '🎁 Boutique PDj', right: `${D.pdj} PDj` },
       { label: '📖 Règles du Dojo' },
       { label: 'Plus tard' },
     ],
     cls: 'shop',
-    cancel: 5,
+    cancel: 4,
   });
-  if (choice === 1) { const m = await import('./multi-events.js'); return m.lancerRaidCoop(game); }
-  if (choice === 2) { const m = await import('./multi-events.js'); return m.lancerTournoiSalon(game); }
-  if (choice === 3) { await dojoBoutique(game, n); return; }
-  if (choice === 4) {
+  if (choice === 1) { const m = await import('./multi-events.js'); return m.lancerTournoiSalon(game); }
+  if (choice === 2) { await dojoBoutique(game, n); return; }
+  if (choice === 3) {
     await ui.say([
       'Le Dojo de Mamadou propose des combats **exclusivement multijoueurs** à haute intensité stratégique !',
       'En Duo Co-op (2v2), 2 dresseurs humains s\'allient (1 Pokémon actif + 1 remplaçant chacun) face à 2 bots coordinateurs.',
       'En Trio Co-op (3v3), il faut 3 dresseurs humains (1 Pokémon actif + 1 remplaçant chacun) contre 3 bots experts.',
       'Chaque série compte 5 paliers avec soin complet entre les combats et un boss final : moi-même !',
+      'Les boss de raid, eux, ne viennent pas ici : ils surgissent sur les routes, un gros boum et ils sont là. Ouvrez l\'œil !',
     ], who);
     return;
   }

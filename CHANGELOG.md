@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 5.138 — 20 novembre 2026
+- **Odyssée** — Les boss de raid surgissent dans la région (Odyssée 1.1).
+  - Toutes les heures et demie environ, quand d'autres joueurs sont connectés, un gros boum retentit et un bandeau annonce le boss et sa route. Il reste 15 minutes, puis repart.
+  - Pour le lancer, allez-y ensemble et parlez-lui : tous les joueurs connectés doivent être à côté (deux ou trois au combat).
+  - Son niveau, c'est la moyenne des niveaux max des participants plus 10 (plus 6 pour un légendaire), avec des PV doublés ou plus. Il est vraiment dur : chacun a 5 essais par apparition.
+  - Victoire : Points du Dojo, 3 Super Bonbons, des Hyper Balls ou une Master Ball face à un légendaire, et la capture des boss qui ne sont pas légendaires.
+  - Les raids ne se lancent plus depuis le Dojo de Mamadou, le menu d'un joueur ou l'écran Amis : ce dernier dit où est le boss, ou quand vient le prochain.
+
 ## 5.137 — 20 novembre 2026
 - **Tête de Calcul** — Nouveau : The Candidate — 31 questions de l'émission tournée en amphi (version 5.123) (Nicolas Muratore)
 

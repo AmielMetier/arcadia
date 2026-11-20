@@ -25,6 +25,7 @@ import {
   guestWaitHost,
   createCoopNet,
 } from './dojo-mamadou.js';
+import { bossParId, capacitesBoss, niveauBoss, RAID_ESSAIS, RAID_PORTEE, RAID_PV } from './raid-monde.js';
 
 /* ======================================================================
    1. RAIDS DE BOSS / ANTRES LÉGENDAIRES CO-OP (2 OU 3 JOUEURS VS BOSS)
@@ -40,11 +41,12 @@ export const RAID_BOSSES = [
 ];
 
 /** Construit un Boss de Raid géant avec PV x3 (Duo) ou x4 (Trio) */
-export function buildRaidBossChallenge(bossIdx = 0, slots = 2, lvl = 55, seed = 1) {
-  const boss = RAID_BOSSES[bossIdx % RAID_BOSSES.length] || RAID_BOSSES[0];
+// opts.monde : boss de raid de la région (raid-monde.js) : son niveau est déjà calculé (lvl), ses PV ×4 (duo) ou ×5 (trio)
+export function buildRaidBossChallenge(bossIdx = 0, slots = 2, lvl = 55, seed = 1, opts = {}) {
+  const boss = opts.def || RAID_BOSSES[bossIdx % RAID_BOSSES.length] || RAID_BOSSES[0];
   const r = seededRng(seed >>> 0);
-  const bossLvl = Math.max(55, Math.min(95, (lvl | 0) + 4));
-  const validMoves = boss.moves.filter((id) => MOVES[id]);
+  const bossLvl = opts.monde ? Math.max(5, Math.min(100, lvl | 0)) : Math.max(55, Math.min(95, (lvl | 0) + 4));
+  const validMoves = opts.def ? capacitesBoss(boss) : boss.moves.filter((id) => MOVES[id]);
   const mon = createMon(boss.sp, bossLvl, {
     iv: [31, 31, 31, 31, 31, 31],
     nat: 0,
@@ -54,13 +56,14 @@ export function buildRaidBossChallenge(bossIdx = 0, slots = 2, lvl = 55, seed = 
     shiny: false,
     rng: r,
   });
-  const hpMult = slots >= 3 ? 4 : 3;
+  const hpMult = opts.monde ? RAID_PV[slots >= 3 ? 3 : 2] : slots >= 3 ? 4 : 3;
   mon.stats[0] = Math.max(mon.stats[0], mon.stats[0] * hpMult);
   mon.hp = mon.stats[0];
   return {
     boss,
     bossLvl,
     hpMult,
+    monde: !!opts.monde,
     name: boss.title,
     party: [mon],
     trainer: {
@@ -74,7 +77,7 @@ export function buildRaidBossChallenge(bossIdx = 0, slots = 2, lvl = 55, seed = 
       mega: false,
       prize: 0,
       items: {},
-      intro: `${boss.title} émerge de la faille avec une aura monumentale !`,
+      intro: opts.monde ? `${boss.title} barre la route, plus fort que tout ce que vous avez vu !` : `${boss.title} émerge de la faille avec une aura monumentale !`,
       lose: `${boss.title} vacille et retrouve son calme sous vos assauts coordonnés !`,
     },
   };
@@ -88,6 +91,7 @@ export class RaidCoopBattle extends CoopDojoBattle {
   constructor(o) {
     super(o);
     this.isRaid = true;
+    this.monde = !!o.foe?.monde;   // boss de raid de la région
     this.shieldMax = this.slots >= 3 ? 6 : 4;
     this.shield = {
       active: false,
@@ -155,6 +159,8 @@ export class RaidCoopBattle extends CoopDojoBattle {
     if (!pAlive.length) return out;
     const forced = this.forcedAction({ side: 1, slot: sl });
     if (forced) return out;
+    // boss de la région face à deux joueurs : sa seconde frappe ne vient qu'un tour sur deux
+    if (this.monde && this.slots < 3 && this.turn % 2 === 1) return out;
 
     const firstTarget = first?.targetSlot ?? pAlive[0];
     const altTargets = pAlive.filter((s) => s !== firstTarget);
@@ -213,7 +219,7 @@ async function offerRaidCapture(game, bossData) {
   const want = await ui.yesNo(`${bossData.boss.title} est affaibli ! Lancer une Hyper Ball pour le capturer ?`);
   if (!want) return;
   const caught = createMon(bossData.boss.sp, bossData.bossLvl, { iv: [31, 31, 31, 31, 31, 31], shiny: false });
-  caught.moves = bossData.boss.moves.filter((id) => MOVES[id]).map((id) => ({ id, pp: MOVES[id].pp, maxPp: MOVES[id].pp }));
+  caught.moves = bossData.party[0].moves.map((m) => m.id).filter((id) => MOVES[id]).map((id) => ({ id, pp: MOVES[id].pp, maxPp: MOVES[id].pp }));
   caught.ability = bossData.boss.ability || null;
   caught.ball = 'ultra-ball';
   caught.ot = st.name;
@@ -231,16 +237,22 @@ async function offerRaidCapture(game, bossData) {
   game.save(true);
 }
 
-async function runRaidBattleSession(game, { rid, bossIdx, format, rosters, mySlot, hostId, peerIds, lvl, seed }) {
+async function runRaidBattleSession(game, { rid, bossIdx, format, rosters, mySlot, hostId, peerIds, lvl, seed, monde, k, bossKey }) {
   const ui = game.ui, st = game.state, D = ensureDojo(st);
   const slots = format === 'triple' ? 3 : 2;
   const isHost = mySlot === 0;
   const ownerNames = rosters.map((r) => String(r.name || 'Dresseur').slice(0, 12));
   const { party, owners, ownerNames: sqNames } = buildCoopSquadParty(rosters);
-  const bossData = buildRaidBossChallenge(bossIdx, slots, lvl, seed);
-  const who = { speaker: 'Raid Co-op', face: 'drakos' };
+  const def = monde ? bossParId(bossKey) : null;
+  if (monde && !def) { await ui.say('Ce boss de raid est inconnu de ta version du jeu.'); return; }
+  const bossData = buildRaidBossChallenge(bossIdx, slots, lvl, seed, monde ? { def, monde: true } : {});
+  const who = { speaker: monde ? 'Boss de raid' : 'Raid Co-op', face: 'drakos' };
+  const RM = game.raidMonde;
+  if (monde && RM) { RM.compterEssai(k); game.save(true); }
 
-  await ui.say(`Alerte Antre ! ${ownerNames.join(', ')} affrontent ${bossData.name} (N.${bossData.bossLvl} · PV ×${bossData.hpMult}) !`, who);
+  await ui.say(monde
+    ? `${ownerNames.join(', ')} affrontent ${bossData.name} (N.${bossData.bossLvl} · PV ×${bossData.hpMult}) ! Essai ${RM ? RM.suivi(k).essais : 1} sur ${RAID_ESSAIS}.`
+    : `Alerte Antre ! ${ownerNames.join(', ')} affrontent ${bossData.name} (N.${bossData.bossLvl} · PV ×${bossData.hpMult}) !`, who);
 
   const battle = new RaidCoopBattle({
     squadName: ownerNames.join(' & '),
@@ -266,8 +278,8 @@ async function runRaidBattleSession(game, { rid, bossIdx, format, rosters, mySlo
     raid: true,
     preset: 'raid',
     title: bossData.boss.title,
-    sub: `Antre Dimensionnelle · N.${bossData.bossLvl}`,
-    badge: `RAID CO-OP · PV ×${bossData.hpMult}`,
+    sub: monde ? `Boss de raid · N.${bossData.bossLvl}` : `Antre Dimensionnelle · N.${bossData.bossLvl}`,
+    badge: `${monde ? 'BOSS DE RAID' : 'RAID CO-OP'} · PV ×${bossData.hpMult}`,
     duration: 5.6,
   });
   const curtain = await game.encounterIntro('raidBoss');
@@ -289,7 +301,24 @@ async function runRaidBattleSession(game, { rid, bossIdx, format, rosters, mySlo
   game.sound.current = null;
   game.updateZone();
 
-  if (res === 'win') {
+  if (res === 'win' && monde) {
+    RM?.marquerVaincu(k);
+    D.pdj += def.legend ? 15 : 10;
+    game.give('rare-candy', 3);
+    game.give(def.legend ? 'master-ball' : 'ultra-ball', def.legend ? 1 : 5);
+    game.sound.sfx('item');
+    game.save(true);
+    await ui.say([
+      `${bossData.name} est vaincu !`,
+      `Tu remportes ${def.legend ? 15 : 10} PDj, 3 Super Bonbons et ${def.legend ? 'une Master Ball' : '5 Hyper Balls'} !`,
+    ], who);
+    if (!def.legend) await offerRaidCapture(game, bossData);
+  } else if (monde) {
+    const reste = RM ? RM.essaisRestants(k) : 0;
+    await ui.say(reste > 0
+      ? [`${bossData.name} tient bon…`, `Il te reste ${reste} essai${reste > 1 ? 's' : ''}. Soignez-vous et retentez votre chance avant qu'il reparte !`]
+      : [`${bossData.name} tient bon…`, 'Tu as utilisé tes 5 essais pour ce boss. Il faudra attendre le prochain !'], who);
+  } else if (res === 'win') {
     D.pdj += 5;
     game.give('rare-candy', 2);
     game.sound.sfx('item');
@@ -304,70 +333,51 @@ async function runRaidBattleSession(game, { rid, bossIdx, format, rosters, mySlo
   }
 }
 
-/** Lance un Raid de Boss Co-op (strictement multijoueur : 2 ou 3 joueurs) */
-export async function lancerRaidCoop(game, prePeer = null) {
-  const st = game.state, ui = game.ui, link = game.link;
-  const who = { speaker: 'Antre de Raid', face: 'drakos' };
-  const healthy = st.party.filter((m) => m && m.hp > 0).length;
-  if (healthy < 2) {
-    await ui.say('Il te faut au moins 2 Pokémon en forme (1 titulaire + 1 remplaçant) pour entrer dans un Raid !', who);
+/** Boss de raid de la région (raid-monde.js) : le joueur l'aborde ; tous les joueurs connectés doivent être là
+ *  (deux autres au plus : le raid se joue à 2 ou 3). Niveau du boss : moyenne des niveaux max des participants + 15. */
+export async function lancerRaidMonde(game, R) {
+  const st = game.state, ui = game.ui, link = game.link, RM = game.raidMonde;
+  const who = { speaker: 'Boss de raid', face: 'drakos' };
+  const def = R.boss;
+  const reste = RM.essaisRestants(R.k);
+  const restant = Math.max(1, Math.round((R.fin - Date.now()) / 60e3));
+  if (reste <= 0) { await ui.say([`${def.title} te toise.`, 'Tu as déjà utilisé tes 5 essais contre ce boss. Le prochain viendra !'], who); return; }
+  if (st.party.filter((m) => m && m.hp > 0).length < 2) { await ui.say([`${def.title} te toise.`, 'Il te faut au moins 2 Pokémon en forme pour l\'affronter.'], who); return; }
+  const tous = link?.enabled ? [...link.others.values()] : [];
+  const besoin = Math.min(2, tous.length);
+  if (besoin < 1) { await ui.say([`${def.title} te toise.`, 'Un boss de raid se combat à plusieurs : il faut au moins un autre joueur connecté.'], who); return; }
+  const me = game.player;
+  const proches = tous.filter((p) => p.map === 'monde' && Math.abs(p.x - me.x) + Math.abs(p.y - me.y) <= RAID_PORTEE && !p.busy && !p.pvp);
+  if (proches.length < besoin) {
+    const loin = tous.filter((p) => !proches.includes(p)).map((p) => p.name || 'Dresseur');
+    await ui.say([
+      `${def.title} te toise. (Il repart dans ${restant} min.)`,
+      `Tout le monde doit être là pour lancer le raid : ${proches.length + 1}/${besoin + 1} joueurs près du boss.`,
+      ...(loin.length ? [`Encore loin ou occupés : ${loin.join(', ')}.`] : []),
+    ], who);
     return;
   }
-  const allConnected = link?.enabled ? [...link.others.values()] : [];
-  const freePeers = allConnected.filter((p) => !p.busy && !p.pvp);
-  if (freePeers.length < 1) {
-    await ui.say(['Les Raids de Boss sont exclusivement multijoueurs !', 'Connecte 1 ou 2 amis via Amis / Connexion (F3) avant de lancer l\'assaut.'], who);
-    return;
-  }
-
-  const fmtChoice = await ui.ask('Quel format de Raid Co-op lancer ?', ['Raid Duo (2 joueurs vs Boss)', 'Raid Trio (3 joueurs vs Boss)', 'Annuler'], who);
-  if (fmtChoice !== 0 && fmtChoice !== 1) return;
-  const format = fmtChoice === 1 ? 'triple' : 'double';
-  const neededPeers = format === 'triple' ? 2 : 1;
-  if (freePeers.length < neededPeers) {
-    await ui.say(`Il faut ${neededPeers} allié${neededPeers > 1 ? 's' : ''} libre${neededPeers > 1 ? 's' : ''} connecté${neededPeers > 1 ? 's' : ''} pour ce format (${freePeers.length} disponible${freePeers.length > 1 ? 's' : ''}).`, who);
-    return;
-  }
-
-  const bossIdx = await ui.list({
-    title: 'Choisir le Boss du Raid Co-op',
-    items: RAID_BOSSES.map((b) => {
-      const sp = SPECIES[b.sp];
-      const typesTxt = (sp?.t || []).map((t) => TYPE_FR[t] || t).join(' / ');
-      const caught = st.dex?.caught?.includes(b.sp) ? '✓ ' : '';
-      return { label: `${caught}${b.title}`, right: `${typesTxt} · ${b.legend ? 'Légendaire' : 'Alpha'}` };
-    }).concat([{ label: 'Annuler' }]),
-    cls: 'shop',
-    cancel: RAID_BOSSES.length,
-  });
-  if (bossIdx < 0 || bossIdx >= RAID_BOSSES.length) return;
-
-  let selectedPeers;
-  if (prePeer && neededPeers === 1 && !prePeer.busy && !prePeer.pvp) {
-    selectedPeers = [prePeer];
-  } else {
-    selectedPeers = await selectPeersForRoom(ui, freePeers, neededPeers, 'Choisir l\'allié de Raid');
-  }
-  if (!selectedPeers) return;
-
+  const ok = await ui.yesNo(`${def.title} (${R.nom}) · essais restants : ${reste}/${RAID_ESSAIS}. Lancer le raid ?`, who);
+  if (!ok) return;
+  const choisis = proches.length === besoin ? proches : await selectPeersForRoom(ui, proches, besoin, 'Avec qui lancer le raid');
+  if (!choisis) return;
+  const format = besoin === 2 ? 'triple' : 'double';
   const rid = newId();
-  const lvl = Math.max(55, ...st.party.map((m) => m.lvl || 55));
-  const peerIds = selectedPeers.map((p) => p.id);
-  for (const p of selectedPeers) {
-    link.send(p.id, { t: 'req', rid, kind: 'raid', format, bossIdx, name: st.name, lvl });
-  }
+  const peerIds = choisis.map((p) => p.id);
+  for (const p of choisis) link.send(p.id, { t: 'req', rid, kind: 'raid', monde: true, k: R.k, bossKey: def.id, format, name: st.name, cap: game.levelCap() });
 
   const box = ui.dialogBox();
-  ui.typePage(box, `Invitation Raid envoyée à ${selectedPeers.map((p) => p.name).join(' et ')}… (Échap : annuler)`, { last: true });
+  ui.typePage(box, `Appel au raid envoyé à ${choisis.map((p) => p.name).join(' et ')}… (Échap : annuler)`, { last: true });
   await wait(30);
-  const pop = game.input.push((k) => { if (k === 'b' || k === 'cancel') for (const pid of peerIds) link.abort(pid); });
-  const reps = await Promise.all(selectedPeers.map((p) => link.wait(p.id, (m) => m.t === 'raid-rep' && m.rid === rid, 30000).then((m) => ({ peer: p, m }))));
+  const pop = game.input.push((key) => { if (key === 'b' || key === 'cancel') for (const pid of peerIds) link.abort(pid); });
+  const reps = await Promise.all(choisis.map((p) => link.wait(p.id, (m) => m.t === 'raid-rep' && m.rid === rid, 30000).then((m) => ({ peer: p, m }))));
   pop();
   ui.closeDialog();
-
-  if (!reps.every(({ m }) => m.t === 'raid-rep' && m.ok)) {
+  const refus = reps.filter(({ m }) => !(m.t === 'raid-rep' && m.ok));
+  if (refus.length) {
     for (const pid of peerIds) link.send(pid, { t: 'raid-cancel', rid });
-    await ui.say('Un allié n\'a pas pu rejoindre le Raid Co-op.', who);
+    const pourquoi = { essais: 'n\'a plus d\'essai', vaincu: 'a déjà vaincu ce boss', nomon: 'n\'a pas 2 Pokémon en forme', busy: 'est occupé' };
+    await ui.say(refus.map(({ peer, m }) => `${peer.name || 'Un allié'} ${pourquoi[m.why] || 'a refusé'}.`), who);
     return;
   }
 
@@ -375,33 +385,25 @@ export async function lancerRaidCoop(game, prePeer = null) {
   game.session = rid;
   try {
     const myMons = await pickDojoPair(game, who);
-    if (!myMons) {
-      for (const pid of peerIds) link.send(pid, { t: 'raid-cancel', rid });
-      await ui.say('Raid annulé.', who);
-      return;
-    }
+    if (!myMons) { for (const pid of peerIds) link.send(pid, { t: 'raid-cancel', rid }); await ui.say('Raid annulé.', who); return; }
     const peerRes = await hostWaitAll(
       game, peerIds,
       (pid) => (q) => q.t === 'raid' && q.rid === rid && (q.step === 'roster' || q.step === 'quit'),
-      `En attente de l'équipe de ${selectedPeers.map((p) => p.name).join(' et ')}…`
+      `En attente de l'équipe de ${choisis.map((p) => p.name).join(' et ')}…`
     );
     if (peerRes.some(({ m }) => m.t !== 'raid' || m.step !== 'roster' || !Array.isArray(m.mons) || m.mons.length < 2 || !m.mons.every(validMon))) {
       for (const pid of peerIds) link.send(pid, { t: 'raid-cancel', rid });
-      await ui.say('Le Raid a été annulé avant le début.', who);
+      await ui.say('Le raid a été annulé avant le début.', who);
       return;
     }
-    const finalLvl = Math.max(lvl, ...reps.map(({ m }) => m.lvl || 55));
+    const lvl = niveauBoss([game.levelCap(), ...reps.map(({ m }) => Math.max(5, Math.min(100, m.cap | 0 || game.levelCap())))], def);
     const rosters = [
       { slot: 0, id: link.myId, name: st.name, hasMega: !!st.bag[MEGA_RING], mons: myMons },
-      ...peerRes.map(({ pid, m }, idx) => ({
-        slot: idx + 1, id: pid, name: String(m.name || selectedPeers[idx].name).slice(0, 12), hasMega: !!m.hasMega, mons: m.mons.slice(0, 2),
-      })),
+      ...peerRes.map(({ pid, m }, idx) => ({ slot: idx + 1, id: pid, name: String(m.name || choisis[idx].name).slice(0, 12), hasMega: !!m.hasMega, mons: m.mons.slice(0, 2) })),
     ];
     const seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
-    peerIds.forEach((pid, idx) => {
-      link.send(pid, { t: 'raid', rid, step: 'start', bossIdx, format, rosters, mySlot: idx + 1, hostId: link.myId, lvl: finalLvl, seed });
-    });
-    await runRaidBattleSession(game, { rid, bossIdx, format, rosters, mySlot: 0, hostId: link.myId, peerIds, lvl: finalLvl, seed });
+    peerIds.forEach((pid, idx) => link.send(pid, { t: 'raid', rid, step: 'start', bossIdx: 0, format, rosters, mySlot: idx + 1, hostId: link.myId, lvl, seed, monde: true, k: R.k, bossKey: def.id }));
+    await runRaidBattleSession(game, { rid, bossIdx: 0, format, rosters, mySlot: 0, hostId: link.myId, peerIds, lvl, seed, monde: true, k: R.k, bossKey: def.id });
   } finally {
     game.busy = false;
     game.session = null;
@@ -416,7 +418,12 @@ export async function onRaidInvite(game, from, m) {
   if (healthy < 2) { link.send(from, { t: 'raid-rep', rid: m.rid, ok: false, why: 'nomon' }); return; }
 
   const name = String(m.name || link.nameOf(from)).slice(0, 12);
-  const boss = RAID_BOSSES[(m.bossIdx | 0) % RAID_BOSSES.length] || RAID_BOSSES[0];
+  // seuls les boss de raid de la région se lancent encore (plus de raid à la demande)
+  if (!m.monde) { link.send(from, { t: 'raid-rep', rid: m.rid, ok: false, why: 'old' }); return; }
+  const RM = game.raidMonde, boss = bossParId(m.bossKey);
+  if (!boss || !RM) { link.send(from, { t: 'raid-rep', rid: m.rid, ok: false, why: 'old' }); return; }
+  if (RM.suivi(m.k).vaincu) { link.send(from, { t: 'raid-rep', rid: m.rid, ok: false, why: 'vaincu' }); return; }
+  if (RM.essaisRestants(m.k) <= 0) { link.send(from, { t: 'raid-rep', rid: m.rid, ok: false, why: 'essais' }); return; }
   game.busy = true;
   game.session = m.rid;
   try {
@@ -428,28 +435,27 @@ export async function onRaidInvite(game, from, m) {
       return r;
     });
     ui.sound.sfx('bang');
-    const yes = await ui.yesNo(`${name} t'invite dans un Raid Co-op contre ${boss.title} (${m.format === 'triple' ? '3j' : '2j'}) ! Rejoindre ?`, { speaker: name });
+    const yes = await ui.yesNo(`${name} lance le raid contre ${boss.title} (essais restants : ${RM.essaisRestants(m.k)}/${RAID_ESSAIS}) ! Y aller ?`, { speaker: name });
     if (gone) { ui.closeDialog(); await ui.say(`${name} a annulé le Raid.`); return; }
     link.abort(from);
-    const myLvl = Math.max(55, ...st.party.map((p) => p.lvl || 55));
-    link.send(from, { t: 'raid-rep', rid: m.rid, ok: yes, lvl: myLvl });
+    link.send(from, { t: 'raid-rep', rid: m.rid, ok: yes, cap: game.levelCap() });
     if (!yes) return;
 
-    const myMons = await pickDojoPair(game, { speaker: 'Antre de Raid', face: 'drakos' });
+    const myMons = await pickDojoPair(game, { speaker: 'Boss de raid', face: 'drakos' });
     if (!myMons) { link.send(from, { t: 'raid', rid: m.rid, step: 'quit', who: st.name }); return; }
     link.send(from, { t: 'raid', rid: m.rid, step: 'roster', name: st.name, hasMega: !!st.bag[MEGA_RING], mons: myMons });
 
     const startMsg = await guestWaitHost(
       game, from,
       (q) => (q.t === 'raid' && q.rid === m.rid && q.step === 'start') || (q.t === 'raid-cancel' && q.rid === m.rid),
-      `En attente du lancement du Raid par ${name}…`
+      `En attente du lancement du raid par ${name}…`
     );
     if (startMsg.t !== 'raid' || startMsg.step !== 'start') {
       if (startMsg.t === 'abort') link.send(from, { t: 'raid', rid: m.rid, step: 'quit', who: st.name });
       await ui.say('Le Raid Co-op n\'a pas démarré.');
       return;
     }
-    await runRaidBattleSession(game, { ...startMsg, rid: m.rid, hostId: from, peerIds: [] });
+    await runRaidBattleSession(game, { ...startMsg, rid: m.rid, hostId: from, peerIds: [], monde: true, k: m.k, bossKey: m.bossKey });
   } finally {
     game.busy = false;
     game.session = null;

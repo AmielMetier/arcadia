@@ -1598,6 +1598,16 @@ export class Sound {
       case 'save': [['E5', 0], ['A5', 0.1], ['E6', 0.2]].forEach(([m, d]) => P(n(m), d, 0.1, 0.08)); break;
       case 'encounter': for (let i = 0; i < 6; i++) P(n(i % 2 ? 'E6' : 'B5'), i * 0.06, 0.05, 0.08); break;
       case 'bang': P(n('E6'), 0, 0.08, 0.1); P(n('B6'), 0.08, 0.16, 0.1); break;
+      // gros « boum » (un boss de raid apparaît) : déflagration grave, grondement, retombée
+      case 'boom': {
+        this.duck(2200);
+        this.tone('noise', 2400, t, 0.12, 0.35, this.sfxBus, { filter: 'lowpass', attack: 0.002, release: 0.1 });
+        this.tone('noise', 220, t, 2.2, 0.55, this.sfxBus, { filter: 'lowpass', attack: 0.004, release: 2.0 });
+        this.tone('sine', 110, t, 1.6, 0.6, this.sfxBus, { slide: 28, attack: 0.003, release: 1.4 });
+        this.tone('triangle', 70, t + 0.05, 1.9, 0.35, this.sfxBus, { slide: 24, attack: 0.01, release: 1.7 });
+        this.tone('noise', 90, t + 0.5, 1.8, 0.2, this.sfxBus, { filter: 'lowpass', attack: 0.4, release: 1.2 });
+        break;
+      }
       case 'hit': this.tone('noise', 600, t, 0.14, 0.22, B, { filter: 'lowpass' }); P(90, 0, 0.12, 0.14, 'triangle', { slide: 40 }); break;
       case 'hitweak': this.tone('noise', 1200, t, 0.09, 0.12, B, { filter: 'lowpass' }); break;
       case 'hitstrong': this.tone('noise', 400, t, 0.24, 0.3, B, { filter: 'lowpass' }); P(70, 0, 0.2, 0.18, 'triangle', { slide: 30 }); P(n('C6'), 0, 0.05, 0.06); break;
