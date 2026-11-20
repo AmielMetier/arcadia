@@ -1,5 +1,6 @@
 // The Backrooms - Interface façon caméscope (REC, signal, bande), jumpscare et écran de fin
 import { ENTITY_IMG, ENTITY_ANIM, ENTITY_VIP } from './scene.js';
+import { BOARD_R } from '../engine/ocean.js';
 import { DEPART_T, SLIDE_T, PIPES_LEVEL, OCEAN_LEVEL, CASSETTES, NOISE, VOICE_MIN, THIRST_BLUR, INV_SIZE, HOTEL_LEVEL, MALL_LEVEL, REELS } from '../engine/sim.js';
 
 import { vault } from './vault.js';
@@ -1006,7 +1007,7 @@ export class BackroomsHUD {
         else if (sim.raft && sim.raft.seats.indexOf(P.id) === 0) text = 'Z / S · ENGINE · Q / D · STEER · F · GET OFF (NEXT TO LAND)';
         else if (sim.raft && sim.raft.seats.includes(P.id)) text = 'F · GET OFF (NEXT TO LAND)';
         else if (sim.nearCassette && sim.nearCassette(P)) text = sim.level === MALL_LEVEL ? 'PRESS F · TAKE THE FILM REEL' : sim.level === OCEAN_LEVEL ? 'PRESS F · TAKE THE FUEL CAN' : 'PRESS F · TAKE THE TAPE';
-        else if (sim.raft && Math.hypot(sim.raft.x - P.x, sim.raft.z - P.z) < 2.9) text = sim.raft.seats.indexOf(-1) < 0 ? 'THE RAFT IS FULL' : `PRESS F · BOARD THE RAFT${sim.raft.seats[0] < 0 ? ' · YOU TAKE THE HELM' : ''}`;
+        else if (sim.raft && Math.hypot(sim.raft.x - P.x, sim.raft.z - P.z) < BOARD_R) text = sim.raft.seats.indexOf(-1) < 0 ? 'THE RAFT IS FULL' : `PRESS F · BOARD THE RAFT${sim.raft.seats[0] < 0 ? ' · YOU TAKE THE HELM' : ''}`;
         else if (sim.nearBench && sim.nearBench(P)) {
           const n = sim.cassettes - (sim.delivered || 0);
           text = n > 0 ? `PRESS F · THREAD ${n > 1 ? `THE ${n} REELS` : 'THE REEL'} ON THE PROJECTOR (${sim.delivered || 0}/${REELS})` : "PRESS F · READ THE PROJECTIONIST'S LOG";

@@ -359,12 +359,12 @@ export function createBackroomsScene(container, floors, lamps) {
   // Level 1 : un froid bleuté, un brouillard plus épais ; Level 2 : une moiteur brune, chaude
   // (Level 1 : le fond a la couleur du brouillard, si épais qu'à 65 m tout s'y est fondu, même un néon allumé — à un
   // millionième près : on ne dessine rien au-delà, l'image n'en change pas d'un pixel)
-  scene.background = new THREE.Color(OCEAN ? '#04080a' : MALL ? '#0a0806' : L3 ? '#070403' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#080604' : '#0d0b06');
-  scene.fog = new THREE.FogExp2(OCEAN ? '#060b0d' : MALL ? '#0b0806' : L3 ? '#120a06' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#0a0705' : '#080604', OCEAN ? 0.03 : MALL ? 0.023 : L3 ? 0.022 : L2 ? 0.022 : L1 ? 0.058 : PIPES ? 0.033 : 0.05);
+  scene.background = new THREE.Color(OCEAN ? '#8a94a3' : MALL ? '#0a0806' : L3 ? '#070403' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#080604' : '#0d0b06');
+  scene.fog = new THREE.FogExp2(OCEAN ? '#8a94a3' : MALL ? '#0b0806' : L3 ? '#120a06' : L2 ? '#d3e4e2' : L1 ? '#050608' : PIPES ? '#0a0705' : '#080604', OCEAN ? 0.011 : MALL ? 0.023 : L3 ? 0.022 : L2 ? 0.022 : L1 ? 0.058 : PIPES ? 0.033 : 0.05);
 
   // Level 1 : le brouillard (0,058) ne laisse plus rien passer vers 40 m ; au-delà de 45 m, rien à dessiner (65 avant
   // la 5.25)
-  const camera = new THREE.PerspectiveCamera(OPTS.fov, window.innerWidth / window.innerHeight, 0.08, L1 ? 45 : MALL ? 110 : 90); // (le mall : des cours de 35 m, des mails de 50 m ; au-delà de 90 m, l'air a tout mangé)
+  const camera = new THREE.PerspectiveCamera(OPTS.fov, window.innerWidth / window.innerHeight, 0.08, L1 ? 45 : MALL ? 110 : OCEAN ? 260 : 90); // (le mall : des cours de 35 m, des mails de 50 m ; au-delà de 90 m, l'air a tout mangé)
   camera.position.set(map0.spawn.x, 1.6, map0.spawn.z);
 
   const renderer = getRenderer();
@@ -377,13 +377,13 @@ export function createBackroomsScene(container, floors, lamps) {
   const textures = createBackroomsTextures(PIPES ? 0 : map0.level || 0);
   const tx2 = PIPES ? createPipesTextures() : null;
   const mallTx = MALL ? createMallTextures() : null; // les sols, enduits et moquettes du mall (les deux étages)
-  const AMB = MALL ? 0.03 : L2 ? 0.045 : L3 ? 0.06 : 0.012; // l'hôtel : une pénombre chaude, mais on y voit (entre deux appliques, plus sombre)
-  const ambient = new THREE.AmbientLight(MALL ? '#ffe3bd' : L3 ? '#ffcf96' : L2 ? '#eaf7f6' : L1 ? '#c9d8ff' : PIPES ? '#ffd9a8' : '#fff3c4', AMB);
+  const AMB = OCEAN ? 0.7 : MALL ? 0.03 : L2 ? 0.045 : L3 ? 0.06 : 0.012; // l'hôtel : une pénombre chaude, mais on y voit (entre deux appliques, plus sombre)
+  const ambient = new THREE.AmbientLight(OCEAN ? '#b4c0cf' : MALL ? '#ffe3bd' : L3 ? '#ffcf96' : L2 ? '#eaf7f6' : L1 ? '#c9d8ff' : PIPES ? '#ffd9a8' : '#fff3c4', AMB);
   scene.add(ambient);
   const dummy = new THREE.Object3D();
   const loader = gltfLoader();
   // Poolrooms : les poissons des bassins (view/fish.js)
-  const oceanView = OCEAN ? buildOcean({ map: map0, scene }) : null; // Level 7 : l'océan, le radeau, la porte, l'ombre
+  const oceanView = OCEAN ? buildOcean({ map: map0, scene, loader }) : null; // Level 7 : l'océan, le radeau, la porte, l'ombre
   const fishView = L2 && map0.fish && map0.fish.length ? createFishView({ map: map0, scene, loader, camera, url: ENTITY_VIP ? vault.poisson || null : null, onSplash: (pos) => api.onFishSplash && api.onFishSplash(pos) }) : null;
   // le cadenas de la porte de la cage d'escalier (Quaternius, CC0) : laiton patiné, anse d'acier, 10 cm de haut
   const padlockModel = new Promise((resolve) => {
@@ -661,7 +661,7 @@ export function createBackroomsScene(container, floors, lamps) {
       uBake2: { value: bake2Tex }, // Level 17 : la lumière du haut
       uBakeScale: { value: new THREE.Vector2(1 / (W * CELL_SIZE), 1 / (H * CELL_SIZE)) },
       uBakeTX: { value: TX },
-      uBakeTint: { value: MALL ? new THREE.Color(1.1, 0.99, 0.8) : L3 ? new THREE.Color(1.2, 0.92, 0.62) : L2 ? new THREE.Color(1.0, 1.05, 1.07) : L1 ? new THREE.Color(0.86, 0.98, 1.12) : PIPES ? new THREE.Color(1.25, 0.98, 0.7) : LOW0 ? new THREE.Color(1.12, 1.04, 0.8) : new THREE.Color(1.05, 1.03, 0.83) }, // Level 0 : en haut une lumière blanche à peine chaude ; en bas, la lumière chaude d'avant
+      uBakeTint: { value: OCEAN ? new THREE.Color(0.86, 0.93, 1.05) : MALL ? new THREE.Color(1.1, 0.99, 0.8) : L3 ? new THREE.Color(1.2, 0.92, 0.62) : L2 ? new THREE.Color(1.0, 1.05, 1.07) : L1 ? new THREE.Color(0.86, 0.98, 1.12) : PIPES ? new THREE.Color(1.25, 0.98, 0.7) : LOW0 ? new THREE.Color(1.12, 1.04, 0.8) : new THREE.Color(1.05, 1.03, 0.83) }, // Level 0 : en haut une lumière blanche à peine chaude ; en bas, la lumière chaude d'avant
       uBakeTint2: { value: MALL ? new THREE.Color(0.8, 0.94, 1.08) : PIPES ? new THREE.Color(0.78, 0.95, 1.08) : L0 ? new THREE.Color(1.2, 0.72, 0.38) : new THREE.Color(0, 0, 0) }, // Level 0 : les lampadaires des recoins calmes
       uCeilB: { value: 1 }, // la part du second canal reçue par le plafond (la phase rouge : des feux qui éclairent vers le bas)
       uBakeY: { value: -fi * FLOOR_DY },
@@ -1104,7 +1104,7 @@ float occVis(vec3 p, vec3 lp) {
         for (const v of nookLamps) if (v.k > 0.01) addPrint(liveB, v.fp, v.k);
       }
       for (let i = 0; i < BW * BH; i++) {
-        const v = Math.min(1, (L2 || PIPES ? 0.03 : L3 ? 0.055 : MALL ? 0.024 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
+        const v = Math.min(1, (OCEAN ? 0.5 : L2 || PIPES ? 0.03 : L3 ? 0.055 : MALL ? 0.024 : AMBIENT) * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
         bakeData[i * 4] = Math.round(v * 255);
         if (PIPES || MALL || alarm || nookLamps.length) bakeData[i * 4 + 2] = Math.round(Math.min(1, liveB[i] * 0.3 * power) * 255);
       }
@@ -2176,7 +2176,7 @@ float bkCaust(vec2 uv, float t) {
     const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(W * CELL_SIZE, H * CELL_SIZE), ceilMat);
     ceiling.rotation.x = Math.PI / 2;
     ceiling.position.set((W * CELL_SIZE) / 2, CEIL, (H * CELL_SIZE) / 2);
-    if (!L2 && !MALL) group.add(ceiling); // Poolrooms : chaque salle a son propre plafond (voir water.js)
+    if (!L2 && !MALL && !map.outdoor) group.add(ceiling); // (Level 7 : dehors, pas de plafond) // Poolrooms : chaque salle a son propre plafond (voir water.js)
     // Level 0 : le long d'un couloir en diagonale, les dalles suivent le couloir. Une pièce de faux plafond couvre ses
     // cases pleines et la moitié libre de ses cases coupées, ses dalles tournées dans l'axe (la même texture, une
     // répétition par 2,5 m, calée sur la ligne médiane du couloir) ; le plafond droit y est découpé
@@ -2786,7 +2786,7 @@ float bkCaust(vec2 uv, float t) {
       }
     }
     // grilles d'aération du faux plafond
-    if (ceilSpots.length) {
+    if (ceilSpots.length && !map.outdoor) {
       const vm = baked(new THREE.MeshLambertMaterial({ map: textures.vent }));
       const vents = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.6, 0.6), vm, ceilSpots.length);
       ceilSpots.forEach((s, i) => {
@@ -2822,7 +2822,7 @@ float bkCaust(vec2 uv, float t) {
     // par là avant vous), et des fuites au plafond qui gouttent dans une flaque. Tirées de la carte : tout le monde les
     // voit au même endroit.
     const drips = [];
-    if (L0 && map.walkable && map.walkable.length) {
+    if (L0 && !map.outdoor && map.walkable && map.walkable.length) {
       let rs = (map.W * 7919 + (map.cassettes || []).reduce((a, c) => a + c.gx * 31 + c.gz * 17, 0) + fi * 101) >>> 0 || 1;
       const rr = () => {
         rs = (rs + 0x6d2b79f5) >>> 0;
@@ -2996,7 +2996,12 @@ float bkCaust(vec2 uv, float t) {
     const reelLabel = (tex) => reelLabels.get(tex) || reelLabels.set(tex, baked(new THREE.MeshLambertMaterial({ map: tex, emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 0.16 }))).get(tex);
     for (const cas of map.cassettes || []) {
       const cg = new THREE.Group();
-      if (cas.reel) {
+      if (cas.can) {
+        // Level 7 : un jerrican de métal (Poly Haven, CC0), posé de travers sur l'îlot
+        loader.load(modelUrl('metal_jerrycan'), (g) => cg.add(g.scene));
+        cg.position.set(cas.x, 0, cas.z);
+        cg.rotation.y = ((cas.gx * 7 + cas.gz * 13 + cas.id * 5) % 12) * 0.52;
+      } else if (cas.reel) {
         cg.add(reelCan(cas.id + 1, reelMat, reelLabel));
         const glint = new THREE.Sprite(glintMat());
         glint.scale.setScalar(0.24);

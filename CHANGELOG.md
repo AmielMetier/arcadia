@@ -2,10 +2,10 @@
 
 ## 5.125 — 19 novembre 2026
 - **The Backrooms** — Un nouveau niveau : le Level 7, Thalassophobia, au bout du toboggan bleu des Poolrooms.
-  - Un océan noir à perte de vue, sous un plafond de bureau qui ne finit jamais. Quelques îlots de bureaux à moitié engloutis dépassent de l'eau.
-  - Un radeau à moteur attend au bord. Monte dessus avec F : le premier tient la barre (Z / S pour le moteur, Q / D pour tourner). Pour descendre, il faut accoster un îlot.
+  - Une mer sans fin dans la brume du soir, qui reflète le ciel. Quelques îlots de sable et de rochers en sortent ; sur l'un d'eux, l'épave d'un grand voilier échoué.
+  - Une barque en bois à moteur attend au ponton. Monte dedans avec F : le premier tient la barre (Z / S pour le moteur, Q / D pour tourner). Pour descendre, il faut accoster un îlot.
   - Trois bidons d'essence sont cachés sur les îlots : le moteur en boit, et sans eux on n'ira pas loin. Tout au bout, une simple porte plantée sur un dernier îlot : la sortie.
-  - Quelque chose d'immense vit sous la surface et entend le moteur. Le sonar dit quand ça approche : coupe le moteur et laisse-le passer. S'il atteint le radeau en marche, il emporte quelqu'un. Et ne traîne pas au bord de l'eau.
+  - Quelque chose d'immense vit sous la surface et entend le moteur. Le sonar dit quand ça approche : coupe le moteur et laisse-le passer. S'il atteint la barque en marche, il emporte quelqu'un. Et ne traîne pas au bord de l'eau.
 
 ## 5.124 — 19 novembre 2026
 - **Odyssée** — Graphismes Noir & Blanc :

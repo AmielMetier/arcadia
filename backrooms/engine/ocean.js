@@ -1,16 +1,17 @@
-// The Backrooms (Level 7) - « Thalassophobia » : un océan sans fin sous un plafond de bureau, au bout du toboggan
-// bleu des Poolrooms. On arrive sur un îlot de bureaux à moitié engloutis, avec un radeau à moteur amarré. Quelques
-// îlots semblables dépassent de l'eau au loin ; sur trois d'entre eux, un bidon d'essence. Tout au bout, une porte
-// ordinaire plantée sur un dernier îlot : la sortie.
-// Le radeau : F tout près pour monter (le premier à bord tient la barre), ZQSD à la barre pour avancer et tourner, F à
+// The Backrooms (Level 7) - « Thalassophobia » : une mer sans fin dans la brume, au bout du toboggan bleu des
+// Poolrooms. On arrive sur un îlot de roches et de sable, une barque à moteur amarrée au ponton. D'autres îlots
+// sortent de la brume au loin ; sur trois d'entre eux, un bidon d'essence ; sur un autre, l'épave d'un navire. Tout
+// au bout, une porte ordinaire plantée sur un dernier îlot : la sortie.
+// La barque (le « radeau » du code) : F tout près pour monter (le premier à bord tient la barre), ZQSD à la barre pour avancer et tourner, F à
 // bord pour descendre sur la terre la plus proche (il faut être à quai). Le moteur boit l'essence : de quoi atteindre
 // le premier îlot au départ, chaque bidon en rajoute.
 // Sous la surface, quelque chose d'immense (le monstre du moteur, sim.monster, mais qui ne quitte jamais l'eau) : il
 // entend le moteur de loin et fond sur le radeau. Couper le moteur (lâcher la barre) : il passe dessous, tourne, et
 // s'en va. S'il atteint le radeau en marche, il emporte quelqu'un par le fond ; il guette aussi les bords des îlots.
-// Le sonar (HUD) montre où il est. Même forme de carte que le Level 0 (grid, cassettes, lights…) : la scène la dessine
-// comme les bureaux, sans moquette là où il y a de l'eau (map.seaHoles), sous la nappe de view/ocean.js.
-import { CELL_SIZE, T, bfs, blocks, itemList, shuffle, PROP_KINDS, WALL_HEIGHT } from './map.js';
+// Le sonar (HUD) montre où il est. Même forme de carte que le Level 0 (grid, cassettes, props…) : la scène n'en garde
+// que les objets (map.outdoor : ni sol, ni plafond, ni néons) ; la mer, le ciel, les îlots et la barque sont dans
+// view/ocean.js.
+import { CELL_SIZE, T, bfs, blocks, itemList, shuffle, WALL_HEIGHT } from './map.js';
 
 // numéro interne de ce niveau (affiché « Level 7 ») : après les Poolrooms, par le toboggan bleu
 export const OCEAN_LEVEL = 6;
@@ -19,20 +20,20 @@ export const CANS = 3;
 export const SEA_Y = -0.42; // la surface de l'eau, sous le niveau des îlots (le plancher des bureaux, à 0)
 export const DECK = 0.12; // la profondeur des pieds de ceux qui sont à bord, sous le plancher (depthAt)
 // le radeau : demi-largeur et demi-longueur (m), vitesses (m/s, rad/s), essence (part du réservoir par mètre)
-export const RAFT = { hw: 1.15, hl: 1.7, speed: 3.4, back: 1.2, turn: 0.75, accel: 1.4, drag: 0.9 };
+export const RAFT = { hw: 0.85, hl: 2.1, speed: 3.4, back: 1.2, turn: 0.75, accel: 1.4, drag: 0.9 };
 export const FUEL_START = 0.32;
 export const FUEL_CAN = 0.38;
 export const FUEL_PER_M = 1 / 210;
-export const BOARD_R = 2.9; // m du centre du radeau : on peut monter
+export const BOARD_R = 3.3; // m du centre de la barque : on peut monter (de son arrière, au bord de l'îlot)
 export const LAND_R = 3.4; // m : à bord, la terre la plus proche où descendre
 // les places à bord (repère du radeau : x à droite, z vers l'avant) ; la première tient la barre, à l'arrière
 export const SEATS = [
-  { x: 0, z: -1.25 },
-  { x: -0.55, z: -0.25 },
-  { x: 0.55, z: -0.25 },
-  { x: -0.55, z: 0.6 },
-  { x: 0.55, z: 0.6 },
-  { x: 0, z: 1.3 },
+  { x: 0, z: -1.45 },
+  { x: -0.32, z: -0.55 },
+  { x: 0.32, z: -0.55 },
+  { x: -0.32, z: 0.35 },
+  { x: 0.32, z: 0.35 },
+  { x: 0, z: 1.15 },
 ];
 // la chose sous l'eau
 export const LEVI = { hear: 75, roam: 2.2, hunt: 5.6, strike: 4.6, shore: 2.6, lose: 3.5, rest: 22, away: 48 };
@@ -54,10 +55,6 @@ export function createOceanMap(seed = 7) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
   const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
-  for (let i = 0; i < W; i++) {
-    grid[i] = grid[(H - 1) * W + i] = T.WALL;
-    grid[i * W] = grid[i * W + W - 1] = T.WALL;
-  }
   const cellPos = (c) => ({ x: (c.x + 0.5) * C, z: (c.z + 0.5) * C, gx: c.x, gz: c.z });
 
   // 1. Les îlots : le départ au sud, la porte au nord, trois îlots à bidon entre les deux, et quelques îlots vides
@@ -96,7 +93,9 @@ export function createOceanMap(seed = 7) {
     n++;
   }
 
-  // 2. Sur les îlots : des cloisons de bureau (une ou deux cases de mur), sans couper l'îlot en deux
+  // 2. L'épave : sur le plus grand des îlots vides, un navire échoué (le décor ; on n'y monte pas)
+  const empties = islets.filter((o) => o.kind === 'empty').sort((a, b) => b.w * b.h - a.w * a.h);
+  if (empties.length) empties[0].kind = 'wreck';
   const isLand = (x, z) => x >= 0 && z >= 0 && x < W && z < H && !sea[z * W + x];
   const landOf = (o) => {
     const out = [];
@@ -121,23 +120,6 @@ export function createOceanMap(seed = 7) {
     }
     return seen.size === cells.length;
   };
-  for (const o of islets) {
-    if (o.kind === 'door' || o.w * o.h < 16) continue;
-    const want = o.kind === 'start' ? 1 : 2 + Math.floor(rnd() * 2);
-    for (let n = 0, k = 0; n < want && k < 30; k++) {
-      const x = o.x0 + 1 + Math.floor(rnd() * (o.w - 2));
-      const z = o.z0 + 1 + Math.floor(rnd() * (o.h - 2));
-      const i = z * W + x;
-      if (grid[i] !== T.FLOOR) continue;
-      grid[i] = T.WALL;
-      if (!connected(o)) {
-        grid[i] = T.FLOOR;
-        continue;
-      }
-      n++;
-    }
-  }
-
   // 3. Le départ, la porte, les bidons (sur chaque îlot à bidon, la case la plus loin de son bord), l'amarrage du radeau
   const spawn = cellPos({ x: start.x0 + Math.floor(start.w / 2), z: start.z0 + Math.floor(start.h / 2) });
   const exit = { x: door.cx, z: door.cz, gx: Math.floor(door.cx / C), gz: Math.floor(door.cz / C), door: true };
@@ -154,25 +136,32 @@ export function createOceanMap(seed = 7) {
   // le radeau attend au nord de l'îlot de départ, le nez vers le large
   const raft0 = { x: spawn.x, z: start.z0 * C - RAFT.hl - 0.3, yaw: Math.PI };
 
-  // 4. Lumière : des dalles de néon au plafond partout, au-dessus de l'eau comme des îlots ; la plupart éteintes au large
+  // 4. Pas de néons : on est dehors (la lumière vient du ciel, view/ocean.js). Des bouées au large de chaque îlot à
+  // bidon (des repères dans la brume), et une balise à mi-chemin de la porte
   const lights = [];
-  for (let z = 2; z < H - 2; z += 3) {
-    for (let x = 2; x < W - 2; x += 3) {
-      const land = isLand(x, z);
-      const r = rnd();
-      if (!land && r < 0.55) continue;
-      const state = land ? (r < 0.15 ? 'flicker' : 'on') : r < 0.8 ? 'off' : r < 0.9 ? 'flicker' : 'on';
-      if (grid[z * W + x] !== T.FLOOR) continue;
-      lights.push({ x: (x + 0.5) * C, z: (z + 0.5) * C, gx: x, gz: z, state, flicker: state === 'flicker' });
-    }
+  const buoys = [];
+  for (const o of canIslets) {
+    const a = rnd() * Math.PI * 2;
+    const r = Math.max(o.w, o.h) * C * 0.5 + 6;
+    const x = o.cx + Math.cos(a) * r;
+    const z = o.cz + Math.sin(a) * r;
+    buoys.push({ x, z, kind: 'ocean_buoy' });
   }
+  buoys.push({ x: (spawn.x + door.cx) / 2 + (rnd() - 0.5) * 20, z: (spawn.z + door.cz) / 2, kind: 'lateral_sea_marker' });
 
-  // 5. Les meubles de bureau sur les îlots (au bord de l'eau, des chaises renversées), l'eau d'amande et les piles
+  // 5. Ce que la mer a laissé sur les îlots (caisses, tonneaux, une bouée, une lanterne), l'eau d'amande et les piles
   const props = [];
   const busy = new Set(cassettes.map((c) => c.gz * W + c.gx));
   busy.add(spawn.gz * W + spawn.gx);
-  const kinds = PROP_KINDS.filter((k) => /desk|chair|box|cabinet|Sofa|School/i.test(k.m));
+  const kinds = [
+    { m: 'wooden_crate_01', h: 0.62, r: 0.38 },
+    { m: 'wooden_crate_02', h: 0.5, r: 0.45 },
+    { m: 'Barrel_01', h: 0.9, r: 0.3 },
+    { m: 'lifebuoy', h: 0.12, r: 0.36, walk: true },
+    { m: 'wooden_lantern_01', h: 0.45, r: 0.15 },
+  ];
   for (const o of islets) {
+    if (o.kind === 'wreck') continue;
     for (const c of shuffle(landOf(o), rnd).slice(0, Math.max(1, Math.floor((o.w * o.h) / 7)))) {
       const k = c.z * W + c.x;
       if (busy.has(k) || !kinds.length) continue;
@@ -182,7 +171,7 @@ export function createOceanMap(seed = 7) {
     }
   }
   const landCells = [];
-  for (const o of islets) if (o.kind !== 'door') for (const c of landOf(o)) if (!busy.has(c.z * W + c.x)) landCells.push(c);
+  for (const o of islets) if (o.kind !== 'door' && o.kind !== 'wreck') for (const c of landOf(o)) if (!busy.has(c.z * W + c.x)) landCells.push(c);
   const scatter = (n) => shuffle(landCells.slice(), rnd).slice(0, n).map((c, i) => {
     busy.add(c.z * W + c.x);
     return { id: i, ...cellPos(c), taken: false };
@@ -195,21 +184,8 @@ export function createOceanMap(seed = 7) {
   for (let z = 4; z < H - 4; z++) for (let x = 4; x < W - 4; x++) if (sea[z * W + x] && Math.hypot((x + 0.5) * C - spawn.x, (z + 0.5) * C - spawn.z) > 70) deep.push({ x, z });
   const monsterSpawn = cellPos(pick(deep));
 
-  // la moquette ôtée là où il y a de l'eau (le masque du sol, scene.js) ; une bande par ligne d'eau continue
-  const seaHoles = [];
-  for (let z = 0; z < H; z++) {
-    let x = 0;
-    while (x < W) {
-      if (!sea[z * W + x]) {
-        x++;
-        continue;
-      }
-      let e = x;
-      while (e < W && sea[z * W + e]) e++;
-      seaHoles.push({ x: ((x + e) / 2) * C, z: (z + 0.5) * C, hx: ((e - x) / 2) * C, hz: C / 2 });
-      x = e;
-    }
-  }
+  // dehors : pas de moquette du tout (le masque du sol de scene.js ôte toute la carte ; les îlots ont leur sol, view/ocean.js)
+  const seaHoles = [{ x: (W / 2) * C, z: (H / 2) * C, hx: (W / 2) * C, hz: (H / 2) * C }];
 
   const walkable = [];
   for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) if (grid[z * W + x] === T.FLOOR) walkable.push({ x, z });
@@ -229,6 +205,8 @@ export function createOceanMap(seed = 7) {
     sea,
     islets,
     seaHoles,
+    buoys,
+    outdoor: true,
     walkable,
     spawn,
     exit,
@@ -249,9 +227,11 @@ export function createOceanMap(seed = 7) {
     pillars: {},
     inSea,
     // à pied, on ne va pas dans l'eau (ni l'entité du Level 0, qui ne vit pas ici)
+    // (ni sur l'îlot de l'épave : le navire couché le couvre en entier)
     collide(x, z, r) {
       for (const [dx, dz] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]) if (inSea(x + dx, z + dz)) return true;
-      return false;
+      const wk = islets.find((o) => o.kind === 'wreck');
+      return !!wk && x > wk.x0 * C - r && x < (wk.x0 + wk.w) * C + r && z > wk.z0 * C - r && z < (wk.z0 + wk.h) * C + r;
     },
     // à bord du radeau, les pieds un peu sous le plancher des îlots (scene.js en descend l'œil)
     depthAt(x, z) {
@@ -282,6 +262,7 @@ export function seatPos(R, i) {
 }
 // le radeau tient-il là ? (toute sa coque sur l'eau)
 function raftFits(map, x, z, yaw) {
+  if (x < 2 * C || z < 2 * C || x > (map.W - 2) * C || z > (map.H - 2) * C) return false; // (le bord du monde)
   const c = Math.cos(yaw);
   const n = Math.sin(yaw);
   for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, 1], [0, -1], [1, 0], [-1, 0]]) {
