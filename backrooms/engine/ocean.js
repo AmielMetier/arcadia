@@ -77,8 +77,8 @@ export function createOceanMap(seed = 7) {
   const canIslets = [];
   for (const [a, b] of bands) {
     for (let k = 0; k < 200; k++) {
-      const w = 4 + Math.floor(rnd() * 2);
-      const h = 4 + Math.floor(rnd() * 2);
+      const w = 4 + Math.floor(rnd() * 3);
+      const h = 4 + Math.floor(rnd() * 3);
       const x0 = a + Math.floor(rnd() * Math.max(1, b - a - w));
       const z0 = 14 + Math.floor(rnd() * 30);
       if (!fits(x0, z0, w, h, 7)) continue;
@@ -101,6 +101,9 @@ export function createOceanMap(seed = 7) {
     o.tilt = { x: (rnd() - 0.5) * 0.5, z: (rnd() < 0.5 ? -1 : 1) * (0.15 + rnd() * 0.25), sink: 0.8 + rnd() * 1.4, yaw: rnd() * Math.PI * 2 };
     n++;
   }
+  // l'allure de chaque maison (tirée de la graine : la même chez tous) : la couleur du bardage, le toit (deux pentes ou
+  // un seul pan), une cheminée, des volets, une rambarde au ponton
+  for (const o of islets) o.style = { tint: Math.floor(rnd() * 5), roof: rnd() < 0.7 ? 'gable' : 'shed', chimney: rnd() < 0.55, shutters: rnd() < 0.5, rail: rnd() < 0.6, flip: rnd() < 0.5 };
   // 2. L'épave : à la place de la plus grande des maisons qui sombrent, un navire échoué (le décor ; on n'y monte pas)
   const sunk = islets.filter((o) => o.kind === 'sunk').sort((a, b) => b.w * b.h - a.w * a.h);
   if (sunk.length) sunk[0].kind = 'wreck';
@@ -137,7 +140,7 @@ export function createOceanMap(seed = 7) {
     const Z0 = hz0 * C + WALL_T / 2;
     const X1 = hx1 * C - WALL_T / 2;
     const Z1 = hz1 * C - WALL_T / 2;
-    const hs = { o, X0, Z0, X1, Z1, side: o.side, segs: [] };
+    const hs = { o, X0, Z0, X1, Z1, side: o.side, segs: [], style: o.style };
     const seg = (ax, az, bx, bz, ext, open) => {
       hs.segs.push({ ax, az, bx, bz, ext, open });
       solid(ax, az, bx, bz, open);
@@ -165,9 +168,26 @@ export function createOceanMap(seed = 7) {
     const pat = plen * (rnd() < 0.5 ? 0.25 : 0.75);
     if (across) seg(X0, mid, X1, mid, false, [{ at: pat, w: 1.0, kind: 'door' }]);
     else seg(mid, Z0, mid, Z1, false, [{ at: pat, w: 1.0, kind: 'door' }]);
-    // les deux pièces : celle de l'entrée, celle du fond (rectangles x0, z0, x1, z1)
+    // les pièces : celle de l'entrée, celle du fond (rectangles x0, z0, x1, z1) ; dans une grande maison, le fond est
+    // coupé en deux par une seconde cloison (sa porte au milieu), et le bidon est dans l'une des deux
     hs.front = { n: [X0, Z0, X1, mid], s: [X0, mid, X1, Z1], w: [X0, Z0, mid, Z1], e: [mid, Z0, X1, Z1] }[o.side];
-    hs.back = { n: [X0, mid, X1, Z1], s: [X0, Z0, X1, mid], w: [mid, Z0, X1, Z1], e: [X0, Z0, mid, Z1] }[o.side];
+    const bk = { n: [X0, mid, X1, Z1], s: [X0, Z0, X1, mid], w: [mid, Z0, X1, Z1], e: [X0, Z0, mid, Z1] }[o.side];
+    hs.rooms = [hs.front];
+    hs.back = bk;
+    if (plen >= 7 && rnd() < 0.85) {
+      // loin de la porte de la première cloison (au quart ou aux trois quarts)
+      const f = pat / plen < 0.5 ? 0.52 + rnd() * 0.1 : 0.38 + rnd() * 0.1;
+      if (across) {
+        const xm = X0 + plen * f;
+        seg(xm, bk[1], xm, bk[3], false, [{ at: (bk[3] - bk[1]) / 2, w: 1.0, kind: 'door' }]);
+        hs.rooms.push([bk[0], bk[1], xm, bk[3]], [xm, bk[1], bk[2], bk[3]]);
+      } else {
+        const zm = Z0 + plen * f;
+        seg(bk[0], zm, bk[2], zm, false, [{ at: (bk[2] - bk[0]) / 2, w: 1.0, kind: 'door' }]);
+        hs.rooms.push([bk[0], bk[1], bk[2], zm], [bk[0], zm, bk[2], bk[3]]);
+      }
+      hs.back = hs.rooms[1 + Math.floor(rnd() * 2)];
+    } else hs.rooms.push(bk);
     // le ponton : la rangée de cases devant l'entrée
     hs.porch = { x0: o.x0 * C, z0: o.z0 * C, x1: (o.x0 + o.w) * C, z1: (o.z0 + o.h) * C, side: o.side };
     o.house = hs;
@@ -223,7 +243,7 @@ export function createOceanMap(seed = 7) {
     return { x: sg.ax + ((sg.bx - sg.ax) / len) * q.at, z: sg.az + ((sg.bz - sg.az) / len) * q.at };
   };
   for (const hs of houses) {
-    for (const room of [hs.front, hs.back]) {
+    for (const room of hs.rooms) {
       const want = 2 + Math.floor(rnd() * 2);
       for (let n = 0, k = 0; n < want && k < 30; k++) {
         const kd = pick(FURN);
@@ -257,7 +277,7 @@ export function createOceanMap(seed = 7) {
     const out = [];
     for (let k = 0; k < 400 && out.length < n; k++) {
       const hs = pick(houses);
-      const p = inRoom(rnd() < 0.5 ? hs.front : hs.back, 0.7);
+      const p = inRoom(pick(hs.rooms), 0.7);
       if (!free(p.x, p.z, 0.3)) continue;
       taken.push({ x: p.x, z: p.z, r: 0.2 });
       out.push({ id: out.length, x: p.x, z: p.z, gx: Math.floor(p.x / C), gz: Math.floor(p.z / C), taken: false });
