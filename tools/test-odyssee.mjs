@@ -198,6 +198,7 @@ for (const it of W.items) ok(reachable(W, seenW, it.x, it.y), `objet ${it.item} 
 // intérieurs : chaque tapis ramène dehors, chaque PNJ est atteignable depuis l'entrée
 for (const [id, m] of Object.entries(maps)) {
   if (id === 'monde') continue;
+  if (m.donjon && !m.warps.size) continue;   // salles de donjon reliées par leurs mécanismes : tools/test-odyssee-donjons.mjs
   const entries = [...m.warps.keys()].map((k) => k.split(',').map(Number));
   ok(entries.length > 0, `${id} a une sortie`);
   const [ex, ey] = entries[0];

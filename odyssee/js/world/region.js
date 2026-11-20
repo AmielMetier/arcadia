@@ -16,6 +16,7 @@ import { addStory } from './story.js';
 import { enrichirTout, equipeDeType, poserTroncons, restaurerTables } from './rencontres.js';
 import { addHabitants } from './habitants.js';
 import { applyRetouches } from './retouches.js';
+import { poserDonjons } from '../donjons/index.js';
 import { redresserPonts } from './ponts.js';
 import { rangs, mers, tourbillonsDuBord, rendreALaForet, degager, oterDecorIsole } from './acces.js';
 import { appliquerBareme } from './bareme.js';
@@ -1465,6 +1466,9 @@ export function buildWorld() {
     W.cachettes = cachettesDesVilles(W, towns, RG.get('monde')); }
   // retouches faites dans l'éditeur de la version test et intégrées au jeu (world/retouches.js)
   applyRetouches(maps);
+  // les donjons à plusieurs (donjons/index.js) : Crypte des Murmures (Route 2), Sanctuaire des Trois Voies et Donjon
+  // des Miroirs (Route 3), posés une fois tout le reste fait
+  W.donjons = poserDonjons(W, maps, routes); W.crypte = W.donjons.crypte;
   // cartes disparues (lieux désormais posés sur la carte du monde) : une ancienne partie qui y était reprend ici
   const moved = { torii: { map: 'monde', x: 222 + TORII.dx, y: 193 + TORII.dy, dir: 'up' } };
   // rencontres par tronçons (world/rencontres.js)
