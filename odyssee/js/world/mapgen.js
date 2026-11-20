@@ -77,6 +77,9 @@ export const GRAND = {
  *  l'on marche devant elle. Appliqué à tout bâtiment posé avec ce modèle et cette emprise (villes, lieux, éditeur), même
  *  quand la définition donne une autre porte : sinon la porte du jeu tombe au milieu de la terrasse du dessin. */
 export const OUVERTS = {
+  // donjons à plusieurs (donjons/) : le sanctuaire des Trois Voies et le palais des Miroirs, marches devant la porte
+  voiesSanctuaire: { w: 9, d: 7, door: 4, porteY: 4, libres: [[3, 5], [4, 5], [5, 5], [3, 6], [4, 6], [5, 6]] },
+  templeMiroirs: { w: 11, d: 7, door: 5, porteY: 4, libres: [[4, 5], [5, 5], [6, 5], [4, 6], [5, 6], [6, 6]] },
   maisonL: GRAND.maisonL,
   // chalet : le balcon de l'étage avance au-dessus de la dernière rangée, sur deux poteaux aux coins
   chalet: { w: 5, d: 5, door: 1, porteY: 3, libres: [[1, 4], [2, 4], [3, 4]] },

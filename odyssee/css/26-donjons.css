@@ -11,3 +11,37 @@
 .dj-panel.cache { min-width: 0; padding: calc(var(--px) * 1.5) calc(var(--px) * 4); }
 .dj-panel.cache .dj-montrer { pointer-events: auto; font: inherit; font-size: calc(var(--px) * 5.5); color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
 
+
+/* combat à plusieurs : barre de vie du boss en blocs, encadré des équipiers (donjons/combat/vue.js) */
+.raid .bhud.foe .bh-hp i { position: relative; }
+.raid-sep { position: absolute; top: 0; bottom: 0; width: calc(var(--bp) * 1); margin-left: calc(var(--bp) * -0.5); background: #182028; }
+.raid-blocs { display: flex; gap: calc(var(--bp) * 2); justify-content: flex-end; margin-top: calc(var(--bp) * 2); }
+.raid-blocs b { width: calc(var(--bp) * 9); height: calc(var(--bp) * 4); border-radius: calc(var(--bp) * 1); background: #b8bcc4; border: calc(var(--bp) * 0.5) solid #485058; }
+.raid-blocs b.on { background: linear-gradient(#c890ff, #8a50d8); }
+.raid-equipe { position: absolute; left: calc(var(--bp) * 6); top: calc(var(--bp) * 62); display: flex; flex-direction: column; gap: calc(var(--bp) * 2); z-index: 3; }
+.raid-adverses { left: auto; right: calc(var(--bp) * 4); top: calc(var(--bp) * 6); gap: calc(var(--bp) * 1.5); }
+.raid-adverses .raid-eq { font-size: calc(var(--bp) * 5.5); min-width: calc(var(--bp) * 58); padding-top: calc(var(--bp) * 1); padding-bottom: calc(var(--bp) * 1); }
+.raid-adverses .raid-eq img { width: calc(var(--bp) * 13); height: calc(var(--bp) * 13); }
+.raid-eq.reste { justify-content: center; font-style: italic; padding: calc(var(--bp) * 2) calc(var(--bp) * 4); }
+.raid-eq { display: flex; align-items: center; gap: calc(var(--bp) * 3); padding: calc(var(--bp) * 1.5) calc(var(--bp) * 5) calc(var(--bp) * 1.5) calc(var(--bp) * 2); background: rgba(251, 251, 244, .92); border: calc(var(--bp) * 1) solid #384030; border-radius: calc(var(--bp) * 4); font-size: calc(var(--bp) * 6.5); min-width: calc(var(--bp) * 70); }
+.raid-eq img { width: calc(var(--bp) * 18); height: calc(var(--bp) * 18); image-rendering: pixelated; object-fit: contain; }
+.raid-eq > div { flex: 1; display: grid; grid-template-columns: 1fr auto; row-gap: calc(var(--bp) * 1); column-gap: calc(var(--bp) * 3); }
+.raid-eq span { opacity: .7; }
+.raid-eq i { grid-column: 1 / 3; height: calc(var(--bp) * 3); background: #485058; border-radius: calc(var(--bp) * 2); overflow: hidden; display: block; }
+.raid-eq u { display: block; height: 100%; transition: width .4s; }
+.raid-eq.out { opacity: .45; filter: grayscale(1); }
+.raid-eq.hit { animation: raid-hit .45s; }
+@keyframes raid-hit { 0%, 100% { transform: none; } 25% { transform: translateX(calc(var(--bp) * -2)); } 75% { transform: translateX(calc(var(--bp) * 2)); } }
+
+/* Sanctuaire des Trois Voies : le coffre brille dans le noir */
+.testody-lueur { position: absolute; z-index: 13; width: calc(var(--px) * 46); height: calc(var(--px) * 46); margin: calc(var(--px) * -26) 0 0 calc(var(--px) * -23); border-radius: 50%; pointer-events: none; background: radial-gradient(circle, rgba(255, 236, 150, .75) 0%, rgba(255, 210, 90, .35) 35%, rgba(255, 200, 80, 0) 70%); mix-blend-mode: screen; }
+/* bouclier du boss brisé */
+.bhud.foe.raid-casse { animation: raid-casse .7s ease-out; }
+@keyframes raid-casse { 0% { transform: translateX(0) scale(1); filter: brightness(2.2); } 20% { transform: translateX(-6px) scale(1.06); } 40% { transform: translateX(6px) scale(1.04); filter: brightness(1.6); } 70% { transform: translateX(-3px); } 100% { transform: none; filter: none; } }
+.raid-bandeau { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); z-index: 20; pointer-events: none; text-align: center;
+  font-weight: 900; font-size: calc(var(--bp) * 16); letter-spacing: .04em; color: #ffe27a; text-shadow: 0 0 calc(var(--bp) * 4) #ff8a00, 0 calc(var(--bp) * 1.5) 0 #6a2a00;
+  animation: raid-bandeau 1.5s ease-out forwards; }
+.raid-bandeau small { display: block; font-size: .42em; color: #fff; letter-spacing: 0; text-shadow: 0 calc(var(--bp) * 1) 0 #000; }
+@keyframes raid-bandeau { 0% { opacity: 0; transform: translate(-50%, -50%) scale(1.8); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -60%) scale(.96); } }
+/* salles sombres du Sanctuaire des Trois Voies : on y voit sur la moitié de l'écran, en cercle */
+.demi-nuit .dark-ov.cave { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0 22%, rgba(0,0,0,.55) 32%, rgba(0,0,0,.95) 44%); }

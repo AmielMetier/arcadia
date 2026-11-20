@@ -1,0 +1,7 @@
+Images des donjons à plusieurs d'Odyssée (odyssee/js/donjons/), reprises du labo de Lucas (TestOdyssée).
+
+miroirs/  Donjon des Miroirs : miroirs muraux et de poche, miroirs sur pied, socles, soleils, fourneau, porte, Copycat
+          (personnage et combat), objets (Bouchon d'Or, Éclat de Miroir, parchemin, CT). Dessinés pour le jeu, dans
+          le code (outil PixelForge : tools/pixelforge/ de la fork de Lucas, copycat.py, miroir_poche.py). Libres pour le jeu.
+voies/    Sanctuaire des Trois Voies : portes des trois vertus, porte à code, grille, coffres, interrupteurs, socle de
+          statue, Relique de Triforce. Dessinés pour le jeu, dans le code. Libres pour le jeu.

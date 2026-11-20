@@ -27,7 +27,7 @@ import { HPX, CHAR_ROWS } from './render/world3d.js';
 import { saveCodeScreen } from './ui/screens.js';
 import { encodeSave, saveSummary } from './core/savecode.js';
 import { installSocial, talkToPeer } from './net/social.js';
-import { Donjons } from './donjons/donjons.js';
+import { Donjons } from './donjons/jeu.js';
 import { storyTalk, storyTrigger, storyWin, lugiaBattle, placeLugia, purify, overlay } from './story.js';
 import { battleMusicForLegend } from './audio.js';
 import { playBossCinematic, isLegendarySpecies } from './ui/cinematic.js';
@@ -699,6 +699,7 @@ export class Game {
   }
 
   occupied(x, y, except) {
+    if (this.donjons?.occupe(x, y)) return true;   // le reflet du joueur (Donjon des Miroirs)
     if (this.player && this.player.x === x && this.player.y === y && except !== this.player) return true;
     for (const n of this.npcs) if (n !== except && ((n.x === x && n.y === y) || (n.move && n.move.fx === x && n.move.fy === y))) return true;
     for (const it of this.items) if (it.x === x && it.y === y) return true;
@@ -712,11 +713,16 @@ export class Game {
   }
 
   tryStep(d) {
+    const p = this.player, avant = p.move, depart = [p.x, p.y];
+    this.tryStepJeu(d);
+    if (!avant && p.move) this.donjons?.apresDepart(d, depart);
+  }
+  tryStepJeu(d) {
     const p = this.player, m = this.mapObj, [dx, dy] = DIRS[d];
     p.dir = d;
     const tx = p.x + dx, ty = p.y + dy, t = m.get(tx, ty);
-    // la porte d'un donjon fermée à clé (la crypte) : on demande la clé avant d'entrer
-    if (!p.move && this.donjons?.porteACle(tx, ty)) return;
+    // donjons à plusieurs : glace et reflet (Miroirs), caisses à pousser (Trois Voies), porte fermée à clé (la crypte)
+    if (!p.move && (this.donjons?.pasSpecial(d) || this.donjons?.pousser(d) || this.donjons?.porteACle(tx, ty))) return;
     // sortie par le tapis
     if (m.get(p.x, p.y) === T.MAT && d === 'down') {
       const w = m.warpAt(p.x, p.y);
@@ -769,6 +775,11 @@ export class Game {
   }
 
   async onStep(mv) {
+    await this.onStepJeu(mv);
+    // donjons à plusieurs : dalles et pièges des Trois Voies
+    if (!this.busy && this.mapObj && this.donjons?.dansUnDonjon()) await this.donjons.apresPasVoies();
+  }
+  async onStepJeu(mv) {
     const p = this.player, m = this.mapObj, t = m.get(p.x, p.y);
     if (mv.jump) this.view.shake = 0.06;
     // arènes à énigmes : glace ou sable qui glisse, flèches et souffles qui poussent, dalles, téléporteurs
@@ -1141,6 +1152,11 @@ export class Game {
     else if (k === 'friends') { this.busy = true; try { await friendsScreen(this); } finally { this.busy = false; } }
   }
   async interact() {
+    // donjons à plusieurs : miroirs, socles, brasier, coffres, statues…
+    if (this.donjons && !this.busy && await this.donjons.interagir()) return;
+    return this.interactJeu();
+  }
+  async interactJeu() {
     const p = this.player, m = this.mapObj, [dx, dy] = DIRS[p.dir], st0 = this.state;
     let fx = p.x + dx, fy = p.y + dy;
     let n = this.npcs.find((q) => q.x === fx && q.y === fy && !q.move);
@@ -1646,7 +1662,8 @@ export class Game {
     opts.push(['Quêtes', 'quests']);
     opts.push(['Trophées', 'trophies']);
     opts.push(['Émotes & Chat', 'chat']);
-    if (this.donjons?.dansUnDonjon()) opts.push(['Quitter le donjon', 'donjon']);
+    if (this.donjons?.dansUnDonjon()) opts.push(['Journal du donjon', 'journalDonjon'], ['Quitter le donjon', 'donjon']);
+    if (this.donjons?.dansLeReflet()) opts.push(['Revenir au début de la salle', 'debutSalle']);
     if (st.domaine) opts.push([this.mapObj.id === 'domaine' ? 'Revenir' : 'Domaine', 'domaine']);
     const friendsMgr = getFriendsManager(this);
     const others = Math.max(0, friendsMgr.getOnlineCount() - 1);
@@ -1673,6 +1690,8 @@ export class Game {
       else if (k === 'trophies') await trophiesScreen(this);
       else if (k === 'chat') { openChatAfter = true; break; }
       else if (k === 'donjon') { if (await this.donjons.quitter()) break; }
+      else if (k === 'journalDonjon') await this.donjons.journal();
+      else if (k === 'debutSalle') { if (await this.ui.yesNo('Revenir à l\'entrée de la salle ? Copycat reprendra sa place.')) { await this.donjons.recommencerSalle(); break; } }
       else if (k === 'domaine') { this.busy = false; if (await allerDomaine(this)) break; this.busy = true; }
       else if (k === 'opt') {
         const res = await optionsScreen(this);
@@ -2219,6 +2238,12 @@ export class Game {
     } finally { this.enCombat = false; }
   }
   async runBattleSafe(o) {
+    // salles claires des donjons (Miroirs) : fond de combat clair, pas celui des grottes
+    const mc = this.mapObj;
+    if (mc?.style === 'clair' && !o._clair) {
+      const avant = [mc.floor, mc.battleBg]; mc.floor = 'clair'; mc.battleBg = 'league';
+      try { return await this.runBattleSafe({ ...o, _clair: true }); } finally { [mc.floor, mc.battleBg] = avant; }
+    }
     const st = this.state;
     const isWild = !!(o.wild || o.wildParty);
     const kind = isWild ? o.music || 'wild' : o.music || 'trainer';

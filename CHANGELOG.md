@@ -1,12 +1,15 @@
 # Journal des versions — Arcadia
 
 ## 5.125 — 20 novembre 2026
-- **Odyssée** — Un premier donjon à faire entre amis : la Crypte des Murmures.
+- **Odyssée** — Trois donjons à faire entre amis : la Crypte des Murmures, le Donjon des Miroirs et le Sanctuaire des Trois Voies.
   - En battant Hector, on reçoit la Clé de la Crypte. Elle ouvre la crypte du Cimetière des Murmures, au bout d'un sentier de la Route 2.
   - Le fossoyeur ouvre la crypte quand le groupe est prêt. Dans les deux premières salles, chaque esprit se combat par un seul joueur à la fois. Dans la Salle des Dalles, tout le groupe doit tenir les dalles en même temps.
   - Au fond, Ossarion a des PV partagés : chaque combat lui retire ce qu'on lui a infligé, et le groupe en vient à bout ensemble.
   - Un encadré suit l'avancée salle par salle (touche N pour le cacher), et on peut quitter le donjon à tout moment.
-  - La crypte se refait autant qu'on veut, mais sa récompense n'est donnée qu'une fois.
+  - Sur la Route 3, deux clairières cachent les deux autres. Au Parvis des Miroirs, un temple de glace : des miroirs qui parlent, des énigmes, une galerie de glace où l'on glisse, des faisceaux de lumière à renvoyer et un reflet qui marche à l'envers.
+  - Dans la Clairière des Trois Voies, un sanctuaire à faire à trois : chacun prend son chemin, il faut s'échanger des codes pour avancer, et les salles sombres ne s'éclairent qu'autour de soi.
+  - Nouveaux combats à plusieurs : un boss dont la barre de vie est coupée en boucliers, qui se brisent un à un et le rendent plus fort, et des combats de groupe où chacun choisit le Pokémon adverse qu'il vise.
+  - Chaque donjon se refait autant qu'on veut ; sa récompense n'est donnée qu'une fois.
 
 ## 5.124 — 19 novembre 2026
 - **Odyssée** — Graphismes Noir & Blanc :

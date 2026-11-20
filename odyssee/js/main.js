@@ -12,7 +12,9 @@ import { brancherManette } from './manette.js';
 import { brancherTactile } from './tactile.js';
 import { Sound } from './audio.js';
 import { UI, el, esc, wait } from './ui/ui.js';
-import { optionsScreen, loadCodeScreen, gfxPickerScreen } from './ui/screens.js';
+import { optionsScreen, loadCodeScreen, gfxPickerScreen, partyScreen } from './ui/screens.js';
+import { DECOR as DECOR_DONJONS, DENSITE_2 as DENSITE_DONJONS, installerDonjons } from './donjons/images.js';
+import { brancherRendu } from './donjons/rendu.js';
 import { decodeSave, saveSummary } from './core/savecode.js';
 import { Cloud } from './net/cloud.js';
 import { Game } from './game.js';
@@ -127,6 +129,11 @@ async function boot() {
   const world = buildWorld();
   etape('carte');
   const art = await loadArt();
+  // les donjons à plusieurs : leur décor, leurs objets, leurs salles claires (donjons/)
+  Object.assign(art.sprites, await loadAll(Object.fromEntries(DECOR_DONJONS)));
+  for (const [k] of DECOR_DONJONS) art.dens[k] = DENSITE_DONJONS.includes(k) ? 2 : 1;
+  installerDonjons(ASSETS, { partyScreen });
+  brancherRendu();
   prechauffe.length = 0;
   etape('images');
   for (const [nom, pal] of Object.entries(packActif()?.murs || {})) paletteMurs(nom, pal);
@@ -145,9 +152,11 @@ async function boot() {
   window.__ody = { game, world, view, ui, sound, cloud, mon: (sp, lvl) => createMon(sp, lvl), playIntroVideo: () => playIntroVideo(ui, input, sound), testIntro: () => intro(game, ui, sound), testGfxPicker: () => gfxPickerScreen(ui, { allowCancel: true }) };
 
   // rendu en basse résolution, agrandi sans lissage : chaque « pixel » du jeu fait --px pixels d'écran
+  // vue : 1 normale, plus grand = de plus haut (le labyrinthe de Copycat, Donjon des Miroirs : game.onVue)
+  let vue = 1;
   const resize = () => {
     // le monde : une case fait 32 pixels de rendu, environ 12 cases de haut comme sur DS (agrandi d'un facteur entier)
-    const scale = Math.max(1, Math.round(innerHeight / 400));
+    const base = Math.max(1, Math.round(innerHeight / 400)), scale = vue === 1 ? base : base >= 2 ? Math.max(1, Math.round(base / vue)) : base / vue;
     const iw = Math.ceil(innerWidth / scale), ih = Math.ceil(innerHeight / scale);
     // rendu natif (?natif=1, ou Options → Graphismes) : même cadrage, mais la géométrie est tracée à la résolution de
     // l'écran (arêtes des bâtiments et du relief nettes en 4K) ; textures, sprites et particules gardent leurs pixels
@@ -159,6 +168,7 @@ async function boot() {
     document.documentElement.style.setProperty('--bp', (innerHeight / 192) + 'px');
   };
   addEventListener('resize', resize); resize();
+  game.onVue = (k) => { vue = k; resize(); };
   // le premier appui débloque le son
   const unlock = () => sound.init();
   addEventListener('keydown', unlock); addEventListener('pointerdown', unlock);
