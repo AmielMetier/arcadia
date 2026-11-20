@@ -670,7 +670,7 @@ export class WorldView {
     const anciens = typeof location !== 'undefined' && /[?&]anciensmurs/.test(location.search);   // comparaison avant / après
     this.murStyle = sm && !anciens && this.A?.cells?.['murh_' + sm] ? sm : null;
     this.fenetres = new Set();
-    if (this.murStyle && map.w > 6) {
+    if (this.murStyle && map.w > 6 && !(this.murStyle === 'center' && this.A?.cells?.clounge)) {
       // fenêtres sur le haut du mur du fond, là où rien ne s'adosse au mur
       const libres = []; for (let x = 2; x < map.w - 2; x++) if (map.get(x, 1) === T.WALL && map.get(x, 2) === T.FLOOR && !map.deco.some((d) => d.x === x && d.y === 2)) libres.push(x);
       const n = map.w >= 12 ? 3 : 2;
@@ -793,7 +793,8 @@ export class WorldView {
         return { c: A[(theme === 'snow' && A.snowtall0 ? 'snowtall' : 'tall') + (v < 0.5 ? 0 : 1)] };
       }
       case T.TREE: case T.PINE: return { c: theme === 'volcanic' ? A.ash1 : theme === 'snow' ? A.snow1 : desertCell ? sandFull : pg ? A[g4()] : A['forest' + (v < 0.5 ? 0 : 1)] };
-      case T.PATH: if (A.q_path_f) return quarts('path', isPathQ);
+      // (Noir & Blanc : contre la roche d'une montagne, le sentier va jusqu'au pied du rocher, sans bordure d'herbe)
+      case T.PATH: if (A.q_path_f) return quarts('path', A.nbr && m.outdoor ? (q) => isPathQ(q) || q === T.CAVEWALL || q === T.CLIFF : isPathQ);
         return { c: A['path' + edge(isPathish)] };
       case T.PAVE: if (A.q_pave_f) return quarts('pave', (q, ax, ay) => isPaveQ(q, ax, ay));
         return { c: A['pave' + edge((q) => isPathish(q))] };
@@ -834,6 +835,8 @@ export class WorldView {
       case T.CAVEWALL: if (m.outdoor) {
         if (sandFull && (desertCell || (hasNbr4(x, y, (g) => g === T.SAND) && !hasNbr8(x, y, (g) => g === T.GRASS || g === T.TREE || g === T.PINE || (g === T.FLOWER && !sandFlower(x, y)))))) return { c: sandFull };
         if (theme === 'volcanic' && this.N.cells.lava && hasNbr4(x, y, (g) => g === T.LAVA) && !hasNbr4(x, y, (g) => g === T.ASH || g === T.PATH || g === T.CAVE || T.STAIRS)) return { anim: this.N.cells.lava };
+        // Noir & Blanc : sous la roche d'une montagne qui borde un sentier, le sentier (pas de liseré d'herbe autour du rocher)
+        if (A.nbr && A.q_path_f && hasNbr8(x, y, (g) => g === T.PATH || g === T.STAIRS)) return { c: A.q_path_f };
         return { c: A[grassKey] };   // sous les montagnes du dehors
       }
         if (this.tiers && A[`rp_${this.biome}_00`]) { const k = reliefKey(A, this.biome, 's', v); return { c: A[k] }; }
@@ -902,12 +905,16 @@ export class WorldView {
     // dans une montagne à gravir (relief.js, montagne), le sentier fait partie du gradin quand il est à sa hauteur (ou
     // plus haut) : la roche sous le bord d'un sentier n'a pas de rebord de ce côté, elle descend en pente vers le bas
     const h0 = m.outdoor ? m.height(x, y) : 0;
+    const nbR = !!A.nbr && (b === 'montagne' || b === 'terre');
+    // Noir & Blanc : chaque gradin d'une montagne un peu plus clair que celui du dessous, pour lire les marches de la roche
+    const ombreGradin = (h) => Math.min(1.1, 0.68 + 0.1 * Math.max(0, h));
     const rock = (dx, dy) => {
       const a = x + dx, c = y + dy; if (a < 0 || c < 0 || a >= m.w || c >= m.h) return true;
       if (ravin(m, a, c)) return false;
       const q = m.get(a, c);
       if (q === T.CAVEWALL) return !m.outdoor || m.height(a, c) >= h0;
-      return m.outdoor && mont(m, a, c) && q !== T.STAIRS && m.height(a, c) >= h0;
+      // (Noir & Blanc : le sentier de la montagne reste un sentier, la roche a son bord tout autour, comme dans le jeu)
+      return m.outdoor && !nbR && mont(m, a, c) && q !== T.STAIRS && m.height(a, c) >= h0;
     };
     if (m.outdoor) {
       // sous les coins arrondis : le gradin du dessous (ou le vide d'un ravin), pas l'herbe
@@ -918,7 +925,7 @@ export class WorldView {
       }
       // à côté d'un sentier (case praticable), le pied de la paroi laisse voir le sentier : pas de roche dessous
       const sol = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => m.in(x + dx, y + dy) && m.get(x + dx, y + dy) !== T.CAVEWALL);
-      if (bas && !sol) flat(G, x, y, x + 1, y + 1, yh - 0.0002, A[`rp_${b}_11`], 0.9);
+      if (bas && !sol) flat(G, x, y, x + 1, y + 1, yh - 0.0002, A[`rp_${b}_11`], nbR ? ombreGradin(h0 - 1) : 0.9);
       // le vide d'un ravin, seulement sous les quarts de case tournés vers lui (pas de noir qui déborde sur la roche)
       const vide = (a, c) => ravin(m, a, c) && m.get(a, c) === T.CAVEWALL;   // le gouffre (pas une passerelle)
       for (let qy = 0; qy < 2; qy++) for (let qx = 0; qx < 2; qx++) {
@@ -938,11 +945,15 @@ export class WorldView {
     const v = hash(x * 13 + 5, y * 7 + 3), pick = (k, n, p) => A[`r${k}_${b}_${Math.floor(v * n)}`] && v < p ? A[`r${k}_${b}_${Math.floor(v * n / p) % n}`] : null;
     const open = (W ? 1 : 0) + (E ? 1 : 0) + (N ? 1 : 0) + (S ? 1 : 0);
     // falaise de montagne sur plusieurs gradins : sous une roche plus haute, la pente continue (pas de dessus de gradin)
-    if (m.outdoor && S && !W && !E && !N && m.get(x, y - 1) === T.CAVEWALL && !ravin(m, x, y - 1) && m.height(x, y - 1) > h0 && mont(m, x, y)) {
+    // graphismes Noir & Blanc (A.nbr) : la roche du kit, en plateaux à bords nets, sans les variantes façon HeartGold
+    const nb = !!A.nbr && (b === 'montagne' || b === 'terre');   // roche brune du kit : dehors comme dans les grottes de terre
+    if (nb) inner[0] = inner[1] = false;   // pas de coins rentrants découpés en quarts : le kit n'en a pas
+    const ombreNB = nb && m.outdoor ? ombreGradin(h0) : undefined;
+    if (!nb && m.outdoor && S && !W && !E && !N && m.get(x, y - 1) === T.CAVEWALL && !ravin(m, x, y - 1) && m.height(x, y - 1) > h0 && mont(m, x, y)) {
       const k = A[`rv_${b}_${Math.floor(v * 4)}`] || A[`rv_${b}_0`];
       if (k) { flat(G, x, y, x + 1, y + 1, yh, k); return; }
     }
-    if (!inner[0] && !inner[1] && open <= 1) {
+    if (!nb && !inner[0] && !inner[1] && open <= 1) {
       const alt = S ? pick('f', 4, 0.8) : N ? pick('n', 4, 0.8) : W ? pick('l', 3, 0.75) : E ? pick('e', 3, 0.75) : pick('q', 6, 0.4);
       if (alt) { flat(G, x, y, x + 1, y + 1, yh, alt); return; }
     }
@@ -954,7 +965,7 @@ export class WorldView {
       // un soupçon de chevauchement entre les quarts : pas de fente d'un pixel où l'on verrait le sol
       const e = 1 / 128, ex0 = qx ? e : 0, ex1 = qx ? 0 : e, ez0 = qy ? e : 0, ez1 = qy ? 0 : e;
       flat(G, x + qx / 2 - ex0, y + qy / 2 - ez0, x + (qx + 1) / 2 + ex1, y + (qy + 1) / 2 + ez1, yh,
-        [u0 - (cell[2] - cell[0]) * ex0, v0 - (cell[3] - cell[1]) * ez0, u0 + hu + (cell[2] - cell[0]) * ex1, v0 + hv + (cell[3] - cell[1]) * ez1]);
+        [u0 - (cell[2] - cell[0]) * ex0, v0 - (cell[3] - cell[1]) * ez0, u0 + hu + (cell[2] - cell[0]) * ex1, v0 + hv + (cell[3] - cell[1]) * ez1], ombreNB);
     }
   }
   /** roche de grotte en pentes : la case est découpée en RN × RN facettes posées sur le champ de hauteur ; une facette
@@ -1027,6 +1038,9 @@ export class WorldView {
     // plateaux d'herbe (world/relief.js, pente) : talus de pelouse, dessiné au pixel par le sol généré (solgen.js, talus) ;
     // sans lui (?sol=0), des pièces de pelouse toutes faites (relief-tex.js)
     const gen = this.sol.couvre(), herbe = (a, b) => pente(m, a, b), lv = levreFalaise(th);
+    // graphismes Noir & Blanc : les buttes d'herbe prennent le cadre « herbe sur roche » du kit (bord d'herbe, paroi de
+    // roche au sud, flancs de roche à l'est et à l'ouest) au lieu des talus dessinés façon HeartGold
+    if (!gen && A.nbf_mur_c && this.nbButte(G, x, y, t, h, herbe)) return;
     if ((t === T.CLIFF || t === T.STAIRS) && herbe(x, y)) {
       if (gen) return;
       if (t === T.CLIFF) {
@@ -1087,6 +1101,48 @@ export class WorldView {
       if (bas(-1, 0) && bd('w')) flat(G, x, y, x + 1, y + 1, Y + 0.0002, bd('w'));
       if (bas(0, -1) && bd('n')) flat(G, x, y, x + 1, y + 1, Y + 0.0003, bd('n'));
     }
+  }
+  /** une butte d'herbe en graphismes Noir & Blanc : pièces nbf_* du pack (bord du plateau, paroi, escalier) ; renvoie
+   *  vrai quand la case est traitée (rien d'autre à dessiner pour son relief) */
+  nbButte(G, x, y, t, h, herbe) {
+    const m = this.map, A = this.A.cells, Y = 0.0049;
+    const pose = (k, dz = 0) => { if (A[k]) flat(G, x, y, x + 1, y + 1, Y + dz, A[k]); };
+    // plateau d'herbe ou de roche (canyons, terrasses) ; les montagnes gardent leurs gradins
+    const plat = (a, b) => herbe(a, b) || (m.height(a, b) > 0 && m.get(a, b) !== T.CAVEWALL && !mont(m, a, b));
+    const paroi = (a, b) => m.get(a, b) === T.CLIFF && !mont(m, a, b);
+    if (t === T.CLIFF) {
+      if (!paroi(x, y)) return false;
+      const fin = (dx) => { const q = m.get(x + dx, y); return q !== T.CLIFF && q !== T.STAIRS; };
+      // au-dessus d'une montagne, la paroi se détache sur la roche (pas sur l'herbe)
+      const r = m.get(x, y + 1) === T.CAVEWALL && A.nbf_mur_c_r ? '_r' : '';
+      pose((fin(-1) && !fin(1) ? 'nbf_mur_w' : fin(1) && !fin(-1) ? 'nbf_mur_e' : 'nbf_mur_c') + r);
+      return true;
+    }
+    if (t === T.STAIRS && (herbe(x, y) || !mont(m, x, y))) { if (A.stairs) pose('stairs', 0.0001); return true; }
+    if (h <= 0 || !plat(x, y)) {
+      // à côté d'un plateau : la roche de son flanc descend sur cette case (côté du plateau) ; au pied, pas d'ombre
+      if (mont(m, x, y)) return false;
+      let fait = paroi(x, y - 1);
+      for (const [dx, c] of [[1, 'w'], [-1, 'e']]) {
+        const a = x + dx, q = m.get(a, y), ha = m.height(a, y);
+        if (t === T.CLIFF) continue;
+        if (q === T.CLIFF && paroi(a, y)) { pose(`nbf_fl_${c}_mur`, 0.0001); fait = true; }
+        else if (plat(a, y) && q !== T.STAIRS && ha > h) {
+          const v = !(m.height(a, y - 1) >= ha && plat(a, y - 1)) ? 't' : m.get(a, y + 1) === T.CLIFF || m.get(a, y + 1) === T.STAIRS ? 'b' : 'm';
+          pose(`nbf_fl_${c}_${v}`, 0.0001); fait = true;
+        }
+      }
+      return fait;
+    }
+    // le bord du plateau : la lèvre d'herbe du kit sur l'herbe ; rien sur la roche (la paroi suffit)
+    if (!herbe(x, y)) return true;
+    const bas = (dx, dy) => { const q = m.get(x + dx, y + dy); return q === T.CLIFF || q === T.STAIRS || (m.height(x + dx, y + dy) < h && q !== T.CAVEWALL); };
+    const n = bas(0, -1), s = bas(0, 1), e = bas(1, 0), w = bas(-1, 0);
+    if (n) pose(w ? 'nbf_nw' : e ? 'nbf_ne' : 'nbf_n', 0.0002);
+    if (s) pose(w ? 'nbf_sw' : e ? 'nbf_se' : 'nbf_s', 0.0002);
+    if (!n && !s) { if (w) pose('nbf_w', 0.0002); if (e) pose('nbf_e', 0.0002); }
+    else if (w && e) { pose('nbf_w', 0.0001); pose('nbf_e', 0.0001); }
+    return true;
   }
   /** hauteur du sol à l'endroit (x, z) du monde : 0 sans le relief en 3D (?relief3d) */
   hAt(x, z) { return this.r3d ? this.r3d.Hmarche(x, z) : 0; }
@@ -1280,6 +1336,12 @@ export class WorldView {
         // tapis des maisons, sous la table (3 × 2 cases au milieu de la pièce)
         if (this.murStyle.startsWith('in') && A['tapis_' + this.murStyle] && x === (m.w >> 1) - 1 && y === 4 && m.h >= 8) flat(O0, x, y, x + 3, y + 2, 0.0043, A['tapis_' + this.murStyle]);
       }
+      // Centre Pokémon 5G (Noir & Blanc) : coins lounge gris clair losanges complets (3×3) à gauche et à droite
+      if (!m.outdoor && m.floor === 'center' && m.music === 'center' && (t === T.FLOOR || t === T.BLOCK) && A.clounge && y >= 6 && y <= m.h - 2 && (x >= 1 && x <= 3 || x >= m.w - 4 && x <= m.w - 2)) {
+        // 0,0024 : bien sous l'ombre des murs (0,0041) qu'il croise contre les murs latéraux, bien au-dessus du sol (0) ; à 0,0038 les deux
+        // couches n'étaient séparées que de 0,0003, sous la précision de profondeur d'un vrai GPU à cette distance de caméra (scintillement)
+        flat(O0, x, y, x + 1, y + 1, 0.0024, A.clounge);
+      }
       let d = this.decoAt.get(x + ',' + y);
       // arènes dessinées dans un plan : plusieurs décors par case, selon l'état de l'arène (portes, fleurs, miroirs…)
       if (m.etat) { this.celluleArene(O0, P, Sh, x, y, Wl); d = null; }
@@ -1296,9 +1358,22 @@ export class WorldView {
       if (d && DECALS.has(d.k)) { const k = 'dec_' + d.k + (d.dir ? '_' + d.dir : d.g ? '_' + d.g : ''); if (A[k]) flat(O0, x, y, x + 1, y + 1, 0.005, A[k]); }
       if (d) {
         if (d.k === 'counter') {
-          box(Wl, x, y + 0.1, x + 1, y + 1, 0.75 * Math.tan(EL), A[d.front] || A.counterfront, A.counter, A.counter, { east: m.get(x + 1, y) !== T.BLOCK, west: m.get(x - 1, y) !== T.BLOCK });
+          const isCC = m.floor === 'center' && !d.top && (!d.front || d.front === 'counterfront') && A.ccounter && A.ccounterfront;
+          // Boutique 5G (Noir & Blanc) : comptoir bleu-turquoise à façade argentée, caisse enregistreuse au bout du comptoir
+          const isMC = m.floor === 'mart' && d.front === 'martfront' && A.mcounter && A.mcounterfront;
+          const cFront = isCC ? A.ccounterfront : isMC ? A.mcounterfront : (A[d.front] || A.counterfront), cTop = isCC ? A.ccounter : isMC ? A.mcounter : A.counter;
+          box(Wl, x, y + 0.1, x + 1, y + 1, 0.75 * Math.tan(EL), cFront, cTop, cTop, { east: m.get(x + 1, y) !== T.BLOCK, west: m.get(x - 1, y) !== T.BLOCK });
           // capsule posée sur le comptoir (starters du labo)
           if (d.ball && S.itemball) { const r = S.itemball; billboard(P, x + 0.5, y + 0.55, SW(r), SH(r), r, 0.75 * Math.tan(EL) - 0.05); }
+          if (isMC && S.mregister && m.get(x + 1, y) !== T.BLOCK) { const r = S.mregister; billboard(P, x + 0.5, y + 0.55, SW(r), SH(r), r, 0.75 * Math.tan(EL) - 0.05); }
+        }
+        // Boutique 5G : un présentoir blanc garni par rangée de rayons (dessiné une fois, centré sur la rangée)
+        else if (d.k === 'shelf' && m.floor === 'mart' && S.martshelf) {
+          if (this.decoAt.get((x - 1) + ',' + y)?.k !== 'shelf') {
+            let n = 1; while (this.decoAt.get((x + n) + ',' + y)?.k === 'shelf') n++;
+            const r = S.martshelf; billboard(P, x + n / 2, y + 0.75, SW(r), SH(r), r);
+            this.ombreSol(Sh, x + 0.05, y + 0.45, x + n - 0.05, y + 0.95, 0.015, 'bande');
+          }
         }
         else if (d.k === 'shelf') box(Wl, x + 0.05, y + 0.2, x + 0.95, y + 0.95, 1.5 * Math.tan(EL), A.shelf, A.roof_flat, A.shelf);
         else if (d.k === 'carpet' || d.k === 'exitlight') { /* sol */ }
@@ -1334,6 +1409,12 @@ export class WorldView {
     // relief en 3D : l'ancien sol (sous le sol généré) n'écrit pas la profondeur, le sol généré le recouvre toujours
     const M3 = r3d ? this.r3dMats() : this.mat;
     add(G, M3.ground, sous); add(N, M3.anim, sous); add(O, M3.overlay, sous); add(O0, this.mat.overlay); add(Sh, this.mat.shadow, 1); add(P, this.mat.sprite); add(Wl, this.mat.walls); add(NO, this.mat.animOver); add(PB, this.mat.overlay, 1);
+    // Centre Pokémon 5G (Noir & Blanc) : grande allée centrale abricot + emblème Poké Ball au sol
+    if (!m.outdoor && m.floor === 'center' && m.music === 'center' && S.center_runner && x0 === 0 && y0 === 0) {
+      const Fl = new Geo(), r = S.center_runner, rx0 = (m.w - 3) / 2;
+      flat(Fl, rx0, 4.98, rx0 + 3, m.h - 0.85, 0.0046, [r.u0, r.v0, r.u1, r.v1]);
+      add(Fl, this.mat.flatSprite, 0);
+    }
     if (r3d) {
       // parois de la couche du dessus (texture vue de la caméra), dessinées juste après le sol généré
       const bw = m.ext ? CH : Math.min(CH, m.w - x0), bh = m.ext ? CH : Math.min(CH, m.h - y0), pg = bw > 0 && bh > 0 ? r3d.geoParois(ci, cj, bw, bh) : null;

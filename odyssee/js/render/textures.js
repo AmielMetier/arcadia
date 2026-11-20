@@ -257,10 +257,7 @@ export function buildAtlas() {
     const [u0, v0] = cells[k], cx = Math.round(u0 * SIZE) - 1, cy = Math.round(v0 * SIZE) - 1;
     blit(ctx, up2(im), cx, cy);
   }
-  // pack de graphismes : une tuile « x_<clé> » remplace telle quelle la tuile <clé> dessinée par le code (comptoirs…)
-  for (const k of Object.keys(SOL32)) if (k.startsWith('x_') && cells[k.slice(2)]) {
-    const [u0, v0] = cells[k.slice(2)]; blit(ctx, up2(SOL32[k]), Math.round(u0 * SIZE) - 1, Math.round(v0 * SIZE) - 1);
-  }
+  // (les remplacements x_<clé> du pack sont appliqués juste après texturesMurs pour pouvoir aussi couvrir murh_/murb_)
   // hautes herbes du tileset : chaque pièce (bords, coins, pleines) posée sur le sol qui l'entoure
   const HERBE_GROUND = { prairie: img.grass0, bois: img.grass0, neige: img.snow0 };
   for (const theme of ['prairie', 'bois', 'neige']) for (const k of HERBE_PIECES) {
@@ -312,6 +309,12 @@ export function buildAtlas() {
   texturesArenes(putImg);
   // murs des intérieurs façon HeartGold / SoulSilver (haut et bas du mur du fond, chaperons, fenêtres, ombres)
   texturesMurs(putImg);
+  // pack de graphismes : une tuile « x_<clé> » remplace (ou ajoute) telle quelle la tuile <clé> dans l'atlas (comptoirs, murs, lounge 5G…)
+  for (const k of Object.keys(SOL32)) if (k.startsWith('x_')) {
+    const key = k.slice(2);
+    if (cells[key]) { const [u0, v0] = cells[key]; blit(ctx, up2(SOL32[k]), Math.round(u0 * SIZE) - 1, Math.round(v0 * SIZE) - 1); }
+    else putImg(key, up2(SOL32[k]));
+  }
   // chaussées de Métropole : asphalte, avec la ligne pointillée du milieu sur le bord commun des deux voies
   const asph = (P) => { P.fill('#5a5c64'); P.speck(18, '#64666e'); P.speck(10, '#4e5058'); };
   putSol('asph', 'asph', asph);
@@ -329,6 +332,8 @@ export function buildAtlas() {
   }));
   // relief du dehors (falaises, rebords, marches, roche ocre) : render/relief-tex.js
   texturesRelief(putImg, img);
+  // pack de graphismes : la roche des montagnes du pack (x_rp_…) passe après celle du relief, qu'elle remplace
+  for (const k of Object.keys(SOL32)) if (k.startsWith('x_rp_') || k === 'x_nbr') putImg(k.slice(2), up2(SOL32[k]));
   tameGreens(atlas);
   // Tour Cendrée : planches noircies par le feu, suie en haut, cendre claire par endroits
   put('wall_cendre', (P) => { P.fill('#3e3028'); for (let x = 0; x < 16; x += 4) P.rect(x, 0, 1, 16, '#271c16'); P.rect(0, 0, 16, 3, '#211814'); P.speck(10, '#2c211b', 0, 3, 16, 9); P.speck(5, '#5e5048'); P.speck(3, '#7a3a20', 0, 6, 16, 6); P.rect(0, 13, 16, 3, '#2a1f19'); P.rect(0, 13, 16, 1, '#54443a'); });

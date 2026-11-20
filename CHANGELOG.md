@@ -1,11 +1,83 @@
 # Journal des versions — Arcadia
 
+## 5.136 — 20 novembre 2026
+- **Odyssée** — Le jeu a maintenant son propre numéro de version (Odyssée 1.0, affiché en bas de l'écran titre). À chaque mise à jour, le navigateur charge directement la nouvelle version : plus besoin de vider le cache pour voir les nouvelles villes ou les nouveaux graphismes.
+
+## 5.135 — 20 novembre 2026
+- **Odyssée** — Graphismes Noir & Blanc : la personnalisation de la tenue marche enfin sur les dresseurs de Noir 2 & Blanc 2. La visière, le haut, le bas, les chaussures et le sac prennent les couleurs choisies, de face, de profil et de dos, pour le garçon comme pour la fille, et les autres joueurs te voient avec ta tenue.
+
+## 5.134 — 20 novembre 2026
+- **Odyssée** — Trois donjons à faire entre amis, posés sur la nouvelle carte : la Crypte des Murmures, le Donjon des Miroirs et le Sanctuaire des Trois Voies.
+  - En battant Hector, on reçoit la Clé de la Crypte. Elle ouvre la crypte du Cimetière des Murmures, au bout d'un sentier de la Route 2.
+  - Le fossoyeur ouvre la crypte quand le groupe est prêt. Dans les deux premières salles, chaque esprit se combat par un seul joueur à la fois. Dans la Salle des Dalles, tout le groupe doit tenir les dalles en même temps.
+  - Au fond, Ossarion a des PV partagés : chaque combat lui retire ce qu'on lui a infligé, et le groupe en vient à bout ensemble.
+  - Sur la Route 3, deux clairières cachent les deux autres. Au Parvis des Miroirs, un temple de glace : des miroirs qui parlent, des énigmes, une galerie de glace où l'on glisse, des faisceaux de lumière à renvoyer et un reflet qui marche à l'envers.
+  - Dans la Clairière des Trois Voies, un sanctuaire à faire à trois : chacun prend son chemin, il faut s'échanger des codes pour avancer, et les salles sombres ne s'éclairent qu'autour de soi.
+  - Nouveaux combats à plusieurs : un boss dont la barre de vie est coupée en boucliers, et des combats de groupe où chacun choisit le Pokémon adverse qu'il vise.
+  - Un encadré suit l'avancée salle par salle (touche N pour le cacher) ; on peut quitter un donjon à tout moment et le refaire autant qu'on veut, sa récompense n'est donnée qu'une fois.
+- **Odyssée** — Graphismes Noir & Blanc :
+  - dans les montagnes, les sentiers sont en terre claire et vont jusqu'au pied de la roche, sans liseré d'herbe : on voit bien où l'on marche et où commence le rocher ;
+  - chaque gradin d'une montagne est un peu plus clair que celui du dessous, pour lire les marches de la roche.
+
+## 5.133 — 20 novembre 2026
+- **Odyssée** — Graphismes Noir & Blanc :
+  - les pentes de montagne en escalier n'ont plus de traits gris en biais sur leurs bords ;
+  - dans les grottes de terre (Route Victoire, Mesas, Crêtes, Sables…), les parois prennent la roche brune du jeu, sans pièces dépareillées ; les grottes marines, de magma et de glace gardent leur roche à elles.
+- **Odyssée** — Port-Orage et Givrebourg s'habillent : caisses et tonneaux près du ponton, bouée, bancs, lanternes dans la neige, jardinets et clôtures.
+
+## 5.132 — 20 novembre 2026
+- **Odyssée** — Graphismes Noir & Blanc : les reliefs prennent enfin les vraies pièces de Noir 2 & Blanc 2.
+  - Les buttes d'herbe ont leur bord d'herbe, leurs flancs de roche et leur paroi brune, comme dans le jeu.
+  - Les falaises des routes, des canyons et de Pierrefort deviennent de la roche brune du jeu au lieu des palissades sombres.
+  - Les montagnes passent en plateaux de roche à bords nets, avec leur paroi au sud.
+- **Odyssée** — Le Plateau Céleste est plus ramassé et plus beau : quatre jardins autour de la grande allée, avec cerisiers, statues, fontaines et lanternes.
+
+## 5.131 — 20 novembre 2026
+- **Odyssée** — Les routes gagnent en détails, sans rien perdre de leur longueur :
+  - des recoins cachés au bout d'une trouée dans les arbres, avec un objet au fond ; certains sont fermés par un arbuste à couper ;
+  - des buttes où l'on monte par un petit escalier, avec un banc ou un objet là-haut ;
+  - sur chaque route, un rocher qui cache quelque chose : approche-toi de celui qui brille ;
+  - de nouveaux rebords à sauter, et des panneaux de conseils du dresseur au bord du chemin.
+
+## 5.130 — 20 novembre 2026
+- **Odyssée** — Toutes les autres villes passent à l'échelle de Noir 2 & Blanc 2, de Port-Azur à Port-Ombre : des villes serrées autour de leur Centre, de leur Boutique et de leur Arène, qu'on traverse en quelques pas.
+  - Métropole reste un cran au-dessus, comme une grande ville du jeu.
+  - Les routes, les forêts, les lacs et les grottes ne changent pas : les portes des villes sont toujours au même endroit, et une allée à travers les bois y mène.
+
+## 5.129 — 20 novembre 2026
+- **Odyssée** — Pierrefort se resserre à la taille d'une ville de Noir 2 & Blanc 2 : le Centre, la Boutique, la Maison des Mineurs et l'usine Poké Ball sont à quelques pas les uns des autres, avec une couronne de maisons, l'auberge et le puits autour.
+  - Le Bois Murmure, la Route 3 et le chemin de la mine arrivent toujours aux mêmes portes.
+
+## 5.128 — 20 novembre 2026
+- **Odyssée** — Bourg-Aube redessiné à l'échelle de Noir 2 & Blanc 2 : un petit bourg où tout est à portée de main.
+  - Ta maison et celle de Théo au nord, le laboratoire du Professeur Saule à deux pas, un étang avec ses bancs.
+  - Au sud, une boulangerie, deux maisons habitées et des potagers fleuris.
+  - Le bourg est vérifié avec les deux graphismes, Odyssée et Noir & Blanc.
+
+## 5.127 — 20 novembre 2026
+- **Odyssée** — Sylvebourg redessinée sur le modèle des villes de Noir 2 & Blanc 2 : un village serré où chaque coin a quelque chose.
+  - La grand-rue relie les deux portes ; au nord le Centre et la Boutique avec leurs massifs de fleurs, au milieu les maisons à jardinets, l'Arène et un parc autour d'un étang.
+  - Au sud, l'auberge du Chêne, la cabane du chasseur et un verger ; de nouveaux habitants ont des choses à raconter.
+  - Le rendu a été vérifié avec les deux graphismes, Odyssée et Noir & Blanc.
+
+## 5.126 — 20 novembre 2026
+- **Odyssée** — Sylvebourg prend un peu d'ampleur : toujours un village façon Noir 2 & Blanc 2, mais avec une couronne de chalets, une auberge, un verger, un parc et la cabane du chasseur autour du centre.
+
+## 5.125 — 20 novembre 2026
+- **Odyssée** — Sylvebourg passe à la taille d'une ville de Noir 2 & Blanc 2 : un village compact où l'on trouve tout en quelques pas.
+  - Centre, Boutique et Arène se voient d'un coup d'œil, les deux maisons et leurs habitants sont toujours là, comme le garde du nord.
+  - Les Routes 1 et 2 s'allongent un peu pour rejoindre les nouvelles portes de la ville.
+  - L'autel du Bois Murmure est désormais relié au sentier par une petite allée.
+
+## 5.124 — 19 novembre 2026
+- **Odyssée** — Graphismes Noir & Blanc :
+  - la Boutique passe aussi en vrai style Noir 2 & Blanc 2 : carrelage gris à losanges, comptoir bleu à façade argentée avec sa caisse enregistreuse, présentoirs blancs garnis ;
+  - au Dojo de Mamadou, on ne peut plus marcher à travers l'appareil de soin ;
+  - le sol du coin salon des Centres Pokémon ne risque plus de scintiller contre l'ombre des murs ;
+  - crédits complétés (planches d'UltimoSpriter et de ditto209).
+
 ## 5.123 — 19 novembre 2026
-- **Tête de Calcul** — The Candidate : 31 nouvelles questions, celles de l'émission tournée en amphi devant le public.
-  - produits structurés : Athena ou Phoenix, capital garanti ou non, comment grossir un coupon, pourquoi le prix baisse alors que le sous-jacent monte ;
-  - options : option digitale, collar à coût nul, skew, put worst-of, gamma, et la nuit où une OPA tombe ;
-  - taux et macro : zéro coupon, taux forward, critères de Maastricht, l'Italie qui emprunte moins cher que la France ;
-  - trois casse-têtes : le premier as du paquet, le jeu des cartes rouges et noires, le sac de boules.
+- Correction : restauration sprites authentiques Gen 5 + interieur Centre Pokemon 5G (Amiel)
 
 ## 5.122 — 19 novembre 2026
 - Correction : corrections d'audit (icones objets/HUD, audio/cinematiques, sauvegardes, habitants, tests) (Amiel)

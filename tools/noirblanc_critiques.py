@@ -1,189 +1,405 @@
 """
-tools/noirblanc_critiques.py — Corrections pixel-art Gen 5 (grille logique 2×2 nette, zéro anti-aliasing, zéro trou de porte)
-des assets critiques du pack Noir & Blanc :
-- Décors : d_caisse, d_caisses, d_squelette (dragon fossile 4 cases pour le Musée)
-- Bâtiments : b_gare (porte vitrée + mur de fond), b_bourse (façade unifiée), b_mairie (hôtel de ville Gen 5),
-  b_centrale (centrale électrique Gen 5), b_fonderie & b_fonderie_b (fonderie brique/acier 7 cases),
-  b_atelier_brique & b_tour_brique (façades Volucité symétriques complètes), b_serre (verrière botanique),
-  b_boutique_mode (boutique chic de Métropole), b_tour_vitre (hall vitré au rez-de-chaussée).
+tools/noirblanc_critiques.py — Correctifs chirurgicaux 100 % fidèles aux sprites officiels Noir & Blanc (zéro dessin
+procédural cartoony : uniquement des correctifs sur les pixels authentiques de kit_bw_set.png, ext_masterpiece.png,
+centre_interieur.png et boutique_interieur.png) :
+- Portes bouchées proprement DERRIÈRE les arches transparentes d'origine (b_centrale, b_mairie, b_serre, b_fonderie,
+  b_gare, b_maison_desert_1) + jonction White-City authentique entre les 2 tours de b_bourse.png (via l'arche de b_mairie)
+- Variantes 100 % kit_bw_set / ext_masterpiece : b_boutique_mode (b_boutique élargie & auvent bordeaux),
+  b_maison_forge_p1 (b_maison_a_g reteintée brique/ardoise), b_tour_vitre_l (b_tour_vitre élargie à 9 cases)
+- Raccourcissement sans couture + suppression ombres alpha=64 sur tour_vitre, tour_jaune, maison_forge_1/2
+- Neige hivernale B2W2 généreuse sur b_boutique_neige_b & b_boutique_neige
+- Décors authentiques : d_caisse / d_caisses tirés du vrai d_boxes.png Gen 5, d_squelette 4 cases, d_lamp nettoyé (s=0)
+- Tuile officielle centre_interieur dans sol.png : x_shelf (rayonnage Poké Mart ; x_mat conservé symétrique pour les tapis rouges).
 """
+import math
 import os
 import numpy as np
 from PIL import Image, ImageDraw
 
 
-def _canvas2x(lw, lh):
-    """Crée un canvas logique (lw × lh) qui sera agrandi ×2 NEAREST en pixel-art Gen 5 net."""
-    return Image.new('RGBA', (lw, lh), (0, 0, 0, 0))
-
-
-def _up2(im):
-    return im.resize((im.width * 2, im.height * 2), Image.NEAREST)
-
-
-def _rect(dr, x0, y0, x1, y1, fill, border=None, hi=None, sh=None):
-    dr.rectangle([x0, y0, x1, y1], fill=fill)
-    if border:
-        dr.rectangle([x0, y0, x1, y1], outline=border)
-    if hi and x1 - x0 >= 2:
-        dr.line([x0 + 1, y0 + 1, x1 - 1, y0 + 1], fill=hi)
-    if sh and x1 - x0 >= 2:
-        dr.line([x0 + 1, y1 - 1, x1 - 1, y1 - 1], fill=sh)
-
-
-def _bricks_l(dr, x0, y0, x1, y1, col_m, col_hi=None, step_y=3, step_x=6):
-    for idx, y in enumerate(range(y0 + step_y, y1, step_y)):
-        dr.line([x0 + 1, y, x1 - 1, y], fill=col_m)
-        off = (step_x // 2) if (idx % 2) else 0
-        for x in range(x0 + 2 + off, x1 - 1, step_x):
-            dr.line([x, y - step_y + 1, x, y - 1], fill=col_m)
-            if col_hi and x + 1 < x1 - 1 and y - step_y + 1 <= y - 1:
-                dr.point((x + 1, y - step_y + 1), fill=col_hi)
-
-
-def _glass_win(dr, x0, y0, x1, y1, frame=(46, 52, 66, 255), dark=(48, 86, 128, 255),
-               mid=(82, 140, 194, 255), hi=(164, 214, 246, 255), sill=None):
-    _rect(dr, x0, y0, x1, y1, mid, border=frame)
-    if x1 - x0 >= 3 and y1 - y0 >= 3:
-        dr.rectangle([x0 + 1, y0 + 1, x1 - 1, y0 + 2], fill=dark)
-        # reflet diagonal Gen 5
-        for k in range(min(x1 - x0 - 2, y1 - y0 - 2)):
-            px, py = x0 + 2 + k, y0 + 2 + (k // 2)
-            if px < x1 and py < y1:
-                dr.point((px, py), fill=hi)
-        if x1 - x0 >= 6:
-            mx = (x0 + x1) // 2
-            dr.line([mx, y0 + 1, mx, y1 - 1], fill=frame)
-        if y1 - y0 >= 6:
-            my = (y0 + y1) // 2
-            dr.line([x0 + 1, my, x1 - 1, my], fill=frame)
-    if sill:
-        dr.line([x0 - 1, y1 + 1, x1 + 1, y1 + 1], fill=sill)
-
-
-def _auto_door(dr, cx, yb, hw=10, h=18, frame=(52, 58, 72, 255), glass=(68, 128, 178, 255),
-               dark=(30, 44, 62, 255), hi=(164, 220, 248, 255), mat=None):
-    """Double porte coulissante vitrée Gen 5 (100 % opaque, zéro trou transparent)."""
-    x0, x1, y0 = cx - hw, cx + hw, yb - h
-    # Encadrement métallique extérieur
-    _rect(dr, x0 - 2, y0 - 2, x1 + 2, yb, (142, 150, 166, 255), border=(34, 38, 48, 255), hi=(198, 206, 220, 255))
-    # Fond intérieur sombre derrière la vitre
-    _rect(dr, x0, y0, x1, yb - 1, dark, border=frame)
-    # Panneaux vitrés gauche & droite
-    dr.rectangle([x0 + 1, y0 + 2, cx - 1, yb - 3], fill=glass)
-    dr.rectangle([cx + 1, y0 + 2, x1 - 1, yb - 3], fill=glass)
-    # Reflets obliques
-    for off in (0, cx - x0):
-        for k in range(min(hw - 3, h - 6)):
-            dr.point((x0 + 2 + off + k, y0 + 3 + k), fill=hi)
-            if y0 + 4 + k < yb - 3:
-                dr.point((x0 + 2 + off + k, y0 + 4 + k), fill=(120, 184, 226, 255))
-    # Montant central + traverses
-    dr.line([cx, y0 + 1, cx, yb - 2], fill=(38, 44, 56, 255))
-    dr.line([x0 + 1, yb - 4, x1 - 1, yb - 4], fill=(96, 108, 126, 255))
-    dr.line([x0 + 1, y0 + 1, x1 - 1, y0 + 1], fill=(110, 122, 140, 255))
-    # Seuil pierre / tapis
-    if mat:
-        _rect(dr, x0 - 2, yb - 2, x1 + 2, yb, mat, border=(48, 34, 34, 255))
-    else:
-        _rect(dr, x0 - 3, yb - 1, x1 + 3, yb, (176, 180, 188, 255), border=(56, 60, 70, 255))
-
-
-def _wood_door(dr, cx, yb, hw=8, h=17, fill=(134, 82, 46, 255), dark=(88, 50, 26, 255), hi=(174, 118, 72, 255)):
-    x0, x1, y0 = cx - hw, cx + hw, yb - h
-    _rect(dr, x0 - 2, y0 - 2, x1 + 2, yb, (92, 82, 74, 255), border=(34, 28, 26, 255), hi=(134, 122, 112, 255))
-    _rect(dr, x0, y0, x1, yb - 1, fill, border=(36, 24, 18, 255), hi=hi)
-    # Double vantail + moulures
-    dr.line([cx, y0 + 1, cx, yb - 2], fill=(42, 26, 18, 255))
-    dr.rectangle([x0 + 2, y0 + 3, cx - 2, y0 + 8], fill=dark)
-    dr.rectangle([cx + 2, y0 + 3, x1 - 2, y0 + 8], fill=dark)
-    dr.rectangle([x0 + 2, y0 + 10, cx - 2, yb - 4], fill=dark)
-    dr.rectangle([cx + 2, y0 + 10, x1 - 2, yb - 4], fill=dark)
-    dr.point((cx - 2, y0 + 9), fill=(238, 198, 76, 255))
-    dr.point((cx + 2, y0 + 9), fill=(238, 198, 76, 255))
-    _rect(dr, x0 - 2, yb - 1, x1 + 2, yb, (176, 172, 162, 255), border=(52, 48, 46, 255))
-
-
-def _strip_soft_shadow(im):
-    """Supprime les ombres portées RPG Maker semi-transparentes (alpha < 200) coupées net par alphaTest."""
+def _strip_soft_shadow(im, thr=190):
     a = np.array(im.convert('RGBA'))
-    a[a[..., 3] < 200] = 0
+    a[a[..., 3] < thr] = 0
     return Image.fromarray(a, 'RGBA')
 
 
-# ================================================================== DÉCORS CRITIQUES
-def _draw_crate_l(dr, x0, y0, w=14, h=15):
-    """Dessine une caisse en bois 3/4 pixel-art Gen 5 dans un rectangle logique (w × h)."""
-    out = (44, 28, 18, 255)
-    top_hi = (224, 178, 114, 255)
-    top_mid = (198, 148, 86, 255)
-    top_sh = (164, 114, 62, 255)
-    fr_hi = (182, 130, 74, 255)
-    fr_mid = (154, 104, 56, 255)
-    fr_in = (122, 78, 40, 255)
-    fr_sh = (92, 56, 28, 255)
-    nail = (68, 44, 28, 255)
-    x1, y1 = x0 + w - 1, y0 + h - 1
-    top_h = max(4, h // 3)
-    # Face supérieure (perspective 3/4)
-    _rect(dr, x0, y0, x1, y0 + top_h, top_mid, border=out, hi=top_hi, sh=top_sh)
-    for y in range(y0 + 2, y0 + top_h, 2):
-        dr.line([x0 + 1, y, x1 - 1, y], fill=top_sh)
-    # Face avant encadrée + traverse diagonale
-    fy0 = y0 + top_h
-    _rect(dr, x0, fy0, x1, y1, fr_mid, border=out, hi=fr_hi, sh=fr_sh)
-    _rect(dr, x0 + 2, fy0 + 2, x1 - 2, y1 - 2, fr_in, border=fr_sh)
-    # Planches intérieures verticales
-    for x in range(x0 + 4, x1 - 2, 3):
-        dr.line([x, fy0 + 3, x, y1 - 3], fill=fr_sh)
-    # Traverse diagonale en bois clair
-    span = min(x1 - x0 - 4, y1 - fy0 - 4)
-    for k in range(span + 1):
-        px = x0 + 2 + k
-        py = y1 - 2 - int(k * (y1 - fy0 - 4) / max(1, span))
-        dr.point((px, py), fill=fr_hi)
-        if px + 1 <= x1 - 2:
-            dr.point((px + 1, py), fill=fr_mid)
-    # Clous d'angle
-    for nx, ny in ((x0 + 1, fy0 + 1), (x1 - 1, fy0 + 1), (x0 + 1, y1 - 1), (x1 - 1, y1 - 1)):
-        dr.point((nx, ny), fill=nail)
+def _trim_bottom(im, thr=128):
+    """Recadre le bas d'un sprite pour supprimer toute bande transparente laissée par un nettoyage d'ombre."""
+    a = np.array(im.convert('RGBA'))
+    ys = np.where(a[..., 3] >= thr)[0]
+    if len(ys):
+        return im.crop((0, 0, im.width, int(ys.max()) + 1))
+    return im
 
 
-def make_d_caisse():
-    im = _canvas2x(15, 16)
-    _draw_crate_l(ImageDraw.Draw(im), 0, 0, 15, 16)
-    return _up2(im)
+def _patch_arch_door_behind(im, x0, y0, x1, y1, tint='glass'):
+    """Place une porte coulissante Gen 5 sombre DERRIÈRE les pixels transparents d'une arche (ne touche aucun pixel opaque)."""
+    im = im.convert('RGBA')
+    w, h = im.size
+    a = np.array(im)
+    bg = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    dr = ImageDraw.Draw(bg)
+    x0, y0, x1, y1 = max(0, x0), max(0, y0), min(w - 1, x1), min(h - 1, y1)
+    cx = (x0 + x1) // 2
+    if tint == 'cyan_glass':
+        # Porte coulissante vitrée bleu-ardoise sobre et symétrique (ombrage Gen 5 progressif sous l'arche, zéro trait crénelé)
+        dr.rectangle([x0, y0, x1, y1], fill=(22, 42, 64, 255))
+        pane_h = max(1, (y1 - 4) - (y0 + 2))
+        for yy in range(y0 + 2, y1 - 3):
+            t = (yy - (y0 + 2)) / pane_h
+            # Dégradé doux sombre sous l'arche -> bleu-verre ardoise en bas (style Opelucid / Ville Noire)
+            cr = int(28 + 26 * t)
+            cg = int(58 + 50 * t)
+            cb = int(90 + 62 * t)
+            dr.line([(x0 + 3, yy), (cx - 2, yy)], fill=(cr, cg, cb, 255))
+            dr.line([(cx + 2, yy), (x1 - 3, yy)], fill=(cr, cg, cb, 255))
+        # Légers reflets verticaux symétriques sur chaque battant (discrets, 2 px de large)
+        hl_top = y0 + max(6, pane_h // 4)
+        hl_bot = y1 - 8
+        if hl_bot > hl_top:
+            for rx in (x0 + 6, cx + 5):
+                if rx + 2 < x1 - 3:
+                    dr.rectangle([rx, hl_top, rx + 1, hl_bot], fill=(92, 148, 188, 255))
+        dr.rectangle([cx - 1, y0, cx + 1, y1], fill=(18, 34, 52, 255))
+        dr.rectangle([x0, y1 - 3, x1, y1], fill=(78, 114, 142, 255))
+        dr.line([(x0, y1 - 3), (x1, y1 - 3)], fill=(122, 162, 190, 255))
+    elif tint == 'dark_wood':
+        # Porte industrielle acier/bois sombre (b_maison_desert_1)
+        dr.rectangle([x0, y0, x1, y1], fill=(38, 30, 26, 255))
+        dr.rectangle([x0 + 2, y0 + 2, cx - 1, y1 - 2], fill=(64, 50, 42, 255))
+        dr.rectangle([cx + 2, y0 + 2, x1 - 2, y1 - 2], fill=(64, 50, 42, 255))
+        dr.rectangle([cx - 1, y0, cx + 1, y1], fill=(30, 24, 20, 255))
+        dr.rectangle([x0, y1 - 2, x1, y1], fill=(92, 82, 74, 255))
+    else:
+        # Porte coulissante vitrée ardoise Gen 5
+        dr.rectangle([x0, y0, x1, y1], fill=(34, 44, 58, 255))
+        dr.rectangle([x0 + 3, y0 + 3, cx - 2, y1 - 4], fill=(62, 88, 118, 255))
+        dr.rectangle([cx + 2, y0 + 3, x1 - 3, y1 - 4], fill=(62, 88, 118, 255))
+        dr.rectangle([cx - 1, y0, cx + 1, y1], fill=(32, 40, 52, 255))
+        dr.rectangle([x0, y1 - 4, x1, y1], fill=(156, 162, 172, 255))
+
+    # Ne remplit QUE la cavité transparente située dans [x0..x1, y0..y1] (aucun débord à l'extérieur des bords arrondis !)
+    bga = np.array(bg)
+    opaque = a[..., 3] >= 180
+    has_above = np.zeros((h, w), dtype=bool)
+    seen = np.zeros(w, dtype=bool)
+    for y in range(h):
+        has_above[y] = seen
+        seen |= opaque[y]
+    fill_mask = (~opaque) & has_above & (bga[..., 3] > 0)
+    out = a.copy()
+    out[fill_mask] = bga[fill_mask]
+    return Image.fromarray(out, 'RGBA')
 
 
-def make_d_caisses():
-    """Pile de 3 caisses en bois Gen 5 (36×50 px) — clairement lisible comme des caisses empilées."""
-    im = _canvas2x(18, 25)
+def _fix_b_gare(orig_im):
+    """Répare la vraie Gare Gen 5 de kit_bw_set : retire l'ombre alpha=64, nettoie le rebord gauche + porte vitrée sobre."""
+    im = _strip_soft_shadow(orig_im, thr=180)
+    im = im.crop((0, 0, im.width, 310)).copy()
+    bg = Image.new('RGBA', im.size, (0, 0, 0, 0))
+    bdr = ImageDraw.Draw(bg)
+    bdr.rectangle([10, 242, 254, 309], fill=(56, 52, 58, 255))
+    bdr.rectangle([10, 298, 254, 309], fill=(112, 108, 114, 255), outline=(42, 38, 44, 255))
+    bg.alpha_composite(im, (0, 0))
+    im = bg
+    # Ferme le bord droit avec le pilier gauche authentique du même sprite
+    im.alpha_composite(im.crop((10, 242, 20, 310)), (246, 242))
+    # Nettoie la petite tache ocre résiduelle (x=34..43, y=282..290) sous la vitrine gauche avec la pierre propre de droite
+    im.paste(im.crop((198, 281, 210, 291)), (33, 281))
+    # Porte vitrée coulissante sobre (verre bleu-ardoise assorti aux fenêtres de la Gare, cadre pierre/bronze)
     dr = ImageDraw.Draw(im)
-    # Caisse arrière gauche (base)
-    _draw_crate_l(dr, 0, 10, 12, 14)
-    # Caisse avant droite légèrement avancée
-    _draw_crate_l(dr, 6, 11, 12, 14)
-    # Caisse empilée au sommet (légèrement décalée)
-    _draw_crate_l(dr, 3, 0, 12, 13)
-    return _up2(im)
+    dr.rectangle([110, 256, 177, 309], fill=(124, 128, 138, 255), outline=(42, 42, 48, 255))
+    dr.rectangle([114, 260, 173, 306], fill=(38, 46, 58, 255))
+    for yy in range(262, 305):
+        t = (yy - 262) / 42.0
+        col = (int(56 + 22 * t), int(78 + 28 * t), int(104 + 34 * t), 255)
+        dr.line([(116, yy), (142, yy)], fill=col)
+        dr.line([(146, yy), (171, yy)], fill=col)
+    # Reflet doux et discret (tons bleu-gris Gen 5, sans blanc criard)
+    for ox in (120, 150):
+        for k in range(0, 16, 2):
+            dr.rectangle([ox + k, 267 + k, ox + k + 2, 268 + k], fill=(122, 152, 182, 255))
+    dr.rectangle([142, 260, 145, 306], fill=(44, 50, 62, 255))
+    dr.rectangle([108, 305, 179, 309], fill=(168, 172, 180, 255), outline=(56, 58, 66, 255))
+    return im, 144
 
 
-def make_d_squelette(root):
-    """Squelette de dragon préhistorique sur socle de musée (128×62 px = 4 cases exactes, style Gen 5 net)."""
+def _fix_b_mairie(orig_im):
+    """Garde 100 % du vrai sprite Gen 5 b_mairie, retire les 2 barres grises parasites et bouche la porte derrière l'arche."""
+    im = _strip_soft_shadow(orig_im, thr=160)
+    a = np.array(im)
+    h, w = a.shape[:2]
+    for side_xs in (range(0, 8), range(w - 8, w)):
+        for x in side_xs:
+            if int((a[:, x, 3] > 0).sum()) < 40:
+                a[:, x] = 0
+    im = _trim_bottom(Image.fromarray(a, 'RGBA'))
+    im = _patch_arch_door_behind(im, 88, 270, 162, im.height - 1, tint='cyan_glass')
+    return im, 125
+
+
+def _fix_b_bourse(orig_bourse, fixed_mairie):
+    """Aligne les 2 vraies tours Gen 5 de b_bourse.png au même niveau de sol (tour droite +12 px), fusionne la fente avec
+    leur propre mur White-City, et pose UNIQUEMENT le capot d'arche détouré de b_mairie au centre (porte=179)."""
+    im = _strip_soft_shadow(orig_bourse, thr=160).copy()
+    w, h = im.size  # 358 x 277 ; tour gauche y=1..276 (x=0..178), tour droite y=13..264 (x=191..358) -> +12 px = y=276 exact !
+    left_tower = im.crop((0, 0, 178, h))
+    right_tower = im.crop((191, 0, w, 265))  # 167 x 265 -> posée à y=12 -> bas exactement à y=277 !
+
+    out = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    # 1. Passerelle symétrique authentique (bande centrale de b_mairie) dans la fente x=177..192 entre les 2 tours
+    bridge_col = fixed_mairie.crop((117, 176, 133, 272))  # 16 x 96 symétrique du même marbre/cyan White-City
+    out.alpha_composite(bridge_col, (177, 132))
+    out.alpha_composite(left_tower.crop((152, 200, 174, h)), (172, 200))
+    # 2. Les deux vraies tours Gen 5 alignées sur exactement la même ligne de sol (y=276) !
+    out.alpha_composite(left_tower, (0, 0))
+    out.alpha_composite(right_tower, (191, 12))
+
+    # 3. Extrait UNIQUEMENT l'arche cintrée + sa porte depuis fixed_mairie (x=85..165, y=262..338 -> 80 x 76 px), détourée au polygone exact
+    arch_raw = fixed_mairie.crop((85, 262, 165, 338))  # 80 x 76, centre x=40
+    mask = Image.new('L', arch_raw.size, 0)
+    mdr = ImageDraw.Draw(mask)
+    # Polygone épousant exactement le capot octogonal/arrondi de l'arche White-City (zéro morceau de mur rectangulaire !)
+    mdr.polygon([
+        (36, 1), (44, 1),     # sommet du capot
+        (68, 12), (76, 22),   # épaule droite
+        (79, 46), (76, 75),   # pilier droit
+        (4, 75), (1, 46),     # pilier gauche
+        (4, 22), (12, 12),    # épaule gauche
+    ], fill=255)
+    arch_a = np.array(arch_raw)
+    arch_a[..., 3] = np.minimum(arch_a[..., 3], np.array(mask))
+    arch_clean = Image.fromarray(arch_a, 'RGBA')
+    out.alpha_composite(arch_clean, (179 - arch_clean.width // 2, h - arch_clean.height))
+    return out, 179
+
+
+def _fix_b_fonderie(orig_im):
+    """Garde 100 % du vrai sprite industriel Gen 5 b_fonderie, retire l'ombre alpha=64 et intègre une vraie porte d'usine à porte=88."""
+    im = _strip_soft_shadow(orig_im, thr=180)
+    im = im.crop((0, 0, im.width, min(im.height, 272))).copy()
+    # Remplit proprement le socle de brique sous la passerelle + double porte métallique sombre centrée à x=88 (porte=88)
+    w, h = im.size  # 176 x 272
+    bg = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    bdr = ImageDraw.Draw(bg)
+    # Mur de fond brique sombre entre les deux piliers principaux (x=28..146, y=246..271) pour ne plus voir d'herbe sous les échafaudages
+    bdr.rectangle([28, 246, 146, h - 1], fill=(70, 58, 46, 255))
+    for yy in range(250, h - 2, 6):
+        bdr.line([(28, yy), (146, yy)], fill=(54, 44, 34, 255))
+    bdr.rectangle([28, h - 4, 146, h - 1], fill=(50, 44, 38, 255))
+    bg.alpha_composite(im, (0, 0))
+    im = bg
+    # Double porte industrielle acier/bois sombre centrée exactement sur porte=88 (x=72..104, y=236..271)
+    dr = ImageDraw.Draw(im)
+    dr.rectangle([72, 236, 104, h - 1], fill=(42, 36, 32, 255), outline=(28, 22, 18, 255))
+    dr.rectangle([75, 239, 87, h - 4], fill=(66, 56, 48, 255), outline=(48, 40, 34, 255))
+    dr.rectangle([89, 239, 101, h - 4], fill=(66, 56, 48, 255), outline=(48, 40, 34, 255))
+    # Petites lucarnes industrielles en haut de chaque battant
+    dr.rectangle([77, 242, 85, 249], fill=(46, 54, 62, 255))
+    dr.rectangle([91, 242, 99, 249], fill=(46, 54, 62, 255))
+    # Seuil métallique bas
+    dr.rectangle([70, h - 4, 106, h - 1], fill=(104, 96, 88, 255), outline=(40, 34, 30, 255))
+    return im, 88
+
+
+def _fix_b_boutique_mode(b_boutique):
+    """Crée la Boutique de mode 6 cases (198×196, porte=112) 100 % sans couture depuis le vrai b_boutique.png !"""
+    # b_boutique est 150×196 ; son auvent et ses vitrines ont une période exacte de 24 px.
+    # On élargit de +48 px (2 × 24 px = 198 px = 6,19 cases) par bande horizontale pour 0 couture !
+    src = b_boutique.convert('RGBA')
+    w, h = src.size  # 150 x 196
+    W = 198
+    out = Image.new('RGBA', (W, h), (0, 0, 0, 0))
+
+    # 1) Toit courbé (y=0..56) : étirement symétrique propre (pic centré à x=99, courbe continue)
+    out.paste(src.crop((0, 0, w, 56)).resize((W, 56), Image.NEAREST), (0, 0))
+
+    # 2) Étage briques brunes (y=56..94) : fenêtre centrale (60..92) centrée + 24 px de brique unie de chaque côté
+    out.paste(src.crop((0, 56, 60, 94)), (0, 56))
+    brick_l = src.crop((54, 56, 62, 94))  # 8 px de brique unie sans ombre verticale
+    for k in range(3):
+        out.paste(brick_l, (60 + k * 8, 56))
+    out.paste(src.crop((60, 56, 92, 94)), (84, 56))  # fenêtre cintrée centrée à x=100
+    brick_r = brick_l.transpose(Image.FLIP_LEFT_RIGHT)
+    for k in range(3):
+        out.paste(brick_r, (116 + k * 8, 56))
+    out.paste(src.crop((92, 56, w, 94)), (140, 56))
+
+    # 3) Auvent rayé (y=94..148) : période exacte 24 px (x=64..88 répétée 2 fois -> 0 rupture de rayure !)
+    out.paste(src.crop((0, 94, 112, 148)), (0, 94))
+    out.paste(src.crop((64, 94, 88, 148)), (112, 94))
+    out.paste(src.crop((64, 94, 88, 148)), (136, 94))
+    out.paste(src.crop((112, 94, w, 148)), (160, 94))
+
+    # 4) Rez-de-chaussée (y=148..196) : vitrines à gauche (0..86) + porte bois à x=112 + vitrines/fleurs en miroir à droite
+    out.paste(src.crop((0, 148, 86, h)), (0, 148))
+    out.paste(src.crop((110, 148, 150, h)), (86, 148))      # pilier + porte bois (centre porte = 86 + 26 = 112 exact !)
+    out.paste(src.crop((110, 148, 120, h)), (126, 148))     # pilier droit symétrique de la porte
+    out.paste(src.crop((0, 148, 62, h)).transpose(Image.FLIP_LEFT_RIGHT), (136, 148))  # 2 vitrines + pot de fleurs miroir
+
+    # Reteint l'auvent bleu Boutique Pokémon en bordeaux/rose chic « Boutique de mode » (ombrage Gen 5 intact)
+    a = np.array(out)
+    r, g, b, al = a[..., 0].astype(float), a[..., 1].astype(float), a[..., 2].astype(float), a[..., 3]
+    yy = np.arange(h)[:, None]
+    m = (al > 0) & (yy >= 92) & (yy <= 160) & (b > r + 24) & (b > g + 8)
+    a[m, 0] = np.clip(b[m] * 0.96 + 18, 0, 255).astype('uint8')
+    a[m, 1] = np.clip(g[m] * 0.42 + 12, 0, 255).astype('uint8')
+    a[m, 2] = np.clip(b[m] * 0.56 + 18, 0, 255).astype('uint8')
+    return Image.fromarray(a, 'RGBA'), 112
+
+
+def _fix_b_maison_forge_p1(b_maison_a_g):
+    """Maison 4 cases pour Forge-Acier 100 % issue du vrai b_maison_a_g de kit_bw_set (toit ardoise + murs brique)."""
+    a = np.array(b_maison_a_g.convert('RGBA')).copy()
+    h, w = a.shape[:2]
+    yy = np.arange(h)[:, None]
+    r, g, b, al = a[..., 0].astype(float), a[..., 1].astype(float), a[..., 2].astype(float), a[..., 3]
+    # Toit orange -> ardoise industrielle bleu-gris foncé (style Forge-Acier)
+    toit = (al > 0) & (yy < 108) & (r > b + 24) & (g >= b + 2)
+    lum = (r[toit] * 0.45 + g[toit] * 0.45 + b[toit] * 0.10) / 180.0
+    a[toit, 0] = np.clip(lum * 86, 28, 138).astype('uint8')
+    a[toit, 1] = np.clip(lum * 94, 30, 148).astype('uint8')
+    a[toit, 2] = np.clip(lum * 110, 36, 168).astype('uint8')
+    # Mur crème bas -> brique chaude ocre-terre
+    mur = (al > 0) & (yy >= 100) & (r > 170) & (g > 155) & (b > 110) & (np.abs(r - g) < 42)
+    a[mur, 0] = np.clip(r[mur] * 0.86, 0, 255).astype('uint8')
+    a[mur, 1] = np.clip(g[mur] * 0.62, 0, 255).astype('uint8')
+    a[mur, 2] = np.clip(b[mur] * 0.50, 0, 255).astype('uint8')
+    return Image.fromarray(a, 'RGBA'), 48
+
+
+def _trim_tall_clean(path, cut_y0, cut_y1, max_y=None):
+    im = _strip_soft_shadow(Image.open(path), thr=180)
+    a = np.array(im)
+    if max_y is not None:
+        a = a[:max_y]
+    else:
+        ys = np.where(a[..., 3] > 0)[0]
+        if len(ys):
+            a = a[:int(ys.max()) + 1]
+    if cut_y0 is not None and cut_y1 is not None and cut_y1 < a.shape[0]:
+        a = np.concatenate([a[:cut_y0], a[cut_y1:]], axis=0)
+    res = Image.fromarray(a, 'RGBA')
+    res.save(path)
+    return res
+
+
+def _fix_b_tour_vitre_lobby(im, x0=72, x1=143):
+    """Ajoute un hall vitré discret dans la fente noire au rez-de-chaussée de b_tour_vitre (100 % cohérent Gen 5)."""
+    im = im.convert('RGBA').copy()
+    h = im.height
+    dr = ImageDraw.Draw(im)
+    y0, y1 = h - 25, h - 1
+    dr.rectangle([x0, y0, x1, y1], fill=(40, 52, 68, 255))
+    dr.rectangle([x0 + 2, y0 + 1, x1 - 2, y1 - 2], fill=(74, 134, 184, 255), outline=(146, 158, 174, 255))
+    span = x1 - x0 - 4
+    n_panes = max(4, round(span / 18))
+    step = span / n_panes
+    for i in range(1, n_panes):
+        mx = int(round(x0 + 2 + i * step))
+        dr.rectangle([mx - 1, y0 + 1, mx, y1 - 2], fill=(44, 54, 70, 255))
+    for i in range(n_panes):
+        bx = int(round(x0 + 6 + i * step))
+        for k in range(0, 10, 2):
+            if bx + k + 1 < x1 - 3:
+                dr.rectangle([bx + k, y0 + 3 + k, bx + k + 1, y0 + 4 + k], fill=(168, 222, 248, 255))
+    dr.rectangle([x0, y1 - 3, x1, y1], fill=(180, 186, 196, 255), outline=(56, 62, 74, 255))
+    return im
+
+
+def _widen_tour_vitre(tv_raw):
+    """Élargit le vrai b_tour_vitre Gen 5 (224 -> 300 px = 9,38 cases) sans aucune couture (2 travées exactes de 38 px)."""
+    w, h = tv_raw.size  # 224 x 268
+    W = w + 76  # 300 px
+    out = Image.new('RGBA', (W, h), (0, 0, 0, 0))
+    # 1) Toit arqué (y=0..48) : élargit uniquement la verrière plate centrale (x=98..117, 19 px × 4 = 76 px) -> arche 100 % lisse
+    out.paste(tv_raw.crop((0, 0, 108, 48)), (0, 0))
+    skylight = tv_raw.crop((98, 0, 117, 48))  # 19 px plats
+    for k in range(4):
+        out.paste(skylight, (108 + k * 19, 0))
+    out.paste(tv_raw.crop((108, 0, w, 48)), (184, 0))
+
+    # 2) Façade + 5 travées de fenêtres (y=48..214) : période exacte 38 px (x=89..127 répétée 2 fois -> 0 couture !)
+    out.paste(tv_raw.crop((0, 48, 127, 214)), (0, 48))
+    bay = tv_raw.crop((89, 48, 127, 214))  # 38 px
+    out.paste(bay, (127, 48))
+    out.paste(bay, (165, 48))
+    out.paste(tv_raw.crop((127, 48, w, 214)), (203, 48))
+
+    # 3) Auvent rouge + bas (y=214..h) : prolonge la zone rouge unie entre les 2 appliques orange (x=100..119 = 19 px × 4)
+    out.paste(tv_raw.crop((0, 214, 110, h)), (0, 214))
+    canopy = tv_raw.crop((100, 214, 119, h))  # 19 px rouges propres sans applique coupée
+    for k in range(4):
+        out.paste(canopy, (110 + k * 19, 214))
+    out.paste(tv_raw.crop((110, 214, w, h)), (186, 214))
+
+    # 4) Hall vitré propre centré sur toute l'entrée élargie (x=72..219 -> 8 travées vitrées nettes)
+    out = _fix_b_tour_vitre_lobby(out, x0=72, x1=219)
+    return out, None
+
+
+def _snow_boutique_generous(im, awning_y_range=None):
+    """Pose d'épaisses congères bleu-glace B2W2 sur tout le haut du toit + la corniche médiane + l'auvent."""
+    im = im.convert('RGBA').copy()
+    px = im.load()
+    w, h = im.size
+    top_ys = [next((y for y in range(h) if px[x, y][3] > 200), None) for x in range(w)]
+    for x in range(2, w - 2):
+        ty = top_ys[x]
+        if ty is None or ty > 60:
+            continue
+        wave = round(3.0 * math.sin(x * 0.16) + 2.0 * math.cos(x * 0.37))
+        depth = 18 + wave
+        for dy in range(depth):
+            y = ty + dy
+            if y >= h:
+                break
+            r, g, b, a = px[x, y]
+            if a < 128:
+                continue
+            if dy == 0:
+                px[x, y] = (54, 64, 88, a)
+            elif dy == depth - 1:
+                px[x, y] = (146, 174, 210, a)
+            elif dy >= depth - 3:
+                px[x, y] = (196, 218, 240, a)
+            elif dy <= 2:
+                px[x, y] = (246, 250, 255, a)
+            else:
+                px[x, y] = (226, 238, 252, a)
+    for x in range(4, w - 4):
+        for y in range(52, min(h - 40, 88)):
+            r, g, b, a = px[x, y]
+            if a > 200 and r > 185 and g > 180 and b > 170:
+                wave2 = 4 + ((x * 5) % 3)
+                for dy in range(wave2):
+                    if y + dy < h and px[x, y + dy][3] > 200:
+                        px[x, y + dy] = (244, 250, 255, 255) if dy < 2 else ((210, 228, 246, 255) if dy < wave2 - 1 else (154, 182, 216, 255))
+                break
+    if awning_y_range:
+        y0, y1, x0, x1 = awning_y_range
+        for x in range(x0, min(w - 2, x1)):
+            wave3 = 5 + ((x * 3) % 3)
+            for dy in range(wave3):
+                y = y0 + dy
+                if y < y1 and px[x, y][3] > 200:
+                    px[x, y] = (242, 248, 255, 255) if dy < 2 else ((206, 226, 246, 255) if dy < wave3 - 1 else (152, 180, 214, 255))
+    return im
+
+
+def _make_d_squelette(root):
+    """Squelette de dragon préhistorique sur socle de musée (128×62 px = 4 cases exactes)."""
     src_path = os.path.join(root, 'odyssee', 'img', 'deco', 'squelette.png')
     if not os.path.exists(src_path):
         return None
     im = Image.open(src_path).convert('RGBA')
     a = np.array(im)
-    # Nettoie les franges violet/magenta résiduelles et normalise le trait sur le gris-brun foncé Gen 5
     r, g, b, al = a[..., 0].astype(int), a[..., 1].astype(int), a[..., 2].astype(int), a[..., 3]
     a[al < 140] = 0
     al = a[..., 3]
     a[al >= 140, 3] = 255
-    # Pixels à dominante magenta/pourpre -> contour os/bois sombre propre
     purp = (al >= 140) & (r > g + 16) & (b > g + 12)
     a[purp, :3] = np.clip(np.stack([r[purp] * 0.55, g[purp] * 0.62, b[purp] * 0.45], axis=-1), 28, 72).astype('uint8')
-    # Éclaircit légèrement l'ivoire des os pour coller à la palette lumineuse BW2
     os_px = (al >= 140) & (r > 130) & (g > 115) & (b > 75) & (np.arange(a.shape[0])[:, None] < 22)
     a[os_px, 0] = np.clip(a[os_px, 0] * 1.08 + 10, 0, 248).astype('uint8')
     a[os_px, 1] = np.clip(a[os_px, 1] * 1.07 + 8, 0, 242).astype('uint8')
@@ -191,549 +407,303 @@ def make_d_squelette(root):
     return Image.fromarray(a, 'RGBA').resize((im.width * 2, im.height * 2), Image.NEAREST)
 
 
-# ================================================================== BÂTIMENTS CRITIQUES
-def make_b_gare(orig_im):
-    """Répare la vraie Gare Gen 5 de kit_bw_set : supprime l'ombre alpha=64, ajoute mur de fond + double porte vitrée."""
-    im = _strip_soft_shadow(orig_im)
-    # Coupe sous y=310 (lignes 310..331 = ombre RPG Maker vide)
-    im = im.crop((0, 0, im.width, 310)).copy()
-    dr = ImageDraw.Draw(im)
-    # 1. Mur de fond sombre derrière les piliers & stands (zéro fuite de trottoir/herbe)
-    bg = Image.new('RGBA', im.size, (0, 0, 0, 0))
-    bdr = ImageDraw.Draw(bg)
-    # Arrière-plan de la galerie (x=10..254, y=242..309)
-    bdr.rectangle([10, 242, 254, 309], fill=(56, 52, 58, 255))
-    for x in range(12, 254, 16):
-        bdr.line([x, 244, x, 300], fill=(46, 42, 48, 255))
-    # Plinthe pierre grise en bas sous les vitrines
-    bdr.rectangle([10, 298, 254, 309], fill=(112, 108, 114, 255), outline=(42, 38, 44, 255))
-    bdr.line([11, 299, 253, 299], fill=(148, 144, 150, 255))
-    # Compose l'original par-dessus le mur de fond (les piliers et stands restent intacts devant !)
-    bg.alpha_composite(im, (0, 0))
-    im = bg
-    # 2. Copie le pilier gauche (x=10..19) sur le bord droit (x=246..255) pour refermer proprement la façade
-    pilier = im.crop((10, 242, 20, 310))
-    im.alpha_composite(pilier, (246, 242))
-    # 3. Grande double porte vitrée coulissante Gen 5 dans l'arche centrale (x=108..179, centre = 144)
-    dr = ImageDraw.Draw(im)
-    # Panneau supérieur métallique au-dessus des portes
-    dr.rectangle([108, 242, 179, 256], fill=(74, 62, 56, 255))
-    dr.rectangle([112, 245, 175, 253], fill=(176, 116, 62, 255), outline=(48, 34, 26, 255))
-    # Bandeau « GARE » doré / bleu
-    dr.rectangle([120, 247, 167, 251], fill=(236, 224, 186, 255))
-    # Double porte vitrée coulissante (x=114..173, y=256..308, centre 144)
-    # Cadre métal gris-bleu
-    dr.rectangle([110, 256, 177, 309], fill=(138, 146, 160, 255), outline=(36, 40, 48, 255))
-    dr.rectangle([114, 260, 173, 306], fill=(32, 46, 64, 255), outline=(48, 56, 70, 255))
-    # Vantaux vitrés gauche & droit
-    dr.rectangle([116, 262, 142, 304], fill=(78, 142, 192, 255))
-    dr.rectangle([146, 262, 171, 304], fill=(78, 142, 192, 255))
-    # Reflets diagonaux pixel-art (par blocs 2×2)
-    for ox in (118, 148):
-        for k in range(0, 20, 2):
-            dr.rectangle([ox + k, 264 + k, ox + k + 3, 265 + k], fill=(166, 220, 248, 255))
-            if k < 14:
-                dr.rectangle([ox + k + 4, 264 + k, ox + k + 5, 265 + k], fill=(120, 184, 226, 255))
-    # Montant central & poignée + bande de sécurité
-    dr.rectangle([142, 260, 145, 306], fill=(42, 48, 60, 255))
-    dr.rectangle([116, 284, 141, 287], fill=(182, 194, 208, 255))
-    dr.rectangle([146, 284, 171, 287], fill=(182, 194, 208, 255))
-    # Marche de seuil en pierre
-    dr.rectangle([108, 305, 179, 309], fill=(184, 188, 196, 255), outline=(54, 58, 66, 255))
-    return im, 144
+def _strip_checker_crop(im, box, strip_dark_bg=False):
+    """Détoure proprement un sprite de centre_bw_ultimo.png par flood-fill bord sur damier violet (111,49,152) / blanc."""
+    sub = im.crop(box).convert('RGBA')
+    a = np.array(sub)
+    h, w = a.shape[:2]
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    is_bg = ((r == 111) & (g == 49) & (b == 152)) | ((r == 255) & (g == 255) & (b == 255))
+    if strip_dark_bg:
+        is_bg |= (r < 12) & (g < 12) & (b < 12)
+    vis = np.zeros((h, w), dtype=bool)
+    q = []
+    for x in range(w):
+        for y in (0, h - 1):
+            if is_bg[y, x] and not vis[y, x]:
+                vis[y, x] = True
+                q.append((y, x))
+    for y in range(h):
+        for x in (0, w - 1):
+            if is_bg[y, x] and not vis[y, x]:
+                vis[y, x] = True
+                q.append((y, x))
+    for cy, cx in q:
+        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            ny, nx = cy + dy, cx + dx
+            if 0 <= ny < h and 0 <= nx < w and not vis[ny, nx] and is_bg[ny, nx]:
+                vis[ny, nx] = True
+                q.append((ny, nx))
+    a[vis] = 0
+    a[(a[..., 0] == 111) & (a[..., 1] == 49) & (a[..., 2] == 152)] = 0
+    ys, xs = np.where(a[..., 3] > 0)
+    if len(ys):
+        a = a[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+    return Image.fromarray(a, 'RGBA')
 
 
-def make_b_tour_vitre(orig_im):
-    """Ajoute un hall vitré Gen 5 dans le rectangle noir vide au pied de b_tour_vitre (x=71..144, y=327..351)."""
-    im = orig_im.convert('RGBA').copy()
-    dr = ImageDraw.Draw(im)
-    # Cadre aluminium + double porte vitrée de hall de gratte-ciel (x=72..143, y=327..351)
-    dr.rectangle([72, 327, 143, 351], fill=(40, 52, 68, 255))
-    dr.rectangle([74, 328, 141, 349], fill=(74, 134, 184, 255), outline=(146, 158, 174, 255))
-    # 3 montants verticaux (porte double au centre + 2 vitrines latérales)
-    for mx in (92, 108, 124):
-        dr.rectangle([mx - 1, 328, mx, 349], fill=(44, 54, 70, 255))
-    # Reflets diagonaux 2×2
-    for bx in (78, 96, 112, 128):
-        for k in range(0, 10, 2):
-            dr.rectangle([bx + k, 330 + k, bx + k + 1, 331 + k], fill=(168, 222, 248, 255))
-    # Seuil pierre claire
-    dr.rectangle([72, 348, 143, 351], fill=(180, 186, 196, 255), outline=(56, 62, 74, 255))
-    return im, None
+def _extraire_centre_gen5(src_dir, out_dir, decos, extra_sol):
+    """Intérieur 100 % authentique 5G (Pokémon Noir & Blanc) depuis centre_bw_ultimo.png (UltimoSpriter) et centre_bw_ditto.png (ditto209)."""
+    u_path = os.path.join(src_dir, 'centre_bw_ultimo.png')
+    d_path = os.path.join(src_dir, 'centre_bw_ditto.png')
+    if not (os.path.exists(u_path) and os.path.exists(d_path)):
+        return
+    u = Image.open(u_path).convert('RGBA')
+    d = Image.open(d_path).convert('RGBA')
+
+    # 1) Sol parquet doré-abricot 5G (16×16 sans couture issu du motif 2×2 parquet Unys)
+    extra_sol['floor_pink'] = d.crop((0, 0, 64, 64)).resize((16, 16), Image.NEAREST)
+
+    # 2) Dalles lounge gris-clair à losanges 5G (miroir bas-droite propre pour zéro angle orange)
+    lg = d.crop((32, 192, 64, 224)).convert('RGBA')
+    lga = np.array(lg)
+    # Remplace le petit coin haut-gauche orange (0..10, 0..10) par le miroir symétrique bas-droite
+    lga[:12, :12] = lga[31:19:-1, 31:19:-1]
+    extra_sol['x_clounge'] = Image.fromarray(lga, 'RGBA').resize((16, 16), Image.NEAREST)
+
+    # 3) Comptoir Centre Pokémon 5G : dessus rouge-corail lisse (sans jointure verticale) + façade blanc-argenté métallique
+    extra_sol['x_ccounter'] = u.crop((106, 228, 118, 237)).resize((16, 16), Image.NEAREST)
+    extra_sol['x_ccounterfront'] = u.crop((106, 237, 118, 249)).resize((16, 16), Image.NEAREST)
+
+    # 4) Mur du fond du Centre Pokémon 5G : blanc-argenté moderne + bande horizontale jaune-or + plinthe ardoise
+    murh = u.crop((46, 30, 62, 46))  # chaperon ardoise sombre + haut blanc-argenté
+    murb = Image.new('RGBA', (16, 16))
+    murb.paste(u.crop((46, 46, 62, 59)), (0, 0))  # panneau argenté + bande jaune-or 5G
+    # Plinthe gris-ardoise en bas (3 px, assortie aux murs de ref_centre_nb_official)
+    dr_m = ImageDraw.Draw(murb)
+    dr_m.rectangle([0, 13, 15, 13], fill=(116, 124, 142, 255))
+    dr_m.rectangle([0, 14, 15, 15], fill=(64, 70, 86, 255))
+    extra_sol['x_murh_center'] = murh
+    extra_sol['x_murb_center'] = murb
+
+    # 5) Allée centrale abricot + grand emblème Poké Ball 5G au sol (48×88 transparent RGBA)
+    rr = np.array(d.crop((96, 0, 192, 176)).convert('RGBA'))
+    rr[(rr[..., 3] > 0) & (rr[..., 0] < 20) & (rr[..., 1] < 20) & (rr[..., 2] < 20)] = 0
+    runner = Image.fromarray(rr, 'RGBA').resize((48, 88), Image.NEAREST)
+    runner.save(os.path.join(out_dir, 'd_center_runner.png'))
+    decos['center_runner'] = runner
+
+    # 6) Mobilier 100 % 5G (ombrage doux DS depuis centre_bw_ultimo.png) :
+    # Machine de soin octogonale blanche/argentée avec moniteur (2 cases de large)
+    healer = _strip_checker_crop(u, (130, 252, 178, 314))
+    healer = healer.resize((60, round(60 * healer.height / healer.width)), Image.NEAREST)
+    healer.save(os.path.join(out_dir, 'd_healer.png'))
+    decos['healer'] = healer
+
+    # PC Unys blanc/bleu-nuit à écran cyan et voyants roses/bleus
+    pc = _strip_checker_crop(u, (140, 322, 166, 366))
+    pc = pc.resize((34, round(34 * pc.height / pc.width)), Image.NEAREST)
+    pc.save(os.path.join(out_dir, 'd_pc.png'))
+    decos['pc'] = pc
+
+    # Palmier tropical en pot crème du Centre Pokémon 5G (sans débord rouge à gauche)
+    plant = _strip_checker_crop(u, (51, 316, 68, 352))
+    plant = plant.resize((30, round(30 * plant.height / plant.width)), Image.NEAREST)
+    plant.save(os.path.join(out_dir, 'd_plant.png'))
+    decos['plant'] = plant
+
+    # Coin salon 5G : table ovale blanche + 4 fauteuils rouges Unys (emprise 2 cases de d_bench)
+    bench = _strip_checker_crop(u, (4, 318, 51, 356), strip_dark_bg=True)
+    bench = bench.resize((72, round(72 * bench.height / bench.width)), Image.NEAREST)
+    bench.save(os.path.join(out_dir, 'd_bench.png'))
+    decos['bench'] = bench
+
+    # Présentoir à brochures blanc coloré 5G (d_vase dans le coin droit du Centre)
+    rack = _strip_checker_crop(u, (6, 362, 34, 402), strip_dark_bg=True)
+    rack = rack.resize((36, round(36 * rack.height / rack.width)), Image.NEAREST)
+    rack.save(os.path.join(out_dir, 'd_vase.png'))
+    decos['vase'] = rack
 
 
-def make_b_bourse():
-    """Bourse de Métropole unifiée Gen 5 (384×272 = 12 cases, porte double centrée à x=192)."""
-    im = _canvas2x(192, 136)
-    dr = ImageDraw.Draw(im)
-    out = (34, 38, 50, 255)
-    stone = (214, 212, 204, 255)
-    stone_hi = (238, 236, 228, 255)
-    stone_sh = (172, 170, 162, 255)
-    slate = (62, 74, 104, 255)
-    slate_hi = (94, 112, 152, 255)
-    slate_sh = (42, 50, 74, 255)
-    gold = (224, 184, 76, 255)
-    gold_hi = (248, 222, 126, 255)
-    gold_sh = (156, 118, 38, 255)
-
-    # Ailes gauche & droite (x=4..54 et x=137..187) — pierre + baies vitrées
-    for ax0, ax1 in ((4, 58), (133, 187)):
-        _rect(dr, ax0, 34, ax1, 135, stone, border=out, hi=stone_hi, sh=stone_sh)
-        _bricks_l(dr, ax0, 40, ax1, 124, (194, 192, 184, 255), step_y=4, step_x=8)
-        # Toit terrasse bleu-ardoise + corniche dorée
-        _rect(dr, ax0 - 2, 22, ax1 + 2, 35, slate, border=out, hi=slate_hi, sh=slate_sh)
-        for y in range(25, 34, 3):
-            dr.line([ax0, y, ax1, y], fill=slate_sh)
-        _rect(dr, ax0 - 1, 35, ax1 + 1, 38, gold, border=(68, 54, 24, 255), hi=gold_hi)
-        # Soubassement granit
-        _rect(dr, ax0, 122, ax1, 135, (124, 128, 138, 255), border=out, hi=(156, 160, 170, 255))
-        # 3 étages × 3 baies vitrées Gen 5
-        for wy in (44, 68, 94):
-            for wx in (ax0 + 6, ax0 + 21, ax0 + 36):
-                _glass_win(dr, wx, wy, wx + 11, wy + 16, sill=(150, 148, 142, 255))
-
-    # Corps central monumental (x=50..141) — colonnade, horloge/emblème Bourse, grand hall d'entrée
-    _rect(dr, 50, 20, 141, 135, stone_hi, border=out, sh=stone_sh)
-    _bricks_l(dr, 50, 36, 141, 122, (204, 202, 194, 255), step_y=4, step_x=8)
-    # Grande verrière d'étage centrale (panneau boursier / verrière bleue)
-    _rect(dr, 56, 38, 135, 92, (46, 62, 86, 255), border=out)
-    for gx in range(60, 132, 12):
-        _glass_win(dr, gx, 42, gx + 9, 64, frame=(40, 50, 68, 255), mid=(76, 138, 194, 255))
-        _glass_win(dr, gx, 68, gx + 9, 88, frame=(40, 50, 68, 255), mid=(66, 122, 176, 255))
-    # Bandeau LED boursier lumineux (cours vert/or) au-dessus du porche
-    _rect(dr, 56, 94, 135, 102, (28, 36, 48, 255), border=out)
-    for tx in range(60, 131, 6):
-        col_t = (84, 218, 136, 255) if (tx // 6) % 3 != 0 else (246, 208, 84, 255)
-        dr.rectangle([tx, 97, tx + 3, 99], fill=col_t)
-
-    # Grand toit mansardé + fronton central doré
-    _rect(dr, 46, 6, 145, 22, slate, border=out, hi=slate_hi, sh=slate_sh)
-    for x in range(52, 140, 8):
-        dr.line([x, 8, x, 20], fill=slate_sh)
-    _rect(dr, 48, 21, 143, 25, gold, border=(68, 54, 24, 255), hi=gold_hi, sh=gold_sh)
-    # Médaillon doré central (symbole Poké-Yen / Bourse)
-    cx = 96
-    _rect(dr, cx - 18, 2, cx + 18, 24, slate_hi, border=out, hi=(132, 152, 196, 255))
-    dr.ellipse([cx - 9, 5, cx + 9, 21], fill=gold, outline=(62, 46, 18, 255))
-    dr.ellipse([cx - 6, 8, cx + 6, 18], fill=gold_hi, outline=gold_sh)
-    # Petit symbole « P » boursier au centre
-    dr.line([cx - 2, 10, cx - 2, 16], fill=(72, 52, 20, 255))
-    dr.rectangle([cx - 2, 10, cx + 2, 13], outline=(72, 52, 20, 255))
-
-    # Colonnes de marbre encadrant le porche
-    for col_x in (54, 70, 118, 134):
-        _rect(dr, col_x, 103, col_x + 5, 135, stone_hi, border=(74, 76, 86, 255), sh=stone_sh)
-        dr.line([col_x + 1, 104, col_x + 1, 134], fill=(250, 248, 242, 255))
-    # Porche et grande double porte vitrée centrée à cx=96 (= 192 px en 2× !)
-    _rect(dr, 76, 104, 116, 135, (148, 150, 158, 255), border=out)
-    _auto_door(dr, cx, 135, hw=13, h=24, mat=(168, 52, 58, 255))
-    return _up2(im), 192
+def _extraire_boutique_gen5(src_dir, out_dir, decos, extra_sol):
+    """Boutique Pokémon 5G depuis centre_bw_ditto.png (ditto209) : carrelage gris à losanges, comptoir bleu-turquoise à façade
+    argentée, caisse enregistreuse, présentoirs blancs garnis (trois cases de large, comme les rayons de la boutique)."""
+    d_path = os.path.join(src_dir, 'centre_bw_ditto.png')
+    if not os.path.exists(d_path):
+        return
+    d = Image.open(d_path).convert('RGBA')
+    # sol : le carrelage gris clair à losanges du coin salon des Centres Unys (même tuile que x_clounge)
+    if 'x_clounge' in extra_sol:
+        extra_sol['floor_blue'] = extra_sol['x_clounge'].copy()
+    # comptoir : dessus bleu-turquoise uni, façade = liseré bleu foncé + plinthe argentée (portion droite du comptoir)
+    extra_sol['x_mcounter'] = d.crop((224, 832, 240, 848))
+    extra_sol['x_mcounterfront'] = d.crop((224, 850, 240, 866))
+    # caisse enregistreuse beige posée sur le comptoir
+    caisse = d.crop((194, 894, 224, 938))
+    a = np.array(caisse); ys, xs = np.where(a[..., 3] > 0)
+    if len(ys):
+        caisse = Image.fromarray(a[ys.min():ys.max() + 1, xs.min():xs.max() + 1], 'RGBA')
+    caisse.save(os.path.join(out_dir, 'd_mregister.png'))
+    decos['mregister'] = caisse
+    # présentoir blanc garni : 64 px de large dans la planche, élargi à 96 px (trois cases) en répétant son milieu
+    pr = d.crop((128, 550, 192, 608))
+    a = np.array(pr); ys, xs = np.where(a[..., 3] > 0)
+    if len(ys):
+        pr = Image.fromarray(a[ys.min():ys.max() + 1, xs.min():xs.max() + 1], 'RGBA')
+    w, h = pr.size
+    trois = Image.new('RGBA', (w + 32, h), (0, 0, 0, 0))
+    trois.paste(pr.crop((0, 0, w // 2, h)), (0, 0))
+    trois.paste(pr.crop((w // 2 - 16, 0, w // 2 + 16, h)), (w // 2, 0))
+    trois.paste(pr.crop((w // 2, 0, w, h)), (w // 2 + 32, 0))
+    trois.save(os.path.join(out_dir, 'd_martshelf.png'))
+    decos['martshelf'] = trois
 
 
-def make_b_mairie():
-    """Mairie Gen 5 (288×256 = 9 cases, porte civique centrée à x=144) — pierre crème, toit ardoise, horloge."""
-    im = _canvas2x(144, 128)
-    dr = ImageDraw.Draw(im)
-    out = (38, 36, 44, 255)
-    wall = (228, 218, 196, 255)
-    wall_hi = (244, 236, 218, 255)
-    wall_sh = (188, 176, 152, 255)
-    roof = (64, 86, 126, 255)
-    roof_hi = (98, 126, 174, 255)
-    roof_sh = (42, 58, 90, 255)
-    trim = (198, 186, 162, 255)
-    cx = 72
+def appliquer_critiques(root, out_dir, cols, noms, decos, bat_imgs, bat_dims):
+    """Applique UNIQUEMENT les correctifs chirurgicaux 100 % authentiques Gen 5."""
+    src_dir = os.path.join(root, 'assets', 'graphics', 'noirblanc')
 
-    # Corps principal pierre crème
-    _rect(dr, 4, 46, 139, 127, wall, border=out, hi=wall_hi, sh=wall_sh)
-    _bricks_l(dr, 4, 48, 139, 114, (206, 196, 174, 255), step_y=4, step_x=8)
-    # Soubassement granit
-    _rect(dr, 4, 114, 139, 127, (134, 132, 136, 255), border=out, hi=(168, 166, 170, 255))
-    _bricks_l(dr, 4, 114, 139, 127, (98, 96, 102, 255), step_y=4, step_x=8)
-    # Toit mansardé ardoise bleue avec rangées d'ardoises
-    for y in range(24, 48):
-        inset = max(0, (47 - y) // 4)
-        col = roof_hi if y < 27 else (roof_sh if y > 44 else roof)
-        dr.line([2 + inset, y, 141 - inset, y], fill=col)
-        if y % 4 == 0 and 26 < y < 45:
-            dr.line([4 + inset, y, 139 - inset, y], fill=roof_sh)
-        dr.point((2 + inset, y), fill=out)
-        dr.point((141 - inset, y), fill=out)
-    dr.line([8, 24, 135, 24], fill=out)
-    _rect(dr, 2, 46, 141, 49, trim, border=out, hi=wall_hi)
+    # 1. Décors authentiques : d_caisse & d_caisses tirés du vrai d_boxes.png Gen 5 + d_squelette 4 cases + nettoyage alpha d_lamp
+    boxes_p = os.path.join(out_dir, 'd_boxes.png')
+    if os.path.exists(boxes_p):
+        bx = Image.open(boxes_p).convert('RGBA')  # 30x28 authentique Gen 5
+        # Caisse simple : le carton bas-droite 100 % isolé (14,13..28,26 = 14x13) élargi en intérieur -> 20x18 (bord 1 px intact !)
+        raw_box = bx.crop((14, 13, 28, 26))  # 14 x 13
+        single = Image.new('RGBA', (20, 18), (0, 0, 0, 0))
+        # Largeur 14 -> 20 (+6 px de corps central x=4..10)
+        mid_w = Image.new('RGBA', (20, 13), (0, 0, 0, 0))
+        mid_w.paste(raw_box.crop((0, 0, 7, 13)), (0, 0))
+        mid_w.paste(raw_box.crop((4, 0, 10, 13)), (7, 0))
+        mid_w.paste(raw_box.crop((7, 0, 14, 13)), (13, 0))
+        # Hauteur 13 -> 18 (+5 px de face avant unie y=7..12)
+        single.paste(mid_w.crop((0, 0, 20, 8)), (0, 0))
+        single.paste(mid_w.crop((0, 6, 20, 11)), (0, 8))
+        single.paste(mid_w.crop((0, 8, 20, 13)), (0, 13))
+        single.save(os.path.join(out_dir, 'd_caisse.png'))
+        decos['caisse'] = single
+        # Pile de caisses : vrai d_boxes.png empilé sur lui-même (34x44 authentique Gen 5, plus de porte en bois !)
+        stack = Image.new('RGBA', (34, 44), (0, 0, 0, 0))
+        stack.alpha_composite(bx, (2, 16))
+        stack.alpha_composite(bx.transpose(Image.FLIP_LEFT_RIGHT), (0, 0))
+        stack.save(os.path.join(out_dir, 'd_caisses.png'))
+        decos['caisses'] = stack
 
-    # Avant-corps central + beffroi d'horloge civique
-    _rect(dr, cx - 24, 34, cx + 24, 127, wall_hi, border=out, sh=wall_sh)
-    _bricks_l(dr, cx - 24, 48, cx + 24, 114, (214, 204, 182, 255), step_y=4, step_x=8)
-    # Clocheton / Fronton horloge
-    _rect(dr, cx - 18, 10, cx + 18, 36, wall_hi, border=out, sh=wall_sh)
-    for y in range(2, 11):
-        hw = 2 + (y - 2) * 2
-        dr.line([cx - hw, y, cx + hw, y], fill=roof_hi if y < 5 else roof)
-        dr.point((cx - hw, y), fill=out)
-        dr.point((cx + hw, y), fill=out)
-    dr.line([cx - 19, 11, cx + 19, 11], fill=out)
-    # Cadran d'horloge doré
-    dr.ellipse([cx - 8, 15, cx + 8, 31], fill=(248, 246, 236, 255), outline=(176, 138, 48, 255))
-    dr.line([cx, 23, cx, 18], fill=(38, 40, 50, 255))
-    dr.line([cx, 23, cx + 4, 23], fill=(38, 40, 50, 255))
-
-    # Fenêtres symétriques sur 2 étages
-    for wy in (58, 86):
-        for wx in (12, 28, 104, 120):
-            _glass_win(dr, wx, wy, wx + 11, wy + 18, frame=(76, 62, 48, 255), sill=wall_sh)
-    # 2 fenêtres hautes sur l'avant-corps + drapeau tricolore / bannière municipale
-    _glass_win(dr, cx - 16, 54, cx - 6, 70, frame=(76, 62, 48, 255))
-    _glass_win(dr, cx + 6, 54, cx + 16, 70, frame=(76, 62, 48, 255))
-    # Fronton triangulaire du porche + 4 colonnes
-    _rect(dr, cx - 22, 82, cx + 22, 87, trim, border=out, hi=wall_hi)
-    for col_x in (cx - 21, cx - 14, cx + 10, cx + 17):
-        _rect(dr, col_x, 87, col_x + 4, 127, wall_hi, border=(78, 72, 66, 255), sh=wall_sh)
-    # Double porte civique bois massif pleine + perron de 2 marches (centrée à cx=72 -> 144 px)
-    _wood_door(dr, cx, 124, hw=10, h=26)
-    _rect(dr, cx - 16, 124, cx + 16, 127, (188, 184, 176, 255), border=out, hi=(220, 216, 208, 255))
-    return _up2(im), 144
-
-
-def make_b_centrale():
-    """Centrale Électrique de Voltacité Gen 5 (128×192 = 4 cases exactes, porte blindée alignée sur door=1 -> 48 px)."""
-    im = _canvas2x(64, 96)
-    dr = ImageDraw.Draw(im)
-    out = (30, 34, 42, 255)
-    steel = (118, 128, 144, 255)
-    steel_hi = (158, 170, 186, 255)
-    steel_sh = (78, 86, 102, 255)
-    dark = (52, 58, 70, 255)
-    yel = (238, 198, 52, 255)
-    yel_hi = (254, 232, 118, 255)
-
-    # Bobines / isolateurs haute tension sur le toit
-    for bx in (10, 24, 46):
-        _rect(dr, bx, 6, bx + 7, 26, (94, 104, 118, 255), border=out, hi=steel_hi)
-        for ry in (9, 14, 19):
-            _rect(dr, bx - 2, ry, bx + 9, ry + 2, (164, 196, 224, 255), border=out)
-        dr.ellipse([bx + 1, 2, bx + 6, 7], fill=yel, outline=out)
-
-    # Corps principal acier/béton industriel
-    _rect(dr, 3, 28, 60, 95, steel, border=out, hi=steel_hi, sh=steel_sh)
-    # Toit technique plat gris foncé
-    _rect(dr, 1, 22, 62, 31, dark, border=out, hi=(84, 92, 108, 255))
-    # Panneaux verticaux d'acier + rivets
-    for px_c in (18, 34, 48):
-        dr.line([px_c, 32, px_c, 94], fill=steel_sh)
-    # Bandeau jaune & noir haute tension (style Unys industriel)
-    _rect(dr, 3, 56, 60, 62, yel, border=out)
-    for sx in range(5, 58, 6):
-        dr.polygon([(sx, 57), (sx + 3, 57), (sx + 1, 61), (sx - 2, 61)], fill=(34, 36, 42, 255))
-
-    # Fenêtres de salle de contrôle (haut) + grille de ventilation (droite)
-    _glass_win(dr, 8, 36, 28, 49, frame=dark, mid=(86, 162, 214, 255), hi=(196, 238, 255, 255))
-    _glass_win(dr, 36, 36, 55, 49, frame=dark, mid=(86, 162, 214, 255), hi=(196, 238, 255, 255))
-    # Emblème éclair jaune sur plaque sombre à droite de la porte
-    _rect(dr, 40, 68, 56, 86, dark, border=out, hi=(82, 90, 106, 255))
-    dr.polygon([(49, 70), (44, 78), (48, 78), (46, 84), (53, 75), (49, 75)], fill=yel_hi, outline=(128, 92, 20, 255))
-    # Porte blindée coulissante pleine centrée à cx=24 (= 48 px en 2× -> door=1 exact !)
-    _rect(dr, 12, 66, 36, 95, (74, 82, 96, 255), border=out, hi=steel_hi)
-    _auto_door(dr, 24, 95, hw=9, h=22, frame=dark, glass=(92, 146, 184, 255))
-    return _up2(im), 48
-
-
-def make_b_fonderie(variant_b=False):
-    """Fonderie industrielle Gen 5 (224×248 = 7 cases exactes de Forge-Acier, porte acier centrée à x=112)."""
-    im = _canvas2x(112, 124)
-    dr = ImageDraw.Draw(im)
-    out = (34, 28, 28, 255)
-    brick = (128, 72, 56, 255) if not variant_b else (106, 86, 74, 255)
-    brick_hi = (158, 96, 76, 255) if not variant_b else (136, 114, 98, 255)
-    brick_sh = (86, 46, 36, 255) if not variant_b else (72, 56, 48, 255)
-    roof = (64, 96, 86, 255) if not variant_b else (76, 82, 94, 255)
-    roof_hi = (94, 134, 122, 255) if not variant_b else (108, 116, 132, 255)
-    roof_sh = (42, 66, 60, 255) if not variant_b else (48, 52, 62, 255)
-    cx = 56
-
-    # Deux grandes cheminées de haut-fourneau en brique & acier au fond
-    for sx in (16, 84):
-        _rect(dr, sx, 4, sx + 12, 42, (92, 66, 58, 255), border=out, hi=(126, 94, 82, 255), sh=(58, 42, 38, 255))
-        _bricks_l(dr, sx, 6, sx + 12, 38, (64, 44, 38, 255), step_y=4, step_x=6)
-        _rect(dr, sx - 2, 2, sx + 14, 7, (58, 62, 72, 255), border=out, hi=(96, 102, 116, 255))
-        _rect(dr, sx - 1, 16, sx + 13, 19, (68, 72, 82, 255), border=out)
-
-    # Corps de brique massif (x=4..107, y=44..123)
-    _rect(dr, 4, 46, 107, 123, brick, border=out, hi=brick_hi, sh=brick_sh)
-    _bricks_l(dr, 4, 48, 107, 110, brick_sh, brick_hi, step_y=4, step_x=8)
-    # Contreforts acier verticaux + soubassement pierre sombre
-    for px_c in (4, 32, 76, 103):
-        _rect(dr, px_c, 46, px_c + 4, 123, (78, 82, 92, 255), border=out, hi=(112, 118, 130, 255))
-    _rect(dr, 4, 110, 107, 123, (88, 86, 92, 255), border=out, hi=(118, 116, 124, 255))
-    _bricks_l(dr, 4, 110, 107, 123, (58, 56, 62, 255), step_y=4, step_x=8)
-
-    # Toit industriel cuivre patiné / ardoise + verrière zénithale (lanterneau)
-    for y in range(28, 48):
-        inset = max(0, (47 - y) // 3)
-        col = roof_hi if y < 32 else (roof_sh if y > 44 else roof)
-        dr.line([2 + inset, y, 109 - inset, y], fill=col)
-        if y % 4 == 0 and 30 < y < 45:
-            dr.line([4 + inset, y, 107 - inset, y], fill=roof_sh)
-        dr.point((2 + inset, y), fill=out)
-        dr.point((109 - inset, y), fill=out)
-    dr.line([8, 28, 103, 28], fill=out)
-    # Lanterneau central avec lueur chaude de forge
-    _rect(dr, 34, 18, 77, 30, (62, 66, 76, 255), border=out, hi=(96, 102, 116, 255))
-    for wx in range(38, 72, 11):
-        _glass_win(dr, wx, 21, wx + 8, 28, frame=(40, 42, 50, 255), dark=(168, 76, 32, 255),
-                   mid=(232, 134, 48, 255), hi=(254, 218, 116, 255))
-
-    # Fenêtres industrielles à lueur de fournaise
-    for wx in (12, 84):
-        _glass_win(dr, wx, 58, wx + 15, 76, frame=(44, 46, 54, 255), dark=(148, 62, 28, 255),
-                   mid=(224, 126, 46, 255), hi=(254, 212, 108, 255), sill=(68, 72, 82, 255))
-        _glass_win(dr, wx, 86, wx + 15, 102, frame=(44, 46, 54, 255), dark=(58, 72, 92, 255),
-                   mid=(92, 126, 158, 255), hi=(164, 198, 224, 255), sill=(68, 72, 82, 255))
-    # Bandeau industriel jaune/noir au-dessus du portail
-    _rect(dr, 38, 78, 73, 84, (232, 188, 52, 255), border=out)
-    for sx in range(40, 71, 6):
-        dr.rectangle([sx, 79, sx + 2, 83], fill=(38, 36, 40, 255))
-    # Grand portail industriel double en acier (100 % opaque, centré à cx=56 -> 112 px)
-    _rect(dr, 40, 84, 71, 123, (64, 70, 82, 255), border=out, hi=(104, 112, 126, 255))
-    _rect(dr, 43, 87, 68, 122, (88, 96, 110, 255), border=(34, 38, 46, 255))
-    dr.line([cx, 87, cx, 122], fill=(34, 38, 46, 255))
-    for gy in range(92, 120, 5):
-        dr.line([45, gy, cx - 2, gy], fill=(64, 70, 82, 255))
-        dr.line([cx + 2, gy, 66, gy], fill=(64, 70, 82, 255))
-    # Hublots chauds sur le portail
-    _rect(dr, 46, 93, 53, 100, (234, 144, 56, 255), border=(42, 46, 54, 255), hi=(254, 218, 120, 255))
-    _rect(dr, 59, 93, 66, 100, (234, 144, 56, 255), border=(42, 46, 54, 255), hi=(254, 218, 120, 255))
-    _rect(dr, 38, 121, 73, 123, (152, 156, 164, 255), border=(48, 50, 58, 255))
-    return _up2(im), 112
-
-
-def make_b_atelier_brique():
-    """Atelier de briques Volucité Gen 5 symétrique et complet (192×228 = 6 cases, porte à x=96)."""
-    im = _canvas2x(96, 114)
-    dr = ImageDraw.Draw(im)
-    out = (38, 28, 26, 255)
-    brick = (144, 76, 56, 255)
-    brick_hi = (176, 102, 76, 255)
-    brick_sh = (98, 48, 36, 255)
-    roof = (64, 54, 58, 255)
-    roof_hi = (98, 86, 92, 255)
-    roof_sh = (42, 34, 38, 255)
-    cx = 48
-
-    # Corps de brique rouge-brun complet (zéro coupe sur les fenêtres !)
-    _rect(dr, 3, 28, 92, 113, brick, border=out, hi=brick_hi, sh=brick_sh)
-    _bricks_l(dr, 3, 30, 92, 102, brick_sh, brick_hi, step_y=4, step_x=8)
-    # Toit mansardé ardoise sombre + lucarnes + corniche pierre
-    for y in range(10, 29):
-        inset = max(0, (28 - y) // 3)
-        col = roof_hi if y < 14 else (roof_sh if y > 25 else roof)
-        dr.line([1 + inset, y, 94 - inset, y], fill=col)
-        if y % 4 == 0 and 12 < y < 26:
-            dr.line([3 + inset, y, 92 - inset, y], fill=roof_sh)
-        dr.point((1 + inset, y), fill=out)
-        dr.point((94 - inset, y), fill=out)
-    dr.line([7, 10, 88, 10], fill=out)
-    _rect(dr, 2, 27, 93, 31, (192, 182, 168, 255), border=out, hi=(224, 214, 200, 255))
-
-    # 3 fenêtres d'étage symétriques
-    for wx in (11, 41, 71):
-        _glass_win(dr, wx, 38, wx + 13, 56, frame=(68, 44, 36, 255), sill=(192, 182, 168, 255))
-    # Bandeau pierre + auvent rayé rouge bordeaux & crème au-dessus de la boutique/atelier
-    _rect(dr, 4, 66, 91, 76, (182, 42, 42, 255), border=out, hi=(214, 72, 66, 255), sh=(126, 26, 28, 255))
-    for bx in range(8, 88, 8):
-        dr.rectangle([bx, 67, min(90, bx + 3), 75], fill=(242, 232, 212, 255))
-    # Rez-de-chaussée pierre sombre + vitrines + porte centrale pleine (cx=48 -> 96 px)
-    _rect(dr, 4, 77, 91, 113, (88, 82, 84, 255), border=out, hi=(118, 112, 114, 255))
-    _glass_win(dr, 9, 82, 31, 104, frame=(46, 40, 42, 255), mid=(106, 164, 206, 255))
-    _glass_win(dr, 64, 82, 86, 104, frame=(46, 40, 42, 255), mid=(106, 164, 206, 255))
-    # Jardinières fleuries sous les vitrines
-    for jx in (9, 64):
-        _rect(dr, jx, 104, jx + 22, 110, (124, 76, 44, 255), border=out)
-        for fx in range(jx + 2, jx + 20, 4):
-            dr.rectangle([fx, 101, fx + 2, 104], fill=(64, 152, 74, 255))
-            dr.point((fx + 1, 101), fill=(242, 92, 88, 255) if (fx % 8 == 0) else (248, 212, 72, 255))
-    _wood_door(dr, cx, 113, hw=9, h=28, fill=(138, 76, 44, 255))
-    return _up2(im), 96
-
-
-def make_b_tour_brique():
-    """Tour de briques Volucité Gen 5 symétrique et complète (208×268 = 6,5 cases, porte=None)."""
-    im = _canvas2x(104, 134)
-    dr = ImageDraw.Draw(im)
-    out = (34, 28, 30, 255)
-    brick = (118, 68, 56, 255)
-    brick_hi = (148, 92, 76, 255)
-    brick_sh = (78, 44, 36, 255)
-    stone = (156, 152, 148, 255)
-
-    # Toit terrasse plat + bloc climatisation / cage d'escalier
-    _rect(dr, 4, 8, 99, 24, (132, 134, 140, 255), border=out, hi=(168, 170, 178, 255), sh=(92, 94, 102, 255))
-    _rect(dr, 12, 12, 91, 20, (108, 112, 120, 255), border=(74, 78, 86, 255))
-    _rect(dr, 20, 4, 42, 16, (94, 100, 112, 255), border=out, hi=(132, 138, 150, 255))
-    _rect(dr, 66, 6, 82, 16, (104, 110, 120, 255), border=out, hi=(138, 144, 154, 255))
-
-    # Corps de brique de 3 étages + pilastres d'angle pierre
-    _rect(dr, 4, 24, 99, 133, brick, border=out, hi=brick_hi, sh=brick_sh)
-    _bricks_l(dr, 4, 26, 99, 110, brick_sh, brick_hi, step_y=4, step_x=8)
-    _rect(dr, 4, 24, 9, 133, stone, border=out, hi=(196, 192, 188, 255))
-    _rect(dr, 94, 24, 99, 133, stone, border=out, hi=(196, 192, 188, 255))
-    # Corniches horizontales
-    for cy in (24, 52, 80, 108):
-        _rect(dr, 3, cy, 100, cy + 3, stone, border=out, hi=(200, 196, 192, 255))
-
-    # 3 étages × 4 fenêtres symétriques intactes
-    for wy in (31, 59, 87):
-        for wx in (14, 34, 56, 76):
-            _glass_win(dr, wx, wy, wx + 13, wy + 17, frame=(56, 44, 42, 255), sill=stone)
-    # Rez-de-chaussée pierre + grand porche vitré décoratif
-    _rect(dr, 4, 111, 99, 133, (96, 94, 100, 255), border=out, hi=(128, 126, 134, 255))
-    _glass_win(dr, 12, 115, 32, 129, frame=(44, 44, 52, 255))
-    _glass_win(dr, 71, 115, 91, 129, frame=(44, 44, 52, 255))
-    _auto_door(dr, 52, 133, hw=12, h=19)
-    return _up2(im), None
-
-
-def make_b_serre():
-    """Serre botanique Gen 5 (160×184 = 5 cases, porte vitrée pleine à x=80)."""
-    im = _canvas2x(80, 92)
-    dr = ImageDraw.Draw(im)
-    out = (42, 54, 64, 255)
-    iron = (232, 238, 244, 255)
-    iron_sh = (162, 176, 190, 255)
-    glass = (166, 220, 236, 255)
-    glass_hi = (218, 246, 254, 255)
-    foliage = (64, 152, 84, 255)
-    fol_hi = (108, 196, 112, 255)
-    cx = 40
-
-    # Verrière arrondie en dôme + feuillage visible à travers la vitre
-    for y in range(6, 46):
-        hw = min(36, int(10 + ((y - 6) ** 0.68) * 3.8))
-        dr.line([cx - hw, y, cx + hw, y], fill=glass_hi if y < 16 else glass)
-        dr.point((cx - hw, y), fill=out)
-        dr.point((cx + hw, y), fill=out)
-    # Verrière basse rectangulaire + muret pierre blanche
-    _rect(dr, 4, 44, 75, 91, glass, border=out)
-    # Plantes luxuriantes derrière les vitres
-    for px_f, py_f, rad in ((16, 62, 10), (30, 56, 9), (52, 58, 10), (64, 64, 9)):
-        dr.ellipse([px_f - rad, py_f - rad, px_f + rad, py_f + rad], fill=foliage)
-        dr.ellipse([px_f - rad + 2, py_f - rad + 1, px_f + rad - 4, py_f + rad - 5], fill=fol_hi)
-    # Armatures blanches en fer forgé
-    for ax in (14, 26, 40, 54, 66):
-        dr.line([ax, 12 if 20 < ax < 60 else 28, ax, 80], fill=iron)
-        dr.line([ax + 1, 12 if 20 < ax < 60 else 28, ax + 1, 80], fill=iron_sh)
-    for ay in (26, 44, 62):
-        dr.line([5, ay, 74, ay], fill=iron)
-        dr.line([5, ay + 1, 74, ay + 1], fill=iron_sh)
-    # Muret bas en brique claire
-    _rect(dr, 4, 78, 75, 91, (206, 198, 184, 255), border=out, hi=(234, 228, 216, 255))
-    _bricks_l(dr, 4, 79, 75, 91, (168, 160, 146, 255), step_y=4, step_x=8)
-    # Double porte vitrée centrale pleine (cx=40 -> 80 px)
-    _auto_door(dr, cx, 91, hw=10, h=24, frame=(72, 86, 98, 255), glass=(112, 188, 212, 255))
-    return _up2(im), 80
-
-
-def make_b_boutique_mode():
-    """Boutique de mode chic de Métropole Gen 5 (192×216 = 6 cases exactes, porte vitrée alignée sur door=3 -> 112 px)."""
-    im = _canvas2x(96, 108)
-    dr = ImageDraw.Draw(im)
-    out = (40, 32, 42, 255)
-    wall = (242, 232, 222, 255)
-    wall_hi = (252, 246, 238, 255)
-    wall_sh = (206, 190, 178, 255)
-    plum = (146, 48, 82, 255)
-    plum_hi = (188, 76, 114, 255)
-    plum_sh = (98, 28, 54, 255)
-    gold = (232, 192, 88, 255)
-
-    # Façade crème élégante style boutique parisienne / Volucité
-    _rect(dr, 3, 24, 92, 107, wall, border=out, hi=wall_hi, sh=wall_sh)
-    _bricks_l(dr, 3, 26, 92, 66, (224, 212, 200, 255), step_y=4, step_x=8)
-    # Toit mansardé prune/bordeaux + corniche dorée
-    for y in range(6, 25):
-        inset = max(0, (24 - y) // 3)
-        col = plum_hi if y < 10 else (plum_sh if y > 21 else plum)
-        dr.line([1 + inset, y, 94 - inset, y], fill=col)
-        if y % 4 == 0 and 9 < y < 22:
-            dr.line([3 + inset, y, 92 - inset, y], fill=plum_sh)
-        dr.point((1 + inset, y), fill=out)
-        dr.point((94 - inset, y), fill=out)
-    dr.line([7, 6, 88, 6], fill=out)
-    _rect(dr, 2, 23, 93, 27, gold, border=out, hi=(252, 228, 138, 255))
-
-    # Fenêtres d'étage avec balcons fer forgé
-    for wx in (11, 41, 71):
-        _glass_win(dr, wx, 33, wx + 13, 51, frame=(76, 52, 64, 255), mid=(124, 176, 222, 255))
-        _rect(dr, wx - 1, 50, wx + 14, 55, (52, 46, 56, 255), border=(32, 28, 36, 255))
-        for bx in range(wx + 1, wx + 13, 3):
-            dr.line([bx, 51, bx, 54], fill=(224, 212, 200, 255))
-
-    # Enseigne chic « MODE » + auvent rayé bordeaux & crème
-    _rect(dr, 26, 57, 70, 65, plum, border=out, hi=plum_hi)
-    _rect(dr, 28, 59, 68, 63, gold)
-    _rect(dr, 3, 66, 92, 75, plum, border=out, hi=plum_hi, sh=plum_sh)
-    for bx in range(7, 89, 8):
-        dr.rectangle([bx, 67, min(91, bx + 3), 74], fill=(250, 242, 232, 255))
-
-    # Rez-de-chaussée pierre claire + grande vitrine de vêtements à gauche (x=8..38) + vitrine droite (x=72..88)
-    _rect(dr, 3, 76, 92, 107, (218, 208, 200, 255), border=out, sh=(176, 166, 158, 255))
-    # Vitrine mannequins à gauche
-    _rect(dr, 8, 79, 39, 103, (238, 234, 244, 255), border=(66, 48, 58, 255))
-    dr.rectangle([9, 80, 38, 92], fill=(214, 228, 246, 255))
-    # 2 silhouettes de tenues colorées (robe rose & veste bleue)
-    dr.rectangle([14, 86, 20, 99], fill=(224, 92, 136, 255), outline=(88, 36, 56, 255))
-    dr.rectangle([16, 83, 18, 86], fill=(232, 192, 88, 255))
-    dr.rectangle([26, 86, 33, 99], fill=(78, 128, 206, 255), outline=(38, 58, 96, 255))
-    dr.rectangle([28, 83, 30, 86], fill=(232, 192, 88, 255))
-    # Petite vitrine chapeau à droite
-    _rect(dr, 73, 79, 88, 103, (238, 234, 244, 255), border=(66, 48, 58, 255))
-    dr.rectangle([77, 88, 84, 95], fill=(236, 178, 66, 255), outline=(92, 62, 26, 255))
-    # Double porte vitrée boutique centrée à cx=56 (= 112 px en 2× -> door=3 sur w=6, doorRel=3.5 exact !)
-    _auto_door(dr, 56, 107, hw=11, h=27, frame=(72, 46, 58, 255), glass=(114, 178, 224, 255), mat=plum)
-    return _up2(im), 112
-
-
-def appliquer_critiques(root, out_dir, decos, bat_dims):
-    """Applique toutes les corrections critiques décors + bâtiments dans out_dir et met à jour decos/bat_dims."""
-    # 1. Décors critiques
-    d_caisse = make_d_caisse()
-    d_caisse.save(os.path.join(out_dir, 'd_caisse.png'))
-    decos['caisse'] = d_caisse
-
-    d_caisses = make_d_caisses()
-    d_caisses.save(os.path.join(out_dir, 'd_caisses.png'))
-    decos['caisses'] = d_caisses
-
-    d_sq = make_d_squelette(root)
+    d_sq = _make_d_squelette(root)
     if d_sq is not None:
         d_sq.save(os.path.join(out_dir, 'd_squelette.png'))
         decos['squelette'] = d_sq
 
-    # 2. Bâtiments critiques
+    lamp_p = os.path.join(out_dir, 'd_lamp.png')
+    if os.path.exists(lamp_p):
+        lp = _strip_soft_shadow(Image.open(lamp_p), thr=140)
+        lp.save(lamp_p)
+        decos['lamp'] = lp
+
+    # 2. Tuiles officielles 5G dans sol.png : x_shelf (rayonnage Poké Mart) + intérieur Centre Pokémon 5G authentique
+    sol_path = os.path.join(out_dir, 'sol.png')
+    sol = Image.open(sol_path).convert('RGBA')
+    idx_of = {n: i for i, n in enumerate(noms)}
+    centre_int = Image.open(os.path.join(src_dir, 'centre_interieur.png')).convert('RGBA')
+    extra_sol = {
+        'x_shelf': centre_int.crop((130, 1020, 190, 1080)).resize((16, 16), Image.NEAREST),
+    }
+    _extraire_centre_gen5(src_dir, out_dir, decos, extra_sol)
+    _extraire_boutique_gen5(src_dir, out_dir, decos, extra_sol)
+    for k in sorted(extra_sol):
+        if k not in idx_of:
+            idx_of[k] = len(noms)
+            noms.append(k)
+    need_rows = math.ceil(len(noms) / cols)
+    new_sol = Image.new('RGBA', (cols * 16, need_rows * 16), (0, 0, 0, 0))
+    new_sol.paste(sol, (0, 0))
+    for k, tile in extra_sol.items():
+        i = idx_of[k]
+        new_sol.paste(tile, ((i % cols) * 16, (i // cols) * 16))
+    new_sol.save(sol_path)
+
+    # 3. Portes bouchées chirurgicalement DERRIÈRE les vrais sprites Gen 5 (99 % du sprite officiel intact !)
+    centrale_p = os.path.join(out_dir, 'b_centrale.png')
+    if os.path.exists(centrale_p):
+        im = _trim_bottom(_strip_soft_shadow(Image.open(centrale_p), 160))
+        im = _patch_arch_door_behind(im, 40, 146, 90, im.height - 1, tint='cyan_glass')
+        im.save(centrale_p)
+        bat_dims['centrale'] = [im.width, 64]
+
+    mairie_p = os.path.join(out_dir, 'b_mairie.png')
+    fixed_mairie = None
+    if os.path.exists(mairie_p):
+        fixed_mairie, mp = _fix_b_mairie(Image.open(mairie_p))
+        fixed_mairie.save(mairie_p)
+        bat_dims['mairie'] = [fixed_mairie.width, mp]
+
+    bourse_p = os.path.join(out_dir, 'b_bourse.png')
+    if os.path.exists(bourse_p) and fixed_mairie is not None:
+        bi, bp = _fix_b_bourse(Image.open(bourse_p), fixed_mairie)
+        bi.save(bourse_p)
+        bat_dims['bourse'] = [bi.width, bp]
+
+    serre_p = os.path.join(out_dir, 'b_serre.png')
+    if os.path.exists(serre_p):
+        im = _trim_bottom(_strip_soft_shadow(Image.open(serre_p), 160))
+        im = _patch_arch_door_behind(im, 50, 162, 104, im.height - 1, tint='cyan_glass')
+        im.save(serre_p)
+        bat_dims['serre'] = [im.width, 77]
+
+    fonderie_p = os.path.join(out_dir, 'b_fonderie.png')
+    if os.path.exists(fonderie_p):
+        fi, fp = _fix_b_fonderie(Image.open(fonderie_p))
+        fi.save(fonderie_p)
+        bat_dims['fonderie'] = [fi.width, fp]
+
     gare_p = os.path.join(out_dir, 'b_gare.png')
     if os.path.exists(gare_p):
-        g_im, g_porte = make_b_gare(Image.open(gare_p))
-        g_im.save(gare_p)
-        bat_dims['gare'] = [g_im.width, g_porte]
+        gi, gp = _fix_b_gare(Image.open(gare_p))
+        gi.save(gare_p)
+        bat_dims['gare'] = [gi.width, gp]
 
+    # Nettoyage des franges semi-transparentes + recadrage bas (évite b_maison_desert_4 qui flottait de 12 px !) + porte b_maison_desert_1
+    for i in range(1, 5):
+        dp = os.path.join(out_dir, f'b_maison_desert_{i}.png')
+        if os.path.exists(dp):
+            im = _trim_bottom(_strip_soft_shadow(Image.open(dp), 160))
+            if i == 1:
+                im = _patch_arch_door_behind(im, 50, im.height - 38, 102, im.height - 1, tint='dark_wood')
+            im.save(dp)
+
+    # 4. Raccourcissement sans couture des tours Gen 5 (supprime le voile damier sur la rue + ombres alpha=64)
     tv_p = os.path.join(out_dir, 'b_tour_vitre.png')
     if os.path.exists(tv_p):
-        tv_im, tv_porte = make_b_tour_vitre(Image.open(tv_p))
-        tv_im.save(tv_p)
-        bat_dims['tour_vitre'] = [tv_im.width, tv_porte]
+        tv_raw = _trim_tall_clean(tv_p, 214, 298, max_y=352)
+        tv = _fix_b_tour_vitre_lobby(tv_raw)
+        tv.save(tv_p)
+        bat_dims['tour_vitre'] = [tv.width, None]
+        # Version élargie 9 cases (300×268) 100 % issue du vrai b_tour_vitre Gen 5 (5 travées nettes, toit continu) !
+        tvl, tvlp = _widen_tour_vitre(tv_raw)
+        tvl.save(os.path.join(out_dir, 'b_tour_vitre_l.png'))
+        bat_dims['tour_vitre_l'] = [tvl.width, tvlp]
 
-    fixes = {
-        'bourse': make_b_bourse(),
-        'mairie': make_b_mairie(),
-        'centrale': make_b_centrale(),
-        'fonderie': make_b_fonderie(variant_b=False),
-        'fonderie_b': make_b_fonderie(variant_b=True),
-        'atelier_brique': make_b_atelier_brique(),
-        'tour_brique': make_b_tour_brique(),
-        'serre': make_b_serre(),
-        'boutique_mode': make_b_boutique_mode(),
-    }
-    for nom, (im, porte) in fixes.items():
-        im.save(os.path.join(out_dir, f'b_{nom}.png'))
-        bat_dims[nom] = [im.width, porte]
+    tj_p = os.path.join(out_dir, 'b_tour_jaune.png')
+    if os.path.exists(tj_p):
+        tj = _trim_tall_clean(tj_p, 188, 234, max_y=294)
+        bat_dims['tour_jaune'] = [tj.width, None]
+
+    for fn in ('maison_forge_1', 'maison_forge_2'):
+        fp = os.path.join(out_dir, f'b_{fn}.png')
+        if os.path.exists(fp):
+            mf = _trim_tall_clean(fp, 40, 84, max_y=310)
+            bat_dims[fn] = [mf.width, 88]
+
+    # 5. Variantes 100 % issues du vrai kit_bw_set (Boutique de mode & maison 4 cases Forge-Acier)
+    if 'boutique' in bat_imgs:
+        bm, bmp = _fix_b_boutique_mode(bat_imgs['boutique'])
+        bm.save(os.path.join(out_dir, 'b_boutique_mode.png'))
+        bat_dims['boutique_mode'] = [bm.width, bmp]
+
+    if 'maison_a_g' in bat_imgs:
+        fp1, fp1p = _fix_b_maison_forge_p1(bat_imgs['maison_a_g'])
+        fp1.save(os.path.join(out_dir, 'b_maison_forge_p1.png'))
+        bat_dims['maison_forge_p1'] = [fp1.width, fp1p]
+
+    # 6. Neige hivernale B2W2 généreuse sur les boutiques enneigées
+    bb_path = os.path.join(out_dir, 'b_boutique_b.png')
+    bnb_path = os.path.join(out_dir, 'b_boutique_neige_b.png')
+    if os.path.exists(bb_path):
+        im_nb = _snow_boutique_generous(Image.open(bb_path), awning_y_range=(112, 126, 20, 128))
+        im_nb.save(bnb_path)
+        bat_dims['boutique_neige_b'] = [im_nb.width, 75]
+
+    bn_path = os.path.join(out_dir, 'b_boutique_neige.png')
+    if os.path.exists(bn_path):
+        im_n = _snow_boutique_generous(Image.open(bn_path), awning_y_range=(92, 108, 6, 144))
+        im_n.save(bn_path)
+        bat_dims['boutique_neige'] = [im_n.width, 116]

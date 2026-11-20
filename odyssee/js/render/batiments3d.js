@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { STATUES } from './statues-data.js';
 import { maisonsVilles } from './maisons-villes.js';
 import { monumentsDesert } from './desert3d.js';
+import { batimentsDonjons } from './donjons3d.js';
 
 export function atelier(D) {
   /* -------------------------------------------------------------- textures ------------------------------------------ */
@@ -2969,12 +2970,14 @@ export function atelier(D) {
 
   // monuments du désert : pyramide, temple du pharaon
   monumentsDesert({ B, tex, hash, mix, S, D, boite, at, M, COL, LUM, cyl, brasero, reperePorte, OR });
+  batimentsDonjons({ B, TX, tex, hash, mix, S, D, boite, at, M, COL, LUM, cyl, reperePorte });
 
   return { B, boite, at, M, COL, TX };
 }
 
 /** emprise au sol (w × d) de chaque modèle, comme dans le jeu */
 export const EMPRISES = {
+  templeMiroirs: [11, 7], voiesSanctuaire: [9, 7],
   maison: [4, 3], maisonL: [5, 5], maisonLongue: [5, 3], maisonHaute: [4, 4], maisonExt: [7, 4], chalet: [5, 5], residence: [6, 4],
   cabaneChasseur: [4, 3], cabanePecheur: [5, 4], grange: [6, 5], moulin: [4, 4], phare: [3, 3], auberge: [6, 5], chapelle: [4, 7],
   boulangerie: [4, 4], maisonThe: [5, 5], gare: [8, 4], kiosque: [4, 5], puits: [2, 2], etal: [2, 2],

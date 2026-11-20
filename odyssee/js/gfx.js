@@ -40,16 +40,13 @@ export const PACKS = {
     dossier: 'gfx/noirblanc',
     planche: { fichier: 'sol', tuiles: NB_TUILES, cols: NB_COLS },   // tuiles de sol de 16 px sur une seule image
     decor: NB_DECOR,          // d_<nom>.png, 32 px par case : dessiné pixel pour pixel
-    // murs des intérieurs aux couleurs de Noir & Blanc (render/murs-tex.js) : Centre crème/orange et Boutique bleu acier/glace 5G
+    // murs des intérieurs aux couleurs de Noir & Blanc (render/murs-tex.js) : Centre blanc-argenté/or 5G et Boutique bleu acier/glace 5G
     murs: {
-      center: { fond: '#f6eab4', motif: '#eedd98', bande: '#f09a52', bandeS: '#c8692c', lam: '#f2d68a', lamC: '#faeab0', lamS: '#d2a85c', cim: '#fffdf2', pl: '#a8602c', cap: '#b06830', capC: '#f0b070' },
+      center: { fond: '#d4dce6', motif: '#c8d0dc', bande: '#e8d080', bandeS: '#c8b060', lam: '#c8c8e0', lamC: '#e8ecf4', lamS: '#989cb4', cim: '#f0f4fa', pl: '#404656', cap: '#303648', capC: '#8088a0' },
       mart: { fond: '#eef4fa', motif: '#dce8f6', motifK: 'carreaux', bande: '#3b82d6', bandeS: '#2258a4', lam: '#d2e2f2', lamC: '#f2f7fc', lamS: '#8fb2d8', cim: '#ffffff', pl: '#244e8c', cap: '#1e3e72', capC: '#78b0ec' },
-      lab: { fond: '#f0f5fa', motif: '#dfe8f2', motifK: 'carreaux', bande: '#5c8ec4', bandeS: '#3c6898', lam: '#cdd9e6', lamC: '#e8f0f8', lamS: '#92a8be', cim: '#ffffff', pl: '#425870', cap: '#3a4e64', capC: '#98b4d0' },
-      gym: { fond: '#e6e8f0', motif: '#d2d6e4', motifK: 'pierres', lam: '#9ca4b8', lamC: '#c2c8d8', lamS: '#6e768c', cim: '#f4f6fc', pl: '#464e62', cap: '#3c4458', capC: '#9ea8c0' },
-      league: { fond: '#584e8c', motif: '#6a60a4', motifK: 'losanges', lam: '#3e346c', lamC: '#64589c', lamS: '#28204c', cim: '#ecc85e', pl: '#20183c', cap: '#2e2454', capC: '#a89ae0' },
-      cendre: { fond: '#524646', motif: '#443838', motifK: 'pierres', lam: '#382e30', lamC: '#544648', lamS: '#261e20', cim: '#8c6e58', pl: '#1c1618', cap: '#282022', capC: '#6c5852' },
     },
     chars: 'chars',           // planche des personnages de Noir & Blanc 2 (même disposition que celle du jeu)
+    tenue: 'tenue',           // zones de la tenue (visière, haut, bas, chaussures, sac) sur les deux dresseurs du pack
     charRows: NB_CHAR_ROWS,   // rangées supplémentaires (au-delà des 75 de base) propres au pack Noir & Blanc
     charVariants: NB_CHAR_VARIANTS,
     // bâtiments entiers (b_<nom>.png) par style du jeu : le jeu prend celui dont la largeur colle à l'emprise (+ filtre biome)
@@ -61,7 +58,7 @@ export const PACKS = {
         ['maison_hiver', ['snow', 'givre', 'cime']], ['maison_neige_bl', ['snow', 'givre', 'cime']], ['maison_neige_rg', ['snow', 'givre', 'cime']], ['maison_neige_b', ['snow', 'givre', 'cime']], ['manoir_neige', ['snow', 'givre', 'cime']],
         ['maison_mirage_1', ['mirage', 'kagura']], ['maison_mirage_2', ['mirage', 'kagura']],
         ['maison_ombre_2', ['ombre']], ['manoir_ombre', ['ombre']], ['maison_ombre', ['ombre']],
-        ['maison_brique', ['forge']], ['maison_brique_r', ['forge']], ['atelier_brique', ['forge']], ['maison_forge_p1', ['forge']], ['maison_forge_p2', ['forge']], ['maison_forge_1', ['forge', 'metro', 'volta']], ['maison_forge_2', ['forge', 'metro', 'volta']],
+        ['maison_brique', ['forge']], ['maison_brique_r', ['forge']], ['maison_forge_p1', ['forge']], ['maison_forge_1', ['forge', 'metro', 'volta']], ['maison_forge_2', ['forge', 'metro', 'volta']],
         ['maison_ville_rg', ['metro', 'volta']], ['maison_ville_bl', ['metro', 'volta']], ['maison_ville_ve', ['metro', 'volta']], ['maison_a_bl', ['metro', 'volta']], ['maison_f_bleue', ['metro', 'volta']], ['maison_bleue', ['metro', 'volta']], ['maison_c_ve', ['metro', 'volta']], ['maison_g', ['metro', 'volta']], ['maison_g_ocre', ['metro', 'volta']], ['manoir', ['metro', 'volta']],
         ...NB_MAISONS,
       ];
@@ -69,10 +66,10 @@ export const PACKS = {
         center: mapList([['centre_desert', ['desert', 'dunes']], ['centre_neige', ['snow', 'givre', 'cime']], ['centre_mirage', ['mirage', 'kagura']], 'centre']),
         mart: mapList([['boutique_desert', ['desert', 'dunes']], ['boutique_neige', ['snow', 'givre', 'cime']], ['boutique_neige_b', ['snow', 'givre', 'cime']], 'boutique', 'boutique_p', 'boutique_b']),
         gym: mapList(['arene']), lab: mapList(['labo']), fontaine: mapList(['fontaine']),
-        tower: mapList([['fonderie', ['forge']], ['fonderie_b', ['forge']], ['tour_brique', ['forge', 'metro', 'volta']], ['atelier_brique', ['forge', 'metro', 'volta']], ['tour_metro', ['metro', 'volta']], ['tour_jaune', ['metro', 'volta']], ['tour_vitre', ['metro', 'volta']], 'tour']),
+        tower: mapList([['fonderie', ['forge']], ['tour_vitre_l', ['metro', 'volta']], ['tour_jaune', ['metro', 'volta']], ['tour_vitre', ['metro', 'volta']], 'tour']),
         house: mapList(MAISONS_BIO), house2: mapList(MAISONS_BIO), house3: mapList(MAISONS_BIO), bighouse: mapList(MAISONS_BIO),
         chapelle: mapList(['chapelle']), gare: mapList(['gare']), mairie: mapList(['mairie']), bourse: mapList(['bourse']), casino: mapList(['casino']),
-        centrale: mapList(['centrale']), serre: mapList(['serre']), fonderie: mapList(['fonderie', 'fonderie_b']),
+        centrale: mapList(['centrale']), serre: mapList(['serre']), fonderie: mapList(['fonderie']),
         boutique_mode: mapList(['boutique_mode']),
         dojo: mapList(['dojo']),
         etal: mapList(['etal']), puits: mapList(['puits']),
@@ -108,7 +105,7 @@ export function choisirSprites(id) { if (SPRITES_CHOIX.some((s) => s.id === id))
 /** crédits affichés dans Options → Crédits graphismes */
 export const CREDITS = [
   ['Sol « Pokémon Lumineux »', 'Tuiles de Flurmimon (planche « Bright »), adaptées par Bivurnum — Team Aqua\'s Asset Repo.'],
-  ['Graphismes « Noir & Blanc »', 'Sol, mer, arbres, bâtiments, intérieurs et personnages : kit « Pokémon Essentials BW » de KleinStudio et ressources Pokémon Essentials Gen 5 (FloofyPanthar ; © Nintendo / Game Freak / Creatures). Lave : Phyromatical. Compléments désert, grottes et sanctuaires : Magiscarf, J-Treecko252, TerribleJared, Anarlaurendil, RisingTempest3, JavaPlume.'],
+  ['Graphismes « Noir & Blanc »', 'Sol, mer, arbres, bâtiments, intérieurs et personnages : kit « Pokémon Essentials BW » de KleinStudio et ressources Pokémon Essentials Gen 5 (FloofyPanthar ; © Nintendo / Game Freak / Creatures). Lave : Phyromatical. Compléments désert, grottes et sanctuaires : Magiscarf, J-Treecko252, TerribleJared, Anarlaurendil, RisingTempest3, JavaPlume. Intérieurs du Centre Pokémon et de la Boutique : planches Gen 5 d\'UltimoSpriter et de ditto209.'],
   ['Sprites Noir & Blanc', 'Sprites des jeux Pokémon © Nintendo / Game Freak / Creatures, récupérés par PokeAPI (projet PokeAPI/sprites).'],
   ['Sprites HeartGold / SoulSilver', 'Même source : PokeAPI/sprites.'],
   ['Utilisation', 'Projet de fans sans but lucratif. Les artistes restent propriétaires de leurs créations.'],
