@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.137 — 20 novembre 2026
+- **Tête de Calcul** — Nouveau : The Candidate — 31 questions de l'émission tournée en amphi (version 5.123) (Nicolas Muratore)
+
 ## 5.136 — 20 novembre 2026
 - **Odyssée** — Le jeu a maintenant son propre numéro de version (Odyssée 1.0, affiché en bas de l'écran titre). À chaque mise à jour, le navigateur charge directement la nouvelle version : plus besoin de vider le cache pour voir les nouvelles villes ou les nouveaux graphismes.
 
