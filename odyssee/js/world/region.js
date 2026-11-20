@@ -464,19 +464,40 @@ export function buildWorld() {
 
   /* ---------- A · Bourg-Aube ---------- */
   const A = towns.A = {
-    id: 'aube', name: 'Bourg-Aube', x: 20, y: 238, w: 40, h: 30, exits: [['n', 14], ['e', 10]], fermer: true, lotir: false,
-    roads: [[14, 0, 15, 29, T.PATH], [0, 10, 39, 11, T.PATH], [14, 18, 20, 19, T.PATH]],
-    deco: [['flowers', 9, 3, 11, 5], ['flowers', 26, 13, 27, 17], ['water', 6, 15, 3.2, 2.2], ['fence', 2, 8, 4, 8], ['fence', 24, 8, 27, 8],
-      ['sign', 12, 8, 'BOURG-AUBE\nLà où chaque aventure commence.'], ['sign', 13, 17, 'LABORATOIRE\nProf. Saule'], ['lamp', 13, 9], ['lamp', 16, 9]],
+    // bourg de 56 × 36 cases, à l'échelle de Noir 2 & Blanc 2 : la rue du nord (x 27-28) mène à la Route 1, la grand-rue
+    // (y 20-21) traverse le bourg jusqu'à la porte de la Route 10 ; au nord les deux maisons et le laboratoire, au sud la
+    // boulangerie, les maisons du bas et les potagers
+    id: 'aube', name: 'Bourg-Aube', x: 20, y: 238, w: 56, h: 36, exits: [['n', 27], ['e', 20]], fermer: true, lotir: false,
+    roads: [[27, 0, 28, 29, T.PATH], [3, 20, 55, 21, T.PATH], [4, 29, 52, 29, T.PATH],
+      [10, 11, 10, 19, T.PATH], [18, 11, 18, 19, T.PATH], [36, 17, 37, 19, T.PATH],
+      [9, 27, 9, 28, T.PATH], [16, 27, 16, 28, T.PATH], [36, 27, 36, 28, T.PATH], [43, 27, 43, 28, T.PATH]],
+    deco: [
+      // le nord : jardins des deux maisons, massifs, arbres d'ornement, l'étang
+      ['flowers', 8, 3, 13, 5], ['trees', 2, 1, 5, 4], ['cerisier', 15, 3], ['cerisier', 21, 3], ['flowers', 20, 13, 23, 15], ['flowers', 5, 13, 8, 15],
+      ['fence', 7, 12, 8, 12], ['fence', 12, 12, 16, 12], ['fence', 20, 12, 22, 12], ['erable', 13, 16], ['erable', 23, 17], ['banc', 15, 17],
+      ['waterRect', 46, 3, 52, 6], ['flowers', 45, 8, 53, 8], ['banc', 47, 1], ['banc', 51, 1], ['cerisier', 44, 2], ['cerisier', 54, 5], ['lanterne', 45, 4],
+      ['flowers', 31, 3, 34, 6], ['erable', 39, 4],
+      ['lamp', 26, 3], ['lamp', 29, 3], ['lamp', 26, 18], ['lamp', 29, 18], ['lamp', 26, 24], ['lamp', 29, 24],
+      ['sign', 25, 18, 'BOURG-AUBE\nLà où chaque aventure commence.'], ['sign', 39, 18, 'LABORATOIRE\nProf. Saule'],
+      ['flowers', 33, 17, 34, 18], ['flowers', 39, 17, 41, 17], ['flowers', 45, 13, 50, 16], ['erable', 52, 14],
+      // le sud : la boulangerie et ses caisses, les maisons du bas, les potagers clos
+      ['caisses', 40, 25], ['tonneau', 41, 26], ['flowers', 20, 24, 24, 26], ['flowers', 47, 24, 51, 26], ['pot', 13, 25], ['pot', 20, 27],
+      ['fence', 4, 31, 12, 31], ['fence', 14, 31, 22, 31], ['fence', 4, 34, 22, 34], ['fence', 4, 32, 4, 33], ['fence', 22, 32, 22, 33],
+      ['flowers', 5, 32, 11, 32], ['flowers', 15, 32, 21, 32], ['flowers', 5, 33, 11, 33], ['flowers', 15, 33, 21, 33], ['banc', 24, 31],
+      ['fence', 32, 31, 50, 31], ['cerisier', 34, 33], ['erable', 39, 33], ['cerisier', 44, 33], ['erable', 49, 33]],
     buildings: [
-      { kind: 'house', x: 4, y: 4, roof: 'red', id: 'maison', name: 'Maison', bed: true, kitchen: true, npcs: [{ id: 'maman', x: 5, y: 4, sprite: 'maman', dir: 'down', script: 'mom' }] },
-      { kind: 'house', x: 20, y: 4, roof: 'blue', id: 'rival', name: 'Maison de Théo', npcs: [{ x: 3, y: 4, sprite: 'habitante', dir: 'right', script: 'rivalMom' }] },
-      { kind: 'lab', ...GRAND.lab, x: 16, y: 12, id: 'labo' },
+      { kind: 'house', x: 9, y: 8, roof: 'red', id: 'maison', name: 'Maison', bed: true, kitchen: true, npcs: [{ id: 'maman', x: 5, y: 4, sprite: 'maman', dir: 'down', script: 'mom' }] },
+      { kind: 'house', x: 17, y: 8, roof: 'blue', id: 'rival', name: 'Maison de Théo', npcs: [{ x: 3, y: 4, sprite: 'habitante', dir: 'right', script: 'rivalMom' }] },
+      { kind: 'lab', ...GRAND.lab, x: 34, y: 10, id: 'labo' },
+      { kind: 'house', x: 8, y: 24, roof: 'orange', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['Le Professeur Saule travaille jour et nuit dans son laboratoire.', 'Il paraît qu\'il prépare des créatures pour les jeunes du bourg !'] }] },
+      { kind: 'house', x: 15, y: 24, roof: 'red', npcs: [{ x: 3, y: 4, sprite: 'vieil_homme', text: ['De mon temps, on allait jusqu\'à Sylvebourg à pied, sans courir !', 'La Route 1 est courte, mais les hautes herbes y sont pleines de surprises.'] }] },
+      { kind: 'house2', x: 34, y: 24, roof: 'orange', name: 'Boulangerie', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['Bienvenue à la boulangerie de l\'Aube !', 'Le premier pain sort du four avant le lever du soleil.'] }] },
+      { kind: 'house', x: 42, y: 24, roof: 'red' },
     ],
     npcs: [
-      { id: 'fille', x: 11, y: 13, sprite: 'fillette', move: 'wander', text: ['Les créatures sauvages vivent dans les hautes herbes.', 'Sans créature à toi, il ne faut surtout pas y aller !'] },
-      { id: 'vieux', x: 24, y: 7, sprite: 'vieil_homme', move: 'turn', text: ['Tu sais courir ? Garde la touche Maj enfoncée en marchant.', 'Et si tu oublies une touche, regarde le petit bouton en bas de l\'écran !'] },
-      { id: 'garde10', x: 37, y: 12, sprite: 'garde', dir: 'up', gate: { badges: 5, tiles: [[38, 10], [38, 11]] }, text: ['La route 10 longe des falaises instables.', 'Reviens quand tu auras 5 badges.'] },
+      { id: 'fille', x: 22, y: 23, sprite: 'fillette', move: 'wander', text: ['Les créatures sauvages vivent dans les hautes herbes.', 'Sans créature à toi, il ne faut surtout pas y aller !'] },
+      { id: 'vieux', x: 31, y: 9, sprite: 'vieil_homme', move: 'turn', text: ['Tu sais courir ? Garde la touche Maj enfoncée en marchant.', 'Et si tu oublies une touche, regarde le petit bouton en bas de l\'écran !'] },
+      { id: 'garde10', x: 53, y: 19, sprite: 'garde', dir: 'down', gate: { badges: 5, tiles: [[55, 20], [55, 21]] }, text: ['La route 10 longe des falaises instables.', 'Reviens quand tu auras 5 badges.'] },
     ],
   };
   ville(A, 'A');

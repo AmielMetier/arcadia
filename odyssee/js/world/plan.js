@@ -18,8 +18,9 @@ export const BLOC = 24, COLS = 50, ROWS = 58, LARGEUR = COLS * BLOC, HAUTEUR = R
 
 /** les villes (lettre de la ville dans region.js / sud.js) */
 export const VILLES = {
-  A: { bx: 1, by: 22, bw: 4, bh: 3, cx: 28, cy: 24, theme: 'aube', devise: 'Là où chaque aventure commence.', toits: ['red', 'orange'], arbres: ['cerisier', 'erable'], quartiers: { maisons: 4, parc: 1, place: 0, marche: 1, jardins: 2, ferme: 2 },
-    sorties: [{ dir: 'n', k: 42, vers: 'r1' }, { dir: 'e', k: 34, vers: 'r10', garde: 'garde10' }] },
+  // Bourg-Aube à l'échelle de Noir 2 & Blanc 2 : 72 × 48 cases, dessiné à la main (region.js)
+  A: { bx: 1, by: 22, bw: 3, bh: 2, cx: 8, cy: 6, theme: 'aube', devise: 'Là où chaque aventure commence.', toits: ['red', 'orange'], arbres: ['cerisier', 'erable'], quartiers: { maisons: 0, parc: 0, place: 0, marche: 0, jardins: 0 },
+    sorties: [{ dir: 'n', k: 35, vers: 'r1' }, { dir: 'e', k: 26, vers: 'r10', garde: 'garde10' }] },
   // Sylvebourg à la taille d'une ville de Noir 2 & Blanc 2, un peu plus grande : 72 × 72 cases, dessinée à la main (le village remplit presque tout le territoire)
   B: { bx: 1, by: 14, bw: 3, bh: 3, cx: 8, cy: 10, theme: 'sylve', devise: 'La ville où murmurent les feuilles.', arbres: ['pine', 'erable'], toits: ['green', 'teal', 'brown'], quartiers: { maisons: 0, parc: 0, place: 0, marche: 0, jardins: 0 },
     sorties: [{ dir: 'n', k: 35, vers: 'r2', garde: 'garde' }, { dir: 's', k: 35, vers: 'r1' }] },
@@ -87,7 +88,7 @@ export const TERR = {
   r5: [[24, 9, 37, 11], [24, 8, 25, 8], [33, 8, 37, 8]],
   r6: [[26, 12, 31, 15]],
   r7: [[32, 19, 37, 22]],
-  r10: [[5, 23, 14, 27]],
+  r10: [[4, 23, 14, 27]],
   r9: [[15, 16, 18, 23], [13, 18, 14, 22]],
   r9b: [[11, 15, 14, 17]],
   r11: [[26, 25, 27, 32]],

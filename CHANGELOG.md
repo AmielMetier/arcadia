@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.128 — 20 novembre 2026
+- **Odyssée** — Bourg-Aube redessiné à l'échelle de Noir 2 & Blanc 2 : un petit bourg où tout est à portée de main.
+  - Ta maison et celle de Théo au nord, le laboratoire du Professeur Saule à deux pas, un étang avec ses bancs.
+  - Au sud, une boulangerie, deux maisons habitées et des potagers fleuris.
+  - Le bourg est vérifié avec les deux graphismes, Odyssée et Noir & Blanc.
+
 ## 5.127 — 20 novembre 2026
 - **Odyssée** — Sylvebourg redessinée sur le modèle des villes de Noir 2 & Blanc 2 : un village serré où chaque coin a quelque chose.
   - La grand-rue relie les deux portes ; au nord le Centre et la Boutique avec leurs massifs de fleurs, au milieu les maisons à jardinets, l'Arène et un parc autour d'un étang.
