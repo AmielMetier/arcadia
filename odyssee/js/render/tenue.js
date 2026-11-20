@@ -128,9 +128,20 @@ export function zonesTenue(px, W, genre) {
   return out;
 }
 
-/** recolore une image (px : RGBA, W × W) selon la tenue ; renvoie le nombre de pixels changés */
-export function recolorer(px, W, genre, T) {
-  const Z = zonesTenue(px, W, genre); let n = 0;
+/** zones dessinées à la main par un pack de graphismes (Noir & Blanc) : { m, f } → Uint8Array de 768 × 64 (une valeur de
+ *  ZONES par pixel, les 12 poses côte à côte) ; elles remplacent la détection automatique faite pour le dresseur de base */
+let MASQUES = null;
+export function setMasques(M) { MASQUES = M; }
+/** les zones de la pose i (W × W), tirées des masques du pack, ou null */
+function zonesPack(genre, i, W) {
+  const M = MASQUES?.[genre]; if (!M || W !== 64) return null;
+  const Z = new Uint8Array(W * W); for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) Z[y * W + x] = M[y * 768 + i * W + x];
+  return Z;
+}
+
+/** recolore une image (px : RGBA, W × W) selon la tenue ; renvoie le nombre de pixels changés (Z : zones déjà connues) */
+export function recolorer(px, W, genre, T, Zp = null) {
+  const Z = Zp || zonesTenue(px, W, genre); let n = 0;
   for (let z = 1; z < ZONES.length; z++) {
     const hex = T[ZONES[z]]; if (!hex) continue;
     // valeur moyenne de la zone : chaque pixel garde son ombre relative autour de la teinte voulue
@@ -160,7 +171,8 @@ export function composer(src, sx, sy, T, doc = typeof document !== 'undefined' ?
   for (let i = 0; i < 12; i++) {
     x.clearRect(0, 0, W, W); x.drawImage(src, sx + i * W, sy, W, W, 0, 0, W, W);
     const im = x.getImageData(0, 0, W, W);
-    recolorer(im.data, W, T.genre === 'f' ? 'f' : 'm', T);
+    const g = T.genre === 'f' ? 'f' : 'm';
+    recolorer(im.data, W, g, T, zonesPack(g, i, W));
     x.putImageData(im, 0, 0);
     ctx.drawImage(c, i * W, 0);
   }

@@ -18,6 +18,7 @@ import { brancherRendu } from './donjons/rendu.js';
 import { decodeSave, saveSummary } from './core/savecode.js';
 import { Cloud } from './net/cloud.js';
 import { Game } from './game.js';
+import { setMasques } from './render/tenue.js';
 import { apparenceScreen } from './ui/apparence.js';
 import { createMon } from './core/mon.js';
 import { ASSETS, loadImg, loadAll } from './assets.js';
@@ -137,6 +138,13 @@ async function boot() {
   prechauffe.length = 0;
   etape('images');
   for (const [nom, pal] of Object.entries(packActif()?.murs || {})) paletteMurs(nom, pal);
+  // pack de graphismes : les zones de la tenue (visière, haut, bas…) dessinées pour ses deux dresseurs (render/tenue.js)
+  if (packActif()?.tenue) try {
+    const im = await loadImg(ASSETS.gfx(packActif().dossier, packActif().tenue)), c = document.createElement('canvas');
+    c.width = im.width; c.height = im.height; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0);
+    const d = x.getImageData(0, 0, im.width, im.height).data, rang = (r) => { const z = new Uint8Array(768 * 64); for (let y = 0; y < 64; y++) for (let k = 0; k < 768; k++) z[y * 768 + k] = d[((r * 64 + y) * im.width + k) * 4]; return z; };
+    setMasques({ m: rang(0), f: rang(1) });
+  } catch (e) { console.warn('[tenue] zones du pack absentes', e); }
   setArt({ kits: art.kits, sols: art.sols, sol32: art.sol32, hgss: art.hgss, relief: art.relief, pack: art.pack });
   const view = new WorldView(renderer, art.chars, { sprites: art.sprites, dens: art.dens, suiveurs: art.suiveurs, batiments: art.batiments, packDecor: !!packActif()?.decor, charRows: packActif()?.charRows || null, charVariants: packActif()?.charVariants || null });
   etape('vue');

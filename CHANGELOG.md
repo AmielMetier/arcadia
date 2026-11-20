@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.135 — 20 novembre 2026
+- **Odyssée** — Graphismes Noir & Blanc : la personnalisation de la tenue marche enfin sur les dresseurs de Noir 2 & Blanc 2. La visière, le haut, le bas, les chaussures et le sac prennent les couleurs choisies, de face, de profil et de dos, pour le garçon comme pour la fille, et les autres joueurs te voient avec ta tenue.
+
 ## 5.134 — 20 novembre 2026
 - **Odyssée** — Trois donjons à faire entre amis, posés sur la nouvelle carte : la Crypte des Murmures, le Donjon des Miroirs et le Sanctuaire des Trois Voies.
   - En battant Hector, on reçoit la Clé de la Crypte. Elle ouvre la crypte du Cimetière des Murmures, au bout d'un sentier de la Route 2.
