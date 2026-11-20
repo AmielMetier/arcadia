@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 5.131 — 20 novembre 2026
+- **Odyssée** — Les routes gagnent en détails, sans rien perdre de leur longueur :
+  - des recoins cachés au bout d'une trouée dans les arbres, avec un objet au fond ; certains sont fermés par un arbuste à couper ;
+  - des buttes où l'on monte par un petit escalier, avec un banc ou un objet là-haut ;
+  - sur chaque route, un rocher qui cache quelque chose : approche-toi de celui qui brille ;
+  - de nouveaux rebords à sauter, et des panneaux de conseils du dresseur au bord du chemin.
+
 ## 5.130 — 20 novembre 2026
 - **Odyssée** — Toutes les autres villes passent à l'échelle de Noir 2 & Blanc 2, de Port-Azur à Port-Ombre : des villes serrées autour de leur Centre, de leur Boutique et de leur Arène, qu'on traverse en quelques pas.
   - Métropole reste un cran au-dessus, comme une grande ville du jeu.
