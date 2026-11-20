@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 5.130 — 20 novembre 2026
+- **Odyssée** — Toutes les autres villes passent à l'échelle de Noir 2 & Blanc 2, de Port-Azur à Port-Ombre : des villes serrées autour de leur Centre, de leur Boutique et de leur Arène, qu'on traverse en quelques pas.
+  - Métropole reste un cran au-dessus, comme une grande ville du jeu.
+  - Les routes, les forêts, les lacs et les grottes ne changent pas : les portes des villes sont toujours au même endroit, et une allée à travers les bois y mène.
+
 ## 5.129 — 20 novembre 2026
 - **Odyssée** — Pierrefort se resserre à la taille d'une ville de Noir 2 & Blanc 2 : le Centre, la Boutique, la Maison des Mineurs et l'usine Poké Ball sont à quelques pas les uns des autres, avec une couronne de maisons, l'auberge et le puits autour.
   - Le Bois Murmure, la Route 3 et le chemin de la mine arrivent toujours aux mêmes portes.

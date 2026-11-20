@@ -27,43 +27,44 @@ export const VILLES = {
   // Pierrefort à l'échelle d'une ville de Noir 2 & Blanc 2 : 96 × 72 cases, le centre (60 × 34) et une couronne serrée
   C: { bx: 5, by: 2, bw: 4, bh: 3, cx: 18, cy: 19, theme: 'pierre', devise: 'Une ville taillée dans la montagne.', quartiers: { maisons: 2, parc: 0, place: 1, marche: 0, jardins: 0 },
     sorties: [{ dir: 's', k: 61, vers: 'bois' }, { dir: 'e', k: 29, vers: 'r3' }, { dir: 'n', k: 63, vers: 'mine' }] },
-  D: { bx: 19, by: 1, bw: 5, bh: 6, cx: 42, cy: 26, theme: 'azur', mer: 'n', devise: 'Le parfum des embruns et des voyages.', quartiers: { maisons: 6, parc: 1, place: 1, marche: 1, jardins: 0 },
+  D: { bx: 19, by: 1, bw: 5, bh: 6, cx: 42, cy: 26, theme: 'azur', mer: 'n', devise: 'Le parfum des embruns et des voyages.', quartiers: { maisons: 3, parc: 1, place: 1, marche: 1, jardins: 0 },
     sorties: [{ dir: 'w', k: 60, vers: 'r3e' }, { dir: 'e', k: 88, vers: 'r4', garde: 'garde' }] },
-  E: { bx: 31, by: 2, bw: 6, bh: 6, cx: 50, cy: 48, theme: 'volta', releve: true, organique: false, pasX: [16, 21], pasY: [13, 16], saute: 0, devise: 'La ville qui ne s\'éteint jamais.', quartiers: { maisons: 5, parc: 1, place: 1, marche: 1, jardins: 0, affaires: 3 },
+  E: { bx: 31, by: 2, bw: 6, bh: 6, cx: 50, cy: 48, theme: 'volta', releve: true, organique: false, pasX: [16, 21], pasY: [13, 16], saute: 0, devise: 'La ville qui ne s\'éteint jamais.', quartiers: { maisons: 3, parc: 1, place: 1, marche: 1, jardins: 0, affaires: 2 },
     sorties: [{ dir: 'w', k: 44, vers: 'r4' }, { dir: 's', k: 110, vers: 'r5', garde: 'garde' }] },
-  F: { bx: 19, by: 12, bw: 7, bh: 5, cx: 60, cy: 42, theme: 'flora', devise: 'La cité aux mille couleurs.', arbres: ['cerisier', 'erable', 'cerisier'], quartiers: { maisons: 7, parc: 2, place: 1, marche: 1, jardins: 3 },
+  F: { bx: 19, by: 12, bw: 7, bh: 5, cx: 60, cy: 42, theme: 'flora', devise: 'La cité aux mille couleurs.', arbres: ['cerisier', 'erable', 'cerisier'], quartiers: { maisons: 4, parc: 1, place: 1, marche: 1, jardins: 1 },
     sorties: [{ dir: 'n', k: 150, vers: 'r5', garde: 'garde' }, { dir: 'e', k: 74, vers: 'r6', coupe: true }] },
-  G: { bx: 32, by: 14, bw: 6, bh: 5, cx: 50, cy: 44, theme: 'mirage', devise: 'La ville où l\'esprit voit plus loin.', statue: 'stele', quartiers: { maisons: 7, parc: 1, place: 1, marche: 1, jardins: 1 },
+  G: { bx: 32, by: 14, bw: 6, bh: 5, cx: 50, cy: 44, theme: 'mirage', devise: 'La ville où l\'esprit voit plus loin.', statue: 'stele', quartiers: { maisons: 4, parc: 1, place: 1, marche: 1, jardins: 0 },
     sorties: [{ dir: 'w', k: 22, vers: 'r6' }, { dir: 'w', k: 71, vers: 'torii' }, { dir: 's', k: 90, vers: 'r7' }] },
-  K: { bx: 34, by: 25, bw: 4, bh: 4, cx: 33, cy: 40, theme: 'granit', devise: 'Île de Granit.', quartiers: { maisons: 4, parc: 1, place: 1, marche: 1, jardins: 0 },
+  K: { bx: 34, by: 25, bw: 4, bh: 4, cx: 33, cy: 40, theme: 'granit', devise: 'Île de Granit.', quartiers: { maisons: 2, parc: 1, place: 1, marche: 1, jardins: 0 },
     sorties: [{ dir: 'n', k: 53, vers: 'quai' }] },
-  H: { bx: 29, by: 28, bw: 4, bh: 4, cx: 42, cy: 40, theme: 'cendre', devise: 'L\'île où dort le volcan.', quartiers: { maisons: 5, parc: 1, place: 1, marche: 1, jardins: 0 },
+  H: { bx: 29, by: 28, bw: 4, bh: 4, cx: 42, cy: 40, theme: 'cendre', devise: 'L\'île où dort le volcan.', quartiers: { maisons: 3, parc: 1, place: 1, marche: 1, jardins: 0 },
     sorties: [{ dir: 'n', k: 60, vers: 'plage-n' }, { dir: 'w', k: 40, vers: 'plage-w' }] },
-  L: { bx: 21, by: 25, bw: 5, bh: 5, cx: 40, cy: 40, theme: 'ecaille', devise: 'Capitale de l\'archipel.', statue: 'statue_dragon', quartiers: { maisons: 6, parc: 1, place: 1, marche: 1, jardins: 0 },
+  L: { bx: 21, by: 25, bw: 5, bh: 5, cx: 40, cy: 40, theme: 'ecaille', devise: 'Capitale de l\'archipel.', statue: 'statue_dragon', quartiers: { maisons: 3, parc: 1, place: 1, marche: 1, jardins: 0 },
     sorties: [{ dir: 'e', k: 50, vers: 'r11' }, { dir: 'n', k: 60, vers: 'cap', garde: 'garde-cap' }, { dir: 's', k: 60, vers: 'r12' }] },
-  I: { bx: 15, by: 24, bw: 4, bh: 4, cx: 32, cy: 36, theme: 'cime', devise: 'La cité des dragons anciens.', statue: 'statue_dragon', quartiers: { maisons: 5, parc: 1, place: 1, marche: 1, jardins: 0 },
+  I: { bx: 15, by: 24, bw: 4, bh: 4, cx: 32, cy: 36, theme: 'cime', devise: 'La cité des dragons anciens.', statue: 'statue_dragon', quartiers: { maisons: 3, parc: 1, place: 1, marche: 1, jardins: 0 },
     sorties: [{ dir: 'w', k: 52, vers: 'r10' }, { dir: 'n', k: 30, vers: 'r9', garde: 'garde' }, { dir: 'e', k: 52, vers: 'plage' }] },
   J: { bx: 11, by: 9, bw: 5, bh: 6, cx: 43, cy: 70, theme: 'plateau', releve: false, devise: 'Le sommet des dresseurs.', quartiers: { maisons: 0, parc: 3, place: 1, marche: 0, jardins: 0, zen: 3, fleurs: 2, verger: 2 }, defaut: 'esplanade', pasX: [34, 46], pasY: [26, 36], saute: 0.4, arbres: ['erable', 'cerisier'], statue: 'statue',
     sorties: [{ dir: 's', k: 59, vers: 'r9b' }] },
   // Terres du Sud
-  SM: { bx: 3, by: 36, bw: 12, bh: 8, cx: 96, cy: 66, theme: 'metro', releve: true, organique: false, pasX: [20, 26], pasY: [15, 19], saute: 0.06, devise: 'La ville qui ne dort jamais.', quartiers: { maisons: 6, parc: 2, place: 2, marche: 1, jardins: 0, affaires: 8 },
+  SM: { bx: 3, by: 36, bw: 12, bh: 8, cx: 96, cy: 66, theme: 'metro', releve: true, organique: false, pasX: [20, 26], pasY: [15, 19], saute: 0.06, devise: 'La ville qui ne dort jamais.', quartiers: { maisons: 4, parc: 1, place: 1, marche: 1, jardins: 0, affaires: 5 },
     sorties: [{ dir: 'n', k: 150, vers: 'r13' }, { dir: 'e', k: 100, vers: 'r14', garde: 'garde-est' }, { dir: 's', k: 130, vers: 'r20', garde: 'garde-sud' }] },
-  SP: { bx: 22, by: 34, bw: 7, bh: 6, cx: 60, cy: 60, theme: 'lisiere', mer: 'n', digue: true, devise: 'Là où le vent prend son élan.', quartiers: { maisons: 7, parc: 1, place: 1, marche: 1, jardins: 1 },
+  SP: { bx: 22, by: 34, bw: 7, bh: 6, cx: 60, cy: 24, theme: 'lisiere', mer: 'n', digue: true, devise: 'Là où le vent prend son élan.', quartiers: { maisons: 4, parc: 1, place: 1, marche: 1, jardins: 0 },
     sorties: [{ dir: 'w', k: 90, vers: 'r14' }, { dir: 'e', k: 80, vers: 'r15', garde: 'garde' }] },
-  SN: { bx: 35, by: 35, bw: 6, bh: 5, cx: 50, cy: 40, theme: 'marais', devise: 'On y entre en bottes, on en sort en rampant.', quartiers: { maisons: 6, parc: 1, place: 1, marche: 1, jardins: 1 },
+  SN: { bx: 35, by: 35, bw: 6, bh: 5, cx: 50, cy: 40, theme: 'marais', devise: 'On y entre en bottes, on en sort en rampant.', quartiers: { maisons: 3, parc: 1, place: 1, marche: 1, jardins: 0 },
     sorties: [{ dir: 'w', k: 55, vers: 'r15' }, { dir: 's', k: 70, vers: 'r16', garde: 'garde' }] },
-  SD: { bx: 41, by: 47, bw: 6, bh: 5, cx: 50, cy: 40, theme: 'dunes', devise: 'Le vent sculpte la ville chaque nuit.', arbres: ['palm', 'cactus', 'palm'], quartiers: { maisons: 6, parc: 1, place: 1, marche: 1, jardins: 0 },
+  SD: { bx: 41, by: 47, bw: 6, bh: 5, cx: 50, cy: 40, theme: 'dunes', devise: 'Le vent sculpte la ville chaque nuit.', arbres: ['palm', 'cactus', 'palm'], quartiers: { maisons: 3, parc: 1, place: 1, marche: 1, jardins: 0 },
     sorties: [{ dir: 'n', k: 60, vers: 'r16' }, { dir: 'w', k: 80, vers: 'r17', garde: 'garde' }] },
-  SF: { bx: 27, by: 49, bw: 6, bh: 5, cx: 50, cy: 40, theme: 'forge', releve: true, organique: false, pasX: [30, 38], pasY: [22, 28], saute: 0.25, devise: 'Le cœur battant de l\'industrie du Sud.', quartiers: { maisons: 5, parc: 1, place: 1, marche: 1, jardins: 0, affaires: 3 },
+  SF: { bx: 27, by: 49, bw: 6, bh: 5, cx: 50, cy: 40, theme: 'forge', releve: true, organique: false, pasX: [30, 38], pasY: [22, 28], saute: 0.25, devise: 'Le cœur battant de l\'industrie du Sud.', quartiers: { maisons: 3, parc: 1, place: 1, marche: 1, jardins: 0, affaires: 2 },
     sorties: [{ dir: 'e', k: 55, vers: 'r17' }, { dir: 'w', k: 60, vers: 'r18', garde: 'garde' }] },
-  SR: { bx: 15, by: 50, bw: 6, bh: 5, cx: 48, cy: 40, theme: 'rose', devise: 'La ville qui sent bon le rêve.', arbres: ['cerisier', 'cerisier', 'erable'], quartiers: { maisons: 6, parc: 2, place: 1, marche: 1, jardins: 2 },
+  SR: { bx: 15, by: 50, bw: 6, bh: 5, cx: 48, cy: 40, theme: 'rose', devise: 'La ville qui sent bon le rêve.', arbres: ['cerisier', 'cerisier', 'erable'], quartiers: { maisons: 3, parc: 1, place: 1, marche: 1, jardins: 1 },
     sorties: [{ dir: 'e', k: 50, vers: 'r18' }, { dir: 'w', k: 60, vers: 'r19', garde: 'garde' }] },
-  SO: { bx: 2, by: 50, bw: 6, bh: 5, cx: 48, cy: 40, theme: 'ombre', devise: 'Ici, même la lune baisse les yeux.', arbres: ['lanterne', 'erable'], quartiers: { maisons: 7, parc: 1, place: 1, marche: 1, jardins: 0 },
+  SO: { bx: 2, by: 50, bw: 6, bh: 5, cx: 48, cy: 40, theme: 'ombre', devise: 'Ici, même la lune baisse les yeux.', arbres: ['lanterne', 'erable'], quartiers: { maisons: 4, parc: 1, place: 1, marche: 1, jardins: 0 },
     sorties: [{ dir: 'e', k: 55, vers: 'r19' }, { dir: 'n', k: 64, vers: 'r20' }] },
 };
 // les villes qu'on visite après Sylvebourg sont plus petites que leur territoire (echelle : part de chaque côté) : la
 // ville au milieu, la forêt tout autour, des avenues d'accès depuis les portes (quartiers.js, noyau)
-const ECHELLES = { C: 0.75, D: 0.75, E: 0.72, F: 0.74, G: 0.75, K: 0.75, H: 0.75, L: 0.75, I: 0.75, J: 0.75, SM: 0.68, SP: 0.74, SN: 0.75, SD: 0.74, SF: 0.72, SR: 0.75, SO: 0.75 };
+// villes à l'échelle de Noir 2 & Blanc 2 : le noyau habité reste serré, la forêt de son territoire garde les portes et les routes à leur place
+const ECHELLES = { C: 0.75, D: 0.45, E: 0.45, F: 0.45, G: 0.45, K: 0.45, H: 0.45, L: 0.45, I: 0.45, J: 0.75, SM: 0.55, SP: 0.45, SN: 0.45, SD: 0.45, SF: 0.45, SR: 0.45, SO: 0.45 };
 for (const [k, v] of Object.entries(VILLES)) Object.assign(v, { x: v.bx * BLOC, y: v.by * BLOC, w: v.bw * BLOC, h: v.bh * BLOC, echelle: ECHELLES[k] ?? 1 });
 
 /** case juste devant une porte de ville (hors de la ville) et direction en sortant */
