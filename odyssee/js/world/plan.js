@@ -24,8 +24,9 @@ export const VILLES = {
   // Sylvebourg à la taille d'une ville de Noir 2 & Blanc 2, un peu plus grande : 72 × 72 cases, dessinée à la main (le village remplit presque tout le territoire)
   B: { bx: 1, by: 14, bw: 3, bh: 3, cx: 8, cy: 10, theme: 'sylve', devise: 'La ville où murmurent les feuilles.', arbres: ['pine', 'erable'], toits: ['green', 'teal', 'brown'], quartiers: { maisons: 0, parc: 0, place: 0, marche: 0, jardins: 0 },
     sorties: [{ dir: 'n', k: 35, vers: 'r2', garde: 'garde' }, { dir: 's', k: 35, vers: 'r1' }] },
-  C: { bx: 3, by: 2, bw: 6, bh: 4, cx: 42, cy: 12, theme: 'pierre', devise: 'Une ville taillée dans la montagne.', quartiers: { maisons: 6, parc: 1, place: 1, marche: 1, jardins: 0 },
-    sorties: [{ dir: 's', k: 100, vers: 'bois' }, { dir: 'e', k: 40, vers: 'r3' }, { dir: 'n', k: 86, vers: 'mine' }] },
+  // Pierrefort à l'échelle d'une ville de Noir 2 & Blanc 2 : 96 × 72 cases, le centre (60 × 34) et une couronne serrée
+  C: { bx: 5, by: 2, bw: 4, bh: 3, cx: 18, cy: 19, theme: 'pierre', devise: 'Une ville taillée dans la montagne.', quartiers: { maisons: 2, parc: 0, place: 1, marche: 0, jardins: 0 },
+    sorties: [{ dir: 's', k: 61, vers: 'bois' }, { dir: 'e', k: 29, vers: 'r3' }, { dir: 'n', k: 63, vers: 'mine' }] },
   D: { bx: 19, by: 1, bw: 5, bh: 6, cx: 42, cy: 26, theme: 'azur', mer: 'n', devise: 'Le parfum des embruns et des voyages.', quartiers: { maisons: 6, parc: 1, place: 1, marche: 1, jardins: 0 },
     sorties: [{ dir: 'w', k: 60, vers: 'r3e' }, { dir: 'e', k: 88, vers: 'r4', garde: 'garde' }] },
   E: { bx: 31, by: 2, bw: 6, bh: 6, cx: 50, cy: 48, theme: 'volta', releve: true, organique: false, pasX: [16, 21], pasY: [13, 16], saute: 0, devise: 'La ville qui ne s\'éteint jamais.', quartiers: { maisons: 5, parc: 1, place: 1, marche: 1, jardins: 0, affaires: 3 },
@@ -81,7 +82,7 @@ export const TERR = {
   // Sylvebourg, rendue à la taille d'une ville de Noir 2 & Blanc 2, laisse la place aux deux routes qui la touchent
   r1: [[1, 17, 3, 21]],
   r2: [[1, 6, 5, 12], [1, 13, 2, 13]],
-  bois: [[6, 6, 9, 11]],
+  bois: [[6, 6, 9, 11], [6, 5, 8, 5]],
   r3: [[9, 1, 11, 5], [12, 4, 12, 5]],
   r3e: [[13, 4, 13, 5], [14, 1, 18, 5]],
   r4: [[24, 1, 30, 8]],

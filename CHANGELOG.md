@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 5.129 — 20 novembre 2026
+- **Odyssée** — Pierrefort se resserre à la taille d'une ville de Noir 2 & Blanc 2 : le Centre, la Boutique, la Maison des Mineurs et l'usine Poké Ball sont à quelques pas les uns des autres, avec une couronne de maisons, l'auberge et le puits autour.
+  - Le Bois Murmure, la Route 3 et le chemin de la mine arrivent toujours aux mêmes portes.
+
 ## 5.128 — 20 novembre 2026
 - **Odyssée** — Bourg-Aube redessiné à l'échelle de Noir 2 & Blanc 2 : un petit bourg où tout est à portée de main.
   - Ta maison et celle de Théo au nord, le laboratoire du Professeur Saule à deux pas, un étang avec ses bancs.

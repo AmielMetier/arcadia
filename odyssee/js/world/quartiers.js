@@ -50,7 +50,7 @@ const DECORS = { moulin: [4, 4, 6], grange: [6, 5, 4], phare: [3, 3, 8], cabaneP
 const THEMES = {
   aube: { q: {}, reperes: [], decor: [], amp: 2 },   // bourg dessiné à la main (taille Noir 2 & Blanc 2)
   sylve: { colline: 0, maisons: 'chalet', reperes: [], decor: [], q: {}, amp: 2 },   // ville de taille Noir 2 & Blanc 2, un peu plus grande
-  pierre: { plan: 'terrasses', colline: 2, roche: true, reperes: ['auberge', 'boulangerie'], decor: ['puits'], q: { carriere: 2 }, amp: 8 },
+  pierre: { plan: 'terrasses', colline: 1, roche: true, reperes: ['auberge'], decor: ['puits'], q: { carriere: 1 }, amp: 3 },   // ville resserrée (taille Noir 2 & Blanc 2)
   azur: { plan: 'arete', style: 'ville', riviere: 'ns', reperes: ['auberge', 'boulangerie'], decor: ['phare', 'cabanePecheur'], q: { verger: 0 }, amp: 7 },
   volta: { plan: 'grille', style: 'ville', reperes: ['gare', 'mairie'], q: { centrale: 1 }, amp: 5 },
   flora: { plan: 'anneaux', colline: 1, reperes: ['boulangerie', 'chapelle'], decor: ['moulin'], q: { jardins: 2, verger: 1, fleurs: 3 }, amp: 11 },
