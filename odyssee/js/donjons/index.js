@@ -1,6 +1,6 @@
 // odyssee/js/donjons/index.js — les donjons à plusieurs du jeu, et leur place dans le monde (appelé à la fin de buildWorld,
 // une fois tout le reste posé) :
-//   la Crypte des Murmures : le cimetière des Ruines Oubliées de la Route 2 (crypte.js) ;
+//   la Crypte des Murmures : le cimetière des ruines d'une impasse de la Route 2 (crypte.js) ;
 //   le Sanctuaire des Trois Voies : la clairière aux ruines au nord de la Route 3, côté ouest ;
 //   le Donjon des Miroirs : la clairière aux ruines au nord de la Route 3, côté est, dans les sapins enneigés.
 // Rien de ce qui était là ne devient inatteignable : un bâtiment, un décor qui couperait un passage n'est pas posé.
@@ -79,7 +79,7 @@ function poserDansClairiere(W, maps, routes, def, o) {
 
 /** tous les donjons dans le monde (fin de buildWorld) */
 export function poserDonjons(W, maps, routes) {
-  const crypte = poserCrypte(W, maps);
+  const crypte = poserCrypte(W, maps, routes);
   CRYPTE.cartes = [CRYPTE.carte];
   const voies = poserDansClairiere(W, maps, routes, VOIES, {
     route: 'r3', kind: 'ruines', nom: 'Clairière des Trois Voies', music: 'route', modele: 'voiesSanctuaire', w: 9, d: 7, door: 4,

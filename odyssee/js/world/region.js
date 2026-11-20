@@ -465,19 +465,40 @@ export function buildWorld() {
 
   /* ---------- A · Bourg-Aube ---------- */
   const A = towns.A = {
-    id: 'aube', name: 'Bourg-Aube', x: 20, y: 238, w: 40, h: 30, exits: [['n', 14], ['e', 10]], fermer: true, lotir: false,
-    roads: [[14, 0, 15, 29, T.PATH], [0, 10, 39, 11, T.PATH], [14, 18, 20, 19, T.PATH]],
-    deco: [['flowers', 9, 3, 11, 5], ['flowers', 26, 13, 27, 17], ['water', 6, 15, 3.2, 2.2], ['fence', 2, 8, 4, 8], ['fence', 24, 8, 27, 8],
-      ['sign', 12, 8, 'BOURG-AUBE\nLà où chaque aventure commence.'], ['sign', 13, 17, 'LABORATOIRE\nProf. Saule'], ['lamp', 13, 9], ['lamp', 16, 9]],
+    // bourg de 56 × 36 cases, à l'échelle de Noir 2 & Blanc 2 : la rue du nord (x 27-28) mène à la Route 1, la grand-rue
+    // (y 20-21) traverse le bourg jusqu'à la porte de la Route 10 ; au nord les deux maisons et le laboratoire, au sud la
+    // boulangerie, les maisons du bas et les potagers
+    id: 'aube', name: 'Bourg-Aube', x: 20, y: 238, w: 56, h: 36, exits: [['n', 27], ['e', 20]], fermer: true, lotir: false,
+    roads: [[27, 0, 28, 29, T.PATH], [3, 20, 55, 21, T.PATH], [4, 29, 52, 29, T.PATH],
+      [10, 11, 10, 19, T.PATH], [18, 11, 18, 19, T.PATH], [36, 17, 37, 19, T.PATH],
+      [9, 27, 9, 28, T.PATH], [16, 27, 16, 28, T.PATH], [36, 27, 36, 28, T.PATH], [43, 27, 43, 28, T.PATH]],
+    deco: [
+      // le nord : jardins des deux maisons, massifs, arbres d'ornement, l'étang
+      ['flowers', 8, 3, 13, 5], ['trees', 2, 1, 5, 4], ['cerisier', 15, 3], ['cerisier', 21, 3], ['flowers', 20, 13, 23, 15], ['flowers', 5, 13, 8, 15],
+      ['fence', 7, 12, 8, 12], ['fence', 12, 12, 16, 12], ['fence', 20, 12, 22, 12], ['erable', 13, 16], ['erable', 23, 17], ['banc', 15, 17],
+      ['waterRect', 46, 3, 52, 6], ['flowers', 45, 8, 53, 8], ['banc', 47, 1], ['banc', 51, 1], ['cerisier', 44, 2], ['cerisier', 54, 5], ['lanterne', 45, 4],
+      ['flowers', 31, 3, 34, 6], ['erable', 39, 4],
+      ['lamp', 26, 3], ['lamp', 29, 3], ['lamp', 26, 18], ['lamp', 29, 18], ['lamp', 26, 24], ['lamp', 29, 24],
+      ['sign', 25, 18, 'BOURG-AUBE\nLà où chaque aventure commence.'], ['sign', 39, 18, 'LABORATOIRE\nProf. Saule'],
+      ['flowers', 33, 17, 34, 18], ['flowers', 39, 17, 41, 17], ['flowers', 45, 13, 50, 16], ['erable', 52, 14],
+      // le sud : la boulangerie et ses caisses, les maisons du bas, les potagers clos
+      ['caisses', 40, 25], ['tonneau', 41, 26], ['flowers', 20, 24, 24, 26], ['flowers', 47, 24, 51, 26], ['pot', 13, 25], ['pot', 20, 27],
+      ['fence', 4, 31, 12, 31], ['fence', 14, 31, 22, 31], ['fence', 4, 34, 22, 34], ['fence', 4, 32, 4, 33], ['fence', 22, 32, 22, 33],
+      ['flowers', 5, 32, 11, 32], ['flowers', 15, 32, 21, 32], ['flowers', 5, 33, 11, 33], ['flowers', 15, 33, 21, 33], ['banc', 24, 31],
+      ['fence', 32, 31, 50, 31], ['cerisier', 34, 33], ['erable', 39, 33], ['cerisier', 44, 33], ['erable', 49, 33]],
     buildings: [
-      { kind: 'house', x: 4, y: 4, roof: 'red', id: 'maison', name: 'Maison', bed: true, kitchen: true, npcs: [{ id: 'maman', x: 5, y: 4, sprite: 'maman', dir: 'down', script: 'mom' }] },
-      { kind: 'house', x: 20, y: 4, roof: 'blue', id: 'rival', name: 'Maison de Théo', npcs: [{ x: 3, y: 4, sprite: 'habitante', dir: 'right', script: 'rivalMom' }] },
-      { kind: 'lab', ...GRAND.lab, x: 16, y: 12, id: 'labo' },
+      { kind: 'house', x: 9, y: 8, roof: 'red', id: 'maison', name: 'Maison', bed: true, kitchen: true, npcs: [{ id: 'maman', x: 5, y: 4, sprite: 'maman', dir: 'down', script: 'mom' }] },
+      { kind: 'house', x: 17, y: 8, roof: 'blue', id: 'rival', name: 'Maison de Théo', npcs: [{ x: 3, y: 4, sprite: 'habitante', dir: 'right', script: 'rivalMom' }] },
+      { kind: 'lab', ...GRAND.lab, x: 34, y: 10, id: 'labo' },
+      { kind: 'house', x: 8, y: 24, roof: 'orange', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['Le Professeur Saule travaille jour et nuit dans son laboratoire.', 'Il paraît qu\'il prépare des créatures pour les jeunes du bourg !'] }] },
+      { kind: 'house', x: 15, y: 24, roof: 'red', npcs: [{ x: 3, y: 4, sprite: 'vieil_homme', text: ['De mon temps, on allait jusqu\'à Sylvebourg à pied, sans courir !', 'La Route 1 est courte, mais les hautes herbes y sont pleines de surprises.'] }] },
+      { kind: 'house2', x: 34, y: 24, roof: 'orange', name: 'Boulangerie', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['Bienvenue à la boulangerie de l\'Aube !', 'Le premier pain sort du four avant le lever du soleil.'] }] },
+      { kind: 'house', x: 42, y: 24, roof: 'red' },
     ],
     npcs: [
-      { id: 'fille', x: 11, y: 13, sprite: 'fillette', move: 'wander', text: ['Les créatures sauvages vivent dans les hautes herbes.', 'Sans créature à toi, il ne faut surtout pas y aller !'] },
-      { id: 'vieux', x: 24, y: 7, sprite: 'vieil_homme', move: 'turn', text: ['Tu sais courir ? Garde la touche Maj enfoncée en marchant.', 'Et si tu oublies une touche, regarde le petit bouton en bas de l\'écran !'] },
-      { id: 'garde10', x: 37, y: 12, sprite: 'garde', dir: 'up', gate: { badges: 5, tiles: [[38, 10], [38, 11]] }, text: ['La route 10 longe des falaises instables.', 'Reviens quand tu auras 5 badges.'] },
+      { id: 'fille', x: 22, y: 23, sprite: 'fillette', move: 'wander', text: ['Les créatures sauvages vivent dans les hautes herbes.', 'Sans créature à toi, il ne faut surtout pas y aller !'] },
+      { id: 'vieux', x: 31, y: 9, sprite: 'vieil_homme', move: 'turn', text: ['Tu sais courir ? Garde la touche Maj enfoncée en marchant.', 'Et si tu oublies une touche, regarde le petit bouton en bas de l\'écran !'] },
+      { id: 'garde10', x: 53, y: 19, sprite: 'garde', dir: 'down', gate: { badges: 5, tiles: [[55, 20], [55, 21]] }, text: ['La route 10 longe des falaises instables.', 'Reviens quand tu auras 5 badges.'] },
     ],
   };
   ville(A, 'A');
@@ -485,19 +506,48 @@ export function buildWorld() {
 
   /* ---------- B · Sylvebourg (Hector, Insecte) ---------- */
   const B = towns.B = {
-    id: 'sylve', name: 'Sylvebourg', x: 18, y: 138, w: 54, h: 44, exits: [['s', 16], ['n', 16]], gym: 0, stock: 1, fermer: true, lotir: { n: 3, seed: 21 },
-    roads: [[16, 0, 17, 43, T.PATH], [0, 11, 53, 12, T.PATH], [0, 20, 17, 21, T.PATH], [0, 36, 53, 37, T.PATH], [46, 11, 47, 37, T.PATH]],
-    deco: [['flowers', 11, 4, 14, 7], ['flowers', 19, 4, 21, 7], ['lamp', 14, 10], ['lamp', 19, 10], ['lamp', 14, 13], ['lamp', 19, 13], ['lamp', 14, 35], ['lamp', 19, 35],
-      ['sign', 14, 9, 'SYLVEBOURG\nLa ville où murmurent les feuilles.'], ['sign', 39, 38, 'ARÈNE DE SYLVEBOURG\nChampion : Hector\nL\'observateur des insectes.'],
-      ['trees', 2, 23, 3, 25], ['tall', 28, 2, 31, 5], ['water', 8, 30, 3.4, 2.2], ['flowers', 19, 29, 26, 33], ['trees', 49, 2, 51, 8], ['trees', 2, 39, 6, 41]],
+    // village de 56 × 52 cases, à l'échelle de Noir 2 & Blanc 2 (un peu plus grand) : la grand-rue nord-sud (x 27-28) relie
+    // les deux portes ; au nord le Centre et la Boutique, au milieu les maisons, l'Arène et le parc à l'étang, au sud
+    // l'auberge, la cabane du chasseur et le verger
+    id: 'sylve', name: 'Sylvebourg', x: 18, y: 138, w: 56, h: 52, exits: [['s', 27], ['n', 27]], gym: 0, stock: 1, fermer: true, lotir: false,
+    roads: [[27, 0, 28, 51, T.PATH], [4, 13, 51, 14, T.PATH], [4, 36, 51, 37, T.PATH], [4, 15, 5, 35, T.PATH], [50, 15, 51, 35, T.PATH],
+      [6, 22, 26, 22, T.PATH], [4, 45, 51, 45, T.PATH], [12, 12, 12, 12, T.PATH], [39, 12, 39, 12, T.PATH],
+      [9, 20, 9, 21, T.PATH], [16, 20, 16, 21, T.PATH], [9, 29, 9, 35, T.PATH], [16, 29, 16, 35, T.PATH], [34, 30, 35, 35, T.PATH],
+      [9, 44, 9, 44, T.PATH], [17, 43, 17, 44, T.PATH], [35, 43, 35, 44, T.PATH], [42, 43, 42, 44, T.PATH], [49, 43, 49, 44, T.PATH]],
+    deco: [
+      // le nord : massifs devant le Centre et la Boutique, arbres d'ornement, lampadaires de la grand-rue
+      ['flowers', 18, 8, 23, 11], ['flowers', 43, 8, 47, 11], ['flowers', 6, 9, 7, 11], ['erable', 18, 4], ['erable', 23, 4], ['cerisier', 43, 4], ['cerisier', 48, 4],
+      ['trees', 2, 1, 6, 4], ['trees', 51, 1, 54, 5], ['lamp', 26, 5], ['lamp', 29, 5], ['lamp', 26, 11], ['lamp', 29, 11], ['lamp', 26, 33], ['lamp', 29, 33], ['lamp', 26, 47], ['lamp', 29, 47],
+      ['sign', 25, 11, 'SYLVEBOURG\nLa ville où murmurent les feuilles.'],
+      // les maisons de l'ouest : jardinets clos et fleurs
+      ['fence', 7, 24, 13, 24], ['fence', 14, 24, 20, 24], ['flowers', 11, 25, 12, 27], ['flowers', 18, 25, 19, 27], ['flowers', 7, 16, 7, 18], ['flowers', 20, 16, 21, 18],
+      ['banc', 22, 24], ['tonneau', 13, 21], ['pot', 20, 30], ['pot', 22, 30], ['flowers', 21, 27, 24, 29],
+      // l'Arène
+      ['sign', 33, 32, 'ARÈNE DE SYLVEBOURG\nChampion : Hector\nL\'observateur des insectes.'], ['flowers', 30, 32, 31, 34], ['flowers', 38, 32, 39, 34],
+      // le parc à l'étang
+      ['waterRect', 43, 20, 47, 23], ['flowers', 42, 18, 48, 18], ['flowers', 42, 25, 48, 25], ['banc', 43, 27], ['banc', 47, 27], ['statue', 45, 31],
+      ['cerisier', 41, 30], ['cerisier', 49, 30], ['erable', 41, 17], ['erable', 49, 17], ['lanterne', 42, 21], ['lanterne', 48, 21],
+      // le sud : l'auberge, la cabane, le verger
+      ['caisses', 21, 41], ['tonneau', 22, 42], ['flowers', 23, 40, 25, 42], ['flowers', 30, 40, 32, 42], ['flowers', 46, 40, 46, 42],
+      ['trees', 6, 48, 6, 48], ['trees', 9, 48, 9, 48], ['trees', 12, 48, 12, 48], ['trees', 15, 48, 15, 48], ['trees', 18, 48, 18, 48], ['trees', 21, 48, 21, 48],
+      ['trees', 7, 50, 7, 50], ['trees', 10, 50, 10, 50], ['trees', 13, 50, 13, 50], ['trees', 16, 50, 16, 50], ['trees', 19, 50, 19, 50], ['trees', 22, 50, 22, 50],
+      ['flowers', 33, 47, 38, 49], ['erable', 41, 48], ['cerisier', 45, 48], ['erable', 49, 48], ['flowers', 40, 50, 50, 51]],
     buildings: [
-      { kind: 'center', ...GRAND.center, x: 5, y: 5 }, { kind: 'mart', ...GRAND.mart, x: 21, y: 6 }, { kind: 'gym', ...GRAND.gym, x: 28, y: 18, roof: 'green' },
-      { kind: 'house', x: 5, y: 15, roof: 'green', npcs: [{ x: 4, y: 4, sprite: 'insectomane', text: ['Hector, le Champion, adore les créatures Insecte.', 'Le Feu, le Vol et la Roche les mettent en difficulté !'] }] },
-      { kind: 'house', x: 10, dx: 1, y: 15, roof: 'brown', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Une créature endormie ou paralysée est bien plus facile à capturer.', 'Et plus ses PV sont bas, mieux c\'est !'] }, { id: 'gs', x: 6, y: 3, sprite: 'vieil_homme', script: 'gsBall' }] },
+      { kind: 'center', ...GRAND.center, x: 9, y: 7 }, { kind: 'mart', ...GRAND.mart, x: 36, y: 8 }, { kind: 'gym', ...GRAND.gym, x: 26, y: 16, roof: 'green' },
+      { kind: 'house', x: 8, y: 17, roof: 'green', npcs: [{ x: 4, y: 4, sprite: 'insectomane', text: ['Hector, le Champion, adore les créatures Insecte.', 'Le Feu, le Vol et la Roche les mettent en difficulté !'] }] },
+      { kind: 'house', x: 15, y: 17, roof: 'brown', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Une créature endormie ou paralysée est bien plus facile à capturer.', 'Et plus ses PV sont bas, mieux c\'est !'] }, { id: 'gs', x: 6, y: 3, sprite: 'vieil_homme', script: 'gsBall' }] },
+      { kind: 'house', x: 8, y: 26, roof: 'teal', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['Le Bois Murmure, au nord, est si touffu qu\'on y voit à peine le ciel.', 'Les créatures Insecte y pullulent !'] }] },
+      { kind: 'house', x: 15, y: 26, roof: 'green', npcs: [{ x: 3, y: 4, sprite: 'gamin', text: ['Mon grand frère a battu Hector du premier coup.', 'Il dit qu\'un oiseau, ça règle tout !'] }] },
+      { kind: 'bighouse', x: 7, y: 40, roof: 'brown', name: 'Auberge', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['Bienvenue à l\'auberge du Chêne !', 'Les voyageurs s\'y reposent avant d\'affronter le Bois Murmure.'] }] },
+      { kind: 'house', x: 16, y: 40, roof: 'teal' },
+      { kind: 'house', x: 34, y: 40, roof: 'green' },
+      { kind: 'house', x: 41, y: 40, roof: 'brown' },
+      { kind: 'house', x: 48, y: 40, roof: 'brown', name: 'Cabane du chasseur', npcs: [{ x: 3, y: 4, sprite: 'insectomane', text: ['Je piste les créatures des bois depuis quarante ans.', 'Les plus rares ne sortent qu\'à l\'aube.'] }] },
     ],
     npcs: [
-      { id: 'gamin', x: 9, y: 13, sprite: 'gamin', move: 'wander', text: ['Le Centre de soins soigne tes créatures gratuitement.', 'C\'est le bâtiment au toit rouge !'] },
-      { id: 'garde', x: 16, y: 3, sprite: 'garde', dir: 'down', gate: { badges: 1, tiles: [[16, 2], [17, 2]] }, text: ['Le Bois Murmure est plein de dresseurs coriaces.', 'Reviens quand tu auras le badge de l\'Arène !'] },
+      { id: 'gamin', x: 22, y: 20, sprite: 'gamin', move: 'wander', text: ['Le Centre de soins soigne tes créatures gratuitement.', 'C\'est le bâtiment au toit rouge !'] },
+      { x: 45, y: 29, sprite: 'fillette', move: 'wander', text: ['Il paraît qu\'un vieil arbre du Bois Murmure cache un autel.', 'Ma grand-mère dit qu\'il ne faut pas y toucher...'] },
+      { id: 'garde', x: 29, y: 2, sprite: 'garde', dir: 'left', gate: { badges: 1, tiles: [[27, 1], [28, 1]] }, text: ['Le Bois Murmure est plein de dresseurs coriaces.', 'Reviens quand tu auras le badge de l\'Arène !'] },
     ],
   };
   ville(B, 'B');
@@ -750,7 +800,15 @@ export function buildWorld() {
     id: 'plateau', name: 'Plateau Céleste', x: 74, y: 130, w: 34, h: 56, exits: [['s', 16]], stock: 7, music: 'league', fermer: true,
     // la Ligue en haut, puis la grande allée bordée de colonnes (laissée libre et pavée) jusqu'à la sortie, au sud
     roads: [[11, 16, 22, 50], [16, 51, 17, 53], [3, 30, 10, 31], [23, 30, 30, 31]],
-    deco: [['flowers', 3, 18, 9, 26], ['flowers', 24, 18, 30, 26], ['flowers', 3, 40, 9, 50], ['flowers', 24, 40, 30, 50], ['lamp', 10, 51], ['lamp', 23, 51],
+    // quatre jardins de part et d'autre de l'allée : massifs en bordure, cerisiers, statues, fontaines et lanternes
+    deco: [
+      ['flowers', 3, 17, 9, 17], ['flowers', 3, 27, 9, 27], ['flowers', 3, 18, 3, 26], ['flowers', 9, 18, 9, 26],
+      ['flowers', 24, 17, 30, 17], ['flowers', 24, 27, 30, 27], ['flowers', 24, 18, 24, 26], ['flowers', 30, 18, 30, 26],
+      ['cerisier', 5, 19], ['cerisier', 7, 25], ['statue', 6, 22], ['banc', 5, 25],
+      ['cerisier', 28, 19], ['cerisier', 26, 25], ['statue', 27, 22], ['banc', 28, 25],
+      ['flowers', 3, 40, 9, 40], ['flowers', 3, 50, 9, 50], ['flowers', 3, 41, 3, 49], ['flowers', 9, 41, 9, 49], ['fontaine', 5, 45], ['lanterne', 4, 42], ['lanterne', 8, 48],
+      ['flowers', 24, 40, 30, 40], ['flowers', 24, 50, 30, 50], ['flowers', 24, 41, 24, 49], ['flowers', 30, 41, 30, 49], ['fontaine', 27, 45], ['lanterne', 29, 42], ['lanterne', 25, 48],
+      ['lamp', 10, 51], ['lamp', 23, 51], ['lanterne', 10, 16], ['lanterne', 23, 16],
       ['sign', 24, 52, 'PLATEAU CÉLESTE\nLe sommet des dresseurs.']],
     buildings: [
       { kind: 'league', ...GRAND.league, x: 2, y: 2, id: 'ligue' },
@@ -775,7 +833,7 @@ export function buildWorld() {
   // le point de passage entre deux routes qui se suivent (la route 2 et le Bois Murmure)
   const relais = (x, y, dir) => ({ x, y, dir });
 
-  const r1 = G2({ id: 'r1', nom: 'Route 1', de: porte('A', 'r1'), vers: arrivee('B', 'r1'), long: 3, graine: 101, w: 13, grass: 0.8, trees: 0.04, paysages: ['rebords', 'prairie', 'fleurs'], branches: 0, dresseurs: 0, promeneurs: 1, panneaux: ['ROUTE 1\n↑ Sylvebourg   ↓ Bourg-Aube', null], voix: 'general' }, 'r1');
+  const r1 = G2({ id: 'r1', nom: 'Route 1', de: porte('A', 'r1'), vers: arrivee('B', 'r1'), long: 5, graine: 101, w: 13, grass: 0.8, trees: 0.04, paysages: ['rebords', 'prairie', 'fleurs'], branches: 0, dresseurs: 0, promeneurs: 1, panneaux: ['ROUTE 1\n↑ Sylvebourg   ↓ Bourg-Aube', null], voix: 'general' }, 'r1');
   const pGuide = along(r1, 0.06);
   const [gx, gy] = caseLibre(W, pGuide.x + 0.5 + pGuide.nx * 2, pGuide.y + 0.5 + pGuide.ny * 2);
   W.npc({
@@ -798,7 +856,7 @@ export function buildWorld() {
   routeItem(W, r1, 0.5, -1, 5, 'potion'); routeItem(W, r1, 0.9, 1, 5, 'poke-ball', 2);
 
   const H1 = relais(143, 196, 'e');
-  const r2 = G2({ id: 'r2', nom: 'Route 2', de: porte('B', 'r2'), vers: H1, effile: [true, false], long: 14, graine: 202, w: 11, grass: 0.7, trees: 0.05, flowers: 0.03, paysages: ['prairie', 'fleurs', 'bosquet', 'plateau', 'etang', 'riviere', 'rebords'], branches: 0.45, raccourci: 'coupe', anciens: 4, panneaux: ['ROUTE 2\n↑ Bois Murmure   ↓ Sylvebourg', null], voix: 'general' }, 'r2');
+  const r2 = G2({ id: 'r2', nom: 'Route 2', de: porte('B', 'r2'), vers: H1, effile: [true, false], long: 15, graine: 202, w: 11, grass: 0.7, trees: 0.05, flowers: 0.03, paysages: ['prairie', 'fleurs', 'bosquet', 'plateau', 'etang', 'riviere', 'rebords'], branches: 0.45, raccourci: 'coupe', anciens: 4, panneaux: ['ROUTE 2\n↑ Bois Murmure   ↓ Sylvebourg', null], voix: 'general' }, 'r2');
   routeTrainer(W, r2, 0.2, -1, 3, 'Insectomane', 'Noé', [[1017, 6], [1018, 6, null, [33, 81, 106]], [10, 7]]);
   routeTrainer(W, r2, 0.45, 1, 3, 'Fillette', 'Jade', [[1039, 7], [29, 7]]);
   routeTrainer(W, r2, 0.7, -1, 4, 'Gamin', 'Sacha', [[21, 8], [1034, 7]]);
@@ -1013,8 +1071,11 @@ export function buildWorld() {
   pierV('granit', 'Île de Granit (Port-Granit)', quaiGranit[0], quaiGranit[1] - 1, -1, 1, 5, { town: 'Port-Granit' });
 
   // Bois Murmure : l'autel de Celebi (la Balle GS vient d'une vieille dame de Sylvebourg)
-  { const [sx, sy] = offRoute(bois, 0.5, 1, 5); thing('statue', sx, sy, { type: 'shrine' });
-    const [cx, cy] = nearestWalkable(W, sx, sy + 1, new Set([sx + ',' + sy]));
+  // une allée part du sentier jusqu'à l'autel : Celebi s'y tient toujours sur une case qu'on atteint, quel que soit le tracé
+  { const p = along(bois, 0.5), pas = [];
+    for (let d = 1; d <= 5; d++) { const x = Math.floor(p.x + 0.5 + p.nx * d), y = Math.floor(p.y + 0.5 + p.ny * d); if (!pas.some(([a, b]) => a === x && b === y)) pas.push([x, y]); }
+    pas.forEach(([x, y], i) => { const q = pas[i - 1]; if (q && q[0] !== x && q[1] !== y && !walkable(W.get(x, q[1]))) W.set(x, q[1], T.GRASS); if (!walkable(W.get(x, y))) W.set(x, y, T.GRASS); });
+    const [sx, sy] = pas[pas.length - 1], [cx, cy] = pas[pas.length - 2]; thing('statue', sx, sy, { type: 'shrine' });
     legend({ id: 'celebi', sp: 251, lvl: 20, x: cx, y: cy, cond: 'celebi', intro: ['La Balle GS se met à trembler...', 'Une petite créature verte surgit d\'entre les feuilles : Celebi !'] }); }
 
   // Embarcadère de l'Aube : un sentier part de la route 1 vers la baie

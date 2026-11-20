@@ -1,5 +1,5 @@
 // tools/test-odyssee-donjons.mjs — les donjons à plusieurs d'Odyssée (odyssee/js/donjons/) : la Crypte des Murmures est
-// posée dans le cimetière des Ruines Oubliées de la Route 2, sa porte s'atteint depuis la route, ses salles se suivent
+// posée dans le cimetière des ruines d'une impasse de la Route 2, sa porte s'atteint depuis la route, ses salles se suivent
 // porte après porte, et une descente entière (gardien, esprits, dalles, Ossarion aux PV partagés) se joue d'un bout à
 // l'autre, puis se recommence.
 //   node tools/test-odyssee-donjons.mjs

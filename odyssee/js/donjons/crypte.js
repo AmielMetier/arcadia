@@ -1,4 +1,4 @@
-// odyssee/js/donjons/crypte.js — la Crypte des Murmures, sous le cimetière des Ruines Oubliées (au bout d'un sentier de
+// odyssee/js/donjons/crypte.js — la Crypte des Murmures, sous le cimetière des ruines (au bout d'un sentier de
 // la Route 2) : petit donjon à faire à plusieurs, sur le modèle des donjons de début de partie des MMO (une salle, un
 // groupe d'adversaires, une porte qui s'ouvre, un boss au bout). Repris du labo (TestOdyssée).
 //
@@ -103,39 +103,54 @@ const CRYPTE = {
 export default CRYPTE;
 
 /**
- * la clairière des Ruines Oubliées, au bout d'un sentier de la Route 2, devient le cimetière des Murmures : l'entrée
+ * la clairière des ruines, au bout d'un sentier de la Route 2, devient le cimetière des Murmures : l'entrée
  * de la crypte au fond (au nord), une allée jusqu'à la stèle des ruines, des rangées de stèles, des lanternes, des
  * arbres morts, et la carte de la crypte reliée à la porte. Posé une fois tout le reste fait (region.js) ; rien de
  * ce qui était là ne devient inatteignable (sinon le décor n'est pas posé).
  */
-export function poserCrypte(W, maps) {
-  const z = W.zones.find((q) => q.name === 'Ruines Oubliées' && q.route === 'r2');
+export function poserCrypte(W, maps, routes = []) {
+  // les ruines d'une impasse de la Route 2 (chemins.js), qu'elles portent un nom de lieu ou non
+  const C = routes.find((r) => r.id === 'r2')?.pts?.res?.cotes?.find((c) => c.kind === 'ruines');
+  const zr = C && W.zoneAt(C.x, C.y);
+  const z = W.zones.find((q) => q.name === 'Ruines Oubliées' && q.route === 'r2')
+    || (C && { x0: C.x - 9, y0: C.y - 12, x1: C.x + 9, y1: C.y + 6, route: 'r2', enc: zr?.enc, theme: zr?.theme });
   const st = z && W.deco.find((d) => d.k === 'stele' && d.x >= z.x0 && d.x <= z.x1 && d.y >= z.y0 && d.y <= z.y1);
-  if (!st) throw new Error('Crypte des Murmures : pas de Ruines Oubliées sur la Route 2');
+  if (!st) throw new Error('Crypte des Murmures : pas de ruines sur la Route 2');
   const herbe = (x, y) => [T.GRASS, T.TALL, T.FLOWER, T.PATH].includes(W.get(x, y)) && W.height(x, y) === 0;
-  // la porte : la case d'herbe la plus au nord de la colonne de la stèle (l'entrée de la crypte s'adosse aux arbres)
-  const X = st.x; let Y = st.y - 1;
-  while (herbe(X, Y - 1) && Y - 1 >= z.y0 + 3) Y--;
-  const b = W.building('cave', X - 2, Y - 3, { name: 'Crypte des Murmures' });
-  // ce qu'il faut toujours pouvoir rejoindre depuis la route : devant la porte, devant la stèle, les dresseurs et objets du lieu
-  const dedans = (x, y) => x >= z.x0 - 6 && x <= z.x1 + 6 && y >= z.y0 - 6 && y <= z.y1 + 6;
-  // on part de devant la stèle ; la clairière doit rester reliée au sentier qui la quitte (les cases de bord du lieu)
+  // ce qu'il faut toujours pouvoir rejoindre depuis la clairière : les sentiers qui en partent (cases atteintes loin de
+  // la stèle), les dresseurs et objets d'alentour, et devant la porte. Une case bâtie se simule avant d'être posée.
+  const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]], R = 26;
+  const dedans = (x, y) => Math.abs(x - st.x) <= R && Math.abs(y - st.y) <= R;
   const depart = [st.x, st.y + 1];
-  const cibles = [[b.doorX, b.doorY + 1], ...W.npcs.filter((n) => dedans(n.x, n.y)).map((n) => [n.x, n.y]), ...W.items.filter((i) => dedans(i.x, i.y)).map((i) => [i.x, i.y])];
-  const libre = (x, y) => walkable(W.get(x, y));
-  const atteint = () => {
+  const parcours = (bloque) => {
     const vu = new Set([depart + '']), f = [depart];
-    while (f.length) { const [x, y] = f.pop(); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a = x + dx, c = y + dy, k = a + ',' + c; if (!vu.has(k) && dedans(a, c) && libre(a, c)) { vu.add(k); f.push([a, c]); } } }
-    // un PNJ ou un objet se rejoint en arrivant à côté
-    return cibles.every(([x, y]) => vu.has(x + ',' + y) || [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => vu.has((x + dx) + ',' + (y + dy))));
+    while (f.length) { const [x, y] = f.pop(); for (const [dx, dy] of N4) { const a = x + dx, c = y + dy, k = a + ',' + c; if (!vu.has(k) && dedans(a, c) && !bloque.has(k) && walkable(W.get(a, c))) { vu.add(k); f.push([a, c]); } } }
+    return vu;
   };
-  // les cases de la clairière au bord du lieu : le sentier part de là
-  { const vu = new Set([depart + '']), f = [depart];
-    while (f.length) { const [x, y] = f.pop(); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a = x + dx, c = y + dy, k = a + ',' + c; if (!vu.has(k) && dedans(a, c) && libre(a, c)) { vu.add(k); f.push([a, c]); } } }
-    for (const k of vu) { const [x, y] = k.split(',').map(Number); if (x <= z.x0 - 5 || x >= z.x1 + 5 || y <= z.y0 - 5 || y >= z.y1 + 5) cibles.push([x, y]); }
-    // (les PNJ et objets d'à côté, qu'on rejoint par la route et non par la clairière, ne comptent pas)
-    for (let i = cibles.length - 1; i >= 1; i--) { const [x, y] = cibles[i]; if (!vu.has(x + ',' + y) && ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => vu.has((x + dx) + ',' + (y + dy)))) cibles.splice(i, 1); } }
-  if (!atteint()) throw new Error('Crypte des Murmures : la porte n\'est pas atteignable ');
+  const touche = (vu, x, y) => vu.has(x + ',' + y) || N4.some(([dx, dy]) => vu.has((x + dx) + ',' + (y + dy)));
+  const avant = parcours(new Set());
+  const cibles = [...avant].map((k) => k.split(',').map(Number)).filter(([x, y]) => Math.max(Math.abs(x - st.x), Math.abs(y - st.y)) >= R - 2);
+  for (const q of [...W.npcs, ...W.items]) if (dedans(q.x, q.y) && touche(avant, q.x, q.y)) cibles.push([q.x, q.y]);
+  const tient = (bloque, plus = []) => { const vu = parcours(bloque); return [...cibles, ...plus].every(([x, y]) => touche(vu, x, y)); };
+  // la porte : au nord de la clairière, la crypte adossée aux arbres ; dans l'axe de la stèle si ça ne coupe aucun sentier,
+  // sinon un peu à côté
+  const occupe = (x, y) => W.deco.some((d) => d.x === x && d.y === y) || W.warpAt(x, y) || W.npcs.some((n) => n.x === x && n.y === y) || W.items.some((q) => q.x === x && q.y === y);
+  let pos = null;
+  for (const dx of [0, -3, 3, -5, 5, -7, 7, -9, 9]) {
+    const X = st.x + dx; let Y = st.y - 1;
+    if (!herbe(X, Y)) continue;
+    while (herbe(X, Y - 1) && st.y - Y < 10) Y--;
+    const bloque = new Set();
+    for (let y = Y - 3; y < Y; y++) for (let x = X - 2; x <= X + 2; x++) bloque.add(x + ',' + y);
+    if ([...bloque].some((k) => occupe(...k.split(',').map(Number)))) continue;
+    if (tient(bloque, [[X, Y]])) { pos = [X, Y]; break; }
+  }
+  if (!pos) throw new Error('Crypte des Murmures : pas de place pour la porte sans couper la clairière');
+  const [X, Y] = pos;
+  const b = W.building('cave', X - 2, Y - 3, { name: 'Crypte des Murmures' });
+  cibles.push([b.doorX, b.doorY + 1]);
+  const atteint = () => tient(new Set());
+  if (!atteint()) throw new Error('Crypte des Murmures : la porte n\'est pas atteignable');
   // un élément du décor, seulement s'il ne coupe rien
   const poser = (k, x, y) => {
     if (!herbe(x, y) || W.deco.some((d) => d.x === x && d.y === y) || W.warpAt(x, y) || cibles.some(([a, c]) => a === x && c === y)) return false;
