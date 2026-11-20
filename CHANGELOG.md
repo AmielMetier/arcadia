@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.136 — 20 novembre 2026
+- **Odyssée** — Le jeu a maintenant son propre numéro de version (Odyssée 1.0, affiché en bas de l'écran titre). À chaque mise à jour, le navigateur charge directement la nouvelle version : plus besoin de vider le cache pour voir les nouvelles villes ou les nouveaux graphismes.
+
 ## 5.135 — 20 novembre 2026
 - **Odyssée** — Graphismes Noir & Blanc : la personnalisation de la tenue marche enfin sur les dresseurs de Noir 2 & Blanc 2. La visière, le haut, le bas, les chaussures et le sac prennent les couleurs choisies, de face, de profil et de dos, pour le garçon comme pour la fille, et les autres joueurs te voient avec ta tenue.
 

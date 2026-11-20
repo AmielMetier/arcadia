@@ -25,6 +25,15 @@ Les joueurs voient les nouveautés dans le Hub (bouton « ✨ Nouveautés »), q
    - The Backrooms : ne jamais écrire le nom des monstres ni des personnages du lore (prénoms des personnes qui leur servent de modèle) dans le journal ni dans les messages de commit. Parler de « l'entité », « le monstre du Level 1 », « le bouc »…
 3. **Mettre le même numéro dans les `?v=` de `index.html` et `apropos.html`** (liens vers `hub/` et `shared/`) : sinon les navigateurs gardent l'ancienne version en cache.
 4. **Faire tout ça dans le même commit** que le changement (ou le même push).
+5. **Odyssée a en plus sa propre version** : à chaque modification d'Odyssée (`odyssee/`, ou un outil qui écrit dans `odyssee/`),
+   monter `VERSION_ODYSSEE` dans `odyssee/js/version.js` (+0.1 : `'1.0'` → `'1.1'`), puis lancer `node tools/odyssee-preload.mjs`
+   (`--check` pour vérifier) : il recopie la version dans les adresses des modules, des feuilles de style et de la carte des imports de
+   `odyssee/index.html` (les images d'`ASSETS` la prennent d'elles-mêmes). Sans ça, les navigateurs des joueurs gardent l'ancienne version
+   en cache (nouvelles villes invisibles, par exemple). La version s'affiche en bas de l'écran titre.
+6. **Odyssée a deux graphismes, et chaque changement visible doit marcher avec les deux** : « Odyssée (de base) » et « Noir & Blanc »
+   (pack tiré du kit Noir 2 & Blanc 2, voir plus bas). Tout nouveau décor, bâtiment, sol, relief, personnage ou écran est aussi adapté
+   au pack Noir & Blanc (pièces du kit dans `tools/odyssee-pack-noirblanc.py`, rendu dans `odyssee/js/render/world3d.js`), et
+   vérifié à l'œil avec les deux graphismes (Options → Graphismes) avant de pousser.
 
 Filet de sécurité : si un push sur `main` ne touche pas `CHANGELOG.md`, l'action GitHub
 `.github/workflows/changelog.yml` rédige elle-même une entrée à partir des messages de commit

@@ -5,6 +5,7 @@ import { SPECIES } from './data/species.js';
 import { SPRITES } from './data/sprites.js';
 import { ITEMS as ITEM_DEFS } from './core/items.js';
 import { spritesChoix } from './gfx.js';
+import { VERSION_ODYSSEE } from './version.js';
 
 const params = new URLSearchParams(location.search);
 // sprites des Pokémon (face, dos, chromatiques, icônes) copiés de PokeAPI dans le dépôt : le jeu n'en dépend plus en ligne
@@ -28,48 +29,48 @@ const OBSCURS = new Set([249]);
 
 export const ASSETS = {
   // version obscure (Lugia Obscur) : son propre dessin s'il existe (img/crea/<espèce>-shadow-f / -b / -i.png)
-  front: (id, shiny, shadow) => (id >= 20000 ? `${IMG}megas/${id}-f.png` : mega(id) ? `${BASE}/pokemon${shiny ? '/shiny' : ''}/${id}.png` : shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-f.png` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-f${shiny ? 's' : ''}.png` : `${gen(id)}${shiny ? '/shiny' : ''}/${id}.png`),
-  back: (id, shiny, shadow) => (id >= 20000 ? `${IMG}megas/${id}-b.png` : mega(id) ? `${BASE}/pokemon/back${shiny ? '/shiny' : ''}/${id}.png` : shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-b.png` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-b${shiny ? 's' : ''}.png` : `${gen(id)}/back${shiny ? '/shiny' : ''}/${id}.png`),
-  icon: (id, shadow) => (id >= 20000 ? ASSETS.icon(SPECIES[id]?.mega || 0) : mega(id) ? `${BASE}/pokemon/versions/generation-vii/icons/${id}.png` : shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-i.png` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-i.png` : `${BASE}/pokemon/versions/generation-vii/icons/${id}.png`),
-  shadowFront: (id) => `${IMG}crea/${SPECIES[id].k}-shadow-f.png`,
-  shadowBack: (id) => `${IMG}crea/${SPECIES[id].k}-shadow-b.png`,
-  shadowIcon: (id) => `${IMG}crea/${SPECIES[id].k}-shadow-i.png`,
-  item: (k) => { const ic = ITEM_DEFS[k]?.icon || k; return ITEMS.has(ic) ? `${IMG}items/${ic}.png` : `${BASE}/items/${ic}.png`; },
+  front: (id, shiny, shadow) => (id >= 20000 ? `${IMG}megas/${id}-f.png?v=${VERSION_ODYSSEE}` : mega(id) ? `${BASE}/pokemon${shiny ? '/shiny' : ''}/${id}.png` : shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-f.png?v=${VERSION_ODYSSEE}` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-f${shiny ? 's' : ''}.png?v=${VERSION_ODYSSEE}` : `${gen(id)}${shiny ? '/shiny' : ''}/${id}.png`),
+  back: (id, shiny, shadow) => (id >= 20000 ? `${IMG}megas/${id}-b.png?v=${VERSION_ODYSSEE}` : mega(id) ? `${BASE}/pokemon/back${shiny ? '/shiny' : ''}/${id}.png` : shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-b.png?v=${VERSION_ODYSSEE}` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-b${shiny ? 's' : ''}.png?v=${VERSION_ODYSSEE}` : `${gen(id)}/back${shiny ? '/shiny' : ''}/${id}.png`),
+  icon: (id, shadow) => (id >= 20000 ? ASSETS.icon(SPECIES[id]?.mega || 0) : mega(id) ? `${BASE}/pokemon/versions/generation-vii/icons/${id}.png` : shadow && OBSCURS.has(id) ? `${IMG}crea/${SPECIES[id].k}-shadow-i.png?v=${VERSION_ODYSSEE}` : orig(id) ? `${IMG}crea/${SPECIES[id].k}-i.png?v=${VERSION_ODYSSEE}` : `${BASE}/pokemon/versions/generation-vii/icons/${id}.png`),
+  shadowFront: (id) => `${IMG}crea/${SPECIES[id].k}-shadow-f.png?v=${VERSION_ODYSSEE}`,
+  shadowBack: (id) => `${IMG}crea/${SPECIES[id].k}-shadow-b.png?v=${VERSION_ODYSSEE}`,
+  shadowIcon: (id) => `${IMG}crea/${SPECIES[id].k}-shadow-i.png?v=${VERSION_ODYSSEE}`,
+  item: (k) => { const ic = ITEM_DEFS[k]?.icon || k; return ITEMS.has(ic) ? `${IMG}items/${ic}.png?v=${VERSION_ODYSSEE}` : `${BASE}/items/${ic}.png`; },
   // cri : enregistrement PokeAPI pour un Pokémon, cri synthétisé (« synth:id ») pour une créature originale
   cry: (id) => (id >= 20000 ? ASSETS.cry(SPECIES[id]?.mega) : orig(id) ? 'synth:' + id : params.has('sprites') ? null : `${CRIES}/${id}.ogg`),
   // dresseur en combat : dessins HeartGold / SoulSilver (provisoires), sinon nos portraits, sinon ceux de Poké Duel
-  trainer: (k) => (!DRESSEURS.has(k) && !PORTRAITS.has(k) && SOSIES[k] ? ASSETS.trainer(SOSIES[k]) : DRESSEURS.has(k) ? `${IMG}dresseurs/${k}.png` : PORTRAITS.has(k) ? `${IMG}portraits/${k}.png` : `../pokemon/assets/trainers/${k}.png`),
+  trainer: (k) => (!DRESSEURS.has(k) && !PORTRAITS.has(k) && SOSIES[k] ? ASSETS.trainer(SOSIES[k]) : DRESSEURS.has(k) ? `${IMG}dresseurs/${k}.png?v=${VERSION_ODYSSEE}` : PORTRAITS.has(k) ? `${IMG}portraits/${k}.png?v=${VERSION_ODYSSEE}` : `../pokemon/assets/trainers/${k}.png`),
   portrait: (k) => {
     if (!k) return null;
-    if (PORTRAITS.has(k)) return `${IMG}portraits/${k}-l.png`;
-    if (DRESSEURS.has(k)) return `${IMG}dresseurs/${k}.png`;
+    if (PORTRAITS.has(k)) return `${IMG}portraits/${k}-l.png?v=${VERSION_ODYSSEE}`;
+    if (DRESSEURS.has(k)) return `${IMG}dresseurs/${k}.png?v=${VERSION_ODYSSEE}`;
     if (SOSIES[k] && (PORTRAITS.has(SOSIES[k]) || DRESSEURS.has(SOSIES[k]))) return ASSETS.portrait(SOSIES[k]);
     return null;
   },
-  chars: `${IMG}chars.png`,
-  suiveurs: `${IMG}suiveurs.png`,
-  relief: `${IMG}relief.png`,
-  nature: (k) => `${IMG}nature/${k}.png`,
-  mobilier: (k) => `${IMG}mobilier/${k}.png`,
-  facade: (k) => `${IMG}facades/${k}.png`,
-  sol: (k) => `${IMG}sol/${k}.png`,
-  sol32: (k) => `${IMG}sol32/${k}.png`,
-  gfx: (dossier, k) => `${IMG}${dossier}/${k}.png`,
-  sol16: (k) => `${IMG}sol16/${k}.png`,
-  herbe: (k) => `${IMG}herbes/${k}.png`,
-  hgss: (k) => `${IMG}hgss/${k}.png`,
-  deco: (k) => `${IMG}deco/${k}.png`,
-  carte: (k) => `${IMG}carte/${k}.png`,
+  chars: `${IMG}chars.png?v=${VERSION_ODYSSEE}`,
+  suiveurs: `${IMG}suiveurs.png?v=${VERSION_ODYSSEE}`,
+  relief: `${IMG}relief.png?v=${VERSION_ODYSSEE}`,
+  nature: (k) => `${IMG}nature/${k}.png?v=${VERSION_ODYSSEE}`,
+  mobilier: (k) => `${IMG}mobilier/${k}.png?v=${VERSION_ODYSSEE}`,
+  facade: (k) => `${IMG}facades/${k}.png?v=${VERSION_ODYSSEE}`,
+  sol: (k) => `${IMG}sol/${k}.png?v=${VERSION_ODYSSEE}`,
+  sol32: (k) => `${IMG}sol32/${k}.png?v=${VERSION_ODYSSEE}`,
+  gfx: (dossier, k) => `${IMG}${dossier}/${k}.png?v=${VERSION_ODYSSEE}`,
+  sol16: (k) => `${IMG}sol16/${k}.png?v=${VERSION_ODYSSEE}`,
+  herbe: (k) => `${IMG}herbes/${k}.png?v=${VERSION_ODYSSEE}`,
+  hgss: (k) => `${IMG}hgss/${k}.png?v=${VERSION_ODYSSEE}`,
+  deco: (k) => `${IMG}deco/${k}.png?v=${VERSION_ODYSSEE}`,
+  carte: (k) => `${IMG}carte/${k}.png?v=${VERSION_ODYSSEE}`,
   carteBg: `${IMG}carte/c_gear_b2w2_bg.jpg`,
-  badge: (k, locked = false) => `${IMG}badges/badge_${k}${locked ? '_locked' : ''}.png`,
-  cardFrame: `${IMG}card/b2w2_card_frame.png`,
+  badge: (k, locked = false) => `${IMG}badges/badge_${k}${locked ? '_locked' : ''}.png?v=${VERSION_ODYSSEE}`,
+  cardFrame: `${IMG}card/b2w2_card_frame.png?v=${VERSION_ODYSSEE}`,
   cardBg: (rankTheme = 'normal') => {
     const valid = ['normal', 'bronze', 'silver', 'gold', 'master'];
     const t = valid.includes(rankTheme) ? rankTheme : 'normal';
     return `${IMG}card/card_front_${t}.jpg`;
   },
   cardBack: `${IMG}card/card_back_case.jpg`,
-  title: `${IMG}title-odyssor.png`,
+  title: `${IMG}title-odyssor.png?v=${VERSION_ODYSSEE}`,
 };
 /** précharge une image (résout même en cas d'échec) */
 export function loadImg(src) {

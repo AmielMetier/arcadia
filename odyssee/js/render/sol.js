@@ -15,6 +15,7 @@
 import * as THREE from 'three';
 import { NFRAMES, LUT, CELL, MARGIN, zoneBloc } from './solgen.js';
 import { matSol } from './relief3d.js';
+import { VERSION_ODYSSEE } from '../version.js';
 import { solChoix } from '../gfx.js';
 import { matTerrain } from './falaises.js';
 
@@ -56,7 +57,7 @@ export class Sol {
   }
   nouveau() {
     let w;
-    try { w = new Worker(new URL('./solgen-worker.js', import.meta.url), { type: 'module' }); } catch (e) { console.warn('[sol] pas de worker', e); return null; }
+    try { w = new Worker(new URL('./solgen-worker.js?v=' + VERSION_ODYSSEE, import.meta.url), { type: 'module' }); } catch (e) { console.warn('[sol] pas de worker', e); return null; }
     w.libre = true;
     w.onmessage = (e) => this.recu(w, e.data);
     w.onerror = (e) => { console.warn('[sol] erreur du worker', e.message); if (w.cle) this.enCours.delete(w.cle); w.libre = true; this.pump(); };

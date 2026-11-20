@@ -19,6 +19,7 @@ import { decodeSave, saveSummary } from './core/savecode.js';
 import { Cloud } from './net/cloud.js';
 import { Game } from './game.js';
 import { setMasques } from './render/tenue.js';
+import { VERSION_ODYSSEE } from './version.js';
 import { apparenceScreen } from './ui/apparence.js';
 import { createMon } from './core/mon.js';
 import { ASSETS, loadImg, loadAll } from './assets.js';
@@ -219,7 +220,7 @@ async function boot() {
   /* ---------------- écran titre ---------------- */
   for (;;) {
     sound.play('title');
-    const title = el('div', 'title-scr', `<canvas class="title-cv" width="256" height="192"></canvas><div class="logo"><div class="logo-main">ODYSSÉE</div></div><div class="press">${matchMedia('(pointer: coarse)').matches ? 'Touche l\'écran' : 'Appuie sur F ou Entrée'}</div><div class="title-foot">H : aide des touches</div>`);
+    const title = el('div', 'title-scr', `<canvas class="title-cv" width="256" height="192"></canvas><div class="logo"><div class="logo-main">ODYSSÉE</div></div><div class="press">${matchMedia('(pointer: coarse)').matches ? 'Touche l\'écran' : 'Appuie sur F ou Entrée'}</div><div class="title-foot">H : aide des touches · Odyssée ${VERSION_ODYSSEE}</div>`);
     uiRoot.appendChild(title);
     const stopSea = titleSea(title.querySelector('canvas'), art.title);
     // au clavier, à la manette, ou d'un simple toucher (ou clic) sur l'écran titre
