@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 5.141 — 20 novembre 2026
+- **Odyssée** — Boss de raid : l'escouade apparaît dans sa tenue, et les Pokémon sont bien posés (Odyssée 1.4).
+  - Dans la présentation avant le combat, chaque joueur apparaît avec les couleurs de sa tenue, et avec les graphismes choisis (Odyssée ou Noir & Blanc).
+  - En combat, les Pokémon de l'escouade sont de nouveau sur leurs socles, et le bas de leur sprite passe sous la boîte de texte comme dans les jeux DS, au lieu d'apparaître coupé.
+
 ## 5.140 — 20 novembre 2026
 - **Odyssée** — Une vraie entrée en scène pour les boss de raid (Odyssée 1.3).
   - Avant le combat, l'escouade se présente : le portrait et le nom de chaque joueur, chacun avec sa couleur, face au boss dans son aura.

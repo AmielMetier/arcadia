@@ -7,6 +7,7 @@ import { SPECIES } from './data/species.js';
 import { MOVES } from './data/moves.js';
 import { ITEMS } from './core/items.js';
 import { createMon, monName, isFainted, healFull, refreshStats } from './core/mon.js';
+import { tenueCode, tenueDecode, tenueValide, tenueOrigine, composer } from './render/tenue.js';
 import { Battle } from './core/battle.js';
 import { battleCopy, validMon } from './core/pvp.js';
 import { MEGA_RING } from './core/mega.js';
@@ -244,6 +245,28 @@ async function selectPeersForRoom(ui, freePeers, neededPeers, labelPrefix) {
 
 /** après la victoire : chaque joueur tente sa chance une fois. Peu de chances (selon le rang du boss), au niveau max
  *  du joueur ; un légendaire capturé est bridé (stats d'un bon Pokémon classique, raid-monde.js). */
+/** code de la tenue du joueur (vide s'il porte la tenue d'origine), pour que les autres la voient */
+const codeTenue = (st) => (st.tenue && !tenueOrigine(tenueValide(st.tenue, st.gender)) ? tenueCode(tenueValide(st.tenue, st.gender)) : undefined);
+
+/** portrait d'un joueur pour la présentation de l'escouade : son personnage de face, dans sa tenue (null : image par défaut) */
+function portraitJoueur(game, genre, tn) {
+  try {
+    const v = game.view, T = tn ? tenueDecode(tn) : null, g = T?.genre || genre, b = v?.baseDe?.(g);
+    if (!b) return null;
+    const src = T ? composer(b.src, b.sx, b.sy, T) : b.src, sx = T ? 0 : b.sx, sy = T ? 0 : b.sy;
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingEnabled = false;
+    x.drawImage(src, sx + 64, sy, 64, 64, 0, 0, 64, 64);   // de face, à l'arrêt
+    // recadré sur le personnage
+    const d = x.getImageData(0, 0, 64, 64).data; let x0 = 64, y0 = 64, x1 = -1, y1 = -1;
+    for (let y = 0; y < 64; y++) for (let i = 0; i < 64; i++) if (d[(y * 64 + i) * 4 + 3] > 20) { x0 = Math.min(x0, i); y0 = Math.min(y0, y); x1 = Math.max(x1, i); y1 = Math.max(y1, y); }
+    if (x1 < 0) return null;
+    const o = document.createElement('canvas'); o.width = x1 - x0 + 1; o.height = y1 - y0 + 1;
+    o.getContext('2d').drawImage(c, x0, y0, o.width, o.height, 0, 0, o.width, o.height);
+    return o.toDataURL();
+  } catch (e) { return null; }
+}
+
 async function offerRaidCapture(game, bossData, def) {
   const st = game.state, ui = game.ui, rang = rangDe(def);
   const who = { speaker: 'Boss de raid', face: 'drakos' };
@@ -336,7 +359,7 @@ async function runRaidBattleSession(game, { rid, bossIdx, format, rosters, mySlo
       bg: bossData.boss.bg || 'cave', night: true,
       // présentation de l'escouade avant que chacun envoie son Pokémon
       lineup: monde ? {
-        joueurs: rosters.map((r) => ({ name: String(r.name || 'Dresseur').slice(0, 12), bs: r.bs === 'player_f' ? 'player_f' : 'player_m', moi: r.slot === mySlot })),
+        joueurs: rosters.map((r) => ({ name: String(r.name || 'Dresseur').slice(0, 12), bs: r.bs === 'player_f' ? 'player_f' : 'player_m', portrait: portraitJoueur(game, r.bs === 'player_f' ? 'f' : 'm', r.tn), moi: r.slot === mySlot })),
         boss: { sp: bossData.boss.sp, title: bossData.boss.title, lvl: bossData.bossLvl, rang: rangDe(def).nom, aura: bossData.aura },
       } : null,
     });
@@ -448,8 +471,8 @@ export async function lancerRaidMonde(game, R) {
     }
     const lvl = niveauBoss([game.levelCap(), ...reps.map(({ m }) => Math.max(5, Math.min(100, m.cap | 0 || game.levelCap())))], def);
     const rosters = [
-      { slot: 0, id: link.myId, name: st.name, bs: st.gender === 'f' ? 'player_f' : 'player_m', hasMega: !!st.bag[MEGA_RING], mons: myMons },
-      ...peerRes.map(({ pid, m }, idx) => ({ slot: idx + 1, id: pid, name: String(m.name || choisis[idx].name).slice(0, 12), bs: m.gender === 'f' ? 'player_f' : 'player_m', hasMega: !!m.hasMega, mons: m.mons.slice(0, 2) })),
+      { slot: 0, id: link.myId, name: st.name, bs: st.gender === 'f' ? 'player_f' : 'player_m', tn: codeTenue(st), hasMega: !!st.bag[MEGA_RING], mons: myMons },
+      ...peerRes.map(({ pid, m }, idx) => ({ slot: idx + 1, id: pid, name: String(m.name || choisis[idx].name).slice(0, 12), bs: m.gender === 'f' ? 'player_f' : 'player_m', tn: typeof m.tn === 'string' ? m.tn.slice(0, 16) : undefined, hasMega: !!m.hasMega, mons: m.mons.slice(0, 2) })),
     ];
     const seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
     peerIds.forEach((pid, idx) => link.send(pid, { t: 'raid', rid, step: 'start', bossIdx: 0, format, rosters, mySlot: idx + 1, hostId: link.myId, lvl, seed, monde: true, k: R.k, bossKey: def.id }));
@@ -493,7 +516,7 @@ export async function onRaidInvite(game, from, m) {
 
     const myMons = await pickDojoPair(game, { speaker: 'Boss de raid', face: 'drakos' });
     if (!myMons) { link.send(from, { t: 'raid', rid: m.rid, step: 'quit', who: st.name }); return; }
-    link.send(from, { t: 'raid', rid: m.rid, step: 'roster', name: st.name, gender: st.gender, hasMega: !!st.bag[MEGA_RING], mons: myMons });
+    link.send(from, { t: 'raid', rid: m.rid, step: 'roster', name: st.name, gender: st.gender, tn: codeTenue(st), hasMega: !!st.bag[MEGA_RING], mons: myMons });
 
     const startMsg = await guestWaitHost(
       game, from,

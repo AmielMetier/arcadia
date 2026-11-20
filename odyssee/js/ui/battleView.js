@@ -115,7 +115,8 @@ export class BattleView {
   posFor(side, slot = 0) {
     const W = this.W, sl = this.slots || 1;
     if (this.battle?.isRaid && side === 0 && sl >= 2) {   // l'escouade en arc devant le boss
-      const P = { 2: [[0.2, 106], [0.42, 112]], 3: [[0.12, 100], [0.29, 106], [0.46, 112]], 4: [[0.1, 96], [0.24, 101], [0.38, 106], [0.52, 111]] }[Math.min(4, sl)];
+      // comme dans les jeux DS : le bas des sprites de dos (coupé net) passe sous la boîte de texte, chacun sur son socle
+      const P = { 2: [[0.2, 131], [0.43, 132]], 3: [[0.13, 128], [0.3, 129], [0.47, 130]], 4: [[0.1, 126], [0.24, 126], [0.38, 127], [0.52, 127]] }[Math.min(4, sl)];
       const [fx, y] = P[slot] || P[0];
       return { x: Math.round(W * fx), y };
     }
@@ -135,7 +136,7 @@ export class BattleView {
   }
   scaleFor(side, slot = 0) {
     const sl = this.slots || 1;
-    if (this.battle?.isRaid && side === 0 && sl >= 2) return { 2: [0.74, 0.7], 3: [0.66, 0.62, 0.58], 4: [0.6, 0.57, 0.54, 0.51] }[Math.min(4, sl)][slot] ?? 0.6;
+    if (this.battle?.isRaid && side === 0 && sl >= 2) return { 2: [0.74, 0.72], 3: [0.66, 0.65, 0.64], 4: [0.6, 0.59, 0.58, 0.57] }[Math.min(4, sl)][slot] ?? 0.6;
     if (this.battle?.isRaid && side === 1 && slot === 0) return 1.0;
     if (sl === 1) return 1;
     if (sl === 2) return side === 1 ? (slot === 0 ? 0.80 : 0.86) : (slot === 0 ? 0.86 : 0.80);
@@ -938,7 +939,7 @@ export class BattleView {
       <div class="rl-titre">ESCOUADE DE RAID</div>
       <div class="rl-equipe">${L.joueurs.map((j, k) => `
         <div class="rl-joueur${j.moi ? ' moi' : ''}" style="--k:${k}">
-          <div class="rl-portrait"><img src="${ASSETS.trainer(j.bs)}" alt=""></div>
+          <div class="rl-portrait"><img src="${j.portrait || ASSETS.trainer(j.bs)}" alt=""></div>
           <div class="rl-nom">${esc(j.name)}${j.moi ? '<i>toi</i>' : ''}</div>
         </div>`).join('')}</div>
       <div class="rl-vs">VS</div>
