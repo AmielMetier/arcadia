@@ -1,0 +1,13 @@
+/* odyssee/css/26-donjons.css — l'encadré d'avancement des donjons à plusieurs (donjons/donjons.js) : nom du donjon, une ligne par salle, bouton pour quitter ; il se cache (touche N ou bouton) et n'en reste qu'un petit onglet */
+.dj-panel { position: absolute; z-index: 14; right: calc(var(--px) * 4); bottom: calc(var(--px) * 18); padding: calc(var(--px) * 3) calc(var(--px) * 7); font-size: calc(var(--px) * 6.5); min-width: calc(var(--px) * 120); pointer-events: none; opacity: .93; }
+.dj-t { font-weight: 600; text-align: center; margin-bottom: calc(var(--px) * 1.5); }
+.dj-l { display: flex; justify-content: space-between; gap: calc(var(--px) * 8); }
+.dj-l b { font-weight: 600; }
+.dj-l.ok { opacity: .55; }
+.dj-quitter { pointer-events: auto; display: block; margin: calc(var(--px) * 2.5) auto 0; padding: calc(var(--px) * 1) calc(var(--px) * 5); font: inherit; font-size: calc(var(--px) * 5.5); color: inherit; background: rgba(0, 0, 0, .08); border: calc(var(--px) * .6) solid currentColor; border-radius: calc(var(--px) * 2); cursor: pointer; opacity: .8; }
+.dj-quitter:hover { opacity: 1; }
+.dj-cacher { pointer-events: auto; position: absolute; top: calc(var(--px) * 2); right: calc(var(--px) * 3); padding: 0 calc(var(--px) * 2); font: inherit; font-size: calc(var(--px) * 6); line-height: 1.1; color: inherit; background: none; border: 0; cursor: pointer; opacity: .7; }
+.dj-cacher:hover { opacity: 1; }
+.dj-panel.cache { min-width: 0; padding: calc(var(--px) * 1.5) calc(var(--px) * 4); }
+.dj-panel.cache .dj-montrer { pointer-events: auto; font: inherit; font-size: calc(var(--px) * 5.5); color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+

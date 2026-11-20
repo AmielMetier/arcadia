@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 5.125 — 20 novembre 2026
+- **Odyssée** — Un premier donjon à faire entre amis : la Crypte des Murmures.
+  - En battant Hector, on reçoit la Clé de la Crypte. Elle ouvre la crypte du Cimetière des Murmures, au bout d'un sentier de la Route 2.
+  - Le fossoyeur ouvre la crypte quand le groupe est prêt. Dans les deux premières salles, chaque esprit se combat par un seul joueur à la fois. Dans la Salle des Dalles, tout le groupe doit tenir les dalles en même temps.
+  - Au fond, Ossarion a des PV partagés : chaque combat lui retire ce qu'on lui a infligé, et le groupe en vient à bout ensemble.
+  - Un encadré suit l'avancée salle par salle (touche N pour le cacher), et on peut quitter le donjon à tout moment.
+  - La crypte se refait autant qu'on veut, mais sa récompense n'est donnée qu'une fois.
+
 ## 5.124 — 19 novembre 2026
 - **Odyssée** — Graphismes Noir & Blanc :
   - la Boutique passe aussi en vrai style Noir 2 & Blanc 2 : carrelage gris à losanges, comptoir bleu à façade argentée avec sa caisse enregistreuse, présentoirs blancs garnis ;

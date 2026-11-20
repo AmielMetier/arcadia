@@ -27,6 +27,7 @@ import { HPX, CHAR_ROWS } from './render/world3d.js';
 import { saveCodeScreen } from './ui/screens.js';
 import { encodeSave, saveSummary } from './core/savecode.js';
 import { installSocial, talkToPeer } from './net/social.js';
+import { Donjons } from './donjons/donjons.js';
 import { storyTalk, storyTrigger, storyWin, lugiaBattle, placeLugia, purify, overlay } from './story.js';
 import { battleMusicForLegend } from './audio.js';
 import { playBossCinematic, isLegendarySpecies } from './ui/cinematic.js';
@@ -147,6 +148,8 @@ export class Game {
     this.hud = new Hud(this);
     this.session = null; // échange ou combat en cours avec un autre joueur
     installSocial(this);
+    // les donjons à plusieurs (la Crypte des Murmures) : état partagé par le salon, encadré d'avancement
+    this.donjons = new Donjons(this, undefined, window.HubBridge);
     input.onFree = (k) => this.onKey(k);
     // visage d'un personnage : son portrait peint s'il en a un, sinon le haut de son dessin de la carte (de face)
     const bustes = new Map();
@@ -245,6 +248,9 @@ export class Game {
     if (state.map === 'monde' && !state.surf && !walkable(this.world.maps.monde.get(state.x, state.y))) [state.x, state.y] = nearestWalkable(this.world.maps.monde, state.x, state.y);
     // intérieur redessiné depuis (l'Arène de Sylvebourg, par exemple) : une partie arrêtée dans un mur reprend à l'entrée
     { const M0 = this.world.maps[state.map]; if (M0 && state.map !== 'monde' && !state.surf && M0.exitX != null && (!M0.in(state.x, state.y) || !walkable(M0.get(state.x, state.y)) || (M0.planArene && state.flags?.['PV:' + M0.id] !== (M0.planArene.version || 1)))) Object.assign(state, { x: M0.exitX, y: M0.exitY - 1, dir: 'up' }); }
+    // une partie sauvegardée dans un donjon reprend à son entrée ; le premier badge donne la clé de la crypte (anciennes parties)
+    this.donjons?.reprise(state);
+    if (state.badges?.[0] && !state.bag?.['cle-crypte'] && !state.flags?.['D:crypte:cle']) { state.bag['cle-crypte'] = 1; state.flags['D:crypte:cle'] = true; }
     this.state = state; this._seen = null;
     revertMegas(state.party); revertMegas(state.box);
     this.stepLock = false; this.stepGap = false;
@@ -590,6 +596,7 @@ export class Game {
   /* ================= boucle ================= */
   tick(dt) {
     const st = this.state; if (!st) return;
+    this.donjons?.tick(dt);
     st.time += dt;
     const p = this.player;
     // déplacement du joueur
@@ -708,6 +715,8 @@ export class Game {
     const p = this.player, m = this.mapObj, [dx, dy] = DIRS[d];
     p.dir = d;
     const tx = p.x + dx, ty = p.y + dy, t = m.get(tx, ty);
+    // la porte d'un donjon fermée à clé (la crypte) : on demande la clé avant d'entrer
+    if (!p.move && this.donjons?.porteACle(tx, ty)) return;
     // sortie par le tapis
     if (m.get(p.x, p.y) === T.MAT && d === 'down') {
       const w = m.warpAt(p.x, p.y);
@@ -1637,6 +1646,7 @@ export class Game {
     opts.push(['Quêtes', 'quests']);
     opts.push(['Trophées', 'trophies']);
     opts.push(['Émotes & Chat', 'chat']);
+    if (this.donjons?.dansUnDonjon()) opts.push(['Quitter le donjon', 'donjon']);
     if (st.domaine) opts.push([this.mapObj.id === 'domaine' ? 'Revenir' : 'Domaine', 'domaine']);
     const friendsMgr = getFriendsManager(this);
     const others = Math.max(0, friendsMgr.getOnlineCount() - 1);
@@ -1662,6 +1672,7 @@ export class Game {
       else if (k === 'quests') await questsScreen(this);
       else if (k === 'trophies') await trophiesScreen(this);
       else if (k === 'chat') { openChatAfter = true; break; }
+      else if (k === 'donjon') { if (await this.donjons.quitter()) break; }
       else if (k === 'domaine') { this.busy = false; if (await allerDomaine(this)) break; this.busy = true; }
       else if (k === 'opt') {
         const res = await optionsScreen(this);
@@ -2096,6 +2107,12 @@ export class Game {
         : `Elle contient ${ITEMS[ct].name.replace(/^CT\d+ /, '')}. Une CT ne s'use pas : sers-t'en autant que tu veux.`, { speaker: name });
     }
     if (g === 7) { st.flags.drakos = true; this.give('town-map'); }
+    // Hector donne aussi la clé de la Crypte des Murmures (donjons/crypte.js)
+    if (g === 0 && !st.bag['cle-crypte']) {
+      await ui.say(['Une dernière chose. Cette vieille clé ouvre la crypte du Cimetière des Murmures.', 'Tu le trouveras au bout d\'un sentier qui part de la Route 2, dans les bois. On dit que des esprits y murmurent...', 'Vas-y avec des amis, et avec une équipe bien plus forte qu\'aujourd\'hui.'], { speaker: name });
+      this.give('cle-crypte'); st.flags['D:crypte:cle'] = true; this.sound.sfx('item');
+      await ui.say(formatObtainItem(st.name, 'cle-crypte'));
+    }
     this.refreshGates();
     await this.profCall(g);
   }
