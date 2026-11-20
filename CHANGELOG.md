@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.127 — 20 novembre 2026
+- **Odyssée** — Sylvebourg redessinée sur le modèle des villes de Noir 2 & Blanc 2 : un village serré où chaque coin a quelque chose.
+  - La grand-rue relie les deux portes ; au nord le Centre et la Boutique avec leurs massifs de fleurs, au milieu les maisons à jardinets, l'Arène et un parc autour d'un étang.
+  - Au sud, l'auberge du Chêne, la cabane du chasseur et un verger ; de nouveaux habitants ont des choses à raconter.
+  - Le rendu a été vérifié avec les deux graphismes, Odyssée et Noir & Blanc.
+
 ## 5.126 — 20 novembre 2026
 - **Odyssée** — Sylvebourg prend un peu d'ampleur : toujours un village façon Noir 2 & Blanc 2, mais avec une couronne de chalets, une auberge, un verger, un parc et la cabane du chasseur autour du centre.
 

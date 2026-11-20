@@ -20,9 +20,9 @@ export const BLOC = 24, COLS = 50, ROWS = 58, LARGEUR = COLS * BLOC, HAUTEUR = R
 export const VILLES = {
   A: { bx: 1, by: 22, bw: 4, bh: 3, cx: 28, cy: 24, theme: 'aube', devise: 'Là où chaque aventure commence.', toits: ['red', 'orange'], arbres: ['cerisier', 'erable'], quartiers: { maisons: 4, parc: 1, place: 0, marche: 1, jardins: 2, ferme: 2 },
     sorties: [{ dir: 'n', k: 42, vers: 'r1' }, { dir: 'e', k: 34, vers: 'r10', garde: 'garde10' }] },
-  // Sylvebourg à la taille d'une ville de Noir 2 & Blanc 2, un peu plus grande : 72 × 72 cases, le centre au milieu et une couronne de maisons
-  B: { bx: 1, by: 14, bw: 3, bh: 3, cx: 16, cy: 18, theme: 'sylve', devise: 'La ville où murmurent les feuilles.', arbres: ['pine', 'erable'], toits: ['green', 'teal', 'brown'], quartiers: { maisons: 2, parc: 1, place: 0, marche: 0, jardins: 1 },
-    sorties: [{ dir: 'n', k: 34, vers: 'r2', garde: 'garde' }, { dir: 's', k: 34, vers: 'r1' }] },
+  // Sylvebourg à la taille d'une ville de Noir 2 & Blanc 2, un peu plus grande : 72 × 72 cases, dessinée à la main (le village remplit presque tout le territoire)
+  B: { bx: 1, by: 14, bw: 3, bh: 3, cx: 8, cy: 10, theme: 'sylve', devise: 'La ville où murmurent les feuilles.', arbres: ['pine', 'erable'], toits: ['green', 'teal', 'brown'], quartiers: { maisons: 0, parc: 0, place: 0, marche: 0, jardins: 0 },
+    sorties: [{ dir: 'n', k: 35, vers: 'r2', garde: 'garde' }, { dir: 's', k: 35, vers: 'r1' }] },
   C: { bx: 3, by: 2, bw: 6, bh: 4, cx: 42, cy: 12, theme: 'pierre', devise: 'Une ville taillée dans la montagne.', quartiers: { maisons: 6, parc: 1, place: 1, marche: 1, jardins: 0 },
     sorties: [{ dir: 's', k: 100, vers: 'bois' }, { dir: 'e', k: 40, vers: 'r3' }, { dir: 'n', k: 86, vers: 'mine' }] },
   D: { bx: 19, by: 1, bw: 5, bh: 6, cx: 42, cy: 26, theme: 'azur', mer: 'n', devise: 'Le parfum des embruns et des voyages.', quartiers: { maisons: 6, parc: 1, place: 1, marche: 1, jardins: 0 },

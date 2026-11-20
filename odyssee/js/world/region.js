@@ -484,21 +484,48 @@ export function buildWorld() {
 
   /* ---------- B · Sylvebourg (Hector, Insecte) ---------- */
   const B = towns.B = {
-    // ville compacte, à l'échelle de Noir 2 & Blanc 2 : 40 × 36 cases. L'allée nord-sud (x 18-19) relie les deux portes,
-    // la rue haute (y 10-11) passe devant le Centre et la Boutique, la rue basse (y 29-30) devant l'Arène et les maisons
-    id: 'sylve', name: 'Sylvebourg', x: 18, y: 138, w: 40, h: 36, exits: [['s', 18], ['n', 18]], gym: 0, stock: 1, fermer: true, lotir: false,
-    roads: [[18, 0, 19, 35, T.PATH], [2, 10, 37, 11, T.PATH], [2, 29, 37, 30, T.PATH], [7, 8, 7, 9, T.PATH], [26, 8, 26, 9, T.PATH], [6, 25, 6, 28, T.PATH], [12, 25, 12, 28, T.PATH], [27, 27, 28, 28, T.PATH]],
-    deco: [['flowers', 12, 3, 15, 6], ['flowers', 29, 3, 33, 6], ['lamp', 16, 9], ['lamp', 21, 9], ['lamp', 16, 28], ['lamp', 21, 28],
-      ['sign', 16, 12, 'SYLVEBOURG\nLa ville où murmurent les feuilles.'], ['sign', 22, 31, 'ARÈNE DE SYLVEBOURG\nChampion : Hector\nL\'observateur des insectes.'],
-      ['water', 8, 16, 3.2, 2.2], ['flowers', 3, 14, 4, 19], ['trees', 34, 14, 36, 18], ['trees', 2, 32, 4, 34], ['trees', 34, 32, 36, 34]],
+    // village de 56 × 52 cases, à l'échelle de Noir 2 & Blanc 2 (un peu plus grand) : la grand-rue nord-sud (x 27-28) relie
+    // les deux portes ; au nord le Centre et la Boutique, au milieu les maisons, l'Arène et le parc à l'étang, au sud
+    // l'auberge, la cabane du chasseur et le verger
+    id: 'sylve', name: 'Sylvebourg', x: 18, y: 138, w: 56, h: 52, exits: [['s', 27], ['n', 27]], gym: 0, stock: 1, fermer: true, lotir: false,
+    roads: [[27, 0, 28, 51, T.PATH], [4, 13, 51, 14, T.PATH], [4, 36, 51, 37, T.PATH], [4, 15, 5, 35, T.PATH], [50, 15, 51, 35, T.PATH],
+      [6, 22, 26, 22, T.PATH], [4, 45, 51, 45, T.PATH], [12, 12, 12, 12, T.PATH], [39, 12, 39, 12, T.PATH],
+      [9, 20, 9, 21, T.PATH], [16, 20, 16, 21, T.PATH], [9, 29, 9, 35, T.PATH], [16, 29, 16, 35, T.PATH], [34, 30, 35, 35, T.PATH],
+      [9, 44, 9, 44, T.PATH], [17, 43, 17, 44, T.PATH], [35, 43, 35, 44, T.PATH], [42, 43, 42, 44, T.PATH], [49, 43, 49, 44, T.PATH]],
+    deco: [
+      // le nord : massifs devant le Centre et la Boutique, arbres d'ornement, lampadaires de la grand-rue
+      ['flowers', 18, 8, 23, 11], ['flowers', 43, 8, 47, 11], ['flowers', 6, 9, 7, 11], ['erable', 18, 4], ['erable', 23, 4], ['cerisier', 43, 4], ['cerisier', 48, 4],
+      ['trees', 2, 1, 6, 4], ['trees', 51, 1, 54, 5], ['lamp', 26, 5], ['lamp', 29, 5], ['lamp', 26, 11], ['lamp', 29, 11], ['lamp', 26, 33], ['lamp', 29, 33], ['lamp', 26, 47], ['lamp', 29, 47],
+      ['sign', 25, 11, 'SYLVEBOURG\nLa ville où murmurent les feuilles.'],
+      // les maisons de l'ouest : jardinets clos et fleurs
+      ['fence', 7, 24, 13, 24], ['fence', 14, 24, 20, 24], ['flowers', 11, 25, 12, 27], ['flowers', 18, 25, 19, 27], ['flowers', 7, 16, 7, 18], ['flowers', 20, 16, 21, 18],
+      ['banc', 22, 24], ['tonneau', 13, 21], ['pot', 20, 30], ['pot', 22, 30], ['flowers', 21, 27, 24, 29],
+      // l'Arène
+      ['sign', 33, 32, 'ARÈNE DE SYLVEBOURG\nChampion : Hector\nL\'observateur des insectes.'], ['flowers', 30, 32, 31, 34], ['flowers', 38, 32, 39, 34],
+      // le parc à l'étang
+      ['waterRect', 43, 20, 47, 23], ['flowers', 42, 18, 48, 18], ['flowers', 42, 25, 48, 25], ['banc', 43, 27], ['banc', 47, 27], ['statue', 45, 31],
+      ['cerisier', 41, 30], ['cerisier', 49, 30], ['erable', 41, 17], ['erable', 49, 17], ['lanterne', 42, 21], ['lanterne', 48, 21],
+      // le sud : l'auberge, la cabane, le verger
+      ['caisses', 21, 41], ['tonneau', 22, 42], ['flowers', 23, 40, 25, 42], ['flowers', 30, 40, 32, 42], ['flowers', 46, 40, 46, 42],
+      ['trees', 6, 48, 6, 48], ['trees', 9, 48, 9, 48], ['trees', 12, 48, 12, 48], ['trees', 15, 48, 15, 48], ['trees', 18, 48, 18, 48], ['trees', 21, 48, 21, 48],
+      ['trees', 7, 50, 7, 50], ['trees', 10, 50, 10, 50], ['trees', 13, 50, 13, 50], ['trees', 16, 50, 16, 50], ['trees', 19, 50, 19, 50], ['trees', 22, 50, 22, 50],
+      ['flowers', 33, 47, 38, 49], ['erable', 41, 48], ['cerisier', 45, 48], ['erable', 49, 48], ['flowers', 40, 50, 50, 51]],
     buildings: [
-      { kind: 'center', ...GRAND.center, x: 4, y: 3 }, { kind: 'mart', ...GRAND.mart, x: 23, y: 4 }, { kind: 'gym', ...GRAND.gym, x: 19, y: 13, roof: 'green' },
-      { kind: 'house', x: 4, y: 22, roof: 'green', npcs: [{ x: 4, y: 4, sprite: 'insectomane', text: ['Hector, le Champion, adore les créatures Insecte.', 'Le Feu, le Vol et la Roche les mettent en difficulté !'] }] },
-      { kind: 'house', x: 10, y: 22, roof: 'brown', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Une créature endormie ou paralysée est bien plus facile à capturer.', 'Et plus ses PV sont bas, mieux c\'est !'] }, { id: 'gs', x: 6, y: 3, sprite: 'vieil_homme', script: 'gsBall' }] },
+      { kind: 'center', ...GRAND.center, x: 9, y: 7 }, { kind: 'mart', ...GRAND.mart, x: 36, y: 8 }, { kind: 'gym', ...GRAND.gym, x: 26, y: 16, roof: 'green' },
+      { kind: 'house', x: 8, y: 17, roof: 'green', npcs: [{ x: 4, y: 4, sprite: 'insectomane', text: ['Hector, le Champion, adore les créatures Insecte.', 'Le Feu, le Vol et la Roche les mettent en difficulté !'] }] },
+      { kind: 'house', x: 15, y: 17, roof: 'brown', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Une créature endormie ou paralysée est bien plus facile à capturer.', 'Et plus ses PV sont bas, mieux c\'est !'] }, { id: 'gs', x: 6, y: 3, sprite: 'vieil_homme', script: 'gsBall' }] },
+      { kind: 'house', x: 8, y: 26, roof: 'teal', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['Le Bois Murmure, au nord, est si touffu qu\'on y voit à peine le ciel.', 'Les créatures Insecte y pullulent !'] }] },
+      { kind: 'house', x: 15, y: 26, roof: 'green', npcs: [{ x: 3, y: 4, sprite: 'gamin', text: ['Mon grand frère a battu Hector du premier coup.', 'Il dit qu\'un oiseau, ça règle tout !'] }] },
+      { kind: 'bighouse', x: 7, y: 40, roof: 'brown', name: 'Auberge', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['Bienvenue à l\'auberge du Chêne !', 'Les voyageurs s\'y reposent avant d\'affronter le Bois Murmure.'] }] },
+      { kind: 'house', x: 16, y: 40, roof: 'teal' },
+      { kind: 'house', x: 34, y: 40, roof: 'green' },
+      { kind: 'house', x: 41, y: 40, roof: 'brown' },
+      { kind: 'house', x: 48, y: 40, roof: 'brown', name: 'Cabane du chasseur', npcs: [{ x: 3, y: 4, sprite: 'insectomane', text: ['Je piste les créatures des bois depuis quarante ans.', 'Les plus rares ne sortent qu\'à l\'aube.'] }] },
     ],
     npcs: [
-      { id: 'gamin', x: 12, y: 13, sprite: 'gamin', move: 'wander', text: ['Le Centre de soins soigne tes créatures gratuitement.', 'C\'est le bâtiment au toit rouge !'] },
-      { id: 'garde', x: 18, y: 3, sprite: 'garde', dir: 'down', gate: { badges: 1, tiles: [[18, 2], [19, 2]] }, text: ['Le Bois Murmure est plein de dresseurs coriaces.', 'Reviens quand tu auras le badge de l\'Arène !'] },
+      { id: 'gamin', x: 22, y: 20, sprite: 'gamin', move: 'wander', text: ['Le Centre de soins soigne tes créatures gratuitement.', 'C\'est le bâtiment au toit rouge !'] },
+      { x: 45, y: 29, sprite: 'fillette', move: 'wander', text: ['Il paraît qu\'un vieil arbre du Bois Murmure cache un autel.', 'Ma grand-mère dit qu\'il ne faut pas y toucher...'] },
+      { id: 'garde', x: 29, y: 2, sprite: 'garde', dir: 'left', gate: { badges: 1, tiles: [[27, 1], [28, 1]] }, text: ['Le Bois Murmure est plein de dresseurs coriaces.', 'Reviens quand tu auras le badge de l\'Arène !'] },
     ],
   };
   ville(B, 'B');
