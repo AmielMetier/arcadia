@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 5.139 — 20 novembre 2026
+- **Odyssée** — Les boss de raid se jouent vraiment en coop, et les légendaires sont nouveaux (Odyssée 1.2).
+  - Combat double, triple ou quadruple : de 2 à 4 joueurs contre le boss, tous les joueurs connectés devant être là. Face à quatre joueurs, il frappe trois fois par tour.
+  - Chaque boss a une aura : bleue pour un Pokémon moyen, rouge pour un Pokémon puissant, dorée pour un légendaire. On la voit sur la route et en combat.
+  - Les légendaires de raid viennent d'ailleurs : Tokorico, Tokopisco, Solgaleo, Lunala, Necrozma, Zacian, Zamazenta et Regidrago. On ne les croise nulle part ailleurs, et ils sont plus rares que les autres boss.
+  - Après une victoire, chacun a un seul lancer de Hyper Ball, avec peu de chances : 30 % (aura bleue), 18 % (rouge), 10 % (or). Le Pokémon capturé arrive à ton niveau max.
+  - Un légendaire capturé perd une bonne part de sa puissance : ses stats ressemblent à celles d'un bon Pokémon classique, à peine plus fort.
+  - Récompenses selon l'aura : 6, 9 ou 14 Points du Dojo et 2, 3 ou 4 Super Bonbons. Plus d'Hyper Balls ni de Master Ball offertes.
+
 ## 5.138 — 20 novembre 2026
 - **Odyssée** — Les boss de raid surgissent dans la région (Odyssée 1.1).
   - Toutes les heures et demie environ, quand d'autres joueurs sont connectés, un gros boum retentit et un bandeau annonce le boss et sa route. Il reste 15 minutes, puis repart.

@@ -9,6 +9,7 @@ import { TYPE_COL, TYPE_FR, STATUS_FR, hpCol, partyScreen, bagScreen } from './s
 import { typeEff } from '../core/battle.js';
 import { moveDesc } from '../data/moveDescriptions.js';
 import { playMoveVfx, TYPE_FX } from './battleVfx.js';
+import { auraFrames, AURA_PAD } from '../render/aura.js';
 
 const BH = 192;
 const BALL_COL = { 'poke-ball': ['#e83838', '#f4f4f4'], 'great-ball': ['#3870e8', '#f4f4f4'], 'ultra-ball': ['#303030', '#f0c830'], 'master-ball': ['#8a3ac8', '#f4f4f4'], 'gs-ball': ['#d8a830', '#c8c8d0'] };
@@ -113,20 +114,26 @@ export class BattleView {
   /* ---------------- positions par format (1v1, 2v2, 3v3) ---------------- */
   posFor(side, slot = 0) {
     const W = this.W, sl = this.slots || 1;
-    if (this.battle?.isRaid && side === 1 && slot === 0) return { x: Math.round(W * 0.67), y: 74 };
+    // boss de raid : plus bas qu'un adversaire ordinaire, pour que sa tête (et son aura) restent dans le cadre
+    if (this.battle?.isRaid && side === 1 && slot === 0) return { x: Math.round(W * 0.68), y: 92 };
     if (sl === 1) return side === 1 ? { x: Math.round(W * 0.71), y: 86 } : { x: Math.round(W * 0.26), y: 140 };
     if (sl === 2) {
       const fx = [0.50, 0.74], fy = [65, 74], px = [0.16, 0.39], py = [118, 126];
       return side === 1 ? { x: Math.round(W * fx[slot]), y: fy[slot] } : { x: Math.round(W * px[slot]), y: py[slot] };
+    }
+    if (sl === 4) {   // raid à quatre : les joueurs en arc devant le boss
+      const px = [0.12, 0.25, 0.38, 0.51], py = [104, 110, 116, 122];
+      return side === 1 ? { x: Math.round(W * 0.68), y: 92 } : { x: Math.round(W * px[slot]), y: py[slot] };
     }
     const fx = [0.39, 0.56, 0.73], fy = [58, 65, 72], px = [0.12, 0.28, 0.44], py = [110, 116, 122];
     return side === 1 ? { x: Math.round(W * fx[slot]), y: fy[slot] } : { x: Math.round(W * px[slot]), y: py[slot] };
   }
   scaleFor(side, slot = 0) {
     const sl = this.slots || 1;
-    if (this.battle?.isRaid && side === 1 && slot === 0) return 1.22;
+    if (this.battle?.isRaid && side === 1 && slot === 0) return 1.0;
     if (sl === 1) return 1;
     if (sl === 2) return side === 1 ? (slot === 0 ? 0.80 : 0.86) : (slot === 0 ? 0.86 : 0.80);
+    if (sl === 4) return side === 1 ? 0.7 : [0.74, 0.7, 0.66, 0.62][slot];
     return side === 1 ? [0.68, 0.73, 0.78][slot] : [0.78, 0.73, 0.68][slot];
   }
   ePos(slot = 0) { return this.posFor(1, slot); }
@@ -214,6 +221,10 @@ export class BattleView {
       x.save(); x.globalAlpha = o.alpha;
       if (o.clipY != null) { x.beginPath(); x.rect(0, 0, W, cy + o.clipY); x.clip(); }
       const drawX = Math.round(cx + o.dx + jitX), drawY = Math.round(cy + dy);
+      if (o.aura && !o.rot && !(o.white > 0.5) && !o.dark) {
+        const fr = o.aura[Math.floor(now / 130) % o.aura.length], kx = w / img.width, ky = h / img.height;
+        x.drawImage(fr, Math.round(drawX - w / 2 - AURA_PAD * kx), Math.round(drawY - h - AURA_PAD * ky), Math.round(fr.width * kx), Math.round(fr.height * ky));
+      }
       if (o.rot) { x.translate(drawX, drawY); x.rotate(o.rot); x.drawImage(img, Math.round(-w / 2), Math.round(-h), Math.round(w), Math.round(h)); }
       else x.drawImage(img, Math.round(drawX - w / 2), Math.round(drawY - h), Math.round(w), Math.round(h));
       if (o.white > 0.01 && o.white < 1 && o.img) {
@@ -429,12 +440,12 @@ export class BattleView {
             <div class="bh-boosts"></div>
           </div>`;
       const fmtCls = this.battle?.isRaid ? ' raid' : this.battle?.is4p ? ' multi4p' : '';
-      const fmtTxt = this.battle?.isRaid ? '🐉 RAID CO-OP · BOSS' : this.battle?.is4p ? '⚔️ MULTI 2V2 · 4 JOUEURS' : sl === 3 ? 'TRIO · 3V3' : 'DUO · 2V2';
+      const fmtTxt = this.battle?.isRaid ? (this.battle.monde ? `💥 BOSS DE RAID · ${sl} JOUEURS` : '🐉 RAID CO-OP · BOSS') : this.battle?.is4p ? '⚔️ MULTI 2V2 · 4 JOUEURS' : sl === 3 ? 'TRIO · 3V3' : 'DUO · 2V2';
       r.insertAdjacentHTML('beforeend', `
         <div class="battle-format-badge${fmtCls}">${fmtTxt}</div>
         <div class="bhud-stack foe">
           <div class="bhud-party-strip foe"><div class="bh-balls"></div></div>
-          ${Array.from({ length: sl }, (_, k) => cardHtml(1, k)).join('')}
+          ${Array.from({ length: this.battle?.isRaid ? 1 : sl }, (_, k) => cardHtml(1, k)).join('')}
         </div>
         <div class="bhud-stack me">
           ${Array.from({ length: sl }, (_, k) => cardHtml(0, k)).join('')}
@@ -895,6 +906,8 @@ export class BattleView {
     if (!m) { o.img = null; o.visible = false; return; }
     o.img = await loadImg(side === 1 ? ASSETS.front(m.sp, m.shiny, m.shadow) : ASSETS.back(m.sp, m.shiny, m.shadow));
     o.whiteImg = null; o.darkImg = null;
+    // boss de raid : son aura (bleue, rouge ou or) ondule derrière lui
+    o.aura = side === 1 && this.battle.aura && o.img ? auraFrames(o.img, this.battle.aura).frames : null;
     if (!o.img) { const c = document.createElement('canvas'); c.width = c.height = 80; const x = c.getContext('2d'); x.fillStyle = TYPE_COL[SPECIES[m.sp].t[0]]; x.beginPath(); x.arc(40, 50, 24, 0, 7); x.fill(); x.fillStyle = '#fff'; x.font = '20px sans-serif'; x.fillText('?', 34, 58); o.img = c; }
   }
   close() { this.alive = false; this.targetHint = null; this.root?.remove(); this.ui.closeDialog(); this.game.input.clearDirs?.(); }

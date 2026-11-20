@@ -58,8 +58,17 @@ export function expFor(g, L) {
   }
 }
 
+/** stats de base d'un Pokémon : celles de son espèce, ou, pour un légendaire capturé en raid (m.bride),
+ *  les mêmes proportions ramenées à un total de 540, comme un bon Pokémon classique (raid-monde.js) */
+export function baseStats(m) {
+  const b = SPECIES[m.sp].b;
+  if (!m.bride) return b;
+  const tot = b.reduce((x, y) => x + y, 0), k = Math.min(1, 540 / tot);
+  return b.map((v) => Math.max(1, Math.round(v * k)));
+}
+
 export function calcStats(m) {
-  const b = SPECIES[m.sp].b, L = m.lvl, iv = m.iv, ev = m.ev || [0, 0, 0, 0, 0, 0], ne = m.nat != null ? natureEffect(m.nat) : null;
+  const b = baseStats(m), L = m.lvl, iv = m.iv, ev = m.ev || [0, 0, 0, 0, 0, 0], ne = m.nat != null ? natureEffect(m.nat) : null;
   return b.map((B, i) => {
     const core = Math.floor((2 * B + iv[i] + Math.floor(ev[i] / 4)) * L / 100);
     if (i === 0) return m.sp === 292 ? 1 : core + L + 10;

@@ -236,7 +236,7 @@ export class CoopDojoBattle extends Battle {
       player: { name: o.squadName || 'Escouade Co-op', party: o.party, bag: {} },
       foe: { name: o.foe.name, party: o.foe.party, trainer: o.foe.trainer },
       rng: seededRng(o.seed >>> 0),
-      format: o.format || (o.slots === 3 ? 'triple' : 'double'),
+      format: o.format || (o.slots === 4 ? 'quadruple' : o.slots === 3 ? 'triple' : 'double'),
       slots: o.slots,
     });
     this.coop = true;

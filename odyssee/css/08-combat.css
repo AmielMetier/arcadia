@@ -732,6 +732,17 @@
 .battle.slots-3 .bhud-stack.me { bottom: calc(var(--bp) * 47); width: calc(var(--bp) * 102); }
 .battle.slots-3 .bh-ball { width: calc(var(--bp) * 4.8); height: calc(var(--bp) * 4.8); }
 
+/* raid à quatre (combat quadruple) : cartes plus serrées */
+.battle.slots-4 .bhud-stack { gap: calc(var(--bp) * 0.5); }
+.battle.slots-4 .bhud-stack.foe { width: calc(var(--bp) * 94); }
+.battle.slots-4 .bhud-stack.me { bottom: calc(var(--bp) * 46); width: calc(var(--bp) * 96); }
+.battle.slots-4 .bh-ball { width: calc(var(--bp) * 4.4); height: calc(var(--bp) * 4.4); }
+.battle.slots-4 .bhud-card { padding: calc(var(--bp) * 0.5) calc(var(--bp) * 1.8); }
+.battle.slots-4 .bhud-card .bh-top { font-size: 0.6em; margin-bottom: calc(var(--bp) * 0.2); }
+.battle.slots-4 .bhud-card .bh-hp { height: calc(var(--bp) * 2.6); }
+.battle.slots-4 .bhud-card .bh-hp i { height: calc(var(--bp) * 1.4); }
+.battle.slots-4 .bhud-card .bh-bot { margin-top: calc(var(--bp) * 0.2); }
+
 .bhud-party-strip {
   display: flex;
   align-items: center;

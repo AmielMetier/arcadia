@@ -4,7 +4,7 @@ import { SPECIES } from '../../data/species.js';
 import { MOVES } from '../../data/moves.js';
 import { glisserPourRanger } from '../glisser.js';
 import { getAbility } from '../../data/abilities.js';
-import { monName, expProgress, STAT_NAMES, levelCap, natureName, natureEffect } from '../../core/mon.js';
+import { monName, expProgress, STAT_NAMES, levelCap, natureName, natureEffect, baseStats } from '../../core/mon.js';
 import { LEADERS } from '../../world/region.js';
 import { ASSETS } from '../../assets.js';
 import { TYPE_FR, TYPE_COL, typeTag, hpCol, hpBar, statusTag, gender, screen, closer } from './common.js';
@@ -479,7 +479,7 @@ export function summaryScreen(game, list, idx) {
       } else if (page === 1) {
         // stats avec la nature (▲ +10 % en rouge, ▼ −10 % en bleu), les IV (0 à 31) et les EV (252 max, 510 en tout)
         const ne = natureEffect(m.nat ?? 0), ev = m.ev || [0, 0, 0, 0, 0, 0], evTot = ev.reduce((a, x) => a + x, 0);
-        body = `<table class="kv stats sum-kv sum-stats"><tr class="sth"><td></td><td>Stat</td><td></td><td>IV</td><td>EV</td></tr>${STAT_NAMES.map((n, k) => `<tr><td class="${ne && ne[0] === k ? 'nat-up' : ne && ne[1] === k ? 'nat-down' : ''}">${n}${ne && ne[0] === k ? ' ▲' : ne && ne[1] === k ? ' ▼' : ''}</td><td><b>${k === 0 ? `${m.hp} / ${m.stats[0]}` : m.stats[k]}</b></td><td><i class="sbar"><u style="width:${Math.min(100, S.b[k] / 1.5)}%"></u></i></td><td class="iv${m.iv[k] === 31 ? ' max' : ''}">${m.iv[k]}</td><td class="evv">${ev[k]}</td></tr>`).join('')}</table>
+        body = `<table class="kv stats sum-kv sum-stats"><tr class="sth"><td></td><td>Stat</td><td></td><td>IV</td><td>EV</td></tr>${STAT_NAMES.map((n, k) => `<tr><td class="${ne && ne[0] === k ? 'nat-up' : ne && ne[1] === k ? 'nat-down' : ''}">${n}${ne && ne[0] === k ? ' ▲' : ne && ne[1] === k ? ' ▼' : ''}</td><td><b>${k === 0 ? `${m.hp} / ${m.stats[0]}` : m.stats[k]}</b></td><td><i class="sbar"><u style="width:${Math.min(100, baseStats(m)[k] / 1.5)}%"></u></i></td><td class="iv${m.iv[k] === 31 ? ' max' : ''}">${m.iv[k]}</td><td class="evv">${ev[k]}</td></tr>`).join('')}</table>
           <div class="sum-natline">Nature <b>${esc(natureName(m.nat ?? 0))}</b> · EV ${evTot} / 510 · Les EV s'ajoutent aux stats au niveau suivant ou au Centre.</div>`;
       } else {
         body = `<div class="moves${curMv >= 0 ? ' ordre' : ''}">${m.moves.map((mv, k) => {

@@ -108,5 +108,6 @@ export const CREDITS = [
   ['Graphismes « Noir & Blanc »', 'Sol, mer, arbres, bâtiments, intérieurs et personnages : kit « Pokémon Essentials BW » de KleinStudio et ressources Pokémon Essentials Gen 5 (FloofyPanthar ; © Nintendo / Game Freak / Creatures). Lave : Phyromatical. Compléments désert, grottes et sanctuaires : Magiscarf, J-Treecko252, TerribleJared, Anarlaurendil, RisingTempest3, JavaPlume. Intérieurs du Centre Pokémon et de la Boutique : planches Gen 5 d\'UltimoSpriter et de ditto209.'],
   ['Sprites Noir & Blanc', 'Sprites des jeux Pokémon © Nintendo / Game Freak / Creatures, récupérés par PokeAPI (projet PokeAPI/sprites).'],
   ['Sprites HeartGold / SoulSilver', 'Même source : PokeAPI/sprites.'],
+  ['Légendaires des boss de raid', 'Sprites au style Noir & Blanc du projet de sprites de Smogon / Pokémon Showdown (dessins de fans), icônes de PokeAPI et de Smogon, cris de PokeAPI/cries.'],
   ['Utilisation', 'Projet de fans sans but lucratif. Les artistes restent propriétaires de leurs créations.'],
 ];

@@ -207,8 +207,8 @@ export function friendsScreen(game) {
               avail: R ? 1 : 0,
               badge: R ? `Là ! ${Math.max(1, Math.round((R.fin - Date.now()) / 60e3))} min` : `Prochain vers ${h}`,
               desc: R
-                ? `${R.boss.title} est sur ${R.nom} ! Allez-y tous ensemble et parlez-lui pour lancer le raid (5 essais).`
-                : 'Un boss très fort surgit sur une route toutes les heures et demie quand des joueurs sont connectés, et repart au bout de 15 minutes.',
+                ? `${R.boss.title} est sur ${R.nom} ! Allez-y tous ensemble (de 2 à 4 joueurs) et parlez-lui pour lancer le raid en coop (5 essais).`
+                : 'Un boss très fort, à l\'aura bleue, rouge ou dorée, surgit sur une route toutes les heures et demie quand des joueurs sont connectés, et repart au bout de 15 minutes. Il se bat en coop, de 2 à 4 joueurs.',
               reward: 'PDj · Super Bonbons · capture',
               btn: R ? 'Où est-il ?' : 'En attente',
             };

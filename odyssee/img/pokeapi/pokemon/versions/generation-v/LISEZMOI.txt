@@ -1,3 +1,9 @@
 Sprites Noir / Blanc (Gen 5) des Pokémon n° 1 à 493, ajoutés pour Options → Graphismes → Sprites des Pokémon.
 Source : https://github.com/PokeAPI/sprites (sprites/pokemon/versions/generation-v/black-white : face, dos, chromatiques).
 Pokémon © Nintendo / Game Freak / Creatures. Projet de fans sans but lucratif.
+
+Légendaires des boss de raid (n° 785, 788, 791, 792, 800, 888, 889, 895 : Tokorico, Tokopisco, Solgaleo, Lunala,
+Necrozma, Zacian, Zamazenta, Regidrago) : sprites au style Noir / Blanc du projet de sprites de Smogon / Pokémon Showdown
+(https://github.com/smogon/sprites, src/sprites/gen5, dessins de fans ; noms des artistes dans spritecollab_credit_names.txt
+du dépôt), replacés sur une toile de 96 × 96 par tools/odyssee-raid-legendes.py. Icônes : PokeAPI/sprites (génération 7) et
+mini-sprites de Smogon (génération 8, réduits). Cris : https://github.com/PokeAPI/cries.

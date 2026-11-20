@@ -45,14 +45,15 @@ export class Battle {
   /**
    * @param o.player { name, party, bag }   bag = { item: qté } (modifié par le combat)
    * @param o.foe    { name, party, trainer?: { cls, name, prize, items: {item:qté}, ai } }
-   * @param o.format 'single' | 'double' | 'triple' | 1 | 2 | 3 (ou o.slots)
+   * @param o.format 'single' | 'double' | 'triple' | 'quadruple' | 1 | 2 | 3 | 4 (ou o.slots)
    */
   constructor(o) {
     this.rng = o.rng || Math.random;
     this.wild = !o.foe.trainer;
-    const rawSlots = o.slots ?? (o.format === 'triple' || o.format === '3v3' || o.format === 3 ? 3 : o.format === 'double' || o.format === '2v2' || o.format === 2 ? 2 : 1);
-    this.slots = Math.max(1, Math.min(3, rawSlots | 0));
-    this.format = this.slots === 3 ? 'triple' : this.slots === 2 ? 'double' : 'single';
+    const rawSlots = o.slots ?? (o.format === 'quadruple' || o.format === 4 ? 4 : o.format === 'triple' || o.format === '3v3' || o.format === 3 ? 3 : o.format === 'double' || o.format === '2v2' || o.format === 2 ? 2 : 1);
+    // 4 emplacements : seulement pour les raids (quatre joueurs contre un boss)
+    this.slots = Math.max(1, Math.min(4, rawSlots | 0));
+    this.format = this.slots === 4 ? 'quadruple' : this.slots === 3 ? 'triple' : this.slots === 2 ? 'double' : 'single';
     this.sides = [
       initSide(o.player.name, o.player.party, this.slots, { player: true, mega: !!o.player.mega }),
       initSide(o.foe.name, o.foe.party, this.slots, { trainer: o.foe.trainer || null, mega: !!o.foe.trainer?.mega }),
@@ -255,7 +256,7 @@ export class Battle {
       if (this.wild) {
         this.say(`${joinNames(foeNames)} sauvages apparaissent !`);
       } else {
-        this.say(`${t.cls} ${t.name} lance un combat ${this.slots === 3 ? 'Trio (3v3)' : 'Duo (2v2)'} !`);
+        this.say(`${t.cls} ${t.name} lance un combat ${this.slots === 4 ? 'Quatuor (4v4)' : this.slots === 3 ? 'Trio (3v3)' : 'Duo (2v2)'} !`);
         for (const sl of foeSlots) this.ev.push({ t: 'send', side: 1, slot: sl, idx: this.sides[1].activeSlots[sl] });
         this.say(`${t.cls} ${t.name} envoie ${joinNames(foeNames)} !`);
       }
