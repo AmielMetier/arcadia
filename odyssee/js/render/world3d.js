@@ -939,7 +939,7 @@ export class WorldView {
     const open = (W ? 1 : 0) + (E ? 1 : 0) + (N ? 1 : 0) + (S ? 1 : 0);
     // falaise de montagne sur plusieurs gradins : sous une roche plus haute, la pente continue (pas de dessus de gradin)
     // graphismes Noir & Blanc (A.nbr) : la roche du kit, en plateaux à bords nets, sans les variantes façon HeartGold
-    const nb = !!A.nbr && m.outdoor;
+    const nb = !!A.nbr && (b === 'montagne' || b === 'terre');   // roche brune du kit : dehors comme dans les grottes de terre
     if (nb) inner[0] = inner[1] = false;   // pas de coins rentrants découpés en quarts : le kit n'en a pas
     if (!nb && m.outdoor && S && !W && !E && !N && m.get(x, y - 1) === T.CAVEWALL && !ravin(m, x, y - 1) && m.height(x, y - 1) > h0 && mont(m, x, y)) {
       const k = A[`rv_${b}_${Math.floor(v * 4)}`] || A[`rv_${b}_0`];

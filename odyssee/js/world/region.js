@@ -1091,7 +1091,11 @@ export function buildWorld() {
     const O = towns.O = {
       id: 'orage', name: 'Port-Orage', x: 352, y: 206, w: 28, h: 20, exits: [['w', 9], ['n', 13], ['e', 9]], stock: 3, music: 'island',
       roads: [[0, 9, 27, 10, T.PATH], [13, 0, 14, 19, T.PATH]],
-      deco: [['lamp', 12, 8], ['lamp', 15, 8], ['flowers', 16, 13, 18, 16], ['sign', 11, 11, 'PORT-ORAGE\nL\'île où gronde le tonnerre.'], ['rock', 24, 16]],
+      deco: [['lamp', 12, 8], ['lamp', 15, 8], ['flowers', 16, 13, 18, 16], ['sign', 11, 11, 'PORT-ORAGE\nL\'île où gronde le tonnerre.'], ['rock', 24, 16],
+        // un village de pêcheurs : caisses et tonneaux près du ponton, bouée, bancs, jardinets fleuris et clôtures
+        ['caisses', 2, 11], ['tonneau', 3, 11], ['tonneau', 2, 12], ['bouee', 1, 8], ['caisses', 24, 12], ['tonneau', 25, 12],
+        ['banc', 10, 12], ['banc', 17, 12], ['flowers', 8, 14, 9, 16], ['flowers', 23, 14, 24, 15],
+        ['fence', 2, 18, 11, 18], ['fence', 16, 18, 25, 18]],
       buildings: [
         { kind: 'center', x: 3, dx: -1, y: 3 }, { kind: 'mart', x: 8, dx: 1, y: 3 },
         { kind: 'tower', x: 21, y: 3, roof: 'red', name: 'Phare de l\'Orage', npcs: [{ id: 'gardien', x: 5, y: 4, sprite: 'scientifique', script: 'phare' }] },
@@ -1201,6 +1205,9 @@ export function buildWorld() {
       id: 'givre', name: 'Givrebourg', x: 350, y: 36, w: 28, h: 20, exits: [['w', 8], ['n', 14], ['e', 8]], stock: 6, music: 'snow', ground: T.SNOW, theme: 'snow',
       roads: [[0, 8, 27, 9, T.PATH], [14, 0, 15, 19, T.PATH]],
       deco: [['water', 22, 15, 3, 2], ['lamp', 13, 7], ['lamp', 16, 7], ['trees', 1, 16, 3, 18, T.PINE],
+        // au bout du monde : pins, lanternes allumées dans la neige, réserves des pêcheurs, clôture du lac gelé
+        ['trees', 24, 2, 26, 4, T.PINE], ['lanterne', 12, 11], ['lanterne', 17, 11], ['banc', 20, 11], ['tonneau', 2, 10], ['caisses', 3, 10],
+        ['fence', 18, 18, 26, 18], ['rock', 25, 12],
         ['sign', 11, 10, 'GIVREBOURG\nLe village au bout du monde.']],
       buildings: [
         { kind: 'center', x: 3, y: 2 }, { kind: 'mart', x: 9, dx: 1, y: 2 },

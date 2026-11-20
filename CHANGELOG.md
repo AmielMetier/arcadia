@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.133 — 20 novembre 2026
+- **Odyssée** — Graphismes Noir & Blanc :
+  - les pentes de montagne en escalier n'ont plus de traits gris en biais sur leurs bords ;
+  - dans les grottes de terre (Route Victoire, Mesas, Crêtes, Sables…), les parois prennent la roche brune du jeu, sans pièces dépareillées ; les grottes marines, de magma et de glace gardent leur roche à elles.
+- **Odyssée** — Port-Orage et Givrebourg s'habillent : caisses et tonneaux près du ponton, bouée, bancs, lanternes dans la neige, jardinets et clôtures.
+
 ## 5.132 — 20 novembre 2026
 - **Odyssée** — Graphismes Noir & Blanc : les reliefs prennent enfin les vraies pièces de Noir 2 & Blanc 2.
   - Les buttes d'herbe ont leur bord d'herbe, leurs flancs de roche et leur paroi brune, comme dans le jeu.

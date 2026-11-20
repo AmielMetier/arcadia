@@ -277,7 +277,7 @@ T['ledgeW'] = over(G0, ledge_s.transpose(Image.ROTATE_270))
 # buttes d'herbe (plateaux du dehors) : le cadre « herbe sur roche » du kit (bord d'herbe tout autour, roche au pied et
 # sur les flancs), découpé sur la grille décalée d'une demi-case où il est dessiné. Pièces posées par world3d.js
 # (reliefDehors) sur les cases du bord du plateau (nbf_n, nbf_e…) et sur les cases de paroi (nbf_mur_*)
-FAL = lambda x, y: BW.crop((x, y, x + 32, y + 32))
+FAL = lambda x, y: net(BW.crop((x, y, x + 32, y + 32)))   # sans les ombres grises à demi transparentes du kit (elles faisaient des lignes en biais)
 Y0 = 14844   # haut du cadre (la lèvre d'herbe) ; le plateau fait 3 × 3 cases de x = 32 à 128, la paroi en dessous
 for nom, (fx, fy) in {'nw': (32, 0), 'n': (64, 0), 'ne': (96, 0), 'w': (32, 1), 'e': (96, 1),
                       'sw': (32, 2), 's': (64, 2), 'se': (96, 2), 'mur_w': (32, 3), 'mur_c': (64, 3), 'mur_e': (96, 3),
@@ -286,8 +286,9 @@ for nom, (fx, fy) in {'nw': (32, 0), 'n': (64, 0), 'ne': (96, 0), 'w': (32, 1), 
                       'fl_e_t': (128, 0), 'fl_e_m': (128, 1), 'fl_e_b': (128, 2), 'fl_e_mur': (128, 3)}.items():
     T['x_nbf_' + nom] = FAL(fx, Y0 + 32 * fy)
 # montagnes du dehors (world3d.js, paroiCell) : le plateau de roche du kit, 3 × 3 cases (dessus, lèvre claire, paroi au
-# sud), posé à la place des gradins façon HeartGold pour la roche brune ; la neige, le magma et la lune gardent les leurs
-for bio in ('montagne', 'terre', 'mer'):
+# sud), posé à la place des gradins façon HeartGold pour la roche brune (dehors et grottes de terre) ; la mer, la neige,
+# le magma et la lune gardent les leurs
+for bio in ('montagne', 'terre'):
     for R in range(3):
         for C in range(3):
             T[f'x_rp_{bio}_{R}{C}'] = FAL(160 + 32 * C, 14711 + 32 * R)
