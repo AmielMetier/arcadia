@@ -938,11 +938,14 @@ export class WorldView {
     const v = hash(x * 13 + 5, y * 7 + 3), pick = (k, n, p) => A[`r${k}_${b}_${Math.floor(v * n)}`] && v < p ? A[`r${k}_${b}_${Math.floor(v * n / p) % n}`] : null;
     const open = (W ? 1 : 0) + (E ? 1 : 0) + (N ? 1 : 0) + (S ? 1 : 0);
     // falaise de montagne sur plusieurs gradins : sous une roche plus haute, la pente continue (pas de dessus de gradin)
-    if (m.outdoor && S && !W && !E && !N && m.get(x, y - 1) === T.CAVEWALL && !ravin(m, x, y - 1) && m.height(x, y - 1) > h0 && mont(m, x, y)) {
+    // graphismes Noir & Blanc (A.nbr) : la roche du kit, en plateaux à bords nets, sans les variantes façon HeartGold
+    const nb = !!A.nbr && m.outdoor;
+    if (nb) inner[0] = inner[1] = false;   // pas de coins rentrants découpés en quarts : le kit n'en a pas
+    if (!nb && m.outdoor && S && !W && !E && !N && m.get(x, y - 1) === T.CAVEWALL && !ravin(m, x, y - 1) && m.height(x, y - 1) > h0 && mont(m, x, y)) {
       const k = A[`rv_${b}_${Math.floor(v * 4)}`] || A[`rv_${b}_0`];
       if (k) { flat(G, x, y, x + 1, y + 1, yh, k); return; }
     }
-    if (!inner[0] && !inner[1] && open <= 1) {
+    if (!nb && !inner[0] && !inner[1] && open <= 1) {
       const alt = S ? pick('f', 4, 0.8) : N ? pick('n', 4, 0.8) : W ? pick('l', 3, 0.75) : E ? pick('e', 3, 0.75) : pick('q', 6, 0.4);
       if (alt) { flat(G, x, y, x + 1, y + 1, yh, alt); return; }
     }
@@ -1027,6 +1030,9 @@ export class WorldView {
     // plateaux d'herbe (world/relief.js, pente) : talus de pelouse, dessiné au pixel par le sol généré (solgen.js, talus) ;
     // sans lui (?sol=0), des pièces de pelouse toutes faites (relief-tex.js)
     const gen = this.sol.couvre(), herbe = (a, b) => pente(m, a, b), lv = levreFalaise(th);
+    // graphismes Noir & Blanc : les buttes d'herbe prennent le cadre « herbe sur roche » du kit (bord d'herbe, paroi de
+    // roche au sud, flancs de roche à l'est et à l'ouest) au lieu des talus dessinés façon HeartGold
+    if (!gen && A.nbf_mur_c && this.nbButte(G, x, y, t, h, herbe)) return;
     if ((t === T.CLIFF || t === T.STAIRS) && herbe(x, y)) {
       if (gen) return;
       if (t === T.CLIFF) {
@@ -1087,6 +1093,48 @@ export class WorldView {
       if (bas(-1, 0) && bd('w')) flat(G, x, y, x + 1, y + 1, Y + 0.0002, bd('w'));
       if (bas(0, -1) && bd('n')) flat(G, x, y, x + 1, y + 1, Y + 0.0003, bd('n'));
     }
+  }
+  /** une butte d'herbe en graphismes Noir & Blanc : pièces nbf_* du pack (bord du plateau, paroi, escalier) ; renvoie
+   *  vrai quand la case est traitée (rien d'autre à dessiner pour son relief) */
+  nbButte(G, x, y, t, h, herbe) {
+    const m = this.map, A = this.A.cells, Y = 0.0049;
+    const pose = (k, dz = 0) => { if (A[k]) flat(G, x, y, x + 1, y + 1, Y + dz, A[k]); };
+    // plateau d'herbe ou de roche (canyons, terrasses) ; les montagnes gardent leurs gradins
+    const plat = (a, b) => herbe(a, b) || (m.height(a, b) > 0 && m.get(a, b) !== T.CAVEWALL && !mont(m, a, b));
+    const paroi = (a, b) => m.get(a, b) === T.CLIFF && !mont(m, a, b);
+    if (t === T.CLIFF) {
+      if (!paroi(x, y)) return false;
+      const fin = (dx) => { const q = m.get(x + dx, y); return q !== T.CLIFF && q !== T.STAIRS; };
+      // au-dessus d'une montagne, la paroi se détache sur la roche (pas sur l'herbe)
+      const r = m.get(x, y + 1) === T.CAVEWALL && A.nbf_mur_c_r ? '_r' : '';
+      pose((fin(-1) && !fin(1) ? 'nbf_mur_w' : fin(1) && !fin(-1) ? 'nbf_mur_e' : 'nbf_mur_c') + r);
+      return true;
+    }
+    if (t === T.STAIRS && (herbe(x, y) || !mont(m, x, y))) { if (A.stairs) pose('stairs', 0.0001); return true; }
+    if (h <= 0 || !plat(x, y)) {
+      // à côté d'un plateau : la roche de son flanc descend sur cette case (côté du plateau) ; au pied, pas d'ombre
+      if (mont(m, x, y)) return false;
+      let fait = paroi(x, y - 1);
+      for (const [dx, c] of [[1, 'w'], [-1, 'e']]) {
+        const a = x + dx, q = m.get(a, y), ha = m.height(a, y);
+        if (t === T.CLIFF) continue;
+        if (q === T.CLIFF && paroi(a, y)) { pose(`nbf_fl_${c}_mur`, 0.0001); fait = true; }
+        else if (plat(a, y) && q !== T.STAIRS && ha > h) {
+          const v = !(m.height(a, y - 1) >= ha && plat(a, y - 1)) ? 't' : m.get(a, y + 1) === T.CLIFF || m.get(a, y + 1) === T.STAIRS ? 'b' : 'm';
+          pose(`nbf_fl_${c}_${v}`, 0.0001); fait = true;
+        }
+      }
+      return fait;
+    }
+    // le bord du plateau : la lèvre d'herbe du kit sur l'herbe ; rien sur la roche (la paroi suffit)
+    if (!herbe(x, y)) return true;
+    const bas = (dx, dy) => { const q = m.get(x + dx, y + dy); return q === T.CLIFF || q === T.STAIRS || (m.height(x + dx, y + dy) < h && q !== T.CAVEWALL); };
+    const n = bas(0, -1), s = bas(0, 1), e = bas(1, 0), w = bas(-1, 0);
+    if (n) pose(w ? 'nbf_nw' : e ? 'nbf_ne' : 'nbf_n', 0.0002);
+    if (s) pose(w ? 'nbf_sw' : e ? 'nbf_se' : 'nbf_s', 0.0002);
+    if (!n && !s) { if (w) pose('nbf_w', 0.0002); if (e) pose('nbf_e', 0.0002); }
+    else if (w && e) { pose('nbf_w', 0.0001); pose('nbf_e', 0.0001); }
+    return true;
   }
   /** hauteur du sol à l'endroit (x, z) du monde : 0 sans le relief en 3D (?relief3d) */
   hAt(x, z) { return this.r3d ? this.r3d.Hmarche(x, z) : 0; }

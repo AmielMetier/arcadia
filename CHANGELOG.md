@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 5.132 — 20 novembre 2026
+- **Odyssée** — Graphismes Noir & Blanc : les reliefs prennent enfin les vraies pièces de Noir 2 & Blanc 2.
+  - Les buttes d'herbe ont leur bord d'herbe, leurs flancs de roche et leur paroi brune, comme dans le jeu.
+  - Les falaises des routes, des canyons et de Pierrefort deviennent de la roche brune du jeu au lieu des palissades sombres.
+  - Les montagnes passent en plateaux de roche à bords nets, avec leur paroi au sud.
+- **Odyssée** — Le Plateau Céleste est plus ramassé et plus beau : quatre jardins autour de la grande allée, avec cerisiers, statues, fontaines et lanternes.
+
 ## 5.131 — 20 novembre 2026
 - **Odyssée** — Les routes gagnent en détails, sans rien perdre de leur longueur :
   - des recoins cachés au bout d'une trouée dans les arbres, avec un objet au fond ; certains sont fermés par un arbuste à couper ;

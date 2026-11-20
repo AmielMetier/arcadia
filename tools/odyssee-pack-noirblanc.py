@@ -274,6 +274,26 @@ ledge_s = BW.crop((112, 960, 144, 992))
 T['ledge'] = over(G0, ledge_s)
 T['ledgeE'] = over(G0, ledge_s.transpose(Image.ROTATE_90))
 T['ledgeW'] = over(G0, ledge_s.transpose(Image.ROTATE_270))
+# buttes d'herbe (plateaux du dehors) : le cadre « herbe sur roche » du kit (bord d'herbe tout autour, roche au pied et
+# sur les flancs), découpé sur la grille décalée d'une demi-case où il est dessiné. Pièces posées par world3d.js
+# (reliefDehors) sur les cases du bord du plateau (nbf_n, nbf_e…) et sur les cases de paroi (nbf_mur_*)
+FAL = lambda x, y: BW.crop((x, y, x + 32, y + 32))
+Y0 = 14844   # haut du cadre (la lèvre d'herbe) ; le plateau fait 3 × 3 cases de x = 32 à 128, la paroi en dessous
+for nom, (fx, fy) in {'nw': (32, 0), 'n': (64, 0), 'ne': (96, 0), 'w': (32, 1), 'e': (96, 1),
+                      'sw': (32, 2), 's': (64, 2), 'se': (96, 2), 'mur_w': (32, 3), 'mur_c': (64, 3), 'mur_e': (96, 3),
+                      # flancs : la roche qui descend sur la case d'à côté (plus basse), à l'ouest et à l'est du plateau
+                      'fl_w_t': (0, 0), 'fl_w_m': (0, 1), 'fl_w_b': (0, 2), 'fl_w_mur': (0, 3),
+                      'fl_e_t': (128, 0), 'fl_e_m': (128, 1), 'fl_e_b': (128, 2), 'fl_e_mur': (128, 3)}.items():
+    T['x_nbf_' + nom] = FAL(fx, Y0 + 32 * fy)
+# montagnes du dehors (world3d.js, paroiCell) : le plateau de roche du kit, 3 × 3 cases (dessus, lèvre claire, paroi au
+# sud), posé à la place des gradins façon HeartGold pour la roche brune ; la neige, le magma et la lune gardent les leurs
+for bio in ('montagne', 'terre', 'mer'):
+    for R in range(3):
+        for C in range(3):
+            T[f'x_rp_{bio}_{R}{C}'] = FAL(160 + 32 * C, 14711 + 32 * R)
+T['x_nbr'] = FAL(192, 14743)
+for nom in ('mur_w', 'mur_c', 'mur_e'):   # la paroi d'une butte posée au-dessus d'une montagne : sur fond de roche
+    T[f'x_nbf_{nom}_r'] = over(T['x_nbr'], T['x_nbf_' + nom])
 CENTRE, BOUTIQUE = L('centre_interieur.png'), L('boutique_interieur.png')
 T['floor_pink'] = cell(1, 10, CENTRE); T['floor_blue'] = cell(0, 5, BOUTIQUE)
 

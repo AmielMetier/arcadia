@@ -43,7 +43,7 @@ export const VILLES = {
     sorties: [{ dir: 'e', k: 50, vers: 'r11' }, { dir: 'n', k: 60, vers: 'cap', garde: 'garde-cap' }, { dir: 's', k: 60, vers: 'r12' }] },
   I: { bx: 15, by: 24, bw: 4, bh: 4, cx: 32, cy: 36, theme: 'cime', devise: 'La cité des dragons anciens.', statue: 'statue_dragon', quartiers: { maisons: 3, parc: 1, place: 1, marche: 1, jardins: 0 },
     sorties: [{ dir: 'w', k: 52, vers: 'r10' }, { dir: 'n', k: 30, vers: 'r9', garde: 'garde' }, { dir: 'e', k: 52, vers: 'plage' }] },
-  J: { bx: 11, by: 9, bw: 5, bh: 6, cx: 43, cy: 70, theme: 'plateau', releve: false, devise: 'Le sommet des dresseurs.', quartiers: { maisons: 0, parc: 3, place: 1, marche: 0, jardins: 0, zen: 3, fleurs: 2, verger: 2 }, defaut: 'esplanade', pasX: [34, 46], pasY: [26, 36], saute: 0.4, arbres: ['erable', 'cerisier'], statue: 'statue',
+  J: { bx: 11, by: 9, bw: 5, bh: 6, cx: 43, cy: 70, theme: 'plateau', releve: false, devise: 'Le sommet des dresseurs.', quartiers: { maisons: 0, parc: 1, place: 0, marche: 0, jardins: 0, zen: 1, fleurs: 1, verger: 0 }, defaut: 'esplanade', pasX: [34, 46], pasY: [26, 36], saute: 0.4, arbres: ['erable', 'cerisier'], statue: 'statue',
     sorties: [{ dir: 's', k: 59, vers: 'r9b' }] },
   // Terres du Sud
   SM: { bx: 3, by: 36, bw: 12, bh: 8, cx: 96, cy: 66, theme: 'metro', releve: true, organique: false, pasX: [20, 26], pasY: [15, 19], saute: 0.06, devise: 'La ville qui ne dort jamais.', quartiers: { maisons: 4, parc: 1, place: 1, marche: 1, jardins: 0, affaires: 5 },
@@ -64,7 +64,7 @@ export const VILLES = {
 // les villes qu'on visite après Sylvebourg sont plus petites que leur territoire (echelle : part de chaque côté) : la
 // ville au milieu, la forêt tout autour, des avenues d'accès depuis les portes (quartiers.js, noyau)
 // villes à l'échelle de Noir 2 & Blanc 2 : le noyau habité reste serré, la forêt de son territoire garde les portes et les routes à leur place
-const ECHELLES = { C: 0.75, D: 0.45, E: 0.45, F: 0.45, G: 0.45, K: 0.45, H: 0.45, L: 0.45, I: 0.45, J: 0.75, SM: 0.55, SP: 0.45, SN: 0.45, SD: 0.45, SF: 0.45, SR: 0.45, SO: 0.45 };
+const ECHELLES = { C: 0.75, D: 0.45, E: 0.45, F: 0.45, G: 0.45, K: 0.45, H: 0.45, L: 0.45, I: 0.45, J: 0.45, SM: 0.55, SP: 0.45, SN: 0.45, SD: 0.45, SF: 0.45, SR: 0.45, SO: 0.45 };
 for (const [k, v] of Object.entries(VILLES)) Object.assign(v, { x: v.bx * BLOC, y: v.by * BLOC, w: v.bw * BLOC, h: v.bh * BLOC, echelle: ECHELLES[k] ?? 1 });
 
 /** case juste devant une porte de ville (hors de la ville) et direction en sortant */

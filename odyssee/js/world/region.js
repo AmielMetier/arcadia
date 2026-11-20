@@ -799,7 +799,15 @@ export function buildWorld() {
     id: 'plateau', name: 'Plateau Céleste', x: 74, y: 130, w: 34, h: 56, exits: [['s', 16]], stock: 7, music: 'league', fermer: true,
     // la Ligue en haut, puis la grande allée bordée de colonnes (laissée libre et pavée) jusqu'à la sortie, au sud
     roads: [[11, 16, 22, 50], [16, 51, 17, 53], [3, 30, 10, 31], [23, 30, 30, 31]],
-    deco: [['flowers', 3, 18, 9, 26], ['flowers', 24, 18, 30, 26], ['flowers', 3, 40, 9, 50], ['flowers', 24, 40, 30, 50], ['lamp', 10, 51], ['lamp', 23, 51],
+    // quatre jardins de part et d'autre de l'allée : massifs en bordure, cerisiers, statues, fontaines et lanternes
+    deco: [
+      ['flowers', 3, 17, 9, 17], ['flowers', 3, 27, 9, 27], ['flowers', 3, 18, 3, 26], ['flowers', 9, 18, 9, 26],
+      ['flowers', 24, 17, 30, 17], ['flowers', 24, 27, 30, 27], ['flowers', 24, 18, 24, 26], ['flowers', 30, 18, 30, 26],
+      ['cerisier', 5, 19], ['cerisier', 7, 25], ['statue', 6, 22], ['banc', 5, 25],
+      ['cerisier', 28, 19], ['cerisier', 26, 25], ['statue', 27, 22], ['banc', 28, 25],
+      ['flowers', 3, 40, 9, 40], ['flowers', 3, 50, 9, 50], ['flowers', 3, 41, 3, 49], ['flowers', 9, 41, 9, 49], ['fontaine', 5, 45], ['lanterne', 4, 42], ['lanterne', 8, 48],
+      ['flowers', 24, 40, 30, 40], ['flowers', 24, 50, 30, 50], ['flowers', 24, 41, 24, 49], ['flowers', 30, 41, 30, 49], ['fontaine', 27, 45], ['lanterne', 29, 42], ['lanterne', 25, 48],
+      ['lamp', 10, 51], ['lamp', 23, 51], ['lanterne', 10, 16], ['lanterne', 23, 16],
       ['sign', 24, 52, 'PLATEAU CÉLESTE\nLe sommet des dresseurs.']],
     buildings: [
       { kind: 'league', ...GRAND.league, x: 2, y: 2, id: 'ligue' },
