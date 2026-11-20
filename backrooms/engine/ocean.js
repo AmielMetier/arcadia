@@ -1,7 +1,7 @@
 // The Backrooms (Level 7) - « Thalassophobia » : une mer sans fin dans la brume, au bout du toboggan bleu des
 // Poolrooms. On arrive sur un îlot de roches et de sable, une barque à moteur amarrée au ponton. D'autres îlots
 // sortent de la brume au loin ; sur trois d'entre eux, un bidon d'essence ; sur un autre, l'épave d'un navire. Tout
-// au bout, une porte ordinaire plantée sur un dernier îlot : la sortie.
+// au bout, sur un dernier îlot, une trappe de bunker et son échelle qui descend : la sortie.
 // La barque (le « radeau » du code) : F tout près pour monter (le premier à bord tient la barre), ZQSD à la barre pour avancer et tourner, F à
 // bord pour descendre sur la terre la plus proche (il faut être à quai). Le moteur boit l'essence : de quoi atteindre
 // le premier îlot au départ, chaque bidon en rajoute.
@@ -59,7 +59,7 @@ export function createOceanMap(seed = 7) {
   const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
   const cellPos = (c) => ({ x: (c.x + 0.5) * C, z: (c.z + 0.5) * C, gx: c.x, gz: c.z });
 
-  // 1. Les îlots : la maison du départ au sud, la porte au nord sur son rocher, trois maisons à bidon entre les deux,
+  // 1. Les îlots : la maison du départ au sud, la trappe au nord sur son rocher, trois maisons à bidon entre les deux,
   // quelques maisons qui sombrent (des leurres, penchées, on n'y entre pas) et l'épave ; au moins 7 cases d'eau entre deux
   const islets = [];
   const fits = (x0, z0, w, h, gap) => x0 >= 3 && z0 >= 3 && x0 + w <= W - 3 && z0 + h <= H - 3 && islets.every((o) => x0 + w + gap <= o.x0 || o.x0 + o.w + gap <= x0 || z0 + h + gap <= o.z0 || o.z0 + o.h + gap <= z0);
@@ -340,6 +340,8 @@ export function createOceanMap(seed = 7) {
     // (ni sur l'îlot de l'épave : le navire couché le couvre en entier)
     collide(x, z, r) {
       for (const [dx, dz] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]) if (inSea(x + dx, z + dz)) return true;
+      // le caisson de béton de la trappe (ouverte, on en sort avant de le toucher)
+      if (Math.abs(x - exit.x) < 0.67 + r && Math.abs(z - exit.z) < 0.67 + r) return true;
       // l'épave et les maisons qui sombrent : on n'y monte pas
       for (const o of islets) if ((o.kind === 'wreck' || o.kind === 'sunk') && x > o.x0 * C - r && x < (o.x0 + o.w) * C + r && z > o.z0 * C - r && z < (o.z0 + o.h) * C + r) return true;
       // les murs des maisons (le long de x ou de z, épaisseur WALL_T)

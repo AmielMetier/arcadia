@@ -592,32 +592,87 @@ export function buildOcean({ map, scene, loader }) {
     });
   }
 
-  // 5. La porte : un bâti et une porte de bureau blanche, plantés seuls au milieu du dernier îlot (le seul reste des
-  // Backrooms, ici)
+  // 5. La sortie : une trappe de bunker au milieu du dernier îlot. Un caisson de béton, le couvercle d'acier rabattu
+  // (son volant), le puits noir, l'échelle qui y descend (ses montants dépassent, recourbés, pour qu'on s'y tienne),
+  // et un gyrophare sur son poteau qu'on voit de loin dans la brume
   const E = map.exit;
-  const doorG = new THREE.Group();
-  const frameMat = new THREE.MeshStandardMaterial({ color: '#8b8576', roughness: 0.7 });
-  const leafMat = new THREE.MeshStandardMaterial({ color: '#d9d4c3', roughness: 0.6 });
-  for (const x of [-0.5, 0.5]) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.15, 0.16), frameMat);
-    m.position.set(x, 1.075, 0);
-    doorG.add(m);
+  const hatchG = new THREE.Group();
+  const concrete = new THREE.MeshStandardMaterial({ color: '#5e5c56', roughness: 0.95 });
+  const steel = new THREE.MeshStandardMaterial({ color: '#4c5a4f', metalness: 0.6, roughness: 0.55 });
+  const rust = new THREE.MeshStandardMaterial({ color: '#6b4a34', metalness: 0.4, roughness: 0.8 });
+  const CH = 0.55; // la hauteur du caisson
+  const IN = 0.9; // l'ouverture
+  const WT = 0.22; // l'épaisseur du béton
+  for (const [x, z, w, d] of [[0, -(IN + WT) / 2, IN + WT * 2, WT], [0, (IN + WT) / 2, IN + WT * 2, WT], [-(IN + WT) / 2, 0, WT, IN], [(IN + WT) / 2, 0, WT, IN]]) {
+    const b = box(w, CH, d, concrete, 1);
+    b.position.set(x, CH / 2, z);
+    hatchG.add(b);
   }
-  const head = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.1, 0.16), frameMat);
-  head.position.set(0, 2.2, 0);
-  doorG.add(head);
-  const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.05, 0.05), leafMat);
-  leaf.position.set(0, 1.03, 0);
-  doorG.add(leaf);
-  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), new THREE.MeshStandardMaterial({ color: '#c9a64a', metalness: 0.8, roughness: 0.3 }));
-  knob.position.set(0.33, 1.0, 0.05);
-  doorG.add(knob);
-  // une petite lampe au-dessus : on la voit de loin dans la brume
-  const lamp = new THREE.PointLight('#ffd9a0', 2.5, 18, 1.6);
-  lamp.position.set(0, 2.5, 0.5);
-  doorG.add(lamp);
-  doorG.position.set(E.x, 0, E.z);
-  root.add(doorG);
+  // le puits : noir, à peine éclairé sur ses parois
+  const shaft = new THREE.Mesh(new THREE.BoxGeometry(IN, CH, IN), new THREE.MeshStandardMaterial({ color: '#1a1c1b', roughness: 1, side: THREE.BackSide }));
+  shaft.position.y = CH / 2;
+  hatchG.add(shaft);
+  const pit = new THREE.Mesh(new THREE.PlaneGeometry(IN, IN), new THREE.MeshBasicMaterial({ color: '#000000' }));
+  pit.rotation.x = -Math.PI / 2;
+  pit.position.y = 0.02;
+  hatchG.add(pit);
+  // le cadre d'acier sur le caisson
+  for (const [x, z, w, d] of [[0, -IN / 2 - 0.04, IN + 0.16, 0.08], [0, IN / 2 + 0.04, IN + 0.16, 0.08], [-IN / 2 - 0.04, 0, 0.08, IN], [IN / 2 + 0.04, 0, 0.08, IN]]) {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d), steel);
+    b.position.set(x, CH + 0.025, z);
+    hatchG.add(b);
+  }
+  // le couvercle, ouvert : pivote sur sa charnière au bord nord et retombe un peu en arrière
+  const lidPivot = new THREE.Group();
+  lidPivot.position.set(0, CH + 0.05, -IN / 2 - 0.06);
+  lidPivot.rotation.x = -1.95;
+  const lid = new THREE.Mesh(new THREE.BoxGeometry(IN + 0.14, 0.07, IN + 0.12), steel);
+  lid.position.set(0, 0.035, (IN + 0.12) / 2);
+  lidPivot.add(lid);
+  const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.025, 8, 20), rust);
+  wheel.rotation.x = Math.PI / 2;
+  wheel.position.set(0, 0.13, (IN + 0.12) / 2);
+  lidPivot.add(wheel);
+  for (const a of [0, Math.PI / 2]) {
+    const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.025, 0.025), rust);
+    spoke.rotation.y = a;
+    spoke.position.copy(wheel.position);
+    lidPivot.add(spoke);
+  }
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.1, 10), rust);
+  hub.position.set(0, 0.09, (IN + 0.12) / 2);
+  lidPivot.add(hub);
+  hatchG.add(lidPivot);
+  // l'échelle contre la paroi sud : ses barreaux s'enfoncent dans le noir, ses montants sortent et se recourbent
+  const lz = IN / 2 - 0.1;
+  for (const sx of [-0.22, 0.22]) {
+    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, CH + 0.75, 8), rust);
+    rail.position.set(sx, (CH + 0.75) / 2 - 0.02, lz);
+    hatchG.add(rail);
+    const bend = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.022, 8, 12, Math.PI), rust);
+    bend.rotation.y = Math.PI / 2;
+    bend.position.set(sx, CH + 0.73, lz + 0.13);
+    hatchG.add(bend);
+  }
+  for (let y = CH + 0.6; y > 0; y -= 0.28) {
+    const rung = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.44, 6), rust);
+    rung.rotation.z = Math.PI / 2;
+    rung.position.set(0, y, lz);
+    hatchG.add(rung);
+  }
+  // le gyrophare sur son poteau, au coin du caisson
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 2.2, 8), steel);
+  post.position.set(IN / 2 + WT + 0.25, 1.1, -IN / 2 - WT);
+  hatchG.add(post);
+  const BULB = new THREE.Color('#ffb347');
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), new THREE.MeshBasicMaterial({ color: BULB.clone() }));
+  bulb.position.set(post.position.x, 2.28, post.position.z);
+  hatchG.add(bulb);
+  const lamp = new THREE.PointLight('#ffb347', 2.5, 18, 1.6);
+  lamp.position.copy(bulb.position);
+  hatchG.add(lamp);
+  hatchG.position.set(E.x, 0, E.z);
+  root.add(hatchG);
 
   // 6. L'épave : le navire couché sur son îlot, la quille en l'air à moitié, dans la brume
   const wreck = map.islets.find((o) => o.kind === 'wreck');
@@ -677,6 +732,10 @@ export function buildOcean({ map, scene, loader }) {
   return {
     update(sim, time, dt) {
       seaMat.uniforms.uT.value = time;
+      // le gyrophare de la trappe : un éclat toutes les 1,4 s
+      const flash = Math.max(0, Math.sin(time * 4.5)) ** 3;
+      lamp.intensity = 0.6 + flash * 4;
+      bulb.material.color.setScalar(0.35 + flash * 0.65).multiply(BULB);
       for (const b of buoys) {
         b.g.position.y = SEA_Y - 0.5 + Math.sin(time * 1.1 + b.ph) * 0.12;
         b.g.rotation.z = Math.sin(time * 0.8 + b.ph) * 0.08;

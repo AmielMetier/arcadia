@@ -408,7 +408,7 @@ export class BackroomsHUD {
           : got === 0
           ? 'LEVEL 17 · HALCYON PARK MALL · CLOSED FOR THE NIGHT'
           : `REEL ${delivered}/${total} ON THE PROJECTOR`;
-      } else if (SEA) b = got >= total ? 'THE TANK IS FULL ENOUGH · FIND THE DOOR, FAR TO THE NORTH' : got === 0 ? 'LEVEL 7 · FIND 3 FUEL CANS ON THE ISLANDS · THE ENGINE CAN BE HEARD FROM BELOW' : `FUEL CAN ${got}/3 · KEEP GOING · CUT THE ENGINE IF THE SONAR CLOSES IN`;
+      } else if (SEA) b = got >= total ? 'THE TANK IS FULL ENOUGH · FIND THE HATCH, FAR TO THE NORTH · FOLLOW THE BEACON' : got === 0 ? 'LEVEL 7 · FIND 3 FUEL CANS ON THE ISLANDS · THE ENGINE CAN BE HEARD FROM BELOW' : `FUEL CAN ${got}/3 · KEEP GOING · CUT THE ENGINE IF THE SONAR CLOSES IN`;
       else if (sim.open && L37) b = slideOf(sim) ? `EVERYONE INTO THE ${slideOf(sim).name} SLIDE · THE OTHERS ARE SHUT` : 'LEVEL 37 · FIND ONE OF THE 3 SLIDES AND GET IN · RED, YELLOW OR BLUE: EACH ONE LEADS SOMEWHERE ELSE';
       else if (sim.open) b = PIPES ? 'THE STEAM IS OFF: THE SERVICE ELEVATOR IS OPEN · EVERYONE GET IN' : L1 ? 'THE FREIGHT ELEVATOR HAS POWER: EVERYONE GET IN' : 'ONLY ONE OF THE TWO ELEVATORS OPENED… THE OTHER ONE IS JUST A WALL NOW · FOLLOW THE RED ARROW';
       else if (PIPES) {
@@ -491,7 +491,7 @@ export class BackroomsHUD {
       }
     }
     const noSig = !(P.signal > 0);
-    this.text('signalLabel', noSig ? 'NO SIGNAL' : L5 ? (sim.open ? 'FIRE ESCAPE' : P.sigTo === 'keypad' ? 'KEYPAD' : P.sigTo === 'mail' ? 'MAILBOXES' : 'LETTER') : P.sigTo === 'stairs' ? 'STAIRS' : P.sigTo === 'breaker' ? 'BREAKER' : P.sigTo === 'key' ? 'KEY' : P.sigTo === 'ladder' ? 'LADDER' : P.sigTo === 'booth' ? 'PROJECTION BOOTH' : P.sigTo === 'can' ? 'FUEL CAN' : SEA ? 'THE DOOR' : L37 && sim.open ? 'SLIDE' : sim.open || (MALL && sim.film > 0) || (sim.level === 1 && delivered >= total) || (sim.level === 1 && !(sim.map.fuses || []).some((f) => !f.taken)) ? (sim.level === 1 || MALL ? 'FREIGHT ELEVATOR' : 'ELEVATOR') : MALL ? 'FILM REEL' : 'SIGNAL');
+    this.text('signalLabel', noSig ? 'NO SIGNAL' : L5 ? (sim.open ? 'FIRE ESCAPE' : P.sigTo === 'keypad' ? 'KEYPAD' : P.sigTo === 'mail' ? 'MAILBOXES' : 'LETTER') : P.sigTo === 'stairs' ? 'STAIRS' : P.sigTo === 'breaker' ? 'BREAKER' : P.sigTo === 'key' ? 'KEY' : P.sigTo === 'ladder' ? 'LADDER' : P.sigTo === 'booth' ? 'PROJECTION BOOTH' : P.sigTo === 'can' ? 'FUEL CAN' : SEA ? 'THE HATCH' : L37 && sim.open ? 'SLIDE' : sim.open || (MALL && sim.film > 0) || (sim.level === 1 && delivered >= total) || (sim.level === 1 && !(sim.map.fuses || []).some((f) => !f.taken)) ? (sim.level === 1 || MALL ? 'FREIGHT ELEVATOR' : 'ELEVATOR') : MALL ? 'FILM REEL' : 'SIGNAL');
     this.flag('signal', 'none', noSig);
     if (this.camOn) this.text('camSigLbl', this.E.signalLabel.textContent.replace('FREIGHT ', ''));
     // Level 0, tout trouvé : une flèche montre la direction du vrai ascenseur (ou de l'escalier, de la clé qui y mène)
@@ -1430,10 +1430,10 @@ export class BackroomsHUD {
         stats.textContent = `HOTEL ENDING · ${formatTime(sim.time)} · ${cleared}`;
         this.$('#endTape').textContent = `${d} · CHECK-OUT`;
       } else if (sim.level === OCEAN_LEVEL) {
-        // Level 7 : par la porte plantée au bout de l'océan
+        // Level 7 : par la trappe du dernier îlot, l'échelle qui descend
         title.textContent = solo ? 'YOU ESCAPED' : 'YOU ALL ESCAPED';
         title.style.color = '#22c55e';
-        sub.textContent = 'The door opened onto a dry, ordinary office corridor. You closed it behind you. Through the gap, the water kept lapping at the carpet. Something very large was turning back toward the deep.';
+        sub.textContent = 'You climbed down the ladder into the dark and pulled the hatch shut above you. The iron clanged. For a long time you heard the sea against it. Then nothing but the rungs, cold and wet, going down to whatever is next. Something very large was circling the island.';
         stats.textContent = `OCEAN ENDING · ${formatTime(sim.time)} · ${cleared}`;
         this.$('#endTape').textContent = `${d} · TAPE SOAKED THROUGH`;
       } else if (sim.level === PIPES_LEVEL) {
