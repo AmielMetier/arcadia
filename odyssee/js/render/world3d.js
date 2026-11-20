@@ -793,7 +793,8 @@ export class WorldView {
         return { c: A[(theme === 'snow' && A.snowtall0 ? 'snowtall' : 'tall') + (v < 0.5 ? 0 : 1)] };
       }
       case T.TREE: case T.PINE: return { c: theme === 'volcanic' ? A.ash1 : theme === 'snow' ? A.snow1 : desertCell ? sandFull : pg ? A[g4()] : A['forest' + (v < 0.5 ? 0 : 1)] };
-      case T.PATH: if (A.q_path_f) return quarts('path', isPathQ);
+      // (Noir & Blanc : contre la roche d'une montagne, le sentier va jusqu'au pied du rocher, sans bordure d'herbe)
+      case T.PATH: if (A.q_path_f) return quarts('path', A.nbr && m.outdoor ? (q) => isPathQ(q) || q === T.CAVEWALL || q === T.CLIFF : isPathQ);
         return { c: A['path' + edge(isPathish)] };
       case T.PAVE: if (A.q_pave_f) return quarts('pave', (q, ax, ay) => isPaveQ(q, ax, ay));
         return { c: A['pave' + edge((q) => isPathish(q))] };
@@ -834,6 +835,8 @@ export class WorldView {
       case T.CAVEWALL: if (m.outdoor) {
         if (sandFull && (desertCell || (hasNbr4(x, y, (g) => g === T.SAND) && !hasNbr8(x, y, (g) => g === T.GRASS || g === T.TREE || g === T.PINE || (g === T.FLOWER && !sandFlower(x, y)))))) return { c: sandFull };
         if (theme === 'volcanic' && this.N.cells.lava && hasNbr4(x, y, (g) => g === T.LAVA) && !hasNbr4(x, y, (g) => g === T.ASH || g === T.PATH || g === T.CAVE || T.STAIRS)) return { anim: this.N.cells.lava };
+        // Noir & Blanc : sous la roche d'une montagne qui borde un sentier, le sentier (pas de liseré d'herbe autour du rocher)
+        if (A.nbr && A.q_path_f && hasNbr8(x, y, (g) => g === T.PATH || g === T.STAIRS)) return { c: A.q_path_f };
         return { c: A[grassKey] };   // sous les montagnes du dehors
       }
         if (this.tiers && A[`rp_${this.biome}_00`]) { const k = reliefKey(A, this.biome, 's', v); return { c: A[k] }; }
@@ -902,12 +905,16 @@ export class WorldView {
     // dans une montagne à gravir (relief.js, montagne), le sentier fait partie du gradin quand il est à sa hauteur (ou
     // plus haut) : la roche sous le bord d'un sentier n'a pas de rebord de ce côté, elle descend en pente vers le bas
     const h0 = m.outdoor ? m.height(x, y) : 0;
+    const nbR = !!A.nbr && (b === 'montagne' || b === 'terre');
+    // Noir & Blanc : chaque gradin d'une montagne un peu plus clair que celui du dessous, pour lire les marches de la roche
+    const ombreGradin = (h) => Math.min(1.1, 0.68 + 0.1 * Math.max(0, h));
     const rock = (dx, dy) => {
       const a = x + dx, c = y + dy; if (a < 0 || c < 0 || a >= m.w || c >= m.h) return true;
       if (ravin(m, a, c)) return false;
       const q = m.get(a, c);
       if (q === T.CAVEWALL) return !m.outdoor || m.height(a, c) >= h0;
-      return m.outdoor && mont(m, a, c) && q !== T.STAIRS && m.height(a, c) >= h0;
+      // (Noir & Blanc : le sentier de la montagne reste un sentier, la roche a son bord tout autour, comme dans le jeu)
+      return m.outdoor && !nbR && mont(m, a, c) && q !== T.STAIRS && m.height(a, c) >= h0;
     };
     if (m.outdoor) {
       // sous les coins arrondis : le gradin du dessous (ou le vide d'un ravin), pas l'herbe
@@ -918,7 +925,7 @@ export class WorldView {
       }
       // à côté d'un sentier (case praticable), le pied de la paroi laisse voir le sentier : pas de roche dessous
       const sol = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => m.in(x + dx, y + dy) && m.get(x + dx, y + dy) !== T.CAVEWALL);
-      if (bas && !sol) flat(G, x, y, x + 1, y + 1, yh - 0.0002, A[`rp_${b}_11`], 0.9);
+      if (bas && !sol) flat(G, x, y, x + 1, y + 1, yh - 0.0002, A[`rp_${b}_11`], nbR ? ombreGradin(h0 - 1) : 0.9);
       // le vide d'un ravin, seulement sous les quarts de case tournés vers lui (pas de noir qui déborde sur la roche)
       const vide = (a, c) => ravin(m, a, c) && m.get(a, c) === T.CAVEWALL;   // le gouffre (pas une passerelle)
       for (let qy = 0; qy < 2; qy++) for (let qx = 0; qx < 2; qx++) {
@@ -941,6 +948,7 @@ export class WorldView {
     // graphismes Noir & Blanc (A.nbr) : la roche du kit, en plateaux à bords nets, sans les variantes façon HeartGold
     const nb = !!A.nbr && (b === 'montagne' || b === 'terre');   // roche brune du kit : dehors comme dans les grottes de terre
     if (nb) inner[0] = inner[1] = false;   // pas de coins rentrants découpés en quarts : le kit n'en a pas
+    const ombreNB = nb && m.outdoor ? ombreGradin(h0) : undefined;
     if (!nb && m.outdoor && S && !W && !E && !N && m.get(x, y - 1) === T.CAVEWALL && !ravin(m, x, y - 1) && m.height(x, y - 1) > h0 && mont(m, x, y)) {
       const k = A[`rv_${b}_${Math.floor(v * 4)}`] || A[`rv_${b}_0`];
       if (k) { flat(G, x, y, x + 1, y + 1, yh, k); return; }
@@ -957,7 +965,7 @@ export class WorldView {
       // un soupçon de chevauchement entre les quarts : pas de fente d'un pixel où l'on verrait le sol
       const e = 1 / 128, ex0 = qx ? e : 0, ex1 = qx ? 0 : e, ez0 = qy ? e : 0, ez1 = qy ? 0 : e;
       flat(G, x + qx / 2 - ex0, y + qy / 2 - ez0, x + (qx + 1) / 2 + ex1, y + (qy + 1) / 2 + ez1, yh,
-        [u0 - (cell[2] - cell[0]) * ex0, v0 - (cell[3] - cell[1]) * ez0, u0 + hu + (cell[2] - cell[0]) * ex1, v0 + hv + (cell[3] - cell[1]) * ez1]);
+        [u0 - (cell[2] - cell[0]) * ex0, v0 - (cell[3] - cell[1]) * ez0, u0 + hu + (cell[2] - cell[0]) * ex1, v0 + hv + (cell[3] - cell[1]) * ez1], ombreNB);
     }
   }
   /** roche de grotte en pentes : la case est découpée en RN × RN facettes posées sur le champ de hauteur ; une facette

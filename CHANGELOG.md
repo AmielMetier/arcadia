@@ -1,5 +1,18 @@
 # Journal des versions — Arcadia
 
+## 5.134 — 20 novembre 2026
+- **Odyssée** — Trois donjons à faire entre amis, posés sur la nouvelle carte : la Crypte des Murmures, le Donjon des Miroirs et le Sanctuaire des Trois Voies.
+  - En battant Hector, on reçoit la Clé de la Crypte. Elle ouvre la crypte du Cimetière des Murmures, au bout d'un sentier de la Route 2.
+  - Le fossoyeur ouvre la crypte quand le groupe est prêt. Dans les deux premières salles, chaque esprit se combat par un seul joueur à la fois. Dans la Salle des Dalles, tout le groupe doit tenir les dalles en même temps.
+  - Au fond, Ossarion a des PV partagés : chaque combat lui retire ce qu'on lui a infligé, et le groupe en vient à bout ensemble.
+  - Sur la Route 3, deux clairières cachent les deux autres. Au Parvis des Miroirs, un temple de glace : des miroirs qui parlent, des énigmes, une galerie de glace où l'on glisse, des faisceaux de lumière à renvoyer et un reflet qui marche à l'envers.
+  - Dans la Clairière des Trois Voies, un sanctuaire à faire à trois : chacun prend son chemin, il faut s'échanger des codes pour avancer, et les salles sombres ne s'éclairent qu'autour de soi.
+  - Nouveaux combats à plusieurs : un boss dont la barre de vie est coupée en boucliers, et des combats de groupe où chacun choisit le Pokémon adverse qu'il vise.
+  - Un encadré suit l'avancée salle par salle (touche N pour le cacher) ; on peut quitter un donjon à tout moment et le refaire autant qu'on veut, sa récompense n'est donnée qu'une fois.
+- **Odyssée** — Graphismes Noir & Blanc :
+  - dans les montagnes, les sentiers sont en terre claire et vont jusqu'au pied de la roche, sans liseré d'herbe : on voit bien où l'on marche et où commence le rocher ;
+  - chaque gradin d'une montagne est un peu plus clair que celui du dessous, pour lire les marches de la roche.
+
 ## 5.133 — 20 novembre 2026
 - **Odyssée** — Graphismes Noir & Blanc :
   - les pentes de montagne en escalier n'ont plus de traits gris en biais sur leurs bords ;
