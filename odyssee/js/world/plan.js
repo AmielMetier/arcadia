@@ -20,8 +20,9 @@ export const BLOC = 24, COLS = 50, ROWS = 58, LARGEUR = COLS * BLOC, HAUTEUR = R
 export const VILLES = {
   A: { bx: 1, by: 22, bw: 4, bh: 3, cx: 28, cy: 24, theme: 'aube', devise: 'Là où chaque aventure commence.', toits: ['red', 'orange'], arbres: ['cerisier', 'erable'], quartiers: { maisons: 4, parc: 1, place: 0, marche: 1, jardins: 2, ferme: 2 },
     sorties: [{ dir: 'n', k: 42, vers: 'r1' }, { dir: 'e', k: 34, vers: 'r10', garde: 'garde10' }] },
-  B: { bx: 1, by: 13, bw: 7, bh: 6, cx: 57, cy: 50, theme: 'sylve', devise: 'La ville où murmurent les feuilles.', arbres: ['pine', 'erable'], toits: ['green', 'teal', 'brown'], quartiers: { maisons: 4, parc: 1, place: 1, marche: 1, jardins: 1 },
-    sorties: [{ dir: 'n', k: 60, vers: 'r2', garde: 'garde' }, { dir: 's', k: 42, vers: 'r1' }] },
+  // Sylvebourg à la taille d'une ville de Noir 2 & Blanc 2 (à peine plus grande) : 48 × 48 cases, le centre compact au milieu
+  B: { bx: 1, by: 15, bw: 2, bh: 2, cx: 4, cy: 6, theme: 'sylve', devise: 'La ville où murmurent les feuilles.', arbres: ['pine', 'erable'], toits: ['green', 'teal', 'brown'], quartiers: { maisons: 0, parc: 0, place: 0, marche: 0, jardins: 0 },
+    sorties: [{ dir: 'n', k: 22, vers: 'r2', garde: 'garde' }, { dir: 's', k: 22, vers: 'r1' }] },
   C: { bx: 3, by: 2, bw: 6, bh: 4, cx: 42, cy: 12, theme: 'pierre', devise: 'Une ville taillée dans la montagne.', quartiers: { maisons: 6, parc: 1, place: 1, marche: 1, jardins: 0 },
     sorties: [{ dir: 's', k: 100, vers: 'bois' }, { dir: 'e', k: 40, vers: 'r3' }, { dir: 'n', k: 86, vers: 'mine' }] },
   D: { bx: 19, by: 1, bw: 5, bh: 6, cx: 42, cy: 26, theme: 'azur', mer: 'n', devise: 'Le parfum des embruns et des voyages.', quartiers: { maisons: 6, parc: 1, place: 1, marche: 1, jardins: 0 },
@@ -76,8 +77,9 @@ export const arrivee = (lettre, vers) => { const p = porte(lettre, vers); return
 
 /** territoires des routes (blocs) */
 export const TERR = {
-  r1: [[1, 19, 3, 21]],
-  r2: [[1, 6, 5, 12]],
+  // Sylvebourg, rendue à la taille d'une ville de Noir 2 & Blanc 2, laisse la place aux deux routes qui la touchent
+  r1: [[1, 17, 3, 21]],
+  r2: [[1, 6, 5, 12], [1, 13, 2, 14]],
   bois: [[6, 6, 9, 11]],
   r3: [[9, 1, 11, 5], [12, 4, 12, 5]],
   r3e: [[13, 4, 13, 5], [14, 1, 18, 5]],

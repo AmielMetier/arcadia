@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.125 — 20 novembre 2026
+- **Odyssée** — Sylvebourg passe à la taille d'une ville de Noir 2 & Blanc 2 : un village compact où l'on trouve tout en quelques pas.
+  - Centre, Boutique et Arène se voient d'un coup d'œil, les deux maisons et leurs habitants sont toujours là, comme le garde du nord.
+  - Les Routes 1 et 2 s'allongent un peu pour rejoindre les nouvelles portes de la ville.
+  - L'autel du Bois Murmure est désormais relié au sentier par une petite allée.
+
 ## 5.124 — 19 novembre 2026
 - **Odyssée** — Graphismes Noir & Blanc :
   - la Boutique passe aussi en vrai style Noir 2 & Blanc 2 : carrelage gris à losanges, comptoir bleu à façade argentée avec sa caisse enregistreuse, présentoirs blancs garnis ;

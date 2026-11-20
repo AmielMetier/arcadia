@@ -484,19 +484,21 @@ export function buildWorld() {
 
   /* ---------- B · Sylvebourg (Hector, Insecte) ---------- */
   const B = towns.B = {
-    id: 'sylve', name: 'Sylvebourg', x: 18, y: 138, w: 54, h: 44, exits: [['s', 16], ['n', 16]], gym: 0, stock: 1, fermer: true, lotir: { n: 3, seed: 21 },
-    roads: [[16, 0, 17, 43, T.PATH], [0, 11, 53, 12, T.PATH], [0, 20, 17, 21, T.PATH], [0, 36, 53, 37, T.PATH], [46, 11, 47, 37, T.PATH]],
-    deco: [['flowers', 11, 4, 14, 7], ['flowers', 19, 4, 21, 7], ['lamp', 14, 10], ['lamp', 19, 10], ['lamp', 14, 13], ['lamp', 19, 13], ['lamp', 14, 35], ['lamp', 19, 35],
-      ['sign', 14, 9, 'SYLVEBOURG\nLa ville où murmurent les feuilles.'], ['sign', 39, 38, 'ARÈNE DE SYLVEBOURG\nChampion : Hector\nL\'observateur des insectes.'],
-      ['trees', 2, 23, 3, 25], ['tall', 28, 2, 31, 5], ['water', 8, 30, 3.4, 2.2], ['flowers', 19, 29, 26, 33], ['trees', 49, 2, 51, 8], ['trees', 2, 39, 6, 41]],
+    // ville compacte, à l'échelle de Noir 2 & Blanc 2 : 40 × 36 cases. L'allée nord-sud (x 18-19) relie les deux portes,
+    // la rue haute (y 10-11) passe devant le Centre et la Boutique, la rue basse (y 29-30) devant l'Arène et les maisons
+    id: 'sylve', name: 'Sylvebourg', x: 18, y: 138, w: 40, h: 36, exits: [['s', 18], ['n', 18]], gym: 0, stock: 1, fermer: true, lotir: false,
+    roads: [[18, 0, 19, 35, T.PATH], [2, 10, 37, 11, T.PATH], [2, 29, 37, 30, T.PATH], [7, 8, 7, 9, T.PATH], [26, 8, 26, 9, T.PATH], [6, 25, 6, 28, T.PATH], [12, 25, 12, 28, T.PATH], [27, 27, 28, 28, T.PATH]],
+    deco: [['flowers', 12, 3, 15, 6], ['flowers', 29, 3, 33, 6], ['lamp', 16, 9], ['lamp', 21, 9], ['lamp', 16, 28], ['lamp', 21, 28],
+      ['sign', 16, 12, 'SYLVEBOURG\nLa ville où murmurent les feuilles.'], ['sign', 22, 31, 'ARÈNE DE SYLVEBOURG\nChampion : Hector\nL\'observateur des insectes.'],
+      ['water', 8, 16, 3.2, 2.2], ['flowers', 3, 14, 4, 19], ['trees', 34, 14, 36, 18], ['trees', 2, 32, 4, 34], ['trees', 34, 32, 36, 34]],
     buildings: [
-      { kind: 'center', ...GRAND.center, x: 5, y: 5 }, { kind: 'mart', ...GRAND.mart, x: 21, y: 6 }, { kind: 'gym', ...GRAND.gym, x: 28, y: 18, roof: 'green' },
-      { kind: 'house', x: 5, y: 15, roof: 'green', npcs: [{ x: 4, y: 4, sprite: 'insectomane', text: ['Hector, le Champion, adore les créatures Insecte.', 'Le Feu, le Vol et la Roche les mettent en difficulté !'] }] },
-      { kind: 'house', x: 10, dx: 1, y: 15, roof: 'brown', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Une créature endormie ou paralysée est bien plus facile à capturer.', 'Et plus ses PV sont bas, mieux c\'est !'] }, { id: 'gs', x: 6, y: 3, sprite: 'vieil_homme', script: 'gsBall' }] },
+      { kind: 'center', ...GRAND.center, x: 4, y: 3 }, { kind: 'mart', ...GRAND.mart, x: 23, y: 4 }, { kind: 'gym', ...GRAND.gym, x: 19, y: 13, roof: 'green' },
+      { kind: 'house', x: 4, y: 22, roof: 'green', npcs: [{ x: 4, y: 4, sprite: 'insectomane', text: ['Hector, le Champion, adore les créatures Insecte.', 'Le Feu, le Vol et la Roche les mettent en difficulté !'] }] },
+      { kind: 'house', x: 10, y: 22, roof: 'brown', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Une créature endormie ou paralysée est bien plus facile à capturer.', 'Et plus ses PV sont bas, mieux c\'est !'] }, { id: 'gs', x: 6, y: 3, sprite: 'vieil_homme', script: 'gsBall' }] },
     ],
     npcs: [
-      { id: 'gamin', x: 9, y: 13, sprite: 'gamin', move: 'wander', text: ['Le Centre de soins soigne tes créatures gratuitement.', 'C\'est le bâtiment au toit rouge !'] },
-      { id: 'garde', x: 16, y: 3, sprite: 'garde', dir: 'down', gate: { badges: 1, tiles: [[16, 2], [17, 2]] }, text: ['Le Bois Murmure est plein de dresseurs coriaces.', 'Reviens quand tu auras le badge de l\'Arène !'] },
+      { id: 'gamin', x: 12, y: 13, sprite: 'gamin', move: 'wander', text: ['Le Centre de soins soigne tes créatures gratuitement.', 'C\'est le bâtiment au toit rouge !'] },
+      { id: 'garde', x: 18, y: 3, sprite: 'garde', dir: 'down', gate: { badges: 1, tiles: [[18, 2], [19, 2]] }, text: ['Le Bois Murmure est plein de dresseurs coriaces.', 'Reviens quand tu auras le badge de l\'Arène !'] },
     ],
   };
   ville(B, 'B');
@@ -774,7 +776,7 @@ export function buildWorld() {
   // le point de passage entre deux routes qui se suivent (la route 2 et le Bois Murmure)
   const relais = (x, y, dir) => ({ x, y, dir });
 
-  const r1 = G2({ id: 'r1', nom: 'Route 1', de: porte('A', 'r1'), vers: arrivee('B', 'r1'), long: 3, graine: 101, w: 13, grass: 0.8, trees: 0.04, paysages: ['rebords', 'prairie', 'fleurs'], branches: 0, dresseurs: 0, promeneurs: 1, panneaux: ['ROUTE 1\n↑ Sylvebourg   ↓ Bourg-Aube', null], voix: 'general' }, 'r1');
+  const r1 = G2({ id: 'r1', nom: 'Route 1', de: porte('A', 'r1'), vers: arrivee('B', 'r1'), long: 5, graine: 101, w: 13, grass: 0.8, trees: 0.04, paysages: ['rebords', 'prairie', 'fleurs'], branches: 0, dresseurs: 0, promeneurs: 1, panneaux: ['ROUTE 1\n↑ Sylvebourg   ↓ Bourg-Aube', null], voix: 'general' }, 'r1');
   const pGuide = along(r1, 0.06);
   const [gx, gy] = caseLibre(W, pGuide.x + 0.5 + pGuide.nx * 2, pGuide.y + 0.5 + pGuide.ny * 2);
   W.npc({
@@ -797,7 +799,7 @@ export function buildWorld() {
   routeItem(W, r1, 0.5, -1, 5, 'potion'); routeItem(W, r1, 0.9, 1, 5, 'poke-ball', 2);
 
   const H1 = relais(143, 196, 'e');
-  const r2 = G2({ id: 'r2', nom: 'Route 2', de: porte('B', 'r2'), vers: H1, effile: [true, false], long: 14, graine: 202, w: 11, grass: 0.7, trees: 0.05, flowers: 0.03, paysages: ['prairie', 'fleurs', 'bosquet', 'plateau', 'etang', 'riviere', 'rebords'], branches: 0.45, raccourci: 'coupe', anciens: 4, panneaux: ['ROUTE 2\n↑ Bois Murmure   ↓ Sylvebourg', null], voix: 'general' }, 'r2');
+  const r2 = G2({ id: 'r2', nom: 'Route 2', de: porte('B', 'r2'), vers: H1, effile: [true, false], long: 15, graine: 202, w: 11, grass: 0.7, trees: 0.05, flowers: 0.03, paysages: ['prairie', 'fleurs', 'bosquet', 'plateau', 'etang', 'riviere', 'rebords'], branches: 0.45, raccourci: 'coupe', anciens: 4, panneaux: ['ROUTE 2\n↑ Bois Murmure   ↓ Sylvebourg', null], voix: 'general' }, 'r2');
   routeTrainer(W, r2, 0.2, -1, 3, 'Insectomane', 'Noé', [[1017, 6], [1018, 6, null, [33, 81, 106]], [10, 7]]);
   routeTrainer(W, r2, 0.45, 1, 3, 'Fillette', 'Jade', [[1039, 7], [29, 7]]);
   routeTrainer(W, r2, 0.7, -1, 4, 'Gamin', 'Sacha', [[21, 8], [1034, 7]]);
@@ -1012,8 +1014,11 @@ export function buildWorld() {
   pierV('granit', 'Île de Granit (Port-Granit)', quaiGranit[0], quaiGranit[1] - 1, -1, 1, 5, { town: 'Port-Granit' });
 
   // Bois Murmure : l'autel de Celebi (la Balle GS vient d'une vieille dame de Sylvebourg)
-  { const [sx, sy] = offRoute(bois, 0.5, 1, 5); thing('statue', sx, sy, { type: 'shrine' });
-    const [cx, cy] = nearestWalkable(W, sx, sy + 1, new Set([sx + ',' + sy]));
+  // une allée part du sentier jusqu'à l'autel : Celebi s'y tient toujours sur une case qu'on atteint, quel que soit le tracé
+  { const p = along(bois, 0.5), pas = [];
+    for (let d = 1; d <= 5; d++) { const x = Math.floor(p.x + 0.5 + p.nx * d), y = Math.floor(p.y + 0.5 + p.ny * d); if (!pas.some(([a, b]) => a === x && b === y)) pas.push([x, y]); }
+    pas.forEach(([x, y], i) => { const q = pas[i - 1]; if (q && q[0] !== x && q[1] !== y && !walkable(W.get(x, q[1]))) W.set(x, q[1], T.GRASS); if (!walkable(W.get(x, y))) W.set(x, y, T.GRASS); });
+    const [sx, sy] = pas[pas.length - 1], [cx, cy] = pas[pas.length - 2]; thing('statue', sx, sy, { type: 'shrine' });
     legend({ id: 'celebi', sp: 251, lvl: 20, x: cx, y: cy, cond: 'celebi', intro: ['La Balle GS se met à trembler...', 'Une petite créature verte surgit d\'entre les feuilles : Celebi !'] }); }
 
   // Embarcadère de l'Aube : un sentier part de la route 1 vers la baie
