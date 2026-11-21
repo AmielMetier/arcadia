@@ -285,13 +285,7 @@ for nom, (fx, fy) in {'nw': (32, 0), 'n': (64, 0), 'ne': (96, 0), 'w': (32, 1), 
                       'fl_w_t': (0, 0), 'fl_w_m': (0, 1), 'fl_w_b': (0, 2), 'fl_w_mur': (0, 3),
                       'fl_e_t': (128, 0), 'fl_e_m': (128, 1), 'fl_e_b': (128, 2), 'fl_e_mur': (128, 3)}.items():
     T['x_nbf_' + nom] = FAL(fx, Y0 + 32 * fy)
-# montagnes du dehors (world3d.js, paroiCell) : le plateau de roche du kit, 3 × 3 cases (dessus, lèvre claire, paroi au
-# sud), posé à la place des gradins façon HeartGold pour la roche brune (dehors et grottes de terre) ; la mer, la neige,
-# le magma et la lune gardent les leurs
-for bio in ('montagne', 'terre'):
-    for R in range(3):
-        for C in range(3):
-            T[f'x_rp_{bio}_{R}{C}'] = FAL(160 + 32 * C, 14711 + 32 * R)
+# la roche du kit sous la paroi d'une butte posée au-dessus d'une montagne (les montagnes gardent la roche d'Odyssée)
 T['x_nbr'] = FAL(192, 14743)
 for nom in ('mur_w', 'mur_c', 'mur_e'):   # la paroi d'une butte posée au-dessus d'une montagne : sur fond de roche
     T[f'x_nbf_{nom}_r'] = over(T['x_nbr'], T['x_nbf_' + nom])

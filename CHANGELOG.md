@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 5.143 — 21 novembre 2026
+- **Odyssée** — Avec les graphismes Noir & Blanc, les montagnes reprennent le dessin d'Odyssée (Odyssée 1.6).
+  - Gradins, falaises et sommets enneigés sont les mêmes qu'avec les graphismes de base, leurs roches passées en brun clair comme le reste du relief Noir & Blanc.
+  - Les mines et les zones de roche brune aussi.
+
 ## 5.142 — 20 novembre 2026
 - **Odyssée** — Récap à la fin de chaque raid (Odyssée 1.5).
   - Classement de l'escouade par dégâts infligés au boss, avec la part de chacun, les dégâts encaissés, les soins et les K.O.

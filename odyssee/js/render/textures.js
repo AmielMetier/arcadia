@@ -332,8 +332,8 @@ export function buildAtlas() {
   }));
   // relief du dehors (falaises, rebords, marches, roche ocre) : render/relief-tex.js
   texturesRelief(putImg, img);
-  // pack de graphismes : la roche des montagnes du pack (x_rp_…) passe après celle du relief, qu'elle remplace
-  for (const k of Object.keys(SOL32)) if (k.startsWith('x_rp_') || k === 'x_nbr') putImg(k.slice(2), up2(SOL32[k]));
+  // pack de graphismes : la roche du pack sous les buttes (x_nbr), après celle du relief
+  for (const k of Object.keys(SOL32)) if (k === 'x_nbr') putImg(k.slice(2), up2(SOL32[k]));
   tameGreens(atlas);
   // Tour Cendrée : planches noircies par le feu, suie en haut, cendre claire par endroits
   put('wall_cendre', (P) => { P.fill('#3e3028'); for (let x = 0; x < 16; x += 4) P.rect(x, 0, 1, 16, '#271c16'); P.rect(0, 0, 16, 3, '#211814'); P.speck(10, '#2c211b', 0, 3, 16, 9); P.speck(5, '#5e5048'); P.speck(3, '#7a3a20', 0, 6, 16, 6); P.rect(0, 13, 16, 3, '#2a1f19'); P.rect(0, 13, 16, 1, '#54443a'); });
