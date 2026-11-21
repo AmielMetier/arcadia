@@ -289,6 +289,23 @@ for nom, (fx, fy) in {'nw': (32, 0), 'n': (64, 0), 'ne': (96, 0), 'w': (32, 1), 
 T['x_nbr'] = FAL(192, 14743)
 for nom in ('mur_w', 'mur_c', 'mur_e'):   # la paroi d'une butte posée au-dessus d'une montagne : sur fond de roche
     T[f'x_nbf_{nom}_r'] = over(T['x_nbr'], T['x_nbf_' + nom])
+# grottes (world3d.js, paroiCell et sol des grottes) : la roche et le sol de grotte 4G de la démo technique de Pokémon SDK
+# (psdk_grotte.png, « 4g tileset_grotte ») ; plateau de roche 3 × 3 (x = 0 à 96, y = 32 à 128), sol uni en (192, 96).
+# Teintée selon la grotte : brune (terre, montagne), bleutée (grottes marines), rouge sombre (magma), givrée (glace).
+PSDK_GROTTE = L('psdk_grotte.png')
+
+
+def teinte(im, mul):
+    a = np.array(im).astype(float); a[..., :3] = np.clip(a[..., :3] * np.array(mul), 0, 255); return Image.fromarray(a.astype(np.uint8), 'RGBA')
+
+
+SOL_G = PSDK_GROTTE.crop((192, 96, 224, 128))
+for bio, mul in {'terre': (1.0, 0.96, 0.9), 'montagne': (1, 1, 1), 'mer': (0.85, 0.97, 1.12), 'magma': (1.05, 0.72, 0.62), 'glace': (1.08, 1.12, 1.25)}.items():
+    for R in range(3):
+        for C in range(3):
+            T[f'x_grp_{bio}_{R}{C}'] = teinte(PSDK_GROTTE.crop((32 * C, 32 + 32 * R, 32 * C + 32, 64 + 32 * R)), mul)
+    T[f'x_grs_{bio}_0'] = teinte(SOL_G, mul); T[f'x_grs_{bio}_1'] = flip(T[f'x_grs_{bio}_0'])
+T['cave0'] = T['x_grs_terre_0']; T['cave1'] = T['x_grs_terre_1']   # sol des grottes sans gradins : le même
 CENTRE, BOUTIQUE = L('centre_interieur.png'), L('boutique_interieur.png')
 T['floor_pink'] = cell(1, 10, CENTRE); T['floor_blue'] = cell(0, 5, BOUTIQUE)
 

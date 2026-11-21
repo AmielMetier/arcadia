@@ -839,7 +839,11 @@ export class WorldView {
         if (A.nbr && A.q_path_f && hasNbr8(x, y, (g) => g === T.PATH || g === T.STAIRS)) return { c: A.q_path_f };
         return { c: A[grassKey] };   // sous les montagnes du dehors
       }
-        if (this.tiers && A[`rp_${this.biome}_00`]) { const k = reliefKey(A, this.biome, 's', v); return { c: A[k] }; }
+        if (this.tiers && A[`rp_${this.biome}_00`]) {
+          // Noir & Blanc : le sol de grotte de la 4G (pack, grs_…)
+          const g = A[`grs_${this.biome}_${v < 0.7 ? 0 : 1}`]; if (g) return { c: g };
+          const k = reliefKey(A, this.biome, 's', v); return { c: A[k] };
+        }
         if (this.tiers && A[`rt_${this.biome}_0`] && !this.tierAt(x, y)) return { c: A[`rt_${this.biome}_${v < 0.7 ? 0 : 1}`], shade: 0.95 };
       // falls through
       case T.CAVE: { const k = reliefKey(A, this.biome, 's', v); return { c: k ? A[k] : A['cave' + (v < 0.5 ? 0 : 1)] }; }
@@ -900,6 +904,8 @@ export class WorldView {
     const m = this.map, A = this.A.cells, b = bio || this.biome;
     // au-dessus du sol généré (sol.js) : ses coins arrondis laissent voir le sol fin, pas l'ancien sol de la case
     const yh = this.sol.couvre() ? 0.0049 : 0.004;
+    // Noir & Blanc, dans les grottes : la roche de grotte de la 4G (pack, grp_…) ; dehors, la roche d'Odyssée
+    const rp = !m.outdoor && A[`grp_${b}_00`] ? 'grp' : 'rp';
     // dehors, les montagnes ont des gradins (massif, montagne de relief.js) : chaque gradin est un plateau de roche posé
     // sur le précédent, ses bords en pente comme ceux des grottes ; la roche plus basse est « dehors »
     // dans une montagne à gravir (relief.js, montagne), le sentier fait partie du gradin quand il est à sa hauteur (ou
@@ -921,7 +927,7 @@ export class WorldView {
       }
       // à côté d'un sentier (case praticable), le pied de la paroi laisse voir le sentier : pas de roche dessous
       const sol = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => m.in(x + dx, y + dy) && m.get(x + dx, y + dy) !== T.CAVEWALL);
-      if (bas && !sol) flat(G, x, y, x + 1, y + 1, yh - 0.0002, A[`rp_${b}_11`], 0.9);
+      if (bas && !sol) flat(G, x, y, x + 1, y + 1, yh - 0.0002, A[`${rp}_${b}_11`], 0.9);
       // le vide d'un ravin, seulement sous les quarts de case tournés vers lui (pas de noir qui déborde sur la roche)
       const vide = (a, c) => ravin(m, a, c) && m.get(a, c) === T.CAVEWALL;   // le gouffre (pas une passerelle)
       for (let qy = 0; qy < 2; qy++) for (let qx = 0; qx < 2; qx++) {
@@ -946,14 +952,14 @@ export class WorldView {
       const k = A[`rv_${b}_${Math.floor(v * 4)}`] || A[`rv_${b}_0`];
       if (k) { flat(G, x, y, x + 1, y + 1, yh, k); return; }
     }
-    if (!inner[0] && !inner[1] && open <= 1) {
+    if (rp === 'rp' && !inner[0] && !inner[1] && open <= 1) {   // (la roche de grotte du pack n'a pas de variantes)
       const alt = S ? pick('f', 4, 0.8) : N ? pick('n', 4, 0.8) : W ? pick('l', 3, 0.75) : E ? pick('e', 3, 0.75) : pick('q', 6, 0.4);
       if (alt) { flat(G, x, y, x + 1, y + 1, yh, alt); return; }
     }
     for (let qy = 0; qy < 2; qy++) for (let qx = 0; qx < 2; qx++) {
       let c = cols[qx], r = rows[qy];
       if (inner[qx] && !S) { if (qy === 1) { r = 5; c = qx ? 3 : 2; } else if (!N) { r = 4; c = qx ? 3 : 2; } }
-      const cell = A[`rp_${b}_${r >> 1}${c >> 1}`]; if (!cell) continue;
+      const cell = A[`${rp}_${b}_${r >> 1}${c >> 1}`]; if (!cell) continue;
       const hu = (cell[2] - cell[0]) / 2, hv = (cell[3] - cell[1]) / 2, u0 = cell[0] + (c & 1) * hu, v0 = cell[1] + (r & 1) * hv;
       // un soupçon de chevauchement entre les quarts : pas de fente d'un pixel où l'on verrait le sol
       const e = 1 / 128, ex0 = qx ? e : 0, ex1 = qx ? 0 : e, ez0 = qy ? e : 0, ez1 = qy ? 0 : e;

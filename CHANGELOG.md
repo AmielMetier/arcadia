@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 5.144 — 21 novembre 2026
+- **Odyssée** — Grottes plus lisibles (Odyssée 1.7).
+  - Dans les grottes sombres, le halo de lumière autour du joueur est bien plus grand, avec ou sans Flash.
+  - Avec les graphismes Noir & Blanc, la roche des grottes a son propre dessin, teinté selon la grotte (mine, grotte marine, magma, glace).
+
 ## 5.143 — 21 novembre 2026
 - **Odyssée** — Avec les graphismes Noir & Blanc, les montagnes reprennent le dessin d'Odyssée (Odyssée 1.6).
   - Gradins, falaises et sommets enneigés sont les mêmes qu'avec les graphismes de base, leurs roches passées en brun clair comme le reste du relief Noir & Blanc.
