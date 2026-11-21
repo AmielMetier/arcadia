@@ -305,7 +305,6 @@ for bio, mul in {'terre': (1.0, 0.96, 0.9), 'montagne': (1, 1, 1), 'mer': (0.85,
         for C in range(3):
             T[f'x_grp_{bio}_{R}{C}'] = teinte(PSDK_GROTTE.crop((32 * C, 32 + 32 * R, 32 * C + 32, 64 + 32 * R)), mul)
     T[f'x_grs_{bio}_0'] = teinte(SOL_G, mul); T[f'x_grs_{bio}_1'] = flip(T[f'x_grs_{bio}_0'])
-T['cave0'] = T['x_grs_terre_0']; T['cave1'] = T['x_grs_terre_1']   # sol des grottes sans gradins : le même
 CENTRE, BOUTIQUE = L('centre_interieur.png'), L('boutique_interieur.png')
 T['floor_pink'] = cell(1, 10, CENTRE); T['floor_blue'] = cell(0, 5, BOUTIQUE)
 

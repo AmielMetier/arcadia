@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.145 — 21 novembre 2026
+- **Odyssée** — Avec les graphismes Noir & Blanc, les donjons (Crypte des Murmures, Donjon des Miroirs, Sanctuaire des Trois Voies) retrouvent leur roche d'origine (Odyssée 1.8).
+
 ## 5.144 — 21 novembre 2026
 - **Odyssée** — Grottes plus lisibles (Odyssée 1.7).
   - Dans les grottes sombres, le halo de lumière autour du joueur est bien plus grand, avec ou sans Flash.

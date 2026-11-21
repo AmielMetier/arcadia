@@ -841,7 +841,7 @@ export class WorldView {
       }
         if (this.tiers && A[`rp_${this.biome}_00`]) {
           // Noir & Blanc : le sol de grotte de la 4G (pack, grs_…)
-          const g = A[`grs_${this.biome}_${v < 0.7 ? 0 : 1}`]; if (g) return { c: g };
+          const g = !m.donjon && A[`grs_${this.biome}_${v < 0.7 ? 0 : 1}`]; if (g) return { c: g };   // (pas dans les donjons)
           const k = reliefKey(A, this.biome, 's', v); return { c: A[k] };
         }
         if (this.tiers && A[`rt_${this.biome}_0`] && !this.tierAt(x, y)) return { c: A[`rt_${this.biome}_${v < 0.7 ? 0 : 1}`], shade: 0.95 };
@@ -904,8 +904,8 @@ export class WorldView {
     const m = this.map, A = this.A.cells, b = bio || this.biome;
     // au-dessus du sol généré (sol.js) : ses coins arrondis laissent voir le sol fin, pas l'ancien sol de la case
     const yh = this.sol.couvre() ? 0.0049 : 0.004;
-    // Noir & Blanc, dans les grottes : la roche de grotte de la 4G (pack, grp_…) ; dehors, la roche d'Odyssée
-    const rp = !m.outdoor && A[`grp_${b}_00`] ? 'grp' : 'rp';
+    // Noir & Blanc, dans les grottes : la roche de grotte de la 4G (pack, grp_…) ; dehors et dans les donjons, la roche d'Odyssée
+    const rp = !m.outdoor && !m.donjon && A[`grp_${b}_00`] ? 'grp' : 'rp';
     // dehors, les montagnes ont des gradins (massif, montagne de relief.js) : chaque gradin est un plateau de roche posé
     // sur le précédent, ses bords en pente comme ceux des grottes ; la roche plus basse est « dehors »
     // dans une montagne à gravir (relief.js, montagne), le sentier fait partie du gradin quand il est à sa hauteur (ou
