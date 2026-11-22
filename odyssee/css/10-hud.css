@@ -422,3 +422,5 @@
 /* interface repliée (par défaut) : rien par-dessus la carte, comme dans un jeu Pokémon ; U la réaffiche */
 .hud.collapsed .hud-gear { display: none; }
 .hud-off > .keybar { display: none; }
+/* pendant un dialogue, la barre des touches s'efface : elle passait par-dessus la boîte de texte */
+#ui:has(> .dlg) > .keybar { display: none; }

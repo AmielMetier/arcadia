@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 5.150 — 22 novembre 2026
+- **Odyssée** — En combat, les Pokémon respirent sans se déformer : ils montent et descendent d'un bloc, leurs pixels ne tremblent plus (Odyssée 2.3).
+  - La barre des touches ne passe plus devant la boîte de texte quand un message s'ouvre.
+
 ## 5.149 — 22 novembre 2026
 - **Odyssée** — Une présentation plus proche d'un vrai jeu Pokémon (Odyssée 2.2) :
   - Plus rien par-dessus la carte au premier lancement : le HUD et la barre des touches se montrent avec U, ou dans Options → HUD (masqué, petit, moyen ou grand).

@@ -217,9 +217,9 @@ export class BattleView {
       const low = mon && mon.hp > 0 && mon.hp <= mon.stats[0] * 0.25;
       const spd = slp ? 0.002 : low ? 0.0075 : 0.0046;
       const wave = Math.sin(now * spd + phaseOff);
-      const idleAnim = o.dy === 0 && o.scale === 1 && !mon?.hp === false;
-      const breathX = idleAnim ? 1 + wave * (slp ? 0.018 : 0.024) : 1;
-      const breathY = idleAnim ? 1 - wave * (slp ? 0.022 : 0.03) : 1;
+      // respiration : le sprite monte et descend d'un pixel entier (drawY arrondi), sans jamais être étiré : un sprite
+      // redimensionné à chaque image fait onduler ses pixels
+      const breathX = 1, breathY = 1;
       const jitX = par && Math.sin(now * 0.03 + phaseOff) > 0.92 ? (Math.sin(now) > 0 ? 1 : -1) : 0;
 
       const w = img.width * o.scale * bs * (o.sx || 1) * breathX;
