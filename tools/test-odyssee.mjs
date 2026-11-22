@@ -85,6 +85,9 @@ const { buildWorld } = await import('../odyssee/js/world/region.js');
 const { T, walkable } = await import('../odyssee/js/world/tiles.js');
 const { maps, towns, legends, docks } = buildWorld();
 const W = maps.monde;
+// le cache des étapes lentes (world/cache-monde.js) doit correspondre à la carte : sinon le jeu démarre plus lentement
+{ const { MANQUES } = await import('../odyssee/js/world/cache-monde.js');
+  if (MANQUES.length) { console.log(`✗ cache du monde périmé (${MANQUES.join(', ')}) : node tools/odyssee-cache-monde.mjs`); fails++; } }
 // exploration à travers les grottes : chaque sortie de grotte relance l'exploration du monde ; le bateau (permis bateau
 // dès 2 badges) relie entre eux les quais atteints, selon les badges que demande chaque quai
 // gates : true ou nombre de badges ; abil : true (Coupe, Surf, Éclate-Roc) ou Set des cases franchissables

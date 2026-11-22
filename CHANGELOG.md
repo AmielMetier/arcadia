@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.147 — 22 novembre 2026
+- **Odyssée** — le jeu démarre encore plus vite : une partie de la carte est préparée d'avance, l'écran de chargement dure environ 7 secondes de moins (Odyssée 2.0).
+
 ## 5.146 — 22 novembre 2026
 - **Odyssée** — le jeu démarre presque deux fois plus vite : l'écran de chargement dure une quinzaine de secondes de moins (Odyssée 1.9).
 

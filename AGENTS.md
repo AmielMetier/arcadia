@@ -111,7 +111,11 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   (portes, grottes, PNJ, objets, arènes) est accessible depuis Bourg-Aube sans qu'un PNJ ne bloque le passage, et que la progression
   tient (avec k badges et les capacités de terrain qu'ils débloquent, l'arène k+1 est ouverte mais pas la suivante ; Ligue à 8 badges ;
   depuis chaque quai du bateau, les légendaires de l'île sont accessibles avec les bons badges et leurs quêtes) :
-  à lancer quand on touche au moteur (`odyssee/js/core/`) ou à la carte (`odyssee/js/world/`). Les données des Pokémon (`odyssee/js/data/`)
+  à lancer quand on touche au moteur (`odyssee/js/core/`) ou à la carte (`odyssee/js/world/`).
+  Cache du monde : les étapes lentes de la construction de la carte qui ne changent que des cases (écrans de verdure, ponts, plages) sont
+  calculées d'avance dans `odyssee/js/data/monde-cache.js` (`memoCases` de `odyssee/js/world/cache-monde.js`, contrôlé par une empreinte de la carte) :
+  après toute modification de la carte, relancer `node tools/odyssee-cache-monde.mjs` (`--check` pour vérifier ; `test-odyssee.mjs` échoue s'il est périmé).
+  Sans ça le jeu reste juste, mais démarre plusieurs secondes plus lentement. Les données des Pokémon (`odyssee/js/data/`)
   sont générées par `tools/odyssee-donnees.mjs` à partir des tables de PokeAPI (leurs sprites viennent de PokeAPI : des remplaçants) ;
   les créatures originales sont dans `odyssee/js/data/creatures.js`. Les dessins d'origine (1024 px) sont dans `assets/graphics/`
   (portraits : `portrait_nom.png`) ; `python3 tools/odyssee-sprites.py [chars portraits crea items nature mobilier sol facades title]`

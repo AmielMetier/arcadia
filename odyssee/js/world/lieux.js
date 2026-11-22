@@ -6,6 +6,7 @@
 //   - sinon un paysage vu de loin : lac caché, piton rocheux, colline boisée, pinède.
 // Un lieu reste dans son bloc, à trois cases du bord au moins : il ne relie jamais deux routes entre elles. Les PNJ et les
 // objets ont des identifiants fixes (`lieu:<bloc>:…`), tirés dans l'ordre des blocs.
+import { memoCases } from './cache-monde.js';
 import { T, walkable } from './tiles.js';
 import { rng, sin, cos } from './mapgen.js';
 import { plateau, massif, sinueuse } from './relief.js';
@@ -67,7 +68,7 @@ export function lieux(W, { maps, trainerNpc, ENC }) {
   }
   W.carrefours = carrefours;   // leurs panneaux sont posés après les écrans de verdure (panneauxDesLieux)
   fondDePaysage();
-  plages();
+  memoCases('plages', W, plages);   // ne change que des cases : calculées d'avance (cache-monde.js)
   return { lieux: nLieux, fond: nFond };
 
   /** les côtes : là où la forêt tombe dans la mer loin de tout passage, une plage de sable (2 à 4 cases), des rochers,

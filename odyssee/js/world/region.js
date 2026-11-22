@@ -6,6 +6,7 @@
 // À l'est, trois îles desservies par le bateau de l'Embarcadère de l'Aube (2, 3 et 5 badges), avec les quêtes des
 // légendaires (renvoyées dans `legends`, les quais dans `docks`).
 // Noms de lieux et personnages originaux ; les créatures du jeu côtoient les Pokémon du prototype.
+import { memoCases } from './cache-monde.js';
 import { T, DIRS, walkable, isGrassEnc } from './tiles.js';
 import { GameMap, carveRoute, carveTown, ledges, along, nearestWalkable, caseLibre, rng, GRAND, sin, cos, hauteurVue } from './mapgen.js';
 import { centerInterior, martInterior, houseInterior, labInterior, gymInterior, leagueInterior, dojoInterior, caveMap } from './interiors.js';
@@ -1441,7 +1442,7 @@ export function buildWorld() {
   for (const [k, t] of Object.entries(towns)) if (VILLES[k]?.releve) relever(W, t);
   // des écrans de verdure entre les zones : d'une ville, d'une route ou d'un lieu, on ne voit jamais une autre zone qu'on
   // ne peut pas rejoindre de près (ecrans.js)
-  { const t0 = performance.now(); W.ecrans = ecrans(W); W.ecrans.ms = Math.round(performance.now() - t0); }
+  { const t0 = performance.now(); W.ecrans = memoCases('ecrans', W, () => ecrans(W)); W.ecrans.ms = Math.round(performance.now() - t0); }
   // un panneau au départ du sentier de chaque lieu habité (hameau, ferme, verger)
   W.panneauxLieux = panneauxDesLieux(W);
   // après la Ligue : les légendaires qu'on ne trouvait nulle part, au bord des routes (apres-ligue.js)
@@ -1451,7 +1452,7 @@ export function buildWorld() {
   // petites barrières de bois le long des chemins des routes (jamais là où elles couperaient un passage)
   fenceRoutes(W, legends);
   // les ponts au propre : droits, d'une ou deux cases de large, jamais deux côte à côte (ponts.js)
-  W.ponts = redresserPonts(W);
+  W.ponts = memoCases('ponts', W, () => redresserPonts(W));
   // finitions (acces.js) : des tourbillons au large, à la limite de la marge (on ne voit jamais le bord de la carte) ;
   // ce qu'on n'atteint jamais redevient forêt ; rien ne bouche un passage ; objets selon l'avancement (bareme.js)
   { const mer = mers(W); W.finitions = { tourbillons: tourbillonsDuBord(W, mer) };
