@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.152 — 22 novembre 2026
+- **Odyssée** — L'écran de combat est plus net : tous ses pixels ont la même taille, quelle que soit la taille de la fenêtre (Odyssée 2.5).
+
 ## 5.151 — 22 novembre 2026
 - **Odyssée** — Écran titre plus sobre : « Appuie sur Entrée », la version en petit dans un coin (Odyssée 2.4).
   - Dans la cinématique d'ouverture, le bouton « Passer » est en haut à droite et ne cache plus les sous-titres.

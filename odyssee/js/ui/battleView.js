@@ -155,6 +155,7 @@ export class BattleView {
   frame = () => {
     if (!this.alive) return;
     const x = this.ctx, W = this.W, s = this.st, now = performance.now();
+    x.setTransform(this.k || 1, 0, 0, this.k || 1, 0, 0);   // coordonnées de la scène (W × 192)
     x.imageSmoothingEnabled = false;
     x.clearRect(0, 0, W, BH);
     x.save(); x.translate(Math.round(s.shakeX), Math.round(s.shakeY));
@@ -414,7 +415,11 @@ export class BattleView {
   buildDom() {
     const sl = this.slots || 1;
     const r = el('div', `battle slots-${sl}${sl > 1 ? ' multi' : ''}${this.battle?.monde ? ' raid-monde' : ''}`); this.root = r;
-    const cv = el('canvas', 'bcv'); cv.width = this.W; cv.height = BH; r.appendChild(cv);
+    // dessiné à un multiple entier de la scène (192 px de haut ×4 en 720p), au pixel près, puis à peine réduit par le
+    // navigateur pour remplir l'écran : tous les pixels ont la même taille (agrandi directement ×3,75, ils faisaient
+    // tantôt 3, tantôt 4 points)
+    this.k = Math.max(1, Math.ceil(innerHeight / BH));
+    const cv = el('canvas', 'bcv'); cv.width = this.W * this.k; cv.height = BH * this.k; r.appendChild(cv);
     this.ctx = cv.getContext('2d');
     if (sl === 1) {
       r.insertAdjacentHTML('beforeend', `

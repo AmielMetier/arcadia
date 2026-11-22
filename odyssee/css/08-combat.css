@@ -10,7 +10,7 @@
   font-size: calc(var(--bp) * 8);
   --px: calc(var(--bp) * 0.85);
 }
-.bcv { width: 100%; height: 100%; image-rendering: pixelated; }
+.bcv { width: 100%; height: 100%; image-rendering: auto; }   /* déjà agrandie au pixel près (battleView.js), juste réduite d'un poil : lissée */
 
 /* Boîtes de statut 5G (Noir 2 / Blanc 2) ancrées aux bords */
 .bhud {
