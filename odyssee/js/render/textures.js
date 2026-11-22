@@ -610,16 +610,21 @@ export function buildSprites() {
 /** dens : densité de chaque image (2 = dessin « version 2 », deux fois plus fin que les tuiles du décor) */
 export function applySpriteImages(S, images, dens = {}) {
   const ctx = S.canvas.getContext('2d');
+  // le test « case vide » se fait sur un petit canevas lu par le processeur : relire la planche après chaque image
+  // forcerait la carte graphique à se synchroniser des centaines de fois (près de 20 s au démarrage)
+  const sonde = document.createElement('canvas'), sx = sonde.getContext('2d', { willReadFrequently: true });
   let x = 0, y = 96, rowH = 0;
   for (const [k, img] of Object.entries(images)) {
     if (!img) continue;
     const w = img.width, h = img.height;
     if (x + w > S.size) { x = 0; y += rowH + 2; rowH = 0; }
     if (y + h > S.size) { console.warn('planche des sprites pleine :', k); break; }
-    ctx.clearRect(x, y, w, h); ctx.drawImage(img, x, y);
     // case vide sur la planche (découpe ratée) : on garde le dessin procédural
-    const px = ctx.getImageData(x, y, w, h).data; let any = false; for (let i = 3; i < px.length; i += 4) if (px[i] > 0) { any = true; break; }
-    if (!any) { ctx.clearRect(x, y, w, h); continue; }
+    if (sonde.width < w || sonde.height < h) { sonde.width = Math.max(sonde.width, w); sonde.height = Math.max(sonde.height, h); }
+    sx.clearRect(0, 0, w, h); sx.drawImage(img, 0, 0);
+    const px = sx.getImageData(0, 0, w, h).data; let any = false; for (let i = 3; i < px.length; i += 4) if (px[i] > 0) { any = true; break; }
+    if (!any) continue;
+    ctx.clearRect(x, y, w, h); ctx.drawImage(img, x, y);
     S.rects[k] = { x, y, w, h, d: dens[k] || 1, u0: x / S.size, v0: y / S.size, u1: (x + w) / S.size, v1: (y + h) / S.size };
     x += w + 2; rowH = Math.max(rowH, h);
   }

@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.146 — 22 novembre 2026
+- **Odyssée** — le jeu démarre presque deux fois plus vite : l'écran de chargement dure une quinzaine de secondes de moins (Odyssée 1.9).
+
 ## 5.145 — 21 novembre 2026
 - **Odyssée** — Avec les graphismes Noir & Blanc, les donjons (Crypte des Murmures, Donjon des Miroirs, Sanctuaire des Trois Voies) retrouvent leur roche d'origine (Odyssée 1.8).
 
