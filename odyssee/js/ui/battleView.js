@@ -10,6 +10,25 @@ import { typeEff } from '../core/battle.js';
 import { moveDesc } from '../data/moveDescriptions.js';
 import { playMoveVfx, TYPE_FX } from './battleVfx.js';
 import { auraFrames, AURA_PAD } from '../render/aura.js';
+import { TALENTS_ESPECES } from '../data/talents.js';
+
+/** vide transparent sous les pattes d'un sprite (en pixels de l'image), mesuré une fois par image */
+const PIEDS = new Map();
+function videSous(img) {
+  const k = img?.src || img; if (!img) return 0;
+  if (PIEDS.has(k)) return PIEDS.get(k);
+  let v = 0;
+  try {
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height).data;
+    bas: for (let y = c.height - 1; y >= 0; y--) { for (let i = 0; i < c.width; i++) if (d[(y * c.width + i) * 4 + 3] > 32) break bas; v++; }
+    if (v >= c.height) v = 0;
+  } catch (e) { v = 0; }
+  PIEDS.set(k, v); return v;
+}
+/** les Pokémon qui lévitent (Fantominus, Smogo…) gardent la hauteur de leur sprite : ils flottent au-dessus du socle */
+const levite = (sp) => (TALENTS_ESPECES[sp] || TALENTS_ESPECES[SPECIES[sp]?.base] || []).includes('levitate');
 
 const BH = 192;
 const BALL_COL = { 'poke-ball': ['#e83838', '#f4f4f4'], 'great-ball': ['#3870e8', '#f4f4f4'], 'ultra-ball': ['#303030', '#f0c830'], 'master-ball': ['#8a3ac8', '#f4f4f4'], 'gs-ball': ['#d8a830', '#c8c8d0'] };
@@ -228,7 +247,9 @@ export class BattleView {
       const dy = o.dy + (o.dy === 0 && o.scale === 1 ? wave * 1.1 : 0);
       x.save(); x.globalAlpha = o.alpha;
       if (o.clipY != null) { x.beginPath(); x.rect(0, 0, W, cy + o.clipY); x.clip(); }
-      const drawX = Math.round(cx + o.dx + jitX), drawY = Math.round(cy + dy);
+      // pattes au milieu de l'ombre (6 px au-dessus de l'ancre des sprites de face), quelle que soit la marge du sprite
+      const sol = o.pied != null ? o.pied * (h / img.height) - 6 : 0;
+      const drawX = Math.round(cx + o.dx + jitX), drawY = Math.round(cy + dy + sol);
       if (o.aura && !o.rot && !(o.white > 0.5) && !o.dark) {
         const fr = o.aura[Math.floor(now / 130) % o.aura.length], kx = w / img.width, ky = h / img.height;
         x.drawImage(fr, Math.round(drawX - w / 2 - AURA_PAD * kx), Math.round(drawY - h - AURA_PAD * ky), Math.round(fr.width * kx), Math.round(fr.height * ky));
@@ -931,6 +952,8 @@ export class BattleView {
     if (!m) { o.img = null; o.visible = false; return; }
     o.img = await loadImg(side === 1 ? ASSETS.front(m.sp, m.shiny, m.shadow) : ASSETS.back(m.sp, m.shiny, m.shadow));
     o.whiteImg = null; o.darkImg = null;
+    // l'adversaire pose ses pattes sur le socle (le sprite a un vide transparent dessous, différent pour chaque espèce)
+    o.pied = side === 1 && o.img && !levite(m.sp) ? videSous(o.img) : null;
     // boss de raid : son aura (bleue, rouge ou or) ondule derrière lui
     o.aura = side === 1 && this.battle.aura && o.img ? auraFrames(o.img, this.battle.aura).frames : null;
     if (!o.img) { const c = document.createElement('canvas'); c.width = c.height = 80; const x = c.getContext('2d'); x.fillStyle = TYPE_COL[SPECIES[m.sp].t[0]]; x.beginPath(); x.arc(40, 50, 24, 0, 7); x.fill(); x.fillStyle = '#fff'; x.font = '20px sans-serif'; x.fillText('?', 34, 58); o.img = c; }

@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.153 — 22 novembre 2026
+- **Odyssée** — En combat, le Pokémon adverse a les pattes posées sur son socle au lieu de flotter au-dessus ; ceux qui lévitent (Fantominus, Smogo…) restent en l'air (Odyssée 2.6).
+
 ## 5.152 — 22 novembre 2026
 - **Odyssée** — L'écran de combat est plus net : tous ses pixels ont la même taille, quelle que soit la taille de la fenêtre (Odyssée 2.5).
 
