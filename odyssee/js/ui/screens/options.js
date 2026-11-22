@@ -22,7 +22,7 @@ export function optionsScreen(game) {
       ['Pokémon qui suit', game.followOff ? 'Non' : 'Oui'],
       ['Style musical', snd.style === 'retro' ? 'Rétro (8 bits)' : 'Moderne'],
       ['Barre Habitat (DexNav)', game.hud?.dexnavHidden ? 'Masquée' : 'Affichée'],
-      ['Taille du HUD', game.hud?.tailleNom?.() || 'Moyen'],
+      ['HUD (touche U)', game.hud?.reglage?.() || 'Masqué'],
       ['Graphismes', nom(SOLS_CHOIX, solChoix())],
       ['Sprites des Pokémon', nom(SPRITES_CHOIX, spritesChoix())],
       ['Rendu', natif() ? 'Net (écrans 4K)' : 'Classique'],
@@ -51,7 +51,7 @@ export function optionsScreen(game) {
         if (i === 2) snd.setVolume(Math.max(0, Math.min(1, Math.round(snd.vol * 10 + d) / 10)));
         if (i === 4) snd.setStyle?.(snd.style === 'retro' ? 'moderne' : 'retro');
         if (i === 5) game.hud?.setDexnavHidden?.(!game.hud.dexnavHidden);
-        if (i === 6) game.hud?.changerTaille?.(d);
+        if (i === 6) game.hud?.changerReglage?.(d);
         if (i === 7) { const L = SOLS_CHOIX, j = (L.findIndex((c) => c.id === solChoix()) + d + L.length) % L.length; choisirSol(L[j].id); marquerGfxChoisi(); solChange = solChoix() !== solInitial; }
         if (i === 8) { const L = SPRITES_CHOIX, j = (L.findIndex((c) => c.id === spritesChoix()) + d + L.length) % L.length; choisirSprites(L[j].id); }
         // rendu net : la géométrie (bâtiments, relief) est tracée à la résolution de l'écran ; appliqué tout de suite

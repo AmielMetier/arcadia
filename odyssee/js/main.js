@@ -1,6 +1,7 @@
 // odyssee/js/main.js — démarrage : images dessinées, rendu basse résolution, écran titre (Odyssor sur la mer),
 // nouvelle partie / continuer, aide des touches
 import * as THREE from 'three';
+import { clavierNom } from './ui/clavier.js';
 import { WorldView } from './render/world3d.js';
 import { setArt } from './render/textures.js';
 import { packActif, solChoix, choisirSol, choisirSprites, aChoisiGfx, marquerGfxChoisi } from './gfx.js';
@@ -470,56 +471,10 @@ function chooseGenderCard(ui, input, sound, parent) {
   });
 }
 
+/** la carte d'enregistrement de l'introduction : le prénom, sur le clavier en grille (ui/clavier.js) */
 function chooseTrainerName(ui, input, sound, gender, parent) {
-  return new Promise((resolve) => {
-    const def = gender === 'f' ? 'Lyra' : 'Ethan';
-    const presets = gender === 'f'
-      ? ['Lyra', 'Céleste', 'Aurore', 'Marina', 'Luna', 'Iris']
-      : ['Ethan', 'Sacha', 'Léo', 'Orion', 'Marin', 'Solal'];
-    const spr = gender === 'f' ? 'img/dresseurs/player_f.png' : 'img/dresseurs/player_m.png';
-    const card = el('div', 'intro-idcard', `
-      <div class="intro-id-left">
-        <img src="${spr}" alt="">
-        <div class="intro-id-badge">BOURG-AUBE · LIGUE D'ODYSSÉE</div>
-      </div>
-      <div class="intro-id-right">
-        <div class="intro-id-head">Carte d'enregistrement · Quel est ton prénom ?</div>
-        <input class="intro-id-in" maxlength="10" spellcheck="false" autocomplete="off" value="${esc(def)}">
-        <div class="intro-id-chips">
-          ${presets.map((p) => `<button type="button" class="intro-id-chip" data-name="${esc(p)}">${esc(p)}</button>`).join('')}
-        </div>
-        <div class="intro-id-foot">
-          <span class="intro-id-hint">Tape ton prénom (max 10 lettres) ou choisis une suggestion</span>
-          <button type="button" class="intro-id-ok">Valider ▸</button>
-        </div>
-      </div>
-    `);
-    parent.appendChild(card);
-    const inp = card.querySelector('.intro-id-in');
-    const okBtn = card.querySelector('.intro-id-ok');
-    setTimeout(() => { inp.focus(); inp.select(); }, 30);
-    const pop = input.push(() => {});
-    const submit = () => {
-      const v = inp.value.trim() || def;
-      pop();
-      card.remove();
-      sound.sfx('select');
-      resolve(v);
-    };
-    card.querySelectorAll('.intro-id-chip').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        sound.sfx('blip');
-        inp.value = btn.dataset.name;
-        inp.focus();
-      });
-    });
-    okBtn.addEventListener('click', (e) => { e.stopPropagation(); submit(); });
-    inp.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); submit(); }
-      e.stopPropagation();
-    });
-  });
+  return clavierNom(ui, { titre: 'Quel est ton prénom ?', def: gender === 'f' ? 'Lyra' : 'Ethan', max: 10,
+    sprite: gender === 'f' ? 'img/dresseurs/player_f.png' : 'img/dresseurs/player_m.png', parent });
 }
 
 async function intro(game, ui, sound) {

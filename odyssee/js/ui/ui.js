@@ -1,4 +1,5 @@
 // odyssee/js/ui/ui.js — briques d'interface façon DS : boîte de dialogue, choix, listes, bandeau de lieu, fondus
+import { clavierNom } from './clavier.js';
 export const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 export const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 export const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -151,20 +152,9 @@ export class UI {
     });
   }
 
-  /** saisie d'un nom (clavier de l'ordinateur) */
+  /** saisie d'un nom : clavier en grille façon DS (ui/clavier.js) */
   nameEntry(title, def) {
-    return new Promise((resolve) => {
-      const w = el('div', 'screen name-screen');
-      w.innerHTML = `<div class="box name-box"><div class="list-title">${esc(title)}</div><input class="name-in" maxlength="10" spellcheck="false" autocomplete="off"><div class="hint">Tape un nom puis appuie sur Entrée</div></div>`;
-      this.root.appendChild(w);
-      const inp = w.querySelector('input'); inp.value = def || ''; setTimeout(() => { inp.focus(); inp.select(); }, 30);
-      const pop = this.input.push(() => {});
-      inp.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); const v = inp.value.trim() || def; pop(); w.remove(); this.sound.sfx('select'); resolve(v); }
-        e.stopPropagation();
-      });
-      inp.addEventListener('blur', () => setTimeout(() => inp.isConnected && inp.focus(), 10));
-    });
+    return clavierNom(this, { titre: title, def, max: Math.max(10, String(def || '').length) });
   }
 
   /* ---------------- effets d'écran ---------------- */
@@ -275,7 +265,7 @@ export class UI {
       <tr><td>Menu (équipe, sac, sauvegarde…)</td><td><kbd>Échap</kbd>, <kbd>Tab</kbd> ou <kbd>M</kbd></td></tr>
       <tr><td>Carte de la région</td><td><kbd>C</kbd></td></tr>
       <tr><td>Journal Quêtes / Trophées</td><td><kbd>Q</kbd> (Quêtes) · <kbd>T</kbd> (Trophées & Médailles)</td></tr>
-      <tr><td>Afficher / replier le HUD</td><td><kbd>U</kbd> (ou clic sur ▴ / ▾)</td></tr>
+      <tr><td>Afficher / masquer le HUD</td><td><kbd>U</kbd> (ou Options → HUD)</td></tr>
       <tr><td>Pêche & Capacités</td><td>Face à l'eau (Canne à Pêche / Surf), un arbre ou un rocher : <kbd>F</kbd></td></tr>
       <tr><td>Lancer rapide de Ball</td><td>En combat sauvage : <kbd>B</kbd> ou clic sur le bandeau tactile</td></tr>
       <tr><td>Objet Enregistré</td><td><kbd>Y</kbd> (ou bouton Y du HUD)</td></tr>

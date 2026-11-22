@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 5.149 — 22 novembre 2026
+- **Odyssée** — Une présentation plus proche d'un vrai jeu Pokémon (Odyssée 2.2) :
+  - Plus rien par-dessus la carte au premier lancement : le HUD et la barre des touches se montrent avec U, ou dans Options → HUD (masqué, petit, moyen ou grand).
+  - Les pièces qui tiennent à l'écran (maisons, Centre Pokémon, boutiques) s'affichent en entier dès qu'on entre, au lieu de couper le comptoir en haut.
+  - Le prénom se choisit sur un clavier en grille façon DS (majuscules, minuscules, accents), aux flèches ou en tapant directement.
+  - Le choix des graphismes prend le style des menus du jeu, et le texte du professeur n'est plus décalé dans sa boîte.
+
 ## 5.148 — 22 novembre 2026
 - **Odyssée** — L'image reste nette quelle que soit la largeur de la fenêtre : une colonne de pixels ne tressaute plus quand le décor défile (Odyssée 2.1).
 

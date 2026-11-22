@@ -2307,6 +2307,7 @@ export class WorldView {
 
   /* ---------------- image ---------------- */
   update(dt, fx, fy) {
+    const px = fx, py = fy;   // position du joueur (fx, fy deviennent le point visé par la caméra)
     this.ensureChunks(fx, fy);
     if (Math.abs(this.ombre - this.ombreCible) > 0.002) { this.ombre += (this.ombreCible - this.ombre) * Math.min(1, dt * 2.5); this.applyTint(this.tintBase); }
     this.sol.update(dt, Math.floor(fx / CH), Math.floor(fy / CH), fx + 0.5, fy + 0.5);
@@ -2316,6 +2317,14 @@ export class WorldView {
       const ctx = this.N.canvas.getContext('2d'); ctx.clearRect(0, 0, this.N.canvas.width, this.N.canvas.height); ctx.drawImage(this.N.frames[this.animFrame], 0, 0); this.texN.needsUpdate = true;
     }
     const estOrtho = !!(this.r3d ? this.r3dOrtho : (this.batPack && this.map?.outdoor && this.orthoPref));
+    // intérieurs éclairés : une pièce qui tient à l'écran est cadrée en entier (centrée) au lieu de suivre le joueur, comme
+    // une pièce de jeu Pokémon ; pas dans les grottes sombres (leur halo est au centre de l'écran) ni dans les donjons
+    const cm = this.map;
+    if (cm && !cm.outdoor && !cm.dark && !cm.donjon) {
+      const u = SPRITE_UNIFORMS.uRes.value, q = (this.zoom || 1) / (TILE_PX * (this.kPx || 1));
+      if (cm.w <= u.x * q) fx = cm.w / 2 - 0.5;
+      if (cm.h + 0.6 <= u.y * q) fy = (cm.h - 0.6) / 2 - 0.5;
+    }
     this.focus.set(fx + 0.5, 0, fy + 0.5);
     if (this.r3d) {
       // relief en 3D : la caméra suit la hauteur du sol, calée sur la grille des pixels (rien ne « nage » en marchant)
@@ -2325,7 +2334,7 @@ export class WorldView {
     } else if (estOrtho) {
       this.focus.set(Math.round((fx + 0.5) * TILE_PX) / TILE_PX, 0, Math.round((fy + 0.5) * TILE_PX) / TILE_PX);
     }
-    this.fadeBuildings(fx, fy, dt);
+    this.fadeBuildings(px, py, dt);
     if (this.portesAnim?.size) for (const t of this.portesAnim) {
       const u = t.userData; u.k += Math.sign(u.cible - u.k) * Math.min(Math.abs(u.cible - u.k), dt / 0.2);
       const cran = Math.ceil(u.k * 3 - 1e-6) / 3;          // trois crans nets, pas un glissement
@@ -2361,7 +2370,7 @@ export class WorldView {
     this.camera.lookAt(this.focus.x, this.focus.y, this.focus.z);
     if (this.weather) this.weather.sol = this.focus.y + 0.02;   // les gouttes éclaboussent le sol où l'on marche
     this.weather?.update(dt, this.focus.x, this.focus.z);
-    this.ambiance.maj(dt, fx, fy);
+    this.ambiance.maj(dt, px, py);
   }
   setWeather(w) { const a = this.weather?.current; this.weather?.setWeather(w); if (this.weather && this.weather.current !== a && this.tintBase) this.applyTint(this.tintBase); }
   render() { this.renderer.render(this.scene, this.camera); }

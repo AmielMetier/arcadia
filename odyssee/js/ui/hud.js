@@ -27,7 +27,9 @@ export class Hud {
     this.dexnavCollapsed = false;
     this.guideExpanded = false;
     this._guidePos = '';
-    try { this.collapsed = localStorage.getItem('odyssee-hud-collapsed') === '1'; } catch (e) {}
+    // repliée par défaut, comme un jeu Pokémon : rien par-dessus la carte (U, ou le bouton du menu, l'affiche)
+    this.collapsed = true;
+    try { this.collapsed = localStorage.getItem('odyssee-hud-collapsed') !== '0'; } catch (e) {}
     try { this.dexnavCollapsed = localStorage.getItem('odyssee-dexnav-collapsed') === '1'; } catch (e) {}
     this.dexnavHidden = false;
     try { this.dexnavHidden = localStorage.getItem('odyssee-dexnav-hidden') === '1'; } catch (e) {}
@@ -41,6 +43,7 @@ export class Hud {
     this.gearEl = el('div', 'hud-gear');
     this.root.append(this.partyEl, this.gearEl);
     game.ui.root.appendChild(this.root);
+    game.ui.root.classList.toggle('hud-off', this.collapsed);   // la barre des touches suit (css/10-hud.css)
 
     this.bindEvents();
   }
@@ -60,11 +63,19 @@ export class Hud {
     this.update(true);
   }
 
+  /** Options → HUD : masqué, ou affiché à l'une des trois tailles */
+  reglage() { return this.collapsed ? 'Masqué' : this.tailleNom(); }
+  changerReglage(d) {
+    const n = TAILLES.length + 1, j = ((this.collapsed ? 0 : this.taille + 1) + d + n) % n;
+    if (j > 0) { this.taille = j - 1; try { localStorage.setItem('odyssee-hud-taille', String(this.taille)); } catch (e) {} this.root.style.setProperty('--hud-k', TAILLES[this.taille][1]); }
+    if ((j === 0) !== this.collapsed) { this.toggle(); }
+  }
   toggle() {
     this.collapsed = !this.collapsed;
     this.swapFrom = -1;
     try { localStorage.setItem('odyssee-hud-collapsed', this.collapsed ? '1' : '0'); } catch (e) {}
     this.root.classList.toggle('collapsed', this.collapsed);
+    this.game.ui.root.classList.toggle('hud-off', this.collapsed);
     this.game.sound.sfx('blip');
     this.update(true);
   }
