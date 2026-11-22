@@ -85,3 +85,6 @@ html.doigt .keyhint b, html.doigt .keyhint:first-child, html.doigt .title-foot {
 #tourne small { display: block; margin-top: 6px; font-size: 14px; font-weight: 500; opacity: .75; }
 @keyframes tourne { 0%, 20% { transform: rotate(0); } 60%, 100% { transform: rotate(90deg); } }
 @media (orientation: portrait) and (pointer: coarse) and (max-width: 600px) { #tourne { display: flex; } }
+
+/* écran titre : la version, discrète, dans le coin (comme la mention en bas d'un écran titre de jeu) */
+.title-scr .title-foot { right: calc(var(--px) * 5); bottom: calc(var(--px) * 3); font-size: calc(var(--px) * 5); opacity: .55; }

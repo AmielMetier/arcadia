@@ -1,8 +1,8 @@
 /* ---------------- cinématique d'ouverture (Nouvelle partie) ---------------- */
 .cine-scr { background: #000; display: flex; align-items: center; justify-content: center; z-index: 45; overflow: hidden; }
 .cine-vid { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
-.cine-skip { position: absolute; right: calc(var(--px) * 10); bottom: calc(var(--px) * 8); z-index: 46;
-  font: inherit; font-size: calc(var(--px) * 7.5); font-weight: 600; color: rgba(255, 250, 232, .92);
+.cine-skip { position: absolute; right: calc(var(--px) * 8); top: calc(var(--px) * 6); z-index: 46;   /* en haut : les sous-titres de la vidéo sont en bas */
+  font: inherit; font-size: calc(var(--px) * 6); font-weight: 600; color: rgba(255, 250, 232, .8);
   background: rgba(14, 22, 38, .72); border: calc(var(--px) * 1) solid rgba(184, 210, 244, .55);
   border-radius: calc(var(--px) * 4); padding: calc(var(--px) * 3) calc(var(--px) * 6);
   box-shadow: 0 calc(var(--px) * 2) calc(var(--px) * 6) rgba(0, 0, 0, .6);

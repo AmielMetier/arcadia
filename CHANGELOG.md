@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 5.151 — 22 novembre 2026
+- **Odyssée** — Écran titre plus sobre : « Appuie sur Entrée », la version en petit dans un coin (Odyssée 2.4).
+  - Dans la cinématique d'ouverture, le bouton « Passer » est en haut à droite et ne cache plus les sous-titres.
+
 ## 5.150 — 22 novembre 2026
 - **Odyssée** — En combat, les Pokémon respirent sans se déformer : ils montent et descendent d'un bloc, leurs pixels ne tremblent plus (Odyssée 2.3).
   - La barre des touches ne passe plus devant la boîte de texte quand un message s'ouvre.

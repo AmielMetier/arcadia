@@ -224,7 +224,7 @@ async function boot() {
   /* ---------------- écran titre ---------------- */
   for (;;) {
     sound.play('title');
-    const title = el('div', 'title-scr', `<canvas class="title-cv" width="256" height="192"></canvas><div class="logo"><div class="logo-main">ODYSSÉE</div></div><div class="press">${matchMedia('(pointer: coarse)').matches ? 'Touche l\'écran' : 'Appuie sur F ou Entrée'}</div><div class="title-foot">H : aide des touches · Odyssée ${VERSION_ODYSSEE}</div>`);
+    const title = el('div', 'title-scr', `<canvas class="title-cv" width="256" height="192"></canvas><div class="logo"><div class="logo-main">ODYSSÉE</div></div><div class="press">${matchMedia('(pointer: coarse)').matches ? 'Touche l\'écran' : 'Appuie sur Entrée'}</div><div class="title-foot">v${VERSION_ODYSSEE}</div>`);
     uiRoot.appendChild(title);
     const stopSea = titleSea(title.querySelector('canvas'), art.title);
     // au clavier, à la manette, ou d'un simple toucher (ou clic) sur l'écran titre
@@ -383,7 +383,7 @@ async function onlineScreen(ui, cloud, info) {
 async function playIntroVideo(ui, input, sound) {
   sound.play(null);
   await ui.fade(true, 250);
-  const s = el('div', 'screen cine-scr', '<video class="cine-vid" src="img/intro.mp4" playsinline preload="auto"></video><button type="button" class="cine-skip">Passer la cinématique (Entrée / Échap)</button>');
+  const s = el('div', 'screen cine-scr', '<video class="cine-vid" src="img/intro.mp4" playsinline preload="auto"></video><button type="button" class="cine-skip">Passer ▸</button>');
   uiRoot.appendChild(s);
   const vid = s.querySelector('.cine-vid'), skipBtn = s.querySelector('.cine-skip');
   vid.muted = !!sound.muted || (sound.vol ?? 0.7) <= 0;
