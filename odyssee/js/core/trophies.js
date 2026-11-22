@@ -104,6 +104,9 @@ for (const [id, sp] of Object.entries(SPECIES)) {
   }
 }
 
+/** les Pokémon légendaires différents capturés (marqués leg dans les données des espèces) */
+const legendairesCaptures = (st) => new Set((st.dex?.caught || []).map(Number).filter((sp) => SPECIES[sp]?.leg)).size;
+
 export const TROPHIES_CATALOG = [
   /* ==========================================================================
      1. DUELS MULTIJOUEUR & COMBAT PVP (12 trophées)
@@ -572,7 +575,229 @@ export const TROPHIES_CATALOG = [
       const money = st.money || 0;
       return { current: Math.min(money, 100000), max: 100000, done: money >= 100000 };
     }
-  }
+  },
+
+  /* ==========================================================================
+     10. BOSS, RAIDS, LÉGENDAIRES, DOJO ET DONJONS (18 trophées)
+     Les boss vaincus sont notés dans st.boss (game.noterBoss), les raids dans st.raids (multi-events.js) ;
+     pour les parties d'avant, ce que la sauvegarde savait déjà compte aussi (quête finie, drapeaux, Pokédex).
+     ========================================================================== */
+  {
+    id: 'boss_first',
+    title: 'Premier Grand Adversaire',
+    desc: 'Vaincre un boss : un admin ou le chef de la Team Éclipse ou de la Brume, ou un boss de la Tour de combat.',
+    tier: 'bronze',
+    category: 'boss',
+    reward: { item: 'revive', count: 3, label: 'Rappel ×3' },
+    check: (st) => {
+      const n = Object.keys(st.boss || {}).length || (st.flags?.lugia || (st.flags?.['Q:magma'] || 0) >= 3 ? 1 : 0);
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'boss_eclipse',
+    title: "Fléau de l'Éclipse",
+    desc: 'Vaincre Erèbe, Nyx et Nocturne, les admins et le chef de la Team Éclipse.',
+    tier: 'gold',
+    category: 'boss',
+    reward: { item: 'dusk-stone', count: 1, label: 'Pierre Nuit ×1' },
+    check: (st) => {
+      const n = st.flags?.lugia ? 3 : ['Erèbe', 'Nyx', 'Nocturne'].filter((k) => st.boss?.[k]).length;
+      return { current: Math.min(n, 3), max: 3, done: n >= 3 };
+    }
+  },
+  {
+    id: 'boss_brume',
+    title: 'Dissipateur de Brume',
+    desc: 'Vaincre Sylas, Ariane et Nox, les admins et le chef de la Brume.',
+    tier: 'gold',
+    category: 'boss',
+    reward: { item: 'scope-lens', count: 1, label: 'Lentilscope ×1' },
+    check: (st) => {
+      const n = (st.flags?.['Q:magma'] || 0) >= 3 ? 3 : ['Sylas', 'Ariane', 'Nox'].filter((k) => st.boss?.[k]).length;
+      return { current: Math.min(n, 3), max: 3, done: n >= 3 };
+    }
+  },
+  {
+    id: 'boss_tour',
+    title: 'Conquérant de la Tour',
+    desc: 'Vaincre le dernier boss de la Tour de combat, à pleine puissance.',
+    tier: 'platinum',
+    category: 'boss',
+    reward: { item: 'master-ball', count: 1, label: 'Master Ball ×1' },
+    check: (st) => {
+      const done = !!(st.flags?.['T:tour:6']);
+      return { current: done ? 1 : 0, max: 1, done };
+    }
+  },
+  {
+    id: 'raid_first',
+    title: 'Briseur de Raid',
+    desc: "Remporter un combat de raid avec d'autres joueurs.",
+    tier: 'bronze',
+    category: 'raid',
+    reward: { item: 'ultra-ball', count: 5, label: 'Hyper Ball ×5' },
+    check: (st) => {
+      const n = st.raids?.gagnes || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'raid_10',
+    title: "Escouade d'Élite",
+    desc: 'Remporter 10 combats de raid.',
+    tier: 'gold',
+    category: 'raid',
+    reward: { item: 'rare-candy', count: 5, label: 'Super Bonbon ×5' },
+    check: (st) => {
+      const n = st.raids?.gagnes || 0;
+      return { current: Math.min(n, 10), max: 10, done: n >= 10 };
+    }
+  },
+  {
+    id: 'raid_legende',
+    title: "Chasseur d'Aura d'Or",
+    desc: "Vaincre un boss de raid légendaire, à l'aura dorée.",
+    tier: 'gold',
+    category: 'raid',
+    reward: { item: 'life-orb', count: 1, label: 'Orbe Vie ×1' },
+    check: (st) => {
+      const n = st.raids?.legendes || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'raid_capture',
+    title: 'Dompteur de Boss',
+    desc: 'Capturer un boss de raid à terre.',
+    tier: 'silver',
+    category: 'raid',
+    reward: { item: 'ultra-ball', count: 10, label: 'Hyper Ball ×10' },
+    check: (st) => {
+      const n = st.raids?.captures || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'leg_1',
+    title: 'Rencontre Mythique',
+    desc: 'Capturer un Pokémon légendaire.',
+    tier: 'silver',
+    category: 'legende',
+    reward: { item: 'ultra-ball', count: 10, label: 'Hyper Ball ×10' },
+    check: (st) => {
+      const n = legendairesCaptures(st);
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'leg_5',
+    title: 'Gardien des Légendes',
+    desc: 'Capturer 5 Pokémon légendaires différents.',
+    tier: 'gold',
+    category: 'legende',
+    reward: { item: 'shiny-stone', count: 1, label: 'Pierre Éclat ×1' },
+    check: (st) => {
+      const n = legendairesCaptures(st);
+      return { current: Math.min(n, 5), max: 5, done: n >= 5 };
+    }
+  },
+  {
+    id: 'leg_10',
+    title: 'Panthéon Vivant',
+    desc: 'Capturer 10 Pokémon légendaires différents.',
+    tier: 'platinum',
+    category: 'legende',
+    reward: { item: 'master-ball', count: 1, label: 'Master Ball ×1' },
+    check: (st) => {
+      const n = legendairesCaptures(st);
+      return { current: Math.min(n, 10), max: 10, done: n >= 10 };
+    }
+  },
+  {
+    id: 'dojo_first',
+    title: 'Disciple de Mamadou',
+    desc: 'Remporter un combat au Dojo de Mamadou.',
+    tier: 'bronze',
+    category: 'dojo',
+    reward: { item: 'black-belt', count: 1, label: 'Ceinture Noire ×1' },
+    check: (st) => {
+      const n = st.dojo?.wins || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'dojo_10',
+    title: 'Pilier du Dojo',
+    desc: 'Remporter 10 combats au Dojo de Mamadou.',
+    tier: 'silver',
+    category: 'dojo',
+    reward: { item: 'muscle-band', count: 1, label: 'Bandeau Muscle ×1' },
+    check: (st) => {
+      const n = st.dojo?.wins || 0;
+      return { current: Math.min(n, 10), max: 10, done: n >= 10 };
+    }
+  },
+  {
+    id: 'dojo_serie5',
+    title: 'Maître du Dojo',
+    desc: "Enchaîner 5 victoires d'affilée au Dojo, en Duo ou en Trio.",
+    tier: 'gold',
+    category: 'dojo',
+    reward: { item: 'choice-band', count: 1, label: 'Bandeau Choix ×1' },
+    check: (st) => {
+      const n = Math.max(st.dojo?.record2 || 0, st.dojo?.record3 || 0);
+      return { current: Math.min(n, 5), max: 5, done: n >= 5 };
+    }
+  },
+  {
+    id: 'donjon_crypte',
+    title: 'Exorciste',
+    desc: 'Venir à bout de la Crypte des Murmures.',
+    tier: 'bronze',
+    category: 'donjon',
+    reward: { item: 'spell-tag', count: 1, label: 'Rune Sort ×1' },
+    check: (st) => {
+      const done = !!(st.flags?.['D:crypte:recompense']);
+      return { current: done ? 1 : 0, max: 1, done };
+    }
+  },
+  {
+    id: 'donjon_miroirs',
+    title: 'Au-delà du Reflet',
+    desc: 'Venir à bout du Donjon des Miroirs.',
+    tier: 'silver',
+    category: 'donjon',
+    reward: { item: 'elixir', count: 3, label: 'Élixir ×3' },
+    check: (st) => {
+      const done = !!(st.flags?.['D:miroirs:recompense']);
+      return { current: done ? 1 : 0, max: 1, done };
+    }
+  },
+  {
+    id: 'donjon_voies',
+    title: 'Trois Voies, Un Cœur',
+    desc: 'Venir à bout du Sanctuaire des Trois Voies.',
+    tier: 'gold',
+    category: 'donjon',
+    reward: { item: 'rare-candy', count: 3, label: 'Super Bonbon ×3' },
+    check: (st) => {
+      const done = !!(st.flags?.['D:voies:recompense']);
+      return { current: done ? 1 : 0, max: 1, done };
+    }
+  },
+  {
+    id: 'donjon_tous',
+    title: 'Seigneur des Donjons',
+    desc: 'Venir à bout des trois donjons : la Crypte, les Miroirs et les Trois Voies.',
+    tier: 'platinum',
+    category: 'donjon',
+    reward: { item: 'choice-specs', count: 1, label: 'Lunettes Choix ×1' },
+    check: (st) => {
+      const n = ['crypte', 'miroirs', 'voies'].filter((d) => st.flags?.['D:' + d + ':recompense']).length;
+      return { current: Math.min(n, 3), max: 3, done: n >= 3 };
+    }
+  },
 ];
 
 export const STREAK_RANKS = [

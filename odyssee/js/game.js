@@ -215,7 +215,9 @@ export class Game {
   }
   save(silent = false) {
     const s = this.state; const p = this.player;
-    if (s && !silent) { try { this.checkTrophies(true); } catch (e) {} }
+    // les médailles se vérifient à chaque sauvegarde, même automatique (porte, fin de raid, de donjon, du Dojo) ;
+    // celles débloquées pendant une scène attendent sa fin (showTrophyToast)
+    if (s) { try { this.checkTrophies(true); } catch (e) {} }
     s.map = this.mapObj.id; s.x = p.x; s.y = p.y; s.dir = p.dir; s.surf = !!p.surf;
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); if (!silent) this.sound.sfx('save'); } catch (e) { return false; }
     this.onSaved?.(silent);
@@ -1746,6 +1748,11 @@ export class Game {
     return outcome;
   }
 
+  /** un boss vaincu (admins et chefs de l'Éclipse et de la Brume, Nox, boss de la Tour de combat) : pour les médailles */
+  noterBoss(nom) {
+    if (!this.state || !nom) return;
+    const b = (this.state.boss ||= {}); b[nom] = (b[nom] || 0) + 1;
+  }
   checkTrophies(notify = true) {
     if (!this.state) return [];
     const newly = checkAllTrophies(this.state);
@@ -2065,6 +2072,7 @@ export class Game {
     if (res === 'win') {
       st.flags['T:' + n.id] = true;
       noteCombat(this, n);
+      if (isEclipseBoss || isTourFinale || d.boss) this.noterBoss(tr.name);
       if (d.leader != null) await this.badgeScene(d.leader, tr.name);
       if (typeof d.onWin === 'function') await d.onWin(this.api(), n); else if (d.onWin) await this.script(d.onWin, n);
       if (d.beatenPos) { await this.npcWalk(n, 'right', d.beatenPos[0] - n.x); n.dir = 'down'; n.home = [n.x, n.y]; }
@@ -2507,6 +2515,7 @@ export class Game {
         const fightMusic = t.music || (t.name === 'Nox' ? 'legendElemental' : isBrumeBoss ? 'eclipse' : leaderMatch ? 'leader' : isRival ? 'rival' : t.boss ? 'champion' : 'trainer');
         const res = await g.runBattle({ trainer: { ...t, items }, party, music: fightMusic, rival: isRival, noWhiteout: t.noWhiteout, format: t.format, slots: t.slots });
         g.musicLock = false; g.updateZone();
+        if (res === 'win' && (isBrumeBoss || t.boss)) g.noterBoss(t.name);
         if (res === 'win' && t.after) await ui().say(t.after, { speaker: t.cls ? `${t.cls} ${t.name}` : t.name, face: t.bs || t.ow });
         return res;
       },

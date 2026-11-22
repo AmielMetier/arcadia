@@ -1,5 +1,15 @@
 # Journal des versions — Arcadia
 
+## 5.155 — 22 novembre 2026
+- **Odyssée** — 18 nouvelles médailles, avec leurs récompenses, et cinq nouveaux onglets dans les Trophées (Odyssée 2.9) :
+  - Boss : vaincre un premier boss, les admins et le chef de l'Éclipse, ceux de la Brume, le dernier boss de la Tour de combat.
+  - Raids : gagner un raid, en gagner 10, vaincre un boss à l'aura dorée, capturer un boss de raid.
+  - Légendaires : en capturer 1, 5 puis 10 différents.
+  - Dojo de Mamadou : 1 puis 10 victoires, une série de 5 en Duo ou en Trio.
+  - Donjons : la Crypte des Murmures, le Donjon des Miroirs, le Sanctuaire des Trois Voies, puis les trois.
+  - Ce que ta partie a déjà accompli compte : légendaires capturés, donjons finis, Dojo, Brume et Éclipse vaincues.
+  - Correction : capturer un boss de raid du Dojo n'interrompt plus la fin du combat.
+
 ## 5.154 — 22 novembre 2026
 - **Odyssée** — Petites corrections (Odyssée 2.7) :
   - À la pêche, un bip et la bulle « ! » quand ça mord (c'était muet).

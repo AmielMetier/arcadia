@@ -352,6 +352,12 @@ async function recapRaid(game, battle, { victoire, boss, rosters, mySlot, aura }
   ov.remove();
 }
 
+/** raids gagnés (et boss légendaires vaincus, boss capturés) : pour les médailles */
+function noterRaid(st, legende) {
+  const R = (st.raids ||= { gagnes: 0, legendes: 0, captures: 0 });
+  R.gagnes++; if (legende) R.legendes++;
+}
+
 async function offerRaidCapture(game, bossData, def) {
   const st = game.state, ui = game.ui, rang = rangDe(def);
   const who = { speaker: 'Boss de raid', face: 'drakos' };
@@ -367,7 +373,7 @@ async function offerRaidCapture(game, bossData, def) {
   const caught = createMon(bossData.boss.sp, lvl);
   caught.moves = bossData.party[0].moves.map((m) => m.id).filter((id) => MOVES[id]).map((id) => ({ id, pp: MOVES[id].pp, maxPp: MOVES[id].pp }));
   caught.ability = bossData.boss.ability || null;
-  if (def.legend) { caught.bride = true; refreshStats(caught); }
+  if (def?.legend) { caught.bride = true; refreshStats(caught); }   // def manque pour les raids du Dojo
   caught.ball = 'ultra-ball';
   caught.ot = st.name;
   caught.met = 'Boss de raid';
@@ -381,7 +387,8 @@ async function offerRaidCapture(game, bossData, def) {
     st.box.push(caught);
     await ui.say(`${monName(caught)} a été transféré dans ton PC !`, who);
   }
-  if (def.legend) await ui.say(`Loin de son monde, ${monName(caught)} a perdu une bonne part de sa puissance…`, who);
+  if (def?.legend) await ui.say(`Loin de son monde, ${monName(caught)} a perdu une bonne part de sa puissance…`, who);
+  (st.raids ||= { gagnes: 0, legendes: 0, captures: 0 }).captures++;
   game.save(true);
 }
 
@@ -464,6 +471,7 @@ async function runRaidBattleSession(game, { rid, bossIdx, format, rosters, mySlo
   if (res === 'win' && monde) {
     const rang = rangDe(def);
     RM?.marquerVaincu(k);
+    noterRaid(st, rang.aura === 'or');
     D.pdj += rang.pdj;
     game.give('rare-candy', rang.bonbons);
     game.sound.sfx('item');
@@ -479,6 +487,7 @@ async function runRaidBattleSession(game, { rid, bossIdx, format, rosters, mySlo
       ? [`${bossData.name} tient bon…`, `Il te reste ${reste} essai${reste > 1 ? 's' : ''}. Soignez-vous et retentez votre chance avant qu'il reparte !`]
       : [`${bossData.name} tient bon…`, 'Tu as utilisé tes 5 essais pour ce boss. Il faudra attendre le prochain !'], who);
   } else if (res === 'win') {
+    noterRaid(st, false);
     D.pdj += 5;
     game.give('rare-candy', 2);
     game.sound.sfx('item');
