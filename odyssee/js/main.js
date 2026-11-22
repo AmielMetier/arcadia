@@ -171,6 +171,9 @@ async function boot() {
     // l'écran (arêtes des bâtiments et du relief nettes en 4K) ; textures, sprites et particules gardent leurs pixels
     if (renduNatif()) { renderer.setSize(iw * scale, ih * scale, false); view.resize(iw * scale, ih * scale, scale); }
     else { renderer.setSize(iw, ih, false); view.resize(iw, ih, 1); }
+    // affiché à un multiple exact de l'image (quitte à déborder d'un pixel hors de l'écran) : étiré sur une largeur
+    // impaire, il perdait une colonne de pixels, qui tressautait quand le décor défilait
+    canvas.style.width = iw * scale + 'px'; canvas.style.height = ih * scale + 'px';
     // l'interface garde son propre pas de pixel
     const ui = Math.max(2, Math.round(innerHeight / 270));
     document.documentElement.style.setProperty('--px', ui + 'px');

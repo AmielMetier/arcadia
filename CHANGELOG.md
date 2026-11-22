@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.148 — 22 novembre 2026
+- **Odyssée** — L'image reste nette quelle que soit la largeur de la fenêtre : une colonne de pixels ne tressaute plus quand le décor défile (Odyssée 2.1).
+
 ## 5.147 — 22 novembre 2026
 - **Odyssée** — le jeu démarre encore plus vite : une partie de la carte est préparée d'avance, l'écran de chargement dure environ 7 secondes de moins (Odyssée 2.0).
 
