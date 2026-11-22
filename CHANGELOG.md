@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 5.154 — 22 novembre 2026
+- **Odyssée** — Petites corrections (Odyssée 2.7) :
+  - À la pêche, un bip et la bulle « ! » quand ça mord (c'était muet).
+  - La Carte de Dresseur compte les médailles sur 36, comme l'écran des trophées (elle affichait 32).
+  - Une médaille débloquée pendant un combat ou une évolution s'affiche après la scène, plus au milieu.
+  - L'aide des touches explique que la sauvegarde est automatique (elle parlait d'un bouton Sauver qui n'existe pas).
+
 ## 5.153 — 22 novembre 2026
 - **Odyssée** — En combat, le Pokémon adverse a les pattes posées sur son socle au lieu de flotter au-dessus ; ceux qui lévitent (Fantominus, Smogo…) restent en l'air (Odyssée 2.6).
 

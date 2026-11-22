@@ -271,7 +271,7 @@ export class UI {
       <tr><td>Objet Enregistré</td><td><kbd>Y</kbd> (ou bouton Y du HUD)</td></tr>
       <tr><td>Ouvrir le Sac</td><td><kbd>I</kbd></td></tr>
       <tr><td>Émotes & Chat multijoueur</td><td><kbd>P</kbd> (ou bouton CHAT du HUD)</td></tr>
-      <tr><td>Sauvegarder</td><td><kbd>Échap</kbd> → SAUVER (ou bouton SAUVER du HUD)</td></tr>
+      <tr><td>Sauvegarde</td><td>Automatique : à chaque porte franchie et en quittant le jeu</td></tr>
       <tr><td>Afficher / cacher cette aide</td><td><kbd>H</kbd></td></tr></table><div class="hint">Appuie sur H, F ou Échap pour fermer</div>`);
     this.root.appendChild(panel);
     const toggle = () => { const on = !panel.classList.contains('on'); panel.classList.toggle('on', on); this.input.helpOpen = on; this.sound.sfx(on ? 'select' : 'cancel'); };

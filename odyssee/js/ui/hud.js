@@ -8,7 +8,7 @@ import { monName, expProgress } from '../core/mon.js';
 import { BADGES } from '../world/region.js';
 import { hpCol, statusTag, partyScreen, summaryScreen, mapScreen, cardScreen, questsScreen, trophiesScreen, friendsScreen, dexScreen } from './screens.js';
 import { getFriendsManager } from '../net/friends.js';
-import { getPvpSummary, getZoneCatchStats } from '../core/trophies.js';
+import { getPvpSummary, getZoneCatchStats, TROPHIES_CATALOG } from '../core/trophies.js';
 import { getTrackedQuest } from '../core/questsData.js';
 import { itemName } from '../core/items.js';
 import { SPECIES } from '../data/species.js';
@@ -279,7 +279,7 @@ export class Hud {
     const bCount = g.badgeCount();
     const pvpSummary = getPvpSummary(st);
     const trUnlocked = pvpSummary?.unlockedCount ?? 0;
-    const trTotal = pvpSummary?.trophiesTotal ?? 32;
+    const trTotal = pvpSummary?.trophiesTotal ?? TROPHIES_CATALOG.length;
     const friendsMgr = getFriendsManager(g);
     const onlineCount = friendsMgr.getOnlineCount();
     const curSpawns = g.currentSpawns?.() || null;

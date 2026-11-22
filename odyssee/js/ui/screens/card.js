@@ -4,6 +4,7 @@ import { SPECIES } from '../../data/species.js';
 import { ASSETS } from '../../assets.js';
 import { TYPE_FR, TYPE_COL, hpCol, screen, closer } from './common.js';
 import { pantheonScreen } from './hof.js';
+import { TROPHIES_CATALOG } from '../../core/trophies.js';
 
 /* ================= CARTE DE DRESSEUR FAÇON 5G (NOIR 2 / BLANC 2) ================= */
 export const BADGE_SPECS = [
@@ -260,7 +261,7 @@ export function cardScreen(game, BADGES, other) {
                       </div>
                       <div class="tc-stat-card">
                         <span class="tc-lbl"><i class="tc-ico">🏅</i> MÉDAILLES</span>
-                        <span class="tc-val tc-trophies-val"><b>${c.trophies || 0}</b> / 32 🏅</span>
+                        <span class="tc-val tc-trophies-val"><b>${c.trophies || 0}</b> / ${TROPHIES_CATALOG.length} 🏅</span>
                       </div>
                       ${c.champion || (c.hof && c.hof.length) ? `
                       <div class="tc-stat-card tc-stat-clickable" data-act="open-pantheon" title="Clic : Consulter vos sacres de la Ligue">

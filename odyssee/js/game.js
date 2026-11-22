@@ -1606,7 +1606,7 @@ export class Game {
     }
 
     this.player.bang = true;
-    this.sound.sfx('fanfare');
+    this.sound.sfx('bang');   // la bulle « ! » et son bip, comme un dresseur qui te repère
     await this.ui.say('Oh ! Ça mord ! Une prise vigoureuse au bout de la ligne !');
     this.player.bang = false;
 

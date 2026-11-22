@@ -45,8 +45,24 @@ export function getTrophyIconSrc(trophy) {
 /**
  * Affiche une bannière toast façon Pokémon Noir 2 / Blanc 2 lors du déblocage d'une médaille.
  */
+// une médaille débloquée pendant un combat, une évolution ou une cinématique attend la fin de la scène, puis les
+// médailles s'affichent l'une après l'autre (au lieu de surgir au milieu de l'action)
+const enAttente = [];
+let attenteT = null;
+const enScene = (game) => !!(game?.bv?.alive || game?.ui?.root?.querySelector('.battle, .evo-scr, .cine-scr, .intro-scr, .hof-scr, .trophy-toast'));
+function suivante(game) {
+  attenteT = null;
+  if (!enAttente.length) return;
+  if (enScene(game)) { attenteT = setTimeout(() => suivante(game), 600); return; }
+  afficher(game, enAttente.shift());
+  if (enAttente.length) attenteT = setTimeout(() => suivante(game), 600);
+}
 export function showTrophyToast(game, trophy) {
   if (!game?.ui?.root || !trophy) return;
+  enAttente.push(trophy);
+  if (!attenteT) suivante(game);
+}
+function afficher(game, trophy) {
   const t = el('div', 'trophy-toast box');
   const iconSrc = getTrophyIconSrc(trophy);
   t.innerHTML = `
