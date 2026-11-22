@@ -137,7 +137,7 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   de `world3d.js`). Chaque place de dresseur du plan reçoit son dresseur (`GYM_CINQUIEME` de `region.js`). `node tools/test-odyssee-arenes-plan.mjs [type]` :
   chaque arène se résout, sans état sans retour, sans dresseur qui bloque ; `node tools/test-odyssee-arenes-jeu.mjs [n°]` (Playwright, `CHROME_PATH`
   possible) rejoue chaque solution dans le vrai jeu et compare les registres coup par coup : à lancer quand on touche à l'un de ces fichiers.
-  Les énigmes tirées d'une graine (`odyssee/js/world/arenes.js`, `node tools/test-odyssee-arenes.mjs`) ne servent plus que de repli ; l'ancienne
+  Les énigmes tirées d'une graine (`odyssee/js/world/arenes.js`, sans test à elles) ne servent plus que de repli ; l'ancienne
   Grande Serre de Sylvebourg (`arene-sylve.js`, `serre-tex.js`) reste vérifiée seule par `node tools/test-odyssee-arene-sylve.mjs` (avec Sacoches de
   Pollen et la CT01 Pollen Collant).
   Intérieurs façon HeartGold / SoulSilver (`murCell` de `world3d.js`, tuiles de `odyssee/js/render/murs-tex.js`) : mur du fond en deux (papier peint
