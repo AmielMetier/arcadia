@@ -20,6 +20,11 @@ class Manche extends Battle {
   nm(ref) { const i = cote(ref), m = this.act(i); return i === 1 ? monName(m) : `${monName(m)} ${deNom(this.joueur.nom)}`; }
   /** un joueur qui tient plusieurs places : on ne rappelle pas un Pokémon déjà en jeu à une autre place */
   canSwitchTo(idx) { return super.canSwitchTo(idx) && !this.g.enJeuAilleurs(this.joueur, idx); }
+  /** réserve adverse gérée par Groupe.places/envoyes ; côté joueur, ne rappelle jamais un Pokémon déjà en jeu ailleurs */
+  roarBench(side, slot) {
+    if (side === 1) return [];
+    return super.roarBench(0, slot).filter((idx) => this.canSwitchTo(idx));
+  }
   tie() { return this.rng() < 0.5 ? -1 : 1; }
   awardExp() {}
   /** l'IA d'Odyssée peut changer de Pokémon ou prendre un objet : ici, l'adversaire attaque toujours */
@@ -183,7 +188,7 @@ export class Groupe {
         if (!u.length) a = { type: 'move', id: 165 };
         else { const s = u.includes(a.idx) ? a.idx : u[0]; a = { type: 'move', id: m.act(0).moves[s].id, slot: s }; }
       }
-      acts.push({ m, i: 0, a, k, vit: m.act(0).stats[5] });
+      acts.push({ m, i: 0, a, k, vit: m.act(0).stats[5], mon: m.act(0) });
     }
     // chaque Pokémon adverse vise un joueur encore debout
     for (const k of this.ciblesAdverses()) {
@@ -191,7 +196,7 @@ export class Groupe {
       if (!debout.length) break;
       const m = debout[Math.floor(this.rng() * debout.length)];
       this.viser(m, k);
-      acts.push({ m, i: 1, a: m.choixAdverse(), k, vit: this.adverse(k).stats[5] });
+      acts.push({ m, i: 1, a: m.choixAdverse(), k, vit: this.adverse(k).stats[5], mon: this.adverse(k) });
     }
     for (const x of acts) { x.m.sides[0].v.flinch = false; x.m.sides[0].v.dmgTaken = null; }
     for (const s of this.places) { s.v.flinch = false; s.v.dmgTaken = null; }
@@ -203,7 +208,7 @@ export class Groupe {
       if (x.i === 0 && !this.adverse(x.k)) { const c = this.ciblesAdverses(); if (!c.length) break; x.k = c[0]; }
       if (x.i === 1 && !this.adverse(x.k)) continue;
       this.viser(x.m, x.k);
-      if (isFainted(x.m.act(x.i)) || isFainted(x.m.act(1 - x.i))) continue;
+      if (isFainted(x.m.act(x.i)) || isFainted(x.m.act(1 - x.i)) || (x.mon && x.m.act(x.i) !== x.mon)) continue;
       if (x.a.type === 'recharge') { this.dans(x.m, () => { x.m.say(`${x.m.Nm(x.i)} doit se recharger !`); x.m.sides[x.i].v.recharge = false; }, x.k); continue; }
       this.dans(x.m, () => { x.m.useMove(x.i, x.a, x.first); x.m.checkFaints(); }, x.k);
       this.bilan();

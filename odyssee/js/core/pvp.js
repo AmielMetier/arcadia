@@ -117,9 +117,11 @@ export class PvpBattle extends Battle {
     if (!left(1)) { this.winBattle(); return true; }
 
     if (this.slots === 1) {
-      if (!stop) return false;
-      this.need = [isFainted(this.act(0)), isFainted(this.act(1))];
-      this.needSlots = [this.need[0] ? [0] : [], this.need[1] ? [0] : []];
+      if (midTurn) return stop;
+      const n0 = isFainted(this.act(0)), n1 = isFainted(this.act(1));
+      if (!n0 && !n1) return false;
+      this.need = [n0, n1];
+      this.needSlots = [n0 ? [0] : [], n1 ? [0] : []];
       this.state = 'switch';
       this.ev.push({ t: 'switch-prompt' });
       return true;

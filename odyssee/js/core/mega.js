@@ -28,7 +28,7 @@ for (const [pidS, f] of Object.entries(MEGA_FORMS)) {
   if (!Object.prototype.hasOwnProperty.call(SPECIES, pid)) {
     Object.defineProperty(SPECIES, pid, {
       enumerable: false, configurable: true,
-      value: { ...base, n: f.n, k: f.key, t: f.t, b: f.b, ev: [], mega: f.base, megaShiny: f.shiny },
+      value: { ...base, n: f.n, k: f.key, t: f.t, b: f.b, ev: [], mega: f.base, megaAb: f.ab || null, megaShiny: f.shiny },
     });
   }
   const baseAb = TALENTS_ESPECES[f.base] || [null, null, null];

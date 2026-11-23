@@ -1142,9 +1142,10 @@ export class BattleView {
       const m = this.battle.act(0, slot);
       const foeSlots = this.battle.aliveSlots(1);
       const foeMon = foeSlots.length === 1 ? this.battle.monAt(1, foeSlots[0]) : this.battle.monAt(1, 0);
+      const foeRef = foeSlots.length === 1 ? { side: 1, slot: foeSlots[0] } : { side: 1, slot: 0 };
+      const attRef = { side: 0, slot };
       const foeKnown = foeMon ? this.game.isSpeciesKnown(foeMon.sp) : false;
-      const foeTypes = (foeMon && foeKnown) ? (SPECIES[foeMon.sp]?.t || ['normal']) : null;
-      const canMegaHere = !megaAlreadyArmed && this.battle.canMega?.({ side: 0, slot });
+      const canMegaHere = !megaAlreadyArmed && this.battle.canMega?.(attRef);
       this.cmd.innerHTML = `
         <div class="mv-desc-banner">
           <div class="mv-desc-head"><span class="mv-desc-name"></span><span class="mv-desc-type"></span><span class="mv-desc-cat"></span><span class="mv-desc-pow"></span><span class="mv-desc-acc"></span><span class="mv-desc-pp"></span></div>
@@ -1154,19 +1155,19 @@ export class BattleView {
           <div class="mv-grid">${[0, 1, 2, 3].map((k) => {
             const x = m.moves[k];
             if (!x) return '<div class="mbtn empty"><span class="mn">—</span></div>';
-            const M = MOVES[x.id], catIcon = `img/battle/cat_${M.c || 'physical'}.png`, pwTxt = M.p ? `Puis. ${M.p}` : 'Statut';
+            const M = MOVES[x.id], mType = this.battle.moveType ? this.battle.moveType(attRef, M) : M.t, catIcon = `img/battle/cat_${M.c || 'physical'}.png`, pwTxt = M.p ? `Puis. ${M.p}` : 'Statut';
             let effBadge = '';
             if (this.slots > 1 && (M.tg === 9 || M.tg === 11)) {
               effBadge = `<span class="bm-eff" style="background:#324a78;color:#dcecff;border-color:#080a10">ZONE</span>`;
             } else if (foeMon && (M.p || M.c !== 'status') && (this.slots === 1 || foeSlots.length === 1)) {
-              if (foeKnown && foeTypes) {
-                const eff = typeEff(M.t, foeTypes);
+              if (foeKnown) {
+                const eff = this.battle.effOn ? this.battle.effOn(attRef, foeRef, mType) : typeEff(mType, SPECIES[foeMon.sp]?.t || ['normal']);
                 if (eff === 0) effBadge = '<span class="bm-eff eff-nul">SANS EFFET</span>';
                 else if (eff >= 2) effBadge = `<span class="bm-eff eff-super">SUPER EFF.${eff > 2 ? ' ×4' : ''}</span>`;
                 else if (eff < 1) effBadge = `<span class="bm-eff eff-weak">PEU EFF.${eff < 0.5 ? ' ×¼' : ''}</span>`;
               } else { effBadge = `<span class="bm-eff eff-unk">???</span>`; }
             }
-            return `<div class="mbtn" data-i="${k}" style="--tc:${TYPE_COL[M.t]}"><div class="mbtn-top"><span class="mn">${esc(M.n)}</span><div class="mbtn-top-right">${effBadge}<img class="mcat" src="${catIcon}" alt="${M.c}"></div></div><div class="mbtn-bot"><div class="mbtn-bot-left"><span class="mt">${TYPE_FR[M.t]}</span><span class="mpw">${pwTxt}</span></div><span class="mpp${x.pp === 0 ? ' zero' : ''}">PP ${x.pp}/${M.pp}</span></div></div>`;
+            return `<div class="mbtn" data-i="${k}" style="--tc:${TYPE_COL[mType]}"><div class="mbtn-top"><span class="mn">${esc(M.n)}</span><div class="mbtn-top-right">${effBadge}<img class="mcat" src="${catIcon}" alt="${M.c}"></div></div><div class="mbtn-bot"><div class="mbtn-bot-left"><span class="mt">${TYPE_FR[mType]}</span><span class="mpw">${pwTxt}</span></div><span class="mpp${x.pp === 0 ? ' zero' : ''}">PP ${x.pp}/${M.pp}</span></div></div>`;
           }).join('')}</div>
           ${canMegaHere ? `<button type="button" class="mv-mega-btn" title="Méga-Évolution (touche M ou Tab)"><img src="${ASSETS.item('mega-ring')}" alt=""><span>MÉGA</span></button>` : ''}
           <button type="button" class="mv-back-btn" title="Retour (Échap / B)"><span class="mv-back-ico">✕</span><span class="mv-back-lbl">RETOUR</span></button>
@@ -1245,7 +1246,8 @@ export class BattleView {
         let effTag = isAlly ? '<span class="bm-eff" style="background:#2d7a4c;color:#fff;border-color:#080a10">ALLIÉ</span>' : '';
         if (!isAlly && (M.p || M.c !== 'status')) {
           if (this.game.isSpeciesKnown(tm.sp)) {
-            const eff = typeEff(M.t, SPECIES[tm.sp]?.t || ['normal']);
+            const mType = this.battle.moveType ? this.battle.moveType(attRef, M) : M.t;
+            const eff = this.battle.effOn ? this.battle.effOn(attRef, c, mType) : typeEff(mType, SPECIES[tm.sp]?.t || ['normal']);
             if (eff === 0) effTag = '<span class="bm-eff eff-nul">SANS EFFET</span>';
             else if (eff >= 2) effTag = `<span class="bm-eff eff-super">SUPER EFF.${eff > 2 ? ' ×4' : ''}</span>`;
             else if (eff < 1) effTag = `<span class="bm-eff eff-weak">PEU EFF.</span>`;

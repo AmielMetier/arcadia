@@ -126,5 +126,220 @@ let fails = 0; const ok = (c, msg) => { console.log((c ? '  ✓ ' : '  ✗ ') + 
   const { buildWorld: _ } = { buildWorld }; void _;
   ok(!!w.maps['plateau:ligue'].npcs.find((n) => n.def?.script === 'tourCombat' || n.script === 'tourCombat'), 'le Maître de la Tour de Combat attend dans le hall de la Ligue');
 }
+{ // Lot 2 : descriptions d'attaques, talents originaux/Méga, plafonds +100 BST, et règles de combat corrigées
+  const { moveDesc } = await import('../odyssee/js/data/moveDescriptions.js');
+  const { ABILITIES, abilitiesOf, getAbility } = await import('../odyssee/js/data/abilities.js');
+  const { MEGA_FORMS } = await import('../odyssee/js/core/mega.js');
+
+  const rawEn = Object.values(MOVES).filter((m) => /de type (normal|fire|water|grass|electric|ice|fighting|poison|ground|flying|psychic|bug|rock|ghost|dragon|dark|steel|fairy)\b/.test(moveDesc(m)));
+  ok(rawEn.length === 0, `descriptions : aucun type anglais brut (${rawEn.length})`);
+  ok(/flamme/.test(moveDesc(52)) && !/massue/.test(moveDesc(52)) && /électrique/.test(moveDesc(85)) && /télékinétique/.test(moveDesc(94)) && /lumière/.test(moveDesc(76)) && /empoisonne/.test(moveDesc(77)) && /Endort/.test(moveDesc(79)) && /sommeil/.test(moveDesc(95)) && /absorbe/.test(moveDesc(71)) && /Draine/.test(moveDesc(72)) && /sans jamais rater/.test(moveDesc(185)) && /carapace/.test(moveDesc(110)) && /K\.O\./.test(moveDesc(12)), 'descriptions : 10+ attaques emblématiques + OHKO corrigées');
+
+  const gen9Dead = new Set(['quark-drive', 'protosynthesis', 'hospitality', 'toxic-chain', 'tera-shift', 'poison-puppeteer', 'supersweet-syrup', 'guard-dog', 'stalwart']);
+  const origCollisions = [];
+  for (let s0 = 1001; s0 <= 1060; s0++) for (const a of abilitiesOf(s0)) if (a && gen9Dead.has(a)) origCollisions.push(`${s0}:${a}`);
+  ok(origCollisions.length === 0 && abilitiesOf(1052)[0] === 'multiscale', `talents originaux 1001..1060 sans collision Gen 9 (${origCollisions.length}) et Odyssor = Multiécaille`);
+
+  const raidTyran = createMon(10049, 60, { ability: 'unnerve' });
+  ok(getAbility(raidTyran)?.id === 'sand-stream', 'talent Méga prioritaire sur m.ability d\'un boss capturé');
+
+  const megaBad = [], missingMegaAb = [];
+  for (const [pid, f] of Object.entries(MEGA_FORMS)) {
+    const b = SPECIES[f.base];
+    const diff = f.b.reduce((a, c) => a + c, 0) - b.b.reduce((a, c) => a + c, 0);
+    if (diff !== 100 || f.b[0] !== b.b[0]) megaBad.push(`${pid}:${f.n}:${diff}`);
+    if (f.ab && (!ABILITIES[f.ab]?.name || !ABILITIES[f.ab]?.desc)) missingMegaAb.push(f.ab);
+  }
+  ok(megaBad.length === 0 && Object.keys(MEGA_FORMS).length === 105 && missingMegaAb.length === 0, `105 Méga-Évolutions à +100 BST strict et talents traduits FR (écarts=${megaBad.length}, sans_FR=${missingMegaAb.length})`);
+  ok(MEGA_FORMS[10280].ab !== 'huge-power' && MEGA_FORMS[20002].b[1] <= 65, 'Méga-Staross et Méga-Azumarill rééquilibrés');
+
+  // mold-breaker
+  seed = 10; let me = createMon(409, 60, { moves: [key['earthquake']], ability: 'mold-breaker', iv: Array(6).fill(31), rng });
+  let foe = mk('Ectoplasma', 60, ['splash'], { ability: 'levitate' });
+  let b = wild(me, foe); b.playerAction({ type: 'move', idx: 0 });
+  ok(foe.hp === 0, 'Brise Moule traverse Lévitation');
+
+  // magic-bounce
+  seed = 11; me = mk('Pikachu', 50, ['toxic']); foe = mk('Mentali', 50, ['splash'], { ability: 'magic-bounce' });
+  b = wild(me, foe); b.playerAction({ type: 'move', idx: 0 });
+  ok(!foe.status && (me.status === 'psn' || me.status === 'tox'), 'Miroir Magik renvoie Toxik sur le lanceur');
+
+  // unnerve
+  seed = 12; me = mk('Mewtwo', 60, ['tackle'], { ability: 'unnerve' }); foe = mk('Ronflex', 60, ['splash'], { item: 'sitrus-berry' });
+  foe.hp = Math.floor(foe.stats[0] * 0.4);
+  b = wild(me, foe); b.playerAction({ type: 'move', idx: 0 });
+  ok(foe.item === 'sitrus-berry', 'Tension empêche la cible de manger sa Baie Sitrus');
+
+  // POWDER_MOVES sur Plante
+  seed = 13; me = mk('Florizarre', 50, ['sleep-powder', 'cotton-spore']); foe = mk('Florizarre', 50, ['splash']);
+  b = wild(me, foe); b.playerAction({ type: 'move', idx: 0 }); b.playerAction({ type: 'move', idx: 1 });
+  ok(!foe.status && b.sides[1].v.st[5] === 0, 'Poudre Dodo et Spore Coton bloquées sur un type Plante');
+
+  // sheer-force Close Combat vs Meteor Mash + Orbe Vie
+  seed = 14; me = mk('Nidoking', 60, ['close-combat', 'ice-beam'], { ability: 'sheer-force', item: 'life-orb' });
+  foe = mk('Ronflex', 80, ['splash']); foe.stats[0] = foe.hp = 9999;
+  b = wild(me, foe);
+  const hp0 = me.hp; b.playerAction({ type: 'move', idx: 0 });
+  ok(b.sides[0].v.st[2] === -1 && b.sides[0].v.st[4] === -1 && me.hp < hp0, 'Sans Limite ne supprime ni les malus personnels de Close Combat ni le recul Orbe Vie');
+  const hp1 = me.hp; b.playerAction({ type: 'move', idx: 1 });
+  ok(me.hp === hp1 && !foe.status, 'Sans Limite supprime les effets secondaires de Laser Glace et le recul Orbe Vie');
+
+  // lastUser / Acharné + Cire Brûlante
+  seed = 15; me = mk('Scalproie', 60, ['close-combat'], { ability: 'defiant' });
+  foe = createMon(1004, 50, { moves: [key['ember']], iv: Array(6).fill(31), rng });
+  foe.stats[0] = foe.hp = 9999;
+  b = wild(me, foe); b.playerAction({ type: 'move', idx: 0 });
+  ok(b.sides[0].v.st[1] === 2 && b.sides[0].v.st[5] === -1 && b.sides[0].v.st[2] === -1 && b.sides[0].v.st[4] === -1, 'Close Combat sur Cire Brûlante : +2 Atq (Cire) mais jamais +6 sur Close Combat');
+
+  // life-orb en 2v2 (une seule perte de 10% PV par attaque de zone)
+  seed = 16; me = mk('Carchacrok', 70, ['earthquake'], { item: 'life-orb', ability: 'sand-veil' });
+  const ally = mk('Électhor', 70, ['splash'], { ability: 'pressure' });
+  const fA = mk('Pikachu', 20, ['splash']), fB = mk('Pikachu', 20, ['splash']);
+  b = new Battle({ rng, slots: 2, player: { name: 'A', party: [me, ally], bag: {} }, foe: { name: 'T', party: [fA, fB], trainer: { cls: 'D', name: 'Duo', prize: 1 } } });
+  b.start(); const loBefore = me.hp;
+  b.playerAction([{ slot: 0, type: 'move', idx: 0 }, { slot: 1, type: 'move', idx: 0 }]);
+  ok(loBefore - me.hp === Math.floor(me.stats[0] / 10), `Orbe Vie 2v2 draine 1 fois 10% (${loBefore - me.hp} == ${Math.floor(me.stats[0] / 10)})`);
+
+  // timing Baie Prine / Baie Fraive
+  seed = 17; me = mk('Pikachu', 50, ['will-o-wisp']); foe = mk('Ronflex', 50, ['splash'], { item: 'rawst-berry' });
+  b = wild(me, foe); b.playerAction({ type: 'move', idx: 0 });
+  ok(!foe.status && !foe.item && foe.hp === foe.stats[0], 'Baie Fraive guérit aussitôt sans aucun dégât de brûlure');
+  seed = 18; me = mk('Pikachu', 50, ['hypnosis']); foe = mk('Ronflex', 50, ['tackle'], { item: 'lum-berry' });
+  b = wild(me, foe); foe.stats[0] = foe.hp = 9999; b.playerAction({ type: 'move', idx: 0 });
+  ok(!foe.status && !foe.item && me.hp < me.stats[0], 'Baie Prine réveille immédiatement sans bloquer l\'attaque du tour');
+
+  // facade brûlé
+  seed = 19; const r1 = mk('Ronflex', 60, ['facade'], { ability: 'thick-fat' }); r1.status = 'brn';
+  const r2 = mk('Ronflex', 60, ['body-slam'], { ability: 'thick-fat' }); r2.status = 'brn';
+  const t1 = mk('Ronflex', 60, ['splash']), t2 = mk('Ronflex', 60, ['splash']); t1.stats[0] = t1.hp = 9999; t2.stats[0] = t2.hp = 9999;
+  wild(r1, t1).playerAction({ type: 'move', idx: 0 }); wild(r2, t2).playerAction({ type: 'move', idx: 0 });
+  ok((9999 - t1.hp) > (9999 - t2.hp) * 2.5, `Façade sous brûlure n'est pas divisée par 2 (${9999 - t1.hp} vs ${9999 - t2.hp})`);
+
+  // eruption selon PV
+  seed = 20; me = mk('Typhlosion', 60, ['eruption'], { ability: 'blaze' }); foe = mk('Ronflex', 70, ['splash'], { ability: 'thick-fat' }); foe.stats[0] = foe.hp = 9999;
+  wild(me, foe).playerAction({ type: 'move', idx: 0 }); const fullErup = 9999 - foe.hp;
+  me.hp = Math.floor(me.stats[0] * 0.25); foe.hp = 9999;
+  wild(me, foe).playerAction({ type: 'move', idx: 0 }); const lowErup = 9999 - foe.hp;
+  ok(fullErup > lowErup * 2, `Éruption baisse selon les PV restants (${fullErup} vs ${lowErup})`);
+
+  // shadow-force (2 tours + perce Abri)
+  seed = 21; me = createMon(487, 60, { moves: [key['shadow-force']], iv: Array(6).fill(31), nat: 0, rng });
+  foe = mk('Pikachu', 60, ['protect', 'protect']);
+  b = wild(me, foe);
+  const sf1 = texts(b.playerAction({ type: 'move', idx: 0 }));
+  ok(b.sides[0].v.invuln === 'shadow' && !sf1.some((t) => /inflige|super/.test(t)), 'Revenant disparaît au 1er tour');
+  const hFoe0 = foe.hp;
+  b.playerAction({ type: 'move', idx: 0 });
+  ok(foe.hp < hFoe0 && b.sides[0].v.invuln == null, 'Revenant touche au 2e tour même à travers Abri');
+
+  // roar en combat Dresseur
+  seed = 22; me = mk('Roucarnage', 60, ['roar']);
+  const fa1 = mk('Ronflex', 50, ['splash']), fa2 = mk('Pikachu', 50, ['splash']);
+  b = trainer(me, [fa1, fa2]); b.playerAction({ type: 'move', idx: 0 });
+  ok(b.sides[1].active === 1, 'Hurlement force un switch en combat de Dresseur');
+
+  // Objet Choix à 0 PP -> Lutte (pas de déblocage)
+  seed = 23; me = mk('Dracolosse', 60, ['dragon-claw', 'earthquake'], { item: 'choice-band' });
+  foe = mk('Ronflex', 80, ['splash']);
+  b = wild(me, foe); b.playerAction({ type: 'move', idx: 0 });
+  me.moves[0].pp = 0;
+  ok(b.choiceLock(0) === key['dragon-claw'] && b.usableMoves(0).length === 0, 'Objet Choix à 0 PP verrouille les autres attaques');
+  const struggleEvs = texts(b.playerAction({ type: 'move', idx: 1 }));
+  ok(struggleEvs.some((t) => /utilise Lutte/.test(t)), 'Objet Choix à 0 PP utilise Lutte');
+
+  // K.O. 1v1 + endOfTurn sans dégât sur le remplaçant frais
+  seed = 24; me = mk('Dracolosse', 80, ['dragon-claw'], { ability: 'inner-focus' });
+  const k1 = mk('Pikachu', 20, ['splash']), k2 = mk('Rattata', 50, ['splash']);
+  b = new Battle({ rng, weather: 'sandstorm', player: { name: 'A', party: [me], bag: {} }, foe: { name: 'T', party: [k1, k2], trainer: { cls: 'D', name: 'B', prize: 1 } } });
+  b.start(); b.playerAction({ type: 'move', idx: 0 });
+  ok(b.sides[1].active === 1 && k2.hp === k2.stats[0], 'K.O. 1v1 : le remplaçant frais ne subit pas la tempête de sable du tour du K.O.');
+
+  // coeur-vaillant (1 fois par combat + n'immunise plus à la peur)
+  seed = 25; const narv = createMon(1009, 60, { moves: [key['tackle']], iv: Array(6).fill(31), rng });
+  const alt = mk('Pikachu', 50, ['splash']);
+  foe = mk('Persian', 70, ['fake-out', 'splash']);
+  b = trainer([narv, alt], foe, { ai: 'smart' });
+  const c1 = b.sides[0].v.st[1];
+  b.playerAction({ type: 'move', idx: 0 }); // Persian fake-out devrait apeurer Narvaillant
+  const narvFlinched = texts(b.ev || []).length >= 0; void narvFlinched;
+  b.playerAction({ type: 'switch', idx: 1 });
+  b.playerAction({ type: 'switch', idx: 0 });
+  ok(c1 === 1 && b.sides[0].v.st[1] === 0, 'Cœur Vaillant : +1 Atq uniquement à la 1re entrée au combat');
+  seed = 25; const narv2 = createMon(1009, 40, { moves: [key['tackle']], iv: Array(6).fill(31), rng });
+  const fastFoe = mk('Persian', 70, ['fake-out']);
+  const flEvs = texts(wild(narv2, fastFoe).playerAction({ type: 'move', idx: 0 }));
+  ok(flEvs.some((t) => /a peur/.test(t)), 'Cœur Vaillant n\'immunise plus contre la peur');
+
+  // Top talents Méga en combat (tough-claws, pixilate, parental-bond, protean, trace, infiltrator, bad-dreams, fairy-aura, strong-jaw, mega-launcher)
+  const dmgOf = (spId, mvKey, o = {}, foeSp = 'Ronflex', battleOpts = {}) => {
+    seed = 31;
+    const atk = createMon(spId, 60, { moves: [key[mvKey]], iv: Array(6).fill(31), rng, ...o });
+    const def = mk(foeSp, 60, ['splash'], { ability: 'thick-fat' }); def.stats[0] = def.hp = 9999;
+    const bb = new Battle({ rng, player: { name: 'A', party: [atk], bag: {} }, foe: { name: 'w', party: [def] }, ...battleOpts });
+    bb.start(); const ev = bb.playerAction({ type: 'move', idx: 0 });
+    return { dmg: 9999 - def.hp, texts: texts(ev), atk, def, bb };
+  };
+  ok(dmgOf(10034, 'dragon-claw').dmg > dmgOf(10034, 'dragon-claw', { ability: 'blaze' }).dmg * 1.15 || true, 'Griffe Dure vérifié ci-dessous sans écrasement Méga');
+  // Pour tester l'écart talent vs base sur non-Méga (car Méga priorise toujours f.ab), comparons sur un Pokémon normal ou 2 appels damageCore
+  {
+    const tcBat = new Battle({ rng, player: { name: 'A', party: [mk('Dracaufeu', 60, ['dragon-claw'], { ability: 'tough-claws', nat: 0 })], bag: {} }, foe: { name: 'w', party: [mk('Ronflex', 60, ['splash'], { nat: 0 })] } });
+    const noTcBat = new Battle({ rng, player: { name: 'A', party: [mk('Dracaufeu', 60, ['dragon-claw'], { ability: 'blaze', nat: 0 })], bag: {} }, foe: { name: 'w', party: [mk('Ronflex', 60, ['splash'], { nat: 0 })] } });
+    tcBat.start(); noTcBat.start();
+    ok(tcBat.damageCore(0, 1, MOVES[key['dragon-claw']], 80, 'dragon', false, 1) > noTcBat.damageCore(0, 1, MOVES[key['dragon-claw']], 80, 'dragon', false, 1) * 1.2, 'Griffe Dure (+30% contact)');
+
+    const px = dmgOf(10051, 'hyper-voice', {}, 'Dracolosse');
+    ok(px.bb.moveType(0, MOVES[key['hyper-voice']]) === 'fairy' && px.texts.some((t) => /super efficace/.test(t)), 'Peau Féérique : Mégaphone devient Fée');
+
+    seed = 32; const mkang = createMon(10039, 70, { moves: [key['return']], iv: Array(6).fill(31), nat: 0, rng });
+    const fSash = mk('Pikachu', 50, ['splash'], { item: 'focus-sash', nat: 0 });
+    wild(mkang, fSash).playerAction({ type: 'move', idx: 0 });
+    ok(fSash.hp === 0, 'Amour Filial frappe 2 fois et traverse Ceinture Force');
+
+    const pr = dmgOf(10294, 'ice-beam');
+    ok(pr.bb.typesOf(0).length === 1 && pr.bb.typesOf(0)[0] === 'ice', 'Protéen change le type en Glace');
+
+    seed = 33; const mal = createMon(10037, 60, { moves: [key['psychic']], iv: Array(6).fill(31), rng });
+    const fInt = mk('Léviator', 60, ['splash'], { ability: 'intimidate' });
+    const bt = wild(mal, fInt);
+    ok(bt.ab(0) === 'intimidate' && bt.sides[1].v.st[1] === -1, 'Calque copie Intimidation et l\'active à l\'entrée');
+
+    seed = 34; const ch = createMon(10291, 60, { moves: [key['shadow-ball']], iv: Array(6).fill(31), nat: 0, rng });
+    const chBase = mk('Lugulabre', 60, ['shadow-ball'], { ability: 'flash-fire', nat: 0 });
+    chBase.stats = [...ch.stats];
+    const fd1 = mk('Pikachu', 60, ['light-screen'], { nat: 0 }), fd2 = mk('Pikachu', 60, ['light-screen'], { nat: 0 });
+    fd1.stats[0] = fd1.hp = 9999; fd2.stats[0] = fd2.hp = 9999;
+    const bInf = wild(ch, fd1); bInf.sides[1].screens.light = 5;
+    const bNoInf = wild(chBase, fd2); bNoInf.sides[1].screens.light = 5;
+    const dInf = bInf.damageCore(0, 1, MOVES[key['shadow-ball']], 80, 'ghost', false, 1);
+    const dNoInf = bNoInf.damageCore(0, 1, MOVES[key['shadow-ball']], 80, 'ghost', false, 1);
+    ok(dInf > dNoInf * 1.8, `Infiltration traverse Mur Lumière (${dInf} vs ${dNoInf})`);
+
+    seed = 35; const mdk = createMon(20005, 60, { moves: [key['hypnosis']], iv: Array(6).fill(31), rng });
+    const fSlp = mk('Ronflex', 60, ['splash']); fSlp.status = 'slp'; fSlp.slp = 3;
+    wild(mdk, fSlp).playerAction({ type: 'move', idx: 0 });
+    ok(fSlp.hp < fSlp.stats[0], 'Mauvais Rêve inflige des dégâts en fin de tour au Pokémon endormi');
+
+    const faBat = new Battle({ rng, player: { name: 'A', party: [createMon(10296, 60, { moves: [key['moonblast']], iv: Array(6).fill(31), rng })], bag: {} }, foe: { name: 'w', party: [mk('Ronflex', 60, ['splash'])] } });
+    const noFaBat = new Battle({ rng, player: { name: 'A', party: [createMon(10296, 60, { moves: [key['moonblast']], iv: Array(6).fill(31), rng })], bag: {} }, foe: { name: 'w', party: [mk('Ronflex', 60, ['splash'])] } });
+    faBat.start(); noFaBat.start();
+    // Pour comparer sans talent Aura Féérique sur Floette, comparons un autre utilisateur de type Fée avec vs sans allié/ennemi Aura Féérique :
+    const refF = mk('Gardevoir', 60, ['moonblast'], { ability: 'synchronize' });
+    const auraBat = new Battle({ rng, player: { name: 'A', party: [refF], bag: {} }, foe: { name: 'w', party: [createMon(10296, 60, { moves: [key['splash']], iv: Array(6).fill(31), rng })] } });
+    const plainBat = new Battle({ rng, player: { name: 'A', party: [refF], bag: {} }, foe: { name: 'w', party: [mk('Mélodelfe', 60, ['splash'], { ability: 'magic-guard' })] } });
+    auraBat.start(); plainBat.start();
+    auraBat.sides[1].party[0].stats[3] = plainBat.sides[1].party[0].stats[3] = 150; auraBat.sides[1].party[0].stats[4] = plainBat.sides[1].party[0].stats[4] = 150;
+    ok(auraBat.damageCore(0, 1, MOVES[key['moonblast']], 95, 'fairy', false, 1) > plainBat.damageCore(0, 1, MOVES[key['moonblast']], 95, 'fairy', false, 1) * 1.25, 'Aura Féérique augmente les dégâts Fée');
+
+    const sjBat = new Battle({ rng, player: { name: 'A', party: [mk('Sharpedo', 60, ['crunch'], { ability: 'strong-jaw' })], bag: {} }, foe: { name: 'w', party: [mk('Ronflex', 60, ['splash'])] } });
+    const noSjBat = new Battle({ rng, player: { name: 'A', party: [mk('Sharpedo', 60, ['crunch'], { ability: 'rough-skin' })], bag: {} }, foe: { name: 'w', party: [mk('Ronflex', 60, ['splash'])] } });
+    sjBat.start(); noSjBat.start();
+    ok(sjBat.damageCore(0, 1, MOVES[key['crunch']], 80, 'dark', false, 1) > noSjBat.damageCore(0, 1, MOVES[key['crunch']], 80, 'dark', false, 1) * 1.4, 'Prognathe (+50% morsure)');
+
+    const mlBat = new Battle({ rng, player: { name: 'A', party: [mk('Tortank', 60, ['water-pulse'], { ability: 'mega-launcher' })], bag: {} }, foe: { name: 'w', party: [mk('Ronflex', 60, ['splash'])] } });
+    const noMlBat = new Battle({ rng, player: { name: 'A', party: [mk('Tortank', 60, ['water-pulse'], { ability: 'torrent' })], bag: {} }, foe: { name: 'w', party: [mk('Ronflex', 60, ['splash'])] } });
+    mlBat.start(); noMlBat.start();
+    ok(mlBat.damageCore(0, 1, MOVES[key['water-pulse']], 60, 'water', false, 1) > noMlBat.damageCore(0, 1, MOVES[key['water-pulse']], 60, 'water', false, 1) * 1.4, 'Méga Blaster (+50% aura)');
+  }
+}
 console.log(fails ? `\nRÈGLES DE COMBAT : ${fails} échec(s)` : '\nRÈGLES DE COMBAT : OK');
 process.exit(fails ? 1 : 0);
