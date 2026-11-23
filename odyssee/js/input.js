@@ -1,26 +1,42 @@
 // odyssee/js/input.js — clavier : flèches ou ZQSD (WASD en QWERTY), F (ou Espace / Entrée) = interagir / valider,
 // Échap / Retour arrière = annuler, menu ; Maj = courir ; R = course continue ; C = carte ; V = vélo ; U = afficher / replier le HUD ; H = aide des touches
-const MAP = {
+const CODE_MAP = {
   ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
   KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right',
-  KeyF: 'a', Space: 'a', Enter: 'a', NumpadEnter: 'a', KeyE: 'a', KeyK: 'a',
-  Escape: 'b', Backspace: 'b', KeyX: 'b', KeyL: 'b',
-  ShiftLeft: 'run', ShiftRight: 'run', KeyR: 'autorun', CapsLock: 'autorun',
+  Space: 'a', Enter: 'a', NumpadEnter: 'a',
+  Escape: 'b', Backspace: 'b',
+  ShiftLeft: 'run', ShiftRight: 'run', CapsLock: 'autorun',
   KeyB: 'ball', KeyY: 'ball',
-  KeyP: 'chat', KeyI: 'bag',
-  Tab: 'menu', KeyM: 'menu', KeyC: 'map', KeyV: 'velo', KeyQ: 'quests', KeyJ: 'quests', KeyT: 'trophies', KeyO: 'friends', KeyG: 'friends', KeyU: 'hud', KeyH: 'help', F1: 'help',
+  Tab: 'menu', F1: 'help',
 };
+const KEY_MAP = {
+  f: 'a', e: 'a', k: 'a',
+  x: 'b', l: 'b',
+  r: 'autorun',
+  p: 'chat', i: 'bag', m: 'menu', c: 'map', v: 'velo',
+  j: 'quests', q: 'quests', t: 'trophies', o: 'friends', g: 'friends',
+  u: 'hud', h: 'help',
+};
+export function resolveKey(e) {
+  return CODE_MAP[e?.code] || KEY_MAP[e?.key?.toLowerCase()] || null;
+}
 export class Input {
   constructor() {
-    this.held = new Map(); this.handlers = []; this.dirOrder = []; this.tap = null;
+    this.held = new Map(); this.handlers = []; this.dirOrder = []; this.tap = null; this._codeAction = new Map();
     addEventListener('keydown', (e) => {
       if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
-      const k = MAP[e.code]; if (!k) return;
+      const k = resolveKey(e); if (!k) return;
       e.preventDefault();
+      if (!e.repeat) this._codeAction.set(e.code, k);
       this.appui(k, e.repeat);
     });
-    addEventListener('keyup', (e) => { const k = MAP[e.code]; if (!k) return; this.relache(k); });
-    addEventListener('blur', () => { this.clearDirs(); });
+    addEventListener('keyup', (e) => {
+      const k = this._codeAction.get(e.code) || resolveKey(e);
+      this._codeAction.delete(e.code);
+      if (!k) return;
+      this.relache(k);
+    });
+    addEventListener('blur', () => { this.clearAll(); });
   }
   /** une touche du jeu enfoncée (clavier, manette ou boutons tactiles : manette.js, tactile.js) */
   appui(k, repeat = false) {
@@ -48,6 +64,12 @@ export class Input {
     this.held.delete('down');
     this.held.delete('left');
     this.held.delete('right');
+  }
+  /** vide toutes les touches maintenues (changement de fenêtre) */
+  clearAll() {
+    this.clearDirs();
+    this.held.clear();
+    this._codeAction.clear();
   }
   /** dernière direction enfoncée encore maintenue */
   dir() { return this.dirOrder.length ? this.dirOrder[this.dirOrder.length - 1] : null; }

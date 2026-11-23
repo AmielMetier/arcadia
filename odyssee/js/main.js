@@ -98,18 +98,23 @@ async function loadArt(prechauffe = false) {
   if (pack?.decor) for (const k of pack.decor) { sprites[k] = ASSETS.gfx(pack.dossier, 'd_' + k); dens[k] = 2; }   // le pack a le dernier mot
   // animations de terrain de HeartGold / SoulSilver (mer, rivages, fleurs)
   const hg = {}; for (const k of Object.keys(SPRITES.hgss || {})) hg[k] = ASSETS.hgss(k);
+  // décor des donjons + masque de tenue du pack actif, préchargés en parallèle avec le reste
+  const donjons = Object.fromEntries(DECOR_DONJONS);
+  for (const [k] of DECOR_DONJONS) dens[k] = DENSITE_DONJONS.includes(k) ? 2 : 1;
+  const tenueSrc = pack?.tenue ? ASSETS.gfx(pack.dossier, pack.tenue) : null;
   if (prechauffe) {
     // même requête que loadImg (crossOrigin), pour que le cache des images du navigateur la resserve telle quelle
-    const L = [sprites, kits, sols, sol32, hg, tuilesPack, batsPack].flatMap(Object.values).concat([pack?.chars ? ASSETS.gfx(pack.dossier, pack.chars) : ASSETS.chars, ASSETS.title, SPRITES.suiveurs && ASSETS.suiveurs, ASSETS.relief]);
+    const L = [sprites, kits, sols, sol32, hg, tuilesPack, batsPack, donjons].flatMap(Object.values).concat([pack?.chars ? ASSETS.gfx(pack.dossier, pack.chars) : ASSETS.chars, ASSETS.title, SPRITES.suiveurs && ASSETS.suiveurs, ASSETS.relief, tenueSrc]);
     return L.filter(Boolean).map((src) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.src = src; return im; });
   }
-  const [S, K, L, L32, HGI, chars, title, suiveurs, relief, PK, PB] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(pack?.chars ? ASSETS.gfx(pack.dossier, pack.chars) : ASSETS.chars), loadImg(ASSETS.title), SPRITES.suiveurs ? loadImg(ASSETS.suiveurs) : null, loadImg(ASSETS.relief).catch(() => null), loadAll(tuilesPack), loadAll(batsPack)]);
+  const [S, K, L, L32, HGI, chars, title, suiveurs, relief, PK, PB, SD, tenueImg] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(pack?.chars ? ASSETS.gfx(pack.dossier, pack.chars) : ASSETS.chars), loadImg(ASSETS.title), SPRITES.suiveurs ? loadImg(ASSETS.suiveurs) : null, loadImg(ASSETS.relief).catch(() => null), loadAll(tuilesPack), loadAll(batsPack), loadAll(donjons), tenueSrc ? loadImg(tenueSrc).catch(() => null) : null]);
+  Object.assign(S, SD);
   // pack sur une seule planche : chaque tuile de 16 px découpée dans son petit canevas
   if (pack?.planche && PK.__planche) {
     const im = PK.__planche; delete PK.__planche;
     pack.planche.tuiles.forEach((k, i) => { const c = document.createElement('canvas'); c.width = c.height = 16; c.getContext('2d').drawImage(im, (i % pack.planche.cols) * 16, Math.floor(i / pack.planche.cols) * 16, 16, 16, 0, 0, 16, 16); PK[k] = c; });
   }
-  return { sprites: S, dens, kits: K, sols: L, sol32: L32, hgss: HGI, chars, title, suiveurs, relief, pack: pack ? PK : null, batiments: pack?.batiments ? { images: PB, styles: pack.batiments } : null };
+  return { sprites: S, dens, kits: K, sols: L, sol32: L32, hgss: HGI, chars, title, suiveurs, relief, tenueImg, pack: pack ? PK : null, batiments: pack?.batiments ? { images: PB, styles: pack.batiments } : null };
 }
 
 /** rendu natif : ?natif=1 / ?natif=0 dans l'adresse, sinon le choix gardé dans le navigateur (« odyssee-natif ») */
@@ -124,25 +129,20 @@ async function boot() {
   renderer.setPixelRatio(1); renderer.outputColorSpace = THREE.SRGBColorSpace;
   const input = new Input(), sound = new Sound(), ui = new UI(uiRoot, input, sound);
   brancherManette(input); brancherTactile(input);   // manette et commandes tactiles : les mêmes touches que le clavier
-  // la construction de la carte occupe le processeur plusieurs secondes d'un seul tenant : les images se téléchargent
-  // pendant ce temps (loadArt les retrouve ensuite dans le cache du navigateur), et l'écran de chargement est affiché avant
-  const prechauffe = await loadArt(true);
+  // téléchargement des images en parallèle pendant la construction de la carte (l'écran de chargement s'affiche d'abord)
+  const artPromise = loadArt();
   await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
   etape('ecran');
   const world = buildWorld();
   etape('carte');
-  const art = await loadArt();
-  // les donjons à plusieurs : leur décor, leurs objets, leurs salles claires (donjons/)
-  Object.assign(art.sprites, await loadAll(Object.fromEntries(DECOR_DONJONS)));
-  for (const [k] of DECOR_DONJONS) art.dens[k] = DENSITE_DONJONS.includes(k) ? 2 : 1;
+  const art = await artPromise;
   installerDonjons(ASSETS, { partyScreen });
   brancherRendu();
-  prechauffe.length = 0;
   etape('images');
   for (const [nom, pal] of Object.entries(packActif()?.murs || {})) paletteMurs(nom, pal);
   // pack de graphismes : les zones de la tenue (visière, haut, bas…) dessinées pour ses deux dresseurs (render/tenue.js)
-  if (packActif()?.tenue) try {
-    const im = await loadImg(ASSETS.gfx(packActif().dossier, packActif().tenue)), c = document.createElement('canvas');
+  if (art.tenueImg) try {
+    const im = art.tenueImg, c = document.createElement('canvas');
     c.width = im.width; c.height = im.height; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0);
     const d = x.getImageData(0, 0, im.width, im.height).data, rang = (r) => { const z = new Uint8Array(768 * 64); for (let y = 0; y < 64; y++) for (let k = 0; k < 768; k++) z[y * 768 + k] = d[((r * 64 + y) * im.width + k) * 4]; return z; };
     setMasques({ m: rang(0), f: rang(1) });
@@ -183,8 +183,12 @@ async function boot() {
   addEventListener('resize', resize); resize();
   game.onVue = (k) => { vue = k; resize(); };
   // le premier appui débloque le son
-  const unlock = () => sound.init();
-  addEventListener('keydown', unlock); addEventListener('pointerdown', unlock);
+  const unlock = () => {
+    removeEventListener('keydown', unlock);
+    removeEventListener('pointerdown', unlock);
+    sound.init();
+  };
+  addEventListener('keydown', unlock, { once: true }); addEventListener('pointerdown', unlock, { once: true });
   ui.helpButton();
 
   let mode = 'title', last = performance.now(), enPanne = 0;

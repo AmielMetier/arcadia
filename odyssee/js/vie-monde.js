@@ -230,6 +230,7 @@ export class VieMonde {
       if (soir && A.herbe > 6 && n('luciole') < 9 && this.betes.length < max + 4) { const [bx, by] = pres(); this.betes.push({ k: 'luciole', x: bx, y: by, ph: Math.random() * 6, vie: 14 }); }
       if (!soir && A.eau >= 8 && n('mouette') < 2) { const g2 = Math.random() < 0.5; this.betes.push({ k: 'mouette', x: p.x + (g2 ? -14 : 14), y: p.y - 3 + Math.random() * 6, vx: g2 ? 3.2 : -3.2, ph: Math.random() * 6, vie: 12 }); }
     }
+    const r = this.betes.length ? c.getBoundingClientRect() : null;
     for (const b of this.betes) {
       b.vie -= dt;
       if (b.k === 'papillon') { b.x += Math.sin(now * 0.9 + b.ph) * dt * 1.2; b.y += Math.cos(now * 0.7 + b.ph * 2) * dt * 0.9; }
@@ -237,7 +238,7 @@ export class VieMonde {
       else b.x += b.vx * dt;
       const s = v.screenPos(b.x, b.y, b.k === 'mouette' ? 120 : b.k === 'papillon' ? 26 + Math.sin(now * 3 + b.ph) * 6 : 18 + Math.sin(now + b.ph) * 8);
       if (!s) continue;
-      const r = c.getBoundingClientRect(), sx = s.left - r.left, sy = s.top - r.top;
+      const sx = s.left - r.left, sy = s.top - r.top;
       if (b.k === 'papillon') {
         const ail = Math.abs(Math.sin(now * 14 + b.ph)) * 5 + 1;
         x.globalAlpha = Math.min(1, b.vie); x.fillStyle = b.col;

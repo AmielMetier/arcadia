@@ -1442,7 +1442,7 @@ export function buildWorld() {
   // posée après les lieux, qui gardent ainsi leur tirage et leurs identifiants)
   W.col = grotteDuCol({ W, maps, routes, ENC, trainerNpc });
   // la Chaîne Céleste déborde de son plan : des avancées de roche dans la forêt de fond (contreforts.js)
-  { const t0 = performance.now(); W.contreforts = contreforts(W); W.contreforts.ms = Math.round(performance.now() - t0); }
+  { const t0 = performance.now(); W.contreforts = memoCases('contreforts', W, () => contreforts(W)) || {}; W.contreforts.ms = Math.round(performance.now() - t0); }
   // les canyons des Hauts d'Ocre : une gorge depuis la route 14 ouvre les vallées de sable entre les mesas (ocre.js)
   W.ocre = canyonsDOcre({ W, maps, ENC, trainerNpc });
   // la Grotte des Sables : dans la falaise d'une mesa de la route 16 (grottes.js)
@@ -1466,12 +1466,12 @@ export function buildWorld() {
   // le rythme des routes (rythme.js) : raccourcis à sens unique et rebords à sauter, objets cachés, panneaux aux deux bouts
   { const t0 = performance.now(); W.rythme = rythme(W, routes, { trainerNpc }); W.rythme.ms = Math.round(performance.now() - t0); }
   // petites barrières de bois le long des chemins des routes (jamais là où elles couperaient un passage)
-  fenceRoutes(W, legends);
+  memoCases('barrieres', W, () => fenceRoutes(W, legends), legends.filter((l) => l.map === 'monde').map((l) => [l.x, l.y]));
   // les ponts au propre : droits, d'une ou deux cases de large, jamais deux côte à côte (ponts.js)
   W.ponts = memoCases('ponts', W, () => redresserPonts(W));
   // finitions (acces.js) : des tourbillons au large, à la limite de la marge (on ne voit jamais le bord de la carte) ;
   // ce qu'on n'atteint jamais redevient forêt ; rien ne bouche un passage ; objets selon l'avancement (bareme.js)
-  { const mer = mers(W); W.finitions = { tourbillons: tourbillonsDuBord(W, mer) };
+  { const mer = mers(W); W.finitions = { tourbillons: memoCases('tourbillons', W, () => tourbillonsDuBord(W, mer)) };
     const RG = rangs(maps, docks, { map: 'monde', x: towns.A.x + 5, y: towns.A.y + 7 }, { bloquants: false });   // un PNJ qui garde un passage ne rend pas la suite inatteignable
     W.finitions.foret = rendreALaForet(W, RG.get('monde'), mer);
     W.finitions.decor = oterDecorIsole(W, RG.get('monde'));

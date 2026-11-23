@@ -18,7 +18,7 @@ import { STARTERS, STARTER_CHOICES, STARTER_TABLE, starterSlot, RIVAL_NAME, BADG
 import { migrerCarte } from './world/migration.js';
 import { BattleView } from './ui/battleView.js';
 import { Hud } from './ui/hud.js';
-import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, naturePcScreen, moveRelearnerScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, typeTag, questsScreen, trophiesScreen, showTrophyToast, hofScreen, pantheonScreen, friendsScreen } from './ui/screens.js';
+import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, naturePcScreen, moveRelearnerScreen, learnMoveScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, typeTag, questsScreen, trophiesScreen, showTrophyToast, hofScreen, pantheonScreen, friendsScreen } from './ui/screens.js';
 import { openChatModal } from './ui/chatModal.js';
 import { getFriendsManager } from './net/friends.js';
 import { recordPvpMatch, ensurePvpState, checkAllTrophies } from './core/trophies.js';
@@ -1146,7 +1146,7 @@ export class Game {
     if (!this.state) return;
     if (k === 'hud') { this.hud?.toggle(); return; }
     if (k === 'autorun') { if (!this.busy && !this.bv.alive) this.toggleAutoRun(); return; }
-    if (k === 'chat') { if (!this.busy && !this.bv.alive) this.openChat(); return; }
+    if (k === 'chat') { if (!this.busy && !this.bv.alive && !this.player.move) this.openChat(); return; }
     if (k === 'ball') { if (!this.busy && !this.bv.alive) await this.useRegisteredItem(); return; }
     if (this.busy || !this.state || this.player.move) return;
     if (k === 'a') await this.interact();
@@ -1677,7 +1677,7 @@ export class Game {
       const friendsMgr = getFriendsManager(this);
       const others = Math.max(0, friendsMgr.getOnlineCount() - 1);
       opts.push([others ? `Amis (${others} en ligne)` : 'Amis', 'friends']);
-      opts.push(['Carte de Dresseur', 'card'], ['Carte', 'map'], ['Code de sauvegarde', 'code'], ['Options', 'opt'], ['Fermer', 'close']);
+      opts.push(['Carte de Dresseur', 'card'], ['Carte', 'map'], ['Sauvegarder', 'save'], ['Code de sauvegarde', 'code'], ['Options', 'opt'], ['Fermer', 'close']);
       // une petite icône devant chaque entrée (celles du HUD et du sac)
       const ICO = { dex: ASSETS.item('dex'), party: 'img/hud/team.png', pc: 'img/hud/save.png', bag: 'img/hud/bag.png', quests: 'img/hud/quest.png', trophies: 'img/hud/trophy.png', friends: 'img/hud/friends.png', card: ASSETS.item('wallet'), map: 'img/hud/map.png', code: ASSETS.item('notebook'), domaine: ASSETS.item('gift'), fly: ASSETS.item('sifflet-celeste'), chat: 'img/hud/chat.png' };
       const itemHtml = ([l, k]) => `<i class="sm-ico">${ICO[k] ? `<img src="${ICO[k]}" alt="">` : ''}</i>${esc(l)}`;
@@ -2345,19 +2345,16 @@ export class Game {
 
   async askLearn(m, moveId) {
     const mv = MOVES[moveId], name = monName(m);
-    for (;;) {
-      await this.ui.say([`${name} veut apprendre ${mv.n}.`, `Mais ${name} connaît déjà quatre attaques.`], { keep: true });
-      if (await this.ui.yesNo(`Oublier une attaque pour apprendre ${mv.n} ?`, { keep: true })) {
-        const k = await this.ui.list({ title: 'Oublier quelle attaque ?', items: m.moves.map((x) => ({ label: MOVES[x.id].n, right: `PP ${x.pp}/${MOVES[x.id].pp}` })).concat([{ label: mv.n + ' (nouvelle)' }]), cls: 'psub learn', cancel: 4 });
-        if (k >= 0 && k < 4) {
-          const old = MOVES[m.moves[k].id].n;
-          m.moves[k] = { id: moveId, pp: mv.pp };
-          this.sound.sfx('learn');
-          await this.ui.say(['1, 2 et... Tadaaa !', `${name} oublie ${old}...`, `Et ${name} apprend ${mv.n} !`]);
-          return;
-        }
-      }
-      if (await this.ui.yesNo(`Abandonner l'apprentissage de ${mv.n} ?`, { keep: true })) { await this.ui.say(`${name} n'a pas appris ${mv.n}.`); return; }
+    await this.ui.say([`${name} veut apprendre ${mv.n}.`, `Mais ${name} connaît déjà quatre attaques.`], { keep: true });
+    this.ui.closeDialog();
+    const k = await learnMoveScreen(this, m, moveId);
+    if (k >= 0 && k < 4) {
+      const old = MOVES[m.moves[k].id].n;
+      m.moves[k] = { id: moveId, pp: mv.pp };
+      this.sound.sfx('learn');
+      await this.ui.say(['1, 2 et... Tadaaa !', `${name} oublie ${old}...`, `Et ${name} apprend ${mv.n} !`]);
+    } else {
+      await this.ui.say(`${name} n'a pas appris ${mv.n}.`);
     }
   }
 

@@ -648,7 +648,11 @@ function openMoveRelearnerUI(game, m, moveIds, scales) {
       s.querySelectorAll('.relearn-row').forEach((row) => {
         const idx = +row.dataset.idx;
         row.addEventListener('mouseenter', () => {
-          if (sel !== idx) { sel = idx; ui.sound.sfx('blip'); draw(); }
+          if (sel !== idx) {
+            sel = idx;
+            ui.sound.sfx('blip');
+            s.querySelectorAll('.relearn-row').forEach((r) => r.classList.toggle('sel', +r.dataset.idx === sel));
+          }
         });
         row.addEventListener('click', () => {
           sel = idx;

@@ -74,7 +74,7 @@ export function dexScreen(game, opts = {}) {
     }
     const seen = new Set(st.dex.seen), caught = new Set(st.dex.caught);
     const counts = st.dex.seenCount || st.dex.counts || {};
-    s.innerHTML = `<div class="dex-left box"><img class="dex-spr" alt=""><div class="dex-info"></div></div><div class="dex-right box"><div class="dex-count"><span>POKÉDEX</span><span>Vus <b>${seen.size}</b> · Capturés <b>${caught.size}</b> / ${ids.length}</span></div><div class="dex-prog"><u style="width:${(100 * caught.size / Math.max(1, ids.length)).toFixed(1)}%"></u><i style="width:${(100 * seen.size / Math.max(1, ids.length)).toFixed(1)}%"></i></div><div class="list-items dex-list"></div></div>`;
+    s.innerHTML = `<div class="dex-left box"><img class="dex-spr" alt=""><div class="dex-info"></div></div><div class="dex-right box"><div class="dex-count"><span>POKÉDEX</span><span>Vus <b>${seen.size}</b> · Capturés <b>${caught.size}</b> / ${ids.length}</span><button type="button" class="scr-close-btn dex-close-btn" data-act="close" title="Fermer (Échap)">✕</button></div><div class="dex-prog"><u style="width:${(100 * caught.size / Math.max(1, ids.length)).toFixed(1)}%"></u><i style="width:${(100 * seen.size / Math.max(1, ids.length)).toFixed(1)}%"></i></div><div class="list-items dex-list"></div></div>`;
     const list = s.querySelector('.dex-list'), spr = s.querySelector('.dex-spr'), info = s.querySelector('.dex-info');
     list.innerHTML = ids.map((id, idx) => `<div class="list-row" data-idx="${idx}" data-i="${id}"><span class="cur">▶</span><span class="dexn">${num(id)}</span><span class="lbl">${seen.has(id) ? esc(SPECIES[id].n) : '-----'}</span>${caught.has(id) ? '<span class="ball-mini"></span>' : ''}</div>`).join('');
     const rows = [...list.children];
@@ -110,6 +110,16 @@ export function dexScreen(game, opts = {}) {
       });
     });
     draw();
+    const close = () => {
+      pop();
+      s.remove();
+      ui.sound.sfx('cancel');
+      resolve();
+    };
+    s.querySelector('[data-act="close"]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      close();
+    });
     const pop = ui.input.push((k) => {
       if (k === 'up') {
         i = (i - 1 + ids.length) % ids.length;
@@ -139,10 +149,7 @@ export function dexScreen(game, opts = {}) {
           try { ui.sound?.sfx?.('cancel'); } catch (e) {}
         }
       } else if (k === 'b') {
-        pop();
-        s.remove();
-        ui.sound.sfx('cancel');
-        resolve();
+        close();
       }
     });
   });

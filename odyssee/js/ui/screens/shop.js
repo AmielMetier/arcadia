@@ -21,21 +21,34 @@ export async function shopScreen(game, stock) {
     }
     if (r !== 0) break;
     const money = el('div', 'box money'); ui.root.appendChild(money);
-    for (;;) {
-      money.innerHTML = `Argent<br><b>${st.money.toLocaleString('fr-FR')} ₽</b>`;
-      const k = await ui.list({ title: 'Acheter', items: stock.map((it) => ({ html: `<img class="itm" src="${ASSETS.item(it)}" alt="">${esc(itemName(it))}`, right: `${ITEMS[it].price.toLocaleString('fr-FR')} ₽` })).concat([{ label: 'Annuler' }]), cls: 'shop', cancel: stock.length, start: game._shopIdx || 0, onMove: (i) => { game._shopIdx = i; } });
-      if (k < 0 || k >= stock.length) break;
-      const it = stock[k], price = ITEMS[it].price, max = Math.min(99, Math.floor(st.money / price));
-      if (max < 1) { await ui.say('Tu n\'as pas assez d\'argent.', { keep: true }); continue; }
-      const q = await ui.quantity(max, { price });
-      if (!q) continue;
-      if (!(await ui.yesNo(`${itemName(it)} × ${q}, ça fera ${(q * price).toLocaleString('fr-FR')} ₽. D'accord ?`, { keep: true }))) continue;
-      st.money -= q * price; st.bag[it] = (st.bag[it] || 0) + q; ui.sound.sfx('buy');
-      money.innerHTML = `Argent<br><b>${st.money.toLocaleString('fr-FR')} ₽</b>`;
-      if (q >= 10 && it === 'poke-ball') { st.bag['poke-ball']++; await ui.say('Voici une Poké Ball en cadeau pour ton achat !', { keep: true }); }
-      else await ui.say('Et voilà ! Merci !', { keep: true });
+    const descBox = el('div', 'box shop-desc'); ui.root.appendChild(descBox);
+    const showDesc = (idx) => {
+      const it = stock[idx];
+      descBox.innerHTML = it
+        ? `<div class="sd-head"><b>${esc(itemName(it))}</b><span>Dans le sac : ×${st.bag[it] || 0}</span></div><div class="sd-txt">${esc(ITEMS[it]?.desc || '')}</div>`
+        : '<div class="sd-txt">Quitter le comptoir d\'achat.</div>';
+    };
+    try {
+      for (;;) {
+        money.innerHTML = `Argent<br><b>${st.money.toLocaleString('fr-FR')} ₽</b>`;
+        showDesc(game._shopIdx || 0);
+        const k = await ui.list({ title: 'Acheter', items: stock.map((it) => ({ html: `<img class="itm" src="${ASSETS.item(it)}" alt="">${esc(itemName(it))}`, right: `${ITEMS[it].price.toLocaleString('fr-FR')} ₽` })).concat([{ label: 'Annuler' }]), cls: 'shop', cancel: stock.length, start: game._shopIdx || 0, onMove: (i) => { game._shopIdx = i; showDesc(i); } });
+        if (k < 0 || k >= stock.length) break;
+        const it = stock[k], price = ITEMS[it].price, max = Math.min(99, Math.floor(st.money / price));
+        if (max < 1) { await ui.say('Tu n\'as pas assez d\'argent.', { keep: true }); continue; }
+        const q = await ui.quantity(max, { price });
+        if (!q) continue;
+        if (!(await ui.yesNo(`${itemName(it)} × ${q}, ça fera ${(q * price).toLocaleString('fr-FR')} ₽. D'accord ?`, { keep: true }))) continue;
+        st.money -= q * price; st.bag[it] = (st.bag[it] || 0) + q; ui.sound.sfx('buy');
+        money.innerHTML = `Argent<br><b>${st.money.toLocaleString('fr-FR')} ₽</b>`;
+        showDesc(k);
+        if (q >= 10 && it === 'poke-ball') { st.bag['poke-ball']++; showDesc(k); await ui.say('Voici une Poké Ball en cadeau pour ton achat !', { keep: true }); }
+        else await ui.say('Et voilà ! Merci !', { keep: true });
+      }
+    } finally {
+      money.remove();
+      descBox.remove();
     }
-    money.remove();
   }
   await ui.say('Reviens quand tu veux !');
 }

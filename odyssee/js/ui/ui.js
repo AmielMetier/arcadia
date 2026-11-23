@@ -48,6 +48,7 @@ export class UI {
   }
   closeDialog() { if (this.dlg) { this.dlg._stopTyping?.(); this.dlg.remove(); this.dlg = null; } }
   typePage(box, text, o = {}) {
+    box._stopTyping?.();
     return new Promise((resolve) => {
       const txt = box.querySelector('.dlg-txt'), arrow = box.querySelector('.dlg-arrow');
       txt.textContent = ''; arrow.style.visibility = 'hidden';
@@ -69,8 +70,8 @@ export class UI {
       };
       const onBoxClick = (e) => { e.stopPropagation(); advance(); };
       box.addEventListener('click', onBoxClick);
-      const pop = this.input.push((k) => {
-        if (k !== 'a' && k !== 'b') return;
+      const pop = this.input.push((k, repeat) => {
+        if (repeat || (k !== 'a' && k !== 'b')) return;
         advance();
       });
     });
@@ -121,7 +122,8 @@ export class UI {
           selectIdx(idx);
         });
       });
-      const pop = this.input.push((k) => {
+      const pop = this.input.push((k, repeat) => {
+        if (repeat && (k === 'a' || k === 'b')) return;
         if (o.onKey && o.onKey(k, i, { close, refresh: show, wrap, rows })) return;
         const n = o.items.length;
         if (k === 'up') { i = (i - 1 + n) % n; this.sound.sfx('blip'); show(); }
@@ -162,7 +164,8 @@ export class UI {
         else q = q <= 1 ? max : Math.max(1, q + d);
         this.sound.sfx('blip'); draw();
       });
-      const pop = this.input.push((k) => {
+      const pop = this.input.push((k, repeat) => {
+        if (repeat && (k === 'a' || k === 'b')) return;
         if (k === 'right') q = q >= max ? 1 : q + 1;
         else if (k === 'left') q = q <= 1 ? max : q - 1;
         else if (k === 'up') q = q >= max ? 1 : Math.min(max, q + 10);
@@ -287,7 +290,7 @@ export class UI {
       <tr><td>Annuler, revenir</td><td><kbd>Échap</kbd> (ou <kbd>Retour arrière</kbd>)</td></tr>
       <tr><td>Menu (équipe, sac, sauvegarde…)</td><td><kbd>Échap</kbd>, <kbd>Tab</kbd> ou <kbd>M</kbd></td></tr>
       <tr><td>Carte de la région</td><td><kbd>C</kbd></td></tr>
-      <tr><td>Journal Quêtes / Trophées</td><td><kbd>Q</kbd> (Quêtes) · <kbd>T</kbd> (Trophées & Médailles)</td></tr>
+      <tr><td>Journal Quêtes / Trophées</td><td><kbd>J</kbd> (Quêtes) · <kbd>T</kbd> (Trophées & Médailles)</td></tr>
       <tr><td>Afficher / masquer le HUD</td><td><kbd>U</kbd> (ou Options → HUD)</td></tr>
       <tr><td>Pêche & Capacités</td><td>Face à l'eau (Canne à Pêche / Surf), un arbre ou un rocher : <kbd>F</kbd></td></tr>
       <tr><td>Lancer rapide de Ball</td><td>En combat sauvage : <kbd>B</kbd> ou clic sur le bandeau tactile</td></tr>

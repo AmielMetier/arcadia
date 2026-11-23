@@ -456,17 +456,19 @@ export function bagScreen(game, o = {}) {
     }, { passive: false });
 
     // Clics sur les 4 boutons tactiles DS
-    useBtn?.addEventListener('click', () => {
+    const activateSelected = async () => {
+      if (busy) return;
       const es = entries();
       if (i >= es.length) { ui.sound.sfx('cancel'); close(null); return; }
       const item = es[i], it = ITEMS[item];
-      // Si c'est un objet purement tenu (ex: baies de tenue, restes, orbe vie), rediriger naturellement vers Donner
-      if (it && it.hold && !it.heal && !it.candy && !it.stone && !it.field) {
-        handleGive();
+      // Si c'est un objet purement tenu (ex: baies de tenue, restes, orbe vie), rediriger naturellement vers Donner hors combat
+      if (!o.battle && it && it.hold && !it.heal && !it.candy && !it.stone && !it.field) {
+        await handleGive();
       } else {
-        triggerRow(i);
+        await triggerRow(i);
       }
-    });
+    };
+    useBtn?.addEventListener('click', activateSelected);
     giveBtn?.addEventListener('click', handleGive);
     tossBtn?.addEventListener('click', handleToss);
     backBtn?.addEventListener('click', () => { ui.sound.sfx('cancel'); close(null); });
@@ -491,21 +493,18 @@ export function bagScreen(game, o = {}) {
       renderList();
     };
     regBtn?.addEventListener('click', toggleRegister);
-    const pop = ui.input.push(async (k) => {
+    const pop = ui.input.push(async (k, repeat) => {
       if (busy) return;
+      if (repeat && !['up', 'down', 'left', 'right'].includes(k)) return;
       if (k === 'left') { changePocket(pocket - 1); return; }
       if (k === 'right') { changePocket(pocket + 1); return; }
       if (k === 'up') { changeItem(i - 1); return; }
       if (k === 'down') { changeItem(i + 1); return; }
       if (k === 'b') { ui.sound.sfx('cancel'); close(null); return; }
-      if (k === 'd' || k === 'g') { await handleGive(); return; }
-      if (k === 'j' || k === 'x') { await handleToss(); return; }
-      if (k === 'ball' || k === 'autorun' || k === 'y' || k === 'r') { toggleRegister(); return; }
-      if (k === 'a') {
-        const es = entries();
-        if (i === es.length) { ui.sound.sfx('cancel'); close(null); return; }
-        await triggerRow(i);
-      }
+      if (k === 'friends') { await handleGive(); return; }
+      if (k === 'quests') { await handleToss(); return; }
+      if (k === 'ball' || k === 'autorun') { toggleRegister(); return; }
+      if (k === 'a') await activateSelected();
     });
   });
 }

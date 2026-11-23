@@ -4,6 +4,7 @@ import { SPECIES } from '../../data/species.js';
 import { MOVES } from '../../data/moves.js';
 import { glisserPourRanger } from '../glisser.js';
 import { getAbility } from '../../data/abilities.js';
+import { moveDesc } from '../../data/moveDescriptions.js';
 import { monName, expProgress, STAT_NAMES, levelCap, natureName, natureEffect, baseStats } from '../../core/mon.js';
 import { LEADERS } from '../../world/region.js';
 import { ASSETS } from '../../assets.js';
@@ -44,17 +45,23 @@ export function partyScreen(game, o = {}) {
 
     const foot = el('div', 'pfoot');
     const help = el('div', 'box phelp');
-    if (o.mode === 'menu') {
-      const pcBtn = el('button', 'pc-link-btn', 'BOÎTES PC 💻');
+    const hasPc = o.mode === 'menu';
+    let pcBtn = null;
+    const openPcBoxes = async () => {
+      if (busy) return;
+      busy = true;
+      await pcScreen(game);
+      busy = false;
+      draw();
+    };
+    if (hasPc) {
+      pcBtn = el('button', 'pc-link-btn', 'BOÎTES PC 💻');
       pcBtn.type = 'button';
       pcBtn.title = 'Accéder au Système de Stockage des Pokémon';
-      pcBtn.onclick = async () => {
-        if (busy) return;
-        busy = true;
-        await pcScreen(game);
-        busy = false;
-        draw();
-      };
+      pcBtn.addEventListener('mouseenter', () => {
+        if (!busy && i !== party.length) { i = party.length; ui.sound.sfx('blip'); updateSel(); }
+      });
+      pcBtn.onclick = openPcBoxes;
       foot.append(pcBtn);
     }
     const cancel = el('button', 'pcancel', 'RETOUR ✕');
@@ -77,8 +84,9 @@ export function partyScreen(game, o = {}) {
 
     const triggerSlot = async (idx) => {
       if (busy) return;
-      const n = party.length;
-      if (idx === n) {
+      const n = party.length, cancelIdx = hasPc ? n + 1 : n;
+      if (hasPc && idx === n) { ui.sound.sfx('select'); await openPcBoxes(); return; }
+      if (idx === cancelIdx) {
         if (swapFrom >= 0) { swapFrom = -1; ui.sound.sfx('cancel'); draw(); return; }
         ui.sound.sfx('cancel'); close(-1); return;
       }
@@ -187,7 +195,7 @@ export function partyScreen(game, o = {}) {
               </div>
               ${why ? `<div class="pwhy">${esc(why)}</div>` : ''}
             </div>`;
-          c.addEventListener('mouseenter', () => { if (!busy && !glisse && i !== 0) { i = 0; ui.sound.sfx('blip'); draw(); } });
+          c.addEventListener('mouseenter', () => { if (!busy && !glisse && i !== 0) { i = 0; ui.sound.sfx('blip'); updateSel(); } });
           c.addEventListener('click', (e) => { e.stopPropagation(); triggerSlot(0); });
           colLead.appendChild(c);
         } else {
@@ -229,7 +237,7 @@ export function partyScreen(game, o = {}) {
                 <div class="pexp-track"><u style="width:${expPct}%"></u></div>
               </div>
             </div>`;
-          c.addEventListener('mouseenter', () => { if (!busy && !glisse && i !== k) { i = k; ui.sound.sfx('blip'); draw(); } });
+          c.addEventListener('mouseenter', () => { if (!busy && !glisse && i !== k) { i = k; ui.sound.sfx('blip'); updateSel(); } });
           c.addEventListener('click', (e) => { e.stopPropagation(); triggerSlot(k); });
           colSubs.appendChild(c);
         }
@@ -248,46 +256,62 @@ export function partyScreen(game, o = {}) {
         colSubs.appendChild(emp);
       }
 
-      cancel.classList.toggle('on', i === party.length);
+      updateSel();
+    };
+
+    const updateSel = () => {
+      const n = party.length, cancelIdx = hasPc ? n + 1 : n;
+      s.querySelectorAll('.pslot-lead-card, .pslot-sub[data-idx]').forEach((elSlot) => {
+        elSlot.classList.toggle('on', +elSlot.dataset.idx === i);
+      });
+      if (pcBtn) pcBtn.classList.toggle('on', i === n);
+      cancel.classList.toggle('on', i === cancelIdx);
       help.textContent = swapFrom >= 0
         ? `Échanger la place de ${monName(party[swapFrom])} avec quel Pokémon ?`
         : o.prompt || (o.mode === 'menu' || !o.mode ? 'Clic ou Entrée : choisir · Glisser un Pokémon sur un autre : échanger leurs places · Échap : quitter' : 'Sélectionne un Pokémon (Clic ou Entrée · Échap pour quitter).');
     };
 
     cancel.addEventListener('mouseenter', () => {
-      if (!busy && i !== party.length) { i = party.length; ui.sound.sfx('blip'); draw(); }
+      const cancelIdx = hasPc ? party.length + 1 : party.length;
+      if (!busy && i !== cancelIdx) { i = cancelIdx; ui.sound.sfx('blip'); updateSel(); }
     });
     cancel.addEventListener('click', (e) => {
       e.stopPropagation();
-      triggerSlot(party.length);
+      triggerSlot(hasPc ? party.length + 1 : party.length);
     });
 
     draw();
     const close = closer(ui, s, () => pop, resolve, null);
     const pop = ui.input.push(async (k) => {
       if (busy) return;
-      const n = party.length;
+      const n = party.length, cancelIdx = hasPc ? n + 1 : n;
       if (k === 'up') {
-        if (i === n) i = n > 1 ? n - 1 : 0;
-        else if (i === 0) i = n;
+        if (i === cancelIdx) i = hasPc ? n : (n > 1 ? n - 1 : 0);
+        else if (hasPc && i === n) i = n > 0 ? n - 1 : cancelIdx;
+        else if (i === 0) i = cancelIdx;
         else if (i === 1) i = 0;
         else i--;
       } else if (k === 'down') {
-        if (i === n) i = 0;
-        else if (i === 0) i = n > 1 ? 1 : n;
-        else if (i === n - 1) i = n;
+        if (i === cancelIdx) i = 0;
+        else if (hasPc && i === n) i = cancelIdx;
+        else if (i === 0) i = n > 1 ? 1 : (hasPc ? n : cancelIdx);
+        else if (i === n - 1) i = hasPc ? n : cancelIdx;
         else i++;
       } else if (k === 'left') {
         if (i > 0 && i < n) i = 0;
+        else if (hasPc && i === cancelIdx) i = n;
+        else return;
       } else if (k === 'right') {
         if (i === 0 && n > 1) i = 1;
+        else if (hasPc && i === n) i = cancelIdx;
+        else return;
       } else if (k === 'b') {
         if (swapFrom >= 0) { swapFrom = -1; draw(); return; }
         ui.sound.sfx('cancel'); close(-1); return;
       } else if (k === 'a') {
         await triggerSlot(i); return;
       } else return;
-      ui.sound.sfx('blip'); draw();
+      ui.sound.sfx('blip'); updateSel();
     });
   });
 }
@@ -484,9 +508,12 @@ export function summaryScreen(game, list, idx) {
       } else {
         body = `<div class="moves${curMv >= 0 ? ' ordre' : ''}">${m.moves.map((mv, k) => {
           const M = MOVES[mv.id];
+          const catLbl = M.c === 'special' ? 'Spécial' : M.c === 'status' ? 'Statut' : 'Physique';
+          const accTxt = M.a ? `${M.a}%` : '—';
           return `<div class="mv${k === curMv ? ' cur' : ''}${k === pris ? ' pris' : ''}" data-mv="${k}" style="--tc:${TYPE_COL[M.t]}">
             <div class="mv-top"><span class="mvn">${esc(M.n)}</span>${typeTag(M.t)}<span class="mvpp">PP <b>${mv.pp}</b>/${M.pp}</span></div>
-            <div class="mvd">${M.c === 'status' ? 'Catégorie : Statut' : `Puissance : ${M.p || '—'}`} · Précision : ${M.a ?? '—'}%</div>
+            <div class="mvd">${catLbl} · ${M.c === 'status' ? 'Effet' : `Puis. ${M.p || '—'}`} · Préc. ${accTxt}</div>
+            <div class="mvd-desc">${esc(moveDesc(M))}</div>
           </div>`;
         }).join('')}</div>${ordreOk && m.moves.length > 1 ? `<div class="mv-ordre-aide">${curMv < 0 ? 'A ou clic : ranger les attaques'
           : pris < 0 ? '▲ ▼ choisir l\'attaque · A la prendre · B terminer' : `▲ ▼ choisir sa nouvelle place · A échanger avec elle · B reposer`}</div>` : ''}`;
@@ -522,7 +549,7 @@ export function summaryScreen(game, list, idx) {
             <div class="sum-content">${body}</div>
           </div>
         </div>
-        <div class="sum-help">${curMv >= 0 ? 'Ranger les attaques · ◀ ▶ Changer d\'onglet' : '◀ ▶ Changer d\'onglet · ▲ ▼ Changer de Pokémon · Clic ou Échap pour fermer'}</div>`;
+        <div class="sum-help">${curMv >= 0 ? 'Ranger les attaques · ◀ ▶ Changer d\'onglet' : '◀ ▶ Changer d\'onglet · ▲ ▼ Changer de Pokémon · Échap ou RETOUR pour fermer'}</div>`;
 
       if (ordreOk) s.querySelectorAll('[data-mv]').forEach((el) => {
         el.addEventListener('click', (e) => {

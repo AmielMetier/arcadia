@@ -25,17 +25,25 @@ export function apparenceScreen(ui, o = {}) {
     const rows = () => [...(o.premiere ? [] : [['genre', () => 'Genre', GENRES]]), ...PIECES.map(([k, nom]) => [k, nom, COULEURS])];
     const valeur = (l) => { const L = l[2], k = L.findIndex(([v]) => v === (T[l[0]] || '')); return [Math.max(0, k), L]; };
     let sheet = null;
+    const prevCanvases = [0, 1, 3, 2].map((d) => {
+      const c = document.createElement('canvas'); c.width = 64; c.height = 64; c._dir = d; prev.appendChild(c); return c;
+    });
+    const drawPrev = () => {
+      if (!sheet) return;
+      for (const c of prevCanvases) {
+        const x = c.getContext('2d'); x.clearRect(0, 0, 64, 64); x.imageSmoothingEnabled = false;
+        x.drawImage(sheet, (c._dir * 3 + (t % 2 ? 0 : 1)) * 64, 0, 64, 64, 0, 0, 64, 64);
+      }
+    };
     const recompose = () => { const b = o.base?.(T.genre); sheet = b ? composer(b.src, b.sx, b.sy, T) : null; };
     const pastille = (v) => v ? `<i class="pastille" style="background:${v}"></i>` : '';
     const draw = () => {
-      const R = rows(); i = Math.min(i, R.length);
+      const R = rows(), nOpts = R.length + (o.premiere ? 1 : 2); i = Math.min(i, nOpts - 1);
       opts.innerHTML = R.map((l, k) => { const [n, L] = valeur(l);
         return `<div class="list-row ${k === i ? 'on' : ''}"><span class="cur">▶</span><span class="lbl">${esc(l[1](T.genre))}</span><span class="rgt">◀ ${L === COULEURS ? pastille(L[n][0]) : ''}${esc(L[n][1])} ▶</span></div>`; }).join('')
-        + `<div class="list-row ${i === R.length ? 'on' : ''}"><span class="cur">▶</span><span class="lbl"><b>${o.premiere ? 'C\'est moi !' : 'Valider'}</b></span></div>`;
-      if (sheet) {
-        prev.innerHTML = '';
-        for (const d of [0, 1, 3, 2]) { const c = document.createElement('canvas'); c.width = 64; c.height = 64; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(sheet, (d * 3 + (t % 2 ? 0 : 1)) * 64, 0, 64, 64, 0, 0, 64, 64); prev.appendChild(c); }
-      }
+        + `<div class="list-row ${i === R.length ? 'on' : ''}"><span class="cur">▶</span><span class="lbl"><b>${o.premiere ? 'C\'est moi !' : 'Valider'}</b></span></div>`
+        + (o.premiere ? '' : `<div class="list-row ${i === R.length + 1 ? 'on' : ''}"><span class="cur">▶</span><span class="lbl">Annuler</span></div>`);
+      drawPrev();
     };
     const changer = (l, d) => { const [n, L] = valeur(l); T[l[0]] = L[(n + d + L.length) % L.length][0]; recompose(); };
     recompose(); draw();
@@ -44,18 +52,23 @@ export function apparenceScreen(ui, o = {}) {
       const row = e.target.closest('.list-row'); if (!row) return;
       const k = [...opts.children].indexOf(row), R = rows();
       if (k === R.length) { ui.sound.sfx('select'); close(T); return; }
-      i = k; const r = row.querySelector('.rgt').getBoundingClientRect();
-      if (e.clientX >= r.left) changer(R[i], e.clientX < r.left + r.width / 2 ? -1 : 1);
+      if (!o.premiere && k === R.length + 1) { ui.sound.sfx('cancel'); close(null); return; }
+      i = k; const r = row.querySelector('.rgt')?.getBoundingClientRect();
+      if (r && e.clientX >= r.left) changer(R[i], e.clientX < r.left + r.width / 2 ? -1 : 1);
       ui.sound.sfx('blip'); draw();
     });
-    const anim = setInterval(() => { t++; draw(); }, 420);
+    const anim = setInterval(() => { t++; drawPrev(); }, 420);
     const close = (v) => { clearInterval(anim); pop(); s.remove(); resolve(v); };
     const pop = ui.input.push((k) => {
-      const R = rows();
-      if (k === 'up') i = (i + R.length) % (R.length + 1);
-      else if (k === 'down') i = (i + 1) % (R.length + 1);
+      const R = rows(), nOpts = R.length + (o.premiere ? 1 : 2);
+      if (k === 'up') i = (i + nOpts - 1) % nOpts;
+      else if (k === 'down') i = (i + 1) % nOpts;
       else if ((k === 'left' || k === 'right') && i < R.length) changer(R[i], k === 'left' ? -1 : 1);
-      else if (k === 'a') { ui.sound.sfx('select'); close(T); return; }   // Entrée valide depuis n'importe quelle ligne
+      else if (k === 'a') {
+        if (!o.premiere && i === R.length + 1) { ui.sound.sfx('cancel'); close(null); }
+        else { ui.sound.sfx('select'); close(T); }
+        return;
+      }
       else if (k === 'b' && !o.premiere) { ui.sound.sfx('cancel'); close(null); return; }
       else return;
       ui.sound.sfx('blip'); draw();

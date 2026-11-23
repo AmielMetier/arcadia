@@ -10,7 +10,7 @@ const PAGES = {
 };
 const COLS = 10;
 const ACTIONS = [['maj', 'ABC / abc'], ['acc', 'é à ç'], ['del', 'Effacer'], ['ok', 'OK']];
-const TAPABLE = /^[\p{L}\-'. !?&+0-9]$/u;
+const TAPABLE = /^[\p{L}\-'.!?&+0-9]$/u;
 
 /**
  * Ouvre le clavier ; renvoie le nom choisi (le nom par défaut si on valide à vide).

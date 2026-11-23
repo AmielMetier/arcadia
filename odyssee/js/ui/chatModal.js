@@ -70,9 +70,24 @@ export function openChatModal(game) {
     if (e.target === overlay) close();
   });
 
-  box.querySelectorAll('.chat-emote-btn').forEach((btn) => {
+  const emoteBtns = [...box.querySelectorAll('.chat-emote-btn')];
+  emoteBtns.forEach((btn, idx) => {
     btn.addEventListener('click', () => {
       send('', btn.dataset.emote);
+    });
+    btn.addEventListener('keydown', (e) => {
+      const cols = 4;
+      if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); emoteBtns[(idx + 1) % emoteBtns.length]?.focus(); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); emoteBtns[(idx - 1 + emoteBtns.length) % emoteBtns.length]?.focus(); }
+      else if (e.key === 'ArrowDown') {
+        e.preventDefault(); e.stopPropagation();
+        if (idx + cols < emoteBtns.length) emoteBtns[idx + cols]?.focus();
+        else inputEl.focus();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault(); e.stopPropagation();
+        if (idx - cols >= 0) emoteBtns[idx - cols]?.focus();
+        else inputEl.focus();
+      }
     });
   });
 
@@ -84,6 +99,11 @@ export function openChatModal(game) {
 
   inputEl.addEventListener('keydown', (e) => {
     e.stopPropagation();
+    if (e.key === 'ArrowUp' && emoteBtns.length) {
+      e.preventDefault();
+      emoteBtns[emoteBtns.length - 1]?.focus();
+      return;
+    }
     if (e.key === 'Enter') {
       const val = inputEl.value.trim();
       if (val) send(val, '');

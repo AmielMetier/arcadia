@@ -220,7 +220,7 @@ export class BattleView {
     for (const a of s.afterimages) {
       x.save();
       x.globalAlpha = Math.max(0, (a.life / a.max) * a.alpha);
-      const im = a.tint ? tinted(a.img, a.tint) : a.img;
+      const im = a.tint ? (a._tinted || (a._tinted = tinted(a.img, a.tint))) : a.img;
       x.drawImage(im, Math.round(a.cx - a.w / 2), Math.round(a.cy - a.h), Math.round(a.w), Math.round(a.h));
       x.restore();
     }
@@ -349,19 +349,20 @@ export class BattleView {
     if (s.screenFlash > 0) s.screenFlash = Math.max(0, s.screenFlash - dt * 2.8);
     for (const a of s.afterimages) a.life -= dt;
     s.afterimages = s.afterimages.filter((a) => a.life > 0);
+    const f = dt * 60;
     for (const p of s.parts) {
       if (p.spiral) {
-        p.spiralAngle = (p.spiralAngle || 0) + (p.spiralSpd || 0.2);
-        p.spiralR = (p.spiralR || 0) + (p.spiralRGrow || 0);
+        p.spiralAngle = (p.spiralAngle || 0) + (p.spiralSpd || 0.2) * f;
+        p.spiralR = (p.spiralR || 0) + (p.spiralRGrow || 0) * f;
         p.x = p.cx + Math.cos(p.spiralAngle) * p.spiralR;
       } else {
-        p.x += p.vx * dt * 60;
+        p.x += p.vx * f;
       }
-      p.y += p.vy * dt * 60;
-      p.vy += (p.g || 0);
+      p.y += p.vy * f;
+      p.vy += (p.g || 0) * f;
       p.life -= dt;
-      if (p.grow) p.r += p.grow;
-      if (p.a != null) p.a += (p.va != null ? p.va : 0.2);
+      if (p.grow) p.r += p.grow * f;
+      if (p.a != null) p.a += (p.va != null ? p.va : 0.2) * f;
     }
     s.parts = s.parts.filter((p) => p.life > 0);
     requestAnimationFrame(this.frame);
@@ -1170,7 +1171,7 @@ export class BattleView {
             return `<div class="mbtn" data-i="${k}" style="--tc:${TYPE_COL[mType]}"><div class="mbtn-top"><span class="mn">${esc(M.n)}</span><div class="mbtn-top-right">${effBadge}<img class="mcat" src="${catIcon}" alt="${M.c}"></div></div><div class="mbtn-bot"><div class="mbtn-bot-left"><span class="mt">${TYPE_FR[mType]}</span><span class="mpw">${pwTxt}</span></div><span class="mpp${x.pp === 0 ? ' zero' : ''}">PP ${x.pp}/${M.pp}</span></div></div>`;
           }).join('')}</div>
           ${canMegaHere ? `<button type="button" class="mv-mega-btn" title="Méga-Évolution (touche M ou Tab)"><img src="${ASSETS.item('mega-ring')}" alt=""><span>MÉGA</span></button>` : ''}
-          <button type="button" class="mv-back-btn" title="Retour (Échap / B)"><span class="mv-back-ico">✕</span><span class="mv-back-lbl">RETOUR</span></button>
+          <button type="button" class="mv-back-btn" title="Retour (Échap)"><span class="mv-back-ico">✕</span><span class="mv-back-lbl">RETOUR</span></button>
         </div>`;
       this.cmd.classList.add('on', 'moves'); this.root.classList.add('cmdon', 'moves-open');
       let i = this.lastMoveMon === m ? this.lastMove || 0 : 0; if (!m.moves[i]) i = 0;
@@ -1487,7 +1488,21 @@ export class BattleView {
     this.root.appendChild(box);
     await this.msg(`${monName(this.game.state.party[e.idx])} monte au niveau ${e.lvl} !`, { wait: true });
     box.innerHTML = names.map((n, k) => `<div><span>${n}</span><b>${e.after[k]}</b></div>`).join('');
-    await new Promise((res) => { const pop = this.ui.input.push((k) => { if (k === 'a' || k === 'b') { pop(); res(); } }); });
+    await new Promise((res) => {
+      let done = false;
+      const fin = () => {
+        if (done) return;
+        done = true;
+        pop();
+        box.removeEventListener('click', onClick);
+        this.root.removeEventListener('click', onClick);
+        res();
+      };
+      const onClick = (ev) => { ev.stopPropagation(); fin(); };
+      const pop = this.ui.input.push((k) => { if (k === 'a' || k === 'b') fin(); });
+      box.addEventListener('click', onClick);
+      this.root.addEventListener('click', onClick);
+    });
     box.remove();
   }
   async animBall(e) {

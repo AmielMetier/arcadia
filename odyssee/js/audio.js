@@ -1411,6 +1411,7 @@ export class Sound {
   constructor() {
     this.ctx = null; this.vol = 0.7; this.music = null; this.songs = {}; this.muted = false;
     try { const v = localStorage.getItem('odyssee-vol'); if (v != null) this.vol = +v; } catch (e) {}
+    try { this.muted = localStorage.getItem('odyssee-muted') === '1'; } catch (e) {}
     // « moderne » : instruments doux, batterie et réverbération ; « retro » : les ondes 8 bits d'origine
     this.style = 'moderne';
     try { const st = localStorage.getItem('odyssee-son'); if (st === 'retro' || st === 'moderne') this.style = st; } catch (e) {}
@@ -1421,13 +1422,18 @@ export class Sound {
       if (document.hidden) this.ctx.suspend().catch(() => {}); else this.ctx.resume().catch(() => {});
     });
   }
+  setMuted(v) {
+    this.muted = !!v;
+    try { localStorage.setItem('odyssee-muted', this.muted ? '1' : '0'); } catch (e) {}
+    if (this.master && this.ctx) this.master.gain.value = this.muted ? 0 : this.vol;
+  }
   setStyle(st) { this.style = st === 'retro' ? 'retro' : 'moderne'; try { localStorage.setItem('odyssee-son', this.style); } catch (e) {} const cur = this.current; this.current = null; if (cur) this.play(cur); }
   init(offline) {
     if (offline) { this.ctx = null; this.offline = offline.length / offline.sampleRate; }
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC && !offline) return;
     this.ctx = offline || new AC();
-    this.master = this.ctx.createGain(); this.master.gain.value = this.vol; this.master.connect(this.ctx.destination);
+    this.master = this.ctx.createGain(); this.master.gain.value = this.muted ? 0 : this.vol; this.master.connect(this.ctx.destination);
     // les réglages de volume du Hub (musique / effets) s'appliquent s'ils sont disponibles
     const DV = window.DDVolume, via = (kind) => { if (!DV) return this.master; const g = DV.gain(this.ctx, kind); g.connect(this.master); return g; };
     this.musicBus = this.ctx.createGain(); this.musicBus.gain.value = 0.8; this.musicBus.connect(via('music'));
@@ -1646,7 +1652,7 @@ export class Sound {
   }
 
   cry(url) {
-    if (!url || this.vol <= 0) return;
+    if (!url || this.muted || this.vol <= 0) return;
     // créature originale : petit cri synthétisé, toujours le même pour une espèce
     if (url.startsWith('synth:')) {
       if (!this.ctx) return;
@@ -1661,7 +1667,8 @@ export class Sound {
       }
       return;
     }
-    try { const a = new window.Audio(url); a.volume = Math.min(1, this.vol * 0.45); a.play().catch(() => {}); } catch (e) {}
+    const dd = typeof window !== 'undefined' && window.DDVolume != null ? Number(window.DDVolume) : 1;
+    try { const a = new window.Audio(url); a.volume = Math.max(0, Math.min(1, this.vol * 0.45 * (Number.isFinite(dd) ? dd : 1))); a.play().catch(() => {}); } catch (e) {}
   }
 
   /* ---------------- carillon cristallin interactif des 15 badges B2W2 (gamme de victoire) ---------------- */
@@ -1683,7 +1690,7 @@ export class Sound {
    */
   playBossCinematicAudio(preset = 'shadow', durationSec = null, opts = {}) {
     if (!this.ctx && typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)) {
-      try { this.unlock?.(); } catch (e) {}
+      try { this.init?.(); } catch (e) {}
     }
     if (!this.ctx || this.muted || (this.vol ?? 0.7) <= 0) return { stop: () => {} };
     const prof = CINE_AUDIO_PROFILES[preset] || CINE_AUDIO_PROFILES.shadow;

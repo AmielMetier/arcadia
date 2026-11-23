@@ -1060,8 +1060,24 @@ export function createBoss3DScene(THREE, container, spriteImg, cfgInput = PRESET
   };
 
   const dispose = () => {
+    try {
+      scene.traverse((obj) => {
+        if (obj.geometry) try { obj.geometry.dispose(); } catch (e) {}
+        if (obj.material) {
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          for (const mat of mats) {
+            if (!mat) continue;
+            for (const mapKey of ['map', 'alphaMap', 'emissiveMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'envMap']) {
+              try { mat[mapKey]?.dispose?.(); } catch (e) {}
+            }
+            try { mat.dispose?.(); } catch (e) {}
+          }
+        }
+      });
+      try { scene.background?.dispose?.(); } catch (e) {}
+    } catch (e) {}
     try { bloom?.dispose?.(); composer?.dispose?.(); } catch (e) {}
-    try { renderer.dispose(); } catch (e) {}
+    try { renderer.dispose(); renderer.forceContextLoss?.(); } catch (e) {}
     try { if (renderer.domElement?.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement); } catch (e) {}
   };
 

@@ -73,19 +73,13 @@ export function appliquerBareme(maps, RG) { return retrograder(lignesObjets(maps
 
 /** les objets ordinaires posés (ceux du barème) avec le rang de l'endroit : { id: carte, m, it, propre, rang, zone } */
 export function lignesObjets(maps, RG) {
-  const lignes = [], parZone = new Map();
+  const lignes = [];
   for (const [id, m] of Object.entries(maps)) {
     const r = RG.get(id); if (!r || !m.items?.length) continue;
-    let min = JAMAIS; if (id !== 'monde') for (let i = 0; i < r.length; i++) if (r[i] < min) min = r[i];
     for (const it of m.items) {
       if (!(it.item in RANG_MIN)) continue;
       const propre = rangAutour(m, r, it.x, it.y); if (propre === JAMAIS) continue;
-      let zr = min, zn = id;
-      if (id === 'monde') {
-        const z = m.zoneAt(it.x, it.y); zn = z?.name || '?';
-        if (!parZone.has(z)) { let v = JAMAIS; if (z) for (let y = Math.max(0, z.y0); y <= Math.min(m.h - 1, z.y1); y++) for (let x = Math.max(0, z.x0); x <= Math.min(m.w - 1, z.x1); x++) { const q = r[y * m.w + x]; if (q < v && m.zoneAt(x, y) === z) v = q; } parZone.set(z, v); }
-        zr = parZone.get(z);
-      }
+      const zn = id === 'monde' ? (m.zoneAt(it.x, it.y)?.name || '?') : id;
       lignes.push({ id, m, it, propre, rang: propre, zone: zn });
     }
   }
