@@ -66,6 +66,8 @@ export async function allerDomaine(game) {
   const st = game.state, ui = game.ui, p = game.player;
   if (!st.domaine) return false;
   if (game.mapObj.gymLock != null && st.flags['IN:' + game.mapObj.id] && !game.libre) { await ui.say('Pas pendant un défi d\'arène !'); return false; }
+  if (game.mapObj.id === 'plateau:ligue' || game.mapObj.id.startsWith('ligue:')) { await ui.say('Pas pendant le défi de la Ligue Céleste !'); return false; }
+  if (game.donjons?.dansUnDonjon()) { await ui.say('Pas à l\'intérieur d\'un donjon !'); return false; }
   if (game.mapObj.id === DOMAINE) {
     const r = st.domaine.retour || { map: PORTE_MAISON.map, x: PORTE_MAISON.arrivee[0], y: PORTE_MAISON.arrivee[1], dir: 'left' };
     if (!(await ui.yesNo(`Revenir ${r.map === PORTE_MAISON.map ? 'à la maison' : 'là où tu étais'} ?`))) return false;

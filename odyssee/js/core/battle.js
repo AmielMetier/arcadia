@@ -1297,7 +1297,7 @@ export class Battle {
       type,
     });
 
-    if (!selfTarget && this.special(attRef, primaryTgt, mv)) { this.afterRampage(attRef); return; }
+    if (this.special(attRef, primaryTgt, mv)) { this.afterRampage(attRef); return; }
     if (mv.c === 'status' && x.u !== 'rest' && x.u !== 'belly-drum' && x.u !== 'reflect' && x.u !== 'light-screen' && x.u !== 'mist' && x.u !== 'safeguard' && x.u !== 'haze') {
       if (mv.tg === 4 || mv.tg === 7 || mv.tg === 12 || mv.tg === 13 || mv.tg === 14) {
         this.statusMove(attRef, primaryTgt, mv, hitTargets);
@@ -1468,7 +1468,7 @@ export class Battle {
       case 'splash': this.say('Mais rien ne se passe !'); return true;
       case 'teleport': if (this.wild && aR.side === 0) { this.say(`${this.Nm(aR)} se téléporte !`); this.end('run'); } else if (this.wild) { this.say(`${this.Nm(aR)} se téléporte !`); this.end('fled'); } else this.say('Mais cela échoue !'); return true;
       case 'rest':
-        if (m.hp >= m.stats[0]) { this.say('Mais cela échoue !'); return true; }
+        if (m.hp >= m.stats[0] || this.ab(aR) === 'insomnia' || this.ab(aR) === 'vital-spirit') { this.say('Mais cela échoue !'); return true; }
         m.status = 'slp'; m.slp = 3; this.ev.push({ t: 'status', side: aR.side, slot: aR.slot, status: 'slp' });
         this.hp(aR, m.stats[0]); this.say(`${this.Nm(aR)} s'endort et récupère ses PV !`); return true;
       case 'belly-drum':
@@ -1482,7 +1482,7 @@ export class Battle {
         if (scr[k]) { this.say('Mais cela échoue !'); return true; }
         scr[k] = 5; this.say(u === 'reflect' ? 'Protection augmente la résistance aux attaques physiques !' : 'Mur Lumière augmente la résistance aux attaques spéciales !'); return true;
       }
-      case 'mist': case 'safeguard': { const scr = this.sides[aR.side].screens; scr[u] = 5; this.say(u === 'mist' ? `${this.Nm(aR)} s'entoure de brume !` : `${this.Nm(aR)} est protégé par un voile mystique !`); return true; }
+      case 'mist': case 'safeguard': { const scr = this.sides[aR.side].screens; if (scr[u]) { this.say('Mais cela échoue !'); return true; } scr[u] = 5; this.say(u === 'mist' ? `${this.Nm(aR)} s'entoure de brume !` : `${this.Nm(aR)} est protégé par un voile mystique !`); return true; }
       case 'roar': case 'whirlwind':
         if (this.wild && this.slots === 1) { this.say(aR.side === 0 ? `${this.Nm(dR)} prend la fuite !` : 'Vous êtes renvoyé !'); this.end(aR.side === 0 ? 'win-flee' : 'fled'); }
         else this.say('Mais cela échoue !');

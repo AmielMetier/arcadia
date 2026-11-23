@@ -65,12 +65,12 @@ export function addMine({ W, maps, towns, trainerNpc, ENC }) {
   const m2 = niveau('mine2', 42, 30, 'Mine de Pierrefort — galeries profondes'); m2.encounter = enc;
   creuse(m2, 4, 4, 6, 25); creuse(m2, 4, 23, 34, 25);                    // galerie qui descend puis file à l'est
   creuse(m2, 7, 11, 9, 13); creuse(m2, 10, 8, 22, 16);                   // grande salle
-  creuse(m2, 23, 12, 30, 12);                                            // boyau étroit, fermé par l'éboulement
+  creuse(m2, 23, 12, 25, 12); creuse(m2, 26, 11, 30, 13);                // boyau étroit (Force), puis galerie d'éboulement contournable
   creuse(m2, 31, 6, 37, 16);                                             // salle du puits
   creuse(m2, 31, 21, 37, 25);                                            // cul-de-sac au bout des rails
   rails(m2, [...ligne(5, 6, 5, 24), ...ligne(6, 24, 33, 24)]);
   for (const y of [9, 15, 20]) etai(m2, 5, y);
-  m2.set(25, 12, T.BOULDER); m2.set(28, 12, T.BOULDER);                 // l'éboulement
+  m2.set(24, 12, T.BOULDER);                                             // l'éboulement (à pousser avec Force vers la galerie)
   m2.prop('wagonnet', 34, 24); m2.prop('wagonnet', 12, 9);
   for (const [x, y] of [[10, 8], [22, 8], [31, 7], [37, 16], [10, 16]]) m2.prop('lampe_mine', x, y);
   for (const [x, y] of [[14, 10], [19, 14], [33, 14], [36, 9], [20, 25]]) m2.prop('minerai', x, y);

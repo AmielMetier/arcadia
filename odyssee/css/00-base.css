@@ -222,7 +222,15 @@ img { image-rendering: pixelated; }
 .shop { right: calc(var(--px) * 8); top: calc(var(--px) * 8); min-width: calc(var(--px) * 150); max-height: calc(100vh - var(--px) * 64); }
 .shop .list-items { overflow-y: auto; }
 .money { position: absolute; left: calc(var(--px) * 8); top: calc(var(--px) * 8); padding: calc(var(--px) * 5) calc(var(--px) * 10); z-index: 24; }
-.qty { position: absolute; right: calc(var(--px) * 8); bottom: calc(var(--px) * 56); padding: calc(var(--px) * 4) calc(var(--px) * 10); z-index: 37; display: flex; gap: calc(var(--px) * 12); }
+.qty { position: absolute; right: calc(var(--px) * 8); bottom: calc(var(--px) * 56); padding: calc(var(--px) * 4) calc(var(--px) * 8); z-index: 37; display: flex; align-items: center; gap: calc(var(--px) * 4); pointer-events: auto; }
+.qty-val { min-width: calc(var(--px) * 28); text-align: center; font-weight: 700; }
+.qty-btn { font: inherit; font-size: .82em; font-weight: 700; color: var(--ink); background: #eef3fa; border: calc(var(--px) * .8) solid var(--frame); border-radius: calc(var(--px) * 2); padding: calc(var(--px) * 1.5) calc(var(--px) * 4); cursor: pointer; line-height: 1.1; }
+.qty-btn:hover { background: #dce8f8; }
+.qty-btn:active { transform: translateY(1px); }
+.qty-ok { background: #dff4e4; border-color: #3a8050; color: #1d502e; margin-left: calc(var(--px) * 3); }
+.qty-ok:hover { background: #c8ecd0; }
+.qty-no { background: #fae4e4; border-color: #a04040; color: #702020; }
+.qty-no:hover { background: #f5cccc; }
 .itm { width: calc(var(--px) * 16); height: calc(var(--px) * 16); vertical-align: middle; margin-right: calc(var(--px) * 2); }
 .toast { position: absolute; left: 50%; top: calc(var(--px) * 10); transform: translateX(-50%); padding: calc(var(--px) * 3) calc(var(--px) * 10); z-index: 40; }
 

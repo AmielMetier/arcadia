@@ -173,7 +173,7 @@ export class PvpBattle extends Battle {
     if (switched.length) {
       for (const s of this.sortBySpeed(switched)) this.triggerEntry(s);
     }
-    this.state = 'choose';
+    if (!this.checkFaints()) this.state = 'choose';
     return this.flush();
   }
 

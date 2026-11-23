@@ -12,6 +12,7 @@ import { rattraperCT } from './world/cts.js';
 import { ITEMS, itemName, applyItem, canUseOn, useCandy, formatFindItem, formatObtainItem, itemPocketName } from './core/items.js';
 import { SPECIES } from './data/species.js';
 import { MOVES } from './data/moves.js';
+import { moveDesc } from './data/moveDescriptions.js';
 import { SAUVAGE, R } from './data/remplacants.js';
 import { STARTERS, STARTER_CHOICES, STARTER_TABLE, starterSlot, RIVAL_NAME, BADGES, LEADERS, FIELD, CARTE_VERSION } from './world/region.js';
 import { migrerCarte } from './world/migration.js';
@@ -1659,80 +1660,83 @@ export class Game {
   async startMenu() {
     this.busy = true;
     let openChatAfter = false;
-    const st = this.state;
-    const opts = [];
-    if (st.flags.dex) opts.push(['Pokédex', 'dex']);
-    if (st.party.length) opts.push(['Équipe', 'party']);
-    if (st.party.length) opts.push(['Boîtes PC', 'pc']);
-    opts.push(['Sac', 'bag']);
-    if (this.canField('vol')) opts.push(['Vol', 'fly']);
-    opts.push(['Quêtes', 'quests']);
-    opts.push(['Trophées', 'trophies']);
-    opts.push(['Émotes & Chat', 'chat']);
-    if (this.donjons?.dansUnDonjon()) opts.push(['Journal du donjon', 'journalDonjon'], ['Quitter le donjon', 'donjon']);
-    if (this.donjons?.dansLeReflet()) opts.push(['Revenir au début de la salle', 'debutSalle']);
-    if (st.domaine) opts.push([this.mapObj.id === 'domaine' ? 'Revenir' : 'Domaine', 'domaine']);
-    const friendsMgr = getFriendsManager(this);
-    const others = Math.max(0, friendsMgr.getOnlineCount() - 1);
-    opts.push([others ? `Amis (${others} en ligne)` : 'Amis', 'friends']);
-    opts.push(['Carte de Dresseur', 'card'], ['Carte', 'map'], ['Code de sauvegarde', 'code'], ['Options', 'opt'], ['Fermer', 'close']);
-    // une petite icône devant chaque entrée (celles du HUD et du sac)
-    const ICO = { dex: ASSETS.item('dex'), party: 'img/hud/team.png', pc: 'img/hud/save.png', bag: 'img/hud/bag.png', quests: 'img/hud/quest.png', trophies: 'img/hud/trophy.png', friends: 'img/hud/friends.png', card: ASSETS.item('wallet'), map: 'img/hud/map.png', code: ASSETS.item('notebook'), domaine: ASSETS.item('gift'), fly: ASSETS.item('sifflet-celeste'), chat: 'img/hud/chat.png' };
-    const itemHtml = ([l, k]) => `<i class="sm-ico">${ICO[k] ? `<img src="${ICO[k]}" alt="">` : ''}</i>${esc(l)}`;
-    let idx = Math.min(this._menuIdx || 0, opts.length - 1);
-    for (;;) {
-      const r = await this.ui.list({ items: opts.map((x) => ({ label: x[0], html: itemHtml(x) })), cls: 'startmenu', cancel: -1, start: idx, onMove: (i) => { this._menuIdx = i; } });
-      if (r < 0 || opts[r][1] === 'close') break;
-      idx = r;
-      const k = opts[r][1];
-      if (k === 'dex') await dexScreen(this);
-      else if (k === 'party') await partyScreen(this, { mode: 'menu' });
-      else if (k === 'pc') await pcScreen(this);
-      else if (k === 'bag') { if (await this.fieldBag()) break; }
-      else if (k === 'fly') { if (this.player.surf || !this.mapObj.outdoor) { await this.ui.say('On ne peut pas s\'envoler d\'ici.'); continue; } if (await this.fly()) break; }
-      else if (k === 'friends') await friendsScreen(this);
-      else if (k === 'card') await cardScreen(this, BADGES);
-      else if (k === 'map') await mapScreen(this);
-      else if (k === 'quests') await questsScreen(this);
-      else if (k === 'trophies') await trophiesScreen(this);
-      else if (k === 'chat') { openChatAfter = true; break; }
-      else if (k === 'donjon') { if (await this.donjons.quitter()) break; }
-      else if (k === 'journalDonjon') await this.donjons.journal();
-      else if (k === 'debutSalle') { if (await this.ui.yesNo('Revenir à l\'entrée de la salle ? Copycat reprendra sa place.')) { await this.donjons.recommencerSalle(); break; } }
-      else if (k === 'domaine') { this.busy = false; if (await allerDomaine(this)) break; this.busy = true; }
-      else if (k === 'opt') {
-        const res = await optionsScreen(this);
-        if (res && res.reload) {
-          const ok = await this.ui.yesNo('Les graphismes ont changé ! Sauvegarder et relancer maintenant pour les appliquer ?');
-          if (ok) {
-            if (this.state && !this.enCombat) this.save(true);
-            try { sessionStorage.setItem('odyssee-auto-action', 'continue'); } catch (e) {}
-            await this.ui.fade(true, 250);
-            location.reload();
-            return;
+    try {
+      const st = this.state;
+      const opts = [];
+      if (st.flags.dex) opts.push(['Pokédex', 'dex']);
+      if (st.party.length) opts.push(['Équipe', 'party']);
+      if (st.party.length) opts.push(['Boîtes PC', 'pc']);
+      opts.push(['Sac', 'bag']);
+      if (this.canField('vol')) opts.push(['Vol', 'fly']);
+      opts.push(['Quêtes', 'quests']);
+      opts.push(['Trophées', 'trophies']);
+      opts.push(['Émotes & Chat', 'chat']);
+      if (this.donjons?.dansUnDonjon()) opts.push(['Journal du donjon', 'journalDonjon'], ['Quitter le donjon', 'donjon']);
+      if (this.donjons?.dansLeReflet()) opts.push(['Revenir au début de la salle', 'debutSalle']);
+      if (st.domaine) opts.push([this.mapObj.id === 'domaine' ? 'Revenir' : 'Domaine', 'domaine']);
+      const friendsMgr = getFriendsManager(this);
+      const others = Math.max(0, friendsMgr.getOnlineCount() - 1);
+      opts.push([others ? `Amis (${others} en ligne)` : 'Amis', 'friends']);
+      opts.push(['Carte de Dresseur', 'card'], ['Carte', 'map'], ['Code de sauvegarde', 'code'], ['Options', 'opt'], ['Fermer', 'close']);
+      // une petite icône devant chaque entrée (celles du HUD et du sac)
+      const ICO = { dex: ASSETS.item('dex'), party: 'img/hud/team.png', pc: 'img/hud/save.png', bag: 'img/hud/bag.png', quests: 'img/hud/quest.png', trophies: 'img/hud/trophy.png', friends: 'img/hud/friends.png', card: ASSETS.item('wallet'), map: 'img/hud/map.png', code: ASSETS.item('notebook'), domaine: ASSETS.item('gift'), fly: ASSETS.item('sifflet-celeste'), chat: 'img/hud/chat.png' };
+      const itemHtml = ([l, k]) => `<i class="sm-ico">${ICO[k] ? `<img src="${ICO[k]}" alt="">` : ''}</i>${esc(l)}`;
+      let idx = Math.min(this._menuIdx || 0, opts.length - 1);
+      for (;;) {
+        const r = await this.ui.list({ items: opts.map((x) => ({ label: x[0], html: itemHtml(x) })), cls: 'startmenu', cancel: -1, start: idx, onMove: (i) => { this._menuIdx = i; } });
+        if (r < 0 || opts[r][1] === 'close') break;
+        idx = r;
+        const k = opts[r][1];
+        if (k === 'dex') await dexScreen(this);
+        else if (k === 'party') await partyScreen(this, { mode: 'menu' });
+        else if (k === 'pc') await pcScreen(this);
+        else if (k === 'bag') { if (await this.fieldBag()) break; }
+        else if (k === 'fly') { if (this.player.surf || !this.mapObj.outdoor) { await this.ui.say('On ne peut pas s\'envoler d\'ici.'); continue; } if (await this.fly()) break; }
+        else if (k === 'friends') await friendsScreen(this);
+        else if (k === 'card') await cardScreen(this, BADGES);
+        else if (k === 'map') await mapScreen(this);
+        else if (k === 'quests') await questsScreen(this);
+        else if (k === 'trophies') await trophiesScreen(this);
+        else if (k === 'chat') { openChatAfter = true; break; }
+        else if (k === 'donjon') { if (await this.donjons.quitter()) break; }
+        else if (k === 'journalDonjon') await this.donjons.journal();
+        else if (k === 'debutSalle') { if (await this.ui.yesNo('Revenir à l\'entrée de la salle ? Copycat reprendra sa place.')) { await this.donjons.recommencerSalle(); break; } }
+        else if (k === 'domaine') { this.busy = false; if (await allerDomaine(this)) break; this.busy = true; }
+        else if (k === 'opt') {
+          const res = await optionsScreen(this);
+          if (res && res.reload) {
+            const ok = await this.ui.yesNo('Les graphismes ont changé ! Sauvegarder et relancer maintenant pour les appliquer ?');
+            if (ok) {
+              if (this.state && !this.enCombat) this.save(true);
+              try { sessionStorage.setItem('odyssee-auto-action', 'continue'); } catch (e) {}
+              await this.ui.fade(true, 250);
+              location.reload();
+              return;
+            }
           }
         }
-      }
-      else if (k === 'code') {
-        // le code reprend la partie telle qu'elle est maintenant : on sauvegarde d'abord
-        this.save(true);
-        await saveCodeScreen(this.ui, await encodeSave(this.state), saveSummary(this.state));
-      }
-      else if (k === 'save') {
-        if (await this.ui.yesNo('Sauvegarder la partie ?')) {
-          this.save();
-          if (!this.cloud?.on) await this.ui.say(`${st.name} a sauvegardé la partie.`);
-          else {
-            this.ui.say('Envoi de la sauvegarde en ligne…', { keep: true, noWaitLast: true });
-            const okOnline = await Promise.race([this.cloud.queue(st, true), wait(12000).then(() => null)]);
-            this.ui.closeDialog();
-            await this.ui.say(okOnline ? `${st.name} a sauvegardé la partie.\nElle est aussi enregistrée en ligne, sur ton compte du Hub.` : okOnline === null ? `${st.name} a sauvegardé la partie.\nLe serveur se réveille : l'envoi en ligne continue en arrière-plan.` : `${st.name} a sauvegardé la partie sur cet appareil.\nLe serveur en ligne ne répond pas pour l'instant.`);
-          }
+        else if (k === 'code') {
+          // le code reprend la partie telle qu'elle est maintenant : on sauvegarde d'abord
+          this.save(true);
+          await saveCodeScreen(this.ui, await encodeSave(this.state), saveSummary(this.state));
         }
-        break;
+        else if (k === 'save') {
+          if (await this.ui.yesNo('Sauvegarder la partie ?')) {
+            this.save();
+            if (!this.cloud?.on) await this.ui.say(`${st.name} a sauvegardé la partie.`);
+            else {
+              this.ui.say('Envoi de la sauvegarde en ligne…', { keep: true, noWaitLast: true });
+              const okOnline = await Promise.race([this.cloud.queue(st, true), wait(12000).then(() => null)]);
+              this.ui.closeDialog();
+              await this.ui.say(okOnline ? `${st.name} a sauvegardé la partie.\nElle est aussi enregistrée en ligne, sur ton compte du Hub.` : okOnline === null ? `${st.name} a sauvegardé la partie.\nLe serveur se réveille : l'envoi en ligne continue en arrière-plan.` : `${st.name} a sauvegardé la partie sur cet appareil.\nLe serveur en ligne ne répond pas pour l'instant.`);
+            }
+          }
+          break;
+        }
       }
+    } finally {
+      this.busy = false;
     }
-    this.busy = false;
     if (openChatAfter) this.openChat();
   }
   /** le sprite du joueur : sa tenue composée s'il en a une, sinon le dresseur ou la dresseuse de base */
@@ -1997,11 +2001,14 @@ export class Game {
   async wildBattle(enc, o = {}) {
     const tir = o.tirage || this.tirageSauvage(enc, o); if (!tir) return;
     const { e, lvl } = tir;
+    const wasBusy = this.busy;
     this.busy = true;
-    const wild = createMon(o.fixed ? e[0] : SAUVAGE(e[0]), lvl, { met: this.locationName() });
-    const res = await this.runBattle({ wild, music: o.music });
-    this.busy = false;
-    return res;
+    try {
+      const wild = createMon(o.fixed ? e[0] : SAUVAGE(e[0]), lvl, { met: this.locationName() });
+      return await this.runBattle({ wild, music: o.music });
+    } finally {
+      this.busy = wasBusy;
+    }
   }
 
   async trainerBattle(n, spotted) {
@@ -2359,42 +2366,46 @@ export class Game {
     const ui = this.ui, oldName = monName(m), fromSp = m.sp;
     const s = el('div', 'screen evo-scr'); s.innerHTML = '<canvas class="evo-cv" width="256" height="192"></canvas>'; ui.root.appendChild(s);
     const cv = s.querySelector('canvas'), x = cv.getContext('2d'); x.imageSmoothingEnabled = false;
-    const [a, b] = await Promise.all([loadImg(ASSETS.front(fromSp, m.shiny)), loadImg(ASSETS.front(to, m.shiny))]);
-    const white = (img) => { if (!img) return null; const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const q = c.getContext('2d'); q.drawImage(img, 0, 0); q.globalCompositeOperation = 'source-atop'; q.fillStyle = '#fff'; q.fillRect(0, 0, c.width, c.height); return c; };
-    const wa = white(a), wb = white(b);
-    let mode = 'old', scale = 1, flashA = 0, cancelled = false;
-    const drawBg = (t) => { const g = x.createRadialGradient(128, 96, 10, 128, 96, 160); g.addColorStop(0, '#406090'); g.addColorStop(1, '#101830'); x.fillStyle = g; x.fillRect(0, 0, 256, 192); x.fillStyle = 'rgba(255,255,255,0.5)'; for (let i = 0; i < 30; i++) { const ang = i * 0.7 + t * 0.002, r = (t * 0.05 + i * 17) % 140; x.fillRect(128 + Math.cos(ang) * r, 96 + Math.sin(ang) * r * 0.7, 2, 2); } };
-    let alive = true; const t0 = performance.now();
-    const loop = () => { if (!alive) return; const t = performance.now() - t0; drawBg(t); const img = mode === 'old' ? a : mode === 'new' ? b : mode === 'wa' ? wa : wb; if (img) { const w = 80 * scale * 1.6, h = 80 * scale * 1.6; x.drawImage(img, 128 - w / 2, 120 - h, w, h); } if (flashA > 0) { x.fillStyle = `rgba(255,255,255,${flashA})`; x.fillRect(0, 0, 256, 192); } requestAnimationFrame(loop); };
-    loop();
-    this.sound.stopMusic(0.2); this.sound.play('evolution');
-    await ui.say(`Quoi ? ${oldName} évolue !`, { keep: true });
-    this.sound.cry(ASSETS.cry(fromSp));
-    const pop = this.input.push((k) => { if (k === 'b') cancelled = true; });
-    mode = 'wa'; await wait(500);
-    this.sound.sfx('evolve');
-    for (let i = 0; i < 14 && !cancelled; i++) { mode = i % 2 ? 'wb' : 'wa'; scale = i % 2 ? 1.05 : 0.95; await wait(Math.max(70, 360 - i * 22)); }
-    pop();
-    if (cancelled) { mode = 'old'; scale = 1; await ui.say(`Hein ? ${oldName} n'a pas évolué !`); }
-    else {
-      flashA = 1; mode = 'new'; scale = 1; for (let i = 0; i < 20; i++) { flashA = 1 - i / 20; await wait(30); } flashA = 0;
-      const res = evolve(m, to); this.markCaught(to);
-      this.sound.cry(ASSETS.cry(to)); this.sound.sfx('levelup');
-      await ui.say(`Félicitations ! Votre ${oldName} a évolué en ${SPECIES[to].n} !`);
-      for (const id of res.learned) {
-        const M = MOVES[id];
-        const cat = M.c === 'special' ? 'Spécial' : M.c === 'status' ? 'Statut' : 'Physique';
-        const pow = M.p ? ('Puis. ' + M.p) : 'Statut';
-        const acc = M.a ? ('Préc. ' + M.a + '%') : 'Préc. —';
-        await ui.say([
-          `${monName(m)} apprend ${M.n} !`,
-          `[${TYPE_FR[M.t]} · ${cat} · ${pow} · ${acc}]\n${moveDesc(M)}`
-        ]);
+    let alive = true, pop = null;
+    try {
+      const [a, b] = await Promise.all([loadImg(ASSETS.front(fromSp, m.shiny)), loadImg(ASSETS.front(to, m.shiny))]);
+      const white = (img) => { if (!img) return null; const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const q = c.getContext('2d'); q.drawImage(img, 0, 0); q.globalCompositeOperation = 'source-atop'; q.fillStyle = '#fff'; q.fillRect(0, 0, c.width, c.height); return c; };
+      const wa = white(a), wb = white(b);
+      let mode = 'old', scale = 1, flashA = 0, cancelled = false;
+      const drawBg = (t) => { const g = x.createRadialGradient(128, 96, 10, 128, 96, 160); g.addColorStop(0, '#406090'); g.addColorStop(1, '#101830'); x.fillStyle = g; x.fillRect(0, 0, 256, 192); x.fillStyle = 'rgba(255,255,255,0.5)'; for (let i = 0; i < 30; i++) { const ang = i * 0.7 + t * 0.002, r = (t * 0.05 + i * 17) % 140; x.fillRect(128 + Math.cos(ang) * r, 96 + Math.sin(ang) * r * 0.7, 2, 2); } };
+      const t0 = performance.now();
+      const loop = () => { if (!alive) return; const t = performance.now() - t0; drawBg(t); const img = mode === 'old' ? a : mode === 'new' ? b : mode === 'wa' ? wa : wb; if (img) { const w = 80 * scale * 1.6, h = 80 * scale * 1.6; x.drawImage(img, 128 - w / 2, 120 - h, w, h); } if (flashA > 0) { x.fillStyle = `rgba(255,255,255,${flashA})`; x.fillRect(0, 0, 256, 192); } requestAnimationFrame(loop); };
+      loop();
+      this.sound.stopMusic(0.2); this.sound.play('evolution');
+      await ui.say(`Quoi ? ${oldName} évolue !`, { keep: true });
+      this.sound.cry(ASSETS.cry(fromSp));
+      pop = this.input.push((k) => { if (k === 'b') cancelled = true; });
+      mode = 'wa'; await wait(500);
+      this.sound.sfx('evolve');
+      for (let i = 0; i < 14 && !cancelled; i++) { mode = i % 2 ? 'wb' : 'wa'; scale = i % 2 ? 1.05 : 0.95; await wait(Math.max(70, 360 - i * 22)); }
+      pop(); pop = null;
+      if (cancelled) { mode = 'old'; scale = 1; await ui.say(`Hein ? ${oldName} n'a pas évolué !`); }
+      else {
+        flashA = 1; mode = 'new'; scale = 1; for (let i = 0; i < 20; i++) { flashA = 1 - i / 20; await wait(30); } flashA = 0;
+        const res = evolve(m, to); this.markCaught(to);
+        this.sound.cry(ASSETS.cry(to)); this.sound.sfx('levelup');
+        await ui.say(`Félicitations ! Votre ${oldName} a évolué en ${SPECIES[to].n} !`);
+        for (const id of res.learned) {
+          const M = MOVES[id];
+          const cat = M.c === 'special' ? 'Spécial' : M.c === 'status' ? 'Statut' : 'Physique';
+          const pow = M.p ? ('Puis. ' + M.p) : 'Statut';
+          const acc = M.a ? ('Préc. ' + M.a + '%') : 'Préc. —';
+          await ui.say([
+            `${monName(m)} apprend ${M.n} !`,
+            `[${TYPE_FR[M.t]} · ${cat} · ${pow} · ${acc}]\n${moveDesc(M)}`
+          ]);
+        }
+        for (const id of res.ask) await this.askLearn(m, id);
       }
-      for (const id of res.ask) await this.askLearn(m, id);
+      return !cancelled;
+    } finally {
+      pop?.(); alive = false; s.remove(); this.sound.current = null; this.updateZone();
     }
-    alive = false; s.remove(); this.sound.current = null; this.updateZone();
-    return !cancelled;
   }
 
   /** meubles et objets du décor : un petit texte, comme sur DS (le lit de la maison soigne l'équipe) */
@@ -2957,8 +2968,9 @@ async chooseStarter(sp, cap) {
   /** Cap des Étoiles : Odyssor apparaît (après le badge de Drakos), on peut tenter de le capturer */
   async odyssorEvent() {
     const st = this.state, ui = this.ui;
-    if (!st.badges[7] || st.flags.odyssor === 'caught' || st.flags.odyssorNow) return false;
-    this.busy = true; st.flags.odyssorNow = true; st.flags.odyssorMet = true;
+    if (!st.badges[7] || st.flags.odyssor === 'caught' || this._odyssorNow) return false;
+    delete st.flags.odyssorNow;
+    this.busy = true; this._odyssorNow = true; st.flags.odyssorMet = true;
     try {
       this.musicLock = true; this.sound.play('mystic');
       await ui.say(['La mer se met à scintiller...', 'Une immense silhouette bleue glisse entre les vagues.', 'C\'est Odyssor, le géant des océans !']);
@@ -2978,7 +2990,7 @@ async chooseStarter(sp, cap) {
       else await ui.say(['Odyssor replonge et disparaît vers le large...', 'Peut-être reviendra-t-il un autre jour.']);
     } finally {
       this.musicLock = false; this.updateZone();
-      setTimeout(() => { st.flags.odyssorNow = false; }, 4000);
+      setTimeout(() => { this._odyssorNow = false; }, 4000);
       this.busy = false;
     }
     return true;

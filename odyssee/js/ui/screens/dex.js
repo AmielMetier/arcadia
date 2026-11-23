@@ -105,7 +105,7 @@ export function dexScreen(game, opts = {}) {
         draw();
         const id = ids[i];
         if (seen.has(id)) {
-          try { ui.sound?.cry?.(id); } catch (err) {}
+          try { ui.sound?.cry?.(ASSETS.cry(id)); } catch (err) {}
         }
       });
     });
@@ -130,7 +130,7 @@ export function dexScreen(game, opts = {}) {
       } else if (k === 'a') {
         const id = ids[i];
         if (seen.has(id)) {
-          try { ui.sound?.cry?.(id); } catch (e) {}
+          try { ui.sound?.cry?.(ASSETS.cry(id)); } catch (e) {}
           if (spr) {
             spr.style.transform = 'scale(1.2)';
             setTimeout(() => { if (spr) spr.style.transform = ''; }, 200);

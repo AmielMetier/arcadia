@@ -234,7 +234,7 @@ export function bagScreen(game, o = {}) {
 
         const canUse = o.battle
           ? (it.heal || it.cure || it.revive || it.ball || it.pp || it.ppAll)
-          : (!it.key || it.field || it.ct || sel === 'town-map' || sel === 'velo');
+          : (!it.key || it.field || it.ct || sel === 'town-map' || sel === 'velo' || sel === 'canne');
         useBtn.disabled = !canUse;
         useBtn.classList.toggle('disabled', !canUse);
 
@@ -367,7 +367,7 @@ export function bagScreen(game, o = {}) {
       const item = es[i], it = ITEMS[item];
       const canUse = o.battle
         ? (it.heal || it.cure || it.revive || it.ball || it.pp || it.ppAll)
-        : (!it.key || it.field || it.ct || item === 'town-map' || item === 'velo');
+        : (!it.key || it.field || it.ct || item === 'town-map' || item === 'velo' || item === 'canne');
 
       if (!canUse) {
         ui.sound.sfx('bump');

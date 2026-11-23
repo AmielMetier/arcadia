@@ -344,7 +344,9 @@ export class BattleView {
     if (s.screenFlash > 0) { x.fillStyle = `rgba(255,255,255,${s.screenFlash})`; x.fillRect(0, 0, W, BH); }
     if (s.wipe > 0) { x.fillStyle = '#000'; const h = BH / 2 * s.wipe; x.fillRect(0, 0, W, h); x.fillRect(0, BH - h, W, h); }
 
-    const dt = 1 / 60;
+    const dt = this._lastFrameT ? Math.min(0.05, Math.max(0.001, (now - this._lastFrameT) / 1000)) : 1 / 60;
+    this._lastFrameT = now;
+    if (s.screenFlash > 0) s.screenFlash = Math.max(0, s.screenFlash - dt * 2.8);
     for (const a of s.afterimages) a.life -= dt;
     s.afterimages = s.afterimages.filter((a) => a.life > 0);
     for (const p of s.parts) {
@@ -578,6 +580,7 @@ export class BattleView {
   async msg(text, o = {}) { await this.ui.typePage(this.textBox, text, { auto: o.wait ? 0 : 750 }); }
 
   initState() {
+    this._lastFrameT = 0;
     const mk = () => Array.from({ length: this.slots }, freshSpr);
     this.st = {
       shakeX: 0, shakeY: 0, eSlide: -this.W, pSlide: this.W, screenFlash: 0, wipe: 0, parts: [], balls: [], afterimages: [],
@@ -657,7 +660,7 @@ export class BattleView {
     this.buildDom();
     this.root.style.setProperty('--bp', (innerHeight / BH) + 'px');
     this.updateWeather(b.weather);
-    this.game.sound.playMusic('trainer', 0.25);
+    this.game.sound.play('trainer');
     const jobs = [this.loadBattleDecor(this.kind, o.night ?? specSession.night)];
     for (let k = 0; k < sl; k++) jobs.push(this.loadSide(1, k), this.loadSide(0, k));
     await Promise.all(jobs);

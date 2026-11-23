@@ -135,18 +135,41 @@ export class UI {
     });
   }
 
-  /** choix d'une quantité (gauche/droite ±1, haut/bas ±10) */
+  /** choix d'une quantité (gauche/droite ±1, haut/bas ±10, cliquable souris/tactile) */
   quantity(max, o = {}) {
     return new Promise((resolve) => {
       const w = el('div', 'box qty'); this.root.appendChild(w);
-      let q = 1;
-      const draw = () => { w.innerHTML = `<span>× ${String(q).padStart(2, '0')}</span>${o.price ? `<span class="rgt">${(q * o.price).toLocaleString('fr-FR')} ₽</span>` : ''}`; };
+      let q = 1, done = false;
+      const draw = () => {
+        const priceHtml = o.price ? `<span class="rgt">${(q * o.price).toLocaleString('fr-FR')} ₽</span>` : '';
+        w.innerHTML = `<button type="button" class="qty-btn" data-d="-10" title="-10">−10</button><button type="button" class="qty-btn" data-d="-1" title="-1">−</button><span class="qty-val">× ${String(q).padStart(2, '0')}</span><button type="button" class="qty-btn" data-d="1" title="+1">+</button><button type="button" class="qty-btn" data-d="10" title="+10">+10</button>${priceHtml}<button type="button" class="qty-btn qty-ok" data-act="ok">OK</button><button type="button" class="qty-btn qty-no" data-act="no">✕</button>`;
+      };
+      const finish = (val, sfx) => {
+        if (done) return;
+        done = true; pop(); w.remove(); this.sound.sfx(sfx); resolve(val);
+      };
       draw();
+      w.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const b = e.target.closest('button'); if (!b) return;
+        if (b.dataset.act === 'ok') { finish(q, 'select'); return; }
+        if (b.dataset.act === 'no') { finish(0, 'cancel'); return; }
+        const d = +b.dataset.d;
+        if (!d) return;
+        if (d === 1) q = q >= max ? 1 : q + 1;
+        else if (d === -1) q = q <= 1 ? max : q - 1;
+        else if (d > 0) q = q >= max ? 1 : Math.min(max, q + d);
+        else q = q <= 1 ? max : Math.max(1, q + d);
+        this.sound.sfx('blip'); draw();
+      });
       const pop = this.input.push((k) => {
-        if (k === 'up' || k === 'right') q = q >= max ? 1 : q + (k === 'up' ? 1 : 1);
-        else if (k === 'down' || k === 'left') q = q <= 1 ? max : q - 1;
-        else if (k === 'a') { pop(); w.remove(); this.sound.sfx('select'); resolve(q); return; }
-        else if (k === 'b') { pop(); w.remove(); this.sound.sfx('cancel'); resolve(0); return; }
+        if (k === 'right') q = q >= max ? 1 : q + 1;
+        else if (k === 'left') q = q <= 1 ? max : q - 1;
+        else if (k === 'up') q = q >= max ? 1 : Math.min(max, q + 10);
+        else if (k === 'down') q = q <= 1 ? max : Math.max(1, q - 10);
+        else if (k === 'a') { finish(q, 'select'); return; }
+        else if (k === 'b') { finish(0, 'cancel'); return; }
+        else return;
         this.sound.sfx('blip'); draw();
       });
     });

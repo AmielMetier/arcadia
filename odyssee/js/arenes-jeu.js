@@ -3,7 +3,7 @@
 // fendent), interrupteurs, leviers et miroirs, rochers qui comblent les fosses, rayon qui barre la route, pupitre qui
 // remet l'arène à zéro. Les règles sont celles du solveur (world/arenes-plan.js) : ce qui se résout là se résout ici.
 import { T, DIRS } from './world/tiles.js';
-import { appliquerEtat, agir, tirCanon, rayons, pousserTourniquet } from './world/arenes-plan.js';
+import { appliquerEtat, agir, cond, tirCanon, rayons, pousserTourniquet } from './world/arenes-plan.js';
 import { wait } from './ui/ui.js';
 
 const k2 = (x, y) => x + ',' + y;
@@ -113,6 +113,27 @@ export async function actionnerArene(g, o) {
     return;
   }
   const R = regsArene(g), R2 = agir(o.a, R, m);
+  const isCartel = !!(o.a?.seq || (o.a?.set && o.a.set[1] === 0 && o.a.sauf));
+  if (isCartel) {
+    const idx = o.a.seq ? o.a.seq[0] : o.a.set[0];
+    const dejaOuvert = !!(o.a.sauf && cond(o.a.sauf, R, m));
+    if (dejaOuvert) {
+      if (o.msg) await g.ui.say(o.msg);
+      return;
+    }
+    if (R2[idx] > R[idx]) {
+      g.sound.sfx(o.son || 'select'); g.view.shake = 0.05;
+      changerRegs(g, R2);
+      const msgs = [o.msg];
+      if (o.a.sauf && cond(o.a.sauf, R2, m)) msgs.push('Un déclic retentit : la porte s\'ouvre !');
+      await g.ui.say(msgs.filter(Boolean));
+    } else {
+      g.sound.sfx('bump');
+      if (R2.join() !== R.join()) changerRegs(g, R2);
+      await g.ui.say([o.msg, R[idx] > 0 ? 'Oups ! Ce n\'est pas le bon ordre… Il faut reprendre cette salle depuis le début.' : 'Ce n\'est pas la bonne œuvre pour commencer… Lis bien le panneau de la salle !'].filter(Boolean));
+    }
+    return;
+  }
   if (R2.join() === R.join()) { await g.ui.say(o.dejaMsg || 'Rien ne se passe.'); return; }
   // arène Fée : le rayon ne doit pas traverser le joueur
   if (m.planArene?.rayonBloque && rayons(m, R2).some((r) => r.cases.some(([x, y]) => x === p.x && y === p.y))) {

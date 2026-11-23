@@ -20,7 +20,7 @@ function table(ui, cls, title) {
 /* ============================== CASINO ============================== */
 export const PRIX_JETON = 20;
 const LOTS = [
-  { k: 'rare-candy', jetons: 120 }, { k: 'ultra-ball', jetons: 40 }, { k: 'max-potion', jetons: 60 }, { k: 'full-restore', jetons: 90 },
+  { k: 'rare-candy', jetons: 250 }, { k: 'ultra-ball', jetons: 65 }, { k: 'max-potion', jetons: 130 }, { k: 'full-restore', jetons: 155 },
   { k: 'moon-stone', jetons: 150 }, { k: 'fire-stone', jetons: 150 }, { k: 'water-stone', jetons: 150 }, { k: 'thunder-stone', jetons: 150 }, { k: 'leaf-stone', jetons: 150 },
 ];
 /** comptoir du casino : achat de jetons, choix d'une table, échange contre des lots */

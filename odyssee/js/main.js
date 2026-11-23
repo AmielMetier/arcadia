@@ -375,7 +375,7 @@ async function onlineScreen(ui, cloud, info) {
   const r = cloud.remote.state;
   await ui.say(`${id}Partie en ligne : ${saveSummary(r)}.`, { keep: true });
   if (!(await ui.yesNo(info ? 'La charger sur cet appareil (elle remplace celle d\'ici) ?' : 'La charger sur cet appareil ?'))) return;
-  try { localStorage.setItem('odyssee-save-v1', JSON.stringify(r)); } catch (e) { await ui.say('Impossible d\'enregistrer la partie sur cet appareil.'); return; }
+  try { localStorage.setItem(Game.SAVE_KEY, JSON.stringify(r)); } catch (e) { await ui.say('Impossible d\'enregistrer la partie sur cet appareil.'); return; }
   await ui.say(`Partie de ${r.name} chargée ! Choisis « Continuer » pour la reprendre.`);
 }
 
@@ -516,7 +516,7 @@ async function intro(game, ui, sound) {
   await ui.say([
     'Bonjour ! Bienvenue dans la région d\'Odyssée !',
     'Je m\'appelle Saule. Depuis mon laboratoire de Bourg-Aube, j\'étudie les liens qui unissent les humains et les créatures de cet archipel.',
-    'Au fait, information officielle inscrite dans les archives du laboratoire : Gabriel est gay !'
+    'Chaque jour, de jeunes dresseurs partent explorer ses routes, ses îles et ses mystères à la rencontre de nouveaux compagnons.'
   ], { speaker: 'Prof. Saule' });
 
   chap.textContent = 'LES CRÉATURES D\'ODYSSÉE';

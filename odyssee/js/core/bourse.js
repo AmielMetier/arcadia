@@ -235,7 +235,8 @@ export function prixDe(m, id) { return id === INDICE.id ? indice(m) / 10 : m.pri
 export function ordre(m, id, qte, argent) {
   const p = prixDe(m, id), pos = m.positions[id] || { qte: 0, pru: 0 };
   if (qte < 0 && -qte > pos.qte) return { ok: false, err: 'Tu n\'as pas autant de titres à vendre.' };
-  const brut = p * qte, frais = Math.abs(brut) * 0.002, total = Math.round(brut + frais);
+  const brut = p * qte, frais = Math.abs(brut) * 0.002;
+  const total = qte > 0 ? Math.ceil(brut + frais) : (-Math.floor(Math.abs(brut) - frais) || 0);
   if (total > argent) return { ok: false, err: 'Pas assez de Pokédollars.' };
   if (qte > 0) pos.pru = (pos.pru * pos.qte + p * qte) / (pos.qte + qte);
   pos.qte += qte; if (pos.qte === 0) delete m.positions[id]; else m.positions[id] = pos;
