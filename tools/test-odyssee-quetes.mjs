@@ -9,7 +9,7 @@ let fails = 0;
 const ok = (c, msg) => { if (!c) { fails++; console.log('ÉCHEC :', msg); } };
 const W = buildWorld();
 const F = {}, bag = {}, party = [], box = [];
-const game = { hour: () => 22, refreshNpcs() {}, state: { flags: F, bag, party, box, name: 'Léa' }, npcs: [] };
+const game = { hour: () => 22, refreshNpcs() {}, badgeCount: () => 8, state: { flags: F, bag, party, box, name: 'Léa' }, npcs: [] };
 const A = {
   game, st: game.state, f: F, name: 'Léa', e: 'e',
   say: async () => {}, yesNo: async () => true, ask: async () => 0,

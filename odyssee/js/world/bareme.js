@@ -66,8 +66,7 @@ export const rangRoute = (id) => RANG_ROUTES[id] ?? 4;
 
 /**
  * Rétrograde les objets posés trop forts pour l'endroit, sur toutes les cartes atteintes. Rang retenu pour un objet :
- * celui de sa zone (badges pour y entrer ; pour une grotte ou une maison, pour y entrer) — un objet derrière un rocher
- * à pousser sur la route 1, ou sur un îlot du port qu'on n'atteint qu'en surfant, reste un objet du début de l'aventure.
+ * celui de sa propre case (badges/CS requis pour l'atteindre) afin qu'un objet caché derrière Coupe, Force ou Surf garde le rang de son accès.
  * Renvoie la liste des changements [carte, id, avant, après, rang, zone].
  */
 export function appliquerBareme(maps, RG) { return retrograder(lignesObjets(maps, RG)); }
@@ -87,7 +86,7 @@ export function lignesObjets(maps, RG) {
         if (!parZone.has(z)) { let v = JAMAIS; if (z) for (let y = Math.max(0, z.y0); y <= Math.min(m.h - 1, z.y1); y++) for (let x = Math.max(0, z.x0); x <= Math.min(m.w - 1, z.x1); x++) { const q = r[y * m.w + x]; if (q < v && m.zoneAt(x, y) === z) v = q; } parZone.set(z, v); }
         zr = parZone.get(z);
       }
-      lignes.push({ id, m, it, propre, rang: Math.min(propre, zr === JAMAIS ? propre : zr), zone: zn });
+      lignes.push({ id, m, it, propre, rang: propre, zone: zn });
     }
   }
   return lignes;

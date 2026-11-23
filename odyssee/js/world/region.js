@@ -88,26 +88,25 @@ export const FIELD = {
   flash: { name: 'Flash', cs: 'CS05', badge: 1, desc: 'Éclaire les grottes plongées dans le noir.' },
   force: { name: 'Force', cs: 'CS06', badge: 3, desc: 'Pousse les gros rochers qui barrent certains chemins.' },
 };
-const STOCK = {
+export const STOCK = {
   1: ['poke-ball', 'potion', 'antidote', 'paralyze-heal', 'awakening', 'repel'],
   2: ['poke-ball', 'potion', 'super-potion', 'antidote', 'paralyze-heal', 'awakening', 'burn-heal', 'ice-heal', 'repel', 'escape-rope'],
   3: ['poke-ball', 'great-ball', 'potion', 'super-potion', 'antidote', 'paralyze-heal', 'awakening', 'burn-heal', 'ice-heal', 'repel', 'super-repel', 'escape-rope'],
   4: ['poke-ball', 'great-ball', 'super-potion', 'hyper-potion', 'full-heal', 'revive', 'super-repel', 'escape-rope', 'thunder-stone', 'moon-stone'],
   5: ['great-ball', 'super-potion', 'hyper-potion', 'full-heal', 'revive', 'super-repel', 'escape-rope', 'leaf-stone', 'fire-stone', 'water-stone', 'sun-stone', 'dusk-stone', 'dawn-stone', 'shiny-stone', 'ice-stone', 'ether'],
   6: ['great-ball', 'ultra-ball', 'hyper-potion', 'max-potion', 'full-heal', 'revive', 'max-repel', 'escape-rope', 'ether', 'elixir'],
-  7: ['ultra-ball', 'hyper-potion', 'max-potion', 'full-restore', 'full-heal', 'revive', 'max-repel', 'escape-rope', 'elixir'],
+  7: ['ultra-ball', 'hyper-potion', 'max-potion', 'full-restore', 'full-heal', 'revive', 'max-revive', 'max-repel', 'escape-rope', 'elixir', 'max-elixir'],
 };
-// baies et objets tenus (5.95) : de plus en plus au fil des boutiques ; les grandes villes du Sud vendent les objets de
-// combat les plus forts (les baies de résistance poussent aussi sur les arbres à baies : world/faune.js)
-{ const plus = {
+// baies et objets tenus (5.95) : de plus en plus au fil des boutiques ; les objets compétitifs uniques restent en exploration + PCo
+{ const TYPE_BOOSTERS = ['charcoal', 'mystic-water', 'miracle-seed', 'magnet', 'never-melt-ice', 'black-belt', 'poison-barb', 'soft-sand', 'sharp-beak', 'twisted-spoon', 'silver-powder', 'hard-stone', 'spell-tag', 'dragon-fang', 'black-glasses', 'metal-coat', 'silk-scarf', 'fairy-feather'];
+  const plus = {
     3: ['cheri-berry', 'pecha-berry', 'rawst-berry'],
     4: ['cheri-berry', 'chesto-berry', 'pecha-berry', 'rawst-berry', 'aspear-berry', 'persim-berry', 'muscle-band', 'wise-glasses'],
     5: ['cheri-berry', 'chesto-berry', 'pecha-berry', 'rawst-berry', 'aspear-berry', 'persim-berry', 'occa-berry', 'passho-berry', 'wacan-berry', 'rindo-berry', 'yache-berry', 'shuca-berry',
       'muscle-band', 'wise-glasses', 'quick-claw', 'scope-lens', 'big-root', 'white-herb'],
     6: ['occa-berry', 'passho-berry', 'wacan-berry', 'rindo-berry', 'yache-berry', 'chople-berry', 'shuca-berry', 'coba-berry', 'payapa-berry', 'kasib-berry', 'haban-berry', 'colbur-berry', 'roseli-berry',
-      'muscle-band', 'wise-glasses', 'quick-claw', 'scope-lens', 'expert-belt', 'white-herb', 'kings-rock', 'black-sludge', 'shell-bell', 'leftovers', 'focus-sash',
-      'charcoal', 'mystic-water', 'miracle-seed', 'magnet', 'never-melt-ice', 'black-belt', 'poison-barb', 'soft-sand', 'sharp-beak', 'twisted-spoon', 'silver-powder', 'hard-stone', 'spell-tag', 'dragon-fang', 'black-glasses', 'metal-coat', 'silk-scarf', 'fairy-feather'],
-    7: ['liechi-berry', 'ganlon-berry', 'petaya-berry', 'apicot-berry', 'salac-berry', 'assault-vest', 'expert-belt', 'life-orb', 'choice-band', 'choice-specs', 'choice-scarf', 'eviolite', 'rocky-helmet', 'leftovers', 'focus-sash'],
+      'muscle-band', 'wise-glasses', 'quick-claw', 'scope-lens', 'white-herb', 'kings-rock', 'black-sludge', 'shell-bell', 'heart-scale', ...TYPE_BOOSTERS],
+    7: ['liechi-berry', 'ganlon-berry', 'petaya-berry', 'apicot-berry', 'salac-berry', 'muscle-band', 'wise-glasses', 'quick-claw', 'scope-lens', 'white-herb', 'kings-rock', 'black-sludge', 'shell-bell', 'heart-scale', ...TYPE_BOOSTERS],
   };
   for (const [k, L] of Object.entries(plus)) STOCK[k] = STOCK[k].concat(L); }
 
@@ -126,8 +125,8 @@ export const ENC = {
   granit: [[1060, 36, 38, 3], [1026, 34, 37, 15], [1027, 36, 38, 5], [1028, 34, 38, 15], [1047, 34, 37, 10], [1048, 37, 39, 3], [74, 34, 37, 15], [111, 35, 38, 10], [1045, 34, 37, 10], [1046, 37, 39, 2], [95, 35, 38, 10], [1024, 34, 37, 5], [140, 34, 37, 4], [138, 34, 37, 4], [447, 34, 36, 3]],
   cendre: [[1041, 38, 42, 20], [1042, 41, 43, 5], [1005, 40, 42, 3], [77, 38, 42, 15], [126, 40, 43, 5], [1028, 38, 41, 10], [1043, 38, 42, 12], [1044, 41, 43, 3], [218, 38, 42, 12], [1036, 38, 41, 10]],
   ecaille: [[1058, 43, 46, 3], [1049, 42, 45, 12], [1050, 45, 47, 4], [1044, 43, 46, 10], [1025, 42, 46, 12], [1016, 42, 45, 10], [1012, 43, 46, 8], [1023, 42, 45, 10], [1048, 43, 46, 8], [148, 44, 46, 6], [1040, 43, 46, 8], [1035, 42, 45, 8], [147, 42, 44, 4], [1, 40, 44, 3], [152, 40, 44, 3], [252, 40, 44, 3], [650, 40, 44, 3]],
-  r9: [[1012, 34, 38, 15], [1035, 34, 38, 10], [67, 34, 38, 20], [75, 34, 38, 20], [42, 34, 37, 20], [1044, 35, 38, 10], [105, 34, 37, 5], [446, 34, 37, 4], [686, 34, 37, 4]],
-  victoire: [[1056, 38, 42, 4], [67, 36, 42, 12], [75, 36, 42, 12], [1028, 36, 42, 12], [1025, 36, 40, 12], [1048, 38, 42, 8], [1050, 38, 42, 6], [95, 37, 41, 8], [42, 36, 40, 12], [105, 36, 40, 8], [1044, 38, 42, 6], [208, 39, 42, 2], [1051, 50, 50, 1]],
+  r9: [[1012, 68, 72, 15], [1035, 68, 72, 10], [68, 68, 72, 20], [76, 68, 72, 20], [169, 68, 72, 20], [1044, 69, 73, 10], [105, 68, 72, 5], [143, 70, 73, 4], [687, 69, 72, 4]],
+  victoire: [[1056, 70, 74, 4], [68, 70, 74, 12], [76, 70, 74, 12], [1028, 70, 74, 12], [1025, 70, 74, 12], [1048, 71, 74, 8], [1050, 71, 74, 6], [208, 71, 75, 8], [169, 70, 74, 12], [105, 70, 74, 8], [1044, 71, 74, 6], [464, 72, 75, 2], [1051, 75, 75, 1]],
   // îles du bateau : un cran au-dessus de l'arène précédente
   orage: [[1034, 20, 24, 15], [1036, 21, 24, 10], [81, 20, 24, 12], [100, 20, 24, 10], [1029, 20, 24, 10], [21, 20, 23, 10], [22, 22, 25, 5], [1031, 20, 24, 10], [179, 20, 23, 10], [180, 24, 26, 3], [1037, 22, 25, 5]],
   grue: [[1054, 30, 32, 3], [1021, 27, 31, 10], [1038, 27, 31, 10], [1039, 27, 30, 10], [1023, 28, 31, 10], [96, 27, 31, 10], [177, 27, 30, 10], [203, 28, 31, 8], [163, 27, 30, 10], [164, 30, 32, 3], [1043, 28, 31, 8], [1015, 27, 30, 8]],
@@ -158,17 +157,17 @@ export const LEADERS = [
   // (Abri, Siffl'Herbe), Bourdonnet frappe vite et puise dans ses Sacoches de Pollen quand il faiblit (talent propre à Odyssée)
   // équipe : [espèce, niveau, objet tenu, attaques, talent]
   { name: 'Hector', type: 'bug', ow: 'hector', team: [
-    [167, 13, null, [81, 184, 40, 132]],
-    [541, 14, null, [182, 320, 75, 106]],
-    [1020, 15, null, [42, 210, 98, 230], 'sacoches-pollen'],
-  ], intro: ['Bienvenue sous mon dôme. Ici, chaque insecte a sa place, et chaque souffle d\'air compte.', 'Tu as su guider le pollen jusqu\'aux stèles... Voyons si tu sais guider tes Pokémon !'], lose: 'Tu as l\'œil vif et la main sûre ! Le Badge Élytre est à toi.' },
+    [167, 12, null, [81, 184, 40, 132]],
+    [541, 13, null, [182, 320, 75, 106]],
+    [1020, 14, null, [42, 210, 98, 230], 'sacoches-pollen'],
+  ], intro: ['Bienvenue dans ma Ruche. Ici, chaque insecte a sa place, et chaque alvéole cache un secret.', 'Tu as su percer les murs de cire... Voyons si tu sais guider tes Pokémon !'], lose: 'Tu as l\'œil vif et la main sûre ! Le Badge Élytre est à toi.' },
   { name: 'Marine', type: 'water', ow: 'marine', team: [[1031, 19], [1029, 19], [120, 20], [1033, 22]], intro: 'La marée monte ! Tu vas te faire emporter par mes créatures de l\'océan !', lose: 'Ouah, tu as tenu face à la vague. Voici le Badge Écume !' },
   { name: 'Volta', type: 'electric', ow: 'volta', team: [[1034, 25], [1036, 26], [82, 26], [1035, 29]], intro: 'Ça grésille ! Prépare-toi à recevoir le choc de ta vie !', lose: 'Court-circuit total ! Tu remportes le Badge Volt.' },
   { name: 'Flora', type: 'grass', ow: 'flora', team: [[1021, 30], [1038, 31], [114, 31], [1022, 34]], intro: 'Mes fleurs sont belles, mais elles savent piquer. Prêt ?', lose: 'Tu as fait éclore quelque chose de beau. Le Badge Pétale te revient.' },
   { name: 'Sibylle', type: 'psychic', ow: 'sibylle', team: [[1039, 35], [1030, 36], [1019, 36], [65, 37], [1040, 39]], intro: 'J\'ai déjà vu l\'issue de ce combat... mais montre-moi quand même.', lose: 'L\'avenir m\'a trompée. Le Badge Mirage est à toi.' },
   { name: 'Basalte', type: 'rock', ow: 'basalte', team: [[1026, 40], [111, 41], [1028, 42], [95, 42], [1027, 44]], intro: 'Mon frère aîné m\'a confié cette île. Pour aller plus loin, il faudra passer à travers la roche !', lose: 'Tu as fendu le roc... Le Badge Granit est à toi. Drakos ne va pas aimer ça.' },
   { name: 'Pyros', type: 'fire', ow: 'pyros', team: [[1041, 45], [78, 46], [1005, 46], [126, 47], [1042, 49]], intro: 'Le volcan gronde et mon cœur aussi ! Personne ne passe sur la Grande Île sans brûler un peu !', lose: 'Quelle flamme... Le Badge Braise te va bien. Va. Drakos t\'attend.' },
-  { name: 'Drakos', type: 'dragon', ow: 'drakos', team: [[1049, 50], [1044, 52], [148, 52], [1050, 53], [149, 54], [1051, 56]], intro: 'Dix ans que personne n\'a franchi cette porte. Célestine t\'envoie ? Peu importe. Ici, c\'est moi qui règne !', lose: '... Les dragons te reconnaissent. Prends le Badge Écaille. Le dernier.' },
+  { name: 'Drakos', type: 'dragon', ow: 'drakos', team: [[1049, 50], [1044, 52], [148, 52], [1050, 53], [149, 54], [1051, 56]], intro: 'Dix ans que personne n\'a franchi cette porte. Célestine t\'envoie ? Peu importe. Ici, c\'est moi qui règne !', lose: '... Les dragons te reconnaissent. Prends le Badge Écaille. Les huit badges du Nord sont à toi — les sept Champions des Terres du Sud t\'attendent au-delà du Pont de l\'Austral.' },
   ...LEADERS_SUD,
 ];
 const CHAMPION = { name: 'Célestine', ow: 'celestine', team: [[1016, 77], [1046, 78], [1035, 78], [1040, 79], [248, 79], [149, 81]], intro: 'Quinze badges... Les huit du Nord et les sept des Terres du Sud. Tu as parcouru toute la région pour arriver jusqu\'ici. Alors montre-moi tout ce que tu as appris !', lose: 'Magnifique. Tu es le nouveau Maître de la Ligue Céleste !' };
@@ -290,7 +289,7 @@ export function poserBatiment(W, maps, def, b) {
   let inside;
   if (b.interior) inside = b.interior(id);
   else if (b.kind === 'center') inside = centerInterior(id, 'Centre de soins');
-  else if (b.kind === 'mart') inside = martInterior(id, 'Boutique', STOCK[def.stock || 1]);
+  else if (b.kind === 'mart') { const earlyCime = def.id === 'cime'; inside = martInterior(id, 'Boutique', STOCK[earlyCime ? 5 : (def.stock || 1)]); if (earlyCime) { const v = inside.npcs.find((q) => q.role === 'shop'); if (v) { v.stockLate = STOCK[7]; v.stockLateBadges = 8; } } }
   else if (b.kind === 'gym') {
     // la première arène (Sylvebourg) est dessinée à la main : la Grande Serre (world/arene-sylve.js) ; les autres sont tirées d'une graine
     // les autres sont dessinées dans un plan (world/arenes-plans.js, mécanismes dans world/arenes-plan.js) ; repli : énigme tirée d'une graine
@@ -561,7 +560,7 @@ export function buildWorld() {
       ['sign', 41, 12, 'PIERREFORT\nUne ville taillée dans la montagne.'], ['sign', 54, 8, 'MAISON DES MINEURS\nAncien atelier de Basalte.'], ['flowers', 46, 21, 46, 24],
       // l'usine Poké Ball, derrière sa clôture : un portail gardé sur l'allée
       ['fence', 2, 3, 37, 3], ['fence', 2, 4, 2, 17], ['fence', 37, 4, 37, 17], ['fence', 3, 17, 18, 17], ['fence', 21, 17, 36, 17],
-      ['sign', 17, 19, 'USINE POKÉ BALL DE PIERREFORT\nFermée au public. Accès réservé au personnel.'], ['lamp', 18, 16], ['lamp', 21, 16]],
+      ['sign', 17, 19, 'USINE POKÉ BALL DE PIERREFORT\nOuverte aux dresseurs titulaires de 5 badges.'], ['lamp', 18, 16], ['lamp', 21, 16]],
     buildings: [
       { kind: 'center', ...GRAND.center, x: 39, y: 3 }, { kind: 'mart', ...GRAND.mart, x: 47, y: 21 },
       { kind: 'bighouse', x: 48, y: 3, roof: 'brown', id: 'mineurs', name: 'Maison des Mineurs', npcs: [
@@ -570,11 +569,26 @@ export function buildWorld() {
       { kind: 'house', x: 45, y: 13, roof: 'gray', npcs: [{ x: 4, y: 4, sprite: 'montagnard', text: ['Les créatures Roche résistent aux attaques Normal et Feu.', 'Mais l\'Eau et la Plante les font fondre !'] }] },
       { kind: 'house', x: 50, dx: 1, y: 13, roof: 'brown', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['À l\'est, la route 3 mène à la Grotte Lunaire.', 'Il y fait sombre... et les Nosferapti adorent s\'y cacher.'] }] },
       { kind: 'house2', x: 53, dx: 1, y: 21, roof: 'red', npcs: [{ x: 2, y: 4, sprite: 'scientifique', text: ['Ta créature peut évoluer en gagnant des niveaux.', 'Certaines ont besoin d\'une pierre spéciale, vendue en boutique.'] }] },
-      { kind: 'tower', ...GRAND.usine, x: 4, y: 4, roof: 'gray', id: 'usine', name: 'Usine Poké Ball', npcs: [{ x: 5, y: 4, sprite: 'scientifique', text: ['Comment es-tu entré ? ... Bon, ne touche à rien.', 'Ici, on assemble les Poké Balls de toute la région.'] }] },
+      { kind: 'tower', ...GRAND.usine, x: 4, y: 4, roof: 'gray', id: 'usine', name: 'Usine Poké Ball', npcs: [{ id: 'inventeur', x: 5, y: 4, sprite: 'scientifique', talk: async (A) => {
+        if (!A.f.giftUsine) {
+          A.flag('giftUsine', true);
+          await A.say([
+            'Tiens, la direction a enfin autorisé la visite aux dresseurs à 5 badges !',
+            'On teste de nouveaux moules pour la Ligue. Prends cet équipement de laboratoire et un lot de Hyper Balls pour tes recherches !'
+          ]);
+          await A.give('expert-belt');
+          await A.give('ultra-ball', 3);
+          return;
+        }
+        await A.say([
+          'Ici, on assemble les Poké Balls et les équipements de combat de toute la région.',
+          'La Ceinture Pro récompense ceux qui exploitent chaque faiblesse de type !'
+        ]);
+      } }] },
     ],
     npcs: [
       { id: 'montagnard', x: 48, y: 12, sprite: 'montagnard', move: 'wander', text: ['Il paraît que des Onix creusent au fond de la Grotte Lunaire.', 'On les entend gronder sous la roche !'] },
-      { id: 'usine', x: 18, y: 18, sprite: 'garde', dir: 'down', gate: { badges: 99, tiles: [[19, 17], [20, 17]] }, text: ['L\'usine Poké Ball est fermée au public.', 'Depuis qu\'on a volé des prototypes de Balls, personne n\'entre sans badge d\'employé.', 'Des gens en gris rôdaient autour, la veille du vol... Circule.'] },
+      { id: 'usine', x: 18, y: 18, sprite: 'garde', dir: 'down', gate: { badges: 5, tiles: [[19, 17], [20, 17]] }, text: ['L\'usine Poké Ball protège ses prototypes des curieux.', 'Reviens avec 5 badges pour entrer — notre scientifique à l\'intérieur a un équipement expérimental pour toi !'] },
     ],
   };
   ville(C, 'C');
@@ -604,7 +618,7 @@ export function buildWorld() {
         sprite: 'pecheur',
         move: 'wander',
         name: 'Pêcheur Barnabé',
-        talk: async (A) => {
+        talk: async (A, n) => {
           if (!A.has('canne')) {
             await A.say([
               'Ahoy jeune dresseur ! La brise marine est vivifiante aujourd\'hui.',
@@ -615,6 +629,7 @@ export function buildWorld() {
             await A.say('Tu pourras ferrer de superbes créatures aquatiques dans tous les étangs et en pleine mer !');
             return;
           }
+          if (n?.def?.show && A.game) return A.game.script('show', n);
           await A.say([
             'Les Racaillou se cachent parmi les galets, méfie-toi en marchant sur la plage.',
             'Quand la mer est calme, c\'est le moment rêvé pour sortir la Canne à Pêche !'
@@ -957,7 +972,7 @@ export function buildWorld() {
   routeTrainer(W, r7, 0.55, -1, 4, 'Karatéka', 'Bruno', [[1033, 29], [107, 29], [106, 30]]);
   routeTrainer(W, r7, 0.8, 1, 4, 'Topdresseuse', 'Lou', [[78, 31], [1012, 31], [1040, 30]]);
   routeTrainer(W, r7, 0.4, 1, 3, 'Pêcheur', 'Gaël', [[1029, 28], [118, 29]]);
-  routeItem(W, r7, 0.4, -1, 5, 'fire-stone');
+  routeItem(W, r7, 0.4, -1, 5, 'fire-stone'); routeItem(W, r7, 0.25, 1, 5, 'eviolite', 1, 'item:r7:eviolite');
   // Cap Mirage : plage, ponton et le rival qui attend
   { const { x, y } = CAP; W.rect(x - 22, y, x + 22, y + 6, T.SAND, [T.TREE, T.GRASS, T.TALL, T.WATER, T.FLOWER]); W.rect(x - 22, y + 7, x + 22, y + 9, T.WATER, [T.TREE, T.GRASS, T.SAND, T.TALL]);
     W.rect(x - 18, y + 4, x + 18, y + 6, T.SAND, [T.WATER]);
@@ -1064,7 +1079,7 @@ export function buildWorld() {
   gemmes(W, r7, 0, [[0.5, 1, 'tyranitarite']]); gemmes(W, r9, 1, [[0.6, 1, 'lucarionite']]);
   gemmes(W, r10, 2, [[0.3, -1, 'gyaradosite'], [0.8, 1, 'aerodactylite']]); gemmes(W, r11, 3, [[0.5, 1, 'absolite']]);
   gemmes(W, r12, 4, [[0.4, -1, 'scizorite'], [0.85, 1, 'heracronite']]);
-  legend({ id: 'latias', sp: 380, lvl: 50, ...xy(offRoute(r10, 0.55, -1, 3)), cond: (f, g) => g.badgeCount() >= 7, intro: ['Un souffle chaud frôle la route...', 'Une créature rouge et blanche plane en silence : Latias !'] });
+  legend({ id: 'latias', sp: 380, lvl: 50, ...xy(offRoute(r10, 0.55, -1, 3)), cond: (f, g) => g.badgeCount() >= 8, intro: ['Un souffle chaud frôle la route...', 'Une créature rouge et blanche plane en silence : Latias !'] });
   legend({ id: 'diancie', sp: 719, lvl: 55, ...xy(offRoute(r12, 0.6, -1, 3)), cond: (f, g) => g.badgeCount() >= 8, intro: ['Des cristaux roses scintillent entre les arbres...', 'Une petite princesse de diamant apparaît : Diancie !'] });
   // le passeur du Cap Mirage et le ponton de Port-Granit : le seul bateau qui franchit les tourbillons de l'archipel
   // (5 badges : on y vient d'abord à pied, par Mirage ; le bateau de l'Embarcadère n'y mène pas plus tôt)
@@ -1126,7 +1141,7 @@ export function buildWorld() {
     W.prop('statue', 415, 159); W.prop('statue', 424, 159);
     W.zone(406, 156, 430, 175, { name: 'Pic Tonnerre', music: 'mystic' });
     legend({ id: 'zapdos', sp: 145, lvl: 30, x: 419, y: 160, cond: 'pylons', intro: ['Le ciel se zèbre d\'éclairs...', 'Électhor, l\'oiseau de foudre, déploie ses ailes !'] });
-    legend({ id: 'raikou', sp: 243, lvl: 40, ...xy(offRoute(so, 0.55, 1, 2)), cond: 'beasts', intro: ['Un rugissement fait trembler l\'herbe...', 'C\'est Raikou, la bête du tonnerre, échappée de la Tour Cendrée !'] });
+    legend({ id: 'raikou', sp: 243, lvl: 50, ...xy(offRoute(so, 0.55, 1, 2)), cond: 'beasts', intro: ['Un rugissement fait trembler l\'herbe...', 'C\'est Raikou, la bête du tonnerre, échappée de la Tour Cendrée !'] });
     // Côte des Ruines : trois stèles, l'autel de Mew, et le sanctuaire scellé de Mewtwo
     const cr = R('orage2', 'Côte des Ruines', [[379.5, 215.5], [394, 221], [410, 225], [424, 225]], { w: 10, grass: 0.8, trees: 0.04, flowers: 0.03 }, 'orage', 'island');
     routeTrainer(W, cr, 0.3, 1, 3, 'Médium', 'Céleste', [[1039, 26], [1023, 27]]);
@@ -1148,7 +1163,7 @@ export function buildWorld() {
     W.zone(409, 235, 423, 242, { name: 'Sanctuaire Scellé', music: 'mystic' });
     legend({ id: 'mewtwo', sp: 150, lvl: 70, x: 416, y: 239, intro: ['Une présence écrasante emplit le sanctuaire...', 'Mewtwo ouvre les yeux.'] });
     gemmes(W, so, 5, [[0.5, -1, 'ampharosite']]); gemmes(W, cr, 6, [[0.6, 1, 'gengarite']]);
-    legend({ id: 'latios', sp: 381, lvl: 50, ...xy(offRoute(cr, 0.35, 1, 3)), cond: (f, g) => g.badgeCount() >= 7, intro: ['Une ombre bleue file au ras des vagues...', 'C\'est Latios !'] });
+    legend({ id: 'latios', sp: 381, lvl: 50, ...xy(offRoute(cr, 0.35, 1, 3)), cond: (f, g) => g.badgeCount() >= 8, intro: ['Une ombre bleue file au ras des vagues...', 'C\'est Latios !'] });
   }, { fond: T.WATER });
 
   atelier(ctxA, [338, 66, 439, 149], 640, 234, (W) => {
@@ -1194,7 +1209,7 @@ export function buildWorld() {
     W.prop('rock', 416, 78); W.prop('rock', 430, 79); W.prop('rock', 417, 85);
     W.zone(412, 75, 433, 94, { name: 'Cratère du Brasier', music: 'volcano', theme: 'volcanic' });
     legend({ id: 'moltres', sp: 146, lvl: 38, x: 423, y: 79, intro: ['La chaleur devient insoutenable...', 'Sulfura, l\'oiseau de feu, s\'élève du cratère !'] });
-    legend({ id: 'entei', sp: 244, lvl: 40, ...xy(offRoute(mb, 0.5, -1, 2)), cond: 'beasts', intro: ['Le sol se met à fumer...', 'C\'est Entei, la bête du feu !'] });
+    legend({ id: 'entei', sp: 244, lvl: 50, ...xy(offRoute(mb, 0.5, -1, 2)), cond: 'beasts', intro: ['Le sol se met à fumer...', 'C\'est Entei, la bête du feu !'] });
     gemmes(W, mb, 7, [[0.5, -1, 'houndoominite']]);
   }, { fond: T.WATER });
 
@@ -1252,7 +1267,7 @@ export function buildWorld() {
     }
     caveTrainers(tourb, [['Pêcheur', 'Morvan', [[1046, 43], [131, 43]]], ['Topdresseur', 'Loïc', [[1032, 43], [87, 44], [1009, 44]]]], 44);
     caveItems(tourb, ['max-repel', 'ultra-ball', 'full-restore'], 45);
-    legend({ id: 'suicune', sp: 245, lvl: 40, ...xy(offRoute(gt, 0.25, -1, 2)), cond: 'beasts', intro: ['Un vent du nord souffle sur la glace...', 'C\'est Suicune, la bête des eaux pures !'] });
+    legend({ id: 'suicune', sp: 245, lvl: 50, ...xy(offRoute(gt, 0.25, -1, 2)), cond: 'beasts', intro: ['Un vent du nord souffle sur la glace...', 'C\'est Suicune, la bête des eaux pures !'] });
     // l'île se couvre de neige ; les arbres deviennent des sapins givrés, les sentiers des chemins pavés
     for (let y = 3; y <= 62; y++) for (let x = 344; x <= 436; x++) { const t = W.get(x, y); if (t === T.GRASS) W.set(x, y, T.SNOW); else if (t === T.TREE) W.set(x, y, T.PINE); else if (t === T.PATH) W.set(x, y, T.PAVE); }
     montGivre({ W, trainerNpc, ENC });   // le Mont Givré, au nord du Rivage Gelé (world/montagnes.js)
@@ -1306,7 +1321,7 @@ export function buildWorld() {
     W.warp(out.doorX, out.doorY, { map: 'victoire', x: cx, y: cy, dir: 'up' });
     victoire.deco.push({ k: 'exitlight', x: cx, y: cy + 1 });
   }
-  caveTrainers(victoire, [['Topdresseur', 'Dimitri', [[67, 40], [1044, 40], [130, 41]], { format: 'triple', intro: 'Route Victoire, format Trio 3v3 ! Montre-moi ce que tu vaux !' }], ['Topdresseuse', 'Sofia', [[148, 41], [1040, 40], [1035, 40]], { format: 'double', intro: 'Un combat Duo avant la Ligue, ça te tente ?' }], ['Karatéka', 'Takeshi', [[68, 42], [1033, 41], [106, 41]]], ['Médium', 'Iris', [[94, 41], [1023, 41]]], ['Montagnard', 'Hubert', [[76, 42], [1028, 42], [112, 42]]]], 41);
+  caveTrainers(victoire, [['Topdresseur', 'Dimitri', [[68, 71], [1044, 72], [130, 72]], { format: 'triple', intro: 'Route Victoire, format Trio 3v3 ! Montre-moi ce que tu vaux !' }], ['Topdresseuse', 'Sofia', [[149, 72], [1040, 72], [1035, 72]], { format: 'double', intro: 'Un combat Duo avant la Ligue, ça te tente ?' }], ['Karatéka', 'Takeshi', [[68, 73], [1033, 72], [106, 73]]], ['Médium', 'Iris', [[94, 73], [1023, 73]]], ['Montagnard', 'Hubert', [[76, 73], [1028, 73], [464, 74]]]], 73);
   caveItems(victoire, ['full-restore', 'max-repel', 'rare-candy', 'ultra-ball', 'revive', 'max-potion'], 43);
   smashOnPath(victoire, { x: 50, y: 34 }, 3, 991);
 
@@ -1325,7 +1340,7 @@ export function buildWorld() {
   W.plateau = plateauNaturel(W, towns.J);
   /* ======================== ARÈNES ======================== */
   const gymTrainers = [
-    [['Insectomane', 'Lucas', [[13, 12], [265, 12], [1017, 13]]], ['Jardinière', 'Capucine', [[540, 13], [401, 13], [1018, 14]]]],   // la Ruche de Sylvebourg (niveaux 12 à 14)
+    [['Insectomane', 'Lucas', [[13, 9], [1017, 10]]], ['Jardinière', 'Capucine', [[540, 10], [401, 10]]]],   // la Ruche de Sylvebourg (niveaux 9 à 11)
     [['Marin', 'Yann', [[1029, 17], [116, 17]]], ['Fillette', 'Océane', [[118, 18], [1031, 18]]], ['Pêcheur', 'Paul', [[60, 19], [1033, 19]]]],
     [['Scientifique', 'Alan', [[100, 23], [1034, 23]]], ['Topdresseuse', 'Électra', [[1036, 24], [25, 24]]], ['Scientifique', 'Ohm', [[82, 25]]]],
     [['Randonneuse', 'Rose', [[69, 28], [1021, 28]]], ['Topdresseuse', 'Lila', [[44, 29], [1038, 29]]], ['Randonneuse', 'Iris', [[189, 30]]]],
@@ -1337,7 +1352,7 @@ export function buildWorld() {
   ];
   // quatrième dresseur des arènes qui n'en avaient que deux ou trois
   const GYM_EXTRA = [
-    ['Insectomane', 'Basile', [[1018, 13, null, [33, 81, 106]], [1020, 13]]], ['Pêcheur', 'Gilles', [[1029, 18]]], ['Scientifique', 'Volt', [[1034, 24]]], ['Fillette', 'Capucine', [[1021, 29]]],
+    ['Insectomane', 'Basile', [[1018, 10, null, [33, 81, 106]], [1020, 11]]], ['Pêcheur', 'Gilles', [[1029, 18]]], ['Scientifique', 'Volt', [[1034, 24]]], ['Fillette', 'Capucine', [[1021, 29]]],
     ['Médium', 'Isaure', [[1039, 34]]], ['Montagnard', 'Roch', [[1026, 39]]], ['Karatéka', 'Kazuo', [[1041, 44]]], ['Topdresseur', 'Siegfried', [[1049, 48]]],
   ];
   // cinquième dresseur des arènes dessinées qui ont cinq places
@@ -1369,14 +1384,15 @@ export function buildWorld() {
     // (les places des plans font partie de l'énigme : chaque place reçoit son dresseur)
     const plus = GYM_CINQUIEME[L2.type] || [];
     for (let k = 0; !ar.dresseurs && ar.map.planArene && spots.length > list.length && list.length && k < plus.length; k++) {
+      if (t.gym === 0 && k === 0) { list.push([plus[k][0], plus[k][1], [[10, 10], [165, 11]]]); continue; }
       const t4 = list[list.length - 1][2]; list.push([plus[k][0], plus[k][1], t4.map(([sp, lv]) => [sp, lv + 1]).slice(0, 1)]);
     }
     list.slice(0, spots.length).forEach(([cls, name, team], i) => {
       const lvl = Math.max(...team.map((m) => m[1]));
       const format = t.gym >= 4 && i === 2 ? 'triple' : t.gym >= 1 && i === 1 ? 'double' : undefined;
       const needMore = format === 'triple' ? Math.max(2, 3 - team.length) : (team.length >= 3 ? 1 : 2);
-      const more = equipeDeType(L2.type, lvl, needMore, t.gym * 31 + i * 7 + 3).filter(([sp]) => !team.some((m) => m[0] === sp));
-      const fullTeam = team.concat(more).slice(0, 4);
+      const more = t.gym === 0 ? [] : equipeDeType(L2.type, lvl, needMore, t.gym * 31 + i * 7 + 3).filter(([sp]) => !team.some((m) => m[0] === sp));
+      const fullTeam = t.gym === 0 ? team.slice(0, 2) : team.concat(more).slice(0, 4);
       const [x, y, dir, vue] = spots[i];
       const intro = format === 'triple' ? 'Place au combat Trio (3v3) ! Montre-moi comment ton équipe se coordonne !'
         : format === 'double' ? 'Place au combat Duo (2v2) ! Tu veux défier notre Champion ? Passe d\'abord par moi !'
@@ -1445,8 +1461,8 @@ export function buildWorld() {
   { const t0 = performance.now(); W.ecrans = memoCases('ecrans', W, () => ecrans(W)); W.ecrans.ms = Math.round(performance.now() - t0); }
   // un panneau au départ du sentier de chaque lieu habité (hameau, ferme, verger)
   W.panneauxLieux = panneauxDesLieux(W);
-  // après la Ligue : les légendaires qu'on ne trouvait nulle part, au bord des routes (apres-ligue.js)
-  W.apresLigue = poserLegendairesApresLigue(W, routes, legends);
+  // après la Ligue : le Parc des Légendes (32 légendaires invités, apres-ligue.js)
+  W.apresLigue = poserLegendairesApresLigue(W, maps, legends);
   // le rythme des routes (rythme.js) : raccourcis à sens unique et rebords à sauter, objets cachés, panneaux aux deux bouts
   { const t0 = performance.now(); W.rythme = rythme(W, routes, { trainerNpc }); W.rythme.ms = Math.round(performance.now() - t0); }
   // petites barrières de bois le long des chemins des routes (jamais là où elles couperaient un passage)

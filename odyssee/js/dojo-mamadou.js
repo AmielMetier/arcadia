@@ -21,6 +21,7 @@ export function ensureDojo(st) {
 
 /** Boutique du Dojo de Mamadou : [idObjet, prix en PDj] */
 export const DOJO_BOUTIQUE = [
+  ['heart-scale', 1],
   ['full-restore', 2],
   ['sitrus-berry', 3],
   ['lum-berry', 3],
@@ -765,7 +766,7 @@ export async function lancerDefiDojoCoop(game, n = null) {
   const who = { speaker: 'Maître Mamadou', face: n?.sprite || 'mamadou' };
 
   if (game.badgeCount() < 5) {
-    await ui.say('Le Dojo accueille uniquement les dresseurs confirmés à partir du 6e Badge (au moins 5 badges en main) !', who);
+    await ui.say('Le Dojo accueille uniquement les dresseurs confirmés à partir de 5 badges !', who);
     return;
   }
 

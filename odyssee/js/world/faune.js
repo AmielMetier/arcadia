@@ -142,7 +142,7 @@ export function addFouilles(maps) {
 
 /* ================= voisinage : Psykokwak perdu, échanges, bancs, panneaux, relais, cyclistes, mineurs ================= */
 export const ECHANGES = [
-  { town: 'sylve', who: 'Gaspard', want: [16, 19, 10, 13], give: [133, 15, 'Plume'] },
+  { town: 'sylve', who: 'Gaspard', want: [16, 19, 10, 13], give: [133, 10, 'Plume'] },
   { town: 'volta', who: 'Ingrid', want: [81, 100, 172, 25], give: [147, 25, 'Tonnerre'] },
   { town: 'granit', who: 'Matelot Yann', want: [129, 118, 72], give: [131, 30, 'Bleuet'] },
   { town: 'cendre', who: 'Forgeronne Alma', want: [58, 37, 4, 218], give: [246, 30, 'Braise'] },

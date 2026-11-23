@@ -173,15 +173,15 @@ export const MISSIONS = [
 
   // après la Ligue : la fin de l'histoire des trois frères et de Théo
   { id: 'mRevanche', town: 'L', at: [22, 5], sprite: 'drakos', who: 'Drakos', kind: 'duel', showIf: 'champion', cat: 'main',
-    duel: { cls: 'Champion', name: 'Drakos', bs: 'drakos', team: [[149, 64], [1051, 64], [1050, 63], [373, 64], [445, 65], [1044, 63]], prize: 300 },
-    ask: ['Maître de la Ligue, hein ? Célestine a trouvé son héritière.', 'Je t\'avais dit que le vieux Drakos attendait sa revanche. Pas contre elle. Contre toi.', 'Cette fois, mes dragons ne retiendront rien.'],
+    duel: { cls: 'Champion', name: 'Drakos', bs: 'drakos', team: [[149, 83], [1051, 84], [715, 82], [373, 83], [445, 85], [1044, 82]], prize: 300 },
+    ask: ['Maître de la Ligue, hein ? Célestine a trouvé son successeur.', 'Je t\'avais dit que le vieux Drakos attendait sa revanche. Pas contre elle. Contre toi.', 'Cette fois, mes dragons ne retiendront rien.'],
     lose: 'Ha ! Je savais que tu ne me ferais pas de cadeau.',
     thanks: ['... Deux fois. Tu m\'as battu deux fois.', 'Ma mère m\'a dit : « Un frère qui perd avec honneur vaut mieux qu\'un roi qui gagne seul. »', 'Les îles sont ouvertes, pour de bon. Prends ceci, Maître.'], reward: [['master-ball', 1]],
     again: ['Prêt pour ma revanche ?'], done: ['Pyros et Basalte veulent t\'affronter aussi. Les îles t\'appartiennent, Maître.'],
     journal: { name: 'La revanche de Drakos', start: 'Drakos m\'a défié à Fort-Écaille : il voulait sa revanche contre le nouveau Maître de la Ligue.', end: 'J\'ai battu Drakos une seconde fois. Les îles sont ouvertes pour de bon.' } },
 
   { id: 'mTheo', town: 'A', at: [17, 21], sprite: 'theo', who: 'Théo', kind: 'duel', showIf: 'champion', cat: 'main',
-    duel: { cls: 'Rival', name: 'Théo', bs: 'theo', team: (st, g) => { const R = g.rivalLine(); return [[1012, 62], [1035, 61], [1022, 62], [1040, 62], [1051, 63], [R[2], 65]]; }, prize: 200 },
+    duel: { cls: 'Rival', name: 'Théo', bs: 'theo', team: (st, g) => { const R = g.rivalLine(); return [[1012, 82], [1035, 82], [1022, 83], [1040, 83], [1051, 84], [R[2], 85]]; }, prize: 200 },
     ask: [`Hé ! Le Maître de la Ligue revient à Bourg-Aube ?`, 'Tu te souviens de notre premier combat, au labo ? Moi, oui. Tous les jours.', 'On rejoue ? Là où tout a commencé. Sans retenue !'],
     lose: 'Encore toi... Toujours toi.',
     thanks: ['... Bon. Tu es vraiment le Maître.', 'Tu sais quoi ? Je vais partir pour une autre région. Voir des Pokémon que personne ici ne connaît.', 'Mais je reviendrai. Et ce jour-là, c\'est moi qui gagnerai ! Tiens, un souvenir.'], reward: [['rare-candy', 3]],

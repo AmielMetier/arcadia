@@ -32,8 +32,8 @@ const ENC = {
   mareesEau: [[90, 32, 36, 20], [120, 32, 36, 15], [222, 33, 36, 15], [339, 32, 36, 15], [369, 35, 38, 5], [131, 35, 38, 3], [366, 33, 36, 10]],
   jardin: [[315, 22, 26, 15], [187, 21, 24, 10], [191, 21, 24, 8], [669, 22, 26, 15], [546, 22, 25, 10], [548, 22, 25, 10], [280, 22, 25, 8], [39, 22, 25, 8], [427, 22, 25, 10], [406, 21, 24, 6]],
   torii: [[92, 34, 37, 15], [93, 37, 39, 4], [200, 34, 38, 10], [355, 34, 37, 10], [198, 34, 37, 10], [123, 36, 38, 4], [570, 35, 37, 4], [607, 34, 37, 8], [302, 35, 38, 5], [163, 34, 37, 10], [177, 34, 37, 10], [433, 35, 38, 6]],
-  magma: [[322, 52, 56, 18], [218, 52, 56, 15], [240, 52, 55, 8], [126, 55, 58, 5], [324, 53, 57, 10], [75, 53, 57, 10], [228, 52, 56, 10], [631, 54, 57, 8], [636, 55, 57, 3], [667, 53, 56, 8]],
-  caverne: [[219, 58, 62, 15], [323, 60, 63, 10], [229, 58, 62, 10], [75, 58, 61, 15], [76, 61, 64, 5], [112, 60, 63, 8], [554, 58, 61, 10], [327, 58, 61, 6], [632, 60, 62, 6]],
+  magma: [[323, 74, 78, 18], [219, 74, 78, 15], [126, 74, 77, 8], [467, 76, 78, 5], [324, 74, 78, 10], [76, 74, 78, 10], [229, 74, 78, 10], [631, 75, 78, 8], [637, 76, 78, 3], [668, 75, 78, 8]],
+  caverne: [[219, 76, 80, 15], [323, 77, 80, 10], [229, 76, 80, 10], [76, 76, 79, 15], [464, 78, 80, 5], [112, 77, 80, 8], [555, 76, 79, 10], [327, 76, 79, 6], [632, 77, 80, 6]],
 };
 enrichirTout(ENC);
 
@@ -267,7 +267,7 @@ export function buildQuests(ctx) {
       }
       if (s === 1) { await A.say('Il y a une pompe à l\'ouest, une au nord et une à l\'est du lac. Chacune est gardée.', who); return; }
       if (s === 2) { await A.say('Les pompes sont coupées ! Mais leur chef traîne encore au nord du lac...', who); return; }
-      if (s === 3 || s === 4) { await A.say(A.badges() >= 5 ? ['La Grotte des Marées est sur le rocher, à l\'est du lac.', 'Avec Surf, tu y seras en un rien de temps.'] : ['La Grotte des Marées est sur un rocher au milieu de l\'eau.', 'Il faudrait savoir surfer... On dit que la Championne de Mirage enseigne Surf.'], who); return; }
+      if (s === 3 || s === 4) { await A.say(A.badges() >= 8 ? ['La Grotte des Marées est sur le rocher, à l\'est du lac.', 'Avec Surf et tes huit badges du Nord, Sylas ne te bloquera pas la route.'] : A.badges() >= 5 ? ['La Grotte des Marées est sur le rocher, à l\'est du lac.', 'Mais Sylas a scellé le fond : seul un dresseur aux huit badges du Nord pourra le faire reculer.'] : ['La Grotte des Marées est sur un rocher au milieu de l\'eau.', 'Il faudrait savoir surfer... On dit que la Championne de Mirage enseigne Surf.'], who); return; }
       await A.say(['Mesprit ? La gardienne du lac ? Tu l\'as vue de tes yeux ?', 'Mon grand-père disait qu\'elle vivait au fond de la grotte et qu\'elle gardait l\'eau claire.', 'C\'est donc ça que la Brume cherchait... pompait l\'eau pour la forcer à sortir.', 'Tiens. Mon vieux Lokhlass m\'a porté sur ce lac pendant trente ans. Il a envie de voir la mer.'], who);
       await A.giveMon(131, 35, { met: 'Lac Miroir' });
       await A.set('lac', 'fin');
@@ -319,6 +319,7 @@ export function buildQuests(ctx) {
     sbire(c, 'q:marees1', 12, 6, 'right', 'Sbire de la Brume', 'Sbire', [[42, 37], [110, 38]], { sight: 3, when: (f) => st(f, 'lac') >= 3, intro: 'Tu as traversé le lac ? Impressionnant... mais inutile !' });
     sbire(c, 'q:marees2', 29, 6, 'left', 'Sbire', 'Sbire', [[229, 38], [262, 37]], { sight: 3, bs: 'brume_f', ow: 'brume_f', when: (f) => st(f, 'lac') >= 3, intro: 'Le chef est juste derrière. Tu n\'iras pas plus loin !' });
     pnj(c, 'q:sylas2', 21, 4, { sprite: 'sylas', dir: 'up', when: (f) => st(f, 'lac') === 3, talk: async (A) => {
+      if (A.badges() < 8) { await A.say(['Tu as osé traverser jusqu\'ici ? Dommage, gamin : la barrière qui protège ce lac souterrain ne cède qu\'à la puissance de huit badges.', 'Reviens quand tu auras vaincu les trois frères de l\'archipel... si tu l\'oses !'], 'Sylas'); return; }
       const r = await A.fight({ cls: 'Admin de la Brume', name: 'Sylas', bs: 'sylas', prize: 120, team: [[169, 40], [110, 40], [319, 41], [430, 42]], intro: ['Encore toi ?! Tu ne lâches donc jamais ?', 'Regarde : la gardienne est là, sous l\'eau. Il ne manque plus qu\'elle se montre...', 'Hors de mon chemin !'], lose: 'Comment... ?' });
       if (r !== 'win') return;
       await A.say(['La gardienne du lac ne m\'intéresse plus. Le chef Nox voulait juste savoir si elle existait.', 'Son vrai trésor, c\'est l\'Orbe Rouge... et ce qu\'il réveille, sur l\'île de feu.', 'Tu entendras encore parler de la Brume, gamin.'], 'Sylas');
@@ -327,7 +328,7 @@ export function buildQuests(ctx) {
       await A.say(['L\'eau du lac souterrain se met à briller...', 'Une petite silhouette rose flotte au-dessus des vagues !']);
       await A.set('lac', 4);
     } });
-    legend({ id: 'mesprit', sp: 481, lvl: 40, map: 'marees', x: 21, y: 3, cond: (f) => st(f, 'lac') === 4 || (done(f, 'lac') && f['L:mesprit'] !== 'caught'), intro: ['Mesprit, la gardienne du Lac Miroir, te regarde.', 'Elle semble te remercier.'],
+    legend({ id: 'mesprit', sp: 481, lvl: 50, map: 'marees', x: 21, y: 3, cond: (f, g) => (st(f, 'lac') === 4 || (done(f, 'lac') && f['L:mesprit'] !== 'caught')) && (!g?.badgeCount || g.badgeCount() >= 8), intro: ['Mesprit, la gardienne du Lac Miroir, te regarde.', 'Elle semble te remercier.'],
       after: async (A, res) => { if (res !== 'lose' && A.step('lac') === 4) await A.set('lac', 5); } });
   }
 
@@ -419,7 +420,7 @@ export function buildQuests(ctx) {
       const s = A.step('songes'), who = 'Hélène';
       if (s === 'fin') { await A.say(['Malo dort comme un bébé, maintenant. Et il ne parle plus que de toi !'], who); return; }
       if (!s) {
-        if (A.badges() < 4) { await A.say(['Mon fils Malo ne se réveille plus le matin... Il fait des cauchemars terribles.', 'Les médecins ne savent pas quoi faire. Il faudrait quelqu\'un de courageux...'], who); return; }
+        if (A.badges() < 8) { await A.say(['Mon fils Malo ne se réveille plus le matin... Il fait des cauchemars terribles.', 'Les médecins ne savent pas quoi faire. Il faudrait un dresseur ayant remporté les huit badges du Nord pour affronter une telle ombre...'], who); return; }
         await A.say(['Excuse-moi... tu as l\'air d\'un dresseur aguerri.', 'Depuis deux semaines, mon fils Malo et trois autres enfants de Floralia font les mêmes cauchemars.', 'Ils dorment, mais ne se réveillent pas vraiment. Ils parlent d\'une ombre aux yeux bleus...', 'Le vieux jardinier du Jardin des Songes connaît les légendes du sommeil. Va le voir, je t\'en prie.'], who);
         await A.set('songes', 1); return;
       }
@@ -459,7 +460,7 @@ export function buildQuests(ctx) {
     } });
   }
   // Cresselia sur l'îlot du lac
-  legend({ id: 'cresselia', sp: 488, lvl: 45, map: 'lac', x: 25, y: 17, cond: (f) => st(f, 'songes') >= 2, intro: ['Une créature aux ailes de lune danse au-dessus des fleurs...', 'C\'est Cresselia !'],
+  legend({ id: 'cresselia', sp: 488, lvl: 50, map: 'lac', x: 25, y: 17, cond: (f, g) => st(f, 'songes') >= 2 && (!g?.badgeCount || g.badgeCount() >= 8), intro: ['Une créature aux ailes de lune danse au-dessus des fleurs...', 'C\'est Cresselia !'],
     after: async (A, res) => {
       if (res === 'lose' || A.has('plume-lune') || A.step('songes') !== 2) return;
       await A.say('Une plume scintillante est restée sur l\'îlot...'); await A.give('plume-lune'); await A.set('songes', 3);
@@ -484,10 +485,10 @@ export function buildQuests(ctx) {
     steps: (f, g) => [`Trouver sept Éclats d'Étoile cachés dans les nouveaux lieux de la région (${g?.state?.bag?.['eclat-etoile'] || 0} / 7) et les jeter dans la fontaine.`, 'Une petite étoile attend sur un banc du jardin.'],
     end: 'Le vœu s\'est réalisé.',
   });
-  legend({ id: 'jirachi', sp: 385, lvl: 30, map: 'jardin', x: 18, y: 15, cond: (f) => !!f.jirachiCall, intro: ['Une petite créature dort, une étoile sur la tête...', 'Jirachi ouvre un œil !'],
+  legend({ id: 'jirachi', sp: 385, lvl: 75, map: 'jardin', x: 18, y: 15, cond: (f) => !!f.jirachiCall, intro: ['Une petite créature dort, une étoile sur la tête...', 'Jirachi ouvre un œil !'],
     after: async (A, res) => { if (res !== 'lose') await A.set('voeu', 'fin'); } });
   // Créfadet : quand les trois gardiens des lacs se sont montrés
-  legend({ id: 'azelf', sp: 482, lvl: 50, map: 'jardin', x: 34, y: 14, cond: (f) => !!f['L:mesprit'] && !!f['L:uxie'], intro: ['Une silhouette bleue flotte au-dessus de l\'étang...', 'Créfadet, le troisième gardien, a senti ses deux frères.'] });
+  legend({ id: 'azelf', sp: 482, lvl: 55, map: 'jardin', x: 34, y: 14, cond: (f, g) => !!f['L:mesprit'] && !!f['L:uxie'] && (!g?.badgeCount || g.badgeCount() >= 8), intro: ['Une silhouette bleue flotte au-dessus de l\'étang...', 'Créfadet, le troisième gardien, a senti ses deux frères.'] });
 
   /* ====================================================================================================
      Forêt des Torii et Temple Kagura (au sud-ouest de Mirage, à l'ouest de la route 7, sur la carte du monde)
@@ -602,7 +603,7 @@ export function buildQuests(ctx) {
       await A.say(['Les braseros vacillent. Une ombre se lève au fond du sanctuaire...']);
       await A.set('songes', 6);
     } });
-    legend({ id: 'darkrai', sp: 491, lvl: 50, map: s.id, x: 5, y: 3, cond: (f) => st(f, 'songes') === 6 || (done(f, 'songes') && f['L:darkrai'] !== 'caught'), intro: ['Une ombre aux yeux bleus te fixe.', 'Darkrai, le seigneur des cauchemars...'],
+    legend({ id: 'darkrai', sp: 491, lvl: 55, map: s.id, x: 5, y: 3, cond: (f, g) => (st(f, 'songes') === 6 || (done(f, 'songes') && f['L:darkrai'] !== 'caught')) && (!g?.badgeCount || g.badgeCount() >= 8), intro: ['Une ombre aux yeux bleus te fixe.', 'Darkrai, le seigneur des cauchemars...'],
       after: async (A, res) => { if (res !== 'lose' && A.step('songes') === 6) { await A.say('L\'air du sanctuaire devient léger, comme au réveil d\'un long rêve.'); await A.set('songes', 7); } } });
   }
   Q('kagura', {
@@ -620,7 +621,7 @@ export function buildQuests(ctx) {
       const s = A.step('kagura'), who = 'Dame Kimono Hana';
       if (s === 'fin') { await A.say('La cloche du temple sonne chaque matin, maintenant. Merci, voyageur.', who); return; }
       if (!s) {
-        if (A.badges() < 5) { await A.say(['Je viens du Temple Kagura, dans la Forêt des Torii, au sud-ouest de Mirage.', 'Il s\'y passe des choses terribles... Mais il faudrait un dresseur plus aguerri.'], who); return; }
+        if (A.badges() < 8) { await A.say(['Je viens du Temple Kagura, dans la Forêt des Torii, au sud-ouest de Mirage.', 'Il s\'y passe des choses terribles... Seul un dresseur aux huit badges du Nord aurait assez de force.'], who); return; }
         await A.say(['Voyageur... tu portes le badge de Sibylle. Écoute-moi.', 'Des gens en gris ont pillé le Temple Kagura, dans la Forêt des Torii, au sud-ouest.', 'Ils ont volé les trois talismans qui éveillent la cloche, et ils fouillent la forêt.', 'Sans la cloche, les esprits de la forêt s\'agitent. Peux-tu retrouver les talismans ?'], who);
         await A.set('kagura', 1); return;
       }
@@ -656,7 +657,7 @@ export function buildQuests(ctx) {
     await A.give('ultra-ball', 5);
     await A.set('kagura', 'fin');
   }
-  legend({ id: 'uxie', sp: 480, lvl: 45, map: 'monde', x: KX + 7 + DT[0], y: KY + 15 + DT[1], cond: (f) => done(f, 'kagura'), intro: ['Une créature jaune médite au bord de l\'étang, les yeux clos.', 'Créhelf, le gardien du savoir.'] });
+  legend({ id: 'uxie', sp: 480, lvl: 50, map: 'monde', x: KX + 7 + DT[0], y: KY + 15 + DT[1], cond: (f, g) => done(f, 'kagura') && (!g?.badgeCount || g.badgeCount() >= 8), intro: ['Une créature jaune médite au bord de l\'étang, les yeux clos.', 'Créhelf, le gardien du savoir.'] });
 
   /* ====================================================================================================
      Île du Magma (bateau de l'Embarcadère, pour le Maître) · Quête : Le cœur du volcan (Groudon, Heatran)
@@ -683,15 +684,15 @@ export function buildQuests(ctx) {
     for (let x = 4; x <= 9; x++) if (m.get(x, 53) === T.WATER || m.get(x, 53) === T.TREE) m.set(x, 53, T.BRIDGE);
     for (let x = 3; x <= 9; x++) for (const y of [52, 54]) if (m.get(x, y) === T.TREE) m.set(x, y, T.WATER);
     m.npc({ id: 'quai:magma', x: 4, y: 53, dir: 'right', sprite: 'capitaine', script: 'ferry', dock: 'magma' });
-    docks.magma = { name: 'Île du Magma (Fumerolle)', map: 'magma', x: 6, y: 53, dir: 'right', badges: 8, show: (f) => !!f.champion };
+    docks.magma = { name: 'Île du Magma (Fumerolle)', map: 'magma', x: 6, y: 53, dir: 'right', badges: 15, show: (f) => !!f.champion };
     // Sentier des Cendres jusqu'au pied du volcan
     carveRoute(m, [[24.5, 44], [24.5, 34], [36, 26], [48, 22], [56, 20]], { seed: 99, w: 9, grass: 0.8, tall: T.TALL, trees: 0.02, rocks: 0.05, overwrite: false, ground: T.ASH, taperStart: false });
     for (const [x, y, rx, ry] of [[30, 28, 3.5, 2.5], [46, 30, 4, 2.5], [36, 36, 3, 2], [20, 30, 2.5, 3], [50, 24, 3, 2]]) m.blob(x, y, rx, ry, T.TALL, rng(x * 7 + y), [T.ASH]);
     m.zone(0, 0, 79, 71, { name: 'Sentier des Cendres', music: 'volcano', enc: ENC.magma, theme: 'volcanic', route: 'magma', prio: 0 });
     m.zone(10, 44, 39, 61, { name: 'Fumerolle', music: 'island', town: 'fumerolle', theme: 'volcanic' });
     m.item(...spot(m, 30, 32), 'eclat-etoile', 1, 'etoile:magma'); m.item(...spot(m, 44, 28), 'max-potion', 2); m.item(...spot(m, 20, 36), 'full-restore');
-    trainerNpc(m, ...spot(m, 30, 30), 'right', 'Karatéka', 'Dante', [[68, 56], [297, 56], [454, 57]], { sight: 4 });
-    trainerNpc(m, ...spot(m, 42, 24), 'down', 'Montagnard', 'Tobias', [[76, 57], [324, 57], [112, 58]], { sight: 4 });
+    trainerNpc(m, ...spot(m, 30, 30), 'right', 'Karatéka', 'Dante', [[68, 76], [297, 76], [454, 77]], { sight: 4 });
+    trainerNpc(m, ...spot(m, 42, 24), 'down', 'Montagnard', 'Tobias', [[76, 77], [324, 77], [464, 78]], { sight: 4 });
     m.outside = { map: 'monde', x: 56, y: 214 };
   }
   // la base de la Brume (au bout du sentier) et la Caverne du Magma (derrière)
@@ -704,18 +705,18 @@ export function buildQuests(ctx) {
     b.warp(b.exitX, b.exitY, b.outside); m.warp(B.doorX, B.doorY, { map: b.id, x: b.exitX, y: b.exitY, dir: 'up' });
     for (let y = B.doorY + 1; y < B.doorY + 6; y++) { if (m.get(B.doorX, y) === T.PATH) break; m.set(B.doorX, y, T.PATH); }
     for (const [x, y, k] of [[1, 2, 'console'], [3, 2, 'ecran_carte'], [11, 2, 'cuve'], [13, 2, 'cuve'], [1, 9, 'caisses'], [13, 9, 'caisses'], [9, 2, 'machine_labo']]) b.prop(k, x, y);
-    sbire(b, 'q:base1', 4, 8, 'right', 'Sbire de la Brume', 'Sbire', [[262, 57], [110, 57], [42, 58]], { sight: 4, when: (fl) => st(fl, 'magma') >= 1 });
-    sbire(b, 'q:base2', 10, 8, 'left', 'Sbire', 'Sbire', [[435, 58], [229, 58]], { sight: 4, bs: 'brume_f', ow: 'brume_f', when: (fl) => st(fl, 'magma') >= 1 });
-    sbire(b, 'q:base3', 4, 5, 'right', 'Sbire de la Brume', 'Sbire', [[560, 58], [454, 58], [169, 59]], { sight: 4, when: (fl) => st(fl, 'magma') >= 1 });
-    sbire(b, 'q:base4', 10, 5, 'left', 'Sbire', 'Sbire', [[510, 59], [430, 59]], { sight: 4, bs: 'brume_f', ow: 'brume_f', when: (fl) => st(fl, 'magma') >= 1 });
+    sbire(b, 'q:base1', 4, 8, 'right', 'Sbire de la Brume', 'Sbire', [[262, 77], [110, 77], [169, 78]], { sight: 4, when: (fl) => st(fl, 'magma') >= 1 });
+    sbire(b, 'q:base2', 10, 8, 'left', 'Sbire', 'Sbire', [[435, 78], [229, 78]], { sight: 4, bs: 'brume_f', ow: 'brume_f', when: (fl) => st(fl, 'magma') >= 1 });
+    sbire(b, 'q:base3', 4, 5, 'right', 'Sbire de la Brume', 'Sbire', [[560, 78], [454, 78], [169, 79]], { sight: 4, when: (fl) => st(fl, 'magma') >= 1 });
+    sbire(b, 'q:base4', 10, 5, 'left', 'Sbire', 'Sbire', [[510, 79], [430, 79]], { sight: 4, bs: 'brume_f', ow: 'brume_f', when: (fl) => st(fl, 'magma') >= 1 });
     pnj(b, 'q:sylas3', 7, 4, { sprite: 'sylas', when: (fl) => st(fl, 'magma') === 1 && !fl.sylas3, talk: async (A) => {
-      const r = await A.fight({ cls: 'Admin de la Brume', name: 'Sylas', bs: 'sylas', prize: 200, team: [[169, 60], [110, 60], [319, 61], [430, 61], [452, 62]], intro: ['Le Maître de la Ligue en personne ! Je savais qu\'on se reverrait.', 'Le chef Nox est juste derrière moi, avec l\'Orbe Rouge. Ce soir, Groudon se réveille !'], lose: 'C\'est fini pour moi...' });
+      const r = await A.fight({ cls: 'Admin de la Brume', name: 'Sylas', bs: 'sylas', prize: 200, team: [[169, 79], [110, 79], [319, 80], [430, 80], [452, 81]], intro: ['Le Maître de la Ligue en personne ! Je savais qu\'on se reverrait.', 'Le chef Nox est juste derrière moi, avec l\'Orbe Rouge. Ce soir, Groudon se réveille !'], lose: 'C\'est fini pour moi...' });
       if (r !== 'win') return;
       await A.say(['Je... je n\'ai jamais voulu réveiller un volcan, moi.', 'Prends ce passe. Arrête-le avant qu\'il ne fasse sauter l\'île.'], 'Sylas');
       await A.give('cle-base'); A.f.sylas3 = true; A.game.refreshNpcs();
     } });
     pnj(b, 'q:nox1', 7, 2, { sprite: 'nox', when: (fl) => st(fl, 'magma') === 1 && fl.sylas3, talk: async (A) => {
-      const r = await A.fight({ cls: 'Chef de la Brume', name: 'Nox', bs: 'nox', prize: 300, team: [[553, 63], [229, 63], [461, 64], [452, 64], [248, 65]], intro: ['Alors c\'est toi, l\'enfant qui défait chacun de mes plans.', 'Ponyta, le lac, les talismans, Darkrai... Des broutilles.', 'Ce qui compte, c\'est ceci : l\'Orbe Rouge. Avec lui, Groudon m\'obéira, et cette région sera à la Brume !'], lose: 'Impossible...' });
+      const r = await A.fight({ cls: 'Chef de la Brume', name: 'Nox', bs: 'nox', prize: 300, team: [[553, 81], [229, 81], [461, 82], [452, 82], [248, 83]], intro: ['Alors c\'est toi, l\'enfant qui défait chacun de mes plans.', 'Ponyta, le lac, les talismans, Darkrai... Des broutilles.', 'Ce qui compte, c\'est ceci : l\'Orbe Rouge. Avec lui, Groudon m\'obéira, et cette région sera à la Brume !'], lose: 'Impossible...' });
       if (r !== 'win') return;
       await A.say(['Tu es fort. Mais l\'Orbe est déjà chaud. Le géant s\'éveille.', 'Rejoins-moi au fond de la Caverne du Magma, si tu l\'oses !'], 'Nox');
       await A.walk('q:nox1', 'up', 0, true);
@@ -735,7 +736,7 @@ export function buildQuests(ctx) {
     for (let y = 13; y < 22; y++) { if (m.get(44, y) === T.PATH) break; if (m.get(44, y) === T.TREE || m.get(44, y) === T.ASH) m.set(44, y, T.PATH); }
     c.rect(36, 2, 45, 9, T.CAVE); c.prop('brasero', 37, 3); c.prop('brasero', 44, 3);
     pnj(c, 'q:nox2', 40, 6, { sprite: 'nox', dir: 'up', when: (fl) => st(fl, 'magma') === 2, talk: async (A) => {
-      const r = await A.fight({ cls: 'Chef de la Brume', name: 'Nox', bs: 'nox', prize: 500, team: [[553, 67], [229, 67], [461, 68], [452, 68], [635, 69], [248, 70]], intro: ['Tu es venu... Parfait. Regarde !', 'L\'Orbe Rouge brille. La lave monte. GROUDON, RÉVEILLE-TOI !'], lose: 'Le volcan... ne m\'écoute pas...' });
+      const r = await A.fight({ cls: 'Chef de la Brume', name: 'Nox', bs: 'nox', prize: 500, team: [[553, 83], [229, 83], [461, 84], [452, 84], [635, 85], [248, 86]], intro: ['Tu es venu... Parfait. Regarde !', 'L\'Orbe Rouge brille. La lave monte. GROUDON, RÉVEILLE-TOI !'], lose: 'Le volcan... ne m\'écoute pas...' });
       if (r !== 'win') return;
       await A.say(['L\'Orbe... il m\'échappe !', 'Groudon ne m\'obéit pas. Il ne m\'a jamais obéi.', '... La Brume est finie. Fais ce que tu veux.'], 'Nox');
       await A.walk('q:nox2', 'down', 3, true);
@@ -744,7 +745,7 @@ export function buildQuests(ctx) {
       await A.say(['La caverne tremble. Une masse rouge émerge de la lave...']);
       await A.set('magma', 3);
     } });
-    legend({ id: 'groudon', sp: 383, lvl: 70, map: c.id, x: 40, y: 3, cond: (fl) => st(fl, 'magma') === 3 || (done(fl, 'magma') && fl['L:groudon'] !== 'caught'), intro: ['Groudon, le géant des terres, pose sur toi un regard brûlant.', 'L\'Orbe Rouge pulse dans ton sac...'],
+    legend({ id: 'groudon', sp: 383, lvl: 82, map: c.id, x: 40, y: 3, cond: (fl) => st(fl, 'magma') === 3 || (done(fl, 'magma') && fl['L:groudon'] !== 'caught'), intro: ['Groudon, le géant des terres, pose sur toi un regard brûlant.', 'L\'Orbe Rouge pulse dans ton sac...'],
       after: async (A, res) => { if (res !== 'lose' && A.step('magma') === 3) { await A.say('Le grondement du volcan s\'apaise peu à peu.'); await A.set('magma', 4); } } });
     caveItems(c, ['max-revive' in ITEMS ? 'max-revive' : 'revive', 'ultra-ball', 'max-potion', 'full-heal', 'fire-stone'], 61);
     // Cratère Ardent : à l'est du sentier, fermé tant que la Brume tient l'île
@@ -753,7 +754,7 @@ export function buildQuests(ctx) {
     const g = m.npc({ id: 'magma:garde-cratere', x: 58, y: 35, dir: 'left', sprite: 'montagnard', gate: { open: (fl) => done(fl, 'magma'), tiles: [[57, 33], [57, 34]] }, text: ['Le Cratère Ardent est trop dangereux tant que le volcan gronde.', 'Les gens en gris l\'ont réveillé. Il faudrait les chasser de l\'île.'] });
     m.gates.push({ npc: g.id, open: (fl) => done(fl, 'magma'), tiles: [[57, 33], [57, 34]] });
     m.zone(58, 29, 72, 40, { name: 'Cratère Ardent', music: 'mystic', theme: 'volcanic' });
-    legend({ id: 'heatran', sp: 485, lvl: 68, map: 'magma', x: 66, y: 33, cond: (fl) => done(fl, 'magma'), intro: ['La roche fond sous de lourdes pattes de métal...', 'Heatran sort du cratère !'] });
+    legend({ id: 'heatran', sp: 485, lvl: 80, map: 'magma', x: 66, y: 33, cond: (fl) => done(fl, 'magma'), intro: ['La roche fond sous de lourdes pattes de métal...', 'Heatran sort du cratère !'] });
   }
   async function ancien(A) {
     const s = A.step('magma'), who = 'Ancien de Fumerolle';

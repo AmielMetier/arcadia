@@ -1221,7 +1221,7 @@ export class Game {
         }
       }
       else if (d.role === 'nurse') await this.nurse();
-      else if (d.role === 'shop') await shopScreen(this, d.stock);
+      else if (d.role === 'shop') { const stShop = (d.stockLate && this.badgeCount() >= (d.stockLateBadges || 8)) ? d.stockLate : d.stock; await shopScreen(this, stShop); }
       else if (d.role === 'relearner') await moveRelearnerScreen(this);
       else if (d.talk) await d.talk(this.api(), n);
       else if (d.script) await this.script(d.script, n);
@@ -1257,8 +1257,8 @@ export class Game {
       case 'celebi': return !!f.celebiCalled;
       case 'pylons': return !!f.pylons;
       case 'mew': return !!(f['S:1'] && f['S:2'] && f['S:3']) && b >= 4;
-      case 'plume': return !!f.plume;
-      case 'beasts': return !!f.beasts && b >= 5;
+      case 'plume': return !!f.plume && b >= 8;
+      case 'beasts': return !!f.beasts && b >= 8;
       default: return true;
     }
   }
@@ -1922,7 +1922,7 @@ export class Game {
     }
   }
   take(item, n = 1) { const b = this.state.bag; b[item] = (b[item] || 0) - n; if (b[item] <= 0) delete b[item]; }
-  give(item, n = 1) { this.state.bag[item] = (this.state.bag[item] || 0) + n; }
+  give(item, n = 1) { if (ITEMS[item]?.key) { this.state.bag[item] = 1; return; } this.state.bag[item] = (this.state.bag[item] || 0) + n; }
 
   /* ================= combats ================= */
   seenCount(sp) {
@@ -2145,7 +2145,7 @@ export class Game {
         ? ['La CT01 contient Pollen Collant : une attaque Insecte qui englue la cible et baisse sa Vitesse.', 'Une CT ne s\'use pas : tu peux l\'apprendre à autant de Pokémon que tu veux !']
         : `Elle contient ${ITEMS[ct].name.replace(/^CT\d+ /, '')}. Une CT ne s'use pas : sers-t'en autant que tu veux.`, { speaker: name });
     }
-    if (g === 7) { st.flags.drakos = true; this.give('town-map'); }
+    if (g === 7) { st.flags.drakos = true; if (!st.bag['town-map']) this.give('town-map'); }
     // Hector donne aussi la clé de la Crypte des Murmures (donjons/crypte.js)
     if (g === 0 && !st.bag['cle-crypte']) {
       await ui.say(['Une dernière chose. Cette vieille clé ouvre la crypte du Cimetière des Murmures.', 'Tu le trouveras au bout d\'un sentier qui part de la Route 2, dans les bois. On dit que des esprits y murmurent...', 'Vas-y avec des amis, et avec une équipe bien plus forte qu\'aujourd\'hui.'], { speaker: name });
@@ -2173,11 +2173,11 @@ export class Game {
   async profCall(g) {
     const st = this.state, B = this.rivalB(), sp = 'Prof. Saule';
     const calls = {
-      1: ['Allô, ' + st.name + ' ? Deux badges, déjà ! Bravo.', 'Écoute : le capitaine de l\'Embarcadère de l\'Aube, à l\'est de la route 1, emmène les dresseurs aguerris vers les îles de l\'Est.', 'On dit qu\'Électhor, l\'oiseau de foudre, dérègle les orages de l\'Île Orageuse. Ça mérite un coup d\'œil !'],
+      1: ['Allô, ' + st.name + ' ? Deux badges, déjà ! Bravo.', 'Écoute : le capitaine de l\'Embarcadère de l\'Aube, à l\'est de la route 1, emmène les dresseurs aguerris vers les îles de l\'Est — pense à passer ton Permis Bateau à la Capitainerie de Port-Azur.', 'On dit qu\'Électhor, l\'oiseau de foudre, dérègle les orages de l\'Île Orageuse. Ça mérite un coup d\'œil !'],
       2: ['Trois badges ! Le capitaine peut maintenant t\'emmener à l\'Île de la Grue.', 'Là-bas vit une doyenne qui connaît la légende de Ho-Oh, l\'oiseau arc-en-ciel, mieux que personne.', 'Il paraît qu\'il se posait autrefois sur une tour dorée...'],
       3: ['Quatre badges... Tu vas bientôt passer à Mirage.', 'Au fait, ' + st.name + ', je ne t\'en ai jamais parlé : j\'ai un' + (B.e ? 'e ' : ' ') + B.fils + ', ' + B.name + '.', B.name + ' a grandi à Port-Granit, sur les îles. Le lendemain de ton départ, ' + B.il + ' est passé' + B.e + ' au labo et a pris la troisième capsule.', 'Depuis, ' + B.il + ' ne répond plus à mes appels. On dit qu\'' + B.il + ' s\'est engagé' + B.e + ' chez les Gardes d\'Écaille de Drakos...', 'Si tu ' + B.le + ' croises, dis-lui que son grand-père pense à ' + (B.e ? 'elle' : 'lui') + '.'],
       4: this.eclipseOn() ? ['Cinq badges ! Et Surf, en plus. Écoute bien, ' + st.name + '.', 'Cette nuit violette ne finira pas toute seule. Si la Team Éclipse a vraiment fermé le cœur de Lugia...', 'La voyante de Mirage connaît les légendes de la mer. Elle saura où dort Lugia. Va la voir avant de partir pour l\'archipel !'] : ['Cinq badges ! Avec Surf, tu peux rejoindre l\'archipel des trois frères, au sud du Cap Mirage.', 'Et le capitaine t\'emmènera aussi à l\'Île Givrée, tout au nord. Artikodin y vivrait... et plus profond encore, Lugia.'],
-      7: ['Tu as battu Drakos ?! Toute la région en parle.', st.flags.rivalB3 ? B.name + ' m\'a appelé. Pour la première fois depuis des mois. ' + (B.e ? 'Elle' : 'Il') + ' a quitté les Gardes d\'Écaille.' : 'J\'espère que mon' + (B.e ? 'e ' : ' ') + B.fils + ' va bien, là-bas...', 'Il ne te reste plus que la Ligue. Mais avant, va donc voir le Cap des Étoiles, au nord de Fort-Écaille.'],
+      7: ['Tu as battu Drakos ?! Toute la région en parle.', st.flags.rivalB3 ? B.name + ' m\'a appelé. Pour la première fois depuis des mois. ' + (B.e ? 'Elle' : 'Il') + ' a quitté les Gardes d\'Écaille.' : 'J\'espère que ' + (B.e ? 'ma ' : 'mon ') + B.fils + ' va bien, là-bas...', 'Avec les huit badges du Nord, le Pont de l\'Austral (au sud de la route 10) s\'ouvre vers les Terres du Sud et leurs sept Champions ! Mais avant, va donc voir le Cap des Étoiles, au nord de Fort-Écaille.'],
     };
     const c = calls[g]; if (!c) return;
     this.sound.sfx('pc'); await wait(300);
@@ -2691,7 +2691,7 @@ export class Game {
       await ui.say(`Encore ${3 - k} relais à rallumer sur le Sentier Orageux. Courage !`, { speaker: sp });
     } else if (name === 'doyenne') {
       const sp = 'Doyenne Amaya', f = st.flags;
-      if (f['L:hooh'] === 'caught') { await ui.say(['Ho-Oh t\'a choisi... Après tant d\'années.', 'Les trois bêtes errent toujours dans les îles. Raikou sur l\'Île Orageuse, Entei sur le Chemin du Brasier, Suicune près de Givrebourg.', 'Elles ne se laisseront approcher que par un dresseur aguerri (5 badges).'], { speaker: sp }); return; }
+      if (f['L:hooh'] === 'caught') { await ui.say(['Ho-Oh t\'a choisi... Après tant d\'années.', 'Les trois bêtes errent toujours dans les îles. Raikou sur l\'Île Orageuse, Entei sur le Chemin du Brasier, Suicune près de Givrebourg.', 'Elles ne se laisseront approcher que par un dresseur aguerri (8 badges).'], { speaker: sp }); return; }
       if (f.plume) { await ui.say(['La Plume Arc-en-ciel et le Sifflet Céleste ! Le Grand Sage t\'a jugé digne de la lignée des gardiens du ciel.', 'Monte sur le toit de la Tour Dorée. Si Ho-Oh le veut, il descendra vers toi. Et le chant de ton sifflet appellera les oiseaux du ciel où que tu sois.'], { speaker: sp }); return; }
       if (!f.grueQuest) {
         f.grueQuest = true;
@@ -2713,14 +2713,14 @@ export class Game {
       await ui.say(formatObtainItem(st.name, 'plume-arc', 1));
       if (!hadVol) await ui.say(formatObtainItem(st.name, 'sifflet-celeste', 1));
       await ui.say(formatObtainItem(st.name, 'great-ball', 5));
-      await ui.say('Monte sur le toit. Le novice te laissera passer.', { speaker: 'Grand Sage Hoël' });
+      await ui.say('Monte sur le toit. Le novice te laissera passer. Quand tu auras réuni les huit badges du Nord, Ho-Oh répondra à l\'appel de la Plume !', { speaker: 'Grand Sage Hoël' });
       this.refreshGates();
     } else if (name === 'ermite') {
       const sp = 'Ermite', f = st.flags; f.ermite = true;
       if (st.flags.eclipse && !st.flags.lugia) { await ui.say(['Les courants de la grotte se sont tus... Lugia n\'est plus là.', 'Je l\'ai senti partir vers le sud, vers un vieux sanctuaire au large du Cap Mirage.', 'Quelque chose l\'appelle. Quelque chose de mauvais.'], { speaker: sp }); return; }
       if (f.plumeArgent) { await ui.say(f['L:lugia'] === 'caught' ? 'Lugia... Tu l\'as vu de tes propres yeux. Moi, j\'ai attendu toute ma vie.' : ['La Grotte des Tourbillons est à l\'est du village.', 'Avec la Plume Argentée, les courants te laisseront passer jusqu\'à Lugia.'], { speaker: sp }); return; }
       if (f['L:articuno']) {
-        f.plumeArgent = true; this.give('plume-argent'); this.sound.sfx('item');
+        f.plumeArgent = true; if (!st.bag['plume-argent']) this.give('plume-argent'); this.sound.sfx('item');
         await ui.say(['Tu as affronté Artikodin sur la Cime Givrée ? Alors tu es prêt.', 'Prends cette plume. Je l\'ai trouvée sur la plage, il y a quarante ans. Elle vient de Lugia, le gardien des mers.'], { speaker: sp });
         await ui.say(formatObtainItem(st.name, 'plume-argent', 1));
         await ui.say('Le pêcheur qui garde la Grotte des Tourbillons te laissera entrer.', { speaker: sp });
@@ -2901,7 +2901,7 @@ async chooseStarter(sp, cap) {
     const rivalFight = async (flag, team, lvlText, lines, after, who = null) => {
       if (st.flags[flag] || !st.flags.rival1 || !st.party.some((m) => m.hp > 0)) return false;
       const W = who || { name: RIVAL_NAME, sprite: 'theo', bs: 'theo' };
-      this.busy = true; st.flags[flag] = true;
+      this.busy = true;
       const R = RIVAL_TEAMS[st.flags.rivalSp] || RIVAL_TEAMS[STARTERS[0]];
       // le rival arrive par le haut (ou par le côté si la place manque), jamais à travers un mur
       let dir = 'up', n = this.spawnAhead('up');
@@ -2914,6 +2914,11 @@ async chooseStarter(sp, cap) {
       if (n > 1) await this.npcWalk(rival, OPP[dir], n - 1);
       rival.dir = OPP[dir];
       await ui.say(lines, { speaker: W.name });
+      if (st.party.some((m) => m.hp < m.stats[0] || m.status)) {
+        for (const m of st.party) healFull(m);
+        this.sound.sfx('heal');
+        await ui.say('Avant de commencer, laisse-moi soigner ton équipe : je veux t\'affronter à pleine puissance !', { speaker: W.name });
+      }
       if (flag === 'rivalB3' || flag === 'rivalB4' || flag === 'rival4' || flag === 'rival5') {
         const subMap = {
           rivalB3: 'Dernier Rempart · Fort-Écaille',
@@ -2933,7 +2938,8 @@ async chooseStarter(sp, cap) {
       const party = buildRivalParty(this, team(R));
       const res = await this.runBattle({ trainer: { cls: W.cls || 'Rival', name: W.name, prize: 40, bs: W.bs, ai: st.badges.some(Boolean) ? 'smart' : 'normal', items: getRivalItems(this), lose: lvlText, megaSp: st.badges.filter(Boolean).length >= 8 ? 'ace' : undefined }, party, music: 'rival', rival: true });
       this.musicLock = false;
-      if (res !== 'lose') {
+      if (res === 'win') {
+        st.flags[flag] = true;
         await ui.say(after, { speaker: W.name });
         // il repart par où il est venu
         if (n > 1) await this.npcWalk(rival, dir, n - 1);

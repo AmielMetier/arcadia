@@ -116,14 +116,17 @@ let fails = 0; const ok = (c, msg) => { console.log((c ? '  ✓ ' : '  ✗ ') + 
   const fs = await import('node:fs'); const manque = icones.filter((k) => !fs.existsSync(new URL(`../odyssee/img/pokeapi/items/${k}.png`, import.meta.url)) && !fs.existsSync(new URL(`../odyssee/img/items/${k}.png`, import.meta.url)));
   ok(!manque.length, `toutes les baies et objets tenus ont leur icône${manque.length ? ' (manque : ' + manque.join(', ') + ')' : ''}`);
 }
-{ // après la Ligue : 33 légendaires au bord des routes, tous atteignables, seulement pour le Maître
+{ // après la Ligue : 32 légendaires invités regroupés au Parc des Légendes (accessible depuis le hall de la Ligue), sans doublon d'Odyssor
   const { buildWorld } = await import('../odyssee/js/world/region.js'); const { rangs, JAMAIS } = await import('../odyssee/js/world/acces.js');
-  const w = buildWorld(), m = w.maps.monde, apres = w.legends.filter((q) => q.apresLigue);
-  const r = rangs(w.maps, w.docks, { map: 'monde', x: w.towns.A.x + 5, y: w.towns.A.y + 7 }, { bloquants: false }).get('monde');
-  const loin = apres.filter((L) => ![[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => { const v = r[(L.y + dy) * m.w + L.x + dx]; return v != null && v !== JAMAIS; }));
-  ok(apres.length === 33 && !loin.length, `33 légendaires d'après la Ligue, tous atteignables${loin.length ? ' (sauf ' + loin.map((L) => L.id).join(', ') + ')' : ''}`);
-  ok(apres.every((L) => !L.cond({}) && (L.id === 'odyssor' || L.cond({ champion: true }) || ['regigigas', 'arceus', 'keldeo', 'demeteros', 'kyurem'].includes(L.id))), 'ils n\'apparaissent qu\'au Maître de la Ligue');
-  const { buildWorld: _ } = { buildWorld }; void _;
+  const w = buildWorld(), parc = w.maps['parc-legendes'], apres = w.legends.filter((q) => q.apresLigue);
+  ok(!!parc && parc.id === 'parc-legendes', 'carte parc-legendes construite');
+  const rMap = rangs(w.maps, w.docks, { map: 'monde', x: w.towns.A.x + 5, y: w.towns.A.y + 7 }, { bloquants: false });
+  const rParc = rMap.get('parc-legendes');
+  const loin = apres.filter((L) => L.map !== 'parc-legendes' || !rParc || ![[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => { const v = rParc[(L.y + dy) * parc.w + L.x + dx]; return v != null && v !== JAMAIS; }));
+  ok(apres.length === 32 && !apres.some((L) => L.id === 'odyssor') && !loin.length, `32 légendaires post-Ligue dans parc-legendes sans doublon d'Odyssor${loin.length ? ' (sauf ' + loin.map((L) => L.id).join(', ') + ')' : ''}`);
+  ok(apres.every((L) => !L.cond({}) && (L.cond({ champion: true }) || ['regigigas', 'arceus', 'keldeo', 'demeteros', 'kyurem'].includes(L.id))), 'ils n\'apparaissent qu\'au Maître de la Ligue');
+  const portail = [...w.maps['plateau:ligue'].warps.values()].find((tw) => tw.map === 'parc-legendes');
+  ok(!!portail, 'le portail vers le Parc des Légendes est présent dans le hall de la Ligue');
   ok(!!w.maps['plateau:ligue'].npcs.find((n) => n.def?.script === 'tourCombat' || n.script === 'tourCombat'), 'le Maître de la Tour de Combat attend dans le hall de la Ligue');
 }
 { // Lot 2 : descriptions d'attaques, talents originaux/Méga, plafonds +100 BST, et règles de combat corrigées
@@ -340,6 +343,77 @@ let fails = 0; const ok = (c, msg) => { console.log((c ? '  ✓ ' : '  ✗ ') + 
     mlBat.start(); noMlBat.start();
     ok(mlBat.damageCore(0, 1, MOVES[key['water-pulse']], 60, 'water', false, 1) > noMlBat.damageCore(0, 1, MOVES[key['water-pulse']], 60, 'water', false, 1) * 1.4, 'Méga Blaster (+50% aura)');
   }
+}
+{ // Lot 3 — désobéissance, Club Combat ×0.6, Conseil 4 / Odyssor / trophées, revanches, économie et Barnabé
+  globalThis.location ??= { search: '' };
+  globalThis.localStorage ??= { getItem: () => null, setItem: () => {} };
+  const { Battle: Bt } = await import('../odyssee/js/core/battle.js');
+  const { createMon: mkMon } = await import('../odyssee/js/core/mon.js');
+  const { SPECIES: SP } = await import('../odyssee/js/data/species.js');
+  const { ITEMS: IT } = await import('../odyssee/js/core/items.js');
+  const { MEGAS_OF } = await import('../odyssee/js/core/mega.js');
+  const { buildWorld, LEADERS, STOCK } = await import('../odyssee/js/world/region.js');
+  const { ELITE } = await import('../odyssee/js/world/story.js');
+  const { REMATCH_TEAMS, clubCombat } = await import('../odyssee/js/tour-combat.js');
+  const { DOJO_BOUTIQUE } = await import('../odyssee/js/dojo-mamadou.js');
+  const { TROPHIES_CATALOG } = await import('../odyssee/js/core/trophies.js');
+  const { marche } = await import('../odyssee/js/vie-monde.js');
+
+  const rng0 = () => 0;
+  const ownHi = mkMon(25, 50, { iv: Array(6).fill(31), rng: rng0 }); ownHi.ot = 'Alex'; ownHi.uid = 'u1';
+  const trdHi = mkMon(25, 50, { iv: Array(6).fill(31), rng: rng0 }); trdHi.ot = 'Gaspard'; trdHi.uid = 'u2';
+  const legHi = mkMon(1052, 50, { iv: Array(6).fill(31), rng: rng0 }); legHi.ot = 'Alex'; legHi.uid = 'u3';
+  const foe1 = mkMon(143, 50, { iv: Array(6).fill(31), rng: rng0 }); foe1.uid = 'f1';
+  const mkBat = (mon) => { const b = new Bt({ rng: rng0, player: { name: 'Alex', party: [mon], bag: {} }, foe: { name: 'w', party: [{ ...foe1 }] } }); b.start(); b.pvp = false; b.coop = false; return b; };
+  const bOwn = mkBat(ownHi); bOwn.cap = 30; ok(!bOwn.shouldDisobey({ side: 0, slot: 0 }), 'Pokémon maison non-légendaire > cap obéit');
+  const bTrd = mkBat(trdHi); bTrd.cap = 30; ok(bTrd.shouldDisobey({ side: 0, slot: 0 }), 'Pokémon échangé > cap peut désobéir'); bTrd.cap = 50; ok(!bTrd.shouldDisobey({ side: 0, slot: 0 }), 'Pokémon échangé <= cap obéit');
+  const bLeg = mkBat(legHi); bLeg.cap = 30; ok(bLeg.shouldDisobey({ side: 0, slot: 0 }), 'Légendaire > cap peut désobéir');
+
+  const pFull = mkMon(143, 30, { iv: Array(6).fill(31), rng: rng0 }); pFull.uid = 'e1';
+  const pClub = mkMon(143, 30, { iv: Array(6).fill(31), rng: rng0 }); pClub.uid = 'e2';
+  const exp0 = pFull.exp, exp1 = pClub.exp;
+  const bFull = mkBat(pFull); bFull.wild = false; bFull.sides[1].trainer = { name: 'A' }; bFull.participants.add('e1'); bFull.awardExp(bFull.sides[1].party[0]);
+  const bClub = mkBat(pClub); bClub.wild = false; bClub.sides[1].trainer = { name: 'B', xpMul: 0.6 }; bClub.participants.add('e2'); bClub.awardExp(bClub.sides[1].party[0]);
+  const dFull = pFull.exp - exp0, dClub = pClub.exp - exp1;
+  ok(dClub > 0 && dClub < dFull && Math.abs(dClub / dFull - 0.6) < 0.02, `awardExp applique xpMul 0.6 (${dClub} vs ${dFull})`);
+
+  let capturedTr = null;
+  const mockClubGame = {
+    state: { flags: {}, party: [mkMon(25, 30, { rng: rng0 }), mkMon(143, 30, { rng: rng0 })] },
+    ui: { list: async () => 0, ask: async () => 0, say: async () => {} },
+    trainerBattle: async (fake) => { capturedTr = fake.def.trainer; return 'win'; },
+  };
+  await clubCombat(mockClubGame, { x: 1, y: 1, dir: 'down', sprite: 'topdresseur' });
+  ok(capturedTr?.xpMul === 0.6, 'clubCombat passe xpMul: 0.6 au Combat Club');
+
+  const corbinSet = new Set(LEADERS[14].team.map((e) => e[0]));
+  const ombrelle = ELITE.find((e) => e.id === 'c4:4');
+  ok(!!ombrelle && ombrelle.team.every(([sp]) => !corbinSet.has(sp)) && ELITE.every((e) => e.team.every(([sp, lvl]) => SP[sp] && lvl >= 74)), 'Conseil 4 évolué et Ombrelle distincte de Corbin');
+
+  const leaderNames = LEADERS.slice(0, 15).map((l) => l.name);
+  ok(leaderNames.every((name) => {
+    const r = REMATCH_TEAMS[name];
+    return r && r.team.length === 6 && MEGAS_OF[r.megaSp]?.length > 0 && r.team.every(([sp, lvl, it]) => SP[sp] && lvl >= 78 && lvl <= 84 && (!it || IT[it]));
+  }), 'REMATCH_TEAMS couvre les 15 Champions avec 6 Pokémon et Méga-Évolution valides');
+
+  const compItems = ['leftovers', 'life-orb', 'choice-band', 'choice-specs', 'choice-scarf', 'focus-sash', 'assault-vest', 'rocky-helmet', 'expert-belt', 'eviolite'];
+  ok(Object.values(STOCK).every((arr) => compItems.every((k) => !arr.includes(k))), 'aucun objet tenu compétitif unique en boutique Pokédollar');
+  ok(STOCK[7].includes('heart-scale') && DOJO_BOUTIQUE.some(([it]) => it === 'heart-scale'), 'Écaille Cœur disponible en boutique niveau 8 et au Dojo');
+
+  const w = buildWorld();
+  const worldItems = new Set(w.maps.monde.items.map((it) => it.item));
+  ok(compItems.filter((k) => k !== 'expert-belt').every((k) => worldItems.has(k)), '9 objets compétitifs uniques posés sur les routes (expert-belt à l\'usine)');
+  const leg1 = TROPHIES_CATALOG.find((t) => t.id === 'leg_1');
+  const q5 = TROPHIES_CATALOG.find((t) => t.id === 'quests_completed_5');
+  const bt = TROPHIES_CATALOG.find((t) => t.id === 'boss_tour');
+  ok(leg1?.check({ dex: { caught: [1052] } }).done === true, 'trophée légendaire compte Odyssor (1052)');
+  ok(q5?.check({ journal: { a: { d: 1 }, b: { d: 2 }, c: { d: 3 }, d: { d: 4 }, e: { d: 5 } } }).done === true, 'quests_completed_5 reconnaît journal { d }');
+  ok(bt?.check({ flags: { bossTour: true } }).done === true && bt?.check({ tour: { record: 7 } }).done === true, 'boss_tour débloqué via flags.bossTour et record >= 7');
+
+  const pe = w.maps.monde.npcs.find((n) => n.id === 'azur:pecheur');
+  let showCalled = false;
+  await pe.talk({ has: () => true, say: async () => {}, game: { script: async (name) => { if (name === 'show') showCalled = true; } } }, { def: pe, id: pe.id });
+  ok(showCalled, 'azur:pecheur délègue la quête Magicarpe (show) une fois la Canne obtenue');
 }
 console.log(fails ? `\nRÈGLES DE COMBAT : ${fails} échec(s)` : '\nRÈGLES DE COMBAT : OK');
 process.exit(fails ? 1 : 0);

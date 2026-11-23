@@ -36,7 +36,7 @@ export function tourDoree({ legends, trainerNpc }, x, y) {
     const gate = { badges: TOUR_DOREE_BADGES, flag: 'plume', tiles: [[10, 2], [11, 3]] };
     const n = f3.npc({ id: id + ':novice', x: 10, y: 3, dir: 'down', sprite: 'medium', gate, text: ['Le toit est réservé à qui porte la Plume Arc-en-ciel.', 'Le Grand Sage Hoël veille au sommet sur la plume et sur le Sifflet Céleste sacré.'] });
     f3.gates.push({ npc: n.id, ...gate });
-    legends.push({ id: 'hooh', sp: 250, lvl: 40, map: roof.id, x: 6, y: 6, cond: 'plume', intro: ['La Plume Arc-en-ciel se met à briller...', 'Un arc-en-ciel déchire les nuages. Ho-Oh se pose sur la Tour Dorée !'] });
+    legends.push({ id: 'hooh', sp: 250, lvl: 55, map: roof.id, x: 6, y: 6, cond: 'plume', intro: ['La Plume Arc-en-ciel se met à briller...', 'Un arc-en-ciel déchire les nuages. Ho-Oh se pose sur la Tour Dorée !'] });
     return [f2, f3, roof];
   };
   // toits dorés (le modèle `pagode` de batiments3d.js), quel que soit le toit de la ville

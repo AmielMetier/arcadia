@@ -105,7 +105,7 @@ for (const [id, sp] of Object.entries(SPECIES)) {
 }
 
 /** les Pokémon légendaires différents capturés (marqués leg dans les données des espèces) */
-const legendairesCaptures = (st) => new Set((st.dex?.caught || []).map(Number).filter((sp) => SPECIES[sp]?.leg)).size;
+const legendairesCaptures = (st) => new Set((st.dex?.caught || []).map(Number).filter((sp) => SPECIES[sp]?.leg || SPECIES[sp]?.legend)).size;
 
 export const TROPHIES_CATALOG = [
   /* ==========================================================================
@@ -502,7 +502,7 @@ export const TROPHIES_CATALOG = [
     category: 'exploration',
     reward: { item: 'black-belt', count: 1, label: 'Ceinture Noire ×1' },
     check: (st) => {
-      const cnt = Object.values(st.journal || {}).filter((q) => q && (q.done || q.step === 'done' || q.status === 'done')).length;
+      const cnt = Object.values(st.journal || {}).filter((q) => q && (q.d != null || q.done || q.step === 'done' || q.status === 'done')).length;
       return { current: Math.min(cnt, 5), max: 5, done: cnt >= 5 };
     }
   },
@@ -626,7 +626,7 @@ export const TROPHIES_CATALOG = [
     category: 'boss',
     reward: { item: 'master-ball', count: 1, label: 'Master Ball ×1' },
     check: (st) => {
-      const done = !!(st.flags?.['T:tour:6']);
+      const done = !!(st.flags?.bossTour || st.flags?.['T:tour:6'] || (st.tour?.record || 0) >= 7);
       return { current: done ? 1 : 0, max: 1, done };
     }
   },

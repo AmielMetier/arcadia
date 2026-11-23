@@ -41,9 +41,9 @@ const QUESTS = [
   { id: 'velo', cat: 'npc', name: 'Le vélo de Lucien', giver: 'Lucien',
     started: (f) => !!f['Q:velo'], done: (f) => f['Q:velo'] === 'fin',
     notes: [
-      [(f) => f['Q:velo'], 'À Voltacité, Lucien m\'a promis un vélo s\'il récupérait deux pièces : une chambre à air et un dérailleur.'],
+      [(f) => f['Q:velo'], 'À Port-Azur, Lucien m\'a promis un vélo s\'il récupérait deux pièces : une chambre à air et un dérailleur.'],
       [(f) => f.velo_chambre, 'Yves, le marin, m\'a donné la chambre à air.'],
-      [(f) => f.velo_derailleur, 'Les mineurs m\'ont forgé un dérailleur.'],
+      [(f) => f.velo_derailleur, 'Gustave, le mineur en escale au port, m\'a forgé un dérailleur.'],
       [(f) => f['Q:velo'] === 'fin', 'Lucien a assemblé mon vélo. Je file sur les routes !'],
     ] },
   { id: 'permis', cat: 'npc', name: 'Le permis bateau', giver: 'Capitaine',

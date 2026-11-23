@@ -544,6 +544,17 @@ export class Battle {
       pm && pm.hp > 0 && !tgtSide.activeSlots.includes(j) && (!owners || owners[j] === slot) ? j : -1
     )).filter((j) => j >= 0);
   }
+  shouldDisobey(attRef) {
+    if (attRef.side !== 0 || this.pvp || this.coop || !this.cap || this.cap >= 100) return false;
+    const m = this.act(attRef);
+    if (!m || m.lvl <= this.cap) return false;
+    const traded = !!(m.ot && this.sides[0].name && m.ot !== this.sides[0].name);
+    const legend = !!(SPECIES[m.sp]?.leg || SPECIES[m.sp]?.legend);
+    if (!traded && !legend) return false;
+    const over = m.lvl - this.cap;
+    const chance = Math.min(0.75, 0.25 + over * 0.08);
+    return this.rng() < chance;
+  }
 
   /* ---------------- IA (1v1 & Multi) ---------------- */
   /** Estime la menace maximale adverse envers un emplacement de l'IA */
@@ -1364,6 +1375,17 @@ export class Battle {
       }
     }
     if (m.status === 'par' && this.r(4) === 0) { this.ev.push({ t: 'anim', side: attRef.side, slot: attRef.slot, k: 'para' }); this.say(`${this.Nm(attRef)} est paralysé ! Il n'a pas pu attaquer !`); stop(); return; }
+    if (!v.charge && !v.rampage && this.shouldDisobey(attRef)) {
+      const msgs = [
+        `${this.Nm(attRef)} fait la sourde oreille !`,
+        `${this.Nm(attRef)} se détourne !`,
+        `${this.Nm(attRef)} paresse et refuse d'obéir !`,
+        `${this.Nm(attRef)} fait comme s'il n'avait rien entendu !`,
+      ];
+      this.say(msgs[this.r(msgs.length)]);
+      stop();
+      return;
+    }
 
     if ((x.charge || VANISH_MOVES.has(mv.key)) && v.charge !== mv.id && !(mv.key === 'solar-beam' && (this.weather === 'sun' || this.ab(attRef) === 'mega-sol'))) {
       v.charge = mv.id;
@@ -1988,7 +2010,9 @@ export class Battle {
     const S = SPECIES[foe.sp], party = this.sides[0].party;
     const ps = party.filter((m) => this.participants.has(m.uid) && m.hp > 0);
     if (!ps.length) return;
-    const base = Math.floor(((this.wild ? 1 : 1.5) * S.xp * foe.lvl) / (7 * ps.length));
+    const xpMul = !this.wild && this.sides[1]?.trainer?.xpMul != null ? this.sides[1].trainer.xpMul : 1;
+    const rawBase = ((this.wild ? 1 : 1.5) * S.xp * foe.lvl) / (7 * ps.length);
+    const base = Math.floor(xpMul === 1 ? rawBase : rawBase * xpMul);
     for (const m of ps) {
       const idx = party.indexOf(m), slot = this.sides[0].activeSlots.indexOf(idx);
       gainEffort(m, foe.sp);

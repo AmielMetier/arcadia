@@ -233,7 +233,7 @@ export async function storyWin(g, name) {
    Lugia Obscur
    ====================================================================== */
 export function shadowLugia() {
-  const m = createMon(LUGIA, 50, { moves: [SHADOW_MOVE, 56, 94, 105], iv: Array(6).fill(28), met: 'Sanctuaire des Marées' });
+  const m = createMon(LUGIA, 55, { moves: [SHADOW_MOVE, 56, 94, 105], iv: Array(6).fill(28), met: 'Sanctuaire des Marées' });
   m.shadow = true;
   return m;
 }

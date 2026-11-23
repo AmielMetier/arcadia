@@ -18,13 +18,24 @@ const nomObjet = (k) => ITEMS[k]?.name || k;
 
 /* ================= colporteurs et marché ================= */
 export async function colporteur(game, n) {
-  await game.ui.say(['Hé, dresseur ! Une petite pause ?', 'Je vends de quoi tenir la route, et une pierre rare que j\'ai trouvée en chemin.'], { speaker: 'Colporteur' });
-  await shopScreen(game, n.def.stock.filter((k) => ITEMS[k]));
+  const b = game.badgeCount?.() ?? 0;
+  const stock = n.def.stock.filter((k) => ITEMS[k] && (b >= 2 || !['ultra-ball', 'hyper-potion', 'revive'].includes(k) && !/-stone$/.test(k)));
+  await game.ui.say(['Hé, dresseur ! Une petite pause ?', b >= 2 ? 'Je vends de quoi tenir la route, et une pierre rare que j\'ai trouvée en chemin.' : 'Je vends de quoi tenir la route !'], { speaker: 'Colporteur' });
+  await shopScreen(game, stock);
   await game.ui.say('Bonne route ! On se recroisera peut-être plus loin.', { speaker: 'Colporteur' });
 }
 export async function marche(game, n) {
+  const b = game.badgeCount?.() ?? 0;
+  const pierres = (n.def.stock || []).filter((k) => /-stone$/.test(k));
+  let raw;
+  if (b < 2) raw = ['super-potion', 'great-ball', 'oran-berry', 'repel'];
+  else if (b < 4) raw = ['super-potion', 'great-ball', 'sitrus-berry', 'ether', 'full-heal', ...pierres.slice(0, 1)];
+  else if (b < 6) raw = ['hyper-potion', 'ultra-ball', 'sitrus-berry', 'lum-berry', 'revive', 'heart-scale', ...pierres.slice(0, 2)];
+  else if (b < 8) raw = ['max-potion', 'ultra-ball', 'lum-berry', 'revive', 'heart-scale', ...pierres];
+  else raw = ['rare-candy', 'max-potion', 'full-restore', 'lum-berry', 'ultra-ball', 'heart-scale', ...pierres];
+  const stock = raw.filter((k) => ITEMS[k]);
   await game.ui.say(['Bienvenue au marché du week-end !', 'Je ne passe que le samedi et le dimanche : profites-en, j\'ai des objets qu\'on ne trouve nulle part ailleurs.'], { speaker: 'Marchande' });
-  await shopScreen(game, n.def.stock.filter((k) => ITEMS[k]));
+  await shopScreen(game, stock);
 }
 
 /* ================= arbres à baies et fouilles ================= */
@@ -36,7 +47,7 @@ export async function cueillir(game, o) {
   game.vieMonde?.majObjet(o);
   await ui.say(`${st.name} cueille ${n} ${nomObjet(o.baie)}${n > 1 ? ' (×' + n + ')' : ''} !`);
 }
-const TRESORS = [['hard-stone', 22], ['ether', 18], ['revive', 12], ['prism-shard', 14], ['fire-stone', 4], ['water-stone', 4], ['thunder-stone', 4], ['leaf-stone', 4], ['moon-stone', 4], ['dusk-stone', 3], ['dawn-stone', 3], ['shiny-stone', 3], ['ice-stone', 3], ['rare-candy', 4], ['gemme', 3], ['fossile', 9]];
+const TRESORS = [['hard-stone', 22], ['ether', 18], ['revive', 12], ['prism-shard', 14], ['heart-scale', 16], ['fire-stone', 4], ['water-stone', 4], ['thunder-stone', 4], ['leaf-stone', 4], ['moon-stone', 4], ['dusk-stone', 3], ['dawn-stone', 3], ['shiny-stone', 3], ['ice-stone', 3], ['rare-candy', 4], ['gemme', 3], ['fossile', 9]];
 export async function fouiller(game, o) {
   const st = game.state, E = etat(st), ui = game.ui;
   if (E.fouilles[o.id] === jourDe()) { await ui.say('Cette paroi a déjà été fouillée aujourd\'hui.'); return; }
@@ -85,7 +96,8 @@ export function ragot(game) {
   const st = game.state, b = game.badgeCount(), N = st.name, f = st.flags;
   const L = [];
   if (f.champion) L.push([`C'est toi, ${N}, le Maître de la Ligue ? Je peux avoir un autographe ?`], ['Depuis que tu es Maître de la Ligue, les gamins du quartier ne parlent que de toi.']);
-  else if (b >= 8) L.push(['Huit badges ! Il ne te reste plus que la Ligue Céleste.', 'Toute la région va suivre ton combat, tu sais.'], ['On dit que Célestine n\'a jamais perdu. Jamais. Bonne chance !']);
+  else if (b >= 15) L.push(['Quinze badges ! Il ne te reste plus que la Ligue Céleste.', 'Toute la région va suivre ton combat, tu sais.'], ['On dit que Célestine n\'a jamais perdu. Jamais. Bonne chance !']);
+  else if (b >= 8) L.push(['Huit badges du Nord ! Le Pont de l\'Austral t\'ouvre maintenant les Terres du Sud et Métropole.'], ['Il paraît que les sept Champions du Sud sont d\'un tout autre niveau.']);
   else if (b >= 5) L.push([`${b} badges… On commence à entendre ton nom jusqu'ici.`], ['La Team Éclipse rôde encore. Fais attention à toi, sur les routes.'], ['Les dresseurs des routes se sont tous mis à s\'entraîner depuis que tu passes. Tu leur donnes envie !']);
   else if (b >= 2) L.push([`Tiens, tu as déjà ${b} badges ? Pas mal du tout !`], ['Mon fils veut devenir dresseur depuis qu\'il t\'a vu combattre.'], ['Il paraît que des gens en noir traînent du côté des ports. Bizarre…']);
   else if (b === 1) L.push(['Ton premier badge ! Ça se fête, ça.'], ['Le premier badge, c\'est le plus beau. Moi, je l\'ai encore dans un tiroir.']);
