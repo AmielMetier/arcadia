@@ -504,7 +504,7 @@ console.log('=== Tests Odyssée Wow (#1 Céleste, #4 Failles, #7 Suiveur/Souveni
       for (const name of wowThemes) { s.play(name); s.stopMusic(0); }
       for (const k of WOW_SFX_KEYS) s.sfx(k);
     }
-    assert.equal(WOW_SFX_KEYS.length, 23);
+    assert.equal(WOW_SFX_KEYS.length, 25);
     console.log(`✓ ${wowThemes.length} musiques stylées & ${WOW_SFX_KEYS.length} SFX/ambiances validés (moderne + rétro)`);
   } finally {
     globalThis.window = prevWin;

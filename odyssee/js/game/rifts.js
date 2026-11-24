@@ -282,6 +282,7 @@ export class RiftSystem {
     const info = RIFT_KINDS[r.kind] || RIFT_KINDS.inverse;
     const ui = g.ui, st = g.state;
     g.busy = true;
+    let scene = null;
     try {
       const lvls = (st.party || []).filter((q) => q.hp > 0).map((q) => q.lvl);
       const avg = lvls.length ? Math.round(lvls.reduce((a, b) => a + b, 0) / lvls.length) : 12;
@@ -303,7 +304,8 @@ export class RiftSystem {
         wild = createAlphaMon(entry, lvl, `${r.zoneName} (Faille)`);
         if (Math.random() < 1 / 512) wild.shiny = true;
         battleOpts = { wild, alpha: true, aura: 'rouge', music: 'alphaBoss', rift: true };
-        g.sound?.sfx('alpha_roar');
+        scene = await this.entrer(r, info, wild);
+        if (!scene) g.sound?.sfx('alpha_roar');
         await ui.say(`Un rugissement fend la faille ! Un ${monName(wild)} Alpha géant bondit sur toi !`);
       } else {
         const pool = [...ALPHA_POOL.map((e) => e.sp), ...CELESTIAL_SPECIES].filter((id) => SPECIES[id]);
@@ -324,10 +326,12 @@ export class RiftSystem {
         } else {
           battleOpts = { wild, chaosWeather: true, weather: 'rain', music: 'riftBattle', rift: true };
         }
-        g.sound?.sfx('rift_open');
+        scene = await this.entrer(r, info, wild);
+        if (!scene) g.sound?.sfx('rift_open');
         await ui.say(`L'espace se tord : un ${monName(wild)} émerge de la faille !`);
       }
 
+      battleOpts.apresRideau = () => scene?.fin();   // l'intérieur de la faille reste en fond jusqu'au rideau du combat
       const res = await g.runBattle(battleOpts);
       if (res === 'win' || res === 'caught') {
         st.flags ||= {};
@@ -351,8 +355,18 @@ export class RiftSystem {
         ]);
       }
     } finally {
+      scene?.fin();
       g.busy = false;
     }
     return true;
+  }
+
+  /** l'animation d'entrée (ui/rift-entree.js) ; null si elle ne peut pas se jouer */
+  async entrer(r, info, mon) {
+    if (typeof document === 'undefined') return null;
+    try {
+      const { entrerFaille } = await import('../ui/rift-entree.js');
+      return await entrerFaille(this.game, { kind: r.kind, info, x: r.x, y: r.y, mon });
+    } catch (e) { warnDev('faille', e); return null; }
   }
 }

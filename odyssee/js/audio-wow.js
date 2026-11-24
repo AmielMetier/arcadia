@@ -298,7 +298,7 @@ export const WOW_COMPOSERS = {
 
 export const WOW_SFX_KEYS = [
   'astrolabe', 'aurora_cast', 'meteor_cast', 'meteor_pick',
-  'rift_open', 'rift_seal', 'alpha_roar', 'memory_unlock',
+  'rift_open', 'rift_enter', 'rift_impact', 'rift_seal', 'alpha_roar', 'memory_unlock',
   'aura_stars', 'aura_petals', 'aura_sparks', 'aura_crimson',
   'follower_happy', 'quest_complete',
   'amb_rain', 'amb_thunder', 'amb_wind_gust', 'amb_aurora',
@@ -343,6 +343,22 @@ export function playWowSfx(sound, k, t, B, P, n) {
       sound.tone('sawtooth', 180, t, 0.48, 0.14, B, { slide: 42 });
       sound.tone('noise', 2200, t + 0.04, 0.42, 0.16, B, { filter: 'bandpass' });
       [['E5', 0.16], ['Bb5', 0.24], ['E6', 0.34]].forEach(([m, dt]) => P(n(m), dt, 0.36, 0.08, 'pulse12'));
+      return true;
+    case 'rift_enter': {
+      // la chute : un souffle qui monte, un grondement qui s'enfonce, des éclats qui filent de plus en plus vite
+      sound.duck(2600);
+      sound.tone('noise', 500, t, 2.2, 0.12, B, { filter: 'bandpass', attack: 1.3, release: 0.5, slide: 5200 });
+      sound.tone('sawtooth', 62, t, 2.1, 0.12, B, { slide: 210, attack: 0.5, release: 0.3 });
+      sound.tone('triangle', 130, t, 2.2, 0.12, B, { slide: 33, attack: 0.1, release: 0.4 });
+      let dt = 0.1;
+      for (let i = 0; i < 15; i++) { P(n(['E5', 'Bb5', 'C6', 'F6', 'Bb6'][i % 5]), dt, 0.09, 0.03 + i * 0.0022, 'sine'); dt += 0.22 - i * 0.0105; }
+      return true;
+    }
+    case 'rift_impact':
+      sound.duck(1200);
+      sound.tone('triangle', 150, t, 0.7, 0.3, B, { slide: 30, release: 0.4 });
+      sound.tone('noise', 1400, t, 0.4, 0.14, B, { filter: 'lowpass', release: 0.35 });
+      [['E4', 0], ['B4', 0.02], ['E5', 0.04], ['Bb5', 0.07]].forEach(([m, d]) => P(n(m), d, 0.9, 0.05, 'sine'));
       return true;
     case 'rift_seal':
       sound.duck(1800);

@@ -64,3 +64,24 @@
   .ow-aurora { animation: none; }
   .ow-meteor::before, .ow-meteor::after { animation: none; }
 }
+
+/* entrée dans une faille (ui/rift-entree.js) : plein écran, sous le dialogue (35) et le rideau du combat (59) */
+.rift-scr { position: absolute; inset: 0; z-index: 34; background: #05020c; overflow: hidden; pointer-events: none; }
+.rift-scr canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.rift-barre { position: absolute; left: 0; right: 0; height: 9%; background: #000; transition: transform .5s cubic-bezier(.2, .8, .2, 1); }
+.rift-barre.haut { top: 0; transform: translateY(-100%); animation: rift-barre .6s .5s cubic-bezier(.2, .8, .2, 1) forwards; }
+.rift-barre.bas { bottom: 0; transform: translateY(100%); animation: rift-barre .6s .5s cubic-bezier(.2, .8, .2, 1) forwards; }
+@keyframes rift-barre { to { transform: none; } }
+.rift-titre {
+  position: absolute; left: 0; top: 13%; padding: calc(var(--px) * 4) calc(var(--px) * 30) calc(var(--px) * 4) calc(var(--px) * 14);
+  background: linear-gradient(90deg, rgba(6, 3, 14, .95) 0 70%, rgba(6, 3, 14, 0)); border-left: calc(var(--px) * 3) solid var(--faille);
+  clip-path: polygon(0 0, 100% 0, calc(100% - calc(var(--px) * 12)) 100%, 0 100%);
+  transform: translateX(-110%); display: flex; flex-direction: column; gap: calc(var(--px) * 1);
+}
+.rift-titre b { font-size: calc(var(--px) * 15); letter-spacing: .06em; text-transform: uppercase; color: #fff; text-shadow: calc(var(--px) * 1) calc(var(--px) * 1) 0 var(--faille2); }
+.rift-titre span { font-size: calc(var(--px) * 7.5); color: var(--faille); }
+.rift-scr.revele .rift-titre { transform: none; transition: transform .32s cubic-bezier(.1, .9, .2, 1); }
+.rift-scr.inverse { --faille: #38e8ff; --faille2: #7a2ad8; }
+.rift-scr.chaos { --faille: #ffd248; --faille2: #2a78c8; }
+.rift-scr.alpha { --faille: #ff5a48; --faille2: #8a1c08; }
+@media (prefers-reduced-motion: reduce) { .rift-barre, .rift-titre { animation-duration: .01s !important; transition-duration: .01s !important; } }

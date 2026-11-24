@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.161 — 24 novembre 2026
+- **Odyssée** — Entrer dans une faille se vit maintenant en grand (Odyssée 3.3) :
+  - L'écran se brise, le monde est aspiré et tu traverses un tunnel propre à la faille : losanges qui s'échangent, quatre climats et leurs éclairs, ou brasier d'un Alpha.
+  - Une silhouette approche au bout du tunnel, puis se révèle avant le combat.
+  - Une touche suffit pour passer l'animation.
+
 ## 5.160 — 24 novembre 2026
 - **Odyssée** — Ouvrir une faille avec l'Astrolabe demande un Fragment Météorique, sans attente (Odyssée 3.2) :
   - Le fragment n'est utilisé qu'après confirmation. Si tu quittes le jeu avant d'entrer, ta faille se rouvre ; si tu la dissipes, le fragment t'est rendu.

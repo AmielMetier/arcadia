@@ -2100,6 +2100,7 @@ export class Game {
     const isWild = !!(o.wild || o.wildParty);
     const kind = isWild ? o.music || 'wild' : o.music || 'trainer';
     const curtain = await this.encounterIntro(kind, isWild);
+    o.apresRideau?.();
     const m = this.mapObj, z = this.zone;
     const isVillage = z?.town === 'aube' || z?.town === 'sylve' || z?.theme === 'village';
     const isCity = !!z?.town || z?.name?.includes('Cité') || z?.name?.includes('Port-');
