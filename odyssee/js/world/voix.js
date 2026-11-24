@@ -181,8 +181,23 @@ export const ROUTES = {
   marais: [['Les passerelles craquent, mais elles tiennent. Enfin, j\'espère.']],
 };
 
-/** prénoms des dresseurs ajoutés le long des routes */
-export const PRENOMS = ['Alix', 'Anouk', 'Arthur', 'Bastien', 'Blanche', 'Camille', 'Cyril', 'Daphné', 'Damien', 'Élio', 'Elsa', 'Émile', 'Fanny', 'Félicien', 'Gabin', 'Gaëlle', 'Hélène', 'Henri',
-  'Ilona', 'Ivan', 'Jasmine', 'Joachim', 'Juliette', 'Kévin', 'Laure', 'Léon', 'Lina', 'Lucien', 'Maud', 'Marius', 'Mathis', 'Nadia', 'Noam', 'Octave', 'Olga', 'Pablo', 'Pauline', 'Quentin',
-  'Rémi', 'Rosalie', 'Sacha', 'Salomé', 'Simon', 'Tess', 'Tristan', 'Ulysse', 'Valérie', 'Victor', 'Wendy', 'Xavier', 'Yasmine', 'Yvan', 'Zélie', 'Zoé', 'Aubin', 'Bérénice', 'Corentin',
-  'Delphine', 'Ernest', 'Flavie', 'Gustave', 'Hortense', 'Isidore', 'Jeanne', 'Lazare', 'Margaux', 'Nestor', 'Ophélie', 'Prosper', 'Romy', 'Sixte', 'Thaïs', 'Urbain', 'Violette'];
+/** prénoms des dresseurs ajoutés le long des routes (accordés au genre de la classe, sans doublon avec les dresseurs fixes) */
+export const PRENOMS_M = [
+  'Adrien', 'Alain', 'Alexis', 'Antoine', 'Arnaud', 'Arthur', 'Aubin', 'Augustin', 'Baptiste', 'Benjamin',
+  'Cédric', 'Charles', 'Christian', 'Christophe', 'Clément', 'Cyril', 'Daniel', 'David', 'Denis', 'Didier',
+  'Dorian', 'Élio', 'Émile', 'Emmanuel', 'Éric', 'Étienne', 'Fabien', 'Fabrice', 'Florian', 'François',
+  'Frédéric', 'Gabin', 'Gabriel', 'Gautier', 'Gérard', 'Grégoire', 'Guillaume', 'Hugo', 'Ivan', 'Jacques',
+  'Jérémy', 'Jérôme', 'Joachim', 'Jonathan', 'Jules', 'Julien', 'Kévin', 'Laurent', 'Louis', 'Luc',
+  'Lucien', 'Marc', 'Martial', 'Martin', 'Mathieu', 'Mathis', 'Maxence', 'Maxime', 'Mickaël', 'Nestor',
+];
+export const PRENOMS_F = [
+  'Adèle', 'Amandine', 'Amélie', 'Anaïs', 'Angèle', 'Anouk', 'Audrey', 'Aurélie', 'Béatrice', 'Blanche',
+  'Carole', 'Caroline', 'Catherine', 'Cécile', 'Céline', 'Chantal', 'Charlotte', 'Claire', 'Clémence', 'Colette',
+  'Coline', 'Constance', 'Coralie', 'Corinne', 'Daphné', 'Delphine', 'Diane', 'Dorothée', 'Édith', 'Éléonore',
+  'Élodie', 'Éloïse', 'Elsa', 'Émilie', 'Emma', 'Eva', 'Fanny', 'Flavie', 'Florence', 'Gaëlle',
+  'Gisèle', 'Hélène', 'Hortense', 'Huguette', 'Ilona', 'Isabelle', 'Jasmine', 'Jeanne', 'Jocelyne', 'Joséphine',
+  'Judith', 'Julia', 'Julie', 'Juliette', 'Justine', 'Laetitia', 'Laura', 'Laure', 'Laurence', 'Manon',
+];
+export const PRENOMS = [...PRENOMS_M, ...PRENOMS_F];
+const CLASSE_FEM = /^(Fillette|Randonneuse|Topdresseuse|Dame|Championne|Nageuse|Jardinière|Sœur)/i;
+export const prenomsPour = (cls) => (CLASSE_FEM.test(cls || '') ? PRENOMS_F : PRENOMS_M);

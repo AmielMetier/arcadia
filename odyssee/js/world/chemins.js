@@ -10,7 +10,7 @@ import { carveRoute, along, nearestWalkable, caseLibre, rng, sin, melanger, ledg
 import { plateau, sinueuse, massif } from './relief.js';
 import { bruit } from './quartiers.js';
 import { houseInterior } from './interiors.js';
-import { ROUTES, PRENOMS } from './voix.js';
+import { ROUTES, PRENOMS, prenomsPour } from './voix.js';
 import { lotsPour, rangRoute, adapter } from './bareme.js';
 
 export const BLOC = 24;
@@ -270,7 +270,8 @@ export function grandeRoute(W, S, ctx) {
     const dir = Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 'right' : 'left') : (vy > 0 ? 'down' : 'up');
     const n = 1 + Math.floor(r() * 3), team = [];
     for (let i = 0; i < n; i++) { const e = pick(enc); team.push([e[0], Math.min(100, niv[1] - 1 + Math.floor(r() * 3) - (n - 1))]); }
-    ctx.trainerNpc(W, x, y, dir, pick(CLASSES), pick(PRENOMS), team, { id: `${S.id}:d${k}`, sight: 3 });
+    const cls = pick(CLASSES);
+    ctx.trainerNpc(W, x, y, dir, cls, pick(prenomsPour(cls)), team, { id: `${S.id}:d${k}`, sight: 3 });
   }
   for (let k = 0; k < (S.promeneurs ?? 1); k++) {
     const p = along(pts, 0.2 + r() * 0.6), [x, y] = caseLibre(W, p.x + 0.5 + p.nx * 2, p.y + 0.5 + p.ny * 2);

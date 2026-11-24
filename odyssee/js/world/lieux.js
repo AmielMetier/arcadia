@@ -12,7 +12,7 @@ import { rng, sin, cos } from './mapgen.js';
 import { plateau, massif, sinueuse } from './relief.js';
 import { bruit } from './quartiers.js';
 import { houseInterior } from './interiors.js';
-import { ROUTES, PRENOMS } from './voix.js';
+import { ROUTES, PRENOMS, prenomsPour } from './voix.js';
 import { lotsPour, rangRoute, adapter } from './bareme.js';
 
 const B = 24, N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -199,7 +199,8 @@ export function lieux(W, { maps, trainerNpc, ENC }) {
       const lv = Math.max(...enc.map((e) => e[2] || e[1] || 5)), team = [];
       for (let i = 0; i < 1 + Math.floor(r() * 3); i++) { const e = pick(enc); team.push([e[0], Math.min(100, lv + Math.floor(r() * 2))]); }
       occ.add(p.join(','));
-      trainerNpc(W, p[0], p[1], dir || 'down', pick(['Randonneuse', 'Montagnard', 'Topdresseur', 'Topdresseuse', 'Insectomane', 'Gamin', 'Karatéka']), pick(PRENOMS), team, { id: `${id}:d${np++}`, sight: 3 });
+      const cls = pick(['Randonneuse', 'Montagnard', 'Topdresseur', 'Topdresseuse', 'Insectomane', 'Gamin', 'Karatéka']);
+      trainerNpc(W, p[0], p[1], dir || 'down', cls, pick(prenomsPour(cls)), team, { id: `${id}:d${np++}`, sight: 3 });
     };
     // le contenu
     if (kind === 'hameau') {

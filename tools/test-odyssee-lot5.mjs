@@ -221,7 +221,7 @@ console.log('=== Tests de régression Lot 5 ===');
 
   // Unicité des dresseurs fixes (hors antagonistes récurrents) & exclusivité des noms de Champions
   const RECURRING_VILLAINS = new Set(['Sbire', 'de la Team Éclipse', 'Nyx', 'Érèbe', 'Nocturne']);
-  const isProc = (id) => /^((r\w+):(d|e)\d+|lieu:[^:]+:d\d+)$/.test(id || '');
+  const isProc = (id) => /^((bois|r\w+):(d|e)\d+|lieu:[^:]+:d\d+)$/.test(id || '');
   const fixedNames = new Map();
   const leaderNames = new Set(LEADERS.map((L) => L.name));
 
@@ -239,6 +239,27 @@ console.log('=== Tests de régression Lot 5 ===');
     }
   }
 
+  // Dresseurs procéduraux : accord du prénom au genre de la classe + zéro chevauchement avec les dresseurs fixes/Champions
+  const { PRENOMS, PRENOMS_M, PRENOMS_F } = await import('../odyssee/js/world/voix.js');
+  const setM = new Set(PRENOMS_M), setF = new Set(PRENOMS_F), setAllProc = new Set(PRENOMS);
+  const femClasses = new Set(['Fillette', 'Randonneuse', 'Topdresseuse']);
+  let procChecked = 0;
+  for (const [mid, m] of Object.entries(W.maps)) {
+    for (const n of m.npcs) {
+      if (!n.trainer?.name) continue;
+      if (isProc(n.id)) {
+        procChecked++;
+        const isFemCls = femClasses.has(n.trainer.cls);
+        assert.equal(isFemCls ? setF.has(n.trainer.name) : setM.has(n.trainer.name), true,
+          `Prénom procédural mal accordé : ${mid}:${n.id} (${n.trainer.cls} :: ${n.trainer.name})`);
+      } else {
+        assert.equal(setAllProc.has(n.trainer.name), false,
+          `Chevauchement PRENOMS avec dresseur fixe : ${mid}:${n.id} (${n.trainer.name})`);
+      }
+    }
+  }
+  assert.equal(procChecked >= 150, true, `Attendu >= 150 dresseurs procéduraux (trouvé ${procChecked})`);
+
   // Regex de pause fin de combat dans ui/battleView.js
   const bvSrc = fs.readFileSync('odyssee/js/ui/battleView.js', 'utf8');
   const m = bvSrc.match(/case 'msg':[^\n]*\/([^/]+)\/\.test\(e\.text\)/);
@@ -248,7 +269,7 @@ console.log('=== Tests de régression Lot 5 ===');
   assert.equal(pauseRe.test('Tu perds connaissance dans la panique...'), true, 'pauseRe doit matcher "perds"');
   assert.equal(pauseRe.test("Tu n'as plus de Pokémon en forme !"), true, 'pauseRe doit matcher "en forme"');
 
-  console.log(`✓ Monde, archipel post-Drakos, genres d'arène, sprites et ${fixedNames.size} dresseurs fixes uniques OK`);
+  console.log(`✓ Monde, archipel post-Drakos, genres d'arène, sprites, ${fixedNames.size} dresseurs fixes uniques et ${procChecked} procéduraux accordés OK`);
 }
 
 console.log('Tous les tests Lot 5 ont réussi.');

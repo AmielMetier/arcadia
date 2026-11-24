@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.157 — 24 novembre 2026
+- **Odyssée** — Finitions et passage en **Odyssée 3.0** :
+  - Prénoms des 206 dresseurs procéduraux des routes et lieux accordés au genre de leur classe, sans collision avec les dresseurs fixes ni les Champions.
+  - Déblocage audio WebAudio fiabilisé sur Safari/iOS (`keydown`, `pointerdown`, `touchend`, `click` et `resume().catch()`).
+  - Cache navigateur rafraîchi sur l'ensemble des 182 modules (`Odyssée 3.0`).
+
 ## 5.156 — 24 novembre 2026
 - Correction : lot 1 — urgences lotcheck (crashs, softlocks, combat, économie) (Amiel)
 - Correction : lot 2 — combat, talents, méga-évolutions et descriptions (Amiel)

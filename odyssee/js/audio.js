@@ -1430,9 +1430,10 @@ export class Sound {
   setStyle(st) { this.style = st === 'retro' ? 'retro' : 'moderne'; try { localStorage.setItem('odyssee-son', this.style); } catch (e) {} const cur = this.current; this.current = null; if (cur) this.play(cur); }
   init(offline) {
     if (offline) { this.ctx = null; this.offline = offline.length / offline.sampleRate; }
-    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    if (this.ctx) { if (this.ctx.state === 'suspended' && this.ctx.resume) this.ctx.resume().catch(() => {}); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC && !offline) return;
     this.ctx = offline || new AC();
+    if (!offline && this.ctx.state === 'suspended' && this.ctx.resume) this.ctx.resume().catch(() => {});
     this.master = this.ctx.createGain(); this.master.gain.value = this.muted ? 0 : this.vol; this.master.connect(this.ctx.destination);
     // les réglages de volume du Hub (musique / effets) s'appliquent s'ils sont disponibles
     const DV = window.DDVolume, via = (kind) => { if (!DV) return this.master; const g = DV.gain(this.ctx, kind); g.connect(this.master); return g; };

@@ -13,7 +13,7 @@ import { T, walkable } from './tiles.js';
 import { along, caseLibre } from './mapgen.js';
 import { bruit } from './quartiers.js';
 import { lotsPour, rangRoute, adapter } from './bareme.js';
-import { PRENOMS } from './voix.js';
+import { PRENOMS, prenomsPour } from './voix.js';
 import { formatFindItem } from '../core/items.js';
 import { rangAutour, JAMAIS } from './acces.js';
 
@@ -254,7 +254,8 @@ function routeRythme(W, R, res, occ, ids, ctx) {
         for (let i = 0; i < n; i++) { const e = enc[Math.floor(h(2 + i) * enc.length) % enc.length]; team.push([e[0], Math.max(2, Math.min(100, niv[1] - 1 + Math.floor(h(9 + i) * 3) - (n - 1)))]); }
         const id = `${R.id}:e${k}`;
         // le regard traverse le sentier jusqu'à l'autre bord de la prairie
-        ctx.trainerNpc(W, x, y, dir, CLASSES[Math.floor(h(20) * CLASSES.length) % CLASSES.length], PRENOMS[Math.floor(h(21) * PRENOMS.length) % PRENOMS.length], team, { id, sight: Math.min(6, d + (sg > 0 ? p.b : p.a) + 1) });
+        const cls = CLASSES[Math.floor(h(20) * CLASSES.length) % CLASSES.length], pool = prenomsPour(cls);
+        ctx.trainerNpc(W, x, y, dir, cls, pool[Math.floor(h(21) * pool.length) % pool.length], team, { id, sight: Math.min(6, d + (sg > 0 ? p.b : p.a) + 1) });
         occ.add(x + ',' + y); pris.push(p.s); k++; out.dresseurs++;
       }
     }

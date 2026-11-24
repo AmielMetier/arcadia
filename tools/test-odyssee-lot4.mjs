@@ -269,6 +269,11 @@ console.log('=== Tests de régression Lot 4 ===');
 
   const html = fs.readFileSync('odyssee/index.html', 'utf8');
   assert.ok(html.includes('css/odyssee.bundle.css'), 'odyssee/index.html utilise le bundle CSS');
+
+  const mainSrc = fs.readFileSync('odyssee/js/main.js', 'utf8');
+  assert.ok(mainSrc.includes("'touchend'") && mainSrc.includes("'click'"), 'main.js doit enregistrer touchend et click pour le déblocage audio Safari/iOS');
+  const audioSrc = fs.readFileSync('odyssee/js/audio.js', 'utf8');
+  assert.ok(audioSrc.includes('resume().catch'), 'audio.js doit gérer resume().catch() sans rejet non capturé');
   console.log('✓ Contrôles d\'intégration Lot 4 OK');
 }
 

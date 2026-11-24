@@ -182,13 +182,19 @@ async function boot() {
   };
   addEventListener('resize', resize); resize();
   game.onVue = (k) => { vue = k; resize(); };
-  // le premier appui débloque le son
+  // le premier geste débloque le son (y compris sur Safari/iOS où pointerdown seul ne suffit pas toujours)
+  const UNLOCK_EVS = ['keydown', 'pointerdown', 'touchend', 'click'];
+  const detachUnlock = () => UNLOCK_EVS.forEach((ev) => removeEventListener(ev, unlock));
   const unlock = () => {
-    removeEventListener('keydown', unlock);
-    removeEventListener('pointerdown', unlock);
     sound.init();
+    const ctx = sound.ctx;
+    if (!ctx) return;
+    if (ctx.state === 'running') { detachUnlock(); return; }
+    if (typeof ctx.resume === 'function') {
+      ctx.resume().then(() => { if (sound.ctx?.state === 'running') detachUnlock(); }).catch(() => {});
+    }
   };
-  addEventListener('keydown', unlock, { once: true }); addEventListener('pointerdown', unlock, { once: true });
+  UNLOCK_EVS.forEach((ev) => addEventListener(ev, unlock, { passive: true }));
   ui.helpButton();
 
   let mode = 'title', last = performance.now(), enPanne = 0;
