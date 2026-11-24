@@ -10,6 +10,7 @@ import { LEADERS } from '../../world/region.js';
 import { ASSETS } from '../../assets.js';
 import { TYPE_FR, TYPE_COL, typeTag, hpCol, hpBar, statusTag, gender, screen, closer } from './common.js';
 import { pcScreen } from './pc.js';
+import { MEMORIES, ENTRANCE_AURAS, unlockedAuras, activeEntranceAura } from '../../game/follower-life.js';
 
 /* ================= ÉQUIPE (Style 5G Noir 2 / Blanc 2) ================= */
 /**
@@ -479,22 +480,30 @@ export function summaryScreen(game, list, idx) {
     const draw = () => {
       const m = list[idx], S = SPECIES[m.sp];
       const isCapped = m.lvl >= cap;
+      const unlockedList = unlockedAuras(m);
+      const unlockedSet = new Set(unlockedList.map((a) => a.id));
+      const activeAura = activeEntranceAura(m);
+      const mems = Array.isArray(m.memories) ? m.memories : [];
+      const totalMemCount = Object.keys(MEMORIES).length;
+      const TOTAL_PAGES = 4;
       const tabs = [
         ['INFOS DRESSEUR', 'Aperçu'],
         ['STATISTIQUES', 'Capacités'],
-        ['ATTAQUES CONNUES', `${m.moves.length}/4`],
+        ['ATTAQUES', `${m.moves.length}/4`],
+        ['SOUVENIRS', `${mems.length}/${totalMemCount}`],
       ].map(([t, sub], k) => `<button type="button" class="sum-tab ${k === page ? 'on' : ''}" data-tab="${k}"><b>${t}</b><small>${sub}</small></button>`).join('');
       let body = '';
       if (page === 0) {
         body = `
           <table class="kv sum-kv">
-            <tr><td>N° Pokédex</td><td>#${String(S.no || m.sp).padStart(3, '0')}</td></tr>
+            <tr><td>N° Pokédex</td><td>#${String(S.no || m.sp).padStart(3, '0')}${m.alpha ? ' <span class="sum-alpha-badge">★ ALPHA</span>' : ''}</td></tr>
             <tr><td>Espèce</td><td>${esc(S.n)}</td></tr>
             <tr><td>Type</td><td>${S.t.map(typeTag).join(' ')}</td></tr>
             <tr><td>Dresseur Orig.</td><td>${esc(m.ot || game.state.name)}</td></tr>
             <tr><td>Rencontré à</td><td>${esc(m.met || '—')}</td></tr>
             <tr><td>Nature</td><td>${esc(natureName(m.nat ?? 0))}${(() => { const ne = natureEffect(m.nat ?? 0); return ne ? ` <small class="nat-fx">(+${STAT_NAMES[ne[0]]} / −${STAT_NAMES[ne[1]]})</small>` : ' <small class="nat-fx">(neutre)</small>'; })()}</td></tr>
             <tr><td>Talent</td><td>${(() => { const ab = getAbility(m); return ab ? `<b>${esc(ab.name)}</b>${ab.desc ? ` <small class="nat-fx">${esc(ab.desc)}</small>` : ''}` : '—'; })()}</td></tr>
+            <tr><td>Aura d'entrée</td><td>${activeAura ? `${activeAura.icon} ${esc(activeAura.name)}` : 'Aucune'}</td></tr>
             <tr><td>Points Exp.</td><td>${m.exp.toLocaleString('fr-FR')} pts</td></tr>
             <tr><td>Limite Arène</td><td>N.${cap} ${isCapped ? '<span class="sum-cap-tag">ATTEINTE</span>' : ''}</td></tr>
           </table>
@@ -505,7 +514,7 @@ export function summaryScreen(game, list, idx) {
         const ne = natureEffect(m.nat ?? 0), ev = m.ev || [0, 0, 0, 0, 0, 0], evTot = ev.reduce((a, x) => a + x, 0);
         body = `<table class="kv stats sum-kv sum-stats"><tr class="sth"><td></td><td>Stat</td><td></td><td>IV</td><td>EV</td></tr>${STAT_NAMES.map((n, k) => `<tr><td class="${ne && ne[0] === k ? 'nat-up' : ne && ne[1] === k ? 'nat-down' : ''}">${n}${ne && ne[0] === k ? ' ▲' : ne && ne[1] === k ? ' ▼' : ''}</td><td><b>${k === 0 ? `${m.hp} / ${m.stats[0]}` : m.stats[k]}</b></td><td><i class="sbar"><u style="width:${Math.min(100, baseStats(m)[k] / 1.5)}%"></u></i></td><td class="iv${m.iv[k] === 31 ? ' max' : ''}">${m.iv[k]}</td><td class="evv">${ev[k]}</td></tr>`).join('')}</table>
           <div class="sum-natline">Nature <b>${esc(natureName(m.nat ?? 0))}</b> · EV ${evTot} / 510 · Les EV s'ajoutent aux stats au niveau suivant ou au Centre.</div>`;
-      } else {
+      } else if (page === 2) {
         body = `<div class="moves${curMv >= 0 ? ' ordre' : ''}">${m.moves.map((mv, k) => {
           const M = MOVES[mv.id];
           const catLbl = M.c === 'special' ? 'Spécial' : M.c === 'status' ? 'Statut' : 'Physique';
@@ -517,6 +526,36 @@ export function summaryScreen(game, list, idx) {
           </div>`;
         }).join('')}</div>${ordreOk && m.moves.length > 1 ? `<div class="mv-ordre-aide">${curMv < 0 ? 'A ou clic : ranger les attaques'
           : pris < 0 ? '▲ ▼ choisir l\'attaque · A la prendre · B terminer' : `▲ ▼ choisir sa nouvelle place · A échanger avec elle · B reposer`}</div>` : ''}`;
+      } else {
+        const auraChoice = m.entranceAura || 'auto';
+        const chips = [
+          `<button type="button" class="sum-aura-btn${auraChoice === 'auto' ? ' on' : ''}" data-aura="auto" title="Utiliser automatiquement la meilleure aura débloquée">✨ Auto</button>`,
+          `<button type="button" class="sum-aura-btn${auraChoice === 'none' ? ' on' : ''}" data-aura="none" title="Désactiver l'aura d'entrée en combat">— Aucune</button>`,
+          ...ENTRANCE_AURAS.map((a) => {
+            const ok = unlockedSet.has(a.id);
+            const selected = auraChoice === a.id && ok;
+            return `<button type="button" class="sum-aura-btn${selected ? ' on' : ''}${!ok ? ' locked' : ''}" ${ok ? `data-aura="${a.id}"` : 'disabled'} title="${esc(ok ? a.reqText : 'Verrouillée : ' + a.reqText)}">${a.icon} ${esc(a.name)}</button>`;
+          }),
+        ].join('');
+        const memHtml = mems.length
+          ? mems.map((entry) => {
+            const def = MEMORIES[entry.id];
+            if (!def) return '';
+            return `<div class="sum-mem-card">
+              <div class="sum-mem-ico">${def.icon}</div>
+              <div class="sum-mem-body">
+                <div class="sum-mem-top"><b>${esc(def.title)}</b>${entry.place ? `<span class="sum-mem-place">${esc(entry.place)}</span>` : ''}</div>
+                <div class="sum-mem-desc">${esc(def.desc)}</div>
+              </div>
+            </div>`;
+          }).join('')
+          : `<div class="sum-mem-empty">Aucun souvenir gravé pour l'instant.<br>Marche avec ce Pokémon, parle-lui sur la route, affronte des failles ou brille en combat pour forger vos souvenirs !</div>`;
+        body = `<div class="sum-souvenirs">
+          <div class="sum-sec-title">Aura d'entrée en combat ${activeAura ? `<small>(Active : ${activeAura.icon} ${esc(activeAura.name)})</small>` : ''}</div>
+          <div class="sum-aura-row">${chips}</div>
+          <div class="sum-sec-title">Carnet de Souvenirs (${mems.length} / ${totalMemCount})</div>
+          <div class="sum-mem-list">${memHtml}</div>
+        </div>`;
       }
       s.innerHTML = `
         <div class="scr-bar">
@@ -534,7 +573,7 @@ export function summaryScreen(game, list, idx) {
         <div class="sum-body">
           <div class="sum-left">
             <div class="sum-head">
-              <span class="sum-name">${esc(monName(m))}${gender(m)}</span>
+              <span class="sum-name">${esc(monName(m))}${gender(m)}${m.alpha ? ' <span class="sum-alpha-badge">ALPHA</span>' : ''}</span>
               <span class="sum-lvl">N.${m.lvl}</span>
             </div>
             <div class="sum-stage">
@@ -557,6 +596,15 @@ export function summaryScreen(game, list, idx) {
           const k = +el.dataset.mv;
           if (pris >= 0) { echanger(pris, k); pris = -1; curMv = k; }
           else { curMv = pris = k; ui.sound.sfx('blip'); }
+          draw();
+        });
+      });
+      s.querySelectorAll('[data-aura]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          list[idx].entranceAura = btn.dataset.aura;
+          ui.sound.sfx('select');
+          game.save?.(true);
           draw();
         });
       });
@@ -591,12 +639,12 @@ export function summaryScreen(game, list, idx) {
       }
       if (k === 'a' && page === 2 && ordreOk && list[idx].moves.length > 1) { curMv = 0; pris = -1; ui.sound.sfx('blip'); draw(); return; }
       if (k === 'up' || k === 'down') sortirOrdre();
-      if (k === 'left') { page = (page + 2) % 3; ui.sound.sfx('blip'); draw(); }
-      else if (k === 'right') { page = (page + 1) % 3; ui.sound.sfx('blip'); draw(); }
+      if (k === 'left') { page = (page + 3) % 4; ui.sound.sfx('blip'); draw(); }
+      else if (k === 'right') { page = (page + 1) % 4; ui.sound.sfx('blip'); draw(); }
       else if (k === 'up') { idx = (idx - 1 + list.length) % list.length; ui.sound.sfx('blip'); draw(); }
       else if (k === 'down') { idx = (idx + 1) % list.length; ui.sound.sfx('blip'); draw(); }
       else if (k === 'a') {
-        page = (page + 1) % 3;
+        page = (page + 1) % 4;
         ui.sound.sfx('blip');
         draw();
       } else if (k === 'b') {

@@ -1,5 +1,6 @@
 // odyssee/js/net/friends.js — Gestionnaire unifié des Amis et Joueurs en Ligne pour Odyssée
 // Compatible 100% avec le Hub Arcadia (HubFriends, HubBridge) et fallback autonome/offline (localStorage).
+import { warnDev } from '../core/safe.js';
 
 const FID_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
@@ -21,7 +22,7 @@ function getHubFriends() {
         return window.parent.HubFriends;
       }
     }
-  } catch (e) {}
+  } catch (e) { warnDev('friends', e); }
   return null;
 }
 
@@ -213,7 +214,7 @@ export class FriendsManager {
           gameName: null,
         }));
       }
-    } catch (e) {}
+    } catch (e) { warnDev('friends', e); }
     return [];
   }
 

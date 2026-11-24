@@ -69,6 +69,41 @@
   padding: 0 calc(var(--bp) * 2);
   line-height: 1.25;
 }
+.bh-alpha-tag {
+  font-size: 0.52em;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #fff2d8;
+  background: linear-gradient(180deg, #b91c1c 0%, #7f1d1d 100%);
+  border: calc(var(--bp) * 0.6) solid #fb923c;
+  padding: 0 calc(var(--bp) * 1.5);
+  line-height: 1.25;
+  text-shadow: 0 1px 0 #000;
+}
+.battle-anomaly-badge {
+  position: absolute;
+  top: calc(var(--bp) * 14);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--bp) * 1.8);
+  padding: calc(var(--bp) * 1) calc(var(--bp) * 3.2);
+  font-size: 0.62em;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: rgba(16, 12, 28, 0.94);
+  color: #f8fafc;
+  border: calc(var(--bp) * 0.9) solid #a855f7;
+  outline: calc(var(--bp) * 0.7) solid #080a10;
+  box-shadow: 0 calc(var(--bp) * 1.4) 0 rgba(0, 0, 0, 0.72);
+  pointer-events: none;
+}
+.battle-anomaly-badge.inverse { border-color: #38bdf8; color: #e0f2fe; background: rgba(14, 24, 48, 0.94); }
+.battle-anomaly-badge.chaos { border-color: #facc15; color: #fef9c3; background: rgba(40, 26, 12, 0.94); }
+.battle-anomaly-badge.alpha { border-color: #f97316; color: #ffedd5; background: rgba(54, 14, 18, 0.94); }
 .bh-types {
   display: flex;
   align-items: center;

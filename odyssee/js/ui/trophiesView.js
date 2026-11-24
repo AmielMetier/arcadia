@@ -1,5 +1,6 @@
 // odyssee/js/ui/trophiesView.js — Écran Journal des Trophées & Boîte à Médailles (Style 5G B2W2)
 import { el, esc } from './ui.js';
+import { warnDev } from '../core/safe.js';
 import {
   TROPHIES_CATALOG,
   STREAK_RANKS,
@@ -76,7 +77,7 @@ function afficher(game, trophy) {
     </div>
   `;
   game.ui.root.appendChild(t);
-  try { game.sound?.sfx('badge'); } catch (e) {}
+  try { game.sound?.sfx('badge'); } catch (e) { warnDev('trophies', e); }
 
   setTimeout(() => {
     t.classList.add('trophy-toast-leave');
@@ -203,7 +204,7 @@ export function trophiesScreen(game) {
           e.stopPropagation();
           tab = b.dataset.tab;
           selIdx = 0;
-          try { ui.sound?.sfx('blip'); } catch (err) {}
+          try { ui.sound?.sfx('blip'); } catch (err) { warnDev('trophies', err); }
           render();
         });
       });
@@ -214,7 +215,7 @@ export function trophiesScreen(game) {
           e.stopPropagation();
           catFilter = b.dataset.cat;
           selIdx = 0;
-          try { ui.sound?.sfx('blip'); } catch (err) {}
+          try { ui.sound?.sfx('blip'); } catch (err) { warnDev('trophies', err); }
           render();
         });
       });
@@ -225,7 +226,7 @@ export function trophiesScreen(game) {
           e.stopPropagation();
           medalFilter = b.dataset.filter;
           selIdx = 0;
-          try { ui.sound?.sfx('blip'); } catch (err) {}
+          try { ui.sound?.sfx('blip'); } catch (err) { warnDev('trophies', err); }
           render();
         });
       });
@@ -269,7 +270,7 @@ export function trophiesScreen(game) {
     const handleClaim = (trophyId) => {
       const res = claimTrophyReward(st, trophyId);
       if (res.ok) {
-        try { game.sound?.sfx('item'); } catch (e) {}
+        try { game.sound?.sfx('item'); } catch (e) { warnDev('trophies', e); }
         game.save(true);
         ui.toast(`Récompense obtenue : ${res.label} ajoutée au Sac !`, 2000);
         game.hud?.update(true);
@@ -282,7 +283,7 @@ export function trophiesScreen(game) {
     const close = () => {
       pop();
       s.remove();
-      try { ui.sound?.sfx('cancel'); } catch (e) {}
+      try { ui.sound?.sfx('cancel'); } catch (e) { warnDev('trophies', e); }
       resolve();
     };
 

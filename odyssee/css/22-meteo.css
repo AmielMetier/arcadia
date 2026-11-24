@@ -20,3 +20,47 @@
   background: radial-gradient(ellipse at center, transparent 40%, rgba(4, 2, 12, .7) 100%); }
 /* papillons, lucioles et mouettes au-dessus du décor (vie-monde.js) */
 .ow-betes { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* phénomènes célestes rares : aurore boréale & pluie d'étoiles filantes (celestial.js) */
+.ow-aurora {
+  position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1.8s ease; overflow: hidden; z-index: 4;
+  background:
+    radial-gradient(ellipse 90% 38% at 25% 12%, rgba(45, 255, 175, 0.24), transparent 72%),
+    radial-gradient(ellipse 80% 34% at 74% 18%, rgba(56, 210, 255, 0.22), transparent 72%),
+    radial-gradient(ellipse 65% 28% at 52% 8%, rgba(180, 95, 255, 0.18), transparent 74%);
+  mix-blend-mode: screen;
+  animation: ow-aurora-wave 14s ease-in-out infinite alternate;
+}
+.ow-aurora.on { opacity: 1; }
+@keyframes ow-aurora-wave {
+  0% { transform: translateX(-3%) scaleY(0.96); filter: hue-rotate(-8deg); }
+  50% { transform: translateX(3%) scaleY(1.04); filter: hue-rotate(10deg); }
+  100% { transform: translateX(-1%) scaleY(0.98); filter: hue-rotate(0deg); }
+}
+
+.ow-meteor {
+  position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1.2s ease; overflow: hidden; z-index: 4;
+  background: radial-gradient(ellipse 95% 42% at 50% 10%, rgba(110, 140, 255, 0.14), transparent 72%);
+  mix-blend-mode: screen;
+}
+.ow-meteor.on { opacity: 1; }
+.ow-meteor::before,
+.ow-meteor::after {
+  content: ''; position: absolute; width: 130px; height: 2px; top: 8%; left: -15%;
+  background: linear-gradient(90deg, transparent, rgba(255, 250, 200, 0.92), #ffffff);
+  box-shadow: 0 0 8px rgba(255, 235, 140, 0.9);
+  transform: rotate(22deg);
+  opacity: 0;
+}
+.ow-meteor.on::before { animation: ow-meteor-streak 4.2s linear infinite; }
+.ow-meteor.on::after { top: 22%; animation: ow-meteor-streak 5.5s linear 2.1s infinite; }
+@keyframes ow-meteor-streak {
+  0% { transform: translate(-10vw, -6vh) rotate(22deg); opacity: 0; }
+  8% { opacity: 1; }
+  36% { transform: translate(110vw, 44vh) rotate(22deg); opacity: 0; }
+  100% { transform: translate(110vw, 44vh) rotate(22deg); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ow-aurora { animation: none; }
+  .ow-meteor::before, .ow-meteor::after { animation: none; }
+}

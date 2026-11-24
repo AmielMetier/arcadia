@@ -20,6 +20,7 @@ import { Classement } from './classement.js';
 import { Autres } from './autres.js';
 import { DONJONS } from './index.js';
 import { validParty } from '../core/pvp.js';
+import { storeGet, storeSet } from '../core/safe.js';
 import { T } from '../world/tiles.js';
 
 const newRid = () => Math.random().toString(36).slice(2, 10);
@@ -48,8 +49,8 @@ export class Donjons {
     game.ui.root.appendChild(this.panel);
     // bouton « Quitter le donjon » de l'encadré
     // le journal du donjon se cache et revient : bouton de l'encadré, ou touche N (le choix vaut pour tous les donjons)
-    try { this.journalCache = localStorage.getItem('labo:journalCache') === '1'; } catch { this.journalCache = false; }
-    const basculer = () => { this.journalCache = !this.journalCache; try { localStorage.setItem('labo:journalCache', this.journalCache ? '1' : '0'); } catch {} this.panelHtml = null; this.majPanneau(); };
+    this.journalCache = storeGet('labo:journalCache') === '1';
+    const basculer = () => { this.journalCache = !this.journalCache; storeSet('labo:journalCache', this.journalCache ? '1' : '0'); this.panelHtml = null; this.majPanneau(); };
     this.panel.addEventListener('click', (ev) => { if (ev.target.closest('.dj-cacher, .dj-montrer')) { ev.stopPropagation(); basculer(); } });
     window.addEventListener('keydown', (ev) => {
       if (ev.code !== 'KeyN' || ev.repeat || ev.ctrlKey || ev.metaKey || ev.altKey || ev.target?.closest?.('input, textarea, [contenteditable]')) return;

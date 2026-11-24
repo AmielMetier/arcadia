@@ -202,6 +202,112 @@ export const MISSIONS = [
     again: ['Toujours pas de nouvelles de mon Psykokwak ? Il doit traîner sur la route 5…'],
     thanks: ['Psykokwak ! Te revoilà, gros malin. Tu m\'as fait une de ces peurs.', 'Merci, petit. Prends ça : ça lui sert quand sa migraine le reprend.'], done: ['Psykokwak se tient la tête… C\'est bon signe, il réfléchit !'],
     journal: { name: 'Le Psykokwak de Papi Octave', start: 'Le Psykokwak de Papi Octave, à Floralia, s\'est perdu du côté de la route 5.', end: 'Psykokwak est rentré chez Papi Octave.' } },
+
+  // lore des phénomènes célestes, des failles spatio-temporelles, des Colosses Alpha et des souvenirs d'équipe
+  { id: 'mAstronome', town: 'A', at: [42, 12], sprite: 'savant', who: 'Astronome Orion', cat: 'side', kind: 'bring', item: 'fragment-meteore', qty: 3,
+    reward: [['moon-stone', 1], ['sun-stone', 1], ['rare-candy', 2]],
+    ask: [
+      'Les anciens navigateurs racontaient qu\'avant la fondation de la Ligue Céleste, les aurores boréales traçaient la route d\'Odyssor jusque vers nos côtes.',
+      'J\'ai poli les lentilles de l\'Astrolabe avec le Prof. Saule, mais depuis que le Prisme Noir de la Team Éclipse a ébranlé le ciel, les étoiles chutent de manière irrégulière.',
+      'Apporte-moi 3 Fragments Météoriques tombés lors des pluies d\'étoiles, et je pourrai recalibrer ma carte du firmament !',
+    ],
+    again: (st) => {
+      const n = st.bag?.['fragment-meteore'] || 0;
+      return [
+        `Tu as déjà ${n} Fragment${n > 1 ? 's' : ''} Météorique${n > 1 ? 's' : ''} sur 3.`,
+        'Sers-toi de ton Astrolabe à ciel ouvert ou guette les pluies nocturnes : leurs pierres étincelantes renferment des éclats précieux.',
+      ];
+    },
+    thanks: [
+      'Trois fragments encore vibrants de lumière stellaire ! Regarde comme leur poussière s\'aimante vers la constellation du Dragon.',
+      'Selon mes relevés, ces météorites attirent des Pokémon venus des cimes célestes — et même les aurores en amplifient l\'éclat.',
+      'Garde ces pierres astrales pour ton équipe, voyageur.',
+    ],
+    done: ['Grâce à toi, ma carte du ciel d\'Odyssée est de nouveau fidèle aux étoiles.'],
+    journal: {
+      name: 'Les Larmes d\'Aurore',
+      notes: [
+        [(f) => f['A:mAstronome'], 'L\'astronome Orion, à Bourg-Aube, étudie le dérèglement du ciel depuis l\'incident du Prisme Noir et cherche trois Fragments Météoriques.'],
+        [(f, g) => f['A:mAstronome'] && !f.mAstronome && (g?.state?.bag?.['fragment-meteore'] || 0) >= 1, (f, g) => `J'ai déjà recueilli ${Math.min(3, g?.state?.bag?.['fragment-meteore'] || 0)} Fragment${(g?.state?.bag?.['fragment-meteore'] || 0) > 1 ? 's' : ''} Météorique${(g?.state?.bag?.['fragment-meteore'] || 0) > 1 ? 's' : ''} sur 3.`],
+        [(f) => f.mAstronome, 'J\'ai confié trois Fragments Météoriques à Orion pour recalibrer sa carte céleste.'],
+      ],
+    } },
+
+  { id: 'mFailles', town: 'G', at: [18, 22], sprite: 'scientifique', who: 'Dr Cassandre', cat: 'side', kind: 'check',
+    test: (st) => !!(st.flags?.['riftKind:inverse'] && st.flags?.['riftKind:chaos'] && st.flags?.['riftKind:alpha']),
+    reward: [['life-orb', 1], ['rare-candy', 2]],
+    ask: [
+      'J\'ai longtemps travaillé avec le Dr Lumen sur les résonances du Prisme Noir. Ses ondes de choc ont laissé trois cicatrices dans l\'espace d\'Odyssée.',
+      'Dans les Failles Inversées, les affinités de types s\'inversent ; dans les Failles Chaotiques, quatre climats se succèdent ; et les Failles Alpha libèrent d\'antiques colosses.',
+      'Si tu parviens à triompher d\'une faille de chaque nature, mes capteurs auront enfin la preuve complète de ce triple phénomène !',
+    ],
+    again: (st) => {
+      const f = st.flags || {};
+      const manque = [!f['riftKind:inverse'] && 'Inversée', !f['riftKind:chaos'] && 'Chaotique', !f['riftKind:alpha'] && 'Alpha'].filter(Boolean);
+      return [
+        `Anomalies restantes à sceller : ${manque.join(', ')}.`,
+        'L\'Astrolabe repère les failles ouvertes sur les routes — et peut même déchirer l\'espace sur commande si tu te sens prêt !',
+      ];
+    },
+    thanks: [
+      'Incroyable ! Tu as surmonté les lois inversées, les cieux déchaînés et la pression d\'un Alpha.',
+      'L\'équilibre spatial se stabilise peu à peu grâce aux dresseurs comme toi. Prends cet Orbe Vie issu de nos recherches sur les distorsions.',
+    ],
+    done: ['Les trois signatures spatio-temporelles brillent désormais en harmonie sur mes relevés.'],
+    journal: {
+      name: 'Les Cicatrices de l\'Espace',
+      notes: [
+        [(f) => f['A:mFailles'], 'Le Dr Cassandre, à Mirage, étudie trois types d\'anomalies issues du Prisme Noir : Inversée, Chaotique et Alpha.'],
+        [(f) => f['riftKind:inverse'], 'J\'ai triomphé d\'une Faille Inversée, là où toutes les forces et faiblesses s\'échangent.'],
+        [(f) => f['riftKind:chaos'], 'J\'ai survécu aux tempêtes tournantes d\'une Faille Chaotique.'],
+        [(f) => f['riftKind:alpha'], 'J\'ai vaincu l\'écrasante aura d\'une Faille Alpha.'],
+        [(f) => f.mFailles, 'Le Dr Cassandre a complété son relevé des trois failles spatio-temporelles.'],
+      ],
+    } },
+
+  { id: 'mAlpha', town: 'I', at: [22, 16], sprite: 'vieil_homme', who: 'Archiviste Balthazar', cat: 'side', kind: 'show',
+    test: (m) => !!m.alpha,
+    reward: [['choice-scarf', 1], ['ultra-ball', 5]],
+    ask: [
+      'Avant même que les premières pierres du Musée des Dragons ne soient posées, nos chroniques parlaient de « Colosses Alpha ».',
+      'Enveloppés d\'une aura cramoisie, plus grands et plus vigoureux que leurs congénères, ils surgissent aujourd\'hui des Failles Alpha sur les routes.',
+      'Mes vieux yeux n\'en ont vu que sur des fresques... Si tu captures un Pokémon Alpha, accepte de me le présenter !',
+    ],
+    again: ['Un véritable Pokémon Alpha capturé dans une faille, avec son aura rouge... Mon rêve d\'archiviste !'],
+    thanks: [
+      'Par les anciens dragons ! Cette stature, ce regard brûlant... Les parchemins ne mentaient donc pas !',
+      'Sa puissance reste intacte même à tes côtés. Prends ce Mouchoir Choix gardé dans les archives de Cimelune.',
+    ],
+    done: ['Grâce à toi, l\'histoire des Colosses Alpha ne restera plus une simple légende.'],
+    journal: {
+      name: 'La Légende des Colosses Alpha',
+      notes: [
+        [(f) => f['A:mAlpha'], 'L\'archiviste Balthazar, à Cimelune, collectionne les récits sur les Pokémon Alpha à l\'aura cramoisie et espère en observer un vivant.'],
+        [(f) => f.mAlpha, 'Balthazar a pu contempler mon Pokémon Alpha et authentifier les vieilles chroniques de Cimelune.'],
+      ],
+    } },
+
+  { id: 'mMemoire', town: 'F', at: [16, 18], sprite: 'dame', who: 'Conteuse Éléonore', cat: 'side', kind: 'show',
+    test: (m) => (m.memories?.length || 0) >= 4,
+    reward: [['leftovers', 1], ['heart-scale', 3]],
+    ask: [
+      'Les habitants de Floralia disent que lorsqu\'un Pokémon marche assez longtemps hors de sa Ball, ses souvenirs tissent une lumière autour de lui.',
+      'Aurores, musiques de rue, tempêtes bravées ensemble ou victoires à un souffle du K.O. : chaque souvenir éveille une Aura d\'entrée en combat !',
+      'Montre-moi un compagnon qui porte déjà au moins 4 souvenirs gravés dans votre aventure commune.',
+    ],
+    again: ['Parle souvent à ton Pokémon en chemin et brave les épreuves avec lui : ses souvenirs s\'inscrivent dans son Résumé !'],
+    thanks: [
+      'Quelle complicité rayonnante ! On lit toute votre épopée dans son regard, comme un poème vivant.',
+      'Reçois ces Écailles Cœur et ces Restes : ils veilleront sur votre lien sur les routes de la Ligue.',
+    ],
+    done: ['Votre histoire brillera à chaque apparition hors de sa Poké Ball.'],
+    journal: {
+      name: 'Les Échos du Compagnon',
+      notes: [
+        [(f) => f['A:mMemoire'], 'La conteuse Éléonore, à Floralia, rassemble des histoires sur le lien qui forge les Souvenirs et éveille les Auras d\'entrée d\'un partenaire.'],
+        [(f) => f.mMemoire, 'Éléonore a écouté les quatre souvenirs gravés par mon compagnon et salué notre complicité.'],
+      ],
+    } },
 ];
 
 /** missions par identifiant (pour le journal) */

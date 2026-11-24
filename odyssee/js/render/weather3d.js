@@ -99,6 +99,32 @@ export class WeatherSystem {
     this.points.visible = false;
     this.points.frustumCulled = false; this.points.renderOrder = 10;
     this.scene.add(this.points);
+
+    // Couche céleste indépendante (aurore boréale / pluie d'étoiles filantes) : n'altère jamais this.points ni la météo de jeu
+    this.celestial = 'none';
+    this.auroraEl = null;
+    this.meteorEl = null;
+    this.celCount = 220;
+    this.celGeo = new THREE.BufferGeometry();
+    this.celPos = new Float32Array(this.celCount * 3);
+    this.celVel = new Float32Array(this.celCount * 3);
+    this.celCol = new Float32Array(this.celCount * 3);
+    this.celGeo.setAttribute('position', new THREE.BufferAttribute(this.celPos, 3));
+    this.celGeo.setAttribute('color', new THREE.BufferAttribute(this.celCol, 3));
+    this.celMat = new THREE.PointsMaterial({
+      size: 3.5,
+      sizeAttenuation: false,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.88,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    this.celPoints = new THREE.Points(this.celGeo, this.celMat);
+    this.celPoints.visible = false;
+    this.celPoints.frustumCulled = false;
+    this.celPoints.renderOrder = 11;
+    this.scene.add(this.celPoints);
   }
 
   drawParticleCanvas() {
@@ -183,10 +209,92 @@ export class WeatherSystem {
     if (this.fogEl) this.fogEl.classList.toggle('on', on);
   }
 
+  /** Phénomènes célestes indépendants de la météo ('none' | 'aurora' | 'meteor') */
+  setCelestial(kind) {
+    const next = kind === 'aurora' || kind === 'meteor' ? kind : 'none';
+    if (this.celestial === next) return;
+    this.celestial = next;
+    if (this.hostCanvas?.parentNode) {
+      if (next === 'aurora' && !this.auroraEl) {
+        this.auroraEl = document.createElement('div');
+        this.auroraEl.className = 'ow-aurora';
+        this.hostCanvas.insertAdjacentElement('afterend', this.auroraEl);
+      }
+      if (next === 'meteor' && !this.meteorEl) {
+        this.meteorEl = document.createElement('div');
+        this.meteorEl.className = 'ow-meteor';
+        this.hostCanvas.insertAdjacentElement('afterend', this.meteorEl);
+      }
+      if (this.auroraEl) this.auroraEl.classList.toggle('on', next === 'aurora');
+      if (this.meteorEl) this.meteorEl.classList.toggle('on', next === 'meteor');
+    }
+    this.celPoints.visible = next !== 'none';
+    if (next !== 'none') {
+      for (let i = 0; i < this.celCount; i++) this.resetCelParticle(i, true, this.fx || 0, this.fz || 0);
+      this.celGeo.attributes.position.needsUpdate = true;
+      this.celGeo.attributes.color.needsUpdate = true;
+    }
+  }
+
+  resetCelParticle(i, initial = false, focusX = 0, focusZ = 0) {
+    const idx = i * 3;
+    const rx = (Math.random() - 0.5) * 34;
+    const rz = (Math.random() - 0.5) * 24;
+    const sol = this.sol ?? 0;
+    if (this.celestial === 'aurora') {
+      const y = initial ? Math.random() * 14 : 0.4 + Math.random() * 2;
+      this.celPos[idx] = focusX + rx;
+      this.celPos[idx + 1] = sol + y;
+      this.celPos[idx + 2] = focusZ + rz * 0.6 + y / TAN_EL;
+      this.celVel[idx] = (Math.random() - 0.5) * 0.025;
+      this.celVel[idx + 1] = 0.02 + Math.random() * 0.028;
+      this.celVel[idx + 2] = (Math.random() - 0.5) * 0.015;
+      const band = i % 3;
+      if (band === 0) { this.celCol[idx] = 0.25; this.celCol[idx + 1] = 0.98; this.celCol[idx + 2] = 0.65; }
+      else if (band === 1) { this.celCol[idx] = 0.25; this.celCol[idx + 1] = 0.85; this.celCol[idx + 2] = 1.0; }
+      else { this.celCol[idx] = 0.72; this.celCol[idx + 1] = 0.45; this.celCol[idx + 2] = 1.0; }
+    } else {
+      const isStreak = i % 5 === 0;
+      const y = initial ? Math.random() * 14 : 11 + Math.random() * 4;
+      this.celPos[idx] = focusX + rx;
+      this.celPos[idx + 1] = sol + y;
+      this.celPos[idx + 2] = focusZ + rz * 0.6 + y / TAN_EL;
+      this.celVel[idx] = isStreak ? 0.26 + Math.random() * 0.16 : 0.015 + (Math.random() - 0.5) * 0.02;
+      this.celVel[idx + 1] = isStreak ? -0.22 - Math.random() * 0.12 : -0.02 - Math.random() * 0.02;
+      this.celVel[idx + 2] = isStreak ? 0.08 + Math.random() * 0.05 : 0.008;
+      if (isStreak) { this.celCol[idx] = 1.0; this.celCol[idx + 1] = 0.94; this.celCol[idx + 2] = 0.68; }
+      else { this.celCol[idx] = 0.8; this.celCol[idx + 1] = 0.9; this.celCol[idx + 2] = 1.0; }
+    }
+  }
+
+  updateCelestial(dt, focusX, focusZ) {
+    if (this.celestial === 'none' || !this.celPoints.visible) return;
+    const mul = Math.min(2.5, dt * 60);
+    const sol = this.sol ?? 0;
+    for (let i = 0; i < this.celCount; i++) {
+      const idx = i * 3;
+      this.celPos[idx] += this.celVel[idx] * mul;
+      this.celPos[idx + 1] += this.celVel[idx + 1] * mul;
+      this.celPos[idx + 2] += this.celVel[idx + 2] * mul;
+      if (this.celestial === 'aurora') {
+        this.celPos[idx] += Math.sin(this.time * 1.4 + i * 0.5) * 0.016 * mul;
+        if (this.celPos[idx + 1] > sol + 15 || Math.abs(this.celPos[idx] - focusX) > 22) {
+          this.resetCelParticle(i, false, focusX, focusZ);
+        }
+      } else {
+        if (this.celPos[idx + 1] <= sol || Math.abs(this.celPos[idx] - focusX) > 22 || Math.abs(this.celPos[idx + 2] - focusZ) > 28) {
+          this.resetCelParticle(i, false, focusX, focusZ);
+        }
+      }
+    }
+    this.celGeo.attributes.position.needsUpdate = true;
+  }
+
   update(dt, focusX = 0, focusZ = 0) {
     this.fx = focusX; this.fz = focusZ;
-    if (this.current === 'none' || !this.points.visible) return;
     this.time += dt;
+    this.updateCelestial(dt, focusX, focusZ);
+    if (this.current === 'none' || !this.points.visible) return;
 
     const pos = this.positions;
     const vel = this.velocities;
@@ -226,7 +334,13 @@ export class WeatherSystem {
     this.scene.remove(this.points);
     this.geometry.dispose();
     this.material.dispose();
+    this.celPoints.visible = false;
+    this.scene.remove(this.celPoints);
+    this.celGeo.dispose();
+    this.celMat.dispose();
     this.texture.dispose();
     this.fogEl?.remove();
+    this.auroraEl?.remove();
+    this.meteorEl?.remove();
   }
 }

@@ -10,6 +10,7 @@ import { isGrassEnc } from '../world/tiles.js';
 import { partyScreen, cardScreen, trainerCard, TYPE_FR } from '../ui/screens.js';
 import { BADGES } from '../world/region.js';
 import { el, esc, wait } from '../ui/ui.js';
+import { warnDev } from '../core/safe.js';
 import { tenueCode, tenueDecode, tenueValide, tenueOrigine, composer } from '../render/tenue.js';
 import { onDojoInvite } from '../dojo-mamadou.js';
 import { onRaidInvite, lancerMulti4p, onMulti4pInvite, lancerTournoiSalon, onTournoiInvite } from '../multi-events.js';
@@ -47,7 +48,7 @@ export function installSocial(game) {
     b.el.classList.remove('fade');
     b.el.style.display = '';
     b.until = performance.now() + 4500;
-    try { (game.sound || game.ui?.sound)?.sfx?.('blip'); } catch (e) {}
+    try { (game.sound || game.ui?.sound)?.sfx?.('blip'); } catch (e) { warnDev('audio', e); }
   };
 
   link.me = () => {

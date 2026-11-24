@@ -1,5 +1,6 @@
 // odyssee/js/ui/screens/hof.js — Hall de la Renommée et Panthéon
 import { esc } from '../ui.js';
+import { warnDev } from '../../core/safe.js';
 import { SPECIES } from '../../data/species.js';
 import { MOVES } from '../../data/moves.js';
 import { getAbility } from '../../data/abilities.js';
@@ -131,7 +132,7 @@ export function hofScreen(game, entry) {
         </div>
       `;
 
-      try { ui.sound?.sfx('select'); ui.sound?.cry(ASSETS.cry(m.sp)); } catch (e) {}
+      try { ui.sound?.sfx('select'); ui.sound?.cry(ASSETS.cry(m.sp)); } catch (e) { warnDev('hof', e); }
 
       s.querySelector('[data-act="next"]')?.addEventListener('click', () => {
         curMonIdx++;

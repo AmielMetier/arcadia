@@ -229,9 +229,15 @@ const QUESTS = [
     notes: [[(f) => f['A:qNiveau'], 'Le vétéran des sources chaudes de Cendrelune n\'accepte que les Pokémon aguerris.'], [(f) => f.qNiveau, 'Le vétéran a salué mon Pokémon.']] },
   { id: 'dexpert', cat: 'npc', name: 'Les recherches du chercheur', giver: 'Un chercheur', started: (f) => !!(f['A:dexpert'] || f.dex25), done: (f) => !!f.dex80,
     notes: [[(f) => f['A:dexpert'] || f.dex25, 'Un chercheur de Mirage récompense les dresseurs qui remplissent leur Pokédex.'], [(f) => f.dex25, 'Il a vu 25 Pokémon dans mon Pokédex.'], [(f) => f.dex50, 'Puis 50.'], [(f) => f.dex80, 'Puis 80. Il n\'a plus rien à m\'apprendre.']] },
-  ...MISSIONS.map((M) => ({ id: M.id, cat: M.cat || 'npc', name: M.journal.name, giver: M.who,
-    started: (f) => !!f['A:' + M.id], done: (f) => !!f[M.id],
-    notes: [[(f) => f['A:' + M.id], M.journal.start], [(f) => f[M.id], M.journal.end]] })),
+  ...MISSIONS.map((M) => ({
+    id: M.id,
+    cat: M.cat || 'npc',
+    name: M.journal.name,
+    giver: M.who,
+    started: (f) => !!f['A:' + M.id],
+    done: (f) => !!f[M.id],
+    notes: M.journal.notes || [[(f) => f['A:' + M.id], M.journal.start], [(f) => f[M.id], M.journal.end]],
+  })),
 ];
 
 /* ======================================================================

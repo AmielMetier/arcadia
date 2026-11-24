@@ -1289,9 +1289,9 @@ img { image-rendering: pixelated; }
     calc(var(--px) * 2) calc(var(--px) * 2) 0 #000;
   color: #eef4ff; text-shadow: var(--px) var(--px) 0 #000;
 }
-.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(var(--px) * 3); margin-bottom: calc(var(--px) * 5); }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(var(--px) * 2.2); margin-bottom: calc(var(--px) * 4); }
 .sum-tab {
-  font: inherit; display: flex; flex-direction: column; align-items: center; padding: calc(var(--px) * 2) calc(var(--px) * 3);
+  font: inherit; display: flex; flex-direction: column; align-items: center; padding: calc(var(--px) * 2) calc(var(--px) * 2);
   border-radius: 0;
   border: calc(var(--px) * 1) solid #000;
   clip-path: polygon(
@@ -1310,8 +1310,8 @@ img { image-rendering: pixelated; }
     calc(var(--px) * 1) calc(var(--px) * 1) 0 #000;
   text-shadow: var(--px) var(--px) 0 #000;
 }
-.sum-tab b { font-size: calc(var(--px) * 6.2); }
-.sum-tab small { font-size: calc(var(--px) * 4.8); opacity: .8; }
+.sum-tab b { font-size: calc(var(--px) * 5.2); white-space: nowrap; }
+.sum-tab small { font-size: calc(var(--px) * 4.5); opacity: .8; }
 .sum-tab.on {
   background: linear-gradient(180deg, #f0a020 0%, #c07010 100%);
   color: #fff;
@@ -1358,6 +1358,34 @@ img { image-rendering: pixelated; }
 .moves .mv.cur { outline: calc(var(--px) * 1) solid #ffe068; outline-offset: calc(var(--px) * 0.5); }
 .moves .mv.pris { transform: translateX(calc(var(--px) * -3)); border-style: dashed; border-left-style: solid; background: #24364e; }
 .mv-ordre-aide { margin-top: calc(var(--px) * 3); font-size: calc(var(--px) * 5.6); color: #ffe068; text-align: center; text-shadow: var(--px) var(--px) 0 #080c12; }
+
+.sum-alpha-badge {
+  font-size: .56em; font-weight: 900; color: #fff4df; background: linear-gradient(180deg, #b91c1c, #7f1d1d);
+  border: calc(var(--px) * .7) solid #fb923c; padding: 0 calc(var(--px) * 2); vertical-align: middle;
+}
+.sum-souvenirs { display: flex; flex-direction: column; gap: calc(var(--px) * 3); height: 100%; overflow: hidden; }
+.sum-sec-title { font-size: calc(var(--px) * 5.8); font-weight: 800; color: #ffd970; }
+.sum-sec-title small { color: #9ec0e8; font-weight: 600; }
+.sum-aura-row { display: flex; flex-wrap: wrap; gap: calc(var(--px) * 1.8); }
+.sum-aura-btn {
+  font: inherit; font-size: calc(var(--px) * 5.2); font-weight: 700; color: #dbeafe;
+  background: #162234; border: calc(var(--px) * .8) solid #3d5a80; padding: calc(var(--px) * 1.2) calc(var(--px) * 2.5);
+  cursor: pointer; text-shadow: var(--px) var(--px) 0 #000;
+}
+.sum-aura-btn.on { background: #1e40af; border-color: #67e8f9; color: #fff; box-shadow: 0 0 0 calc(var(--px) * .6) #000; }
+.sum-aura-btn.locked { opacity: 0.45; cursor: not-allowed; }
+.sum-mem-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: calc(var(--px) * 2); padding-right: calc(var(--px) * 1.5); }
+.sum-mem-card {
+  display: flex; gap: calc(var(--px) * 3); align-items: flex-start;
+  background: #142030; border: calc(var(--px) * .8) solid #284264; padding: calc(var(--px) * 2) calc(var(--px) * 3);
+}
+.sum-mem-ico { font-size: calc(var(--px) * 8); line-height: 1; }
+.sum-mem-body { flex: 1; min-width: 0; }
+.sum-mem-top { display: flex; justify-content: space-between; gap: calc(var(--px) * 2); align-items: baseline; }
+.sum-mem-top b { font-size: calc(var(--px) * 5.8); color: #f8fafc; }
+.sum-mem-place { font-size: calc(var(--px) * 4.6); color: #7dd3fc; white-space: nowrap; }
+.sum-mem-desc { font-size: calc(var(--px) * 5); color: #b8cce4; line-height: 1.25; }
+.sum-mem-empty { color: #9cb4d4; font-size: calc(var(--px) * 5.6); line-height: 1.4; background: #121c2c; border: calc(var(--px) * .8) dashed #324a6e; padding: calc(var(--px) * 4); text-align: center; }
 
 /* === 03-sac.css === */
 /* ================= SAC D'OBJETS B2W2 (PROPOSITION 1 — DUAL PANEL & ROUE ANIMÉE) ================= */
@@ -4446,6 +4474,41 @@ img { image-rendering: pixelated; }
   padding: 0 calc(var(--bp) * 2);
   line-height: 1.25;
 }
+.bh-alpha-tag {
+  font-size: 0.52em;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #fff2d8;
+  background: linear-gradient(180deg, #b91c1c 0%, #7f1d1d 100%);
+  border: calc(var(--bp) * 0.6) solid #fb923c;
+  padding: 0 calc(var(--bp) * 1.5);
+  line-height: 1.25;
+  text-shadow: 0 1px 0 #000;
+}
+.battle-anomaly-badge {
+  position: absolute;
+  top: calc(var(--bp) * 14);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--bp) * 1.8);
+  padding: calc(var(--bp) * 1) calc(var(--bp) * 3.2);
+  font-size: 0.62em;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: rgba(16, 12, 28, 0.94);
+  color: #f8fafc;
+  border: calc(var(--bp) * 0.9) solid #a855f7;
+  outline: calc(var(--bp) * 0.7) solid #080a10;
+  box-shadow: 0 calc(var(--bp) * 1.4) 0 rgba(0, 0, 0, 0.72);
+  pointer-events: none;
+}
+.battle-anomaly-badge.inverse { border-color: #38bdf8; color: #e0f2fe; background: rgba(14, 24, 48, 0.94); }
+.battle-anomaly-badge.chaos { border-color: #facc15; color: #fef9c3; background: rgba(40, 26, 12, 0.94); }
+.battle-anomaly-badge.alpha { border-color: #f97316; color: #ffedd5; background: rgba(54, 14, 18, 0.94); }
 .bh-types {
   display: flex;
   align-items: center;
@@ -5826,11 +5889,21 @@ html.doigt .keyhint b, html.doigt .keyhint:first-child, html.doigt .title-foot {
   filter: drop-shadow(0 6px 10px rgba(0,0,0,.55)); transition: none !important; }
 
 /* interface repliée (par défaut) : rien par-dessus la carte, comme dans un jeu Pokémon ; U la réaffiche */
-.hud.collapsed .hud-loc, .hud.collapsed .hud-online-badge, .hud.collapsed .hud-stats, .hud.collapsed .hud-quick-item, .hud.collapsed .hud-guide, .hud.collapsed .hud-dexnav, .hud.collapsed .hud-bdots-row, .hud.collapsed .hud-quest-card, .hud.collapsed .hud-actions { display: none; }
+.hud.collapsed .hud-loc, .hud.collapsed .hud-online-badge, .hud.collapsed .hud-event-pill, .hud.collapsed .hud-stats, .hud.collapsed .hud-quick-item, .hud.collapsed .hud-guide, .hud.collapsed .hud-dexnav, .hud.collapsed .hud-bdots-row, .hud.collapsed .hud-quest-card, .hud.collapsed .hud-actions { display: none; }
 .hud.collapsed .hud-loc-row { gap: calc(var(--px) * 1.5); }
 .hud-off > .keybar { display: none; }
 /* pendant un dialogue, la barre des touches s'efface : elle passait par-dessus la boîte de texte */
 #ui:has(> .dlg) > .keybar { display: none; }
+
+.hud-event-pill {
+  font: inherit; width: 100%; display: flex; align-items: center; justify-content: center; gap: calc(var(--px) * 1.5);
+  padding: calc(var(--px) * 1.1) calc(var(--px) * 2.5);
+  font-size: calc(var(--px) * 5); font-weight: 800; color: #f0f9ff; cursor: pointer;
+  background: linear-gradient(90deg, rgba(16, 78, 98, 0.9) 0%, rgba(76, 29, 149, 0.9) 100%);
+  border: calc(var(--px) * .8) solid #67e8f9; border-radius: calc(var(--px) * 3);
+  text-shadow: 0 1px 0 #000;
+}
+.hud-event-pill:hover { filter: brightness(1.18); }
 
 /* === 11-intro.css === */
 /* ---------------- cinématique d'ouverture (Nouvelle partie) ---------------- */
@@ -10909,6 +10982,50 @@ html.doigt .keyhint b, html.doigt .keyhint:first-child, html.doigt .title-foot {
   background: radial-gradient(ellipse at center, transparent 40%, rgba(4, 2, 12, .7) 100%); }
 /* papillons, lucioles et mouettes au-dessus du décor (vie-monde.js) */
 .ow-betes { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* phénomènes célestes rares : aurore boréale & pluie d'étoiles filantes (celestial.js) */
+.ow-aurora {
+  position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1.8s ease; overflow: hidden; z-index: 4;
+  background:
+    radial-gradient(ellipse 90% 38% at 25% 12%, rgba(45, 255, 175, 0.24), transparent 72%),
+    radial-gradient(ellipse 80% 34% at 74% 18%, rgba(56, 210, 255, 0.22), transparent 72%),
+    radial-gradient(ellipse 65% 28% at 52% 8%, rgba(180, 95, 255, 0.18), transparent 74%);
+  mix-blend-mode: screen;
+  animation: ow-aurora-wave 14s ease-in-out infinite alternate;
+}
+.ow-aurora.on { opacity: 1; }
+@keyframes ow-aurora-wave {
+  0% { transform: translateX(-3%) scaleY(0.96); filter: hue-rotate(-8deg); }
+  50% { transform: translateX(3%) scaleY(1.04); filter: hue-rotate(10deg); }
+  100% { transform: translateX(-1%) scaleY(0.98); filter: hue-rotate(0deg); }
+}
+
+.ow-meteor {
+  position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1.2s ease; overflow: hidden; z-index: 4;
+  background: radial-gradient(ellipse 95% 42% at 50% 10%, rgba(110, 140, 255, 0.14), transparent 72%);
+  mix-blend-mode: screen;
+}
+.ow-meteor.on { opacity: 1; }
+.ow-meteor::before,
+.ow-meteor::after {
+  content: ''; position: absolute; width: 130px; height: 2px; top: 8%; left: -15%;
+  background: linear-gradient(90deg, transparent, rgba(255, 250, 200, 0.92), #ffffff);
+  box-shadow: 0 0 8px rgba(255, 235, 140, 0.9);
+  transform: rotate(22deg);
+  opacity: 0;
+}
+.ow-meteor.on::before { animation: ow-meteor-streak 4.2s linear infinite; }
+.ow-meteor.on::after { top: 22%; animation: ow-meteor-streak 5.5s linear 2.1s infinite; }
+@keyframes ow-meteor-streak {
+  0% { transform: translate(-10vw, -6vh) rotate(22deg); opacity: 0; }
+  8% { opacity: 1; }
+  36% { transform: translate(110vw, 44vh) rotate(22deg); opacity: 0; }
+  100% { transform: translate(110vw, 44vh) rotate(22deg); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ow-aurora { animation: none; }
+  .ow-meteor::before, .ow-meteor::after { animation: none; }
+}
 
 /* === 23-harmonie.css === */
 /* ---------- harmonisation : Pokédex et Options au même style bleu nuit que l'équipe, le résumé et le sac ---------- */

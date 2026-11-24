@@ -19,6 +19,7 @@ import { brancherRendu } from './donjons/rendu.js';
 import { decodeSave, saveSummary } from './core/savecode.js';
 import { Cloud } from './net/cloud.js';
 import { Game } from './game.js';
+import { warnDev, storeSet, sessSet, sessPop } from './core/safe.js';
 import { setMasques } from './render/tenue.js';
 import { VERSION_ODYSSEE } from './version.js';
 import { apparenceScreen } from './ui/apparence.js';
@@ -191,7 +192,7 @@ async function boot() {
     if (!ctx) return;
     if (ctx.state === 'running') { detachUnlock(); return; }
     if (typeof ctx.resume === 'function') {
-      ctx.resume().then(() => { if (sound.ctx?.state === 'running') detachUnlock(); }).catch(() => {});
+      ctx.resume().then(() => { if (sound.ctx?.state === 'running') detachUnlock(); }).catch((e) => warnDev('audio-unlock', e));
     }
   };
   UNLOCK_EVS.forEach((ev) => addEventListener(ev, unlock, { passive: true }));
@@ -214,8 +215,7 @@ async function boot() {
   window.__ody.play = async (state) => { document.querySelector('.title-scr')?.remove(); input.handlers.length = 0; ui.closeDialog(); mode = 'game'; await game.start(state); };
 
   // reprise automatique juste après un rechargement déclenché par le choix des graphismes
-  let autoAction = null;
-  try { autoAction = sessionStorage.getItem('odyssee-auto-action'); sessionStorage.removeItem('odyssee-auto-action'); } catch (e) {}
+  const autoAction = sessPop('odyssee-auto-action');
   if (autoAction === 'newgame') {
     await playIntroVideo(ui, input, sound);
     const state = await intro(game, ui, sound);
@@ -281,7 +281,7 @@ async function boot() {
       if (!picked) return 'cancel';
       choisirSol(picked.sol); choisirSprites(picked.sprites); marquerGfxChoisi();
       if (picked.sol !== bootSol) {
-        try { sessionStorage.setItem('odyssee-auto-action', autoAct); } catch (e) {}
+        sessSet('odyssee-auto-action', autoAct);
         await ui.fade(true, 250);
         location.reload();
         return 'reloading';
@@ -293,7 +293,7 @@ async function boot() {
       // la partie la plus avancée l'emporte : celle de cet appareil, ou celle du compte en ligne
       let useRemote = newer && !info;
       if (newer && info) useRemote = await ui.yesNo(`Ta partie en ligne est plus récente (${saveSummary(remote)}). La reprendre ?`);
-      if (useRemote) { try { localStorage.setItem(Game.SAVE_KEY, JSON.stringify(remote)); } catch (e) {} }
+      if (useRemote) storeSet(Game.SAVE_KEY, JSON.stringify(remote));
       if (!aChoisiGfx()) {
         const g = await pickGfx('continue');
         if (g === 'reloading') return;
@@ -405,7 +405,7 @@ async function playIntroVideo(ui, input, sound) {
       done = true;
       clearTimeout(loadTimer);
       pop();
-      try { vid.pause(); } catch (e) {}
+      try { vid.pause(); } catch (e) { warnDev('video', e); }
       res();
     };
     const pop = input.push((k) => {

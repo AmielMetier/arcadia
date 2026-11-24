@@ -1,6 +1,7 @@
 // odyssee/js/ui/screens/options.js — options
 import { el } from '../ui.js';
 import { screen } from './common.js';
+import { storeGet, storeSet } from '../../core/safe.js';
 import { SOLS_CHOIX, SPRITES_CHOIX, CREDITS, solChoix, spritesChoix, choisirSol, choisirSprites, marquerGfxChoisi } from '../../gfx.js';
 
 /* ================= OPTIONS ================= */
@@ -13,7 +14,7 @@ export function optionsScreen(game) {
     const runSpeeds = ['Normale (1×)', 'Rapide (1.7×)', 'Turbo (2.5×)'];
     const solInitial = solChoix();
     let i = 0, solChange = false;
-    const natif = () => { try { return localStorage.getItem('odyssee-natif') === '1'; } catch (e) { return false; } };
+    const natif = () => storeGet('odyssee-natif') === '1';
     const nom = (liste, id) => liste.find((c) => c.id === id)?.nom || id;
     const rows = () => [
       ['Vitesse du texte', speeds[ui.textSpeed]],
@@ -31,22 +32,22 @@ export function optionsScreen(game) {
       ['Retour', ''],
     ];
     const applyRow = (rowIdx, d) => {
-      if (rowIdx === 0) { ui.textSpeed = (ui.textSpeed + d + 4) % 4; try { localStorage.setItem('odyssee-textspeed', ui.textSpeed); } catch (e) {} }
+      if (rowIdx === 0) { ui.textSpeed = (ui.textSpeed + d + 4) % 4; storeSet('odyssee-textspeed', ui.textSpeed); }
       else if (rowIdx === 1) {
         game.runSpeed = ((game.runSpeed ?? 1) + d + 3) % 3;
-        try { localStorage.setItem('odyssee-runspeed', game.runSpeed); } catch (e) {}
+        storeSet('odyssee-runspeed', game.runSpeed);
         game.hud?.update(true);
         game.ui.updateRunKeyHint?.(game.autoRun, game.runSpeed);
       } else if (rowIdx === 2) snd.setVolume(Math.max(0, Math.min(1, Math.round(snd.vol * 10 + d) / 10)));
       else if (rowIdx === 3) snd.setMuted?.(!snd.muted);
-      else if (rowIdx === 4) { game.followOff = !game.followOff; try { localStorage.setItem('odyssee-suiveur', game.followOff ? '0' : '1'); } catch (e) {} }
+      else if (rowIdx === 4) { game.followOff = !game.followOff; storeSet('odyssee-suiveur', game.followOff ? '0' : '1'); }
       else if (rowIdx === 5) snd.setStyle?.(snd.style === 'retro' ? 'moderne' : 'retro');
       else if (rowIdx === 6) game.hud?.setDexnavHidden?.(!game.hud.dexnavHidden);
       else if (rowIdx === 7) game.hud?.changerReglage?.(d);
       else if (rowIdx === 8) { const L = SOLS_CHOIX, j = (L.findIndex((c) => c.id === solChoix()) + d + L.length) % L.length; choisirSol(L[j].id); marquerGfxChoisi(); solChange = solChoix() !== solInitial; }
       else if (rowIdx === 9) { const L = SPRITES_CHOIX, j = (L.findIndex((c) => c.id === spritesChoix()) + d + L.length) % L.length; choisirSprites(L[j].id); }
       // rendu net : la géométrie (bâtiments, relief) est tracée à la résolution de l'écran ; appliqué tout de suite
-      else if (rowIdx === 10) { try { localStorage.setItem('odyssee-natif', natif() ? '0' : '1'); } catch (e) {} dispatchEvent(new Event('resize')); }
+      else if (rowIdx === 10) { storeSet('odyssee-natif', natif() ? '0' : '1'); dispatchEvent(new Event('resize')); }
     };
     const draw = () => {
       const msgReload = solChange

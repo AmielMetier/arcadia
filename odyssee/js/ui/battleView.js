@@ -11,6 +11,7 @@ import { moveDesc } from '../data/moveDescriptions.js';
 import { playMoveVfx, TYPE_FX } from './battleVfx.js';
 import { auraFrames, AURA_PAD } from '../render/aura.js';
 import { TALENTS_ESPECES } from '../data/talents.js';
+import { auraBurstSpec } from '../game/follower-life.js';
 
 /** vide transparent sous les pattes d'un sprite (en pixels de l'image), mesuré une fois par image */
 const PIEDS = new Map();
@@ -155,12 +156,14 @@ export class BattleView {
   }
   scaleFor(side, slot = 0) {
     const sl = this.slots || 1;
-    if (this.battle?.isRaid && side === 0 && sl >= 2) return { 2: [0.74, 0.72], 3: [0.66, 0.65, 0.64], 4: [0.6, 0.59, 0.58, 0.57] }[Math.min(4, sl)][slot] ?? 0.6;
-    if (this.battle?.isRaid && side === 1 && slot === 0) return 1.0;
-    if (sl === 1) return 1;
-    if (sl === 2) return side === 1 ? (slot === 0 ? 0.80 : 0.86) : (slot === 0 ? 0.86 : 0.80);
-    if (sl === 4) return side === 1 ? 0.7 : [0.74, 0.7, 0.66, 0.62][slot];
-    return side === 1 ? [0.68, 0.73, 0.78][slot] : [0.78, 0.73, 0.68][slot];
+    let base = 1;
+    if (this.battle?.isRaid && side === 0 && sl >= 2) base = { 2: [0.74, 0.72], 3: [0.66, 0.65, 0.64], 4: [0.6, 0.59, 0.58, 0.57] }[Math.min(4, sl)][slot] ?? 0.6;
+    else if (this.battle?.isRaid && side === 1 && slot === 0) base = 1.0;
+    else if (sl === 2) base = side === 1 ? (slot === 0 ? 0.80 : 0.86) : (slot === 0 ? 0.86 : 0.80);
+    else if (sl === 4) base = side === 1 ? 0.7 : [0.74, 0.7, 0.66, 0.62][slot];
+    else if (sl > 1) base = side === 1 ? [0.68, 0.73, 0.78][slot] : [0.78, 0.73, 0.68][slot];
+    const isAlpha = (this.battle?.alpha && side === 1 && slot === 0) || !!this.battle?.act(side, slot)?.alpha;
+    return isAlpha ? base * (sl > 1 ? 1.15 : 1.25) : base;
   }
   ePos(slot = 0) { return this.posFor(1, slot); }
   pPos(slot = 0) { return this.posFor(0, slot); }
@@ -494,13 +497,33 @@ export class BattleView {
     }
     r.insertAdjacentHTML('beforeend', `
       <div class="battle-weather-badge" style="display:none"></div>
+      <div class="battle-anomaly-badge" style="display:none"></div>
       <div class="dlg box btext"><div class="dlg-name" style="display:none"></div><div class="dlg-txt"></div><div class="dlg-arrow">▼</div></div>
       <div class="bcmd"></div>`);
     this.game.ui.root.appendChild(r);
     this.textBox = r.querySelector('.btext'); this.cmd = r.querySelector('.bcmd');
     this.weatherBadge = r.querySelector('.battle-weather-badge');
+    this.anomalyBadge = r.querySelector('.battle-anomaly-badge');
   }
   hudFor(side, slot = 0) { return (side === 1 ? this.hud?.foe : this.hud?.me)?.[slot] || null; }
+
+  updateAnomaly() {
+    if (!this.anomalyBadge) this.anomalyBadge = this.root?.querySelector('.battle-anomaly-badge');
+    if (!this.anomalyBadge) return;
+    const b = this.battle;
+    const info = b?.inverse ? { cls: 'inverse', icon: '⚡', label: 'Types Inversés' }
+      : b?.chaosWeather ? { cls: 'chaos', icon: '🌀', label: 'Météo Chaotique' }
+        : b?.alpha ? { cls: 'alpha', icon: '🔥', label: 'Alpha Géant' }
+          : null;
+    if (!info) {
+      this.anomalyBadge.style.display = 'none';
+      this.anomalyBadge.className = 'battle-anomaly-badge';
+      return;
+    }
+    this.anomalyBadge.innerHTML = `<span class="bab-icon">${info.icon}</span><span class="bab-label">${info.label}</span>`;
+    this.anomalyBadge.className = `battle-anomaly-badge ${info.cls}`;
+    this.anomalyBadge.style.display = 'flex';
+  }
 
   updateWeather(w) {
     if (!this.weatherBadge) this.weatherBadge = this.root?.querySelector('.battle-weather-badge');
@@ -551,7 +574,8 @@ export class BattleView {
       : coopOwner
         ? `<span class="bh-trainer-tag">${esc(coopOwner)} ·</span> `
         : '';
-    h.querySelector('.bh-name').innerHTML = trainerTag + esc(monName(m)) + g;
+    const alphaTag = m.alpha ? '<span class="bh-alpha-tag">ALPHA</span>' : '';
+    h.querySelector('.bh-name').innerHTML = trainerTag + alphaTag + esc(monName(m)) + g;
     h.querySelector('.bh-lv').textContent = 'N.' + m.lvl;
     const typesEl = h.querySelector('.bh-types');
     if (typesEl) {
@@ -604,6 +628,7 @@ export class BattleView {
     this.buildDom();
     this.root.style.setProperty('--bp', (innerHeight / BH) + 'px');
     this.updateWeather(battle.weather);
+    this.updateAnomaly();
     for (let sl = 0; sl < this.slots; sl++) { this.setHud(1, null, 0, sl); this.setHud(0, null, 0, sl); }
     const jobs = [this.loadBattleDecor(this.kind, o.night)];
     for (let sl = 0; sl < this.slots; sl++) { jobs.push(this.loadSide(1, sl), this.loadSide(0, sl)); }
@@ -719,6 +744,7 @@ export class BattleView {
     this.buildDom();
     this.root.style.setProperty('--bp', (innerHeight / BH) + 'px');
     this.updateWeather(battle.weather);
+    this.updateAnomaly();
     for (let sl = 0; sl < this.slots; sl++) { this.setHud(1, null, 0, sl); this.setHud(0, null, 0, sl); }
     const jobs = [this.loadBattleDecor(this.kind, o.night)];
     for (let sl = 0; sl < this.slots; sl++) jobs.push(this.loadSide(1, sl), this.loadSide(0, sl));
@@ -873,6 +899,7 @@ export class BattleView {
     this.buildDom();
     this.root.style.setProperty('--bp', (innerHeight / BH) + 'px');
     this.updateWeather(battle.weather);
+    this.updateAnomaly();
     for (let sl = 0; sl < this.slots; sl++) { this.setHud(1, null, 0, sl); this.setHud(0, null, 0, sl); }
     const jobs = [this.loadBattleDecor(this.kind, o.night)];
     for (let sl = 0; sl < this.slots; sl++) jobs.push(this.loadSide(1, sl), this.loadSide(0, sl));
@@ -958,8 +985,9 @@ export class BattleView {
     o.whiteImg = null; o.darkImg = null;
     // l'adversaire pose ses pattes sur le socle (le sprite a un vide transparent dessous, différent pour chaque espèce)
     o.pied = side === 1 && o.img && !levite(m.sp) ? videSous(o.img) : null;
-    // boss de raid : son aura (bleue, rouge ou or) ondule derrière lui
-    o.aura = side === 1 && this.battle.aura && o.img ? auraFrames(o.img, this.battle.aura).frames : null;
+    // boss de raid / Pokémon Alpha : son aura (bleue, rouge ou or) ondule derrière lui
+    const auraKind = (side === 1 && this.battle.aura) ? this.battle.aura : (m.alpha ? 'rouge' : null);
+    o.aura = auraKind && o.img ? auraFrames(o.img, auraKind).frames : null;
     if (!o.img) { const c = document.createElement('canvas'); c.width = c.height = 80; const x = c.getContext('2d'); x.fillStyle = TYPE_COL[SPECIES[m.sp].t[0]]; x.beginPath(); x.arc(40, 50, 24, 0, 7); x.fill(); x.fillStyle = '#fff'; x.font = '20px sans-serif'; x.fillText('?', 34, 58); o.img = c; }
   }
   /** boss de raid : l'escouade se présente (portrait et nom de chaque joueur) face au boss, puis s'efface */
@@ -1410,6 +1438,15 @@ export class BattleView {
     if (m) this.sound.cry(ASSETS.cry(m.sp));
     await this.tween(200, (u) => { o.white = 1 - u; });
     o.white = 0;
+    const auraSpec = auraBurstSpec(m);
+    if (auraSpec && (side === 0 || m?.alpha)) {
+      this.burst(tx, ty - 6, auraSpec.colors, auraSpec.count, { speed: auraSpec.speed });
+      this.burst(tx, ty - 14, auraSpec.colors, Math.round(auraSpec.count * 0.6), { speed: auraSpec.speed * 1.35 });
+      const auraSfx = auraSpec.id === 'crimson' ? 'aura_crimson'
+        : auraSpec.id === 'sparks' ? 'aura_sparks'
+          : auraSpec.id === 'petals' ? 'aura_petals' : 'aura_stars';
+      try { this.sound.sfx(auraSfx); } catch (e) { void e; }
+    }
   }
   async animMega(side, slot = 0) {
     const m = this.battle.act(side, slot), o = this.spriteObj(side, slot), c = this.sprCenter(side, slot);

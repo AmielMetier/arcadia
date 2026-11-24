@@ -3,10 +3,11 @@
 // ralenti, chœur des abysses, tambours, tintement de l'œil, cri de Lugia, ostinato et cuivres, montée de l'Aéroblast,
 // impact, accord final. Tout passe par une réverbération de cathédrale et un compresseur.
 import { LUGIA_EPIC } from './ui/cine-lugia.js';
+import { warnDev } from './core/safe.js';
 
 /** snd : l'objet Sound d'audio.js (contexte, bruit blanc, volume, sortie) */
 export function playShadowLugiaEpic(snd, opts = {}) {
-  if (!snd.ctx && typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)) { try { snd.unlock?.(); } catch (e) { /* rien */ } }
+  if (!snd.ctx && typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)) { try { snd.unlock?.(); } catch (e) { warnDev('audio-lugia', e); } }
   if (!snd.ctx || snd.muted || (snd.vol ?? 0.7) <= 0 || !snd.noise) return { stop: () => {} };
   const E = LUGIA_EPIC, c = snd.ctx, t0 = c.currentTime + 0.05, T = (s) => t0 + s, D = E.dur;
   const nodes = [], timers = [], cris = [];
@@ -119,7 +120,7 @@ export function playShadowLugiaEpic(snd, opts = {}) {
   if (cryUrl && typeof window !== 'undefined' && typeof window.Audio === 'function' && !String(cryUrl).startsWith('synth:')) {
     timers.push(setTimeout(() => {
       if (stopped) return;
-      try { const a = new window.Audio(cryUrl); a.volume = Math.min(1, (snd.vol ?? 0.7) * 1.05); a.preservesPitch = false; a.playbackRate = 0.82; cris.push(a); a.play().catch(() => {}); } catch (e) { /* pas de cri */ }
+      try { const a = new window.Audio(cryUrl); a.volume = Math.min(1, (snd.vol ?? 0.7) * 1.05); a.preservesPitch = false; a.playbackRate = 0.82; cris.push(a); a.play().catch((e) => warnDev('audio-lugia', e)); } catch (e) { warnDev('audio-lugia', e); }
     }, Math.round((E.reveal + 0.05) * 1000)));
   }
   try {

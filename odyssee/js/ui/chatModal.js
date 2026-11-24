@@ -1,5 +1,6 @@
 // chatModal.js - Roue d'émotes pixel-art et saisie de message rapide multijoueur
 import { el, esc } from './ui.js';
+import { warnDev } from '../core/safe.js';
 
 const EMOTES = [
   { id: 'wave', label: 'Salut !', icon: '👋' },
@@ -52,7 +53,7 @@ export function openChatModal(game) {
     popKey?.();
     overlay.remove();
     game.busy = false;
-    try { (game.sound || game.ui?.sound)?.sfx?.('cancel'); } catch (e) {}
+    try { (game.sound || game.ui?.sound)?.sfx?.('cancel'); } catch (e) { warnDev('audio', e); }
   };
 
   const send = (text, emote) => {

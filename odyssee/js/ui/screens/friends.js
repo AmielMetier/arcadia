@@ -1,5 +1,6 @@
 // odyssee/js/ui/screens/friends.js — amis et joueurs connectés
 import { esc } from '../ui.js';
+import { warnDev } from '../../core/safe.js';
 import { BADGES } from '../../world/region.js';
 import { ASSETS } from '../../assets.js';
 import { getFriendsManager, formatFid } from '../../net/friends.js';
@@ -26,7 +27,7 @@ export function friendsScreen(game) {
         if (type === 'ok') ui.sound?.sfx('select');
         else if (type === 'err') ui.sound?.sfx('bump');
         else ui.sound?.sfx('blip');
-      } catch (e) {}
+      } catch (e) { warnDev('friends', e); }
       render();
     };
 
@@ -457,7 +458,7 @@ export function friendsScreen(game) {
         b.onclick = async () => {
           try {
             await cardScreen(game, BADGES);
-          } catch (e) {}
+          } catch (e) { warnDev('friends', e); }
         };
       });
 
@@ -548,7 +549,7 @@ export function friendsScreen(game) {
         inputEl.oninput = (e) => {
           addCodeInput = e.target.value.toUpperCase();
         };
-        if (hadFocus) { inputEl.focus(); try { inputEl.setSelectionRange(caret, caret); } catch (e) {} }
+        if (hadFocus) { inputEl.focus(); try { inputEl.setSelectionRange(caret, caret); } catch (e) { warnDev('friends', e); } }
         inputEl.onkeydown = (e) => {
           e.stopPropagation();
           if (e.key === 'Enter') {

@@ -1,5 +1,6 @@
 // odyssee/js/ui/screens/card.js — carte de dresseur
 import { esc } from '../ui.js';
+import { warnDev } from '../../core/safe.js';
 import { SPECIES } from '../../data/species.js';
 import { ASSETS } from '../../assets.js';
 import { TYPE_FR, TYPE_COL, hpCol, screen, closer } from './common.js';
@@ -393,7 +394,7 @@ export function cardScreen(game, BADGES, other) {
               } else {
                 ui.sound?.sfx('select');
               }
-            } catch (err) {}
+            } catch (err) { warnDev('card', err); }
             render();
           }
         };
@@ -406,7 +407,7 @@ export function cardScreen(game, BADGES, other) {
           const sidx = parseInt(slot.dataset.slotidx, 10);
           const mon = team[sidx];
           if (mon) {
-            try { ui.sound?.cry(ASSETS.cry(mon.sp)); } catch (err) {}
+            try { ui.sound?.cry(ASSETS.cry(mon.sp)); } catch (err) { warnDev('card', err); }
             slot.classList?.remove?.('tc-ts-bounce');
             void slot.offsetWidth;
             slot.classList?.add?.('tc-ts-bounce');
@@ -474,7 +475,7 @@ export function cardScreen(game, BADGES, other) {
           } else {
             ui.sound?.sfx('select');
           }
-        } catch (err) {}
+        } catch (err) { warnDev('card', err); }
         render();
       }
     });

@@ -1,5 +1,6 @@
 // odyssee/js/ui/screens/dex.js — Pokédex
 import { esc } from '../ui.js';
+import { warnDev } from '../../core/safe.js';
 import { SPECIES } from '../../data/species.js';
 import { ORIGINALES } from '../../data/remplacants.js';
 import { SPAWNS } from '../../world/region.js';
@@ -105,7 +106,7 @@ export function dexScreen(game, opts = {}) {
         draw();
         const id = ids[i];
         if (seen.has(id)) {
-          try { ui.sound?.cry?.(ASSETS.cry(id)); } catch (err) {}
+          try { ui.sound?.cry?.(ASSETS.cry(id)); } catch (err) { warnDev('dex', err); }
         }
       });
     });
@@ -140,13 +141,13 @@ export function dexScreen(game, opts = {}) {
       } else if (k === 'a') {
         const id = ids[i];
         if (seen.has(id)) {
-          try { ui.sound?.cry?.(ASSETS.cry(id)); } catch (e) {}
+          try { ui.sound?.cry?.(ASSETS.cry(id)); } catch (e) { warnDev('dex', e); }
           if (spr) {
             spr.style.transform = 'scale(1.2)';
             setTimeout(() => { if (spr) spr.style.transform = ''; }, 200);
           }
         } else {
-          try { ui.sound?.sfx?.('cancel'); } catch (e) {}
+          try { ui.sound?.sfx?.('cancel'); } catch (e) { warnDev('dex', e); }
         }
       } else if (k === 'b') {
         close();

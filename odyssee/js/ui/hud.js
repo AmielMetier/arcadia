@@ -3,6 +3,7 @@
 //   nom, statut, niveau, barre HP brillante et barre EXP.
 // - En haut à droite : capsule Pokégear DS avec lieu actuel, pièce d'or + argent, trophée + badges, et 4 boutons illustrés.
 import { el, esc } from './ui.js';
+import { storeGet, storeSet } from '../core/safe.js';
 import { ASSETS } from '../assets.js';
 import { monName, expProgress } from '../core/mon.js';
 import { BADGES } from '../world/region.js';
@@ -14,6 +15,7 @@ import { itemName } from '../core/items.js';
 import { SPECIES } from '../data/species.js';
 import { glisserPourRanger } from './glisser.js';
 import { lieuxVille, batimentsImportants, capVers } from './screens/carteLocale.js';
+import { openAstrolabe } from '../game/celestial.js';
 
 const gender = (m) => (m.gender === 'm' ? '<span class="g m">♂</span>' : m.gender === 'f' ? '<span class="g f">♀</span>' : '');
 
@@ -28,11 +30,9 @@ export class Hud {
     this.guideExpanded = false;
     this._guidePos = '';
     // repliée par défaut, comme un jeu Pokémon : rien par-dessus la carte (U, ou le bouton du menu, l'affiche)
-    this.collapsed = true;
-    try { this.collapsed = localStorage.getItem('odyssee-hud-collapsed') !== '0'; } catch (e) {}
-    try { this.dexnavCollapsed = localStorage.getItem('odyssee-dexnav-collapsed') === '1'; } catch (e) {}
-    this.dexnavHidden = false;
-    try { this.dexnavHidden = localStorage.getItem('odyssee-dexnav-hidden') === '1'; } catch (e) {}
+    this.collapsed = storeGet('odyssee-hud-collapsed') !== '0';
+    this.dexnavCollapsed = storeGet('odyssee-dexnav-collapsed') === '1';
+    this.dexnavHidden = storeGet('odyssee-dexnav-hidden') === '1';
     this._sig = '';
 
     this.root = el('div', 'hud' + (this.collapsed ? ' collapsed' : ''));
@@ -52,14 +52,14 @@ export class Hud {
   tailleNom() { return TAILLES[this.taille][0]; }
   changerTaille(d) {
     this.taille = (this.taille + d + TAILLES.length) % TAILLES.length;
-    try { localStorage.setItem('odyssee-hud-taille', String(this.taille)); } catch (e) {}
+    storeSet('odyssee-hud-taille', String(this.taille));
     this.root.style.setProperty('--hud-k', TAILLES[this.taille][1]);
   }
 
   /** retire complètement (ou réaffiche) la barre Habitat DexNav ; réglable aussi dans Options */
   setDexnavHidden(v) {
     this.dexnavHidden = !!v;
-    try { localStorage.setItem('odyssee-dexnav-hidden', this.dexnavHidden ? '1' : '0'); } catch (e) {}
+    storeSet('odyssee-dexnav-hidden', this.dexnavHidden ? '1' : '0');
     this.update(true);
   }
 
@@ -67,13 +67,13 @@ export class Hud {
   reglage() { return this.collapsed ? 'Masqué' : this.tailleNom(); }
   changerReglage(d) {
     const n = TAILLES.length + 1, j = ((this.collapsed ? 0 : this.taille + 1) + d + n) % n;
-    if (j > 0) { this.taille = j - 1; try { localStorage.setItem('odyssee-hud-taille', String(this.taille)); } catch (e) {} this.root.style.setProperty('--hud-k', TAILLES[this.taille][1]); }
+    if (j > 0) { this.taille = j - 1; storeSet('odyssee-hud-taille', String(this.taille)); this.root.style.setProperty('--hud-k', TAILLES[this.taille][1]); }
     if ((j === 0) !== this.collapsed) { this.toggle(); }
   }
   toggle() {
     this.collapsed = !this.collapsed;
     this.swapFrom = -1;
-    try { localStorage.setItem('odyssee-hud-collapsed', this.collapsed ? '1' : '0'); } catch (e) {}
+    storeSet('odyssee-hud-collapsed', this.collapsed ? '1' : '0');
     this.root.classList.toggle('collapsed', this.collapsed);
     this.game.ui.root.classList?.toggle('hud-off', this.collapsed);
     this.game.sound.sfx('blip');
@@ -218,6 +218,10 @@ export class Hud {
         try { await friendsScreen(g); } finally { g.busy = false; this.update(true); }
       } else if (act === 'quick-item') {
         g.useRegisteredItem();
+      } else if (act === 'astrolabe') {
+        if (g.busy || g.bv?.alive || g.player?.move) return;
+        g.busy = true; g.sound.sfx('select');
+        try { await openAstrolabe(g); } finally { g.busy = false; this.update(true); }
       } else if (act === 'chat') {
         g.openChat();
       } else if (act === 'hide-dexnav') {
@@ -226,7 +230,7 @@ export class Hud {
         this.game.ui.toast?.('Barre Habitat retirée (réactivable dans Options)');
       } else if (act === 'toggle-dexnav') {
         this.dexnavCollapsed = !this.dexnavCollapsed;
-        try { localStorage.setItem('odyssee-dexnav-collapsed', this.dexnavCollapsed ? '1' : '0'); } catch (e) {}
+        storeSet('odyssee-dexnav-collapsed', this.dexnavCollapsed ? '1' : '0');
         this.game.sound.sfx('blip');
         this.update(true);
       } else if (act === 'guide-pick') {
@@ -285,7 +289,9 @@ export class Hud {
     const px0 = Math.round(g.player?.x ?? 0), py0 = Math.round(g.player?.y ?? 0);
     const tq = st.trackedQuest || '';
     const tqStep = tq ? `${st.flags?.['Q:' + tq] ?? ''}:${st.journal?.[tq]?.d ?? ''}` : '';
-    const fastSig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0}:${g.runSpeed ?? 1};${this.swapFrom};${g.mapObj.id || ''}:${g.mapObj.name || ''}:${px0},${py0};${st.money};${badgesKey};${quickKey};${tq}:${tqStep};${st.dex?.seen?.length || 0}:${st.dex?.caught?.length || 0};${onlineCount};${this.dexnavHidden ? 1 : 0}:${this.dexnavCollapsed ? 1 : 0}:${this.guideExpanded ? 1 : 0};${st.villeCible?.key || ''};${partyKey}`;
+    const celKind = g.celestial?.activeKind || 'none';
+    const riftKind = g.rifts?.active?.kind || 'none';
+    const fastSig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0}:${g.runSpeed ?? 1};${this.swapFrom};${g.mapObj.id || ''}:${g.mapObj.name || ''}:${px0},${py0};${st.money};${badgesKey};${quickKey};${tq}:${tqStep};${st.dex?.seen?.length || 0}:${st.dex?.caught?.length || 0};${onlineCount};${this.dexnavHidden ? 1 : 0}:${this.dexnavCollapsed ? 1 : 0}:${this.guideExpanded ? 1 : 0};${st.villeCible?.key || ''};${celKind}:${riftKind};${partyKey}`;
     if (!force && fastSig === this._fastSig) return;
     this._fastSig = fastSig;
 
@@ -307,7 +313,7 @@ export class Hud {
     const cap = g.levelCap ? g.levelCap() : 100;
     const questSig = `${tq}:${tracked?.note || ''}:${tracked?.since || ''}`;
     const guideSig = V ? `${V.id}:${V.nom}:${!V.zone && V.id === 'monde' ? `${V.p.x >> 4},${V.p.y >> 4}` : ''}:${this.guideExpanded ? 1 : 0}:${st.villeCible?.key || ''}` : '';
-    const sig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0}:${g.runSpeed ?? 1};${this.swapFrom};${loc};${guideSig};${zoneCatchKey};${st.money};${badgesKey};${cap};${trUnlocked};${questSig};${quickKey};${onlineCount};${partyKey}`;
+    const sig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0}:${g.runSpeed ?? 1};${this.swapFrom};${loc};${guideSig};${zoneCatchKey};${st.money};${badgesKey};${cap};${trUnlocked};${questSig};${quickKey};${onlineCount};${celKind}:${riftKind};${partyKey}`;
     if (!force && sig === this._sig) { if (V && !this.collapsed) this.refreshGuide(V); return; }
     this._sig = sig;
     this._guidePos = V ? `${Math.round(V.p.x)},${Math.round(V.p.y)}` : '';
@@ -381,6 +387,14 @@ export class Hud {
             <span>Niv. max ${g.levelCap()}</span>
           </div>
         </div>
+        ${(() => {
+          const parts = [];
+          if (celKind === 'aurora') parts.push('✨ Aurore');
+          else if (celKind === 'meteor') parts.push('☄️ Météores');
+          if (riftKind !== 'none') parts.push(riftKind === 'alpha' ? '🔥 Faille Alpha' : riftKind === 'chaos' ? '🌀 Faille Chaotique' : '⚡ Faille Inversée');
+          if (!parts.length) return '';
+          return `<button type="button" class="hud-event-pill" data-act="astrolabe" title="Phénomène actif — Cliquer pour ouvrir l'Astrolabe" tabindex="-1">${parts.join(' · ')}</button>`;
+        })()}
         ${(() => {
           if (!reg || (regQty <= 0 && reg !== 'running-shoes')) return '';
           return `<div class="hud-quick-item" data-act="quick-item" title="Objet Rapide (Touche Y ou Clic) : ${esc(itemName(reg))}">

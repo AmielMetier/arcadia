@@ -1,5 +1,6 @@
 // odyssee/js/ui/ui.js — briques d'interface façon DS : boîte de dialogue, choix, listes, bandeau de lieu, fondus
 import { clavierNom } from './clavier.js';
+import { storeGet } from '../core/safe.js';
 export const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 export const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 export const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -8,7 +9,7 @@ export class UI {
   constructor(root, input, sound) {
     this.root = root; this.input = input; this.sound = sound;
     this.textSpeed = 2;
-    try { this.textSpeed = +(localStorage.getItem('odyssee-textspeed') ?? 2); } catch (e) {}
+    this.textSpeed = +(storeGet('odyssee-textspeed') ?? 2);
     this.fadeEl = el('div', 'fade'); root.appendChild(this.fadeEl);
     this.flashEl = el('div', 'flash'); root.appendChild(this.flashEl);
   }

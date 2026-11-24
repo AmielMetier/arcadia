@@ -206,6 +206,19 @@ export class VieMonde {
     this.tSon -= dt; if (this.tSon > 0) return;
     this.tSon = 3 + Math.random() * 5;
     const A = this.autour(), h = g.hour(), soir = h >= 20 || h < 6;
+    const wx = g.getMapWeather ? g.getMapWeather() : 'none';
+    const cel = g.celestial?.activeKind || 'none';
+    const riftDist = g.rifts?.distToPlayer?.() ?? Infinity;
+    const nearMusician = (g.npcs || []).some((n) => (n?.def?.script === 'musicien' || /musicien/i.test(String(n?.id || '')))
+      && Math.abs(n.x - g.player.x) + Math.abs(n.y - g.player.y) <= 6);
+    if (riftDist <= 12 && Math.random() < 0.7) { g.sound.sfx('amb_rift_hum'); return; }
+    if (nearMusician && Math.random() < 0.55) { g.sound.sfx('amb_musician'); return; }
+    if (cel === 'aurora' && Math.random() < 0.65) { g.sound.sfx('amb_aurora'); return; }
+    if (cel === 'meteor' && Math.random() < 0.65) { g.sound.sfx('amb_shooting_star'); return; }
+    if (wx === 'rain') { g.sound.sfx(Math.random() < 0.18 ? 'amb_thunder' : 'amb_rain'); return; }
+    if (wx === 'sandstorm' || wx === 'ash' || wx === 'hail') { g.sound.sfx('amb_wind_gust'); return; }
+    if (['volcanic', 'cendre', 'forge'].includes(A.theme)) { g.sound.sfx('amb_volcano'); return; }
+    if (A.theme === 'mystic' || A.theme === 'sanctuary' || ['Cap des Étoiles', 'Jardin des Songes'].includes(g.zoneName)) { g.sound.sfx('amb_mystic'); return; }
     if (A.theme === 'snow' || A.theme === 'cime') g.sound.sfx('vent');
     else if (A.eau >= 12) g.sound.sfx('vague');
     else if (soir && A.herbe > 10) g.sound.sfx('grillon');
@@ -439,6 +452,6 @@ export async function loterie(game) {
   await game.api().give(lot, 1);
 }
 export async function musicien(game) {
-  game.sound.sfx('evolve');
+  game.sound.sfx('amb_musician');
   await game.ui.say(['♪ La la la… ♫', 'Le musicien joue un air de fête. Les enfants dansent autour de lui !'], { speaker: 'Musicien' });
 }

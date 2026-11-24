@@ -420,8 +420,18 @@
   filter: drop-shadow(0 6px 10px rgba(0,0,0,.55)); transition: none !important; }
 
 /* interface repliée (par défaut) : rien par-dessus la carte, comme dans un jeu Pokémon ; U la réaffiche */
-.hud.collapsed .hud-loc, .hud.collapsed .hud-online-badge, .hud.collapsed .hud-stats, .hud.collapsed .hud-quick-item, .hud.collapsed .hud-guide, .hud.collapsed .hud-dexnav, .hud.collapsed .hud-bdots-row, .hud.collapsed .hud-quest-card, .hud.collapsed .hud-actions { display: none; }
+.hud.collapsed .hud-loc, .hud.collapsed .hud-online-badge, .hud.collapsed .hud-event-pill, .hud.collapsed .hud-stats, .hud.collapsed .hud-quick-item, .hud.collapsed .hud-guide, .hud.collapsed .hud-dexnav, .hud.collapsed .hud-bdots-row, .hud.collapsed .hud-quest-card, .hud.collapsed .hud-actions { display: none; }
 .hud.collapsed .hud-loc-row { gap: calc(var(--px) * 1.5); }
 .hud-off > .keybar { display: none; }
 /* pendant un dialogue, la barre des touches s'efface : elle passait par-dessus la boîte de texte */
 #ui:has(> .dlg) > .keybar { display: none; }
+
+.hud-event-pill {
+  font: inherit; width: 100%; display: flex; align-items: center; justify-content: center; gap: calc(var(--px) * 1.5);
+  padding: calc(var(--px) * 1.1) calc(var(--px) * 2.5);
+  font-size: calc(var(--px) * 5); font-weight: 800; color: #f0f9ff; cursor: pointer;
+  background: linear-gradient(90deg, rgba(16, 78, 98, 0.9) 0%, rgba(76, 29, 149, 0.9) 100%);
+  border: calc(var(--px) * .8) solid #67e8f9; border-radius: calc(var(--px) * 3);
+  text-shadow: 0 1px 0 #000;
+}
+.hud-event-pill:hover { filter: brightness(1.18); }

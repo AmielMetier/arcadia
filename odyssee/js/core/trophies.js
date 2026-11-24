@@ -798,6 +798,160 @@ export const TROPHIES_CATALOG = [
       return { current: Math.min(n, 3), max: 3, done: n >= 3 };
     }
   },
+  {
+    id: 'celestial_meteor',
+    title: 'Chasseur d\'Étoiles',
+    desc: 'Ramasser un fragment de météorite tombé lors d\'un phénomène céleste.',
+    tier: 'silver',
+    category: 'exploration',
+    reward: { item: 'fragment-meteore', count: 1, label: 'Fragment Météorique ×1' },
+    check: (st) => {
+      const n = st.flags?.celestialMeteors || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'celestial_aurora',
+    title: 'Veilleur d\'Aurore',
+    desc: 'Contempler une aurore boréale illuminer le ciel d\'Odyssée.',
+    tier: 'bronze',
+    category: 'exploration',
+    reward: { item: 'moon-stone', count: 1, label: 'Pierre Lune ×1' },
+    check: (st) => {
+      const done = !!st.flags?.celestialAuroraSeen;
+      return { current: done ? 1 : 0, max: 1, done };
+    }
+  },
+  {
+    id: 'celestial_meteor_5',
+    title: 'Moissonneur d\'Étoiles',
+    desc: 'Recueillir au moins 5 météorites tombées du ciel.',
+    tier: 'gold',
+    category: 'exploration',
+    reward: { item: 'fragment-meteore', count: 2, label: 'Fragment Météorique ×2' },
+    check: (st) => {
+      const n = st.flags?.celestialMeteors || 0;
+      return { current: Math.min(n, 5), max: 5, done: n >= 5 };
+    }
+  },
+  {
+    id: 'celestial_cosmic_catch',
+    title: 'Visiteur Stellaire',
+    desc: 'Capturer un Pokémon cosmique surgi d\'une météorite.',
+    tier: 'silver',
+    category: 'exploration',
+    reward: { item: 'ultra-ball', count: 5, label: 'Hyper Ball ×5' },
+    check: (st) => {
+      const n = st.flags?.celestialCosmicCaught || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'rift_clear',
+    title: 'Marcheur des Failles',
+    desc: 'Triompher d\'un combat dans une faille spatio-temporelle.',
+    tier: 'gold',
+    category: 'exploration',
+    reward: { item: 'rare-candy', count: 2, label: 'Super Bonbon ×2' },
+    check: (st) => {
+      const n = st.flags?.riftsCleared || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'rift_inverse_win',
+    title: 'Esprit Inversé',
+    desc: 'Vaincre ou capturer un Pokémon dans une Faille Inversée.',
+    tier: 'silver',
+    category: 'aventure',
+    reward: { item: 'rare-candy', count: 1, label: 'Super Bonbon ×1' },
+    check: (st) => {
+      const n = st.flags?.['riftKind:inverse'] || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'rift_chaos_win',
+    title: 'Dompteur de Tempêtes',
+    desc: 'Triompher d\'une Faille Chaotique à météo tournante.',
+    tier: 'silver',
+    category: 'aventure',
+    reward: { item: 'sitrus-berry', count: 4, label: 'Baie Sitrus ×4' },
+    check: (st) => {
+      const n = st.flags?.['riftKind:chaos'] || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'rift_alpha_catch',
+    title: 'Cœur de Colosse',
+    desc: 'Capturer un Pokémon Alpha surgi d\'une Faille Alpha.',
+    tier: 'gold',
+    category: 'aventure',
+    reward: { item: 'hyper-potion', count: 5, label: 'Hyper Potion ×5' },
+    check: (st) => {
+      const hasAlpha = (st.flags?.alphaCaught || 0) >= 1
+        || (st.party || []).concat(st.box || []).some((m) => !!m?.alpha);
+      return { current: hasAlpha ? 1 : 0, max: 1, done: hasAlpha };
+    }
+  },
+  {
+    id: 'rift_trinity',
+    title: 'Gardien de l\'Espace-Temps',
+    desc: 'Surmonter les trois types de failles : Inversée, Chaotique et Alpha.',
+    tier: 'platinum',
+    category: 'exploration',
+    reward: { item: 'choice-band', count: 1, label: 'Bandeau Choix ×1' },
+    check: (st) => {
+      const f = st.flags || {};
+      const cnt = (f['riftKind:inverse'] ? 1 : 0) + (f['riftKind:chaos'] ? 1 : 0) + (f['riftKind:alpha'] ? 1 : 0);
+      return { current: cnt, max: 3, done: cnt >= 3 };
+    }
+  },
+  {
+    id: 'follower_memories',
+    title: 'Complicité Éternelle',
+    desc: 'Forger au moins 4 souvenirs uniques avec un même Pokémon.',
+    tier: 'gold',
+    category: 'entrainement',
+    reward: { item: 'leftovers', count: 1, label: 'Restes ×1' },
+    check: (st) => {
+      let best = 0;
+      for (const m of (st.party || []).concat(st.box || [])) {
+        const n = m?.memories?.length || 0;
+        if (n > best) best = n;
+      }
+      return { current: Math.min(best, 4), max: 4, done: best >= 4 };
+    }
+  },
+  {
+    id: 'follower_clutch',
+    title: 'Cœur Indomptable',
+    desc: 'Voir un allié survivre à 5 % PV ou moins et remporter le combat.',
+    tier: 'gold',
+    category: 'entrainement',
+    reward: { item: 'focus-sash', count: 1, label: 'Ceinture Force ×1' },
+    check: (st) => {
+      const ok = (st.party || []).concat(st.box || []).some((m) => (m?.memories || []).some((x) => x.id === 'clutch_1hp'));
+      return { current: ok ? 1 : 0, max: 1, done: ok };
+    }
+  },
+  {
+    id: 'follower_legend_bond',
+    title: 'Lien Légendaire',
+    desc: 'Forger au moins 6 souvenirs uniques avec un même Pokémon.',
+    tier: 'platinum',
+    category: 'entrainement',
+    reward: { item: 'rare-candy', count: 3, label: 'Super Bonbon ×3' },
+    check: (st) => {
+      let best = 0;
+      for (const m of (st.party || []).concat(st.box || [])) {
+        const n = m?.memories?.length || 0;
+        if (n > best) best = n;
+      }
+      return { current: Math.min(best, 6), max: 6, done: best >= 6 };
+    }
+  },
 ];
 
 export const STREAK_RANKS = [

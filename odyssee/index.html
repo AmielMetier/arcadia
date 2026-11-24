@@ -14,9 +14,13 @@
     "three": "../shared/vendor/three/three.module.min.js?v=3.0",
     "./js/arenes-jeu.js": "./js/arenes-jeu.js?v=3.0",
     "./js/assets.js": "./js/assets.js?v=3.0",
+    "./js/audio-boss.js": "./js/audio-boss.js?v=3.0",
     "./js/audio-lugia.js": "./js/audio-lugia.js?v=3.0",
+    "./js/audio-wow.js": "./js/audio-wow.js?v=3.0",
     "./js/audio.js": "./js/audio.js?v=3.0",
     "./js/core/arcade.js": "./js/core/arcade.js?v=3.0",
+    "./js/core/battle-ai.js": "./js/core/battle-ai.js?v=3.0",
+    "./js/core/battle-helpers.js": "./js/core/battle-helpers.js?v=3.0",
     "./js/core/battle.js": "./js/core/battle.js?v=3.0",
     "./js/core/bourse.js": "./js/core/bourse.js?v=3.0",
     "./js/core/casino.js": "./js/core/casino.js?v=3.0",
@@ -27,6 +31,7 @@
     "./js/core/pvp.js": "./js/core/pvp.js?v=3.0",
     "./js/core/questsData.js": "./js/core/questsData.js?v=3.0",
     "./js/core/reprise.js": "./js/core/reprise.js?v=3.0",
+    "./js/core/safe.js": "./js/core/safe.js?v=3.0",
     "./js/core/savecode.js": "./js/core/savecode.js?v=3.0",
     "./js/core/trophies.js": "./js/core/trophies.js?v=3.0",
     "./js/data/abilities.js": "./js/data/abilities.js?v=3.0",
@@ -69,6 +74,12 @@
     "./js/donjons/rendu.js": "./js/donjons/rendu.js?v=3.0",
     "./js/donjons/voies-jeu.js": "./js/donjons/voies-jeu.js?v=3.0",
     "./js/donjons/voies.js": "./js/donjons/voies.js?v=3.0",
+    "./js/game/celestial.js": "./js/game/celestial.js?v=3.0",
+    "./js/game/follower-life.js": "./js/game/follower-life.js?v=3.0",
+    "./js/game/puzzles.js": "./js/game/puzzles.js?v=3.0",
+    "./js/game/rifts.js": "./js/game/rifts.js?v=3.0",
+    "./js/game/triggers.js": "./js/game/triggers.js?v=3.0",
+    "./js/game/world-events.js": "./js/game/world-events.js?v=3.0",
     "./js/game.js": "./js/game.js?v=3.0",
     "./js/gfx.js": "./js/gfx.js?v=3.0",
     "./js/input.js": "./js/input.js?v=3.0",
@@ -205,6 +216,7 @@
 <link rel="modulepreload" href="../shared/vendor/three/three.module.min.js?v=3.0">
 <link rel="modulepreload" href="js/ui/clavier.js?v=3.0">
 <link rel="modulepreload" href="js/ui/ui.js?v=3.0">
+<link rel="modulepreload" href="js/core/safe.js?v=3.0">
 <link rel="modulepreload" href="js/render/world3d.js?v=3.0">
 <link rel="modulepreload" href="js/world/tiles.js?v=3.0">
 <link rel="modulepreload" href="js/render/murs-tex.js?v=3.0">
@@ -298,6 +310,8 @@
 <link rel="modulepreload" href="js/manette.js?v=3.0">
 <link rel="modulepreload" href="js/tactile.js?v=3.0">
 <link rel="modulepreload" href="js/audio.js?v=3.0">
+<link rel="modulepreload" href="js/audio-boss.js?v=3.0">
+<link rel="modulepreload" href="js/audio-wow.js?v=3.0">
 <link rel="modulepreload" href="js/ui/screens.js?v=3.0">
 <link rel="modulepreload" href="js/ui/trophiesView.js?v=3.0">
 <link rel="modulepreload" href="js/core/trophies.js?v=3.0">
@@ -309,6 +323,7 @@
 <link rel="modulepreload" href="js/data/talents.js?v=3.0">
 <link rel="modulepreload" href="js/data/moveDescriptions.js?v=3.0">
 <link rel="modulepreload" href="js/ui/screens/pc.js?v=3.0">
+<link rel="modulepreload" href="js/game/follower-life.js?v=3.0">
 <link rel="modulepreload" href="js/ui/screens/bag.js?v=3.0">
 <link rel="modulepreload" href="js/ui/screens/dex.js?v=3.0">
 <link rel="modulepreload" href="js/ui/screens/map.js?v=3.0">
@@ -336,10 +351,13 @@
 <link rel="modulepreload" href="js/data/megas.js?v=3.0">
 <link rel="modulepreload" href="js/data/megasFans.js?v=3.0">
 <link rel="modulepreload" href="js/core/battle.js?v=3.0">
+<link rel="modulepreload" href="js/core/battle-helpers.js?v=3.0">
+<link rel="modulepreload" href="js/core/battle-ai.js?v=3.0">
 <link rel="modulepreload" href="js/world/migration.js?v=3.0">
 <link rel="modulepreload" href="js/ui/battleView.js?v=3.0">
 <link rel="modulepreload" href="js/ui/battleVfx.js?v=3.0">
 <link rel="modulepreload" href="js/ui/hud.js?v=3.0">
+<link rel="modulepreload" href="js/game/celestial.js?v=3.0">
 <link rel="modulepreload" href="js/ui/chatModal.js?v=3.0">
 <link rel="modulepreload" href="js/net/social.js?v=3.0">
 <link rel="modulepreload" href="js/net/link.js?v=3.0">
@@ -383,6 +401,10 @@
 <link rel="modulepreload" href="js/vie.js?v=3.0">
 <link rel="modulepreload" href="js/tour-combat.js?v=3.0">
 <link rel="modulepreload" href="js/vie-monde.js?v=3.0">
+<link rel="modulepreload" href="js/game/puzzles.js?v=3.0">
+<link rel="modulepreload" href="js/game/triggers.js?v=3.0">
+<link rel="modulepreload" href="js/game/world-events.js?v=3.0">
+<link rel="modulepreload" href="js/game/rifts.js?v=3.0">
 <link rel="modulepreload" href="js/data/decor-plus.js?v=3.0">
 <!-- fin des modules préchargés -->
 </head>
