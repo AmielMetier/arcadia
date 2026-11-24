@@ -798,7 +798,7 @@ export class Multi4pBattle extends Battle {
   }
   loseBattle() {
     this.say('Votre équipe n\'a plus de Pokémon en forme !');
-    this.say(`${this.sides[1].name} remporte ce 2v2 à 4 joueurs !`);
+    this.say(`${this.sides[1].name} remporte ce Combat Multi Duo !`);
     this.end('lose');
   }
   stop(result, text) {
@@ -995,27 +995,27 @@ async function runMulti4pSession(game, { rid, rosters, myKey, hostId, peerIds, s
   game.updateZone();
 
   if (res === 'win') {
-    await ui.say(`Victoire en 2v2 à 4 joueurs contre ${foeTeam.name} !`);
+    await ui.say(`Victoire en Combat Multi Duo contre ${foeTeam.name} !`);
   } else {
-    await ui.say(`${foeTeam.name} remporte ce duel 2v2 à 4 dresseurs !`);
+    await ui.say(`${foeTeam.name} remporte ce Combat Multi Duo !`);
   }
 }
 
-/** Lance un vrai combat 2v2 avec 4 joueurs humains connectés (Équipe A [J0,J1] vs Équipe B [J2,J3]) */
+/** Lance un Combat Multi Duo à 4 dresseurs connectés (Équipe A [J0,J1] vs Équipe B [J2,J3]) */
 export async function lancerMulti4p(game, preOpp = null) {
   const st = game.state, ui = game.ui, link = game.link;
-  const who = { speaker: 'Multi 2v2 (4j)', face: 'topdresseur' };
+  const who = { speaker: 'Combat Multi Duo', face: 'topdresseur' };
   const healthy = st.party.filter((m) => m && m.hp > 0).length;
   if (healthy < 2) {
-    await ui.say('Il te faut au moins 2 Pokémon en forme (1 actif + 1 remplaçant) pour le Multi 2v2 !', who);
+    await ui.say('Il te faut au moins 2 Pokémon en forme (1 actif + 1 remplaçant) pour un Combat Multi Duo !', who);
     return;
   }
   const allConnected = link?.enabled ? [...link.others.values()] : [];
   const freePeers = allConnected.filter((p) => !p.busy && !p.pvp);
   if (freePeers.length < 3) {
     await ui.say([
-      'Le Multi 2v2 à 4 joueurs nécessite 4 dresseurs humains connectés (2 équipes de 2) !',
-      `Connecte 3 autres dresseurs via Amis / Connexion (F3) (${freePeers.length} disponible${freePeers.length > 1 ? 's' : ''}).`,
+      'Le Combat Multi Duo nécessite 4 dresseurs connectés (2 équipes de 2) !',
+      `Connecte 3 autres dresseurs via le menu Amis / Connexion (${freePeers.length} disponible${freePeers.length > 1 ? 's' : ''}).`,
     ], who);
     return;
   }
@@ -1043,7 +1043,7 @@ export async function lancerMulti4p(game, preOpp = null) {
   });
 
   const box = ui.dialogBox();
-  ui.typePage(box, `Invitation Multi 2v2 envoyée aux 3 dresseurs… (Échap : annuler)`, { last: true });
+  ui.typePage(box, `Invitation Multi Duo envoyée aux 3 dresseurs… (Échap : annuler)`, { last: true });
   await wait(30);
   const pop = game.input.push((k) => { if (k === 'b' || k === 'cancel') for (const pid of peerIds) link.abort(pid); });
   const reps = await Promise.all(selected.map((p) => link.wait(p.id, (m) => m.t === 'm4p-rep' && m.rid === rid, 30000).then((m) => ({ peer: p, m }))));
@@ -1062,7 +1062,7 @@ export async function lancerMulti4p(game, preOpp = null) {
     const myMons = await pickDojoPair(game, who);
     if (!myMons) {
       for (const pid of peerIds) link.send(pid, { t: 'm4p-cancel', rid });
-      await ui.say('Combat 2v2 à 4 joueurs annulé.', who);
+      await ui.say('Combat Multi Duo annulé.', who);
       return;
     }
     const peerRes = await hostWaitAll(
@@ -1072,7 +1072,7 @@ export async function lancerMulti4p(game, preOpp = null) {
     );
     if (peerRes.some(({ m }) => m.t !== 'm4p' || m.step !== 'roster' || !Array.isArray(m.mons) || m.mons.length < 2 || !m.mons.every(validMon))) {
       for (const pid of peerIds) link.send(pid, { t: 'm4p-cancel', rid });
-      await ui.say('Le Multi 2v2 a été annulé avant le coup d\'envoi.', who);
+      await ui.say('Le Combat Multi Duo a été annulé avant le coup d\'envoi.', who);
       return;
     }
     const keys = ['0:1', '1:0', '1:1'];
@@ -1120,24 +1120,24 @@ export async function onMulti4pInvite(game, from, m) {
       return r;
     });
     ui.sound.sfx('bang');
-    const yes = await ui.yesNo(`${name} t'invite en Multi 2v2 (4 joueurs · ${m.summary || ''}) comme ${m.role || 'participant'} ! Accepter ?`, { speaker: name });
-    if (gone) { ui.closeDialog(); await ui.say(`${name} a annulé le combat 2v2.`); return; }
+    const yes = await ui.yesNo(`${name} t'invite en Combat Multi Duo (4 joueurs · ${m.summary || ''}) comme ${m.role || 'participant'} ! Accepter ?`, { speaker: name });
+    if (gone) { ui.closeDialog(); await ui.say(`${name} a annulé le Combat Multi Duo.`); return; }
     link.abort(from);
     link.send(from, { t: 'm4p-rep', rid: m.rid, ok: yes });
     if (!yes) return;
 
-    const myMons = await pickDojoPair(game, { speaker: 'Multi 2v2 (4j)', face: 'topdresseur' });
+    const myMons = await pickDojoPair(game, { speaker: 'Multi Duo', face: 'topdresseur' });
     if (!myMons) { link.send(from, { t: 'm4p', rid: m.rid, step: 'quit', who: st.name }); return; }
     link.send(from, { t: 'm4p', rid: m.rid, step: 'roster', name: st.name, gender: st.gender, hasMega: !!st.bag[MEGA_RING], mons: myMons });
 
     const startMsg = await guestWaitHost(
       game, from,
       (q) => (q.t === 'm4p' && q.rid === m.rid && q.step === 'start') || (q.t === 'm4p-cancel' && q.rid === m.rid),
-      `En attente du lancement du Multi 2v2 par ${name}…`
+      `En attente du lancement du Combat Multi Duo par ${name}…`
     );
     if (startMsg.t !== 'm4p' || startMsg.step !== 'start') {
       if (startMsg.t === 'abort') link.send(from, { t: 'm4p', rid: m.rid, step: 'quit', who: st.name });
-      await ui.say('Le Multi 2v2 n\'a pas commencé.');
+      await ui.say('Le Combat Multi Duo n\'a pas commencé.');
       return;
     }
     await runMulti4pSession(game, { ...startMsg, rid: m.rid, hostId: from, peerIds: [] });
@@ -1333,7 +1333,7 @@ async function playHumanVsBotTournoi(game, botSeat, lvl, format, seed, matchRid)
       if (battle.state === 'switch') {
         const need = battle.needPlayerSlots?.length ? battle.needPlayerSlots : [0];
         const picks = bv.slots === 1
-          ? await partyScreen(game, { mode: 'pick', pickLabel: 'Envoyer', prompt: 'Envoyer quelle créature ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === battle.sides[0].active ? 'Au combat' : null) })
+          ? await partyScreen(game, { mode: 'pick', pickLabel: 'Envoyer', prompt: 'Envoyer quel Pokémon ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === battle.sides[0].active ? 'Au combat' : null) })
           : await bv.pickReplacementList(need);
         if (bv.slots === 1 && picks < 0) continue;
         const evSw = battle.playerSwitch(picks);
@@ -1406,7 +1406,7 @@ async function runGuestTournoiLoop(game, { rid, hostId, format, bracket, lvl }) 
     }
     bracket = sync.bracket;
     const match = bracket.matches[sync.matchIdx];
-    await showBracketModal(game, bracket, `${match.label} · ${format === 'double' ? '2v2' : '1v1'}`, 2200);
+    await showBracketModal(game, bracket, `${match.label} · ${format === 'double' ? 'Duo' : 'Solo'}`, 2200);
     const sA = bracket.seats[match.a];
     const sB = bracket.seats[match.b];
 
@@ -1466,11 +1466,11 @@ export async function lancerTournoiSalon(game) {
     return;
   }
 
-  const fmtPick = await ui.ask('Quel format pour le Tournoi à 4 places ?', ['Solo (1v1)', 'Duo (2v2)', 'Annuler'], who);
+  const fmtPick = await ui.ask('Quel format pour le Tournoi à 4 places ?', ['Solo', 'Duo', 'Annuler'], who);
   if (fmtPick !== 0 && fmtPick !== 1) return;
   const format = fmtPick === 1 ? 'double' : 'single';
   if (format === 'double' && healthy < 2) {
-    await ui.say('Il te faut au moins 2 Pokémon en forme pour un Tournoi Duo (2v2) !', who);
+    await ui.say('Il te faut au moins 2 Pokémon en forme pour un Tournoi Duo !', who);
     return;
   }
 
@@ -1536,7 +1536,7 @@ export async function lancerTournoiSalon(game) {
       for (const pid of peerIds) {
         link.send(pid, { t: 'tournoi', rid, step: 'match', matchIdx, bracket, seed, spectators: spectIds });
       }
-      await showBracketModal(game, bracket, `${m.label} · ${format === 'double' ? '2v2' : '1v1'}`, 2400);
+      await showBracketModal(game, bracket, `${m.label} · ${format === 'double' ? 'Duo' : 'Solo'}`, 2400);
 
       let winnerSeatIdx = m.a;
       if (sA.bot && sB.bot) {
@@ -1611,7 +1611,7 @@ export async function onTournoiInvite(game, from, m) {
       return r;
     });
     ui.sound.sfx('bang');
-    const yes = await ui.yesNo(`${name} t'invite au Tournoi en direct (${m.format === 'double' ? 'Duo 2v2' : 'Solo 1v1'}, 4 places) ! Participer ?`, { speaker: name });
+    const yes = await ui.yesNo(`${name} t'invite au Tournoi en direct (${m.format === 'double' ? 'Duo' : 'Solo'}, 4 places) ! Participer ?`, { speaker: name });
     if (gone) { ui.closeDialog(); await ui.say(`${name} a lancé le Tournoi sans toi.`); return; }
     link.abort(from);
     const myLvl = Math.max(50, ...st.party.map((p) => p.lvl || 50));

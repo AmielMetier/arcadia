@@ -296,7 +296,7 @@ const CONSEILS = [
   'CONSEIL DU DRESSEUR\nUn rocher qui brille cache souvent quelque chose. Approche-toi et regarde de plus près.',
   'CONSEIL DU DRESSEUR\nDu haut d\'une butte, on voit des coins de la route qu\'on ne remarque pas d\'en bas.',
   'CONSEIL DU DRESSEUR\nUn dresseur qui te voit vient te défier. Contourne-le si ton équipe est fatiguée.',
-  'CONSEIL DU DRESSEUR\nLes herbes hautes sombres abritent des créatures plus rares... et plus coriaces.',
+  'CONSEIL DU DRESSEUR\nLes herbes hautes sombres abritent des Pokémon plus rares... et plus coriaces.',
 ];
 const BOIS = new Set([T.TREE, T.PINE]);
 function details(W, S, { info, cells, pts, chemin, tBloc, herbe, base, T0, LOTS, rang }) {

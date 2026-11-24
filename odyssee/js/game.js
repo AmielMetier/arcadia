@@ -582,10 +582,10 @@ export class Game {
     const imgs = await Promise.all(m.betes.map(([sp]) => loadImg(ASSETS.front(sp)).catch(() => null)));
     if (this.mapObj !== m) return;
     const acteurs = m.betes.map(([sp, x, y], i) => { if (!imgs[i]) return null; const a = v.imageActor(ids[i], imgs[i], 0.5); v.place(a, x, y - 0.1); return a; });
-    await this.ui.say(['Au fond du sous-sol, trois grandes créatures se tiennent immobiles dans la cendre, les yeux clos...', 'Elles respirent lentement, comme si elles dormaient depuis très longtemps.']);
+    await this.ui.say(['Au fond du sous-sol, trois grands Pokémon se tiennent immobiles dans la cendre, les yeux clos...', 'Ils respirent lentement, comme s\'ils dormaient depuis très longtemps.']);
     this.sound.sfx('bang'); v.shake = 0.3;
     this.sound.cry(ASSETS.cry(m.betes[1]?.[0] ?? m.betes[0][0]));
-    await this.ui.say('Les trois créatures ouvrent les yeux et se dressent d\'un bond !');
+    await this.ui.say('Les trois Pokémon ouvrent les yeux et se dressent d\'un bond !');
     // chacune file à son tour vers l'échelle, en sautant, puis s'évanouit
     const [ex, ey] = m.betesSortie || [2, 3];
     for (let i = 0; i < m.betes.length; i++) {
@@ -943,7 +943,7 @@ export class Game {
     const m = this.mapObj, st = this.state, ui = this.ui, L = LEADERS[m.gymLock];
     const g = this.npcs.find((n) => n.def.script === 'gymguide');
     if (g) { const dx = this.player.x - g.x, dy = this.player.y - g.y; g.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down'); }
-    await ui.say([`Yo, futur Maître ! Bienvenue dans l'Arène de ${L.name} !`, `${L.name} utilise des créatures de type ${TYPE_FR[L.type]}. Mise sur ${GYM_HINTS[L.type]} !`,
+    await ui.say([`Yo, futur Maître ! Bienvenue dans l'Arène de ${L.name} !`, `${L.name} utilise des Pokémon de type ${TYPE_FR[L.type]}. Mise sur ${GYM_HINTS[L.type]} !`,
       'Mais attention : une fois le défi lancé, tu affrontes l\'arène d\'une traite.', 'Si tu ressors avant d\'avoir battu le Champion, il faudra tout recommencer depuis le début.'], { speaker: 'Guide' });
     if (await ui.yesNo('Es-tu prêt à relever le défi ?')) {
       st.flags['IN:' + m.id] = true; this.sound.sfx('door');
@@ -1082,7 +1082,7 @@ export class Game {
       this.take(reg);
       this.sound.sfx('item');
       st.repel = Math.max(st.repel || 0, it.repel || 100); st.lastRepel = reg;
-      await this.ui.say(`${st.name} utilise un ${itemName(reg)} ! Les créatures sauvages s'éloignent.`);
+      await this.ui.say(`${st.name} utilise un ${itemName(reg)} ! Les Pokémon sauvages s'éloignent.`);
       this.save(true);
       return;
     }
@@ -1225,7 +1225,7 @@ export class Game {
       else if (d.role === 'relearner') await moveRelearnerScreen(this);
       else if (d.talk) await d.talk(this.api(), n);
       else if (d.script) await this.script(d.script, n);
-      else if (d.text) await this.ui.say(/:h\d+$/.test(n.id) && Math.random() < 0.4 ? ragot(this) : d.text, {
+      else if (d.text) await this.ui.say(/:h\d+$/.test(n.id) && Math.random() < 0.4 ? ragot(this) : (typeof d.text === 'function' ? d.text(this.state, this) : d.text), {
         speaker: d.name || n.name || (d.who ? d.who : null),
         face: d.sprite || n.sprite
       });
@@ -1310,10 +1310,10 @@ export class Game {
     const st = this.state, ui = this.ui;
     if (st.flags['L:celebi'] === 'caught') { await ui.say('Un vieil autel de bois. Les feuilles autour bruissent doucement.'); return; }
     if (st.flags.celebiCalled) { await ui.say('L\'autel est tiède. Celebi ne doit pas être loin...'); return; }
-    if (!st.bag['gs-ball']) { await ui.say(['Un vieil autel de bois, couvert de mousse.', 'Il y a un creux au centre, de la taille d\'une capsule...']); return; }
-    if (!(await ui.yesNo('Un vieil autel de bois, couvert de mousse.\nPoser la Balle GS dans le creux ?'))) return;
+    if (!st.bag['gs-ball']) { await ui.say(['Un vieil autel de bois, couvert de mousse.', 'Il y a un creux au centre, de la taille d\'une Poké Ball...']); return; }
+    if (!(await ui.yesNo('Un vieil autel de bois, couvert de mousse.\nPoser la GS Ball dans le creux ?'))) return;
     this.take('gs-ball'); st.flags.celebiCalled = true;
-    await ui.say(['Tu poses la Balle GS sur l\'autel...', '... ... ...', 'La Balle GS s\'ouvre dans un éclat vert !']);
+    await ui.say(['Tu poses la GS Ball sur l\'autel...', '... ... ...', 'La GS Ball s\'ouvre dans un éclat vert !']);
     await ui.flash(3, '#c8ffb0', 80);
     this.spawnLegends();
     const L = this.legends.find((q) => q.id === 'celebi');
@@ -1557,7 +1557,7 @@ export class Game {
   async pecher(fx, fy) {
     const st = this.state;
     if (!st.party.some((m) => m.hp > 0)) {
-      await this.ui.say('Toutes tes créatures sont K.O. ! Mieux vaut se reposer.');
+      await this.ui.say('Tous tes Pokémon sont K.O. ! Mieux vaut se reposer.');
       return;
     }
     this.sound.sfx('splash');
@@ -1604,7 +1604,7 @@ export class Game {
     const bite = Math.random() < 0.85;
     if (!bite) {
       this.sound.sfx('bump');
-      await this.ui.say('Pas même une touche... Les créatures aquatiques ne mordent pas pour l\'instant.');
+      await this.ui.say('Pas même une touche... Les Pokémon aquatiques ne mordent pas pour l\'instant.');
       return;
     }
 
@@ -1642,7 +1642,7 @@ export class Game {
     this.sound.cry(ASSETS.cry(mon.sp));
     this.sound.sfx('whistle');
     await this.animateFlyDeparture();
-    await this.ui.say(`${st.name} souffle dans le Sifflet Céleste !\nUne mélodie dorée résonne et vous emporte dans les cieux.`, { auto: 700 });
+    await this.ui.say(`${st.name} souffle dans le Sifflet Céleste !\nUne mélodie dorée résonne et t'emporte dans les cieux.`, { auto: 700 });
     await this.animateFlyAscent();
     await this.ui.doorTransition(true, 280);
     const [x, y] = t.centerDoor || t.homeDoor;
@@ -1652,7 +1652,7 @@ export class Game {
     this.save(true);
     await this.ui.doorTransition(false, 250);
     await this.animateFlyDescent();
-    await this.ui.say(`Vous atterrissez en douceur devant le Centre de soins de ${t.name}.`, { auto: 650 });
+    await this.ui.say(t.centerDoor ? `Tu atterris en douceur devant le Centre de soins de ${t.name}.` : `Tu atterris en douceur devant chez toi, à ${t.name}.`, { auto: 650 });
     return true;
   }
 
@@ -1846,7 +1846,7 @@ export class Game {
     const k = order.find((id) => st.bag[id] > 0); if (!k) return;
     if (!(await ui.yesNo(`Utiliser un autre ${itemName(k)} ?\n(il t'en reste ${st.bag[k]})`))) return;
     st.repel = ITEMS[k].repel; st.lastRepel = k; this.take(k); this.sound.sfx('item');
-    await ui.say(`${st.name} utilise ${itemName(k)}.\nLes créatures sauvages faibles fuiront pendant ${st.repel} pas.`);
+    await ui.say(`${st.name} utilise ${itemName(k)}.\nLes Pokémon sauvages faibles fuiront pendant ${st.repel} pas.`);
   }
   /** sac hors combat ; renvoie true si l'objet utilisé ferme le menu (Corde Sortie, Vol…) */
   async fieldBag() {
@@ -1886,15 +1886,15 @@ export class Game {
       // Repousses : on peut en utiliser plusieurs d'affilée, les pas s'additionnent (le sac reste ouvert)
       if (it.repel) {
         st.repel = Math.min(9999, (st.repel || 0) + it.repel); st.lastRepel = r.item; this.take(r.item); this.sound.sfx('item');
-        await this.ui.say(`${st.name} utilise ${itemName(r.item)}.\nLes créatures sauvages faibles fuiront pendant ${st.repel} pas.`); continue;
+        await this.ui.say(`${st.name} utilise ${itemName(r.item)}.\nLes Pokémon sauvages faibles fuiront pendant ${st.repel} pas.`); continue;
       }
       if (r.item === 'escape-rope') {
         if (this.mapObj.floor === 'cave' && st.lastOutdoor) { this.take(r.item); await this.ui.say(`${st.name} utilise la Corde Sortie !`); await this.warp({ map: 'monde', x: st.lastOutdoor.x, y: st.lastOutdoor.y, dir: 'down' }, 'exit'); return true; }
         await this.ui.say('Ce n\'est pas le moment d\'utiliser ça !'); continue;
       }
-      if (!st.party.length) { await this.ui.say('Tu n\'as encore aucune créature.'); continue; }
+      if (!st.party.length) { await this.ui.say('Tu n\'as encore aucun Pokémon.'); continue; }
       const cap = this.levelCap();
-      const target = await partyScreen(this, { mode: 'pick', prompt: `Utiliser ${itemName(r.item)} sur quelle créature ?`, filter: (m) => (canUseOn(r.item, m, cap) ? null : it.candy && m.lvl >= cap && m.lvl < 100 ? `Niv. max (${cap})` : 'Pas d\'effet') });
+      const target = await partyScreen(this, { mode: 'pick', prompt: `Utiliser ${itemName(r.item)} sur quel Pokémon ?`, filter: (m) => (canUseOn(r.item, m, cap) ? null : it.candy && m.lvl >= cap && m.lvl < 100 ? `Niv. max (${cap})` : 'Pas d\'effet') });
       if (target < 0) continue;
       const m = st.party[target];
       // la pierre n'est consommée que si l'évolution a bien lieu (elle peut être annulée)
@@ -2127,7 +2127,14 @@ export class Game {
       6: this.hasField('vol')
         ? ['Drakos t\'attend à Fort-Écaille, sur la Grande Île, à l\'ouest.', 'Je vois que tu portes déjà le Sifflet Céleste des Sages de la Tour Dorée ! Les vents te porteront sans peine jusqu\'à lui.', 'Mon frère a besoin qu\'on le batte. Peut-être qu\'il ouvrira enfin les yeux.']
         : ['Drakos t\'attend à Fort-Écaille, sur la Grande Île, à l\'ouest.', 'Tiens, prends ce Sifflet Céleste qu\'un pèlerin de la Tour Dorée m\'a confié. Il appellera un oiseau pour te transporter d\'une ville à l\'autre en un instant !', 'Mon frère a besoin qu\'on le batte. Peut-être qu\'il ouvrira enfin les yeux.'],
-      7: ['...Tu te bats comme Célestine. Avec tes créatures, pas contre elles.', 'Les îles resteront libres. Mais j\'arrête de prélever les pêches et de fermer les ports.', 'Va à la Ligue. Et dis à Célestine que le vieux Drakos attend sa revanche.', 'Ah, et le Cap des Étoiles, au nord de la ville, t\'est ouvert. Odyssor y passe parfois...'],
+      7: ['...Tu te bats comme Célestine. Avec tes Pokémon, pas contre eux.', 'Les îles resteront libres. Mais j\'arrête de prélever les pêches et de fermer les ports.', 'Il reste encore les sept Champions des Terres du Sud, au-delà du Pont de l\'Austral, avant la Ligue. Et dis à Célestine que le vieux Drakos attend sa revanche.', 'Ah, et le Cap des Étoiles, au nord de la ville, t\'est ouvert. Odyssor y passe parfois...'],
+      8: [`Ton bilan est positif, ${st.name}. Tu sais calculer tes risques !`, 'La Route 14, à l\'est de la ville, mène à Port-Lisière sur les falaises. Aurèle y commande le vent.'],
+      9: ['Tu as percé les courants comme un as !', 'Plus à l\'est, la Route 15 traverse le marécage jusqu\'à Marais-Noir. Garde des Antidotes dans ton sac !'],
+      10: ['Le marais s\'incline devant toi...', 'Prends la Route 16 vers le sud : les Dunes d\'Ocre et le désert de Gaspard t\'attendent.'],
+      11: ['Tu tiens bon même sur le sable mouvant !', 'Descends le Canyon d\'Ocre par la Route 17 jusqu\'à Forge-Acier. Ferdinand va tester ton équipe au feu et au fer.'],
+      12: ['Un travail de maître forgeron !', 'À l\'ouest, la Route 18 fleurie mène à Rosebrume. Ne te laisse pas attendrir par les Fées de Lilas !'],
+      13: ['Ton cœur et celui de tes Pokémon brillent d\'un bel éclat.', 'La Route 19, à l\'ouest, s\'enfonce vers Ombreval. Le garde te laissera passer — bon courage face à Corbin !'],
+      14: ['Les ténèbres n\'ont pas éteint ta flamme. Tu tiens tes quinze badges !', 'Remonte vers le nord par la Route 20 pour rejoindre Métropole, puis file à Cimelune et à la Route Victoire. La Ligue Céleste est à ta portée !'],
     }[g];
     if (lines) await ui.say(lines, { speaker: name });
     const gift = GYM_GIFT[g];
@@ -2175,9 +2182,11 @@ export class Game {
     const calls = {
       1: ['Allô, ' + st.name + ' ? Deux badges, déjà ! Bravo.', 'Écoute : le capitaine de l\'Embarcadère de l\'Aube, à l\'est de la route 1, emmène les dresseurs aguerris vers les îles de l\'Est — pense à passer ton Permis Bateau à la Capitainerie de Port-Azur.', 'On dit qu\'Électhor, l\'oiseau de foudre, dérègle les orages de l\'Île Orageuse. Ça mérite un coup d\'œil !'],
       2: ['Trois badges ! Le capitaine peut maintenant t\'emmener à l\'Île de la Grue.', 'Là-bas vit une doyenne qui connaît la légende de Ho-Oh, l\'oiseau arc-en-ciel, mieux que personne.', 'Il paraît qu\'il se posait autrefois sur une tour dorée...'],
-      3: ['Quatre badges... Tu vas bientôt passer à Mirage.', 'Au fait, ' + st.name + ', je ne t\'en ai jamais parlé : j\'ai un' + (B.e ? 'e ' : ' ') + B.fils + ', ' + B.name + '.', B.name + ' a grandi à Port-Granit, sur les îles. Le lendemain de ton départ, ' + B.il + ' est passé' + B.e + ' au labo et a pris la troisième capsule.', 'Depuis, ' + B.il + ' ne répond plus à mes appels. On dit qu\'' + B.il + ' s\'est engagé' + B.e + ' chez les Gardes d\'Écaille de Drakos...', 'Si tu ' + B.le + ' croises, dis-lui que son grand-père pense à ' + (B.e ? 'elle' : 'lui') + '.'],
+      3: ['Quatre badges... Tu vas bientôt passer à Mirage.', 'Au fait, ' + st.name + ', je ne t\'en ai jamais parlé : j\'ai un' + (B.e ? 'e ' : ' ') + B.fils + ', ' + B.name + '.', B.name + ' a grandi à Port-Granit, sur les îles. Le lendemain de ton départ, ' + B.il + ' est passé' + B.e + ' au labo et a pris la troisième Poké Ball.', 'Depuis, ' + B.il + ' ne répond plus à mes appels. On dit qu\'' + B.il + ' s\'est engagé' + B.e + ' chez les Gardes d\'Écaille de Drakos...', 'Si tu ' + B.le + ' croises, dis-lui que son grand-père pense à ' + (B.e ? 'elle' : 'lui') + '.'],
       4: this.eclipseOn() ? ['Cinq badges ! Et Surf, en plus. Écoute bien, ' + st.name + '.', 'Cette nuit violette ne finira pas toute seule. Si la Team Éclipse a vraiment fermé le cœur de Lugia...', 'La voyante de Mirage connaît les légendes de la mer. Elle saura où dort Lugia. Va la voir avant de partir pour l\'archipel !'] : ['Cinq badges ! Avec Surf, tu peux rejoindre l\'archipel des trois frères, au sud du Cap Mirage.', 'Et le capitaine t\'emmènera aussi à l\'Île Givrée, tout au nord. Artikodin y vivrait... et plus profond encore, Lugia.'],
       7: ['Tu as battu Drakos ?! Toute la région en parle.', st.flags.rivalB3 ? B.name + ' m\'a appelé. Pour la première fois depuis des mois. ' + (B.e ? 'Elle' : 'Il') + ' a quitté les Gardes d\'Écaille.' : 'J\'espère que ' + (B.e ? 'ma ' : 'mon ') + B.fils + ' va bien, là-bas...', 'Avec les huit badges du Nord, le Pont de l\'Austral (au sud de la route 10) s\'ouvre vers les Terres du Sud et leurs sept Champions ! Mais avant, va donc voir le Cap des Étoiles, au nord de Fort-Écaille.'],
+      10: ['Onze badges ! Tu avances vite dans les Terres du Sud, ' + st.name + '.', 'Entre le marais, les dunes et Forge-Acier, ces routes mettent n\'importe quel dresseur à l\'épreuve.', 'Garde confiance en tes Pokémon : il ne te reste plus que quatre Champions avant la Ligue Céleste !'],
+      14: ['Quinze badges ! Tu as réussi, ' + st.name + ' !', 'Les cinq Champions du Nord, les trois frères de l\'archipel, et les sept Champions des Terres du Sud... Tous ont reconnu ta valeur.', 'La Route Victoire, au nord de Cimelune, t\'ouvre enfin ses portes. Rejoins la Ligue Céleste : toute la région d\'Odyssée compte sur toi !'],
     };
     const c = calls[g]; if (!c) return;
     this.sound.sfx('pc'); await wait(300);
@@ -2340,7 +2349,7 @@ export class Game {
     this.view.update(0, this.player.x, this.player.y); this.view.render();
     await this.view.solPret?.();
     await this.ui.fade(false, 400);
-    await this.ui.say([`${st.name} a perdu ${lost.toLocaleString('fr-FR')} ₽ dans la panique...`, '... ... ...', `${st.name} reprend ses esprits. Ses créatures ont été soignées.`]);
+    await this.ui.say([`${st.name} a perdu ${lost.toLocaleString('fr-FR')} ₽ dans la panique...`, '... ... ...', `${st.name} reprend ses esprits. Ses Pokémon ont été soignés.`]);
   }
 
   async askLearn(m, moveId) {
@@ -2386,7 +2395,7 @@ export class Game {
         flashA = 1; mode = 'new'; scale = 1; for (let i = 0; i < 20; i++) { flashA = 1 - i / 20; await wait(30); } flashA = 0;
         const res = evolve(m, to); this.markCaught(to);
         this.sound.cry(ASSETS.cry(to)); this.sound.sfx('levelup');
-        await ui.say(`Félicitations ! Votre ${oldName} a évolué en ${SPECIES[to].n} !`);
+        await ui.say(`Félicitations ! Ton ${oldName} a évolué en ${SPECIES[to].n} !`);
         for (const id of res.learned) {
           const M = MOVES[id];
           const cat = M.c === 'special' ? 'Spécial' : M.c === 'status' ? 'Statut' : 'Physique';
@@ -2411,13 +2420,13 @@ export class Game {
     const pick = (a) => a[(x * 7 + y * 3 + this.mapObj.id.length) % a.length];
     const TV = [
       ['C\'est un film : quatre amis suivent une voie ferrée à travers la forêt.', 'Ça donne envie de partir à l\'aventure !'],
-      ['Un reportage sur les créatures de la région.', '« Les Germignon adorent les journées ensoleillées... »'],
+      ['Un reportage sur les Pokémon de la région.', '« Les Germignon adorent les journées ensoleillées... »'],
       ['La météo : grand soleil sur Bourg-Aube, tempête de neige sur l\'Île Givrée.'],
     ];
     if (b >= 3 && !st.flags.rivalB4) TV.push(['Flash spécial : les Gardes d\'Écaille ferment des ports de pêche.', 'Les pêcheurs de Port-Granit protestent...']);
     if (st.flags.champion) TV.push(['On parle de toi aux informations ! Le nouveau Maître de la Ligue...', 'Maman doit être si fière.']);
     const T_ = {
-      books: home ? ['Des livres d\'images sur les créatures...', '« Mon premier voyage », celui que Maman te lisait le soir.']
+      books: home ? ['Des livres d\'images sur les Pokémon...', '« Mon premier voyage », celui que Maman te lisait le soir.']
         : pick([['« Le guide du jeune Dresseur ».', 'Chapitre 1 : toujours garder des Potions dans son sac.'],
           ['« Légendes de la région ».', 'On raconte que trois bêtes sacrées veillent sur les îles de l\'est...'],
           ['Un livre de recettes de baies.', '« Tarte à la Baie Oran : de quoi requinquer toute une équipe. »'],
@@ -2451,13 +2460,13 @@ export class Game {
   }
   async nurse() {
     const ui = this.ui, st = this.state;
-    await ui.say('Bienvenue au Centre de soins !', { keep: true, speaker: 'Infirmière' });
-    if (await ui.yesNo('Voulez-vous que je soigne vos créatures ?', { keep: true, speaker: 'Infirmière' })) {
-      await ui.say('Très bien. Confiez-les-moi quelques instants.', { keep: true, speaker: 'Infirmière' });
+    await ui.say('Bienvenue au Centre Pokémon !', { keep: true, speaker: 'Infirmière' });
+    if (await ui.yesNo('Veux-tu que je soigne tes Pokémon ?', { keep: true, speaker: 'Infirmière' })) {
+      await ui.say('Très bien. Confie-les-moi quelques instants.', { keep: true, speaker: 'Infirmière' });
       this.sound.sfx('heal'); await wait(2400);
       for (const m of st.party) healFull(m);
       st.lastCenter = { map: this.mapObj.id, x: 6, y: 5, dir: 'up' };
-      await ui.say(['Merci d\'avoir attendu.', 'Vos créatures sont en pleine forme !'], { keep: true, speaker: 'Infirmière' });
+      await ui.say(['Merci d\'avoir attendu.', 'Tes Pokémon sont en pleine forme !'], { keep: true, speaker: 'Infirmière' });
     }
     await ui.say('À bientôt !', { speaker: 'Infirmière' });
   }
@@ -2562,11 +2571,11 @@ export class Game {
   }
 
   /* ================= histoire ================= */
-  /** Port-Granit : le professeur Orme remet le Méga-Anneau (5 badges) et la gemme du starter, puis vend les Méga-Gemmes */
+  /** Port-Granit : le Professeur Cèdre remet le Méga-Anneau (5 badges) et la gemme du starter, puis vend les Méga-Gemmes */
   async megaRing() {
-    const st = this.state, ui = this.ui, sp = { speaker: 'Pr Orme' };
+    const st = this.state, ui = this.ui, sp = { speaker: 'Pr Cèdre' };
     if (!st.bag[MEGA_RING]) {
-      if (this.badgeCount() < 5) { await ui.say(['Je suis le professeur Orme. J\'étudie un phénomène fascinant : la Méga-Évolution.', 'Certains Pokémon dépassent leur forme finale grâce à une Méga-Gemme... et au lien qui les unit à leur dresseur.', 'Reviens quand tu auras cinq badges : je verrai alors si ce lien est assez fort.'], sp); return; }
+      if (this.badgeCount() < 5) { await ui.say(['Je suis le Professeur Cèdre. J\'étudie un phénomène fascinant : la Méga-Évolution.', 'Certains Pokémon dépassent leur forme finale grâce à une Méga-Gemme... et au lien qui les unit à leur dresseur.', 'Reviens quand tu auras cinq badges : je verrai alors si ce lien est assez fort.'], sp); return; }
       await ui.say(['Cinq badges... Je le sens : toi et tes Pokémon, vous êtes prêts.', 'Voici la clé de la Méga-Évolution !'], sp);
       st.bag[MEGA_RING] = 1; this.sound.sfx('badge');
       await ui.say(`${st.name} reçoit le Méga-Anneau !`);
@@ -2609,7 +2618,7 @@ export class Game {
     if (name === 'loterie') return loterie(this, n);
     if (name === 'musicien') return musicien(this, n);
     if (name === 'mom') {
-      if (!st.flags.starter) { await ui.say([`Ah, ${st.name}, tu es enfin réveillé${st.gender === 'f' ? 'e' : ''} !`, 'Le Professeur Saule est passé ce matin. Il t\'attend à son laboratoire, juste au sud-est.', 'Théo y est déjà, bien sûr... Allez, file !'], { speaker: 'Maman' }); return; }
+      if (!st.flags.starter) { await ui.say([`Ah, ${st.name}, tu es enfin réveillé${st.gender === 'f' ? 'e' : ''} !`, 'Le Professeur Saule est passé ce matin. Il t\'attend à son laboratoire, juste à l\'est du village.', 'Théo y est déjà, bien sûr... Allez, file !'], { speaker: 'Maman' }); return; }
       if (!st.flags.momGift) {
         st.flags.momGift = true;
         const starterMon = st.party[0];
@@ -2623,7 +2632,7 @@ export class Game {
         this.give('running-shoes');
         await ui.say(`${st.name} reçoit les Chaussures de Course !`);
         await ui.say([
-          'Enfile-les vite ! Tu peux courir en maintenant la touche Maj, ou appuyer sur R (ou sur le bouton du Pokégear) pour activer la course continue.',
+          'Enfile-les vite ! Tu peux courir en maintenant la touche Maj, ou appuyer sur R (ou sur le bouton du Pokématos) pour activer la course continue.',
           'Prends aussi ces quelques baies pour requinquer ton équipe en cas de coup dur sur la route.'
         ], { speaker: 'Maman' });
         this.sound.sfx('item');
@@ -2637,26 +2646,26 @@ export class Game {
       this.sound.sfx('heal'); await wait(2000);
       for (const m of st.party) healFull(m);
       st.lastCenter = { map: 'aube:maison', x: 4, y: 5, dir: 'up' };
-      await ui.say(['Voilà, tes créatures sont en pleine forme !', 'Je suis fière de toi. Reviens quand tu veux !'], { speaker: 'Maman' });
+      await ui.say(['Voilà, tes Pokémon sont en pleine forme !', 'Je suis fière de toi. Reviens quand tu veux !'], { speaker: 'Maman' });
     } else if (name === 'rivalMom') {
       await ui.say(st.badges[7] ? ['Théo m\'a appelée : il paraît que tu as battu Drakos !', 'Il en parle comme si c\'était lui qui avait gagné, ha ha.'] : ['Théo est parti au labo dès l\'aube.', 'Il ne tient pas en place, celui-là !'], { speaker: 'Mère de Théo' });
     } else if (name === 'prof') {
       if (!st.flags.metProf) {
         st.flags.metProf = true;
-        await ui.say([`Ah, ${st.name} ! Te voilà enfin.`, 'J\'étudie les créatures d\'Odyssée depuis trente ans. Et aujourd\'hui, j\'ai besoin de jeunes dresseurs pour m\'aider.', 'Sur la table, il y a trois capsules : Plante, Feu et Eau.', 'Dans chacune, trois créatures attendent un partenaire : une d\'ici, d\'Odyssée, et deux venues de régions lointaines, Kanto et Johto.', 'Approche-toi de la table et choisis celle qui te plaît !'], { speaker: 'Prof. Saule' });
+        await ui.say([`Ah, ${st.name} ! Te voilà enfin.`, 'J\'étudie les Pokémon d\'Odyssée depuis trente ans. Et aujourd\'hui, j\'ai besoin de jeunes dresseurs pour m\'aider.', 'Sur la table, il y a trois Poké Balls : Plante, Feu et Eau.', 'Dans chacune, trois Pokémon attendent un partenaire : un d\'ici, d\'Odyssée, et deux venus de régions lointaines, Kanto et Johto.', 'Approche-toi de la table et choisis celui qui te plaît !'], { speaker: 'Prof. Saule' });
         const rival = this.npcs.find((q) => q.id === 'rival-lab');
         if (rival) { rival.dir = 'up'; await ui.say('Hé ! T\'en as mis du temps ! Allez, choisis vite, je prendrai après toi.', { speaker: RIVAL_NAME }); rival.dir = 'left'; }
         return;
       }
-      if (!st.flags.starter) { await ui.say('Les trois capsules sont sur la table. Approche-toi et choisis !', { speaker: 'Prof. Saule' }); return; }
+      if (!st.flags.starter) { await ui.say('Les trois Poké Balls sont sur la table. Approche-toi et choisis !', { speaker: 'Prof. Saule' }); return; }
       if (await purify(this)) return;
       if (this.eclipseOn()) { await ui.say(['Cette nuit violette... C\'est l\'œuvre de la Team Éclipse, n\'est-ce pas ?', 'Si Lugia se réveille avec un cœur fermé, la nuit ne finira jamais.', 'La voyante de Mirage connaît les vieilles légendes de la mer. Va la voir !'], { speaker: 'Prof. Saule' }); return; }
       const LEG = (this.world.legends || []).map((L) => L.id), seen = LEG.filter((k) => st.flags['L:' + k]).length, caught = LEG.filter((k) => st.flags['L:' + k] === 'caught').length;
       const B = this.rivalB(), lines = [];
-      if (st.flags.rivalB3) lines.push(`${B.name} m'a raconté votre combat à Fort-Écaille. Merci, ${st.name}. Tu m'as rendu mon${B.e ? 'e' : ''} ${B.fils}.`);
+      if (st.flags.rivalB3) lines.push(`${B.name} m'a raconté votre combat à Fort-Écaille. Merci, ${st.name}. Tu m'as rendu ${B.e ? 'ma' : 'mon'} ${B.fils}.`);
       else if (st.flags.rivalB1) lines.push(`Tu as croisé ${B.name} ? ${B.il === 'il' ? 'Il' : 'Elle'} a toujours eu la tête dure... comme sa grand-mère.`);
-      if (seen) lines.push(`Tu as déjà rencontré ${seen} créature${seen > 1 ? 's' : ''} légendaire${seen > 1 ? 's' : ''}${caught ? `, et tu en as capturé ${caught}` : ''} !`, caught >= 10 ? 'Presque toutes les légendes d\'Odyssée sont dans ton équipe ou ton PC. Odyssor lui-même doit t\'observer.' : 'Les anciens disent que les légendaires ne choisissent que les dresseurs au cœur sincère.');
-      else lines.push('Chaque créature que tu rencontreras remplira ton Pokédex.', 'On raconte que des créatures légendaires dorment sur les îles de l\'Est. Le capitaine de l\'Embarcadère pourra t\'y emmener.');
+      if (seen) lines.push(`Tu as déjà rencontré ${seen} Pokémon légendaire${seen > 1 ? 's' : ''}${caught ? `, et tu en as capturé ${caught}` : ''} !`, caught >= 10 ? 'Presque toutes les légendes d\'Odyssée sont dans ton équipe ou ton PC. Odyssor lui-même doit t\'observer.' : 'Les anciens disent que les légendaires ne choisissent que les dresseurs au cœur sincère.');
+      else lines.push('Chaque Pokémon que tu rencontreras remplira ton Pokédex.', 'On raconte que des Pokémon légendaires dorment sur les îles de l\'Est. Le capitaine de l\'Embarcadère pourra t\'y emmener.');
       lines.push(this.badgeCount() >= 15 ? 'Il ne te reste que la Ligue Céleste. Je suis fier de toi.' : st.badges[7] ? 'Les trois frères sont tombés ! Au-delà du Pont de l\'Austral, au sud de Bourg-Aube, sept Champions t\'attendent dans les Terres du Sud.' : 'Les cinq Champions du continent t\'attendent, puis les trois frères de l\'archipel, et enfin les sept Champions des Terres du Sud. Et au bout du chemin : la Ligue Céleste !');
       await ui.say(lines, { speaker: 'Prof. Saule' });
     } else if (name === 'rivalLab') {
@@ -2665,15 +2674,15 @@ export class Game {
     } else if (name === 'gymguide') {
       const L = LEADERS[n.def.gym];
       if (st.badges[n.def.gym]) { await ui.say(['Bravo, champion en devenir !', 'Tu as battu ' + L.name + ' ! Continue comme ça !'], { speaker: 'Guide' }); return; }
-      await ui.say(['Yo, futur Maître ! Bienvenue dans l\'Arène.', `${L.name} utilise des créatures de type ${TYPE_FR[L.type]}.`, `Pour en venir à bout, mise sur ${GYM_HINTS[L.type]} !`], { speaker: 'Guide' });
+      await ui.say(['Yo, futur Maître ! Bienvenue dans l\'Arène.', `${L.name} utilise des Pokémon de type ${TYPE_FR[L.type]}.`, `Pour en venir à bout, mise sur ${GYM_HINTS[L.type]} !`], { speaker: 'Guide' });
     } else if (name === 'ferry') {
       await this.ferry(n);
     } else if (name === 'gsBall') {
       const sp = 'Vieille dame';
-      if (st.flags.gsGiven) { await ui.say(st.flags['L:celebi'] === 'caught' ? ['Tu as vu Celebi ? Oh... Alors la légende était vraie.', 'Prends bien soin de lui, mon petit.'] : ['L\'autel est dans le Bois Murmure, un peu à l\'écart du sentier.', 'Pose la Balle GS dans le creux... et sois patient.'], { speaker: sp }); return; }
-      if (this.badgeCount() < 1) { await ui.say(['Quand j\'étais jeune, j\'ai trouvé une étrange capsule dorée dans le Bois Murmure.', 'Reviens me voir quand tu auras le badge d\'Hector. Je te raconterai.'], { speaker: sp }); return; }
+      if (st.flags.gsGiven) { await ui.say(st.flags['L:celebi'] === 'caught' ? ['Tu as vu Celebi ? Oh... Alors la légende était vraie.', 'Prends bien soin de lui, mon petit.'] : ['L\'autel est dans le Bois Murmure, un peu à l\'écart du sentier.', 'Pose la GS Ball dans le creux... et sois patient.'], { speaker: sp }); return; }
+      if (this.badgeCount() < 1) { await ui.say(['Quand j\'étais jeune, j\'ai trouvé une étrange Poké Ball dorée dans le Bois Murmure.', 'Reviens me voir quand tu auras le badge d\'Hector. Je te raconterai.'], { speaker: sp }); return; }
       st.flags.gsGiven = true; this.give('gs-ball'); this.sound.sfx('item');
-      await ui.say(['Le badge d\'Hector ! Tu es un vrai dresseur, maintenant.', 'Tiens, prends cette capsule dorée. Je l\'ai trouvée près d\'un vieil autel du Bois Murmure.'], { speaker: sp });
+      await ui.say(['Le badge d\'Hector ! Tu es un vrai dresseur, maintenant.', 'Tiens, prends cette Poké Ball dorée. Je l\'ai trouvée près d\'un vieil autel du Bois Murmure.'], { speaker: sp });
       await ui.say(formatObtainItem(st.name, 'gs-ball', 1));
       await ui.say('On dit que le gardien de la forêt, un petit être qui voyage dans le temps, attend qu\'on la lui rapporte...', { speaker: sp });
     } else if (name === 'phare') {
@@ -2692,7 +2701,7 @@ export class Game {
       if (f.plume) { await ui.say(['La Plume Arc-en-ciel et le Sifflet Céleste ! Le Grand Sage t\'a jugé digne de la lignée des gardiens du ciel.', 'Monte sur le toit de la Tour Dorée. Si Ho-Oh le veut, il descendra vers toi. Et le chant de ton sifflet appellera les oiseaux du ciel où que tu sois.'], { speaker: sp }); return; }
       if (!f.grueQuest) {
         f.grueQuest = true;
-        await ui.say(['Tu viens du continent ? Assieds-toi, que je te raconte.', 'Là-bas, dans la Forêt des Torii, au sud-ouest de Mirage, deux tours se dressent côte à côte.', 'L\'une a brûlé, et trois créatures ont péri dans les flammes. Ho-Oh, l\'oiseau arc-en-ciel, les a ramenées à la vie : ce sont Raikou, Entei et Suicune.', 'Depuis, Ho-Oh ne se pose plus que sur l\'autre, la Tour Dorée... Nos anciens l\'appelaient la Tour de la Grue, comme notre village.', 'Il ne se pose que devant celui qui porte la Plume Arc-en-ciel. Le Grand Sage la garde, au sommet de la tour. Gagne le respect des Sages, et peut-être te la confiera-t-il.'], { speaker: sp });
+        await ui.say(['Tu viens du continent ? Assieds-toi, que je te raconte.', 'Là-bas, dans la Forêt des Torii, au sud-ouest de Mirage, deux tours se dressent côte à côte.', 'L\'une a brûlé, et trois Pokémon ont péri dans les flammes. Ho-Oh, l\'oiseau arc-en-ciel, les a ramenés à la vie : ce sont Raikou, Entei et Suicune.', 'Depuis, Ho-Oh ne se pose plus que sur l\'autre, la Tour Dorée... Nos anciens l\'appelaient la Tour de la Grue, comme notre village.', 'Il ne se pose que devant celui qui porte la Plume Arc-en-ciel. Le Grand Sage la garde, au sommet de la tour. Gagne le respect des Sages, et peut-être te la confiera-t-il.'], { speaker: sp });
         return;
       }
       await ui.say(['Les Sages t\'attendent dans la Tour Dorée, sur le continent : dans la Forêt des Torii, au sud-ouest de Mirage.', 'Le Grand Sage Hoël garde la Plume Arc-en-ciel au dernier étage.'], { speaker: sp });
@@ -2702,7 +2711,7 @@ export class Game {
       const hadVol = this.hasField('vol');
       if (!hadVol) this.give('sifflet-celeste');
       await ui.say([
-        'Ton cœur et celui de tes créatures battent à l\'unisson.',
+        'Ton cœur et celui de tes Pokémon battent à l\'unisson.',
         'Cette Plume Arc-en-ciel t\'appartient désormais pour éveiller Ho-Oh sur le toit de la tour.',
         'Et reçois également ce trésor des cieux : le Sifflet Céleste !',
         'Sculpté dans le bois sacré de la tour et orné d\'un ruban céleste, son chant appelle les grands oiseaux du ciel pour te transporter d\'une ville à l\'autre en un instant.'
@@ -2710,7 +2719,9 @@ export class Game {
       await ui.say(formatObtainItem(st.name, 'plume-arc', 1));
       if (!hadVol) await ui.say(formatObtainItem(st.name, 'sifflet-celeste', 1));
       await ui.say(formatObtainItem(st.name, 'great-ball', 5));
-      await ui.say('Monte sur le toit. Le novice te laissera passer. Quand tu auras réuni les huit badges du Nord, Ho-Oh répondra à l\'appel de la Plume !', { speaker: 'Grand Sage Hoël' });
+      await ui.say(st.badges[4]
+        ? 'Monte sur le toit. Le novice te laissera passer. Quand tu auras réuni les huit badges du Nord, Ho-Oh répondra à l\'appel de la Plume !'
+        : ['Ton Sifflet Céleste s\'éveillera dès que tu auras remporté le Badge Mirage.', 'Monte sur le toit. Le novice te laissera passer. Quand tu auras réuni les huit badges du Nord, Ho-Oh répondra à l\'appel de la Plume !'], { speaker: 'Grand Sage Hoël' });
       this.refreshGates();
     } else if (name === 'ermite') {
       const sp = 'Ermite', f = st.flags; f.ermite = true;
@@ -2740,8 +2751,8 @@ export class Game {
       wrap.innerHTML = `
         <div class="starter-select-box">
           <div class="st-header">
-            <span class="st-title">Capsule ${esc(typeLabel)}</span>
-            <span class="st-sub">Cliquez sur une créature ou utilisez les flèches + Entrée</span>
+            <span class="st-title">Poké Ball ${esc(typeLabel)}</span>
+            <span class="st-sub">Clique sur un Pokémon ou utilise les flèches + Entrée</span>
           </div>
           <div class="starter-cards">
             ${picks.map((p, idx) => {
@@ -2761,7 +2772,7 @@ export class Game {
             }).join('')}
           </div>
           <div class="st-footer">
-            <button type="button" class="st-cancel-btn">Refermer la capsule ✕</button>
+            <button type="button" class="st-cancel-btn">Refermer la Poké Ball ✕</button>
           </div>
         </div>
       `;
@@ -2826,10 +2837,10 @@ export class Game {
 
 async chooseStarter(sp, cap) {
     const st = this.state, ui = this.ui;
-    if (st.flags.starter) { await ui.say('C\'est une capsule vide.'); return; }
-    // on n'ouvre pas les capsules du professeur sans lui avoir parlé
-    if (!st.flags.metProf) { await ui.say('Il y a une créature dans cette capsule... Mieux vaut d\'abord parler au Professeur Saule.'); return; }
-    // la capsule d'un type : deux ou trois partenaires au choix
+    if (st.flags.starter) { await ui.say('C\'est une Poké Ball vide.'); return; }
+    // on n'ouvre pas les Poké Balls du professeur sans lui avoir parlé
+    if (!st.flags.metProf) { await ui.say('Il y a un Pokémon dans cette Poké Ball... Mieux vaut d\'abord parler au Professeur Saule.'); return; }
+    // la Poké Ball d'un type : deux ou trois partenaires au choix
     const C = STARTER_CHOICES[cap ?? Math.max(0, STARTERS.indexOf(sp))], picks = C.lines.map((l) => l[0]);
     const ORIG = picks.length === 3 ? ['Odyssée', 'Kanto', 'Johto'] : ['Kanto', 'Johto'];
 
@@ -2842,7 +2853,7 @@ async chooseStarter(sp, cap) {
       sp = picks[chosenIdx];
       const S = SPECIES[sp];
       const typeStr = S.t.map((t) => TYPE_FR[t] || t).join('/');
-      const ok = await ui.yesNo(`Tu veux ${S.n}, la créature de type ${typeStr} ?`, { speaker: 'Prof. Saule' });
+      const ok = await ui.yesNo(`Tu veux ${S.n}, le Pokémon de type ${typeStr} ?`, { speaker: 'Prof. Saule' });
       if (!ok) continue;
       break;
     }
@@ -2852,23 +2863,23 @@ async chooseStarter(sp, cap) {
     this.sound.sfx('caught');
     await ui.say(`${st.name} reçoit ${S.n} !`);
     if (await ui.yesNo(`Donner un surnom à ${S.n} ?`)) { const nick = await ui.nameEntry(`Surnom de ${S.n}`, S.n); if (nick && nick !== S.n) mon.nick = nick; }
-    // le rival choisit la créature qui a l'avantage
+    // le rival choisit le Pokémon qui a l'avantage
     const rs = RIVAL_TEAMS[sp][0];
     st.flags.rivalSp = sp;
     const rival = this.npcs.find((q) => q.id === 'rival-lab');
     if (rival) rival.dir = 'up';
-    await ui.say(['Alors je prends celle-là !', `${SPECIES[rs].n} ! Il a une tête de gagnant, comme moi.`], { speaker: RIVAL_NAME });
+    await ui.say(['Alors je prends celui-là !', `${SPECIES[rs].n} ! Il a une tête de gagnant, comme moi.`], { speaker: RIVAL_NAME });
     if (rival) rival.dir = 'left';
-    await ui.say(['Hé, ' + st.name + ' ! On a nos créatures, alors...', 'On se fait un petit combat ? Allez !'], { speaker: RIVAL_NAME });
+    await ui.say(['Hé, ' + st.name + ' ! On a nos Pokémon, alors...', 'On se fait un petit combat ? Allez !'], { speaker: RIVAL_NAME });
     const rivalMon = createMon(rs, 5, { ot: RIVAL_NAME, iv: [10, 10, 10, 10, 10, 10], moves: SPECIES[rs].ls.filter(([l]) => l <= 1).map(([, id]) => id) });
     const res = await this.runBattle({ trainer: { cls: 'Rival', name: RIVAL_NAME, prize: 30, bs: 'theo', ai: 'normal', friendly: true, lose: 'Quoi ?! J\'aurais dû choisir l\'autre !' }, party: [rivalMon], music: 'rival', rival: true, noWhiteout: true });   // premier combat : à armes égales (même niveau, IA simple)
     for (const m of st.party) healFull(m);
     st.flags.rival1 = true;
     await ui.say(res === 'win' ? 'Pfff... Bon, c\'était juste un échauffement !' : 'Ha ha ! Je suis trop fort ! Mais t\'inquiète, tu t\'améliores déjà.', { speaker: RIVAL_NAME });
-    await ui.say([res === 'win' ? 'Quel combat ! Vos créatures ont déjà l\'air de vous adorer.' : 'Ne te décourage pas, ' + st.name + '. Ce n\'était que votre tout premier combat !', `${st.name}, prends aussi ceci.`], { speaker: 'Prof. Saule' });
+    await ui.say([res === 'win' ? 'Quel combat ! Tes Pokémon ont déjà l\'air de t\'adorer.' : 'Ne te décourage pas, ' + st.name + '. Ce n\'était que votre tout premier combat !', `${st.name}, prends aussi ceci.`], { speaker: 'Prof. Saule' });
     this.sound.sfx('item');
     st.flags.dex = true; st.bag['poke-ball'] = (st.bag['poke-ball'] || 0) + 5; st.bag.potion = (st.bag.potion || 0) + 2; this.give('town-map');
-    await ui.say([`${st.name} reçoit le Pokédex, la Carte, 5 Poké Balls et 2 Potions !`, 'Le Pokédex enregistre chaque créature que tu vois ou captures.', 'Quand tes créatures sont fatiguées, reviens voir ta mère ou passe au Centre de soins.', 'La première Arène se trouve à Sylvebourg, au nord. Bonne route !'], { speaker: 'Prof. Saule' });
+    await ui.say([`${st.name} reçoit le Pokédex, la Carte, 5 Poké Balls et 2 Potions !`, 'Le Pokédex enregistre chaque Pokémon que tu vois ou captures.', 'Quand tes Pokémon sont fatigués, reviens voir ta mère ou passe au Centre de soins.', 'La première Arène se trouve à Sylvebourg, au nord. Bonne route !'], { speaker: 'Prof. Saule' });
     await ui.say('Je file ! À plus, ' + st.name + ' !', { speaker: RIVAL_NAME });
     if (rival) { await this.npcWalk(rival, 'down', 2); this.npcs = this.npcs.filter((q) => q !== rival); this.view.removeActor('npc:rival-lab'); }
     this.save(true);
@@ -2891,7 +2902,7 @@ async chooseStarter(sp, cap) {
     if (await storyTrigger(this, name)) return true;
     if (name === 'needStarter' && !st.flags.starter) {
       this.busy = true;
-      await ui.say(['Hé ! Attends !', 'Les hautes herbes sont pleines de créatures sauvages. Sans créature à toi, c\'est bien trop dangereux !', 'Va d\'abord voir le Professeur Saule, à son labo.'], { speaker: '???' });
+      await ui.say(['Hé ! Attends !', 'Les hautes herbes sont pleines de Pokémon sauvages. Sans Pokémon à toi, c\'est bien trop dangereux !', 'Va d\'abord voir le Professeur Saule, à son labo.'], { speaker: '???' });
       await this.playerWalk('down', 1);
       this.busy = false; return true;
     }
@@ -2947,13 +2958,13 @@ async chooseStarter(sp, cap) {
     };
     // Théo t'attend sur la Route 2 une fois ton premier badge en poche (sa réplique et son équipe vont avec)
     if (name === 'rival2' && st.badges[0]) return rivalFight('rival2', (R) => [[1010, 9], [1013, 9], [R[0], 11]], 'Grr... Tu as eu de la chance !', [`${st.name} ! Tu as déjà ton premier badge ?`, 'Moi aussi, évidemment. Voyons qui a le plus progressé !'], ['Je vais m\'entraîner dans le Bois Murmure.', 'La prochaine fois, je ne perdrai pas !']);
-    if (name === 'rival3') return rivalFight('rival3', (R) => [[1011, 27], [1034, 26], [1021, 26], [R[1], 29]], 'Encore ?! Tes créatures sont devenues sacrément fortes...', ['Tiens, tiens... Le grand voyageur !', 'Floralia, c\'est ma ville porte-bonheur. Prépare-toi !'], ['Flora t\'attend à l\'Arène. Moi, je file vers l\'est.', 'On se retrouvera tout en haut, à la Ligue !']);
-    if (name === 'rival4') return rivalFight('rival4', (R) => [[1012, 36], [1035, 35], [1022, 36], [1019, 36], [R[2], 39]], 'Toi et tes créatures, vous êtes vraiment synchronisés...', [`${st.name} ! Tu vas sur les îles, toi aussi ?`, 'On dit que Drakos a battu tous ceux qui ont osé le défier, sauf Célestine.', 'Avant que tu y ailles, montre-moi si tu es prêt !'], ['Bon. Tu es prêt. Fonce !', 'Moi, je vais m\'entraîner sur la route 10. On se revoit avant la Ligue.']);
+    if (name === 'rival3') return rivalFight('rival3', (R) => [[1011, 27], [1034, 26], [1021, 26], [R[1], 29]], 'Encore ?! Tes Pokémon sont devenus sacrément forts...', ['Tiens, tiens... Le grand voyageur !', 'Floralia, c\'est ma ville porte-bonheur. Prépare-toi !'], ['Flora t\'attend à l\'Arène. Moi, je file vers l\'est.', 'On se retrouvera tout en haut, à la Ligue !']);
+    if (name === 'rival4') return rivalFight('rival4', (R) => [[1012, 36], [1035, 35], [1022, 36], [1019, 36], [R[2], 39]], 'Toi et tes Pokémon, vous êtes vraiment synchronisés...', [`${st.name} ! Tu vas sur les îles, toi aussi ?`, 'On dit que Drakos a battu tous ceux qui ont osé le défier, sauf Célestine.', 'Avant que tu y ailles, montre-moi si tu es prêt !'], ['Bon. Tu es prêt. Fonce !', 'Moi, je vais m\'entraîner sur la route 10. On se revoit avant la Ligue.']);
     // second rival : l'autre enfant, petit-fils / petite-fille du professeur, recrue des Gardes d'Écaille
     const B = this.rivalB(), L3 = this.thirdLine(), bd = (k) => st.badges[k];
     const asB = { name: B.name, sprite: B.sprite, bs: B.bs, cls: 'Garde d\'Écaille' };
     if (name === 'rivalB1' && bd(3)) return rivalFight('rivalB1', () => [[1043, 33], [1015, 33], [L3[1], 36]], 'Pas mal... pour quelqu\'un du continent.',
-      [`Alors c'est toi, ${st.name}. Le prodige de Bourg-Aube.`, `Moi, c'est ${B.name}. J'ai pris la dernière capsule de mon grand-père, le lendemain de ton départ.`, 'J\'ai grandi sur les îles. Là-bas, la Ligue ne vient jamais. Personne ne nous aide... sauf Drakos.', 'Je suis Garde d\'Écaille, maintenant. Et je viens voir de quoi tu es capable avant que tu ne mettes les pieds chez nous.'],
+      [`Alors c'est toi, ${st.name}. Le prodige de Bourg-Aube.`, `Moi, c'est ${B.name}. J'ai pris la dernière Poké Ball de mon grand-père, le lendemain de ton départ.`, 'J\'ai grandi sur les îles. Là-bas, la Ligue ne vient jamais. Personne ne nous aide... sauf Drakos.', 'Je suis Garde d\'Écaille, maintenant. Et je viens voir de quoi tu es capable avant que tu ne mettes les pieds chez nous.'],
       ['Tu viendras sur les îles, je le sais. Drakos t\'attend.', 'Et moi aussi.'], { ...asB, cls: 'Rival' });
     if (name === 'rivalB2' && bd(5)) return rivalFight('rivalB2', () => [[1044, 42], [1015, 41], [1039, 41], [L3[2], 45]], 'Basalte avait raison... tu ne lâches rien.',
       [`${st.name}. Tu as battu Basalte.`, 'C\'est lui qui m\'a appris à me battre, tu sais.', 'Les pêcheurs disent que Drakos leur prend trop. Je... je ne veux pas y croire.', 'Montre-moi que tu mérites d\'aller plus loin !'],
@@ -2962,7 +2973,7 @@ async chooseStarter(sp, cap) {
       [`Stop, ${st.name}. Je suis le dernier rempart avant la Tour de Drakos.`, 'Les pêcheurs m\'ont tout raconté. Les ports fermés, les pêches confisquées...', 'Mais Drakos nous a protégés quand personne d\'autre ne le faisait.', 'Alors je vais me battre. Une dernière fois. Pour savoir lequel de nous deux a raison !'],
       ['Vas-y. Montre-lui ce que ça fait de perdre... comme moi.', 'Je quitte les Gardes. Peut-être qu\'après toi, Drakos écoutera enfin les îles.'], asB);
     if (name === 'rivalB4' && bd(7)) return rivalFight('rivalB4', () => [[1044, 54], [1016, 54], [1040, 54], [149, 55], [1046, 54], [L3[2], 57]], 'Merci. J\'avais besoin de ce combat.',
-      [`${st.name} ! Je savais que tu viendrais ici.`, 'Drakos m\'a parlé, hier soir. Il dit que Odyssor passe au Cap quand quelqu\'un a eu le courage de changer les choses.', 'J\'aimerais le voir avec toi. Mais d\'abord... un vrai combat. Sans uniforme, sans camp. Juste nous deux !'],
+      [`${st.name} ! Je savais que tu viendrais ici.`, 'Drakos m\'a parlé, hier soir. Il dit qu\'Odyssor passe au Cap quand quelqu\'un a eu le courage de changer les choses.', 'J\'aimerais le voir avec toi. Mais d\'abord... un vrai combat. Sans uniforme, sans camp. Juste nous deux !'],
       ['Mon grand-père a raison : on apprend plus en perdant qu\'en gagnant.', 'Avance jusqu\'au bord de la falaise. Si Odyssor vient, c\'est pour toi.'], { ...asB, cls: 'Rival' });
     if (name === 'rival5') return rivalFight('rival5', (R) => [[1012, 72], [1035, 71], [1022, 72], [1040, 72], [1051, 73], [R[2], 76]], 'Incroyable... Tu mérites d\'aller jusqu\'au bout.', [`${st.name}... Je savais que tu viendrais.`, 'Quinze badges, dont celui de Drakos et les sept du Sud. Tout le monde ne parle que de toi.', 'Mais avant la Ligue, il y a moi. Donne tout ce que tu as !'], ['Va. La Maître de la Ligue t\'attend.', 'Et bats-la, sinon c\'est moi qui m\'en chargerai !']);
     return false;
@@ -2977,7 +2988,7 @@ async chooseStarter(sp, cap) {
     try {
       this.musicLock = true; this.sound.play('mystic');
       await ui.say(['La mer se met à scintiller...', 'Une immense silhouette bleue glisse entre les vagues.', 'C\'est Odyssor, le géant des océans !']);
-      if (st.flags.rivalB4) await ui.say(['... Il est magnifique.', 'Les anciens disent que Odyssor a guidé les premiers marins jusqu\'aux îles, avant même la Ligue.', 'Vas-y. C\'est toi qu\'il est venu voir.'], { speaker: this.rivalB().name });
+      if (st.flags.rivalB4) await ui.say(['... Il est magnifique.', 'Les anciens disent qu\'Odyssor a guidé les premiers marins jusqu\'aux îles, avant même la Ligue.', 'Vas-y. C\'est toi qu\'il est venu voir.'], { speaker: this.rivalB().name });
       await ui.flash(4, '#cfe4ff', 90);
       await playBossCinematic(this, {
       sp: 1052,
@@ -3004,7 +3015,16 @@ async chooseStarter(sp, cap) {
     st.flags.champion = true;
     this.sound.play('victory');
     const B = this.rivalB();
-    await ui.say(['Félicitations !', `${st.name}, tu es le nouveau Maître de la Ligue Céleste !`, 'Drakos m\'a fait passer un message, tu sais. « Le vieux Drakos attend sa revanche. »', st.flags.rivalB3 ? `Et ${B.name} m'a écrit aussi. ${B.il === 'il' ? 'Il' : 'Elle'} veut ouvrir une arène à Port-Granit, ouverte à tous.` : 'Drakos a rouvert les ports de l\'archipel.', 'Grâce à toi, les îles et le continent se reparlent.', 'Et sans toi, la nuit de la Team Éclipse recouvrirait encore la région. Lugia veille de nouveau sur les marées.', 'Ton équipe et toi entrez au Panthéon des dresseurs.'], { speaker: 'Célestine' });
+    await ui.say([
+      'Félicitations !',
+      `${st.name}, tu es le nouveau Maître de la Ligue Céleste !`,
+      'Quinze badges, du Nord jusqu\'à Ombreval : tu as relié toute la région d\'Odyssée, des îles jusqu\'à Métropole.',
+      'Drakos m\'a fait passer un message, tu sais. « Le vieux Drakos attend sa revanche. »',
+      st.flags.rivalB3 ? `Et ${B.name} m'a écrit aussi. ${B.il === 'il' ? 'Il' : 'Elle'} veut ouvrir une école de dresseurs à Fort-Écaille, ouverte à tous.` : 'Drakos a rouvert les ports de l\'archipel.',
+      'Grâce à toi, les îles, le Nord et les Terres du Sud avancent enfin ensemble.',
+      'Et sans toi, la nuit de la Team Éclipse recouvrirait encore la région. Lugia veille de nouveau sur les marées.',
+      'Ton équipe et toi entrez au Panthéon des dresseurs.'
+    ], { speaker: 'Célestine' });
     await ui.say([`Bravo, ${st.name}. Tu as tenu ta promesse.`, 'Mais la prochaine fois, c\'est moi qui serai Maître !'], { speaker: RIVAL_NAME });
     if (st.flags.rivalB4) await ui.say(['Félicitations. Je suis venu' + B.e + ' avec mon grand-père pour voir ça.', 'On se reverra sur les îles. Elles t\'attendront toujours.'], { speaker: B.name });
     if (!st.hof) st.hof = [];

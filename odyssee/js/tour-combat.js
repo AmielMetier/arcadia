@@ -104,10 +104,10 @@ export async function tourCombat(game, n) {
   if (!st.flags.champion) { await ui.say(['Ici se tiendra la Tour de Combat.', 'Elle n\'accueille que les Maîtres de la Ligue. Reviens quand tu auras battu Célestine.'], who); return; }
   await ui.say([`Bienvenue à la Tour de Combat, ${st.name} !`, `Tu as ${T.pco} Point${T.pco > 1 ? 's' : ''} Combat. Ta meilleure série : ${T.record} victoire${T.record > 1 ? 's' : ''}.`], who);
   const c = await ui.ask('Que veux-tu faire ?', ['Relever le défi', 'Échanger des PCo', 'Les règles', 'Rien'], who);
-  if (c === 2) { await ui.say(['Sept combats d\'affilée contre des dresseurs tirés au sort, en Solo (1v1 · 3 Pokémon), Duo (2v2 · 4 Pokémon) ou Trio (3v3 · 6 Pokémon).', 'Tes Pokémon sont soignés entre chaque combat. Une défaite, et la série s\'arrête.', 'Chaque série gagnée rapporte des Points Combat, d\'autant plus que ta série dure.', 'Tu ne perds ni argent ni rien d\'autre en cas de défaite.'], who); return; }
+  if (c === 2) { await ui.say(['Sept combats d\'affilée contre des dresseurs tirés au sort, en Solo (3 Pokémon), Duo (4 Pokémon) ou Trio (6 Pokémon).', 'Tes Pokémon sont soignés entre chaque combat. Une défaite, et la série s\'arrête.', 'Chaque série gagnée rapporte des Points Combat, d\'autant plus que ta série dure.', 'Tu ne perds ni argent ni rien d\'autre en cas de défaite.'], who); return; }
   if (c === 1) { await boutique(game, who); return; }
   if (c !== 0) return;
-  const fmt = await ui.ask('Quel format de combat ?', ['Solo (1v1)', 'Duo (2v2)', 'Trio (3v3)', 'Annuler'], who);
+  const fmt = await ui.ask('Quel format de combat ?', ['Solo', 'Duo', 'Trio', 'Annuler'], who);
   if (fmt < 0 || fmt > 2) return;
   const format = ['single', 'double', 'triple'][fmt];
   const minParty = fmt === 1 ? 2 : 3;
@@ -119,7 +119,7 @@ export async function tourCombat(game, n) {
   for (let k = 0; k < 7; k++) {
     for (const m of st.party) healFull(m);
     const adv = adversaire(k, niveau, r, teamSize);
-    const fmtLabel = fmt === 2 ? 'Trio 3v3' : fmt === 1 ? 'Duo 2v2' : 'Solo 1v1';
+    const fmtLabel = fmt === 2 ? 'Combat Trio' : fmt === 1 ? 'Combat Duo' : 'Combat Solo';
     await ui.say(`Combat ${k + 1} sur 7 (${fmtLabel}). Série en cours : ${T.serie} victoire${T.serie > 1 ? 's' : ''}.`, who);
     const fake = { id: 'tour:' + k, x: n.x, y: n.y, dir: n.dir, sprite: adv.ow, def: { id: 'tour:' + k, boss: true, sprite: adv.ow, noWhiteout: true, format,
       trainer: { cls: adv.cls, name: adv.name, team: adv.team, ai: adv.ai, prize: 0, items: adv.items, format, intro: k === 6 ? 'Le dernier combat de la série. Donne tout !' : 'En garde !', lose: 'Bien joué…' } } };
@@ -145,15 +145,15 @@ export async function tourCombat(game, n) {
 /** Coach Duo / Trio disponible dès les Centres Pokémon pour pratiquer le 2v2 et le 3v3 à tout moment */
 export async function clubCombat(game, n) {
   const st = game.state, ui = game.ui, who = { speaker: 'Coach Tactique', face: n.sprite };
-  await ui.say(['Bienvenue au Club Tactique Duo & Trio !', 'Ici, tu peux t\'entraîner en combat Duo (2v2) ou Trio (3v3) face à des équipes adaptées à ton niveau, sans risque.'], who);
+  await ui.say(['Bienvenue au Club Tactique Duo & Trio !', 'Ici, tu peux t\'entraîner en combat Duo ou Trio face à des équipes adaptées à ton niveau, sans risque.'], who);
   const choice = await ui.list({
     title: 'Club Tactique',
     items: [
-      { label: '⚔️ Duo (2v2)', right: 'Entraînement' },
-      { label: '⚔️ Trio (3v3)', right: 'Entraînement' },
-      { label: '⚔️ Solo (1v1)', right: 'Entraînement' },
+      { label: '⚔️ Combat Duo', right: 'Entraînement' },
+      { label: '⚔️ Combat Trio', right: 'Entraînement' },
+      { label: '⚔️ Combat Solo', right: 'Entraînement' },
       { label: '🏆 Tournoi en direct', right: '4 places' },
-      { label: '🎮 Multi 2v2', right: '4 joueurs' },
+      { label: '🎮 Multi Duo', right: '4 dresseurs' },
       { label: '📖 Règles Duo / Trio' },
       { label: 'Plus tard' },
     ],
@@ -164,8 +164,8 @@ export async function clubCombat(game, n) {
   if (choice === 4) { const m = await import('./multi-events.js'); return m.lancerMulti4p(game); }
   if (choice === 5) {
     await ui.say([
-      'En Duo (2v2), deux Pokémon combattent côte à côte : attention aux capacités de zone comme Séisme ou Surf qui peuvent toucher ton allié !',
-      'En Trio (3v3), trois Pokémon entrent en scène. Les attaques de mêlée ne visent que les adversaires en face ou voisins ; les capacités spéciales, de type Vol ou les rayons atteignent tout le terrain.',
+      'En Combat Duo, deux Pokémon combattent côte à côte : attention aux capacités de zone comme Séisme ou Surf qui peuvent toucher ton allié !',
+      'En Combat Trio, trois Pokémon entrent en scène. Les attaques de mêlée ne visent que les adversaires en face ou voisins ; les capacités spéciales, de type Vol ou les rayons atteignent tout le terrain.',
       'Tu peux revenir sur le choix du Pokémon précédent avec Retour pendant la phase d\'ordres !'
     ], who);
     return;
@@ -175,7 +175,7 @@ export async function clubCombat(game, n) {
   const minParty = choice === 0 ? 2 : choice === 1 ? 3 : 1;
   const aliveCount = st.party.filter((m) => m && m.hp > 0).length;
   if (aliveCount < minParty) {
-    await ui.say(`Il te faut au moins ${minParty} Pokémon en forme dans ton équipe pour un combat en ${choice === 0 ? 'Duo (2v2)' : 'Trio (3v3)'}.`, who);
+    await ui.say(`Il te faut au moins ${minParty} Pokémon en forme dans ton équipe pour un combat en ${choice === 0 ? 'Duo' : 'Trio'}.`, who);
     return;
   }
   const avgLvl = Math.max(8, Math.round(st.party.reduce((s, m) => s + (m.lvl || 5), 0) / st.party.length));

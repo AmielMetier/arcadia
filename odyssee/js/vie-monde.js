@@ -2,7 +2,7 @@
 //  colporteurs et marché du week-end, arbres à baies et parois à fouiller (une fois par jour), revanches des dresseurs
 //  de route, habitants qui parlent de tes exploits, sons d'ambiance, papillons / lucioles / mouettes.
 import { T } from './world/tiles.js';
-import { ITEMS } from './core/items.js';
+import { ITEMS, itemPluralName } from './core/items.js';
 import { MEGA_FORMS, LEGEND } from './core/mega.js';
 import { levelCap } from './core/mon.js';
 import { shopScreen, partyScreen } from './ui/screens.js';
@@ -45,9 +45,9 @@ export async function cueillir(game, o) {
   const n = 1 + Math.floor(Math.random() * 3);
   E.baies[o.id] = jourDe(); game.give(o.baie, n); game.sound.sfx('item');
   game.vieMonde?.majObjet(o);
-  await ui.say(`${st.name} cueille ${n} ${nomObjet(o.baie)}${n > 1 ? ' (×' + n + ')' : ''} !`);
+  await ui.say(`${st.name} cueille ${n === 1 ? 'une ' + itemPluralName(o.baie, 1) : itemPluralName(o.baie, n)} !`);
 }
-const TRESORS = [['hard-stone', 22], ['ether', 18], ['revive', 12], ['prism-shard', 14], ['heart-scale', 16], ['fire-stone', 4], ['water-stone', 4], ['thunder-stone', 4], ['leaf-stone', 4], ['moon-stone', 4], ['dusk-stone', 3], ['dawn-stone', 3], ['shiny-stone', 3], ['ice-stone', 3], ['rare-candy', 4], ['gemme', 3], ['fossile', 9]];
+const TRESORS = [['hard-stone', 22], ['ether', 18], ['revive', 12], ['elixir', 10], ['heart-scale', 16], ['fire-stone', 4], ['water-stone', 4], ['thunder-stone', 4], ['leaf-stone', 4], ['moon-stone', 4], ['dusk-stone', 3], ['dawn-stone', 3], ['shiny-stone', 3], ['ice-stone', 3], ['rare-candy', 4], ['gemme', 3], ['fossile', 9]];
 export async function fouiller(game, o) {
   const st = game.state, E = etat(st), ui = game.ui;
   if (E.fouilles[o.id] === jourDe()) { await ui.say('Cette paroi a déjà été fouillée aujourd\'hui.'); return; }
@@ -98,7 +98,7 @@ export function ragot(game) {
   if (f.champion) L.push([`C'est toi, ${N}, le Maître de la Ligue ? Je peux avoir un autographe ?`], ['Depuis que tu es Maître de la Ligue, les gamins du quartier ne parlent que de toi.']);
   else if (b >= 15) L.push(['Quinze badges ! Il ne te reste plus que la Ligue Céleste.', 'Toute la région va suivre ton combat, tu sais.'], ['On dit que Célestine n\'a jamais perdu. Jamais. Bonne chance !']);
   else if (b >= 8) L.push(['Huit badges du Nord ! Le Pont de l\'Austral t\'ouvre maintenant les Terres du Sud et Métropole.'], ['Il paraît que les sept Champions du Sud sont d\'un tout autre niveau.']);
-  else if (b >= 5) L.push([`${b} badges… On commence à entendre ton nom jusqu'ici.`], ['La Team Éclipse rôde encore. Fais attention à toi, sur les routes.'], ['Les dresseurs des routes se sont tous mis à s\'entraîner depuis que tu passes. Tu leur donnes envie !']);
+  else if (b >= 5) L.push([`${b} badges… On commence à entendre ton nom jusqu'ici.`], [f.lugia ? 'Depuis que le soleil est revenu, tout le monde respire mieux sur les routes.' : 'La Team Éclipse rôde encore. Fais attention à toi, sur les routes.'], ['Les dresseurs des routes se sont tous mis à s\'entraîner depuis que tu passes. Tu leur donnes envie !']);
   else if (b >= 2) L.push([`Tiens, tu as déjà ${b} badges ? Pas mal du tout !`], ['Mon fils veut devenir dresseur depuis qu\'il t\'a vu combattre.'], ['Il paraît que des gens en noir traînent du côté des ports. Bizarre…']);
   else if (b === 1) L.push(['Ton premier badge ! Ça se fête, ça.'], ['Le premier badge, c\'est le plus beau. Moi, je l\'ai encore dans un tiroir.']);
   else L.push(['Un nouveau dresseur ! Ça se voit, tu as encore l\'air tout neuf.'], ['Tu pars à la conquête des badges ? Commence par bien connaître ton Pokémon.']);
@@ -422,7 +422,7 @@ export async function concours(game, n) {
   game.sound.cry?.(ASSETS.cry(m.sp));
   await ui.say([`${monName(m)} entre en scène et montre toute sa ${cat[2]} !`, 'Le jury délibère…', ...tab.map((t, k) => `${k + 1}. ${t[0]} — ${Math.round(t[1])} points`)], who);
   E.concours = jourDe();
-  const prix = [[['rare-candy', 1], ['prism-shard', 1]], [['ultra-ball', 3]], [['super-potion', 2]], []][rang - 1];
+  const prix = [[['rare-candy', 1], ['heart-scale', 2]], [['ultra-ball', 3]], [['super-potion', 2]], []][rang - 1];
   if (rang === 1) { game.sound.sfx('medal'); await ui.say(`Et la gagnante est… l'équipe de ${st.name} ! Bravo !`, who); }
   else await ui.say(rang === 4 ? 'Pas de prix cette fois… Reviens demain, la catégorie change chaque jour !' : `${rang}e place ! Joli passage.`, who);
   for (const [it, q] of prix) if (ITEMS[it]) await game.api().give(it, q);

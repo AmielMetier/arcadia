@@ -94,8 +94,8 @@ export function dexScreen(game, opts = {}) {
       info.innerHTML = caught.has(id)
         ? `<div class="dex-name">${num(id)} ${esc(S.n)}</div><div>${esc(S.genus || '')}</div><div>${S.t.map(typeTag).join(' ')}</div><div>Taille ${(S.h / 10).toLocaleString('fr-FR')} m · Poids ${(S.w / 10).toLocaleString('fr-FR')} kg</div><p>${esc(S.dex)}</p>${habitatHtml}`
         : seen.has(id)
-          ? `<div class="dex-name">${num(id)} ${esc(S.n)}</div><div>${S.t.map(typeTag).join(' ')}</div><p>Capture cette créature pour débloquer sa description complète.</p>${habitatHtml}`
-          : `<div class="dex-unknown"><div class="dex-q">?</div><div class="dex-name">${num(id)} ?????</div><p>Pas encore rencontrée. Les hautes herbes, les grottes et l'eau cachent encore bien des créatures.</p></div>`;
+          ? `<div class="dex-name">${num(id)} ${esc(S.n)}</div><div>${S.t.map(typeTag).join(' ')}</div><p>Capture ce Pokémon pour débloquer sa description complète.</p>${habitatHtml}`
+          : `<div class="dex-unknown"><div class="dex-q">?</div><div class="dex-name">${num(id)} ?????</div><p>Pas encore rencontré. Les hautes herbes, les grottes et l'eau cachent encore bien des Pokémon.</p></div>`;
     };
     rows.forEach((r, idx) => {
       r.addEventListener?.('click', (e) => {

@@ -60,8 +60,8 @@ function casinoInterior(id) {
   table('counterseg', 3, 5, 'blackjack'); table('counterseg', 8, 5, 'roulette'); table('counterseg', 13, 5, 'poker');
   table('counterseg', 12, 9, 'belote');
   m.npc({ id: id + ':croupier1', x: 4, y: 4, sprite: 'topdresseur', dir: 'down', text: ['Blackjack : le croupier reste sur 17. Approche-toi de la table.'] });
-  m.npc({ id: id + ':croupier2', x: 9, y: 4, sprite: 'topdresseuse', dir: 'down', text: ['Faites vos jeux ! La roulette n\'a qu\'un zéro, ici.'] });
-  m.npc({ id: id + ':croupier3', x: 14, y: 4, sprite: 'topdresseur', dir: 'down', text: ['Texas Hold\'em : deux cartes en main, cinq cartes au milieu. Blindes à 1 et 2 jetons.', 'Gérard, Mimi et le Baron cherchent un quatrième joueur.'] });
+  m.npc({ id: id + ':croupier2', x: 9, y: 4, sprite: 'topdresseuse', dir: 'down', text: ['Faites vos jeux ! La Roue d\'Odyssée n\'a qu\'un zéro, ici.'] });
+  m.npc({ id: id + ':croupier3', x: 14, y: 4, sprite: 'topdresseur', dir: 'down', text: ['Hold\'em de Métropole : deux cartes en main, cinq cartes au milieu. Blindes à 1 et 2 jetons.', 'Gérard, Mimi et le Baron cherchent un quatrième joueur.'] });
   m.npc({ id: id + ':mamie', x: 13, y: 10, sprite: 'dame', dir: 'up', text: ['Une petite belote, mon chou ? Je cherche un partenaire.', 'Le Marquis et Fernand trichent sûrement, mais chut.'] });
   m.npc({ id: id + ':joueur', x: 7, y: 2, sprite: 'vieil_homme', dir: 'up', move: 'turn', text: ['Trois 7 ! Trois 7 ! Ah… non, deux.', 'La machine du milieu paie mieux, j\'en suis sûr.'] });
   // la salle d'arcade : quatre bornes au fond, des plantes qui la séparent des tables
@@ -83,7 +83,7 @@ function bourseInterior(id) {
   m.npc({ id: 'bourse:pierre', x: 8, y: 3, sprite: 'pierre', dir: 'down', script: 'pierre' });
   m.npc({ id: id + ':trader1', x: 4, y: 9, sprite: 'topdresseur', move: 'wander', text: ['Achète la rumeur, vends la nouvelle !', '… C\'est ce qu\'on dit, en tout cas.'] });
   m.npc({ id: id + ':trader2', x: 12, y: 9, sprite: 'topdresseuse', move: 'turn', text: ['Quand la Sylphe annonce une pénurie de Poké Balls, l\'action de Devon fait souvent l\'inverse.', 'Deux concurrents, deux réactions.'] });
-  m.npc({ id: id + ':analyste', x: 14, y: 11, sprite: 'scientifique', text: ['Une option asiatique se calcule sur la moyenne des cours : elle coûte moins cher qu\'une européenne.', 'Et une américaine vaut toujours au moins autant qu\'une européenne.'] });
+  m.npc({ id: id + ':analyste', x: 14, y: 11, sprite: 'scientifique', text: ['Une option Johto (sur moyenne) coûte moins cher qu\'une option Kalos (à échéance).', 'Et une option Unys (exercice anticipé) vaut toujours au moins autant qu\'une option Kalos.'] });
   return m;
 }
 function modeInterior(id) {
@@ -121,7 +121,7 @@ export function buildSud(ctx) {
   void y0;
 
   const r13 = G2({ id: 'r13', nom: 'Route 13', de: { x: px, y: y1 + 3, dir: 's' }, vers: arrivee('SM', 'r13'), effile: [false, true], long: 2, graine: 1301, w: 9, grass: 0.4, trees: 0.03, branches: 0, dresseurs: 0, promeneurs: 0, paysages: ['prairie'] }, 'r13');
-  routeTrainer(W, r13, 0.5, 1, 3, 'Topdresseuse', 'Céleste', [[203, 52], [508, 52], [53, 53]]);
+  routeTrainer(W, r13, 0.5, 1, 3, 'Topdresseuse', 'Estelle', [[203, 52], [508, 52], [53, 53]]);
   routeItem(W, r13, 0.65, -1, 5, 'rocky-helmet', 1, 'item:r13:rocky-helmet');
 
   // près du pont, la rive sud est bordée de rochers : on n'y accoste pas en surfant (seul le pont y mène)
@@ -183,10 +183,10 @@ export function buildSud(ctx) {
 
   /* ---------- route 14 → Port-Lisière ---------- */
   const r14 = G2({ id: 'r14', nom: 'Route 14', de: porte('SM', 'r14'), vers: arrivee('SP', 'r14'), long: 11, graine: 1401, w: 11, grass: 0.8, trees: 0.04, rocks: 0.03, flowers: 0.02, paysages: ['plateau', 'prairie', 'rochers', 'fleurs', 'etang'], branches: 0.45, raccourci: 'coupe', anciens: 4, panneaux: ['ROUTE 14\n→ Port-Lisière', 'ROUTE 14\n← Métropole'] }, 'r14');
-  routeTrainer(W, r14, 0.2, 1, 3, 'Pilote', 'Hugo', [[22, 53], [279, 54]]);
+  routeTrainer(W, r14, 0.2, 1, 3, 'Pilote', 'Célestin', [[22, 53], [279, 54]]);
   routeTrainer(W, r14, 0.4, -1, 4, 'Topdresseur', 'Ilan', [[528, 54], [397, 54], [178, 55]]);
   routeTrainer(W, r14, 0.6, 1, 4, 'Fillette', 'Nora', [[521, 54], [22, 55]]);
-  routeTrainer(W, r14, 0.8, -1, 3, 'Pilote', 'Sacha', [[227, 55], [630, 55]]);
+  routeTrainer(W, r14, 0.8, -1, 3, 'Pilote', 'Alban', [[227, 55], [630, 55]]);
   routeItem(W, r14, 0.3, -1, 5, 'max-potion'); routeItem(W, r14, 0.7, 1, 5, 'ultra-ball', 3); routeItem(W, r14, 0.5, -1, 5, 'focus-sash', 1, 'item:r14:focus-sash');
 
   const P = towns.SP = {
@@ -231,7 +231,7 @@ export function buildSud(ctx) {
   desert(W, r16, TERR.r16, 1616);
   routeTrainer(W, r16, 0.2, 1, 4, 'Montagnard', 'Caravane', [[28, 59], [105, 59]]);
   routeTrainer(W, r16, 0.45, -1, 4, 'Randonneuse', 'Sahra', [[232, 60], [51, 60], [344, 60]]);
-  routeTrainer(W, r16, 0.7, 1, 3, 'Topdresseur', 'Mirage', [[330, 61], [553, 61]]);
+  routeTrainer(W, r16, 0.7, 1, 3, 'Topdresseur', 'Sirocco', [[330, 61], [553, 61]]);
   routeTrainer(W, r16, 0.88, -1, 4, 'Montagnard', 'Touareg', [[450, 61], [324, 61]]);
   routeItem(W, r16, 0.35, 1, 6, 'max-repel'); routeItem(W, r16, 0.6, -1, 6, 'revive', 2); routeItem(W, r16, 0.78, 1, 5, 'choice-band', 1, 'item:r16:choice-band');
 
@@ -258,7 +258,7 @@ export function buildSud(ctx) {
   routeTrainer(W, r17, 0.25, -1, 4, 'Ouvrier', 'Boulon', [[82, 62], [437, 63]]);
   routeTrainer(W, r17, 0.5, 1, 4, 'Topdresseuse', 'Alice', [[303, 63], [208, 63], [227, 64]]);
   routeTrainer(W, r17, 0.72, -1, 3, 'Ouvrier', 'Écrou', [[598, 63], [530, 64]]);
-  routeTrainer(W, r17, 0.9, 1, 4, 'Karatéka', 'Kenji', [[107, 64], [68, 64]]);
+  routeTrainer(W, r17, 0.9, 1, 4, 'Karatéka', 'Haruto', [[107, 64], [68, 64]]);
   routeItem(W, r17, 0.4, 1, 6, 'full-restore'); routeItem(W, r17, 0.8, -1, 6, 'ultra-ball', 5); routeItem(W, r17, 0.6, 1, 5, 'assault-vest', 1, 'item:r17:assault-vest');
 
   const F = towns.SF = {
@@ -297,10 +297,10 @@ export function buildSud(ctx) {
 
   /* ---------- route 19 → Ombreval (forêt sombre) ---------- */
   const r19 = G2({ id: 'r19', nom: 'Route 19', de: porte('SR', 'r19'), vers: arrivee('SO', 'r19'), long: 12, graine: 1901, w: 13, grass: 1.2, tall: T.DARKTALL, trees: 0.12, theme: 'forest', ombre: 0.5, paysages: ['bosquet', 'prairie', 'etang', 'bosquet'], branches: 0.5, anciens: 4, voix: 'bois', panneaux: ['ROUTE 19\n← Ombreval', null] }, 'r19', 'forest');
-  routeTrainer(W, r19, 0.2, -1, 4, 'Médium', 'Séléné', [[197, 68], [302, 68]]);
+  routeTrainer(W, r19, 0.2, -1, 4, 'Médium', 'Aurore', [[197, 68], [302, 68]]);
   routeTrainer(W, r19, 0.4, 1, 4, 'Voleur', 'Arsène', [[262, 68], [430, 69]]);
   routeTrainer(W, r19, 0.6, -1, 4, 'Topdresseuse', 'Nuit', [[359, 69], [461, 69], [510, 69]]);
-  routeTrainer(W, r19, 0.8, 1, 3, 'Médium', 'Erwan', [[609, 70], [625, 70]]);
+  routeTrainer(W, r19, 0.8, 1, 3, 'Médium', 'Tanguy', [[609, 70], [625, 70]]);
   routeItem(W, r19, 0.5, 1, 6, 'rare-candy'); routeItem(W, r19, 0.9, -1, 6, 'dusk-stone'); routeItem(W, r19, 0.72, 1, 5, 'choice-scarf', 1, 'item:r19:choice-scarf');
 
   const O = towns.SO = {

@@ -181,11 +181,11 @@ export class PvpBattle extends Battle {
 
   winBattle() {
     this.ev.push({ t: 'trainer-back' });
-    this.say(`Vous avez battu ${this.sides[1].name} !`);
+    this.say(`Tu as battu ${this.sides[1].name} !`);
     this.end('win');
   }
   loseBattle() {
-    this.say('Vous n\'avez plus de Pokémon en forme !');
+    this.say('Tu n\'as plus de Pokémon en forme !');
     this.say(`${this.sides[1].name} remporte le combat !`);
     this.end('lose');
   }

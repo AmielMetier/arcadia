@@ -90,10 +90,10 @@ export const MISSIONS = [
     journal: { name: 'Le registre du capitaine', start: 'Le capitaine Corentin, à Port-Azur, veut que j\'enregistre dix Pokémon Eau dans mon Pokédex.', end: 'Mon nom est dans le registre du capitaine Corentin.' } },
 
   { id: 'mWatt', town: 'E', at: [23, 22], sprite: 'scientifique', who: 'Mlle Watt', kind: 'show', test: (m) => has('electric')(m) && m.lvl >= 25, reward: [['thunder-stone', 1], ['elixir', 1]],
-    ask: ['Depuis que la Team Éclipse a vidé les générateurs, je cherche des Pokémon Électrik puissants pour relancer mes expériences.', 'Montre-moi un Pokémon Électrik d\'au moins le niveau 25 !'],
+    ask: ['Depuis que la Team Éclipse a vidé les générateurs, je cherche des Pokémon Électrik puissants pour relancer mes expériences.', 'Montre-moi un Pokémon Électrik au moins au niveau 25 !'],
     again: ['Un Pokémon Électrik, niveau 25 au moins. Je suis prête à mesurer !'],
     thanks: ['Regarde-moi ces étincelles ! Mon voltmètre s\'affole.', 'Merci ! Prends ça pour ta peine.'], done: ['Mes expériences avancent à pleine tension !'],
-    journal: { name: 'Haute tension', start: 'Mlle Watt, chercheuse à Voltacité, veut mesurer un Pokémon Électrik d\'au moins le niveau 25.', end: 'Mlle Watt a pu mesurer mon Pokémon Électrik.' } },
+    journal: { name: 'Haute tension', start: 'Mlle Watt, chercheuse à Voltacité, veut mesurer un Pokémon Électrik au moins au niveau 25.', end: 'Mlle Watt a pu mesurer mon Pokémon Électrik.' } },
 
   { id: 'mLivreur', town: 'E', at: [13, 23], sprite: 'habitant', who: 'M. Fernand', kind: 'check', test: (st, g) => g.missionTrainers('r5').every((id) => st.flags['T:' + id]), reward: [['rare-candy', 1], ['super-repel', 3]],
     ask: ['Je livre des colis à Floralia par la route 5, mais tous ces dresseurs m\'arrêtent pour se battre !', 'Si quelqu\'un les battait tous, ils me laisseraient peut-être tranquille...'],

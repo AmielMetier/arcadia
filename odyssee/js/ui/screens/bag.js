@@ -18,7 +18,7 @@ export function bagScreen(game, o = {}) {
     const POCKET_CFG = [
       { id: 'objets', label: 'Objets', sub: 'Pierres, Bonbons et Objets tenus', color: '#00e0ff', glow: 'rgba(0, 224, 255, 0.45)', bg: 'img/bag/backpack_objets.jpg', icon: 'img/bag/icon_objets.png', arcX: 40.2, arcY: 11.6 },
       { id: 'soin', label: 'Soins', sub: 'Médicaments, Potions et Guérisons', color: '#34d870', glow: 'rgba(52, 216, 112, 0.45)', bg: 'img/bag/backpack_soin.jpg', icon: 'img/bag/icon_soin.png', arcX: 62.1, arcY: 25.2 },
-      { id: 'balls', label: 'Poké Balls', sub: 'Capsules de capture de créatures', color: '#ff4c4c', glow: 'rgba(255, 76, 76, 0.45)', bg: 'img/bag/backpack_balls.jpg', icon: 'img/bag/icon_balls.png', arcX: 70.9, arcY: 40.1 },
+      { id: 'balls', label: 'Poké Balls', sub: 'Poké Balls de capture', color: '#ff4c4c', glow: 'rgba(255, 76, 76, 0.45)', bg: 'img/bag/backpack_balls.jpg', icon: 'img/bag/icon_balls.png', arcX: 70.9, arcY: 40.1 },
       { id: 'ct', label: 'CT & CS', sub: 'Capsules Techniques et Secrètes', color: '#b966ff', glow: 'rgba(185, 102, 255, 0.45)', bg: 'img/bag/backpack_ct.jpg', icon: 'img/bag/icon_ct.png', arcX: 70.5, arcY: 54.8 },
       { id: 'baies', label: 'Baies', sub: 'Baies naturelles et remèdes doux', color: '#ff77a8', glow: 'rgba(255, 119, 168, 0.45)', bg: 'img/bag/backpack_baies.jpg', icon: 'img/bag/icon_baies.png', arcX: 59.1, arcY: 74.4 },
       { id: 'cles', label: 'Objets Rares', sub: 'Objets précieux, Carte et Bicyclette', color: '#ffe058', glow: 'rgba(255, 224, 88, 0.45)', bg: 'img/bag/backpack_cles.jpg', icon: 'img/bag/icon_cles.png', arcX: 34.2, arcY: 87.8 },
@@ -392,7 +392,7 @@ export function bagScreen(game, o = {}) {
       }
       if (!st.party || !st.party.length) {
         ui.sound.sfx('bump');
-        await ui.say("Tu n'as aucune créature dans ton équipe !");
+        await ui.say("Tu n'as aucun Pokémon dans ton équipe !");
         return;
       }
       busy = true;

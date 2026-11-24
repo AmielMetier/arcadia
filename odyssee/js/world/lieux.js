@@ -234,7 +234,7 @@ export function lieux(W, { maps, trainerNpc, ENC }) {
               'Tiens, prends ma Canne à Pêche ! Mets-toi face à l\'eau et appuie pour lancer ta ligne.'
             ]);
             await A.give('canne');
-            await A.say('Tu pourras ferrer des créatures aquatiques dans tous les étangs et en mer !');
+            await A.say('Tu pourras ferrer des Pokémon aquatiques dans tous les étangs et en mer !');
             return;
           }
           await A.say([

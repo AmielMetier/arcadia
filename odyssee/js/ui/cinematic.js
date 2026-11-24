@@ -388,7 +388,7 @@ export function resolveBossCinematicConfig(opts = {}) {
     } else if (sp) {
       const ts = SPECIES[sp]?.t || [];
       presetKey = ts.includes('fire') ? 'fire' : ts.includes('water') ? 'water' : ts.includes('electric') ? 'thunder' : ts.includes('ice') ? 'ice' : ts.includes('grass') ? 'nature' : ts.includes('fairy') ? 'fairy' : ts.includes('dragon') ? 'dragon' : ts.includes('psychic') ? 'cosmic' : ts.includes('dark') || ts.includes('ghost') ? 'eclipse' : 'titan';
-      sub = sub || (SPECIES[sp]?.genus || 'Créature Légendaire');
+      sub = sub || (SPECIES[sp]?.genus || 'Pokémon Légendaire');
       badge = badge || 'LÉGENDAIRE RENCONTRÉ';
     } else {
       presetKey = 'rival';

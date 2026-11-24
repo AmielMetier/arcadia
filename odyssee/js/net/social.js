@@ -226,7 +226,7 @@ export async function talkToPeer(game, peer, directAction = null) {
     });
     if (pick === 0) action = 'battle';
     else if (pick === 1) {
-      const s = await ui.ask('Quel événement lancer dans le salon ?', ['🏆 Tournoi en direct (4 places)', '🃏 Poker Texas Hold\'em Multi', 'Annuler'], { speaker: peer.name });
+      const s = await ui.ask('Quel événement lancer dans le salon ?', ['🏆 Tournoi en direct (4 places)', '🃏 Poker Hold\'em Multi', 'Annuler'], { speaker: peer.name });
       if (s === 0) return lancerTournoiSalon(game);
       if (s === 1) return pokerTableMulti(game);
       return;

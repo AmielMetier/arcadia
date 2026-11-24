@@ -187,7 +187,7 @@ export class Donjons {
   async trophee(d) {
     const t = this.game.ile?.debloquer(d.id); if (!t) return;
     this.game.sound.sfx('badge');
-    await this.game.ui.say(`Nouveau trophée pour ton île : ${t.nom} !\nTu peux la poser sur ton île ou l'exposer au musée.`);
+    await this.game.ui.say(`Nouveau trophée pour ton île : ${t.nom} !\nTu peux le poser sur ton île ou l'exposer au musée.`);
   }
 
   /* ---------------- demandes ---------------- */

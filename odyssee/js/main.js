@@ -519,11 +519,11 @@ async function intro(game, ui, sound) {
   prof.classList.add('in');
   await ui.say([
     'Bonjour ! Bienvenue dans la région d\'Odyssée !',
-    'Je m\'appelle Saule. Depuis mon laboratoire de Bourg-Aube, j\'étudie les liens qui unissent les humains et les créatures de cet archipel.',
+    'Je m\'appelle Saule. Depuis mon laboratoire de Bourg-Aube, j\'étudie les liens qui unissent les humains et les Pokémon de cet archipel.',
     'Chaque jour, de jeunes dresseurs partent explorer ses routes, ses îles et ses mystères à la rencontre de nouveaux compagnons.'
   ], { speaker: 'Prof. Saule' });
 
-  chap.textContent = 'LES CRÉATURES D\'ODYSSÉE';
+  chap.textContent = 'LES POKÉMON D\'ODYSSÉE';
   prof.classList.add('side');
   ped.classList.add('side');
   subped.classList.add('in');
@@ -537,7 +537,7 @@ async function intro(game, ui, sound) {
   starter.classList.add('in');
   sound.cry(ASSETS.cry(starterSp));
   await ui.say([
-    'Ce monde est peuplé de créatures étonnantes !',
+    'Ce monde est peuplé de créatures appelées Pokémon !',
     'Certains les adoptent comme fidèles compagnons de route, d\'autres les entraînent pour disputer des combats passionnants à travers les quinze Arènes de l\'archipel.'
   ], { speaker: 'Prof. Saule' });
 
@@ -610,7 +610,7 @@ async function _legacyIntro(game, ui, sound) {
   await wait(400); prof.classList.add('in');
   await ui.say(['Bonjour ! Bienvenue dans la région d\'Odyssée !', 'Je m\'appelle Saule. Les gens d\'ici m\'appellent le Professeur.'], { speaker: 'Prof. Saule' });
   mon.src = ASSETS.front(R(1001)); mon.classList.add('in'); sound.cry(ASSETS.cry(R(1001)));
-  await ui.say(['Ce monde est peuplé de créatures étonnantes.', 'Certains les adoptent comme compagnons, d\'autres les entraînent pour le combat.', 'Et les marins racontent qu\'un géant des océans, Odyssor, guide ceux qui partent à l\'aventure...'], { speaker: 'Prof. Saule' });
+  await ui.say(['Ce monde est peuplé de créatures appelées Pokémon.', 'Certains les adoptent comme compagnons, d\'autres les entraînent pour le combat.', 'Et les marins racontent qu\'un géant des océans, Odyssor, guide ceux qui partent à l\'aventure...'], { speaker: 'Prof. Saule' });
   mon.classList.remove('in'); prof.classList.remove('in');
   await wait(300);
   const g = await ui.ask('Mais parle-moi un peu de toi. Es-tu un garçon ou une fille ?', ['Garçon', 'Fille'], { cancel: null, speaker: 'Prof. Saule' });

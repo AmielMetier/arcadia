@@ -85,10 +85,10 @@ function afficher(game, trophy) {
 }
 
 const CAT_INFOS = {
-  combat: { label: 'Duel PvP', icon: '⚔️', cls: 'cat-pvp' },
-  reseau: { label: 'Réseau PvP', icon: '🌐', cls: 'cat-pvp' },
-  rival: { label: 'Rival PvP', icon: '🔥', cls: 'cat-pvp' },
-  streak: { label: 'Série PvP', icon: '👑', cls: 'cat-pvp' },
+  combat: { label: 'Duel en ligne', icon: '⚔️', cls: 'cat-pvp' },
+  reseau: { label: 'Réseau', icon: '🌐', cls: 'cat-pvp' },
+  rival: { label: 'Rivalités', icon: '🔥', cls: 'cat-pvp' },
+  streak: { label: 'Séries', icon: '👑', cls: 'cat-pvp' },
   aventure: { label: 'Aventure', icon: '🗺️', cls: 'cat-aventure' },
   pokedex: { label: 'Pokédex', icon: '📖', cls: 'cat-pokedex' },
   entrainement: { label: 'Entraînement', icon: '⚡', cls: 'cat-entrainement' },
@@ -356,7 +356,7 @@ function renderMedalsTab(filteredTrophies, allTrophies, summary, medalFilter, ca
         <!-- Ligne 1 : Catégories thématiques B2W2 -->
         <div class="tfilter-row tfilter-cat-row">
           <button type="button" class="tfilter-cat-btn${catFilter === 'all' ? ' on' : ''}" data-cat="all">Toutes (${countCat('all')})</button>
-          <button type="button" class="tfilter-cat-btn${catFilter === 'pvp' ? ' on' : ''}" data-cat="pvp">⚔️ PvP (${countCat('pvp')})</button>
+          <button type="button" class="tfilter-cat-btn${catFilter === 'pvp' ? ' on' : ''}" data-cat="pvp">⚔️ Duels (${countCat('pvp')})</button>
           <button type="button" class="tfilter-cat-btn${catFilter === 'aventure' ? ' on' : ''}" data-cat="aventure">🗺️ Aventure (${countCat('aventure')})</button>
           <button type="button" class="tfilter-cat-btn${catFilter === 'pokedex' ? ' on' : ''}" data-cat="pokedex">📖 Pokédex (${countCat('pokedex')})</button>
           <button type="button" class="tfilter-cat-btn${catFilter === 'entrainement' ? ' on' : ''}" data-cat="entrainement">⚡ Entraînement (${countCat('entrainement')})</button>
@@ -523,8 +523,8 @@ function renderHistoryTab(summary, game) {
         }).join('') : `
           <div class="tempty-msg box">
             <div class="tempty-ico">⚔️</div>
-            <div class="tempty-title">Aucun match PvP enregistré</div>
-            <div class="tempty-sub">Défiez un autre dresseur dans le mode multijoueur pour enregistrer vos statistiques, vos bilans face-à-face et débloquer des trophées !</div>
+            <div class="tempty-title">Aucun duel en ligne enregistré</div>
+            <div class="tempty-sub">Défie un autre dresseur en ligne pour enregistrer tes statistiques, tes bilans face-à-face et débloquer des trophées !</div>
           </div>
         `}
       </div>

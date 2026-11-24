@@ -32,9 +32,10 @@ const QUESTS = [
   { id: 'depart', cat: 'main', name: 'Le départ de Bourg-Aube', giver: 'Maman',
     started: () => true, done: (f) => !!f.starter && !!f.rival1,
     notes: [
-      [() => true, 'Aujourd\'hui commence mon aventure ! Je dois rejoindre le Prof. Saule à son laboratoire au sud-est de Bourg-Aube pour choisir mon premier Pokémon.'],
+      [() => true, 'Aujourd\'hui commence mon aventure ! Le Prof. Saule m\'attend dans son laboratoire à l\'est de Bourg-Aube pour choisir mon premier Pokémon.'],
       [(f) => f.metProf, 'Le Professeur Saule m\'a accueilli dans son laboratoire. Il m\'invite à choisir mon tout premier compagnon sur la table.'],
-      [(f) => f.starter, (f) => 'J\'ai choisi mon premier partenaire ! Théo a pris le sien et m\'a défié dans notre tout premier combat.'],
+      [(f) => f.starter, 'J\'ai choisi mon premier partenaire !'],
+      [(f) => f.rival1, 'Théo a pris son Pokémon et m\'a défié dans notre tout premier combat.'],
       [(f) => f.starter && f.momGift, 'Maman m\'a encouragé et m\'a offert les Chaussures de Course et des Baies Oran. En route vers la Route 1 et l\'Arène de Sylvebourg !']
     ] },
   /* ---------- les voyages : le vélo et le permis bateau ---------- */
@@ -67,7 +68,7 @@ const QUESTS = [
     notes: [
       [(f) => f['T:ecl:bois1'] || f['T:ecl:bois2'] || f.giftFlash, 'Dans le Bois Murmure, des sbires de la Team Éclipse menaçaient le Dr Lumen, un savant qui étudie les Plumes Argentées.'],
       [(f) => f.giftFlash, 'Le Dr Lumen m\'a parlé d\'un « Prisme Noir », capable de fermer le cœur d\'un Pokémon.'],
-      [(f) => f['T:ecl:erebe1'], 'Erèbe, un Admin de la Team Éclipse, pillait les Pierres Lune de la Grotte Lunaire.'],
+      [(f) => f['T:ecl:erebe1'], 'Érèbe, un Admin de la Team Éclipse, pillait les Pierres Lune de la Grotte Lunaire.'],
       [(f) => f['T:ecl:nyx1'], 'Nyx, une autre Admin, harcelait un vieux marin de Port-Azur au sujet du gardien des mers.'],
       [(f) => f['T:ecl:erebe2'], 'J\'ai chassé la Team Éclipse de la Centrale de Voltacité. Elle volait l\'électricité de la région pour son Prisme.'],
       [(f) => f.eclipse, 'J\'ai battu Nocturne, le chef de la Team Éclipse, dans son repaire. Mais une nuit violette est tombée sur toute la région.'],
@@ -131,7 +132,7 @@ const QUESTS = [
   { id: 'songes', cat: 'side', name: 'Les nuits blanches de Floralia', giver: 'Hélène', started: atLeast('songes', 1), done: fin('songes'),
     notes: [
       [atLeast('songes', 1), 'Hélène, à Floralia, s\'inquiète : les enfants de la ville font des cauchemars toutes les nuits.'],
-      [atLeast('songes', 2), 'Le jardinier du Jardin des Songes m\'a parlé d\'une créature qui chasse les cauchemars.'],
+      [atLeast('songes', 2), 'Le jardinier du Jardin des Songes m\'a parlé d\'un Pokémon qui chasse les cauchemars.'],
       [atLeast('songes', 3), 'J\'ai trouvé une Plume Lune sur l\'îlot du Lac Miroir.'],
       [atLeast('songes', 4), 'Hélène a reçu la Plume Lune. Mais les cauchemars continuent.'],
       [atLeast('songes', 5), 'Une nuit, au jardin, j\'ai surpris Ariane, de la Brume, avec un étrange projecteur.'],
@@ -172,10 +173,10 @@ const QUESTS = [
     ] },
 
   /* ---------- les légendes ---------- */
-  { id: 'celebi', cat: 'legend', name: 'La Balle GS', giver: 'Une vieille dame', started: (f) => !!f.gsGiven, done: (f) => !!f['L:celebi'],
+  { id: 'celebi', cat: 'legend', name: 'La GS Ball', giver: 'Une vieille dame', started: (f) => !!f.gsGiven, done: (f) => !!f['L:celebi'],
     notes: [
-      [(f) => f.gsGiven, 'Une vieille dame de Sylvebourg m\'a confié la Balle GS, trouvée près d\'un vieil autel du Bois Murmure.'],
-      [(f) => f.celebiCalled, 'J\'ai posé la Balle GS sur l\'autel.'],
+      [(f) => f.gsGiven, 'Une vieille dame de Sylvebourg m\'a confié la GS Ball, trouvée près d\'un vieil autel du Bois Murmure.'],
+      [(f) => f.celebiCalled, 'J\'ai posé la GS Ball sur l\'autel.'],
       [(f) => f['L:celebi'], 'Celebi, le gardien de la forêt, est apparu.'],
     ] },
   { id: 'orage', cat: 'legend', name: 'Les relais de l\'Île Orageuse', giver: 'Le gardien du phare', started: (f) => !!f.orageQuest, done: (f) => !!f['L:zapdos'],
@@ -187,7 +188,7 @@ const QUESTS = [
     ] },
   { id: 'mew', cat: 'legend', name: 'Les stèles des ruines', giver: 'Les stèles', started: (f) => !!(f['S:1'] || f['S:2'] || f['S:3']), done: (f) => !!f['L:mew'],
     notes: [
-      [(f) => f['S:1'] || f['S:2'] || f['S:3'], 'Une stèle de la Côte des Ruines parle d\'une créature minuscule, rose comme l\'aube.'],
+      [(f) => f['S:1'] || f['S:2'] || f['S:3'], 'Une stèle de la Côte des Ruines parle d\'un Pokémon minuscule, rose comme l\'aube.'],
       [(f) => f['S:1'] && f['S:2'] && f['S:3'], 'J\'ai lu les trois stèles.'],
       [(f) => f['L:mew'], 'Mew a dansé sur l\'autel.'],
     ] },

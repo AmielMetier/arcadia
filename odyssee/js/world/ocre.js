@@ -68,7 +68,7 @@ export function canyonsDOcre({ W, maps, ENC, trainerNpc, route = 'r14' }) {
   const enc = ENC?.[route] || [];
   const niv = enc.length ? Math.max(...enc.map((e) => e[2])) : 55;
   const equipe = (k, n) => Array.from({ length: n }, (_, i) => [enc[(k * 5 + i * 3) % enc.length]?.[0] ?? 74, niv - n + 1 + i % 2]);
-  const dresseurs = [['Montagnard', 'Gustave', 0.3, 'right', 2], ['Randonneuse', 'Sahra', 0.55, 'left', 3], ['Topdresseur', 'Anouar', 0.85, 'down', 3]];
+  const dresseurs = [['Montagnard', 'Gustave', 0.3, 'right', 2], ['Randonneuse', 'Viviane', 0.55, 'left', 3], ['Topdresseur', 'Anouar', 0.85, 'down', 3]];
   dresseurs.forEach(([cls, nom, f, dir, n], k) => { const p = caseLibre(...loin(f)); if (p) trainerNpc(W, p[0], p[1], dir, cls, nom, equipe(k, n), { id: `ocre:d${k}`, sight: 3 }); });
   const objets = [['hyper-potion', 0.4], ['max-repel', 0.7], ['rare-candy', 1]];
   objets.forEach(([it, f], k) => { const p = caseLibre(...loin(f), 2); if (p) W.item(p[0], p[1], it, 1, `ocre:o${k}`); });
@@ -127,7 +127,7 @@ function grotteDesMesas({ W, maps, ENC, trainerNpc, val, dist }) {
   const prend = (L, f) => { const p = L[Math.floor(f * (L.length - 1))]; if (!p) return null; L.splice(L.indexOf(p), 1); return p; };
   const lv = Math.max(...m.encounter.map((e) => e[2]));
   const t1 = prend(avant, 0.4); if (t1) trainerNpc(m, t1[0], t1[1], 'left', 'Montagnard', 'Barnabé', [[g[0]?.[0] ?? 74, lv], [g[2]?.[0] ?? 95, lv + 1]], { id: 'mesas:d0', sight: 3, intro: 'Les mesas sont creuses, tu savais ? Le vent y siffle comme dans une flûte.' });
-  const t2 = prend(apres.length ? apres : avant, 0.2); if (t2) trainerNpc(m, t2[0], t2[1], 'down', 'Montagnard', 'Isidore', [[g[1]?.[0] ?? 74, lv], [g[3]?.[0] ?? 75, lv], [g[4]?.[0] ?? 95, lv + 1]], { id: 'mesas:d1', sight: 3 });
+  const t2 = prend(apres.length ? apres : avant, 0.2); if (t2) trainerNpc(m, t2[0], t2[1], 'down', 'Montagnard', 'Hervé', [[g[1]?.[0] ?? 74, lv], [g[3]?.[0] ?? 75, lv], [g[4]?.[0] ?? 95, lv + 1]], { id: 'mesas:d1', sight: 3 });
   const o = [[avant, 0.1, 'full-heal'], [apres.length ? apres : avant, 0.05, 'sun-stone'], [apres.length ? apres : avant, 0.6, 'max-potion']];
   o.forEach(([L, f, it], k) => { const p = prend(L, f); if (p) m.item(p[0], p[1], it, 1, 'mesas:o' + k); });
   // l'objet caché : la roche au bout d'une impasse

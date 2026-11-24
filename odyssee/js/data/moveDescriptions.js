@@ -33,7 +33,7 @@ export const SPECIFIC_MOVE_DESCS = {
   68: "Riposte en infligeant le double des dégâts physiques subis durant ce tour.",
   69: "Projette l'ennemi au sol. Inflige des dégâts strictement égaux au niveau du lanceur.",
   82: "Projette une onde draconique infligeant toujours exactement 40 PV de dégâts fixes.",
-  100: "Téléporte instantanément le lanceur loin du combat contre une créature sauvage.",
+  100: "Téléporte instantanément le lanceur loin du combat contre un Pokémon sauvage.",
   101: "Fait surgir un mirage spectral infligeant des dégâts égaux au niveau du lanceur.",
   113: "Dresse un mur de lumière réduisant de moitié les dégâts spéciaux pendant 5 tours.",
   114: "Répand un nuage de buée noire qui annule immédiatement tous les changements de stats.",

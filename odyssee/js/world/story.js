@@ -81,7 +81,7 @@ export function addStory(ctx) {
   };
   const admin = (map, x, y, dir, id, who, team, o) => {
     const [a, b] = free(map, x, y, false);
-    return Object.assign(trainerNpc(map, a, b, dir, 'Admin Éclipse', who === 'nyx' ? 'Nyx' : 'Erèbe', team, {
+    return Object.assign(trainerNpc(map, a, b, dir, 'Admin Éclipse', who === 'nyx' ? 'Nyx' : 'Érèbe', team, {
       id, sight: o.sight ?? 3, ow: who, bs: who === 'nyx' ? 'nyx' : 'erebe', prize: 70, ai: 'smart', items: { 'super-potion': 1, 'hyper-potion': team[0][1] > 30 ? 1 : 0 }, intro: o.intro, lose: o.lose, after: o.after || '...',
     }), { vanish: true, music: 'eclipse', winScript: o.win });
   };
@@ -101,7 +101,7 @@ export function addStory(ctx) {
     const g = maps.grotte; g.dark = true;
     const [ex, ey] = nearestCave(g, 30, 20);
     admin(g, ex, ey, 'left', 'ecl:erebe1', 'erebe', GRUNT.erebe1, {
-      intro: 'Tiens, un gamin. Je suis Erèbe, Admin de la Team Éclipse. Ces Pierres Lune nourriront le Prisme Noir. Ne te mets pas en travers de notre chemin.',
+      intro: 'Tiens, un gamin. Je suis Érèbe, Admin de la Team Éclipse. Ces Pierres Lune nourriront le Prisme Noir. Ne te mets pas en travers de notre chemin.',
       lose: 'Intéressant... Tu as du cran. Mais le Prisme est presque prêt.',
     });
     const [ax, ay] = nearestCave(g, 14, 8), [bx, by] = nearestCave(g, 36, 7);
@@ -122,7 +122,7 @@ export function addStory(ctx) {
     Object.assign(marin, { script: 'gift', move: 'static', dir: 'down', text: null, gift: {
       item: 'max-repel', qty: 3, flag: 'giftMarin', who: 'Vieux marin', need: (st) => st.flags['T:ecl:nyx1'],
       pre: ['Ahoy... Ces gens en noir veulent savoir où dort le gardien des mers.', 'Jamais je ne leur dirai !'],
-      give: ['Merci de m\'avoir débarrassé de cette Nyx, petit. Tiens, ça éloigne les créatures sauvages en mer.'],
+      give: ['Merci de m\'avoir débarrassé de cette Nyx, petit. Tiens, ça éloigne les Pokémon sauvages en mer.'],
       got: ['Le gardien des mers, c\'est Lugia. Les anciens disent qu\'il dort dans un sanctuaire, sur un îlot au sud du Cap Mirage.', 'Et regarde l\'îlot, là-bas, au bout du port : un jour, avec Surf, va donc voir ce qu\'il cache.'],
       done: ['Bon vent, petit ! Les marées te seront favorables.'] } });
     // le pêcheur : montre-moi un Magicarpe
@@ -144,7 +144,7 @@ export function addStory(ctx) {
     const [ix, iy] = fl(2, 6);
     cen.npc({ id: 'volta:ingenieur', x: ix, y: iy, sprite: 'scientifique', dir: 'right', script: 'gift', gift: {
       item: 'cs-force', flag: 'giftForce', who: 'Ingénieur', need: (st) => st.flags['T:ecl:erebe2'],
-      pre: ['Ils ont pris le contrôle des générateurs ! Ils volent l\'électricité de toute la région pour leur Prisme Noir...', 'Leur chef, Erèbe, est au fond de la salle. Je t\'en prie, chasse-les !'],
+      pre: ['Ils ont pris le contrôle des générateurs ! Ils volent l\'électricité de toute la région pour leur Prisme Noir...', 'Leur chef, Érèbe, est au fond de la salle. Je t\'en prie, chasse-les !'],
       give: ['Les générateurs repartent ! Tu nous as sauvés. Prends ceci, ça devrait t\'aider dans ton voyage.'],
       got: ['La CS06 contient Force. Avec le Badge Volt, ton Pokémon pourra pousser les gros rochers qui bloquent certains recoins.', 'Volta t\'attend à l\'Arène, maintenant que tout est rentré dans l\'ordre.'],
       done: ['Les Magnéti sont revenus se blottir contre les générateurs. Tout va bien !'] } });
@@ -182,7 +182,7 @@ export function addStory(ctx) {
     admin(rep, 19, 10, 'left', 'ecl:nyx2', 'nyx', GRUNT.nyx2, { sight: 2,
       intro: 'Toi, ici ?! Tu es vraiment collant. Le Chef est en train d\'achever le Prisme Noir. Je ne te laisserai pas le déranger !', lose: 'Non, non, NON ! ... Bon, vas-y. De toute façon, il est trop tard.' });
     const boss = trainerNpc(rep, 11, 3, 'down', 'Chef Éclipse', 'Nocturne', GRUNT.boss1, { id: 'ecl:boss1', sight: 1, ow: 'nocturne', bs: 'nocturne', prize: 120, ai: 'smart', items: { 'hyper-potion': 2 },
-      intro: 'Je suis Nocturne, chef de la Team Éclipse. Le jour rend les gens faibles et bruyants. Sous une nuit éternelle, tout serait enfin calme... Le Prisme Noir fermera le cœur de Lugia, et Lugia obéira. Toi, tu n\'es qu\'un grain de sable.',
+      intro: 'Je suis Nocturne, chef de la Team Éclipse. Nox et sa bande de la Brume préfèrent courir après l\'Orbe Rouge ? Qu\'ils s\'amusent dans le brouillard. Le jour rend les gens faibles et bruyants. Sous une nuit éternelle, tout serait enfin calme... Le Prisme Noir fermera le cœur de Lugia, et Lugia obéira. Toi, tu n\'es qu\'un grain de sable.',
       lose: 'Impressionnant. Mais il est trop tard : le Prisme Noir est déjà au Sanctuaire des Marées.', after: '...' });
     Object.assign(boss, { vanish: true, music: 'eclipse', winScript: 'boss1' });
     rep.item(2, 6, 'ultra-ball', 2); rep.item(20, 10, 'full-heal'); rep.item(20, 14, 'hyper-potion');

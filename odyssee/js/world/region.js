@@ -161,7 +161,7 @@ export const LEADERS = [
     [541, 13, null, [182, 320, 75, 106]],
     [1020, 14, null, [42, 210, 98, 230], 'sacoches-pollen'],
   ], intro: ['Bienvenue dans ma Ruche. Ici, chaque insecte a sa place, et chaque alvéole cache un secret.', 'Tu as su percer les murs de cire... Voyons si tu sais guider tes Pokémon !'], lose: 'Tu as l\'œil vif et la main sûre ! Le Badge Élytre est à toi.' },
-  { name: 'Marine', type: 'water', ow: 'marine', team: [[1031, 19], [1029, 19], [120, 20], [1033, 22]], intro: 'La marée monte ! Tu vas te faire emporter par mes créatures de l\'océan !', lose: 'Ouah, tu as tenu face à la vague. Voici le Badge Écume !' },
+  { name: 'Marine', type: 'water', ow: 'marine', team: [[1031, 19], [1029, 19], [120, 20], [1033, 22]], intro: 'La marée monte ! Tu vas te faire emporter par mes Pokémon de l\'océan !', lose: 'Ouah, tu as tenu face à la vague. Voici le Badge Écume !' },
   { name: 'Volta', type: 'electric', ow: 'volta', team: [[1034, 25], [1036, 26], [82, 26], [1035, 29]], intro: 'Ça grésille ! Prépare-toi à recevoir le choc de ta vie !', lose: 'Court-circuit total ! Tu remportes le Badge Volt.' },
   { name: 'Flora', type: 'grass', ow: 'flora', team: [[1021, 30], [1038, 31], [114, 31], [1022, 34]], intro: 'Mes fleurs sont belles, mais elles savent piquer. Prêt ?', lose: 'Tu as fait éclore quelque chose de beau. Le Badge Pétale te revient.' },
   { name: 'Sibylle', type: 'psychic', ow: 'sibylle', team: [[1039, 35], [1030, 36], [1019, 36], [65, 37], [1040, 39]], intro: 'J\'ai déjà vu l\'issue de ce combat... mais montre-moi quand même.', lose: 'L\'avenir m\'a trompée. Le Badge Mirage est à toi.' },
@@ -490,13 +490,13 @@ export function buildWorld() {
       { kind: 'house', x: 9, y: 8, roof: 'red', id: 'maison', name: 'Maison', bed: true, kitchen: true, npcs: [{ id: 'maman', x: 5, y: 4, sprite: 'maman', dir: 'down', script: 'mom' }] },
       { kind: 'house', x: 17, y: 8, roof: 'blue', id: 'rival', name: 'Maison de Théo', npcs: [{ x: 3, y: 4, sprite: 'habitante', dir: 'right', script: 'rivalMom' }] },
       { kind: 'lab', ...GRAND.lab, x: 34, y: 10, id: 'labo' },
-      { kind: 'house', x: 8, y: 24, roof: 'orange', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['Le Professeur Saule travaille jour et nuit dans son laboratoire.', 'Il paraît qu\'il prépare des créatures pour les jeunes du bourg !'] }] },
+      { kind: 'house', x: 8, y: 24, roof: 'orange', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['Le Professeur Saule travaille jour et nuit dans son laboratoire.', 'Il paraît qu\'il prépare des Pokémon pour les jeunes du bourg !'] }] },
       { kind: 'house', x: 15, y: 24, roof: 'red', npcs: [{ x: 3, y: 4, sprite: 'vieil_homme', text: ['De mon temps, on allait jusqu\'à Sylvebourg à pied, sans courir !', 'La Route 1 est courte, mais les hautes herbes y sont pleines de surprises.'] }] },
       { kind: 'house2', x: 34, y: 24, roof: 'orange', name: 'Boulangerie', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['Bienvenue à la boulangerie de l\'Aube !', 'Le premier pain sort du four avant le lever du soleil.'] }] },
       { kind: 'house', x: 42, y: 24, roof: 'red' },
     ],
     npcs: [
-      { id: 'fille', x: 22, y: 23, sprite: 'fillette', move: 'wander', text: ['Les créatures sauvages vivent dans les hautes herbes.', 'Sans créature à toi, il ne faut surtout pas y aller !'] },
+      { id: 'fille', x: 22, y: 23, sprite: 'fillette', move: 'wander', text: ['Les Pokémon sauvages vivent dans les hautes herbes.', 'Sans Pokémon à toi, il ne faut surtout pas y aller !'] },
       { id: 'vieux', x: 31, y: 9, sprite: 'vieil_homme', move: 'turn', text: ['Tu sais courir ? Garde la touche Maj enfoncée en marchant.', 'Et si tu oublies une touche, regarde le petit bouton en bas de l\'écran !'] },
       { id: 'garde10', x: 53, y: 19, sprite: 'garde', dir: 'down', gate: { badges: 5, tiles: [[55, 20], [55, 21]] }, text: ['La route 10 longe des falaises instables.', 'Reviens quand tu auras 5 badges.'] },
     ],
@@ -534,18 +534,18 @@ export function buildWorld() {
       ['flowers', 33, 47, 38, 49], ['erable', 41, 48], ['cerisier', 45, 48], ['erable', 49, 48], ['flowers', 40, 50, 50, 51]],
     buildings: [
       { kind: 'center', ...GRAND.center, x: 9, y: 7 }, { kind: 'mart', ...GRAND.mart, x: 36, y: 8 }, { kind: 'gym', ...GRAND.gym, x: 26, y: 16, roof: 'green' },
-      { kind: 'house', x: 8, y: 17, roof: 'green', npcs: [{ x: 4, y: 4, sprite: 'insectomane', text: ['Hector, le Champion, adore les créatures Insecte.', 'Le Feu, le Vol et la Roche les mettent en difficulté !'] }] },
-      { kind: 'house', x: 15, y: 17, roof: 'brown', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Une créature endormie ou paralysée est bien plus facile à capturer.', 'Et plus ses PV sont bas, mieux c\'est !'] }, { id: 'gs', x: 6, y: 3, sprite: 'vieil_homme', script: 'gsBall' }] },
-      { kind: 'house', x: 8, y: 26, roof: 'teal', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['Le Bois Murmure, au nord, est si touffu qu\'on y voit à peine le ciel.', 'Les créatures Insecte y pullulent !'] }] },
+      { kind: 'house', x: 8, y: 17, roof: 'green', npcs: [{ x: 4, y: 4, sprite: 'insectomane', text: ['Hector, le Champion, adore les Pokémon Insecte.', 'Le Feu, le Vol et la Roche les mettent en difficulté !'] }] },
+      { kind: 'house', x: 15, y: 17, roof: 'brown', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Un Pokémon endormi ou paralysé est bien plus facile à capturer.', 'Et plus ses PV sont bas, mieux c\'est !'] }, { id: 'gs', x: 6, y: 3, sprite: 'dame', script: 'gsBall' }] },
+      { kind: 'house', x: 8, y: 26, roof: 'teal', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['Le Bois Murmure, au nord, est si touffu qu\'on y voit à peine le ciel.', 'Les Pokémon Insecte y pullulent !'] }] },
       { kind: 'house', x: 15, y: 26, roof: 'green', npcs: [{ x: 3, y: 4, sprite: 'gamin', text: ['Mon grand frère a battu Hector du premier coup.', 'Il dit qu\'un oiseau, ça règle tout !'] }] },
       { kind: 'bighouse', x: 7, y: 40, roof: 'brown', name: 'Auberge', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['Bienvenue à l\'auberge du Chêne !', 'Les voyageurs s\'y reposent avant d\'affronter le Bois Murmure.'] }] },
       { kind: 'house', x: 16, y: 40, roof: 'teal' },
       { kind: 'house', x: 34, y: 40, roof: 'green' },
       { kind: 'house', x: 41, y: 40, roof: 'brown' },
-      { kind: 'house', x: 48, y: 40, roof: 'brown', name: 'Cabane du chasseur', npcs: [{ x: 3, y: 4, sprite: 'insectomane', text: ['Je piste les créatures des bois depuis quarante ans.', 'Les plus rares ne sortent qu\'à l\'aube.'] }] },
+      { kind: 'house', x: 48, y: 40, roof: 'brown', name: 'Cabane du chasseur', npcs: [{ x: 3, y: 4, sprite: 'insectomane', text: ['Je piste les Pokémon des bois depuis quarante ans.', 'Les plus rares ne sortent qu\'à l\'aube.'] }] },
     ],
     npcs: [
-      { id: 'gamin', x: 22, y: 20, sprite: 'gamin', move: 'wander', text: ['Le Centre de soins soigne tes créatures gratuitement.', 'C\'est le bâtiment au toit rouge !'] },
+      { id: 'gamin', x: 22, y: 20, sprite: 'gamin', move: 'wander', text: ['Le Centre de soins soigne tes Pokémon gratuitement.', 'C\'est le bâtiment au toit rouge !'] },
       { x: 45, y: 29, sprite: 'fillette', move: 'wander', text: ['Il paraît qu\'un vieil arbre du Bois Murmure cache un autel.', 'Ma grand-mère dit qu\'il ne faut pas y toucher...'] },
       { id: 'garde', x: 29, y: 2, sprite: 'garde', dir: 'left', gate: { badges: 1, tiles: [[27, 1], [28, 1]] }, text: ['Le Bois Murmure est plein de dresseurs coriaces.', 'Reviens quand tu auras le badge de l\'Arène !'] },
     ],
@@ -566,9 +566,9 @@ export function buildWorld() {
       { kind: 'bighouse', x: 48, y: 3, roof: 'brown', id: 'mineurs', name: 'Maison des Mineurs', npcs: [
         { x: 4, y: 5, sprite: 'montagnard', text: ['Ici travaillait Basalte, le meilleur mineur de la région.', 'Il est parti sur l\'Île de Granit, au sud-est, rejoindre ses deux frères.', 'On dit qu\'il garde l\'île pour le compte de l\'aîné, Drakos...'] },
         { x: 7, y: 6, sprite: 'vieil_homme', text: ['Les trois frères étaient de braves gars.', 'Puis Drakos a perdu contre Célestine, la Maître de la Ligue.', 'Il n\'a jamais digéré sa défaite. Il s\'est taillé un royaume sur les îles.'] }] },
-      { kind: 'house', x: 45, y: 13, roof: 'gray', npcs: [{ x: 4, y: 4, sprite: 'montagnard', text: ['Les créatures Roche résistent aux attaques Normal et Feu.', 'Mais l\'Eau et la Plante les font fondre !'] }] },
+      { kind: 'house', x: 45, y: 13, roof: 'gray', npcs: [{ x: 4, y: 4, sprite: 'montagnard', text: ['Les Pokémon Roche résistent aux attaques Normal et Feu.', 'Mais l\'Eau et la Plante les font fondre !'] }] },
       { kind: 'house', x: 50, dx: 1, y: 13, roof: 'brown', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['À l\'est, la route 3 mène à la Grotte Lunaire.', 'Il y fait sombre... et les Nosferapti adorent s\'y cacher.'] }] },
-      { kind: 'house2', x: 53, dx: 1, y: 21, roof: 'red', npcs: [{ x: 2, y: 4, sprite: 'scientifique', text: ['Ta créature peut évoluer en gagnant des niveaux.', 'Certaines ont besoin d\'une pierre spéciale, vendue en boutique.'] }] },
+      { kind: 'house2', x: 53, dx: 1, y: 21, roof: 'red', npcs: [{ x: 2, y: 4, sprite: 'scientifique', text: ['Ton Pokémon peut évoluer en gagnant des niveaux.', 'Certains ont besoin d\'une pierre spéciale, vendue en boutique.'] }] },
       { kind: 'tower', ...GRAND.usine, x: 4, y: 4, roof: 'gray', id: 'usine', name: 'Usine Poké Ball', npcs: [{ id: 'inventeur', x: 5, y: 4, sprite: 'scientifique', talk: async (A) => {
         if (!A.f.giftUsine) {
           A.flag('giftUsine', true);
@@ -603,11 +603,11 @@ export function buildWorld() {
     buildings: [
       { kind: 'center', ...GRAND.center, x: 2, dx: -1, y: 6 }, { kind: 'mart', ...GRAND.mart, x: 10, y: 6 },
       { kind: 'house', x: 19, y: 8, roof: 'blue', npcs: [{ x: 4, y: 4, sprite: 'marin', text: ['Plus loin à l\'est, Voltacité ne dort jamais.', 'Ses néons éclairent la côte toute la nuit !'] }] },
-      { kind: 'house', x: 24, dx: 1, y: 8, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Une créature peut retenir quatre attaques au maximum.', 'Quand elle en apprend une cinquième, il faut en oublier une.'] }] },
+      { kind: 'house', x: 24, dx: 1, y: 8, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Un Pokémon peut retenir quatre attaques au maximum.', 'Quand il en apprend une cinquième, il faut en oublier une.'] }] },
       { kind: 'gym', ...GRAND.gym, x: 6, y: 25, roof: 'blue' },
       { kind: 'house2', x: 5, y: 14, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'marin', text: ['Le port s\'agrandit chaque année : les quais du sud sont tout neufs.'] }] },
       { kind: 'house', x: 19, y: 16, roof: 'red', npcs: [{ x: 4, y: 4, sprite: 'pecheur', text: ['Avant, un ferry partait d\'ici pour l\'archipel du sud.', 'Depuis que Drakos tient les îles, plus un bateau ne part d\'ici.', 'Et ne compte pas y aller à la nage : des tourbillons entourent l\'archipel. Seul le vieux passeur du Cap Mirage connaît la passe.'] }] },
-      { kind: 'house2', x: 24, dx: 1, y: 16, roof: 'orange', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Le jour, la nuit, le matin, le soir...', 'La couleur du ciel change avec l\'heure de ton ordinateur !'] }] },
+      { kind: 'house2', x: 24, dx: 1, y: 16, roof: 'orange', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Le jour, la nuit, le matin, le soir...', 'La couleur du ciel change au fil de la journée : certains Pokémon ne sortent que la nuit !'] }] },
     ],
     npcs: [
       { id: 'marin', x: 17, y: 5, sprite: 'marin', move: 'turn', text: ['Ahoy ! Ce ponton était le départ des ferries.', 'Depuis que les îles ont fermé leurs ports, plus aucun bateau ne part...'] },
@@ -626,7 +626,7 @@ export function buildWorld() {
               'Tiens, prends ma Canne à Pêche ! Mets-toi face à l\'eau depuis le rivage et appuie pour lancer ta ligne.'
             ]);
             await A.give('canne');
-            await A.say('Tu pourras ferrer de superbes créatures aquatiques dans tous les étangs et en pleine mer !');
+            await A.say('Tu pourras ferrer de superbes Pokémon aquatiques dans tous les étangs et en pleine mer !');
             return;
           }
           if (n?.def?.show && A.game) return A.game.script('show', n);
@@ -649,20 +649,20 @@ export function buildWorld() {
       ['sign', 11, 12, 'VOLTACITÉ\nLa ville qui ne s\'éteint jamais.'], ['sign', 21, 41, 'ARÈNE DE VOLTACITÉ\nChampionne : Volta\nL\'étincelle foudroyante.'], ['flowers', 2, 21, 7, 22], ['flowers', 11, 21, 28, 22], ['lamp', 12, 41], ['lamp', 34, 41], ['lamp', 39, 20], ['pot', 42, 12]],
     buildings: [
       { kind: 'center', ...GRAND.center, x: 2, y: 5 }, { kind: 'mart', ...GRAND.mart, x: 11, y: 5 },
-      { kind: 'tower', x: 17, dx: 1, y: 6, roof: 'gold', name: 'Centrale de Voltacité', npcs: [{ x: 5, y: 4, sprite: 'scientifique', text: ['Cette centrale alimente toute la région.', 'Les Magnéti adorent se blottir contre les générateurs !'] }, { x: 8, y: 6, sprite: 'scientifique', text: ['Les créatures Sol ne craignent pas du tout l\'électricité.', 'Un bon atout contre l\'Arène !'] }] },
-      { kind: 'house2', x: 23, dx: 1, y: 7, roof: 'gray', npcs: [{ x: 2, y: 4, sprite: 'gamin', text: ['La paralysie divise la vitesse par quatre.', 'Et parfois, la créature ne peut même pas attaquer !'] }] },
+      { kind: 'tower', x: 17, dx: 1, y: 6, roof: 'gold', name: 'Centrale de Voltacité', npcs: [{ x: 5, y: 4, sprite: 'scientifique', text: ['Cette centrale alimente toute la région.', 'Les Magnéti adorent se blottir contre les générateurs !'] }, { x: 8, y: 6, sprite: 'scientifique', text: ['Les Pokémon Sol ne craignent pas du tout l\'électricité.', 'Un bon atout contre l\'Arène !'] }] },
+      { kind: 'house2', x: 23, dx: 1, y: 7, roof: 'gray', npcs: [{ x: 2, y: 4, sprite: 'gamin', text: ['La paralysie divise la vitesse par quatre.', 'Et parfois, le Pokémon ne peut même pas attaquer !'] }] },
       { kind: 'gym', ...GRAND.gym, x: 13, y: 24, roof: 'gold' },
       { kind: 'house2', x: 31, y: 7, roof: 'blue', npcs: [{ x: 2, y: 4, sprite: 'scientifique', text: ['La nuit, la ville brille tellement qu\'on voit à peine les étoiles.'] }] },
       { kind: 'bighouse', x: 33, y: 21, roof: 'gray', name: 'Résidence des Néons', npcs: [{ x: 4, y: 4, sprite: 'topdresseuse', text: ['Douze étages, et l\'ascenseur est toujours en panne. Merci les coupures de courant !'] }] },
       { kind: 'house', x: 33, y: 29, roof: 'red', npcs: [{ x: 4, y: 4, sprite: 'habitant', text: ['Mon Pikachu recharge mon téléphone. Pratique, non ?'] }] },
       { kind: 'house2', x: 2, y: 24, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'enfant', text: ['Quand je serai grand, je travaillerai à la Centrale !'] }] },
       { kind: 'house', x: 2, y: 33, roof: 'orange', npcs: [{ x: 4, y: 4, sprite: 'dame', text: ['Les Magnéti adorent se coller aux lampadaires. Ça fait de drôles de grappes.'] }] },
-      { kind: 'house2', x: 33, y: 35, roof: 'purple', npcs: [{ x: 2, y: 4, sprite: 'gamin', text: ['Le Champion de Port-Azur, c\'était dur ? Volta, c\'est autre chose !'] }] },
-      { kind: 'house', x: 11, y: 15, roof: 'blue', npcs: [{ x: 4, y: 4, sprite: 'habitante', text: ['Une Super Capsule capture mieux qu\'une Capsule.', 'Une Hyper Capsule, c\'est encore mieux !'] }] },
+      { kind: 'house2', x: 33, y: 35, roof: 'purple', npcs: [{ x: 2, y: 4, sprite: 'gamin', text: ['La Championne de Port-Azur, c\'était dur ? Volta, c\'est autre chose !'] }] },
+      { kind: 'house', x: 11, y: 15, roof: 'blue', npcs: [{ x: 4, y: 4, sprite: 'habitante', text: ['Une Super Ball capture mieux qu\'une Poké Ball.', 'Une Hyper Ball, c\'est encore mieux !'] }] },
       { kind: 'house', x: 3, y: 15, roof: 'purple', npcs: [{ x: 2, y: 4, sprite: 'habitant', text: ['Au sud, la route 5 descend jusqu\'à Floralia.', 'Une ville couverte de fleurs, tu verras.'] }] },
     ],
     npcs: [
-      { id: 'scientifique', x: 14, y: 14, sprite: 'scientifique', move: 'wander', text: ['La nuit, les créatures qu\'on croise ne sont pas tout à fait les mêmes.', 'Les Hoothoot, par exemple, sortent surtout le soir.'] },
+      { id: 'scientifique', x: 14, y: 14, sprite: 'scientifique', move: 'wander', text: ['La nuit, les Pokémon qu\'on croise ne sont pas tout à fait les mêmes.', 'Les Hoothoot, par exemple, sortent surtout le soir.'] },
       { id: 'garde', x: 10, y: 43, sprite: 'garde', dir: 'left', gate: { badges: 3, tiles: [[8, 44], [9, 44]] }, text: ['La route 5 est fermée aux dresseurs débutants.', 'Il faut trois badges pour passer.'] },
     ],
   };
@@ -682,9 +682,9 @@ export function buildWorld() {
       { kind: 'bighouse', x: 21, y: 5, roof: 'purple', name: 'Résidence Floralia', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['Les attaques de statut ne font pas de dégâts, mais elles changent tout.', 'Un adversaire endormi, c\'est un adversaire inoffensif !'] }, { x: 7, y: 5, sprite: 'scientifique', text: ['J\'ai vu un dresseur aux cheveux bleus foncer vers l\'Arène.', 'Il avait l\'air pressé de te battre...'] }] },
       { kind: 'house2', x: 27, dx: 2, y: 6, roof: 'green', npcs: [{ x: 2, y: 4, sprite: 'gamin', text: ['Les buissons épineux à l\'est bloquent la Route 6 vers Mirage.', 'Flora, notre Championne, conserve le précieux Sécateur Sylvestre.', 'Elle ne le confie qu\'aux dresseurs qui remportent le Badge Pétale !'] }] },
       { kind: 'gym', ...GRAND.gym, x: 26, y: 21, roof: 'green' },
-      { kind: 'house', x: 4, y: 16, roof: 'red', npcs: [{ x: 4, y: 4, sprite: 'habitante', text: ['Ta créature la plus en forme combat en premier.', 'Change l\'ordre de ton équipe dans le menu Équipe !'] }] },
+      { kind: 'house', x: 4, y: 16, roof: 'red', npcs: [{ x: 4, y: 4, sprite: 'habitante', text: ['Ton Pokémon en tête d\'équipe combat en premier.', 'Change l\'ordre de ton équipe dans le menu Équipe !'] }] },
       { kind: 'house', x: 9, dx: 1, y: 16, roof: 'orange', npcs: [{ x: 2, y: 4, sprite: 'habitant', text: ['Mirage, à l\'est, est une ville étrange.', 'On dit que ses habitants lisent dans les pensées.'] }] },
-      { kind: 'house', x: 28, y: 16, roof: 'blue', npcs: [{ x: 3, y: 4, sprite: 'marin', text: ['Le PC du Centre garde les créatures en trop.', 'Ton équipe ne peut compter que six créatures.'] }] },
+      { kind: 'house', x: 28, y: 16, roof: 'blue', npcs: [{ x: 3, y: 4, sprite: 'marin', text: ['Le PC du Centre garde les Pokémon en trop.', 'Ton équipe ne peut compter que six Pokémon.'] }] },
     ],
     npcs: [
       { id: 'jardiniere', x: 12, y: 13, sprite: 'fillette', move: 'wander', text: ['Bienvenue à Floralia ! Respire ce parfum...'] },
@@ -720,19 +720,19 @@ export function buildWorld() {
     roads: [[20, 0, 21, 26, T.PATH], [2, 18, 27, 18, T.PATH], [2, 26, 27, 26, T.PATH]],
     deco: [['rock', 26, 13], ['rock', 27, 17], ['rock', 2, 27], ['rock', 17, 21], ['lamp', 22, 12], ['lamp', 22, 17], ['lamp', 19, 19], ['lamp', 22, 25],
       ['flowers', 25, 15, 27, 16], ['flowers', 11, 19, 16, 20],
-      ['sign', 22, 5, 'PORT-GRANIT\nÎle de Granit — sous la protection de Drakos.'], ['sign', 12, 17, 'ARÈNE DE GRANIT\nChampion : Basalte\nLe frère cadet.'], ['sign', 24, 25, 'DOJO DE MAMADOU\nCombats Co-op 2v2 & 3v3\nRéservé aux escouades de 2 ou 3 dresseurs !']],
+      ['sign', 22, 5, 'PORT-GRANIT\nÎle de Granit — sous la protection de Drakos.'], ['sign', 12, 17, 'ARÈNE DE GRANIT\nChampion : Basalte\nLe frère cadet.'], ['sign', 24, 25, 'DOJO DE MAMADOU\nCombats Co-op Duo & Trio\nRéservé aux escouades de 2 ou 3 dresseurs !']],
     buildings: [
       // mapId : les identifiants des intérieurs d'avant l'agrandissement (parties arrêtées dedans, dresseurs de l'arène)
       { kind: 'gym', ...GRAND.gym, x: 2, y: 2, roof: 'brown', mapId: 'granit:gym3' },
       { kind: 'mart', ...GRAND.mart, x: 23, y: 3, mapId: 'granit:mart18' },
-      { kind: 'house', x: 23, y: 9, roof: 'gray', mapId: 'granit:house15', npcs: [{ x: 4, y: 4, sprite: 'pecheur', text: ['Drakos nous prend la moitié de chaque pêche.', '« Pour protéger les îles », qu\'il dit.', 'Basalte ferme les yeux... c\'est son frère, après tout.'] }] },
+      { kind: 'house', x: 23, y: 9, roof: 'gray', mapId: 'granit:house15', npcs: [{ x: 4, y: 4, sprite: 'pecheur', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Drakos a supprimé l\'impôt sur la pêche ! Les bateaux rentrent enfin les cales pleines.', 'Basalte vient même donner un coup de main sur le port le matin.'] : ['Drakos nous prend la moitié de chaque pêche.', '« Pour protéger les îles », qu\'il dit.', 'Basalte ferme les yeux... c\'est son frère, après tout.'] }] },
       { kind: 'center', ...GRAND.center, x: 3, y: 21, mapId: 'granit:center2' },
       { kind: 'dojo', ...GRAND.dojo, x: 23, y: 20, roof: 'red', mapId: 'granit:dojo', name: 'Dojo de Mamadou' },
       { kind: 'house', x: 12, y: 23, roof: 'brown', mapId: 'granit:house20', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Les trois frères sont nés ici, sur Granit.', 'Basalte est le plus jeune. Pyros garde le volcan, et Drakos... la Grande Île.'] }] },
     ],
     npcs: [
       { id: 'garde-quai', x: 22, y: 2, sprite: 'garde', dir: 'down', script: 'granitDock', text: ['Port-Granit. Ici, c\'est Drakos qui fait la loi, pas la Ligue.'] },
-      // le professeur Orme, chercheur des Méga-Évolutions : remet le Méga-Anneau aux dresseurs qui ont 5 badges, puis vend les Méga-Gemmes
+      // le Professeur Cèdre, chercheur des Méga-Évolutions : remet le Méga-Anneau aux dresseurs qui ont 5 badges, puis vend les Méga-Gemmes
       { id: 'mega-chercheuse', x: 17, y: 8, sprite: 'savant', dir: 'down', script: 'megaRing' },
       { id: 'marin', x: 15, y: 22, sprite: 'marin', move: 'wander', text: ['Avec Surf, tu peux rejoindre Cendrelune, au sud-ouest.', 'Mais les gardes de Pyros ne laissent entrer que ceux qui ont battu Basalte.'] },
     ],
@@ -756,7 +756,7 @@ export function buildWorld() {
       { kind: 'center', ...GRAND.center, x: 2, y: 2, mapId: 'cendre:center3' }, { kind: 'mart', ...GRAND.mart, x: 27, y: 2, mapId: 'cendre:mart11' },
       { kind: 'house', x: 2, y: 19, roof: 'orange', mapId: 'cendre:house23', npcs: [{ x: 4, y: 4, sprite: 'montagnard', text: ['L\'Eau, la Roche et le Sol éteignent le Feu.', 'Pyros a beau être ardent, il a ses faiblesses.'] }] },
       { kind: 'gym', ...GRAND.gym, x: 8, y: 11, roof: 'red', mapId: 'cendre:gym12' },
-      { kind: 'house', x: 2, y: 12, roof: 'brown', mapId: 'cendre:house3', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Le pont qui nous reliait au continent a été coupé sur ordre de Drakos.', 'Il voulait que les îles se débrouillent sans la Ligue.'] }] },
+      { kind: 'house', x: 2, y: 12, roof: 'brown', mapId: 'cendre:house3', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Les ferries du continent accostent de nouveau sur l\'archipel !', 'On dit que même Pyros et Drakos se reparlent comme avant.'] : ['Le pont qui nous reliait au continent a été coupé sur ordre de Drakos.', 'Il voulait que les îles se débrouillent sans la Ligue.'] }] },
       { kind: 'house', x: 30, y: 12, roof: 'gray', mapId: 'cendre:house22', npcs: [{ x: 4, y: 4, sprite: 'vieil_homme', text: ['Pyros n\'est pas méchant. Il croit que son frère protège les îles.', 'Mais protéger, ce n\'est pas tout prendre...'] }] },
     ],
     npcs: [],
@@ -777,9 +777,9 @@ export function buildWorld() {
       // mapId : les identifiants des intérieurs d'avant l'agrandissement (parties arrêtées dedans, dresseurs de l'arène)
       { kind: 'gym', ...GRAND.gym, x: 2, y: 14, roof: 'purple', mapId: 'ecaille:gym13' },
       { kind: 'center', ...GRAND.center, x: 23, y: 3, mapId: 'ecaille:center3' }, { kind: 'mart', ...GRAND.mart, x: 31, dx: 1, y: 4, mapId: 'ecaille:mart9' },
-      { kind: 'bighouse', x: 23, y: 14, roof: 'purple', mapId: 'ecaille:bighouse23', name: 'Caserne d\'Écaille', npcs: [{ x: 4, y: 4, sprite: 'garde', text: ['Nous, les Gardes d\'Écaille, servons Drakos.', 'Il a juré qu\'aucun Maître de la Ligue ne dicterait jamais sa loi aux îles.'] }, { x: 7, y: 5, sprite: 'garde', text: ['Entre nous... ça fait longtemps que je ne sais plus contre qui on se bat.'] }] },
-      { kind: 'house', x: 31, y: 14, roof: 'teal', mapId: 'ecaille:house4', npcs: [{ x: 4, y: 4, sprite: 'habitante', text: ['Drakos a perdu contre Célestine, il y a dix ans, en finale de la Ligue.', 'Depuis, il refuse toute autorité. Même celle de la Ligue.'] }] },
-      { kind: 'house', x: 24, y: 21, roof: 'red', mapId: 'ecaille:house25', npcs: [{ x: 2, y: 4, sprite: 'vieil_homme', text: ['Au nord de la ville, il y a le Cap des Étoiles.', 'On raconte que Odyssor, le géant des océans, y passe quand la mer est calme...', 'Mais Drakos en interdit l\'accès.'] }] },
+      { kind: 'bighouse', x: 23, y: 14, roof: 'purple', mapId: 'ecaille:bighouse23', name: 'Caserne d\'Écaille', npcs: [{ x: 4, y: 4, sprite: 'garde', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Drakos a ouvert les ports et laissé le passé derrière lui.', 'Nous veillons désormais sur la paix de l\'archipel aux côtés de la Ligue.'] : ['Nous, les Gardes d\'Écaille, servons Drakos.', 'Il a juré qu\'aucun Maître de la Ligue ne dicterait jamais sa loi aux îles.'] }, { x: 7, y: 5, sprite: 'garde', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Depuis que tu as vaincu Drakos, tout le monde respire ici.'] : ['Entre nous... ça fait longtemps que je ne sais plus contre qui on se bat.'] }] },
+      { kind: 'house', x: 31, y: 14, roof: 'teal', mapId: 'ecaille:house4', npcs: [{ x: 4, y: 4, sprite: 'habitante', text: (st) => (st.badges[7] || st.flags.drakos) ? ['On raconte que Drakos prépare déjà sa revanche amicale contre Célestine… et contre toi !'] : ['Drakos a perdu contre Célestine, il y a dix ans, en finale de la Ligue.', 'Depuis, il refuse toute autorité. Même celle de la Ligue.'] }] },
+      { kind: 'house', x: 24, y: 21, roof: 'red', mapId: 'ecaille:house25', npcs: [{ x: 2, y: 4, sprite: 'vieil_homme', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Le Cap des Étoiles est désormais ouvert au nord de la ville !', 'On raconte qu\'Odyssor, le géant des océans, y passe quand la mer est calme...'] : ['Au nord de la ville, il y a le Cap des Étoiles.', 'On raconte qu\'Odyssor, le géant des océans, y passe quand la mer est calme...', 'Mais Drakos en interdit l\'accès.'] }] },
     ],
     npcs: [
       { id: 'garde-cap', x: 20, y: 2, sprite: 'garde', dir: 'down', gate: { badges: 8, tiles: [[20, 1], [21, 1]] }, text: ['Le Cap des Étoiles est interdit.', 'Seul Drakos, ou celui qui l\'aura vaincu, peut y passer.'] },
@@ -798,8 +798,8 @@ export function buildWorld() {
       ['sign', 8, 8, 'CIMELUNE\nLa cité des dragons anciens.'], ['sign', 13, 14, 'MUSÉE DES DRAGONS\nL\'histoire des dragons d\'Odyssée.']],
     buildings: [
       { kind: 'center', ...GRAND.center, x: 2, y: 3 }, { kind: 'mart', ...GRAND.mart, x: 13, y: 4 },
-      { kind: 'house', x: 19, dx: 1, y: 6, roof: 'purple', npcs: [{ x: 4, y: 4, sprite: 'scientifique', text: ['Les dragons ne craignent presque rien...', 'sauf la Glace et les autres dragons.'] }] },
-      { kind: 'bighouse', x: 13, y: 11, roof: 'purple', name: 'Musée des Dragons', npcs: [{ x: 5, y: 4, sprite: 'vieil_homme', text: ['Drakos a grandi en écoutant les histoires de ce musée.', 'Il rêvait de devenir Maître. Célestine l\'a battu en finale.', 'Depuis, il règne sur l\'archipel, loin de la Ligue.'] }, { x: 8, y: 5, sprite: 'scientifique', text: ['Regarde cette fresque : une créature immense nageant sous la mer étoilée.', 'Odyssor. Les anciens disaient qu\'il apparaît au Cap des Étoiles quand les îles et le continent se réconcilient.', 'À côté, un oiseau d\'argent plonge dans la mer : Lugia. On dit que Odyssor et Lugia sont les deux gardiens des eaux.'] }] },
+      { kind: 'house', x: 19, dx: 1, y: 6, roof: 'purple', npcs: [{ x: 4, y: 4, sprite: 'scientifique', text: ['Les dragons ne craignent presque rien...', 'sauf la Glace, la Fée et les autres dragons.'] }] },
+      { kind: 'bighouse', x: 13, y: 11, roof: 'purple', name: 'Musée des Dragons', npcs: [{ x: 5, y: 4, sprite: 'vieil_homme', text: ['Drakos a grandi en écoutant les histoires de ce musée.', 'Il rêvait de devenir Maître. Célestine l\'a battu en finale.', 'Depuis, il règne sur l\'archipel, loin de la Ligue.'] }, { x: 8, y: 5, sprite: 'scientifique', text: ['Regarde cette fresque : un Pokémon immense nageant sous la mer étoilée.', 'Odyssor. Les anciens disaient qu\'il apparaît au Cap des Étoiles quand les îles et le continent se réconcilient.', 'À côté, un oiseau d\'argent plonge dans la mer : Lugia. On dit qu\'Odyssor et Lugia sont les deux gardiens des eaux.'] }] },
       { kind: 'house', x: 3, y: 13, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Au nord, la Route Victoire mène au Plateau Céleste.', 'Seuls les dresseurs aux quinze badges peuvent la franchir : les douze du continent et ceux des trois frères.'] }] },
       { kind: 'house', x: 22, y: 13, roof: 'red', npcs: [{ x: 4, y: 4, sprite: 'montagnard', text: ['La route 10 relie Cimelune à Bourg-Aube, par l\'ouest.', 'Ça rappelle des souvenirs, hein ?'] }] },
     ],
@@ -865,10 +865,10 @@ export function buildWorld() {
       'Astuce de pro : en combat sauvage, appuie directement sur B ou Y pour lancer ta meilleure Ball sans passer par les menus !'
     ]
   });
-  routeTrainer(W, r1, 0.35, 1, 4, 'Gamin', 'Léo', [[1013, 3]], { intro: 'Hé ! Toi aussi tu viens d\'avoir ta première créature ?' });
+  routeTrainer(W, r1, 0.35, 1, 4, 'Gamin', 'Léo', [[1013, 3]], { intro: 'Hé ! Toi aussi tu viens d\'avoir ton premier Pokémon ?' });
   routeTrainer(W, r1, 0.62, -1, 4, 'Fillette', 'Inès', [[161, 4]], { intro: 'Mon Fouinette est le plus mignon de la route !' });
   routeTrainer(W, r1, 0.82, 1, 3, 'Gamin', 'Malo', [[1010, 4], [19, 4]]);
-  routeTrainer(W, r1, 0.5, 1, 5, 'Fillette', 'Mila', [[16, 4]]);
+  routeTrainer(W, r1, 0.5, 1, 5, 'Fillette', 'Chloé', [[16, 4]]);
   routeItem(W, r1, 0.5, -1, 5, 'potion'); routeItem(W, r1, 0.9, 1, 5, 'poke-ball', 2);
 
   const H1 = relais(143, 196, 'e');
@@ -905,14 +905,14 @@ export function buildWorld() {
     W.prop('tonneau', cx1 - 3, cy1); W.prop('caisses', cx1 + 4, cy1 - 1); W.sign(cx1 - 3, cy1 + 2, 'CABANE DU BÛCHERON\nBois mort uniquement.');
     const vieille = cabane('abandonnee', 'Cabane abandonnée', cx2 - 2, cy2 - 2, versChemin(b2));
     vieille.item(2, 3, 'dusk-stone'); vieille.item(7, 5, 'super-potion', 2);
-    vieille.prop('books', 6, 2); vieille.object(6, 2, { use: async (A) => A.say(['Un vieux carnet est resté ouvert sur l\'étagère. L\'écriture est pâle :', '« Le jour où j\'ai posé la capsule sur l\'autel, les feuilles se sont figées en l\'air. »', '« Puis tout est reparti, comme si de rien n\'était. J\'ai reperdu la capsule depuis. »', '... La suite est illisible.']) });
+    vieille.prop('books', 6, 2); vieille.object(6, 2, { use: async (A) => A.say(['Un vieux carnet est resté ouvert sur l\'étagère. L\'écriture est pâle :', '« Le jour où j\'ai posé la Poké Ball dorée sur l\'autel, les feuilles se sont figées en l\'air. »', '« Puis tout est reparti, comme si de rien n\'était. J\'ai reperdu la Poké Ball depuis. »', '... La suite est illisible.']) });
     W.prop('rocher_grand', cx2 - 4, cy2 + 2); W.prop('tonneau', cx2 + 4, cy2 - 1);
     // la clairière cachée : un passage d'une case entre les arbres, un cercle de pierres, une silhouette qui parle par énigmes
     W.rect(cx3 - 3, cy3 - 3, cx3 + 2, cy3 + 2, T.GRASS, [T.TREE, T.PINE, T.DARKTALL]);
     { const [px, py] = versChemin(b3), dedans = (x, y) => x >= cx3 - 3 && x <= cx3 + 2 && y >= cy3 - 3 && y <= cy3 + 2;
       let x = cx3, y = cy3; while (x !== px || y !== py) { if (x !== px) x += Math.sign(px - x); else y += Math.sign(py - y); if (dedans(x, y)) continue; if (walkable(W.get(x, y))) break; W.set(x, y, T.GRASS); W.setHeight(x, y, W.height(px, py)); } }
     for (const [x, y] of [[cx3 - 3, cy3 - 3], [cx3 + 2, cy3 - 3], [cx3 - 3, cy3 + 2], [cx3 + 2, cy3 + 2], [cx3 - 1, cy3 - 3]]) W.prop('rocher_grand', x, y);
-    W.prop('stele', cx3, cy3 - 1); W.object(cx3, cy3 - 1, { use: async (A) => A.say('Une pierre couverte de mousse. On y devine des feuilles gravées en spirale,\net, au centre, une petite créature aux ailes rondes.') });
+    W.prop('stele', cx3, cy3 - 1); W.object(cx3, cy3 - 1, { use: async (A) => A.say('Une pierre couverte de mousse. On y devine des feuilles gravées en spirale,\net, au centre, un petit Pokémon aux ailes rondes.') });
     W.npc({ id: 'bois:silhouette', x: cx3 - 1, y: cy3 + 1, sprite: 'medium', dir: 'left', text: ['Tu as trouvé le passage. Peu de gens le voient.', 'Ce bois murmure parce qu\'il se souvient. Hier, demain... pour lui, c\'est la même chose.', 'Ceux qui portent ce qu\'il attend trouvent toujours l\'autel.'] });
     W.item(cx3 + 1, cy3, 'rare-candy');
   }
@@ -929,7 +929,7 @@ export function buildWorld() {
   const g1in = W.building('cave', 146 + LX, 38 + LY), g1out = W.building('cave', 171 + LX, 38 + LY);
   const r3a = G2({ id: 'r3', nom: 'Route 3', de: porte('C', 'r3'), vers: { x: g1in.doorX, y: g1in.doorY + 1, dir: 'n' }, long: 6, graine: 404, w: 10, grass: 0.8, trees: 0.04, rocks: 0.02, paysages: ['rochers', 'prairie', 'bosquet', 'fleurs'], branches: 0.5, anciens: 4, panneaux: ['ROUTE 3\n→ Grotte Lunaire, Mont Lunaire', null], voix: 'montagne' }, 'r3');
   plateau(W, polygone([[137.5 + LX, 27 + LY], [153 + LX, 25 + LY], [154.5 + LX, 34 + LY], [153.5 + LX, 47.5 + LY], [146 + LX, 48.5 + LY], [137.5 + LX, 47.5 + LY]]), 1);
-  routeTrainer(W, r3a, 0.35, 1, 3, 'Montagnard', 'Gaston', [[1026, 11], [74, 12], [66, 12]]);
+  routeTrainer(W, r3a, 0.35, 1, 3, 'Montagnard', 'Béranger', [[1026, 11], [74, 12], [66, 12]]);
   routeTrainer(W, r3a, 0.7, -1, 3, 'Fillette', 'Lise', [[1039, 12], [35, 11]]);
   routeItem(W, r3a, 0.55, 1, 4, 'burn-heal');
   routeTrainer(W, r3a, 0.15, -1, 3, 'Gamin', 'Joris', [[1024, 11], [21, 11]]);
@@ -949,7 +949,7 @@ export function buildWorld() {
   const r5 = G2({ id: 'r5', nom: 'Route 5', de: porte('E', 'r5'), vers: arrivee('F', 'r5'), long: 17, graine: 707, w: 12, grass: 0.75, trees: 0.05, rocks: 0.01, paysages: ['prairie', 'rebords', 'rochers', 'etang', 'fleurs', 'riviere', 'bosquet'], branches: 0.4, raccourci: 'eclate', anciens: 5, panneaux: ['ROUTE 5\n↓ Floralia', 'ROUTE 5\n↑ Voltacité'], voix: 'general' }, 'r5');
   // au milieu de la route, un tertre : un escalier taillé y grimpe, sa falaise domine le sentier
   tertre(W, r5, 0.5, 'ether', 2);
-  routeTrainer(W, r5, 0.12, 1, 4, 'Scientifique', 'Pierre', [[1036, 19], [100, 19], [81, 20]]);
+  routeTrainer(W, r5, 0.12, 1, 4, 'Scientifique', 'Aurélien', [[1036, 19], [100, 19], [81, 20]]);
   routeTrainer(W, r5, 0.3, -1, 4, 'Randonneuse', 'Élise', [[77, 20], [1014, 20]]);
   routeTrainer(W, r5, 0.46, 1, 4, 'Karatéka', 'Kenji', [[66, 21], [1033, 22]]);
   routeTrainer(W, r5, 0.6, -1, 4, 'Gamin', 'Nathan', [[1034, 20], [22, 20], [209, 21]]);
@@ -960,8 +960,8 @@ export function buildWorld() {
   // une falaise boisée et un petit belvédère où l'on monte par un escalier taillé
   tertre(W, r6, 0.8, 'elixir', 1);
   routeTrainer(W, r6, 0.15, 1, 4, 'Randonneuse', 'Nina', [[1038, 24], [70, 24]]);
-  routeTrainer(W, r6, 0.35, -1, 4, 'Insectomane', 'Hugo', [[1019, 25], [127, 25]]);
-  routeTrainer(W, r6, 0.55, 1, 3, 'Médium', 'Morgane', [[1023, 25], [92, 24], [1039, 26]]);
+  routeTrainer(W, r6, 0.35, -1, 4, 'Insectomane', 'Thibault', [[1019, 25], [127, 25]]);
+  routeTrainer(W, r6, 0.55, 1, 3, 'Médium', 'Gwenaëlle', [[1023, 25], [92, 24], [1039, 26]]);
   routeTrainer(W, r6, 0.75, -1, 4, 'Topdresseur', 'Axel', [[47, 26], [1020, 26], [1016, 26]]);
   routeItem(W, r6, 0.25, -1, 5, 'leaf-stone'); routeItem(W, r6, 0.65, 1, 5, 'hyper-potion'); routeItem(W, r6, 0.9, -1, 5, 'revive');
 
@@ -971,7 +971,7 @@ export function buildWorld() {
   routeTrainer(W, r7, 0.25, 1, 4, 'Médium', 'Ophélie', [[1023, 28], [97, 29]]);
   routeTrainer(W, r7, 0.55, -1, 4, 'Karatéka', 'Bruno', [[1033, 29], [107, 29], [106, 30]]);
   routeTrainer(W, r7, 0.8, 1, 4, 'Topdresseuse', 'Lou', [[78, 31], [1012, 31], [1040, 30]]);
-  routeTrainer(W, r7, 0.4, 1, 3, 'Pêcheur', 'Gaël', [[1029, 28], [118, 29]]);
+  routeTrainer(W, r7, 0.4, 1, 3, 'Pêcheur', 'Yohan', [[1029, 28], [118, 29]]);
   routeItem(W, r7, 0.4, -1, 5, 'fire-stone'); routeItem(W, r7, 0.25, 1, 5, 'eviolite', 1, 'item:r7:eviolite');
   // Cap Mirage : plage, ponton et le rival qui attend
   { const { x, y } = CAP; W.rect(x - 22, y, x + 22, y + 6, T.SAND, [T.TREE, T.GRASS, T.TALL, T.WATER, T.FLOWER]); W.rect(x - 22, y + 7, x + 22, y + 9, T.WATER, [T.TREE, T.GRASS, T.SAND, T.TALL]);
@@ -1079,7 +1079,7 @@ export function buildWorld() {
   gemmes(W, r7, 0, [[0.5, 1, 'tyranitarite']]); gemmes(W, r9, 1, [[0.6, 1, 'lucarionite']]);
   gemmes(W, r10, 2, [[0.3, -1, 'gyaradosite'], [0.8, 1, 'aerodactylite']]); gemmes(W, r11, 3, [[0.5, 1, 'absolite']]);
   gemmes(W, r12, 4, [[0.4, -1, 'scizorite'], [0.85, 1, 'heracronite']]);
-  legend({ id: 'latias', sp: 380, lvl: 50, ...xy(offRoute(r10, 0.55, -1, 3)), cond: (f, g) => g.badgeCount() >= 8, intro: ['Un souffle chaud frôle la route...', 'Une créature rouge et blanche plane en silence : Latias !'] });
+  legend({ id: 'latias', sp: 380, lvl: 50, ...xy(offRoute(r10, 0.55, -1, 3)), cond: (f, g) => g.badgeCount() >= 8, intro: ['Un souffle chaud frôle la route...', 'Un Pokémon rouge et blanc plane en silence : Latias !'] });
   legend({ id: 'diancie', sp: 719, lvl: 55, ...xy(offRoute(r12, 0.6, -1, 3)), cond: (f, g) => g.badgeCount() >= 8, intro: ['Des cristaux roses scintillent entre les arbres...', 'Une petite princesse de diamant apparaît : Diancie !'] });
   // le passeur du Cap Mirage et le ponton de Port-Granit : le seul bateau qui franchit les tourbillons de l'archipel
   // (5 badges : on y vient d'abord à pied, par Mirage ; le bateau de l'Embarcadère n'y mène pas plus tôt)
@@ -1092,7 +1092,7 @@ export function buildWorld() {
     for (let d = 1; d <= 5; d++) { const x = Math.floor(p.x + 0.5 + p.nx * d), y = Math.floor(p.y + 0.5 + p.ny * d); if (!pas.some(([a, b]) => a === x && b === y)) pas.push([x, y]); }
     pas.forEach(([x, y], i) => { const q = pas[i - 1]; if (q && q[0] !== x && q[1] !== y && !walkable(W.get(x, q[1]))) W.set(x, q[1], T.GRASS); if (!walkable(W.get(x, y))) W.set(x, y, T.GRASS); });
     const [sx, sy] = pas[pas.length - 1], [cx, cy] = pas[pas.length - 2]; thing('statue', sx, sy, { type: 'shrine' });
-    legend({ id: 'celebi', sp: 251, lvl: 20, x: cx, y: cy, cond: 'celebi', intro: ['La Balle GS se met à trembler...', 'Une petite créature verte surgit d\'entre les feuilles : Celebi !'] }); }
+    legend({ id: 'celebi', sp: 251, lvl: 20, x: cx, y: cy, cond: 'celebi', intro: ['La GS Ball se met à trembler...', 'Un petit Pokémon vert surgit d\'entre les feuilles : Celebi !'] }); }
 
   // Embarcadère de l'Aube : un sentier part de la route 1 vers la baie
   { const p = along(r1, 0.55), y = Math.round(p.y); let x = Math.round(p.x) + 3;
@@ -1117,7 +1117,7 @@ export function buildWorld() {
         { kind: 'center', x: 3, dx: -1, y: 3 }, { kind: 'mart', x: 8, dx: 1, y: 3 },
         { kind: 'tower', x: 21, y: 3, roof: 'red', name: 'Phare de l\'Orage', npcs: [{ id: 'gardien', x: 5, y: 4, sprite: 'scientifique', script: 'phare' }] },
         { kind: 'house', x: 16, dx: -1, y: 4, roof: 'blue', npcs: [{ x: 4, y: 4, sprite: 'pecheur', text: ['Les orages d\'ici ne sont pas naturels.', 'Mon grand-père disait qu\'un grand oiseau de foudre dort sur le Pic Tonnerre.'] }] },
-        { kind: 'house', x: 3, y: 13, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['À l\'est, au bout de la côte, il y a de vieilles ruines.', 'Trois stèles racontent l\'histoire d\'une créature minuscule, rose comme l\'aube...'] }] },
+        { kind: 'house', x: 3, y: 13, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['À l\'est, au bout de la côte, il y a de vieilles ruines.', 'Trois stèles racontent l\'histoire d\'un Pokémon minuscule, rose comme l\'aube...'] }] },
         { kind: 'house', x: 19, y: 13, roof: 'gray', npcs: [{ x: 4, y: 4, sprite: 'vieil_homme', text: ['Tout au fond de l\'île, il y a un sanctuaire scellé.', 'Seul le Maître de la Ligue a le droit d\'y entrer. Ce qui dort là-dedans est... dangereux.'] }] },
       ],
       npcs: [{ id: 'marin', x: 8, y: 11, sprite: 'marin', move: 'wander', text: ['Le bateau de l\'Embarcadère passe ici tous les jours.', 'Avec trois badges, il t\'emmènera à l\'Île de la Grue, au nord.'] }],
@@ -1148,9 +1148,9 @@ export function buildWorld() {
     routeTrainer(W, cr, 0.65, -1, 3, 'Karatéka', 'Tao', [[1033, 27], [66, 27], [1037, 28]]);
     routeItem(W, cr, 0.5, 1, 4, 'great-ball', 3);
     const STELES = [
-      'STÈLE I\n« Avant les hommes, avant les villes, une créature minuscule portait en elle toutes les autres. »',
-      'STÈLE II\n« Elle jouait dans le vent des îles, invisible à ceux qui la cherchaient. »',
-      'STÈLE III\n« Qui aura lu les trois pierres et porté quatre badges la verra danser sur l\'autel. »',
+      'STÈLE I\n« Avant les hommes, avant les villes, un Pokémon minuscule portait en lui tous les autres. »',
+      'STÈLE II\n« Il jouait dans le vent des îles, invisible à ceux qui le cherchaient. »',
+      'STÈLE III\n« Qui aura lu les trois pierres et porté quatre badges le verra danser sur l\'autel. »',
     ];
     [[0.2, -1], [0.5, -1], [0.8, 1]].forEach(([t, side], i) => { const [x, y] = offRoute(cr, t, side, 3); thing('statue', x, y, { type: 'stele', n: i + 1, text: STELES[i] }); });
     W.rect(424, 222, 431, 228, T.GRASS); W.rect(424, 225, 431, 225, T.PATH);
@@ -1185,8 +1185,8 @@ export function buildWorld() {
       buildings: [
         { kind: 'center', ...GRAND.center, x: 3, dx: -1, y: 4, mapId: 'grue:center5' }, { kind: 'mart', ...GRAND.mart, x: 11, y: 4, mapId: 'grue:mart10' },
         { kind: 'house', w: 5, d: 5, h: 3, door: 2, modele: 'maisonThe', x: 25, y: 15, roof: 'gray', id: 'the', name: 'Maison de thé', npcs: [{ x: 4, y: 4, sprite: 'dame', text: ['Une tasse de thé ? Les Sages s\'arrêtaient toujours ici avant de prendre le bateau.', 'Leur tour dorée est sur le continent, dans la Forêt des Torii, au sud-ouest de Mirage.', 'Tout près de la Tour Cendrée, sa sœur brûlée.'] }] },
-        { kind: 'house', x: 4, y: 16, roof: 'brown', id: 'doyenne', name: 'Maison de la Doyenne', npcs: [{ id: 'doyenne', x: 4, y: 4, sprite: 'vieil_homme', script: 'doyenne' }] },
-        { kind: 'house', x: 22, y: 4, roof: 'red', npcs: [{ x: 4, y: 4, sprite: 'habitante', text: ['Il y a longtemps, trois créatures ont péri dans l\'incendie d\'une tour : la Tour Cendrée,', 'la sœur de la Tour Dorée. Les deux tours se dressent côte à côte dans la Forêt des Torii, sur le continent.', 'On raconte que Ho-Oh a ramené les trois créatures à la vie : Raikou, Entei et Suicune.'] }] },
+        { kind: 'house', x: 4, y: 16, roof: 'brown', id: 'doyenne', name: 'Maison de la Doyenne', npcs: [{ id: 'doyenne', x: 4, y: 4, sprite: 'dame', script: 'doyenne' }] },
+        { kind: 'house', x: 22, y: 4, roof: 'red', npcs: [{ x: 4, y: 4, sprite: 'habitante', text: ['Il y a longtemps, trois Pokémon ont péri dans l\'incendie d\'une tour : la Tour Cendrée,', 'la sœur de la Tour Dorée. Les deux tours se dressent côte à côte dans la Forêt des Torii, sur le continent.', 'On raconte que Ho-Oh a ramené les trois Pokémon à la vie : Raikou, Entei et Suicune.'] }] },
         { kind: 'house', x: 10, y: 17, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'montagnard', text: ['À l\'est, le chemin du Mont Brasier est barré par des arbustes.', 'Avec Coupe, tu pourrais aller voir le cratère... on dit qu\'un oiseau de feu y niche.'] }] },
       ],
       npcs: [{ id: 'enfant', x: 12, y: 15, sprite: 'enfant', move: 'wander', text: ['Mamie dit que la Tour Dorée, sur le continent, touche presque les nuages !', 'Avant, on l\'appelait la Tour de la Grue, comme notre village.'] }],
@@ -1196,14 +1196,14 @@ export function buildWorld() {
     pier('grue', 'Île de la Grue (Hautegrue)', 349, 124, -1, 5, 3, { town: 'Hautegrue', music: 'mystic' });
     // Sentier des Pins, au nord du village
     const sp1 = R('grue1', 'Sentier des Pins', [[370.5, 112], [370.5, 100], [384, 90], [396, 86], [404, 85]], { w: 11, grass: 0.9, trees: 0.06, treeT: T.PINE, flowers: 0.02 }, 'grue', 'forest');
-    routeTrainer(W, sp1, 0.2, -1, 4, 'Randonneuse', 'Iris', [[1021, 29], [1038, 30], [69, 29]]);
+    routeTrainer(W, sp1, 0.2, -1, 4, 'Randonneuse', 'Opaline', [[1021, 29], [1038, 30], [69, 29]]);
     routeTrainer(W, sp1, 0.45, 1, 4, 'Médium', 'Séléné', [[1039, 30], [1023, 31]]);
-    routeTrainer(W, sp1, 0.75, -1, 4, 'Topdresseur', 'Hugo', [[1043, 31], [1011, 31], [58, 31]]);
+    routeTrainer(W, sp1, 0.75, -1, 4, 'Topdresseur', 'Léonard', [[1043, 31], [1011, 31], [58, 31]]);
     routeItem(W, sp1, 0.3, 1, 5, 'great-ball', 3); routeItem(W, sp1, 0.6, -1, 5, 'hyper-potion'); routeItem(W, sp1, 0.95, 1, 3, 'rare-candy');
     // Chemin du Mont Brasier, à l'est : des arbustes à couper (Coupe) mènent au cratère de Sulfura
     const mb = R('grue2', 'Chemin du Brasier', [[387.5, 124.5], [400, 120], [412, 112], [423.5, 102]], { w: 10, grass: 0.8, trees: 0.04, rocks: 0.04 }, 'brasier', 'volcano');
     routeTrainer(W, mb, 0.35, 1, 4, 'Karatéka', 'Kaito', [[1033, 31], [66, 31], [1041, 32]]);
-    routeTrainer(W, mb, 0.7, -1, 4, 'Montagnard', 'Bastien', [[1042, 32], [1028, 31], [74, 31]]);
+    routeTrainer(W, mb, 0.7, -1, 4, 'Montagnard', 'Damien', [[1042, 32], [1028, 31], [74, 31]]);
     W.rect(423, 88, 424, 103, T.PATH); W.set(423, 95, T.CUT); W.set(424, 95, T.CUT);
     W.rect(414, 76, 432, 87, T.ASH); W.rect(423, 78, 424, 87, T.PATH);
     W.prop('rock', 416, 78); W.prop('rock', 430, 79); W.prop('rock', 417, 85);
@@ -1229,7 +1229,7 @@ export function buildWorld() {
       buildings: [
         { kind: 'center', x: 3, y: 2 }, { kind: 'mart', x: 9, dx: 1, y: 2 },
         { kind: 'house', x: 19, y: 3, roof: 'gray', id: 'ermite', name: 'Cabane de l\'Ermite', npcs: [{ id: 'ermite', x: 4, y: 4, sprite: 'montagnard', script: 'ermite' }] },
-        { kind: 'house', x: 3, y: 12, roof: 'blue', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Sous l\'île, la mer creuse des grottes immenses.', 'Les tourbillons y sont si forts que personne n\'en revient... sauf ceux que Lugia laisse passer.', 'Ma grand-mère disait que Lugia et Ho-Oh étaient autrefois amis. Depuis l\'incendie de la vieille tour, chacun garde son île.'] }] },
+        { kind: 'house', x: 3, y: 12, roof: 'blue', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Sous l\'île, la mer creuse des grottes immenses.', 'Les tourbillons y sont si forts que personne n\'en revient... sauf ceux que Lugia laisse passer.', 'Ma grand-mère disait que Lugia et Ho-Oh étaient autrefois amis. Depuis l\'incendie de la vieille tour, Lugia veille sur son île et Ho-Oh sur sa tour dorée.'] }] },
         { kind: 'house', x: 9, y: 13, roof: 'teal', npcs: [{ x: 4, y: 4, sprite: 'pecheur', text: ['La Glace craint le Feu, le Combat, la Roche et l\'Acier.', 'Pense à prendre de quoi soigner le gel !'] }] },
       ],
       npcs: [{ id: 'enfant', x: 18, y: 11, sprite: 'enfant', move: 'wander', text: ['Il neige tout le temps ici. J\'adore !'] }],
@@ -1239,8 +1239,8 @@ export function buildWorld() {
     pier('givre', 'Île Givrée (Givrebourg)', 343, 44, -1, 3, 5, { town: 'Givrebourg', music: 'snow' });
     const pg = R('givre1', 'Pente Givrée', [[364.5, 36], [364.5, 24], [380, 16], [398, 12], [414, 10]], { w: 11, grass: 0.8, trees: 0.06, treeT: T.PINE, rocks: 0.03, theme: 'snow' }, 'givre', 'snow');
     routeTrainer(W, pg, 0.2, 1, 4, 'Skieuse', 'Neige', [[1045, 38], [225, 38], [86, 39]], { intro: 'Attention, ça glisse !' });
-    routeTrainer(W, pg, 0.45, -1, 4, 'Alpiniste', 'Gaspard', [[220, 39], [1028, 39], [1027, 40]]);
-    routeTrainer(W, pg, 0.7, 1, 4, 'Topdresseuse', 'Alba', [[1046, 41], [124, 40], [1040, 41]]);
+    routeTrainer(W, pg, 0.45, -1, 4, 'Alpiniste', 'Benoît', [[220, 39], [1028, 39], [1027, 40]]);
+    routeTrainer(W, pg, 0.7, 1, 4, 'Topdresseuse', 'Noémie', [[1046, 41], [124, 40], [1040, 41]]);
     routeTrainer(W, pg, 0.9, -1, 3, 'Alpiniste', 'Erwan', [[221, 42], [87, 42], [1035, 42]]);
     routeItem(W, pg, 0.3, -1, 5, 'ice-heal', 3); routeItem(W, pg, 0.6, 1, 5, 'ultra-ball', 3); routeItem(W, pg, 0.8, -1, 5, 'max-potion');
     // Cime Givrée : Artikodin
@@ -1265,7 +1265,7 @@ export function buildWorld() {
       const [lx, ly] = nearestWalkable(tourb, 38, 6);
       legends.push({ id: 'lugia', sp: 249, lvl: 50, map: 'tourbillons', x: lx, y: ly, intro: ['L\'eau se met à tourbillonner...', 'Une immense silhouette argentée émerge des profondeurs : Lugia !'] });
     }
-    caveTrainers(tourb, [['Pêcheur', 'Morvan', [[1046, 43], [131, 43]]], ['Topdresseur', 'Loïc', [[1032, 43], [87, 44], [1009, 44]]]], 44);
+    caveTrainers(tourb, [['Pêcheur', 'Morvan', [[1046, 43], [131, 43]]], ['Topdresseur', 'Tristan', [[1032, 43], [87, 44], [1009, 44]]]], 44);
     caveItems(tourb, ['max-repel', 'ultra-ball', 'full-restore'], 45);
     legend({ id: 'suicune', sp: 245, lvl: 50, ...xy(offRoute(gt, 0.25, -1, 2)), cond: 'beasts', intro: ['Un vent du nord souffle sur la glace...', 'C\'est Suicune, la bête des eaux pures !'] });
     // l'île se couvre de neige ; les arbres deviennent des sapins givrés, les sentiers des chemins pavés
@@ -1321,7 +1321,7 @@ export function buildWorld() {
     W.warp(out.doorX, out.doorY, { map: 'victoire', x: cx, y: cy, dir: 'up' });
     victoire.deco.push({ k: 'exitlight', x: cx, y: cy + 1 });
   }
-  caveTrainers(victoire, [['Topdresseur', 'Dimitri', [[68, 71], [1044, 72], [130, 72]], { format: 'triple', intro: 'Route Victoire, format Trio 3v3 ! Montre-moi ce que tu vaux !' }], ['Topdresseuse', 'Sofia', [[149, 72], [1040, 72], [1035, 72]], { format: 'double', intro: 'Un combat Duo avant la Ligue, ça te tente ?' }], ['Karatéka', 'Takeshi', [[68, 73], [1033, 72], [106, 73]]], ['Médium', 'Iris', [[94, 73], [1023, 73]]], ['Montagnard', 'Hubert', [[76, 73], [1028, 73], [464, 74]]]], 73);
+  caveTrainers(victoire, [['Topdresseur', 'Dimitri', [[68, 71], [1044, 72], [130, 72]], { format: 'triple', intro: 'Route Victoire, combat Trio ! Montre-moi ce que tu vaux !' }], ['Topdresseuse', 'Sofia', [[149, 72], [1040, 72], [1035, 72]], { format: 'double', intro: 'Un combat Duo avant la Ligue, ça te tente ?' }], ['Karatéka', 'Takeshi', [[68, 73], [1033, 72], [106, 73]]], ['Médium', 'Violette', [[94, 73], [1023, 73]]], ['Montagnard', 'Hubert', [[76, 73], [1028, 73], [464, 74]]]], 73);
   caveItems(victoire, ['full-restore', 'max-repel', 'rare-candy', 'ultra-ball', 'revive', 'max-potion'], 43);
   smashOnPath(victoire, { x: 50, y: 34 }, 3, 991);
 
@@ -1340,7 +1340,7 @@ export function buildWorld() {
   W.plateau = plateauNaturel(W, towns.J);
   /* ======================== ARÈNES ======================== */
   const gymTrainers = [
-    [['Insectomane', 'Lucas', [[13, 9], [1017, 10]]], ['Jardinière', 'Capucine', [[540, 10], [401, 10]]]],   // la Ruche de Sylvebourg (niveaux 9 à 11)
+    [['Insectomane', 'Lucas', [[13, 9], [1017, 10]]], ['Jardinière', 'Anémone', [[540, 10], [401, 10]]]],   // la Ruche de Sylvebourg (niveaux 9 à 11)
     [['Marin', 'Yann', [[1029, 17], [116, 17]]], ['Fillette', 'Océane', [[118, 18], [1031, 18]]], ['Pêcheur', 'Paul', [[60, 19], [1033, 19]]]],
     [['Scientifique', 'Alan', [[100, 23], [1034, 23]]], ['Topdresseuse', 'Électra', [[1036, 24], [25, 24]]], ['Scientifique', 'Ohm', [[82, 25]]]],
     [['Randonneuse', 'Rose', [[69, 28], [1021, 28]]], ['Topdresseuse', 'Lila', [[44, 29], [1038, 29]]], ['Randonneuse', 'Iris', [[189, 30]]]],
@@ -1352,16 +1352,16 @@ export function buildWorld() {
   ];
   // quatrième dresseur des arènes qui n'en avaient que deux ou trois
   const GYM_EXTRA = [
-    ['Insectomane', 'Basile', [[1018, 10, null, [33, 81, 106]], [1020, 11]]], ['Pêcheur', 'Gilles', [[1029, 18]]], ['Scientifique', 'Volt', [[1034, 24]]], ['Fillette', 'Capucine', [[1021, 29]]],
+    ['Insectomane', 'Basile', [[1018, 10, null, [33, 81, 106]], [1020, 11]]], ['Pêcheur', 'Gilles', [[1029, 18]]], ['Scientifique', 'Volt', [[1034, 24]]], ['Fillette', 'Pivoine', [[1021, 29]]],
     ['Médium', 'Isaure', [[1039, 34]]], ['Montagnard', 'Roch', [[1026, 39]]], ['Karatéka', 'Kazuo', [[1041, 44]]], ['Topdresseur', 'Siegfried', [[1049, 48]]],
   ];
   // cinquième dresseur des arènes dessinées qui ont cinq places
   const GYM_CINQUIEME = {
     grass: [['Jardinière', 'Pervenche'], ['Randonneuse', 'Myrtille']], psychic: [['Médium', 'Oriane'], ['Médium', 'Séraphin']], rock: [['Montagnard', 'Silex'], ['Montagnard', 'Galet']],
-    fire: [['Karatéka', 'Daigo'], ['Topdresseur', 'Ignis']], dragon: [['Garde d\'Écaille', 'Ysolde'], ['Topdresseuse', 'Draconia']], flying: [['Pilote', 'Zéphyr'], ['Pilote', 'Alizée']],
-    dark: [['Ninja', 'Nyx'], ['Voleur', 'Sombral']], normal: [['Homme d\'affaires', 'Albert'], ['Femme d\'affaires', 'Odile']], water: [['Marin', 'Loïc'], ['Pêcheur', 'Ewen']],
-    electric: [['Scientifique', 'Ampère'], ['Topdresseuse', 'Volta Jr']], poison: [['Voleur', 'Toxin'], ['Médium', 'Belladone']], ground: [['Montagnard', 'Sablon'], ['Ouvrier', 'Gravier']],
-    steel: [['Ouvrier', 'Boulon'], ['Scientifique', 'Rivet']], fairy: [['Dame Kimono', 'Rosalie'], ['Fillette', 'Mélusine']],
+    fire: [['Karatéka', 'Daigo'], ['Topdresseur', 'Ignis']], dragon: [['Garde d\'Écaille', 'Ysolde'], ['Topdresseuse', 'Draconia']], flying: [['Pilote', 'Mistral'], ['Pilote', 'Alizée']],
+    dark: [['Ninja', 'Vesper'], ['Voleur', 'Sombral']], normal: [['Homme d\'affaires', 'Albert'], ['Femme d\'affaires', 'Odile']], water: [['Marin', 'Yannick'], ['Pêcheur', 'Ewen']],
+    electric: [['Scientifique', 'Thibaut'], ['Topdresseuse', 'Volta Jr']], poison: [['Voleur', 'Vénénis'], ['Médium', 'Belladone']], ground: [['Montagnard', 'Argile'], ['Ouvrier', 'Gravier']],
+    steel: [['Ouvrier', 'Félicien'], ['Scientifique', 'Ferraille']], fairy: [['Dame Kimono', 'Jacinthe'], ['Fillette', 'Mélusine']],
     bug: [['Gamin', 'Théodore'], ['Insectomane', 'Mathis']],
   };
   // objets des recoins (case « o » des plans)
@@ -1387,6 +1387,8 @@ export function buildWorld() {
       if (t.gym === 0 && k === 0) { list.push([plus[k][0], plus[k][1], [[10, 10], [165, 11]]]); continue; }
       const t4 = list[list.length - 1][2]; list.push([plus[k][0], plus[k][1], t4.map(([sp, lv]) => [sp, lv + 1]).slice(0, 1)]);
     }
+    const fem = L2.fem || ['Marine', 'Volta', 'Flora', 'Sibylle'].includes(L2.name);
+    const titre = fem ? 'notre Championne' : 'notre Champion';
     list.slice(0, spots.length).forEach(([cls, name, team], i) => {
       const lvl = Math.max(...team.map((m) => m[1]));
       const format = t.gym >= 4 && i === 2 ? 'triple' : t.gym >= 1 && i === 1 ? 'double' : undefined;
@@ -1394,14 +1396,13 @@ export function buildWorld() {
       const more = t.gym === 0 ? [] : equipeDeType(L2.type, lvl, needMore, t.gym * 31 + i * 7 + 3).filter(([sp]) => !team.some((m) => m[0] === sp));
       const fullTeam = t.gym === 0 ? team.slice(0, 2) : team.concat(more).slice(0, 4);
       const [x, y, dir, vue] = spots[i];
-      const intro = format === 'triple' ? 'Place au combat Trio (3v3) ! Montre-moi comment ton équipe se coordonne !'
-        : format === 'double' ? 'Place au combat Duo (2v2) ! Tu veux défier notre Champion ? Passe d\'abord par moi !'
-          : 'Tu veux défier notre Champion ? Passe d\'abord par moi !';
-      trainerNpc(g, x, y, dir, cls, name, fullTeam, { sight: vue ?? 3, format: fullTeam.length >= (format === 'triple' ? 3 : 2) ? format : undefined, intro, after: 'Notre Champion est bien plus fort que moi.' });
+      const intro = format === 'triple' ? 'Place au combat Trio ! Montre-moi comment ton équipe se coordonne !'
+        : format === 'double' ? `Place au combat Duo ! Tu veux défier ${titre} ? Passe d'abord par moi !`
+          : `Tu veux défier ${titre} ? Passe d'abord par moi !`;
+      trainerNpc(g, x, y, dir, cls, name, fullTeam, { sight: vue ?? 3, format: fullTeam.length >= (format === 'triple' ? 3 : 2) ? format : undefined, intro, after: `${fem ? 'Notre Championne est bien plus forte' : 'Notre Champion est bien plus fort'} que moi.` });
     });
     // objets posés dans les recoins des arènes dessinées
     (ar.objets || []).forEach(([x, y], i) => g.item(x, y, OBJETS_ARENE[t.gym]?.[i] || 'super-potion', 1, `${g.id}:objet${i}`));
-    const fem = L2.fem || ['Marine', 'Volta', 'Flora', 'Sibylle'].includes(L2.name);
     g.npc({ id: g.id + ':leader', x: ar.leader[0], y: ar.leader[1], dir: 'down', sprite: L2.ow, leader: t.gym, trainer: { cls: fem ? 'Championne' : 'Champion', name: L2.name, team: L2.team, prize: 100, bs: L2.ow, ai: t.gym === 0 ? 'normal' : 'smart', items: { 'potion': t.gym === 0 ? 2 : 0, 'super-potion': (t.gym >= 1 && t.gym < 3 ? 2 : 0), 'hyper-potion': (t.gym >= 3 ? 2 : 0), 'full-restore': (t.gym >= 6 ? 2 : (t.gym >= 4 ? 1 : 0)) }, intro: L2.intro, lose: L2.lose, sight: 0 } });
   }
   // Ligue : la Maître
@@ -1414,7 +1415,7 @@ export function buildWorld() {
   const lab = maps['aube:labo'];
   lab.battleBg = 'lab';
   lab.npc({ id: 'prof', x: 6, y: 3, sprite: 'saule', dir: 'down', script: 'prof' });
-  lab.npc({ id: 'assistant', x: 10, y: 7, sprite: 'scientifique', move: 'wander', text: ['Le professeur étudie le lien entre les dresseurs et leurs créatures.', 'Il dit que c\'est en voyageant qu\'on le comprend le mieux.'] });
+  lab.npc({ id: 'assistant', x: 10, y: 7, sprite: 'scientifique', move: 'wander', text: ['Le professeur étudie le lien entre les dresseurs et leurs Pokémon.', 'Il dit que c\'est en voyageant qu\'on le comprend le mieux.'] });
   STARTERS.forEach((sp, i) => lab.object(5 + i, 5, { type: 'starter', sp, cap: i }));
 
   // histoire secondaire : la Brume, les nouveaux lieux (lac, forêt des torii, jardin, île du Magma) et leurs quêtes
@@ -1447,11 +1448,11 @@ export function buildWorld() {
   W.ocre = canyonsDOcre({ W, maps, ENC, trainerNpc });
   // la Grotte des Sables : dans la falaise d'une mesa de la route 16 (grottes.js)
   W.sables = grotteDansFalaise({ W, maps, ENC, trainerNpc }, { routes, route: 'r16', id: 'sables', nom: 'Grotte des Sables', graine: 8181,
-    dresseurs: [['Montagnard', 'Ulysse', [[28, 61], [105, 62]]], ['Randonneuse', 'Nora', [[51, 61], [232, 61], [330, 62]]]],
+    dresseurs: [['Montagnard', 'Ulysse', [[28, 61], [105, 62]]], ['Randonneuse', 'Sidonie', [[51, 61], [232, 61], [330, 62]]]],
     objets: ['max-potion', 'max-repel', 'fire-stone', 'max-elixir'], cache: 'ultra-ball' });
   // la Grotte des Crêtes : une percée depuis la route 3 dans la roche de la Chaîne Céleste, au nord (grottes.js)
   W.cretes = grotteDansFalaise({ W, maps, ENC, trainerNpc }, { routes, route: 'r3', id: 'cretes', nom: 'Grotte des Crêtes', graine: 9191, percee: [0, -1], enc: ENC.grotte,
-    panneau: 'Sous les crêtes de la Chaîne Céleste.', dresseurs: [['Montagnard', 'Léon', [[74, 10], [41, 11]]], ['Gamin', 'Timéo', [[1024, 10], [1026, 11]]]],
+    panneau: 'Sous les crêtes de la Chaîne Céleste.', dresseurs: [['Montagnard', 'Léon', [[74, 10], [41, 11]]], ['Gamin', 'Matéo', [[1024, 10], [1026, 11]]]],
     objets: ['great-ball', 'escape-rope', 'moon-stone', 'super-potion'], cache: 'repel' });
   { const tz = W.zones.filter((z) => z.town || z.trigger), sz = W.zones.filter((z) => z.sea), rz = W.zones.filter((z) => !z.town && !z.trigger && !z.sea); W.zones = [...sz, ...rz, ...tz]; }
   // les grandes villes perchées : on y monte par des escaliers à chaque porte

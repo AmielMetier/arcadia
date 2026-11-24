@@ -36,8 +36,8 @@ const APRES = [
   ['kyurem', 646, 75, 39, 14, (f) => pris(f, 'reshiram', 'zekrom'), 'Un froid mortel monte du sol…'],
 
   // Aile Sud-Ouest : Jardin des Fabuleux
-  ['phione', 489, 50, 6, 26, null, 'Une petite créature flotte dans une flaque…'],
-  ['manaphy', 490, 50, 10, 26, null, 'Une petite créature bleue t\'observe depuis les fleurs…'],
+  ['phione', 489, 50, 6, 26, null, 'Un petit Pokémon flotte dans une flaque…'],
+  ['manaphy', 490, 50, 10, 26, null, 'Un petit Pokémon bleu t\'observe depuis les fleurs…'],
   ['shaymin', 492, 60, 14, 26, null, 'Les fleurs s\'écartent : un petit hérisson dort dessous…'],
   ['victini', 494, 60, 17, 27, null, 'Une petite flamme de victoire danse dans la clairière…'],
   ['meloetta', 648, 60, 6, 31, null, 'Une mélodie flotte dans l\'air…'],

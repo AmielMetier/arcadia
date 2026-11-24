@@ -332,7 +332,7 @@ export class Battle {
       if (this.wild) {
         this.say(`${joinNames(foeNames)} sauvages apparaissent !`);
       } else {
-        this.say(`${t.cls} ${t.name} lance un combat ${this.slots === 4 ? 'Quatuor (4v4)' : this.slots === 3 ? 'Trio (3v3)' : 'Duo (2v2)'} !`);
+        this.say(`${t.cls} ${t.name} lance un combat ${this.slots === 4 ? 'Quatuor' : this.slots === 3 ? 'Trio' : 'Duo'} !`);
         for (const sl of foeSlots) this.ev.push({ t: 'send', side: 1, slot: sl, idx: this.sides[1].activeSlots[sl] });
         this.say(`${t.cls} ${t.name} envoie ${joinNames(foeNames)} !`);
       }
@@ -1114,13 +1114,13 @@ export class Battle {
     this.runTries++;
     const lead = { side: 0, slot: this.aliveSlots(0)[0] ?? 0 }, fLead = { side: 1, slot: this.aliveSlots(1)[0] ?? 0 };
     if (this.trapped(lead)) { this.say(`${monName(this.act(lead))} est pris au piège : impossible de fuir !`); return false; }
-    if (this.ab(lead) === 'run-away') { this.ev.push({ t: 'sfx', k: 'run' }); this.say('Vous prenez la fuite !'); this.end('run'); return true; }
+    if (this.ab(lead) === 'run-away') { this.ev.push({ t: 'sfx', k: 'run' }); this.say('Tu prends la fuite !'); this.end('run'); return true; }
     if ((this.ab(fLead) === 'shadow-tag' && this.ab(lead) !== 'shadow-tag') || (this.ab(fLead) === 'arena-trap' && this.isGrounded(lead))) {
       this.say(`${this.Nm(fLead)} empêche la fuite !`); return false;
     }
     const a = this.stat(lead, 5), b = this.stat(fLead, 5);
     const f = Math.floor(a * 128 / b) + 30 * this.runTries;
-    if (a >= b || f > 255 || this.r(256) < f) { this.ev.push({ t: 'sfx', k: 'run' }); this.say('Vous prenez la fuite !'); this.end('run'); return true; }
+    if (a >= b || f > 255 || this.r(256) < f) { this.ev.push({ t: 'sfx', k: 'run' }); this.say('Tu prends la fuite !'); this.end('run'); return true; }
     this.say('Impossible de fuir !'); return false;
   }
 
@@ -1168,7 +1168,7 @@ export class Battle {
     if (!(it.ball && !this.wild)) { this.bag[a.item] = (this.bag[a.item] || 0) - 1; if (this.bag[a.item] <= 0) delete this.bag[a.item]; }
     if (it.ball) return this.throwBall(a.item);
     const m = this.sides[0].party[a.target], before = m.hp;
-    this.say(`Vous utilisez ${itemName(a.item)} !`);
+    this.say(`Tu utilises ${itemName(a.item)} !`);
     const msg = applyItem(a.item, m, a.moveIdx ?? -1);
     if (m.hp > 0) delete m._ko;
     const onSlot = this.sides[0].activeSlots.indexOf(a.target);
@@ -1180,7 +1180,7 @@ export class Battle {
 
   throwBall(item) {
     const fSlots = this.aliveSlots(1), tgtSlot = fSlots[0] ?? 0;
-    this.say(`Vous lancez une ${itemName(item)} !`);
+    this.say(`Tu lances une ${itemName(item)} !`);
     if (!this.wild) { this.ev.push({ t: 'ball', item, slot: tgtSlot, blocked: true }); this.say('Le Dresseur dévie la Ball !'); this.say('Voler, c\'est mal !'); return false; }
     const m = this.monAt(1, tgtSlot), S = SPECIES[m.sp], max = m.stats[0];
     const st = m.status === 'slp' || m.status === 'frz' ? 2 : m.status ? 1.5 : 1;
@@ -1200,7 +1200,7 @@ export class Battle {
       this.end('caught');
       return true;
     }
-    this.say(['Oh non ! La créature s\'est libérée !', 'Raaah ! Ça y était presque !', 'Aaaah ! Presque !', 'Mince ! Ça y était presque !'][shakes] || 'Raté !');
+    this.say(['Oh non ! Le Pokémon s\'est libéré !', 'Raaah ! Ça y était presque !', 'Aaaah ! Presque !', 'Mince ! Ça y était presque !'][shakes] || 'Raté !');
     return false;
   }
 
@@ -1680,7 +1680,7 @@ export class Battle {
         if (m.hp <= m.stats[0] / 2) { this.say('Mais cela échoue !'); return true; }
         this.hp(aR, -Math.floor(m.stats[0] / 2)); v.st[1] = 6; this.ev.push({ t: 'stat', side: aR.side, slot: aR.slot, up: true, all: this.stages(), slots: this.allStages() });
         this.say(`${this.Nm(aR)} sacrifie des PV et monte son Attaque au maximum !`); return true;
-      case 'pain-split': { const avg = Math.floor((m.hp + T.hp) / 2); this.hp(aR, avg - m.hp); this.hp(dR, avg - T.hp); this.say('Les deux créatures partagent leur douleur !'); return true; }
+      case 'pain-split': { const avg = Math.floor((m.hp + T.hp) / 2); this.hp(aR, avg - m.hp); this.hp(dR, avg - T.hp); this.say('Les deux Pokémon partagent leur douleur !'); return true; }
       case 'haze': for (const s of this.sides) for (const vs of s.vs) vs.st = [0, 0, 0, 0, 0, 0, 0, 0]; this.ev.push({ t: 'stat', side: -1, all: this.stages(), slots: this.allStages() }); this.say('Les changements de stats sont annulés !'); return true;
       case 'reflect': case 'light-screen': {
         const k = u === 'reflect' ? 'reflect' : 'light', scr = this.sides[aR.side].screens;
@@ -1690,7 +1690,7 @@ export class Battle {
       case 'mist': case 'safeguard': { const scr = this.sides[aR.side].screens; if (scr[u]) { this.say('Mais cela échoue !'); return true; } scr[u] = 5; this.say(u === 'mist' ? `${this.Nm(aR)} s'entoure de brume !` : `${this.Nm(aR)} est protégé par un voile mystique !`); return true; }
       case 'roar': case 'whirlwind': {
         if (this.wild && this.slots === 1) {
-          this.say(aR.side === 0 ? `${this.Nm(dR)} prend la fuite !` : 'Vous êtes renvoyé !');
+          this.say(aR.side === 0 ? `${this.Nm(dR)} prend la fuite !` : 'Tu es renvoyé !');
           this.end(aR.side === 0 ? 'win-flee' : 'fled');
           return true;
         }
@@ -2041,17 +2041,17 @@ export class Battle {
     const t = this.sides[1].trainer;
     if (t) {
       this.ev.push({ t: 'trainer-back' });
-      this.say(`Vous avez battu ${t.cls} ${t.name} !`);
+      this.say(`Tu as battu ${t.cls} ${t.name} !`);
       if (t.lose) for (const l of [].concat(t.lose)) this.ev.push({ t: 'msg', text: l, speaker: t.name });
       const last = this.sides[1].party[this.sides[1].party.length - 1];
       this.prizeMoney = (t.prize || 20) * last.lvl * (this.slots > 1 ? this.slots : 1);
-      this.say(`Vous remportez ${this.prizeMoney} ₽ !`);
+      this.say(`Tu remportes ${this.prizeMoney} ₽ !`);
     }
     this.end('win');
   }
   loseBattle() {
-    this.say('Vous n\'avez plus de créature en forme !');
-    if (!this.sides[1].trainer?.friendly) this.say('Vous êtes pris de panique et perdez connaissance...');
+    this.say('Tu n\'as plus de Pokémon en forme !');
+    if (!this.sides[1].trainer?.friendly) this.say('Tu perds connaissance dans la panique...');
     this.end('lose');
   }
   end(result) {

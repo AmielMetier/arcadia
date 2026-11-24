@@ -113,8 +113,8 @@ export const TROPHIES_CATALOG = [
      ========================================================================== */
   {
     id: 'pvp_first_win',
-    title: 'Premier Sang',
-    desc: 'Remporter votre tout premier duel en combat PvP.',
+    title: 'Première Victoire',
+    desc: 'Remporter ton tout premier duel entre dresseurs.',
     tier: 'bronze',
     category: 'combat',
     reward: { item: 'rare-candy', count: 2, label: 'Super Bonbon ×2' },
@@ -150,7 +150,7 @@ export const TROPHIES_CATALOG = [
   },
   {
     id: 'pvp_ten_same_player',
-    title: 'Némésis Suprême',
+    title: 'Rival Légendaire',
     desc: 'Battre 10 fois le même dresseur en duel.',
     tier: 'gold',
     category: 'rival',
@@ -224,7 +224,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'pvp_ten_battles',
     title: 'Vétéran de l\'Arène',
-    desc: 'Disputer au moins 10 combats PvP au total.',
+    desc: 'Disputer au moins 10 duels en ligne au total.',
     tier: 'bronze',
     category: 'combat',
     reward: { item: 'full-restore', count: 3, label: 'Guérison ×3' },
@@ -236,7 +236,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'pvp_twentyfive_wins',
     title: 'Champion de la Ligue',
-    desc: 'Cumuler 25 victoires en combat PvP au total.',
+    desc: 'Cumuler 25 victoires en duel en ligne au total.',
     tier: 'gold',
     category: 'combat',
     reward: { item: 'rocky-helmet', count: 1, label: 'Casque Brut ×1' },
@@ -248,7 +248,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'pvp_fifty_wins',
     title: 'Seigneur des Duels',
-    desc: 'Cumuler 50 victoires en combat PvP au total.',
+    desc: 'Cumuler 50 victoires en duel en ligne au total.',
     tier: 'platinum',
     category: 'combat',
     reward: { item: 'master-ball', count: 1, label: 'Master Ball ×1' },
@@ -401,7 +401,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'dex_shiny_hunter',
     title: 'Étoile Miraculeuse',
-    desc: 'Trouver et posséder un Pokémon chromatique (Shiny) dans son équipe ou ses boîtes.',
+    desc: 'Trouver et posséder un Pokémon chromatique dans ton équipe ou tes boîtes.',
     tier: 'platinum',
     category: 'pokedex',
     reward: { item: 'leftovers', count: 1, label: 'Restes ×1' },
@@ -529,7 +529,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'domaine_first_build',
     title: 'Bâtisseur du Domaine',
-    desc: 'Acquérir le Domaine d\'Aube et y poser votre toute première construction.',
+    desc: 'Acquérir le Domaine d\'Aube et y poser ta toute première construction.',
     tier: 'bronze',
     category: 'domaine',
     reward: { item: 'hyper-potion', count: 5, label: 'Hyper Potion ×5' },
@@ -542,7 +542,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'domaine_residents_3',
     title: 'Maire Prospère',
-    desc: 'Accueillir et installer au moins 3 résidents dans votre Domaine d\'Aube.',
+    desc: 'Accueillir et installer au moins 3 résidents dans ton Domaine d\'Aube.',
     tier: 'silver',
     category: 'domaine',
     reward: { item: 'sitrus-berry', count: 5, label: 'Baie Sitrus ×5' },
@@ -554,7 +554,7 @@ export const TROPHIES_CATALOG = [
   },
   {
     id: 'casino_coins_1000',
-    title: 'Flambeur de Métropole',
+    title: 'As des Jetons',
     desc: 'Amasser ou détenir au moins 1 000 jetons au Casino de Métropole.',
     tier: 'silver',
     category: 'domaine',
@@ -567,7 +567,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'economy_rich_100k',
     title: 'Magnat d\'Odyssée',
-    desc: 'Amasser une fortune d\'au moins 100 000 ₽ sur votre compte.',
+    desc: 'Amasser une fortune d\'au moins 100 000 ₽ dans ta poche.',
     tier: 'gold',
     category: 'domaine',
     reward: { item: 'choice-band', count: 1, label: 'Bandeau Choix ×1' },
@@ -585,7 +585,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'boss_first',
     title: 'Premier Grand Adversaire',
-    desc: 'Vaincre un boss : un admin ou le chef de la Team Éclipse ou de la Brume, ou un boss de la Tour de combat.',
+    desc: 'Vaincre un adversaire majeur : un Admin ou le Chef de la Team Éclipse ou de la Brume, ou un Champion de la Tour de combat.',
     tier: 'bronze',
     category: 'boss',
     reward: { item: 'revive', count: 3, label: 'Rappel ×3' },
@@ -597,19 +597,19 @@ export const TROPHIES_CATALOG = [
   {
     id: 'boss_eclipse',
     title: "Fléau de l'Éclipse",
-    desc: 'Vaincre Erèbe, Nyx et Nocturne, les admins et le chef de la Team Éclipse.',
+    desc: 'Vaincre Érèbe, Nyx et Nocturne, les Admins et le Chef de la Team Éclipse.',
     tier: 'gold',
     category: 'boss',
     reward: { item: 'dusk-stone', count: 1, label: 'Pierre Nuit ×1' },
     check: (st) => {
-      const n = st.flags?.lugia ? 3 : ['Erèbe', 'Nyx', 'Nocturne'].filter((k) => st.boss?.[k]).length;
+      const n = st.flags?.lugia ? 3 : [['Érèbe', 'Erèbe'], ['Nyx'], ['Nocturne']].filter((ks) => ks.some((k) => st.boss?.[k])).length;
       return { current: Math.min(n, 3), max: 3, done: n >= 3 };
     }
   },
   {
     id: 'boss_brume',
     title: 'Dissipateur de Brume',
-    desc: 'Vaincre Sylas, Ariane et Nox, les admins et le chef de la Brume.',
+    desc: 'Vaincre Sylas, Ariane et Nox, les Admins et le Chef de la Brume.',
     tier: 'gold',
     category: 'boss',
     reward: { item: 'scope-lens', count: 1, label: 'Lentilscope ×1' },
@@ -621,7 +621,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'boss_tour',
     title: 'Conquérant de la Tour',
-    desc: 'Vaincre le dernier boss de la Tour de combat, à pleine puissance.',
+    desc: 'Vaincre le dernier adversaire de la Tour de combat, à pleine puissance.',
     tier: 'platinum',
     category: 'boss',
     reward: { item: 'master-ball', count: 1, label: 'Master Ball ×1' },
@@ -633,7 +633,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'raid_first',
     title: 'Briseur de Raid',
-    desc: "Remporter un combat de raid avec d'autres joueurs.",
+    desc: "Remporter un combat de raid avec d'autres dresseurs.",
     tier: 'bronze',
     category: 'raid',
     reward: { item: 'ultra-ball', count: 5, label: 'Hyper Ball ×5' },
@@ -657,7 +657,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'raid_legende',
     title: "Chasseur d'Aura d'Or",
-    desc: "Vaincre un boss de raid légendaire, à l'aura dorée.",
+    desc: "Vaincre un Pokémon de raid légendaire, à l'aura dorée.",
     tier: 'gold',
     category: 'raid',
     reward: { item: 'life-orb', count: 1, label: 'Orbe Vie ×1' },
@@ -668,8 +668,8 @@ export const TROPHIES_CATALOG = [
   },
   {
     id: 'raid_capture',
-    title: 'Dompteur de Boss',
-    desc: 'Capturer un boss de raid à terre.',
+    title: 'Maître des Raids',
+    desc: 'Capturer un Pokémon de raid légendaire.',
     tier: 'silver',
     category: 'raid',
     reward: { item: 'ultra-ball', count: 10, label: 'Hyper Ball ×10' },
@@ -752,7 +752,7 @@ export const TROPHIES_CATALOG = [
   },
   {
     id: 'donjon_crypte',
-    title: 'Exorciste',
+    title: 'Gardien des Esprits',
     desc: 'Venir à bout de la Crypte des Murmures.',
     tier: 'bronze',
     category: 'donjon',
@@ -801,7 +801,7 @@ export const TROPHIES_CATALOG = [
 ];
 
 export const STREAK_RANKS = [
-  { min: 0, title: 'Challenger', desc: 'En apprentissage', icon: 'medal_bronze', flame: 'none' },
+  { min: 0, title: 'Aspirant', desc: 'En apprentissage', icon: 'medal_bronze', flame: 'none' },
   { min: 3, title: '🔥 En Série', desc: 'Série de 3 victoires', icon: 'medal_silver', flame: 'low' },
   { min: 5, title: '🔥🔥 Flamboyant', desc: 'Série de 5 victoires', icon: 'medal_gold', flame: 'medium' },
   { min: 10, title: '⚡ Foudre d\'Élite', desc: 'Série de 10 victoires', icon: 'medal_platinum', flame: 'high' },
@@ -1013,7 +1013,7 @@ export function getPvpSummary(st) {
 export function getHeadToHeadStatus(record) {
   if (!record) return { label: 'Inconnu', cls: 'neutral' };
   if (record.wins > record.losses) {
-    return { label: '👑 Domination', cls: 'domination', desc: `Vous menez face à ce dresseur (+${record.wins - record.losses})` };
+    return { label: '👑 Domination', cls: 'domination', desc: `Tu mènes face à ce dresseur (+${record.wins - record.losses})` };
   }
   if (record.wins === record.losses) {
     return { label: '⚖️ Égalité', cls: 'equality', desc: 'Score parfaitement équilibré' };

@@ -476,7 +476,7 @@ export class BattleView {
             <div class="bh-boosts"></div>
           </div>`;
       const fmtCls = this.battle?.isRaid ? ' raid' : this.battle?.is4p ? ' multi4p' : '';
-      const fmtTxt = this.battle?.isRaid ? (this.battle.monde ? `💥 BOSS DE RAID · ${sl} JOUEURS` : '🐉 RAID CO-OP · BOSS') : this.battle?.is4p ? '⚔️ MULTI 2V2 · 4 JOUEURS' : sl === 3 ? 'TRIO · 3V3' : 'DUO · 2V2';
+      const fmtTxt = this.battle?.isRaid ? (this.battle.monde ? `💥 RAID LÉGENDAIRE · ${sl} DRESSEURS` : '🐉 RAID CO-OP') : this.battle?.is4p ? '⚔️ MULTI DUO · 4 DRESSEURS' : sl === 3 ? 'COMBAT TRIO' : 'COMBAT DUO';
       r.insertAdjacentHTML('beforeend', `
         <div class="battle-format-badge${fmtCls}">${fmtTxt}</div>
         <div class="bhud-stack foe">
@@ -732,7 +732,7 @@ export class BattleView {
     duel.broadcastEvents?.(startEvs);
     const waiting = () => this.ui.typePage(this.textBox, `En attente de ${duel.foeName}…`, { last: true });
     const lost = async (r) => {
-      if (r.mine) { const stopEvs = battle.stop('lose', 'Vous abandonnez le combat...'); await this.play(stopEvs); duel.broadcastEvents?.(stopEvs, true, duel.foeName); return; }
+      if (r.mine) { const stopEvs = battle.stop('lose', 'Tu abandonnes le combat...'); await this.play(stopEvs); duel.broadcastEvents?.(stopEvs, true, duel.foeName); return; }
       const why = r.quit ? `${duel.foeName} abandonne le combat !` : r.left ? `${duel.foeName} a quitté la partie.` : r.desync ? 'La connexion a mélangé le combat : il s\'arrête ici, sans vainqueur.' : `${duel.foeName} ne répond plus.`;
       const stopEvs = battle.stop(r.desync ? 'draw' : 'win', why);
       await this.play(stopEvs); duel.broadcastEvents?.(stopEvs, true, r.quit ? battle.sides[0].name : duel.foeName);
@@ -754,7 +754,7 @@ export class BattleView {
       const action = await this.chooseAction();
       if (!action) continue;
       if (action.type === 'forfeit' || (Array.isArray(action) && action.some((a) => a.type === 'forfeit'))) {
-        duel.sendQuit(); const stopEvs = battle.stop('lose', 'Vous abandonnez le combat...');
+        duel.sendQuit(); const stopEvs = battle.stop('lose', 'Tu abandonnes le combat...');
         await this.play(stopEvs); duel.broadcastEvents?.(stopEvs, true, duel.foeName); break;
       }
       const n = battle.turn + 1, sum = battle.checksum();
@@ -898,7 +898,7 @@ export class BattleView {
 
     const mySlot = battle.mySlot ?? 0;
     const waiting = () => (coopNet.waitUiHint ? coopNet.waitUiHint(this.textBox) : this.ui.typePage(this.textBox, 'En attente de ton escouade…', { last: true }));
-    const quitMsg = battle.isRaid ? 'Vous abandonnez le Raid Co-op…' : battle.is4p ? 'Vous déclarez forfait…' : 'Vous abandonnez le défi du Dojo…';
+    const quitMsg = battle.isRaid ? 'Tu abandonnes le Raid Co-op…' : battle.is4p ? 'Tu déclares forfait…' : 'Tu abandonnes le défi du Dojo…';
     const aborted = async (r) => {
       if (r.mine) { coopNet.sendQuit?.(); await this.play(battle.stop('lose', quitMsg)); return; }
       const who = r.who || 'Un participant';
@@ -1043,7 +1043,7 @@ export class BattleView {
           if (this.game.state.party.length >= 6 && this.game.state.box.length >= 300) { await this.msg('Plus de place dans le PC !', { wait: true }); continue; }
           return { slot: sl, type: 'item', item: r.item };
         }
-        const target = await partyScreen(this.game, { mode: 'pick', prompt: `Utiliser ${itemName(r.item)} sur quelle créature ?`, filter: (m) => (canUseOn(r.item, m, cap) ? null : it.candy && m.lvl >= cap && m.lvl < 100 ? `Niv. max (${cap})` : 'Pas d\'effet') });
+        const target = await partyScreen(this.game, { mode: 'pick', prompt: `Utiliser ${itemName(r.item)} sur quel Pokémon ?`, filter: (m) => (canUseOn(r.item, m, cap) ? null : it.candy && m.lvl >= cap && m.lvl < 100 ? `Niv. max (${cap})` : 'Pas d\'effet') });
         if (target < 0) continue;
         let moveIdx = -1;
         if (it.pp) { const m = this.game.state.party[target]; moveIdx = await this.ui.list({ title: 'Quelle attaque ?', items: m.moves.map((x) => ({ label: MOVES[x.id].n, right: `${x.pp}/${MOVES[x.id].pp}` })), cls: 'psub', cancel: -1 }); if (moveIdx < 0) continue; }
@@ -1051,7 +1051,7 @@ export class BattleView {
       }
       if (c === 2) {
         const k = await partyScreen(this.game, {
-          mode: 'battle', prompt: 'Choisis une créature.',
+          mode: 'battle', prompt: 'Choisis un Pokémon.',
           filter: (m, i) => (m.hp <= 0 ? `${monName(m)} n'a plus la force de se battre !` : b.sides[0].activeSlots.includes(i) ? `${monName(m)} est déjà au combat !` : reservedSwitches.has(i) ? 'Déjà appelé ce tour' : null),
         });
         if (k < 0) continue;
@@ -1303,8 +1303,8 @@ export class BattleView {
     for (let s = 0; s < neededSlots.length; s++) {
       const k = await partyScreen(this.game, {
         mode: 'pick', pickLabel: 'Envoyer',
-        prompt: neededSlots.length > 1 ? `Remplaçant ${s + 1}/${neededSlots.length} : quelle créature ?` : 'Envoyer quelle créature ?',
-        filter: (m, i) => (m.hp <= 0 ? 'K.O.' : b.sides[0].activeSlots.includes(i) ? 'Au combat' : picks.includes(i) ? 'Déjà choisie' : null),
+        prompt: neededSlots.length > 1 ? `Remplaçant ${s + 1}/${neededSlots.length} : quel Pokémon ?` : 'Envoyer quel Pokémon ?',
+        filter: (m, i) => (m.hp <= 0 ? 'K.O.' : b.sides[0].activeSlots.includes(i) ? 'Au combat' : picks.includes(i) ? 'Déjà choisi' : null),
       });
       const fallback = b.sides[0].party.findIndex((m, j) => m && m.hp > 0 && !b.sides[0].activeSlots.includes(j) && !picks.includes(j));
       picks.push(k >= 0 ? k : fallback);
@@ -1314,7 +1314,7 @@ export class BattleView {
   async forcedSwitch() {
     const b = this.battle;
     if (this.slots === 1) {
-      const k = await partyScreen(this.game, { mode: 'pick', pickLabel: 'Envoyer', prompt: 'Envoyer quelle créature ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === b.sides[0].active ? 'Au combat' : null) });
+      const k = await partyScreen(this.game, { mode: 'pick', pickLabel: 'Envoyer', prompt: 'Envoyer quel Pokémon ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === b.sides[0].active ? 'Au combat' : null) });
       if (k < 0) return;
       await this.play(b.playerSwitch(k));
       return;
@@ -1329,7 +1329,7 @@ export class BattleView {
     for (const e of evs) {
       const sl = e.slot ?? 0;
       switch (e.t) {
-        case 'msg': await this.msg(e.text, { wait: this.battle.state === 'over' && /remportez|battu|K\.O\.|perdez|attrapé|panique/.test(e.text) }); break;
+        case 'msg': await this.msg(e.text, { wait: this.battle.state === 'over' && /remportez|remportes|battu|K\.O\.|perdez|perds|attrapé|panique|en forme/.test(e.text) }); break;
         case 'send':
           if (this.boostSlots?.[e.side]) this.boostSlots[e.side][sl] = [0, 0, 0, 0, 0, 0, 0, 0];
           if (this.boosts && sl === 0) this.boosts[e.side] = [0, 0, 0, 0, 0, 0, 0, 0];

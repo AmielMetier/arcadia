@@ -229,7 +229,7 @@ export function buildQuests(ctx) {
       buildings: [
         { kind: 'center', x: 3, y: 2 },
         { kind: 'house', x: 18, y: 2, roof: 'teal', name: 'Maison de la Rive', npcs: [{ x: 4, y: 4, sprite: 'habitante', text: ['Avant, l\'eau du lac était si claire qu\'on s\'y voyait comme dans un miroir.', 'Depuis que ces machines sont arrivées, elle devient trouble...'] }] },
-        { kind: 'house', x: 3, y: 13, roof: 'brown', name: 'Cabane du Passeur', npcs: [{ x: 2, y: 4, sprite: 'vieil_homme', text: ['L\'îlot à l\'ouest du lac... Les soirs de pleine lune, une créature y danse.', 'On ne peut y aller qu\'en surfant.'] }] },
+        { kind: 'house', x: 3, y: 13, roof: 'brown', name: 'Cabane du Passeur', npcs: [{ x: 2, y: 4, sprite: 'vieil_homme', text: ['L\'îlot à l\'ouest du lac... Les soirs de pleine lune, un Pokémon mystérieux y danse.', 'On ne peut y aller qu\'en surfant.'] }] },
       ],
       npcs: [{ id: 'gamin', x: 20, y: 16, sprite: 'gamin', move: 'wander', text: ['Mon grand frère dit qu\'il y a une grotte dans le lac.', 'Il faut surfer pour y aller !'] }],
     });
@@ -242,8 +242,8 @@ export function buildQuests(ctx) {
     m.item(...spot(m, 8, 10), 'super-potion', 2); m.item(...spot(m, 61, 9), 'great-ball', 3); m.item(...spot(m, 25, 16), 'eclat-etoile', 1, 'etoile:lac1'); m.item(...spot(m, 62, 26), 'eclat-etoile', 1, 'etoile:lac2');
     // dresseurs du tour du lac
     trainerNpc(m, ...spot(m, 12, 22), 'right', 'Pêcheur', 'Marius', [[118, 17], [129, 15], [60, 18]], { sight: 3 });
-    trainerNpc(m, ...spot(m, 60, 21), 'left', 'Fillette', 'Ondine', [[183, 18], [270, 17]], { sight: 3 });
-    trainerNpc(m, ...spot(m, 22, 3), 'down', 'Randonneuse', 'Maëlle', [[283, 18], [399, 18], [298, 17]], { sight: 3 });
+    trainerNpc(m, ...spot(m, 60, 21), 'left', 'Fillette', 'Mélodie', [[183, 18], [270, 17]], { sight: 3 });
+    trainerNpc(m, ...spot(m, 22, 3), 'down', 'Randonneuse', 'Aline', [[283, 18], [399, 18], [298, 17]], { sight: 3 });
   }
   Q('lac', {
     name: 'Les eaux troubles du Lac Miroir', where: 'Rive-Claire',
@@ -268,7 +268,7 @@ export function buildQuests(ctx) {
       if (s === 1) { await A.say('Il y a une pompe à l\'ouest, une au nord et une à l\'est du lac. Chacune est gardée.', who); return; }
       if (s === 2) { await A.say('Les pompes sont coupées ! Mais leur chef traîne encore au nord du lac...', who); return; }
       if (s === 3 || s === 4) { await A.say(A.badges() >= 8 ? ['La Grotte des Marées est sur le rocher, à l\'est du lac.', 'Avec Surf et tes huit badges du Nord, Sylas ne te bloquera pas la route.'] : A.badges() >= 5 ? ['La Grotte des Marées est sur le rocher, à l\'est du lac.', 'Mais Sylas a scellé le fond : seul un dresseur aux huit badges du Nord pourra le faire reculer.'] : ['La Grotte des Marées est sur un rocher au milieu de l\'eau.', 'Il faudrait savoir surfer... On dit que la Championne de Mirage enseigne Surf.'], who); return; }
-      await A.say(['Mesprit ? La gardienne du lac ? Tu l\'as vue de tes yeux ?', 'Mon grand-père disait qu\'elle vivait au fond de la grotte et qu\'elle gardait l\'eau claire.', 'C\'est donc ça que la Brume cherchait... pompait l\'eau pour la forcer à sortir.', 'Tiens. Mon vieux Lokhlass m\'a porté sur ce lac pendant trente ans. Il a envie de voir la mer.'], who);
+      await A.say(['Créfollet ? Le gardien du lac ? Tu l\'as vu de tes yeux ?', 'Mon grand-père disait qu\'il vivait au fond de la grotte et qu\'il gardait l\'eau claire.', 'C\'est donc ça que la Brume cherchait... Ils pompaient l\'eau pour le forcer à sortir.', 'Tiens. Mon vieux Lokhlass m\'a porté sur ce lac pendant trente ans. Il a envie de voir la mer.'], who);
       await A.giveMon(131, 35, { met: 'Lac Miroir' });
       await A.set('lac', 'fin');
     } });
@@ -328,7 +328,7 @@ export function buildQuests(ctx) {
       await A.say(['L\'eau du lac souterrain se met à briller...', 'Une petite silhouette rose flotte au-dessus des vagues !']);
       await A.set('lac', 4);
     } });
-    legend({ id: 'mesprit', sp: 481, lvl: 50, map: 'marees', x: 21, y: 3, cond: (f, g) => (st(f, 'lac') === 4 || (done(f, 'lac') && f['L:mesprit'] !== 'caught')) && (!g?.badgeCount || g.badgeCount() >= 8), intro: ['Mesprit, la gardienne du Lac Miroir, te regarde.', 'Elle semble te remercier.'],
+    legend({ id: 'mesprit', sp: 481, lvl: 50, map: 'marees', x: 21, y: 3, cond: (f, g) => (st(f, 'lac') === 4 || (done(f, 'lac') && f['L:mesprit'] !== 'caught')) && (!g?.badgeCount || g.badgeCount() >= 8), intro: ['Créfollet, l\'être de l\'émotion du Lac Miroir, te regarde.', 'Il semble te remercier.'],
       after: async (A, res) => { if (res !== 'lose' && A.step('lac') === 4) await A.set('lac', 5); } });
   }
 
@@ -398,14 +398,14 @@ export function buildQuests(ctx) {
     const entree = passage('r6', [0.35, 0.45, 0.25, 0.55, 0.65], [1, -1], 6, { map: 'jardin', x: 22, y: 38, dir: 'up' }, 'JARDIN DES SONGES ↓\nUn jardin de fleurs et de rêves.');
     m.warp(22, 39, { ...entree.back, step: true }); m.warp(23, 39, { ...entree.back, step: true });
     m.outside = { map: 'monde', x: entree.at[0], y: entree.at[1] };
-    trainerNpc(m, ...spot(m, 9, 20), 'right', 'Fillette', 'Capucine', [[315, 24], [669, 25]], { sight: 3, intro: 'Mes fleurs sont les plus belles du jardin !' });
-    trainerNpc(m, ...spot(m, 36, 20), 'left', 'Topdresseuse', 'Rosalie', [[548, 25], [187, 25], [280, 26]], { sight: 3 });
+    trainerNpc(m, ...spot(m, 9, 20), 'right', 'Fillette', 'Azalée', [[315, 24], [669, 25]], { sight: 3, intro: 'Mes fleurs sont les plus belles du jardin !' });
+    trainerNpc(m, ...spot(m, 36, 20), 'left', 'Topdresseuse', 'Agathe', [[548, 25], [187, 25], [280, 26]], { sight: 3 });
   }
   Q('songes', {
     name: 'Les nuits blanches de Floralia', where: 'Floralia',
     steps: [
       'Demander conseil au jardinier du Jardin des Songes (au sud de la route 6).',
-      'Trouver la créature de l\'îlot du Lac Miroir et rapporter une Plume Lune (Surf).',
+      'Trouver le Pokémon de l\'îlot du Lac Miroir et rapporter une Plume Lune (Surf).',
       'Rapporter la Plume Lune à Hélène, à Floralia.',
       'Surveiller le Jardin des Songes la nuit (de 20 h à 5 h).',
       'Ariane a emporté son projecteur au Temple Kagura, dans la Forêt des Torii (à l\'ouest de la route 7).',
@@ -427,8 +427,8 @@ export function buildQuests(ctx) {
       if (s === 3 && A.has('plume-lune')) {
         A.flash('#e0e8ff');
         await A.say(['Une Plume Lune ! Pose-la sur l\'oreiller de Malo...', '...', 'Il ouvre les yeux ! Malo ! Tu m\'entends ?'], who);
-        await A.say(['Maman... J\'ai rêvé d\'un homme en noir dans le jardin, la nuit. Avec une grosse lampe violette.', 'Elle faisait venir l\'ombre...'], 'Malo');
-        await A.say(['Un homme en noir dans le jardin ? La nuit ?', 'Je t\'en prie, va voir ce qui se passe au Jardin des Songes cette nuit.'], who);
+        await A.say(['Maman... J\'ai rêvé d\'une silhouette en noir dans le jardin, la nuit. Avec une grosse lampe violette.', 'Elle faisait venir l\'ombre...'], 'Malo');
+        await A.say(['Une silhouette en noir dans le jardin ? La nuit ?', 'Je t\'en prie, va voir ce qui se passe au Jardin des Songes cette nuit.'], who);
         await A.set('songes', 4); return;
       }
       if (s === 7) {
@@ -460,7 +460,7 @@ export function buildQuests(ctx) {
     } });
   }
   // Cresselia sur l'îlot du lac
-  legend({ id: 'cresselia', sp: 488, lvl: 50, map: 'lac', x: 25, y: 17, cond: (f, g) => st(f, 'songes') >= 2 && (!g?.badgeCount || g.badgeCount() >= 8), intro: ['Une créature aux ailes de lune danse au-dessus des fleurs...', 'C\'est Cresselia !'],
+  legend({ id: 'cresselia', sp: 488, lvl: 50, map: 'lac', x: 25, y: 17, cond: (f, g) => st(f, 'songes') >= 2 && (!g?.badgeCount || g.badgeCount() >= 8), intro: ['Un Pokémon aux ailes de lune danse au-dessus des fleurs...', 'C\'est Cresselia !'],
     after: async (A, res) => {
       if (res === 'lose' || A.has('plume-lune') || A.step('songes') !== 2) return;
       await A.say('Une plume scintillante est restée sur l\'îlot...'); await A.give('plume-lune'); await A.set('songes', 3);
@@ -482,10 +482,10 @@ export function buildQuests(ctx) {
   };
   Q('voeu', {
     name: 'Le vœu de la fontaine', where: 'Jardin des Songes',
-    steps: (f, g) => [`Trouver sept Éclats d'Étoile cachés dans les nouveaux lieux de la région (${g?.state?.bag?.['eclat-etoile'] || 0} / 7) et les jeter dans la fontaine.`, 'Une petite étoile attend sur un banc du jardin.'],
+    steps: (f, g) => [`Trouver sept Éclats d'Étoile cachés aux quatre coins d'Odyssée (${g?.state?.bag?.['eclat-etoile'] || 0} / 7) et les jeter dans la fontaine.`, 'Une petite étoile attend sur un banc du jardin.'],
     end: 'Le vœu s\'est réalisé.',
   });
-  legend({ id: 'jirachi', sp: 385, lvl: 75, map: 'jardin', x: 18, y: 15, cond: (f) => !!f.jirachiCall, intro: ['Une petite créature dort, une étoile sur la tête...', 'Jirachi ouvre un œil !'],
+  legend({ id: 'jirachi', sp: 385, lvl: 75, map: 'jardin', x: 18, y: 15, cond: (f) => !!f.jirachiCall, intro: ['Un petit Pokémon dort, une étoile sur la tête...', 'Jirachi ouvre un œil !'],
     after: async (A, res) => { if (res !== 'lose') await A.set('voeu', 'fin'); } });
   // Créfadet : quand les trois gardiens des lacs se sont montrés
   legend({ id: 'azelf', sp: 482, lvl: 55, map: 'jardin', x: 34, y: 14, cond: (f, g) => !!f['L:mesprit'] && !!f['L:uxie'] && (!g?.badgeCount || g.badgeCount() >= 8), intro: ['Une silhouette bleue flotte au-dessus de l\'étang...', 'Créfadet, le troisième gardien, a senti ses deux frères.'] });
@@ -571,7 +571,7 @@ export function buildQuests(ctx) {
       m.item(...spot(m, 247, 177), 'ultra-ball', 2); m.item(...spot(m, 233, 186), 'max-repel');
       trainerNpc(m, ...spot(m, 270, 172), 'left', 'Médium', 'Ombeline', [[92, 35], [200, 36]], { sight: 4 });
       trainerNpc(m, ...spot(m, 251, 183), 'right', 'Moine', 'Jōkan', [[163, 36], [177, 36], [302, 37]], { sight: 4, intro: 'La forêt éprouve ceux qui marchent vers le temple.' });
-      trainerNpc(m, ...spot(m, 224, 189), 'left', 'Dame Kimono', 'Sakura', [[196, 37], [197, 37]], { sight: 2, intro: 'Je danse pour les esprits de la forêt. Danse avec moi !' });
+      trainerNpc(m, ...spot(m, 224, 189), 'left', 'Dame Kimono', 'Haruka', [[196, 37], [197, 37]], { sight: 2, intro: 'Je danse pour les esprits de la forêt. Danse avec moi !' });
     }
     // la forêt agrandie vers l'ouest, ses sentiers, son relief, et la Tour Cendrée (world/cendree.js)
     addCendree({ W, maps, trainerNpc, spot, enc: ENC.torii });
@@ -657,7 +657,7 @@ export function buildQuests(ctx) {
     await A.give('ultra-ball', 5);
     await A.set('kagura', 'fin');
   }
-  legend({ id: 'uxie', sp: 480, lvl: 50, map: 'monde', x: KX + 7 + DT[0], y: KY + 15 + DT[1], cond: (f, g) => done(f, 'kagura') && (!g?.badgeCount || g.badgeCount() >= 8), intro: ['Une créature jaune médite au bord de l\'étang, les yeux clos.', 'Créhelf, le gardien du savoir.'] });
+  legend({ id: 'uxie', sp: 480, lvl: 50, map: 'monde', x: KX + 7 + DT[0], y: KY + 15 + DT[1], cond: (f, g) => done(f, 'kagura') && (!g?.badgeCount || g.badgeCount() >= 8), intro: ['Un Pokémon jaune médite au bord de l\'étang, les yeux clos.', 'Créhelf, le gardien du savoir.'] });
 
   /* ====================================================================================================
      Île du Magma (bateau de l'Embarcadère, pour le Maître) · Quête : Le cœur du volcan (Groudon, Heatran)
@@ -716,7 +716,7 @@ export function buildQuests(ctx) {
       await A.give('cle-base'); A.f.sylas3 = true; A.game.refreshNpcs();
     } });
     pnj(b, 'q:nox1', 7, 2, { sprite: 'nox', when: (fl) => st(fl, 'magma') === 1 && fl.sylas3, talk: async (A) => {
-      const r = await A.fight({ cls: 'Chef de la Brume', name: 'Nox', bs: 'nox', prize: 300, team: [[553, 81], [229, 81], [461, 82], [452, 82], [248, 83]], intro: ['Alors c\'est toi, l\'enfant qui défait chacun de mes plans.', 'Ponyta, le lac, les talismans, Darkrai... Des broutilles.', 'Ce qui compte, c\'est ceci : l\'Orbe Rouge. Avec lui, Groudon m\'obéira, et cette région sera à la Brume !'], lose: 'Impossible...' });
+      const r = await A.fight({ cls: 'Chef de la Brume', name: 'Nox', bs: 'nox', prize: 300, team: [[553, 81], [229, 81], [461, 82], [452, 82], [248, 83]], intro: ['Alors c\'est toi, l\'enfant qui défait chacun de mes plans.', 'Ponyta, le lac, les talismans, Darkrai... Des broutilles.', 'Nocturne et sa Team Éclipse ont échoué avec leur Prisme Noir ? Des amateurs.', 'Ce qui compte, c\'est ceci : l\'Orbe Rouge. Avec lui, Groudon m\'obéira, et cette région sera à la Brume !'], lose: 'Impossible...' });
       if (r !== 'win') return;
       await A.say(['Tu es fort. Mais l\'Orbe est déjà chaud. Le géant s\'éveille.', 'Rejoins-moi au fond de la Caverne du Magma, si tu l\'oses !'], 'Nox');
       await A.walk('q:nox1', 'up', 0, true);
