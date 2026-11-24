@@ -17,7 +17,7 @@ import { foeChooseAll } from '../odyssee/js/core/battle-ai.js';
 import { TROPHIES_CATALOG, checkAllTrophies } from '../odyssee/js/core/trophies.js';
 import { encodeSave, decodeSave } from '../odyssee/js/core/savecode.js';
 import { T } from '../odyssee/js/world/tiles.js';
-import { CelestialSystem, CELESTIAL_SPECIES, JIRACHI_SP, openAstrolabe, rechargeAstrolabe, RECHARGE_FAILLE } from '../odyssee/js/game/celestial.js';
+import { CelestialSystem, CELESTIAL_SPECIES, JIRACHI_SP, openAstrolabe, rechargeAstrolabe, RECHARGE_CIEL } from '../odyssee/js/game/celestial.js';
 import { RiftSystem, RIFT_KINDS, ALPHA_POOL, createAlphaMon, normalizeCapturedAlpha, formeAdaptee } from '../odyssee/js/game/rifts.js';
 import {
   MEMORIES, ENTRANCE_AURAS, addMemory, unlockedAuras, activeEntranceAura, auraBurstSpec, recordBattleMemories,
@@ -184,7 +184,7 @@ console.log('=== Tests Odyssée Wow (#1 Céleste, #4 Failles, #7 Suiveur/Souveni
   const g = {
     mapObj: mur, player: { x: 12, y: 12, dir: 'down' }, npcs: [{ x: 8, y: 12 }], items: [], hour: () => 12,
     state: { flags: { dex: 1 }, party: [createMon(25, 12)], box: [], bag: { astrolabe: 1 }, money: 0, name: 'Test' }, locationName: () => 'Mur', levelCap: () => 100, badgeCount: () => 8,
-    view: { actors: new Map(), setCelestial: () => {}, removeActor: () => {} }, hud: { update: () => {} }, sound: { sfx: () => {} }, save: () => {}, give: () => {}, checkTrophies: () => {},
+    view: { actors: new Map(), setCelestial: () => {}, removeActor: () => {} }, hud: { update: () => {} }, sound: { sfx: () => {} }, save: () => {}, give: (k, n = 1) => { g.state.bag[k] = (g.state.bag[k] || 0) + n; }, take: (k, n = 1) => { g.state.bag[k] -= n; }, checkTrophies: () => {},
     ui: { say: async (t) => { dits.push(...[].concat(t)); }, yesNo: async () => true, list: async () => 0, toast: () => {} },
   };
   g.celestial = new CelestialSystem(g); g.rifts = new RiftSystem(g);
@@ -200,14 +200,28 @@ console.log('=== Tests Odyssée Wow (#1 Céleste, #4 Failles, #7 Suiveur/Souveni
   assert.equal(g.rifts.active, null, 'une faille dissipée reste fermée');
   // sans Pokédex : pas de faille
   g.state.flags = {}; g.rifts._cherche = 0; g.rifts.tick(0.1); assert.equal(g.rifts.active, null, 'pas de faille avant le Pokédex'); g.state.flags = { dex: 1 };
-  // l'Astrolabe se recharge
-  const choix = [3, 1]; g.ui.list = async () => choix.shift() ?? 0;
-  await openAstrolabe(g);
-  assert.equal(g.rifts.active?.kind, 'inverse'); assert(g.state.flags.astroFaille > 0);
-  g.rifts.clear(); choix.push(3, 1); dits.length = 0; await openAstrolabe(g);
-  assert.equal(g.rifts.active, null, 'pas de seconde faille tant que l\'Astrolabe se recharge'); assert(dits.some((t) => /sera prêt dans/.test(t)));
-  assert.equal(rechargeAstrolabe({ flags: { astroFaille: Date.now() - RECHARGE_FAILLE - 1 } }, 'astroFaille', RECHARGE_FAILLE), 0);
-  assert.equal(rechargeAstrolabe({ flags: { astroFaille: Date.now() + 9e9 } }, 'astroFaille', RECHARGE_FAILLE), 0, 'horloge reculée : jamais bloqué');
+  // une faille se paie d'un Fragment Météorique
+  const choix = []; g.ui.list = async () => choix.shift() ?? 0;
+  const F = 'fragment-meteore', astro = async (...c) => { choix.length = 0; choix.push(...c); dits.length = 0; await openAstrolabe(g); };
+  await astro(3, 1); assert.equal(g.rifts.active, null, 'pas de fragment, pas de faille'); assert(dits.some((t) => /Il faut un Fragment/.test(t)));
+  g.state.bag[F] = 2; g.ui.yesNo = async () => false; await astro(3, 1); assert.equal(g.rifts.active, null); assert.equal(g.state.bag[F], 2, 'refuser ne coûte rien');
+  g.ui.yesNo = async () => true; await astro(3, 1); assert.equal(g.rifts.active?.kind, 'inverse'); assert.equal(g.state.bag[F], 1);
+  await astro(3, 1); assert.equal(g.state.bag[F], 1, 'une faille déjà ouverte ne se paie pas deux fois');
+  // quitter le jeu avant d'y entrer : elle se rouvre
+  g.rifts = new RiftSystem(g); g.rifts.tick(0.1); assert.equal(g.rifts.active?.kind, 'inverse', 'la faille payée se rouvre');
+  // la dissiper rend le fragment, une seule fois
+  await astro(4); assert.equal(g.state.bag[F], 2); g.rifts._cherche = 0; g.rifts.tick(0.1); assert.equal(g.rifts.active, null, 'aucune autre ne prend sa place'); g.rifts.dissiper(); assert.equal(g.state.bag[F], 2);
+  // la franchir ne le rembourse pas ; une faille naturelle en donne un
+  for (const [manuelle, gagne] of [[true, 0], [false, 1]]) {
+    const r = g.rifts.spawnNearPlayer('inverse', manuelle), av = g.state.bag[F]; g.player.dir = 'right'; g.player.x = r.x - 1; g.player.y = r.y;
+    if (manuelle) g.state.flags.failleAstro = 'inverse';
+    g.runBattle = async () => 'win'; await g.rifts.interagir(); assert.equal(g.state.bag[F] - av, gagne); assert.equal(g.state.flags.failleAstro, undefined); g.player.x = 12; g.player.y = 12;
+  }
+  // le ciel, lui, se recharge
+  await astro(1); assert(g.state.flags.astroCiel > 0); await astro(2); assert(dits.some((t) => /sera prêt dans/.test(t)));
+  g.celestial.invoke(null);
+  assert.equal(rechargeAstrolabe({ flags: { astroCiel: Date.now() - RECHARGE_CIEL - 1 } }, 'astroCiel', RECHARGE_CIEL), 0);
+  assert.equal(rechargeAstrolabe({ flags: { astroCiel: Date.now() + 9e9 } }, 'astroCiel', RECHARGE_CIEL), 0, 'horloge reculée : jamais bloqué');
   // entrer dans une faille : fuite, elle reste ; victoire, elle se referme et compte
   for (const [res, reste] of [['flee', true], ['lose', true], ['win', false]]) {
     const r = g.rifts.spawnNearPlayer('chaos', true); g.player.dir = 'right'; g.player.x = r.x - 1; g.player.y = r.y;

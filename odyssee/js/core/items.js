@@ -111,8 +111,8 @@ export const ITEMS = {
   'secateur-sylvestre': { pocket: 'cles', price: 0, key: true, field: 'coupe', icon: 'secateur-sylvestre', name: 'Sécateur Sylvestre', desc: 'Des cisailles horticoles ouvragées en acier ciselé et or. Elles tranchent net les arbustes épineux. Place-toi face au buisson et appuie sur F.' },
   'harnais-flottant': { pocket: 'cles', price: 0, key: true, field: 'surf', icon: 'harnais-flottant', name: 'Harnais Flottant', desc: 'Une selle nautique étanche avec flotteurs profilés. Permet de glisser sur l\'eau et la mer. Place-toi face à l\'eau et appuie sur F.' },
   'sifflet-celeste': { pocket: 'cles', price: 0, key: true, field: 'vol', icon: 'sifflet-celeste', name: 'Sifflet Céleste', desc: 'Un sifflet ouvragé en argent et ruban saphir. Il appelle un grand oiseau pour voyager en un instant vers une ville déjà visitée (depuis le menu ou le sac). Badge Mirage requis.' },
-  astrolabe: { pocket: 'cles', price: 0, key: true, icon: 'scope-lens', name: 'Astrolabe', desc: 'Un astrolabe gravé d\'étoiles. Permet d\'observer le ciel, repérer les failles spatio-temporelles et invoquer aurores boréales, pluies d\'étoiles ou failles sur les routes.' },
-  'fragment-meteore': { pocket: 'objets', price: 4500, icon: 'star-piece', name: 'Fragment Météorique', desc: 'Un fragment d\'étoile filante encore tiède. Très prisé des astronomes et des boutiques d\'Odyssée.' },
+  astrolabe: { pocket: 'cles', price: 0, key: true, icon: 'scope-lens', name: 'Astrolabe', desc: 'Un astrolabe gravé d\'étoiles. Permet d\'observer le ciel, repérer les failles spatio-temporelles et invoquer aurores boréales et pluies d\'étoiles. Un Fragment Météorique lui permet d\'ouvrir une faille.' },
+  'fragment-meteore': { pocket: 'objets', price: 4500, icon: 'star-piece', name: 'Fragment Météorique', desc: 'Un fragment d\'étoile filante encore tiède. Très prisé des astronomes et des boutiques, il permet à l\'Astrolabe d\'ouvrir une faille.' },
 };
 // baies et objets tenus de la 5.95 (data/baies-objets.js)
 Object.assign(ITEMS, NOUVEAUX_OBJETS);

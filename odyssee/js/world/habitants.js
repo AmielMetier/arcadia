@@ -246,7 +246,7 @@ export const MISSIONS = [
       const manque = [!f['riftKind:inverse'] && 'Inversée', !f['riftKind:chaos'] && 'Chaotique', !f['riftKind:alpha'] && 'Alpha'].filter(Boolean);
       return [
         `Anomalies restantes à sceller : ${manque.join(', ')}.`,
-        'L\'Astrolabe repère les failles ouvertes sur les routes — et peut même déchirer l\'espace sur commande si tu te sens prêt !',
+        'L\'Astrolabe repère les failles ouvertes sur les routes — et, avec un Fragment Météorique, il peut même déchirer l\'espace !',
       ];
     },
     thanks: [

@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.160 — 24 novembre 2026
+- **Odyssée** — Ouvrir une faille avec l'Astrolabe demande un Fragment Météorique, sans attente (Odyssée 3.2) :
+  - Le fragment n'est utilisé qu'après confirmation. Si tu quittes le jeu avant d'entrer, ta faille se rouvre ; si tu la dissipes, le fragment t'est rendu.
+  - Une faille ouverte ainsi donne 2 Hyper Balls (un Super Bonbon pour une Faille Alpha) ; les failles des routes donnent toujours un fragment.
+  - L'aurore et la pluie d'étoiles gardent leur recharge de 15 minutes.
+
 ## 5.159 — 24 novembre 2026
 - **Odyssée** — Grand contrôle des nouveautés célestes, des failles et des souvenirs (Odyssée 3.1) :
   - L'Astrolabe se recharge après usage : 15 minutes pour le ciel, 8 minutes pour les failles.

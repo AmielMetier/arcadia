@@ -12,9 +12,10 @@ import { warnDev } from '../core/safe.js';
 export const CELESTIAL_SPECIES = [35, 120, 173, 337, 338, 374, 436, 517, 605];
 export const JIRACHI_SP = 385;
 
-// l'Astrolabe se recharge : sans ça, on enchaînait failles et pluies d'étoiles (argent, Super Bonbons) sans fin
+// l'Astrolabe se recharge après avoir invoqué le ciel (sans ça, on enchaînait les pluies d'étoiles sans fin) ;
+// une faille, elle, se paie d'un Fragment Météorique
 export const RECHARGE_CIEL = 15 * 60_000;
-export const RECHARGE_FAILLE = 8 * 60_000;
+export const PRIX_FAILLE = 'fragment-meteore';
 /** minutes avant que l'Astrolabe soit prêt (0 : prêt) ; une date dans le futur (horloge reculée) ne bloque jamais */
 export function rechargeAstrolabe(st, cle, duree, now = Date.now()) {
   const t = st?.flags?.[cle] || 0;
@@ -281,13 +282,13 @@ export async function openAstrolabe(game) {
       : 'Ciel calme';
 
   const st = game.state, reste = (cle, d) => rechargeAstrolabe(st, cle, d);
-  const ciel = reste('astroCiel', RECHARGE_CIEL), faille = reste('astroFaille', RECHARGE_FAILLE);
+  const ciel = reste('astroCiel', RECHARGE_CIEL), fragments = st?.bag?.[PRIX_FAILLE] || 0;
   const etat = (n, pret) => (n > 0 ? `${n} min` : pret);
   const actions = [
     { id: 'observe', label: 'Observer le ciel et les failles', right: cel?.activeKind !== 'none' || rifts?.active ? 'Actif' : 'Calme' },
     { id: 'aurora', label: 'Invoquer une Aurore Boréale', right: etat(ciel, 'Ciel') },
     { id: 'meteor', label: 'Invoquer une Pluie d\'Étoiles', right: etat(ciel, 'Météores') },
-    { id: 'rift', label: 'Ouvrir une Faille Spatio-Temporelle', right: etat(faille, 'Anomalie') },
+    { id: 'rift', label: 'Ouvrir une Faille Spatio-Temporelle', right: `Fragment × ${fragments}` },
   ];
   if (cel?.activeKind !== 'none' || rifts?.active) {
     actions.push({ id: 'clear', label: 'Dissiper les phénomènes', right: '' });
@@ -319,13 +320,21 @@ export async function openAstrolabe(game) {
 
   if (choice.id === 'clear') {
     cel?.invoke(null);
-    rifts?.dissiper?.();
+    const rendu = rifts?.dissiper?.();
     game.hud?.update?.(true);
-    await ui.say('L\'Astrolabe apaise le ciel et referme les distorsions.');
+    await ui.say(['L\'Astrolabe apaise le ciel et referme les distorsions.', ...(rendu ? ['La poussière d\'étoiles reforme ton Fragment Météorique !'] : [])]);
     return;
   }
 
-  const attente = choice.id === 'rift' ? faille : ciel;
+  if (choice.id === 'rift' && rifts?.active?.manual) {
+    await ui.say(`Ta faille est toujours ouverte ${rifts.compassFromPlayer()} !`);
+    return;
+  }
+  if (choice.id === 'rift' && !fragments) {
+    await ui.say(['Il faut un Fragment Météorique pour déchirer l\'espace.', 'Les météorites des pluies d\'étoiles en renferment, et les failles des routes en laissent parfois un.']);
+    return;
+  }
+  const attente = choice.id === 'rift' ? 0 : ciel;
   if (attente > 0) {
     await ui.say(`Les lentilles de l'Astrolabe sont encore brûlantes. Il sera prêt dans ${attente} minute${attente > 1 ? 's' : ''}.`);
     return;
@@ -367,15 +376,19 @@ export async function openAstrolabe(game) {
     const rPick = await ui.list({ title: 'Type de Faille à ouvrir', items: sub, cancel: sub.length - 1 });
     const rChoice = sub[rPick];
     if (!rChoice || rChoice.id === 'back') return;
+    if (!(await ui.yesNo('Utiliser un Fragment Météorique pour ouvrir cette faille ?'))) return;
     const spawned = rifts?.spawnNearPlayer(rChoice.id === 'random' ? null : rChoice.id);
     if (!spawned) {
       await ui.say('Le terrain autour de toi est trop encombré pour ouvrir une faille !');
       return;
     }
-    st.flags.astroFaille = Date.now();
+    game.take(PRIX_FAILLE, 1);
+    st.flags.failleAstro = spawned.kind;   // payée : elle se rouvre si l'on quitte le jeu avant d'y entrer
+    game.save?.(true);
     game.sound.sfx('rift_open');
     await ui.say([
       'L\'Astrolabe déchire un instant la trame de l\'espace...',
+      'Le Fragment Météorique se change en poussière d\'étoiles.',
       `Une ${spawned.kindLabel} vient de s'ouvrir ${rifts.compassFromPlayer()} !`,
     ]);
   }

@@ -160,8 +160,12 @@ export class RiftSystem {
   /** l'Astrolabe referme la faille : celle du créneau en cours ne se rouvre pas aussitôt */
   dissiper() {
     const st = this.game.state;
-    if (this.active && !this.active.manual && st) (st.flags ||= {}).lastRiftSlot = this.currentSlot();
+    if (this.active && st) (st.flags ||= {}).lastRiftSlot = this.currentSlot();
+    // ouverte avec un fragment et pas encore franchie : il est rendu
+    const rendu = !!st?.flags?.failleAstro;
+    if (rendu) { delete st.flags.failleAstro; this.game.give('fragment-meteore', 1); this.game.save?.(true); }
     this.clear();
+    return rendu;
   }
 
   findSpawnTile(minDist, maxDist) {
@@ -216,10 +220,11 @@ export class RiftSystem {
       return;
     }
     const slot = this.currentSlot();
-    if (this.active && (this.active.manual ? slot - this.active.slot > 1 : this.active.slot !== slot)) {
+    if (this.active && !this.active.manual && this.active.slot !== slot) {
       this.clear();
     }
     this._cherche -= dt;
+    if (!this.active && this._cherche <= 0 && st.flags?.failleAstro) { this._cherche = 2; this.spawnNearPlayer(st.flags.failleAstro, true); }   // faille payée, partie rechargée
     if (!this.active && this._cherche <= 0 && st.flags?.dex && st.flags.lastRiftSlot !== slot && (st.party?.length || 0) > 0) {
       this._cherche = 2;
       // Apparition périodique naturelle d'une faille (sans bloquer si terrain serré)
@@ -330,8 +335,10 @@ export class RiftSystem {
         st.flags.riftsCleared = (st.flags.riftsCleared || 0) + 1;
         st.flags['riftKind:' + r.kind] = (st.flags['riftKind:' + r.kind] || 0) + 1;
         if (r.kind === 'alpha' && res === 'caught') st.flags.alphaCaught = (st.flags.alphaCaught || 0) + 1;
-        const loot = r.kind === 'alpha' ? 'rare-candy' : 'fragment-meteore';
-        g.give(loot, 1);
+        // une faille ouverte avec un fragment ne le rembourse pas
+        const [loot, combien] = r.kind === 'alpha' ? ['rare-candy', 1] : r.manual ? ['ultra-ball', 2] : ['fragment-meteore', 1];
+        if (r.manual) delete st.flags.failleAstro;
+        g.give(loot, combien);
         st.money = (st.money || 0) + 1500;
         this.clear();
         try { g.checkTrophies?.(true); } catch (e) { warnDev('rift-trophy', e); }
@@ -339,7 +346,7 @@ export class RiftSystem {
         g.sound?.sfx('rift_seal');
         await ui.say([
           'La faille spatio-temporelle se referme dans un éclat prismatique !',
-          formatFindItem(st.name, loot, 1),
+          formatFindItem(st.name, loot, combien),
           'Tu récupères aussi 1 500 ₽ au cœur de la distorsion !',
         ]);
       }
