@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 5.156 — 24 novembre 2026
+- Correction : lot 1 — urgences lotcheck (crashs, softlocks, combat, économie) (Amiel)
+- Correction : lot 2 — combat, talents, méga-évolutions et descriptions (Amiel)
+- Correction : lot 3 — progression 15 badges, économie, parc des légendes et finitions (Amiel)
+- Correction : lot 4 — finition ux/ui, azerty, tactile, hud, audio et boot (Amiel)
+- Correction : lot 5 — ton nintendo, localisation fr, coherence narrative et pnj (Amiel)
+
 ## 5.155 — 22 novembre 2026
 - **Odyssée** — 18 nouvelles médailles, avec leurs récompenses, et cinq nouveaux onglets dans les Trophées (Odyssée 2.9) :
   - Boss : vaincre un premier boss, les admins et le chef de l'Éclipse, ceux de la Brume, le dernier boss de la Tour de combat.
