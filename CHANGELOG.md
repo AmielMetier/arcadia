@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 5.158 — 24 novembre 2026
+- Nouveau : phenomenes celestes, failles 3D, suiveur vivant, lore, medailles, audio enrichi et refactoring (Amiel)
+  - Refactoring et hygiene : decoupage modulaire (safe.js, audio-boss.js, battle-helpers.js, battle-ai.js, puzzles.js, triggers.js, world-events.js), suppression des catch vides et ajout de test-odyssee-hygiene.mjs
+  - Phenomenes celestes 3D : aurores boreales, pluie d'etoiles filantes, meteorites ramassables, Astrolabe et fragment-meteore
+  - Failles spatio-temporelles 3D : failles Inversee, Chaotique et Alpha geant
+  - Compagnon suiveur vivant : 10 Souvenirs uniques, 5 Auras d'entree en combat et onglet Souvenirs dans le Resume
+  - Lore et recompenses : 4 quetes narratives (mAstronome, mFailles, mAlpha, mMemoire) et 12 medailles/trophees thematiques
+  - Audio enrichi (audio-wow.js) : 4 musiques sur mesure, 9 ambiances dynamiques et 14 SFX compatibles moderne et retro
+
 ## 5.157 — 24 novembre 2026
 - **Odyssée** — Finitions et passage en **Odyssée 3.0** :
   - Prénoms des 206 dresseurs procéduraux des routes et lieux accordés au genre de leur classe, sans collision avec les dresseurs fixes ni les Champions.
