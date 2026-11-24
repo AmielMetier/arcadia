@@ -4,7 +4,8 @@ import { MOVES } from '../data/moves.js';
 import { abilitiesOf } from '../data/abilities.js';
 import { formatFindItem } from '../core/items.js';
 import { createMon, refreshStats, monName } from '../core/mon.js';
-import { walkable, isGrassEnc, DIRS, T } from '../world/tiles.js';
+import { DIRS } from '../world/tiles.js';
+import { caseAccessible } from './places.js';
 import { CELESTIAL_SPECIES } from './celestial.js';
 import { warnDev } from '../core/safe.js';
 
@@ -55,10 +56,24 @@ export const ALPHA_POOL = [
   { sp: 637, sigMoveId: 126 },  // Pyrax — Déflagration
 ];
 
+// l'évolution d'avant, pour chaque espèce (une faille ouverte tôt ne doit pas donner un Dracolosse au niveau 10)
+let AVANT = null;
+/** la forme qu'aurait cette espèce à ce niveau : une évolution par niveau est ramenée à la forme précédente tant que le
+ *  niveau n'y est pas ; par une pierre ou un échange, avant le niveau 30 */
+export function formeAdaptee(sp, lvl) {
+  if (!AVANT) {
+    AVANT = new Map();
+    for (const k of Object.keys(SPECIES)) for (const e of SPECIES[k].ev || []) if (!AVANT.has(e.to)) AVANT.set(e.to, { de: +k, lvl: e.lvl || 30 });
+  }
+  let s = sp;
+  for (let i = 0; i < 3; i++) { const a = AVANT.get(s); if (!a || lvl >= a.lvl || !SPECIES[a.de]) break; s = a.de; }
+  return s;
+}
+
 export function createAlphaMon(entry, lvl, met = 'Faille Alpha') {
   const sp = entry?.sp || 130;
   const sigId = entry?.sigMoveId;
-  const mon = createMon(sp, lvl, { met });
+  const mon = createMon(formeAdaptee(sp, lvl), lvl, { met });
   // 3 IV garantis à 31
   const pool = [0, 1, 2, 3, 4, 5];
   for (let i = 0; i < 3; i++) {
@@ -89,43 +104,34 @@ export function normalizeCapturedAlpha(mon) {
   return mon;
 }
 
-const BLOCKED_RIFT_TILES = new Set([
-  T.DOOR, T.MAT, T.CAVEDOOR, T.WATER, T.LEDGE, T.LEDGE_E, T.LEDGE_W, T.CUT, T.SMASH, T.BOULDER,
-]);
-
 function drawRiftCanvas(canvas, kind, frame) {
   const info = RIFT_KINDS[kind] || RIFT_KINDS.inverse;
   const x = canvas.getContext('2d');
   x.clearRect(0, 0, 32, 32);
-  // Aura extérieure pulsante
-  const rOut = frame % 2 === 0 ? 13 : 14;
-  x.fillStyle = info.rim;
-  x.globalAlpha = 0.35;
-  x.fillRect(16 - rOut, 4, rOut * 2, 24);
-  x.fillRect(16 - (rOut - 3), 2, (rOut - 3) * 2, 28);
-  // Anneau principal
-  x.globalAlpha = 0.85;
-  x.fillStyle = info.rim;
-  x.fillRect(8, 5, 16, 22);
-  x.fillRect(6, 8, 20, 16);
-  // Cœur sombre de faille
-  x.globalAlpha = 1;
-  x.fillStyle = '#090612';
-  x.fillRect(10, 8, 12, 16);
-  x.fillRect(9, 10, 14, 12);
-  // Spirales tournantes en pixel-art
+  // ovale en pixels pleins (le rendu ne garde que les pixels opaques), au bord qui ondule
+  const ovale = (rx, ry, c, biais = 0) => {
+    x.fillStyle = c;
+    for (let y = -ry; y <= ry; y++) {
+      const w = Math.round(rx * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry))));
+      if (w > 0) x.fillRect(16 - w + Math.round(Math.sin((y + biais) * 0.7) * 0.8), 16 + y, w * 2, 1);
+    }
+  };
+  ovale(9 + (frame % 2), 15, '#120a24', frame);
+  ovale(8 + (frame % 2), 14, info.rim, frame);
+  ovale(7, 12, info.core, frame + 2);
+  ovale(6, 11, '#2a1648', frame + 2);
+  ovale(5, 9, '#0a0614', frame + 3);
+  // deux bras de lumière qui tournent dans le vide
+  for (let i = 0; i < 14; i++) {
+    for (const s of [0, Math.PI]) {
+      const a = i * 0.42 + s - frame * (Math.PI / 4), r = 0.6 + i * 0.3;
+      x.fillStyle = i < 4 ? '#ffffff' : i < 9 ? info.core : info.rim;
+      x.fillRect(Math.round(16 + Math.cos(a) * r), Math.round(16 + Math.sin(a) * r * 1.7), 1, 1);
+    }
+  }
+  // éclats d'espace arrachés autour
   x.fillStyle = info.core;
-  const rot = frame % 4;
-  const pts = [
-    [14 + (rot % 2 ? 2 : -1), 10 + (rot >= 2 ? 2 : 0), 4, 2],
-    [13 + (rot === 1 ? -2 : 2), 20 - (rot >= 2 ? 2 : 0), 5, 2],
-    [10 + (rot % 2), 14 + (rot < 2 ? 1 : -2), 2, 4],
-    [20 - (rot % 2), 13 + (rot >= 2 ? 1 : -1), 2, 4],
-  ];
-  for (const [px, py, pw, ph] of pts) x.fillRect(px, py, pw, ph);
-  // Noyau brillant
-  x.fillStyle = '#ffffff';
-  x.fillRect(15, 15, 2, 2);
+  for (const [px, py] of [[5, 8], [26, 11], [4, 21], [27, 24]]) x.fillRect(px + ((frame + py) % 2), py - (frame % 4 === px % 4 ? 2 : 0), 2, 2);
 }
 
 export class RiftSystem {
@@ -133,6 +139,7 @@ export class RiftSystem {
     this.game = game;
     this.active = null; // { kind, kindLabel, x, y, slot, zoneName, manual, canvas, frame }
     this._animT = 0;
+    this._cherche = 0;   // secondes avant de chercher à nouveau une place
   }
 
   currentSlot() {
@@ -150,28 +157,15 @@ export class RiftSystem {
     this.game.hud?.update?.(true);
   }
 
+  /** l'Astrolabe referme la faille : celle du créneau en cours ne se rouvre pas aussitôt */
+  dissiper() {
+    const st = this.game.state;
+    if (this.active && !this.active.manual && st) (st.flags ||= {}).lastRiftSlot = this.currentSlot();
+    this.clear();
+  }
+
   findSpawnTile(minDist, maxDist) {
-    const g = this.game, m = g.mapObj, p = g.player;
-    if (!m || m.id !== 'monde' || !p) return null;
-    const ph = m.height ? m.height(p.x, p.y) : 0;
-    const cands = [];
-    for (let dx = -maxDist; dx <= maxDist; dx++) {
-      for (let dy = -maxDist; dy <= maxDist; dy++) {
-        const d = Math.abs(dx) + Math.abs(dy);
-        if (d < minDist || d > maxDist) continue;
-        const x = p.x + dx, y = p.y + dy;
-        if (!m.in(x, y)) continue;
-        const tile = m.get(x, y);
-        if (!walkable(tile) || BLOCKED_RIFT_TILES.has(tile) || isGrassEnc(tile)) continue;
-        if (m.height && Math.abs(m.height(x, y) - ph) > 1) continue;
-        if (g.fol && g.fol.x === x && g.fol.y === y) continue;
-        if ((g.npcs || []).some((n) => n.x === x && n.y === y)) continue;
-        if ((g.items || []).some((it) => it.x === x && it.y === y)) continue;
-        cands.push({ x, y });
-      }
-    }
-    if (!cands.length) return null;
-    return cands[Math.floor(Math.random() * cands.length)];
+    return caseAccessible(this.game, minDist, maxDist);
   }
 
   spawnNearPlayer(forcedKind = null, manual = true) {
@@ -222,12 +216,14 @@ export class RiftSystem {
       return;
     }
     const slot = this.currentSlot();
-    if (this.active && !this.active.manual && this.active.slot !== slot) {
+    if (this.active && (this.active.manual ? slot - this.active.slot > 1 : this.active.slot !== slot)) {
       this.clear();
     }
-    if (!this.active && st.flags?.lastRiftSlot !== slot && (st.party?.length || 0) > 0) {
+    this._cherche -= dt;
+    if (!this.active && this._cherche <= 0 && st.flags?.dex && st.flags.lastRiftSlot !== slot && (st.party?.length || 0) > 0) {
+      this._cherche = 2;
       // Apparition périodique naturelle d'une faille (sans bloquer si terrain serré)
-      if ((slot % 2) === 0 || (st.flags?.starter && !st.flags?.riftsCleared)) {
+      if ((slot % 2) === 0 || !st.flags.riftsCleared) {
         const pos = this.findSpawnTile(6, 15);
         if (pos) {
           const keys = Object.keys(RIFT_KINDS);
@@ -245,6 +241,7 @@ export class RiftSystem {
             frame: -1,
           };
           g.hud?.update?.(true);
+          if (!g.busy && !g.bv?.alive) { g.ui?.toast?.(`🌀 Une faille s'est ouverte ${this.compassFromPlayer()} !`, 3200); g.sound?.sfx?.('amb_rift_hum'); }
         }
       }
     }
@@ -258,7 +255,7 @@ export class RiftSystem {
       drawRiftCanvas(this.active.canvas, this.active.kind, frame);
       this.active.frame = frame;
     }
-    const a = v.imageActor('rift:portal', this.active.canvas, 1.35);
+    const a = v.imageActor('rift:portal', this.active.canvas, 1.35, { lumineux: true });
     if (this.active.frame !== frame) {
       drawRiftCanvas(this.active.canvas, this.active.kind, frame);
       this.active.frame = frame;
@@ -281,16 +278,17 @@ export class RiftSystem {
     const ui = g.ui, st = g.state;
     g.busy = true;
     try {
-      await ui.say([
-        `${info.label} détectée !`,
-        info.desc,
-      ]);
-      if (!(await ui.yesNo('Entrer dans cette faille spatio-temporelle ?'))) return true;
-
       const lvls = (st.party || []).filter((q) => q.hp > 0).map((q) => q.lvl);
       const avg = lvls.length ? Math.round(lvls.reduce((a, b) => a + b, 0) / lvls.length) : 12;
       const cap = g.levelCap ? g.levelCap() : 100;
       const lvl = Math.max(10, Math.min(cap, avg + 2));
+
+      await ui.say([
+        `${info.label} détectée !`,
+        info.desc,
+        `Une présence de niveau ${lvl} se devine de l'autre côté...`,
+      ]);
+      if (!(await ui.yesNo('Entrer dans cette faille spatio-temporelle ?'))) return true;
 
       let wild = null;
       let battleOpts = { music: 'wild', rift: true };
@@ -304,7 +302,7 @@ export class RiftSystem {
         await ui.say(`Un rugissement fend la faille ! Un ${monName(wild)} Alpha géant bondit sur toi !`);
       } else {
         const pool = [...ALPHA_POOL.map((e) => e.sp), ...CELESTIAL_SPECIES].filter((id) => SPECIES[id]);
-        const sp = pool[Math.floor(Math.random() * pool.length)];
+        const sp = formeAdaptee(pool[Math.floor(Math.random() * pool.length)], lvl);
         wild = createMon(sp, lvl, { met: `${r.zoneName} (Faille)` });
         const poolIdx = [0, 1, 2, 3, 4, 5];
         for (let k = 0; k < 2; k++) {
@@ -325,11 +323,10 @@ export class RiftSystem {
         await ui.say(`L'espace se tord : un ${monName(wild)} émerge de la faille !`);
       }
 
-      g.busy = false;
       const res = await g.runBattle(battleOpts);
       if (res === 'win' || res === 'caught') {
         st.flags ||= {};
-        if (!r.manual) st.flags.lastRiftSlot = r.slot;
+        st.flags.lastRiftSlot = this.currentSlot();   // une autre ne s'ouvre pas à côté dans la foulée
         st.flags.riftsCleared = (st.flags.riftsCleared || 0) + 1;
         st.flags['riftKind:' + r.kind] = (st.flags['riftKind:' + r.kind] || 0) + 1;
         if (r.kind === 'alpha' && res === 'caught') st.flags.alphaCaught = (st.flags.alphaCaught || 0) + 1;

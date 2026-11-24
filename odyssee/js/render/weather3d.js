@@ -278,7 +278,7 @@ export class WeatherSystem {
       this.celPos[idx + 2] += this.celVel[idx + 2] * mul;
       if (this.celestial === 'aurora') {
         this.celPos[idx] += Math.sin(this.time * 1.4 + i * 0.5) * 0.016 * mul;
-        if (this.celPos[idx + 1] > sol + 15 || Math.abs(this.celPos[idx] - focusX) > 22) {
+        if (this.celPos[idx + 1] > sol + 15 || Math.abs(this.celPos[idx] - focusX) > 22 || Math.abs(this.celPos[idx + 2] - focusZ) > 30) {
           this.resetCelParticle(i, false, focusX, focusZ);
         }
       } else {

@@ -82,7 +82,7 @@
 }
 .battle-anomaly-badge {
   position: absolute;
-  top: calc(var(--bp) * 14);
+  top: calc(var(--bp) * 18);   /* sous la pastille de météo */
   left: 50%;
   transform: translateX(-50%);
   z-index: 10;
@@ -352,9 +352,10 @@
 /* Bannière Lancer Rapide de Poké Ball (combat sauvage B2W2) */
 .fast-ball-banner {
   position: absolute;
-  bottom: calc(100% + var(--bp) * 2);
-  right: 0;
-  width: 100%;
+  /* dans la boîte « Que doit faire… », sous la question : au-dessus des boutons, elle cachait les PV du joueur */
+  bottom: calc(var(--bp) * 4);
+  right: calc(100% + var(--bp) * 7.5);
+  width: calc(85.18% - var(--bp) * 20);
   display: flex;
   align-items: center;
   justify-content: space-between;

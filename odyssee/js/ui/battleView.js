@@ -11,6 +11,7 @@ import { moveDesc } from '../data/moveDescriptions.js';
 import { playMoveVfx, TYPE_FX } from './battleVfx.js';
 import { auraFrames, AURA_PAD } from '../render/aura.js';
 import { TALENTS_ESPECES } from '../data/talents.js';
+import { warnDev } from '../core/safe.js';
 import { auraBurstSpec } from '../game/follower-life.js';
 
 /** vide transparent sous les pattes d'un sprite (en pixels de l'image), mesuré une fois par image */
@@ -27,6 +28,16 @@ function videSous(img) {
     if (v >= c.height) v = 0;
   } catch (e) { v = 0; }
   PIEDS.set(k, v); return v;
+}
+/** rangées vides au-dessus du dessin */
+function videSur(img) {
+  try {
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height).data;
+    for (let y = 0; y < c.height; y++) for (let i = 0; i < c.width; i++) if (d[(y * c.width + i) * 4 + 3] > 32) return y;
+  } catch (e) { warnDev('sprite', e); }
+  return 0;
 }
 /** les Pokémon qui lévitent (Fantominus, Smogo…) gardent la hauteur de leur sprite : ils flottent au-dessus du socle */
 const levite = (sp) => (TALENTS_ESPECES[sp] || TALENTS_ESPECES[SPECIES[sp]?.base] || []).includes('levitate');
@@ -141,6 +152,7 @@ export class BattleView {
       return { x: Math.round(W * fx), y };
     }
     // boss de raid : plus bas qu'un adversaire ordinaire, pour que sa tête (et son aura) restent dans le cadre
+    if (this.battle?.alpha && sl === 1 && side === 1) return { x: Math.round(W * 0.7), y: 89 };
     if (this.battle?.isRaid && side === 1 && slot === 0) return { x: Math.round(W * (this.battle.monde ? 0.6 : 0.68)), y: 92 };
     if (sl === 1) return side === 1 ? { x: Math.round(W * 0.71), y: 86 } : { x: Math.round(W * 0.26), y: 140 };
     if (sl === 2) {
@@ -163,7 +175,12 @@ export class BattleView {
     else if (sl === 4) base = side === 1 ? 0.7 : [0.74, 0.7, 0.66, 0.62][slot];
     else if (sl > 1) base = side === 1 ? [0.68, 0.73, 0.78][slot] : [0.78, 0.73, 0.68][slot];
     const isAlpha = (this.battle?.alpha && side === 1 && slot === 0) || !!this.battle?.act(side, slot)?.alpha;
-    return isAlpha ? base * (sl > 1 ? 1.15 : 1.25) : base;
+    if (!isAlpha) return base;
+    // un Alpha est plus grand que les autres, mais sa tête (et son aura) restent dans le cadre
+    let grand = sl > 1 ? 1.15 : 1.25;
+    const o = side === 1 ? this.spriteObj(side, slot) : null;
+    if (o?.hautVu) grand = Math.max(1, Math.min(grand, (this.posFor(side, slot).y - 10) / (o.hautVu * base)));
+    return base * grand;
   }
   ePos(slot = 0) { return this.posFor(1, slot); }
   pPos(slot = 0) { return this.posFor(0, slot); }
@@ -985,6 +1002,7 @@ export class BattleView {
     o.whiteImg = null; o.darkImg = null;
     // l'adversaire pose ses pattes sur le socle (le sprite a un vide transparent dessous, différent pour chaque espèce)
     o.pied = side === 1 && o.img && !levite(m.sp) ? videSous(o.img) : null;
+    o.hautVu = side === 1 && m.alpha && o.img ? o.img.height - videSur(o.img) - (o.pied || 0) : 0;   // du sommet du crâne aux pattes
     // boss de raid / Pokémon Alpha : son aura (bleue, rouge ou or) ondule derrière lui
     const auraKind = (side === 1 && this.battle.aura) ? this.battle.aura : (m.alpha ? 'rouge' : null);
     o.aura = auraKind && o.img ? auraFrames(o.img, auraKind).frames : null;
@@ -1445,7 +1463,7 @@ export class BattleView {
       const auraSfx = auraSpec.id === 'crimson' ? 'aura_crimson'
         : auraSpec.id === 'sparks' ? 'aura_sparks'
           : auraSpec.id === 'petals' ? 'aura_petals' : 'aura_stars';
-      try { this.sound.sfx(auraSfx); } catch (e) { void e; }
+      this.sound.sfx(auraSfx);
     }
   }
   async animMega(side, slot = 0) {

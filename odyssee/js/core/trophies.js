@@ -624,7 +624,7 @@ export const TROPHIES_CATALOG = [
     desc: 'Vaincre le dernier adversaire de la Tour de combat, à pleine puissance.',
     tier: 'platinum',
     category: 'boss',
-    reward: { item: 'master-ball', count: 1, label: 'Master Ball ×1' },
+    reward: { item: 'rare-candy', count: 10, label: 'Super Bonbon ×10' },
     check: (st) => {
       const done = !!(st.flags?.bossTour || st.flags?.['T:tour:6'] || (st.tour?.record || 0) >= 7);
       return { current: done ? 1 : 0, max: 1, done };
@@ -708,7 +708,7 @@ export const TROPHIES_CATALOG = [
     desc: 'Capturer 10 Pokémon légendaires différents.',
     tier: 'platinum',
     category: 'legende',
-    reward: { item: 'master-ball', count: 1, label: 'Master Ball ×1' },
+    reward: { item: 'full-restore', count: 5, label: 'Guérison ×5' },
     check: (st) => {
       const n = legendairesCaptures(st);
       return { current: Math.min(n, 10), max: 10, done: n >= 10 };

@@ -201,7 +201,7 @@ function composeRiftBattle() {
           tracks.subLead.push({ s: at(b, st % 16), d, m: E + iv - 5, v: 0.7 });
         }
       }
-    } else {
+    } else if (b === 3) {   // un seul roulement : empilé quatre fois, il saturait
       for (let k = 12; k < 16; k++) tracks.drum.push({ s: at(3, k), k: 't', m: 54 - (k - 12) * 2 });
     }
   }

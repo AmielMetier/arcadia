@@ -1,13 +1,28 @@
 # Journal des versions — Arcadia
 
+## 5.159 — 24 novembre 2026
+- **Odyssée** — Grand contrôle des nouveautés célestes, des failles et des souvenirs (Odyssée 3.1) :
+  - L'Astrolabe se recharge après usage : 15 minutes pour le ciel, 8 minutes pour les failles.
+  - Failles et météorites apparaissent toujours à un endroit où l'on peut aller à pied ; une faille refermée à l'Astrolabe reste fermée.
+  - Une faille annonce le niveau de ce qui t'attend ; trop tôt dans l'aventure, le Pokémon n'a pas encore sa forme évoluée.
+  - Un Pokémon Alpha choisit mieux ses attaques, et sa tête ne sort plus de l'écran.
+  - Appuyer plusieurs fois sur Entrée devant une faille n'ouvre plus deux conversations à la fois.
+  - Jirachi, mis K.O. ou en fuite, peut revenir avec une autre météorite.
+  - Portails et météorites redessinés ; ils brillent la nuit. Une faille ou une aurore qui commence s'annonce à l'écran.
+  - Onglet Souvenirs : les dix souvenirs tiennent à l'écran et l'aura d'entrée se choisit au clavier (Entrée). Un souvenir gagné en combat ou en marchant s'annonce.
+  - La bulle de ton compagnon suit ses pas et ne cache plus ton dresseur.
+  - Combat : le lancer rapide de Poké Ball ne cache plus les PV. En faille inversée, Cage-Éclair touche le type Sol.
+  - Le thème des failles ne grésille plus ; changer le volume ne réactive plus un son coupé.
+  - Médailles : la seule Master Ball reste celle des 50 victoires entre joueurs ; Conquérant de la Tour donne 10 Super Bonbons, Panthéon Vivant 5 Guérisons.
+
 ## 5.158 — 24 novembre 2026
-- Nouveau : phenomenes celestes, failles 3D, suiveur vivant, lore, medailles, audio enrichi et refactoring (Amiel)
-  - Refactoring et hygiene : decoupage modulaire (safe.js, audio-boss.js, battle-helpers.js, battle-ai.js, puzzles.js, triggers.js, world-events.js), suppression des catch vides et ajout de test-odyssee-hygiene.mjs
-  - Phenomenes celestes 3D : aurores boreales, pluie d'etoiles filantes, meteorites ramassables, Astrolabe et fragment-meteore
-  - Failles spatio-temporelles 3D : failles Inversee, Chaotique et Alpha geant
-  - Compagnon suiveur vivant : 10 Souvenirs uniques, 5 Auras d'entree en combat et onglet Souvenirs dans le Resume
-  - Lore et recompenses : 4 quetes narratives (mAstronome, mFailles, mAlpha, mMemoire) et 12 medailles/trophees thematiques
-  - Audio enrichi (audio-wow.js) : 4 musiques sur mesure, 9 ambiances dynamiques et 14 SFX compatibles moderne et retro
+- **Odyssée** — Le ciel et l'espace s'animent :
+  - Aurores boréales et pluies d'étoiles filantes la nuit, météorites à ramasser et visiteurs venus des étoiles.
+  - L'Astrolabe, remis avec le Pokédex, observe le ciel et ouvre des failles.
+  - Failles sur les routes : types inversés, météo chaotique ou Pokémon Alpha géant.
+  - Ton compagnon réagit à ce qui l'entoure et garde des Souvenirs, qui débloquent des auras d'entrée en combat.
+  - Quatre quêtes : Les Larmes d'Aurore, Les Cicatrices de l'Espace, La Légende des Colosses Alpha, Les Échos du Compagnon.
+  - 12 nouvelles médailles, quatre musiques et des ambiances sonores.
 
 ## 5.157 — 24 novembre 2026
 - **Odyssée** — Finitions et passage en **Odyssée 3.0** :

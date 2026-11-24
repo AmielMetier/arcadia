@@ -469,6 +469,14 @@ export function summaryScreen(game, list, idx) {
     // la place de celle visée (les deux s'échangent) ; à la souris, un clic prend, un second clic échange
     const ordreOk = !game.bv?.alive;
     let curMv = -1, pris = -1;
+    // onglet Souvenirs : A change l'aura d'entrée (au clavier comme à la manette), le carnet défile tout seul de bas en haut
+    const changerAura = () => {
+      const m = list[idx], choix = ['auto', 'none', ...unlockedAuras(m).map((a) => a.id)];
+      if (choix.length < 3) { ui.sound.sfx('bump'); return; }
+      const i = choix.indexOf(m.entranceAura || 'auto');
+      m.entranceAura = choix[(i + 1) % choix.length];
+      ui.sound.sfx('select'); game.save?.(true); draw();
+    };
     const sortirOrdre = () => { curMv = -1; pris = -1; };
     const echanger = (a, b) => {
       const mv = list[idx].moves; if (a === b || !mv[a] || !mv[b]) return;
@@ -588,7 +596,7 @@ export function summaryScreen(game, list, idx) {
             <div class="sum-content">${body}</div>
           </div>
         </div>
-        <div class="sum-help">${curMv >= 0 ? 'Ranger les attaques · ◀ ▶ Changer d\'onglet' : '◀ ▶ Changer d\'onglet · ▲ ▼ Changer de Pokémon · Échap ou RETOUR pour fermer'}</div>`;
+        <div class="sum-help">${curMv >= 0 ? 'Ranger les attaques · ◀ ▶ Changer d\'onglet' : page === 3 && unlockedAuras(m).length ? 'Entrée : changer d\'aura · ◀ ▶ Changer d\'onglet · ▲ ▼ Changer de Pokémon' : '◀ ▶ Changer d\'onglet · ▲ ▼ Changer de Pokémon · Échap ou RETOUR pour fermer'}</div>`;
 
       if (ordreOk) s.querySelectorAll('[data-mv]').forEach((el) => {
         el.addEventListener('click', (e) => {
@@ -638,6 +646,7 @@ export function summaryScreen(game, list, idx) {
         sortirOrdre();
       }
       if (k === 'a' && page === 2 && ordreOk && list[idx].moves.length > 1) { curMv = 0; pris = -1; ui.sound.sfx('blip'); draw(); return; }
+      if (k === 'a' && page === 3) { changerAura(); return; }
       if (k === 'up' || k === 'down') sortirOrdre();
       if (k === 'left') { page = (page + 3) % 4; ui.sound.sfx('blip'); draw(); }
       else if (k === 'right') { page = (page + 1) % 4; ui.sound.sfx('blip'); draw(); }

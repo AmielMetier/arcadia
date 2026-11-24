@@ -255,12 +255,23 @@ function paintEmote(emote) {
   return emoteCanvas;
 }
 
+/** annonce discrète des souvenirs gagnés en marchant, au combat ou à la fin d'une Arène */
+export function annoncerSouvenirs(game, gagnes) {
+  if (!gagnes?.length || !game?.ui?.toast) return;
+  const [a] = gagnes, reste = gagnes.length - 1;
+  game.sound?.sfx?.('memory_unlock');
+  game.ui.toast(`${a.memory.icon} Souvenir de ${monName(a.mon)} : « ${a.memory.title} »${reste > 0 ? ` (et ${reste} autre${reste > 1 ? 's' : ''})` : ''}`, 3200);
+  const aura = gagnes.find((g) => g.newAuras?.length);
+  if (aura) setTimeout(() => game.ui.toast(`${aura.newAuras[0].icon} Aura d'entrée de ${monName(aura.mon)} : ${aura.newAuras[0].name} !`, 3200), 3400);
+}
+
 function nearbySpecialNpc(game, f) {
   let musician = false;
   let goat = false;
   for (const n of (game.npcs || [])) {
     if (!n) continue;
     const dist = Math.abs(n.x - f.x) + Math.abs(n.y - f.y);
+    if (dist > 6) continue;
     const id = String(n.id || '');
     const scr = String(n.def?.script || '');
     if ((scr === 'musicien' || /musicien/i.test(id)) && dist <= 6) musician = true;
@@ -280,12 +291,17 @@ export function followerTickLife(game, dt) {
     if (v?.actors?.has('fol:emote')) v.removeActor('fol:emote');
     return;
   }
-  const { musician, goat } = nearbySpecialNpc(game, f);
+  // les gens autour sont regardés quatre fois par seconde (la région en compte plus d'un millier)
+  f._vieT = (f._vieT ?? 0) - dt;
+  if (f._vieT <= 0 || !f._autour) { f._vieT = 0.25; f._autour = nearbySpecialNpc(game, f); }
+  const { musician, goat } = f._autour;
   f._dancing = musician;
   if (musician) {
     f._danceT = (f._danceT || 0) + dt;
-    if (f._danceT >= 1.5 && game.state?.party?.[0]) {
-      addMemory(game.state.party[0], 'music_dance', game.locationName?.() || '');
+    const tete = game.state?.party?.[0];
+    if (f._danceT >= 1.5 && tete && !hasMemory(tete, 'music_dance') && !game.busy) {
+      const res = addMemory(tete, 'music_dance', game.locationName?.() || '');
+      if (res.added) annoncerSouvenirs(game, [{ mon: tete, memory: res.memory, newAuras: res.newlyUnlockedAuras }]);
     }
   } else {
     f._danceT = 0;
@@ -298,6 +314,9 @@ export function followerTickLife(game, dt) {
   else if (riftDist <= 8) emote = 'alert';
   else if (cel !== 'none') emote = 'star';
   else if (goat) emote = 'heart';
+  // émerveillé ou attendri : la bulle va et vient, elle ne reste pas tout le temps au-dessus de lui
+  f._emoteT = (f._emoteT || 0) + dt;
+  if ((emote === 'star' || emote === 'heart') && f._emoteT % 7 > 2.4) emote = null;
 
   f._emote = emote;
   if (!emote || typeof document === 'undefined') {
@@ -306,13 +325,19 @@ export function followerTickLife(game, dt) {
   }
   const canvas = paintEmote(emote);
   if (!canvas) return;
-  const a = v.imageActor('fol:emote', canvas, 0.7);
-  if (f._drawnEmote !== emote) {
+  const a = v.imageActor('fol:emote', canvas, 0.7, { lumineux: true });
+  if (f._drawnEmote !== emote || f._emoteActeur !== a) {
+    f._emoteActeur = a;
     f._drawnEmote = emote;
     if (a.mesh?.material?.map) a.mesh.material.map.needsUpdate = true;
   }
   const bob = Math.sin(performance.now() / 240) * 0.08;
-  v.place(a, f.x, f.y, 1.05 + bob + followerDanceHop(f), true);
+  // la bulle suit le Pokémon pendant son pas, au-dessus de sa tête
+  const u = f.move ? Math.min(1, f.move.t) : 1;
+  const ex = f.move ? f.move.fx + (f.move.tx - f.move.fx) * u : f.x, ey = f.move ? f.move.fy + (f.move.ty - f.move.fy) * u : f.y;
+  // le dresseur juste derrière lui : la bulle se décale pour ne pas lui couvrir le dos
+  const p = game.player, cote = p && Math.abs(p.x - ex) < 0.6 && ey - p.y > 0.4 && ey - p.y < 1.6 ? 0.7 : 0;
+  v.place(a, ex + cote, ey, 1.05 + bob + followerDanceHop(f) - (cote ? 0.25 : 0), true);
   if (a.shadow) a.shadow.visible = false;
 }
 
@@ -330,7 +355,7 @@ function typeLines(mon, spData, weather, h, outdoor, mapName) {
     lines.push(weather === 'rain' ? `${n} danse joyeusement sous l'averse ! La pluie le revigore.` : `${n} scrute les reflets d'eau alentour avec entrain.`);
   }
   if (types.includes('electric')) {
-    lines.push(`${n} fait crépiter de minuscules étincelles d'enthousiasme sur ses joues !`);
+    lines.push(`${n} fait crépiter de minuscules étincelles d'enthousiasme !`);
   }
   if (types.includes('grass')) {
     lines.push(outdoor && (h >= 7 && h < 19) ? `${n} profite pleinement de la lumière pour faire le plein de chlorophylle !` : `${n} caresse doucement le sol de ses feuilles.`);
@@ -390,7 +415,7 @@ export async function talkFollowerRich(game) {
     chosenLine = `${n} contemple l'aurore boréale émeraude avec des yeux pleins d'étoiles !`;
   } else if (cel === 'meteor') {
     tryUnlock('celestial');
-    chosenLine = `${n} pointe du museau les étoiles filantes dans le ciel nocturne ! Des éclats brillent sûrement au sol.`;
+    chosenLine = `${n} lève la tête vers les étoiles filantes ! Des éclats brillent sûrement au sol.`;
   } else if (musician) {
     tryUnlock('music_dance');
     chosenLine = `♪ ${n} marque le rythme de la musique avec enthousiasme !`;
@@ -406,7 +431,7 @@ export async function talkFollowerRich(game) {
     game.state.flags ||= {};
     game.state.flags.lastFollowerGiftAt = now;
     game.state.flags.followerGifts = (game.state.flags.followerGifts || 0) + 1;
-    foundItem = cel === 'meteor' ? 'fragment-meteore' : GIFT_POOL[Math.floor(Math.random() * GIFT_POOL.length)];
+    foundItem = GIFT_POOL[Math.floor(Math.random() * GIFT_POOL.length)];
     game.give?.(foundItem, 1);
     tryUnlock('gift_finder');
   }

@@ -208,7 +208,7 @@ export const MISSIONS = [
     reward: [['moon-stone', 1], ['sun-stone', 1], ['rare-candy', 2]],
     ask: [
       'Les anciens navigateurs racontaient qu\'avant la fondation de la Ligue Céleste, les aurores boréales traçaient la route d\'Odyssor jusque vers nos côtes.',
-      'J\'ai poli les lentilles de l\'Astrolabe avec le Prof. Saule, mais depuis que le Prisme Noir de la Team Éclipse a ébranlé le ciel, les étoiles chutent de manière irrégulière.',
+      'J\'ai poli les lentilles de l\'Astrolabe avec le Prof. Saule, mais depuis quelque temps une ombre trouble le ciel, et les étoiles chutent de manière irrégulière.',
       'Apporte-moi 3 Fragments Météoriques tombés lors des pluies d\'étoiles, et je pourrai recalibrer ma carte du firmament !',
     ],
     again: (st) => {
@@ -227,7 +227,7 @@ export const MISSIONS = [
     journal: {
       name: 'Les Larmes d\'Aurore',
       notes: [
-        [(f) => f['A:mAstronome'], 'L\'astronome Orion, à Bourg-Aube, étudie le dérèglement du ciel depuis l\'incident du Prisme Noir et cherche trois Fragments Météoriques.'],
+        [(f) => f['A:mAstronome'], 'L\'astronome Orion, à Bourg-Aube, étudie le dérèglement du ciel et cherche trois Fragments Météoriques.'],
         [(f, g) => f['A:mAstronome'] && !f.mAstronome && (g?.state?.bag?.['fragment-meteore'] || 0) >= 1, (f, g) => `J'ai déjà recueilli ${Math.min(3, g?.state?.bag?.['fragment-meteore'] || 0)} Fragment${(g?.state?.bag?.['fragment-meteore'] || 0) > 1 ? 's' : ''} Météorique${(g?.state?.bag?.['fragment-meteore'] || 0) > 1 ? 's' : ''} sur 3.`],
         [(f) => f.mAstronome, 'J\'ai confié trois Fragments Météoriques à Orion pour recalibrer sa carte céleste.'],
       ],

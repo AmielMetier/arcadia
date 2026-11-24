@@ -219,7 +219,7 @@ export class Hud {
       } else if (act === 'quick-item') {
         g.useRegisteredItem();
       } else if (act === 'astrolabe') {
-        if (g.busy || g.bv?.alive || g.player?.move) return;
+        if (g.busy || g.bv?.alive || g.player?.move || !g.state?.bag?.astrolabe) return;
         g.busy = true; g.sound.sfx('select');
         try { await openAstrolabe(g); } finally { g.busy = false; this.update(true); }
       } else if (act === 'chat') {

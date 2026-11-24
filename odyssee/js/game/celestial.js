@@ -3,7 +3,8 @@ import { SPECIES } from '../data/species.js';
 import { abilitiesOf } from '../data/abilities.js';
 import { formatFindItem } from '../core/items.js';
 import { createMon, refreshStats, monName } from '../core/mon.js';
-import { walkable, isGrassEnc, DIRS, T } from '../world/tiles.js';
+import { DIRS } from '../world/tiles.js';
+import { caseAccessible } from './places.js';
 import { addMemory } from './follower-life.js';
 import { warnDev } from '../core/safe.js';
 
@@ -11,34 +12,37 @@ import { warnDev } from '../core/safe.js';
 export const CELESTIAL_SPECIES = [35, 120, 173, 337, 338, 374, 436, 517, 605];
 export const JIRACHI_SP = 385;
 
-const BLOCKED_METEOR_TILES = new Set([
-  T.DOOR, T.MAT, T.CAVEDOOR, T.WATER, T.LEDGE, T.LEDGE_E, T.LEDGE_W, T.CUT, T.SMASH, T.BOULDER,
-]);
+// l'Astrolabe se recharge : sans ça, on enchaînait failles et pluies d'étoiles (argent, Super Bonbons) sans fin
+export const RECHARGE_CIEL = 15 * 60_000;
+export const RECHARGE_FAILLE = 8 * 60_000;
+/** minutes avant que l'Astrolabe soit prêt (0 : prêt) ; une date dans le futur (horloge reculée) ne bloque jamais */
+export function rechargeAstrolabe(st, cle, duree, now = Date.now()) {
+  const t = st?.flags?.[cle] || 0;
+  if (!t || t > now) return 0;
+  return Math.max(0, Math.ceil((t + duree - now) / 60_000));
+}
 
 function drawMeteorCanvas(canvas, frame) {
   const x = canvas.getContext('2d');
   x.clearRect(0, 0, 24, 24);
-  const pulse = frame % 2 === 0;
-  // Halo brillant
-  x.fillStyle = pulse ? 'rgba(130, 235, 255, 0.34)' : 'rgba(255, 225, 120, 0.38)';
-  x.fillRect(4, 5, 16, 14);
-  x.fillRect(6, 3, 12, 18);
-  // Base rocheuse étoilée
-  x.fillStyle = '#241e38';
-  x.fillRect(6, 10, 12, 9);
-  x.fillRect(5, 12, 14, 6);
-  x.fillStyle = '#483e6e';
-  x.fillRect(7, 11, 10, 6);
-  // Cristal lumineux
-  x.fillStyle = pulse ? '#7af0ff' : '#ffd860';
-  x.fillRect(9, 6, 6, 8);
-  x.fillRect(10, 4, 4, 11);
-  x.fillStyle = '#ffffff';
-  x.fillRect(11, 6, 2, 5);
-  // Étincelles
-  x.fillStyle = '#fff8a0';
-  x.fillRect(frame === 0 ? 4 : 18, frame < 2 ? 5 : 15, 2, 2);
-  x.fillRect(frame === 1 ? 3 : 17, frame < 2 ? 16 : 6, 2, 2);
+  const clair = frame % 2 === 0;
+  // des rangées de pixels : [y, x de début, largeur]
+  const rangs = (L, c) => { x.fillStyle = c; for (const [y, a, w] of L) x.fillRect(a, y, w, 1); };
+  // roche brûlée : contour, masse, reflets, ombre
+  rangs([[12, 8, 8], [13, 6, 12], [14, 5, 14], [15, 4, 16], [16, 4, 16], [17, 4, 16], [18, 5, 14], [19, 6, 12], [20, 8, 8]], '#1a1426');
+  rangs([[13, 8, 8], [14, 7, 10], [15, 6, 12], [16, 5, 14], [17, 6, 12], [18, 7, 10], [19, 9, 6]], '#4a3a58');
+  rangs([[14, 7, 4], [15, 6, 4], [16, 6, 2]], '#7a6690');
+  rangs([[17, 14, 3], [18, 12, 4]], '#2e2440');
+  // braises dans les fissures
+  rangs([[16, 10, 2], [17, 9, 1], [18, 11, 2]], clair ? '#ffb040' : '#ff7a28');
+  // cristal : contour, corps, arête éclairée, côté sombre
+  rangs([[3, 11, 2], [4, 10, 4], [5, 10, 4], [6, 9, 6], [7, 9, 6], [8, 8, 8], [9, 8, 8], [10, 8, 8], [11, 8, 8], [12, 9, 6], [13, 10, 4], [14, 11, 2]], '#16405e');
+  rangs([[4, 11, 2], [5, 11, 2], [6, 10, 4], [7, 10, 4], [8, 9, 6], [9, 9, 6], [10, 9, 6], [11, 9, 6], [12, 10, 4], [13, 11, 2]], clair ? '#58d8f8' : '#38b0e8');
+  rangs([[5, 11, 1], [6, 10, 2], [7, 10, 2], [8, 9, 2], [9, 9, 2], [10, 9, 2], [11, 10, 1]], clair ? '#d8fcff' : '#a8f0ff');
+  rangs([[8, 14, 1], [9, 14, 1], [10, 14, 1], [11, 13, 2], [12, 13, 1]], '#2078b8');
+  // une étincelle en croix qui tourne autour
+  const [ex, ey] = [[4, 7], [18, 4], [19, 11], [5, 11]][frame % 4];
+  x.fillStyle = '#fff4a8'; x.fillRect(ex, ey - 1, 1, 3); x.fillRect(ex - 1, ey, 3, 1);
 }
 
 export class CelestialSystem {
@@ -69,7 +73,7 @@ export class CelestialSystem {
     }
     const h = g.hour ? g.hour() : 12;
     const isNight = h >= 20 || h < 5;
-    if (!isNight) return 'none';
+    if (!isNight || g.eclipseOn?.()) return 'none';   // pas d'aurore pendant la nuit violette de l'Éclipse
     const rawSlot = this.naturalSlot();
     if (this._suppressedSlot === rawSlot) return 'none';
     // Cycle naturel de 20 minutes par fenêtre : Aurore puis Pause puis Pluie d'étoiles
@@ -88,6 +92,9 @@ export class CelestialSystem {
     if (next !== this.activeKind) {
       this.activeKind = next;
       this.game.view?.setCelestial?.(next);
+      if (next !== 'none' && !this.manualKind && !this.game.busy && !this.game.bv?.alive && this.game.state?.flags?.dex) {
+        this.game.ui?.toast?.(next === 'aurora' ? '✨ Une aurore boréale illumine le ciel !' : '☄️ Des étoiles filantes traversent le ciel !', 2800);
+      }
       if (next !== 'meteor') this.clearActors();
       if (!this.game.musicLock && !this.game.enCombat && this.game.mapObj?.id === 'monde') {
         this.game.updateZone?.();
@@ -123,7 +130,7 @@ export class CelestialSystem {
     this.manualUntil = Date.now() + minutes * 60_000;
     this.syncView();
     if (kind === 'meteor' && g.mapObj?.id === 'monde') {
-      this._spawnCd = 1.5;
+      this._spawnCd = 6;
       if (this.meteors.length < 2) {
         this.spawnMeteorNearPlayer();
         this.spawnMeteorNearPlayer();
@@ -139,32 +146,8 @@ export class CelestialSystem {
     const g = this.game, m = g.mapObj, p = g.player;
     if (!m || m.id !== 'monde' || !p) return null;
     if (this.meteors.length >= 3) return null;
-    const ph = m.height ? m.height(p.x, p.y) : 0;
-    const occupied = (x, y) => {
-      if (x === p.x && y === p.y) return true;
-      if (g.fol && g.fol.x === x && g.fol.y === y) return true;
-      if (this.meteors.some((q) => q.x === x && q.y === y)) return true;
-      if (g.rifts?.active && g.rifts.active.x === x && g.rifts.active.y === y) return true;
-      if ((g.npcs || []).some((n) => n.x === x && n.y === y)) return true;
-      if ((g.items || []).some((it) => it.x === x && it.y === y)) return true;
-      return false;
-    };
-    const cands = [];
-    for (let dx = -10; dx <= 10; dx++) {
-      for (let dy = -10; dy <= 10; dy++) {
-        const d = Math.abs(dx) + Math.abs(dy);
-        if (d < 4 || d > 11) continue;
-        const x = p.x + dx, y = p.y + dy;
-        if (!m.in(x, y)) continue;
-        const tile = m.get(x, y);
-        if (!walkable(tile) || BLOCKED_METEOR_TILES.has(tile) || isGrassEnc(tile)) continue;
-        if (m.height && Math.abs(m.height(x, y) - ph) > 1) continue;
-        if (occupied(x, y)) continue;
-        cands.push({ x, y });
-      }
-    }
-    if (!cands.length) return null;
-    const pick = cands[Math.floor(Math.random() * cands.length)];
+    const pick = caseAccessible(g, 4, 11);
+    if (!pick) return null;
     const met = { id: this._nextId++, x: pick.x, y: pick.y, canvas: null, frame: -1 };
     this.meteors.push(met);
     return met;
@@ -180,7 +163,7 @@ export class CelestialSystem {
     this._animT += dt;
     this._spawnCd -= dt;
     if (this._spawnCd <= 0 && this.meteors.length < 3) {
-      this._spawnCd = 11;
+      this._spawnCd = 20;
       this.spawnMeteorNearPlayer();
     }
     // Retirer les météorites trop lointaines
@@ -202,7 +185,7 @@ export class CelestialSystem {
         met.frame = frame;
       }
       const key = `meteor:${met.id}`;
-      const a = v.imageActor(key, met.canvas, 1.0);
+      const a = v.imageActor(key, met.canvas, 1.0, { lumineux: true });
       if (met.frame !== frame) {
         drawMeteorCanvas(met.canvas, frame);
         met.frame = frame;
@@ -216,7 +199,7 @@ export class CelestialSystem {
   /** Bonus appliqué aux rencontres sauvages pendant un phénomène céleste actif */
   applyWildBonus(wild) {
     if (!wild || this.activeKind === 'none') return;
-    if (!wild.shiny && Math.random() < 1 / 512) wild.shiny = true;
+    if (!wild.shiny && Math.random() < 3 / 1024) wild.shiny = true;   // 1/1024 de base : quatre fois plus de chances en tout
     const [, , ha] = abilitiesOf(wild.sp);
     if (ha && !wild.ability && Math.random() < 0.25) wild.ability = ha;
   }
@@ -246,7 +229,7 @@ export class CelestialSystem {
       await ui.say('Une pierre météorique encore tiède brille d\'une poussière d\'étoiles...');
       if (Math.random() < 0.65) {
         const r = Math.random();
-        const item = r < 0.45 ? 'fragment-meteore' : r < 0.65 ? 'moon-stone' : r < 0.75 ? 'sun-stone' : r < 0.90 ? 'rare-candy' : 'ultra-ball';
+        const item = r < 0.55 ? 'fragment-meteore' : r < 0.70 ? 'moon-stone' : r < 0.80 ? 'sun-stone' : r < 0.86 ? 'rare-candy' : 'ultra-ball';
         const qty = item === 'ultra-ball' ? 2 : 1;
         g.give(item, qty);
         await ui.say(formatFindItem(st.name, item, qty));
@@ -270,11 +253,10 @@ export class CelestialSystem {
         }
         refreshStats(wild, false);
         wild.hp = wild.stats[0];
-        if (sp === JIRACHI_SP) st.flags.meteorJirachi = true;
         await ui.say(`Une lueur cosmique s'échappe du cratère : un ${monName(wild)} stellaire surgit !`);
-        g.busy = false;
         const res = await g.runBattle({ wild, music: 'wild' });
         if (res === 'caught') {
+          if (sp === JIRACHI_SP) st.flags.meteorJirachi = true;   // mis K.O. ou en fuite, il pourra revenir
           st.flags.celestialCosmicCaught = (st.flags.celestialCosmicCaught || 0) + 1;
           try { g.checkTrophies?.(true); } catch (e) { warnDev('celestial-trophy', e); }
         }
@@ -298,14 +280,17 @@ export async function openAstrolabe(game) {
     : k === 'meteor' ? 'Pluie d\'étoiles filantes (météorites sur la route)'
       : 'Ciel calme';
 
+  const st = game.state, reste = (cle, d) => rechargeAstrolabe(st, cle, d);
+  const ciel = reste('astroCiel', RECHARGE_CIEL), faille = reste('astroFaille', RECHARGE_FAILLE);
+  const etat = (n, pret) => (n > 0 ? `${n} min` : pret);
   const actions = [
     { id: 'observe', label: 'Observer le ciel et les failles', right: cel?.activeKind !== 'none' || rifts?.active ? 'Actif' : 'Calme' },
-    { id: 'aurora', label: 'Invoquer une Aurore Boréale', right: 'Ciel' },
-    { id: 'meteor', label: 'Invoquer une Pluie d\'Étoiles', right: 'Météores' },
-    { id: 'rift', label: 'Ouvrir une Faille Spatio-Temporelle', right: 'Anomalie' },
+    { id: 'aurora', label: 'Invoquer une Aurore Boréale', right: etat(ciel, 'Ciel') },
+    { id: 'meteor', label: 'Invoquer une Pluie d\'Étoiles', right: etat(ciel, 'Météores') },
+    { id: 'rift', label: 'Ouvrir une Faille Spatio-Temporelle', right: etat(faille, 'Anomalie') },
   ];
   if (cel?.activeKind !== 'none' || rifts?.active) {
-    actions.push({ id: 'clear', label: 'Dissiper les phénomènes', right: 'Reset' });
+    actions.push({ id: 'clear', label: 'Dissiper les phénomènes', right: '' });
   }
   actions.push({ id: 'close', label: 'Ranger l\'Astrolabe', right: '' });
 
@@ -321,7 +306,7 @@ export async function openAstrolabe(game) {
         : 'Aucune faille spatio-temporelle détectée pour le moment.',
     ];
     if (cel?.activeKind === 'meteor' && cel.meteors.length) {
-      msgs.push(`${cel.meteors.length} météorite(s) tombée(s) brille(nt) près d'ici !`);
+      msgs.push(cel.meteors.length > 1 ? `${cel.meteors.length} météorites brillent près d'ici !` : 'Une météorite brille près d\'ici !');
     }
     await ui.say(msgs);
     return;
@@ -334,15 +319,26 @@ export async function openAstrolabe(game) {
 
   if (choice.id === 'clear') {
     cel?.invoke(null);
-    rifts?.clear?.();
+    rifts?.dissiper?.();
     game.hud?.update?.(true);
     await ui.say('L\'Astrolabe apaise le ciel et referme les distorsions.');
     return;
   }
 
+  const attente = choice.id === 'rift' ? faille : ciel;
+  if (attente > 0) {
+    await ui.say(`Les lentilles de l'Astrolabe sont encore brûlantes. Il sera prêt dans ${attente} minute${attente > 1 ? 's' : ''}.`);
+    return;
+  }
+  if (choice.id !== 'rift' && game.eclipseOn?.()) {
+    await ui.say('La nuit violette brouille les lentilles : l\'Astrolabe ne trouve plus aucune étoile.');
+    return;
+  }
+  st.flags ||= {};
+
   if (choice.id === 'aurora') {
     game.sound.sfx('aurora_cast');
-    cel?.invoke('aurora', 8);
+    cel?.invoke('aurora', 8); st.flags.astroCiel = Date.now();
     await ui.say([
       'Les lentilles de l\'Astrolabe captent les vents solaires...',
       'Une Aurore Boréale illumine le ciel ! Les Pokémon chromatiques et les Talents Cachés sont attirés ici.',
@@ -352,7 +348,7 @@ export async function openAstrolabe(game) {
 
   if (choice.id === 'meteor') {
     game.sound.sfx('meteor_cast');
-    cel?.invoke('meteor', 8);
+    cel?.invoke('meteor', 8); st.flags.astroCiel = Date.now();
     await ui.say([
       'L\'Astrolabe s\'aligne avec la constellation du Dragon...',
       'Une pluie d\'étoiles filantes embrase le ciel ! Cherche les météorites brillantes tombées tout autour de toi.',
@@ -376,6 +372,7 @@ export async function openAstrolabe(game) {
       await ui.say('Le terrain autour de toi est trop encombré pour ouvrir une faille !');
       return;
     }
+    st.flags.astroFaille = Date.now();
     game.sound.sfx('rift_open');
     await ui.say([
       'L\'Astrolabe déchire un instant la trame de l\'espace...',

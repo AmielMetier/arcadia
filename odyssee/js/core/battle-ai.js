@@ -188,7 +188,12 @@ export function foeChooseSlot(b, slot = 0, itemUsed = false, ctx = null) {
 
   if (b.wild) {
     const lock = b.choiceLock(ref); if (lock != null) { const k = m.moves.findIndex((q) => q.id === lock); return { type: 'move', id: lock, slot: k }; }
-    const k = usable[b.r(usable.length)];
+    let k = usable[b.r(usable.length)];
+    // un Alpha sait se battre : deux fois sur trois, il choisit son attaque la plus forte
+    if (b.alpha && b.r(3) > 0) {
+      const cible = b.aliveSlots(0).map((sl) => ({ side: 0, slot: sl }))[0];
+      if (cible) { let mieux = 0; for (const j of usable) { const d = estimate(b, ref, cible, MOVES[m.moves[j].id]); if (d > mieux) { mieux = d; k = j; } } }
+    }
     const mv = MOVES[m.moves[k].id];
     const cands = b.validFoeTargets(ref, mv);
     const tgt = cands.length ? cands[b.r(cands.length)] : { side: 0, slot: 0 };
@@ -350,7 +355,7 @@ export function foeChooseSlot(b, slot = 0, itemUsed = false, ctx = null) {
         } else if (x.ail && !['conf', 'seed', 'trap'].includes(x.ail)) {
           const ailType = mv.key === 'toxic' ? 'tox' : x.ail;
           const immuneAb = { psn: ['immunity'], tox: ['immunity'], par: ['limber'], slp: ['insomnia', 'vital-spirit'], brn: ['water-veil', 'fire-mane'], frz: ['magma-armor'] }[ailType];
-          const blockedByGround = mv.key === 'thunder-wave' && pType.includes('ground');
+          const blockedByGround = mv.key === 'thunder-wave' && !b.inverse && pType.includes('ground');
           const blockedByPowder = POWDER_MOVES.has(mv.key) && (pType.includes('grass') || tgtAb === 'overcoat');
           const blockedByTerrain = ailType === 'slp' && b.terrain === 'electric' && b.isGrounded(tgtRef);
           const blockedBySound = SOUND_MOVES.has(mv.key) && tgtAb === 'soundproof';

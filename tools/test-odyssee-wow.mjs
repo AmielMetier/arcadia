@@ -17,8 +17,8 @@ import { foeChooseAll } from '../odyssee/js/core/battle-ai.js';
 import { TROPHIES_CATALOG, checkAllTrophies } from '../odyssee/js/core/trophies.js';
 import { encodeSave, decodeSave } from '../odyssee/js/core/savecode.js';
 import { T } from '../odyssee/js/world/tiles.js';
-import { CelestialSystem, CELESTIAL_SPECIES, JIRACHI_SP } from '../odyssee/js/game/celestial.js';
-import { RiftSystem, RIFT_KINDS, ALPHA_POOL, createAlphaMon, normalizeCapturedAlpha } from '../odyssee/js/game/rifts.js';
+import { CelestialSystem, CELESTIAL_SPECIES, JIRACHI_SP, openAstrolabe, rechargeAstrolabe, RECHARGE_FAILLE } from '../odyssee/js/game/celestial.js';
+import { RiftSystem, RIFT_KINDS, ALPHA_POOL, createAlphaMon, normalizeCapturedAlpha, formeAdaptee } from '../odyssee/js/game/rifts.js';
 import {
   MEMORIES, ENTRANCE_AURAS, addMemory, unlockedAuras, activeEntranceAura, auraBurstSpec, recordBattleMemories,
 } from '../odyssee/js/game/follower-life.js';
@@ -174,6 +174,78 @@ console.log('=== Tests Odyssée Wow (#1 Céleste, #4 Failles, #7 Suiveur/Souveni
   assert(rf && rf.kind === 'inverse' && RIFT_KINDS[rf.kind]);
   assert(rifts.compassFromPlayer().includes('pas'));
   console.log('✓ Phénomènes célestes, météorites & failles spatio-temporelles OK');
+}
+
+// 4 bis. Audit du 24 novembre 2026 : accès à pied, recharge, faille dissipée, Jirachi, formes selon le niveau, inversé
+{
+  // un mur coupe la carte en deux : rien ne doit tomber de l'autre côté
+  const mur = { id: 'monde', outdoor: true, in: (x, y) => x >= 0 && y >= 0 && x < 30 && y < 30, get: (x) => (x === 15 ? T.TREE : T.PATH), height: () => 0, zoneAt: () => ({ name: 'Mur' }) };
+  const dits = [];
+  const g = {
+    mapObj: mur, player: { x: 12, y: 12, dir: 'down' }, npcs: [{ x: 8, y: 12 }], items: [], hour: () => 12,
+    state: { flags: { dex: 1 }, party: [createMon(25, 12)], box: [], bag: { astrolabe: 1 }, money: 0, name: 'Test' }, locationName: () => 'Mur', levelCap: () => 100, badgeCount: () => 8,
+    view: { actors: new Map(), setCelestial: () => {}, removeActor: () => {} }, hud: { update: () => {} }, sound: { sfx: () => {} }, save: () => {}, give: () => {}, checkTrophies: () => {},
+    ui: { say: async (t) => { dits.push(...[].concat(t)); }, yesNo: async () => true, list: async () => 0, toast: () => {} },
+  };
+  g.celestial = new CelestialSystem(g); g.rifts = new RiftSystem(g);
+  for (let i = 0; i < 60; i++) {
+    const r = g.rifts.spawnNearPlayer(null, true);
+    assert(r.x < 15, 'une faille ne s\'ouvre jamais derrière un mur');
+    assert(!(r.x === 8 && r.y === 12), 'ni sur un habitant');
+  }
+  // la faille dissipée ne se rouvre pas dans le même créneau
+  g.rifts.clear(); g.state.flags.riftsCleared = 0; g.rifts.tick(0.1);
+  assert(g.rifts.active && !g.rifts.active.manual, 'la première faille naturelle s\'ouvre');
+  g.rifts.dissiper(); for (let i = 0; i < 50; i++) g.rifts.tick(0.1);
+  assert.equal(g.rifts.active, null, 'une faille dissipée reste fermée');
+  // sans Pokédex : pas de faille
+  g.state.flags = {}; g.rifts._cherche = 0; g.rifts.tick(0.1); assert.equal(g.rifts.active, null, 'pas de faille avant le Pokédex'); g.state.flags = { dex: 1 };
+  // l'Astrolabe se recharge
+  const choix = [3, 1]; g.ui.list = async () => choix.shift() ?? 0;
+  await openAstrolabe(g);
+  assert.equal(g.rifts.active?.kind, 'inverse'); assert(g.state.flags.astroFaille > 0);
+  g.rifts.clear(); choix.push(3, 1); dits.length = 0; await openAstrolabe(g);
+  assert.equal(g.rifts.active, null, 'pas de seconde faille tant que l\'Astrolabe se recharge'); assert(dits.some((t) => /sera prêt dans/.test(t)));
+  assert.equal(rechargeAstrolabe({ flags: { astroFaille: Date.now() - RECHARGE_FAILLE - 1 } }, 'astroFaille', RECHARGE_FAILLE), 0);
+  assert.equal(rechargeAstrolabe({ flags: { astroFaille: Date.now() + 9e9 } }, 'astroFaille', RECHARGE_FAILLE), 0, 'horloge reculée : jamais bloqué');
+  // entrer dans une faille : fuite, elle reste ; victoire, elle se referme et compte
+  for (const [res, reste] of [['flee', true], ['lose', true], ['win', false]]) {
+    const r = g.rifts.spawnNearPlayer('chaos', true); g.player.dir = 'right'; g.player.x = r.x - 1; g.player.y = r.y;
+    g.runBattle = async (o) => { assert(o.chaosWeather && o.rift && o.wild); assert.equal(g.busy, true, 'le joueur ne reprend pas la main avant le combat'); return res; };
+    assert.equal(await g.rifts.interagir(), true); assert.equal(!!g.rifts.active, reste, `faille après ${res}`); assert.equal(g.busy, false);
+    g.player.x = 12; g.player.y = 12;
+  }
+  assert.equal(g.state.flags['riftKind:chaos'], 1);
+  // Jirachi mis K.O. n'est pas perdu
+  const alea = Math.random;
+  for (const [res, pris] of [['win', false], ['caught', true]]) {
+    g.state.flags = { dex: 1 }; g.celestial.meteors = [{ id: 1, x: 12, y: 13 }]; g.player.dir = 'down';
+    let n = 0; Math.random = () => (n++ === 0 ? 0.9 : 0.01);   // rencontre, puis Jirachi
+    let vu = null; g.runBattle = async (o) => { Math.random = alea; vu = o.wild.sp; assert.equal(g.busy, true); return res; };
+    await g.celestial.interagir(); Math.random = alea;
+    assert.equal(vu, JIRACHI_SP); assert.equal(!!g.state.flags.meteorJirachi, pris, `Jirachi après ${res}`);
+  }
+  // formes selon le niveau
+  assert.equal(formeAdaptee(149, 10), 147); assert.equal(formeAdaptee(149, 40), 148); assert.equal(formeAdaptee(149, 60), 149);
+  assert.equal(formeAdaptee(59, 12), 58); assert.equal(formeAdaptee(59, 40), 59);
+  for (const e of ALPHA_POOL) for (const l of [10, 25, 45, 80]) assert(SPECIES[createAlphaMon(e, l).sp], 'forme Alpha valide');
+  // inversé : les talents protègent toujours, Cage-Éclair touche le type Sol
+  const R = (o, inverse) => new Battle({ rng: mkRng(5), inverse, player: { name: 'A', party: [createMon(25, 50, { moves: o.moves, rng: mkRng(1) })], bag: {} }, foe: { name: 'S', party: [createMon(o.sp, 50, { rng: mkRng(2), ability: o.ab || null, moves: [moveByKey.splash || moveByKey.tackle] })] } });
+  for (const [ab, mv] of [['levitate', 'earthquake'], ['water-absorb', 'water-gun'], ['volt-absorb', 'thunderbolt'], ['flash-fire', 'flamethrower'], ['sap-sipper', 'energy-ball']]) {
+    const b = R({ sp: 143, ab, moves: [moveByKey[mv]] }, true); b.start();
+    assert.equal(b.estimate({ side: 0, slot: 0 }, { side: 1, slot: 0 }, MOVES[moveByKey[mv]]), 0, `${ab} protège en inversé (estimation)`);
+    const pv = b.foe.hp; b.playerAction({ type: 'move', idx: 0 }); assert(b.foe.hp >= pv, `${ab} protège en inversé`);
+  }
+  for (const inv of [false, true]) {
+    let par = 0;
+    for (let s = 1; s < 12; s++) { const b = R({ sp: 27, moves: [moveByKey['thunder-wave']] }, inv); b.rng = mkRng(s); b.start(); b.playerAction({ type: 'move', idx: 0 }); if (b.foe.status === 'par') par++; }
+    assert.equal(par > 0, inv, 'Cage-Éclair sur le type Sol : seulement en inversé');
+  }
+  // parties d'avant : aucun champ nouveau, rien ne casse
+  const vieux = createMon(25, 20); delete vieux.memories; delete vieux.entranceAura;
+  assert.equal(auraBurstSpec(vieux), null); assert.deepEqual(unlockedAuras(vieux), []);
+  for (const t of TROPHIES_CATALOG) t.check({ party: [vieux], box: [null], bag: {}, badges: [], dex: { seen: [], caught: [] } });
+  console.log('✓ Accès à pied, recharge, fuite/défaite/victoire, Jirachi, formes, inversé & anciennes parties OK');
 }
 
 // 5. Souvenirs, Auras, survie héroïque (≤5% PV) & persistance savecode (#7)
@@ -394,6 +466,10 @@ console.log('=== Tests Odyssée Wow (#1 Céleste, #4 Failles, #7 Suiveur/Souveni
       assert(song.steps > 0 && song.loopStart != null && song.loopStart < song.steps, `${name}: structure steps/loopStart invalide`);
       assert(song.tracks.length >= 6, `${name}: au moins 6 pistes attendues`);
       for (const tr of song.tracks) {
+        for (const nt of tr.notes) {
+          const double = nt.m != null && tr.notes.some((q) => q !== nt && q.s === nt.s && q.m === nt.m && q.k === nt.k && q.d === nt.d);
+          assert(!double, `${name}: deux notes identiques empilées au pas ${nt.s} (saturation)`);
+        }
         if (tr.type === 'drum') continue;
         for (const nt of tr.notes) {
           assert(nt.s >= 0 && nt.s < song.steps, `${name}: step hors bornes ${nt.s}`);

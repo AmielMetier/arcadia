@@ -2,8 +2,8 @@
 // Aucun morceau existant n'est repris : mélodies composées par un générateur à graine (toujours les mêmes pour un thème).
 
 import { storeGet, storeSet, warnDev } from './core/safe.js';
-import { NOTE, midiOf, freq, CINE_AUDIO_KEYS, playBossCinematicAudio } from './audio-boss.js';
-import { WOW_THEMES, WOW_COMPOSERS, playWowSfx, WOW_SFX_KEYS } from './audio-wow.js';
+import { midiOf, freq, playBossCinematicAudio } from './audio-boss.js';
+import { WOW_THEMES, WOW_COMPOSERS, playWowSfx } from './audio-wow.js';
 
 export { CINE_AUDIO_KEYS } from './audio-boss.js';
 export { WOW_SFX_KEYS } from './audio-wow.js';
@@ -1311,7 +1311,8 @@ export class Sound {
   setStyle(st) { this.style = st === 'retro' ? 'retro' : 'moderne'; storeSet('odyssee-son', this.style); const cur = this.current; this.current = null; if (cur) this.play(cur); }
   init(offline) {
     if (offline) { this.ctx = null; this.offline = offline.length / offline.sampleRate; }
-    if (this.ctx) { if (this.ctx.state === 'suspended' && this.ctx.resume) this.ctx.resume().catch((e) => warnDev('audio', e)); return; }
+    // iOS met aussi le son en « interrupted » (appel, Siri) : tout ce qui ne tourne pas est relancé
+    if (this.ctx) { if (this.ctx.state !== 'running' && this.ctx.state !== 'closed' && this.ctx.resume) this.ctx.resume().catch((e) => warnDev('audio', e)); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC && !offline) return;
     this.ctx = offline || new AC();
     if (!offline && this.ctx.state === 'suspended' && this.ctx.resume) this.ctx.resume().catch((e) => warnDev('audio', e));
@@ -1341,7 +1342,7 @@ export class Sound {
     this.noise = buf;
     if (this.pending) { const p = this.pending; this.pending = null; this.play(p); }
   }
-  setVolume(v) { this.vol = v; if (this.master) this.master.gain.value = v; storeSet('odyssee-vol', v); }
+  setVolume(v) { this.vol = v; if (this.master) this.master.gain.value = this.muted ? 0 : v; storeSet('odyssee-vol', v); }
 
   tone(type, f, t, dur, vol, bus, o = {}) {
     const c = this.ctx; const g = c.createGain();

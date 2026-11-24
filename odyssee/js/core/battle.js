@@ -2,7 +2,6 @@
 // Le moteur calcule un tour d'un coup et renvoie une liste d'événements que la vue rejoue (textes, PV, animations).
 import { SPECIES } from '../data/species.js';
 import { MOVES } from '../data/moves.js';
-import { TYPE_CHART } from '../data/types.js';
 import { monName, gainExp, gainEffort, isFainted, expProgress } from './mon.js';
 import { RESIST, SOIN, STAT_BAIE } from '../data/baies-objets.js';
 import { ITEMS, itemName, applyItem } from './items.js';
@@ -1253,7 +1252,7 @@ export class Battle {
         this.say(this.typesOf(dR).includes('grass') ? `Ça n'affecte pas ${this.nm(dR)}...` : `Envelocape protège ${this.nm(dR)} !`);
         return;
       }
-      if (mv.key === 'thunder-wave' && this.typesOf(dR).includes('ground')) { this.say(`Ça n'affecte pas ${this.nm(dR)}...`); return; }
+      if (mv.key === 'thunder-wave' && !this.inverse && this.typesOf(dR).includes('ground')) { this.say(`Ça n'affecte pas ${this.nm(dR)}...`); return; }
       did = this.inflict(dR, x.ail, mv, false, aR) || did;
     }
     if (x.st) {
@@ -1432,7 +1431,7 @@ export class Battle {
       this.terrainTurns--;
       if (this.terrainTurns === 0 && this.terrain !== 'none') this.setTerrain('none', 0);
     }
-    if (this.chaosWeather && this.state !== 'over') {
+    if (this.chaosWeather && this.state !== 'over' && this.aliveSlots(0).length && this.aliveSlots(1).length) {
       const opts = ['rain', 'sun', 'sandstorm', 'hail'].filter((w) => w !== this.weather);
       const nextW = opts[this.r(opts.length)];
       this.say('La faille déchaîne un nouveau climat !');

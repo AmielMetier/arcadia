@@ -51,7 +51,7 @@ import { RIVAL_TEAMS, spawnAhead, trigger } from './game/triggers.js';
 import { GYM_HINTS, reveilBetes, spawnLegends, legendReady, legendBattle, ferry, odyssorEvent, runNpcScript } from './game/world-events.js';
 import { CelestialSystem, openAstrolabe } from './game/celestial.js';
 import { RiftSystem, normalizeCapturedAlpha } from './game/rifts.js';
-import { talkFollowerRich, followerTickLife, followerDanceHop, recordBattleMemories, addMemory } from './game/follower-life.js';
+import { talkFollowerRich, followerTickLife, followerDanceHop, recordBattleMemories, addMemory, annoncerSouvenirs } from './game/follower-life.js';
 
 /** météos qui comptent en combat (brume et cendres ne sont que du décor, comme dans les jeux 5G) */
 const BATTLE_WEATHERS = ['rain', 'sun', 'sandstorm', 'hail'];
@@ -1927,7 +1927,7 @@ export class Game {
   async badgeScene(g, name) {
     const st = this.state, ui = this.ui;
     st.badges[g] = true;
-    for (const mon of (st.party || [])) addMemory(mon, 'gym_victory', name);
+    for (const mon of (st.party || [])) if (!this.dernierCombat?.size || this.dernierCombat.has(mon.uid)) addMemory(mon, 'gym_victory', this.mapObj?.name || name);
     try { this.checkTrophies(true); } catch (e) { warnDev('trophies', e); }
     this.sound.sfx('badge');
     await ui.say(`${st.name} reçoit le ${BADGES[g].name} de la part de ${name} !`);
@@ -2132,9 +2132,8 @@ export class Game {
     const result = await this.bv.run(battle, { bg, night: m.outdoor && (h >= 20 || h < 5.5), weather: BATTLE_WEATHERS.includes(weather) ? weather : 'none', curtain });
     // argent
     if (result === 'win' && battle.prizeMoney) st.money += battle.prizeMoney;
-    if (result === 'win' || result === 'caught') {
-      recordBattleMemories(this, battle, result, { rift: !!o.rift, alpha: !!o.alpha });
-    }
+    this.dernierCombat = battle.participants;   // ceux qui ont combattu (souvenir d'Arène)
+    const souvenirs = result === 'win' || result === 'caught' ? recordBattleMemories(this, battle, result, { rift: !!o.rift, alpha: !!o.alpha }) : [];
     try { this.checkTrophies?.(true); } catch (e) { warnDev('trophies', e); }
     if (result === 'caught') {
       const mon = battle.caughtMon || foeMons[0]; mon.ot = st.name; mon.met = this.locationName();
@@ -2159,6 +2158,7 @@ export class Game {
     this.updateZone();
     delete st.combatEnCours;
     this.save(true);
+    annoncerSouvenirs(this, souvenirs);
     return result;
   }
 

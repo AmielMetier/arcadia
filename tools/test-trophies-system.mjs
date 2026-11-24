@@ -16,22 +16,27 @@ console.log('Testing Odyssée Trophies, Medals & PvP System...');
 // ============================================================================
 // 1. Catalog integrity & Master Ball reward constraint
 // ============================================================================
-assert.equal(TROPHIES_CATALOG.length, 36, 'Le catalogue comporte 36 trophées (12 PvP + 24 Aventure/Dex)');
+assert.equal(TROPHIES_CATALOG.length, 66, 'Le catalogue comporte 66 trophées (12 PvP, 36 d\'aventure, 18 de boss, raids, légendaires, Dojo et donjons)');
 
 const pvpTrophies = TROPHIES_CATALOG.filter((t) => ['combat', 'reseau', 'rival', 'streak'].includes(t.category));
 assert.equal(pvpTrophies.length, 12, 'Il doit y avoir exactement 12 trophées PvP');
 
 const aventureTrophies = TROPHIES_CATALOG.filter((t) => t.category === 'aventure');
-assert.equal(aventureTrophies.length, 4, 'Il doit y avoir 4 trophées Aventure');
+assert.equal(aventureTrophies.length, 7, 'Il doit y avoir 7 trophées Aventure (dont les failles)');
 
 const dexTrophies = TROPHIES_CATALOG.filter((t) => t.category === 'pokedex');
 assert.equal(dexTrophies.length, 8, 'Il doit y avoir 8 trophées Pokédex (dont captures 200 et complétion de routes)');
 
 const trainTrophies = TROPHIES_CATALOG.filter((t) => t.category === 'entrainement');
-assert.equal(trainTrophies.length, 4, 'Il doit y avoir 4 trophées Entraînement');
+assert.equal(trainTrophies.length, 7, 'Il doit y avoir 7 trophées Entraînement (dont les souvenirs)');
 
 const explorTrophies = TROPHIES_CATALOG.filter((t) => t.category === 'exploration');
-assert.equal(explorTrophies.length, 4, 'Il doit y avoir 4 trophées Exploration');
+assert.equal(explorTrophies.length, 10, 'Il doit y avoir 10 trophées Exploration (dont le ciel et les failles)');
+
+for (const [cat, n] of [['boss', 4], ['raid', 4], ['legende', 3], ['dojo', 3], ['donjon', 4]]) {
+  assert.equal(TROPHIES_CATALOG.filter((t) => t.category === cat).length, n, `Il doit y avoir ${n} trophées « ${cat} »`);
+}
+assert.equal(new Set(TROPHIES_CATALOG.map((t) => t.id)).size, TROPHIES_CATALOG.length, 'Chaque trophée a son identifiant');
 
 const domaineTrophies = TROPHIES_CATALOG.filter((t) => t.category === 'domaine');
 assert.equal(domaineTrophies.length, 4, 'Il doit y avoir 4 trophées Domaine & Économie');
@@ -77,8 +82,8 @@ let summary = getPvpSummary(state);
 assert.equal(summary.totalMatches, 0);
 assert.equal(summary.winRate, '0.0%');
 assert.equal(summary.unlockedCount, 0);
-assert.equal(summary.trophiesTotal, 36);
-assert.equal(summary.rank.title, 'Challenger');
+assert.equal(summary.trophiesTotal, TROPHIES_CATALOG.length);
+assert.equal(summary.rank.title, 'Aspirant');
 
 // ============================================================================
 // 3. PvP progression & Duels
@@ -319,6 +324,6 @@ assert.equal(state.bag['choice-band'], 1);
 summary = getPvpSummary(state);
 assert(summary.unlockedCount >= 25);
 assert(summary.claimedCount >= 5);
-assert.equal(summary.trophiesTotal, 36);
+assert.equal(summary.trophiesTotal, TROPHIES_CATALOG.length);
 
 console.log('✔ All Trophies, Medals (PvP + Non-PvP) & Master Ball constraint tests PASSED 100%!');

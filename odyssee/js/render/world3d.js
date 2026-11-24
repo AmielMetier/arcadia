@@ -2164,13 +2164,14 @@ export class WorldView {
     return true;
   }
   /** grande créature posée sur la carte (légendaire) : son image de face, debout sur la case */
-  imageActor(id, img, scale = 1) {
+  /** lumineux : l'image garde ses couleurs la nuit et sous la pluie (faille, météorite, émotion) */
+  imageActor(id, img, scale = 1, { lumineux = false } = {}) {
     let a = this.actors.get(id); if (a) return a;
     const t = tex(img); t.flipY = true; t.needsUpdate = true;   // image chargée telle quelle : le haut en haut
     const W = Math.round(img.width * scale) * WPX, H = Math.round(img.height * scale) * HPX;
     const geo = new THREE.PlaneGeometry(W, H); geo.translate(0, H / 2 - 3 * HPX * scale, 0);
     geo.setAttribute('anchor', new THREE.Float32BufferAttribute(new Array(12).fill(0), 3));
-    const mat = screenSprite(new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide }), AVANCE_PERSO); this.tinted.push(mat); mat.color.copy(this.tint);
+    const mat = screenSprite(new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide }), AVANCE_PERSO); if (!lumineux) { this.tinted.push(mat); mat.color.copy(this.tint); }
     const mesh = new THREE.Mesh(geo, mat);
     const S = this.ombres.uv(1.6 * TILE_PX, 0.7 * TILE_PX), sg = new THREE.PlaneGeometry(1.6, 0.7); sg.rotateX(-Math.PI / 2);
     const uv = sg.attributes.uv; for (let i = 0; i < 4; i++) uv.setXY(i, i % 2 ? S[2] : S[0], i < 2 ? S[1] : S[3]);
