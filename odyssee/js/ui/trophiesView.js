@@ -50,7 +50,7 @@ export function getTrophyIconSrc(trophy) {
 // médailles s'affichent l'une après l'autre (au lieu de surgir au milieu de l'action)
 const enAttente = [];
 let attenteT = null;
-const enScene = (game) => !!(game?.bv?.alive || game?.ui?.root?.querySelector('.battle, .evo-scr, .cine-scr, .intro-scr, .hof-scr, .trophy-toast'));
+const enScene = (game) => !!(game?.bv?.alive || game?.ui?.root?.querySelector('.battle, .rift-scr, .evo-scr, .cine-scr, .intro-scr, .hof-scr, .trophy-toast'));
 function suivante(game) {
   attenteT = null;
   if (!enAttente.length) return;

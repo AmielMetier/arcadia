@@ -15,7 +15,6 @@ import { itemName } from '../core/items.js';
 import { SPECIES } from '../data/species.js';
 import { glisserPourRanger } from './glisser.js';
 import { lieuxVille, batimentsImportants, capVers } from './screens/carteLocale.js';
-import { openAstrolabe } from '../game/celestial.js';
 
 const gender = (m) => (m.gender === 'm' ? '<span class="g m">♂</span>' : m.gender === 'f' ? '<span class="g f">♀</span>' : '');
 
@@ -218,10 +217,14 @@ export class Hud {
         try { await friendsScreen(g); } finally { g.busy = false; this.update(true); }
       } else if (act === 'quick-item') {
         g.useRegisteredItem();
-      } else if (act === 'astrolabe') {
-        if (g.busy || g.bv?.alive || g.player?.move || !g.state?.bag?.astrolabe) return;
-        g.busy = true; g.sound.sfx('select');
-        try { await openAstrolabe(g); } finally { g.busy = false; this.update(true); }
+      } else if (act === 'phenomene') {
+        // où chercher
+        if (g.busy || g.bv?.alive) return;
+        const C = g.celestial, L = [];
+        if (C?.activeKind === 'aurora') L.push('✨ Aurore boréale : chromatiques et talents cachés plus fréquents');
+        else if (C?.activeKind === 'meteor') L.push('☄️ Pluie d\'étoiles : des météorites tombent autour de toi');
+        if (g.rifts?.active) L.push(`🌀 ${g.rifts.active.kindLabel} ${g.rifts.compassFromPlayer()}`);
+        g.sound.sfx('select'); if (L.length) this.game.ui?.toast?.(L.join(' · '), 3200);
       } else if (act === 'chat') {
         g.openChat();
       } else if (act === 'hide-dexnav') {
@@ -393,7 +396,7 @@ export class Hud {
           else if (celKind === 'meteor') parts.push('☄️ Météores');
           if (riftKind !== 'none') parts.push(riftKind === 'alpha' ? '🔥 Faille Alpha' : riftKind === 'chaos' ? '🌀 Faille Chaotique' : '⚡ Faille Inversée');
           if (!parts.length) return '';
-          return `<button type="button" class="hud-event-pill" data-act="astrolabe" title="Phénomène actif — Cliquer pour ouvrir l'Astrolabe" tabindex="-1">${parts.join(' · ')}</button>`;
+          return `<button type="button" class="hud-event-pill" data-act="phenomene" title="Phénomène en cours" tabindex="-1">${parts.join(' · ')}</button>`;
         })()}
         ${(() => {
           if (!reg || (regQty <= 0 && reg !== 'running-shoes')) return '';

@@ -896,6 +896,18 @@ export const TROPHIES_CATALOG = [
     }
   },
   {
+    id: 'rift_guardian',
+    title: 'Au Bout de la Faille',
+    desc: 'Traverser les trois îles d\'une faille et vaincre son gardien.',
+    tier: 'gold',
+    category: 'aventure',
+    reward: { item: 'rare-candy', count: 3, label: 'Super Bonbon ×3' },
+    check: (st) => {
+      const n = st.flags?.gardiensFaille || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
     id: 'rift_trinity',
     title: 'Gardien de l\'Espace-Temps',
     desc: 'Surmonter les trois types de failles : Inversée, Chaotique et Alpha.',

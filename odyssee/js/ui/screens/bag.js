@@ -1,6 +1,6 @@
 // odyssee/js/ui/screens/bag.js — sac
 import { esc } from '../ui.js';
-import { ITEMS, itemName, giveHeldItem } from '../../core/items.js';
+import { ITEMS, itemName, giveHeldItem, estSoin } from '../../core/items.js';
 import { monName } from '../../core/mon.js';
 import { ASSETS } from '../../assets.js';
 import { screen, closer } from './common.js';
@@ -232,9 +232,11 @@ export function bagScreen(game, o = {}) {
         inspQtyEl.textContent = it.key ? 'Objet Unique Rare' : `Quantité : × ${bag[sel]}`;
         inspDescEl.textContent = it.desc || '';
 
-        const canUse = o.battle
+        const interdit = o.sansSoins && estSoin(sel);
+        if (interdit) inspDescEl.textContent = 'Sans effet dans une faille.';
+        const canUse = interdit ? false : o.battle
           ? (it.heal || it.cure || it.revive || it.ball || it.pp || it.ppAll)
-          : (!it.key || it.field || it.ct || sel === 'town-map' || sel === 'velo' || sel === 'canne' || sel === 'astrolabe');
+          : (!it.key || it.field || it.ct || sel === 'town-map' || sel === 'velo' || sel === 'canne');
         useBtn.disabled = !canUse;
         useBtn.classList.toggle('disabled', !canUse);
 
@@ -365,9 +367,9 @@ export function bagScreen(game, o = {}) {
       updateInspector();
 
       const item = es[i], it = ITEMS[item];
-      const canUse = o.battle
+      const canUse = o.sansSoins && estSoin(item) ? false : o.battle
         ? (it.heal || it.cure || it.revive || it.ball || it.pp || it.ppAll)
-        : (!it.key || it.field || it.ct || item === 'town-map' || item === 'velo' || item === 'canne' || item === 'astrolabe');
+        : (!it.key || it.field || it.ct || item === 'town-map' || item === 'velo' || item === 'canne');
 
       if (!canUse) {
         ui.sound.sfx('bump');

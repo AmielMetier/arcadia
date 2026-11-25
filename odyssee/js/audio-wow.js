@@ -298,7 +298,7 @@ export const WOW_COMPOSERS = {
 
 export const WOW_SFX_KEYS = [
   'astrolabe', 'aurora_cast', 'meteor_cast', 'meteor_pick',
-  'rift_open', 'rift_enter', 'rift_impact', 'rift_seal', 'alpha_roar', 'memory_unlock',
+  'rift_open', 'rift_enter', 'rift_impact', 'rift_exit', 'rift_seal', 'alpha_roar', 'memory_unlock',
   'aura_stars', 'aura_petals', 'aura_sparks', 'aura_crimson',
   'follower_happy', 'quest_complete',
   'amb_rain', 'amb_thunder', 'amb_wind_gust', 'amb_aurora',
@@ -359,6 +359,13 @@ export function playWowSfx(sound, k, t, B, P, n) {
       sound.tone('triangle', 150, t, 0.7, 0.3, B, { slide: 30, release: 0.4 });
       sound.tone('noise', 1400, t, 0.4, 0.14, B, { filter: 'lowpass', release: 0.35 });
       [['E4', 0], ['B4', 0.02], ['E5', 0.04], ['Bb5', 0.07]].forEach(([m, d]) => P(n(m), d, 0.9, 0.05, 'sine'));
+      return true;
+    case 'rift_exit':
+      // l'implosion : tout se rétracte vers le haut, puis un vide
+      sound.duck(1600);
+      sound.tone('noise', 3200, t, 1.05, 0.12, B, { filter: 'bandpass', attack: 0.9, release: 0.06 });
+      sound.tone('sawtooth', 50, t, 1.05, 0.1, B, { slide: 620, attack: 0.5, release: 0.05 });
+      ['Bb6', 'F6', 'C6', 'Bb5', 'F5', 'E5'].forEach((m, i) => P(n(m), 0.1 + i * 0.15, 0.12, 0.04, 'sine'));
       return true;
     case 'rift_seal':
       sound.duck(1800);

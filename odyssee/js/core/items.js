@@ -25,7 +25,7 @@ export const ITEMS = {
   'max-potion': { pocket: 'soin', price: 2500, heal: 9999, desc: 'Restaure tous les PV d\'un Pokémon.' },
   'full-restore': { pocket: 'soin', price: 3000, heal: 9999, cure: 'all', desc: 'Restaure tous les PV et soigne les problèmes de statut.' },
   revive: { pocket: 'soin', price: 1500, revive: 0.5, desc: 'Ranime un Pokémon K.O. avec la moitié de ses PV.' },
-  'max-revive': { pocket: 'soin', price: 4000, revive: 1, name: 'Rappel Max', desc: 'Ranime un Pokémon K.O. et restaure tous ses PV.' },
+  'max-revive': { pocket: 'soin', icon: 'revive', price: 4000, revive: 1, name: 'Rappel Max', desc: 'Ranime un Pokémon K.O. et restaure tous ses PV.' },
   antidote: { pocket: 'soin', price: 100, cure: ['psn', 'tox'], desc: 'Soigne l\'empoisonnement.' },
   'paralyze-heal': { pocket: 'soin', price: 200, cure: ['par'], desc: 'Soigne la paralysie.' },
   awakening: { pocket: 'soin', price: 250, cure: ['slp'], desc: 'Réveille un Pokémon endormi.' },
@@ -111,8 +111,7 @@ export const ITEMS = {
   'secateur-sylvestre': { pocket: 'cles', price: 0, key: true, field: 'coupe', icon: 'secateur-sylvestre', name: 'Sécateur Sylvestre', desc: 'Des cisailles horticoles ouvragées en acier ciselé et or. Elles tranchent net les arbustes épineux. Place-toi face au buisson et appuie sur F.' },
   'harnais-flottant': { pocket: 'cles', price: 0, key: true, field: 'surf', icon: 'harnais-flottant', name: 'Harnais Flottant', desc: 'Une selle nautique étanche avec flotteurs profilés. Permet de glisser sur l\'eau et la mer. Place-toi face à l\'eau et appuie sur F.' },
   'sifflet-celeste': { pocket: 'cles', price: 0, key: true, field: 'vol', icon: 'sifflet-celeste', name: 'Sifflet Céleste', desc: 'Un sifflet ouvragé en argent et ruban saphir. Il appelle un grand oiseau pour voyager en un instant vers une ville déjà visitée (depuis le menu ou le sac). Badge Mirage requis.' },
-  astrolabe: { pocket: 'cles', price: 0, key: true, icon: 'scope-lens', name: 'Astrolabe', desc: 'Un astrolabe gravé d\'étoiles. Permet d\'observer le ciel, repérer les failles spatio-temporelles et invoquer aurores boréales et pluies d\'étoiles. Un Fragment Météorique lui permet d\'ouvrir une faille.' },
-  'fragment-meteore': { pocket: 'objets', price: 4500, icon: 'star-piece', name: 'Fragment Météorique', desc: 'Un fragment d\'étoile filante encore tiède. Très prisé des astronomes et des boutiques, il permet à l\'Astrolabe d\'ouvrir une faille.' },
+  'fragment-meteore': { pocket: 'objets', price: 4500, icon: 'star-piece', name: 'Fragment Météorique', desc: 'Un fragment d\'étoile filante encore tiède. Très prisé des astronomes et des boutiques d\'Odyssée.' },
 };
 // baies et objets tenus de la 5.95 (data/baies-objets.js)
 Object.assign(ITEMS, NOUVEAUX_OBJETS);
@@ -260,6 +259,9 @@ export function canUseOn(item, m, maxLvl = 100) {
   if (it.stone) return !!itemEvolution(m, item);
   return false;
 }
+
+/** objet qui soigne (PV, statut, K.O., PP) : interdit dans les failles */
+export const estSoin = (item) => { const it = ITEMS[item]; return !!(it && (it.heal || it.cure || it.revive || it.pp || it.ppAll)); };
 
 /** applique un objet de soin ; renvoie le message (ou null si sans effet) */
 export function applyItem(item, m, moveIdx = -1) {

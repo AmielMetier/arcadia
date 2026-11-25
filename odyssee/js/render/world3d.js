@@ -1,6 +1,8 @@
 // odyssee/js/render/world3d.js — rendu « fausse 3D » façon DS : sol en tuiles, bâtiments en volume,
 // arbres / herbes / personnages en sprites verticaux, caméra inclinée en perspective étroite, rendu basse résolution.
 import * as THREE from 'three';
+import { IleFaille } from './iles-faille.js';
+import { Portail } from './portails.js';
 import { T, walkable } from '../world/tiles.js';
 import { styleMur } from './murs-tex.js';
 import { pente, ravin, mont } from '../world/relief.js';
@@ -661,7 +663,7 @@ export class WorldView {
     this.decoAt = new Map(); for (const d of map.deco) this.decoAt.set(d.x + ',' + d.y, d);
     // arènes dessinées : tous les décors d'une case, dans l'ordre où ils ont été posés
     this.decosAt = new Map(); if (map.etat) for (const d of map.deco) (this.decosAt.get(d.x + ',' + d.y) || this.decosAt.set(d.x + ',' + d.y, []).get(d.x + ',' + d.y)).push(d);
-    this.tiers = map.outdoor ? null : caveTiers(map); this.biome = caveBiome(map);
+    this.tiers = map.outdoor || map.faille ? null : caveTiers(map); this.biome = caveBiome(map);
     this.int = styleInterieur(map);   // maison : murs et sol assortis à sa ville (interieurs.js)
     if (this.int && !this.A.cells[`int_${this.int}_haut`]) this.int = null;
     this.fenetresInt = this.int ? fenetresInterieur(map, this.decoAt) : null;
@@ -704,6 +706,7 @@ export class WorldView {
     this.buildSorties();
     this.buildWindowsGroup();
     this.lastChunk = null; this.aBatir = null;
+    this.ile = map.faille ? new IleFaille(this, map) : null;   // île d'une faille : sa roche, ses ponts, son vide
   }
 
   groundCell(x, y) {
@@ -1546,6 +1549,7 @@ export class WorldView {
     return this.sol.pret(Math.floor(x0), Math.floor(y0), Math.ceil(x1), Math.ceil(y1) + 1, ms);
   }
   ensureChunks(px, py) {
+    if (this.ile) return;   // rien d'autre à bâtir
     const ci = Math.floor(px / CH), cj = Math.floor(py / CH), k = ci + ',' + cj;
     if (k !== this.lastChunk) {
       this.lastChunk = k;
@@ -2164,6 +2168,11 @@ export class WorldView {
     return true;
   }
   /** grande créature posée sur la carte (légendaire) : son image de face, debout sur la case */
+  /** portail d'une faille (render/portails.js) ; à faire vivre avec `maj(dt, x, y, ouverture)` */
+  portailActor(id, o) {
+    let a = this.actors.get(id); if (a?.kind === 'portail') return a;
+    a = new Portail(this, o); this.actors.set(id, a); return a;
+  }
   /** lumineux : l'image garde ses couleurs la nuit et sous la pluie (faille, météorite, émotion) */
   imageActor(id, img, scale = 1, { lumineux = false } = {}) {
     let a = this.actors.get(id); if (a) return a;
@@ -2313,6 +2322,7 @@ export class WorldView {
   update(dt, fx, fy) {
     const px = fx, py = fy;   // position du joueur (fx, fy deviennent le point visé par la caméra)
     this.ensureChunks(fx, fy);
+    this.ile?.maj(dt);
     if (Math.abs(this.ombre - this.ombreCible) > 0.002) { this.ombre += (this.ombreCible - this.ombre) * Math.min(1, dt * 2.5); this.applyTint(this.tintBase); }
     this.sol.update(dt, Math.floor(fx / CH), Math.floor(fy / CH), fx + 0.5, fy + 0.5);
     this.animT += dt;
@@ -2387,5 +2397,12 @@ export class WorldView {
       else this.setTimeOfDay(this._lastHour ?? 12);
     }
   }
-  render() { this.renderer.render(this.scene, this.camera); }
+  /** le vide des failles : le tunnel dessiné par ui/rift-entree.js, en image de fond */
+  majFond(force = false) {
+    const c = this.map?.faille?.fond?.dessine(performance.now(), force);
+    if (!c) return;
+    if (!this.fondTex || this.fondTex.image !== c) { this.fondTex?.dispose(); this.fondTex = new THREE.CanvasTexture(c); this.fondTex.colorSpace = THREE.SRGBColorSpace; this.fondTex.generateMipmaps = false; this.fondTex.minFilter = this.fondTex.magFilter = THREE.NearestFilter; }
+    this.fondTex.needsUpdate = true; this.scene.background = this.fondTex;
+  }
+  render() { if (this.map?.faille) this.majFond(); else if (this.fondTex) { this.fondTex.dispose(); this.fondTex = null; } this.renderer.render(this.scene, this.camera); }
 }

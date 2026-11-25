@@ -9,7 +9,7 @@ import { createMon, movesChoisies, monName, healFull, levelEvolution, itemEvolut
 import { Battle } from './core/battle.js';
 import { CT_DU_BADGE } from './data/cts.js';
 import { rattraperCT } from './world/cts.js';
-import { ITEMS, itemName, applyItem, canUseOn, useCandy, formatFindItem, formatObtainItem } from './core/items.js';
+import { ITEMS, itemName, applyItem, estSoin, canUseOn, useCandy, formatFindItem, formatObtainItem } from './core/items.js';
 import { SPECIES } from './data/species.js';
 import { MOVES } from './data/moves.js';
 import { moveDesc } from './data/moveDescriptions.js';
@@ -49,7 +49,7 @@ import { storeGet, storeSet, sessSet, warnDev } from './core/safe.js';
 import { glisse, dalle, souffle, remiseSerre, pupitreSerre, teleporte, savoir, pylon, stele, shrine } from './game/puzzles.js';
 import { RIVAL_TEAMS, spawnAhead, trigger } from './game/triggers.js';
 import { GYM_HINTS, reveilBetes, spawnLegends, legendReady, legendBattle, ferry, odyssorEvent, runNpcScript } from './game/world-events.js';
-import { CelestialSystem, openAstrolabe } from './game/celestial.js';
+import { CelestialSystem } from './game/celestial.js';
 import { RiftSystem, normalizeCapturedAlpha } from './game/rifts.js';
 import { talkFollowerRich, followerTickLife, followerDanceHop, recordBattleMemories, addMemory, annoncerSouvenirs } from './game/follower-life.js';
 
@@ -217,6 +217,8 @@ export class Game {
     // celles débloquées pendant une scène attendent sa fin (showTrophyToast)
     if (s) { try { this.checkTrophies(true); } catch (e) { warnDev('trophies', e); } }
     s.map = this.mapObj.id; s.x = p.x; s.y = p.y; s.dir = p.dir; s.surf = !!p.surf;
+    // dans une faille (île éphémère), la partie se sauvegarde sur la route où elle s'est ouverte
+    const rf = this.mapObj.faille && this.rifts?.exp?.retour; if (rf) Object.assign(s, { map: 'monde', x: rf.x, y: rf.y, dir: rf.dir });
     if (!storeSet(SAVE_KEY, JSON.stringify(s))) return false;
     if (!silent) this.sound.sfx('save');
     this.onSaved?.(silent);
@@ -254,7 +256,8 @@ export class Game {
     // une partie sauvegardée dans un donjon reprend à son entrée ; le premier badge donne la clé de la crypte (anciennes parties)
     this.donjons?.reprise(state);
     if (state.badges?.[0] && !state.bag?.['cle-crypte'] && !state.flags?.['D:crypte:cle']) { state.bag['cle-crypte'] = 1; state.flags['D:crypte:cle'] = true; }
-    if ((state.flags?.starter || state.flags?.dex) && !state.bag?.astrolabe && !state.flags?.astrolabeGiven) { state.bag.astrolabe = 1; state.flags.astrolabeGiven = true; }
+    // l'Astrolabe n'existe plus (les phénomènes arrivent au hasard) ; une faille déjà payée rend son fragment
+    { const b = state.bag || {}, f = state.flags || {}; delete b.astrolabe; if (state.registeredItem === 'astrolabe') state.registeredItem = null; if (f.failleAstro) b['fragment-meteore'] = (b['fragment-meteore'] || 0) + 1; for (const k of ['astrolabeGiven', 'astroCiel', 'astroFaille', 'failleAstro', 'lastRiftSlot']) delete f[k]; }
     this.state = state; this._seen = null;
     revertMegas(state.party); revertMegas(state.box);
     this.stepLock = false; this.stepGap = false;
@@ -688,6 +691,7 @@ export class Game {
   occupied(x, y, except) {
     if (this.donjons?.occupe(x, y)) return true;   // le reflet du joueur (Donjon des Miroirs)
     if (this.raidMonde?.occupe(x, y)) return true;   // le boss de raid de la région
+    if (this.mapObj?.faille && this.rifts?.exp?.occupe(x, y)) return true;   // le Pokémon d'une île de faille
     if (this.player && this.player.x === x && this.player.y === y && except !== this.player) return true;
     for (const n of this.npcs) if (n !== except && ((n.x === x && n.y === y) || (n.move && n.move.fx === x && n.move.fy === y))) return true;
     for (const it of this.items) if (it.x === x && it.y === y) return true;
@@ -766,6 +770,7 @@ export class Game {
     await this.onStepJeu(mv);
     // donjons à plusieurs : dalles et pièges des Trois Voies
     if (!this.busy && this.mapObj && this.donjons?.dansUnDonjon()) await this.donjons.apresPasVoies();
+    if (!this.busy && this.mapObj?.faille) await this.rifts?.exp?.surCase();   // îles des failles : courants, cristaux, portails
   }
   async onStepJeu(mv) {
     const p = this.player, m = this.mapObj, t = m.get(p.x, p.y);
@@ -1008,11 +1013,6 @@ export class Game {
 
     if (reg === 'town-map') {
       await mapScreen(this);
-      return;
-    }
-
-    if (reg === 'astrolabe') {
-      await openAstrolabe(this);
       return;
     }
 
@@ -1671,7 +1671,8 @@ export class Game {
   /** sac hors combat ; renvoie true si l'objet utilisé ferme le menu (Corde Sortie, Vol…) */
   async fieldBag() {
     for (;;) {
-      const r = await bagScreen(this, {}); if (!r) return false;
+      const r = await bagScreen(this, { sansSoins: !!this.mapObj.faille }); if (!r) return false;
+      if (this.mapObj.faille && estSoin(r.item)) { await this.ui.say('Les objets de soin n\'ont aucun effet dans une faille !'); continue; }
       const it = ITEMS[r.item], st = this.state;
       if (it.ball) { await this.ui.say('Ce n\'est pas le moment d\'utiliser ça !'); continue; }
       if (r.item === 'canne') {
@@ -1685,7 +1686,6 @@ export class Game {
         continue;
       }
       if (r.item === 'town-map') { await mapScreen(this); continue; }
-      if (r.item === 'astrolabe') { await openAstrolabe(this); return true; }
       if (r.item === 'velo') { if (await this.toggleVelo()) return true; continue; }
       if (it.ct) { await this.utiliserCT(r.item); continue; }
       if (it.field) {
@@ -2125,12 +2125,12 @@ export class Game {
     }
     const format = o.format || o.trainer?.format, slots = o.slots || o.trainer?.slots;
     const wildParty = o.wildParty || (o.wild ? [o.wild] : null);
-    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag, mega: (st.bag[MEGA_RING] || 0) > 0 }, foe: wildParty ? { name: 'sauvage', party: wildParty } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap(), weather: BATTLE_WEATHERS.includes(weather) ? weather : undefined, weatherTurns: o.weather ? 0 : 5, format, slots, inverse: !!o.inverse, chaosWeather: !!o.chaosWeather, alpha: !!o.alpha, aura: o.aura });
+    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag, mega: (st.bag[MEGA_RING] || 0) > 0 }, foe: wildParty ? { name: 'sauvage', party: wildParty } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap(), weather: BATTLE_WEATHERS.includes(weather) ? weather : undefined, weatherTurns: o.weather ? 0 : 5, format, slots, inverse: !!o.inverse, chaosWeather: !!o.chaosWeather, alpha: !!o.alpha, aura: o.aura, sansFuite: !!o.sansFuite, sansSoins: !!o.sansSoins });
     // combat de dresseur en cours : noté dans la sauvegarde, pour que recharger la page ne permette pas d'y échapper
     if (o.trainer && !o.trainer.friendly && !o.noWhiteout) { st.combatEnCours = true; this.save(true); }
     const foeMons = wildParty || o.party;
     const h = this.hour();
-    const result = await this.bv.run(battle, { bg, night: m.outdoor && (h >= 20 || h < 5.5), weather: BATTLE_WEATHERS.includes(weather) ? weather : 'none', curtain });
+    const result = await this.bv.run(battle, { bg: o.fond ? 'faille' : bg, fond: o.fond || null, night: !o.fond && m.outdoor && (h >= 20 || h < 5.5), weather: BATTLE_WEATHERS.includes(weather) ? weather : 'none', curtain });
     // argent
     if (result === 'win' && battle.prizeMoney) st.money += battle.prizeMoney;
     this.dernierCombat = battle.participants;   // ceux qui ont combattu (souvenir d'Arène)
@@ -2154,7 +2154,7 @@ export class Game {
     // évolutions après le combat
     if (result !== 'lose') for (const mon of st.party) if (battle.levelUps.has(mon.uid) && mon.hp > 0) { const to = levelEvolution(mon, this.hour()); if (to) await this.evolveScene(mon, to); }
     if (result === 'lose' && o.noWhiteout) for (const mon of st.party) healFull(mon);
-    else if (result === 'lose') await this.whiteout();
+    else if (result === 'lose') { o.surDefaite?.(); await this.whiteout(); }
     this.sound.current = null;
     this.updateZone();
     delete st.combatEnCours;
@@ -2614,8 +2614,8 @@ async chooseStarter(sp, cap) {
     await ui.say(res === 'win' ? 'Pfff... Bon, c\'était juste un échauffement !' : 'Ha ha ! Je suis trop fort ! Mais t\'inquiète, tu t\'améliores déjà.', { speaker: RIVAL_NAME });
     await ui.say([res === 'win' ? 'Quel combat ! Tes Pokémon ont déjà l\'air de t\'adorer.' : 'Ne te décourage pas, ' + st.name + '. Ce n\'était que votre tout premier combat !', `${st.name}, prends aussi ceci.`], { speaker: 'Prof. Saule' });
     this.sound.sfx('item');
-    st.flags.dex = true; st.bag['poke-ball'] = (st.bag['poke-ball'] || 0) + 5; st.bag.potion = (st.bag.potion || 0) + 2; this.give('town-map'); this.give('astrolabe'); st.flags.astrolabeGiven = true;
-    await ui.say([`${st.name} reçoit le Pokédex, la Carte, l'Astrolabe, 5 Poké Balls et 2 Potions !`, 'Le Pokédex enregistre chaque Pokémon que tu vois ou captures.', 'Quand tes Pokémon sont fatigués, reviens voir ta mère ou passe au Centre de soins.', 'La première Arène se trouve à Sylvebourg, au nord. Bonne route !'], { speaker: 'Prof. Saule' });
+    st.flags.dex = true; st.bag['poke-ball'] = (st.bag['poke-ball'] || 0) + 5; st.bag.potion = (st.bag.potion || 0) + 2; this.give('town-map');
+    await ui.say([`${st.name} reçoit le Pokédex, la Carte, 5 Poké Balls et 2 Potions !`, 'Le Pokédex enregistre chaque Pokémon que tu vois ou captures.', 'Quand tes Pokémon sont fatigués, reviens voir ta mère ou passe au Centre de soins.', 'La première Arène se trouve à Sylvebourg, au nord. Bonne route !'], { speaker: 'Prof. Saule' });
     await ui.say('Je file ! À plus, ' + st.name + ' !', { speaker: RIVAL_NAME });
     if (rival) { await this.npcWalk(rival, 'down', 2); this.npcs = this.npcs.filter((q) => q !== rival); this.view.removeActor('npc:rival-lab'); }
     this.save(true);

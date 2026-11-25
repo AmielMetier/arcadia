@@ -16,13 +16,13 @@ console.log('Testing Odyssée Trophies, Medals & PvP System...');
 // ============================================================================
 // 1. Catalog integrity & Master Ball reward constraint
 // ============================================================================
-assert.equal(TROPHIES_CATALOG.length, 66, 'Le catalogue comporte 66 trophées (12 PvP, 36 d\'aventure, 18 de boss, raids, légendaires, Dojo et donjons)');
+assert.equal(TROPHIES_CATALOG.length, 67, 'Le catalogue comporte 67 trophées (12 PvP, 37 d\'aventure, 18 de boss, raids, légendaires, Dojo et donjons)');
 
 const pvpTrophies = TROPHIES_CATALOG.filter((t) => ['combat', 'reseau', 'rival', 'streak'].includes(t.category));
 assert.equal(pvpTrophies.length, 12, 'Il doit y avoir exactement 12 trophées PvP');
 
 const aventureTrophies = TROPHIES_CATALOG.filter((t) => t.category === 'aventure');
-assert.equal(aventureTrophies.length, 7, 'Il doit y avoir 7 trophées Aventure (dont les failles)');
+assert.equal(aventureTrophies.length, 8, 'Il doit y avoir 8 trophées Aventure (dont les failles)');
 
 const dexTrophies = TROPHIES_CATALOG.filter((t) => t.category === 'pokedex');
 assert.equal(dexTrophies.length, 8, 'Il doit y avoir 8 trophées Pokédex (dont captures 200 et complétion de routes)');

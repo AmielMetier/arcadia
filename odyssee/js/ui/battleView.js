@@ -116,10 +116,31 @@ export class BattleView {
     return c;
   }
   drawPlatform(x, cx, cy, rx, ry, kind) {
+    if (kind === 'faille') { this.socleFaille(x, cx, cy, rx, ry); return; }
     const cols = kind === 'cave' || kind === 'gym_rock' ? ['#4a3a2c', '#8a7258', '#a08a6c'] : kind === 'indoor' || kind === 'gym' || kind === 'league' || kind === 'city' ? ['#9098a8', '#d8dce8', '#f2f4f8'] : kind === 'water' ? ['#c0a060', '#f0dca0', '#fbecc0'] : kind === 'volcanic' ? ['#5a5250', '#8a8280', '#a8a09c'] : kind === 'snow' ? ['#a0b4cc', '#dce8f4', '#ffffff'] : ['#3c8a3c', '#6cc458', '#90dc78'];
     x.fillStyle = cols[0]; x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, 0, 7); x.fill();
     x.fillStyle = cols[1]; x.beginPath(); x.ellipse(cx, cy - 2, rx - 3, ry - 3, 0, 0, 7); x.fill();
     x.fillStyle = cols[2]; x.beginPath(); x.ellipse(cx - rx * 0.15, cy - 4, rx * 0.55, ry * 0.4, 0, 0, 7); x.fill();
+  }
+  /** îlot de roche arraché au monde, qui flotte dans la faille */
+  socleFaille(x, cx, cy, rx, ry) {
+    const { core = '#38e8ff', rim = '#a848ff' } = this.fond?.info || {}, t = performance.now() / 1000;
+    cx = Math.round(cx); cy = Math.round(cy);
+    const rang = (y, w, c) => { x.fillStyle = c; x.fillRect(cx - w, y, w * 2, 1); };
+    // dessous en pointes
+    const prof = Math.round(ry * 1.7);
+    for (let j = 0; j < prof; j++) {
+      const u = j / prof, w = Math.round(rx * 0.92 * Math.pow(1 - u, 1.5) * (0.92 + 0.08 * Math.sin(j * 1.9)));
+      if (w > 0) { rang(cy + j, w, j % 4 === 3 ? '#1c1030' : '#2a1846'); x.fillStyle = '#3c2460'; x.fillRect(cx - w, cy + j, Math.max(1, Math.round(w * 0.22)), 1); }
+    }
+    // lueur du bord, dessus de pierre
+    for (let j = -ry; j <= ry; j++) { const w = Math.round(rx * Math.sqrt(1 - (j * j) / (ry * ry))); if (w > 0) rang(cy + j, w, rim); }
+    for (let j = -ry + 1; j <= ry - 1; j++) { const w = Math.round((rx - 2) * Math.sqrt(1 - (j * j) / ((ry - 1) * (ry - 1)))); if (w > 0) rang(cy + j - 1, w, j < -ry * 0.2 ? '#6a5490' : j < ry * 0.45 ? '#5a4580' : '#48366c'); }
+    x.fillStyle = core;
+    for (let k = 0; k < 5; k++) { const a = k * 1.9 + 0.6, px = Math.round(cx + Math.cos(a) * rx * 0.62), py = Math.round(cy - 1 + Math.sin(a) * ry * 0.5); x.globalAlpha = 0.35 + 0.35 * Math.sin(t * 2 + k); x.fillRect(px - 2, py, 4, 1); x.fillRect(px, py - 1, 1, 3); }
+    x.globalAlpha = 1;
+    // éclats qui tournent autour
+    for (let k = 0; k < 4; k++) { const a = t * 0.5 + k * 1.57, px = Math.round(cx + Math.cos(a) * rx * 1.12), py = Math.round(cy + ry * 0.7 + Math.sin(a) * ry * 0.9 + Math.sin(t * 1.4 + k) * 2); x.fillStyle = '#4a3070'; x.fillRect(px - 2, py - 2, 4, 4); x.fillStyle = core; x.fillRect(px - 1, py - 2, 2, 1); }
   }
   async loadBattleDecor(kind, night) {
     const bgMap = {
@@ -127,15 +148,15 @@ export class BattleView {
       city: 'bg_city', village: 'bg_village', water: night ? 'bg_water_night' : 'bg_water',
       snow: night ? 'bg_snow_night' : 'bg_snow', volcanic: 'bg_volcanic',
     };
-    const drawn = kind === 'lab';
+    const drawn = kind === 'lab' || kind === 'faille', nu = kind === 'faille';
     const bgKey = bgMap[kind] || (night ? 'bg_grass_night' : 'bg_grass');
     const platMap = { cave: 'cave', gym: 'stone', gym_rock: 'cave', league: 'stone', indoor: 'stone', lab: 'stone', city: 'stone', village: 'grass', water: 'water', snow: 'snow', volcanic: 'volcanic' };
     const platKey = platMap[kind] || (this.battle?.wild ? 'tallgrass' : 'grass');
     const ballPromises = Object.entries(BALL_SPRITE_PATHS).map(async ([k, p]) => [k, await loadImg(p)]);
     const [bgImg, platE, platP, ...ballEntries] = await Promise.all([
       drawn ? Promise.resolve(null) : loadImg(`img/battle/${bgKey}.png`),
-      loadImg(`img/battle/plat_${platKey}_e.png`),
-      loadImg(`img/battle/plat_${platKey}_p.png`),
+      nu ? Promise.resolve(null) : loadImg(`img/battle/plat_${platKey}_e.png`),
+      nu ? Promise.resolve(null) : loadImg(`img/battle/plat_${platKey}_p.png`),
       ...ballPromises,
     ]);
     this.bgImg = bgImg; this.platE = platE; this.platP = platP;
@@ -198,7 +219,9 @@ export class BattleView {
     x.imageSmoothingEnabled = false;
     x.clearRect(0, 0, W, BH);
     x.save(); x.translate(Math.round(s.shakeX), Math.round(s.shakeY));
-    if (this.bgImg) x.drawImage(this.bgImg, 0, 0, W, BH);
+    const vivant = this.fond?.dessine(now);   // l'intérieur d'une faille, qui continue de défiler derrière le combat
+    if (vivant) x.drawImage(vivant, 0, 0, W, BH);
+    else if (this.bgImg) x.drawImage(this.bgImg, 0, 0, W, BH);
     else x.drawImage(this.bg, 0, 0);
 
     // Socles de combat (par emplacement)
@@ -528,8 +551,8 @@ export class BattleView {
     if (!this.anomalyBadge) this.anomalyBadge = this.root?.querySelector('.battle-anomaly-badge');
     if (!this.anomalyBadge) return;
     const b = this.battle;
-    const info = b?.inverse ? { cls: 'inverse', icon: '⚡', label: 'Types Inversés' }
-      : b?.chaosWeather ? { cls: 'chaos', icon: '🌀', label: 'Météo Chaotique' }
+    const info = b?.inverse ? { cls: 'inverse', icon: '⚡', label: b.alpha ? 'Inversé · Alpha' : 'Types Inversés' }
+      : b?.chaosWeather ? { cls: 'chaos', icon: '🌀', label: b.alpha ? 'Chaos · Alpha' : 'Météo Chaotique' }
         : b?.alpha ? { cls: 'alpha', icon: '🔥', label: 'Alpha Géant' }
           : null;
     if (!info) {
@@ -635,7 +658,7 @@ export class BattleView {
 
   /* ---------------- lancement ---------------- */
   async run(battle, o = {}) {
-    this.battle = battle; this.slots = battle.slots || 1; this.kind = o.bg || 'grass'; this.alive = true;
+    this.battle = battle; this.slots = battle.slots || 1; this.kind = o.bg || 'grass'; this.alive = true; this.fond = o.fond || null;
     this.lastMove = 0; this.lastMoveMon = null;
     this.seenInBattle = new Set();
     this.W = Math.max(256, Math.min(420, Math.round(BH * innerWidth / innerHeight)));
@@ -1045,7 +1068,7 @@ export class BattleView {
       ov.remove();
     }
   }
-  close() { this.alive = false; this.targetHint = null; this.root?.remove(); this.ui.closeDialog(); this.game.input.clearDirs?.(); }
+  close() { this.alive = false; this.fond = null; this.targetHint = null; this.root?.remove(); this.ui.closeDialog(); this.game.input.clearDirs?.(); }
 
   /* ---------------- choix du joueur ---------------- */
   async chooseActionForSlot(sl, { allowBack = false, reservedSwitches = new Set(), megaAlreadyArmed = false, usedItems = {} } = {}) {
@@ -1079,7 +1102,7 @@ export class BattleView {
       if (c === 1 && b.pvp) { await this.msg('Pas d\'objets dans un combat entre dresseurs !', { wait: true }); continue; }
       if (c === 3 && b.pvp) { if (await this.ui.yesNo('Abandonner le combat ?')) return { slot: sl, type: 'forfeit' }; continue; }
       if (c === 1) {
-        const r = await bagScreen(this.game, { battle: true, initialItem: this.lastBattleItem || this.game._lastBattleItem }); if (!r) continue;
+        const r = await bagScreen(this.game, { battle: true, sansSoins: !!b.sansSoins, initialItem: this.lastBattleItem || this.game._lastBattleItem }); if (!r) continue;
         const leftQty = (this.game.state.bag[r.item] || 0) - (usedItems[r.item] || 0);
         if (leftQty <= 0) { await this.msg(`Tu n'as plus de ${itemName(r.item)} disponible ce tour !`, { wait: true }); continue; }
         this.lastBattleItem = r.item; this.game._lastBattleItem = r.item;
@@ -1104,7 +1127,7 @@ export class BattleView {
         return { slot: sl, type: 'switch', idx: k };
       }
       if (c === 3) {
-        if (!b.wild) { this.sound.sfx('bump'); await this.msg('Impossible de fuir un combat de Dresseur !', { wait: true }); continue; }
+        if (!b.wild || b.sansFuite) { this.sound.sfx('bump'); await this.msg(b.wild ? 'La faille s\'est refermée : impossible de fuir !' : 'Impossible de fuir un combat de Dresseur !', { wait: true }); continue; }
         return { slot: sl, type: 'run' };
       }
     }
@@ -1149,9 +1172,9 @@ export class BattleView {
       const fastBall = this.getFastBall();
       const items = [
         { label: 'ATTAQUE', sub: 'Capacités', cls: 'fight', icon: 'img/battle/fight.png' },
-        { label: 'SAC', sub: 'Objets & Balls', cls: 'bag', icon: 'img/hud/bag.png' },
+        { label: 'SAC', sub: this.battle.sansSoins ? 'Balls seulement' : 'Objets & Balls', cls: 'bag', icon: 'img/hud/bag.png' },
         { label: 'ÉQUIPE', sub: 'Changer', cls: 'mon', icon: 'img/hud/team.png' },
-        { label: allowBack ? 'RETOUR' : this.battle.pvp ? 'ABANDON' : 'FUITE', sub: allowBack ? 'Précédent' : this.battle.pvp ? 'Forfait' : 'Quitter', cls: 'run', icon: 'img/hud/run.png' },
+        { label: allowBack ? 'RETOUR' : this.battle.pvp ? 'ABANDON' : 'FUITE', sub: allowBack ? 'Précédent' : this.battle.pvp ? 'Forfait' : this.battle.sansFuite ? 'Impossible' : 'Quitter', cls: !allowBack && this.battle.sansFuite ? 'run interdit' : 'run', icon: 'img/hud/run.png' },
       ];
       const fastHtml = fastBall ? `<div class="fast-ball-banner" title="Lancer rapide (Touche B ou Clic)"><div class="fbb-left"><span class="fbb-key-pill">B</span><img class="fbb-ico" src="${ASSETS.item(fastBall.id)}" alt="${esc(fastBall.name)}"><div class="fbb-text"><span class="fbb-sub">Lancer rapide</span><span class="fbb-name">${esc(fastBall.name)}</span></div></div><div class="fbb-right"><span class="fbb-count">×${fastBall.count}</span></div></div>` : '';
       this.cmd.innerHTML = `${fastHtml}<div class="cmd-grid">${items.map((it, i) => `<div class="cbtn ${it.cls}" data-i="${i}"><img class="cbtn-ico" src="${it.icon}" alt=""><div class="cbtn-txt"><span class="cbtn-lbl">${it.label}</span><span class="cbtn-sub">${it.sub}</span></div></div>`).join('')}</div>`;

@@ -208,14 +208,14 @@ export const MISSIONS = [
     reward: [['moon-stone', 1], ['sun-stone', 1], ['rare-candy', 2]],
     ask: [
       'Les anciens navigateurs racontaient qu\'avant la fondation de la Ligue Céleste, les aurores boréales traçaient la route d\'Odyssor jusque vers nos côtes.',
-      'J\'ai poli les lentilles de l\'Astrolabe avec le Prof. Saule, mais depuis quelque temps une ombre trouble le ciel, et les étoiles chutent de manière irrégulière.',
+      'J\'observe le firmament avec le Prof. Saule, mais depuis quelque temps une ombre trouble le ciel, et les étoiles chutent de manière irrégulière.',
       'Apporte-moi 3 Fragments Météoriques tombés lors des pluies d\'étoiles, et je pourrai recalibrer ma carte du firmament !',
     ],
     again: (st) => {
       const n = st.bag?.['fragment-meteore'] || 0;
       return [
         `Tu as déjà ${n} Fragment${n > 1 ? 's' : ''} Météorique${n > 1 ? 's' : ''} sur 3.`,
-        'Sers-toi de ton Astrolabe à ciel ouvert ou guette les pluies nocturnes : leurs pierres étincelantes renferment des éclats précieux.',
+        'Guette les pluies d\'étoiles, la nuit : leurs pierres étincelantes renferment des éclats précieux. Les failles des routes en laissent aussi parfois.',
       ];
     },
     thanks: [
@@ -246,7 +246,7 @@ export const MISSIONS = [
       const manque = [!f['riftKind:inverse'] && 'Inversée', !f['riftKind:chaos'] && 'Chaotique', !f['riftKind:alpha'] && 'Alpha'].filter(Boolean);
       return [
         `Anomalies restantes à sceller : ${manque.join(', ')}.`,
-        'L\'Astrolabe repère les failles ouvertes sur les routes — et, avec un Fragment Météorique, il peut même déchirer l\'espace !',
+        'Elles s\'ouvrent au hasard, où que tu marches. Ton Pokémon les sent souvent avant toi !',
       ];
     },
     thanks: [

@@ -4,7 +4,7 @@ import { SPECIES } from '../data/species.js';
 import { MOVES } from '../data/moves.js';
 import { monName, gainExp, gainEffort, isFainted, expProgress } from './mon.js';
 import { RESIST, SOIN, STAT_BAIE } from '../data/baies-objets.js';
-import { ITEMS, itemName, applyItem } from './items.js';
+import { ITEMS, itemName, applyItem, estSoin } from './items.js';
 import { ABILITIES, getAbility } from '../data/abilities.js';
 import { megaFormOf, megaEvolve, revertMegas } from './mega.js';
 import { STAGE_NAMES, SOUND_MOVES, POWDER_MOVES, VANISH_MOVES, BULLET_MOVES, typeEff, hiddenPower, freshVol } from './battle-helpers.js';
@@ -96,6 +96,8 @@ export class Battle {
     this.inverse = !!o.inverse;
     this.chaosWeather = !!o.chaosWeather;
     this.alpha = !!o.alpha;
+    this.sansSoins = !!o.sansSoins;   // ni objets de soin
+    this.sansFuite = !!o.sansFuite;   // dans une faille, on ne fuit pas (ni Fuite, ni Téléport, ni Hurlement)
     this.aura = o.aura || (this.alpha ? 'rouge' : null);
     this.clutchUids = new Set();
     this.needPlayerSlots = [];
@@ -424,8 +426,11 @@ export class Battle {
     this.ev = [];
     this.turn++;
     const alive0 = this.aliveSlots(0);
-    if (actions.some((a) => a?.type === 'run') && !this.wild) {
-      this.turn--; return [{ t: 'msg', text: 'Impossible de fuir un combat de Dresseur !' }];
+    if (actions.some((a) => a?.type === 'run') && (!this.wild || this.sansFuite)) {
+      this.turn--; return [{ t: 'msg', text: this.wild ? 'La faille s\'est refermée : impossible de fuir !' : 'Impossible de fuir un combat de Dresseur !' }];
+    }
+    if (this.sansSoins && actions.some((a) => a?.type === 'item' && estSoin(a.item))) {
+      this.turn--; return [{ t: 'msg', text: 'Les objets de soin n\'ont aucun effet dans une faille !' }];
     }
     if (this.slots > 1 && actions.some((a) => a?.type === 'item' && ITEMS[a.item]?.ball) && this.aliveSlots(1).length > 1) {
       this.turn--; return [{ t: 'msg', text: 'Il y a trop de cibles ! Mets-en d\'abord K.O. pour n\'en laisser qu\'une !' }];
@@ -633,6 +638,7 @@ export class Battle {
 
   tryRun() {
     if (!this.wild) { this.say('Impossible de fuir un combat de Dresseur !'); return false; }
+    if (this.sansFuite) { this.say('La faille s\'est refermée : impossible de fuir !'); return false; }
     this.runTries++;
     const lead = { side: 0, slot: this.aliveSlots(0)[0] ?? 0 }, fLead = { side: 1, slot: this.aliveSlots(1)[0] ?? 0 };
     if (this.trapped(lead)) { this.say(`${monName(this.act(lead))} est pris au piège : impossible de fuir !`); return false; }
@@ -1196,7 +1202,7 @@ export class Battle {
     if (!u) return false;
     switch (u) {
       case 'splash': this.say('Mais rien ne se passe !'); return true;
-      case 'teleport': if (this.wild && aR.side === 0) { this.say(`${this.Nm(aR)} se téléporte !`); this.end('run'); } else if (this.wild) { this.say(`${this.Nm(aR)} se téléporte !`); this.end('fled'); } else this.say('Mais cela échoue !'); return true;
+      case 'teleport': if (this.sansFuite) this.say('Mais cela échoue !'); else if (this.wild && aR.side === 0) { this.say(`${this.Nm(aR)} se téléporte !`); this.end('run'); } else if (this.wild) { this.say(`${this.Nm(aR)} se téléporte !`); this.end('fled'); } else this.say('Mais cela échoue !'); return true;
       case 'rest':
         if (m.hp >= m.stats[0] || this.ab(aR) === 'insomnia' || this.ab(aR) === 'vital-spirit' || (this.terrain === 'electric' && this.isGrounded(aR))) { this.say('Mais cela échoue !'); return true; }
         m.status = 'slp'; m.slp = 3; this.ev.push({ t: 'status', side: aR.side, slot: aR.slot, status: 'slp' });
@@ -1214,7 +1220,8 @@ export class Battle {
       }
       case 'mist': case 'safeguard': { const scr = this.sides[aR.side].screens; if (scr[u]) { this.say('Mais cela échoue !'); return true; } scr[u] = 5; this.say(u === 'mist' ? `${this.Nm(aR)} s'entoure de brume !` : `${this.Nm(aR)} est protégé par un voile mystique !`); return true; }
       case 'roar': case 'whirlwind': {
-        if (this.wild && this.slots === 1) {
+        if (this.sansFuite && dR.side === 1) { this.say('Mais cela échoue !'); return true; }
+        if (this.wild && this.slots === 1 && !this.sansFuite) {
           this.say(aR.side === 0 ? `${this.Nm(dR)} prend la fuite !` : 'Tu es renvoyé !');
           this.end(aR.side === 0 ? 'win-flee' : 'fled');
           return true;

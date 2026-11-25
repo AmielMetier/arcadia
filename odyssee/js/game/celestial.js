@@ -1,4 +1,4 @@
-// odyssee/js/game/celestial.js — Phénomènes célestes rares (Aurore & Météores 3D), chutes de météorites et Astrolabe
+// odyssee/js/game/celestial.js — Phénomènes célestes rares (Aurore & Météores 3D), qui arrivent au hasard la nuit, et chutes de météorites
 import { SPECIES } from '../data/species.js';
 import { abilitiesOf } from '../data/abilities.js';
 import { formatFindItem } from '../core/items.js';
@@ -12,16 +12,10 @@ import { warnDev } from '../core/safe.js';
 export const CELESTIAL_SPECIES = [35, 120, 173, 337, 338, 374, 436, 517, 605];
 export const JIRACHI_SP = 385;
 
-// l'Astrolabe se recharge après avoir invoqué le ciel (sans ça, on enchaînait les pluies d'étoiles sans fin) ;
-// une faille, elle, se paie d'un Fragment Météorique
-export const RECHARGE_CIEL = 15 * 60_000;
-export const PRIX_FAILLE = 'fragment-meteore';
-/** minutes avant que l'Astrolabe soit prêt (0 : prêt) ; une date dans le futur (horloge reculée) ne bloque jamais */
-export function rechargeAstrolabe(st, cle, duree, now = Date.now()) {
-  const t = st?.flags?.[cle] || 0;
-  if (!t || t > now) return 0;
-  return Math.max(0, Math.ceil((t + duree - now) / 60_000));
-}
+/** un nombre de secondes au hasard entre deux bornes */
+const entre = (a, b) => a + Math.random() * (b - a);
+/** nuit au dehors : attente avant le prochain phénomène, puis durée (secondes de jeu) */
+export const CIEL = { premier: [90, 360], attente: [480, 1500], duree: [300, 480] };
 
 function drawMeteorCanvas(canvas, frame) {
   const x = canvas.getContext('2d');
@@ -52,7 +46,6 @@ export class CelestialSystem {
     this.activeKind = 'none'; // 'none' | 'aurora' | 'meteor'
     this.manualKind = null;
     this.manualUntil = 0;
-    this._suppressedSlot = null;
     this.meteors = [];
     this._spawnCd = 0;
     this._animT = 0;
@@ -60,8 +53,18 @@ export class CelestialSystem {
     this._lastFrame = -1;
   }
 
-  naturalSlot() {
-    return Math.floor(Date.now() / (20 * 60_000));
+  nuit() { const g = this.game, h = g.hour ? g.hour() : 12; return (h >= 20 || h < 5) && !g.eclipseOn?.(); }   // rien pendant la nuit violette de l'Éclipse
+  /** au hasard, la nuit, en plein air : le compte à rebours et le phénomène en cours sont dans la sauvegarde */
+  avancer(dt) {
+    const g = this.game, f = g.state?.flags;
+    if (!f?.dex || g.mapObj?.id !== 'monde' || !this.nuit() || this.manualKind) return;
+    const C = (f.ciel ||= { dans: entre(...CIEL.premier) });
+    if (C.kind) { C.reste -= dt; if (C.reste <= 0) f.ciel = { dans: entre(...CIEL.attente) }; return; }
+    C.dans -= dt;
+    if (C.dans > 0 || g.busy || g.bv?.alive) return;
+    const kind = Math.random() < 0.5 ? 'aurora' : 'meteor';
+    f.ciel = { kind, reste: entre(...CIEL.duree) };
+    g.sound?.sfx?.(kind === 'aurora' ? 'aurora_cast' : 'meteor_cast');
   }
 
   computeKind() {
@@ -72,16 +75,7 @@ export class CelestialSystem {
       this.manualKind = null;
       this.manualUntil = 0;
     }
-    const h = g.hour ? g.hour() : 12;
-    const isNight = h >= 20 || h < 5;
-    if (!isNight || g.eclipseOn?.()) return 'none';   // pas d'aurore pendant la nuit violette de l'Éclipse
-    const rawSlot = this.naturalSlot();
-    if (this._suppressedSlot === rawSlot) return 'none';
-    // Cycle naturel de 20 minutes par fenêtre : Aurore puis Pause puis Pluie d'étoiles
-    const slot = rawSlot % 4;
-    if (slot === 0) return 'aurora';
-    if (slot === 2) return 'meteor';
-    return 'none';
+    return this.nuit() ? g.state?.flags?.ciel?.kind || 'none' : 'none';
   }
 
   syncView() {
@@ -121,12 +115,11 @@ export class CelestialSystem {
     if (!kind || kind === 'none') {
       this.manualKind = null;
       this.manualUntil = 0;
-      this._suppressedSlot = this.naturalSlot();
+      if (this.game.state?.flags) this.game.state.flags.ciel = { dans: entre(...CIEL.attente) };
       this.clearActors();
       this.syncView();
       return 'none';
     }
-    this._suppressedSlot = null;
     this.manualKind = kind;
     this.manualUntil = Date.now() + minutes * 60_000;
     this.syncView();
@@ -155,6 +148,7 @@ export class CelestialSystem {
   }
 
   tick(dt) {
+    this.avancer(dt);
     this.syncView();
     const g = this.game, v = g.view, p = g.player;
     if (this.activeKind !== 'meteor' || g.mapObj?.id !== 'monde') {
@@ -267,129 +261,5 @@ export class CelestialSystem {
       g.busy = false;
     }
     return true;
-  }
-}
-
-export async function openAstrolabe(game) {
-  const ui = game.ui;
-  const cel = game.celestial;
-  const rifts = game.rifts;
-  if (!ui) return;
-  game.sound?.sfx('astrolabe');
-
-  const skyName = (k) => k === 'aurora' ? 'Aurore boréale (chromatiques ×4 & Talents Cachés)'
-    : k === 'meteor' ? 'Pluie d\'étoiles filantes (météorites sur la route)'
-      : 'Ciel calme';
-
-  const st = game.state, reste = (cle, d) => rechargeAstrolabe(st, cle, d);
-  const ciel = reste('astroCiel', RECHARGE_CIEL), fragments = st?.bag?.[PRIX_FAILLE] || 0;
-  const etat = (n, pret) => (n > 0 ? `${n} min` : pret);
-  const actions = [
-    { id: 'observe', label: 'Observer le ciel et les failles', right: cel?.activeKind !== 'none' || rifts?.active ? 'Actif' : 'Calme' },
-    { id: 'aurora', label: 'Invoquer une Aurore Boréale', right: etat(ciel, 'Ciel') },
-    { id: 'meteor', label: 'Invoquer une Pluie d\'Étoiles', right: etat(ciel, 'Météores') },
-    { id: 'rift', label: 'Ouvrir une Faille Spatio-Temporelle', right: `Fragment × ${fragments}` },
-  ];
-  if (cel?.activeKind !== 'none' || rifts?.active) {
-    actions.push({ id: 'clear', label: 'Dissiper les phénomènes', right: '' });
-  }
-  actions.push({ id: 'close', label: 'Ranger l\'Astrolabe', right: '' });
-
-  const pick = await ui.list({ title: 'Astrolabe Céleste', items: actions, cancel: actions.length - 1 });
-  const choice = actions[pick];
-  if (!choice || choice.id === 'close') return;
-
-  if (choice.id === 'observe') {
-    const msgs = [
-      `État du ciel : ${skyName(cel?.activeKind || 'none')}.`,
-      rifts?.active
-        ? `Anomalie détectée : ${rifts.compassFromPlayer()}`
-        : 'Aucune faille spatio-temporelle détectée pour le moment.',
-    ];
-    if (cel?.activeKind === 'meteor' && cel.meteors.length) {
-      msgs.push(cel.meteors.length > 1 ? `${cel.meteors.length} météorites brillent près d'ici !` : 'Une météorite brille près d\'ici !');
-    }
-    await ui.say(msgs);
-    return;
-  }
-
-  if (game.mapObj?.id !== 'monde' || !game.mapObj?.outdoor) {
-    await ui.say('L\'Astrolabe doit être braqué vers le ciel découvert de la région d\'Odyssée !');
-    return;
-  }
-
-  if (choice.id === 'clear') {
-    cel?.invoke(null);
-    const rendu = rifts?.dissiper?.();
-    game.hud?.update?.(true);
-    await ui.say(['L\'Astrolabe apaise le ciel et referme les distorsions.', ...(rendu ? ['La poussière d\'étoiles reforme ton Fragment Météorique !'] : [])]);
-    return;
-  }
-
-  if (choice.id === 'rift' && rifts?.active?.manual) {
-    await ui.say(`Ta faille est toujours ouverte ${rifts.compassFromPlayer()} !`);
-    return;
-  }
-  if (choice.id === 'rift' && !fragments) {
-    await ui.say(['Il faut un Fragment Météorique pour déchirer l\'espace.', 'Les météorites des pluies d\'étoiles en renferment, et les failles des routes en laissent parfois un.']);
-    return;
-  }
-  const attente = choice.id === 'rift' ? 0 : ciel;
-  if (attente > 0) {
-    await ui.say(`Les lentilles de l'Astrolabe sont encore brûlantes. Il sera prêt dans ${attente} minute${attente > 1 ? 's' : ''}.`);
-    return;
-  }
-  if (choice.id !== 'rift' && game.eclipseOn?.()) {
-    await ui.say('La nuit violette brouille les lentilles : l\'Astrolabe ne trouve plus aucune étoile.');
-    return;
-  }
-  st.flags ||= {};
-
-  if (choice.id === 'aurora') {
-    game.sound.sfx('aurora_cast');
-    cel?.invoke('aurora', 8); st.flags.astroCiel = Date.now();
-    await ui.say([
-      'Les lentilles de l\'Astrolabe captent les vents solaires...',
-      'Une Aurore Boréale illumine le ciel ! Les Pokémon chromatiques et les Talents Cachés sont attirés ici.',
-    ]);
-    return;
-  }
-
-  if (choice.id === 'meteor') {
-    game.sound.sfx('meteor_cast');
-    cel?.invoke('meteor', 8); st.flags.astroCiel = Date.now();
-    await ui.say([
-      'L\'Astrolabe s\'aligne avec la constellation du Dragon...',
-      'Une pluie d\'étoiles filantes embrase le ciel ! Cherche les météorites brillantes tombées tout autour de toi.',
-    ]);
-    return;
-  }
-
-  if (choice.id === 'rift') {
-    const sub = [
-      { id: 'random', label: 'Faille Aléatoire', right: '?' },
-      { id: 'inverse', label: 'Faille Inversée (Types inversés)', right: '⚡' },
-      { id: 'chaos', label: 'Faille Chaotique (Météo tournante)', right: '🌀' },
-      { id: 'alpha', label: 'Faille Alpha (Colosse géant)', right: '🔥' },
-      { id: 'back', label: 'Annuler', right: '' },
-    ];
-    const rPick = await ui.list({ title: 'Type de Faille à ouvrir', items: sub, cancel: sub.length - 1 });
-    const rChoice = sub[rPick];
-    if (!rChoice || rChoice.id === 'back') return;
-    if (!(await ui.yesNo('Utiliser un Fragment Météorique pour ouvrir cette faille ?'))) return;
-    const spawned = rifts?.spawnNearPlayer(rChoice.id === 'random' ? null : rChoice.id);
-    if (!spawned) {
-      await ui.say('Le terrain autour de toi est trop encombré pour ouvrir une faille !');
-      return;
-    }
-    game.take(PRIX_FAILLE, 1);
-    st.flags.failleAstro = spawned.kind;   // payée : elle se rouvre si l'on quitte le jeu avant d'y entrer
-    game.save?.(true);
-    game.sound.sfx('rift_open');
-    await ui.say([
-      'L\'Astrolabe déchire un instant la trame de l\'espace...',
-      'Le Fragment Météorique se change en poussière d\'étoiles.',
-      `Une ${spawned.kindLabel} vient de s'ouvrir ${rifts.compassFromPlayer()} !`,
-    ]);
   }
 }

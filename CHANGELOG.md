@@ -1,11 +1,26 @@
 # Journal des versions — Arcadia
 
+## 5.163 — 25 novembre 2026
+- **Odyssée** — Les failles deviennent de vraies expéditions (Odyssée 3.4) :
+  - L'Astrolabe disparaît : failles, aurores et pluies d'étoiles arrivent au hasard (le ciel, la nuit). Une annonce te dit où chercher ; un fragment déjà dépensé pour une faille est rendu.
+  - Derrière une faille, trois îles flottantes où l'on se déplace, au-dessus du tunnel qui défile.
+  - Faille Inversée : des ponts de lumière s'échangent quand on marche sur un cristal. Faille Chaotique : des courants t'emportent d'une île à l'autre. Faille Alpha : le colosse te prend en chasse.
+  - Bats le Pokémon de l'île pour ouvrir deux portails : chacun annonce sa règle et sa récompense. Tu peux aussi rentrer avec ton butin par le passage du sud.
+  - Des éclats à ramasser, et un gardien Alpha à l'aura dorée sur la dernière île.
+  - Le butin n'est remis qu'à la sortie : une défaite après la première île, et il reste dans la faille.
+  - Dans une faille, ni fuite ni objets de soin : seules tes Balls sortent du Sac pendant les combats.
+  - Portails redessinés : une déchirure ouverte sur le tunnel, arête crépitante, éclats en orbite et runes au sol.
+  - Les combats se jouent dans la faille, sur des îlots de roche. À la sortie, la faille implose et te recrache sur la route.
+  - Cinq musiques nouvelles : les îles du Reflet, des Quatre Vents et du Colosse, le trône, et le combat du gardien.
+  - Nouvelle médaille : Au Bout de la Faille. Le Rappel Max retrouve son icône.
+
 ## 5.162 — 25 novembre 2026
 - **The Backrooms** — Un nouveau niveau : le Level 7, Thalassophobia, au bout du toboggan bleu des Poolrooms.
   - Une mer sans fin dans la brume du soir, avec sa houle, ses reflets, l'éclat du jour qui baisse et un peu d'écume sur les crêtes. Des maisons à moitié englouties en sortent : le rez-de-chaussée sous l'eau, l'étage et le toit au-dessus. Aucune ne se ressemble : grises, bleues, rouges, vertes ou blanches, un toit à deux pentes ou à un seul pan, une cheminée, des volets qui pendent, une rambarde ; deux ou trois pièces. D'autres sombrent de travers, et l'épave d'un grand voilier s'est échouée sur un rocher.
   - Une barque en bois à moteur attend au ponton. Monte dedans avec F : le premier tient la barre (Z / S pour le moteur, Q / D pour tourner). Pour descendre, il faut accoster un îlot.
   - Trois bidons d'essence sont cachés au fond de trois de ces maisons : accoste à leur ponton, entre, fouille les pièces. Le moteur en boit, et sans eux on n'ira pas loin. Tout au bout, sur un dernier îlot, une trappe de bunker ouverte sous un gyrophare : la sortie, par une échelle qui descend dans le noir.
   - Quelque chose d'immense vit sous la surface et entend le moteur. Le sonar dit quand ça approche : coupe le moteur et laisse-le passer. S'il atteint la barque en marche, il emporte quelqu'un. Et ne traîne pas au bord de l'eau.
+
 ## 5.161 — 24 novembre 2026
 - **Odyssée** — Entrer dans une faille se vit maintenant en grand (Odyssée 3.3) :
   - L'écran se brise, le monde est aspiré et tu traverses un tunnel propre à la faille : losanges qui s'échangent, quatre climats et leurs éclairs, ou brasier d'un Alpha.

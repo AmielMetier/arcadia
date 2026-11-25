@@ -4,6 +4,7 @@
 import { storeGet, storeSet, warnDev } from './core/safe.js';
 import { midiOf, freq, playBossCinematicAudio } from './audio-boss.js';
 import { WOW_THEMES, WOW_COMPOSERS, playWowSfx } from './audio-wow.js';
+import { FAILLES_THEMES, FAILLES_COMPOSERS } from './audio-failles.js';
 
 export { CINE_AUDIO_KEYS } from './audio-boss.js';
 export { WOW_SFX_KEYS } from './audio-wow.js';
@@ -53,6 +54,7 @@ export const THEMES = {
   hideout: { key: 'C3', scale: 'min', bpm: 112, prog: ['i', 'iv', 'VI', 'V', 'i', 'iv', 'VII', 'V'], seed: 195, style: 'mystery' },
   sanctuary: { key: 'A2', scale: 'min', bpm: 78, prog: ['i', 'VI', 'III', 'VII', 'i', 'iv', 'VI', 'V'], seed: 205, style: 'mystery', soft: 1 },
   ...WOW_THEMES,
+  ...FAILLES_THEMES,
 };
 const ROMAN = { I: 0, II: 1, III: 2, IV: 3, V: 4, VI: 5, VII: 6 };
 function chordOf(sym, key, scale) {
@@ -1285,6 +1287,7 @@ export const CUSTOM_COMPOSERS = {
   raidBoss: () => composeEpicTrack(EPIC_TRACK_SPECS.raidBoss),
   dojoBoss: () => composeEpicTrack(EPIC_TRACK_SPECS.dojoBoss),
   ...WOW_COMPOSERS,
+  ...FAILLES_COMPOSERS,
 };
 
 export class Sound {

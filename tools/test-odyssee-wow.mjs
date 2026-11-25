@@ -17,8 +17,10 @@ import { foeChooseAll } from '../odyssee/js/core/battle-ai.js';
 import { TROPHIES_CATALOG, checkAllTrophies } from '../odyssee/js/core/trophies.js';
 import { encodeSave, decodeSave } from '../odyssee/js/core/savecode.js';
 import { T } from '../odyssee/js/world/tiles.js';
-import { CelestialSystem, CELESTIAL_SPECIES, JIRACHI_SP, openAstrolabe, rechargeAstrolabe, RECHARGE_CIEL } from '../odyssee/js/game/celestial.js';
-import { RiftSystem, RIFT_KINDS, ALPHA_POOL, createAlphaMon, normalizeCapturedAlpha, formeAdaptee } from '../odyssee/js/game/rifts.js';
+import { CelestialSystem, CELESTIAL_SPECIES, JIRACHI_SP, CIEL } from '../odyssee/js/game/celestial.js';
+import { SALLES, LOTS, LOTS_GARDIEN } from '../odyssee/js/game/faille.js';
+import { PLANS, construireIle, verifierIle, echangerPonts, finCourant, pasVers } from '../odyssee/js/game/faille-iles.js';
+import { RiftSystem, RIFT_KINDS, ALPHA_POOL, createAlphaMon, normalizeCapturedAlpha, formeAdaptee, FAILLES } from '../odyssee/js/game/rifts.js';
 import {
   MEMORIES, ENTRANCE_AURAS, addMemory, unlockedAuras, activeEntranceAura, auraBurstSpec, recordBattleMemories,
 } from '../odyssee/js/game/follower-life.js';
@@ -119,7 +121,7 @@ console.log('=== Tests Odyssée Wow (#1 Céleste, #4 Failles, #7 Suiveur/Souveni
   console.log(`✓ Pool Alpha (${ALPHA_POOL.length} espèces), PV boss & capture normalisée OK`);
 }
 
-// 4. Phénomènes célestes & Astrolabe (#1) + isolation stricte getMapWeather
+// 4. Phénomènes célestes (#1) + isolation stricte getMapWeather
 {
   for (const id of CELESTIAL_SPECIES) assert(SPECIES[id], `Espèce céleste ${id} introuvable`);
   assert(SPECIES[JIRACHI_SP], 'Jirachi introuvable');
@@ -183,7 +185,7 @@ console.log('=== Tests Odyssée Wow (#1 Céleste, #4 Failles, #7 Suiveur/Souveni
   const dits = [];
   const g = {
     mapObj: mur, player: { x: 12, y: 12, dir: 'down' }, npcs: [{ x: 8, y: 12 }], items: [], hour: () => 12,
-    state: { flags: { dex: 1 }, party: [createMon(25, 12)], box: [], bag: { astrolabe: 1 }, money: 0, name: 'Test' }, locationName: () => 'Mur', levelCap: () => 100, badgeCount: () => 8,
+    state: { flags: { dex: 1 }, party: [createMon(25, 12)], box: [], bag: {}, money: 0, name: 'Test' }, locationName: () => 'Mur', levelCap: () => 100, badgeCount: () => 8,
     view: { actors: new Map(), setCelestial: () => {}, removeActor: () => {} }, hud: { update: () => {} }, sound: { sfx: () => {} }, save: () => {}, give: (k, n = 1) => { g.state.bag[k] = (g.state.bag[k] || 0) + n; }, take: (k, n = 1) => { g.state.bag[k] -= n; }, checkTrophies: () => {},
     ui: { say: async (t) => { dits.push(...[].concat(t)); }, yesNo: async () => true, list: async () => 0, toast: () => {} },
   };
@@ -193,43 +195,68 @@ console.log('=== Tests Odyssée Wow (#1 Céleste, #4 Failles, #7 Suiveur/Souveni
     assert(r.x < 15, 'une faille ne s\'ouvre jamais derrière un mur');
     assert(!(r.x === 8 && r.y === 12), 'ni sur un habitant');
   }
-  // la faille dissipée ne se rouvre pas dans le même créneau
-  g.rifts.clear(); g.state.flags.riftsCleared = 0; g.rifts.tick(0.1);
-  assert(g.rifts.active && !g.rifts.active.manual, 'la première faille naturelle s\'ouvre');
-  g.rifts.dissiper(); for (let i = 0; i < 50; i++) g.rifts.tick(0.1);
-  assert.equal(g.rifts.active, null, 'une faille dissipée reste fermée');
-  // sans Pokédex : pas de faille
-  g.state.flags = {}; g.rifts._cherche = 0; g.rifts.tick(0.1); assert.equal(g.rifts.active, null, 'pas de faille avant le Pokédex'); g.state.flags = { dex: 1 };
-  // une faille se paie d'un Fragment Météorique
-  const choix = []; g.ui.list = async () => choix.shift() ?? 0;
-  const F = 'fragment-meteore', astro = async (...c) => { choix.length = 0; choix.push(...c); dits.length = 0; await openAstrolabe(g); };
-  await astro(3, 1); assert.equal(g.rifts.active, null, 'pas de fragment, pas de faille'); assert(dits.some((t) => /Il faut un Fragment/.test(t)));
-  g.state.bag[F] = 2; g.ui.yesNo = async () => false; await astro(3, 1); assert.equal(g.rifts.active, null); assert.equal(g.state.bag[F], 2, 'refuser ne coûte rien');
-  g.ui.yesNo = async () => true; await astro(3, 1); assert.equal(g.rifts.active?.kind, 'inverse'); assert.equal(g.state.bag[F], 1);
-  await astro(3, 1); assert.equal(g.state.bag[F], 1, 'une faille déjà ouverte ne se paie pas deux fois');
-  // quitter le jeu avant d'y entrer : elle se rouvre
-  g.rifts = new RiftSystem(g); g.rifts.tick(0.1); assert.equal(g.rifts.active?.kind, 'inverse', 'la faille payée se rouvre');
-  // la dissiper rend le fragment, une seule fois
-  await astro(4); assert.equal(g.state.bag[F], 2); g.rifts._cherche = 0; g.rifts.tick(0.1); assert.equal(g.rifts.active, null, 'aucune autre ne prend sa place'); g.rifts.dissiper(); assert.equal(g.state.bag[F], 2);
-  // la franchir ne le rembourse pas ; une faille naturelle en donne un
-  for (const [manuelle, gagne] of [[true, 0], [false, 1]]) {
-    const r = g.rifts.spawnNearPlayer('inverse', manuelle), av = g.state.bag[F]; g.player.dir = 'right'; g.player.x = r.x - 1; g.player.y = r.y;
-    if (manuelle) g.state.flags.failleAstro = 'inverse';
-    g.runBattle = async () => 'win'; await g.rifts.interagir(); assert.equal(g.state.bag[F] - av, gagne); assert.equal(g.state.flags.failleAstro, undefined); g.player.x = 12; g.player.y = 12;
+  // les failles s'ouvrent au hasard : après une attente, n'importe quel genre, et se referment d'elles-mêmes
+  const vusG = new Set(), attentes = [];
+  for (let n = 0; n < 40; n++) {
+    g.state.flags = { dex: 1 }; g.rifts = new RiftSystem(g); let t = 0;
+    while (!g.rifts.active && t < 4000) { g.rifts.tick(1); t++; }
+    assert(t >= FAILLES.premiere[0] - 2 && t <= FAILLES.premiere[1] + 4, `première faille après ${t} s`); attentes.push(t); vusG.add(g.rifts.active.kind);
+    assert.equal(g.rifts.active.manual, false);
   }
-  // le ciel, lui, se recharge
-  await astro(1); assert(g.state.flags.astroCiel > 0); await astro(2); assert(dits.some((t) => /sera prêt dans/.test(t)));
-  g.celestial.invoke(null);
-  assert.equal(rechargeAstrolabe({ flags: { astroCiel: Date.now() - RECHARGE_CIEL - 1 } }, 'astroCiel', RECHARGE_CIEL), 0);
-  assert.equal(rechargeAstrolabe({ flags: { astroCiel: Date.now() + 9e9 } }, 'astroCiel', RECHARGE_CIEL), 0, 'horloge reculée : jamais bloqué');
-  // entrer dans une faille : fuite, elle reste ; victoire, elle se referme et compte
-  for (const [res, reste] of [['flee', true], ['lose', true], ['win', false]]) {
-    const r = g.rifts.spawnNearPlayer('chaos', true); g.player.dir = 'right'; g.player.x = r.x - 1; g.player.y = r.y;
-    g.runBattle = async (o) => { assert(o.chaosWeather && o.rift && o.wild); assert.equal(g.busy, true, 'le joueur ne reprend pas la main avant le combat'); return res; };
-    assert.equal(await g.rifts.interagir(), true); assert.equal(!!g.rifts.active, reste, `faille après ${res}`); assert.equal(g.busy, false);
-    g.player.x = 12; g.player.y = 12;
-  }
-  assert.equal(g.state.flags['riftKind:chaos'], 1);
+  assert.equal(vusG.size, 3, 'les trois genres sortent'); assert(new Set(attentes).size > 10, 'jamais au même moment');
+  // elle reste si l'on quitte le jeu, se referme quand on s'éloigne trop longtemps, et une autre viendra plus tard
+  { const k = g.rifts.active.kind; g.rifts = new RiftSystem(g); g.rifts.tick(0.1); assert.equal(g.rifts.active?.kind, k, 'la même après un rechargement'); }
+  g.state.flags.faille.reste = 1; g.rifts.active.x = 12; g.rifts.active.y = 13; g.rifts.tick(2); assert(g.rifts.active, 'jamais sous le nez du joueur');
+  g.rifts.active.x = 1; g.rifts.active.y = 1; g.rifts.tick(1); assert.equal(g.rifts.active, null); assert(g.state.flags.faille.dans >= FAILLES.attente[0] && !g.state.flags.faille.kind);
+  // pas de faille avant le Pokédex, ni pendant une scène
+  g.state.flags = {}; g.rifts = new RiftSystem(g); for (let n = 0; n < 900; n++) g.rifts.tick(1); assert.equal(g.rifts.active, null, 'pas de faille avant le Pokédex');
+  g.state.flags = { dex: 1 }; g.busy = true; for (let n = 0; n < 900; n++) g.rifts.tick(1); assert.equal(g.rifts.active, null, 'pas pendant une scène'); g.busy = false;
+  // le ciel : la nuit seulement, au hasard
+  g.hour = () => 12; g.state.flags = { dex: 1 }; for (let n = 0; n < 3000; n++) g.celestial.tick(1); assert.equal(g.celestial.activeKind, 'none', 'rien en plein jour');
+  g.hour = () => 23; const cieux = new Set();
+  for (let n = 0; n < 30; n++) { g.state.flags = { dex: 1 }; g.celestial = new CelestialSystem(g); let t = 0; while (g.celestial.activeKind === 'none' && t < 2000) { g.celestial.tick(1); t++; } assert(t <= CIEL.premier[1] + 4); cieux.add(g.celestial.activeKind); let d = 0; while (g.celestial.activeKind !== 'none' && d < 2000) { g.celestial.tick(1); d++; } assert(d >= CIEL.duree[0] - 3 && d <= CIEL.duree[1] + 4, `durée ${d}`); }
+  assert.deepEqual([...cieux].sort(), ['aurora', 'meteor']);
+  g.hour = () => 12; g.celestial = new CelestialSystem(g); g.rifts = new RiftSystem(g); g.state.flags = { dex: 1 };
+  // les îles : tout est atteignable, aucun cul-de-sac, ponts et courants compris
+  for (const kind in PLANS) for (const plan of PLANS[kind]) for (const miroir of [false, true]) assert.deepEqual(verifierIle(construireIle('t', kind, plan, { miroir })), [], `île ${kind}`);
+  { const m = construireIle('t', 'inverse', PLANS.inverse[0]), [a] = m.faille.ponts.a, [b] = m.faille.ponts.b; assert(m.get(...a) === T.CAVE && m.get(...b) !== T.CAVE); echangerPonts(m); assert(m.get(...a) !== T.CAVE && m.get(...b) === T.CAVE); }
+  { const m = construireIle('t', 'chaos', PLANS.chaos[0]); for (const id of m.faille.courants.keys()) { const [x, y] = finCourant(m, ...id.split(',').map(Number)); assert(!m.faille.courants.has(x + ',' + y), 'un courant dépose toujours sur la roche'); } }
+  for (const [k] of [...LOTS, ...LOTS_GARDIEN]) assert(ITEMS[k] && !ITEMS[k].key && k !== 'master-ball', `butin ${k}`);
+  // l'expédition : trois îles, un Pokémon à vaincre sur chacune, des portails, un gardien ; le butin seulement à la sortie
+  g.world = { maps: { monde: mur } }; g.setMap = (id) => { g.mapObj = g.world.maps[id]; }; g.updateZone = () => {}; g.ui.fade = async () => {}; g.input = { free: true };
+  const aventure = async (kind, manuelle, resultats, portes, oui = true) => {
+    g.state.bag = {}; g.state.money = 0; g.state.flags = { dex: 1 }; g.rifts = new RiftSystem(g); g.mapObj = mur; g.player.x = 12; g.player.y = 12;
+    const r = g.rifts.spawnNearPlayer(kind, manuelle); r.x = 13; r.y = 12; g.player.dir = 'right'; dits.length = 0; g.ui.yesNo = async () => true;
+    const vus = []; let n = 0;
+    g.runBattle = async (o) => { vus.push(o); assert.equal(g.busy, true, 'le joueur ne reprend pas la main avant le combat'); assert(o.sansFuite && o.sansSoins); const res = resultats[n++]; if (res === 'lose') { o.surDefaite?.(); g.setMap('monde'); } return res; };
+    assert.equal(await g.rifts.interagir(), true); assert.equal(g.busy, false);
+    const X = g.rifts.exp; assert(X && g.mapObj.faille, 'on est sur une île'); assert(X.retour.x === 12 && X.retour.y === 12);
+    for (const p of portes) {
+      if (!g.mapObj.faille) break;
+      const F = g.mapObj.faille, va = async ([x, y]) => { [g.player.x, g.player.y] = [x, y]; await X.surCase(); };
+      if (p === 'quitte') { await va(F.sortie); break; }
+      X.trouve = 0; await va([F.ennemi[0], F.ennemi[1] + 1]);          // à côté du Pokémon : il attaque
+      if (!g.mapObj.faille || !X.gagnee) break;
+      assert.equal(X.mon, null); assert.equal(g.busy, false);
+      if (p === 'eclat') { await va([X.eclats[0].x, X.eclats[0].y]); await va(F.sortie); }
+      else await va(p === 'sortie' ? F.sortie : F.portes[Math.min(p, F.portes.length - 1)]);
+    }
+    assert.equal(g.busy, false);
+    return { vus, argent: g.state.money, objets: g.state.bag, nb: Object.keys(g.state.bag).length, ouverte: !!g.rifts.active, f: g.state.flags, ile: !!g.mapObj.faille, reste: Object.keys(g.world.maps).filter((k) => k.startsWith('faille')).length, X };
+  };
+  let E = await aventure('inverse', true, ['win', 'caught', 'win'], [0, 1, 0]);
+  assert.equal(E.vus.length, SALLES); assert.equal(E.vus[0].inverse, true); assert.equal(E.vus[2].alpha, true, 'le gardien est un Alpha'); assert(E.vus[2].wild.lvl >= E.vus[0].wild.lvl);
+  assert.equal(E.argent, 9000); assert(E.nb >= 2); assert.equal(E.f.gardiensFaille, 1); assert.equal(E.f.riftsCleared, 1); assert.equal(E.ouverte, false); assert.equal(E.ile, false); assert.equal(E.reste, 0, 'les îles sont rangées'); assert.equal(g.rifts.exp, null); assert(E.f.faille.dans > 0, 'la suivante est programmée');
+  E = await aventure('chaos', false, ['win', 'win'], [0, 'sortie']); assert.equal(E.vus.length, 2); assert.equal(E.vus[0].chaosWeather, true); assert.equal(E.argent, 4000); assert(E.objets['fragment-meteore'] >= 1, 'une faille naturelle donne un fragment'); assert(!E.f.gardiensFaille); assert.equal(E.ouverte, false);
+  E = await aventure('inverse', true, ['win'], ['eclat']); assert(E.argent > 1500 || E.nb >= 2, 'un éclat ramassé rejoint le butin');
+  E = await aventure('alpha', true, [], ['quitte']); assert.equal(E.ile, false); assert.equal(E.ouverte, true, 'repartir sans combattre : elle reste ouverte'); assert.equal(E.argent, 0);
+  E = await aventure('inverse', true, ['flee'], [0]); assert.equal(E.ile, true, 'fuir sur la première île : on y reste'); assert.equal(E.X.gagnee, false); await E.X.ranger(); g.setMap('monde');
+  for (const fin of ['lose', 'flee']) { E = await aventure('inverse', true, ['win', fin], [1, 0]); assert.equal(E.argent, 0, 'butin perdu'); assert.equal(E.nb, 0); assert.equal(E.ouverte, false); assert.equal(E.ile, false); assert.equal(E.f['riftKind:inverse'], 1); assert.equal(E.reste, 0); }
+  E = await aventure('inverse', true, ['lose'], [0]); assert.equal(E.ouverte, true, 'vaincu sur la première île : elle reste ouverte'); assert.equal(g.rifts.exp, null);
+  // scellé tant que l'île 2 est gardée ; l'Alpha prend en chasse
+  { const X0 = await aventure('inverse', true, ['win'], [0]); assert.equal(X0.ile, true); assert.equal(X0.X.salle, 2); [g.player.x, g.player.y] = g.mapObj.faille.sortie; dits.length = 0; await X0.X.surCase(); assert(dits.some((t) => /scellé/.test(t))); assert(g.mapObj.faille); X0.X.ranger(); g.setMap('monde'); }
+  { const X0 = await aventure('alpha', true, [], []); const M = X0.X.mon, F = g.mapObj.faille; assert(X0.ile); [g.player.x, g.player.y] = [F.ennemi[0], F.ennemi[1] + 5]; const d0 = Math.abs(M.y - g.player.y); for (let i = 0; i < 30; i++) X0.X.tick(0.1); assert(Math.abs(M.x - g.player.x) + Math.abs(M.y - g.player.y) < d0, 'l\'Alpha approche'); assert(pasVers(g.mapObj, [...F.ennemi], [...F.depart]), 'un chemin mène au joueur'); X0.X.ranger(); g.setMap('monde'); }
+  g.rifts = new RiftSystem(g); g.player.x = 12; g.player.y = 12;
   // Jirachi mis K.O. n'est pas perdu
   const alea = Math.random;
   for (const [res, pris] of [['win', false], ['caught', true]]) {
@@ -255,6 +282,12 @@ console.log('=== Tests Odyssée Wow (#1 Céleste, #4 Failles, #7 Suiveur/Souveni
     for (let s = 1; s < 12; s++) { const b = R({ sp: 27, moves: [moveByKey['thunder-wave']] }, inv); b.rng = mkRng(s); b.start(); b.playerAction({ type: 'move', idx: 0 }); if (b.foe.status === 'par') par++; }
     assert.equal(par > 0, inv, 'Cage-Éclair sur le type Sol : seulement en inversé');
   }
+  // dans une faille, on ne fuit pas
+  for (const mv of ['teleport', 'roar', 'whirlwind']) { const b = new Battle({ rng: mkRng(5), sansFuite: true, player: { name: 'A', party: [createMon(25, 60, { moves: [moveByKey[mv]], rng: mkRng(1) })], bag: {} }, foe: { name: 'S', party: [createMon(143, 20, { rng: mkRng(2), moves: [moveByKey.splash, moveByKey.teleport, moveByKey.roar] })] } }); b.start(); for (let n = 0; n < 4; n++) b.playerAction({ type: 'move', idx: 0 }); assert.notEqual(b.state, 'over', `${mv} ne termine pas le combat`); const t = b.turn, ev = b.playerAction({ type: 'run' }); assert(ev.some((e) => /impossible de fuir/.test(e.text || ''))); assert.equal(b.turn, t, 'essayer de fuir ne coûte pas le tour'); }
+  // ni objets de soin : le tour n'est pas perdu, les Balls restent permises
+  { const b = new Battle({ rng: mkRng(5), sansSoins: true, player: { name: 'A', party: [createMon(25, 60, { rng: mkRng(1) })], bag: { potion: 2, 'max-revive': 1, ether: 1, 'ultra-ball': 3 } }, foe: { name: 'S', party: [createMon(143, 20, { rng: mkRng(2), moves: [moveByKey.splash] })] } }); b.start(); b.me.hp = 10;
+    for (const it of ['potion', 'max-revive', 'ether']) { const t = b.turn, ev = b.playerAction({ type: 'item', item: it, target: 0 }); assert(ev.some((e) => /aucun effet dans une faille/.test(e.text || ''))); assert.equal(b.turn, t); } assert.equal(b.me.hp, 10); assert.equal(b.sides[0].bag?.potion ?? 2, 2);
+    const t = b.turn; b.playerAction({ type: 'item', item: 'ultra-ball' }); assert.equal(b.turn, t + 1, 'une Ball se lance'); }
   // parties d'avant : aucun champ nouveau, rien ne casse
   const vieux = createMon(25, 20); delete vieux.memories; delete vieux.entranceAura;
   assert.equal(auraBurstSpec(vieux), null); assert.deepEqual(unlockedAuras(vieux), []);
@@ -306,10 +339,10 @@ console.log('=== Tests Odyssée Wow (#1 Céleste, #4 Failles, #7 Suiveur/Souveni
     id: 1,
     money: 5000,
     badges: Array(15).fill(false),
-    flags: { astrolabeGiven: true, celestialMeteors: 2, riftsCleared: 1 },
+    flags: { celestialMeteors: 2, riftsCleared: 1 },
     party: [pikachu],
     box: [],
-    bag: { astrolabe: 1, 'fragment-meteore': 3 },
+    bag: { 'fragment-meteore': 3 },
     dex: { seen: [25], caught: [25], seenCount: { 25: 1 } },
     map: 'monde',
     x: 10,
@@ -321,19 +354,18 @@ console.log('=== Tests Odyssée Wow (#1 Céleste, #4 Failles, #7 Suiveur/Souveni
   assert.equal(back.party[0].alpha, true);
   assert.equal(back.party[0].entranceAura, 'stars');
   assert.equal(back.party[0].memories.length, 2);
-  assert.equal(back.bag.astrolabe, 1);
   assert.equal(back.bag['fragment-meteore'], 3);
   console.log('✓ Souvenirs, Auras, survie ≤5% PV et roundtrip savecode OK');
 }
 
 // 6. Objets (Fragment Météorique vs Éclat d'Étoile), icônes PNG, pluriels & 12 trophées thématiques
 {
-  assert.equal(ITEMS.astrolabe?.name, 'Astrolabe');
+  assert.equal(ITEMS.astrolabe, undefined, 'plus d\'Astrolabe : les phénomènes arrivent au hasard');
   assert.equal(ITEMS['fragment-meteore']?.name, 'Fragment Météorique');
   assert.equal(ITEMS['fragment-meteore']?.pocket, 'objets');
   assert.equal(ITEMS['fragment-meteore']?.price, 4500);
   assert.equal(itemPluralName('fragment-meteore', 3), '3 Fragments Météoriques');
-  for (const k of ['astrolabe', 'fragment-meteore']) {
+  for (const k of ['fragment-meteore']) {
     const ic = ITEMS[k].icon || k;
     const p1 = path.join(ROOT, 'odyssee/img/items', `${ic}.png`);
     const p2 = path.join(ROOT, 'odyssee/img/pokeapi/items', `${ic}.png`);
@@ -472,7 +504,7 @@ console.log('=== Tests Odyssée Wow (#1 Céleste, #4 Failles, #7 Suiveur/Souveni
   globalThis.window = { AudioContext: MockAC };
   try {
     const { Sound, THEMES, CUSTOM_COMPOSERS, WOW_SFX_KEYS } = await import('../odyssee/js/audio.js');
-    const wowThemes = ['aurora', 'meteor', 'riftBattle', 'alphaBoss'];
+    const wowThemes = ['aurora', 'meteor', 'riftBattle', 'alphaBoss', 'ileInverse', 'ileChaos', 'ileAlpha', 'ileTrone', 'gardienFaille'];
     for (const name of wowThemes) {
       assert(THEMES[name], `Thème musical ${name} manquant dans THEMES`);
       assert.equal(typeof CUSTOM_COMPOSERS[name], 'function', `CUSTOM_COMPOSERS[${name}] manquant`);
@@ -491,7 +523,7 @@ console.log('=== Tests Odyssée Wow (#1 Céleste, #4 Failles, #7 Suiveur/Souveni
           assert(nt.m >= 20 && nt.m <= 110, `${name}: MIDI hors registre [20, 110]: ${nt.m}`);
         }
       }
-      if (name === 'riftBattle' || name === 'alphaBoss') {
+      if (['riftBattle', 'alphaBoss', 'gardienFaille'].includes(name)) {
         assert(song.tracks.some((tr) => tr.dist && tr.type === 'sawtooth'), `${name}: guitare dist attendue`);
         assert(song.bpm >= 165 && song.bpm <= 190, `${name}: BPM combat attendu`);
       }
@@ -504,7 +536,7 @@ console.log('=== Tests Odyssée Wow (#1 Céleste, #4 Failles, #7 Suiveur/Souveni
       for (const name of wowThemes) { s.play(name); s.stopMusic(0); }
       for (const k of WOW_SFX_KEYS) s.sfx(k);
     }
-    assert.equal(WOW_SFX_KEYS.length, 25);
+    assert.equal(WOW_SFX_KEYS.length, 26);
     console.log(`✓ ${wowThemes.length} musiques stylées & ${WOW_SFX_KEYS.length} SFX/ambiances validés (moderne + rétro)`);
   } finally {
     globalThis.window = prevWin;
