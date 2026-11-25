@@ -7,6 +7,9 @@
 // légendaires (renvoyées dans `legends`, les quais dans `docks`).
 // Noms de lieux et personnages originaux ; les créatures du jeu côtoient les Pokémon du prototype.
 import { memoCases } from './cache-monde.js';
+import { poserBiomes } from './biomes.js';
+import { decorerRoutes, reserver } from './decors-routes.js';
+import { tracerRoutes } from './traces.js';
 import { T, DIRS, walkable, isGrassEnc } from './tiles.js';
 import { GameMap, carveRoute, carveTown, ledges, along, nearestWalkable, caseLibre, rng, GRAND, sin, cos, hauteurVue } from './mapgen.js';
 import { centerInterior, martInterior, houseInterior, labInterior, gymInterior, leagueInterior, dojoInterior, caveMap } from './interiors.js';
@@ -444,7 +447,7 @@ function gymGuard(W, def, badges, text) {
 /* ======================================================================
    Construction de la région
    ====================================================================== */
-export function buildWorld() {
+export function buildWorld({ decors = true, traces = decors } = {}) {
   restaurerTables();   // les tables de rencontres d'avant les tronçons (une construction précédente les a réunies)
   tCount = 0;
   // la grande région : 1200 × 1392 cases (plan.js) ; le continent au nord, l'archipel au sud-est, les îles du bateau à l'est,
@@ -882,7 +885,7 @@ export function buildWorld() {
 
   // le Bois Murmure : une forêt dense et sombre (on marche à l'ombre des frondaisons), un sentier qui serpente, deux
   // cabanes, une clairière cachée derrière un passage dans les arbres
-  const bois = G2({ id: 'bois', nom: 'Bois Murmure', de: relais(144, 196, 'e'), vers: arrivee('C', 'bois'), effile: [false, true], long: 7, graine: 303, w: 11, grass: 1.3, tall: T.DARKTALL, trees: 0.3, flowers: 0, theme: 'forest', ombre: 0.5, paysages: ['bosquet', 'prairie', 'bosquet', 'etang'], branches: 0, anciens: 4, voix: 'bois', bande: [4, 5], panneaux: [null, 'BOIS MURMURE\n↑ Pierrefort'] }, 'bois', 'forest');
+  const bois = G2({ id: 'bois', nom: 'Bois Murmure', de: relais(144, 196, 'e'), vers: arrivee('C', 'bois'), effile: [false, true], long: 7, graine: 303, w: 11, grass: 1.3, tall: T.DARKTALL, trees: 0.3, flowers: 0, theme: 'forest', ombre: 0.78, paysages: ['bosquet', 'prairie', 'bosquet', 'etang'], branches: 0, anciens: 4, voix: 'bois', bande: [4, 5], panneaux: [null, 'BOIS MURMURE\n↑ Pierrefort'] }, 'bois', 'forest');
   {
     /** cabane dans les bois : une petite clairière, une maison de bois et son intérieur, un sentier jusqu'à la route */
     const cabane = (id, name, x, y, vers, o = {}) => {
@@ -1489,6 +1492,11 @@ export function buildWorld() {
   W.donjons = poserDonjons(W, maps, routes); W.crypte = W.donjons.crypte;
   // cartes disparues (lieux désormais posés sur la carte du monde) : une ancienne partie qui y était reprend ici
   const moved = { torii: { map: 'monde', x: 222 + TORII.dx, y: 193 + TORII.dy, dir: 'up' } };
+  // les biomes des routes (world/biomes.js) et leur level design (world/decors-routes.js)
+  poserBiomes(W, mers(W));
+  // la trame des routes : terrasses, obstacles, boucles, sentiers redessinés (world/traces.js ; ne change que des cases)
+  if (traces) W.traces = memoCases('traces', W, () => tracerRoutes(W, routes, reserver(W, routes, legends)), legends.filter((l) => l.map === 'monde').map((l) => [l.x, l.y]));
+  if (decors) W.decorsRoutes = decorerRoutes(W, routes, { legends, trainerNpc, maps });   // (decors : false dans les tests, pour comparer)
   // rencontres par tronçons (world/rencontres.js)
   poserTroncons({ maps, routes });
   if (W.anciensObjets.length) throw new Error('anciens objets jamais posés : ' + W.anciensObjets.map((q) => q.join(' ')).join(', '));

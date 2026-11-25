@@ -11,6 +11,7 @@
 
 import { T } from '../world/tiles.js';
 import { sensPont } from '../world/ponts.js';
+import { BIOMES, MER, biomeEn, biomeBrut, matiere, degrade } from '../world/biomes.js';
 
 export const NFRAMES = 8;      // images de l'eau animée
 export const CELL = 32;        // pixels par case
@@ -39,6 +40,8 @@ export function setRelief3dSol(v) { RELIEF3D = !!v; }
  *  les marches sont du chemin (le relief les dessine). Réglé par world3d.js. */
 let HGSS = false;
 export function setReliefHGSSSol(v) { HGSS = !!v; }
+/** matières des biomes (world/biomes.js) */
+const MATIERES = { neige: K.SN, cendre: K.AS, sable: K.SA, feuilles: K.FA, mousse: K.MO, roche: K.RC };
 /** sorte d'une case de la carte du jeu (K.X : le jeu garde son propre sol) */
 export function sorteCase(m, x, y) {
   if (HGSS && m.outdoor && m.get(x, y) === T.STAIRS) return m.zoneAt?.(x, y)?.theme === 'snow' ? K.SN : K.P;
@@ -60,12 +63,15 @@ export function sorteCase(m, x, y) {
   }
   const th = m.zoneAt?.(x, y)?.theme;
   // sol de fond de la zone : herbe, herbe sombre de forêt, neige, cendre du volcan
-  const fond = th === 'snow' ? K.SN : th === 'volcanic' ? K.AS : th === 'forest' || th === 'foretsombre' || th === 'sylve' ? K.GF
+  const nb = biomeEn(m, x, y), bio = BIOMES[nb];
+  const fond0 = th === 'snow' ? K.SN : th === 'volcanic' ? K.AS : th === 'forest' || th === 'foretsombre' || th === 'sylve' ? K.GF
     : th === 'automne' ? K.FA : th === 'desert' ? K.SA : th === 'canyon' ? K.RC : K.G;
-  const herbeux = fond === K.G || fond === K.GF || fond === K.FA;
+  const herbeux = fond0 === K.G || fond0 === K.GF || fond0 === K.FA;
+  // biome : des plaques d'une autre matière (neige, cendre, sable, mousse…) dans l'herbe de la route
+  const fond = (bio && (fond0 === K.G || fond0 === K.GF) && MATIERES[matiere(nb, x, y)]) || fond0;
   const jardin = th === 'automne';
   // montagne à gravir (hors neige) : sol de roche, le sentier en terre par-dessus ; passerelle au-dessus d'un ravin : le jeu
-  if (fond === K.G && m.monts && x >= 0 && y >= 0 && x < m.w && y < m.h && m.monts[y * m.w + x]) {
+  if (fond0 === K.G && m.monts && x >= 0 && y >= 0 && x < m.w && y < m.h && m.monts[y * m.w + x]) {
     if (t === T.BRIDGE) return K.X;
     return t === T.PATH ? K.MP : t === T.CAVEWALL ? K.MR : t === T.GRASS ? K.G : K.MT;   // le sommet garde son herbe
   }
@@ -73,11 +79,11 @@ export function sorteCase(m, x, y) {
     case T.WATER: return K.W;
     case T.BRIDGE: return m.ravins?.[y * m.w + x] ? K.X : sensPont(m, x, y) === 'ns' ? K.BN : K.B;   // passerelle au-dessus d'un ravin : dessinée par le jeu
     case T.PAVE: return GRANDES_VILLES.has(m.zoneAt?.(x, y)?.name) ? K.A : K.V;
-    case T.PATH: case T.DOOR: return K.P;
+    case T.PATH: case T.DOOR: return bio?.voie === 'pave' ? K.V : K.P;
     case T.SNOW: return K.SN;
     case T.ASH: return K.AS;
     case T.SAND: return jardin ? K.GR : th === 'canyon' ? K.RC : K.SA;   // jardins japonais : gravier ratissé
-    case T.TALL: return th === 'snow' ? K.TS : jardin || th === 'desert' || th === 'canyon' ? K.TA : K.T;
+    case T.TALL: if (bio?.tall) return K[bio.tall]; return th === 'snow' ? K.TS : jardin || th === 'desert' || th === 'canyon' ? K.TA : K.T;
     case T.DARKTALL: return K.TD;
     case T.FLOWER: return jardin ? K.MO : herbeux ? K.F : fond;   // jardins japonais : coussins de mousse
     case T.LEDGE: return K.L;
@@ -124,7 +130,14 @@ export function zoneBloc(m, ci, cj, CH = 16) {
       calme[y * zw + x] = hi > lo ? 1 : 0;
     }
   }
-  return { kinds, zw, zh, zx0, zy0, bw, bh, rel, roche, calme };
+  // biomes des cases (null : le sol ordinaire partout)
+  let bio = null;
+  if (m.outdoor && (m.base || m).biomes) {
+    const L = new Uint8Array(zw * zh); let any = 0;
+    for (let y = 0; y < zh; y++) for (let x = 0; x < zw; x++) any |= L[y * zw + x] = biomeBrut(m, zx0 + x, zy0 + y);
+    if (any) bio = L;
+  }
+  return { kinds, zw, zh, zx0, zy0, bw, bh, rel, roche, calme, bio };
 }
 /** cases de roche ajoutées sous le bloc dans la bande de roche (le motif déroulé d'une pente descend plus bas que la case) */
 export const ROCHE_PLUS = 4;
@@ -205,6 +218,19 @@ const I = Object.fromEntries(NAMES.map((k, i) => [k, i]));
 export const LUT = new Uint32Array(256);
 NAMES.forEach((k, i) => { const n = parseInt(HEX[k].slice(1), 16); LUT[i] = (0xff000000 | ((n & 255) << 16) | (n & 0xff00) | (n >> 16)) >>> 0; });
 LUT[TRANSPARENT] = 0;
+/** la même table pour chaque biome (world/biomes.js) : mêmes indices, autres teintes ; LUTB[0] : le sol ordinaire */
+const RAMPES_BIOME = { herbe: [['g', 7], ['ag', 7]], haute: [['h', 5], ['k', 5], ['j', 5], ['ha', 5]], chemin: [['d', 6]], berge: [['s', 3]], cendre: [['e', 6]], sable: [['z', 4]], rocher: [['x', 6]], mousse: [['o', 5]], feuilles: [['ag', 7]], pave: [['u', 5], ['q', 5], ['v', 5]] };
+const octets = (hex) => { const n = parseInt(hex.slice(1), 16); return (0xff000000 | ((n & 255) << 16) | (n & 0xff00) | (n >> 16)) >>> 0; };
+export const LUTB = []; [0, MER].forEach((mer) => BIOMES.forEach((b, nb) => { LUTB[nb + mer] = (() => {
+  const L = LUT.slice(); if (!b) return L;
+  const put = (k, hex) => { const i = NAMES.indexOf(k); if (i >= 0) L[i] = octets(hex); };
+  for (const [cle, rs] of Object.entries(RAMPES_BIOME)) if (b[cle]) for (const [p, n] of rs) degrade(b[cle], n).forEach((c, i) => put(p + i, c));
+  if (b.eau && !mer) { degrade(b.eau, 9).slice(1, 8).forEach((c, i) => put('w' + i, c)); put('w6', b.eau[2]); put('wd', b.eau[0]); put('wt', degrade(b.eau, 5)[3]); }
+  if (b.fleurs) ['fr', 'fR', 'fy', 'fw', 'fW', 'fb', 'fB'].forEach((k, i) => put(k, b.fleurs[i]));
+  if (b.herbe) { put('m0', degrade(b.herbe, 7)[1]); put('m1', degrade(b.herbe, 7)[3]); }
+  if (b.pave) put('vj', b.pave[0]);
+  return L;
+})(); }));
 const ramp = (p, n) => Array.from({ length: n }, (_, i) => I[p + i]);
 const G = ramp('g', 7), H = ramp('h', 5), HK = ramp('k', 5), D = ramp('d', 6), P = ramp('p', 4), S = ramp('s', 3);
 const W = ramp('w', 7), B = ramp('b', 4), V = ramp('v', 5), L = ramp('l', 6);
@@ -1200,6 +1226,64 @@ function marchesTalus(Z, img, rel) {
   }
 }
 
+/* ------------------------------------------------------------------ biomes ------------------------------------------- */
+const SUR = isIn([...G, ...AG, ...E, ...N, ...Zs, ...OC, ...MOU]);
+/** petites choses semées sur le sol d'un biome : [dx, dy, indice de palette] par motif (plusieurs dessins) */
+const MOTIFS = {
+  fleur: [[[0, -1, I.fr], [-1, 0, I.fr], [1, 0, I.fR], [0, 1, I.fR], [0, 0, I.fy], [0, 2, I.h2]], [[0, -1, I.fw], [-1, 0, I.fw], [1, 0, I.fW], [0, 1, I.fW], [0, 0, I.fy], [0, 2, I.h2]], [[0, -1, I.fb], [-1, 0, I.fb], [1, 0, I.fB], [0, 1, I.fB], [0, 0, I.fw], [0, 2, I.h2]],
+    [[0, 0, I.fr], [1, 0, I.fr], [0, 1, I.fR], [1, 1, I.fR], [0, 2, I.h1]]],
+  trefle: [[[0, 0, I.g6], [2, 0, I.g6], [1, 1, I.g5], [1, 2, I.g0], [0, 1, I.g5], [2, 1, I.g5]]],
+  petale: [[[0, 0, I.fr], [1, 0, I.fw]], [[0, 0, I.fw], [0, 1, I.fr]], [[0, 0, I.fr]], [[0, 0, I.fw], [1, 1, I.fr], [1, 0, I.fr]]],
+  lueur: [[[0, 0, I.fw], [-1, 0, I.fr], [1, 0, I.fr], [0, -1, I.fr], [0, 1, I.fR], [0, 2, I.h1]], [[0, 0, I.fy], [0, 1, I.fr], [0, 2, I.fR]]],
+  champi: [[[-2, 0, I.fR], [-1, 0, I.fr], [0, 0, I.fr], [1, 0, I.fr], [2, 0, I.fR], [-1, -1, I.fr], [0, -1, I.fw], [1, -1, I.fr], [0, -2, I.fr], [0, 1, I.fW], [0, 2, I.fW], [1, 2, I.g0], [-1, 1, I.g0], [1, 1, I.g0]]],
+  caillou: [[[0, 0, I.p3], [1, 0, I.p2], [2, 0, I.p1], [-1, 1, I.p1], [0, 1, I.p2], [1, 1, I.p2], [2, 1, I.p1], [0, 2, I.p0], [1, 2, I.p0], [2, 2, I.p0]], [[0, 0, I.p3], [1, 0, I.p1], [0, 1, I.p0], [1, 1, I.p0]],
+    [[0, -1, I.p3], [1, -1, I.p3], [-1, 0, I.p2], [0, 0, I.p2], [1, 0, I.p2], [2, 0, I.p1], [-2, 1, I.p1], [-1, 1, I.p2], [0, 1, I.p1], [1, 1, I.p1], [2, 1, I.p1], [3, 1, I.p0], [-1, 2, I.p0], [0, 2, I.p0], [1, 2, I.p0], [2, 2, I.p0]]],
+  touffe: [[[0, 0, I.h2], [0, -1, I.h3], [0, -2, I.h4], [-1, -1, I.h2], [-2, -2, I.h3], [1, -1, I.h2], [2, -2, I.h3], [-1, 0, I.h1], [1, 0, I.h1], [-1, 1, I.g0], [0, 1, I.g0], [1, 1, I.g0]]],
+  fougere: [[[0, 0, I.h1], [0, -1, I.h2], [0, -2, I.h3], [-1, -2, I.h3], [-2, -3, I.h4], [-3, -2, I.h3], [1, -2, I.h2], [2, -3, I.h3], [3, -2, I.h2], [-1, 0, I.h2], [-2, 0, I.h3], [-3, 1, I.h2], [1, 0, I.h2], [2, 0, I.h2], [3, 1, I.h1], [0, 1, I.g0], [-1, 1, I.g0], [1, 1, I.g0]]],
+  etoile: [[[0, 0, I.fw], [-1, 0, I.fy], [1, 0, I.fy], [0, -1, I.fy], [0, 1, I.fy]], [[0, 0, I.fw]], [[0, 0, I.fb], [1, 0, I.fw]]],
+  cristal: [[[0, 1, I.fB], [1, 1, I.fB], [0, 0, I.fb], [1, 0, I.fB], [0, -1, I.fb], [1, -1, I.fB], [0, -2, I.fw], [1, -2, I.fb], [0, -3, I.fw], [-1, 1, I.fb], [-1, 0, I.fw], [2, 1, I.fB], [2, 0, I.fb], [-1, 2, I.g0], [0, 2, I.g0], [1, 2, I.g0], [2, 2, I.g0]]],
+  os: [[[-3, 0, I.fw], [-2, 0, I.n4], [-1, 0, I.n4], [0, 0, I.n4], [1, 0, I.n3], [2, 0, I.n3], [3, 0, I.n4], [-3, -1, I.fw], [-3, 1, I.n2], [3, -1, I.n4], [3, 1, I.n2], [-2, 1, I.z0], [-1, 1, I.z0], [0, 1, I.z0], [1, 1, I.z0], [2, 1, I.z0]]],
+  coquille: [[[0, 0, I.fw], [-1, 1, I.zp], [0, 1, I.fw], [1, 1, I.zp], [0, 2, I.s0]], [[0, 0, I.zp], [1, 0, I.fw], [0, 1, I.s0], [1, 1, I.s0]]],
+  feuille_m: [[[0, 0, I.fa2], [1, 0, I.fa3], [0, 1, I.fa1]], [[0, 0, I.fa1], [1, 1, I.fa0], [1, 0, I.fa2]], [[0, 0, I.fa4], [0, 1, I.fa3]], [[0, 0, I.fa5], [1, 0, I.fa0]]],
+  feuille_b: [[[0, 0, I.h4], [1, 1, I.h3], [2, 2, I.h2]], [[0, 2, I.h3], [1, 1, I.h4], [2, 0, I.h3]], [[0, 0, I.g6], [1, 0, I.h3], [2, 0, I.h2]]],
+  etincelle: [[[0, 0, I.fw], [1, -1, I.fy], [0, 1, I.fy], [-1, 2, I.fR]], [[0, 0, I.fy]]],
+  braise: [[[0, 0, I.fy], [1, 0, I.fr], [0, 1, I.fR]], [[0, 0, I.fr], [-1, 0, I.fR]], [[0, 0, I.fr]]],
+};
+function semis(Z, img, bio) {
+  const c = Z.c, Wd = Z.W;
+  for (let cy = 0; cy < Z.ch; cy++) for (let cx = 0; cx < Z.cw; cx++) {
+    const S = BIOMES[bio[cy * Z.cw + cx] & 31]?.semis; if (!S) continue;
+    const r = cellRng(cx + Z.rx0, cy + Z.ry0, Z.s + 400), force = Z.kind(cx, cy) === K.F ? 3 : 1;
+    for (const [nom, dens] of S) {
+      // par colonies : là où le bruit est haut, bien plus qu'ailleurs
+      const col = vnoise(cx + Z.rx0, cy + Z.ry0, 5, Z.s + 410 + nom.length * 7 + nom.charCodeAt(0)), n = poisson(r, dens * (col > 0.6 ? 2.4 : col > 0.42 ? 0.9 : 0.3) * force);
+      for (let k = 0; k < n; k++) {
+        const x = cx * c + ri(r, 4, c - 4), y = cy * c + ri(r, 4, c - 4), M = pick(r, MOTIFS[nom]), i = y * Wd + x;
+        if (!SUR[img[i]]) continue;
+        for (const [dx, dy, v] of M) { const j = i + dy * Wd + dx; if (SUR[img[j]] || img[j] === v) img[j] = v; }
+      }
+    }
+  }
+}
+/**
+ * Le biome de chaque pixel d'un bloc (bw × bh cases) : un nombre s'il n'y en a qu'un, sinon un tableau. D'un biome à
+ * l'autre, la limite ondule de part et d'autre de celle des cases (presque deux cases) et s'effiloche.
+ */
+export function biomesPixels({ bio, zw, zx0, zy0, bw, bh, seed = 7 }) {
+  if (!bio) return 0;
+  let un = bio[0]; for (let i = 1; i < bio.length; i++) if (bio[i] !== un) { un = -1; break; }
+  if (un >= 0) return un;
+  const c = CELL, w = bw * c, h = bh * c, out = new Uint8Array(w * h), zh = bio.length / zw;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const X = (zx0 + MARGIN) * c + x, Y = (zy0 + MARGIN) * c + y;
+    const dx = (vnoise(X, Y, 70, seed + 801) - 0.5) * 72 + (vnoise(X, Y, 9, seed + 803) - 0.5) * 22 + (hash2(X >> 1, Y >> 1, seed + 805) - 0.5) * 10;
+    const dy = (vnoise(X, Y, 70, seed + 802) - 0.5) * 72 + (vnoise(X, Y, 9, seed + 804) - 0.5) * 22 + (hash2(X >> 1, Y >> 1, seed + 806) - 0.5) * 10;
+    const cx = Math.max(0, Math.min(zw - 1, Math.floor((x + dx) / c) + MARGIN)), cy = Math.max(0, Math.min(zh - 1, Math.floor((y + dy) / c) + MARGIN));
+    out[y * w + x] = bio[cy * zw + cx];
+  }
+  return out;
+}
+
 /* ------------------------------------------------------------------ un bloc de carte ---------------------------------- */
 /**
  * kinds : sortes des cases de la zone (bloc + MARGIN cases tout autour), zw × zh ; (zx0, zy0) : première case de la zone.
@@ -1208,7 +1292,7 @@ function marchesTalus(Z, img, rel) {
  */
 /** style des talus d'herbe (propositions) : actuel, hgss, terre, roche, douce */
 let STYLE_TALUS = 'actuel';
-export function rendreBloc({ kinds, zw, zh, zx0, zy0, bw, bh, seed = 7, cave = null, rel = null, talus: styleTalus = null, calme = null }) {
+export function rendreBloc({ kinds, zw, zh, zx0, zy0, bw, bh, seed = 7, cave = null, rel = null, talus: styleTalus = null, calme = null, bio = null }) {
   STYLE_TALUS = styleTalus || globalThis.TALUS_STYLE || 'actuel';
   const Z = new Zone(kinds, zw, zh, zx0, zy0, seed), c = CELL;
   const img = new Uint8Array(Z.N).fill(TRANSPARENT);
@@ -1277,6 +1361,7 @@ export function rendreBloc({ kinds, zw, zh, zx0, zy0, bw, bh, seed = 7, cave = n
     if (anyOf(pave)) paves(Z, img, pave, andNot(andNot(grass, path), water), path);
     if (anyOf(asph)) { bitume(Z, img, asph); escaliers(Z, img); }
     if (rel) talus(Z, img, rel, water);
+    if (bio) semis(Z, img, bio);
   } else grotte(Z, img, caveM, C);
   // transparence : cases que le jeu dessine lui-même (sable, neige, maisons, parois de grotte…)
   const keep = Z.px((k) => k !== K.X);

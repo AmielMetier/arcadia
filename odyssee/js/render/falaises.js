@@ -22,6 +22,7 @@ import * as THREE from 'three';
 import { T, walkable } from '../world/tiles.js';
 import { ravin, mont, pente } from '../world/relief.js';
 import { LV, KLV } from './relief3d.js';
+import { BIOMES as BIOMES_R, biomeEn, degrade } from '../world/biomes.js';
 
 const params = () => { try { return new URLSearchParams(location.search); } catch (e) { return new URLSearchParams(''); } };
 /** le relief façon HGSS est-il demandé ? (par défaut oui ; ?relief=plat ou ?relief3d pour les anciens rendus) */
@@ -73,6 +74,9 @@ const DESSUS = {
 const BIO_GROTTE = { terre: 'grotte', mer: 'mer', magma: 'magma', glace: 'glace', montagne: 'granit' };
 // lèvres : rien (dessus de roche), herbe, neige, sable, herbe sombre de forêt
 const LEVRES = [null, ['#2c7236', '#52a446', '#8ad064'], ['#b8cad8', '#e2ecf4', '#ffffff'], ['#b89058', '#d8b478', '#f0d49c'], ['#1f5a2e', '#3d8c3c', '#6cbb52']];
+
+// l'herbe de chaque biome de route (world/biomes.js) : lèvre 4 + son numéro
+BIOMES_R.forEach((b, i) => { if (i) LEVRES.push(b.herbe ? [1, 3, 5].map((k) => degrade(b.herbe, 7)[k]) : LEVRES[1]); });
 
 /** ondulation d'un bord de roche le long de u (0..1), la même en JS et dans le shader */
 const ondeBord = (u, seed) => 0.5 + 0.3 * Math.sin(u * 2.7 + seed * 1.3) + 0.2 * Math.sin(u * 6.1 + seed * 2.9);
@@ -591,12 +595,14 @@ export class ReliefHGSS {
       if (n >= 5) return 'glace';
     }
     if (z?.roche && FACE[z.roche]) return z.roche;
+    { const r = BIOMES_R[biomeEn(b, x, y)]?.roche; if (r && FACE[r]) return r; }
     return th === 'snow' ? 'glace' : th === 'volcanic' ? 'magma' : th === 'canyon' || th === 'desert' ? 'ocre' : th === 'beach' || th === 'sea' ? 'mer' : th === 'forest' || th === 'automne' || th === 'foretsombre' ? 'terre' : 'montagne';
   }
   /** lèvre en haut des falaises d'une case : 0 dessus de roche, 1 herbe, 2 neige, 3 sable, 4 herbe de forêt */
   levreDe(x, y, s) {
     if (s === ROC || this.grotte) return 0;
-    const th = this.m.zoneAt?.(x, y)?.theme;
+    const th = this.m.zoneAt?.(x, y)?.theme, nb = biomeEn(this.base, x, y);
+    if (BIOMES_R[nb]?.herbe) return 4 + nb;   // l'herbe du biome
     return th === 'snow' ? 2 : th === 'desert' || th === 'canyon' || th === 'beach' ? 3 : th === 'forest' || th === 'foretsombre' ? 4 : 1;
   }
   /** sorte, niveau (unités du monde) d'une case */
@@ -730,6 +736,11 @@ export class ReliefHGSS {
   /** sens de montée des marches : [dx, dy] vers le haut */
   sensMarche(x, y) {
     const hi = this.nivDe(x, y);
+    // dehors : le côté haut dont le côté opposé est le bas (des marches posées de flanc ne montent pas vers le nord)
+    if (!this.grotte) {
+      const lo = this.bas[this.cell(x, y)], a = (dx, dy, n) => { const s = this.sorteDe(x + dx, y + dy); return s !== PAROI && s !== ROC && s !== MARCHE && Math.abs(this.nivDe(x + dx, y + dy) - n) < 1e-4; };
+      if (hi > lo + 1e-4) for (const [dx, dy] of [[0, -1], [0, 1], [1, 0], [-1, 0]]) if (a(dx, dy, hi) && a(-dx, -dy, lo)) return [dx, dy];
+    }
     for (const [dx, dy] of [[0, -1], [0, 1], [1, 0], [-1, 0]]) {
       const s = this.sorteDe(x + dx, y + dy);
       if (s !== PAROI && s !== ROC && Math.abs(this.nivDe(x + dx, y + dy) - hi) < 1e-4 && s !== MARCHE) return [dx, dy];

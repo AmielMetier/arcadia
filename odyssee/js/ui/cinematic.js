@@ -1159,7 +1159,7 @@ export async function playBossCinematic(game, opts = {}) {
           <div class="lugia-cine-sub">${esc(cfg.sub)}</div>
         </div>
       </div>
-      <button type="button" class="lugia-cine-skip">Passer ▶</button>
+      <button type="button" class="lugia-cine-skip">Passer (Échap) ▶</button>
     </div>
   `;
 
@@ -1251,6 +1251,10 @@ export async function playBossCinematic(game, opts = {}) {
       }
     } catch (e) { warnDev('cinematic', e); }
 
+    // la première image se prépare (nuanceurs, textures) avant que le temps de la scène ne commence : rien n'est sauté
+    if (sceneCtrl && !epic) { try { sceneCtrl.update(0, 0); } catch (e) { warnDev('cinematic', e); } }
+    if (typeof requestAnimationFrame === 'function') await new Promise((r) => { requestAnimationFrame(() => requestAnimationFrame(r)); setTimeout(r, 400); });
+
     await new Promise((resolve) => {
       const dur = cfg.duration || 6.4;
       const tStart = performance.now();
@@ -1265,8 +1269,10 @@ export async function playBossCinematic(game, opts = {}) {
         resolve();
       };
 
-      pop = ui.input?.push?.((k) => {
-        if (k === 'a' || k === 'b' || k === 'start') {
+      // les appuis qui servaient à fermer les dialogues (A martelée ou gardée enfoncée) ne passent pas la scène : A n'y
+      // peut rien ; Échap la passe, ou le bouton « Passer »
+      pop = ui.input?.push?.((k, repeat) => {
+        if (!repeat && (k === 'b' || k === 'start') && performance.now() - tStart > 500) {
           sound?.sfx?.('select');
           finish();
         }

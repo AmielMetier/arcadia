@@ -1,0 +1,4 @@
+Arbres et décors des biomes des routes (odyssee/js/world/biomes.js)
+
+planche.png est écrite par tools/odyssee-biomes.py : dessins faits dans le script (champignons, bambous, saules, arches,
+cristaux, pierres…), et arbres du jeu (odyssee/img/nature) reteints. Ne pas la modifier à la main.

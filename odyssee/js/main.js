@@ -27,6 +27,7 @@ import { createMon } from './core/mon.js';
 import { ASSETS, loadImg, loadAll } from './assets.js';
 import { DECOR_PLUS } from './data/decor-plus.js';
 import { SPRITES } from './data/sprites.js';
+import { BIOMES_SPRITES } from './data/biomes-sprites.js';
 import { SOL16_FICHIERS } from './data/sol16.js';
 import { R, ORIGINALES } from './data/remplacants.js';
 
@@ -75,6 +76,7 @@ async function loadArt(prechauffe = false) {
   for (const k of Object.keys(SPRITES.deco || {})) if (!sprites[k]) { sprites[k] = ASSETS.deco(k); dens[k] = 1; }
   // décor ajouté à la main (arbres d'automne, relief…) : data/decor-plus.js
   for (const [k, [dir, d]] of Object.entries(DECOR_PLUS)) { sprites[k] = ASSETS[dir](k); dens[k] = d; }
+  const planches = { biomes: ASSETS.biomes('planche') };   // arbres et décors des biomes (tools/odyssee-biomes.py), sur une seule planche
   const kits = {}; for (const k of SPRITES.facades || []) kits[k] = ASSETS.facade(k);
   const sols = {}; for (const k of SOLS) sols[k] = ASSETS.sol(k);
   // tileset global (tools/odyssee-tileset.py) : sols à 32 px et pièces des hautes herbes
@@ -105,11 +107,12 @@ async function loadArt(prechauffe = false) {
   const tenueSrc = pack?.tenue ? ASSETS.gfx(pack.dossier, pack.tenue) : null;
   if (prechauffe) {
     // même requête que loadImg (crossOrigin), pour que le cache des images du navigateur la resserve telle quelle
-    const L = [sprites, kits, sols, sol32, hg, tuilesPack, batsPack, donjons].flatMap(Object.values).concat([pack?.chars ? ASSETS.gfx(pack.dossier, pack.chars) : ASSETS.chars, ASSETS.title, SPRITES.suiveurs && ASSETS.suiveurs, ASSETS.relief, tenueSrc]);
+    const L = [sprites, planches, kits, sols, sol32, hg, tuilesPack, batsPack, donjons].flatMap(Object.values).concat([pack?.chars ? ASSETS.gfx(pack.dossier, pack.chars) : ASSETS.chars, ASSETS.title, SPRITES.suiveurs && ASSETS.suiveurs, ASSETS.relief, tenueSrc]);
     return L.filter(Boolean).map((src) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.src = src; return im; });
   }
-  const [S, K, L, L32, HGI, chars, title, suiveurs, relief, PK, PB, SD, tenueImg] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(pack?.chars ? ASSETS.gfx(pack.dossier, pack.chars) : ASSETS.chars), loadImg(ASSETS.title), SPRITES.suiveurs ? loadImg(ASSETS.suiveurs) : null, loadImg(ASSETS.relief).catch(() => null), loadAll(tuilesPack), loadAll(batsPack), loadAll(donjons), tenueSrc ? loadImg(tenueSrc).catch(() => null) : null]);
+  const [S, K, L, L32, HGI, chars, title, suiveurs, relief, PK, PB, SD, tenueImg, PL] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(pack?.chars ? ASSETS.gfx(pack.dossier, pack.chars) : ASSETS.chars), loadImg(ASSETS.title), SPRITES.suiveurs ? loadImg(ASSETS.suiveurs) : null, loadImg(ASSETS.relief).catch(() => null), loadAll(tuilesPack), loadAll(batsPack), loadAll(donjons), tenueSrc ? loadImg(tenueSrc).catch(() => null) : null, loadAll(planches)]);
   Object.assign(S, SD);
+  if (PL.biomes) for (const [k, [x, y, w, h]] of Object.entries(BIOMES_SPRITES)) { const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(PL.biomes, x, y, w, h, 0, 0, w, h); S[k] = c; dens[k] = 2; }
   // pack sur une seule planche : chaque tuile de 16 px découpée dans son petit canevas
   if (pack?.planche && PK.__planche) {
     const im = PK.__planche; delete PK.__planche;

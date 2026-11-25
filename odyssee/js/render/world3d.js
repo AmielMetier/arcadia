@@ -20,6 +20,8 @@ import { styleInterieur } from './interieurs.js';
 import { teinteHeure, nuitHeure, VITRE_NUIT, Lumieres } from './lumieres.js';
 import { choisirModele, geometriesModele, couleurBase, EMPRISES, materiauTerrasse } from './bati-jeu.js';
 import { variantesArbres, variante, miroir, teinte } from './arbres.js';
+import { matBiome, carteBiomes } from './biomes-pack.js';
+import { BIOMES, biomeEn, matiere, essence, bruitBiome } from '../world/biomes.js';
 import { dessinHerbe, imageHerbe, NIMAGES, MARGE as HERBE_M, HAUTEUR as HERBE_H } from './herbes.js';
 import { Relief3D, relief3dActif, matParoi, matFacettes, facettesActives, matPente, matsPente, LV as R3LV } from './relief3d.js';
 import { setRelief3dSol, setReliefHGSSSol } from './solgen.js';
@@ -599,6 +601,8 @@ export class WorldView {
       chars: screenSprite(new THREE.MeshBasicMaterial({ map: this.texC, alphaTest: 0.5, side: THREE.DoubleSide }), AVANCE_PERSO),
       // sprites isolés (objets, bulle « ! », herbes qui bougent) : pas de couleurs de sommets
       actorSprite: screenSprite(new THREE.MeshBasicMaterial({ map: this.texS, alphaTest: 0.5, side: THREE.DoubleSide })),
+      // herbe haute redessinée devant un personnage (avec un pack, aux couleurs du biome)
+      cover: screenSprite(new THREE.MeshBasicMaterial({ map: this.texS, alphaTest: 0.5, side: THREE.DoubleSide })),
       // sprite couché au sol (sillage du surf)
       flatSprite: new THREE.MeshBasicMaterial({ map: this.texS, alphaTest: 0.5, side: THREE.DoubleSide }),
       // ombres au sol : dessinées à la densité de l'écran, une seule couche là où elles se croisent (ombres.js)
@@ -609,6 +613,8 @@ export class WorldView {
       // décor animé posé sur l'eau (tourbillons)
       animOver: mk(this.texN, { alphaTest: 0.5 }),
     };
+    if (art.packDecor) for (const k of ['ground', 'anim', 'overlay', 'animOver', 'cover']) matBiome(this.mat[k]);   // pack de graphismes : les biomes reteignent ses tuiles
+    this.biomesPack = !!art.packDecor;
     this.tinted = Object.values(this.mat);
     this.glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 32; const x = c.getContext('2d'); const g = x.createRadialGradient(16, 16, 1, 16, 16, 16); g.addColorStop(0, 'rgba(255,240,180,0.9)'); g.addColorStop(0.4, 'rgba(255,210,120,0.35)'); g.addColorStop(1, 'rgba(255,200,100,0)'); x.fillStyle = g; x.fillRect(0, 0, 32, 32); return tex(c); })();
     this.matGlow = new THREE.MeshBasicMaterial({ map: this.glowTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
@@ -657,6 +663,7 @@ export class WorldView {
     this.chunks = new Map(); this.glows = new THREE.Group(); this.root.add(this.glows);
     this.ambiance.vider(this.root); this.tournants = new Set();
     this.sol.setMap(map);
+    if (this.biomesPack) carteBiomes(map);
     this.r3d = this.r3dOn && (map.outdoor || (this.r3dHGSS && map.floor === 'cave')) && this.sol.couvre(map) ? (this.r3dHGSS ? new ReliefHGSS(map, { biome: caveBiome(map) }) : new Relief3D(map)) : null;
     if (this.r3d && !this.r3dHGSS && !this.tinted.includes(matParoi())) this.tinted.push(matParoi(), matFacettes());
     for (const e of this.herbes?.values() || []) e.tex?.dispose(); this.herbes = new Map();   // herbes de devant (herbes.js)
@@ -721,7 +728,8 @@ export class WorldView {
     const hasNbr4 = (ax, ay, pred) => [groundAt(ax + 1, ay), groundAt(ax - 1, ay), groundAt(ax, ay + 1), groundAt(ax, ay - 1)].some(pred);
     const snowEdge = m.outdoor && !rawZone?.theme && [m.zoneAt(x + 5, y), m.zoneAt(x - 5, y), m.zoneAt(x, y + 5), m.zoneAt(x, y - 5)].some((z) => z?.theme === 'snow') && (t === T.PINE || hasNbr8(x, y, (q) => q === T.SNOW));
     const theme = rawZone?.theme || (snowEdge ? 'snow' : undefined);
-    const grassKey = theme === 'volcanic' ? 'ash' + (v < 0.5 ? 0 : 1) : theme === 'snow' ? 'snow' + (v < 0.5 ? 0 : 1) : g4();
+    const nbio = m.outdoor ? biomeEn(m, x, y) : 0, mat = nbio && !theme || theme === 'forest' || theme === 'montagne' ? matiere(nbio, x, y) : null;   // biome : neige, cendre ou sable mêlés à l'herbe
+    const grassKey = this.biomesPack && nbio && (mat === 'neige' || mat === 'cendre') && !theme ? g4() : mat === 'neige' ? 'snow' + (v < 0.5 ? 0 : 1) : mat === 'cendre' ? 'ash' + (v < 0.5 ? 0 : 1) : mat === 'sable' && A.q_sand_f ? g4() : theme === 'volcanic' ? 'ash' + (v < 0.5 ? 0 : 1) : theme === 'snow' ? 'snow' + (v < 0.5 ? 0 : 1) : g4();
     const sandFull = A.q_sand_f || A.sand15 || A.sand0;
     const desertCell = !!(sandFull && m.outdoor && desertAt(x, y) && !hasNbr4(x, y, (q) => q === T.GRASS || q === T.TALL));
     const sandFlower = (ax, ay) => {
@@ -783,7 +791,10 @@ export class WorldView {
       if (tt === T.TALL && A.hautes_herbes0) return { c: A['hautes_herbes' + (v < 0.5 ? 0 : 1)] };
     }
     switch (tt) {
-      case T.GRASS: case T.FENCE: return { c: A[grassKey] };
+      case T.GRASS: case T.FENCE:
+        // une plaque de sable dans l'herbe (pack) : ses bords et ses coins, comme un chemin
+        if (mat === 'sable' && A.q_sand_f && tt === T.GRASS) return quarts('sand', (q, ax, ay) => q === T.SAND || (q === T.GRASS && matiere(biomeEn(m, ax, ay), ax, ay) === 'sable'));
+        return { c: A[grassKey] };
       case T.ROCK: case T.BUSH: case T.CUT: return { c: desertCell ? sandFull : A[grassKey] };
       case T.SMASH: case T.BOULDER: return { c: m.outdoor ? (desertCell ? sandFull : A[grassKey]) : A['cave' + (v < 0.5 ? 0 : 1)] };
       // hautes herbes : un tapis dessiné au sol, comme sur DS (les jambes de qui s'y tient sont cachées par view.cover)
@@ -797,7 +808,8 @@ export class WorldView {
       }
       case T.TREE: case T.PINE: return { c: theme === 'volcanic' ? A.ash1 : theme === 'snow' ? A.snow1 : desertCell ? sandFull : pg ? A[g4()] : A['forest' + (v < 0.5 ? 0 : 1)] };
       // (Noir & Blanc : contre la roche d'une montagne, le sentier va jusqu'au pied du rocher, sans bordure d'herbe)
-      case T.PATH: if (A.q_path_f) return quarts('path', A.nbr && m.outdoor ? (q) => isPathQ(q) || q === T.CAVEWALL || q === T.CLIFF : isPathQ);
+      case T.PATH: if (A.q_pave_f && BIOMES[nbio]?.voie === 'pave') return quarts('pave', isPathQ);
+        if (A.q_path_f) return quarts('path', A.nbr && m.outdoor ? (q) => isPathQ(q) || q === T.CAVEWALL || q === T.CLIFF : isPathQ);
         return { c: A['path' + edge(isPathish)] };
       case T.PAVE: if (A.q_pave_f) return quarts('pave', (q, ax, ay) => isPaveQ(q, ax, ay));
         return { c: A['pave' + edge((q) => isPathish(q))] };
@@ -1120,7 +1132,13 @@ export class WorldView {
       pose((fin(-1) && !fin(1) ? 'nbf_mur_w' : fin(1) && !fin(-1) ? 'nbf_mur_e' : 'nbf_mur_c') + r);
       return true;
     }
-    if (t === T.STAIRS && (herbe(x, y) || !mont(m, x, y))) { if (A.stairs) pose('stairs', 0.0001); return true; }
+    if (t === T.STAIRS && (herbe(x, y) || !mont(m, x, y))) {
+      // des marches de flanc (on monte vers l'est ou l'ouest) : le dessin tourné d'un quart de tour
+      const autre = (dx, dy) => walkable(m.get(x + dx, y + dy)) && m.get(x + dx, y + dy) !== T.STAIRS && m.height(x + dx, y + dy) !== h;
+      if (A.stairs && (autre(1, 0) || autre(-1, 0)) && !autre(0, 1) && !autre(0, -1)) flatTourne(G, x, y, Y + 0.0001, A.stairs, 1, false);
+      else if (A.stairs) pose('stairs', 0.0001);
+      return true;
+    }
     if (h <= 0 || !plat(x, y)) {
       // à côté d'un plateau : la roche de son flanc descend sur cette case (côté du plateau) ; au pied, pas d'ombre
       if (mont(m, x, y)) return false;
@@ -1138,7 +1156,7 @@ export class WorldView {
     }
     // le bord du plateau : la lèvre d'herbe du kit sur l'herbe ; rien sur la roche (la paroi suffit)
     if (!herbe(x, y)) return true;
-    const bas = (dx, dy) => { const q = m.get(x + dx, y + dy); return q === T.CLIFF || q === T.STAIRS || (m.height(x + dx, y + dy) < h && q !== T.CAVEWALL); };
+    const bas = (dx, dy) => { const q = m.get(x + dx, y + dy); return q === T.CLIFF || (m.height(x + dx, y + dy) < h && q !== T.CAVEWALL && q !== T.STAIRS); };   // (pas de lèvre en travers des marches)
     const n = bas(0, -1), s = bas(0, 1), e = bas(1, 0), w = bas(-1, 0);
     if (n) pose(w ? 'nbf_nw' : e ? 'nbf_ne' : 'nbf_n', 0.0002);
     if (s) pose(w ? 'nbf_sw' : e ? 'nbf_se' : 'nbf_s', 0.0002);
@@ -1151,7 +1169,7 @@ export class WorldView {
   r3dLV() { return this.r3d ? R3LV : 0; }
   r3dMats() {
     if (!this._r3dMats) {
-      const c = (m) => { const k = m.clone(); k.depthWrite = false; this.tinted.push(k); return k; };
+      const c = (m) => { const k = m.clone(); if (this.biomesPack) matBiome(k); k.depthWrite = false; this.tinted.push(k); return k; };
       this._r3dMats = { ground: c(this.mat.ground), anim: c(this.mat.anim), overlay: c(this.mat.overlay) };
     }
     return this._r3dMats;
@@ -1250,10 +1268,17 @@ export class WorldView {
           // automne : érables et feuillus roux ; deux pins sur trois prennent aussi leurs couleurs (un tiers de résineux
           // reste vert sombre, comme dans une forêt japonaise en momiji)
           else if (S.automne0 && (theme === 'automne' || m.outdoor) && hash(x * 13 + 5, y * 11 + 7) < this.partAutomne(x, y, theme, t)) { const a = 'automne' + Math.floor(hash(x * 7 + 3, y * 3 + 9) * 6); if (S[a]) key = a; }
+          // biome de la route : ses essences, par bosquets ; au bord, celles des deux biomes se mêlent
+          const bio = m.outdoor ? BIOMES[biomeEn(m, Math.round(x + (hash(x * 17 + 2, y * 5 + 9) - 0.5) * 7), Math.round(y + (hash(x * 3 + 8, y * 19 + 1) - 0.5) * 7))] : null;
+          if (bio && theme !== 'volcanic' && theme !== 'automne') {
+            let e = essence(t === T.PINE && bio.pins || bio.arbres, Math.min(0.999, Math.max(0, (bruitBiome(x, y, 5, 77) - 0.15) / 0.7) * 0.6 + hash(x * 29 + 3, y * 31 + 7) * 0.4));
+            if (e === 'automne') e = 'automne' + Math.floor(hash(x * 7 + 3, y * 3 + 9) * 6);
+            if (S[e]) key = e;
+          }
           // un des dessins de l'essence (arbres.js), miroir et teinte tirés de la case
           if (!this.arbresUnis) key = variante(S, key, x, y);
           const r = S[key], cx = x + 0.5 + (v - 0.5) * 0.2, cz = y + 0.7;
-          billboard(P, cx, cz, SW(r), SH(r), r, 0, this.arbresUnis ? vb > 0.5 : miroir(x, y), this.arbresUnis ? 1 : teinte(x, y, key.startsWith('snowpine') || key.startsWith('deadtree')));
+          billboard(P, cx, cz, SW(r), SH(r), r, 0, this.arbresUnis ? vb > 0.5 : miroir(x, y), this.arbresUnis ? 1 : teinte(x, y, /^(snowpine|deadtree|b_)/.test(key)));
           this.ombreSol(Sh, cx - 0.75, cz - 0.3, cx + 0.75, cz + 0.3);
         }
       } else if (t === T.FENCE) {
@@ -1276,7 +1301,7 @@ export class WorldView {
           const r = vert ? (m.get(x, y - 1) === T.FENCE ? S.fence_v : S.fence_v0 || S.fence_v) : S.fence; billboard(P, x + 0.5, y + (vert ? 0.75 : 0.6), SW(r), SH(r), r);
         }
       }
-      else if (t === T.ROCK) { const r = S.rock; billboard(P, x + 0.5, y + 0.6, SW(r), SH(r), r); this.ombreSol(Sh, x + 0.05, y + 0.4, x + 0.95, y + 0.85); }
+      else if (t === T.ROCK) { const r = S.rock; billboard(P, x + 0.5, y + 0.6, SW(r), SH(r), r, 0, false, (m.outdoor && BIOMES[biomeEn(m, x, y)]?.pierre) || 1); this.ombreSol(Sh, x + 0.05, y + 0.4, x + 0.95, y + 0.85); }
       else if (t === T.BUSH) { const r = S[this.arbresUnis ? 'bush' : variante(S, 'bush', x, y)]; billboard(P, x + 0.5, y + 0.6, SW(r), SH(r), r, 0, !this.arbresUnis && miroir(x, y), this.arbresUnis ? 1 : teinte(x, y)); }
       else if (t === T.CUT) { const r = S.cuttree; billboard(P, x + 0.5, y + 0.62, SW(r), SH(r), r); this.ombreSol(Sh, x + 0.05, y + 0.4, x + 0.95, y + 0.85); }
       else if (t === T.BOULDER && m.bloc && S[m.bloc]) { const r = S[m.bloc]; billboard(P, x + 0.5, y + 0.66, SW(r) * 1.1, SH(r) * 1.1, r); this.ombreSol(Sh, x + 0.14, y + 0.5, x + 0.86, y + 0.86); }
@@ -2114,7 +2139,7 @@ export class WorldView {
     const r = this.S.rects[key]; if (!r) return;
     if (!a.cover) {
       const geo = new THREE.PlaneGeometry(1, 1); geo.setAttribute('anchor', new THREE.Float32BufferAttribute(new Array(12).fill(0), 3));
-      a.cover = new THREE.Mesh(geo, this.mat.actorSprite); this.root.add(a.cover);
+      a.cover = new THREE.Mesh(geo, this.mat.cover); this.root.add(a.cover);
       const d = a.dispose; a.dispose = () => { d(); this.root?.remove(a.cover); geo.dispose(); };
     }
     if (a.coverKey !== key) { this.setSpriteRect({ mesh: a.cover }, r, r.w, r.h); a.coverKey = key; }
@@ -2127,7 +2152,7 @@ export class WorldView {
     let e = C.get(k);
     if (e && e.d !== c.d) { e.tex?.dispose(); C.delete(k); e = null; }
     if (!e) {
-      const r = dessinHerbe(this.sol.pixelsCase(gx, gy).px);
+      const pc = this.sol.pixelsCase(gx, gy), r = dessinHerbe(pc.px, pc.lut);
       let tex = null;
       if (r) {
         tex = new THREE.DataTexture(r.data, r.w, r.h, THREE.RGBAFormat);
@@ -2277,6 +2302,7 @@ export class WorldView {
     let k = indoorOrCave ? (this.map?.floor === 'cave' ? [0.82, 0.8, 0.86] : [1, 1, 1]) : this.eclipse ? [0.3, 0.17, 0.44] : c;
     // sous les frondaisons : plus sombre, un peu plus vert (la valeur de la zone est passée en lumière linéaire, un peu
     // moins que la teinte de l'heure : 0,5 donne un sous-bois à 60 % de la lumière du jour à l'écran)
+    if (!indoorOrCave && this.lumBio) k = k.map((v, i) => v * this.lumBio[i]);   // la lumière du biome
     if (!indoorOrCave && this.ombre < 0.999) { const o = Math.pow(this.ombre, 1.6); k = [k[0] * o * 0.94, k[1] * Math.min(1, o * 1.06), k[2] * o * 0.92]; }
     // ciel couvert : la pluie et la grêle assombrissent et bleuissent, le sable jaunit, la cendre grise (lumière linéaire)
     const ciel = indoorOrCave ? null : METEO_TEINTE[this.weather?.current];
@@ -2323,6 +2349,7 @@ export class WorldView {
     const px = fx, py = fy;   // position du joueur (fx, fy deviennent le point visé par la caméra)
     this.ensureChunks(fx, fy);
     this.ile?.maj(dt);
+    if (this.lumCible) { const L = this.lumBio ||= [1, 1, 1], d = this.lumCible.map((v, i) => v - L[i]); if (d.some((v) => Math.abs(v) > 0.004)) { for (let i = 0; i < 3; i++) L[i] += d[i] * Math.min(1, dt * 2); this.applyTint(this.tintBase); } }
     if (Math.abs(this.ombre - this.ombreCible) > 0.002) { this.ombre += (this.ombreCible - this.ombre) * Math.min(1, dt * 2.5); this.applyTint(this.tintBase); }
     this.sol.update(dt, Math.floor(fx / CH), Math.floor(fy / CH), fx + 0.5, fy + 0.5);
     this.animT += dt;

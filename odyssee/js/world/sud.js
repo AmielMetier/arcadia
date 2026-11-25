@@ -204,7 +204,7 @@ export function buildSud(ctx) {
   ville(P, 'SP');
 
   /* ---------- route 15 → Marais-Noir (marécage, passerelles) ---------- */
-  const r15 = G2({ id: 'r15', nom: 'Route 15', de: porte('SP', 'r15'), vers: arrivee('SN', 'r15'), long: 10, graine: 1501, w: 12, grass: 1.1, tall: T.DARKTALL, trees: 0.06, theme: 'forest', ombre: 0.75, paysages: ['etang', 'riviere', 'etang', 'bosquet', 'prairie'], branches: 0.45, raccourci: 'surf', anciens: 5, voix: 'marais', panneaux: ['ROUTE 15\n→ Marais-Noir', null] }, 'r15', 'forest');
+  const r15 = G2({ id: 'r15', nom: 'Route 15', de: porte('SP', 'r15'), vers: arrivee('SN', 'r15'), long: 10, graine: 1501, w: 12, grass: 1.1, tall: T.DARKTALL, trees: 0.06, theme: 'forest', ombre: 0.9, paysages: ['etang', 'riviere', 'etang', 'bosquet', 'prairie'], branches: 0.45, raccourci: 'surf', anciens: 5, voix: 'marais', panneaux: ['ROUTE 15\n→ Marais-Noir', null] }, 'r15', 'forest');
   routeTrainer(W, r15, 0.15, -1, 4, 'Ninja', 'Hayate', [[49, 56], [453, 57]]);
   routeTrainer(W, r15, 0.35, 1, 4, 'Médium', 'Bérénice', [[195, 57], [342, 57], [89, 57]]);
   routeTrainer(W, r15, 0.55, -1, 3, 'Pêcheur', 'Albin', [[195, 57], [453, 58]]);
@@ -296,7 +296,7 @@ export function buildSud(ctx) {
   ville(Ro, 'SR');
 
   /* ---------- route 19 → Ombreval (forêt sombre) ---------- */
-  const r19 = G2({ id: 'r19', nom: 'Route 19', de: porte('SR', 'r19'), vers: arrivee('SO', 'r19'), long: 12, graine: 1901, w: 13, grass: 1.2, tall: T.DARKTALL, trees: 0.12, theme: 'forest', ombre: 0.5, paysages: ['bosquet', 'prairie', 'etang', 'bosquet'], branches: 0.5, anciens: 4, voix: 'bois', panneaux: ['ROUTE 19\n← Ombreval', null] }, 'r19', 'forest');
+  const r19 = G2({ id: 'r19', nom: 'Route 19', de: porte('SR', 'r19'), vers: arrivee('SO', 'r19'), long: 12, graine: 1901, w: 13, grass: 1.2, tall: T.DARKTALL, trees: 0.12, theme: 'forest', ombre: 0.72, paysages: ['bosquet', 'prairie', 'etang', 'bosquet'], branches: 0.5, anciens: 4, voix: 'bois', panneaux: ['ROUTE 19\n← Ombreval', null] }, 'r19', 'forest');
   routeTrainer(W, r19, 0.2, -1, 4, 'Médium', 'Aurore', [[197, 68], [302, 68]]);
   routeTrainer(W, r19, 0.4, 1, 4, 'Voleur', 'Arsène', [[262, 68], [430, 69]]);
   routeTrainer(W, r19, 0.6, -1, 4, 'Topdresseuse', 'Nuit', [[359, 69], [461, 69], [510, 69]]);

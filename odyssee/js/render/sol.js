@@ -13,10 +13,11 @@
 //  - en changeant de carte, le jeu attend que les blocs à l'écran soient prêts avant de rouvrir l'écran (pret()).
 // Désactiver pour comparer : ?sol=0 dans l'adresse, ou Options → Graphismes → Sol du dehors (gfx.js).
 import * as THREE from 'three';
-import { NFRAMES, LUT, CELL, MARGIN, zoneBloc } from './solgen.js';
+import { NFRAMES, LUT, LUTB, CELL, MARGIN, zoneBloc } from './solgen.js';
 import { matSol } from './relief3d.js';
 import { VERSION_ODYSSEE } from '../version.js';
 import { solChoix } from '../gfx.js';
+import { biomeBrut } from '../world/biomes.js';
 import { matTerrain } from './falaises.js';
 
 const CH = 16;                 // taille d'un bloc de carte (comme world3d.js)
@@ -31,7 +32,12 @@ function actif() {
   try { return solChoix() === 'odyssee'; } catch (e) { return true; }
 }
 const graine = (id) => { let h = 7; for (const ch of String(id)) h = (Math.imul(h, 31) + ch.charCodeAt(0)) | 0; return (h >>> 0) % 100000; };
-function remplir(data, idx) { const u = new Uint32Array(data.buffer, data.byteOffset, idx.length); for (let i = 0; i < idx.length; i++) u[i] = LUT[idx[i]]; }
+/** indices → couleurs ; bpx : le biome du bloc (un nombre) ou de chaque pixel */
+function remplir(data, idx, bpx = 0) {
+  const u = new Uint32Array(data.buffer, data.byteOffset, idx.length);
+  if (typeof bpx === 'number') { const L = LUTB[bpx] || LUT; for (let i = 0; i < idx.length; i++) u[i] = L[idx[i]]; }
+  else for (let i = 0; i < idx.length; i++) u[i] = LUTB[bpx[i]][idx[i]];
+}
 const memes = (a, b) => { if (!a || !b || a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; };
 /** l'image d'un bloc vaut-elle encore pour ces cases ? (sortes des cases, et relief des plateaux d'herbe) */
 const pareil = (c, z) => memes(c.kinds, z.kinds) && (!c.rel && !z.rel ? true : memes(c.rel, z.rel));
@@ -68,7 +74,7 @@ export class Sol {
   lire(k) { const c = this.cache.get(k); if (c) { this.cache.delete(k); this.cache.set(k, c); } return c; }
   ranger(k, c) {
     const old = this.cache.get(k); if (old) { this.octets -= old.octets; this.cache.delete(k); }
-    c.octets = c.frames.length * c.frames[0].length + (c.roche ? c.roche.length : 0); this.cache.set(k, c); this.octets += c.octets;
+    c.octets = c.frames.length * c.frames[0].length + (c.roche ? c.roche.length : 0) + (c.bpx.length || 0); this.cache.set(k, c); this.octets += c.octets;
     for (const [k2, c2] of this.cache) { if (this.octets <= BUDGET) break; if (k2 === k) continue; this.cache.delete(k2); this.octets -= c2.octets; }
   }
 
@@ -152,7 +158,7 @@ export class Sol {
   recu(w, d) {
     w.libre = true; w.cle = null; this.enCours.delete(d.key);
     if (d.error) { console.warn('[sol]', d.key, d.error); this.pump(); return; }
-    const c = { frames: d.frames, bw: d.bw, bh: d.bh, kinds: d.kinds, rel: d.rel || null, roche: d.roche || null, rocheH: d.rocheH || 0 };
+    const c = { frames: d.frames, bw: d.bw, bh: d.bh, kinds: d.kinds, rel: d.rel || null, bpx: d.bpx || 0, roche: d.roche || null, rocheH: d.rocheH || 0 };
     this.ranger(d.key, c);
     const grp = this.groups.get(d.key);
     if (grp && grp.parent) {
@@ -179,7 +185,7 @@ export class Sol {
     const roche = r3d && d.roche ? d.roche : null, h = d.bh * CELL + (roche ? d.rocheH * CELL : 0);
     const data = new Uint8Array(w * h * 4);
     const f = d.frames.length > 1 ? this.frame % d.frames.length : 0;
-    remplir(data, d.frames[f]);
+    remplir(data, d.frames[f], d.bpx);
     if (roche) remplir(data.subarray(w * d.bh * CELL * 4), roche);
     const tex = new THREE.DataTexture(data, w, h, THREE.RGBAFormat);
     tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.generateMipmaps = false;
@@ -222,7 +228,7 @@ export class Sol {
     const c = this.solCase(x, y); if (!c) return null;
     const { d, lx, ly } = c, W = d.bw * CELL, src = d.frames[0], out = new Uint8Array(CELL * CELL);
     for (let r = 0; r < CELL; r++) out.set(src.subarray((ly * CELL + r) * W + lx * CELL, (ly * CELL + r) * W + lx * CELL + CELL), r * CELL);
-    return { px: out, d };
+    return { px: out, d, lut: LUTB[biomeBrut(this.map, x, y)] };
   }
 
   /**
@@ -276,7 +282,7 @@ export class Sol {
       const [i, j] = grp.userData.key, s = grp.userData.sol;
       if (!grp.visible || Math.abs(i - ci) > 1 || Math.abs(j - cj) > 1) continue;
       const f = this.frame % s.frames.length; if (s.f === f) continue;
-      remplir(s.data, s.frames[f]); s.tex.needsUpdate = true; s.f = f;
+      remplir(s.data, s.frames[f], s.d.bpx); s.tex.needsUpdate = true; s.f = f;
     }
   }
 }

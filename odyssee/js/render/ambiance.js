@@ -6,9 +6,10 @@
 // ici ne touche ni aux combats ni à la carte).
 import * as THREE from 'three';
 import { T } from '../world/tiles.js';
+import { BIOMES, biomeEn } from '../world/biomes.js';
 
-const N = 320;                       // points au plus à l'écran
-const F = { BOUFFEE: 0, PAPILLON_O: 1, PAPILLON_F: 2, LUCIOLE: 3, FEUILLE_A: 4, FEUILLE_B: 5, TRACE_V: 6, TRACE_H: 7, OISEAU_H: 8, OISEAU_B: 9 };
+const N = 420;                       // points au plus à l'écran
+const F = { BOUFFEE: 0, PAPILLON_O: 1, PAPILLON_F: 2, LUCIOLE: 3, FEUILLE_A: 4, FEUILLE_B: 5, TRACE_V: 6, TRACE_H: 7, OISEAU_H: 8, OISEAU_B: 9, POINT: 10, CROIX: 11, TRAIT: 12, BULLE: 13 };
 const EL = 55 * Math.PI / 180, TAN = Math.tan(EL);
 
 const VERT = /* glsl */`
@@ -62,6 +63,20 @@ const FRAG = /* glsl */`
       if ( q.x > 6.0 || q.y > 2.0 ) discard;
       int i = int( q.y ) * 7 + int( q.x );
       if ( ( f == 8 ? OIS_H[ i ] : OIS_B[ i ] ) == 0 ) discard;
+    } else if ( f == 10 ) {
+      // point carré
+    } else if ( f == 11 ) {
+      // étincelle : une croix d'un pixel, le cœur blanc
+      vec2 d = abs( q - floor( vTaille * 0.5 ) ); if ( min( d.x, d.y ) > 0.5 ) discard;
+      if ( d.x + d.y < 0.5 ) col = mix( col, vec3( 1.0 ), 0.7 ); else a *= 0.8;
+    } else if ( f == 12 ) {
+      // trait de vent, couché
+      if ( abs( q.y - floor( vTaille * 0.5 ) ) > 0.5 ) discard;
+      a *= 1.0 - abs( q.x / vTaille - 0.5 ) * 1.6;
+    } else if ( f == 13 ) {
+      // bulle : un anneau et son reflet
+      vec2 d = q + 0.5 - vTaille * 0.5; float r = length( d ), R = vTaille * 0.5;
+      if ( r > R || r < R - 1.2 ) { if ( !( q.x == 1.0 && q.y == 1.0 ) ) discard; col = vec3( 1.0 ); }
     } else if ( f == 6 || f == 7 ) {
       // empreinte de pas : petit ovale de 2 × 3 (marche nord-sud) ou 3 × 2 (est-ouest), le talon plus marqué
       vec2 r = f == 6 ? q : q.yx;
@@ -74,13 +89,43 @@ const FRAG = /* glsl */`
       if ( q.x == 2.0 ) col *= 0.75;
     }
     // la teinte de l'heure, sauf pour les lucioles (elles éclairent)
-    gl_FragColor = vec4( f == 3 ? col : col * uTeinte, a );
+    gl_FragColor = vec4( f == 3 || f == 11 ? col : col * uTeinte, a );
     #include <colorspace_fragment>
   }`;
 
 const TRACE = { sable: [0.6, 0.44, 0.26], neige: [0.52, 0.6, 0.78], cendre: [0.2, 0.18, 0.18] };
 const COUL_PAP = [[0.98, 0.98, 0.94], [0.99, 0.88, 0.32], [0.98, 0.6, 0.22], [0.66, 0.82, 1.0], [0.98, 0.74, 0.86]];
 const COUL_FEUILLE = [[0.86, 0.28, 0.14], [0.94, 0.52, 0.16], [0.95, 0.74, 0.22], [0.72, 0.2, 0.16]];
+/**
+ * Ce qui flotte dans l'air d'un biome (world/biomes.js, `air`).
+ *  n : combien à l'écran ; c : couleurs ; f : forme ; taille ; vie (s) ; v : vitesse [x, y, z] ; ond : [ampleur, rythme] ;
+ *  haut : départ au-dessus du sol [min, max] ; clig : clignote ; lueur : éclaire (pas de teinte de l'heure) ; tombe : se pose
+ */
+const AIRS = {
+  graines: { n: 14, c: ['#ffffff', '#fff6d8'], f: 'CROIX', taille: 3, vie: 9, v: [0.35, 0.02, 0.08], ond: [0.25, 0.9], haut: [0.4, 2], a: 0.75 },
+  pollen: { n: 20, c: ['#ffe88c', '#ffc8e0', '#ffffff'], f: 'POINT', taille: 2, vie: 8, v: [0.18, 0.06, 0], ond: [0.3, 1.1], haut: [0.2, 1.8], a: 0.85 },
+  pollen_v: { n: 20, c: ['#d8b8ff', '#f4e0ff', '#ffe88c'], f: 'POINT', taille: 2, vie: 8, v: [0.2, 0.06, 0], ond: [0.3, 1.1], haut: [0.2, 1.8], a: 0.9 },
+  spores: { n: 30, c: ['#7cfff0', '#54c8ff', '#b8a0ff'], f: 'CROIX', taille: 3, vie: 7, v: [0.04, 0.14, 0], ond: [0.35, 0.8], haut: [0.1, 1.4], clig: 1.6, a: 0.95 },
+  spores_v: { n: 18, c: ['#d0ff8c', '#fff4a0'], f: 'POINT', taille: 2, vie: 7, v: [0.06, 0.1, 0], ond: [0.35, 0.8], haut: [0.1, 1.8], clig: 1.2, a: 0.8 },
+  petales: { n: 34, c: ['#ffc8dc', '#ff9cc0', '#fff0f6'], f: 'FEUILLE', taille: 3, vie: 8, v: [0.55, -0.34, 0.1], ond: [0.5, 2.1], haut: [1.4, 3.2], tombe: true, a: 0.95 },
+  petales_r: { n: 28, c: ['#ff5c8c', '#e02c5c', '#ffc0d4'], f: 'FEUILLE', taille: 3, vie: 8, v: [0.45, -0.34, 0.1], ond: [0.5, 2.1], haut: [1.4, 3.2], tombe: true, a: 0.95 },
+  feuilles: { n: 26, c: ['#dc4a24', '#f08a2c', '#f2c03c', '#b83c28'], f: 'FEUILLE', taille: 3, vie: 8, v: [0.7, -0.36, 0.12], ond: [0.6, 2], haut: [1.4, 3.2], tombe: true, a: 1 },
+  feuilles_b: { n: 24, c: ['#b8e060', '#7cb838', '#e8f890'], f: 'FEUILLE', taille: 3, vie: 8, v: [0.3, -0.3, 0.1], ond: [0.6, 1.8], haut: [1.6, 3.4], tombe: true, a: 0.95 },
+  vent: { n: 10, c: ['#ffffff', '#e8e0f0'], f: 'TRAIT', taille: 17, vie: 2.4, v: [5.2, 0, 0.3], ond: [0.1, 2], haut: [0.4, 2.4], a: 0.34 },
+  embruns: { n: 12, c: ['#ffffff', '#d8fcff'], f: 'POINT', taille: 2, vie: 4, v: [1.4, 0.1, -0.2], ond: [0.15, 2], haut: [0.3, 1.6], a: 0.65 },
+  etincelles: { n: 26, c: ['#ffffff', '#ffd0f4', '#b8f4ff'], f: 'CROIX', taille: 5, vie: 3.4, v: [0.02, 0.08, 0], ond: [0.06, 1], haut: [0.1, 1.8], clig: 2.6, a: 1 },
+  vapeur: { n: 10, c: ['#f4fcff', '#e8f4f4'], f: 'BOUFFEE', taille: 9, vie: 4.2, v: [0.16, 0.42, 0], ond: [0.2, 1], haut: [0, 0.4], a: 0.26, gonfle: 9 },
+  flocons: { n: 30, c: ['#ffffff', '#e0f0ff'], f: 'POINT', taille: 2, vie: 8, v: [0.25, -0.42, 0.1], ond: [0.35, 1.3], haut: [2, 4], tombe: true, a: 0.9 },
+  plumes: { n: 16, c: ['#ffffff', '#fff0b8', '#ffd864'], f: 'CROIX', taille: 3, vie: 8, v: [0.12, 0.12, 0], ond: [0.4, 0.8], haut: [0.2, 2.4], clig: 1.1, a: 0.95 },
+  libellules: { n: 6, c: ['#54d0e8', '#e85c5c', '#8ce060'], f: 'TRAIT', taille: 5, vie: 6, v: [0.5, 0, 0], ond: [1.5, 2.6], haut: [0.4, 1.1], a: 1 },
+  bulles: { n: 14, c: ['#c8e890', '#98b860'], f: 'BULLE', taille: 5, vie: 3.2, v: [0, 0.3, 0], ond: [0.06, 3], haut: [0, 0.3], a: 0.7 },
+  sable: { n: 18, c: ['#ffe8b8', '#f0c890'], f: 'TRAIT', taille: 9, vie: 2.2, v: [4.2, 0, 0.4], ond: [0.08, 2], haut: [0.1, 1.4], a: 0.42 },
+  follets: { n: 12, c: ['#a878ff', '#70ffc8', '#8cb8ff'], f: 'CROIX', taille: 5, vie: 7, v: [0.06, 0.05, 0], ond: [0.5, 0.7], haut: [0.3, 1.4], clig: 1.1, a: 1, sillage: true },
+  statique: { n: 14, c: ['#fff8a0', '#ffffff', '#a0d8ff'], f: 'CROIX', taille: 5, vie: 0.5, v: [0, 0, 0], ond: [0.5, 14], haut: [0.1, 2.2], clig: 16, a: 1 },
+  braises: { n: 30, c: ['#ffb040', '#ff6a1c', '#ffe080'], f: 'POINT', taille: 2, vie: 4.5, v: [0.25, 0.62, 0], ond: [0.3, 2.2], haut: [0, 1], clig: 5, a: 1, lueur: true },
+};
+const coul = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+for (const A of Object.values(AIRS)) A.c = A.c.map(coul);
 const COUL_PETALE = [[1.0, 0.8, 0.86], [0.98, 0.7, 0.8]];
 
 export class Ambiance {
@@ -161,6 +206,19 @@ export class Ambiance {
         }
       }
     }
+    // ---- l'air du biome : graines, pétales, braises, spores…
+    const air = dehors ? AIRS[BIOMES[biomeEn(m, Math.floor(cx), Math.floor(cz))]?.air] : null;
+    if (air && !(pluie && !air.clig)) {
+      this.airT = (this.airT || 0) - dt;
+      if (this.airT <= 0) {
+        this.airT = air.vie / air.n * (0.5 + Math.random());
+        const x = cx + (Math.random() - 0.5) * 24 - air.v[0] * air.vie * 0.4, z = cz + (Math.random() - 0.5) * 15;
+        if (m.get(Math.floor(x), Math.floor(z)) != null) {
+          const h = v.hAt(x, z);
+          this.ajout({ k: 'air', A: air, x, y: h + (air.haut[0] + Math.random() * (air.haut[1] - air.haut[0])) * TAN * 0.6, z, sol: h + 0.02, vie: air.vie * (0.8 + Math.random() * 0.4), c: air.c[Math.floor(Math.random() * air.c.length)], ph: Math.random() * 6.28 });
+        }
+      }
+    }
     // ---- de temps en temps, le jour, un vol d'oiseaux traverse le ciel (haut au-dessus du décor), et son ombre au sol
     this.vol = (this.vol ?? 6) - dt;
     if (dehors && !nuit && !pluie && this.vol <= 0) {
@@ -210,6 +268,10 @@ export class Ambiance {
       } else if (p.k === 'luciole') {
         p.cap += (Math.random() - 0.5) * dt * 2;
         p.x += Math.cos(p.cap) * dt * 0.25; p.z += Math.sin(p.cap) * dt * 0.18; p.y += Math.sin(p.ph + p.t * 1.3) * dt * 0.12;
+      } else if (p.k === 'air') {
+        const A = p.A;
+        if (A.tombe && p.y <= p.sol) { if (!p.pose) { p.pose = p.t; p.vie = Math.min(p.vie, p.t + 1.6); } }
+        else { p.x += (A.v[0] + Math.sin(p.ph + p.t * A.ond[1]) * A.ond[0]) * dt; p.y += (A.v[1] + Math.cos(p.ph * 2 + p.t * A.ond[1] * 1.3) * A.ond[0] * 0.3) * TAN * dt; p.z += A.v[2] * dt; }
       } else if (p.k === 'poussiere') {
         p.x += p.vx * dt * (1 - p.t / p.vie); p.y += dt * 0.25;
       } else if (p.k === 'oiseau') {
@@ -231,6 +293,11 @@ export class Ambiance {
       else if (p.k === 'feuille') { taille = 3; f = p.pose ? F.FEUILLE_A : Math.floor(p.t * 3 + p.ph) % 2 ? F.FEUILLE_A : F.FEUILLE_B; a = p.pose ? Math.max(0, 1 - (p.t - p.pose) / 2.5) : Math.min(1, p.t * 2); }
       else if (p.k === 'oiseau') { taille = 7; f = Math.floor(p.t * 5 + p.ph) % 2 ? F.OISEAU_H : F.OISEAU_B; c = [0.22, 0.2, 0.24]; a = Math.min(1, p.t); }
       else if (p.k === 'poussiere') { taille = Math.round(4 + u * 3); f = F.BOUFFEE; c = [0.94, 0.9, 0.8]; a = 0.9 * (1 - u * u); }
+      else if (p.k === 'air') {
+        const A = p.A; taille = A.taille + (A.gonfle ? Math.round(u * A.gonfle) : 0);
+        f = A.f === 'FEUILLE' ? (p.pose || Math.floor(p.t * 3 + p.ph) % 2 ? F.FEUILLE_A : F.FEUILLE_B) : F[A.f];
+        a = A.a * Math.min(1, p.t * 2.5, (p.vie - p.t) * 2) * (A.clig ? 0.55 + 0.45 * Math.sin(p.ph + p.t * A.clig * 2) : 1);
+      }
       else if (p.k === 'trace') { taille = 3; f = p.f; a = 0.72 * Math.min(1, (p.vie - p.t) / 2.5); }
       if (a <= 0.01) return;
       this.pos[n * 3] = p.x; this.pos[n * 3 + 1] = p.y; this.pos[n * 3 + 2] = p.z;

@@ -46,6 +46,7 @@ import { revancheBossPossible, revancheBoss, tourCombat, clubCombat } from './to
 import { dojoMamadou, dojoBoutique, dojoMascotte } from './dojo-mamadou.js';
 import { VieMonde, colporteur, marche, cueillir, fouiller, revanchePossible, revanche, noteCombat, ragot, echange, relais, concours, loterie, musicien } from './vie-monde.js';
 import { storeGet, storeSet, sessSet, warnDev } from './core/safe.js';
+import { BIOMES, biomeEn, estLave } from './world/biomes.js';
 import { glisse, dalle, souffle, remiseSerre, pupitreSerre, teleporte, savoir, pylon, stele, shrine } from './game/puzzles.js';
 import { RIVAL_TEAMS, spawnAhead, trigger } from './game/triggers.js';
 import { GYM_HINTS, reveilBetes, spawnLegends, legendReady, legendBattle, ferry, odyssorEvent, runNpcScript } from './game/world-events.js';
@@ -482,6 +483,7 @@ export class Game {
     if ((m.outdoor || m.floor === 'cave') && name !== this.zoneName) { this.zoneName = name; this.ui.banner(name); }
     if (z?.town && !this.state.visited.includes(z.town)) this.state.visited.push(z.town);
     this.zone = z; this.explore();
+    this.view.lumCible = (m.outdoor && BIOMES[biomeEn(m, this.player.x, this.player.y)]?.lum) || [1, 1, 1];   // la lumière du biome
     this.view.ombreCible = (m.outdoor && z?.ombre) || 1;   // sous-bois : l'image s'assombrit doucement
     if (!this.musicLock) {
       const celMusic = m.id === 'monde' && m.outdoor && this.celestial?.activeKind !== 'none' ? this.celestial.activeKind : null;
@@ -960,7 +962,7 @@ export class Game {
     if (reg === 'canne') {
       const p = this.player, m = this.mapObj, [dx, dy] = DIRS[p.dir];
       const fx = p.x + dx, fy = p.y + dy;
-      if (m.get(fx, fy) === T.WATER && (m.outdoor || m.surf) && !p.surf) {
+      if (m.get(fx, fy) === T.WATER && (m.outdoor || m.surf) && !p.surf && !estLave(m, fx, fy)) {
         await this.pecher(fx, fy);
         return;
       }
@@ -1108,6 +1110,7 @@ export class Game {
         else if (t === T.SMASH) await this.fieldObstacle('eclate', fx, fy, 'Ce rocher est plein de fissures. Il pourrait être brisé.');
         else if (t === T.BOULDER && m.bloc) await this.ui.say(['Un gros bloc de pollen, tout collant.', 'Impossible de le pousser à la main... Un bon courant d\'air ferait l\'affaire !']);
         else if (t === T.BOULDER) await this.useForce();
+        else if (t === T.WATER && estLave(m, fx, fy)) await this.ui.say('De la lave en fusion ! Impossible de s\'approcher davantage.');
         else if (t === T.WATER && (m.outdoor || m.surf) && !p.surf) await this.tryWaterInteraction(fx, fy);
       }
     } finally { this.busy = false; }
@@ -1678,7 +1681,7 @@ export class Game {
       if (r.item === 'canne') {
         const p = this.player, m = this.mapObj, [dx, dy] = DIRS[p.dir];
         const fx = p.x + dx, fy = p.y + dy;
-        if (m.get(fx, fy) === T.WATER && (m.outdoor || m.surf) && !p.surf) {
+        if (m.get(fx, fy) === T.WATER && (m.outdoor || m.surf) && !p.surf && !estLave(m, fx, fy)) {
           await this.pecher(fx, fy);
           return true;
         }

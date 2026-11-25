@@ -34,7 +34,7 @@ for (const R of HAUTES) R.forEach((v, i) => { TOUTES[v] = 1; if (i >= 2) BRINS[v
  * px : indices de palette de la case (CELL × CELL, ligne 0 = nord). Rend les NIMAGES images côte à côte (RGBA,
  * LARG × NIMAGES de large, HAUTEUR de haut, ligne 0 = haut), ou null s'il n'y a pas d'herbe haute dans la case.
  */
-export function dessinHerbe(px) {
+export function dessinHerbe(px, lut = LUT) {
   let n = 0;
   for (let r = HAUT; r < CELL; r++) for (let x = 0; x < CELL; x++) n += TOUTES[px[r * CELL + x]];
   if (n < CELL * 4) return null;
@@ -51,7 +51,7 @@ export function dessinHerbe(px) {
         if (!TOUTES[v] || (r < FRANGE && !BRINS[v])) continue;
         const dx = x < mil ? x - e : x + e, X = ox + dx;
         if (dx < -MARGE || dx >= CELL + MARGE) continue;
-        out[r * W + X] = LUT[v];
+        out[r * W + X] = lut[v];
       }
     }
   });

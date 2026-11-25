@@ -50,6 +50,7 @@ export const ASSETS = {
   chars: `${IMG}chars.png?v=${VERSION_ODYSSEE}`,
   suiveurs: `${IMG}suiveurs.png?v=${VERSION_ODYSSEE}`,
   relief: `${IMG}relief.png?v=${VERSION_ODYSSEE}`,
+  biomes: (k) => `${IMG}biomes/${k}.png?v=${VERSION_ODYSSEE}`,
   nature: (k) => `${IMG}nature/${k}.png?v=${VERSION_ODYSSEE}`,
   mobilier: (k) => `${IMG}mobilier/${k}.png?v=${VERSION_ODYSSEE}`,
   facade: (k) => `${IMG}facades/${k}.png?v=${VERSION_ODYSSEE}`,

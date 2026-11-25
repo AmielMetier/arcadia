@@ -1,5 +1,19 @@
 # Journal des versions — Arcadia
 
+## 5.164 — 25 novembre 2026
+- **Odyssée** — Chaque route a maintenant son propre biome (Odyssée 3.5) :
+  - 26 biomes : blés dorés et moulin sur la Route 1, val fleuri et ses étangs, forêt aux champignons lumineux, alpages, cerisaie, lande de bruyère et ses cercles de pierres, savane aux baobabs, champs de lavande, prairie d'opale aux cristaux, jungle, gorge aux geysers, taïga enneigée, jardins célestes, côte aux palmiers et son phare…
+  - Dans le Sud : vergers, rizières et leurs diguettes, marais traversé sur des passerelles, mer de dunes, canyon rouge, roseraie pavée, forêt hantée et ses tombes, coteaux de vignes.
+  - Sur les îles : terres d'orage, bambouseraie, terres de braise et leurs mares de lave, pente givrée.
+  - Sol, sentier, hautes herbes, eau, falaises, arbres, rochers et lumière changent d'une route à l'autre ; pétales, spores, braises, feux follets ou flocons flottent dans l'air.
+  - Plus de 70 dessins nouveaux, des arches sous lesquelles on passe, des champs, des passerelles, des pierres gravées à lire.
+  - Les routes ne sont plus une ligne droite : le chemin serpente, se sépare et se rejoint, contourne des lacs, des bosquets et des rochers, monte sur des corniches. 80 boucles et clairières cachées s'ouvrent dans les forêts et les canyons.
+  - Elles sont habitées : campements où se reposer, pique-niques, chercheurs, gens du coin, troupeaux de Pokémon, et une trentaine de nouveaux dresseurs cachés dans les clairières.
+  - Plus de 120 objets nouveaux à trouver au bout des sentiers, et d'autres cachés sous les buissons, les rochers et les souches.
+  - Les dresseurs, les objets et les passages d'avant n'ont pas bougé. Marche avec les deux graphismes.
+- **Odyssée** — Les cinématiques des boss (Champions, Conseil 4, Lugia, légendaires) ne sautent plus quand on appuie vite pour passer les dialogues : seuls Échap ou le bouton « Passer » les interrompent.
+- **Odyssée** — Les marches posées de côté montent dans le bon sens, dans les deux graphismes, et l'herbe ne passe plus en travers (Noir & Blanc).
+
 ## 5.163 — 25 novembre 2026
 - **Odyssée** — Les failles deviennent de vraies expéditions (Odyssée 3.4) :
   - L'Astrolabe disparaît : failles, aurores et pluies d'étoiles arrivent au hasard (le ciel, la nuit). Une annonce te dit où chercher ; un fragment déjà dépensé pour une faille est rendu.
