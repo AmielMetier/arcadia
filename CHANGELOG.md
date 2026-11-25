@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.162 — 25 novembre 2026
+- **The Backrooms** — Un nouveau niveau : le Level 7, Thalassophobia, au bout du toboggan bleu des Poolrooms.
+  - Une mer sans fin dans la brume du soir, avec sa houle, ses reflets, l'éclat du jour qui baisse et un peu d'écume sur les crêtes. Des maisons à moitié englouties en sortent : le rez-de-chaussée sous l'eau, l'étage et le toit au-dessus. Aucune ne se ressemble : grises, bleues, rouges, vertes ou blanches, un toit à deux pentes ou à un seul pan, une cheminée, des volets qui pendent, une rambarde ; deux ou trois pièces. D'autres sombrent de travers, et l'épave d'un grand voilier s'est échouée sur un rocher.
+  - Une barque en bois à moteur attend au ponton. Monte dedans avec F : le premier tient la barre (Z / S pour le moteur, Q / D pour tourner). Pour descendre, il faut accoster un îlot.
+  - Trois bidons d'essence sont cachés au fond de trois de ces maisons : accoste à leur ponton, entre, fouille les pièces. Le moteur en boit, et sans eux on n'ira pas loin. Tout au bout, sur un dernier îlot, une trappe de bunker ouverte sous un gyrophare : la sortie, par une échelle qui descend dans le noir.
+  - Quelque chose d'immense vit sous la surface et entend le moteur. Le sonar dit quand ça approche : coupe le moteur et laisse-le passer. S'il atteint la barque en marche, il emporte quelqu'un. Et ne traîne pas au bord de l'eau.
 ## 5.161 — 24 novembre 2026
 - **Odyssée** — Entrer dans une faille se vit maintenant en grand (Odyssée 3.3) :
   - L'écran se brise, le monde est aspiré et tu traverses un tunnel propre à la faille : losanges qui s'échangent, quatre climats et leurs éclairs, ou brasier d'un Alpha.

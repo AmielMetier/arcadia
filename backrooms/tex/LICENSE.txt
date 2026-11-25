@@ -51,3 +51,12 @@ couleur en 1024 px, teintée dans backrooms/view/mallTextures.js ; « _relief »
   l17_carrelage_brun.jpg (+ _relief, _lisse)  Brown Floor Tiles  https://polyhaven.com/a/brown_floor_tiles         (le sol de l'annexe)
   l17_carrelage_use.jpg (+ _relief, _lisse)   Dirty Tiles        https://polyhaven.com/a/dirty_tiles               (le food court, la jardinerie)
   (le velours des fauteuils du cinéma reprend l5_velours.jpg)
+
+Level 7 (Thalassophobia), Poly Haven (CC0) :
+  l7_ciel.jpg                        Kloppenheim 01 (Pure Sky)  https://polyhaven.com/a/kloppenheim_01_puresky  (le ciel, réduit en 2048 × 1024)
+  l7_planches.webp (+ _relief)       Weathered Planks           https://polyhaven.com/a/weathered_planks          (la coque de la barque)
+  l7_sable.webp (+ _relief)          Coast Sand Rocks 02        https://polyhaven.com/a/coast_sand_rocks_02       (le dessus des îlots)
+  l7_bardage.webp (+ _relief)        Weathered Plank Siding     https://polyhaven.com/a/weathered_plank_siding    (les façades des maisons)
+  l7_cloison.webp (+ _relief)        Wood Peeling Paint Weathered https://polyhaven.com/a/wood_peeling_paint_weathered (leurs murs intérieurs)
+  l7_plancher.webp (+ _relief)       Old Wooden Floor 02        https://polyhaven.com/a/old_wooden_floor_02       (leurs planchers)
+  l7_toit.webp (+ _relief)           Roof Planks                https://polyhaven.com/a/roof_planks               (leurs toits)

@@ -219,3 +219,7 @@ Sketchfab, sous licence CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
   poolrooms/fish.glb  « Fish » par ethem (https://sketchfab.com/ethem)
     https://sketchfab.com/3d-models/fish-81d01e6ce8f745778e2629bca80724af
     Modifié : texture réencodée en WebP 1024 px (tools/glb-webp.py), animé dans le code (view/fish.js).
+
+Level 7 (Thalassophobia), dossier ocean/ : Poly Haven (CC0), simplifiés et compressés (Draco, textures WebP) :
+  coast_rocks_01, coast_rocks_03, coastal_cliff_01, modular_wooden_pier, ship_pinnace (l'épave), ocean_buoy,
+  lateral_sea_marker, wooden_lantern_01 — https://polyhaven.com/a/<nom>
