@@ -28,7 +28,7 @@ export const ACTIONS = [
   { id: 'NAV', nom: 'Chantiers d\'Écaille', secteur: 'industrie', s0: 66, beta: 1.15, vol: 0.27, q: 0.02, lambda: 0.022, poids: 3, desc: 'Ferries et bateaux de pêche.' },
   { id: 'FER', nom: 'Ferry de l\'Est', secteur: 'transport', s0: 41, beta: 1.05, vol: 0.3, q: 0.01, lambda: 0.035, poids: 2, desc: 'Les traversées vers les îles.' },
   { id: 'BQA', nom: 'Banque d\'Aube', secteur: 'finance', s0: 88, beta: 1.3, vol: 0.24, q: 0.04, lambda: 0.015, poids: 5, desc: 'La banque des dresseurs depuis trois générations.' },
-  { id: 'LUS', nom: 'Lustrelle Cosmétiques', secteur: 'conso', s0: 120, beta: 0.85, vol: 0.21, q: 0.018, lambda: 0.009, poids: 4, desc: 'Shampoings pour Pokémon : « parce que votre Ponyta le vaut bien ».' },
+  { id: 'LUS', nom: 'Lustrelle Cosmétiques', secteur: 'conso', s0: 120, beta: 0.85, vol: 0.21, q: 0.018, lambda: 0.009, poids: 4, desc: 'Shampoings pour Pokémon : « pour un Ponyta à la crinière éclatante ! ».' },
 ];
 // matières premières et objets (cours au comptant) : coût de stockage u, rendement d'opportunité y
 export const MATIERES = [
@@ -38,8 +38,8 @@ export const MATIERES = [
   { id: 'PIE', nom: 'Pierre Évolution', unite: 'la pierre', s0: 2100, vol: 0.22, u: 0.005, y: 0.0, secteur: 'industrie' },
   { id: 'MAG', nom: 'Huile de Magma', unite: 'le baril', s0: 82, vol: 0.38, u: 0.04, y: 0.05, secteur: 'energie' },
 ];
-export const FX = { id: 'PDE', nom: 'Pokéeuro (€) en Pokédollars', s0: 1.35, vol: 0.08 };
-export const INDICE = { id: 'SPO', nom: 'S&P Odyssée 500' };
+export const FX = { id: 'PDE', nom: 'Écu de Kalos (₭) en Pokédollars', s0: 1.35, vol: 0.08 };
+export const INDICE = { id: 'SPO', nom: 'Indice Odyssée 500' };
 
 /** nouvelles : chocs par secteur (en %) ; une même nouvelle monte un secteur, en fait baisser un autre, laisse le reste */
 export const NOUVELLES = [
@@ -49,8 +49,8 @@ export const NOUVELLES = [
   { t: 'Éruption sur l\'Île du Magma : production d\'Huile de Magma à l\'arrêt.', chocs: { MAG: 15, energie: 4, transport: -4 } },
   { t: 'Tempête sur la mer de l\'Est : les ferries restent à quai.', chocs: { transport: -7, NAV: -3, FER: -9 } },
   { t: 'La Banque d\'Aube relève ses taux.', chocs: { finance: 3, tech: -2, industrie: -2, PDE: 1.5 } },
-  { t: 'Le Pokéeuro s\'envole après de bons chiffres à Kalos.', chocs: { PDE: 3, conso: -1 } },
-  { t: 'Kalos en panne de croissance : le Pokéeuro recule.', chocs: { PDE: -3, conso: 1 } },
+  { t: 'L\'Écu de Kalos s\'envole après de bons chiffres à Kalos.', chocs: { PDE: 3, conso: -1 } },
+  { t: 'Kalos en panne de croissance : l\'Écu de Kalos recule.', chocs: { PDE: -3, conso: 1 } },
   { t: 'Récolte record : les paniers de Baies Oran ne trouvent pas preneur.', chocs: { ORN: -10, agro: 2 } },
   { t: 'L\'Île du Magma rouvre ses puits : l\'Huile de Magma dégringole.', chocs: { MAG: -12, transport: 3 } },
   { t: 'Record d\'inscriptions à la Ligue : les Centres Pokémon débordent.', chocs: { sante: 4, POT: 5, balls: 2 } },
@@ -184,11 +184,11 @@ export function question(m, k, seed) {
     }
     case 2: { // change à terme
       const Sx = arr(m.prix.PDE, 4), F = changeATerme(Sx, R_PD, R_PE, T);
-      return { q: `1 € vaut ${fmt(Sx, 4)} ₽. Taux du Pokédollar ${fmt(R_PD * 100, 1)} %, du Pokéeuro ${fmt(R_PE * 100, 1)} %. Cours à terme à ${T} an(s) ?`, ...choix(r, fmt(F, 4) + ' ₽', [fmt(Sx * Math.exp((R_PE - R_PD) * T), 4) + ' ₽', fmt(Sx, 4) + ' ₽', fmt(Sx * Math.exp(R_PD * T), 4) + ' ₽']), exp: `Parité des taux : F = S·e^((r₽−r€)T). La monnaie au taux le plus bas (€) se traite plus cher à terme.` };
+      return { q: `1 ₭ vaut ${fmt(Sx, 4)} ₽. Taux du Pokédollar ${fmt(R_PD * 100, 1)} %, de l'Écu de Kalos ${fmt(R_PE * 100, 1)} %. Cours à terme à ${T} an(s) ?`, ...choix(r, fmt(F, 4) + ' ₽', [fmt(Sx * Math.exp((R_PE - R_PD) * T), 4) + ' ₽', fmt(Sx, 4) + ' ₽', fmt(Sx * Math.exp(R_PD * T), 4) + ' ₽']), exp: `Parité des taux : F = S·e^((r₽−r₭)T). La monnaie au taux le plus bas (₭) se traite plus cher à terme.` };
     }
     case 3: { // swap de change : points
       const Sx = arr(m.prix.PDE, 4), p = pointsSwap(Sx, R_PD, R_PE, 1);
-      return { q: `Swap de change 1 an sur l'€ (comptant ${fmt(Sx, 4)} ₽, r₽ ${fmt(R_PD * 100, 1)} %, r€ ${fmt(R_PE * 100, 1)} %). Les points de swap sont…`, ...choix(r, `positifs (+${fmt(p, 4)} ₽)`, [`négatifs (−${fmt(p, 4)} ₽)`, 'nuls : un swap ne coûte rien', `positifs (+${fmt(Sx * 0.03, 4)} ₽)`]), exp: `Points = F − S = ${fmt(p, 4)} ₽ > 0 car r₽ > r€.` };
+      return { q: `Swap de change 1 an sur le ₭ (comptant ${fmt(Sx, 4)} ₽, r₽ ${fmt(R_PD * 100, 1)} %, r₭ ${fmt(R_PE * 100, 1)} %). Les points de swap sont…`, ...choix(r, `positifs (+${fmt(p, 4)} ₽)`, [`négatifs (−${fmt(p, 4)} ₽)`, 'nuls : un swap ne coûte rien', `positifs (+${fmt(Sx * 0.03, 4)} ₽)`]), exp: `Points = F − S = ${fmt(p, 4)} ₽ > 0 car r₽ > r₭.` };
     }
     case 4: { // CDS
       const pr = primeCDS(a.lambda);
@@ -198,22 +198,22 @@ export function question(m, k, seed) {
       const n = pick([2, 3, 5]), s = tauxSwap(R_PD, n);
       return { q: `Courbe plate à ${fmt(R_PD * 100, 1)} % (taux continu). Taux fixe d'un swap ${n} ans à paiements annuels ?`, ...choix(r, fmt(s * 100, 3) + ' %', [fmt(R_PD * 100, 3) + ' %', fmt((Math.exp(R_PD) - 1) * 100 + 0.2, 3) + ' %', fmt(R_PD * 100 * 0.9, 3) + ' %']), exp: `Taux fixe = (1 − DF(${n})) / ΣDF = ${fmt(s * 100, 3)} % (c'est le taux annuel équivalent, un peu au-dessus du taux continu).` };
     }
-    case 6: { // option européenne
+    case 6: { // option à échéance (modèle de Kalos)
       const sig = arr(volDe(a), 2), c = blackScholes('call', S, K, T, R_PD, sig, a.q);
-      return { q: `Call européen sur ${a.nom} : S = ${fmt(S)} ₽, K = ${K} ₽, ${T} an(s), vol ${fmt(sig * 100, 0)} %, r ${fmt(R_PD * 100, 1)} %, dividende ${fmt(a.q * 100, 1)} %. Prix ?`, ...choix(r, fmt(c) + ' ₽', [fmt(Math.max(0, S - K)) + ' ₽', fmt(blackScholes('put', S, K, T, R_PD, sig, a.q)) + ' ₽', fmt(c * 1.6) + ' ₽']), exp: `Black-Scholes : ${fmt(c)} ₽ (la valeur intrinsèque ${fmt(Math.max(0, S - K))} ₽ plus la valeur temps).` };
+      return { q: `Call Kalos sur ${a.nom} : S = ${fmt(S)} ₽, K = ${K} ₽, ${T} an(s), vol ${fmt(sig * 100, 0)} %, r ${fmt(R_PD * 100, 1)} %, dividende ${fmt(a.q * 100, 1)} %. Prix ?`, ...choix(r, fmt(c) + ' ₽', [fmt(Math.max(0, S - K)) + ' ₽', fmt(blackScholes('put', S, K, T, R_PD, sig, a.q)) + ' ₽', fmt(c * 1.6) + ' ₽']), exp: `Black-Scholes : ${fmt(c)} ₽ (la valeur intrinsèque ${fmt(Math.max(0, S - K))} ₽ plus la valeur temps).` };
     }
-    case 7: { // américaine
+    case 7: { // option à exercice anticipé (modèle d'Unys)
       const sig = arr(volDe(a), 2), pa = americaine('put', S, K, T, R_PD, sig, a.q), pe = blackScholes('put', S, K, T, R_PD, sig, a.q);
-      return { q: `Put AMÉRICAIN sur ${a.nom} (S = ${fmt(S)} ₽, K = ${K} ₽, ${T} an(s), vol ${fmt(sig * 100, 0)} %, r ${fmt(R_PD * 100, 1)} %). Le put européen vaut ${fmt(pe)} ₽. Et l'américain ?`, ...choix(r, fmt(pa) + ' ₽', [fmt(pe * 0.9) + ' ₽', fmt(Math.max(0, K - S)) + ' ₽', fmt(pe * 1.8 + 1) + ' ₽']), exp: `Arbre binomial : ${fmt(pa)} ₽ ≥ ${fmt(pe)} ₽ — le droit d'exercer plus tôt a toujours une valeur positive ou nulle.` };
+      return { q: `Put UNYS (exercice anticipé) sur ${a.nom} (S = ${fmt(S)} ₽, K = ${K} ₽, ${T} an(s), vol ${fmt(sig * 100, 0)} %, r ${fmt(R_PD * 100, 1)} %). Le put Kalos (à échéance) vaut ${fmt(pe)} ₽. Et celui d'Unys ?`, ...choix(r, fmt(pa) + ' ₽', [fmt(pe * 0.9) + ' ₽', fmt(Math.max(0, K - S)) + ' ₽', fmt(pe * 1.8 + 1) + ' ₽']), exp: `Arbre binomial : ${fmt(pa)} ₽ ≥ ${fmt(pe)} ₽ — le droit d'exercer plus tôt a toujours une valeur positive ou nulle.` };
     }
-    case 8: { // asiatique : concept
-      return { q: `Un call ASIATIQUE (sur la moyenne des cours) et un call européen ont les mêmes S, K, T, vol. Lequel est le moins cher ?`, ...choix(r, 'L\'asiatique : la moyenne bouge moins que le cours final', ['L\'européen : il n\'a qu\'une date d\'exercice', 'Ils valent pareil', 'Ça dépend du dividende uniquement']), exp: `La moyenne lisse les variations : moins de volatilité, donc une option moins chère.` };
+    case 8: { // option sur moyenne (modèle de Johto) : concept
+      return { q: `Un call JOHTO (sur la moyenne des cours) et un call Kalos (à échéance) ont les mêmes S, K, T, vol. Lequel est le moins cher ?`, ...choix(r, 'Le call Johto : la moyenne bouge moins que le cours final', ['Le call Kalos : il n\'a qu\'une date d\'exercice', 'Ils valent pareil', 'Ça dépend du dividende uniquement']), exp: `La moyenne lisse les variations : moins de volatilité, donc une option moins chère.` };
     }
     default: { // corrélations et nouvelles
       const L = [
         ['La Sylphe annonce une pénurie de Poké Balls. Que fait probablement l\'action Devon, son concurrent qui vend aussi des Balls ?', 'Elle baisse un peu, ou monte si Devon récupère les clients : c\'est un concurrent (anticorrélé à court terme)', ['Exactement comme la Sylphe', 'Rien : aucun lien', 'Elle est suspendue de cotation'], 'Deux concurrents réagissent souvent en sens inverse à une nouvelle propre à l\'un d\'eux.'],
         ['Une tempête bloque les ferries. Quel actif réagit le MOINS ?', 'Lustrelle Cosmétiques', ['Ferry de l\'Est', 'Chantiers d\'Écaille', 'Huile de Magma'], 'Les cosmétiques n\'ont presque aucun lien avec la mer : actif décorrélé.'],
-        ['Le Pokéeuro monte face au Pokédollar. Un dresseur de Kalos qui achète des actions de Métropole les trouve…', 'Moins chères dans sa monnaie', ['Plus chères dans sa monnaie', 'Au même prix', 'Interdites'], 'Avec un € plus fort, il faut moins d\'€ pour le même nombre de ₽.'],
+        ['L\'Écu de Kalos (₭) monte face au Pokédollar. Un dresseur de Kalos qui achète des actions de Métropole les trouve…', 'Moins chères dans sa monnaie', ['Plus chères dans sa monnaie', 'Au même prix', 'Interdites'], 'Avec un ₭ plus fort, il faut moins de ₭ pour le même nombre de ₽.'],
         ['Tu détiens un call sur la Sylphe. Si le cours monte, la valeur du call…', 'Monte (delta positif)', ['Baisse (delta négatif)', 'Ne bouge pas', 'Monte seulement si c\'est un put'], 'Le delta d\'un call est entre 0 et 1 : il monte avec le sous-jacent.'],
       ];
       const [q, b, f, exp] = L[Math.floor(r() * L.length)];
@@ -235,7 +235,8 @@ export function prixDe(m, id) { return id === INDICE.id ? indice(m) / 10 : m.pri
 export function ordre(m, id, qte, argent) {
   const p = prixDe(m, id), pos = m.positions[id] || { qte: 0, pru: 0 };
   if (qte < 0 && -qte > pos.qte) return { ok: false, err: 'Tu n\'as pas autant de titres à vendre.' };
-  const brut = p * qte, frais = Math.abs(brut) * 0.002, total = Math.round(brut + frais);
+  const brut = p * qte, frais = Math.abs(brut) * 0.002;
+  const total = qte > 0 ? Math.ceil(brut + frais) : (-Math.floor(Math.abs(brut) - frais) || 0);
   if (total > argent) return { ok: false, err: 'Pas assez de Pokédollars.' };
   if (qte > 0) pos.pru = (pos.pru * pos.qte + p * qte) / (pos.qte + qte);
   pos.qte += qte; if (pos.qte === 0) delete m.positions[id]; else m.positions[id] = pos;

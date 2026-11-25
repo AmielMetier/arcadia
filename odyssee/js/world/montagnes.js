@@ -92,10 +92,10 @@ export function montGivre({ W, trainerNpc, ENC }) {
   for (const [x0, y0, x1, y1] of [[391, 36, 396, 37], [406, 32, 411, 33], [413, 23, 418, 24]]) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (W.get(x, y) === T.SNOW) W.set(x, y, T.TALL);
   W.zone(380, 21, 436, 41, { name: 'Mont Givré', music: 'snow', theme: 'snow', roche: 'mer', enc: ENC.givre, prio: 1 });
   W.sign(390, 43, 'MONT GIVRÉ\nSentier du belvédère. Passerelles glissantes : tenez la corde !');
-  trainerNpc(W, 394, 39, 'down', 'Randonneuse', 'Solène', [[220, 38], [225, 39]], { id: 'givre:solene', sight: 2, intro: 'Le Mont Givré ! Il paraît que du belvédère, on voit jusqu\'aux îles du Sud.', lose: 'Je vais finir la montée tout doucement...' });
+  trainerNpc(W, 394, 39, 'down', 'Randonneuse', 'Solange', [[220, 38], [225, 39]], { id: 'givre:solene', sight: 2, intro: 'Le Mont Givré ! Il paraît que du belvédère, on voit jusqu\'aux îles du Sud.', lose: 'Je vais finir la montée tout doucement...' });
   trainerNpc(W, 400, 35, 'down', 'Montagnard', 'Armand', [[75, 39], [361, 39], [95, 40]], { id: 'givre:armand', sight: 2, intro: 'Ici, la roche est gelée jusqu\'au cœur. Mes Pokémon aussi sont durs comme la pierre !', lose: 'Fondu... comme neige au soleil.' });
   trainerNpc(W, 416, 31, 'down', 'Montagnard', 'Hugues', [[221, 40], [208, 41]], { id: 'givre:hugues', sight: 2, intro: 'Tu as passé la passerelle ? Moi, j\'ai fermé les yeux !', lose: 'La corniche du haut est encore plus étroite. Courage !' });
-  trainerNpc(W, 423, 29, 'up', 'Randonneuse', 'Iris', [[124, 41], [362, 41]], { id: 'givre:iris', sight: 2, intro: 'Le vent du ravin hurle ici... Tu l\'entends ?', lose: 'Le sommet est juste de l\'autre côté du gouffre.' });
+  trainerNpc(W, 423, 29, 'up', 'Randonneuse', 'Irène', [[124, 41], [362, 41]], { id: 'givre:iris', sight: 2, intro: 'Le vent du ravin hurle ici... Tu l\'entends ?', lose: 'Le sommet est juste de l\'autre côté du gouffre.' });
   trainerNpc(W, 399, 23, 'right', 'Montagnard', 'Edgar', [[76, 42], [460, 42]], { id: 'givre:edgar', sight: 3, intro: 'Personne ne passe sur le plateau sans m\'avoir battu !', lose: 'Va donc voir la mer depuis le belvédère.' });
   W.item(384, 40, 'max-repel', 1, 'givre:mont-repousse');
   W.item(386, 35, 'never-melt-ice', 1, 'givre:mont-glace-eternelle');

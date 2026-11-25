@@ -31,7 +31,7 @@ export const GENERAL = [
   ['Il y a des objets cachés partout : au bout des impasses, derrière les maisons, au fond des clairières.'],
   ['Les routes sont longues, maintenant. Prends des Potions, et un peu de patience.'],
   ['Quand une route se divise, le chemin le plus long cache souvent quelque chose.'],
-  ['Mon chat dort sur le muret tous les après-midi. Ne le réveille pas.'],
+  ['Mon Chaglam dort sur le muret tous les après-midi. Ne le réveille pas.'],
   ['Le facteur passe deux fois par jour. Sauf quand il pleut. Ou quand il fait beau.'],
 ];
 
@@ -39,15 +39,15 @@ export const VILLES = {
   aube: [
     ['Bourg-Aube est petit, mais tout le monde se connaît.', 'Ici, on ne ferme jamais sa porte à clé.'],
     ['Le moulin tourne depuis cent ans. Il moud le grain de tout le bourg.'],
-    ['Les vaches Écrémeuh du pré donnent le meilleur lait de la région.'],
+    ['Les Écrémeuh du pré donnent le meilleur lait de la région.'],
     ['Au nord, la route 1 mène à Sylvebourg. Les dresseurs débutants y font leurs premiers combats.'],
     ['Le professeur Saule travaille tard. On voit souvent la lumière du labo à minuit.'],
   ],
   sylve: [
     ['Sylvebourg a poussé au milieu des arbres. Les plus vieux chênes sont plus âgés que la ville.'],
     ['Le soir, les Lumivole dansent au-dessus de l\'étang du parc.'],
-    ['Les créatures Insecte craignent le Feu, le Vol et la Roche.', 'Hector le sait mieux que personne.'],
-    ['Au marché, on trouve du miel de Apitrini. Il colle aux doigts toute la journée.'],
+    ['Les Pokémon Insecte craignent le Feu, le Vol et la Roche.', 'Hector le sait mieux que personne.'],
+    ['Au marché, on trouve du miel d\'Apitrini. Il colle aux doigts toute la journée.'],
     ['Le Bois Murmure, au nord, est si dense qu\'on s\'y perd en plein midi.'],
     ['Les enfants d\'ici chassent les Chenipan avec des épuisettes. Mais ils les relâchent toujours.'],
   ],
@@ -62,13 +62,13 @@ export const VILLES = {
     ['Port-Azur sent le sel et le poisson grillé.'],
     ['Les bateaux de pêche rentrent à l\'aube. Les Goélise les suivent en criant.'],
     ['Le phare guide les marins depuis cent cinquante ans.'],
-    ['Les créatures Eau craignent l\'Électrik et la Plante.', 'Marine, à l\'Arène, adore les vagues.'],
+    ['Les Pokémon Eau craignent l\'Électrik et la Plante.', 'Marine, à l\'Arène, adore les vagues.'],
     ['Sur les quais, on raccommode les filets en chantant. C\'est une tradition.'],
   ],
   volta: [
     ['Voltacité ne s\'éteint jamais. Même à trois heures du matin, les néons brillent.'],
     ['La Centrale alimente toute la région. Les Magnéti s\'y collent par grappes.'],
-    ['Les créatures Sol ne craignent pas du tout l\'électricité.'],
+    ['Les Pokémon Sol ne craignent pas du tout l\'électricité.'],
     ['Les tramways passaient ici autrefois. On a gardé les rails pour faire joli.'],
     ['Au marché de nuit, on vend des piles, des câbles et des brochettes. Tout ce qu\'il faut !'],
   ],
@@ -76,20 +76,20 @@ export const VILLES = {
     ['Floralia compte plus de fleurs que d\'habitants. Mille fois plus.'],
     ['Au printemps, la ville entière sent le miel.'],
     ['Les serres du jardin botanique gardent des fleurs de toute la région.'],
-    ['Les créatures Plante craignent le Feu, la Glace, le Vol, le Poison et l\'Insecte.', 'Flora a pourtant de la ressource.'],
+    ['Les Pokémon Plante craignent le Feu, la Glace, le Vol, le Poison et l\'Insecte.', 'Flora a pourtant de la ressource.'],
     ['Les buissons épineux à l\'est ne se laissent pas traverser. Il faut une capacité spéciale.'],
   ],
   mirage: [
     ['À Mirage, on dit que les rêves se souviennent de nous.'],
     ['La place des Pierres Levées est plus vieille que la ville. Personne ne sait qui les a dressées.'],
-    ['Les attaques Psy ne touchent pas les créatures Ténèbres.'],
+    ['Les attaques Psy ne touchent pas les Pokémon Ténèbres.'],
     ['Ma voisine devine toujours ce que je vais dire. C\'est fatigant, à la longue.'],
     ['Au sud, la route 7 descend vers le Cap Mirage et la mer.'],
   ],
   granit: [
     ['Sur Granit, on vit de la pêche et de la pierre.'],
     ['Les Rocrabe se cachent dans les rochers du port. Gare aux orteils.'],
-    ['Les créatures Roche craignent l\'Eau, la Plante, le Combat, le Sol et l\'Acier.'],
+    ['Les Pokémon Roche craignent l\'Eau, la Plante, le Combat, le Sol et l\'Acier.'],
   ],
   cendre: [
     ['Les sources chaudes de Cendrelune soignent les rhumatismes. Et les Ponyta adorent y tremper les pattes.'],
@@ -115,7 +115,7 @@ export const VILLES = {
     ['Le métro ? On l\'attend depuis vingt ans.'],
     ['Au quartier des affaires, personne ne regarde le ciel.'],
     ['Le parc central est le seul endroit calme de la ville. Le matin, il est plein de joggeurs.'],
-    ['Les créatures Normal ne craignent que le Combat. Mais Margot a plus d\'un tour dans son sac.'],
+    ['Les Pokémon Normal ne craignent que le Combat. Mais Margot a plus d\'un tour dans son sac.'],
   ],
   lisiere: [
     ['À Port-Lisière, le vent souffle tellement que les éoliennes ne s\'arrêtent jamais.'],
@@ -139,7 +139,7 @@ export const VILLES = {
   ],
   rose: [
     ['Rosebrume a la plus grande roseraie du monde. Enfin, c\'est ce qu\'on dit.'],
-    ['Les créatures Fée craignent le Poison et l\'Acier.'],
+    ['Les Pokémon Fée craignent le Poison et l\'Acier.'],
     ['Les Fées dansent dans la brume du matin, autour du kiosque.'],
   ],
   ombre: [
@@ -156,7 +156,7 @@ export const VILLES = {
 export const ETALS = [
   ['Baies fraîches ! Ceriz, Pêcha, Oran ! Cueillies ce matin !'],
   ['Du miel de la forêt, du vrai ! Goûtez, goûtez !'],
-  ['Poissons du port, pêchés à l\'aube !'],
+  ['Écailles et perles du port, ramassées à l\'aube !'],
   ['Des fleurs pour la maison ? Elles tiennent une semaine. Promis.'],
   ['Pain chaud, croissants ! Le Ronflex du boulanger en a déjà mangé la moitié.'],
   ['Des fromages de la ferme ! Celui-ci a un caractère… comme un Tauros.'],
@@ -181,8 +181,23 @@ export const ROUTES = {
   marais: [['Les passerelles craquent, mais elles tiennent. Enfin, j\'espère.']],
 };
 
-/** prénoms des dresseurs ajoutés le long des routes */
-export const PRENOMS = ['Alix', 'Anouk', 'Arthur', 'Bastien', 'Blanche', 'Camille', 'Cyril', 'Daphné', 'Damien', 'Élio', 'Elsa', 'Émile', 'Fanny', 'Félicien', 'Gabin', 'Gaëlle', 'Hélène', 'Henri',
-  'Ilona', 'Ivan', 'Jasmine', 'Joachim', 'Juliette', 'Kévin', 'Laure', 'Léon', 'Lina', 'Lucien', 'Maud', 'Marius', 'Mathis', 'Nadia', 'Noam', 'Octave', 'Olga', 'Pablo', 'Pauline', 'Quentin',
-  'Rémi', 'Rosalie', 'Sacha', 'Salomé', 'Simon', 'Tess', 'Tristan', 'Ulysse', 'Valérie', 'Victor', 'Wendy', 'Xavier', 'Yasmine', 'Yvan', 'Zélie', 'Zoé', 'Aubin', 'Bérénice', 'Corentin',
-  'Delphine', 'Ernest', 'Flavie', 'Gustave', 'Hortense', 'Isidore', 'Jeanne', 'Lazare', 'Margaux', 'Nestor', 'Ophélie', 'Prosper', 'Romy', 'Sixte', 'Thaïs', 'Urbain', 'Violette'];
+/** prénoms des dresseurs ajoutés le long des routes (accordés au genre de la classe, sans doublon avec les dresseurs fixes) */
+export const PRENOMS_M = [
+  'Adrien', 'Alain', 'Alexis', 'Antoine', 'Arnaud', 'Arthur', 'Aubin', 'Augustin', 'Baptiste', 'Benjamin',
+  'Cédric', 'Charles', 'Christian', 'Christophe', 'Clément', 'Cyril', 'Daniel', 'David', 'Denis', 'Didier',
+  'Dorian', 'Élio', 'Émile', 'Emmanuel', 'Éric', 'Étienne', 'Fabien', 'Fabrice', 'Florian', 'François',
+  'Frédéric', 'Gabin', 'Gabriel', 'Gautier', 'Gérard', 'Grégoire', 'Guillaume', 'Hugo', 'Ivan', 'Jacques',
+  'Jérémy', 'Jérôme', 'Joachim', 'Jonathan', 'Jules', 'Julien', 'Kévin', 'Laurent', 'Louis', 'Luc',
+  'Lucien', 'Marc', 'Martial', 'Martin', 'Mathieu', 'Mathis', 'Maxence', 'Maxime', 'Mickaël', 'Nestor',
+];
+export const PRENOMS_F = [
+  'Adèle', 'Amandine', 'Amélie', 'Anaïs', 'Angèle', 'Anouk', 'Audrey', 'Aurélie', 'Béatrice', 'Blanche',
+  'Carole', 'Caroline', 'Catherine', 'Cécile', 'Céline', 'Chantal', 'Charlotte', 'Claire', 'Clémence', 'Colette',
+  'Coline', 'Constance', 'Coralie', 'Corinne', 'Daphné', 'Delphine', 'Diane', 'Dorothée', 'Édith', 'Éléonore',
+  'Élodie', 'Éloïse', 'Elsa', 'Émilie', 'Emma', 'Eva', 'Fanny', 'Flavie', 'Florence', 'Gaëlle',
+  'Gisèle', 'Hélène', 'Hortense', 'Huguette', 'Ilona', 'Isabelle', 'Jasmine', 'Jeanne', 'Jocelyne', 'Joséphine',
+  'Judith', 'Julia', 'Julie', 'Juliette', 'Justine', 'Laetitia', 'Laura', 'Laure', 'Laurence', 'Manon',
+];
+export const PRENOMS = [...PRENOMS_M, ...PRENOMS_F];
+const CLASSE_FEM = /^(Fillette|Randonneuse|Topdresseuse|Dame|Championne|Nageuse|Jardinière|Sœur)/i;
+export const prenomsPour = (cls) => (CLASSE_FEM.test(cls || '') ? PRENOMS_F : PRENOMS_M);

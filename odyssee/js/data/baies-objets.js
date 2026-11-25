@@ -21,12 +21,19 @@ export const BAIES_STAT = [
   ['apicot-berry', 'Baie Abriko', 5], ['salac-berry', 'Baie Sailak', 6],
 ];
 const TY = { normal: 'Normal', fighting: 'Combat', flying: 'Vol', poison: 'Poison', ground: 'Sol', rock: 'Roche', bug: 'Insecte', ghost: 'Spectre', steel: 'Acier', fire: 'Feu', water: 'Eau', grass: 'Plante', electric: 'Électrik', psychic: 'Psy', ice: 'Glace', dragon: 'Dragon', dark: 'Ténèbres', fairy: 'Fée' };
-const ALT = { par: 'la paralysie', slp: 'le sommeil', psn: 'l\'empoisonnement', brn: 'la brûlure', frz: 'le gel', conf: 'la confusion' };
+const ALT = {
+  par: ['la paralysie', 'elle'],
+  slp: ['le sommeil', 'il'],
+  psn: ['l\'empoisonnement', 'il'],
+  brn: ['la brûlure', 'elle'],
+  frz: ['le gel', 'il'],
+  conf: ['la confusion', 'elle'],
+};
 const STAT = { 2: 'l\'Attaque', 3: 'la Défense', 4: 'l\'Attaque Spéciale', 5: 'la Défense Spéciale', 6: 'la Vitesse' };
 
 /** les objets à ajouter à core/items.js */
 export const NOUVEAUX_OBJETS = {
-  ...Object.fromEntries(BAIES_SOIN.map(([k, n, a]) => [k, { pocket: 'baies', price: 200, hold: k, cure: a === 'conf' ? undefined : a === 'psn' ? ['psn', 'tox'] : [a], name: n, desc: `Objet à tenir. Guérit ${ALT[a]} dès qu'elle survient.` }])),
+  ...Object.fromEntries(BAIES_SOIN.map(([k, n, a]) => [k, { pocket: 'baies', price: 200, hold: k, cure: a === 'conf' ? undefined : a === 'psn' ? ['psn', 'tox'] : [a], name: n, desc: `Objet à tenir. Guérit ${ALT[a][0]} dès qu'${ALT[a][1]} survient.` }])),
   ...Object.fromEntries(BAIES_RESIST.map(([k, n, t]) => [k, { pocket: 'baies', price: 1000, hold: k, name: n, desc: t === 'normal'
     ? 'Objet à tenir. Divise par deux les dégâts d\'une attaque Normal, une fois.'
     : `Objet à tenir. Divise par deux les dégâts d'une attaque ${TY[t]} super efficace, une fois.` }])),

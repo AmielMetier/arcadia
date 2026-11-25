@@ -2,6 +2,8 @@
 // Format : « ODY1. » + base64url( deflate( JSON ) ) + « . » + empreinte (8 caractères hexadécimaux).
 // L'empreinte détecte un code tronqué ou mal recopié ; la vérification de structure refuse un code d'autre chose.
 
+import { SPECIES } from '../data/species.js';
+
 const PREFIX = 'ODY1.';
 
 function fnv(str) {
@@ -34,9 +36,12 @@ export function checkState(s) {
   if (s.v !== 2) return 'Ce code vient d\'une autre version du jeu.';
   if (typeof s.name !== 'string' || !s.name) return 'Ce code ne contient pas de partie.';
   if (!Array.isArray(s.party) || !Array.isArray(s.box) || !Array.isArray(s.badges) || (s.badges.length !== 8 && s.badges.length !== 15)) return 'Ce code ne contient pas de partie.';
+  if (!s.bag || typeof s.bag !== 'object' || Array.isArray(s.bag)) return 'Ce code ne contient pas de partie.';
+  if (!s.flags || typeof s.flags !== 'object' || Array.isArray(s.flags)) return 'Ce code ne contient pas de partie.';
+  if (!s.dex || !Array.isArray(s.dex.seen) || !Array.isArray(s.dex.caught)) return 'Ce code ne contient pas de partie.';
   if (typeof s.map !== 'string' || !Number.isFinite(s.x) || !Number.isFinite(s.y)) return 'Ce code ne contient pas de partie.';
   for (const m of s.party.concat(s.box)) {
-    if (!m || !Number.isFinite(m.sp) || !Number.isFinite(m.lvl) || !Array.isArray(m.moves) || !Array.isArray(m.stats)) return 'Un Pokémon de ce code est illisible.';
+    if (!m || !Number.isFinite(m.sp) || !SPECIES[m.sp] || !Number.isFinite(m.lvl) || m.lvl < 1 || m.lvl > 100 || !Array.isArray(m.moves) || !Array.isArray(m.stats)) return 'Un Pokémon de ce code est illisible.';
   }
   return null;
 }

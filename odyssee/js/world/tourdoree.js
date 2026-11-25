@@ -29,14 +29,14 @@ export function tourDoree({ legends, trainerNpc }, x, y) {
     // identifiants des dresseurs : ceux d'avant le déménagement (drapeaux T: des parties en cours)
     const sage = (m, x, y, dir, name, team, intro, n) => trainerNpc(m, x, y, dir, 'Sage', name, team, { id: m.id + ':t' + n, sight: 3, intro, after: 'Le Grand Sage t\'attend plus haut.' });
     sage(f1, 4, 7, 'right', 'Ernest', [[1039, 30], [163, 30]], 'La tour accueille ceux qui viennent en paix. Prouve-le !', 47);
-    sage(f1, 8, 5, 'left', 'Gaspard', [[1023, 31], [1015, 30]], 'Cette tour dorée veille sur la forêt depuis mille ans.', 48);
+    sage(f1, 8, 5, 'left', 'Théophile', [[1023, 31], [1015, 30]], 'Cette tour dorée veille sur la forêt depuis mille ans.', 48);
     sage(f2, 5, 5, 'right', 'Hilaire', [[1030, 32], [1040, 31]], 'Ho-Oh ne se montre qu\'aux cœurs sincères.', 49);
     sage(f2, 8, 8, 'left', 'Isidore', [[164, 32], [1016, 32]], 'Plus haut, l\'air devient sacré.', 50);
-    trainerNpc(f3, 6, 4, 'down', 'Grand Sage', 'Hoël', [[1040, 34], [1030, 34], [1023, 35], [1016, 36]], { id: f3.id + ':t51', sight: 0, ai: 'smart', onWin: 'grandSage', intro: 'Tu viens chercher la Plume Arc-en-ciel ? Montre-moi le lien qui t\'unit à tes créatures !', lose: 'Ce lien... il est réel.', after: 'Va sur le toit. Ho-Oh t\'attend peut-être.' });
+    trainerNpc(f3, 6, 4, 'down', 'Grand Sage', 'Hoël', [[1040, 34], [1030, 34], [1023, 35], [1016, 36]], { id: f3.id + ':t51', sight: 0, ai: 'smart', onWin: 'grandSage', intro: 'Tu viens chercher la Plume Arc-en-ciel ? Montre-moi le lien qui t\'unit à tes Pokémon !', lose: 'Ce lien... il est réel.', after: 'Va sur le toit. Ho-Oh t\'attend peut-être.' });
     const gate = { badges: TOUR_DOREE_BADGES, flag: 'plume', tiles: [[10, 2], [11, 3]] };
     const n = f3.npc({ id: id + ':novice', x: 10, y: 3, dir: 'down', sprite: 'medium', gate, text: ['Le toit est réservé à qui porte la Plume Arc-en-ciel.', 'Le Grand Sage Hoël veille au sommet sur la plume et sur le Sifflet Céleste sacré.'] });
     f3.gates.push({ npc: n.id, ...gate });
-    legends.push({ id: 'hooh', sp: 250, lvl: 40, map: roof.id, x: 6, y: 6, cond: 'plume', intro: ['La Plume Arc-en-ciel se met à briller...', 'Un arc-en-ciel déchire les nuages. Ho-Oh se pose sur la Tour Dorée !'] });
+    legends.push({ id: 'hooh', sp: 250, lvl: 55, map: roof.id, x: 6, y: 6, cond: 'plume', intro: ['La Plume Arc-en-ciel se met à briller...', 'Un arc-en-ciel déchire les nuages. Ho-Oh se pose sur la Tour Dorée !'] });
     return [f2, f3, roof];
   };
   // toits dorés (le modèle `pagode` de batiments3d.js), quel que soit le toit de la ville

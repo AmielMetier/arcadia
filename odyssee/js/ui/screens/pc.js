@@ -49,7 +49,7 @@ function renderPCPokemonPreview(m) {
   if (!m) {
     return `<div class="pc-preview-empty">
       <div class="pc-empty-icon">?</div>
-      <div class="pc-empty-text">Sélectionnez une créature</div>
+      <div class="pc-empty-text">Sélectionne un Pokémon</div>
     </div>`;
   }
   const S = SPECIES[m.sp] || {};
@@ -285,10 +285,10 @@ export async function pcScreen(game) {
         } else {
           if (st.party.length <= 1) {
             ui.sound.sfx('bump');
-            await ui.say('C\'est ta dernière créature en équipe !');
+            await ui.say('C\'est ton dernier Pokémon en équipe !');
           } else if (st.party.filter((p, j) => p !== m && p.hp > 0).length === 0) {
             ui.sound.sfx('bump');
-            await ui.say('Il te faut au moins une créature en forme dans ton équipe !');
+            await ui.say('Il te faut au moins un Pokémon en forme dans ton équipe !');
           } else {
             // Trouver premier slot libre
             const occSlots = new Set(st.box.filter((b) => b.box === curBox).map((b) => b.slot));
@@ -311,7 +311,7 @@ export async function pcScreen(game) {
         if (m.item) {
           const it = takeHeldItem(m, st.bag);
           ui.sound.sfx('item');
-          await ui.say(`Vous retirez ${itemName(it)} à ${monName(m)}.`);
+          await ui.say(`Tu retires ${itemName(it)} à ${monName(m)}.`);
         } else {
           // Donner un objet
           const heldEligible = Object.keys(st.bag).filter((k) => st.bag[k] > 0 && ITEMS[k]?.held);
@@ -340,7 +340,7 @@ export async function pcScreen(game) {
         // Relâcher
         if (area === 'party' && st.party.length <= 1) {
           ui.sound.sfx('bump');
-          await ui.say('Impossible de relâcher ta seule créature en équipe !');
+          await ui.say('Impossible de relâcher ton seul Pokémon en équipe !');
         } else {
           const sure = await ui.yesNo(`Es-tu vraiment sûr de vouloir relâcher ${monName(m)} dans la nature ?\nCette action est irréversible !`);
           if (sure) {
@@ -648,7 +648,11 @@ function openMoveRelearnerUI(game, m, moveIds, scales) {
       s.querySelectorAll('.relearn-row').forEach((row) => {
         const idx = +row.dataset.idx;
         row.addEventListener('mouseenter', () => {
-          if (sel !== idx) { sel = idx; ui.sound.sfx('blip'); draw(); }
+          if (sel !== idx) {
+            sel = idx;
+            ui.sound.sfx('blip');
+            s.querySelectorAll('.relearn-row').forEach((r) => r.classList.toggle('sel', +r.dataset.idx === sel));
+          }
         });
         row.addEventListener('click', () => {
           sel = idx;
@@ -777,7 +781,7 @@ export async function naturePcScreen(game) {
   ui.sound.sfx('pc');
   await ui.say([`${st.name} allume le PC des Natures.`, 'Ce PC règle le caractère d\'un Pokémon : une stat monte de 10 %, une autre baisse de 10 %.'], { keep: true });
   for (;;) {
-    if (!st.party.length) { await ui.say('Tu n\'as encore aucune créature.', { keep: true }); break; }
+    if (!st.party.length) { await ui.say('Tu n\'as encore aucun Pokémon.', { keep: true }); break; }
     ui.closeDialog();
     const k = await partyScreen(game, { mode: 'pick', prompt: 'Changer la nature de quel Pokémon ?' });
     if (k < 0) break;

@@ -14,7 +14,7 @@ export const ITEMS = {
     key: true,
     icon: 'running-shoes',
     name: 'Chaussures de Course',
-    desc: 'Des baskets ultra-légères offertes par Maman. Maintiens Maj ou appuie sur R (ou sur le bouton du Pokégear) pour courir à vive allure.'
+    desc: 'Des baskets ultra-légères offertes par Maman. Maintiens Maj ou appuie sur R (ou sur le bouton du Pokématos) pour courir à vive allure.'
   },
   'poke-ball': { pocket: 'balls', price: 200, ball: 1, desc: 'Un objet semblable à une capsule, qui capture les Pokémon sauvages.' },
   'great-ball': { pocket: 'balls', price: 600, ball: 1.5, desc: 'Une Ball de bonne qualité, plus efficace que la Poké Ball.' },
@@ -25,6 +25,7 @@ export const ITEMS = {
   'max-potion': { pocket: 'soin', price: 2500, heal: 9999, desc: 'Restaure tous les PV d\'un Pokémon.' },
   'full-restore': { pocket: 'soin', price: 3000, heal: 9999, cure: 'all', desc: 'Restaure tous les PV et soigne les problèmes de statut.' },
   revive: { pocket: 'soin', price: 1500, revive: 0.5, desc: 'Ranime un Pokémon K.O. avec la moitié de ses PV.' },
+  'max-revive': { pocket: 'soin', price: 4000, revive: 1, name: 'Rappel Max', desc: 'Ranime un Pokémon K.O. et restaure tous ses PV.' },
   antidote: { pocket: 'soin', price: 100, cure: ['psn', 'tox'], desc: 'Soigne l\'empoisonnement.' },
   'paralyze-heal': { pocket: 'soin', price: 200, cure: ['par'], desc: 'Soigne la paralysie.' },
   awakening: { pocket: 'soin', price: 250, cure: ['slp'], desc: 'Réveille un Pokémon endormi.' },
@@ -34,6 +35,7 @@ export const ITEMS = {
   'oran-berry': { pocket: 'baies', price: 80, heal: 10, desc: 'Une Baie qui restaure 10 PV.' },
   ether: { pocket: 'soin', price: 1200, pp: 10, desc: 'Restaure 10 PP d\'une attaque.' },
   elixir: { pocket: 'soin', price: 3000, ppAll: 10, desc: 'Restaure 10 PP de toutes les attaques.' },
+  'max-elixir': { pocket: 'soin', price: 4500, ppAll: 99, name: 'Élixir Max', desc: 'Restaure tous les PP de toutes les attaques d\'un Pokémon.' },
   'escape-rope': { pocket: 'objets', price: 550, desc: 'Une longue corde pour sortir d\'une grotte en un instant.' },
   repel: { pocket: 'objets', price: 350, repel: 100, desc: 'Éloigne les Pokémon sauvages faibles pendant 100 pas.' },
   'super-repel': { pocket: 'objets', price: 500, repel: 200, desc: 'Éloigne les Pokémon sauvages faibles pendant 200 pas.' },
@@ -51,7 +53,7 @@ export const ITEMS = {
   'ice-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle est froide comme la glace.' },
   // objets rares : les capacités de terrain (on les utilise face à l'obstacle, avec F)
   'cs-coupe': { pocket: 'ct', price: 0, key: true, field: 'coupe', icon: 'notebook', name: 'CS01 Coupe', desc: 'Tranche les petits arbres qui barrent le chemin. Badge Pétale requis. Place-toi face à l\'arbre et appuie sur F.' },
-  'cs-surf': { pocket: 'ct', price: 0, key: true, field: 'surf', icon: 'notebook', name: 'CS02 Surf', desc: 'Traverse l\'eau sur le dos d\'une créature. Badge Mirage requis. Place-toi face à l\'eau et appuie sur F.' },
+  'cs-surf': { pocket: 'ct', price: 0, key: true, field: 'surf', icon: 'notebook', name: 'CS02 Surf', desc: 'Traverse l\'eau sur le dos d\'un Pokémon. Badge Mirage requis. Place-toi face à l\'eau et appuie sur F.' },
   'cs-eclate': { pocket: 'ct', price: 0, key: true, field: 'eclate', icon: 'notebook', name: 'CS03 Éclate-Roc', desc: 'Brise les rochers fissurés. Badge Granit requis. Place-toi face au rocher et appuie sur F.' },
   'cs-flash': { pocket: 'ct', price: 0, key: true, field: 'flash', icon: 'notebook', name: 'CS05 Flash', desc: 'Éclaire les grottes plongées dans le noir. Elle agit toute seule dès que tu entres dans une grotte sombre. Badge Élytre requis.' },
   'cs-force': { pocket: 'ct', price: 0, key: true, field: 'force', icon: 'notebook', name: 'CS06 Force', desc: 'Pousse les gros rochers. Place-toi face au rocher, appuie sur F, puis marche contre lui. Badge Volt requis.' },
@@ -59,16 +61,16 @@ export const ITEMS = {
   'prism-shard': { pocket: 'cles', price: 0, key: true, icon: 'shoal-shell', name: 'Éclat de Prisme', desc: 'Un fragment noir du Prisme de la Team Éclipse. Il est glacé au toucher.' },
   // CT01 : donnée par Hector avec le Badge Élytre ; ne s'use pas
   'ct-01': { pocket: 'ct', price: 0, key: true, ct: 10002, types: ['bug'], icon: 'notebook', name: 'CT01 Pollen Collant', desc: 'Insecte · Spéciale · Puissance 55 · Précision 95. Un nuage de pollen gluant englue la cible et baisse sa Vitesse. Pour les Pokémon Insecte et ceux qui connaissent des attaques Insecte. La CT ne s\'use pas.' },
-  'cs-vol': { pocket: 'ct', price: 0, key: true, field: 'vol', icon: 'notebook', name: 'CS04 Vol', desc: 'Ramène en un instant dans une ville déjà visitée (depuis le menu, ou en utilisant cet objet). Badge Braise requis.' },
+  'cs-vol': { pocket: 'ct', price: 0, key: true, field: 'vol', icon: 'notebook', name: 'CS04 Vol', desc: 'Ramène en un instant dans une ville déjà visitée (depuis le menu, ou en utilisant cet objet). Badge Mirage requis.' },
   // objets de quête des légendaires
-  'gs-ball': { pocket: 'cles', price: 0, key: true, icon: 'gift', name: 'Balle GS', desc: 'Une capsule dorée gravée des lettres G et S. Elle semble attirée par l\'autel du Bois Murmure.' },
+  'gs-ball': { pocket: 'cles', price: 0, key: true, icon: 'gift', name: 'GS Ball', desc: 'Une Poké Ball dorée gravée des lettres G et S. Elle semble attirée par l\'autel du Bois Murmure.' },
   'ferry-ticket': { pocket: 'cles', price: 0, key: true, icon: 'letter', name: 'Passe Marin', desc: 'Le passe du bateau de l\'Embarcadère de l\'Aube. Les îles s\'ouvrent au fil des badges.' },
   'plume-arc': { pocket: 'cles', price: 0, key: true, icon: 'rainbow-wing', name: 'Plume Arc-en-ciel', desc: 'Une plume qui brille de sept couleurs. Elle appelle Ho-Oh au sommet de la Tour Dorée.' },
   'plume-argent': { pocket: 'cles', price: 0, key: true, icon: 'silver-wing', name: 'Plume Argentée', desc: 'Une plume d\'argent, douce comme l\'écume. Elle apaise les courants de la Grotte des Tourbillons.' },
   // --- OBJETS DE COMBAT & OBJETS TENUS (Held Items) ---
   leftovers: { pocket: 'objets', price: 4000, hold: 'leftovers', name: 'Restes', desc: "Objet à tenir. Restaure 1/16 des PV max du porteur à la fin de chaque tour." },
   'sitrus-berry': { pocket: 'baies', price: 250, hold: 'sitrus-berry', name: 'Baie Sitrus', desc: "Objet à tenir. Restaure 25% des PV quand le porteur passe sous la moitié de ses PV." },
-  'lum-berry': { pocket: 'baies', price: 350, hold: 'lum-berry', name: 'Baie Prun', desc: "Objet à tenir. Guérit automatiquement toute altération de statut (brûlure, paralysie, sommeil...)." },
+  'lum-berry': { pocket: 'baies', price: 350, hold: 'lum-berry', name: 'Baie Prine', desc: "Objet à tenir. Guérit automatiquement toute altération de statut (brûlure, paralysie, sommeil...)." },
   'life-orb': { pocket: 'objets', price: 5000, hold: 'life-orb', name: 'Orbe Vie', desc: "Objet à tenir. Augmente la puissance des attaques de 30%, mais coûte 10% des PV max par coup réussi." },
   'choice-band': { pocket: 'objets', price: 6000, hold: 'choice-band', name: 'Bandeau Choix', desc: "Objet à tenir. Augmente l'Attaque de 50%, mais bloque sur la première capacité utilisée." },
   'choice-specs': { pocket: 'objets', price: 6000, hold: 'choice-specs', name: 'Lunettes Choix', desc: "Objet à tenir. Augmente l'Atq. Spé. de 50%, mais bloque sur la première capacité utilisée." },
@@ -95,7 +97,7 @@ export const ITEMS = {
   'silk-scarf': { pocket: 'objets', price: 2000, hold: 'silk-scarf', name: 'Mouchoir Soie', desc: "Objet à tenir. Augmente de 20% la puissance des attaques de type Normal." },
   'town-map': { pocket: 'cles', price: 0, key: true, name: 'Carte', desc: 'La carte de la région d\'Odyssée. On peut aussi l\'ouvrir avec la touche C.' },
   'master-ball': { pocket: 'balls', price: 0, ball: 255, name: 'Master Ball', desc: 'La meilleure Ball qui soit. Elle capture à coup sûr n\'importe quel Pokémon sauvage.' },
-  'insigne-brume': { pocket: 'cles', price: 0, key: true, name: 'Insigne Brume', desc: 'Un insigne prouvant votre aide contre les voleurs de Sylvebourg.' },
+  'insigne-brume': { pocket: 'cles', price: 0, key: true, name: 'Insigne Brume', desc: 'Un insigne prouvant ton aide contre les voleurs de Sylvebourg.' },
   'lettre-facteur': { pocket: 'cles', price: 0, key: true, name: 'Lettre du Facteur', desc: 'Une lettre à distribuer aux habitants.' },
   'plume-lune': { pocket: 'cles', price: 0, key: true, name: 'Plume Lune', desc: 'Une plume scintillante laissée par Cresselia.' },
   talisman: { pocket: 'cles', price: 0, key: true, name: 'Talisman', desc: 'Un talisman sacré du Temple Kagura.' },
@@ -108,7 +110,9 @@ export const ITEMS = {
   canne: { pocket: 'cles', price: 0, key: true, icon: 'good-rod', name: 'Canne à Pêche', desc: 'Une canne à pêche solide et maniable. Permet de ferrer des Pokémon aquatiques depuis la rive.' },
   'secateur-sylvestre': { pocket: 'cles', price: 0, key: true, field: 'coupe', icon: 'secateur-sylvestre', name: 'Sécateur Sylvestre', desc: 'Des cisailles horticoles ouvragées en acier ciselé et or. Elles tranchent net les arbustes épineux. Place-toi face au buisson et appuie sur F.' },
   'harnais-flottant': { pocket: 'cles', price: 0, key: true, field: 'surf', icon: 'harnais-flottant', name: 'Harnais Flottant', desc: 'Une selle nautique étanche avec flotteurs profilés. Permet de glisser sur l\'eau et la mer. Place-toi face à l\'eau et appuie sur F.' },
-  'sifflet-celeste': { pocket: 'cles', price: 0, key: true, field: 'vol', icon: 'sifflet-celeste', name: 'Sifflet Céleste', desc: 'Un sifflet ouvragé en argent et ruban saphir. Il appelle un grand oiseau pour voyager en un instant vers une ville déjà visitée (depuis le menu ou le sac).' },
+  'sifflet-celeste': { pocket: 'cles', price: 0, key: true, field: 'vol', icon: 'sifflet-celeste', name: 'Sifflet Céleste', desc: 'Un sifflet ouvragé en argent et ruban saphir. Il appelle un grand oiseau pour voyager en un instant vers une ville déjà visitée (depuis le menu ou le sac). Badge Mirage requis.' },
+  astrolabe: { pocket: 'cles', price: 0, key: true, icon: 'scope-lens', name: 'Astrolabe', desc: 'Un astrolabe gravé d\'étoiles. Permet d\'observer le ciel, repérer les failles spatio-temporelles et invoquer aurores boréales et pluies d\'étoiles. Un Fragment Météorique lui permet d\'ouvrir une faille.' },
+  'fragment-meteore': { pocket: 'objets', price: 4500, icon: 'star-piece', name: 'Fragment Météorique', desc: 'Un fragment d\'étoile filante encore tiède. Très prisé des astronomes et des boutiques, il permet à l\'Astrolabe d\'ouvrir une faille.' },
 };
 // baies et objets tenus de la 5.95 (data/baies-objets.js)
 Object.assign(ITEMS, NOUVEAUX_OBJETS);
@@ -153,16 +157,36 @@ export function itemPocketName(k) {
   return POCKET_NAMES[it.pocket] || 'Objets';
 }
 
+const PLURAL_SPECIAL = {
+  'Total Soin': 'Total Soin',
+  'Corde Sortie': 'Cordes Sortie',
+  'Eau Mystique': 'Eaux Mystiques',
+  'Écaille Cœur': 'Écailles Cœur',
+  'Anti-Para': 'Anti-Para',
+  'Anti-Brûle': 'Anti-Brûle',
+  'Antigel': 'Antigel',
+  'Potion Max': 'Potions Max',
+  'Rappel Max': 'Rappels Max',
+  'Élixir Max': 'Élixirs Max',
+  'Repousse Max': 'Repousses Max',
+  'Huile Max': 'Huiles Max',
+  'Éclat d\'Étoile': 'Éclats d\'Étoile',
+  'Fragment Météorique': 'Fragments Météoriques',
+};
+
 export function itemPluralName(k, qty = 1) {
   const name = itemName(k);
   if (qty <= 1) return name;
+  if (PLURAL_SPECIAL[name]) return `${qty} ${PLURAL_SPECIAL[name]}`;
   if (name.endsWith('s') || name.endsWith('x')) return `${qty} ${name}`;
   if (name.endsWith(' Ball')) return `${qty} ${name}s`;
   if (name.endsWith(' Potion')) return `${qty} ${name}s`;
   if (name === 'Potion') return `${qty} Potions`;
   if (name === 'Super Bonbon') return `${qty} Super Bonbons`;
-  if (name.startsWith('Pierre ')) return `${qty} ${name}s`;
-  if (name.startsWith('Baie ')) return `${qty} ${name}s`;
+  if (name.startsWith('Pierre ')) return `${qty} Pierres ${name.slice(7)}`;
+  if (name.startsWith('Baie ')) return `${qty} Baies ${name.slice(5)}`;
+  if (name.startsWith('Poudre ')) return `${qty} Poudres ${name.slice(7)}`;
+  if (name.startsWith('Graine ')) return `${qty} Graines ${name.slice(7)}`;
   return `${qty} ${name}s`;
 }
 

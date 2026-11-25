@@ -26,6 +26,11 @@ export function saveCodeScreen(ui, code, summary) {
     const close = closer(ui, s, () => pop, resolve);
     box.querySelector('[data-k=copy]').onclick = copy;
     box.querySelector('[data-k=close]').onclick = close;
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+      else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); copy(); }
+      e.stopPropagation();
+    });
     const pop = ui.input.push((k) => { if (k === 'b') close(); else if (k === 'a') copy(); });
     setTimeout(() => { ta.focus(); ta.select(); }, 30);
   });

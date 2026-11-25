@@ -274,6 +274,37 @@ ledge_s = BW.crop((112, 960, 144, 992))
 T['ledge'] = over(G0, ledge_s)
 T['ledgeE'] = over(G0, ledge_s.transpose(Image.ROTATE_90))
 T['ledgeW'] = over(G0, ledge_s.transpose(Image.ROTATE_270))
+# buttes d'herbe (plateaux du dehors) : le cadre « herbe sur roche » du kit (bord d'herbe tout autour, roche au pied et
+# sur les flancs), découpé sur la grille décalée d'une demi-case où il est dessiné. Pièces posées par world3d.js
+# (reliefDehors) sur les cases du bord du plateau (nbf_n, nbf_e…) et sur les cases de paroi (nbf_mur_*)
+FAL = lambda x, y: net(BW.crop((x, y, x + 32, y + 32)))   # sans les ombres grises à demi transparentes du kit (elles faisaient des lignes en biais)
+Y0 = 14844   # haut du cadre (la lèvre d'herbe) ; le plateau fait 3 × 3 cases de x = 32 à 128, la paroi en dessous
+for nom, (fx, fy) in {'nw': (32, 0), 'n': (64, 0), 'ne': (96, 0), 'w': (32, 1), 'e': (96, 1),
+                      'sw': (32, 2), 's': (64, 2), 'se': (96, 2), 'mur_w': (32, 3), 'mur_c': (64, 3), 'mur_e': (96, 3),
+                      # flancs : la roche qui descend sur la case d'à côté (plus basse), à l'ouest et à l'est du plateau
+                      'fl_w_t': (0, 0), 'fl_w_m': (0, 1), 'fl_w_b': (0, 2), 'fl_w_mur': (0, 3),
+                      'fl_e_t': (128, 0), 'fl_e_m': (128, 1), 'fl_e_b': (128, 2), 'fl_e_mur': (128, 3)}.items():
+    T['x_nbf_' + nom] = FAL(fx, Y0 + 32 * fy)
+# la roche du kit sous la paroi d'une butte posée au-dessus d'une montagne (les montagnes gardent la roche d'Odyssée)
+T['x_nbr'] = FAL(192, 14743)
+for nom in ('mur_w', 'mur_c', 'mur_e'):   # la paroi d'une butte posée au-dessus d'une montagne : sur fond de roche
+    T[f'x_nbf_{nom}_r'] = over(T['x_nbr'], T['x_nbf_' + nom])
+# grottes (world3d.js, paroiCell et sol des grottes) : la roche et le sol de grotte 4G de la démo technique de Pokémon SDK
+# (psdk_grotte.png, « 4g tileset_grotte ») ; plateau de roche 3 × 3 (x = 0 à 96, y = 32 à 128), sol uni en (192, 96).
+# Teintée selon la grotte : brune (terre, montagne), bleutée (grottes marines), rouge sombre (magma), givrée (glace).
+PSDK_GROTTE = L('psdk_grotte.png')
+
+
+def teinte(im, mul):
+    a = np.array(im).astype(float); a[..., :3] = np.clip(a[..., :3] * np.array(mul), 0, 255); return Image.fromarray(a.astype(np.uint8), 'RGBA')
+
+
+SOL_G = PSDK_GROTTE.crop((192, 96, 224, 128))
+for bio, mul in {'terre': (1.0, 0.96, 0.9), 'montagne': (1, 1, 1), 'mer': (0.85, 0.97, 1.12), 'magma': (1.05, 0.72, 0.62), 'glace': (1.08, 1.12, 1.25)}.items():
+    for R in range(3):
+        for C in range(3):
+            T[f'x_grp_{bio}_{R}{C}'] = teinte(PSDK_GROTTE.crop((32 * C, 32 + 32 * R, 32 * C + 32, 64 + 32 * R)), mul)
+    T[f'x_grs_{bio}_0'] = teinte(SOL_G, mul); T[f'x_grs_{bio}_1'] = flip(T[f'x_grs_{bio}_0'])
 CENTRE, BOUTIQUE = L('centre_interieur.png'), L('boutique_interieur.png')
 T['floor_pink'] = cell(1, 10, CENTRE); T['floor_blue'] = cell(0, 5, BOUTIQUE)
 
@@ -610,6 +641,42 @@ for nom, fichier in PERSOS.items():
             chars.alpha_composite(cadrer_pose(fr), ((d * 3 + k) * 64, y))
     faits += 1
 chars.save(os.path.join(OUT, 'chars.png'))
+
+# zones de la tenue du joueur (Options → apparence) sur les dresseurs de Noir 2 & Blanc 2 (rangées 0 et 1 de la planche) :
+# une image 768 × 128 où chaque pixel vaut sa zone (0 rien, 1 visière, 2 haut, 3 bas, 4 chaussures, 5 sac / bandoulière),
+# lue par render/tenue.js (setMasques) à la place de la détection automatique faite pour le dresseur de base
+import colorsys
+
+
+def _zone_tenue(genre, y, h, s, v):
+    if genre == 'm':   # Ludvic : visière rouge, veste bleue, bandoulière blanche, short gris, baskets rouges
+        rouge = (h < 0.085 or h > 0.95) and s >= 0.5
+        if rouge and v >= 0.4 and y < 44: return 1
+        if rouge and v >= 0.3 and y >= 53: return 4
+        if s < 0.22 and v > 0.74 and 38 <= y <= 56: return 5
+        if 0.55 <= h <= 0.72 and s >= 0.3 and v >= 0.2 and 38 <= y <= 56: return 2
+        if s <= 0.16 and 0.5 <= v <= 0.74 and 46 <= y <= 60: return 3
+        return 0
+    # Ludvina : visière blanche et rose, haut blanc, short jaune, sac rose, bottines lilas
+    rose = (h >= 0.88 or h < 0.015) and s >= 0.25
+    clair = s < 0.2 and v > 0.7
+    if 16 <= y < 37 and ((rose and v >= 0.4) or clair or (0.45 <= h <= 0.62 and s < 0.25 and v > 0.7)): return 1
+    if rose and s >= 0.35 and v >= 0.35 and 37 <= y <= 57: return 5
+    if 0.09 <= h <= 0.18 and s >= 0.35 and v >= 0.6 and y >= 44: return 3
+    if clair and 37 <= y <= 54: return 2
+    if 0.58 <= h <= 0.78 and 0.12 <= s <= 0.45 and v >= 0.5 and y >= 53: return 4
+    return 0
+
+
+tenue = Image.new('L', (chars.width, 128), 0); tq = tenue.load(); cp = chars.load()
+for g, row in (('m', 0), ('f', 1)):
+    for yy in range(64):
+        for xx in range(chars.width):
+            r, gg, b, a = cp[xx, row * 64 + yy]
+            if a < 128: continue
+            h, sat, val = colorsys.rgb_to_hsv(r / 255, gg / 255, b / 255)
+            tq[xx, row * 64 + yy] = _zone_tenue(g, yy, h, sat, val)
+tenue.save(os.path.join(OUT, 'tenue.png'))
 
 from noirblanc_masterpiece import appliquer_masterpiece
 appliquer_masterpiece(ROOT, OUT, COLS, noms, D, bat_dims)

@@ -10,9 +10,10 @@ import { isGrassEnc } from '../world/tiles.js';
 import { partyScreen, cardScreen, trainerCard, TYPE_FR } from '../ui/screens.js';
 import { BADGES } from '../world/region.js';
 import { el, esc, wait } from '../ui/ui.js';
+import { warnDev } from '../core/safe.js';
 import { tenueCode, tenueDecode, tenueValide, tenueOrigine, composer } from '../render/tenue.js';
 import { onDojoInvite } from '../dojo-mamadou.js';
-import { lancerRaidCoop, onRaidInvite, lancerMulti4p, onMulti4pInvite, lancerTournoiSalon, onTournoiInvite } from '../multi-events.js';
+import { onRaidInvite, lancerMulti4p, onMulti4pInvite, lancerTournoiSalon, onTournoiInvite } from '../multi-events.js';
 import { pokerTableMulti, onPokerInvite } from '../ui/casino/poker.js';
 import { visiterDomaineAmi } from '../ui/domaine.js';
 
@@ -47,7 +48,7 @@ export function installSocial(game) {
     b.el.classList.remove('fade');
     b.el.style.display = '';
     b.until = performance.now() + 4500;
-    try { (game.sound || game.ui?.sound)?.sfx?.('blip'); } catch (e) {}
+    try { (game.sound || game.ui?.sound)?.sfx?.('blip'); } catch (e) { warnDev('audio', e); }
   };
 
   link.me = () => {
@@ -207,7 +208,6 @@ export async function talkToPeer(game, peer, directAction = null) {
     return;
   }
   if (peer.busy) { await ui.say(`${peer.name} est occupé${peer.gender === 'f' ? 'e' : ''} pour le moment.`); return; }
-  if (directAction === 'raid') return lancerRaidCoop(game, peer);
   if (directAction === 'domaine') return visiterDomaineAmi(game, peer);
 
   let action = directAction;
@@ -216,7 +216,6 @@ export async function talkToPeer(game, peer, directAction = null) {
       title: `${peer.name}`,
       items: [
         { label: '⚔️ Combattre', right: '1v1 · 2v2 · 3v3 · 4J' },
-        { label: '🐉 Raid de Boss Co-op', right: '2-3 joueurs' },
         { label: '🏆 Tournoi / 🃏 Poker Multi', right: 'Salon' },
         { label: '🔄 Échanger un Pokémon', right: '4e Badge' },
         { label: '🏡 Visiter son Domaine', right: 'Panier & Gardien' },
@@ -224,18 +223,17 @@ export async function talkToPeer(game, peer, directAction = null) {
         { label: 'Rien' },
       ],
       cls: 'shop',
-      cancel: 6,
+      cancel: 5,
     });
     if (pick === 0) action = 'battle';
-    else if (pick === 1) return lancerRaidCoop(game, peer);
-    else if (pick === 2) {
-      const s = await ui.ask('Quel événement lancer dans le salon ?', ['🏆 Tournoi en direct (4 places)', '🃏 Poker Texas Hold\'em Multi', 'Annuler'], { speaker: peer.name });
+    else if (pick === 1) {
+      const s = await ui.ask('Quel événement lancer dans le salon ?', ['🏆 Tournoi en direct (4 places)', '🃏 Poker Hold\'em Multi', 'Annuler'], { speaker: peer.name });
       if (s === 0) return lancerTournoiSalon(game);
       if (s === 1) return pokerTableMulti(game);
       return;
-    } else if (pick === 3) action = 'trade';
-    else if (pick === 4) return visiterDomaineAmi(game, peer);
-    else if (pick === 5) { await showCard(game, peer); return; }
+    } else if (pick === 2) action = 'trade';
+    else if (pick === 3) return visiterDomaineAmi(game, peer);
+    else if (pick === 4) { await showCard(game, peer); return; }
     else return;
   }
 

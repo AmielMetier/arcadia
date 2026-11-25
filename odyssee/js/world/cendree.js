@@ -155,12 +155,12 @@ export function addCendree({ W, maps, trainerNpc, spot, enc }) {
 
   /* ------------------------------------------------------------------ dresseurs, objets, panneaux */
   const t = (id, x, y, dir, cls, name, team, o) => trainerNpc(m, ...spot(m, x, y), dir, cls, name, team, { id: 'cendree:' + id, sight: 4, ...o });
-  t('sage', DX - 3, TY + 13, 'right', 'Sage', 'Ignace', [[92, 36], [93, 37], [200, 37]], { intro: 'Le vent passe encore entre les poutres brûlées. Écoute... Il parle de feu.', after: 'La tour n\'a jamais été reconstruite. Certains disent qu\'elle attend quelqu\'un.' });
+  t('sage', DX - 3, TY + 13, 'right', 'Sage', 'Norbert', [[92, 36], [93, 37], [200, 37]], { intro: 'Le vent passe encore entre les poutres brûlées. Écoute... Il parle de feu.', after: 'La tour n\'a jamais été reconstruite. Certains disent qu\'elle attend quelqu\'un.' });
   t('medium', 210, 155, 'left', 'Médium', 'Cendrine', [[198, 36], [200, 37], [94, 38]], { intro: 'D\'ici, on voit toute la forêt. Et toi, je te voyais venir depuis longtemps.' });
   t('moine', 174, 189, 'left', 'Moine', 'Kōen', [[58, 36], [77, 37], [126, 38]], { intro: 'Ce petit autel est plus vieux que le temple. Respecte-le, et bats-toi bien.' });
   t('kimono', 262, 162, 'left', 'Dame Kimono', 'Momiji', [[196, 37], [197, 37], [38, 38]], { sight: 3, intro: 'Les érables rougissent pour la danse. Danse avec moi !' });
-  t('alpiniste', 203, 189, 'right', 'Alpiniste', 'Basile', [[75, 37], [111, 37], [95, 38]], { sight: 5, intro: 'Ce ravin, je le remonte tous les matins. Toi, tu le remontes en combattant !' });
-  t('karateka', 181, 174, 'right', 'Karatéka', 'Daigo', [[107, 37], [106, 37], [68, 38]], { sight: 3, intro: 'Ces marches sont mon terrain d\'entraînement !' });
+  t('alpiniste', 203, 189, 'right', 'Alpiniste', 'Brice', [[75, 37], [111, 37], [95, 38]], { sight: 5, intro: 'Ce ravin, je le remonte tous les matins. Toi, tu le remontes en combattant !' });
+  t('karateka', 181, 174, 'right', 'Karatéka', 'Kenzo', [[107, 37], [106, 37], [68, 38]], { sight: 3, intro: 'Ces marches sont mon terrain d\'entraînement !' });
   m.item(...spot(m, TX + 12, TY + 5), 'ultra-ball', 2);
   m.item(...spot(m, 232, 156), 'revive');
   m.item(...spot(m, 202, 184), 'hyper-potion', 2);

@@ -109,8 +109,8 @@ export function dojoInterior(id, name = 'Dojo de Mamadou') {
     id: id + ':disciple', x: 3, y: 10, dir: 'right', sprite: 'kimono',
     text: [
       'Bienvenue au Dojo de Mamadou ! Ici, personne ne combat jamais seul.',
-      'En Duo Co-op (2v2), 2 joueurs s\'unissent avec 1 Pokémon actif chacun (+ 1 remplaçant) contre deux tacticiens redoutables.',
-      'En Trio Co-op (3v3), vous devez être 3 dresseurs connectés en ligne ! Ouvrez la Connexion (F3 ou Amis) pour vous retrouver dans la même salle.',
+      'En Duo Co-op, deux dresseurs s\'unissent avec 1 Pokémon actif chacun (+ 1 remplaçant) contre deux tacticiens redoutables.',
+      'En Trio Co-op, il faut être trois dresseurs connectés en ligne ! Passe par le menu Amis / Connexion pour vous retrouver dans la même salle.',
     ],
   });
   return m;

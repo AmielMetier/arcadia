@@ -4,11 +4,13 @@ import { SPECIES } from '../../data/species.js';
 import { MOVES } from '../../data/moves.js';
 import { glisserPourRanger } from '../glisser.js';
 import { getAbility } from '../../data/abilities.js';
-import { monName, expProgress, STAT_NAMES, levelCap, natureName, natureEffect } from '../../core/mon.js';
+import { moveDesc } from '../../data/moveDescriptions.js';
+import { monName, expProgress, STAT_NAMES, levelCap, natureName, natureEffect, baseStats } from '../../core/mon.js';
 import { LEADERS } from '../../world/region.js';
 import { ASSETS } from '../../assets.js';
 import { TYPE_FR, TYPE_COL, typeTag, hpCol, hpBar, statusTag, gender, screen, closer } from './common.js';
 import { pcScreen } from './pc.js';
+import { MEMORIES, ENTRANCE_AURAS, unlockedAuras, activeEntranceAura } from '../../game/follower-life.js';
 
 /* ================= ÉQUIPE (Style 5G Noir 2 / Blanc 2) ================= */
 /**
@@ -44,17 +46,23 @@ export function partyScreen(game, o = {}) {
 
     const foot = el('div', 'pfoot');
     const help = el('div', 'box phelp');
-    if (o.mode === 'menu') {
-      const pcBtn = el('button', 'pc-link-btn', 'BOÎTES PC 💻');
+    const hasPc = o.mode === 'menu';
+    let pcBtn = null;
+    const openPcBoxes = async () => {
+      if (busy) return;
+      busy = true;
+      await pcScreen(game);
+      busy = false;
+      draw();
+    };
+    if (hasPc) {
+      pcBtn = el('button', 'pc-link-btn', 'BOÎTES PC 💻');
       pcBtn.type = 'button';
       pcBtn.title = 'Accéder au Système de Stockage des Pokémon';
-      pcBtn.onclick = async () => {
-        if (busy) return;
-        busy = true;
-        await pcScreen(game);
-        busy = false;
-        draw();
-      };
+      pcBtn.addEventListener('mouseenter', () => {
+        if (!busy && i !== party.length) { i = party.length; ui.sound.sfx('blip'); updateSel(); }
+      });
+      pcBtn.onclick = openPcBoxes;
       foot.append(pcBtn);
     }
     const cancel = el('button', 'pcancel', 'RETOUR ✕');
@@ -77,8 +85,9 @@ export function partyScreen(game, o = {}) {
 
     const triggerSlot = async (idx) => {
       if (busy) return;
-      const n = party.length;
-      if (idx === n) {
+      const n = party.length, cancelIdx = hasPc ? n + 1 : n;
+      if (hasPc && idx === n) { ui.sound.sfx('select'); await openPcBoxes(); return; }
+      if (idx === cancelIdx) {
         if (swapFrom >= 0) { swapFrom = -1; ui.sound.sfx('cancel'); draw(); return; }
         ui.sound.sfx('cancel'); close(-1); return;
       }
@@ -187,7 +196,7 @@ export function partyScreen(game, o = {}) {
               </div>
               ${why ? `<div class="pwhy">${esc(why)}</div>` : ''}
             </div>`;
-          c.addEventListener('mouseenter', () => { if (!busy && !glisse && i !== 0) { i = 0; ui.sound.sfx('blip'); draw(); } });
+          c.addEventListener('mouseenter', () => { if (!busy && !glisse && i !== 0) { i = 0; ui.sound.sfx('blip'); updateSel(); } });
           c.addEventListener('click', (e) => { e.stopPropagation(); triggerSlot(0); });
           colLead.appendChild(c);
         } else {
@@ -229,7 +238,7 @@ export function partyScreen(game, o = {}) {
                 <div class="pexp-track"><u style="width:${expPct}%"></u></div>
               </div>
             </div>`;
-          c.addEventListener('mouseenter', () => { if (!busy && !glisse && i !== k) { i = k; ui.sound.sfx('blip'); draw(); } });
+          c.addEventListener('mouseenter', () => { if (!busy && !glisse && i !== k) { i = k; ui.sound.sfx('blip'); updateSel(); } });
           c.addEventListener('click', (e) => { e.stopPropagation(); triggerSlot(k); });
           colSubs.appendChild(c);
         }
@@ -248,46 +257,62 @@ export function partyScreen(game, o = {}) {
         colSubs.appendChild(emp);
       }
 
-      cancel.classList.toggle('on', i === party.length);
+      updateSel();
+    };
+
+    const updateSel = () => {
+      const n = party.length, cancelIdx = hasPc ? n + 1 : n;
+      s.querySelectorAll('.pslot-lead-card, .pslot-sub[data-idx]').forEach((elSlot) => {
+        elSlot.classList.toggle('on', +elSlot.dataset.idx === i);
+      });
+      if (pcBtn) pcBtn.classList.toggle('on', i === n);
+      cancel.classList.toggle('on', i === cancelIdx);
       help.textContent = swapFrom >= 0
         ? `Échanger la place de ${monName(party[swapFrom])} avec quel Pokémon ?`
         : o.prompt || (o.mode === 'menu' || !o.mode ? 'Clic ou Entrée : choisir · Glisser un Pokémon sur un autre : échanger leurs places · Échap : quitter' : 'Sélectionne un Pokémon (Clic ou Entrée · Échap pour quitter).');
     };
 
     cancel.addEventListener('mouseenter', () => {
-      if (!busy && i !== party.length) { i = party.length; ui.sound.sfx('blip'); draw(); }
+      const cancelIdx = hasPc ? party.length + 1 : party.length;
+      if (!busy && i !== cancelIdx) { i = cancelIdx; ui.sound.sfx('blip'); updateSel(); }
     });
     cancel.addEventListener('click', (e) => {
       e.stopPropagation();
-      triggerSlot(party.length);
+      triggerSlot(hasPc ? party.length + 1 : party.length);
     });
 
     draw();
     const close = closer(ui, s, () => pop, resolve, null);
     const pop = ui.input.push(async (k) => {
       if (busy) return;
-      const n = party.length;
+      const n = party.length, cancelIdx = hasPc ? n + 1 : n;
       if (k === 'up') {
-        if (i === n) i = n > 1 ? n - 1 : 0;
-        else if (i === 0) i = n;
+        if (i === cancelIdx) i = hasPc ? n : (n > 1 ? n - 1 : 0);
+        else if (hasPc && i === n) i = n > 0 ? n - 1 : cancelIdx;
+        else if (i === 0) i = cancelIdx;
         else if (i === 1) i = 0;
         else i--;
       } else if (k === 'down') {
-        if (i === n) i = 0;
-        else if (i === 0) i = n > 1 ? 1 : n;
-        else if (i === n - 1) i = n;
+        if (i === cancelIdx) i = 0;
+        else if (hasPc && i === n) i = cancelIdx;
+        else if (i === 0) i = n > 1 ? 1 : (hasPc ? n : cancelIdx);
+        else if (i === n - 1) i = hasPc ? n : cancelIdx;
         else i++;
       } else if (k === 'left') {
         if (i > 0 && i < n) i = 0;
+        else if (hasPc && i === cancelIdx) i = n;
+        else return;
       } else if (k === 'right') {
         if (i === 0 && n > 1) i = 1;
+        else if (hasPc && i === n) i = cancelIdx;
+        else return;
       } else if (k === 'b') {
         if (swapFrom >= 0) { swapFrom = -1; draw(); return; }
         ui.sound.sfx('cancel'); close(-1); return;
       } else if (k === 'a') {
         await triggerSlot(i); return;
       } else return;
-      ui.sound.sfx('blip'); draw();
+      ui.sound.sfx('blip'); updateSel();
     });
   });
 }
@@ -444,6 +469,14 @@ export function summaryScreen(game, list, idx) {
     // la place de celle visée (les deux s'échangent) ; à la souris, un clic prend, un second clic échange
     const ordreOk = !game.bv?.alive;
     let curMv = -1, pris = -1;
+    // onglet Souvenirs : A change l'aura d'entrée (au clavier comme à la manette), le carnet défile tout seul de bas en haut
+    const changerAura = () => {
+      const m = list[idx], choix = ['auto', 'none', ...unlockedAuras(m).map((a) => a.id)];
+      if (choix.length < 3) { ui.sound.sfx('bump'); return; }
+      const i = choix.indexOf(m.entranceAura || 'auto');
+      m.entranceAura = choix[(i + 1) % choix.length];
+      ui.sound.sfx('select'); game.save?.(true); draw();
+    };
     const sortirOrdre = () => { curMv = -1; pris = -1; };
     const echanger = (a, b) => {
       const mv = list[idx].moves; if (a === b || !mv[a] || !mv[b]) return;
@@ -455,22 +488,30 @@ export function summaryScreen(game, list, idx) {
     const draw = () => {
       const m = list[idx], S = SPECIES[m.sp];
       const isCapped = m.lvl >= cap;
+      const unlockedList = unlockedAuras(m);
+      const unlockedSet = new Set(unlockedList.map((a) => a.id));
+      const activeAura = activeEntranceAura(m);
+      const mems = Array.isArray(m.memories) ? m.memories : [];
+      const totalMemCount = Object.keys(MEMORIES).length;
+      const TOTAL_PAGES = 4;
       const tabs = [
         ['INFOS DRESSEUR', 'Aperçu'],
         ['STATISTIQUES', 'Capacités'],
-        ['ATTAQUES CONNUES', `${m.moves.length}/4`],
+        ['ATTAQUES', `${m.moves.length}/4`],
+        ['SOUVENIRS', `${mems.length}/${totalMemCount}`],
       ].map(([t, sub], k) => `<button type="button" class="sum-tab ${k === page ? 'on' : ''}" data-tab="${k}"><b>${t}</b><small>${sub}</small></button>`).join('');
       let body = '';
       if (page === 0) {
         body = `
           <table class="kv sum-kv">
-            <tr><td>N° Pokédex</td><td>#${String(S.no || m.sp).padStart(3, '0')}</td></tr>
+            <tr><td>N° Pokédex</td><td>#${String(S.no || m.sp).padStart(3, '0')}${m.alpha ? ' <span class="sum-alpha-badge">★ ALPHA</span>' : ''}</td></tr>
             <tr><td>Espèce</td><td>${esc(S.n)}</td></tr>
             <tr><td>Type</td><td>${S.t.map(typeTag).join(' ')}</td></tr>
             <tr><td>Dresseur Orig.</td><td>${esc(m.ot || game.state.name)}</td></tr>
             <tr><td>Rencontré à</td><td>${esc(m.met || '—')}</td></tr>
             <tr><td>Nature</td><td>${esc(natureName(m.nat ?? 0))}${(() => { const ne = natureEffect(m.nat ?? 0); return ne ? ` <small class="nat-fx">(+${STAT_NAMES[ne[0]]} / −${STAT_NAMES[ne[1]]})</small>` : ' <small class="nat-fx">(neutre)</small>'; })()}</td></tr>
             <tr><td>Talent</td><td>${(() => { const ab = getAbility(m); return ab ? `<b>${esc(ab.name)}</b>${ab.desc ? ` <small class="nat-fx">${esc(ab.desc)}</small>` : ''}` : '—'; })()}</td></tr>
+            <tr><td>Aura d'entrée</td><td>${activeAura ? `${activeAura.icon} ${esc(activeAura.name)}` : 'Aucune'}</td></tr>
             <tr><td>Points Exp.</td><td>${m.exp.toLocaleString('fr-FR')} pts</td></tr>
             <tr><td>Limite Arène</td><td>N.${cap} ${isCapped ? '<span class="sum-cap-tag">ATTEINTE</span>' : ''}</td></tr>
           </table>
@@ -479,17 +520,50 @@ export function summaryScreen(game, list, idx) {
       } else if (page === 1) {
         // stats avec la nature (▲ +10 % en rouge, ▼ −10 % en bleu), les IV (0 à 31) et les EV (252 max, 510 en tout)
         const ne = natureEffect(m.nat ?? 0), ev = m.ev || [0, 0, 0, 0, 0, 0], evTot = ev.reduce((a, x) => a + x, 0);
-        body = `<table class="kv stats sum-kv sum-stats"><tr class="sth"><td></td><td>Stat</td><td></td><td>IV</td><td>EV</td></tr>${STAT_NAMES.map((n, k) => `<tr><td class="${ne && ne[0] === k ? 'nat-up' : ne && ne[1] === k ? 'nat-down' : ''}">${n}${ne && ne[0] === k ? ' ▲' : ne && ne[1] === k ? ' ▼' : ''}</td><td><b>${k === 0 ? `${m.hp} / ${m.stats[0]}` : m.stats[k]}</b></td><td><i class="sbar"><u style="width:${Math.min(100, S.b[k] / 1.5)}%"></u></i></td><td class="iv${m.iv[k] === 31 ? ' max' : ''}">${m.iv[k]}</td><td class="evv">${ev[k]}</td></tr>`).join('')}</table>
+        body = `<table class="kv stats sum-kv sum-stats"><tr class="sth"><td></td><td>Stat</td><td></td><td>IV</td><td>EV</td></tr>${STAT_NAMES.map((n, k) => `<tr><td class="${ne && ne[0] === k ? 'nat-up' : ne && ne[1] === k ? 'nat-down' : ''}">${n}${ne && ne[0] === k ? ' ▲' : ne && ne[1] === k ? ' ▼' : ''}</td><td><b>${k === 0 ? `${m.hp} / ${m.stats[0]}` : m.stats[k]}</b></td><td><i class="sbar"><u style="width:${Math.min(100, baseStats(m)[k] / 1.5)}%"></u></i></td><td class="iv${m.iv[k] === 31 ? ' max' : ''}">${m.iv[k]}</td><td class="evv">${ev[k]}</td></tr>`).join('')}</table>
           <div class="sum-natline">Nature <b>${esc(natureName(m.nat ?? 0))}</b> · EV ${evTot} / 510 · Les EV s'ajoutent aux stats au niveau suivant ou au Centre.</div>`;
-      } else {
+      } else if (page === 2) {
         body = `<div class="moves${curMv >= 0 ? ' ordre' : ''}">${m.moves.map((mv, k) => {
           const M = MOVES[mv.id];
+          const catLbl = M.c === 'special' ? 'Spécial' : M.c === 'status' ? 'Statut' : 'Physique';
+          const accTxt = M.a ? `${M.a}%` : '—';
           return `<div class="mv${k === curMv ? ' cur' : ''}${k === pris ? ' pris' : ''}" data-mv="${k}" style="--tc:${TYPE_COL[M.t]}">
             <div class="mv-top"><span class="mvn">${esc(M.n)}</span>${typeTag(M.t)}<span class="mvpp">PP <b>${mv.pp}</b>/${M.pp}</span></div>
-            <div class="mvd">${M.c === 'status' ? 'Catégorie : Statut' : `Puissance : ${M.p || '—'}`} · Précision : ${M.a ?? '—'}%</div>
+            <div class="mvd">${catLbl} · ${M.c === 'status' ? 'Effet' : `Puis. ${M.p || '—'}`} · Préc. ${accTxt}</div>
+            <div class="mvd-desc">${esc(moveDesc(M))}</div>
           </div>`;
         }).join('')}</div>${ordreOk && m.moves.length > 1 ? `<div class="mv-ordre-aide">${curMv < 0 ? 'A ou clic : ranger les attaques'
           : pris < 0 ? '▲ ▼ choisir l\'attaque · A la prendre · B terminer' : `▲ ▼ choisir sa nouvelle place · A échanger avec elle · B reposer`}</div>` : ''}`;
+      } else {
+        const auraChoice = m.entranceAura || 'auto';
+        const chips = [
+          `<button type="button" class="sum-aura-btn${auraChoice === 'auto' ? ' on' : ''}" data-aura="auto" title="Utiliser automatiquement la meilleure aura débloquée">✨ Auto</button>`,
+          `<button type="button" class="sum-aura-btn${auraChoice === 'none' ? ' on' : ''}" data-aura="none" title="Désactiver l'aura d'entrée en combat">— Aucune</button>`,
+          ...ENTRANCE_AURAS.map((a) => {
+            const ok = unlockedSet.has(a.id);
+            const selected = auraChoice === a.id && ok;
+            return `<button type="button" class="sum-aura-btn${selected ? ' on' : ''}${!ok ? ' locked' : ''}" ${ok ? `data-aura="${a.id}"` : 'disabled'} title="${esc(ok ? a.reqText : 'Verrouillée : ' + a.reqText)}">${a.icon} ${esc(a.name)}</button>`;
+          }),
+        ].join('');
+        const memHtml = mems.length
+          ? mems.map((entry) => {
+            const def = MEMORIES[entry.id];
+            if (!def) return '';
+            return `<div class="sum-mem-card">
+              <div class="sum-mem-ico">${def.icon}</div>
+              <div class="sum-mem-body">
+                <div class="sum-mem-top"><b>${esc(def.title)}</b>${entry.place ? `<span class="sum-mem-place">${esc(entry.place)}</span>` : ''}</div>
+                <div class="sum-mem-desc">${esc(def.desc)}</div>
+              </div>
+            </div>`;
+          }).join('')
+          : `<div class="sum-mem-empty">Aucun souvenir gravé pour l'instant.<br>Marche avec ce Pokémon, parle-lui sur la route, affronte des failles ou brille en combat pour forger vos souvenirs !</div>`;
+        body = `<div class="sum-souvenirs">
+          <div class="sum-sec-title">Aura d'entrée en combat ${activeAura ? `<small>(Active : ${activeAura.icon} ${esc(activeAura.name)})</small>` : ''}</div>
+          <div class="sum-aura-row">${chips}</div>
+          <div class="sum-sec-title">Carnet de Souvenirs (${mems.length} / ${totalMemCount})</div>
+          <div class="sum-mem-list">${memHtml}</div>
+        </div>`;
       }
       s.innerHTML = `
         <div class="scr-bar">
@@ -507,7 +581,7 @@ export function summaryScreen(game, list, idx) {
         <div class="sum-body">
           <div class="sum-left">
             <div class="sum-head">
-              <span class="sum-name">${esc(monName(m))}${gender(m)}</span>
+              <span class="sum-name">${esc(monName(m))}${gender(m)}${m.alpha ? ' <span class="sum-alpha-badge">ALPHA</span>' : ''}</span>
               <span class="sum-lvl">N.${m.lvl}</span>
             </div>
             <div class="sum-stage">
@@ -522,7 +596,7 @@ export function summaryScreen(game, list, idx) {
             <div class="sum-content">${body}</div>
           </div>
         </div>
-        <div class="sum-help">${curMv >= 0 ? 'Ranger les attaques · ◀ ▶ Changer d\'onglet' : '◀ ▶ Changer d\'onglet · ▲ ▼ Changer de Pokémon · Clic ou Échap pour fermer'}</div>`;
+        <div class="sum-help">${curMv >= 0 ? 'Ranger les attaques · ◀ ▶ Changer d\'onglet' : page === 3 && unlockedAuras(m).length ? 'Entrée : changer d\'aura · ◀ ▶ Changer d\'onglet · ▲ ▼ Changer de Pokémon' : '◀ ▶ Changer d\'onglet · ▲ ▼ Changer de Pokémon · Échap ou RETOUR pour fermer'}</div>`;
 
       if (ordreOk) s.querySelectorAll('[data-mv]').forEach((el) => {
         el.addEventListener('click', (e) => {
@@ -530,6 +604,15 @@ export function summaryScreen(game, list, idx) {
           const k = +el.dataset.mv;
           if (pris >= 0) { echanger(pris, k); pris = -1; curMv = k; }
           else { curMv = pris = k; ui.sound.sfx('blip'); }
+          draw();
+        });
+      });
+      s.querySelectorAll('[data-aura]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          list[idx].entranceAura = btn.dataset.aura;
+          ui.sound.sfx('select');
+          game.save?.(true);
           draw();
         });
       });
@@ -563,13 +646,14 @@ export function summaryScreen(game, list, idx) {
         sortirOrdre();
       }
       if (k === 'a' && page === 2 && ordreOk && list[idx].moves.length > 1) { curMv = 0; pris = -1; ui.sound.sfx('blip'); draw(); return; }
+      if (k === 'a' && page === 3) { changerAura(); return; }
       if (k === 'up' || k === 'down') sortirOrdre();
-      if (k === 'left') { page = (page + 2) % 3; ui.sound.sfx('blip'); draw(); }
-      else if (k === 'right') { page = (page + 1) % 3; ui.sound.sfx('blip'); draw(); }
+      if (k === 'left') { page = (page + 3) % 4; ui.sound.sfx('blip'); draw(); }
+      else if (k === 'right') { page = (page + 1) % 4; ui.sound.sfx('blip'); draw(); }
       else if (k === 'up') { idx = (idx - 1 + list.length) % list.length; ui.sound.sfx('blip'); draw(); }
       else if (k === 'down') { idx = (idx + 1) % list.length; ui.sound.sfx('blip'); draw(); }
       else if (k === 'a') {
-        page = (page + 1) % 3;
+        page = (page + 1) % 4;
         ui.sound.sfx('blip');
         draw();
       } else if (k === 'b') {

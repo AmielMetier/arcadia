@@ -1,7 +1,7 @@
 /* ---------- HUD en jeu (Mix A + C : capsules pixel-art Nano Banana à gauche + Pokégear en haut à droite) ---------- */
 .hud { position: absolute; inset: 0; z-index: 14; pointer-events: none; transition: opacity .18s ease; }
-#ui:has(> .screen, > .wipe, > .battle-wipe, > .door-iris.on, > .battle, > .title-scr, > .intro-scr, > .list, > .dlg, > .keypanel.on) .hud { opacity: 0; pointer-events: none; }
-#ui:has(> .screen, > .wipe, > .battle-wipe, > .door-iris.on, > .battle, > .title-scr, > .intro-scr, > .list, > .dlg, > .keypanel.on) .hud * { pointer-events: none !important; }
+#ui:has(> .screen, > .wipe, > .battle-wipe, > .door-iris.on, > .battle, > .title-scr, > .intro-scr, > .list, > .dlg, > .keypanel.on, > .chat-modal-overlay, > .starter-select-modal, > .lugia-cine, > .boss-cine, > .evo-scr) .hud { opacity: 0; pointer-events: none; }
+#ui:has(> .screen, > .wipe, > .battle-wipe, > .door-iris.on, > .battle, > .title-scr, > .intro-scr, > .list, > .dlg, > .keypanel.on, > .chat-modal-overlay, > .starter-select-modal, > .lugia-cine, > .boss-cine, > .evo-scr) .hud * { pointer-events: none !important; }
 
 /* Colonne d'équipe à gauche — capsules pixel-art biseautées (slot_lead.png & slot_normal.png) */
 .hud-party { position: absolute; left: calc(var(--px) * 4); top: calc(var(--px) * 18); display: flex; flex-direction: column; gap: calc(var(--px) * 2.5); width: calc(var(--px) * 136); pointer-events: auto; transition: transform .22s ease, opacity .2s ease; }
@@ -418,3 +418,20 @@
   box-shadow: inset 0 0 0 calc(var(--px) * 1.4) #ffe050, 0 0 calc(var(--px) * 5) rgba(255, 224, 80, .7) !important; }
 .glisse-fantome { position: fixed; z-index: 9999; pointer-events: none; opacity: .9; margin: 0 !important;
   filter: drop-shadow(0 6px 10px rgba(0,0,0,.55)); transition: none !important; }
+
+/* interface repliée (par défaut) : rien par-dessus la carte, comme dans un jeu Pokémon ; U la réaffiche */
+.hud.collapsed .hud-loc, .hud.collapsed .hud-online-badge, .hud.collapsed .hud-event-pill, .hud.collapsed .hud-stats, .hud.collapsed .hud-quick-item, .hud.collapsed .hud-guide, .hud.collapsed .hud-dexnav, .hud.collapsed .hud-bdots-row, .hud.collapsed .hud-quest-card, .hud.collapsed .hud-actions { display: none; }
+.hud.collapsed .hud-loc-row { gap: calc(var(--px) * 1.5); }
+.hud-off > .keybar { display: none; }
+/* pendant un dialogue, la barre des touches s'efface : elle passait par-dessus la boîte de texte */
+#ui:has(> .dlg) > .keybar { display: none; }
+
+.hud-event-pill {
+  font: inherit; width: 100%; display: flex; align-items: center; justify-content: center; gap: calc(var(--px) * 1.5);
+  padding: calc(var(--px) * 1.1) calc(var(--px) * 2.5);
+  font-size: calc(var(--px) * 5); font-weight: 800; color: #f0f9ff; cursor: pointer;
+  background: linear-gradient(90deg, rgba(16, 78, 98, 0.9) 0%, rgba(76, 29, 149, 0.9) 100%);
+  border: calc(var(--px) * .8) solid #67e8f9; border-radius: calc(var(--px) * 3);
+  text-shadow: 0 1px 0 #000;
+}
+.hud-event-pill:hover { filter: brightness(1.18); }

@@ -63,8 +63,8 @@ kbd { display: inline-block; font: inherit; font-size: .85em; min-width: 1.4em; 
 
 /* ---------- histoire : grottes sombres, Éclipse, Pokémon Obscurs ---------- */
 .dark-ov { position: absolute; inset: 0; pointer-events: none; display: none; }
-.dark-ov.cave { display: block; background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0 8%, rgba(0,0,0,.6) 12%, rgba(0,0,0,.96) 18%); }
-.dark-ov.cave.flash { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0 26%, rgba(0,0,0,.45) 42%, rgba(0,0,0,.8) 64%); }
+.dark-ov.cave { display: block; background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0 16%, rgba(0,0,0,.55) 24%, rgba(0,0,0,.94) 34%); }
+.dark-ov.cave.flash { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0 42%, rgba(0,0,0,.35) 60%, rgba(0,0,0,.7) 85%); }
 .dark-ov.cave.lueur0 { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0 9%, rgba(0,0,0,.55) 14%, rgba(0,0,0,.94) 22%); }
 .dark-ov.cave.lueur1 { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0 13%, rgba(0,0,0,.5) 20%, rgba(0,0,0,.92) 30%); }
 .dark-ov.cave.lueur2 { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0 18%, rgba(0,0,0,.45) 28%, rgba(0,0,0,.88) 40%); }
@@ -85,3 +85,6 @@ html.doigt .keyhint b, html.doigt .keyhint:first-child, html.doigt .title-foot {
 #tourne small { display: block; margin-top: 6px; font-size: 14px; font-weight: 500; opacity: .75; }
 @keyframes tourne { 0%, 20% { transform: rotate(0); } 60%, 100% { transform: rotate(90deg); } }
 @media (orientation: portrait) and (pointer: coarse) and (max-width: 600px) { #tourne { display: flex; } }
+
+/* écran titre : la version, discrète, dans le coin (comme la mention en bas d'un écran titre de jeu) */
+.title-scr .title-foot { right: calc(var(--px) * 5); bottom: calc(var(--px) * 3); font-size: calc(var(--px) * 5); opacity: .55; }

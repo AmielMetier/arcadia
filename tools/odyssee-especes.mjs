@@ -18,7 +18,7 @@ for (const s of [129, 1029, 118, 1031, 60, 98, 211, 690, 692, 688, 501]) add(s, 
 for (const l of w.legends || []) add(l.sp ?? l[0], 'légendaire');
 for (const c of region.STARTER_TABLE) for (const L of c.lines) add(L[0], 'starter');
 // dons, échanges, fossiles : nombres cités dans giveMon / give / sp / E.give / FOSSILES
-const code = ['world/story.js', 'world/quetes.js', 'world/mine.js', 'vie-monde.js', 'story.js', 'game.js', 'ui/domaine.js'].map((f) => { try { return fs.readFileSync(new URL(f, B), 'utf8'); } catch { return ''; } }).join('\n');
+const code = ['world/story.js', 'world/quetes.js', 'world/mine.js', 'vie-monde.js', 'story.js', 'game.js', 'game/triggers.js', 'game/world-events.js', 'ui/domaine.js'].map((f) => { try { return fs.readFileSync(new URL(f, B), 'utf8'); } catch { return ''; } }).join('\n');
 for (const m of code.matchAll(/giveMon\((\d+)|give: (\d+)|\bsp: (\d+)|give: \[(\d+)/g)) add(m[1] || m[2] || m[3] || m[4], 'don');
 const { FOSSILES } = await import(B + 'world/faune.js').catch(() => ({})); for (const v of Object.values(FOSSILES || {})) add(v[0], 'fossile');
 // évolutions

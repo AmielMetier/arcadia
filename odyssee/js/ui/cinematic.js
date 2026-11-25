@@ -1,6 +1,7 @@
 // odyssee/js/ui/cinematic.js — Cinématiques 3D temps réel (Three.js + HD-2D) pour chaque Boss & Légendaire
 import { SPECIES } from '../data/species.js';
 import { esc } from './ui.js';
+import { warnDev } from '../core/safe.js';
 
 const PRESET_DEFS = {
   shadow: {
@@ -388,7 +389,7 @@ export function resolveBossCinematicConfig(opts = {}) {
     } else if (sp) {
       const ts = SPECIES[sp]?.t || [];
       presetKey = ts.includes('fire') ? 'fire' : ts.includes('water') ? 'water' : ts.includes('electric') ? 'thunder' : ts.includes('ice') ? 'ice' : ts.includes('grass') ? 'nature' : ts.includes('fairy') ? 'fairy' : ts.includes('dragon') ? 'dragon' : ts.includes('psychic') ? 'cosmic' : ts.includes('dark') || ts.includes('ghost') ? 'eclipse' : 'titan';
-      sub = sub || (SPECIES[sp]?.genus || 'Créature Légendaire');
+      sub = sub || (SPECIES[sp]?.genus || 'Pokémon Légendaire');
       badge = badge || 'LÉGENDAIRE RENCONTRÉ';
     } else {
       presetKey = 'rival';
@@ -1060,9 +1061,25 @@ export function createBoss3DScene(THREE, container, spriteImg, cfgInput = PRESET
   };
 
   const dispose = () => {
-    try { bloom?.dispose?.(); composer?.dispose?.(); } catch (e) {}
-    try { renderer.dispose(); } catch (e) {}
-    try { if (renderer.domElement?.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement); } catch (e) {}
+    try {
+      scene.traverse((obj) => {
+        if (obj.geometry) try { obj.geometry.dispose(); } catch (e) { warnDev('webgl', e); }
+        if (obj.material) {
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          for (const mat of mats) {
+            if (!mat) continue;
+            for (const mapKey of ['map', 'alphaMap', 'emissiveMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'envMap']) {
+              try { mat[mapKey]?.dispose?.(); } catch (e) { warnDev('webgl', e); }
+            }
+            try { mat.dispose?.(); } catch (e) { warnDev('webgl', e); }
+          }
+        }
+      });
+      try { scene.background?.dispose?.(); } catch (e) { warnDev('webgl', e); }
+    } catch (e) { warnDev('webgl', e); }
+    try { bloom?.dispose?.(); composer?.dispose?.(); } catch (e) { warnDev('webgl', e); }
+    try { renderer.dispose(); renderer.forceContextLoss?.(); } catch (e) { warnDev('webgl', e); }
+    try { if (renderer.domElement?.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement); } catch (e) { warnDev('webgl', e); }
   };
 
   return { update, resize, dispose, revealAt };
@@ -1164,9 +1181,9 @@ export async function playBossCinematic(game, opts = {}) {
     done = true;
     for (const id of flashTimers) clearTimeout(id);
     flashTimers.length = 0;
-    try { pop?.(); } catch (e) {}
-    try { audioCtrl?.stop?.(); } catch (e) {}
-    try { sceneCtrl?.dispose?.(); } catch (e) {}
+    try { pop?.(); } catch (e) { warnDev('cinematic', e); }
+    try { audioCtrl?.stop?.(); } catch (e) { warnDev('cinematic', e); }
+    try { sceneCtrl?.dispose?.(); } catch (e) { warnDev('cinematic', e); }
   };
 
   try {
@@ -1196,7 +1213,7 @@ export async function playBossCinematic(game, opts = {}) {
         spriteImg = await loadImg(url).catch(() => null);
         if (spriteImg) break;
       }
-    } catch (e) {}
+    } catch (e) { warnDev('cinematic', e); }
 
     let hasWebGL = false;
     // l'éveil de Lugia Obscur a sa propre mise en scène (cine-lugia.js : sept plans, bande-son écrite pour eux)
@@ -1232,7 +1249,7 @@ export async function playBossCinematic(game, opts = {}) {
       } else if (sound?.playLugiaCinematicAudio && cfg.presetKey === 'shadow') {
         audioCtrl = sound.playLugiaCinematicAudio();
       }
-    } catch (e) {}
+    } catch (e) { warnDev('cinematic', e); }
 
     await new Promise((resolve) => {
       const dur = cfg.duration || 6.4;
@@ -1332,14 +1349,16 @@ export async function playBossCinematic(game, opts = {}) {
       requestAnimationFrame(tick);
     });
 
-    try { await ui.fade?.(240); } catch (e) {}
+    // fondu au noir pour cacher la fin de la cinématique ; l'écran se rouvre une fois la scène retirée (finally)
+    try { await ui.fade?.(true, 240); } catch (e) { warnDev('cinematic', e); }
     if (cfg.presetKey === 'shadow' && st?.flags) st.flags.seenLugiaCinematic = true;
   } finally {
     cleanupAll();
     if (typeof window !== 'undefined' && sceneCtrl?.resize) {
       window.removeEventListener?.('resize', sceneCtrl.resize);
     }
-    try { wrap.remove(); } catch (e) {}
+    try { wrap.remove(); } catch (e) { warnDev('cinematic', e); }
+    try { await ui.fade?.(false, 160); } catch (e) { warnDev('cinematic', e); }
     if (sound) sound.current = null;
     game.busy = prevBusy;
   }

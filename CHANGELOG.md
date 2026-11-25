@@ -1,11 +1,227 @@
 # Journal des versions — Arcadia
 
-## 5.125 — 19 novembre 2026
+## 5.162 — 25 novembre 2026
 - **The Backrooms** — Un nouveau niveau : le Level 7, Thalassophobia, au bout du toboggan bleu des Poolrooms.
   - Une mer sans fin dans la brume du soir, avec sa houle, ses reflets, l'éclat du jour qui baisse et un peu d'écume sur les crêtes. Des maisons à moitié englouties en sortent : le rez-de-chaussée sous l'eau, l'étage et le toit au-dessus. Aucune ne se ressemble : grises, bleues, rouges, vertes ou blanches, un toit à deux pentes ou à un seul pan, une cheminée, des volets qui pendent, une rambarde ; deux ou trois pièces. D'autres sombrent de travers, et l'épave d'un grand voilier s'est échouée sur un rocher.
   - Une barque en bois à moteur attend au ponton. Monte dedans avec F : le premier tient la barre (Z / S pour le moteur, Q / D pour tourner). Pour descendre, il faut accoster un îlot.
   - Trois bidons d'essence sont cachés au fond de trois de ces maisons : accoste à leur ponton, entre, fouille les pièces. Le moteur en boit, et sans eux on n'ira pas loin. Tout au bout, sur un dernier îlot, une trappe de bunker ouverte sous un gyrophare : la sortie, par une échelle qui descend dans le noir.
   - Quelque chose d'immense vit sous la surface et entend le moteur. Le sonar dit quand ça approche : coupe le moteur et laisse-le passer. S'il atteint la barque en marche, il emporte quelqu'un. Et ne traîne pas au bord de l'eau.
+## 5.161 — 24 novembre 2026
+- **Odyssée** — Entrer dans une faille se vit maintenant en grand (Odyssée 3.3) :
+  - L'écran se brise, le monde est aspiré et tu traverses un tunnel propre à la faille : losanges qui s'échangent, quatre climats et leurs éclairs, ou brasier d'un Alpha.
+  - Une silhouette approche au bout du tunnel, puis se révèle avant le combat.
+  - Une touche suffit pour passer l'animation.
+
+## 5.160 — 24 novembre 2026
+- **Odyssée** — Ouvrir une faille avec l'Astrolabe demande un Fragment Météorique, sans attente (Odyssée 3.2) :
+  - Le fragment n'est utilisé qu'après confirmation. Si tu quittes le jeu avant d'entrer, ta faille se rouvre ; si tu la dissipes, le fragment t'est rendu.
+  - Une faille ouverte ainsi donne 2 Hyper Balls (un Super Bonbon pour une Faille Alpha) ; les failles des routes donnent toujours un fragment.
+  - L'aurore et la pluie d'étoiles gardent leur recharge de 15 minutes.
+
+## 5.159 — 24 novembre 2026
+- **Odyssée** — Grand contrôle des nouveautés célestes, des failles et des souvenirs (Odyssée 3.1) :
+  - L'Astrolabe se recharge après usage : 15 minutes pour le ciel, 8 minutes pour les failles.
+  - Failles et météorites apparaissent toujours à un endroit où l'on peut aller à pied ; une faille refermée à l'Astrolabe reste fermée.
+  - Une faille annonce le niveau de ce qui t'attend ; trop tôt dans l'aventure, le Pokémon n'a pas encore sa forme évoluée.
+  - Un Pokémon Alpha choisit mieux ses attaques, et sa tête ne sort plus de l'écran.
+  - Appuyer plusieurs fois sur Entrée devant une faille n'ouvre plus deux conversations à la fois.
+  - Jirachi, mis K.O. ou en fuite, peut revenir avec une autre météorite.
+  - Portails et météorites redessinés ; ils brillent la nuit. Une faille ou une aurore qui commence s'annonce à l'écran.
+  - Onglet Souvenirs : les dix souvenirs tiennent à l'écran et l'aura d'entrée se choisit au clavier (Entrée). Un souvenir gagné en combat ou en marchant s'annonce.
+  - La bulle de ton compagnon suit ses pas et ne cache plus ton dresseur.
+  - Combat : le lancer rapide de Poké Ball ne cache plus les PV. En faille inversée, Cage-Éclair touche le type Sol.
+  - Le thème des failles ne grésille plus ; changer le volume ne réactive plus un son coupé.
+  - Médailles : la seule Master Ball reste celle des 50 victoires entre joueurs ; Conquérant de la Tour donne 10 Super Bonbons, Panthéon Vivant 5 Guérisons.
+
+## 5.158 — 24 novembre 2026
+- **Odyssée** — Le ciel et l'espace s'animent :
+  - Aurores boréales et pluies d'étoiles filantes la nuit, météorites à ramasser et visiteurs venus des étoiles.
+  - L'Astrolabe, remis avec le Pokédex, observe le ciel et ouvre des failles.
+  - Failles sur les routes : types inversés, météo chaotique ou Pokémon Alpha géant.
+  - Ton compagnon réagit à ce qui l'entoure et garde des Souvenirs, qui débloquent des auras d'entrée en combat.
+  - Quatre quêtes : Les Larmes d'Aurore, Les Cicatrices de l'Espace, La Légende des Colosses Alpha, Les Échos du Compagnon.
+  - 12 nouvelles médailles, quatre musiques et des ambiances sonores.
+
+## 5.157 — 24 novembre 2026
+- **Odyssée** — Finitions et passage en **Odyssée 3.0** :
+  - Prénoms des 206 dresseurs procéduraux des routes et lieux accordés au genre de leur classe, sans collision avec les dresseurs fixes ni les Champions.
+  - Déblocage audio WebAudio fiabilisé sur Safari/iOS (`keydown`, `pointerdown`, `touchend`, `click` et `resume().catch()`).
+  - Cache navigateur rafraîchi sur l'ensemble des 182 modules (`Odyssée 3.0`).
+
+## 5.156 — 24 novembre 2026
+- Correction : lot 1 — urgences lotcheck (crashs, softlocks, combat, économie) (Amiel)
+- Correction : lot 2 — combat, talents, méga-évolutions et descriptions (Amiel)
+- Correction : lot 3 — progression 15 badges, économie, parc des légendes et finitions (Amiel)
+- Correction : lot 4 — finition ux/ui, azerty, tactile, hud, audio et boot (Amiel)
+- Correction : lot 5 — ton nintendo, localisation fr, coherence narrative et pnj (Amiel)
+
+## 5.155 — 22 novembre 2026
+- **Odyssée** — 18 nouvelles médailles, avec leurs récompenses, et cinq nouveaux onglets dans les Trophées (Odyssée 2.9) :
+  - Boss : vaincre un premier boss, les admins et le chef de l'Éclipse, ceux de la Brume, le dernier boss de la Tour de combat.
+  - Raids : gagner un raid, en gagner 10, vaincre un boss à l'aura dorée, capturer un boss de raid.
+  - Légendaires : en capturer 1, 5 puis 10 différents.
+  - Dojo de Mamadou : 1 puis 10 victoires, une série de 5 en Duo ou en Trio.
+  - Donjons : la Crypte des Murmures, le Donjon des Miroirs, le Sanctuaire des Trois Voies, puis les trois.
+  - Ce que ta partie a déjà accompli compte : légendaires capturés, donjons finis, Dojo, Brume et Éclipse vaincues.
+  - Correction : capturer un boss de raid du Dojo n'interrompt plus la fin du combat.
+
+## 5.154 — 22 novembre 2026
+- **Odyssée** — Petites corrections (Odyssée 2.7) :
+  - À la pêche, un bip et la bulle « ! » quand ça mord (c'était muet).
+  - La Carte de Dresseur compte les médailles sur 36, comme l'écran des trophées (elle affichait 32).
+  - Une médaille débloquée pendant un combat ou une évolution s'affiche après la scène, plus au milieu.
+  - L'aide des touches explique que la sauvegarde est automatique (elle parlait d'un bouton Sauver qui n'existe pas).
+
+## 5.153 — 22 novembre 2026
+- **Odyssée** — En combat, le Pokémon adverse a les pattes posées sur son socle au lieu de flotter au-dessus ; ceux qui lévitent (Fantominus, Smogo…) restent en l'air (Odyssée 2.6).
+
+## 5.152 — 22 novembre 2026
+- **Odyssée** — L'écran de combat est plus net : tous ses pixels ont la même taille, quelle que soit la taille de la fenêtre (Odyssée 2.5).
+
+## 5.151 — 22 novembre 2026
+- **Odyssée** — Écran titre plus sobre : « Appuie sur Entrée », la version en petit dans un coin (Odyssée 2.4).
+  - Dans la cinématique d'ouverture, le bouton « Passer » est en haut à droite et ne cache plus les sous-titres.
+
+## 5.150 — 22 novembre 2026
+- **Odyssée** — En combat, les Pokémon respirent sans se déformer : ils montent et descendent d'un bloc, leurs pixels ne tremblent plus (Odyssée 2.3).
+  - La barre des touches ne passe plus devant la boîte de texte quand un message s'ouvre.
+
+## 5.149 — 22 novembre 2026
+- **Odyssée** — Une présentation plus proche d'un vrai jeu Pokémon (Odyssée 2.2) :
+  - Plus rien par-dessus la carte au premier lancement : le HUD et la barre des touches se montrent avec U, ou dans Options → HUD (masqué, petit, moyen ou grand).
+  - Les pièces qui tiennent à l'écran (maisons, Centre Pokémon, boutiques) s'affichent en entier dès qu'on entre, au lieu de couper le comptoir en haut.
+  - Le prénom se choisit sur un clavier en grille façon DS (majuscules, minuscules, accents), aux flèches ou en tapant directement.
+  - Le choix des graphismes prend le style des menus du jeu, et le texte du professeur n'est plus décalé dans sa boîte.
+
+## 5.148 — 22 novembre 2026
+- **Odyssée** — L'image reste nette quelle que soit la largeur de la fenêtre : une colonne de pixels ne tressaute plus quand le décor défile (Odyssée 2.1).
+
+## 5.147 — 22 novembre 2026
+- **Odyssée** — le jeu démarre encore plus vite : une partie de la carte est préparée d'avance, l'écran de chargement dure environ 7 secondes de moins (Odyssée 2.0).
+
+## 5.146 — 22 novembre 2026
+- **Odyssée** — le jeu démarre presque deux fois plus vite : l'écran de chargement dure une quinzaine de secondes de moins (Odyssée 1.9).
+
+## 5.145 — 21 novembre 2026
+- **Odyssée** — Avec les graphismes Noir & Blanc, les donjons (Crypte des Murmures, Donjon des Miroirs, Sanctuaire des Trois Voies) retrouvent leur roche d'origine (Odyssée 1.8).
+
+## 5.144 — 21 novembre 2026
+- **Odyssée** — Grottes plus lisibles (Odyssée 1.7).
+  - Dans les grottes sombres, le halo de lumière autour du joueur est bien plus grand, avec ou sans Flash.
+  - Avec les graphismes Noir & Blanc, la roche des grottes a son propre dessin, teinté selon la grotte (mine, grotte marine, magma, glace).
+
+## 5.143 — 21 novembre 2026
+- **Odyssée** — Avec les graphismes Noir & Blanc, les montagnes reprennent le dessin d'Odyssée (Odyssée 1.6).
+  - Gradins, falaises et sommets enneigés sont les mêmes qu'avec les graphismes de base, leurs roches passées en brun clair comme le reste du relief Noir & Blanc.
+  - Les mines et les zones de roche brune aussi.
+
+## 5.142 — 20 novembre 2026
+- **Odyssée** — Récap à la fin de chaque raid (Odyssée 1.5).
+  - Classement de l'escouade par dégâts infligés au boss, avec la part de chacun, les dégâts encaissés, les soins et les K.O.
+  - Des titres pour le combat : plus gros frappeur, coup le plus fort, mur de l'escouade, soigneur, toujours debout.
+  - Le même récap s'affiche chez tous les joueurs, en cas de victoire comme de défaite.
+
+## 5.141 — 20 novembre 2026
+- **Odyssée** — Boss de raid : l'escouade apparaît dans sa tenue, et les Pokémon sont bien posés (Odyssée 1.4).
+  - Dans la présentation avant le combat, chaque joueur apparaît avec les couleurs de sa tenue, et avec les graphismes choisis (Odyssée ou Noir & Blanc).
+  - En combat, les Pokémon de l'escouade sont de nouveau sur leurs socles, et le bas de leur sprite passe sous la boîte de texte comme dans les jeux DS, au lieu d'apparaître coupé.
+
+## 5.140 — 20 novembre 2026
+- **Odyssée** — Une vraie entrée en scène pour les boss de raid (Odyssée 1.3).
+  - Avant le combat, l'escouade se présente : le portrait et le nom de chaque joueur, chacun avec sa couleur, face au boss dans son aura.
+  - Plus de dresseur en face : le boss sort de l'ombre en rugissant, puis chaque joueur envoie son Pokémon à son tour (« J1 envoie Dracaufeu ! »).
+  - Écran de combat plus propre : les Pokémon de l'escouade restent dans le cadre, les fiches des joueurs sont regroupées à droite et ne cachent plus le boss.
+  - Le bandeau d'annonce disparaît quand le raid commence.
+  - Correction : après une cinématique de boss (champion, légendaire, raid), l'écran ne reste plus noir pendant le combat.
+
+## 5.139 — 20 novembre 2026
+- **Odyssée** — Les boss de raid se jouent vraiment en coop, et les légendaires sont nouveaux (Odyssée 1.2).
+  - Combat double, triple ou quadruple : de 2 à 4 joueurs contre le boss, tous les joueurs connectés devant être là. Face à quatre joueurs, il frappe trois fois par tour.
+  - Chaque boss a une aura : bleue pour un Pokémon moyen, rouge pour un Pokémon puissant, dorée pour un légendaire. On la voit sur la route et en combat.
+  - Les légendaires de raid viennent d'ailleurs : Tokorico, Tokopisco, Solgaleo, Lunala, Necrozma, Zacian, Zamazenta et Regidrago. On ne les croise nulle part ailleurs, et ils sont plus rares que les autres boss.
+  - Après une victoire, chacun a un seul lancer de Hyper Ball, avec peu de chances : 30 % (aura bleue), 18 % (rouge), 10 % (or). Le Pokémon capturé arrive à ton niveau max.
+  - Un légendaire capturé perd une bonne part de sa puissance : ses stats ressemblent à celles d'un bon Pokémon classique, à peine plus fort.
+  - Récompenses selon l'aura : 6, 9 ou 14 Points du Dojo et 2, 3 ou 4 Super Bonbons. Plus d'Hyper Balls ni de Master Ball offertes.
+
+## 5.138 — 20 novembre 2026
+- **Odyssée** — Les boss de raid surgissent dans la région (Odyssée 1.1).
+  - Toutes les heures et demie environ, quand d'autres joueurs sont connectés, un gros boum retentit et un bandeau annonce le boss et sa route. Il reste 15 minutes, puis repart.
+  - Pour le lancer, allez-y ensemble et parlez-lui : tous les joueurs connectés doivent être à côté (deux ou trois au combat).
+  - Son niveau, c'est la moyenne des niveaux max des participants plus 10 (plus 6 pour un légendaire), avec des PV doublés ou plus. Il est vraiment dur : chacun a 5 essais par apparition.
+  - Victoire : Points du Dojo, 3 Super Bonbons, des Hyper Balls ou une Master Ball face à un légendaire, et la capture des boss qui ne sont pas légendaires.
+  - Les raids ne se lancent plus depuis le Dojo de Mamadou, le menu d'un joueur ou l'écran Amis : ce dernier dit où est le boss, ou quand vient le prochain.
+
+## 5.137 — 20 novembre 2026
+- **Tête de Calcul** — Nouveau : The Candidate — 31 questions de l'émission tournée en amphi (version 5.123) (Nicolas Muratore)
+
+## 5.136 — 20 novembre 2026
+- **Odyssée** — Le jeu a maintenant son propre numéro de version (Odyssée 1.0, affiché en bas de l'écran titre). À chaque mise à jour, le navigateur charge directement la nouvelle version : plus besoin de vider le cache pour voir les nouvelles villes ou les nouveaux graphismes.
+
+## 5.135 — 20 novembre 2026
+- **Odyssée** — Graphismes Noir & Blanc : la personnalisation de la tenue marche enfin sur les dresseurs de Noir 2 & Blanc 2. La visière, le haut, le bas, les chaussures et le sac prennent les couleurs choisies, de face, de profil et de dos, pour le garçon comme pour la fille, et les autres joueurs te voient avec ta tenue.
+
+## 5.134 — 20 novembre 2026
+- **Odyssée** — Trois donjons à faire entre amis, posés sur la nouvelle carte : la Crypte des Murmures, le Donjon des Miroirs et le Sanctuaire des Trois Voies.
+  - En battant Hector, on reçoit la Clé de la Crypte. Elle ouvre la crypte du Cimetière des Murmures, au bout d'un sentier de la Route 2.
+  - Le fossoyeur ouvre la crypte quand le groupe est prêt. Dans les deux premières salles, chaque esprit se combat par un seul joueur à la fois. Dans la Salle des Dalles, tout le groupe doit tenir les dalles en même temps.
+  - Au fond, Ossarion a des PV partagés : chaque combat lui retire ce qu'on lui a infligé, et le groupe en vient à bout ensemble.
+  - Sur la Route 3, deux clairières cachent les deux autres. Au Parvis des Miroirs, un temple de glace : des miroirs qui parlent, des énigmes, une galerie de glace où l'on glisse, des faisceaux de lumière à renvoyer et un reflet qui marche à l'envers.
+  - Dans la Clairière des Trois Voies, un sanctuaire à faire à trois : chacun prend son chemin, il faut s'échanger des codes pour avancer, et les salles sombres ne s'éclairent qu'autour de soi.
+  - Nouveaux combats à plusieurs : un boss dont la barre de vie est coupée en boucliers, et des combats de groupe où chacun choisit le Pokémon adverse qu'il vise.
+  - Un encadré suit l'avancée salle par salle (touche N pour le cacher) ; on peut quitter un donjon à tout moment et le refaire autant qu'on veut, sa récompense n'est donnée qu'une fois.
+- **Odyssée** — Graphismes Noir & Blanc :
+  - dans les montagnes, les sentiers sont en terre claire et vont jusqu'au pied de la roche, sans liseré d'herbe : on voit bien où l'on marche et où commence le rocher ;
+  - chaque gradin d'une montagne est un peu plus clair que celui du dessous, pour lire les marches de la roche.
+
+## 5.133 — 20 novembre 2026
+- **Odyssée** — Graphismes Noir & Blanc :
+  - les pentes de montagne en escalier n'ont plus de traits gris en biais sur leurs bords ;
+  - dans les grottes de terre (Route Victoire, Mesas, Crêtes, Sables…), les parois prennent la roche brune du jeu, sans pièces dépareillées ; les grottes marines, de magma et de glace gardent leur roche à elles.
+- **Odyssée** — Port-Orage et Givrebourg s'habillent : caisses et tonneaux près du ponton, bouée, bancs, lanternes dans la neige, jardinets et clôtures.
+
+## 5.132 — 20 novembre 2026
+- **Odyssée** — Graphismes Noir & Blanc : les reliefs prennent enfin les vraies pièces de Noir 2 & Blanc 2.
+  - Les buttes d'herbe ont leur bord d'herbe, leurs flancs de roche et leur paroi brune, comme dans le jeu.
+  - Les falaises des routes, des canyons et de Pierrefort deviennent de la roche brune du jeu au lieu des palissades sombres.
+  - Les montagnes passent en plateaux de roche à bords nets, avec leur paroi au sud.
+- **Odyssée** — Le Plateau Céleste est plus ramassé et plus beau : quatre jardins autour de la grande allée, avec cerisiers, statues, fontaines et lanternes.
+
+## 5.131 — 20 novembre 2026
+- **Odyssée** — Les routes gagnent en détails, sans rien perdre de leur longueur :
+  - des recoins cachés au bout d'une trouée dans les arbres, avec un objet au fond ; certains sont fermés par un arbuste à couper ;
+  - des buttes où l'on monte par un petit escalier, avec un banc ou un objet là-haut ;
+  - sur chaque route, un rocher qui cache quelque chose : approche-toi de celui qui brille ;
+  - de nouveaux rebords à sauter, et des panneaux de conseils du dresseur au bord du chemin.
+
+## 5.130 — 20 novembre 2026
+- **Odyssée** — Toutes les autres villes passent à l'échelle de Noir 2 & Blanc 2, de Port-Azur à Port-Ombre : des villes serrées autour de leur Centre, de leur Boutique et de leur Arène, qu'on traverse en quelques pas.
+  - Métropole reste un cran au-dessus, comme une grande ville du jeu.
+  - Les routes, les forêts, les lacs et les grottes ne changent pas : les portes des villes sont toujours au même endroit, et une allée à travers les bois y mène.
+
+## 5.129 — 20 novembre 2026
+- **Odyssée** — Pierrefort se resserre à la taille d'une ville de Noir 2 & Blanc 2 : le Centre, la Boutique, la Maison des Mineurs et l'usine Poké Ball sont à quelques pas les uns des autres, avec une couronne de maisons, l'auberge et le puits autour.
+  - Le Bois Murmure, la Route 3 et le chemin de la mine arrivent toujours aux mêmes portes.
+
+## 5.128 — 20 novembre 2026
+- **Odyssée** — Bourg-Aube redessiné à l'échelle de Noir 2 & Blanc 2 : un petit bourg où tout est à portée de main.
+  - Ta maison et celle de Théo au nord, le laboratoire du Professeur Saule à deux pas, un étang avec ses bancs.
+  - Au sud, une boulangerie, deux maisons habitées et des potagers fleuris.
+  - Le bourg est vérifié avec les deux graphismes, Odyssée et Noir & Blanc.
+
+## 5.127 — 20 novembre 2026
+- **Odyssée** — Sylvebourg redessinée sur le modèle des villes de Noir 2 & Blanc 2 : un village serré où chaque coin a quelque chose.
+  - La grand-rue relie les deux portes ; au nord le Centre et la Boutique avec leurs massifs de fleurs, au milieu les maisons à jardinets, l'Arène et un parc autour d'un étang.
+  - Au sud, l'auberge du Chêne, la cabane du chasseur et un verger ; de nouveaux habitants ont des choses à raconter.
+  - Le rendu a été vérifié avec les deux graphismes, Odyssée et Noir & Blanc.
+
+## 5.126 — 20 novembre 2026
+- **Odyssée** — Sylvebourg prend un peu d'ampleur : toujours un village façon Noir 2 & Blanc 2, mais avec une couronne de chalets, une auberge, un verger, un parc et la cabane du chasseur autour du centre.
+
+## 5.125 — 20 novembre 2026
+- **Odyssée** — Sylvebourg passe à la taille d'une ville de Noir 2 & Blanc 2 : un village compact où l'on trouve tout en quelques pas.
+  - Centre, Boutique et Arène se voient d'un coup d'œil, les deux maisons et leurs habitants sont toujours là, comme le garde du nord.
+  - Les Routes 1 et 2 s'allongent un peu pour rejoindre les nouvelles portes de la ville.
+  - L'autel du Bois Murmure est désormais relié au sentier par une petite allée.
 
 ## 5.124 — 19 novembre 2026
 - **Odyssée** — Graphismes Noir & Blanc :

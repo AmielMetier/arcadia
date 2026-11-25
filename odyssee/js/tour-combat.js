@@ -19,16 +19,37 @@ export function revancheBossPossible(game, n) {
   const t = tour(st).revanches[n.id];
   return t == null || Date.now() - t >= JOUR;
 }
+export const REMATCH_TEAMS = {
+  Hector: { megaSp: 212, team: [[1020, 78, 'focus-sash'], [1019, 79, 'wise-glasses'], [1048, 80, 'rocky-helmet'], [469, 80, 'choice-specs'], [637, 82, 'life-orb'], [212, 84, null]] },
+  Marine: { megaSp: 121, team: [[1033, 78, 'expert-belt'], [1030, 79, 'leftovers'], [1032, 80, 'sitrus-berry'], [350, 81, 'leftovers'], [658, 82, 'life-orb'], [121, 84, null]] },
+  Volta: { megaSp: 181, team: [[1035, 78, 'life-orb'], [135, 79, 'choice-specs'], [462, 80, 'assault-vest'], [604, 81, 'leftovers'], [466, 82, 'expert-belt'], [181, 84, null]] },
+  Flora: { megaSp: 3, team: [[1022, 78, 'black-sludge'], [407, 79, 'life-orb'], [465, 80, 'rocky-helmet'], [598, 81, 'leftovers'], [470, 82, 'scope-lens'], [3, 84, null]] },
+  Sibylle: { megaSp: 65, team: [[1040, 78, 'leftovers'], [196, 79, 'choice-specs'], [579, 80, 'life-orb'], [475, 81, 'expert-belt'], [282, 82, 'choice-scarf'], [65, 84, null]] },
+  Basalte: { megaSp: 142, team: [[1027, 78, 'assault-vest'], [526, 79, 'leftovers'], [464, 80, 'rocky-helmet'], [208, 81, 'leftovers'], [697, 82, 'choice-band'], [142, 84, null]] },
+  Pyros: { megaSp: 6, team: [[1042, 78, 'assault-vest'], [38, 79, 'leftovers'], [59, 80, 'life-orb'], [609, 81, 'choice-specs'], [467, 82, 'expert-belt'], [6, 84, null]] },
+  Drakos: { megaSp: 149, team: [[1044, 79, 'life-orb'], [330, 80, 'choice-scarf'], [612, 81, 'choice-band'], [635, 82, 'choice-specs'], [1051, 83, 'leftovers'], [149, 84, null]] },
+  Margot: { megaSp: 143, team: [[424, 78, 'life-orb'], [241, 79, 'leftovers'], [217, 80, 'muscle-band'], [128, 81, 'choice-band'], [474, 82, 'choice-specs'], [143, 84, null]] },
+  Aurèle: { megaSp: 373, team: [[279, 78, 'leftovers'], [227, 79, 'rocky-helmet'], [398, 80, 'choice-band'], [468, 81, 'leftovers'], [715, 82, 'choice-specs'], [373, 84, null]] },
+  Morgane: { megaSp: 691, team: [[110, 78, 'black-sludge'], [435, 79, 'sitrus-berry'], [452, 80, 'scope-lens'], [454, 81, 'life-orb'], [169, 82, 'choice-band'], [691, 84, null]] },
+  Gaspard: { megaSp: 445, team: [[450, 79, 'leftovers'], [464, 80, 'assault-vest'], [472, 81, 'leftovers'], [530, 82, 'life-orb'], [1060, 82, 'rocky-helmet'], [445, 84, null]] },
+  Ferdinand: { megaSp: 376, team: [[598, 79, 'rocky-helmet'], [462, 80, 'choice-specs'], [681, 81, 'leftovers'], [306, 82, 'assault-vest'], [448, 82, 'life-orb'], [376, 84, null]] },
+  Lilas: { megaSp: 282, team: [[683, 79, 'leftovers'], [685, 80, 'sitrus-berry'], [184, 81, 'choice-band'], [468, 82, 'choice-scarf'], [700, 82, 'choice-specs'], [282, 84, null]] },
+  Corbin: { megaSp: 248, team: [[197, 79, 'leftovers'], [430, 80, 'life-orb'], [461, 81, 'focus-sash'], [571, 82, 'choice-specs'], [635, 83, 'choice-scarf'], [248, 84, null]] },
+};
+
 export async function revancheBoss(game, n) {
   const d = n.def, tr = d.trainer, st = game.state, ui = game.ui;
   const who = { speaker: tr.cls ? `${tr.cls} ${tr.name}` : tr.name, face: tr.bs || tr.ow || n.sprite };
-  if (!(await ui.yesNo(['Le nouveau Maître de la Ligue en personne !', 'Mon équipe s\'est entraînée sans relâche depuis notre combat. Une revanche, à pleine puissance ?'], who))) { await ui.say('Quand tu veux. Je serai prêt.', who); return; }
-  // à pleine puissance : niveaux 70 à 86, attaques choisies, IA forte (trainerBattle : d.boss)
-  const team = tr.team.map((e) => { const [sp, lvl, item, moves, ab] = Array.isArray(e) ? e : [e.sp, e.lvl, e.item, e.moves, e.ability];
-    return [sp, Math.min(100, Math.max(lvl + 5, 70 + Math.round(lvl / 8))), item, null, ab]; });
+  if (!(await ui.yesNo(['Le nouveau Maître de la Ligue en personne !', 'Mon équipe s\'est entraînée sans relâche depuis notre combat. Une revanche, à pleine puissance ?'], who))) { await ui.say('Quand tu veux. Je t\'attendrai.', who); return; }
+  // à pleine puissance : équipes dédiées pour les 15 Champions, niveaux 70 à 86 pour le reste, IA forte (trainerBattle : d.boss)
+  const custom = REMATCH_TEAMS[tr.name];
+  const team = custom
+    ? custom.team.map(([sp, lvl, item, ab]) => [sp, lvl, item, null, ab])
+    : tr.team.map((e) => { const [sp, lvl, item, moves, ab] = Array.isArray(e) ? e : [e.sp, e.lvl, e.item, e.moves, e.ability];
+      return [sp, Math.min(100, Math.max(lvl + 5, 70 + Math.round(lvl / 8))), item, null, ab]; });
   const id = n.id + ':revanche';
   const fake = { ...n, id, def: { ...d, id, leader: undefined, champion: undefined, boss: true, onWin: undefined, winScript: undefined, beatenPos: undefined, vanish: undefined,
-    trainer: { ...tr, team, ai: 'smart', prize: (tr.prize || 100) * 2, megaSp: tr.megaSp || 'auto', intro: ['Cette fois, je ne retiens rien !'] } } };
+    trainer: { ...tr, team, ai: 'smart', prize: (tr.prize || 100) * 2, megaSp: custom?.megaSp || tr.megaSp || 'auto', intro: ['Cette fois, je ne retiens rien !'] } } };
   tour(st).revanches[n.id] = Date.now();
   const res = await game.trainerBattle(fake, false);
   delete st.flags['T:' + id];
@@ -75,7 +96,7 @@ function adversaire(n, niveau, r, count = 3, customPool = null) {
   return { cls, name: noms[Math.floor(r() * noms.length)], team, ow, ai: n >= 3 ? 'smart' : 'normal', prize: 0, items: n >= 5 ? { 'hyper-potion': 1 } : {} };
 }
 /** la boutique des Points Combat : [objet, prix en PCo] */
-const BOUTIQUE = [['rare-candy', 3], ['pp-up', 3], ['max-revive', 2], ['full-restore', 2], ['leftovers', 8], ['life-orb', 8], ['choice-band', 8], ['choice-specs', 8], ['choice-scarf', 8],
+const BOUTIQUE = [['heart-scale', 1], ['rare-candy', 3], ['pp-up', 3], ['max-revive', 2], ['full-restore', 2], ['leftovers', 8], ['life-orb', 8], ['choice-band', 8], ['choice-specs', 8], ['choice-scarf', 8],
   ['assault-vest', 8], ['focus-sash', 6], ['expert-belt', 6], ['rocky-helmet', 6], ['eviolite', 6], ['master-ball', 30]].filter(([k]) => ITEMS[k]);
 
 export async function tourCombat(game, n) {
@@ -83,10 +104,10 @@ export async function tourCombat(game, n) {
   if (!st.flags.champion) { await ui.say(['Ici se tiendra la Tour de Combat.', 'Elle n\'accueille que les Maîtres de la Ligue. Reviens quand tu auras battu Célestine.'], who); return; }
   await ui.say([`Bienvenue à la Tour de Combat, ${st.name} !`, `Tu as ${T.pco} Point${T.pco > 1 ? 's' : ''} Combat. Ta meilleure série : ${T.record} victoire${T.record > 1 ? 's' : ''}.`], who);
   const c = await ui.ask('Que veux-tu faire ?', ['Relever le défi', 'Échanger des PCo', 'Les règles', 'Rien'], who);
-  if (c === 2) { await ui.say(['Sept combats d\'affilée contre des dresseurs tirés au sort, en Solo (1v1 · 3 Pokémon), Duo (2v2 · 4 Pokémon) ou Trio (3v3 · 6 Pokémon).', 'Tes Pokémon sont soignés entre chaque combat. Une défaite, et la série s\'arrête.', 'Chaque série gagnée rapporte des Points Combat, d\'autant plus que ta série dure.', 'Tu ne perds ni argent ni rien d\'autre en cas de défaite.'], who); return; }
+  if (c === 2) { await ui.say(['Sept combats d\'affilée contre des dresseurs tirés au sort, en Solo (3 Pokémon), Duo (4 Pokémon) ou Trio (6 Pokémon).', 'Tes Pokémon sont soignés entre chaque combat. Une défaite, et la série s\'arrête.', 'Chaque série gagnée rapporte des Points Combat, d\'autant plus que ta série dure.', 'Tu ne perds ni argent ni rien d\'autre en cas de défaite.'], who); return; }
   if (c === 1) { await boutique(game, who); return; }
   if (c !== 0) return;
-  const fmt = await ui.ask('Quel format de combat ?', ['Solo (1v1)', 'Duo (2v2)', 'Trio (3v3)', 'Annuler'], who);
+  const fmt = await ui.ask('Quel format de combat ?', ['Solo', 'Duo', 'Trio', 'Annuler'], who);
   if (fmt < 0 || fmt > 2) return;
   const format = ['single', 'double', 'triple'][fmt];
   const minParty = fmt === 1 ? 2 : 3;
@@ -98,11 +119,12 @@ export async function tourCombat(game, n) {
   for (let k = 0; k < 7; k++) {
     for (const m of st.party) healFull(m);
     const adv = adversaire(k, niveau, r, teamSize);
-    const fmtLabel = fmt === 2 ? 'Trio 3v3' : fmt === 1 ? 'Duo 2v2' : 'Solo 1v1';
+    const fmtLabel = fmt === 2 ? 'Combat Trio' : fmt === 1 ? 'Combat Duo' : 'Combat Solo';
     await ui.say(`Combat ${k + 1} sur 7 (${fmtLabel}). Série en cours : ${T.serie} victoire${T.serie > 1 ? 's' : ''}.`, who);
     const fake = { id: 'tour:' + k, x: n.x, y: n.y, dir: n.dir, sprite: adv.ow, def: { id: 'tour:' + k, boss: true, sprite: adv.ow, noWhiteout: true, format,
       trainer: { cls: adv.cls, name: adv.name, team: adv.team, ai: adv.ai, prize: 0, items: adv.items, format, intro: k === 6 ? 'Le dernier combat de la série. Donne tout !' : 'En garde !', lose: 'Bien joué…' } } };
     const res = await game.trainerBattle(fake, false);
+    if (res === 'win' && k === 6) st.flags.bossTour = true;
     delete st.flags['T:tour:' + k];
     if (res !== 'win') {
       for (const m of st.party) healFull(m);
@@ -123,15 +145,15 @@ export async function tourCombat(game, n) {
 /** Coach Duo / Trio disponible dès les Centres Pokémon pour pratiquer le 2v2 et le 3v3 à tout moment */
 export async function clubCombat(game, n) {
   const st = game.state, ui = game.ui, who = { speaker: 'Coach Tactique', face: n.sprite };
-  await ui.say(['Bienvenue au Club Tactique Duo & Trio !', 'Ici, tu peux t\'entraîner en combat Duo (2v2) ou Trio (3v3) face à des équipes adaptées à ton niveau, sans risque.'], who);
+  await ui.say(['Bienvenue au Club Tactique Duo & Trio !', 'Ici, tu peux t\'entraîner en combat Duo ou Trio face à des équipes adaptées à ton niveau, sans risque.'], who);
   const choice = await ui.list({
     title: 'Club Tactique',
     items: [
-      { label: '⚔️ Duo (2v2)', right: 'Entraînement' },
-      { label: '⚔️ Trio (3v3)', right: 'Entraînement' },
-      { label: '⚔️ Solo (1v1)', right: 'Entraînement' },
+      { label: '⚔️ Combat Duo', right: 'Entraînement' },
+      { label: '⚔️ Combat Trio', right: 'Entraînement' },
+      { label: '⚔️ Combat Solo', right: 'Entraînement' },
       { label: '🏆 Tournoi en direct', right: '4 places' },
-      { label: '🎮 Multi 2v2', right: '4 joueurs' },
+      { label: '🎮 Multi Duo', right: '4 dresseurs' },
       { label: '📖 Règles Duo / Trio' },
       { label: 'Plus tard' },
     ],
@@ -142,8 +164,8 @@ export async function clubCombat(game, n) {
   if (choice === 4) { const m = await import('./multi-events.js'); return m.lancerMulti4p(game); }
   if (choice === 5) {
     await ui.say([
-      'En Duo (2v2), deux Pokémon combattent côte à côte : attention aux capacités de zone comme Séisme ou Surf qui peuvent toucher ton allié !',
-      'En Trio (3v3), trois Pokémon entrent en scène. Les attaques de mêlée ne visent que les adversaires en face ou voisins ; les capacités spéciales, de type Vol ou les rayons atteignent tout le terrain.',
+      'En Combat Duo, deux Pokémon combattent côte à côte : attention aux capacités de zone comme Séisme ou Surf qui peuvent toucher ton allié !',
+      'En Combat Trio, trois Pokémon entrent en scène. Les attaques de mêlée ne visent que les adversaires en face ou voisins ; les capacités spéciales, de type Vol ou les rayons atteignent tout le terrain.',
       'Tu peux revenir sur le choix du Pokémon précédent avec Retour pendant la phase d\'ordres !'
     ], who);
     return;
@@ -153,7 +175,7 @@ export async function clubCombat(game, n) {
   const minParty = choice === 0 ? 2 : choice === 1 ? 3 : 1;
   const aliveCount = st.party.filter((m) => m && m.hp > 0).length;
   if (aliveCount < minParty) {
-    await ui.say(`Il te faut au moins ${minParty} Pokémon en forme dans ton équipe pour un combat en ${choice === 0 ? 'Duo (2v2)' : 'Trio (3v3)'}.`, who);
+    await ui.say(`Il te faut au moins ${minParty} Pokémon en forme dans ton équipe pour un combat en ${choice === 0 ? 'Duo' : 'Trio'}.`, who);
     return;
   }
   const avgLvl = Math.max(8, Math.round(st.party.reduce((s, m) => s + (m.lvl || 5), 0) / st.party.length));
@@ -167,7 +189,7 @@ export async function clubCombat(game, n) {
     def: {
       id: 'club:' + format, sprite: adv.ow, noWhiteout: true, format,
       trainer: {
-        cls: adv.cls, name: adv.name, team: adv.team, ai: 'smart', prize: 0, items: {}, friendly: true, format,
+        cls: adv.cls, name: adv.name, team: adv.team, ai: 'smart', prize: 0, items: {}, friendly: true, format, xpMul: 0.6,
         intro: choice === 1 ? 'Trois contre trois ! Coordonne bien tes attaques et la portée de ton équipe !' : choice === 0 ? 'Combat Duo ! Montre-moi ta synergie !' : 'Un duel classique pour affûter tes réflexes !',
         lose: 'Superbe maîtrise tactique !'
       }

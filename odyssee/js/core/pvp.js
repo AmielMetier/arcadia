@@ -117,9 +117,11 @@ export class PvpBattle extends Battle {
     if (!left(1)) { this.winBattle(); return true; }
 
     if (this.slots === 1) {
-      if (!stop) return false;
-      this.need = [isFainted(this.act(0)), isFainted(this.act(1))];
-      this.needSlots = [this.need[0] ? [0] : [], this.need[1] ? [0] : []];
+      if (midTurn) return stop;
+      const n0 = isFainted(this.act(0)), n1 = isFainted(this.act(1));
+      if (!n0 && !n1) return false;
+      this.need = [n0, n1];
+      this.needSlots = [n0 ? [0] : [], n1 ? [0] : []];
       this.state = 'switch';
       this.ev.push({ t: 'switch-prompt' });
       return true;
@@ -173,17 +175,17 @@ export class PvpBattle extends Battle {
     if (switched.length) {
       for (const s of this.sortBySpeed(switched)) this.triggerEntry(s);
     }
-    this.state = 'choose';
+    if (!this.checkFaints()) this.state = 'choose';
     return this.flush();
   }
 
   winBattle() {
     this.ev.push({ t: 'trainer-back' });
-    this.say(`Vous avez battu ${this.sides[1].name} !`);
+    this.say(`Tu as battu ${this.sides[1].name} !`);
     this.end('win');
   }
   loseBattle() {
-    this.say('Vous n\'avez plus de Pokémon en forme !');
+    this.say('Tu n\'as plus de Pokémon en forme !');
     this.say(`${this.sides[1].name} remporte le combat !`);
     this.end('lose');
   }

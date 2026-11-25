@@ -1,5 +1,6 @@
 // odyssee/js/ui/screens/dex.js — Pokédex
 import { esc } from '../ui.js';
+import { warnDev } from '../../core/safe.js';
 import { SPECIES } from '../../data/species.js';
 import { ORIGINALES } from '../../data/remplacants.js';
 import { SPAWNS } from '../../world/region.js';
@@ -74,7 +75,7 @@ export function dexScreen(game, opts = {}) {
     }
     const seen = new Set(st.dex.seen), caught = new Set(st.dex.caught);
     const counts = st.dex.seenCount || st.dex.counts || {};
-    s.innerHTML = `<div class="dex-left box"><img class="dex-spr" alt=""><div class="dex-info"></div></div><div class="dex-right box"><div class="dex-count"><span>POKÉDEX</span><span>Vus <b>${seen.size}</b> · Capturés <b>${caught.size}</b> / ${ids.length}</span></div><div class="dex-prog"><u style="width:${(100 * caught.size / Math.max(1, ids.length)).toFixed(1)}%"></u><i style="width:${(100 * seen.size / Math.max(1, ids.length)).toFixed(1)}%"></i></div><div class="list-items dex-list"></div></div>`;
+    s.innerHTML = `<div class="dex-left box"><img class="dex-spr" alt=""><div class="dex-info"></div></div><div class="dex-right box"><div class="dex-count"><span>POKÉDEX</span><span>Vus <b>${seen.size}</b> · Capturés <b>${caught.size}</b> / ${ids.length}</span><button type="button" class="scr-close-btn dex-close-btn" data-act="close" title="Fermer (Échap)">✕</button></div><div class="dex-prog"><u style="width:${(100 * caught.size / Math.max(1, ids.length)).toFixed(1)}%"></u><i style="width:${(100 * seen.size / Math.max(1, ids.length)).toFixed(1)}%"></i></div><div class="list-items dex-list"></div></div>`;
     const list = s.querySelector('.dex-list'), spr = s.querySelector('.dex-spr'), info = s.querySelector('.dex-info');
     list.innerHTML = ids.map((id, idx) => `<div class="list-row" data-idx="${idx}" data-i="${id}"><span class="cur">▶</span><span class="dexn">${num(id)}</span><span class="lbl">${seen.has(id) ? esc(SPECIES[id].n) : '-----'}</span>${caught.has(id) ? '<span class="ball-mini"></span>' : ''}</div>`).join('');
     const rows = [...list.children];
@@ -94,8 +95,8 @@ export function dexScreen(game, opts = {}) {
       info.innerHTML = caught.has(id)
         ? `<div class="dex-name">${num(id)} ${esc(S.n)}</div><div>${esc(S.genus || '')}</div><div>${S.t.map(typeTag).join(' ')}</div><div>Taille ${(S.h / 10).toLocaleString('fr-FR')} m · Poids ${(S.w / 10).toLocaleString('fr-FR')} kg</div><p>${esc(S.dex)}</p>${habitatHtml}`
         : seen.has(id)
-          ? `<div class="dex-name">${num(id)} ${esc(S.n)}</div><div>${S.t.map(typeTag).join(' ')}</div><p>Capture cette créature pour débloquer sa description complète.</p>${habitatHtml}`
-          : `<div class="dex-unknown"><div class="dex-q">?</div><div class="dex-name">${num(id)} ?????</div><p>Pas encore rencontrée. Les hautes herbes, les grottes et l'eau cachent encore bien des créatures.</p></div>`;
+          ? `<div class="dex-name">${num(id)} ${esc(S.n)}</div><div>${S.t.map(typeTag).join(' ')}</div><p>Capture ce Pokémon pour débloquer sa description complète.</p>${habitatHtml}`
+          : `<div class="dex-unknown"><div class="dex-q">?</div><div class="dex-name">${num(id)} ?????</div><p>Pas encore rencontré. Les hautes herbes, les grottes et l'eau cachent encore bien des Pokémon.</p></div>`;
     };
     rows.forEach((r, idx) => {
       r.addEventListener?.('click', (e) => {
@@ -105,11 +106,21 @@ export function dexScreen(game, opts = {}) {
         draw();
         const id = ids[i];
         if (seen.has(id)) {
-          try { ui.sound?.cry?.(id); } catch (err) {}
+          try { ui.sound?.cry?.(ASSETS.cry(id)); } catch (err) { warnDev('dex', err); }
         }
       });
     });
     draw();
+    const close = () => {
+      pop();
+      s.remove();
+      ui.sound.sfx('cancel');
+      resolve();
+    };
+    s.querySelector('[data-act="close"]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      close();
+    });
     const pop = ui.input.push((k) => {
       if (k === 'up') {
         i = (i - 1 + ids.length) % ids.length;
@@ -130,19 +141,16 @@ export function dexScreen(game, opts = {}) {
       } else if (k === 'a') {
         const id = ids[i];
         if (seen.has(id)) {
-          try { ui.sound?.cry?.(id); } catch (e) {}
+          try { ui.sound?.cry?.(ASSETS.cry(id)); } catch (e) { warnDev('dex', e); }
           if (spr) {
             spr.style.transform = 'scale(1.2)';
             setTimeout(() => { if (spr) spr.style.transform = ''; }, 200);
           }
         } else {
-          try { ui.sound?.sfx?.('cancel'); } catch (e) {}
+          try { ui.sound?.sfx?.('cancel'); } catch (e) { warnDev('dex', e); }
         }
       } else if (k === 'b') {
-        pop();
-        s.remove();
-        ui.sound.sfx('cancel');
-        resolve();
+        close();
       }
     });
   });

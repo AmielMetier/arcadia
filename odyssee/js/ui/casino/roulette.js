@@ -79,7 +79,7 @@ function dessinerRoue(g, angle) {
 }
 
 export async function rouletteTable(game) {
-  const T = await ouvrir(game, 'roul', 'Roulette'), st = T.st, g = T.g, fond = fondRoulette();
+  const T = await ouvrir(game, 'roul', 'Roue d\'Odyssée'), st = T.st, g = T.g, fond = fondRoulette();
   const [roue, rg] = (() => { const c = document.createElement('canvas'); c.width = c.height = R_CASES * 2 + 2; return [c, c.getContext('2d')]; })();
   let angle = 0, vRoue = 0.4, bille = null, tourne = false, gagnant = null, historique = [], valeur = 5, curseur = CASES.find((c) => c.type === 'rouge'), focus = 'tapis', clign = 0;
   const paris = new Map();   // cle → { type, v, mise }

@@ -57,7 +57,7 @@ export function addMine({ W, maps, towns, trainerNpc, ENC }) {
   m1.warp(6, 28, { map: 'monde', x: porte.doorX, y: porte.doorY + 1, dir: 'down' });
   W.warp(porte.doorX, porte.doorY, { map: 'mine1', x: 6, y: 27, dir: 'up' });
   m1.outside = { map: 'monde', x: porte.doorX, y: porte.doorY + 1 };
-  trainerNpc(m1, 17, 13, 'down', 'Ouvrier', 'Firmin', [[74, 13], [66, 13], [1026, 14]], { sight: 3, intro: 'Hé, casque obligatoire ici ! ... Bon, un combat et on n\'en parle plus.' });
+  trainerNpc(m1, 17, 13, 'down', 'Ouvrier', 'Fernand', [[74, 13], [66, 13], [1026, 14]], { sight: 3, intro: 'Hé, casque obligatoire ici ! ... Bon, un combat et on n\'en parle plus.' });
   trainerNpc(m1, 29, 18, 'left', 'Montagnard', 'Lazare', [[1024, 14], [95, 15]], { sight: 3 });
   m1.item(20, 20, 'escape-rope'); m1.item(37, 23, 'hard-stone');
 
@@ -65,17 +65,17 @@ export function addMine({ W, maps, towns, trainerNpc, ENC }) {
   const m2 = niveau('mine2', 42, 30, 'Mine de Pierrefort — galeries profondes'); m2.encounter = enc;
   creuse(m2, 4, 4, 6, 25); creuse(m2, 4, 23, 34, 25);                    // galerie qui descend puis file à l'est
   creuse(m2, 7, 11, 9, 13); creuse(m2, 10, 8, 22, 16);                   // grande salle
-  creuse(m2, 23, 12, 30, 12);                                            // boyau étroit, fermé par l'éboulement
+  creuse(m2, 23, 12, 25, 12); creuse(m2, 26, 11, 30, 13);                // boyau étroit (Force), puis galerie d'éboulement contournable
   creuse(m2, 31, 6, 37, 16);                                             // salle du puits
   creuse(m2, 31, 21, 37, 25);                                            // cul-de-sac au bout des rails
   rails(m2, [...ligne(5, 6, 5, 24), ...ligne(6, 24, 33, 24)]);
   for (const y of [9, 15, 20]) etai(m2, 5, y);
-  m2.set(25, 12, T.BOULDER); m2.set(28, 12, T.BOULDER);                 // l'éboulement
+  m2.set(24, 12, T.BOULDER);                                             // l'éboulement (à pousser avec Force vers la galerie)
   m2.prop('wagonnet', 34, 24); m2.prop('wagonnet', 12, 9);
   for (const [x, y] of [[10, 8], [22, 8], [31, 7], [37, 16], [10, 16]]) m2.prop('lampe_mine', x, y);
   for (const [x, y] of [[14, 10], [19, 14], [33, 14], [36, 9], [20, 25]]) m2.prop('minerai', x, y);
   trainerNpc(m2, 16, 12, 'left', 'Ouvrier', 'Gédéon', [[75, 16], [1028, 16], [111, 17]], { sight: 3 });
-  trainerNpc(m2, 28, 25, 'left', 'Montagnard', 'Hector', [[1026, 16], [74, 16], [95, 17]], { sight: 4, intro: 'Plus bas, c\'est l\'éboulement. Personne n\'y est retourné.' });
+  trainerNpc(m2, 28, 25, 'left', 'Montagnard', 'Bertrand', [[1026, 16], [74, 16], [95, 17]], { sight: 4, intro: 'Plus bas, c\'est l\'éboulement. Personne n\'y est retourné.' });
   m2.item(21, 15, 'super-potion', 2); m2.item(36, 25, 'great-ball', 3);
   echelle(m1, 35, 22, { map: 'mine2', x: 5, y: 5, dir: 'down' });
   echelle(m2, 5, 4, { map: 'mine1', x: 35, y: 23, dir: 'down' }, true);   // sous l'échelle (35, 22) : au-dessus, c'est un filon

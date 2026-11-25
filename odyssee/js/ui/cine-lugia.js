@@ -662,7 +662,7 @@ export function createShadowLugiaEpic(THREE, container, img, fx = null) {
     try { for (const e of eclairs) e.geos.forEach((g) => g.dispose()); } catch (e) { /* rien */ }
     for (const o of disposables) { try { o.dispose?.(); } catch (e) { /* rien */ } }
     try { bloom?.dispose?.(); composer?.dispose?.(); } catch (e) { /* rien */ }
-    try { renderer.dispose(); } catch (e) { /* rien */ }
+    try { renderer.dispose(); renderer.forceContextLoss?.(); } catch (e) { /* rien */ }
     try { renderer.domElement?.parentNode?.removeChild(renderer.domElement); } catch (e) { /* rien */ }
   };
 

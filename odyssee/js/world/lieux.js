@@ -6,12 +6,13 @@
 //   - sinon un paysage vu de loin : lac caché, piton rocheux, colline boisée, pinède.
 // Un lieu reste dans son bloc, à trois cases du bord au moins : il ne relie jamais deux routes entre elles. Les PNJ et les
 // objets ont des identifiants fixes (`lieu:<bloc>:…`), tirés dans l'ordre des blocs.
+import { memoCases } from './cache-monde.js';
 import { T, walkable } from './tiles.js';
 import { rng, sin, cos } from './mapgen.js';
 import { plateau, massif, sinueuse } from './relief.js';
 import { bruit } from './quartiers.js';
 import { houseInterior } from './interiors.js';
-import { ROUTES, PRENOMS } from './voix.js';
+import { ROUTES, PRENOMS, prenomsPour } from './voix.js';
 import { lotsPour, rangRoute, adapter } from './bareme.js';
 
 const B = 24, N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -67,7 +68,7 @@ export function lieux(W, { maps, trainerNpc, ENC }) {
   }
   W.carrefours = carrefours;   // leurs panneaux sont posés après les écrans de verdure (panneauxDesLieux)
   fondDePaysage();
-  plages();
+  memoCases('plages', W, plages);   // ne change que des cases : calculées d'avance (cache-monde.js)
   return { lieux: nLieux, fond: nFond };
 
   /** les côtes : là où la forêt tombe dans la mer loin de tout passage, une plage de sable (2 à 4 cases), des rochers,
@@ -198,7 +199,8 @@ export function lieux(W, { maps, trainerNpc, ENC }) {
       const lv = Math.max(...enc.map((e) => e[2] || e[1] || 5)), team = [];
       for (let i = 0; i < 1 + Math.floor(r() * 3); i++) { const e = pick(enc); team.push([e[0], Math.min(100, lv + Math.floor(r() * 2))]); }
       occ.add(p.join(','));
-      trainerNpc(W, p[0], p[1], dir || 'down', pick(['Randonneuse', 'Montagnard', 'Topdresseur', 'Topdresseuse', 'Insectomane', 'Gamin', 'Karatéka']), pick(PRENOMS), team, { id: `${id}:d${np++}`, sight: 3 });
+      const cls = pick(['Randonneuse', 'Montagnard', 'Topdresseur', 'Topdresseuse', 'Insectomane', 'Gamin', 'Karatéka']);
+      trainerNpc(W, p[0], p[1], dir || 'down', cls, pick(prenomsPour(cls)), team, { id: `${id}:d${np++}`, sight: 3 });
     };
     // le contenu
     if (kind === 'hameau') {
@@ -233,7 +235,7 @@ export function lieux(W, { maps, trainerNpc, ENC }) {
               'Tiens, prends ma Canne à Pêche ! Mets-toi face à l\'eau et appuie pour lancer ta ligne.'
             ]);
             await A.give('canne');
-            await A.say('Tu pourras ferrer des créatures aquatiques dans tous les étangs et en mer !');
+            await A.say('Tu pourras ferrer des Pokémon aquatiques dans tous les étangs et en mer !');
             return;
           }
           await A.say([

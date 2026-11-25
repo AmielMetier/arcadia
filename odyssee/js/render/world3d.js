@@ -613,7 +613,7 @@ export class WorldView {
     this.geoHalo = new THREE.PlaneGeometry(1.6, 1.6);   // halo d'un lampadaire (une géométrie pour tous)
     this.lum = new Lumieres();                           // flaques de lumière de nuit (lumieres.js)
     this.ambiance = new Ambiance(this, SPRITE_UNIFORMS); // fumées, papillons, lucioles, feuilles qui tombent (ambiance.js)
-    this.tint = new THREE.Color(1, 1, 1); this.night = 0;
+    this.tint = new THREE.Color(1, 1, 1); this.night = 0; this.celestial = 'none'; this._lastHour = 12;
     // ombre des sous-bois (zones avec `ombre`, comme le Bois Murmure) : 1 en plein jour, plus bas sous les frondaisons
     this.ombre = 1; this.ombreCible = 1; this.tintBase = [1, 1, 1];
     this.animFrame = 0; this.animT = 0;
@@ -793,7 +793,8 @@ export class WorldView {
         return { c: A[(theme === 'snow' && A.snowtall0 ? 'snowtall' : 'tall') + (v < 0.5 ? 0 : 1)] };
       }
       case T.TREE: case T.PINE: return { c: theme === 'volcanic' ? A.ash1 : theme === 'snow' ? A.snow1 : desertCell ? sandFull : pg ? A[g4()] : A['forest' + (v < 0.5 ? 0 : 1)] };
-      case T.PATH: if (A.q_path_f) return quarts('path', isPathQ);
+      // (Noir & Blanc : contre la roche d'une montagne, le sentier va jusqu'au pied du rocher, sans bordure d'herbe)
+      case T.PATH: if (A.q_path_f) return quarts('path', A.nbr && m.outdoor ? (q) => isPathQ(q) || q === T.CAVEWALL || q === T.CLIFF : isPathQ);
         return { c: A['path' + edge(isPathish)] };
       case T.PAVE: if (A.q_pave_f) return quarts('pave', (q, ax, ay) => isPaveQ(q, ax, ay));
         return { c: A['pave' + edge((q) => isPathish(q))] };
@@ -834,9 +835,15 @@ export class WorldView {
       case T.CAVEWALL: if (m.outdoor) {
         if (sandFull && (desertCell || (hasNbr4(x, y, (g) => g === T.SAND) && !hasNbr8(x, y, (g) => g === T.GRASS || g === T.TREE || g === T.PINE || (g === T.FLOWER && !sandFlower(x, y)))))) return { c: sandFull };
         if (theme === 'volcanic' && this.N.cells.lava && hasNbr4(x, y, (g) => g === T.LAVA) && !hasNbr4(x, y, (g) => g === T.ASH || g === T.PATH || g === T.CAVE || T.STAIRS)) return { anim: this.N.cells.lava };
+        // Noir & Blanc : sous la roche d'une montagne qui borde un sentier, le sentier (pas de liseré d'herbe autour du rocher)
+        if (A.nbr && A.q_path_f && hasNbr8(x, y, (g) => g === T.PATH || g === T.STAIRS)) return { c: A.q_path_f };
         return { c: A[grassKey] };   // sous les montagnes du dehors
       }
-        if (this.tiers && A[`rp_${this.biome}_00`]) { const k = reliefKey(A, this.biome, 's', v); return { c: A[k] }; }
+        if (this.tiers && A[`rp_${this.biome}_00`]) {
+          // Noir & Blanc : le sol de grotte de la 4G (pack, grs_…)
+          const g = !m.donjon && A[`grs_${this.biome}_${v < 0.7 ? 0 : 1}`]; if (g) return { c: g };   // (pas dans les donjons)
+          const k = reliefKey(A, this.biome, 's', v); return { c: A[k] };
+        }
         if (this.tiers && A[`rt_${this.biome}_0`] && !this.tierAt(x, y)) return { c: A[`rt_${this.biome}_${v < 0.7 ? 0 : 1}`], shade: 0.95 };
       // falls through
       case T.CAVE: { const k = reliefKey(A, this.biome, 's', v); return { c: k ? A[k] : A['cave' + (v < 0.5 ? 0 : 1)] }; }
@@ -897,6 +904,8 @@ export class WorldView {
     const m = this.map, A = this.A.cells, b = bio || this.biome;
     // au-dessus du sol généré (sol.js) : ses coins arrondis laissent voir le sol fin, pas l'ancien sol de la case
     const yh = this.sol.couvre() ? 0.0049 : 0.004;
+    // Noir & Blanc, dans les grottes : la roche de grotte de la 4G (pack, grp_…) ; dehors et dans les donjons, la roche d'Odyssée
+    const rp = !m.outdoor && !m.donjon && A[`grp_${b}_00`] ? 'grp' : 'rp';
     // dehors, les montagnes ont des gradins (massif, montagne de relief.js) : chaque gradin est un plateau de roche posé
     // sur le précédent, ses bords en pente comme ceux des grottes ; la roche plus basse est « dehors »
     // dans une montagne à gravir (relief.js, montagne), le sentier fait partie du gradin quand il est à sa hauteur (ou
@@ -918,7 +927,7 @@ export class WorldView {
       }
       // à côté d'un sentier (case praticable), le pied de la paroi laisse voir le sentier : pas de roche dessous
       const sol = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => m.in(x + dx, y + dy) && m.get(x + dx, y + dy) !== T.CAVEWALL);
-      if (bas && !sol) flat(G, x, y, x + 1, y + 1, yh - 0.0002, A[`rp_${b}_11`], 0.9);
+      if (bas && !sol) flat(G, x, y, x + 1, y + 1, yh - 0.0002, A[`${rp}_${b}_11`], 0.9);
       // le vide d'un ravin, seulement sous les quarts de case tournés vers lui (pas de noir qui déborde sur la roche)
       const vide = (a, c) => ravin(m, a, c) && m.get(a, c) === T.CAVEWALL;   // le gouffre (pas une passerelle)
       for (let qy = 0; qy < 2; qy++) for (let qx = 0; qx < 2; qx++) {
@@ -938,18 +947,19 @@ export class WorldView {
     const v = hash(x * 13 + 5, y * 7 + 3), pick = (k, n, p) => A[`r${k}_${b}_${Math.floor(v * n)}`] && v < p ? A[`r${k}_${b}_${Math.floor(v * n / p) % n}`] : null;
     const open = (W ? 1 : 0) + (E ? 1 : 0) + (N ? 1 : 0) + (S ? 1 : 0);
     // falaise de montagne sur plusieurs gradins : sous une roche plus haute, la pente continue (pas de dessus de gradin)
+    // (les deux graphismes ont la même roche : celle d'Odyssée, le kit Noir & Blanc n'en a pas d'aussi lisible)
     if (m.outdoor && S && !W && !E && !N && m.get(x, y - 1) === T.CAVEWALL && !ravin(m, x, y - 1) && m.height(x, y - 1) > h0 && mont(m, x, y)) {
       const k = A[`rv_${b}_${Math.floor(v * 4)}`] || A[`rv_${b}_0`];
       if (k) { flat(G, x, y, x + 1, y + 1, yh, k); return; }
     }
-    if (!inner[0] && !inner[1] && open <= 1) {
+    if (rp === 'rp' && !inner[0] && !inner[1] && open <= 1) {   // (la roche de grotte du pack n'a pas de variantes)
       const alt = S ? pick('f', 4, 0.8) : N ? pick('n', 4, 0.8) : W ? pick('l', 3, 0.75) : E ? pick('e', 3, 0.75) : pick('q', 6, 0.4);
       if (alt) { flat(G, x, y, x + 1, y + 1, yh, alt); return; }
     }
     for (let qy = 0; qy < 2; qy++) for (let qx = 0; qx < 2; qx++) {
       let c = cols[qx], r = rows[qy];
       if (inner[qx] && !S) { if (qy === 1) { r = 5; c = qx ? 3 : 2; } else if (!N) { r = 4; c = qx ? 3 : 2; } }
-      const cell = A[`rp_${b}_${r >> 1}${c >> 1}`]; if (!cell) continue;
+      const cell = A[`${rp}_${b}_${r >> 1}${c >> 1}`]; if (!cell) continue;
       const hu = (cell[2] - cell[0]) / 2, hv = (cell[3] - cell[1]) / 2, u0 = cell[0] + (c & 1) * hu, v0 = cell[1] + (r & 1) * hv;
       // un soupçon de chevauchement entre les quarts : pas de fente d'un pixel où l'on verrait le sol
       const e = 1 / 128, ex0 = qx ? e : 0, ex1 = qx ? 0 : e, ez0 = qy ? e : 0, ez1 = qy ? 0 : e;
@@ -1027,6 +1037,9 @@ export class WorldView {
     // plateaux d'herbe (world/relief.js, pente) : talus de pelouse, dessiné au pixel par le sol généré (solgen.js, talus) ;
     // sans lui (?sol=0), des pièces de pelouse toutes faites (relief-tex.js)
     const gen = this.sol.couvre(), herbe = (a, b) => pente(m, a, b), lv = levreFalaise(th);
+    // graphismes Noir & Blanc : les buttes d'herbe prennent le cadre « herbe sur roche » du kit (bord d'herbe, paroi de
+    // roche au sud, flancs de roche à l'est et à l'ouest) au lieu des talus dessinés façon HeartGold
+    if (!gen && A.nbf_mur_c && this.nbButte(G, x, y, t, h, herbe)) return;
     if ((t === T.CLIFF || t === T.STAIRS) && herbe(x, y)) {
       if (gen) return;
       if (t === T.CLIFF) {
@@ -1087,6 +1100,48 @@ export class WorldView {
       if (bas(-1, 0) && bd('w')) flat(G, x, y, x + 1, y + 1, Y + 0.0002, bd('w'));
       if (bas(0, -1) && bd('n')) flat(G, x, y, x + 1, y + 1, Y + 0.0003, bd('n'));
     }
+  }
+  /** une butte d'herbe en graphismes Noir & Blanc : pièces nbf_* du pack (bord du plateau, paroi, escalier) ; renvoie
+   *  vrai quand la case est traitée (rien d'autre à dessiner pour son relief) */
+  nbButte(G, x, y, t, h, herbe) {
+    const m = this.map, A = this.A.cells, Y = 0.0049;
+    const pose = (k, dz = 0) => { if (A[k]) flat(G, x, y, x + 1, y + 1, Y + dz, A[k]); };
+    // plateau d'herbe ou de roche (canyons, terrasses) ; les montagnes gardent leurs gradins
+    const plat = (a, b) => herbe(a, b) || (m.height(a, b) > 0 && m.get(a, b) !== T.CAVEWALL && !mont(m, a, b));
+    const paroi = (a, b) => m.get(a, b) === T.CLIFF && !mont(m, a, b);
+    if (t === T.CLIFF) {
+      if (!paroi(x, y)) return false;
+      const fin = (dx) => { const q = m.get(x + dx, y); return q !== T.CLIFF && q !== T.STAIRS; };
+      // au-dessus d'une montagne, la paroi se détache sur la roche (pas sur l'herbe)
+      const r = m.get(x, y + 1) === T.CAVEWALL && A.nbf_mur_c_r ? '_r' : '';
+      pose((fin(-1) && !fin(1) ? 'nbf_mur_w' : fin(1) && !fin(-1) ? 'nbf_mur_e' : 'nbf_mur_c') + r);
+      return true;
+    }
+    if (t === T.STAIRS && (herbe(x, y) || !mont(m, x, y))) { if (A.stairs) pose('stairs', 0.0001); return true; }
+    if (h <= 0 || !plat(x, y)) {
+      // à côté d'un plateau : la roche de son flanc descend sur cette case (côté du plateau) ; au pied, pas d'ombre
+      if (mont(m, x, y)) return false;
+      let fait = paroi(x, y - 1);
+      for (const [dx, c] of [[1, 'w'], [-1, 'e']]) {
+        const a = x + dx, q = m.get(a, y), ha = m.height(a, y);
+        if (t === T.CLIFF) continue;
+        if (q === T.CLIFF && paroi(a, y)) { pose(`nbf_fl_${c}_mur`, 0.0001); fait = true; }
+        else if (plat(a, y) && q !== T.STAIRS && ha > h) {
+          const v = !(m.height(a, y - 1) >= ha && plat(a, y - 1)) ? 't' : m.get(a, y + 1) === T.CLIFF || m.get(a, y + 1) === T.STAIRS ? 'b' : 'm';
+          pose(`nbf_fl_${c}_${v}`, 0.0001); fait = true;
+        }
+      }
+      return fait;
+    }
+    // le bord du plateau : la lèvre d'herbe du kit sur l'herbe ; rien sur la roche (la paroi suffit)
+    if (!herbe(x, y)) return true;
+    const bas = (dx, dy) => { const q = m.get(x + dx, y + dy); return q === T.CLIFF || q === T.STAIRS || (m.height(x + dx, y + dy) < h && q !== T.CAVEWALL); };
+    const n = bas(0, -1), s = bas(0, 1), e = bas(1, 0), w = bas(-1, 0);
+    if (n) pose(w ? 'nbf_nw' : e ? 'nbf_ne' : 'nbf_n', 0.0002);
+    if (s) pose(w ? 'nbf_sw' : e ? 'nbf_se' : 'nbf_s', 0.0002);
+    if (!n && !s) { if (w) pose('nbf_w', 0.0002); if (e) pose('nbf_e', 0.0002); }
+    else if (w && e) { pose('nbf_w', 0.0001); pose('nbf_e', 0.0001); }
+    return true;
   }
   /** hauteur du sol à l'endroit (x, z) du monde : 0 sans le relief en 3D (?relief3d) */
   hAt(x, z) { return this.r3d ? this.r3d.Hmarche(x, z) : 0; }
@@ -2109,13 +2164,14 @@ export class WorldView {
     return true;
   }
   /** grande créature posée sur la carte (légendaire) : son image de face, debout sur la case */
-  imageActor(id, img, scale = 1) {
+  /** lumineux : l'image garde ses couleurs la nuit et sous la pluie (faille, météorite, émotion) */
+  imageActor(id, img, scale = 1, { lumineux = false } = {}) {
     let a = this.actors.get(id); if (a) return a;
     const t = tex(img); t.flipY = true; t.needsUpdate = true;   // image chargée telle quelle : le haut en haut
     const W = Math.round(img.width * scale) * WPX, H = Math.round(img.height * scale) * HPX;
     const geo = new THREE.PlaneGeometry(W, H); geo.translate(0, H / 2 - 3 * HPX * scale, 0);
     geo.setAttribute('anchor', new THREE.Float32BufferAttribute(new Array(12).fill(0), 3));
-    const mat = screenSprite(new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide }), AVANCE_PERSO); this.tinted.push(mat); mat.color.copy(this.tint);
+    const mat = screenSprite(new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide }), AVANCE_PERSO); if (!lumineux) { this.tinted.push(mat); mat.color.copy(this.tint); }
     const mesh = new THREE.Mesh(geo, mat);
     const S = this.ombres.uv(1.6 * TILE_PX, 0.7 * TILE_PX), sg = new THREE.PlaneGeometry(1.6, 0.7); sg.rotateX(-Math.PI / 2);
     const uv = sg.attributes.uv; for (let i = 0; i < 4; i++) uv.setXY(i, i % 2 ? S[2] : S[0], i < 2 ? S[1] : S[3]);
@@ -2201,6 +2257,7 @@ export class WorldView {
   /* ---------------- heure du jour ---------------- */
   setTimeOfDay(h) {
     // aube rosée, matin doré, journée neutre, soir orangé, nuit bleue (lumieres.js : teintes vues à l'écran)
+    this._lastHour = h;
     const c = teinteHeure(h);
     this.night = nuitHeure(h);
     this.tintBase = c;
@@ -2215,6 +2272,8 @@ export class WorldView {
     // ciel couvert : la pluie et la grêle assombrissent et bleuissent, le sable jaunit, la cendre grise (lumière linéaire)
     const ciel = indoorOrCave ? null : METEO_TEINTE[this.weather?.current];
     if (ciel) k = k.map((v, i) => v * ciel[i]);
+    if (!indoorOrCave && this.celestial === 'aurora') k = [Math.min(1.2, k[0] * 0.78), Math.min(1.2, k[1] * 1.12), Math.min(1.2, k[2] * 1.06)];
+    else if (!indoorOrCave && this.celestial === 'meteor') k = [Math.min(1.2, k[0] * 0.94), Math.min(1.2, k[1] * 0.9), Math.min(1.2, k[2] * 1.14)];
     this.tint.setRGB(k[0], k[1], k[2]);
     for (const m of this.tinted) { const base = m.userData.base; if (m.userData.vitre && !indoorOrCave && this.night > 0.5) m.color.setRGB(...VITRE_NUIT); else if (base) m.color.copy(base).multiply(this.tint); else m.color.copy(this.tint); }
     if (this.nightGroup) this.nightGroup.visible = !indoorOrCave && this.night > 0.5;
@@ -2252,6 +2311,7 @@ export class WorldView {
 
   /* ---------------- image ---------------- */
   update(dt, fx, fy) {
+    const px = fx, py = fy;   // position du joueur (fx, fy deviennent le point visé par la caméra)
     this.ensureChunks(fx, fy);
     if (Math.abs(this.ombre - this.ombreCible) > 0.002) { this.ombre += (this.ombreCible - this.ombre) * Math.min(1, dt * 2.5); this.applyTint(this.tintBase); }
     this.sol.update(dt, Math.floor(fx / CH), Math.floor(fy / CH), fx + 0.5, fy + 0.5);
@@ -2261,6 +2321,14 @@ export class WorldView {
       const ctx = this.N.canvas.getContext('2d'); ctx.clearRect(0, 0, this.N.canvas.width, this.N.canvas.height); ctx.drawImage(this.N.frames[this.animFrame], 0, 0); this.texN.needsUpdate = true;
     }
     const estOrtho = !!(this.r3d ? this.r3dOrtho : (this.batPack && this.map?.outdoor && this.orthoPref));
+    // intérieurs éclairés : une pièce qui tient à l'écran est cadrée en entier (centrée) au lieu de suivre le joueur, comme
+    // une pièce de jeu Pokémon ; pas dans les grottes sombres (leur halo est au centre de l'écran) ni dans les donjons
+    const cm = this.map;
+    if (cm && !cm.outdoor && !cm.dark && !cm.donjon) {
+      const u = SPRITE_UNIFORMS.uRes.value, q = (this.zoom || 1) / (TILE_PX * (this.kPx || 1));
+      if (cm.w <= u.x * q) fx = cm.w / 2 - 0.5;
+      if (cm.h + 0.6 <= u.y * q) fy = (cm.h - 0.6) / 2 - 0.5;
+    }
     this.focus.set(fx + 0.5, 0, fy + 0.5);
     if (this.r3d) {
       // relief en 3D : la caméra suit la hauteur du sol, calée sur la grille des pixels (rien ne « nage » en marchant)
@@ -2270,7 +2338,7 @@ export class WorldView {
     } else if (estOrtho) {
       this.focus.set(Math.round((fx + 0.5) * TILE_PX) / TILE_PX, 0, Math.round((fy + 0.5) * TILE_PX) / TILE_PX);
     }
-    this.fadeBuildings(fx, fy, dt);
+    this.fadeBuildings(px, py, dt);
     if (this.portesAnim?.size) for (const t of this.portesAnim) {
       const u = t.userData; u.k += Math.sign(u.cible - u.k) * Math.min(Math.abs(u.cible - u.k), dt / 0.2);
       const cran = Math.ceil(u.k * 3 - 1e-6) / 3;          // trois crans nets, pas un glissement
@@ -2306,8 +2374,18 @@ export class WorldView {
     this.camera.lookAt(this.focus.x, this.focus.y, this.focus.z);
     if (this.weather) this.weather.sol = this.focus.y + 0.02;   // les gouttes éclaboussent le sol où l'on marche
     this.weather?.update(dt, this.focus.x, this.focus.z);
-    this.ambiance.maj(dt, fx, fy);
+    this.ambiance.maj(dt, px, py);
   }
   setWeather(w) { const a = this.weather?.current; this.weather?.setWeather(w); if (this.weather && this.weather.current !== a && this.tintBase) this.applyTint(this.tintBase); }
+  setCelestial(kind) {
+    const next = kind === 'aurora' || kind === 'meteor' ? kind : 'none';
+    const prev = this.celestial || 'none';
+    this.celestial = next;
+    this.weather?.setCelestial?.(next);
+    if (prev !== next) {
+      if (this.tintBase) this.applyTint(this.tintBase);
+      else this.setTimeOfDay(this._lastHour ?? 12);
+    }
+  }
   render() { this.renderer.render(this.scene, this.camera); }
 }

@@ -85,6 +85,9 @@ const { buildWorld } = await import('../odyssee/js/world/region.js');
 const { T, walkable } = await import('../odyssee/js/world/tiles.js');
 const { maps, towns, legends, docks } = buildWorld();
 const W = maps.monde;
+// le cache des étapes lentes (world/cache-monde.js) doit correspondre à la carte : sinon le jeu démarre plus lentement
+{ const { MANQUES } = await import('../odyssee/js/world/cache-monde.js');
+  if (MANQUES.length) { console.log(`✗ cache du monde périmé (${MANQUES.join(', ')}) : node tools/odyssee-cache-monde.mjs`); fails++; } }
 // exploration à travers les grottes : chaque sortie de grotte relance l'exploration du monde ; le bateau (permis bateau
 // dès 2 badges) relie entre eux les quais atteints, selon les badges que demande chaque quai
 // gates : true ou nombre de badges ; abil : true (Coupe, Surf, Éclate-Roc) ou Set des cases franchissables
@@ -198,6 +201,7 @@ for (const it of W.items) ok(reachable(W, seenW, it.x, it.y), `objet ${it.item} 
 // intérieurs : chaque tapis ramène dehors, chaque PNJ est atteignable depuis l'entrée
 for (const [id, m] of Object.entries(maps)) {
   if (id === 'monde') continue;
+  if (m.donjon && !m.warps.size) continue;   // salles de donjon reliées par leurs mécanismes : tools/test-odyssee-donjons.mjs
   const entries = [...m.warps.keys()].map((k) => k.split(',').map(Number));
   ok(entries.length > 0, `${id} a une sortie`);
   const [ex, ey] = entries[0];
@@ -224,9 +228,9 @@ for (let k = 0; k <= NB; k++) {
   ok(doorOpen(seen, leagueDoor) === (k === NB), `Ligue ${k === NB ? 'ouverte' : 'fermée'} avec ${k} badge(s)`);
   { const [cx, cy] = W.capEtoiles || [212, 202]; ok(!!seen[at(W, cx, cy)] === (k >= 8), `Cap des Étoiles ${k >= 8 ? 'ouvert' : 'fermé'} avec ${k} badge(s)`); }
 }
-// l'usine Poké Ball de Pierrefort reste fermée (portail gardé), même avec tous les badges et toutes les capacités
+// l'usine Poké Ball de Pierrefort s'ouvre à partir de 5 badges (fermée à 4, ouverte à 5)
 { const u = [...W.warps].find(([, w]) => w.map === 'pierre:usine'); ok(!!u, 'usine Poké Ball posée à Pierrefort');
-  if (u) { const [x, y] = u[0].split(',').map(Number), s15 = explore(NB, true); ok(!s15[at(W, x, y + 1)], 'l\'usine Poké Ball reste fermée'); } }
+  if (u) { const [x, y] = u[0].split(',').map(Number), s4 = explore(4, true), s5 = explore(5, true); ok(!s4[at(W, x, y + 1)], 'l\'usine Poké Ball est fermée à 4 badges'); ok(!!s5[at(W, x, y + 1)], 'l\'usine Poké Ball s\'ouvre à 5 badges'); } }
 // îles du bateau : depuis chaque quai, sans Surf, avec les badges qui ouvrent la traversée
 const near = (seen, m, x, y) => [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => m.in(x + dx, y + dy) && seen[(y + dy) * m.w + x + dx]);
 for (const [k, d] of Object.entries(docks)) ok(d.map !== 'monde' ? walkable(maps[d.map].get(d.x, d.y)) : walkable(W.get(d.x, d.y)) && seenW[at(W, d.x, d.y)], `quai ${k} praticable et atteignable`);

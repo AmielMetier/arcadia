@@ -10,7 +10,7 @@
   font-size: calc(var(--bp) * 8);
   --px: calc(var(--bp) * 0.85);
 }
-.bcv { width: 100%; height: 100%; image-rendering: pixelated; }
+.bcv { width: 100%; height: 100%; image-rendering: auto; }   /* déjà agrandie au pixel près (battleView.js), juste réduite d'un poil : lissée */
 
 /* Boîtes de statut 5G (Noir 2 / Blanc 2) ancrées aux bords */
 .bhud {
@@ -69,6 +69,41 @@
   padding: 0 calc(var(--bp) * 2);
   line-height: 1.25;
 }
+.bh-alpha-tag {
+  font-size: 0.52em;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #fff2d8;
+  background: linear-gradient(180deg, #b91c1c 0%, #7f1d1d 100%);
+  border: calc(var(--bp) * 0.6) solid #fb923c;
+  padding: 0 calc(var(--bp) * 1.5);
+  line-height: 1.25;
+  text-shadow: 0 1px 0 #000;
+}
+.battle-anomaly-badge {
+  position: absolute;
+  top: calc(var(--bp) * 18);   /* sous la pastille de météo */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--bp) * 1.8);
+  padding: calc(var(--bp) * 1) calc(var(--bp) * 3.2);
+  font-size: 0.62em;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: rgba(16, 12, 28, 0.94);
+  color: #f8fafc;
+  border: calc(var(--bp) * 0.9) solid #a855f7;
+  outline: calc(var(--bp) * 0.7) solid #080a10;
+  box-shadow: 0 calc(var(--bp) * 1.4) 0 rgba(0, 0, 0, 0.72);
+  pointer-events: none;
+}
+.battle-anomaly-badge.inverse { border-color: #38bdf8; color: #e0f2fe; background: rgba(14, 24, 48, 0.94); }
+.battle-anomaly-badge.chaos { border-color: #facc15; color: #fef9c3; background: rgba(40, 26, 12, 0.94); }
+.battle-anomaly-badge.alpha { border-color: #f97316; color: #ffedd5; background: rgba(54, 14, 18, 0.94); }
 .bh-types {
   display: flex;
   align-items: center;
@@ -317,9 +352,10 @@
 /* Bannière Lancer Rapide de Poké Ball (combat sauvage B2W2) */
 .fast-ball-banner {
   position: absolute;
-  bottom: calc(100% + var(--bp) * 2);
-  right: 0;
-  width: 100%;
+  /* dans la boîte « Que doit faire… », sous la question : au-dessus des boutons, elle cachait les PV du joueur */
+  bottom: calc(var(--bp) * 4);
+  right: calc(100% + var(--bp) * 7.5);
+  width: calc(85.18% - var(--bp) * 20);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -732,6 +768,17 @@
 .battle.slots-3 .bhud-stack.me { bottom: calc(var(--bp) * 47); width: calc(var(--bp) * 102); }
 .battle.slots-3 .bh-ball { width: calc(var(--bp) * 4.8); height: calc(var(--bp) * 4.8); }
 
+/* raid à quatre (combat quadruple) : cartes plus serrées */
+.battle.slots-4 .bhud-stack { gap: calc(var(--bp) * 0.5); }
+.battle.slots-4 .bhud-stack.foe { width: calc(var(--bp) * 94); }
+.battle.slots-4 .bhud-stack.me { bottom: calc(var(--bp) * 46); width: calc(var(--bp) * 96); }
+.battle.slots-4 .bh-ball { width: calc(var(--bp) * 4.4); height: calc(var(--bp) * 4.4); }
+.battle.slots-4 .bhud-card { padding: calc(var(--bp) * 0.5) calc(var(--bp) * 1.8); }
+.battle.slots-4 .bhud-card .bh-top { font-size: 0.6em; margin-bottom: calc(var(--bp) * 0.2); }
+.battle.slots-4 .bhud-card .bh-hp { height: calc(var(--bp) * 2.6); }
+.battle.slots-4 .bhud-card .bh-hp i { height: calc(var(--bp) * 1.4); }
+.battle.slots-4 .bhud-card .bh-bot { margin-top: calc(var(--bp) * 0.2); }
+
 .bhud-party-strip {
   display: flex;
   align-items: center;
@@ -816,3 +863,109 @@
 .tgt-bar u { display: block; height: 100%; }
 .tgt-bot { display: flex; justify-content: space-between; align-items: center; gap: calc(var(--bp) * 1); font-size: 0.58em; }
 .tgt-hp { color: #d0e0ff; font-variant-numeric: tabular-nums; }
+
+/* ---------- boss de raid : l'escouade se présente face au boss ---------- */
+.raid-lineup { position: absolute; inset: 0; z-index: 40; pointer-events: none; overflow: hidden;
+  --aura: #ffd23a; --aura2: #e09a00; font-family: inherit; }
+.raid-lineup.aura-rouge { --aura: #ff5a4a; --aura2: #b00018; }
+.raid-lineup.aura-bleu { --aura: #6cc4ff; --aura2: #1f5bd6; }
+.raid-lineup .rl-bande { position: absolute; left: 0; right: 0; top: 18%; height: 58%;
+  background: linear-gradient(100deg, rgba(10, 22, 48, 0.95) 0 54%, rgba(0, 0, 0, 0.92) 54% 56%, rgba(28, 10, 6, 0.95) 56%);
+  border-top: calc(var(--bp) * 1) solid #e8f2ff; border-bottom: calc(var(--bp) * 1) solid var(--aura);
+  box-shadow: 0 0 calc(var(--bp) * 6) rgba(0, 0, 0, 0.8);
+  transform: scaleY(0); transition: transform 0.24s cubic-bezier(.2, .9, .3, 1); }
+.raid-lineup.in .rl-bande { transform: scaleY(1); }
+.raid-lineup .rl-titre { position: absolute; left: calc(var(--bp) * 6); top: calc(18% + var(--bp) * 2.5); color: #9fd8ff;
+  font-size: calc(var(--bp) * 5.2); letter-spacing: 0.18em; font-weight: 900; opacity: 0; transition: opacity 0.3s 0.15s;
+  text-shadow: calc(var(--bp) * 0.6) calc(var(--bp) * 0.6) 0 #000; }
+.raid-lineup.in .rl-titre { opacity: 1; }
+.raid-lineup .rl-equipe { position: absolute; left: calc(var(--bp) * 4); width: 52%; top: 28%; height: 44%;
+  display: flex; align-items: flex-end; justify-content: space-evenly; gap: calc(var(--bp) * 1.5); }
+.raid-lineup .rl-joueur { flex: 1 1 0; max-width: calc(var(--bp) * 44); display: flex; flex-direction: column; align-items: center;
+  opacity: 0; transform: translateX(calc(var(--bp) * -60)) skewX(-8deg);
+  transition: transform 0.3s cubic-bezier(.2, 1.4, .4, 1), opacity 0.2s; transition-delay: calc(0.26s + var(--k) * 0.2s); }
+.raid-lineup.in .rl-joueur { opacity: 1; transform: none; }
+.raid-lineup .rl-portrait { width: 100%; aspect-ratio: 1; display: grid; place-items: end center; overflow: hidden;
+  background: radial-gradient(circle at 50% 70%, rgba(120, 200, 255, 0.35), transparent 65%);
+  border-bottom: calc(var(--bp) * 0.8) solid #78d0ff; }
+.raid-lineup .rl-portrait img { height: 100%; image-rendering: pixelated; filter: drop-shadow(calc(var(--bp) * 0.8) calc(var(--bp) * 0.8) 0 rgba(0, 0, 0, 0.6)); }
+.raid-lineup .rl-nom { margin-top: calc(var(--bp) * 1.2); color: #fff; font-weight: 800; font-size: calc(var(--bp) * 4.6);
+  white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; text-shadow: calc(var(--bp) * 0.6) calc(var(--bp) * 0.6) 0 #000; }
+.raid-lineup .rl-nom i { font-style: normal; margin-left: calc(var(--bp) * 1); padding: 0 calc(var(--bp) * 1); font-size: 0.7em;
+  background: #78d0ff; color: #08142c; border-radius: calc(var(--bp) * 1); vertical-align: middle; }
+.raid-lineup .rl-joueur.moi .rl-portrait { border-bottom-color: #ffe14a; }
+/* une couleur par joueur, comme les manettes : bleu, rouge, vert, jaune */
+.raid-lineup .rl-joueur { --c: #4aa8ff; }
+.raid-lineup .rl-joueur:nth-child(2) { --c: #ff5a5a; }
+.raid-lineup .rl-joueur:nth-child(3) { --c: #4ade80; }
+.raid-lineup .rl-joueur:nth-child(4) { --c: #ffd23a; }
+.raid-lineup .rl-portrait { border-bottom-color: var(--c) !important; background: radial-gradient(circle at 50% 70%, color-mix(in srgb, var(--c) 40%, transparent), transparent 65%); }
+.raid-lineup .rl-nom i { background: var(--c); }
+
+/* combat contre un boss de raid : les cartes des joueurs en colonne serrée à droite, au-dessus de la boîte de texte,
+   pour laisser le boss et l'escouade à découvert */
+.battle.raid-monde .bhud-stack.me { top: calc(var(--bp) * 14); bottom: auto; right: calc(var(--bp) * 2); width: calc(var(--bp) * 58); gap: calc(var(--bp) * 1.2); }
+.battle.raid-monde .bhud-stack.me .bhud-party-strip { display: none; }
+.battle.raid-monde .bhud-card.me { padding: calc(var(--bp) * 0.6) calc(var(--bp) * 1.6); }
+.battle.raid-monde .bhud-card.me .bh-top { font-size: 0.6em; margin-bottom: calc(var(--bp) * 0.2); }
+.battle.raid-monde .bhud-card.me .bh-types, .battle.raid-monde .bhud-card.me .bh-exp-wrap { display: none; }
+.battle.raid-monde .bhud-card.me .bh-hp { height: calc(var(--bp) * 2.6); }
+.battle.raid-monde .bhud-card.me .bh-hp i { height: calc(var(--bp) * 1.4); }
+.battle.raid-monde .bhud-card.me .bh-bot { margin-top: calc(var(--bp) * 0.1); justify-content: flex-end; font-size: 0.85em; }
+.raid-lineup.n4 .rl-nom { font-size: calc(var(--bp) * 3.8); }
+.raid-lineup .rl-vs { position: absolute; left: 55%; top: 47%; transform: translate(-50%, -50%) scale(3); opacity: 0;
+  color: #fff; font-size: calc(var(--bp) * 14); font-weight: 900; font-style: italic; letter-spacing: -0.04em;
+  text-shadow: calc(var(--bp) * 1) calc(var(--bp) * 1) 0 var(--aura2), 0 0 calc(var(--bp) * 4) var(--aura);
+  transition: transform 0.22s cubic-bezier(.3, 1.6, .5, 1), opacity 0.12s; }
+.raid-lineup.vs .rl-vs { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.raid-lineup .rl-boss { position: absolute; right: calc(var(--bp) * 4); width: 38%; top: 20%; height: 54%;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  opacity: 0; transform: translateX(calc(var(--bp) * 60)); transition: transform 0.3s cubic-bezier(.2, 1.3, .4, 1), opacity 0.2s; }
+.raid-lineup.boss .rl-boss { opacity: 1; transform: none; }
+.raid-lineup .rl-boss-img { flex: 1; min-height: 0; display: grid; place-items: end center; width: 100%;
+  background: radial-gradient(ellipse 45% 55% at 50% 62%, color-mix(in srgb, var(--aura) 45%, transparent), transparent 70%); }
+.raid-lineup .rl-boss-img img { height: 100%; image-rendering: pixelated;
+  filter: drop-shadow(0 0 calc(var(--bp) * 1) var(--aura)) drop-shadow(0 0 calc(var(--bp) * 3) var(--aura2)); }
+.raid-lineup .rl-boss-nom { color: #fff; font-weight: 900; font-size: calc(var(--bp) * 5.6); white-space: nowrap;
+  text-shadow: calc(var(--bp) * 0.6) calc(var(--bp) * 0.6) 0 #000, 0 0 calc(var(--bp) * 2) var(--aura2); }
+.raid-lineup .rl-boss-sous { color: var(--aura); font-weight: 800; font-size: calc(var(--bp) * 3.8); text-shadow: calc(var(--bp) * 0.5) calc(var(--bp) * 0.5) 0 #000; }
+.raid-lineup.out { opacity: 0; transition: opacity 0.3s; }
+
+/* ---------- boss de raid : le récap de fin de combat ---------- */
+.raid-recap { position: absolute; inset: 0; z-index: 70; display: grid; place-items: center; background: rgba(4, 8, 18, 0.72);
+  --aura: #ffd23a; opacity: 0; transition: opacity 0.25s; font-size: clamp(11px, 2.3vmin, 18px); }
+.raid-recap.aura-rouge { --aura: #ff5a4a; }
+.raid-recap.aura-bleu { --aura: #6cc4ff; }
+.raid-recap.in { opacity: 1; }
+.raid-recap .rr-panneau { width: min(92vw, 62em); background: linear-gradient(180deg, #1c2438, #10141f); color: #eef3ff;
+  border: 0.25em solid #8898b8; outline: 0.2em solid #05070c; box-shadow: 0 0 2.5em rgba(0, 0, 0, 0.7), 0 0 1.2em color-mix(in srgb, var(--aura) 35%, transparent);
+  padding: 1em 1.2em 0.8em; transform: translateY(1.5em) scale(0.96); transition: transform 0.3s cubic-bezier(.2, 1.3, .4, 1); }
+.raid-recap.in .rr-panneau { transform: none; }
+.raid-recap .rr-tete { display: flex; align-items: baseline; gap: 0.8em; border-bottom: 0.15em solid var(--aura); padding-bottom: 0.4em; margin-bottom: 0.6em; }
+.raid-recap .rr-tete b { font-size: 1.7em; font-weight: 900; letter-spacing: 0.04em; color: var(--aura); text-shadow: 0.08em 0.08em 0 #000; }
+.raid-recap.perdu .rr-tete b { color: #c8d2e8; }
+.raid-recap .rr-tete span { opacity: 0.75; }
+.raid-recap .rr-ligne { display: grid; grid-template-columns: 2.2em minmax(6em, 1.1fr) 2.2fr 0.7fr 0.7fr 0.5fr; gap: 0.6em; align-items: center;
+  padding: 0.35em 0.5em; margin-bottom: 0.3em; background: rgba(255, 255, 255, 0.05); border-left: 0.3em solid var(--c, transparent);
+  opacity: 0; transform: translateX(-1.5em); transition: opacity 0.25s var(--d, 0s), transform 0.3s var(--d, 0s); }
+.raid-recap.in .rr-ligne { opacity: 1; transform: none; }
+.raid-recap .rr-ligne > span:nth-child(n+4) { text-align: right; font-variant-numeric: tabular-nums; }
+.raid-recap .rr-entete { background: none; border: 0; font-size: 0.75em; opacity: 0.6 !important; text-transform: uppercase; letter-spacing: 0.06em; padding-top: 0; }
+.raid-recap .rr-ligne.moi { background: rgba(255, 225, 74, 0.1); }
+.raid-recap .rr-rang { font-size: 1.3em; text-align: center; }
+.raid-recap .rr-nom { font-weight: 800; color: var(--c); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.raid-recap .rr-nom i { font-style: normal; font-size: 0.7em; color: #08142c; background: var(--c); padding: 0 0.35em; border-radius: 0.3em; }
+.raid-recap .rr-deg { position: relative; display: flex; align-items: center; gap: 0.5em; height: 1.5em; background: rgba(0, 0, 0, 0.35); padding: 0 0.4em; }
+.raid-recap .rr-deg i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--c) 70%, transparent), color-mix(in srgb, var(--c) 35%, transparent)); }
+.raid-recap .rr-deg b, .raid-recap .rr-deg small { position: relative; }
+.raid-recap .rr-deg small { margin-left: auto; opacity: 0.8; }
+.raid-recap .rr-titres { display: flex; flex-wrap: wrap; gap: 0.5em; margin-top: 0.7em; }
+.raid-recap .rr-titre { flex: 1 1 10em; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 0.5em; align-items: center;
+  background: rgba(255, 255, 255, 0.06); border: 0.1em solid rgba(255, 255, 255, 0.12); padding: 0.35em 0.6em; grid-template-rows: auto auto auto;
+  opacity: 0; transition: opacity 0.3s var(--d, 0s); }
+.raid-recap.in .rr-titre { opacity: 1; }
+.raid-recap .rr-titre span { grid-row: span 3; font-size: 1.5em; }
+.raid-recap .rr-titre b { font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--aura); }
+.raid-recap .rr-titre em { font-style: normal; font-weight: 800; }
+.raid-recap .rr-titre small { grid-column: 2; opacity: 0.7; }
+.raid-recap .rr-pied { text-align: right; margin-top: 0.6em; font-size: 0.8em; opacity: 0.65; }

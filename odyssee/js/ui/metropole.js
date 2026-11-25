@@ -20,7 +20,7 @@ function table(ui, cls, title) {
 /* ============================== CASINO ============================== */
 export const PRIX_JETON = 20;
 const LOTS = [
-  { k: 'rare-candy', jetons: 120 }, { k: 'ultra-ball', jetons: 40 }, { k: 'max-potion', jetons: 60 }, { k: 'full-restore', jetons: 90 },
+  { k: 'rare-candy', jetons: 250 }, { k: 'ultra-ball', jetons: 65 }, { k: 'max-potion', jetons: 130 }, { k: 'full-restore', jetons: 155 },
   { k: 'moon-stone', jetons: 150 }, { k: 'fire-stone', jetons: 150 }, { k: 'water-stone', jetons: 150 }, { k: 'thunder-stone', jetons: 150 }, { k: 'leaf-stone', jetons: 150 },
 ];
 /** comptoir du casino : achat de jetons, choix d'une table, échange contre des lots */
@@ -74,12 +74,12 @@ export async function bourseScreen(game) {
   const ui = game.ui, st = game.state, m = marche(game);
   const T = table(ui, 'bourse', 'BOURSE DE MÉTROPOLE');
   const ids = [B.INDICE.id, ...B.ACTIFS.map((a) => a.id)];
-  const nom = (id) => (id === B.INDICE.id ? 'Tracker S&P Odyssée 500' : B.ACTIF[id].nom);
+  const nom = (id) => (id === B.INDICE.id ? 'Tracker Indice Odyssée 500' : B.ACTIF[id].nom);
   const var_ = (id) => { const h = id === B.INDICE.id ? m.hist[id] : m.hist[id]; const a = h[Math.max(0, h.length - 21)], b = h[h.length - 1]; return (b / a - 1) * 100; };
   const draw = (sel) => {
     const v = B.valeur(m);
     T.board.innerHTML = `<div class="cotes">${ids.map((id) => { const vv = var_(id); return `<div class="cote ${id === sel ? 'on' : ''}"><span class="tick">${id}</span><span class="nm">${esc(nom(id))}</span><span class="px">${fr(B.prixDe(m, id), id === 'PDE' ? 4 : 2)}</span><span class="var ${vv >= 0 ? 'up' : 'dn'}">${vv >= 0 ? '+' : ''}${fr(vv, 1)} %</span>${spark(m.hist[id].slice(-40))}<span class="pos">${m.positions[id] ? '×' + m.positions[id].qte : ''}</span></div>`; }).join('')}</div>
-      <div class="side"><div class="indice">S&P Odyssée 500 : <b>${fr(B.indice(m), 0)}</b> pts · 1 € = ${fr(m.prix.PDE, 4)} ₽</div>
+      <div class="side"><div class="indice">Indice Odyssée 500 : <b>${fr(B.indice(m), 0)}</b> pts · 1 ₭ = ${fr(m.prix.PDE, 4)} ₽</div>
       <div class="news"><b>Dernières nouvelles</b>${m.nouvelles.slice(0, 6).map((n) => `<p>${esc(n.texte)}</p>`).join('') || '<p>Rien de neuf.</p>'}</div>
       <div class="ptf">Portefeuille : <b>${fr(v.valeur)} ₽</b> · plus-value latente <b class="${v.plusValue >= 0 ? 'up' : 'dn'}">${v.plusValue >= 0 ? '+' : ''}${fr(v.plusValue)} ₽</b><br>Liquidités : ${fr(st.money)} ₽${m.embauche ? '' : '<br><i>Pierre ne t\'a pas encore ouvert de compte : tu peux seulement regarder.</i>'}</div></div>`;
   };
@@ -120,15 +120,15 @@ export async function bourseScreen(game) {
 /** prix théoriques des produits dérivés sur un titre (6 mois, à la monnaie) : de quoi s'entraîner avant l'entretien */
 function pricer(m, id) {
   const T = 0.5, r = B.R_PD;
-  if (id === B.INDICE.id) { const S = B.prixDe(m, id), sig = 0.18; return [['Future 6 mois (tracker)', fr(B.forward(S, r, T, 0.02), 2) + ' ₽'], ['Call européen ATM', fr(B.blackScholes('call', S, S, T, r, sig, 0.02), 2) + ' ₽'], ['Put européen ATM', fr(B.blackScholes('put', S, S, T, r, sig, 0.02), 2) + ' ₽'], ['Call asiatique ATM', fr(B.asiatique('call', S, S, T, r, sig, 0.02, 6, 2000), 2) + ' ₽'], ['Retour', '']]; }
+  if (id === B.INDICE.id) { const S = B.prixDe(m, id), sig = 0.18; return [['Future 6 mois (tracker)', fr(B.forward(S, r, T, 0.02), 2) + ' ₽'], ['Call Kalos ATM', fr(B.blackScholes('call', S, S, T, r, sig, 0.02), 2) + ' ₽'], ['Put Kalos ATM', fr(B.blackScholes('put', S, S, T, r, sig, 0.02), 2) + ' ₽'], ['Call Johto ATM', fr(B.asiatique('call', S, S, T, r, sig, 0.02, 6, 2000), 2) + ' ₽'], ['Retour', '']]; }
   const a = B.ACTIF[id], S = m.prix[id];
-  if (a.fx) return [['Change à terme 6 mois', fr(B.changeATerme(S, r, B.R_PE, T), 4) + ' ₽'], ['Change à terme 1 an', fr(B.changeATerme(S, r, B.R_PE, 1), 4) + ' ₽'], ['Points de swap 1 an', fr(B.pointsSwap(S, r, B.R_PE, 1), 4) + ' ₽'], ['Taux de swap ₽ 5 ans', fr(B.tauxSwap(r, 5) * 100, 3) + ' %'], ['Call € ATM 6 mois (vol ' + Math.round(a.vol * 100) + ' %)', fr(B.blackScholes('call', S, S, T, r, a.vol, B.R_PE), 4) + ' ₽'], ['Retour', '']];
+  if (a.fx) return [['Change à terme 6 mois', fr(B.changeATerme(S, r, B.R_PE, T), 4) + ' ₽'], ['Change à terme 1 an', fr(B.changeATerme(S, r, B.R_PE, 1), 4) + ' ₽'], ['Points de swap 1 an', fr(B.pointsSwap(S, r, B.R_PE, 1), 4) + ' ₽'], ['Taux de swap ₽ 5 ans', fr(B.tauxSwap(r, 5) * 100, 3) + ' %'], ['Call ₭ ATM 6 mois (vol ' + Math.round(a.vol * 100) + ' %)', fr(B.blackScholes('call', S, S, T, r, a.vol, B.R_PE), 4) + ' ₽'], ['Retour', '']];
   const sig = B.volDe(a), q = a.q || 0, u = a.u || 0, y = a.y || 0, L = [];
   L.push([a.matiere ? 'Future 6 mois (stockage, rendement)' : 'Forward 6 mois (dividende)', fr(B.forward(S, r, T, q, u, y), 2) + ' ₽']);
-  L.push([`Call européen ATM (vol ${Math.round(sig * 100)} %)`, fr(B.blackScholes('call', S, S, T, r, sig, q), 2) + ' ₽']);
-  L.push(['Put européen ATM', fr(B.blackScholes('put', S, S, T, r, sig, q), 2) + ' ₽']);
-  L.push(['Put américain ATM (arbre)', fr(B.americaine('put', S, S, T, r, sig, q, 120), 2) + ' ₽']);
-  L.push(['Call asiatique ATM (Monte-Carlo)', fr(B.asiatique('call', S, S, T, r, sig, q, 6, 2000), 2) + ' ₽']);
+  L.push([`Call Kalos ATM (vol ${Math.round(sig * 100)} %)`, fr(B.blackScholes('call', S, S, T, r, sig, q), 2) + ' ₽']);
+  L.push(['Put Kalos ATM', fr(B.blackScholes('put', S, S, T, r, sig, q), 2) + ' ₽']);
+  L.push(['Put Unys ATM (arbre)', fr(B.americaine('put', S, S, T, r, sig, q, 120), 2) + ' ₽']);
+  L.push(['Call Johto ATM (Monte-Carlo)', fr(B.asiatique('call', S, S, T, r, sig, q, 6, 2000), 2) + ' ₽']);
   L.push(['Delta du call', fr(B.delta('call', S, S, T, r, sig, q), 3)]);
   if (a.lambda) L.push(['CDS 5 ans (récup. 40 %)', fr(B.primeCDS(a.lambda) * 1e4, 0) + ' pb/an'], ['Survie à 5 ans', fr(B.survie(a.lambda, 5) * 100, 1) + ' %']);
   L.push(['Retour', '']);

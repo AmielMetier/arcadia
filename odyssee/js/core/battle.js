@@ -2,30 +2,48 @@
 // Le moteur calcule un tour d'un coup et renvoie une liste d'événements que la vue rejoue (textes, PV, animations).
 import { SPECIES } from '../data/species.js';
 import { MOVES } from '../data/moves.js';
-import { TYPE_CHART } from '../data/types.js';
 import { monName, gainExp, gainEffort, isFainted, expProgress } from './mon.js';
 import { RESIST, SOIN, STAT_BAIE } from '../data/baies-objets.js';
 import { ITEMS, itemName, applyItem } from './items.js';
-import { getAbility } from '../data/abilities.js';
+import { ABILITIES, getAbility } from '../data/abilities.js';
 import { megaFormOf, megaEvolve, revertMegas } from './mega.js';
+import { STAGE_NAMES, SOUND_MOVES, POWDER_MOVES, VANISH_MOVES, BULLET_MOVES, typeEff, hiddenPower, freshVol } from './battle-helpers.js';
+import { foeThreatInfo, foePickBestReplacement, foeConsiderSwitch, foeChooseAll, foeChooseSlot, damagePreview, estimate } from './battle-ai.js';
 
-export const STAGE_NAMES = { 1: 'l\'Attaque', 2: 'la Défense', 3: 'l\'Attaque Spéciale', 4: 'la Défense Spéciale', 5: 'la Vitesse', 6: 'la Précision', 7: 'l\'Esquive' };
+export { STAGE_NAMES, typeEff, hiddenPower } from './battle-helpers.js';
+
 const STATUS_TXT = { par: 'est paralysé ! Il aura du mal à attaquer !', slp: 's\'est endormi !', frz: 'est gelé !', brn: 'est brûlé !', psn: 'est empoisonné !', tox: 'est gravement empoisonné !' };
-const HP_TYPES = ['fighting', 'flying', 'poison', 'ground', 'rock', 'bug', 'ghost', 'steel', 'fire', 'water', 'grass', 'electric', 'psychic', 'ice', 'dragon', 'dark'];
-const SOUND_MOVES = new Set(['growl', 'roar', 'sing', 'supersonic', 'screech', 'snore', 'uproar', 'hyper-voice', 'bug-buzz', 'perish-song', 'metal-sound', 'grass-whistle', 'echoed-voice', 'round', 'chatter', 'boomburst', 'disarming-voice', 'snarl', 'noble-roar', 'parting-shot']);
-const POWDER_MOVES = new Set(['sleep-powder', 'spore', 'stun-spore', 'poison-powder']);
+const TYPE_FR_MSG = { normal: 'Normal', fighting: 'Combat', flying: 'Vol', poison: 'Poison', ground: 'Sol', rock: 'Roche', bug: 'Insecte', ghost: 'Spectre', steel: 'Acier', fire: 'Feu', water: 'Eau', grass: 'Plante', electric: 'Électrik', psychic: 'Psy', ice: 'Glace', dragon: 'Dragon', dark: 'Ténèbres', fairy: 'Fée' };
+const NON_CONTACT_PHYS = new Set([
+  'poison-sting', 'twineedle', 'pin-missile', 'razor-leaf', 'rock-throw', 'earthquake', 'fissure', 'self-destruct',
+  'egg-bomb', 'bone-club', 'spike-cannon', 'barrage', 'sky-attack', 'explosion', 'bonemerang', 'rock-slide',
+  'bone-rush', 'sacred-fire', 'magnitude', 'rock-tomb', 'sand-tomb', 'bullet-seed', 'icicle-spear', 'rock-blast',
+  'seed-bomb', 'ice-shard', 'psycho-cut', 'rock-wrecker', 'gunk-shot', 'magnet-bomb', 'stone-edge', 'attack-order',
+  'smack-down', 'bulldoze', 'gear-grind', 'icicle-crash', 'fusion-bolt', 'flying-press', 'petal-blizzard', 'diamond-storm',
+]);
+const SPECIAL_CONTACT = new Set(['petal-dance', 'draining-kiss']);
+const isContact = (mv) => !!mv && ((mv.c === 'physical' && !NON_CONTACT_PHYS.has(mv.key)) || SPECIAL_CONTACT.has(mv.key));
+const PULSE_MOVES = new Set(['water-pulse', 'dark-pulse', 'dragon-pulse', 'aura-sphere', 'heal-pulse']);
+const BITE_MOVES = new Set(['bite', 'crunch', 'fire-fang', 'ice-fang', 'thunder-fang', 'poison-fang', 'hyper-fang']);
+const SLICE_MOVES = new Set([
+  'cut', 'razor-leaf', 'slash', 'fury-cutter', 'air-cutter', 'aerial-ace', 'leaf-blade', 'night-slash',
+  'air-slash', 'x-scissor', 'psycho-cut', 'cross-poison', 'sacred-sword', 'razor-shell',
+]);
+const IGNORES_ABILITY = new Set(['mold-breaker', 'turboblaze', 'teravolt']);
+const UNTRACEABLE = new Set(['trace', 'multitype', 'illusion', 'imposter', 'stance-change', 'zen-mode', 'forecast', 'flower-gift', 'tera-shift']);
+const isSheerForceMove = (mv) => {
+  const x = mv?.m;
+  if (!mv || mv.c === 'status' || !x) return false;
+  if (x.flinch || x.ailc) return true;
+  if (x.stc && x.st?.length) {
+    if (x.cat === 7 && x.st.some(([, c]) => c < 0)) return false;
+    return true;
+  }
+  return false;
+};
 
-export function typeEff(mt, defTypes) {
-  let e = 1; for (const d of defTypes) { const r = TYPE_CHART[mt]?.[d]; if (r != null) e *= r; } return e;
-}
-export function hiddenPower(m) {
-  const order = [0, 1, 2, 5, 3, 4]; let t = 0, p = 0;
-  order.forEach((s, i) => { t += (m.iv[s] & 1) << i; p += ((m.iv[s] >> 1) & 1) << i; });
-  return { type: HP_TYPES[Math.floor(t * 15 / 63)], power: Math.floor(p * 40 / 63) + 30 };
-}
 const stageMul = (s) => (s >= 0 ? (2 + s) / 2 : 2 / (2 - s));
 const accMul = (s) => (s >= 0 ? (3 + s) / 3 : 3 / (3 - s));
-const freshVol = () => ({ st: [0, 0, 0, 0, 0, 0, 0, 0], conf: 0, flinch: false, charge: null, recharge: false, protect: false, protChain: 0, seed: null, trap: 0, rampage: null, invuln: null, dmgTaken: null, turns: 0 });
 const refKey = (r) => `${r.side}:${r.slot}`;
 
 function initSide(name, party, slots, extra) {
@@ -45,14 +63,15 @@ export class Battle {
   /**
    * @param o.player { name, party, bag }   bag = { item: qté } (modifié par le combat)
    * @param o.foe    { name, party, trainer?: { cls, name, prize, items: {item:qté}, ai } }
-   * @param o.format 'single' | 'double' | 'triple' | 1 | 2 | 3 (ou o.slots)
+   * @param o.format 'single' | 'double' | 'triple' | 'quadruple' | 1 | 2 | 3 | 4 (ou o.slots)
    */
   constructor(o) {
     this.rng = o.rng || Math.random;
     this.wild = !o.foe.trainer;
-    const rawSlots = o.slots ?? (o.format === 'triple' || o.format === '3v3' || o.format === 3 ? 3 : o.format === 'double' || o.format === '2v2' || o.format === 2 ? 2 : 1);
-    this.slots = Math.max(1, Math.min(3, rawSlots | 0));
-    this.format = this.slots === 3 ? 'triple' : this.slots === 2 ? 'double' : 'single';
+    const rawSlots = o.slots ?? (o.format === 'quadruple' || o.format === 4 ? 4 : o.format === 'triple' || o.format === '3v3' || o.format === 3 ? 3 : o.format === 'double' || o.format === '2v2' || o.format === 2 ? 2 : 1);
+    // 4 emplacements : seulement pour les raids (quatre joueurs contre un boss)
+    this.slots = Math.max(1, Math.min(4, rawSlots | 0));
+    this.format = this.slots === 4 ? 'quadruple' : this.slots === 3 ? 'triple' : this.slots === 2 ? 'double' : 'single';
     this.sides = [
       initSide(o.player.name, o.player.party, this.slots, { player: true, mega: !!o.player.mega }),
       initSide(o.foe.name, o.foe.party, this.slots, { trainer: o.foe.trainer || null, mega: !!o.foe.trainer?.mega }),
@@ -70,8 +89,15 @@ export class Battle {
     this.levelUps = new Set();
     this.weather = o.weather || 'none';
     this.weatherTurns = o.weatherTurns || 0;
+    this.terrain = o.terrain || 'none';
+    this.terrainTurns = o.terrainTurns || 0;
     this.gymCrisisTriggered = false;
     this.baseWeather = this.weather; this.baseWeatherTurns = this.weatherTurns;
+    this.inverse = !!o.inverse;
+    this.chaosWeather = !!o.chaosWeather;
+    this.alpha = !!o.alpha;
+    this.aura = o.aura || (this.alpha ? 'rouge' : null);
+    this.clutchUids = new Set();
     this.needPlayerSlots = [];
     this.pendingFoeSlots = [];
     this.caughtMon = null;
@@ -134,11 +160,32 @@ export class Battle {
   /** crans de stats : en 1v1 renvoie [st0, st1] pour compatibilité ; `allStages()` renvoie tous les emplacements */
   stages() { return this.sides.map((x) => x.vs[0].st.slice()); }
   allStages() { return this.sides.map((x) => x.vs.map((v) => v.st.slice())); }
-  ab(ref) { const m = this.act(ref); return m && !isFainted(m) ? getAbility(m)?.id : null; }
+  ab(ref) {
+    const r = this.norm(ref), m = this.act(r);
+    if (!m || isFainted(m)) return null;
+    return this.vol(r)?.ability || getAbility(m)?.id || null;
+  }
+  abName(ref) { const id = this.ab(ref); return id ? (ABILITIES[id]?.name || id) : 'Talent'; }
+  ignoresDefAbility(aRef) { return IGNORES_ABILITY.has(this.ab(aRef)); }
+  defAb(aRef, dRef) { return this.ignoresDefAbility(aRef) ? null : this.ab(dRef); }
+  hasOppAbility(ref, id) {
+    const r = this.norm(ref), opp = 1 - r.side;
+    return this.aliveSlots(opp).some((sl) => this.ab({ side: opp, slot: sl }) === id);
+  }
+  hasFieldAbility(id) { return this.allAliveRefs().some((r) => this.ab(r) === id); }
+  typesOf(ref) {
+    const r = this.norm(ref), m = this.act(r);
+    if (!m) return ['normal'];
+    return this.vol(r)?.types || SPECIES[m.sp]?.t || ['normal'];
+  }
+  isGrounded(ref) {
+    const types = this.typesOf(ref), id = this.ab(ref);
+    return !types.includes('flying') && id !== 'levitate' && id !== 'eelevate';
+  }
   effOn(a, d, type) {
-    let t = SPECIES[this.act(d).sp].t;
-    if (this.ab(a) === 'scrappy' && (type === 'normal' || type === 'fighting')) t = t.filter((x) => x !== 'ghost');
-    return typeEff(type, t);
+    let t = this.typesOf(d);
+    if (!this.inverse && this.ab(a) === 'scrappy' && (type === 'normal' || type === 'fighting')) t = t.filter((x) => x !== 'ghost');
+    return typeEff(type, t, this.inverse);
   }
   r(n) { return Math.floor(this.rng() * n); }
   tie() { return this.rng() < 0.5 ? -1 : 1; }
@@ -164,51 +211,69 @@ export class Battle {
     this.ev.push({ t: 'weather', weather: w, turns });
   }
 
+  setTerrain(t, turns = 5) {
+    if (this.terrain === t && turns === this.terrainTurns) return;
+    this.terrain = t; this.terrainTurns = turns;
+    if (t === 'electric') this.say('Un champ électrifié se répand sur le terrain !');
+    else if (t === 'none') this.say('Le champ électrifié se dissipe.');
+  }
+
   triggerEntry(ref) {
-    const r = this.norm(ref), m = this.act(r);
+    const r = this.norm(ref), m = this.act(r), v = this.vol(r);
     if (!m || isFainted(m)) return;
-    const ab = getAbility(m);
-    if (!ab) return;
-    const opp = 1 - r.side;
+    const abId = this.ab(r);
+    if (!abId) return;
     const foes = this.validFoeTargets(r, null);
-    if (ab.id === 'intimidate') {
+    if (abId === 'trace') {
+      const src = foes.find((f) => { const fid = this.ab(f); return fid && !UNTRACEABLE.has(fid); });
+      if (src) {
+        const copied = this.ab(src);
+        v.ability = copied;
+        this.say(`${this.Nm(r)} calque le talent ${ABILITIES[copied]?.name || copied} de ${this.nm(src)} !`);
+        this.triggerEntry(r);
+      }
+      return;
+    }
+    if (abId === 'intimidate') {
       if (foes.length) {
         this.say(`Le talent Intimidation de ${this.nm(r)} s'active !`);
-        this.lastUser = r;
-        for (const f of foes) this.boost(f, 2, -1, true);
+        for (const f of foes) this.boost(f, 2, -1, true, r);
       }
-    } else if (ab.id === 'halo-sylvestre') {
+    } else if (abId === 'halo-sylvestre') {
       if (foes.length) {
         this.say(`Le Halo Sylvestre de ${this.nm(r)} rayonne doucement !`);
-        this.lastUser = r;
-        for (const f of foes) this.boost(f, 4, -1, true);
+        for (const f of foes) this.boost(f, 4, -1, true, r);
       }
-    } else if (ab.id === 'coeur-vaillant') {
+    } else if (abId === 'coeur-vaillant') {
       if (r.side === 1 && this.sides[1].trainer?.friendly) return;
+      if ((this.coeurUsed ||= new Set()).has(m.uid)) return;
+      this.coeurUsed.add(m.uid);
       this.say(`Le Cœur Vaillant de ${this.nm(r)} s'enflamme de bravoure !`);
-      this.lastUser = r; this.boost(r, 2, 1, true);
-    } else if (ab.id === 'drizzle') {
+      this.boost(r, 2, 1, true, r);
+    } else if (abId === 'drizzle') {
       this.say(`Le talent Crachin de ${this.nm(r)} fait tomber la pluie !`); this.setWeather('rain', 5);
-    } else if (ab.id === 'drought') {
+    } else if (abId === 'drought') {
       this.say(`Le talent Sécheresse de ${this.nm(r)} intensifie les rayons du soleil !`); this.setWeather('sun', 5);
-    } else if (ab.id === 'sand-stream') {
+    } else if (abId === 'sand-stream') {
       this.say(`Le talent Sable Volant de ${this.nm(r)} déclenche une tempête de sable !`); this.setWeather('sandstorm', 5);
-    } else if (ab.id === 'snow-warning') {
+    } else if (abId === 'snow-warning') {
       this.say(`Le talent Alerte Neige de ${this.nm(r)} fait tomber la grêle !`); this.setWeather('hail', 5);
-    } else if (ab.id === 'pressure') {
+    } else if (abId === 'electric-surge') {
+      this.say(`Créa-Élec de ${this.nm(r)} électrise le sol !`); this.setTerrain('electric', 5);
+    } else if (abId === 'pressure') {
       this.say(`${this.Nm(r)} met la pression !`);
-    } else if (ab.id === 'unnerve') {
+    } else if (abId === 'unnerve') {
       this.say(`${this.Nm(r)} rend nerveuse l'équipe adverse !`);
-    } else if (ab.id === 'mold-breaker') {
+    } else if (abId === 'mold-breaker') {
       this.say(`${this.Nm(r)} brise le moule !`);
-    } else if (ab.id === 'cloud-nine' || ab.id === 'air-lock') {
+    } else if (abId === 'cloud-nine' || abId === 'air-lock') {
       if (this.weather && this.weather !== 'none') { this.say('Les effets de la météo disparaissent !'); this.setWeather('none', 0); }
-    } else if (ab.id === 'frisk') {
+    } else if (abId === 'frisk') {
       for (const f of foes) { const fm = this.act(f); if (fm?.item) { this.say(`${this.Nm(r)} fouille ${this.nm(f)} et trouve ${itemName(fm.item)} !`); break; } }
-    } else if (ab.id === 'anticipation') {
+    } else if (abId === 'anticipation') {
       for (const f of foes) {
         const fm = this.act(f);
-        if (fm?.moves?.some((q) => MOVES[q.id] && MOVES[q.id].c !== 'status' && typeEff(MOVES[q.id].t, SPECIES[m.sp].t) > 1)) { this.say(`${this.Nm(r)} frissonne !`); break; }
+        if (fm?.moves?.some((q) => MOVES[q.id] && MOVES[q.id].c !== 'status' && typeEff(this.moveType(f, MOVES[q.id]), this.typesOf(r)) > 1)) { this.say(`${this.Nm(r)} frissonne !`); break; }
       }
     }
   }
@@ -216,6 +281,7 @@ export class Battle {
   checkBerries(ref) {
     const r = this.norm(ref), m = this.act(r), v = this.vol(r);
     if (!m || isFainted(m) || !m.item) return;
+    if (this.hasOppAbility(r, 'unnerve') && /-(berry)$/.test(m.item)) return;
     if (m.item === 'sitrus-berry' && m.hp <= m.stats[0] / 2) {
       m.item = null;
       this.hp(r, Math.max(1, Math.floor(m.stats[0] / 4)));
@@ -230,11 +296,11 @@ export class Battle {
       else { m.status = null; m.slp = 0; m.tox = 0; this.ev.push({ t: 'status', side: r.side, slot: r.slot, status: null }); this.say(`La ${itemName(k)} guérit ${this.nm(r)} !`); }
     } else if (STAT_BAIE[m.item] && m.hp <= m.stats[0] / 4) {
       const k = m.item; m.item = null;
-      this.say(`${this.Nm(r)} mange sa ${itemName(k)} !`); this.lastUser = r; this.boost(r, STAT_BAIE[k], 1, true);
-    } else if (m.item === 'lum-berry' && m.status) {
-      m.item = null; m.status = null; m.slp = 0; m.tox = 0;
+      this.say(`${this.Nm(r)} mange sa ${itemName(k)} !`); this.boost(r, STAT_BAIE[k], 1, true, r);
+    } else if (m.item === 'lum-berry' && (m.status || v.conf > 0)) {
+      m.item = null; m.status = null; m.slp = 0; m.tox = 0; v.conf = 0;
       this.ev.push({ t: 'status', side: r.side, slot: r.slot, status: null });
-      this.say(`La Baie Prun guérit les altérations d'état de ${this.nm(r)} !`);
+      this.say(`La Baie Prine guérit les altérations d'état de ${this.nm(r)} !`);
     }
   }
 
@@ -255,7 +321,7 @@ export class Battle {
       if (this.wild) {
         this.say(`${joinNames(foeNames)} sauvages apparaissent !`);
       } else {
-        this.say(`${t.cls} ${t.name} lance un combat ${this.slots === 3 ? 'Trio (3v3)' : 'Duo (2v2)'} !`);
+        this.say(`${t.cls} ${t.name} lance un combat ${this.slots === 4 ? 'Quatuor' : this.slots === 3 ? 'Trio' : 'Duo'} !`);
         for (const sl of foeSlots) this.ev.push({ t: 'send', side: 1, slot: sl, idx: this.sides[1].activeSlots[sl] });
         this.say(`${t.cls} ${t.name} envoie ${joinNames(foeNames)} !`);
       }
@@ -267,6 +333,9 @@ export class Battle {
       this.say(`En avant ! ${joinNames(myNames)} !`);
     }
     if (this.weather && this.weather !== 'none') this.ev.push({ t: 'weather', weather: this.weather, turns: this.weatherTurns });
+    if (this.inverse) this.say('Distorsion spatiale ! Les affinités de types sont inversées !');
+    if (this.chaosWeather) this.say('Météo chaotique ! Le ciel bascule à chaque fin de tour !');
+    if (this.alpha) this.say('Une aura écrasante émane de ce Pokémon Alpha géant !');
     const startRefs = this.sortBySpeed([...mySlots.map((slot) => ({ side: 0, slot })), ...foeSlots.map((slot) => ({ side: 1, slot }))]);
     for (const r of startRefs) this.triggerEntry(r);
     return this.flush();
@@ -280,7 +349,7 @@ export class Battle {
     let s = ignore ? 0 : v.st[k];
     if (crit) s = atkSide ? Math.max(0, s) : Math.min(0, s);
     let x = Math.floor(m.stats[k] * stageMul(s));
-    const ab = getAbility(m), w = this.weather, id = ab?.id;
+    const id = this.ab(r), w = this.weather;
     if (k === 1) {
       if (m.item === 'choice-band') x = Math.floor(x * 1.5);
       if (id === 'guts' && m.status) x = Math.floor(x * 1.5);
@@ -297,10 +366,10 @@ export class Battle {
     } else if (k === 4) {
       if (m.item === 'eviolite' && SPECIES[m.sp]?.ev?.length) x = Math.floor(x * 1.5);
       if (m.item === 'assault-vest') x = Math.floor(x * 1.5);
-      if (this.weather === 'sandstorm' && SPECIES[m.sp]?.t?.includes('rock')) x = Math.floor(x * 1.5);
+      if (this.weather === 'sandstorm' && this.typesOf(r).includes('rock')) x = Math.floor(x * 1.5);
     } else if (k === 5) {
       if (m.item === 'choice-scarf') x = Math.floor(x * 1.5);
-      if ((id === 'swift-swim' && w === 'rain') || (id === 'chlorophyll' && w === 'sun') || (id === 'sand-rush' && w === 'sandstorm')) x *= 2;
+      if ((id === 'swift-swim' && w === 'rain') || (id === 'chlorophyll' && w === 'sun') || (id === 'sand-rush' && w === 'sandstorm') || (id === 'slush-rush' && w === 'hail')) x *= 2;
       if (id === 'quick-feet' && m.status) x = Math.floor(x * 1.5);
       else if (m.status === 'par') x = Math.floor(x / 4);
     }
@@ -308,7 +377,12 @@ export class Battle {
   }
 
   /* ---------------- choix du joueur ---------------- */
-  usableMoves(ref) { const m = this.act(ref); return m ? m.moves.map((x, k) => (x.pp > 0 ? k : -1)).filter((k) => k >= 0) : []; }
+  usableMoves(ref) {
+    const m = this.act(ref);
+    if (!m) return [];
+    const lock = !this.pvp ? this.choiceLock(ref) : null;
+    return m.moves.map((x, k) => (x.pp > 0 && (lock == null || x.id === lock) ? k : -1)).filter((k) => k >= 0);
+  }
   forcedAction(ref) {
     const v = this.vol(ref);
     if (!v) return null;
@@ -443,496 +517,53 @@ export class Battle {
     return this.flush();
   }
 
-  trapped(ref) { const m = this.act(ref); return !!m && this.vol(ref).trap > 0 && !SPECIES[m.sp].t.includes('ghost'); }
+  trapped(ref) { const m = this.act(ref); return !!m && this.vol(ref).trap > 0 && !this.typesOf(ref).includes('ghost'); }
   choiceLock(ref) {
     const m = this.act(ref), v = this.vol(ref);
     if (!m || !v) return null;
     const id = v.choice;
     if (id == null || !/^choice-/.test(m.item || '')) return null;
-    return m.moves.some((q) => q.id === id && q.pp > 0) ? id : null;
+    return m.moves.some((q) => q.id === id) ? id : null;
   }
   canSwitchTo(idx) {
     const m = this.sides[0].party[idx];
     return !!m && m.hp > 0 && !this.sides[0].activeSlots.includes(idx);
   }
+  roarBench(side, slot) {
+    const tgtSide = this.sides[side];
+    const owners = this.sideOwners ? this.sideOwners[side] : (side === 0 && this.owners?.length ? this.owners : null);
+    return tgtSide.party.map((pm, j) => (
+      pm && pm.hp > 0 && !tgtSide.activeSlots.includes(j) && (!owners || owners[j] === slot) ? j : -1
+    )).filter((j) => j >= 0);
+  }
+  shouldDisobey(attRef) {
+    if (attRef.side !== 0 || this.pvp || this.coop || !this.cap || this.cap >= 100) return false;
+    const m = this.act(attRef);
+    if (!m || m.lvl <= this.cap) return false;
+    const traded = !!(m.ot && this.sides[0].name && m.ot !== this.sides[0].name);
+    const legend = !!(SPECIES[m.sp]?.leg || SPECIES[m.sp]?.legend);
+    if (!traded && !legend) return false;
+    const over = m.lvl - this.cap;
+    const chance = Math.min(0.75, 0.25 + over * 0.08);
+    return this.rng() < chance;
+  }
 
   /* ---------------- IA (1v1 & Multi) ---------------- */
   /** Estime la menace maximale adverse envers un emplacement de l'IA */
-  foeThreatInfo(slot = 0) {
-    const ref = { side: 1, slot }, m = this.act(ref);
-    if (!m || isFainted(m)) return { incomingMaxDmg: 0, foeFaster: false, threatenedKO: false };
-    const mySpe = this.stat(ref, 5), mTypes = SPECIES[m.sp]?.t || ['normal'];
-    let incomingMaxDmg = 0, foeFaster = false, threatenedKO = false;
-    for (const sl0 of this.aliveSlots(0)) {
-      const fRef = { side: 0, slot: sl0 }, fm = this.act(fRef);
-      if (!fm) continue;
-      const faster = this.stat(fRef, 5) > mySpe;
-      let maxFromThis = 0;
-      for (const q of (fm.moves || [])) {
-        if (!q || q.pp <= 0) continue;
-        const mv = MOVES[q.id];
-        if (!mv || mv.c === 'status') continue;
-        const d = this.estimate(fRef, ref, mv);
-        if (d > maxFromThis) maxFromThis = d;
-        if ((faster || (mv.pr || 0) > 0) && d >= m.hp) threatenedKO = true;
-      }
-      if (!(fm.moves || []).some((q) => q && q.pp > 0 && MOVES[q.id]?.c !== 'status')) {
-        const fTypes = SPECIES[fm.sp]?.t || ['normal'];
-        for (const ft of fTypes) {
-          const eff = typeEff(ft, mTypes);
-          if (eff > 0) {
-            const heur = Math.floor(((2 * fm.lvl / 5 + 2) * 80 * Math.max(this.stat(fRef, 1), this.stat(fRef, 3)) / Math.max(1, Math.min(this.stat(ref, 2), this.stat(ref, 4)))) / 50 * 1.5 * eff);
-            if (heur > maxFromThis) maxFromThis = heur;
-          }
-        }
-        if (faster && maxFromThis >= m.hp) threatenedKO = true;
-      }
-      if (maxFromThis > incomingMaxDmg) incomingMaxDmg = maxFromThis;
-      if (faster && maxFromThis >= m.hp * 0.45) foeFaster = true;
-    }
-    return { incomingMaxDmg, foeFaster, threatenedKO };
-  }
+  foeThreatInfo(slot = 0) { return foeThreatInfo(this, slot); }
 
   /** Choisit le meilleur remplaçant du banc de l'IA face aux Pokémon actifs du joueur */
-  foePickBestReplacement(slot = 0, candidateIndices = null) {
-    const side = this.sides[1];
-    const cands = candidateIndices
-      ? candidateIndices.filter((j) => side.party[j] && side.party[j].hp > 0 && !side.activeSlots.includes(j))
-      : side.party.map((m, j) => (m && m.hp > 0 && !side.activeSlots.includes(j) ? j : -1)).filter((j) => j >= 0);
-    if (!cands.length) return -1;
-    const t = side.trainer;
-    const isStrong = !!t?.strategic || t?.ai === 'smart' || t?.ai === 'strategic' || t?.cls === 'Rival' || t?.rival || this.rival;
-    if (cands.length === 1 || !isStrong) return cands[0];
-    const foeRefs = this.aliveSlots(0).map((sl) => ({ side: 0, slot: sl }));
-    if (!foeRefs.length) return cands[0];
-
-    const prevIdx = side.activeSlots[slot], prevVol = side.vs[slot];
-    let bestIdx = cands[0], bestScore = -Infinity;
-    try {
-      side.vs[slot] = freshVol();
-      for (const idx of cands) {
-        const cand = side.party[idx];
-        const cTypes = SPECIES[cand.sp]?.t || ['normal'];
-        const cAb = getAbility(cand)?.id || null;
-        let score = (cand.hp / Math.max(1, cand.stats[0])) * 20;
-        side.activeSlots[slot] = idx;
-        const candRef = { side: 1, slot };
-        const candSpe = cand.stats?.[5] || 50;
-
-        for (const fRef of foeRefs) {
-          const foeMon = this.act(fRef);
-          if (!foeMon) continue;
-          const fTypes = SPECIES[foeMon.sp]?.t || ['normal'];
-          let worstEff = 0;
-          for (const ft of fTypes) {
-            const nul = { ground: ['levitate'], water: ['water-absorb', 'dry-skin', 'storm-drain'], electric: ['volt-absorb', 'lightning-rod', 'motor-drive'], fire: ['flash-fire'], grass: ['sap-sipper'] }[ft];
-            if (nul && nul.includes(cAb) && this.ab(fRef) !== 'mold-breaker') continue;
-            let eff = typeEff(ft, cTypes);
-            if ((cAb === 'thick-fat' && (ft === 'fire' || ft === 'ice')) || (cAb === 'heatproof' && ft === 'fire')) eff *= 0.5;
-            if ((cAb === 'filter' || cAb === 'solid-rock') && eff > 1) eff *= 0.75;
-            if (cAb === 'wonder-guard' && eff <= 1) eff = 0;
-            worstEff = Math.max(worstEff, eff);
-          }
-          if (worstEff === 0) score += 65;
-          else if (worstEff <= 0.25) score += 55;
-          else if (worstEff <= 0.5) score += 45;
-          else if (worstEff >= 4) score -= 85;
-          else if (worstEff >= 2) score -= 45;
-
-          let bestOff = 0, canPrioKO = false;
-          for (const q of (cand.moves || [])) {
-            if (!q || q.pp <= 0) continue;
-            const mv = MOVES[q.id];
-            if (!mv || mv.c === 'status') continue;
-            const mt = mv.m?.u === 'hidden-power' ? hiddenPower(cand).type : mv.t;
-            const eff = typeEff(mt, fTypes);
-            if (eff === 0) continue;
-            const dmg = this.estimate(candRef, fRef, mv);
-            let off = Math.min(1.5, dmg / Math.max(1, foeMon.hp)) * 80 + (eff >= 2 ? 25 : eff < 1 ? -10 : 0);
-            if ((mv.pr || 0) > 0 && dmg >= foeMon.hp) { off += 45; canPrioKO = true; }
-            if (off > bestOff) bestOff = off;
-          }
-          score += bestOff;
-          if (candSpe > this.stat(fRef, 5) && !canPrioKO) score += 18;
-          if (cAb === 'intimidate' && this.stat(fRef, 1) >= this.stat(fRef, 3)) score += 20;
-        }
-        if ((cAb === 'multiscale' || cAb === 'sturdy') && cand.hp === cand.stats[0]) score += 14;
-        if ((cAb === 'drizzle' || cAb === 'drought' || cAb === 'sand-stream') && this.weather === 'none') score += 12;
-        if (score > bestScore) { bestScore = score; bestIdx = idx; }
-      }
-    } finally {
-      side.activeSlots[slot] = prevIdx;
-      side.vs[slot] = prevVol;
-    }
-    return bestIdx;
-  }
+  foePickBestReplacement(slot = 0, candidateIndices = null) { return foePickBestReplacement(this, slot, candidateIndices); }
 
   /** Évalue s'il est tactiquement avantageux pour l'IA de rappeler le Pokémon actif */
-  foeConsiderSwitch(slot, threat, bestMoveDamage, ctx = null) {
-    if (this.wild || this.pvp || this.trapped({ side: 1, slot })) return null;
-    const side = this.sides[1], ref = { side: 1, slot }, m = this.act(ref), v = this.vol(ref);
-    if (!m || isFainted(m)) return null;
-    if (this.turn - (side.switchTour ?? -10) < 3) return null;
-    const avail = side.party.map((q, j) => (q && q.hp > 0 && !side.activeSlots.includes(j) && !ctx?.reservedSwitches?.has(j) ? j : -1)).filter((j) => j >= 0);
-    if (!avail.length) return null;
+  foeConsiderSwitch(slot, threat, bestMoveDamage, ctx = null) { return foeConsiderSwitch(this, slot, threat, bestMoveDamage, ctx); }
 
-    const lock = this.choiceLock(ref);
-    const curAb = this.ab(ref);
-    const lockedUseless = lock != null && bestMoveDamage <= 0;
-    const walledAndThreatened = bestMoveDamage < m.stats[0] * 0.14 && threat.incomingMaxDmg >= m.hp * 0.55;
-    const crippledStats = Math.min(v.st[1], v.st[3]) <= -3 && m.hp > m.stats[0] * 0.45 && threat.incomingMaxDmg >= m.hp * 0.45;
-    const cureOrRegen = ((curAb === 'natural-cure' && (m.status === 'slp' || m.status === 'par' || m.status === 'brn')) || (curAb === 'regenerator' && m.hp < m.stats[0] * 0.35)) && threat.incomingMaxDmg < m.hp * 0.9;
-    if (!lockedUseless && !walledAndThreatened && !crippledStats && !cureOrRegen) return null;
-
-    const bestIdx = this.foePickBestReplacement(slot, avail);
-    if (bestIdx < 0) return null;
-    const cand = side.party[bestIdx];
-    if (!cand || cand.hp < cand.stats[0] * 0.35) return null;
-
-    const cTypes = SPECIES[cand.sp]?.t || ['normal'], cAb = getAbility(cand)?.id || null;
-    const foeRefs = this.aliveSlots(0).map((sl) => ({ side: 0, slot: sl }));
-    let candTakesHeavy = false, candHasHit = false;
-    for (const fRef of foeRefs) {
-      const fm = this.act(fRef); if (!fm) continue;
-      const fTypes = SPECIES[fm.sp]?.t || ['normal'];
-      for (const ft of fTypes) {
-        const nul = { ground: ['levitate'], water: ['water-absorb', 'dry-skin', 'storm-drain'], electric: ['volt-absorb', 'lightning-rod', 'motor-drive'], fire: ['flash-fire'], grass: ['sap-sipper'] }[ft];
-        if (nul && nul.includes(cAb) && this.ab(fRef) !== 'mold-breaker') continue;
-        if (typeEff(ft, cTypes) >= 2) candTakesHeavy = true;
-      }
-      for (const q of (cand.moves || [])) {
-        const mv = q && q.pp > 0 ? MOVES[q.id] : null;
-        if (!mv || mv.c === 'status') continue;
-        if (typeEff(mv.t, fTypes) >= 1) candHasHit = true;
-      }
-    }
-    if (candTakesHeavy || (!candHasHit && !lockedUseless)) return null;
-    side.switchTour = this.turn;
-    ctx?.reservedSwitches?.add(bestIdx);
-    return { type: 'switch', idx: bestIdx };
-  }
-
-  foeChooseAll() {
-    const out = [];
-    let itemUsed = false;
-    const t = this.sides[1]?.trainer;
-    const isStrat = !!t?.strategic || t?.ai === 'strategic';
-    const isStrongMulti = this.slots > 1 && (isStrat || t?.ai === 'smart' || t?.cls === 'Rival' || t?.rival || this.rival);
-    const ctx = isStrongMulti ? { plannedDmg: new Map(), protectedAlly: new Set(), usedUtility: new Set(), statusedTarget: new Set(), reservedSwitches: new Set() } : null;
-    const slots = this.aliveSlots(1);
-    const evalOrder = isStrongMulti ? [...slots].sort((a, b) => this.stat({ side: 1, slot: b }, 5) - this.stat({ side: 1, slot: a }, 5)) : slots;
-    for (const sl of evalOrder) {
-      const a = this.foeChooseSlot(sl, itemUsed, ctx);
-      if (a.type === 'item') itemUsed = true;
-      out.push({ i: 1, side: 1, slot: sl, a });
-    }
-    return isStrongMulti ? out.sort((a, b) => a.slot - b.slot) : out;
-  }
+  foeChooseAll() { return foeChooseAll(this); }
   foeChoose() { return this.foeChooseSlot(0, false, null); }
-  foeChooseSlot(slot = 0, itemUsed = false, ctx = null) {
-    const ref = { side: 1, slot };
-    const forced = this.forcedAction(ref); if (forced) return forced;
-    const side = this.sides[1], m = this.act(ref), t = side.trainer, v = this.vol(ref);
-    const usable = this.usableMoves(ref);
-    if (!usable.length) return { type: 'move', id: 165 };
+  foeChooseSlot(slot = 0, itemUsed = false, ctx = null) { return foeChooseSlot(this, slot, itemUsed, ctx); }
 
-    if (this.wild) {
-      const lock = this.choiceLock(ref); if (lock != null) { const k = m.moves.findIndex((q) => q.id === lock); return { type: 'move', id: lock, slot: k }; }
-      const k = usable[this.r(usable.length)];
-      const mv = MOVES[m.moves[k].id];
-      const cands = this.validFoeTargets(ref, mv);
-      const tgt = cands.length ? cands[this.r(cands.length)] : { side: 0, slot: 0 };
-      return { type: 'move', id: mv.id, slot: k, targetSide: tgt.side, targetSlot: tgt.slot };
-    }
-
-    const isStrategic = !!t.strategic || t.ai === 'strategic';
-    const isRival = t.cls === 'Rival' || t.rival || this.rival;
-    const isSmart = t.ai === 'smart' || isStrategic;
-    const lock = this.choiceLock(ref);
-    const threat = (isSmart || isRival) ? this.foeThreatInfo(slot) : { incomingMaxDmg: 0, foeFaster: false, threatenedKO: false };
-
-    if (lock != null) {
-      const k = m.moves.findIndex((q) => q.id === lock);
-      const lockedMv = MOVES[lock];
-      const cands = lockedMv ? this.validFoeTargets(ref, lockedMv) : [];
-      const bestLockedDmg = cands.reduce((mx, fRef) => Math.max(mx, this.estimate(ref, fRef, lockedMv)), 0);
-      if (isSmart || isRival) {
-        const sw = this.foeConsiderSwitch(slot, threat, bestLockedDmg, ctx);
-        if (sw) return sw;
-      }
-      const bestFoe = cands.reduce((best, fRef) => (!best || this.estimate(ref, fRef, lockedMv) > this.estimate(ref, best, lockedMv) ? fRef : best), cands[0]);
-      return { type: 'move', id: lock, slot: k, ...(bestFoe ? { targetSide: bestFoe.side, targetSlot: bestFoe.slot } : {}) };
-    }
-
-    if (!itemUsed && t.items && !(side.soinTour != null && this.turn - side.soinTour <= 1)) {
-      const ratio = m.hp / m.stats[0];
-      const hasStatus = !!m.status;
-      const benchAlive = side.party.some((p, idx) => !side.activeSlots.includes(idx) && p.hp > 0);
-      const healThreshold = (isSmart || isRival) ? (!benchAlive ? 0.52 : 0.44) : 0.28;
-      if (hasStatus && t.items['full-restore'] > 0 && (ratio < 0.75 || this.rng() < 0.85)) {
-        t.items['full-restore']--; side.soinTour = this.turn;
-        return { type: 'item', item: 'full-restore', foe: true, slot };
-      }
-      if (ratio <= healThreshold && (!isSmart ? this.rng() < 0.85 : true)) {
-        const needed = m.stats[0] - m.hp;
-        let chosen = null;
-        if (t.items['full-restore'] > 0 && (hasStatus || needed > 120)) chosen = 'full-restore';
-        else if (t.items['hyper-potion'] > 0 && needed > 90) chosen = 'hyper-potion';
-        else if (t.items['super-potion'] > 0 && needed > 35) chosen = 'super-potion';
-        else if (t.items['potion'] > 0) chosen = 'potion';
-        else if (t.items['hyper-potion'] > 0) chosen = 'hyper-potion';
-        else if (t.items['full-restore'] > 0) chosen = 'full-restore';
-        if (chosen) { t.items[chosen]--; side.soinTour = this.turn; return { type: 'item', item: chosen, foe: true, slot }; }
-      }
-    }
-
-    const mySpeed = this.stat(ref, 5);
-    const myTypes = SPECIES[m.sp]?.t || [];
-    const hasPhysMove = usable.some((idx) => MOVES[m.moves[idx].id]?.c === 'physical');
-    const hasSpecMove = usable.some((idx) => MOVES[m.moves[idx].id]?.c === 'special');
-    let bestOffDmg = 0;
-    const options = [];
-    for (const k of usable) {
-      const mv = MOVES[m.moves[k].id];
-      const cands = this.validFoeTargets(ref, mv);
-      const tgtPool = cands.length ? cands : [{ side: 0, slot: 0 }];
-      const isSpreadMove = mv.tg === 9 || mv.tg === 11;
-      // En combat multi, on évalue chaque cible possible pour trouver la meilleure paire (attaque, cible)
-      const evalTargets = (isSpreadMove || mv.tg === 7 || mv.tg === 4 || mv.tg === 13) ? [tgtPool[0]] : tgtPool;
-      for (const tgtRef of evalTargets) {
-        const pMon = this.act(tgtRef) || this.me;
-        const pType = SPECIES[pMon.sp]?.t || ['normal'];
-        const pVol = this.vol(tgtRef);
-        const tgtSpe = this.stat(tgtRef, 5);
-        const amFaster = mySpeed >= tgtSpe;
-        let s = 10;
-        let estDmg = 0;
-        if (mv.c === 'status' && m.item === 'assault-vest') s = 0.0001;
-        else if (mv.key === 'fake-out' && v.turns > 0) s = 0.0001;
-        else if (mv.c !== 'status' && (mv.p > 0 || mv.m?.u)) {
-          const mvType = this.moveType(ref, mv);
-          const scoreVs = (tr) => {
-            const pm = this.act(tr);
-            if (!pm || isFainted(pm)) return 0;
-            const dRaw = this.estimate(ref, tr, mv);
-            if (dRaw <= 0) return 0;
-            const pt = SPECIES[pm.sp]?.t || ['normal'];
-            const eff = typeEff(mvType, pt);
-            const d = dRaw * (isSpreadMove && tgtPool.length > 1 ? 0.75 : 1);
-            if (tr.side === 0 && d > bestOffDmg) bestOffDmg = d;
-            let sc = d * ((mv.a || 100) / 100);
-            if ((isSmart || isRival) && ctx && tr.side === 0) {
-              const queued = ctx.plannedDmg.get(tr.slot) || 0;
-              const remHp = Math.max(1, pm.hp - queued);
-              if (queued >= pm.hp) sc *= 0.12;
-              else if (d >= remHp) { sc *= 3.2; if ((mv.pr || 0) > 0) sc *= 4.0; }
-            }
-            if (d >= pm.hp) { sc *= 3.8; if ((mv.pr || 0) > 0) sc *= 5.0; }
-            if (eff >= 2) sc *= (eff >= 4 ? 1.75 : 1.35);
-            if (mv.m?.recharge) sc *= 0.5;
-            if (mv.m?.charge && v.charge !== mv.id) {
-              if (mv.key === 'solar-beam' && this.weather === 'sun') sc *= 1.25;
-              else if (threat.threatenedKO) sc *= 0.05;
-              else sc *= ['fly', 'dig', 'dive', 'bounce'].includes(mv.key) ? 0.72 : 0.6;
-            }
-            if (mv.m?.drain > 0 && m.hp < m.stats[0] * 0.8) sc += Math.min(m.stats[0] - m.hp, d * mv.m.drain / 100) * 0.75;
-            if (mv.m?.drain < 0 && this.ab(ref) !== 'rock-head' && this.ab(ref) !== 'magic-guard') {
-              const rec = Math.floor(d * (-mv.m.drain) / 100);
-              if (rec >= m.hp && d < pm.hp) sc *= 0.35;
-            }
-            if (mv.m?.boom) sc = (m.hp < m.stats[0] * 0.22 && d >= pm.hp) ? sc * 1.5 : sc * 0.04;
-            if (myTypes.includes(mvType)) sc *= 1.3;
-            if (mv.m?.flinch && amFaster) sc *= isStrategic && mv.key === 'fake-out' ? 2.1 : 1.25;
-            if (mv.m?.crit) sc *= 1.15;
-            if (threat.threatenedKO && ((mv.pr || 0) > 0 || (this.ab(ref) === 'gale-wings' && mvType === 'flying'))) sc *= 2.8;
-            if (!amFaster && mv.m?.st?.some(([sd, amt]) => sd === 6 && amt < 0)) {
-              const tgtAb = this.ab(tr);
-              if (tgtAb !== 'clear-body' && tgtAb !== 'white-smoke' && tgtAb !== 'contrary' && mySpeed >= Math.floor(this.stat(tr, 5) * 2 / 3)) sc *= 1.45;
-            }
-            return sc;
-          };
-          if (isSpreadMove && this.slots > 1) {
-            s = 0;
-            for (const f of tgtPool) s += scoreVs(f);
-            let dangerousFriendly = false;
-            // Pénalité si l'attaque touche aussi nos alliés (Séisme, Surf, Coup d'Jus…)
-            if (mv.tg === 9) {
-              for (const alSl of this.aliveSlots(1)) if (alSl !== slot && this.isAdjacent(ref, { side: 1, slot: alSl })) {
-                if (ctx?.protectedAlly?.has(alSl)) continue;
-                const alRef = { side: 1, slot: alSl }, alMon = this.act(alRef);
-                const allyPenalty = scoreVs(alRef);
-                if ((isSmart || isRival) && allyPenalty > 0 && alMon) {
-                  if (this.estimate(ref, alRef, mv) >= alMon.hp * 0.45) dangerousFriendly = true;
-                  s -= allyPenalty * 2.6;
-                } else {
-                  s -= allyPenalty * 1.1;
-                }
-              }
-            }
-            if (ctx && !dangerousFriendly && tgtPool.length >= 2 && s > 0) s *= 1.15;
-            s = dangerousFriendly ? 0.0001 : Math.max(0.0001, s);
-            estDmg = tgtPool.reduce((mx, f) => Math.max(mx, this.estimate(ref, f, mv)), 0);
-          } else {
-            estDmg = this.estimate(ref, tgtRef, mv);
-            s = Math.max(0.0001, scoreVs(tgtRef));
-          }
-        } else {
-          const x = mv.m || {}, tgtAb = this.ab(tgtRef), tgtScr = this.sides[tgtRef.side].screens;
-          if (x.heal || x.u === 'rest') {
-            if (threat.threatenedKO) s = 0.001;
-            else if (m.hp < m.stats[0] * (isStrategic ? 0.50 : 0.45)) s = pMon.stats[0] * (isStrategic ? 1.65 : 1.4);
-            else if (m.hp < m.stats[0] * 0.65) s = pMon.stats[0] * 0.55;
-            else s = 0.001;
-          } else if (x.u === 'reflect' || x.u === 'light-screen' || x.u === 'mist' || x.u === 'safeguard') {
-            const scrKey = x.u === 'light-screen' ? 'light' : x.u;
-            if (side.screens[scrKey] || ctx?.usedUtility?.has(x.u)) s = 0.0001;
-            else s = pMon.stats[0] * (isStrategic ? 1.45 : isSmart ? 1.05 : 0.6);
-          } else if (x.u === 'haze') {
-            const foeBoosted = this.aliveSlots(0).some((s0) => { const vs0 = this.vol({ side: 0, slot: s0 }).st; return vs0[1] >= 2 || vs0[3] >= 2 || vs0[5] >= 2 || vs0.reduce((a, b) => a + Math.max(0, b), 0) >= 2; });
-            s = foeBoosted ? pMon.stats[0] * 1.65 : 0.001;
-          } else if (x.u === 'pain-split') {
-            const gain = Math.floor((m.hp + pMon.hp) / 2) - m.hp;
-            s = gain > 0 ? gain * 2.2 : 0.001;
-          } else if (x.u === 'belly-drum') {
-            s = (hasPhysMove && m.hp > m.stats[0] * 0.65 && !threat.threatenedKO && (v.st[1] || 0) < 2) ? pMon.stats[0] * 1.7 : 0.001;
-          } else if (x.ail && !['conf', 'seed', 'trap'].includes(x.ail)) {
-            const ailType = mv.key === 'toxic' ? 'tox' : x.ail;
-            const immuneAb = { psn: ['immunity'], tox: ['immunity'], par: ['limber'], slp: ['insomnia', 'vital-spirit'], brn: ['water-veil'], frz: ['magma-armor'] }[ailType];
-            const blockedByGround = mv.key === 'thunder-wave' && pType.includes('ground');
-            const blockedByPowder = POWDER_MOVES.has(mv.key) && pType.includes('grass');
-            const blockedBySound = SOUND_MOVES.has(mv.key) && tgtAb === 'soundproof';
-            const blockedByAb = (immuneAb && immuneAb.includes(tgtAb)) || tgtAb === 'magic-bounce' || (tgtAb === 'leaf-guard' && this.weather === 'sun');
-            if (pMon.status || tgtScr.safeguard || blockedByGround || blockedByPowder || blockedBySound || blockedByAb || (ctx?.statusedTarget?.has(tgtRef.slot))) s = 0.001;
-            else {
-              const cannot = ((ailType === 'psn' || ailType === 'tox') && (pType.includes('poison') || pType.includes('steel'))) ||
-                (ailType === 'brn' && pType.includes('fire')) || (ailType === 'par' && pType.includes('electric')) || (ailType === 'frz' && pType.includes('ice'));
-              const brnBoost = (isSmart || isRival) && ailType === 'brn' && this.stat(tgtRef, 1) >= this.stat(tgtRef, 3) ? 1.65 : 1.4;
-              s = cannot ? 0.001 : pMon.stats[0] * (ailType === 'slp' ? 1.85 : brnBoost);
-            }
-          } else if (x.ail === 'conf') {
-            s = (pVol.conf || tgtAb === 'own-tempo' || tgtAb === 'magic-bounce' || (SOUND_MOVES.has(mv.key) && tgtAb === 'soundproof')) ? 0.001 : pMon.stats[0] * 0.7;
-          } else if (x.ail === 'seed') {
-            s = (pVol.seed || pType.includes('grass') || tgtAb === 'magic-bounce') ? 0.001 : pMon.stats[0] * 0.95;
-          } else if (x.st) {
-            const isDebuff = x.st.some(([, amt]) => amt < 0);
-            if (isDebuff) {
-              const blockedDebuff = tgtScr.mist || tgtAb === 'magic-bounce' || tgtAb === 'clear-body' || tgtAb === 'white-smoke' || tgtAb === 'contrary' || tgtAb === 'defiant' || tgtAb === 'competitive'
-                || ((tgtAb === 'hyper-cutter' || tgtAb === 'coeur-vaillant') && x.st.some(([sd]) => sd === 2))
-                || (tgtAb === 'keen-eye' && x.st.some(([sd]) => sd === 7))
-                || (tgtAb === 'big-pecks' && x.st.some(([sd]) => sd === 3));
-              const alreadyLowered = x.st.some(([sd]) => (pVol.st[sd - 1] || 0) <= -1);
-              s = (blockedDebuff || alreadyLowered || v.turns > 1 || m.hp < m.stats[0] * 0.70) ? 0.001 : pMon.stats[0] * 0.35;
-            } else {
-              const boostsAtk = x.st.some(([sd, amt]) => sd === 2 && amt > 0);
-              const boostsSpa = x.st.some(([sd, amt]) => sd === 4 && amt > 0);
-              const boostsSpe = x.st.some(([sd, amt]) => sd === 6 && amt > 0);
-              const usefulOff = (!boostsAtk && !boostsSpa) || (boostsAtk && hasPhysMove) || (boostsSpa && hasSpecMove);
-              const curStage = Math.max(...x.st.map(([sd]) => v.st[sd - 1] || 0));
-              if (threat.threatenedKO || !usefulOff || curStage >= 2 || m.hp < m.stats[0] * 0.45) {
-                s = curStage >= 2 || !usefulOff || threat.threatenedKO ? 0.001 : pMon.stats[0] * 0.1;
-              } else {
-                s = (boostsAtk || boostsSpa) ? pMon.stats[0] * 1.35 : pMon.stats[0] * 0.85;
-                if (boostsSpe && !amFaster && Math.floor(mySpeed * 1.5) >= tgtSpe) s += pMon.stats[0] * 0.25;
-              }
-            }
-          } else if (mv.key === 'protect' || mv.key === 'detect') {
-            if (v.protChain > 0) s = 0.001;
-            else if (pVol.seed || pMon.status === 'tox') s = pMon.stats[0] * 1.15;
-            else if ((isSmart || isRival) && m.item === 'leftovers' && m.hp < m.stats[0] * 0.45) s = pMon.stats[0] * 1.1;
-            else if ((isSmart || isRival) && this.slots > 1 && this.aliveSlots(1).some((alSl) => alSl !== slot && this.isAdjacent(ref, { side: 1, slot: alSl }) && this.act({ side: 1, slot: alSl })?.moves?.some((amv) => { const mm = MOVES[amv.id]; return amv.pp > 0 && mm?.tg === 9 && this.estimate({ side: 1, slot: alSl }, ref, mm) >= m.hp * 0.35; }))) s = pMon.stats[0] * 1.35;
-            else s = pMon.stats[0] * 0.35;
-          } else s = pMon.stats[0] * 0.2;
-        }
-        options.push({ k, mv, tgtRef, s: Math.max(0.01, s), d: estDmg, pHp: pMon.hp });
-      }
-    }
-
-    if ((isSmart || isRival) && !ctx?.disableSwitch) {
-      const sw = this.foeConsiderSwitch(slot, threat, bestOffDmg, ctx);
-      if (sw) return sw;
-    }
-
-    let pick;
-    if (isSmart || isRival) {
-      const tri = [...options].sort((a, b) => b.s - a.s);
-      pick = tri[0];
-      const ko = pick.mv.c !== 'status' && pick.d >= pick.pHp;
-      if (!isStrategic && !ko && tri[1] && tri[1].s >= pick.s * 0.8 && this.rng() < 0.3) pick = tri[1];
-    } else {
-      const tot = options.reduce((acc, x) => acc + x.s * x.s, 0);
-      let r = this.rng() * tot;
-      pick = options[0];
-      for (const x of options) { r -= x.s * x.s; if (r <= 0) { pick = x; break; } }
-    }
-    if (ctx) {
-      if (pick.mv.key === 'protect' || pick.mv.key === 'detect') ctx.protectedAlly.add(slot);
-      if (pick.mv.m?.u) ctx.usedUtility.add(pick.mv.m.u);
-      if (pick.mv.m?.ail && !['conf', 'seed', 'trap'].includes(pick.mv.m.ail)) ctx.statusedTarget.add(pick.tgtRef.slot);
-      if (pick.mv.c !== 'status') {
-        const hitTgts = (pick.mv.tg === 9 || pick.mv.tg === 11) ? this.validFoeTargets(ref, pick.mv) : [pick.tgtRef];
-        const mul = (pick.mv.tg === 9 || pick.mv.tg === 11) && hitTgts.length > 1 ? 0.75 : 1;
-        for (const f of hitTgts) {
-          if (f.side !== 0) continue;
-          ctx.plannedDmg.set(f.slot, (ctx.plannedDmg.get(f.slot) || 0) + this.estimate(ref, f, pick.mv) * mul);
-        }
-      }
-    }
-    return { type: 'move', id: pick.mv.id, slot: pick.k, targetSide: pick.tgtRef.side, targetSlot: pick.tgtRef.slot };
-  }
-
-  damagePreview(a, d, moveId) {
-    const mv = MOVES[moveId], T = this.act(d); if (!mv || !T || !T.stats) return null;
-    if (mv.c === 'status' && !mv.m?.u) return null;
-    const u = mv.m?.u, max = T.stats[0];
-    const pct = (lo, hi) => ({ lo: Math.max(0, Math.floor(lo * 1000 / max) / 10), hi: Math.min(999, Math.ceil(hi * 1000 / max) / 10), lo0: lo, hi0: hi, ko: hi >= T.hp, sure: lo >= T.hp });
-    const type = this.moveType(a, mv), eff = typeEff(type, SPECIES[T.sp].t);
-    if (eff === 0) return { lo: 0, hi: 0, eff: 0 };
-    const m = this.act(a);
-    const fixed = u === 'dragon-rage' ? 40 : u === 'sonic-boom' ? 20 : u === 'seismic-toss' || u === 'night-shade' ? m.lvl : u === 'super-fang' ? Math.max(1, Math.floor(T.hp / 2)) : u === 'endeavor' ? Math.max(0, T.hp - m.hp) : null;
-    if (u === 'psywave') return { ...pct(Math.floor(m.lvl * 0.5), Math.floor(m.lvl * 1.5)), eff: 1 };
-    if (u === 'counter' || u === 'mirror-coat' || u === 'splash' || mv.m?.cat === 9 || mv.key === 'metal-burst') return null;
-    if (mv.key === 'final-gambit') return { ...pct(m.hp, m.hp), eff: 1 };
-    if (fixed != null) return { ...pct(fixed, fixed), eff: 1 };
-    const p = u === 'magnitude' ? 70 : u === 'present' ? 40 : this.movePower(a, d, mv);
-    if (!p) return null;
-    const x = mv.m || {}, hits = x.h0 ? [x.h0, x.h1 || x.h0] : [1, 1];
-    const spread = this.slots > 1 && (mv.tg === 9 || mv.tg === 11) && this.validFoeTargets(this.norm(a), mv).length > 1 ? 0.75 : 1;
-    const lo = Math.floor(this.damageCore(a, d, mv, p, type, false, 0.85) * spread) * hits[0];
-    const hi = Math.floor(this.damageCore(a, d, mv, p, type, false, 1) * spread) * hits[1];
-    return { ...pct(lo, hi), eff };
-  }
-  estimate(a, d, mv) {
-    const aR = this.norm(a), dR = this.norm(d);
-    const A = this.act(aR), D = this.act(dR);
-    if (!A || !D || !mv) return 0;
-    const t = this.moveType(aR, mv), eff = this.effOn(aR, dR, t);
-    if (eff === 0) return 0;
-    const dAb = this.ab(dR), aAb = this.ab(aR);
-    if (dAb === 'soundproof' && SOUND_MOVES.has(mv.key)) return 0;
-    if (aAb !== 'mold-breaker') {
-      const nul = { ground: ['levitate'], water: ['water-absorb', 'dry-skin', 'storm-drain'], electric: ['volt-absorb', 'lightning-rod', 'motor-drive'], fire: ['flash-fire'], grass: ['sap-sipper'] }[t];
-      if ((nul && nul.includes(dAb)) || (dAb === 'wonder-guard' && eff <= 1)) return 0;
-    }
-    const u = mv.m?.u, x = mv.m || {};
-    if (u === 'counter' || u === 'mirror-coat' || mv.key === 'metal-burst') return 0;
-    let dmg, avgHits = 1;
-    const fixed = u === 'psywave' ? Math.max(1, A.lvl) : this.fixedDamage(aR, dR, mv);
-    if (fixed != null) {
-      dmg = fixed;
-    } else {
-      const p = u === 'magnitude' ? 71 : this.movePower(aR, dR, mv);
-      if (!p) return 0;
-      dmg = this.damageCore(aR, dR, mv, p, t, false, 0.92);
-      if (x.h0) {
-        avgHits = x.h0 === x.h1 ? x.h0 : aAb === 'skill-link' ? x.h1 : (x.h0 === 2 && x.h1 === 5) ? 3.1 : (x.h0 + (x.h1 || x.h0)) / 2;
-        dmg = Math.floor(dmg * avgHits);
-      }
-    }
-    if (avgHits <= 1 && D.hp === D.stats[0] && dmg >= D.hp && (D.item === 'focus-sash' || (dAb === 'sturdy' && aAb !== 'mold-breaker'))) {
-      dmg = Math.max(1, D.hp - 1);
-    }
-    return dmg;
-  }
+  damagePreview(a, d, moveId) { return damagePreview(this, a, d, moveId); }
+  estimate(a, d, mv) { return estimate(this, a, d, mv); }
 
   /* ---------------- résolution d'un tour ---------------- */
   resolve(a, b) { this.resolveAll([{ i: 0, side: 0, slot: 0, a }, { i: 1, side: 1, slot: 0, a: b }]); }
@@ -940,13 +571,16 @@ export class Battle {
   resolveAll(acts) {
     const order = this.eotOrder ? this.eotOrder() : [0, 1];
     acts = [...acts].sort((a, b) => order.indexOf(a.side ?? a.i) - order.indexOf(b.side ?? b.i) || (a.slot ?? 0) - (b.slot ?? 0));
+    this._switchedThisTurn = new Set();
     for (const s of this.sides) for (const v of s.vs) { v.flinch = false; v.dmgTaken = null; }
     for (const x of acts) {
       const ref = { side: x.side, slot: x.slot };
       if (x.a.type === 'switch' && this.trapped(ref)) { this.say(`${this.Nm(ref)} est pris au piège et ne peut pas être rappelé !`); x.a = { type: 'none' }; x.done = true; }
       const lock = this.choiceLock(ref);
       if (x.a.type === 'move' && lock != null && x.a.id !== 165 && x.a.id !== lock) {
-        x.a = { ...x.a, type: 'move', id: lock, slot: this.act(ref).moves.findIndex((q) => q.id === lock) };
+        const lSlot = this.act(ref).moves.findIndex((q) => q.id === lock);
+        if (lSlot >= 0 && this.act(ref).moves[lSlot].pp > 0) x.a = { ...x.a, type: 'move', id: lock, slot: lSlot };
+        else x.a = { ...x.a, type: 'move', id: 165, slot: undefined };
       }
     }
     const reservedSwitch = new Set();
@@ -973,11 +607,12 @@ export class Battle {
     const movers = acts.filter((x) => !x.done);
     const prio = (x) => {
       if (x.a.type !== 'move') return 0;
-      const mv = MOVES[x.a.id], id = this.ab(x);
-      return mv.pr + ((id === 'prankster' && mv.c === 'status') || (id === 'gale-wings' && mv.t === 'flying') ? 1 : 0);
+      const mv = MOVES[x.a.id], id = this.ab(x), am = this.act(x);
+      return mv.pr + ((id === 'prankster' && mv.c === 'status') || (id === 'gale-wings' && mv.t === 'flying' && am && am.hp === am.stats[0]) ? 1 : 0);
     };
     for (const x of movers) {
       const m = this.act(x);
+      x.monUid = m?.uid || null;
       x.griffe = m && m.item === 'quick-claw' && x.a.type === 'move' && this.r(5) === 0;
     }
     const sortedMovers = this.sortBySpeed(movers, prio);
@@ -986,7 +621,8 @@ export class Battle {
     for (const x of sortedMovers) {
       if (this.state === 'over') return;
       const ref = { side: x.side, slot: x.slot };
-      if (isFainted(this.act(ref))) continue;
+      const curMon = this.act(ref);
+      if (!curMon || isFainted(curMon) || (x.monUid && curMon.uid !== x.monUid)) continue;
       if (x.a.type === 'recharge') { this.say(`${this.Nm(ref)} doit se recharger !`); this.vol(ref).recharge = false; acted.add(refKey(ref)); continue; }
       this.useMoveRef(ref, x.a, acted);
       acted.add(refKey(ref));
@@ -1000,13 +636,13 @@ export class Battle {
     this.runTries++;
     const lead = { side: 0, slot: this.aliveSlots(0)[0] ?? 0 }, fLead = { side: 1, slot: this.aliveSlots(1)[0] ?? 0 };
     if (this.trapped(lead)) { this.say(`${monName(this.act(lead))} est pris au piège : impossible de fuir !`); return false; }
-    if (this.ab(lead) === 'run-away') { this.ev.push({ t: 'sfx', k: 'run' }); this.say('Vous prenez la fuite !'); this.end('run'); return true; }
-    if ((this.ab(fLead) === 'shadow-tag' && this.ab(lead) !== 'shadow-tag') || (this.ab(fLead) === 'arena-trap' && !SPECIES[this.act(lead).sp].t.includes('flying') && this.ab(lead) !== 'levitate')) {
+    if (this.ab(lead) === 'run-away') { this.ev.push({ t: 'sfx', k: 'run' }); this.say('Tu prends la fuite !'); this.end('run'); return true; }
+    if ((this.ab(fLead) === 'shadow-tag' && this.ab(lead) !== 'shadow-tag') || (this.ab(fLead) === 'arena-trap' && this.isGrounded(lead))) {
       this.say(`${this.Nm(fLead)} empêche la fuite !`); return false;
     }
     const a = this.stat(lead, 5), b = this.stat(fLead, 5);
     const f = Math.floor(a * 128 / b) + 30 * this.runTries;
-    if (a >= b || f > 255 || this.r(256) < f) { this.ev.push({ t: 'sfx', k: 'run' }); this.say('Vous prenez la fuite !'); this.end('run'); return true; }
+    if (a >= b || f > 255 || this.r(256) < f) { this.ev.push({ t: 'sfx', k: 'run' }); this.say('Tu prends la fuite !'); this.end('run'); return true; }
     this.say('Impossible de fuir !'); return false;
   }
 
@@ -1024,6 +660,7 @@ export class Battle {
     }
     side.activeSlots[slot] = idx;
     side.vs[slot] = freshVol();
+    this._switchedThisTurn?.add(refKey(ref));
     const sent = this.act(ref);
     this.ev.push({ t: 'send', side: i, slot, idx });
     if (i === 0 && sent) {
@@ -1053,7 +690,7 @@ export class Battle {
     if (!(it.ball && !this.wild)) { this.bag[a.item] = (this.bag[a.item] || 0) - 1; if (this.bag[a.item] <= 0) delete this.bag[a.item]; }
     if (it.ball) return this.throwBall(a.item);
     const m = this.sides[0].party[a.target], before = m.hp;
-    this.say(`Vous utilisez ${itemName(a.item)} !`);
+    this.say(`Tu utilises ${itemName(a.item)} !`);
     const msg = applyItem(a.item, m, a.moveIdx ?? -1);
     if (m.hp > 0) delete m._ko;
     const onSlot = this.sides[0].activeSlots.indexOf(a.target);
@@ -1065,7 +702,7 @@ export class Battle {
 
   throwBall(item) {
     const fSlots = this.aliveSlots(1), tgtSlot = fSlots[0] ?? 0;
-    this.say(`Vous lancez une ${itemName(item)} !`);
+    this.say(`Tu lances une ${itemName(item)} !`);
     if (!this.wild) { this.ev.push({ t: 'ball', item, slot: tgtSlot, blocked: true }); this.say('Le Dresseur dévie la Ball !'); this.say('Voler, c\'est mal !'); return false; }
     const m = this.monAt(1, tgtSlot), S = SPECIES[m.sp], max = m.stats[0];
     const st = m.status === 'slp' || m.status === 'frz' ? 2 : m.status ? 1.5 : 1;
@@ -1085,14 +722,27 @@ export class Battle {
       this.end('caught');
       return true;
     }
-    this.say(['Oh non ! La créature s\'est libérée !', 'Raaah ! Ça y était presque !', 'Aaaah ! Presque !', 'Mince ! Ça y était presque !'][shakes] || 'Raté !');
+    this.say(['Oh non ! Le Pokémon s\'est libéré !', 'Raaah ! Ça y était presque !', 'Aaaah ! Presque !', 'Mince ! Ça y était presque !'][shakes] || 'Raté !');
     return false;
   }
 
-  moveType(i, mv) { return mv.m?.u === 'hidden-power' ? hiddenPower(this.act(i)).type : mv.t; }
+  moveType(i, mv) {
+    if (!mv) return 'normal';
+    if (mv.m?.u === 'hidden-power') return hiddenPower(this.act(i)).type;
+    const id = this.ab(i);
+    if (id === 'normalize' && mv.id !== 165) return 'normal';
+    if (mv.t === 'normal' && mv.c !== 'status' && mv.id !== 165) {
+      if (id === 'aerilate') return 'flying';
+      if (id === 'pixilate') return 'fairy';
+      if (id === 'refrigerate') return 'ice';
+      if (id === 'dragonize') return 'dragon';
+    }
+    return mv.t;
+  }
   movePower(i, d, mv) {
     const u = mv.m?.u, m = this.act(i), t = this.act(d);
     if (u === 'hidden-power') return hiddenPower(m).power;
+    if (mv.key === 'eruption' || mv.key === 'water-spout') return Math.max(1, Math.floor(150 * m.hp / Math.max(1, m.stats[0])));
     if (mv.key === 'electro-ball') { const q = this.stat(i, 5) / this.stat(d, 5); return q >= 4 ? 150 : q >= 3 ? 120 : q >= 2 ? 80 : q >= 1 ? 60 : 40; }
     if (mv.key === 'heat-crash') { const q = (SPECIES[m.sp].w || 100) / (SPECIES[t.sp].w || 100); return q >= 5 ? 120 : q >= 4 ? 100 : q >= 3 ? 80 : q >= 2 ? 60 : 40; }
     if (u === 'flail' || u === 'reversal') { const p = Math.floor(48 * m.hp / m.stats[0]); return p <= 1 ? 200 : p <= 4 ? 150 : p <= 9 ? 100 : p <= 16 ? 80 : p <= 32 ? 40 : 20; }
@@ -1104,34 +754,49 @@ export class Battle {
     return mv.p || 0;
   }
 
-  damageCore(a, d, mv, power, type, crit, rand) {
+  damageCore(a, d, mv, power, type, crit, rand, late = false) {
     const aR = this.norm(a), dR = this.norm(d);
     const A = this.act(aR), D = this.act(dR);
     const phys = mv.c === 'physical';
-    const aId = this.ab(aR), dId = this.ab(dR), x = mv.m || {};
+    const aId = this.ab(aR), dId = this.defAb(aR, dR), x = mv.m || {};
     const atk = this.stat(aR, phys ? 1 : 3, crit, true, dId === 'unaware'), def = this.stat(dR, phys ? 2 : 4, crit, false, aId === 'unaware');
     let dmg = Math.floor(Math.floor(Math.floor(2 * A.lvl / 5 + 2) * power * atk / def) / 50);
-    if (phys && A.status === 'brn' && aId !== 'guts') dmg = Math.floor(dmg / 2);
+    if (phys && A.status === 'brn' && aId !== 'guts' && mv.m?.u !== 'facade') dmg = Math.floor(dmg / 2);
     const scr = this.sides[dR.side].screens;
-    if (!crit && ((phys && scr.reflect) || (!phys && scr.light))) dmg = Math.floor(dmg / 2);
+    const bypassScreens = crit || aId === 'infiltrator' || (aId === 'piercing-drill' && isContact(mv));
+    if (!bypassScreens && ((phys && scr.reflect) || (!phys && scr.light))) dmg = Math.floor(dmg / 2);
     dmg += 2;
     if (crit) dmg = Math.floor(dmg * 1.5);
     dmg = Math.floor(dmg * rand);
-    const aAb = getAbility(A), dAb = getAbility(D);
-    if (SPECIES[A.sp].t.includes(type)) dmg = Math.floor(dmg * (aAb?.id === 'adaptability' ? 2.0 : 1.5));
+    if (this.typesOf(aR).includes(type)) dmg = Math.floor(dmg * (aId === 'adaptability' ? 2.0 : 1.5));
     if (A.hp <= A.stats[0] / 3) {
-      if (type === 'fire' && aAb?.id === 'blaze') dmg = Math.floor(dmg * 1.5);
-      if (type === 'water' && aAb?.id === 'torrent') dmg = Math.floor(dmg * 1.5);
-      if (type === 'grass' && aAb?.id === 'overgrow') dmg = Math.floor(dmg * 1.5);
-      if (type === 'bug' && aAb?.id === 'swarm') dmg = Math.floor(dmg * 1.5);
+      if (type === 'fire' && aId === 'blaze') dmg = Math.floor(dmg * 1.5);
+      if (type === 'water' && aId === 'torrent') dmg = Math.floor(dmg * 1.5);
+      if (type === 'grass' && aId === 'overgrow') dmg = Math.floor(dmg * 1.5);
+      if (type === 'bug' && aId === 'swarm') dmg = Math.floor(dmg * 1.5);
     }
-    if (aAb?.id === 'technician' && power <= 60) dmg = Math.floor(dmg * 1.5);
+    if (aId === 'technician' && power <= 60) dmg = Math.floor(dmg * 1.5);
     if (aId === 'iron-fist' && /punch|poing/.test(mv.key || '')) dmg = Math.floor(dmg * 1.2);
+    if (aId === 'tough-claws' && isContact(mv)) dmg = Math.floor(dmg * 1.3);
+    if (aId === 'mega-launcher' && PULSE_MOVES.has(mv.key)) dmg = Math.floor(dmg * 1.5);
+    if (aId === 'strong-jaw' && BITE_MOVES.has(mv.key)) dmg = Math.floor(dmg * 1.5);
+    if (aId === 'sharpness' && SLICE_MOVES.has(mv.key)) dmg = Math.floor(dmg * 1.5);
+    if (aId === 'analytic' && late) dmg = Math.floor(dmg * 1.3);
+    if (mv.c !== 'status' && mv.id !== 165) {
+      if (aId === 'normalize' || (mv.t === 'normal' && ['aerilate', 'pixilate', 'refrigerate', 'dragonize'].includes(aId))) dmg = Math.floor(dmg * 1.2);
+    }
+    if (aId === 'eelevate' && type === 'electric') dmg = Math.floor(dmg * 1.2);
+    if (aId === 'fire-mane' && type === 'fire') dmg = Math.floor(dmg * 1.2);
+    if (aId === 'mega-sol' && this.weather === 'sun' && type === 'grass') dmg = Math.floor(dmg * 1.2);
     if (aId === 'reckless' && x.drain < 0) dmg = Math.floor(dmg * 1.2);
-    if (aId === 'sheer-force' && (x.ailc || x.stc || x.flinch)) dmg = Math.floor(dmg * 1.3);
+    if (aId === 'sheer-force' && isSheerForceMove(mv)) dmg = Math.floor(dmg * 1.3);
     if (aId === 'sand-force' && this.weather === 'sandstorm' && ['rock', 'ground', 'steel'].includes(type)) dmg = Math.floor(dmg * 1.3);
     if (aId === 'sniper' && crit) dmg = Math.floor(dmg * 1.5);
     if (type === 'fire' && this.vol(aR).flashFire) dmg = Math.floor(dmg * 1.5);
+    if ((type === 'fairy' && this.hasFieldAbility('fairy-aura')) || (type === 'dark' && this.hasFieldAbility('dark-aura'))) {
+      dmg = Math.floor(dmg * (this.hasFieldAbility('aura-break') ? 0.75 : 4 / 3));
+    }
+    if (this.terrain === 'electric' && type === 'electric' && this.isGrounded(aR)) dmg = Math.floor(dmg * 1.3);
     const typeBoosters = {
       fire: 'charcoal', water: 'mystic-water', grass: 'miracle-seed', electric: 'magnet', dark: 'black-glasses',
       rock: 'hard-stone', ground: 'soft-sand', flying: 'sharp-beak', fighting: 'black-belt', poison: 'poison-barb',
@@ -1147,10 +812,11 @@ export class Battle {
     dmg = Math.floor(dmg * eff);
     if (aId === 'tinted-lens' && eff > 0 && eff < 1) dmg *= 2;
     if (A.item === 'expert-belt' && eff > 1) dmg = Math.floor(dmg * 1.2);
-    if (dAb?.id === 'thick-fat' && (type === 'fire' || type === 'ice')) dmg = Math.floor(dmg / 2);
+    if (dId === 'thick-fat' && (type === 'fire' || type === 'ice')) dmg = Math.floor(dmg / 2);
     if (dId === 'heatproof' && type === 'fire') dmg = Math.floor(dmg / 2);
     if (dId === 'dry-skin' && type === 'fire') dmg = Math.floor(dmg * 1.25);
-    if ((dId === 'filter' || dId === 'solid-rock') && eff > 1) dmg = Math.floor(dmg * 0.75);
+    if (phys && dId === 'fur-coat') dmg = Math.floor(dmg / 2);
+    if ((dId === 'filter' || dId === 'solid-rock' || dId === 'aura-guard') && eff > 1) dmg = Math.floor(dmg * 0.75);
     if (dId === 'multiscale' && D.hp === D.stats[0]) dmg = Math.floor(dmg / 2);
     return Math.max(1, dmg);
   }
@@ -1161,12 +827,15 @@ export class Battle {
     const before = m.hp;
     m.hp = Math.max(0, Math.min(m.stats[0], m.hp + delta));
     if (m.hp !== before) this.ev.push({ t: 'hp', side: r.side, slot: r.slot, hp: m.hp, from: before, cause, max: m.stats[0] });
+    if (delta < 0 && r.side === 0 && m.hp > 0 && before > m.hp && m.hp <= Math.max(1, Math.floor(m.stats[0] * 0.05))) {
+      this.clutchUids?.add(m.uid);
+    }
     const half = m.stats[0] / 2;
     if (m.hp > 0 && m.hp <= half && before > half && this.ab(r) === 'sacoches-pollen' && !(this.sacoches ||= new Set()).has(m.uid)) {
       this.sacoches.add(m.uid);
       this.say(`${this.Nm(r)} puise dans ses Sacoches de Pollen !`);
       this.hp(r, Math.max(1, Math.floor(m.stats[0] / 4)));
-      this.boost(r, 6, 1);
+      this.boost(r, 6, 1, true, r);
     }
     return before - m.hp;
   }
@@ -1214,7 +883,7 @@ export class Battle {
       if (m.slp <= 0) { m.status = null; this.ev.push({ t: 'status', side: attRef.side, slot: attRef.slot, status: null }); this.say(`${this.Nm(attRef)} se réveille !`); }
       else { this.ev.push({ t: 'anim', side: attRef.side, slot: attRef.slot, k: 'sleep' }); this.say(`${this.Nm(attRef)} dort profondément.`); stop(); return; }
     }
-    if (v.flinch && this.ab(attRef) !== 'inner-focus' && this.ab(attRef) !== 'coeur-vaillant') { this.say(`${this.Nm(attRef)} a peur ! Il ne peut pas attaquer !`); stop(); return; }
+    if (v.flinch && this.ab(attRef) !== 'inner-focus') { this.say(`${this.Nm(attRef)} a peur ! Il ne peut pas attaquer !`); stop(); return; }
     if (v.conf > 0) {
       v.conf--;
       if (v.conf === 0) this.say(`${this.Nm(attRef)} n'est plus confus !`);
@@ -1231,13 +900,25 @@ export class Battle {
       }
     }
     if (m.status === 'par' && this.r(4) === 0) { this.ev.push({ t: 'anim', side: attRef.side, slot: attRef.slot, k: 'para' }); this.say(`${this.Nm(attRef)} est paralysé ! Il n'a pas pu attaquer !`); stop(); return; }
+    if (!v.charge && !v.rampage && this.shouldDisobey(attRef)) {
+      const msgs = [
+        `${this.Nm(attRef)} fait la sourde oreille !`,
+        `${this.Nm(attRef)} se détourne !`,
+        `${this.Nm(attRef)} paresse et refuse d'obéir !`,
+        `${this.Nm(attRef)} fait comme s'il n'avait rien entendu !`,
+      ];
+      this.say(msgs[this.r(msgs.length)]);
+      stop();
+      return;
+    }
 
-    if (x.charge && v.charge !== mv.id && !(mv.key === 'solar-beam' && this.weather === 'sun')) {
+    if ((x.charge || VANISH_MOVES.has(mv.key)) && v.charge !== mv.id && !(mv.key === 'solar-beam' && (this.weather === 'sun' || this.ab(attRef) === 'mega-sol'))) {
       v.charge = mv.id;
       const slot = m.moves.findIndex((q) => q.id === mv.id); if (slot >= 0 && m.moves[slot].pp > 0) m.moves[slot].pp--;
-      const txt = { 'solar-beam': 'absorbe la lumière !', 'razor-wind': 'se prépare !', 'sky-attack': 'est entouré d\'une lumière intense !', 'skull-bash': 'baisse la tête !', fly: 's\'envole !', dig: 's\'enfonce dans le sol !', dive: 'plonge !', bounce: 'saute très haut !' }[mv.key] || 'se concentre !';
+      const txt = { 'solar-beam': 'absorbe la lumière !', 'razor-wind': 'se prépare !', 'sky-attack': 'est entouré d\'une lumière intense !', 'skull-bash': 'baisse la tête !', fly: 's\'envole !', dig: 's\'enfonce dans le sol !', dive: 'plonge !', bounce: 'saute très haut !', 'shadow-force': 'disparaît dans l\'ombre !', 'phantom-force': 'disparaît instantanément !' }[mv.key] || 'se concentre !';
       if (['fly', 'dig', 'dive', 'bounce'].includes(mv.key)) { v.invuln = mv.key; this.ev.push({ t: 'hide', side: attRef.side, slot: attRef.slot, on: true }); }
-      if (mv.key === 'skull-bash') this.boost(attRef, 3, 1, true);
+      else if (VANISH_MOVES.has(mv.key)) { v.invuln = 'shadow'; this.ev.push({ t: 'hide', side: attRef.side, slot: attRef.slot, on: true }); }
+      if (mv.key === 'skull-bash') this.boost(attRef, 3, 1, true, attRef);
       this.say(`${this.Nm(attRef)} ${txt}`);
       return;
     }
@@ -1267,12 +948,18 @@ export class Battle {
     const { targets, isSpread, selfTarget } = this.resolveTargets(attRef, a, mv);
     if (!selfTarget && !targets.length) { this.say('Mais il n\'y a pas de cible...'); return; }
 
+    const attAb = this.ab(attRef);
+    const bypassProtect = VANISH_MOVES.has(mv.key) || ((attAb === 'unseen-fist' || attAb === 'piercing-drill') && isContact(mv));
+
     // Filtrage protection / esquive pour savoir qui est effectivement touché
     const hitTargets = [];
     for (const dRef of targets) {
       const T = this.act(dRef), tv = this.vol(dRef);
       if (!T || isFainted(T)) { if (!isSpread) this.say('Mais il n\'y a pas de cible...'); continue; }
-      if (!selfTarget && tv.protect) { this.say(`${this.Nm(dRef)} se protège !`); if (!isSpread) v.rampage = null; continue; }
+      if (!selfTarget && tv.protect) {
+        if (bypassProtect) { tv.protect = false; this.say(`${this.Nm(attRef)} passe à travers la protection de ${this.nm(dRef)} !`); }
+        else { this.say(`${this.Nm(dRef)} se protège !`); if (!isSpread) v.rampage = null; continue; }
+      }
       if (!selfTarget && !this.hits(attRef, dRef, mv)) {
         this.say(`${this.Nm(attRef)} rate ${this.slots > 1 ? this.nm(dRef) : 'son attaque'} !`);
         if (!isSpread) v.rampage = null;
@@ -1284,6 +971,10 @@ export class Battle {
     if (!hitTargets.length) { boomOut(); return; }
 
     const type = this.moveType(attRef, mv);
+    if (attAb === 'protean' && !v.proteanUsed && mv.id !== 165) {
+      v.types = [type]; v.proteanUsed = true;
+      this.say(`${this.Nm(attRef)} prend le type ${TYPE_FR_MSG[type] || type} grâce à Protéen !`);
+    }
     const primaryTgt = hitTargets[0];
     this.ev.push({
       t: 'move',
@@ -1296,13 +987,30 @@ export class Battle {
       type,
     });
 
-    if (!selfTarget && this.special(attRef, primaryTgt, mv)) { this.afterRampage(attRef); return; }
+    if (mv.c === 'status' && !selfTarget && !a._bounced) {
+      const mirrored = [], normal = [];
+      for (const dRef of hitTargets) {
+        if (dRef.side !== attRef.side && this.defAb(attRef, dRef) === 'magic-bounce') mirrored.push(dRef);
+        else normal.push(dRef);
+      }
+      if (mirrored.length) {
+        for (const dRef of mirrored) {
+          this.say(`Miroir Magik de ${this.nm(dRef)} renvoie ${mv.n} !`);
+          if (x.u === 'roar' || x.u === 'whirlwind') this.special(dRef, attRef, mv);
+          else this.statusMove(dRef, attRef, mv, [attRef]);
+        }
+        if (!normal.length) { this.afterRampage(attRef); return; }
+        hitTargets.length = 0; hitTargets.push(...normal);
+      }
+    }
+
+    if (this.special(attRef, hitTargets[0], mv)) { this.afterRampage(attRef); return; }
     if (mv.c === 'status' && x.u !== 'rest' && x.u !== 'belly-drum' && x.u !== 'reflect' && x.u !== 'light-screen' && x.u !== 'mist' && x.u !== 'safeguard' && x.u !== 'haze') {
       if (mv.tg === 4 || mv.tg === 7 || mv.tg === 12 || mv.tg === 13 || mv.tg === 14) {
-        this.statusMove(attRef, primaryTgt, mv, hitTargets);
+        this.statusMove(attRef, hitTargets[0], mv, hitTargets);
       } else {
         for (const dRef of hitTargets) {
-          if (this.ab(dRef) === 'soundproof' && ['growl', 'roar', 'sing', 'supersonic', 'screech', 'snore', 'uproar', 'hyper-voice', 'bug-buzz', 'perish-song', 'metal-sound', 'grass-whistle', 'echoed-voice', 'round', 'chatter', 'boomburst', 'disarming-voice', 'snarl', 'noble-roar', 'parting-shot'].includes(mv.key)) {
+          if (this.defAb(attRef, dRef) === 'soundproof' && SOUND_MOVES.has(mv.key)) {
             this.say(`Anti-Bruit protège ${this.nm(dRef)} !`); continue;
           }
           this.statusMove(attRef, dRef, mv, [dRef]);
@@ -1310,110 +1018,131 @@ export class Battle {
       }
       return;
     }
-    if (mv.c === 'status') { this.statusMove(attRef, primaryTgt, mv, hitTargets); return; }
+    if (mv.c === 'status') { this.statusMove(attRef, hitTargets[0], mv, hitTargets); return; }
 
     const spreadMul = isSpread && hitTargets.length > 1 ? 0.75 : 1;
-    const SOUND_KEYS = ['growl', 'roar', 'sing', 'supersonic', 'screech', 'snore', 'uproar', 'hyper-voice', 'bug-buzz', 'perish-song', 'metal-sound', 'grass-whistle', 'echoed-voice', 'round', 'chatter', 'boomburst', 'disarming-voice', 'snarl', 'noble-roar', 'parting-shot'];
+    const sfActive = attAb === 'sheer-force' && isSheerForceMove(mv);
+    const hasUnnerveOpp = this.hasOppAbility(attRef, 'unnerve');
+    let hitAny = false;
 
     for (const dRef of hitTargets) {
       if (isFainted(m)) break;
       const T = this.act(dRef), tv = this.vol(dRef);
       if (!T || isFainted(T)) continue;
-      if (this.ab(dRef) === 'soundproof' && SOUND_KEYS.includes(mv.key)) { this.say(`Anti-Bruit protège ${this.nm(dRef)} !`); v.rampage = null; continue; }
-      const tAb = getAbility(T);
-      if (type === 'ground' && tAb?.id === 'levitate') { this.say(`Lévitation immunise ${this.nm(dRef)} contre les attaques Sol !`); v.rampage = null; continue; }
-      if (type === 'water' && tAb?.id === 'water-absorb') { this.say(`Absorb-Eau absorbe l'attaque et soigne ${this.nm(dRef)} !`); this.hp(dRef, Math.floor(T.stats[0] / 4)); v.rampage = null; continue; }
-      if (type === 'electric' && tAb?.id === 'volt-absorb') { this.say(`Absorb-Volt absorbe l'électricité et soigne ${this.nm(dRef)} !`); this.hp(dRef, Math.floor(T.stats[0] / 4)); v.rampage = null; continue; }
-      if (type === 'fire' && tAb?.id === 'flash-fire') { this.say(`Torche absorbe les flammes et renforce ${this.nm(dRef)} !`); tv.flashFire = true; v.rampage = null; continue; }
-      if (type === 'water' && tAb?.id === 'dry-skin') { this.say(`Peau Sèche absorbe l'eau et soigne ${this.nm(dRef)} !`); this.hp(dRef, Math.floor(T.stats[0] / 4)); v.rampage = null; continue; }
-      const absorb = { 'storm-drain': ['water', 4], 'lightning-rod': ['electric', 4], 'motor-drive': ['electric', 6], 'sap-sipper': ['grass', 2] }[tAb?.id];
-      if (absorb && absorb[0] === type) { this.say(`${tAb.name} attire l'attaque vers ${this.nm(dRef)} !`); this.lastUser = dRef; this.boost(dRef, absorb[1], 1, true); v.rampage = null; continue; }
+      const tAbId = this.defAb(attRef, dRef);
+      const tAb = tAbId ? ABILITIES[tAbId] : null;
+      const dRawAb = this.ab(dRef);
+      if (tAbId === 'soundproof' && SOUND_MOVES.has(mv.key)) { this.say(`Anti-Bruit protège ${this.nm(dRef)} !`); v.rampage = null; continue; }
+      if (tAbId === 'bulletproof' && BULLET_MOVES.has(mv.key)) { this.say(`Pare-Balles protège ${this.nm(dRef)} !`); v.rampage = null; continue; }
+      if (type === 'ground' && (tAbId === 'levitate' || tAbId === 'eelevate')) { this.say(`${tAb?.name || 'Lévitation'} immunise ${this.nm(dRef)} contre les attaques Sol !`); v.rampage = null; continue; }
+      if (type === 'water' && tAbId === 'water-absorb') { this.say(`Absorb-Eau absorbe l'attaque et soigne ${this.nm(dRef)} !`); this.hp(dRef, Math.floor(T.stats[0] / 4)); v.rampage = null; continue; }
+      if (type === 'electric' && tAbId === 'volt-absorb') { this.say(`Absorb-Volt absorbe l'électricité et soigne ${this.nm(dRef)} !`); this.hp(dRef, Math.floor(T.stats[0] / 4)); v.rampage = null; continue; }
+      if (type === 'fire' && tAbId === 'flash-fire') { this.say(`Torche absorbe les flammes et renforce ${this.nm(dRef)} !`); tv.flashFire = true; v.rampage = null; continue; }
+      if (type === 'water' && tAbId === 'dry-skin') { this.say(`Peau Sèche absorbe l'eau et soigne ${this.nm(dRef)} !`); this.hp(dRef, Math.floor(T.stats[0] / 4)); v.rampage = null; continue; }
+      const absorb = { 'storm-drain': ['water', 4], 'lightning-rod': ['electric', 4], 'motor-drive': ['electric', 6], 'sap-sipper': ['grass', 2] }[tAbId];
+      if (absorb && absorb[0] === type) { this.say(`${tAb?.name || tAbId} attire l'attaque vers ${this.nm(dRef)} !`); this.boost(dRef, absorb[1], 1, true, dRef); v.rampage = null; continue; }
       const eff = this.effOn(attRef, dRef, type);
-      if (tAb?.id === 'wonder-guard' && eff <= 1 && this.fixedDamage(attRef, dRef, mv) == null) { this.say(`Garde Mystik protège ${this.nm(dRef)} !`); v.rampage = null; continue; }
+      if (tAbId === 'wonder-guard' && eff <= 1 && this.fixedDamage(attRef, dRef, mv) == null) { this.say(`Garde Mystik protège ${this.nm(dRef)} !`); v.rampage = null; continue; }
       if (eff === 0) { this.say(`Ça n'affecte pas ${this.nm(dRef)}...`); v.rampage = null; continue; }
       if (this.fixedDamage(attRef, dRef, mv) === 0) { this.say('Mais cela échoue !'); continue; }
       if (x.cat === 9) {
-        if (T.lvl > m.lvl || tAb?.id === 'sturdy') { this.say('Mais cela échoue !'); continue; }
+        if (T.lvl > m.lvl || tAbId === 'sturdy') { this.say('Mais cela échoue !'); continue; }
         this.ev.push({ t: 'hit', side: dRef.side, slot: dRef.slot, eff: 2 });
-        this.hp(dRef, -T.hp); this.say('K.O. en un coup !'); continue;
+        this.hp(dRef, -T.hp); this.say('K.O. en un coup !'); hitAny = true; continue;
       }
 
-      let hits = 1;
-      if (x.h0) hits = x.h0 === x.h1 ? x.h0 : this.ab(attRef) === 'skill-link' ? x.h1 : x.h0 === 2 && x.h1 === 5 ? [2, 2, 2, 3, 3, 3, 4, 5][this.r(8)] : x.h0 + this.r(x.h1 - x.h0 + 1);
-      let total = 0, n = 0;
+      const late = actedSet ? (actedSet.has(refKey(dRef)) || this._switchedThisTurn?.has(refKey(dRef))) : false;
+      let hits = 1, isParentalBond = false;
+      if (x.h0) hits = x.h0 === x.h1 ? x.h0 : attAb === 'skill-link' ? x.h1 : x.h0 === 2 && x.h1 === 5 ? [2, 2, 2, 3, 3, 3, 4, 5][this.r(8)] : x.h0 + this.r(x.h1 - x.h0 + 1);
+      else if (attAb === 'parental-bond' && !isSpread && !x.boom && mv.key !== 'final-gambit' && mv.id !== 165) { hits = 2; isParentalBond = true; }
+      let total = 0, n = 0, koRemainingHp = 0;
       for (; n < hits; n++) {
         if (isFainted(T)) break;
-        const noCrit = tAb?.id === 'battle-armor' || tAb?.id === 'shell-armor';
-        const crit = !noCrit && this.r(24) < [1, 3, 6, 8, 12][Math.min(4, (x.crit || 0) + (this.ab(attRef) === 'super-luck' ? 1 : 0) + (m.item === 'scope-lens' ? 1 : 0))];
+        const hpBeforeHit = T.hp;
+        const noCrit = tAbId === 'battle-armor' || tAbId === 'shell-armor' || tAbId === 'aura-guard';
+        const crit = !noCrit && this.r(24) < [1, 3, 12, 24][Math.min(3, (x.crit || 0) + (attAb === 'super-luck' ? 1 : 0) + (m.item === 'scope-lens' ? 1 : 0))];
         let p = this.movePower(attRef, dRef, mv);
         if (tv.invuln === 'dig' && ['earthquake', 'magnitude'].includes(mv.key)) p *= 2;
         let dmg = this.fixedDamage(attRef, dRef, mv);
         if (dmg == null) {
-          dmg = this.damageCore(attRef, dRef, mv, p, type, crit, (85 + this.r(16)) / 100);
+          dmg = this.damageCore(attRef, dRef, mv, p, type, crit, (85 + this.r(16)) / 100, late);
           if (spreadMul < 1) dmg = Math.max(1, Math.floor(dmg * spreadMul));
+          if (isParentalBond && n === 1) dmg = Math.max(1, Math.floor(dmg * 0.25));
         } else if (eff === 0) dmg = 0;
         if (x.u === 'false-swipe' && dmg >= T.hp) dmg = T.hp - 1;
-        if (dmg > 0 && RESIST[T.item] === type && (eff > 1 || type === 'normal') && this.fixedDamage(attRef, dRef, mv) == null && this.ab(attRef) !== 'unnerve') {
+        const foeHasUnnerve = hasUnnerveOpp || this.ab(attRef) === 'unnerve';
+        if (dmg > 0 && RESIST[T.item] === type && (eff > 1 || type === 'normal') && this.fixedDamage(attRef, dRef, mv) == null && !foeHasUnnerve) {
           const k = T.item; T.item = null; dmg = Math.max(1, Math.floor(dmg / 2));
           this.say(`${this.Nm(dRef)} mange sa ${itemName(k)} : elle affaiblit l'attaque !`);
         }
         if (dmg >= T.hp && T.hp === T.stats[0]) {
           if (T.item === 'focus-sash') { dmg = T.hp - 1; T.item = null; this.say(`${this.Nm(dRef)} tient bon grâce à sa Ceinture Force !`); }
-          else if (tAb?.id === 'sturdy') { dmg = T.hp - 1; this.say(`${this.Nm(dRef)} tient bon grâce à son talent Fermeté !`); }
+          else if (tAbId === 'sturdy') { dmg = T.hp - 1; this.say(`${this.Nm(dRef)} tient bon grâce à son talent Fermeté !`); }
         }
         dmg = Math.min(dmg, T.hp);
         this.ev.push({ t: 'hit', side: dRef.side, slot: dRef.slot, eff: this.fixedDamage(attRef, dRef, mv) != null ? 1 : eff, crit });
         this.hp(dRef, -dmg);
+        if (T.hp === 0) koRemainingHp = hpBeforeHit;
         tv.dmgTaken = { amount: dmg, c: mv.c };
         total += dmg;
         if (crit) {
           this.say('Coup critique !');
-          if (tAb?.id === 'anger-point' && !isFainted(T)) {
+          if (dRawAb === 'anger-point' && !isFainted(T)) {
             this.say(`Colérique de ${this.nm(dRef)} monte son Attaque au maximum !`);
             tv.st[1] = 6; this.ev.push({ t: 'stat', side: dRef.side, slot: dRef.slot, up: true, all: this.stages(), slots: this.allStages() });
           }
         }
       }
+      if (total > 0) hitAny = true;
       if (this.fixedDamage(attRef, dRef, mv) == null) {
         if (eff > 1) this.say('C\'est super efficace !');
         else if (eff < 1) this.say('Ce n\'est pas très efficace...');
       }
       if (hits > 1) this.say(`Touché ${n} fois !`);
       const targetCanFlinch = actedSet ? !actedSet.has(refKey(dRef)) : true;
-      if (m.item === 'shell-bell' && total > 0 && !isFainted(m) && m.hp < m.stats[0]) { this.hp(attRef, Math.max(1, Math.floor(total / 8))); this.say(`${this.Nm(attRef)} récupère des PV grâce au Grelot Coque !`); }
-      if (m.item === 'kings-rock' && total > 0 && targetCanFlinch && !x.flinch && !isFainted(T) && this.r(10) === 0 && tAb?.id !== 'inner-focus' && tAb?.id !== 'coeur-vaillant') tv.flinch = true;
+      if (m.item === 'shell-bell' && total > 0 && !isFainted(m) && m.hp < m.stats[0] && !sfActive) { this.hp(attRef, Math.max(1, Math.floor(total / 8))); this.say(`${this.Nm(attRef)} récupère des PV grâce au Grelot Coque !`); }
+      if (m.item === 'kings-rock' && total > 0 && targetCanFlinch && !x.flinch && !isFainted(T) && this.r(10) === 0 && tAbId !== 'inner-focus') tv.flinch = true;
       if (x.drain > 0 && total > 0 && !isFainted(m)) { const h = Math.max(1, Math.floor(total * x.drain / 100 * (m.item === 'big-root' ? 1.3 : 1))); if (this.hp(attRef, h)) this.say(`${this.Nm(dRef)} a perdu de l'énergie !`); }
       if (x.drain < 0 && total > 0 && this.ab(attRef) !== 'rock-head' && this.ab(attRef) !== 'magic-guard') { this.hp(attRef, -Math.max(1, Math.floor(total * -x.drain / 100))); this.say(`${this.Nm(attRef)} est blessé par le contrecoup !`); }
-      if (m.item === 'life-orb' && total > 0 && !isFainted(m) && this.ab(attRef) !== 'magic-guard') { this.hp(attRef, -Math.max(1, Math.floor(m.stats[0] / 10))); this.say(`L'Orbe Vie draine un peu d'énergie de ${this.nm(attRef)} !`); }
       if (mv.c === 'physical' && total > 0 && !isFainted(T)) {
         if (T.item === 'rocky-helmet') { this.hp(attRef, -Math.max(1, Math.floor(m.stats[0] / 6))); this.say(`Le Casque Brut de ${this.nm(dRef)} blesse ${this.nm(attRef)} !`); }
-        if (tAb?.id === 'rough-skin') { this.hp(attRef, -Math.max(1, Math.floor(m.stats[0] / 8))); this.say(`La Peau Dure de ${this.nm(dRef)} blesse ${this.nm(attRef)} !`); }
-        if (tAb?.id === 'static' && this.r(100) < 30) this.inflict(attRef, 'par', mv, true);
-        if (tAb?.id === 'flame-body' && this.r(100) < 30) this.inflict(attRef, 'brn', mv, true);
-        if (tAb?.id === 'cire-brulante') { this.say(`La Cire Brûlante de ${this.nm(dRef)} jaillit !`); if (this.r(100) < 30) this.inflict(attRef, 'brn', mv, true); this.lastUser = dRef; this.boost(attRef, 6, -1, true); }
-        if (tAb?.id === 'poison-point' && this.r(100) < 30) this.inflict(attRef, 'psn', mv, true);
-        if (tAb?.id === 'iron-barbs') { this.hp(attRef, -Math.max(1, Math.floor(m.stats[0] / 8))); this.say(`Épine de Fer de ${this.nm(dRef)} blesse ${this.nm(attRef)} !`); }
-        if (tAb?.id === 'effect-spore' && this.r(100) < 30 && !SPECIES[m.sp].t.includes('grass')) this.inflict(attRef, ['psn', 'par', 'slp'][this.r(3)], mv, true);
-        if (tAb?.id === 'gooey') { this.lastUser = dRef; this.boost(attRef, 6, -1, true); }
-        if (tAb?.id === 'cute-charm' && this.r(100) < 30 && m.gender && T.gender && m.gender !== T.gender && !v.conf) { v.conf = 2 + this.r(4); this.say(`Joli Sourire de ${this.nm(dRef)} rend ${this.nm(attRef)} confus !`); }
-        if (this.ab(attRef) === 'poison-touch' && this.r(100) < 30) this.inflict(dRef, 'psn', mv, true);
+        if (dRawAb === 'rough-skin') { this.hp(attRef, -Math.max(1, Math.floor(m.stats[0] / 8))); this.say(`La Peau Dure de ${this.nm(dRef)} blesse ${this.nm(attRef)} !`); }
+        if (dRawAb === 'static' && this.r(100) < 30) this.inflict(attRef, 'par', mv, true, dRef);
+        if (dRawAb === 'flame-body' && this.r(100) < 30) this.inflict(attRef, 'brn', mv, true, dRef);
+        if (dRawAb === 'cire-brulante') { this.say(`La Cire Brûlante de ${this.nm(dRef)} jaillit !`); if (this.r(100) < 30) this.inflict(attRef, 'brn', mv, true, dRef); this.boost(attRef, 6, -1, true, dRef); }
+        if (dRawAb === 'poison-point' && this.r(100) < 30) this.inflict(attRef, 'psn', mv, true, dRef);
+        if (dRawAb === 'iron-barbs') { this.hp(attRef, -Math.max(1, Math.floor(m.stats[0] / 8))); this.say(`Épine de Fer de ${this.nm(dRef)} blesse ${this.nm(attRef)} !`); }
+        if (dRawAb === 'effect-spore' && this.r(100) < 30 && !this.typesOf(attRef).includes('grass') && this.defAb(dRef, attRef) !== 'overcoat') this.inflict(attRef, ['psn', 'par', 'slp'][this.r(3)], mv, true, dRef);
+        if (dRawAb === 'gooey') { this.boost(attRef, 6, -1, true, dRef); }
+        if (dRawAb === 'cute-charm' && this.r(100) < 30 && m.gender && T.gender && m.gender !== T.gender && !v.conf) { v.conf = 2 + this.r(4); this.say(`Joli Sourire de ${this.nm(dRef)} rend ${this.nm(attRef)} confus !`); this.checkBerries(attRef); }
+        if (this.ab(attRef) === 'poison-touch' && this.r(100) < 30) this.inflict(dRef, 'psn', mv, true, attRef);
       }
-      if (mv.c === 'physical' && total > 0 && isFainted(T) && tAb?.id === 'aftermath' && !isFainted(m)) { this.hp(attRef, -Math.max(1, Math.floor(m.stats[0] / 4))); this.say(`Boom Final de ${this.nm(dRef)} blesse ${this.nm(attRef)} !`); }
-      if (total > 0 && isFainted(T) && this.ab(attRef) === 'moxie') this.boost(attRef, 2, 1, true);
+      if (total > 0 && isFainted(T) && !isFainted(m)) {
+        if (mv.c === 'physical' && dRawAb === 'aftermath') { this.hp(attRef, -Math.max(1, Math.floor(m.stats[0] / 4))); this.say(`Boom Final de ${this.nm(dRef)} blesse ${this.nm(attRef)} !`); }
+        if (dRawAb === 'innards-out' && koRemainingHp > 0 && this.ab(attRef) !== 'magic-guard') { this.hp(attRef, -koRemainingHp); this.say(`Expuls'Organes de ${this.nm(dRef)} inflige ${koRemainingHp} PV à ${this.nm(attRef)} !`); }
+      }
+      if (total > 0 && isFainted(T) && this.ab(attRef) === 'moxie') this.boost(attRef, 2, 1, true, attRef);
       this.checkBerries(dRef);
       this.checkBerries(attRef);
 
-      const ch = (c) => (this.ab(attRef) === 'serene-grace' ? c * 2 : c), noSec = this.ab(attRef) === 'sheer-force' || tAb?.id === 'shield-dust';
-      if (!isFainted(T) && !noSec) {
+      const ch = (c) => (this.ab(attRef) === 'serene-grace' ? c * 2 : c), shieldDust = tAbId === 'shield-dust';
+      if (!isFainted(T) && !sfActive && !shieldDust) {
         if (x.flinch && targetCanFlinch && this.r(100) < ch(x.flinch)) {
-          if (tAb?.id !== 'inner-focus' && tAb?.id !== 'coeur-vaillant') { tv.flinch = true; if (tAb?.id === 'steadfast') { this.lastUser = dRef; this.boost(dRef, 6, 1, true); } }
+          if (tAbId !== 'inner-focus') { tv.flinch = true; if (dRawAb === 'steadfast') this.boost(dRef, 6, 1, true, dRef); }
         }
         if (x.ail && x.ailc && this.r(100) < ch(x.ailc)) this.inflict(dRef, x.ail, mv, true, attRef);
-        if (x.st && x.stc && this.r(100) < ch(x.stc)) for (const [s, c] of x.st) this.boost(x.cat === 7 ? attRef : dRef, s, c, true);
-      } else if (x.st && x.cat === 7 && x.stc && this.ab(attRef) !== 'sheer-force' && this.r(100) < ch(x.stc)) for (const [s, c] of x.st) this.boost(attRef, s, c, true);
+        if (x.st && x.cat !== 7 && x.stc && this.r(100) < ch(x.stc)) for (const [s, c] of x.st) this.boost(dRef, s, c, true, attRef);
+      }
+      if (!isFainted(m) && x.st && x.cat === 7 && x.stc && !sfActive && this.r(100) < ch(x.stc)) {
+        for (const [s, c] of x.st) this.boost(attRef, s, c, true, attRef);
+      }
       if (T.status === 'frz' && type === 'fire' && !isFainted(T)) { T.status = null; this.ev.push({ t: 'status', side: dRef.side, slot: dRef.slot, status: null }); this.say(`${this.Nm(dRef)} n'est plus gelé !`); }
     }
 
+    if (hitAny && m.item === 'life-orb' && !isFainted(m) && this.ab(attRef) !== 'magic-guard' && !sfActive) {
+      this.hp(attRef, -Math.max(1, Math.floor(m.stats[0] / 10)));
+      this.say(`L'Orbe Vie draine un peu d'énergie de ${this.nm(attRef)} !`);
+    }
     if (mv.id === 165 && !isFainted(m)) { this.hp(attRef, -Math.max(1, Math.floor(m.stats[0] / 4))); this.say(`${this.Nm(attRef)} est blessé par le contrecoup !`); }
     if (x.boom || mv.key === 'final-gambit') this.hp(attRef, -m.hp);
     if (x.recharge) v.recharge = true;
@@ -1428,13 +1157,15 @@ export class Battle {
   hits(i, d, mv) {
     const tv = this.vol(d), iv = this.vol(i), x = mv.m || {};
     if (tv.invuln) {
-      const ok = (tv.invuln === 'fly' || tv.invuln === 'bounce') ? ['thunder', 'gust', 'twister', 'sky-uppercut'].includes(mv.key) : tv.invuln === 'dig' ? ['earthquake', 'magnitude', 'fissure'].includes(mv.key) : ['surf', 'whirlpool'].includes(mv.key);
+      const ok = (tv.invuln === 'fly' || tv.invuln === 'bounce') ? ['thunder', 'gust', 'twister', 'sky-uppercut'].includes(mv.key)
+        : tv.invuln === 'dig' ? ['earthquake', 'magnitude', 'fissure'].includes(mv.key)
+        : tv.invuln === 'dive' ? ['surf', 'whirlpool'].includes(mv.key) : false;
       if (!ok) return false;
     }
     if (x.cat === 9) return this.r(100) < 30 + (this.act(i).lvl - this.act(d).lvl);
     if (mv.a == null || x.sure) return true;
-    const ai = this.ab(i), di = this.ab(d);
-    if (ai === 'no-guard' || di === 'no-guard') return true;
+    const ai = this.ab(i), di = this.defAb(i, d);
+    if (ai === 'no-guard' || this.ab(d) === 'no-guard') return true;
     const s = Math.max(-6, Math.min(6, iv.st[6] - (ai === 'unaware' ? 0 : tv.st[7])));
     let acc = mv.a * accMul(s);
     if (ai === 'compound-eyes') acc *= 1.3;
@@ -1467,25 +1198,39 @@ export class Battle {
       case 'splash': this.say('Mais rien ne se passe !'); return true;
       case 'teleport': if (this.wild && aR.side === 0) { this.say(`${this.Nm(aR)} se téléporte !`); this.end('run'); } else if (this.wild) { this.say(`${this.Nm(aR)} se téléporte !`); this.end('fled'); } else this.say('Mais cela échoue !'); return true;
       case 'rest':
-        if (m.hp >= m.stats[0]) { this.say('Mais cela échoue !'); return true; }
+        if (m.hp >= m.stats[0] || this.ab(aR) === 'insomnia' || this.ab(aR) === 'vital-spirit' || (this.terrain === 'electric' && this.isGrounded(aR))) { this.say('Mais cela échoue !'); return true; }
         m.status = 'slp'; m.slp = 3; this.ev.push({ t: 'status', side: aR.side, slot: aR.slot, status: 'slp' });
-        this.hp(aR, m.stats[0]); this.say(`${this.Nm(aR)} s'endort et récupère ses PV !`); return true;
+        this.hp(aR, m.stats[0]); this.say(`${this.Nm(aR)} s'endort et récupère ses PV !`); this.checkBerries(aR); return true;
       case 'belly-drum':
         if (m.hp <= m.stats[0] / 2) { this.say('Mais cela échoue !'); return true; }
         this.hp(aR, -Math.floor(m.stats[0] / 2)); v.st[1] = 6; this.ev.push({ t: 'stat', side: aR.side, slot: aR.slot, up: true, all: this.stages(), slots: this.allStages() });
         this.say(`${this.Nm(aR)} sacrifie des PV et monte son Attaque au maximum !`); return true;
-      case 'pain-split': { const avg = Math.floor((m.hp + T.hp) / 2); this.hp(aR, avg - m.hp); this.hp(dR, avg - T.hp); this.say('Les deux créatures partagent leur douleur !'); return true; }
+      case 'pain-split': { const avg = Math.floor((m.hp + T.hp) / 2); this.hp(aR, avg - m.hp); this.hp(dR, avg - T.hp); this.say('Les deux Pokémon partagent leur douleur !'); return true; }
       case 'haze': for (const s of this.sides) for (const vs of s.vs) vs.st = [0, 0, 0, 0, 0, 0, 0, 0]; this.ev.push({ t: 'stat', side: -1, all: this.stages(), slots: this.allStages() }); this.say('Les changements de stats sont annulés !'); return true;
       case 'reflect': case 'light-screen': {
         const k = u === 'reflect' ? 'reflect' : 'light', scr = this.sides[aR.side].screens;
         if (scr[k]) { this.say('Mais cela échoue !'); return true; }
         scr[k] = 5; this.say(u === 'reflect' ? 'Protection augmente la résistance aux attaques physiques !' : 'Mur Lumière augmente la résistance aux attaques spéciales !'); return true;
       }
-      case 'mist': case 'safeguard': { const scr = this.sides[aR.side].screens; scr[u] = 5; this.say(u === 'mist' ? `${this.Nm(aR)} s'entoure de brume !` : `${this.Nm(aR)} est protégé par un voile mystique !`); return true; }
-      case 'roar': case 'whirlwind':
-        if (this.wild && this.slots === 1) { this.say(aR.side === 0 ? `${this.Nm(dR)} prend la fuite !` : 'Vous êtes renvoyé !'); this.end(aR.side === 0 ? 'win-flee' : 'fled'); }
-        else this.say('Mais cela échoue !');
+      case 'mist': case 'safeguard': { const scr = this.sides[aR.side].screens; if (scr[u]) { this.say('Mais cela échoue !'); return true; } scr[u] = 5; this.say(u === 'mist' ? `${this.Nm(aR)} s'entoure de brume !` : `${this.Nm(aR)} est protégé par un voile mystique !`); return true; }
+      case 'roar': case 'whirlwind': {
+        if (this.wild && this.slots === 1) {
+          this.say(aR.side === 0 ? `${this.Nm(dR)} prend la fuite !` : 'Tu es renvoyé !');
+          this.end(aR.side === 0 ? 'win-flee' : 'fled');
+          return true;
+        }
+        const tId = this.defAb(aR, dR);
+        if (tId === 'suction-cups' || tId === 'guard-dog') {
+          this.say(`${ABILITIES[tId]?.name || tId} ancre ${this.nm(dR)} solidement au sol !`);
+          return true;
+        }
+        const bench = this.roarBench(dR.side, dR.slot);
+        if (!bench.length) { this.say('Mais cela échoue !'); return true; }
+        const pick = bench[this.r(bench.length)];
+        if (this.slots === 1 && dR.slot === 0) this.doSwitch(dR.side, pick, false, true);
+        else this.doSwitchSlot(dR.side, dR.slot, pick, false, true);
         return true;
+      }
       case 'present':
         if (this.r(5) === 0) { this.hp(dR, Math.floor(T.stats[0] / 4)); this.say(`${this.Nm(dR)} récupère des PV !`); return true; }
         return false;
@@ -1503,13 +1248,23 @@ export class Battle {
       this.hp(target, Math.max(1, Math.floor(tm.stats[0] * (x.heal || 50) / 100))); this.say(`${this.Nm(target)} récupère des PV !`); return;
     }
     if (x.ail) {
-      if (mv.key === 'thunder-wave' && SPECIES[T.sp].t.includes('ground')) { this.say(`Ça n'affecte pas ${this.nm(dR)}...`); return; }
+      if (POWDER_MOVES.has(mv.key) && (this.typesOf(dR).includes('grass') || this.defAb(aR, dR) === 'overcoat')) {
+        this.say(this.typesOf(dR).includes('grass') ? `Ça n'affecte pas ${this.nm(dR)}...` : `Envelocape protège ${this.nm(dR)} !`);
+        return;
+      }
+      if (mv.key === 'thunder-wave' && !this.inverse && this.typesOf(dR).includes('ground')) { this.say(`Ça n'affecte pas ${this.nm(dR)}...`); return; }
       did = this.inflict(dR, x.ail, mv, false, aR) || did;
     }
     if (x.st) {
       const isSelf = mv.tg === 7 || (x.st.every(([, c]) => c > 0) && mv.tg !== 10 && mv.tg !== 11 && mv.tg !== 13 && mv.tg !== 14);
       const tgtList = isSelf ? [aR] : (multiTargets || [dR]);
-      for (const t of tgtList) for (const [s, c] of x.st) did = this.boost(t, s, c, false) || did;
+      for (const t of tgtList) {
+        if (!isSelf && POWDER_MOVES.has(mv.key) && (this.typesOf(t).includes('grass') || this.defAb(aR, t) === 'overcoat')) {
+          this.say(this.typesOf(t).includes('grass') ? `Ça n'affecte pas ${this.nm(t)}...` : `Envelocape protège ${this.nm(t)} !`);
+          continue;
+        }
+        for (const [s, c] of x.st) did = this.boost(t, s, c, false, aR) || did;
+      }
     }
     if (!x.ail && !x.st) this.say('Mais cela échoue !');
   }
@@ -1518,11 +1273,15 @@ export class Battle {
     const dR = this.norm(dRef), T = this.act(dR), tv = this.vol(dR);
     const fail = () => { if (!secondary) this.say('Mais cela échoue !'); return false; };
     if (!T || isFainted(T)) return false;
-    const types = SPECIES[T.sp].t, scr = this.sides[dR.side].screens, tid = this.ab(dR);
+    const types = this.typesOf(dR), scr = this.sides[dR.side].screens;
+    const tid = srcRef ? this.defAb(srcRef, dR) : this.ab(dR);
+    if (POWDER_MOVES.has(mv?.key) && (types.includes('grass') || tid === 'overcoat')) return fail();
     if (ail === 'conf' && tid === 'own-tempo') return fail();
     if (ail === 'conf') {
       if (tv.conf) { if (!secondary) this.say(`${this.Nm(dR)} est déjà confus !`); return false; }
-      tv.conf = 2 + this.r(4); this.ev.push({ t: 'anim', side: dR.side, slot: dR.slot, k: 'confused' }); this.say(`${this.Nm(dR)} devient confus !`); return true;
+      tv.conf = 2 + this.r(4); this.ev.push({ t: 'anim', side: dR.side, slot: dR.slot, k: 'confused' }); this.say(`${this.Nm(dR)} devient confus !`);
+      this.checkBerries(dR);
+      return true;
     }
     if (ail === 'seed') {
       if (types.includes('grass') || tv.seed) return fail();
@@ -1541,48 +1300,56 @@ export class Battle {
     if (st === 'brn' && types.includes('fire')) return fail();
     if (st === 'par' && types.includes('electric')) return fail();
     if (st === 'frz' && types.includes('ice')) return fail();
-    const immune = { limber: ['par'], insomnia: ['slp'], 'vital-spirit': ['slp'], immunity: ['psn', 'tox'], 'water-veil': ['brn'], 'magma-armor': ['frz'] }[tid];
-    if ((immune && immune.includes(st)) || (tid === 'leaf-guard' && this.weather === 'sun')) { if (!secondary) this.say(`${getAbility(T).name} protège ${this.nm(dR)} !`); return false; }
+    if (st === 'slp' && this.terrain === 'electric' && this.isGrounded(dR)) return fail();
+    const immune = { limber: ['par'], insomnia: ['slp'], 'vital-spirit': ['slp'], immunity: ['psn', 'tox'], 'water-veil': ['brn'], 'fire-mane': ['brn'], 'magma-armor': ['frz'] }[tid];
+    if ((immune && immune.includes(st)) || (tid === 'leaf-guard' && this.weather === 'sun')) { if (!secondary) this.say(`${ABILITIES[tid]?.name || tid} protège ${this.nm(dR)} !`); return false; }
     T.status = st;
     if (st === 'slp') T.slp = 2 + this.r(4);
     if (st === 'tox') T.tox = 0;
     this.ev.push({ t: 'status', side: dR.side, slot: dR.slot, status: st });
     this.say(`${this.Nm(dR)} ${STATUS_TXT[st]}`);
     if (st === 'slp') tv.rampage = null;
-    if (tid === 'synchronize' && ['psn', 'tox', 'par', 'brn'].includes(st) && !this._sync) {
+    if (this.ab(dR) === 'synchronize' && ['psn', 'tox', 'par', 'brn'].includes(st) && !this._sync) {
       const src = srcRef ? this.norm(srcRef) : { side: 1 - dR.side, slot: 0 };
       const sm = this.act(src);
-      if (sm && !isFainted(sm) && !sm.status) { this._sync = true; this.say(`Synchro de ${this.nm(dR)} s'active !`); this.inflict(src, st === 'tox' ? 'psn' : st, mv, true); this._sync = false; }
+      if (sm && !isFainted(sm) && !sm.status) { this._sync = true; this.say(`Synchro de ${this.nm(dR)} s'active !`); this.inflict(src, st === 'tox' ? 'psn' : st, mv, true, dR); this._sync = false; }
     }
+    this.checkBerries(dR);
     return true;
   }
 
-  boost(ref, sid, c, secondary) {
-    const r = this.norm(ref), v = this.vol(r), m = this.act(r), s = sid - 1, id = this.ab(r);
+  boost(ref, sid, c, secondary, srcRef = null) {
+    const r = this.norm(ref), v = this.vol(r), m = this.act(r), s = sid - 1;
     if (!m || isFainted(m)) return false;
-    const lu = this.lastUser ? this.norm(this.lastUser) : null;
-    const byFoe = c < 0 && (!lu || lu.side !== r.side || lu.slot !== r.slot);
-    if (c < 0 && this.sides[r.side].screens.mist && byFoe) { if (!secondary) this.say(`${this.Nm(r)} est protégé par la brume !`); return false; }
-    if (byFoe && (id === 'clear-body' || id === 'white-smoke' || (id === 'hyper-cutter' && s === 1) || (id === 'coeur-vaillant' && s === 1) || (id === 'keen-eye' && s === 6) || (id === 'big-pecks' && s === 2))) {
-      if (!secondary || sid === 2) this.say(`${getAbility(m).name} de ${this.nm(r)} empêche la baisse !`); return false;
+    const sr = srcRef ? this.norm(srcRef) : (this.lastUser ? this.norm(this.lastUser) : null);
+    const byOther = c < 0 && (!sr || sr.side !== r.side || sr.slot !== r.slot);
+    const byFoe = c < 0 && (!sr || sr.side !== r.side);
+    const id = (byOther && sr) ? this.defAb(sr, r) : this.ab(r);
+    const rawId = this.ab(r);
+    if (c < 0 && this.sides[r.side].screens.mist && byFoe && !(sr && this.ab(sr) === 'infiltrator')) {
+      if (!secondary) this.say(`${this.Nm(r)} est protégé par la brume !`); return false;
     }
-    if (id === 'simple') c *= 2;
-    if (id === 'contrary') c = -c;
+    if (byOther && (id === 'clear-body' || id === 'white-smoke' || (id === 'hyper-cutter' && s === 1) || (id === 'coeur-vaillant' && s === 1) || (id === 'keen-eye' && s === 6) || (id === 'big-pecks' && s === 2))) {
+      if (!secondary || sid === 2) this.say(`${ABILITIES[id]?.name || id} de ${this.nm(r)} empêche la baisse !`); return false;
+    }
+    let delta = c;
+    if (rawId === 'simple') delta *= 2;
+    if (id === 'contrary') delta = -delta;
     const before = v.st[s];
-    v.st[s] = Math.max(-6, Math.min(6, v.st[s] + c));
+    v.st[s] = Math.max(-6, Math.min(6, v.st[s] + delta));
     const name = STAGE_NAMES[s];
-    if (v.st[s] === before) { if (!secondary) this.say(`${name[0].toUpperCase() + name.slice(1)} de ${this.nm(r)} ne peut plus ${c > 0 ? 'augmenter' : 'baisser'} !`); return false; }
-    this.ev.push({ t: 'stat', side: r.side, slot: r.slot, up: c > 0, all: this.stages(), slots: this.allStages() });
-    const amt = Math.abs(c) >= 2 ? 'beaucoup ' : '';
-    this.say(`${name[0].toUpperCase() + name.slice(1)} de ${this.nm(r)} ${c > 0 ? 'augmente' : 'baisse'}${amt ? ' ' + amt.trim() : ''} !`);
-    if (c < 0 && m.item === 'white-herb') {
+    if (v.st[s] === before) { if (!secondary) this.say(`${name[0].toUpperCase() + name.slice(1)} de ${this.nm(r)} ne peut plus ${delta > 0 ? 'augmenter' : 'baisser'} !`); return false; }
+    this.ev.push({ t: 'stat', side: r.side, slot: r.slot, up: delta > 0, all: this.stages(), slots: this.allStages() });
+    const amt = Math.abs(delta) >= 2 ? 'beaucoup ' : '';
+    this.say(`${name[0].toUpperCase() + name.slice(1)} de ${this.nm(r)} ${delta > 0 ? 'augmente' : 'baisse'}${amt ? ' ' + amt.trim() : ''} !`);
+    if (delta < 0 && m.item === 'white-herb') {
       for (let k = 0; k < v.st.length; k++) if (v.st[k] < 0) v.st[k] = 0;
       m.item = null; this.ev.push({ t: 'stat', side: r.side, slot: r.slot, up: true, all: this.stages(), slots: this.allStages() });
       this.say(`${this.Nm(r)} utilise son Herbe Blanche : ses stats reviennent à la normale !`);
     }
-    if (byFoe && c < 0 && (id === 'defiant' || id === 'competitive') && !this._defiant) {
-      this._defiant = true; this.say(`${getAbility(m).name} de ${this.nm(r)} s'active !`);
-      this.boost(r, id === 'defiant' ? 2 : 4, 2, true); this._defiant = false;
+    if (byFoe && delta < 0 && (rawId === 'defiant' || rawId === 'competitive') && !this._defiant) {
+      this._defiant = true; this.say(`${ABILITIES[rawId]?.name || rawId} de ${this.nm(r)} s'active !`);
+      this.boost(r, rawId === 'defiant' ? 2 : 4, 2, true, r); this._defiant = false;
     }
     return true;
   }
@@ -1594,8 +1361,8 @@ export class Battle {
         const ref = { side: i, slot }, m = this.act(ref), v = this.vol(ref);
         v.protect = false;
         if (!m || isFainted(m)) continue;
-        const ab = getAbility(m), mg = ab?.id === 'magic-guard';
-        if (ab?.id === 'poison-heal' && (m.status === 'psn' || m.status === 'tox')) {
+        const abId = this.ab(ref), mg = abId === 'magic-guard', types = this.typesOf(ref);
+        if (abId === 'poison-heal' && (m.status === 'psn' || m.status === 'tox')) {
           if (m.hp < m.stats[0]) { this.hp(ref, Math.max(1, Math.floor(m.stats[0] / 8))); this.say(`Soin Poison soigne ${this.nm(ref)} !`); }
         } else if (mg) { /* Garde Magik */ }
         else if (m.status === 'brn') { this.ev.push({ t: 'anim', side: i, slot, k: 'burn' }); this.say(`${this.Nm(ref)} souffre de sa brûlure !`); this.hp(ref, -Math.max(1, Math.floor(m.stats[0] / 8))); }
@@ -1620,28 +1387,35 @@ export class Battle {
         }
         if (isFainted(m)) continue;
         if (m.item === 'black-sludge') {
-          if (SPECIES[m.sp].t.includes('poison')) { if (m.hp < m.stats[0]) { this.hp(ref, Math.max(1, Math.floor(m.stats[0] / 16))); this.say(`${this.Nm(ref)} récupère un peu de PV grâce à sa Boue Noire !`); } }
-          else if (this.ab(ref) !== 'magic-guard') { this.hp(ref, -Math.max(1, Math.floor(m.stats[0] / 8))); this.say(`${this.Nm(ref)} est blessé par la Boue Noire !`); if (isFainted(m)) continue; }
+          if (types.includes('poison')) { if (m.hp < m.stats[0]) { this.hp(ref, Math.max(1, Math.floor(m.stats[0] / 16))); this.say(`${this.Nm(ref)} récupère un peu de PV grâce à sa Boue Noire !`); } }
+          else if (!mg) { this.hp(ref, -Math.max(1, Math.floor(m.stats[0] / 8))); this.say(`${this.Nm(ref)} est blessé par la Boue Noire !`); if (isFainted(m)) continue; }
         }
         if (m.item === 'leftovers' && m.hp < m.stats[0]) { this.hp(ref, Math.max(1, Math.floor(m.stats[0] / 16))); this.say(`${this.Nm(ref)} récupère un peu de PV grâce à ses Restes !`); }
-        const wImm = ['magic-guard', 'overcoat'].includes(ab?.id);
-        if (this.weather === 'sandstorm' && !wImm && !['sand-veil', 'sand-rush', 'sand-force'].includes(ab?.id)) {
-          const types = SPECIES[m.sp]?.t || [];
+        const wImm = ['magic-guard', 'overcoat'].includes(abId);
+        if (this.weather === 'sandstorm' && !wImm && !['sand-veil', 'sand-rush', 'sand-force'].includes(abId)) {
           if (!types.includes('rock') && !types.includes('ground') && !types.includes('steel')) { this.hp(ref, -Math.max(1, Math.floor(m.stats[0] / 16))); this.say(`${this.Nm(ref)} est blessé par la tempête de sable !`); }
-        } else if (this.weather === 'hail' && !wImm && !['ice-body', 'snow-cloak'].includes(ab?.id)) {
-          const types = SPECIES[m.sp]?.t || [];
+        } else if (this.weather === 'hail' && !wImm && !['ice-body', 'snow-cloak', 'slush-rush'].includes(abId)) {
           if (!types.includes('ice')) { this.hp(ref, -Math.max(1, Math.floor(m.stats[0] / 16))); this.say(`${this.Nm(ref)} est blessé par la grêle !`); }
         }
-        if (ab?.id === 'speed-boost' && !isFainted(m)) this.boost(ref, 6, 1, true);
+        if (abId === 'speed-boost' && !isFainted(m)) this.boost(ref, 6, 1, true, ref);
+        if (abId === 'bad-dreams' && !isFainted(m)) {
+          for (const fRef of this.validFoeTargets(ref, null)) {
+            const fm = this.act(fRef);
+            if (fm && !isFainted(fm) && fm.status === 'slp' && this.ab(fRef) !== 'magic-guard') {
+              this.hp(fRef, -Math.max(1, Math.floor(fm.stats[0] / 8)));
+              this.say(`${this.Nm(fRef)} est tourmenté par un Mauvais Rêve !`);
+            }
+          }
+        }
         if (!isFainted(m)) {
           const heal = (f, txt) => { if (m.hp < m.stats[0]) { this.hp(ref, Math.max(1, Math.floor(m.stats[0] * f))); this.say(txt); } };
           const w = this.weather;
-          if (ab?.id === 'rain-dish' && w === 'rain') heal(1 / 16, `Cuvette soigne ${this.nm(ref)} !`);
-          if (ab?.id === 'ice-body' && w === 'hail') heal(1 / 16, `Corps Gel soigne ${this.nm(ref)} !`);
-          if (ab?.id === 'dry-skin' && w === 'rain') heal(1 / 8, `Peau Sèche soigne ${this.nm(ref)} !`);
-          if ((ab?.id === 'dry-skin' || ab?.id === 'solar-power') && w === 'sun') { this.hp(ref, -Math.max(1, Math.floor(m.stats[0] / 8))); this.say(`${this.Nm(ref)} souffre du soleil !`); }
-          const cure = (ab?.id === 'shed-skin' && this.r(100) < 30) || (ab?.id === 'hydration' && w === 'rain');
-          if (cure && m.status && !isFainted(m)) { m.status = null; m.slp = 0; m.tox = 0; this.ev.push({ t: 'status', side: i, slot, status: null }); this.say(`${getAbility(m).name} guérit ${this.nm(ref)} !`); }
+          if (abId === 'rain-dish' && w === 'rain') heal(1 / 16, `Cuvette soigne ${this.nm(ref)} !`);
+          if (abId === 'ice-body' && w === 'hail') heal(1 / 16, `Corps Gel soigne ${this.nm(ref)} !`);
+          if (abId === 'dry-skin' && w === 'rain') heal(1 / 8, `Peau Sèche soigne ${this.nm(ref)} !`);
+          if ((abId === 'dry-skin' || abId === 'solar-power') && w === 'sun') { this.hp(ref, -Math.max(1, Math.floor(m.stats[0] / 8))); this.say(`${this.Nm(ref)} souffre du soleil !`); }
+          const cure = (abId === 'shed-skin' && this.r(100) < 30) || (abId === 'hydration' && w === 'rain');
+          if (cure && m.status && !isFainted(m)) { m.status = null; m.slp = 0; m.tox = 0; this.ev.push({ t: 'status', side: i, slot, status: null }); this.say(`${ABILITIES[abId]?.name || abId} guérit ${this.nm(ref)} !`); }
         }
         this.checkBerries(ref);
       }
@@ -1652,6 +1426,16 @@ export class Battle {
         const back = this.baseWeather !== this.weather && !this.baseWeatherTurns ? this.baseWeather : 'none';
         this.setWeather(back, 0);
       }
+    }
+    if (this.terrainTurns > 0) {
+      this.terrainTurns--;
+      if (this.terrainTurns === 0 && this.terrain !== 'none') this.setTerrain('none', 0);
+    }
+    if (this.chaosWeather && this.state !== 'over' && this.aliveSlots(0).length && this.aliveSlots(1).length) {
+      const opts = ['rain', 'sun', 'sandstorm', 'hail'].filter((w) => w !== this.weather);
+      const nextW = opts[this.r(opts.length)];
+      this.say('La faille déchaîne un nouveau climat !');
+      this.setWeather(nextW, 0);
     }
     for (const s of this.sides) for (const k of Object.keys(s.screens)) { s.screens[k]--; if (s.screens[k] <= 0) { delete s.screens[k]; this.say(k === 'reflect' ? 'L\'effet de Protection prend fin.' : k === 'light' ? 'L\'effet de Mur Lumière prend fin.' : k === 'mist' ? 'La brume se dissipe.' : 'Le voile mystique disparaît.'); } }
     this.checkFaints(false);
@@ -1684,8 +1468,10 @@ export class Battle {
     if (!foeLeft) { this.winBattle(); return true; }
 
     if (this.slots === 1) {
-      if (!stop) return false;
-      if (isFainted(this.foe)) {
+      if (midTurn) return stop;
+      const faint1 = isFainted(this.foe), faint0 = isFainted(this.me);
+      if (!faint1 && !faint0) return false;
+      if (faint1) {
         const tr = this.sides[1].trainer;
         const aliveFoes = this.sides[1].party.filter((m) => m.hp > 0).length;
         if (tr && (tr.leader != null || tr.champion || tr.cls === 'Champion') && aliveFoes === 1 && !this.gymCrisisTriggered) {
@@ -1694,10 +1480,10 @@ export class Battle {
           this.say(`${tr.name} : « C'est mon dernier partenaire... Mais notre volonté est inébranlable ! »`);
         }
         const idx = this.foePickBestReplacement(0);
-        if (isFainted(this.me)) { this.state = 'switch'; this.pendingFoe = idx; this.ev.push({ t: 'switch-prompt' }); return true; }
+        if (faint0) { this.state = 'switch'; this.pendingFoe = idx; this.ev.push({ t: 'switch-prompt' }); return true; }
         this.doSwitch(1, idx, true);
       }
-      if (isFainted(this.me)) { this.state = 'switch'; this.ev.push({ t: 'switch-prompt' }); }
+      if (faint0) { this.state = 'switch'; this.ev.push({ t: 'switch-prompt' }); }
       return true;
     }
 
@@ -1755,7 +1541,9 @@ export class Battle {
     const S = SPECIES[foe.sp], party = this.sides[0].party;
     const ps = party.filter((m) => this.participants.has(m.uid) && m.hp > 0);
     if (!ps.length) return;
-    const base = Math.floor(((this.wild ? 1 : 1.5) * S.xp * foe.lvl) / (7 * ps.length));
+    const xpMul = !this.wild && this.sides[1]?.trainer?.xpMul != null ? this.sides[1].trainer.xpMul : 1;
+    const rawBase = ((this.wild ? 1 : 1.5) * S.xp * foe.lvl) / (7 * ps.length);
+    const base = Math.floor(xpMul === 1 ? rawBase : rawBase * xpMul);
     for (const m of ps) {
       const idx = party.indexOf(m), slot = this.sides[0].activeSlots.indexOf(idx);
       gainEffort(m, foe.sp);
@@ -1784,17 +1572,17 @@ export class Battle {
     const t = this.sides[1].trainer;
     if (t) {
       this.ev.push({ t: 'trainer-back' });
-      this.say(`Vous avez battu ${t.cls} ${t.name} !`);
+      this.say(`Tu as battu ${t.cls} ${t.name} !`);
       if (t.lose) for (const l of [].concat(t.lose)) this.ev.push({ t: 'msg', text: l, speaker: t.name });
       const last = this.sides[1].party[this.sides[1].party.length - 1];
       this.prizeMoney = (t.prize || 20) * last.lvl * (this.slots > 1 ? this.slots : 1);
-      this.say(`Vous remportez ${this.prizeMoney} ₽ !`);
+      this.say(`Tu remportes ${this.prizeMoney} ₽ !`);
     }
     this.end('win');
   }
   loseBattle() {
-    this.say('Vous n\'avez plus de créature en forme !');
-    if (!this.sides[1].trainer?.friendly) this.say('Vous êtes pris de panique et perdez connaissance...');
+    this.say('Tu n\'as plus de Pokémon en forme !');
+    if (!this.sides[1].trainer?.friendly) this.say('Tu perds connaissance dans la panique...');
     this.end('lose');
   }
   end(result) {

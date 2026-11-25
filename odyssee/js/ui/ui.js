@@ -1,4 +1,6 @@
 // odyssee/js/ui/ui.js — briques d'interface façon DS : boîte de dialogue, choix, listes, bandeau de lieu, fondus
+import { clavierNom } from './clavier.js';
+import { storeGet } from '../core/safe.js';
 export const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 export const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 export const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -7,7 +9,7 @@ export class UI {
   constructor(root, input, sound) {
     this.root = root; this.input = input; this.sound = sound;
     this.textSpeed = 2;
-    try { this.textSpeed = +(localStorage.getItem('odyssee-textspeed') ?? 2); } catch (e) {}
+    this.textSpeed = +(storeGet('odyssee-textspeed') ?? 2);
     this.fadeEl = el('div', 'fade'); root.appendChild(this.fadeEl);
     this.flashEl = el('div', 'flash'); root.appendChild(this.flashEl);
   }
@@ -47,6 +49,7 @@ export class UI {
   }
   closeDialog() { if (this.dlg) { this.dlg._stopTyping?.(); this.dlg.remove(); this.dlg = null; } }
   typePage(box, text, o = {}) {
+    box._stopTyping?.();
     return new Promise((resolve) => {
       const txt = box.querySelector('.dlg-txt'), arrow = box.querySelector('.dlg-arrow');
       txt.textContent = ''; arrow.style.visibility = 'hidden';
@@ -68,8 +71,8 @@ export class UI {
       };
       const onBoxClick = (e) => { e.stopPropagation(); advance(); };
       box.addEventListener('click', onBoxClick);
-      const pop = this.input.push((k) => {
-        if (k !== 'a' && k !== 'b') return;
+      const pop = this.input.push((k, repeat) => {
+        if (repeat || (k !== 'a' && k !== 'b')) return;
         advance();
       });
     });
@@ -120,7 +123,8 @@ export class UI {
           selectIdx(idx);
         });
       });
-      const pop = this.input.push((k) => {
+      const pop = this.input.push((k, repeat) => {
+        if (repeat && (k === 'a' || k === 'b')) return;
         if (o.onKey && o.onKey(k, i, { close, refresh: show, wrap, rows })) return;
         const n = o.items.length;
         if (k === 'up') { i = (i - 1 + n) % n; this.sound.sfx('blip'); show(); }
@@ -134,37 +138,50 @@ export class UI {
     });
   }
 
-  /** choix d'une quantité (gauche/droite ±1, haut/bas ±10) */
+  /** choix d'une quantité (gauche/droite ±1, haut/bas ±10, cliquable souris/tactile) */
   quantity(max, o = {}) {
     return new Promise((resolve) => {
       const w = el('div', 'box qty'); this.root.appendChild(w);
-      let q = 1;
-      const draw = () => { w.innerHTML = `<span>× ${String(q).padStart(2, '0')}</span>${o.price ? `<span class="rgt">${(q * o.price).toLocaleString('fr-FR')} ₽</span>` : ''}`; };
+      let q = 1, done = false;
+      const draw = () => {
+        const priceHtml = o.price ? `<span class="rgt">${(q * o.price).toLocaleString('fr-FR')} ₽</span>` : '';
+        w.innerHTML = `<button type="button" class="qty-btn" data-d="-10" title="-10">−10</button><button type="button" class="qty-btn" data-d="-1" title="-1">−</button><span class="qty-val">× ${String(q).padStart(2, '0')}</span><button type="button" class="qty-btn" data-d="1" title="+1">+</button><button type="button" class="qty-btn" data-d="10" title="+10">+10</button>${priceHtml}<button type="button" class="qty-btn qty-ok" data-act="ok">OK</button><button type="button" class="qty-btn qty-no" data-act="no">✕</button>`;
+      };
+      const finish = (val, sfx) => {
+        if (done) return;
+        done = true; pop(); w.remove(); this.sound.sfx(sfx); resolve(val);
+      };
       draw();
-      const pop = this.input.push((k) => {
-        if (k === 'up' || k === 'right') q = q >= max ? 1 : q + (k === 'up' ? 1 : 1);
-        else if (k === 'down' || k === 'left') q = q <= 1 ? max : q - 1;
-        else if (k === 'a') { pop(); w.remove(); this.sound.sfx('select'); resolve(q); return; }
-        else if (k === 'b') { pop(); w.remove(); this.sound.sfx('cancel'); resolve(0); return; }
+      w.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const b = e.target.closest('button'); if (!b) return;
+        if (b.dataset.act === 'ok') { finish(q, 'select'); return; }
+        if (b.dataset.act === 'no') { finish(0, 'cancel'); return; }
+        const d = +b.dataset.d;
+        if (!d) return;
+        if (d === 1) q = q >= max ? 1 : q + 1;
+        else if (d === -1) q = q <= 1 ? max : q - 1;
+        else if (d > 0) q = q >= max ? 1 : Math.min(max, q + d);
+        else q = q <= 1 ? max : Math.max(1, q + d);
+        this.sound.sfx('blip'); draw();
+      });
+      const pop = this.input.push((k, repeat) => {
+        if (repeat && (k === 'a' || k === 'b')) return;
+        if (k === 'right') q = q >= max ? 1 : q + 1;
+        else if (k === 'left') q = q <= 1 ? max : q - 1;
+        else if (k === 'up') q = q >= max ? 1 : Math.min(max, q + 10);
+        else if (k === 'down') q = q <= 1 ? max : Math.max(1, q - 10);
+        else if (k === 'a') { finish(q, 'select'); return; }
+        else if (k === 'b') { finish(0, 'cancel'); return; }
+        else return;
         this.sound.sfx('blip'); draw();
       });
     });
   }
 
-  /** saisie d'un nom (clavier de l'ordinateur) */
+  /** saisie d'un nom : clavier en grille façon DS (ui/clavier.js) */
   nameEntry(title, def) {
-    return new Promise((resolve) => {
-      const w = el('div', 'screen name-screen');
-      w.innerHTML = `<div class="box name-box"><div class="list-title">${esc(title)}</div><input class="name-in" maxlength="10" spellcheck="false" autocomplete="off"><div class="hint">Tape un nom puis appuie sur Entrée</div></div>`;
-      this.root.appendChild(w);
-      const inp = w.querySelector('input'); inp.value = def || ''; setTimeout(() => { inp.focus(); inp.select(); }, 30);
-      const pop = this.input.push(() => {});
-      inp.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); const v = inp.value.trim() || def; pop(); w.remove(); this.sound.sfx('select'); resolve(v); }
-        e.stopPropagation();
-      });
-      inp.addEventListener('blur', () => setTimeout(() => inp.isConnected && inp.focus(), 10));
-    });
+    return clavierNom(this, { titre: title, def, max: Math.max(10, String(def || '').length) });
   }
 
   /* ---------------- effets d'écran ---------------- */
@@ -274,14 +291,14 @@ export class UI {
       <tr><td>Annuler, revenir</td><td><kbd>Échap</kbd> (ou <kbd>Retour arrière</kbd>)</td></tr>
       <tr><td>Menu (équipe, sac, sauvegarde…)</td><td><kbd>Échap</kbd>, <kbd>Tab</kbd> ou <kbd>M</kbd></td></tr>
       <tr><td>Carte de la région</td><td><kbd>C</kbd></td></tr>
-      <tr><td>Journal Quêtes / Trophées</td><td><kbd>Q</kbd> (Quêtes) · <kbd>T</kbd> (Trophées & Médailles)</td></tr>
-      <tr><td>Afficher / replier le HUD</td><td><kbd>U</kbd> (ou clic sur ▴ / ▾)</td></tr>
+      <tr><td>Journal Quêtes / Trophées</td><td><kbd>J</kbd> (Quêtes) · <kbd>T</kbd> (Trophées & Médailles)</td></tr>
+      <tr><td>Afficher / masquer le HUD</td><td><kbd>U</kbd> (ou Options → HUD)</td></tr>
       <tr><td>Pêche & Capacités</td><td>Face à l'eau (Canne à Pêche / Surf), un arbre ou un rocher : <kbd>F</kbd></td></tr>
       <tr><td>Lancer rapide de Ball</td><td>En combat sauvage : <kbd>B</kbd> ou clic sur le bandeau tactile</td></tr>
       <tr><td>Objet Enregistré</td><td><kbd>Y</kbd> (ou bouton Y du HUD)</td></tr>
       <tr><td>Ouvrir le Sac</td><td><kbd>I</kbd></td></tr>
       <tr><td>Émotes & Chat multijoueur</td><td><kbd>P</kbd> (ou bouton CHAT du HUD)</td></tr>
-      <tr><td>Sauvegarder</td><td><kbd>Échap</kbd> → SAUVER (ou bouton SAUVER du HUD)</td></tr>
+      <tr><td>Sauvegarde</td><td>Automatique : à chaque porte franchie et en quittant le jeu</td></tr>
       <tr><td>Afficher / cacher cette aide</td><td><kbd>H</kbd></td></tr></table><div class="hint">Appuie sur H, F ou Échap pour fermer</div>`);
     this.root.appendChild(panel);
     const toggle = () => { const on = !panel.classList.contains('on'); panel.classList.toggle('on', on); this.input.helpOpen = on; this.sound.sfx(on ? 'select' : 'cancel'); };

@@ -152,7 +152,9 @@ async function mission(g, q) {
     if (!st.bag[q.item]) { await say(g, lines(R.idle), who); return true; }
     await g.ui.say(`${st.name} donne : ${itemName(q.item)}.`);
     g.take(q.item, st.bag[q.item]); f[q.id] = true;
+    g.sound?.sfx('quest_complete');
     await say(g, lines(R.thanks), who); await reward(R.reward);
+    g.save?.(true);
     return true;
   }
   if (f[q.id]) { await say(g, lines(q.done), who); return true; }
@@ -169,7 +171,7 @@ async function mission(g, q) {
     if (!(await g.ui.yesNo('Accepter le combat ?'))) return true;
     const d = q.duel, team = typeof d.team === 'function' ? d.team(st, g) : d.team;
     const res = await g.api().fight({ ...d, team, ai: 'smart', items: { 'full-restore': 2 }, intro: null, lose: q.lose, noWhiteout: true, music: d.music || 'champion' });
-    if (res === 'win') { f[q.id] = true; await say(g, lines(q.thanks), who); await reward(q.reward); }
+    if (res === 'win') { f[q.id] = true; g.sound?.sfx('quest_complete'); await say(g, lines(q.thanks), who); await reward(q.reward); g.save?.(true); }
     else await say(g, 'Reviens quand tu veux. Je serai là.', who);
     return true;
   }
@@ -186,7 +188,9 @@ async function mission(g, q) {
   } else if (q.kind === 'check') ok = !!q.test(st, g);
   if (!ok) return true;
   f[q.id] = true;
+  g.sound?.sfx('quest_complete');
   await say(g, lines(q.thanks), who); await reward(q.reward);
+  g.save?.(true);
   return true;
 }
 
@@ -233,7 +237,7 @@ export async function storyWin(g, name) {
    Lugia Obscur
    ====================================================================== */
 export function shadowLugia() {
-  const m = createMon(LUGIA, 50, { moves: [SHADOW_MOVE, 56, 94, 105], iv: Array(6).fill(28), met: 'Sanctuaire des Marées' });
+  const m = createMon(LUGIA, 55, { moves: [SHADOW_MOVE, 56, 94, 105], iv: Array(6).fill(28), met: 'Sanctuaire des Marées' });
   m.shadow = true;
   return m;
 }

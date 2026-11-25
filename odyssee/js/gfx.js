@@ -46,6 +46,7 @@ export const PACKS = {
       mart: { fond: '#eef4fa', motif: '#dce8f6', motifK: 'carreaux', bande: '#3b82d6', bandeS: '#2258a4', lam: '#d2e2f2', lamC: '#f2f7fc', lamS: '#8fb2d8', cim: '#ffffff', pl: '#244e8c', cap: '#1e3e72', capC: '#78b0ec' },
     },
     chars: 'chars',           // planche des personnages de Noir & Blanc 2 (même disposition que celle du jeu)
+    tenue: 'tenue',           // zones de la tenue (visière, haut, bas, chaussures, sac) sur les deux dresseurs du pack
     charRows: NB_CHAR_ROWS,   // rangées supplémentaires (au-delà des 75 de base) propres au pack Noir & Blanc
     charVariants: NB_CHAR_VARIANTS,
     // bâtiments entiers (b_<nom>.png) par style du jeu : le jeu prend celui dont la largeur colle à l'emprise (+ filtre biome)
@@ -104,8 +105,9 @@ export function choisirSprites(id) { if (SPRITES_CHOIX.some((s) => s.id === id))
 /** crédits affichés dans Options → Crédits graphismes */
 export const CREDITS = [
   ['Sol « Pokémon Lumineux »', 'Tuiles de Flurmimon (planche « Bright »), adaptées par Bivurnum — Team Aqua\'s Asset Repo.'],
-  ['Graphismes « Noir & Blanc »', 'Sol, mer, arbres, bâtiments, intérieurs et personnages : kit « Pokémon Essentials BW » de KleinStudio et ressources Pokémon Essentials Gen 5 (FloofyPanthar ; © Nintendo / Game Freak / Creatures). Lave : Phyromatical. Compléments désert, grottes et sanctuaires : Magiscarf, J-Treecko252, TerribleJared, Anarlaurendil, RisingTempest3, JavaPlume. Intérieurs du Centre Pokémon et de la Boutique : planches Gen 5 d\'UltimoSpriter et de ditto209.'],
+  ['Graphismes « Noir & Blanc »', 'Sol, mer, arbres, bâtiments, intérieurs et personnages : kit « Pokémon Essentials BW » de KleinStudio et ressources Pokémon Essentials Gen 5 (FloofyPanthar ; © Nintendo / Game Freak / Creatures). Lave : Phyromatical. Compléments désert, grottes et sanctuaires : Magiscarf, J-Treecko252, TerribleJared, Anarlaurendil, RisingTempest3, JavaPlume. Intérieurs du Centre Pokémon et de la Boutique : planches Gen 5 d\'UltimoSpriter et de ditto209. Roche et sol des grottes : tileset de grotte 4G de la démo technique de Pokémon SDK (Pokémon Workshop, Rey et SirMalo).'],
   ['Sprites Noir & Blanc', 'Sprites des jeux Pokémon © Nintendo / Game Freak / Creatures, récupérés par PokeAPI (projet PokeAPI/sprites).'],
   ['Sprites HeartGold / SoulSilver', 'Même source : PokeAPI/sprites.'],
+  ['Légendaires des boss de raid', 'Sprites au style Noir & Blanc du projet de sprites de Smogon / Pokémon Showdown (dessins de fans), icônes de PokeAPI et de Smogon, cris de PokeAPI/cries.'],
   ['Utilisation', 'Projet de fans sans but lucratif. Les artistes restent propriétaires de leurs créations.'],
 ];

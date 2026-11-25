@@ -10,7 +10,7 @@ import { carveRoute, along, nearestWalkable, caseLibre, rng, sin, melanger, ledg
 import { plateau, sinueuse, massif } from './relief.js';
 import { bruit } from './quartiers.js';
 import { houseInterior } from './interiors.js';
-import { ROUTES, PRENOMS } from './voix.js';
+import { ROUTES, PRENOMS, prenomsPour } from './voix.js';
 import { lotsPour, rangRoute, adapter } from './bareme.js';
 
 export const BLOC = 24;
@@ -270,7 +270,8 @@ export function grandeRoute(W, S, ctx) {
     const dir = Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 'right' : 'left') : (vy > 0 ? 'down' : 'up');
     const n = 1 + Math.floor(r() * 3), team = [];
     for (let i = 0; i < n; i++) { const e = pick(enc); team.push([e[0], Math.min(100, niv[1] - 1 + Math.floor(r() * 3) - (n - 1))]); }
-    ctx.trainerNpc(W, x, y, dir, pick(CLASSES), pick(PRENOMS), team, { id: `${S.id}:d${k}`, sight: 3 });
+    const cls = pick(CLASSES);
+    ctx.trainerNpc(W, x, y, dir, cls, pick(prenomsPour(cls)), team, { id: `${S.id}:d${k}`, sight: 3 });
   }
   for (let k = 0; k < (S.promeneurs ?? 1); k++) {
     const p = along(pts, 0.2 + r() * 0.6), [x, y] = caseLibre(W, p.x + 0.5 + p.nx * 2, p.y + 0.5 + p.ny * 2);
@@ -281,7 +282,126 @@ export function grandeRoute(W, S, ctx) {
     if (a) { const p = along(pts, 0.03); W.sign(...nearestWalkable(W, p.x + 0.5 + p.nx * 2.2, p.y + 0.5 + p.ny * 2.2), a); }
     if (b2) { const p = along(pts, 0.97); W.sign(...nearestWalkable(W, p.x + 0.5 - p.nx * 2.2, p.y + 0.5 - p.ny * 2.2), b2); }
   }
+  if (S.details !== false) details(W, S, { info, cells, pts, chemin, tBloc, herbe, base, T0, LOTS, rang });
   return { pts, cells, chemin, cotes, marque, total, tBloc, niveaux: res.niveaux };
+}
+
+/* ---------------- détails de route, façon Noir 2 & Blanc 2 ----------------
+ * Une fois la route taillée (sans rien raccourcir) : des recoins cachés au bout d'une trouée dans les arbres (certains
+ * fermés par un arbuste à couper), des buttes où l'on monte par un escalier, un objet caché sous un rocher, des rebords
+ * à sauter et un panneau de conseils. Tirage à part (le reste de la route ne bouge pas) ; identifiants fixes `route:kN`. */
+const CONSEILS = [
+  'CONSEIL DU DRESSEUR\nLes rebords se sautent vers le bas, jamais vers le haut : regarde bien avant de sauter !',
+  'CONSEIL DU DRESSEUR\nUne trouée dans les arbres cache parfois un recoin. Longe la lisière !',
+  'CONSEIL DU DRESSEUR\nUn arbuste fin barre le passage ? Avec Coupe, plus rien ne t\'arrête.',
+  'CONSEIL DU DRESSEUR\nUn rocher qui brille cache souvent quelque chose. Approche-toi et regarde de plus près.',
+  'CONSEIL DU DRESSEUR\nDu haut d\'une butte, on voit des coins de la route qu\'on ne remarque pas d\'en bas.',
+  'CONSEIL DU DRESSEUR\nUn dresseur qui te voit vient te défier. Contourne-le si ton équipe est fatiguée.',
+  'CONSEIL DU DRESSEUR\nLes herbes hautes sombres abritent des Pokémon plus rares... et plus coriaces.',
+];
+const BOIS = new Set([T.TREE, T.PINE]);
+function details(W, S, { info, cells, pts, chemin, tBloc, herbe, base, T0, LOTS, rang }) {
+  if (chemin.length < 3) return;
+  const r = rng((S.graine || 1) * 977 + 3), pick = (L) => L[Math.floor(r() * L.length)];
+  const dansT = (x, y) => T0.has(key(Math.floor(x / BLOC), Math.floor(y / BLOC)));
+  const occupe = (x, y) => W.npcs.some((n) => n.x === x && n.y === y) || W.items.some((i) => i.x === x && i.y === y) || W.objectAt(x, y) || W.warpAt(x, y);
+  const bois = (x, y) => BOIS.has(W.get(x, y)) && dansT(x, y) && !info.has(key(x, y));
+  let nk = 0;
+  const objet = (x, y) => W.item(x, y, adapter(pick(LOTS), rang), 1, `${S.id}:k${nk++}`);
+  const ouvrir = (x, y, t = herbe) => { W.set(x, y, t); W.setHeight(x, y, base); cells.add(key(x, y)); };
+  const tirage = () => { const i = 1 + Math.floor(r() * (chemin.length - 2)), t = Math.max(0.02, Math.min(0.98, tBloc[i] + (r() - 0.5) * 0.04)); return along(pts, t); };
+
+  /* 1. recoins cachés : une trouée d'une case dans la lisière, un coude, une petite clairière avec un objet */
+  const nRecoins = Math.max(1, Math.round(chemin.length / 3));
+  for (let essai = 0, faits = 0; essai < nRecoins * 12 && faits < nRecoins; essai++) {
+    const p = tirage(), s = r() < 0.5 ? 1 : -1;
+    const [dx, dy] = Math.abs(p.nx) > Math.abs(p.ny) ? [Math.sign(p.nx) * s, 0] : [0, Math.sign(p.ny) * s];
+    // le bord de la clairière de la route, dans cette direction
+    let x = Math.round(p.x), y = Math.round(p.y), k = 0;
+    while (k < 16 && !bois(x, y)) { x += dx; y += dy; k++; }
+    if (k >= 16 || !walkable(W.get(x - dx, y - dy)) || W.get(x - dx, y - dy) === T.WATER || occupe(x - dx, y - dy)) continue;
+    // le couloir : tout droit, puis un coude d'un côté (on ne voit pas le fond depuis la route)
+    const L1 = 3 + Math.floor(r() * 3), L2 = 2 + Math.floor(r() * 3), c = r() < 0.5 ? 1 : -1, [ex, ey] = [dy * c, dx * c];
+    const couloir = [];
+    for (let i = 0; i < L1; i++) couloir.push([x + dx * i, y + dy * i]);
+    const [ax, ay] = couloir[couloir.length - 1];
+    for (let i = 1; i <= L2; i++) couloir.push([ax + ex * i, ay + ey * i]);
+    const [fx, fy] = couloir[couloir.length - 1], cx = fx + ex * 2, cy = fy + ey * 2;
+    const poche = []; for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) poche.push([cx + a, cy + b]);
+    // tout doit être dans les arbres, avec une rangée d'arbres autour (le recoin ne s'ouvre que par sa trouée)
+    const zone = [...couloir.slice(1), ...poche, [fx + ex, fy + ey]];
+    const tout = new Set([...couloir, ...zone].map(([a, b]) => key(a, b)));
+    let ok = zone.every(([a, b]) => bois(a, b));
+    for (const [a, b] of zone) for (const [u, v] of N4) { const kk = key(a + u, b + v); if (!tout.has(kk) && !bois(a + u, b + v)) ok = false; }
+    if (!ok || !bois(x, y)) continue;
+    for (const [a, b] of couloir) ouvrir(a, b);
+    ouvrir(fx + ex, fy + ey);
+    for (const [a, b] of poche) ouvrir(a, b, r() < 0.3 ? T.FLOWER : herbe);
+    if (r() < 0.45) W.set(x, y, T.CUT);   // un arbuste à couper ferme l'entrée
+    objet(cx, cy);
+    faits++;
+  }
+
+  /* 2. une butte au bord du chemin : on y monte par un escalier, avec un banc ou un objet là-haut */
+  if (!S.monte) {
+    const nButtes = Math.max(1, Math.floor(chemin.length / 5));
+    for (let essai = 0, faits = 0; essai < nButtes * 15 && faits < nButtes; essai++) {
+      const p = tirage(), s = r() < 0.5 ? 1 : -1, d = 5 + r() * 2;
+      const cx = Math.round(p.x + p.nx * s * d), cy = Math.round(p.y + p.ny * s * d), R = 2.6 + r() * 0.9;
+      const C = []; let ok = true;
+      for (let b = -4; b <= 4 && ok; b++) for (let a = -4; a <= 4; a++) {
+        if (Math.hypot(a, b * 1.15) > R) continue;
+        const x = cx + a, y = cy + b, v = info.get(key(x, y)), t = W.get(x, y);
+        if ((v && v.d < 3.2) || !dansT(x, y) || ![herbe, T.TALL, T.FLOWER].includes(t) || occupe(x, y) || W.height(x, y) !== base) { ok = false; break; }
+        C.push([x, y]);
+      }
+      if (!ok || C.length < 12) continue;
+      // l'escalier : au bas de la butte, sur la face sud (la paroi) ; en dessous, le chemin doit continuer
+      const by = Math.max(...C.filter(([x]) => x === cx).map(([, y]) => y));
+      const sous = W.get(cx, by + 2), v2 = info.get(key(cx, by + 2));
+      if (!v2 || !walkable(sous) || sous === T.WATER || occupe(cx, by + 1) || occupe(cx, by + 2)) continue;
+      if (![herbe, T.TALL, T.FLOWER, T.PATH].includes(W.get(cx, by + 1))) continue;
+      W.set(cx, by, T.PATH); W.set(cx, by + 2, T.PATH);
+      const Rset = plateau(W, C, base + 1, { brut: true });
+      for (const kk of Rset) cells.add(kk);
+      if (W.get(cx, by + 1) !== T.STAIRS) { // pas d'escalier posé : on remet tout à plat
+        for (const [x, y] of C) W.setHeight(x, y, base);
+        continue;
+      }
+      if (r() < 0.6) objet(cx, cy - 1); else W.prop('banc', cx, cy - 1);
+      for (const [x, y] of C) if (W.get(x, y) === T.TALL) W.set(x, y, herbe);
+      faits++;
+    }
+  }
+
+  /* 3. un rocher qui cache quelque chose (une fois) */
+  for (let essai = 0; essai < 30; essai++) {
+    const p = tirage(), s = r() < 0.5 ? 1 : -1, d = 3 + r() * 3;
+    const x = Math.round(p.x + p.nx * s * d), y = Math.round(p.y + p.ny * s * d), v = info.get(key(x, y));
+    if (!v || v.d < 2.8 || ![herbe, T.FLOWER].includes(W.get(x, y)) || occupe(x, y)) continue;
+    // le rocher ne doit rien boucher : ses quatre voisins praticables restent reliés autour de lui
+    const voisins = N4.filter(([a, b]) => walkable(W.get(x + a, y + b))).length;
+    if (voisins < 4) continue;
+    W.set(x, y, T.ROCK);
+    const id = `cache:${S.id}:0`, item = adapter(pick(LOTS), rang);
+    W.object(x, y, { use: async (A) => {
+      if (A.f[id]) { await A.say('Un rocher couvert de mousse. Il n\'y a plus rien dessous.'); return; }
+      if (!(await A.yesNo('Quelque chose brille sous ce rocher…\nRegarder de plus près ?'))) return;
+      A.flag(id); await A.give(item);
+    } });
+    break;
+  }
+
+  /* 4. des rebords à sauter (raccourcis à sens unique), si la route n'en a pas déjà */
+  if (!S.monte && !(S.paysages || []).includes('rebords')) {
+    _ledges(W, pts, [0.3 + r() * 0.15, 0.62 + r() * 0.15], { reach: 6 });
+    // jamais sous un dresseur, un promeneur ou un objet
+    for (const q of [...W.npcs, ...W.items]) if (W.get(q.x, q.y) === T.LEDGE && info.has(key(q.x, q.y))) W.set(q.x, q.y, herbe);
+  }
+
+  /* 5. un panneau de conseils, au bord du chemin */
+  { const p = along(pts, 0.4 + r() * 0.2), s = r() < 0.5 ? 1 : -1, [x, y] = nearestWalkable(W, p.x + 0.5 + p.nx * s * 2.4, p.y + 0.5 + p.ny * s * 2.4);
+    if (!occupe(x, y) && W.get(x, y) !== T.PATH) W.sign(x, y, pick(CONSEILS)); }
 }
 
 /** les morceaux de la route devenus inaccessibles (relief, étangs) redeviennent forêt : exploration locale (le rectangle

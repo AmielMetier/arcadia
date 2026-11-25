@@ -36,7 +36,7 @@ function fondPoker(seatSprites = null, multi = false) {
   perso(g, sp[1], 'down', 200, 64);
   perso(g, sp[2], 'left', 376, 136);
   tableOvale(g, 200, 118, 156, 64);
-  texte(g, multi ? 'TEXAS HOLD\'EM · MULTI' : 'TEXAS HOLD\'EM', 200, 136, multi ? '#ffe070' : '#2f9a58', { a: 'c' });
+  texte(g, multi ? 'HOLD\'EM MÉTROPOLE · MULTI' : 'HOLD\'EM MÉTROPOLE', 200, 136, multi ? '#ffe070' : '#2f9a58', { a: 'c' });
   BOARD.forEach(([x, y]) => emplacement(g, x, y));
   return c;
 }
@@ -303,7 +303,7 @@ export async function pokerTable(game) {
     if (mode !== 0) return;
   }
 
-  const T = await ouvrir(game, 'poker', 'Poker — Texas Hold\'em'), st = T.st;
+  const T = await ouvrir(game, 'poker', 'Poker — Hold\'em de Métropole'), st = T.st;
   const ia = [ADVERSAIRES[1], ADVERSAIRES[2], ADVERSAIRES[0]];
   const caves = [20, 50, 100, 200, 500].filter((n) => n <= st.jetons);
   if (!caves.length) {
@@ -523,7 +523,7 @@ export async function onPokerInvite(game, from, m) {
       return r;
     });
     ui.sound.sfx('bang');
-    const yes = await ui.yesNo(`${name} t'invite à une table de Poker Texas Hold'em multijoueur ! Rejoindre ?`, { speaker: name });
+    const yes = await ui.yesNo(`${name} t'invite à une table de Hold'em de Métropole multijoueur ! Rejoindre ?`, { speaker: name });
     if (gone) { ui.closeDialog(); await ui.say(`${name} a fermé l'invitation Poker.`); return; }
     link.abort(from);
     if (!yes) { link.send(from, { t: 'poker-rep', rid: m.rid, ok: false }); return; }
@@ -542,7 +542,7 @@ export async function onPokerInvite(game, from, m) {
       return;
     }
 
-    const T = await ouvrir(game, 'poker', 'Poker — Texas Hold\'em Multi');
+    const T = await ouvrir(game, 'poker', 'Poker — Hold\'em Multi');
     T.majJetons();
     await runPokerTableLoop(game, T, {
       mySeat: startMsg.mySeat,

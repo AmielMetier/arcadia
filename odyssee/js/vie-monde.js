@@ -2,7 +2,7 @@
 //  colporteurs et marché du week-end, arbres à baies et parois à fouiller (une fois par jour), revanches des dresseurs
 //  de route, habitants qui parlent de tes exploits, sons d'ambiance, papillons / lucioles / mouettes.
 import { T } from './world/tiles.js';
-import { ITEMS } from './core/items.js';
+import { ITEMS, itemPluralName } from './core/items.js';
 import { MEGA_FORMS, LEGEND } from './core/mega.js';
 import { levelCap } from './core/mon.js';
 import { shopScreen, partyScreen } from './ui/screens.js';
@@ -18,13 +18,24 @@ const nomObjet = (k) => ITEMS[k]?.name || k;
 
 /* ================= colporteurs et marché ================= */
 export async function colporteur(game, n) {
-  await game.ui.say(['Hé, dresseur ! Une petite pause ?', 'Je vends de quoi tenir la route, et une pierre rare que j\'ai trouvée en chemin.'], { speaker: 'Colporteur' });
-  await shopScreen(game, n.def.stock.filter((k) => ITEMS[k]));
+  const b = game.badgeCount?.() ?? 0;
+  const stock = n.def.stock.filter((k) => ITEMS[k] && (b >= 2 || !['ultra-ball', 'hyper-potion', 'revive'].includes(k) && !/-stone$/.test(k)));
+  await game.ui.say(['Hé, dresseur ! Une petite pause ?', b >= 2 ? 'Je vends de quoi tenir la route, et une pierre rare que j\'ai trouvée en chemin.' : 'Je vends de quoi tenir la route !'], { speaker: 'Colporteur' });
+  await shopScreen(game, stock);
   await game.ui.say('Bonne route ! On se recroisera peut-être plus loin.', { speaker: 'Colporteur' });
 }
 export async function marche(game, n) {
+  const b = game.badgeCount?.() ?? 0;
+  const pierres = (n.def.stock || []).filter((k) => /-stone$/.test(k));
+  let raw;
+  if (b < 2) raw = ['super-potion', 'great-ball', 'oran-berry', 'repel'];
+  else if (b < 4) raw = ['super-potion', 'great-ball', 'sitrus-berry', 'ether', 'full-heal', ...pierres.slice(0, 1)];
+  else if (b < 6) raw = ['hyper-potion', 'ultra-ball', 'sitrus-berry', 'lum-berry', 'revive', 'heart-scale', ...pierres.slice(0, 2)];
+  else if (b < 8) raw = ['max-potion', 'ultra-ball', 'lum-berry', 'revive', 'heart-scale', ...pierres];
+  else raw = ['rare-candy', 'max-potion', 'full-restore', 'lum-berry', 'ultra-ball', 'heart-scale', ...pierres];
+  const stock = raw.filter((k) => ITEMS[k]);
   await game.ui.say(['Bienvenue au marché du week-end !', 'Je ne passe que le samedi et le dimanche : profites-en, j\'ai des objets qu\'on ne trouve nulle part ailleurs.'], { speaker: 'Marchande' });
-  await shopScreen(game, n.def.stock.filter((k) => ITEMS[k]));
+  await shopScreen(game, stock);
 }
 
 /* ================= arbres à baies et fouilles ================= */
@@ -34,9 +45,9 @@ export async function cueillir(game, o) {
   const n = 1 + Math.floor(Math.random() * 3);
   E.baies[o.id] = jourDe(); game.give(o.baie, n); game.sound.sfx('item');
   game.vieMonde?.majObjet(o);
-  await ui.say(`${st.name} cueille ${n} ${nomObjet(o.baie)}${n > 1 ? ' (×' + n + ')' : ''} !`);
+  await ui.say(`${st.name} cueille ${n === 1 ? 'une ' + itemPluralName(o.baie, 1) : itemPluralName(o.baie, n)} !`);
 }
-const TRESORS = [['hard-stone', 22], ['ether', 18], ['revive', 12], ['prism-shard', 14], ['fire-stone', 4], ['water-stone', 4], ['thunder-stone', 4], ['leaf-stone', 4], ['moon-stone', 4], ['dusk-stone', 3], ['dawn-stone', 3], ['shiny-stone', 3], ['ice-stone', 3], ['rare-candy', 4], ['gemme', 3], ['fossile', 9]];
+const TRESORS = [['hard-stone', 22], ['ether', 18], ['revive', 12], ['elixir', 10], ['heart-scale', 16], ['fire-stone', 4], ['water-stone', 4], ['thunder-stone', 4], ['leaf-stone', 4], ['moon-stone', 4], ['dusk-stone', 3], ['dawn-stone', 3], ['shiny-stone', 3], ['ice-stone', 3], ['rare-candy', 4], ['gemme', 3], ['fossile', 9]];
 export async function fouiller(game, o) {
   const st = game.state, E = etat(st), ui = game.ui;
   if (E.fouilles[o.id] === jourDe()) { await ui.say('Cette paroi a déjà été fouillée aujourd\'hui.'); return; }
@@ -85,8 +96,9 @@ export function ragot(game) {
   const st = game.state, b = game.badgeCount(), N = st.name, f = st.flags;
   const L = [];
   if (f.champion) L.push([`C'est toi, ${N}, le Maître de la Ligue ? Je peux avoir un autographe ?`], ['Depuis que tu es Maître de la Ligue, les gamins du quartier ne parlent que de toi.']);
-  else if (b >= 8) L.push(['Huit badges ! Il ne te reste plus que la Ligue Céleste.', 'Toute la région va suivre ton combat, tu sais.'], ['On dit que Célestine n\'a jamais perdu. Jamais. Bonne chance !']);
-  else if (b >= 5) L.push([`${b} badges… On commence à entendre ton nom jusqu'ici.`], ['La Team Éclipse rôde encore. Fais attention à toi, sur les routes.'], ['Les dresseurs des routes se sont tous mis à s\'entraîner depuis que tu passes. Tu leur donnes envie !']);
+  else if (b >= 15) L.push(['Quinze badges ! Il ne te reste plus que la Ligue Céleste.', 'Toute la région va suivre ton combat, tu sais.'], ['On dit que Célestine n\'a jamais perdu. Jamais. Bonne chance !']);
+  else if (b >= 8) L.push(['Huit badges du Nord ! Le Pont de l\'Austral t\'ouvre maintenant les Terres du Sud et Métropole.'], ['Il paraît que les sept Champions du Sud sont d\'un tout autre niveau.']);
+  else if (b >= 5) L.push([`${b} badges… On commence à entendre ton nom jusqu'ici.`], [f.lugia ? 'Depuis que le soleil est revenu, tout le monde respire mieux sur les routes.' : 'La Team Éclipse rôde encore. Fais attention à toi, sur les routes.'], ['Les dresseurs des routes se sont tous mis à s\'entraîner depuis que tu passes. Tu leur donnes envie !']);
   else if (b >= 2) L.push([`Tiens, tu as déjà ${b} badges ? Pas mal du tout !`], ['Mon fils veut devenir dresseur depuis qu\'il t\'a vu combattre.'], ['Il paraît que des gens en noir traînent du côté des ports. Bizarre…']);
   else if (b === 1) L.push(['Ton premier badge ! Ça se fête, ça.'], ['Le premier badge, c\'est le plus beau. Moi, je l\'ai encore dans un tiroir.']);
   else L.push(['Un nouveau dresseur ! Ça se voit, tu as encore l\'air tout neuf.'], ['Tu pars à la conquête des badges ? Commence par bien connaître ton Pokémon.']);
@@ -194,6 +206,19 @@ export class VieMonde {
     this.tSon -= dt; if (this.tSon > 0) return;
     this.tSon = 3 + Math.random() * 5;
     const A = this.autour(), h = g.hour(), soir = h >= 20 || h < 6;
+    const wx = g.getMapWeather ? g.getMapWeather() : 'none';
+    const cel = g.celestial?.activeKind || 'none';
+    const riftDist = g.rifts?.distToPlayer?.() ?? Infinity;
+    const nearMusician = (g.npcs || []).some((n) => (n?.def?.script === 'musicien' || /musicien/i.test(String(n?.id || '')))
+      && Math.abs(n.x - g.player.x) + Math.abs(n.y - g.player.y) <= 6);
+    if (riftDist <= 12 && Math.random() < 0.7) { g.sound.sfx('amb_rift_hum'); return; }
+    if (nearMusician && Math.random() < 0.55) { g.sound.sfx('amb_musician'); return; }
+    if (cel === 'aurora' && Math.random() < 0.65) { g.sound.sfx('amb_aurora'); return; }
+    if (cel === 'meteor' && Math.random() < 0.65) { g.sound.sfx('amb_shooting_star'); return; }
+    if (wx === 'rain') { g.sound.sfx(Math.random() < 0.18 ? 'amb_thunder' : 'amb_rain'); return; }
+    if (wx === 'sandstorm' || wx === 'ash' || wx === 'hail') { g.sound.sfx('amb_wind_gust'); return; }
+    if (['volcanic', 'cendre', 'forge'].includes(A.theme)) { g.sound.sfx('amb_volcano'); return; }
+    if (A.theme === 'mystic' || A.theme === 'sanctuary' || ['Cap des Étoiles', 'Jardin des Songes'].includes(g.zoneName)) { g.sound.sfx('amb_mystic'); return; }
     if (A.theme === 'snow' || A.theme === 'cime') g.sound.sfx('vent');
     else if (A.eau >= 12) g.sound.sfx('vague');
     else if (soir && A.herbe > 10) g.sound.sfx('grillon');
@@ -218,6 +243,7 @@ export class VieMonde {
       if (soir && A.herbe > 6 && n('luciole') < 9 && this.betes.length < max + 4) { const [bx, by] = pres(); this.betes.push({ k: 'luciole', x: bx, y: by, ph: Math.random() * 6, vie: 14 }); }
       if (!soir && A.eau >= 8 && n('mouette') < 2) { const g2 = Math.random() < 0.5; this.betes.push({ k: 'mouette', x: p.x + (g2 ? -14 : 14), y: p.y - 3 + Math.random() * 6, vx: g2 ? 3.2 : -3.2, ph: Math.random() * 6, vie: 12 }); }
     }
+    const r = this.betes.length ? c.getBoundingClientRect() : null;
     for (const b of this.betes) {
       b.vie -= dt;
       if (b.k === 'papillon') { b.x += Math.sin(now * 0.9 + b.ph) * dt * 1.2; b.y += Math.cos(now * 0.7 + b.ph * 2) * dt * 0.9; }
@@ -225,7 +251,7 @@ export class VieMonde {
       else b.x += b.vx * dt;
       const s = v.screenPos(b.x, b.y, b.k === 'mouette' ? 120 : b.k === 'papillon' ? 26 + Math.sin(now * 3 + b.ph) * 6 : 18 + Math.sin(now + b.ph) * 8);
       if (!s) continue;
-      const r = c.getBoundingClientRect(), sx = s.left - r.left, sy = s.top - r.top;
+      const sx = s.left - r.left, sy = s.top - r.top;
       if (b.k === 'papillon') {
         const ail = Math.abs(Math.sin(now * 14 + b.ph)) * 5 + 1;
         x.globalAlpha = Math.min(1, b.vie); x.fillStyle = b.col;
@@ -409,7 +435,7 @@ export async function concours(game, n) {
   game.sound.cry?.(ASSETS.cry(m.sp));
   await ui.say([`${monName(m)} entre en scène et montre toute sa ${cat[2]} !`, 'Le jury délibère…', ...tab.map((t, k) => `${k + 1}. ${t[0]} — ${Math.round(t[1])} points`)], who);
   E.concours = jourDe();
-  const prix = [[['rare-candy', 1], ['prism-shard', 1]], [['ultra-ball', 3]], [['super-potion', 2]], []][rang - 1];
+  const prix = [[['rare-candy', 1], ['heart-scale', 2]], [['ultra-ball', 3]], [['super-potion', 2]], []][rang - 1];
   if (rang === 1) { game.sound.sfx('medal'); await ui.say(`Et la gagnante est… l'équipe de ${st.name} ! Bravo !`, who); }
   else await ui.say(rang === 4 ? 'Pas de prix cette fois… Reviens demain, la catégorie change chaque jour !' : `${rang}e place ! Joli passage.`, who);
   for (const [it, q] of prix) if (ITEMS[it]) await game.api().give(it, q);
@@ -426,6 +452,6 @@ export async function loterie(game) {
   await game.api().give(lot, 1);
 }
 export async function musicien(game) {
-  game.sound.sfx('evolve');
+  game.sound.sfx('amb_musician');
   await game.ui.say(['♪ La la la… ♫', 'Le musicien joue un air de fête. Les enfants dansent autour de lui !'], { speaker: 'Musicien' });
 }

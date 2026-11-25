@@ -35,13 +35,13 @@ const GRUNT = {
   boss2: [[197, 43], [215, 43], [94, 44], [110, 43], [229, 45]],                                // Sanctuaire
 };
 export const ELITE = [
-  { id: 'c4:1', name: 'Frimas', ow: 'frimas', bs: 'frimas', team: [[87, 73], [91, 73], [221, 74], [124, 74], [131, 75]], room: 'Salle de Glace', floor: 'gymWater', deco: 'statue',
+  { id: 'c4:1', name: 'Frimas', ow: 'frimas', bs: 'frimas', team: [[87, 74], [91, 74], [473, 75], [124, 75], [131, 76]], room: 'Salle de Glace', floor: 'gymWater', deco: 'statue',
     intro: 'Bienvenue au Conseil 4. Je suis Frimas. Mon cœur s\'est figé il y a bien longtemps... Le tien tiendra-t-il face au froid ?', lose: 'Ta flamme a fait fondre ma glace. Passe, la salle suivante t\'attend.' },
-  { id: 'c4:2', name: 'Brutus', ow: 'brutus', bs: 'brutus', team: [[237, 75], [106, 75], [107, 75], [1033, 76], [68, 77]], room: 'Salle du Poing', floor: 'gymRock', deco: 'statue',
+  { id: 'c4:2', name: 'Brutus', ow: 'brutus', bs: 'brutus', team: [[237, 75], [106, 75], [107, 76], [1033, 76], [68, 77]], room: 'Salle du Poing', floor: 'gymRock', deco: 'statue',
     intro: 'Je suis Brutus ! J\'ai entraîné mes muscles et ceux de mes Pokémon chaque jour de ma vie. Hoo ! Hah !', lose: 'Ma force n\'a pas suffi... Va. Tu le mérites.' },
-  { id: 'c4:3', name: 'Spectrel', ow: 'spectrel', bs: 'spectrel', team: [[93, 75], [200, 75], [1023, 76], [94, 77]], room: 'Salle des Ombres', floor: 'gymPsy', deco: 'gymstatue',
+  { id: 'c4:3', name: 'Spectrel', ow: 'spectrel', bs: 'spectrel', team: [[609, 76], [429, 76], [477, 77], [1023, 77], [94, 78]], room: 'Salle des Ombres', floor: 'gymPsy', deco: 'gymstatue',
     intro: 'Chut... Les esprits me murmurent ton nom depuis que tu es entré. Ils ont hâte de jouer avec toi.', lose: 'Les esprits se taisent... Tu les as impressionnés.' },
-  { id: 'c4:4', name: 'Ombrelle', ow: 'ombrelle', bs: 'ombrelle', megaSp: 248, team: [[197, 76], [198, 76], [215, 77], [229, 77], [248, 78]], room: 'Salle de la Nuit', floor: 'gymDragon', deco: 'gymstatue',
+  { id: 'c4:4', name: 'Ombrelle', ow: 'ombrelle', bs: 'ombrelle', megaSp: 229, team: [[169, 77], [442, 77], [625, 78], [715, 78], [229, 79]], room: 'Salle de la Nuit', floor: 'gymDragon', deco: 'gymstatue',
     intro: 'Je suis Ombrelle, la dernière du Conseil 4. Les gentils Pokémon, les méchants Pokémon... Seuls les dresseurs comptent. Montre-moi ce que tu vaux.', lose: 'Tu es fort, et tu aimes tes Pokémon. C\'est ce qui fait un vrai dresseur. Célestine t\'attend.' },
 ];
 
@@ -81,7 +81,7 @@ export function addStory(ctx) {
   };
   const admin = (map, x, y, dir, id, who, team, o) => {
     const [a, b] = free(map, x, y, false);
-    return Object.assign(trainerNpc(map, a, b, dir, 'Admin Éclipse', who === 'nyx' ? 'Nyx' : 'Erèbe', team, {
+    return Object.assign(trainerNpc(map, a, b, dir, 'Admin Éclipse', who === 'nyx' ? 'Nyx' : 'Érèbe', team, {
       id, sight: o.sight ?? 3, ow: who, bs: who === 'nyx' ? 'nyx' : 'erebe', prize: 70, ai: 'smart', items: { 'super-potion': 1, 'hyper-potion': team[0][1] > 30 ? 1 : 0 }, intro: o.intro, lose: o.lose, after: o.after || '...',
     }), { vanish: true, music: 'eclipse', winScript: o.win });
   };
@@ -101,7 +101,7 @@ export function addStory(ctx) {
     const g = maps.grotte; g.dark = true;
     const [ex, ey] = nearestCave(g, 30, 20);
     admin(g, ex, ey, 'left', 'ecl:erebe1', 'erebe', GRUNT.erebe1, {
-      intro: 'Tiens, un gamin. Je suis Erèbe, Admin de la Team Éclipse. Ces Pierres Lune nourriront le Prisme Noir. Ne te mets pas en travers de notre chemin.',
+      intro: 'Tiens, un gamin. Je suis Érèbe, Admin de la Team Éclipse. Ces Pierres Lune nourriront le Prisme Noir. Ne te mets pas en travers de notre chemin.',
       lose: 'Intéressant... Tu as du cran. Mais le Prisme est presque prêt.',
     });
     const [ax, ay] = nearestCave(g, 14, 8), [bx, by] = nearestCave(g, 36, 7);
@@ -122,7 +122,7 @@ export function addStory(ctx) {
     Object.assign(marin, { script: 'gift', move: 'static', dir: 'down', text: null, gift: {
       item: 'max-repel', qty: 3, flag: 'giftMarin', who: 'Vieux marin', need: (st) => st.flags['T:ecl:nyx1'],
       pre: ['Ahoy... Ces gens en noir veulent savoir où dort le gardien des mers.', 'Jamais je ne leur dirai !'],
-      give: ['Merci de m\'avoir débarrassé de cette Nyx, petit. Tiens, ça éloigne les créatures sauvages en mer.'],
+      give: ['Merci de m\'avoir débarrassé de cette Nyx, petit. Tiens, ça éloigne les Pokémon sauvages en mer.'],
       got: ['Le gardien des mers, c\'est Lugia. Les anciens disent qu\'il dort dans un sanctuaire, sur un îlot au sud du Cap Mirage.', 'Et regarde l\'îlot, là-bas, au bout du port : un jour, avec Surf, va donc voir ce qu\'il cache.'],
       done: ['Bon vent, petit ! Les marées te seront favorables.'] } });
     // le pêcheur : montre-moi un Magicarpe
@@ -144,7 +144,7 @@ export function addStory(ctx) {
     const [ix, iy] = fl(2, 6);
     cen.npc({ id: 'volta:ingenieur', x: ix, y: iy, sprite: 'scientifique', dir: 'right', script: 'gift', gift: {
       item: 'cs-force', flag: 'giftForce', who: 'Ingénieur', need: (st) => st.flags['T:ecl:erebe2'],
-      pre: ['Ils ont pris le contrôle des générateurs ! Ils volent l\'électricité de toute la région pour leur Prisme Noir...', 'Leur chef, Erèbe, est au fond de la salle. Je t\'en prie, chasse-les !'],
+      pre: ['Ils ont pris le contrôle des générateurs ! Ils volent l\'électricité de toute la région pour leur Prisme Noir...', 'Leur chef, Érèbe, est au fond de la salle. Je t\'en prie, chasse-les !'],
       give: ['Les générateurs repartent ! Tu nous as sauvés. Prends ceci, ça devrait t\'aider dans ton voyage.'],
       got: ['La CS06 contient Force. Avec le Badge Volt, ton Pokémon pourra pousser les gros rochers qui bloquent certains recoins.', 'Volta t\'attend à l\'Arène, maintenant que tout est rentré dans l\'ordre.'],
       done: ['Les Magnéti sont revenus se blottir contre les générateurs. Tout va bien !'] } });
@@ -182,7 +182,7 @@ export function addStory(ctx) {
     admin(rep, 19, 10, 'left', 'ecl:nyx2', 'nyx', GRUNT.nyx2, { sight: 2,
       intro: 'Toi, ici ?! Tu es vraiment collant. Le Chef est en train d\'achever le Prisme Noir. Je ne te laisserai pas le déranger !', lose: 'Non, non, NON ! ... Bon, vas-y. De toute façon, il est trop tard.' });
     const boss = trainerNpc(rep, 11, 3, 'down', 'Chef Éclipse', 'Nocturne', GRUNT.boss1, { id: 'ecl:boss1', sight: 1, ow: 'nocturne', bs: 'nocturne', prize: 120, ai: 'smart', items: { 'hyper-potion': 2 },
-      intro: 'Je suis Nocturne, chef de la Team Éclipse. Le jour rend les gens faibles et bruyants. Sous une nuit éternelle, tout serait enfin calme... Le Prisme Noir fermera le cœur de Lugia, et Lugia obéira. Toi, tu n\'es qu\'un grain de sable.',
+      intro: 'Je suis Nocturne, chef de la Team Éclipse. Nox et sa bande de la Brume préfèrent courir après l\'Orbe Rouge ? Qu\'ils s\'amusent dans le brouillard. Le jour rend les gens faibles et bruyants. Sous une nuit éternelle, tout serait enfin calme... Le Prisme Noir fermera le cœur de Lugia, et Lugia obéira. Toi, tu n\'es qu\'un grain de sable.',
       lose: 'Impressionnant. Mais il est trop tard : le Prisme Noir est déjà au Sanctuaire des Marées.', after: '...' });
     Object.assign(boss, { vanish: true, music: 'eclipse', winScript: 'boss1' });
     rep.item(2, 6, 'ultra-ball', 2); rep.item(20, 10, 'full-heal'); rep.item(20, 14, 'hyper-potion');
@@ -336,9 +336,9 @@ export function addStory(ctx) {
     // la voyante de Mirage connaît la légende et garde la Plume Argentée
     const voy = W.npcs.find((n) => n.id === 'mirage:voyante');
     Object.assign(voy, { script: 'gift', text: null, gift: {
-      item: 'plume-argent', flag: 'giftPlume', set: 'plumeArgent', who: 'Voyante', need: (st) => st.flags.eclipse && st.badges[4],
-      pre: (st) => (st.flags.eclipse ? ['Le ciel s\'est éteint... Je vois une grande ombre sous les vagues.', 'Bats d\'abord Sibylle, à l\'Arène. Ensuite, reviens me voir.'] : ['Je vois... trois îles, trois frères.', 'Et une vieille rancune qui gronde comme un volcan.']),
-      give: ['Tu as le Badge Mirage. Écoute-moi bien.', 'Lugia, le gardien des marées, dort dans le Sanctuaire des Marées, sur un îlot au sud du Cap Mirage.', 'La Team Éclipse a fermé son cœur avec le Prisme Noir. S\'il se réveille ainsi, la nuit ne finira jamais.', 'Cette Plume Argentée ouvre le Sanctuaire. Surfe depuis le Cap Mirage, vers le sud. Va, vite !'],
+      item: 'plume-argent', flag: 'giftPlume', set: 'plumeArgent', who: 'Voyante', need: (st) => st.flags.eclipse && st.badges[7],
+      pre: (st) => (st.flags.eclipse ? (!st.badges[4] ? ['Le ciel s\'est éteint... Je vois une grande ombre sous les vagues.', 'Bats d\'abord Sibylle, à l\'Arène. Ensuite, reviens me voir.'] : ['Le Sanctuaire des Marées abrite Lugia Obscur, immense et furieux.', 'Va d\'abord conquérir les trois îles de l\'archipel : avec les huit badges du Nord, la Plume Argentée répondra à ton appel !']) : ['Je vois... trois îles, trois frères.', 'Et une vieille rancune qui gronde comme un volcan.']),
+      give: ['Huit badges... Les trois frères se sont inclinés devant toi.', 'Lugia, le gardien des marées, dort dans le Sanctuaire des Marées, sur un îlot au sud du Cap Mirage.', 'La Team Éclipse a fermé son cœur avec le Prisme Noir. S\'il se réveille ainsi, la nuit ne finira jamais.', 'Cette Plume Argentée ouvre le Sanctuaire. Surfe depuis le Cap Mirage, vers le sud. Va, vite !'],
       got: ['Le Cap Mirage est au bout de la route 7, au sud de la ville.'], done: (st) => (st.flags.lugia ? ['Le jour est revenu... Je savais que tu y arriverais.'] : ['Le Sanctuaire t\'attend, au sud du Cap Mirage...']) } });
     // la Route Victoire reste fermée tant que dure l'Éclipse
     const vg = W.npcs.find((n) => n.id === 'cime:garde');

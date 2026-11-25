@@ -4,8 +4,9 @@
 //   croix : glisser le doigt dessus, la direction suit le doigt (zone morte au centre) ; tenue = marche continue
 //   A : parler, valider     B : annuler, menu     Menu : menu principal (la course : bouton COURSE du HUD)
 const CSS = `
-.tactile { position: fixed; inset: 0; pointer-events: none; z-index: 40; display: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.tactile { position: fixed; inset: 0; pointer-events: none; z-index: 16; display: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 html.doigt .tactile { display: block; }
+html.doigt #ui:has(> .screen, > .battle, > .title-scr, > .intro-scr, > .list, > .qty, > .keypanel.on, > .chat-modal-overlay, > .starter-select-modal, > .lugia-cine, > .boss-cine, > .evo-scr) ~ .tactile { display: none !important; }
 html.doigt .keybar { display: none; }   /* les rappels du clavier ne servent pas au doigt */
 .tactile > * { pointer-events: auto; touch-action: none; position: absolute; }
 .tactile .croix { left: max(14px, env(safe-area-inset-left)); bottom: max(18px, env(safe-area-inset-bottom)); width: 132px; height: 132px; border-radius: 50%;

@@ -97,9 +97,9 @@
     calc(var(--px) * 2) calc(var(--px) * 2) 0 #000;
   color: #eef4ff; text-shadow: var(--px) var(--px) 0 #000;
 }
-.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(var(--px) * 3); margin-bottom: calc(var(--px) * 5); }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(var(--px) * 2.2); margin-bottom: calc(var(--px) * 4); }
 .sum-tab {
-  font: inherit; display: flex; flex-direction: column; align-items: center; padding: calc(var(--px) * 2) calc(var(--px) * 3);
+  font: inherit; display: flex; flex-direction: column; align-items: center; padding: calc(var(--px) * 2) calc(var(--px) * 2);
   border-radius: 0;
   border: calc(var(--px) * 1) solid #000;
   clip-path: polygon(
@@ -118,8 +118,8 @@
     calc(var(--px) * 1) calc(var(--px) * 1) 0 #000;
   text-shadow: var(--px) var(--px) 0 #000;
 }
-.sum-tab b { font-size: calc(var(--px) * 6.2); }
-.sum-tab small { font-size: calc(var(--px) * 4.8); opacity: .8; }
+.sum-tab b { font-size: calc(var(--px) * 5.2); white-space: nowrap; }
+.sum-tab small { font-size: calc(var(--px) * 4.5); opacity: .8; }
 .sum-tab.on {
   background: linear-gradient(180deg, #f0a020 0%, #c07010 100%);
   color: #fff;
@@ -130,7 +130,7 @@
     calc(var(--px) * 1) calc(var(--px) * 1) 0 #000;
   text-shadow: var(--px) var(--px) 0 #402000;
 }
-.sum-content { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+.sum-content { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: space-between; }
 .kv { border-collapse: collapse; width: 100%; }
 .kv td { padding: calc(var(--px) * 1.2) calc(var(--px) * 3); border-bottom: var(--px) solid rgba(70, 110, 160, .3); }
 .kv td:first-child { color: #88a8cc; width: 42%; }
@@ -166,3 +166,33 @@
 .moves .mv.cur { outline: calc(var(--px) * 1) solid #ffe068; outline-offset: calc(var(--px) * 0.5); }
 .moves .mv.pris { transform: translateX(calc(var(--px) * -3)); border-style: dashed; border-left-style: solid; background: #24364e; }
 .mv-ordre-aide { margin-top: calc(var(--px) * 3); font-size: calc(var(--px) * 5.6); color: #ffe068; text-align: center; text-shadow: var(--px) var(--px) 0 #080c12; }
+
+.sum-alpha-badge {
+  font-size: .56em; font-weight: 900; color: #fff4df; background: linear-gradient(180deg, #b91c1c, #7f1d1d);
+  border: calc(var(--px) * .7) solid #fb923c; padding: 0 calc(var(--px) * 2); vertical-align: middle;
+}
+.sum-souvenirs { display: flex; flex-direction: column; gap: calc(var(--px) * 3); height: 100%; min-height: 0; overflow: hidden; }
+.sum-sec-title { font-size: calc(var(--px) * 5.8); font-weight: 800; color: #ffd970; }
+.sum-sec-title small { color: #9ec0e8; font-weight: 600; }
+.sum-aura-row { display: flex; flex-wrap: wrap; gap: calc(var(--px) * 1.8); }
+.sum-aura-btn {
+  font: inherit; font-size: calc(var(--px) * 5.2); font-weight: 700; color: #dbeafe;
+  background: #162234; border: calc(var(--px) * .8) solid #3d5a80; padding: calc(var(--px) * 1.2) calc(var(--px) * 2.5);
+  cursor: pointer; text-shadow: var(--px) var(--px) 0 #000;
+}
+.sum-aura-btn.on { background: #1e40af; border-color: #67e8f9; color: #fff; box-shadow: 0 0 0 calc(var(--px) * .6) #000; }
+.sum-aura-btn.locked { opacity: 0.45; cursor: not-allowed; }
+/* deux colonnes : les dix souvenirs tiennent à l'écran, sans défilement (inaccessible au clavier) */
+.sum-mem-list { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; align-content: start; gap: calc(var(--px) * 1.2); padding-right: calc(var(--px) * 1.5); }
+@media (max-width: 720px) { .sum-mem-list { grid-template-columns: 1fr; } }
+.sum-mem-card {
+  display: flex; gap: calc(var(--px) * 3); align-items: flex-start;
+  background: #142030; border: calc(var(--px) * .8) solid #284264; padding: calc(var(--px) * .7) calc(var(--px) * 2.2);
+}
+.sum-mem-ico { font-size: calc(var(--px) * 8); line-height: 1; }
+.sum-mem-body { flex: 1; min-width: 0; }
+.sum-mem-top { display: flex; flex-wrap: wrap; justify-content: space-between; column-gap: calc(var(--px) * 2); align-items: baseline; }
+.sum-mem-top b { font-size: calc(var(--px) * 5.2); color: #f8fafc; }
+.sum-mem-place { font-size: calc(var(--px) * 4.6); color: #7dd3fc; white-space: nowrap; }
+.sum-mem-desc { font-size: calc(var(--px) * 4.6); color: #b8cce4; line-height: 1.15; }
+.sum-mem-empty { grid-column: 1 / -1; color: #9cb4d4; font-size: calc(var(--px) * 5.6); line-height: 1.4; background: #121c2c; border: calc(var(--px) * .8) dashed #324a6e; padding: calc(var(--px) * 4); text-align: center; }

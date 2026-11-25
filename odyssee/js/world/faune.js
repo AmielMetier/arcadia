@@ -62,11 +62,14 @@ export function addFauneVilles(W) {
 const STOCK_DEBUT = ['potion', 'super-potion', 'poke-ball', 'great-ball', 'repel', 'oran-berry', 'ether'];
 const STOCK_FIN = ['hyper-potion', 'great-ball', 'ultra-ball', 'super-repel', 'revive', 'sitrus-berry', 'lum-berry'];
 const PIERRES = ['fire-stone', 'water-stone', 'thunder-stone', 'leaf-stone', 'moon-stone', 'sun-stone', 'dusk-stone', 'dawn-stone', 'shiny-stone', 'ice-stone'];
+const estMasc = (r) => /^(Bois|Sentier|Chemin|Pont|Cap|Col|Canyon|Désert|Lac|Pic|Mont)\b/i.test(r || '');
+const artDef = (r, maj = false) => `${maj ? (estMasc(r) ? 'Le' : 'La') : (estMasc(r) ? 'le' : 'la')} ${r}`;
+const deRoute = (r) => (estMasc(r) ? `du ${r}` : `de la ${r}`);
 const VOYAGEURS = [
-  { sprite: 'habitant', name: 'Peintre', text: (r) => [`Je peins la ${r} depuis ce matin.`, 'La lumière change tout le temps… Je n\'arrive jamais à finir !'] },
-  { sprite: 'montagnard', name: 'Randonneur', text: (r) => [`La ${r}, je la connais par cœur. Chaque saison, elle a une autre tête.`, 'Prends le temps de regarder autour de toi, gamin !'] },
-  { sprite: 'scientifique', name: 'Ornithologue', text: (r) => ['Chut… J\'observe les Pokémon Oiseau.', 'Le matin, ils chantent tous en même temps. Le soir, ce sont d\'autres qui sortent.'] },
-  { sprite: 'vieil_homme', name: 'Promeneur', text: (r) => [`Je fais le tour de la ${r} tous les jours. Bon pour les jambes !`, 'Si tu vois un arbre plein de baies, sers-toi : elles repoussent chaque jour.'] },
+  { sprite: 'habitant', name: 'Peintre', text: (r) => [`Je peins ${artDef(r)} depuis ce matin.`, 'La lumière change tout le temps… Je n\'arrive jamais à finir !'] },
+  { sprite: 'montagnard', name: 'Randonneur', text: (r) => [`${artDef(r, true)}, je ${estMasc(r) ? 'le' : 'la'} connais par cœur. Chaque saison, ${estMasc(r) ? 'il' : 'elle'} a une autre tête.`, 'Prends le temps de regarder autour de toi, gamin !'] },
+  { sprite: 'scientifique', name: 'Ornithologue', text: () => ['Chut… J\'observe les Pokémon Oiseau.', 'Le matin, ils chantent tous en même temps. Le soir, ce sont d\'autres qui sortent.'] },
+  { sprite: 'vieil_homme', name: 'Promeneur', text: (r) => [`Je fais le tour ${deRoute(r)} tous les jours. Bon pour les jambes !`, 'Si tu vois un arbre plein de baies, sers-toi : elles repoussent chaque jour.'] },
 ];
 
 /** pose les PNJ des routes (colporteur sur une route sur trois, un voyageur sur les autres) et deux arbres à baies par route */
@@ -117,7 +120,7 @@ export function addMarches(W, towns) {
     const [x, y] = nearestWalkable(W, t.x + t.w / 2 + 2, t.y + t.h / 2 + 2, pris);
     if (x == null) return;
     pris.add(x + ',' + y);
-    W.npc({ id: 'marche:' + t.id, x, y, sprite: 'habitant', dir: 'down', move: 'turn', name: 'Marchande', script: 'marche',
+    W.npc({ id: 'marche:' + t.id, x, y, sprite: 'habitante', dir: 'down', move: 'turn', name: 'Marchande', script: 'marche',
       when: (f, g) => { const d = (g?.jour?.() ?? new Date()).getDay(); return d === 0 || d === 6; },
       stock: ['rare-candy', 'max-potion', 'lum-berry', 'ultra-ball', PIERRES[i % PIERRES.length], PIERRES[(i + 4) % PIERRES.length], PIERRES[(i + 7) % PIERRES.length]] });
   });
@@ -142,7 +145,7 @@ export function addFouilles(maps) {
 
 /* ================= voisinage : Psykokwak perdu, échanges, bancs, panneaux, relais, cyclistes, mineurs ================= */
 export const ECHANGES = [
-  { town: 'sylve', who: 'Gaspard', want: [16, 19, 10, 13], give: [133, 15, 'Plume'] },
+  { town: 'sylve', who: 'Ambroise', want: [16, 19, 10, 13], give: [133, 10, 'Plume'] },
   { town: 'volta', who: 'Ingrid', want: [81, 100, 172, 25], give: [147, 25, 'Tonnerre'] },
   { town: 'granit', who: 'Matelot Yann', want: [129, 118, 72], give: [131, 30, 'Bleuet'] },
   { town: 'cendre', who: 'Forgeronne Alma', want: [58, 37, 4, 218], give: [246, 30, 'Braise'] },
@@ -187,7 +190,7 @@ export function addVoisinage(W, maps, routes, towns) {
     const s = pres(r.pts, 0.7, i % 2 ? 1 : -1, 2); if (s) W.sign(s[0], s[1], HISTOIRES[i % HISTOIRES.length](nom));
     if (i % 4 === 2) { const p = pres(r.pts, 0.55, i % 2 ? -1 : 1, 3); if (p) W.npc({ id: 'relais:' + r.id, x: p[0], y: p[1], sprite: 'habitante', dir: 'down', move: 'turn', name: 'Gardienne du relais', script: 'relais' }); }
     if (r.pts.length > 40 && i % 3 === 0) { const p = pres(r.pts, 0.35, i % 2 ? 1 : -1, 2); if (p) W.npc({ id: 'cycliste:' + r.id, x: p[0], y: p[1], sprite: i % 2 ? 'topdresseuse' : 'topdresseur', dir: 'down', move: 'wander', roam: 6, name: 'Cycliste',
-      text: ['Je fais toute la région à vélo ! Rien de tel pour sentir le vent.', `La ${nom}, c'est ma préférée : ça descend dans un sens… et ça monte dans l'autre.`] }); }
+      text: ['Je fais toute la région à vélo ! Rien de tel pour sentir le vent.', `${artDef(nom, true)}, c'est ${estMasc(nom) ? 'mon préféré' : 'ma préférée'} : ça descend dans un sens… et ça monte dans l'autre.`] }); }
   });
   // grottes : un mineur ou une exploratrice
   for (const m of Object.values(maps)) {

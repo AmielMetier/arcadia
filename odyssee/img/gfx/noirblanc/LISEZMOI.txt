@@ -1,7 +1,7 @@
 Graphismes « Noir & Blanc » d'Odyssée (Options → Graphismes), fabriqués par tools/odyssee-pack-noirblanc.py.
 
 Tout vient du kit « Pokémon Essentials BW » v3.1.1 de KleinStudio (planches gardées dans assets/graphics/noirblanc/) :
-  sol.png     herbe, chemins, sable, pavés, mer et rivages, hautes herbes, sol de grotte
+  sol.png     herbe, chemins, sable, pavés, mer et rivages, hautes herbes
   d_*.png     arbres, sapins, haies, lampadaires, rochers
   b_*.png     Centre Pokémon, Boutique, arène, labo, tour, maisons
   chars.png   personnages du monde (héros de Noir 2 & Blanc 2, habitants, dresseurs, champions)
@@ -10,6 +10,9 @@ Intérieurs du Centre Pokémon et de la Boutique (sol abricot et allée Poké Ba
 machine de soin, PC, palmier, coin salon, présentoirs, caisse enregistreuse, carrelage de la Boutique) : planches Gen 5
 communautaires d'UltimoSpriter (centre_bw_ultimo.png) et de ditto209 (centre_bw_ditto.png), découpées par
 tools/noirblanc_critiques.py.
+Roche et sol des grottes (sol.png : grp_*, grs_*, cave0, cave1) : « 4g tileset_grotte » de la démo technique de
+Pokémon SDK (Pokémon Workshop, par Rey et SirMalo ; planche gardée dans assets/graphics/noirblanc/psdk_grotte.png),
+teinté selon la grotte (marine, magma, glace).
 
 Ces graphismes sont ceux de Pokémon Noir & Blanc / Noir 2 & Blanc 2 (© Nintendo / Game Freak / Creatures),
 repris ici pour un projet de fans sans but lucratif. Crédits affichés dans le jeu : Options → Crédits graphismes.

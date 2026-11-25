@@ -15,6 +15,13 @@ import { battleCopy, validMon } from '../core/pvp.js';
 import { healFull } from '../core/mon.js';
 
 const PROPRE = new Set([T.GRASS, T.PATH, T.PAVE, T.SAND, T.FLOWER, T.TALL, T.BRIDGE, T.ASH]);
+const NOM_TOIT = { red: 'Rouge', blue: 'Bleu', green: 'Vert', brown: 'Marron', gray: 'Gris', teal: 'Turquoise', purple: 'Violet', orange: 'Orange' };
+const NOM_HABITANT = {
+  habitant: 'Habitant', habitante: 'Habitante', vieil_homme: 'Vieil homme', dame: 'Dame',
+  gamin: 'Gamin', fillette: 'Fillette', enfant: 'Enfant', pecheur: 'Pêcheur',
+  jardinier: 'Jardinier', montagnard: 'Montagnard', randonneuse: 'Randonneuse', marin: 'Marin',
+  scientifique: 'Scientifique', kimono: 'Dame Kimono', karateka: 'Karatéka', insectomane: 'Insectomane',
+};
 const fmt = (n) => n.toLocaleString('fr-FR');
 const ICO = Object.fromEntries(MATERIAUX.map(([k, i]) => [k, i]));
 export const coutTexte = (c) => Object.entries(c || {}).filter(([, v]) => v).map(([k, v]) => `${v} ${ICO[k]}`).join(' ') || 'gratuit';
@@ -66,6 +73,8 @@ export async function allerDomaine(game) {
   const st = game.state, ui = game.ui, p = game.player;
   if (!st.domaine) return false;
   if (game.mapObj.gymLock != null && st.flags['IN:' + game.mapObj.id] && !game.libre) { await ui.say('Pas pendant un défi d\'arène !'); return false; }
+  if (game.mapObj.id === 'plateau:ligue' || game.mapObj.id.startsWith('ligue:')) { await ui.say('Pas pendant le défi de la Ligue Céleste !'); return false; }
+  if (game.donjons?.dansUnDonjon()) { await ui.say('Pas à l\'intérieur d\'un donjon !'); return false; }
   if (game.mapObj.id === DOMAINE) {
     const r = st.domaine.retour || { map: PORTE_MAISON.map, x: PORTE_MAISON.arrivee[0], y: PORTE_MAISON.arrivee[1], dir: 'left' };
     if (!(await ui.yesNo(`Revenir ${r.map === PORTE_MAISON.map ? 'à la maison' : 'là où tu étais'} ?`))) return false;
@@ -339,7 +348,7 @@ export async function chantier(game) {
       if (der?.a === art.id) return;
     }
     if (art.b) {
-      const toit = await ui.list({ title: 'Couleur du toit', items: TOITS.map((t) => ({ label: t })), cls: 'shop', cancel: -1 }); if (toit < 0) return;
+      const toit = await ui.list({ title: 'Couleur du toit', items: TOITS.map((t) => ({ label: NOM_TOIT[t] || t })), cls: 'shop', cancel: -1 }); if (toit < 0) return;
       trav.toit = TOITS[toit]; trav.nom = art.nom;
       if (!(await ui.yesNo(`Construire : ${art.nom} pour ${coutTexte(art.cout)} ?`))) return;
     } else if (art.s) {
@@ -347,7 +356,7 @@ export async function chantier(game) {
     } else if (art.n) {
       const c = compter(game.mapObj), habitants = T0.filter((t) => ARTICLE[t.a]?.n).length;
       if (habitants >= c.maisons) { game.sound.sfx('bump'); ui.toast('Il faut une maison libre pour chaque habitant'); return; }
-      const k = await ui.list({ title: 'Qui inviter ?', items: HABITANTS.map((h) => ({ label: h.replace('_', ' ') })), cls: 'shop', cancel: -1 }); if (k < 0) return;
+      const k = await ui.list({ title: 'Qui inviter ?', items: HABITANTS.map((h) => ({ label: NOM_HABITANT[h] || h.replace('_', ' ') })), cls: 'shop', cancel: -1 }); if (k < 0) return;
       d.hab = (d.hab || 0) + 1; trav.k = d.hab; trav.sprite = HABITANTS[k];
     }
     for (const [k, v] of Object.entries(art.cout || {})) d.mat[k] -= v;

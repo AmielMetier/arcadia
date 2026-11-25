@@ -175,7 +175,7 @@ export function cardinalDir(dx, dy) {
 }
 const distLabel = (dx, dy) => {
   const d = Math.round(Math.hypot(dx, dy)), dir = cardinalDir(dx, dy);
-  return dir ? `À ~${d} pas au ${dir}` : 'Vous y êtes';
+  return dir ? `À ~${d} pas au ${dir}` : 'Tu y es';
 };
 
 /** même taille que la vue explorée, mais centrée sur le joueur (bornée à la région) */
@@ -466,7 +466,7 @@ export function mapScreen(game, opts = {}) {
           Suivant <span class="map-btn-arr">▶</span>
         </button>
         <div class="map-legend">
-          <span><i class="lg-dot me"></i> Vous</span>
+          <span><i class="lg-dot me"></i> Toi</span>
           <span><i class="lg-dot town"></i> Ville</span>
           <span><i class="lg-dot gym"></i> Arène</span>
           <span><i class="lg-dot league"></i> Ligue</span>
@@ -540,7 +540,7 @@ export function mapScreen(game, opts = {}) {
       <div class="map-me-core"></div>
       <div class="map-me-tag">Toi</div>
     `;
-    me.title = `Votre position : ${here} [${Math.round(p.x)}, ${Math.round(p.y)}]`;
+    me.title = `Ta position : ${here} [${Math.round(p.x)}, ${Math.round(p.y)}]`;
     me.addEventListener('click', (e) => {
       e.stopPropagation();
       k = 0;

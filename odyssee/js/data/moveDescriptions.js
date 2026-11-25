@@ -1,6 +1,27 @@
 // odyssee/js/data/moveDescriptions.js — Descriptions officielles et explicatives des capacités Pokémon en français
 import { MOVES } from './moves.js';
 
+const TYPE_FR = {
+  normal: 'Normal',
+  fighting: 'Combat',
+  flying: 'Vol',
+  poison: 'Poison',
+  ground: 'Sol',
+  rock: 'Roche',
+  bug: 'Insecte',
+  ghost: 'Spectre',
+  steel: 'Acier',
+  fire: 'Feu',
+  water: 'Eau',
+  grass: 'Plante',
+  electric: 'Électrik',
+  psychic: 'Psy',
+  ice: 'Glace',
+  dragon: 'Dragon',
+  dark: 'Ténèbres',
+  fairy: 'Fée',
+};
+
 export const SPECIFIC_MOVE_DESCS = {
   10002: "Projette un nuage de pollen gluant qui englue la cible : elle subit des dégâts et sa Vitesse baisse.",
   // Capacités uniques et tactiques
@@ -12,7 +33,7 @@ export const SPECIFIC_MOVE_DESCS = {
   68: "Riposte en infligeant le double des dégâts physiques subis durant ce tour.",
   69: "Projette l'ennemi au sol. Inflige des dégâts strictement égaux au niveau du lanceur.",
   82: "Projette une onde draconique infligeant toujours exactement 40 PV de dégâts fixes.",
-  100: "Téléporte instantanément le lanceur loin du combat contre une créature sauvage.",
+  100: "Téléporte instantanément le lanceur loin du combat contre un Pokémon sauvage.",
   101: "Fait surgir un mirage spectral infligeant des dégâts égaux au niveau du lanceur.",
   113: "Dresse un mur de lumière réduisant de moitié les dégâts spéciaux pendant 5 tours.",
   114: "Répand un nuage de buée noire qui annule immédiatement tous les changements de stats.",
@@ -38,6 +59,8 @@ export const SPECIFIC_MOVE_DESCS = {
   243: "Renvoie le double des dégâts spéciaux subis durant le tour.",
   263: "La puissance de l'attaque est doublée si le lanceur est brûlé, paralysé ou empoisonné.",
   283: "Ronge les forces de l'adversaire pour réduire ses PV au même niveau que le lanceur.",
+  284: "Une éruption volcanique qui inflige des dégâts d'autant plus élevés que les PV du lanceur sont hauts.",
+  323: "Un déluge d'eau dont la puissance augmente avec les PV restants du lanceur.",
 
   // Attaques de statut et boosts
   14: "Une danse belliqueuse qui augmente beaucoup l'Attaque du lanceur (+2).",
@@ -45,15 +68,17 @@ export const SPECIFIC_MOVE_DESCS = {
   43: "Un regard terrifiant qui baisse la Défense de la cible d'un niveau (-1).",
   45: "Pousse un cri intimidant pour baisser l'Attaque de la cible d'un niveau (-1).",
   73: "Plante des graines sur l'ennemi pour lui voler des PV à chaque fin de tour.",
-  76: "Répand une poussière toxique qui empoisonne la cible.",
-  77: "Endort profondément la cible grâce à un doux nuage de pollen somnifère.",
+  76: "Absorbe la lumière au 1er tour puis libère un rayon surpuissant au 2e. Immédiat sous le soleil.",
+  77: "Répand une poussière toxique qui empoisonne la cible.",
   78: "Projette des spores paralysantes qui paralysent l'adversaire.",
+  79: "Endort profondément la cible grâce à un doux nuage de pollen somnifère.",
   86: "Envoie une onde électrique qui paralyse à coup sûr le Pokémon ennemi.",
-  95: "Un violent souffle toxique qui empoisonne gravement la cible (dégâts progressifs).",
+  92: "Un violent poison qui empoisonne gravement la cible (dégâts croissants à chaque tour).",
+  95: "Une onde hypnotique plonge l'adversaire dans un profond sommeil.",
   97: "Détend son corps pour courir plus vite. Augmente beaucoup la Vitesse (+2).",
   104: "Se déplace si vite qu'il crée des clones illusoires. Augmente l'Esquive (+1).",
   109: "Un rayon mystérieux plonge la cible dans une profonde confusion.",
-  110: "Rend le corps dur comme du roc pour augmenter la Défense d'un niveau (+1).",
+  110: "Le lanceur se rétracte dans sa carapace pour augmenter sa Défense d'un niveau (+1).",
   111: "S'enroule sur lui-même pour dissimuler ses faiblesses. Augmente la Défense (+1).",
   139: "Projette un nuage de gaz étouffant qui empoisonne l'adversaire.",
   142: "Fait un bisou avec une moue terrifiante qui endort la cible.",
@@ -71,21 +96,23 @@ export const SPECIFIC_MOVE_DESCS = {
   37: "Attaque avec fureur pendant 2 à 3 tours, puis devient confus par épuisement.",
   38: "Une charge désespérée d'une grande violence causant 33% de dégâts de recul.",
   44: "Mord l'ennemi de ses crocs acérés. 30% de chance d'apeurer la cible.",
-  52: "Frappe violemment avec une massue ou un os. Frappe 2 à 5 fois d'affilée.",
+  52: "Projette une petite flamme sur la cible. 10% de chance de brûler.",
+  53: "Projette un torrent de flammes incandescentes sur la cible. 10% de chance de brûler.",
   55: "Projette un jet d'eau puissant sur la cible.",
   56: "Projette une violente trombe d'eau surpressée sur la cible.",
   57: "Projette une grande vague d'eau qui submerge tout le champ de bataille.",
   63: "Tire un rayon destructeur d'une puissance inouïe. Le lanceur doit se reposer au tour suivant.",
-  71: "Une gerbe de feuilles acérées lacère l'ennemi. Taux de coups critiques élevé.",
-  72: "Une petite flamme est projetée sur l'ennemi. 10% de chance de brûler.",
+  71: "Une attaque végétale qui absorbe l'énergie de l'ennemi et restaure la moitié des dégâts infligés.",
+  72: "Draine la force vitale de la cible et soigne le lanceur à hauteur de la moitié des dégâts infligés.",
+  75: "Une gerbe de feuilles acérées lacère l'ennemi. Taux de coups critiques élevé.",
   80: "Une danse florale furieuse pendant 2 à 3 tours, puis devient confus par épuisement.",
   84: "Lance une décharge électrique sur l'ennemi. 10% de chance de paralyser.",
-  85: "Projette un torrent de flammes incandescentes sur la cible. 10% de chance de brûler.",
+  85: "Une puissante décharge électrique foudroie la cible. 10% de chance de paralyser.",
   88: "Jette des cailloux sur l'ennemi pour lui infliger des dégâts physiques.",
   89: "Un violent tremblement de terre secoue le terrain et inflige d'énormes dégâts.",
   91: "Creuse sous terre au 1er tour pour éviter les attaques, puis frappe au 2e tour.",
   93: "Une onde télékinétique attaque l'ennemi. 10% de chance de le rendre confus.",
-  94: "Une puissante foudre foudroie la cible. 10% de chance de paralyser.",
+  94: "Une puissante vague télékinétique frappe la cible. 10% de chance de baisser sa Déf. Spé. (-1).",
   98: "Fonce à une vitesse fulgurante sur la cible. Frappe toujours en priorité (+1).",
   106: "Durcit les muscles ou la carapace pour augmenter la Défense du lanceur (+1).",
   120: "Fait exploser le corps du lanceur pour infliger des dégâts titanesques, mais tombe K.O.",
@@ -93,7 +120,7 @@ export const SPECIFIC_MOVE_DESCS = {
   127: "Charge l'ennemi dans un jaillissement d'eau. 20% de chance d'apeurer la cible.",
   153: "Provoque une explosion cataclysmique dévastant tout autour, mais met le lanceur K.O.",
   157: "Fait s'abattre de lourds rochers sur l'ennemi. 30% de chance d'apeurer.",
-  185: "Feinte pour contourner les défenses et toucher même si la cible utilise Abri.",
+  185: "Le lanceur s'approche sournoisement et frappe sans jamais rater sa cible.",
   200: "Attaque avec une rage destructrice pendant 2 à 3 tours, puis devient confus.",
   202: "Une attaque végétale qui draine les forces ennemies et soigne le lanceur de moitié.",
   209: "Une charge électrique enveloppe l'ennemi. 30% de chance de paralyser.",
@@ -117,6 +144,8 @@ export const SPECIFIC_MOVE_DESCS = {
   453: "Fonce à vive allure entouré d'eau. Frappe toujours en priorité (+1).",
   457: "Un coup de tête d'une violence extrême causant 50% de dégâts de recul au lanceur.",
   466: "Souffle un vent spectral maudit. 10% de chance d'augmenter toutes les stats d'un niveau !",
+  467: "Disparaît dans l'ombre au 1er tour et frappe au 2e en traversant même Abri et Détection.",
+  566: "Disparaît au 1er tour et frappe au 2e en contournant Abri et Détection.",
 };
 
 const STAT_NAMES = {
@@ -189,12 +218,14 @@ export function moveDesc(moveOrId) {
     }
   }
 
+  if (meta.cat === 9) parts.push("Met instantanément la cible K.O. si l'attaque touche (échoue si le niveau adverse est supérieur).");
+
   if (parts.length === 0) {
     if (M.c === 'status') {
       parts.push('Capacité tactique influençant le déroulement du combat.');
     } else {
       const cat = M.c === 'physical' ? 'physique' : 'spéciale';
-      parts.push(`Attaque ${cat} de type ${M.t} infligeant des dégâts directs.`);
+      parts.push(`Attaque ${cat} de type ${TYPE_FR[M.t] || M.t} infligeant des dégâts directs.`);
     }
   }
 

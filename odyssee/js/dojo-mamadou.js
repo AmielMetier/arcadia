@@ -21,6 +21,7 @@ export function ensureDojo(st) {
 
 /** Boutique du Dojo de Mamadou : [idObjet, prix en PDj] */
 export const DOJO_BOUTIQUE = [
+  ['heart-scale', 1],
   ['full-restore', 2],
   ['sitrus-berry', 3],
   ['lum-berry', 3],
@@ -123,7 +124,7 @@ export const DOJO_ARCHETYPES = [
     name: 'Valère & Céleste',
     ow: 'scientifique',
     bs: 'scientifique',
-    intro: 'Priorités acérées, Contre-Attaque et pressions combinées : chaque erreur se paie cash.',
+    intro: 'Priorités acérées, Contre-Attaque et pressions combinées : chaque erreur se paie au prix fort.',
     lose: 'Une faille trouvée à force de solidarité… Respect !',
     team: [
       [212, 'life-orb', 'technician', [418, 404, 14, 182]],           // Cizayox (Pisto-Poing Technicien)
@@ -236,7 +237,7 @@ export class CoopDojoBattle extends Battle {
       player: { name: o.squadName || 'Escouade Co-op', party: o.party, bag: {} },
       foe: { name: o.foe.name, party: o.foe.party, trainer: o.foe.trainer },
       rng: seededRng(o.seed >>> 0),
-      format: o.format || (o.slots === 3 ? 'triple' : 'double'),
+      format: o.format || (o.slots === 4 ? 'quadruple' : o.slots === 3 ? 'triple' : 'double'),
       slots: o.slots,
     });
     this.coop = true;
@@ -602,7 +603,7 @@ async function runDojoSeries(game, { rid, format, rosters, mySlot, hostId, peerI
     const foeChallenge = buildDojoBotChallenge(stage, format, lvl, seedBase);
     const stageSeed = (seedBase ^ ((stage + 1) * 0x45d9f3b)) >>> 0;
     const floorLabel = stage === 4 ? 'Finale — Maître Mamadou' : `Palier ${stage + 1}/5`;
-    await ui.say(`${floorLabel} (${slots === 3 ? 'Trio 3v3' : 'Duo 2v2'}) contre ${foeChallenge.name} !`, who);
+    await ui.say(`${floorLabel} (${slots === 3 ? 'Trio' : 'Duo'}) contre ${foeChallenge.name} !`, who);
 
     const battle = new CoopDojoBattle({
       squadName: ownerNames.join(' & '),
@@ -709,7 +710,7 @@ export async function dojoMascotte(game, n) {
   const who = { speaker: 'Mascotte du Dojo', face: n?.sprite || 'bouc' };
   const tips = [
     'Astuce du Bouc : associe Lévitation ou le type Vol à Séisme pour balayer l\'équipe adverse sans toucher ton coéquipier !',
-    'Astuce du Bouc : Abri au bon tour ruine les double-focus et laisse ton allié placer un boost ou briser le camp d\'en face.',
+    'Astuce du Bouc : Abri au bon tour bloque les attaques concentrées et laisse ton allié se renforcer ou contre-attaquer.',
     'Astuce du Bouc : Maître Mamadou garde un Méga-Lucario redoutable au 5e palier… garde ta Méga-Évolution ou une attaque de priorité !',
   ];
   const tip = tips[(D.wins + D.pdj) % tips.length];
@@ -729,30 +730,29 @@ export async function dojoMamadou(game, n) {
   const who = { speaker: 'Maître Mamadou', face: n?.sprite || 'mamadou' };
   await ui.say([
     `Bienvenue dans mon Dojo, ${st.name} ! Ici, la stratégie collective prime sur la force brute.`,
-    `Tu as ${D.pdj} Point${D.pdj > 1 ? 's' : ''} du Dojo (PDj). Records — Duo 2v2 : ${D.record2} · Trio 3v3 : ${D.record3}.`,
+    `Tu as ${D.pdj} Point${D.pdj > 1 ? 's' : ''} du Dojo (PDj). Records — Duo : ${D.record2} · Trio : ${D.record3}.`,
   ], who);
   const choice = await ui.list({
     title: `Dojo de Mamadou · ${D.pdj} PDj`,
     items: [
-      { label: '🥋 Défi Co-op (2v2 / 3v3)', right: '2-3 joueurs' },
-      { label: '🐉 Raid de Boss Co-op', right: '2-3 joueurs' },
+      { label: '🥋 Défi Co-op (Duo / Trio)', right: '2-3 dresseurs' },
       { label: '🏆 Tournoi en direct', right: '4 places' },
       { label: '🎁 Boutique PDj', right: `${D.pdj} PDj` },
       { label: '📖 Règles du Dojo' },
       { label: 'Plus tard' },
     ],
     cls: 'shop',
-    cancel: 5,
+    cancel: 4,
   });
-  if (choice === 1) { const m = await import('./multi-events.js'); return m.lancerRaidCoop(game); }
-  if (choice === 2) { const m = await import('./multi-events.js'); return m.lancerTournoiSalon(game); }
-  if (choice === 3) { await dojoBoutique(game, n); return; }
-  if (choice === 4) {
+  if (choice === 1) { const m = await import('./multi-events.js'); return m.lancerTournoiSalon(game); }
+  if (choice === 2) { await dojoBoutique(game, n); return; }
+  if (choice === 3) {
     await ui.say([
-      'Le Dojo de Mamadou propose des combats **exclusivement multijoueurs** à haute intensité stratégique !',
-      'En Duo Co-op (2v2), 2 dresseurs humains s\'allient (1 Pokémon actif + 1 remplaçant chacun) face à 2 bots coordinateurs.',
-      'En Trio Co-op (3v3), il faut 3 dresseurs humains (1 Pokémon actif + 1 remplaçant chacun) contre 3 bots experts.',
-      'Chaque série compte 5 paliers avec soin complet entre les combats et un boss final : moi-même !',
+      'Le Dojo de Mamadou propose des combats uniquement en coopération, entre dresseurs !',
+      'En Duo Co-op, deux dresseurs s\'allient (1 Pokémon actif et 1 remplaçant chacun) face à deux disciples coordonnés.',
+      'En Trio Co-op, trois dresseurs s\'allient (1 Pokémon actif et 1 remplaçant chacun) contre trois maîtres du Dojo.',
+      'Chaque série compte 5 paliers avec soin complet entre les combats et un combat final contre moi-même !',
+      'Les Raids légendaires, eux, surgissent directement sur les routes dans un grand grondement. Ouvre l\'œil !',
     ], who);
     return;
   }
@@ -760,17 +760,17 @@ export async function dojoMamadou(game, n) {
   return lancerDefiDojoCoop(game, n);
 }
 
-/** Lance un défi Co-op du Dojo (Duo 2v2 ou Trio 3v3) depuis Maître Mamadou ou le C-Gear */
+/** Lance un défi Co-op du Dojo (Duo ou Trio) depuis Maître Mamadou ou le C-Gear */
 export async function lancerDefiDojoCoop(game, n = null) {
   const st = game.state, ui = game.ui;
   const who = { speaker: 'Maître Mamadou', face: n?.sprite || 'mamadou' };
 
   if (game.badgeCount() < 5) {
-    await ui.say('Le Dojo accueille uniquement les dresseurs confirmés à partir du 6e Badge (au moins 5 badges en main) !', who);
+    await ui.say('Le Dojo accueille uniquement les dresseurs confirmés à partir de 5 badges !', who);
     return;
   }
 
-  const fmtPick = await ui.ask('Quel format Co-op multijoueur veux-tu lancer ?', ['Duo Co-op (2v2 · 2 joueurs vs 2 bots)', 'Trio Co-op (3v3 · 3 joueurs vs 3 bots)', 'Annuler'], who);
+  const fmtPick = await ui.ask('Quel format Co-op multijoueur veux-tu lancer ?', ['Duo Co-op (2 dresseurs)', 'Trio Co-op (3 dresseurs)', 'Annuler'], who);
   if (fmtPick !== 0 && fmtPick !== 1) return;
   const format = fmtPick === 1 ? 'triple' : 'double';
   const neededPeers = format === 'triple' ? 2 : 1;
@@ -785,8 +785,8 @@ export async function lancerDefiDojoCoop(game, n = null) {
   if (allConnected.length < neededPeers) {
     await ui.say(
       format === 'triple'
-        ? ['Les combats du Dojo en Trio (3v3) sont strictement multijoueurs : il faut 3 dresseurs humains connectés !', 'Connecte 2 alliés via Amis / Connexion (F3) avant de lancer le défi.']
-        : ['Les combats du Dojo de Mamadou sont exclusivement multijoueurs (2 joueurs contre 2 bots en 2v2, 3 contre 3 en 3v3) !', 'Rejoins d\'abord un allié dans Amis / Connexion (F3) puis viens me reparler.'],
+        ? ['Les combats du Dojo en Trio se jouent en équipe de trois dresseurs connectés !', 'Retrouve deux alliés dans le menu Amis / Connexion avant de lancer le défi.']
+        : ['Les combats du Dojo de Mamadou se jouent en coopération (en Duo ou en Trio) !', 'Rejoins d\'abord un allié dans le menu Amis / Connexion, puis viens me reparler.'],
       who
     );
     return;
@@ -794,7 +794,7 @@ export async function lancerDefiDojoCoop(game, n = null) {
 
   const freePeers = allConnected.filter((p) => !p.busy && !p.pvp);
   if (freePeers.length < neededPeers) {
-    await ui.say('Un ou plusieurs alliés connectés sont occupés ailleurs pour le moment. Réessayez dès qu\'ils sont libres !', who);
+    await ui.say('Un ou plusieurs alliés connectés sont occupés ailleurs pour le moment. Réessaie dès qu\'ils sont libres !', who);
     return;
   }
 
@@ -825,7 +825,7 @@ export async function lancerDefiDojoCoop(game, n = null) {
   }
 
   const repBox = ui.dialogBox();
-  ui.typePage(repBox, `Invitation Co-op ${format === 'triple' ? '3v3' : '2v2'} envoyée à ${selectedPeers.map((p) => p.name).join(' et ')}… (Échap : annuler)`, { last: true });
+  ui.typePage(repBox, `Invitation Co-op ${format === 'triple' ? 'Trio' : 'Duo'} envoyée à ${selectedPeers.map((p) => p.name).join(' et ')}… (Échap : annuler)`, { last: true });
   await wait(30);
   const popInv = game.input.push((k) => { if (k === 'b' || k === 'cancel') for (const pid of peerIds) link.abort(pid); });
   const reps = await Promise.all(selectedPeers.map((p) => link.wait(p.id, (m) => m.t === 'dojo-rep' && m.rid === rid, 30000).then((m) => ({ peer: p, m }))));
@@ -921,7 +921,7 @@ export async function onDojoInvite(game, from, m) {
       return r;
     });
     ui.sound.sfx('bang');
-    const yes = await ui.yesNo(`${name} t'invite au Dojo de Mamadou en ${fmt === 'triple' ? 'Trio Co-op (3v3 · 3 joueurs)' : 'Duo Co-op (2v2 · 2 joueurs)'} ! Accepter ?`, { speaker: name });
+    const yes = await ui.yesNo(`${name} t'invite au Dojo de Mamadou en ${fmt === 'triple' ? 'Trio Co-op (3 joueurs)' : 'Duo Co-op (2 joueurs)'} ! Accepter ?`, { speaker: name });
     if (gone) { ui.closeDialog(); await ui.say(`${name} a annulé l'invitation du Dojo.`); return; }
     link.abort(from);
     void cancel;

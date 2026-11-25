@@ -104,14 +104,17 @@ for (const [id, sp] of Object.entries(SPECIES)) {
   }
 }
 
+/** les Pokémon légendaires différents capturés (marqués leg dans les données des espèces) */
+const legendairesCaptures = (st) => new Set((st.dex?.caught || []).map(Number).filter((sp) => SPECIES[sp]?.leg || SPECIES[sp]?.legend)).size;
+
 export const TROPHIES_CATALOG = [
   /* ==========================================================================
      1. DUELS MULTIJOUEUR & COMBAT PVP (12 trophées)
      ========================================================================== */
   {
     id: 'pvp_first_win',
-    title: 'Premier Sang',
-    desc: 'Remporter votre tout premier duel en combat PvP.',
+    title: 'Première Victoire',
+    desc: 'Remporter ton tout premier duel entre dresseurs.',
     tier: 'bronze',
     category: 'combat',
     reward: { item: 'rare-candy', count: 2, label: 'Super Bonbon ×2' },
@@ -147,7 +150,7 @@ export const TROPHIES_CATALOG = [
   },
   {
     id: 'pvp_ten_same_player',
-    title: 'Némésis Suprême',
+    title: 'Rival Légendaire',
     desc: 'Battre 10 fois le même dresseur en duel.',
     tier: 'gold',
     category: 'rival',
@@ -221,7 +224,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'pvp_ten_battles',
     title: 'Vétéran de l\'Arène',
-    desc: 'Disputer au moins 10 combats PvP au total.',
+    desc: 'Disputer au moins 10 duels en ligne au total.',
     tier: 'bronze',
     category: 'combat',
     reward: { item: 'full-restore', count: 3, label: 'Guérison ×3' },
@@ -233,7 +236,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'pvp_twentyfive_wins',
     title: 'Champion de la Ligue',
-    desc: 'Cumuler 25 victoires en combat PvP au total.',
+    desc: 'Cumuler 25 victoires en duel en ligne au total.',
     tier: 'gold',
     category: 'combat',
     reward: { item: 'rocky-helmet', count: 1, label: 'Casque Brut ×1' },
@@ -245,7 +248,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'pvp_fifty_wins',
     title: 'Seigneur des Duels',
-    desc: 'Cumuler 50 victoires en combat PvP au total.',
+    desc: 'Cumuler 50 victoires en duel en ligne au total.',
     tier: 'platinum',
     category: 'combat',
     reward: { item: 'master-ball', count: 1, label: 'Master Ball ×1' },
@@ -398,7 +401,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'dex_shiny_hunter',
     title: 'Étoile Miraculeuse',
-    desc: 'Trouver et posséder un Pokémon chromatique (Shiny) dans son équipe ou ses boîtes.',
+    desc: 'Trouver et posséder un Pokémon chromatique dans ton équipe ou tes boîtes.',
     tier: 'platinum',
     category: 'pokedex',
     reward: { item: 'leftovers', count: 1, label: 'Restes ×1' },
@@ -499,7 +502,7 @@ export const TROPHIES_CATALOG = [
     category: 'exploration',
     reward: { item: 'black-belt', count: 1, label: 'Ceinture Noire ×1' },
     check: (st) => {
-      const cnt = Object.values(st.journal || {}).filter((q) => q && (q.done || q.step === 'done' || q.status === 'done')).length;
+      const cnt = Object.values(st.journal || {}).filter((q) => q && (q.d != null || q.done || q.step === 'done' || q.status === 'done')).length;
       return { current: Math.min(cnt, 5), max: 5, done: cnt >= 5 };
     }
   },
@@ -526,7 +529,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'domaine_first_build',
     title: 'Bâtisseur du Domaine',
-    desc: 'Acquérir le Domaine d\'Aube et y poser votre toute première construction.',
+    desc: 'Acquérir le Domaine d\'Aube et y poser ta toute première construction.',
     tier: 'bronze',
     category: 'domaine',
     reward: { item: 'hyper-potion', count: 5, label: 'Hyper Potion ×5' },
@@ -539,7 +542,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'domaine_residents_3',
     title: 'Maire Prospère',
-    desc: 'Accueillir et installer au moins 3 résidents dans votre Domaine d\'Aube.',
+    desc: 'Accueillir et installer au moins 3 résidents dans ton Domaine d\'Aube.',
     tier: 'silver',
     category: 'domaine',
     reward: { item: 'sitrus-berry', count: 5, label: 'Baie Sitrus ×5' },
@@ -551,7 +554,7 @@ export const TROPHIES_CATALOG = [
   },
   {
     id: 'casino_coins_1000',
-    title: 'Flambeur de Métropole',
+    title: 'As des Jetons',
     desc: 'Amasser ou détenir au moins 1 000 jetons au Casino de Métropole.',
     tier: 'silver',
     category: 'domaine',
@@ -564,7 +567,7 @@ export const TROPHIES_CATALOG = [
   {
     id: 'economy_rich_100k',
     title: 'Magnat d\'Odyssée',
-    desc: 'Amasser une fortune d\'au moins 100 000 ₽ sur votre compte.',
+    desc: 'Amasser une fortune d\'au moins 100 000 ₽ dans ta poche.',
     tier: 'gold',
     category: 'domaine',
     reward: { item: 'choice-band', count: 1, label: 'Bandeau Choix ×1' },
@@ -572,11 +575,387 @@ export const TROPHIES_CATALOG = [
       const money = st.money || 0;
       return { current: Math.min(money, 100000), max: 100000, done: money >= 100000 };
     }
-  }
+  },
+
+  /* ==========================================================================
+     10. BOSS, RAIDS, LÉGENDAIRES, DOJO ET DONJONS (18 trophées)
+     Les boss vaincus sont notés dans st.boss (game.noterBoss), les raids dans st.raids (multi-events.js) ;
+     pour les parties d'avant, ce que la sauvegarde savait déjà compte aussi (quête finie, drapeaux, Pokédex).
+     ========================================================================== */
+  {
+    id: 'boss_first',
+    title: 'Premier Grand Adversaire',
+    desc: 'Vaincre un adversaire majeur : un Admin ou le Chef de la Team Éclipse ou de la Brume, ou un Champion de la Tour de combat.',
+    tier: 'bronze',
+    category: 'boss',
+    reward: { item: 'revive', count: 3, label: 'Rappel ×3' },
+    check: (st) => {
+      const n = Object.keys(st.boss || {}).length || (st.flags?.lugia || (st.flags?.['Q:magma'] || 0) >= 3 ? 1 : 0);
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'boss_eclipse',
+    title: "Fléau de l'Éclipse",
+    desc: 'Vaincre Érèbe, Nyx et Nocturne, les Admins et le Chef de la Team Éclipse.',
+    tier: 'gold',
+    category: 'boss',
+    reward: { item: 'dusk-stone', count: 1, label: 'Pierre Nuit ×1' },
+    check: (st) => {
+      const n = st.flags?.lugia ? 3 : [['Érèbe', 'Erèbe'], ['Nyx'], ['Nocturne']].filter((ks) => ks.some((k) => st.boss?.[k])).length;
+      return { current: Math.min(n, 3), max: 3, done: n >= 3 };
+    }
+  },
+  {
+    id: 'boss_brume',
+    title: 'Dissipateur de Brume',
+    desc: 'Vaincre Sylas, Ariane et Nox, les Admins et le Chef de la Brume.',
+    tier: 'gold',
+    category: 'boss',
+    reward: { item: 'scope-lens', count: 1, label: 'Lentilscope ×1' },
+    check: (st) => {
+      const n = (st.flags?.['Q:magma'] || 0) >= 3 ? 3 : ['Sylas', 'Ariane', 'Nox'].filter((k) => st.boss?.[k]).length;
+      return { current: Math.min(n, 3), max: 3, done: n >= 3 };
+    }
+  },
+  {
+    id: 'boss_tour',
+    title: 'Conquérant de la Tour',
+    desc: 'Vaincre le dernier adversaire de la Tour de combat, à pleine puissance.',
+    tier: 'platinum',
+    category: 'boss',
+    reward: { item: 'rare-candy', count: 10, label: 'Super Bonbon ×10' },
+    check: (st) => {
+      const done = !!(st.flags?.bossTour || st.flags?.['T:tour:6'] || (st.tour?.record || 0) >= 7);
+      return { current: done ? 1 : 0, max: 1, done };
+    }
+  },
+  {
+    id: 'raid_first',
+    title: 'Briseur de Raid',
+    desc: "Remporter un combat de raid avec d'autres dresseurs.",
+    tier: 'bronze',
+    category: 'raid',
+    reward: { item: 'ultra-ball', count: 5, label: 'Hyper Ball ×5' },
+    check: (st) => {
+      const n = st.raids?.gagnes || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'raid_10',
+    title: "Escouade d'Élite",
+    desc: 'Remporter 10 combats de raid.',
+    tier: 'gold',
+    category: 'raid',
+    reward: { item: 'rare-candy', count: 5, label: 'Super Bonbon ×5' },
+    check: (st) => {
+      const n = st.raids?.gagnes || 0;
+      return { current: Math.min(n, 10), max: 10, done: n >= 10 };
+    }
+  },
+  {
+    id: 'raid_legende',
+    title: "Chasseur d'Aura d'Or",
+    desc: "Vaincre un Pokémon de raid légendaire, à l'aura dorée.",
+    tier: 'gold',
+    category: 'raid',
+    reward: { item: 'life-orb', count: 1, label: 'Orbe Vie ×1' },
+    check: (st) => {
+      const n = st.raids?.legendes || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'raid_capture',
+    title: 'Maître des Raids',
+    desc: 'Capturer un Pokémon de raid légendaire.',
+    tier: 'silver',
+    category: 'raid',
+    reward: { item: 'ultra-ball', count: 10, label: 'Hyper Ball ×10' },
+    check: (st) => {
+      const n = st.raids?.captures || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'leg_1',
+    title: 'Rencontre Mythique',
+    desc: 'Capturer un Pokémon légendaire.',
+    tier: 'silver',
+    category: 'legende',
+    reward: { item: 'ultra-ball', count: 10, label: 'Hyper Ball ×10' },
+    check: (st) => {
+      const n = legendairesCaptures(st);
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'leg_5',
+    title: 'Gardien des Légendes',
+    desc: 'Capturer 5 Pokémon légendaires différents.',
+    tier: 'gold',
+    category: 'legende',
+    reward: { item: 'shiny-stone', count: 1, label: 'Pierre Éclat ×1' },
+    check: (st) => {
+      const n = legendairesCaptures(st);
+      return { current: Math.min(n, 5), max: 5, done: n >= 5 };
+    }
+  },
+  {
+    id: 'leg_10',
+    title: 'Panthéon Vivant',
+    desc: 'Capturer 10 Pokémon légendaires différents.',
+    tier: 'platinum',
+    category: 'legende',
+    reward: { item: 'full-restore', count: 5, label: 'Guérison ×5' },
+    check: (st) => {
+      const n = legendairesCaptures(st);
+      return { current: Math.min(n, 10), max: 10, done: n >= 10 };
+    }
+  },
+  {
+    id: 'dojo_first',
+    title: 'Disciple de Mamadou',
+    desc: 'Remporter un combat au Dojo de Mamadou.',
+    tier: 'bronze',
+    category: 'dojo',
+    reward: { item: 'black-belt', count: 1, label: 'Ceinture Noire ×1' },
+    check: (st) => {
+      const n = st.dojo?.wins || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'dojo_10',
+    title: 'Pilier du Dojo',
+    desc: 'Remporter 10 combats au Dojo de Mamadou.',
+    tier: 'silver',
+    category: 'dojo',
+    reward: { item: 'muscle-band', count: 1, label: 'Bandeau Muscle ×1' },
+    check: (st) => {
+      const n = st.dojo?.wins || 0;
+      return { current: Math.min(n, 10), max: 10, done: n >= 10 };
+    }
+  },
+  {
+    id: 'dojo_serie5',
+    title: 'Maître du Dojo',
+    desc: "Enchaîner 5 victoires d'affilée au Dojo, en Duo ou en Trio.",
+    tier: 'gold',
+    category: 'dojo',
+    reward: { item: 'choice-band', count: 1, label: 'Bandeau Choix ×1' },
+    check: (st) => {
+      const n = Math.max(st.dojo?.record2 || 0, st.dojo?.record3 || 0);
+      return { current: Math.min(n, 5), max: 5, done: n >= 5 };
+    }
+  },
+  {
+    id: 'donjon_crypte',
+    title: 'Gardien des Esprits',
+    desc: 'Venir à bout de la Crypte des Murmures.',
+    tier: 'bronze',
+    category: 'donjon',
+    reward: { item: 'spell-tag', count: 1, label: 'Rune Sort ×1' },
+    check: (st) => {
+      const done = !!(st.flags?.['D:crypte:recompense']);
+      return { current: done ? 1 : 0, max: 1, done };
+    }
+  },
+  {
+    id: 'donjon_miroirs',
+    title: 'Au-delà du Reflet',
+    desc: 'Venir à bout du Donjon des Miroirs.',
+    tier: 'silver',
+    category: 'donjon',
+    reward: { item: 'elixir', count: 3, label: 'Élixir ×3' },
+    check: (st) => {
+      const done = !!(st.flags?.['D:miroirs:recompense']);
+      return { current: done ? 1 : 0, max: 1, done };
+    }
+  },
+  {
+    id: 'donjon_voies',
+    title: 'Trois Voies, Un Cœur',
+    desc: 'Venir à bout du Sanctuaire des Trois Voies.',
+    tier: 'gold',
+    category: 'donjon',
+    reward: { item: 'rare-candy', count: 3, label: 'Super Bonbon ×3' },
+    check: (st) => {
+      const done = !!(st.flags?.['D:voies:recompense']);
+      return { current: done ? 1 : 0, max: 1, done };
+    }
+  },
+  {
+    id: 'donjon_tous',
+    title: 'Seigneur des Donjons',
+    desc: 'Venir à bout des trois donjons : la Crypte, les Miroirs et les Trois Voies.',
+    tier: 'platinum',
+    category: 'donjon',
+    reward: { item: 'choice-specs', count: 1, label: 'Lunettes Choix ×1' },
+    check: (st) => {
+      const n = ['crypte', 'miroirs', 'voies'].filter((d) => st.flags?.['D:' + d + ':recompense']).length;
+      return { current: Math.min(n, 3), max: 3, done: n >= 3 };
+    }
+  },
+  {
+    id: 'celestial_meteor',
+    title: 'Chasseur d\'Étoiles',
+    desc: 'Ramasser un fragment de météorite tombé lors d\'un phénomène céleste.',
+    tier: 'silver',
+    category: 'exploration',
+    reward: { item: 'fragment-meteore', count: 1, label: 'Fragment Météorique ×1' },
+    check: (st) => {
+      const n = st.flags?.celestialMeteors || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'celestial_aurora',
+    title: 'Veilleur d\'Aurore',
+    desc: 'Contempler une aurore boréale illuminer le ciel d\'Odyssée.',
+    tier: 'bronze',
+    category: 'exploration',
+    reward: { item: 'moon-stone', count: 1, label: 'Pierre Lune ×1' },
+    check: (st) => {
+      const done = !!st.flags?.celestialAuroraSeen;
+      return { current: done ? 1 : 0, max: 1, done };
+    }
+  },
+  {
+    id: 'celestial_meteor_5',
+    title: 'Moissonneur d\'Étoiles',
+    desc: 'Recueillir au moins 5 météorites tombées du ciel.',
+    tier: 'gold',
+    category: 'exploration',
+    reward: { item: 'fragment-meteore', count: 2, label: 'Fragment Météorique ×2' },
+    check: (st) => {
+      const n = st.flags?.celestialMeteors || 0;
+      return { current: Math.min(n, 5), max: 5, done: n >= 5 };
+    }
+  },
+  {
+    id: 'celestial_cosmic_catch',
+    title: 'Visiteur Stellaire',
+    desc: 'Capturer un Pokémon cosmique surgi d\'une météorite.',
+    tier: 'silver',
+    category: 'exploration',
+    reward: { item: 'ultra-ball', count: 5, label: 'Hyper Ball ×5' },
+    check: (st) => {
+      const n = st.flags?.celestialCosmicCaught || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'rift_clear',
+    title: 'Marcheur des Failles',
+    desc: 'Triompher d\'un combat dans une faille spatio-temporelle.',
+    tier: 'gold',
+    category: 'exploration',
+    reward: { item: 'rare-candy', count: 2, label: 'Super Bonbon ×2' },
+    check: (st) => {
+      const n = st.flags?.riftsCleared || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'rift_inverse_win',
+    title: 'Esprit Inversé',
+    desc: 'Vaincre ou capturer un Pokémon dans une Faille Inversée.',
+    tier: 'silver',
+    category: 'aventure',
+    reward: { item: 'rare-candy', count: 1, label: 'Super Bonbon ×1' },
+    check: (st) => {
+      const n = st.flags?.['riftKind:inverse'] || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'rift_chaos_win',
+    title: 'Dompteur de Tempêtes',
+    desc: 'Triompher d\'une Faille Chaotique à météo tournante.',
+    tier: 'silver',
+    category: 'aventure',
+    reward: { item: 'sitrus-berry', count: 4, label: 'Baie Sitrus ×4' },
+    check: (st) => {
+      const n = st.flags?.['riftKind:chaos'] || 0;
+      return { current: Math.min(n, 1), max: 1, done: n >= 1 };
+    }
+  },
+  {
+    id: 'rift_alpha_catch',
+    title: 'Cœur de Colosse',
+    desc: 'Capturer un Pokémon Alpha surgi d\'une Faille Alpha.',
+    tier: 'gold',
+    category: 'aventure',
+    reward: { item: 'hyper-potion', count: 5, label: 'Hyper Potion ×5' },
+    check: (st) => {
+      const hasAlpha = (st.flags?.alphaCaught || 0) >= 1
+        || (st.party || []).concat(st.box || []).some((m) => !!m?.alpha);
+      return { current: hasAlpha ? 1 : 0, max: 1, done: hasAlpha };
+    }
+  },
+  {
+    id: 'rift_trinity',
+    title: 'Gardien de l\'Espace-Temps',
+    desc: 'Surmonter les trois types de failles : Inversée, Chaotique et Alpha.',
+    tier: 'platinum',
+    category: 'exploration',
+    reward: { item: 'choice-band', count: 1, label: 'Bandeau Choix ×1' },
+    check: (st) => {
+      const f = st.flags || {};
+      const cnt = (f['riftKind:inverse'] ? 1 : 0) + (f['riftKind:chaos'] ? 1 : 0) + (f['riftKind:alpha'] ? 1 : 0);
+      return { current: cnt, max: 3, done: cnt >= 3 };
+    }
+  },
+  {
+    id: 'follower_memories',
+    title: 'Complicité Éternelle',
+    desc: 'Forger au moins 4 souvenirs uniques avec un même Pokémon.',
+    tier: 'gold',
+    category: 'entrainement',
+    reward: { item: 'leftovers', count: 1, label: 'Restes ×1' },
+    check: (st) => {
+      let best = 0;
+      for (const m of (st.party || []).concat(st.box || [])) {
+        const n = m?.memories?.length || 0;
+        if (n > best) best = n;
+      }
+      return { current: Math.min(best, 4), max: 4, done: best >= 4 };
+    }
+  },
+  {
+    id: 'follower_clutch',
+    title: 'Cœur Indomptable',
+    desc: 'Voir un allié survivre à 5 % PV ou moins et remporter le combat.',
+    tier: 'gold',
+    category: 'entrainement',
+    reward: { item: 'focus-sash', count: 1, label: 'Ceinture Force ×1' },
+    check: (st) => {
+      const ok = (st.party || []).concat(st.box || []).some((m) => (m?.memories || []).some((x) => x.id === 'clutch_1hp'));
+      return { current: ok ? 1 : 0, max: 1, done: ok };
+    }
+  },
+  {
+    id: 'follower_legend_bond',
+    title: 'Lien Légendaire',
+    desc: 'Forger au moins 6 souvenirs uniques avec un même Pokémon.',
+    tier: 'platinum',
+    category: 'entrainement',
+    reward: { item: 'rare-candy', count: 3, label: 'Super Bonbon ×3' },
+    check: (st) => {
+      let best = 0;
+      for (const m of (st.party || []).concat(st.box || [])) {
+        const n = m?.memories?.length || 0;
+        if (n > best) best = n;
+      }
+      return { current: Math.min(best, 6), max: 6, done: best >= 6 };
+    }
+  },
 ];
 
 export const STREAK_RANKS = [
-  { min: 0, title: 'Challenger', desc: 'En apprentissage', icon: 'medal_bronze', flame: 'none' },
+  { min: 0, title: 'Aspirant', desc: 'En apprentissage', icon: 'medal_bronze', flame: 'none' },
   { min: 3, title: '🔥 En Série', desc: 'Série de 3 victoires', icon: 'medal_silver', flame: 'low' },
   { min: 5, title: '🔥🔥 Flamboyant', desc: 'Série de 5 victoires', icon: 'medal_gold', flame: 'medium' },
   { min: 10, title: '⚡ Foudre d\'Élite', desc: 'Série de 10 victoires', icon: 'medal_platinum', flame: 'high' },
@@ -788,7 +1167,7 @@ export function getPvpSummary(st) {
 export function getHeadToHeadStatus(record) {
   if (!record) return { label: 'Inconnu', cls: 'neutral' };
   if (record.wins > record.losses) {
-    return { label: '👑 Domination', cls: 'domination', desc: `Vous menez face à ce dresseur (+${record.wins - record.losses})` };
+    return { label: '👑 Domination', cls: 'domination', desc: `Tu mènes face à ce dresseur (+${record.wins - record.losses})` };
   }
   if (record.wins === record.losses) {
     return { label: '⚖️ Égalité', cls: 'equality', desc: 'Score parfaitement équilibré' };

@@ -1,8 +1,8 @@
 /* ---------------- cinématique d'ouverture (Nouvelle partie) ---------------- */
 .cine-scr { background: #000; display: flex; align-items: center; justify-content: center; z-index: 45; overflow: hidden; }
 .cine-vid { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
-.cine-skip { position: absolute; right: calc(var(--px) * 10); bottom: calc(var(--px) * 8); z-index: 46;
-  font: inherit; font-size: calc(var(--px) * 7.5); font-weight: 600; color: rgba(255, 250, 232, .92);
+.cine-skip { position: absolute; right: calc(var(--px) * 8); top: calc(var(--px) * 6); z-index: 46;   /* en haut : les sous-titres de la vidéo sont en bas */
+  font: inherit; font-size: calc(var(--px) * 6); font-weight: 600; color: rgba(255, 250, 232, .8);
   background: rgba(14, 22, 38, .72); border: calc(var(--px) * 1) solid rgba(184, 210, 244, .55);
   border-radius: calc(var(--px) * 4); padding: calc(var(--px) * 3) calc(var(--px) * 6);
   box-shadow: 0 calc(var(--px) * 2) calc(var(--px) * 6) rgba(0, 0, 0, .6);
@@ -13,6 +13,9 @@
 .intro-scr { position: absolute; inset: 0; overflow: hidden; background: #1e2c50; transition: opacity .55s ease; z-index: 25; padding: 0; }
 .intro-scr.out { opacity: 0; }
 #ui:has(> .intro-scr) .dlg-face { display: none; }
+/* sans portrait (le professeur est déjà au centre de l'écran), la boîte garde la marge d'une boîte ordinaire */
+#ui:has(> .intro-scr) .dlg.has-face { padding-left: calc(var(--px) * 14); min-height: calc(var(--px) * 48); }
+#ui:has(> .intro-scr) .dlg.has-face .dlg-name { left: calc(var(--px) * 8); }
 .intro-bg { position: absolute; inset: 0;
   background:
     radial-gradient(ellipse 52% 20% at 50% 66%, rgba(255, 255, 255, .95) 0%, rgba(226, 236, 255, .82) 48%, rgba(168, 192, 238, 0) 78%),
@@ -250,3 +253,32 @@
   .gfx-pick-stage { height: calc(var(--px) * 52); }
   .gfx-pick-desc { display: none; }
 }
+
+/* ---------- choix des graphismes, façon menu DS : boîtes blanches à cadre bleu (comme .box), curseur rouge, à plat ---------- */
+.gfx-pick-title { color: var(--ink); text-shadow: none; letter-spacing: 0; background: var(--paper); border: calc(var(--px) * 1) solid #283850;
+  border-radius: calc(var(--px) * 3); padding: calc(var(--px) * 1.5) calc(var(--px) * 10); box-shadow: inset 0 0 0 calc(var(--px) * 1.5) var(--frame2); }
+.gfx-pick-sub { color: #f6faff; text-shadow: calc(var(--px) * .7) calc(var(--px) * .7) 0 #16223a; }
+.gfx-pick-card, .gfx-pick-card.on, .gfx-pick-card:hover { transform: none; transition: none; color: var(--ink);
+  background: var(--paper); border: calc(var(--px) * 1) solid #283850; border-radius: calc(var(--px) * 4);
+  box-shadow: inset 0 0 0 calc(var(--px) * 1.5) var(--frame2), inset 0 0 0 calc(var(--px) * 2.5) #fff, 0 calc(var(--px) * 1) 0 rgba(0,0,0,.35); }
+.gfx-pick-card { position: relative; }
+.gfx-pick-card.on { box-shadow: inset 0 0 0 calc(var(--px) * 1.5) #e04040, inset 0 0 0 calc(var(--px) * 2.5) #fff, 0 calc(var(--px) * 1) 0 rgba(0,0,0,.35); }
+.gfx-pick-card::before { content: '▶'; position: absolute; left: calc(var(--px) * -9); top: 50%; transform: translateY(-50%);
+  color: #e04040; font-size: calc(var(--px) * 7); text-shadow: calc(var(--px) * .6) calc(var(--px) * .6) 0 #000; visibility: hidden; }
+.gfx-pick-card.on::before { visibility: visible; }
+.gfx-pick-badge { background: #3a5888; color: #fff; border: none; border-radius: calc(var(--px) * 2); box-shadow: none; text-shadow: none; }
+.gfx-pick-stage { border-radius: calc(var(--px) * 2); box-shadow: inset 0 0 0 calc(var(--px) * 1) #283850; }
+.gfx-pick-name { color: var(--ink); text-shadow: none; }
+.gfx-pick-desc { color: #4a5068; }
+.gfx-pick-check { color: #c03030; text-shadow: none; }
+.gfx-pick-sprites, .gfx-pick-sprites.focus { background: var(--paper); border: calc(var(--px) * 1) solid #283850; border-radius: calc(var(--px) * 3);
+  box-shadow: inset 0 0 0 calc(var(--px) * 1.5) var(--frame2); }
+.gfx-pick-sprites.focus { box-shadow: inset 0 0 0 calc(var(--px) * 1.5) #e04040; }
+.gfx-pick-sp-lbl { color: var(--ink); }
+.gfx-pick-sp-btn { color: var(--ink); background: transparent; border: calc(var(--px) * .8) solid transparent; box-shadow: none; text-shadow: none; }
+.gfx-pick-sp-btn:hover { background: rgba(88, 136, 208, .15); }
+.gfx-pick-sp-btn.on { background: rgba(88, 136, 208, .2); color: var(--ink); border-color: #e04040; }
+.gfx-pick-back, .gfx-pick-ok, .gfx-pick-ok:hover { color: var(--ink); background: var(--paper); filter: none; transform: none; text-shadow: none;
+  border: calc(var(--px) * 1) solid #283850; border-radius: calc(var(--px) * 3); box-shadow: inset 0 0 0 calc(var(--px) * 1.2) var(--frame2), 0 calc(var(--px) * 1) 0 rgba(0,0,0,.35); }
+.gfx-pick-ok { box-shadow: inset 0 0 0 calc(var(--px) * 1.2) #e04040, 0 calc(var(--px) * 1) 0 rgba(0,0,0,.35); }
+.gfx-pick-hint { color: #f6faff; text-shadow: calc(var(--px) * .7) calc(var(--px) * .7) 0 #16223a; }
