@@ -196,3 +196,7 @@
 .sum-mem-place { font-size: calc(var(--px) * 4.6); color: #7dd3fc; white-space: nowrap; }
 .sum-mem-desc { font-size: calc(var(--px) * 4.6); color: #b8cce4; line-height: 1.15; }
 .sum-mem-empty { grid-column: 1 / -1; color: #9cb4d4; font-size: calc(var(--px) * 5.6); line-height: 1.4; background: #121c2c; border: calc(var(--px) * .8) dashed #324a6e; padding: calc(var(--px) * 4); text-align: center; }
+
+/* objet tenu dans le résumé : icône et nom */
+.sum-held { display: inline-flex; align-items: center; gap: 0.35em; vertical-align: middle; }
+.sum-held img { width: 1.6em; height: 1.6em; image-rendering: pixelated; }

@@ -69,7 +69,8 @@ export function installSocial(game) {
     if (text || emote) game.showSpeechBubble(from, text, emote);
   };
   // fiche demandée par un autre joueur : réponse automatique, sans interrompre la partie
-  link.onCard = () => (game.state ? trainerCard(game.state) : null);
+  // l'équipe reste un mystère : la fiche envoyée aux autres ne la contient pas (ni le Panthéon, qui la montre)
+  link.onCard = () => { if (!game.state) return null; const c = trainerCard(game.state); delete c.team; delete c.hof; return c; };
   link.onDomaine = () => {
     const st = game.state;
     if (!st) return null;
@@ -300,7 +301,6 @@ export async function showCard(game, peer) {
   const card = {
     name: String(c.name || peer.name).slice(0, 12), id: (c.id | 0) % 100000, gender: c.gender === 'f' ? 'f' : 'm', dex: c.dex | 0, seen: c.seen | 0, time: +c.time || 0, champion: !!c.champion,
     badges: Array.isArray(c.badges) ? c.badges.slice(0, 15).map(Boolean) : [],
-    team: Array.isArray(c.team) ? c.team.slice(0, 6).filter((q) => SPECIES[q?.sp]).map((q) => ({ sp: q.sp, lvl: Math.max(1, Math.min(100, q.lvl | 0)), nick: q.nick ? String(q.nick).slice(0, 12) : null, shiny: !!q.shiny, hp: q.hp != null ? q.hp : null, maxHp: q.maxHp != null ? q.maxHp : null, ball: q.ball || 'poke-ball' })) : [],
     trophies: (c.trophies | 0) || 0,
     pvpWins: (c.pvpWins | 0) || 0,
     pvpLosses: (c.pvpLosses | 0) || 0,

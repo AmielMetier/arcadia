@@ -858,3 +858,18 @@
   background: linear-gradient(180deg, #f03838 0%, #a81c1c 100%);
   transform: translate(calc(var(--px) * 1), calc(var(--px) * -1));
 }
+
+/* objet tenu : petite icône posée en bas à droite du Pokémon, et une ligne sous les types du Pokémon en tête */
+.pslot-sub-ped { position: relative; }
+.pslot-held {
+  position: absolute; right: calc(var(--px) * -2); bottom: calc(var(--px) * -2); z-index: 2;
+  width: calc(var(--px) * 12); height: calc(var(--px) * 12); object-fit: contain; image-rendering: pixelated;
+  background: #0a1420; border: calc(var(--px) * 0.8) solid #f0c040; padding: calc(var(--px) * 0.5);
+  filter: drop-shadow(0 calc(var(--px) * 0.6) 0 rgba(0,0,0,0.7));
+}
+.pslot-held-line {
+  display: flex; align-items: center; gap: calc(var(--px) * 2); margin-top: calc(var(--px) * 2);
+  font-size: calc(var(--px) * 5.5); color: #9fc4e8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pslot-held-line img { width: calc(var(--px) * 10); height: calc(var(--px) * 10); image-rendering: pixelated; flex: none; }
+.pslot-held-line b { color: #ffd860; font-weight: normal; overflow: hidden; text-overflow: ellipsis; }

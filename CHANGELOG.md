@@ -1,5 +1,15 @@
 # Journal des versions — Arcadia
 
+## 5.165 — 26 novembre 2026
+- **Odyssée** — Quelques retouches (Odyssée 3.6) :
+  - Plus de bouton « Sauvegarder » dans le menu : la partie se sauvegarde toute seule (à chaque porte, après chaque combat et chaque discussion, et quand on quitte le jeu), aussi en ligne sur le compte du Hub.
+  - L'objet tenu par un Pokémon se voit dans l'équipe (une petite icône sur le Pokémon, « Tient : … » sous celui en tête) et dans son résumé.
+  - L'équipe des autres joueurs reste un mystère : elle n'apparaît plus sur leur Carte de Dresseur.
+  - La Ruche, l'arène d'Hector, est plus simple : quatre ruchers bien choisis suffisent pour rejoindre le Champion (elle demandait neuf secousses et des allers-retours). Les murs repartent fermés pour tout le monde.
+  - Toutes les routes sont moins vides : le sol nu loin du sentier se couvre de grandes plaques d'herbes hautes, jusque dans les clairières et les boucles (jamais sur la neige ni la cendre).
+  - Les hautes herbes sont redessinées : en graphismes de base, de vraies touffes rangées en quinconce au lieu d'un tapis de bruit ; en Noir & Blanc, elles prennent le vert du biome avec des bords nets (fini les bandes de couleur et les carrés d'herbe sur le sable).
+  - Plus de passants qui ne font que parler ni de Pokémon de décor sur les routes : chaque personne croisée soigne ton équipe, offre quelque chose ou te défie, et il y a plus de dresseurs à affronter.
+
 ## 5.164 — 25 novembre 2026
 - **Odyssée** — Chaque route a maintenant son propre biome (Odyssée 3.5) :
   - 26 biomes : blés dorés et moulin sur la Route 1, val fleuri et ses étangs, forêt aux champignons lumineux, alpages, cerisaie, lande de bruyère et ses cercles de pierres, savane aux baobabs, champs de lavande, prairie d'opale aux cristaux, jungle, gorge aux geysers, taïga enneigée, jardins célestes, côte aux palmiers et son phare…

@@ -740,6 +740,8 @@ export class WorldView {
     };
     // pack de graphismes : un terrain en cinq tuiles (q_<nom>_<état>) posé par quarts sur l'herbe, selon les huit voisins
     // (coin sortant, bord, coin rentrant, plein) ; eau = planche animée
+    // case de sable pour les raccords : sable, ou herbe (hautes herbes comprises) dont la matière est du sable
+    const sableEn = (q, ax, ay) => q === T.SAND || ((q === T.GRASS || q === T.TALL) && matiere(biomeEn(m, ax, ay), ax, ay) === 'sable');
     const quarts = (nom, same, eau) => {
       const C = eau ? this.N.cells : A, s = (dx, dy) => same(groundAt(x + dx, y + dy), x + dx, y + dy), q = [];
       let pleins = 0;
@@ -793,13 +795,16 @@ export class WorldView {
     switch (tt) {
       case T.GRASS: case T.FENCE:
         // une plaque de sable dans l'herbe (pack) : ses bords et ses coins, comme un chemin
-        if (mat === 'sable' && A.q_sand_f && tt === T.GRASS) return quarts('sand', (q, ax, ay) => q === T.SAND || (q === T.GRASS && matiere(biomeEn(m, ax, ay), ax, ay) === 'sable'));
+        if (mat === 'sable' && A.q_sand_f && tt === T.GRASS) return quarts('sand', sableEn);
         return { c: A[grassKey] };
       case T.ROCK: case T.BUSH: case T.CUT: return { c: desertCell ? sandFull : A[grassKey] };
       case T.SMASH: case T.BOULDER: return { c: m.outdoor ? (desertCell ? sandFull : A[grassKey]) : A['cave' + (v < 0.5 ? 0 : 1)] };
       // hautes herbes : un tapis dessiné au sol, comme sur DS (les jambes de qui s'y tient sont cachées par view.cover)
       case T.TALL: case T.DARKTALL: {
-        if (A.q_tall0 && theme !== 'snow') return { c: A[grassKey], ov: A[(tt === T.DARKTALL ? 'q_darktall' : 'q_tall') + (v < 0.5 ? 0 : 1)] };
+        const touffe = A[(tt === T.DARKTALL ? 'q_darktall' : 'q_tall') + (v < 0.5 ? 0 : 1)];
+        // sur une plaque de sable (canyon, savane, désert) : la touffe pousse sur le sable, pas sur un carré d'herbe
+        if (A.q_tall0 && theme !== 'snow' && mat === 'sable' && A.q_sand_f) return { ...quarts('sand', sableEn), ov: touffe };
+        if (A.q_tall0 && theme !== 'snow') return { c: A[grassKey], ov: touffe };
         // tileset : nappe d'herbe avec ses bords et ses coins arrondis (pièce choisie selon les voisins)
         const hk = 'h_' + (tt === T.DARKTALL ? 'bois' : theme === 'snow' ? 'neige' : 'prairie') + '_' + herbePiece(m, x, y, tt, v);
         if (A[hk]) return { c: A[hk] };

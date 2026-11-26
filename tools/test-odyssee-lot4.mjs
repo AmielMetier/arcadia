@@ -252,7 +252,8 @@ console.log('=== Tests de régression Lot 4 ===');
 {
   const gameSrc = fs.readFileSync('odyssee/js/game.js', 'utf8');
   assert.ok(gameSrc.includes("learnMoveScreen(this, m, moveId)"), 'game.js doit appeler learnMoveScreen');
-  assert.ok(gameSrc.includes("['Sauvegarder', 'save']"), 'game.js doit inclure Sauvegarder dans le menu Pause');
+  // la partie se sauvegarde toute seule : plus de bouton Sauvegarder dans le menu Pause
+  assert.ok(!gameSrc.includes("['Sauvegarder', 'save']"), 'le menu Pause ne doit plus proposer Sauvegarder');
 
   const cineSrc = fs.readFileSync('odyssee/js/ui/cinematic.js', 'utf8');
   const lugiaSrc = fs.readFileSync('odyssee/js/ui/cine-lugia.js', 'utf8');

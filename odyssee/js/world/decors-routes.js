@@ -8,8 +8,8 @@
 import { T, walkable } from './tiles.js';
 import { along, rng } from './mapgen.js';
 import { massif } from './relief.js';
-import { B, BIOME_ROUTE, BIOMES, bruitBiome, hasardCase, essence } from './biomes.js';
-import { PETITS, FAUNE, GENS, CAMP, PIQUENIQUE, ETUDE, DEFI, APRES_DEFI, DEFIEURS } from './vie-routes.js';
+import { B, BIOME_ROUTE, BIOMES, bruitBiome, hasardCase, essence, matiere } from './biomes.js';
+import { PETITS, GENS, CAMP, PIQUENIQUE, ETUDE, DEFI, APRES_DEFI, DEFIEURS } from './vie-routes.js';
 import { adapter, lotsPour, rangRoute } from './bareme.js';
 import { cacher } from './rythme.js';
 import { PRENOMS } from './voix.js';
@@ -399,17 +399,16 @@ Object.assign(Chantier.prototype, {
   objetA(p, item, id) { this.W.item(p[0], p[1], item, 1, id); this.abords(p); },
   /** un petit décor bloquant qui ne coupe rien */
   pose(k, p) { if (!p) return false; this.W.prop(k, p[0], p[1], true); this.pris.add(this.k(...p)); this.occ.add(this.k(...p)); return true; },
-  bete(p) { const L = FAUNE[this.bio.id] || []; if (!p || !L.length) return; const sp = this.pick(L); this.quelquun(p, { id: `${this.id}:b${this.np++}`, sprite: 'poke:' + sp, sp, dir: 'down', move: 'wander', roam: 3, script: 'faune', phrase: Math.floor(this.r() * 6) }); },
   /** les clairières, corniches et bords de chemin prennent vie */
   habiter({ trainerNpc, enc, noms }) {
     const W = this.W, id = this.id, rang = rangRoute(id), LOTS = lotsPour(rang), lot = () => adapter(this.pick(LOTS), rang), gens = (GENS[this.bio.id] || []).slice();
-    const salles = (this.tr?.salles || []).slice(), n0 = salles.length, SCENES = ['camp', 'pique', 'troupeau', 'etude', 'defi', 'gens', 'defi', 'camp', 'troupeau'];
+    const salles = (this.tr?.salles || []).slice(), n0 = salles.length, SCENES = ['camp', 'pique', 'defi', 'etude', 'defi', 'gens', 'defi', 'camp', 'pique'];
     // en plus : des haltes au bord du chemin
     for (let i = 0, n = Math.max(2, Math.round(this.long / 55)); i < n * 12 && salles.length < n0 + n; i++) {
       const p = this.pick(this.ech), s = this.r() < 0.5 ? 1 : -1, d = 4 + this.r() * 5, x = Math.round(p.x + p.nx * s * d), y = Math.round(p.y + p.ny * s * d);
       if (!this.degagee(x, y) || salles.some((q) => Math.hypot(q.x - x, q.y - y) < 14)) continue; salles.push({ x, y, r: 3, sorte: 'halte' });
     }
-    let no = 0, nv = 0, nd = 0, suite = Math.floor(this.r() * SCENES.length); this.np = 0;
+    let no = 0, nv = 0, nd = 0, suite = Math.floor(this.r() * SCENES.length);
     for (const q of salles) {
       const { x, y } = q, r = Math.max(2, q.r), kind = SCENES[suite++ % SCENES.length], centre = this.coin(x, y, r) || this.coin(x, y, r + 3); if (!centre) continue;
       const pres = (sauf = 1.5) => this.coin(centre[0], centre[1], 3, sauf);
@@ -420,40 +419,35 @@ Object.assign(Chantier.prototype, {
         this.pose('brasero', this.coin(...centre, 1) || null); this.pose('tonneau', pres(2)); this.pose('caisses', pres(2));
         const txt = this.pick(CAMP);
         parle(pres(1.2), this.pick(['randonneuse', 'montagnard']), 'Campeur', { talk: async (A) => { await A.say(txt, 'Campeur'); if (await A.yesNo('Te reposer près du feu ?', 'Campeur')) { A.sfx('heal'); A.heal(); await A.say('Ton équipe se repose au coin du feu. Tout le monde est en pleine forme !'); } } });
-        parle(pres(1.2), this.pick(['gamin', 'vieil_homme', 'topdresseuse']), 'Campeur', { text: [this.pick(CAMP)] }); if (this.r() < 0.6) this.bete(pres(2));
       } else if (kind === 'pique') {
         const f = `${id}:pique${nv}`, txt = this.pick(PIQUENIQUE), baie = adapter('sitrus-berry', rang);
         parle(pres(1), 'habitante', 'Pique-niqueuse', { talk: async (A) => { if (A.f[f]) { await A.say('Bonne route ! Et prends le temps de regarder autour de toi.', 'Pique-niqueuse'); return; } await A.say(txt, 'Pique-niqueuse'); A.flag(f); await A.give(baie, 2); } });
-        parle(pres(1), this.pick(['fillette', 'enfant', 'gamin']), 'Pique-niqueur', { text: gens.length ? this.pick(gens)[2] : [this.pick(CAMP)] }); this.bete(pres(1.5)); this.bete(pres(2)); this.pose('caisse', pres(2));
-      } else if (kind === 'troupeau') {
-        for (let n = 3 + Math.floor(this.r() * 3); n > 0; n--) this.bete(this.coin(x, y, r + 2, 0));
-        if (gens.length && this.r() < 0.6) { const g = gens.pop(); parle(pres(1), g[0], g[1], { text: g[2] }); }
+        this.pose('caisse', pres(2));
       } else if (kind === 'etude') {
         const f = `${id}:etude${nv}`, txt = this.pick(ETUDE), don = lot(); this.pose('caisses', pres(1.5)); this.pose('caisse', pres(1.5));
         parle(this.coin(...centre, 2), 'scientifique', 'Chercheur de terrain', { talk: async (A) => { if (A.f[f]) { await A.say('Je note, je compte, je note encore. Continue, toi : tu vois des choses que je ne vois pas !', 'Chercheur de terrain'); return; } await A.say(txt, 'Chercheur de terrain'); A.flag(f); await A.give(don); } });
-        this.bete(pres(2)); this.bete(pres(2));
       } else if (kind === 'defi' && enc.length && q.sorte !== 'halte') {
         const cls = this.pick(['Randonneuse', 'Montagnard', 'Topdresseur', 'Topdresseuse', 'Insectomane', 'Karatéka']), N = 1 + Math.floor(this.r() * 3), haut = Math.max(...enc.map((e) => e[2])), team = [];
         for (let i = 0; i < N; i++) team.push([this.pick(enc)[0], Math.min(100, haut + 1 - (N - 1) + Math.floor(this.r() * 2))]);
         trainerNpc(W, centre[0], centre[1], this.pick(['down', 'left', 'right', 'up']), cls, noms(/euse|ée$/.test(cls) && cls !== 'Karatéka' ? 'f' : 'm'), team, { id: `${id}:s${nd++}`, sight: 2, intro: this.pick(DEFI), after: this.pick(APRES_DEFI) });
-        this.abords(centre, 2); if (this.r() < 0.5) this.bete(pres(2));
+        this.abords(centre, 2);
       } else if (gens.length) {
-        const g = gens.pop(); parle(centre, g[0], g[1], { text: g[2] }); this.bete(pres(1.5)); if (this.r() < 0.5) this.pose('banc', pres(1.5));
-      } else { this.bete(centre); this.bete(pres(2)); }
+        // quelqu'un du coin : il raconte, puis donne un petit quelque chose (une seule fois)
+        const g = gens.pop(), f = `${id}:don${nv}`, don = lot();
+        parle(centre, g[0], g[1], { talk: async (A) => { if (A.f[f]) { await A.say(g[2][g[2].length - 1], g[1]); return; } for (const l of g[2]) await A.say(l, g[1]); A.flag(f); await A.say('Tiens, prends ça. Moi, je n\'en ai plus besoin.', g[1]); await A.give(don); } });
+        if (this.r() < 0.5) this.pose('banc', pres(1.5));
+      } else continue;
       this.lieux.push(['scene:' + kind, centre[0], centre[1]]);
       for (let b = -2; b <= 2; b++) for (let a = -2; a <= 2; a++) this.pris.add(this.k(centre[0] + a, centre[1] + b));
     }
-    const auBord = (d0, d1) => { const p = this.pick(this.ech), s = this.r() < 0.5 ? 1 : -1, d = d0 + this.r() * (d1 - d0); return this.coin(Math.round(p.x + p.nx * s * d), Math.round(p.y + p.ny * s * d), 2); };
-    // les gens du coin qui restent, le long du chemin, et des Pokémon en liberté un peu partout
-    for (let i = 0; i < 60 && gens.length; i++) { const c = auBord(2.5, 4); if (!c) continue; const g = gens.pop(); this.quelquun(c, { id: `${id}:v${nv++}`, sprite: g[0], name: g[1], dir: 'down', move: 'wander', roam: 2, text: g[2] }); }
-    for (let i = 0, n = Math.round(this.long / 30); i < 80 && n > 0; i++) { const c = auBord(3, 9); if (c) { this.bete(c); n--; } }
-    Object.assign(this.faits, { gens: nv, betes: this.np, objets: no, defis: nd });
+    // (plus de passants qui ne font que parler, ni de Pokémon de décor : chaque personne d'une route sert à quelque chose)
+    Object.assign(this.faits, { gens: nv, objets: no, defis: nd });
   },
   /** les vides se remplissent : fourrés, rochers, buissons, menu décor, et quelques cachettes */
   remplir() {
     const W = this.W, g = this.graine, petits = PETITS[this.bio.id] || [['bush', 1]];
     // 1. des fourrés par plaques (la forêt du biome)
-    const cand = new Set(); for (const [k, v] of this.info) { const x = k % W.w, y = (k - x) / W.w; if (v.d < 2.9 || !this.libre(x, y, 2.9) || this.occ.has(k) || W.objects.has(x + ',' + y)) continue; if (bruitBiome(x, y, 6.5, g) * 0.7 + bruitBiome(x, y, 2.6, g + 1) * 0.3 > 0.585) cand.add(k); }
+    const cand = new Set(); for (const [k, v] of this.info) { const x = k % W.w, y = (k - x) / W.w; if (v.d < 2.9 || !this.libre(x, y, 2.9) || this.occ.has(k) || W.objects.has(x + ',' + y)) continue; if (bruitBiome(x, y, 6.5, g) * 0.7 + bruitBiome(x, y, 2.6, g + 1) * 0.3 > SEUIL_BOIS) cand.add(k); }
     let nf = 0;
     for (const k0 of [...cand]) {
       if (!cand.delete(k0)) continue; const C = [k0];
@@ -474,14 +468,31 @@ Object.assign(Chantier.prototype, {
       np++;
       if (nc < NC && hasardCase(x, y, g + 8) < 0.04) { cacher(W, x, y, `${this.id}:h${nc}`, adapter(this.pick(LOTS), rang), 1, tuile ? null : q); nc++; }
     }
-    // 3. des tapis de fleurs et quelques carrés d'herbes hautes
+    // 3. des tapis de fleurs et de grandes plaques d'herbes hautes : loin du sentier, plus de sol nu
     for (const [k, v] of this.info) {
       const x = k % W.w, y = (k - x) / W.w; if (v.d < 1.8 || this.pris.has(k) || !this.dans(x, y) || W.get(x, y) !== T.GRASS) continue;
-      const a = bruitBiome(x, y, 4.5, g + 9); if (a > 0.73 && !SECS.has(this.bio.id)) W.set(x, y, T.FLOWER); else if (a < 0.2 && v.d > 2.6 && !this.reserve.has(k)) W.set(x, y, T.TALL);
+      const a = bruitBiome(x, y, 4.5, g + 9); if (a > 0.78 && !SECS.has(this.bio.id)) W.set(x, y, T.FLOWER); else if (a < SEUIL_HERBES && v.d > 2.2 && !this.reserve.has(k) && !SANS_HERBES.has(matiere(this.nb, x, y))) W.set(x, y, T.TALL);
     }
-    Object.assign(this.faits, { fourres: nf, petits: np, cachettes: nc });
+    // 4. le sol nu hors du ruban (clairières et boucles de la trame) : on y va à pied depuis le sentier, et à plus de deux pas
+    //    du chemin le sol nu prend des herbes hautes par grandes plaques (les herbes ne bloquent rien : aucun passage coupé)
+    let nh = 0; { const D = new Map(), F = [];
+      for (const L of [this.main, ...(this.tr?.autres || [])]) for (const [x, y] of L) { const k = this.k(Math.round(x), Math.round(y)); if (!D.has(k)) { D.set(k, 0); F.push(k); } }
+      for (let i = 0; i < F.length; i++) {
+        const k = F[i], x = k % W.w, y = (k - x) / W.w, d = D.get(k); if (d >= 24) continue;
+        for (const [u, v] of N4) { const a = x + u, b = y + v, q = this.k(a, b); if (D.has(q) || !W.in(a, b) || !walkable(W.get(a, b)) || W.zoneAt(a, b)?.route !== this.id) continue; D.set(q, this.sentier(a, b) ? 0 : d + 1); F.push(q); }
+      }
+      for (const [k, d] of D) {
+        const x = k % W.w, y = (k - x) / W.w; if (d < 3 || W.get(x, y) !== T.GRASS || this.pris.has(k) || this.reserve.has(k) || this.occ.has(k) || W.objects.has(x + ',' + y) || (W.biomes[k] & 31) !== this.nb) continue;
+        if (bruitBiome(x, y, 4.5, g + 9) < SEUIL_HERBES + 0.2 && !SANS_HERBES.has(matiere(this.nb, x, y))) { W.set(x, y, T.TALL); nh++; }
+      } }
+    Object.assign(this.faits, { fourres: nf, petits: np, cachettes: nc, herbes: nh });
   },
 });
+
+// remplissage du vide : au-dessus de SEUIL_BOIS, un bosquet ; sous SEUIL_HERBES, des herbes hautes (bruits de 0 à 1)
+const SEUIL_BOIS = 0.53, SEUIL_HERBES = 0.56;
+// pas de hautes herbes sur une plaque de neige ou de cendre (comme sur DS : elles y feraient des carrés d'herbe)
+const SANS_HERBES = new Set(['neige', 'cendre']);
 
 /** ce que chaque biome fait de sa route (u : nombre de choses pour 100 cases de chemin) */
 const PLANS = {

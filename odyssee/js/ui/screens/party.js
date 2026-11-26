@@ -8,6 +8,7 @@ import { moveDesc } from '../../data/moveDescriptions.js';
 import { monName, expProgress, STAT_NAMES, levelCap, natureName, natureEffect, baseStats } from '../../core/mon.js';
 import { LEADERS } from '../../world/region.js';
 import { ASSETS } from '../../assets.js';
+import { ITEMS, itemName } from '../../core/items.js';
 import { TYPE_FR, TYPE_COL, typeTag, hpCol, hpBar, statusTag, gender, screen, closer } from './common.js';
 import { pcScreen } from './pc.js';
 import { MEMORIES, ENTRANCE_AURAS, unlockedAuras, activeEntranceAura } from '../../game/follower-life.js';
@@ -17,6 +18,9 @@ import { MEMORIES, ENTRANCE_AURAS, unlockedAuras, activeEntranceAura } from '../
  * o.mode : 'menu' | 'pick' | 'battle' ; o.prompt ; o.filter(m) → texte d'interdiction ou null
  * renvoie l'index choisi (-1 si annulé)
  */
+/** l'objet tenu : une petite icône posée sur le Pokémon (rien s'il n'en tient pas) */
+const objetTenu = (m) => m.item ? `<img class="pslot-held" src="${ASSETS.item(m.item)}" alt="" title="Tient : ${esc(itemName(m.item))}">` : '';
+
 export function partyScreen(game, o = {}) {
   const ui = game.ui, party = game.state.party;
   const cap = game.levelCap ? game.levelCap() : levelCap(game.state?.badges);
@@ -182,6 +186,7 @@ export function partyScreen(game, o = {}) {
                 ${gender(m)}
               </div>
               <div class="pslot-types">${typesHtml}</div>
+              ${m.item ? `<div class="pslot-held-line"><img src="${ASSETS.item(m.item)}" alt="">Tient : <b>${esc(itemName(m.item))}</b></div>` : ''}
               <div class="pslot-hp-box">
                 <div class="hp-b2w2">
                   <span class="hp-tag">PV</span>
@@ -211,6 +216,7 @@ export function partyScreen(game, o = {}) {
               <span class="pslot-sub-num">#${k + 1}</span>
               <div class="pslot-sub-ped">
                 <img class="pslot-sub-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny, m.shadow)}" alt="" onerror="this.src='${ASSETS.icon(m.sp, m.shadow)}'">
+                ${objetTenu(m)}
               </div>
             </div>
             <div class="pslot-sub-mid">
@@ -511,6 +517,7 @@ export function summaryScreen(game, list, idx) {
             <tr><td>Rencontré à</td><td>${esc(m.met || '—')}</td></tr>
             <tr><td>Nature</td><td>${esc(natureName(m.nat ?? 0))}${(() => { const ne = natureEffect(m.nat ?? 0); return ne ? ` <small class="nat-fx">(+${STAT_NAMES[ne[0]]} / −${STAT_NAMES[ne[1]]})</small>` : ' <small class="nat-fx">(neutre)</small>'; })()}</td></tr>
             <tr><td>Talent</td><td>${(() => { const ab = getAbility(m); return ab ? `<b>${esc(ab.name)}</b>${ab.desc ? ` <small class="nat-fx">${esc(ab.desc)}</small>` : ''}` : '—'; })()}</td></tr>
+            <tr><td>Objet tenu</td><td>${m.item ? `<span class="sum-held" title="${esc(ITEMS[m.item]?.desc || '')}"><img src="${ASSETS.item(m.item)}" alt=""><b>${esc(itemName(m.item))}</b></span>` : 'Aucun'}</td></tr>
             <tr><td>Aura d'entrée</td><td>${activeAura ? `${activeAura.icon} ${esc(activeAura.name)}` : 'Aucune'}</td></tr>
             <tr><td>Points Exp.</td><td>${m.exp.toLocaleString('fr-FR')} pts</td></tr>
             <tr><td>Limite Arène</td><td>N.${cap} ${isCapped ? '<span class="sum-cap-tag">ATTEINTE</span>' : ''}</td></tr>

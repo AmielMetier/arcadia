@@ -118,7 +118,7 @@ export function cardScreen(game, BADGES, other) {
         .join('');
 
       // Face A : Profil
-      const team = (c.team || []).slice(0, 6);
+      const team = other ? [] : (c.team || []).slice(0, 6);
       const teamHtml = Array.from({ length: 6 }).map((_, slotIdx) => {
         const q = team[slotIdx];
         if (!q) {
@@ -285,14 +285,14 @@ export function cardScreen(game, BADGES, other) {
                 </div>
               </div>
 
-              <!-- Plateau Équipe Pokémon (6 Slots) -->
-              <div class="tc-team-tray">
+              <!-- Plateau Équipe Pokémon (6 Slots) : seulement sur sa propre carte, l'équipe des autres reste un mystère -->
+              ${other ? '' : `<div class="tc-team-tray">
                 <div class="tc-tray-head">
                   <span class="tc-tray-title">ÉQUIPE EN VOYAGE</span>
                   <span class="tc-tray-sub">${team.length} / 6</span>
                 </div>
                 <div class="tc-team-grid">${teamHtml}</div>
-              </div>
+              </div>`}
             </div>
 
             <!-- FACE B : Coffret des 15 Badges -->

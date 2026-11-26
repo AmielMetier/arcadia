@@ -1,11 +1,11 @@
 # Arènes du nord (1 à 7), peintes case par case ; lu par dessiner.py (Plan, arene). Chaque arène : un plan de 25 colonnes,
 # sa légende propre (en plus de la légende commune de world/arenes-plan.js), ses registres, ses règles et ses dresseurs.
 # ---------------------------------------------------------------- 0. Hector (Insecte) : la Ruche — murs de cire de cinq couleurs, ruchers qui en font fondre ou rebâtir plusieurs à la fois (Volucité, Écorcia)
-# configuration trouvée par recherche : 9 ruchers au moins, 432 états
+# configuration trouvée par recherche : 4 ruchers au moins (première arène : courte), murs tous fermés au départ
 P = Plan(32)
 T0 = ['w', None, '3', None, '3', 'w', '1', '3', '2', '1', '0', '4', '4', '4', 'w', '0', 'w', 'w', '4']
-SW0 = {(0, 0): (1, 2), (1, 0): (0, 2, 3), (0, 1): (2, 3), (1, 1): (0, 1), (2, 1): (0, 1, 4), (0, 2): (2, 3, 4), (1, 2): (0, 3, 4), (2, 2): (0, 3, 4), (1, 3): (1,), (2, 3): (0, 3, 4)}
-R00 = [0, 0, 1, 0, 0]
+SW0 = {(0, 0): (0, 3), (1, 0): (3,), (0, 1): (1, 2), (1, 1): (1, 2), (2, 1): (0,), (0, 2): (0, 4), (1, 2): (2, 3), (2, 2): (3,), (1, 3): (2, 4), (2, 3): (4,)}
+R00 = [0, 0, 0, 0, 0]
 archipel(P, 'v', [None if t is None else '.' if t == 'w' else 'abcde'[int(t)] for t in T0])
 RCH = {}
 for (c, r), fl in SW0.items():
@@ -20,7 +20,7 @@ for fl, ch in RCH.items():
     noms = ', '.join(COUL[k] for k in fl)
     L0.append(f"{ch}: {{ prop: 'ruche_{''.join(map(str, fl))}', reg: {{ flip: {list(fl)} }}, use: true, msg: 'Bzzz… Les abeilles s\\'affairent : les murs de cire {noms} fondent ou se rebâtissent !', son: 'select' }}")
 arene(0, P, r"""
-    type: 'bug', sol: 'gymBug', regs: """ + str(R00) + r""", minActions: 8,
+    type: 'bug', sol: 'gymBug', regs: """ + str(R00) + r""", minActions: 4, version: 2,
     regles: [
       'ARÈNE DE SYLVEBOURG — LA RUCHE\nChampion : Hector, l\'apiculteur.',
       'Des murs de cire de cinq couleurs ferment les passages entre les alvéoles : AMBRE, ROUGE, VERTE, BLEUE et VIOLETTE.',

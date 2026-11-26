@@ -18,13 +18,6 @@ export const PETITS = {
   braises: [['rock', 5], ['b_braise', 2], ['brasero_r', 0.6]], givre: [['cristal_glace', 3], ['rock', 2], ['snowpine', 2]],
 };
 
-/** les Pokémon qu'on y croise en liberté (ils ont un dessin de marche) */
-export const FAUNE = {
-  campagne: [16, 19, 52, 133], valfleuri: [43, 54, 60, 10], murmure: [43, 10, 16], alpage: [66, 74, 16], cerisaie: [133, 25, 16], lande: [19, 37, 74], savane: [52, 19, 37], lavande: [43, 25, 133],
-  mirage: [133, 25, 1], jungle: [1, 152, 43, 10], gorge: [74, 50], taiga: [133, 16, 143], celeste: [16, 133], cote: [54, 60, 7, 158], verger: [16, 10, 133], riziere: [60, 54, 10], marais: [60, 43, 54],
-  desert: [50, 74], canyon: [74, 50, 66], roseraie: [43, 1, 152], hante: [52, 19, 37], vigne: [52, 37, 133], orage: [25], bambou: [152, 66, 10], braises: [4, 155, 37], givre: [133, 7],
-};
-
 /** les gens du coin : [apparence, nom, répliques] */
 export const GENS = {
   campagne: [['jardinier', 'Fermier', ['Le blé sera mûr dans une semaine. Enfin, je dis ça toutes les semaines.', 'Prends le sentier de derrière si tu veux marcher à l\'ombre.']], ['fillette', 'Lison', ['Je compte les Roucool. J\'en suis à quarante… ou alors c\'est toujours le même.']], ['vieil_homme', 'Papi Marcel', ['Le chemin n\'a jamais été droit, ici. On contourne les arbres : ils étaient là avant nous.']]],

@@ -63,7 +63,12 @@ vec3 bioTon(float n, float k, float l) { return texture2D(uPal, vec2((floor(clam
       if (kind < 0.5 || (kind > 3.5 && kind != 7.0)) { kind = floor(texture2D(uBio, (floor(bw) + 0.5) / uBioT).g * 255.0 + 0.5); if (kind < 3.5 || kind == 7.0) kind = 0.0; }   // les plaques de matière ondulent aussi
       vec3 c = pow(max(diffuseColor.rgb, 0.0), vec3(0.4545));
       float l = dot(c, vec3(0.3, 0.59, 0.11)), mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), sat = mx - mn;
-      if (kind == 7.0) {
+      if (kind > 0.5 && kind < 1.5 && !(c.r > c.g && c.g > c.b && sat > 0.15)) {   // (le sable sous une touffe garde sa couleur)
+        // hautes herbes : toute la touffe (contours compris) prend l'herbe du biome, un ton plus sombre que le sol, comme
+        // dans Noir 2 / Blanc 2 ; la rampe « haute » des biomes colorés (rose, or, lavande) changeait la ligne claire du
+        // haut de chaque tuile en bande de couleur, et la touffe paraissait mal détourée
+        vec3 t = bioTon(n, 0.0, (l - 0.28) / 0.55); if (dot(t, vec3(1.0)) > 0.0) diffuseColor.rgb = t;   // (même teinte que le sol : le fond de la tuile se raccorde)
+      } else if (kind == 7.0) {
         // un massif : son herbe prend l'herbe du biome, sa roche la roche du biome
         bool vert = c.g > c.r * 1.12 && c.g > c.b * 1.12 && sat > 0.16;
         diffuseColor.rgb = vert ? bioTon(n, 0.0, (l - 0.28) / 0.55) : bioTon(n, 6.0, (l - 0.1) / 0.62);

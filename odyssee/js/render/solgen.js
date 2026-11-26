@@ -529,24 +529,27 @@ function hautesHerbes(Z, img, mask, lv, dark) {
   for (let i = 0; i < Z.N; i++) if (sh[i] && !mask[i] && img[i] !== TRANSPARENT && IS_G[img[i]]) img[i] = G[Math.max(0, lv[i] - 2)];
   const dk = Z.field(16, s + 20, 2);
   for (let i = 0; i < Z.N; i++) if (mask[i]) img[i] = dk[i] < 0.45 ? Hp[0] : Hp[1];
-  const d = edt(mask, Wd, Z.H, 1), n = Math.floor(c * c / 4), occ = occupees(Z, mask), B = brins(Z.cw * Z.ch * n), LE = [-1, 1];
+  // des touffes rangées en quinconce (4 × 4 par case, comme les hautes herbes des jeux DS) : un éventail de sept brins en arc,
+  // le pied dans l'ombre, la pointe claire ; dessinées de haut en bas, celles de devant recouvrent celles de derrière
+  const d = edt(mask, Wd, Z.H, 1), occ = occupees(Z, mask), PAS = c >> 2, B = brins(Z.cw * Z.ch * 16 * 7);
+  const EVENTAIL = [[-3, -1, 4], [-2, -1, 6], [-1, -1, 7], [0, 0, 9], [1, 1, 7], [2, 1, 6], [3, 1, 4]];
   for (let cy = 0; cy < Z.ch; cy++) for (let cx = 0; cx < Z.cw; cx++) {
     if (!occ[cy * Z.cw + cx]) continue;
     const r = cellRng(cx + Z.rx0, cy + Z.ry0, s + 21);
-    for (let k = 0; k < n; k++) { const y = cy * c + ri(r, 0, c), x = cx * c + ri(r, 0, c); B.add(y * Wd + x, ri(r, 0, 4), pick(r, LE), r()); }
+    for (let ty = 0; ty < 4; ty++) for (let tx = 0; tx < 4; tx++) {
+      const y = cy * c + ty * PAS + PAS - 1 + ri(r, 0, 1), x = cx * c + tx * PAS + (ty % 2 ? PAS : PAS >> 1) + ri(r, -2, 2), plus = ri(r, 0, 2);
+      for (const [dx, lean, ln] of EVENTAIL) { const xx = Math.min(Wd - 1, Math.max(0, x + dx)); if (y < Z.H) B.add(y * Wd + xx, ln + plus, lean * (Math.abs(dx) >= 2 ? 2 : 1), r()); }
+    }
   }
-  B.trier((i, e, lean, v) => {
+  B.trier((i, e, lean) => {
     if (!mask[i]) return;
     const y = (i / Wd) | 0, x = i - y * Wd;
-    const Ln = Math.floor(4 + e + Math.min(2, d[y * Wd + x] / 5));
-    const tufts = v < 0.6 ? [[0, lean], [1, -lean]] : [[0, lean]];
-    for (const [dx, ln] of tufts) {
-      const top = Ln - 1 - (dx ? 1 : 0);
-      for (let j = 0; j < Ln - (dx ? 1 : 0); j++) {
-        const yy = y - j, xx = x + dx + (j > Ln * 0.55 ? ln : 0);
-        if (yy < 0 || xx < 0 || yy >= Z.H || xx >= Wd) continue;
-        img[yy * Wd + xx] = j === top ? Hp[4] : j < Ln * 0.35 ? Hp[1] : j < Ln * 0.75 ? Hp[2] : Hp[3];
-      }
+    const Ln = Math.max(3, Math.floor(e - (d[i] < 3 ? 2 : 0))), top = Ln - 1;
+    if (y + 1 < Z.H && mask[i + Wd]) img[i + Wd] = Hp[0];   // l'ombre au pied
+    for (let j = 0; j < Ln; j++) {
+      const yy = y - j, xx = x + (j > Ln * 0.45 ? Math.sign(lean) : 0) + (j > Ln * 0.8 && Math.abs(lean) > 1 ? Math.sign(lean) : 0);
+      if (yy < 0 || xx < 0 || yy >= Z.H || xx >= Wd) continue;
+      img[yy * Wd + xx] = j === top ? Hp[4] : j < Ln * 0.35 ? Hp[1] : j < Ln * 0.75 ? Hp[2] : Hp[3];
     }
   });
 }

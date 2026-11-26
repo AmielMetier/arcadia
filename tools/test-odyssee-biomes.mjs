@@ -84,7 +84,11 @@ assert(W.decorsRoutes.r14.lieux.filter((l) => l[0] === 'riziere').length >= 8); 
 /* 3 bis. la trame : des routes qui ne sont plus un ruban (fourches, boucles, clairières), et habitées */
 { let boucles = 0, voies = 0; for (const [id, R] of Object.entries(W.traces)) { boucles += (R.faits.boucle || 0) + (R.faits.clairiere || 0); voies += R.autres.length; if (['r1', 'r2', 'r4', 'r5', 'r10', 'r14', 'r16', 'r17', 'r18', 'r19', 'r20'].includes(id)) assert(R.salles.length >= 4 && R.autres.length >= 4, `${id} : ${R.salles.length} clairières, ${R.autres.length} embranchements`); }
   assert(boucles >= 60 && voies >= 150, `${boucles} boucles et clairières, ${voies} embranchements`);
-  assert(W.npcs.length - W0.npcs.length > 400 && W.items.length - W0.items.length > 80, `${W.npcs.length - W0.npcs.length} habitants, ${W.items.length - W0.items.length} objets de plus`);
+  assert(W.npcs.length - W0.npcs.length > 150 && W.items.length - W0.items.length > 80, `${W.npcs.length - W0.npcs.length} habitants, ${W.items.length - W0.items.length} objets de plus`);
+  // personne pour rien : pas de Pokémon de décor sur les routes, et chaque habitant ajouté soigne, donne ou combat
+  const ajout = W.npcs.slice(W0.npcs.length).filter((n) => /^[a-z0-9]+:[a-z]+\d+$/.test(n.id || ''));
+  assert(!ajout.some((n) => /:b\d+$/.test(n.id)), 'plus de Pokémon de décor sur les routes');
+  for (const n of ajout) assert(n.trainer || typeof n.talk === 'function', `habitant sans rôle : ${n.id} (${n.name})`);
   lieux += 0; console.log(`  trame : ${boucles} boucles et clairières, ${voies} embranchements, ${W.npcs.length - W0.npcs.length} habitants et Pokémon, ${W.items.length - W0.items.length} objets`); }
 
 /* 4. les teintes : ville, lave, pavés */

@@ -1500,7 +1500,7 @@ export class Game {
       const friendsMgr = getFriendsManager(this);
       const others = Math.max(0, friendsMgr.getOnlineCount() - 1);
       opts.push([others ? `Amis (${others} en ligne)` : 'Amis', 'friends']);
-      opts.push(['Carte de Dresseur', 'card'], ['Carte', 'map'], ['Sauvegarder', 'save'], ['Code de sauvegarde', 'code'], ['Options', 'opt'], ['Fermer', 'close']);
+      opts.push(['Carte de Dresseur', 'card'], ['Carte', 'map'], ['Code de sauvegarde', 'code'], ['Options', 'opt'], ['Fermer', 'close']);
       // une petite icône devant chaque entrée (celles du HUD et du sac)
       const ICO = { dex: ASSETS.item('dex'), party: 'img/hud/team.png', pc: 'img/hud/save.png', bag: 'img/hud/bag.png', quests: 'img/hud/quest.png', trophies: 'img/hud/trophy.png', friends: 'img/hud/friends.png', card: ASSETS.item('wallet'), map: 'img/hud/map.png', code: ASSETS.item('notebook'), domaine: ASSETS.item('gift'), fly: ASSETS.item('sifflet-celeste'), chat: 'img/hud/chat.png' };
       const itemHtml = ([l, k]) => `<i class="sm-ico">${ICO[k] ? `<img src="${ICO[k]}" alt="">` : ''}</i>${esc(l)}`;
@@ -1542,19 +1542,6 @@ export class Game {
           // le code reprend la partie telle qu'elle est maintenant : on sauvegarde d'abord
           this.save(true);
           await saveCodeScreen(this.ui, await encodeSave(this.state), saveSummary(this.state));
-        }
-        else if (k === 'save') {
-          if (await this.ui.yesNo('Sauvegarder la partie ?')) {
-            this.save();
-            if (!this.cloud?.on) await this.ui.say(`${st.name} a sauvegardé la partie.`);
-            else {
-              this.ui.say('Envoi de la sauvegarde en ligne…', { keep: true, noWaitLast: true });
-              const okOnline = await Promise.race([this.cloud.queue(st, true), wait(12000).then(() => null)]);
-              this.ui.closeDialog();
-              await this.ui.say(okOnline ? `${st.name} a sauvegardé la partie.\nElle est aussi enregistrée en ligne, sur ton compte du Hub.` : okOnline === null ? `${st.name} a sauvegardé la partie.\nLe serveur se réveille : l'envoi en ligne continue en arrière-plan.` : `${st.name} a sauvegardé la partie sur cet appareil.\nLe serveur en ligne ne répond pas pour l'instant.`);
-            }
-          }
-          break;
         }
       }
     } finally {
