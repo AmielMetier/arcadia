@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.169 — 27 novembre 2026
+- Odyssée 3.7 : correctifs Acte 2 Lot P0 (progression 5e badge, courbes, arènes 4-5, Lugia, portraits) (Amiel)
+
 ## 5.168 — 27 novembre 2026
 - Odyssée 3.7 : ajout des portraits/sprites P2, icônes objets clés et fix boutons Sac (Amiel)
 
