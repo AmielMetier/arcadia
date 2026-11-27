@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.172 — 27 novembre 2026
+- Odyssée 3.8 : correctifs Acte 3 Lot P0 (passeur Granit, barrages r11/Pont Austral, arènes 6-7, Méga fans, doMega/Dojo) (Amiel)
+
 ## 5.171 — 27 novembre 2026
 - **Odyssée 3.8 — Acte 2 complet (Route 4 à Sanctuaire des Marées)** :
   - Centrale de Voltacité et Tour Mirage dotées de vrais modèles 3D extérieurs et d'intérieurs dédiés (générateurs/turbines, sanctuaire à fresques).
