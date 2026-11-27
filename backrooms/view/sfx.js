@@ -1074,7 +1074,8 @@ export class BackroomsSfx {
     if (voice && !this.voiceGain) this.initVoice();
     if (ent && !this.rushBufs && (levelSfx(this.roomLevel).rush || []).length) this.rushReady(levelSfx(this.roomLevel).rush);
     // toujours un murmure au loin, de plus en plus fort à mesure qu'elle approche
-    if (this.voiceGain && !(t < this.scareUntil)) this.voiceGain.gain.setTargetAtTime(voice ? 0.04 + Math.pow(d, 0.8) * 1.3 : 0.0001, t, 0.1);
+    // (un peu plus présent qu'avant : on doit la sentir approcher, de loin, sous le bruit des pas)
+    if (this.voiceGain && !(t < this.scareUntil)) this.voiceGain.gain.setTargetAtTime(voice ? 0.07 + Math.pow(d, 0.7) * 1.7 : 0.0001, t, 0.1);
     if (voice) this.voiceTick(t);
     if (voice && d > 0.25) this.caption('[garbled voice]', pos);
 
@@ -1190,6 +1191,21 @@ export class BackroomsSfx {
       wet.connect(this.verb);
       this.burst(wet, t, 0.03, 'bandpass', 2400 * v, 1, 0.06 * v);
       this.burst(dest, t + 0.05, 0.06, 'highpass', 2600, 0.7, 0.008 * v);
+      return;
+    }
+
+    if (hard === 'concrete') {
+      // le béton de l'entrepôt (Level 1) : une semelle de caoutchouc, pas un talon. Un coup sourd et bas, le grain du sol
+      // sous la semelle (un frottement dans le médium, sans claquement aigu), un peu de la halle qui le renvoie ; nettement
+      // plus discret qu'avant, pour que l'entrepôt reste silencieux et qu'on entende ce qui rôde
+      this.tone(dest, t, 'triangle', 92 * v, 38, 0.07, 0.03 * v);
+      this.burst(dest, t + 0.008, 0.06, 'bandpass', 900 * v, 0.9, 0.022 * v);
+      this.burst(dest, t + 0.03, 0.05, 'bandpass', 1900 * v, 1.2, 0.006 * v);
+      if (!pos && this.verb) {
+        const wet = this.gainNode(0.25 * v);
+        wet.connect(this.verb);
+        this.burst(wet, t, 0.04, 'bandpass', 1100 * v, 1, 0.02 * v);
+      }
       return;
     }
 
@@ -2512,6 +2528,35 @@ export class BackroomsSfx {
       src.start(t, from, len);
     } else this.scareScream(t + 0.05, this.ent ? 1.1 : 0.9, this.ent ? this.ent.near : null);
     this.caption('[the entity screams]', pos);
+  }
+
+  // Level 1 (et Poolrooms) : elle rôde et se rapproche, sans nous avoir encore pris en chasse. De temps en temps, un de
+  // ses cris, plus grave et lointain, là où elle est (les murs l'étouffent) : on sait qu'elle vient, pas d'où exactement.
+  // vol : 0 à 1, selon la distance
+  stalkCry(pos, vol = 0.5) {
+    if (!this.unlocked || !this.ctx || !this.ent) return;
+    const buf = this.rushReady(levelSfx(this.roomLevel).rush || []);
+    if (!buf) return;
+    const c = this.ctx;
+    const t = c.currentTime + 0.02;
+    const [a, b] = loudPart(buf);
+    const from = Math.max(0, a - 0.05);
+    const len = Math.min(buf.duration - from, Math.max(1, Math.min(2.2, b - from + 0.4)));
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = rnd(0.72, 0.88); // (plus grave : un appel, pas la ruée)
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 2400;
+    const g = c.createGain();
+    const peak = 0.25 + 0.75 * clamp01(vol);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.15);
+    g.gain.setValueAtTime(peak, t + len * 0.7);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len / src.playbackRate.value);
+    src.connect(lp).connect(g).connect(this.ent.near);
+    src.start(t, from, len);
+    this.caption('[a distant shriek]', pos);
   }
 
   // un des cris enregistrés déjà chargé (jamais deux fois le même de suite) ; les autres se chargent pour la suite

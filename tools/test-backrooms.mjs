@@ -37,6 +37,10 @@ import { createMallMap, MALL_LEVEL, polyDist as mallPolyDist } from '../backroom
 import { dollTerrain, dollCanStand, DOLL_R, DOLL_VMAX, DOLL_RELOC_T, DOLL_BORED_T, DOLL_LIFT_T } from '../backrooms/engine/doll.js';
 
 // avance la partie de n secondes
+// Level 0 : la clé de l'escalier trouvée (la fin ne s'enclenche qu'avec elle)
+const takeKey = (sim) => {
+  for (const f of sim.floors || []) if (f.key) f.key.taken = true;
+};
 const run = (sim, sec, input = {}, others = null) => {
   for (let i = 0; i < Math.round(sec / DT); i++) sim.step(input, others);
 };
@@ -231,11 +235,59 @@ test("ramassage des 6 cassettes, l'ascenseur s'ouvre et descend au Level 1", () 
   assert.ok(sim.isColliding(A.x, A.z, 0.3), "et on n'y rentre plus");
 });
 
+test("Level 0 : toutes les cassettes sans la clé de l'escalier, la fin attend la clé (et la flèche y mène)", () => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 4, players: [{ id: 0, name: 'A' }, { id: 1, name: 'B' }] });
+  const P = sim.player;
+  assert.ok(sim.stairsLocked, "les portes de l'escalier sont cadenassées");
+  for (const c of sim.allCassettes) if (!c.collected) sim.takeCassette(P, c);
+  assert.ok(sim.drainEvents().some((e) => e.type === 'needKey'), "on annonce qu'il manque la clé");
+  run(sim, FINALE_WAIT + 1);
+  assert.ok(!sim.open && !sim.unlocked && !(sim.finaleT > 0), "sans la clé, rien ne s'ouvre");
+  sim.updateSignal(P);
+  const K = sim.keyOf(P.floor);
+  assert.equal(P.sigTo, 'key');
+  assert.ok(P.sigX === K.x && P.sigZ === K.z, 'la flèche du caméscope mène à la clé');
+  P.x = K.x;
+  P.z = K.z;
+  sim.pickUp(P);
+  assert.ok(!sim.stairsLocked && sim.finaleT > 0, 'la clé enclenche la fin');
+  run(sim, FINALE_WAIT + 0.1);
+  assert.ok(sim.open && sim.unlocked, "puis le vrai ascenseur s'ouvre");
+});
+
+test("Level 0 : toute l'équipe tombée en bas, l'escalier cadenassé : le caméscope mène à la clé du bas, chez l'invité aussi", () => {
+  const players = [{ id: 0, name: 'A' }, { id: 1, name: 'B' }];
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 9, players });
+  const [A, B] = sim.players;
+  const S1 = sim.fm(1).spawn;
+  Object.assign(A, { floor: 1, x: S1.x, z: S1.z });
+  sim.updateSignal(A);
+  assert.ok(!A.sigArrow, "B est encore en haut : pas de flèche");
+  Object.assign(B, { floor: 1, x: S1.x, z: S1.z });
+  assert.ok(sim.stuckBelow(A));
+  sim.updateSignal(A);
+  const K = sim.keyOf(1);
+  assert.ok(A.sigArrow && A.sigTo === 'key' && A.sigX === K.x && A.sigZ === K.z, 'la flèche mène à la clé du bas');
+  // l'invité B : la flèche se recalcule chez lui à partir de l'instantané
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 9, players, localId: 1 });
+  for (const Q of sim.players) sim.updateSignal(Q);
+  guest.applySnapshot(sim.snapshot(), 0);
+  const G = guest.player;
+  assert.ok(G.sigArrow && G.sigX === K.x && G.sigZ === K.z, "chez l'invité aussi");
+  // la clé prise, plus de flèche
+  A.x = K.x;
+  A.z = K.z;
+  sim.pickUp(A);
+  sim.updateSignal(A);
+  assert.ok(!sim.stuckBelow(A) && !A.sigArrow);
+});
+
 test("phase finale : après la pause, l'alarme ; quelques secondes plus tard, l'entité poursuit l'équipe sans relâche", () => {
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 7 });
   const P = sim.player;
   const M = sim.monster;
   sim.cassettes = 5;
+  for (const f of sim.floors) if (f.key) f.key.taken = true; // (la clé de l'escalier déjà trouvée)
   const cas = sim.allCassettes.find((c) => !c.high);
   for (const c of sim.allCassettes) if (c !== cas) c.collected = true;
   putOn(sim, P, cas);
@@ -1664,6 +1716,7 @@ test("Level 1 : l'entité se cache au bout des étagères pour tendre une embusc
 test("à plusieurs : le bouton de la cabine attend les autres, sinon on part sans eux", () => {
   const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }, { id: 3, name: 'C' }];
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 21, players, localId: 1 });
+  takeKey(sim);
   for (const c of sim.allCassettes) {
     putOn(sim, sim.player, c);
     sim.step(); // (en haut de l'échelle pour la cassette perchée)
@@ -1704,6 +1757,7 @@ test("à plusieurs : le bouton de la cabine attend les autres, sinon on part san
   // tous ensemble dans la cabine : un seul appui suffit
   const s2 = new BackroomsSim({ difficulty: 'normal', seed: 21, players, localId: 1 });
   s2.cassettes = 6;
+  takeKey(s2);
   s2.startFinale();
   const E2 = s2.fm(s2.realFloor).elevator;
   s2.monster.x = s2.monster.z = -999;
@@ -1719,6 +1773,7 @@ test("à plusieurs : plus il y a de monde à l'abri, plus l'entité est rapide e
   const speed = (inside) => {
     const sim = new BackroomsSim({ difficulty: 'normal', seed: 5, players, localId: 1 });
     sim.cassettes = 6;
+    takeKey(sim);
     for (let i = 0; i < inside; i++) sim.players[i].status = 'elevator';
     const P = sim.players[2];
     sim.monster.mode = 'chase';
@@ -1743,6 +1798,7 @@ test("à plusieurs : un joueur attrapé devient spectateur, la partie continue ;
   assert.equal(sim.state, 'playing', 'B joue encore');
   assert.equal(sim.viewPlayer(0).id, b.id, 'A regarde B');
   sim.cassettes = 6;
+  takeKey(sim);
   sim.startFinale();
   sim.realFloor = 0; // (le test choisit lui-même le vrai ascenseur)
   sim.unlockLevel0();
@@ -1783,6 +1839,7 @@ test("réseau : l'invité reçoit l'état de l'hôte, se déplace chez lui et su
   assert.equal(guest.allCassettes.find((q) => q.id === c.id).collected, true);
   // tout le monde dans l'ascenseur : l'invité passe au Level 1 avec la même carte
   host.cassettes = 6;
+  takeKey(host);
   host.startFinale();
   host.realFloor = 0; // (le test choisit lui-même le vrai ascenseur)
   host.unlockLevel0();
@@ -1869,6 +1926,7 @@ test("un joueur tombé au Level 0 repart au Level 1 avec une lampe (éteinte, co
   const [a, b] = sim.players;
   a.status = 'dead'; // attrapé avant d'avoir pris sa lampe
   sim.cassettes = 6;
+  takeKey(sim);
   sim.startFinale();
   sim.realFloor = 0; // (le test choisit lui-même le vrai ascenseur)
   sim.unlockLevel0();
@@ -2257,6 +2315,7 @@ test("le faux ascenseur est toujours le plus proche de l'équipe (le coéquipier
       const spot = other.walkable.reduce((best, c) => (Math.hypot(c.x * CELL_SIZE - other.exit.x, c.z * CELL_SIZE - other.exit.z) > Math.hypot(best.x * CELL_SIZE - other.exit.x, best.z * CELL_SIZE - other.exit.z) ? c : best));
       Object.assign(b, { floor: 1 - near, x: (spot.x + 0.5) * CELL_SIZE, z: (spot.z + 0.5) * CELL_SIZE });
       sim.cassettes = 6;
+      takeKey(sim);
       sim.startFinale();
       assert.equal(sim.realFloor, 1 - near, `graine ${seed} : celui devant lequel attend A se referme`);
       assert.ok(sim.fm(near).elevator.fake);
@@ -2269,6 +2328,7 @@ test("portes de la cabine : elles poussent celui qui reste entre les vantaux, et
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players, localId: 1 });
   const [a, b] = sim.players;
   sim.cassettes = 6;
+  takeKey(sim);
   sim.startFinale();
   sim.realFloor = 0;
   sim.unlockLevel0();
@@ -2301,6 +2361,7 @@ test("ascenseurs : un en haut, un en bas ; les 6 cassettes trouvées, le faux de
     const fake = 1 - real;
     // fermés tous les deux, impossibles à distinguer
     for (const f of sim.floors) assert.ok(sim.isColliding(f.elevator.x, f.elevator.z, 0.3, sim.floors.indexOf(f)));
+    takeKey(sim);
     for (const c of sim.allCassettes) {
       putOn(sim, sim.player, c);
       sim.step();
@@ -2602,6 +2663,7 @@ test("réseau : l'étage, la chute et le faux ascenseur arrivent chez l'invité"
   assert.ok(Math.hypot(guest.player.x - pit.x, guest.player.z - pit.z) < 0.01);
   // le vrai ascenseur ne se dévoile qu'une fois les cassettes trouvées
   assert.equal(host.snapshot().rf, -1);
+  takeKey(host);
   for (const c of host.allCassettes) {
     putOn(host, host.player, c);
     host.step();
@@ -4468,6 +4530,7 @@ test("l'ascenseur : celui qui a appuyé s'en va pendant que les portes se fermen
   const players = [{ id: 1, name: 'H' }, { id: 2, name: 'G' }];
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 3, players, localId: 1 });
   sim.cassettes = 6;
+  takeKey(sim);
   sim.startFinale();
   const E = sim.fm(sim.realFloor).elevator;
   const G = sim.players.find((q) => q.id === 2);
@@ -5034,6 +5097,7 @@ test("à plusieurs : les portes de la cabine qui se ferment arrivent chez l'invi
   const host = new BackroomsSim({ difficulty: 'peaceful', seed: 3, players, localId: 1 });
   const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 3, players, localId: 2 });
   host.cassettes = 6;
+  takeKey(host);
   host.startFinale();
   const E = host.fm(host.realFloor).elevator;
   for (const P of host.players) Object.assign(P, { floor: host.realFloor, x: E.x, z: E.z });
@@ -5086,6 +5150,7 @@ test("la cabine : l'entité n'attrape qu'à travers la baie ouverte — ni à tr
   const setup = () => {
     const sim = new BackroomsSim({ difficulty: 'normal', seed: 3 });
     sim.cassettes = 6;
+    takeKey(sim);
     sim.startFinale();
     sim.huntT = 1e9;
     const P = sim.player;
@@ -5148,6 +5213,7 @@ test("la cabine : tenu à travers la baie quand les portes se ferment, on est ar
   const setup = (mLz, mOff = 0) => {
     const sim = new BackroomsSim({ difficulty: 'normal', seed: 3, players, localId: 1 });
     sim.cassettes = 6;
+    takeKey(sim);
     sim.startFinale();
     sim.huntT = 1e9;
     const P = sim.player;

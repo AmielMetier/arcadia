@@ -24,7 +24,7 @@ export const GUARD_DOOR = 1.2; // (une porte large : on y passe à deux, l'entit
 export const GUARD_DOOR_H = 2.1; // au-dessus, l'imposte de parpaings
 export const GUARD_NEAR = 1.7; // à moins de ça du milieu de la porte, elle s'ouvre
 // les salles de sécurité : une porte blindée qu'on verrouille de l'intérieur ; tant qu'elle est fermée, elle arrête tout
-export const SAFE_DOOR = 1.0;
+export const SAFE_DOOR = 1.2; // (assez large pour que l'entité y passe sans frotter les montants)
 export const SAFE_LEVER_R = 1.3; // portée du levier du verrou (de l'intérieur)
 
 // le battant d'une porte (guard ou salle) : le segment de la baie
@@ -800,6 +800,22 @@ export function createWarehouseMap(seed = 7) {
       for (const sg of segs) if (hit(sg)) return true;
       for (const S of safes) if (S.shut && hit(S.seg)) return true;
       return false;
+    },
+    // une porte blindée est-elle fermée ? (les chemins de l'entité en tiennent compte)
+    shutAt: () => safes.some((S) => S.shut),
+    // la distance libre jusqu'aux cloisons (et aux portes blindées fermées), plafonnée à cap : l'entité s'en sert pour
+    // glisser le long d'un montant de porte au lieu d'y rester l'épaule plantée (gait.js)
+    collideDist(x, z, cap = 1) {
+      let best = cap;
+      const near = (sg) => {
+        if (x < Math.min(sg.x0, sg.x1) - best - 0.2 || x > Math.max(sg.x0, sg.x1) + best + 0.2) return;
+        if (z < Math.min(sg.z0, sg.z1) - best - 0.2 || z > Math.max(sg.z0, sg.z1) + best + 0.2) return;
+        const d = segDist(sg, x, z) - GUARD_T / 2;
+        if (d < best) best = Math.max(0, d);
+      };
+      for (const sg of segs) near(sg);
+      for (const S of safes) if (S.shut) near(S.seg);
+      return best;
     },
     // la lumière d'une lampe en (lx, lz) atteint-elle (px, pz) sans traverser de cloison (ni la porte fermée) ? Sert
     // aussi à la vue de l'entité et au bruit étouffé

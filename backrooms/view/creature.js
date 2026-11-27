@@ -517,7 +517,13 @@ export function createCreature(opts = {}) {
     if (M.mode === 'stun') return 'stun';
     if (M.mode === 'bang') return 'bang';
     if ((M.rushT || 0) > 0 || (M.windT || 0) > 0) return 'rush';
-    return st.speed > 2.4 ? 'run' : st.speed > 0.25 ? 'walk' : 'idle';
+    // (avec un peu d'écart entre monter et redescendre : elle ne papillonne plus entre l'attente, la marche et la course
+    // quand elle ralentit pour tourner ou que sa vitesse hésite autour d'un seuil)
+    const was = st.gaitS || 'idle';
+    const v = st.speed;
+    const g = was === 'run' ? (v > 2.0 ? 'run' : v > 0.15 ? 'walk' : 'idle') : was === 'walk' ? (v > 2.7 ? 'run' : v > 0.15 ? 'walk' : 'idle') : v > 2.7 ? 'run' : v > 0.45 ? 'walk' : 'idle';
+    st.gaitS = g;
+    return g;
   };
   const ease = (a, b, k, dt) => a + (b - a) * Math.min(1, dt * k);
   const add = (b, x, y, z, k) => {
@@ -600,7 +606,7 @@ export function createCreature(opts = {}) {
         st.w[n] = ease(st.w[n], n === want ? 1 : 0, s === 'drop' || s === 'unmask' ? 14 : 7, dt);
         st.acts[n].weight = st.w[n];
       }
-      if (st.acts.walk) st.acts.walk.timeScale = THREE.MathUtils.clamp(st.speed / 1.6, 0.6, 1.6);
+      if (st.acts.walk) st.acts.walk.timeScale = THREE.MathUtils.clamp(st.speed / 1.6, 0.75, 1.5);
       if (st.acts.run) st.acts.run.timeScale = s === 'rush' ? 1.7 : THREE.MathUtils.clamp(1.25 * Math.sqrt(Math.max(0.3, st.speed) / 3.3), 0.9, 2.1);
       for (const r of st.rest) {
         r.o.quaternion.copy(r.q);

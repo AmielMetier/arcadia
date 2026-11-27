@@ -1,5 +1,17 @@
 # Journal des versions — Arcadia
 
+## 5.166 — 27 novembre 2026
+- **The Backrooms** — Corrections du Level 0 et du Level 1 :
+  - Level 0 : la fin ne se déclenche plus tant que personne n'a trouvé la clé de l'escalier. Avant, un joueur tombé à l'étage du bas pouvait rester coincé quand l'ascenseur s'ouvrait en haut. Toutes les cassettes trouvées sans la clé, un message le dit et une flèche du caméscope mène à la clé.
+  - Level 0 : si toute l'équipe est tombée en bas sans la clé, un message rappelle que l'étage du bas a sa propre clé, et la flèche du caméscope y mène. Les invités voient enfin la flèche eux aussi (vers la clé, puis vers le vrai ascenseur).
+  - Level 1 : l'imitation des voix marche enfin à plusieurs. L'accord pour le clonage et les phrases enregistrées ne passaient pas d'un joueur à l'autre : l'entité n'avait ni vraie phrase ni voix clonée. Pendant le Level 0, chacun garde maintenant les phrases des autres, prépare leur voix clonée, puis des phrases inventées (environ deux douzaines par joueur en moins de dix minutes).
+  - Level 1 : l'entité ne reste plus coincée dans l'encadrement des portes : elle glisse le long des montants, et les portes des salles de sécurité sont plus larges. Elle ne s'acharne plus non plus sur une porte blindée fermée quand elle passe.
+  - Level 1 : l'entité ne saute plus sans arrêt entre l'attente, la marche et la course. Déguisée en joueur, elle marche enfin chez tout le monde (avant, elle glissait sans bouger les jambes chez les invités).
+  - Level 1 : l'entité imite les voix bien plus souvent quand l'équipe reste groupée. Elle parle avec la voix de quelqu'un dès qu'il est hors de vue, à plus de 10 m et silencieux.
+  - Level 1 : elle invente aussi des phrases avec la voix clonée de ses victimes, surtout pour appeler un joueur par son prénom. À l'arrivée dans le niveau, un message dit si la voix clonée est prête : chaque joueur doit l'autoriser dans les réglages.
+  - Level 1 : quand l'équipe n'avance plus, l'objectif réapparaît, avec des indices de plus en plus précis (caméscope, casiers, poste de garde, disjoncteurs).
+  - Level 1 : des bruits de pas plus discrets sur le béton. La voix de l'entité s'entend mieux de loin, et elle pousse des cris lointains quand elle rôde et se rapproche.
+
 ## 5.165 — 26 novembre 2026
 - **Odyssée** — Quelques retouches (Odyssée 3.6) :
   - Plus de bouton « Sauvegarder » dans le menu : la partie se sauvegarde toute seule (à chaque porte, après chaque combat et chaque discussion, et quand on quitte le jeu), aussi en ligne sur le compte du Hub.

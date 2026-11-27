@@ -122,6 +122,8 @@ function build(sim, floor) {
       }
     }
     // Poolrooms (cloisons minces, colonnes) et Level 5 (meubles, montants des portes) : la collision propre à la carte
+    // (Level 1 : la vraie distance aux cloisons, pour que l'entité glisse le long des montants de porte)
+    if (m.collideDist) return Math.min(best, m.collideDist(x, z, best));
     if (m.collide && m.collide(x, z, best)) return 0;
     return best;
   };
@@ -305,6 +307,7 @@ function heapPop(N, n) {
 // plus proche atteinte, si la recherche s'arrête avant)
 function astar(N, s, t, cap = 50000) {
   const { FW, FH, free, g, from, seen, done } = N;
+  const shut = N.m.shutAt && N.m.shutAt() ? (x, z) => N.m.collideDist(x, z, PLAN_R) < PLAN_R * 0.5 : null;
   const gen = (N.gen = (N.gen + 1) >>> 0) || (N.gen = 1);
   const tx = t % FW;
   const tz = (t - tx) / FW;
@@ -344,6 +347,8 @@ function astar(N, s, t, cap = 50000) {
       if (nx < 0 || nz < 0 || nx >= FW || nz >= FH) continue;
       const nk = nz * FW + nx;
       if (!free[nk] || done[nk] === gen) continue;
+      // (Level 1 : une porte blindée fermée barre la baie, la grille faite une fois ne le sait pas)
+      if (shut && shut((nx + 0.5) * RES, (nz + 0.5) * RES)) continue;
       if (d >= 4 && (!free[z * FW + nx] || !free[nz * FW + x])) continue;
       const ng = g[k] + (d >= 4 ? Math.SQRT2 : 1);
       if (seen[nk] === gen && ng >= g[nk]) continue;

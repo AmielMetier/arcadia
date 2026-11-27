@@ -5571,6 +5571,7 @@ void main() {
   // Les autres joueurs : des explorateurs en combinaison jaune (view/players.js). Leurs lampes sont posées dès
   // maintenant, éteintes, pour que la compilation des matériaux (à la fin) les compte déjà
   const avatars = createPlayerAvatars(scene, lamps);
+  const mimicMove = { x: 0, z: 0, v: 0 }; // l'imposteur du Level 1 : sa vitesse mesurée à l'écran
   // Vue subjective : son propre explorateur sous la caméra (on voit son buste, ses bras et ses jambes en baissant les
   // yeux), et ce que l'on tient est dans ses mains. Chaque objet a sa place à l'écran (HOME, ROT, plus SHIFT avec le
   // corps) ; HOLD est l'endroit où la main le serre (repère de l'objet), l'axe de l'objet (le côté de sa tête : il
@@ -6334,7 +6335,14 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       // celui de l'entité, d'où le demi-tour)
       const Mq = Mw && Mw.mimic != null && !Mw.away ? sim.players.find((q) => q.id === Mw.mimic) : null;
       if (Mq) {
-        const D = { ...Mq, id: 'mimic', status: 'alive', x: Mw.x, z: Mw.z, yaw: (Mw.yaw || 0) + Math.PI, pitch: 0, floor: Mw.floor || 0, flashlight: false, cam: false, moving: (Mw.v || 0) > 0.2, running: false, crouch: false, hidden: -1, jy: 0, tilt: 0, onLadder: false };
+        // sa vitesse d'après son déplacement à l'écran (les invités ne reçoivent pas M.v : sans ça, il glissait sans
+        // bouger les jambes chez eux)
+        const mm = mimicMove;
+        const jump = Math.hypot(Mw.x - mm.x, Mw.z - mm.z);
+        if (dt > 0) mm.v += ((jump < 3 ? jump / dt : mm.v) - mm.v) * Math.min(1, dt * 8);
+        mm.x = Mw.x;
+        mm.z = Mw.z;
+        const D = { ...Mq, id: 'mimic', status: 'alive', x: Mw.x, z: Mw.z, yaw: (Mw.yaw || 0) + Math.PI, pitch: 0, floor: Mw.floor || 0, flashlight: false, cam: false, moving: Math.max(Mw.v || 0, mm.v) > 0.25, running: Math.max(Mw.v || 0, mm.v) > 3, crouch: false, hidden: -1, jy: 0, tilt: 0, onLadder: false };
         const mv2 = floorViews[D.floor];
         avatars.update(D, true, Mw.y ?? feetY(sim.stairs, D.x, D.z, D.floor), mv2 ? mv2.lightAt(D.x, D.z) : 0.3, dt, time);
       } else if (avatars.has('mimic')) avatars.update({ id: 'mimic' }, false);

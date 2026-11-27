@@ -44,6 +44,7 @@ const ENTRY_T = 1.1;
 let sfx = null;
 let hud = null;
 let stepDist = 0;
+let stalkCryT = 12; // Level 1 : le prochain cri lointain de l'entité qui rôde
 let callT = 6; // prochaine fois que la voix qui appelle se fait entendre (Level 1, mode VIP)
 let letterN = 0; // lettres ramassées à l'hôtel (pour le registre)
 let monsterStepT = 0; // sans entité animée (mode VIP du Level 1) : le prochain pas, à la minuterie
@@ -240,6 +241,47 @@ function voiceTrouble(id, kind) {
   if (kind === 'relay') hud.toast(`Voice · no direct link with ${name} · going through the server (lower quality)`);
   else if (kind === 'failed') hud.toast(`Voice · can't reach ${name} · this browser can't send through the server`);
   else hud.toast(`Voice · direct link with ${name} restored`);
+}
+// Level 1 : on ne sait pas toujours quoi faire dans l'entrepôt. Sans progrès de l'équipe pendant un moment, le
+// bandeau d'objectif revient et le caméscope souffle une indication, de plus en plus précise (une seule à la fois)
+const L1_HINT_T = [70, 140, 210, 300]; // s sans progrès avant chaque indication
+let l1Hint = { key: '', t: 0, n: 0 };
+// Level 0 : toute l'équipe en bas, l'escalier cadenassé : on le dit une fois (le caméscope montre la clé du bas)
+let belowTold = false;
+function belowStep() {
+  if (!sim || !hud || sim.level !== 0) return void (belowTold = false);
+  if (belowTold || sim.state !== 'playing' || !sim.stuckBelow(sim.player)) return;
+  belowTold = true;
+  hud.toast(multi() ? 'Everyone is downstairs and the stairwell is padlocked · this floor has its own key · follow the camcorder arrow (V)' : 'The stairwell is padlocked · this floor has its own key · follow the camcorder arrow (V)', 7);
+}
+function l1HintStep(dt) {
+  if (sim && sim.level !== 1) l1Hint.told = false;
+  if (!sim || !hud || sim.level !== 1 || sim.state !== 'playing' || sim.player.status !== 'alive') return;
+  // à l'arrivée : où en est la voix clonée (sinon on ne sait pas pourquoi l'entité ne fait que répéter)
+  if (!l1Hint.told && multi() && sim.time > 8) {
+    l1Hint.told = true;
+    const mates = sim.players.filter((q) => q.id !== sim.player.id);
+    if (OPTS.clone !== 'on') hud.toast('Voice cloning is off on your side · the entity can only replay real phrases · turn it on in Settings ⚙ (every player must agree)', 7);
+    else if (voice) {
+      const ready = mates.map((q) => `${q.name}: ${voice.fakeCount(q.id)}`).join(' · ');
+      hud.toast(cloner && cloner.state === 'error' ? 'Voice cloning failed to load in this browser · the entity only replays real phrases' : `Invented phrases ready · ${ready}${mates.some((q) => !voice.fakeCount(q.id)) ? ' (0: that player did not agree, or not enough of their voice was heard on Level 0)' : ''}`, 7);
+    }
+  }
+  const carry = (sim.fuses || 0) > (sim.delivered || 0);
+  const key = `${sim.fuses}:${sim.delivered}:${sim.mains}:${sim.powered}`;
+  if (key !== l1Hint.key) l1Hint = { key, t: 0, n: 0, told: l1Hint.told };
+  l1Hint.t += dt;
+  if (l1Hint.n >= L1_HINT_T.length || l1Hint.t < L1_HINT_T[l1Hint.n] || sim.liftCallT > 0 || sim.powered) return;
+  const k = l1Hint.n++;
+  let tips;
+  if ((sim.delivered || 0) >= 3 && !sim.mains)
+    tips = ['The camcorder (V) now points to the main breakers · the signal says BREAKER', 'Several breakers must be on at the same time · split up and count down out loud', 'A breaker only holds a few seconds · the guard post console can hold one for you while someone sits there', 'Use the walkie-talkie (R) to sync: "3, 2, 1, now"'];
+  else if (carry)
+    tips = ['A fuse is in a pocket · bring it to the panel next to the freight elevator', 'Follow the camcorder signal (V): it reads FREIGHT ELEVATOR', 'Put the fuse in the panel with F', 'If it chases you, lock yourself in a safe room: pull the lever from inside'];
+  else
+    tips = ['Take out the camcorder (V) · the more bars, the closer the fuse', 'The last fuse is hidden in a staff locker · press F in front of lockers to search them', 'The guard post (the room with screens) shows the cameras · tell the others where the fuses are', `Something may wear a teammate's face · if "they" call you from afar on the radio, check before you go`];
+  hud.toast(`Hint · ${tips[k % tips.length]}`, 6);
+  hud.lastCount = null; // (le bandeau d'objectif revient)
 }
 function ensureVoice() {
   if (!voice) {
@@ -773,6 +815,8 @@ function stepKind(P) {
     const k = mallFloorKey(m.roomAt(P.x, P.z), P.floor || 0, m.shops, Math.floor(P.x / CELL_SIZE), Math.floor(P.z / CELL_SIZE));
     return k === 'cine' ? 'hotelCarpet' : /carpet/.test(k) ? false : /terrazzo|checker|quarry|annexTile|faience/.test(k) ? 'marble' : true;
   }
+  // Level 1 : le béton de l'entrepôt, une semelle discrète
+  if (sim.level === 1) return 'concrete';
   // Level 5 : le marbre du hall, la moquette épaisse partout ailleurs
   if (sim.level === HOTEL_LEVEL) {
     const L = sim.fm(0).lobby;
@@ -1165,8 +1209,9 @@ const slotOf = (s) => (Number.isInteger(s) && s >= 1 && s <= INV_SIZE ? s : 1); 
 // Messages du réseau (from : l'identifiant donné par le salon, la seule identité fiable)
 function onMsg(from, m) {
   if (!m || typeof m !== 'object') return;
-  // la voix : d'un joueur à l'autre, sans passer par l'hôte
-  if (m.t === 'rtc' || m.t === 'vx' || m.t === 'va') {
+  // la voix : d'un joueur à l'autre, sans passer par l'hôte (rtc, vx, va ; et pour la voix volée : vc l'accord de
+  // clonage, vu les phrases annoncées, vt leur texte. Sans ces trois-là, l'entité n'avait jamais de vraie phrase ni de clone)
+  if (m.t === 'rtc' || m.t === 'vx' || m.t === 'va' || m.t === 'vc' || m.t === 'vu' || m.t === 'vt') {
     ensureVoice().onMessage(from, m);
     return;
   }
@@ -1778,6 +1823,9 @@ function handleEvent(ev, me) {
       // la porte du haut de l'escalier, cadenassée
       if (sfx) sfx.lockedDoor(mine ? null : { x: ev.x, z: ev.z, muffled: (ev.floor || 0) !== (sim.viewPlayer(sim.spectate || 0).floor || 0) });
       if (mine && hud) hud.toast("Locked. A chain and a padlock hold the door shut · find the stairwell key on this floor");
+      break;
+    case 'needKey':
+      if (hud) hud.toast('All tapes found · the elevator will not move until someone finds the stairwell key. Follow the arrow', 6);
       break;
     case 'key':
       if (ev.by === me) {
@@ -2690,6 +2738,17 @@ function frame(currentTime) {
     // Level 2 : pas de bourdonnement d'entité, les sabots du troupeau
     sfx.updateMonsterSound(sim.goats || M.away ? 0 : M.danger, M, sim.level === 1 || sim.level === 2, occl); // Poolrooms : la voix de l'entité du Level 1
     sfx.updateChase(chasing, M.danger, M, occl);
+    // Level 1 et Poolrooms : elle rôde à portée sans nous chasser encore ; de temps en temps, un cri au loin (plus
+    // souvent quand elle se rapproche). Pas sous l'apparence d'un joueur (l'imposteur se tait), ni dans le prélude
+    if ((sim.level === 1 || sim.level === 2) && !chasing && !M.away && M.mimic == null && !sim.goats && !paused && !monstersVip) {
+      const dM = (M.floor || 0) === (V0.floor || 0) ? Math.hypot(M.x - V0.x, M.z - V0.z) : 99;
+      stalkCryT -= delta;
+      if (dM > 30 || dM < 6) stalkCryT = Math.max(stalkCryT, 3);
+      else if (stalkCryT <= 0) {
+        sfx.stalkCry({ x: M.x, z: M.z }, 1 - dM / 32);
+        stalkCryT = 8 + (dM / 30) * 10 + Math.random() * 5;
+      }
+    }
     // Level 1, mode VIP : la voix qui appelle se fait entendre quand l'entité est proche (de temps en temps) et pendant
     // la poursuite (plus souvent)
     if (sim.level === 1 && monstersVip && !M.away && !paused) {
@@ -2904,6 +2963,8 @@ function frame(currentTime) {
     cloneStep(delta);
     if (hud) hud.voice(voice, sim, multi(), !!(keys['KeyR'] || padRadio) && !radioOk && multi());
   }
+  l1HintStep(delta);
+  belowStep();
   if (hud) {
     hud.update(sim, sim.time, delta);
     if (scene && scene.cam) hud.camera(scene.cam, sim, delta);
@@ -2917,7 +2978,7 @@ function frame(currentTime) {
 
 // ?debug : accès à la partie depuis la console (tests)
 if (/[?&]debug(&|=|$)/.test(location.search)) {
-  window.__br = { get voice() { return voice; }, get sim() { return sim; }, get scene() { return scene; }, get sfx() { return sfx; }, get hud() { return hud; }, keys, act, OPTS, frame: (t) => frame(t) };
+  window.__br = { get voice() { return voice; }, get cloner() { return cloner; }, get sim() { return sim; }, get scene() { return scene; }, get sfx() { return sfx; }, get hud() { return hud; }, keys, act, OPTS, frame: (t) => frame(t) };
 }
 
 // Réglages (bouton ⚙ commun aux jeux) : son, et choix Souris / Sans souris

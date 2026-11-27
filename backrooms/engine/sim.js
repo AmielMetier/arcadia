@@ -225,6 +225,7 @@ export const MIMIC_CALL = [7, 13]; // s entre deux appels (la voix volée, de vi
 // ceux qui l'entendraient (plus loin que ne porte une voix), et au talkie que s'il est seul et se tait. Tout près d'un
 // joueur (MIMIC_CHAT_R), elle bavarde comme lui (des phrases qu'il a dites) au lieu d'appeler, un peu plus souvent
 export const MIMIC_FAR = 30;
+export const MIMIC_NEAR = 10; // m : plus près, jamais ; entre les deux, seulement s'il est hors de vue et se tait
 export const MIMIC_HEAR = 22; // m : jusqu'où porte sa voix (comme celle d'un joueur, VOICE_R de view/voice.js)
 export const MIMIC_CHAT_R = 11;
 export const MIMIC_CHAT = [5, 9]; // s entre deux phrases quand elle bavarde
@@ -815,7 +816,8 @@ export class BackroomsSim {
     if (this.level === MALL_LEVEL) return this.film >= FILM_LEAD_T; // Level 17 : le film passe, le monte-charge de scène s'ouvre
     // (Level 1 : le courant revenu, le monte-charge doit encore descendre jusqu'à l'équipe)
     if (this.level === 1) return this.powered && !(this.liftCallT > 0);
-    return this.level === 0 ? this.cassettes >= CASSETTES && !(this.finaleT > 0) : this.powered;
+    // Level 0 : toutes les cassettes, et la clé de l'escalier trouvée (sinon un joueur tombé en bas resterait coincé)
+    return this.level === 0 ? this.cassettes >= CASSETTES && !this.stairsLocked && !(this.finaleT > 0) : this.powered;
   }
 
   // dans la cabine du vrai ascenseur ouvert (ou devant la sortie, sans cabine)
@@ -1607,7 +1609,17 @@ export class BackroomsSim {
     const A = this.players.find((Q) => Q.id === M.mimic);
     if (!A || A.status !== 'alive' || this.players.length < 2) return true;
     if (A === L) return false;
-    return (A.floor || 0) !== (L.floor || 0) || Math.hypot(A.x - L.x, A.z - L.z) > MIMIC_FAR;
+    if ((A.floor || 0) !== (L.floor || 0)) return true;
+    const d = Math.hypot(A.x - L.x, A.z - L.z);
+    if (d > MIMIC_FAR) return true;
+    // plus près : seulement si L ne le voit pas, et qu'il ne parle pas à ce moment-là (sinon, en groupe, elle ne
+    // parlait presque jamais)
+    return d > MIMIC_NEAR && !((A.voice || 0) > 0.15) && !hasLineOfSight(this.fm(L.floor || 0), L.x, L.z, A.x, A.z);
+  }
+
+  // A (le joueur imité) est-il sous les yeux d'un coéquipier, qui le verrait se taire pendant qu'« il » parle ?
+  mimicWatched(A) {
+    return this.players.some((Q) => Q !== A && Q.status === 'alive' && (Q.floor || 0) === (A.floor || 0) && Math.hypot(Q.x - A.x, Q.z - A.z) < MIMIC_NEAR && hasLineOfSight(this.fm(Q.floor || 0), Q.x, Q.z, A.x, A.z));
   }
 
   // Level 1 : elle prend l'apparence de V (sa tenue, sa voix) et part rejoindre les autres ; kill : elle vient de le tuer
@@ -1745,8 +1757,9 @@ export class BackroomsSim {
       const chat = !locked && !(P.hidden >= 0) && hear.some((Q) => Math.hypot(Q.x - M.x, Q.z - M.z) < MIMIC_CHAT_R);
       const radio = !reply && !(near || chat);
       let ok;
-      if (!radio) ok = (!real || Math.hypot(A.x - M.x, A.z - M.z) > MIMIC_HEAR || (A.floor || 0) !== (M.floor || 0)) && hear.every((Q) => this.mimicCover(M, Q));
-      else ok = !this.radioDead && this.mimicCover(M, P) && (!real || (!A.radio && !this.players.some((Q) => Q !== A && Q.status === 'alive' && (Q.floor || 0) === (A.floor || 0) && Math.hypot(Q.x - A.x, Q.z - A.z) < MIMIC_HEAR)));
+      // (celui qu'elle imite ne l'entend pas : son jeu ne la lui fait pas entendre)
+      if (!radio) ok = hear.every((Q) => this.mimicCover(M, Q));
+      else ok = !this.radioDead && this.mimicCover(M, P) && (!real || (!A.radio && !this.mimicWatched(A)));
       if (!ok) return null;
       const kind = reply ? 'reply' : radio ? 'radio' : locked || P.hidden >= 0 ? 'door' : chat ? 'chat' : 'call';
       const ctx = this.level !== 1 ? undefined : this.blackout > 0 ? 'dark' : this.powered ? 'lift' : this.fuses === FUSES - 1 ? 'last' : this.fuses > 0 ? 'fuse' : undefined;
@@ -2267,7 +2280,10 @@ export class BackroomsSim {
       // la première clé trouvée ouvre les portes des deux étages : l'autre disparaît
       for (const f of this.floors) if (f.key) f.key.taken = true;
       this.makeNoise(P, NOISE.pick, 0.8);
-      return this.emit({ type: 'key', by: P.id, name: P.name, x: K.x, z: K.z, floor: P.floor || 0 });
+      this.emit({ type: 'key', by: P.id, name: P.name, x: K.x, z: K.z, floor: P.floor || 0 });
+      // toutes les cassettes déjà trouvées : la clé enclenche la fin
+      if (this.level === 0 && this.cassettes >= CASSETTES && !this.unlocked && !(this.finaleT > 0)) this.finaleT = FINALE_WAIT;
+      return;
     }
     const cas = this.nearCassette(P);
     if (cas) return this.takeCassette(P, cas);
@@ -2695,7 +2711,11 @@ export class BackroomsSim {
     // Level 17 : une bobine du film (elle reste à monter dans la cabine de projection)
     if (cas.reel) return this.emit({ type: 'reel', id: cas.id, by: P.id, count: this.cassettes, total: REELS, x: cas.x, z: cas.z, floor: P.floor || 0 });
     this.emit({ type: 'cassette', id: cas.id, by: P.id, count: this.cassettes, total: CASSETTES, x: cas.x, z: cas.z, floor: P.floor || 0 });
-    if (this.cassettes === CASSETTES && this.level === 0) this.finaleT = FINALE_WAIT;
+    if (this.cassettes === CASSETTES && this.level === 0) {
+      // la fin ne s'enclenche qu'avec la clé de l'escalier : sinon, on l'annonce et le caméscope mène à elle
+      if (this.stairsLocked) this.emit({ type: 'needKey' });
+      else this.finaleT = FINALE_WAIT;
+    }
   }
 
   // Level 17 : devant la table de montage de la cabine de projection (tant que le film ne passe pas)
@@ -3174,11 +3194,29 @@ export class BackroomsSim {
     return { x: door.x, z: door.z, sig: 'stairs' };
   }
 
+  // Level 0 : tous les vivants sont tombés en bas, et les portes de l'escalier sont encore cadenassées : personne là-haut
+  // ne trouvera la clé du haut. Celle de l'étage du bas est la seule issue (le caméscope y mène, voir updateSignal)
+  stuckBelow(P) {
+    if (this.level !== 0 || this.open || !this.stairsLocked || (P.floor || 0) !== 1 || !this.keyOf(1)) return false;
+    const alive = this.players.filter((Q) => Q.status === 'alive');
+    return alive.length > 0 && alive.every((Q) => (Q.floor || 0) === 1);
+  }
+
   updateSignal(P) {
     const map = this.fm(P.floor);
     const near = (list) => list.reduce((b, g) => Math.min(b, Math.hypot(g.x - P.x, g.z - P.z)), Infinity);
     let best = Infinity;
     P.sigTo = 'goal';
+    P.sigArrow = false; // (Level 0 : la flèche du caméscope vers la clé, avant que tout soit trouvé)
+    if (this.stuckBelow(P) && !(this.finaleT > 0)) {
+      const K = this.keyOf(1);
+      P.sigTo = 'key';
+      P.sigX = K.x;
+      P.sigZ = K.z;
+      P.sigArrow = true;
+      P.signal = this.blackout > 0 ? 0 : Math.max(0.2, 1 - Math.hypot(K.x - P.x, K.z - P.z) / SIGNAL_RANGE);
+      return;
+    }
     if (this.level === 0 && this.finaleT > 0) {
       // la 6e cassette trouvée : plus rien ne capte… quelques secondes
       P.signal = 0;
@@ -3196,6 +3234,15 @@ export class BackroomsSim {
         if (K) {
           best = Math.hypot(K.x - P.x, K.z - P.z);
           P.sigTo = 'key';
+          // toutes les cassettes trouvées : une flèche mène à la clé, de partout (comme vers l'ascenseur à la fin)
+          if (this.cassettes >= CASSETTES) {
+            P.sigX = K.x;
+            P.sigZ = K.z;
+            P.sigArrow = true;
+            P.signal = Math.max(0.2, 1 - best / SIGNAL_RANGE);
+            if (this.blackout > 0) P.signal = 0;
+            return;
+          }
         } else {
           best = near(this.stairs);
           P.sigTo = 'stairs';
@@ -4048,6 +4095,26 @@ export class BackroomsSim {
     if (snap.gt) applyGoatSnapshot(this, snap.gt);
     if (this.goats) senseGoats(this);
     else if (this.hasMonster) this.senseMonster();
+    this.guideGuest(this.player);
+  }
+
+  // (invité) l'instantané ne porte que le nom du but du caméscope (sigTo) : la flèche du Level 0 (vers la clé, puis vers
+  // le vrai ascenseur) se recalcule ici, comme updateSignal le fait chez l'hôte. Sans ça, elle ne s'affichait jamais
+  guideGuest(P) {
+    if (!P || this.level !== 0) return;
+    P.sigArrow = false;
+    if (this.open && this.floors.length > 1 && this.fm(this.realFloor).exit) {
+      const G = this.exitGoal(P);
+      P.sigX = G.x;
+      P.sigZ = G.z;
+      return;
+    }
+    const K = P.sigTo === 'key' ? this.keyOf(P.floor) : null;
+    if (K && (this.stuckBelow(P) || this.cassettes >= this.allCassettes.length)) {
+      P.sigX = K.x;
+      P.sigZ = K.z;
+      P.sigArrow = true;
+    }
   }
 
   // Fin d'équipe : le premier dans l'ascenseur lance le compte à rebours. L'entité est attirée vers la cabine, puis

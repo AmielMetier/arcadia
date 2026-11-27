@@ -496,7 +496,7 @@ export class BackroomsHUD {
     if (this.camOn) this.text('camSigLbl', this.E.signalLabel.textContent.replace('FREIGHT ', ''));
     // Level 0, tout trouvé : une flèche montre la direction du vrai ascenseur (ou de l'escalier, de la clé qui y mène)
     // (Level 17 : dès que le film passe, vers le monte-charge de scène)
-    const arrow = ((sim.level === 0 && sim.open) || (MALL && sim.film > 0)) && P.status === 'alive' && P.sigX !== undefined && !noSig;
+    const arrow = ((sim.level === 0 && (sim.open || P.sigArrow)) || (MALL && sim.film > 0)) && P.status === 'alive' && P.sigX !== undefined && !noSig;
     this.show('signalArrow', arrow);
     this.show('camArrow', arrow && this.camOn);
     if (arrow) {

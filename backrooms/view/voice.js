@@ -47,7 +47,7 @@ const CLIP_RMS = 0.012; // en dessous : le souffle, la pièce
 const REF_KEEP = 30;
 const REF_MIN = 6;
 const REF_USE = 10;
-const FAKE_SHARE = 0.5; // part des phrases inventées, là où elles passent (voir masked dans playMimic)
+const FAKE_SHARE = 0.75; // part des phrases inventées, là où elles passent (voir masked dans playMimic)
 const SMALL_MIN = 0.15; // s : en dessous de UTT_MIN, un petit bruit de voix (un « hm », un souffle, un rire bref)
 const SMALLS = 6; // petits bruits gardés par coéquipier
 const REPLY_MAX = 1.4; // s : une réplique est courte
@@ -247,6 +247,7 @@ export function speechRms(d, sr) {
 
 export function createVoice({ send, myId, sfx, onTrouble = null }) {
   const peers = new Map(); // id -> liaison
+  const earlyVc = new Map(); // id -> accord de clonage reçu avant que ce joueur soit dans peers
   let stream = null;
   let track = null;
   let analyser = null;
@@ -582,7 +583,8 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
   // un peu après le message), on adoucit ses bords et on la range
   function onMark(p, m) {
     const small = !!m.s; // (un petit bruit de voix, pas une phrase : gardé à part)
-    if (!p.ring || !(m.d >= (small ? SMALL_MIN : UTT_MIN) && m.d <= UTT_MAX + 0.5) || !(m.a >= 0 && m.a < RING_S - UTT_MAX - 2)) return;
+    const why = (k) => ((p.why = p.why || {})[k] = (p.why[k] || 0) + 1);
+    if (!p.ring || !(m.d >= (small ? SMALL_MIN : UTT_MIN) && m.d <= UTT_MAX + 0.5) || !(m.a >= 0 && m.a < RING_S - UTT_MAX - 2)) return why('mark');
     const at = p.ringN;
     const tm = setTimeout(() => {
       p.cuts = (p.cuts || []).filter((x) => x !== tm);
@@ -590,14 +592,15 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
       const ring = p.ring;
       const end = Math.min(p.ringN, at + Math.round((0.6 - m.a) * sr));
       const start = Math.max(0, p.ringN - ring.length, end - Math.round((m.d + 1.25) * sr));
-      if (end - start < sr * 0.4) return;
+      if (end - start < sr * 0.4) return why('short');
       const w = new Float32Array(end - start);
       for (let i = 0, k = start % ring.length; i < w.length; i++) {
         w[i] = ring[k++];
         if (k === ring.length) k = 0;
       }
       const span = voicedSpan(w, sr, m.d, 0.45, small ? 0.1 : 0.25);
-      if (!span || (span[1] - span[0]) / sr < (small ? SMALL_MIN * 0.7 : UTT_MIN * 0.7)) return;
+      if (!span || (span[1] - span[0]) / sr < (small ? SMALL_MIN * 0.7 : UTT_MIN * 0.7)) return why(span ? 'span' : 'nospan');
+      why('ok');
       const d = w.slice(span[0], span[1]);
       // (la propreté de la prise : la voix par rapport au fond, en dB, mesuré dans ce qui entoure la phrase)
       let es = 0;
@@ -871,7 +874,10 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
     const seen = !!(V && lastSim && dist < VOICE_R && hasLineOfSight(lastSim.fm ? lastSim.fm(V.floor || 0) : lastSim.map, V.x, V.z, pos.x, pos.z));
     const masked = radio || kind === 'door' || kind === 'reply' || !seen || dist > MASK_R;
     const fakes = p && p.cloneOk && cloneOn && p.fakes ? p.fakes.filter((f) => f.kind === kind && (f.to == null || f.to === to) && (!f.ctx || f.ctx === ctx)) : [];
-    if (fakes.length && (!u || (masked && ((seed >> 3) % 100) / 100 < FAKE_SHARE))) {
+    // (une phrase inventée qui appelle ce joueur par son prénom, ou qui colle à ce qui se passe : elle passe toujours
+    // devant, là où le clone ne se trahit pas ; c'est ce qui attire le mieux)
+    const lure = masked && fakes.some((f) => f.to === to || (f.ctx && f.ctx === ctx));
+    if (fakes.length && (!u || lure || (masked && ((seed >> 3) % 100) / 100 < FAKE_SHARE))) {
       const fresh = fakes.filter((f) => f.i !== p.lastFake);
       const pool = [];
       for (const f of fresh.length ? fresh : fakes) for (let k = f.to != null || f.ctx ? 3 : 1; k > 0; k--) pool.push(f);
@@ -1253,7 +1259,11 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
         if (!p) {
           p = { id, mode: 0, pc: null, since: performance.now() / 1000 };
           peers.set(id, p);
-          if (cloneOn) send(id, { t: 'vc', on: 1 });
+          // (son accord, s'il nous l'a dit avant qu'on le connaisse)
+          if (earlyVc.has(id)) { p.cloneOk = earlyVc.get(id); earlyVc.delete(id); }
+          // notre accord, et la question en retour : chacun le redit à l'autre, même si notre premier message est arrivé
+          // avant qu'il nous connaisse (sinon il se perdait, et personne n'était jamais d'accord)
+          if (cloneOn) send(id, { t: 'vc', on: 1, ask: 1 });
           if (myId < id && window.RTCPeerConnection) call(p);
         }
       }
@@ -1275,8 +1285,8 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
         if (p) {
           p.cloneOk = !!m.on;
           if (!p.cloneOk) { p.fakes = null; p.texts = null; }
-          if (m.ask && cloneOn) send(from, { t: 'vc', on: 1 });
-        }
+        } else earlyVc.set(from, !!m.on); // (il nous connaît avant qu'on le connaisse : gardé pour son arrivée)
+        if (m.ask && cloneOn) send(from, { t: 'vc', on: 1 });
       }
       else if (m.t === 'vt') {
         // le texte d'une de ses phrases (transcrit chez lui)
@@ -1544,6 +1554,10 @@ export function createVoice({ send, myId, sfx, onTrouble = null }) {
     clipSeconds(id) {
       const p = peers.get(id);
       return p && p.bank ? p.bank.reduce((a, u) => a + u.buf.length / u.sr, 0) : 0;
+    },
+    // (essais) l'état de chaque liaison : la voix reçue, le tampon, les phrases annoncées
+    debug() {
+      return { mic: micState, mine: myBank, utt: !!utt, marks: marks.length, peers: [...peers.values()].map((p) => ({ id: p.id, pc: p.pc ? p.pc.connectionState : null, relay: !!p.relay, ring: !!p.ring, ringN: p.ringN || 0, heard: !!p.heard, cloneOk: !!p.cloneOk, why: p.why || null, bank: p.bank ? p.bank.length : 0, refSecs: +(p.refSecs || 0).toFixed(1), mode: p.mode })) };
     },
     // combien de phrases on a de chacun (soi compris) : l'hôte s'en sert pour choisir qui l'entité imite
     bank() {
