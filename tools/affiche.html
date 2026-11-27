@@ -13,7 +13,7 @@
 </head>
 <body>
 <!-- Affiche 960 × 540 d'un jeu pour le Hub, dans le style commun : vraie image du jeu, grand titre en deux couleurs, bandeau.
-     Paramètres : img (capture du jeu, même origine), t1 / t2 (les deux mots du titre), c1 / c2 (leurs couleurs),
+     Paramètres : img (capture du jeu, même origine), t1 / t2 (les deux mots du titre ; t2 vide = titre en un mot), c1 / c2 (leurs couleurs),
      sub (bandeau), pill (couleur du bandeau), y (cadrage vertical de l'image, 0 à 1), size (taille du titre).
      Exemple : tools/affiche.html?img=../golf/img/fond.png&t1=BIRDIE&t2=PARTY&c2=%237fdc3a&sub=Golf%203D%20entre%20potes&pill=%23338f1d
      Enregistrer : clic droit sur l'image, ou le lien sous l'image (JPEG), à placer dans <jeu>/img/affiche.jpg. -->
@@ -23,7 +23,7 @@
 (async function () {
   const Q = new URLSearchParams(location.search);
   const W = 960, H = 540, INK = '#16181d';
-  const t1 = (Q.get('t1') || 'MON').toUpperCase(), t2 = (Q.get('t2') || 'JEU').toUpperCase();
+  const t1 = (Q.get('t1') || 'MON').toUpperCase(), t2 = (Q.get('t2') ?? 'JEU').toUpperCase();
   const c1 = Q.get('c1') || '#ffffff', c2 = Q.get('c2') || '#ffc531';
   const sub = (Q.get('sub') || '').toUpperCase(), pill = Q.get('pill') || '#ff4b2b';
   const cv = document.getElementById('cv'), g = cv.getContext('2d');

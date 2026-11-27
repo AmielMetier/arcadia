@@ -1,7 +1,7 @@
 # Consignes pour les assistants de code (Claude, Codex, Copilot, Cursor, Gemini…) et les contributeurs
 
 Ce dépôt est **Arcadia** (anciennement « Game Hub »), le salon de jeux d'Amiel : un site statique (GitHub Pages, sans étape de build) qui réunit plusieurs
-jeux multijoueurs dans le navigateur — Duo Drift, DavidSimulator, Tête de Calcul, Bastion Clash, Outbreak, Fil Rouge, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party, Island Rush, Odyssée, Mollo !, Site Noir, Mystère Mystère, Dogfight 3D, The Backrooms et Fief Maudit.
+jeux multijoueurs dans le navigateur — Duo Drift, DavidSimulator, Tête de Calcul, Bastion Clash, Outbreak, Fil Rouge, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party, Island Rush, Odyssée, Mollo !, Site Noir, Mystère Mystère, Dogfight 3D, The Backrooms, Fief Maudit et Synapse.
 
 ## À chaque modification poussée sur `main` : journal + version
 
@@ -40,12 +40,12 @@ Filet de sécurité : si un push sur `main` ne touche pas `CHANGELOG.md`, l'acti
 (`tools/changelog-auto.mjs`) et monte la version. Elle est moins bien écrite qu'une entrée faite à la main :
 préférer l'écrire soi-même. Pour qu'elle soit lisible, écrire des messages de commit clairs, par exemple
 `feat(calcul): mode Éclair` ou `fix(david): la caméra qui suit ne se désactive plus`
-(portées reconnues : `drift`, `david`, `calcul`, `bastion`, `outbreak`, `filrouge`, `kart`, `convoy`, `golf`, `minigolf`, `royale`, `odyssee`, `mollo`, `sitenoir`, `mystery`, `fief`, `hub`, `server`).
+(portées reconnues : `drift`, `david`, `calcul`, `bastion`, `outbreak`, `filrouge`, `kart`, `convoy`, `golf`, `minigolf`, `royale`, `odyssee`, `mollo`, `sitenoir`, `mystery`, `fief`, `synapse`, `hub`, `server`).
 Ajouter `[skip changelog]` dans le message d'un commit purement technique pour qu'il n'apparaisse pas.
 
 ## Repères
 
-- Chaque jeu vit dans son dossier (`drift/`, `david/`, `calcul/`, `bastion/`, `outbreak/`, `filrouge/`, `kart/`, `convoy/`, `golf/`, `minigolf/`, `royale/`, `odyssee/`, `mollo/`, `sitenoir/`, `mystery/`, `backrooms/`, `fief/`) et tourne dans une iframe du Hub ;
+- Chaque jeu vit dans son dossier (`drift/`, `david/`, `calcul/`, `bastion/`, `outbreak/`, `filrouge/`, `kart/`, `convoy/`, `golf/`, `minigolf/`, `royale/`, `odyssee/`, `mollo/`, `sitenoir/`, `mystery/`, `backrooms/`, `fief/`, `synapse/`) et tourne dans une iframe du Hub ;
   le Hub (`index.html`, `hub/`) gère le salon, le classement entre potes et le pont `shared/bridge.js`.
 - Multijoueur : relais WebSocket (`shared/net.js`, serveur dans `server/`). `?local` dans l'adresse simule le réseau
   entre onglets du même navigateur pour tester à plusieurs.
@@ -225,4 +225,9 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   `node tools/test-fief.mjs` (le `Sim` des tests retire les coffres sauf `{ chests: true }` ; à lancer quand on touche au moteur : vallée, chemins, hache et bûches, nuit, braseros, squelettes, bouclier, relève, défaite, instantané, une nuit jouée par deux bots, métiers, poutres, arrivées et départs, réseau, construction, faim, froid, sièges, dix nuits, sauvegarde, crypte et Roi, capacités, début de partie : jour court, bûches empilées, cloche, coffres).
   Modèles (Quaternius Medieval Village MegaKit, KayKit Adventurers et Skeletons, CC0) préparés par `node tools/fief-assets.mjs <clones>` dans `fief/models/` (crédits : `fief/models/LICENSE.txt`) ;
   arbres, ciel et textures repris de Birdie Party, rochers de Kenney et sons d'Island Rush et Birdie Party. `?debug` expose `__fief` (`ff(sec)`, `tp(x, z, cap)`, `cam(cap, inclinaison, distance)`, `press('fc'|'uc')`), `?manual` ne dessine qu'à la demande (`__fief.frames(n)`), `?seed`, `?bots=0..2`, `?job=…`, `?autostart`.
+- Synapse (`synapse/`, moteur sans DOM dans `synapse/engine/`) : jeu de réflexes et de rythme, chacun de son côté (aucun message réseau, pas de `HubBridge.report` : tout reste dans `localStorage`, clé `synapse_v1`).
+  Quatre épreuves (`view/pulse.js`, `aiguillage.js`, `reseau.js`, `double.js`), déroulé d'une partie dans `view/run.js`, Session du jour qui les enchaîne dans `app.js`. Les temps sont programmés et les appuis jugés sur l'horloge de l'`AudioContext`
+  (`view/audio.js`), jamais sur `setTimeout`. Moteur : niveaux 1 à 10 et difficulté qui s'adapte (`levels.js`), filtre des doubles appuis et jugement d'un appui (`press.js`), tirages (`trials.js`), indicateurs du tableau de bord (`stats.js`),
+  série de jours (`days.js`), validation des données importées (`save.js`). `node tools/test-synapse.mjs` : à lancer quand on touche au moteur. Interface pensée pour 1280 × 720, mise à l'échelle de la fenêtre par `--z` (`app.js`).
+  `?debug` expose `__synapse` (`start('pulse' | 'aiguillage' | 'reseau' | 'double' | 'session')`, `state()`, `end()`, `menu()`, `board()`, `calibrate()`), `?seed`. Affiche : capture du jeu passée dans `tools/affiche.html` (`t2` vide pour un titre en un mot).
 - Commits : auteur et messages en français, un message qui décrit ce que le joueur gagne.
