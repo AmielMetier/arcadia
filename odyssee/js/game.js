@@ -233,7 +233,8 @@ export class Game {
     s.map = this.mapObj.id; s.x = p.x; s.y = p.y; s.dir = p.dir; s.surf = !!p.surf;
     // dans une faille (île éphémère), la partie se sauvegarde sur la route où elle s'est ouverte
     const rf = this.mapObj.faille && this.rifts?.exp?.retour; if (rf) Object.assign(s, { map: 'monde', x: rf.x, y: rf.y, dir: rf.dir });
-    if (!storeSet(SAVE_KEY, JSON.stringify(s))) return false;
+    const toSave = this._dojoRealParty ? { ...s, party: this._dojoRealParty } : s;
+    if (!storeSet(SAVE_KEY, JSON.stringify(toSave))) return false;
     if (!silent) this.sound.sfx('save');
     this.onSaved?.(silent);
     return true;
@@ -2300,7 +2301,7 @@ export class Game {
       ['Un reportage sur les Pokémon de la région.', '« Les Germignon adorent les journées ensoleillées... »'],
       ['La météo : grand soleil sur Bourg-Aube, tempête de neige sur l\'Île Givrée.'],
     ];
-    if (b >= 3 && !st.flags.rivalB4) TV.push(['Flash spécial : les Gardes d\'Écaille ferment des ports de pêche.', 'Les pêcheurs de Port-Granit protestent...']);
+    if (b >= 3 && !st.badges[7] && !st.flags.drakos && !st.flags.rivalB4) TV.push(['Flash spécial : les Gardes d\'Écaille ferment des ports de pêche.', 'Les pêcheurs de Port-Granit protestent...']);
     if (st.flags.champion) TV.push(['On parle de toi aux informations ! Le nouveau Maître de la Ligue...', 'Maman doit être si fière.']);
     const T_ = {
       books: home ? ['Des livres d\'images sur les Pokémon...', '« Mon premier voyage », celui que Maman te lisait le soir.']
@@ -2404,7 +2405,7 @@ export class Game {
             sub: t.name === 'Nox' ? 'Chef de la Brume · Orbe Rouge' : isBrumeBoss ? t.cls : (t.name === RIVAL_NAME ? 'Dernier Duel · Bourg-Aube' : undefined),
           });
         }
-        const party = isRival ? buildRivalParty(g, t.team) : t.team.map(([sp, lvl]) => createMon(sp, lvl, { iv: Array(6).fill(Math.min(31, 10 + lvl / 2 | 0)), shiny: false }));
+        const party = isRival ? buildRivalParty(g, t.team) : t.team.map(([sp, lvl]) => createMon(sp, lvl, { iv: Array(6).fill(Math.min(31, 10 + lvl / 2 | 0)), moves: (leaderMatch || t.boss) ? movesChoisies(sp, lvl) : undefined, shiny: false }));
         g.musicLock = true;
         const items = isRival ? getRivalItems(g) : { ...(t.items || {}) };
         const fightMusic = t.music || (t.name === 'Nox' ? 'legendElemental' : isBrumeBoss ? 'eclipse' : leaderMatch ? 'leader' : isRival ? 'rival' : t.boss ? 'champion' : 'trainer');

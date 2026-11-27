@@ -331,7 +331,7 @@ for i, (x, y, bras, q0) in enumerate(PIVOTS):
         c = next(POOLP); P.put(x + dx, y + dy, c)
         LEGP.append(f"'{c}': {{ porte: {{ r: {i}, dans: {ouvert} }}, ferme: 'bloc', o: 'pont_dragon', f: 'gouffre', dirDeco: '{d}' }}")
 STATUES = {'A': [1, 5], 'B': [0, 2], 'D': [3, 1], 'F': [4, 5]}       # chaque statue fait pivoter deux ponts d'un quart de tour
-P.put(4, 17, 'A'); P.put(2, 8, 'B'); P.put(22, 11, 'D'); P.put(3, 4, 'F')
+P.put(4, 17, 'A'); P.put(2, 8, 'B'); P.put(22, 11, 'D'); P.put(3, 4, 'F'); P.put(20, 19, 'Z')
 for x, y in ((1, 14), (23, 14), (1, 21), (23, 21), (1, 7), (23, 7), (1, 12), (23, 12)): P.put(x, y, 'p')
 P.put(14, 17, '1'); P.put(3, 10, '2'); P.put(21, 9, '3'); P.put(19, 4, '4'); P.put(7, 19, '5')
 P.hall(22)
@@ -341,7 +341,7 @@ arene(7, P, r"""
     regles: [
       'ARÈNE DE FORT-ÉCAILLE — LE SANCTUAIRE\nChampion : Drakos, le gardien des dragons.',
       'Les ponts-dragons pivotent au-dessus du gouffre. Chaque statue fait tourner DEUX ponts d\'un quart de tour.',
-      'Regarde bien où mène chaque bras avant de toucher une statue : un pont tourné peut te couper la route du retour !',
+      'Regarde bien où mène chaque bras avant de toucher une statue : un pont tourné peut te couper la route du retour ! Un pupitre sur le parvis permet de remettre les ponts à zéro.',
       'Conseil de Drakos : « La Glace, la Fée et les Dragons eux-mêmes font trembler mes écailles. »',
     ],
     legende: {

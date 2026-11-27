@@ -96,10 +96,10 @@ export async function trigger(g, name) {
   if (name === 'rivalB1' && bd(3)) return rivalFight(g, 'rivalB1', () => [[1044, 33], [1016, 33], [L3[1], 36]], 'Pas mal... pour quelqu\'un du continent.',
     [`Alors c'est toi, ${st.name}. Le prodige de Bourg-Aube.`, `Moi, c'est ${B.name}. J'ai pris la dernière Poké Ball de mon grand-père, le lendemain de ton départ.`, 'J\'ai grandi sur les îles. Là-bas, la Ligue ne vient jamais. Personne ne nous aide... sauf Drakos.', 'Je suis Garde d\'Écaille, maintenant. Et je viens voir de quoi tu es capable avant que tu ne mettes les pieds chez nous.'],
     ['Tu viendras sur les îles, je le sais. Drakos t\'attend.', 'Et moi aussi.'], { ...asB, cls: 'Rival' });
-  if (name === 'rivalB2' && bd(5)) return rivalFight(g, 'rivalB2', () => [[1044, 42], [1015, 41], [1039, 41], [L3[2], 45]], 'Basalte avait raison... tu ne lâches rien.',
+  if (name === 'rivalB2' && bd(5)) return rivalFight(g, 'rivalB2', () => [[1044, 40], [1015, 39], [1039, 39], [L3[2], 43]], 'Basalte avait raison... tu ne lâches rien.',
     [`${st.name}. Tu as battu Basalte.`, 'C\'est lui qui m\'a appris à me battre, tu sais.', 'Les pêcheurs disent que Drakos leur prend trop. Je... je ne veux pas y croire.', 'Montre-moi que tu mérites d\'aller plus loin !'],
     ['Va voir Pyros, à Cendrelune.', `Moi... je vais parler aux pêcheurs. Juste pour savoir.`], { ...asB, cls: 'Rival' });
-  if (name === 'rivalB3' && bd(6) && !bd(7)) return rivalFight(g, 'rivalB3', () => [[1044, 48], [1016, 48], [1040, 49], [148, 48], [L3[2], 51]], 'C\'est fini. Je ne suis plus sûr' + B.e + ' de rien.',
+  if (name === 'rivalB3' && bd(6) && !bd(7)) return rivalFight(g, 'rivalB3', () => [[1044, 45], [1016, 45], [1040, 46], [148, 45], [L3[2], 48]], 'C\'est fini. Je ne suis plus sûr' + B.e + ' de rien.',
     [`Stop, ${st.name}. Je suis le dernier rempart avant la Tour de Drakos.`, 'Les pêcheurs m\'ont tout raconté. Les ports fermés, les pêches confisquées...', 'Mais Drakos nous a protégés quand personne d\'autre ne le faisait.', 'Alors je vais me battre. Une dernière fois. Pour savoir lequel de nous deux a raison !'],
     ['Vas-y. Montre-lui ce que ça fait de perdre... comme moi.', 'Je quitte les Gardes. Peut-être qu\'après toi, Drakos écoutera enfin les îles.'], asB);
   if (name === 'rivalB4' && bd(7)) return rivalFight(g, 'rivalB4', () => [[1044, 54], [1016, 54], [1040, 54], [149, 55], [1046, 54], [L3[2], 57]], 'Merci. J\'avais besoin de ce combat.',

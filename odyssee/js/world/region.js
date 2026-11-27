@@ -667,7 +667,7 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
       { kind: 'house', x: 24, dx: 1, y: 8, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Un Pokémon peut retenir quatre attaques au maximum.', 'Quand il en apprend une cinquième, il faut en oublier une.'] }] },
       { kind: 'gym', ...GRAND.gym, x: 6, y: 25, roof: 'blue' },
       { kind: 'house2', x: 5, y: 14, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'marin', text: ['Le port s\'agrandit chaque année : les quais du sud sont tout neufs.'] }] },
-      { kind: 'house', x: 19, y: 16, roof: 'red', npcs: [{ x: 4, y: 4, sprite: 'pecheur', text: ['Avant, un ferry partait d\'ici pour l\'archipel du sud.', 'Depuis que Drakos tient les îles, plus un bateau ne part d\'ici.', 'Et ne compte pas y aller à la nage : des tourbillons entourent l\'archipel. Seul le vieux passeur du Cap Mirage connaît la passe.'] }] },
+      { kind: 'house', x: 19, y: 16, roof: 'red', npcs: [{ x: 4, y: 4, sprite: 'pecheur', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Les ferries se préparent de nouveau pour l\'archipel !', 'Mais même sans ferry, le passeur du Cap Mirage y emmène les dresseurs confirmés.'] : ['Avant, un ferry partait d\'ici pour l\'archipel du sud.', 'Depuis que Drakos tient les îles, plus un bateau ne part d\'ici.', 'Et ne compte pas y aller à la nage : des tourbillons entourent l\'archipel. Seul le vieux passeur du Cap Mirage connaît la passe.'] }] },
       { kind: 'house2', x: 24, dx: 1, y: 16, roof: 'orange', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Le jour, la nuit, le matin, le soir...', 'La couleur du ciel change au fil de la journée : certains Pokémon ne sortent que la nuit !'] }] },
     ],
     npcs: [
@@ -782,7 +782,7 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
     roads: [[20, 0, 21, 26, T.PATH], [2, 18, 27, 18, T.PATH], [2, 26, 27, 26, T.PATH]],
     deco: [['rock', 26, 13], ['rock', 27, 17], ['rock', 2, 27], ['rock', 17, 21], ['lamp', 22, 12], ['lamp', 22, 17], ['lamp', 19, 19], ['lamp', 22, 25],
       ['flowers', 25, 15, 27, 16], ['flowers', 11, 19, 16, 20],
-      ['sign', 22, 5, 'PORT-GRANIT\nÎle de Granit — sous la protection de Drakos.'], ['sign', 12, 17, 'ARÈNE DE GRANIT\nChampion : Basalte\nLe frère cadet.'], ['sign', 24, 25, 'DOJO DE MAMADOU\nCombats Co-op Duo & Trio\nRéservé aux escouades de 2 ou 3 dresseurs !']],
+      ['sign', 22, 5, 'PORT-GRANIT\nÎle de Granit — Porte de l\'archipel.'], ['sign', 12, 17, 'ARÈNE DE GRANIT\nChampion : Basalte\nLe frère cadet.'], ['sign', 24, 25, 'DOJO DE MAMADOU\nCombats Co-op Duo & Trio\nRéservé aux escouades de 2 ou 3 dresseurs !']],
     buildings: [
       // mapId : les identifiants des intérieurs d'avant l'agrandissement (parties arrêtées dedans, dresseurs de l'arène)
       { kind: 'gym', ...GRAND.gym, x: 2, y: 2, roof: 'brown', mapId: 'granit:gym3' },
@@ -796,10 +796,11 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
       { id: 'garde-quai', x: 22, y: 2, sprite: 'garde', dir: 'down', script: 'granitDock', text: ['Port-Granit. Ici, c\'est Drakos qui fait la loi, pas la Ligue.'] },
       // le Professeur Cèdre, chercheur des Méga-Évolutions : remet le Méga-Anneau aux dresseurs qui ont 5 badges, puis vend les Méga-Gemmes
       { id: 'mega-chercheuse', x: 17, y: 8, sprite: 'savant', dir: 'down', script: 'megaRing' },
-      { id: 'marin', x: 15, y: 22, sprite: 'marin', move: 'wander', text: ['Avec Surf, tu peux rejoindre Cendrelune, au sud-ouest.', 'Mais les gardes de Pyros ne laissent entrer que ceux qui ont battu Basalte.'] },
+      { id: 'marin', x: 15, y: 22, sprite: 'marin', move: 'wander', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Depuis que tu as battu Drakos, les ferries reprennent la mer vers le continent !', 'Les trois îles respirent enfin.'] : st.badges[5] ? ['Tu as battu Basalte ! Avec Surf, tu peux rejoindre Cendrelune au sud-ouest.', 'Les gardes de Pyros devraient te laisser passer maintenant.'] : ['Avec Surf, tu peux rejoindre Cendrelune, au sud-ouest.', 'Mais les gardes de Pyros ne laissent entrer que ceux qui ont battu Basalte.'] },
     ],
   };
   ville(K, 'K');
+  gymGuard(W, K, 5, ['Halte ! L\'arène de Basalte n\'accueille que les dresseurs confirmés.', 'Reviens avec cinq badges.']);
   zoneSortie(K, 'quai', { name: 'Port-Granit', music: 'port', town: 'granit', trigger: 'rivalB2' });
   // le chemin du ponton de Port-Granit, face au Cap Mirage
   const quaiGranit = (() => { const s = sortie(K, 'quai'), [x, y] = s.ext[0]; W.rect(x - 2, y - 14, x + 3, y, T.SAND, [T.TREE, T.GRASS, T.WATER]); W.rect(x, y - 14, x + 1, y, T.PATH); let qy = y - 14; while (W.get(x, qy - 1) !== T.WATER && qy > y - 40) { W.set(x, qy - 1, T.PATH); W.set(x + 1, qy - 1, T.PATH); qy--; } return [x, qy]; })();
@@ -819,7 +820,7 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
       { kind: 'house', x: 2, y: 19, roof: 'orange', mapId: 'cendre:house23', npcs: [{ x: 4, y: 4, sprite: 'montagnard', text: ['L\'Eau, la Roche et le Sol éteignent le Feu.', 'Pyros a beau être ardent, il a ses faiblesses.'] }] },
       { kind: 'gym', ...GRAND.gym, x: 8, y: 11, roof: 'red', mapId: 'cendre:gym12' },
       { kind: 'house', x: 2, y: 12, roof: 'brown', mapId: 'cendre:house3', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Les ferries du continent accostent de nouveau sur l\'archipel !', 'On dit que même Pyros et Drakos se reparlent comme avant.'] : ['Le pont qui nous reliait au continent a été coupé sur ordre de Drakos.', 'Il voulait que les îles se débrouillent sans la Ligue.'] }] },
-      { kind: 'house', x: 30, y: 12, roof: 'gray', mapId: 'cendre:house22', npcs: [{ x: 4, y: 4, sprite: 'vieil_homme', text: ['Pyros n\'est pas méchant. Il croit que son frère protège les îles.', 'Mais protéger, ce n\'est pas tout prendre...'] }] },
+      { kind: 'house', x: 30, y: 12, roof: 'gray', mapId: 'cendre:house22', npcs: [{ x: 4, y: 4, sprite: 'vieil_homme', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Pyros a compris que son frère n\'avait pas besoin qu\'on ferme les îles.', 'Les trois frères se parlent de nouveau. Ça fait chaud au cœur.'] : ['Pyros n\'est pas méchant. Il croit que son frère protège les îles.', 'Mais protéger, ce n\'est pas tout prendre...'] }] },
     ],
     npcs: [],
   };
@@ -834,7 +835,7 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
     roads: [[20, 0, 21, 33], [22, 11, 37, 12], [2, 30, 35, 30]],
     deco: [['trees', 2, 2, 19, 9, T.PINE], ['flowers', 3, 10, 17, 12], ['statue', 18, 11], ['statue', 23, 13], ['statue', 18, 2], ['lamp', 22, 2], ['lamp', 19, 14], ['lamp', 22, 22], ['lamp', 19, 29], ['lamp', 22, 29],
       ['trees', 34, 2, 35, 3, T.PINE], ['trees', 34, 18, 35, 23, T.PINE], ['flowers', 29, 25, 35, 28], ['flowers', 29, 20, 31, 22], ['flowers', 23, 26, 27, 28],
-      ['sign', 22, 10, 'FORT-ÉCAILLE\nCapitale de l\'archipel. Par ordre de Drakos.'], ['sign', 12, 29, 'TOUR DE DRAKOS\nChampion : Drakos\nL\'aîné des trois frères.']],
+      ['sign', 22, 10, 'FORT-ÉCAILLE\nCapitale de l\'archipel des dragons.'], ['sign', 12, 29, 'TOUR DE DRAKOS\nChampion : Drakos\nL\'aîné des trois frères.']],
     buildings: [
       // mapId : les identifiants des intérieurs d'avant l'agrandissement (parties arrêtées dedans, dresseurs de l'arène)
       { kind: 'gym', ...GRAND.gym, x: 2, y: 14, roof: 'purple', mapId: 'ecaille:gym13' },
@@ -844,8 +845,8 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
       { kind: 'house', x: 24, y: 21, roof: 'red', mapId: 'ecaille:house25', npcs: [{ x: 2, y: 4, sprite: 'vieil_homme', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Le Cap des Étoiles est désormais ouvert au nord de la ville !', 'On raconte qu\'Odyssor, le géant des océans, y passe quand la mer est calme...'] : ['Au nord de la ville, il y a le Cap des Étoiles.', 'On raconte qu\'Odyssor, le géant des océans, y passe quand la mer est calme...', 'Mais Drakos en interdit l\'accès.'] }] },
     ],
     npcs: [
-      { id: 'garde-cap', x: 20, y: 2, sprite: 'garde', dir: 'down', gate: { badges: 8, tiles: [[20, 1], [21, 1]] }, text: ['Le Cap des Étoiles est interdit.', 'Seul Drakos, ou celui qui l\'aura vaincu, peut y passer.'] },
-      { id: 'enfant', x: 27, y: 26, sprite: 'enfant', move: 'wander', text: ['Mon papa dit que Drakos était un héros, avant.'] },
+      { id: 'garde-cap', x: 20, y: 2, sprite: 'garde', dir: 'down', gate: { badges: 8, open: (f, g) => (g?.state ? !!(f.drakos || g.state.badges?.[7]) : g.badgeCount() >= 8), tiles: [[20, 1], [21, 1]] }, text: (st) => (st.badges[7] || st.flags.drakos) ? ['La voie du Cap des Étoiles t\'est ouverte, Champion.', 'Puisse le gardien des eaux t\'entendre.'] : ['Le Cap des Étoiles est interdit.', 'Seul Drakos, ou celui qui l\'aura vaincu, peut y passer.'] },
+      { id: 'enfant', x: 27, y: 26, sprite: 'enfant', move: 'wander', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Mon papa dit que Drakos sourit de nouveau, depuis son combat contre toi !'] : ['Mon papa dit que Drakos était un héros, avant.'] },
     ],
   };
   ville(L, 'L');
@@ -861,7 +862,7 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
     buildings: [
       { kind: 'center', ...GRAND.center, x: 2, y: 3 }, { kind: 'mart', ...GRAND.mart, x: 13, y: 4 },
       { kind: 'house', x: 19, dx: 1, y: 6, roof: 'purple', npcs: [{ x: 4, y: 4, sprite: 'scientifique', text: ['Les dragons ne craignent presque rien...', 'sauf la Glace, la Fée et les autres dragons.'] }] },
-      { kind: 'bighouse', x: 13, y: 11, roof: 'purple', name: 'Musée des Dragons', npcs: [{ x: 5, y: 4, sprite: 'vieil_homme', text: ['Drakos a grandi en écoutant les histoires de ce musée.', 'Il rêvait de devenir Maître. Célestine l\'a battu en finale.', 'Depuis, il règne sur l\'archipel, loin de la Ligue.'] }, { x: 8, y: 5, sprite: 'scientifique', text: ['Regarde cette fresque : un Pokémon immense nageant sous la mer étoilée.', 'Odyssor. Les anciens disaient qu\'il apparaît au Cap des Étoiles quand les îles et le continent se réconcilient.', 'À côté, un oiseau d\'argent plonge dans la mer : Lugia. On dit qu\'Odyssor et Lugia sont les deux gardiens des eaux.'] }] },
+      { kind: 'bighouse', x: 13, y: 11, roof: 'purple', name: 'Musée des Dragons', npcs: [{ x: 5, y: 4, sprite: 'vieil_homme', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Drakos est revenu s\'incliner devant les stèles du musée après votre duel.', 'Les trois frères ont enfin rouvert l\'archipel vers le continent.'] : ['Drakos a grandi en écoutant les histoires de ce musée.', 'Il rêvait de devenir Maître. Célestine l\'a battu en finale.', 'Depuis, il règne sur l\'archipel, loin de la Ligue.'] }, { x: 8, y: 5, sprite: 'scientifique', text: (st) => st.flags.odyssorMet ? ['La fresque d\'Odyssor semble briller davantage depuis ta rencontre au Cap des Étoiles !', 'Les anciens avaient raison : les deux gardiens des eaux veillent sur un archipel réconcilié.'] : (st.badges[7] || st.flags.drakos) ? ['Tu as vaincu Drakos : les îles et le continent se réconcilient enfin.', 'Va au nord de Fort-Écaille, au Cap des Étoiles... Odyssor doit déjà s\'y montrer !'] : ['Regarde cette fresque : un Pokémon immense nageant sous la mer étoilée.', 'Odyssor. Les anciens disaient qu\'il apparaît au Cap des Étoiles quand les îles et le continent se réconcilient.', 'À côté, un oiseau d\'argent plonge dans la mer : Lugia. On dit qu\'Odyssor et Lugia sont les deux gardiens des eaux.'] }] },
       { kind: 'house', x: 3, y: 13, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Au nord, la Route Victoire mène au Plateau Céleste.', 'Seuls les dresseurs aux quinze badges peuvent la franchir : les douze du continent et ceux des trois frères.'] }] },
       { kind: 'house', x: 22, y: 13, roof: 'red', npcs: [{ x: 4, y: 4, sprite: 'montagnard', text: ['La route 10 relie Cimelune à Bourg-Aube, par l\'ouest.', 'Ça rappelle des souvenirs, hein ?'] }] },
     ],
@@ -1040,7 +1041,7 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
     W.rect(x - 18, y + 4, x + 18, y + 6, T.SAND, [T.WATER]);
     W.zone(x - 22, y - 2, x + 22, y + 6, { name: 'Cap Mirage', music: 'route', trigger: 'rival4' });
     W.sign(x + 9, y + 1, 'CAP MIRAGE\nAu sud-est : Île de Granit. Au sud : Cendrelune.\nTourbillons au large : baignade interdite. Passeur pour l\'archipel.');
-    W.npc({ id: 'cap:pecheur', x: x - 6, y: y + 2, sprite: 'pecheur', dir: 'down', text: ['Les trois îles que tu vois là-bas, ce sont les îles des trois frères.', 'Granit, la plus proche. Puis Cendrelune, le volcan. Et la Grande Île, tout au fond.', 'Drakos, l\'aîné, règne sur les trois depuis Fort-Écaille.', 'Même avec le Harnais Flottant, n\'essaie pas d\'y aller à la nage : les tourbillons t\'avaleraient. Le passeur du Cap t\'y emmènera.', 'Là-bas, ton Harnais te servira pour passer d\'une île à l\'autre.'] }); }
+    W.npc({ id: 'cap:pecheur', x: x - 6, y: y + 2, sprite: 'pecheur', dir: 'down', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Les ferries traversent de nouveau le détroit jusqu\'à Port-Granit !', 'Tu as réussi là où la Ligue hésitait depuis des années : les trois frères sont réconciliés.'] : ['Les trois îles que tu vois là-bas, ce sont les îles des trois frères.', 'Granit, la plus proche. Puis Cendrelune, le volcan. Et la Grande Île, tout au fond.', 'Drakos, l\'aîné, règne sur les trois depuis Fort-Écaille.', 'Même avec le Harnais Flottant, n\'essaie pas d\'y aller à la nage : les tourbillons t\'avaleraient. Le passeur du Cap t\'y emmènera.', 'Là-bas, ton Harnais te servira pour passer d\'une île à l\'autre.'] }); }
 
   // Grande Île : route 11 (de la plage est à Fort-Écaille, par une passe rocheuse) et forêt d'Écaille au sud
   const PLAGE11 = { x: 668, y: 744 };
@@ -1141,8 +1142,8 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
   gemmes(W, r7, 0, [[0.5, 1, 'tyranitarite']]); gemmes(W, r9, 1, [[0.6, 1, 'lucarionite']]);
   gemmes(W, r10, 2, [[0.3, -1, 'gyaradosite'], [0.8, 1, 'aerodactylite']]); gemmes(W, r11, 3, [[0.5, 1, 'absolite']]);
   gemmes(W, r12, 4, [[0.4, -1, 'scizorite'], [0.85, 1, 'heracronite']]);
-  legend({ id: 'latias', sp: 380, lvl: 50, ...xy(offRoute(r10, 0.55, -1, 3)), cond: (f, g) => g.badgeCount() >= 8, intro: ['Un souffle chaud frôle la route...', 'Un Pokémon rouge et blanc plane en silence : Latias !'] });
-  legend({ id: 'diancie', sp: 719, lvl: 55, ...xy(offRoute(r12, 0.6, -1, 3)), cond: (f, g) => g.badgeCount() >= 8, intro: ['Des cristaux roses scintillent entre les arbres...', 'Une petite princesse de diamant apparaît : Diancie !'] });
+  legend({ id: 'latias', sp: 380, lvl: 50, ...xy(offRoute(r10, 0.55, -1, 3)), cond: (f, g) => g.badgeCount() >= 8 && (!!f.drakos || !!g.state?.badges?.[7]), intro: ['Un souffle chaud frôle la route...', 'Un Pokémon rouge et blanc plane en silence : Latias !'] });
+  legend({ id: 'diancie', sp: 719, lvl: 55, ...xy(offRoute(r12, 0.6, -1, 3)), cond: (f, g) => g.badgeCount() >= 8 && (!!f.drakos || !!g.state?.badges?.[7]), intro: ['Des cristaux roses scintillent entre les arbres...', 'Une petite princesse de diamant apparaît : Diancie !'] });
   // le passeur du Cap Mirage et le ponton de Port-Granit : le seul bateau qui franchit les tourbillons de l'archipel
   // (5 badges : on y vient d'abord à pied, par Mirage ; le bateau de l'Embarcadère n'y mène pas plus tôt)
   pierV('cap', 'Cap Mirage', CAP.x + 12, CAP.y + 7, 1, 2, 5, { town: 'Cap Mirage' });
@@ -1409,7 +1410,7 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
     [['Médium', 'Esther', [[1039, 33], [178, 33]]], ['Médium', 'Félix', [[97, 34], [1030, 34]]], ['Topdresseuse', 'Luna', [[196, 35]]]],
     [['Montagnard', 'Marcel', [[1026, 38], [74, 38]]], ['Montagnard', 'Henri', [[95, 39], [1028, 39]]], ['Garde d\'Écaille', 'Gwen', [[1027, 40]]]],
     [['Karatéka', 'Akira', [[1041, 43], [58, 43]]], ['Topdresseur', 'Blaise', [[78, 44], [1005, 44]]], ['Garde d\'Écaille', 'Ignace', [[1042, 45], [218, 44]]]],
-    [['Garde d\'Écaille', 'Kael', [[1049, 47], [1050, 48]]], ['Topdresseuse', 'Wyrna', [[148, 49], [1044, 49]]], ['Garde d\'Écaille', 'Ivar', [[147, 48], [1050, 49], [1025, 49]]]],
+    [['Garde d\'Écaille', 'Kael', [[1049, 47], [1050, 48]]], ['Topdresseuse', 'Wyrna', [[148, 49], [329, 49]]], ['Garde d\'Écaille', 'Ivar', [[147, 48], [1050, 49], [334, 49]]]],
     ...GYM_TRAINERS_SUD,
   ];
   // quatrième dresseur des arènes qui n'en avaient que deux ou trois

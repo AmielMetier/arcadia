@@ -70,7 +70,9 @@ export const MISSIONS = [
       idle: ['Je suis la mère des trois frères. Drakos, Pyros, Basalte...', 'Ils ne viennent plus me voir. Le continent non plus.'],
       thanks: ['Une lettre de Pierrefort ? Les mineurs se souviennent de mon Basalte...', 'Mes trois garçons se sont perdus dans la rancune de l\'aîné.', 'Merci, petit. Prends ça. Et si tu les croises, dis-leur que leur mère les attend pour dîner.'],
       done: (st) => (st.badges[7] ? ['Ils sont venus dîner, tous les trois. Pour la première fois depuis dix ans.'] : ['Basalte m\'a répondu. Les choses changent, je crois.']) },
-    ask: ['Basalte travaillait ici, avec nous. Le meilleur mineur que j\'aie connu.', 'Sa mère vit toujours à Port-Granit, sur l\'Île de Granit. Elle n\'a plus de nouvelles du continent depuis que Drakos a fermé les ports.', 'Si un jour tu passes là-bas, apporte-lui cette lettre de la part des mineurs.'],
+    ask: (st) => (st.badges[7] || st.flags.drakos)
+      ? ['Basalte travaillait ici, avec nous. Le meilleur mineur que j\'aie connu.', 'Sa mère vit toujours à Port-Granit, sur l\'Île de Granit. Maintenant que les îles s\'ouvrent, apporte-lui cette lettre de la part des mineurs !']
+      : ['Basalte travaillait ici, avec nous. Le meilleur mineur que j\'aie connu.', 'Sa mère vit toujours à Port-Granit, sur l\'Île de Granit. Elle n\'a plus de nouvelles du continent depuis que Drakos a fermé les ports.', 'Si un jour tu passes là-bas, apporte-lui cette lettre de la part des mineurs.'],
     wait: ['L\'Île de Granit est loin, au-delà du Cap Mirage. Prends ton temps.'], done: ['La mère de Basalte a eu notre lettre ? Les mineurs vont être contents.'],
     journal: { name: 'Des nouvelles du continent', start: 'Le vieux Léon, à Pierrefort, m\'a confié une lettre des mineurs pour la mère de Basalte, qui vit à Port-Granit.', end: 'La mère des trois frères a reçu la lettre des mineurs.' } },
 
@@ -132,7 +134,9 @@ export const MISSIONS = [
     journal: { name: 'Une nuit au jardin', start: 'Séraphine, à Mirage, m\'a demandé de me promener une nuit au Jardin des Songes.', end: 'J\'ai raconté ma nuit au Jardin des Songes à Séraphine.' } },
 
   { id: 'mPierreFeu', town: 'H', at: [26, 22], sprite: 'habitante', who: 'Salomé', kind: 'bring', item: 'fire-stone', reward: [['full-restore', 1], ['burn-heal', 3]],
-    ask: ['Mon Goupix rêve d\'évoluer, mais on ne trouve plus aucune Pierre Feu sur l\'île depuis que les ports sont fermés.', 'Si tu en as une, je te l\'échange contre de quoi soigner ton équipe !'],
+    ask: (st) => (st.badges[7] || st.flags.drakos)
+      ? ['Mon Goupix rêve d\'évoluer, et les bateaux arrivent encore timidement jusqu\'ici.', 'Si tu as une Pierre Feu en trop, je te l\'échange contre de quoi soigner ton équipe !']
+      : ['Mon Goupix rêve d\'évoluer, mais on ne trouve plus aucune Pierre Feu sur l\'île depuis que les ports sont fermés.', 'Si tu en as une, je te l\'échange contre de quoi soigner ton équipe !'],
     again: ['Une Pierre Feu... On en vendait dans les boutiques du continent.'],
     thanks: ['Une Pierre Feu ! Goupix, regarde !', 'Voilà, comme promis.'], done: ['Mon Feunard est magnifique, non ?'],
     journal: { name: 'La pierre de Goupix', start: 'Salomé, à Cendrelune, cherche une Pierre Feu pour faire évoluer son Goupix.', end: 'Le Goupix de Salomé est devenu un Feunard.' } },
@@ -176,11 +180,11 @@ export const MISSIONS = [
 
   // après la Ligue : la fin de l'histoire des trois frères et de Théo
   { id: 'mRevanche', town: 'L', at: [22, 5], sprite: 'drakos', who: 'Drakos', kind: 'duel', showIf: 'champion', cat: 'main',
-    duel: { cls: 'Champion', name: 'Drakos', bs: 'drakos', team: [[149, 83], [1051, 84], [715, 82], [373, 83], [445, 85], [1044, 82]], prize: 300 },
+    duel: { cls: 'Champion', name: 'Drakos', bs: 'drakos', team: [[149, 83], [1051, 84], [715, 82], [373, 83], [445, 85], [330, 84]], megaSp: 330, boss: true, prize: 300 },
     ask: ['Maître de la Ligue, hein ? Célestine a trouvé son successeur.', 'Je t\'avais dit que le vieux Drakos attendait sa revanche. Pas contre elle. Contre toi.', 'Cette fois, mes dragons ne retiendront rien.'],
     lose: 'Ha ! Je savais que tu ne me ferais pas de cadeau.',
     thanks: ['... Deux fois. Tu m\'as battu deux fois.', 'Ma mère m\'a dit : « Un frère qui perd avec honneur vaut mieux qu\'un roi qui gagne seul. »', 'Les îles sont ouvertes, pour de bon. Prends ceci, Maître.'], reward: [['master-ball', 1]],
-    again: ['Prêt pour ma revanche ?'], done: ['Pyros et Basalte veulent t\'affronter aussi. Les îles t\'appartiennent, Maître.'],
+    again: (st) => [`Prêt${st.gender === 'f' ? 'e' : ''} pour ma revanche ?`], done: ['Basalte et Pyros t\'ont déjà salué à leur manière, mais les îles se souviendront longtemps de toi, Maître.'],
     journal: { name: 'La revanche de Drakos', start: 'Drakos m\'a défié à Fort-Écaille : il voulait sa revanche contre le nouveau Maître de la Ligue.', end: 'J\'ai battu Drakos une seconde fois. Les îles sont ouvertes pour de bon.' } },
 
   { id: 'mTheo', town: 'A', at: [17, 21], sprite: 'theo', who: 'Théo', kind: 'duel', showIf: 'champion', cat: 'main',

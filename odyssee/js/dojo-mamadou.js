@@ -1,4 +1,4 @@
-// odyssee/js/dojo-mamadou.js — Dojo de Mamadou (Port-Granit, dès le 6e Badge) :
+// odyssee/js/dojo-mamadou.js — Dojo de Mamadou (Port-Granit, dès le 5e Badge) :
 // Donjon / Tour de combat exclusivement multijoueur en Duo Co-op (2 humains vs 2 bots) et Trio Co-op (3 humains vs 3 bots),
 // avec 1 Pokémon actif sur le terrain par joueur, bots à IA hyperstratégique, Points du Dojo (PDj) et Boutique.
 
@@ -173,7 +173,7 @@ export function buildDojoBotChallenge(stage, format = 'double', lvl = 55, seed =
     }
     arch = DOJO_ARCHETYPES[poolIdx[stage]];
   }
-  const scaledLvl = Math.max(50, lvl + (stage >= 4 ? 2 : 0));
+  const scaledLvl = Math.min(100, Math.max(50, lvl + (stage >= 4 ? 2 : 0)));
   const party = arch.team.slice(0, count).map(([sp, item, ability, mvIds]) => {
     const validMoves = mvIds.filter((id) => MOVES[id]);
     return createMon(sp, scaledLvl, {
@@ -641,12 +641,14 @@ async function runDojoSeries(game, { rid, format, rosters, mySlot, hostId, peerI
     game.sound.play(dojoMusic);
     curtain.remove();
     game.bv.pvp = true;
+    game._dojoRealParty = realParty;
     st.party = battle.sides[0].party;
     let res;
     try {
       res = await game.bv.runCoopDojo(battle, coopNet, { bg: 'gym', night: false });
     } finally {
       st.party = realParty;
+      delete game._dojoRealParty;
       game.bv.pvp = false;
       game.bv.close();
       game.musicLock = false;

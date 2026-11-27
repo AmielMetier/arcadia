@@ -476,7 +476,7 @@ export const PLANS = {
       '#.......................#',
       '#...A.........1.........#',
       '#.......................#',
-      '#......5................#',
+      '#......5............Z...#',
       '#.......................#',
       '#p.....................p#',
       '############.############',
@@ -495,7 +495,7 @@ export const PLANS = {
     regles: [
       'ARÈNE DE FORT-ÉCAILLE — LE SANCTUAIRE\nChampion : Drakos, le gardien des dragons.',
       'Les ponts-dragons pivotent au-dessus du gouffre. Chaque statue fait tourner DEUX ponts d\'un quart de tour.',
-      'Regarde bien où mène chaque bras avant de toucher une statue : un pont tourné peut te couper la route du retour !',
+      'Regarde bien où mène chaque bras avant de toucher une statue : un pont tourné peut te couper la route du retour ! Un pupitre sur le parvis permet de remettre les ponts à zéro.',
       'Conseil de Drakos : « La Glace, la Fée et les Dragons eux-mêmes font trembler mes écailles. »',
     ],
     legende: {
