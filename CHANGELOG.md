@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.173 — 27 novembre 2026
+- Odyssée 3.8 : correctifs Acte 3 Lot P1 (Dojo, bareme/Rival, arènes 6 & 8, Odyssor, continuité post-Drakos) (Amiel)
+
 ## 5.172 — 27 novembre 2026
 - Odyssée 3.8 : correctifs Acte 3 Lot P0 (passeur Granit, barrages r11/Pont Austral, arènes 6-7, Méga fans, doMega/Dojo) (Amiel)
 
