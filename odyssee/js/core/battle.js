@@ -477,14 +477,16 @@ export class Battle {
   }
   foeWantsMega(b, slot = 0) { return b?.type === 'move' && this.canMega({ side: 1, slot }); }
   doMega(ref) {
-    const r = this.norm(ref), m = this.act(r), before = this.Nm(r);
+    const r = this.norm(ref), m = this.act(r), v = this.vol(r), before = this.Nm(r);
+    const prevAb = this.ab(r);
     const trainer = r.side === 0 ? this.sides[0].name : (this.sides[1].trainer?.name || this.sides[1].name);
     const de = /^[AEIOUYÉÈÊÂÎÔH]/i.test(trainer) ? 'd\'' : 'de ';
     this.say(`${before} réagit au Méga-Anneau ${de}${trainer} !`);
     megaEvolve(m); this.sides[r.side].megaUsed = true;
+    if (v) { delete v.ability; delete v.types; }
     this.ev.push({ t: 'mega', side: r.side, slot: r.slot, sp: m.sp });
     this.say(`${before} méga-évolue en ${SPECIES[m.sp].n} !`);
-    this.triggerEntry(r);
+    if (this.ab(r) !== prevAb) this.triggerEntry(r);
   }
 
   /** après un K.O. : en 1v1 reçoit un indice ; en 2v2/3v3 reçoit un indice, un tableau d'indices ou [{ slot, idx }] */
@@ -876,7 +878,18 @@ export class Battle {
     if (!cands.length) return { targets: [], isSpread: false, selfTarget: false };
     if (mv.tg === 8) return { targets: [cands[this.r(cands.length)]], isSpread: false, selfTarget: false };
     const picked = a.targetSide === opp && cands.find((t) => t.slot === a.targetSlot);
-    return { targets: [picked || cands[0]], isSpread: false, selfTarget: false };
+    let tgt = picked || cands[0];
+    // en Duo/Trio, Paratonnerre et Lavabo attirent les attaques monocibles Électrik/Eau, sauf face à Nerfs d'Acier (stalwart)
+    const attAb = this.ab(attRef);
+    if (this.slots > 1 && mv.c !== 'status' && attAb !== 'stalwart' && attAb !== 'propeller-tail') {
+      const mType = this.moveType(attRef, mv);
+      const redirAb = mType === 'electric' ? 'lightning-rod' : mType === 'water' ? 'storm-drain' : null;
+      if (redirAb && this.defAb(attRef, tgt) !== redirAb) {
+        const magnet = this.allAliveRefs().find((t) => !(t.side === attRef.side && t.slot === attRef.slot) && this.defAb(attRef, t) === redirAb);
+        if (magnet) tgt = magnet;
+      }
+    }
+    return { targets: [tgt], isSpread: false, selfTarget: false };
   }
 
   useMove(i, a, first) { return this.useMoveRef({ side: i, slot: 0 }, a, first ? null : new Set(['acted'])); }
@@ -1428,6 +1441,17 @@ export class Battle {
           if (abId === 'ice-body' && w === 'hail') heal(1 / 16, `Corps Gel soigne ${this.nm(ref)} !`);
           if (abId === 'dry-skin' && w === 'rain') heal(1 / 8, `Peau Sèche soigne ${this.nm(ref)} !`);
           if ((abId === 'dry-skin' || abId === 'solar-power') && w === 'sun') { this.hp(ref, -Math.max(1, Math.floor(m.stats[0] / 8))); this.say(`${this.Nm(ref)} souffre du soleil !`); }
+          if (abId === 'healer' && this.slots > 1) {
+            for (const sl of this.aliveSlots(i)) {
+              if (sl === slot) continue;
+              const allyRef = { side: i, slot: sl }, ally = this.act(allyRef);
+              if (ally?.status && this.rng() < 0.3) {
+                ally.status = null; ally.slp = 0; ally.tox = 0;
+                this.ev.push({ t: 'status', side: i, slot: sl, status: null });
+                this.say(`Cœur Soin de ${this.nm(ref)} soigne le statut de ${this.nm(allyRef)} !`);
+              }
+            }
+          }
           const cure = (abId === 'shed-skin' && this.r(100) < 30) || (abId === 'hydration' && w === 'rain');
           if (cure && m.status && !isFainted(m)) { m.status = null; m.slp = 0; m.tox = 0; this.ev.push({ t: 'status', side: i, slot, status: null }); this.say(`${ABILITIES[abId]?.name || abId} guérit ${this.nm(ref)} !`); }
         }

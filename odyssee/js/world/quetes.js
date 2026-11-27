@@ -791,10 +791,10 @@ export function buildQuests(ctx) {
   });
 
   /* ====================================================================================================
-     Quête · Le dragon de pierre (Musée des Dragons, Fort-Écaille) : le Vieil Ambre de la Grotte des Marées
+     Quête · Le dragon de pierre (Musée des Dragons, Cimelune) : le Vieil Ambre de la Grotte des Marées
      ==================================================================================================== */
   Q('fossile', {
-    name: 'Le dragon de pierre', where: 'Fort-Écaille',
+    name: 'Le dragon de pierre', where: 'Cimelune',
     steps: ['Trouver un morceau d\'ambre ancien. On dit que la Grotte des Marées en cache un.', 'Rapporter le Vieil Ambre au savant du Musée des Dragons.'],
     end: 'Le savant a ranimé un Ptéra, un dragon d\'avant l\'histoire.',
   });

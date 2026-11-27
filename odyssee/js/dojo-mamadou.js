@@ -128,7 +128,7 @@ export const DOJO_ARCHETYPES = [
     lose: 'Une faille trouvée à force de solidarité… Respect !',
     team: [
       [212, 'life-orb', 'technician', [418, 404, 14, 182]],           // Cizayox (Pisto-Poing Technicien)
-      [681, 'leftovers', null, [430, 247, 425, 197]],                 // Exagide
+      [376, 'leftovers', 'clear-body', [309, 428, 418, 182]],          // Métalosse (Forteresse d'Acier)
       [530, 'focus-sash', 'mold-breaker', [89, 442, 157, 182]],       // Minotaupe
       [248, 'assault-vest', 'sand-stream', [157, 242, 89, 8]],        // Tyranocif
       [598, 'rocky-helmet', 'iron-barbs', [438, 442, 86, 182]],       // Noacier

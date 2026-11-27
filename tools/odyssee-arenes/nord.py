@@ -253,7 +253,7 @@ for y, r in enumerate([
     '#rrrrrrr.Rrr.....rrrrrrr#',
     '#rrrrrrr...R.rr.rrrrrrrr#',
     '#rrrrrrr....r.r..rrrrrrr#',
-    '#rrrrrrr........Zrrrrrrr#',
+    '#rrrrrrr..5.....Zrrrrrrr#',
     '#rrrrrrr........rrrrrrrr#',
 ]):
     P.row(y, 0, r)
@@ -270,7 +270,7 @@ arene(5, P, r"""
       r: { t: 'bloc', deco: 'roche_gym' },
       X: { fosse: true },
     },
-    dresseurs: [{ dir: 'right', vue: 3 }, { dir: 'left', vue: 3 }, { dir: 'down', vue: 3 }, { dir: 'left', vue: 3 }, { dir: 'right', vue: 3 }],
+    dresseurs: [{ dir: 'right', vue: 3 }, { dir: 'up', vue: 2 }, { dir: 'down', vue: 3 }, { dir: 'left', vue: 3 }, { dir: 'right', vue: 3 }],
 """)
 
 # ---------------------------------------------------------------- 6. Pyros (Feu) : la Forge — deux réseaux de coulées à aiguiller, sol crevé, gardiens du savoir (Cramois'Île, Vermilava)
@@ -282,7 +282,9 @@ archipel(P, 'L', [None if t is None else '.' if t == 'w' else t for t in T6])
 for (c, r), k in V6.items(): P.put(*ile(c, r, 1, 0), 'VW'[k])
 for c, r, dx, dy in [(2, 1, 2, 1), (0, 1, -2, 1), (1, 2, 2, -1), (2, 0, -2, -1), (0, 2, 2, 1)]: P.put(*ile(c, r, dx, dy), 'h')
 P.put(*ile(1, 3, -1, 1), 'U')
-P.put(*ile(1, 0, -1, 0), 'K'); P.put(*ile(0, 2, -1, 0), 'K')
+# gardiens du savoir sur des passages obligés devant les ponts à 1 case (lave sur les côtés libres hors chemin de vanne)
+P.put(*ile(1, 0, 0, -1), 'K'); P.put(*ile(1, 0, -1, -1), 'L')
+P.put(*ile(0, 2, 0, -1), 'K'); P.put(*ile(0, 2, -1, -1), 'L')
 for i, (c, r, dx, dy) in enumerate([(2, 3, 2, 1), (0, 3, -2, 1), (1, 1, -2, -1), (2, 2, 2, -1), (0, 0, -2, 1)]): P.put(*ile(c, r, dx, dy), str(i + 1))
 P.hall(22)
 arene(6, P, r"""
