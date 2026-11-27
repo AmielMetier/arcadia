@@ -157,7 +157,9 @@ export function playBossCinematicAudio(sound, preset = 'shadow', durationSec = n
   const isShadowFull = preset === 'shadow' && dur >= 12;
   const c = sound.ctx;
   const bus = c.createGain();
-  const masterVol = Math.max(0, Math.min(1.35, (sound.vol ?? 0.7) * 1.25));
+  // le bus général (sound.master) applique déjà le volume réglé : ici, seulement le niveau propre à la scène
+  // (avant : volume × volume × 1,25, trop fort à fond et presque muet à bas volume)
+  const masterVol = sound.master ? 1 : Math.max(0, Math.min(1, sound.vol ?? 0.7));
   bus.gain.value = masterVol;
   bus.connect(sound.master || c.destination);
 
@@ -309,7 +311,8 @@ export function playBossCinematicAudio(sound, preset = 'shadow', durationSec = n
     if (cryUrl && typeof window !== 'undefined' && typeof window.Audio === 'function') {
       try {
         const a = new window.Audio(cryUrl);
-        a.volume = sound.muted ? 0 : Math.min(1, (sound.vol ?? 0.7) * 0.92);
+        const fx = typeof window !== 'undefined' && window.DDVolume?.get ? Number(window.DDVolume.get('fx')) : 1;
+        a.volume = sound.muted ? 0 : Math.max(0, Math.min(1, (sound.vol ?? 0.7) * 0.92 * (Number.isFinite(fx) ? fx : 1)));
         if (isShadowFull) a.playbackRate = 0.85;
         cryEls.push(a);
         a.play().catch((e) => warnDev('audio-boss', e));

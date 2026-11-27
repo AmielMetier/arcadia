@@ -201,7 +201,7 @@ export function foeChooseSlot(b, slot = 0, itemUsed = false, ctx = null) {
   }
 
   const isStrategic = !!t.strategic || t.ai === 'strategic';
-  const isRival = t.cls === 'Rival' || t.rival || b.rival;
+  const isRival = !t.friendly && (t.cls === 'Rival' || t.rival || b.rival);
   const isSmart = t.ai === 'smart' || isStrategic;
   const lock = b.choiceLock(ref);
   const threat = (isSmart || isRival) ? foeThreatInfo(b, slot) : { incomingMaxDmg: 0, foeFaster: false, threatenedKO: false };

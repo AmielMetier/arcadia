@@ -1189,6 +1189,21 @@ img { image-rendering: pixelated; }
   transform: translate(calc(var(--px) * 1), calc(var(--px) * -1));
 }
 
+/* objet tenu : petite icône posée en bas à droite du Pokémon, et une ligne sous les types du Pokémon en tête */
+.pslot-sub-ped { position: relative; }
+.pslot-held {
+  position: absolute; right: calc(var(--px) * -2); bottom: calc(var(--px) * -2); z-index: 2;
+  width: calc(var(--px) * 12); height: calc(var(--px) * 12); object-fit: contain; image-rendering: pixelated;
+  background: #0a1420; border: calc(var(--px) * 0.8) solid #f0c040; padding: calc(var(--px) * 0.5);
+  filter: drop-shadow(0 calc(var(--px) * 0.6) 0 rgba(0,0,0,0.7));
+}
+.pslot-held-line {
+  display: flex; align-items: center; gap: calc(var(--px) * 2); margin-top: calc(var(--px) * 2);
+  font-size: calc(var(--px) * 5.5); color: #9fc4e8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pslot-held-line img { width: calc(var(--px) * 10); height: calc(var(--px) * 10); image-rendering: pixelated; flex: none; }
+.pslot-held-line b { color: #ffd860; font-weight: normal; overflow: hidden; text-overflow: ellipsis; }
+
 /* === 02-resume.css === */
 /* ---------- résumé (Style 5G Noir 2 / Blanc 2 - Pixel Art) ---------- */
 .sum-scr {
@@ -1388,6 +1403,10 @@ img { image-rendering: pixelated; }
 .sum-mem-place { font-size: calc(var(--px) * 4.6); color: #7dd3fc; white-space: nowrap; }
 .sum-mem-desc { font-size: calc(var(--px) * 4.6); color: #b8cce4; line-height: 1.15; }
 .sum-mem-empty { grid-column: 1 / -1; color: #9cb4d4; font-size: calc(var(--px) * 5.6); line-height: 1.4; background: #121c2c; border: calc(var(--px) * .8) dashed #324a6e; padding: calc(var(--px) * 4); text-align: center; }
+
+/* objet tenu dans le résumé : icône et nom */
+.sum-held { display: inline-flex; align-items: center; gap: 0.35em; vertical-align: middle; }
+.sum-held img { width: 1.6em; height: 1.6em; image-rendering: pixelated; }
 
 /* === 03-sac.css === */
 /* ================= SAC D'OBJETS B2W2 (PROPOSITION 1 — DUAL PANEL & ROUE ANIMÉE) ================= */
@@ -4148,7 +4167,8 @@ img { image-rendering: pixelated; }
 .speech-bubble {
   position: absolute;
   pointer-events: none;
-  z-index: 85;
+  /* dans le monde, sous la bannière (15), les écrans (22), les dialogues (35) et les fondus (60) */
+  z-index: 14;
   background: #ffffff;
   border: 2px solid #142030;
   border-radius: 12px;
@@ -5381,7 +5401,8 @@ img { image-rendering: pixelated; }
 
 /* === 09-aide-reseau.css === */
 /* écran titre : la mer d'Odyssor en fond */
-.title-cv { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; z-index: -1; }
+/* 256 × 192 rogné en 16:9 : on coupe surtout le bas de la mer, pour garder la lune et le ciel entiers */
+.title-cv { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 22%; image-rendering: pixelated; z-index: -1; }
 .title-scr .logo, .title-scr .press, .title-scr .title-menu, .title-scr .title-foot, .title-scr .save-info { position: relative; }
 /* comme sur SoulSilver : le titre en haut, la créature au centre, l'invite sur la mer */
 .title-scr .logo { position: absolute; top: calc(var(--px) * 2); transform: none; }
@@ -5401,10 +5422,12 @@ img { image-rendering: pixelated; }
 .keyhint.active.turbo { background: rgba(156, 40, 16, 0.78); color: #ffc898; border-color: #ff8848; }
 #ui:has(> .dlg, > .screen, > .wipe, > .battle-wipe, > .door-iris.on, > .battle, > .title-scr) .keybar { opacity: 0; }
 #ui:has(> .dlg, > .screen, > .wipe, > .battle-wipe, > .door-iris.on, > .battle, > .title-scr) .keyhint { pointer-events: none; }
-.keypanel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 56; padding: calc(var(--px) * 6) calc(var(--px) * 10); display: none; width: min(94vw, calc(var(--px) * 330)); font-size: .85em; }
+.keypanel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 56; padding: calc(var(--px) * 6) calc(var(--px) * 10); display: none; width: min(94vw, calc(var(--px) * 330)); max-height: 90vh; overflow-y: auto; font-size: .85em; pointer-events: auto; }
 .keypanel.on { display: block; }
+.keypanel-close { position: absolute; top: calc(var(--px) * 3); right: calc(var(--px) * 4); min-width: calc(var(--px) * 16); min-height: calc(var(--px) * 16); padding: 0 calc(var(--px) * 3); border: var(--px) solid #283850; border-radius: calc(var(--px) * 3); background: #d84848; color: #fff; font: inherit; font-weight: 700; line-height: 1.2; cursor: pointer; text-shadow: none; }
+.keypanel-close:hover { background: #b83030; }
 .keypanel td:first-child { width: 46%; }
-.keypanel .hint { margin-top: calc(var(--px) * 4); text-align: center; }
+.keypanel .hint { margin-top: calc(var(--px) * 4); text-align: center; cursor: pointer; }
 kbd { display: inline-block; font: inherit; font-size: .85em; min-width: 1.4em; text-align: center; padding: 0 calc(var(--px) * 1.5); margin: 0 1px; border-radius: calc(var(--px) * 1.5); background: #eef1f6; border: var(--px) solid #8898b0; border-bottom-width: calc(var(--px) * 2); text-shadow: none; color: var(--ink); }
 
 .surf-ride { position: absolute; }
@@ -5894,7 +5917,8 @@ html.doigt .keyhint b, html.doigt .keyhint:first-child, html.doigt .title-foot {
   filter: drop-shadow(0 6px 10px rgba(0,0,0,.55)); transition: none !important; }
 
 /* interface repliée (par défaut) : rien par-dessus la carte, comme dans un jeu Pokémon ; U la réaffiche */
-.hud.collapsed .hud-loc, .hud.collapsed .hud-online-badge, .hud.collapsed .hud-event-pill, .hud.collapsed .hud-stats, .hud.collapsed .hud-quick-item, .hud.collapsed .hud-guide, .hud.collapsed .hud-dexnav, .hud.collapsed .hud-bdots-row, .hud.collapsed .hud-quest-card, .hud.collapsed .hud-actions { display: none; }
+/* HUD replié : le nom du lieu reste affiché */
+.hud.collapsed .hud-online-badge, .hud.collapsed .hud-event-pill, .hud.collapsed .hud-stats, .hud.collapsed .hud-quick-item, .hud.collapsed .hud-guide, .hud.collapsed .hud-dexnav, .hud.collapsed .hud-bdots-row, .hud.collapsed .hud-quest-card, .hud.collapsed .hud-actions { display: none; }
 .hud.collapsed .hud-loc-row { gap: calc(var(--px) * 1.5); }
 .hud-off > .keybar { display: none; }
 /* pendant un dialogue, la barre des touches s'efface : elle passait par-dessus la boîte de texte */
@@ -9098,6 +9122,9 @@ html.doigt .keyhint b, html.doigt .keyhint:first-child, html.doigt .title-foot {
   max-width: calc(var(--px) * 100);
   line-height: 1.4;
 }
+
+/* médaille choisie au clavier (▲ ▼) */
+.tmedal-card.sel { outline: calc(var(--px) * 1) solid #7dd3fc; outline-offset: calc(var(--px) * 0.5); }
 
 /* === 19-spectateur.css === */
 /* ==========================================================================

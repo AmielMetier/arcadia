@@ -62,7 +62,7 @@ export class CelestialSystem {
     if (C.kind) { C.reste -= dt; if (C.reste <= 0) f.ciel = { dans: entre(...CIEL.attente) }; return; }
     C.dans -= dt;
     if (C.dans > 0 || g.busy || g.bv?.alive) return;
-    const kind = Math.random() < 0.5 ? 'aurora' : 'meteor';
+    const kind = (g.badgeCount?.() || 0) >= 1 && Math.random() < 0.5 ? 'meteor' : 'aurora';
     f.ciel = { kind, reste: entre(...CIEL.duree) };
     g.sound?.sfx?.(kind === 'aurora' ? 'aurora_cast' : 'meteor_cast');
   }
@@ -158,7 +158,7 @@ export class CelestialSystem {
     this._animT += dt;
     this._spawnCd -= dt;
     if (this._spawnCd <= 0 && this.meteors.length < 3) {
-      this._spawnCd = 20;
+      this._spawnCd = 35;
       this.spawnMeteorNearPlayer();
     }
     // Retirer les météorites trop lointaines
@@ -222,15 +222,24 @@ export class CelestialSystem {
     try {
       g.sound?.sfx('meteor_pick');
       await ui.say('Une pierre météorique encore tiède brille d\'une poussière d\'étoiles...');
+      const badges = g.badgeCount?.() || 0;
       if (Math.random() < 0.65) {
         const r = Math.random();
-        const item = r < 0.55 ? 'fragment-meteore' : r < 0.70 ? 'moon-stone' : r < 0.80 ? 'sun-stone' : r < 0.86 ? 'rare-candy' : 'ultra-ball';
-        const qty = item === 'ultra-ball' ? 2 : 1;
+        let item, qty = 1;
+        if (badges < 2) {
+          item = r < 0.35 ? 'super-potion' : r < 0.65 ? 'great-ball' : r < 0.85 ? 'sitrus-berry' : 'fragment-meteore';
+        } else if (badges < 4) {
+          item = r < 0.45 ? 'fragment-meteore' : r < 0.65 ? 'moon-stone' : r < 0.80 ? 'sun-stone' : r < 0.90 ? 'rare-candy' : 'great-ball';
+          qty = item === 'great-ball' ? 2 : 1;
+        } else {
+          item = r < 0.55 ? 'fragment-meteore' : r < 0.70 ? 'moon-stone' : r < 0.80 ? 'sun-stone' : r < 0.86 ? 'rare-candy' : 'ultra-ball';
+          qty = item === 'ultra-ball' ? 2 : 1;
+        }
         g.give(item, qty);
         await ui.say(formatFindItem(st.name, item, qty));
       } else {
-        const validPool = CELESTIAL_SPECIES.filter((id) => SPECIES[id]);
-        const jirachiReady = (g.badgeCount?.() || 0) >= 8 && !st.flags.meteorJirachi && SPECIES[JIRACHI_SP] && Math.random() < 0.04;
+        const validPool = CELESTIAL_SPECIES.filter((id) => SPECIES[id] && (badges >= 2 || (id !== 337 && id !== 338)));
+        const jirachiReady = badges >= 8 && !st.flags.meteorJirachi && SPECIES[JIRACHI_SP] && Math.random() < 0.04;
         const sp = jirachiReady ? JIRACHI_SP : validPool[Math.floor(Math.random() * validPool.length)];
         const lvls = (st.party || []).filter((q) => q.hp > 0).map((q) => q.lvl);
         const leadLvl = lvls.length ? lvls[0] : 12;

@@ -77,7 +77,7 @@ export function createAlphaMon(entry, lvl, met = 'Faille Alpha') {
     const idx = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
     mon.iv[idx] = 31;
   }
-  if (sigId && MOVES[sigId] && !mon.moves.some((mv) => mv.id === sigId)) {
+  if (lvl >= 25 && sigId && MOVES[sigId] && !mon.moves.some((mv) => mv.id === sigId)) {
     const moveObj = { id: sigId, pp: MOVES[sigId].pp };
     if (mon.moves.length < 4) mon.moves.push(moveObj);
     else mon.moves[0] = moveObj;
@@ -181,7 +181,7 @@ export class RiftSystem {
       this.clearActor();
       return;
     }
-    if (st.flags?.dex && (st.party?.length || 0) > 0) {
+    if (st.flags?.dex && (st.party?.length || 0) > 0 && (g.badgeCount?.() || 0) >= 2) {
       const F = (st.flags.faille ||= { dans: entre(...FAILLES.premiere) });
       this._cherche -= dt;
       if (this.active) {

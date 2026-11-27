@@ -40,6 +40,32 @@ const PRESET_DEFS = {
     badge: 'FLAMME ARC-EN-CIEL',
     cssVars: { '--cine-accent': '#fbbf24', '--cine-dot': '#f43f5e', '--cine-glow': 'rgba(251,191,36,0.92)', '--cine-aura': 'rgba(217,119,6,0.42)', '--cine-aura-hi': 'rgba(244,63,94,0.65)', '--cine-badge-bg': 'rgba(69,18,24,0.84)', '--cine-badge-txt': '#fef3c7', '--cine-badge-bd': 'rgba(251,191,36,0.65)', '--cine-grad-mid': '#fef9c3', '--cine-grad-end': '#e11d48', '--cine-sky-bg': '#190814' },
   },
+  // premiers Champions : des scènes plus courtes et plus douces que celles des légendaires (pas d'éclairs, moins de
+  // particules), pour ne pas voler la vedette aux boss de la fin
+  ruche: {   // Hector, l'apiculteur : la Ruche, lumière ambrée, pollen doré qui flotte
+    audio: 'nature', duration: 4.8,
+    skyBg: 0x1a1004, fog: 0x2a1a06, fogDensity: 0.022,
+    skyType: 'aurora', skyPrimary: 0xfbbf24, skySecondary: 0xd97706,
+    pillarType: 'obelisk', pillarCol: 0x3a2508, pillarGlow: 0xfcd34d,
+    sealType: 'core', coreCol: 0x4a2f08, coreEmissive: 0xd97706, ringCol: 0xfde68a,
+    groundMode: 'arena', groundCol: 0x241605, groundEmissive: 0x5a3a0a, altarCol: 0x3a2508,
+    aura1: '#fde68a', aura2: '#f59e0b', aura3: '#fcd34d',
+    boltCol: 0xfde68a, flashHex: '#fef3c7', particleMotion: 'spores', lightningFreq: 0, pCount: 200,
+    badge: 'LA RUCHE',
+    cssVars: { '--cine-accent': '#fbbf24', '--cine-dot': '#fde68a', '--cine-glow': 'rgba(251,191,36,0.85)', '--cine-aura': 'rgba(217,119,6,0.38)', '--cine-aura-hi': 'rgba(252,211,77,0.6)', '--cine-badge-bg': 'rgba(58,37,8,0.84)', '--cine-badge-txt': '#fef3c7', '--cine-badge-bd': 'rgba(251,191,36,0.6)', '--cine-grad-mid': '#fef9c3', '--cine-grad-end': '#b45309', '--cine-sky-bg': '#1a1004' },
+  },
+  ecume: {   // Marine, la dompteuse de vagues : l'océan au crépuscule, houle calme, écume claire
+    audio: 'water', duration: 4.8,
+    skyBg: 0x05203a, fog: 0x0a2f52, fogDensity: 0.02,
+    skyType: 'aurora', skyPrimary: 0x7dd3fc, skySecondary: 0x38bdf8,
+    pillarType: 'obelisk', pillarCol: 0x0c3358, pillarGlow: 0xbae6fd,
+    sealType: 'core', coreCol: 0x0c3a5e, coreEmissive: 0x0ea5e9, ringCol: 0xe0f2fe,
+    groundMode: 'waves', waveSeg: 24, waveAmp: 0.22, groundCol: 0x0a3358, groundEmissive: 0x0c4a6e, altarCol: 0x0c3358,
+    aura1: '#e0f2fe', aura2: '#38bdf8', aura3: '#bae6fd',
+    boltCol: 0xe0f2fe, flashHex: '#f0f9ff', particleMotion: 'spores', lightningFreq: 0, pCount: 200,
+    badge: 'LE BARRAGE',
+    cssVars: { '--cine-accent': '#7dd3fc', '--cine-dot': '#e0f2fe', '--cine-glow': 'rgba(125,211,252,0.85)', '--cine-aura': 'rgba(14,165,233,0.38)', '--cine-aura-hi': 'rgba(186,230,253,0.6)', '--cine-badge-bg': 'rgba(12,51,88,0.82)', '--cine-badge-txt': '#f0f9ff', '--cine-badge-bd': 'rgba(125,211,252,0.58)', '--cine-grad-mid': '#f0f9ff', '--cine-grad-end': '#0369a1', '--cine-sky-bg': '#05203a' },
+  },
   water: {
     audio: 'water', duration: 6.4,
     skyBg: 0x031426, fog: 0x06203b, fogDensity: 0.019,
@@ -308,20 +334,20 @@ const LEGEND_PRESET_MAP = {
 export const isLegendarySpecies = (sp) => Object.prototype.hasOwnProperty.call(LEGEND_PRESET_MAP, sp);
 
 const GYM_PRESET_MAP = {
-  bug: ['nature', 'Badge Carapace · Arène de Sylvebourg'],
-  water: ['water', 'Badge Onde · Arène de Port-Azur'],
-  electric: ['thunder', 'Badge Éclair · Arène de Voltacité'],
+  bug: ['ruche', 'Badge Élytre · Arène de Sylvebourg'],
+  water: ['ecume', 'Badge Écume · Arène de Port-Azur'],
+  electric: ['thunder', 'Badge Volt · Arène de Voltacité'],
   grass: ['nature', 'Badge Pétale · Arène de Floralia'],
-  psychic: ['cosmic', 'Badge Vision · Arène de Cap Mirage'],
-  rock: ['titan', 'Badge Faille · Arène du Pic Basalte'],
+  psychic: ['cosmic', 'Badge Mirage · Arène de Mirage'],
+  rock: ['titan', 'Badge Granit · Arène de Port-Granit'],
   fire: ['fire', 'Badge Braise · Arène de Cendrelune'],
-  dragon: ['dragon', 'Badge Écaille · Tour de Fort-Écaille'],
-  normal: ['gym', 'Badge Harmonie · Arène de Métropole'],
-  flying: ['water', 'Badge Alizé · Arène de Port-Lisière'],
+  dragon: ['dragon', 'Badge Écaille · Arène de Fort-Écaille'],
+  normal: ['gym', 'Badge Pavé · Arène de Métropole'],
+  flying: ['water', 'Badge Rafale · Arène de Port-Lisière'],
   poison: ['eclipse', 'Badge Venin · Arène de Marais-Noir'],
-  ground: ['titan', 'Badge Ocre · Arène des Dunes d\'Ocre'],
-  steel: ['titan', 'Badge Enclume · Arène de Forge-Acier'],
-  fairy: ['fairy', 'Badge Rose · Arène de Rosebrume'],
+  ground: ['titan', 'Badge Dune · Arène des Dunes d\'Ocre'],
+  steel: ['titan', 'Badge Rouage · Arène de Forge-Acier'],
+  fairy: ['fairy', 'Badge Féérie · Arène de Rosebrume'],
   dark: ['eclipse', 'Badge Ombre · Arène d\'Ombreval'],
 };
 
@@ -478,7 +504,8 @@ export function buildSanctuary(THREE, cfg = PRESET_DEFS.shadow) {
   let geo;
   let basePos = null;
   if (cfg.groundMode === 'waves') {
-    geo = new THREE.PlaneGeometry(110, 110, 64, 64);
+    const seg = cfg.waveSeg || 64;   // moins de sommets pour les scènes légères (Champions) : moins de calcul à chaque image
+    geo = new THREE.PlaneGeometry(110, 110, seg, seg);
     geo.rotateX(-Math.PI / 2);
     basePos = new Float32Array(geo.attributes.position.array);
   } else {
@@ -784,7 +811,7 @@ export function createBoss3DScene(THREE, container, spriteImg, cfgInput = PRESET
   }
 
   // Particules 3D (tempête / braises / spores / orbite)
-  const pCount = 460;
+  const pCount = cfg.pCount || 460;
   const pPos = new Float32Array(pCount * 3);
   const pData = [];
   for (let i = 0; i < pCount; i++) {
@@ -889,7 +916,7 @@ export function createBoss3DScene(THREE, container, spriteImg, cfgInput = PRESET
     if (sanctuary.basePos) {
       const pos = sanctuary.groundMesh.geometry.attributes.position.array;
       const base = sanctuary.basePos;
-      const stormAmp = t < shatterAt ? 0.35 : Math.min(1.1, 0.4 + (t - shatterAt) * 0.2);
+      const stormAmp = cfg.waveAmp != null ? cfg.waveAmp : t < shatterAt ? 0.35 : Math.min(1.1, 0.4 + (t - shatterAt) * 0.2);
       for (let i = 0; i < pos.length; i += 3) {
         const vx = base[i], vz = base[i + 2];
         pos[i + 1] = Math.sin(vx * 0.25 + t * 2.2) * Math.cos(vz * 0.22 - t * 1.6) * stormAmp;

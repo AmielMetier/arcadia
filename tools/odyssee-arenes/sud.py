@@ -368,6 +368,6 @@ arene(12, P, r"""
 """ + ''.join(f"      {c}: {{ fleche: '{d}', r: {g}, mul: 2, decoFleche: 'tapis_{'rouge' if g == 0 else 'bleu'}' }},\n" for (d, g), c in TAPIS.items()) + r"""      K: { prop: 'levier_rouge', reg: { inc: [0, 2] }, use: true, msg: 'Clac ! Tu abaisses le levier rouge : tous les tapis rouges changent de sens.', son: 'select' },
       Q: { prop: 'levier_bleu', reg: { inc: [1, 2] }, use: true, msg: 'Clac ! Tu abaisses le levier bleu : tous les tapis bleus changent de sens.', son: 'select' },
     },
-    dresseurs: [{ dir: 'left', vue: 2 }, { dir: 'right', vue: 2 }, { dir: 'left', vue: 2 }, { dir: 'right', vue: 2 }],
+    dresseurs: [{ dir: 'down', vue: 2 }, { dir: 'right', vue: 2 }, { dir: 'down', vue: 2 }, { dir: 'right', vue: 2 }],
 """)
 

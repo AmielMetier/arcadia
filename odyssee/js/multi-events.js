@@ -27,6 +27,7 @@ import {
   createCoopNet,
 } from './dojo-mamadou.js';
 import { bossParId, capacitesBoss, niveauBoss, rangDe, formatRaid, joueursDuFormat, RAID_ESSAIS, RAID_PORTEE, RAID_PV, RAID_MAX_JOUEURS } from './raid-monde.js';
+import { nomDresseur } from './core/battle-helpers.js';
 
 /* ======================================================================
    1. RAIDS DE BOSS / ANTRES LÉGENDAIRES CO-OP (2 OU 3 JOUEURS VS BOSS)
@@ -183,7 +184,7 @@ export class RaidCoopBattle extends CoopDojoBattle {
     if (!this.monde) return super.start();
     const t = this.sides[1].trainer;
     const evs = super.start().filter((e) => !(e.t === 'send'
-      || (e.t === 'msg' && (/lance un combat/.test(e.text) || e.text.startsWith(`${t.cls} ${t.name} envoie`) || e.text.startsWith('En avant !')))));
+      || (e.t === 'msg' && (/lance un combat/.test(e.text) || e.text.startsWith(`${nomDresseur(t)} envoie`) || e.text.startsWith('En avant !')))));
     const out = [{ t: 'msg', text: `${this.sides[1].name} surgit, entouré d'une aura ${{ bleu: 'bleue', rouge: 'rouge', or: 'dorée' }[this.aura] || 'mystérieuse'} !` }];
     for (const sl of this.aliveSlots(0)) {
       const idx = this.sides[0].activeSlots[sl];

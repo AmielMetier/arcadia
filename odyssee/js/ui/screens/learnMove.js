@@ -13,10 +13,32 @@ export function learnMoveScreen(game, m, moveId) {
     const newM = MOVES[moveId];
     const s = screen(ui, 'learn-move-scr');
     let sel = 0; // 0..3: anciennes capacités, 4: abandonner
+    let occupe = false, fini = false;   // une question Oui / Non est ouverte : les autres clics attendent
 
-    const draw = () => {
+    /** encadré comparatif de l'attaque choisie */
+    const comparaison = () => {
       const activeMove = sel < 4 ? MOVES[m.moves[sel].id] : null;
       const activeDesc = sel < 4 ? moveDesc(activeMove) : "Conserver les 4 capacités actuelles et abandonner l'apprentissage de cette nouvelle capacité.";
+      return `
+              <div class="lm-comp-head">
+                ${sel < 4 ? `
+                  <span class="lm-comp-tag">CAPACITÉ ACTUELLE SÉLECTIONNÉE (${sel + 1}/4) :</span>
+                  <span class="lm-comp-name">${esc(activeMove.n)}</span>
+                  <span class="lm-comp-acc">${activeMove.a ? 'Précision : ' + activeMove.a + '%' : 'Précision : —'}</span>
+                ` : `
+                  <span class="lm-comp-tag">OPTION :</span>
+                  <span class="lm-comp-name">Abandonner</span>
+                `}
+              </div>
+              <div class="lm-comp-desc">${esc(activeDesc)}</div>`;
+    };
+    /** change la sélection sans tout redessiner (survol à la souris, flèches) */
+    const majSel = () => {
+      s.querySelectorAll('.lm-cur-move').forEach((e) => e.classList.toggle('sel', +e.dataset.idx === sel));
+      const box = s.querySelector('.lm-comparison-box'); if (box) box.innerHTML = comparaison();
+    };
+
+    const draw = () => {
 
       s.innerHTML = `
         <div class="scr-bar">
@@ -85,19 +107,7 @@ export function learnMoveScreen(game, m, moveId) {
             </div>
 
             <!-- Encadré comparatif dynamique pour l'attaque sélectionnée -->
-            <div class="lm-comparison-box">
-              <div class="lm-comp-head">
-                ${sel < 4 ? `
-                  <span class="lm-comp-tag">CAPACITÉ ACTUELLE SÉLECTIONNÉE (${sel + 1}/4) :</span>
-                  <span class="lm-comp-name">${esc(activeMove.n)}</span>
-                  <span class="lm-comp-acc">${activeMove.a ? 'Précision : ' + activeMove.a + '%' : 'Précision : —'}</span>
-                ` : `
-                  <span class="lm-comp-tag">OPTION :</span>
-                  <span class="lm-comp-name">Abandonner</span>
-                `}
-              </div>
-              <div class="lm-comp-desc">${esc(activeDesc)}</div>
-            </div>
+            <div class="lm-comparison-box">${comparaison()}</div>
           </div>
         </div>
       `;
@@ -106,10 +116,10 @@ export function learnMoveScreen(game, m, moveId) {
       s.querySelectorAll('.lm-cur-move').forEach((elRow) => {
         const idx = +elRow.dataset.idx;
         elRow.addEventListener('pointerenter', () => {
-          if (sel !== idx) {
+          if (sel !== idx && !occupe) {
             sel = idx;
             game.sound.sfx('blip');
-            draw();
+            majSel();
           }
         });
         elRow.addEventListener('click', () => {
@@ -119,22 +129,20 @@ export function learnMoveScreen(game, m, moveId) {
       });
     };
 
-    const doReplace = async (k) => {
-      const oldMove = MOVES[m.moves[k].id];
-      const confirm = await ui.yesNo(`Oublier ${oldMove.n} pour apprendre ${newM.n} ?`);
-      if (!confirm) return;
+    /** une seule question à la fois : un second clic pendant le Oui / Non ne rouvre rien (ni ne résout deux fois) */
+    const demander = async (texte, valeur) => {
+      if (occupe || fini) return;
+      occupe = true;
+      const ok = await ui.yesNo(texte);
+      occupe = false;
+      if (!ok || fini) return;
+      fini = true;
       s.remove();
       pop();
-      resolve(k);
+      resolve(valeur);
     };
-
-    const doCancel = async () => {
-      const confirm = await ui.yesNo(`Abandonner l'apprentissage de ${newM.n} ?`);
-      if (!confirm) return;
-      s.remove();
-      pop();
-      resolve(-1);
-    };
+    const doReplace = (k) => demander(`Oublier ${MOVES[m.moves[k].id].n} pour apprendre ${newM.n} ?`, k);
+    const doCancel = () => demander(`Abandonner l'apprentissage de ${newM.n} ?`, -1);
 
     const pop = ui.input.push((k) => {
       let j = sel;
@@ -160,7 +168,7 @@ export function learnMoveScreen(game, m, moveId) {
       if (j !== sel) {
         sel = j;
         game.sound.sfx('blip');
-        draw();
+        majSel();
       }
     });
 

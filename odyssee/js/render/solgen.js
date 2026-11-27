@@ -391,6 +391,17 @@ class Zone {
     return m;
   }
   /** cases → région au pixel près : coins arrondis, bord bruité, jamais à plus de band de la limite des cases */
+  /** un pont passe-t-il sur l'eau ? (en travers du pont, au-delà des voies voisines, il y a de l'eau) ; un ponton posé
+   *  sur la plage ou l'herbe garde son sol : pas de canal creusé dessous */
+  pontSurEau(cx, cy) {
+    const k = this.kind(cx, cy), horiz = k === K.B;
+    for (const d of [-1, 1]) for (let n = 1; n <= 4; n++) {
+      const q = horiz ? this.kind(cx, cy + d * n) : this.kind(cx + d * n, cy);
+      if (q === K.W) return true;
+      if (q !== k) break;
+    }
+    return false;
+  }
   region(pred, s, o = {}) { return this.regionC((cx, cy) => pred(this.kind(cx, cy)), s, o); }
   /** comme region, le prédicat porte sur la position de la case (cx, cy dans la zone ; hors zone : appelé quand même) */
   regionC(inC, s, { wobble = 1, round = 0.35, band = this.band, freq = 0.4 } = {}) {
@@ -928,7 +939,7 @@ function ponton(Z, img, frame) {
     for (let v = 0; v < c; v++) for (let u = 0; u < c; u++) tile[v * c + u] = img[at(u, v)];
     const a = intA ? -4 : c >> 3, b = intB ? c + 4 : c - (c >> 3), set = (u, v, col) => { if (u >= 0 && u < c && v >= 0 && v < c) tile[v * c + u] = col; };
     const gx = cx + Z.rx0, gy = cy + Z.ry0, le = horiz ? gx : gy, tr = horiz ? gy : gx;   // le long, en travers (monde)
-    if (!intB) {
+    if (!intB && Z.pontSurEau(cx, cy)) {
       for (let u = 0; u < c; u++) { for (let v = b; v < Math.min(c, b + 5); v++) set(u, v, W[0]); set(u, b, B[0]); set(u, b + 1, B[0]); }
       for (const px of [Math.floor(c / 6), c - Math.floor(c / 6) - 4]) {                          // pieux et ronds dans l'eau
         for (let v = b; v < Math.min(c, b + 6); v++) { for (let u = px; u < px + 4; u++) set(u, v, B[1]); set(px, v, B[3]); set(px + 3, v, B[0]); }
@@ -1300,8 +1311,7 @@ export function rendreBloc({ kinds, zw, zh, zx0, zy0, bw, bh, seed = 7, cave = n
   const Z = new Zone(kinds, zw, zh, zx0, zy0, seed), c = CELL;
   const img = new Uint8Array(Z.N).fill(TRANSPARENT);
   const has = (k) => kinds.includes(k);
-  const isW = (k) => k === K.W || k === K.B || k === K.BN;
-  const water = has(K.W) || has(K.B) || has(K.BN) ? Z.region(isW, seed + 100, { wobble: 0.7, round: 0.45 }) : new Uint8Array(Z.N);
+  const water = has(K.W) || has(K.B) || has(K.BN) ? Z.regionC((cx, cy) => { const k = Z.kind(cx, cy); return k === K.W || ((k === K.B || k === K.BN) && Z.pontSurEau(cx, cy)); }, seed + 100, { wobble: 0.7, round: 0.45 }) : new Uint8Array(Z.N);
   let path = has(K.P) || has(K.MP) ? Z.region((k) => k === K.P || k === K.MP, seed + 101, { wobble: 0.9, round: 0.55, band: c >> 1 }) : new Uint8Array(Z.N);
   const asph = has(K.A) ? Z.region((k) => k === K.A, seed + 104, { wobble: 0, round: 0.05, band: c >> 3 }) : new Uint8Array(Z.N);
   const pave = has(K.V) ? Z.region((k) => k === K.V, seed + 103, { wobble: 0.35, round: 0.1, band: c >> 2 }) : new Uint8Array(Z.N);

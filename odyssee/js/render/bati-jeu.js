@@ -15,7 +15,7 @@ const atelierJeu = () => (AT ||= atelier(32));
 const TOITS = { red: '#c05a40', blue: '#3a68c8', green: '#4a9a4a', brown: '#8a5a3a', gray: '#6a6e78', teal: '#3a8a8a', orange: '#d8803a', purple: '#7a4a9a', gold: '#c89a30', yellow: '#c8a838' };
 const hashB = (b) => Math.abs((b.x * 73856093) ^ (b.y * 19349663));
 /** type de l'arène d'une ville (pour la couleur et les ornements) */
-const TYPE_ARENE = { bug: 'plante', grass: 'plante', water: 'eau', fire: 'feu', electric: 'electrik', psychic: 'psy', dragon: 'dragon', ice: 'glace', rock: 'roche', ground: 'roche', fighting: 'combat', ghost: 'spectre', dark: 'spectre', poison: 'psy', flying: 'eau', normal: 'roche', steel: 'electrik', fairy: 'psy' };
+const TYPE_ARENE = { bug: 'insecte', grass: 'plante', water: 'eau', fire: 'feu', electric: 'electrik', psychic: 'psy', dragon: 'dragon', ice: 'glace', rock: 'roche', ground: 'roche', fighting: 'combat', ghost: 'spectre', dark: 'spectre', poison: 'psy', flying: 'eau', normal: 'roche', steel: 'electrik', fairy: 'psy' };
 
 /**
  * Le modèle d'un bâtiment de la carte : { nom, o } (paramètres du modèle), ou null pour garder l'ancien rendu (façade

@@ -20,7 +20,7 @@ import { decodeSave, saveSummary } from './core/savecode.js';
 import { Cloud } from './net/cloud.js';
 import { Game } from './game.js';
 import { warnDev, storeSet, sessSet, sessPop } from './core/safe.js';
-import { setMasques } from './render/tenue.js';
+import { setMasques, composer } from './render/tenue.js';
 import { VERSION_ODYSSEE } from './version.js';
 import { apparenceScreen } from './ui/apparence.js';
 import { createMon } from './core/mon.js';
@@ -325,10 +325,12 @@ function titleSea(cv, whale) {
   const W = 256, Hh = 192, SEA = 118;
   const stars = Array.from({ length: 70 }, (_, i) => ({ x: (i * 97) % W, y: (i * 53) % (SEA - 20), p: i * 0.7 }));
   const sparks = [];
-  let alive = true; const t0 = performance.now();
+  let alive = true; const t0 = performance.now(); let avant = t0;
   const frame = () => {
     if (!alive) return;
-    const t = (performance.now() - t0) / 1000;
+    const now = performance.now(), t = (now - t0) / 1000;
+    // pas de temps en images de 60 Hz : les gouttes tombent à la même vitesse à 60, 144 ou 30 images par seconde
+    const k = Math.min(3, (now - avant) / (1000 / 60)); avant = now;
     // ciel
     const g = x.createLinearGradient(0, 0, 0, SEA); g.addColorStop(0, '#0b1030'); g.addColorStop(0.6, '#24306a'); g.addColorStop(1, '#5a4e8e');
     x.fillStyle = g; x.fillRect(0, 0, W, SEA);
@@ -350,9 +352,9 @@ function titleSea(cv, whale) {
       x.save(); x.beginPath(); x.rect(0, 0, W, SEA + 3); x.clip();
       x.drawImage(whale, Math.round(wx - 80), wy); x.restore();
       // gouttes qui tombent des ailes
-      if (Math.random() < 0.8) sparks.push({ x: wx - 62 + Math.random() * 124, y: wy + 30 + Math.random() * 40, v: 0.6 + Math.random() * 0.6, life: 1, drop: true });
+      if (Math.random() < 0.8 * Math.min(1, k)) sparks.push({ x: wx - 62 + Math.random() * 124, y: wy + 30 + Math.random() * 40, v: 0.6 + Math.random() * 0.6, life: 1, drop: true });
     }
-    for (const p of sparks) { p.y += p.v; p.v += 0.05; p.life -= 0.018; if (p.y > SEA + 2) p.life = 0; x.fillStyle = `rgba(210,235,255,${Math.max(0, p.life)})`; x.fillRect(Math.round(p.x), Math.round(p.y), 1, 2); }
+    for (const p of sparks) { p.y += p.v * k; p.v += 0.05 * k; p.life -= 0.018 * k; if (p.y > SEA + 2) p.life = 0; x.fillStyle = `rgba(210,235,255,${Math.max(0, p.life)})`; x.fillRect(Math.round(p.x), Math.round(p.y), 1, 2); }
     for (let i = sparks.length - 1; i >= 0; i--) if (sparks[i].life <= 0) sparks.splice(i, 1);
     // vagues (par-dessus le bas d'Odyssor)
     for (let row = 0; row < 7; row++) {
@@ -582,6 +584,16 @@ async function intro(game, ui, sound) {
   chap.textContent = `${name.toUpperCase()} & THÉO · DÉPART À BOURG-AUBE`;
   ped.style.opacity = '1';
   hero.src = gender === 'f' ? 'img/dresseurs/player_f.png' : 'img/dresseurs/player_m.png';
+  // la tenue qu'on vient de choisir : le Prof. Saule voit le dresseur à ses couleurs (son dessin de la carte, de face)
+  const base = tenue && game.view.baseDe?.(gender);
+  if (base) {
+    const sheet = composer(base.src, base.sx, base.sy, tenue);
+    if (sheet) {
+      const c = document.createElement('canvas'); c.width = c.height = 64;
+      const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(sheet, 64, 0, 64, 64, 0, 0, 64, 64);
+      hero.src = c.toDataURL(); hero.style.imageRendering = 'pixelated';
+    }
+  }
   hero.classList.add('in');
   await ui.say([`${name} ! Voilà un prénom qui résonnera bientôt dans toutes les Arènes de la région !`], { speaker: 'Prof. Saule' });
 

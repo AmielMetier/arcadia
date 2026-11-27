@@ -10,6 +10,7 @@ import { createMon, monName } from './core/mon.js';
 import { SPECIES } from './data/species.js';
 import { ASSETS } from './assets.js';
 import { FOSSILES, enFete } from './world/faune.js';
+import { nomDresseur } from './core/battle-helpers.js';
 
 const jourDe = (d = new Date()) => d.toDateString();
 const h32 = (a, b, s) => { let h = (Math.imul(a | 0, 374761393) + Math.imul(b | 0, 668265263) + Math.imul(s | 0, 1442695041)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
@@ -79,7 +80,7 @@ export function revanchePossible(game, n) {
 export function noteCombat(game, n) { if (n.def.trainer && game.mapObj?.id === 'monde') etat(game.state).revanche[n.id] = Date.now(); }
 export async function revanche(game, n) {
   const d = n.def, tr = d.trainer, st = game.state, ui = game.ui;
-  const who = { speaker: tr.cls ? `${tr.cls} ${tr.name}` : tr.name, face: tr.bs || tr.ow || n.sprite };
+  const who = { speaker: nomDresseur(tr), face: tr.bs || tr.ow || n.sprite };
   if (!(await ui.yesNo(`Te revoilà ! Mon équipe s'est entraînée depuis la dernière fois.\nUne revanche ?`, who))) { await ui.say('Une autre fois, alors !', who); return; }
   // l'équipe a progressé : près du niveau maximal du moment, sans jamais redescendre
   const cap = Math.min(100, levelCap(st.badges));

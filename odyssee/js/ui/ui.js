@@ -284,7 +284,7 @@ export class UI {
     runBtn.addEventListener('click', () => { if (!this.input.helpOpen) this.input.emit('autorun'); });
     this.keyRunBtn = runBtn;
     bar.append(btn, escBtn, hudBtn, runBtn);
-    const panel = el('div', 'keypanel box', `<div class="list-title">Commandes</div><table class="kv">
+    const panel = el('div', 'keypanel box', `<button type="button" class="keypanel-close" aria-label="Fermer">✕</button><div class="list-title">Commandes</div><table class="kv">
       <tr><td>Se déplacer</td><td><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> ou <kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd></td></tr>
       <tr><td>Courir / Vitesse</td><td><kbd>Maj</kbd> maintenue · <kbd>R</kbd> (ou bouton COURSE) pour alterner Marche / Rapide (1.7×) / Turbo (2.5×) · Maj pour sprint</td></tr>
       <tr><td>Parler, interagir, valider</td><td><kbd>F</kbd> (ou <kbd>Espace</kbd>, <kbd>Entrée</kbd>)</td></tr>
@@ -299,10 +299,13 @@ export class UI {
       <tr><td>Ouvrir le Sac</td><td><kbd>I</kbd></td></tr>
       <tr><td>Émotes & Chat multijoueur</td><td><kbd>P</kbd> (ou bouton CHAT du HUD)</td></tr>
       <tr><td>Sauvegarde</td><td>Automatique : à chaque porte franchie et en quittant le jeu</td></tr>
-      <tr><td>Afficher / cacher cette aide</td><td><kbd>H</kbd></td></tr></table><div class="hint">Appuie sur H, F ou Échap pour fermer</div>`);
+      <tr><td>Afficher / cacher cette aide</td><td><kbd>H</kbd></td></tr></table><div class="hint">Appuie sur H, F, Échap ou touche ici pour fermer</div>`);
     this.root.appendChild(panel);
     const toggle = () => { const on = !panel.classList.contains('on'); panel.classList.toggle('on', on); this.input.helpOpen = on; this.sound.sfx(on ? 'select' : 'cancel'); };
-    btn.addEventListener('click', toggle);
+    panel.querySelector('.keypanel-close')?.addEventListener('click', (e) => { e.stopPropagation(); if (panel.classList.contains('on')) toggle(); });
+    panel.querySelector('.hint')?.addEventListener('click', (e) => { e.stopPropagation(); if (panel.classList.contains('on')) toggle(); });
+    btn.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
+    document.addEventListener('pointerdown', (e) => { if (panel.classList.contains('on') && !panel.contains(e.target) && e.target !== btn) toggle(); });
     this.input.onHelp = toggle;
   }
   updateRunKeyHint(autoRun, runSpeed) {

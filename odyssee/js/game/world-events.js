@@ -190,12 +190,12 @@ export async function runNpcScript(g, name, n) {
   if (name === 'prof') {
     if (!st.flags.metProf) {
       st.flags.metProf = true;
-      await ui.say([`Ah, ${st.name} ! Te voilà enfin.`, 'J\'étudie les Pokémon d\'Odyssée depuis trente ans. Et aujourd\'hui, j\'ai besoin de jeunes dresseurs pour m\'aider.', 'Sur la table, il y a trois Poké Balls : Plante, Feu et Eau.', 'Dans chacune, trois Pokémon attendent un partenaire : un d\'ici, d\'Odyssée, et deux venus de régions lointaines, Kanto et Johto.', 'Approche-toi de la table et choisis celui qui te plaît !'], { speaker: 'Prof. Saule' });
+      await ui.say([`Ah, ${st.name} ! Te voilà enfin.`, 'J\'étudie les Pokémon d\'Odyssée depuis trente ans. Et aujourd\'hui, j\'ai besoin de jeunes dresseurs pour m\'aider.', 'Sur la table, il y a trois coffrets : Plante, Feu et Eau.', 'Dans chacun, trois Poké Balls : trois Pokémon attendent un partenaire : un d\'ici, d\'Odyssée, et deux venus de régions lointaines, Kanto et Johto.', 'Approche-toi de la table et choisis celui qui te plaît !'], { speaker: 'Prof. Saule' });
       const rival = g.npcs.find((q) => q.id === 'rival-lab');
       if (rival) { rival.dir = 'up'; await ui.say('Hé ! T\'en as mis du temps ! Allez, choisis vite, je prendrai après toi.', { speaker: RIVAL_NAME }); rival.dir = 'left'; }
       return true;
     }
-    if (!st.flags.starter) { await ui.say('Les trois Poké Balls sont sur la table. Approche-toi et choisis !', { speaker: 'Prof. Saule' }); return true; }
+    if (!st.flags.starter) { await ui.say('Les trois coffrets sont sur la table. Approche-toi et choisis !', { speaker: 'Prof. Saule' }); return true; }
     if (await purify(g)) return true;
     if (g.eclipseOn()) { await ui.say(['Cette nuit violette... C\'est l\'œuvre de la Team Éclipse, n\'est-ce pas ?', 'Si Lugia se réveille avec un cœur fermé, la nuit ne finira jamais.', 'La voyante de Mirage connaît les vieilles légendes de la mer. Va la voir !'], { speaker: 'Prof. Saule' }); return true; }
     const LEG = (g.world.legends || []).map((L) => L.id), seen = LEG.filter((k) => st.flags['L:' + k]).length, caught = LEG.filter((k) => st.flags['L:' + k] === 'caught').length;
@@ -223,9 +223,9 @@ export async function runNpcScript(g, name, n) {
   if (name === 'gsBall') {
     const sp = 'Vieille dame';
     if (st.flags.gsGiven) { await ui.say(st.flags['L:celebi'] === 'caught' ? ['Tu as vu Celebi ? Oh... Alors la légende était vraie.', 'Prends bien soin de lui, mon petit.'] : ['L\'autel est dans le Bois Murmure, un peu à l\'écart du sentier.', 'Pose la GS Ball dans le creux... et sois patient.'], { speaker: sp }); return true; }
-    if (g.badgeCount() < 1) { await ui.say(['Quand j\'étais jeune, j\'ai trouvé une étrange Poké Ball dorée dans le Bois Murmure.', 'Reviens me voir quand tu auras le badge d\'Hector. Je te raconterai.'], { speaker: sp }); return true; }
+    if (g.badgeCount() < 3) { await ui.say(['Quand j\'étais jeune, j\'ai trouvé une étrange Poké Ball dorée dans le Bois Murmure.', 'Reviens me voir quand tu auras trois badges. Le gardien de la forêt ne se montre qu\'aux dresseurs aguerris.'], { speaker: sp }); return true; }
     st.flags.gsGiven = true; g.give('gs-ball'); g.sound.sfx('item');
-    await ui.say(['Le badge d\'Hector ! Tu es un vrai dresseur, maintenant.', 'Tiens, prends cette Poké Ball dorée. Je l\'ai trouvée près d\'un vieil autel du Bois Murmure.'], { speaker: sp });
+    await ui.say(['Trois badges ! Tu es devenu un vrai dresseur, maintenant.', 'Tiens, prends cette Poké Ball dorée. Je l\'ai trouvée près d\'un vieil autel du Bois Murmure.'], { speaker: sp });
     await ui.say(formatObtainItem(st.name, 'gs-ball', 1));
     await ui.say('On dit que le gardien de la forêt, un petit être qui voyage dans le temps, attend qu\'on la lui rapporte...', { speaker: sp });
     return true;
@@ -248,7 +248,7 @@ export async function runNpcScript(g, name, n) {
     if (f.plumeArgent) { await ui.say(f['L:lugia'] === 'caught' ? 'Lugia... Tu l\'as vu de tes propres yeux. Moi, j\'ai attendu toute ma vie.' : ['La Grotte des Tourbillons est à l\'est du village.', 'Avec la Plume Argentée, les courants te laisseront passer jusqu\'à Lugia.'], { speaker: sp }); return true; }
     if (f['L:articuno']) {
       f.plumeArgent = true; if (!st.bag['plume-argent']) g.give('plume-argent'); g.sound.sfx('item');
-      await ui.say(['Tu as affronté Artikodin sur la Cime Givrée ? Alors tu es prêt.', 'Prends cette plume. Je l\'ai trouvée sur la plage, il y a quarante ans. Elle vient de Lugia, le gardien des mers.'], { speaker: sp });
+      await ui.say([`Tu as affronté Artikodin sur la Cime Givrée ? Alors tu es prêt${st.gender === 'f' ? 'e' : ''}.`, 'Prends cette plume. Je l\'ai trouvée sur la plage, il y a quarante ans. Elle vient de Lugia, le gardien des mers.'], { speaker: sp });
       await ui.say(formatObtainItem(st.name, 'plume-argent', 1));
       await ui.say('Le pêcheur qui garde la Grotte des Tourbillons te laissera entrer.', { speaker: sp });
       g.refreshGates();

@@ -319,7 +319,7 @@ export const TROPHIES_CATALOG = [
     desc: 'Enregistrer au moins 20 Pokémon capturés dans le Pokédex.',
     tier: 'bronze',
     category: 'pokedex',
-    reward: { item: 'great-ball', count: 10, label: 'Super Ball ×10' },
+    reward: { item: 'great-ball', count: 5, label: 'Super Ball ×5' },
     check: (st) => {
       const cnt = st.dex?.caught?.length || 0;
       return { current: Math.min(cnt, 20), max: 20, done: cnt >= 20 };
@@ -367,7 +367,7 @@ export const TROPHIES_CATALOG = [
     desc: 'Capturer 100% des espèces de Pokémon sauvages présentes sur une route ou zone sauvage.',
     tier: 'bronze',
     category: 'pokedex',
-    reward: { item: 'ultra-ball', count: 10, label: 'Hyper Ball ×10' },
+    reward: { item: 'great-ball', count: 5, label: 'Super Ball ×5' },
     check: (st) => {
       const { completedZones } = getAllRoutesCatchSummary(st);
       return { current: Math.min(completedZones, 1), max: 1, done: completedZones >= 1 };
@@ -421,7 +421,7 @@ export const TROPHIES_CATALOG = [
     desc: 'Faire évoluer un Pokémon pour la première fois.',
     tier: 'bronze',
     category: 'entrainement',
-    reward: { item: 'rare-candy', count: 2, label: 'Super Bonbon ×2' },
+    reward: { item: 'super-potion', count: 3, label: 'Super Potion ×3' },
     check: (st) => {
       const all = (st.party || []).concat(st.box || []);
       const evolved = !!st.flags?.evolved_once || all.some((m) => m && EVOLVED_SPECIES.has(m.sp));
@@ -476,7 +476,7 @@ export const TROPHIES_CATALOG = [
     desc: 'Ramasser au moins 15 objets ou Poké Balls abandonnés au sol sur les routes et grottes.',
     tier: 'bronze',
     category: 'exploration',
-    reward: { item: 'max-repel', count: 5, label: 'Repousse Max ×5' },
+    reward: { item: 'super-repel', count: 3, label: 'Superepousse ×3' },
     check: (st) => {
       const cnt = Object.keys(st.flags || {}).filter((k) => k.startsWith('I:')).length;
       return { current: Math.min(cnt, 15), max: 15, done: cnt >= 15 };
@@ -804,7 +804,7 @@ export const TROPHIES_CATALOG = [
     desc: 'Ramasser un fragment de météorite tombé lors d\'un phénomène céleste.',
     tier: 'silver',
     category: 'exploration',
-    reward: { item: 'fragment-meteore', count: 1, label: 'Fragment Météorique ×1' },
+    reward: { item: 'great-ball', count: 3, label: 'Super Ball ×3' },
     check: (st) => {
       const n = st.flags?.celestialMeteors || 0;
       return { current: Math.min(n, 1), max: 1, done: n >= 1 };
@@ -816,7 +816,7 @@ export const TROPHIES_CATALOG = [
     desc: 'Contempler une aurore boréale illuminer le ciel d\'Odyssée.',
     tier: 'bronze',
     category: 'exploration',
-    reward: { item: 'moon-stone', count: 1, label: 'Pierre Lune ×1' },
+    reward: { item: 'sitrus-berry', count: 2, label: 'Baie Sitrus ×2' },
     check: (st) => {
       const done = !!st.flags?.celestialAuroraSeen;
       return { current: done ? 1 : 0, max: 1, done };
@@ -828,7 +828,7 @@ export const TROPHIES_CATALOG = [
     desc: 'Recueillir au moins 5 météorites tombées du ciel.',
     tier: 'gold',
     category: 'exploration',
-    reward: { item: 'fragment-meteore', count: 2, label: 'Fragment Météorique ×2' },
+    reward: { item: 'moon-stone', count: 1, label: 'Pierre Lune ×1' },
     check: (st) => {
       const n = st.flags?.celestialMeteors || 0;
       return { current: Math.min(n, 5), max: 5, done: n >= 5 };
@@ -840,7 +840,7 @@ export const TROPHIES_CATALOG = [
     desc: 'Capturer un Pokémon cosmique surgi d\'une météorite.',
     tier: 'silver',
     category: 'exploration',
-    reward: { item: 'ultra-ball', count: 5, label: 'Hyper Ball ×5' },
+    reward: { item: 'great-ball', count: 5, label: 'Super Ball ×5' },
     check: (st) => {
       const n = st.flags?.celestialCosmicCaught || 0;
       return { current: Math.min(n, 1), max: 1, done: n >= 1 };
@@ -852,7 +852,7 @@ export const TROPHIES_CATALOG = [
     desc: 'Triompher d\'un combat dans une faille spatio-temporelle.',
     tier: 'gold',
     category: 'exploration',
-    reward: { item: 'rare-candy', count: 2, label: 'Super Bonbon ×2' },
+    reward: { item: 'rare-candy', count: 1, label: 'Super Bonbon ×1' },
     check: (st) => {
       const n = st.flags?.riftsCleared || 0;
       return { current: Math.min(n, 1), max: 1, done: n >= 1 };
@@ -864,7 +864,7 @@ export const TROPHIES_CATALOG = [
     desc: 'Vaincre ou capturer un Pokémon dans une Faille Inversée.',
     tier: 'silver',
     category: 'aventure',
-    reward: { item: 'rare-candy', count: 1, label: 'Super Bonbon ×1' },
+    reward: { item: 'hyper-potion', count: 2, label: 'Hyper Potion ×2' },
     check: (st) => {
       const n = st.flags?.['riftKind:inverse'] || 0;
       return { current: Math.min(n, 1), max: 1, done: n >= 1 };
@@ -901,7 +901,7 @@ export const TROPHIES_CATALOG = [
     desc: 'Traverser les trois îles d\'une faille et vaincre son gardien.',
     tier: 'gold',
     category: 'aventure',
-    reward: { item: 'rare-candy', count: 3, label: 'Super Bonbon ×3' },
+    reward: { item: 'rare-candy', count: 2, label: 'Super Bonbon ×2' },
     check: (st) => {
       const n = st.flags?.gardiensFaille || 0;
       return { current: Math.min(n, 1), max: 1, done: n >= 1 };
@@ -926,7 +926,7 @@ export const TROPHIES_CATALOG = [
     desc: 'Forger au moins 4 souvenirs uniques avec un même Pokémon.',
     tier: 'gold',
     category: 'entrainement',
-    reward: { item: 'leftovers', count: 1, label: 'Restes ×1' },
+    reward: { item: 'sitrus-berry', count: 4, label: 'Baie Sitrus ×4' },
     check: (st) => {
       let best = 0;
       for (const m of (st.party || []).concat(st.box || [])) {
@@ -942,7 +942,7 @@ export const TROPHIES_CATALOG = [
     desc: 'Voir un allié survivre à 5 % PV ou moins et remporter le combat.',
     tier: 'gold',
     category: 'entrainement',
-    reward: { item: 'focus-sash', count: 1, label: 'Ceinture Force ×1' },
+    reward: { item: 'revive', count: 2, label: 'Rappel ×2' },
     check: (st) => {
       const ok = (st.party || []).concat(st.box || []).some((m) => (m?.memories || []).some((x) => x.id === 'clutch_1hp'));
       return { current: ok ? 1 : 0, max: 1, done: ok };

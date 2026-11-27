@@ -1386,6 +1386,7 @@ export function atelier(D) {
     feu: { acc: '#e05a20', pierre: '#c8b0a0', toit: '#b8402a' },
     eau: { acc: '#2a86d8', pierre: '#dce4ea', toit: '#2a6aa8' },
     plante: { acc: '#4aa040', pierre: '#d8d0b0', toit: '#3a7a3a' },
+    insecte: { acc: '#d89a18', pierre: '#e2d6b2', toit: '#8a5a14' },   // la Ruche d'Hector : ambre et cire
     electrik: { acc: '#f0c020', pierre: '#c8ccd2', toit: '#c89a20' },
     psy: { acc: '#c050c0', pierre: '#e4dcea', toit: '#7a3a9a' },
     dragon: { acc: '#6a4ad0', pierre: '#9a96a8', toit: '#3a2a6a' },
@@ -1406,6 +1407,11 @@ export function atelier(D) {
       case 'feu': g.moveTo(.5 * w, .2 * h); g.bezierCurveTo(.75 * w, .45 * h, .72 * w, .8 * h, .5 * w, .8 * h); g.bezierCurveTo(.28 * w, .8 * h, .25 * w, .55 * h, .42 * w, .42 * h); g.bezierCurveTo(.42 * w, .55 * h, .5 * w, .55 * h, .5 * w, .2 * h); g.fill(); break;
       case 'eau': g.moveTo(.5 * w, .18 * h); g.quadraticCurveTo(.72 * w, .5 * h, .7 * w, .6 * h); g.arc(.5 * w, .6 * h, .2 * w, 0, Math.PI); g.quadraticCurveTo(.28 * w, .5 * h, .5 * w, .18 * h); g.fill(); break;
       case 'plante': g.ellipse(.5 * w, .5 * h, .14 * w, .3 * h, 0.6, 0, 7); g.fill(); g.strokeStyle = acc; g.lineWidth = w * 0.03; g.beginPath(); g.moveTo(.34 * w, .72 * h); g.lineTo(.64 * w, .3 * h); g.stroke(); break;
+      case 'insecte': {   // une abeille : corps rayé, deux ailes
+        g.ellipse(.36 * w, .36 * h, .14 * w, .1 * h, -0.5, 0, 7); g.fill(); g.beginPath(); g.ellipse(.64 * w, .36 * h, .14 * w, .1 * h, 0.5, 0, 7); g.fill();
+        g.beginPath(); g.ellipse(.5 * w, .58 * h, .14 * w, .22 * h, 0, 0, 7); g.fill(); g.fillStyle = acc; for (const yy of [.52, .62, .72]) g.fillRect(.37 * w, yy * h, .26 * w, .04 * h);
+        break;
+      }
       case 'electrik': P([.56, .16, .32, .54, .48, .54, .42, .84, .7, .42, .53, .42, .62, .16]); break;
       case 'psy': g.ellipse(.5 * w, .5 * h, .3 * w, .16 * h, 0, 0, 7); g.fill(); g.fillStyle = acc; g.beginPath(); g.arc(.5 * w, .5 * h, .1 * w, 0, 7); g.fill(); break;
       case 'dragon': P([.3, .25, .45, .78, .5, .45]); P([.5, .2, .58, .8, .62, .4]); P([.68, .28, .7, .74, .78, .45]); break;
@@ -1432,6 +1438,11 @@ export function atelier(D) {
         G.add(at(cyl(0.6, 0.5, 0.35, M({ map: TX.pierre('#b8b098') }), 10), x, y + 0.17, z));
         G.add(at(cyl(0.1, 0.14, 0.8, COL('#6a4a2a'), 6), x, y + 0.7, z));
         for (const [dx, dy, dz, r] of [[0, 1.3, 0, 0.6], [0.35, 1.0, 0.2, 0.4], [-0.35, 1.05, -0.1, 0.45], [0.1, 1.0, -0.35, 0.38]]) G.add(at(new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), COL(dx > 0 ? '#4a9a40' : '#3a8a38')), x + dx, y + dy, z + dz));
+        break;
+      case 'insecte':   // une ruche en paille : anneaux qui rétrécissent, trou d'envol
+        for (let k = 0; k < 4; k++) G.add(at(cyl(0.5 - k * 0.1, 0.55 - k * 0.1, 0.3, COL(k % 2 ? '#c88a20' : '#e0a830'), 12), x, y + 0.15 + k * 0.28, z));
+        G.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 6), COL('#e0a830')), x, y + 1.15, z));
+        G.add(at(boite(0.16, 0.12, 0.05, COL('#3a2410')), x, y + 0.3, z + 0.52));
         break;
       case 'electrik':
         G.add(at(cyl(0.1, 0.16, 1.4, COL('#5a5e68'), 8), x, y + 0.7, z));

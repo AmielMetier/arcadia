@@ -1,5 +1,24 @@
 # Journal des versions — Arcadia
 
+## 5.167 — 27 novembre 2026
+- **Odyssée** — Le début de l'aventure, de Bourg-Aube à la deuxième Arène, est plus soigné :
+  - Arène de Port-Azur : la passerelle d'entrée est dans le bon sens, les pontons et les radeaux portent la couleur de leur bassin (bleu à l'ouest, vert à l'est), et le sol ne scintille plus.
+  - Les arènes ont un vrai mur entre l'accueil et l'épreuve, et une estrade à leur image (rayon de miel chez Hector, pierre bleue chez Marine).
+  - L'arène d'Hector a son propre style Insecte, couleur miel. Le panneau de l'Arène de Port-Azur est maintenant à côté de sa porte, et le ponton du port ne creuse plus de canal dans la plage.
+  - Les ombres des murs intérieurs sont de retour.
+  - Les cinématiques d'Hector et de Marine ont leur propre ambiance, et le bon nom de badge (Badge Écume).
+  - Le Sac propose Utiliser, Donner, Jeter ou Enregistrer quand on touche un objet, au lieu de l'utiliser tout de suite.
+  - La Carte de Dresseur affiche les vrais niveaux maximum des Arènes, les bons noms de villes et le vrai total du Pokédex.
+  - En tapant ton prénom, la première lettre remplace le prénom proposé, et Espace ne valide plus par erreur.
+  - Les Médailles se parcourent avec les flèches.
+  - Courir demande les Chaussures de Course, et le vélo va nettement plus vite que la course.
+  - Les volumes des cinématiques et des cris respectent les réglages, et les premières villes et routes ont des musiques plus variées.
+  - La Brume (trafiquants en gris) et la Team Éclipse (en noir et violet) se distinguent mieux, et les noms comme « Sbire Sbire » ont disparu.
+  - Dialogues corrigés : le conseil de Marine, Hector l'apiculteur, la direction du Lac Miroir, le Magicarpe à pêcher, l'examen du permis bateau. Les répliques s'accordent mieux au féminin.
+  - Des maisons vides de Bourg-Aube et de Sylvebourg sont habitées. L'une d'elles explique pourquoi il y a un niveau maximum avant chaque Arène.
+  - Les Pokémon de départ attendent dans des coffrets.
+  - Retouches d'équilibre du début de partie : niveaux plus réguliers sur les premières routes, failles et météores selon tes badges, et plusieurs combats qui ne pouvaient plus bloquer la partie.
+
 ## 5.166 — 27 novembre 2026
 - **The Backrooms** — Corrections du Level 0 et du Level 1 :
   - Level 0 : la fin ne se déclenche plus tant que personne n'a trouvé la clé de l'escalier. Avant, un joueur tombé à l'étage du bas pouvait rester coincé quand l'ascenseur s'ouvrait en haut. Toutes les cassettes trouvées sans la clé, un message le dit et une flèche du caméscope mène à la clé.

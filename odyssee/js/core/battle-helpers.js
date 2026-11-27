@@ -56,3 +56,7 @@ export const freshVol = () => ({
   types: null,
   proteanUsed: false,
 });
+
+/** nom d'un dresseur tel qu'on l'affiche : « Classe Nom », sans répéter le nom quand la classe le contient déjà
+ *  (« Sbire de la Brume », nom « Sbire » : pas de « Sbire de la Brume Sbire ») */
+export const nomDresseur = (t) => !t?.cls ? (t?.name || '') : !t.name || t.cls.split(' ')[0] === t.name ? t.cls : `${t.cls} ${t.name}`;

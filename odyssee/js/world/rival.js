@@ -12,24 +12,24 @@ export function getPlayerMaxLevel(party) {
 }
 
 // Natures stratégiques compétitives :
-// 3: Adamant (Rigide: +Atk -SpA), 8: Modest (Modeste: +SpA -Atk), 10: Timid (Timide: +Vit -Atk),
-// 13: Jolly (Jovial: +Vit -SpA), 5: Bold (Assuré: +Def -Atk), 15: Impish (Malin: +Def -SpA), 23: Careful (Prudent: +SpDef -SpA)
+// 3: Adamant (Rigide: +Atk -SpA), 8: Impish (Malin: +Def -SpA), 10: Timid (Timide: +Vit -Atk),
+// 13: Jolly (Jovial: +Vit -SpA), 5: Bold (Assuré: +Def -Atk), 15: Modest (Modeste: +SpA -Atk), 23: Careful (Prudent: +SpDef -SpA)
 export const STRAT_NATURES = {
   1010: 13, 1011: 13, 1012: 13, // Ligne Plumorage : Jovial (+Vit)
   1013: 3,                     // Grignotin : Rigide
   1034: 10, 1035: 10,          // Ligne Gerboltz : Timide (+Vit)
-  1021: 15, 1022: 15,          // Ligne Champitron : Malin (+Def)
-  1039: 8,  1040: 8,           // Ligne Rêvelaine : Modeste (+SpA)
+  1021: 8, 1022: 8,            // Ligne Champitron : Malin (+Def -SpA)
+  1039: 15, 1040: 15,          // Ligne Rêvelaine : Modeste (+SpA -Atk)
   1043: 13, 1044: 13,          // Ligne Nocturmine : Jovial (+Vit)
-  1046: 15,                    // Morsegivre : Malin (+Def)
+  1046: 8,                     // Morsegivre : Malin (+Def -SpA)
   1051: 3,                     // Cieldrake : Rigide (+Atk)
   148: 23,  149: 3,            // Draco: Prudent / Dracolosse: Rigide
 
   // Starters
-  1001: 8, 1002: 8, 1003: 8,   // Ligne Capysaule : Modeste (+SpA)
+  1001: 15, 1002: 15, 1003: 15,// Ligne Capysaule : Modeste (+SpA -Atk)
   1004: 10, 1005: 10, 1006: 10,// Ligne Lustrelle : Timide (+Vit)
   1007: 3, 1008: 3, 1009: 3,   // Ligne Narvaillant : Rigide (+Atk)
-  1: 8, 2: 8, 3: 5,            // Bulbizarre / Florizarre : Assuré
+  1: 15, 2: 15, 3: 5,          // Bulbizarre / Herbizarre : Modeste, Florizarre : Assuré
   4: 10, 5: 10, 6: 10,         // Salamèche / Dracaufeu : Timide
   7: 5, 8: 5, 9: 5,            // Carapuce / Tortank : Assuré
   152: 5, 153: 5, 154: 5,      // Germignon / Méganium : Assuré
@@ -164,7 +164,7 @@ export function buildRivalParty(game, rawTeamSpec) {
     const iv = early ? undefined : [31, 31, 31, 31, 31, 31];
 
     // Nature stratégique compétitive
-    const nat = STRAT_NATURES[sp] ?? (SPECIES[sp]?.b[1] >= SPECIES[sp]?.b[3] ? 3 : 8);
+    const nat = STRAT_NATURES[sp] ?? (SPECIES[sp]?.b[1] >= SPECIES[sp]?.b[3] ? 3 : 15);
 
     // Règle 3 : Objets stratégiques UNIQUEMENT à partir de la 3e arène (badges >= 3)
     let item = null;

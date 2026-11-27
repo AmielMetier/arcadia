@@ -20,6 +20,8 @@ export function clavierNom(ui, { titre, def = '', max = 10, sprite = null, paren
   return new Promise((resolve) => {
     let nom = String(def || '').slice(0, Math.max(max, String(def || '').length)), page = 'ABC';
     let r = -1, c = ACTIONS.length - 1;   // le curseur part sur OK (r = -1 : la rangée des actions)
+    // nom proposé (Ethan, Lyra…) : la première lettre tapée le remplace au lieu de s'ajouter derrière
+    let propose = !!nom;
     const w = el('div', 'screen clavier-scr');
     w.innerHTML = `
       <div class="box clavier-tete">
@@ -39,8 +41,12 @@ export function clavierNom(ui, { titre, def = '', max = 10, sprite = null, paren
       touches.innerHTML = lettres().map((ch, i) => `<div class="clavier-k${r === Math.floor(i / COLS) && c === i % COLS ? ' on' : ''}" data-i="${i}">${ch === ' ' ? '␣' : esc(ch)}</div>`).join('');
       actions.innerHTML = ACTIONS.map(([id, lbl], j) => `<div class="clavier-a${r === -1 && c === j ? ' on' : ''}${id === 'ok' ? ' ok' : ''}" data-a="${j}">${lbl}</div>`).join('');
     };
-    const tape = (ch) => { if (nom.length < max) { nom += ch; ui.sound.sfx('blip'); } else ui.sound.sfx('cancel'); };
-    const efface = () => { if (nom.length) { nom = nom.slice(0, -1); ui.sound.sfx('cancel'); } };
+    const tape = (ch) => {
+      if (propose) { nom = ''; propose = false; }
+      if (ch === ' ' && !nom) return;   // pas d'espace en tête de nom
+      if (nom.length < max) { nom += ch; ui.sound.sfx('blip'); } else ui.sound.sfx('cancel');
+    };
+    const efface = () => { if (propose) { nom = ''; propose = false; ui.sound.sfx('cancel'); return; } if (nom.length) { nom = nom.slice(0, -1); ui.sound.sfx('cancel'); } };
     const fin = () => { pop(); removeEventListener('keydown', clavierPC, true); w.remove(); ui.sound.sfx('select'); resolve(nom.trim() || def); };
     const active = () => {
       if (r === -1) {
@@ -81,6 +87,8 @@ export function clavierNom(ui, { titre, def = '', max = 10, sprite = null, paren
     const clavierPC = (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === 'Enter') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) active(); return; }
+      // Espace : une espace dans le nom (jamais « valider » : le jeu prend Espace pour la touche A)
+      if (e.key === ' ') { e.preventDefault(); e.stopImmediatePropagation(); tape(' '); dessine(); return; }
       if (e.key === 'Backspace') { e.preventDefault(); e.stopImmediatePropagation(); efface(); dessine(); return; }
       if (e.key.length === 1 && TAPABLE.test(e.key)) { e.preventDefault(); e.stopImmediatePropagation(); tape(e.key); r = -1; c = ACTIONS.length - 1; dessine(); }   // puis Entrée valide (curseur sur OK)
     };

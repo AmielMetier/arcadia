@@ -85,8 +85,10 @@ export function addVehicules({ W, towns }) {
       if (bon < 3) { await A.say([`${bon} bonne${bon > 1 ? 's' : ''} réponse${bon > 1 ? 's' : ''} sur quatre. Il en faut trois.`, 'Révise le code de la mer et reviens !'], who); return; }
       await A.say([`${bon} sur quatre, c'est bon pour la théorie.`, 'Maintenant, l\'épreuve pratique : montre-moi que tes Pokémon savent tenir la mer !'], who);
       const lvl = 22;
+      const ici = A.game?.mapObj?.id;
       const res = await A.fight({ cls: 'Inspectrice', name: 'Morvan', team: [[72, lvl], [118, lvl], [222, lvl + 1]], ow: 'topdresseuse', bs: 'topdresseuse', prize: 0, lose: 'Bien navigué !' });
-      if (res !== 'win') { await A.say('La mer est cruelle… Repose-toi et retente ta chance.', who); return; }
+      // défaite : le joueur se réveille au Centre Pokémon, l'inspectrice ne lui parle pas à travers la ville
+      if (res !== 'win') { if (A.game?.mapObj?.id === ici) await A.say('La mer est cruelle… Repose-toi et retente ta chance.', who); return; }
       await A.say(['Félicitations, tu es reçu' + A.e + ' !', 'Voici ton permis bateau. Le capitaine de l\'Embarcadère de l\'Aube te fera embarquer pour les îles de l\'Est.'], who);
       await A.give('permis-bateau'); await A.set('permis', 'fin');
     } });

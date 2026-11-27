@@ -65,9 +65,10 @@ export function apparenceScreen(ui, o = {}) {
       else if (k === 'down') i = (i + 1) % nOpts;
       else if ((k === 'left' || k === 'right') && i < R.length) changer(R[i], k === 'left' ? -1 : 1);
       else if (k === 'a') {
-        if (!o.premiere && i === R.length + 1) { ui.sound.sfx('cancel'); close(null); }
-        else { ui.sound.sfx('select'); close(T); }
-        return;
+        // Entrée sur une pièce de la tenue : ligne suivante (on ne valide que sur « C'est moi ! » / « Valider »)
+        if (i < R.length) i++;
+        else if (!o.premiere && i === R.length + 1) { ui.sound.sfx('cancel'); close(null); return; }
+        else { ui.sound.sfx('select'); close(T); return; }
       }
       else if (k === 'b' && !o.premiere) { ui.sound.sfx('cancel'); close(null); return; }
       else return;

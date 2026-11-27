@@ -59,6 +59,12 @@ const vide = (T, fond, points) => {
 /* ------------------------------------------------------------------ tuiles à plat */
 export function texturesArenes(putImg) {
   // sols des arènes qui n'en avaient pas
+  // le Barrage (Port-Azur) : dalles bleu doux, joints à peine marqués (l'ancien damier bleu et blanc scintillait)
+  putImg('floor_gymWater', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#5a9ad4');
+    for (let j = 0; j < 32; j++) for (let i = 0; i < 32; i++) if (i % 16 === 0 || j % 16 === 0) T.p(i, j, '#4f8cc6');
+    grain(T, 14, ['#649fd8', '#5494cf']);
+  }, 21));
   putImg('floor_gymGalerie', toile(32, 32, (T) => {      // parquet en chevrons, cire chaude
     T.rect(0, 0, 32, 32, '#c89058');
     for (let j = 0; j < 32; j++) for (let i = 0; i < 32; i++) {
@@ -113,17 +119,40 @@ export function texturesArenes(putImg) {
   }));
   for (const [k, c] of CIRE.entries()) putImg('dec_cire_ouverte_' + k, toile(32, 32, (T) => { for (let n = 0; n < 9; n++) T.disque(4 + (n * 11) % 25, 4 + (n * 7) % 25, 2.5, 1.6, c[0] + '90'); T.rect(0, 0, 32, 2, c[1] + '80'); T.rect(0, 30, 32, 2, c[1] + '80'); }));
 
+  // estrade d'Hector (la Ruche) : rayon de miel ambré cerclé de cire dorée
+  putImg('dec_estrade_bug', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#8a5a14');
+    for (let j = 1; j < 31; j++) for (let i = 1; i < 31; i++) {
+      const r = Math.floor(j / 6), x = (i + (r % 2 ? 3 : 0)) % 6, y = j % 6;
+      T.p(i, j, x === 0 || y === 0 ? '#b07818' : y < 3 ? '#f6c850' : '#e0a838');
+    }
+    T.cadre(0, 0, 32, 32, '#f0d070'); T.rect(0, 30, 32, 2, '#6a4410');
+  }));
+
   // ------- Port-Azur (Eau) : pontons, radeaux, vannes
-  putImg('dec_ponton', toile(32, 32, (T) => {
-    eauBord(T);
-    T.rect(2, 3, 28, 26, '#6a6a72'); T.rect(3, 4, 26, 24, '#9a9aa4'); T.rect(3, 4, 26, 2, '#c4c4cc'); T.rect(3, 26, 26, 2, '#7a7a84');
+  // pontons et radeaux : couvrent toute la case (plus de bord d'eau figé à côté de l'eau animée) ; liseré à la couleur
+  // de leur bassin, comme les vannes et le panneau : _0 OUEST (bleu), _1 EST (vert)
+  const BASSIN = [['#2a6ac8', '#8ac0f8'], ['#2a9a5a', '#8ae0a8']];
+  const ponton = (T, b) => {
+    T.rect(0, 0, 32, 32, '#6a6a72'); T.rect(1, 1, 30, 30, '#9a9aa4'); T.rect(1, 1, 30, 2, '#c4c4cc'); T.rect(1, 29, 30, 2, '#7a7a84');
     T.ligne(10, 6, 14, 18, '#7e7e88'); T.ligne(20, 12, 24, 25, '#7e7e88');
-  }, 7));
-  putImg('dec_radeau', toile(32, 32, (T) => {
-    eauBord(T);
-    for (let k = 0; k < 5; k++) { const x = 2 + k * 6; T.rect(x, 3, 5, 26, '#8a5a30'); T.rect(x + 1, 3, 3, 26, '#b07a44'); T.rect(x + 1, 3, 1, 26, '#d09a60'); }
-    T.rect(2, 8, 28, 2, '#5a3a1c'); T.rect(2, 22, 28, 2, '#5a3a1c');
-  }, 9));
+    if (b != null) { const [c, l] = BASSIN[b]; T.cadre(3, 3, 26, 26, c); for (const [x, y] of [[3, 3], [27, 3], [3, 27], [27, 27]]) { T.rect(x, y, 2, 2, l); } }
+  };
+  const radeau = (T, b) => {
+    for (let k = 0; k < 5; k++) { const x = 1 + k * 6; T.rect(x, 0, 6, 32, '#5a3a1c'); T.rect(x + 1, 0, 4, 32, '#8a5a30'); T.rect(x + 2, 0, 2, 32, '#b07a44'); T.p(x + 2, 3 + k * 5, '#d09a60'); }
+    const c = b != null ? BASSIN[b][0] : '#5a3a1c', l = b != null ? BASSIN[b][1] : '#7a5028';
+    for (const y of [6, 24]) { T.rect(0, y, 32, 2, c); T.rect(0, y, 32, 1, l); }
+  };
+  putImg('dec_ponton', toile(32, 32, (T) => ponton(T), 7));
+  putImg('dec_radeau', toile(32, 32, (T) => radeau(T), 9));
+  for (const b of [0, 1]) { putImg('dec_ponton_' + b, toile(32, 32, (T) => ponton(T, b), 7)); putImg('dec_radeau_' + b, toile(32, 32, (T) => radeau(T, b), 9)); }
+  // estrade de Marine (le Barrage) : dalle de pierre bleue, liseré d'écume
+  putImg('dec_estrade_water', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#3a6ea8');
+    for (let j = 0; j < 32; j++) for (let i = 0; i < 32; i++) if (i % 16 === 0 || j % 16 === 0) T.p(i, j, '#2c5a8c');
+    for (let i = 0; i < 32; i++) { const o = Math.round(1.5 + Math.sin(i * 0.8) * 1.5); T.p(i, o, '#e8f6ff'); T.p(i, o + 1, '#a8d8f8'); }
+    T.rect(0, 30, 32, 2, '#1e4270'); T.p(6, 9, '#6aa0d8'); T.p(22, 21, '#6aa0d8');
+  }));
   // vannes : un bassin (0 ouest, bleu ; 1 est, vert) et un niveau (0 bas, 1 moyen, 2 haut) — clé dec_vanne_<bassin><niveau>
   for (const [b, anneau] of [[0, '#2a6ac8'], [1, '#2a9a5a']]) for (const [g, col] of [[0, '#8ad0f8'], [1, '#3a90e0'], [2, '#1a4aa0']]) putImg(`dec_vanne_${b}${g}`, toile(32, 32, (T) => {
     T.disque(16, 16, 14, 14, '#3a3a44'); T.disque(16, 16, 12.5, 12.5, anneau); T.disque(16, 16, 10.5, 10.5, '#c8c8d0');
@@ -132,10 +161,14 @@ export function texturesArenes(putImg) {
     T.disque(16, 16, 4, 4, col); T.p(15, 15, '#ffffff');
     for (let k = 0; k <= g; k++) T.rect(9 + k * 5, 27, 4, 3, col);
   }));
+  // passerelle de bois : planches en travers du passage, poutres le long ; _v pour un passage nord–sud
   putImg('dec_passerelle_bois', toile(32, 32, (T) => {
-    eauBord(T);
-    T.rect(0, 5, 32, 22, '#6a4422'); for (let i = 0; i < 32; i += 6) { T.rect(i, 6, 5, 20, '#a8743e'); T.rect(i, 6, 5, 2, '#c8945a'); T.rect(i, 24, 5, 2, '#7a5028'); }
-    T.rect(0, 5, 32, 1, '#3a2410'); T.rect(0, 26, 32, 1, '#3a2410');
+    T.rect(0, 0, 32, 32, '#6a4422'); for (let i = 0; i < 32; i += 6) { T.rect(i, 3, 5, 26, '#a8743e'); T.rect(i, 3, 5, 2, '#c8945a'); T.rect(i, 27, 5, 2, '#7a5028'); }
+    T.rect(0, 0, 32, 3, '#3a2410'); T.rect(0, 29, 32, 3, '#3a2410');
+  }, 13));
+  putImg('dec_passerelle_bois_v', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#6a4422'); for (let j = 0; j < 32; j += 6) { T.rect(3, j, 26, 5, '#a8743e'); T.rect(3, j, 26, 1, '#c8945a'); T.rect(3, j + 4, 26, 1, '#7a5028'); }
+    T.rect(0, 0, 3, 32, '#3a2410'); T.rect(29, 0, 3, 32, '#3a2410');
   }, 13));
 
   // ------- Voltacité (Électrik) : dalle-éclair, sol de la porte du générateur

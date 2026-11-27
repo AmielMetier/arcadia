@@ -77,7 +77,7 @@ function afficher(game, trophy) {
     </div>
   `;
   game.ui.root.appendChild(t);
-  try { game.sound?.sfx('badge'); } catch (e) { warnDev('trophies', e); }
+  try { game.sound?.sfx('medal'); } catch (e) { warnDev('trophies', e); }   // la fanfare d'Arène reste aux badges
 
   setTimeout(() => {
     t.classList.add('trophy-toast-leave');
@@ -265,6 +265,21 @@ export function trophiesScreen(game) {
           close();
         });
       });
+      marquer();
+    };
+
+    // ▲ ▼ : la médaille choisie (onglet Médailles) ; ailleurs, on fait défiler la page
+    const marquer = () => {
+      const cards = [...s.querySelectorAll('.tmedal-card')];
+      if (!cards.length) return;
+      selIdx = Math.max(0, Math.min(selIdx, cards.length - 1));
+      cards.forEach((c, k) => c.classList.toggle('sel', k === selIdx));
+      cards[selIdx].scrollIntoView({ block: 'nearest' });
+    };
+    const bougeSel = (d) => {
+      if (tab !== 'medals') { s.querySelector('.trophies-body')?.scrollBy(0, d * 80); return; }
+      const n = s.querySelectorAll('.tmedal-card').length; if (!n) return;
+      selIdx = (selIdx + d + n) % n; ui.sound?.sfx('blip'); marquer();
     };
 
     const handleClaim = (trophyId) => {
@@ -298,8 +313,13 @@ export function trophiesScreen(game) {
         selIdx = 0;
         ui.sound?.sfx('blip');
         render();
+      } else if (k === 'up' || k === 'down') {
+        bougeSel(k === 'up' ? -1 : 1);
       } else if (k === 'a' || k === 'space') {
         if (tab === 'medals') {
+          // la médaille choisie d'abord, sinon la première à réclamer
+          const choisie = currentFiltered[selIdx];
+          if (choisie && choisie.unlocked && !choisie.claimed) { handleClaim(choisie.id); return; }
           const claimable = currentFiltered.find((t) => t.unlocked && !t.claimed) ||
                             currentTrophies.find((t) => t.unlocked && !t.claimed);
           if (claimable) {

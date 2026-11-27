@@ -7,6 +7,7 @@ import { MEGAS_OF, MEGA_RING, LEGEND, STONE_FORM, revertMegas } from './core/meg
 import { MEGA_FORMS } from './core/mega.js';
 import { createMon, movesChoisies, monName, healFull, levelEvolution, itemEvolution, evolve, setUidBase, levelCap, ensureNature, apteCT } from './core/mon.js';
 import { Battle } from './core/battle.js';
+import { nomDresseur } from './core/battle-helpers.js';
 import { CT_DU_BADGE } from './data/cts.js';
 import { rattraperCT } from './world/cts.js';
 import { ITEMS, itemName, applyItem, estSoin, canUseOn, useCandy, formatFindItem, formatObtainItem } from './core/items.js';
@@ -60,7 +61,8 @@ const BATTLE_WEATHERS = ['rain', 'sun', 'sandstorm', 'hail'];
 // v2 : nouvelle région (arènes dans un autre ordre, archipel, créatures originales) — les sauvegardes v1 ne sont pas reprises
 const SAVE_KEY = 'odyssee-save-v2';
 const SUIVEUR = 0.75;   // taille du Pokémon qui suit (1 = celle de son dessin)
-export const WALK = 0.27, SURF = 0.11, VELO = 0.042;
+// le vélo va nettement plus vite que la course, même en Turbo (0,046)
+export const WALK = 0.27, SURF = 0.11, VELO = 0.034;
 export const RUN_SPEEDS = [
   { id: 'norm', label: 'Normale (1×)', dur: 0.100 },
   { id: 'fast', label: 'Rapide (1.7×)', dur: 0.068 },
@@ -724,8 +726,9 @@ export class Game {
       if (w && !this.libre && m.gymLock != null && !this.state.badges[m.gymLock] && this.state.flags['IN:' + m.id]) { this.gymLocked(w); return; }
       if (w) { this.warp(w, 'exit'); return; }
     }
-    const isShift = this.input.isDown('run');
-    const isRunning = this.autoRun || isShift;
+    // courir demande les Chaussures de Course (Maman les donne après le choix du premier Pokémon)
+    const isShift = this.input.isDown('run') && this.aChaussures();
+    const isRunning = isShift || (this.autoRun && this.aChaussures());
     const isTurbo = (this.autoRun && isShift) || (this.runSpeed === 2 && isRunning);
     // en surf : on glisse sur l'eau, et on descend sur la berge
     if (p.surf) {
@@ -855,28 +858,33 @@ export class Game {
     const g = this.npcs.find((n) => n.def.script === 'gymguide');
     if (g) { const dx = this.player.x - g.x, dy = this.player.y - g.y; g.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down'); }
     await ui.say([`Yo, futur Maître ! Bienvenue dans l'Arène de ${L.name} !`, `${L.name} utilise des Pokémon de type ${TYPE_FR[L.type]}. Mise sur ${GYM_HINTS[L.type]} !`,
-      'Mais attention : une fois le défi lancé, tu affrontes l\'arène d\'une traite.', 'Si tu ressors avant d\'avoir battu le Champion, il faudra tout recommencer depuis le début.'], { speaker: 'Guide' });
-    if (await ui.yesNo('Es-tu prêt à relever le défi ?')) {
+      'Mais attention : une fois le défi lancé, tu affrontes l\'arène d\'une traite.', `Si tu ressors avant d'avoir battu ${(L.fem || ['Marine', 'Volta', 'Flora', 'Sibylle'].includes(L.name)) ? 'la Championne' : 'le Champion'}, il faudra tout recommencer depuis le début.`], { speaker: 'Guide' });
+    if (await ui.yesNo(`Es-tu prêt${st.gender === 'f' ? 'e' : ''} à relever le défi ?`)) {
       st.flags['IN:' + m.id] = true; this.sound.sfx('door');
       await ui.say(['Voilà l\'esprit ! Le défi commence.', 'Bonne chance !'], { speaker: 'Guide' });
       return;
     }
-    await ui.say(['Pas de souci. Soigne ton équipe, remplis ton sac…', 'Et reviens quand tu seras prêt !'], { speaker: 'Guide' });
+    await ui.say(['Pas de souci. Soigne ton équipe, remplis ton sac…', `Et reviens quand tu seras prêt${st.gender === 'f' ? 'e' : ''} !`], { speaker: 'Guide' });
     const w = m.exitX != null ? m.warpAt(m.exitX, m.exitY) : null;
     if (w) await this.warp(w, 'exit');
+  }
+  /** réinitialise les dresseurs et l'énigme d'une arène en cours */
+  async resetGymChallenge(m) {
+    const st = this.state;
+    if (!m || !st) return;
+    for (const k of Object.keys(st.flags)) if (k.startsWith('T:' + m.id + ':') && !k.endsWith(':leader')) delete st.flags[k];
+    st.flags['IN:' + m.id] = false;
+    if (m.serre) { delete st.tiles?.[m.id]; this.applyTiles(m); }
+    if (m.etat) await remettreArene(this, false);
   }
   /** l'arène est fermée derrière nous : le guide le rappelle */
   /** sortir d'une arène en plein défi : permis, mais tous les dresseurs de l'arène sont à rebattre */
   async gymLocked(w) {
     this.busy = true;
-    const m = this.mapObj, st = this.state;
+    const m = this.mapObj;
     const ok = await this.ui.yesNo('Le guide : « Si tu sors maintenant, ton défi s\'arrête là : il faudra recommencer l\'arène depuis le début. Tu veux sortir ? »');
     if (!ok) { this.busy = false; return; }
-    // les dresseurs de l'arène (pas le Champion) reprennent leur place et redeviennent à battre
-    for (const k of Object.keys(st.flags)) if (k.startsWith('T:' + m.id + ':') && !k.endsWith(':leader')) delete st.flags[k];
-    st.flags['IN:' + m.id] = false;
-    if (m.serre) { delete st.tiles?.[m.id]; this.applyTiles(m); }   // la Grande Serre repart de zéro
-    if (m.etat) await remettreArene(this);   // arène dessinée : registres, rochers et fosses comme au début
+    await this.resetGymChallenge(m);
     this.busy = false;
     await this.warp(w, 'exit');
   }
@@ -1022,7 +1030,9 @@ export class Game {
     await this.fieldBag();
   }
 
+  aChaussures() { return !!(this.libre || this.state?.bag?.['running-shoes']); }
   toggleAutoRun() {
+    if (!this.aChaussures()) { this.sound.sfx('bump'); this.ui.toast('Il te faut des Chaussures de Course pour courir. Maman en a peut-être une paire…', 1800); return; }
     // Cycle : Désactivé -> Course Rapide (1.7×) -> Turbo (2.5×) -> Désactivé
     if (!this.autoRun) {
       this.autoRun = true;
@@ -1126,7 +1136,7 @@ export class Game {
         else if (revanchePossible(this, n)) await revanche(this, n);
         else {
           await this.ui.say(d.trainer.after || 'Quel combat !', {
-            speaker: d.trainer.cls ? `${d.trainer.cls} ${d.trainer.name}` : d.trainer.name,
+            speaker: nomDresseur(d.trainer),
             face: d.trainer.bs || d.trainer.ow || n.sprite
           });
           if (d.leader != null) await this.retourEntreeArene();
@@ -1733,7 +1743,7 @@ export class Game {
     }
   }
   take(item, n = 1) { const b = this.state.bag; b[item] = (b[item] || 0) - n; if (b[item] <= 0) delete b[item]; }
-  give(item, n = 1) { if (ITEMS[item]?.key) { this.state.bag[item] = 1; return; } this.state.bag[item] = (this.state.bag[item] || 0) + n; }
+  give(item, n = 1) { if (ITEMS[item]?.key && !ITEMS[item]?.stack) { this.state.bag[item] = 1; return; } this.state.bag[item] = (this.state.bag[item] || 0) + n; }
 
   /* ================= combats ================= */
   seenCount(sp) {
@@ -1848,24 +1858,27 @@ export class Game {
     }
     this.musicLock = true; this.sound.play(music);
     await this.ui.say(tr.intro, {
-      speaker: tr.cls ? `${tr.cls} ${tr.name}` : tr.name,
+      speaker: nomDresseur(tr),
       face: tr.bs || tr.ow || n.sprite
     });
     // le premier champion reste une marche d'apprentissage : IV ordinaires et pas d'objet tenu
     const isBoss = (d.leader != null && d.leader !== 0) || d.champion || d.boss;
-    const leaderDefaultItem = (sp, lvl) => {
+    const leaderDefaultItem = (sp, lvl, noEviolite = false) => {
       const S = SPECIES[sp]; if (!S) return 'sitrus-berry';
       const type = S.t[0] || 'normal';
       const typeBoosters = { fire: 'charcoal', water: 'mystic-water', grass: 'miracle-seed', electric: 'magnet', dark: 'black-glasses', rock: 'hard-stone', ground: 'soft-sand', flying: 'sharp-beak', fighting: 'black-belt', poison: 'poison-barb', psychic: 'twisted-spoon', bug: 'silver-powder', dragon: 'dragon-fang', ice: 'never-melt-ice', steel: 'metal-coat', normal: 'silk-scarf' };
       if (lvl >= 65) return 'life-orb';
-      if (S.ev && S.ev.length) return 'eviolite';
+      if (!noEviolite && S.ev && S.ev.length) return 'eviolite';
       return typeBoosters[type] || 'sitrus-berry';
     };
-    const party = tr.team.map((entry) => {
+    const party = tr.team.map((entry, idx) => {
       const [sp, lvl, heldItem, customMoves, ability] = Array.isArray(entry) ? entry : [entry.sp, entry.lvl, entry.item, entry.moves, entry.ability];
+      const autoItem = d.leader === 1
+        ? (idx === tr.team.length - 1 ? leaderDefaultItem(sp, lvl, true) : null)
+        : (isBoss ? leaderDefaultItem(sp, lvl) : null);
       return createMon(sp, lvl, {
-        iv: Array(6).fill(isBoss ? 31 : Math.min(31, 8 + lvl / 2 | 0)),
-        item: heldItem || (isBoss ? leaderDefaultItem(sp, lvl) : null),
+        iv: Array(6).fill(d.leader === 1 ? 20 : isBoss ? 31 : Math.min(31, 8 + lvl / 2 | 0)),
+        item: heldItem || autoItem,
         // Champions, Ligue, rivaux (IA « smart ») : des attaques choisies plutôt que les quatre dernières apprises
         moves: customMoves || (isBoss || tr.ai === 'smart' ? movesChoisies(sp, lvl) : null),
         ability: ability || null,
@@ -1886,7 +1899,7 @@ export class Game {
         badge: isTourFinale ? 'TOUR DE COMBAT · FINALE' : undefined,
       });
     }
-    const res = await this.runBattle({ trainer: { ...tr, bs: tr.bs || tr.ow || n.sprite, items: { ...(tr.items || {}) } }, party, music, id: n.id, leader: d.leader, champion: d.champion, rival: d.rival, noWhiteout: d.noWhiteout, format: tr.format || d.format, slots: tr.slots || d.slots });
+    const res = await this.runBattle({ trainer: { ...tr, ...(d.leader != null ? { leader: d.leader } : {}), bs: tr.bs || tr.ow || n.sprite, items: { ...(tr.items || {}) } }, party, music, id: n.id, leader: d.leader, champion: d.champion, rival: d.rival, noWhiteout: d.noWhiteout, format: tr.format || d.format, slots: tr.slots || d.slots });
     this.musicLock = false;
     if (res === 'win') {
       st.flags['T:' + n.id] = true;
@@ -1922,7 +1935,7 @@ export class Game {
     this.sound.sfx('badge');
     await ui.say(`${st.name} reçoit le ${BADGES[g].name} de la part de ${name} !`);
     const lines = {
-      0: ['Avec ce badge, tu prouves ta valeur de dresseur.', 'Le garde au nord de la ville te laissera passer vers le Bois Murmure.', 'Et prends aussi ceci : une technique de ma serre, que mes Pokémon utilisent pour coller leurs proies au sol.'],
+      0: ['Avec ce badge, tu prouves ta valeur de dresseur.', 'Le garde au nord de la ville te laissera passer vers le Bois Murmure.', 'Et prends aussi ceci : une technique de ma ruche, que mes Pokémon utilisent pour coller leurs proies au sol.'],
       1: ['La route 4, à l\'est, t\'est désormais ouverte.', 'Voltacité t\'attend au bout de la côte.'],
       2: ['Le garde de la route 5 te laissera passer.', 'Floralia et sa Championne sont au sud-ouest.'],
       3: [
@@ -2155,6 +2168,9 @@ export class Game {
 
   async whiteout() {
     const st = this.state;
+    if (this.mapObj?.gymLock != null && st.flags['IN:' + this.mapObj.id] && !st.badges[this.mapObj.gymLock]) {
+      await this.resetGymChallenge(this.mapObj);
+    }
     // comme dans les jeux : la perte dépend des badges et du meilleur niveau, sans jamais dépasser la moitié de la bourse
     const nb = (st.badges || []).filter(Boolean).length, top = Math.max(1, ...st.party.map((m) => m.lvl || 1));
     const lost = Math.min(Math.floor(st.money / 2), [8, 16, 24, 36, 48, 64, 80, 100, 120][Math.min(8, nb)] * top);
@@ -2329,7 +2345,7 @@ export class Game {
       /** combat contre un dresseur de quête ; renvoie 'win' ou 'lose' */
       fight: async (tr) => {
         const t = { cls: 'Dresseur', prize: 40, ai: 'smart', ...tr, bs: tr.bs || tr.ow || 'garde' };
-        if (t.intro) await ui().say(t.intro, { speaker: t.cls ? `${t.cls} ${t.name}` : t.name, face: t.bs || t.ow });
+        if (t.intro) await ui().say(t.intro, { speaker: nomDresseur(t), face: t.bs || t.ow });
         const isRival = t.cls === 'Rival' || t.name === RIVAL_NAME || t.rival;
         const isBrumeBoss = t.cls === 'Chef de la Brume' || t.cls === 'Admin de la Brume' || t.cls === 'Chef Éclipse' || t.cls === 'Admin Éclipse';
         const leaderMatch = (t.cls === 'Champion' || t.cls === 'Championne') ? LEADERS.find((L) => L.name === t.name) : null;
@@ -2351,7 +2367,7 @@ export class Game {
         const res = await g.runBattle({ trainer: { ...t, items }, party, music: fightMusic, rival: isRival, noWhiteout: t.noWhiteout, format: t.format, slots: t.slots });
         g.musicLock = false; g.updateZone();
         if (res === 'win' && (isBrumeBoss || t.boss)) g.noterBoss(t.name);
-        if (res === 'win' && t.after) await ui().say(t.after, { speaker: t.cls ? `${t.cls} ${t.name}` : t.name, face: t.bs || t.ow });
+        if (res === 'win' && t.after) await ui().say(t.after, { speaker: nomDresseur(t), face: t.bs || t.ow });
         return res;
       },
       /** rencontre d'un Pokémon (sauvage ou légendaire) */
@@ -2477,7 +2493,7 @@ export class Game {
       wrap.innerHTML = `
         <div class="starter-select-box">
           <div class="st-header">
-            <span class="st-title">Poké Ball ${esc(typeLabel)}</span>
+            <span class="st-title">Coffret ${esc(typeLabel)}</span>
             <span class="st-sub">Clique sur un Pokémon ou utilise les flèches + Entrée</span>
           </div>
           <div class="starter-cards">
@@ -2498,7 +2514,7 @@ export class Game {
             }).join('')}
           </div>
           <div class="st-footer">
-            <button type="button" class="st-cancel-btn">Refermer la Poké Ball ✕</button>
+            <button type="button" class="st-cancel-btn">Refermer le coffret ✕</button>
           </div>
         </div>
       `;
@@ -2563,9 +2579,9 @@ export class Game {
 
 async chooseStarter(sp, cap) {
     const st = this.state, ui = this.ui;
-    if (st.flags.starter) { await ui.say('C\'est une Poké Ball vide.'); return; }
+    if (st.flags.starter) { await ui.say('C\'est un coffret vide.'); return; }
     // on n'ouvre pas les Poké Balls du professeur sans lui avoir parlé
-    if (!st.flags.metProf) { await ui.say('Il y a un Pokémon dans cette Poké Ball... Mieux vaut d\'abord parler au Professeur Saule.'); return; }
+    if (!st.flags.metProf) { await ui.say('Des Poké Balls attendent dans ce coffret... Mieux vaut d\'abord parler au Professeur Saule.'); return; }
     // la Poké Ball d'un type : deux ou trois partenaires au choix
     const C = STARTER_CHOICES[cap ?? Math.max(0, STARTERS.indexOf(sp))], picks = C.lines.map((l) => l[0]);
     const ORIG = picks.length === 3 ? ['Odyssée', 'Kanto', 'Johto'] : ['Kanto', 'Johto'];
@@ -2597,7 +2613,8 @@ async chooseStarter(sp, cap) {
     await ui.say(['Alors je prends celui-là !', `${SPECIES[rs].n} ! Il a une tête de gagnant, comme moi.`], { speaker: RIVAL_NAME });
     if (rival) rival.dir = 'left';
     await ui.say(['Hé, ' + st.name + ' ! On a nos Pokémon, alors...', 'On se fait un petit combat ? Allez !'], { speaker: RIVAL_NAME });
-    const rivalMon = createMon(rs, 5, { ot: RIVAL_NAME, iv: [10, 10, 10, 10, 10, 10], moves: SPECIES[rs].ls.filter(([l]) => l <= 1).map(([, id]) => id) });
+    const rMoves = SPECIES[rs].ls.filter(([l, id]) => l <= 4 && MOVES[id]?.t === 'normal').map(([, id]) => id);
+    const rivalMon = createMon(rs, 4, { ot: RIVAL_NAME, iv: [8, 8, 8, 8, 8, 8], moves: rMoves.length ? rMoves.slice(0, 2) : SPECIES[rs].ls.filter(([l]) => l <= 1).map(([, id]) => id) });
     const res = await this.runBattle({ trainer: { cls: 'Rival', name: RIVAL_NAME, prize: 30, bs: 'theo', ai: 'normal', friendly: true, lose: 'Quoi ?! J\'aurais dû choisir l\'autre !' }, party: [rivalMon], music: 'rival', rival: true, noWhiteout: true });   // premier combat : à armes égales (même niveau, IA simple)
     for (const m of st.party) healFull(m);
     st.flags.rival1 = true;

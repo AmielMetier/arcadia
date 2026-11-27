@@ -6,6 +6,7 @@ import { SPECIES } from './data/species.js';
 import { LEGENDAIRES } from './data/rencontres.js';
 import { ITEMS, itemName } from './core/items.js';
 import { healFull } from './core/mon.js';
+import { nomDresseur } from './core/battle-helpers.js';
 
 const JOUR = 20 * 3600e3;
 const tour = (st) => (st.tour ||= { serie: 0, record: 0, pco: 0, revanches: {} });
@@ -39,7 +40,7 @@ export const REMATCH_TEAMS = {
 
 export async function revancheBoss(game, n) {
   const d = n.def, tr = d.trainer, st = game.state, ui = game.ui;
-  const who = { speaker: tr.cls ? `${tr.cls} ${tr.name}` : tr.name, face: tr.bs || tr.ow || n.sprite };
+  const who = { speaker: nomDresseur(tr), face: tr.bs || tr.ow || n.sprite };
   if (!(await ui.yesNo(['Le nouveau Maître de la Ligue en personne !', 'Mon équipe s\'est entraînée sans relâche depuis notre combat. Une revanche, à pleine puissance ?'], who))) { await ui.say('Quand tu veux. Je t\'attendrai.', who); return; }
   // à pleine puissance : équipes dédiées pour les 15 Champions, niveaux 70 à 86 pour le reste, IA forte (trainerBattle : d.boss)
   const custom = REMATCH_TEAMS[tr.name];

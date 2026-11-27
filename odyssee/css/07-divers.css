@@ -266,7 +266,8 @@
 .speech-bubble {
   position: absolute;
   pointer-events: none;
-  z-index: 85;
+  /* dans le monde, sous la bannière (15), les écrans (22), les dialogues (35) et les fondus (60) */
+  z-index: 14;
   background: #ffffff;
   border: 2px solid #142030;
   border-radius: 12px;

@@ -1322,7 +1322,15 @@ export class Sound {
     this.master = this.ctx.createGain(); this.master.gain.value = this.muted ? 0 : this.vol; this.master.connect(this.ctx.destination);
     // les réglages de volume du Hub (musique / effets) s'appliquent s'ils sont disponibles
     const DV = window.DDVolume, via = (kind) => { if (!DV) return this.master; const g = DV.gain(this.ctx, kind); g.connect(this.master); return g; };
-    this.musicBus = this.ctx.createGain(); this.musicBus.gain.value = 0.8; this.musicBus.connect(via('music'));
+    // compression douce de la musique : les thèmes chargés (combats, boss) ne sautent plus au-dessus des autres
+    // (un contexte sans compresseur, comme celui des tests : la musique va droit au réglage du volume)
+    const sortieMusique = via('music');
+    this.musicComp = typeof this.ctx.createDynamicsCompressor === 'function' ? this.ctx.createDynamicsCompressor() : null;
+    if (this.musicComp) {
+      this.musicComp.threshold.value = -14; this.musicComp.knee.value = 12; this.musicComp.ratio.value = 2.5; this.musicComp.attack.value = 0.02; this.musicComp.release.value = 0.3;
+      this.musicComp.connect(sortieMusique);
+    }
+    this.musicBus = this.ctx.createGain(); this.musicBus.gain.value = 0.8; this.musicBus.connect(this.musicComp || sortieMusique);
     this.sfxBus = this.ctx.createGain(); this.sfxBus.gain.value = 1; this.sfxBus.connect(via('fx'));
     // salle de concert : une réverbération synthétique (bruit qui décroît) partagée par la musique et un peu par les effets
     try {
@@ -1343,7 +1351,7 @@ export class Sound {
     const len = this.ctx.sampleRate * 0.5, buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate), d = buf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this.noise = buf;
-    if (this.pending) { const p = this.pending; this.pending = null; this.play(p); }
+    if (this.pending) { const p = this.pending; this.pending = null; if (this.current === p) this.current = null; this.play(p); }
   }
   setVolume(v) { this.vol = v; if (this.master) this.master.gain.value = this.muted ? 0 : v; storeSet('odyssee-vol', v); }
 
@@ -1404,9 +1412,9 @@ export class Sound {
 
   /* ---------------- musique ---------------- */
   play(name) {
+    if (!this.ctx) { this.pending = name; return; }
     if (this.current === name) return;
     this.current = name;
-    if (!this.ctx) { this.pending = name; return; }
     this.stopMusic(0.25);
     if (!name || !THEMES[name]) return;
     const song = this.songs[name] ||= (THEMES[name].custom && CUSTOM_COMPOSERS[THEMES[name].custom] ? CUSTOM_COMPOSERS[THEMES[name].custom]() : compose(THEMES[name]));
@@ -1553,7 +1561,8 @@ export class Sound {
       }
       return;
     }
-    const dd = typeof window !== 'undefined' && window.DDVolume != null ? Number(window.DDVolume) : 1;
+    // un cri enregistré ne passe pas par les bus WebAudio : volume général du jeu × curseur « effets » du Hub
+    const dd = typeof window !== 'undefined' && window.DDVolume?.get ? Number(window.DDVolume.get('fx')) : 1;
     try { const a = new window.Audio(url); a.volume = Math.max(0, Math.min(1, this.vol * 0.45 * (Number.isFinite(dd) ? dd : 1))); a.play().catch((e) => warnDev('audio', e)); } catch (e) { warnDev('audio', e); }
   }
 

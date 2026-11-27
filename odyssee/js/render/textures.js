@@ -135,7 +135,7 @@ function floorCell(P, style) {
     lab: ['#e8e8ec', '#cfd0d8', '#fafafc', '#b0b2bc'],
     league: ['#c8b6e8', '#a894d0', '#e2d6f8', '#8a74b8'],
     gymBug: ['#b6d68a', '#98bc68', '#d2ecaa', '#78a050'], gymRock: ['#c8b49a', '#aa967a', '#e0d0b8', '#8a765e'],
-    gymWater: ['#a8d4f0', '#88b8e0', '#c8e8ff', '#6898c8'], gymElec: ['#f0e08a', '#d8c464', '#fff4b0', '#b8a040'],
+    gymWater: ['#a4cce8', '#94bcdc', '#b4d8f0', '#84acd0'], gymElec: ['#f0e08a', '#d8c464', '#fff4b0', '#b8a040'],
     gymGrass: ['#9ad48a', '#7cbc6c', '#bce8a8', '#5c9c4c'], gymPsy: ['#e0b0e0', '#c890c8', '#f4d0f4', '#a870a8'],
     gymFire: ['#e8a888', '#d08868', '#f8c8a8', '#b06848'], gymDragon: ['#a8a0d8', '#8880c0', '#c8c0f0', '#6860a0'],
   }[style] || ['#d8c8a8', '#c0b090', '#e8dcc0', '#a89878'];
@@ -228,7 +228,7 @@ export function buildAtlas() {
   putSol('stairs', 'stairs', (P) => { const c = PAL.rock; P.fill(c[0]); for (let y = 0; y < 16; y += 4) { P.rect(0, y, 16, 1, c[2]); P.rect(0, y + 3, 16, 1, c[3]); } });
   putSol('cavestairs', 'cavestairs', (P) => { const c = PAL.cave; P.fill(c[0]); for (let y = 0; y < 16; y += 4) { P.rect(0, y, 16, 1, c[2]); P.rect(0, y + 3, 16, 1, c[3]); } });
   // sols d'intérieur : la tuile du tileset qui correspond à chaque salle
-  const FLOOR32 = { base: 'floor_metal', temple: 'tatami', musee: 'floor_marble', wood: 'floor_wood', center: 'floor_pink', mart: 'floor_blue', lab: 'floor_white', league: 'carpet', cendre: 'floor_dark', gymBug: 'leaves0', gymRock: 'floor_stone', gymWater: 'floor_blue2', gymElec: 'floor_metal', gymGrass: 'tatami', gymPsy: 'floor_marble', gymFire: 'floor_dark2', gymDragon: 'floor_dark', cave: 'cave0' };
+  const FLOOR32 = { base: 'floor_metal', temple: 'tatami', musee: 'floor_marble', wood: 'floor_wood', center: 'floor_pink', mart: 'floor_blue', lab: 'floor_white', league: 'carpet', cendre: 'floor_dark', gymBug: 'leaves0', gymRock: 'floor_stone', gymElec: 'floor_metal', gymGrass: 'tatami', gymPsy: 'floor_marble', gymFire: 'floor_dark2', gymDragon: 'floor_dark', cave: 'cave0' };
   for (const st of ['wood', 'center', 'mart', 'lab', 'league', 'gymBug', 'gymRock', 'gymWater', 'gymElec', 'gymGrass', 'gymPsy', 'gymFire', 'gymDragon', 'base', 'temple', 'musee']) putSol('floor_' + st, FLOOR32[st], (P) => floorCell(P, st));
   put('mat', (P) => { P.fill('#c84848'); P.rect(1, 1, 14, 14, '#e06060'); P.rect(3, 3, 10, 10, '#c84848'); P.rect(0, 15, 16, 1, '#902a2a'); });
   put('matgreen', (P) => { P.fill('#3c8c54'); P.rect(1, 1, 14, 14, '#56a86c'); P.rect(3, 3, 10, 10, '#3c8c54'); });

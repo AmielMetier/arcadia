@@ -610,6 +610,8 @@ export class WorldView {
       walls: mk(this.texA),
       // pièces de transition des sols (terrain du bas transparent)
       overlay: mk(this.texA, { alphaTest: 0.5 }),
+      // décalques translucides (ombre des murs intérieurs, cire ouverte de la Ruche) : l'alphaTest les jetterait
+      voile: mk(this.texA, { transparent: true, depthWrite: false }),
       // décor animé posé sur l'eau (tourbillons)
       animOver: mk(this.texN, { alphaTest: 0.5 }),
     };
@@ -1222,6 +1224,7 @@ export class WorldView {
   buildChunk(ci, cj) {
     const m = this.map, A = this.A.cells, S = this.S.rects;
     const G = new Geo(), N = new Geo(), P = new Geo(), Wl = new Geo(), Sh = new Geo(), O0 = new Geo(), NO = new Geo(), PB = new Geo();
+    const TR = this._TR = new Geo();   // décalques translucides (ombre des murs, cire ouverte) : mélangés, pas découpés
     const r3d = this.r3d;
     const base = m.base || m;
     const glows = [];
@@ -1362,9 +1365,9 @@ export class WorldView {
       // décor posé (lampadaires, panneaux, meubles…)
       // ombre portée des murs sur le sol (intérieurs façon HGSS)
       if (this.murStyle && t !== T.WALL) {
-        if (m.get(x, y - 1) === T.WALL && y <= 2) flat(O0, x, y, x + 1, y + 1, 0.0042, A.ombre_n);
-        if (x === 1 && m.get(0, y) === T.WALL) flat(O0, x, y, x + 1, y + 1, 0.0041, A.ombre_o);
-        if (x === m.w - 2 && m.get(x + 1, y) === T.WALL) flat(O0, x, y, x + 1, y + 1, 0.0041, A.ombre_e);
+        if (m.get(x, y - 1) === T.WALL && y <= 2) flat(TR, x, y, x + 1, y + 1, 0.0042, A.ombre_n);
+        if (x === 1 && m.get(0, y) === T.WALL) flat(TR, x, y, x + 1, y + 1, 0.0041, A.ombre_o);
+        if (x === m.w - 2 && m.get(x + 1, y) === T.WALL) flat(TR, x, y, x + 1, y + 1, 0.0041, A.ombre_e);
         // tapis des maisons, sous la table (3 × 2 cases au milieu de la pièce)
         if (this.murStyle.startsWith('in') && A['tapis_' + this.murStyle] && x === (m.w >> 1) - 1 && y === 4 && m.h >= 8) flat(O0, x, y, x + 3, y + 2, 0.0043, A['tapis_' + this.murStyle]);
       }
@@ -1426,7 +1429,7 @@ export class WorldView {
     if (SOL16 && m.outdoor) this.wangChunk(O, x0, y0);
     // relief en 3D : tout ce qui est posé suit le sol (l'ancien sol passe juste dessous du sol généré)
     if (r3d) {
-      for (const q of [G, N, O]) this.r3dLift(q, -0.03); for (const q of [O0, NO, P, Wl]) this.r3dLift(q, 0);
+      for (const q of [G, N, O]) this.r3dLift(q, -0.03); for (const q of [O0, TR, NO, P, Wl]) this.r3dLift(q, 0);
       // ombres au sol : posées à plat sous l'arbre (au haut de sa case), et pas d'ombre sur une paroi
       for (let v = 0; v < Sh.n; v += 4) {
         const cx = (Sh.p[v * 3] + Sh.p[v * 3 + 6]) / 2, cz = (Sh.p[v * 3 + 2] + Sh.p[v * 3 + 8]) / 2;
@@ -1440,7 +1443,7 @@ export class WorldView {
     const sous = this.sol.couvre() ? -3 : 0;
     // relief en 3D : l'ancien sol (sous le sol généré) n'écrit pas la profondeur, le sol généré le recouvre toujours
     const M3 = r3d ? this.r3dMats() : this.mat;
-    add(G, M3.ground, sous); add(N, M3.anim, sous); add(O, M3.overlay, sous); add(O0, this.mat.overlay); add(Sh, this.mat.shadow, 1); add(P, this.mat.sprite); add(Wl, this.mat.walls); add(NO, this.mat.animOver); add(PB, this.mat.overlay, 1);
+    add(G, M3.ground, sous); add(N, M3.anim, sous); add(O, M3.overlay, sous); add(O0, this.mat.overlay); add(Sh, this.mat.shadow, 1); add(P, this.mat.sprite); add(Wl, this.mat.walls); add(NO, this.mat.animOver); add(PB, this.mat.overlay, 1); add(TR, this.mat.voile, 1);
     // Centre Pokémon 5G (Noir & Blanc) : grande allée centrale abricot + emblème Poké Ball au sol
     if (!m.outdoor && m.floor === 'center' && m.music === 'center' && S.center_runner && x0 === 0 && y0 === 0) {
       const Fl = new Geo(), r = S.center_runner, rx0 = (m.w - 3) / 2;
@@ -1501,6 +1504,19 @@ export class WorldView {
       dessus(wallH, capv);
       return true;
     }
+    if (m.etat && (y === m.h - 10 || y === m.h - 9) && W(1, y) && W(m.w - 2, y)) {
+      // cloison d'une arène dessinée (entre l'accueil et l'arène) : un vrai mur HGSS de deux rangs, face sud et
+      // montants de la porte en volume, coiffé de son chaperon (au lieu d'une bordure à plat)
+      if (!W(x, y + 1)) face(x, x + 1, y + 1, wallH);
+      const cote = (xp, z0, z1) => {
+        Wl.quad([xp, 0, z0], [xp, 0, z1], [xp, wallH / 2, z1], [xp, wallH / 2, z0], bas[0], bas[1], bas[2], bas[3], 0.8);
+        Wl.quad([xp, wallH / 2, z0], [xp, wallH / 2, z1], [xp, wallH, z1], [xp, wallH, z0], haut[0], haut[1], haut[2], haut[3], 0.8);
+      };
+      if (!W(x + 1, y)) cote(x + 1, y + 1, y);
+      if (!W(x - 1, y)) cote(x, y, y + 1);
+      dessus(wallH, capv);
+      return true;
+    }
     if (y === m.h - 1) {
       // mur du bas : un muret, pour ne pas cacher la dernière rangée de la pièce
       const h = 0.3 * Math.tan(EL);
@@ -1516,11 +1532,11 @@ export class WorldView {
     const m = this.map, A = this.A.cells, S = this.S.rects, R = m.regs || m.regs0 || [], t = m.get(x, y);
     const marche = walkable(t);
     let h = 0.005;
-    const aPlat = (k) => { if (!A[k]) return false; flat(O0, x, y, x + 1, y + 1, h, A[k]); h += 0.0004; return true; };
+    const aPlat = (k) => { if (!A[k]) return false; flat(k.startsWith('dec_cire_ouverte') ? this._TR : O0, x, y, x + 1, y + 1, h, A[k]); h += 0.0004; return true; };
     const debout = (k, dz = 0.62, ombre = true) => {
       const r = S[k]; if (!r) return false;
       billboard(P, x + 0.5, y + dz, SW(r), SH(r), r);
-      if (ombre && S.shadow) flat(Sh, x + 0.1, y + 0.4, x + 0.9, y + 0.85, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]);
+      if (ombre) this.ombreSol(Sh, x + 0.1, y + 0.4, x + 0.9, y + 0.85);
       return true;
     };
     const ou = (k, dz) => aPlat('dec_' + k) || debout(k, dz);
@@ -1549,6 +1565,9 @@ export class WorldView {
       if (k === 'fleche' || k === 'vent' || k === 'courant' || k.startsWith('tapis_')) { aPlat(`dec_${k}_${d.dir || 'up'}`); continue; }
       if (k === 'lanterne_marais' || k === 'torche_ombre') { const o = m.objectAt(x, y), r = o?.a?.set?.[0]; debout(r != null && R[r] ? k + '_on' : k); continue; }
       if (k === 'sign' || k === 'gymstatue' || k === 'plant' || k === 'pupitre') { debout(k, k === 'gymstatue' ? 0.66 : 0.6); continue; }
+      if (k === 'estrade' && A['dec_estrade_' + m.arene]) { aPlat('dec_estrade_' + m.arene); continue; }   // estrade à la couleur de l'arène
+      // passerelle d'un passage nord–sud : planches tournées (pas d'eau qui la traverse)
+      if (k === 'passerelle_bois') { const ns = !walkable(m.get(x - 1, y)) && !walkable(m.get(x + 1, y)); aPlat(ns ? 'dec_passerelle_bois_v' : 'dec_passerelle_bois'); continue; }
       const cle = k + (d.g != null ? '_' + d.g : d.dir ? '_' + d.dir : '');
       if (!aPlat('dec_' + cle) && !aPlat('dec_' + k)) debout(cle) || debout(k);
     }
@@ -1648,9 +1667,10 @@ export class WorldView {
   defaireCarte() {
     this.scene.remove(this.root);
     for (const g of this.sol.groups.values()) this.sol.liberer(g);
+    const partages = new Set([this.geoHalo, this.lum?.geoLampe, this.lum?.geoPorte, this.lum?.geoFaisceau, this.ambiance?.geo, this.ambiance?.g2].filter(Boolean));
     const mats = new Set();
     this.root.traverse((o) => {
-      if (o.geometry) o.geometry.dispose();
+      if (o.geometry && !o.userData?.partage && !partages.has(o.geometry)) o.geometry.dispose();
       const m = o.material; if (!m) return;
       if (m.userData.own || m.userData.ownTint) { if (m.userData.own) m.map?.dispose(); mats.add(m); }
     });
@@ -2276,6 +2296,7 @@ export class WorldView {
       const P = g.userData.portes.reduce((a, q) => (Math.abs(q[0] - cx) < Math.abs(a[0] - cx) ? q : a));
       const geo = new THREE.PlaneGeometry(P[3] * 0.94, P[4] * 0.97); geo.translate(0, P[4] * 0.485, 0);
       const mat = frontDepth(new THREE.MeshBasicMaterial({ color: 0x16121e }), b.y + b.d + 0.035);
+      mat.userData.own = true;
       t = g.userData.trou = new THREE.Mesh(geo, mat); t.position.set(P[0], P[1], P[2] + 0.05 / sz); t.userData.k = 0; t.visible = false; g.add(t);
     }
     t.userData.cible = ouvert ? 1 : 0;

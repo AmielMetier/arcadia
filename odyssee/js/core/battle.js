@@ -7,7 +7,7 @@ import { RESIST, SOIN, STAT_BAIE } from '../data/baies-objets.js';
 import { ITEMS, itemName, applyItem, estSoin } from './items.js';
 import { ABILITIES, getAbility } from '../data/abilities.js';
 import { megaFormOf, megaEvolve, revertMegas } from './mega.js';
-import { STAGE_NAMES, SOUND_MOVES, POWDER_MOVES, VANISH_MOVES, BULLET_MOVES, typeEff, hiddenPower, freshVol } from './battle-helpers.js';
+import { STAGE_NAMES, SOUND_MOVES, POWDER_MOVES, VANISH_MOVES, BULLET_MOVES, typeEff, hiddenPower, freshVol, nomDresseur } from './battle-helpers.js';
 import { foeThreatInfo, foePickBestReplacement, foeConsiderSwitch, foeChooseAll, foeChooseSlot, damagePreview, estimate } from './battle-ai.js';
 
 export { STAGE_NAMES, typeEff, hiddenPower } from './battle-helpers.js';
@@ -242,12 +242,13 @@ export class Battle {
         for (const f of foes) this.boost(f, 2, -1, true, r);
       }
     } else if (abId === 'halo-sylvestre') {
+      if (this.sides[1].trainer?.friendly) return;
       if (foes.length) {
         this.say(`Le Halo Sylvestre de ${this.nm(r)} rayonne doucement !`);
         for (const f of foes) this.boost(f, 4, -1, true, r);
       }
     } else if (abId === 'coeur-vaillant') {
-      if (r.side === 1 && this.sides[1].trainer?.friendly) return;
+      if (this.sides[1].trainer?.friendly) return;
       if ((this.coeurUsed ||= new Set()).has(m.uid)) return;
       this.coeurUsed.add(m.uid);
       this.say(`Le Cœur Vaillant de ${this.nm(r)} s'enflamme de bravoure !`);
@@ -314,7 +315,7 @@ export class Battle {
     if (this.slots === 1) {
       const f = this.foe;
       if (this.wild) this.say(`Un ${monName(f)} sauvage apparaît !`);
-      else { this.say(`${t.cls} ${t.name} veut se battre !`); this.ev.push({ t: 'send', side: 1, slot: 0, idx: this.sides[1].activeSlots[0] }); this.say(`${t.cls} ${t.name} envoie ${monName(f)} !`); }
+      else { this.say(`${nomDresseur(t)} veut se battre !`); this.ev.push({ t: 'send', side: 1, slot: 0, idx: this.sides[1].activeSlots[0] }); this.say(`${nomDresseur(t)} envoie ${monName(f)} !`); }
       this.ev.push({ t: 'send', side: 0, slot: 0, idx: this.sides[0].activeSlots[0] });
       this.say(`En avant ! ${monName(this.me)} !`);
       this.participants.add(this.me.uid);
@@ -323,9 +324,9 @@ export class Battle {
       if (this.wild) {
         this.say(`${joinNames(foeNames)} sauvages apparaissent !`);
       } else {
-        this.say(`${t.cls} ${t.name} lance un combat ${this.slots === 4 ? 'Quatuor' : this.slots === 3 ? 'Trio' : 'Duo'} !`);
+        this.say(`${nomDresseur(t)} lance un combat ${this.slots === 4 ? 'Quatuor' : this.slots === 3 ? 'Trio' : 'Duo'} !`);
         for (const sl of foeSlots) this.ev.push({ t: 'send', side: 1, slot: sl, idx: this.sides[1].activeSlots[sl] });
-        this.say(`${t.cls} ${t.name} envoie ${joinNames(foeNames)} !`);
+        this.say(`${nomDresseur(t)} envoie ${joinNames(foeNames)} !`);
       }
       const myNames = mySlots.map((sl) => monName(this.monAt(0, sl)));
       for (const sl of mySlots) {
@@ -522,7 +523,12 @@ export class Battle {
     return this.flush();
   }
 
-  trapped(ref) { const m = this.act(ref); return !!m && this.vol(ref).trap > 0 && !this.typesOf(ref).includes('ghost'); }
+  trapped(ref) {
+    const m = this.act(ref);
+    if (!m || this.typesOf(ref).includes('ghost')) return false;
+    const trp = this.vol(ref)?.trap;
+    return (typeof trp === 'object' ? trp?.t : trp) > 0;
+  }
   choiceLock(ref) {
     const m = this.act(ref), v = this.vol(ref);
     if (!m || !v) return null;
@@ -656,7 +662,7 @@ export class Battle {
   doSwitchSlot(i, slot, idx, afterFaint, trigger = true) {
     const side = this.sides[i], ref = { side: i, slot }, cur = this.act(ref);
     if (!afterFaint && cur) {
-      this.say(i === 0 ? `${monName(cur)}, reviens !` : `${side.trainer ? `${side.trainer.cls} ${side.trainer.name}` : side.name} rappelle ${monName(cur)} !`);
+      this.say(i === 0 ? `${monName(cur)}, reviens !` : `${side.trainer ? `${nomDresseur(side.trainer)}` : side.name} rappelle ${monName(cur)} !`);
       this.ev.push({ t: 'recall', side: i, slot });
     }
     if (cur && !isFainted(cur)) {
@@ -673,7 +679,7 @@ export class Battle {
       this.say(`En avant ! ${monName(sent)} !`);
       this.participants.add(sent.uid);
     } else if (sent) {
-      this.say(side.trainer ? `${side.trainer.cls} ${side.trainer.name} envoie ${monName(sent)} !` : `${monName(sent)} sauvage apparaît !`);
+      this.say(side.trainer ? `${nomDresseur(side.trainer)} envoie ${monName(sent)} !` : `${monName(sent)} sauvage apparaît !`);
       if (this.slots === 1) this.participants = new Set(this.aliveSlots(0).map((s0) => this.monAt(0, s0).uid));
     }
     for (const vOpp of this.sides[1 - i].vs) if (vOpp.trap && vOpp.trap.by === refKey(ref)) vOpp.trap = 0;
@@ -687,7 +693,7 @@ export class Battle {
       if (!m) return false;
       const before = m.hp, st0 = m.status;
       applyItem(a.item, m);
-      this.say(`${t.cls} ${t.name} utilise ${itemName(a.item)} !`);
+      this.say(`${nomDresseur(t)} utilise ${itemName(a.item)} !`);
       this.ev.push({ t: 'hp', side: 1, slot: ref.slot, hp: m.hp, from: before, max: m.stats[0] });
       if (st0 && !m.status) this.ev.push({ t: 'status', side: 1, slot: ref.slot, status: null });
       return false;
@@ -725,6 +731,7 @@ export class Battle {
       m.ball = item; m.status = m.status === 'frz' ? null : m.status;
       this.caughtMon = m;
       this.say(`Et hop ! ${monName(m)} est attrapé !`);
+      this.awardExp(m);
       this.end('caught');
       return true;
     }
@@ -1110,12 +1117,12 @@ export class Battle {
       if (m.item === 'kings-rock' && total > 0 && targetCanFlinch && !x.flinch && !isFainted(T) && this.r(10) === 0 && tAbId !== 'inner-focus') tv.flinch = true;
       if (x.drain > 0 && total > 0 && !isFainted(m)) { const h = Math.max(1, Math.floor(total * x.drain / 100 * (m.item === 'big-root' ? 1.3 : 1))); if (this.hp(attRef, h)) this.say(`${this.Nm(dRef)} a perdu de l'énergie !`); }
       if (x.drain < 0 && total > 0 && this.ab(attRef) !== 'rock-head' && this.ab(attRef) !== 'magic-guard') { this.hp(attRef, -Math.max(1, Math.floor(total * -x.drain / 100))); this.say(`${this.Nm(attRef)} est blessé par le contrecoup !`); }
-      if (mv.c === 'physical' && total > 0 && !isFainted(T)) {
+      if (isContact(mv) && total > 0 && !isFainted(T)) {
         if (T.item === 'rocky-helmet') { this.hp(attRef, -Math.max(1, Math.floor(m.stats[0] / 6))); this.say(`Le Casque Brut de ${this.nm(dRef)} blesse ${this.nm(attRef)} !`); }
         if (dRawAb === 'rough-skin') { this.hp(attRef, -Math.max(1, Math.floor(m.stats[0] / 8))); this.say(`La Peau Dure de ${this.nm(dRef)} blesse ${this.nm(attRef)} !`); }
         if (dRawAb === 'static' && this.r(100) < 30) this.inflict(attRef, 'par', mv, true, dRef);
         if (dRawAb === 'flame-body' && this.r(100) < 30) this.inflict(attRef, 'brn', mv, true, dRef);
-        if (dRawAb === 'cire-brulante') { this.say(`La Cire Brûlante de ${this.nm(dRef)} jaillit !`); if (this.r(100) < 30) this.inflict(attRef, 'brn', mv, true, dRef); this.boost(attRef, 6, -1, true, dRef); }
+        if (dRawAb === 'cire-brulante' && !this.sides[1].trainer?.friendly) { this.say(`La Cire Brûlante de ${this.nm(dRef)} jaillit !`); if (this.r(100) < 30) this.inflict(attRef, 'brn', mv, true, dRef); this.boost(attRef, 6, -1, true, dRef); }
         if (dRawAb === 'poison-point' && this.r(100) < 30) this.inflict(attRef, 'psn', mv, true, dRef);
         if (dRawAb === 'iron-barbs') { this.hp(attRef, -Math.max(1, Math.floor(m.stats[0] / 8))); this.say(`Épine de Fer de ${this.nm(dRef)} blesse ${this.nm(attRef)} !`); }
         if (dRawAb === 'effect-spore' && this.r(100) < 30 && !this.typesOf(attRef).includes('grass') && this.defAb(dRef, attRef) !== 'overcoat') this.inflict(attRef, ['psn', 'par', 'slp'][this.r(3)], mv, true, dRef);
@@ -1124,7 +1131,7 @@ export class Battle {
         if (this.ab(attRef) === 'poison-touch' && this.r(100) < 30) this.inflict(dRef, 'psn', mv, true, attRef);
       }
       if (total > 0 && isFainted(T) && !isFainted(m)) {
-        if (mv.c === 'physical' && dRawAb === 'aftermath') { this.hp(attRef, -Math.max(1, Math.floor(m.stats[0] / 4))); this.say(`Boom Final de ${this.nm(dRef)} blesse ${this.nm(attRef)} !`); }
+        if (isContact(mv) && dRawAb === 'aftermath') { this.hp(attRef, -Math.max(1, Math.floor(m.stats[0] / 4))); this.say(`Boom Final de ${this.nm(dRef)} blesse ${this.nm(attRef)} !`); }
         if (dRawAb === 'innards-out' && koRemainingHp > 0 && this.ab(attRef) !== 'magic-guard') { this.hp(attRef, -koRemainingHp); this.say(`Expuls'Organes de ${this.nm(dRef)} inflige ${koRemainingHp} PV à ${this.nm(attRef)} !`); }
       }
       if (total > 0 && isFainted(T) && this.ab(attRef) === 'moxie') this.boost(attRef, 2, 1, true, attRef);
@@ -1481,7 +1488,7 @@ export class Battle {
       if (faint1) {
         const tr = this.sides[1].trainer;
         const aliveFoes = this.sides[1].party.filter((m) => m.hp > 0).length;
-        if (tr && (tr.leader != null || tr.champion || tr.cls === 'Champion') && aliveFoes === 1 && !this.gymCrisisTriggered) {
+        if (tr && (tr.leader != null || tr.champion || tr.cls === 'Champion' || tr.cls === 'Championne') && aliveFoes === 1 && !this.gymCrisisTriggered) {
           this.gymCrisisTriggered = true;
           this.ev.push({ t: 'gym-tension', foe: this.sides[1].party.find((m) => m.hp > 0), trainer: tr });
           this.say(`${tr.name} : « C'est mon dernier partenaire... Mais notre volonté est inébranlable ! »`);
@@ -1520,7 +1527,7 @@ export class Battle {
     }
     const tr = this.sides[1].trainer;
     const aliveFoes = this.sides[1].party.filter((m) => m.hp > 0).length;
-    if (emptyFoeSlots.length && tr && (tr.leader != null || tr.champion || tr.cls === 'Champion') && aliveFoes === 1 && !this.gymCrisisTriggered) {
+    if (emptyFoeSlots.length && tr && (tr.leader != null || tr.champion || tr.cls === 'Champion' || tr.cls === 'Championne') && aliveFoes === 1 && !this.gymCrisisTriggered) {
       this.gymCrisisTriggered = true;
       this.ev.push({ t: 'gym-tension', foe: this.sides[1].party.find((m) => m.hp > 0), trainer: tr });
       this.say(`${tr.name} : « C'est mon dernier partenaire... Mais notre volonté est inébranlable ! »`);
@@ -1579,7 +1586,7 @@ export class Battle {
     const t = this.sides[1].trainer;
     if (t) {
       this.ev.push({ t: 'trainer-back' });
-      this.say(`Tu as battu ${t.cls} ${t.name} !`);
+      this.say(`Tu as battu ${nomDresseur(t)} !`);
       if (t.lose) for (const l of [].concat(t.lose)) this.ev.push({ t: 'msg', text: l, speaker: t.name });
       const last = this.sides[1].party[this.sides[1].party.length - 1];
       this.prizeMoney = (t.prize || 20) * last.lvl * (this.slots > 1 ? this.slots : 1);

@@ -1,4 +1,6 @@
 // odyssee/js/world/arene-sylve.js — l'Arène de Sylvebourg (Insecte, premier badge) : une serre botanique en trois salles.
+// ANCIENNE VERSION : le jeu joue désormais la Ruche (arenes-plans.js, arène 0). Ce fichier reste seulement comme repli
+// et pour tools/test-odyssee-arene-sylve.mjs (Sacoches de Pollen, CT01) ; ne plus y écrire de textes pour les joueurs.
 //
 //   Salle 1, l'accueil : grande pièce claire, panneau des règles AU CENTRE (rien ne gêne à l'entrée), deux portes au fond.
 //   Salle 2, la Grande Serre : deux demi-serres, une derrière chaque porte. Dans chacune, un bassin d'alvéoles de pollen

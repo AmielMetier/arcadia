@@ -420,7 +420,8 @@
   filter: drop-shadow(0 6px 10px rgba(0,0,0,.55)); transition: none !important; }
 
 /* interface repliée (par défaut) : rien par-dessus la carte, comme dans un jeu Pokémon ; U la réaffiche */
-.hud.collapsed .hud-loc, .hud.collapsed .hud-online-badge, .hud.collapsed .hud-event-pill, .hud.collapsed .hud-stats, .hud.collapsed .hud-quick-item, .hud.collapsed .hud-guide, .hud.collapsed .hud-dexnav, .hud.collapsed .hud-bdots-row, .hud.collapsed .hud-quest-card, .hud.collapsed .hud-actions { display: none; }
+/* HUD replié : le nom du lieu reste affiché */
+.hud.collapsed .hud-online-badge, .hud.collapsed .hud-event-pill, .hud.collapsed .hud-stats, .hud.collapsed .hud-quick-item, .hud.collapsed .hud-guide, .hud.collapsed .hud-dexnav, .hud.collapsed .hud-bdots-row, .hud.collapsed .hud-quest-card, .hud.collapsed .hud-actions { display: none; }
 .hud.collapsed .hud-loc-row { gap: calc(var(--px) * 1.5); }
 .hud-off > .keybar { display: none; }
 /* pendant un dialogue, la barre des touches s'efface : elle passait par-dessus la boîte de texte */

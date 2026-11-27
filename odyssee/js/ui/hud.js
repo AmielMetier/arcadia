@@ -379,7 +379,7 @@ export class Hud {
             <span class="hud-online-cnt">${onlineCount - 1} en ligne</span>
           </button>` : ''}
           <button type="button" class="hud-toggle hud-help-mini" data-act="help" title="Aide & Commandes (Touche H)" tabindex="-1">?</button>
-          <button type="button" class="hud-toggle" data-act="toggle" title="${this.collapsed ? 'Afficher le HUD (Touche U)' : 'Cacher le HUD (Touche U)'}" tabindex="-1">${this.collapsed ? '▾ HUD' : '▴'}</button>
+          <button type="button" class="hud-toggle" data-act="toggle" title="${this.collapsed ? 'Afficher le HUD (Touche U)' : 'Cacher le HUD (Touche U)'}" tabindex="-1">${this.collapsed ? '▾ HUD (U)' : '▴'}</button>
         </div>
         <div class="hud-stats" data-act="card" title="Cliquer pour ouvrir la Carte de Dresseur">
           <div class="hud-stat-item">
@@ -488,8 +488,8 @@ export class Hud {
         ` : ''}
       </div>
       <div class="hud-actions">
-        <button type="button" class="hud-btn run${g.autoRun ? ' on' : ''}${g.autoRun && g.runSpeed === 2 ? ' turbo' : ''}" data-act="autorun" tabindex="-1" title="Course continue (Touche R)">
-          <img src="img/hud/run.png" alt="" onerror="this.style.display='none'"><span>${!g.autoRun ? 'COURSE' : g.runSpeed === 2 ? 'TURBO 2.5×' : 'COURSE 1.7×'}</span>
+        <button type="button" class="hud-btn run${g.autoRun ? ' on' : ''}${g.autoRun && g.runSpeed === 2 ? ' turbo' : ''}" data-act="autorun" tabindex="-1" title="${!g.autoRun ? 'Course continue (Touche R)' : g.runSpeed === 2 ? 'Course continue Turbo, 2,5× (Touche R)' : 'Course continue rapide, 1,7× (Touche R)'}">
+          <img src="img/hud/run.png" alt="" onerror="this.style.display='none'"><span>${!g.autoRun ? 'COURSE' : g.runSpeed === 2 ? 'TURBO' : 'RAPIDE'}</span>
         </button>
         <button type="button" class="hud-btn${st.party.length ? '' : ' off'}" data-act="party" tabindex="-1" title="Équipe">
           <img src="img/hud/team.png" alt=""><span>ÉQUIPE</span>

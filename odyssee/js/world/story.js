@@ -23,9 +23,9 @@ const key = (x, y) => x + ',' + y;
 /* ---------------- équipes ---------------- */
 // Team Éclipse : des Pokémon officiels (la Brume, elle, garde les créatures de la région)
 const GRUNT = {
-  a: [[19, 10], [41, 11]], b: [[23, 11], [109, 10]],                                            // Bois Murmure
-  c: [[41, 13], [74, 14]], d: [[109, 13], [19, 14]], erebe1: [[41, 15], [109, 15], [198, 17]],  // Grotte Lunaire
-  e: [[20, 18], [109, 19]], nyx1: [[41, 20], [228, 21], [215, 22]],                             // Port-Azur
+  a: [[19, 13], [41, 14]], b: [[23, 14], [109, 13]],                                            // Bois Murmure
+  c: [[41, 15], [74, 15]], d: [[109, 15], [19, 16]], erebe1: [[41, 16], [109, 16], [198, 17]],  // Grotte Lunaire
+  e: [[20, 16], [109, 17]], nyx1: [[41, 17], [228, 18], [215, 19]],                             // Port-Azur
   f: [[81, 24], [100, 24]], g: [[110, 25], [42, 25]], erebe2: [[42, 26], [110, 26], [82, 26], [198, 28]], // Centrale
   h: [[20, 29], [24, 29]], i: [[42, 30], [215, 30]], j: [[110, 30], [89, 31]], k: [[24, 31], [228, 31]], l: [[198, 31], [20, 31]],
   nyx2: [[42, 33], [215, 33], [229, 34], [24, 35]],
@@ -40,9 +40,9 @@ export const ELITE = [
   { id: 'c4:2', name: 'Brutus', ow: 'brutus', bs: 'brutus', team: [[237, 75], [106, 75], [107, 76], [1033, 76], [68, 77]], room: 'Salle du Poing', floor: 'gymRock', deco: 'statue',
     intro: 'Je suis Brutus ! J\'ai entraîné mes muscles et ceux de mes Pokémon chaque jour de ma vie. Hoo ! Hah !', lose: 'Ma force n\'a pas suffi... Va. Tu le mérites.' },
   { id: 'c4:3', name: 'Spectrel', ow: 'spectrel', bs: 'spectrel', team: [[609, 76], [429, 76], [477, 77], [1023, 77], [94, 78]], room: 'Salle des Ombres', floor: 'gymPsy', deco: 'gymstatue',
-    intro: 'Chut... Les esprits me murmurent ton nom depuis que tu es entré. Ils ont hâte de jouer avec toi.', lose: 'Les esprits se taisent... Tu les as impressionnés.' },
+    intro: 'Chut... Les esprits me murmurent ton nom depuis ton arrivée. Ils ont hâte de jouer avec toi.', lose: 'Les esprits se taisent... Tu les as impressionnés.' },
   { id: 'c4:4', name: 'Ombrelle', ow: 'ombrelle', bs: 'ombrelle', megaSp: 229, team: [[169, 77], [442, 77], [625, 78], [715, 78], [229, 79]], room: 'Salle de la Nuit', floor: 'gymDragon', deco: 'gymstatue',
-    intro: 'Je suis Ombrelle, la dernière du Conseil 4. Les gentils Pokémon, les méchants Pokémon... Seuls les dresseurs comptent. Montre-moi ce que tu vaux.', lose: 'Tu es fort, et tu aimes tes Pokémon. C\'est ce qui fait un vrai dresseur. Célestine t\'attend.' },
+    intro: 'Je suis Ombrelle, la dernière du Conseil 4. Les gentils Pokémon, les méchants Pokémon... Seuls les dresseurs comptent. Montre-moi ce que tu vaux.', lose: 'Quelle force ! Et tu aimes tes Pokémon. C\'est ce qui fait un vrai dresseur. Célestine t\'attend.' },
 ];
 
 /* ---------------- rencontres du Sanctuaire ---------------- */
@@ -74,7 +74,7 @@ export function addStory(ctx) {
   const grunt = (map, x, y, dir, id, team, o = {}) => {
     const [a, b] = o.exact ? [x, y] : free(map, x, y, false);
     return Object.assign(trainerNpc(map, a, b, dir, 'Sbire', 'de la Team Éclipse', team, {
-      id, sight: o.sight ?? 3, ow: o.f ? 'eclipse_f' : 'eclipse_m', bs: o.f ? 'eclipse_f' : 'eclipse_m', prize: 40 + team[0][1] * 2,
+      id, sight: o.sight ?? 3, ow: o.f ? 'eclipse_f' : 'eclipse_m', bs: o.f ? 'eclipse_f' : 'eclipse_m', prize: 36,
       intro: o.intro || 'Hé ! La Team Éclipse est occupée ici. Dégage, ou je te fais tâter de mes Pokémon !',
       lose: o.lose || 'Gnn... Pas possible !', after: o.after || 'La Team Éclipse ne se laissera pas faire...',
     }), { vanish: o.vanish ?? true, music: 'eclipse' });
@@ -101,11 +101,11 @@ export function addStory(ctx) {
     const g = maps.grotte; g.dark = true;
     const [ex, ey] = nearestCave(g, 30, 20);
     admin(g, ex, ey, 'left', 'ecl:erebe1', 'erebe', GRUNT.erebe1, {
-      intro: 'Tiens, un gamin. Je suis Érèbe, Admin de la Team Éclipse. Ces Pierres Lune nourriront le Prisme Noir. Ne te mets pas en travers de notre chemin.',
+      intro: 'Tiens, une graine de dresseur. Je suis Érèbe, Admin de la Team Éclipse. Ces Pierres Lune nourriront le Prisme Noir. Ne te mets pas en travers de notre chemin.',
       lose: 'Intéressant... Tu as du cran. Mais le Prisme est presque prêt.',
     });
     const [ax, ay] = nearestCave(g, 14, 8), [bx, by] = nearestCave(g, 36, 7);
-    grunt(g, ax, ay, 'down', 'ecl:grotte1', GRUNT.c, { exact: 1, intro: 'On creuse pour le Chef ! Tu tombes mal, gamin !' });
+    grunt(g, ax, ay, 'down', 'ecl:grotte1', GRUNT.c, { exact: 1, intro: 'On creuse pour le Chef ! Tu tombes mal, minus !' });
     grunt(g, bx, by, 'left', 'ecl:grotte2', GRUNT.d, { exact: 1, f: 1, intro: 'Ces cailloux brillent dans le noir... Le Chef va adorer. Mais toi, tu vas disparaître !' });
   }
 
@@ -116,7 +116,7 @@ export function addStory(ctx) {
       intro: 'Oh, un petit curieux ! Je suis Nyx, Admin de la Team Éclipse. On cherche le Sanctuaire des Marées... et ce vieux marin refuse de parler. Tu veux payer à sa place ?',
       lose: 'Pfff, quelle plaie ! On trouvera le Sanctuaire sans lui. Ciao !',
     });
-    grunt(W, D.x + 12, D.y + 5, 'down', 'ecl:azur1', GRUNT.e, { sight: 2, intro: 'Le ponton est réquisitionné par la Team Éclipse !' });
+    grunt(W, D.x + 12, D.y + 5, 'right', 'ecl:azur1', GRUNT.e, { sight: 3, intro: 'Le ponton est réquisitionné par la Team Éclipse !' });
     // le vieux marin remercie le joueur une fois Nyx chassée
     const marin = W.npcs.find((n) => n.id === 'azur:marin');
     Object.assign(marin, { script: 'gift', move: 'static', dir: 'down', text: null, gift: {
@@ -129,7 +129,7 @@ export function addStory(ctx) {
     const pe = W.npcs.find((n) => n.id === 'azur:pecheur');
     Object.assign(pe, { script: 'show', move: 'turn', text: null, show: {
       flag: 'qMagicarpe', who: 'Pêcheur', test: (m) => m.sp === 129, reward: [['rare-candy', 2]],
-      ask: ['Les Racaillou se cachent parmi les galets, méfie-toi en marchant sur la plage.', 'Dis, tu me montrerais un Magicarpe ? Juste pour le voir. On en trouve en surfant.'],
+      ask: ['Les Racaillou se cachent parmi les galets, méfie-toi en marchant sur la plage.', 'Dis, tu me montrerais un Magicarpe ? Juste pour le voir. Il en mord à la Canne à Pêche, juste au bout du ponton !'],
       thanks: ['Ooooh ! Un Magicarpe ! Ses écailles brillent, c\'est un beau spécimen.', 'Tiens, pour ta peine.'], done: ['Un jour, ton Magicarpe deviendra un Léviator. Patience !'] } });
     // îlot caché au bout du port, accessible avec Surf
     W.rect(D.x + 24, D.y + 1, D.x + 27, D.y + 2, T.SAND);
@@ -231,8 +231,8 @@ export function addStory(ctx) {
     s.npc({ id: 'lumen-sanct', x: 13, y: 29, sprite: 'lumen', dir: 'left', script: 'lumenSanct' });
     grunt(s, 8, 24, 'right', 'ecl:sanct1', GRUNT.m, { exact: 1, sight: 4, intro: 'Le rituel a commencé ! Tu ne passeras pas !' });
     grunt(s, 16, 20, 'left', 'ecl:sanct2', GRUNT.n, { exact: 1, f: 1, sight: 4, intro: 'Tu entends ? C\'est Lugia qui gronde sous nos pieds...' });
-    admin(s, 11, 14, 'right', 'ecl:nyx3', 'nyx', GRUNT.nyx3, { sight: 2, intro: 'Encore toi ! Tu ne comprends donc rien ? Quand Lugia ouvrira les yeux, plus rien ne pourra l\'arrêter !', lose: 'Ce gamin... c\'est un vrai cauchemar.' });
-    admin(s, 13, 12, 'left', 'ecl:erebe3', 'erebe', GRUNT.erebe3, { sight: 2, intro: 'Tu es arrivé jusqu\'ici. Alors je vais devoir être sérieux.', lose: 'Je... Peut-être que la nuit éternelle n\'était pas une si bonne idée.' });
+    admin(s, 11, 14, 'right', 'ecl:nyx3', 'nyx', GRUNT.nyx3, { sight: 2, intro: 'Encore toi ! Tu ne comprends donc rien ? Quand Lugia ouvrira les yeux, plus rien ne pourra l\'arrêter !', lose: 'Cet enfant... c\'est un vrai cauchemar.' });
+    admin(s, 13, 12, 'left', 'ecl:erebe3', 'erebe', GRUNT.erebe3, { sight: 2, intro: 'Tu as réussi à venir jusqu\'ici. Alors je vais devoir être sérieux.', lose: 'Je... Peut-être que la nuit éternelle n\'était pas une si bonne idée.' });
     const boss = trainerNpc(s, 12, 8, 'down', 'Chef Éclipse', 'Nocturne', GRUNT.boss2, { id: 'ecl:boss2', sight: 2, ow: 'nocturne', bs: 'nocturne', prize: 200, ai: 'smart', items: { 'hyper-potion': 2, 'full-restore': 1 },
       intro: 'Te voilà enfin. Regarde. Lugia dort encore, mais le Prisme Noir a déjà refermé son cœur. Dans un instant, il se réveillera, et il m\'obéira. Rien ne peut plus empêcher l\'Éclipse.',
       lose: 'Impossible... Battu par un enfant, ici, au moment de mon triomphe...', after: '...' });
@@ -400,17 +400,25 @@ function secretPocket(W, pts, t0, side, obs, items) {
     const cx = ex + dx * 5, cy = ey + dy * 5;
     for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) set.push([cx + i, cy + j]);
     const inSet = new Set(set.map(([a, b]) => key(a, b)));
-    let ok = W.in(cx - 3, cy - 3) && W.in(cx + 3, cy + 3) && W.height(ex, ey) === W.height(ex - dx, ey - dy);
+    const marge = obs === T.BOULDER && tries < 20 ? 2 : 1;
+    let ok = W.in(cx - marge - 2, cy - marge - 2) && W.in(cx + marge + 2, cy + marge + 2) && W.height(ex, ey) === W.height(ex - dx, ey - dy);
     for (const [a, b] of set) {
       if (!ok) break;
       if (W.get(a, b) !== T.TREE && W.get(a, b) !== T.PINE) ok = false;
       if (W.height(a, b) !== W.height(ex - dx, ey - dy)) ok = false;   // le recoin reste au niveau du sentier (relief)
-      for (let j = -1; j <= 1 && ok; j++) for (let i = -1; i <= 1; i++) {
-        const q = key(a + i, b + j); if (inSet.has(q) || (a + i === ex && b + j === ey)) continue;
-        const tt = W.get(a + i, b + j); if (tt !== T.TREE && tt !== T.PINE && tt !== T.WATER) { ok = false; break; }
+      for (let j = -marge; j <= marge && ok; j++) for (let i = -marge; i <= marge; i++) {
+        const ax = a + i, by = b + j;
+        const q = key(ax, by); if (inSet.has(q) || (ax === ex && by === ey)) continue;
+        if (Math.abs(ax - (ex - dx)) <= 1 && Math.abs(by - (ey - dy)) <= 1) continue;
+        const tt = W.get(ax, by); if (tt !== T.TREE && tt !== T.PINE && tt !== T.WATER) { ok = false; break; }
       }
     }
-    for (const [i, j] of [[dy, dx], [-dy, -dx]]) { const tt = W.get(ex + i, ey + j); if (tt !== T.TREE && tt !== T.PINE) ok = false; }
+    for (const [i, j] of [[dy, dx], [-dy, -dx]]) {
+      for (const k of (marge === 2 ? [1, 2] : [1])) {
+        const tt = W.get(ex + i * k, ey + j * k);
+        if (tt !== T.TREE && tt !== T.PINE) ok = false;
+      }
+    }
     if (!ok || W.zones.some((z) => z.town && cx >= z.x0 - 2 && cx <= z.x1 + 2 && cy >= z.y0 - 2 && cy <= z.y1 + 2)) continue;
     for (const [a, b] of set) W.set(a, b, T.GRASS);
     W.set(ex, ey, obs);

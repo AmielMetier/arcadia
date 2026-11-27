@@ -44,14 +44,18 @@ function percee(W, cells, dx, dy, o = {}) {
         if (!propre) { if (foret) break; continue; }
         if (!foret) f0 = n;
         foret++;
-      } else if (foret) break;   // de nouveau du praticable après la forêt : ce n'est pas la montagne
+      } else if (foret) {
+        if (o.zone && o.zone(a, b) && walkable(t)) { foret = 0; f0 = 0; continue; }
+        break;   // de nouveau du praticable après la forêt : ce n'est pas la montagne
+      }
       else if (!walkable(t)) break;
     }
     if (!ok) continue;
     // la falaise doit être franche : trois cases de roche de front, et de la roche derrière
     const ra = x + dx * n, rb = y + dy * n;
-    let falaise = true;
-    for (let s = -2; s <= 2; s++) for (let d = 0; d <= 2; d++) if (!ROCHE(W, ra + px * s + dx * d, rb + py * s + dy * d)) falaise = false;
+    let falaise = ROCHE(W, ra, rb);
+    const sw = dx !== 0 ? 1 : 2, d0 = dx !== 0 ? 1 : 0;
+    for (let s = -sw; s <= sw; s++) for (let d = d0; d <= 2; d++) if (!ROCHE(W, ra + px * s + dx * d, rb + py * s + dy * d)) falaise = false;
     if (!falaise) continue;
     const note = foret + (o.vers ? Math.hypot(x - o.vers[0], y - o.vers[1]) * 0.05 : 0);
     if (!best || note < best.note) best = { x, y, n, f0, note };
@@ -152,8 +156,8 @@ export function grotteDuCol({ W, maps, routes, ENC, trainerNpc }) {
   const tr = (d, x, y, dir, cls, name, team, id) => { const p = sol(d, x, y); if (p) trainerNpc(m, p[0], p[1], dir, cls, name, team, { id, sight: 3 }); };
   tr(dO, 14, 14, 'right', 'Montagnard', 'Gaston', [[1026, 12], [74, 13]], 'col:d0');
   tr(dO, 20, 28, 'left', 'Randonneuse', 'Odile', [[41, 12], [1024, 13], [1028, 13]], 'col:d1');
-  tr(dE, 44, 14, 'left', 'Montagnard', 'Armand', [[75, 36], [1028, 37], [95, 37]], 'col:d2');
-  tr(dE, 50, 26, 'down', 'Topdresseuse', 'Céleste', [[42, 37], [1044, 37]], 'col:d3');
+  tr(dE, 44, 14, 'left', 'Montagnard', 'Renaud', [[75, 36], [1028, 37], [95, 37]], 'col:d2');
+  tr(dE, 50, 26, 'down', 'Topdresseuse', 'Mireille', [[42, 37], [1044, 37]], 'col:d3');
   const obj = (d, x, y, item, id) => { const p = sol(d, x, y, 6); if (p) m.item(p[0], p[1], item, 1, id); };
   obj(dO, 8, 6, 'great-ball', 'col:o0'); obj(dO, 18, 22, 'escape-rope', 'col:o1');
   obj(dE, 52, 6, 'ultra-ball', 'col:o2'); obj(dE, 40, 30, 'hyper-potion', 'col:o3');
@@ -178,7 +182,7 @@ export function grotteDuCol({ W, maps, routes, ENC, trainerNpc }) {
   for (const x of [bxc - 1, bxc + 1]) for (let y = sy1 + 1; y <= sy1 + 2; y++) if (m2.get(x, y) === T.CAVE) m2.set(x, y, T.CAVEWALL);
   m2.item(sx1, sy0, 'moon-stone', 1, 'col:o5'); m2.item(sx0, sy0, 'hard-stone', 1, 'col:o6');
   { const dd = distances(m2, 5, 24); let best = null, bd = -1; for (let y = 3; y < m2.h - 3; y++) for (let x = 3; x < 30; x++) { const v = dd[y * m2.w + x]; if (v > bd && m2.get(x, y) === T.CAVE && N4.filter(([a, b]) => m2.get(x + a, y + b) === T.CAVE).length >= 3) { bd = v; best = [x, y]; } }
-    if (best) trainerNpc(m2, best[0], best[1], 'left', 'Montagnard', 'Fernand', [[1026, 15], [1028, 15], [95, 16]], { id: 'col:d4', sight: 3, intro: 'Tu as de la lumière ? Moi, je me guide au bruit des gouttes.' });
+    if (best) trainerNpc(m2, best[0], best[1], 'left', 'Montagnard', 'Clovis', [[1026, 15], [1028, 15], [95, 16]], { id: 'col:d4', sight: 3, intro: 'Tu as de la lumière ? Moi, je me guide au bruit des gouttes.' });
     const q = []; for (let y = 3; y < m2.h - 3; y++) for (let x = 3; x < m2.w - 3; x++) if (m2.get(x, y) === T.CAVE && dd[y * m2.w + x] > 12 && N4.filter(([a, b]) => m2.get(x + a, y + b) === T.CAVE).length === 1) q.push([x, y]);
     // un objet caché au bout d'une impasse de la galerie (on le trouve en fouillant la roche qui la ferme)
     if (q.length) { const [x, y] = q[Math.floor(bruit(3, 7, 1.3, 6263) * q.length) % q.length]; const [ox, oy] = N4.map(([a, b]) => [x + a, y + b]).find(([a, b]) => m2.get(a, b) === T.CAVEWALL) || []; if (ox != null) cacher(m2, ox, oy, 'col:c0', 'super-potion'); } }

@@ -235,7 +235,9 @@ function routeRythme(W, R, res, occ, ids, ctx) {
         passages.push({ x, y, s, nx, ny, a, b, larg, note: larg + 3 * bruit(x, y, 4, 4411) });
       }
       passages.sort((p, q) => p.note - q.note || p.y - q.y || p.x - q.x);
-      const CLASSES = ['Gamin', 'Fillette', 'Randonneuse', 'Montagnard', 'Topdresseur', 'Topdresseuse', 'Insectomane', 'Karatéka'];
+      const CLASSES = rang <= 1
+        ? ['Gamin', 'Fillette', 'Randonneuse', 'Montagnard', 'Insectomane']
+        : ['Gamin', 'Fillette', 'Randonneuse', 'Montagnard', 'Topdresseur', 'Topdresseuse', 'Insectomane', 'Karatéka'];
       const pris = [...sDeN]; let k = 0;
       for (const p of passages) {
         if (k >= ajout) break;

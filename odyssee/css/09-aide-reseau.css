@@ -1,5 +1,6 @@
 /* écran titre : la mer d'Odyssor en fond */
-.title-cv { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; z-index: -1; }
+/* 256 × 192 rogné en 16:9 : on coupe surtout le bas de la mer, pour garder la lune et le ciel entiers */
+.title-cv { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 22%; image-rendering: pixelated; z-index: -1; }
 .title-scr .logo, .title-scr .press, .title-scr .title-menu, .title-scr .title-foot, .title-scr .save-info { position: relative; }
 /* comme sur SoulSilver : le titre en haut, la créature au centre, l'invite sur la mer */
 .title-scr .logo { position: absolute; top: calc(var(--px) * 2); transform: none; }
@@ -19,10 +20,12 @@
 .keyhint.active.turbo { background: rgba(156, 40, 16, 0.78); color: #ffc898; border-color: #ff8848; }
 #ui:has(> .dlg, > .screen, > .wipe, > .battle-wipe, > .door-iris.on, > .battle, > .title-scr) .keybar { opacity: 0; }
 #ui:has(> .dlg, > .screen, > .wipe, > .battle-wipe, > .door-iris.on, > .battle, > .title-scr) .keyhint { pointer-events: none; }
-.keypanel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 56; padding: calc(var(--px) * 6) calc(var(--px) * 10); display: none; width: min(94vw, calc(var(--px) * 330)); font-size: .85em; }
+.keypanel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 56; padding: calc(var(--px) * 6) calc(var(--px) * 10); display: none; width: min(94vw, calc(var(--px) * 330)); max-height: 90vh; overflow-y: auto; font-size: .85em; pointer-events: auto; }
 .keypanel.on { display: block; }
+.keypanel-close { position: absolute; top: calc(var(--px) * 3); right: calc(var(--px) * 4); min-width: calc(var(--px) * 16); min-height: calc(var(--px) * 16); padding: 0 calc(var(--px) * 3); border: var(--px) solid #283850; border-radius: calc(var(--px) * 3); background: #d84848; color: #fff; font: inherit; font-weight: 700; line-height: 1.2; cursor: pointer; text-shadow: none; }
+.keypanel-close:hover { background: #b83030; }
 .keypanel td:first-child { width: 46%; }
-.keypanel .hint { margin-top: calc(var(--px) * 4); text-align: center; }
+.keypanel .hint { margin-top: calc(var(--px) * 4); text-align: center; cursor: pointer; }
 kbd { display: inline-block; font: inherit; font-size: .85em; min-width: 1.4em; text-align: center; padding: 0 calc(var(--px) * 1.5); margin: 0 1px; border-radius: calc(var(--px) * 1.5); background: #eef1f6; border: var(--px) solid #8898b0; border-bottom-width: calc(var(--px) * 2); text-shadow: none; color: var(--ink); }
 
 .surf-ride { position: absolute; }

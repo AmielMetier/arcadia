@@ -6,24 +6,28 @@ import { ASSETS } from '../../assets.js';
 import { TYPE_FR, TYPE_COL, hpCol, screen, closer } from './common.js';
 import { pantheonScreen } from './hof.js';
 import { TROPHIES_CATALOG } from '../../core/trophies.js';
+import { GYM_CAPS } from '../../core/mon.js';
+import { ORIGINALES } from '../../data/remplacants.js';
+// Pokédex complet : les mêmes espèces que l'écran du Pokédex
+const DEX_TOTAL = Object.keys(SPECIES).map(Number).filter((id) => id < 1000 || (ORIGINALES && id < 10000)).length;
 
 /* ================= CARTE DE DRESSEUR FAÇON 5G (NOIR 2 / BLANC 2) ================= */
 export const BADGE_SPECS = [
-  { id: 1, name: 'Badge Élytre', type: 'bug', leader: 'Hector', town: 'Sylve', reward: 'CT01 Pollen Collant · Flash hors combat', cap: 25 },
-  { id: 2, name: 'Badge Écume', type: 'water', leader: 'Marine', town: 'Port-Azur', reward: 'Accès aux Navires & Mers', cap: 35 },
-  { id: 3, name: 'Badge Volt', type: 'electric', leader: 'Volta', town: 'Électro-Ville', reward: 'Autorise Flash & Galeries', cap: 45 },
-  { id: 4, name: 'Badge Pétale', type: 'grass', leader: 'Flora', town: 'Floralia', reward: 'Débloque les Échanges multijoueurs', cap: 55 },
-  { id: 5, name: 'Badge Mirage', type: 'psychic', leader: 'Sibylle', town: 'Cité Mirage', reward: 'Dissipe les Brumes & Illusions', cap: 65 },
-  { id: 6, name: 'Badge Granit', type: 'rock', leader: 'Basalte', town: 'Île Basalte', reward: 'Autorise Éclate-Roc hors combat', cap: 70 },
-  { id: 7, name: 'Badge Braise', type: 'fire', leader: 'Pyros', town: 'Île Pyros', reward: 'Autorise Force hors combat', cap: 75 },
-  { id: 8, name: 'Badge Écaille', type: 'dragon', leader: 'Drakos', town: 'Île Drakos', reward: 'Autorise Vol & Accès Ligue du Nord', cap: 80 },
-  { id: 9, name: 'Badge Pavé', type: 'normal', leader: 'Margot', town: 'Métropole', reward: 'Accès VIP au Casino & Bourse', cap: 82 },
-  { id: 10, name: 'Badge Rafale', type: 'flying', leader: 'Aurèle', town: 'Port-Lisière', reward: 'Courants aériens des Terres du Sud', cap: 85 },
-  { id: 11, name: 'Badge Venin', type: 'poison', leader: 'Morgane', town: 'Marais-Noir', reward: 'Immunité aux bourbiers toxiques', cap: 88 },
-  { id: 12, name: 'Badge Dune', type: 'ground', leader: 'Gaspard', town: 'Dunes d\'Ocre', reward: 'Traversée des tempêtes de sable', cap: 90 },
-  { id: 13, name: 'Badge Rouage', type: 'steel', leader: 'Ferdinand', town: 'Forge-Acier', reward: 'Maîtrise métallurgique & blindages', cap: 92 },
-  { id: 14, name: 'Badge Féérie', type: 'fairy', leader: 'Lilas', town: 'Rosebrume', reward: 'Passage du Sanctuaire Féerique', cap: 95 },
-  { id: 15, name: 'Badge Ombre', type: 'dark', leader: 'Corbin', town: 'Ombreval', reward: 'Accès ultime à la Ligue du Sud', cap: 100 },
+  { id: 1, name: 'Badge Élytre', type: 'bug', leader: 'Hector', town: 'Sylvebourg', reward: 'CT01 Pollen Collant · Flash hors combat', cap: GYM_CAPS[0] },
+  { id: 2, name: 'Badge Écume', type: 'water', leader: 'Marine', town: 'Port-Azur', reward: 'Accès aux Navires & Mers', cap: GYM_CAPS[1] },
+  { id: 3, name: 'Badge Volt', type: 'electric', leader: 'Volta', town: 'Voltacité', reward: 'Autorise Flash & Galeries', cap: GYM_CAPS[2] },
+  { id: 4, name: 'Badge Pétale', type: 'grass', leader: 'Flora', town: 'Floralia', reward: 'Débloque les Échanges multijoueurs', cap: GYM_CAPS[3] },
+  { id: 5, name: 'Badge Mirage', type: 'psychic', leader: 'Sibylle', town: 'Mirage', reward: 'Dissipe les Brumes & Illusions', cap: GYM_CAPS[4] },
+  { id: 6, name: 'Badge Granit', type: 'rock', leader: 'Basalte', town: 'Port-Granit', reward: 'Autorise Éclate-Roc hors combat', cap: GYM_CAPS[5] },
+  { id: 7, name: 'Badge Braise', type: 'fire', leader: 'Pyros', town: 'Cendrelune', reward: 'Autorise Force hors combat', cap: GYM_CAPS[6] },
+  { id: 8, name: 'Badge Écaille', type: 'dragon', leader: 'Drakos', town: 'Fort-Écaille', reward: 'Autorise Vol & Accès Ligue du Nord', cap: GYM_CAPS[7] },
+  { id: 9, name: 'Badge Pavé', type: 'normal', leader: 'Margot', town: 'Métropole', reward: 'Accès VIP au Casino & Bourse', cap: GYM_CAPS[8] },
+  { id: 10, name: 'Badge Rafale', type: 'flying', leader: 'Aurèle', town: 'Port-Lisière', reward: 'Courants aériens des Terres du Sud', cap: GYM_CAPS[9] },
+  { id: 11, name: 'Badge Venin', type: 'poison', leader: 'Morgane', town: 'Marais-Noir', reward: 'Immunité aux bourbiers toxiques', cap: GYM_CAPS[10] },
+  { id: 12, name: 'Badge Dune', type: 'ground', leader: 'Gaspard', town: 'Dunes d\'Ocre', reward: 'Traversée des tempêtes de sable', cap: GYM_CAPS[11] },
+  { id: 13, name: 'Badge Rouage', type: 'steel', leader: 'Ferdinand', town: 'Forge-Acier', reward: 'Maîtrise métallurgique & blindages', cap: GYM_CAPS[12] },
+  { id: 14, name: 'Badge Féérie', type: 'fairy', leader: 'Lilas', town: 'Rosebrume', reward: 'Passage du Sanctuaire Féerique', cap: GYM_CAPS[13] },
+  { id: 15, name: 'Badge Ombre', type: 'dark', leader: 'Corbin', town: 'Ombreval', reward: 'Accès ultime à la Ligue du Sud', cap: GYM_CAPS[14] },
 ];
 
 export function getCardRank(c) {
@@ -61,7 +65,9 @@ export function getCardRank(c) {
     title = 'Étoile Montante';
   }
 
-  return { stars, grade, themeCls, title, badgesCount };
+  // fond de la carte (ASSETS.cardBg) : pas de dessin platine, la carte or le remplace
+  const theme = { 'card-master': 'master', 'card-platinum': 'gold', 'card-gold': 'gold', 'card-silver': 'silver', 'card-bronze': 'bronze' }[themeCls] || 'normal';
+  return { stars, grade, themeCls, theme, title, badgesCount };
 }
 
 /** Fiche d'un dresseur (la sienne, ou reçue par le réseau) */
@@ -109,7 +115,7 @@ export function cardScreen(game, BADGES, other) {
     const m = Math.floor((c.time || 0) / 60) % 60;
     const timeStr = `${h}h ${String(m).padStart(2, '0')}`;
     const idStr = String(c.id || 0).padStart(5, '0');
-    const dexTotal = 150;
+    const dexTotal = DEX_TOTAL;
     const dexPct = Math.min(100, Math.round(((c.dex || 0) / dexTotal) * 100));
 
     const render = () => {
@@ -338,7 +344,7 @@ export function cardScreen(game, BADGES, other) {
                       Arène de <b>${esc(selSpec.town)}</b> · Champion${selSpec.leader === 'Marine' || selSpec.leader === 'Volta' || selSpec.leader === 'Flora' || selSpec.leader === 'Sibylle' || selSpec.leader === 'Margot' || selSpec.leader === 'Morgane' || selSpec.leader === 'Lilas' ? 'ne' : ''} <b>${esc(selSpec.leader)}</b>
                     </div>
                     <div class="tc-bi-reward-row">
-                      Privilège : <b>${esc(selSpec.reward)}</b> <span class="tc-bi-cap">(Niv. max : N.${selSpec.cap})</span>
+                      Privilège : <b>${esc(selSpec.reward)}</b> <span class="tc-bi-cap">(niveau max avant l'Arène : N.${selSpec.cap})</span>
                     </div>
                   </div>
                 </div>

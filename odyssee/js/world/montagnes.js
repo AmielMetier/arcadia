@@ -40,10 +40,10 @@ export function montLunaire({ W, trainerNpc }) {
   W.zone(143, 19, 181, 37, { name: 'Mont Lunaire', music: 'route', prio: 1 });
   W.sign(150, 36, 'MONT LUNAIRE\nSentier du sommet. Gare au ravin : on passe sur les passerelles !');
   // dresseurs le long du sentier : chacun se tient dans un renfoncement, jamais en travers du passage
-  trainerNpc(W, 159, 27, 'down', 'Randonneuse', 'Ondine', [[35, 13], [41, 12], [27, 13]], { id: 'lunaire:ondine', sight: 3, intro: 'On dit que la nuit, des Mélofée dansent au sommet. Je monte voir !', lose: 'Bon, je redescends... par les marches.' });
-  trainerNpc(W, 172, 30, 'up', 'Montagnard', 'Firmin', [[74, 12], [95, 13]], { id: 'lunaire:firmin', sight: 3, intro: 'Ho ! Tu as traversé la passerelle sans regarder en bas ? Moi, j\'ai encore les jambes qui tremblent !', lose: 'Le vertige, ça se soigne en grimpant encore.' });
-  trainerNpc(W, 156, 23, 'down', 'Montagnard', 'Bastien', [[66, 13], [74, 13], [95, 14]], { id: 'lunaire:bastien', sight: 3, intro: 'La corniche du haut longe la mer. Si tu passes, le sommet est à toi.', lose: 'Va voir la mer de là-haut. Ça vaut toutes les montées.' });
-  trainerNpc(W, 155, 20, 'down', 'Randonneuse', 'Nadège', [[35, 14], [39, 14]], { id: 'lunaire:nadege', sight: 2, intro: 'Chut ! Le vent souffle fort ici... Un combat pour se réchauffer ?', lose: 'Brr. Le sommet est tout près, à l\'est.' });
+  trainerNpc(W, 159, 27, 'down', 'Randonneuse', 'Ondine', [[35, 15], [41, 14], [27, 15]], { id: 'lunaire:ondine', sight: 3, intro: 'On dit que la nuit, des Mélofée dansent au sommet. Je monte voir !', lose: 'Bon, je redescends... par les marches.' });
+  trainerNpc(W, 172, 30, 'up', 'Montagnard', 'Firmin', [[74, 15], [95, 16]], { id: 'lunaire:firmin', sight: 3, intro: 'Ho ! Tu as traversé la passerelle sans regarder en bas ? Moi, j\'ai encore les jambes qui tremblent !', lose: 'Le vertige, ça se soigne en grimpant encore.' });
+  trainerNpc(W, 156, 23, 'down', 'Montagnard', 'Bastien', [[66, 15], [74, 16], [95, 16]], { id: 'lunaire:bastien', sight: 3, intro: 'La corniche du haut longe la mer. Si tu passes, le sommet est à toi.', lose: 'Va voir la mer de là-haut. Ça vaut toutes les montées.' });
+  trainerNpc(W, 155, 20, 'down', 'Randonneuse', 'Nadège', [[35, 16], [39, 16]], { id: 'lunaire:nadege', sight: 2, intro: 'Chut ! Le vent souffle fort ici... Un combat pour se réchauffer ?', lose: 'Brr. Le sommet est tout près, à l\'est.' });
   // objets : un au bout du premier palier, un dans le renfoncement du palier 3, un au bout de la corniche, la Pierre Lune au sommet
   W.item(146, 32, 'escape-rope', 1, 'lunaire:corde');
   W.item(175, 30, 'ether', 1, 'lunaire:ether');

@@ -86,6 +86,9 @@ export function lignesObjets(maps, RG) {
   return lignes;
 }
 
+/** Objets narratifs ou d'orientation dont le lore mentionne explicitement l'emplacement */
+export const estProtege = (mapId, it) => it?.id === 'lunaire:pierre-lune' || it?.id === 'lunaire:corde' || (mapId === 'grotte' && (it?.item === 'moon-stone' || it?.item === 'escape-rope'));
+
 function retrograder(lignes) {
   const changes = [];
   let total = { 'rare-candy': 0, pierre: 0 };
@@ -95,6 +98,7 @@ function retrograder(lignes) {
   const vus = new Set();
   for (const L of lignes) {
     const { it, rang } = L, avant = it.item;
+    if (estProtege(L.id, it)) continue;
     let compte = true;
     if (COMPTE(avant) && rang >= 2 && rang < 4) {
       const cat = avant === 'rare-candy' ? 'rare-candy' : 'pierre', k = L.zone + '|' + cat;

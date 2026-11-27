@@ -14,12 +14,18 @@ import { warnDev } from '../core/safe.js';
 export const SALLES = 3;
 export const REGLE = { inverse: 'Types inversés', chaos: 'Météo tournante', alpha: 'Pokémon Alpha' };
 const ARGENT = [1500, 2500, 5000], MUSIQUES = { inverse: 'ileInverse', chaos: 'ileChaos', alpha: 'ileAlpha' };
+const ARGENT_PALIER = (b) => (b >= 5 ? ARGENT : b >= 3 ? [800, 1400, 2600] : [400, 750, 1400]);
 const NOMS = { inverse: 'Îles du Reflet', chaos: 'Îles des Quatre Vents', alpha: 'Îles du Colosse', gardien: 'Trône du Gardien' };
 const SORTIE = { core: '#ffffff', rim: '#7fb0ff' }, OR = { core: '#fff0b0', rim: '#ff3a2a' };
 /** ce que promet un passage : [objet, quantité] */
 export const LOTS = [['rare-candy', 1], ['ultra-ball', 5], ['revive', 2], ['full-restore', 1], ['moon-stone', 1], ['sun-stone', 1], ['dusk-stone', 1], ['elixir', 1]];
 export const LOTS_GARDIEN = [['rare-candy', 3], ['fragment-meteore', 2], ['max-revive', 2], ['full-restore', 3]];
+const LOTS_DEBUT = [['super-potion', 2], ['great-ball', 3], ['sitrus-berry', 2], ['full-heal', 2], ['ether', 1], ['super-repel', 2]];
+const LOTS_MILIEU = [['hyper-potion', 2], ['great-ball', 4], ['revive', 1], ['moon-stone', 1], ['sun-stone', 1], ['ether', 2], ['rare-candy', 1]];
+const LOTS_GARDIEN_DEBUT = [['rare-candy', 1], ['fragment-meteore', 1], ['great-ball', 5], ['hyper-potion', 2]];
+const LOTS_GARDIEN_MILIEU = [['rare-candy', 2], ['fragment-meteore', 1], ['revive', 2], ['ultra-ball', 3]];
 const ECLATS = [['sitrus-berry', 1], ['full-heal', 1], ['hyper-potion', 1]];
+const ECLATS_DEBUT = [['oran-berry', 1], ['potion', 1], ['super-potion', 1]];
 
 export class Expedition {
   constructor(game, r) {
@@ -69,7 +75,11 @@ export class Expedition {
   /** deux passages différents vers la salle suivante, avec ce que chacun promet */
   tirerPassages() {
     const tire = (L) => L.splice(Math.floor(Math.random() * L.length), 1)[0];
-    const genres = Object.keys(RIFT_KINDS), lots = [...(this.salle + 1 === SALLES ? LOTS_GARDIEN : LOTS)];
+    const b = this.game.badgeCount?.() || 0;
+    const pool = this.salle + 1 === SALLES
+      ? (b >= 5 ? LOTS_GARDIEN : b >= 3 ? LOTS_GARDIEN_MILIEU : LOTS_GARDIEN_DEBUT)
+      : (b >= 5 ? LOTS : b >= 3 ? LOTS_MILIEU : LOTS_DEBUT);
+    const genres = Object.keys(RIFT_KINDS), lots = [...pool];
     return [0, 1].map(() => { const kind = tire(genres), [item, n] = tire(lots); return { kind, lot: { item, n } }; });
   }
 
@@ -181,9 +191,14 @@ export class Expedition {
       }
       f['riftKind:' + this.kind] = (f['riftKind:' + this.kind] || 0) + 1;
       if (E.wild.alpha && res === 'caught') f.alphaCaught = (f.alphaCaught || 0) + 1;
-      this.butin.argent += ARGENT[this.salle - 1];
-      if (this.salle === 1) this.gagne(...(this.kind === 'alpha' ? ['rare-candy', 1] : ['fragment-meteore', 1]));
-      else this.gagne(this.lot.item, this.lot.n);
+      const b = g.badgeCount?.() || 0;
+      this.butin.argent += ARGENT_PALIER(b)[this.salle - 1];
+      if (this.salle === 1) {
+        const lot1 = b >= 4
+          ? (this.kind === 'alpha' ? ['rare-candy', 1] : ['fragment-meteore', 1])
+          : (this.kind === 'alpha' ? ['hyper-potion', 1] : ['great-ball', 2]);
+        this.gagne(...lot1);
+      } else this.gagne(this.lot.item, this.lot.n);
       if (this.gardien) f.gardiensFaille = (f.gardiensFaille || 0) + 1;
       try { g.checkTrophies?.(true); } catch (e) { warnDev('rift-trophy', e); }
       g.save?.(true);
@@ -218,9 +233,16 @@ export class Expedition {
     if (Math.abs(M.x - p.x) + Math.abs(M.y - p.y) === 1) await this.affronter();
   }
   ramasser(i) {
-    const g = this.game, [o] = this.eclats.splice(i, 1); this.retirerActeur('faille:eclat' + o.i);
+    const g = this.game, b = g.badgeCount?.() || 0, [o] = this.eclats.splice(i, 1); this.retirerActeur('faille:eclat' + o.i);
     g.sound?.sfx?.('meteor_pick');
-    if (Math.random() < 0.6) { const n = 300 + 100 * Math.floor(Math.random() * 6); this.butin.argent += n; g.ui.toast?.(`✦ +${n} ₽ au butin`, 2000); } else { const [item, n] = ECLATS[Math.floor(Math.random() * ECLATS.length)]; this.gagne(item, n); g.ui.toast?.(`✦ ${itemName(item)} au butin`, 2000); }
+    if (Math.random() < 0.6) {
+      const n = b >= 5 ? 300 + 100 * Math.floor(Math.random() * 6) : b >= 3 ? 150 + 50 * Math.floor(Math.random() * 5) : 80 + 30 * Math.floor(Math.random() * 4);
+      this.butin.argent += n; g.ui.toast?.(`✦ +${n} ₽ au butin`, 2000);
+    } else {
+      const pool = b >= 3 ? ECLATS : ECLATS_DEBUT;
+      const [item, n] = pool[Math.floor(Math.random() * pool.length)];
+      this.gagne(item, n); g.ui.toast?.(`✦ ${itemName(item)} au butin`, 2000);
+    }
     this.montrerBadge();
   }
   async passageSortie() {

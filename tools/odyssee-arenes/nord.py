@@ -31,7 +31,7 @@ arene(0, P, r"""
       v: { t: 'bloc', deco: 'alveoles' },
 """ + ',\n'.join('      ' + l for l in L0) + r""",
     },
-    dresseurs: [{ dir: 'left', vue: 2 }, { dir: 'right', vue: 2 }, { dir: 'left', vue: 2 }, { dir: 'right', vue: 2 }],
+    dresseurs: [{ dir: 'down', vue: 2 }, { dir: 'right', vue: 2 }, { dir: 'down', vue: 2 }, { dir: 'right', vue: 2 }],
 """)
 
 # ---------------------------------------------------------------- 1. Marine (Eau) : le Barrage — deux bassins, trois niveaux d'eau (Crasher Wake, Verchamps)
@@ -57,7 +57,7 @@ LEG1 = []
 NIV = {'a': ('eq', 0), 'b': ('le', 1), 's': ('ge', 1), 'r': ('eq', 2)}
 for (t, b), ch in CARS1.items():
     op, v = NIV[t]
-    LEG1.append(f"{ch}: {{ porte: {{ r: {b}, {op}: {v} }}, ferme: 'eau', o: '{'ponton' if t in 'ab' else 'radeau'}', f: 'eau' }}")
+    LEG1.append(f"{ch}: {{ porte: {{ r: {b}, {op}: {v} }}, ferme: 'eau', o: '{'ponton' if t in 'ab' else 'radeau'}_{b}', f: 'eau' }}")
 NOMB = ['OUEST', 'EST']; NOMN = ['BAS', 'MOYEN', 'HAUT']
 for (b, v), ch in VCH.items():
     LEG1.append(f"{ch}: {{ reg: {{ set: [{b}, {v}] }}, pad: 'vanne', g: '{b}{v}', msg: 'Les vannes grincent : le bassin {NOMB[b]} passe au niveau {NOMN[v]}.' }}")
@@ -68,7 +68,7 @@ arene(1, P, r"""
       'Le barrage a DEUX bassins : l\'OUEST (vannes bleues) et l\'EST (vannes vertes). Chaque vanne règle un bassin sur un niveau : BAS, MOYEN ou HAUT.',
       'Eau basse : les pontons de pierre sortent de l\'eau. Eau haute : les radeaux montent jusqu\'aux quais. Certains pontons restent hors de l\'eau tant qu\'elle n\'est pas HAUTE, certains radeaux flottent dès qu\'elle est MOYENNE.',
       'Regarde bien de quel bassin dépend chaque passage avant de tourner une vanne !',
-      'Conseil de Marine : « L\'Électrik et la Plante n\'aiment pas mes vagues… mais les vagues, elles, s\'en moquent ! »',
+      'Conseil de Marine : « Mes vagues craignent l\'Électrik et la Plante… encore faut-il tenir assez longtemps pour les lancer ! »',
     ],
     legende: {
 """ + ',\n'.join('      ' + l for l in LEG1) + r""",

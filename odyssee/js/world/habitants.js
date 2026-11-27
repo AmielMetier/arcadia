@@ -38,14 +38,14 @@ const caughtOfType = (st, t) => st.dex.caught.filter((sp) => SPECIES[sp]?.t.incl
    Les missions
    ====================================================================== */
 export const MISSIONS = [
-  { id: 'mPanier', town: 'A', at: [7, 14], sprite: 'habitante', who: 'Mme Rose', kind: 'relay', item: 'panier-gouter',
+  { id: 'mPanier', town: 'A', at: [7, 14], sprite: 'habitante', who: 'Mme Bérénice', kind: 'relay', item: 'panier-gouter',
     to: { town: 'B', at: [12, 16], sprite: 'gamin', who: 'Nils', reward: [['super-potion', 2]],
       idle: ['Je suis venu tout seul jusqu\'à Sylvebourg ! Mais... j\'ai un peu faim.'],
       thanks: ['Mon goûter ! Maman pense vraiment à tout.', 'Tiens, prends ça. Maman dit qu\'il faut toujours en avoir sur soi.'],
       done: ['Miam ! Je vais pouvoir aller voir l\'Arène d\'Hector.'] },
     ask: ['Bonjour ! Mon fils Nils est parti ce matin pour Sylvebourg, et il a oublié son goûter.', 'Tu vas vers le nord, toi aussi ? Tu veux bien lui apporter ce panier ?'],
     wait: ['Nils doit avoir faim, le pauvre...'], done: ['Nils a eu son goûter ? Merci, tu es un amour !'],
-    journal: { name: 'Le goûter de Nils', start: 'Mme Rose, à Bourg-Aube, m\'a confié le goûter de son fils Nils, parti pour Sylvebourg.', end: 'Nils a eu son goûter.' } },
+    journal: { name: 'Le goûter de Nils', start: 'Mme Bérénice, à Bourg-Aube, m\'a confié le goûter de son fils Nils, parti pour Sylvebourg.', end: 'Nils a eu son goûter.' } },
 
   { id: 'mInsecte', town: 'B', at: [24, 21], sprite: 'insectomane', who: 'Jules', kind: 'show', test: (m, st) => has('bug')(m) && m.ot === st.name, reward: [['great-ball', 3]],
     ask: ['Je suis le plus grand chasseur d\'insectes de Sylvebourg ! Enfin... après Hector.', 'Montre-moi un Pokémon Insecte que tu as attrapé toi-même !'],
@@ -53,11 +53,11 @@ export const MISSIONS = [
     thanks: ['Pas mal du tout ! On voit que tu l\'as bien choisi.', 'Tiens, des Super Balls. Les insectes rapides s\'échappent souvent.'], done: ['Un jour, j\'aurai mon arène à moi !'],
     journal: { name: 'Le chasseur d\'insectes', start: 'Jules, un chasseur d\'insectes de Sylvebourg, veut voir un Pokémon Insecte que j\'ai capturé moi-même.', end: 'Jules a vu mon Pokémon Insecte. Il m\'a donné des Super Balls.' } },
 
-  { id: 'mJumelles', town: 'B', at: [3, 13], sprite: 'vieil_homme', who: 'Papi Gustave', kind: 'bring', item: 'jumelles', place: { route: 'bois', t: 0.36, side: 1, off: 6 }, reward: [['rare-candy', 1]],
+  { id: 'mJumelles', town: 'B', at: [3, 13], sprite: 'vieil_homme', who: 'Papi Joachim', kind: 'bring', item: 'jumelles', place: { route: 'bois', t: 0.36, side: 1, off: 6 }, reward: [['rare-candy', 1]],
     ask: ['Mes jumelles ! Je les ai posées pour observer un Coxy dans le Bois Murmure... et je suis rentré sans elles.', 'Mes jambes ne me portent plus aussi loin. Si tu les vois, rapporte-les-moi.'],
     again: ['Mes jumelles... Tu ne les aurais pas vues ?'],
     thanks: ['Mes jumelles ! Je vais enfin revoir les Coxy danser.', 'Prends ça, tu l\'as bien mérité.'], done: ['Regarde là-haut... un Roucool qui plane !'],
-    journal: { name: 'Les jumelles de Gustave', start: 'Papi Gustave, à Sylvebourg, a oublié ses jumelles dans le Bois Murmure.', end: 'J\'ai rendu ses jumelles à Papi Gustave.' } },
+    journal: { name: 'Les jumelles de Joachim', start: 'Papi Joachim, à Sylvebourg, a oublié ses jumelles dans le Bois Murmure.', end: 'J\'ai rendu ses jumelles à Papi Joachim.' } },
 
   { id: 'mCasque', town: 'C', at: [25, 22], sprite: 'montagnard', who: 'Firmin', kind: 'bring', item: 'casque-mineur', place: { cave: 'grotte', x: 22, y: 12 }, reward: [['escape-rope', 3], ['moon-stone', 1]],
     ask: ['La Team Éclipse a semé la pagaille dans la Grotte Lunaire. J\'ai filé si vite que j\'y ai laissé mon casque !', 'Un casque jaune, avec une lampe. Il est quelque part dans les galeries.'],

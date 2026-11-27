@@ -63,7 +63,7 @@ export const PLANS = {
       V: { prop: 'ruche_24', reg: { flip: [2, 4] }, use: true, msg: 'Bzzz… Les abeilles s\'affairent : les murs de cire VERTE, VIOLETTE fondent ou se rebâtissent !', son: 'select' },
       W: { prop: 'ruche_4', reg: { flip: [4] }, use: true, msg: 'Bzzz… Les abeilles s\'affairent : les murs de cire VIOLETTE fondent ou se rebâtissent !', son: 'select' },
     },
-    dresseurs: [{ dir: 'left', vue: 2 }, { dir: 'right', vue: 2 }, { dir: 'left', vue: 2 }, { dir: 'right', vue: 2 }],
+    dresseurs: [{ dir: 'down', vue: 2 }, { dir: 'right', vue: 2 }, { dir: 'down', vue: 2 }, { dir: 'right', vue: 2 }],
   },
   1: {
     plan: [
@@ -107,16 +107,16 @@ export const PLANS = {
       'Le barrage a DEUX bassins : l\'OUEST (vannes bleues) et l\'EST (vannes vertes). Chaque vanne règle un bassin sur un niveau : BAS, MOYEN ou HAUT.',
       'Eau basse : les pontons de pierre sortent de l\'eau. Eau haute : les radeaux montent jusqu\'aux quais. Certains pontons restent hors de l\'eau tant qu\'elle n\'est pas HAUTE, certains radeaux flottent dès qu\'elle est MOYENNE.',
       'Regarde bien de quel bassin dépend chaque passage avant de tourner une vanne !',
-      'Conseil de Marine : « L\'Électrik et la Plante n\'aiment pas mes vagues… mais les vagues, elles, s\'en moquent ! »',
+      'Conseil de Marine : « Mes vagues craignent l\'Électrik et la Plante… encore faut-il tenir assez longtemps pour les lancer ! »',
     ],
     legende: {
-      a: { porte: { r: 0, eq: 0 }, ferme: 'eau', o: 'ponton', f: 'eau' },
-      b: { porte: { r: 0, eq: 2 }, ferme: 'eau', o: 'radeau', f: 'eau' },
-      d: { porte: { r: 0, ge: 1 }, ferme: 'eau', o: 'radeau', f: 'eau' },
-      f: { porte: { r: 0, le: 1 }, ferme: 'eau', o: 'ponton', f: 'eau' },
-      h: { porte: { r: 1, le: 1 }, ferme: 'eau', o: 'ponton', f: 'eau' },
-      j: { porte: { r: 1, ge: 1 }, ferme: 'eau', o: 'radeau', f: 'eau' },
-      k: { porte: { r: 1, eq: 2 }, ferme: 'eau', o: 'radeau', f: 'eau' },
+      a: { porte: { r: 0, eq: 0 }, ferme: 'eau', o: 'ponton_0', f: 'eau' },
+      b: { porte: { r: 0, eq: 2 }, ferme: 'eau', o: 'radeau_0', f: 'eau' },
+      d: { porte: { r: 0, ge: 1 }, ferme: 'eau', o: 'radeau_0', f: 'eau' },
+      f: { porte: { r: 0, le: 1 }, ferme: 'eau', o: 'ponton_0', f: 'eau' },
+      h: { porte: { r: 1, le: 1 }, ferme: 'eau', o: 'ponton_1', f: 'eau' },
+      j: { porte: { r: 1, ge: 1 }, ferme: 'eau', o: 'radeau_1', f: 'eau' },
+      k: { porte: { r: 1, eq: 2 }, ferme: 'eau', o: 'radeau_1', f: 'eau' },
       q: { reg: { set: [1, 0] }, pad: 'vanne', g: '10', msg: 'Les vannes grincent : le bassin EST passe au niveau BAS.' },
       m: { reg: { set: [0, 1] }, pad: 'vanne', g: '01', msg: 'Les vannes grincent : le bassin OUEST passe au niveau MOYEN.' },
       Q: { reg: { set: [1, 1] }, pad: 'vanne', g: '11', msg: 'Les vannes grincent : le bassin EST passe au niveau MOYEN.' },
@@ -839,7 +839,7 @@ export const PLANS = {
       K: { prop: 'levier_rouge', reg: { inc: [0, 2] }, use: true, msg: 'Clac ! Tu abaisses le levier rouge : tous les tapis rouges changent de sens.', son: 'select' },
       Q: { prop: 'levier_bleu', reg: { inc: [1, 2] }, use: true, msg: 'Clac ! Tu abaisses le levier bleu : tous les tapis bleus changent de sens.', son: 'select' },
     },
-    dresseurs: [{ dir: 'left', vue: 2 }, { dir: 'right', vue: 2 }, { dir: 'left', vue: 2 }, { dir: 'right', vue: 2 }],
+    dresseurs: [{ dir: 'down', vue: 2 }, { dir: 'right', vue: 2 }, { dir: 'down', vue: 2 }, { dir: 'right', vue: 2 }],
   },
   13: {
     plan: [

@@ -18,7 +18,7 @@ Object.assign(ITEMS, {
   'plume-lune': { pocket: 'cles', price: 0, key: true, icon: 'lunar-wing', name: 'Plume Lune', desc: 'Une plume qui brille comme un croissant de lune. Elle chasse les cauchemars.' },
   talisman: { pocket: 'cles', price: 0, key: true, icon: 'spell-tag', name: 'Talisman Kagura', desc: 'Un talisman de papier du Temple Kagura. Il en faut trois pour réveiller la cloche.' },
   'orbe-rouge': { pocket: 'cles', price: 0, key: true, icon: 'red-orb', name: 'Orbe Rouge', desc: 'Un orbe brûlant. Il calme Groudon... ou le réveille.' },
-  'lettre-facteur': { pocket: 'cles', price: 0, key: true, icon: 'air-mail', name: 'Lettre', desc: 'Du courrier que le facteur de Port-Azur n\'a pas pu distribuer.' },
+  'lettre-facteur': { pocket: 'cles', price: 0, key: true, stack: true, icon: 'air-mail', name: 'Lettre', desc: 'Du courrier que le facteur de Port-Azur n\'a pas pu distribuer.' },
   'vieil-ambre': { pocket: 'cles', price: 0, key: true, icon: 'old-amber', name: 'Vieil Ambre', desc: 'Un morceau d\'ambre ancien. Un Pokémon d\'avant l\'histoire y dort peut-être.' },
   'eclat-etoile': { pocket: 'cles', price: 0, key: true, icon: 'star-piece', name: 'Éclat d\'Étoile', desc: 'Un éclat qui scintille même en plein jour. La fontaine du Jardin des Songes en réclame sept.' },
   'cle-base': { pocket: 'cles', price: 0, key: true, icon: 'secret-key', name: 'Passe de la Brume', desc: 'La carte magnétique qui ouvre la salle du chef de la Brume.' },
@@ -86,7 +86,7 @@ export function buildQuests(ctx) {
       const dir = nx > 0 ? 'right' : nx < 0 ? 'left' : ny > 0 ? 'down' : 'up', opp = { right: 'left', left: 'right', down: 'up', up: 'down' }[dir];
       for (const [ax, ay] of last) W.warp(ax, ay, { map: dest.map, x: dest.x, y: dest.y, dir: dest.dir, step: true });
       W.prop('torii', start[0] + (ny ? 0 : 0), start[1], false, { dz: 0.95, w: ny ? 2 : 1 });
-      W.sign(...nearestWalkable(W, start[0] - nx * 2 + (ny ? -1 : 0), start[1] - ny * 2 + (nx ? -1 : 0), new Set(cells.map(([a, b]) => key(a, b)))), label);
+      W.sign(...nearestWalkable(W, start[0] - nx * 2 + (ny ? -1 : 0), start[1] - ny * 2 + (nx ? -1 : 0), new Set(cells.map(([a, b]) => key(a, b)))), label.replace(/[↑↓←→]/, { up: '↑', down: '↓', left: '←', right: '→' }[dir]));   // la flèche suit le vrai sens du passage
       return { back: { map: 'monde', x: back[0][0], y: back[0][1], dir: opp }, at: start };
     }
     throw new Error('pas de passage pour ' + routeId);
@@ -172,7 +172,7 @@ export function buildQuests(ctx) {
       await A.giveMon(133, 12, { met: 'Sylvebourg' });
       await A.give('rare-candy', 2);
       await A.set('ponyta', 'fin');
-      await A.say(['Au fait... le voleur a laissé tomber ceci dans l\'enclos. Un insigne, avec écrit « Lac Miroir » au dos.', 'On raconte que le lac est au nord de la route 3, dans la forêt. Je me demande ce qu\'ils y fabriquent.'], who);
+      await A.say(['Au fait... le voleur a laissé tomber ceci dans l\'enclos. Un insigne, avec écrit « Lac Miroir » au dos.', 'On raconte que le lac est caché dans la forêt, au sud de la route 3 : un portique rouge marque le sentier. Je me demande ce qu\'ils y fabriquent.'], who);
     } });
     const temoin = (id, x, y, sprite, flag, lines, after) => pnj(W, 'q:' + id, sx + x, sy + y, { sprite, move: 'turn', talk: async (A) => {
       const s = A.step('ponyta');
@@ -197,7 +197,7 @@ export function buildQuests(ctx) {
     W.zone(c.x0 - 1, c.y0 - 1, c.x0 + c.w, c.y0 + c.h, { name: 'Clairière cachée', music: 'forest', prio: 2 });
     W.prop('caisse', c.x0 + 1, c.y0 + 1); W.prop('caisses', c.x0 + c.w - 2, c.y0 + 1); W.prop('tonneau', c.x0 + c.w - 2, c.y0 + c.h - 2);
     const g1 = sbire(W, 'q:brume1', c.cx - 1, c.cy, 'down', 'Sbire de la Brume', 'Sbire', [[261, 13], [19, 14]], { sight: 3, when: (f) => st(f, 'ponyta') >= 3, intro: 'Halte ! Cette clairière appartient à la Brume !', lose: 'Je vais me faire gronder...', after: 'La Brume est partout, tu sais.' });
-    const g2 = sbire(W, 'q:brume2', c.cx + 1, c.cy, 'down', 'Sbire', 'Sbire', [[41, 14], [109, 14]], { sight: 3, when: (f) => st(f, 'ponyta') >= 3, bs: 'brume_f', intro: 'Tu veux le Ponyta ? Viens le chercher !', lose: 'Pfff... La chef ne va pas être contente.', after: 'Notre chef, Nox, a de grands projets...' });
+    const g2 = sbire(W, 'q:brume2', c.cx + 1, c.cy, 'down', 'Sbire de la Brume', 'Sbire', [[41, 14], [109, 14]], { sight: 3, when: (f) => st(f, 'ponyta') >= 3, bs: 'brume_f', intro: 'Ce Ponyta vaut une fortune au marché noir. Tu le veux ? Viens le chercher !', lose: 'Pfff... Le chef ne va pas être content.', after: 'Notre chef, Nox, paie bien ceux qui lui ramènent des Pokémon rares...' });
     // la caisse, au fond de la clairière (à l'opposé du sentier qui y entre)
     const [kx, ky] = c.ny > 0 ? [c.cx, c.y0 + c.h - 1] : c.nx > 0 ? [c.x0 + c.w - 1, c.cy] : c.nx < 0 ? [c.x0, c.cy] : [c.cx, c.y0];
     chose(W, 'caisse', kx, ky, { use: async (A) => {
@@ -210,7 +210,7 @@ export function buildQuests(ctx) {
   }
 
   /* ====================================================================================================
-     Lac Miroir (au nord de la route 3) et Rive-Claire · Grotte des Marées (en surfant)
+     Lac Miroir (au sud de la route 3) et Rive-Claire · Grotte des Marées (en surfant)
      ==================================================================================================== */
   const LAC = outdoor('lac', 70, 58, { name: 'Lac Miroir', music: 'route2' });
   {
@@ -241,9 +241,9 @@ export function buildQuests(ctx) {
     m.zone(21, 36, 48, 55, { name: 'Rive-Claire', music: 'town', town: 'rive' });
     m.item(...spot(m, 8, 10), 'super-potion', 2); m.item(...spot(m, 61, 9), 'great-ball', 3); m.item(...spot(m, 25, 16), 'eclat-etoile', 1, 'etoile:lac1'); m.item(...spot(m, 62, 26), 'eclat-etoile', 1, 'etoile:lac2');
     // dresseurs du tour du lac
-    trainerNpc(m, ...spot(m, 12, 22), 'right', 'Pêcheur', 'Marius', [[118, 17], [129, 15], [60, 18]], { sight: 3 });
-    trainerNpc(m, ...spot(m, 60, 21), 'left', 'Fillette', 'Mélodie', [[183, 18], [270, 17]], { sight: 3 });
-    trainerNpc(m, ...spot(m, 22, 3), 'down', 'Randonneuse', 'Aline', [[283, 18], [399, 18], [298, 17]], { sight: 3 });
+    trainerNpc(m, ...spot(m, 12, 22), 'right', 'Pêcheur', 'Marius', [[118, 16], [129, 15], [60, 16]], { sight: 3 });
+    trainerNpc(m, ...spot(m, 60, 21), 'left', 'Fillette', 'Mélodie', [[183, 16], [270, 16]], { sight: 3 });
+    trainerNpc(m, ...spot(m, 22, 3), 'down', 'Randonneuse', 'Aline', [[283, 17], [399, 16], [298, 16]], { sight: 3 });
   }
   Q('lac', {
     name: 'Les eaux troubles du Lac Miroir', where: 'Rive-Claire',
@@ -262,6 +262,10 @@ export function buildQuests(ctx) {
       const s = A.step('lac'), who = 'Gaston';
       if (s === 'fin') { await A.say(['Regarde l\'eau : on y voit les nuages ! Le lac est redevenu un miroir.', 'Prends soin de mon Lokhlass, hein.'], who); return; }
       if (!s) {
+        if (A.badges() < 2) {
+          await A.say(['Bah alors, un jeune dresseur ? Des types en gris ont planté des pompes au bord du lac.', 'Leurs Pokémon sont bien trop forts pour quelqu\'un qui n\'a pas encore le Badge Écume de Port-Azur. Reviens me voir après Marine !'], who);
+          return;
+        }
         await A.say(['Bah alors, un dresseur ? Tu tombes bien.', 'Il y a une semaine, des types en gris ont planté trois grosses pompes au bord du lac.', 'Depuis, l\'eau se trouble et les Pokémon du lac sont nerveux.', 'Ils pompent quelque chose au fond... Moi, je suis trop vieux pour les chasser. Tu veux bien t\'en charger ?'], who);
         await A.set('lac', 1); return;
       }
@@ -276,9 +280,9 @@ export function buildQuests(ctx) {
     const pompes = [[15, 17, 'right'], [35, 5, 'down'], [57, 17, 'left']];
     pompes.forEach(([px, py, dir], i) => {
       const [x, y] = spot(m, px, py);
-      const g = sbire(m, 'q:pompe' + (i + 1), ...spot(m, x + (dir === 'down' ? 1 : 0), y + (dir === 'down' ? 0 : 1)), dir, i === 1 ? 'Sbire' : 'Sbire de la Brume', 'Sbire', [[[42, 19], [109, 20]], [[261, 20], [198, 19]], [[110, 21], [41, 19], [19, 20]]][i], {
+      const g = sbire(m, 'q:pompe' + (i + 1), ...spot(m, x + (dir === 'down' ? 1 : 0), y + (dir === 'down' ? 0 : 1)), dir, 'Sbire de la Brume', 'Sbire', [[[42, 18], [109, 19]], [[261, 19], [198, 18]], [[110, 20], [41, 18], [19, 19]]][i], {
         sight: 3, when: (f) => st(f, 'lac') >= 1, bs: i === 1 ? 'brume_f' : 'brume', ow: i === 1 ? 'brume_f' : 'brume',
-        intro: ['Ne touche pas à la pompe !', 'Hé, toi, au pied du lac, tu n\'as rien à faire là !', 'Le chef Sylas veut ce qui dort au fond. On ne s\'arrêtera pas !'][i],
+        intro: ['Ne touche pas à la pompe !', 'Hé, toi, au pied du lac, tu n\'as rien à faire là !', 'Le chef Sylas veut ce qui dort au fond. Ça se revend cher, ces bêtes-là !'][i],
         lose: 'Mince... La pompe...', after: 'Coupe-la si tu veux. Ça ne changera rien.',
       });
       chose(m, 'console', x, y, { use: async (A) => {
@@ -292,7 +296,7 @@ export function buildQuests(ctx) {
       } });
     });
     pnj(m, 'q:sylas1', 44, 4, { sprite: 'sylas', when: (f) => st(f, 'lac') === 2, talk: async (A) => {
-      const r = await A.fight({ cls: 'Admin de la Brume', name: 'Sylas', bs: 'sylas', prize: 60, team: [[42, 22], [110, 23], [319, 24]], intro: ['Alors c\'est toi qui as coupé mes pompes ?', 'Je suis Sylas, admin de la Brume. Ce lac cache une gardienne, et la Brume en a besoin.', 'Tu veux jouer les héros ? Très bien !'], lose: 'Tch... Pas mal.' });
+      const r = await A.fight({ cls: 'Admin de la Brume', name: 'Sylas', bs: 'sylas', prize: 60, team: [[42, 20], [110, 21], [319, 22]], intro: ['Alors c\'est toi qui as coupé mes pompes ?', 'Je suis Sylas, admin de la Brume. Ce lac cache une gardienne, et la Brume en a besoin.', 'Tu veux jouer les héros ? Très bien !'], lose: 'Tch... Pas mal.' });
       if (r !== 'win') return;
       await A.say(['Garde ton lac. Nous, on prend ce qu\'il y a dessous.', 'La Grotte des Marées nous attend. Et toi, sans Surf, tu ne pourras même pas nous suivre !'], 'Sylas');
       await A.set('lac', 3);
@@ -317,12 +321,12 @@ export function buildQuests(ctx) {
     caveLink(m, 46, 12, MAREES, 20, 29);
     const c = MAREES;
     sbire(c, 'q:marees1', 12, 6, 'right', 'Sbire de la Brume', 'Sbire', [[42, 37], [110, 38]], { sight: 3, when: (f) => st(f, 'lac') >= 3, intro: 'Tu as traversé le lac ? Impressionnant... mais inutile !' });
-    sbire(c, 'q:marees2', 29, 6, 'left', 'Sbire', 'Sbire', [[229, 38], [262, 37]], { sight: 3, bs: 'brume_f', ow: 'brume_f', when: (f) => st(f, 'lac') >= 3, intro: 'Le chef est juste derrière. Tu n\'iras pas plus loin !' });
+    sbire(c, 'q:marees2', 29, 6, 'left', 'Sbire de la Brume', 'Sbire', [[229, 38], [262, 37]], { sight: 3, bs: 'brume_f', ow: 'brume_f', when: (f) => st(f, 'lac') >= 3, intro: 'Le chef est juste derrière. Tu n\'iras pas plus loin !' });
     pnj(c, 'q:sylas2', 21, 4, { sprite: 'sylas', dir: 'up', when: (f) => st(f, 'lac') === 3, talk: async (A) => {
-      if (A.badges() < 8) { await A.say(['Tu as osé traverser jusqu\'ici ? Dommage, gamin : la barrière qui protège ce lac souterrain ne cède qu\'à la puissance de huit badges.', 'Reviens quand tu auras vaincu les trois frères de l\'archipel... si tu l\'oses !'], 'Sylas'); return; }
+      if (A.badges() < 8) { await A.say(['Tu as osé traverser jusqu\'ici ? Dommage, minus : la barrière qui protège ce lac souterrain ne cède qu\'à la puissance de huit badges.', 'Reviens quand tu auras vaincu les trois frères de l\'archipel... si tu l\'oses !'], 'Sylas'); return; }
       const r = await A.fight({ cls: 'Admin de la Brume', name: 'Sylas', bs: 'sylas', prize: 120, team: [[169, 40], [110, 40], [319, 41], [430, 42]], intro: ['Encore toi ?! Tu ne lâches donc jamais ?', 'Regarde : la gardienne est là, sous l\'eau. Il ne manque plus qu\'elle se montre...', 'Hors de mon chemin !'], lose: 'Comment... ?' });
       if (r !== 'win') return;
-      await A.say(['La gardienne du lac ne m\'intéresse plus. Le chef Nox voulait juste savoir si elle existait.', 'Son vrai trésor, c\'est l\'Orbe Rouge... et ce qu\'il réveille, sur l\'île de feu.', 'Tu entendras encore parler de la Brume, gamin.'], 'Sylas');
+      await A.say(['La gardienne du lac ne m\'intéresse plus. Le chef Nox voulait juste savoir si elle existait.', 'Son vrai trésor, c\'est l\'Orbe Rouge... et ce qu\'il réveille, sur l\'île de feu.', 'Tu entendras encore parler de la Brume, minus.'], 'Sylas');
       await A.walk('q:sylas2', 'down', 3, true);
       A.flash('#c8e8ff'); A.cry(481);
       await A.say(['L\'eau du lac souterrain se met à briller...', 'Une petite silhouette rose flotte au-dessus des vagues !']);
@@ -349,7 +353,12 @@ export function buildQuests(ctx) {
         await A.say(['Aïe aïe aïe... Mon Roucarnage a la grippe, et j\'ai quatre lettres qui partent loin.', 'Lucie à Sylvebourg, Gaston au Lac Miroir, le jardinier du Jardin des Songes et le prêtre du Temple Kagura.', 'Tu voyages beaucoup, toi. Tu veux bien les porter ?'], who);
         await A.give('lettre-facteur', 4); await A.set('courrier', 1); return;
       }
-      if (s === 1) { await A.say('Il te reste des lettres à distribuer. Courage !', who); return; }
+      if (s === 1) {
+        const rest = ['lucie', 'gaston', 'jardin', 'pretre'].filter((q) => !A.f['CL:' + q]).length;
+        if ((A.state.bag['lettre-facteur'] || 0) < rest) A.state.bag['lettre-facteur'] = rest;
+        await A.say('Il te reste des lettres à distribuer. Courage !', who);
+        return;
+      }
       await A.say(['Toutes livrées ? Formidable !', 'Voici ta paie de facteur. Et un souvenir de la poste.'], who);
       await A.money(3000); await A.give('rare-candy', 3); await A.give('shiny-stone');
       await A.set('courrier', 'fin');
@@ -357,10 +366,14 @@ export function buildQuests(ctx) {
   }
   /** un destinataire de lettre : remet la lettre, puis continue avec sa propre conversation */
   const lettre = (who, k) => async (A) => {
-    if (A.step('courrier') === 1 && !A.f['CL:' + k] && A.has('lettre-facteur')) {
-      A.take('lettre-facteur'); A.f['CL:' + k] = true; A.sfx('item');
+    if (A.step('courrier') === 1 && !A.f['CL:' + k]) {
+      if (A.has('lettre-facteur')) A.take('lettre-facteur');
+      A.f['CL:' + k] = true; A.sfx('item');
       await A.say([`${A.name} remet une lettre à ${who}.`, 'Oh ! Une lettre pour moi ? Merci beaucoup !']);
-      if (['lucie', 'gaston', 'jardin', 'pretre'].every((q) => A.f['CL:' + q])) await A.set('courrier', 2);
+      if (['lucie', 'gaston', 'jardin', 'pretre'].every((q) => A.f['CL:' + q])) {
+        if (A.has('lettre-facteur')) A.take('lettre-facteur', A.state.bag['lettre-facteur']);
+        await A.set('courrier', 2);
+      }
       return true;
     }
     return false;
@@ -630,7 +643,7 @@ export function buildQuests(ctx) {
     const m = W;
     const tal = async (A) => { if ((A.st.bag.talisman || 0) < 3) { await A.give('talisman'); if ((A.st.bag.talisman || 0) >= 3) { await A.say('Les trois talismans sont réunis ! Il faut les rapporter au Grand Prêtre.'); await A.set('kagura', 2); } } };
     sbire(m, 'q:tor1', 262 + DT[0], 170 + DT[1], 'left', 'Sbire de la Brume', 'Sbire', [[262, 36], [42, 37], [110, 37]], { sight: 4, when: (f) => st(f, 'kagura') >= 1, intro: 'Un talisman ? Il est à la Brume, maintenant !', lose: 'Rah... Prends-le, ton bout de papier !', onWin: tal });
-    sbire(m, 'q:tor2', 241 + DT[0], 188 + DT[1], 'down', 'Sbire', 'Sbire', [[198, 37], [435, 38]], { sight: 4, bs: 'brume_f', ow: 'brume_f', when: (f) => st(f, 'kagura') >= 1, intro: 'On cherche un orbe, pas des talismans. Mais je garde celui-là !', lose: 'Bon, bon...', onWin: tal });
+    sbire(m, 'q:tor2', 241 + DT[0], 188 + DT[1], 'down', 'Sbire de la Brume', 'Sbire', [[198, 37], [435, 38]], { sight: 4, bs: 'brume_f', ow: 'brume_f', when: (f) => st(f, 'kagura') >= 1, intro: 'On cherche un orbe, pas des talismans. Mais je garde celui-là !', lose: 'Bon, bon...', onWin: tal });
     m.object(267 + DT[0], 181 + DT[1], { use: async (A) => {
       if (A.step('kagura') !== 1 || A.f.talCascade) { await A.say('« Ici, l\'eau chante pour les esprits. »'); return; }
       A.f.talCascade = true; await A.say(['Une stèle couverte de mousse. Quelque chose est coincé derrière...', 'Un talisman ! Un sbire a dû le cacher là.']); await tal(A);
@@ -706,9 +719,9 @@ export function buildQuests(ctx) {
     for (let y = B.doorY + 1; y < B.doorY + 6; y++) { if (m.get(B.doorX, y) === T.PATH) break; m.set(B.doorX, y, T.PATH); }
     for (const [x, y, k] of [[1, 2, 'console'], [3, 2, 'ecran_carte'], [11, 2, 'cuve'], [13, 2, 'cuve'], [1, 9, 'caisses'], [13, 9, 'caisses'], [9, 2, 'machine_labo']]) b.prop(k, x, y);
     sbire(b, 'q:base1', 4, 8, 'right', 'Sbire de la Brume', 'Sbire', [[262, 77], [110, 77], [169, 78]], { sight: 4, when: (fl) => st(fl, 'magma') >= 1 });
-    sbire(b, 'q:base2', 10, 8, 'left', 'Sbire', 'Sbire', [[435, 78], [229, 78]], { sight: 4, bs: 'brume_f', ow: 'brume_f', when: (fl) => st(fl, 'magma') >= 1 });
+    sbire(b, 'q:base2', 10, 8, 'left', 'Sbire de la Brume', 'Sbire', [[435, 78], [229, 78]], { sight: 4, bs: 'brume_f', ow: 'brume_f', when: (fl) => st(fl, 'magma') >= 1 });
     sbire(b, 'q:base3', 4, 5, 'right', 'Sbire de la Brume', 'Sbire', [[560, 78], [454, 78], [169, 79]], { sight: 4, when: (fl) => st(fl, 'magma') >= 1 });
-    sbire(b, 'q:base4', 10, 5, 'left', 'Sbire', 'Sbire', [[510, 79], [430, 79]], { sight: 4, bs: 'brume_f', ow: 'brume_f', when: (fl) => st(fl, 'magma') >= 1 });
+    sbire(b, 'q:base4', 10, 5, 'left', 'Sbire de la Brume', 'Sbire', [[510, 79], [430, 79]], { sight: 4, bs: 'brume_f', ow: 'brume_f', when: (fl) => st(fl, 'magma') >= 1 });
     pnj(b, 'q:sylas3', 7, 4, { sprite: 'sylas', when: (fl) => st(fl, 'magma') === 1 && !fl.sylas3, talk: async (A) => {
       const r = await A.fight({ cls: 'Admin de la Brume', name: 'Sylas', bs: 'sylas', prize: 200, team: [[169, 79], [110, 79], [319, 80], [430, 80], [452, 81]], intro: ['Le Maître de la Ligue en personne ! Je savais qu\'on se reverrait.', 'Le chef Nox est juste derrière moi, avec l\'Orbe Rouge. Ce soir, Groudon se réveille !'], lose: 'C\'est fini pour moi...' });
       if (r !== 'win') return;
@@ -718,7 +731,7 @@ export function buildQuests(ctx) {
     pnj(b, 'q:nox1', 7, 2, { sprite: 'nox', when: (fl) => st(fl, 'magma') === 1 && fl.sylas3, talk: async (A) => {
       const r = await A.fight({ cls: 'Chef de la Brume', name: 'Nox', bs: 'nox', prize: 300, team: [[553, 81], [229, 81], [461, 82], [452, 82], [248, 83]], intro: ['Alors c\'est toi, l\'enfant qui défait chacun de mes plans.', 'Ponyta, le lac, les talismans, Darkrai... Des broutilles.', 'Nocturne et sa Team Éclipse ont échoué avec leur Prisme Noir ? Des amateurs.', 'Ce qui compte, c\'est ceci : l\'Orbe Rouge. Avec lui, Groudon m\'obéira, et cette région sera à la Brume !'], lose: 'Impossible...' });
       if (r !== 'win') return;
-      await A.say(['Tu es fort. Mais l\'Orbe est déjà chaud. Le géant s\'éveille.', 'Rejoins-moi au fond de la Caverne du Magma, si tu l\'oses !'], 'Nox');
+      await A.say(['Quelle force... Mais l\'Orbe est déjà chaud. Le géant s\'éveille.', 'Rejoins-moi au fond de la Caverne du Magma, si tu l\'oses !'], 'Nox');
       await A.walk('q:nox1', 'up', 0, true);
       await A.set('magma', 2);
     } });
@@ -736,7 +749,7 @@ export function buildQuests(ctx) {
     for (let y = 13; y < 22; y++) { if (m.get(44, y) === T.PATH) break; if (m.get(44, y) === T.TREE || m.get(44, y) === T.ASH) m.set(44, y, T.PATH); }
     c.rect(36, 2, 45, 9, T.CAVE); c.prop('brasero', 37, 3); c.prop('brasero', 44, 3);
     pnj(c, 'q:nox2', 40, 6, { sprite: 'nox', dir: 'up', when: (fl) => st(fl, 'magma') === 2, talk: async (A) => {
-      const r = await A.fight({ cls: 'Chef de la Brume', name: 'Nox', bs: 'nox', prize: 500, team: [[553, 83], [229, 83], [461, 84], [452, 84], [635, 85], [248, 86]], intro: ['Tu es venu... Parfait. Regarde !', 'L\'Orbe Rouge brille. La lave monte. GROUDON, RÉVEILLE-TOI !'], lose: 'Le volcan... ne m\'écoute pas...' });
+      const r = await A.fight({ cls: 'Chef de la Brume', name: 'Nox', bs: 'nox', prize: 500, team: [[553, 83], [229, 83], [461, 84], [452, 84], [635, 85], [248, 86]], intro: ['Te voilà... Parfait. Regarde !', 'L\'Orbe Rouge brille. La lave monte. GROUDON, RÉVEILLE-TOI !'], lose: 'Le volcan... ne m\'écoute pas...' });
       if (r !== 'win') return;
       await A.say(['L\'Orbe... il m\'échappe !', 'Groudon ne m\'obéit pas. Il ne m\'a jamais obéi.', '... La Brume est finie. Fais ce que tu veux.'], 'Nox');
       await A.walk('q:nox2', 'down', 3, true);

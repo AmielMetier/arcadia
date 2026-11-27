@@ -23,7 +23,8 @@ function spawnAfterimage(view, side, slot, tint = null) {
   view.st.afterimages.push({
     img: o.img, tint,
     cx: pos.x + (side === 1 ? view.st.eSlide : view.st.pSlide) + o.dx,
-    cy: pos.y + (side === 1 ? 8 : 18) + o.dy,
+    // même ancrage que le sprite (battleView, drawSpr) : pattes au milieu de l'ombre, marge du bas du sprite comprise
+    cy: pos.y + (side === 1 ? 8 : 18) + o.dy + (o.pied != null ? o.pied * (h / o.img.height) - 6 : 0),
     w, h, alpha: 0.48, life: 0.22, max: 0.22,
   });
 }

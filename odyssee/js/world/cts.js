@@ -4,14 +4,14 @@
 // ne dépend que de la carte : il est le même à chaque chargement.
 // Une ancienne partie qui avait déjà ramassé l'objet remplacé reçoit la CT au chargement (rattraperCT).
 import { CTS, CTS_POSEES } from '../data/cts.js';
-import { lignesObjets } from './bareme.js';
+import { estProtege, lignesObjets } from './bareme.js';
 
 const hache = (t) => { let h = 2166136261; for (const c of String(t)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return h; };
 
 /** remplace des objets posés par les CT ; renvoie [[ct, carte, idObjet, avant, rang]] */
 export function poserCT(maps, RG) {
   // ordre fixe (carte, identifiant) : le résultat ne dépend pas de l'ordre de construction
-  const lignes = lignesObjets(maps, RG).filter((L) => L.it.id && !/rare-candy|-stone$/.test(L.it.item))
+  const lignes = lignesObjets(maps, RG).filter((L) => L.it.id && !estProtege(L.id, L.it) && !/rare-candy|-stone$/.test(L.it.item))
     .sort((a, b) => (a.id + '|' + a.it.id < b.id + '|' + b.it.id ? -1 : 1));
   const prises = new Set(), zones = new Set(), out = [];
   for (const ct of CTS_POSEES) {

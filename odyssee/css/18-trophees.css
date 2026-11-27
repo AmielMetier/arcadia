@@ -928,3 +928,6 @@
   max-width: calc(var(--px) * 100);
   line-height: 1.4;
 }
+
+/* médaille choisie au clavier (▲ ▼) */
+.tmedal-card.sel { outline: calc(var(--px) * 1) solid #7dd3fc; outline-offset: calc(var(--px) * 0.5); }

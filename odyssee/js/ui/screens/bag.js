@@ -149,11 +149,11 @@ export function bagScreen(game, o = {}) {
           <button type="button" class="b2w2-touch-btn b2w2-btn-back" data-act="back" title="Fermer le sac (Échap / B)">
             <span class="touch-btn-lbl">RETOUR</span>
           </button>
-          <button type="button" class="b2w2-touch-btn b2w2-btn-give" data-act="give" title="Donner à un Pokémon (D)">
-            <span class="touch-btn-lbl">DONNER</span>
+          <button type="button" class="b2w2-touch-btn b2w2-btn-give" data-act="give" title="Donner à un Pokémon (G)">
+            <span class="touch-btn-lbl">DONNER [G]</span>
           </button>
           <button type="button" class="b2w2-touch-btn b2w2-btn-toss" data-act="toss" title="Jeter une quantité (J)">
-            <span class="touch-btn-lbl">JETER</span>
+            <span class="touch-btn-lbl">JETER [J]</span>
           </button>
         </div>
       </div>
@@ -322,9 +322,11 @@ export function bagScreen(game, o = {}) {
             updateInspector();
           }
         });
+        // clic ou toucher : on choisit d'abord quoi faire de l'objet (jamais d'objet utilisé au premier toucher)
         row.addEventListener('click', (e) => {
           e.stopPropagation();
-          triggerRow(idx);
+          if (idx >= entries().length) { triggerRow(idx); return; }
+          menuObjet(idx);
         });
       });
 
@@ -378,6 +380,24 @@ export function bagScreen(game, o = {}) {
       ui.sound.sfx('select');
       if (o.battle) game._lastBattleItem = item;
       close({ item });
+    };
+
+    /** sous-menu d'un objet (clic ou toucher) : Utiliser, Donner, Jeter, Enregistrer */
+    const menuObjet = async (idx) => {
+      if (busy) return;
+      const es = entries(); if (idx < 0 || idx >= es.length) return;
+      if (i !== idx) { i = idx; renderList(); updateInspector(); }
+      const item = es[idx], it = ITEMS[item]; if (!it) return;
+      const choix = [['Utiliser', () => activateSelected()]];
+      if (!o.battle && !it.key) choix.push(['Donner', () => handleGive()], ['Jeter', () => handleToss()]);
+      if (!o.battle) choix.push([st.registeredItem === item ? 'Retirer du raccourci' : 'Enregistrer', () => toggleRegister()]);
+      choix.push(['Annuler', null]);
+      busy = true;
+      ui.sound.sfx('select');
+      const r = await ui.ask(`Que faire de : ${itemName(item)} ?`, choix.map(([l]) => l));
+      busy = false;
+      const act = choix[r]?.[1];
+      if (act) await act();
     };
 
     const handleGive = async () => {
