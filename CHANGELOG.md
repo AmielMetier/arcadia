@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.170 — 27 novembre 2026
+- Odyssée 3.7 : correctifs Acte 2 Lot P1 (arènes 3-5, Éclipse, Rival, Force/Surf, audio, Sanctuaire) (Amiel)
+
 ## 5.169 — 27 novembre 2026
 - Odyssée 3.7 : correctifs Acte 2 Lot P0 (progression 5e badge, courbes, arènes 4-5, Lugia, portraits) (Amiel)
 
