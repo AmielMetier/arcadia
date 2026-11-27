@@ -14,11 +14,11 @@ import { tourDoree } from './tourdoree.js';
 
 /* ---------------- objets de quête ---------------- */
 Object.assign(ITEMS, {
-  'insigne-brume': { pocket: 'cles', price: 0, key: true, icon: 'dark-gem', name: 'Insigne Brume', desc: 'Un insigne gris frappé d\'un nuage. Les sbires de la Brume le portent au col. Au dos : « Lac Miroir ».' },
+  'insigne-brume': { pocket: 'cles', price: 0, key: true, icon: 'insigne-brume', name: 'Insigne Brume', desc: 'Un insigne gris frappé d\'un nuage. Les sbires de la Brume le portent au col. Au dos : « Lac Miroir ».' },
   'plume-lune': { pocket: 'cles', price: 0, key: true, icon: 'lunar-wing', name: 'Plume Lune', desc: 'Une plume qui brille comme un croissant de lune. Elle chasse les cauchemars.' },
   talisman: { pocket: 'cles', price: 0, key: true, icon: 'spell-tag', name: 'Talisman Kagura', desc: 'Un talisman de papier du Temple Kagura. Il en faut trois pour réveiller la cloche.' },
   'orbe-rouge': { pocket: 'cles', price: 0, key: true, icon: 'red-orb', name: 'Orbe Rouge', desc: 'Un orbe brûlant. Il calme Groudon... ou le réveille.' },
-  'lettre-facteur': { pocket: 'cles', price: 0, key: true, stack: true, icon: 'air-mail', name: 'Lettre', desc: 'Du courrier que le facteur de Port-Azur n\'a pas pu distribuer.' },
+  'lettre-facteur': { pocket: 'cles', price: 0, key: true, stack: true, icon: 'lettre-facteur', name: 'Lettre', desc: 'Du courrier que le facteur de Port-Azur n\'a pas pu distribuer.' },
   'vieil-ambre': { pocket: 'cles', price: 0, key: true, icon: 'old-amber', name: 'Vieil Ambre', desc: 'Un morceau d\'ambre ancien. Un Pokémon d\'avant l\'histoire y dort peut-être.' },
   'eclat-etoile': { pocket: 'cles', price: 0, key: true, icon: 'star-piece', name: 'Éclat d\'Étoile', desc: 'Un éclat qui scintille même en plein jour. La fontaine du Jardin des Songes en réclame sept.' },
   'cle-base': { pocket: 'cles', price: 0, key: true, icon: 'secret-key', name: 'Passe de la Brume', desc: 'La carte magnétique qui ouvre la salle du chef de la Brume.' },

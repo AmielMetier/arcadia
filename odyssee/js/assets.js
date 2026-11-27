@@ -23,7 +23,7 @@ const ITEMS = new Set(SPRITES.items || []), PORTRAITS = new Set(SPRITES.portrait
 const SOSIES = { pierre: 'topdresseur', croupier: 'garde' };
 // en combat seulement (les dialogues gardent le buste de leur dessin) : personnages sans dessin de combat ni portrait
 // peint (Dr Lumen, habitants…), pour ne jamais demander une image introuvable
-const SOSIES_COMBAT = { ...SOSIES, lumen: 'scientifique', savant: 'scientifique', capitaine: 'marin', facteur: 'habitant', jardinier: 'habitant', maman: 'habitante', dame: 'habitante', lucie: 'fillette', fillette2: 'fillette', nurse: 'habitante', vendeur: 'habitant' };
+const SOSIES_COMBAT = { ...SOSIES, savant: 'scientifique', capitaine: 'marin', facteur: 'habitant', jardinier: 'habitant', maman: 'habitante', dame: 'habitante', lucie: 'fillette', fillette2: 'fillette', nurse: 'habitante', vendeur: 'habitant' };
 // dresseurs de Poké Duel (../pokemon/assets/trainers) : derniers recours connus
 const POKEDUEL = new Set(['agatha-gen3', 'blue', 'brock', 'bruno', 'calem', 'cynthia', 'cyrus', 'galacticgrunt', 'galacticgruntf', 'hiker', 'karen', 'korrina', 'lance', 'lass', 'mars', 'misty', 'morty', 'pokemoncenterlady', 'pryce', 'red', 'sailor', 'saturn', 'serena', 'sycamore', 'youngster']);
 const orig = (id) => id >= 1000 && id < 10000 && SPECIES[id];

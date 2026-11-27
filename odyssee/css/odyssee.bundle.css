@@ -1926,7 +1926,7 @@ img { image-rendering: pixelated; }
 /* Grille 2x2 de boutons tactiles DS Concept 1 */
 .b2w2-btn-grid {
   display: grid;
-  grid-template-columns: repeat(3, calc(var(--px) * 23.5));
+  grid-template-columns: repeat(3, calc(var(--px) * 27.5));
   grid-template-rows: repeat(2, calc(var(--px) * 11));
   gap: calc(var(--px) * 1.5);
   flex-shrink: 0;
@@ -1961,15 +1961,16 @@ img { image-rendering: pixelated; }
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: calc(var(--px) * 1.5);
-  padding: 0 calc(var(--px) * 2);
+  gap: calc(var(--px) * 1.2);
+  padding: 0 calc(var(--px) * 1.2);
   border: calc(var(--px) * 1) solid #000;
   color: #ffffff;
   cursor: pointer;
   pointer-events: auto;
   user-select: none;
+  white-space: nowrap;
   font-weight: 800;
-  font-size: calc(var(--px) * 5.8);
+  font-size: calc(var(--px) * 4.5);
   letter-spacing: 0.04em;
   text-shadow: var(--px) var(--px) 0 #000;
   clip-path: polygon(
