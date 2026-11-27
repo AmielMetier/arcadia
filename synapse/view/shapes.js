@@ -21,5 +21,10 @@ export function shapeSvg(shape, hex, { size = 40, striped = false, label = '' } 
   const a11y = label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"';
   return `<svg class="shape" width="${size}" height="${size}" viewBox="-1.15 -1.15 2.3 2.3" ${a11y}>${defs}<path d="${PATHS[shape]}" fill="${fill}" stroke="#F8FAFC" stroke-opacity="0.35" stroke-width="0.06"/></svg>`;
 }
+// '#38BDF8' → 'rgba(56,189,248,a)' pour le canvas.
+export function rgba(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
+}
 export const colorHex = (i) => COLORS[i].hex;
 export const colorName = (i) => COLORS[i].id;

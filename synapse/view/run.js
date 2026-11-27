@@ -19,7 +19,7 @@ const KINDS = {
 
 export function emptyResult(Mode, session) {
   const lv = startLevel(store.data.levels[Mode.id]);
-  return { mode: Mode.id, title: Mode.title, session, dur: 0, score: 0, best: 0, trials: 0, acc: 0, lv0: lv, lv1: lv, m: emptyMetrics(), errs: {}, lines: Mode.summary(emptyMetrics(), {}), tip: Mode.tip({}) };
+  return { mode: Mode.id, title: Mode.title, color: Mode.color, session, dur: 0, score: 0, best: 0, trials: 0, acc: 0, lv0: lv, lv1: lv, m: emptyMetrics(), errs: {}, lines: Mode.summary(emptyMetrics(), {}), tip: Mode.tip({}) };
 }
 
 export function createRun({ Mode, setup, dur, session, rng, els, onEnd }) {
@@ -40,7 +40,13 @@ export function createRun({ Mode, setup, dur, session, rng, els, onEnd }) {
   }
 
   const api = {
-    rng, t0, layer: els.layer, m,
+    rng, t0, layer: els.layer, m, color: Mode.color,
+    // Place le retour « Juste / Manqué » près de l'élément principal (centre en px de la scène ; x : centré par défaut).
+    place(y, x) {
+      const s = els.fb.style, t = Math.round(y) + 'px', l = x == null ? '' : Math.round(x) + 'px';
+      if (s.top !== t) s.top = t;
+      if (s.left !== l) s.left = l;
+    },
     get level() { return ad.level; },
     get calm() { return document.body.classList.contains('calm'); },
     p: () => params(id, ad.level),
@@ -80,7 +86,7 @@ export function createRun({ Mode, setup, dur, session, rng, els, onEnd }) {
     phase = 'over'; mode.stop(); clearQueue(); clock.reset(); showPause(null);
     for (const k of ['rt', 'sw', 'rep']) m[k] = m[k].slice(-MAX_SAMPLES).map((v) => Math.max(0, Math.round(v))); // le calage peut rendre un temps négatif
     const r = {
-      mode: id, title: Mode.title, session: !!session, dur: Math.round(Math.max(0, Math.min(dur, now - t0)) * 10) / 10,
+      mode: id, title: Mode.title, color: Mode.color, session: !!session, dur: Math.round(Math.max(0, Math.min(dur, now - t0)) * 10) / 10,
       score, best, trials, acc: trials ? Math.round(100 * oks / trials) : 0, lv0, lv1: ad.level, m, errs,
     };
     if (trials > 0) {
@@ -128,6 +134,7 @@ export function createRun({ Mode, setup, dur, session, rng, els, onEnd }) {
       const hd = els.hud;
       setText(hd.level, ad.level); setText(hd.score, score); setText(hd.streak, streak);
       setText(hd.time, Math.max(0, Math.ceil(tEnd - Math.max(now, t0))) + ' s');
+      els.tbar.style.transform = `scaleX(${Math.max(0, Math.min(1, (tEnd - Math.max(now, t0)) / dur)).toFixed(4)})`;
       els.wait.hidden = audioState() === 'running';
     },
     state() {

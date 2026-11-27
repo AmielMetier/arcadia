@@ -2,41 +2,78 @@
 import { startLevel } from '../engine/levels.js';
 import { streak, dayKey } from '../engine/days.js';
 import { store } from './store.js';
+import { GLYPHS } from './glyphs.js';
 
 export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 export const dayStreak = () => streak(store.data.history.map((g) => g.day), dayKey(new Date()));
 const plural = (n, one, many) => `${n} ${n > 1 ? many : one}`;
+const DAY_LETTERS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+
+// Niveau sur dix crans, dans la couleur de l'épreuve.
+const pips = (lv) => `<span class="pips" role="img" aria-label="Niveau ${lv} sur 10">${Array.from({ length: 10 }, (_, i) => `<i${i < lv ? ' class="on"' : ''}></i>`).join('')}</span>`;
 
 export function menuHtml(modes) {
-  const s = dayStreak();
-  const card = (M) => `<button type="button" class="card" data-go="${M.id}"><span class="card-t">${M.title}</span><span class="card-d">${M.blurb}</span><span class="card-l">Niveau ${store.data.levels[M.id]}</span></button>`;
+  const today = dayKey(new Date()), hist = store.data.history;
+  const played = new Set(hist.map((g) => g.day)), s = dayStreak();
+  const week = Array.from({ length: 7 }, (_, k) => { const d = new Date(); d.setDate(d.getDate() - 6 + k); return d; });
+  const doneToday = new Set(hist.filter((g) => g.session && g.day === today).map((g) => g.mode)).size;
+  const status = doneToday >= modes.length ? '<span class="chip done">Faite aujourd\'hui</span>'
+    : doneToday ? `<span class="chip">${doneToday} sur ${modes.length} aujourd'hui</span>` : '';
+  const tile = (M) => `<button type="button" class="card tile" data-go="${M.id}" style="--m:${M.color}">${GLYPHS[M.id]}
+      <span class="card-t">${M.title}</span><span class="card-d">${M.blurb}</span>
+      <span class="tile-lv">${pips(store.data.levels[M.id])}<span>Niveau ${store.data.levels[M.id]}</span></span></button>`;
   return `<section class="menu">
-    <div class="menu-head"><h1>Synapse</h1><p>Réflexes et rythme : quatre épreuves, une difficulté qui s'adapte à chaque partie.</p>
-      <p class="streak">${s ? `Série en cours : ${plural(s, 'jour', 'jours')}` : 'Aucune série en cours'}</p></div>
-    <div class="menu-grid">
-      ${modes.map(card).join('')}
-      <button type="button" class="card session" data-go="session"><span class="card-t">Session du jour</span><span class="card-d">Les quatre épreuves enchaînées, 70 s chacune : 5 minutes en tout.</span></button>
-      <button type="button" class="card board" data-go="board"><span class="card-t">Tableau de bord</span><span class="card-d">Série de jours, courbes, historique, export.</span></button>
-    </div></section>`;
+    <header class="menu-head">
+      <div><h1>Synapse</h1><p>Quatre épreuves de réflexes et de rythme, une difficulté qui suit le niveau.</p></div>
+      <div class="week"><div class="week-days" role="img" aria-label="Jours joués cette semaine">${week.map((d) => {
+        const k = dayKey(d);
+        return `<i class="${played.has(k) ? 'on' : ''}${k === today ? ' today' : ''}">${DAY_LETTERS[d.getDay()]}</i>`;
+      }).join('')}</div><b>${s ? `Série : ${plural(s, 'jour', 'jours')}` : 'Aucune série en cours'}</b></div>
+    </header>
+    <button type="button" class="card hero" data-go="session">
+      <span class="hero-txt"><span class="card-t">Session du jour ${status}</span><span class="card-d">Les quatre épreuves enchaînées, 70 s chacune : 5 minutes en tout.</span></span>
+      <span class="hero-modes">${modes.map((M) => `<span style="--m:${M.color}">${GLYPHS[M.id]}</span>`).join('')}</span>
+      <span class="hero-go">Commencer</span>
+    </button>
+    <div class="tiles">${modes.map(tile).join('')}</div>
+    <button type="button" class="card boardlink" data-go="board"><span class="card-t">Tableau de bord</span>
+      <span class="card-d">${hist.length ? plural(hist.length, 'partie enregistrée', 'parties enregistrées') + ' · ' : ''}courbes, historique, export</span><span class="chev" aria-hidden="true">→</span></button>
+  </section>`;
 }
 
 export function briefHtml(M, setup, { dur, session }) {
   const lv = startLevel(store.data.levels[M.id]);
-  const head = session ? `<p class="brief-kicker">Session du jour · épreuve ${session.i + 1} sur ${session.n}</p>` : '';
   const actions = session
-    ? '<p class="brief-count" aria-live="polite">Départ dans 5</p><div class="row"><button type="button" class="primary" data-go="start">Commencer maintenant</button><button type="button" data-go="menu">Arrêter la session</button></div>'
-    : '<div class="row"><button type="button" class="primary" data-go="start">Commencer</button><button type="button" data-go="menu">Menu</button></div>';
-  return `<section class="brief">${head}<h2>${M.title}</h2><div class="brief-rules">${M.rules(setup)}</div>
-    <p class="brief-meta">${dur} s · niveau de départ ${lv} · <kbd>Échap</kbd> : pause</p>${actions}</section>`;
+    ? '<div class="brief-go"><p class="brief-count" aria-live="polite">Départ dans 5</p><div class="row"><button type="button" class="primary" data-go="start">Commencer maintenant</button><button type="button" data-go="menu">Arrêter la session</button></div></div>'
+    : '<div class="brief-go"><div class="row"><button type="button" class="primary" data-go="start">Commencer</button><button type="button" data-go="menu">Menu</button></div></div>';
+  const steps = M.steps(setup).map(([ico, t, sub], i) => `<li><span class="st-ico">${ico}</span><span class="st-n">${i + 1}</span><b>${t}</b><span class="st-sub">${sub}</span></li>`).join('');
+  return `<section class="brief" style="--m:${M.color}">
+    <header class="brief-head">${GLYPHS[M.id]}<div>${session ? `<p class="kicker">Session du jour · épreuve ${session.i + 1} sur ${session.n}</p>` : '<p class="kicker">Comment jouer</p>'}<h2>${M.title}</h2></div>
+      <div class="chips"><span class="chip">${dur} s</span><span class="chip">Niveau ${lv}</span><span class="chip"><kbd>Échap</kbd> pause</span></div></header>
+    <ol class="steps">${steps}</ol>
+    <p class="brief-foot">Une erreur remet la série à zéro. La difficulté s'ajuste toute seule pendant la partie.</p>
+    ${actions}</section>`;
 }
 
 const stat = (k, v) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`;
+// Meilleur score de l'épreuve, la partie qui vient d'être enregistrée exceptée.
+function isRecord(r) {
+  if (!r.trials || r.session || r.score <= 0) return false;
+  const before = store.data.history.filter((g) => g.mode === r.mode).slice(0, -1);
+  return before.length > 0 && r.score > Math.max(...before.map((g) => g.score));
+}
+const tipHtml = (text) => `<p class="tip"><strong>Astuce</strong><span>${esc(text)}</span></p>`;
+const again = '<div class="row"><button type="button" class="primary" data-go="again">Rejouer</button><button type="button" data-go="menu">Menu</button></div>';
+
 export function reportHtml(r) {
-  return `<section class="report"><h2>Bilan · ${esc(r.title)}</h2>
-    <dl class="stats">${stat('Score', r.score)}${stat('Meilleure série', r.best)}${stat('Réussite', r.trials ? r.acc + ' %' : '—')}${stat('Niveau', `${r.lv0} → ${r.lv1}`)}${r.lines.map(([k, v]) => stat(k, v)).join('')}</dl>
-    <p class="tip"><strong>Astuce</strong> ${esc(r.tip)}</p>
+  return `<section class="report" style="--m:${r.color}">
+    <header class="rep-head">${GLYPHS[r.mode]}<div><p class="kicker">Bilan</p><h2>${esc(r.title)}</h2></div>${isRecord(r) ? '<span class="chip rec">Record</span>' : ''}</header>
+    <div class="rep-main"><p class="big">${r.score}<small>points</small></p>
+      <div class="lvl"><span>Niveau ${r.lv0} → ${r.lv1}${r.lv1 > r.lv0 ? ' <b class="up">en hausse</b>' : ''}</span>${pips(r.lv1)}</div></div>
+    <dl class="stats">${stat('Meilleure série', r.best)}${stat('Réussite', r.trials ? r.acc + ' %' : '—')}${r.lines.map(([k, v]) => stat(k, v)).join('')}</dl>
+    ${tipHtml(r.tip)}
     ${r.trials ? '' : '<p class="note">Aucun essai joué : partie non enregistrée.</p>'}
-    <div class="row"><button type="button" class="primary" data-go="again">Rejouer</button><button type="button" data-go="menu">Menu</button></div></section>`;
+    ${again}</section>`;
 }
 
 export function sessionHtml(results) {
@@ -44,12 +81,14 @@ export function sessionHtml(results) {
   const trials = played.reduce((a, r) => a + r.trials, 0);
   const acc = trials ? Math.round(played.reduce((a, r) => a + r.acc * r.trials, 0) / trials) : null;
   const weakest = [...played].sort((a, b) => a.acc - b.acc)[0];
-  const rows = results.map((r) => `<tr><th scope="row">${esc(r.title)}</th><td>${r.score}</td><td>${r.trials ? r.acc + ' %' : '—'}</td><td>${r.best}</td><td>${r.lv0} → ${r.lv1}</td><td>${r.lines.map(([k, v]) => `${esc(k)} : ${esc(v)}`).join('<br>')}</td></tr>`).join('');
-  return `<section class="report wide"><h2>Bilan de la session</h2>
-    <dl class="stats">${stat('Score total', results.reduce((a, r) => a + r.score, 0))}${stat('Réussite', acc == null ? '—' : acc + ' %')}${stat('Meilleure série', Math.max(0, ...results.map((r) => r.best)))}${stat('Épreuves jouées', `${played.length} / 4`)}</dl>
+  const rows = results.map((r) => `<tr style="--m:${r.color}"><th scope="row"><i class="mdot"></i>${esc(r.title)}</th><td>${r.score}</td><td>${r.trials ? r.acc + ' %' : '—'}</td><td>${r.best}</td><td>${r.lv0} → ${r.lv1}</td><td>${r.lines.map(([k, v]) => `${esc(k)} : ${esc(v)}`).join('<br>')}</td></tr>`).join('');
+  return `<section class="report wide">
+    <header class="rep-head"><div><p class="kicker">Session du jour</p><h2>Bilan de la session</h2></div>${played.length === 4 ? '<span class="chip done">Session complète</span>' : ''}</header>
+    <div class="rep-main"><p class="big">${results.reduce((a, r) => a + r.score, 0)}<small>points</small></p>
+      <dl class="stats inline">${stat('Réussite', acc == null ? '—' : acc + ' %')}${stat('Meilleure série', Math.max(0, ...results.map((r) => r.best)))}${stat('Épreuves jouées', `${played.length} / 4`)}</dl></div>
     <table class="tbl"><thead><tr><th>Épreuve</th><th>Score</th><th>Réussite</th><th>Série</th><th>Niveau</th><th>Indicateurs</th></tr></thead><tbody>${rows || '<tr><td colspan="6">Aucune épreuve jouée.</td></tr>'}</tbody></table>
-    <p class="tip"><strong>Astuce</strong> ${esc(weakest ? `${weakest.title} : ${weakest.tip}` : 'Jouer chaque épreuve jusqu\'au bout pour obtenir un bilan complet.')}</p>
-    <div class="row"><button type="button" class="primary" data-go="again">Rejouer</button><button type="button" data-go="menu">Menu</button></div></section>`;
+    ${tipHtml(weakest ? `${weakest.title} : ${weakest.tip}` : 'Jouer chaque épreuve jusqu\'au bout pour obtenir un bilan complet.')}
+    ${again}</section>`;
 }
 
 // Demande de confirmation dans la page ; renvoie une promesse de vrai / faux.

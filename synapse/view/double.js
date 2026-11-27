@@ -2,24 +2,30 @@
 import { DOT_RULES, ruleById, dotNumber, soundRun } from '../engine/trials.js';
 import { judge, beatScore } from '../engine/press.js';
 import { at, tick } from './audio.js';
+import { rgba } from './shapes.js';
 import { fmtMs, fmtPct, ind, pickTip } from './run.js';
 
-const LEAD = 4, MAX_DOTS = 3;
-// Emplacements fixes sur le pourtour (en % de la scène) : les pastilles ne se chevauchent jamais.
-const SLOTS = [[16, 13], [38, 13], [62, 13], [84, 13], [16, 87], [38, 87], [62, 87], [84, 87], [7, 50], [93, 50]];
+const LEAD = 4, MAX_DOTS = 3, OK = '#34D399', ERR = '#FB7185';
+// Emplacements fixes sur le pourtour (en % de la scène), loin du tempo central : les pastilles ne se chevauchent jamais.
+const SLOTS = [[15, 24], [36, 22], [64, 22], [85, 24], [15, 84], [36, 86], [64, 86], [85, 84], [8, 54], [92, 54]];
+const dotIco = (n, on) => `<span class="ico-dot${on ? ' on' : ''}">${n}</span>`;
 
 export const Double = {
-  id: 'double', title: 'Double Tempo',
+  id: 'double', title: 'Double Tempo', color: '#A3E635',
   blurb: 'Tenir le tempo et cliquer les bonnes pastilles en même temps.',
   setup: (rng) => ({ rule: rng.pick(DOT_RULES).id }),
-  rules: ({ rule }) => `
-    <p>Battre le tempo avec <kbd>Espace</kbd>, un appui par temps, calé sur la pulsation.</p>
-    <p>Par moments, la pulsation se tait : continuer seul, au même tempo, jusqu'à son retour.</p>
-    <p>En même temps, des pastilles apparaissent sur le pourtour. Cliquer <strong>${ruleById(rule).label}</strong> avant que leur anneau se referme ; laisser les autres.</p>`,
+  steps: ({ rule }) => {
+    const r = ruleById(rule), yes = [1, 2, 3, 4, 6, 7, 8, 9].find((n) => r.test(n)), no = [1, 2, 3, 4, 6, 7, 8, 9].find((n) => !r.test(n));
+    return [
+      ['<span class="ico-ring"></span><kbd>Espace</kbd>', 'Frapper chaque temps', 'Un appui quand l\'aiguille arrive en haut. Les quatre premiers servent à se caler.'],
+      ['<span class="ico-ring off"></span>', 'Continuer pendant les silences', 'Par moments, le tempo se tait : garder le même rythme jusqu\'à son retour.'],
+      [`${dotIco(yes, true)}${dotIco(no, false)}`, `Cliquer ${r.label}`, 'Avant que leur anneau se vide. Laisser les autres.'],
+    ];
+  },
+  hint: ({ rule }) => `<kbd>Espace</kbd><span>à chaque temps</span><i class="sep"></i><span class="mouse" aria-hidden="true"></span><span>cliquer ${ruleById(rule).label}</span>`,
 
   create(api, setup) {
     const rule = ruleById(setup.rule), L = api.layer;
-    L.innerHTML = `<p class="dot-rule">Cliquer ${rule.label}</p>`;
     const beats = [], dots = [];
     let next = api.t0, i = 0, run = soundRun(api.rng), silent = 0, nextDot = 0, flash = { t: -9, ok: true };
 
@@ -31,7 +37,7 @@ export const Double = {
           if (silent > 0) { audible = false; silent--; if (!silent) run = soundRun(api.rng); }
           else if (--run <= 0) { silent = p.silence - 1; audible = false; if (!silent) run = soundRun(api.rng); }
         }
-        const b = { t: next, iv, tol: iv / 4, lure: false, done: i < LEAD, audible, judged: i >= LEAD };
+        const b = { t: next, iv, n: i, tol: iv / 4, lure: false, done: i < LEAD, audible, judged: i >= LEAD };
         beats.push(b);
         if (audible) { const accent = i % 4 === 0; at(next, (w) => tick(w, accent)); }
         if (i === LEAD) nextDot = next;
@@ -53,7 +59,13 @@ export const Double = {
       L.appendChild(el);
       dots.push({ n, ok: rule.test(n), born: now, life: p.life, slot, el });
     }
-    function drop(d) { d.el.remove(); dots.splice(dots.indexOf(d), 1); }
+    // Une pastille cliquée ou expirée s'efface en montrant si c'était juste.
+    function drop(d, res) {
+      dots.splice(dots.indexOf(d), 1);
+      if (!res) { d.el.remove(); return; }
+      d.el.classList.add('gone', res); d.el.disabled = true;
+      setTimeout(() => d.el.remove(), 420);
+    }
 
     function tap(e) {
       const t = api.press(e, 'key');
@@ -75,7 +87,7 @@ export const Double = {
       const d = dots.find((x) => x.el === el), t = api.press(e, 'pointer');
       if (!d || t == null) return;
       if (d.ok) { api.m.rt.push((t - d.born) * 1000); api.trial('dotok'); } else api.trial('dot');
-      drop(d);
+      drop(d, d.ok ? 'ok' : 'err');
     };
     L.addEventListener('pointerdown', onPointer);
 
@@ -90,23 +102,48 @@ export const Double = {
           plan(now);
           if (nextDot && now >= nextDot) spawn(now);
           for (const b of beats) if (b.judged && !b.done && now > b.t + b.tol) { b.done = true; api.m.beatN++; api.trial('miss'); flash = { t: now, ok: false }; }
-          for (const d of [...dots]) if (now - d.born >= d.life) { api.trial(d.ok ? 'dotmiss' : 'left', true); drop(d); }
+          for (const d of [...dots]) if (now - d.born >= d.life) { api.trial(d.ok ? 'dotmiss' : 'left', true); drop(d, d.ok ? 'err' : null); }
         }
         for (const d of dots) d.el.style.setProperty('--p', Math.max(0, 1 - (now - d.born) / d.life).toFixed(3));
-        // pulsation centrale, muette pendant les silences
-        const cx = w / 2, cy = h / 2;
-        const last = beats.filter((b) => b.t <= now).pop();
-        const heard = !last || last.audible;
+
+        // tempo central : une aiguille fait le tour en un temps et arrive en haut sur le temps ; muette pendant les silences
+        const cx = w / 2, cy = h * 0.54, RR = Math.max(84, Math.min(130, Math.min(w, h) * 0.18)), col = api.color;
+        api.place(cy + RR + 86);
+        const last = beats.filter((b) => b.t <= now).pop(), nb = beats.find((b) => b.t > now);
+        const heard = !last || last.audible, sweep = nb && nb.audible;
         const k = last && heard ? Math.exp(-(now - last.t) * 7) : 0;
         const fl = Math.exp(-(now - flash.t) * 4);
-        g.lineWidth = 4;
-        if (!heard) g.setLineDash([10, 10]);
-        g.strokeStyle = fl > 0.05 ? (flash.ok ? `rgba(52,211,153,${0.4 + fl * 0.6})` : `rgba(251,113,133,${0.4 + fl * 0.6})`) : `rgba(56,189,248,${heard ? 0.55 + k * 0.45 : 0.4})`;
-        g.beginPath(); g.arc(cx, cy, 70 + (api.calm ? 0 : k * 8), 0, 6.283); g.stroke(); g.setLineDash([]);
-        g.fillStyle = `rgba(56,189,248,${0.08 + k * 0.25})`;
-        g.beginPath(); g.arc(cx, cy, 56, 0, 6.283); g.fill();
-        g.fillStyle = '#CBD5E1'; g.font = '600 17px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-        g.fillText(heard ? 'Espace sur le temps' : 'Continuer seul', cx, cy + 104);
+        g.lineCap = 'round';
+        g.lineWidth = 10; g.strokeStyle = 'rgba(51,65,85,0.75)';
+        if (!sweep) g.setLineDash([3, 16]);
+        g.beginPath(); g.arc(cx, cy, RR, 0, 6.283); g.stroke(); g.setLineDash([]);
+        if (sweep) {
+          const f = Math.max(0, Math.min(1, 1 - (nb.t - now) / nb.iv)), a0 = -Math.PI / 2, a1 = a0 + f * Math.PI * 2;
+          g.strokeStyle = rgba(col, 0.85); g.lineWidth = 10;
+          g.beginPath(); g.arc(cx, cy, RR, a0, a1); g.stroke();
+          g.fillStyle = '#F8FAFC';
+          g.beginPath(); g.arc(cx + Math.cos(a1) * RR, cy + Math.sin(a1) * RR, 9, 0, 6.283); g.fill();
+        }
+        // repère du temps, en haut
+        g.fillStyle = sweep ? rgba(col, 0.6 + k * 0.4) : 'rgba(148,163,184,0.4)';
+        g.beginPath(); g.arc(cx, cy - RR, 15 + (api.calm ? 0 : k * 4), 0, 6.283); g.fill();
+        // disque : bat avec le tempo, se colore du résultat de la frappe
+        g.fillStyle = fl > 0.05 ? rgba(flash.ok ? OK : ERR, 0.12 + fl * 0.3) : rgba(col, 0.05 + k * 0.22);
+        g.beginPath(); g.arc(cx, cy, RR - 24, 0, 6.283); g.fill();
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        if (heard && last) {
+          g.fillStyle = '#F8FAFC'; g.font = `800 ${Math.round(RR * 0.62)}px system-ui, sans-serif`;
+          g.fillText(String(last.n % 4 + 1), cx, cy + 2);
+        } else if (!heard) {
+          g.fillStyle = '#CBD5E1'; g.font = '700 26px system-ui, sans-serif'; g.fillText('Silence', cx, cy - 12);
+          g.font = '500 17px system-ui, sans-serif'; g.fillText('continuer seul', cx, cy + 18);
+        }
+        // mesure à quatre temps sous le cercle
+        const beatIx = last && heard ? last.n % 4 : -1, dy = cy + RR + 38;
+        for (let q = 0; q < 4; q++) {
+          g.fillStyle = q === beatIx ? rgba(col, 0.5 + k * 0.5) : 'rgba(148,163,184,0.25)';
+          g.beginPath(); g.arc(cx + (q - 1.5) * 24, dy, q === 0 ? 7 : 5.5, 0, 6.283); g.fill();
+        }
       },
     };
   },
@@ -116,7 +153,7 @@ export const Double = {
     early: 'Pendant les silences, compter « un, deux, trois, quatre » pour garder le tempo sans accélérer.',
     late: 'Pendant les silences, garder le geste régulier : le tempo ne ralentit pas.',
     miss: 'Garder la main sur Espace et frapper chaque temps, même en regardant les pastilles.',
-    dot: 'Relire la consigne des pastilles : ne cliquer que celles qui la respectent.',
+    dot: 'Relire la consigne en haut de l\'écran : ne cliquer que les pastilles qui la respectent.',
     dotmiss: 'Jeter un œil au pourtour juste après chaque temps frappé.',
     none: 'Garder le tempo au clavier et laisser la souris travailler seule.',
   }),

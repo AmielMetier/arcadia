@@ -3,6 +3,7 @@
 ## 5.169 — 27 novembre 2026
 - **Synapse** — Nouveau jeu de réflexes et de rythme, à jouer chacun de son côté.
   - Quatre épreuves : Pulse (frapper sur le temps sans toucher aux leurres), Aiguillage (trier pendant que la règle change), Réseau (refaire une séquence après une épreuve réflexe) et Double Tempo (tenir le tempo tout en cliquant les bonnes pastilles).
+  - Chaque épreuve a sa couleur et son illustration, sa consigne en trois étapes, et un rappel reste affiché pendant la partie.
   - La Session du jour enchaîne les quatre épreuves en 5 minutes.
   - La difficulté suit ton niveau : elle monte quand tu réussis, redescend quand ça coince.
   - Un tableau de bord garde ta série de jours, ton historique et tes courbes de progression. Tout reste dans ton navigateur, avec export et import.

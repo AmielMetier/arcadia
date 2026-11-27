@@ -46,10 +46,13 @@ function setHud(on, title = '') {
 }
 function focusFirst(sel) { const b = main.querySelector(sel); if (b) b.focus({ preventScroll: true }); }
 function leave() { brief = null; calage = null; clearQueue(); setHud(false); quitBtn.hidden = true; }
+// Couleur de l'épreuve en cours (barre du haut, fond) ; celle du jeu hors épreuve.
+let tint = null;
+function setTint(color) { tint = color; document.body.style.setProperty('--m', color || 'var(--accent)'); }
 
 function showMenu() {
   if (run) { const r = run; run = null; session = null; leaving = true; r.end(); leaving = false; }
-  leave(); session = null; screen = 'menu';
+  leave(); session = null; screen = 'menu'; setTint(null);
   main.innerHTML = menuHtml(LIST);
   quitBtn.hidden = !H.embedded; // dans le Hub : retour au salon, depuis le menu
   focusFirst('.card');
@@ -60,6 +63,7 @@ function showBrief(id) {
   const M = BY_ID[id], rng = rngFor(), setup = M.setup(rng), dur = session ? SESSION_DUR : FREE_DUR;
   main.innerHTML = briefHtml(M, setup, { dur, session: session && { i: session.i, n: MODES.length } });
   brief = { M, setup, rng, dur, deadline: session ? performance.now() + BRIEF_MS : null };
+  setTint(M.color);
   focusFirst('.primary');
 }
 
@@ -67,8 +71,10 @@ function play() {
   if (!brief) return;
   const { M, setup, rng, dur } = brief;
   leave(); unlock(); screen = 'jeu';
-  main.innerHTML = `<section class="stage" data-mode="${M.id}">
+  main.innerHTML = `<section class="stage" data-mode="${M.id}" style="--m:${M.color}">
     <canvas class="cv"></canvas><div class="layer"></div>
+    <div class="tbar" aria-hidden="true"><i></i></div>
+    ${M.hint ? `<p class="strip">${M.hint(setup)}</p>` : ''}
     <p class="fb" aria-live="polite"></p>
     <p class="wait" hidden>Cliquer ou appuyer sur une touche pour activer le son.</p>
     <div class="pause" hidden><div class="pause-card">
@@ -76,7 +82,7 @@ function play() {
         <div class="row"><button type="button" class="primary" data-go="resume">Reprendre</button><button type="button" data-go="stop">Terminer la partie</button></div></div>
       <p class="pause-count" aria-live="polite"></p></div></div></section>`;
   const st = main.querySelector('.stage');
-  const els = { stage: st, canvas: st.querySelector('.cv'), layer: st.querySelector('.layer'), fb: st.querySelector('.fb'), wait: st.querySelector('.wait'), pause: st.querySelector('.pause'), count: st.querySelector('.pause-count'), hud };
+  const els = { stage: st, canvas: st.querySelector('.cv'), layer: st.querySelector('.layer'), fb: st.querySelector('.fb'), tbar: st.querySelector('.tbar i'), wait: st.querySelector('.wait'), pause: st.querySelector('.pause'), count: st.querySelector('.pause-count'), hud };
   setHud(true, M.title);
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   run = createRun({ Mode: M, setup, dur, session: !!session, rng, els, onEnd: ended });
@@ -96,12 +102,12 @@ function nextBlock() {
   else showSessionReport();
 }
 function showReport(r) {
-  leave(); screen = 'bilan'; report = r;
+  leave(); screen = 'bilan'; report = r; setTint(r.color);
   main.innerHTML = reportHtml(r);
   focusFirst('.primary');
 }
 function showSessionReport() {
-  leave(); screen = 'session-bilan'; report = { session: session.results };
+  leave(); screen = 'session-bilan'; report = { session: session.results }; setTint(null);
   main.innerHTML = sessionHtml(session.results);
   session = null;
   focusFirst('.primary');
@@ -109,13 +115,13 @@ function showSessionReport() {
 function startSession() { session = { i: 0, results: [] }; showBrief(MODES[0]); }
 function openBoard() {
   if (run) return;
-  leave(); session = null; screen = 'board';
+  leave(); session = null; screen = 'board'; setTint(null);
   main.innerHTML = '<div class="board-wrap"></div>';
   showBoard(main.firstChild, { back: () => { applyCalm(); showMenu(); } });
 }
 function openCalage() {
   if (run) return;
-  leave(); session = null; screen = 'calage'; unlock();
+  leave(); session = null; screen = 'calage'; unlock(); setTint(null);
   calage = showCalage(main, { back: showMenu });
 }
 
@@ -166,7 +172,7 @@ document.addEventListener('visibilitychange', () => {
 let lastPerf = performance.now();
 function loop(perf) {
   const dt = perf - lastPerf; lastPerf = perf;
-  bg.draw(perf / 1000, run ? run.streak : 0, document.body.classList.contains('calm'));
+  bg.draw(perf / 1000, run ? run.streak : 0, document.body.classList.contains('calm'), tint);
   if (run) { if (V && V.isOpen() && run.phase === 'play') run.pause(); run.frame(); }
   if (calage) calage.frame();
   if (brief && brief.deadline) {
