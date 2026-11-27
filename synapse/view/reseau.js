@@ -116,7 +116,7 @@ export const Reseau = {
 
     // Centres des nœuds dans le repère du canvas (l'interface peut être agrandie par zoom).
     function centers(cv) {
-      const z = cv.currentCSSZoom || 1, b = cv.getBoundingClientRect();
+      const b = cv.getBoundingClientRect(), z = b.width / cv.clientWidth || 1;
       return cells.map((el) => { const r = el.getBoundingClientRect(); return [(r.left + r.width / 2 - b.left) / z, (r.top + r.height / 2 - b.top) / z]; });
     }
     function path(g, pts, list) {
@@ -176,7 +176,7 @@ export const Reseau = {
         });
         g.stroke();
         g.lineWidth = 6;
-        // pendant la séquence, seul le dernier trait reste un instant : la mémoire travaille autant qu'avant
+        // pendant la séquence, seul le dernier trait reste un instant : le chemin entier ne s'affiche jamais d'un coup
         if (phase === 'show') for (let k = 1; k < lights.length; k++) {
           const a = now < lights[k].from ? 0 : Math.max(0, 1 - (now - lights[k].from) / (p.step * 1.2));
           if (a > 0) { g.strokeStyle = rgba(api.color, 0.6 * a); path(g, pts, [seq[k - 1], seq[k]]); }

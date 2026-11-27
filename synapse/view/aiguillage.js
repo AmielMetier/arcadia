@@ -59,6 +59,8 @@ export const Aiguillage = {
       fig = null;
       if (--left <= 0) {
         rule = rule === 'color' ? 'shape' : 'color'; left = gap(); afterSwitch = true;
+        for (const k of marks) k.el.classList.remove(k.cls); // les reflets parlaient de l'ancienne règle
+        marks.length = 0;
         showRule(); sfx.rule();
         ruleBox.classList.add('changed'); newUntil = now + 1.4;
         nextAt = now + 0.9;

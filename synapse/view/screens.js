@@ -49,9 +49,9 @@ export function briefHtml(M, setup, { dur, session }) {
   const steps = M.steps(setup).map(([ico, t, sub], i) => `<li><span class="st-ico">${ico}</span><span class="st-n">${i + 1}</span><b>${t}</b><span class="st-sub">${sub}</span></li>`).join('');
   return `<section class="brief" style="--m:${M.color}">
     <header class="brief-head">${GLYPHS[M.id]}<div>${session ? `<p class="kicker">Session du jour · épreuve ${session.i + 1} sur ${session.n}</p>` : '<p class="kicker">Comment jouer</p>'}<h2>${M.title}</h2></div>
-      <div class="chips"><span class="chip">${dur} s</span><span class="chip">Niveau ${lv}</span><span class="chip"><kbd>Échap</kbd> pause</span></div></header>
+      <div class="chips"><span class="chip">${dur} s</span><span class="chip">Départ : niveau ${lv}</span><span class="chip"><kbd>Échap</kbd> pause</span></div></header>
     <ol class="steps">${steps}</ol>
-    <p class="brief-foot">Une erreur remet la série à zéro. La difficulté s'ajuste toute seule pendant la partie.</p>
+    <p class="brief-foot">Une erreur remet la série à zéro. La partie démarre un cran sous le niveau atteint, puis la difficulté s'ajuste toute seule.</p>
     ${actions}</section>`;
 }
 
