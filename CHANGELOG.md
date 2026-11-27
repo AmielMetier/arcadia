@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 5.168 — 27 novembre 2026
+- Odyssée 3.7 : ajout des portraits/sprites P2, icônes objets clés et fix boutons Sac (Amiel)
+
 ## 5.167 — 27 novembre 2026
 - **Odyssée** — Le début de l'aventure, de Bourg-Aube à la deuxième Arène, est plus soigné :
   - Arène de Port-Azur : la passerelle d'entrée est dans le bon sens, les pontons et les radeaux portent la couleur de leur bassin (bleu à l'ouest, vert à l'est), et le sol ne scintille plus.
