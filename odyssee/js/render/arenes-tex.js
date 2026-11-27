@@ -65,6 +65,13 @@ export function texturesArenes(putImg) {
     for (let j = 0; j < 32; j++) for (let i = 0; i < 32; i++) if (i % 16 === 0 || j % 16 === 0) T.p(i, j, '#4f8cc6');
     grain(T, 14, ['#649fd8', '#5494cf']);
   }, 21));
+  // le Jardin des Floraisons (Floralia) : grandes dalles de pierre de serre, joints envahis de mousse
+  putImg('floor_gymGrass', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#b4b8a0'); grain(T, 18, ['#bcc0a8', '#a8ac94', '#c4c8b0']);
+    for (let j = 0; j < 32; j++) for (let i = 0; i < 32; i++) if (i % 16 === 0 || j % 16 === 0) T.p(i, j, (i * 5 + j * 3) % 7 < 4 ? '#5a8a4a' : '#7aa860');
+    for (const [x, y] of [[1, 15], [15, 3], [17, 29], [30, 17], [16, 16]]) { T.p(x, y, '#4a7a3a'); T.p(x + 1, y, '#8ab870'); }
+    T.p(6, 6, '#d0d4bc'); T.p(24, 22, '#d0d4bc');
+  }, 23));
   putImg('floor_gymGalerie', toile(32, 32, (T) => {      // parquet en chevrons, cire chaude
     T.rect(0, 0, 32, 32, '#c89058');
     for (let j = 0; j < 32; j++) for (let i = 0; i < 32; i++) {
@@ -129,6 +136,51 @@ export function texturesArenes(putImg) {
     T.cadre(0, 0, 32, 32, '#f0d070'); T.rect(0, 30, 32, 2, '#6a4410');
   }));
 
+  // estrade de Volta (la Dynamo) : plaque d'acier striée, bande jaune et noire, rivets
+  putImg('dec_estrade_elec', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#4a525e'); T.rect(1, 1, 30, 30, '#6a7482');
+    for (let j = 4; j < 28; j += 4) for (let i = 3; i < 29; i += 6) { T.rect(i + (j % 8 ? 3 : 0), j, 2, 1, '#8a94a2'); }
+    for (let i = 0; i < 32; i += 8) { T.rect(i, 0, 4, 3, '#f0d040'); T.rect(i + 4, 0, 4, 3, '#2a2a30'); T.rect(i, 29, 4, 3, '#2a2a30'); T.rect(i + 4, 29, 4, 3, '#f0d040'); }
+    for (const [x, y] of [[3, 5], [28, 5], [3, 26], [28, 26]]) { T.p(x, y, '#b8c0cc'); T.p(x + 1, y + 1, '#3a4048'); }
+  }));
+  // estrade de Flora (le Jardin) : dalle de pierre claire bordée de mousse et de petites fleurs
+  putImg('dec_estrade_grass', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#b8b098'); for (let j = 0; j < 32; j++) for (let i = 0; i < 32; i++) if (i % 16 === 0 || j % 16 === 0) T.p(i, j, '#8a8470');
+    T.cadre(0, 0, 32, 32, '#4a8a3a'); T.cadre(1, 1, 30, 30, '#6aaa4a');
+    for (const [x, y, c] of [[4, 2, '#ff8ab0'], [14, 1, '#f6d040'], [25, 2, '#ff8ab0'], [2, 14, '#fff0f4'], [29, 20, '#f6d040'], [9, 29, '#fff0f4'], [21, 30, '#ff8ab0']]) { T.p(x, y, c); T.p(x + 1, y, c); }
+    T.rect(0, 30, 32, 2, '#3a6a2a');
+  }));
+  // estrade de Sibylle (le Palais des Songes) : marbre lilas, cercle d'or, étoile au centre
+  putImg('dec_estrade_psy', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#6a5a9a'); T.rect(1, 1, 30, 30, '#8a7ab8');
+    for (let i = 0; i < 32; i++) { const o = Math.round(10 + Math.sin(i * 0.35) * 6); T.p(i, o, '#a898d0'); T.p(i, o + 12, '#7a6aa8'); }
+    T.disque(16, 16, 9, 9, null, (i, j, q) => (q > 0.85 ? '#e8c860' : null));
+    T.p(16, 12, '#fff0b0'); T.p(16, 20, '#fff0b0'); T.p(12, 16, '#fff0b0'); T.p(20, 16, '#fff0b0'); T.rect(15, 15, 3, 3, '#f8e090');
+    T.rect(0, 30, 32, 2, '#3a2e5a');
+  }));
+
+  // ------- lieux de l'histoire : la Centrale de Voltacité, le repaire de la Team Éclipse, le Sanctuaire des Marées
+  // câble au sol (de la porte aux générateurs) et bande de sécurité jaune et noire
+  putImg('dec_cable_sol', toile(32, 32, (T) => {
+    for (const [x, c] of [[11, '#1e2228'], [16, '#2a3038'], [21, '#1e2228']]) { T.rect(x, 0, 3, 32, c); T.rect(x, 0, 1, 32, '#4a525e'); }
+    for (let j = 4; j < 32; j += 12) T.rect(9, j, 16, 2, '#f0c838');
+  }));
+  putImg('dec_bande_danger', toile(32, 32, (T) => { for (let i = -32; i < 32; i += 8) for (let j = 0; j < 6; j++) { T.rect(i + j, 26 + j, 4, 1, '#f0c838'); T.rect(i + j + 4, 26 + j, 4, 1, '#22262c'); } }));
+  // sol du repaire : dalles d'obsidienne polie, joints de métal sombre, éclat violet par endroits
+  putImg('floor_eclipse', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#221c2e'); grain(T, 20, ['#2a2338', '#1c1726', '#2e2640']);
+    for (let j = 0; j < 32; j++) for (let i = 0; i < 32; i++) if (i % 16 === 0 || j % 16 === 0) T.p(i, j, '#3e3654');
+    T.p(4, 3, '#6a4aa8'); T.p(5, 3, '#4a3478'); T.p(21, 19, '#6a4aa8'); T.p(22, 19, '#4a3478');
+  }, 31));
+  // lumière de sortie d'une grotte : flaque de jour, douce et transparente (posée par world3d.js sur 2,5 × 2,25 cases)
+  putImg('dec_exitlight', toile(32, 32, (T) => T.disque(16, 18, 15, 13, null, (i, j, q) => '#fff4d0' + Math.round(70 * (1 - q) ** 1.5).toString(16).padStart(2, '0'))));
+  // runes gravées autour de l'autel de Lugia : anneau de pierre bleu nuit, signe argenté
+  for (let n = 0; n < 4; n++) putImg('dec_rune_' + (n + 1), toile(32, 32, (T) => {
+    T.disque(16, 16, 13, 13, null, (i, j, q) => (q > 0.82 ? '#3a4a6a' : q > 0.7 ? '#8aa8d8' : null));
+    const L = [[[16, 8, 16, 24], [10, 12, 22, 20]], [[10, 10, 22, 22], [22, 10, 10, 22]], [[16, 8, 9, 22], [16, 8, 23, 22], [12, 18, 20, 18]], [[10, 16, 22, 16], [16, 9, 16, 23], [12, 11, 20, 21]]][n];
+    for (const [a, b, c, d] of L) { T.ligne(a, b, c, d, '#c8dcf8'); T.ligne(a + 1, b, c + 1, d, '#6a8ac080'); }
+  }, 40 + n));
+
   // ------- Port-Azur (Eau) : pontons, radeaux, vannes
   // pontons et radeaux : couvrent toute la case (plus de bord d'eau figé à côté de l'eau animée) ; liseré à la couleur
   // de leur bassin, comme les vannes et le panneau : _0 OUEST (bleu), _1 EST (vert)
@@ -187,6 +239,12 @@ export function texturesArenes(putImg) {
     T.disque(16, 16, 13, 13, '#7a4a6a'); T.disque(16, 16, 12, 12, '#f4c8dc');
     for (let a = 0; a < 5; a++) { const c = Math.cos(a * 1.2566 - 1.57), s = Math.sin(a * 1.2566 - 1.57); T.disque(16 + c * 6, 16 + s * 6, 4, 4, null, (i, j, q) => (q > 0.6 ? '#e888b0' : '#ffb0d0')); }
     T.disque(16, 16, 3, 3, '#f6d040'); T.p(15, 15, '#fff8c0');
+  }));
+  // parterre validé : la dalle ne répond plus (pétales refermés, cœur vert, liseré de feuilles)
+  putImg('dec_dalle_petale_fige', toile(32, 32, (T) => {
+    T.disque(16, 16, 13, 13, '#3a6a3a'); T.disque(16, 16, 12, 12, '#d8e8c8');
+    for (let a = 0; a < 5; a++) { const c = Math.cos(a * 1.2566 - 1.57), s = Math.sin(a * 1.2566 - 1.57); T.disque(16 + c * 5, 16 + s * 5, 3, 3, null, (i, j, q) => (q > 0.6 ? '#b8a0b0' : '#e0d0d8')); }
+    T.disque(16, 16, 3, 3, '#6aa850'); T.p(15, 15, '#c8f0a8');
   }));
   putImg('dec_parterre', toile(32, 32, (T) => {
     T.rect(0, 0, 32, 32, '#6a4a2a'); T.rect(1, 1, 30, 30, '#7a5632');
@@ -304,6 +362,30 @@ export function texturesArenes(putImg) {
 }
 
 /* ------------------------------------------------------------------ sprites (debout) */
+function armoire(T, on) {
+  T.rect(4, 4, 24, 38, '#3a4250'); T.rect(5, 5, 22, 36, '#9aa4b2'); T.rect(5, 5, 22, 2, '#c8d0dc');
+  T.rect(8, 10, 16, 12, '#2a3038');
+  if (on) { T.rect(9, 15, 6, 6, '#e8c040'); T.rect(17, 11, 6, 10, '#3a9a5a'); T.rect(18, 12, 4, 2, '#8af0a8'); }
+  else { T.rect(9, 11, 6, 10, '#e8c040'); T.rect(17, 11, 6, 10, '#606870'); T.p(11, 13, '#fff4a0'); }
+  T.disque(16, 30, 4, 4, on ? '#30d060' : '#e04040'); T.p(15, 29, on ? '#c0ffd0' : '#ffa0a0');
+  if (on) T.disque(16, 30, 6, 6, null, (i, j, q) => (q > 0.7 ? '#30d06040' : null));
+  for (let j = 25; j < 40; j += 3) T.rect(7, j, 4, 1, '#6a7480');
+}
+function porteGen(T, n) {
+  T.rect(0, 2, 32, 46, '#2a3038'); T.rect(2, 4, 28, 44, '#6a7482'); T.rect(2, 4, 28, 2, '#9aa4b2');
+  for (let j = 10; j < 46; j += 8) T.rect(2, j, 28, 2, '#4a525e');
+  T.rect(14, 4, 4, 44, '#f0d040'); for (let j = 6; j < 46; j += 6) T.rect(14, j, 4, 3, '#2a2a30');
+  // trois voyants au-dessus de la porte : verts (fusible enclenché) ou rouges éteints
+  T.rect(4, 0, 24, 6, '#1e2228');
+  for (let k = 0; k < 3; k++) { const x = 8 + k * 8; T.disque(x, 3, 2.2, 2.2, k < n ? '#40e070' : '#6a2020'); if (k < n) T.p(x - 1, 2, '#c8ffd8'); }
+}
+function orbe(T, ph) {
+  const [c0, c1, c2] = [['#5a3ab0', '#9a7ae8', '#d8c8ff'], ['#b07a10', '#f0c040', '#fff2b8'], ['#1a5ab0', '#5aa8f0', '#d0ecff']][ph];
+  T.rect(9, 32, 14, 10, '#5a4a7a'); T.rect(9, 32, 14, 2, '#8a7ab0'); T.rect(6, 40, 20, 4, '#3a2e52');
+  T.disque(16, 18, 15, 15, null, (i, j, q) => (q > 0.75 ? c1 + '30' : null));
+  T.disque(16, 18, 13, 13, null, (i, j, q) => (q > 0.85 ? c0 : q > 0.5 ? c1 : c2));
+  T.disque(12, 13, 3, 2.5, '#ffffff'); T.p(20, 24, '#ffffff');
+}
 const SPR = {
   // Voltacité : machine (transformateur), armoire à fusibles, porte du générateur
   machine: [32, 40, (T) => {
@@ -312,18 +394,12 @@ const SPR = {
     T.rect(8, 2, 4, 9, '#c8a040'); T.rect(20, 2, 4, 9, '#c8a040'); T.disque(10, 3, 3, 2, '#f0d060'); T.disque(22, 3, 3, 2, '#f0d060');
     T.rect(12, 34, 8, 2, '#f0d040');
   }],
-  armoire_elec: [32, 44, (T) => {
-    T.rect(4, 4, 24, 38, '#3a4250'); T.rect(5, 5, 22, 36, '#9aa4b2'); T.rect(5, 5, 22, 2, '#c8d0dc');
-    T.rect(8, 10, 16, 12, '#2a3038'); T.rect(9, 11, 6, 10, '#e8c040'); T.rect(17, 11, 6, 10, '#606870'); T.p(11, 13, '#fff4a0');
-    T.disque(16, 30, 4, 4, '#e04040'); T.p(15, 29, '#ffa0a0');
-    for (let j = 25; j < 40; j += 3) T.rect(7, j, 4, 1, '#6a7480');
-  }],
-  porte_gen: [32, 48, (T) => {
-    T.rect(0, 2, 32, 46, '#2a3038'); T.rect(2, 4, 28, 44, '#6a7482'); T.rect(2, 4, 28, 2, '#9aa4b2');
-    for (let j = 10; j < 46; j += 8) T.rect(2, j, 28, 2, '#4a525e');
-    T.rect(14, 4, 4, 44, '#f0d040'); for (let j = 6; j < 46; j += 6) T.rect(14, j, 4, 3, '#2a2a30');
-    T.disque(8, 8, 2, 2, '#40e070'); T.disque(24, 8, 2, 2, '#40e070');
-  }],
+  armoire_elec: [32, 44, (T) => armoire(T, false)],
+  // fusible enclenché : le levier abaissé, le voyant passe au vert
+  armoire_elec_on: [32, 44, (T) => armoire(T, true)],
+  // porte du générateur : un voyant vert par fusible enclenché (porte_gen_0 à porte_gen_3)
+  porte_gen: [32, 48, (T) => porteGen(T, 0)],
+  porte_gen_0: [32, 48, (T) => porteGen(T, 0)], porte_gen_1: [32, 48, (T) => porteGen(T, 1)], porte_gen_2: [32, 48, (T) => porteGen(T, 2)], porte_gen_3: [32, 48, (T) => porteGen(T, 3)],
   // Floralia : fleurs sur leur parterre, haie fermée
   fleur_bouton: [32, 34, (T) => { T.ligne(16, 16, 16, 32, '#2e7a32'); T.disque(11, 26, 5, 2.4, '#4aa04a'); T.disque(21, 28, 5, 2.4, '#3a903e'); T.disque(16, 11, 5, 7, null, (i, j, q) => (q > 0.65 ? '#2e7a32' : j < 9 ? '#e8a8c0' : '#5aa850')); }],
   fleur_ouverte: [32, 34, (T) => {
@@ -332,16 +408,41 @@ const SPR = {
     T.disque(16, 11, 4, 4, '#f6d040'); T.p(15, 10, '#fff8c0'); T.p(14, 9, '#fff8c0');
   }],
   haie: [32, 40, (T) => {
-    T.disque(16, 20, 16, 18, null, (i, j, q) => (q > 0.88 ? '#1e4a24' : j < 12 ? '#6ab85a' : (i * 3 + j * 5) % 11 === 0 ? '#2e6a34' : '#3e8a44'));
+    // contour sombre net, dessus éclairé, touffes de feuilles marquées : la haie se lit bien sur le sol clair de la serre
+    T.disque(16, 20, 16, 18, null, (i, j, q) => (q > 0.86 ? '#163a1c' : j < 10 ? '#7ac86a' : j < 14 ? '#5aa850' : (i * 3 + j * 5) % 11 === 0 ? '#2a6030' : (i + j * 2) % 9 === 0 ? '#5aa850' : '#3a8440'));
+    for (let k = 0; k < 6; k++) { const x = 6 + (k * 7) % 20, y = 14 + (k * 5) % 16; T.p(x, y, '#76c066'); T.p(x + 1, y - 1, '#76c066'); T.p(x + 1, y + 1, '#235a2a'); }
     for (let k = 0; k < 7; k++) { const x = 5 + (k * 9) % 22, y = 8 + (k * 7) % 22; T.p(x, y, '#ff8ab0'); T.p(x + 1, y, '#ff8ab0'); T.p(x, y + 1, '#ffd0e0'); }
     T.rect(4, 36, 24, 4, '#2a4a2a');
   }],
-  // Mirage : orbe de cristal sur son socle
-  orbe: [32, 44, (T) => {
-    T.rect(9, 32, 14, 10, '#5a4a7a'); T.rect(9, 32, 14, 2, '#8a7ab0'); T.rect(6, 40, 20, 4, '#3a2e52');
-    T.disque(16, 18, 13, 13, null, (i, j, q) => (q > 0.85 ? '#5a3ab0' : q > 0.5 ? '#9a7ae8' : '#d8c8ff'));
-    T.disque(12, 13, 3, 2.5, '#ffffff'); T.p(20, 24, '#ffffff');
+  // repaire de la Team Éclipse : console, bannière, pilier et le Prisme Noir sur son socle
+  console_eclipse: [32, 40, (T) => {
+    T.rect(2, 16, 28, 22, '#1a1626'); T.rect(3, 17, 26, 20, '#2e2840'); T.rect(3, 17, 26, 2, '#4a3e66');
+    T.rect(5, 2, 22, 15, '#120e1a'); T.rect(6, 3, 20, 13, '#1e0e34');
+    for (let i = 6; i < 26; i++) T.p(i, Math.round(9 + Math.sin(i * 0.6) * 3), '#b07af0');
+    T.rect(6, 22, 4, 2, '#e04a8a'); T.rect(12, 22, 4, 2, '#b07af0'); T.rect(18, 22, 8, 2, '#6a5a8a');
+    for (let i = 6; i < 26; i += 3) T.p(i, 28, '#8a5ad0');
   }],
+  banniere_eclipse: [32, 48, (T) => {
+    T.rect(4, 2, 24, 3, '#c8a040'); T.rect(6, 5, 20, 36, '#1e1630'); T.rect(6, 5, 2, 36, '#2e2448');
+    for (let i = 0; i < 10; i++) { T.p(6 + i, 41 + Math.floor(i / 2), '#1e1630'); T.p(25 - i, 41 + Math.floor(i / 2), '#1e1630'); }
+    T.disque(16, 20, 7, 7, '#e8c860'); T.disque(19, 18, 6, 6, '#1e1630');   // l'éclipse : un croissant d'or mangé par l'ombre
+    T.rect(9, 32, 14, 1, '#8a5ad0'); T.rect(11, 35, 10, 1, '#8a5ad0');
+  }],
+  pilier_eclipse: [32, 48, (T) => {
+    T.rect(9, 6, 14, 36, '#2a2438'); T.rect(9, 6, 3, 36, '#3e3654'); T.rect(20, 6, 3, 36, '#1a1626');
+    T.rect(6, 2, 20, 5, '#3a3050'); T.rect(6, 42, 20, 5, '#3a3050'); T.rect(6, 2, 20, 1, '#6a5a8a');
+    for (let j = 12; j < 40; j += 8) T.rect(15, j, 2, 4, '#b07af0');
+  }],
+  prisme_noir: [32, 48, (T) => {
+    T.rect(6, 38, 20, 10, '#2a2438'); T.rect(6, 38, 20, 2, '#6a5a8a'); T.rect(9, 34, 14, 5, '#3a3050');
+    T.disque(16, 18, 15, 16, null, (i, j, q) => (q > 0.6 ? '#9a5ae040' : null));
+    for (let j = 2; j < 34; j++) { const h = j < 18 ? (j - 2) * 0.5 : (34 - j) * 0.5; for (let i = Math.round(16 - h); i <= Math.round(16 + h); i++) T.p(i, j, i < 16 ? '#2a1a44' : i === 16 ? '#c8a0ff' : '#140c24'); }
+    T.ligne(16, 2, 16, 33, '#e0c8ff'); T.p(13, 12, '#ffffff');
+  }],
+  // Mirage : orbe de cristal sur son socle
+  orbe: [32, 44, (T) => orbe(T, 0)],
+  // la couleur de la phase du palais : lune (violet), soleil (or), étoile (bleu)
+  orbe_0: [32, 44, (T) => orbe(T, 0)], orbe_1: [32, 44, (T) => orbe(T, 1)], orbe_2: [32, 44, (T) => orbe(T, 2)],
   // Port-Granit : roche de la carrière
   roche_gym: [32, 34, (T) => {
     T.disque(16, 20, 15, 13, null, (i, j, q) => (q > 0.82 ? '#4a3e32' : j < 14 && i < 18 ? '#c8b49a' : j > 24 ? '#7a6a56' : '#a8967c'));

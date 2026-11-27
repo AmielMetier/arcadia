@@ -9,7 +9,8 @@ import * as THREE from 'three';
 // orthographique du relief : la météo était presque invisible.)
 const TAN_EL = Math.tan(55 * Math.PI / 180);
 /** points utilisés par chaque météo (la géométrie en garde assez pour la pluie) */
-const N_METEO = { rain: 720, hail: 420, sandstorm: 720, ash: 260 };
+// cendresViolettes : la Nuit Violette de la Team Éclipse (dehors) et le Sanctuaire des Marées — rares, lentes, du décor
+const N_METEO = { rain: 720, hail: 420, sandstorm: 720, ash: 260, cendresViolettes: 110 };
 const VERT = /* glsl */`
   attribute float aVie;
   uniform vec2 uRes; uniform float uEch; uniform float uTaille;
@@ -142,7 +143,7 @@ export class WeatherSystem {
     if (this.current === w) return;
     this.current = w;
     // soleil : pas de particules (l'effet est porté par le combat et la lumière)
-    this.points.visible = (w === 'rain' || w === 'hail' || w === 'sandstorm' || w === 'ash');
+    this.points.visible = (w === 'rain' || w === 'hail' || w === 'sandstorm' || w === 'ash' || w === 'cendresViolettes');
     this.setFog(w === 'fog');
 
     const u = this.material.uniforms, regle = (hex, taille, opac, forme) => { u.uCoul.value.set(hex); u.uTaille.value = taille; u.uOpac.value = opac; u.uForme.value = forme; };
@@ -151,6 +152,7 @@ export class WeatherSystem {
     else if (w === 'hail') regle(0xffffff, 3, 0.95, 1);
     else if (w === 'sandstorm') regle(0xfff2cc, 7, 0.8, 2);
     else if (w === 'ash') regle(0xe8e4de, 3, 0.95, 3);   // cendres volcaniques : flocons gris qui tombent en tourbillonnant
+    else if (w === 'cendresViolettes') regle(0xb48af0, 2.5, 0.7, 3);
 
     // Réinitialiser les particules autour du joueur lors d'un changement de météo
     // (autour du dernier point de vue connu : sinon tout repart d'un bord de l'écran)
@@ -190,6 +192,10 @@ export class WeatherSystem {
       if (!initial) this.positions[idx] = focusX - 20 - Math.random() * 2;
       this.positions[idx + 1] = (this.sol ?? 0) + h;
       this.positions[idx + 2] = focusZ + (Math.random() - 0.5) * 14 + h / TAN_EL;
+    } else if (this.current === 'cendresViolettes') {
+      this.velocities[idx] = (Math.random() - 0.5) * 0.012;
+      this.velocities[idx + 1] = -0.012 - Math.random() * 0.012;
+      this.velocities[idx + 2] = (Math.random() - 0.5) * 0.01;
     } else if (this.current === 'ash') {
       this.velocities[idx] = 0.02 + Math.random() * 0.03;
       this.velocities[idx + 1] = -0.035 - Math.random() * 0.025;
@@ -308,7 +314,7 @@ export class WeatherSystem {
       pos[idx + 1] += vel[idx + 1] * speedMultiplier;
       pos[idx + 2] += vel[idx + 2] * speedMultiplier;
       // les cendres ondulent en tombant
-      if (this.current === 'ash') pos[idx] += Math.sin(this.time * 1.7 + i) * 0.012 * speedMultiplier;
+      if (this.current === 'ash' || this.current === 'cendresViolettes') pos[idx] += Math.sin(this.time * 1.7 + i) * 0.012 * speedMultiplier;
       if (this.current === 'hail') pos[idx] += Math.sin(this.time * 1.3 + i * 0.7) * 0.018 * speedMultiplier;
 
       // éclaboussure : la goutte arrivée au sol y reste un instant en couronne, puis repart d'en haut

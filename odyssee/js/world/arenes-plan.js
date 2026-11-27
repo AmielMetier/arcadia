@@ -198,7 +198,7 @@ export function construireArene(id, gym, def, name) {
     if (s.porte) {
       const ferme = { r: T.BARRIER_R, b: T.BARRIER_B, lave: T.LAVA, eau: T.WATER, bloc: T.BLOCK }[s.ferme || 'r'];
       E.portes.push({ x, y, c: s.porte, ferme }); E.portesK.add(k2(x, y));
-      if (s.o || s.f) m.deco.push({ k: 'etat', x, y, o: s.o, f: s.f, dir: s.dirDeco });
+      if (s.o || s.f) m.deco.push({ k: 'etat', x, y, o: s.o, f: s.f, dir: s.dirDeco, c: s.porte });
       else if (s.ferme === 'r' || s.ferme === 'b' || !s.ferme) m.deco.push({ k: 'socle', x, y, g: s.ferme || 'r' });
     }
     if (s.reg) {

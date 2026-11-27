@@ -13,6 +13,8 @@ const NB_MAISONS = [
   'maison_ville_rg', 'maison_ville_bl', 'maison_ville_ve',
   'manoir', 'manoir_r', 'manoir_v',
 ];
+/** décor du pack Noir & Blanc encore à dessiner : la cuve des quartiers industriels et de la centrale (world/quartiers.js) */
+export const DECOR_A_VENIR = ['cuve'];
 const lire = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } };
 const ecrire = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* navigation privée : le choix ne dure que le temps de la page */ } };
 
@@ -39,7 +41,9 @@ export const PACKS = {
   noirblanc: {
     dossier: 'gfx/noirblanc',
     planche: { fichier: 'sol', tuiles: NB_TUILES, cols: NB_COLS },   // tuiles de sol de 16 px sur une seule image
-    decor: NB_DECOR,          // d_<nom>.png, 32 px par case : dessiné pixel pour pixel
+    // d_<nom>.png, 32 px par case : dessiné pixel pour pixel. DECOR_A_VENIR : dessins attendus (pas encore dans le kit,
+    // ni dans data/gfx-noirblanc.js) ; tant que leur image manque, main.js garde le dessin de base
+    decor: [...NB_DECOR, ...DECOR_A_VENIR.filter((k) => !NB_DECOR.includes(k))],
     // murs des intérieurs aux couleurs de Noir & Blanc (render/murs-tex.js) : Centre blanc-argenté/or 5G et Boutique bleu acier/glace 5G
     murs: {
       center: { fond: '#d4dce6', motif: '#c8d0dc', bande: '#e8d080', bandeS: '#c8b060', lam: '#c8c8e0', lamC: '#e8ecf4', lamS: '#989cb4', cim: '#f0f4fa', pl: '#404656', cap: '#303648', capC: '#8088a0' },
@@ -57,6 +61,8 @@ export const PACKS = {
         ['maison_desert_1', ['desert', 'dunes']], ['maison_desert_2', ['desert', 'dunes']], ['maison_desert_3', ['desert', 'dunes']], ['maison_desert_4', ['desert', 'dunes']],
         ['maison_hiver', ['snow', 'givre', 'cime']], ['maison_neige_bl', ['snow', 'givre', 'cime']], ['maison_neige_rg', ['snow', 'givre', 'cime']], ['maison_neige_b', ['snow', 'givre', 'cime']], ['manoir_neige', ['snow', 'givre', 'cime']],
         ['maison_mirage_1', ['mirage', 'kagura']], ['maison_mirage_2', ['mirage', 'kagura']],
+        // Floralia, la ville des jardins : maisons aux toits verts et jaunes, manoir à la façade fleurie
+        ['maison_verte', ['flora']], ['maison_c_ve', ['flora']], ['manoir_v', ['flora']], ['maison_jaune', ['flora']], ['maison_a_g', ['flora']],
         ['maison_ombre_2', ['ombre']], ['manoir_ombre', ['ombre']], ['maison_ombre', ['ombre']],
         ['maison_brique', ['forge']], ['maison_brique_r', ['forge']], ['maison_forge_p1', ['forge']], ['maison_forge_1', ['forge', 'metro', 'volta']], ['maison_forge_2', ['forge', 'metro', 'volta']],
         ['maison_ville_rg', ['metro', 'volta']], ['maison_ville_bl', ['metro', 'volta']], ['maison_ville_ve', ['metro', 'volta']], ['maison_a_bl', ['metro', 'volta']], ['maison_f_bleue', ['metro', 'volta']], ['maison_bleue', ['metro', 'volta']], ['maison_c_ve', ['metro', 'volta']], ['maison_g', ['metro', 'volta']], ['maison_g_ocre', ['metro', 'volta']], ['manoir', ['metro', 'volta']],

@@ -130,7 +130,7 @@ export const PLANS = {
   2: {
     plan: [
       '#########################',
-      '#........p..C..p........#',
+      '#........p__C__p........#',
       '#MMMMMMMMMMMDMMMMMMMMMMM#',
       '#M.....MMMF....MMMf....M#',
       '#M.....rrr.....MMM.....M#',

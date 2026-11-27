@@ -35,7 +35,7 @@ export function changerRegs(g, R2) {
   appliquerEtat(m, R2, [p.x, p.y]);
   // l'arène est petite : on la redessine toute (murs révélés, lanternes allumées, rayon…)
   for (let y = 0; y < m.h; y += 4) for (let x = 0; x < m.w; x += 4) g.view.rebuildAt(x, y);
-  if (m.planArene?.noir) g.updateOverlay?.();
+  if (m.planArene?.noir || m.planArene?.type === 'psychic') g.updateOverlay?.();
 }
 
 /** le joueur vient d'arriver sur une case (pas, glissade) ; renvoie true s'il a été déplacé (il faut rejouer l'arrivée) */

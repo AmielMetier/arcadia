@@ -56,9 +56,9 @@ export const ITEMS = {
   'cs-surf': { pocket: 'ct', price: 0, key: true, field: 'surf', icon: 'notebook', name: 'CS02 Surf', desc: 'Traverse l\'eau sur le dos d\'un Pokémon. Badge Mirage requis. Place-toi face à l\'eau et appuie sur F.' },
   'cs-eclate': { pocket: 'ct', price: 0, key: true, field: 'eclate', icon: 'notebook', name: 'CS03 Éclate-Roc', desc: 'Brise les rochers fissurés. Badge Granit requis. Place-toi face au rocher et appuie sur F.' },
   'cs-flash': { pocket: 'ct', price: 0, key: true, field: 'flash', icon: 'notebook', name: 'CS05 Flash', desc: 'Éclaire les grottes plongées dans le noir. Elle agit toute seule dès que tu entres dans une grotte sombre. Badge Élytre requis.' },
-  'cs-force': { pocket: 'ct', price: 0, key: true, field: 'force', icon: 'notebook', name: 'CS06 Force', desc: 'Pousse les gros rochers. Place-toi face au rocher, appuie sur F, puis marche contre lui. Badge Volt requis.' },
+  'cs-force': { pocket: 'ct', price: 0, key: true, field: 'force', icon: 'cs-force', name: 'CS06 Force', desc: 'Pousse les gros rochers. Place-toi face au rocher, appuie sur F, puis marche contre lui. Badge Volt requis.' },
   medaillon: { pocket: 'cles', price: 0, key: true, icon: 'soothe-bell', name: 'Médaillon', desc: 'Un médaillon gravé d\'une petite fleur. Quelqu\'un de Sylvebourg doit le chercher partout.' },
-  'prism-shard': { pocket: 'cles', price: 0, key: true, icon: 'shoal-shell', name: 'Éclat de Prisme', desc: 'Un fragment noir du Prisme de la Team Éclipse. Il est glacé au toucher.' },
+  'prism-shard': { pocket: 'cles', price: 0, key: true, icon: 'prism-shard', name: 'Éclat de Prisme', desc: 'Un fragment noir du Prisme de la Team Éclipse. Il est glacé au toucher.' },
   // CT01 : donnée par Hector avec le Badge Élytre ; ne s'use pas
   'ct-01': { pocket: 'ct', price: 0, key: true, ct: 10002, types: ['bug'], icon: 'notebook', name: 'CT01 Pollen Collant', desc: 'Insecte · Spéciale · Puissance 55 · Précision 95. Un nuage de pollen gluant englue la cible et baisse sa Vitesse. Pour les Pokémon Insecte et ceux qui connaissent des attaques Insecte. La CT ne s\'use pas.' },
   'cs-vol': { pocket: 'ct', price: 0, key: true, field: 'vol', icon: 'notebook', name: 'CS04 Vol', desc: 'Ramène en un instant dans une ville déjà visitée (depuis le menu, ou en utilisant cet objet). Badge Mirage requis.' },
@@ -66,7 +66,7 @@ export const ITEMS = {
   'gs-ball': { pocket: 'cles', price: 0, key: true, icon: 'gift', name: 'GS Ball', desc: 'Une Poké Ball dorée gravée des lettres G et S. Elle semble attirée par l\'autel du Bois Murmure.' },
   'ferry-ticket': { pocket: 'cles', price: 0, key: true, icon: 'letter', name: 'Passe Marin', desc: 'Le passe du bateau de l\'Embarcadère de l\'Aube. Les îles s\'ouvrent au fil des badges.' },
   'plume-arc': { pocket: 'cles', price: 0, key: true, icon: 'rainbow-wing', name: 'Plume Arc-en-ciel', desc: 'Une plume qui brille de sept couleurs. Elle appelle Ho-Oh au sommet de la Tour Dorée.' },
-  'plume-argent': { pocket: 'cles', price: 0, key: true, icon: 'silver-wing', name: 'Plume Argentée', desc: 'Une plume d\'argent, douce comme l\'écume. Elle ouvre le Sanctuaire des Marées et apaise la Grotte des Tourbillons.' },
+  'plume-argent': { pocket: 'cles', price: 0, key: true, icon: 'plume-argent', name: 'Plume Argentée', desc: 'Une plume d\'argent, douce comme l\'écume. Elle ouvre le Sanctuaire des Marées et apaise la Grotte des Tourbillons.' },
   // --- OBJETS DE COMBAT & OBJETS TENUS (Held Items) ---
   leftovers: { pocket: 'objets', price: 4000, hold: 'leftovers', name: 'Restes', desc: "Objet à tenir. Restaure 1/16 des PV max du porteur à la fin de chaque tour." },
   'sitrus-berry': { pocket: 'baies', price: 250, hold: 'sitrus-berry', name: 'Baie Sitrus', desc: "Objet à tenir. Restaure 25% des PV quand le porteur passe sous la moitié de ses PV." },

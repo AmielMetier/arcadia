@@ -87,7 +87,9 @@ export function lignesObjets(maps, RG) {
 }
 
 /** Objets narratifs ou d'orientation dont le lore mentionne explicitement l'emplacement */
-export const estProtege = (mapId, it) => it?.id === 'lunaire:pierre-lune' || it?.id === 'lunaire:corde' || (mapId === 'grotte' && (it?.item === 'moon-stone' || it?.item === 'escape-rope'));
+// (la Pierre Foudre de la Centrale de Voltacité, la Pierre Eau de la route 4 : des récompenses d'histoire, gardées telles quelles)
+export const estProtege = (mapId, it) => it?.id === 'lunaire:pierre-lune' || it?.id === 'lunaire:corde' || (mapId === 'grotte' && (it?.item === 'moon-stone' || it?.item === 'escape-rope'))
+  || (mapId === 'volta:tower17' && it?.item === 'thunder-stone') || (mapId === 'monde' && it?.id === 'monde:265,47' && it?.item === 'water-stone');
 
 function retrograder(lignes) {
   const changes = [];

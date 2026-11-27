@@ -349,5 +349,7 @@ export function overlay(g) {
   const m = g.mapObj, dark = !!m?.dark, flash = m?.dark !== 'arene' && g.hasField('flash') && g.badgeCount() >= FIELD.flash.badge;   // l'arène Ténèbres reste dans le noir
   // arène dessinée dans le noir : chaque torche allumée élargit la lueur autour du joueur
   const lueur = dark && m.planArene?.noir ? ' lueur' + Math.min(3, (m.regs || []).filter((v) => v).length) : '';
-  ov.className = 'dark-ov' + (dark ? (flash ? ' cave flash' : ' cave') : '') + lueur + (g.eclipseOn() && m?.outdoor ? ' eclipse' : '');
+  // arène de Mirage : une lueur douce à la couleur de la phase (lune violette, soleil doré, étoile bleue)
+  const phase = m?.planArene?.type === 'psychic' ? ' psy' + (((m.regs || [])[0] || 0) % 3) : '';
+  ov.className = 'dark-ov' + (dark ? (flash ? ' cave flash' : ' cave') : '') + lueur + phase + (g.eclipseOn() && m?.outdoor ? ' eclipse' : '');
 }

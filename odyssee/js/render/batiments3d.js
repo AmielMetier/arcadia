@@ -2976,6 +2976,79 @@ export function atelier(D) {
     return G;
   };
 
+  /** la Centrale de Voltacité (4 × 4, porte en x = 1) : halle de béton et de tôle, deux tours de refroidissement,
+   *  transformateurs derrière un grillage, éclair jaune au fronton, pylône dont la lampe rouge clignote la nuit */
+  B.centrale = ({ acc = '#f2c838' } = {}) => {
+    const G = new THREE.Group(), w = 4, d = 4, beton = M({ map: TX.enduit('#a8aeb8') }), metal = COL('#5a6478'), sombre = COL('#2e3440');
+    G.add(at(boite(w, 0.3, d, M({ map: TX.dalles('#8a909a') })), w / 2, 0.15, d / 2));
+    // la halle des générateurs : soubassement sombre, murs de béton, bande jaune et noire, toit de tôle
+    G.add(at(boite(3.8, 2.6, 2.9, beton), w / 2, 1.6, 2.35));
+    G.add(at(boite(3.84, 0.5, 2.94, sombre), w / 2, 0.55, 2.35));
+    for (let i = 0; i < 10; i++) G.add(at(boite(0.38, 0.16, 0.02, COL(i % 2 ? '#1e2228' : acc)), 0.29 + i * 0.38, 2.55, 3.81));
+    G.add(at(boite(4.0, 0.22, 3.1, M({ map: TX.tole('#6a7488') })), w / 2, 3.0, 2.35));
+    // fronton : le grand éclair qui luit la nuit
+    G.add(at(boite(1.6, 0.9, 0.08, sombre), w / 2, 3.55, 3.7));
+    for (const [x, y, ww, hh] of [[0.12, 0.2, 0.22, 0.34], [-0.04, -0.02, 0.5, 0.12], [-0.14, -0.22, 0.22, 0.34]]) G.add(at(boite(ww, hh, 0.04, LUM(acc, '#b08000')), w / 2 + x, 3.55 + y, 3.76));
+    // fenêtres hautes de la halle, allumées la nuit
+    for (const x of [0.7, 3.3]) G.add(at(boite(0.7, 0.5, 0.03, M({ map: TX.verre() })), x, 2.05, 3.81));
+    // deux tours de refroidissement au fond, d'où monte la vapeur
+    for (const [x, r] of [[0.9, 0.62], [3.0, 0.72]]) {
+      G.add(at(cyl(r * 0.78, r, 2.4, M({ map: TX.enduit('#c8ccd2') }), 16), x, 3.2 + 1.2, 0.75));
+      G.add(at(cyl(r * 0.84, r * 0.78, 0.9, M({ map: TX.enduit('#c8ccd2') }), 16), x, 3.2 + 2.85, 0.75));
+      G.add(at(cyl(r * 0.86, r * 0.86, 0.12, COL('#d84a3a'), 16), x, 3.2 + 2.2, 0.75));
+      const f = new THREE.Object3D(); f.position.set(x, 3.2 + 3.35, 0.75); f.userData.fumee = true; G.add(f);
+    }
+    // pylône sur le toit, lampe rouge au sommet
+    G.add(at(cyl(0.05, 0.09, 2.2, metal, 6), 2.0, 4.2, 1.9));
+    for (const y of [3.7, 4.3, 4.9]) G.add(at(boite(0.6 - (y - 3.7) * 0.3, 0.05, 0.05, metal), 2.0, y, 1.9));
+    G.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), LUM('#ff4040', '#c00000')), 2.0, 5.35, 1.9));
+    // transformateurs à droite de la porte, derrière un grillage ; câbles vers la halle
+    for (const x of [2.85, 3.55]) {
+      G.add(at(boite(0.52, 0.62, 0.42, metal), x, 0.61, 3.95));
+      for (const dx of [-0.14, 0, 0.14]) G.add(at(cyl(0.04, 0.05, 0.22, COL('#d8d0b8'), 6), x + dx, 1.03, 3.95));
+    }
+    G.add(at(boite(1.5, 0.7, 0.03, M({ color: new THREE.Color('#9aa4b4'), transparent: true, opacity: 0.45 })), 3.2, 0.65, 4.2));
+    for (const x of [2.45, 3.95]) G.add(at(boite(0.05, 0.75, 0.05, metal), x, 0.67, 4.2));
+    for (const x of [2.85, 3.55]) { const c = cyl(0.02, 0.02, 1.3, sombre, 4); c.rotation.x = 0.9; G.add(at(c, x, 1.55, 3.6)); }
+    // la porte de service, son auvent et son panneau « danger »
+    porte(G, 1.5, 3.8, 0.3, 1.25, metal, COL(acc), 0.85);
+    G.add(at(boite(1.3, 0.08, 0.45, sombre), 1.5, 1.72, 3.98));
+    G.add(at(boite(0.3, 0.3, 0.03, COL(acc)), 0.45, 1.25, 3.82));
+    return G;
+  };
+  /** la Tour Mirage (4 × 4, porte en x = 1) : tour antique dorée sur trois étages qui se resserrent, colonnade au
+   *  pied, frises et oculus pourpres, flèche d'or ; un orbe brille au sommet la nuit */
+  B.tourMirage = ({ toit = '#7a4a9a' } = {}) => {
+    const G = new THREE.Group(), w = 4, d = 4, cx = 2, cz = 2;
+    const or = COL('#d8a83a'), orC = COL('#f0cc68'), pierre = M({ map: TX.pierre('#e0cc98') }), pourpre = COL(toit);
+    // le perron à trois marches
+    for (let k = 0; k < 3; k++) G.add(at(boite(4.0 - k * 0.2, 0.18, 4.0 - k * 0.2, M({ map: TX.pierre('#cfc2a6') })), cx, 0.09 + k * 0.18, cz));
+    const y0 = 0.54;
+    // rez-de-chaussée : un fût de pierre dorée entouré de huit colonnes
+    G.add(at(cyl(1.25, 1.3, 2.0, pierre, 16), cx, y0 + 1.0, cz));
+    for (let i = 0; i < 8; i++) { const a = (i + 0.5) / 8 * Math.PI * 2; G.add(at(cyl(0.13, 0.15, 2.0, COL('#f2e6c4'), 8), cx + Math.sin(a) * 1.6, y0 + 1.0, cz + Math.cos(a) * 1.6)); }
+    G.add(at(cyl(1.82, 1.82, 0.22, or, 16), cx, y0 + 2.11, cz));
+    G.add(at(cyl(1.76, 1.76, 0.08, pourpre, 16), cx, y0 + 1.96, cz));
+    // deux étages qui se resserrent, chacun avec sa frise d'or et ses oculus pourpres
+    let y = y0 + 2.22;
+    for (const [r, h] of [[1.15, 1.7], [0.85, 1.5]]) {
+      G.add(at(cyl(r * 0.94, r, h, pierre, 16), cx, y + h / 2, cz));
+      G.add(at(cyl(r + 0.08, r + 0.08, 0.16, or, 16), cx, y + h - 0.08, cz));
+      for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + Math.PI / 4, o = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), LUM(toit, '#40205a')); G.add(at(o, cx + Math.sin(a) * r * 0.97, y + h * 0.55, cz + Math.cos(a) * r * 0.97)); }
+      G.add(at(boite(0.24, 0.42, 0.04, M({ map: TX.verre() })), cx, y + h * 0.5, cz + r * 0.97));
+      y += h;
+    }
+    // le toit pointu, la flèche et l'orbe
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(1.05, 1.5, 16), COL(toit)); cone.castShadow = true; G.add(at(cone, cx, y + 0.75, cz));
+    G.add(at(cyl(1.0, 1.0, 0.1, orC, 16), cx, y + 0.05, cz));
+    G.add(at(cyl(0.03, 0.06, 0.9, or, 6), cx, y + 1.85, cz));
+    G.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), LUM('#f4e0ff', '#a070d0')), cx, y + 2.35, cz));
+    // la porte en arc, deux braseros de part et d'autre du perron
+    porte(G, 1.5, cz + 1.3, y0, 1.35, M({ map: TX.bois('#5a3a6a') }), or, 0.8);
+    for (const x of [0.35, 3.65]) { G.add(at(cyl(0.12, 0.16, 0.5, COL('#6a5a48'), 8), x, 0.25, 3.7)); G.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), LUM('#ffb040', '#d06010')), x, 0.58, 3.7)); }
+    return G;
+  };
+
   // maisons des villes (une architecture par ville) : modèle « maisonVille », réglé par styles-villes.js
   maisonsVilles({ B, TX, tex, hash, mix, S, D, boite, at, M, COL, LUM, cyl, fenetre2, fenArc, porte, portesVitrees, toit4, toitChinois, cheminee, fumee, balustrade, bucher, socle });
 
@@ -2996,4 +3069,5 @@ export const EMPRISES = {
   pagode: [11, 11], tourCendree: [11, 11], pavillon: [8, 7], dojo: [6, 5], tour: [8, 5], tourVerre: [10, 7], tourDeco: [8, 8], bourse: [12, 8], casino: [14, 8], ligue: [30, 14], usinePokeball: [32, 10],
   escalierMontant: [1, 2], escalierDescendant: [1, 2],
   pyramide: [12, 12], temple: [11, 8],
+  centrale: [4, 4], tourMirage: [4, 4],
 };

@@ -22,9 +22,9 @@ Object.assign(ITEMS, {
   'casque-mineur': { pocket: 'cles', price: 0, key: true, icon: 'explorer-kit', name: 'Casque de mineur', desc: 'Un casque jaune cabossé, avec une lampe frontale. Il appartient à un mineur de Pierrefort.' },
   'lettre-mineurs': { pocket: 'cles', price: 0, key: true, icon: 'letter', name: 'Lettre des mineurs', desc: 'Une lettre signée par tous les mineurs de Pierrefort, pour la mère de Basalte.' },
   'bouteille-mer': { pocket: 'cles', price: 0, key: true, icon: 'fresh-water', name: 'Bouteille à la mer', desc: 'Une bouteille avec un message : « Je suis Sven, pêcheur à Givrebourg. Écris-moi ! »' },
-  'flacon-parfum': { pocket: 'cles', price: 0, key: true, icon: 'gift', name: 'Flacon de parfum', desc: 'Un parfum de fleurs de Floralia, pour Madame Opaline, à Mirage.' },
+  'flacon-parfum': { pocket: 'cles', price: 0, key: true, icon: 'flacon-parfum', name: 'Flacon de parfum', desc: 'Un parfum de fleurs de Floralia, pour Madame Opaline, à Mirage.' },
   'collier-miaouss': { pocket: 'cles', price: 0, key: true, icon: 'soothe-bell', name: 'Collier à clochette', desc: 'Un petit collier rouge avec une clochette. Celui d\'un Miaouss ?' },
-  'colis-postal': { pocket: 'cles', price: 0, key: true, icon: 'gift', name: 'Colis', desc: 'Un colis bien ficelé, adressé à Mme Léonie, Port-Granit. Il est tout mou.' },
+  'colis-postal': { pocket: 'cles', price: 0, key: true, icon: 'colis-postal', name: 'Colis', desc: 'Un colis bien ficelé, adressé à Mme Léonie, Port-Granit. Il est tout mou.' },
   clochette: { pocket: 'cles', price: 0, key: true, icon: 'clear-bell', name: 'Clochette de vent', desc: 'Une clochette du Jardin de la Grue, emportée par la tempête. Il y en a trois.' },
 });
 
@@ -90,7 +90,10 @@ export const MISSIONS = [
     journal: { name: 'Le registre du capitaine', start: 'Le capitaine Corentin, à Port-Azur, veut que j\'enregistre dix Pokémon Eau dans mon Pokédex.', end: 'Mon nom est dans le registre du capitaine Corentin.' } },
 
   { id: 'mWatt', town: 'E', at: [23, 22], sprite: 'scientifique', who: 'Mlle Watt', kind: 'show', test: (m) => has('electric')(m) && m.lvl >= 25, reward: [['thunder-stone', 1], ['elixir', 1]],
-    ask: ['Depuis que la Team Éclipse a vidé les générateurs, je cherche des Pokémon Électrik puissants pour relancer mes expériences.', 'Montre-moi un Pokémon Électrik au moins au niveau 25 !'],
+    // tant que la Centrale est occupée, Mlle Watt n'en parle pas au passé
+    ask: (st) => (st.flags['T:ecl:erebe2']
+      ? ['La Centrale tourne de nouveau, mais la Team Éclipse a vidé les générateurs. Il me faut des Pokémon Électrik puissants pour relancer mes expériences.', 'Montre-moi un Pokémon Électrik au moins au niveau 25 !']
+      : ['La Team Éclipse occupe la Centrale et pompe toute l\'électricité de la ville... Mes expériences sont à l\'arrêt.', 'En attendant, je cherche des Pokémon Électrik puissants. Montre-m\'en un au moins au niveau 25 !']),
     again: ['Un Pokémon Électrik, niveau 25 au moins. Je suis prête à mesurer !'],
     thanks: ['Regarde-moi ces étincelles ! Mon voltmètre s\'affole.', 'Merci ! Prends ça pour ta peine.'], done: ['Mes expériences avancent à pleine tension !'],
     journal: { name: 'Haute tension', start: 'Mlle Watt, chercheuse à Voltacité, veut mesurer un Pokémon Électrik au moins au niveau 25.', end: 'Mlle Watt a pu mesurer mon Pokémon Électrik.' } },
@@ -125,7 +128,7 @@ export const MISSIONS = [
   { id: 'mReves', town: 'G', at: [26, 21], sprite: 'medium', who: 'Séraphine', kind: 'check', test: (st) => !!st.flags['VN:jardin'], reward: [['full-heal', 2], ['rare-candy', 1]],
     ask: ['Le Jardin des Songes... Les nuits de lune, les rêves y prennent forme.', 'Va t\'y promener une nuit, et reviens me dire ce que tu as ressenti.'],
     again: ['Une nuit au Jardin des Songes. Pas le jour : la nuit.'],
-    thanks: ['Je le vois dans tes yeux : tu y es allé, la nuit.', 'Garde ceci. Ça veille sur les dormeurs.'], done: ['Fais de beaux rêves, voyageur.'],
+    thanks: (st) => [`Je le vois dans tes yeux : tu y es allé${st.gender === 'f' ? 'e' : ''}, la nuit.`, 'Garde ceci. Ça veille sur les dormeurs.'], done: (st) => [`Fais de beaux rêves, ${st.gender === 'f' ? 'voyageuse' : 'voyageur'}.`],
     journal: { name: 'Une nuit au jardin', start: 'Séraphine, à Mirage, m\'a demandé de me promener une nuit au Jardin des Songes.', end: 'J\'ai raconté ma nuit au Jardin des Songes à Séraphine.' } },
 
   { id: 'mPierreFeu', town: 'H', at: [26, 22], sprite: 'habitante', who: 'Salomé', kind: 'bring', item: 'fire-stone', reward: [['full-restore', 1], ['burn-heal', 3]],

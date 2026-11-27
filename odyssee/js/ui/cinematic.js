@@ -376,7 +376,7 @@ export function resolveBossCinematicConfig(opts = {}) {
   if (!presetKey) {
     if (isShadowLugia) {
       presetKey = 'shadow';
-      sub = sub || 'Gardien des Abyssales · Cœur Fermé';
+      sub = sub || 'Gardien des Abysses · Cœur Fermé';
       badge = badge || 'ÉVEIL OBSCUR';
     } else if (opts.raid) {
       presetKey = 'raid';
@@ -1408,7 +1408,7 @@ export async function playLugiaCinematic(game) {
     shadow: true,
     preset: 'shadow',
     title: 'LUGIA OBSCUR',
-    sub: 'Gardien des Abyssales · Cœur Fermé',
+    sub: 'Gardien des Abysses · Cœur Fermé',
     badge: 'ÉVEIL OBSCUR',
     duration: 14.8,
   });

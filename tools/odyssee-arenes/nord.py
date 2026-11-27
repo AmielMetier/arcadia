@@ -85,6 +85,7 @@ PADS2 = [(0, 1), (1, 2), (2, 1), (0, 0), (1, 1), (0, 3), (2, 0), (2, 3), (0, 2),
 FUS2 = [(1, 0), (2, 0), (2, 3)]
 archipel(P, 'M', [None if t is None else '.' if t == 'w' else t for t in T2])
 P.put(12, 2, 'D')
+for x in (10, 11, 13, 14): P.put(x, 1, '_')   # l'estrade de Volta, de part et d'autre de la Championne
 for (c, r) in PADS2: P.put(*ile(c, r, 2, 1), 'T')
 for k, (c, r) in enumerate(FUS2): P.put(*ile(c, r, -2, -1), 'FfY'[k])
 for i, (c, r, dx, dy) in enumerate([(0, 3, -2, -1), (2, 2, -2, -1), (0, 1, -2, 1), (1, 1, 2, -1)]): P.put(*ile(c, r, dx, dy), str(i + 1))
@@ -92,8 +93,8 @@ P.hall(22)
 arene(2, P, r"""
     type: 'electric', sol: 'gymElec', regs: [0, 0, 0, 0], minActions: 15,
     regles: [
-      'ARÈNE DE VOLTACITÉ — LA CENTRALE\nChampionne : Volta, l\'étincelle de la région.',
-      'Chaque dalle-éclair inverse le courant de TOUTE la centrale : les barrières rouges se lèvent quand les bleues s\'abaissent, et inversement.',
+      'ARÈNE DE VOLTACITÉ — LA DYNAMO\nChampionne : Volta, l\'étincelle de la région.',
+      'Chaque dalle-éclair inverse le courant de TOUTE la dynamo : les barrières rouges se lèvent quand les bleues s\'abaissent, et inversement.',
       'La porte du générateur ne s\'ouvre qu\'avec ses TROIS fusibles, rangés dans les armoires de trois îlots.',
       'Conseil de Volta : « Le Sol ne craint pas mes éclairs. Mais il faut encore réussir à l\'amener jusqu\'à moi ! »',
     ],
@@ -101,10 +102,10 @@ arene(2, P, r"""
       M: { prop: 'machine' },
       r: { porte: { r: 0, eq: 1 }, ferme: 'r' },
       b: { porte: { r: 0, eq: 0 }, ferme: 'b' },
-      T: { reg: { inc: [0, 2] }, pad: 'eclair', msg: 'Bzzzt ! Le courant s\'inverse dans toute la centrale.', son: 'select' },
-      F: { prop: 'armoire_elec', reg: { set: [1, 1] }, use: true, msg: 'Tu enclenches un fusible. Un voyant vert s\'allume au-dessus de la porte du générateur.' },
-      f: { prop: 'armoire_elec', reg: { set: [2, 1] }, use: true, msg: 'Tu enclenches un fusible. Un deuxième voyant vert s\'allume.' },
-      Y: { prop: 'armoire_elec', reg: { set: [3, 1] }, use: true, msg: 'Tu enclenches un fusible. Un voyant vert s\'allume au-dessus de la porte du générateur.' },
+      T: { reg: { inc: [0, 2] }, pad: 'eclair', son: 'select' },
+      F: { prop: 'armoire_elec', reg: { set: [1, 1] }, use: true, dejaMsg: 'Ce fusible est déjà enclenché.', msg: (R) => { const n = R[1] + R[2] + R[3]; return n >= 3 ? 'Troisième fusible enclenché ! La porte du générateur s\'ouvre !' : `Tu enclenches un fusible (${n}/3). Un voyant vert s'allume au-dessus de la porte du générateur.`; } },
+      f: { prop: 'armoire_elec', reg: { set: [2, 1] }, use: true, dejaMsg: 'Ce fusible est déjà enclenché.', msg: (R) => { const n = R[1] + R[2] + R[3]; return n >= 3 ? 'Troisième fusible enclenché ! La porte du générateur s\'ouvre !' : `Tu enclenches un fusible (${n}/3). Un voyant vert s'allume au-dessus de la porte du générateur.`; } },
+      Y: { prop: 'armoire_elec', reg: { set: [3, 1] }, use: true, dejaMsg: 'Ce fusible est déjà enclenché.', msg: (R) => { const n = R[1] + R[2] + R[3]; return n >= 3 ? 'Troisième fusible enclenché ! La porte du générateur s\'ouvre !' : `Tu enclenches un fusible (${n}/3). Un voyant vert s'allume au-dessus de la porte du générateur.`; } },
       D: { porte: { tous: [1, 2, 3], eq: 1 }, ferme: 'bloc', o: 'tapis_metal', f: 'porte_gen' },
     },
     dresseurs: [{ dir: 'right', vue: 2 }, { dir: 'right', vue: 3 }, { dir: 'right', vue: 3 }, { dir: 'left', vue: 3 }],
@@ -122,7 +123,8 @@ P.rect(1, 8, 23, 8, '#'); P.put(20, 8, 'I')
 P.rect(1, 9, 23, 14, '.')
 P.row(11, 6, 'BlBmBnBuBvB')                                                  # parterre du milieu (5 fleurs)
 P.col(18, 12, '###'); P.col(8, 9, '##'); P.col(15, 9, '#')                   # haies qui découpent le jardin
-P.put(4, 13, 'M'); P.put(10, 13, 'N'); P.put(12, 9, 'O'); P.put(21, 13, 'P'); P.put(14, 13, 'Q'); P.put(20, 9, 'Z')
+P.put(4, 13, 'M'); P.put(10, 13, 'N'); P.put(12, 9, 'O'); P.put(21, 13, 'P'); P.put(14, 13, 'Q'); P.put(20, 9, 'W')
+P.put(4, 7, 'Z')                                                             # pupitre de remise
 P.rect(1, 15, 23, 15, '#'); P.put(4, 15, 'H')
 P.rect(1, 16, 23, 21, '.')
 P.row(18, 7, 'BxByBzBwB')                                                    # parterre du bas (4 fleurs)
@@ -131,7 +133,7 @@ P.put(1, 16, 'p'); P.put(23, 16, 'p'); P.put(1, 9, 'p'); P.put(23, 14, 'p'); P.p
 P.put(8, 20, '1'); P.put(2, 10, '2'); P.put(22, 11, '3'); P.put(17, 5, '4'); P.put(6, 6, '5')
 P.hall(22)
 BAS3 = {'q': (0, 2), 'r': (1, 2, 3), 's': (0, 1), 't': (0, 1, 2), 'U': (0, 2, 3)}
-MIL3 = {'M': (2, 3), 'N': (0, 1), 'O': (1, 4), 'P': (0, 1, 2), 'Q': (0, 3, 4), 'Z': (0, 3)}
+MIL3 = {'M': (2, 3), 'N': (0, 1), 'O': (1, 4), 'P': (0, 1, 2), 'Q': (0, 3, 4), 'W': (0, 3)}
 CARRE = 'abcdejfhk'
 voisins = lambda i: [j for j in range(9) if abs(j % 3 - i % 3) + abs(j // 3 - i // 3) <= 1]
 L3 = ["B: { t: 'bloc', deco: 'parterre' }"]
@@ -216,16 +218,16 @@ P.hall(22)
 arene(4, P, r"""
     type: 'psychic', sol: 'gymPsy', regs: [0], minActions: 6,
     regles: [
-      'ARÈNE DE MIRAGE — LE PALAIS DES SONGES\nChampionne : Sibylle, la voyante.',
+      'ARÈNE DE MIRAGE — LE PALAIS DES SONGES\nChampionne : Sibylle, l\'oracle.',
       'Les téléporteurs mènent d\'une salle à l\'autre. Les BLANCS marchent toujours ; les VIOLETS en phase de LUNE, les DORÉS en phase de SOLEIL, les BLEUS en phase d\'ÉTOILE.',
       'Quatre orbes de cristal font passer le palais à la phase suivante : lune, puis soleil, puis étoile, puis de nouveau lune. Retiens bien d\'où part chaque téléporteur !',
       'Conseil de Sibylle : « Mes visions sont claires… sauf face aux Spectres et aux Ténèbres. »',
     ],
     legende: {
-      O: { prop: 'orbe', reg: { inc: [0, 3] }, use: true, msg: 'Tu poses la main sur l\'orbe… La lumière du palais passe à la phase suivante !', son: 'select' },
+      O: { prop: 'orbe', reg: { inc: [0, 3] }, use: true, msg: (R) => ['Tu poses la main sur l\'orbe… Phase de LUNE (téléporteurs violets actifs) !', 'Tu poses la main sur l\'orbe… Phase de SOLEIL (téléporteurs dorés actifs) !', 'Tu poses la main sur l\'orbe… Phase d\'ÉTOILE (téléporteurs bleus actifs) !'][R[0]], son: 'select' },
 """ + ',\n'.join('      ' + l for l in LEG) + r""",
     },
-    dresseurs: [{ dir: 'left', vue: 3 }, { dir: 'right', vue: 3 }, { dir: 'up', vue: 3 }, { dir: 'left', vue: 3 }, { dir: 'right', vue: 3 }],
+    dresseurs: [{ dir: 'left', vue: 3 }, { dir: 'right', vue: 3 }, { dir: 'up', vue: 3 }, { dir: 'left', vue: 3 }, { dir: 'down', vue: 3 }],
 """)
 
 # ---------------------------------------------------------------- 5. Basalte (Roche) : la Carrière — rochers à pousser dans les fosses (Rocky, Charbourg, Argenta)

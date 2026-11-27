@@ -94,7 +94,7 @@ const QUESTS = [
       [(f) => f.rival1, (f, g) => `Théo a pris ${sp(g.rivalLine ? g.rivalLine()[0] : 0)} au labo, juste après moi, et m'a défié sur-le-champ.`],
       [(f) => f.rival2, 'Théo m\'a rattrapé sur la route 2. Lui aussi a son premier badge.'],
       [(f) => f.rival3, 'Théo m\'attendait à Floralia, sa « ville porte-bonheur ».'],
-      [(f) => f.rival4, 'Au Cap Mirage, Théo a voulu vérifier que j\'étais prêt pour les îles.'],
+      [(f) => f.rival4, (f, g) => `Au Cap Mirage, Théo a voulu vérifier que j'étais prêt${g?.state?.gender === 'f' ? 'e' : ''} pour les îles.`],
       [(f) => f.rival5, 'Sur la route 9, Théo m\'a donné tout ce qu\'il avait avant la Ligue.'],
       [(f) => f.mTheo, 'J\'ai battu Théo une dernière fois, à Bourg-Aube. Il part découvrir une autre région.'],
     ] },
@@ -306,3 +306,5 @@ export function syncJournal(game) {
 }
 
 export const QUEST_COUNT = QUESTS.length;
+/** nom d'une quête du journal (pour les quêtes qui ne sont pas dans world.quests : le vélo, le permis bateau) */
+export function nomQuete(id, game) { const Q = QUESTS.find((q) => q.id === id); return Q ? txt(Q.name, game?.state?.flags || {}, game) : null; }

@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 5.171 — 27 novembre 2026
+- **Odyssée 3.8 — Acte 2 complet (Route 4 à Sanctuaire des Marées)** :
+  - Centrale de Voltacité et Tour Mirage dotées de vrais modèles 3D extérieurs et d'intérieurs dédiés (générateurs/turbines, sanctuaire à fresques).
+  - Repaire Éclipse entièrement refondu (façade dédiée aux plaques Team Éclipse violettes sans « R », sol obsidienne, murs liserés de violet, consoles et Prisme Noir).
+  - Arènes 3, 4 et 5 repensées : sol botanique pierre/mousse à Floralia, moulures murales et estrades de Champion dédiées, retour visuel dynamique sur les puzzles (armoires électriques, porte 0..3/3, dalles verrouillées, orbes et teinte lunaire/solaire/stellaire), fonds de combat différenciés et variante Nuit Violette.
+  - Sanctuaire des Marées enrichi (runes gravées autour de Lugia Obscur, cendres violettes, sons d'eau souterraine) ; Noir & Blanc enrichi pour Floralia, Mirage et la cuve industrielle (`d_cuve.png`).
+  - Portrait dédié pour Chef Nocturne, 7 icônes d'objets clés dédiées, musiques et dialogues enrichis, fautes de français et accords corrigés.
+
 ## 5.170 — 27 novembre 2026
 - Odyssée 3.7 : correctifs Acte 2 Lot P1 (arènes 3-5, Éclipse, Rival, Force/Surf, audio, Sanctuaire) (Amiel)
 

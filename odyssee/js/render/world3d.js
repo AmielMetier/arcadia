@@ -124,7 +124,29 @@ function profondeurGrille(mat, b) {
   mat.customProgramCacheKey = () => 'profondeurGrille';
   return mat;
 }
-const DECALS = new Set(['fleche', 'vent', 'courant', 'dalle', 'tp', 'socle', 'pollen', 'alveole', 'interrupteur', 'estrade', 'tapis']);
+/** pack Noir & Blanc : une seule image d'arène ; celles de Voltacité, Floralia et Mirage prennent la teinte de leur
+ *  type (on garde la lumière et la saturation de chaque pixel coloré, seule sa teinte change ; gris et blancs intacts) */
+const TEINTES_ARENE = { electric: 48, grass: 115, psychic: 282 };
+const _arenesTeintees = new Map();
+function areneTeintee(im, type) {
+  const k = type + ':' + im.width; if (_arenesTeintees.has(k)) return _arenesTeintees.get(k);
+  const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+  const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0);
+  const d = x.getImageData(0, 0, c.width, c.height), p = d.data, h = TEINTES_ARENE[type] / 360;
+  for (let i = 0; i < p.length; i += 4) {
+    if (!p[i + 3]) continue;
+    const r = p[i] / 255, g = p[i + 1] / 255, bl = p[i + 2] / 255, mx = Math.max(r, g, bl), mn = Math.min(r, g, bl), l = (mx + mn) / 2, ch = mx - mn;
+    if (ch < 0.12) continue;
+    const s = ch / (1 - Math.abs(2 * l - 1));
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s, pp = 2 * l - q;
+    const f = (t) => { t = (t + 1) % 1; return t < 1 / 6 ? pp + (q - pp) * 6 * t : t < 0.5 ? q : t < 2 / 3 ? pp + (q - pp) * (2 / 3 - t) * 6 : pp; };
+    p[i] = f(h + 1 / 3) * 255; p[i + 1] = f(h) * 255; p[i + 2] = f(h - 1 / 3) * 255;
+  }
+  x.putImageData(d, 0, 0); _arenesTeintees.set(k, c); return c;
+}
+/** estrade du Champion propre à chaque arène (render/arenes-tex.js : dec_estrade_<nom>) */
+const ESTRADES = { electric: 'elec', psychic: 'psy' };
+const DECALS = new Set(['fleche', 'vent', 'courant', 'dalle', 'tp', 'socle', 'pollen', 'alveole', 'interrupteur', 'estrade', 'tapis', 'cable_sol', 'bande_danger', 'rune']);
 const AVANCE_PERSO = 0.38;
 const WIDE_DECO = new Set(['healer', 'sofa', 'bench', 'startertable', 'fireplace', 'rug']);
 /** décor du dehors posé avec une ombre au sol (leur ombre violette, dessinée dans le sprite, a été retirée) */
@@ -1411,7 +1433,9 @@ export class WorldView {
           }
         }
         else if (d.k === 'shelf') box(Wl, x + 0.05, y + 0.2, x + 0.95, y + 0.95, 1.5 * Math.tan(EL), A.shelf, A.roof_flat, A.shelf);
-        else if (d.k === 'carpet' || d.k === 'exitlight') { /* sol */ }
+        // sortie d'une grotte : la lumière du jour qui entre, en flaque douce sur le sol devant l'ouverture
+        else if (d.k === 'exitlight') { if (A.dec_exitlight && !m.donjon) flat(TR, x - 0.75, y - 1.25, x + 1.75, y + 1, 0.0058, A.dec_exitlight); }
+        else if (d.k === 'carpet') { /* sol */ }
         else if (d.k === 'lianes' && m.get(x, y) !== T.BLOCK) { /* portail de lianes ouvert */ }
         else if (d.allume && S[d.k + '_on'] && m.get(d.allume[0], d.allume[1]) === T.BOULDER) { const r = S[d.k + '_on']; billboard(P, x + 0.5, y + 0.6, SW(r), SH(r), r); }
         else if (S[d.k]) {
@@ -1540,7 +1564,7 @@ export class WorldView {
     const m = this.map, A = this.A.cells, S = this.S.rects, R = m.regs || m.regs0 || [], t = m.get(x, y);
     const marche = walkable(t);
     let h = 0.005;
-    const aPlat = (k) => { if (!A[k]) return false; flat(k.startsWith('dec_cire_ouverte') ? this._TR : O0, x, y, x + 1, y + 1, h, A[k]); h += 0.0004; return true; };
+    const aPlat = (k) => { if (!A[k]) return false; flat(k.startsWith('dec_cire_ouverte') ? this._TR : O0, x, y, x + 1, y + 1, h, A[k]); h += 0.0012; return true; };
     const debout = (k, dz = 0.62, ombre = true) => {
       const r = S[k]; if (!r) return false;
       billboard(P, x + 0.5, y + dz, SW(r), SH(r), r);
@@ -1559,7 +1583,9 @@ export class WorldView {
       }
       if (k === 'etat') {
         if (d.bras && !marche) { debout(d.f, 0.62, false) || aPlat('dec_' + d.f); continue; }
-        const n = marche ? d.o : d.f; if (!n) continue;
+        let n = marche ? d.o : d.f; if (!n) continue;
+        // porte du générateur (Voltacité) : un voyant vert par fusible enclenché
+        if (n === 'porte_gen' && d.c?.tous) n += '_' + d.c.tous.filter((i) => R[i]).length;
         if (d.dir && (A[`dec_${n}_${d.dir}`] || S[`${n}_${d.dir}`])) ou(`${n}_${d.dir}`); else ou(n);
         continue;
       }
@@ -1572,8 +1598,13 @@ export class WorldView {
       if (k === 'ciel') { aPlat(hash(x * 3 + 1, y * 5 + 2) < 0.1 ? 'dec_nuage' : 'dec_ciel'); continue; }
       if (k === 'fleche' || k === 'vent' || k === 'courant' || k.startsWith('tapis_')) { aPlat(`dec_${k}_${d.dir || 'up'}`); continue; }
       if (k === 'lanterne_marais' || k === 'torche_ombre') { const o = m.objectAt(x, y), r = o?.a?.set?.[0]; debout(r != null && R[r] ? k + '_on' : k); continue; }
+      // armoire à fusibles enclenchée : voyant vert ; orbe de Mirage à la couleur de la phase (lune, soleil, étoile)
+      if (k === 'armoire_elec') { const r = m.objectAt(x, y)?.a?.set?.[0]; debout(r != null && R[r] ? 'armoire_elec_on' : k); continue; }
+      if (k === 'orbe') { debout('orbe_' + ((R[0] || 0) % 3)) || debout(k); continue; }
+      // dalle-pétale d'un parterre déjà validé : elle ne répond plus, elle se fige (pétales fanés, liseré vert)
+      if (k === 'dalle_petale') { const s2 = m.objectAt(x, y)?.a?.sauf; aPlat(s2 && R[s2.r] === s2.eq ? 'dec_dalle_petale_fige' : 'dec_dalle_petale'); continue; }
       if (k === 'sign' || k === 'gymstatue' || k === 'plant' || k === 'pupitre') { debout(k, k === 'gymstatue' ? 0.66 : 0.6); continue; }
-      if (k === 'estrade' && A['dec_estrade_' + m.arene]) { aPlat('dec_estrade_' + m.arene); continue; }   // estrade à la couleur de l'arène
+      if (k === 'estrade') { const e = 'dec_estrade_' + (ESTRADES[m.arene] || m.arene); if (A[e]) { aPlat(e); continue; } }   // estrade à la couleur de l'arène
       // passerelle d'un passage nord–sud : planches tournées (pas d'eau qui la traverse)
       if (k === 'passerelle_bois') { const ns = !walkable(m.get(x - 1, y)) && !walkable(m.get(x + 1, y)); aPlat(ns ? 'dec_passerelle_bois_v' : 'dec_passerelle_bois'); continue; }
       const cle = k + (d.g != null ? '_' + d.g : d.dir ? '_' + d.dir : '');
@@ -1843,7 +1874,9 @@ export class WorldView {
       const graine = (b.x * 13 + b.y * 29 + b.w * 7 + (b.roof ? b.roof.charCodeAt(0) * 5 : 0)) >>> 0;
       const pick = pris.length ? pris[graine % pris.length] : null;
       if (pick) {
-        const [n, , porte] = pick, im = BP.images[n];
+        const [n0, , porte] = pick, teinte = n0 === 'arene' && TEINTES_ARENE[b.typeArene] != null ? b.typeArene : null;
+        // arènes de Voltacité, Floralia et Mirage : l'image du pack reteinte (toit et ornements à la couleur du type)
+        const n = teinte ? n0 + '_' + teinte : n0, im = teinte ? areneTeintee(BP.images[n0], teinte) : BP.images[n0];
         const t = T3('pack_' + n, () => im); t.flipY = true; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.needsUpdate = true;
         const W = im.width * WPX / 2, H = im.height * HPX / 2;
         const px = porte == null || doorRel == null ? null : porte / 32;

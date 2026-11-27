@@ -33,6 +33,16 @@ const STYLES = {
   lab: { fond: '#f2f4f6', motif: '#e2e6ea', motifK: 'carreaux', lam: '#b8c0c8', lamC: '#d8dee4', lamS: '#8a929a', cim: '#6a7480', pl: '#4a525c', cap: '#5a6470', capC: '#a8b0bc' },
   gym: { fond: '#c8ccd8', motif: '#b4b8c6', motifK: 'pierres', lam: '#8a8ea0', lamC: '#a8acbe', lamS: '#6a6e80', cim: '#e0e4f0', pl: '#4a4e60', cap: '#4a4e60', capC: '#9a9eb0' },
   league: { fond: '#6c5c9c', motif: '#7c6cac', motifK: 'losanges', lam: '#4c3c7c', lamC: '#6c5c9c', lamS: '#342860', cim: '#e8c860', pl: '#241a44', cap: '#3a2c66', capC: '#a090d8' },
+  // arènes 3 à 5 : Voltacité (acier et bande jaune), Floralia (treillis de serre), Mirage (marbre lilas, cimaise d'or)
+  gymElec: { fond: '#8a94a4', motif: '#7a8494', motifK: 'carreaux', bande: '#f0c838', bandeS: '#2a2a30', lam: '#4a5260', lamC: '#6a7484', lamS: '#323842', cim: '#f0c838', pl: '#1e2228', cap: '#2e343e', capC: '#f0c838' },
+  gymGrass: { fond: '#dcecd0', motif: '#a8cc94', motifK: 'treillis', lam: '#7a5a3a', lamC: '#9a7650', lamS: '#5a3e24', cim: '#5a9a4a', pl: '#3a2a1a', cap: '#3e6a32', capC: '#8ac470' },
+  gymPsy: { fond: '#d8cce8', motif: '#c4b4dc', motifK: 'losanges', lam: '#7a6aa8', lamC: '#9a8ac8', lamS: '#5a4a88', cim: '#e8c860', pl: '#3a2e5a', cap: '#4a3a72', capC: '#e8c860' },
+  // la Centrale de Voltacité : tôle grise, bande de danger jaune et noire, des écrans de contrôle au lieu des fenêtres
+  usine: { fond: '#9aa2ae', motif: '#8a929e', motifK: 'carreaux', bande: '#f0c838', bandeS: '#2a2a30', lam: '#5a6270', lamC: '#7a8490', lamS: '#3e444e', cim: '#c8ccd4', pl: '#22262c', cap: '#30363e', capC: '#8a94a2', fenK: 'ecran', ecran: ['#0e2a20', '#40e070'] },
+  // le repaire de la Team Éclipse : murs d'obsidienne, liserés violets, écrans pourpres
+  eclipse: { fond: '#2a2438', motif: '#342c46', motifK: 'pierres', bande: '#6a3aa8', bandeS: '#a070e0', lam: '#1e1a2a', lamC: '#3a2e52', lamS: '#120e1a', cim: '#8a5ad0', pl: '#0a0810', cap: '#181424', capC: '#7a4ac0', fenK: 'ecran', ecran: ['#1a0a2a', '#b07af0'] },
+  // la Tour Mirage : pierre dorée, frise de fresques antiques au lieu des fenêtres
+  antique: { fond: '#e6d6a8', motif: '#d6c290', motifK: 'pierres', lam: '#b08a4a', lamC: '#d0aa64', lamS: '#8a6a34', cim: '#7a4a9a', pl: '#5a3a1a', cap: '#6a4a2a', capC: '#e8c860', fenK: 'fresque' },
   cendre: { fond: '#5a4a44', motif: '#4a3c36', motifK: 'pierres', lam: '#3e322c', lamC: '#5a4a42', lamS: '#2a201c', cim: '#8a6a50', pl: '#1e1612', cap: '#2e2420', capC: '#6a5444' },
 };
 /** style des murs d'une carte d'intérieur (null : on garde l'ancien rendu) */
@@ -43,6 +53,8 @@ export function styleMur(m) {
   const w = m.wallStyle || 'wall_in';
   if (w === 'wall_in') { let h = 0; for (const ch of String(m.id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return 'in' + (h % 4); }
   if (w === 'wall_mart') return m.floor === 'lab' ? 'lab' : 'mart';
+  // arènes de Voltacité, Floralia et Mirage : leurs propres murs (les autres gardent la pierre grise)
+  if (w === 'wall_gym' && STYLES[m.floor]) return m.floor;
   const k = w.replace('wall_', '');
   return STYLES[k] ? k : null;
 }
@@ -54,6 +66,7 @@ function motif(T, S, y0, y1) {
     else if (S.motifK === 'losanges') on = (Math.abs((i % 16) - 8) + Math.abs((j % 16) - 8)) === 6;
     else if (S.motifK === 'pois') on = (i % 8 === 3 && j % 8 === 3) || (i % 8 === 7 && j % 8 === 7);
     else if (S.motifK === 'carreaux') on = i % 16 === 0 || j % 16 === 0;
+    else if (S.motifK === 'treillis') on = (i + j) % 8 === 0 || (i - j + 64) % 8 === 0;
     else if (S.motifK === 'pierres') on = j % 8 === 0 || (i + (Math.floor(j / 8) % 2 ? 8 : 0)) % 16 === 0;
     else if (S.motifK === 'fleurs') { const a = i % 16, b = (j + (Math.floor(i / 16) % 2 ? 8 : 0)) % 16; on = (Math.abs(a - 8) + Math.abs(b - 8) <= 1) || ((a === 8) && (b === 6 || b === 10)) || ((b === 8) && (a === 6 || a === 10)); }
     T.p(i, j, on ? S.motif : S.fond);
@@ -86,6 +99,22 @@ export function texturesMurs(putImg) {
     putImg('capv_' + k, toile((T) => chaperon(T, false)));
     // fenêtre (posée sur le haut du mur du fond), avec rideaux pour les maisons
     putImg('fen_' + k, toile((T) => {
+      // écran de contrôle (Centrale, repaire) : courbes lumineuses sur fond sombre
+      if (S.fenK === 'ecran') {
+        const [f, l] = S.ecran;
+        T.rect(4, 6, 24, 18, S.cap); T.rect(6, 8, 20, 14, f);
+        for (let i = 6; i < 26; i++) { T.p(i, Math.round(15 + Math.sin(i * 0.7) * 3), l); T.p(i, Math.round(19 + Math.cos(i * 0.45) * 1.5), l + '80'); }
+        for (let i = 7; i < 25; i += 4) T.p(i, 10, l + 'a0');
+        T.rect(4, 24, 24, 2, S.capC); return;
+      }
+      // fresque antique (Tour Mirage) : trois oiseaux et la mer, sur un fond ocre, dans un cadre d'or
+      if (S.fenK === 'fresque') {
+        T.rect(3, 5, 26, 21, S.capC); T.rect(4, 6, 24, 19, '#d8b878'); T.rect(4, 19, 24, 6, '#5a7ab0');
+        for (let i = 4; i < 28; i += 3) T.p(i, 19 + (i % 2), '#a8c8e8');
+        for (const [x, y, c] of [[9, 11, '#e8c040'], [16, 9, '#d84a3a'], [23, 11, '#7ac0e8']]) { T.p(x, y, c); T.p(x - 1, y - 1, c); T.p(x - 2, y - 1, c); T.p(x + 1, y - 1, c); T.p(x + 2, y - 1, c); T.p(x, y + 1, c); }
+        T.rect(14, 14, 4, 3, '#e8e8f0'); T.p(13, 15, '#e8e8f0'); T.p(18, 15, '#e8e8f0');
+        return;
+      }
       T.rect(5, 6, 22, 20, S.cap); T.rect(7, 8, 18, 16, '#a8d8f8'); T.rect(7, 8, 18, 6, '#c8e8ff');
       T.rect(15, 8, 2, 16, S.cap); T.rect(7, 15, 18, 2, S.cap);
       T.rect(9, 9, 3, 1, '#ffffff'); T.rect(19, 18, 3, 1, '#ffffff');

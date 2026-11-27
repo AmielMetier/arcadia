@@ -55,6 +55,38 @@ export function houseInterior(id, name, o = {}) {
   if (w > 9) { furn(m, 'sofa', 7, 5); m.set(8, 5, T.BLOCK); furn(m, 'boxes', 1, 6); }
   return m;
 }
+/**
+ * La Centrale de Voltacité (11 × 9) : la salle des générateurs. Sol de tôle, murs d'usine, consoles et générateurs au
+ * fond, turbines (cuves) le long des murs. Les cases que story.js occupe restent libres : l'ingénieur (2, 6), les deux
+ * sbires (4, 6) et (8, 5), la pierre (9, 6), et Érèbe en (7, 3) avec toute sa ligne de vue vers le sud (7, 4 → 7, 7).
+ */
+export function centraleInterior(id, name = 'Centrale de Voltacité') {
+  const m = room(id, 11, 9, { floor: 'base', music: 'hideout', wall: 'wall_usine', name });
+  for (const x of [1, 2, 3]) furn(m, 'console', x, 2);
+  furn(m, 'ecran_carte', 4, 2);
+  for (const x of [6, 7, 8]) furn(m, 'machine', x, 2);   // les trois générateurs derrière Érèbe
+  furn(m, 'console', 9, 2);
+  for (const [x, y] of [[1, 4], [1, 5], [9, 3], [9, 4]]) furn(m, 'cuve', x, y);   // turbines
+  furn(m, 'machine', 3, 4); furn(m, 'borne', 1, 7); furn(m, 'borne', 9, 7);
+  // câbles et bande de sécurité au sol : de la porte aux générateurs
+  for (let y = 3; y <= 7; y++) m.deco.push({ k: 'cable_sol', x: 6, y });
+  for (let x = 4; x <= 8; x++) m.deco.push({ k: 'bande_danger', x, y: 3 });
+  return m;
+}
+/**
+ * La Tour Mirage (11 × 9) : un sanctuaire à fresques. Dallage de marbre, murs de pierre dorée dont les fresques
+ * racontent les légendes (le vieil homme en parle), piliers, stèle et gardiens de pierre au fond, tapis pourpre jusqu'à
+ * la stèle. La médium (5, 4) et le vieil homme (8, 5) de region.js restent à leur place.
+ */
+export function tourMirageInterior(id, name = 'Tour Mirage') {
+  const m = room(id, 11, 9, { floor: 'musee', music: 'tower', wall: 'wall_antique', name, battleBg: 'indoor' });
+  furn(m, 'stele', 5, 2); furn(m, 'statue_dragon', 3, 2); furn(m, 'statue_dragon', 7, 2);
+  furn(m, 'brasero', 1, 2); furn(m, 'brasero', 9, 2);
+  for (const [x, y] of [[2, 4], [8, 3], [2, 6], [8, 7]]) furn(m, 'colonne', x, y);
+  furn(m, 'vase', 1, 7); furn(m, 'vase', 9, 5);
+  for (let y = 3; y <= 7; y++) m.deco.push({ k: 'carpet', x: 5, y });
+  return m;
+}
 export function labInterior(id) {
   const m = room(id, 13, 12, { floor: 'lab', music: 'lab', wall: 'wall_mart', name: 'Labo du Prof. Saule' });
   for (const x of [1, 2, 3, 9, 10, 11]) furn(m, 'books', x, 2);

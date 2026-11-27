@@ -63,6 +63,52 @@ const ease = (t) => t * t * (3 - 2 * t);
 const BOOST_NAMES = ['Atq', 'Déf', 'Atq Spé', 'Déf Spé', 'Vit', 'Préc', 'Esq'];
 const freshSpr = () => ({ visible: false, img: null, scale: 1, alpha: 1, dx: 0, dy: 0, sx: 1, sy: 1, rot: 0, white: 0, whiteImg: null, darkImg: null, clipY: null });
 
+/**
+ * Fond de combat reteint (sans nouvelle image) : arènes de Voltacité (éclairs jaunes), Floralia (lumière verte de serre,
+ * feuillages) et Mirage (lueur violette, étoiles), et la Nuit Violette dehors (assombri, ciel pourpre). Une toile par
+ * image et par teinte, gardée en cache.
+ */
+const FONDS_TEINTES = new Map();
+function fondTeinte(im, teinte) {
+  const cle = im.src + '|' + teinte;
+  if (FONDS_TEINTES.has(cle)) return FONDS_TEINTES.get(cle);
+  const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+  const x = c.getContext('2d'), W = c.width, H = c.height;
+  x.drawImage(im, 0, 0);
+  const voile = (mode, col, a) => { x.globalCompositeOperation = mode; x.globalAlpha = a; x.fillStyle = col; x.fillRect(0, 0, W, H); };
+  if (teinte === 'eclipse') {
+    voile('multiply', '#4a3070', 0.55);
+    x.globalCompositeOperation = 'screen'; x.globalAlpha = 0.5;
+    const g = x.createLinearGradient(0, 0, 0, H * 0.55); g.addColorStop(0, '#6a2aa8'); g.addColorStop(1, 'rgba(106,42,168,0)');
+    x.fillStyle = g; x.fillRect(0, 0, W, H * 0.55);
+    // l'éclipse : un disque noir cerclé d'une couronne violette, haut dans le ciel
+    x.globalCompositeOperation = 'source-over'; x.globalAlpha = 0.9;
+    x.fillStyle = '#c8a0ff'; x.beginPath(); x.arc(W * 0.78, H * 0.16, H * 0.075, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#120a1e'; x.beginPath(); x.arc(W * 0.78, H * 0.16, H * 0.066, 0, Math.PI * 2); x.fill();
+  } else {
+    const col = { electric: '#f0c838', grass: '#4aa850', psychic: '#9a6ae0' }[teinte] || '#ffffff';
+    voile('soft-light', col, 0.55);
+    voile('source-over', col, 0.1);
+    x.globalCompositeOperation = 'source-over'; x.globalAlpha = 0.5;
+    if (teinte === 'electric') {
+      // éclairs pâles en haut du décor
+      x.strokeStyle = '#fff4a0'; x.lineWidth = Math.max(1, W / 200);
+      for (const [px, s] of [[0.14, 1], [0.52, -1], [0.86, 1]]) { x.beginPath(); let y = 0; x.moveTo(W * px, 0); for (let k = 0; k < 4; k++) { y += H * 0.05; x.lineTo(W * px + s * (k % 2 ? -1 : 1) * W * 0.02, y); } x.stroke(); }
+    } else if (teinte === 'grass') {
+      // feuillages de serre qui retombent des coins
+      x.fillStyle = '#2e7a32';
+      for (let k = 0; k < 14; k++) { const L = k < 7, px = L ? W * (0.02 + k * 0.03) : W * (0.98 - (k - 7) * 0.03), py = H * (0.02 + (k % 7) * 0.025); x.beginPath(); x.ellipse(px, py, W * 0.03, H * 0.018, L ? 0.5 : -0.5, 0, Math.PI * 2); x.fill(); }
+    } else if (teinte === 'psychic') {
+      // petites étoiles qui flottent
+      x.fillStyle = '#fff0ff';
+      for (let k = 0; k < 18; k++) { const px = ((k * 0.618) % 1) * W, py = ((k * 0.377) % 1) * H * 0.45, r = Math.max(1, W / 320); x.fillRect(px - r, py, 3 * r, r); x.fillRect(px, py - r, r, 3 * r); }
+    }
+  }
+  x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1;
+  FONDS_TEINTES.set(cle, c);
+  return c;
+}
+
 export class BattleView {
   constructor(game) { this.game = game; this.ui = game.ui; this.sound = game.sound; }
 
@@ -142,7 +188,7 @@ export class BattleView {
     // éclats qui tournent autour
     for (let k = 0; k < 4; k++) { const a = t * 0.5 + k * 1.57, px = Math.round(cx + Math.cos(a) * rx * 1.12), py = Math.round(cy + ry * 0.7 + Math.sin(a) * ry * 0.9 + Math.sin(t * 1.4 + k) * 2); x.fillStyle = '#4a3070'; x.fillRect(px - 2, py - 2, 4, 4); x.fillStyle = core; x.fillRect(px - 1, py - 2, 2, 1); }
   }
-  async loadBattleDecor(kind, night) {
+  async loadBattleDecor(kind, night, teinte = null) {
     const bgMap = {
       cave: 'bg_cave', gym: 'bg_gym', gym_rock: 'bg_gym_rock', league: 'bg_league', indoor: 'bg_indoor',
       city: 'bg_city', village: 'bg_village', water: night ? 'bg_water_night' : 'bg_water',
@@ -159,7 +205,7 @@ export class BattleView {
       nu ? Promise.resolve(null) : loadImg(`img/battle/plat_${platKey}_p.png`),
       ...ballPromises,
     ]);
-    this.bgImg = bgImg; this.platE = platE; this.platP = platP;
+    this.bgImg = bgImg && teinte ? fondTeinte(bgImg, teinte) : bgImg; this.platE = platE; this.platP = platP;
     this.ballImgs = Object.fromEntries(ballEntries);
   }
 
@@ -658,7 +704,7 @@ export class BattleView {
 
   /* ---------------- lancement ---------------- */
   async run(battle, o = {}) {
-    this.battle = battle; this.slots = battle.slots || 1; this.kind = o.bg || 'grass'; this.alive = true; this.fond = o.fond || null;
+    this.battle = battle; this.slots = battle.slots || 1; this.kind = o.bg || 'grass'; this.alive = true; this.fond = o.fond || null; this.teinte = o.teinte || null;
     this.lastMove = 0; this.lastMoveMon = null;
     this.seenInBattle = new Set();
     this.W = Math.max(256, Math.min(420, Math.round(BH * innerWidth / innerHeight)));
@@ -670,7 +716,7 @@ export class BattleView {
     this.updateWeather(battle.weather);
     this.updateAnomaly();
     for (let sl = 0; sl < this.slots; sl++) { this.setHud(1, null, 0, sl); this.setHud(0, null, 0, sl); }
-    const jobs = [this.loadBattleDecor(this.kind, o.night)];
+    const jobs = [this.loadBattleDecor(this.kind, o.night, this.teinte)];
     for (let sl = 0; sl < this.slots; sl++) { jobs.push(this.loadSide(1, sl), this.loadSide(0, sl)); }
     await Promise.all(jobs);
     if (battle.sides[1].trainer) this.st.trainer.img = await loadImg(ASSETS.trainer(battle.sides[1].trainer.bs));

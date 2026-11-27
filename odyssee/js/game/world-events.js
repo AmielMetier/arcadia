@@ -16,7 +16,7 @@ export const GYM_HINTS = {
   water: 'l\'Électrik et la Plante',
   electric: 'le Sol',
   grass: 'le Feu, la Glace, le Vol, le Poison et l\'Insecte',
-  psychic: 'l\'Insecte et les Ténèbres',
+  psychic: 'l\'Insecte, le Spectre et les Ténèbres',
   fire: 'l\'Eau, la Roche et le Sol',
   dragon: 'la Glace, le Dragon et la Fée',
   normal: 'le Combat',

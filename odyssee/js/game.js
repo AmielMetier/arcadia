@@ -34,7 +34,7 @@ import { Donjons } from './donjons/jeu.js';
 import { storyTalk, storyWin, lugiaBattle, placeLugia, overlay } from './story.js';
 import { battleMusicForLegend } from './audio.js';
 import { playBossCinematic, isLegendarySpecies } from './ui/cinematic.js';
-import { syncJournal } from './core/questsData.js';
+import { syncJournal, nomQuete } from './core/questsData.js';
 import { preparerArene, surCaseArene, actionnerArene, remettreArene, pasArene, rocherDansFosse } from './arenes-jeu.js';
 import { casinoScreen, bourseScreen, entretienPierre } from './ui/metropole.js';
 import { arcadeScreen } from './ui/arcade.js';
@@ -500,7 +500,9 @@ export class Game {
     this.view.ombreCible = (m.outdoor && z?.ombre) || 1;   // sous-bois : l'image s'assombrit doucement
     if (!this.musicLock) {
       const celMusic = m.id === 'monde' && m.outdoor && this.celestial?.activeKind !== 'none' ? this.celestial.activeKind : null;
-      const track = (m.id === 'volta:tower17' && this.state.flags['T:ecl:erebe2']) ? 'city' : ((z && z.music) || m.music);
+      // la Centrale libérée reprend l'air de Voltacité ; pendant la Nuit Violette, les routes deviennent inquiètes
+      const nuitViolette = m.outdoor && z?.route && !z.town && this.eclipseOn();
+      const track = (m.id === 'volta:tower17' && this.state.flags['T:ecl:erebe2']) ? 'cityVolt' : nuitViolette ? 'routeNuit' : ((z && z.music) || m.music);
       this.sound.play(celMusic || (p.surf && m.outdoor ? 'route2' : track));
     }
     this.zone = z;
@@ -1162,7 +1164,9 @@ export class Game {
         else if (revancheBossPossible(this, n)) await revancheBoss(this, n);
         else if (revanchePossible(this, n)) await revanche(this, n);
         else {
-          await this.ui.say(d.trainer.after || 'Quel combat !', {
+          // (une réplique peut dépendre de la partie : (st) => texte)
+          const apres = typeof d.trainer.after === 'function' ? d.trainer.after(st) : d.trainer.after;
+          await this.ui.say(apres || 'Quel combat !', {
             speaker: nomDresseur(d.trainer),
             face: d.trainer.bs || d.trainer.ow || n.sprite
           });
@@ -1358,11 +1362,13 @@ export class Game {
     const F = FIELD[k], st = this.state;
     if (!this.hasField(k)) { await this.ui.say(look); return; }
     if (!this.canField(k)) { await this.ui.say([look, `Il faut le ${BADGES[F.badge - 1].name} pour utiliser ${F.name} hors combat.`]); return; }
-    if (!(await this.ui.yesNo(`${look}\nUtiliser ${F.name} ?`))) return;
+    // Coupe : avec la CS, c'est un Pokémon qui coupe ; avec le seul Sécateur Sylvestre, c'est le joueur, et la question le dit
+    const outil = k === 'coupe' && !st.bag['cs-coupe'] && F.item && st.bag[F.item] ? 'le ' + F.itemName : null;
+    if (!(await this.ui.yesNo(`${look}\nUtiliser ${outil || F.name} ?`))) return;
     const mon = this.fieldUser();
-    this.sound.cry(ASSETS.cry(mon.sp));
+    if (!outil) this.sound.cry(ASSETS.cry(mon.sp));
     if (k === 'coupe') {
-      await this.ui.say(`${st.name} utilise le Sécateur Sylvestre pour trancher le buisson !`, { auto: 600 });
+      await this.ui.say(outil ? `${st.name} utilise ${outil} et coupe le petit arbre !` : `${monName(mon)} utilise Coupe et tranche le petit arbre !`, { auto: 600 });
       await this.animateCut(x, y);
     } else {
       await this.ui.say(`${monName(mon)} utilise ${F.name} !`, { auto: 500 });
@@ -1378,6 +1384,8 @@ export class Game {
   /** Force : une fois activée sur la carte, on pousse les rochers en marchant contre eux */
   async useForce() {
     const look = 'C\'est un gros rocher. Un Pokémon très costaud pourrait le pousser.';
+    // dans les arènes, les rochers se poussent sans Force : on le dit au lieu de proposer la CS
+    if (this.mapObj?.pushFree) { await this.ui.say('Ce rocher n\'est pas si lourd : marche contre lui pour le pousser.'); return; }
     if (!this.hasField('force')) { await this.ui.say(look); return; }
     if (!this.canField('force')) { await this.ui.say([look, `Il faut le ${BADGES[FIELD.force.badge - 1].name} pour utiliser Force hors combat.`]); return; }
     if (this.strengthOn === this.mapObj.id) { await this.ui.say('Force est active : marche contre le rocher pour le pousser.'); return; }
@@ -2082,6 +2090,8 @@ export class Game {
     const m = this.mapObj, z = this.zone;
     if (!m) return 'none';
     if (m.weather) return m.weather;
+    // le Sanctuaire des Marées : de rares cendres violettes flottent autour de l'autel (du décor, sans effet en combat)
+    if (m.id === 'sanctuaire') return 'cendresViolettes';
     // sous un toit ou sous terre, il ne pleut pas : les maisons de Cendrelune (« cendre:… ») recevaient des cendres,
     // celles de Marais-Noir de la pluie, parce que le nom de la ville est dans celui de la carte
     if (!m.outdoor) return 'none';
@@ -2091,6 +2101,8 @@ export class Game {
     if (z?.theme === 'volcanic' || m.id?.includes('cendre')) return this.weatherSlot('volcan') % 2 ? 'ash' : 'sandstorm';
     if (m.id?.includes('desert')) return 'sandstorm';
     if (z?.town === 'azur' || z?.name?.includes('Pluie') || m.id?.includes('marais')) return 'rain';
+    // la Nuit Violette (l'Éclipse) : des cendres violettes tombent sur toute la région
+    if (m.outdoor && this.eclipseOn()) return 'cendresViolettes';
     if (m.outdoor) {
       const h = this.hour();
       if ((z?.surfEnc || m.surfEnc) && (Math.sin(h * 0.7) > 0.65)) return 'rain';
@@ -2162,7 +2174,9 @@ export class Game {
     if (o.trainer && !o.trainer.friendly && !o.noWhiteout) { st.combatEnCours = true; this.save(true); }
     const foeMons = wildParty || o.party;
     const h = this.hour();
-    const result = await this.bv.run(battle, { bg: o.fond ? 'faille' : bg, fond: o.fond || null, night: !o.fond && m.outdoor && (h >= 20 || h < 5.5), weather: BATTLE_WEATHERS.includes(weather) ? weather : 'none', curtain });
+    // fond teinté : arènes de Voltacité, Floralia et Mirage à leurs couleurs, et dehors pendant la Nuit Violette
+    const teinte = o.fond ? null : !m.outdoor && m.battleBg === 'gym' && ['electric', 'grass', 'psychic'].includes(m.arene) ? m.arene : m.outdoor && this.eclipseOn() ? 'eclipse' : null;
+    const result = await this.bv.run(battle, { bg: o.fond ? 'faille' : bg, teinte, fond: o.fond || null, night: !o.fond && m.outdoor && (h >= 20 || h < 5.5), weather: BATTLE_WEATHERS.includes(weather) ? weather : 'none', curtain });
     // argent
     if (result === 'win' && battle.prizeMoney) st.money += battle.prizeMoney;
     this.dernierCombat = battle.participants;   // ceux qui ont combattu (souvenir d'Arène)
@@ -2354,7 +2368,8 @@ export class Game {
       /** passe la quête à l'étape n (et l'annonce dans le journal) */
       set: async (id, n, quiet) => {
         const was = g.qstep(id); st().flags['Q:' + id] = n;
-        const Q = (g.world.quests || {})[id];
+        // (le vélo et le permis bateau ne sont pas dans world.quests : leur nom vient du journal)
+        const Q = (g.world.quests || {})[id] || (nomQuete(id, g) ? { name: nomQuete(id, g) } : null);
         if (!quiet && Q && was !== n) {
           g.sound.sfx(n === 'fin' ? 'badge' : 'item');
           await ui().say(n === 'fin' ? `Quête terminée : ${Q.name} !` : was ? `Journal des quêtes : « ${Q.name} » mis à jour.` : `Nouvelle quête : ${Q.name} !`, { auto: 1400 });
@@ -2396,7 +2411,7 @@ export class Game {
         const res = await g.runBattle({ trainer: { ...t, items }, party, music: fightMusic, rival: isRival, noWhiteout: t.noWhiteout, format: t.format, slots: t.slots });
         g.musicLock = false; g.updateZone();
         if (res === 'win' && (isBrumeBoss || t.boss)) g.noterBoss(t.name);
-        if (res === 'win' && t.after) await ui().say(t.after, { speaker: nomDresseur(t), face: t.bs || t.ow });
+        if (res === 'win' && t.after) await ui().say(typeof t.after === 'function' ? t.after(st()) : t.after, { speaker: nomDresseur(t), face: t.bs || t.ow });
         return res;
       },
       /** rencontre d'un Pokémon (sauvage ou légendaire) */

@@ -128,7 +128,7 @@ export function addStory(ctx) {
     // le pêcheur : montre-moi un Magicarpe
     const pe = W.npcs.find((n) => n.id === 'azur:pecheur');
     Object.assign(pe, { script: 'show', move: 'turn', text: null, show: {
-      flag: 'qMagicarpe', who: 'Pêcheur', test: (m) => m.sp === 129, reward: [['rare-candy', 2]],
+      flag: 'qMagicarpe', who: 'Pêcheur Barnabé', test: (m) => m.sp === 129, reward: [['rare-candy', 2]],
       ask: ['Les Racaillou se cachent parmi les galets, méfie-toi en marchant sur la plage.', 'Dis, tu me montrerais un Magicarpe ? Juste pour le voir. Il en mord à la Canne à Pêche, juste au bout du ponton !'],
       thanks: ['Ooooh ! Un Magicarpe ! Ses écailles brillent, c\'est un beau spécimen.', 'Tiens, pour ta peine.'], done: ['Un jour, ton Magicarpe deviendra un Léviator. Patience !'] } });
     // îlot caché au bout du port, accessible avec Surf
@@ -158,27 +158,39 @@ export function addStory(ctx) {
     // l'Arène est fermée tant que la Centrale est occupée (les 2 cases de la double porte)
     const [dx, dy] = E.gymDoor;
     const [gx, gy] = free(W, dx + 1, dy + 1, false);
-    const n = W.npc({ id: 'volta:arene-fermee', x: gx, y: gy, sprite: 'vendeur', dir: 'left', text: ['L\'Arène est fermée ! La Team Éclipse a envahi la Centrale, et Volta refuse de combattre tant qu\'elle est occupée.', 'La Centrale, c\'est la grande tour dorée au nord.'] });
+    const n = W.npc({ id: 'volta:arene-fermee', x: gx, y: gy, sprite: 'vendeur', dir: 'left', text: ['L\'Arène est fermée ! La Team Éclipse a envahi la Centrale, et Volta refuse de combattre tant qu\'elle est occupée.', 'La Centrale, c\'est le grand bâtiment aux deux cheminées, au nord.'] });
     n.gate = { open: (f) => !!f['T:ecl:erebe2'], badges: 2, tiles: [[dx, dy + 1], [dx + 1, dy + 1]] };
     W.gates.push({ npc: n.id, ...n.gate });
   }
 
   /* ======================== Acte 5 · le repaire (route 6) ======================== */
   {
-    const door = cavePortal(W, R.r6, 0.5);
-    const rep = room('repaire', 23, 16, { floor: 'lab', music: 'hideout', wall: 'wall_mart', name: 'Repaire Éclipse', exitX: 11 });
-    // rangées de machines qui forment un petit labyrinthe
-    const wall = (y, gap, width = 2) => { for (let x = 1; x < 22; x++) if (x < gap || x >= gap + width) rep.prop((x + y) % 4 === 0 ? 'pc' : 'labmachine', x, y); };
+    // l'entrée : la façade de la base (img/facades/base.png) à la lisière de la route 6, et un panneau qui la signale
+    const door = cavePortal(W, R.r6, 0.5, { kind: 'tower', o: { w: 5, d: 3, h: 2, door: 2, kit: 'base', flat: true, roof: 'purple', name: 'Repaire Éclipse' } });
+    // (le panneau prend la place d'un arbre à côté du sentier : aucun passage n'est bouché)
+    { const [sx, sy] = [[door.x + 1, door.y + 1], [door.x - 1, door.y + 1], [door.x + 1, door.y + 2], [door.x - 1, door.y + 2]].find(([x, y]) => W.get(x, y) === T.TREE || W.get(x, y) === T.PINE) || []; if (sx != null) { W.set(sx, sy, T.GRASS); W.sign(sx, sy, 'ENTREPÔT PRIVÉ — ACCÈS INTERDIT\nUn croissant noir est peint sous l\'inscription.'); } }
+    // la rangée devant la façade : plus d'arbres qui la cachent (de l'herbe, bordée par la forêt)
+    for (let dx = -2; dx <= 2; dx++) { const t = W.get(door.x + dx, door.y + 1); if (t === T.TREE || t === T.PINE) W.set(door.x + dx, door.y + 1, T.GRASS); }
+    // l'intérieur : une base secrète (sol d'obsidienne, murs sombres liserés de violet) ; les rangées de cloisons gardent
+    // les couloirs et les passages d'avant (y = 12 : x 5-6 ; y = 8 : x 16-17 ; y = 4 : x 11), donc les mêmes vues pour les sbires
+    const rep = room('repaire', 23, 16, { floor: 'eclipse', music: 'hideout', wall: 'wall_eclipse', name: 'Repaire Éclipse', exitX: 11 });
+    rep.cloisons = true;
+    const wall = (y, gap, width = 2) => { for (let x = 1; x < 22; x++) if (x < gap || x >= gap + width) rep.set(x, y, T.WALL); };
     wall(12, 5); wall(8, 16); wall(4, 11, 1);
-    rep.prop('pc', 9, 2); rep.prop('pc', 13, 2); rep.prop('labmachine', 8, 2); rep.prop('labmachine', 14, 2);
+    // au fond : consoles, bannières, et le socle du Prisme Noir derrière le Chef
+    for (const [k, x] of [['console_eclipse', 8], ['banniere_eclipse', 9], ['prisme_noir', 11], ['banniere_eclipse', 13], ['console_eclipse', 14], ['console_eclipse', 1], ['console_eclipse', 21]]) rep.prop(k, x, 2);
+    // piliers dans les angles des salles (hors des couloirs et des vues des sbires)
+    for (const [x, y] of [[1, 14], [21, 14], [1, 9], [21, 9], [21, 5], [1, 3]]) rep.prop('pilier_eclipse', x, y);
+    rep.prop('console_eclipse', 3, 9); rep.prop('console_eclipse', 19, 13);
     rep.outside = { map: 'monde', x: door.x, y: door.y + 1, dir: 'down' };
     rep.warp(rep.exitX, rep.exitY, rep.outside);
     W.warp(door.x, door.y, { map: 'repaire', x: rep.exitX, y: rep.exitY, dir: 'up' });
-    grunt(rep, 8, 13, 'left', 'ecl:rep1', GRUNT.h, { exact: 1, sight: 4, vanish: false, after: 'Le Chef est tout là-haut... mais tu n\'arriveras jamais jusqu\'à lui.' });
-    grunt(rep, 12, 10, 'down', 'ecl:rep2', GRUNT.i, { exact: 1, f: 1, sight: 1, vanish: false, after: 'Le Prisme Noir... j\'en ai froid dans le dos.' });
-    grunt(rep, 14, 9, 'left', 'ecl:rep3', GRUNT.j, { exact: 1, sight: 3, vanish: false });
-    grunt(rep, 14, 6, 'left', 'ecl:rep4', GRUNT.k, { exact: 1, sight: 4, vanish: false });
-    grunt(rep, 8, 6, 'right', 'ecl:rep5', GRUNT.l, { exact: 1, f: 1, sight: 3, vanish: false });
+    grunt(rep, 8, 13, 'left', 'ecl:rep1', GRUNT.h, { exact: 1, sight: 4, vanish: false, intro: 'Hé ! On n\'entre pas dans le repaire sans le mot de passe. Et je parie que tu ne l\'as pas !', lose: 'Le mot de passe, c\'était « Nuit éternelle »... Zut, je l\'ai dit !',
+      after: (st) => (st.flags.eclipse ? 'Le Chef est parti pour le Sanctuaire des Marées... Il ne reste plus grand monde ici.' : 'Le Chef est tout là-haut... mais tu n\'arriveras jamais jusqu\'à lui.') });
+    grunt(rep, 12, 10, 'down', 'ecl:rep2', GRUNT.i, { exact: 1, f: 1, sight: 1, vanish: false, intro: 'Tu entends ce bourdonnement ? C\'est le Prisme Noir qui se charge. N\'approche pas !', lose: 'Mon équipe... vidée comme une batterie.', after: 'Le Prisme Noir... j\'en ai froid dans le dos.' });
+    grunt(rep, 14, 9, 'left', 'ecl:rep3', GRUNT.j, { exact: 1, sight: 3, vanish: false, intro: 'Ces couloirs, c\'est un vrai labyrinthe. Toi, tu t\'arrêtes ici !', lose: 'Mes attaques partent dans tous les sens...', after: 'Les cloisons changent de place la nuit, je te jure !' });
+    grunt(rep, 14, 6, 'left', 'ecl:rep4', GRUNT.k, { exact: 1, sight: 4, vanish: false, intro: 'Tu crois qu\'on a volé l\'électricité de Voltacité pour rien ? Recule !', lose: 'Grr... Érèbe va me passer un savon.', after: 'La Centrale, c\'était mon idée. Et personne ne m\'a dit merci.' });
+    grunt(rep, 8, 6, 'right', 'ecl:rep5', GRUNT.l, { exact: 1, f: 1, sight: 3, vanish: false, intro: 'La nuit éternelle, c\'est pour bientôt. Tu préfères l\'attendre K.O. ?', lose: 'Bon, d\'accord. Tu es coriace.', after: 'Quand le soleil ne se lèvera plus, on verra bien qui rira.' });
     admin(rep, 19, 10, 'left', 'ecl:nyx2', 'nyx', GRUNT.nyx2, { sight: 4,
       intro: 'Toi, ici ?! Tu es vraiment collant. Le Chef est en train d\'achever le Prisme Noir. Je ne te laisserai pas le déranger !', lose: 'Non, non, NON ! ... Bon, vas-y. De toute façon, il est trop tard.' });
     const boss = trainerNpc(rep, 11, 3, 'down', 'Chef Éclipse', 'Nocturne', GRUNT.boss1, { id: 'ecl:boss1', sight: 2, ow: 'nocturne', bs: 'nocturne', prize: 120, ai: 'smart', items: { 'hyper-potion': 2 },
@@ -225,9 +237,12 @@ export function addStory(ctx) {
     s.warp(12, 32, s.outside);
     W.warp(b.doorX, b.doorY, { map: 'sanctuaire', x: 12, y: 31, dir: 'up', need: 'plume-argent' });
     s.encounter = SANCT;
-    s.zone(11, 26, 13, 27, { name: s.name, music: 'sanctuary', trigger: 'lumenSanct' });
+    // le Dr Lumen attend en (13, 29) : la zone qui le fait parler est à sa hauteur, juste après l'entrée
+    s.zone(11, 29, 13, 30, { name: s.name, music: 'sanctuary', trigger: 'lumenSanct' });
     // Lugia Obscur repose sur l'autel
     s.under.set(key(12, 4), T.CAVE); s.set(12, 4, T.BLOCK); s.object(12, 4, { type: 'lugia' });
+    // dalles gravées de runes en cercle autour de l'autel (des décalques : on marche dessus)
+    for (const [x, y, g] of [[10, 3, 1], [14, 3, 2], [10, 5, 3], [14, 5, 4], [11, 7, 2], [13, 7, 1], [12, 6, 3]]) s.deco.push({ k: 'rune', x, y, g });
     s.npc({ id: 'lumen-sanct', x: 13, y: 29, sprite: 'lumen', dir: 'left', script: 'lumenSanct' });
     grunt(s, 8, 24, 'right', 'ecl:sanct1', GRUNT.m, { exact: 1, sight: 4, intro: 'Le rituel a commencé ! Tu ne passeras pas !' });
     grunt(s, 16, 20, 'left', 'ecl:sanct2', GRUNT.n, { exact: 1, f: 1, sight: 4, intro: 'Tu entends ? C\'est Lugia qui gronde sous nos pieds...' });
@@ -331,6 +346,8 @@ export function addStory(ctx) {
       [F, 14, 14, 'Mes fleurs se referment toutes... Elles croient que c\'est la nuit. Elles ont raison, d\'ailleurs.', 'jardinier'],
       [E, 5, 13, 'Même les néons de Voltacité n\'arrivent plus à percer ce ciel violet...', 'habitant'],
       [I, 25, 11, 'Les dragons de Cimelune s\'agitent. Ils sentent la présence d\'un Pokémon immense, quelque part au sud du Cap Mirage.', 'enfant'],
+      // (ajoutée en dernier : les autres gardent leur identifiant, eclipse0 à eclipse4)
+      [G, 22, 18, 'Les cristaux de la Tour Mirage brillent en plein jour... Depuis que le ciel est violet, plus personne ici ne fait de beaux rêves.', 'habitante'],
     ];
     worry.forEach(([t, lx, ly, line, sprite], i) => tn(t, lx, ly, { id: 'eclipse' + i, sprite, dir: 'down', move: 'turn', showIf: 'eclipse', hideIf: 'lugia', text: [line] }));
     // la voyante de Mirage connaît la légende et garde la Plume Argentée
@@ -358,7 +375,7 @@ function nearestCave(m, x, y) {
 }
 
 /** entrée de grotte creusée dans les arbres au bord d'une route, reliée au sentier par un chemin */
-function cavePortal(W, pts, t0) {
+function cavePortal(W, pts, t0, bat = { kind: 'cave', o: {} }) {
   for (let tries = 0; tries < 30; tries++) {
     const t = t0 + (tries % 2 ? 1 : -1) * Math.ceil(tries / 2) * 0.02;
     const p = along(pts, t);
@@ -371,7 +388,7 @@ function cavePortal(W, pts, t0) {
     let ok = true;
     for (let j = -1; j < 3 && ok; j++) for (let i = -1; i < 6; i++) { const tt = W.get(bx + i, by + j); if (tt !== T.TREE && tt !== T.PINE) { ok = false; break; } }
     if (!ok || W.zones.some((z) => z.town && x >= z.x0 - 3 && x <= z.x1 + 3 && y >= z.y0 - 3 && y <= z.y1 + 3)) continue;
-    const b = W.building('cave', bx, by);
+    const b = W.building(bat.kind, bx, by, bat.o);
     for (let yy = b.doorY + 1; yy < b.doorY + 14; yy++) { if (walkable(W.get(b.doorX, yy))) break; W.set(b.doorX, yy, T.PATH); }
     return { x: b.doorX, y: b.doorY };
   }
