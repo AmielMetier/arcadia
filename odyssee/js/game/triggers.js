@@ -93,7 +93,7 @@ export async function trigger(g, name) {
   // second rival : l'autre enfant, petit-fils / petite-fille du professeur, recrue des Gardes d'Écaille
   const B = g.rivalB(), L3 = g.thirdLine(), bd = (k) => st.badges[k];
   const asB = { name: B.name, sprite: B.sprite, bs: B.bs, cls: 'Garde d\'Écaille' };
-  if (name === 'rivalB1' && bd(3)) return rivalFight(g, 'rivalB1', () => [[1043, 33], [1015, 33], [L3[1], 36]], 'Pas mal... pour quelqu\'un du continent.',
+  if (name === 'rivalB1' && bd(3)) return rivalFight(g, 'rivalB1', () => [[1044, 33], [1016, 33], [L3[1], 36]], 'Pas mal... pour quelqu\'un du continent.',
     [`Alors c'est toi, ${st.name}. Le prodige de Bourg-Aube.`, `Moi, c'est ${B.name}. J'ai pris la dernière Poké Ball de mon grand-père, le lendemain de ton départ.`, 'J\'ai grandi sur les îles. Là-bas, la Ligue ne vient jamais. Personne ne nous aide... sauf Drakos.', 'Je suis Garde d\'Écaille, maintenant. Et je viens voir de quoi tu es capable avant que tu ne mettes les pieds chez nous.'],
     ['Tu viendras sur les îles, je le sais. Drakos t\'attend.', 'Et moi aussi.'], { ...asB, cls: 'Rival' });
   if (name === 'rivalB2' && bd(5)) return rivalFight(g, 'rivalB2', () => [[1044, 42], [1015, 41], [1039, 41], [L3[2], 45]], 'Basalte avait raison... tu ne lâches rien.',

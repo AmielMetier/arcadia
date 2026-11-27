@@ -143,7 +143,8 @@ export async function actionnerArene(g, o) {
   }
   g.sound.sfx(o.son || 'select'); g.view.shake = 0.05;
   changerRegs(g, R2);
-  if (o.msg) await g.ui.say(o.msg);
+  const txt = typeof o.msg === 'function' ? o.msg(R2) : o.msg;
+  if (txt) await g.ui.say(txt);
 }
 
 /** tout remettre comme au début : registres, rochers et fosses, dalles fendues ; à l'entrée si a l'entree */

@@ -18,7 +18,7 @@ import { R } from '../data/remplacants.js';
 import { buildQuests } from './quetes.js';
 import { addStory } from './story.js';
 import { enrichirTout, equipeDeType, poserTroncons, restaurerTables } from './rencontres.js';
-import { addHabitants } from './habitants.js';
+import { addHabitants, indexMissionTrainers } from './habitants.js';
 import { applyRetouches } from './retouches.js';
 import { poserDonjons } from '../donjons/index.js';
 import { redresserPonts } from './ponts.js';
@@ -165,8 +165,8 @@ export const LEADERS = [
     [1020, 14, null, [42, 210, 98, 230], 'sacoches-pollen'],
   ], intro: ['Bienvenue dans ma Ruche. Ici, chaque insecte a sa place, et chaque alvéole cache un secret.', 'Tu as su percer les murs de cire... Voyons si tu sais guider tes Pokémon !'], lose: 'Tu as l\'œil vif et la main sûre ! Le Badge Élytre est à toi.' },
   { name: 'Marine', type: 'water', ow: 'marine', team: [[1031, 19], [1029, 19], [120, 20], [1033, 22]], intro: 'La marée monte ! Tu vas te faire emporter par mes Pokémon de l\'océan !', lose: 'Ouah, tu as tenu face à la vague. Voici le Badge Écume !' },
-  { name: 'Volta', type: 'electric', ow: 'volta', team: [[1034, 25], [1036, 26], [82, 26], [1035, 29]], intro: 'Ça grésille ! Prépare-toi à recevoir le choc de ta vie !', lose: 'Court-circuit total ! Tu remportes le Badge Volt.' },
-  { name: 'Flora', type: 'grass', ow: 'flora', team: [[1021, 30], [1038, 31], [114, 31], [1022, 34]], intro: 'Mes fleurs sont belles, mais elles savent piquer. Prêt ?', lose: 'Tu as fait éclore quelque chose de beau. Le Badge Pétale te revient.' },
+  { name: 'Volta', type: 'electric', ow: 'volta', team: [[1034, 25], [1036, 26], [82, 26, null, [430, 351, 451, 86]], [1035, 29, null, [85, 247, 98, 86]]], intro: 'Ça grésille ! Prépare-toi à recevoir le choc de ta vie !', lose: 'Court-circuit total ! Tu remportes le Badge Volt.' },
+  { name: 'Flora', type: 'grass', ow: 'flora', team: [[1021, 30], [1038, 31], [114, 31, null, [202, 246, 79, 73]], [1022, 34, null, [202, 188, 147, 523]]], intro: 'Mes fleurs sont belles, mais elles savent piquer. Prêt ?', lose: 'Tu as fait éclore quelque chose de beau. Le Badge Pétale te revient.' },
   { name: 'Sibylle', type: 'psychic', ow: 'sibylle', team: [[1039, 35], [1030, 36], [1019, 36], [65, 37, null, [94, 324, 347, 105]], [1040, 39, null, [94, 585, 347, 236]]], intro: 'J\'ai déjà vu l\'issue de ce combat... mais montre-moi quand même.', lose: 'L\'avenir m\'a trompée. Le Badge Mirage est à toi.' },
   { name: 'Basalte', type: 'rock', ow: 'basalte', team: [[1026, 40], [111, 41], [1028, 42], [95, 42], [1027, 44]], intro: 'Mon frère aîné m\'a confié cette île. Pour aller plus loin, il faudra passer à travers la roche !', lose: 'Tu as fendu le roc... Le Badge Granit est à toi. Drakos ne va pas aimer ça.' },
   { name: 'Pyros', type: 'fire', ow: 'pyros', team: [[1041, 45], [78, 46], [1005, 46], [126, 47], [1042, 49]], intro: 'Le volcan gronde et mon cœur aussi ! Personne ne passe sur la Grande Île sans brûler un peu !', lose: 'Quelle flamme... Le Badge Braise te va bien. Va. Drakos t\'attend.' },
@@ -1371,7 +1371,7 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
   const gymTrainers = [
     [['Insectomane', 'Lucas', [[13, 9], [1017, 10]]], ['Jardinière', 'Anémone', [[540, 10], [401, 10]]]],   // la Ruche de Sylvebourg (niveaux 9 à 11)
     [['Marin', 'Yann', [[1029, 17], [116, 17]]], ['Fillette', 'Océane', [[118, 18], [1031, 18]]], ['Pêcheur', 'Paul', [[60, 19], [1033, 19]]]],
-    [['Scientifique', 'Alan', [[100, 23], [1034, 23]]], ['Topdresseuse', 'Électra', [[1036, 24], [25, 24]]], ['Scientifique', 'Ohm', [[82, 25]]]],
+    [['Scientifique', 'Alan', [[100, 23], [1034, 23]]], ['Topdresseuse', 'Électra', [[1036, 24], [25, 24, null, [351, 98, 86, 451]]]], ['Scientifique', 'Ohm', [[82, 25]]]],
     [['Randonneuse', 'Rose', [[69, 28], [1021, 28]]], ['Topdresseuse', 'Lila', [[44, 29], [1038, 29]]], ['Randonneuse', 'Iris', [[189, 30]]]],
     [['Médium', 'Esther', [[1039, 33], [178, 33]]], ['Médium', 'Félix', [[97, 34], [1030, 34]]], ['Topdresseuse', 'Luna', [[196, 35]]]],
     [['Montagnard', 'Marcel', [[1026, 38], [74, 38]]], ['Montagnard', 'Henri', [[95, 39], [1028, 39]]], ['Garde d\'Écaille', 'Gwen', [[1027, 40]]]],
@@ -1524,6 +1524,7 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
   // la trame des routes : terrasses, obstacles, boucles, sentiers redessinés (world/traces.js ; ne change que des cases)
   if (traces) W.traces = memoCases('traces', W, () => tracerRoutes(W, routes, reserver(W, routes, legends)), legends.filter((l) => l.map === 'monde').map((l) => [l.x, l.y]));
   if (decors) W.decorsRoutes = decorerRoutes(W, routes, { legends, trainerNpc, maps });   // (decors : false dans les tests, pour comparer)
+  indexMissionTrainers(W, routes);
   orienterDresseursAveugles(W);
   // rencontres par tronçons (world/rencontres.js)
   poserTroncons({ maps, routes });

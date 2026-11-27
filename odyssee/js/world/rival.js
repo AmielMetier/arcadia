@@ -17,6 +17,7 @@ export function getPlayerMaxLevel(party) {
 export const STRAT_NATURES = {
   1010: 13, 1011: 13, 1012: 13, // Ligne Plumorage : Jovial (+Vit)
   1013: 3,                     // Grignotin : Rigide
+  1015: 13, 1016: 13,          // Chouillon / Hulumière : Jovial (+Vit -SpA)
   1034: 10, 1035: 10,          // Ligne Gerboltz : Timide (+Vit)
   1021: 8, 1022: 8,            // Ligne Champitron : Malin (+Def -SpA)
   1039: 15, 1040: 15,          // Ligne Rêvelaine : Modeste (+SpA -Atk)
@@ -111,8 +112,8 @@ export const STRAT_MOVES_LATE = {
 
 // Sets stratégiques intermédiaires (badges >= 3 && badges < 6)
 export const STRAT_MOVES_MID = {
-  1011: [17, 98, 403, 14],    // Piouffon (Cru-Ailes, Vive-Attaque, Lame d'Air, Danse Lames)
-  1012: [17, 98, 403, 14],    // Plumorage
+  1011: [17, 98, 332, 14],    // Piouffon (Cru-Ailes, Vive-Attaque, Aéropique, Danse Lames)
+  1012: [17, 98, 332, 14],    // Plumorage
   1034: [85, 98, 86, 247],    // Gerbizz (Tonnerre, Vive-Attaque, Cage Éclair, Ball'Ombre)
   1035: [85, 98, 86, 247],    // Gerboltz
   1021: [202, 79, 73, 188],   // Champinou (Giga-Sangsue, Poudre Dodo, Vampigraine, Bombe Beurk)
@@ -157,10 +158,11 @@ export function buildRivalParty(game, rawTeamSpec) {
     // sauf son starter qui a 2 niveaux de plus !
     // Début du jeu (aucun badge) : Théo est à ta hauteur — même niveau pour son starter, un de moins pour les autres,
     // et des IV ordinaires. La règle « +2 niveaux, IV parfaits » ne s'applique qu'à partir du premier badge.
-    const early = badges <= 1; // 0 ou 1 badge (début et Route 2) : niveau équitable, pas de sur-niveau +2
+    const early = badges <= 1; // 0 ou 1 badge (début et Route 2) : niveau équitable, pas de sur-niveau
+    const starterBoost = early ? 0 : (badges <= 3 ? 1 : 2);
     const lvl = early
       ? (isStarter ? Math.max(baseLvl, maxPlayerLvl) : Math.max(baseLvl, maxPlayerLvl - 1))
-      : (isStarter ? Math.max(baseLvl, maxPlayerLvl + 2) : Math.max(baseLvl, maxPlayerLvl));
+      : (isStarter ? Math.max(baseLvl, maxPlayerLvl + starterBoost) : Math.max(baseLvl, maxPlayerLvl));
 
     // Règle 2 : IVs à fond (31 partout), sauf au tout début
     const iv = early ? undefined : [31, 31, 31, 31, 31, 31];
@@ -169,11 +171,16 @@ export function buildRivalParty(game, rawTeamSpec) {
     const nat = STRAT_NATURES[sp] ?? (SPECIES[sp]?.b[1] >= SPECIES[sp]?.b[3] ? 3 : 15);
 
     // Règle 3 : Objets stratégiques UNIQUEMENT à partir de la 3e arène (badges >= 3)
-    // (les Lunettes Choix sur Gerboltz ne s'activent qu'à partir du niveau fin de jeu >= 6 badges)
+    // (les Lunettes Choix et la Ceinture Force n'arrivent qu'après le pic de mi-jeu)
     let item = null;
     if (badges >= 3) {
       const rawItem = STRAT_ITEMS[sp];
-      item = (badges < 6 && rawItem === 'choice-specs' ? 'magnet' : rawItem) || (isStarter ? (badges >= 6 ? 'life-orb' : 'sitrus-berry') : null);
+      const gatedItem = (badges < 6 && rawItem === 'choice-specs')
+        ? 'magnet'
+        : (badges === 3 && rawItem === 'focus-sash')
+          ? 'sitrus-berry'
+          : rawItem;
+      item = gatedItem || (isStarter ? (badges >= 6 ? 'life-orb' : 'sitrus-berry') : null);
     }
 
     // Règle 4 : Sets stratégiques adaptatifs

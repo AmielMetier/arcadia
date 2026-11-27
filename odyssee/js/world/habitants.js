@@ -201,7 +201,14 @@ export const MISSIONS = [
     ask: ['Mon Psykokwak a encore filé ! Il a mal à la tête, alors il marche tout droit sans réfléchir…', 'La dernière fois, je l\'ai retrouvé sur la route 5, à regarder les nuages. Tu pourrais aller voir ?'],
     again: ['Toujours pas de nouvelles de mon Psykokwak ? Il doit traîner sur la route 5…'],
     thanks: ['Psykokwak ! Te revoilà, gros malin. Tu m\'as fait une de ces peurs.', 'Merci, petit. Prends ça : ça lui sert quand sa migraine le reprend.'], done: ['Psykokwak se tient la tête… C\'est bon signe, il réfléchit !'],
-    journal: { name: 'Le Psykokwak de Papi Octave', start: 'Le Psykokwak de Papi Octave, à Floralia, s\'est perdu du côté de la route 5.', end: 'Psykokwak est rentré chez Papi Octave.' } },
+    journal: {
+      name: 'Le Psykokwak de Papi Octave',
+      notes: [
+        [(f) => f['A:mPsyko'], 'Le Psykokwak de Papi Octave, à Floralia, s\'est perdu du côté de la route 5.'],
+        [(f) => f.psykoRetrouve && !f.mPsyko, 'J\'ai retrouvé Psykokwak sur la route 5 : il est reparti vers Floralia.'],
+        [(f) => f.mPsyko, 'Psykokwak est rentré chez Papi Octave.'],
+      ],
+    } },
 
   // lore des phénomènes célestes, des failles spatio-temporelles, des Colosses Alpha et des souvenirs d'équipe
   { id: 'mAstronome', town: 'A', at: [42, 12], sprite: 'savant', who: 'Astronome Orion', cat: 'side', kind: 'bring', item: 'fragment-meteore', qty: 3,
@@ -349,15 +356,7 @@ export function addHabitants({ W, maps, towns, routes }) {
   };
   // les dresseurs d'une route (pour « bats-les tous »)
   // chaque dresseur de la grande carte appartient à la route dont le tracé passe le plus près de lui
-  const trainersOn = {};
-  const segDist = (px, py, [ax, ay], [bx, by]) => { const vx = bx - ax, vy = by - ay, L = vx * vx + vy * vy || 1, u = Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / L)); return Math.hypot(px - ax - u * vx, py - ay - u * vy); };
-  for (const n of W.npcs) {
-    if (!n.trainer || W.zoneAt(n.x, n.y)?.town) continue;
-    let best = null, bd = 9;
-    for (const r of routes) for (let i = 1; i < r.pts.length; i++) { const d = segDist(n.x, n.y, r.pts[i - 1], r.pts[i]); if (d < bd) { bd = d; best = r.id; } }
-    if (best) (trainersOn[best] ||= []).push(n.id);
-  }
-  W.missionTrainers = trainersOn;
+  indexMissionTrainers(W, routes);
   for (const M of MISSIONS) {
     const t = towns[M.town]; if (!t) continue;
     const [x, y] = free(W, t.x + (t.decal?.[0] || 0) + M.at[0], t.y + (t.decal?.[1] || 0) + M.at[1]);   // decal : déplacement de l'ancien centre d'une ville agrandie
@@ -369,5 +368,16 @@ export function addHabitants({ W, maps, towns, routes }) {
     }
     if (M.place) for (const p of [].concat(M.place)) placeItem(p, M.item);
   }
+}
+export function indexMissionTrainers(W, routes) {
+  const trainersOn = {};
+  const segDist = (px, py, [ax, ay], [bx, by]) => { const vx = bx - ax, vy = by - ay, L = vx * vx + vy * vy || 1, u = Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / L)); return Math.hypot(px - ax - u * vx, py - ay - u * vy); };
+  for (const n of W.npcs) {
+    if (!n.trainer || W.zoneAt(n.x, n.y)?.town) continue;
+    let best = null, bd = 9;
+    for (const r of routes) for (let i = 1; i < r.pts.length; i++) { const d = segDist(n.x, n.y, r.pts[i - 1], r.pts[i]); if (d < bd) { bd = d; best = r.id; } }
+    if (best) (trainersOn[best] ||= []).push(n.id);
+  }
+  W.missionTrainers = trainersOn;
 }
 void key;

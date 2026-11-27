@@ -250,7 +250,7 @@ export function buildQuests(ctx) {
     steps: (f) => [
       `Arrêter les trois pompes de la Brume autour du Lac Miroir (${[1, 2, 3].filter((k) => f['pompe' + k]).length} / 3).`,
       'Un admin de la Brume surveille le nord du lac. L\'affronter.',
-      'L\'admin Sylas a fui vers la Grotte des Marées, au milieu du lac : y aller en surfant (Badge Mirage).',
+      'L\'admin Sylas a fui vers la Grotte des Marées, au milieu du lac : y aller en surfant (Surf · 8 badges du Nord pour ouvrir le fond).',
       'Une présence s\'éveille au fond de la Grotte des Marées...',
       'Raconter à Gaston ce qui s\'est passé dans la grotte.',
     ],
@@ -386,7 +386,7 @@ export function buildQuests(ctx) {
   /* ====================================================================================================
      Jardin des Songes (au sud de la route 6) · Quête : Les nuits blanches de Floralia (Cresselia, Darkrai)
      ==================================================================================================== */
-  const JAR = outdoor('jardin', 46, 40, { name: 'Jardin des Songes', music: 'route2' });
+  const JAR = outdoor('jardin', 46, 40, { name: 'Jardin des Songes', music: 'mystic' });
   {
     const m = JAR;
     m.rect(3, 3, 42, 36, T.GRASS);
@@ -405,7 +405,7 @@ export function buildQuests(ctx) {
     for (const [x, y] of [[21, 15], [24, 15], [21, 24], [24, 24]]) m.prop('lanterne', x, y);
     m.blob(34, 17, 4.5, 2.5, T.WATER, rng(71), [T.GRASS]);
     m.rect(22, 37, 23, 39, T.PATH);
-    m.zone(0, 0, 45, 39, { name: 'Jardin des Songes', music: 'route2', enc: ENC.jardin, theme: 'jardin' });
+    m.zone(0, 0, 45, 39, { name: 'Jardin des Songes', music: 'mystic', enc: ENC.jardin, theme: 'jardin' });
     m.rect(8, 15, 12, 17, T.TALL); m.rect(33, 21, 39, 23, T.TALL); m.rect(14, 32, 19, 34, T.TALL); m.rect(27, 32, 33, 34, T.TALL);
     m.item(...spot(m, 40, 34), 'eclat-etoile', 1, 'etoile:jardin'); m.item(...spot(m, 5, 34), 'max-potion');
     const entree = passage('r6', [0.35, 0.45, 0.25, 0.55, 0.65], [1, -1], 6, { map: 'jardin', x: 22, y: 38, dir: 'up' }, 'JARDIN DES SONGES ↓\nUn jardin de fleurs et de rêves.');
@@ -421,7 +421,7 @@ export function buildQuests(ctx) {
       'Trouver le Pokémon de l\'îlot du Lac Miroir et rapporter une Plume Lune (Surf).',
       'Rapporter la Plume Lune à Hélène, à Floralia.',
       'Surveiller le Jardin des Songes la nuit (de 20 h à 5 h).',
-      'Ariane a emporté son projecteur au Temple Kagura, dans la Forêt des Torii (à l\'ouest de la route 7).',
+      'Ariane a emporté son projecteur au Temple Kagura, dans la Forêt des Torii (à la sortie sud-ouest de Mirage).',
       'Darkrai rôde dans le sanctuaire du Temple Kagura...',
       'Retourner voir Hélène à Floralia.',
     ],
@@ -635,10 +635,10 @@ export function buildQuests(ctx) {
       if (s === 'fin') { await A.say('La cloche du temple sonne chaque matin, maintenant. Merci, voyageur.', who); return; }
       if (!s) {
         if (A.badges() < 8) { await A.say(['Je viens du Temple Kagura, dans la Forêt des Torii, au sud-ouest de Mirage.', 'Il s\'y passe des choses terribles... Seul un dresseur aux huit badges du Nord aurait assez de force.'], who); return; }
-        await A.say(['Voyageur... tu portes le badge de Sibylle. Écoute-moi.', 'Des gens en gris ont pillé le Temple Kagura, dans la Forêt des Torii, au sud-ouest.', 'Ils ont volé les trois talismans qui éveillent la cloche, et ils fouillent la forêt.', 'Sans la cloche, les esprits de la forêt s\'agitent. Peux-tu retrouver les talismans ?'], who);
+        await A.say(['Voyageur... tu portes les huit badges du Nord. Écoute-moi.', 'Des gens en gris ont pillé le Temple Kagura, dans la Forêt des Torii, au sud-ouest.', 'Ils ont volé les trois talismans qui éveillent la cloche, et ils fouillent la forêt.', 'Sans la cloche, les esprits de la forêt s\'agitent. Peux-tu retrouver les talismans ?'], who);
         await A.set('kagura', 1); return;
       }
-      await A.say('La Forêt des Torii s\'ouvre à l\'ouest de la route 7. Sois prudent.', who);
+      await A.say('La Forêt des Torii s\'ouvre à la sortie sud-ouest de Mirage. Sois prudent.', who);
     } });
     const m = W;
     const tal = async (A) => { if ((A.st.bag.talisman || 0) < 3) { await A.give('talisman'); if ((A.st.bag.talisman || 0) >= 3) { await A.say('Les trois talismans sont réunis ! Il faut les rapporter au Grand Prêtre.'); await A.set('kagura', 2); } } };

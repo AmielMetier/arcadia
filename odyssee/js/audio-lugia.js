@@ -12,7 +12,7 @@ export function playShadowLugiaEpic(snd, opts = {}) {
   const E = LUGIA_EPIC, c = snd.ctx, t0 = c.currentTime + 0.05, T = (s) => t0 + s, D = E.dur;
   const nodes = [], timers = [], cris = [];
   let stopped = false;
-  const bus = c.createGain(); bus.gain.value = Math.min(1.3, (snd.vol ?? 0.7) * 1.2);
+  const bus = c.createGain(); bus.gain.value = snd.master ? 1.15 : Math.min(1.3, (snd.vol ?? 0.7) * 1.2);
   const comp = c.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.25;
   bus.connect(comp); comp.connect(snd.master || c.destination);
   // réverbération : réponse impulsionnelle de bruit qui décroît en 3,4 s
@@ -120,7 +120,7 @@ export function playShadowLugiaEpic(snd, opts = {}) {
   if (cryUrl && typeof window !== 'undefined' && typeof window.Audio === 'function' && !String(cryUrl).startsWith('synth:')) {
     timers.push(setTimeout(() => {
       if (stopped) return;
-      try { const a = new window.Audio(cryUrl); a.volume = Math.min(1, (snd.vol ?? 0.7) * 1.05); a.preservesPitch = false; a.playbackRate = 0.82; cris.push(a); a.play().catch((e) => warnDev('audio-lugia', e)); } catch (e) { warnDev('audio-lugia', e); }
+      try { const a = new window.Audio(cryUrl); const fxVol = typeof window.DDVolume?.get === 'function' ? window.DDVolume.get('fx') : 1; a.volume = Math.min(1, (snd.vol ?? 0.7) * fxVol * 1.05); a.preservesPitch = false; a.playbackRate = 0.82; cris.push(a); a.play().catch((e) => warnDev('audio-lugia', e)); } catch (e) { warnDev('audio-lugia', e); }
     }, Math.round((E.reveal + 0.05) * 1000)));
   }
   try {

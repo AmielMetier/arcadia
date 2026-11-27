@@ -28,11 +28,11 @@ const GRUNT = {
   e: [[20, 16], [109, 17]], nyx1: [[41, 17], [228, 18], [215, 19]],                             // Port-Azur
   f: [[81, 24], [100, 24]], g: [[110, 25], [42, 25]], erebe2: [[42, 26], [110, 26], [82, 26], [198, 28]], // Centrale
   h: [[20, 29], [24, 29]], i: [[42, 30], [215, 30]], j: [[110, 30], [89, 31]], k: [[24, 31], [228, 31]], l: [[198, 31], [20, 31]],
-  nyx2: [[42, 33], [215, 33], [229, 34], [24, 35]],
+  nyx2: [[42, 33], [215, 33], [229, 34], [24, 35, null, [398, 242, 92, 157]]],
   boss1: [[197, 35, null, [185, 109, 92, 236]], [110, 35], [215, 36], [229, 38]],
   m: [[89, 39], [24, 40], [229, 40]], n: [[42, 40], [110, 40], [215, 41]],
-  nyx3: [[169, 41], [215, 41], [229, 42], [24, 42]], erebe3: [[42, 41], [89, 41], [110, 42], [198, 43]],
-  boss2: [[197, 43], [215, 43], [94, 44], [110, 43], [229, 45]],                                // Sanctuaire
+  nyx3: [[169, 41], [215, 41], [229, 42], [24, 42, null, [398, 242, 92, 157]]], erebe3: [[42, 41], [89, 41], [110, 42], [198, 43, null, [400, 65, 109, 92]]],
+  boss2: [[197, 43, null, [399, 109, 92, 236]], [110, 43, null, [188, 53, 92, 247]], [94, 44, null, [247, 188, 399, 109]], [229, 45, null, [53, 399, 92, 242]]], // Sanctuaire
 };
 export const ELITE = [
   { id: 'c4:1', name: 'Frimas', ow: 'frimas', bs: 'frimas', team: [[87, 74], [91, 74], [473, 75], [124, 75], [131, 76]], room: 'Salle de Glace', floor: 'gymWater', deco: 'statue',
@@ -184,7 +184,7 @@ export function addStory(ctx) {
     const boss = trainerNpc(rep, 11, 3, 'down', 'Chef Éclipse', 'Nocturne', GRUNT.boss1, { id: 'ecl:boss1', sight: 2, ow: 'nocturne', bs: 'nocturne', prize: 120, ai: 'smart', items: { 'hyper-potion': 2 },
       intro: 'Je suis Nocturne, chef de la Team Éclipse. Nox et sa bande de la Brume préfèrent courir après l\'Orbe Rouge ? Qu\'ils s\'amusent dans le brouillard. Le jour rend les gens faibles et bruyants. Sous une nuit éternelle, tout serait enfin calme... Le Prisme Noir fermera le cœur de Lugia, et Lugia obéira. Toi, tu n\'es qu\'un grain de sable.',
       lose: 'Impressionnant. Mais il est trop tard : le Prisme Noir est déjà au Sanctuaire des Marées.', after: '...' });
-    Object.assign(boss, { vanish: true, music: 'eclipse', winScript: 'boss1' });
+    Object.assign(boss, { vanish: true, music: 'legendElemental', winScript: 'boss1' });
     rep.item(2, 6, 'ultra-ball', 2); rep.item(20, 10, 'full-heal'); rep.item(20, 14, 'hyper-potion');
     maps.repaire = rep;
     // des sbires bloquent l'entrée de Mirage tant que le Chef n'est pas battu
@@ -233,10 +233,10 @@ export function addStory(ctx) {
     grunt(s, 16, 20, 'left', 'ecl:sanct2', GRUNT.n, { exact: 1, f: 1, sight: 4, intro: 'Tu entends ? C\'est Lugia qui gronde sous nos pieds...' });
     admin(s, 11, 14, 'right', 'ecl:nyx3', 'nyx', GRUNT.nyx3, { sight: 2, intro: 'Encore toi ! Tu ne comprends donc rien ? Quand Lugia ouvrira les yeux, plus rien ne pourra l\'arrêter !', lose: 'Cet enfant... c\'est un vrai cauchemar.' });
     admin(s, 13, 12, 'left', 'ecl:erebe3', 'erebe', GRUNT.erebe3, { sight: 2, intro: 'Tu as réussi à venir jusqu\'ici. Alors je vais devoir être sérieux.', lose: 'Je... Peut-être que la nuit éternelle n\'était pas une si bonne idée.' });
-    const boss = trainerNpc(s, 12, 8, 'down', 'Chef Éclipse', 'Nocturne', GRUNT.boss2, { id: 'ecl:boss2', sight: 2, ow: 'nocturne', bs: 'nocturne', prize: 200, ai: 'smart', items: { 'hyper-potion': 2, 'full-restore': 1 },
+    const boss = trainerNpc(s, 12, 8, 'down', 'Chef Éclipse', 'Nocturne', GRUNT.boss2, { id: 'ecl:boss2', sight: 2, ow: 'nocturne', bs: 'nocturne', prize: 200, ai: 'smart', megaSp: 229, items: { 'hyper-potion': 2, 'full-restore': 1 },
       intro: 'Te voilà enfin. Regarde. Lugia dort encore, mais le Prisme Noir a déjà refermé son cœur. Dans un instant, il se réveillera, et il m\'obéira. Rien ne peut plus empêcher l\'Éclipse.',
       lose: 'Impossible... Battu par un enfant, ici, au moment de mon triomphe...', after: '...' });
-    Object.assign(boss, { vanish: true, music: 'eclipse', winScript: 'boss2' });
+    Object.assign(boss, { vanish: true, music: 'legendElemental', winScript: 'boss2' });
     s.item(3, 16, 'revive', 2); s.item(21, 17, 'full-restore');
     maps.sanctuaire = s;
     // Lugia de la Grotte des Tourbillons : s'il a été vaincu (et non capturé) au Sanctuaire, il s'y réfugie
@@ -306,7 +306,7 @@ export function addStory(ctx) {
       ask: ['Je collectionne les observations de Pokémon Roche.', 'Montre-m\'en un, n\'importe lequel, et je te récompenserai !'],
       thanks: ['Magnifique ! Regarde-moi cette carapace minérale...', 'Voilà pour toi, comme promis.'], done: ['La Grotte Lunaire regorge de Pokémon Roche. Et de Pierres Lune !'] } });
     tn(E, 26, 15, { id: 'echange', sprite: 'gamin', dir: 'down', script: 'trade', trade: {
-      flag: 'qEchange', who: 'Bastien', face: 'gamin', want: 16, give: 81, lvl: 18, nick: 'Boulon',
+      flag: 'qEchange', who: 'Bastien', face: 'gamin', want: 16, give: 81, lvl: 24, nick: 'Boulon',
       ask: ['J\'adore les Pokémon Vol ! Tu n\'aurais pas un Roucool ?', 'Je te l\'échange contre mon Magnéti, Boulon !'],
       thanks: ['Génial ! Prends soin de Boulon, il adore les néons de la ville.'], done: ['Mon Roucool vole déjà comme un pro !'] } });
     { const m = maps['flora:bighouse21']; const [x, y] = free(m, 8, 3, false);

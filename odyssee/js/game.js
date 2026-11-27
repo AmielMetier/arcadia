@@ -500,7 +500,8 @@ export class Game {
     this.view.ombreCible = (m.outdoor && z?.ombre) || 1;   // sous-bois : l'image s'assombrit doucement
     if (!this.musicLock) {
       const celMusic = m.id === 'monde' && m.outdoor && this.celestial?.activeKind !== 'none' ? this.celestial.activeKind : null;
-      this.sound.play(celMusic || (p.surf && m.outdoor ? 'route2' : (z && z.music) || m.music));
+      const track = (m.id === 'volta:tower17' && this.state.flags['T:ecl:erebe2']) ? 'city' : ((z && z.music) || m.music);
+      this.sound.play(celMusic || (p.surf && m.outdoor ? 'route2' : track));
     }
     this.zone = z;
     try { this.view?.setWeather(this.getMapWeather()); this.celestial?.syncView(); } catch (e) { warnDev('weather', e); }
@@ -754,8 +755,20 @@ export class Game {
       const bx = tx + dx, by = ty + dy, bt = m.get(bx, by);
       // arène de la Carrière : le rocher comble la fosse
       if (m.etat && !this.occupied(bx, by) && rocherDansFosse(this, tx, ty, bx, by)) { p.bumpT = 0.3; p.walking = false; return; }
-      if (walkable(bt) && ![T.DOOR, T.MAT, T.CAVEDOOR, T.STAIRS].includes(bt) && !this.occupied(bx, by) && !m.warpAt(bx, by) && !(m.etat && m.objectAt(bx, by))) {
-        this.setTile(tx, ty, m.etat ? T.FLOOR : m.outdoor ? T.GRASS : T.CAVE); this.setTile(bx, by, T.BOULDER);
+      if (walkable(bt) && ![T.DOOR, T.MAT, T.CAVEDOOR, T.STAIRS].includes(bt) && !this.occupied(bx, by) && !m.warpAt(bx, by) && !(m.etat && m.objectAt(bx, by)) && (m.etat || m.canStep(tx, ty, bx, by))) {
+        if (m.etat) {
+          this.setTile(tx, ty, T.FLOOR); this.setTile(bx, by, T.BOULDER);
+        } else {
+          // hors arène, les rochers poussés ne sont pas gravés définitivement : ils se réinitialisent en quittant la zone
+          if (!m._orig) m._orig = new Map();
+          const kt = key(tx, ty), kb = key(bx, by);
+          if (!m._orig.has(kt)) m._orig.set(kt, m.get(tx, ty));
+          if (!m._orig.has(kb)) m._orig.set(kb, bt);
+          const under = m._orig.get(kt);
+          m.set(tx, ty, under === T.BOULDER ? (m.outdoor ? T.GRASS : T.CAVE) : under);
+          m.set(bx, by, T.BOULDER);
+          this.view.rebuildAt(tx, ty); this.view.rebuildAt(bx, by);
+        }
         this.sound.sfx('ledge'); this.view.shake = 0.08; p.bumpT = 0.3; p.walking = false;
         return;
       }
@@ -796,7 +809,10 @@ export class Game {
     if (!mv.slid && (mo?.type === 'glace' || mo?.type === 'fleche')) { this.busy = true; try { await this.glisse(mo.type === 'fleche' ? mo.dir : p.dir); } finally { this.busy = false; } return this.onStep({ slid: true }); }
     if (mo?.type === 'dalle') this.dalle(mo);
     if (mo?.type === 'souffle' && !mv.slid) { this.busy = true; try { await this.souffle(mo); } finally { this.busy = false; } }
-    if (mo?.type === 'tp' && !mv.slid) { this.busy = true; try { await this.teleporte(mo); } finally { this.busy = false; } return this.onStep({ slid: true }); }
+    if (mo?.type === 'tp' && !mv.slid) {
+      if (await this.checkTrainers()) return;
+      this.busy = true; try { await this.teleporte(mo); } finally { this.busy = false; } return this.onStep({ slid: true });
+    }
     // arènes dessinées : dalles-interrupteurs, trous, canons à vent, dalles d'argile
     if (m.etat && mo && ['reg', 'chute', 'canon', 'fragile'].includes(mo.type)) {
       this.busy = true; let bouge = false;
@@ -1461,12 +1477,12 @@ export class Game {
   }
 
   async trySurf(x, y, skipConfirm = false) {
-    const st = this.state;
+    const st = this.state, m = this.mapObj, p = this.player;
+    if (!m?.in(x, y) || m.get(p.x, p.y) === T.BRIDGE || m.height(x, y) !== m.height(p.x, p.y)) { this.sound.sfx('bump'); return; }
     if (!this.canField('surf')) { await this.ui.say(this.hasField('surf') ? ['L\'eau est d\'un bleu profond...', 'Il faut le Badge Mirage pour surfer.'] : 'L\'eau est d\'un bleu profond...'); return; }
-    if (!st.party.some((m) => m.hp > 0)) return;
+    if (!st.party.some((q) => q.hp > 0)) return;
     if (!skipConfirm && !(await this.ui.yesNo('L\'eau est d\'un bleu profond...\nUtiliser le Harnais Flottant ?'))) return;
     await this.ui.say(`${st.name} déploie le Harnais Flottant et s'élance sur l'eau !`, { auto: 600 });
-    const p = this.player;
     this.sound.sfx('ledge');
     p.move = { fx: p.x, fy: p.y, tx: x, ty: y, t: 0, dur: 0.35, jump: true, scripted: true };
     while (p.move && p.move.t < 0.85) await wait(16);
@@ -1873,7 +1889,7 @@ export class Game {
       face: tr.bs || tr.ow || n.sprite
     });
     // le premier champion reste une marche d'apprentissage : IV ordinaires et pas d'objet tenu
-    const isBoss = (d.leader != null && d.leader !== 0) || d.champion || d.boss;
+    const isBoss = (d.leader != null && d.leader !== 0) || d.champion || d.boss || isEclipseBoss;
     const leaderDefaultItem = (sp, lvl, noEviolite = false) => {
       const S = SPECIES[sp]; if (!S) return 'sitrus-berry';
       const type = S.t[0] || 'normal';
@@ -2125,8 +2141,9 @@ export class Game {
     // Méga-Évolution : le joueur avec son Méga-Anneau ; un dresseur marqué megaSp tend sa gemme à ce Pokémon (« ace » : le dernier)
     // À partir de la 6e arène (5 badges), les Champions et au moins un dresseur sur trois méga-évoluent
     if (o.trainer && !o.trainer.megaSp && !o.trainer.friendly && o.party?.length && this.badgeCount() >= 5) {
+      const isGrunt = /sbire/i.test(o.trainer.cls || '');
       const key = String(o.id || o.trainer.name || ''); let h = 0; for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-      if (o.leader != null || o.champion || h % 3 === 0) o.trainer = { ...o.trainer, megaSp: 'auto', megaSeed: h };
+      if (o.leader != null || o.champion || (!isGrunt && h % 3 === 0)) o.trainer = { ...o.trainer, megaSp: 'auto', megaSeed: h };
     }
     if (o.trainer?.megaSp && o.party?.length) {
       let target = o.trainer.megaSp === 'ace' ? o.party[o.party.length - 1]

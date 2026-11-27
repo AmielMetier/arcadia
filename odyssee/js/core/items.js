@@ -66,7 +66,7 @@ export const ITEMS = {
   'gs-ball': { pocket: 'cles', price: 0, key: true, icon: 'gift', name: 'GS Ball', desc: 'Une Poké Ball dorée gravée des lettres G et S. Elle semble attirée par l\'autel du Bois Murmure.' },
   'ferry-ticket': { pocket: 'cles', price: 0, key: true, icon: 'letter', name: 'Passe Marin', desc: 'Le passe du bateau de l\'Embarcadère de l\'Aube. Les îles s\'ouvrent au fil des badges.' },
   'plume-arc': { pocket: 'cles', price: 0, key: true, icon: 'rainbow-wing', name: 'Plume Arc-en-ciel', desc: 'Une plume qui brille de sept couleurs. Elle appelle Ho-Oh au sommet de la Tour Dorée.' },
-  'plume-argent': { pocket: 'cles', price: 0, key: true, icon: 'silver-wing', name: 'Plume Argentée', desc: 'Une plume d\'argent, douce comme l\'écume. Elle apaise les courants de la Grotte des Tourbillons.' },
+  'plume-argent': { pocket: 'cles', price: 0, key: true, icon: 'silver-wing', name: 'Plume Argentée', desc: 'Une plume d\'argent, douce comme l\'écume. Elle ouvre le Sanctuaire des Marées et apaise la Grotte des Tourbillons.' },
   // --- OBJETS DE COMBAT & OBJETS TENUS (Held Items) ---
   leftovers: { pocket: 'objets', price: 4000, hold: 'leftovers', name: 'Restes', desc: "Objet à tenir. Restaure 1/16 des PV max du porteur à la fin de chaque tour." },
   'sitrus-berry': { pocket: 'baies', price: 250, hold: 'sitrus-berry', name: 'Baie Sitrus', desc: "Objet à tenir. Restaure 25% des PV quand le porteur passe sous la moitié de ses PV." },

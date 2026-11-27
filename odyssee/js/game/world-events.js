@@ -97,17 +97,18 @@ export async function legendBattle(g, L) {
 /** Bateau de l'Embarcadère : chaque île s'ouvre avec un nombre de badges. */
 export async function ferry(g, n) {
   const st = g.state, ui = g.ui, docks = g.world.docks, here = n.def.dock, sp = 'Capitaine';
-  // sans permis bateau, on ne monte pas à bord : l'examen se passe à la Capitainerie de Port-Azur
-  if (!st.bag['permis-bateau']) {
+  // sans permis bateau, les quais du Nord/Est sont bloqués — sauf le Cap Mirage vers l'Archipel
+  if (!st.bag['permis-bateau'] && here !== 'cap') {
     await ui.say(['Ahoy, moussaillon ! Tu veux prendre la mer ?', 'Pas sans ton permis bateau ! La Capitainerie de Port-Azur fait passer l\'examen.', 'Reviens avec, et je te fais embarquer.'], { speaker: sp });
     if (!st.flags['Q:permis']) { st.flags['Q:permis'] = 1; g.refreshNpcs(); }
     return;
   }
-  if (!st.flags.passe) {
+  if (!st.flags.passe && st.bag['permis-bateau']) {
     st.flags.passe = true; g.give('ferry-ticket'); g.sound.sfx('item');
     await ui.say(['Ahoy, moussaillon ! Mon bateau fait le tour des îles de l\'Est.', 'L\'Île Orageuse pour ceux qui ont 2 badges, l\'Île de la Grue avec 3, et l\'Île Givrée, tout au nord, avec 5.', 'Pour l\'archipel des trois frères, au-delà des tourbillons, il faut 5 badges : Drakos n\'aime pas les débutants.', 'Tiens, voici ton Passe Marin.'], { speaker: sp });
   }
-  const opts = Object.entries(docks).filter(([k, d]) => k !== here && (!d.show || d.show(st.flags))), b = g.badgeCount();
+  const eastIslands = new Set(['orage', 'grue', 'givre']);
+  const opts = Object.entries(docks).filter(([k, d]) => k !== here && (!d.show || d.show(st.flags)) && (st.bag['permis-bateau'] || !eastIslands.has(k))), b = g.badgeCount();
   await ui.say('Où veux-tu aller ?', { keep: true, speaker: sp });
   const r = await ui.list({ title: 'Destination', items: opts.map(([, d]) => ({ label: d.name, right: b >= d.badges ? '' : `${d.badges} badges`, disabled: b < d.badges })).concat([{ label: 'Rester ici' }]), cls: 'shop', cancel: opts.length });
   if (r < 0 || r >= opts.length) { await ui.say('Bon vent, moussaillon !', { speaker: sp }); return; }

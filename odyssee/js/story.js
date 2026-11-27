@@ -205,7 +205,9 @@ async function lumenSanct(g, talked) {
   if (f.giftMaster) { if (talked) await say(g, f.lugia ? ['Lugia est apaisé... Tu as rendu le jour à la région. Merci.'] : ['Lugia dort au fond du Sanctuaire. Bonne chance !'], who); return talked; }
   g.busy = true;
   const n = g.npcs.find((q) => q.id === 'lumen-sanct'); if (n) n.dir = 'left';
-  await say(g, [`${st.name} ! Toi aussi, tu as trouvé le chemin du Sanctuaire !`, 'La Team Éclipse est au fond, près de l\'autel. Le Prisme Noir a fermé le cœur de Lugia : c\'est devenu un Pokémon Obscur.', 'Si Lugia se réveille, il faudra briser l\'emprise du Prisme — en le battant ou en le capturant. Si tu le captures, le Prof. Saule saura ouvrir son cœur.', 'Prends cette Master Ball. Elle capture n\'importe quel Pokémon, à coup sûr. Ne la gaspille pas !'], who);
+  await say(g, [`${st.name} ! Toi aussi, tu as trouvé le chemin du Sanctuaire !`, 'La Team Éclipse est au fond, près de l\'autel. Le Prisme Noir a fermé le cœur de Lugia : c\'est devenu un Pokémon Obscur.', 'Laisse-moi d\'abord soigner ton équipe avant que tu n\'avances.', 'Si Lugia se réveille, il faudra briser l\'emprise du Prisme — en le battant ou en le capturant. Si tu le captures, le Prof. Saule saura ouvrir son cœur.', 'Prends cette Master Ball. Elle capture n\'importe quel Pokémon, à coup sûr. Ne la gaspille pas !'], who);
+  for (const m of st.party) healFull(m);
+  g.sound.sfx('heal');
   f.giftMaster = true;
   await receive(g, 'master-ball');
   g.busy = false;
@@ -271,12 +273,12 @@ export async function lugiaBattle(g) {
     st.flags['L:lugia'] = 'caught'; st.flags.lugiaCaught = true;
     g.setTile(LUGIA_ALTAR.x, LUGIA_ALTAR.y, T.CAVE); g.view.removeActor('lugia');
     await ui.say(['Le Prisme Noir se brise en mille éclats !', 'Lugia est libéré de son emprise... mais son cœur reste encore fermé. Le Prof. Saule saura peut-être l\'ouvrir.']);
-    g.give('prism-shard');
+    await receive(g, 'prism-shard');
   } else if (res === 'win') {
     st.flags['L:lugia'] = st.flags['L:lugia'] || 'met';
     g.setTile(LUGIA_ALTAR.x, LUGIA_ALTAR.y, T.CAVE); g.view.removeActor('lugia');
     await ui.say(['Lugia Obscur s\'effondre sur l\'autel... Le Prisme Noir vole en éclats.', 'Libéré, Lugia déploie ses ailes et s\'envole vers le nord, au-dessus de la mer.', 'Il doit retourner dormir dans la Grotte des Tourbillons, sous l\'Île Givrée...']);
-    g.give('prism-shard');
+    await receive(g, 'prism-shard');
   } else if (res === 'lose') return;
   else { await ui.say('Lugia Obscur reste sur l\'autel, les yeux fixés sur toi...'); return; }
   if (!st.flags.lugia) await endEclipse(g);
@@ -302,7 +304,7 @@ export async function placeLugia(g) {
   }
   const img = await loadImg(ASSETS.front(LUGIA, false, true));
   if (g.mapObj.id !== LUGIA_ALTAR.map || !img) return;
-  const a = g.view.imageActor('lugia', img, 0.55);
+  const a = g.view.imageActor('lugia', img, 1.15, { lumineux: true });
   g.view.place(a, LUGIA_ALTAR.x, LUGIA_ALTAR.y - 0.1);
 }
 

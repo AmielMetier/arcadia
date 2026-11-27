@@ -1268,6 +1268,10 @@ export async function playBossCinematic(game, opts = {}) {
       } catch (e) { hasWebGL = false; }
     }
 
+    // la première image se prépare (nuanceurs, textures) avant que le temps de la scène et la partition ne commencent
+    if (sceneCtrl) { try { sceneCtrl.update(0, 0); } catch (e) { warnDev('cinematic', e); } }
+    if (typeof requestAnimationFrame === 'function') await new Promise((r) => { requestAnimationFrame(() => requestAnimationFrame(r)); setTimeout(r, 400); });
+
     try {
       if (epic && sound?.playShadowLugiaEpic) {
         audioCtrl = sound.playShadowLugiaEpic({ cryUrl });
@@ -1277,10 +1281,6 @@ export async function playBossCinematic(game, opts = {}) {
         audioCtrl = sound.playLugiaCinematicAudio();
       }
     } catch (e) { warnDev('cinematic', e); }
-
-    // la première image se prépare (nuanceurs, textures) avant que le temps de la scène ne commence : rien n'est sauté
-    if (sceneCtrl && !epic) { try { sceneCtrl.update(0, 0); } catch (e) { warnDev('cinematic', e); } }
-    if (typeof requestAnimationFrame === 'function') await new Promise((r) => { requestAnimationFrame(() => requestAnimationFrame(r)); setTimeout(r, 400); });
 
     await new Promise((resolve) => {
       const dur = cfg.duration || 6.4;

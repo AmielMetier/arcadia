@@ -70,6 +70,7 @@ const QUESTS = [
       [(f) => f.giftFlash, 'Le Dr Lumen m\'a parlé d\'un « Prisme Noir », capable de fermer le cœur d\'un Pokémon.'],
       [(f) => f['T:ecl:erebe1'], 'Érèbe, un Admin de la Team Éclipse, pillait les Pierres Lune de la Grotte Lunaire.'],
       [(f) => f['T:ecl:nyx1'], 'Nyx, une autre Admin, harcelait un vieux marin de Port-Azur au sujet du gardien des mers.'],
+      [(f) => f['A:giftForce'] && !f['T:ecl:erebe2'], 'L\'Arène de Voltacité est fermée : la Team Éclipse occupe la Centrale au nord de la ville.'],
       [(f) => f['T:ecl:erebe2'], 'J\'ai chassé la Team Éclipse de la Centrale de Voltacité. Elle volait l\'électricité de la région pour son Prisme.'],
       [(f) => f.eclipse, 'J\'ai battu Nocturne, le chef de la Team Éclipse, dans son repaire. Mais une nuit violette est tombée sur toute la région.'],
       [(f) => f.giftPlume, 'La voyante de Mirage m\'a confié la Plume Argentée, qui ouvre le Sanctuaire des Marées.'],
