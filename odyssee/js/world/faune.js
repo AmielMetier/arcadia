@@ -129,7 +129,7 @@ export function addMarches(W, towns) {
 /** grottes : trois parois qui brillent, à fouiller une fois par jour */
 export function addFouilles(maps) {
   for (const m of Object.values(maps)) {
-    if (m.floor !== 'cave') continue;
+    if (m.floor !== 'cave' || m.id === 'sanctuaire') continue;
     const cands = [];
     for (let y = 1; y < m.h - 2; y++) for (let x = 1; x < m.w - 1; x++)
       if (m.get(x, y) === T.CAVEWALL && m.get(x, y + 1) === T.CAVE && !m.objectAt(x, y) && !m.objectAt(x, y + 1)) cands.push([x, y]);
@@ -194,7 +194,7 @@ export function addVoisinage(W, maps, routes, towns) {
   });
   // grottes : un mineur ou une exploratrice
   for (const m of Object.values(maps)) {
-    if (m.floor !== 'cave') continue;
+    if (m.floor !== 'cave' || m.id === 'sanctuaire') continue;
     const ok = (x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (m.get(x + dx, y + dy) !== T.CAVE || m.objectAt(x + dx, y + dy) || m.npcs.some((n) => Math.abs(n.x - x - dx) + Math.abs(n.y - y - dy) === 0) || m.warpAt?.(x + dx, y + dy)) return false; return true; };
     for (let k = 0; k < 300; k++) {
       const x = 2 + Math.floor(h32(m.w, k, 21) * (m.w - 4)), y = 2 + Math.floor(h32(m.h, k, 22) * (m.h - 4));

@@ -77,13 +77,21 @@ const GYM_GIFT = { 3: 'coupe', 4: 'surf', 5: 'eclate', 6: 'vol' };
 const FACES = {
   // Professeur & Rivaux
   'Prof. Saule': 'saule', 'Professeur Saule': 'saule', 'Saule': 'saule',
+  'Dr Lumen': 'lumen', 'Lumen': 'lumen',
   [RIVAL_NAME]: 'theo', 'Théo': 'theo', 'Theo': 'theo', 'Rival': 'theo',
+  'Ethan': 'player_m', 'Lyra': 'player_f',
   // Famille & PNJ récurrents
   'Maman': 'maman', 'Mère de Théo': 'habitante', 'Infirmière': 'nurse',
   'Vendeur': 'vendeur', 'Garde': 'garde', 'Capitaine': 'capitaine', 'Capitaine Corentin': 'capitaine',
   'Architecte': 'topdresseur', 'Pierre': 'pierre', 'Croupier': 'croupier', 'Facteur': 'facteur',
   'Gardien du phare': 'scientifique', 'Ermite': 'montagnard', 'Styliste': 'topdresseuse',
   'Gardien du savoir': 'scientifique', 'Inspectrice Morvan': 'topdresseuse', 'Morvan': 'topdresseuse',
+  'Ingénieur': 'scientifique', 'Voyante': 'medium', 'Guide': 'habitant',
+  'Éleveuse': 'habitante', 'Chercheur': 'scientifique', 'Hélène': 'habitante',
+  'Dr Cassandre': 'scientifique', 'Conteuse Éléonore': 'habitante', 'Papi Octave': 'vieil_homme',
+  'Mme Léonie': 'habitante', 'Présentatrice': 'topdresseuse', 'Ingrid': 'habitante',
+  'Pr Cèdre': 'scientifique', 'Doyenne Amaya': 'habitante', 'Vieille dame': 'habitante',
+  'Jardinier Firmin': 'jardinier', 'Lucien': 'habitant', 'Gustave': 'vieil_homme',
   // Champions du Continent
   'Hector': 'hector', 'Marine': 'marine', 'Volta': 'volta', 'Flora': 'flora',
   'Sibylle': 'sibylle', 'Basalte': 'basalte', 'Pyros': 'pyros', 'Drakos': 'drakos',
@@ -114,7 +122,7 @@ const TRAINER_NAME_TO_SPRITE = {
   'neige': 'randonneuse', 'flocon': 'randonneuse', 'hayate': 'voleur', 'raiden': 'voleur', 'arsène': 'voleur', 'sakura': 'kimono',
   'nils': 'gamin', 'timéo': 'gamin', 'rosalie': 'fillette', 'lison': 'fillette', 'fernand': 'habitant', 'm. fernand': 'habitant',
   'rose': 'habitante', 'mme rose': 'habitante', 'héliotrope': 'habitante', 'mme héliotrope': 'habitante',
-  'opaline': 'habitante', 'madame opaline': 'habitante', 'jules': 'insectomane', 'watt': 'scientifique', 'mlle watt': 'scientifique',
+  'opaline': 'medium', 'madame opaline': 'medium', 'jules': 'insectomane', 'watt': 'scientifique', 'mlle watt': 'scientifique',
   'gustave': 'vieil_homme', 'papi gustave': 'vieil_homme', 'léon': 'vieil_homme', 'vieux léon': 'vieil_homme', 'firmin': 'montagnard',
   'séraphine': 'medium', 'sven': 'pecheur', 'corentin': 'marin',
 };
@@ -186,9 +194,12 @@ export class Game {
       if (TRAINER_NAME_TO_SPRITE[low]) { const p = visage(TRAINER_NAME_TO_SPRITE[low]); if (p) return p; }
       if (CLASS_TO_SPRITE[low]) { const p = visage(CLASS_TO_SPRITE[low]); if (p) return p; }
       const words = s.split(/\s+/);
-      for (const w of words) {
+      for (const raw of words) {
+        const w = raw.replace(/^[,.:;!?«»"']+|[,.:;!?«»"']+$/g, '');
+        if (!w) continue;
         const wLow = w.toLowerCase();
         if (FACES[w]) { const p = visage(FACES[w]); if (p) return p; }
+        if (FACES[wLow]) { const p = visage(FACES[wLow]); if (p) return p; }
         if (TRAINER_NAME_TO_SPRITE[wLow]) { const p = visage(TRAINER_NAME_TO_SPRITE[wLow]); if (p) return p; }
         if (CLASS_TO_SPRITE[wLow]) { const p = visage(CLASS_TO_SPRITE[wLow]); if (p) return p; }
       }
@@ -1901,6 +1912,7 @@ export class Game {
     }
     const res = await this.runBattle({ trainer: { ...tr, ...(d.leader != null ? { leader: d.leader } : {}), bs: tr.bs || tr.ow || n.sprite, items: { ...(tr.items || {}) } }, party, music, id: n.id, leader: d.leader, champion: d.champion, rival: d.rival, noWhiteout: d.noWhiteout, format: tr.format || d.format, slots: tr.slots || d.slots });
     this.musicLock = false;
+    this.updateZone();
     if (res === 'win') {
       st.flags['T:' + n.id] = true;
       noteCombat(this, n);
@@ -1908,8 +1920,8 @@ export class Game {
       if (d.leader != null) await this.badgeScene(d.leader, tr.name);
       if (typeof d.onWin === 'function') await d.onWin(this.api(), n); else if (d.onWin) await this.script(d.onWin, n);
       if (d.beatenPos) { await this.npcWalk(n, 'right', d.beatenPos[0] - n.x); n.dir = 'down'; n.home = [n.x, n.y]; }
-      if (d.vanish) { await this.ui.fade(true, 200); this.npcs = this.npcs.filter((q) => q !== n); this.view.removeActor('npc:' + n.id); await this.ui.fade(false, 200); }
       if (d.winScript) await storyWin(this, d.winScript, n);
+      if (d.vanish && this.npcs.includes(n)) { await this.ui.fade(true, 200); this.npcs = this.npcs.filter((q) => q !== n); this.view.removeActor('npc:' + n.id); await this.ui.fade(false, 200); }
       if (d.beatenPos || d.vanish || d.winScript) this.refreshNpcs();
       if (d.champion) await this.ending();
       if (d.leader != null) await this.retourEntreeArene();

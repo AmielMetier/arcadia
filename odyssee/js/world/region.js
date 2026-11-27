@@ -121,9 +121,9 @@ export const ENC = {
   r3: [[1055, 13, 16, 6], [1026, 13, 16, 15], [1034, 13, 16, 15], [1011, 13, 16, 10], [1014, 14, 16, 5], [21, 13, 16, 15], [27, 13, 16, 10], [56, 13, 16, 10], [66, 13, 16, 10], [1039, 13, 16, 10]],
   grotte: [[1057, 13, 17, 6], [1024, 13, 17, 35], [1028, 14, 17, 15], [1026, 13, 16, 15], [74, 13, 17, 15], [41, 13, 17, 10], [1047, 14, 16, 7], [95, 15, 17, 3]],
   r4: [[1059, 18, 21, 6], [1031, 18, 21, 20], [1029, 18, 21, 15], [1026, 18, 21, 10], [54, 18, 21, 10], [72, 18, 21, 10], [98, 18, 21, 10], [1011, 18, 21, 10], [1037, 18, 21, 8], [179, 18, 21, 7]],
-  r5: [[1055, 17, 20, 5], [1034, 16, 20, 12], [1035, 19, 21, 3], [1036, 17, 20, 10], [1037, 16, 19, 10], [100, 16, 20, 10], [81, 16, 20, 10], [1014, 17, 20, 10], [1043, 17, 20, 10], [77, 17, 21, 10], [1015, 16, 19, 10], [58, 17, 20, 5]],
-  r6: [[1053, 21, 24, 6], [1021, 21, 23, 10], [1022, 24, 25, 3], [1038, 21, 24, 12], [1039, 21, 23, 10], [1040, 25, 26, 2], [1019, 22, 24, 8], [1020, 21, 24, 10], [43, 21, 23, 10], [69, 21, 23, 10], [114, 22, 25, 8], [123, 24, 26, 3], [127, 24, 26, 2], [1016, 24, 26, 7]],
-  r7: [[1011, 26, 29, 10], [1023, 26, 30, 10], [1039, 26, 29, 10], [1043, 27, 30, 10], [1031, 26, 29, 10], [96, 26, 30, 10], [177, 26, 29, 10], [203, 27, 30, 10], [1012, 30, 30, 3], [1029, 26, 29, 10], [216, 26, 29, 7]],
+  r5: [[1055, 25, 27, 5], [1034, 24, 27, 12], [1035, 26, 28, 3], [1036, 24, 27, 10], [1037, 24, 27, 10], [100, 24, 27, 10], [81, 24, 27, 10], [1014, 24, 27, 10], [1043, 25, 28, 10], [77, 25, 28, 10], [1015, 24, 27, 10], [58, 25, 28, 5]],
+  r6: [[1053, 29, 32, 6], [1021, 29, 31, 10], [1022, 31, 33, 3], [1038, 29, 32, 12], [1039, 29, 31, 10], [1040, 32, 33, 2], [1019, 30, 32, 8], [1020, 29, 32, 10], [43, 29, 31, 10], [69, 29, 31, 10], [114, 30, 33, 8], [123, 31, 33, 3], [127, 31, 33, 2], [1016, 31, 33, 7]],
+  r7: [[1011, 34, 37, 10], [1023, 34, 38, 10], [1039, 34, 37, 10], [1043, 35, 38, 10], [1031, 34, 37, 10], [96, 34, 38, 10], [177, 34, 37, 10], [203, 35, 38, 10], [1012, 37, 38, 3], [1029, 34, 37, 10], [216, 34, 37, 7]],
   mer: [[1029, 25, 32, 25], [1031, 25, 32, 20], [1007, 28, 30, 3], [1045, 28, 32, 10], [72, 25, 32, 20], [1033, 30, 33, 7], [120, 26, 32, 10], [1027, 32, 34, 5]],
   granit: [[1060, 36, 38, 3], [1026, 34, 37, 15], [1027, 36, 38, 5], [1028, 34, 38, 15], [1047, 34, 37, 10], [1048, 37, 39, 3], [74, 34, 37, 15], [111, 35, 38, 10], [1045, 34, 37, 10], [1046, 37, 39, 2], [95, 35, 38, 10], [1024, 34, 37, 5], [140, 34, 37, 4], [138, 34, 37, 4], [447, 34, 36, 3]],
   cendre: [[1041, 38, 42, 20], [1042, 41, 43, 5], [1005, 40, 42, 3], [77, 38, 42, 15], [126, 40, 43, 5], [1028, 38, 41, 10], [1043, 38, 42, 12], [1044, 41, 43, 3], [218, 38, 42, 12], [1036, 38, 41, 10]],
@@ -167,7 +167,7 @@ export const LEADERS = [
   { name: 'Marine', type: 'water', ow: 'marine', team: [[1031, 19], [1029, 19], [120, 20], [1033, 22]], intro: 'La marée monte ! Tu vas te faire emporter par mes Pokémon de l\'océan !', lose: 'Ouah, tu as tenu face à la vague. Voici le Badge Écume !' },
   { name: 'Volta', type: 'electric', ow: 'volta', team: [[1034, 25], [1036, 26], [82, 26], [1035, 29]], intro: 'Ça grésille ! Prépare-toi à recevoir le choc de ta vie !', lose: 'Court-circuit total ! Tu remportes le Badge Volt.' },
   { name: 'Flora', type: 'grass', ow: 'flora', team: [[1021, 30], [1038, 31], [114, 31], [1022, 34]], intro: 'Mes fleurs sont belles, mais elles savent piquer. Prêt ?', lose: 'Tu as fait éclore quelque chose de beau. Le Badge Pétale te revient.' },
-  { name: 'Sibylle', type: 'psychic', ow: 'sibylle', team: [[1039, 35], [1030, 36], [1019, 36], [65, 37], [1040, 39]], intro: 'J\'ai déjà vu l\'issue de ce combat... mais montre-moi quand même.', lose: 'L\'avenir m\'a trompée. Le Badge Mirage est à toi.' },
+  { name: 'Sibylle', type: 'psychic', ow: 'sibylle', team: [[1039, 35], [1030, 36], [1019, 36], [65, 37, null, [94, 324, 347, 105]], [1040, 39, null, [94, 585, 347, 236]]], intro: 'J\'ai déjà vu l\'issue de ce combat... mais montre-moi quand même.', lose: 'L\'avenir m\'a trompée. Le Badge Mirage est à toi.' },
   { name: 'Basalte', type: 'rock', ow: 'basalte', team: [[1026, 40], [111, 41], [1028, 42], [95, 42], [1027, 44]], intro: 'Mon frère aîné m\'a confié cette île. Pour aller plus loin, il faudra passer à travers la roche !', lose: 'Tu as fendu le roc... Le Badge Granit est à toi. Drakos ne va pas aimer ça.' },
   { name: 'Pyros', type: 'fire', ow: 'pyros', team: [[1041, 45], [78, 46], [1005, 46], [126, 47], [1042, 49]], intro: 'Le volcan gronde et mon cœur aussi ! Personne ne passe sur la Grande Île sans brûler un peu !', lose: 'Quelle flamme... Le Badge Braise te va bien. Va. Drakos t\'attend.' },
   { name: 'Drakos', type: 'dragon', ow: 'drakos', team: [[1049, 50], [1044, 52], [148, 52], [1050, 53], [149, 54], [1051, 56]], intro: 'Dix ans que personne n\'a franchi cette porte. Célestine t\'envoie ? Peu importe. Ici, c\'est moi qui règne !', lose: '... Les dragons te reconnaissent. Prends le Badge Écaille. Les huit badges du Nord sont à toi — les sept Champions des Terres du Sud t\'attendent au-delà du Pont de l\'Austral.' },
@@ -440,8 +440,9 @@ function lotir(W, def, poser) {
 /** garde posté devant la porte de l'arène d'une île (on peut y arriver par la mer de plusieurs côtés) */
 function gymGuard(W, def, badges, text) {
   const [dx, dy] = def.gymDoor;
-  const npc = W.npc({ id: `${def.id}:garde-arene`, x: dx + 1, y: dy + 1, dir: 'left', sprite: 'garde', gate: { badges, tiles: [[dx, dy + 1]] }, text });
-  W.gates.push({ npc: npc.id, badges, tiles: [[dx, dy + 1]] });
+  const tiles = def.doubleDoor ? [[dx, dy + 1], [dx + 1, dy + 1]] : [[dx, dy + 1], [dx + 1, dy + 1]];
+  const npc = W.npc({ id: `${def.id}:garde-arene`, x: dx + 1, y: dy + 1, dir: 'left', sprite: 'garde', gate: { badges, tiles }, text });
+  W.gates.push({ npc: npc.id, badges, tiles });
 }
 
 /** réoriente tout dresseur dont la ligne de vue est immédiatement bloquée par un mur, relief ou obstacle */
@@ -977,29 +978,29 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
   const r5 = G2({ id: 'r5', nom: 'Route 5', de: porte('E', 'r5'), vers: arrivee('F', 'r5'), long: 17, graine: 707, w: 12, grass: 0.75, trees: 0.05, rocks: 0.01, paysages: ['prairie', 'rebords', 'rochers', 'etang', 'fleurs', 'riviere', 'bosquet'], branches: 0.4, raccourci: 'eclate', anciens: 5, panneaux: ['ROUTE 5\n↓ Floralia', 'ROUTE 5\n↑ Voltacité'], voix: 'general' }, 'r5');
   // au milieu de la route, un tertre : un escalier taillé y grimpe, sa falaise domine le sentier
   tertre(W, r5, 0.5, 'ether', 2);
-  routeTrainer(W, r5, 0.12, 1, 4, 'Scientifique', 'Aurélien', [[1036, 19], [100, 19], [81, 20]]);
-  routeTrainer(W, r5, 0.3, -1, 4, 'Randonneuse', 'Élise', [[77, 20], [1014, 20]]);
-  routeTrainer(W, r5, 0.46, 1, 4, 'Karatéka', 'Kenji', [[66, 21], [1033, 22]]);
-  routeTrainer(W, r5, 0.6, -1, 4, 'Gamin', 'Nathan', [[1034, 20], [22, 20], [209, 21]]);
-  routeTrainer(W, r5, 0.78, 1, 4, 'Topdresseuse', 'Zoé', [[1037, 22], [1043, 21], [179, 21]]);
+  routeTrainer(W, r5, 0.12, 1, 4, 'Scientifique', 'Aurélien', [[1036, 26], [100, 26], [81, 27]]);
+  routeTrainer(W, r5, 0.3, -1, 4, 'Randonneuse', 'Élise', [[77, 27], [1014, 27]]);
+  routeTrainer(W, r5, 0.46, 1, 4, 'Karatéka', 'Kenji', [[66, 28], [1033, 29]]);
+  routeTrainer(W, r5, 0.6, -1, 4, 'Gamin', 'Nathan', [[1034, 27], [22, 27], [209, 28]]);
+  routeTrainer(W, r5, 0.78, 1, 4, 'Topdresseuse', 'Zoé', [[1037, 29], [1043, 28], [179, 28]]);
   routeItem(W, r5, 0.22, -1, 5, 'super-potion', 2); routeItem(W, r5, 0.5, 1, 5, 'thunder-stone'); routeItem(W, r5, 0.7, -1, 5, 'full-heal'); routeItem(W, r5, 0.9, 1, 5, 'rare-candy');
 
   const r6 = G2({ id: 'r6', nom: 'Route 6', de: porte('F', 'r6'), vers: arrivee('G', 'r6'), long: 10, graine: 808, w: 12, grass: 0.8, trees: 0.06, flowers: 0.04, paysages: ['fleurs', 'prairie', 'plateau', 'etang', 'bosquet'], branches: 0.4, anciens: 4, panneaux: ['ROUTE 6\n→ Mirage', 'ROUTE 6\n← Floralia'], voix: 'general' }, 'r6', 'route2');
   // une falaise boisée et un petit belvédère où l'on monte par un escalier taillé
   tertre(W, r6, 0.8, 'elixir', 1);
-  routeTrainer(W, r6, 0.15, 1, 4, 'Randonneuse', 'Nina', [[1038, 24], [70, 24]]);
-  routeTrainer(W, r6, 0.35, -1, 4, 'Insectomane', 'Thibault', [[1019, 25], [127, 25]]);
-  routeTrainer(W, r6, 0.55, 1, 3, 'Médium', 'Gwenaëlle', [[1023, 25], [92, 24], [1039, 26]]);
-  routeTrainer(W, r6, 0.75, -1, 4, 'Topdresseur', 'Axel', [[47, 26], [1020, 26], [1016, 26]]);
+  routeTrainer(W, r6, 0.15, 1, 4, 'Randonneuse', 'Nina', [[1038, 31], [70, 31]]);
+  routeTrainer(W, r6, 0.35, -1, 4, 'Insectomane', 'Thibault', [[1019, 32], [127, 32]]);
+  routeTrainer(W, r6, 0.55, 1, 3, 'Médium', 'Gwenaëlle', [[1023, 32], [92, 32], [1039, 33]]);
+  routeTrainer(W, r6, 0.75, -1, 4, 'Topdresseur', 'Axel', [[47, 33], [1020, 33], [1016, 34]]);
   routeItem(W, r6, 0.25, -1, 5, 'leaf-stone'); routeItem(W, r6, 0.65, 1, 5, 'hyper-potion'); routeItem(W, r6, 0.9, -1, 5, 'revive');
 
   // route 7 : de Mirage au Cap Mirage, face à l'archipel
   const CAP = { x: 830, y: 548 };
   const r7 = G2({ id: 'r7', nom: 'Route 7', de: porte('G', 'r7'), vers: { x: CAP.x, y: CAP.y, dir: 's' }, effile: [true, false], long: 6, graine: 909, w: 12, grass: 0.7, trees: 0.04, rocks: 0.03, paysages: ['rebords', 'rochers', 'prairie', 'fleurs'], branches: 0.4, anciens: 4, panneaux: ['ROUTE 7\n↓ Cap Mirage', null], voix: 'mer' }, 'r7');
-  routeTrainer(W, r7, 0.25, 1, 4, 'Médium', 'Ophélie', [[1023, 28], [97, 29]]);
-  routeTrainer(W, r7, 0.55, -1, 4, 'Karatéka', 'Bruno', [[1033, 29], [107, 29], [106, 30]]);
-  routeTrainer(W, r7, 0.8, 1, 4, 'Topdresseuse', 'Lou', [[78, 31], [1012, 31], [1040, 30]]);
-  routeTrainer(W, r7, 0.4, 1, 3, 'Pêcheur', 'Yohan', [[1029, 28], [118, 29]]);
+  routeTrainer(W, r7, 0.25, 1, 4, 'Médium', 'Ophélie', [[1023, 36], [97, 37]]);
+  routeTrainer(W, r7, 0.55, -1, 4, 'Karatéka', 'Bruno', [[1033, 37], [107, 37], [106, 38]]);
+  routeTrainer(W, r7, 0.8, 1, 4, 'Topdresseuse', 'Lou', [[78, 38], [1012, 39], [1040, 38]]);
+  routeTrainer(W, r7, 0.4, 1, 3, 'Pêcheur', 'Yohan', [[1029, 36], [118, 37]]);
   routeItem(W, r7, 0.4, -1, 5, 'fire-stone'); routeItem(W, r7, 0.25, 1, 5, 'eviolite', 1, 'item:r7:eviolite');
   // Cap Mirage : plage, ponton et le rival qui attend
   { const { x, y } = CAP; W.rect(x - 22, y, x + 22, y + 6, T.SAND, [T.TREE, T.GRASS, T.TALL, T.WATER, T.FLOWER]); W.rect(x - 22, y + 7, x + 22, y + 9, T.WATER, [T.TREE, T.GRASS, T.SAND, T.TALL]);

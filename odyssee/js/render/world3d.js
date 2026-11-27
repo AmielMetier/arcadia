@@ -1320,8 +1320,8 @@ export class WorldView {
         // mur du fond en volume ; murs latéraux et bas réduits à une bordure sombre, comme sur DS
         if (y <= 1 && this.int) this.murInterieur(Wl, x, y, wallH);
         else if (y <= 1) { const south = m.get(x, y + 1) !== T.WALL; box(Wl, x, y, x + 1, y + 1, wallH, A[m.wallStyle] || A.wall_in, A.walltop, A.walltop, { south, east: false, west: false }); }
-        // cloisons entre deux salles (m.cloisons : Arène de Sylvebourg) : face sud en volume, d'une case de haut
-        else if (m.cloisons && y < m.h - 1 && x > 0 && x < m.w - 1 && m.get(x, y + 1) !== T.WALL) box(Wl, x, y, x + 1, y + 1, Math.tan(EL), A[m.wallStyle] || A.wall_in, A.walltop, A.walltop, { south: true, east: m.get(x + 1, y) !== T.WALL, west: m.get(x - 1, y) !== T.WALL });
+        // cloisons entre deux salles (m.cloisons : Arènes) : volume complet (y compris pans verticaux)
+        else if (m.cloisons && y < m.h - 1 && x > 0 && x < m.w - 1) box(Wl, x, y, x + 1, y + 1, Math.tan(EL), A[m.wallStyle] || A.wall_in, A.walltop, A.walltop, { south: m.get(x, y + 1) !== T.WALL, east: m.get(x + 1, y) !== T.WALL, west: m.get(x - 1, y) !== T.WALL });
         else flat(Wl, x, y, x + 1, y + 1, 0.01, (this.int && A[`int_${this.int}_bord`]) || A.walltop);
       } else if (t === T.CAVEWALL) {
         // dehors (montagnes des entrées de grottes, bord du monde) : mêmes plateaux de roche que dans les grottes
@@ -1504,14 +1504,22 @@ export class WorldView {
       dessus(wallH, capv);
       return true;
     }
+    const cote = (xp, z0, z1) => {
+      Wl.quad([xp, 0, z0], [xp, 0, z1], [xp, wallH / 2, z1], [xp, wallH / 2, z0], bas[0], bas[1], bas[2], bas[3], 0.8);
+      Wl.quad([xp, wallH / 2, z0], [xp, wallH / 2, z1], [xp, wallH, z1], [xp, wallH, z0], haut[0], haut[1], haut[2], haut[3], 0.8);
+    };
     if (m.etat && (y === m.h - 10 || y === m.h - 9) && W(1, y) && W(m.w - 2, y)) {
       // cloison d'une arène dessinée (entre l'accueil et l'arène) : un vrai mur HGSS de deux rangs, face sud et
       // montants de la porte en volume, coiffé de son chaperon (au lieu d'une bordure à plat)
       if (!W(x, y + 1)) face(x, x + 1, y + 1, wallH);
-      const cote = (xp, z0, z1) => {
-        Wl.quad([xp, 0, z0], [xp, 0, z1], [xp, wallH / 2, z1], [xp, wallH / 2, z0], bas[0], bas[1], bas[2], bas[3], 0.8);
-        Wl.quad([xp, wallH / 2, z0], [xp, wallH / 2, z1], [xp, wallH, z1], [xp, wallH, z0], haut[0], haut[1], haut[2], haut[3], 0.8);
-      };
+      if (!W(x + 1, y)) cote(x + 1, y + 1, y);
+      if (!W(x - 1, y)) cote(x, y, y + 1);
+      dessus(wallH, capv);
+      return true;
+    }
+    if (m.cloisons && y > 1 && y < m.h - 1 && x > 0 && x < m.w - 1) {
+      // cloisons internes horizontales et verticales d'arène (Floralia, Mirage) en volume HGSS complet
+      if (!W(x, y + 1)) face(x, x + 1, y + 1, wallH);
       if (!W(x + 1, y)) cote(x + 1, y + 1, y);
       if (!W(x - 1, y)) cote(x, y, y + 1);
       dessus(wallH, capv);

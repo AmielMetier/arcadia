@@ -206,18 +206,18 @@ export function texturesArenes(putImg) {
   putImg('dec_fleur_ouverte', toile(32, 32, (T) => { T.rect(0, 0, 32, 32, '#9ad07a'); T.cadre(0, 0, 32, 32, '#d880a8'); grain(T, 10, ['#b0e090', '#ffd0e0']); fleur(T, true, 16, 12); }));
   putImg('dec_arche_fleurie', toile(32, 32, (T) => { T.rect(0, 0, 32, 32, '#7ab05a'); for (let k = 0; k < 6; k++) { const x = 3 + k * 5; T.rect(x, 2, 2, 2, ['#ff8ab0', '#f6d040', '#ffffff'][k % 3]); T.rect(x + 1, 28, 2, 2, ['#ffffff', '#ff8ab0', '#f6d040'][k % 3]); } grain(T, 12, ['#8ac06a', '#6a9a4a']); }));
 
-  // ------- Mirage (Psy) : téléporteurs de lune et de soleil (allumés / éteints), points d'arrivée
-  const tele = (T, c1, c2, c3, on) => {
-    T.disque(16, 16, 14, 14, '#2a2238'); T.disque(16, 16, 12, 12, on ? c1 : '#4a4458');
-    T.disque(16, 16, 8, 8, on ? c2 : '#5a5468'); T.disque(16, 16, 4, 4, on ? c3 : '#6a6478');
+  // ------- Mirage (Psy) : téléporteurs de lune, soleil et étoile (allumés / éteints), points d'arrivée
+  const tele = (T, c1, c2, c3, on, offRing = '#3c384a') => {
+    T.disque(16, 16, 14, 14, on ? '#2a2238' : offRing); T.disque(16, 16, 12, 12, on ? c1 : '#343040');
+    T.disque(16, 16, 8, 8, on ? c2 : '#3f3a4e'); T.disque(16, 16, 4, 4, on ? c3 : '#4a455a');
     if (on) for (let a = 0; a < 8; a++) T.p(16 + Math.cos(a * 0.785) * 10, 16 + Math.sin(a * 0.785) * 10, '#ffffff');
   };
-  putImg('dec_tp_lune', toile(32, 32, (T) => { tele(T, '#7a5ad0', '#a88af0', '#e8dcff', true); T.disque(17, 15, 3, 3, '#7a5ad0'); }));
-  putImg('dec_tp_lune_off', toile(32, 32, (T) => tele(T, '', '', '', false)));
+  putImg('dec_tp_lune', toile(32, 32, (T) => { tele(T, '#7a5ad0', '#a88af0', '#e8dcff', true); T.disque(18, 15, 3, 3, '#7a5ad0'); }));
+  putImg('dec_tp_lune_off', toile(32, 32, (T) => { tele(T, '', '', '', false, '#6a4aa8'); T.disque(15, 16, 4, 4, '#9a80d0'); T.disque(17, 15, 3, 3, '#3f3a4e'); }));
   putImg('dec_tp_soleil', toile(32, 32, (T) => { tele(T, '#e09a20', '#f6c84a', '#fff4c0', true); }));
-  putImg('dec_tp_soleil_off', toile(32, 32, (T) => tele(T, '', '', '', false)));
+  putImg('dec_tp_soleil_off', toile(32, 32, (T) => { tele(T, '', '', '', false, '#a07228'); for (let k = 0; k < 4; k++) { const a = k * 1.57; T.ligne(16, 16, 16 + Math.cos(a) * 6, 16 + Math.sin(a) * 6, '#c29240'); } T.disque(16, 16, 3, 3, '#d4a654'); }));
   putImg('dec_tp_etoile', toile(32, 32, (T) => { tele(T, '#2a6ad0', '#5aa0f0', '#d8f0ff', true); for (let k = 0; k < 5; k++) { const a = -1.57 + k * 1.2566; T.ligne(16, 16, 16 + Math.cos(a) * 5, 16 + Math.sin(a) * 5, '#ffffff'); } }));
-  putImg('dec_tp_etoile_off', toile(32, 32, (T) => tele(T, '', '', '', false)));
+  putImg('dec_tp_etoile_off', toile(32, 32, (T) => { tele(T, '', '', '', false, '#3864a8'); for (let k = 0; k < 5; k++) { const a = -1.57 + k * 1.2566; T.ligne(16, 16, 16 + Math.cos(a) * 5, 16 + Math.sin(a) * 5, '#729ee0'); } }));
   putImg('dec_arrivee', toile(32, 32, (T) => { for (let a = 0; a < 16; a++) T.p(16 + Math.cos(a * 0.393) * 11, 16 + Math.sin(a * 0.393) * 11, '#c8b8f0'); for (let a = 0; a < 8; a++) T.p(16 + Math.cos(a * 0.785) * 6, 16 + Math.sin(a * 0.785) * 6, '#e8e0ff'); }));
 
   // ------- Port-Granit (Roche) : fosses vides et comblées

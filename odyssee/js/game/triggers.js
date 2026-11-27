@@ -38,11 +38,12 @@ async function rivalFight(g, flag, team, lvlText, lines, after, who = null) {
   p.dir = dir; rival.bang = true; g.sound.sfx('bang'); await wait(500); rival.bang = false;
   if (n > 1) await g.npcWalk(rival, OPP[dir], n - 1);
   rival.dir = OPP[dir];
-  await ui.say(lines, { speaker: W.name });
+  const face = W.bs || W.sprite;
+  await ui.say(lines, { speaker: W.name, face });
   if (st.party.some((m) => m.hp < m.stats[0] || m.status)) {
     for (const m of st.party) healFull(m);
     g.sound.sfx('heal');
-    await ui.say('Avant de commencer, laisse-moi soigner ton équipe : je veux t\'affronter à pleine puissance !', { speaker: W.name });
+    await ui.say('Avant de commencer, laisse-moi soigner ton équipe : je veux t\'affronter à pleine puissance !', { speaker: W.name, face });
   }
   if (flag === 'rivalB3' || flag === 'rivalB4' || flag === 'rival4' || flag === 'rival5') {
     const subMap = {
@@ -65,7 +66,7 @@ async function rivalFight(g, flag, team, lvlText, lines, after, who = null) {
   g.musicLock = false;
   if (res === 'win') {
     st.flags[flag] = true;
-    await ui.say(after, { speaker: W.name });
+    await ui.say(after, { speaker: W.name, face });
     // il repart par où il est venu
     if (n > 1) await g.npcWalk(rival, dir, n - 1);
   }
@@ -88,7 +89,7 @@ export async function trigger(g, name) {
   // Théo t'attend sur la Route 2 une fois ton premier badge en poche (sa réplique et son équipe vont avec)
   if (name === 'rival2' && st.badges[0]) return rivalFight(g, 'rival2', (R) => [[1010, 12], [1013, 12], [R[0], 13]], 'Grr... Tu as eu de la chance !', [`${st.name} ! Tu as déjà ton premier badge ?`, 'Moi aussi, évidemment. Voyons qui a le plus progressé !'], ['Je vais m\'entraîner dans le Bois Murmure.', 'La prochaine fois, je ne perdrai pas !']);
   if (name === 'rival3') return rivalFight(g, 'rival3', (R) => [[1011, 27], [1034, 26], [1021, 26], [R[1], 29]], 'Encore ?! Tes Pokémon sont devenus sacrément forts...', ['Tiens, tiens... Le grand voyageur !', 'Floralia, c\'est ma ville porte-bonheur. Prépare-toi !'], ['Flora t\'attend à l\'Arène. Moi, je file vers l\'est.', 'On se retrouvera tout en haut, à la Ligue !']);
-  if (name === 'rival4') return rivalFight(g, 'rival4', (R) => [[1012, 36], [1035, 35], [1022, 36], [1019, 36], [R[2], 39]], 'Toi et tes Pokémon, vous êtes vraiment synchronisés...', [`${st.name} ! Tu vas sur les îles, toi aussi ?`, 'On dit que Drakos a battu tous ceux qui ont osé le défier, sauf Célestine.', 'Avant que tu y ailles, montre-moi si tu es prêt !'], ['Bon. Tu es prêt. Fonce !', 'Moi, je vais m\'entraîner sur la route 10. On se revoit avant la Ligue.']);
+  if (name === 'rival4' && st.badges[4]) return rivalFight(g, 'rival4', (R) => [[1012, 36], [1035, 35], [1022, 36], [1019, 36], [R[2], 39]], 'Toi et tes Pokémon, vous êtes vraiment synchronisés...', [`${st.name} ! Tu vas sur les îles, toi aussi ?`, 'On dit que Drakos a battu tous ceux qui ont osé le défier, sauf Célestine.', 'Avant que tu y ailles, montre-moi si tu es prêt !'], ['Bon. Tu es prêt. Fonce !', 'Moi, je vais m\'entraîner sur la route 10. On se revoit avant la Ligue.']);
   // second rival : l'autre enfant, petit-fils / petite-fille du professeur, recrue des Gardes d'Écaille
   const B = g.rivalB(), L3 = g.thirdLine(), bd = (k) => st.badges[k];
   const asB = { name: B.name, sprite: B.sprite, bs: B.bs, cls: 'Garde d\'Écaille' };

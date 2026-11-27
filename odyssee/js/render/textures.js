@@ -275,7 +275,7 @@ export function buildAtlas() {
     put('barr_' + g, (P) => { P.fill(c1); for (let y = 2; y < 16; y += 5) P.rect(0, y, 16, 2, shade(c1, -0.3)); P.rect(0, 0, 16, 1, c2); P.rect(7, 0, 2, 16, shade(c1, 0.25)); });
     put('barr_' + g + '_top', (P) => { P.fill(c2); P.rect(1, 1, 14, 14, c1); });
   }
-  putImg('dec_tp', decal16((P) => { P.rect(2, 2, 12, 12, '#4a3a7a'); P.rect(3, 3, 10, 10, '#8a6ae0'); P.rect(5, 5, 6, 6, '#c8b8ff'); P.rect(7, 7, 2, 2, '#ffffff'); P.p(3, 3, '#4a3a7a'); P.p(12, 3, '#4a3a7a'); P.p(3, 12, '#4a3a7a'); P.p(12, 12, '#4a3a7a'); }));
+  putImg('dec_tp', decal16((P) => { P.rect(2, 2, 12, 12, '#4f5a70'); P.rect(3, 3, 10, 10, '#c8d6ea'); P.rect(5, 5, 6, 6, '#eef4ff'); P.rect(7, 7, 2, 2, '#ffffff'); P.p(3, 3, '#4f5a70'); P.p(12, 3, '#4f5a70'); P.p(3, 12, '#4f5a70'); P.p(12, 12, '#4f5a70'); }));
   const chevron = (P, col, dark) => { for (let k = 0; k < 2; k++) for (let i = 0; i < 5; i++) { P.p(3 + i, 9 - i + k * 4, col); P.p(12 - i, 9 - i + k * 4, col); P.p(3 + i, 10 - i + k * 4, dark); P.p(12 - i, 10 - i + k * 4, dark); } };
   // flèches des arènes à énigmes, dessinées à 32 px (la densité des sols) : deux chevrons épais, cernés d'un trait
   // sombre, avec un reflet clair, lisibles sur n'importe quel sol (damier de l'Arène de Port-Azur compris)

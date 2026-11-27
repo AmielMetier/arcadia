@@ -1292,7 +1292,9 @@ export async function playBossCinematic(game, opts = {}) {
       let revealFlashed = false;
 
       const finish = () => {
-        cleanupAll();
+        if (done) return;
+        done = true;
+        if (pop) { try { pop(); } catch (e) { warnDev('cinematic', e); } pop = null; }
         resolve();
       };
 
