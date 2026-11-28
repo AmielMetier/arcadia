@@ -65,8 +65,9 @@ const freshSpr = () => ({ visible: false, img: null, scale: 1, alpha: 1, dx: 0, 
 
 /**
  * Fond de combat reteint (sans nouvelle image) : arènes de Voltacité (éclairs jaunes), Floralia (lumière verte de serre,
- * feuillages) et Mirage (lueur violette, étoiles), et la Nuit Violette dehors (assombri, ciel pourpre). Une toile par
- * image et par teinte, gardée en cache.
+ * feuillages), Mirage (lueur violette, étoiles), Port-Granit (ocre de carrière, strates et poussière), Cendrelune (rougeoiement
+ * de la lave par en dessous, braises) et Fort-Écaille (pénombre indigo, écailles d'or), et la Nuit Violette dehors
+ * (assombri, ciel pourpre). Une toile par image et par teinte, gardée en cache.
  */
 const FONDS_TEINTES = new Map();
 function fondTeinte(im, teinte) {
@@ -86,8 +87,9 @@ function fondTeinte(im, teinte) {
     x.fillStyle = '#c8a0ff'; x.beginPath(); x.arc(W * 0.78, H * 0.16, H * 0.075, 0, Math.PI * 2); x.fill();
     x.fillStyle = '#120a1e'; x.beginPath(); x.arc(W * 0.78, H * 0.16, H * 0.066, 0, Math.PI * 2); x.fill();
   } else {
-    const col = { electric: '#f0c838', grass: '#4aa850', psychic: '#9a6ae0' }[teinte] || '#ffffff';
-    voile('soft-light', col, 0.55);
+    const col = { electric: '#f0c838', grass: '#4aa850', psychic: '#9a6ae0', rock: '#c89a5a', fire: '#ff6a20', dragon: '#5a44c8' }[teinte] || '#ffffff';
+    if (teinte === 'dragon') voile('multiply', '#8a84b8', 0.5);   // la Tour de Drakos est sombre
+    voile('soft-light', col, teinte === 'fire' ? 0.4 : 0.55);
     voile('source-over', col, 0.1);
     x.globalCompositeOperation = 'source-over'; x.globalAlpha = 0.5;
     if (teinte === 'electric') {
@@ -98,6 +100,25 @@ function fondTeinte(im, teinte) {
       // feuillages de serre qui retombent des coins
       x.fillStyle = '#2e7a32';
       for (let k = 0; k < 14; k++) { const L = k < 7, px = L ? W * (0.02 + k * 0.03) : W * (0.98 - (k - 7) * 0.03), py = H * (0.02 + (k % 7) * 0.025); x.beginPath(); x.ellipse(px, py, W * 0.03, H * 0.018, L ? 0.5 : -0.5, 0, Math.PI * 2); x.fill(); }
+    } else if (teinte === 'rock') {
+      // strates de la carrière en haut du décor, poussière en suspension
+      x.strokeStyle = '#6a4e2c'; x.lineWidth = Math.max(1, W / 240);
+      for (const [py, d] of [[0.05, 0.012], [0.11, -0.01], [0.18, 0.008]]) { x.beginPath(); x.moveTo(0, H * py); for (let k = 1; k <= 8; k++) x.lineTo(W * k / 8, H * (py + (k % 2 ? d : -d))); x.stroke(); }
+      x.fillStyle = '#f0dcb0';
+      for (let k = 0; k < 22; k++) { const r = Math.max(1, W / 360); x.fillRect(((k * 0.618) % 1) * W, ((k * 0.271) % 1) * H * 0.6, r, r); }
+    } else if (teinte === 'fire') {
+      // la lave éclaire le décor par en dessous, des braises montent
+      x.globalCompositeOperation = 'screen'; x.globalAlpha = 0.55;
+      const g = x.createLinearGradient(0, H, 0, H * 0.45); g.addColorStop(0, '#ff5a10'); g.addColorStop(1, 'rgba(255,90,16,0)');
+      x.fillStyle = g; x.fillRect(0, H * 0.45, W, H * 0.55);
+      x.globalCompositeOperation = 'source-over'; x.globalAlpha = 0.8;
+      for (let k = 0; k < 20; k++) { const r = Math.max(1, W / 320); x.fillStyle = k % 3 ? '#ffb040' : '#ffe890'; x.fillRect(((k * 0.618) % 1) * W, H * (0.2 + ((k * 0.377) % 1) * 0.6), r, r); }
+    } else if (teinte === 'dragon') {
+      // frise d'écailles d'or en haut du décor, deux lueurs violettes
+      x.strokeStyle = '#e8c860'; x.lineWidth = Math.max(1, W / 260);
+      const r = W / 26; for (let k = 0; k < 14; k++) { x.beginPath(); x.arc(r + k * 2 * r, H * 0.02, r, 0, Math.PI); x.stroke(); }
+      x.globalCompositeOperation = 'screen'; x.globalAlpha = 0.45;
+      for (const px of [0.12, 0.88]) { const g = x.createRadialGradient(W * px, H * 0.22, 1, W * px, H * 0.22, W * 0.14); g.addColorStop(0, '#b080ff'); g.addColorStop(1, 'rgba(176,128,255,0)'); x.fillStyle = g; x.fillRect(W * (px - 0.14), 0, W * 0.28, H * 0.5); }
     } else if (teinte === 'psychic') {
       // petites étoiles qui flottent
       x.fillStyle = '#fff0ff';
@@ -458,9 +479,26 @@ export class BattleView {
   };
 
   drawWeatherFx(x, W, now) {
-    const w = this.battle?.weather;
+    // la météo du combat passe devant ; sans elle, le décor du lieu (cendres de Cendrelune : sans effet sur le combat)
+    const w0 = this.battle?.weather, w = !w0 || w0 === 'none' ? this.meteoDecor : w0;
     if (!w || w === 'none') return;
     x.save();
+    if (w === 'ash') {
+      // cendres : flocons gris qui tombent en biais, quelques braises qui montent
+      for (let i = 0; i < 30; i++) {
+        const px = ((i * 59 + now * 0.03 + Math.sin(now * 0.0015 + i) * 9) % (W + 20) + W + 20) % (W + 20) - 10;
+        const py = ((i * 41 + now * 0.05) % (BH + 10)) - 5;
+        x.fillStyle = i % 4 === 0 ? 'rgba(120, 112, 110, 0.6)' : 'rgba(200, 194, 190, 0.5)';
+        x.fillRect(Math.round(px), Math.round(py), i % 5 === 0 ? 3 : 2, 2);
+      }
+      for (let i = 0; i < 8; i++) {
+        const px = (i * 97 + Math.sin(now * 0.002 + i * 2) * 12 + W) % W;
+        const py = BH - ((i * 53 + now * 0.04) % (BH * 0.8));
+        x.fillStyle = `rgba(255, ${150 + (i % 3) * 30}, 60, ${0.5 + 0.3 * Math.sin(now * 0.006 + i)})`;
+        x.fillRect(Math.round(px), Math.round(py), 2, 2);
+      }
+      x.restore(); return;
+    }
     if (w === 'rain') {
       x.strokeStyle = 'rgba(160, 210, 255, 0.45)'; x.lineWidth = 1;
       for (let i = 0; i < 24; i++) {
@@ -704,7 +742,7 @@ export class BattleView {
 
   /* ---------------- lancement ---------------- */
   async run(battle, o = {}) {
-    this.battle = battle; this.slots = battle.slots || 1; this.kind = o.bg || 'grass'; this.alive = true; this.fond = o.fond || null; this.teinte = o.teinte || null;
+    this.battle = battle; this.slots = battle.slots || 1; this.kind = o.bg || 'grass'; this.alive = true; this.fond = o.fond || null; this.teinte = o.teinte || null; this.meteoDecor = o.meteoDecor || null;
     this.lastMove = 0; this.lastMoveMon = null;
     this.seenInBattle = new Set();
     this.W = Math.max(256, Math.min(420, Math.round(BH * innerWidth / innerHeight)));

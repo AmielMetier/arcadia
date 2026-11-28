@@ -13,8 +13,9 @@ const NB_MAISONS = [
   'maison_ville_rg', 'maison_ville_bl', 'maison_ville_ve',
   'manoir', 'manoir_r', 'manoir_v',
 ];
-/** décor du pack Noir & Blanc encore à dessiner : la cuve des quartiers industriels et de la centrale (world/quartiers.js) */
-export const DECOR_A_VENIR = ['cuve'];
+/** décor du pack Noir & Blanc encore à dessiner (leur d_<nom>.png manque dans le kit) : plus aucun pour l'instant, la
+ *  cuve des quartiers industriels et de la centrale est dans le kit (d_cuve.png, data/gfx-noirblanc.js) */
+export const DECOR_A_VENIR = [];
 const lire = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } };
 const ecrire = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* navigation privée : le choix ne dure que le temps de la page */ } };
 
@@ -65,12 +66,18 @@ export const PACKS = {
         ['maison_verte', ['flora']], ['maison_c_ve', ['flora']], ['manoir_v', ['flora']], ['maison_jaune', ['flora']], ['maison_a_g', ['flora']],
         ['maison_ombre_2', ['ombre']], ['manoir_ombre', ['ombre']], ['maison_ombre', ['ombre']],
         ['maison_brique', ['forge']], ['maison_brique_r', ['forge']], ['maison_forge_p1', ['forge']], ['maison_forge_1', ['forge', 'metro', 'volta']], ['maison_forge_2', ['forge', 'metro', 'volta']],
+        // l'archipel des trois frères, au plus près de l'architecture de chaque île (render/styles-villes.js). Port-Granit :
+        // granit et ardoise, soubassement rose ; Cendrelune : toits rouges, bois sombre aux huisseries vertes ;
+        // Fort-Écaille : la ville blanche et bleue
+        ['maison_forge_p1', ['granit']], ['maison_a_bl', ['granit']], ['cabane_pecheur', ['granit']], ['maison_g', ['granit']],
+        ['maison_rouge', ['cendre']], ['maison_brique_r', ['cendre']], ['maison_d', ['cendre']], ['maison_e', ['cendre']],
+        ['maison_ville_bl', ['ecaille']], ['maison_bleue', ['ecaille']], ['maison_f_bleue', ['ecaille']], ['maison_a_g_bl', ['ecaille']],
         ['maison_ville_rg', ['metro', 'volta']], ['maison_ville_bl', ['metro', 'volta']], ['maison_ville_ve', ['metro', 'volta']], ['maison_a_bl', ['metro', 'volta']], ['maison_f_bleue', ['metro', 'volta']], ['maison_bleue', ['metro', 'volta']], ['maison_c_ve', ['metro', 'volta']], ['maison_g', ['metro', 'volta']], ['maison_g_ocre', ['metro', 'volta']], ['manoir', ['metro', 'volta']],
         ...NB_MAISONS,
       ];
       return {
-        center: mapList([['centre_desert', ['desert', 'dunes']], ['centre_neige', ['snow', 'givre', 'cime']], ['centre_mirage', ['mirage', 'kagura']], 'centre']),
-        mart: mapList([['boutique_desert', ['desert', 'dunes']], ['boutique_neige', ['snow', 'givre', 'cime']], ['boutique_neige_b', ['snow', 'givre', 'cime']], 'boutique', 'boutique_p', 'boutique_b']),
+        center: mapList([['centre_desert', ['desert', 'dunes', 'granit', 'cendre']], ['centre_neige', ['snow', 'givre', 'cime']], ['centre_mirage', ['mirage', 'kagura', 'ecaille']], 'centre']),
+        mart: mapList([['boutique_desert', ['desert', 'dunes', 'granit', 'cendre']], ['boutique_b', ['ecaille']], ['boutique_neige', ['snow', 'givre', 'cime']], ['boutique_neige_b', ['snow', 'givre', 'cime']], 'boutique', 'boutique_p', 'boutique_b']),
         gym: mapList(['arene']), lab: mapList(['labo']), fontaine: mapList(['fontaine']),
         tower: mapList([['fonderie', ['forge']], ['tour_vitre_l', ['metro', 'volta']], ['tour_jaune', ['metro', 'volta']], ['tour_vitre', ['metro', 'volta']], 'tour']),
         house: mapList(MAISONS_BIO), house2: mapList(MAISONS_BIO), house3: mapList(MAISONS_BIO), bighouse: mapList(MAISONS_BIO),

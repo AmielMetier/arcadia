@@ -12,7 +12,7 @@ import { decorerRoutes, reserver } from './decors-routes.js';
 import { tracerRoutes } from './traces.js';
 import { T, DIRS, walkable, isGrassEnc } from './tiles.js';
 import { GameMap, carveRoute, carveTown, ledges, along, nearestWalkable, caseLibre, rng, GRAND, sin, cos, hauteurVue } from './mapgen.js';
-import { centerInterior, martInterior, houseInterior, labInterior, gymInterior, leagueInterior, dojoInterior, caveMap, centraleInterior, tourMirageInterior } from './interiors.js';
+import { centerInterior, martInterior, houseInterior, labInterior, gymInterior, leagueInterior, dojoInterior, caveMap, centraleInterior, tourMirageInterior, museeInterior, caserneInterior } from './interiors.js';
 import { NEW_STARTERS } from '../data/creatures.js';
 import { R } from '../data/remplacants.js';
 import { buildQuests } from './quetes.js';
@@ -635,7 +635,7 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
           A.flag('giftUsine', true);
           await A.say([
             'Tiens, la direction a enfin autorisé la visite aux dresseurs à 5 badges !',
-            'On teste de nouveaux moules pour la Ligue. Prends cet équipement de laboratoire et un lot de Hyper Balls pour tes recherches !'
+            'On teste de nouveaux moules pour la Ligue. Prends cet équipement de laboratoire et un lot d\'Hyper Balls pour tes recherches !'
           ]);
           await A.give('expert-belt');
           await A.give('ultra-ball', 3);
@@ -840,12 +840,12 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
       // mapId : les identifiants des intérieurs d'avant l'agrandissement (parties arrêtées dedans, dresseurs de l'arène)
       { kind: 'gym', ...GRAND.gym, x: 2, y: 14, roof: 'purple', mapId: 'ecaille:gym13' },
       { kind: 'center', ...GRAND.center, x: 23, y: 3, mapId: 'ecaille:center3' }, { kind: 'mart', ...GRAND.mart, x: 31, dx: 1, y: 4, mapId: 'ecaille:mart9' },
-      { kind: 'bighouse', x: 23, y: 14, roof: 'purple', mapId: 'ecaille:bighouse23', name: 'Caserne d\'Écaille', npcs: [{ x: 4, y: 4, sprite: 'garde', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Drakos a ouvert les ports et laissé le passé derrière lui.', 'Nous veillons désormais sur la paix de l\'archipel aux côtés de la Ligue.'] : ['Nous, les Gardes d\'Écaille, servons Drakos.', 'Il a juré qu\'aucun Maître de la Ligue ne dicterait jamais sa loi aux îles.'] }, { x: 7, y: 5, sprite: 'garde', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Depuis que tu as vaincu Drakos, tout le monde respire ici.'] : ['Entre nous... ça fait longtemps que je ne sais plus contre qui on se bat.'] }] },
+      { kind: 'bighouse', x: 23, y: 14, roof: 'purple', mapId: 'ecaille:bighouse23', name: 'Caserne d\'Écaille', interior: (id) => caserneInterior(id), npcs: [{ x: 4, y: 4, sprite: 'garde', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Drakos a ouvert les ports et laissé le passé derrière lui.', 'Nous veillons désormais sur la paix de l\'archipel aux côtés de la Ligue.'] : ['Nous, les Gardes d\'Écaille, servons Drakos.', 'Il a juré qu\'aucun Maître de la Ligue ne dicterait jamais sa loi aux îles.'] }, { x: 7, y: 5, sprite: 'garde', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Depuis que tu as vaincu Drakos, tout le monde respire ici.'] : ['Entre nous... ça fait longtemps que je ne sais plus contre qui on se bat.'] }] },
       { kind: 'house', x: 31, y: 14, roof: 'teal', mapId: 'ecaille:house4', npcs: [{ x: 4, y: 4, sprite: 'habitante', text: (st) => (st.badges[7] || st.flags.drakos) ? ['On raconte que Drakos prépare déjà sa revanche amicale contre Célestine… et contre toi !'] : ['Drakos a perdu contre Célestine, il y a dix ans, en finale de la Ligue.', 'Depuis, il refuse toute autorité. Même celle de la Ligue.'] }] },
       { kind: 'house', x: 24, y: 21, roof: 'red', mapId: 'ecaille:house25', npcs: [{ x: 2, y: 4, sprite: 'vieil_homme', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Le Cap des Étoiles est désormais ouvert au nord de la ville !', 'On raconte qu\'Odyssor, le géant des océans, y passe quand la mer est calme...'] : ['Au nord de la ville, il y a le Cap des Étoiles.', 'On raconte qu\'Odyssor, le géant des océans, y passe quand la mer est calme...', 'Mais Drakos en interdit l\'accès.'] }] },
     ],
     npcs: [
-      { id: 'garde-cap', x: 20, y: 2, sprite: 'garde', dir: 'down', gate: { badges: 8, open: (f, g) => (g?.state ? !!(f.drakos || g.state.badges?.[7]) : g.badgeCount() >= 8), tiles: [[20, 1], [21, 1]] }, text: (st) => (st.badges[7] || st.flags.drakos) ? ['La voie du Cap des Étoiles t\'est ouverte, Champion.', 'Puisse le gardien des eaux t\'entendre.'] : ['Le Cap des Étoiles est interdit.', 'Seul Drakos, ou celui qui l\'aura vaincu, peut y passer.'] },
+      { id: 'garde-cap', x: 20, y: 2, sprite: 'garde', dir: 'down', gate: { badges: 8, open: (f, g) => (g?.state ? !!(f.drakos || g.state.badges?.[7]) : g.badgeCount() >= 8), tiles: [[20, 1], [21, 1]] }, text: (st) => (st.badges[7] || st.flags.drakos) ? [`La voie du Cap des Étoiles t'est ouverte, Champion${st.gender === 'f' ? 'ne' : ''}.`, 'Puisse le gardien des eaux t\'entendre.'] : ['Le Cap des Étoiles est interdit.', 'Seul Drakos, ou celui qui l\'aura vaincu, peut y passer.'] },
       { id: 'enfant', x: 27, y: 26, sprite: 'enfant', move: 'wander', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Mon papa dit que Drakos sourit de nouveau, depuis son combat contre toi !'] : ['Mon papa dit que Drakos était un héros, avant.'] },
     ],
   };
@@ -862,7 +862,7 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
     buildings: [
       { kind: 'center', ...GRAND.center, x: 2, y: 3 }, { kind: 'mart', ...GRAND.mart, x: 13, y: 4 },
       { kind: 'house', x: 19, dx: 1, y: 6, roof: 'purple', npcs: [{ x: 4, y: 4, sprite: 'scientifique', text: ['Les dragons ne craignent presque rien...', 'sauf la Glace, la Fée et les autres dragons.'] }] },
-      { kind: 'bighouse', x: 13, y: 11, roof: 'purple', name: 'Musée des Dragons', npcs: [{ x: 5, y: 4, sprite: 'vieil_homme', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Drakos est revenu s\'incliner devant les stèles du musée après votre duel.', 'Les trois frères ont enfin rouvert l\'archipel vers le continent.'] : ['Drakos a grandi en écoutant les histoires de ce musée.', 'Il rêvait de devenir Maître. Célestine l\'a battu en finale.', 'Depuis, il règne sur l\'archipel, loin de la Ligue.'] }, { x: 8, y: 5, sprite: 'scientifique', text: (st) => st.flags.odyssorMet ? ['La fresque d\'Odyssor semble briller davantage depuis ta rencontre au Cap des Étoiles !', 'Les anciens avaient raison : les deux gardiens des eaux veillent sur un archipel réconcilié.'] : (st.badges[7] || st.flags.drakos) ? ['Tu as vaincu Drakos : les îles et le continent se réconcilient enfin.', 'Va au nord de Fort-Écaille, au Cap des Étoiles... Odyssor doit déjà s\'y montrer !'] : ['Regarde cette fresque : un Pokémon immense nageant sous la mer étoilée.', 'Odyssor. Les anciens disaient qu\'il apparaît au Cap des Étoiles quand les îles et le continent se réconcilient.', 'À côté, un oiseau d\'argent plonge dans la mer : Lugia. On dit qu\'Odyssor et Lugia sont les deux gardiens des eaux.'] }] },
+      { kind: 'bighouse', x: 13, y: 11, roof: 'purple', name: 'Musée des Dragons', interior: (id) => museeInterior(id), npcs: [{ x: 5, y: 4, sprite: 'vieil_homme', text: (st) => (st.badges[7] || st.flags.drakos) ? ['Drakos est revenu s\'incliner devant les stèles du musée après votre duel.', 'Les trois frères ont enfin rouvert l\'archipel vers le continent.'] : ['Drakos a grandi en écoutant les histoires de ce musée.', 'Il rêvait de devenir Maître. Célestine l\'a battu en finale.', 'Depuis, il règne sur l\'archipel, loin de la Ligue.'] }, { x: 8, y: 5, sprite: 'scientifique', text: (st) => st.flags.odyssorMet ? ['La fresque d\'Odyssor semble briller davantage depuis ta rencontre au Cap des Étoiles !', 'Les anciens avaient raison : les deux gardiens des eaux veillent sur un archipel réconcilié.'] : (st.badges[7] || st.flags.drakos) ? ['Tu as vaincu Drakos : les îles et le continent se réconcilient enfin.', 'Va au nord de Fort-Écaille, au Cap des Étoiles... Odyssor doit déjà s\'y montrer !'] : ['Regarde cette fresque : un Pokémon immense nageant sous la mer étoilée.', 'Odyssor. Les anciens disaient qu\'il apparaît au Cap des Étoiles quand les îles et le continent se réconcilient.', 'À côté, un oiseau d\'argent plonge dans la mer : Lugia. On dit qu\'Odyssor et Lugia sont les deux gardiens des eaux.'] }] },
       { kind: 'house', x: 3, y: 13, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Au nord, la Route Victoire mène au Plateau Céleste.', 'Seuls les dresseurs aux quinze badges peuvent la franchir : les douze du continent et ceux des trois frères.'] }] },
       { kind: 'house', x: 22, y: 13, roof: 'red', npcs: [{ x: 4, y: 4, sprite: 'montagnard', text: ['La route 10 relie Cimelune à Bourg-Aube, par l\'ouest.', 'Ça rappelle des souvenirs, hein ?'] }] },
     ],
@@ -1430,8 +1430,9 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
   // objets des recoins (case « o » des plans)
   // la Ruche : un Antidote (les Mimigal d'Hector empoisonnent), pas un Anti-Para
   const OBJETS_ARENE = { 0: ['potion', 'antidote'], 1: ['mystic-water'], 11: ['soft-sand'] };
-  // répliques [avant, après le combat] des dresseurs des arènes de Voltacité (2), Floralia (3) et Mirage (4), dans
-  // l'ordre de leurs places sur le plan ; aucune ne dit si le joueur est un garçon ou une fille
+  // répliques [avant, après le combat] des dresseurs des arènes de Voltacité (2), Floralia (3), Mirage (4) et des trois
+  // frères de l'archipel (Port-Granit 5, Cendrelune 6, Fort-Écaille 7), dans l'ordre de leurs places sur le plan ;
+  // aucune ne dit si le joueur est un garçon ou une fille
   const REPLIQUES_ARENE = {
     2: [
       ['Bzzt ! Tu sens ce picotement ? C\'est la dynamo qui te souhaite la bienvenue !', 'Mes circuits ont grillé... Notre Championne va te recharger, elle.'],
@@ -1452,6 +1453,30 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
       ['Les téléporteurs t\'ont donné le tournis ? Mes Pokémon Psy vont finir le travail !', 'C\'est moi qui ai la tête qui tourne... Notre Championne ne te fera pas de cadeau.'],
       ['Sibylle voit l\'avenir. Et moi, je vois ta défaite !', 'Ma boule de cristal était embuée... Notre Championne, elle, ne se trompe jamais.'],
       ['Le Palais des Songes garde ses secrets. Ta victoire n\'en fera pas partie !', 'Mes songes s\'envolent... Notre Championne t\'attend.'],
+    ],
+    // la Carrière de Basalte : rochers à pousser dans les fosses
+    5: [
+      ['Ici, on ne contourne pas la roche : on la pousse. Mes Pokémon aussi sont durs à déplacer !', 'Tu m\'as roulé comme un galet... Basalte, lui, ne bouge pas d\'un pouce.'],
+      ['Un rocher dans chaque fosse, et la voie s\'ouvre. Deux Pokémon de front, et elle se referme !', 'Tu as comblé toutes mes failles. Notre Champion t\'attend au bout de la carrière.'],
+      ['Les Gardes d\'Écaille surveillent cette carrière pour Drakos. Trois contre trois, sans discuter !', 'Tch... La roche se fissure. Ne crois pas que Basalte cédera aussi vite.'],
+      ['Trente ans que je taille le granit de l\'île. Toi, je vais te tailler en pièces !', 'Bien taillé... Tu as le coup de pioche. Notre Champion va apprécier.'],
+      ['Un rocher mal poussé, et il faut tout reprendre au pupitre. Un combat mal engagé, c\'est pareil !', 'Éboulement général dans mon équipe... Monte voir notre Champion, la voie est dégagée.'],
+    ],
+    // la Forge de Pyros : vannes rouge et noire, coulées de lave, gardiens du savoir
+    6: [
+      ['Kiai ! La chaleur de la forge endurcit le corps. Viens tâter de mes flammes !', 'Refroidi d\'un seul coup... Pyros, lui, ne s\'éteint jamais.'],
+      ['Vanne rouge, vanne noire : une coulée se fige, l\'autre repart. Mes deux Pokémon se relaient pareil !', 'Tu as fermé le robinet... Notre Champion bout d\'impatience, là-haut.'],
+      ['Ordre de Drakos : personne n\'atteint la Grande Île sans passer par le feu. À trois, on t\'encercle !', 'Mon uniforme sent le roussi... Passe. Mais Pyros te fera regretter le voyage.'],
+      ['Je médite au bord de la lave depuis l\'aube. Mon esprit est un brasier !', 'Il ne reste que des braises... Va, notre Champion t\'attend au cœur du volcan.'],
+      ['Les gardiens du savoir posent des questions. Moi, je ne pose que mes poings !', 'Belle riposte. Garde ce feu-là pour notre Champion !'],
+    ],
+    // la Tour de Drakos : statues qui rugissent, ponts-dragons au-dessus du gouffre
+    7: [
+      ['Halte ! Les statues ne rugissent que pour ceux qui le méritent. Prouve-le !', 'Les ponts pivotent pour toi... Drakos t\'observe déjà, là-haut.'],
+      ['Deux dragons valent mieux qu\'un. Sauras-tu regarder des deux côtés du gouffre ?', 'Mes dragons baissent la tête. Notre Champion, lui, ne la baisse devant personne.'],
+      ['Dix ans que je garde cette tour. Dix ans que personne ne passe. Trois dragons te barrent la route !', 'Dix ans... et c\'est toi. Avance. Notre Champion attendait peut-être ce jour.'],
+      ['On dit que j\'ai tenu trois tours face à Drakos. Et toi, combien en tiendras-tu face à moi ?', 'Trois tours... C\'est ce que j\'ai tenu face à toi. Notre Champion va enfin avoir un vrai combat.'],
+      ['Un faux pas, et c\'est le gouffre. Une attaque mal choisie, et c\'est pareil !', 'Tu marches droit, même au-dessus du vide. Monte : notre Champion t\'attend au sommet.'],
     ],
   };
   for (const t of Object.values(towns)) {
@@ -1484,7 +1509,7 @@ export function buildWorld({ decors = true, traces = decors } = {}) {
       const more = t.gym === 0 ? [] : equipeDeType(L2.type, lvl, needMore, t.gym * 31 + i * 7 + 3).filter(([sp]) => !team.some((m) => m[0] === sp));
       const fullTeam = t.gym === 0 ? team.slice(0, 2) : team.concat(more).slice(0, t.gym === 1 ? 3 : 4);
       const [x, y, dir, vue] = spots[i];
-      // arènes de Voltacité, Floralia et Mirage : chaque dresseur a ses propres répliques (REPLIQUES_ARENE)
+      // arènes de Voltacité, Floralia, Mirage et de l'archipel : chaque dresseur a ses propres répliques (REPLIQUES_ARENE)
       const rep = REPLIQUES_ARENE[t.gym]?.[i];
       const annonce = format === 'triple' ? 'Place au combat Trio ! ' : format === 'double' ? 'Place au combat Duo ! ' : '';
       const intro = rep ? annonce + rep[0]

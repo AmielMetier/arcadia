@@ -102,7 +102,7 @@ export async function savoir(g, n) {
     const lvl = Math.max(20, g.levelCap() - 4), team = [[58, lvl], [126, lvl + 1]];
     const res = await g.api().fight({ cls: 'Gardien', name: 'du savoir', team, ow: 'scientifique', bs: 'scientifique', prize: 30, lose: 'Bien joué. Tu peux passer.' });
     if (res !== 'win') return;
-  } else { g.sound.sfx('select'); await ui.say('Exact ! Passe, dresseur.', sp); }
+  } else { g.sound.sfx('select'); await ui.say(`Exact ! Passe, ${g.state.gender === 'f' ? 'dresseuse' : 'dresseur'}.`, sp); }
   g.state.flags['QZ:' + n.id] = true; g.refreshNpcs();
 }
 

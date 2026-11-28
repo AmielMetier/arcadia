@@ -289,7 +289,7 @@ const LEGEND_PRESET_MAP = {
   379: ['titan', 'Golem d\'Acier · Forge Antique'],
   380: ['cosmic', 'Dragon Éon · Voile Écarlate'],
   381: ['abyssal', 'Dragon Éon · Flèche d\'Azur'],
-  382: ['abyssal', 'Souzerain des Océans · Orbe Bleu'],
+  382: ['abyssal', 'Souverain des Océans · Orbe Bleu'],
   383: ['fire', 'Souverain des Continents · Orbe Rouge'],
   384: ['dragon', 'Seigneur des Cieux · Stratosphère'],
   385: ['cosmic', 'Étoile des Souhaits Millénaires'],
@@ -299,7 +299,7 @@ const LEGEND_PRESET_MAP = {
   482: ['water', 'Être de la Volonté · Gardien des Lacs'],
   483: ['cosmic', 'Maître du Temps · Colonnes Célestes'],
   484: ['cosmic', 'Maître de l\'Espace · Faille Astrale'],
-  485: ['fire', 'Gardiens du Magma · Caldeira Ardente'],
+  485: ['fire', 'Gardien du Magma · Caldeira Ardente'],
   486: ['titan', 'Roi des Titans · Éveil Millénaire'],
   487: ['eclipse', 'Seigneur du Monde Distorsion'],
   488: ['cosmic', 'Ailes du Croissant · Rêves Clairs'],
@@ -380,7 +380,7 @@ export function resolveBossCinematicConfig(opts = {}) {
       badge = badge || 'ÉVEIL OBSCUR';
     } else if (opts.raid) {
       presetKey = 'raid';
-      badge = badge || 'RAID CO-OP · ANTRE DIMENSIONNELLE';
+      badge = badge || 'RAID CO-OP · ANTRE DIMENSIONNEL';
     } else if (opts.dojo) {
       presetKey = 'dojo';
       badge = badge || 'FINALE DU DOJO DE MAMADOU';

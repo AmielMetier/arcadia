@@ -801,7 +801,7 @@ export function buildQuests(ctx) {
   {
     const musee = Object.values(maps).find((mm) => mm.name === 'Musée des Dragons');
     if (musee) {
-      musee.prop('squelette', 3, 6, true, { w: 4 }); for (let x = 4; x <= 6; x++) musee.set(x, 6, T.BLOCK);
+      musee.prop('squelette', 3, 6, true, { w: 4, sol: 'estrade_musee_g' });   // sur l'estrade de la galerie (interiors.js) for (let x = 4; x <= 6; x++) musee.set(x, 6, T.BLOCK);
       musee.prop('fossile', 8, 6); musee.prop('statue_dragon', 9, 2);
       pnj(musee, 'q:savant', 2, 4, { sprite: 'savant', talk: async (A) => {
         const s = A.step('fossile'), who = 'Savant Ambroise';

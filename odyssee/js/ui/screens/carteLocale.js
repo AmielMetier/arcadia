@@ -208,7 +208,7 @@ export function batimentsImportants(game, L) {
     let sub = '';
     if (b.kind === 'gym' && z0?.gym != null && LEADERS[z0.gym]) {
       const ch = LEADERS[z0.gym];
-      sub = `Champion ${ch.name} · ${TYPE_FR[ch.type] || ch.type}`;
+      sub = `${ch.fem || ['Marine', 'Volta', 'Flora', 'Sibylle'].includes(ch.name) ? 'Championne' : 'Champion'} ${ch.name} · ${TYPE_FR[ch.type] || ch.type}`;
     } else if (ess) {
       sub = b.kind === 'center' ? 'Soin de l\'équipe et PC' : b.kind === 'mart' ? 'Objets et Poké Balls' : b.kind === 'dojo' ? 'Combats Co-op 2v2 & 3v3 de Maître Mamadou' : b.kind === 'lab' ? 'Laboratoire du Professeur' : 'Conseil 4 & Maître';
     } else {

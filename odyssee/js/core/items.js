@@ -54,7 +54,7 @@ export const ITEMS = {
   // objets rares : les capacités de terrain (on les utilise face à l'obstacle, avec F)
   'cs-coupe': { pocket: 'ct', price: 0, key: true, field: 'coupe', icon: 'notebook', name: 'CS01 Coupe', desc: 'Tranche les petits arbres qui barrent le chemin. Badge Pétale requis. Place-toi face à l\'arbre et appuie sur F.' },
   'cs-surf': { pocket: 'ct', price: 0, key: true, field: 'surf', icon: 'notebook', name: 'CS02 Surf', desc: 'Traverse l\'eau sur le dos d\'un Pokémon. Badge Mirage requis. Place-toi face à l\'eau et appuie sur F.' },
-  'cs-eclate': { pocket: 'ct', price: 0, key: true, field: 'eclate', icon: 'notebook', name: 'CS03 Éclate-Roc', desc: 'Brise les rochers fissurés. Badge Granit requis. Place-toi face au rocher et appuie sur F.' },
+  'cs-eclate': { pocket: 'ct', price: 0, key: true, field: 'eclate', icon: 'cs-eclate', name: 'CS03 Éclate-Roc', desc: 'Brise les rochers fissurés. Badge Granit requis. Place-toi face au rocher et appuie sur F.' },
   'cs-flash': { pocket: 'ct', price: 0, key: true, field: 'flash', icon: 'notebook', name: 'CS05 Flash', desc: 'Éclaire les grottes plongées dans le noir. Elle agit toute seule dès que tu entres dans une grotte sombre. Badge Élytre requis.' },
   'cs-force': { pocket: 'ct', price: 0, key: true, field: 'force', icon: 'cs-force', name: 'CS06 Force', desc: 'Pousse les gros rochers. Place-toi face au rocher, appuie sur F, puis marche contre lui. Badge Volt requis.' },
   medaillon: { pocket: 'cles', price: 0, key: true, icon: 'soothe-bell', name: 'Médaillon', desc: 'Un médaillon gravé d\'une petite fleur. Quelqu\'un de Sylvebourg doit le chercher partout.' },

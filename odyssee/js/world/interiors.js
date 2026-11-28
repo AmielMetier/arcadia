@@ -87,6 +87,42 @@ export function tourMirageInterior(id, name = 'Tour Mirage') {
   for (let y = 3; y <= 7; y++) m.deco.push({ k: 'carpet', x: 5, y });
   return m;
 }
+/**
+ * Le Musée des Dragons de Cimelune (11 × 9) : une galerie de marbre qui n'expose « que des squelettes et des fresques »,
+ * comme le dit la conservatrice. Au mur du fond, côte à côte, les deux fresques que montre le scientifique : Odyssor sous
+ * la mer étoilée et Lugia, l'oiseau d'argent (colonnes 4 et 6), de part et d'autre de la vitrine au crâne de dragon ;
+ * les stèles devant lesquelles Drakos s'incline, un dragon de pierre, deux colonnes et des urnes.
+ * L'estrade de velours attend le grand squelette que la quête du fossile pose en (3 → 6, 6), avec la vitrine du fossile
+ * (8, 6) et le second dragon de pierre (9, 2).
+ * Les habitants gardent leur place : le vieil homme (5, 4), le savant de la quête (2, 4) et le scientifique, demandé en
+ * (8, 5) et décalé en (9, 5), à côté de la vitrine du fossile, comme il l'était par le canapé.
+ */
+export function museeInterior(id, name = 'Musée des Dragons') {
+  const m = room(id, 11, 9, { floor: 'musee', music: 'house', wall: 'wall_musee', name });
+  furn(m, 'statue_dragon', 1, 2); furn(m, 'stele', 3, 2); furn(m, 'vitrine_dragon', 5, 2); furn(m, 'stele', 7, 2);
+  m.fenetresMur = [4, 6];
+  furn(m, 'colonne', 3, 4); furn(m, 'colonne', 7, 4);
+  m.set(8, 5, T.BLOCK);   // l'arrière de la grande vitrine du fossile (8, 6), qui déborde sur cette case
+  furn(m, 'vase', 1, 7); furn(m, 'vase', 9, 7);
+  for (const [x, g] of [[3, 'musee_g'], [4, 'musee_m'], [5, 'musee_m'], [6, 'musee_d']]) m.deco.push({ k: 'estrade', x, y: 6, g });
+  return m;
+}
+/**
+ * La Caserne d'Écaille de Fort-Écaille (11 × 9) : le corps de garde de Drakos. Dallage de pierre, murs sombres au
+ * bandeau indigo, bannières au dragon, râteliers de hallebardes et armures au fond, table d'état-major (la carte de
+ * l'archipel), mannequin d'entraînement, tonneaux et caisses de l'intendance, braseros, tapis de garde depuis la porte.
+ * Les deux gardes gardent leur place : demandés en (4, 4) et (7, 5), ils se tiennent en (5, 4) devant la table et en
+ * (6, 5) près du mannequin (la table et le mannequin occupent les cases de l'ancienne table et de l'ancien canapé).
+ */
+export function caserneInterior(id, name = 'Caserne d\'Écaille') {
+  const m = room(id, 11, 9, { floor: 'caserne', music: 'house', wall: 'wall_caserne', name });
+  furn(m, 'ratelier', 1, 2); furn(m, 'armure', 3, 2); furn(m, 'armure', 7, 2); furn(m, 'ratelier', 9, 2);
+  furn(m, 'table_tactique', 4, 4);
+  furn(m, 'mannequin', 7, 5); furn(m, 'ratelier', 8, 5);
+  furn(m, 'caisses', 1, 6); furn(m, 'tonneau', 1, 7); furn(m, 'brasero', 9, 7); furn(m, 'brasero', 1, 4);
+  for (let y = 5; y <= 7; y++) m.deco.push({ k: 'tapis', x: 5, y, g: 'caserne' });
+  return m;
+}
 export function labInterior(id) {
   const m = room(id, 13, 12, { floor: 'lab', music: 'lab', wall: 'wall_mart', name: 'Labo du Prof. Saule' });
   for (const x of [1, 2, 3, 9, 10, 11]) furn(m, 'books', x, 2);

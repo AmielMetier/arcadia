@@ -90,7 +90,8 @@ const FACES = {
   'Éleveuse': 'habitante', 'Chercheur': 'scientifique', 'Hélène': 'habitante',
   'Dr Cassandre': 'scientifique', 'Conteuse Éléonore': 'habitante', 'Papi Octave': 'vieil_homme',
   'Mme Léonie': 'habitante', 'Présentatrice': 'topdresseuse', 'Ingrid': 'habitante',
-  'Pr Cèdre': 'scientifique', 'Doyenne Amaya': 'habitante', 'Vieille dame': 'habitante',
+  // le Professeur Cèdre attend son buste (img/portraits/savant-l.png) : d'ici là, celui du scientifique
+  'Pr Cèdre': ASSETS.aBuste('savant') ? 'savant' : 'scientifique', 'Doyenne Amaya': 'habitante', 'Vieille dame': 'habitante',
   'Jardinier Firmin': 'jardinier', 'Lucien': 'habitant', 'Gustave': 'vieil_homme',
   // Champions du Continent
   'Hector': 'hector', 'Marine': 'marine', 'Volta': 'volta', 'Flora': 'flora',
@@ -2148,8 +2149,9 @@ export class Game {
     const m = this.mapObj, z = this.zone;
     const isVillage = z?.town === 'aube' || z?.town === 'sylve' || z?.theme === 'village';
     const isCity = !!z?.town || z?.name?.includes('Cité') || z?.name?.includes('Port-');
-    const gymKind = (m.arene === 'rock' || m.arene === 'ground' || m.arene === 'fire' || m.arene === 'fighting') ? 'gym_rock' : 'gym';
-    const bg = !m.outdoor ? (m.floor === 'cave' ? 'cave' : m.battleBg === 'gym' ? gymKind : m.battleBg) : this.player.surf ? 'water' : z?.theme === 'volcanic' ? 'volcanic' : z?.theme === 'snow' ? 'snow' : isVillage ? 'village' : isCity ? 'city' : 'grass';
+    const gymKind = (m.arene === 'rock' || m.arene === 'ground' || m.arene === 'fighting') ? 'gym_rock' : 'gym';
+    // l'arène de Cendrelune se bat dans le volcan (fond et socles volcaniques), pas dans la grotte des arènes de roche
+    const bg = !m.outdoor ? (m.floor === 'cave' ? 'cave' : m.battleBg === 'gym' ? (m.arene === 'fire' ? 'volcanic' : gymKind) : m.battleBg) : this.player.surf ? 'water' : z?.theme === 'volcanic' ? 'volcanic' : z?.theme === 'snow' ? 'snow' : isVillage ? 'village' : isCity ? 'city' : 'grass';
     const weather = o.weather || this.getMapWeather();
     // Méga-Évolution : le joueur avec son Méga-Anneau ; un dresseur marqué megaSp tend sa gemme à ce Pokémon (« ace » : le dernier)
     // À partir de la 6e arène (5 badges), les Champions et au moins un dresseur sur trois méga-évoluent
@@ -2175,9 +2177,12 @@ export class Game {
     if (o.trainer && !o.trainer.friendly && !o.noWhiteout) { st.combatEnCours = true; this.save(true); }
     const foeMons = wildParty || o.party;
     const h = this.hour();
-    // fond teinté : arènes de Voltacité, Floralia et Mirage à leurs couleurs, et dehors pendant la Nuit Violette
-    const teinte = o.fond ? null : !m.outdoor && m.battleBg === 'gym' && ['electric', 'grass', 'psychic'].includes(m.arene) ? m.arene : m.outdoor && this.eclipseOn() ? 'eclipse' : null;
-    const result = await this.bv.run(battle, { bg: o.fond ? 'faille' : bg, teinte, fond: o.fond || null, night: !o.fond && m.outdoor && (h >= 20 || h < 5.5), weather: BATTLE_WEATHERS.includes(weather) ? weather : 'none', curtain });
+    // fond teinté : arènes de Voltacité, Floralia, Mirage et de l'archipel (roche, feu, dragon) à leurs couleurs, et dehors
+    // pendant la Nuit Violette
+    const teinte = o.fond ? null : !m.outdoor && m.battleBg === 'gym' && ['electric', 'grass', 'psychic', 'rock', 'fire', 'dragon'].includes(m.arene) ? m.arene : m.outdoor && this.eclipseOn() ? 'eclipse' : null;
+    // météo de décor : les cendres de Cendrelune tombent aussi pendant le combat (dehors, et dans la Forge de Pyros)
+    const meteoDecor = o.fond ? null : weather === 'ash' || (!m.outdoor && m.battleBg === 'gym' && m.arene === 'fire') ? 'ash' : null;
+    const result = await this.bv.run(battle, { bg: o.fond ? 'faille' : bg, teinte, meteoDecor, fond: o.fond || null, night: !o.fond && m.outdoor && (h >= 20 || h < 5.5), weather: BATTLE_WEATHERS.includes(weather) ? weather : 'none', curtain });
     // argent
     if (result === 'win' && battle.prizeMoney) st.money += battle.prizeMoney;
     this.dernierCombat = battle.participants;   // ceux qui ont combattu (souvenir d'Arène)

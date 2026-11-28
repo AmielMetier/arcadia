@@ -19,6 +19,12 @@ const BW = BASE + '/pokemon/versions/generation-v/black-white';
 const gen = (id) => (id <= 493 && spritesChoix() !== 'bw' ? HG : BW);   // Options → Graphismes → Sprites des Pokémon
 const IMG = new URL('../img/', import.meta.url).href;
 const ITEMS = new Set(SPRITES.items || []), PORTRAITS = new Set(SPRITES.portraits || []), DRESSEURS = new Set(SPRITES.dresseurs || []);
+// images attendues, pas encore peintes : tant que leur nom n'est pas inscrit dans data/sprites.js, une image qui existe sert de repli
+// (on ne demande jamais un fichier absent). Objets : img/items/<nom>.png, inscrit dans SPRITES.items ; bustes de dialogue sans
+// portrait de combat : img/portraits/<nom>-l.png, inscrit dans SPRITES.bustes (savant = le Professeur Cèdre ; mamadou, garde et
+// vieil_homme gardent d'ici là leur dessin de combat)
+const REPLI_OBJET = { 'cs-eclate': 'notebook' };
+const BUSTES = new Set(SPRITES.bustes || []);
 // champions dont le portrait de combat n'est pas encore dessiné : un dresseur qui leur ressemble
 const SOSIES = { pierre: 'topdresseur', croupier: 'garde' };
 // en combat seulement (les dialogues gardent le buste de leur dessin) : personnages sans dessin de combat ni portrait
@@ -40,18 +46,20 @@ export const ASSETS = {
   shadowFront: (id) => `${IMG}crea/${SPECIES[id].k}-shadow-f.png?v=${VERSION_ODYSSEE}`,
   shadowBack: (id) => `${IMG}crea/${SPECIES[id].k}-shadow-b.png?v=${VERSION_ODYSSEE}`,
   shadowIcon: (id) => `${IMG}crea/${SPECIES[id].k}-shadow-i.png?v=${VERSION_ODYSSEE}`,
-  item: (k) => { const ic = ITEM_DEFS[k]?.icon || k; return ITEMS.has(ic) ? `${IMG}items/${ic}.png?v=${VERSION_ODYSSEE}` : `${BASE}/items/${ic}.png`; },
+  item: (k) => { const voulu = ITEM_DEFS[k]?.icon || k, ic = ITEMS.has(voulu) ? voulu : REPLI_OBJET[voulu] || voulu; return ITEMS.has(ic) ? `${IMG}items/${ic}.png?v=${VERSION_ODYSSEE}` : `${BASE}/items/${ic}.png`; },
   // cri : enregistrement PokeAPI pour un Pokémon, cri synthétisé (« synth:id ») pour une créature originale
   cry: (id) => (id >= 20000 ? ASSETS.cry(SPECIES[id]?.mega) : orig(id) ? 'synth:' + id : params.has('sprites') ? null : `${CRIES}/${id}.ogg`),
   // dresseur en combat : dessins HeartGold / SoulSilver (provisoires), sinon nos portraits, sinon ceux de Poké Duel
   trainer: (k) => (!DRESSEURS.has(k) && !PORTRAITS.has(k) && SOSIES_COMBAT[k] ? ASSETS.trainer(SOSIES_COMBAT[k]) : DRESSEURS.has(k) ? `${IMG}dresseurs/${k}.png?v=${VERSION_ODYSSEE}` : PORTRAITS.has(k) ? `${IMG}portraits/${k}.png?v=${VERSION_ODYSSEE}` : POKEDUEL.has(k) ? `../pokemon/assets/trainers/${k}.png` : `${IMG}portraits/topdresseur.png?v=${VERSION_ODYSSEE}`),
   portrait: (k) => {
     if (!k) return null;
-    if (PORTRAITS.has(k)) return `${IMG}portraits/${k}-l.png?v=${VERSION_ODYSSEE}`;
+    if (PORTRAITS.has(k) || BUSTES.has(k)) return `${IMG}portraits/${k}-l.png?v=${VERSION_ODYSSEE}`;
     if (DRESSEURS.has(k)) return `${IMG}dresseurs/${k}.png?v=${VERSION_ODYSSEE}`;
     if (SOSIES[k] && (PORTRAITS.has(SOSIES[k]) || DRESSEURS.has(SOSIES[k]))) return ASSETS.portrait(SOSIES[k]);
     return null;
   },
+  /** ce personnage a-t-il son buste de dialogue peint (portrait ou buste seul) ? */
+  aBuste: (k) => PORTRAITS.has(k) || BUSTES.has(k),
   chars: `${IMG}chars.png?v=${VERSION_ODYSSEE}`,
   suiveurs: `${IMG}suiveurs.png?v=${VERSION_ODYSSEE}`,
   relief: `${IMG}relief.png?v=${VERSION_ODYSSEE}`,

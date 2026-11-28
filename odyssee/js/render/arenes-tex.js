@@ -159,6 +159,82 @@ export function texturesArenes(putImg) {
     T.rect(0, 30, 32, 2, '#3a2e5a');
   }));
 
+  // ------- les trois frères de l'archipel : leur estrade de Champion
+  // estrade de Basalte (la Carrière) : dalle de granit taillé, veines sombres, cornières de fer aux angles
+  putImg('dec_estrade_rock', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#8a7458'); T.rect(1, 1, 30, 30, '#b49c7a');
+    for (let k = 0; k < 46; k++) { const x = 2 + Math.floor(T.rnd() * 28), y = 2 + Math.floor(T.rnd() * 28); T.p(x, y, T.rnd() < 0.5 ? '#c8b292' : '#96805e'); }
+    T.ligne(3, 9, 13, 13, '#6a5a44'); T.ligne(13, 13, 17, 22, '#6a5a44'); T.ligne(20, 4, 28, 11, '#6a5a44'); T.ligne(6, 26, 12, 22, '#6a5a44');
+    T.rect(1, 1, 30, 1, '#d8c4a2'); T.rect(0, 30, 32, 2, '#57442e');
+    for (const [x, y] of [[0, 0], [27, 0], [0, 27], [27, 27]]) { T.rect(x, y, 5, 5, '#4a4a52'); T.p(x + 2, y + 2, '#c0c0cc'); }
+  }));
+  // estrade de Pyros (la Forge) : basalte noir craquelé, la braise affleure dans les fissures, liseré de lave
+  putImg('dec_estrade_fire', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#b8320e'); T.rect(1, 1, 30, 30, '#ff8a2a'); T.rect(2, 2, 28, 28, '#2e2422');
+    for (let k = 0; k < 30; k++) { const x = 3 + Math.floor(T.rnd() * 26), y = 3 + Math.floor(T.rnd() * 26); T.p(x, y, '#463633'); }
+    for (const [x0, y0, x1, y1] of [[4, 8, 12, 12], [12, 12, 15, 20], [15, 20, 26, 23], [19, 4, 22, 13], [22, 13, 28, 15], [6, 26, 12, 21]]) { T.ligne(x0, y0, x1, y1, '#e8521e'); T.ligne(x0, y0 + 1, x1, y1 + 1, '#7a1e0a'); }
+    T.p(12, 12, '#ffd060'); T.p(15, 20, '#ffd060'); T.p(22, 13, '#ffd060');
+  }));
+  // estrade de Drakos (la Tour) : écailles indigo imbriquées, cerclées d'or
+  putImg('dec_estrade_dragon', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#231d3e');
+    for (let j = 2; j < 30; j++) for (let i = 2; i < 30; i++) {
+      const b = j % 8, a = (i + ((j >> 3) % 2 ? 4 : 0)) % 8 - 3.5, r = Math.sqrt(a * a + (b - 1) * (b - 1));
+      T.p(i, j, r > 3.3 && r < 4.4 && b >= 1 ? '#1a1530' : b < 3 ? '#6a5cc0' : b < 6 ? '#4a3f96' : '#3a3078');
+    }
+    T.cadre(0, 0, 32, 32, '#8a6a2a'); T.cadre(1, 1, 30, 30, '#e8c860'); T.rect(0, 30, 32, 2, '#5a4418');
+  }));
+
+  // ------- parois des arènes en relief (render/arenes-relief.js) : une tuile = une case d'écran de haut, calée en haut
+  // au ras de la lave : la tranche de basalte des dalles, rougie par en dessous (les 8 premières lignes servent)
+  putImg('arf_lave', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#1a1210'); T.rect(0, 0, 32, 1, '#5a4a44');
+    for (let i = 0; i < 32; i++) { const f = (i * 7) % 5 === 0; T.p(i, 1, f ? '#2a1e1a' : '#3a2c28'); T.p(i, 2, '#2e2220'); T.p(i, 3, f ? '#5a2a18' : '#3a2420'); T.p(i, 4, '#8a3a14'); T.p(i, 5, '#c8521a'); T.p(i, 6, '#f08a2a'); T.p(i, 7, i % 3 ? '#ffb040' : '#ffe080'); }
+    for (const x of [5, 14, 22, 29]) { T.p(x, 2, '#c8521a'); T.p(x, 3, '#f08a2a'); }
+  }));
+  // fosse de la carrière : front de taille, strates qui s'assombrissent (les 12 premières lignes servent)
+  putImg('arf_fosse', toile(32, 32, (T) => {
+    for (let j = 0; j < 32; j++) { const c = ['#c8b49a', '#a8967c', '#a08c72', '#8a7860', '#84725a', '#74624c', '#6a5a46', '#5a4a3a', '#50422e', '#443828', '#3a2e22', '#2e241a'][Math.min(11, j)]; T.rect(0, j, 32, 1, c); }
+    for (const [x, y, l] of [[3, 3, 7], [18, 2, 9], [9, 6, 11], [24, 7, 6], [1, 9, 8], [15, 10, 10]]) T.rect(x, y, l, 1, '#4a3c2c');
+    for (const x of [7, 16, 27]) { T.p(x, 4, '#4a3c2c'); T.p(x, 5, '#4a3c2c'); T.p(x + 1, 8, '#3a2e22'); }
+  }));
+  // gouffre de la Tour de Drakos : trois assises de pierre indigo sous une lèvre claire, puis la paroi fond dans le noir
+  const NUIT = ['#0c0a14', '#100e1a'];
+  putImg('arf_gouffre', toile(32, 32, (T) => {
+    for (let j = 0; j < 32; j++) for (let i = 0; i < 32; i++) {
+      const r = j >> 3, joint = j % 8 === 0 || (i + (r % 2 ? 8 : 0)) % 16 === 0, k = Math.min(1, j / 26);
+      const mel = (a, b) => Math.round(a + (b - a) * k * k).toString(16).padStart(2, '0');
+      const [cr, cg, cb] = joint ? [0x2a, 0x24, 0x48] : j % 8 === 1 ? [0x6a, 0x5e, 0xa8] : [0x4a, 0x40, 0x80];
+      T.p(i, j, '#' + mel(cr, 0x0c) + mel(cg, 0x0a) + mel(cb, 0x14));
+    }
+    T.rect(0, 0, 32, 1, '#9a8ee0'); T.rect(0, 1, 32, 1, '#7a6ec0');
+    for (let k = 0; k < 5; k++) T.p(3 + k * 7, 27 + (k % 2) * 2, '#3a2a5a');
+  }));
+  // pont-dragon : une dalle de quatre lignes (chant doré), et dessous l'ombre du gouffre
+  putImg('arf_pont', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, NUIT[0]); for (let k = 0; k < 9; k++) T.p((k * 11 + 3) % 32, 8 + (k * 7) % 22, k % 3 ? NUIT[1] : '#2a2040');
+    T.rect(0, 0, 32, 1, '#e8c860'); T.rect(0, 1, 32, 2, '#8a7ad0'); T.rect(0, 3, 32, 1, '#3a3078'); T.rect(0, 4, 32, 2, '#1a1530');
+    for (let i = 3; i < 32; i += 8) T.p(i, 2, '#5a4ea0');
+  }));
+
+  // ------- Cimelune, le Musée des Dragons : estrade de marbre sous le squelette (gauche, milieu, droite), cordon de velours
+  for (const [g, x0, x1] of [['g', 2, 32], ['m', 0, 32], ['d', 0, 30]]) putImg('dec_estrade_musee_' + g, toile(32, 32, (T) => {
+    T.rect(x0, 3, x1 - x0, 27, '#6e2a3a'); T.rect(x0, 3, x1 - x0, 2, '#e8c860'); T.rect(x0, 28, x1 - x0, 2, '#4a1a26');
+    for (let i = x0; i < x1; i += 4) T.p(i, 16 + (i % 8 ? 0 : 1), '#8a3a4c');
+    if (g === 'g') { T.rect(2, 3, 2, 27, '#e8c860'); } if (g === 'd') { T.rect(28, 3, 2, 27, '#e8c860'); }
+    T.rect(x0, 30, x1 - x0, 2, '#00000030');
+  }));
+  // ------- Fort-Écaille, la Caserne d'Écaille : dallage de pierre bleutée, tapis de garde indigo liseré d'or
+  putImg('floor_caserne', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#7c7a8e');
+    for (let j = 0; j < 32; j++) for (let i = 0; i < 32; i++) { const r = j >> 4, x = (i + (r % 2 ? 8 : 0)) % 16, y = j % 16; if (x === 0 || y === 0) T.p(i, j, '#585668'); else if (x === 1 || y === 1) T.p(i, j, '#9694a8'); }
+    for (let k = 0; k < 26; k++) T.p(Math.floor(T.rnd() * 32), Math.floor(T.rnd() * 32), T.rnd() < 0.5 ? '#8a889c' : '#6e6c80');
+  }));
+  putImg('dec_tapis_caserne', toile(32, 32, (T) => {
+    T.rect(3, 0, 26, 32, '#3c3470'); T.rect(3, 0, 2, 32, '#d8b45a'); T.rect(27, 0, 2, 32, '#d8b45a'); T.rect(6, 0, 1, 32, '#5a4ea0'); T.rect(25, 0, 1, 32, '#5a4ea0');
+    for (let j = 4; j < 32; j += 16) { T.ligne(16, j, 20, j + 4, '#8a7ad0'); T.ligne(20, j + 4, 16, j + 8, '#8a7ad0'); T.ligne(16, j + 8, 12, j + 4, '#8a7ad0'); T.ligne(12, j + 4, 16, j, '#8a7ad0'); }
+  }));
+
   // ------- lieux de l'histoire : la Centrale de Voltacité, le repaire de la Team Éclipse, le Sanctuaire des Marées
   // câble au sol (de la porte aux générateurs) et bande de sécurité jaune et noire
   putImg('dec_cable_sol', toile(32, 32, (T) => {
@@ -448,26 +524,60 @@ const SPR = {
     T.disque(16, 20, 15, 13, null, (i, j, q) => (q > 0.82 ? '#4a3e32' : j < 14 && i < 18 ? '#c8b49a' : j > 24 ? '#7a6a56' : '#a8967c'));
     T.ligne(9, 12, 14, 22, '#6a5a48'); T.ligne(20, 14, 24, 26, '#6a5a48'); T.disque(10, 12, 3, 2, '#dccab0');
   }],
-  // Cendrelune : vanne de la lave
-  vanne_lave: [32, 40, (T) => {
-    T.rect(13, 18, 6, 20, '#4a3a34'); T.rect(14, 18, 2, 20, '#7a6a60'); T.rect(8, 36, 16, 4, '#2a201c');
-    T.disque(16, 14, 12, 12, '#2a2020'); T.disque(16, 14, 10, 10, '#c84a20'); T.disque(16, 14, 7, 7, '#2a2020');
-    for (let a = 0; a < 4; a++) T.ligne(16, 14, 16 + Math.cos(a * 1.57 + 0.4) * 9, 14 + Math.sin(a * 1.57 + 0.4) * 9, '#e86a30');
-    T.disque(16, 14, 2.5, 2.5, '#f0a040');
+  // Cendrelune : vannes de la lave (rouge, noire) ; tournée, le volant a fait un quart de tour, son moyeu rougeoie
+  // et la conduite au pied de la vanne s'emplit de lave
+  vanne_lave: [32, 40, (T) => vanneLave(T, ['#4a3a34', '#7a6a60', '#2a201c', '#2a2020', '#c84a20', '#e86a30', '#f0a040'], false)],
+  vanne_lave_on: [32, 40, (T) => vanneLave(T, ['#4a3a34', '#7a6a60', '#2a201c', '#2a2020', '#c84a20', '#e86a30', '#f0a040'], true)],
+  vanne_lave2: [32, 40, (T) => vanneLave(T, ['#2a2a34', '#5a5a6a', '#141418', '#141418', '#4a4a5a', '#8a5ae0', '#b08af0'], false)],
+  vanne_lave2_on: [32, 40, (T) => vanneLave(T, ['#2a2a34', '#5a5a6a', '#141418', '#141418', '#4a4a5a', '#8a5ae0', '#b08af0'], true)],
+  // Fort-Écaille : statue de dragon ; à chaque rugissement ses yeux et la gemme de son poitrail changent de couleur
+  // (statue_pont_1 à _3 : les trois autres orientations du pont), et un halo l'entoure
+  statue_pont: [32, 48, (T) => statuePont(T, 0)],
+  statue_pont_1: [32, 48, (T) => statuePont(T, 1)], statue_pont_2: [32, 48, (T) => statuePont(T, 2)], statue_pont_3: [32, 48, (T) => statuePont(T, 3)],
+  // Cimelune, le Musée des Dragons : vitrine au crâne de dragon
+  vitrine_dragon: [32, 44, (T) => {
+    T.rect(3, 28, 26, 16, '#d8d4cc'); T.rect(3, 28, 26, 2, '#f4f0e8'); T.rect(3, 42, 26, 2, '#9a968e'); T.rect(11, 33, 10, 4, '#b08a3a'); T.rect(12, 34, 8, 1, '#e8c860');
+    T.rect(4, 5, 24, 23, '#c8e8f870'); T.cadre(4, 5, 24, 23, '#b08a3a');
+    // le crâne : museau, orbite, cornes, crocs
+    T.disque(15, 19, 8, 5, null, (i, j, q) => (q > 0.78 ? '#a89a7c' : j < 18 ? '#f0e6cc' : '#d8caa8'));
+    T.disque(22, 21, 4, 3, '#e4d8ba'); T.disque(13, 18, 2, 2, '#4a4032'); T.ligne(9, 15, 5, 9, '#e8dcc0'); T.ligne(13, 14, 11, 8, '#e8dcc0');
+    for (const x of [17, 20, 23]) T.rect(x, 23, 1, 3, '#fffbee');
+    T.ligne(7, 9, 11, 6, '#ffffff'); T.ligne(7, 13, 14, 6, '#ffffffa0');
   }],
-  vanne_lave2: [32, 40, (T) => {
-    T.rect(13, 18, 6, 20, '#2a2a34'); T.rect(14, 18, 2, 20, '#5a5a6a'); T.rect(8, 36, 16, 4, '#141418');
-    T.disque(16, 14, 12, 12, '#141418'); T.disque(16, 14, 10, 10, '#4a4a5a'); T.disque(16, 14, 7, 7, '#141418');
-    for (let a = 0; a < 4; a++) T.ligne(16, 14, 16 + Math.cos(a * 1.57 + 0.4) * 9, 14 + Math.sin(a * 1.57 + 0.4) * 9, '#8a5ae0');
-    T.disque(16, 14, 2.5, 2.5, '#b08af0');
+  // Fort-Écaille, la Caserne d'Écaille : râtelier de hallebardes, armure de garde, mannequin d'entraînement, table d'état-major
+  ratelier: [32, 46, (T) => {
+    T.rect(2, 18, 28, 3, '#6a4a2a'); T.rect(2, 18, 28, 1, '#9a7448'); T.rect(2, 36, 28, 3, '#6a4a2a'); T.rect(2, 36, 28, 1, '#9a7448');
+    T.rect(2, 16, 3, 30, '#4a3018'); T.rect(27, 16, 3, 30, '#4a3018');
+    for (const [x, k] of [[8, 0], [14, 1], [20, 0], [25, 1]]) {
+      T.rect(x, 6, 2, 38, '#8a6a44'); T.rect(x, 6, 1, 38, '#b08c5e');
+      if (k) { T.rect(x - 2, 2, 6, 5, '#b8c0cc'); T.rect(x - 3, 3, 2, 3, '#8a929e'); T.p(x, 0, '#e0e6f0'); T.p(x, 1, '#e0e6f0'); }
+      else { for (let j = 0; j < 7; j++) T.rect(x - Math.floor((6 - j) / 3), j, 2 + 2 * Math.floor((6 - j) / 3), 1, j < 2 ? '#e0e6f0' : '#b8c0cc'); }
+      T.rect(x - 1, 9, 4, 2, '#3c3470');
+    }
   }],
-  // Fort-Écaille : statue de dragon
-  statue_pont: [32, 48, (T) => {
-    T.rect(4, 38, 24, 10, '#4a4258'); T.rect(4, 38, 24, 2, '#7a7290');
-    T.disque(16, 26, 10, 12, null, (i, j, q) => (q > 0.8 ? '#3a3448' : i < 14 ? '#9a90b8' : '#6e6688'));
-    T.disque(16, 11, 8, 7, null, (i, j, q) => (q > 0.8 ? '#3a3448' : i < 14 ? '#aaa0c8' : '#7a7298'));
-    T.ligne(10, 6, 6, 0, '#7a7298'); T.ligne(22, 6, 26, 0, '#7a7298'); T.rect(12, 9, 3, 2, '#e05050'); T.rect(18, 9, 3, 2, '#e05050');
-    T.ligne(6, 22, 1, 14, '#7a7298'); T.ligne(26, 22, 31, 14, '#7a7298');
+  armure: [32, 46, (T) => {
+    T.rect(15, 26, 2, 16, '#4a3018'); T.rect(9, 42, 14, 3, '#3a2412'); T.rect(9, 42, 14, 1, '#6a4a2a');
+    T.disque(16, 20, 8, 9, null, (i, j, q) => (q > 0.82 ? '#231d3e' : i < 13 ? '#7a6ed0' : '#4a3f96'));
+    for (let j = 15; j < 27; j += 4) for (let i = 10; i < 23; i += 4) T.p(i + (j % 8 ? 2 : 0), j, '#2e2660');
+    T.rect(6, 13, 5, 5, '#d8b45a'); T.rect(21, 13, 5, 5, '#d8b45a'); T.rect(6, 13, 5, 1, '#f4dc90'); T.rect(21, 13, 5, 1, '#f4dc90');
+    T.disque(16, 7, 5, 6, null, (i, j, q) => (q > 0.8 ? '#231d3e' : i < 15 ? '#8a7ee0' : '#5a4eaa')); T.rect(12, 7, 8, 2, '#14101e');
+    T.ligne(12, 3, 9, 0, '#d8b45a'); T.ligne(20, 3, 23, 0, '#d8b45a'); T.rect(14, 27, 4, 2, '#d8b45a');
+  }],
+  mannequin: [32, 44, (T) => {
+    T.rect(15, 24, 2, 16, '#6a4a2a'); T.rect(8, 40, 16, 3, '#4a3018'); T.rect(8, 40, 16, 1, '#8a6a44');
+    T.rect(4, 15, 24, 3, '#8a6a44'); T.rect(4, 15, 24, 1, '#b08c5e');
+    T.disque(16, 20, 7, 8, null, (i, j, q) => (q > 0.8 ? '#7a5a2a' : i < 14 ? '#e8cc8a' : '#c8a862'));
+    T.disque(16, 20, 4, 4, '#c03a3a'); T.disque(16, 20, 2.2, 2.2, '#f4f0e0'); T.p(16, 20, '#c03a3a');
+    T.disque(16, 8, 5, 5, null, (i, j, q) => (q > 0.78 ? '#7a5a2a' : i < 15 ? '#e8cc8a' : '#c8a862')); T.ligne(12, 11, 20, 11, '#7a5a2a');
+    T.ligne(6, 22, 11, 26, '#5a4a3a'); T.ligne(22, 12, 25, 17, '#5a4a3a');
+  }],
+  table_tactique: [32, 36, (T) => {
+    T.rect(3, 30, 3, 6, '#3a2412'); T.rect(26, 30, 3, 6, '#3a2412'); T.rect(1, 12, 30, 19, '#5a3a20'); T.rect(1, 12, 30, 2, '#8a6034'); T.rect(1, 29, 30, 2, '#3a2412');
+    // la carte de l'archipel : la mer, trois îles, les pions de la garde
+    T.rect(4, 14, 24, 13, '#e8dcb8'); T.cadre(4, 14, 24, 13, '#b09a6a'); T.rect(5, 15, 22, 11, '#9ac4d8');
+    T.disque(10, 20, 3, 2.5, '#b8a47a'); T.disque(17, 22, 3, 2, '#a85a3a'); T.disque(23, 18, 2.5, 3, '#6a5cc0');
+    for (const [x, y, c] of [[9, 18, '#d8b45a'], [18, 20, '#d8b45a'], [22, 15, '#c03a3a']]) { T.rect(x, y, 2, 3, c); T.p(x, y - 1, '#ffffff'); }
+    T.ligne(11, 20, 15, 22, '#3a3a4a'); T.ligne(19, 21, 22, 19, '#3a3a4a');
   }],
   // Métropole : vitrine, tableau sur chevalet, socle, porte de salle fermée
   vitrine: [32, 44, (T) => {
@@ -605,6 +715,32 @@ function torche(T, on) {
   T.rect(10, 12, 12, 5, '#4a3a5a'); T.rect(10, 12, 12, 1, '#7a6a8a');
   if (on) { T.disque(16, 7, 5, 7, null, (i, j, q) => (q > 0.5 ? '#9a4ae0' : q > 0.2 ? '#c88aff' : '#ffffff')); T.p(14, 2, '#e0c0ff'); }
   else T.disque(16, 10, 4, 2, '#2a2034');
+}
+/** vanne de lave : [pied, reflet, socle, jante, volant, rayons, moyeu] ; ouverte = volant tourné, moyeu et conduite incandescents */
+function vanneLave(T, [pied, reflet, socle, jante, volant, rayons, moyeu], ouverte) {
+  if (ouverte) T.disque(16, 14, 15, 14, null, (i, j, q) => (q > 0.72 ? '#ff8a2030' : null));
+  T.rect(13, 18, 6, 20, pied); T.rect(14, 18, 2, 20, reflet); T.rect(8, 36, 16, 4, socle);
+  if (ouverte) { T.rect(9, 37, 14, 2, '#ff7a20'); T.rect(11, 37, 6, 1, '#ffe070'); T.rect(15, 22, 2, 14, '#ff9a30'); }
+  T.disque(16, 14, 12, 12, jante); T.disque(16, 14, 10, 10, ouverte ? '#f0a040' : volant); T.disque(16, 14, 7, 7, jante);
+  const a0 = ouverte ? 1.185 : 0.4;
+  for (let a = 0; a < 4; a++) T.ligne(16, 14, 16 + Math.cos(a * 1.57 + a0) * 9, 14 + Math.sin(a * 1.57 + a0) * 9, ouverte ? '#ffe070' : rayons);
+  T.disque(16, 14, 2.5, 2.5, ouverte ? '#ffffff' : moyeu);
+}
+/** statue de dragon de la Tour de Drakos ; n = orientation du pont qu'elle commande (0 : au repos, yeux rouges) */
+function statuePont(T, n) {
+  const lueur = ['#e05050', '#ffd040', '#50e0c0', '#c080ff'][n];
+  if (n) T.disque(16, 14, 15, 14, null, (i, j, q) => (q > 0.6 ? lueur + '38' : lueur + '20'));
+  T.rect(4, 38, 24, 10, '#4a4258'); T.rect(4, 38, 24, 2, '#7a7290');
+  T.disque(16, 26, 10, 12, null, (i, j, q) => (q > 0.8 ? '#3a3448' : i < 14 ? '#9a90b8' : '#6e6688'));
+  T.disque(16, 11, 8, 7, null, (i, j, q) => (q > 0.8 ? '#3a3448' : i < 14 ? '#aaa0c8' : '#7a7298'));
+  T.ligne(10, 6, 6, 0, '#7a7298'); T.ligne(22, 6, 26, 0, '#7a7298'); T.rect(12, 9, 3, 2, lueur); T.rect(18, 9, 3, 2, lueur);
+  T.ligne(6, 22, 1, 14, '#7a7298'); T.ligne(26, 22, 31, 14, '#7a7298');
+  if (n) {
+    // gueule ouverte sur une lueur, gemme allumée au poitrail, runes sur le socle (une par quart de tour)
+    T.rect(13, 14, 6, 2, lueur); T.p(15, 16, '#ffffff'); T.p(16, 16, '#ffffff'); T.p(12, 9, '#ffffff'); T.p(18, 9, '#ffffff');
+    T.disque(16, 27, 3, 3, lueur); T.p(15, 26, '#ffffff');
+    for (let k = 0; k < n; k++) T.rect(9 + k * 6, 42, 3, 3, lueur);
+  } else T.disque(16, 27, 2, 2, '#3a3448');
 }
 /** pose les sprites des arènes dans la planche (zone libre du bas) ; add(k, x, y, w, h, densité) */
 export function spritesArenes(ctx, add, x0 = 0, y0 = 1900, largeur = 2048) {

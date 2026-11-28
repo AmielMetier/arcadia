@@ -122,7 +122,7 @@ export function addStory(ctx) {
     Object.assign(marin, { script: 'gift', move: 'static', dir: 'down', text: null, gift: {
       item: 'max-repel', qty: 3, flag: 'giftMarin', who: 'Vieux marin', need: (st) => st.flags['T:ecl:nyx1'],
       pre: ['Ahoy... Ces gens en noir veulent savoir où dort le gardien des mers.', 'Jamais je ne leur dirai !'],
-      give: ['Merci de m\'avoir débarrassé de cette Nyx, petit. Tiens, ça éloigne les Pokémon sauvages en mer.'],
+      give: (st) => [`Merci de m'avoir débarrassé de cette Nyx, petit${st.gender === 'f' ? 'e' : ''}. Tiens, ça éloigne les Pokémon sauvages en mer.`],
       got: ['Le gardien des mers, c\'est Lugia. Les anciens disent qu\'il dort dans un sanctuaire, sur un îlot au sud du Cap Mirage.', 'Et regarde l\'îlot, là-bas, au bout du port : un jour, avec Surf, va donc voir ce qu\'il cache.'],
       done: ['Bon vent, petit ! Les marées te seront favorables.'] } });
     // le pêcheur : montre-moi un Magicarpe
@@ -338,7 +338,7 @@ export function addStory(ctx) {
       sp: 147, lvl: 30, flag: 'giftMinidraco', who: 'Ancien du clan', need: (st) => st.badges[7],
       pre: ['Seuls ceux que Drakos a reconnus peuvent recevoir l\'héritage du clan des dragons.'],
       ask: ['Tu portes le Badge Écaille... Drakos t\'a reconnu.', 'Alors accepte ce Minidraco. Il deviendra un jour un puissant Dracolosse.'],
-      got: ['Traite-le avec respect, et il te le rendra au centuple.'], done: ['Les dragons veillent sur toi, jeune dresseur.'] } });
+      got: ['Traite-le avec respect, et il te le rendra au centuple.'], done: (st) => [`Les dragons veillent sur toi, jeune ${st.gender === 'f' ? 'dresseuse' : 'dresseur'}.`] } });
     // pendant l'Éclipse, les habitants s'inquiètent
     const worry = [
       [A, 9, 15, 'Il fait nuit en plein jour... Les Pokémon de la route 1 ne sortent plus de leurs terriers.', 'habitante'],
