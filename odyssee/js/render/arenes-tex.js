@@ -185,6 +185,38 @@ export function texturesArenes(putImg) {
     T.cadre(0, 0, 32, 32, '#8a6a2a'); T.cadre(1, 1, 30, 30, '#e8c860'); T.rect(0, 30, 32, 2, '#5a4418');
   }));
 
+  // ------- parois des arènes en relief (render/arenes-relief.js) : une tuile = une case d'écran de haut, calée en haut
+  // au ras de la lave : la tranche de basalte des dalles, rougie par en dessous (les 8 premières lignes servent)
+  putImg('arf_lave', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#1a1210'); T.rect(0, 0, 32, 1, '#5a4a44');
+    for (let i = 0; i < 32; i++) { const f = (i * 7) % 5 === 0; T.p(i, 1, f ? '#2a1e1a' : '#3a2c28'); T.p(i, 2, '#2e2220'); T.p(i, 3, f ? '#5a2a18' : '#3a2420'); T.p(i, 4, '#8a3a14'); T.p(i, 5, '#c8521a'); T.p(i, 6, '#f08a2a'); T.p(i, 7, i % 3 ? '#ffb040' : '#ffe080'); }
+    for (const x of [5, 14, 22, 29]) { T.p(x, 2, '#c8521a'); T.p(x, 3, '#f08a2a'); }
+  }));
+  // fosse de la carrière : front de taille, strates qui s'assombrissent (les 12 premières lignes servent)
+  putImg('arf_fosse', toile(32, 32, (T) => {
+    for (let j = 0; j < 32; j++) { const c = ['#c8b49a', '#a8967c', '#a08c72', '#8a7860', '#84725a', '#74624c', '#6a5a46', '#5a4a3a', '#50422e', '#443828', '#3a2e22', '#2e241a'][Math.min(11, j)]; T.rect(0, j, 32, 1, c); }
+    for (const [x, y, l] of [[3, 3, 7], [18, 2, 9], [9, 6, 11], [24, 7, 6], [1, 9, 8], [15, 10, 10]]) T.rect(x, y, l, 1, '#4a3c2c');
+    for (const x of [7, 16, 27]) { T.p(x, 4, '#4a3c2c'); T.p(x, 5, '#4a3c2c'); T.p(x + 1, 8, '#3a2e22'); }
+  }));
+  // gouffre de la Tour de Drakos : trois assises de pierre indigo sous une lèvre claire, puis la paroi fond dans le noir
+  const NUIT = ['#0c0a14', '#100e1a'];
+  putImg('arf_gouffre', toile(32, 32, (T) => {
+    for (let j = 0; j < 32; j++) for (let i = 0; i < 32; i++) {
+      const r = j >> 3, joint = j % 8 === 0 || (i + (r % 2 ? 8 : 0)) % 16 === 0, k = Math.min(1, j / 26);
+      const mel = (a, b) => Math.round(a + (b - a) * k * k).toString(16).padStart(2, '0');
+      const [cr, cg, cb] = joint ? [0x2a, 0x24, 0x48] : j % 8 === 1 ? [0x6a, 0x5e, 0xa8] : [0x4a, 0x40, 0x80];
+      T.p(i, j, '#' + mel(cr, 0x0c) + mel(cg, 0x0a) + mel(cb, 0x14));
+    }
+    T.rect(0, 0, 32, 1, '#9a8ee0'); T.rect(0, 1, 32, 1, '#7a6ec0');
+    for (let k = 0; k < 5; k++) T.p(3 + k * 7, 27 + (k % 2) * 2, '#3a2a5a');
+  }));
+  // pont-dragon : une dalle de quatre lignes (chant doré), et dessous l'ombre du gouffre
+  putImg('arf_pont', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, NUIT[0]); for (let k = 0; k < 9; k++) T.p((k * 11 + 3) % 32, 8 + (k * 7) % 22, k % 3 ? NUIT[1] : '#2a2040');
+    T.rect(0, 0, 32, 1, '#e8c860'); T.rect(0, 1, 32, 2, '#8a7ad0'); T.rect(0, 3, 32, 1, '#3a3078'); T.rect(0, 4, 32, 2, '#1a1530');
+    for (let i = 3; i < 32; i += 8) T.p(i, 2, '#5a4ea0');
+  }));
+
   // ------- Cimelune, le Musée des Dragons : estrade de marbre sous le squelette (gauche, milieu, droite), cordon de velours
   for (const [g, x0, x1] of [['g', 2, 32], ['m', 0, 32], ['d', 0, 30]]) putImg('dec_estrade_musee_' + g, toile(32, 32, (T) => {
     T.rect(x0, 3, x1 - x0, 27, '#6e2a3a'); T.rect(x0, 3, x1 - x0, 2, '#e8c860'); T.rect(x0, 28, x1 - x0, 2, '#4a1a26');

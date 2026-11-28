@@ -26,8 +26,11 @@ import { dessinHerbe, imageHerbe, NIMAGES, MARGE as HERBE_M, HAUTEUR as HERBE_H 
 import { Relief3D, relief3dActif, matParoi, matFacettes, facettesActives, matPente, matsPente, LV as R3LV } from './relief3d.js';
 import { setRelief3dSol, setReliefHGSSSol } from './solgen.js';
 import { ReliefHGSS, reliefHGSSActif } from './falaises.js';
+import { ReliefArene } from './arenes-relief.js';
 
 export const EL = 55 * Math.PI / 180, FOV = 13;
+/** hauteur du monde qui décale un point d'une case à l'écran (les hauteurs des arènes en relief sont dans cette unité) */
+const CASE_ECRAN = Math.tan(EL);
 
 // Une tuile fait 16 × 16 pixels à l'écran (la projection est resserrée en largeur pour que les tuiles soient carrées,
 // comme sur DS) ; un pixel de sprite vaut un pixel d'écran : WPX en largeur, HPX en hauteur (unités du monde).
@@ -538,7 +541,7 @@ function box(G, x0, z0, x1, z1, h, front, top, side = front, o = {}) {
   if (o.south !== false) G.quad([x0, 0, z1], [x1, 0, z1], [x1, h, z1], [x0, h, z1], front[0], front[1], front[2], front[3], 1);
   if (o.east !== false) G.quad([x1, 0, z1], [x1, 0, z0], [x1, h, z0], [x1, h, z1], side[0], side[1], side[2], side[3], 0.78);
   if (o.west !== false) G.quad([x0, 0, z0], [x0, 0, z1], [x0, h, z1], [x0, h, z0], side[0], side[1], side[2], side[3], 0.78);
-  if (top) G.quad([x0, h, z1], [x1, h, z1], [x1, h, z0], [x0, h, z0], top[0], top[1], top[2], top[3], 1);
+  if (top) G.quad([x0, h, z1], [x1, h, z1], [x1, h, z0], [x0, h, z0], top[0], top[1], top[2], top[3], o.dessus ?? 1);
 }
 
 /** pièce de hautes herbes d'une case selon ses voisins (bords, coins, coins rentrants, sinon une des trois pleines) */
@@ -697,6 +700,9 @@ export class WorldView {
     this.decoAt = new Map(); for (const d of map.deco) this.decoAt.set(d.x + ',' + d.y, d);
     // arènes dessinées : tous les décors d'une case, dans l'ordre où ils ont été posés
     this.decosAt = new Map(); if (map.etat) for (const d of map.deco) (this.decosAt.get(d.x + ',' + d.y) || this.decosAt.set(d.x + ',' + d.y, []).get(d.x + ',' + d.y)).push(d);
+    // arène dessinée : son relief (estrade, lave en contrebas, fosses, gouffre), lu dans l'état des cases ; ?arenesplates
+    // remet le rendu à plat pour comparer
+    { const R = map.etat && !(typeof location !== 'undefined' && /[?&]arenesplates/.test(location.search)) ? new ReliefArene(map, this.decosAt) : null; this.relA = R && R.utile() ? R : null; }
     this.tiers = map.outdoor || map.faille ? null : caveTiers(map); this.biome = caveBiome(map);
     this.int = styleInterieur(map);   // maison : murs et sol assortis à sa ville (interieurs.js)
     if (this.int && !this.A.cells[`int_${this.int}_haut`]) this.int = null;
@@ -1199,7 +1205,7 @@ export class WorldView {
     return true;
   }
   /** hauteur du sol à l'endroit (x, z) du monde : 0 sans le relief en 3D (?relief3d) */
-  hAt(x, z) { return this.r3d ? this.r3d.Hmarche(x, z) : 0; }
+  hAt(x, z) { return this.r3d ? this.r3d.Hmarche(x, z) : this.relA ? this.relA.marche(x, z) * CASE_ECRAN : 0; }
   r3dLV() { return this.r3d ? R3LV : 0; }
   r3dMats() {
     if (!this._r3dMats) {
@@ -1260,11 +1266,13 @@ export class WorldView {
     const yEnd = m.ext ? y0 + CH : Math.min(m.h, y0 + CH), xEnd = m.ext ? x0 + CH : Math.min(m.w, x0 + CH);
     for (let y = y0; y < yEnd; y++) for (let x = x0; x < xEnd; x++) {
       const t = m.get(x, y), g = this.groundCell(x, y), v = hash(x + 7, y + 3);
-      if (g.c) flat(G, x, y, x + 1, y + 1, 0, g.c, g.shade);
-      if (g.anim) flat(N, x, y, x + 1, y + 1, 0, g.anim);
-      if (g.ovAnim) flat(NO, x, y, x + 1, y + 1, 0.002, g.ovAnim);
-      if (g.q) for (let i = 0; i < 4; i++) { const qx = i & 1, qy = i >> 1; flat(g.qEau ? NO : O0, x + qx / 2, y + qy / 2, x + (qx + 1) / 2, y + (qy + 1) / 2, 0.003, g.q[i]); }
-      if (g.ov) flat(O0, x, y, x + 1, y + 1, 0.003, g.ov);
+      // arène en relief : le dessus de la case à sa hauteur, ses parois vers les voisines plus basses
+      const yb = this.relA ? this.reliefCase(G, x, y) : 0;
+      if (g.c) flat(G, x, y, x + 1, y + 1, yb, g.c, g.shade);
+      if (g.anim) flat(N, x, y, x + 1, y + 1, yb, g.anim);
+      if (g.ovAnim) flat(NO, x, y, x + 1, y + 1, yb + 0.002, g.ovAnim);
+      if (g.q) for (let i = 0; i < 4; i++) { const qx = i & 1, qy = i >> 1; flat(g.qEau ? NO : O0, x + qx / 2, y + qy / 2, x + (qx + 1) / 2, y + (qy + 1) / 2, yb + 0.003, g.q[i]); }
+      if (g.ov) flat(O0, x, y, x + 1, y + 1, yb + 0.003, g.ov);
       if (g.bridge && !this.sol.couvre()) flat(G, x - 0.02, y, x + 1.02, y + 1, 0.012, g.bridge);   // le sol généré dessine ses pontons
       if (g.passerelle) flat(r3d ? PB : G, x, y, x + 1, y + 1, 0.012 + (r3d ? r3d.Hmarche(x + 0.5, y + 0.5) : 0), g.passerelle);
       // détails de l'herbe (touffes, trèfles, cailloux, fleurettes…) : une case d'herbe sur six environ, jamais deux
@@ -1392,9 +1400,9 @@ export class WorldView {
       // décor posé (lampadaires, panneaux, meubles…)
       // ombre portée des murs sur le sol (intérieurs façon HGSS)
       if (this.murStyle && t !== T.WALL) {
-        if (m.get(x, y - 1) === T.WALL && y <= 2) flat(TR, x, y, x + 1, y + 1, 0.0042, A.ombre_n);
-        if (x === 1 && m.get(0, y) === T.WALL) flat(TR, x, y, x + 1, y + 1, 0.0041, A.ombre_o);
-        if (x === m.w - 2 && m.get(x + 1, y) === T.WALL) flat(TR, x, y, x + 1, y + 1, 0.0041, A.ombre_e);
+        if (m.get(x, y - 1) === T.WALL && y <= 2) flat(TR, x, y, x + 1, y + 1, yb + 0.0042, A.ombre_n);
+        if (x === 1 && m.get(0, y) === T.WALL) flat(TR, x, y, x + 1, y + 1, yb + 0.0041, A.ombre_o);
+        if (x === m.w - 2 && m.get(x + 1, y) === T.WALL) flat(TR, x, y, x + 1, y + 1, yb + 0.0041, A.ombre_e);
         // tapis des maisons, sous la table (3 × 2 cases au milieu de la pièce)
         if (this.murStyle.startsWith('in') && A['tapis_' + this.murStyle] && x === (m.w >> 1) - 1 && y === 4 && m.h >= 8) flat(O0, x, y, x + 3, y + 2, 0.0043, A['tapis_' + this.murStyle]);
       }
@@ -1568,26 +1576,64 @@ export class WorldView {
     return false;
   }
 
+  /**
+   * Arène en relief (render/arenes-relief.js), à la façon du moteur de terrain : la case (x, y) reçoit une paroi vers chaque
+   * voisine plus basse au sud, à l'est et à l'ouest (le nord ne se voit pas), dessinée par bandes d'une case d'écran au
+   * plus, la tuile calée en haut. Renvoie la hauteur du dessus de la case dans le monde.
+   */
+  reliefCase(G, x, y) {
+    const R = this.relA, A = this.A.cells, e = R.h(x, y), s = R.sorte(x, y);
+    for (const [dx, dy, ombre] of [[0, 1, 0.85], [1, 0, 0.7], [-1, 0, 0.7]]) {
+      const en = R.h(x + dx, y + dy); if (en >= e - 1e-6) continue;
+      const sn = R.sorte(x + dx, y + dy);
+      // matière de la paroi : le chant de l'estrade, la roche de la fosse, le basalte au ras de la lave, la maçonnerie
+      // qui plonge dans le gouffre ; un pont n'est qu'une dalle, le reste de sa paroi est l'ombre du gouffre
+      const est = s === 'estrade' && A['dec_estrade_' + (ESTRADES[this.map.arene] || this.map.arene)];
+      const tex = est || (sn === 'lave' ? A.arf_lave : sn === 'fosse' ? A.arf_fosse : s === 'pont' ? A.arf_pont : A.arf_gouffre);
+      if (!tex) continue;
+      const c = est ? ombre * 0.72 : ombre;
+      for (let hb = e; hb > en + 1e-6; hb -= 1) {
+        const bas = Math.max(en, hb - 1), t = hb * CASE_ECRAN, b = bas * CASE_ECRAN;
+        // au-delà de la première bande, le gouffre est noir (bas de la tuile)
+        const k0 = hb < e - 1e-6 ? 31 / 32 : 0, v1 = tex[3] - (tex[3] - tex[1]) * k0, v0 = tex[3] - (tex[3] - tex[1]) * Math.min(1, k0 + (hb - bas));
+        if (dy === 1) G.quad([x, b, y + 1], [x + 1, b, y + 1], [x + 1, t, y + 1], [x, t, y + 1], tex[0], v0, tex[2], v1, c);
+        else if (dx === 1) G.quad([x + 1, b, y + 1], [x + 1, b, y], [x + 1, t, y], [x + 1, t, y + 1], tex[0], v0, tex[2], v1, c);
+        else G.quad([x, b, y], [x, b, y + 1], [x, t, y + 1], [x, t, y], tex[0], v0, tex[2], v1, c);
+      }
+    }
+    return e * CASE_ECRAN;
+  }
+
   /** une case d'arène dessinée (world/arenes-plan.js) : décalques à plat puis objets debout, selon les registres */
   celluleArene(O0, P, Sh, x, y, Wl) {
     const m = this.map, A = this.A.cells, S = this.S.rects, R = m.regs || m.regs0 || [], t = m.get(x, y);
     const marche = walkable(t);
-    let h = 0.005;
+    // arène en relief : décalques et objets posés sur le dessus de la case (au fond du gouffre, sur l'estrade…)
+    const y0 = this.relA ? this.relA.h(x, y) * CASE_ECRAN : 0;
+    let h = y0 + 0.005;
     const aPlat = (k) => { if (!A[k]) return false; flat(k.startsWith('dec_cire_ouverte') ? this._TR : O0, x, y, x + 1, y + 1, h, A[k]); h += 0.0012; return true; };
     const debout = (k, dz = 0.62, ombre = true) => {
       const r = S[k]; if (!r) return false;
-      billboard(P, x + 0.5, y + dz, SW(r), SH(r), r);
-      if (ombre) this.ombreSol(Sh, x + 0.1, y + 0.4, x + 0.9, y + 0.85);
+      billboard(P, x + 0.5, y + dz, SW(r), SH(r), r, y0);
+      if (ombre) this.ombreSol(Sh, x + 0.1, y + 0.4, x + 0.9, y + 0.85, y0 + 0.015);
       return true;
     };
     const ou = (k, dz) => aPlat('dec_' + k) || debout(k, dz);
     const roche = (a, b) => (this.decosAt.get(a + ',' + b) || []).some((q) => q.k === 'roche_gym');
     for (const d of this.decosAt.get(x + ',' + y) || []) {
       const k = d.k;
-      // roche de la carrière : un bloc de roche comme les parois des grottes
+      // roche de la carrière : un bloc de roche comme les parois des grottes. Arène en relief : la carrière monte en
+      // gradins, un bloc est d'autant plus haut qu'il est loin du sol où l'on marche (20, 28 puis 36 pixels) ; le plus haut
+      // ne dépasse jamais sur une case de sol (il est à trois cases au moins du bord)
       if (k === 'roche_gym' && A.cavewall) {
-        const s2 = !roche(x, y + 1), e = !roche(x + 1, y), w = !roche(x - 1, y);
-        box(Wl, x, y, x + 1, y + 1, 0.9 * Math.tan(EL), A.cavewall, A.cavetop, A.cavewall, { south: s2, east: e, west: w });
+        if (!this.relA) { box(Wl, x, y, x + 1, y + 1, 0.9 * CASE_ECRAN, A.cavewall, A.cavetop, A.cavewall, { south: !roche(x, y + 1), east: !roche(x + 1, y), west: !roche(x - 1, y) }); continue; }
+        const gradin = (a, b) => {
+          if (!roche(a, b)) return 0;
+          for (let r = 1; r <= 2; r++) for (let i = -r; i <= r; i++) { const j = r - Math.abs(i); if (!roche(a + i, b + j) || !roche(a + i, b - j)) return r === 1 ? 20 / 32 : 28 / 32; }
+          return 36 / 32;
+        };
+        const hr = gradin(x, y);
+        box(Wl, x, y, x + 1, y + 1, hr * CASE_ECRAN, A.cavewall, A.cavetop, A.cavewall, { south: gradin(x, y + 1) < hr, east: gradin(x + 1, y) < hr, west: gradin(x - 1, y) < hr, dessus: hr < 0.7 ? 0.8 : hr < 1 ? 0.92 : 1.04 });   // les gradins du haut prennent la lumière
         continue;
       }
       if (k === 'etat') {
@@ -2194,7 +2240,7 @@ export class WorldView {
     const uv = a.mesh.geometry.attributes.uv; uv.setXY(0, u0, v0); uv.setXY(1, u1, v0); uv.setXY(2, u0, v1); uv.setXY(3, u1, v1); uv.needsUpdate = true;
   }
   place(a, x, y, hop = 0, inGrass = false) {
-    const h = this.r3d ? this.r3d.Hmarche(x + 0.5, y + 0.55) : 0;
+    const h = this.hAt(x + 0.5, y + 0.55);
     // retombée d'un saut (rebord) : un petit nuage de poussière aux pieds
     if ((a.hop ?? 0) > 0.08 && hop < 0.02 && !inGrass && a.kind === 'char') this.ambiance.poussiere(x + 0.5, h, y + 0.6);
     a.hop = hop;
