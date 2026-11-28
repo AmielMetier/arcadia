@@ -34,7 +34,7 @@ import { Donjons } from './donjons/jeu.js';
 import { storyTalk, storyWin, lugiaBattle, placeLugia, overlay } from './story.js';
 import { battleMusicForLegend } from './audio.js';
 import { playBossCinematic, isLegendarySpecies } from './ui/cinematic.js';
-import { syncJournal } from './core/questsData.js';
+import { syncJournal, nomQuete } from './core/questsData.js';
 import { preparerArene, surCaseArene, actionnerArene, remettreArene, pasArene, rocherDansFosse } from './arenes-jeu.js';
 import { casinoScreen, bourseScreen, entretienPierre } from './ui/metropole.js';
 import { arcadeScreen } from './ui/arcade.js';
@@ -77,13 +77,21 @@ const GYM_GIFT = { 3: 'coupe', 4: 'surf', 5: 'eclate', 6: 'vol' };
 const FACES = {
   // Professeur & Rivaux
   'Prof. Saule': 'saule', 'Professeur Saule': 'saule', 'Saule': 'saule',
+  'Dr Lumen': 'lumen', 'Lumen': 'lumen',
   [RIVAL_NAME]: 'theo', 'Théo': 'theo', 'Theo': 'theo', 'Rival': 'theo',
+  'Ethan': 'player_m', 'Lyra': 'player_f',
   // Famille & PNJ récurrents
   'Maman': 'maman', 'Mère de Théo': 'habitante', 'Infirmière': 'nurse',
   'Vendeur': 'vendeur', 'Garde': 'garde', 'Capitaine': 'capitaine', 'Capitaine Corentin': 'capitaine',
   'Architecte': 'topdresseur', 'Pierre': 'pierre', 'Croupier': 'croupier', 'Facteur': 'facteur',
   'Gardien du phare': 'scientifique', 'Ermite': 'montagnard', 'Styliste': 'topdresseuse',
   'Gardien du savoir': 'scientifique', 'Inspectrice Morvan': 'topdresseuse', 'Morvan': 'topdresseuse',
+  'Ingénieur': 'scientifique', 'Voyante': 'medium', 'Guide': 'habitant',
+  'Éleveuse': 'habitante', 'Chercheur': 'scientifique', 'Hélène': 'habitante',
+  'Dr Cassandre': 'scientifique', 'Conteuse Éléonore': 'habitante', 'Papi Octave': 'vieil_homme',
+  'Mme Léonie': 'habitante', 'Présentatrice': 'topdresseuse', 'Ingrid': 'habitante',
+  'Pr Cèdre': 'scientifique', 'Doyenne Amaya': 'habitante', 'Vieille dame': 'habitante',
+  'Jardinier Firmin': 'jardinier', 'Lucien': 'habitant', 'Gustave': 'vieil_homme',
   // Champions du Continent
   'Hector': 'hector', 'Marine': 'marine', 'Volta': 'volta', 'Flora': 'flora',
   'Sibylle': 'sibylle', 'Basalte': 'basalte', 'Pyros': 'pyros', 'Drakos': 'drakos',
@@ -114,7 +122,7 @@ const TRAINER_NAME_TO_SPRITE = {
   'neige': 'randonneuse', 'flocon': 'randonneuse', 'hayate': 'voleur', 'raiden': 'voleur', 'arsène': 'voleur', 'sakura': 'kimono',
   'nils': 'gamin', 'timéo': 'gamin', 'rosalie': 'fillette', 'lison': 'fillette', 'fernand': 'habitant', 'm. fernand': 'habitant',
   'rose': 'habitante', 'mme rose': 'habitante', 'héliotrope': 'habitante', 'mme héliotrope': 'habitante',
-  'opaline': 'habitante', 'madame opaline': 'habitante', 'jules': 'insectomane', 'watt': 'scientifique', 'mlle watt': 'scientifique',
+  'opaline': 'medium', 'madame opaline': 'medium', 'jules': 'insectomane', 'watt': 'scientifique', 'mlle watt': 'scientifique',
   'gustave': 'vieil_homme', 'papi gustave': 'vieil_homme', 'léon': 'vieil_homme', 'vieux léon': 'vieil_homme', 'firmin': 'montagnard',
   'séraphine': 'medium', 'sven': 'pecheur', 'corentin': 'marin',
 };
@@ -186,9 +194,12 @@ export class Game {
       if (TRAINER_NAME_TO_SPRITE[low]) { const p = visage(TRAINER_NAME_TO_SPRITE[low]); if (p) return p; }
       if (CLASS_TO_SPRITE[low]) { const p = visage(CLASS_TO_SPRITE[low]); if (p) return p; }
       const words = s.split(/\s+/);
-      for (const w of words) {
+      for (const raw of words) {
+        const w = raw.replace(/^[,.:;!?«»"']+|[,.:;!?«»"']+$/g, '');
+        if (!w) continue;
         const wLow = w.toLowerCase();
         if (FACES[w]) { const p = visage(FACES[w]); if (p) return p; }
+        if (FACES[wLow]) { const p = visage(FACES[wLow]); if (p) return p; }
         if (TRAINER_NAME_TO_SPRITE[wLow]) { const p = visage(TRAINER_NAME_TO_SPRITE[wLow]); if (p) return p; }
         if (CLASS_TO_SPRITE[wLow]) { const p = visage(CLASS_TO_SPRITE[wLow]); if (p) return p; }
       }
@@ -222,7 +233,8 @@ export class Game {
     s.map = this.mapObj.id; s.x = p.x; s.y = p.y; s.dir = p.dir; s.surf = !!p.surf;
     // dans une faille (île éphémère), la partie se sauvegarde sur la route où elle s'est ouverte
     const rf = this.mapObj.faille && this.rifts?.exp?.retour; if (rf) Object.assign(s, { map: 'monde', x: rf.x, y: rf.y, dir: rf.dir });
-    if (!storeSet(SAVE_KEY, JSON.stringify(s))) return false;
+    const toSave = this._dojoRealParty ? { ...s, party: this._dojoRealParty } : s;
+    if (!storeSet(SAVE_KEY, JSON.stringify(toSave))) return false;
     if (!silent) this.sound.sfx('save');
     this.onSaved?.(silent);
     return true;
@@ -489,7 +501,10 @@ export class Game {
     this.view.ombreCible = (m.outdoor && z?.ombre) || 1;   // sous-bois : l'image s'assombrit doucement
     if (!this.musicLock) {
       const celMusic = m.id === 'monde' && m.outdoor && this.celestial?.activeKind !== 'none' ? this.celestial.activeKind : null;
-      this.sound.play(celMusic || (p.surf && m.outdoor ? 'route2' : (z && z.music) || m.music));
+      // la Centrale libérée reprend l'air de Voltacité ; pendant la Nuit Violette, les routes deviennent inquiètes
+      const nuitViolette = m.outdoor && z?.route && !z.town && this.eclipseOn();
+      const track = (m.id === 'volta:tower17' && this.state.flags['T:ecl:erebe2']) ? 'cityVolt' : nuitViolette ? 'routeNuit' : ((z && z.music) || m.music);
+      this.sound.play(celMusic || (p.surf && m.outdoor ? 'route2' : track));
     }
     this.zone = z;
     try { this.view?.setWeather(this.getMapWeather()); this.celestial?.syncView(); } catch (e) { warnDev('weather', e); }
@@ -743,8 +758,20 @@ export class Game {
       const bx = tx + dx, by = ty + dy, bt = m.get(bx, by);
       // arène de la Carrière : le rocher comble la fosse
       if (m.etat && !this.occupied(bx, by) && rocherDansFosse(this, tx, ty, bx, by)) { p.bumpT = 0.3; p.walking = false; return; }
-      if (walkable(bt) && ![T.DOOR, T.MAT, T.CAVEDOOR, T.STAIRS].includes(bt) && !this.occupied(bx, by) && !m.warpAt(bx, by) && !(m.etat && m.objectAt(bx, by))) {
-        this.setTile(tx, ty, m.etat ? T.FLOOR : m.outdoor ? T.GRASS : T.CAVE); this.setTile(bx, by, T.BOULDER);
+      if (walkable(bt) && ![T.DOOR, T.MAT, T.CAVEDOOR, T.STAIRS].includes(bt) && !this.occupied(bx, by) && !m.warpAt(bx, by) && !(m.etat && m.objectAt(bx, by)) && (m.etat || m.canStep(tx, ty, bx, by))) {
+        if (m.etat) {
+          this.setTile(tx, ty, T.FLOOR); this.setTile(bx, by, T.BOULDER);
+        } else {
+          // hors arène, les rochers poussés ne sont pas gravés définitivement : ils se réinitialisent en quittant la zone
+          if (!m._orig) m._orig = new Map();
+          const kt = key(tx, ty), kb = key(bx, by);
+          if (!m._orig.has(kt)) m._orig.set(kt, m.get(tx, ty));
+          if (!m._orig.has(kb)) m._orig.set(kb, bt);
+          const under = m._orig.get(kt);
+          m.set(tx, ty, under === T.BOULDER ? (m.outdoor ? T.GRASS : T.CAVE) : under);
+          m.set(bx, by, T.BOULDER);
+          this.view.rebuildAt(tx, ty); this.view.rebuildAt(bx, by);
+        }
         this.sound.sfx('ledge'); this.view.shake = 0.08; p.bumpT = 0.3; p.walking = false;
         return;
       }
@@ -785,7 +812,10 @@ export class Game {
     if (!mv.slid && (mo?.type === 'glace' || mo?.type === 'fleche')) { this.busy = true; try { await this.glisse(mo.type === 'fleche' ? mo.dir : p.dir); } finally { this.busy = false; } return this.onStep({ slid: true }); }
     if (mo?.type === 'dalle') this.dalle(mo);
     if (mo?.type === 'souffle' && !mv.slid) { this.busy = true; try { await this.souffle(mo); } finally { this.busy = false; } }
-    if (mo?.type === 'tp' && !mv.slid) { this.busy = true; try { await this.teleporte(mo); } finally { this.busy = false; } return this.onStep({ slid: true }); }
+    if (mo?.type === 'tp' && !mv.slid) {
+      if (await this.checkTrainers()) return;
+      this.busy = true; try { await this.teleporte(mo); } finally { this.busy = false; } return this.onStep({ slid: true });
+    }
     // arènes dessinées : dalles-interrupteurs, trous, canons à vent, dalles d'argile
     if (m.etat && mo && ['reg', 'chute', 'canon', 'fragile'].includes(mo.type)) {
       this.busy = true; let bouge = false;
@@ -1135,7 +1165,9 @@ export class Game {
         else if (revancheBossPossible(this, n)) await revancheBoss(this, n);
         else if (revanchePossible(this, n)) await revanche(this, n);
         else {
-          await this.ui.say(d.trainer.after || 'Quel combat !', {
+          // (une réplique peut dépendre de la partie : (st) => texte)
+          const apres = typeof d.trainer.after === 'function' ? d.trainer.after(st) : d.trainer.after;
+          await this.ui.say(apres || 'Quel combat !', {
             speaker: nomDresseur(d.trainer),
             face: d.trainer.bs || d.trainer.ow || n.sprite
           });
@@ -1331,11 +1363,13 @@ export class Game {
     const F = FIELD[k], st = this.state;
     if (!this.hasField(k)) { await this.ui.say(look); return; }
     if (!this.canField(k)) { await this.ui.say([look, `Il faut le ${BADGES[F.badge - 1].name} pour utiliser ${F.name} hors combat.`]); return; }
-    if (!(await this.ui.yesNo(`${look}\nUtiliser ${F.name} ?`))) return;
+    // Coupe : avec la CS, c'est un Pokémon qui coupe ; avec le seul Sécateur Sylvestre, c'est le joueur, et la question le dit
+    const outil = k === 'coupe' && !st.bag['cs-coupe'] && F.item && st.bag[F.item] ? 'le ' + F.itemName : null;
+    if (!(await this.ui.yesNo(`${look}\nUtiliser ${outil || F.name} ?`))) return;
     const mon = this.fieldUser();
-    this.sound.cry(ASSETS.cry(mon.sp));
+    if (!outil) this.sound.cry(ASSETS.cry(mon.sp));
     if (k === 'coupe') {
-      await this.ui.say(`${st.name} utilise le Sécateur Sylvestre pour trancher le buisson !`, { auto: 600 });
+      await this.ui.say(outil ? `${st.name} utilise ${outil} et coupe le petit arbre !` : `${monName(mon)} utilise Coupe et tranche le petit arbre !`, { auto: 600 });
       await this.animateCut(x, y);
     } else {
       await this.ui.say(`${monName(mon)} utilise ${F.name} !`, { auto: 500 });
@@ -1351,6 +1385,8 @@ export class Game {
   /** Force : une fois activée sur la carte, on pousse les rochers en marchant contre eux */
   async useForce() {
     const look = 'C\'est un gros rocher. Un Pokémon très costaud pourrait le pousser.';
+    // dans les arènes, les rochers se poussent sans Force : on le dit au lieu de proposer la CS
+    if (this.mapObj?.pushFree) { await this.ui.say('Ce rocher n\'est pas si lourd : marche contre lui pour le pousser.'); return; }
     if (!this.hasField('force')) { await this.ui.say(look); return; }
     if (!this.canField('force')) { await this.ui.say([look, `Il faut le ${BADGES[FIELD.force.badge - 1].name} pour utiliser Force hors combat.`]); return; }
     if (this.strengthOn === this.mapObj.id) { await this.ui.say('Force est active : marche contre le rocher pour le pousser.'); return; }
@@ -1450,12 +1486,12 @@ export class Game {
   }
 
   async trySurf(x, y, skipConfirm = false) {
-    const st = this.state;
+    const st = this.state, m = this.mapObj, p = this.player;
+    if (!m?.in(x, y) || m.get(p.x, p.y) === T.BRIDGE || m.height(x, y) !== m.height(p.x, p.y)) { this.sound.sfx('bump'); return; }
     if (!this.canField('surf')) { await this.ui.say(this.hasField('surf') ? ['L\'eau est d\'un bleu profond...', 'Il faut le Badge Mirage pour surfer.'] : 'L\'eau est d\'un bleu profond...'); return; }
-    if (!st.party.some((m) => m.hp > 0)) return;
+    if (!st.party.some((q) => q.hp > 0)) return;
     if (!skipConfirm && !(await this.ui.yesNo('L\'eau est d\'un bleu profond...\nUtiliser le Harnais Flottant ?'))) return;
     await this.ui.say(`${st.name} déploie le Harnais Flottant et s'élance sur l'eau !`, { auto: 600 });
-    const p = this.player;
     this.sound.sfx('ledge');
     p.move = { fx: p.x, fy: p.y, tx: x, ty: y, t: 0, dur: 0.35, jump: true, scripted: true };
     while (p.move && p.move.t < 0.85) await wait(16);
@@ -1862,7 +1898,7 @@ export class Game {
       face: tr.bs || tr.ow || n.sprite
     });
     // le premier champion reste une marche d'apprentissage : IV ordinaires et pas d'objet tenu
-    const isBoss = (d.leader != null && d.leader !== 0) || d.champion || d.boss;
+    const isBoss = (d.leader != null && d.leader !== 0) || d.champion || d.boss || isEclipseBoss;
     const leaderDefaultItem = (sp, lvl, noEviolite = false) => {
       const S = SPECIES[sp]; if (!S) return 'sitrus-berry';
       const type = S.t[0] || 'normal';
@@ -1901,6 +1937,7 @@ export class Game {
     }
     const res = await this.runBattle({ trainer: { ...tr, ...(d.leader != null ? { leader: d.leader } : {}), bs: tr.bs || tr.ow || n.sprite, items: { ...(tr.items || {}) } }, party, music, id: n.id, leader: d.leader, champion: d.champion, rival: d.rival, noWhiteout: d.noWhiteout, format: tr.format || d.format, slots: tr.slots || d.slots });
     this.musicLock = false;
+    this.updateZone();
     if (res === 'win') {
       st.flags['T:' + n.id] = true;
       noteCombat(this, n);
@@ -1908,8 +1945,8 @@ export class Game {
       if (d.leader != null) await this.badgeScene(d.leader, tr.name);
       if (typeof d.onWin === 'function') await d.onWin(this.api(), n); else if (d.onWin) await this.script(d.onWin, n);
       if (d.beatenPos) { await this.npcWalk(n, 'right', d.beatenPos[0] - n.x); n.dir = 'down'; n.home = [n.x, n.y]; }
-      if (d.vanish) { await this.ui.fade(true, 200); this.npcs = this.npcs.filter((q) => q !== n); this.view.removeActor('npc:' + n.id); await this.ui.fade(false, 200); }
       if (d.winScript) await storyWin(this, d.winScript, n);
+      if (d.vanish && this.npcs.includes(n)) { await this.ui.fade(true, 200); this.npcs = this.npcs.filter((q) => q !== n); this.view.removeActor('npc:' + n.id); await this.ui.fade(false, 200); }
       if (d.beatenPos || d.vanish || d.winScript) this.refreshNpcs();
       if (d.champion) await this.ending();
       if (d.leader != null) await this.retourEntreeArene();
@@ -2054,6 +2091,8 @@ export class Game {
     const m = this.mapObj, z = this.zone;
     if (!m) return 'none';
     if (m.weather) return m.weather;
+    // le Sanctuaire des Marées : de rares cendres violettes flottent autour de l'autel (du décor, sans effet en combat)
+    if (m.id === 'sanctuaire') return 'cendresViolettes';
     // sous un toit ou sous terre, il ne pleut pas : les maisons de Cendrelune (« cendre:… ») recevaient des cendres,
     // celles de Marais-Noir de la pluie, parce que le nom de la ville est dans celui de la carte
     if (!m.outdoor) return 'none';
@@ -2063,6 +2102,8 @@ export class Game {
     if (z?.theme === 'volcanic' || m.id?.includes('cendre')) return this.weatherSlot('volcan') % 2 ? 'ash' : 'sandstorm';
     if (m.id?.includes('desert')) return 'sandstorm';
     if (z?.town === 'azur' || z?.name?.includes('Pluie') || m.id?.includes('marais')) return 'rain';
+    // la Nuit Violette (l'Éclipse) : des cendres violettes tombent sur toute la région
+    if (m.outdoor && this.eclipseOn()) return 'cendresViolettes';
     if (m.outdoor) {
       const h = this.hour();
       if ((z?.surfEnc || m.surfEnc) && (Math.sin(h * 0.7) > 0.65)) return 'rain';
@@ -2113,8 +2154,9 @@ export class Game {
     // Méga-Évolution : le joueur avec son Méga-Anneau ; un dresseur marqué megaSp tend sa gemme à ce Pokémon (« ace » : le dernier)
     // À partir de la 6e arène (5 badges), les Champions et au moins un dresseur sur trois méga-évoluent
     if (o.trainer && !o.trainer.megaSp && !o.trainer.friendly && o.party?.length && this.badgeCount() >= 5) {
+      const isGrunt = /sbire/i.test(o.trainer.cls || '');
       const key = String(o.id || o.trainer.name || ''); let h = 0; for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-      if (o.leader != null || o.champion || h % 3 === 0) o.trainer = { ...o.trainer, megaSp: 'auto', megaSeed: h };
+      if (o.leader != null || o.champion || (!isGrunt && h % 3 === 0)) o.trainer = { ...o.trainer, megaSp: 'auto', megaSeed: h };
     }
     if (o.trainer?.megaSp && o.party?.length) {
       let target = o.trainer.megaSp === 'ace' ? o.party[o.party.length - 1]
@@ -2133,7 +2175,9 @@ export class Game {
     if (o.trainer && !o.trainer.friendly && !o.noWhiteout) { st.combatEnCours = true; this.save(true); }
     const foeMons = wildParty || o.party;
     const h = this.hour();
-    const result = await this.bv.run(battle, { bg: o.fond ? 'faille' : bg, fond: o.fond || null, night: !o.fond && m.outdoor && (h >= 20 || h < 5.5), weather: BATTLE_WEATHERS.includes(weather) ? weather : 'none', curtain });
+    // fond teinté : arènes de Voltacité, Floralia et Mirage à leurs couleurs, et dehors pendant la Nuit Violette
+    const teinte = o.fond ? null : !m.outdoor && m.battleBg === 'gym' && ['electric', 'grass', 'psychic'].includes(m.arene) ? m.arene : m.outdoor && this.eclipseOn() ? 'eclipse' : null;
+    const result = await this.bv.run(battle, { bg: o.fond ? 'faille' : bg, teinte, fond: o.fond || null, night: !o.fond && m.outdoor && (h >= 20 || h < 5.5), weather: BATTLE_WEATHERS.includes(weather) ? weather : 'none', curtain });
     // argent
     if (result === 'win' && battle.prizeMoney) st.money += battle.prizeMoney;
     this.dernierCombat = battle.participants;   // ceux qui ont combattu (souvenir d'Arène)
@@ -2257,7 +2301,7 @@ export class Game {
       ['Un reportage sur les Pokémon de la région.', '« Les Germignon adorent les journées ensoleillées... »'],
       ['La météo : grand soleil sur Bourg-Aube, tempête de neige sur l\'Île Givrée.'],
     ];
-    if (b >= 3 && !st.flags.rivalB4) TV.push(['Flash spécial : les Gardes d\'Écaille ferment des ports de pêche.', 'Les pêcheurs de Port-Granit protestent...']);
+    if (b >= 3 && !st.badges[7] && !st.flags.drakos && !st.flags.rivalB4) TV.push(['Flash spécial : les Gardes d\'Écaille ferment des ports de pêche.', 'Les pêcheurs de Port-Granit protestent...']);
     if (st.flags.champion) TV.push(['On parle de toi aux informations ! Le nouveau Maître de la Ligue...', 'Maman doit être si fière.']);
     const T_ = {
       books: home ? ['Des livres d\'images sur les Pokémon...', '« Mon premier voyage », celui que Maman te lisait le soir.']
@@ -2325,7 +2369,8 @@ export class Game {
       /** passe la quête à l'étape n (et l'annonce dans le journal) */
       set: async (id, n, quiet) => {
         const was = g.qstep(id); st().flags['Q:' + id] = n;
-        const Q = (g.world.quests || {})[id];
+        // (le vélo et le permis bateau ne sont pas dans world.quests : leur nom vient du journal)
+        const Q = (g.world.quests || {})[id] || (nomQuete(id, g) ? { name: nomQuete(id, g) } : null);
         if (!quiet && Q && was !== n) {
           g.sound.sfx(n === 'fin' ? 'badge' : 'item');
           await ui().say(n === 'fin' ? `Quête terminée : ${Q.name} !` : was ? `Journal des quêtes : « ${Q.name} » mis à jour.` : `Nouvelle quête : ${Q.name} !`, { auto: 1400 });
@@ -2360,14 +2405,14 @@ export class Game {
             sub: t.name === 'Nox' ? 'Chef de la Brume · Orbe Rouge' : isBrumeBoss ? t.cls : (t.name === RIVAL_NAME ? 'Dernier Duel · Bourg-Aube' : undefined),
           });
         }
-        const party = isRival ? buildRivalParty(g, t.team) : t.team.map(([sp, lvl]) => createMon(sp, lvl, { iv: Array(6).fill(Math.min(31, 10 + lvl / 2 | 0)), shiny: false }));
+        const party = isRival ? buildRivalParty(g, t.team) : t.team.map(([sp, lvl]) => createMon(sp, lvl, { iv: Array(6).fill(Math.min(31, 10 + lvl / 2 | 0)), moves: (leaderMatch || t.boss) ? movesChoisies(sp, lvl) : undefined, shiny: false }));
         g.musicLock = true;
         const items = isRival ? getRivalItems(g) : { ...(t.items || {}) };
         const fightMusic = t.music || (t.name === 'Nox' ? 'legendElemental' : isBrumeBoss ? 'eclipse' : leaderMatch ? 'leader' : isRival ? 'rival' : t.boss ? 'champion' : 'trainer');
         const res = await g.runBattle({ trainer: { ...t, items }, party, music: fightMusic, rival: isRival, noWhiteout: t.noWhiteout, format: t.format, slots: t.slots });
         g.musicLock = false; g.updateZone();
         if (res === 'win' && (isBrumeBoss || t.boss)) g.noterBoss(t.name);
-        if (res === 'win' && t.after) await ui().say(t.after, { speaker: nomDresseur(t), face: t.bs || t.ow });
+        if (res === 'win' && t.after) await ui().say(typeof t.after === 'function' ? t.after(st()) : t.after, { speaker: nomDresseur(t), face: t.bs || t.ow });
         return res;
       },
       /** rencontre d'un Pokémon (sauvage ou légendaire) */

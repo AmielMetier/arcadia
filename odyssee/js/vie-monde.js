@@ -198,12 +198,15 @@ export class VieMonde {
       if (t === T.WATER) eau++; else if (t === T.FLOWER) fleurs++; else if (t === T.TALL || t === T.GRASS || t === T.TREE) herbe++;
     }
     const z = m.outdoor ? m.zoneAt(p.x, p.y) : null;
-    return { eau, fleurs, herbe, theme: z?.theme || '', ville: !!z?.town };
+    // lieux mystiques (aucune zone n'a ce thème : on les reconnaît à leur carte, leur musique ou leur ville) : le Sanctuaire
+    // des Marées, l'Îlot des Marées et Mirage
+    const mystique = m.id === 'sanctuaire' || z?.music === 'sanctuary' || z?.music === 'mystic' || z?.town === 'mirage' || z?.name === 'Îlot des Marées';
+    return { eau, fleurs, herbe, theme: mystique ? (m.id === 'sanctuaire' ? 'sanctuary' : 'mystic') : z?.theme || '', ville: !!z?.town };
   }
 
   sons(dt) {
     const g = this.game, m = g.mapObj;
-    if (!m.outdoor || g.busy) return;
+    if ((!m.outdoor && m.id !== 'sanctuaire') || g.busy) return;   // sous terre, seul le Sanctuaire a ses bruits
     this.tSon -= dt; if (this.tSon > 0) return;
     this.tSon = 3 + Math.random() * 5;
     const A = this.autour(), h = g.hour(), soir = h >= 20 || h < 6;
@@ -219,7 +222,9 @@ export class VieMonde {
     if (wx === 'rain') { g.sound.sfx(Math.random() < 0.18 ? 'amb_thunder' : 'amb_rain'); return; }
     if (wx === 'sandstorm' || wx === 'ash' || wx === 'hail') { g.sound.sfx('amb_wind_gust'); return; }
     if (['volcanic', 'cendre', 'forge'].includes(A.theme)) { g.sound.sfx('amb_volcano'); return; }
-    if (A.theme === 'mystic' || A.theme === 'sanctuary' || ['Cap des Étoiles', 'Jardin des Songes'].includes(g.zoneName)) { g.sound.sfx('amb_mystic'); return; }
+    // le Sanctuaire : l'eau qui goutte sous la roche, et parfois l'écho mystique de Lugia
+    if (A.theme === 'sanctuary') { g.sound.sfx(Math.random() < 0.6 ? 'goutte' : 'amb_mystic'); return; }
+    if (A.theme === 'mystic' || ['Cap des Étoiles', 'Jardin des Songes'].includes(g.zoneName)) { g.sound.sfx('amb_mystic'); return; }
     if (A.theme === 'snow' || A.theme === 'cime') g.sound.sfx('vent');
     else if (A.eau >= 12) g.sound.sfx('vague');
     else if (soir && A.herbe > 10) g.sound.sfx('grillon');
@@ -418,12 +423,13 @@ export async function relais(game, n) {
   await ui.say('Tes Pokémon encore debout ont repris des forces (au moins la moitié de leurs PV).');
 }
 
-const CATEGORIES = [['Beauté', 3, 'élégance'], ['Force', 1, 'puissance'], ['Grâce', 5, 'agilité'], ['Sagesse', 4, 'sang-froid']];
+// [catégorie, statistique jugée, « le jury regarde … », « montre … »] : l'article et l'accord vont avec chaque mot
+const CATEGORIES = [['Beauté', 3, 'l\'élégance', 'toute son élégance'], ['Force', 1, 'la puissance', 'toute sa puissance'], ['Grâce', 5, 'l\'agilité', 'toute son agilité'], ['Sagesse', 4, 'le sang-froid', 'tout son sang-froid']];
 export async function concours(game, n) {
   const st = game.state, E = etat(st), ui = game.ui, who = { speaker: 'Présentatrice' };
   if (E.concours === jourDe()) { await ui.say('Le concours du jour est terminé ! Reviens demain pour une nouvelle catégorie.', who); return; }
   const cat = CATEGORIES[new Date().getDay() % CATEGORIES.length];
-  await ui.say([`Bienvenue au Concours Pokémon de Floralia ! Aujourd'hui : catégorie ${cat[0]} !`, `Le jury regarde la ${cat[2]} de ton Pokémon, son niveau… et la complicité entre vous.`], who);
+  await ui.say([`Bienvenue au Concours Pokémon de Floralia ! Aujourd'hui : catégorie ${cat[0]} !`, `Le jury regarde ${cat[2]} de ton Pokémon, son niveau… et la complicité entre vous.`], who);
   if (!(await ui.yesNo('Participer au concours ?', who))) return;
   const i = await partyScreen(game, { mode: 'pick', prompt: 'Quel Pokémon présenter ?', filter: (m) => (m.hp > 0 ? null : 'Il est K.O.') });
   if (i == null || i < 0) return;
@@ -434,7 +440,7 @@ export async function concours(game, n) {
   const tab = [[`${st.name} et ${monName(m)}`, toi], ...rivaux].sort((a, b) => b[1] - a[1]);
   const rang = tab.findIndex((t) => t[1] === toi) + 1;
   game.sound.cry?.(ASSETS.cry(m.sp));
-  await ui.say([`${monName(m)} entre en scène et montre toute sa ${cat[2]} !`, 'Le jury délibère…', ...tab.map((t, k) => `${k + 1}. ${t[0]} — ${Math.round(t[1])} points`)], who);
+  await ui.say([`${monName(m)} entre en scène et montre ${cat[3]} !`, 'Le jury délibère…', ...tab.map((t, k) => `${k + 1}. ${t[0]} — ${Math.round(t[1])} points`)], who);
   E.concours = jourDe();
   const prix = [[['rare-candy', 1], ['heart-scale', 2]], [['ultra-ball', 3]], [['super-potion', 2]], []][rang - 1];
   if (rang === 1) { game.sound.sfx('medal'); await ui.say(`Et la gagnante est… l'équipe de ${st.name} ! Bravo !`, who); }

@@ -23,6 +23,11 @@ export const THEMES = {
   route2: { key: 'D3', scale: 'maj', bpm: 128, prog: ['I', 'V', 'vi', 'IV', 'ii', 'V', 'I', 'V'], seed: 33, style: 'march' },
   forest: { key: 'E3', scale: 'dor', bpm: 108, prog: ['i', 'VII', 'IV', 'i', 'i', 'VII', 'VI', 'v'], seed: 41, style: 'mystery' },
   city: { key: 'Eb3', scale: 'maj', bpm: 120, prog: ['I', 'vi', 'ii', 'V', 'iii', 'vi', 'ii', 'V'], seed: 51, style: 'swing' },
+  // Voltacité : une ville qui grésille, plus vive et plus carrée que le swing des autres villes ; Floralia : une ville jardin, douce
+  cityVolt: { key: 'E3', scale: 'maj', bpm: 132, prog: ['I', 'V', 'vi', 'IV', 'I', 'V', 'ii', 'V'], seed: 57, style: 'march' },
+  cityFlora: { key: 'G3', scale: 'maj', bpm: 104, prog: ['I', 'iii', 'IV', 'I', 'vi', 'ii', 'IV', 'V'], seed: 59, style: 'gentle' },
+  // les routes pendant la Nuit Violette : lent, mineur harmonique, inquiet
+  routeNuit: { key: 'E3', scale: 'harm', bpm: 92, prog: ['i', 'VI', 'iv', 'V', 'i', 'VI', 'II', 'V'], seed: 197, style: 'mystery', soft: 1 },
   port: { key: 'D3', scale: 'maj', bpm: 116, prog: ['I', 'IV', 'V', 'I', 'vi', 'IV', 'V', 'V'], seed: 55, style: 'gentle' },
   mystic: { key: 'B2', scale: 'min', bpm: 96, prog: ['i', 'VI', 'iv', 'V', 'i', 'III', 'VI', 'V'], seed: 61, style: 'mystery' },
   volcano: { key: 'G3', scale: 'harm', bpm: 120, prog: ['i', 'VI', 'VII', 'i', 'iv', 'VI', 'V', 'V'], seed: 71, style: 'march' },

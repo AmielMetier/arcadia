@@ -122,6 +122,8 @@ export function createShadowLugiaEpic(THREE, container, img, fx = null) {
     uEclipse: { value: new THREE.Vector3(0, 0.33, -1).normalize() },
     uFogCol: { value: new THREE.Color(0.075, 0.035, 0.13) },
   };
+  const hasComposer = !!fx?.EffectComposer;
+  const tonemapTail = hasComposer ? '' : '#include <tonemapping_fragment>\n#include <colorspace_fragment>';
 
   /* ---------------- ciel d'orage et éclipse ---------------- */
   const sky = new THREE.Mesh(keep(new THREE.SphereGeometry(300, 48, 24)), keep(new THREE.ShaderMaterial({
@@ -143,8 +145,7 @@ export function createShadowLugiaEpic(THREE, container, img, fx = null) {
         col = mix(col, vec3(0.0), 1.0 - smoothstep(0.057, 0.061, ang));
         col += vec3(0.6, 0.55, 0.9) * uFlash * 0.15 * smoothstep(-0.1, 0.5, hgt);
         gl_FragColor = vec4(col, 1.0);
-        #include <tonemapping_fragment>
-        #include <colorspace_fragment>
+        ${tonemapTail}
       }`,
   })));
   sky.renderOrder = -10; sky.frustumCulled = false;
@@ -192,8 +193,7 @@ export function createShadowLugiaEpic(THREE, container, img, fx = null) {
         col += vec3(0.7, 0.65, 1.0) * uFlash * (0.05 + fres * 0.4);
         col = mix(col, uFogCol, 1.0 - exp(-length(cameraPosition - vW) * 0.011));
         gl_FragColor = vec4(col, 1.0);
-        #include <tonemapping_fragment>
-        #include <colorspace_fragment>
+        ${tonemapTail}
       }`,
   })));
   mer.position.y = -1.4; mer.frustumCulled = false;
@@ -331,8 +331,7 @@ export function createShadowLugiaEpic(THREE, container, img, fx = null) {
         vec3 col = mix(vec3(0.008, 0.012, 0.035), vec3(0.5, 0.18, 0.85), stri) + vec3(0.7, 0.75, 1.0) * pow(bord, 4.0) * 0.14;
         float a = (0.62 + 0.3 * stri + bord * 0.2) * uFade * (1.0 - smoothstep(0.82, 1.0, vUv.y) * 0.85);
         gl_FragColor = vec4(col, a);
-        #include <tonemapping_fragment>
-        #include <colorspace_fragment>
+        ${tonemapTail}
       }`,
   }));
   const colGeo = keep(new THREE.CylinderGeometry(1, 1, 1, 48, 32, true)); colGeo.translate(0, 0.5, 0);
@@ -417,7 +416,7 @@ export function createShadowLugiaEpic(THREE, container, img, fx = null) {
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
   const tmp = new THREE.Vector3(), droite = new THREE.Vector3(), haut = new THREE.Vector3(), versCam = new THREE.Vector3();
   const coeur = (t) => E.heart.reduce((s, b) => s + (t >= b ? Math.exp(-(t - b) * 9) : 0), 0);
-  const bouche = new THREE.Vector3();
+  const bouche = L.clone();
   const plan = (t) => {
     if (t < E.shots[1]) { const u = t / E.shots[1]; return { p: V(16, 3, 36).lerp(V(7, 4.5, 19), easeInOut(u)), l: V(0, 2, 0), f: 38 }; }
     if (t < E.shots[2]) {
@@ -456,12 +455,6 @@ export function createShadowLugiaEpic(THREE, container, img, fx = null) {
   const update = (t, dt) => {
     const d = Math.min(0.05, Math.max(0.001, dt));
     U.uTime.value = t;
-
-    // repère de l'œil et de la gueule à l'écran (le sprite fait toujours face à la caméra)
-    droite.setFromMatrixColumn(camera.matrixWorld, 0); haut.setFromMatrixColumn(camera.matrixWorld, 1);
-    const sc = lugia.scale;
-    const posOeil = lugia.position.clone().addScaledVector(droite, (oeil.u - 0.5) * sc.x).addScaledVector(haut, (0.5 - oeil.v) * sc.y);
-    bouche.copy(L).addScaledVector(droite, (oeil.u - 0.06 - 0.5) * LW).addScaledVector(haut, (0.5 - oeil.v - 0.07) * LS);
 
     /* foudre */
     E.strikes.forEach((s, i) => { if (une('f' + i, t, s)) { const c = ciblesFoudre[i % ciblesFoudre.length]; foudre(V(c[0], -1.2, c[1])); secousse += 0.12; } });
@@ -547,42 +540,31 @@ export function createShadowLugiaEpic(THREE, container, img, fx = null) {
     embGeo.attributes.position.needsUpdate = true;
 
     /* Lugia : montée dans la colonne, révélation, vol stationnaire */
+    const sLugia = t < E.reveal ? 0.88 : lerp(0.88, 1, smooth(E.reveal, E.reveal + 0.5, t));
     if (t >= E.rise) {
       lugia.visible = contour.visible = aura.visible = true;
       const m = clamp01((t - E.rise) / (E.eyes + 0.3 - E.rise));
       let y = lerp(-6, 7.6, easeOut(m)) + Math.sin(t * 1.8) * 0.25;
       if (t >= E.reveal) y = L.y + Math.sin(t * 1.6) * 0.35 + Math.exp(-(t - E.reveal) * 3) * 0.8;
       lugia.position.set(L.x + Math.sin(t * 0.7) * 0.15, y, L.z);
-      const s = t < E.reveal ? 0.88 : lerp(0.88, 1, smooth(E.reveal, E.reveal + 0.5, t));
-      lugia.scale.set(LW * s, LS * s, 1);
+      lugia.scale.set(LW * sLugia, LS * sLugia, 1);
       const k = t < E.reveal ? 0 : smooth(E.reveal, E.reveal + 0.45, t);
       lugiaMat.color.setRGB(lerp(0.02, 1, k), lerp(0.015, 1, k), lerp(0.04, 1, k));
-      versCam.copy(lugia.position).sub(camera.position).normalize();
-      contour.position.copy(lugia.position).addScaledVector(versCam, 0.25);
-      contour.scale.set(LW * s * 1.05, LS * s * 1.05, 1);
+      contour.scale.set(LW * sLugia * 1.05, LS * sLugia * 1.05, 1);
       contourMat.opacity = t < E.reveal ? smooth(E.rise, E.eyes, t) * 0.55 : 0.5 + Math.exp(-(t - E.reveal) * 2.5) * 0.6;
-      aura.position.copy(lugia.position).addScaledVector(versCam, 1.2);
       aura.scale.setScalar(LS * 2.1 * (1 + Math.sin(t * 5) * 0.04));
       auraMat.opacity = t < E.reveal ? 0.25 * smooth(E.rise, E.eyes, t) : 0.55 + Math.sin(t * 4) * 0.08;
       lugiaLum.position.copy(lugia.position).add(V(0, 0, 3));
       lugiaLum.intensity = t < E.reveal ? 0 : 3 + Math.sin(t * 6) * 0.8;
     }
-    // l'œil rouge
     const og = t < E.eyes ? 0 : t < E.reveal ? Math.exp(-(t - E.eyes) * 2.4) * 1.6 + 0.5 : 0.55 + Math.exp(-(t - E.reveal) * 3) + (t > E.charge && t < E.white ? smooth(E.charge, E.fire, t) * 0.8 : 0);
     if (une('yeux', t, E.eyes)) { bloomKick = Math.max(bloomKick, 0.5); caKick = Math.max(caKick, 0.012); }
-    lueurOeil.position.copy(posOeil).addScaledVector(versCam.copy(camera.position).sub(posOeil).normalize(), 0.4);
-    lueurOeil.material.opacity = Math.min(1, og);
-    lueurOeil.scale.setScalar(0.9 + og * 1.6);
-    trainee.position.copy(lueurOeil.position);
-    trainee.material.opacity = Math.min(1, og * 0.8);
-    trainee.scale.set(4 + og * 10, 0.22 + og * 0.12, 1);
-    if (t >= E.white + 0.3) { lueurOeil.material.opacity *= 0.5; trainee.material.opacity *= 0.4; }
 
     /* le cri : onde dans l'air, tornade, fumée */
     if (une('cri', t, E.reveal)) { secousse += 0.8; bloomKick = Math.max(bloomKick, 1.2); caKick = 0.02; }
     const tc = t - E.reveal;
     if (tc >= 0 && tc < 1.6) {
-      anneauCri.position.copy(lugia.position); anneauCri.quaternion.copy(camera.quaternion);
+      anneauCri.position.copy(lugia.position);
       const k = (tc % 0.8) / 0.8; anneauCri.scale.setScalar(1 + k * 34); anneauCri.material.opacity = (1 - k) * 0.75;
     } else anneauCri.material.opacity = 0;
     const tor = t < E.reveal ? 0 : t < E.white ? smooth(E.reveal, E.reveal + 1, t) * 0.5 + smooth(E.charge, E.fire, t) * 0.3 : 0.35;
@@ -594,41 +576,20 @@ export function createShadowLugiaEpic(THREE, container, img, fx = null) {
     }
     fumGeo.attributes.position.needsUpdate = true;
 
-    /* l'Aéroblast */
+    /* l'Aéroblast (déclencheurs) */
     const enCharge = t >= E.charge && t < E.fire + 0.1;
-    sphere.visible = enCharge || (t >= E.fire && t < E.white);
     const kc = smooth(E.charge, E.fire, t);
-    if (sphere.visible) { sphere.position.copy(bouche); sphere.scale.setScalar((0.1 + kc * 0.75) * (1 + Math.sin(t * 40) * 0.06)); }
-    halo.position.copy(bouche);
-    halo.material.opacity = t >= E.charge && t < E.white + 0.4 ? Math.min(1, kc * 1.2) : 0;
-    halo.scale.setScalar(1.5 + kc * 6 + (t > E.fire ? 2.5 : 0));
-    chMat.opacity = enCharge ? 0.9 * Math.min(1, (t - E.charge) * 2) : 0;
     if (enCharge) {
-      for (let i = 0; i < NC; i++) {
-        const c = charges[i]; c.d -= c.v * d * (1 + kc * 2); if (c.d < 0.3) { c.d = 6 + Math.random() * 9; c.dir.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize(); }
-        chPos[i * 3] = bouche.x + c.dir.x * c.d; chPos[i * 3 + 1] = bouche.y + c.dir.y * c.d; chPos[i * 3 + 2] = bouche.z + c.dir.z * c.d;
-      }
-      chGeo.attributes.position.needsUpdate = true;
       lugiaLum.intensity += kc * 8;
       secousse = Math.max(secousse, kc * 0.12);
       caKick = Math.max(caKick, kc * 0.008);
     }
     if (une('tir', t, E.fire)) { secousse += 1.4; bloomKick = 1.1; caKick = 0.045; }
-    if (t >= E.fire && t < E.white + 0.2) {
-      // le rayon file de la gueule vers la caméra en un quart de seconde, puis l'engloutit
-      const k = smooth(E.fire, E.fire + 0.1, t), kl = smooth(E.fire, E.fire + 0.28, t);
-      const dist = (bouche.distanceTo(camera.position) + 3) * Math.max(0.02, kl);
-      for (const [m, rr, o] of [[rayCoeur, 0.45, 1], [rayHalo, 1.3, 0.7]]) {
-        m.position.copy(bouche); m.lookAt(camera.position); m.scale.set(rr * k * (1 + Math.sin(t * 60) * 0.08), rr * k, dist);
-        m.material.opacity = o * k;
-      }
-    } else { rayCoeur.material.opacity = 0; rayHalo.material.opacity = 0; }
 
     /* plan héroïque : la mer se calme un peu, la lueur respire */
     if (une('titre', t, E.title)) { bloomKick = Math.max(bloomKick, 0.9); secousse += 0.25; }
 
     /* pluie autour de la caméra */
-    pluie.position.copy(camera.position);
     for (let i = 0; i < NP; i++) {
       const g = gouttes[i]; g.y -= g.v * d; g.x -= 7 * d;
       if (g.y < -14) { g.y += 44; g.x = (Math.random() - 0.5) * 70; g.z = (Math.random() - 0.5) * 70; }
@@ -637,7 +598,7 @@ export function createShadowLugiaEpic(THREE, container, img, fx = null) {
     }
     pluieGeo.attributes.position.needsUpdate = true;
 
-    /* caméra */
+    /* caméra (mise à jour AVANT les billboards attachés à l'œil et à la gueule) */
     const c = plan(t);
     secousse = Math.max(0, secousse - d * 1.5 * (1 + secousse));
     const sx = (Math.sin(t * 47.0) + Math.sin(t * 29.3 + 1.7)) * 0.5, sy = (Math.sin(t * 41.0 + 0.6) + Math.sin(t * 23.9 + 2.9)) * 0.5;
@@ -646,7 +607,49 @@ export function createShadowLugiaEpic(THREE, container, img, fx = null) {
     roulis = Math.sin(t * 13.7) * secousse * 0.02;
     camera.rotateZ(roulis);
     if (Math.abs(camera.fov - c.f) > 0.01) { camera.fov = c.f; camera.updateProjectionMatrix(); }
+    camera.updateMatrixWorld(true);
     sky.position.copy(camera.position);
+    pluie.position.copy(camera.position);
+
+    /* repère caméra courant : contour, aura, œil rouge, anneau et rayon alignés sans lag */
+    droite.setFromMatrixColumn(camera.matrixWorld, 0); haut.setFromMatrixColumn(camera.matrixWorld, 1);
+    const sc = lugia.scale;
+    const posOeil = lugia.position.clone().addScaledVector(droite, (oeil.u - 0.5) * sc.x).addScaledVector(haut, (0.5 - oeil.v) * sc.y);
+    bouche.copy(L).addScaledVector(droite, (oeil.u - 0.06 - 0.5) * LW).addScaledVector(haut, (0.5 - oeil.v - 0.07) * LS);
+    if (t >= E.rise) {
+      versCam.copy(lugia.position).sub(camera.position).normalize();
+      contour.position.copy(lugia.position).addScaledVector(versCam, 0.25);
+      aura.position.copy(lugia.position).addScaledVector(versCam, 1.2);
+    }
+    if (tc >= 0 && tc < 1.6) anneauCri.quaternion.copy(camera.quaternion);
+    lueurOeil.position.copy(posOeil).addScaledVector(versCam.copy(camera.position).sub(posOeil).normalize(), 0.4);
+    lueurOeil.material.opacity = Math.min(1, og);
+    lueurOeil.scale.setScalar(0.9 + og * 1.6);
+    trainee.position.copy(lueurOeil.position);
+    trainee.material.opacity = Math.min(1, og * 0.8);
+    trainee.scale.set(4 + og * 10, 0.22 + og * 0.12, 1);
+    if (t >= E.white + 0.3) { lueurOeil.material.opacity *= 0.5; trainee.material.opacity *= 0.4; }
+    sphere.visible = enCharge || (t >= E.fire && t < E.white);
+    if (sphere.visible) { sphere.position.copy(bouche); sphere.scale.setScalar((0.1 + kc * 0.75) * (1 + Math.sin(t * 40) * 0.06)); }
+    halo.position.copy(bouche);
+    halo.material.opacity = t >= E.charge && t < E.white + 0.4 ? Math.min(1, kc * 1.2) : 0;
+    halo.scale.setScalar(1.5 + kc * 6 + (t > E.fire ? 2.5 : 0));
+    chMat.opacity = enCharge ? 0.9 * Math.min(1, (t - E.charge) * 2) : 0;
+    if (enCharge) {
+      for (let i = 0; i < NC; i++) {
+        const c2 = charges[i]; c2.d -= c2.v * d * (1 + kc * 2); if (c2.d < 0.3) { c2.d = 6 + Math.random() * 9; c2.dir.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize(); }
+        chPos[i * 3] = bouche.x + c2.dir.x * c2.d; chPos[i * 3 + 1] = bouche.y + c2.dir.y * c2.d; chPos[i * 3 + 2] = bouche.z + c2.dir.z * c2.d;
+      }
+      chGeo.attributes.position.needsUpdate = true;
+    }
+    if (t >= E.fire && t < E.white + 0.2) {
+      const k = smooth(E.fire, E.fire + 0.1, t), kl = smooth(E.fire, E.fire + 0.28, t);
+      const dist = (bouche.distanceTo(camera.position) + 3) * Math.max(0.02, kl);
+      for (const [m, rr, o] of [[rayCoeur, 0.45, 1], [rayHalo, 1.3, 0.7]]) {
+        m.position.copy(bouche); m.lookAt(camera.position); m.scale.set(rr * k * (1 + Math.sin(t * 60) * 0.08), rr * k, dist);
+        m.material.opacity = o * k;
+      }
+    } else { rayCoeur.material.opacity = 0; rayHalo.material.opacity = 0; }
 
     /* rendu */
     bloomKick = Math.max(0, bloomKick - d * 2.2);

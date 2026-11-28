@@ -10,7 +10,7 @@ import { JAMAIS, rangAutour } from './acces.js';
 /** rang des routes (badges pour y entrer), vérifié par tools/odyssee-acces.mjs */
 export const RANG_ROUTES = {
   r1: 0, r2: 1, bois: 1, r3: 1, r3e: 1, r4: 2, orage1: 2, orage2: 2, r5: 3, grue1: 3, grue2: 3, r6: 4, r7: 4, torii: 4,
-  r10: 5, r11: 5, r12: 5, r13: 8, r14: 9, r15: 10, r16: 11, r17: 12, r18: 13, r19: 14, r20: 14, r9: 15, r9b: 15,
+  r10: 5, r11: 6, r12: 7, r13: 8, r14: 9, r15: 10, r16: 11, r17: 12, r18: 13, r19: 14, r20: 14, r9: 15, r9b: 15,
 };
 
 /** rang minimal de chaque objet courant */
@@ -87,7 +87,9 @@ export function lignesObjets(maps, RG) {
 }
 
 /** Objets narratifs ou d'orientation dont le lore mentionne explicitement l'emplacement */
-export const estProtege = (mapId, it) => it?.id === 'lunaire:pierre-lune' || it?.id === 'lunaire:corde' || (mapId === 'grotte' && (it?.item === 'moon-stone' || it?.item === 'escape-rope'));
+// (la Pierre Foudre de la Centrale de Voltacité, la Pierre Eau de la route 4 : des récompenses d'histoire, gardées telles quelles)
+export const estProtege = (mapId, it) => it?.id === 'lunaire:pierre-lune' || it?.id === 'lunaire:corde' || (mapId === 'grotte' && (it?.item === 'moon-stone' || it?.item === 'escape-rope'))
+  || (mapId === 'volta:tower17' && it?.item === 'thunder-stone') || (mapId === 'monde' && it?.id === 'monde:265,47' && it?.item === 'water-stone');
 
 function retrograder(lignes) {
   const changes = [];

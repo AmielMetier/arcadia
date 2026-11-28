@@ -70,13 +70,15 @@ const QUESTS = [
       [(f) => f.giftFlash, 'Le Dr Lumen m\'a parlé d\'un « Prisme Noir », capable de fermer le cœur d\'un Pokémon.'],
       [(f) => f['T:ecl:erebe1'], 'Érèbe, un Admin de la Team Éclipse, pillait les Pierres Lune de la Grotte Lunaire.'],
       [(f) => f['T:ecl:nyx1'], 'Nyx, une autre Admin, harcelait un vieux marin de Port-Azur au sujet du gardien des mers.'],
+      [(f) => f['A:giftForce'] && !f['T:ecl:erebe2'], 'L\'Arène de Voltacité est fermée : la Team Éclipse occupe la Centrale au nord de la ville.'],
       [(f) => f['T:ecl:erebe2'], 'J\'ai chassé la Team Éclipse de la Centrale de Voltacité. Elle volait l\'électricité de la région pour son Prisme.'],
       [(f) => f.eclipse, 'J\'ai battu Nocturne, le chef de la Team Éclipse, dans son repaire. Mais une nuit violette est tombée sur toute la région.'],
       [(f) => f.giftPlume, 'La voyante de Mirage m\'a confié la Plume Argentée, qui ouvre le Sanctuaire des Marées.'],
       [(f) => f.giftMaster, 'Au Sanctuaire des Marées, le Dr Lumen m\'a donné une Master Ball.'],
       [(f) => f['T:ecl:boss2'], 'Nocturne est vaincu, mais Lugia s\'est réveillé, le cœur fermé par le Prisme Noir.'],
       [(f) => f.lugia, (f) => (f.lugiaCaught ? 'J\'ai capturé Lugia et brisé le Prisme Noir. Le jour est revenu.' : 'Lugia est libéré du Prisme Noir et s\'est envolé. Le jour est revenu.')],
-      [(f) => f.lugiaCaught && f.lugia, 'Le Prof. Saule saura peut-être ouvrir le cœur de Lugia.'],
+      [(f) => f.lugiaCaught && f.lugia && !f.lugiaPurified, 'Le Prof. Saule saura peut-être ouvrir le cœur de Lugia.'],
+      [(f) => f.lugiaPurified, 'Le Prof. Saule a ouvert le cœur de Lugia. Il voyage désormais à mes côtés.'],
     ] },
   { id: 'freres', cat: 'main', name: 'Les trois frères de l\'archipel', giver: 'Gardes d\'Écaille',
     started: (f, g) => !!(f.granitDock || g.state.badges[5]), done: (f, g) => !!g.state.badges[7],
@@ -92,7 +94,7 @@ const QUESTS = [
       [(f) => f.rival1, (f, g) => `Théo a pris ${sp(g.rivalLine ? g.rivalLine()[0] : 0)} au labo, juste après moi, et m'a défié sur-le-champ.`],
       [(f) => f.rival2, 'Théo m\'a rattrapé sur la route 2. Lui aussi a son premier badge.'],
       [(f) => f.rival3, 'Théo m\'attendait à Floralia, sa « ville porte-bonheur ».'],
-      [(f) => f.rival4, 'Au Cap Mirage, Théo a voulu vérifier que j\'étais prêt pour les îles.'],
+      [(f) => f.rival4, (f, g) => `Au Cap Mirage, Théo a voulu vérifier que j'étais prêt${g?.state?.gender === 'f' ? 'e' : ''} pour les îles.`],
       [(f) => f.rival5, 'Sur la route 9, Théo m\'a donné tout ce qu\'il avait avant la Ligue.'],
       [(f) => f.mTheo, 'J\'ai battu Théo une dernière fois, à Bourg-Aube. Il part découvrir une autre région.'],
     ] },
@@ -304,3 +306,5 @@ export function syncJournal(game) {
 }
 
 export const QUEST_COUNT = QUESTS.length;
+/** nom d'une quête du journal (pour les quêtes qui ne sont pas dans world.quests : le vélo, le permis bateau) */
+export function nomQuete(id, game) { const Q = QUESTS.find((q) => q.id === id); return Q ? txt(Q.name, game?.state?.flags || {}, game) : null; }

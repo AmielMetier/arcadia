@@ -15,8 +15,8 @@ import { tourDoree } from './tourdoree.js';
 /* ---------------- objets de quête ---------------- */
 Object.assign(ITEMS, {
   'insigne-brume': { pocket: 'cles', price: 0, key: true, icon: 'insigne-brume', name: 'Insigne Brume', desc: 'Un insigne gris frappé d\'un nuage. Les sbires de la Brume le portent au col. Au dos : « Lac Miroir ».' },
-  'plume-lune': { pocket: 'cles', price: 0, key: true, icon: 'lunar-wing', name: 'Plume Lune', desc: 'Une plume qui brille comme un croissant de lune. Elle chasse les cauchemars.' },
-  talisman: { pocket: 'cles', price: 0, key: true, icon: 'spell-tag', name: 'Talisman Kagura', desc: 'Un talisman de papier du Temple Kagura. Il en faut trois pour réveiller la cloche.' },
+  'plume-lune': { pocket: 'cles', price: 0, key: true, icon: 'plume-lune', name: 'Plume Lune', desc: 'Une plume qui brille comme un croissant de lune. Elle chasse les cauchemars.' },
+  talisman: { pocket: 'cles', price: 0, key: true, icon: 'talisman', name: 'Talisman Kagura', desc: 'Un talisman de papier du Temple Kagura. Il en faut trois pour réveiller la cloche.' },
   'orbe-rouge': { pocket: 'cles', price: 0, key: true, icon: 'red-orb', name: 'Orbe Rouge', desc: 'Un orbe brûlant. Il calme Groudon... ou le réveille.' },
   'lettre-facteur': { pocket: 'cles', price: 0, key: true, stack: true, icon: 'lettre-facteur', name: 'Lettre', desc: 'Du courrier que le facteur de Port-Azur n\'a pas pu distribuer.' },
   'vieil-ambre': { pocket: 'cles', price: 0, key: true, icon: 'old-amber', name: 'Vieil Ambre', desc: 'Un morceau d\'ambre ancien. Un Pokémon d\'avant l\'histoire y dort peut-être.' },
@@ -30,8 +30,8 @@ const ENC = {
   lacEau: [[54, 25, 32, 20], [118, 25, 32, 20], [183, 25, 30, 15], [419, 30, 33, 6], [131, 30, 34, 3], [226, 28, 32, 6], [340, 30, 33, 8], [222, 28, 32, 8], [592, 28, 32, 6]],
   marees: [[41, 32, 36, 20], [42, 35, 38, 10], [86, 32, 35, 10], [90, 32, 35, 10], [120, 32, 36, 10], [222, 32, 35, 10], [339, 32, 35, 10], [369, 34, 37, 3], [564, 33, 36, 4]],
   mareesEau: [[90, 32, 36, 20], [120, 32, 36, 15], [222, 33, 36, 15], [339, 32, 36, 15], [369, 35, 38, 5], [131, 35, 38, 3], [366, 33, 36, 10]],
-  jardin: [[315, 22, 26, 15], [187, 21, 24, 10], [191, 21, 24, 8], [669, 22, 26, 15], [546, 22, 25, 10], [548, 22, 25, 10], [280, 22, 25, 8], [39, 22, 25, 8], [427, 22, 25, 10], [406, 21, 24, 6]],
-  torii: [[92, 34, 37, 15], [93, 37, 39, 4], [200, 34, 38, 10], [355, 34, 37, 10], [198, 34, 37, 10], [123, 36, 38, 4], [570, 35, 37, 4], [607, 34, 37, 8], [302, 35, 38, 5], [163, 34, 37, 10], [177, 34, 37, 10], [433, 35, 38, 6]],
+  jardin: [[315, 29, 33, 15], [187, 29, 32, 10], [191, 29, 32, 8], [669, 30, 33, 15], [546, 29, 32, 10], [548, 29, 32, 10], [280, 30, 33, 8], [39, 29, 32, 8], [427, 29, 32, 10], [406, 29, 32, 6]],
+  torii: [[92, 32, 35, 15], [93, 34, 36, 4], [200, 32, 36, 10], [355, 32, 35, 10], [198, 32, 35, 10], [123, 33, 36, 4], [570, 33, 35, 4], [607, 32, 35, 8], [302, 33, 36, 5], [163, 32, 35, 10], [177, 32, 35, 10], [433, 33, 36, 6]],
   magma: [[323, 74, 78, 18], [219, 74, 78, 15], [126, 74, 77, 8], [467, 76, 78, 5], [324, 74, 78, 10], [76, 74, 78, 10], [229, 74, 78, 10], [631, 75, 78, 8], [637, 76, 78, 3], [668, 75, 78, 8]],
   caverne: [[219, 76, 80, 15], [323, 77, 80, 10], [229, 76, 80, 10], [76, 76, 79, 15], [464, 78, 80, 5], [112, 77, 80, 8], [555, 76, 79, 10], [327, 76, 79, 6], [632, 77, 80, 6]],
 };
@@ -250,7 +250,7 @@ export function buildQuests(ctx) {
     steps: (f) => [
       `Arrêter les trois pompes de la Brume autour du Lac Miroir (${[1, 2, 3].filter((k) => f['pompe' + k]).length} / 3).`,
       'Un admin de la Brume surveille le nord du lac. L\'affronter.',
-      'L\'admin Sylas a fui vers la Grotte des Marées, au milieu du lac : y aller en surfant (Badge Mirage).',
+      'L\'admin Sylas a fui vers la Grotte des Marées, au milieu du lac : y aller en surfant (Surf · 8 badges du Nord pour ouvrir le fond).',
       'Une présence s\'éveille au fond de la Grotte des Marées...',
       'Raconter à Gaston ce qui s\'est passé dans la grotte.',
     ],
@@ -386,7 +386,7 @@ export function buildQuests(ctx) {
   /* ====================================================================================================
      Jardin des Songes (au sud de la route 6) · Quête : Les nuits blanches de Floralia (Cresselia, Darkrai)
      ==================================================================================================== */
-  const JAR = outdoor('jardin', 46, 40, { name: 'Jardin des Songes', music: 'route2' });
+  const JAR = outdoor('jardin', 46, 40, { name: 'Jardin des Songes', music: 'mystic' });
   {
     const m = JAR;
     m.rect(3, 3, 42, 36, T.GRASS);
@@ -405,7 +405,7 @@ export function buildQuests(ctx) {
     for (const [x, y] of [[21, 15], [24, 15], [21, 24], [24, 24]]) m.prop('lanterne', x, y);
     m.blob(34, 17, 4.5, 2.5, T.WATER, rng(71), [T.GRASS]);
     m.rect(22, 37, 23, 39, T.PATH);
-    m.zone(0, 0, 45, 39, { name: 'Jardin des Songes', music: 'route2', enc: ENC.jardin, theme: 'jardin' });
+    m.zone(0, 0, 45, 39, { name: 'Jardin des Songes', music: 'mystic', enc: ENC.jardin, theme: 'jardin' });
     m.rect(8, 15, 12, 17, T.TALL); m.rect(33, 21, 39, 23, T.TALL); m.rect(14, 32, 19, 34, T.TALL); m.rect(27, 32, 33, 34, T.TALL);
     m.item(...spot(m, 40, 34), 'eclat-etoile', 1, 'etoile:jardin'); m.item(...spot(m, 5, 34), 'max-potion');
     const entree = passage('r6', [0.35, 0.45, 0.25, 0.55, 0.65], [1, -1], 6, { map: 'jardin', x: 22, y: 38, dir: 'up' }, 'JARDIN DES SONGES ↓\nUn jardin de fleurs et de rêves.');
@@ -421,7 +421,7 @@ export function buildQuests(ctx) {
       'Trouver le Pokémon de l\'îlot du Lac Miroir et rapporter une Plume Lune (Surf).',
       'Rapporter la Plume Lune à Hélène, à Floralia.',
       'Surveiller le Jardin des Songes la nuit (de 20 h à 5 h).',
-      'Ariane a emporté son projecteur au Temple Kagura, dans la Forêt des Torii (à l\'ouest de la route 7).',
+      'Ariane a emporté son projecteur au Temple Kagura, dans la Forêt des Torii (à la sortie sud-ouest de Mirage).',
       'Darkrai rôde dans le sanctuaire du Temple Kagura...',
       'Retourner voir Hélène à Floralia.',
     ],
@@ -526,7 +526,7 @@ export function buildQuests(ctx) {
       const path = sinueuse([[276, 164.5], [271, 168], [266, 167.5], [259, 171], [252, 179], [244, 184], [236, 189.5], [229, 191.5], [222.5, 191.5]], 2.5);
       carveRoute(m, path, { seed: 4242, w: 9, grass: 1.0, tall: T.TALL, trees: 0.06, flowers: 0.01, taperStart: true, taperEnd: false });
       routes.push({ id: 'torii', name: 'Forêt des Torii', pts: path });
-      m.sign(280, 162, 'FORÊT DES TORII ←\nTemple Kagura · Tour Dorée · Tour Cendrée.');
+      m.sign(274, 162, 'FORÊT DES TORII ←\nTemple Kagura · Tour Dorée · Tour Cendrée.');
       // l'allée des torii : du bout du sentier jusqu'au pied de l'escalier du temple, un portique toutes les deux rangées
       m.rect(219, 183, 224, 193, T.GRASS, [T.TREE, T.TALL, T.FLOWER]); m.rect(221, 183, 222, 193, T.PATH);
       for (const y of [184, 186, 188, 190, 192]) {
@@ -635,10 +635,10 @@ export function buildQuests(ctx) {
       if (s === 'fin') { await A.say('La cloche du temple sonne chaque matin, maintenant. Merci, voyageur.', who); return; }
       if (!s) {
         if (A.badges() < 8) { await A.say(['Je viens du Temple Kagura, dans la Forêt des Torii, au sud-ouest de Mirage.', 'Il s\'y passe des choses terribles... Seul un dresseur aux huit badges du Nord aurait assez de force.'], who); return; }
-        await A.say(['Voyageur... tu portes le badge de Sibylle. Écoute-moi.', 'Des gens en gris ont pillé le Temple Kagura, dans la Forêt des Torii, au sud-ouest.', 'Ils ont volé les trois talismans qui éveillent la cloche, et ils fouillent la forêt.', 'Sans la cloche, les esprits de la forêt s\'agitent. Peux-tu retrouver les talismans ?'], who);
+        await A.say(['Voyageur... tu portes les huit badges du Nord. Écoute-moi.', 'Des gens en gris ont pillé le Temple Kagura, dans la Forêt des Torii, au sud-ouest.', 'Ils ont volé les trois talismans qui éveillent la cloche, et ils fouillent la forêt.', 'Sans la cloche, les esprits de la forêt s\'agitent. Peux-tu retrouver les talismans ?'], who);
         await A.set('kagura', 1); return;
       }
-      await A.say('La Forêt des Torii s\'ouvre à l\'ouest de la route 7. Sois prudent.', who);
+      await A.say('La Forêt des Torii s\'ouvre à la sortie sud-ouest de Mirage. Sois prudent.', who);
     } });
     const m = W;
     const tal = async (A) => { if ((A.st.bag.talisman || 0) < 3) { await A.give('talisman'); if ((A.st.bag.talisman || 0) >= 3) { await A.say('Les trois talismans sont réunis ! Il faut les rapporter au Grand Prêtre.'); await A.set('kagura', 2); } } };
@@ -791,10 +791,10 @@ export function buildQuests(ctx) {
   });
 
   /* ====================================================================================================
-     Quête · Le dragon de pierre (Musée des Dragons, Fort-Écaille) : le Vieil Ambre de la Grotte des Marées
+     Quête · Le dragon de pierre (Musée des Dragons, Cimelune) : le Vieil Ambre de la Grotte des Marées
      ==================================================================================================== */
   Q('fossile', {
-    name: 'Le dragon de pierre', where: 'Fort-Écaille',
+    name: 'Le dragon de pierre', where: 'Cimelune',
     steps: ['Trouver un morceau d\'ambre ancien. On dit que la Grotte des Marées en cache un.', 'Rapporter le Vieil Ambre au savant du Musée des Dragons.'],
     end: 'Le savant a ranimé un Ptéra, un dragon d\'avant l\'histoire.',
   });

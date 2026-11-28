@@ -188,11 +188,17 @@ export function foeChooseSlot(b, slot = 0, itemUsed = false, ctx = null) {
 
   if (b.wild) {
     const lock = b.choiceLock(ref); if (lock != null) { const k = m.moves.findIndex((q) => q.id === lock); return { type: 'move', id: lock, slot: k }; }
-    let k = usable[b.r(usable.length)];
-    // un Alpha sait se battre : deux fois sur trois, il choisit son attaque la plus forte
-    if (b.alpha && b.r(3) > 0) {
+    const hpRatio = m.hp / Math.max(1, m.stats[0]);
+    const pool = (m.shadow && hpRatio >= 0.7 && usable.some((j) => m.moves[j].id !== 105))
+      ? usable.filter((j) => m.moves[j].id !== 105)
+      : usable;
+    let k = pool[b.r(pool.length)];
+    // un Alpha ou Pokémon Obscur (boss) sait se battre intelligemment
+    if (m.shadow && hpRatio < 0.45 && usable.includes(m.moves.findIndex((q) => q.id === 105)) && b.r(3) > 0) {
+      k = m.moves.findIndex((q) => q.id === 105);
+    } else if ((b.alpha && b.r(3) > 0) || (m.shadow && b.r(5) > 0)) {
       const cible = b.aliveSlots(0).map((sl) => ({ side: 0, slot: sl }))[0];
-      if (cible) { let mieux = 0; for (const j of usable) { const d = estimate(b, ref, cible, MOVES[m.moves[j].id]); if (d > mieux) { mieux = d; k = j; } } }
+      if (cible) { let mieux = 0; for (const j of pool) { const d = estimate(b, ref, cible, MOVES[m.moves[j].id]); if (d > mieux) { mieux = d; k = j; } } }
     }
     const mv = MOVES[m.moves[k].id];
     const cands = b.validFoeTargets(ref, mv);

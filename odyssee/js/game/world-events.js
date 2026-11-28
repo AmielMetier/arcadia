@@ -12,11 +12,11 @@ import { purify } from '../story.js';
 
 export const GYM_HINTS = {
   bug: 'le Feu, le Vol et la Roche',
-  rock: 'l\'Eau, la Plante, le Combat et le Sol',
+  rock: 'l\'Eau, la Plante, le Combat, le Sol et l\'Acier',
   water: 'l\'Électrik et la Plante',
   electric: 'le Sol',
   grass: 'le Feu, la Glace, le Vol, le Poison et l\'Insecte',
-  psychic: 'l\'Insecte et les Ténèbres',
+  psychic: 'l\'Insecte, le Spectre et les Ténèbres',
   fire: 'l\'Eau, la Roche et le Sol',
   dragon: 'la Glace, le Dragon et la Fée',
   normal: 'le Combat',
@@ -97,17 +97,21 @@ export async function legendBattle(g, L) {
 /** Bateau de l'Embarcadère : chaque île s'ouvre avec un nombre de badges. */
 export async function ferry(g, n) {
   const st = g.state, ui = g.ui, docks = g.world.docks, here = n.def.dock, sp = 'Capitaine';
-  // sans permis bateau, on ne monte pas à bord : l'examen se passe à la Capitainerie de Port-Azur
-  if (!st.bag['permis-bateau']) {
+  // sans permis bateau, les quais du Nord/Est sont bloqués — sauf l'aller-retour Cap Mirage <-> Port-Granit
+  if (!st.bag['permis-bateau'] && here !== 'cap' && here !== 'granit') {
     await ui.say(['Ahoy, moussaillon ! Tu veux prendre la mer ?', 'Pas sans ton permis bateau ! La Capitainerie de Port-Azur fait passer l\'examen.', 'Reviens avec, et je te fais embarquer.'], { speaker: sp });
     if (!st.flags['Q:permis']) { st.flags['Q:permis'] = 1; g.refreshNpcs(); }
     return;
   }
-  if (!st.flags.passe) {
+  if (!st.flags.passe && st.bag['permis-bateau']) {
     st.flags.passe = true; g.give('ferry-ticket'); g.sound.sfx('item');
-    await ui.say(['Ahoy, moussaillon ! Mon bateau fait le tour des îles de l\'Est.', 'L\'Île Orageuse pour ceux qui ont 2 badges, l\'Île de la Grue avec 3, et l\'Île Givrée, tout au nord, avec 5.', 'Pour l\'archipel des trois frères, au-delà des tourbillons, il faut 5 badges : Drakos n\'aime pas les débutants.', 'Tiens, voici ton Passe Marin.'], { speaker: sp });
+    const archipelMsg = (st.badges[7] || st.flags.drakos)
+      ? 'L\'archipel des trois frères est désormais grand ouvert à tous les dresseurs confirmés.'
+      : 'Pour l\'archipel des trois frères, au-delà des tourbillons, il faut 5 badges : Drakos n\'aime pas les débutants.';
+    await ui.say(['Ahoy, moussaillon ! Mon bateau fait le tour des îles de l\'Est.', 'L\'Île Orageuse pour ceux qui ont 2 badges, l\'Île de la Grue avec 3, et l\'Île Givrée, tout au nord, avec 5.', archipelMsg, 'Tiens, voici ton Passe Marin.'], { speaker: sp });
   }
-  const opts = Object.entries(docks).filter(([k, d]) => k !== here && (!d.show || d.show(st.flags))), b = g.badgeCount();
+  const shuttle = new Set(['cap', 'granit']);
+  const opts = Object.entries(docks).filter(([k, d]) => k !== here && (!d.show || d.show(st.flags)) && (st.bag['permis-bateau'] || shuttle.has(k))), b = g.badgeCount();
   await ui.say('Où veux-tu aller ?', { keep: true, speaker: sp });
   const r = await ui.list({ title: 'Destination', items: opts.map(([, d]) => ({ label: d.name, right: b >= d.badges ? '' : `${d.badges} badges`, disabled: b < d.badges })).concat([{ label: 'Rester ici' }]), cls: 'shop', cancel: opts.length });
   if (r < 0 || r >= opts.length) { await ui.say('Bon vent, moussaillon !', { speaker: sp }); return; }
@@ -126,7 +130,7 @@ export async function odyssorEvent(g) {
   try {
     g.musicLock = true; g.sound.play('mystic');
     await ui.say(['La mer se met à scintiller...', 'Une immense silhouette bleue glisse entre les vagues.', 'C\'est Odyssor, le géant des océans !']);
-    if (st.flags.rivalB4) await ui.say(['... Il est magnifique.', 'Les anciens disent qu\'Odyssor a guidé les premiers marins jusqu\'aux îles, avant même la Ligue.', 'Vas-y. C\'est toi qu\'il est venu voir.'], { speaker: g.rivalB().name });
+    if (st.flags.rivalB4) await ui.say([`Tu repenses aux mots de ${g.rivalB().name} : « Les anciens disent qu'Odyssor a guidé les premiers marins jusqu'aux îles, avant même la Ligue. »`, 'Le géant des océans s\'approche doucement, porté par la lumière des étoiles...']);
     await ui.flash(4, '#cfe4ff', 90);
     await playBossCinematic(g, {
       sp: 1052,
@@ -138,7 +142,7 @@ export async function odyssorEvent(g) {
       duration: 8.0,
     });
     const res = await g.wildBattle([[1052, 50, 50, 1]], { fixed: true, music: battleMusicForLegend(1052) });
-    if (res === 'caught') { st.flags.odyssor = 'caught'; await ui.say(['Odyssor a rejoint ton équipe.', 'Les marins d\'Odyssée raconteront longtemps cette nuit-là.']); }
+    if (res === 'caught') { st.flags.odyssor = 'caught'; st.flags['L:odyssor'] = 'caught'; await ui.say(['Odyssor a rejoint ton équipe.', 'Les marins d\'Odyssée raconteront longtemps cette nuit-là.']); }
     else await ui.say(['Odyssor replonge et disparaît vers le large...', 'Peut-être reviendra-t-il un autre jour.']);
   } finally {
     g.musicLock = false; g.updateZone();

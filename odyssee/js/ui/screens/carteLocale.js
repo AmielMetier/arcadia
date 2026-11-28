@@ -214,7 +214,8 @@ export function batimentsImportants(game, L) {
     } else {
       sub = 'Lieu notable';
     }
-    const base = ess || { txt, ico: '◈', col: '#10b981', prio: L.ville ? 5 : 2, ess: !L.ville };
+    const isImportantTower = b.kind === 'tower' && /centrale/i.test(brut);
+    const base = ess || (isImportantTower ? { txt, ico: '⚡', col: '#facc15', prio: 3, ess: true } : { txt, ico: '◈', col: '#10b981', prio: L.ville ? 5 : 2, ess: !L.ville });
     out.push({
       key: `${txt}@${Math.round(px)},${Math.round(py)}`,
       txt, ico: base.ico, col: base.col, prio: base.prio, ess: base.ess, kind: b.kind, sub,

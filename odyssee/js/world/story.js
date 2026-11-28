@@ -28,11 +28,11 @@ const GRUNT = {
   e: [[20, 16], [109, 17]], nyx1: [[41, 17], [228, 18], [215, 19]],                             // Port-Azur
   f: [[81, 24], [100, 24]], g: [[110, 25], [42, 25]], erebe2: [[42, 26], [110, 26], [82, 26], [198, 28]], // Centrale
   h: [[20, 29], [24, 29]], i: [[42, 30], [215, 30]], j: [[110, 30], [89, 31]], k: [[24, 31], [228, 31]], l: [[198, 31], [20, 31]],
-  nyx2: [[42, 33], [215, 33], [229, 34], [24, 35]],
-  boss1: [[197, 35], [110, 35], [215, 36], [229, 38]],                                          // repaire
+  nyx2: [[42, 33], [215, 33], [229, 34], [24, 35, null, [398, 242, 92, 157]]],
+  boss1: [[197, 35, null, [185, 109, 92, 236]], [110, 35], [215, 36], [229, 38]],
   m: [[89, 39], [24, 40], [229, 40]], n: [[42, 40], [110, 40], [215, 41]],
-  nyx3: [[169, 41], [215, 41], [229, 42], [24, 42]], erebe3: [[42, 41], [89, 41], [110, 42], [198, 43]],
-  boss2: [[197, 43], [215, 43], [94, 44], [110, 43], [229, 45]],                                // Sanctuaire
+  nyx3: [[169, 41], [215, 41], [229, 42], [24, 42, null, [398, 242, 92, 157]]], erebe3: [[42, 41], [89, 41], [110, 42], [198, 43, null, [400, 65, 109, 92]]],
+  boss2: [[197, 43, null, [399, 109, 92, 236]], [110, 43, null, [188, 53, 92, 247]], [94, 44, null, [247, 188, 399, 109]], [229, 45, null, [53, 399, 92, 242]]], // Sanctuaire
 };
 export const ELITE = [
   { id: 'c4:1', name: 'Frimas', ow: 'frimas', bs: 'frimas', team: [[87, 74], [91, 74], [473, 75], [124, 75], [131, 76]], room: 'Salle de Glace', floor: 'gymWater', deco: 'statue',
@@ -128,7 +128,7 @@ export function addStory(ctx) {
     // le pêcheur : montre-moi un Magicarpe
     const pe = W.npcs.find((n) => n.id === 'azur:pecheur');
     Object.assign(pe, { script: 'show', move: 'turn', text: null, show: {
-      flag: 'qMagicarpe', who: 'Pêcheur', test: (m) => m.sp === 129, reward: [['rare-candy', 2]],
+      flag: 'qMagicarpe', who: 'Pêcheur Barnabé', test: (m) => m.sp === 129, reward: [['rare-candy', 2]],
       ask: ['Les Racaillou se cachent parmi les galets, méfie-toi en marchant sur la plage.', 'Dis, tu me montrerais un Magicarpe ? Juste pour le voir. Il en mord à la Canne à Pêche, juste au bout du ponton !'],
       thanks: ['Ooooh ! Un Magicarpe ! Ses écailles brillent, c\'est un beau spécimen.', 'Tiens, pour ta peine.'], done: ['Un jour, ton Magicarpe deviendra un Léviator. Patience !'] } });
     // îlot caché au bout du port, accessible avec Surf
@@ -155,36 +155,48 @@ export function addStory(ctx) {
       lose: 'Hmph. Ce n\'est qu\'un contretemps. Le Chef Nocturne a déjà ce qu\'il lui faut. Nous nous retirons.',
     });
     { const [x, y] = fl(9, 6); cen.item(x, y, 'thunder-stone'); }
-    // l'Arène est fermée tant que la Centrale est occupée
+    // l'Arène est fermée tant que la Centrale est occupée (les 2 cases de la double porte)
     const [dx, dy] = E.gymDoor;
     const [gx, gy] = free(W, dx + 1, dy + 1, false);
-    const n = W.npc({ id: 'volta:arene-fermee', x: gx, y: gy, sprite: 'vendeur', dir: 'left', text: ['L\'Arène est fermée ! La Team Éclipse a envahi la Centrale, et Volta refuse de combattre tant qu\'elle est occupée.', 'La Centrale, c\'est la grande tour dorée au nord.'] });
-    n.gate = { open: (f) => !!f['T:ecl:erebe2'], badges: 2, tiles: [[dx, dy + 1]] };
+    const n = W.npc({ id: 'volta:arene-fermee', x: gx, y: gy, sprite: 'vendeur', dir: 'left', text: ['L\'Arène est fermée ! La Team Éclipse a envahi la Centrale, et Volta refuse de combattre tant qu\'elle est occupée.', 'La Centrale, c\'est le grand bâtiment aux deux cheminées, au nord.'] });
+    n.gate = { open: (f) => !!f['T:ecl:erebe2'], badges: 2, tiles: [[dx, dy + 1], [dx + 1, dy + 1]] };
     W.gates.push({ npc: n.id, ...n.gate });
   }
 
   /* ======================== Acte 5 · le repaire (route 6) ======================== */
   {
-    const door = cavePortal(W, R.r6, 0.5);
-    const rep = room('repaire', 23, 16, { floor: 'lab', music: 'hideout', wall: 'wall_mart', name: 'Repaire Éclipse', exitX: 11 });
-    // rangées de machines qui forment un petit labyrinthe
-    const wall = (y, gap) => { for (let x = 1; x < 22; x++) if (x !== gap && x !== gap + 1) rep.prop((x + y) % 4 === 0 ? 'pc' : 'labmachine', x, y); };
-    wall(12, 5); wall(8, 16); wall(4, 10);
-    rep.prop('pc', 9, 2); rep.prop('pc', 13, 2); rep.prop('labmachine', 8, 2); rep.prop('labmachine', 14, 2);
+    // l'entrée : la façade de la base (img/facades/base.png) à la lisière de la route 6, et un panneau qui la signale
+    const door = cavePortal(W, R.r6, 0.5, { kind: 'tower', o: { w: 5, d: 3, h: 2, door: 2, kit: 'base', flat: true, roof: 'purple', name: 'Repaire Éclipse' } });
+    // (le panneau prend la place d'un arbre à côté du sentier : aucun passage n'est bouché)
+    { const [sx, sy] = [[door.x + 1, door.y + 1], [door.x - 1, door.y + 1], [door.x + 1, door.y + 2], [door.x - 1, door.y + 2]].find(([x, y]) => W.get(x, y) === T.TREE || W.get(x, y) === T.PINE) || []; if (sx != null) { W.set(sx, sy, T.GRASS); W.sign(sx, sy, 'ENTREPÔT PRIVÉ — ACCÈS INTERDIT\nUn croissant noir est peint sous l\'inscription.'); } }
+    // la rangée devant la façade : plus d'arbres qui la cachent (de l'herbe, bordée par la forêt)
+    for (let dx = -2; dx <= 2; dx++) { const t = W.get(door.x + dx, door.y + 1); if (t === T.TREE || t === T.PINE) W.set(door.x + dx, door.y + 1, T.GRASS); }
+    // l'intérieur : une base secrète (sol d'obsidienne, murs sombres liserés de violet) ; les rangées de cloisons gardent
+    // les couloirs et les passages d'avant (y = 12 : x 5-6 ; y = 8 : x 16-17 ; y = 4 : x 11), donc les mêmes vues pour les sbires
+    const rep = room('repaire', 23, 16, { floor: 'eclipse', music: 'hideout', wall: 'wall_eclipse', name: 'Repaire Éclipse', exitX: 11 });
+    rep.cloisons = true;
+    const wall = (y, gap, width = 2) => { for (let x = 1; x < 22; x++) if (x < gap || x >= gap + width) rep.set(x, y, T.WALL); };
+    wall(12, 5); wall(8, 16); wall(4, 11, 1);
+    // au fond : consoles, bannières, et le socle du Prisme Noir derrière le Chef
+    for (const [k, x] of [['console_eclipse', 8], ['banniere_eclipse', 9], ['prisme_noir', 11], ['banniere_eclipse', 13], ['console_eclipse', 14], ['console_eclipse', 1], ['console_eclipse', 21]]) rep.prop(k, x, 2);
+    // piliers dans les angles des salles (hors des couloirs et des vues des sbires)
+    for (const [x, y] of [[1, 14], [21, 14], [1, 9], [21, 9], [21, 5], [1, 3]]) rep.prop('pilier_eclipse', x, y);
+    rep.prop('console_eclipse', 3, 9); rep.prop('console_eclipse', 19, 13);
     rep.outside = { map: 'monde', x: door.x, y: door.y + 1, dir: 'down' };
     rep.warp(rep.exitX, rep.exitY, rep.outside);
     W.warp(door.x, door.y, { map: 'repaire', x: rep.exitX, y: rep.exitY, dir: 'up' });
-    grunt(rep, 9, 13, 'left', 'ecl:rep1', GRUNT.h, { exact: 1, vanish: false, after: 'Le Chef est tout là-haut... mais tu n\'arriveras jamais jusqu\'à lui.' });
-    grunt(rep, 12, 10, 'down', 'ecl:rep2', GRUNT.i, { exact: 1, f: 1, sight: 1, vanish: false, after: 'Le Prisme Noir... j\'en ai froid dans le dos.' });
-    grunt(rep, 14, 9, 'left', 'ecl:rep3', GRUNT.j, { exact: 1, sight: 3, vanish: false });
-    grunt(rep, 14, 6, 'right', 'ecl:rep4', GRUNT.k, { exact: 1, sight: 2, vanish: false });
-    grunt(rep, 8, 6, 'right', 'ecl:rep5', GRUNT.l, { exact: 1, f: 1, sight: 3, vanish: false });
-    admin(rep, 19, 10, 'left', 'ecl:nyx2', 'nyx', GRUNT.nyx2, { sight: 2,
+    grunt(rep, 8, 13, 'left', 'ecl:rep1', GRUNT.h, { exact: 1, sight: 4, vanish: false, intro: 'Hé ! On n\'entre pas dans le repaire sans le mot de passe. Et je parie que tu ne l\'as pas !', lose: 'Le mot de passe, c\'était « Nuit éternelle »... Zut, je l\'ai dit !',
+      after: (st) => (st.flags.eclipse ? 'Le Chef est parti pour le Sanctuaire des Marées... Il ne reste plus grand monde ici.' : 'Le Chef est tout là-haut... mais tu n\'arriveras jamais jusqu\'à lui.') });
+    grunt(rep, 12, 10, 'down', 'ecl:rep2', GRUNT.i, { exact: 1, f: 1, sight: 1, vanish: false, intro: 'Tu entends ce bourdonnement ? C\'est le Prisme Noir qui se charge. N\'approche pas !', lose: 'Mon équipe... vidée comme une batterie.', after: 'Le Prisme Noir... j\'en ai froid dans le dos.' });
+    grunt(rep, 14, 9, 'left', 'ecl:rep3', GRUNT.j, { exact: 1, sight: 3, vanish: false, intro: 'Ces couloirs, c\'est un vrai labyrinthe. Toi, tu t\'arrêtes ici !', lose: 'Mes attaques partent dans tous les sens...', after: 'Les cloisons changent de place la nuit, je te jure !' });
+    grunt(rep, 14, 6, 'left', 'ecl:rep4', GRUNT.k, { exact: 1, sight: 4, vanish: false, intro: 'Tu crois qu\'on a volé l\'électricité de Voltacité pour rien ? Recule !', lose: 'Grr... Érèbe va me passer un savon.', after: 'La Centrale, c\'était mon idée. Et personne ne m\'a dit merci.' });
+    grunt(rep, 8, 6, 'right', 'ecl:rep5', GRUNT.l, { exact: 1, f: 1, sight: 3, vanish: false, intro: 'La nuit éternelle, c\'est pour bientôt. Tu préfères l\'attendre K.O. ?', lose: 'Bon, d\'accord. Tu es coriace.', after: 'Quand le soleil ne se lèvera plus, on verra bien qui rira.' });
+    admin(rep, 19, 10, 'left', 'ecl:nyx2', 'nyx', GRUNT.nyx2, { sight: 4,
       intro: 'Toi, ici ?! Tu es vraiment collant. Le Chef est en train d\'achever le Prisme Noir. Je ne te laisserai pas le déranger !', lose: 'Non, non, NON ! ... Bon, vas-y. De toute façon, il est trop tard.' });
-    const boss = trainerNpc(rep, 11, 3, 'down', 'Chef Éclipse', 'Nocturne', GRUNT.boss1, { id: 'ecl:boss1', sight: 1, ow: 'nocturne', bs: 'nocturne', prize: 120, ai: 'smart', items: { 'hyper-potion': 2 },
+    const boss = trainerNpc(rep, 11, 3, 'down', 'Chef Éclipse', 'Nocturne', GRUNT.boss1, { id: 'ecl:boss1', sight: 2, ow: 'nocturne', bs: 'nocturne', prize: 120, ai: 'smart', items: { 'hyper-potion': 2 },
       intro: 'Je suis Nocturne, chef de la Team Éclipse. Nox et sa bande de la Brume préfèrent courir après l\'Orbe Rouge ? Qu\'ils s\'amusent dans le brouillard. Le jour rend les gens faibles et bruyants. Sous une nuit éternelle, tout serait enfin calme... Le Prisme Noir fermera le cœur de Lugia, et Lugia obéira. Toi, tu n\'es qu\'un grain de sable.',
       lose: 'Impressionnant. Mais il est trop tard : le Prisme Noir est déjà au Sanctuaire des Marées.', after: '...' });
-    Object.assign(boss, { vanish: true, music: 'eclipse', winScript: 'boss1' });
+    Object.assign(boss, { vanish: true, music: 'legendElemental', winScript: 'boss1' });
     rep.item(2, 6, 'ultra-ball', 2); rep.item(20, 10, 'full-heal'); rep.item(20, 14, 'hyper-potion');
     maps.repaire = rep;
     // des sbires bloquent l'entrée de Mirage tant que le Chef n'est pas battu
@@ -225,18 +237,21 @@ export function addStory(ctx) {
     s.warp(12, 32, s.outside);
     W.warp(b.doorX, b.doorY, { map: 'sanctuaire', x: 12, y: 31, dir: 'up', need: 'plume-argent' });
     s.encounter = SANCT;
-    s.zone(11, 26, 13, 27, { name: s.name, music: 'sanctuary', trigger: 'lumenSanct' });
+    // le Dr Lumen attend en (13, 29) : la zone qui le fait parler est à sa hauteur, juste après l'entrée
+    s.zone(11, 29, 13, 30, { name: s.name, music: 'sanctuary', trigger: 'lumenSanct' });
     // Lugia Obscur repose sur l'autel
     s.under.set(key(12, 4), T.CAVE); s.set(12, 4, T.BLOCK); s.object(12, 4, { type: 'lugia' });
+    // dalles gravées de runes en cercle autour de l'autel (des décalques : on marche dessus)
+    for (const [x, y, g] of [[10, 3, 1], [14, 3, 2], [10, 5, 3], [14, 5, 4], [11, 7, 2], [13, 7, 1], [12, 6, 3]]) s.deco.push({ k: 'rune', x, y, g });
     s.npc({ id: 'lumen-sanct', x: 13, y: 29, sprite: 'lumen', dir: 'left', script: 'lumenSanct' });
     grunt(s, 8, 24, 'right', 'ecl:sanct1', GRUNT.m, { exact: 1, sight: 4, intro: 'Le rituel a commencé ! Tu ne passeras pas !' });
     grunt(s, 16, 20, 'left', 'ecl:sanct2', GRUNT.n, { exact: 1, f: 1, sight: 4, intro: 'Tu entends ? C\'est Lugia qui gronde sous nos pieds...' });
     admin(s, 11, 14, 'right', 'ecl:nyx3', 'nyx', GRUNT.nyx3, { sight: 2, intro: 'Encore toi ! Tu ne comprends donc rien ? Quand Lugia ouvrira les yeux, plus rien ne pourra l\'arrêter !', lose: 'Cet enfant... c\'est un vrai cauchemar.' });
     admin(s, 13, 12, 'left', 'ecl:erebe3', 'erebe', GRUNT.erebe3, { sight: 2, intro: 'Tu as réussi à venir jusqu\'ici. Alors je vais devoir être sérieux.', lose: 'Je... Peut-être que la nuit éternelle n\'était pas une si bonne idée.' });
-    const boss = trainerNpc(s, 12, 8, 'down', 'Chef Éclipse', 'Nocturne', GRUNT.boss2, { id: 'ecl:boss2', sight: 2, ow: 'nocturne', bs: 'nocturne', prize: 200, ai: 'smart', items: { 'hyper-potion': 2, 'full-restore': 1 },
+    const boss = trainerNpc(s, 12, 8, 'down', 'Chef Éclipse', 'Nocturne', GRUNT.boss2, { id: 'ecl:boss2', sight: 2, ow: 'nocturne', bs: 'nocturne', prize: 200, ai: 'smart', megaSp: 229, items: { 'hyper-potion': 2, 'full-restore': 1 },
       intro: 'Te voilà enfin. Regarde. Lugia dort encore, mais le Prisme Noir a déjà refermé son cœur. Dans un instant, il se réveillera, et il m\'obéira. Rien ne peut plus empêcher l\'Éclipse.',
       lose: 'Impossible... Battu par un enfant, ici, au moment de mon triomphe...', after: '...' });
-    Object.assign(boss, { vanish: true, music: 'eclipse', winScript: 'boss2' });
+    Object.assign(boss, { vanish: true, music: 'legendElemental', winScript: 'boss2' });
     s.item(3, 16, 'revive', 2); s.item(21, 17, 'full-restore');
     maps.sanctuaire = s;
     // Lugia de la Grotte des Tourbillons : s'il a été vaincu (et non capturé) au Sanctuaire, il s'y réfugie
@@ -306,7 +321,7 @@ export function addStory(ctx) {
       ask: ['Je collectionne les observations de Pokémon Roche.', 'Montre-m\'en un, n\'importe lequel, et je te récompenserai !'],
       thanks: ['Magnifique ! Regarde-moi cette carapace minérale...', 'Voilà pour toi, comme promis.'], done: ['La Grotte Lunaire regorge de Pokémon Roche. Et de Pierres Lune !'] } });
     tn(E, 26, 15, { id: 'echange', sprite: 'gamin', dir: 'down', script: 'trade', trade: {
-      flag: 'qEchange', who: 'Bastien', want: 16, give: 81, lvl: 18, nick: 'Boulon',
+      flag: 'qEchange', who: 'Bastien', face: 'gamin', want: 16, give: 81, lvl: 24, nick: 'Boulon',
       ask: ['J\'adore les Pokémon Vol ! Tu n\'aurais pas un Roucool ?', 'Je te l\'échange contre mon Magnéti, Boulon !'],
       thanks: ['Génial ! Prends soin de Boulon, il adore les néons de la ville.'], done: ['Mon Roucool vole déjà comme un pro !'] } });
     { const m = maps['flora:bighouse21']; const [x, y] = free(m, 8, 3, false);
@@ -331,14 +346,16 @@ export function addStory(ctx) {
       [F, 14, 14, 'Mes fleurs se referment toutes... Elles croient que c\'est la nuit. Elles ont raison, d\'ailleurs.', 'jardinier'],
       [E, 5, 13, 'Même les néons de Voltacité n\'arrivent plus à percer ce ciel violet...', 'habitant'],
       [I, 25, 11, 'Les dragons de Cimelune s\'agitent. Ils sentent la présence d\'un Pokémon immense, quelque part au sud du Cap Mirage.', 'enfant'],
+      // (ajoutée en dernier : les autres gardent leur identifiant, eclipse0 à eclipse4)
+      [G, 22, 18, 'Les cristaux de la Tour Mirage brillent en plein jour... Depuis que le ciel est violet, plus personne ici ne fait de beaux rêves.', 'habitante'],
     ];
     worry.forEach(([t, lx, ly, line, sprite], i) => tn(t, lx, ly, { id: 'eclipse' + i, sprite, dir: 'down', move: 'turn', showIf: 'eclipse', hideIf: 'lugia', text: [line] }));
     // la voyante de Mirage connaît la légende et garde la Plume Argentée
     const voy = W.npcs.find((n) => n.id === 'mirage:voyante');
     Object.assign(voy, { script: 'gift', text: null, gift: {
-      item: 'plume-argent', flag: 'giftPlume', set: 'plumeArgent', who: 'Voyante', need: (st) => st.flags.eclipse && st.badges[7],
-      pre: (st) => (st.flags.eclipse ? (!st.badges[4] ? ['Le ciel s\'est éteint... Je vois une grande ombre sous les vagues.', 'Bats d\'abord Sibylle, à l\'Arène. Ensuite, reviens me voir.'] : ['Le Sanctuaire des Marées abrite Lugia Obscur, immense et furieux.', 'Va d\'abord conquérir les trois îles de l\'archipel : avec les huit badges du Nord, la Plume Argentée répondra à ton appel !']) : ['Je vois... trois îles, trois frères.', 'Et une vieille rancune qui gronde comme un volcan.']),
-      give: ['Huit badges... Les trois frères se sont inclinés devant toi.', 'Lugia, le gardien des marées, dort dans le Sanctuaire des Marées, sur un îlot au sud du Cap Mirage.', 'La Team Éclipse a fermé son cœur avec le Prisme Noir. S\'il se réveille ainsi, la nuit ne finira jamais.', 'Cette Plume Argentée ouvre le Sanctuaire. Surfe depuis le Cap Mirage, vers le sud. Va, vite !'],
+      item: 'plume-argent', flag: 'giftPlume', set: 'plumeArgent', who: 'Voyante', need: (st) => st.flags.eclipse && st.badges[4],
+      pre: (st) => (st.flags.eclipse ? ['Le ciel s\'est éteint... Je vois une grande ombre sous les vagues.', 'Bats d\'abord Sibylle, à l\'Arène. Ensuite, reviens me voir.'] : ['Je vois... trois îles, trois frères.', 'Et une vieille rancune qui gronde comme un volcan.']),
+      give: ['Le Badge Mirage brille dans ta main... Tu es prêt à affronter la marée.', 'Lugia, le gardien des marées, dort dans le Sanctuaire des Marées, sur un îlot au sud du Cap Mirage.', 'La Team Éclipse a fermé son cœur avec le Prisme Noir. S\'il se réveille ainsi, la nuit ne finira jamais.', 'Cette Plume Argentée ouvre le Sanctuaire. Surfe depuis le Cap Mirage, vers le sud. Va, vite !'],
       got: ['Le Cap Mirage est au bout de la route 7, au sud de la ville.'], done: (st) => (st.flags.lugia ? ['Le jour est revenu... Je savais que tu y arriverais.'] : ['Le Sanctuaire t\'attend, au sud du Cap Mirage...']) } });
     // la Route Victoire reste fermée tant que dure l'Éclipse
     const vg = W.npcs.find((n) => n.id === 'cime:garde');
@@ -358,7 +375,7 @@ function nearestCave(m, x, y) {
 }
 
 /** entrée de grotte creusée dans les arbres au bord d'une route, reliée au sentier par un chemin */
-function cavePortal(W, pts, t0) {
+function cavePortal(W, pts, t0, bat = { kind: 'cave', o: {} }) {
   for (let tries = 0; tries < 30; tries++) {
     const t = t0 + (tries % 2 ? 1 : -1) * Math.ceil(tries / 2) * 0.02;
     const p = along(pts, t);
@@ -371,7 +388,7 @@ function cavePortal(W, pts, t0) {
     let ok = true;
     for (let j = -1; j < 3 && ok; j++) for (let i = -1; i < 6; i++) { const tt = W.get(bx + i, by + j); if (tt !== T.TREE && tt !== T.PINE) { ok = false; break; } }
     if (!ok || W.zones.some((z) => z.town && x >= z.x0 - 3 && x <= z.x1 + 3 && y >= z.y0 - 3 && y <= z.y1 + 3)) continue;
-    const b = W.building('cave', bx, by);
+    const b = W.building(bat.kind, bx, by, bat.o);
     for (let yy = b.doorY + 1; yy < b.doorY + 14; yy++) { if (walkable(W.get(b.doorX, yy))) break; W.set(b.doorX, yy, T.PATH); }
     return { x: b.doorX, y: b.doorY };
   }

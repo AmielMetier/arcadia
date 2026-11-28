@@ -90,7 +90,9 @@ async function loadArt(prechauffe = false) {
   // décor du pack (arbres, rochers…) : remplace celui du jeu, dessiné pixel pour pixel
   if (pack?.kits) for (const [k, f] of Object.entries(pack.kits)) kits[k] = ASSETS.gfx(pack.dossier, f);   // façades du pack
   const batsPack = {}; if (pack?.batiments) for (const L of Object.values(pack.batiments)) for (const [n] of L) batsPack[n] = ASSETS.gfx(pack.dossier, 'b_' + n);
-  if (pack?.decor) for (const k of pack.decor) { sprites[k] = ASSETS.gfx(pack.dossier, 'd_' + k); dens[k] = 2; }
+  // repli : le dessin de base de chaque décor que le pack remplace (si l'image du pack manque encore, on le garde)
+  const repliDecor = {};
+  if (pack?.decor) for (const k of pack.decor) { if (sprites[k]) repliDecor[k] = [sprites[k], dens[k]]; sprites[k] = ASSETS.gfx(pack.dossier, 'd_' + k); dens[k] = 2; }
   // devant un personnage dans l'herbe : le bas de la nappe du tileset (et l'image de l'herbe qui bouge)
   for (const [th, key] of [['prairie', 'grassfront'], ['bois', 'darkfront'], ['neige', 'snowfront']]) {
     if (!SPRITES.herbes?.[th]) continue;
@@ -112,6 +114,7 @@ async function loadArt(prechauffe = false) {
   }
   const [S, K, L, L32, HGI, chars, title, suiveurs, relief, PK, PB, SD, tenueImg, PL] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(pack?.chars ? ASSETS.gfx(pack.dossier, pack.chars) : ASSETS.chars), loadImg(ASSETS.title), SPRITES.suiveurs ? loadImg(ASSETS.suiveurs) : null, loadImg(ASSETS.relief).catch(() => null), loadAll(tuilesPack), loadAll(batsPack), loadAll(donjons), tenueSrc ? loadImg(tenueSrc).catch(() => null) : null, loadAll(planches)]);
   Object.assign(S, SD);
+  for (const [k, [src, d]] of Object.entries(repliDecor)) if (!S[k]) { S[k] = await loadImg(src); dens[k] = d; }
   if (PL.biomes) for (const [k, [x, y, w, h]] of Object.entries(BIOMES_SPRITES)) { const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(PL.biomes, x, y, w, h, 0, 0, w, h); S[k] = c; dens[k] = 2; }
   // pack sur une seule planche : chaque tuile de 16 px découpée dans son petit canevas
   if (pack?.planche && PK.__planche) {

@@ -376,7 +376,7 @@ export function resolveBossCinematicConfig(opts = {}) {
   if (!presetKey) {
     if (isShadowLugia) {
       presetKey = 'shadow';
-      sub = sub || 'Gardien des Abyssales · Cœur Fermé';
+      sub = sub || 'Gardien des Abysses · Cœur Fermé';
       badge = badge || 'ÉVEIL OBSCUR';
     } else if (opts.raid) {
       presetKey = 'raid';
@@ -1268,6 +1268,10 @@ export async function playBossCinematic(game, opts = {}) {
       } catch (e) { hasWebGL = false; }
     }
 
+    // la première image se prépare (nuanceurs, textures) avant que le temps de la scène et la partition ne commencent
+    if (sceneCtrl) { try { sceneCtrl.update(0, 0); } catch (e) { warnDev('cinematic', e); } }
+    if (typeof requestAnimationFrame === 'function') await new Promise((r) => { requestAnimationFrame(() => requestAnimationFrame(r)); setTimeout(r, 400); });
+
     try {
       if (epic && sound?.playShadowLugiaEpic) {
         audioCtrl = sound.playShadowLugiaEpic({ cryUrl });
@@ -1277,10 +1281,6 @@ export async function playBossCinematic(game, opts = {}) {
         audioCtrl = sound.playLugiaCinematicAudio();
       }
     } catch (e) { warnDev('cinematic', e); }
-
-    // la première image se prépare (nuanceurs, textures) avant que le temps de la scène ne commence : rien n'est sauté
-    if (sceneCtrl && !epic) { try { sceneCtrl.update(0, 0); } catch (e) { warnDev('cinematic', e); } }
-    if (typeof requestAnimationFrame === 'function') await new Promise((r) => { requestAnimationFrame(() => requestAnimationFrame(r)); setTimeout(r, 400); });
 
     await new Promise((resolve) => {
       const dur = cfg.duration || 6.4;
@@ -1292,7 +1292,9 @@ export async function playBossCinematic(game, opts = {}) {
       let revealFlashed = false;
 
       const finish = () => {
-        cleanupAll();
+        if (done) return;
+        done = true;
+        if (pop) { try { pop(); } catch (e) { warnDev('cinematic', e); } pop = null; }
         resolve();
       };
 
@@ -1406,7 +1408,7 @@ export async function playLugiaCinematic(game) {
     shadow: true,
     preset: 'shadow',
     title: 'LUGIA OBSCUR',
-    sub: 'Gardien des Abyssales · Cœur Fermé',
+    sub: 'Gardien des Abysses · Cœur Fermé',
     badge: 'ÉVEIL OBSCUR',
     duration: 14.8,
   });

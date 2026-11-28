@@ -111,7 +111,12 @@ export function buildSud(ctx) {
   // le garde se tient au bord de l'eau, juste avant les planches : personne ne passe sur le pont sans lui
   const gy = y - 1;
   W.set(px + 2, gy, T.GRASS); W.set(px - 1, gy - 2, T.GRASS);
-  const y0 = y; while (W.get(px, y) === T.WATER || W.get(px, y) === T.WHIRL) { W.set(px, y, T.BRIDGE); W.set(px + 1, y, T.BRIDGE); y++; }
+  const y0 = y; while (W.get(px, y) === T.WATER || W.get(px, y) === T.WHIRL) {
+    W.set(px, y, T.BRIDGE); W.set(px + 1, y, T.BRIDGE);
+    // tourbillons le long du pont pour empêcher d'accoster en surfant sans passer par le garde
+    for (const bx of [px - 2, px - 1, px + 2, px + 3]) if (W.get(bx, y) === T.WATER) W.set(bx, y, T.WHIRL);
+    y++;
+  }
   const y1 = y; for (let k = 0; k < 4; k++) { for (const x of [px - 2, px - 1, px + 2, px + 3]) W.set(x, y + k, T.TREE); W.set(px, y + k, T.PATH); W.set(px + 1, y + k, T.PATH); }
   W.npc({ id: 'sud:garde-pont', x: px + 2, y: gy, sprite: 'garde', dir: 'left', gate: { badges: 8, tiles: [[px, gy], [px + 1, gy]] }, text: ['Le Pont de l\'Austral mène aux Terres du Sud et à Métropole.', 'On ne laisse passer que les dresseurs aux huit badges : les cinq du continent et ceux des trois frères.'] });
   W.gates.push({ npc: 'sud:garde-pont', badges: 8, tiles: [[px, gy], [px + 1, gy]] });
@@ -125,7 +130,7 @@ export function buildSud(ctx) {
   routeItem(W, r13, 0.65, -1, 5, 'rocky-helmet', 1, 'item:r13:rocky-helmet');
 
   // près du pont, la rive sud est bordée de rochers : on n'y accoste pas en surfant (seul le pont y mène)
-  for (let yy = y1 - 6; yy <= y1 + 16; yy++) for (let xx = px - 16; xx <= px + 17; xx++) {
+  for (let yy = y1 - 8; yy <= y1 + 18; yy++) for (let xx = px - 24; xx <= px + 25; xx++) {
     if (W.get(xx, yy) !== T.WATER) continue;
     if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => { const t = W.get(xx + a, yy + b); return walkable(t) && t !== T.BRIDGE; })) W.set(xx, yy, T.ROCK);
   }

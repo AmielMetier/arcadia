@@ -1,4 +1,4 @@
-// odyssee/js/dojo-mamadou.js — Dojo de Mamadou (Port-Granit, dès le 6e Badge) :
+// odyssee/js/dojo-mamadou.js — Dojo de Mamadou (Port-Granit, dès le 5e Badge) :
 // Donjon / Tour de combat exclusivement multijoueur en Duo Co-op (2 humains vs 2 bots) et Trio Co-op (3 humains vs 3 bots),
 // avec 1 Pokémon actif sur le terrain par joueur, bots à IA hyperstratégique, Points du Dojo (PDj) et Boutique.
 
@@ -128,7 +128,7 @@ export const DOJO_ARCHETYPES = [
     lose: 'Une faille trouvée à force de solidarité… Respect !',
     team: [
       [212, 'life-orb', 'technician', [418, 404, 14, 182]],           // Cizayox (Pisto-Poing Technicien)
-      [681, 'leftovers', null, [430, 247, 425, 197]],                 // Exagide
+      [376, 'leftovers', 'clear-body', [309, 428, 418, 182]],          // Métalosse (Forteresse d'Acier)
       [530, 'focus-sash', 'mold-breaker', [89, 442, 157, 182]],       // Minotaupe
       [248, 'assault-vest', 'sand-stream', [157, 242, 89, 8]],        // Tyranocif
       [598, 'rocky-helmet', 'iron-barbs', [438, 442, 86, 182]],       // Noacier
@@ -173,7 +173,7 @@ export function buildDojoBotChallenge(stage, format = 'double', lvl = 55, seed =
     }
     arch = DOJO_ARCHETYPES[poolIdx[stage]];
   }
-  const scaledLvl = Math.max(50, lvl + (stage >= 4 ? 2 : 0));
+  const scaledLvl = Math.min(100, Math.max(50, lvl + (stage >= 4 ? 2 : 0)));
   const party = arch.team.slice(0, count).map(([sp, item, ability, mvIds]) => {
     const validMoves = mvIds.filter((id) => MOVES[id]);
     return createMon(sp, scaledLvl, {
@@ -641,12 +641,14 @@ async function runDojoSeries(game, { rid, format, rosters, mySlot, hostId, peerI
     game.sound.play(dojoMusic);
     curtain.remove();
     game.bv.pvp = true;
+    game._dojoRealParty = realParty;
     st.party = battle.sides[0].party;
     let res;
     try {
       res = await game.bv.runCoopDojo(battle, coopNet, { bg: 'gym', night: false });
     } finally {
       st.party = realParty;
+      delete game._dojoRealParty;
       game.bv.pvp = false;
       game.bv.close();
       game.musicLock = false;

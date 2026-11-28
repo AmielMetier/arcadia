@@ -22,9 +22,9 @@ Object.assign(ITEMS, {
   'casque-mineur': { pocket: 'cles', price: 0, key: true, icon: 'explorer-kit', name: 'Casque de mineur', desc: 'Un casque jaune cabossé, avec une lampe frontale. Il appartient à un mineur de Pierrefort.' },
   'lettre-mineurs': { pocket: 'cles', price: 0, key: true, icon: 'letter', name: 'Lettre des mineurs', desc: 'Une lettre signée par tous les mineurs de Pierrefort, pour la mère de Basalte.' },
   'bouteille-mer': { pocket: 'cles', price: 0, key: true, icon: 'fresh-water', name: 'Bouteille à la mer', desc: 'Une bouteille avec un message : « Je suis Sven, pêcheur à Givrebourg. Écris-moi ! »' },
-  'flacon-parfum': { pocket: 'cles', price: 0, key: true, icon: 'gift', name: 'Flacon de parfum', desc: 'Un parfum de fleurs de Floralia, pour Madame Opaline, à Mirage.' },
+  'flacon-parfum': { pocket: 'cles', price: 0, key: true, icon: 'flacon-parfum', name: 'Flacon de parfum', desc: 'Un parfum de fleurs de Floralia, pour Madame Opaline, à Mirage.' },
   'collier-miaouss': { pocket: 'cles', price: 0, key: true, icon: 'soothe-bell', name: 'Collier à clochette', desc: 'Un petit collier rouge avec une clochette. Celui d\'un Miaouss ?' },
-  'colis-postal': { pocket: 'cles', price: 0, key: true, icon: 'gift', name: 'Colis', desc: 'Un colis bien ficelé, adressé à Mme Léonie, Port-Granit. Il est tout mou.' },
+  'colis-postal': { pocket: 'cles', price: 0, key: true, icon: 'colis-postal', name: 'Colis', desc: 'Un colis bien ficelé, adressé à Mme Léonie, Port-Granit. Il est tout mou.' },
   clochette: { pocket: 'cles', price: 0, key: true, icon: 'clear-bell', name: 'Clochette de vent', desc: 'Une clochette du Jardin de la Grue, emportée par la tempête. Il y en a trois.' },
 });
 
@@ -70,7 +70,9 @@ export const MISSIONS = [
       idle: ['Je suis la mère des trois frères. Drakos, Pyros, Basalte...', 'Ils ne viennent plus me voir. Le continent non plus.'],
       thanks: ['Une lettre de Pierrefort ? Les mineurs se souviennent de mon Basalte...', 'Mes trois garçons se sont perdus dans la rancune de l\'aîné.', 'Merci, petit. Prends ça. Et si tu les croises, dis-leur que leur mère les attend pour dîner.'],
       done: (st) => (st.badges[7] ? ['Ils sont venus dîner, tous les trois. Pour la première fois depuis dix ans.'] : ['Basalte m\'a répondu. Les choses changent, je crois.']) },
-    ask: ['Basalte travaillait ici, avec nous. Le meilleur mineur que j\'aie connu.', 'Sa mère vit toujours à Port-Granit, sur l\'Île de Granit. Elle n\'a plus de nouvelles du continent depuis que Drakos a fermé les ports.', 'Si un jour tu passes là-bas, apporte-lui cette lettre de la part des mineurs.'],
+    ask: (st) => (st.badges[7] || st.flags.drakos)
+      ? ['Basalte travaillait ici, avec nous. Le meilleur mineur que j\'aie connu.', 'Sa mère vit toujours à Port-Granit, sur l\'Île de Granit. Maintenant que les îles s\'ouvrent, apporte-lui cette lettre de la part des mineurs !']
+      : ['Basalte travaillait ici, avec nous. Le meilleur mineur que j\'aie connu.', 'Sa mère vit toujours à Port-Granit, sur l\'Île de Granit. Elle n\'a plus de nouvelles du continent depuis que Drakos a fermé les ports.', 'Si un jour tu passes là-bas, apporte-lui cette lettre de la part des mineurs.'],
     wait: ['L\'Île de Granit est loin, au-delà du Cap Mirage. Prends ton temps.'], done: ['La mère de Basalte a eu notre lettre ? Les mineurs vont être contents.'],
     journal: { name: 'Des nouvelles du continent', start: 'Le vieux Léon, à Pierrefort, m\'a confié une lettre des mineurs pour la mère de Basalte, qui vit à Port-Granit.', end: 'La mère des trois frères a reçu la lettre des mineurs.' } },
 
@@ -90,7 +92,10 @@ export const MISSIONS = [
     journal: { name: 'Le registre du capitaine', start: 'Le capitaine Corentin, à Port-Azur, veut que j\'enregistre dix Pokémon Eau dans mon Pokédex.', end: 'Mon nom est dans le registre du capitaine Corentin.' } },
 
   { id: 'mWatt', town: 'E', at: [23, 22], sprite: 'scientifique', who: 'Mlle Watt', kind: 'show', test: (m) => has('electric')(m) && m.lvl >= 25, reward: [['thunder-stone', 1], ['elixir', 1]],
-    ask: ['Depuis que la Team Éclipse a vidé les générateurs, je cherche des Pokémon Électrik puissants pour relancer mes expériences.', 'Montre-moi un Pokémon Électrik au moins au niveau 25 !'],
+    // tant que la Centrale est occupée, Mlle Watt n'en parle pas au passé
+    ask: (st) => (st.flags['T:ecl:erebe2']
+      ? ['La Centrale tourne de nouveau, mais la Team Éclipse a vidé les générateurs. Il me faut des Pokémon Électrik puissants pour relancer mes expériences.', 'Montre-moi un Pokémon Électrik au moins au niveau 25 !']
+      : ['La Team Éclipse occupe la Centrale et pompe toute l\'électricité de la ville... Mes expériences sont à l\'arrêt.', 'En attendant, je cherche des Pokémon Électrik puissants. Montre-m\'en un au moins au niveau 25 !']),
     again: ['Un Pokémon Électrik, niveau 25 au moins. Je suis prête à mesurer !'],
     thanks: ['Regarde-moi ces étincelles ! Mon voltmètre s\'affole.', 'Merci ! Prends ça pour ta peine.'], done: ['Mes expériences avancent à pleine tension !'],
     journal: { name: 'Haute tension', start: 'Mlle Watt, chercheuse à Voltacité, veut mesurer un Pokémon Électrik au moins au niveau 25.', end: 'Mlle Watt a pu mesurer mon Pokémon Électrik.' } },
@@ -125,11 +130,13 @@ export const MISSIONS = [
   { id: 'mReves', town: 'G', at: [26, 21], sprite: 'medium', who: 'Séraphine', kind: 'check', test: (st) => !!st.flags['VN:jardin'], reward: [['full-heal', 2], ['rare-candy', 1]],
     ask: ['Le Jardin des Songes... Les nuits de lune, les rêves y prennent forme.', 'Va t\'y promener une nuit, et reviens me dire ce que tu as ressenti.'],
     again: ['Une nuit au Jardin des Songes. Pas le jour : la nuit.'],
-    thanks: ['Je le vois dans tes yeux : tu y es allé, la nuit.', 'Garde ceci. Ça veille sur les dormeurs.'], done: ['Fais de beaux rêves, voyageur.'],
+    thanks: (st) => [`Je le vois dans tes yeux : tu y es allé${st.gender === 'f' ? 'e' : ''}, la nuit.`, 'Garde ceci. Ça veille sur les dormeurs.'], done: (st) => [`Fais de beaux rêves, ${st.gender === 'f' ? 'voyageuse' : 'voyageur'}.`],
     journal: { name: 'Une nuit au jardin', start: 'Séraphine, à Mirage, m\'a demandé de me promener une nuit au Jardin des Songes.', end: 'J\'ai raconté ma nuit au Jardin des Songes à Séraphine.' } },
 
   { id: 'mPierreFeu', town: 'H', at: [26, 22], sprite: 'habitante', who: 'Salomé', kind: 'bring', item: 'fire-stone', reward: [['full-restore', 1], ['burn-heal', 3]],
-    ask: ['Mon Goupix rêve d\'évoluer, mais on ne trouve plus aucune Pierre Feu sur l\'île depuis que les ports sont fermés.', 'Si tu en as une, je te l\'échange contre de quoi soigner ton équipe !'],
+    ask: (st) => (st.badges[7] || st.flags.drakos)
+      ? ['Mon Goupix rêve d\'évoluer, et les bateaux arrivent encore timidement jusqu\'ici.', 'Si tu as une Pierre Feu en trop, je te l\'échange contre de quoi soigner ton équipe !']
+      : ['Mon Goupix rêve d\'évoluer, mais on ne trouve plus aucune Pierre Feu sur l\'île depuis que les ports sont fermés.', 'Si tu en as une, je te l\'échange contre de quoi soigner ton équipe !'],
     again: ['Une Pierre Feu... On en vendait dans les boutiques du continent.'],
     thanks: ['Une Pierre Feu ! Goupix, regarde !', 'Voilà, comme promis.'], done: ['Mon Feunard est magnifique, non ?'],
     journal: { name: 'La pierre de Goupix', start: 'Salomé, à Cendrelune, cherche une Pierre Feu pour faire évoluer son Goupix.', end: 'Le Goupix de Salomé est devenu un Feunard.' } },
@@ -173,11 +180,11 @@ export const MISSIONS = [
 
   // après la Ligue : la fin de l'histoire des trois frères et de Théo
   { id: 'mRevanche', town: 'L', at: [22, 5], sprite: 'drakos', who: 'Drakos', kind: 'duel', showIf: 'champion', cat: 'main',
-    duel: { cls: 'Champion', name: 'Drakos', bs: 'drakos', team: [[149, 83], [1051, 84], [715, 82], [373, 83], [445, 85], [1044, 82]], prize: 300 },
+    duel: { cls: 'Champion', name: 'Drakos', bs: 'drakos', team: [[149, 83], [1051, 84], [715, 82], [373, 83], [445, 85], [330, 84]], megaSp: 330, boss: true, prize: 300 },
     ask: ['Maître de la Ligue, hein ? Célestine a trouvé son successeur.', 'Je t\'avais dit que le vieux Drakos attendait sa revanche. Pas contre elle. Contre toi.', 'Cette fois, mes dragons ne retiendront rien.'],
     lose: 'Ha ! Je savais que tu ne me ferais pas de cadeau.',
     thanks: ['... Deux fois. Tu m\'as battu deux fois.', 'Ma mère m\'a dit : « Un frère qui perd avec honneur vaut mieux qu\'un roi qui gagne seul. »', 'Les îles sont ouvertes, pour de bon. Prends ceci, Maître.'], reward: [['master-ball', 1]],
-    again: ['Prêt pour ma revanche ?'], done: ['Pyros et Basalte veulent t\'affronter aussi. Les îles t\'appartiennent, Maître.'],
+    again: (st) => [`Prêt${st.gender === 'f' ? 'e' : ''} pour ma revanche ?`], done: ['Basalte et Pyros t\'ont déjà salué à leur manière, mais les îles se souviendront longtemps de toi, Maître.'],
     journal: { name: 'La revanche de Drakos', start: 'Drakos m\'a défié à Fort-Écaille : il voulait sa revanche contre le nouveau Maître de la Ligue.', end: 'J\'ai battu Drakos une seconde fois. Les îles sont ouvertes pour de bon.' } },
 
   { id: 'mTheo', town: 'A', at: [17, 21], sprite: 'theo', who: 'Théo', kind: 'duel', showIf: 'champion', cat: 'main',
@@ -201,7 +208,14 @@ export const MISSIONS = [
     ask: ['Mon Psykokwak a encore filé ! Il a mal à la tête, alors il marche tout droit sans réfléchir…', 'La dernière fois, je l\'ai retrouvé sur la route 5, à regarder les nuages. Tu pourrais aller voir ?'],
     again: ['Toujours pas de nouvelles de mon Psykokwak ? Il doit traîner sur la route 5…'],
     thanks: ['Psykokwak ! Te revoilà, gros malin. Tu m\'as fait une de ces peurs.', 'Merci, petit. Prends ça : ça lui sert quand sa migraine le reprend.'], done: ['Psykokwak se tient la tête… C\'est bon signe, il réfléchit !'],
-    journal: { name: 'Le Psykokwak de Papi Octave', start: 'Le Psykokwak de Papi Octave, à Floralia, s\'est perdu du côté de la route 5.', end: 'Psykokwak est rentré chez Papi Octave.' } },
+    journal: {
+      name: 'Le Psykokwak de Papi Octave',
+      notes: [
+        [(f) => f['A:mPsyko'], 'Le Psykokwak de Papi Octave, à Floralia, s\'est perdu du côté de la route 5.'],
+        [(f) => f.psykoRetrouve && !f.mPsyko, 'J\'ai retrouvé Psykokwak sur la route 5 : il est reparti vers Floralia.'],
+        [(f) => f.mPsyko, 'Psykokwak est rentré chez Papi Octave.'],
+      ],
+    } },
 
   // lore des phénomènes célestes, des failles spatio-temporelles, des Colosses Alpha et des souvenirs d'équipe
   { id: 'mAstronome', town: 'A', at: [42, 12], sprite: 'savant', who: 'Astronome Orion', cat: 'side', kind: 'bring', item: 'fragment-meteore', qty: 3,
@@ -349,15 +363,7 @@ export function addHabitants({ W, maps, towns, routes }) {
   };
   // les dresseurs d'une route (pour « bats-les tous »)
   // chaque dresseur de la grande carte appartient à la route dont le tracé passe le plus près de lui
-  const trainersOn = {};
-  const segDist = (px, py, [ax, ay], [bx, by]) => { const vx = bx - ax, vy = by - ay, L = vx * vx + vy * vy || 1, u = Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / L)); return Math.hypot(px - ax - u * vx, py - ay - u * vy); };
-  for (const n of W.npcs) {
-    if (!n.trainer || W.zoneAt(n.x, n.y)?.town) continue;
-    let best = null, bd = 9;
-    for (const r of routes) for (let i = 1; i < r.pts.length; i++) { const d = segDist(n.x, n.y, r.pts[i - 1], r.pts[i]); if (d < bd) { bd = d; best = r.id; } }
-    if (best) (trainersOn[best] ||= []).push(n.id);
-  }
-  W.missionTrainers = trainersOn;
+  indexMissionTrainers(W, routes);
   for (const M of MISSIONS) {
     const t = towns[M.town]; if (!t) continue;
     const [x, y] = free(W, t.x + (t.decal?.[0] || 0) + M.at[0], t.y + (t.decal?.[1] || 0) + M.at[1]);   // decal : déplacement de l'ancien centre d'une ville agrandie
@@ -369,5 +375,16 @@ export function addHabitants({ W, maps, towns, routes }) {
     }
     if (M.place) for (const p of [].concat(M.place)) placeItem(p, M.item);
   }
+}
+export function indexMissionTrainers(W, routes) {
+  const trainersOn = {};
+  const segDist = (px, py, [ax, ay], [bx, by]) => { const vx = bx - ax, vy = by - ay, L = vx * vx + vy * vy || 1, u = Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / L)); return Math.hypot(px - ax - u * vx, py - ay - u * vy); };
+  for (const n of W.npcs) {
+    if (!n.trainer || W.zoneAt(n.x, n.y)?.town) continue;
+    let best = null, bd = 9;
+    for (const r of routes) for (let i = 1; i < r.pts.length; i++) { const d = segDist(n.x, n.y, r.pts[i - 1], r.pts[i]); if (d < bd) { bd = d; best = r.id; } }
+    if (best) (trainersOn[best] ||= []).push(n.id);
+  }
+  W.missionTrainers = trainersOn;
 }
 void key;
