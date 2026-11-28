@@ -386,6 +386,19 @@
         "EXP_HOST_STOPPED_GAME : l'hôte a arrêté la veillée",
         "EXP_PEER_LEFT_MIDGAME : un villageois s'est déconnecté"
       ]
+    },
+    {
+      "id": "synapse",
+      "title": "Synapse",
+      "maxPlayers": 6,
+      "engine": "Canvas 2D + Web Audio (réflexes et rythme, chacun de son côté)",
+      "crashReasons": [
+        "Contexte audio refusé ou suspendu par le navigateur avant le premier appui",
+        "Stockage local plein ou désactivé : le tableau de bord ne s'enregistre pas"
+      ],
+      "expulsionReasons": [
+        "EXP_HOST_STOPPED_GAME : l'hôte a ramené le salon à l'accueil"
+      ]
     }
   ]
 }

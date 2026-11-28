@@ -202,6 +202,18 @@ Des manches de 2 à 4 minutes, de 3 à 12 invités (bots compris), et un mode D�
   papiers peints, parquets et damiers peints au canvas, lustres, fenêtres au clair de lune. Sons et petite valse de boîte à musique synthétisés (WebAudio).
 - `?debug` expose `__mystery` ; `?autostart`, `?seed`, `?role=m|s|i`, `?mode=explore`, `?bots=4`, `?lag=150`, `?q=bas`.
 
+## Synapse
+Jeu de réflexes et de rythme (`synapse/`), à jouer chacun de son côté : quatre épreuves de 90 s et une Session du jour de 5 minutes qui les enchaîne.
+
+- **Pulse** : frapper pile sur le temps les signaux annoncés, laisser passer les leurres
+- **Aiguillage** : trier des figures selon la couleur ou la forme, la règle change sans prévenir
+- **Réseau** : retenir une séquence de nœuds, trouver un intrus, puis refaire la séquence
+- **Double Tempo** : tenir le tempo même quand le métronome se tait, tout en cliquant les bonnes pastilles
+- **Difficulté** : dix niveaux par épreuve, qui montent au-dessus de 85 % de réussite et redescendent sous 75 %
+- **Tableau de bord** : série de jours, historique, quatre courbes (temps de réaction, leurres évités, changement de règle, précision rythmique), export et import ; tout reste dans le navigateur
+- **Réglages** : filtre des doubles appuis, calage du son (casque sans fil), animations réduites
+- `?debug` expose `__synapse` (`start('pulse' | 'aiguillage' | 'reseau' | 'double' | 'session')`, `state()`, `end()`) ; `?seed`.
+
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.
 - `?local` dans l'adresse : réseau simulé entre onglets du même navigateur, pratique pour tester à plusieurs.
@@ -217,6 +229,7 @@ Des manches de 2 à 4 minutes, de 3 à 12 invités (bots compris), et un mode D�
   `node tools/bench-royale.mjs` y fait jouer une partie entière entre bots ;
   `node tools/test-sitenoir.mjs` teste le moteur de Site Noir (carte, clés, générateur, ascenseur, coups, extraction, copies des invités, relais d'hôte, parties entières entre bots).
   `node tools/test-mystery.mjs` teste le moteur de Mystère Mystère, The Backrooms (manoir, escaliers, passages secrets, armes, bavure, héros, pièces, coupure, secret des rôles, prédiction, manches entre bots).
+  `node tools/test-synapse.mjs` teste le moteur de Synapse (difficulté, filtre des doubles appuis, jugement des appuis, tirages, indicateurs, série de jours, import).
   `node tools/test-mollo.mjs` teste le moteur de Mollo ! (arènes et pièges, objets, collisions, marche, coups, KO, prises, rebords, parties entières entre bots, reprise d'hôte).
 - Serveur relais (`server/server.js`, à redéployer quand il change) : `/status` donne les salons et les pics de trafic
   (`maxFrame`, `peakMsgs`, `peakBytes`) ; la lecture des logs (`GET /api/logs`) demande la variable d'environnement

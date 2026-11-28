@@ -330,6 +330,16 @@ window.HUB_GAMES = [
     ],
     cover: 'backrooms/img/affiche.jpg?v=3', // affiche 960 × 540 : le Level 0 du jeu, grand titre et bandeau caméscope
   },
+  {
+    id: 'synapse',
+    title: 'Synapse',
+    tag: 'Réflexes & rythme',
+    desc: 'Quatre épreuves de réflexes et de rythme et une session de 5 minutes par jour : la difficulté suit ton niveau, et un tableau de bord garde tes progrès.',
+    url: 'synapse/',
+    minPlayers: 1, maxPlayers: 6, // chacun joue de son côté ; les résultats restent dans le navigateur (pas de classement)
+    accent: '#38bdf8',
+    cover: 'synapse/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
+  },
 ];
 
 /* Fiche de présentation de chaque jeu : catégorie, durée d'une partie, commandes et astuces.
@@ -393,5 +403,8 @@ window.HUB_GAME_INFO = {
   mollo: { genre: 'party', time: '5–10 min',
     keys: [['ZQSD', 'Marcher'], ['Espace', 'Sauter · se hisser · soulever'], ['F / clic gauche', 'Frapper · maintiens : gros coup'], ['Maj / C', 'Se protéger'], ['E / clic droit', 'Saisir (maintenu) · lâcher : jeter · ramasser ou lancer un objet'], ['Échap', 'Menu'], ['🎮 Manette', 'A : sauter · X / RT : frapper · B / LT : saisir · Y, LB, RB : se protéger']],
     tips: ['La garde arrête les poings, le gros coup la brise, la saisie passe à travers.', 'Attrape celui qui arme un gros coup : son coup part en fumée.', 'Trois poings d\'affilée éjectent.', 'La barre sous un nom vire au rouge : il est assez sonné pour être soulevé. Saisis-le, saute, lâche au bord.', 'En tenant quelqu\'un, F donne un coup de tête.', 'En tombant, garde E : tes mains attrapent le rebord.', 'Accroché, maintiens Espace pour te hisser. Tes bras lâchent au bout de 7 secondes.', 'En pleine course, saute et frappe : coup de pied sauté.', 'Marteler réveille plus vite.', 'Un pétard ramassé s\'allume aussitôt : lance-le vite.', 'Avec le parapluie, on plane au-dessus du vide.', 'Quand l\'alarme sonne à l\'incinérateur, quitte les trappes.'] },
+  synapse: { genre: 'reflexion', time: '5 min',
+    keys: [['Espace', 'Frapper sur le temps'], ['← →', 'Trier'], ['Souris', 'Cliquer les cibles'], ['Entrée', 'Valider'], ['Échap', 'Pause']],
+    tips: ['La Session du jour enchaîne les quatre épreuves en 5 minutes.', 'La difficulté monte quand tu réussis plus de 85 % des essais, et redescend sous 75 %.', 'Avec un casque sans fil, fais le « Calage du son » dans les réglages.'] },
 };
-window.HUB_GENRES = [['all', 'Tous'], ['course', 'Course'], ['action', 'Action'], ['strategie', 'Stratégie'], ['party', 'Party'], ['sport', 'Sport'], ['plateau', 'Plateau'], ['aventure', 'Aventure']];
+window.HUB_GENRES = [['all', 'Tous'], ['course', 'Course'], ['action', 'Action'], ['strategie', 'Stratégie'], ['party', 'Party'], ['sport', 'Sport'], ['plateau', 'Plateau'], ['aventure', 'Aventure'], ['reflexion', 'Réflexion']];
