@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 5.176 — 28 novembre 2026
+- **Pokémon Odyssée 3.9** — Finitions Acte 3 & relief complet des arènes :
+  - Icône dédiée pour la **CS03 Éclate-Roc** (`cs-eclate.png`) et bustes HD de dialogue pour le **Professeur Cèdre**, **Maître Mamadou**, les **Gardes** et les **Vieils hommes**
+  - Relief étendu aux arènes de **Port-Azur** (bassins en contrebas), **Port-Lisière** (îles flottantes et passerelles au-dessus du ciel) et **Ombreval** (abîme profond et passerelles d'ombre)
+  - Carrière de **Port-Granit** plus lisible (plateaux en grès et trois niveaux de gradins mieux étagés), contrôlée avec les 12 autres arènes en mode Noir & Blanc
+
 ## 5.175 — 28 novembre 2026
 - Nouveau : Acte 3 — le Musée des Dragons, la Caserne et la Tour de Drakos prennent forme, les arènes de l'archipel ont leurs couleurs (Claude)
   - Cimelune : le Musée des Dragons devient un vrai musée (temple de montagne dehors, galerie de marbre, fresques, vitrines et squelette sur son estrade dedans)

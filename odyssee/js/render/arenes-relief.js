@@ -16,28 +16,40 @@ import { T, walkable } from '../world/tiles.js';
 /** hauteur du dessus de chaque sorte de case, en cases d'écran */
 export const HAUTEURS = {
   estrade: 6 / 32,     // l'estrade du Champion : une marche
+  eau: -8 / 32,        // les bassins de Port-Azur, en contrebas des margelles
   lave: -8 / 32,       // le lac de lave, en contrebas des dalles de basalte
   fosse: -12 / 32,     // une fosse de la carrière, tant qu'un rocher ne l'a pas comblée
   gouffre: -1,         // le gouffre de la Tour de Drakos
+  ciel: -1,            // le vide du ciel sous les îles flottantes de Port-Lisière
+  abime: -1,           // l'abîme d'Ombreval
   pont: 0,             // un pont-dragon : une dalle mince au-dessus du gouffre
+  pont_ciel: 0,        // une passerelle suspendue au-dessus du ciel
+  pont_ombre: 0,       // une passerelle d'ombre éclairée au-dessus de l'abîme
 };
 
 export class ReliefArene {
   /** decosAt : les décors de la carte rangés par case (« x,y » → liste), tenus par la vue */
   constructor(map, decosAt) { this.m = map; this.decosAt = decosAt; }
-  /** sorte de relief d'une case : 'estrade', 'lave', 'fosse', 'gouffre', 'pont', ou null (sol ordinaire, mur, hors carte) */
+  /** sorte de relief d'une case : 'estrade', 'eau', 'lave', 'fosse', 'gouffre', 'ciel', 'abime', 'pont', 'pont_ciel', 'pont_ombre', ou null */
   sorte(x, y) {
     const m = this.m; if (!m.in(x, y)) return null;
     const t = m.get(x, y);
     if (t === T.LAVA) return 'lave';
+    if (t === T.WATER) return 'eau';
     const D = this.decosAt.get(x + ',' + y); if (!D) return null;
-    const marche = walkable(t);
+    const marche = walkable(t), R = m.regs || m.regs0 || [];
+    let abime = false;
     for (const d of D) {
       if (d.k === 'estrade') return 'estrade';
       if (d.k === 'gouffre') return 'gouffre';
+      if (d.k === 'ciel') return 'ciel';
+      if (d.k === 'passerelle_ciel') return 'pont_ciel';
+      if (d.k === 'pont_ombre') return R[d.r] ? 'pont_ombre' : 'abime';
+      if (d.k === 'abime') abime = true;
       if (d.k === 'etat' && d.f === 'gouffre') return marche ? 'pont' : 'gouffre';
       if (d.k === 'etat' && d.f === 'fosse') return marche ? null : 'fosse';
     }
+    if (abime) return 'abime';
     return null;
   }
   /** hauteur du dessus d'une case, en cases d'écran */

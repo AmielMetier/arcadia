@@ -1586,10 +1586,20 @@ export class WorldView {
     for (const [dx, dy, ombre] of [[0, 1, 0.85], [1, 0, 0.7], [-1, 0, 0.7]]) {
       const en = R.h(x + dx, y + dy); if (en >= e - 1e-6) continue;
       const sn = R.sorte(x + dx, y + dy);
-      // matière de la paroi : le chant de l'estrade, la roche de la fosse, le basalte au ras de la lave, la maçonnerie
-      // qui plonge dans le gouffre ; un pont n'est qu'une dalle, le reste de sa paroi est l'ombre du gouffre
-      const est = s === 'estrade' && A['dec_estrade_' + (ESTRADES[this.map.arene] || this.map.arene)];
-      const tex = est || (sn === 'lave' ? A.arf_lave : sn === 'fosse' ? A.arf_fosse : s === 'pont' ? A.arf_pont : A.arf_gouffre);
+      // matière de la paroi : le chant de l'estrade, la roche de la fosse, les bassins, le basalte au ras de la lave,
+      // les îles célestes, l'abîme ou le gouffre ; les ponts et passerelles ne sont que des dalles minces
+      const est = s === 'estrade' && en >= -1e-6 && A['dec_estrade_' + (ESTRADES[this.map.arene] || this.map.arene)];
+      const tex = est || (
+        sn === 'lave' ? A.arf_lave :
+        sn === 'eau' ? A.arf_eau :
+        sn === 'fosse' ? A.arf_fosse :
+        s === 'pont' ? A.arf_pont :
+        s === 'pont_ciel' ? A.arf_pont_ciel :
+        s === 'pont_ombre' ? A.arf_pont_ombre :
+        sn === 'ciel' ? A.arf_ciel :
+        sn === 'abime' ? A.arf_abime :
+        A.arf_gouffre
+      );
       if (!tex) continue;
       const c = est ? ombre * 0.72 : ombre;
       for (let hb = e; hb > en + 1e-6; hb -= 1) {
@@ -1633,7 +1643,7 @@ export class WorldView {
           return 36 / 32;
         };
         const hr = gradin(x, y);
-        box(Wl, x, y, x + 1, y + 1, hr * CASE_ECRAN, A.cavewall, A.cavetop, A.cavewall, { south: gradin(x, y + 1) < hr, east: gradin(x + 1, y) < hr, west: gradin(x - 1, y) < hr, dessus: hr < 0.7 ? 0.8 : hr < 1 ? 0.92 : 1.04 });   // les gradins du haut prennent la lumière
+        box(Wl, x, y, x + 1, y + 1, hr * CASE_ECRAN, A.cavewall, A.arf_carriere_haut || A.cavetop, A.cavewall, { south: gradin(x, y + 1) < hr, east: gradin(x + 1, y) < hr, west: gradin(x - 1, y) < hr, dessus: hr < 0.7 ? 0.68 : hr < 1 ? 0.84 : 1.0 });   // plateau lisible et paliers bien étagés
         continue;
       }
       if (k === 'etat') {

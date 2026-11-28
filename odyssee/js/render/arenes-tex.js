@@ -216,6 +216,51 @@ export function texturesArenes(putImg) {
     T.rect(0, 0, 32, 1, '#e8c860'); T.rect(0, 1, 32, 2, '#8a7ad0'); T.rect(0, 3, 32, 1, '#3a3078'); T.rect(0, 4, 32, 2, '#1a1530');
     for (let i = 3; i < 32; i += 8) T.p(i, 2, '#5a4ea0');
   }));
+  // au ras des bassins (Port-Azur) : margelle claire puis carrelage humide et reflet d'écume (les 8 premières lignes servent)
+  putImg('arf_eau', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#1e3a58');
+    T.rect(0, 0, 32, 1, '#c4d4e4'); T.rect(0, 1, 32, 2, '#5a7c9c'); T.rect(0, 3, 32, 2, '#446484'); T.rect(0, 5, 32, 1, '#324e6e');
+    for (let i = 0; i < 32; i += 8) { T.rect(i, 1, 1, 5, '#3a5878'); T.p(i + 4, 2, '#6e90b0'); }
+    T.rect(0, 6, 32, 1, '#8cc4e8'); T.rect(0, 7, 32, 1, '#c8ecff');
+    for (let i = 2; i < 32; i += 7) T.p(i, 6, '#b8e4fc');
+  }));
+  // Port-Lisière (Vol) : corniche nuageuse/blanche des îles flottantes qui fond dans le bleu du ciel (#9ad0f6)
+  putImg('arf_ciel', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#9ad0f6');
+    T.rect(0, 0, 32, 2, '#ffffff'); T.rect(0, 2, 32, 2, '#d8eefc'); T.rect(0, 4, 32, 3, '#98c8ee'); T.rect(0, 7, 32, 2, '#68a4dc');
+    for (let i = 0; i < 32; i += 8) { T.rect(i + 2, 3, 4, 3, '#b8dcf6'); T.rect(i, 7, 2, 3, '#5490cc'); }
+    for (let j = 9; j < 18; j++) for (let i = 0; i < 32; i++) if ((i + j) % 3 === 0) T.p(i, j, j < 13 ? '#80b8e8' : '#8ec6f2');
+  }));
+  // passerelle suspendue dans le ciel (Port-Lisière) : bois chaud liseré blanc, ciel dessous
+  putImg('arf_pont_ciel', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#9ad0f6');
+    T.rect(0, 0, 32, 1, '#f0f0f0'); T.rect(0, 1, 32, 2, '#c08a50'); T.rect(0, 3, 32, 1, '#8a5a30'); T.rect(0, 4, 32, 1, '#5a7ea8');
+    for (let i = 4; i < 32; i += 6) T.p(i, 2, '#7a4a24');
+  }));
+  // abîme d'Ombreval : assises de pierre sombre violacée fondant vers #06040a (fond dec_abime)
+  putImg('arf_abime', toile(32, 32, (T) => {
+    for (let j = 0; j < 32; j++) for (let i = 0; i < 32; i++) {
+      const r = j >> 3, joint = j % 8 === 0 || (i + (r % 2 ? 8 : 0)) % 16 === 0, k = Math.min(1, j / 24);
+      const mel = (a, b) => Math.round(a + (b - a) * k * k).toString(16).padStart(2, '0');
+      const [cr, cg, cb] = joint ? [0x1c, 0x12, 0x2c] : j % 8 === 1 ? [0x58, 0x46, 0x78] : [0x38, 0x28, 0x54];
+      T.p(i, j, '#' + mel(cr, 0x06) + mel(cg, 0x04) + mel(cb, 0x0a));
+    }
+    T.rect(0, 0, 32, 1, '#7a6898'); T.rect(0, 1, 32, 1, '#5a4a78');
+  }));
+  // passerelle d'ombre d'Ombreval : chant lumineux améthyste, noir de l'abîme dessous
+  putImg('arf_pont_ombre', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#06040a');
+    T.rect(0, 0, 32, 1, '#c08af0'); T.rect(0, 1, 32, 2, '#7a4ab8'); T.rect(0, 3, 32, 1, '#3a1e5a');
+    for (let i = 2; i < 32; i += 6) T.p(i, 1, '#e0b8ff');
+  }));
+  // dessus lisible des gradins de la carrière (Port-Granit) : plateau de grès / calcaire aux strates nettes
+  putImg('arf_carriere_haut', toile(32, 32, (T) => {
+    T.rect(0, 0, 32, 32, '#aa9274');
+    T.rect(0, 0, 32, 2, '#d4be9e'); T.rect(0, 0, 2, 32, '#d4be9e');
+    T.rect(0, 30, 32, 2, '#6a5640'); T.rect(30, 0, 2, 32, '#6a5640');
+    for (const [x, y, l] of [[4, 7, 10], [17, 11, 9], [6, 18, 13], [19, 24, 8]]) T.rect(x, y, l, 1, '#7c664e');
+    for (let k = 0; k < 14; k++) T.p(3 + (k * 7) % 25, 4 + (k * 11) % 24, k % 2 ? '#c4ac8c' : '#8c765c');
+  }));
 
   // ------- Cimelune, le Musée des Dragons : estrade de marbre sous le squelette (gauche, milieu, droite), cordon de velours
   for (const [g, x0, x1] of [['g', 2, 32], ['m', 0, 32], ['d', 0, 30]]) putImg('dec_estrade_musee_' + g, toile(32, 32, (T) => {
