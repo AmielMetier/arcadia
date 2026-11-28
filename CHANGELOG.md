@@ -1,5 +1,25 @@
 # Journal des versions — Arcadia
 
+## 5.175 — 28 novembre 2026
+- Nouveau : Acte 3 — le Musée des Dragons, la Caserne et la Tour de Drakos prennent forme, les arènes de l'archipel ont leurs couleurs (Claude)
+  - Cimelune : le Musée des Dragons devient un vrai musée (temple de montagne dehors, galerie de marbre, fresques, vitrines et squelette sur son estrade dedans)
+  - Fort-Écaille : la Caserne d'Écaille devient un corps de garde (bannières, râteliers, armures, table d'état-major) et l'arène une tour de dragon
+  - Arènes de Port-Granit, Cendrelune et Fort-Écaille : murs et estrade du Champion propres à chacune, répliques propres à chaque dresseur, fond de combat à leurs couleurs (Pyros se bat dans le volcan, sous les cendres)
+  - La lave coule ; les vannes tournées et les statues qui ont rugi se voient
+  - Noir & Blanc : arènes de l'archipel teintées, maisons, Centres et Boutiques des trois îles
+  - Français : Odyssor au masculin partout, accords au féminin pour la joueuse, coquilles corrigées
+- Correction : Acte 3 — le musée, la tour et les îles s'accordent à leur ville et à ce qu'en disent les habitants (Claude)
+  - Musée des Dragons : les deux fresques dont parle le scientifique sont au mur, côte à côte (Odyssor sous la mer étoilée, Lugia qui plonge), autour de la vitrine au crâne de dragon ; plus rien n'est caché derrière la vitrine du fossile
+  - Le musée prend la pierre grise et les lauzes enneigées des maisons de Cimelune
+  - La Tour de Drakos prend la pierre de l'arène Dragon, un chaînage blanc et des coupoles, comme la ville blanche de Fort-Écaille
+  - Noir & Blanc : les maisons des trois îles suivent mieux l'architecture de chacune (ardoise et rose à Port-Granit, toits rouges à Cendrelune, bleu à Fort-Écaille)
+- Nouveau : les arènes prennent du relief — estrade surélevée, lac de lave en contrebas, fosses creusées, vrai gouffre (Claude)
+  - Toutes les arènes : le Champion se tient sur une estrade surélevée d'une marche
+  - Port-Granit : la carrière monte en gradins, les fosses sont de vrais creux tant qu'un rocher ne les a pas comblées
+  - Cendrelune : les dalles de basalte dominent le lac de lave, leur tranche rougie par en dessous ; une coulée figée remonte au niveau des dalles
+  - Fort-Écaille : le gouffre est un vrai vide aux parois de pierre qui plongent dans le noir, les ponts-dragons sont des dalles au-dessus
+  - Les personnages prennent la hauteur de leur case. Rien ne change aux énigmes ni aux sauvegardes : le relief n'est que du dessin, lu dans l'état de chaque case
+
 ## 5.174 — 28 novembre 2026
 - **Synapse** — Nouveau : Synapse, nouveau jeu de réflexes et de rythme (version 5.169) (Nicolas Muratore)
   - Difficulté sur dix niveaux qui suit la réussite du joueur
