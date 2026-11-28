@@ -1,5 +1,21 @@
 # Journal des versions — Arcadia
 
+## 5.174 — 28 novembre 2026
+- **Synapse** — Nouveau : Synapse, nouveau jeu de réflexes et de rythme (version 5.169) (Nicolas Muratore)
+  - Difficulté sur dix niveaux qui suit la réussite du joueur
+  - Tableau de bord dans le navigateur : série de jours, historique, courbes,
+  - Réglages dans le panneau commun : filtre des doubles appuis, calage du son,
+  - Accueil : nouvelle catégorie « Réflexion »
+  - Tools/affiche.html : t2 vide donne un titre en un mot
+- **Synapse** — Nouveau : un habillage plus vivant et plus clair pour les quatre épreuves (Nicolas Muratore)
+  - Chaque épreuve a sa couleur, reprise par le menu, la consigne, la partie et le bilan, et sa petite illustration
+  - Menu : la Session du jour en tête, les jours joués de la semaine, le niveau de chaque épreuve sur dix crans
+  - Consignes en trois étapes illustrées ; bilans avec le score en grand, le niveau, un record signalé
+  - Pendant la partie : un rappel de la consigne en haut (Pulse, Double Tempo), une barre de temps aux couleurs de l'épreuve
+  - Pulse : les signaux arrivent par quatre voies, un anneau se referme sur la cible à chaque temps
+  - Aiguillage : un anneau de temps autour de la figure, qui part du côté choisi ; le bon côté s'éclaire après une erreur
+- **Synapse** — Correction : le niveau de départ est annoncé dans la consigne, le bon côté ne reste plus allumé quand la règle change (Nicolas Muratore)
+
 ## 5.173 — 27 novembre 2026
 - Odyssée 3.8 : correctifs Acte 3 Lot P1 (Dojo, bareme/Rival, arènes 6 & 8, Odyssor, continuité post-Drakos) (Amiel)
 
