@@ -68,7 +68,7 @@ export const MISSIONS = [
   { id: 'mLettre', town: 'C', at: [28, 9], sprite: 'vieil_homme', who: 'Vieux Léon', kind: 'relay', item: 'lettre-mineurs',
     to: { town: 'K', at: [26, 14], sprite: 'habitante', who: 'Mère Ardoise', reward: [['hyper-potion', 3]],
       idle: ['Je suis la mère des trois frères. Drakos, Pyros, Basalte...', 'Ils ne viennent plus me voir. Le continent non plus.'],
-      thanks: ['Une lettre de Pierrefort ? Les mineurs se souviennent de mon Basalte...', 'Mes trois garçons se sont perdus dans la rancune de l\'aîné.', 'Merci, petit. Prends ça. Et si tu les croises, dis-leur que leur mère les attend pour dîner.'],
+      thanks: (st) => ['Une lettre de Pierrefort ? Les mineurs se souviennent de mon Basalte...', 'Mes trois garçons se sont perdus dans la rancune de l\'aîné.', `Merci, petit${st.gender === 'f' ? 'e' : ''}. Prends ça. Et si tu les croises, dis-leur que leur mère les attend pour dîner.`],
       done: (st) => (st.badges[7] ? ['Ils sont venus dîner, tous les trois. Pour la première fois depuis dix ans.'] : ['Basalte m\'a répondu. Les choses changent, je crois.']) },
     ask: (st) => (st.badges[7] || st.flags.drakos)
       ? ['Basalte travaillait ici, avec nous. Le meilleur mineur que j\'aie connu.', 'Sa mère vit toujours à Port-Granit, sur l\'Île de Granit. Maintenant que les îles s\'ouvrent, apporte-lui cette lettre de la part des mineurs !']
@@ -169,7 +169,7 @@ export const MISSIONS = [
     place: [{ route: 'grue1', t: 0.3, side: -1, off: 5 }, { route: 'grue2', t: 0.55, side: 1, off: 5 }, { route: 'grue1', t: 0.85, side: 1, off: 5 }], reward: [['rare-candy', 2]],
     ask: ['La tempête a arraché les trois clochettes de vent du Jardin de la Grue.', 'Les Sages de la Tour Dorée venaient méditer à leur chant... Si tu les trouves, rapporte-les-moi.'],
     again: (st) => [`Il manque encore ${3 - (st.bag.clochette || 0)} clochette${3 - (st.bag.clochette || 0) > 1 ? 's' : ''}...`],
-    thanks: ['Les trois clochettes ! Écoute : le jardin chante de nouveau.', 'Que le vent te porte, voyageur.'], done: ['Ding... Ding... Le jardin respire.'],
+    thanks: (st) => ['Les trois clochettes ! Écoute : le jardin chante de nouveau.', `Que le vent te porte, ${st.gender === 'f' ? 'voyageuse' : 'voyageur'}.`], done: ['Ding... Ding... Le jardin respire.'],
     journal: { name: 'Les clochettes de vent', start: 'Frère Anselme, à Hautegrue, a perdu les trois clochettes de vent du Jardin de la Grue dans la tempête.', end: 'Les trois clochettes chantent de nouveau au Jardin de la Grue.' } },
 
   { id: 'mGlace', town: 'V', at: [9, 18], sprite: 'enfant', who: 'Inuk', kind: 'show', test: has('ice'), reward: [['ice-heal', 3], ['ultra-ball', 2]],
@@ -181,11 +181,11 @@ export const MISSIONS = [
   // après la Ligue : la fin de l'histoire des trois frères et de Théo
   { id: 'mRevanche', town: 'L', at: [22, 5], sprite: 'drakos', who: 'Drakos', kind: 'duel', showIf: 'champion', cat: 'main',
     duel: { cls: 'Champion', name: 'Drakos', bs: 'drakos', team: [[149, 83], [1051, 84], [715, 82], [373, 83], [445, 85], [330, 84]], megaSp: 330, boss: true, prize: 300 },
-    ask: ['Maître de la Ligue, hein ? Célestine a trouvé son successeur.', 'Je t\'avais dit que le vieux Drakos attendait sa revanche. Pas contre elle. Contre toi.', 'Cette fois, mes dragons ne retiendront rien.'],
+    ask: (st) => [`Maître de la Ligue, hein ? Célestine a trouvé ${st.gender === 'f' ? 'celle qui lui succède' : 'son successeur'}.`, 'Je t\'avais dit que le vieux Drakos attendait sa revanche. Pas contre elle. Contre toi.', 'Cette fois, mes dragons ne retiendront rien.'],
     lose: 'Ha ! Je savais que tu ne me ferais pas de cadeau.',
     thanks: ['... Deux fois. Tu m\'as battu deux fois.', 'Ma mère m\'a dit : « Un frère qui perd avec honneur vaut mieux qu\'un roi qui gagne seul. »', 'Les îles sont ouvertes, pour de bon. Prends ceci, Maître.'], reward: [['master-ball', 1]],
     again: (st) => [`Prêt${st.gender === 'f' ? 'e' : ''} pour ma revanche ?`], done: ['Basalte et Pyros t\'ont déjà salué à leur manière, mais les îles se souviendront longtemps de toi, Maître.'],
-    journal: { name: 'La revanche de Drakos', start: 'Drakos m\'a défié à Fort-Écaille : il voulait sa revanche contre le nouveau Maître de la Ligue.', end: 'J\'ai battu Drakos une seconde fois. Les îles sont ouvertes pour de bon.' } },
+    journal: { name: 'La revanche de Drakos', start: (f, g) => `Drakos m'a ${g?.state?.gender === 'f' ? 'défiée' : 'défié'} à Fort-Écaille : il voulait sa revanche contre ${g?.state?.gender === 'f' ? 'la nouvelle' : 'le nouveau'} Maître de la Ligue.`, end: 'J\'ai battu Drakos une seconde fois. Les îles sont ouvertes pour de bon.' } },
 
   { id: 'mTheo', town: 'A', at: [17, 21], sprite: 'theo', who: 'Théo', kind: 'duel', showIf: 'champion', cat: 'main',
     duel: { cls: 'Rival', name: 'Théo', bs: 'theo', team: (st, g) => { const R = g.rivalLine(); return [[1012, 82], [1035, 82], [1022, 83], [1040, 83], [1051, 84], [R[2], 85]]; }, prize: 200 },
@@ -207,7 +207,7 @@ export const MISSIONS = [
   { id: 'mPsyko', town: 'F', at: [20, 8], sprite: 'vieil_homme', who: 'Papi Octave', kind: 'check', test: (st) => !!st.flags.psykoRetrouve, reward: [['rare-candy', 1], ['lum-berry', 2]],
     ask: ['Mon Psykokwak a encore filé ! Il a mal à la tête, alors il marche tout droit sans réfléchir…', 'La dernière fois, je l\'ai retrouvé sur la route 5, à regarder les nuages. Tu pourrais aller voir ?'],
     again: ['Toujours pas de nouvelles de mon Psykokwak ? Il doit traîner sur la route 5…'],
-    thanks: ['Psykokwak ! Te revoilà, gros malin. Tu m\'as fait une de ces peurs.', 'Merci, petit. Prends ça : ça lui sert quand sa migraine le reprend.'], done: ['Psykokwak se tient la tête… C\'est bon signe, il réfléchit !'],
+    thanks: (st) => ['Psykokwak ! Te revoilà, gros malin. Tu m\'as fait une de ces peurs.', `Merci, petit${st.gender === 'f' ? 'e' : ''}. Prends ça : ça lui sert quand sa migraine le reprend.`], done: ['Psykokwak se tient la tête… C\'est bon signe, il réfléchit !'],
     journal: {
       name: 'Le Psykokwak de Papi Octave',
       notes: [
@@ -232,10 +232,10 @@ export const MISSIONS = [
         'Guette les pluies d\'étoiles, la nuit : leurs pierres étincelantes renferment des éclats précieux. Les failles des routes en laissent aussi parfois.',
       ];
     },
-    thanks: [
+    thanks: (st) => [
       'Trois fragments encore vibrants de lumière stellaire ! Regarde comme leur poussière s\'aimante vers la constellation du Dragon.',
       'Selon mes relevés, ces météorites attirent des Pokémon venus des cimes célestes — et même les aurores en amplifient l\'éclat.',
-      'Garde ces pierres astrales pour ton équipe, voyageur.',
+      (st.gender === 'f' ? 'Garde ces pierres astrales pour ton équipe, voyageuse.' : 'Garde ces pierres astrales pour ton équipe, voyageur.'),
     ],
     done: ['Grâce à toi, ma carte du ciel d\'Odyssée est de nouveau fidèle aux étoiles.'],
     journal: {

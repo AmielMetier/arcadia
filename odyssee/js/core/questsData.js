@@ -33,10 +33,10 @@ const QUESTS = [
     started: () => true, done: (f) => !!f.starter && !!f.rival1,
     notes: [
       [() => true, 'Aujourd\'hui commence mon aventure ! Le Prof. Saule m\'attend dans son laboratoire à l\'est de Bourg-Aube pour choisir mon premier Pokémon.'],
-      [(f) => f.metProf, 'Le Professeur Saule m\'a accueilli dans son laboratoire. Il m\'invite à choisir mon tout premier compagnon sur la table.'],
+      [(f) => f.metProf, (f, g) => `Le Professeur Saule m'a accueilli${g?.state?.gender === 'f' ? 'e' : ''} dans son laboratoire. Il m'invite à choisir mon tout premier compagnon sur la table.`],
       [(f) => f.starter, 'J\'ai choisi mon premier partenaire !'],
-      [(f) => f.rival1, 'Théo a pris son Pokémon et m\'a défié dans notre tout premier combat.'],
-      [(f) => f.starter && f.momGift, 'Maman m\'a encouragé et m\'a offert les Chaussures de Course et des Baies Oran. En route vers la Route 1 et l\'Arène de Sylvebourg !']
+      [(f) => f.rival1, (f, g) => `Théo a pris son Pokémon et m'a défié${g?.state?.gender === 'f' ? 'e' : ''} dans notre tout premier combat.`],
+      [(f) => f.starter && f.momGift, (f, g) => `Maman m'a encouragé${g?.state?.gender === 'f' ? 'e' : ''} et m'a offert les Chaussures de Course et des Baies Oran. En route vers la Route 1 et l'Arène de Sylvebourg !`]
     ] },
   /* ---------- les voyages : le vélo et le permis bateau ---------- */
   { id: 'velo', cat: 'npc', name: 'Le vélo de Lucien', giver: 'Lucien',
@@ -83,7 +83,7 @@ const QUESTS = [
   { id: 'freres', cat: 'main', name: 'Les trois frères de l\'archipel', giver: 'Gardes d\'Écaille',
     started: (f, g) => !!(f.granitDock || g.state.badges[5]), done: (f, g) => !!g.state.badges[7],
     notes: [
-      [(f, g) => f.granitDock || g.state.badges[5], 'Sur l\'Île de Granit, on m\'a prévenu : sur l\'archipel, ce n\'est pas la Ligue qui fait la loi, c\'est Drakos.'],
+      [(f, g) => f.granitDock || g.state.badges[5], (f, g) => `Sur l'Île de Granit, on m'a prévenu${g?.state?.gender === 'f' ? 'e' : ''} : sur l'archipel, ce n'est pas la Ligue qui fait la loi, c'est Drakos.`],
       [(f, g) => g.state.badges[5], 'Basalte, le plus jeune des trois frères, m\'a remis le Badge Granit.'],
       [(f, g) => g.state.badges[6], 'Pyros, le frère du milieu, m\'a remis le Badge Braise.'],
       [(f, g) => g.state.badges[7], 'Drakos, l\'aîné, est tombé. Il a promis de rouvrir les ports de l\'archipel.'],
@@ -91,7 +91,7 @@ const QUESTS = [
   { id: 'theo', cat: 'main', name: 'Théo, mon rival', giver: 'Théo',
     started: (f) => !!f.rival1, done: (f) => !!f.mTheo,
     notes: [
-      [(f) => f.rival1, (f, g) => `Théo a pris ${sp(g.rivalLine ? g.rivalLine()[0] : 0)} au labo, juste après moi, et m'a défié sur-le-champ.`],
+      [(f) => f.rival1, (f, g) => `Théo a pris ${sp(g.rivalLine ? g.rivalLine()[0] : 0)} au labo, juste après moi, et m'a défié${g?.state?.gender === 'f' ? 'e' : ''} sur-le-champ.`],
       [(f) => f.rival2, 'Théo m\'a rattrapé sur la route 2. Lui aussi a son premier badge.'],
       [(f) => f.rival3, 'Théo m\'attendait à Floralia, sa « ville porte-bonheur ».'],
       [(f) => f.rival4, (f, g) => `Au Cap Mirage, Théo a voulu vérifier que j'étais prêt${g?.state?.gender === 'f' ? 'e' : ''} pour les îles.`],

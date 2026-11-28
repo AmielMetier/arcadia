@@ -25,6 +25,8 @@ export function choisirModele(b, ctx = {}) {
   const roof = TOITS[b.roof] || TOITS.red, h = hashB(b), n = b.name || '', th = ctx.theme || '';
   const egal = (nom) => { const e = EMPRISES[nom]; return e && e[0] === b.w && e[1] === b.d; };
   let r = null;
+  // monuments nommés : leur propre modèle, avant l'architecture de leur ville
+  if (b.kind === 'bighouse' && /^Musée des Dragons/.test(n) && egal('museeDragons')) return { nom: 'museeDragons', o: { porte: b.door + 0.5 } };
   // maisons ordinaires des villes : l'architecture de la ville (styles-villes.js) ; ?styles=0 remet les anciennes
   if (ctx.ville && !/[?&]styles=0/.test(globalThis.location?.search || '')) { const mv = maisonDeVille(b, ctx.ville); if (mv) return mv; }
   if (b.modele) return { nom: b.modele, o: { toit: roof, ...(b.opts || {}) } };
@@ -36,6 +38,8 @@ export function choisirModele(b, ctx = {}) {
   else if (b.kind === 'center') r = { nom: 'centre', o: {} };
   else if (b.kind === 'mart') r = { nom: 'boutique', o: {} };
   else if (b.kind === 'lab') r = { nom: 'labo', o: {} };
+  // l'arène de Fort-Écaille est la Tour de Drakos : un donjon, pas le portique des autres arènes
+  else if (b.kind === 'gym' && ctx.ville === 'ecaille' && egal('tourDrakos')) r = { nom: 'tourDrakos', o: {} };
   else if (b.kind === 'gym') r = b.w === 8 ? { nom: 'areneVoute', o: { style: 'portique', type: TYPE_ARENE[ctx.typeArene] || 'feu', statue: 'bronze', champion: b.champion } }
     : { nom: 'areneCour', o: { type: TYPE_ARENE[ctx.typeArene] || 'feu' } };
   else if (b.kind === 'league') r = { nom: 'ligue', o: {} };

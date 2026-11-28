@@ -124,20 +124,23 @@ function profondeurGrille(mat, b) {
   mat.customProgramCacheKey = () => 'profondeurGrille';
   return mat;
 }
-/** pack Noir & Blanc : une seule image d'arène ; celles de Voltacité, Floralia et Mirage prennent la teinte de leur
- *  type (on garde la lumière et la saturation de chaque pixel coloré, seule sa teinte change ; gris et blancs intacts) */
-const TEINTES_ARENE = { electric: 48, grass: 115, psychic: 282 };
+/** pack Noir & Blanc : une seule image d'arène ; celles de Voltacité, Floralia, Mirage et des trois frères de l'archipel
+ *  (Port-Granit, Cendrelune, Fort-Écaille) prennent la teinte de leur type : on garde la lumière de chaque pixel coloré,
+ *  seule sa teinte change (gris et blancs intacts). [teinte en degrés, saturation ×, lumière ×] : la roche est brunie
+ *  (moins saturée, plus sombre), le dragon assombri */
+const TEINTES_ARENE = { electric: [48], grass: [115], psychic: [282], rock: [28, 0.5, 0.88], fire: [6, 1.1, 1], dragon: [246, 0.9, 0.82] };
 const _arenesTeintees = new Map();
 function areneTeintee(im, type) {
   const k = type + ':' + im.width; if (_arenesTeintees.has(k)) return _arenesTeintees.get(k);
   const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
   const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0);
-  const d = x.getImageData(0, 0, c.width, c.height), p = d.data, h = TEINTES_ARENE[type] / 360;
+  const [deg, ks = 1, kl = 1] = TEINTES_ARENE[type];
+  const d = x.getImageData(0, 0, c.width, c.height), p = d.data, h = deg / 360;
   for (let i = 0; i < p.length; i += 4) {
     if (!p[i + 3]) continue;
-    const r = p[i] / 255, g = p[i + 1] / 255, bl = p[i + 2] / 255, mx = Math.max(r, g, bl), mn = Math.min(r, g, bl), l = (mx + mn) / 2, ch = mx - mn;
+    const r = p[i] / 255, g = p[i + 1] / 255, bl = p[i + 2] / 255, mx = Math.max(r, g, bl), mn = Math.min(r, g, bl), l0 = (mx + mn) / 2, ch = mx - mn;
     if (ch < 0.12) continue;
-    const s = ch / (1 - Math.abs(2 * l - 1));
+    const s = Math.min(1, ch / (1 - Math.abs(2 * l0 - 1)) * ks), l = l0 * kl;
     const q = l < 0.5 ? l * (1 + s) : l + s - l * s, pp = 2 * l - q;
     const f = (t) => { t = (t + 1) % 1; return t < 1 / 6 ? pp + (q - pp) * 6 * t : t < 0.5 ? q : t < 2 / 3 ? pp + (q - pp) * (2 / 3 - t) * 6 : pp; };
     p[i] = f(h + 1 / 3) * 255; p[i + 1] = f(h) * 255; p[i + 2] = f(h - 1 / 3) * 255;
@@ -878,7 +881,7 @@ export class WorldView {
       case T.LEDGE: return { c: A.ledge }; case T.LEDGE_E: return { c: A.ledgeE }; case T.LEDGE_W: return { c: A.ledgeW };
       case T.CAVEWALL: if (m.outdoor) {
         if (sandFull && (desertCell || (hasNbr4(x, y, (g) => g === T.SAND) && !hasNbr8(x, y, (g) => g === T.GRASS || g === T.TREE || g === T.PINE || (g === T.FLOWER && !sandFlower(x, y)))))) return { c: sandFull };
-        if (theme === 'volcanic' && this.N.cells.lava && hasNbr4(x, y, (g) => g === T.LAVA) && !hasNbr4(x, y, (g) => g === T.ASH || g === T.PATH || g === T.CAVE || T.STAIRS)) return { anim: this.N.cells.lava };
+        if (theme === 'volcanic' && this.N.cells.lava && hasNbr4(x, y, (g) => g === T.LAVA) && !hasNbr4(x, y, (g) => g === T.ASH || g === T.PATH || g === T.CAVE || g === T.STAIRS)) return { anim: this.N.cells.lava };
         // Noir & Blanc : sous la roche d'une montagne qui borde un sentier, le sentier (pas de liseré d'herbe autour du rocher)
         if (A.nbr && A.q_path_f && hasNbr8(x, y, (g) => g === T.PATH || g === T.STAIRS)) return { c: A.q_path_f };
         return { c: A[grassKey] };   // sous les montagnes du dehors
@@ -1601,6 +1604,10 @@ export class WorldView {
       // armoire à fusibles enclenchée : voyant vert ; orbe de Mirage à la couleur de la phase (lune, soleil, étoile)
       if (k === 'armoire_elec') { const r = m.objectAt(x, y)?.a?.set?.[0]; debout(r != null && R[r] ? 'armoire_elec_on' : k); continue; }
       if (k === 'orbe') { debout('orbe_' + ((R[0] || 0) % 3)) || debout(k); continue; }
+      // Cendrelune : une vanne tournée (registre impair) garde son volant incandescent ; Fort-Écaille : la statue qui a
+      // rugi montre l'orientation de son pont (yeux, gemme et runes d'une autre couleur à chaque quart de tour)
+      if (k === 'vanne_lave' || k === 'vanne_lave2') { const r = m.objectAt(x, y)?.a?.inc?.[0]; debout(r != null && (R[r] || 0) % 2 ? k + '_on' : k) || debout(k); continue; }
+      if (k === 'statue_pont') { const r = m.objectAt(x, y)?.a?.inc?.[0], n = r != null ? (R[r] || 0) % 4 : 0; debout(n ? 'statue_pont_' + n : k) || debout(k); continue; }
       // dalle-pétale d'un parterre déjà validé : elle ne répond plus, elle se fige (pétales fanés, liseré vert)
       if (k === 'dalle_petale') { const s2 = m.objectAt(x, y)?.a?.sauf; aPlat(s2 && R[s2.r] === s2.eq ? 'dec_dalle_petale_fige' : 'dec_dalle_petale'); continue; }
       if (k === 'sign' || k === 'gymstatue' || k === 'plant' || k === 'pupitre') { debout(k, k === 'gymstatue' ? 0.66 : 0.6); continue; }
@@ -1875,7 +1882,7 @@ export class WorldView {
       const pick = pris.length ? pris[graine % pris.length] : null;
       if (pick) {
         const [n0, , porte] = pick, teinte = n0 === 'arene' && TEINTES_ARENE[b.typeArene] != null ? b.typeArene : null;
-        // arènes de Voltacité, Floralia et Mirage : l'image du pack reteinte (toit et ornements à la couleur du type)
+        // arènes de Voltacité, Floralia, Mirage et de l'archipel : l'image du pack reteinte (toit et ornements à la couleur du type)
         const n = teinte ? n0 + '_' + teinte : n0, im = teinte ? areneTeintee(BP.images[n0], teinte) : BP.images[n0];
         const t = T3('pack_' + n, () => im); t.flipY = true; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.needsUpdate = true;
         const W = im.width * WPX / 2, H = im.height * HPX / 2;

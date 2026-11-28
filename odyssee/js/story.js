@@ -68,7 +68,7 @@ export async function storyTalk(g, name, n) {
       if (f[q.flag]) { await say(g, q.done, q.who); return true; }
       f['A:' + q.flag] = true;
       if (!st.bag[q.item]) { await say(g, q.ask, q.who); return true; }
-      await g.ui.say(`${st.name} rend le ${itemName(q.item)}.`);
+      await g.ui.say(`${st.name} rend : ${itemName(q.item)}.`);
       g.take(q.item); f[q.flag] = true;
       await say(g, q.thanks, q.who);
       for (const [it, k] of q.reward) await receive(g, it, k);
@@ -93,7 +93,7 @@ export async function storyTalk(g, name, n) {
     }
     case 'giftmon': {
       const q = d.giftmon;
-      if (f[q.flag]) { await say(g, q.done, q.who); return true; }
+      if (f[q.flag]) { await say(g, val(q.done, st), q.who); return true; }
       if (q.need && !q.need(st)) { await say(g, q.pre, q.who); return true; }
       await say(g, q.ask, q.who);
       if (!(await g.ui.yesNo(`Accepter ${SPECIES[q.sp].n} ?`))) { await say(g, 'Oh... Reviens si tu changes d\'avis.', q.who); return true; }

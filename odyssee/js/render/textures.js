@@ -160,6 +160,26 @@ function blit(ctx, img, cx, cy) {
   ctx.drawImage(img, 0, 0, C2, 1, cx + 1, cy, C2, 1); ctx.drawImage(img, 0, C2 - 1, C2, 1, cx + 1, cy + C2 + 1, C2, 1);
   ctx.drawImage(img, 0, 0, 1, C2, cx, cy + 1, 1, C2); ctx.drawImage(img, C2 - 1, 0, 1, C2, cx + C2 + 1, cy + 1, 1, C2);
 }
+/**
+ * Lave qui coule, tirée d'une seule tuile (le sol à 16 px d'Odyssée n'a qu'un dessin de lave) : la tuile glisse en
+ * diagonale d'un huitième de case par image (elle se raccorde à elle-même : huit images font une boucle sans saut),
+ * des veines claires la remontent à contre-courant et l'incandescence respire.
+ */
+function laveFluide(tuile, f) {
+  const c = canvas(C2, C2), x = c.getContext('2d'), d = (f % 8) * C2 / 8;
+  x.imageSmoothingEnabled = false;
+  for (const ox of [d - C2, d]) for (const oy of [d - C2, d]) x.drawImage(tuile, ox, oy);
+  // veines de lave claire : trois bandes sinueuses qui dérivent dans l'autre sens
+  x.globalCompositeOperation = 'lighter';
+  for (let j = 0; j < C2; j += 2) for (let k = 0; k < 3; k++) {
+    const px = ((k * 11 + Math.round(Math.sin((j + f * 4 + k * 9) / C2 * Math.PI * 2) * 3) - (f % 8) * C2 / 8 + j) % C2 + C2) % C2;
+    x.fillStyle = k === 1 ? 'rgba(255, 220, 120, 0.22)' : 'rgba(255, 150, 50, 0.16)'; x.fillRect(px, j, 3, 2); if (px > C2 - 3) x.fillRect(px - C2, j, 3, 2);
+  }
+  // l'incandescence respire sur la boucle
+  x.fillStyle = `rgba(255, 120, 30, ${(0.05 + 0.05 * Math.sin(f / 8 * Math.PI * 2)).toFixed(3)})`; x.fillRect(0, 0, C2, C2);
+  x.globalCompositeOperation = 'source-over';
+  return c;
+}
 const up2 = (src) => { const c = canvas(C2, C2), x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(src, 0, 0, src.width, src.height, 0, 0, C2, C2); return c; };
 /** bordure d'herbe dessinée (32 px) autour d'un chemin : dentelée, avec un liseré sombre, sur les côtés sans voisin */
 function grassEdges32(base, grass, mask, seed) {
@@ -467,7 +487,7 @@ export function buildAnimAtlas() {
   // (32 px, qui se balancent) posées sur l'herbe du jeu ; à défaut, les petites fleurs à 16 px ou celles du tileset
   for (let k = 0; k < 4; k++) keys.push(['flower' + k, (P, f) => flowerCell(P, f >> 1, k % 3), SOL32[`q_flower${k}_f0`] ? ((f) => up2(SOL32[`q_flower${k}_f${(f >> 2) & 1}`])) : HG[HGF[k]] ? ((f) => hgFlower(HGF[k], f, SOL32.grass0)) : F16[k] ? ((f) => { const c = up2(F16[k]); if ((f >> 2) & 1) { const x = c.getContext('2d'), t = canvas(C2, C2); t.getContext('2d').drawImage(c, 0, 0); x.clearRect(0, 0, C2, C2); x.drawImage(t, 0, 0, C2, C2, 0, -1, C2, C2); x.drawImage(t, 0, C2 - 1, C2, 1, 0, C2 - 1, C2, 1); } return c; }) : FL[k] && (() => up2(FL[k]))]);
   for (const [k, hk] of [[4, 'fleur_o'], [5, 'fleur_w']]) if (SOL32[`q_flower${k}_f0`] || HG[hk]) keys.push(['flower' + k, (P, f) => flowerCell(P, f >> 1, k % 3), SOL32[`q_flower${k}_f0`] ? ((f) => up2(SOL32[`q_flower${k}_f${(f >> 2) & 1}`])) : ((f) => hgFlower(hk, f, SOL32.grass0))]);
-  keys.push(['lava', (P, f) => { P.fill('#e85a20'); for (let i = 0; i < 6; i++) { const x = (i * 5 + f * 3) % 16, y = (i * 7 + f) % 16; P.rect(x, y, 3, 1, '#ffb040'); P.p(x + 1, y + 1, '#ffe080'); } P.speck(5, '#b83a10'); }, SOL32.lava0 && ((f) => up2(SOL32['lava' + ((f >> 2) & 1)] || SOL32.lava0))]);
+  keys.push(['lava', (P, f) => { P.fill('#e85a20'); for (let i = 0; i < 6; i++) { const x = (i * 5 + f * 3) % 16, y = (i * 7 + f) % 16; P.rect(x, y, 3, 1, '#ffb040'); P.p(x + 1, y + 1, '#ffe080'); } P.speck(5, '#b83a10'); }, SOL32.lava0 && ((f) => (SOL32.lava1 ? up2(SOL32['lava' + ((f >> 2) & 1)]) : laveFluide(up2(SOL32.lava0), f)))]);
   keys.push(['deep', (P, f) => { const w = PAL.water; P.fill(w[4]); for (let k = 0; k < 3; k++) { const y = (k * 5 + 2) % 16, x0 = (k * 6 + f * 2) % 16; for (let i = 0; i < 3; i++) P.p((x0 + i) % 16, y, w[1]); } }, SOL32.deep0 && ((f) => up2(SOL32['deep' + ((f >> 2) & 1)] || SOL32.deep0))]);
   // tourbillons : grands (2 × 2 cases, deux sens de rotation), remous entre eux, carpes koï (render/relief-tex.js)
   const tbCache = new Map(), tb = (v, f) => { const k = v * 8 + f; if (!tbCache.has(k)) tbCache.set(k, tourbillon(f, v)); return tbCache.get(k); };
@@ -651,6 +671,8 @@ export function setArt({ kits = {}, sols = {}, sol32 = {}, hgss = {}, relief = n
       snow0: 'neige_0', snow1: 'herbes_neige_0', ash0: 'cendre_0', ash1: 'cendre_0', ledge: 'rebord', bridgeNS: 'pont_ns', bridgeEW: 'pont_eo', stairs: 'escalier',
       cliffR: 'falaise', cave0: 'grotte', cave1: 'grotte', lava0: 'lave', deep0: 'profond' };
     for (const [k, v] of Object.entries(alias)) if (s(v)) SOL32[k] = s(v);
+    // une seule tuile de lave à 16 px : pas de seconde image (celle du tileset à 32 px ne lui ressemble pas), la coulée est
+    // animée à partir d'elle (laveFluide)
     SOL32.lava1 = null; SOL32.deep1 = null; SOL16 = true;
   }
   // pack de tuiles Pokémon (Options → Graphismes → Sol du dehors, gfx.js) : ses tuiles de 16 px prennent la place de celles

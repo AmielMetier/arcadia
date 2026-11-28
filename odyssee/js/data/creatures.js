@@ -204,8 +204,8 @@ export const CREATURES = {
     dex: 'Ses ailes immenses comme des voiles le portent au-dessus des nuages. Il ne se pose qu\'au sommet des montagnes.' }),
   1052: C(52, 'Odyssor', 'odyssor', ['flying', 'psychic'], [106, 90, 110, 120, 130, 104], { cr: 3, xp: 300, g: 1, gr: -1, legend: true,
     ls: [[1, 93], [1, 16], [10, 109], [20, 352], [30, 326], [40, 403], [50, 177], [60, 322], [70, 94]],
-    genus: 'Pokémon Voyageuse', h: 52, w: 3990,
-    dex: 'Une baleine céleste qui nage entre la mer et les étoiles. Les marins disent qu\'elle guide ceux qui partent à l\'aventure.' }),
+    genus: 'Pokémon Voyageur', h: 52, w: 3990,
+    dex: 'Ce géant des océans nage entre la mer et les étoiles, telle une baleine céleste. Les marins disent qu\'il guide ceux qui partent à l\'aventure.' }),
   // ---------------------------------------------------------------- nouvelles créatures (2026)
   1053: C(53, 'Lutinelle', 'lutinelle', ['fairy'], [48, 40, 50, 60, 62, 55], { cr: 190, xp: 58, g: 2,
     ls: [[1, 33], [1, 204], [6, 584], [10, 186], [15, 109], [21, 577], [27, 236], [33, 585]], ev: [{ to: 1054, lvl: 32 }], genus: 'Pokémon Lutin', h: 4, w: 18,

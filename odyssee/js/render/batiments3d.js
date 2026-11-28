@@ -3049,6 +3049,97 @@ export function atelier(D) {
     return G;
   };
 
+  /** le Musée des Dragons de Cimelune (6 × 4, porte en x = 2 par défaut) : un temple de montagne. Podium et emmarchement,
+   *  salle de pierre claire derrière une colonnade de marbre (la travée de la porte est plus large), fronton frappé d'un
+   *  médaillon d'or, toit d'ardoise à deux pans ourlé de neige, deux dragons de bronze de part et d'autre des marches */
+  B.museeDragons = ({ toit = '#4a5a72', porte: px = 2.5 } = {}) => {
+    const G = new THREE.Group(), w = 6, cx = 3, y0 = 0.42, H = 2.3;
+    const P = M({ map: TX.pierre('#dcd6c8') }), PS = M({ map: TX.pierre('#b4ac9c') }), MA = M({ map: TX.marbre() }), or = COL('#d8a83a'), bronze = COL('#6a5a3a'), neige = COL('#f4f8fc');
+    // podium, marches devant la porte
+    G.add(at(boite(w, y0, 3.5, PS), cx, y0 / 2, 1.75));
+    for (let k = 0; k < 3; k++) G.add(at(boite(1.9 - k * 0.2, y0 * (3 - k) / 3, 0.5 - k * 0.14, P), px, y0 * (3 - k) / 6, 3.5 + (0.5 - k * 0.14) / 2));
+    // la salle
+    G.add(at(boite(5.2, H, 2.5, P), cx, y0 + H / 2, 1.45));
+    G.add(at(boite(5.26, 0.26, 2.56, PS), cx, y0 + 0.13, 1.45));
+    // colonnade : cinq colonnes, la travée de la porte ouverte
+    for (const x of [px - 2.05, px - 0.95, px + 0.95, px + 2.0, px + 3.05]) {
+      if (x < 0.3 || x > w - 0.3) continue;
+      G.add(at(boite(0.44, 0.12, 0.44, PS), x, y0 + 0.06, 3.18)); G.add(at(cyl(0.15, 0.18, H - 0.24, MA, 10), x, y0 + H / 2, 3.18)); G.add(at(boite(0.46, 0.12, 0.46, PS), x, y0 + H - 0.06, 3.18));
+    }
+    // entablement et frise d'or
+    const yE = y0 + H;
+    G.add(at(boite(w, 0.3, 3.6, PS), cx, yE + 0.15, 1.75)); G.add(at(boite(w + 0.06, 0.07, 3.66, or), cx, yE + 0.3, 1.75));
+    // fronton (devant et derrière) et toit à deux pans, faîtage d'avant en arrière
+    const yT = yE + 0.34, hr = 0.95, sh = new THREE.Shape(); sh.moveTo(-w / 2, 0); sh.lineTo(w / 2, 0); sh.lineTo(0, hr); sh.closePath();
+    for (const [z, ry] of [[3.5, 0], [0.0, Math.PI]]) { const f = new THREE.Mesh(new THREE.ShapeGeometry(sh), P); f.rotation.y = ry; f.castShadow = true; G.add(at(f, cx, yT, z)); }
+    const L = Math.hypot(w / 2 + 0.2, hr), a = Math.atan2(hr, w / 2 + 0.2), TT = M({ map: TX.ardoise(toit) });
+    for (const sgn of [-1, 1]) {
+      const pan = boite(L, 0.1, 3.9, TT); pan.rotation.z = -sgn * a; G.add(at(pan, cx + sgn * (w / 4 + 0.1), yT + hr / 2 + 0.03, 1.75));
+      // la neige tient sur le bas des pans
+      const n1 = boite(L * 0.26, 0.07, 3.94, neige); n1.rotation.z = -sgn * a; G.add(at(n1, cx + sgn * (w / 2 + 0.2 - L * 0.13 * Math.cos(a)), yT + L * 0.13 * Math.sin(a) + 0.1, 1.75));
+    }
+    G.add(at(boite(0.2, 0.12, 4.0, neige), cx, yT + hr + 0.1, 1.75));
+    // médaillon du dragon au fronton
+    { const m = cyl(0.33, 0.33, 0.06, or, 14); m.rotation.x = Math.PI / 2; G.add(at(m, cx, yT + 0.36, 3.53)); const o = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), LUM('#7a5ae0', '#3a1a80')); G.add(at(o, cx, yT + 0.36, 3.56)); }
+    // porte de bronze, fenêtres en arc
+    porte(G, px, 2.71, y0, 1.55, M({ map: TX.bois('#4a3a2a') }), or, 0.9);
+    for (const x of [px - 1.5, px + 1.5, px + 2.55]) if (x > 0.6 && x < w - 0.6) fenArc(G, x, y0 + 1.15, 2.71, 0.42, 0.8, PS);
+    // deux dragons de bronze sur leur socle, au pied des marches
+    for (const sgn of [-1, 1]) {
+      const x = px + sgn * 1.35, z = 3.72;
+      G.add(at(boite(0.46, 0.5, 0.46, PS), x, 0.25, z));
+      G.add(at(cyl(0.1, 0.2, 0.5, bronze, 8), x, 0.75, z)); G.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), bronze), x, 1.08, z + 0.05));
+      for (const c of [-1, 1]) { const corne = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.2, 5), bronze); corne.rotation.z = -c * 0.5; G.add(at(corne, x + c * 0.09, 1.24, z)); const aile = boite(0.3, 0.34, 0.03, bronze); aile.rotation.z = c * 0.6; G.add(at(aile, x + c * 0.22, 0.92, z - 0.08)); }
+    }
+    return G;
+  };
+  /** la Tour de Drakos, arène de Fort-Écaille (8 × 11, portes en x = 3 et 4) : un donjon draconique. Enceinte crénelée à
+   *  quatre tourelles, donjon octogonal de pierre sombre sur deux étages, meurtrières qui luisent, toit d'écailles indigo
+   *  coiffé de deux cornes et d'un œil de dragon, châtelet d'entrée gardé par une tête de dragon ; deux braseros sur le parvis */
+  B.tourDrakos = ({ toit = '#3c3470' } = {}) => {
+    const G = new THREE.Group(), W = 8, cx = 4, cz = 5.0, y0 = 0.45;
+    const P = M({ map: TX.pierre('#6e6884') }), PC = M({ map: TX.pierre('#8f89a6') }), PS = M({ map: TX.pierre('#4a4560') }), TT = M({ map: TX.ardoise(toit) });
+    const or = COL('#d8b45a'), oeil = LUM('#c9a0ff', '#6a2ad0'), braise = LUM('#ff7a40', '#c02a10');
+    const creneaux = (x0, x1, z0, z1, y, mat = PC) => { for (let x = x0; x <= x1 + 0.01; x += 0.62) for (const z of [z0, z1]) G.add(at(boite(0.34, 0.4, 0.34, mat), x, y + 0.2, z)); for (let z = z0 + 0.62; z < z1 - 0.3; z += 0.62) for (const x of [x0, x1]) G.add(at(boite(0.34, 0.4, 0.34, mat), x, y + 0.2, z)); };
+    // socle et enceinte
+    G.add(at(boite(W + 0.3, y0, 10.6, PS), cx, y0 / 2, 5.3));
+    const hE = 2.4;
+    G.add(at(boite(7.0, hE, 8.6, P), cx, y0 + hE / 2, 4.9)); G.add(at(boite(7.1, 0.24, 8.7, PS), cx, y0 + 0.12, 4.9)); G.add(at(boite(7.16, 0.16, 8.76, PC), cx, y0 + hE + 0.02, 4.9));
+    creneaux(0.6, 7.4, 0.7, 9.1, y0 + hE + 0.1);
+    // quatre tourelles d'angle à toit pointu
+    for (const [x, z] of [[0.75, 0.9], [7.25, 0.9], [0.75, 9.0], [7.25, 9.0]]) {
+      G.add(at(cyl(0.68, 0.74, 3.7, P, 10), x, y0 + 1.85, z)); G.add(at(cyl(0.8, 0.8, 0.18, PC, 10), x, y0 + 3.7, z));
+      const c = new THREE.Mesh(new THREE.ConeGeometry(0.86, 1.35, 10), TT); c.castShadow = true; G.add(at(c, x, y0 + 4.45, z));
+      G.add(at(boite(0.12, 0.42, 0.04, oeil), x, y0 + 2.6, z + 0.72));
+    }
+    // le donjon : deux étages octogonaux qui se resserrent
+    let y = y0 + hE;
+    for (const [r, h] of [[2.45, 3.0], [1.85, 2.2]]) {
+      G.add(at(cyl(r * 0.95, r, h, P, 8), cx, y + h / 2, cz)); G.add(at(cyl(r + 0.1, r + 0.1, 0.2, PC, 8), cx, y + h - 0.1, cz)); G.add(at(cyl(r * 0.97, r * 0.97, 0.1, or, 8), cx, y + h - 0.32, cz));
+      // meurtrières sur les pans de face
+      for (const a of [-0.785, 0, 0.785]) G.add(at(boite(0.14, 0.62, 0.05, oeil), cx + Math.sin(a) * r * 0.95, y + h * 0.5, cz + Math.cos(a) * r * 0.9 + 0.04));
+      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; G.add(at(boite(0.32, 0.36, 0.32, PC), cx + Math.sin(a) * (r + 0.02), y + h + 0.18, cz + Math.cos(a) * (r + 0.02))); }
+      y += h;
+    }
+    // toit d'écailles, cornes et œil du dragon
+    { const c = new THREE.Mesh(new THREE.ConeGeometry(1.75, 2.5, 8), TT); c.castShadow = true; G.add(at(c, cx, y + 1.25, cz)); G.add(at(cyl(1.7, 1.7, 0.1, or, 8), cx, y + 0.05, cz)); }
+    for (const sgn of [-1, 1]) { const corne = new THREE.Mesh(new THREE.ConeGeometry(0.2, 1.7, 6), PC); corne.rotation.z = -sgn * 0.75; corne.castShadow = true; G.add(at(corne, cx + sgn * 1.45, y + 1.35, cz)); }
+    G.add(at(cyl(0.04, 0.07, 0.8, or, 6), cx, y + 2.85, cz)); G.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), oeil), cx, y + 3.35, cz));
+    // contreforts en ailes de part et d'autre du donjon
+    for (const sgn of [-1, 1]) { const aile = boite(0.2, 2.6, 1.6, PS); aile.rotation.z = sgn * 0.42; G.add(at(aile, cx + sgn * 2.75, y0 + hE + 1.05, cz)); }
+    // châtelet d'entrée : porte en arc, bannières, tête de dragon aux yeux de braise
+    const zc = 9.9, hC = 3.3;
+    G.add(at(boite(3.4, hC, 1.5, P), cx, y0 + hC / 2, zc)); G.add(at(boite(3.5, 0.18, 1.6, PC), cx, y0 + hC + 0.02, zc)); creneaux(cx - 1.55, cx + 1.55, zc - 0.6, zc + 0.6, y0 + hC + 0.1);
+    porte2(G, cx, zc + 0.76, y0, 2.0, 1.8, '#2a1c3a', or, true);
+    for (const sgn of [-1, 1]) { G.add(at(boite(0.42, 1.5, 0.04, COL(toit)), cx + sgn * 1.35, y0 + 1.75, zc + 0.78)); G.add(at(boite(0.42, 0.1, 0.05, or), cx + sgn * 1.35, y0 + 2.5, zc + 0.79)); G.add(at(boite(0.16, 0.16, 0.05, or), cx + sgn * 1.35, y0 + 1.8, zc + 0.8)); }
+    { const yH = y0 + hC - 0.35; G.add(at(boite(0.9, 0.6, 0.7, PS), cx, yH, zc + 0.95)); G.add(at(boite(0.6, 0.3, 0.5, PS), cx, yH - 0.25, zc + 1.3));
+      for (const sgn of [-1, 1]) { G.add(at(boite(0.14, 0.1, 0.05, braise), cx + sgn * 0.24, yH + 0.1, zc + 1.31)); const corne = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.6, 5), PC); corne.rotation.z = -sgn * 0.6; G.add(at(corne, cx + sgn * 0.5, yH + 0.5, zc + 0.85)); } }
+    // perron et braseros du parvis
+    G.add(at(boite(2.6, y0 * 0.55, 0.5, PC), cx, y0 * 0.275, 10.85));
+    for (const x of [1.5, 6.5]) brasero(G, x, 0, 10.75, 0.8, 0.9);
+    return G;
+  };
+
   // maisons des villes (une architecture par ville) : modèle « maisonVille », réglé par styles-villes.js
   maisonsVilles({ B, TX, tex, hash, mix, S, D, boite, at, M, COL, LUM, cyl, fenetre2, fenArc, porte, portesVitrees, toit4, toitChinois, cheminee, fumee, balustrade, bucher, socle });
 
@@ -3069,5 +3160,5 @@ export const EMPRISES = {
   pagode: [11, 11], tourCendree: [11, 11], pavillon: [8, 7], dojo: [6, 5], tour: [8, 5], tourVerre: [10, 7], tourDeco: [8, 8], bourse: [12, 8], casino: [14, 8], ligue: [30, 14], usinePokeball: [32, 10],
   escalierMontant: [1, 2], escalierDescendant: [1, 2],
   pyramide: [12, 12], temple: [11, 8],
-  centrale: [4, 4], tourMirage: [4, 4],
+  centrale: [4, 4], tourMirage: [4, 4], museeDragons: [6, 4], tourDrakos: [8, 11],
 };
