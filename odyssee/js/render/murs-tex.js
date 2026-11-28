@@ -48,8 +48,8 @@ const STYLES = {
   eclipse: { fond: '#2a2438', motif: '#342c46', motifK: 'pierres', bande: '#6a3aa8', bandeS: '#a070e0', lam: '#1e1a2a', lamC: '#3a2e52', lamS: '#120e1a', cim: '#8a5ad0', pl: '#0a0810', cap: '#181424', capC: '#7a4ac0', fenK: 'ecran', ecran: ['#1a0a2a', '#b07af0'] },
   // la Tour Mirage : pierre dorée, frise de fresques antiques au lieu des fenêtres
   antique: { fond: '#e6d6a8', motif: '#d6c290', motifK: 'pierres', lam: '#b08a4a', lamC: '#d0aa64', lamS: '#8a6a34', cim: '#7a4a9a', pl: '#5a3a1a', cap: '#6a4a2a', capC: '#e8c860', fenK: 'fresque' },
-  // le Musée des Dragons de Cimelune : marbre clair, cimaise d'or, fresques de dragons au lieu des fenêtres
-  musee: { fond: '#ece6da', motif: '#dad2c2', motifK: 'pierres', lam: '#bdb5a6', lamC: '#dad2c4', lamS: '#928a7c', cim: '#c8a040', pl: '#5a5448', cap: '#6e6656', capC: '#e8c860', fenK: 'dragon' },
+  // le Musée des Dragons de Cimelune : marbre clair, cimaise d'or, fresques des légendes (Odyssor, Lugia) au lieu des fenêtres
+  musee: { fond: '#ece6da', motif: '#dad2c2', motifK: 'pierres', lam: '#bdb5a6', lamC: '#dad2c4', lamS: '#928a7c', cim: '#c8a040', pl: '#5a5448', cap: '#6e6656', capC: '#e8c860', fenK: 'legendes' },
   // la Caserne d'Écaille : pierre de taille sombre, bandeau indigo de la garde, bannières au dragon au lieu des fenêtres
   caserne: { fond: '#6a687c', motif: '#565468', motifK: 'pierres', bande: '#3c3470', bandeS: '#d8b45a', lam: '#444254', lamC: '#5e5c70', lamS: '#2c2a38', cim: '#d8b45a', pl: '#16141e', cap: '#2e2c3c', capC: '#9a96b8', fenK: 'banniere' },
   cendre: { fond: '#5a4a44', motif: '#4a3c36', motifK: 'pierres', lam: '#3e322c', lamC: '#5a4a42', lamS: '#2a201c', cim: '#8a6a50', pl: '#1e1612', cap: '#2e2420', capC: '#6a5444' },
@@ -114,6 +114,30 @@ export function texturesMurs(putImg) {
     putImg('cap_' + k, toile((T) => chaperon(T, true)));
     putImg('capv_' + k, toile((T) => chaperon(T, false)));
     // fenêtre (posée sur le haut du mur du fond), avec rideaux pour les maisons
+    // le Musée des Dragons a deux fresques, posées en alternance : celles dont parle le scientifique du musée. La première,
+    // Odyssor, immense, nage sous la mer étoilée ; la seconde (fen_<style>_b), l'oiseau d'argent, Lugia, plonge dans la mer
+    if (S.fenK === 'legendes') {
+      const cadre = (T, ciel, mer) => { haut(T); T.rect(3, 5, 26, 21, S.capC); T.rect(4, 6, 24, 19, ciel); T.rect(4, 17, 24, 8, mer); for (let i = 4; i < 28; i += 3) T.p(i, 17 + (i % 2), '#a8c8e8'); };
+      putImg('fen_' + k, toile((T) => {
+        cadre(T, '#1c2450', '#27508c');
+        for (const [x, y] of [[6, 8], [10, 11], [14, 7], [19, 10], [23, 8], [26, 12], [8, 14], [17, 13]]) T.p(x, y, (x + y) % 3 ? '#f4f0c0' : '#ffffff');
+        // la baleine céleste : dos bleu nuit, ventre clair, nageoire, queue relevée, œil d'or
+        for (let j = 18; j <= 23; j++) for (let i = 7; i <= 23; i++) { const q = ((i - 15) / 8.5) ** 2 + ((j - 20.5) / 2.9) ** 2; if (q <= 1) T.p(i, j, j > 21 ? '#c8dcf0' : q > 0.7 ? '#2a3a8a' : '#4a62c0'); }
+        T.rect(23, 18, 2, 2, '#4a62c0'); T.p(25, 17, '#4a62c0'); T.p(26, 16, '#4a62c0'); T.p(25, 19, '#4a62c0'); T.p(26, 20, '#4a62c0');
+        T.p(10, 20, '#f0d060'); T.rect(13, 23, 3, 1, '#2a3a8a'); for (const x of [12, 15, 18]) T.p(x, 19, '#9ab4f0');
+      }));
+      putImg('fen_' + k + '_b', toile((T) => {
+        cadre(T, '#e4d6ac', '#3a6aa8');
+        T.rect(4, 6, 24, 4, '#f0e6c4');
+        // l'oiseau d'argent en piqué : corps blanc, ailes déployées, ventre et tour de l'œil bleus
+        for (let k2 = 0; k2 < 7; k2++) { T.rect(13 + k2, 9 + k2, 3, 2, '#f4f6fa'); }
+        for (let k2 = 0; k2 < 5; k2++) { T.rect(10 - k2, 9 + k2, 4, 1, '#d8dee8'); T.rect(17 + k2, 7 + k2, 4, 1, '#d8dee8'); }
+        T.rect(19, 15, 2, 2, '#f4f6fa'); T.p(21, 17, '#5a7ad0'); T.p(20, 16, '#27408c'); T.rect(14, 11, 2, 2, '#5a7ad0'); T.p(12, 8, '#f4f6fa'); T.p(11, 7, '#f4f6fa');
+        // gerbe d'écume là où il touche la mer
+        for (const [x, y] of [[20, 18], [22, 17], [23, 19], [19, 19], [24, 18]]) T.p(x, y, '#ffffff');
+      }));
+      continue;
+    }
     putImg('fen_' + k, toile((T) => {
       // écran, fresque, bannière : plus petits que la tuile, posés sur le mur (sans lui, leur tour restait noir)
       if (S.fenK) haut(T);
@@ -124,16 +148,6 @@ export function texturesMurs(putImg) {
         for (let i = 6; i < 26; i++) { T.p(i, Math.round(15 + Math.sin(i * 0.7) * 3), l); T.p(i, Math.round(19 + Math.cos(i * 0.45) * 1.5), l + '80'); }
         for (let i = 7; i < 25; i += 4) T.p(i, 10, l + 'a0');
         T.rect(4, 24, 24, 2, S.capC); return;
-      }
-      // fresque du Musée des Dragons : un dragon indigo ondule au-dessus des cimes enneigées, dans un cadre d'or
-      if (S.fenK === 'dragon') {
-        T.rect(3, 5, 26, 21, S.capC); T.rect(4, 6, 24, 19, '#d9c79a'); T.rect(4, 6, 24, 6, '#e8dcb8');
-        for (const [x, h] of [[7, 6], [14, 9], [22, 7]]) for (let j = 0; j < h; j++) { T.rect(x - j, 25 - h + j, 2 * j + 1, 1, j < 2 ? '#f4f8fc' : '#8a94a8'); }
-        const dos = [[6, 13], [8, 11], [10, 10], [12, 11], [14, 13], [16, 14], [18, 13], [20, 11], [22, 10], [24, 11]];
-        for (const [x, y] of dos) { T.rect(x, y, 2, 2, '#4a3f96'); T.p(x, y - 1, '#8a7ad0'); }
-        T.rect(24, 9, 3, 3, '#4a3f96'); T.p(26, 9, '#e8c860'); T.p(27, 11, '#d84a3a'); T.p(5, 14, '#4a3f96');
-        for (const x of [11, 19]) { T.p(x, 8, '#6a5cc0'); T.p(x + 1, 7, '#6a5cc0'); T.p(x + 2, 8, '#6a5cc0'); }
-        return;
       }
       // bannière de la Garde d'Écaille : étoffe indigo à pointe, liseré d'or, écaille brodée
       if (S.fenK === 'banniere') {

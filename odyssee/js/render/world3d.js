@@ -706,7 +706,9 @@ export class WorldView {
     const anciens = typeof location !== 'undefined' && /[?&]anciensmurs/.test(location.search);   // comparaison avant / après
     this.murStyle = sm && !anciens && this.A?.cells?.['murh_' + sm] ? sm : null;
     this.fenetres = new Set();
-    if (this.murStyle && map.w > 6 && !(this.murStyle === 'center' && this.A?.cells?.clounge)) {
+    // une carte peut imposer les colonnes de ses fenêtres (les deux fresques du Musée des Dragons, côte à côte)
+    if (this.murStyle && Array.isArray(map.fenetresMur)) for (const x of map.fenetresMur) this.fenetres.add(x);
+    else if (this.murStyle && map.w > 6 && !(this.murStyle === 'center' && this.A?.cells?.clounge)) {
       // fenêtres sur le haut du mur du fond, là où rien ne s'adosse au mur
       const libres = []; for (let x = 2; x < map.w - 2; x++) if (map.get(x, 1) === T.WALL && map.get(x, 2) === T.FLOOR && !map.deco.some((d) => d.x === x && d.y === 2)) libres.push(x);
       const n = map.w >= 12 ? 3 : 2;
@@ -1510,7 +1512,7 @@ export class WorldView {
    *  latéraux en vrais volumes coiffés d'un chaperon, mur du bas en muret ; renvoie false pour les autres murs */
   murCell(Wl, x, y, wallH) {
     const m = this.map, A = this.A.cells, st = this.murStyle, W = (a, b) => m.get(a, b) === T.WALL;
-    const haut = A['murh_' + st], bas = A['murb_' + st], cap = A['cap_' + st], capv = A['capv_' + st] || cap, fen = A['fen_' + st];
+    const haut = A['murh_' + st], bas = A['murb_' + st], cap = A['cap_' + st], capv = A['capv_' + st] || cap, fen = A['fen_' + st], fenB = A['fen_' + st + '_b'];
     const face = (x0, x1, z, h) => {
       Wl.quad([x0, 0, z], [x1, 0, z], [x1, h / 2, z], [x0, h / 2, z], bas[0], bas[1], bas[2], bas[3], 1);
       Wl.quad([x0, h / 2, z], [x1, h / 2, z], [x1, h, z], [x0, h, z], haut[0], haut[1], haut[2], haut[3], 1);
@@ -1519,7 +1521,11 @@ export class WorldView {
     if (y <= 1) {
       if (!W(x, y + 1)) {
         face(x, x + 1, y + 1, wallH);
-        if (this.fenetres.has(x) && fen) Wl.quad([x, wallH * 0.5, y + 1.004], [x + 1, wallH * 0.5, y + 1.004], [x + 1, wallH, y + 1.004], [x, wallH, y + 1.004], fen[0], fen[1], fen[2], fen[3], 1);
+        if (this.fenetres.has(x) && fen) {
+          // style à deux dessins (fen_<style>_b) : ils alternent le long du mur, de gauche à droite
+          const f = fenB && [...this.fenetres].sort((a, b) => a - b).indexOf(x) % 2 ? fenB : fen;
+          Wl.quad([x, wallH * 0.5, y + 1.004], [x + 1, wallH * 0.5, y + 1.004], [x + 1, wallH, y + 1.004], [x, wallH, y + 1.004], f[0], f[1], f[2], f[3], 1);
+        }
       }
       dessus(wallH);
       return true;

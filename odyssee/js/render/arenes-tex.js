@@ -502,7 +502,7 @@ const SPR = {
   // (statue_pont_1 à _3 : les trois autres orientations du pont), et un halo l'entoure
   statue_pont: [32, 48, (T) => statuePont(T, 0)],
   statue_pont_1: [32, 48, (T) => statuePont(T, 1)], statue_pont_2: [32, 48, (T) => statuePont(T, 2)], statue_pont_3: [32, 48, (T) => statuePont(T, 3)],
-  // Cimelune, le Musée des Dragons : vitrine au crâne de dragon, écaille géante sur son présentoir
+  // Cimelune, le Musée des Dragons : vitrine au crâne de dragon
   vitrine_dragon: [32, 44, (T) => {
     T.rect(3, 28, 26, 16, '#d8d4cc'); T.rect(3, 28, 26, 2, '#f4f0e8'); T.rect(3, 42, 26, 2, '#9a968e'); T.rect(11, 33, 10, 4, '#b08a3a'); T.rect(12, 34, 8, 1, '#e8c860');
     T.rect(4, 5, 24, 23, '#c8e8f870'); T.cadre(4, 5, 24, 23, '#b08a3a');
@@ -511,11 +511,6 @@ const SPR = {
     T.disque(22, 21, 4, 3, '#e4d8ba'); T.disque(13, 18, 2, 2, '#4a4032'); T.ligne(9, 15, 5, 9, '#e8dcc0'); T.ligne(13, 14, 11, 8, '#e8dcc0');
     for (const x of [17, 20, 23]) T.rect(x, 23, 1, 3, '#fffbee');
     T.ligne(7, 9, 11, 6, '#ffffff'); T.ligne(7, 13, 14, 6, '#ffffffa0');
-  }],
-  ecaille_geante: [32, 44, (T) => {
-    T.rect(8, 34, 16, 10, '#d8d4cc'); T.rect(8, 34, 16, 2, '#f4f0e8'); T.rect(6, 42, 20, 2, '#9a968e'); T.rect(15, 28, 2, 6, '#b08a3a');
-    T.disque(16, 16, 10, 13, null, (i, j, q) => (q > 0.82 ? '#231d3e' : (i + j) % 7 === 0 ? '#8a7ad0' : i < 13 ? '#6a5cc0' : j > 20 ? '#3a3078' : '#4a3f96'));
-    T.ligne(16, 5, 16, 27, '#2e2660'); T.ligne(11, 9, 14, 13, '#b0a4f0'); T.p(12, 8, '#ffffff');
   }],
   // Fort-Écaille, la Caserne d'Écaille : râtelier de hallebardes, armure de garde, mannequin d'entraînement, table d'état-major
   ratelier: [32, 46, (T) => {
